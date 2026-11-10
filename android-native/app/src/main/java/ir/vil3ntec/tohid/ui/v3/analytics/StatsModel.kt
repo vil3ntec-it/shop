@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ui.v3.analytics
 import ir.vil3ntec.tohid.core.calendar.BusinessDay
 import ir.vil3ntec.tohid.core.calendar.CivilDays
 import ir.vil3ntec.tohid.core.calendar.SolarHijri
+import ir.vil3ntec.tohid.core.calendar.WeekRules
 import ir.vil3ntec.tohid.data.ReportEngine
 import ir.vil3ntec.tohid.data.ShopData
 
@@ -32,11 +33,11 @@ data class HourBin(val hour: Int, val span: Int, val count: Int, val net: Double
  */
 object StatsModel {
 
-  /** بازه‌های ستون‌ها، قدیمی اول و بازهٔ جاری آخر */
-  fun buckets(period: StatsPeriod, today: String): List<Pair<String, String>> = when (period) {
+  /** بازه‌های ستون‌ها، قدیمی اول و بازهٔ جاری آخر؛ هفته از آغازِ هفتهٔ دکان (`rules`، پیش‌فرض شنبه) */
+  fun buckets(period: StatsPeriod, today: String, rules: WeekRules = WeekRules()): List<Pair<String, String>> = when (period) {
     StatsPeriod.DAY -> (period.count - 1 downTo 0).mapNotNull { back -> CivilDays.addDays(today, -back)?.let { it to it } }
     StatsPeriod.WEEK -> {
-      val start = BusinessDay.weekStartOf(today)
+      val start = BusinessDay.weekStartOf(today, rules)
       if (start == null) emptyList() else (period.count - 1 downTo 0).mapNotNull { back ->
         val from = CivilDays.addDays(start, -7 * back) ?: return@mapNotNull null
         val to = CivilDays.addDays(from, 6) ?: return@mapNotNull null
@@ -63,23 +64,24 @@ object StatsModel {
     }
   }
 
-  fun bars(d: ShopData, period: StatsPeriod, today: String): List<StatsBar> =
-    buckets(period, today).map { (from, to) -> ReportEngine.sales(d, from, to).let { StatsBar(from, to, it.net, it.count) } }
+  fun bars(d: ShopData, period: StatsPeriod, today: String, rules: WeekRules = WeekRules()): List<StatsBar> =
+    buckets(period, today, rules).map { (from, to) -> ReportEngine.sales(d, from, to).let { StatsBar(from, to, it.net, it.count) } }
 
   /** «مصارف و خرید» ِ یک بازه — مصارفِ `ReportEngine.sales` + جمعِ `ReportEngine.purchases` */
   fun spend(d: ShopData, from: String, to: String): Double =
     ReportEngine.sales(d, from, to).expenses + ReportEngine.purchases(d, from, to).total
 
   /**
-   *  هفتهٔ دکان (از شنبه، `BusinessDay`) تا امروز: کدام روز فروش داشت؛ روزهای آینده جدا. LOC-03: روزِ تعطیلِ
-   *  `WeekRules` (جمعه) که گذشته و فروش نداشت «تعطیل» است، نه «بی فروش»؛ جمعه‌ای که فروخت همان روزِ فروش.
+   *  هفتهٔ دکان (از آغازِ هفتهٔ `rules`، پیش‌فرض شنبه، `BusinessDay`) تا امروز: کدام روز فروش داشت؛ روزهای آینده جدا.
+   *  LOC-03: روزِ تعطیلِ `rules` (پیش‌فرض جمعه) که گذشته و فروش نداشت «تعطیل» است، نه «بی فروش»؛ روزِ تعطیلی که
+   *  فروخت همان روزِ فروش.
    */
-  fun streak(d: ShopData, today: String): List<StreakDay> {
-    val start = BusinessDay.weekStartOf(today) ?: return emptyList()
+  fun streak(d: ShopData, today: String, rules: WeekRules = WeekRules()): List<StreakDay> {
+    val start = BusinessDay.weekStartOf(today, rules) ?: return emptyList()
     return (0 until 7).mapNotNull { i ->
       val day = CivilDays.addDays(start, i) ?: return@mapNotNull null
       val sold = day <= today && ReportEngine.sales(d, day, day).count > 0
-      StreakDay(day, sold = sold, future = day > today, closed = day <= today && !sold && !BusinessDay.isWorkingDay(day))
+      StreakDay(day, sold = sold, future = day > today, closed = day <= today && !sold && !BusinessDay.isWorkingDay(day, rules))
     }
   }
 

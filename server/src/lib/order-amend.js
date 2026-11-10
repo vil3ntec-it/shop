@@ -236,6 +236,7 @@ async function applyIn(c, shopId, row, p, at) {
     [shopId, row.id, p.subtotalMinor, p.totalMinor, p.itemsCount, at]
   );
   await require('./delivery-due').syncIn(c, shopId, row.id, at);   //  DLV-11: پیکِ سپرده‌شده جمعِ تازه را می‌گیرد
+  await require('./stock-reserve').syncOrderIn(c, shopId, row.id, at);   //  O-06 = ب: نگه‌داشته هم‌اندازهٔ قلم‌های تازه
 }
 
 const amounts = (p) => ({
@@ -328,6 +329,7 @@ async function propose(shopId, id, { key, body, actor }) {
       await event(c, shopId, row, actor, {
         type: TYPES.applied, ...common, consent: { ...p.consent, by: 'staff' }, settlement: settlementOf(row, pl),
       }, p, at);
+      await require('./delivery-prefs').dropStaleTenderIn(c, shopId, row.id, at);   //  CHK-24: اسکناسی که جمعِ تازه نمی‌پذیرد
     }
     return { replayed: false, amendId };
   });
@@ -380,6 +382,7 @@ async function decide(shopId, id, amendId, decision, actor) {
     await event(c, shopId, row, actor, {
       type: TYPES.closed, amendId, outcome: 'applied', consent: { via: 'link', by: 'customer' }, settlement: settlementOf(row, it),
     }, {}, at);
+    await require('./delivery-prefs').dropStaleTenderIn(c, shopId, row.id, at);   //  CHK-24: اسکناسی که جمعِ تازه نمی‌پذیرد
     return { status: 'applied', unchanged: false };
   });
 }

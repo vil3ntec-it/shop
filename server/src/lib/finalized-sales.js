@@ -7,8 +7,13 @@
  *
  *   enforce  دستگاهی که زنجیره دارد (ردیفی در `device_chain_heads` ِ همین دکان) و درِ مستقیمِ API (`routes/data.js`)
  *            ⇒ رد با `sale_finalized_edit_forbidden` (v1: همان op «rejected»؛ API: ۴۰۹ و هیچ نوشتنی) + رویداد.
- *   log      دستگاهِ بی زنجیره (برنامهٔ کهنه، وب) و راهِ قدیمِ `/api/sync` ⇒ همان امروز می‌نشیند، فقط رویداد —
- *            «قاعدهٔ سازگاری» (F0-02: راهِ قدیم برای برنامهٔ کهنه باز می‌ماند) و «زنجیره هرگز فروش را نمی‌بندد».
+ *            «دستگاهِ زنجیره‌دار» = شناسهٔ ادعاشده **یا دستگاهِ خودِ نشست** (`tokens.device_id` ⇐ `devices.device_uid`،
+ *            سرور-مرجع): شناسهٔ دستگاه در بدنه از کاربر است و بی پرچمِ `sync.device_bind` فقط ثبت می‌شود ⇒ پیش‌تر
+ *            نشستِ دستگاهِ زنجیره‌دار با یک `device_id` ِ تازه به `log` می‌رسید و فاکتورِ ثبت‌شده را سرِ جا عوض می‌کرد
+ *            (SEC-03). راهِ قدیمِ `/api/sync` هم همین: نشست یا شناسهٔ زنجیره‌دار ⇒ `enforce` (۴۰۹، کلِ دسته).
+ *   log      دستگاهِ بی زنجیره (برنامهٔ کهنه، وب) و راهِ قدیمِ `/api/sync` با نشست و شناسهٔ بی زنجیره ⇒ همان امروز
+ *            می‌نشیند، فقط رویداد — «قاعدهٔ سازگاری» (F0-02: راهِ قدیم برای برنامهٔ کهنه باز می‌ماند) و «زنجیره هرگز
+ *            فروش را نمی‌بندد».
  * رویداد: `security.doc_chain` با `problem = finalized_edit` (یک ردیف برای هر فاکتور در هر نوشتن).
  *
  * ── محتوای مالی (عوض نمی‌شود؛ همان مقدار دوباره = «همان») ─────────────────────────────────────
@@ -168,10 +173,15 @@ function itemChanges(cur, fields, { full = false } = {}) {
 /** پرچمِ دکان — همان `orders.flagOf` (دکان بر `all` جلو؛ فقط `true`) */
 const flagOn = (shopId) => require('./orders').flagOf(shopId, FLAG);
 
-async function chainDevice(shopId, deviceId) {
-  if (!deviceId) return false;
-  return !!(await db.one('SELECT 1 AS ok FROM device_chain_heads WHERE shop_id=$1 AND device_id=$2 LIMIT 1', [shopId, deviceId]));
+/** یکی از این شناسه‌ها (ادعاشده، دستگاهِ نشست) در همین دکان زنجیره دارد؟ خالی‌ها کنار. */
+async function chainDevice(shopId, ...deviceIds) {
+  const ids = [...new Set(deviceIds.filter((d) => typeof d === 'string' && d))];
+  if (!ids.length) return false;
+  return !!(await db.one('SELECT 1 AS ok FROM device_chain_heads WHERE shop_id=$1 AND device_id = ANY($2::text[]) LIMIT 1', [shopId, ids]));
 }
+
+/** دستگاهِ خودِ نشست (`req.sync.deviceUid`؛ سرور-مرجع، نه بدنه) ⇐ شناسه یا '' */
+const boundOf = (ctx) => (ctx && typeof ctx.deviceUid === 'string' ? ctx.deviceUid : '');
 
 /**
  * نگهبانِ یک نوشتن. `rowOf(c, table, id)` ⇐ دادهٔ ردیفِ زنده یا null، `firstInsert(c, saleId)` ⇐ {device, ts} یا null.
@@ -388,7 +398,7 @@ async function v1Guard(ctx, deviceId, ops, { ip = '' } = {}) {
   const shopId = ctx.accountId;
   return new Guard({
     ctx, deviceId, path: 'v1', merges, ip,
-    mode: (await chainDevice(shopId, deviceId)) ? 'enforce' : 'log',
+    mode: (await chainDevice(shopId, deviceId, boundOf(ctx))) ? 'enforce' : 'log',
     rowOf: v1RowOf(shopId),
     firstInsert: async (c, saleId) => {
       const r = (await c.query(
@@ -439,8 +449,10 @@ const LEGACY = Object.freeze({ sales: 'sales', saleItems: 'sale_items', debtors:
 /**
  * نگهبانِ `sync.pushChanges` ⇐ Guard یا null. `mode`: `log` برای `/api/sync` (برنامهٔ کهنه، F0-02)،
  * `enforce` برای `routes/data.js` (درِ مستقیمِ API — هیچ برنامه‌ای از آن نمی‌نویسد).
+ * `boundDevice`: دستگاهِ خودِ نشست (`req.device.device_uid`). `log` با شناسهٔ ادعاشده یا نشستِ زنجیره‌دار ⇐ `enforce`
+ * (راه همان `legacy`): برنامهٔ تازه از راهِ قدیم نمی‌نویسد (F0-02)، پس این فقط دورزدنِ نگهبانِ v1 است.
  */
-async function legacyGuard({ shopId, userId = '', deviceId = '', ip = '' }, mode, changes) {
+async function legacyGuard({ shopId, userId = '', deviceId = '', boundDevice = '', ip = '' }, mode, changes) {
   if (!shopId || !mode || !Array.isArray(changes)) return null;
   if (!changes.some((r) => r && SALE_TABLES.has(String(r.collection || '')))) return null;
   if (!(await flagOn(shopId))) return null;
@@ -448,8 +460,10 @@ async function legacyGuard({ shopId, userId = '', deviceId = '', ip = '' }, mode
   for (const r of changes) {
     if (r && r.collection === 'debtors' && isPlainObject(r.data) && hasOwn(r.data, 'mergedInto')) merges.set(String(r.id || ''), r.data.mergedInto);
   }
+  const path = mode === 'enforce' ? 'api' : 'legacy';
+  const enforce = mode === 'enforce' || (await chainDevice(shopId, deviceId, boundDevice));
   return new Guard({
-    ctx: { accountId: shopId, userId }, deviceId, mode, path: mode === 'enforce' ? 'api' : 'legacy', merges, ip,
+    ctx: { accountId: shopId, userId }, deviceId, mode: enforce ? 'enforce' : 'log', path, merges, ip,
     rowOf: async (c, collection, id) => {
       const r = (await c.query(
         `SELECT data FROM ${LEGACY[collection]} WHERE shop_id=$1 AND id=$2 AND deleted = false`, [shopId, id]

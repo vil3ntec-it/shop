@@ -283,14 +283,38 @@ test('CHK-24 مشتری: ویرایشِ سفارشِ ویترینِ خودش ب�
   //  صفحهٔ پیگیری: «دستورِ تحویل» با نسخه و «ویرایش‌پذیر؟»؛ ⛔ بی نشانی و نشانه
   const track = async () => (await h.get(`/api/store/${slug}/orders/${token}`)).body.order;
   const p0 = (await track()).deliveryPrefs;
-  assert.deepEqual(Object.keys(p0).sort(), ['callBeforeArrival', 'editable', 'leaveWith', 'version']);
-  assert.deepEqual([p0.editable, p0.callBeforeArrival, p0.leaveWith], [true, false, '']);
+  //  `cashTenderMinor`: اسکناسِ خودِ مشتری تا برنامهٔ خرید «با کدام اسکناس…» را پُر کند (ذخیرهٔ کادرِ دیگر آن را پاک نکند)
+  assert.deepEqual(Object.keys(p0).sort(), ['callBeforeArrival', 'cashTenderMinor', 'editable', 'leaveWith', 'version']);
+  assert.deepEqual([p0.editable, p0.callBeforeArrival, p0.leaveWith, p0.cashTenderMinor], [true, false, '', 50_000]);
   assert.ok(!JSON.stringify(await track()).includes('پشتِ مسجد'), 'نمای مشتری نشانه ندارد');
   const url = (t) => `/api/store/${slug}/orders/${t}/delivery`;
   const r = await h.api('POST', url(token), { body: { delivery: { callBeforeArrival: true, leaveWith: 'دربان' }, expectedVersion: p0.version } });
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.deepEqual([r.body.order.deliveryPrefs.callBeforeArrival, r.body.order.deliveryPrefs.leaveWith], [true, 'دربان']);
   assert.ok(r.body.order.deliveryPrefs.version > p0.version, 'نسخه بالا رفت');
+  assert.equal(r.body.order.deliveryPrefs.cashTenderMinor, 50_000, 'کلیدِ نیامده (اسکناس) دست نمی‌خورد');
+  //  برنامهٔ خرید (CHK-24 + CHK-14): اسکناس پس از ثبت با همین در و همان قاعده؛ ۲۹۰ افغانی ⇒ ۳۰۰/۵۰۰/۱۰۰۰ (بردارِ cash-tender-v1)
+  const v1 = r.body.order.deliveryPrefs.version;
+  const cash = (m, v) => h.api('POST', url(token), { body: { delivery: { cashTenderMinor: m }, expectedVersion: v } });
+  for (const [m, code] of [[20_000, 'cash_tender_short'], [29_000 + 100_000, 'cash_tender_excess'], [30_050, 'bad_cash_tender'], ['30000', 'bad_cash_tender']]) {
+    const x = await cash(m, v1);
+    assert.equal(x.status, 400, `${m}: ${JSON.stringify(x.body)}`);
+    assert.equal(x.body.error.code, code, String(m));
+  }
+  const t1 = await cash(30_000, v1);
+  assert.equal(t1.status, 200, JSON.stringify(t1.body));
+  assert.deepEqual([t1.body.order.deliveryPrefs.cashTenderMinor, t1.body.order.deliveryPrefs.leaveWith], [30_000, 'دربان']);
+  assert.equal((await staffView()).delivery.cashTenderMinor, 30_000, 'پیک همان اسکناسِ تازه را می‌بیند');
+  const v2 = t1.body.order.deliveryPrefs.version;
+  //  پاسخِ گم‌شده و تکرار: با نسخهٔ کهنه ⇒ ۴۰۹ (دو ویرایشِ گوناگون روی یک نسخه هرگز)؛ همان مقدار با نسخهٔ تازه ⇒ بی تغییر
+  const replay = await cash(50_000, v1);
+  assert.deepEqual([replay.status, replay.body.error.code, replay.body.error.version], [409, 'version_conflict', v2]);
+  const same = await cash(30_000, v2);
+  assert.deepEqual([same.status, same.body.unchanged, same.body.order.deliveryPrefs.version], [200, true, v2]);
+  const none = await cash(null, v2);
+  assert.equal(none.status, 200, JSON.stringify(none.body));
+  assert.equal(none.body.order.deliveryPrefs.cashTenderMinor, null, '«پول خرد لازم نیست» ⇒ برداشته');
+  assert.equal((await track()).deliveryPrefs.cashTenderMinor, null);
   //  نسخهٔ کهنه ⇒ ۴۰۹ (دو صفحهٔ باز هم‌دیگر را بی‌صدا رونویسی نمی‌کنند)
   const stale = await h.api('POST', url(token), { body: { delivery: { leaveWith: 'همسایه' }, expectedVersion: p0.version } });
   assert.equal(stale.status, 409, JSON.stringify(stale.body));

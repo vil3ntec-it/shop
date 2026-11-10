@@ -191,12 +191,18 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState, onOpen: (String) -> Un
   val (from, to) = if (keys && shift != 0) ReportKeys.range(span.name, baseFrom, baseTo, shift, today) else baseFrom to baseTo
   val lineSeller = remember { ir.vil3ntec.tohid.data.LineSellerPref.on(context) } // POS-23: فروشندهٔ هر ردیف
   val base = remember(d, rep, from, to) { ReportCsv.of(rep.key, d, from, to, today, reminderTemplate).let { ReportCsv.lineSellers(it, rep.key, d, from, to, lineSeller) } }
-  //  RPT-13: «مقایسه» ⇒ ستونِ «دورهٔ قبل» و «تغییر» در خودِ جدول (فقط برگهٔ کلیددار؛ چاپ و اکسل همان جدول)
+  //  RPT-13: «مقایسه» ⇒ ستونِ «دورهٔ قبل» و «تغییر» در خودِ جدول (چاپ و اکسل همان جدول): برگهٔ کلیددار ردیف‌به‌ردیف، برگهٔ
+  //  فهرستیِ سند (فاکتور، خرید، مصرف) گروه‌شده با روشِ پرداخت/تأمین‌کننده/دسته (`ReportCsv.compareGroup`)
   val sheet = remember(base, keys, compare, span, from, to) {
-    val prev = if (keys && compare && rep.ranged && ReportCsv.compareColumn(rep.key) != null)
+    val keyed = ReportCsv.compareColumn(rep.key) != null
+    val prev = if (keys && compare && rep.ranged && (keyed || ReportCsv.compareGroup(rep.key) != null))
       ir.vil3ntec.tohid.core.report.ReportPeriod.shift(ReportKeys.unitOf(span.name), from, to, -1, today) else null
     if (prev == null) base
-    else ReportCsv.compared(rep.key, base, ReportCsv.of(rep.key, d, prev.from, prev.to, today, reminderTemplate).let { ReportCsv.lineSellers(it, rep.key, d, prev.from, prev.to, lineSeller) }, StrReach.prevColumn, StrReach.changeColumn)
+    else {
+      val past = ReportCsv.of(rep.key, d, prev.from, prev.to, today, reminderTemplate).let { ReportCsv.lineSellers(it, rep.key, d, prev.from, prev.to, lineSeller) }
+      if (keyed) ReportCsv.compared(rep.key, base, past, StrReach.prevColumn, StrReach.changeColumn)
+      else ReportCsv.comparedList(rep.key, base, past, StrReports.colCount, StrReach.prevColumn, StrReach.changeColumn)
+    }
   }
   //  «پرسشِ ساده» برگه ندارد: Ctrl+P/Ctrl+E آن‌جا کاری نمی‌کنند
   fun print() { if (rep != DeskRep.ASK) { onExport(rep.key); ReportPrint.print(context, sheet, sheet.name) } }

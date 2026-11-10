@@ -83,6 +83,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.storefront.media', scope: 'shop', default: false, what: 'لوگو و تصویرِ سرِ ویترین (M3)' },
   { key: 'shop.storefront.promos', scope: 'shop', default: false, what: 'کدِ تخفیف و تخفیفِ خودکار/زمان‌دارِ ویترین (MKT-01/09)' },
   { key: 'shop.storefront.promo_guard', scope: 'shop', default: false, what: 'تخفیفِ اولین خرید و سدِ سوءاستفاده از تخفیف (MKT-02، RSK-09)؛ با `shop.storefront.promos`' },
+  { key: 'shop.storefront.promo_groups', scope: 'shop', default: false, what: 'تخفیفِ گروهِ مشتری در ویترین فقط با گروهِ قرض‌دارِ همان شمارهٔ تأییدشده (PRM-11)؛ با `shop.storefront.promos`' },
   { key: 'shop.storefront.campaigns', scope: 'shop', default: false, what: 'پیوند و QR ِ کمپین با ردیابیِ منبع (MKT-10/11)' },
   { key: 'shop.storefront.bulk', scope: 'shop', default: false, what: 'انتشارِ گروهیِ کالای ویترین از کاتالوگِ واحد (M2)' },
   { key: 'shop.storefront.visual_search', scope: 'shop', default: false, what: '«جست‌وجو با عکس» ِ ویترین (AI-11)؛ با `shop.visual_search`' },
@@ -123,6 +124,10 @@ const KNOWN = Object.freeze([
   { key: 'shop.promo_loyalty_review', scope: 'shop', default: false, what: 'تخفیفِ خودکارِ قلم و مصرفِ امتیازِ فاکتورِ کارمند با تعریف‌های دکان ⇒ سابقهٔ بررسی برای صاحب (STF-03؛ رد نمی‌کند)' },
   { key: 'shop.custom_roles', scope: 'shop', default: false, what: 'نقشِ سفارشی: نام + نقشِ پایه + محدودیت‌های بیشتر (STF-01)' },
   { key: 'shop.catalog', scope: 'shop', default: false, what: 'دفترِ موجودیِ سرور: مکان‌ها، انتقالِ کالا و تطبیق (INV-11)؛ پایهٔ «پنهان کردنِ ناموجود» ِ ویترین' },
+  //  O-06 = ب (ORD-20، CHK-18؛ lib/stock-reserve.js): با `shop.catalog`؛ سرور باز هم موجودی را کم نمی‌کند
+  { key: 'shop.stock_reserve', scope: 'shop', default: false, what: 'نگه‌داشتنِ کوتاهِ موجودی برای سفارشِ آنلاین تا دکان قبول کند: آخرین عدد دو بار سفارش نمی‌گیرد (O-06 ب)؛ با shop.catalog' },
+  //  PRD-08: فقط برنامه (`QtyExactWiring`)؛ سرور فقط پرچم را در `GET /api/shop/stock-ledger/config` می‌گوید (‎routes/shop-stock-ledger.js‎)
+  { key: 'shop.qty_exact', scope: 'shop', default: false, what: 'کالای وزنی (۳ رقمِ اعشار): مبلغِ ردیفِ مقدارِ اعشاری با قاعدهٔ دقیقِ ۳.۴ (همان سفارشِ آنلاین) و مقدارِ سبد/فاکتور/حرکت به هزارمِ دقیق؛ مقدارِ درست همان امروز (PRD-08)' },
   { key: 'shop.count_absorb', scope: 'shop', default: false, what: 'فروشِ آفلاینِ پیش از شمارش که پس از ثبتِ شمارش می‌رسد دوباره از موجودی کم نمی‌شود — سرور و برنامه (INV-10)؛ با shop.catalog' },
   { key: 'market.slug_hold', scope: 'shop', default: false, what: 'نشانیِ پیشینِ ویترین یک سال برای همان دکان می‌ماند تا QR ِ چاپی به دکانِ دیگری نرسد' },
   //  RPT-03 (docs/FLAGS-ON-fa.md): عددِ تازه در پیامی که صاحب همین حالا می‌گیرد ⇒ جدا و خاموش؛ با `shop.owner_report`

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -26,8 +27,10 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.i18n.OnlineFmt
+import ir.vil3ntec.tohid.core.i18n.StrRisk
 import ir.vil3ntec.tohid.core.model.OrderPermsDto
 import ir.vil3ntec.tohid.core.model.OrdersConfigDto
+import ir.vil3ntec.tohid.core.orders.OrderRisk
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.OrdersRepository
 import ir.vil3ntec.tohid.print.OrderSlipPrint
@@ -37,6 +40,7 @@ import ir.vil3ntec.tohid.ui.screens.Haptics
 import ir.vil3ntec.tohid.ui.screens.rememberOrderBulk
 import ir.vil3ntec.tohid.ui.screens.rememberOrderDesk
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
+import ir.vil3ntec.tohid.ui.v3.V3MenuItem
 import ir.vil3ntec.tohid.ui.v3.V3TwoPane
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.online.OnlinePaths
@@ -80,6 +84,12 @@ private fun RouteScope.OrdersRouteBody(wide: Boolean) {
   )
   val state = ctl.state.copy(perms = perms, counts = OrdersLive.counts.value, notes = notes)
   fun openOrder(id: String) { if (wide) selected = id else nav.open(OnlinePaths.order(id)) }
+  //  RSK-03 «کارت در صف»: یک پرسش برای همهٔ صف (`/risk/queue`)، فقط با `risk` ِ `/config` (پرچمِ `shop.order_risk`)
+  val riskOn = cfg?.risk == true
+  val riskQ = rememberRiskQueue(riskOn, remember(context) { OrdersHub.repo(context) }, rev, changed)
+  val riskFlags = OrderRisk.cardFlags(riskQ.queue.value)
+  //  RSK-04: صفحهٔ جدای «فهرستِ بسته و مطمئن» در «…» — فقط صاحب و مدیر (`orders.contact`) با همان پرچم
+  val riskMenu = if (riskOn && perms.contact) listOf(V3MenuItem(Icons.Outlined.Checklist, StrRisk.listsTitle) { nav.open(OnlinePaths.RISK_LISTS) }) else emptyList()
   //  میزِ سفارش، هشدارها و انتخابِ چندتایی (ORD-03/04/08/09/18/19) — هر کدام فقط با پرچمِ خودش
   val deskCtl = rememberOrderDesk(remember(context) { Backend.api(context) })
   val bulk = rememberOrderBulk(cfg ?: OrdersConfigDto(), state.tab)
@@ -92,6 +102,7 @@ private fun RouteScope.OrdersRouteBody(wide: Boolean) {
     //  «چرا سفارش نمی‌رسد؟» — ویترینِ خاموش، بی کالا، دورهٔ آزمایشی، اعلانِ خاموش… (lib/order-arrival)
     OrdersLive.arrival.value?.let { a -> OrderArrivalCardV3(a, onFix = { openFix(it) }) }
     cfg?.let { c -> OrderAlertNotes(c, ::openOrder) }
+    OrderRiskQueueCardV3(riskQ, riskOn, ::openOrder)
     //  قفسه و دستهٔ جمع‌آوری (PCK-10/12)، گزارش‌ها و نظرها (NTF-07/09) و «کالا به انبار برگشت؟» ِ بازپرداخت‌ها (RET-11)
     OrderQueueExtras(cfg, onChanged = { ctl.reload() }, onOpen = ::openOrder)
     if (cfg?.bulk == true) Row { OrderBulkToggleV3(bulk, cfg) }
@@ -106,7 +117,7 @@ private fun RouteScope.OrdersRouteBody(wide: Boolean) {
     onOpen = { o -> if (!bulk.tap(o.id)) openOrder(o.id) },
     onStep = { o, to -> nav.open(OnlinePaths.action(o.id, to)) },
     onNew = { nav.open(OnlinePaths.NEW_ORDER) },
-    onRetry = ctl::reload,
+    onRetry = { ctl.reload(); riskQ.retry.value++ },
     onMore = ctl::more,
     onNote = { n ->
       when (n.act) {
@@ -124,11 +135,11 @@ private fun RouteScope.OrdersRouteBody(wide: Boolean) {
     onDispose { if (AppNav.addAction.value === action) AppNav.addAction.value = null }
   }
   if (!wide) {
-    OrdersScreen(state, actions, backOrNull, header = header, picked = picked)
+    OrdersScreen(state, actions, backOrNull, header = header, picked = picked, riskFlags = riskFlags, menu = riskMenu)
     return
   }
   V3TwoPane(
-    list = { OrdersScreen(state, actions, backOrNull, selectedId = selected, header = header, picked = picked) },
+    list = { OrdersScreen(state, actions, backOrNull, selectedId = selected, header = header, picked = picked, riskFlags = riskFlags, menu = riskMenu) },
     detail = {
       val id = selected
       if (id == null) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -229,10 +240,11 @@ internal fun RouteScope.OrderDetailRoute(id: String, embedded: Boolean = false) 
       //  RSK-08: «پروندهٔ مدرک» — همان شرط و حالتِ رابطِ امروز (`orders.manage` و پرچمِ `shop.orders.dispute_file`)
       OrderEvidenceEntryV3(o.id, cfg?.permissions?.manage == true, remember(context) { Backend.api(context) })
       //  RSK-03: سابقهٔ همین مشتری در همین دکان پیش از ارسال — فقط با پرچمِ `shop.order_risk` (خاموش ⇒ هیچ)؛
-      //  RSK-04: فهرستِ بسته/مطمئن فقط برای `orders.contact` و فقط با شمارهٔ کاملِ همین سفارش
+      //  RSK-04: فهرستِ بسته/مطمئن فقط برای `orders.contact`: شمارهٔ کامل یا پینِ ارسالِ همین سفارش
       OrderRiskCardV3(
         o.id, remember(context) { OrdersHub.repo(context) }, rev,
         canList = perms.contact, phone = OrderDetailModel.fullPhone(o),
+        pin = OrderRisk.orderPin(o.fulfillment, o.address.lat, o.address.lng),
       )
       //  جمع‌آوری (PCK)، ویرایش (ORD-14)، ترجیحِ تحویل (CHK-14)، جایگزینی (CHK-15/16)، پیام‌ها (ORD-16) و برگشتِ کالا (RET-11)
       OrderDetailExtras(o, cfg)

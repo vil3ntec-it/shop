@@ -206,7 +206,7 @@ object SettingsSearchIndex {
     //  ظاهر و زبان
     "ظاهر" to kw("ظاهر رنگ تم تیره روشن حرکت", "appearance theme dark light motion", "بڼه رنګ تیاره"),
     "زبان" to kw("زبان دری پشتو انگلیسی فارسی", "language dari pashto english persian", "ژبه دري پښتو"),
-    "تاریخ و رقم" to kw("تاریخ رقم تقویم افغانی", "date digits calendar afghani", "نېټه شمېرې کلیز"),
+    "تاریخ و رقم" to kw("تاریخ رقم تقویم افغانی هفته شنبه جمعه تعطیل روز کاری", "date digits calendar afghani week start working days closed", "نېټه شمېرې کلیز اونۍ جمعه رخصت کاري ورځ"),
     L.NAV_BAR to kw("نوار پایین منو", "bottom bar menu", "لاندې پټه"),
     L.TRAINING to kw("آموزشی تمرین", "training practice", "زده کړه تمرین"),
   )

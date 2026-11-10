@@ -38,3 +38,24 @@ test('پرچمِ shop.stock_v2: پیش‌فرض خاموش؛ روشن برای �
   assert.deepEqual((await h.get(C, { token: t.owner })).body, { enabled: false });
   await query("DELETE FROM live_config WHERE key='shop.stock_v2'");
 });
+
+test('PRD-08 پرچمِ shop.qty_exact: خاموش ⇒ کلید نیست (بیت‌به‌بیت همان)؛ روشن برای همین دکان ⇒ qtyExact؛ دکانِ دیگر نه؛ all برای همه', async () => {
+  const t = await shopWithStaff('وزنی-الف');
+  const u = await shopWithStaff('وزنی-ب');
+  assert.deepEqual((await h.get(C, { token: t.staff })).body, { enabled: false });
+  await query("INSERT INTO live_config (scope, key, value, updated_at) VALUES ($1,'shop.qty_exact','true',1)", [t.shopId]);
+  //  شاگرد و صاحب هر دو می‌خوانند — مبلغِ ردیفِ وزنی روی همهٔ صندوق‌های دکان یکی است
+  assert.deepEqual((await h.get(C, { token: t.staff })).body, { enabled: false, qtyExact: true });
+  assert.deepEqual((await h.get(C, { token: t.owner })).body, { enabled: false, qtyExact: true });
+  assert.deepEqual((await h.get(C, { token: u.owner })).body, { enabled: false }, 'پرچمِ «الف» به «ب» نمی‌رسد');
+  //  مستقل از shop.stock_v2
+  await query("INSERT INTO live_config (scope, key, value, updated_at) VALUES ($1,'shop.stock_v2','true',1)", [t.shopId]);
+  assert.deepEqual((await h.get(C, { token: t.staff })).body, { enabled: true, qtyExact: true });
+  await query("INSERT INTO live_config (scope, key, value, updated_at) VALUES ('all','shop.qty_exact','true',1)");
+  assert.deepEqual((await h.get(C, { token: u.staff })).body, { enabled: false, qtyExact: true });
+  //  «false» ِ خودِ دکان بر all جلو می‌افتد ⇒ همان پاسخِ پیشین
+  await query("UPDATE live_config SET value='false' WHERE scope=$1 AND key='shop.qty_exact'", [t.shopId]);
+  assert.deepEqual((await h.get(C, { token: t.owner })).body, { enabled: true });
+  assert.equal(require('../src/routes/shop-stock-ledger').QTY_FLAG, 'shop.qty_exact');
+  await query("DELETE FROM live_config WHERE key IN ('shop.qty_exact','shop.stock_v2')");
+});

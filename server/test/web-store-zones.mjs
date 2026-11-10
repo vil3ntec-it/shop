@@ -13,6 +13,8 @@
 import { createRequire } from 'node:module';
 import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -22,6 +24,10 @@ for (const p of [globalRoot && `${globalRoot}/playwright`, 'playwright']) {
   try { ({ chromium } = require(p)); break; } catch { /* بعدی */ }
 }
 if (!chromium) missingTool('پلی‌رایت', PLAYWRIGHT_INSTALL);
+let axeSrc = null;
+for (const p of [`${globalRoot}/axe-core/axe.min.js`, path.join(import.meta.dirname, '..', 'node_modules', 'axe-core', 'axe.min.js'), process.env.AXE_PATH || '']) {
+  if (p && fs.existsSync(p)) { axeSrc = fs.readFileSync(p, 'utf8'); break; }
+}
 
 process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgres://shop:shoppass@127.0.0.1:5432/shop_test';
@@ -410,6 +416,8 @@ const tv = await page.locator('#d-tender option').nth(1).getAttribute('value');
 ok((await page.locator('#d-tender option').nth(1).textContent()).includes('پول خرد'), 'گزینهٔ اسکناس پول خرد را می‌گوید', await page.locator('#d-tender option').nth(1).textContent());
 await page.selectOption('#d-tender', tv);
 await page.waitForFunction(() => !document.getElementById('submit-order').disabled, null, { timeout: 10000 });
+//  CHK-24 ِ پایین همین‌ها را می‌خواهد: پس از رسیدنِ تخفیفِ سرور (تا آن‌گاه «ثبت» بسته است و جمع بی تخفیف)
+const ckOpts = await page.$$eval('#d-tender option', (os) => os.map((x) => x.value));
 await page.click('#submit-order');
 await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
 {
@@ -419,6 +427,108 @@ await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
   ok(dj.cashTenderMinor === Number(tv) && dj.cashTenderMinor > total && dj.cashTenderMinor - total < 100000,
     'CHK-14: همان اسکناس در سفارش؛ بیش از جمع و پول خرد کمتر از یک اسکناسِ ۱۰۰۰', `${dj.cashTenderMinor} / ${total}`);
 }
+
+//  CHK-24 (وب، پس از ثبت): «با کدام اسکناس…» در «دستورِ تحویل» ِ پیگیری، همزادِ `PrefsRules` ِ برنامهٔ خرید — همان گزینه‌های
+//  فرمِ ثبت (`K.tenders`) با اسکناسِ همین سفارش برگزیده؛ «پول خرد لازم نیست» ⇒ null ِ صریح؛ اسکناسِ درستِ بیرون از فهرست
+//  می‌ماند؛ اسکناسی که جمعِ امروز دیگر نمی‌پذیرد برداشته می‌شود (⛔ هرگز ردِ سرور)؛ ۴۰۹ و ردِ اسکناس ⇒ پیگیری از نو و پیامِ
+//  همان؛ axe؛ و کارت برای سفارشِ ردشده/لغوشده پنهان (پیشتر «از دکان بیرون رفته» نشان می‌داد)
+{
+  const last = await one('SELECT id, total_minor FROM online_orders WHERE shop_id = $1 ORDER BY created_at DESC LIMIT 1', [shopId]);
+  const total = Number(last.total_minor);
+  const lastToken = require('../src/lib/storefront').tokenOf(shopId, last.id);
+  const dlv = async () => { const r = await one('SELECT delivery FROM online_orders WHERE id = $1', [last.id]); return typeof r.delivery === 'string' ? JSON.parse(r.delivery) : r.delivery; };
+  const opts = () => page.$$eval('#op-tn option', (os) => os.map((x) => x.value));
+  const msgHas = (re) => page.waitForFunction((src) => new RegExp(src).test(document.getElementById('op-msg').textContent), re, { timeout: 10000 }).then(() => true, () => false);
+  const fresh = async () => { await page.reload(); await page.waitForSelector('#o-prefs:not([hidden])', { timeout: 15000 }); };
+  //  ⛔ ردشده: کارت پنهان (همان `PrefsRules.shown`)، نه «از دکان بیرون رفته» — سفارشِ ارسالِ بازِ دیگر (CHK-07 ِ بالا)
+  const other0 = await one(`SELECT id FROM online_orders WHERE shop_id = $1 AND fulfillment = 'delivery' AND status = 'new' AND id <> $2
+                             ORDER BY created_at DESC LIMIT 1`, [shopId, last.id]);
+  const rj = await call('POST', `/api/shop/orders/${other0.id}/transition`, { to: 'rejected', reason: 'busy' }, T);
+  ok(rj.status === 200, 'دکان سفارشِ ارسالِ دیگری را نپذیرفت', JSON.stringify(rj.body).slice(0, 120));
+  await page.goto(`${base}/store/${slug}#/o/${encodeURIComponent(require('../src/lib/storefront').tokenOf(shopId, other0.id))}`);
+  await page.reload();
+  await page.waitForFunction(() => /نپذیرفت/.test(document.getElementById('o-status').textContent), null, { timeout: 15000 });
+  ok(await page.isHidden('#o-prefs'), 'سفارشِ ردشده ⇒ بی کارتِ «دستورِ تحویل»', await text('#op-msg'));
+
+  await page.goto(`${base}/store/${slug}#/o/${encodeURIComponent(lastToken)}`);
+  await fresh();
+  ok(await page.isVisible('#op-tn'), 'CHK-24 وب: «با کدام اسکناس…» در دستورِ تحویلِ سفارشِ ارسال + نقد');
+  ok(JSON.stringify(await opts()) === JSON.stringify(ckOpts), 'همان گزینه‌های فرمِ ثبت («پول خرد لازم نیست» + K.tenders)', `${await opts()} / ${ckOpts}`);
+  ok(await page.inputValue('#op-tn').catch(() => '') === tv, 'اسکناسِ همین سفارش برگزیده است', tv);
+  await page.selectOption('#op-tn', '', { timeout: 5000 }).catch(() => {});
+  await page.click('#op-save');
+  let done = await msgHas('ثبت شد');
+  ok(done && (await dlv()).cashTenderMinor === undefined, '«پول خرد لازم نیست» ⇒ null ِ صریح، اسکناس برداشته شد', JSON.stringify(await dlv()));
+  const other = ckOpts.filter((v) => v && v !== tv).pop() || tv;
+  await page.selectOption('#op-tn', other, { timeout: 5000 }).catch(() => {});
+  await page.click('#op-save');
+  done = await msgHas('ثبت شد');
+  ok(done && (await dlv()).cashTenderMinor === Number(other) && await page.isVisible('#op-tn') && await page.inputValue('#op-tn') === other,
+    'اسکناسِ تازه همان در سفارشِ سرور؛ کارت با نسخهٔ تازه همان را نشان می‌دهد', `${other} / ${JSON.stringify(await dlv())}`);
+
+  //  دکان مبلغِ دیگری نوشت (همان جمع، درست ولی بیرون از گزینه‌ها) ⇒ در فهرست و برگزیده؛ ذخیرهٔ کادرِ دیگر پاکش نمی‌کند
+  const sx = await call('POST', `/api/shop/orders/${last.id}/delivery`, { delivery: { cashTenderMinor: total } }, T);
+  ok(sx.status === 200, 'دکان اسکناسِ مشتری را «همان جمع» نوشت', JSON.stringify(sx.body).slice(0, 120));
+  await fresh();
+  ok((await opts()).includes(String(total)) && await page.inputValue('#op-tn').catch(() => '') === String(total), 'اسکناسِ کنونیِ درست بیرون از فهرست می‌ماند و برگزیده است', String(await opts()));
+  await page.check('#op-call');
+  await page.click('#op-save');
+  done = await msgHas('ثبت شد');
+  const d1 = await dlv();
+  ok(done && d1.cashTenderMinor === total && d1.callBeforeArrival === true, 'ذخیرهٔ «زنگ بزنید» اسکناسِ دکان را نگه داشت', JSON.stringify(d1));
+
+  //  اسکناسی که جمعِ امروز دیگر نمی‌پذیرد (پول خرد ≥ ۱۰۰۰) ⇒ نه گزینه، نه برگزیده؛ ذخیره null ِ صریح می‌فرستد، نه ردِ سرور
+  const bad = { ...d1, cashTenderMinor: total + 150000 };
+  await query('UPDATE online_orders SET delivery = $2::jsonb, version = version + 1 WHERE id = $1', [last.id, JSON.stringify(bad)]);
+  await fresh();
+  ok(!(await opts()).includes(String(total + 150000)) && await page.inputValue('#op-tn').catch(() => 'x') === '', 'اسکناسِ نادرست برای جمعِ امروز ⇒ «پول خرد لازم نیست»', String(await opts()));
+  await page.fill('#op-leave', 'همسایه');
+  await page.click('#op-save');
+  done = await msgHas('ثبت شد');
+  const d2 = await dlv();
+  ok(done && d2.cashTenderMinor === undefined && d2.leaveWith === 'همسایه', 'ذخیره بی ردِ cash_tender_excess، اسکناسِ نادرست برداشته شد', JSON.stringify(d2));
+
+  //  ۴۰۹: دکان همین حالا عوض کرد ⇒ پیامِ «جای دیگری عوض شد» و کادرها با نسخهٔ تازه
+  await fresh();
+  const sv = await call('POST', `/api/shop/orders/${last.id}/delivery`, { delivery: { leaveWith: 'نگهبان' } }, T);
+  ok(sv.status === 200, 'دکان «تحویل به» را عوض کرد', JSON.stringify(sv.body).slice(0, 120));
+  await page.fill('#op-leave', 'پدرم');
+  await page.click('#op-save');
+  ok(await msgHas('جای دیگری عوض شد'), '۴۰۹ ِ version_conflict ⇒ پیامِ همان', await text('#op-msg'));
+  await page.waitForFunction(() => document.getElementById('op-leave').value === 'نگهبان', null, { timeout: 10000 }).catch(() => {});
+  ok(await page.inputValue('#op-leave') === 'نگهبان' && await page.isEnabled('#op-save'), 'پیگیری از نو: کادرها با نسخهٔ تازهٔ دکان و «ثبت» باز', await page.inputValue('#op-leave'));
+  ok((await dlv()).leaveWith === 'نگهبان', 'نوشتهٔ دکان رونویسی نشد');
+
+  //  ردِ اسکناس از سرور (جمع جای دیگری عوض شد؛ این‌جا بدنه در راه دست‌کاری می‌شود) ⇒ پیامِ خودِ صفحه، نه خطای خام
+  await page.route('**/delivery', async (route) => {
+    const b = JSON.parse(route.request().postData() || '{}');
+    b.delivery = { ...(b.delivery || {}), cashTenderMinor: total - 100 };
+    await route.continue({ postData: JSON.stringify(b) });
+  });
+  await page.selectOption('#op-tn', ckOpts[1], { timeout: 5000 }).catch(() => {});
+  await page.click('#op-save');
+  ok(await msgHas('اسکناس') && !(await text('#op-msg')).includes('کمتر است'), 'cash_tender_short ⇒ پیامِ «با کدام اسکناس…» ِ پیگیری', await text('#op-msg'));
+  await page.unroute('**/delivery');
+  ok((await dlv()).cashTenderMinor === undefined, 'اسکناسِ ردشده ننشست');
+
+  //  دسترس‌پذیری ِ کارت با «با کدام اسکناس…»
+  if (axeSrc) {
+    await page.evaluate(axeSrc);   //  بی bypassCSP: سنجهٔ CSP ِ همین برگه سرِ جای خود (مثلِ web-store-cart-sync)
+    const v = await page.evaluate(async () => (await window.axe.run(document.getElementById('o-prefs'),
+      { runOnly: ['color-contrast', 'button-name', 'label', 'select-name', 'aria-allowed-attr', 'nested-interactive'] })).violations
+      .map((x) => `${x.id}: ${x.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' ; ')}`));
+    ok(v.length === 0, 'دسترس‌پذیری (axe-core): دستورِ تحویل با «با کدام اسکناس…»', v.join(' | '));
+  } else if (process.env.SKIP_BROWSER_TESTS === '1') console.log('⏭  axe-core نیست و SKIP_BROWSER_TESTS=1 — سنجهٔ دسترس‌پذیری اجرا نشد');
+  else ok(false, 'axe-core پیدا نشد (npm i -g axe-core@4.10.3، یا AXE_PATH)');
+
+  //  ⛔ لغوشده: کارت پنهان
+  const cx = await call('POST', `/api/store/${slug}/orders/${encodeURIComponent(lastToken)}/cancel`, {});
+  ok(cx.status === 200, 'مشتری همین سفارش را لغو کرد', JSON.stringify(cx.body).slice(0, 120));
+  await page.reload();
+  await page.waitForFunction(() => /لغو کردید/.test(document.getElementById('o-status').textContent), null, { timeout: 15000 });
+  ok(await page.isHidden('#o-prefs'), 'سفارشِ لغوشده ⇒ بی کارتِ «دستورِ تحویل»', await text('#op-msg'));
+}
+
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));
 

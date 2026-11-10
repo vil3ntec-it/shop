@@ -99,6 +99,8 @@ object ShopSettingsKeys {
     shop("tax_quarter_due_day", "i"),
     shop("tax_quarter_remind_days", "i"),
     shop("day_end_hour", "i"),                  // ShopDayChoice: پایانِ روزِ کاری (گزارش‌ها)
+    shop("week_start", "i"),                    // ShopDayChoice: آغازِ هفتهٔ دکان (LOC-03)
+    shop("closed_days", "s"),                   // ShopDayChoice: روزهای تعطیلِ هفتگی (LOC-03)
     shop("fraud_trail", "b"),                   // RPT-09: سابقهٔ ضدتقلب
 
     //  ── مالِ همین دستگاه ──

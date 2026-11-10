@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.market.PublicOrder
+import ir.vil3ntec.tohid.core.shopper.PrefsRules
 import ir.vil3ntec.tohid.core.shopper.RefillCard
 import ir.vil3ntec.tohid.core.shopper.RepeatPlan
 import ir.vil3ntec.tohid.core.shopper.RepeatPlans
@@ -75,6 +76,42 @@ fun OrderExtrasBlock(model: CustomerModel, slug: String, o: PublicOrder) {
   }
   f.note?.let { Note(it) }
   RepeatChooser(model, o)
+}
+
+/**
+ *  CHK-24: «دستورِ تحویل» تا پیش از حرکت (همان کارتِ `#o-prefs` ِ وب) و «با کدام اسکناس…» با «نقد هنگامِ تحویل» —
+ *  فقط با کلیدِ `deliveryPrefs` ِ پیگیری؛ پس از حرکت دیده ولی بسته ([PrefsModel]).
+ */
+@Composable
+fun DeliveryPrefsCard(model: CustomerModel, slug: String, o: PublicOrder) {
+  val m = model.deliveryPrefs
+  val p = m.prefs
+  if (p == null || !m.shown(o)) return
+  val f = m.form
+  val on = p.editable && !m.busy
+  Card(Modifier.fillMaxWidth()) {
+    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+      Text(ShopperText.prefsTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+      Check(ShopperText.callBefore, f.callBeforeArrival, enabled = on) { m.form = m.form.copy(callBeforeArrival = it) }
+      OutlinedTextField(
+        value = f.leaveWith, onValueChange = { m.form = m.form.copy(leaveWith = it.take(PrefsRules.LEAVE_MAX)) }, enabled = on,
+        label = { Text(ShopperText.leaveWith) }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+      )
+      OutlinedTextField(
+        value = f.landmark, onValueChange = { m.form = m.form.copy(landmark = it.take(PrefsRules.LANDMARK_MAX)) }, enabled = on,
+        label = { Text(ShopperText.prefsLandmark) }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+      )
+      if (PrefsRules.tenderShown(o, p)) {
+        Text(ShopperText.tenderAsk, style = MaterialTheme.typography.bodyMedium)
+        Choice(ShopperText.tenderNone, f.cashTenderMinor == null, enabled = on) { m.form = m.form.copy(cashTenderMinor = null) }
+        m.tenders(o).forEach { x ->
+          Choice(ShopperText.tenderOption(x, x - o.totalMinor), f.cashTenderMinor == x, enabled = on) { m.form = m.form.copy(cashTenderMinor = x) }
+        }
+      }
+      m.note?.let { Note(it, if (m.ok) Tone.OK else if (p.editable) Tone.ERROR else Tone.INFO) }
+      MainButton(ShopperText.prefsSave, enabled = on) { m.save(slug) }
+    }
+  }
 }
 
 /** پنج ستاره با هدفِ لمسِ ۴۸dp و برچسبِ دسترس‌پذیرِ «n ستاره از ۵» */

@@ -104,15 +104,24 @@ async function liveRows(shopId, table, where, params) {
   return out;
 }
 
-/** قرض‌دارهای همین دکان با **همین** شماره (دقیق) — شناسه‌ها، حداکثر MAX_DEBTORS */
-async function debtorsOf(shopId, phone) {
+/**
+ * قرض‌دارهای همین دکان با **همین** شماره (دقیق)، بی ادغام‌شده/پاک‌شده — `{id, group}` به ترتیبِ شناسه، حداکثر MAX_DEBTORS.
+ * `group` (CRM-08) فقط برای تخفیفِ گروهِ ویترین (PRM-11، `storefront-promo-groups.js`)؛ هرگز در پاسخِ «حسابِ من» نیست.
+ */
+async function debtorRowsOf(shopId, phone) {
   const key = phoneKeyOf(phone);
   if (!key) return [];
   const digits = `regexp_replace(translate(COALESCE(data->>'phone', ''), '۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩', '01234567890123456789'), '[^0-9]', '', 'g')`;
   const rows = await liveRows(shopId, 'debtors', `right(${digits}, 9) = $2`, [tailOf(key)]);
   return rows
     .filter((r) => !str(r.d.mergedInto) && phoneKeyOf(r.d.phone) === key)
-    .map((r) => r.id).sort().slice(0, MAX_DEBTORS);
+    .map((r) => ({ id: r.id, group: str(r.d.group) }))
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).slice(0, MAX_DEBTORS);
+}
+
+/** قرض‌دارهای همین دکان با **همین** شماره (دقیق) — شناسه‌ها، حداکثر MAX_DEBTORS */
+async function debtorsOf(shopId, phone) {
+  return (await debtorRowsOf(shopId, phone)).map((r) => r.id);
 }
 
 function pageOf(list, { cursor, limit } = {}) {
@@ -279,4 +288,4 @@ async function part(sf, phone, name, opts) {
   return { balanceMinor: ledger.balanceMinor, ...pageOf(ledger.entries, opts) };
 }
 
-module.exports = { FLAG, PARTS, flagOn, summary, part, debtorsOf, phoneKeyOf, loyaltyOf };
+module.exports = { FLAG, PARTS, flagOn, summary, part, debtorsOf, debtorRowsOf, phoneKeyOf, loyaltyOf };

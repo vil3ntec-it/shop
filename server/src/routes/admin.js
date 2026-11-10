@@ -95,6 +95,8 @@ router.use('/system/notify-usage', rateLimit({ max: 30, windowMs: 60 * 1000, key
 router.use('/contract', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-contract-ip' }));
 router.use('/subscriptions/period-end', rateLimit({ max: 240, windowMs: 60 * 1000, keyPrefix: 'admin-period-end-ip' }));
 router.use('/shops/:id/staff-perms/devices', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-device-state-ip' }));
+//  LOC-04: جدولِ تعطیلات (`routes/admin-calendar.js`، پس از این روتر سوار) — سقفِ IP پیش از همین `requireAdmin`
+router.use('/calendar', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-calendar-ip' }));
 
 router.use(requireAdmin);
 

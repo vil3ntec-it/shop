@@ -84,7 +84,9 @@ class ShopSettingsSyncTest {
     val types = mapOf("Boolean" to "b", "String" to "s", "Int" to "i", "Long" to "l", "Float" to "f", "StringSet" to "set")
     //  پرونده‌هایی که انبار را کلی می‌خوانند (همین همگام‌سازی و پشتیبان)، و انبارِ دیگرِ همان پرونده
     val generic = setOf("ShopSettingsBundleAndroid.kt", "ShopSettingsSyncAndroid.kt", "ShopSettingsKeys.kt")
-    val otherStore = mapOf("WhatsNewPrefAndroid.kt" to setOf("seen", "keys"))
+    //  `ShopDayChoiceAndroid.kt` هم `tohid-policy` (آغازِ هفته، پایانِ روز) را دارد و هم نسخهٔ محلیِ جدولِ تعطیلاتِ سرور را در
+    //  انبارِ جدای `tohid-holidays` (LOC-04؛ نه تنظیمِ دکان، DATA-SAFETY §۶) — آن دو کلید مالِ انبارِ دیگرند
+    val otherStore = mapOf("WhatsNewPrefAndroid.kt" to setOf("seen", "keys"), "ShopDayChoiceAndroid.kt" to setOf("table", "fetched_at"))
     val out = HashMap<String, MutableSet<String>>()
     src.walkTopDown().filter { it.isFile && it.extension == "kt" && it.name !in generic }.forEach { f ->
       val text = f.readText()

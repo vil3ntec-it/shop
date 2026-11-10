@@ -89,6 +89,7 @@
         $('ct-text').focus();
       }).catch(function (er) {
         if (er.status === 401) { H.fail(er); return; }
+        var c = H.conv(); if (!c || c.id !== e.cid) return;   //  رشتهٔ دیگری باز شد ⇒ خطای دیرِ آن رشته این‌جا نمی‌نشیند
         var x = H.info()[e.id];
         if (er.code === 'edit_window_passed' || er.code === 'not_author' || er.code === 'message_not_found') {
           if (x && er.code === 'edit_window_passed') x.m.editUntil = 0;

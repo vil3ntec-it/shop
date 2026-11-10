@@ -97,7 +97,8 @@ const A = (await call('POST', '/api/admin/login', { username: 'admin', password:
 
 //  ── ۰ پرچم‌ها: از کاتالوگِ KNOWN، با بررسیِ کامل بودنش در برابرِ کد ──
 const FAMILY_RE = /^shop\.(storefront|chat|orders)(\.[a-z_]+)*$/;
-const FAMILY_EXTRA = ['shop.catalog', 'shop.image_bank', 'shop.customer_notify', 'shop.delivery_customer_view'];
+//  SEC-10: `shop.customer_erasure` از ۱۴۰۵/۰۸/۲۰ «پاک کردنِ داده‌های من» ِ وب هم هست (`store/erase.js`) ⇒ مشتری‌رو
+const FAMILY_EXTRA = ['shop.catalog', 'shop.image_bank', 'shop.customer_notify', 'shop.delivery_customer_view', 'shop.customer_erasure'];
 const inFamily = (k) => FAMILY_RE.test(k) || FAMILY_EXTRA.includes(k);
 //  بازنشسته: `lib/order-ledger.js` «دیگر خوانده نمی‌شود» (فقط کفِ تحویل هنگامِ راه‌اندازی، همان `shop.catalog`) ⇒ نه در کاتالوگ، نه روشن
 const RETIRED = { 'shop.orders.ledger': 'بازنشسته — order-ledger.js دیگر نمی‌خواندش (کفِ تحویل همان shop.catalog)' };
@@ -134,7 +135,7 @@ const WHY = (k) => {
   if (k.scope !== 'shop') return `دامنهٔ «${k.scope}» (نه پرچمِ دکان)`;
   if (k.default === true) return 'پیش‌فرض روشن (رفعِ درستی/امنیت؛ خاموش فقط اضطراری) — همان پیش‌فرضِ تولید می‌ماند';
   if (/^shop\.(sync|returns|save_base|ledger_merge|sync_shadow_file|settings_sync|held_sync|count_absorb|staff_scope|custom_roles|approval_requests|credit_|promo_loyalty_review|receipt_v2|promo_stamp|loyalty_rule)/.test(k.key)) return 'صندوق/همگام‌سازیِ برنامهٔ دکان، نه صفحهٔ مشتری';
-  if (/^shop\.(owner_report|backup_contact_guard|customer_erasure)/.test(k.key)) return 'کارِ صاحب/پشتیبان در برنامه یا پنل، نه سفرِ مشتری';
+  if (/^shop\.(owner_report|backup_contact_guard)/.test(k.key)) return 'کارِ صاحب/پشتیبان در برنامه یا پنل، نه سفرِ مشتری';
   if (/^shop\.(order_notify|device_push)/.test(k.key)) return 'اعلان به گوشی‌های دکان (Firebase، O-01)، نه صفحهٔ مشتری';
   if (/^market\./.test(k.key)) return 'بازارچه، نه ویترینِ یک دکان';
   return 'بیرون از خانوادهٔ مشتری‌رو';

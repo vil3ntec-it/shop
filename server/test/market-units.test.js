@@ -8,6 +8,8 @@
  *   ۳) قیمتِ یک پایه (دانه، کیلو، لیتر، متر)، گرد به نزدیک‌ترین یک‌صدم.
  *   ۴) «ارزان‌ترین» فقط درونِ همان پایه و فقط با دست‌کم دو پیشنهاد؛ بی واحدِ روشن هرگز.
  *   ۵) ترتیب کامل است (لغت‌نامه‌ای) و قیمتِ خامِ دو واحدِ ناهم‌سنج را مقایسه نمی‌کند مگر برای ترتیبِ پایانی.
+ *   ۶) اندازهٔ واحدِ بی عدد از «واحدِ فروشِ دوم» (`saleUnit` + ضریب) و «بسته‌ها» (`packs`، PRD-04) وقتی نامِ آن‌ها
+ *      اندازهٔ روشن دارد و نسبت دقیق است؛ ناسازگاری، دانهٔ اعشاری و دو پایهٔ بی اندازهٔ خودِ واحد ⇒ null.
  * آزمونِ HTTP ِ همان قاعده روی `/api/market/same/:id`: `market-same-units.test.js`.
  */
 const test = require('node:test');
@@ -104,4 +106,46 @@ test('ترتیب: هم‌سنج‌ها با قیمتِ یک پایه، بعد ب
   for (const p of list) for (const q of list) {
     assert.equal(Math.sign(units.order(p, q)) + Math.sign(units.order(q, p)), 0, 'پادتقارن');
   }
+});
+
+test('S70: اندازهٔ واحدِ بی عدد از واحدِ فروشِ دوم و بسته‌ها (`saleUnit`، `packs`)', () => {
+  const pk = (name, sizeMilli) => ({ name, sizeMilli });
+  //  «شیشه» خودش اندازه ندارد؛ «کارتن ۱۲ عددی» = ۱۲ شیشه ⇒ یک شیشه یک دانه
+  assert.deepEqual(units.sizeOfItem('شیشه', { packs: [pk('کارتن ۱۲ عددی', 12000)] }), { base: 'piece', milli: 1000 });
+  //  یک «عدد» = ۰٫۱ بسته ⇒ بسته ۱۰ دانه؛ یک «بستهٔ ۶ تایی» = ۰٫۲۵ کارتن ⇒ کارتن ۲۴ دانه؛ یک کیلو = ۰٫۰۲ کیسه ⇒ کیسه ۵۰ کیلو
+  assert.deepEqual(units.sizeOfItem('بسته', { saleUnit: { unit: 'عدد', factorMilli: 100 } }), { base: 'piece', milli: 10000 });
+  assert.deepEqual(units.sizeOfItem('کارتن', { saleUnit: { unit: 'بستهٔ ۶ تایی', factorMilli: 250 } }), { base: 'piece', milli: 24000 });
+  assert.deepEqual(units.sizeOfItem('کیسه', { saleUnit: { unit: 'کیلو', factorMilli: 20 } }), { base: 'kg', milli: 50000 });
+  //  هم‌خوان ⇒ همان؛ اندازهٔ خودِ واحد جلو
+  assert.deepEqual(units.sizeOfItem('کارتن ۲۴ عددی', { packs: [pk('عدد', 42)] }), { base: 'piece', milli: 24000 },
+    'راهِ نادقیق (۱÷۰٫۰۴۲) کنار می‌رود، نه ناسازگاری');
+  assert.deepEqual(units.sizeOfItem('کارتن ۲۴ عددی', { saleUnit: { unit: 'بستهٔ ۶ تایی', factorMilli: 250 } }), { base: 'piece', milli: 24000 });
+  //  پایهٔ دیگر کنارِ اندازهٔ خودِ واحد ⇒ خودِ واحد (بطری ۱٫۵ لیتر و یک دانه، هر دو راست)
+  assert.deepEqual(units.sizeOfItem('بطری ۱٫۵ لیتری', { packs: [pk('کارتن ۶ تایی', 6000)] }), { base: 'l', milli: 1500 });
+  //  ⛔ ناسازگار در همان پایه (۲۴ و ۲۰) ⇒ هیچ، هرگز یکی را برنمی‌گزیند
+  assert.equal(units.sizeOfItem('کارتن ۲۴ عددی', { packs: [pk('کارتن ۲۰ تایی', 1000)] }), null);
+  assert.equal(units.sizeOfItem('بسته', { saleUnit: { unit: 'عدد', factorMilli: 100 }, packs: [pk('کارتن ۱۲ عددی', 1000)] }), null);
+  //  ⛔ دو پایه بی اندازهٔ خودِ واحد ⇒ کدام؟ هیچ
+  assert.equal(units.sizeOfItem('شیشه', { saleUnit: { unit: 'میلی‌لیتر', factorMilli: 2 }, packs: [pk('کارتن ۱۲ عددی', 12000)] }), null);
+  //  دو راهِ هم‌خوان بی اندازهٔ خودِ واحد ⇒ همان
+  assert.deepEqual(units.sizeOfItem('شیشه', { saleUnit: { unit: 'عدد', factorMilli: 1000 }, packs: [pk('کارتن ۱۲ عددی', 12000)] }),
+    { base: 'piece', milli: 1000 });
+  //  ⛔ نسبتِ نادقیق (۱÷۲۴ ⇐ ۴۲ هزارم ⇒ ۲۳٫۸ دانه) و دانهٔ اعشاری (کارتنِ ۲۵ تایی = ۴ بسته ⇒ ۶٫۲۵) ⇒ null
+  assert.equal(units.sizeOfItem('کارتن', { saleUnit: { unit: 'عدد', factorMilli: 42 } }), null);
+  assert.equal(units.sizeOfItem('بسته', { packs: [pk('کارتن ۲۵ عددی', 4000)] }), null);
+  //  نامِ بی اندازه، اندازهٔ ناجور و ورودیِ ناجور کنار می‌روند
+  for (const more of [
+    { packs: [pk('کارتن', 24000), pk('شل', 6000)] }, { saleUnit: { unit: 'کارتن', factorMilli: 24000 } },
+    { packs: [pk('کارتن ۲۴ عددی', 0)] }, { packs: [pk('کارتن ۲۴ عددی', -24000)] }, { packs: [pk('کارتن ۲۴ عددی', 1.5)] },
+    { packs: [pk('کارتن ۲۴ عددی', 2_000_000_000)] }, { saleUnit: { unit: 'عدد', factorMilli: 0 } },
+    { saleUnit: { unit: 'عدد' } }, { saleUnit: 'عدد' }, { packs: 'کارتن ۲۴ عددی' }, { packs: [null, 5, 'x'] }, {}, undefined,
+  ]) assert.equal(units.sizeOfItem('کارتن', more), null, JSON.stringify(more));
+  //  فقط پنج بستهٔ نخست (همان `PackBarcodes.MAX_PACKS`)
+  const five = Array.from({ length: 5 }, () => pk('کارتن', 1000));
+  assert.equal(units.sizeOfItem('شیشه', { packs: [...five, pk('کارتن ۱۲ عددی', 12000)] }), null);
+  //  قیمتِ یک پایه با همین اندازه
+  assert.deepEqual(units.perUnit('شیشه', 2500, { packs: [pk('کارتن ۱۲ عددی', 12000)] }), { base: 'piece', priceMinor: 2500 });
+  assert.deepEqual(units.perUnit('بسته', 18000, { saleUnit: { unit: 'عدد', factorMilli: 100 } }), { base: 'piece', priceMinor: 1800 });
+  assert.deepEqual(units.perUnit('عدد', 2000, { packs: [pk('کارتن ۲۴ عددی', 24000)] }), { base: 'piece', priceMinor: 2000 });
+  assert.equal(units.perUnit('کارتن', 30000, { packs: [pk('کارتن', 1000)] }), null);
 });

@@ -313,12 +313,13 @@
                 <p class="muted small" data-t="od.keep">این صفحه با همین نشانی دوباره باز می‌شود؛ نشانی را نگه دارید.</p>
               </div>
               <form id="o-prefs" class="card card-lg stack" hidden novalidate>
-                <h2 class="label-lg" data-t="od.prefs">دستورِ تحویل</h2>
+                <h2 class="label-lg" data-t="od.pf">دستورِ تحویل</h2>
                 <label class="check"><input id="op-call" type="checkbox"> <span data-t="ck.call">پیش از رسیدن زنگ بزنید</span></label>
                 <label class="field"><span data-t="ck.leave.l">تحویل به (اختیاری)</span><input id="op-leave" type="text" maxlength="80"></label>
-                <label class="field"><span data-t="od.prefs.lm">نشانهٔ تازه (اختیاری)</span><input id="op-lm" type="text" maxlength="200"></label>
+                <label class="field" id="op-tn-row" hidden><span data-t="od.tn">با کدام اسکناس می‌پردازید؟</span><select id="op-tn"></select></label>
+                <label class="field"><span data-t="od.pf.lm">نشانهٔ تازه (اختیاری)</span><input id="op-lm" type="text" maxlength="200"></label>
                 <div id="op-msg" class="note" hidden role="status"></div>
-                <button id="op-save" class="btn btn-block" type="submit" data-t="od.prefs.save">ثبتِ دستورِ تحویل</button>
+                <button id="op-save" class="btn btn-block" type="submit" data-t="od.pf.save">ثبتِ دستورِ تحویل</button>
               </form>
             </aside>
           </div>

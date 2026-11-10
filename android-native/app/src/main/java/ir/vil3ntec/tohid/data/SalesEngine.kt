@@ -199,7 +199,7 @@ object SalesEngine {
    */
   fun addToCart(cart: List<CartLine>, productId: String, quantity: Double = 1.0): List<CartLine> {
     if (cart.any { it.productId == productId }) {
-      return cart.map { if (it.productId == productId) it.copy(quantity = it.quantity + quantity) else it }
+      return cart.map { if (it.productId == productId) it.copy(quantity = QtyExactWiring.plus(it.quantity, quantity)) else it } // PRD-08: هزارمِ دقیق با `shop.qty_exact`
     }
     return cart + CartLine(productId, quantity)
   }
@@ -224,7 +224,7 @@ object SalesEngine {
     available: Double,
   ): Added {
     val inCart = cart.find { it.productId == productId }?.quantity ?: 0.0
-    val room = (available - inCart).coerceAtLeast(0.0)
+    val room = QtyExactWiring.room(available, inCart) // PRD-08: خاموش ⇒ همان تفریقِ Double
     if (room <= 0.0) return Added(cart, capped = true, available = available)
     val take = minOf(quantity, room)
     return Added(
@@ -286,7 +286,7 @@ object SalesEngine {
     if (available <= 0) {
       return StrLedger.noStock(product.name)
     }
-    return StrLedger.shortStock(product.name, money(available), u, money(wanted))
+    return StrLedger.shortStock(product.name, QtyExactWiring.stockText(available), u, QtyExactWiring.stockText(wanted)) // PRD-08: ۱٫۲۵ کیلو، نه ۱
   }
 
   /**
@@ -294,7 +294,7 @@ object SalesEngine {
    *  بی این، بدهیِ نیم‌افغانی‌ای می‌نشست که هیچ پرداختی صافش نمی‌کرد، چون پول
    *  با عددِ گردشده نشان داده و پرداخت می‌شود. همان `lineTotal`ِ نسخهٔ وب.
    */
-  fun lineTotal(price: Double, quantity: Double): Double = (price * quantity).roundToLong().toDouble()
+  fun lineTotal(price: Double, quantity: Double): Double = QtyExactWiring.lineTotal(price, quantity) // PRD-08: مقدارِ اعشاری با `shop.qty_exact` ⇒ قاعدهٔ ۳.۴؛ خاموش ⇒ همان
 
   fun cartTotal(d: ShopData, cart: List<CartLine>): Double =
     cart.sumOf { line ->
@@ -538,7 +538,7 @@ object SalesEngine {
           saleId = saleId,
           productId = "",
           name = line.label,
-          quantity = line.quantity,
+          quantity = QtyExactWiring.stored(line.quantity),
           unitPrice = price,
           purchasePrice = 0.0,
           totalPrice = lineTotal(price, line.quantity),
@@ -557,7 +557,7 @@ object SalesEngine {
         id = newId(),
         saleId = saleId,
         productId = p.id,
-        quantity = line.quantity,
+        quantity = QtyExactWiring.stored(line.quantity), // PRD-08: هزارمِ دقیق با `shop.qty_exact`
         unitPrice = unit,
         purchasePrice = planned?.let { it.unitCostMinor / 100.0 } ?: ProductPlansMap.cost(d, p),
         totalPrice = lineTotal(unit, line.quantity),
@@ -572,7 +572,7 @@ object SalesEngine {
         id = newId(),
         productId = p.id,
         type = "sale",
-        qty = -line.quantity,
+        qty = -QtyExactWiring.stored(line.quantity),
         date = today,
         notes = "فاکتور #${sale.invoiceLabel()}",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         refId = saleId,

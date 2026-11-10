@@ -141,6 +141,64 @@ ok(shown.status === 200 && shown.body.settings.hideOutOfStock === false, 'WEB-09
 await look();
 ok(await page.locator('#products li[data-id="oil"]').count() === 1, 'WEB-09 خاموش: کالای ناموجود دوباره با «ناموجود» دیده می‌شود');
 
+//  O-06 = ب (ORD-20، CHK-18): نگه‌داشتنِ کوتاهِ موجودی پشتِ پرچمِ خاموشِ `shop.stock_reserve` — مشتریِ ویترین آخرین روغن را در
+//  سبد دارد، سفارشِ تلفنیِ دکان همان را نگه می‌دارد ⇒ «ثبت» ِ مشتری پیامِ روشنِ «نگه داشته شده» می‌گیرد و کارت «ناموجود» با
+//  دکمهٔ بسته است؛ دکان سفارشِ تلفنی را رد می‌کند ⇒ روغن دوباره قابلِ سفارش
+await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.stock_reserve', value: true }, A);
+const oilIn = await call('POST', '/api/sync/v1/push', { device_id: 'dev-owner', schema_version: 2, ops: [
+  op('warehouseEntries', 'oil-e1', { productId: 'oil', units: 1, cartons: 0, perCarton: 0, unit: 'دانه', price: 200, createdAt: Date.now() }),
+] }, T, { 'X-App': 'shop', 'X-Device': 'dev-owner' });
+//  ⛔ ویترین دفترِ دستگاه را برای هر دکان حداکثر هر `CATALOG_REFRESH_THROTTLE_MS` (۵۰۰ms) یک بار می‌پرسد (`catalog.refresh`)؛
+//  push ِ درونِ پنجرهٔ پرسشِ `look()` ِ پیشین را بارِ بعدیِ ویترین هنوز نمی‌بیند و صفحه دوباره نمی‌پرسد ⇒ «ناموجود» تا ۱۰ ثانیه.
+//  پس اول خودِ رسیدن در دفترِ سرور (خواندنِ کارمند بی مهلت می‌خواند و تا کامیت صبر می‌کند)، سپس ویترین. بازتولید: پاسخِ
+//  `PUT /api/shop/storefront` ۶۰۰ms دیر، یا `CATALOG_REFRESH_THROTTLE_MS=5000` ⇒ کدِ پیشین هر بار همین‌جا سرخ
+const oilNow = await call('GET', '/api/shop/catalog/products/oil', null, T);
+const oilLv = oilNow.body && oilNow.body.product ? oilNow.body.product.stock : null;
+ok(oilIn.status === 200 && oilNow.status === 200 && oilLv && Number(oilLv.levels.shop_floor) === 1000 && Number(oilLv.sellableMilli) === 1000
+  && oilLv.badge.status === 'in_stock', 'O-06: یک روغن به قفسه رسید (در دفترِ سرور)', JSON.stringify(oilLv));
+await look();
+const oilCard = () => page.locator('#products li[data-id="oil"]');
+await page.waitForFunction(() => {
+  const b = document.querySelector('#products li[data-id="oil"] .p-add');
+  return b && !b.disabled;
+}, null, { timeout: 10000 });
+await oilCard().locator('.p-add').click();
+ok(await page.isVisible('#cart-bar'), 'O-06: آخرین روغن در سبدِ مشتری');
+const phone = await call('POST', '/api/shop/orders', {
+  source: 'phone', fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: 'مشتریِ تلفنی' },
+  lines: [{ productId: 'oil', name: 'روغن', unit: 'دانه', qtyMilli: 1000, unitPriceMinor: 25000 }],
+}, T, { 'Idempotency-Key': `web-stock-hold-${Date.now()}` });
+ok(phone.status === 201 && phone.body.order.stockHold && phone.body.order.stockHold.status === 'held',
+  'O-06: سفارشِ تلفنیِ دکان آخرین روغن را نگه داشت', JSON.stringify(phone.body).slice(0, 160));
+await page.click('#open-cart');
+await page.waitForFunction(() => document.body.classList.contains('cart-open') || document.getElementById('cart-sheet').classList.contains('on'));
+await page.click('#cart-next');
+await page.waitForSelector('#view-checkout:not([hidden])');
+await page.check('input[name="fulfillment"][value="pickup"]');
+await page.fill('#c-name', 'مشتریِ ویترین');
+await page.fill('#c-phone', '0791112244');
+await page.click('#verify-send');
+await page.waitForSelector('#verify-code-row:not([hidden])', { timeout: 10000 });
+await page.fill('#v-code', ((await page.textContent('#verify-msg')).match(/(\d{4,8})/) || [])[1] || '');
+await page.click('#verify-check');
+await page.waitForFunction(() => !document.getElementById('submit-order').disabled, null, { timeout: 10000 });
+await page.click('#submit-order');
+await page.waitForFunction(() => /نگه داشته شده/.test(document.getElementById('checkout-msg').textContent), null, { timeout: 10000 })
+  .catch(() => {});
+ok(/برای سفارشِ دیگری نگه داشته شده/.test(await page.textContent('#checkout-msg')),
+  'O-06: «ثبت» ِ مشتری ⇒ پیامِ روشنِ «برای سفارشِ دیگری نگه داشته شده»', await page.textContent('#checkout-msg'));
+ok(await page.isVisible('#view-checkout'), 'O-06: سفارشِ دوم ثبت نشد (همان صفحهٔ ثبت)');
+const orders = await call('GET', '/api/shop/orders?tab=new', null, T);
+ok(orders.status === 200 && orders.body.items.length === 1, 'O-06: فقط سفارشِ تلفنی در صف', String(orders.body && orders.body.items && orders.body.items.length));
+await look();
+ok(((await oilCard().textContent()) || '').includes('ناموجود') && await oilCard().locator('.p-add').isDisabled(),
+  'O-06: کارتِ روغنِ نگه‌داشته «ناموجود» و دکمه‌اش بسته');
+const rej = await call('POST', `/api/shop/orders/${phone.body.order.id}/transition`, { to: 'rejected', reason: 'busy' }, T);
+ok(rej.status === 200, 'O-06: دکان سفارشِ تلفنی را رد کرد');
+await look();
+ok(!((await oilCard().textContent()) || '').includes('ناموجود') && await oilCard().locator('.p-add').isEnabled(),
+  'O-06: رد ⇒ روغن آزاد و دوباره قابلِ سفارش');
+
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));
 

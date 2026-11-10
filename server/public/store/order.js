@@ -18,6 +18,8 @@
     var api = ctx.api;
 
     function renderOrder(o, token) {
+      if (want !== null && token !== want) return o;   //  پاسخِ دیرِ سفارشی که دیگر این‌جا نیست (لغو، جایگزین، روش…)
+      seen(token);
       $('o-title').textContent = t('od.no', { n: K.fa(o.orderNo, 0) });
       var st = $('o-status');
       var why = K.reason(o.statusReason);
@@ -301,7 +303,7 @@
               el('button', { class: 'btn btn-ghost', attrs: { type: 'button' }, text: t('od.sub.no'), on: { click: function () { choose(o, token, s.id, 'reject'); } } })));
           } else {
             var yes = s.status === 'accepted' || s.willApply === 'accept';
-            ul.appendChild(el('li', {}, el('small', { class: 'muted', text: t(yes ? 'od.sub.accepted' : 'od.sub.rejected') })));
+            ul.appendChild(el('li', {}, el('small', { class: 'muted', text: t(yes ? 'od.sub.ok' : 'od.sub.rm') })));
           }
         });
       }).catch(function () { box.hidden = true; });
@@ -313,35 +315,73 @@
         .catch(function (e) { K.note($('o-msg'), 'err', e.message); renderSubs(o, token); });
     }
 
-    //  DLV-06 (S5): پیک برای مشتری فقط از نمای سرور (`delivery`، پشتِ پرچمِ shop.delivery_customer_view):
-    //  نامِ کوچک، رسیدنِ تقریبی و کدِ تحویل — نه شماره، نه شناسه. بی کلید یا چیزی برای گفتن ⇒ پنهان.
-    // ── CHK-24: ویرایشِ دستورِ تحویل تا پیش از ارسال — فقط با `o.deliveryPrefs` (پرچمِ `shop.orders.delivery_prefs`) ──
-    //  پیگیری هر ۲۰ ثانیه دوباره می‌کشد: کادرها فقط با نسخهٔ تازه از سرور پر می‌شوند تا نوشتهٔ مشتری پاک نشود
+    // ── CHK-24: ویرایشِ دستورِ تحویل تا پیش از ارسال — همزادِ `PrefsRules` ِ برنامهٔ خرید (core/.../shopper/ShopperPrefs.kt) ──
+    //  کارت فقط با `o.deliveryPrefs` (پرچمِ `shop.orders.delivery_prefs`)، ارسال، و نه ردشده/لغوشده (`K.orderKind` = err).
+    //  پیگیری هر ۲۰ ثانیه دوباره می‌کشد: کادرها فقط با نسخهٔ تازهٔ همان سفارش پُر می‌شوند تا نوشتهٔ مشتری پاک نشود.
+    //  «با کدام اسکناس…» فقط با «نقد هنگامِ تحویل» (`checkTender`): `K.tenders` ِ جمعِ سفارش + اسکناسِ کنونی اگر هنوز درست است؛
+    //  «پول خرد لازم نیست» ⇒ null ِ صریح؛ ⛔ هرگز مبلغی که سرور رد می‌کند. یک درخواست در هر لحظه؛ ۴xx (جز ۴۲۹) ⇒ پیگیری از نو و
+    //  نمای تازه همان فرستاده ⇒ «ثبت شد» (`PrefsRules.landed`؛ با نشانه هرگز)، وگرنه پیامِ همان کد تا نسخهٔ بعد.
+    var busy = false; var sent = null;
     function renderPrefs(o, token) {
-      var p = o.deliveryPrefs; var f = $('o-prefs'); var msg = $('op-msg');
-      f.hidden = !p;
-      if (!p) return;
-      if (f.getAttribute('data-v') !== String(p.version)) {
+      var p = o.deliveryPrefs; var f = $('o-prefs'); var msg = $('op-msg'); var sel = $('op-tn');
+      f.hidden = !p || o.fulfillment !== 'delivery' || K.orderKind(o.status) === 'err';
+      if (f.hidden) return;
+      var v = token + ':' + p.version;
+      var cash = o.paymentMethod === 'cod';
+      var list = cash ? K.tenders(o.totalMinor, p.cashTenderMinor) : [];
+      $('op-tn-row').hidden = !cash;
+      if (f.getAttribute('data-v') !== v) {
         $('op-call').checked = p.callBeforeArrival; $('op-leave').value = p.leaveWith; $('op-lm').value = '';
-        f.setAttribute('data-v', String(p.version));
+        K.clear(sel).appendChild(el('option', { attrs: { value: '' }, text: t('od.tn.no') }));
+        list.forEach(function (x) { sel.appendChild(el('option', { attrs: { value: String(x) }, text: t('od.tn.o', { m: K.money(x), c: K.money(x - o.totalMinor) }) })); });
+        sel.value = list.indexOf(p.cashTenderMinor) >= 0 ? String(p.cashTenderMinor) : '';
+        f.setAttribute('data-v', v);
       }
-      ['op-call', 'op-leave', 'op-lm', 'op-save'].forEach(function (id) { $(id).disabled = !p.editable; });
-      if (!p.editable) K.note(msg, 'info', t('od.prefs.locked'));
-      else if (msg.getAttribute('data-ok') !== String(p.version)) msg.hidden = true;
+      if (sent && sent.token === token) {
+        var s = sent; sent = null;
+        if (!s.lm && p.callBeforeArrival === s.d.callBeforeArrival && p.leaveWith === s.d.leaveWith && (!cash || p.cashTenderMinor === s.d.cashTenderMinor)) {
+          K.note(msg, 'ok', t('od.pf.ok'));
+        }
+        msg.setAttribute('data-ok', v);
+      }
+      ['op-call', 'op-leave', 'op-lm', 'op-tn'].forEach(function (id) { $(id).disabled = !p.editable; });
+      $('op-save').disabled = !p.editable || busy;
+      if (!p.editable) K.note(msg, 'info', t('err.delivery_locked'));
+      else if (msg.getAttribute('data-ok') !== v) msg.hidden = true;
       f.onsubmit = function (ev) {
         ev.preventDefault();
-        var body = { delivery: { callBeforeArrival: $('op-call').checked, leaveWith: $('op-leave').value.trim() }, expectedVersion: p.version };
-        var lm = $('op-lm').value.trim();
+        if (busy || !p.editable) return;
+        var d = { callBeforeArrival: $('op-call').checked, leaveWith: $('op-leave').value.trim().slice(0, 80) };
+        var x = Number(sel.value) || 0;
+        if (cash) d.cashTenderMinor = list.indexOf(x) >= 0 ? x : null;
+        //  پرداخت دیگر نقد نیست (حساب‌پی پس از ثبت) ⇒ اسکناسِ مانده را سرور با هر ذخیره رد می‌کرد (`bad_cash_tender`)
+        else if (p.cashTenderMinor) d.cashTenderMinor = null;
+        var body = { delivery: d, expectedVersion: p.version };
+        var lm = $('op-lm').value.trim().slice(0, 200);
         if (lm) body.address = { landmark: lm };
-        $('op-save').disabled = true;
+        busy = true; sent = null; $('op-save').disabled = true; K.note(msg, '', '');
         api('/orders/' + encodeURIComponent(token) + '/delivery', { method: 'POST', body: body }).then(function (r) {
+          busy = false;
           var np = r.order && r.order.deliveryPrefs;
-          if (np) { msg.setAttribute('data-ok', String(np.version)); f.setAttribute('data-v', ''); o.deliveryPrefs = np; renderPrefs(o, token); }
-          K.note(msg, 'ok', t('od.prefs.saved'));
-        }).catch(function (e) { K.note(msg, 'err', e.message); $('op-save').disabled = false; });
+          if (np) { msg.setAttribute('data-ok', token + ':' + np.version); renderPrefs(r.order, token); }
+          K.note(msg, 'ok', t('od.pf.ok'));
+        }).catch(function (e) {
+          busy = false; $('op-save').disabled = false;
+          var tn = /^(cash_tender_short|cash_tender_excess|bad_cash_tender)$/.test(e.code);
+          //  اسکناسِ ردشده برگزیده نمی‌ماند: همان که سرور دارد (اگر هنوز درست است) یا «پول خرد لازم نیست»
+          if (tn) sel.value = list.indexOf(p.cashTenderMinor) >= 0 ? String(p.cashTenderMinor) : '';
+          K.note(msg, 'err', tn ? t('od.tn.x') : e.message);
+          sent = { token: token, d: d, lm: lm };
+          //  نسخهٔ کهنه، قفل، پرچمِ خاموش یا اسکناسِ ردشده ⇒ نمای امروز؛ شبکه/۴۲۹/۵xx ⇒ همین کادرها می‌مانند
+          if (e.status >= 400 && e.status < 500 && e.status !== 429 && location.hash === '#/o/' + encodeURIComponent(token)) {
+            api('/orders/' + encodeURIComponent(token)).then(function (r) { open(token, r.order); }, function () { /* همان کادرها */ });
+          }
+        });
       };
     }
 
+    //  DLV-06 (S5): پیک برای مشتری فقط از نمای سرور (`delivery`، پشتِ پرچمِ shop.delivery_customer_view):
+    //  نامِ کوچک، رسیدنِ تقریبی و کدِ تحویل — نه شماره، نه شناسه. بی کلید یا چیزی برای گفتن ⇒ پنهان.
     function renderDelivery(d) {
       var name = d && d.courierName ? String(d.courierName) : '';
       var eta = d && d.etaAt ? K.clock(d.etaAt) : '';
@@ -374,8 +414,8 @@
       $('o-payhint').hidden = !can;
       $('o-pay').disabled = false;
       if (o.paymentMethod === 'online' && st === 'paid') K.note($('o-paynote'), 'ok', t('od.pay.paid'));
-      else if (st === 'pending') K.note($('o-paynote'), 'warn', t('od.pay.pending'));
-      else if (st === 'failed' && can) K.note($('o-paynote'), 'warn', t('od.pay.failed'));
+      else if (st === 'pending') K.note($('o-paynote'), 'warn', t('od.pay.wait'));
+      else if (st === 'failed' && can) K.note($('o-paynote'), 'warn', t('od.pay.fail'));
       else $('o-paynote').hidden = true;
       $('o-pay').onclick = function () { payOnline(token, true); };
       renderPayStep(o, token);
@@ -394,14 +434,14 @@
     function payOnline(token, retry) {
       var scope = 'pay:' + ctx.slug + ':' + token;
       $('o-pay').disabled = true;
-      K.note($('o-paynote'), 'ok', t('od.pay.redirect'));
+      K.note($('o-paynote'), 'ok', t('od.pay.go'));
       api('/orders/' + encodeURIComponent(token) + '/pay', { method: 'POST', body: {}, key: K.keyFor(scope, { token: token }) }).then(function (r) {
         var p = r.payment || {};
         //  تلاشِ پیشینِ همین کلید بسته شده (ناموفق/منقضی/لغو) ⇒ یک بار با کلیدِ تازه
         if (p.status !== 'pending' && p.status !== 'created') {
           K.dropKey(scope);
           if (retry) return payOnline(token, false);
-          throw new Error(t('od.pay.failed'));
+          throw new Error(t('od.pay.fail'));
         }
         if (!/^https:\/\//.test(p.checkoutUrl || '')) throw new Error(t('err.generic'));
         location.assign(p.checkoutUrl);
@@ -416,9 +456,24 @@
     //  پرداختِ در انتظار (برگشت از حساب‌پی) ⇒ هر ۵ ثانیه تا سرور «پرداخت‌شده/ناموفق» بگوید
     var FINAL = ['rejected', 'auto_rejected', 'cancelled_by_customer', 'cancelled', 'delivered', 'picked_up', 'restocked', 'refunded_full', 'refunded_partial'];
     var poll = 0;
+    //  سفارشِ همین نشانی (`want`) و سفارشی که صفحه نشان می‌دهد (`shown`): سفارشِ دیگر در همان سند (فقط `#/o/…` ِ دیگر) ⇒
+    //  محتوا و کارهای سفارشِ پیشین (لغو، پرداخت، گفت‌وگو…) تا پاسخِ همین پنهان، و پاسخِ دیرِ سفارشِ پیشین (پیگیری، لغو…)
+    //  نمی‌نشیند — پیش‌تر روی شبکهٔ کند کارتِ «گفت‌وگو» ِ سفارشِ پیشین زدنی ماند و عکس به رشتهٔ همان رفت
+    var want = null; var shown = null;
+    function body() { return $('view-order').querySelector('.split'); }
+    function wait(token) {
+      clearTimeout(poll); want = token;
+      var stale = shown !== token; var w = $('o-wait');
+      if (stale && !w) { w = el('p', { class: 'muted', attrs: { id: 'o-wait', role: 'status' }, text: t('loading') }); body().parentNode.insertBefore(w, body()); }
+      body().hidden = stale;
+      if (w) w.hidden = !stale;
+    }
+    function seen(token) { shown = token; body().hidden = false; if ($('o-wait')) $('o-wait').hidden = true; }
     function open(token, order) {
+      if (want !== null && token !== want) return;
+      want = token;
       clearTimeout(poll);
-      var load = function () { api('/orders/' + encodeURIComponent(token)).then(function (r) { open(token, r.order); }).catch(fail); };
+      var load = function () { api('/orders/' + encodeURIComponent(token)).then(function (r) { open(token, r.order); }).catch(function (e) { if (token === want) fail(e); }); };
       var o = renderOrder(order, token);
       //  CHK-01: پیشنهادِ ساختنِ حساب پس از ثبت (acct.js، فقط با `features.webAccount` و بی نشست)
       if (ctx.acct) ctx.acct().then(function (a) { a.offer(token); }, function () {});
@@ -426,6 +481,7 @@
       if (pend || FINAL.indexOf(o.status) < 0) poll = setTimeout(function () { if (!document.hidden && location.hash === '#/o/' + encodeURIComponent(token)) load(); else poll = setTimeout(load, 20000); }, pend ? 5000 : 20000);
     }
     function fail(e) {
+      seen(null);
       $('o-title').textContent = t('od.title');
       K.clear($('o-steps')); K.clear($('o-lines')); K.clear($('o-totals')); K.clear($('o-timeline'));
       $('o-status').className = 'pill err';
@@ -435,6 +491,6 @@
       $('o-dlv').hidden = true; ['o-add', 'o-apology', 'o-chat', 'o-np'].forEach(function (id) { if ($(id)) $(id).hidden = true; });
     }
 
-    return { open: open, fail: fail, stop: function () { clearTimeout(poll); } };
+    return { open: open, fail: fail, wait: wait, stop: function () { clearTimeout(poll); } };
   };
 })();

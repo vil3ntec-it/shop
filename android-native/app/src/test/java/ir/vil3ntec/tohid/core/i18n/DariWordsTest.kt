@@ -165,6 +165,20 @@ class DariWordsTest {
     assertTrue("واژهٔ ایرانی در دری ماند:\n" + left.joinToString("\n"), left.isEmpty())
   }
 
+  /** OPS-06: راهنمای ۱۶ صفحه (`core/guide/ScreenGuides`) هم با همان سنجه — متنِ برنامه است، نه دادهٔ کاربر */
+  @Test fun `راهنمای صفحه‌ها در دری واژهٔ ایرانیِ فهرست را جا نمی‌گذارد`() {
+    val left = ArrayList<String>()
+    for (g in ir.vil3ntec.tohid.core.guide.ScreenGuides.ALL) for (gt in listOf(g.title) + g.steps) {
+      var text = gt.of("prs")
+      for (a in dariAllowed) text = text.replace(a, "")
+      for (w in DariText.WORDS) {
+        val tail = if (w.fa in standaloneOnly) "(?![\\p{L}\\p{M}\\u200C])" else ""
+        if (Regex("(?<![\\p{L}\\p{M}\\u200C])" + Regex.escape(w.fa) + tail).containsMatchIn(text)) left += "${g.screen}: «${w.fa}» در «$text»"
+      }
+    }
+    assertTrue("واژهٔ ایرانی در دریِ راهنما ماند:\n" + left.joinToString("\n"), left.isEmpty())
+  }
+
   @Test fun `کلیدِ هر عبارتِ کاملِ دری متنِ فارسیِ یکی از جدول‌هاست`() {
     val all = rows()
     //  کلیدِ با `{}` همان متنِ دری‌شدهٔ ردیف است که هر مقدارِ asIs در آن `{}` شده (`DariText.shape`)
