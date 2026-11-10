@@ -19,9 +19,26 @@ const audit = require('../lib/audit');
 const { entitlementOf } = require('../lib/entitlement');
 const config = require('../config');
 const { requireUser, requireShop } = require('../middleware/auth');
-const { rateLimit, clientIp } = require('../middleware/ratelimit');
+const { rateLimit, refund, clientIp } = require('../middleware/ratelimit');
 
 const router = express.Router();
+
+/*
+ *  ⛔ ممیزیِ ۳۵ (X4): سطلِ IP به‌تنهایی حدس از چند IP را نمی‌بندد ⇒ دو سطلِ «تلاشِ ناموفق» پس از احراز:
+ *    • هر حساب (`u:`) — صاحب و کارمند؛
+ *    • هر دکان، فقط کارمندها با هم (`s:`) — صد حسابِ کارمندِ یک دکان هم با هم همان ده تا. صاحب در این سطل نیست:
+ *      کارمند (یا حسابِ دزدیدهٔ او) هرگز درِ کدِ صاحب را نمی‌بندد.
+ *  موفق پس داده می‌شود (`refundable`)؛ کدِ خرج‌شده/باطل/دکانِ دیگر ناموفق است (خودش نشانِ «این کد هست» است).
+ *  قفل موقت است (`vipFailWindowMs`) و فقط همین در: ورود، نشست و بقیهٔ دکان دست نمی‌خورند.
+ */
+const VIP_FAIL_USER = 'vip-redeem-fail-user';
+const VIP_FAIL_SHOP = 'vip-redeem-fail-shop';
+const failBucket = (keyPrefix, key) => rateLimit({
+  max: config.rateLimit.vipFailMax, windowMs: config.rateLimit.vipFailWindowMs, keyPrefix, key, refundable: true,
+});
+const failPerUser = failBucket(VIP_FAIL_USER, (req) => `u:${req.user.id}`);
+const failPerShop = failBucket(VIP_FAIL_SHOP, (req) => `s:${req.shopId}`);
+const failPerStaff = (req, res, next) => (req.member?.role === 'owner' ? next() : failPerShop(req, res, next));
 
 router.post(
   '/redeem',
@@ -30,10 +47,14 @@ router.post(
   rateLimit({ max: config.rateLimit.joinMax, keyPrefix: 'vip-redeem' }),
   requireUser,
   requireShop,
+  failPerUser,
+  failPerStaff,
   async (req, res, next) => {
     try {
       const code = v.text(req.body?.code, { max: 20, required: true, field: 'کد' });
       const out = await vip.redeem(code, { userId: req.user.id, shopId: req.shopId });
+      refund(req, VIP_FAIL_USER);
+      refund(req, VIP_FAIL_SHOP);
       await audit.log({
         shopId: req.shopId, userId: req.user.id, action: 'vip.redeemed',
         detail: { plan: out.plan, days: out.days }, ip: clientIp(req),

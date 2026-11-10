@@ -143,6 +143,15 @@
 - نیمه‌کاره: هیچ. CI ِ سرور روی PR ای که فقط `docs/WHATS-NEW-fa.md`، `docs/DARI-REVIEW-fa.md` یا پروندهٔ کاتلینِ خوانده‌شده را عوض کند نمی‌دود (pathهای `server.yml`) — تصمیمِ هماهنگ‌کننده.
 - قدمِ بعدی: آزمونِ کاتلینِ پرونده‌خوانِ تازه ⇒ آینه در همان PR؛ برای بردارهای فقط‌کاتلین (customer-price، gift، layaway، price-list، returns، special-order،
   stock-ledger) همتای JS نیست.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-left` (بندهای بازِ ممیزیِ ۳۵: X1–X4 و لرزانیِ push-fcm؛ روی `main` + `claude/sec-audit-35`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد (`server/test/security-audit-35b.test.js`، ردیف‌های X1–X4 در `docs/SECURITY-AUDIT-fa.md`): X1 `admin/sync/errors?limit=-1`؛ X2 NUL در
+  پرسش **سراسری** ⇒ ۴۰۰ `bad_query` (جز `sync`/`shop/sync`/`pump`؛ دو سنجهٔ کهنه با دلیل درست شد: `customer-access` ِ `routes-idor-31` و
+  `bad_product_id` ِ B4)؛ X3 کلیدِ تأیید زیرِ قفلِ دکان+کاربر و رونویسیِ کلیدِ کاربرِ دیگر بسته (روی PostgreSQL پیش از رفع هفت/هشت کلید)؛
+  X4 سطلِ «ناموفق» ِ وی‌آی‌پی به‌ازای حساب و دکان (صاحب جدا، موقت، فقط همین در)؛ لرزانیِ `push-fcm` («250» در شناسهٔ تصادفی) با دانهٔ
+  ثابت بازتولید و رفع، سنجه سخت‌تر (رقمِ فارسی و جداکنندهٔ هزارگان).
+- نیمه‌کاره/تصمیم: P4 (کدِ وی‌آی‌پیِ پمپ فقط IP)، P5 (`sync/v1/status?device_id=%00` ⇒ ۵۰۰ در راهِ مشترک)، X5 (`sectionOf` و پروتوتایپ) فقط
+  گزارش؛ P1–P3 همان. کاتلینی عوض نشد.
+- قدمِ بعدی: P1/P4/P5 در کارِ پمپ با اجازهٔ صاحب‌کار؛ شاهدِ CI.
 ### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/sec-review-38` (بازبینیِ امنیتیِ دومِ دسته‌های ۳۷–۳۸؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: سه یافته با آزمونِ پیش‌سرخ و رفعِ کوچک (`server/test/security-review-38.test.js`، شرح در `docs/SECURITY-AUDIT-fa.md` «B3»): SR38-1 (High) پشتیبانِ
   مهرشدهٔ PGlite رازها را در `pg_statistic` ِ ANALYZE ِ دوره‌ای خام داشت ⇒ `sealPglite` آمار را هم می‌بَرد؛ SR38-2 (Medium) reviver ِ NUL پارسِ هر بدنه را پیش از
