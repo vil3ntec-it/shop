@@ -116,6 +116,8 @@ const KNOWN = Object.freeze([
   { key: 'shop.credit_limit_review', scope: 'shop', default: false, what: 'فروشِ نسیهٔ بیش از سقفِ اعتبارِ مشتری بی تأییدِ دستگاه ⇒ سابقهٔ بررسی برای صاحب (CRM-03؛ رد نمی‌کند)' },
   //  CRM-03 / §۱۰.۱: سرور مجوزِ `customers.credit_limit` را در v1، v3 و REST اجرا می‌کند (‎lib/credit-limit-perm.js‎)
   { key: 'shop.credit_limit_perm', scope: 'shop', default: false, what: 'مجوزِ «تغییرِ سقفِ اعتبارِ مشتری» در سرور (`customers.credit_limit`، CRM-03)؛ ویرایشِ بی‌اجازه رد و به صندوقِ تعارض' },
+  //  PRD-07: همتای `ProductDraftRules` ِ برنامه در v1 و v3 (‎lib/product-unit-rules.js‎)
+  { key: 'shop.product_unit_rules', scope: 'shop', default: false, what: 'واحدِ پایهٔ کالای گردش‌دار و ضریبِ تازهٔ واحدِ فروشِ دوم که دقیقاً به هزارم نیست در همگام‌سازی رد می‌شود (PRD-07؛ صاحب هم)' },
   //  STF-03: فقط سابقهٔ بررسی، هرگز رد (‎lib/promo-loyalty-review.js‎)
   { key: 'shop.promo_loyalty_review', scope: 'shop', default: false, what: 'تخفیفِ خودکارِ قلم و مصرفِ امتیازِ فاکتورِ کارمند با تعریف‌های دکان ⇒ سابقهٔ بررسی برای صاحب (STF-03؛ رد نمی‌کند)' },
   { key: 'shop.custom_roles', scope: 'shop', default: false, what: 'نقشِ سفارشی: نام + نقشِ پایه + محدودیت‌های بیشتر (STF-01)' },

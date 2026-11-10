@@ -187,7 +187,11 @@ function v1NewerFields(req, res, next) {
     }
     //  PRD-07: شکلِ `products.purchaseUnits` روی همان دستهٔ پالایش‌شده (‎lib/purchase-units.js‎؛ ‎routes/sync-v1.js‎ دست نمی‌خورد)
     require('./purchase-units').v1Guard(req, res);
-    next();
+    //  PRD-07: واحدِ پایهٔ کالای گردش‌دار و ضریبِ تازهٔ ناجور (‎lib/product-unit-rules.js‎، پرچمِ خاموش) — فقط اگر op ِ کالا
+    //  واحد/ضریب دارد ناهمگام می‌شود؛ وگرنه همان `next()` ِ همگامِ پیشین
+    const units = require('./product-unit-rules');
+    if (!units.v1Hits(req.body?.ops).length) return next();
+    units.v1Guard(req, res).then(() => next(), (err) => next(err));
   } catch (err) { next(err); }
 }
 
