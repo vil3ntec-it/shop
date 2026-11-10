@@ -233,3 +233,30 @@ test('v1Guard ِ مستقیم، روشن: بدنهٔ بی فهرستِ op (نب�
     assert.equal(res.json, json, 'پاسخ دست نمی‌خورد');
   }
 });
+
+test('v1OpOf همان پذیرشِ validateOp ِ v1 را دارد (شکل‌ها، نام‌های دیگر، فیلدِ ناجور، دلتا، اندازه، hash)', () => {
+  const ok = (extra = {}) => ({ op_id: 'op-1', table: 'products', row_id: 'p1', type: 'update', fields: { unit: 'دانه' }, ...extra });
+  const fields = { unit: 'کیلو', unitFactor: 2 };
+  const cases = [
+    ok(), ok({ type: 'insert' }), ok({ type: 'delete', fields: undefined }), ok({ type: 'delete', fields: {} }), ok({ type: 'delete', fields: { a: 1 } }),
+    { opId: 'op-2', tableName: 'Products', rowId: 'p2', opType: 'insert', fields },
+    { op_id: 'op-3', table_name: 'pro_ducts', id: 'p3', op_type: 'update', fields },
+    ok({ op_id: 'bad id' }), ok({ op_id: 'x'.repeat(65) }), ok({ op_id: 7 }), ok({ row_id: '' }), ok({ row_id: 'r'.repeat(81) }), ok({ row_id: 5 }),
+    ok({ type: 'upsert' }), ok({ table: 'nope' }), ok({ fields: null }), ok({ fields: [1] }), ok({ fields: 'x' }), ok({ type: 'insert', fields: {} }),
+    ok({ fields: { $x: 1 } }), ok({ fields: { ['k'.repeat(65)]: 1 } }), ok({ fields: { '': 1 } }),
+    ok({ fields: { stock: { $inc: 2 } } }), ok({ type: 'insert', fields: { stock: { $inc: 2 } } }), ok({ fields: { stock: { $set: 2 } } }),
+    ok({ fields: { big: 'x'.repeat(syncV1.MAX_FIELDS_BYTES + 1) } }),
+    ok({ hash: 'nope' }), ok({ hash: syncV1.hashOf({ table: 'products', row_id: 'p1', type: 'update', fields: { unit: 'دانه' } }) }),
+    ok({ table: 'warehouseEntries', fields: { productId: 'p1', units: 1 } }),
+    null, 'op', [ok()],
+  ];
+  for (const raw of cases) {
+    const v = syncV1.validateOp('shop', raw);
+    const o = R.v1OpOf(raw);
+    assert.equal(!!o, v.ok, JSON.stringify(raw)?.slice(0, 120));
+    if (v.ok) {
+      assert.deepEqual([o.op_id, o.row_id, o.type, o.table], [v.op.op_id, v.op.row_id, v.op.type, v.op.table], JSON.stringify(raw));
+      assert.deepEqual(o.fields, v.op.type === 'delete' ? null : v.op.fields);
+    }
+  }
+});

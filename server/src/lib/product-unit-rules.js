@@ -95,15 +95,56 @@ async function judgeV3(c, ctx, op, row) {
   return why || null;
 }
 
+/** همان سنجشِ شکلِ `validateOp` ِ v1 (`OP_ID_RE`، `TYPES`، `row_id` ≤ ۸۰) */
+const OP_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const TYPES = Object.freeze(['insert', 'update', 'delete']);
+const isInc = (v) => isObj(v) && Object.keys(v).length === 1 && Number.isFinite(v.$inc);
+
+/**
+ * خوانشِ همان op که v1 می‌نشاند — همان نام‌های `normalize` و همان `tableOf` ِ v1، مثلِ `purchase-units.v1Guard`.
+ * ⛔ نه `validateOp` و نه شیءِ تازه از کلیدهای `fields` (CodeQL: remote-property-injection در `applyOp` ِ `sync-v1.js`).
+ * opی که v1 به‌هر‌حال رد می‌کند ⇒ null (داوری نمی‌شود، دلیلِ v1 همان می‌ماند).
+ */
+function v1OpOf(raw) {
+  if (!isObj(raw)) return null;
+  const opId = raw.op_id ?? raw.opId ?? '';
+  const rowId = raw.row_id ?? raw.rowId ?? raw.id ?? '';
+  const type = raw.type ?? raw.op_type ?? raw.opType ?? '';
+  if (typeof opId !== 'string' || !OP_ID_RE.test(opId) || typeof rowId !== 'string' || !rowId || rowId.length > 80) return null;
+  if (!TYPES.includes(type)) return null;
+  const v1 = require('./sync-v1');
+  const rawTable = raw.table ?? raw.table_name ?? raw.tableName ?? '';
+  const table = v1.tableOf('shop', rawTable);
+  if (!table) return null;
+  let fields = {};
+  if (type === 'delete') {
+    const f = raw.fields;
+    if (f !== undefined && f !== null && !(isObj(f) && !Object.keys(f).length)) return null;
+  } else {
+    fields = raw.fields;
+    if (!isObj(fields)) return null;
+    const keys = Object.keys(fields);
+    if (type === 'insert' && !keys.length) return null;
+    for (const k of keys) {
+      if (!k || k.length > 64 || k.startsWith('$')) return null;
+      const v = fields[k];
+      if (isObj(v) && Object.keys(v).some((x) => x.startsWith('$')) && !(type === 'update' && isInc(v))) return null;
+    }
+    if (Buffer.byteLength(JSON.stringify(fields), 'utf8') > v1.MAX_FIELDS_BYTES) return null;
+  }
+  const hash = raw.hash ? String(raw.hash) : '';
+  if (hash && hash !== v1.hashOf({ table: rawTable, row_id: rowId, type, fields })) return null;
+  return { op_id: opId, row_id: rowId, type, table, fields: type === 'delete' ? null : fields };
+}
+
 /** v1: opهای کالا که واحد/ضریب دارند — همگام، تا دستهٔ بی آن‌ها بی هیچ پرسشی بگذرد */
 function v1Hits(ops) {
   if (!Array.isArray(ops) || !ops.length) return [];
-  const { validateOp } = require('./sync-v1');
   const out = [];
   ops.forEach((raw, i) => {
     if (!isObj(raw) || !touches(raw.fields)) return;
-    const v = validateOp('shop', raw);
-    if (v.ok && v.op.table === 'products' && (v.op.type === 'insert' || v.op.type === 'update')) out.push(i);
+    const o = v1OpOf(raw);
+    if (o && o.table === 'products' && (o.type === 'insert' || o.type === 'update')) out.push(i);
   });
   return out;
 }
@@ -114,8 +155,7 @@ async function v1Guard(req, res) {
   //  همان الگوی نگهبان‌های دیگرِ v1 (`staff-approval`، `purchase-units`): فقط فهرستِ op، وگرنه هیچ (CodeQL: loop bound)
   const ops = Array.isArray(req.body?.ops) ? req.body.ops : null;
   if (!ops || !ops.length || !(await on(ctx.accountId))) return;
-  const { validateOp } = require('./sync-v1');
-  const all = ops.map((raw) => { const v = validateOp('shop', raw); return v.ok ? v.op : null; });
+  const all = ops.map(v1OpOf);
   const ids = [...new Set(all.filter((o) => o && o.table === 'products').map((o) => o.row_id))];
   const { query } = require('../db');
   const stored = new Map((await query(
@@ -149,4 +189,4 @@ async function v1Guard(req, res) {
   require('./v1-reject').rejectOps(req, res, ops, rejected);
 }
 
-module.exports = { FLAG, LOCKED, INEXACT, HISTORY, factorMilli, exactMilli, touches, reasonOf, judgeV3, v1Hits, v1Guard };
+module.exports = { FLAG, LOCKED, INEXACT, HISTORY, factorMilli, exactMilli, touches, reasonOf, judgeV3, v1OpOf, v1Hits, v1Guard };
