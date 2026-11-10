@@ -54,6 +54,17 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/pur-2` (خانوادهٔ PUR: PUR-02/03/04/13/14؛ روی `origin/main` ‏99036497 = #1026؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- ممیزی: هر پنج ردیف جز آزمونِ **دستگاه** کد داشتند؛ سه کاستیِ واقعی پیدا شد. (۱) سرور «بخشی/کامل» را نمی‌پالایید و برنامه فقط صفحهٔ
+  نخستِ ۵۰تاییِ `state=sent` را می‌خواند ⇒ پالایه‌های گوشی ناقص و «در راه» ِ پیشنهادِ سفارش (PUR-03) بی سفارشِ بازِ کهنه. (۲) `onOrderMilli`
+  ضریبِ واحدِ خرید (PRD-07) را نمی‌دید: ۲ کارتنِ ۲۴تایی = ۲ ⇒ پیشنهادِ بیش از نیاز. (۳) پنجرهٔ دریافتِ کامپیوتر «دریافتِ همهٔ باقی‌مانده» نداشت.
+- انجام شد: سرور `GET /api/shop/purchase-orders?status=…` (draft/sent/partial/complete/cancelled/open) با `core.status`، صفحه‌بندیِ پیموده و
+  `SCAN_MAX` ِ ۵۰۰ (`lib/purchase-orders.js` ‹`list`›)، بی مهاجرت و بی پرچمِ تازه — `purchase-orders-status.test.js` ۳/۳ (پیش از تغییر ۰/۳) روی PGlite و
+  PostgreSQL 16؛ برنامه: `PurchaseOrderBook.planningOrders` (همهٔ بازها + صفحهٔ نخستِ فرستاده‌ها) در هر سه جای پیشنهاد، `onOrderMilli` به واحدِ پایه،
+  `PoForms.serverStatus`/`openOnly`، و `DeskReceiveAll` در `PoReceive`؛ `PurchaseOrderPlanningTest` (۴) و کارِ تازهٔ `V3ReachabilityTest`.
+- نیمه‌کاره: کامپایل و آزمون‌های Kotlin فقط در CI (Gradle این‌جا نیست). PUR-13/14 کدِ تازه نخواستند؛ مانده همان چاپگر/اسکنر و گوشی/کامپیوترِ واقعی.
+  PUR-03: فصل و درجهٔ اطمینانِ INV-13 در پیشنهادِ فرم همان **تصمیمِ صاحب‌کار**. پیشنهادِ اختیاری: `match` ِ سه‌طرفه در `GET /:id` ِ سرور (امروز فقط برنامه).
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد و نتیجهٔ `PurchaseOrderPlanningTest` و `V3ReachabilityTest` را از CI در STATUS بنویسد.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/rsk-platform` (تمیزکاری: بی سقفِ پلتفرمیِ تازه برای `OrderRiskListsV3.kt`؛ روی `ccr-…-batch-42` ‏1879be76؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: `090a2373` (از `claude/rsk-app`) برای یک `LocalContext` در صفحهٔ v3 سقفِ تازهٔ ۱ در `platformDeps` ِ `tools/quality/baseline.json` گذاشته بود.
   پوستهٔ مسیرِ `RiskListsRoute` (مخزن از `Context`) به `OrderRiskListsAndroid.kt` رفت (مرزِ `*Android.kt` در `PLATFORM_DEPS.boundary`)؛ بدنه `RiskListsContent(repo)`

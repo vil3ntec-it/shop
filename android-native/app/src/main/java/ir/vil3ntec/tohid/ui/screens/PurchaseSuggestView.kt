@@ -54,7 +54,8 @@ internal fun PoSuggest(
   val c = Shop.colors
   val scope = rememberCoroutineScope()
   var orders by remember { mutableStateOf<List<PurchaseOrderDto>?>(null) }
-  LaunchedEffect(Unit) { orders = repo.list("sent").valueOrNull()?.orders.orEmpty() }
+  //  PUR-03: «در راه» از همهٔ سفارش‌های باز (نه فقط ۵۰ فرستادهٔ تازه‌تر)
+  LaunchedEffect(Unit) { orders = repo.planningOrders() }
   var onlyDue by remember { mutableStateOf(true) }
   var busy by remember { mutableStateOf<String?>(null) }
   var error by remember { mutableStateOf<String?>(null) }
