@@ -516,9 +516,14 @@
       //  نقش بیرونِ `shop` می‌آید (`role`، `isOwner`)؛ کنارِ دکان نگه داشته
       //  می‌شود تا صفحه بداند تخفیف و لغو با این حساب هست یا نه، و «نقشِ شما»
       //  در نمایه دیگر «—» نماند.
-      const shop = r.shop ? Object.assign({}, r.shop, { role: r.role || '', isOwner: !!r.isOwner }) : null;
+      //  CRM-15: `policy` (لایه‌های مجوز، `effective`) برای «شمارهٔ مشتریان» و «سابقه» ِ `customer-access.js`
+      const shop = r.shop ? Object.assign({}, r.shop, {
+        role: r.role || '', isOwner: !!r.isOwner, actualRole: r.actualRole || r.role || '', policy: r.policy || null,
+      }) : null;
       setState({ shop, members: r.members || [] });
       assignInvoiceBlock(r);
+      //  مجوزِ تازه (لایهٔ صاحب) بی بارگذاریِ دوباره به صفحه می‌رسد — `customer-access.js` شماره‌ها را دوباره می‌پوشاند
+      try { window.dispatchEvent(new CustomEvent('tohid:shop-info')); } catch { /* مرورگرِ کهنه */ }
       return r;
     } catch { return null; }
   }
@@ -722,6 +727,14 @@
   //  POS-03: «۳*کد» در کادرِ بارکدِ فروش (`cart-query.js`، همان `CartQuery` ِ برنامه؛ پشتِ تنظیمِ خاموشِ همین مرورگر)
   if (!window.TohidCartQuery) {
     document.head.appendChild(Object.assign(document.createElement('script'), { src: 'license/cart-query.js?v=1', defer: true }));
+  }
+  //  POS-04: نامِ کالا در همان کادر (`catalog-match.js`، همزادِ `CatalogMatch` ِ کامپیوتر با `text-core.js`؛ پشتِ تنظیمِ خاموشِ همین مرورگر)
+  if (!window.TohidCatalogMatch) {
+    document.head.appendChild(Object.assign(document.createElement('script'), { src: 'license/catalog-match.js?v=1', defer: true }));
+  }
+  //  CRM-15: شمارهٔ پوشیدهٔ مشتری، سابقهٔ دسترسی و «چه کسی این پرونده را دید» (`customer-access.js`)
+  if (!window.TohidCustomerAccess) {
+    document.head.appendChild(Object.assign(document.createElement('script'), { src: 'license/customer-access.js?v=1', defer: true }));
   }
   //  R10: خانهٔ CSV ِ هر چهار خروجیِ صفحه بی «فرمول» در اکسل (`csv-cell.js`، همان `finance-reports.cell` ِ سرور)
   if (!window.TohidCsvCell) {

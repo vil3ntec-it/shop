@@ -30,6 +30,11 @@ object StrTill {
   val deviceCode: String get() = t("با رمزِ دستگاه", "With the device code", "د وسیلې د رمز سره")
   val back: String get() = t("برگشت به فهرست", "Back to the list", "لړلیک ته بېرته")
   fun atTill(name: String): String = t("پشتِ صندوق: ${asIs(name)}", "At the till: $name", "په صندوق کې: $name")
+  val serverEnrollFailed: String get() = t(
+    "PIN روی همین دستگاه گذاشته شد، ولی سرور آن را نپذیرفت؛ تا آن را دوباره نگذارید، سرور کارِ این کاربر را به نامِ حسابِ همین دستگاه می‌بیند.",
+    "The PIN was set on this device, but the server did not accept it; until you set it again, the server records this user's work under this device's account.",
+    "PIN په همدې وسیله کې کېښودل شو، خو سرور ونه مانه؛ تر هغه چې یې بیا کېنږدئ، سرور د دې کارن کار د همدې وسیلې د حساب په نوم ګڼي.",
+  )
   fun lockedUser(name: String): String = t(
     "PIN ِ «${asIs(name)}» پس از خطاهای پیاپی قفل است.",
     "$name's PIN is locked after repeated mistakes.",

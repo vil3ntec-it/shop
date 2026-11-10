@@ -69,11 +69,13 @@ const PARTS = {
   //  «خبرم کن روی همین دستگاه» (پوشِ وب، CHK-20/NTF-01؛ order-push.js ِ دیربار از پیگیری، فقط با `order.push`): بخش را خودِ اسکریپت می‌سازد
   //  «روی همین دستگاه هم خبرم کن» ِ «خبرم کن» ِ کالا (WEB-10، alert-push.js ِ دیربار از filters.js، فقط با `push` ِ «هشدارهای من»)
   //  همان واژه‌نامه را دارد؛ push-client.js (کارگرِ سرویس و اشتراکِ مشترکِ هر دو) هیچ متنی ندارد
-  push: { js: 'store/order-push.js', also: ['store/alert-push.js', 'store/push-client.js'], root: 'view-order' },
+  push: { js: 'store/order-push.js', also: ['store/alert-push.js', 'store/push-client.js'], root: 'o-np' },
+  //  خلاصهٔ صفحهٔ تأیید (CHK-20، §۱۹.۲ بندِ ۸: دکانِ مسئول، ناحیه، بازه و «کپیِ نشانیِ پیگیری»؛ order-facts.js ِ دیربار از پیگیری)
+  facts: { js: 'store/order-facts.js', root: 'o-facts' },
 };
 const parts = Object.fromEntries(Object.keys(PARTS).map((n) => [n, Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/${n}.${l}.json`))]))]));
 const dict = Object.fromEntries(LANGS.map((l) => [l, Object.assign({}, main[l], ...Object.values(parts).map((p) => p[l]))]));
-const SOURCES = ['kit/kit.js', 'kit/settings.js', 'kit/order-kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js', 'store/catalog.js', 'store/filters.js', 'store/order-feedback.js', 'store/order-changes.js', 'store/reviews.js', 'market/index.html', 'store/index.html', 'store/account.js', 'store/visual-search.js', 'store/delivery-method.js', 'store/chat.js', 'store/chat-out.js', 'store/chat-acts.js', 'store/chat-voice.js', 'store/pay-step.js', 'store/line-prefs.js', 'store/acct.js', 'store/cart-sync.js', 'store/erase.js', 'store/order-push.js', 'store/sw.js', 'store/alert-push.js', 'store/push-client.js', 'store/same.js'];
+const SOURCES = ['kit/kit.js', 'kit/settings.js', 'kit/order-kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js', 'store/catalog.js', 'store/filters.js', 'store/order-feedback.js', 'store/order-changes.js', 'store/reviews.js', 'market/index.html', 'store/index.html', 'store/account.js', 'store/visual-search.js', 'store/delivery-method.js', 'store/chat.js', 'store/chat-out.js', 'store/chat-acts.js', 'store/chat-voice.js', 'store/pay-step.js', 'store/line-prefs.js', 'store/acct.js', 'store/cart-sync.js', 'store/erase.js', 'store/order-push.js', 'store/sw.js', 'store/alert-push.js', 'store/push-client.js', 'store/same.js', 'store/order-facts.js'];
 const ARABIC = /[\u0600-\u06FF]/;
 
 function usedKeys() {

@@ -12,6 +12,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.ShopDayChoice
+import ir.vil3ntec.tohid.core.calendar.BusinessDay
 import ir.vil3ntec.tohid.core.calendar.ShopDay
 import ir.vil3ntec.tohid.core.i18n.StrStaffTime
 import ir.vil3ntec.tohid.core.money.Currency
@@ -109,6 +110,10 @@ fun StaffTimeHub(d: ShopData, monthFrom: String, today: String, initial: StaffTi
     if (!manager) null else plan?.let { p -> Commission.compute(StaffReport.commissionLines(d, monthFrom, today, lineSeller), p.plan, Currency.AFN) }
   }
   val periods = if (!manager) emptyList() else StaffReport.periods(spans, today, monthFrom)
+  //  STF-07: زدن‌های روزهای کاریِ همین ماه که سرور دیر گرفت (`late`، ساعتِ سرور) — هیچ زدنی رد نمی‌شود، فقط نشان داده می‌شود
+  val lateThisMonth = if (!manager) emptyMap() else punches
+    .filter { it.late && BusinessDay.businessDateAt(it.punch.atMs, offset, dayStart) >= monthFrom }
+    .groupingBy { it.punch.staffId }.eachCount()
 
   fun punch(forMember: String?, kind: TimeClock.Kind) {
     busy = true
@@ -152,6 +157,7 @@ fun StaffTimeHub(d: ShopData, monthFrom: String, today: String, initial: StaffTi
           week = hm(r.week),
           month = StrStaffTime.monthWorked(hm(r.month), r.month?.days ?: 0),
           issues = r.month?.issues ?: 0,
+          late = lateThisMonth[r.staffId] ?: 0,
         )
       },
       commission = result?.sellers?.sortedByDescending { it.commission.minor }?.map { SellerRow(it.sellerId, money(it.base.minor / 100.0), "${money(it.commission.minor / 100.0)} ؋") },

@@ -11,6 +11,9 @@
  * ⛔ هر عضو برای خودش می‌زند؛ زدن برای عضوِ دیگر (اصلاحِ «خروجِ جاافتاده») فقط صاحب و مدیر،
  *    و `by_member_id` ثبت می‌کند چه کسی زد. هم‌زمانی زیرِ قفلِ ردیفِ عضو است.
  * ⛔ نرخ‌ها به پایه‌امتیاز (۰ تا ۱۰٬۰۰۰، `Commission.Plan`)؛ نوشتن با `version` ِ فعلی (۴۰۹ کهنه).
+ * ⛔ «دیر ثبت‌شده» (تصمیمِ صاحب‌کار: زدنِ تا ۷ روز عقب پذیرفته است): هر زدن `recordedAt` (ساعتِ **سرور** هنگامِ ثبت) و
+ *    `late` (بیش از [LATE_MS] پس از زمانِ خودش رسید) دارد تا صاحب ببیند کدام زدن با ساعتِ گذشته آمده — صفِ آفلاین
+ *    یا دستی؛ هیچ زدنی رد یا عوض نمی‌شود. داوری فقط با ساعتِ سرور، نه چیزی که دستگاه می‌فرستد.
  */
 const { one, many, tx, now } = require('../db');
 const { badRequest, conflict, forbidden, notFound } = require('../middleware/errors');
@@ -23,6 +26,7 @@ const MAX_RANGE_MS = 62 * 24 * 60 * 60 * 1000;
 const MAX_KEYS = 200;
 const ID = /^[A-Za-z0-9_-]{8,64}$/;
 const MANAGERS = ['owner', 'manager'];
+const LATE_MS = 30 * 60 * 1000;
 
 const flagOf = (shopId) => orders.flagOf(shopId, FLAG);
 
@@ -30,6 +34,7 @@ function shapePunch(r) {
   return {
     id: r.id, memberId: r.member_id, kind: r.kind, at: Number(r.at),
     deviceUid: r.device_uid, byMemberId: r.by_member_id, name: r.name ?? undefined,
+    recordedAt: Number(r.created_at), late: Number(r.created_at) - Number(r.at) > LATE_MS,
   };
 }
 
@@ -150,4 +155,4 @@ async function savePlan(shopId, actor, body = {}) {
   });
 }
 
-module.exports = { FLAG, flagOf, punch, list, plan, savePlan, FUTURE_SKEW_MS, MAX_AGE_MS };
+module.exports = { FLAG, flagOf, punch, list, plan, savePlan, FUTURE_SKEW_MS, MAX_AGE_MS, LATE_MS };

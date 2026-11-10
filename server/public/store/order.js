@@ -93,7 +93,16 @@
       renderAlt(o);
       renderPlace(o);
       renderPush(o, token);
+      renderFacts(o, token);
       return o;
+    }
+
+    //  CHK-20 (§۱۹.۲ بندِ ۸): دکانِ مسئول، ناحیه، بازهٔ برگزیده و «کپیِ نشانیِ پیگیری» — store/order-facts.js ِ دیربار
+    var facts = null;
+    function renderFacts(o, token) {
+      facts = facts || K.js('/store/order-facts.js').then(function () { return window.StoreOrderFacts({ store: ctx.store }); })
+        .catch(function () { facts = null; return null; });
+      facts.then(function (f) { if (f && (want === null || want === token)) f.render(o, token); });
     }
 
     //  CHK-20/NTF-01: «خبرم کن روی همین دستگاه» (پوشِ وب) — store/order-push.js فقط وقتی پیگیری کلیدِ `push` را داد
@@ -488,7 +497,7 @@
       $('o-status').textContent = e.status === 404 ? t('od.nf') : t('od.err');
       $('o-meta').textContent = e.message;
       $('o-cancel').hidden = true; $('o-reorder').hidden = true; $('o-pay').hidden = true; $('o-payhint').hidden = true; $('o-paynote').hidden = true;
-      $('o-dlv').hidden = true; ['o-add', 'o-apology', 'o-chat', 'o-np'].forEach(function (id) { if ($(id)) $(id).hidden = true; });
+      $('o-dlv').hidden = true; ['o-add', 'o-apology', 'o-chat', 'o-np', 'o-facts', 'o-link'].forEach(function (id) { if ($(id)) $(id).hidden = true; });
     }
 
     return { open: open, fail: fail, wait: wait, stop: function () { clearTimeout(poll); } };

@@ -6,6 +6,9 @@
  *   door `debtor`  `GET /api/debtors/:id` (پروندهٔ قرض‌دار: شماره، نشانی، مانده) — kind `phone` اگر شماره یا
  *                  نشانیِ کامل در پاسخ رفت، وگرنه `detail`؛
  *   door `orders`  `GET /api/shop/orders/customer` (CRM-07، سفارش‌های یک مشتری با شمارهٔ او) — kind `detail`.
+ *   door `app`     `POST /api/shop/customer-access` ([noteApp]، مهاجرتِ ۶۱۰): دیدنی که **برنامه** از دفترِ خودش گزارش
+ *                  می‌دهد — وب (`license/customer-access.js`، دفترِ مرورگر) و نقشی که `auditLog` نمی‌نویسد (حسابدار،
+ *                  `perm-core.canWrite`)؛ `*` = خروجیِ برگهٔ همهٔ مشتریان (فقط `export`).
  *   فهرست‌ها (`GET /api/debtors`) و همگام‌سازی خواندنِ «یک مشتری» نیستند و این‌جا نمی‌آیند. خواندنِ دفترِ خودِ
  *   دستگاه (بی‌اینترنت) را برنامه در `auditLog` ِ دفتر می‌نویسد (`type = customer_view`) و با همان همگام‌سازیِ
  *   امروز به سرور می‌رسد — نه این جدول (`data/CustomerAccessLog.kt`).
@@ -26,13 +29,18 @@ const config = require('../config');
 const { tx, query, many, newId, now } = require('../db');
 const v = require('./validate');
 const { serverSecret } = require('./server-secret');
+const { badRequest } = require('../middleware/errors');
 
 const KINDS = Object.freeze(['detail', 'phone', 'export']);
-const DOORS = Object.freeze(['debtor', 'orders']);
+const DOORS = Object.freeze(['debtor', 'orders', 'app']);
+/** `customer_ref` ِ خروجیِ برگهٔ همهٔ مشتریان (همان `CustomerAccess.ALL` ِ برنامه) — در پروندهٔ هر مشتری دیده می‌شود */
+const ALL = '*';
 const WINDOW_MS = 10 * 60 * 1000;
 const PHONE_PREFIX = 'ph:';
 const ERASED_PREFIX = 'erased:';
 const LIST_MAX = 200;
+/** SR45-1: سهمِ بیشینهٔ `*` از صفحهٔ فهرست وقتی ردیفِ خودیِ همان مشتری بیشتر است (۱ از ۴) */
+const ALL_SHARE = 4;
 const REF_RE = /^[A-Za-z0-9_.:-]{1,80}$/;
 
 //  ── شمارِ ops (در حافظهٔ همین نمونه) ─────────────────────────────────
@@ -150,6 +158,28 @@ function noteLookup(req, { customerId, phones, kind = 'detail', door = 'orders' 
   } catch (err) { failed(err); }
 }
 
+/**
+ * دیدنی که **برنامه** از دفترِ خودش گزارش می‌دهد (`POST /api/shop/customer-access`، درِ `app`) — وب و نقشی که `auditLog`
+ * نمی‌نویسد. ⛔ بیننده، نقش، دکان و دستگاه فقط از توکن؛ از بدنه فقط `customerId` و `kind`. ⛔ `phone` از اصلی که
+ * `customers.contact` ندارد ⇐ `detail` (شمارهٔ کامل هرگز به او نرسیده؛ سرور داور است). `*` فقط با `export`. همان
+ * یکی کردنِ ۱۰ دقیقه. شناسهٔ بدشکل یا نوعِ ناشناخته ⇐ ۴۰۰؛ خطای پایگاه شمرده می‌شود و بالا می‌رود.
+ * @returns {Promise<{kind: string, hits: number}>}
+ */
+async function noteApp(req, { customerId, kind }) {
+  if (typeof kind !== 'string' || !KINDS.includes(kind)) throw badRequest('نوعِ دیدن درست نیست', 'bad_kind');
+  const ref = customerId === ALL ? (kind === 'export' ? ALL : null) : refOf(customerId);
+  if (!ref) throw badRequest('شناسهٔ پرونده درست نیست', 'bad_customer');
+  const recorded = kind === 'phone' && (await require('./customer-contact').hiddenForReq(req)) ? 'detail' : kind;
+  try {
+    const r = await api.record({
+      shopId: req.shopId, viewerId: req.user.id, role: req.role || req.member?.role || '',
+      deviceId: req.device?.device_uid || '', customerRef: ref, kind: recorded, door: 'app',
+    });
+    counters.recorded += 1;
+    return { kind: recorded, hits: r.hits };
+  } catch (err) { failed(err); throw err; }
+}
+
 /** همهٔ نوشتن‌های در راه (آزمون، و پیش از بستنِ سرور) */
 async function settle() { while (pending.size) await Promise.allSettled([...pending]); }
 
@@ -210,25 +240,37 @@ async function anonymize(c, shopId, forms, placeholder) {
 }
 
 /**
- * سابقهٔ دسترسیِ یک مشتری (درِ سرور)، تازه‌ترین اول — بیننده (شناسه و نام)، نقش، دستگاه، نوع، در، زمان و شمار.
- * ⛔ فقط همین دکان؛ `ph:` ِ شماره‌های همین قرض‌دار هم (خواندنِ «سفارش‌های مشتری» بی شناسهٔ پرونده).
+ * سابقهٔ دسترسیِ یک مشتری (درِ سرور)، تازه‌ترین اول — بیننده (شناسه و نام)، نقش، دستگاه، نوع، در، زمان و شمار
+ * (و `all: true` برای خروجیِ برگهٔ همهٔ مشتریان).
+ * ⛔ فقط همین دکان؛ `ph:` ِ شماره‌های همین قرض‌دار هم (خواندنِ «سفارش‌های مشتری» بی شناسهٔ پرونده)، و خروجی‌های
+ *    برگهٔ همهٔ مشتریان (`*`، درِ `app`) — همان قاعدهٔ `CustomerAccess.rows` ِ برنامه.
+ * ⛔ SR45-1: ردیف‌های `*` در فهرستِ **هر** مشتری می‌آیند و هر عضو هر ۱۰ دقیقه یکی می‌نویسد ⇒ با یک `LIMIT` ِ مشترک،
+ *    همان انباشت (یا شاگردی که عمداً «خروجیِ همه» می‌فرستد) دیدنِ واقعیِ همین مشتری را از صفحه بیرون می‌راند. پس `*` وقتی
+ *    ردیفِ خودیِ بیشتری هست حداکثر یک‌چهارمِ صفحه را می‌گیرد؛ جای خالی را هر کدام پر می‌کند و ترتیب همان تازه‌ترین اول.
  */
 async function list(shopId, customerId, { limit = 100 } = {}) {
   const id = refOf(customerId);
   if (!id) return [];
   const lim = Math.min(Math.max(Number(limit) || 100, 1), LIST_MAX);
   const refs = [id, ...(await phoneRefsOf({ query }, shopId, id))];
-  const rows = await many(
+  const of = (where, params) => many(
     `SELECT l.id, l.viewer_id, COALESCE(u.name, '') AS viewer_name, l.role, l.device_id, l.kind, l.door,
-            l.first_at, l.last_at, l.hits
+            l.first_at, l.last_at, l.hits, l.customer_ref = '*' AS all_sheet
        FROM customer_access_log l LEFT JOIN users u ON u.id = l.viewer_id
-      WHERE l.shop_id = $1 AND l.customer_ref = ANY($2::text[])
+      WHERE l.shop_id = $1 AND ${where}
       ORDER BY l.last_at DESC, l.id DESC LIMIT $3`,
-    [shopId, refs, lim]
+    [shopId, ...params, lim]
   );
+  const own = await of('l.customer_ref = ANY($2::text[])', [refs]);
+  const sheet = await of('l.customer_ref = $2', [ALL]);
+  const sheetTake = Math.min(sheet.length, Math.max(Math.ceil(lim / ALL_SHARE), lim - own.length));
+  const rows = [...own.slice(0, lim - sheetTake), ...sheet.slice(0, sheetTake)]
+    .sort((a, b) => Number(b.last_at) - Number(a.last_at) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
   return rows.map((r) => ({
     id: r.id, viewerId: r.viewer_id, viewerName: r.viewer_name, role: r.role, device: r.device_id,
     kind: r.kind, door: r.door, firstAt: Number(r.first_at), lastAt: Number(r.last_at), count: Number(r.hits),
+    //  خروجیِ برگهٔ همهٔ مشتریان (`*`) — برنامه «برگهٔ همه» می‌نویسد، نه «صورت‌حسابِ همین مشتری»
+    ...(r.all_sheet ? { all: true } : {}),
   }));
 }
 
@@ -240,8 +282,8 @@ async function sweep({ at = now(), days = retentionDays() } = {}) {
 }
 
 const api = module.exports = {
-  KINDS, DOORS, WINDOW_MS, PHONE_PREFIX, ERASED_PREFIX,
-  refOf, phoneRef, record, note, noteLookup, settle, stats, list, anonymize, sweep, retentionDays,
+  KINDS, DOORS, WINDOW_MS, PHONE_PREFIX, ERASED_PREFIX, ALL,
+  refOf, phoneRef, record, note, noteLookup, noteApp, settle, stats, list, anonymize, sweep, retentionDays,
   //  برای آزمون
   _debtorIdsByPhone: debtorIdsByPhone, _counters: counters,
 };

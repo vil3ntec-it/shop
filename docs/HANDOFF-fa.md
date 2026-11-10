@@ -66,6 +66,120 @@
   ورودیِ کاربر به آن گزارش نمی‌رسد)؛ فهرستِ نویسنده‌های CSV (سرور/وب/پنل) در `web-csv-cell.test.js` ۶/۶. `security-review-44.test.js` ۷/۷ (PGlite و PostgreSQL).
 - نیمه‌کاره: هیچ. پیش‌فرضِ کم‌ترِ `IMAGE_STUDIO_DECODE_MB` برای سرورِ خانگیِ کم‌حافظه — تصمیمِ صاحب‌کار.
 - قدمِ بعدی: هماهنگ‌کننده شاخه را پس از `claude/sec-review-44` در دسته بگذارد؛ `VERSION` ِ `sw.js` با شاخه‌های دیگرِ دسته هماهنگ شود.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/ci-evidence-3` (شاهدِ CI ِ دستهٔ ۴۳ برای ردیف‌هایی که آزمونِ Kotlin شان «فقط در CI» بود؛ روی main ‏cceb5930 (#1027)؛ فقط سند؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: لاگِ سرِ سبزِ #1027 ‏866af600 خوانده شد — KTEST ِ «کامپایل و آزمون» 129710301971 (۵۴۹۰ PASS، ۷ SKIP)، «ساخت نسخهٔ بومی» 129710297176
+  (۶۸۷۹ PASS، ۴ SKIP)، «برنامهٔ خریدِ مشتری (گزارش)» 129710297127 (۳۰ PASS)، دیسکِ ویندوز ۱۴۱ و مک ۱۴۰ PASS (+۱ SKIP ِ ACL ِ ویندوز)، iOS ِ core
+  129712432526 (۲۳۱ `<testsuite>` بی شکست)، سرور (run 42780861831) و مرورگر 129710301956؛ **هیچ FAIL**؛ SKIPها همه بی‌محیط (`ShopperLiveTest`/`ShopperStage2LiveTest`
+  بی سرور — در کارِ برنامهٔ خرید PASS —، `AtRestDiskTest` ِ ویندوز، دو سنجهٔ کارایی، `NewScreensRenderTest`، `Offline30DaysDesktopTest`). ۲۵ ردیف شاهدِ کلاس‌به‌کلاس
+  گرفتند (PASS = `@Test`) و «فقط در CI/بی شاهد» از آن‌ها برداشته شد؛ فقط **CHAT-14** جز شاهد چیزی نداشت ⇒ IMPLEMENTED-VERIFIED. همه: ۴۳۶ IV (از ۴۳۵)، ۲۶۱ PARTIAL (از ۲۶۲).
+- PARTIAL ماندند: تصمیمِ صاحب‌کار (`OWNER-PENDING-fa.md`) — NTF-08 (۱-۹)، PRD-17 و PRD-27 (۴-۲۲)، PRM-02 (۴-۲۱)، CRM-03 و STF-03 (۱-۸)، SYN-12 (۳-۲۱)، LOC-03 (۴-۲۰)،
+  LOC-04 (۴-۱۹)، PRD-08 (۳-۲۰)، RPT-14 (۲-۱۷)، POS-10، OPS-06، CHAT-07 (۳-۷ + آیفون)؛ دستگاه — CHK-18 و ORD-20 (+۳-۲۳)، CHAT-02، RSK-03، RSK-04، MKT-06 (+O-01)؛
+  دیگر — CHK-03 (D-09)، LOC-06، SYN-01 (`Offline30DaysDesktopTest` در CI هم SKIP)، RPT-13 (`keymap.json` هنوز `reports.drill` «partial» و سه کلیدِ دوره «planned»).
+- یافته: در «ساخت نسخهٔ بومی» هر کلاسِ `core` دو بار می‌آید (`:core:jvmTest` و `:jvmTest` ِ جدا) ⇒ PASS = ۲ × `@Test`؛ `ScreenGuidesTest` ۵ `@Test` دارد، نه ۶ ِ STATUS.
+- نیمه‌کاره: هیچ.
+- قدمِ بعدی: ردیف‌های فقط-JS با «شاهدِ CI هنوز نه» (مثلاً DLV-06 که O-07 اش گرفته شد) با همین لاگ‌ها؛ RPT-13: هم‌خوان کردنِ `keymap.json` با آنچه ساخته شد.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/owner-decisions-4` (فهرستِ یکتای تصمیم‌های مانده، دورِ چهارم؛ فقط سند؛ روی main ‏cceb5930 (#1027)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: `docs/OWNER-PENDING-fa.md` ۷۹ ⇐ ۹۰ (۱۱ / ۲۶ / ۲۸ / ۲۵؛ شماره‌ها با اسکریپت: بی تکرار، پیوسته، هر ارجاعِ «گ-ش» موجود)، هر بند با متنِ منبع سنجیده:
+  ۱-۱۰ PAY-10 (یک روز / ۱۰ دقیقه، نیمه رو به بالا، `FX_EXCESS`، پولِ پسِ بی سقف، IRR بی اعشار و واحدهای ۱ / ۱٬۰۰۰ / ۱٬۰۰۰٬۰۰۰ از `license/fx-till.js`)،
+  ۱-۱۱ POS-10/21 + PRD-12 (عمده بی مجوز)، ۲-۲۳ R7/R8 (B8، در main)، ۲-۲۴ R10 (B9)، ۲-۲۵ `shop.till_pin` + STF-07، ۲-۲۶ `panel.db`، به‌روزرسان، مخزن، امضا و
+  مقدارِ env ِ سایت برای viewer (ریپوی `server`: «۱.۵۰.۸۲» در main، «۱.۵۰.۸۳» در `claude/server-48` تا f09672b)، ۳-۲۶ `shop.stock_v2` / ارزشِ موجودیِ D-23 /
+  انبار و محل، ۳-۲۷ PUR-03، ۴-۲۳ استودیوی عکس (+ R11/R12)، ۴-۲۴ HW-07/09، ۴-۲۵ POS-02 / PRD-12 ِ نام‌دار / PRM-18. یکی‌شده: ۲-۸ (۴+۳)، ۲-۱۰، ۲-۱۱ (کاربرِ
+  غیرِ root)، ۲-۱۳، ۲-۱۸ (چهار از هفت در ۱.۵۰.۸۰؛ دانلودِ پشتیبان)، ۳-۳، ۳-۱۲، ۳-۲۲ (+ `shop.owner_report.profit`)، ۴-۱، ۴-۲، ۴-۷ (AI-01/09/12)، ۴-۱۰ (en/ps ِ
+  `claude/rpt-2`)، ۴-۱۱ (مجوزِ چندپخشِ HW-12). «گرفته‌شده»: R9، نوشتنِ انتشار فقط مالک، کلیدهای پرخطرِ پنل.
+- نیمه‌کاره: بی منبعِ «تصمیم» و نیامد: هشدار و «فقط کپی» ِ نشانیِ پیگیری (CHK-20 فقط D-09 ِ ۱-۱)، کلیدهای گزارشِ وب (RPT-13 دست نخورد)، جای «موجودیِ هر مکان».
+  R10/R11/R12 در `claude/sec-fix-44` (push‌نشده) در دستِ رفع‌اند؛ با مرجش ۲-۲۴ و یادداشتِ ۴-۲۳ به «گرفته‌شده». تاریخ: ساعتِ سیستم ۲۰۲۶/۱۱/۱۰ = ۱۴۰۵/۰۸/۱۹.
+- قدمِ بعدی: پاسخِ صاحب‌کار؛ با مرجِ هر شاخهٔ منبع «هنوز در main نیست» ِ بندها برداشته شود. ⚠️ `pay-10` (دستهٔ ۴۴) و `stf-2` هر دو بخشِ «۸ط» ِ `FLAGS-ON-fa.md` را
+  دارند؛ هنگامِ ادغام یکی «۸ی» شود (OWNER-PENDING به نامِ بخش ارجاع می‌دهد، نه شماره).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/till-pin-2` (پیگیریِ B10: R14 و R15 ِ PIN ِ صندوق، روی `claude/sec-review-45` ‏2151eff7؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: R14 — `till-pin.unlock` فقط قفلِ کنونی را برمی‌دارد و شمار می‌ماند (۵ خطای بعدی ۳۰ دقیقه)؛ `VOID_AFTER` = ۱۰ خطا از آخرین درستی ⇒ PIN باطل
+  (`pin_hash=''`، سابقهٔ `till_pin.invalidated`)، فقط PIN ِ تازه (خودِ عضو `PUT /me` یا صاحب/مدیر) برمی‌گرداند؛ صاحب با تأییدِ دوباره همیشه برمی‌گردد. R15 —
+  «ندارد/باطل» ِ `/verify` فقط برای خودِ عضو و `members.view`؛ بقیه همان ۴۰۳/۴۲۳ ِ PIN ِ غلط با ردیفِ جانشین و PBKDF2 ِ ساختگی. `/config` و `/members`
+  حالا `invalidated` دارند. آزمون: سه آزمونِ تازه در `security-review-45.test.js` (پیش از رفع سرخ، پس از رفع سبز؛ PGlite و PostgreSQL 16) و یک قید در
+  `till-pin.test.js` (بازکردن دیگر شمار را صفر نمی‌کند). برنامهٔ اندروید پاسخِ خطای `/verify` را نمی‌خواند ⇒ بی تغییر. B10، FLAGS-ON §۸ی، RULES.
+- نیمه‌کاره: هیچ. R13 (قفل برای هر هدف، نه هر (هدف، حسابِ دستگاه))، R16 و R17 هنوز تصمیمِ صاحب‌کار.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-45` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۵، روی `ccr-…-batch-44` ‏391148a8 + هشت شاخهٔ دسته؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: هشت شاخه (`stf-2`، `crm-2`، `web-2`، `pos-3`، `pur-2`، `prd-prm`، `syn-3`، `hw-2`) یکی‌یکی ادغام (ادغامِ آخر df7a6ac0) و حمله شدند؛ سه یافتهٔ Low،
+  هر سه با آزمونِ سرخ‌پیش‌از‌رفع (`server/test/security-review-45.test.js`، ۳ از ۳ روی PGlite و PostgreSQL 16): SR45-1 ردیف‌های `*` ِ «خروجیِ همه» دیدنِ
+  واقعیِ مشتری را از ۲۰۰ ردیفِ فهرستِ صاحب بیرون نمی‌رانند (`customer-access.list`، `ALL_SHARE`)، SR45-2 PBKDF2 ِ گذاشتنِ PIN پس از سنجشِ عضو و اختیار و
+  سطلِ `till-pin-set` ِ ۲۰ در دقیقه، SR45-3 تعلیق/برداشتنِ عضو PIN ِ صندوق و نوبتِ بازش را پاک/بسته می‌کند (`till-pin.memberGone` در `shops.updateMember`).
+  B10 ِ `SECURITY-AUDIT-fa.md` (شش شاخهٔ دیگر سالم)، یک خطِ RULES کنارِ STF-04. ۱۸ پروندهٔ آزمونِ مرتبط (۱۴۹ آزمون) روی PGlite و PostgreSQL سبز.
+- نیمه‌کاره: هیچ. R13 (قفلِ PIN ِ هدف با حدسِ عضوِ دیگر)، R14 (مدیر با `unlock` حدس را از سر می‌گیرد)، R15–R17 (Info) تصمیمِ صاحب‌کار.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/syn-3` (ردیف‌های P0 ِ SYN-04/05/06: پاسخِ push ِ v3 روی خودِ دستگاه و push ِ فشردهٔ v3؛ روی main ‏cceb5930 = دستهٔ ۴۳ (#1027)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) SYN-05/06: سرور `current` را برای درجِ سندِ ساعت‌کج (`correctedAt`) و برای «تکراری» ِ پاسخِ گم‌شده هم می‌دهد
+  (`lib/sync-v3-apply.js`، `amendOf` ِ `lib/sync-v3-time.js`)؛ وب `currentFixes` و کاتلین `V3Current` آن را پیش از بیرون رفتنِ ورودی از صف
+  روی دفتر و سایه می‌نشانند (بردارِ `core/test-vectors/v3-current-v1.json`). سه شکافِ داده بسته شد: دستگاهِ ساعت‌کج با قیمتِ بازنده می‌ماند،
+  حذف‌کنندهٔ کهنه با Pull ردیفِ نیمه می‌ساخت، `correctedAt` به دستگاهِ سازنده نمی‌رسید (سطرِ PENDING ِ `scenario-s28b` ⇒ assert).
+  (۲) SYN-04: push ِ v3 ِ فشرده پشتِ همان `sync.gzip_push` (وب و کاتلین). ⛔ `sync-v1.js`، `finalized-sales.js`، `sync.js`، `fromV2`/`unitClash`
+  و `convertFields` دست نخوردند؛ `sync-v3-engine.js` با فشرده‌نویسی در همان سقفِ ۱۲۵۸ ماند و `SyncV3Engine.kt` ۷۹۸ خط؛ بی مهاجرت، بی مسیرِ تازه.
+- نیمه‌کاره: کاتلین (`V3Current`، `V3Gzip`، `V3CurrentVectorsTest`، `V3GzipTest`، آزمونِ تازهٔ `SyncV3EngineTest`) فقط در CI؛ v3 هنوز پیش‌فرض
+  خاموش و بی دکمه (تصمیمِ صاحب‌کار)؛ push ِ v1 ِ کاتلین هنوز ساده؛ v3 روی 2G سنجیده نشد.
+- قدمِ بعدی: شاهدِ CI ِ همین آزمون‌ها و `sync-v3-current`/`sync-v3-gzip-push`/`web-sync-v3`/`scenario-s28b` ⇒ STATUS؛ سپس push ِ فشردهٔ v1 ِ
+  کاتلین با همان `V3Gzip` (پس از `gzip_push` ِ pull ِ v1).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/prd-prm` (ردیف‌های PARTIAL ِ PRD-12، PRM-11، PRM-18؛ روی main ‏cceb5930 (#1027)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **PRM-11، کانال** — ویرایشگر هر قاعدهٔ تازه را «فقط صندوق» می‌ساخت و کانال را هرگز عوض نمی‌کرد ⇒ تخفیفِ ویترین (MKT-01) ساختنی نبود.
+  `GET /api/shop/promos` با پرچمِ `shop.storefront.promos` کلیدِ `online` دارد ⇒ فرم «کجا اعمال شود» (صندوق/ویترین/هر دو؛ `PromoForm.channel`، دست‌نخورده ⇒ همان فهرست) و
+  متنِ دامنه؛ `POST /redeem` کدِ «فقط ویترین» را `wrong_channel` رد می‌کند (همه یا هیچ). `shop-promos` ۱۰/۱۰، `promo-redemptions` ۹/۹ (PGlite و PostgreSQL ۱۶؛ پیش از رفع ۲ سرخ)؛
+  `PromoChannelTest` فقط CI. شاهدِ CI ِ `storefront-promo-groups` (main ‏99036497) در STATUS. PRD-12 و PRM-18 ممیزی شدند: کدی نماند (STATUS).
+- نیمه‌کاره: کامپایل و `PromoChannelTest` فقط CI. تصمیمِ صاحب‌کار: لیستِ قیمتِ نام‌دار (PRD-12)؛ فروشِ خرده به قیمتِ عمده بی سقف/مجوز (`sale-caps.refUnits` + چیپِ بی مجوزِ صندوق)؛
+  چارچوبِ آزمونِ Compose برای PRM-18 (وابستگیِ تازه). وبِ دکان (`index.html` ِ یخ‌زده) نه تخفیفِ خودکار دارد نه عمده.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد؛ پس از CI ِ سبز شاهدِ PRM-11 و ارتقا اگر چیزی جز گروه در `redeem` نماند؛ دو تصمیمِ بالا برای `OWNER-PENDING-fa.md`.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/hw-2` (خانوادهٔ HW، دورِ دوم: شکاف‌های کدیِ بی‌نیاز به دستگاه؛ روی main ‏cceb5930 (#1027)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: HW-12 — پیدا کردنِ چاپگرِ خامِ شبکه با mDNS/DNS-SD (`_pdl-datastream._tcp`): `core/hw/Mdns.kt` (پرسش، خواندنِ بسته با فشرده‌سازیِ نام،
+  PTR ⇐ SRV ⇐ A، فقط RFC1918)، `MdnsProbe` در core/jvmMain (پرسشِ یک‌باره و پاسخِ تک‌پخشِ RFC 6762 §6.7، بسته به نشانیِ کارت)،
+  `PrinterFinderPlatform.mdnsPrinters` (اندروید پس از `LocalNetworkAccess.blocked` ِ HW-13؛ کامپیوتر؛ آیفون فهرستِ خالی) و هم‌زمان با جست‌وجوی ۹۱۰۰
+  در «پیدا کردنِ خودکارِ چاپگر» (پشتِ همان `easy_setup` ِ خاموش). بردارهای `core/test-vectors/mdns-v1.json` را dnspython ساخته؛
+  `hw-mdns.test.js` ۵/۵ محلی (پیش از `Mdns.kt` سرخ)؛ MdnsVectorsTest، MdnsProbeTest (پاسخ‌دهندهٔ ساختگی روی loopback) و یک آزمونِ EasySetupWiringTest فقط CI.
+- نیمه‌کاره: کامپایل و آزمونِ Kotlin فقط در CI (Gradle این‌جا نیست؛ kotlinc ِ جدا هم اجرا نشد). هیچ ردیفی بالا نرفت (سخت‌افزارِ واقعی، MKT-10).
+  بررسی شد و ساخته نشد: HW-01/02/03/08/11/13 جز دستگاهِ واقعی کمبودی ندارند؛ HW-07 (اسکنِ گوشی ⇐ هاب ⇐ صندوق) روی مرزِ امنیتیِ هابِ SYN-09 است
+  (توکن بی اینترنت سنجیده نمی‌شود) و طرح می‌خواهد؛ HW-10 (سبد روی صفحهٔ دومِ اندروید) با `Presentation` ِ حساب‌پی در `pay/platform` یکی می‌شود؛
+  HW-09 ِ گوشی (ترازوی بلوتوثی در صندوق): `ScaleWeighButton` فقط در `CartLineDialog` ِ صندوقِ پیشین و `PickSheet` است و صندوقِ v3 دکمهٔ وزن ندارد؛ BLE ِ GATT ِ چاپگر بی دستگاه آزمودنی نیست.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد و KTEST ِ `:core:jvmTest` (MdnsVectorsTest ۵، MdnsProbeTest ۵) و EasySetupWiringTest ۷ را در STATUS ِ HW-12 بنویسد.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/pur-2` (خانوادهٔ PUR: PUR-02/03/04/13/14؛ روی `origin/main` ‏99036497 = #1026، سپس ادغامِ #1027؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- ممیزی: هر پنج ردیف جز آزمونِ **دستگاه** کد داشتند؛ سه کاستیِ واقعی پیدا شد. (۱) سرور «بخشی/کامل» را نمی‌پالایید و برنامه فقط صفحهٔ
+  نخستِ ۵۰تاییِ `state=sent` را می‌خواند ⇒ پالایه‌های گوشی ناقص و «در راه» ِ پیشنهادِ سفارش (PUR-03) بی سفارشِ بازِ کهنه. (۲) `onOrderMilli`
+  ضریبِ واحدِ خرید (PRD-07) را نمی‌دید: ۲ کارتنِ ۲۴تایی = ۲ ⇒ پیشنهادِ بیش از نیاز. (۳) پنجرهٔ دریافتِ کامپیوتر «دریافتِ همهٔ باقی‌مانده» نداشت.
+- انجام شد: سرور `GET /api/shop/purchase-orders?status=…` (draft/sent/partial/complete/cancelled/open) با `core.status`، صفحه‌بندیِ پیموده و
+  `SCAN_MAX` ِ ۵۰۰ (`lib/purchase-orders.js` ‹`list`›)، بی مهاجرت و بی پرچمِ تازه — `purchase-orders-status.test.js` ۳/۳ (پیش از تغییر ۰/۳) روی PGlite و
+  PostgreSQL 16؛ برنامه: `PurchaseOrderBook.planningOrders` (همهٔ بازها + صفحهٔ نخستِ فرستاده‌ها) در هر سه جای پیشنهاد، `onOrderMilli` به واحدِ پایه،
+  `PoForms.serverStatus`/`openOnly`، و `DeskReceiveAll` در `PoReceive`؛ `PurchaseOrderPlanningTest` (۴) و کارِ تازهٔ `V3ReachabilityTest`.
+- نیمه‌کاره: کامپایل و آزمون‌های Kotlin فقط در CI (Gradle این‌جا نیست). PUR-13/14 کدِ تازه نخواستند؛ مانده همان چاپگر/اسکنر و گوشی/کامپیوترِ واقعی.
+  PUR-03: فصل و درجهٔ اطمینانِ INV-13 در پیشنهادِ فرم همان **تصمیمِ صاحب‌کار**. پیشنهادِ اختیاری: `match` ِ سه‌طرفه در `GET /:id` ِ سرور (امروز فقط برنامه).
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد و نتیجهٔ `PurchaseOrderPlanningTest` و `V3ReachabilityTest` را از CI در STATUS بنویسد.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/crm-2` (CRM-15، P0: سابقهٔ دسترسیِ وب و حسابدار، شمارهٔ پوشیدهٔ وب؛ روی `origin/main` ‏99036497 = دستهٔ ۴۲؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) سرور `POST /api/shop/customer-access` (درِ `app`، مهاجرتِ ۶۱۰ با rollback، `lib/customer-access.noteApp`): بیننده/نقش/دستگاه از توکن، `phone` ِ بی مجوز ⇐ `detail`، `*` فقط `export` (`all: true` در فهرست)، سطلِ IP و هر کاربر، FREE ِ SUB-10؛
+  (۲) حسابدار روی دستگاه (`CustomerAccessNote`) به همین در؛ (۳) وب `license/customer-access.js` (بارکننده و `policy` در `shop-sync.js`، پیش‌کشِ `sw.js` v71): شمارهٔ پوشیده، کادرِ شمارهٔ پنهان، ثبتِ دیدن‌ها و «چه کسی این پرونده را دید».
+  آزمون: `customer-access-app` ۸/۸ (PGlite و PostgreSQL ۱۶، پیش از کد ۰/۸)، `web-customer-access.test.js` ۵/۵، کرومیوم `web-customer-access.mjs` ۱۰/۱۰ (سه بار PGlite، یک بار PostgreSQL؛ بی کد سرخ)، و فهرست‌های در/مجوز/دکان سبز.
+- نیمه‌کاره: Kotlin (`CustomerAccessTest`، `CustomerAccessLogTest`) فقط CI؛ حسابدارِ بی‌اینترنت ثبت نمی‌شود؛ CRM-15 PARTIAL می‌ماند (تصمیمِ صاحب: `phoneMasked` ۴+۳، نشانیِ سفارش/تحویل؛ SEC-10 روی دفترِ دستگاه).
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد؛ شاهدِ CI ِ همین آزمون‌ها در STATUS. CRM-06: قالبِ یادآوری حالا با `shop.settings_sync` (خاموش) همگام می‌شود — «مانده» ِ STATUS کهنه است.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/pos-3` (دو پیگیریِ `claude/pos-2`: بارکدِ کامل پیش از پیشوند در کامپیوتر و گوشی، و POS-04 = نامِ کالا در کادرِ صندوقِ وب؛ روی `claude/pos-2` ‏63a0bbfc؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **«12x34»** — `PosSearch.resolve` (و `DeskSale`: بسته و شبکهٔ پیشنهاد؛ `CatalogModel.query` ِ گوشی؛ شبیه‌سازِ `PosSpeed` ِ کامپیوتر) پیشوند را پیش از
+  بارکدِ کامل می‌خواند ⇒ ۱۲ تا از «34». حالا `CartQuery.parse(query, isCode)` ⇐ `PosSearch.parse`/`isFullCode` (بارکدِ کاملِ کالا یا بسته) همان `decide` ِ وب است؛ بخشِ
+  `fullCode` ِ `cart-query-v1.json` (۱۵ مورد) را `CartQueryVectorsTest` و `web-cart-query.test.js` می‌خوانند؛ JS خودش درست بود (فقط بردار تازه). **POS-04 وب** —
+  `license/catalog-match.js` همزادِ `CatalogMatch` با `text-core.js` و بردارِ `core/test-vectors/catalog-match-v1.json` (۵۳ جست‌وجو، ۲۶ تا از `CatalogMatchTest`؛ ۴۳۲ فاصله)
+  و `CatalogMatchVectorsTest` (jvmTest)؛ پشتِ تنظیمِ خاموشِ همین مرورگر `tohid-pos-name-search-v1` («تنظیمات» ⇐ «دوربین بارکدخوان»): فهرستِ شناورِ ARIA زیرِ کادر، ↑ ↓/Enter/لمس،
+  بارکدِ کامل اول، «۳*نام» با پیشوندِ روشن، افزودن با `addToCart` ِ صفحه. بارکننده `shop-sync.js`، `sw.js` v72، چهار کلیدِ تازهٔ واژه‌نامه (fa/en/ps)، `test:web` + `web-pos-name.mjs`.
+  آزمون (محلی): `web-catalog-match.test.js` ۹/۹، `web-cart-query.test.js` ۹/۹، `web-shop-i18n.test.js` ۱۷/۱۷ (PGlite)؛ `web-pos-name.mjs` ۱۲/۱۲ با axe (روی `claude/pos-2` ۱۱ سرخ)، `web-pos-qty` ۹/۹،
+  `web-shop-i18n.mjs` ۱۸/۱۸، `web-digits`/`web-pos-draft`/`web-beta-channel`/`web-vip-gate`/`web-product-cycle` سبز؛ بردارها جدا با برنامهٔ یک‌بارِ Java ِ JDK 21 هم‌خوان (۲٬۴۰۰ پرس‌وجوی تصادفی هم).
+- نیمه‌کاره: آزمون‌های Kotlin (`CartQueryVectorsTest`، `PosLogicTest`، `CartModelTest`، `CatalogMatchVectorsTest`) فقط CI؛ STATUS: POS-03 و POS-04 همان PARTIAL (گوشیِ واقعی؛ فرهنگِ مترادف OWNER-PENDING 4-1).
+- قدمِ بعدی: CI؛ سنجشِ وب روی گوشیِ واقعی (صفحه‌کلیدِ حرف و لمسِ فهرست)؛ اگر `claude/pos-2` جدا مرج شد، این شاخه روی main بازپایه شود (بخشِ «تازه‌ها» ی جدا دارد).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/stf-2` (خانوادهٔ STF: STF-04 هویتِ سروریِ کاربرِ صندوق، STF-07 «دیر ثبت‌شده»؛ روی main ‏99036497 (#1026)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **STF-04/S46** PIN ِ صندوق در سرور پشتِ پرچمِ خاموشِ `shop.till_pin` (مهاجرتِ ۶۴۰ ِ `shop_till_pins`/`shop_till_sessions` + rollback؛
+  `lib/till-pin.js`، `routes/shop-till-pin.js`): فقط اثرِ PBKDF2، سنجش زیرِ `FOR UPDATE`، هر ۵ خطا قفلِ زمان‌دار، هر نوشتن با تأییدِ دوبارهٔ ورود، صاحب هرگز
+  بیرون نمی‌ماند؛ PIN ِ درست روی دستگاهِ توکن نوبتِ صندوق باز می‌کند (`whoAt`). برنامه (فقط CI): `TillPinRepository`، `TillUser.serverEnroll/serverVerify/serverEnd`.
+  **STF-07** هر زدن `recordedAt` و `late` (ساعتِ سرور، >۳۰ دقیقه) دارد؛ کارتِ «۷ روز و این ماه» نشانش را برای صاحب و مدیر دارد. `till-pin.test.js` ۹/۹ و
+  `staff-time.test.js` ۹/۹ روی PGlite و PostgreSQL 16 (پیش از کار سرخ)، درهای SUB-10/route-authz/tenant/inventory/admin-flags سبز. STATUS ِ STF-04، STF-07 و S46 (PARTIAL).
+- نیمه‌کاره: کامپایل و آزمونِ برنامه فقط CI؛ سندهای همگام‌سازی ستونِ کاربرِ صندوق ندارند (نسبت با دستگاه + زمان)؛ STF-06 دست نخورد (مانده‌اش امضای هر کارمند، فاز ۶ یا `routes/sync-v1.js` ِ ممنوع است).
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد؛ تصمیمِ صاحب‌کار: روشن کردنِ `shop.till_pin` (کاربرانِ پیشین یک بار دوباره افزوده شوند — FLAGS-ON §۸ی؛ PAY-10 هم §۸ط گرفته بود و در دستهٔ ۴۵ این بند ۸ی شد).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/web-2` (دورِ دوم: ردیف‌های PARTIAL ِ WEB و CHK؛ روی main ‏99036497 = دستهٔ ۴۲؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) CHK-20 در برابرِ §۱۹.۲ بندِ ۸: رسید دکانِ مسئول، ناحیهٔ ارسال، بازهٔ برگزیده (`scheduledFor` در پاسخ بود و دیده نمی‌شد) و «کپیِ نشانیِ پیگیری» با هشدارِ لغو را
+  نداشت ⇒ `store/order-facts.js` ِ دیربار + واژه‌نامهٔ `facts` (واژه‌نامهٔ `order` در ۴KB پر است)؛ `web-store-zones.mjs` (کدِ پیشین ۶ ❌). رفعِ همراه: `K.part(…, $('view-order'))`
+  همهٔ `data-t` ِ صفحه را از نو می‌نوشت ⇒ با پوشِ وب ِ روشن عنوانِ رسید «سفارش» می‌شد؛ ریشه فقط گرهٔ خودِ بخش (`web-store-push.mjs`، کدِ پیشین ۱ ❌). (۲) WEB-17: نقشهٔ سایت در ۵۰۰۰ کالا
+  بی‌صدا بریده می‌شد ⇒ `sitemapindex` + `?page=<n>` (بی نشانیِ تازه؛ `STORE_SITEMAP_PAGE`)؛ `storefront-seo.test.js` ۶/۶ روی PGlite و PostgreSQL (تازه روی کدِ پیشین سرخ).
+  بقیهٔ نامزدها جز کارِ بیرونی/تصمیم چیزی نداشتند: WEB-01 (صفحهٔ وبِ مدیریت، `market.slug_hold`)، WEB-05 (فرهنگِ مترادف ۴-۱)، WEB-20 (Sharing Debugger)، CHK-03 (D-09 و CI).
+- نیمه‌کاره: هیچ. ردیف‌ها PARTIAL ماندند (CHK-20: D-09 و CI؛ WEB-17: Search Console). شاخهٔ کهنهٔ `claude/web-2` (ac8bfe21، squash‌شده) روی origin بود.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد؛ شاهدِ CI ِ `web-store-zones.mjs` و `storefront-seo.test.js`.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-44` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۴، روی `ccr-…-batch-44` ‏6c73e73c؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: سه یافتهٔ Low در استودیوی عکس، هر سه با آزمونِ سرخ‌پیش‌از‌رفع (`server/test/security-review-44.test.js`، ۳ آزمون): SR44-1 PNG ِ دو-IHDR
   (`inspectPng` ⇒ `png-multi-ihdr`؛ `image-codec.decodePng` و `image-quality.pngLuma` IHDR ِ دوم را نمی‌گیرند)، SR44-2 سقفِ روزانه/صفِ `createBatch` زیرِ قفلِ دکان

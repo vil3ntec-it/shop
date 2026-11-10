@@ -12,6 +12,9 @@
  *
  * زیرِ پیشوندِ موجودِ `/shop` است، پس `ACCOUNT_PREFIXES` ِ پنلِ خانگی چیزِ تازه‌ای نمی‌خواهد.
  *
+ * فهرست: `GET /?state=&status=&supplierId=&cursor=&limit=` — `status` (draft|sent|partial|complete|cancelled|open)
+ *   وضعیتِ نمایشی را روی سرور می‌پالاید؛ صفحهٔ کم‌تر از `limit` با `next` ممکن است (lib/purchase-orders.js ‹list›).
+ *
  * PUR-14 — فاکتورِ جدای تأمین‌کننده (مهاجرتِ ۲۰۸، شرح در lib/purchase-orders.js):
  *   POST /:id/bills                  `{id, billNo, billDate?, note?, lines:[{lineId?, productId?, qtyMilli, totalMinor}]}`
  *                                    ⇒ ۲۰۱ (همان کلید و بدنه ⇒ ۲۰۰ و `replayed`)؛ فقط `stock.adjust` (بدهیِ تأمین‌کننده)
@@ -45,8 +48,9 @@ router.get('/config', async (req, res) => {
 });
 
 router.get('/', needFlag, async (req, res) => {
+  //  `status` (PUR-02/03): وضعیتِ نمایشی — بخشی/کامل/«باز» از رسیدها روی سرور (lib/purchase-orders.js ‹list›)
   res.json(await po.list(req.shopId, {
-    state: req.query.state, supplierId: req.query.supplierId, cursor: req.query.cursor, limit: req.query.limit,
+    state: req.query.state, status: req.query.status, supplierId: req.query.supplierId, cursor: req.query.cursor, limit: req.query.limit,
   }));
 });
 

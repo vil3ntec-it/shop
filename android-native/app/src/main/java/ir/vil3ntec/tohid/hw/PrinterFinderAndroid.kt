@@ -13,9 +13,13 @@ import android.os.Build
 import androidx.core.content.ContextCompat
 import ir.vil3ntec.tohid.core.hw.BtClass
 import ir.vil3ntec.tohid.core.hw.FoundPrinter
+import ir.vil3ntec.tohid.core.hw.Mdns
+import ir.vil3ntec.tohid.core.hw.MdnsProbe
 import ir.vil3ntec.tohid.core.hw.Subnet
 import ir.vil3ntec.tohid.print.ThermalPrinter
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.net.Inet4Address
 
 /**
@@ -49,6 +53,16 @@ object PrinterFinderPlatform {
       }
     }
   }.getOrDefault(emptyList())
+
+  /**
+   *  HW-12 — چاپگرِ «خام» ِ شبکه با mDNS (`core/hw/Mdns.kt`): یک پرسشِ یک‌باره از هر کارتِ [lans] و پاسخِ تک‌پخش، بی
+   *  قفلِ چندپخشِ وای‌فای. اندروید ۱۷ بی اجازهٔ شبکهٔ محلی (HW-13) ⇒ هیچ، پیش از هر سوکت. خطای سوکت ⇒ همان کارت هیچ.
+   */
+  suspend fun mdnsPrinters(context: Context, lans: List<Subnet.Lan>): List<FoundPrinter> = withContext(Dispatchers.IO) {
+    if (LocalNetworkAccess.blocked(context, Mdns.GROUP)) return@withContext emptyList()
+    lans.filterNot { LocalNetworkAccess.blocked(context, it.ip) }
+      .flatMap { lan -> runCatching { MdnsProbe.ask(lan.ip) }.getOrDefault(emptyList()) }
+  }
 
   fun bluetoothPermissions(): List<String> =
     if (Build.VERSION.SDK_INT >= 31) listOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)

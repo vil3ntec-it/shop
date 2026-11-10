@@ -177,6 +177,8 @@ async function updateMember(shopId, memberId, patch, { by = '', ip = '' } = {}) 
     )).rows[0];
     if (status === 'active') return { row: updated, keys: deviceKeys.NONE };
     await c.query('UPDATE tokens SET revoked_at=$1 WHERE subject_id=$2 AND revoked_at IS NULL', [now(), m.user_id]);
+    //  SR45-3: PIN ِ صندوقِ او هم و نوبتِ بازش (STF-04) — «پشتِ دستگاه» پس از رفتن او نیست
+    await require('./till-pin').memberGone(c, shopId, memberId);
     return {
       row: updated,
       keys: await deviceKeys.revokeIn(c, {

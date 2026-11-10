@@ -11,7 +11,8 @@ const { can } = require('./permissions');
 const hlc = require('./hlc');
 const approvals = require('./staff-approval');
 const permCore = require('./perm-core');
-const { SERVER_DEVICE, validate, merge, emptyRow, pick, shortId, normPhone } = require('./sync-v3-merge');
+const { SERVER_DEVICE, validate, merge, emptyRow, pick, shortId, normPhone, deepEqual } = require('./sync-v3-merge');
+const { amendOf } = require('./sync-v3-time');
 
 const clock = hlc.createClock({ node: SERVER_DEVICE });
 let clockReady = null;
@@ -84,7 +85,7 @@ async function authorize(c, ctx, op, row, deviceId, origin, groups = null, plan 
 async function applyOne(s, ctx, op, { deviceId, origin, cursor = 0, t, groups = null, plan = null, hideContact = false }) {
   const c = s.c;
   const dup = await s.dup(ctx, op.op_id);
-  if (dup) return { op_id: op.op_id, status: 'duplicate', server_seq: Number(dup.server_seq) };
+  if (dup) return retried(s, ctx, op, origin, { op_id: op.op_id, status: 'duplicate', server_seq: Number(dup.server_seq) }, hideContact);
 
   const row = await s.load(ctx, op.table, op.row_id);
   const denied = await require('./sync-v3-roles').denied(c, ctx, op, origin, plan) || await authorize(c, ctx, op, row, deviceId, origin, groups, plan);
@@ -127,6 +128,9 @@ async function applyOne(s, ctx, op, { deviceId, origin, cursor = 0, t, groups = 
   if (res.effect && res.row) await after(s, ctx, op, res, { eff, origin, t });
 
   const out = { op_id: op.op_id, status: res.status, server_seq: seq, hlc: eff, ...(cc ? { ignored: cc.ignored } : {}) };
+  //  SYN-05: `correctedAt` ِ سرور برای دستگاهِ سازنده (Pull opِ خودش را برایش نمی‌آورد) — ‎lib/sync-v3-time.js‎
+  const amend = res.status === 'applied' && op.kind === 'insert' && res.row ? amendOf(op.fields, res.row.data) : null;
+  if (amend) out.current = { deleted: false, data: amend };
   if (skewed) out.skewed = true;
   if (res.conflicts.length) out.conflicts = res.conflicts.length;
   if (res.status !== 'applied') {
@@ -135,6 +139,27 @@ async function applyOne(s, ctx, op, { deviceId, origin, cursor = 0, t, groups = 
     const data = op.kind === 'delete' || op.kind === 'cancel' ? now.data : pick(now.data, Object.keys(op.fields || {}));
     out.current = { deleted: !!now.deleted_at, data: hideContact ? require('./customer-contact').omit(op.table, data) : data };
   }
+  return out;
+}
+
+/**
+ * SYN-05/06: op ِ تکراری (پاسخِ بارِ پیش گم شد) همان `current` ای را می‌گیرد که بارِ نخست می‌رفت، از حالِ امروزِ ردیف:
+ * سرور با آنچه دستگاه فرستاد فرق دارد (ساعتِ کج یا «آخرین نوشتن» نبرد، حذفِ کهنه، `correctedAt` ِ سرور) ⇒ برنامه دفتر و
+ * سایه را به سرور می‌رساند (`currentFix` ِ وب، `V3Current` ِ کاتلین). فقط op ِ دستگاه، نه دلتا/لغو؛ بی فرق ⇒ همان پاسخ.
+ */
+async function retried(s, ctx, op, origin, out, hide) {
+  if ((origin !== 'v3' && origin !== 'v2') || op.kind === 'delta' || op.kind === 'cancel') return out;
+  const row = await s.load(ctx, op.table, op.row_id);
+  if (!row || !row.inserted) return out;
+  const fields = op.fields || {};
+  let data = null;
+  if (op.spec.policy !== 'master') data = op.kind === 'insert' ? amendOf(fields, row.data) : null;
+  else if (op.kind === 'delete') data = row.deleted_at ? null : row.data;
+  else {
+    const now = pick(row.data, Object.keys(fields));
+    if (row.deleted_at || Object.keys(fields).some((k) => !deepEqual(now[k], fields[k]))) data = now;
+  }
+  if (data) out.current = { deleted: !!row.deleted_at, data: hide ? require('./customer-contact').omit(op.table, data) : data };
   return out;
 }
 

@@ -42,7 +42,10 @@
  *      • `uses` ِ هر قاعده در پاسخ‌ها = شمارِ مصرفِ آزادنشدهٔ دفتر؛ عددِ برنامه همیشه نادیده.
  *      • سقفِ نرخ برای هر کاربر (`RATE_PROMO_REDEEM_MAX` در دقیقه، پیش‌فرض ۱۲۰): شاگرد نمی‌تواند
  *        با فاکتورهای ساختگی ظرفیتِ کد را در یک لحظه بسوزاند؛ هر مصرف هم سابقه (`promos.redeem`) دارد.
- *    سرور پنجرهٔ زمانی/کانال را دوباره نمی‌سنجد (کارِ هستهٔ صندوق است)؛ فقط قاعدهٔ زنده و سقف را.
+ *    سرور پنجرهٔ زمانی را دوباره نمی‌سنجد (کارِ هستهٔ صندوق است)؛ فقط قاعدهٔ زنده، کانال و سقف را:
+ *    کدِ قاعده‌ای که کانالش صندوق را ندارد (PRM-11، «فقط ویترین») ⇒ `wrong_channel` (همه یا هیچ).
+ * ⛔ PRM-11: `online` در پاسخِ GET (فقط وقتی روشن است) = پرچمِ تخفیفِ ویترین `shop.storefront.promos` ⇒ فرمِ قاعده
+ *    «کجا اعمال شود» را نشان می‌دهد؛ قاعدهٔ تازه همچنان فقط صندوق (`channels: ['pos']`).
  *
  * زیرِ پیشوندِ موجودِ `/shop` ⇒ `ACCOUNT_PREFIXES` چیزِ تازه‌ای نمی‌خواهد.
  * ⚠️ در app.js پیش از `/shop` سوار می‌شود.
@@ -68,6 +71,8 @@ const TIER_PRICE_FLAG = 'shop.promo_tier_price';
 const EXPIRY_FLAG = 'shop.promo_expiry';
 /** پرچمِ `live_config` ِ دفترِ مصرفِ کد (PRM-02) */
 const USES_FLAG = 'shop.promo_uses';
+/** PRM-11 — همان پرچمِ تخفیفِ ویترین (`lib/storefront-promos.js`) */
+const ONLINE_FLAG = require('../lib/storefront-promos').FLAG;
 const MAX_USES = 1000000;
 /** همان سقفِ `Sale.coupons` ِ برنامه */
 const MAX_CODES = 10;
@@ -189,6 +194,8 @@ router.get('/', requirePermission('data.read'), async (req, res) => {
     redeem: await flagOf(req.shopId, USES_FLAG),
     //  PRM-10: فقط روشن نوشته می‌شود — پاسخِ دکانِ بی پرچم بایت‌به‌بایت همان پیشین
     ...((await flagOf(req.shopId, EXPIRY_FLAG)) ? { expiry: true } : {}),
+    //  PRM-11: ویترین تخفیف می‌خواند (MKT-01) ⇒ فرمِ قاعده «کجا: صندوق / ویترین / هر دو» را نشان می‌دهد؛ فقط روشن
+    ...((await flagOf(req.shopId, ONLINE_FLAG)) ? { online: true } : {}),
     version: P.VERSION,
     permissions: { manage: can(req.role, 'settings.write'), belowCost: req.role === 'owner' },
   });
@@ -312,6 +319,9 @@ router.post('/redeem', requirePermission('data.write'), redeemLimit, async (req,
         [req.shopId, r.id])).rows[0].n);
       const base = { code, promoId: r.id };
       if (r.data.active === false) { results.push({ ...base, status: 'inactive', uses: n, maxUses }); continue; }
+      //  PRM-11: کدِ «فقط ویترین» در صندوق اعمال نمی‌شود (همان `eligible` ِ هسته) ⇒ ظرفیتش این‌جا نمی‌سوزد
+      const ch = Array.isArray(r.data.channels) ? r.data.channels : [];
+      if (ch.length > 0 && !ch.includes('pos')) { results.push({ ...base, status: 'wrong_channel', uses: n, maxUses }); continue; }
       const held = (await c.query(
         `SELECT 1 FROM shop_promo_redemptions WHERE shop_id=$1 AND promo_id=$2 AND sale_id=$3 AND released_at IS NULL`,
         [req.shopId, r.id, saleId])).rows.length > 0;
@@ -336,7 +346,7 @@ router.post('/redeem', requirePermission('data.write'), redeemLimit, async (req,
   });
   if (out.rejected) {
     //  پیامِ صندوق همین است (برنامه جزئیاتِ `codes` را نمی‌خواند): کدام کد و چرا
-    const why = { used_up: 'ظرفیتش پر شده', unknown_code: 'در این دکان نیست', inactive: 'خاموش است' };
+    const why = { used_up: 'ظرفیتش پر شده', unknown_code: 'در این دکان نیست', inactive: 'خاموش است', wrong_channel: 'فقط در ویترین است' };
     const bad = out.results.filter((x) => why[x.status]).map((x) => `کدِ ${x.code} ${why[x.status]}`);
     return res.status(409).json({
       error: { code: 'coupon_rejected', message: `${bad.join('؛ ')} — آن را از سبد بردارید`, codes: out.results },

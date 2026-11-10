@@ -1,0 +1,179 @@
+{
+  "about": "SYN-05/06 — `current` ِ پاسخِ push ِ Sync v3 (سرور: lib/sync-v3-apply.js) ⇒ opهای v1 که دفتر و سایهٔ دستگاه را به سرور می‌رسانند. وب: currentFixes ِ license/sync-v3-engine.js؛ کاتلین: V3Current.fixes. هر item یک op ِ همان دسته به ترتیب: {table, row_id, kind, fields (نامِ v3، یا نامِ v1 در ورودیِ v2), res (پاسخِ سرور), pending (همان ردیف پس از این دسته هنوز در صف), exists (ردیف روی دفتر هست)}. want: opهای v1 به همان ترتیب.",
+  "cases": [
+    {
+      "name": "ساعتِ کج: قیمتِ بازنده ⇒ قیمتِ سرور روی دفتر",
+      "items": [
+        {"table": "products", "row_id": "p1", "kind": "update", "fields": {"salePriceMinor": 13000},
+         "res": {"op_id": "o1", "status": "conflict", "skewed": true, "current": {"deleted": false, "data": {"salePriceMinor": 5000}}}, "pending": false, "exists": true}
+      ],
+      "want": [{"op_id": "cur.o1", "type": "update", "table": "products", "row_id": "p1", "fields": {"salePrice": 50}}]
+    },
+    {
+      "name": "همان ردیف هنوز در صف ⇒ دست نمی‌خورد (تغییرِ تازه‌ترِ کاربر می‌ماند)",
+      "items": [
+        {"table": "products", "row_id": "p1", "kind": "update", "fields": {"salePriceMinor": 13000},
+         "res": {"op_id": "o1", "status": "conflict", "current": {"deleted": false, "data": {"salePriceMinor": 5000}}}, "pending": true, "exists": true}
+      ],
+      "want": []
+    },
+    {
+      "name": "حذفِ کهنه (ویرایشِ تازه‌تر هست): ردیفِ پاک‌شده با دادهٔ کاملِ سرور برمی‌گردد",
+      "items": [
+        {"table": "products", "row_id": "p2", "kind": "delete",
+         "res": {"op_id": "o2", "status": "conflict", "current": {"deleted": false, "data": {"name": "چای", "salePriceMinor": 5050, "minStockMilli": 2500, "barcodes": ["6260000000017"]}}}, "pending": false, "exists": false}
+      ],
+      "want": [{"op_id": "cur.o2", "type": "insert", "table": "products", "row_id": "p2", "fields": {"name": "چای", "salePrice": 50.5, "minStock": 2.5, "barcodes": ["6260000000017"]}}]
+    },
+    {
+      "name": "پاسخِ حذف و ردیف هنوز روی دفتر ⇒ همان دادهٔ سرور",
+      "items": [
+        {"table": "debtors", "row_id": "d1", "kind": "delete",
+         "res": {"op_id": "o3", "status": "conflict", "current": {"deleted": false, "data": {"name": "احمد", "phone": "0700000001"}}}, "pending": false, "exists": true}
+      ],
+      "want": [{"op_id": "cur.o3", "type": "update", "table": "debtors", "row_id": "d1", "fields": {"name": "احمد", "phone": "0700000001"}}]
+    },
+    {
+      "name": "ویرایشِ کهنه‌تر از حذفِ دستگاهِ دیگر ⇒ حذف روی دفتر",
+      "items": [
+        {"table": "products", "row_id": "p3", "kind": "update", "fields": {"name": "نو"},
+         "res": {"op_id": "o4", "status": "conflict", "current": {"deleted": true, "data": {"name": "نو"}}}, "pending": false, "exists": true}
+      ],
+      "want": [{"op_id": "cur.o4", "type": "delete", "table": "products", "row_id": "p3"}]
+    },
+    {
+      "name": "حذف‌شده و این‌جا هم نیست ⇒ هیچ",
+      "items": [
+        {"table": "products", "row_id": "p3", "kind": "update", "fields": {"name": "نو"},
+         "res": {"op_id": "o4", "status": "duplicate", "current": {"deleted": true, "data": {"name": "نو"}}}, "pending": false, "exists": false}
+      ],
+      "want": []
+    },
+    {
+      "name": "ردیفِ نبوده و دادهٔ نیمه ⇒ هیچ (ردیفِ نیمه ساخته نمی‌شود)",
+      "items": [
+        {"table": "products", "row_id": "p4", "kind": "update", "fields": {"salePriceMinor": 100},
+         "res": {"op_id": "o5", "status": "conflict", "current": {"deleted": false, "data": {"salePriceMinor": 5000}}}, "pending": false, "exists": false}
+      ],
+      "want": []
+    },
+    {
+      "name": "«تاریخِ تصحیح‌شده» ِ فاکتورِ خودِ دستگاه (درجِ پذیرفته)",
+      "items": [
+        {"table": "sales", "row_id": "s1", "kind": "insert", "fields": {"totalMinor": 14000, "createdAt": 946684800000},
+         "res": {"op_id": "o6", "status": "applied", "current": {"deleted": false, "data": {"correctedAt": 1800000000000}}}, "pending": false, "exists": true}
+      ],
+      "want": [{"op_id": "cur.o6", "type": "update", "table": "sales", "row_id": "s1", "fields": {"correctedAt": 1800000000000}}]
+    },
+    {
+      "name": "تکراری (پاسخِ بارِ پیش گم شد) ⇒ همان",
+      "items": [
+        {"table": "sales", "row_id": "s1", "kind": "insert", "fields": {"totalMinor": 14000, "createdAt": 946684800000},
+         "res": {"op_id": "o6", "status": "duplicate", "current": {"deleted": false, "data": {"correctedAt": 1800000000000}}}, "pending": false, "exists": true}
+      ],
+      "want": [{"op_id": "cur.o6", "type": "update", "table": "sales", "row_id": "s1", "fields": {"correctedAt": 1800000000000}}]
+    },
+    {
+      "name": "ویرایشِ سندِ مالی (append_only_edit) ⇒ سندِ محلی دست نمی‌خورد",
+      "items": [
+        {"table": "sales", "row_id": "s2", "kind": "update", "fields": {"customerName": "تازه"},
+         "res": {"op_id": "o7", "status": "conflict", "current": {"deleted": false, "data": {"customerName": "کهنه"}}}, "pending": false, "exists": true}
+      ],
+      "want": []
+    },
+    {
+      "name": "حرکتِ کالا: از دادهٔ سرور فقط correctedAt",
+      "items": [
+        {"table": "stockMovements", "row_id": "m1", "kind": "insert", "fields": {"productId": "p1", "qtyMilli": -2000, "createdAt": 946684800000},
+         "res": {"op_id": "o8", "status": "applied", "current": {"deleted": false, "data": {"correctedAt": 1800000000000, "qtyMilli": -2000}}}, "pending": false, "exists": true}
+      ],
+      "want": [{"op_id": "cur.o8", "type": "update", "table": "stockMovements", "row_id": "m1", "fields": {"correctedAt": 1800000000000}}]
+    },
+    {
+      "name": "فاکتورِ نبوده، correctedAt ِ رشته‌ای یا بی current ⇒ هیچ",
+      "items": [
+        {"table": "sales", "row_id": "s9", "kind": "insert", "fields": {"totalMinor": 1},
+         "res": {"op_id": "o9", "status": "applied", "current": {"deleted": false, "data": {"correctedAt": 1800000000000}}}, "pending": false, "exists": false},
+        {"table": "sales", "row_id": "s10", "kind": "insert", "fields": {"totalMinor": 1},
+         "res": {"op_id": "o10", "status": "applied", "current": {"deleted": false, "data": {"correctedAt": "1800000000000"}}}, "pending": false, "exists": true},
+        {"table": "products", "row_id": "p5", "kind": "update", "fields": {"name": "x"},
+         "res": {"op_id": "o11", "status": "applied"}, "pending": false, "exists": true}
+      ],
+      "want": []
+    },
+    {
+      "name": "ردشده ⇒ هیچ، حتی با current",
+      "items": [
+        {"table": "products", "row_id": "p1", "kind": "update", "fields": {"salePriceMinor": 13000},
+         "res": {"op_id": "o12", "status": "rejected", "reason": "price_not_allowed", "current": {"deleted": false, "data": {"salePriceMinor": 5000}}}, "pending": false, "exists": true}
+      ],
+      "want": []
+    },
+    {
+      "name": "فهرستِ نامی و شمارشِ v3 ⇒ هیچ",
+      "items": [
+        {"table": "productCategories", "row_id": "c1", "kind": "update", "fields": {"name": "نو"},
+         "res": {"op_id": "o13", "status": "conflict", "current": {"deleted": false, "data": {"name": "کهنه"}}}, "pending": false, "exists": true},
+        {"table": "stockCounts", "row_id": "k1", "kind": "insert", "fields": {"productId": "p1", "countedQtyMilli": 1000},
+         "res": {"op_id": "o14", "status": "applied", "current": {"deleted": false, "data": {"correctedAt": 1800000000000}}}, "pending": false, "exists": true},
+        {"table": "unknownTable", "row_id": "u1", "kind": "update", "fields": {"name": "نو"},
+         "res": {"op_id": "o15", "status": "conflict", "current": {"deleted": false, "data": {"name": "کهنه"}}}, "pending": false, "exists": true}
+      ],
+      "want": []
+    },
+    {
+      "name": "op ِ بعدیِ همان دسته همان فیلد را فرستاد ⇒ آن فیلد برداشته، بقیه می‌ماند",
+      "items": [
+        {"table": "products", "row_id": "p1", "kind": "update", "fields": {"salePriceMinor": 1000, "name": "A"},
+         "res": {"op_id": "o16", "status": "conflict", "current": {"deleted": false, "data": {"salePriceMinor": 5000, "name": "B"}}}, "pending": false, "exists": true},
+        {"table": "products", "row_id": "p1", "kind": "update", "fields": {"salePriceMinor": 2000},
+         "res": {"op_id": "o17", "status": "applied"}, "pending": false, "exists": true}
+      ],
+      "want": [{"op_id": "cur.o16", "type": "update", "table": "products", "row_id": "p1", "fields": {"name": "B"}}]
+    },
+    {
+      "name": "همهٔ فیلدها را op ِ بعدی فرستاد، یا حذفِ بعدی ⇒ هیچ",
+      "items": [
+        {"table": "products", "row_id": "p1", "kind": "update", "fields": {"salePriceMinor": 1000},
+         "res": {"op_id": "o18", "status": "conflict", "current": {"deleted": false, "data": {"salePriceMinor": 5000}}}, "pending": false, "exists": true},
+        {"table": "products", "row_id": "p1", "kind": "update", "fields": {"salePriceMinor": 2000},
+         "res": {"op_id": "o19", "status": "applied"}, "pending": false, "exists": true},
+        {"table": "products", "row_id": "p6", "kind": "update", "fields": {"name": "x"},
+         "res": {"op_id": "o20", "status": "conflict", "current": {"deleted": false, "data": {"name": "y"}}}, "pending": false, "exists": true},
+        {"table": "products", "row_id": "p6", "kind": "delete",
+         "res": {"op_id": "o21", "status": "applied"}, "pending": false, "exists": false}
+      ],
+      "want": []
+    },
+    {
+      "name": "اصلاحِ «حذف» و op ِ بعدیِ همان ردیف ⇒ حذف نه",
+      "items": [
+        {"table": "products", "row_id": "p7", "kind": "update", "fields": {"name": "x"},
+         "res": {"op_id": "o22", "status": "conflict", "current": {"deleted": true, "data": {"name": "x"}}}, "pending": false, "exists": true},
+        {"table": "products", "row_id": "p7", "kind": "update", "fields": {"salePriceMinor": 900},
+         "res": {"op_id": "o23", "status": "applied"}, "pending": false, "exists": true}
+      ],
+      "want": []
+    },
+    {
+      "name": "دلتای بعدیِ همان فاکتور correctedAt را برنمی‌دارد",
+      "items": [
+        {"table": "sales", "row_id": "s3", "kind": "insert", "fields": {"totalMinor": 500, "createdAt": 946684800000},
+         "res": {"op_id": "o24", "status": "applied", "current": {"deleted": false, "data": {"correctedAt": 1800000000000}}}, "pending": false, "exists": true},
+        {"table": "sales", "row_id": "s3", "kind": "delta", "fields": {"paidAmountMinor": 500},
+         "res": {"op_id": "o25", "status": "applied"}, "pending": false, "exists": true}
+      ],
+      "want": [{"op_id": "cur.o24", "type": "update", "table": "sales", "row_id": "s3", "fields": {"correctedAt": 1800000000000}}]
+    },
+    {
+      "name": "ورودیِ v2 (نام‌های v1): بخشِ مبدل با current، و نامِ v1 ِ op ِ بعدی همان فیلد را برمی‌دارد",
+      "items": [
+        {"table": "products", "row_id": "p8", "kind": "update", "fields": {"salePrice": 130, "name": "A"},
+         "res": {"op_id": "o26.c0", "status": "conflict", "current": {"deleted": false, "data": {"salePriceMinor": 5000, "name": "B"}}}, "pending": false, "exists": true},
+        {"table": "products", "row_id": "p8", "kind": "update", "fields": {"name": "C"},
+         "res": {"op_id": "o27.c0", "status": "applied"}, "pending": false, "exists": true}
+      ],
+      "want": [{"op_id": "cur.o26.c0", "type": "update", "table": "products", "row_id": "p8", "fields": {"salePrice": 50}}]
+    }
+  ]
+}

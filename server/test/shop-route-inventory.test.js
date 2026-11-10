@@ -228,6 +228,8 @@ FLAGS.push('shop.custom_roles');
 FLAGS.push('shop.settings_sync');
 //  POS-12/S09: پشتیبانِ فاکتورهای نگه‌داشته (`/shop/held-invoices/:id`، مهاجرتِ ۴۲۵) — «ب» با شناسهٔ «الف» فقط فضای خودش
 FLAGS.push('shop.held_sync');
+//  STF-04/S46: PIN ِ صندوق در سرور (`/shop/till-pin/members/:id…`، مهاجرتِ ۶۴۰) — «ب» PIN ِ عضوِ «الف» را نه می‌گذارد، نه برمی‌دارد، نه بازش می‌کند
+FLAGS.push('shop.till_pin');
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و
@@ -670,6 +672,7 @@ function concreteFor(ids) {
     [/^(\/shop\/permissions\/roles\/):role/, 'staff'],
     [/^(\/shop\/permissions\/members\/):id/, ids.member],
     [/^(\/shop\/staff-scope\/members\/):id/, ids.member],
+    [/^(\/shop\/till-pin\/members\/):id/, ids.member],
     [/^(\/shop\/devices\/):id/, ids.device],
     [/^(\/shop\/approver-keys\/):id/, ids.approverKey],
     [/^(\/shop\/approval-requests\/):id/, ids.approvalRequest],
@@ -747,6 +750,8 @@ function bodyFor(r, ids) {
     'PATCH /shop/members/:id': { role: 'manager' },
     'PUT /shop/permissions/members/:id': { perms: {} },
     'PUT /shop/staff-scope/members/:id': { places: ['warehouse'] },
+    'PUT /shop/till-pin/members/:id': { pin: '390471' },
+    'POST /shop/till-pin/verify': { memberId: ids.member, pin: '390471' },
     'POST /shop/approval-requests/:id/approve': { note: 'تأییدِ ب' },
     'POST /shop/approval-requests/:id/deny': { note: 'ردِ ب' },
     'POST /shop/conflict-inbox/:id/resubmit': { note: 'دوباره ثبتِ ب' },

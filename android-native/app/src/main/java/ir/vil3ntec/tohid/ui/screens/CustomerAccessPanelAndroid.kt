@@ -41,13 +41,20 @@ import kotlinx.coroutines.launch
 /** ثبتِ یک دیدن در `auditLog` ِ دفتر — هرگز خطا نمی‌دهد و صفحه را نگه نمی‌دارد */
 object CustomerAccessNote {
   /**
-   *  `true` نوشته شد؛ `null` چیزی برای نوشتن نبود (تکرارِ ۱۰ دقیقه)؛ `false` ننوشت: حالتِ آموزشی، نقشی که
-   *  `auditLog` نمی‌نویسد (حسابدار — سرور هم می‌انداخت)، بازسازیِ دفتر، یا خطای دیسک.
+   *  `true` نوشته شد؛ `null` چیزی برای نوشتن نبود (تکرارِ ۱۰ دقیقه)؛ `false` ننوشت: حالتِ آموزشی، بازسازیِ دفتر،
+   *  خطای دیسک، یا نقشِ بی `auditLog` (حسابدار — سرور ردیفِ دفترش را می‌انداخت) که سرور در دسترس نبود.
+   *  نقشِ بی `auditLog` ⇐ همان دیدن به درِ `app` ِ سرور ([CustomerAccess.noteBody]؛ بیننده و دستگاه از توکن، یکی کردنِ
+   *  ۱۰ دقیقه با سرور) — بی‌اینترنت ثبت نمی‌شود.
    */
   suspend fun note(context: Context, store: ShopStore, customerId: String, kind: CustomerAccess.Kind): Boolean? = runCatching {
     if (store.training) return@runCatching false
     val role = ShopRole.current(context)
-    if (!PermCore.canWrite(role, "auditLog")) return@runCatching false
+    if (!PermCore.canWrite(role, "auditLog")) {
+      val body = CustomerAccess.noteBody(customerId, kind) ?: return@runCatching false
+      if (!Backend.isReady(context)) return@runCatching false
+      Backend.api(context).post(CustomerAccess.PATH, body)
+      return@runCatching true
+    }
     if (ir.vil3ntec.tohid.sync.v1.SyncV1Engine.of(context).rebuilding) return@runCatching false
     val who = CustomerAccessLog.Viewer(
       id = TillUser.meId(context), name = TillUser.me(context), role = role,

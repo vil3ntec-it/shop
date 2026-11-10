@@ -27,6 +27,18 @@ object CartQuery {
     return Parsed(count, query.substring(rest.coerceAtMost(query.length)))
   }
 
+  /**
+   *  POS-03 — متنی که **خودش** بارکدِ کامل است («12x34») بر پیشوند پیش است: همان `decide` ِ صندوقِ وب
+   *  (`license/cart-query.js`؛ بخشِ `fullCode` ِ بردارِ `cart-query-v1.json`). [isCode] فقط وقتی پرسیده می‌شود که پیشوندی
+   *  خوانده شد، با متنِ trim‌شده؛ بارکد ⇒ (۱، همان متن). پیش از این «12x34» ِ کالای «باتری» دوازده تا از کالای «34» می‌شد.
+   */
+  fun parse(query: String, isCode: (String) -> Boolean): Parsed {
+    val p = parse(query)
+    if (p.term.length == query.length) return p
+    val whole = query.trim()
+    return if (whole.isNotEmpty() && isCode(whole)) Parsed(1.0, query) else p
+  }
+
   /** پیشنهادِ کالا: آیا یکی از بارکدها با این نوشته شروع می‌شود — رقمِ فارسی و لاتین یکی است */
   fun barcodeStarts(barcodes: List<String>, term: String): Boolean {
     if (barcodes.any { it.startsWith(term) }) return true

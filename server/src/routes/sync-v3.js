@@ -126,6 +126,8 @@ router.get('/pull', async (req, res, next) => {
     //  §۹.۵: «دورانِ» سرور کنارِ هر pull — عوض شده ⇒ برنامه opهای گم‌شده را دوباره می‌فرستد
     //  (`lib/sync-epoch.js`، `SyncV3Engine.pullOnce`). خاموش ⇒ همان پاسخِ پیشین.
     if (config.syncEpoch.enabled) out.epoch = await syncEpoch.forAccount(req.sync, 'v3');
+    //  SYN-04: «push ات را فشرده بفرست» فقط با پرچمِ دکانِ `sync.gzip_push` (همان پرچمِ v1؛ سرور بدنهٔ فشرده را همیشه باز می‌کند)
+    if ((await require('../lib/sync-v1-keep').flags(req.sync)).gzipPush) out.gzip_push = true;
     if (contact.touches(out.ops) && await contact.hiddenForReq(req)) out.ops = contact.omitV3Ops(out.ops);
     await send(req, res, { ok: true, ...out });
   } catch (err) { next(err); }

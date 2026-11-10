@@ -34,6 +34,7 @@ object PromoJson {
       tierPrice = bool(o["tierPrice"]),
       redeem = bool(o["redeem"]),
       expiry = bool(o["expiry"]),
+      online = bool(o["online"]),
       revs = rules.zip(raw).mapNotNull { (r, e) -> (e as? JsonObject)?.let { rev(it) }?.takeIf { it > 0 }?.let { r.id to it } }.toMap(),
     )
   }
@@ -49,6 +50,8 @@ object PromoJson {
     put("redeem", s.redeem)
     //  PRM-10: فقط روشن — همان پاسخِ سرور
     if (s.expiry) put("expiry", true)
+    //  PRM-11: فقط روشن — همان پاسخِ سرور
+    if (s.online) put("online", true)
     //  `rev` فقط برای همین نسخهٔ دستگاه — `PUT` ِ قاعده آن را نمی‌فرستد
     put("rules", JsonArray(s.rules.map { r -> s.revs[r.id]?.let { JsonObject(toJson(r) + ("rev" to JsonPrimitive(it))) } ?: toJson(r) }))
     put("permissions", buildJsonObject { put("manage", s.manage); put("belowCost", s.belowCost) })

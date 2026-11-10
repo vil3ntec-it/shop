@@ -114,10 +114,28 @@ class CustomerAccessLogTest {
     assertTrue(panel.contains("ShopRole.allows(context, \"audit.view\")"))
     assertTrue(panel.indexOf("if (!allowed) return") in 0 until panel.indexOf("Backend.api(context).get(path)"))
     assertTrue(panel.contains("if (store.training) return@runCatching false"))
-    assertTrue(panel.contains("if (!PermCore.canWrite(role, \"auditLog\")) return@runCatching false"))
+    //  نقشِ بی `auditLog` (حسابدار) پیش از نوشتنِ دفتر برمی‌گردد — به درِ `app` ِ سرور (آزمونِ پایین)، نه به دفتر
+    val noWriter = panel.indexOf("if (!PermCore.canWrite(role, \"auditLog\")) {")
+    assertTrue(noWriter in 0 until panel.indexOf("store.update { d -> CustomerAccessLog.record("))
     assertTrue(panel.contains("}.getOrDefault(false)"))
     assertFalse(ir.vil3ntec.tohid.core.perm.PermCore.canWrite("accountant", "auditLog"))
     assertTrue(ir.vil3ntec.tohid.core.perm.PermCore.canWrite("cashier", "auditLog"))
+  }
+
+  @Test fun `حسابدار دیدن را به درِ app ِ سرور می‌گوید نه به دفتر؛ آموزشی و بی سرور هیچ`() {
+    val panel = src("ui/screens/CustomerAccessPanelAndroid.kt")
+    val training = panel.indexOf("if (store.training) return@runCatching false")
+    val branch = panel.indexOf("if (!PermCore.canWrite(role, \"auditLog\")) {")
+    val body = panel.indexOf("val body = CustomerAccess.noteBody(customerId, kind) ?: return@runCatching false")
+    val ready = panel.indexOf("if (!Backend.isReady(context)) return@runCatching false")
+    val post = panel.indexOf("Backend.api(context).post(CustomerAccess.PATH, body)")
+    val done = panel.indexOf("return@runCatching true", post)
+    val ledger = panel.indexOf("store.update { d -> CustomerAccessLog.record(")
+    assertTrue("حالتِ آموزشی پیش از هر راهی", training in 0 until branch)
+    assertTrue("شاخهٔ حسابدار پیش از دفتر و با بازگشت", branch < body && body < ready && ready < post && post < done && done < ledger)
+    //  بدنه فقط شناسه و نوع است؛ برگهٔ همه فقط با خروجی (core: CustomerAccessTest)
+    assertEquals(setOf("customerId", "kind"), CustomerAccess.noteBody("d1", Kind.DETAIL)?.keys)
+    assertNull(CustomerAccess.noteBody(CustomerAccess.ALL, Kind.DETAIL))
   }
 
   private fun assertNotNullData(d: ShopData?): ShopData { assertNotNull(d); return d!! }
