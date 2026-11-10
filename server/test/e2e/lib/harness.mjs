@@ -108,7 +108,9 @@ export async function boot({ name, env = {}, port = 0 }) {
   const syncV1 = require('../../../src/lib/sync-v1');
 
   if (!db.isPglite()) {
-    await db.query('DROP SCHEMA public CASCADE');
+    //  `IF EXISTS`: سناریویی که میانِ این دو کشته شد (خاموشیِ ظرف، سقفِ زمانِ run.mjs) دیتابیسِ مشترک را بی `public` می‌گذاشت
+    //  و از آن پس هر سناریو همین‌جا با «schema "public" does not exist» می‌افتاد (۳۷ از ۳۷ سرخ)
+    await db.query('DROP SCHEMA IF EXISTS public CASCADE');
     await db.query('CREATE SCHEMA public');
   }
   await migrate.run();
