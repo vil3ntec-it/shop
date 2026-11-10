@@ -202,6 +202,25 @@ test('PRM-10: «نزدیکِ انقضا» فقط با پرچمِ shop.promo_expi
   assert.equal('expiry' in (await h.get('/api/shop/promos', { token: b.staff })).body, false);
 });
 
+test('PRM-11: online = پرچمِ shop.storefront.promos، مالِ همان دکان؛ خاموش ⇒ پاسخ بی کلیدِ online؛ کانال همان که آمد', async () => {
+  const a = await shopWithTeam('کانال');
+  const b = await shopWithTeam('کانالِ دوم');
+  const before = await h.get('/api/shop/promos', { token: a.staff });
+  assert.equal('online' in before.body, false, JSON.stringify(before.body));
+  await query("INSERT INTO live_config (scope, key, value, updated_at) VALUES ($1,'shop.storefront.promos','true',1)", [a.shopId]);
+  assert.equal((await h.get('/api/shop/promos', { token: a.staff })).body.online, true);
+  assert.equal('online' in (await h.get('/api/shop/promos', { token: b.staff })).body, false);
+  //  «فقط ویترین»، «هر دو» و کانالِ ناشناخته — همان اعتبارسنجیِ هسته؛ کانال همان که برنامه فرستاد
+  for (const [id, channels] of [['web', ['online']], ['both', ['pos', 'online']]]) {
+    const r = await h.put(`/api/shop/promos/rules/${id}`, { rule: { ...P10, channels } }, { token: a.manager });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.deepEqual(r.body.rule.channels, channels);
+  }
+  const bad = await h.put('/api/shop/promos/rules/x', { rule: { ...P10, channels: ['phone'] } }, { token: a.owner });
+  assert.equal(bad.status, 400);
+  assert.deepEqual(bad.body.error.fields, ['channel']);
+});
+
 test('«زیرِ بهای خرید» فقط با صاحب', async () => {
   const t = await shopWithTeam('پ');
   const rule = { ...P10, allowBelowCost: true };

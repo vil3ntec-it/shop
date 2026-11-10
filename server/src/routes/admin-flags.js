@@ -81,7 +81,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.storefront.stock_list', scope: 'shop', default: false, what: 'در ۴۰۹ ِ ناموجود همهٔ قلم‌های کم با «کم کن به …» (E2E-MKT-02)' },
   { key: 'shop.storefront.banners', scope: 'shop', default: false, what: 'بنرهای زمان‌دارِ ویترین برای هر ناحیه (WEB-24)' },
   { key: 'shop.storefront.media', scope: 'shop', default: false, what: 'لوگو و تصویرِ سرِ ویترین (M3)' },
-  { key: 'shop.storefront.promos', scope: 'shop', default: false, what: 'کدِ تخفیف و تخفیفِ خودکار/زمان‌دارِ ویترین (MKT-01/09)' },
+  { key: 'shop.storefront.promos', scope: 'shop', default: false, what: 'کدِ تخفیف و تخفیفِ خودکار/زمان‌دارِ ویترین (MKT-01/09)؛ و «کجا اعمال شود» در فرمِ تخفیفِ برنامه (PRM-11)' },
   { key: 'shop.storefront.promo_guard', scope: 'shop', default: false, what: 'تخفیفِ اولین خرید و سدِ سوءاستفاده از تخفیف (MKT-02، RSK-09)؛ با `shop.storefront.promos`' },
   { key: 'shop.storefront.promo_groups', scope: 'shop', default: false, what: 'تخفیفِ گروهِ مشتری در ویترین فقط با گروهِ قرض‌دارِ همان شمارهٔ تأییدشده (PRM-11)؛ با `shop.storefront.promos`' },
   { key: 'shop.storefront.campaigns', scope: 'shop', default: false, what: 'پیوند و QR ِ کمپین با ردیابیِ منبع (MKT-10/11)' },

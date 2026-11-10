@@ -134,6 +134,14 @@
 - نیمه‌کاره: کامپایل و آزمون‌های Kotlin فقط در CI (Gradle این‌جا نیست). PUR-13/14 کدِ تازه نخواستند؛ مانده همان چاپگر/اسکنر و گوشی/کامپیوترِ واقعی.
   PUR-03: فصل و درجهٔ اطمینانِ INV-13 در پیشنهادِ فرم همان **تصمیمِ صاحب‌کار**. پیشنهادِ اختیاری: `match` ِ سه‌طرفه در `GET /:id` ِ سرور (امروز فقط برنامه).
 - قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد و نتیجهٔ `PurchaseOrderPlanningTest` و `V3ReachabilityTest` را از CI در STATUS بنویسد.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/prd-prm` (ردیف‌های PARTIAL ِ PRD-12، PRM-11، PRM-18؛ روی main ‏cceb5930 (#1027)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **PRM-11، کانال** — ویرایشگر هر قاعدهٔ تازه را «فقط صندوق» می‌ساخت و کانال را هرگز عوض نمی‌کرد ⇒ تخفیفِ ویترین (MKT-01) ساختنی نبود.
+  `GET /api/shop/promos` با پرچمِ `shop.storefront.promos` کلیدِ `online` دارد ⇒ فرم «کجا اعمال شود» (صندوق/ویترین/هر دو؛ `PromoForm.channel`، دست‌نخورده ⇒ همان فهرست) و
+  متنِ دامنه؛ `POST /redeem` کدِ «فقط ویترین» را `wrong_channel` رد می‌کند (همه یا هیچ). `shop-promos` ۱۰/۱۰، `promo-redemptions` ۹/۹ (PGlite و PostgreSQL ۱۶؛ پیش از رفع ۲ سرخ)؛
+  `PromoChannelTest` فقط CI. شاهدِ CI ِ `storefront-promo-groups` (main ‏99036497) در STATUS. PRD-12 و PRM-18 ممیزی شدند: کدی نماند (STATUS).
+- نیمه‌کاره: کامپایل و `PromoChannelTest` فقط CI. تصمیمِ صاحب‌کار: لیستِ قیمتِ نام‌دار (PRD-12)؛ فروشِ خرده به قیمتِ عمده بی سقف/مجوز (`sale-caps.refUnits` + چیپِ بی مجوزِ صندوق)؛
+  چارچوبِ آزمونِ Compose برای PRM-18 (وابستگیِ تازه). وبِ دکان (`index.html` ِ یخ‌زده) نه تخفیفِ خودکار دارد نه عمده.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد؛ پس از CI ِ سبز شاهدِ PRM-11 و ارتقا اگر چیزی جز گروه در `redeem` نماند؛ دو تصمیمِ بالا برای `OWNER-PENDING-fa.md`.
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/sec-review-43` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۳، ادغامِ `reserve-off`، `syn-12`، `posted-docs` و `app-gaps-4` روی `ccr-…-batch-42`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: دو یافتهٔ Low در نگهبانِ S89 (`lib/finalized-sales.js`، پرچمِ خاموشِ `shop.doc_chain`)، هر دو با آزمونِ سرخ‌پیش‌از‌رفع
   (`server/test/security-review-43.test.js`، ۳ آزمون، PGlite و PostgreSQL): SR43-1 ادغامِ «خیالی» (op ِ ردشده/تکراری/کهنه) قرض یا فاکتورِ نسیهٔ ثبت‌شده را
