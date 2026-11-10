@@ -28,6 +28,8 @@ data class CheckoutForm(
   val pinAccuracyM: Int? = null,
   /** نشانیِ ذخیره‌شده‌ای که برگه از آن پُر شد (فقط برای نشانِ «برگزیده» در صفحه) */
   val addressId: String? = null,
+  /** CHK-14: اسکناسِ برگزیده (یک‌صدم)؛ فقط تا وقتی یکی از [CheckoutRules.tenders] است فرستاده می‌شود */
+  val cashTenderMinor: Long? = null,
 ) {
   val pin: GeoPin? get() = if (pinLat != null && pinLng != null) GeoPin(pinLat, pinLng, pinAccuracyM) else null
 }
@@ -171,6 +173,37 @@ object CheckoutRules {
     return out
   }
 
+  // ── CHK-14: «با کدام اسکناس پرداخت می‌کنید؟» (همان `tenders`/`renderTender` ِ `checkout.js`) ──
+
+  /** بزرگ‌ترین اسکناسِ افغانی (۱۰۰۰) به یک‌صدم؛ پول خرد همیشه کمتر از آن (`LARGEST_NOTE_MINOR` ِ `lib/delivery-prefs.js`) */
+  const val NOTE_MINOR: Long = 100_000
+  private val TENDER_STEPS = listOf(10_000L, 50_000L, 100_000L)
+
+  /** اسکناس‌هایی که `delivery-prefs.checkTender` ِ سرور برای [totalMinor] می‌پذیرد: بیش از جمع، افغانیِ کامل، پول خرد < ۱۰۰۰ */
+  fun tenderOptions(totalMinor: Long): List<Long> {
+    if (totalMinor <= 0) return emptyList()
+    val out = mutableListOf<Long>()
+    for (u in TENDER_STEPS) {
+      var x = (totalMinor + u - 1) / u * u
+      if (x == totalMinor) x += u
+      if (x - totalMinor < NOTE_MINOR && x !in out) out += x
+    }
+    return out.sorted()
+  }
+
+  /** پرسش دیده می‌شود؟ فقط `features.deliveryPrefs`، ارسال (پرداخت همیشه نقد) و هزینهٔ ارسالِ دانسته (ناحیه گزیده) */
+  fun tenderShown(page: StorePage, cart: Cart?, form: CheckoutForm, slots: SlotsPage?): Boolean =
+    page.features.deliveryPrefs && fulfillmentOf(page.shop, form) == DELIVERY && summary(page, cart, form, slots).deliveryFeeMinor != null
+
+  /** گزینه‌ها برای همان جمعی که در `expectedTotalMinor` می‌رود (پس از تخفیفِ [discountMinor]) */
+  fun tenders(page: StorePage, cart: Cart?, form: CheckoutForm, slots: SlotsPage?, discountMinor: Long = 0): List<Long> =
+    if (!tenderShown(page, cart, form, slots)) emptyList()
+    else tenderOptions(summary(page, cart, form, slots).totalMinor - discountMinor)
+
+  /** اسکناسِ برگزیده فقط اگر هنوز یکی از [tenders] است (جمع عوض شد ⇒ null)؛ ⛔ هرگز مبلغی که سرور رد می‌کند */
+  fun tenderOf(page: StorePage, cart: Cart?, form: CheckoutForm, slots: SlotsPage?, discountMinor: Long = 0): Long? =
+    form.cashTenderMinor?.takeIf { it in tenders(page, cart, form, slots, discountMinor) }
+
   /** بدنهٔ `POST /checkout` (همان `orderBody` ِ وب). [phone] همان E.164 ِ بلیت؛ [promo] تخفیفِ گفتهٔ سرور برای همین سبد. */
   fun request(page: StorePage, cart: Cart, form: CheckoutForm, phone: String, lang: String, slots: SlotsPage?, promo: AppliedPromo? = null): CheckoutRequest {
     val f = fulfillmentOf(page.shop, form) ?: DELIVERY
@@ -193,7 +226,9 @@ object CheckoutRules {
       ),
       promoCode = promo?.code?.takeIf { it.isNotBlank() },
       deviceId = promo?.deviceId,
-      delivery = if (f != DELIVERY) null else CheckoutDelivery(form.callBeforeArrival, form.leaveWith.trim().take(80)),
+      delivery = if (f != DELIVERY) null else CheckoutDelivery(
+        form.callBeforeArrival, form.leaveWith.trim().take(80), tenderOf(page, cart, form, slots, promo?.discountMinor ?: 0),
+      ),
     )
   }
 }

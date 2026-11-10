@@ -114,19 +114,24 @@ async function enter(key, { heavy = false } = {}) {
     waiting--;
   }
   let done = false;
-  return () => {
+  const free = () => {
     if (done) return;
     done = true;
     freeSlot?.();
     freeTurn();
   };
+  free.deadline = deadline;
+  return free;
 }
 
-/** [fn] پس از نوبتِ [key] (و جای push با [heavy])؛ آزاد با پایانِ آن، موفق یا ناموفق */
+/**
+ * [fn] پس از نوبتِ [key] (و جای push با [heavy])؛ آزاد با پایانِ آن، موفق یا ناموفق. با `poolDeadline` (پیش‌فرض خاموش)
+ * push ِ [heavy] `{ acquireBy }` می‌گیرد: گرفتنِ اتصالِ تراکنش هم تا همان سقفِ انتظار (`db.tx`)، نه جدا تا `PG_CONNECT_TIMEOUT_MS`.
+ */
 async function run(key, heavy, fn) {
   const free = await enter(key, { heavy });
   try {
-    return await fn();
+    return await fn(heavy && free.deadline && config.syncV3.gate.poolDeadline ? { acquireBy: free.deadline } : undefined);
   } finally {
     free();
   }

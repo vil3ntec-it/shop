@@ -58,7 +58,7 @@ function lock(c, ctx) {
   return c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [lockKey(ctx)]);
 }
 //  تراکنش زیرِ قفلِ حساب: اول نوبت در صفِ فرآیند، بی اتصال ([heavy]: جای push هم؛ `sync-v3-gate.js`)، بعد همان قفلِ advisory
-const lockedTx = (ctx, fn, heavy = false) => require('./sync-v3-gate').run(lockKey(ctx), heavy, () => tx((c) => lock(c, ctx).then(() => fn(c))));
+const lockedTx = (ctx, fn, heavy = false) => require('./sync-v3-gate').run(lockKey(ctx), heavy, (o) => tx((c) => lock(c, ctx).then(() => fn(c)), o));
 
 function requireShop(ctx) {
   if (!ctx || ctx.app !== 'shop' || ctx.accountKind !== 'shop') {

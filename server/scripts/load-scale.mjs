@@ -6,6 +6,9 @@
  *   sync3.edit   ویرایشِ بهای کالا (`products` update) + `priceHistory` در یک tx — چند دستگاه روی همان کالا ⇒ LWW با HLC
  *   sync3.stock  حرکتِ کالا (خرید/تعدیل)
  *   sync3.customer  مشتریِ تازه یا ویرایشِ نامِ مشتریِ همان دستگاه (`debtors`)
+ *   sync3.count  انبارگردانیِ باز: ۵ تا ۴۰ ردیفِ شمارشِ تازه (`stockCounts`) در جلسهٔ شمارشِ همان دستگاه؛ هر شمارش تعدیلِ سرور
+ *                می‌سازد و هر حرکتِ دیررسیده (صفِ آفلاین، ۵۰۳) با HLC ِ پیش از آن «تعدیلِ دیررسیده» (`v3.lateCount`). شمارش‌های بستهٔ
+ *                پیشین (۱۰۰ تا ۱۰ هزار ردیف برای هر دکان) را `countHistory` پیش از بار می‌فرستد
  *   held.*       فاکتورِ نگه‌داشته (`/api/shop/held-invoices`: نگه‌داشتن، ویرایش، فروش/دور انداختن، خواندن)
  *   owner.sub    `GET /api/me/subscription` ِ صاحبِ دکان
  *   admin.*      خلاصه‌های پنلِ مدیر (آمار، خانه، میزِ دکان‌ها، همگام‌سازی، مالی)
@@ -18,7 +21,7 @@
  */
 
 export const SCALE_MIX = Object.freeze({
-  'sync3.pull': 24, 'sync3.push': 14, 'sync3.edit': 4, 'sync3.stock': 4, 'sync3.customer': 3,
+  'sync3.pull': 24, 'sync3.push': 14, 'sync3.edit': 4, 'sync3.stock': 4, 'sync3.customer': 3, 'sync3.count': 1,
   'held.put': 3, 'held.del': 2, 'held.get': 2,
   'store.home': 3, 'store.products': 7, 'store.search': 5, 'store.product': 6, 'store.checkout': 2, 'store.track': 2, 'xt.probe': 1,
   'desk.list': 3, 'desk.summary': 1, 'owner.sub': 4,
@@ -121,6 +124,50 @@ export function scaleKit({ hit, rnd, pick, int, hlc, state, withDevice, retry })
       fields: { name, phone, balanceMinor: 0 } }], { row, name, phone, hlc: h, insert: true });
   }
 
+  /**
+   * ردیف‌های شمارشِ یک جلسهٔ انبارگردانی (هر ردیف یک واحد، مثلِ برنامه که هر کالای شمرده را جدا ثبت می‌کند). جلسهٔ باز
+   * کالاهایش را تکرار نمی‌کند؛ پس از همهٔ کالاها یا به تصادف (۱۰٪) بسته می‌شود و جلسهٔ بعدی تازه است.
+   */
+  function counts(d, k, { status = 'open' } = {}) {
+    const out = [];
+    for (let j = 0; j < k; j++) {
+      let cs = d.countSession;
+      if (!cs || cs.done.size >= d.shop.products.length || (status === 'open' && j === 0 && rnd() < 0.1)) {
+        cs = d.countSession = { id: `lk-${d.id}-${++seq}`, done: new Set() };
+      }
+      const left = d.shop.products.filter((p) => !cs.done.has(p.id));
+      const p = pick(left);
+      cs.done.add(p.id);
+      const n = ++seq, counted = 1000 * int(0, 60);
+      out.push(unit(d, 'count', [{ op_id: `lo-${d.id}-${n}-k`, hlc: H(d), table: 'stockCounts', row_id: `lk-${d.id}-${n}`, kind: 'insert',
+        fields: { productId: p.id, countedQtyMilli: counted, session: cs.id, status } }], { pid: p.id, counted }));
+    }
+    return out;
+  }
+  /**
+   * شمارش‌های بستهٔ پیشینِ دکان (پیش از بار، ثبت نمی‌شود): [lines] ردیف، دور به دور روی همهٔ کالاها، ۱۰۰ ردیف در هر push
+   * (هر ردیف تعدیلِ سرور هم می‌سازد ⇒ push ِ ۵۰۰تایی روی دکانِ بزرگ از ۱۰ ثانیهٔ بارساز گذشت). شکست ⇒ همان صف دوباره، تا ۸ بار.
+   */
+  async function countHistory(d, lines, label = 'sync3.countHistory') {
+    let sent = 0, fails = 0, r = null;
+    const flush = async () => {
+      while (d.queue && d.queue.length) {
+        r = await pushUnits(d, [], label);
+        if (r && r.status === 200) { fails = 0; continue; }
+        if (++fails > 8) return false;
+        await new Promise((ok) => setTimeout(ok, 1000 * fails));
+      }
+      return true;
+    };
+    while (sent < lines) {
+      const k = Math.min(100, lines - sent);
+      d.queue = [...(d.queue || []), ...counts(d, k, { status: 'closed' })];
+      sent += k;
+      if (!(await flush())) return { ...(r || {}), sent };
+    }
+    return { status: 200, sent };
+  }
+
   /** همان push ِ برنامه: اول صفِ کهنهٔ همین دستگاه، سپس تازه‌ها؛ فقط واحدِ کامل، تا ۵۰۰ op */
   async function pushUnits(d, fresh, label) {
     const q = d.queue || (d.queue = []);
@@ -196,6 +243,7 @@ export function scaleKit({ hit, rnd, pick, int, hlc, state, withDevice, retry })
     'sync3.edit': () => withDevice((d) => pushUnits(d, [edit(d)], 'sync3.edit')),
     'sync3.stock': () => withDevice((d) => pushUnits(d, [stock(d)], 'sync3.stock')),
     'sync3.customer': () => withDevice((d) => pushUnits(d, [customer(d)], 'sync3.customer')),
+    'sync3.count': () => withDevice((d) => pushUnits(d, counts(d, int(5, 40)), 'sync3.count')),
     'sync3.pull': () => withDevice((d) => pull(d)),
     'held.put': () => withDevice((d) => heldPut(d)),
     'held.del': () => withDevice((d) => heldDel(d)),
@@ -224,16 +272,47 @@ export function scaleKit({ hit, rnd, pick, int, hlc, state, withDevice, retry })
     },
   };
 
-  /** «قطعِ سراسری»: هر دستگاه یک صفِ ۳ تا ۱۵ فروش و چند ویرایش/حرکت دارد؛ همه را می‌فرستد و تا سرِ دفتر pull می‌کند */
-  async function outage(d) {
-    if (d.busy) return;
+  /**
+   * «قطعِ سراسری»: هر دستگاه یک صفِ ۳ تا ۱۵ فروش و چند ویرایش/حرکت/مشتری دارد؛ همه را می‌فرستد و تا سرِ دفتر pull می‌کند.
+   * شکست (۵۰۳، مهلت، اتصالِ بریده) ⇒ همان درنگِ برنامه‌ها پیش از دوباره (`sync-core.js backoffMs` و `SyncV3Engine.backoffMs`:
+   * ۲ ثانیه × ۲ⁿ، ±۲۵٪، بی نگاه به `Retry-After`) تا [limitMs]؛ موفق ⇒ بی درنگ دستهٔ بعد. «تخلیه» = از آغاز تا صفِ خالی و pull تا سر.
+   */
+  const burst = { devices: 0, busy: 0, drainedMs: [], left: 0, retries: 0, t0: 0, lastMs: 0 };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const backoffMs = (attempt) => Math.round(Math.min(300_000, 2000 * 2 ** attempt) * (0.75 + rnd() * 0.5));
+  async function outage(d, { limitMs = 120_000 } = {}) {
+    if (d.busy) { burst.busy++; return; }
     d.busy = true;
+    const t0 = performance.now();
+    if (!burst.t0) burst.t0 = t0;
+    burst.devices++;
+    let fails = 0;
+    const failed = async () => { if (performance.now() - t0 > limitMs) return false; burst.retries++; await sleep(backoffMs(fails++)); return true; };
     try {
-      const fresh = [...salesOf(d, int(3, 15)), edit(d), stock(d), customer(d)];
-      await pushUnits(d, fresh, 'sync3.pushOutage');
-      for (let i = 0; i < 3 && d.queue.length; i++) await pushUnits(d, [], 'sync3.pushOutage');
-      await pull(d, 'sync3.pullOutage');
+      let r = await pushUnits(d, [...salesOf(d, int(3, 15)), edit(d), stock(d), customer(d)], 'sync3.pushOutage');
+      while (d.queue.length && performance.now() - t0 < limitMs) {
+        if (r && r.status === 200) fails = 0;
+        else if (!(await failed())) break;
+        r = await pushUnits(d, [], 'sync3.pushOutage');
+      }
+      let synced = false;
+      while (!d.queue.length && performance.now() - t0 < limitMs) {
+        const p = await pull(d, 'sync3.pullOutage');
+        if (p.status === 200) { fails = 0; if (!d.hasMore) { synced = true; break; } } else if (!(await failed())) break;
+      }
+      if (synced) { const ms = performance.now() - t0; burst.drainedMs.push(ms); burst.lastMs = Math.max(burst.lastMs, t0 + ms - burst.t0); } else burst.left++;
     } finally { d.busy = false; }
+  }
+  /** خلاصهٔ «قطعِ سراسری»: چند دستگاه در چند ثانیه تا سر رسیدند (و بقیه تا [limitMs] نه) */
+  function burstStats() {
+    const s = [...burst.drainedMs].sort((a, b) => a - b);
+    const q = (p) => (s.length ? Math.round(s[Math.min(s.length - 1, Math.ceil(p * s.length) - 1)]) : null);
+    const within = (sec) => s.filter((x) => x <= sec * 1000).length;
+    const out = { devices: burst.devices, skippedBusy: burst.busy, drained: s.length, notDrained: burst.left, retries: burst.retries,
+      p50Ms: q(0.5), p95Ms: q(0.95), maxMs: s.length ? Math.round(s[s.length - 1]) : null, lastDrainedAfterMs: Math.round(burst.lastMs),
+      within10s: within(10), within30s: within(30), within60s: within(60) };
+    Object.assign(burst, { devices: 0, busy: 0, drainedMs: [], left: 0, retries: 0, t0: 0, lastMs: 0 });
+    return out;
   }
 
   /**
@@ -267,7 +346,7 @@ export function scaleKit({ hit, rnd, pick, int, hlc, state, withDevice, retry })
 
   function ledger() {
     const ops = [];
-    const sales = {}, moves = {}, prices = {}, debtors = {};
+    const sales = {}, moves = {}, prices = {}, debtors = {}, counts = {};
     const bump = (o, k, v) => { o[k] = (o[k] || 0) + v; };
     const win = (cur, h) => !cur || hlc.compare(h, cur.hlc) > 0;
     for (const u of units) {
@@ -277,6 +356,7 @@ export function scaleKit({ hit, rnd, pick, int, hlc, state, withDevice, retry })
       const s = String(u.shop);
       if (u.kind === 'sale') { const x = sales[s] ||= { n: 0, totalMinor: 0 }; x.n++; x.totalMinor += u.data.total; }
       if (u.data.moves) for (const [pid, q] of u.data.moves) bump(moves[s] ||= {}, pid, q);
+      if (u.kind === 'count') bump(counts, s, 1);
       if (u.kind === 'edit') { const m = prices[s] ||= {}; if (win(m[u.data.pid], u.data.hlc)) m[u.data.pid] = { minor: u.data.minor, hlc: u.data.hlc }; }
       if (u.kind === 'customer') {
         const m = debtors[s] ||= {};
@@ -301,11 +381,11 @@ export function scaleKit({ hit, rnd, pick, int, hlc, state, withDevice, retry })
       shops: state.shops.map((sh) => ({ index: sh.index, shopId: sh.shopId, slug: sh.slug })),
       devices: state.devices.map((d) => ({ id: d.id, shop: d.shop.index, cursor: d.cursor, queued: d.queue ? d.queue.length : 0,
         dup: d.dup || 0, seen: [...(d.seen || [])] })),
-      ops, sales, moves, prices, seedPrices, debtors, held: heldOut,
+      ops, sales, moves, prices, seedPrices, debtors, counts, held: heldOut,
       orders: Object.fromEntries([...state.orders.entries()].map(([slug, toks]) => [slug, toks.slice()])),
       foreign, xt,
     };
   }
 
-  return { SCENARIOS, pushUnits, pull, outage, drain, ledger, note, sales: salesOf };
+  return { SCENARIOS, pushUnits, pull, outage, burstStats, drain, ledger, note, sales: salesOf, countHistory };
 }

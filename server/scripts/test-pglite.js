@@ -47,8 +47,10 @@ const watchdog = require('./test-watchdog');
 
 const dir = path.join(__dirname, '..', 'test');
 const skip = new Set(['backup.test.js', 'pump-isolation.test.js']);
-const files = fs.readdirSync(dir).filter((f) => f.endsWith('.test.js') && !skip.has(f)).sort()
+const all = fs.readdirSync(dir).filter((f) => f.endsWith('.test.js') && !skip.has(f)).sort()
   .map((f) => path.join('test', f));
+//  ⏱ TEST_SHARD=k/n (کارهای CI ِ PGlite و Electron، دو تکهٔ هم‌زمان؛ `scripts/test-shard.js`) — نبود ⇒ همه
+const files = require('./test-shard').shardOf(all, process.env.TEST_SHARD);
 
 const failed = path.join(os.tmpdir(), `test-failures-${process.pid}-${Date.now()}.jsonl`);
 //  `npm test` دو بار این را صدا می‌زند ⇒ هر اجرا به پروندهٔ شواهد افزوده می‌شود، نه رونویسی
