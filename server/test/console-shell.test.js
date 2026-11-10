@@ -243,6 +243,7 @@ const NOT_CATALOG = Object.freeze({
   'sync.live_expiry_close': 'مشترک با پمپ (scope = دکان یا پمپ، `sync-v1-live.js`)؛ همان دلیل',
   'sync.epoch': 'کلیدِ `app_config`، نه `live_config` (`sync-epoch.js`)',
   'customers.contact': 'نامِ مجوز (`customer-contact.js`)، نه پرچم',
+  'customers.credit_limit': 'نامِ مجوز (`CreditLimitPerm.PERM`، CRM-03)، نه پرچم — پرچمش `shop.credit_limit_perm` است',
 });
 test('کاتالوگ: هر کلیدِ live_config که سرور، وب یا کاتلینِ غیرِ پمپ می‌خواند در KNOWN است (یا با دلیل بیرون)', () => {
   const { scanFlags } = require('./flag-scan');
