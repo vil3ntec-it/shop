@@ -673,13 +673,14 @@ async function createApp({ runMigrations = true } = {}) {
     if (!slug) return next();
     storefront.open(slug).then(async (sf) => {
       if (!(await storeSeo.on(sf))) return next();
-      return seoLimit(req, res, (err) => (err ? next(err) : fn(sf, req, res).catch(next)));
+      return seoLimit(req, res, (err) => (err ? next(err) : fn(sf, req, res, next).catch(next)));
     }, (err) => (err.status === 404 ? next() : next(err))).catch(next);
   };
   const productPage = (sf, req, res) => storeSeo.page(sf, { productId: req.params.id, lang: seoLang(req.query.lang) })
     .then((p) => storeHeaders(req, res, () => res.status(p.status).set('Cache-Control', 'no-cache').type('html').send(shell(p.body))));
-  const sitemapOf = (sf, req, res) => storeSeo.sitemap(sf)
-    .then((x) => res.set('Cache-Control', 'no-cache').type('application/xml').send(x));
+  //  WEB-17: بیش از یک برگ ⇒ فهرستِ برگ‌ها و `?page=<n>`؛ برگِ نبوده یا بدشکل ⇒ همان ۴۰۴ ِ نشانیِ ناشناخته
+  const sitemapOf = (sf, req, res, next) => storeSeo.sitemap(sf, { page: req.query.page })
+    .then((x) => (x === false ? next() : res.set('Cache-Control', 'no-cache').type('application/xml').send(x)));
   const robotsOf = (sf, req, res) => storeSeo.robots(sf)
     .then((x) => res.set('Cache-Control', 'no-cache').type('text/plain').send(x));
   const hostSlug = (req) => storefront.slugFromHost(req.hostname);

@@ -477,6 +477,8 @@ const config = {
     paperLinkTtlMs: num(process.env.STORE_PAPER_LINK_DAYS, 365) * 24 * 60 * 60 * 1000,
     //  WEB-04 — زمانِ تقریبیِ عمومیِ ویترین (`GET /api/store/:slug/eta`) این‌قدر در حافظهٔ همین نمونه می‌ماند؛ ۰ ⇒ بی حافظه
     etaCacheMs: num(process.env.STORE_ETA_CACHE_MS, 30 * 1000),
+    //  WEB-17 — نشانیِ هر برگِ نقشهٔ سایتِ دکان (`lib/store-seo.js`)؛ بیشتر ⇒ فهرستِ برگ‌ها (سقفِ پروتکل ۵۰٬۰۰۰)
+    sitemapPageSize: num(process.env.STORE_SITEMAP_PAGE, 5000),
   },
 
   /**

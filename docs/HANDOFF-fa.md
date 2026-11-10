@@ -54,6 +54,14 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/web-2` (دورِ دوم: ردیف‌های PARTIAL ِ WEB و CHK؛ روی main ‏99036497 = دستهٔ ۴۲؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) CHK-20 در برابرِ §۱۹.۲ بندِ ۸: رسید دکانِ مسئول، ناحیهٔ ارسال، بازهٔ برگزیده (`scheduledFor` در پاسخ بود و دیده نمی‌شد) و «کپیِ نشانیِ پیگیری» با هشدارِ لغو را
+  نداشت ⇒ `store/order-facts.js` ِ دیربار + واژه‌نامهٔ `facts` (واژه‌نامهٔ `order` در ۴KB پر است)؛ `web-store-zones.mjs` (کدِ پیشین ۶ ❌). رفعِ همراه: `K.part(…, $('view-order'))`
+  همهٔ `data-t` ِ صفحه را از نو می‌نوشت ⇒ با پوشِ وب ِ روشن عنوانِ رسید «سفارش» می‌شد؛ ریشه فقط گرهٔ خودِ بخش (`web-store-push.mjs`، کدِ پیشین ۱ ❌). (۲) WEB-17: نقشهٔ سایت در ۵۰۰۰ کالا
+  بی‌صدا بریده می‌شد ⇒ `sitemapindex` + `?page=<n>` (بی نشانیِ تازه؛ `STORE_SITEMAP_PAGE`)؛ `storefront-seo.test.js` ۶/۶ روی PGlite و PostgreSQL (تازه روی کدِ پیشین سرخ).
+  بقیهٔ نامزدها جز کارِ بیرونی/تصمیم چیزی نداشتند: WEB-01 (صفحهٔ وبِ مدیریت، `market.slug_hold`)، WEB-05 (فرهنگِ مترادف ۴-۱)، WEB-20 (Sharing Debugger)، CHK-03 (D-09 و CI).
+- نیمه‌کاره: هیچ. ردیف‌ها PARTIAL ماندند (CHK-20: D-09 و CI؛ WEB-17: Search Console). شاخهٔ کهنهٔ `claude/web-2` (ac8bfe21، squash‌شده) روی origin بود.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد؛ شاهدِ CI ِ `web-store-zones.mjs` و `storefront-seo.test.js`.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/dari-mirror` (آینهٔ JS ِ DariCoverageTest برای جدول‌های `Str*`؛ روی main ‏99036497؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: روی `ccr-…-batch-43` ‏f067bf9c فقط CI ِ اندروید سرخ شد (`StrProductGallery.notSent`، `StrPromoHeld.releaseFailed`: «دوباره بزنید») و همهٔ JS سبز بود،
   چون آینهٔ `dari-text.test.js` فقط خرید + وب را می‌سنجید. حالا `KT.appTexts` (`server/test/kt-source.js`) همان `rows(I18nTables.all)` را از خودِ Str*.kt می‌خواند

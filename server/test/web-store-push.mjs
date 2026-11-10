@@ -182,6 +182,8 @@ await page.waitForSelector('#o-np-on', { state: 'visible', timeout: 10000 });
 ok(/خبرِ این سفارش روی همین دستگاه/.test(await text('#o-np-h')), 'کارت: «خبرِ این سفارش روی همین دستگاه»', await text('#o-np-h'));
 ok(/قبول کرد/.test(await text('#o-np-state')) && (await text('#o-np-on')) === 'خبرم کن', 'شرح و دکمهٔ «خبرم کن»');
 ok(!(await visible('#o-np-off')), 'پیش از لمس: بی «خاموش کن»');
+//  CHK-20: رسیدنِ واژه‌نامهٔ کارت عنوانِ رسید («سفارشِ شمارهٔ …») را به «سفارش» برنمی‌گرداند (پیش‌تر `K.part('push', #view-order)`)
+ok(/شمارهٔ/.test(await text('#o-title')), 'CHK-20: پس از کارتِ پوش عنوانِ رسید همان «سفارشِ شمارهٔ …» است', await text('#o-title'));
 ok((await subsOf(o1.id)).length === 0 && posts.length === 0, 'بی لمس: هیچ اشتراک و هیچ درخواست');
 if (axeSrc) {
   await page.evaluate(axeSrc);

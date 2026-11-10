@@ -13,8 +13,10 @@
  *              `hreflang` برای fa/en/ps (+ `x-default`) با `?lang=` ِ همان
  *              `kit/boot.js`، و دادهٔ ساختاریافتهٔ `Product`/`Offer` (JSON-LD).
  *   نقشهٔ سایت ─ `/sitemap.xml` روی میزبانِ دکان (و `/store/<slug>/sitemap.xml`)
- *              با همهٔ کالاهای فروختنیِ ویترین (حداکثر `MAX_SITEMAP`) و
- *              `xhtml:link` ِ سه زبان؛ `robots.txt` ِ همان میزبان به آن اشاره می‌کند.
+ *              با همهٔ کالاهای فروختنیِ ویترین و `xhtml:link` ِ سه زبان؛ `robots.txt` ِ
+ *              همان میزبان به آن اشاره می‌کند. بیش از یک برگ (`sitemapPageSize`، پیش‌فرض
+ *              ۵۰۰۰) ⇒ همان نشانی فهرستِ برگ‌هاست (`sitemapindex`) و هر برگ `?page=<n>`؛
+ *              پیش‌تر کالای ۵۰۰۱ُم به بعد بی‌صدا از نقشه بیرون می‌ماند (WEB-17).
  *
  *   ⛔ خاموش ⇒ هیچ رفتاری عوض نمی‌شود: `/store/<slug>` همان پرونده را می‌فرستد،
  *     نشانی‌های تازه همان ۴۰۴ ِ امروز را دارند و `GET /api/store/:slug` کلیدِ
@@ -45,7 +47,10 @@ const FLAG_KEY = 'shop.storefront.seo';
 const LANGS = ['fa', 'en', 'ps'];
 const DIR = { fa: 'rtl', en: 'ltr', ps: 'rtl' };
 const LOCALE = { fa: 'fa_AF', en: 'en_US', ps: 'ps_AF' };
-const MAX_SITEMAP = 5000;
+//  سقفِ پروتکلِ نقشهٔ سایت: ۵۰٬۰۰۰ نشانی در هر پرونده؛ برگِ ما کوچک‌تر تا پاسخ سبک بماند
+const MAX_SITEMAP = 50000;
+const MAX_SITEMAP_PAGES = 1000;
+const sitemapPageSize = () => Math.min(MAX_SITEMAP, Math.max(1, Math.trunc(Number(config.storefront.sitemapPageSize) || 5000)));
 const MAX_DESCRIPTION = 200;
 
 //  متنِ کوتاهِ برچسب‌ها (فقط وقتی دکان توضیحی ننوشته) — سه زبان، مثلِ کیتِ وب
@@ -252,14 +257,42 @@ async function page(store, { productId = null, lang } = {}) {
   return { status: productId !== null && !product ? 404 : 200, body: html };
 }
 
-/** نقشهٔ سایتِ همین دکان — یا null اگر خاموش است. */
-async function sitemap(store) {
+/** شمارهٔ برگِ `?page=` — نیامده ⇒ undefined؛ هر چیزِ دیگری جز ۱…۱۰۰۰ ⇒ null (همان ۴۰۴) */
+function sitemapPageOf(v) {
+  if (v === undefined) return undefined;
+  if (typeof v !== 'string' || !/^[1-9][0-9]{0,3}$/.test(v)) return null;
+  const n = Number(v);
+  return n <= MAX_SITEMAP_PAGES ? n : null;
+}
+
+/**
+ * نقشهٔ سایتِ همین دکان — null اگر خاموش است، false اگر برگِ خواسته‌شده نیست (۴۰۴).
+ * تا یک برگ: همان `urlset` ِ همیشگی (و `?page=1` همان). بیشتر: بی `page` ⇒ `sitemapindex` ِ برگ‌ها، با `page` ⇒
+ * همان برگ (نخستین برگ صفحهٔ خودِ دکان را هم دارد). ترتیب همان نام و شناسه، تا برگ‌ها هم‌پوشانی نداشته باشند.
+ */
+async function sitemap(store, { page } = {}) {
   if (!(await on(store))) return null;
+  const want = sitemapPageOf(page);
+  if (want === null) return false;
+  const per = sitemapPageSize();
+  const where = `FROM ${sf.PRODUCT_FROM} WHERE sp.shop_id = $1 AND sp.published AND ${sf.LIVE_PRODUCT}`;
+  const total = Number((await one(`SELECT COUNT(*) AS n ${where}`, [store.shop_id])).n);
+  const pages = Math.min(MAX_SITEMAP_PAGES, Math.max(1, Math.ceil(total / per)));
+  if (want !== undefined && want > pages) return false;
+  if (want === undefined && pages > 1) {
+    return [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+      ...Array.from({ length: pages }, (_, i) => `<sitemap><loc>${esc(`${originOf(store)}/sitemap.xml?page=${i + 1}`)}</loc></sitemap>`),
+      '</sitemapindex>',
+      '',
+    ].join('\n');
+  }
+  const at = (want || 1) - 1;
   const rows = await many(
-    `SELECT r.row_id AS id, r.data, sp.online_price_minor, sp.max_qty_milli, false AS has_photo FROM ${sf.PRODUCT_FROM}
-      WHERE sp.shop_id = $1 AND sp.published AND ${sf.LIVE_PRODUCT}
-      ORDER BY COALESCE(r.data->>'name', ''), r.row_id LIMIT $2`,
-    [store.shop_id, MAX_SITEMAP]
+    `SELECT r.row_id AS id, r.data, sp.online_price_minor, sp.max_qty_milli, false AS has_photo ${where}
+      ORDER BY COALESCE(r.data->>'name', ''), r.row_id LIMIT $2 OFFSET $3`,
+    [store.shop_id, per, at * per]
   );
   const ids = rows.map(sf.productView).filter((p) => p.priceMinor !== null && p.name).map((p) => p.id);
   const entry = (url) => [
@@ -270,7 +303,7 @@ async function sitemap(store) {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
-    entry(pageUrl(store, null)),
+    ...(at === 0 ? [entry(pageUrl(store, null))] : []),
     ...ids.map((id) => entry(pageUrl(store, id))),
     '</urlset>',
     '',
@@ -285,7 +318,7 @@ async function robots(store) {
 
 module.exports = {
   FLAG_KEY, LANGS, MAX_SITEMAP,
-  on, publicInfo, page, sitemap, robots,
+  on, publicInfo, page, sitemap, sitemapPageOf, robots,
   //  برای آزمون
   amountOf, priceText, headOf, esc, ld,
 };
