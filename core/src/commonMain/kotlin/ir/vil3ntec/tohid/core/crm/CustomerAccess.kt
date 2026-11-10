@@ -13,7 +13,8 @@ import kotlinx.serialization.json.longOrNull
  *   • **دستگاه** (بی‌اینترنت هم): هر دیدنِ پرونده روی همین دستگاه یک ردیفِ `auditLog` ِ دفتر با `type = customer_view`
  *     ([TYPE]) است و با همان همگام‌سازیِ امروز به سرور و دستگاه‌های دیگرِ دکان می‌رسد (`data/CustomerAccessLog.kt`).
  *     همان بیننده + مشتری + نوع در [WINDOW_MS] ⇐ ردیفِ تازه نیست ([isRepeat]) — سابقه فقط‌افزودنی است و ردیف ویرایش نمی‌شود.
- *   • **سرور**: خواندنِ پرونده از درِ سرور (`GET /api/debtors/:id`، سفارش‌های یک مشتری) با شمار ([parse] ِ پاسخِ [path]).
+ *   • **سرور**: خواندنِ پرونده از درِ سرور (`GET /api/debtors/:id`، سفارش‌های یک مشتری) با شمار ([parse] ِ پاسخِ [path])،
+ *     و دیدنی که نقشِ بی `auditLog` (حسابدار) از دفترِ خودش به سرور می‌گوید ([noteBody] ⇐ `POST` ِ [PATH]، درِ `app`).
  *  ⛔ بی دادهٔ شخصیِ مشتری: فقط شناسهٔ پرونده، بیننده (شناسه، نام، نقش)، دستگاه، نوع و زمان.
  *  ⛔ دیدنِ فهرست فقط صاحب و `audit.view` (همان «سابقهٔ عملیات»)؛ سرور هم همان را می‌خواهد.
  */
@@ -73,17 +74,32 @@ object CustomerAccess {
   fun isRepeat(existing: List<View>, viewerId: String, customerId: String, kind: Kind, now: Long): Boolean =
     existing.any { it.viewerId == viewerId && it.customerId == customerId && it.kind == kind && now - it.at < WINDOW_MS }
 
+  /**
+   *  بدنهٔ `POST` ِ [PATH] (درِ `app` ِ سرور، مهاجرتِ ۶۱۰): دیدنِ پرونده روی دستگاهی که `auditLog` نمی‌نویسد (حسابدار،
+   *  `PermCore.canWrite`). بیننده، نقش و دستگاه را سرور از توکن می‌گیرد و `phone` ِ بی `customers.contact` را `detail`
+   *  می‌کند. شناسهٔ ناامن ⇒ null (هیچ درخواستی)؛ [ALL] فقط با [Kind.EXPORT].
+   */
+  fun noteBody(customerId: String, kind: Kind): JsonObject? {
+    val id = customerId.trim()
+    val ok = if (id == ALL) kind == Kind.EXPORT else path(id) != null
+    return if (!ok) null else JsonObject(mapOf("customerId" to JsonPrimitive(id), "kind" to JsonPrimitive(kind.key)))
+  }
+
   private fun str(o: JsonObject, k: String): String = (o[k] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull.orEmpty()
   private fun long(o: JsonObject, k: String): Long? = (o[k] as? JsonPrimitive)?.takeIf { !it.isString }?.longOrNull
 
-  /** پاسخِ `GET /shop/customer-access` ⇐ ردیف‌های سرور؛ ردیفِ بدشکل یا نوعِ ناشناخته کنار می‌رود */
+  /**
+   *  پاسخِ `GET /shop/customer-access` ⇐ ردیف‌های سرور؛ ردیفِ بدشکل یا نوعِ ناشناخته کنار می‌رود. `all: true` (خروجیِ برگهٔ
+   *  همهٔ مشتریان) ⇐ مشتریِ [ALL]، همان ردیفِ دستگاه.
+   */
   fun parse(o: JsonObject, customerId: String): List<View> =
     (o["entries"] as? JsonArray).orEmpty().mapNotNull { e ->
       val r = e as? JsonObject ?: return@mapNotNull null
       val kind = Kind.of(str(r, "kind")) ?: return@mapNotNull null
       val id = str(r, "id").ifEmpty { return@mapNotNull null }
+      val all = (r["all"] as? JsonPrimitive)?.takeIf { !it.isString }?.contentOrNull == "true"
       View(
-        id = id, customerId = customerId, viewerId = str(r, "viewerId"), viewerName = str(r, "viewerName"),
+        id = id, customerId = if (all) ALL else customerId, viewerId = str(r, "viewerId"), viewerName = str(r, "viewerName"),
         role = str(r, "role"), device = str(r, "device"), kind = kind,
         at = long(r, "lastAt") ?: long(r, "firstAt") ?: 0L, count = (long(r, "count") ?: 1L).coerceIn(1L, 1_000_000L).toInt(),
         server = true,
