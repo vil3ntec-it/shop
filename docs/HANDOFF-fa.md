@@ -54,6 +54,17 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/pos-2` (ردیف‌های P0 ِ صندوق: POS-03 در نسخهٔ وب، شاهدِ وب برای POS-02، و راست کردنِ POS-04/10/21؛ روی main ‏990364974؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **POS-03 وب** (سند: «در گوشی و وب اضافه شود») — `license/cart-query.js` همزادِ `CartQuery.parse` با `\s`/`.`/`$` ِ java.util.regex و بردارِ مشترکِ
+  `license/test-vectors/cart-query-v1.json` (۵۳ مورد؛ جدا با JDK 21 ِ همین ماشین ۵۳/۵۳ و همهٔ BMP هم‌خوان؛ `CartQueryVectorsTest` ِ Kotlin فقط CI)؛ پشتِ
+  تنظیمِ خاموشِ همین مرورگر `tohid-pos-qty-prefix-v1` («تنظیمات» ⇐ «دوربین بارکدخوان»)؛ «۳*کد» در کادرِ دستی و «۳*» ِ تنها برای اسکنِ بعدی، فقط از
+  `handleBarcodeScanned` ِ صفحه؛ بارکدِ کامل بر پیشوند پیش است؛ کادر روی گوشی `tel`. بارکننده `shop-sync.js`، `sw.js` v71، چهار کلیدِ واژه‌نامه (fa/en/ps).
+  آزمون: `web-cart-query.test.js` ۸/۸ (PGlite و PostgreSQL)، `web-pos-qty.mjs` ۹/۹ (روی origin/main ۹ سرخ)، بی‌پسرفتِ پنج آزمونِ مرورگرِ وب. **STATUS:** POS-02 شاهدِ وب؛
+  POS-04 «#359 باز» کهنه بود و وب جست‌وجوی نام ندارد؛ POS-21 «سرور نمی‌سنجد» کهنه بود (`shop.price_cap` هست؛ price-cap ۸/۸، sale-caps ۶/۶، staff-approval ۲۱/۲۱ روی هر دو)؛
+  POS-10 یافته: قلمِ آزاد (`productId` خالی) در سرور از سنجشِ قیمت بیرون است. هیچ ردیفی وضعیت عوض نکرد (همه PARTIAL). یک خطِ RULES («v3 · فروش و صندوق») و یک خطِ نقشهٔ پرچم‌ها.
+- نیمه‌کاره: POS-41 (Alt+P در پنلِ پرداخت = پرونده‌های پرداخت، بیرون از قلمرو)؛ POS-02 «ردیفِ جدا» و POS-10/21 تصمیمِ صاحب‌کار؛ `PosSearch.resolve` ِ کامپیوتر پیشوند را پیش از
+  بارکدِ کامل می‌خواند (یافته، دست نخورد)؛ دوربینی که پیش از بارِ `cart-query.js` روشن شد «۳*» ِ تنها را تا روشن شدنِ دوباره نمی‌بیند.
+- قدمِ بعدی: CI (`CartQueryVectorsTest`)؛ سنجشِ وب روی آیفونِ واقعی (صفحه‌کلیدِ `tel`)؛ تصمیمِ صاحب‌کار دربارهٔ مجوزِ «قلمِ آزاد» در سرور و روشن کردنِ `shop.price_cap`.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/rsk-platform` (تمیزکاری: بی سقفِ پلتفرمیِ تازه برای `OrderRiskListsV3.kt`؛ روی `ccr-…-batch-42` ‏1879be76؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: `090a2373` (از `claude/rsk-app`) برای یک `LocalContext` در صفحهٔ v3 سقفِ تازهٔ ۱ در `platformDeps` ِ `tools/quality/baseline.json` گذاشته بود.
   پوستهٔ مسیرِ `RiskListsRoute` (مخزن از `Context`) به `OrderRiskListsAndroid.kt` رفت (مرزِ `*Android.kt` در `PLATFORM_DEPS.boundary`)؛ بدنه `RiskListsContent(repo)`
