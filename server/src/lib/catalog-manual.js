@@ -7,6 +7,7 @@
 const crypto = require('crypto');
 const { query, one, now, tx } = require('../db');
 const stock = require('./stock');
+const repack = require('./catalog-repack');
 const { stable } = require('./idempotency');
 const { badRequest, notFound, conflict } = require('../middleware/errors');
 
@@ -39,6 +40,8 @@ function locOf(v, allowed, def) {
 function parseManual(body) {
   const b = body && typeof body === 'object' ? body : {};
   const kind = str(b.kind);
+  //  INV-21: شکستنِ کارتن و ساختِ بسته (`lib/catalog-repack.js`)؛ پرچمش را درِ مسیر و `manualMove` می‌سنجند
+  if (repack.isKind(kind)) return repack.parse(b, { str, text, qtyOf, locOf, max: MAX_QTY_MILLI });
   const spec = MANUAL[kind];
   if (!spec) throw badRequest('نوعِ حرکت معتبر نیست', 'bad_kind');
   const productId = str(b.productId);
@@ -112,9 +115,12 @@ function hashOf(body) {
   return crypto.createHash('sha256').update(stable(body || {})).digest('hex').slice(0, 32);
 }
 
-//  هر درخواستِ دستی حداکثر دو حرکت دارد (انتقال = خروج + ورود) ⇒ کلیدهای دقیق، نه LIKE
-const MAX_PLAN = 2;
+//  هر درخواستِ دستی حداکثر دو حرکت دارد (انتقال = خروج + ورود)، و ساختِ بسته یکی برای هر جزء + خروجی ⇒ کلیدهای دقیق، نه LIKE
+const MAX_PLAN = 1 + repack.MAX_PARTS;
 const staffKeys = (k) => Array.from({ length: MAX_PLAN }, (_, i) => `staff:${k}:${i + 1}`);
+//  به ترتیبِ ردیفِ سند (`staff:k:10` پس از `staff:k:9`، نه پیش از `:2`)
+const seqOf = (r) => Number(r.source_key.slice(r.source_key.lastIndexOf(':') + 1));
+const bySeq = (rows) => rows.sort((a, b) => seqOf(a) - seqOf(b));
 
 function keyOf(raw) {
   const key = str(raw);
@@ -140,22 +146,27 @@ async function manualMove(shopId, { key, body, actor }) {
     const prev = (await c.query(
       `SELECT * FROM stock_moves WHERE shop_id=$1 AND source_key = ANY($2::text[]) ORDER BY source_key`, [shopId, staffKeys(k)]
     )).rows;
+    bySeq(prev);
     if (prev.length) {
       if (prev[0].ref_id !== hash) throw conflict('این کلیدِ یکتایی پیش‌تر برای حرکتِ دیگری به کار رفته است', 'idempotency_key_reused');
       return { moves: prev.map(moveView), replayed: true, unchanged: false };
     }
+    if (m.repack && !(await repack.enabled(shopId, c))) throw badRequest('نوعِ حرکت معتبر نیست', 'bad_kind');
     const settings = await stock.settingsOf(shopId, c);
     //  دفترِ دستگاه پیش از اصلاح: شمارش و انتقال روی موجودیِ امروز حساب شوند
     ingested = await ingestTx(c, shopId, at, settings);
     const p = (await c.query('SELECT product_id FROM catalog_products WHERE shop_id=$1 AND product_id=$2', [shopId, m.productId])).rows[0];
     if (!p) throw notFound('کالا پیدا نشد', 'product_not_found');
+    if (m.repack) await repack.requireProducts(c, shopId, m);
 
     const base = {
       productId: m.productId, mode: 'local', source: 'staff', refType: 'staff', refId: hash,
       actorType: 'user', actorId: actor.id, note: m.note, at,
     };
     const plan = [];
-    if (m.kind === 'transfer' || m.kind === 'damage') {
+    if (m.repack) {
+      plan.push(...repack.plan(m, base));
+    } else if (m.kind === 'transfer' || m.kind === 'damage') {
       const to = m.kind === 'damage' ? 'damaged' : m.to;
       const reason = m.reason || (m.kind === 'damage' ? 'damage' : 'transfer');
       plan.push({ ...base, location: m.from, type: 'transfer_out', qtyMilli: m.qtyMilli, reason });
@@ -177,10 +188,10 @@ async function manualMove(shopId, { key, body, actor }) {
     for (let i = 0; i < plan.length; i++) {
       await stock.postMove(c, shopId, { ...plan[i], sourceKey: `staff:${k}:${i + 1}` }, at);
     }
-    await stock.checkProducts(c, shopId, [m.productId], settings, at);
-    const rows = (await c.query(
+    await stock.checkProducts(c, shopId, m.repack ? repack.ids(m) : [m.productId], settings, at);
+    const rows = bySeq((await c.query(
       `SELECT * FROM stock_moves WHERE shop_id=$1 AND source_key = ANY($2::text[]) ORDER BY source_key`, [shopId, staffKeys(k)]
-    )).rows;
+    )).rows);
     return { moves: rows.map(moveView), replayed: false, unchanged: false };
   });
   //  کنار گذاشتنِ کسرِ سفارشیِ پیشین در همین تراکنش ⇒ همان سطرِ ممیزیِ خواندنِ کاتالوگ

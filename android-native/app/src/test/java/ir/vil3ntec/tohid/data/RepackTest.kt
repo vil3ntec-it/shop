@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrGoods
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -104,5 +105,33 @@ class RepackTest {
     //  ۱۰ دانه × ۵۰ + ۳ کارتن × ۱۲۰۰ = ۴۱۰۰ ؋
     assertEquals(410_000L, can.valueMinor)
     assertEquals(600_000L, StockLedger.productView(v, "ctn").valueMinor)
+  }
+
+  /*
+   *  یک ردیفِ سند تنها پاک یا عوض می‌شد (`WarehouseEngine.deleteEntry` فقط ورودِ خرید را می‌پایید، صفحهٔ کالا دکمهٔ حذف را برای
+   *  هر ورود دارد): برداشتنِ ردیفِ منفیِ کارتن کارتن را برمی‌گرداند و ۲۴ دانه هم می‌ماند. حالا رد، با همان دفتر؛ یادداشت آزاد؛
+   *  ورودِ دستیِ همان کالاها مثلِ امروز پاک می‌شود.
+   */
+  @Test fun `یک ردیفِ سندِ تولید تنها پاک یا عوض نمی‌شود`() {
+    val d = ok(Repack.breakPack(base, "op4", "ctn", 1_000, "can", 24_000, null, "", "", today, 500, newId))
+    val rows = d.warehouseEntries.filter { it.refId == "op4" }
+    assertEquals(listOf(-1.0, 24.0), rows.map { it.units })
+    assertTrue(rows.all { Repack.isDocRow(it) })
+    assertTrue(base.warehouseEntries.none { Repack.isDocRow(it) })
+    val fixed = WarehouseEngine.Result.Failed(StrGoods.repackEntryFixed)
+    for (r in rows) assertEquals(fixed, WarehouseEngine.deleteEntry(d, r.id, today, 600, newId))
+    val out = rows.single { it.units > 0 }
+    val draft = WarehouseEngine.EntryDraft(productId = out.productId, units = out.units, unit = out.unit, price = out.price, date = out.date)
+    assertEquals(fixed, WarehouseEngine.editEntry(d, out.id, draft.copy(units = 30.0), today))
+    assertEquals(fixed, WarehouseEngine.editEntry(d, out.id, draft.copy(price = out.price + 1.0), today))
+    assertEquals(fixed, WarehouseEngine.editEntry(d, out.id, draft.copy(productId = "rib"), today))
+    assertTrue(WarehouseEngine.editEntry(d, rows.single { it.units < 0 }.id, draft, today) is WarehouseEngine.Result.Failed)
+    val noted = WarehouseEngine.editEntry(d, out.id, draft.copy(notes = "قفسهٔ بالا"), today)
+    assertTrue(noted.toString(), noted is WarehouseEngine.Result.Ok)
+    assertEquals(34.0, ShopStore.stock((noted as WarehouseEngine.Result.Ok).data, "can"), 0.0)
+    val plain = WarehouseEngine.deleteEntry(d, "w2", today, 600, newId)
+    assertTrue(plain.toString(), plain is WarehouseEngine.Result.Ok)
+    assertEquals(24.0, ShopStore.stock((plain as WarehouseEngine.Result.Ok).data, "can"), 0.0)
+    assertEquals(7.0, ShopStore.stock(d, "ctn"), 0.0)
   }
 }
