@@ -54,6 +54,15 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/syn-12` (SYN-12 ِ سمتِ دستگاه: قطعیِ شبکهٔ دستگاه، سرور، قطعیِ سراسری یا نشست؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: تصمیمِ یگانه در `core/…/core/sync/SyncOutage.kt` و همزادِ `license/sync-core.js` با بردارِ `core/test-vectors/sync-outage-v1.json`
+  (بی‌نت ⇒ آفلاین؛ شکستِ شبکه/سرورِ کوتاه ⇒ «دوباره می‌کوشد» بی هشدار؛ ≥ ۲ شکست و ۶۰ ثانیه ⇒ «به سرور نمی‌رسیم» یا «سرور» با اعلانِ آرام؛
+  نشست و خطای واقعی همان سرخ). موتورهای v1/v3 ِ وب و برنامه رشتهٔ شکست را در حافظه نگه می‌دارند و حکم و چراغ را در حال می‌گذارند؛ نوارِ
+  `#sync-outage` و پنجرهٔ همگام‌سازیِ وب، کارتِ آرامِ خانه و تشخیصِ صفحهٔ همگام‌سازیِ نسخهٔ ۳. صف، بدنهٔ push، فاصلهٔ تلاش و `Retry-After` دست نخوردند.
+  آزمون: `sync-outage.test.js` ۱۰/۱۰، `web-sync-ux.mjs` ۸ ✅ (axe روز و شب؛ گامِ «پهن» حالا زرد به‌جای سرخ برای نخستین شکستِ شبکه — عمدی).
+- نیمه‌کاره: Kotlin فقط در CI (`SyncOutageTest`، `SyncOutageVectorsTest`، `SyncV3EngineTest`، `SyncV1CoreTest`، `PhoneHomeModelTest`، `SettingsModelsTest`)؛
+  STATUS همان PARTIAL. «کنترلِ هجوم پس از وصلِ دوباره» در دستگاه نیست (رویدادِ `online` ِ وب همان دم یک دور می‌زند)؛ `Retry-After` نادیده (تصمیمِ صاحب‌کار).
+- قدمِ بعدی: شاهدِ CI ِ آزمون‌های Kotlin؛ اگر صاحب‌کار خواست، پراکندگیِ دورِ نخست پس از `online`/بازگشتِ شبکه و پذیرفتنِ `Retry-After` (با سقف).
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/acct-console` (بندهای سمتِ سرورِ حسابِ ممیزیِ پنلِ مرکزی §۹: بازگرداندنِ یک‌باره، S12، S15، S18؛ روی main ‏ed8009d7 = دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) `POST /admin/sync/conflicts/:id/restore` یک بار — شناسهٔ یک‌شکل (۴۰۰ `bad_id`)، ۴۰۹ `already_restored`/`restore_in_progress` با نشانِ پایگاه
   (`sync_conflict_restore_claims`، مهاجرتِ ۴۹۵)، `Idempotency-Key` (`lib/sync-restore-once.js`؛ `sync-v1.js` دست نخورد). (۲) S12: نگهبانِ مالک از پیش بود

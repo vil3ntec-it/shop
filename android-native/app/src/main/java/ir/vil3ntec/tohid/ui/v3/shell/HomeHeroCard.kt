@@ -282,6 +282,7 @@ private fun SyncChip(sync: HomeAlerts.Sync, hc: HeroColors) {
     HomeAlerts.Sync.OK -> StrHero.live to hc.live
     HomeAlerts.Sync.QUEUED -> StrHero.queued to hc.wait
     HomeAlerts.Sync.ERROR -> StrHero.syncError to hc.error
+    HomeAlerts.Sync.OUTAGE -> StrHero.waitingServer to hc.wait
     HomeAlerts.Sync.OFFLINE -> StrHero.offline to hc.idle
     HomeAlerts.Sync.LOCAL_ONLY -> StrHero.localOnly to hc.idle
   }
