@@ -266,6 +266,53 @@ test('نقشهٔ سایت و robots فقط کالاهای فروختنی را ب
   assert.equal((await rawGet('/sitemap.xml')).status, 404);
 });
 
+test('WEB-17: بیش از یک برگ ⇒ فهرستِ برگ‌ها، هر کالای فروختنی در دقیقاً یک برگ، برگِ نبوده یا بدشکل ۴۰۴', async () => {
+  const s = await liveStore('برگ');
+  await setFlag(s.shopId, 'shop.storefront.seo', true);
+  const origin = `https://${s.slug}.vill3n.top`;
+  const host = `${s.slug}.vill3n.top`;
+  const more = ['pa', 'pb', 'pc'];
+  assert.equal((await push(s.token, more.map((id, i) => op(id, { name: `کالای ${i}`, unit: 'دانه', salePrice: 10 + i })))).status, 200);
+  for (const id of more) assert.equal((await h.put(`/api/shop/storefront/products/${id}`, { published: true }, { token: s.token })).status, 200);
+  const locsOf = (xml) => [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  const config = require('../src/config');
+  const was = config.storefront.sitemapPageSize;
+  config.storefront.sitemapPageSize = 2;   //  ۵ کالای فروختنی ⇒ ۳ برگ (پیش‌تر: یک urlset و کالای پس از سقف بی‌صدا بیرون)
+  try {
+    const idx = await rawGet(`/store/${s.slug}/sitemap.xml`);
+    assert.equal(idx.status, 200);
+    assert.match(idx.headers['content-type'], /application\/xml/);
+    assert.match(idx.body, /^<\?xml version="1.0" encoding="UTF-8"\?>\n<sitemapindex xmlns="http:\/\/www.sitemaps.org\/schemas\/sitemap\/0.9">/);
+    assert.doesNotMatch(idx.body, /<urlset/);
+    assert.deepEqual(locsOf(idx.body), [1, 2, 3].map((n) => `${origin}/sitemap.xml?page=${n}`));
+    assert.equal((await rawGet('/sitemap.xml', host)).body, idx.body, 'میزبانِ دکان همان فهرست');
+    const seen = [];
+    for (const n of [1, 2, 3]) {
+      const r = await rawGet(`/sitemap.xml?page=${n}`, host);
+      assert.equal(r.status, 200, `برگِ ${n}`);
+      assert.match(r.body, /<urlset xmlns="http:\/\/www.sitemaps.org\/schemas\/sitemap\/0.9" xmlns:xhtml="http:\/\/www.w3.org\/1999\/xhtml">/);
+      const locs = locsOf(r.body);
+      assert.ok(locs.length >= 1 && locs.filter((u) => u !== `${origin}/`).length <= 2, `برگِ ${n}: ${locs}`);
+      assert.equal(locs.includes(`${origin}/`), n === 1, 'صفحهٔ دکان فقط در برگِ نخست');
+      assert.equal(r.body, (await rawGet(`/store/${s.slug}/sitemap.xml?page=${n}`)).body, `برگِ ${n} از هر دو نشانی یکی`);
+      seen.push(...locs);
+    }
+    assert.deepEqual([...seen].sort(), [`${origin}/`, ...['oil', 'rice', ...more].map((id) => `${origin}/p/${id}`)].sort(),
+      'هر کالای فروختنی دقیقاً یک بار، منتشرنشده نه');
+    for (const q of ['page=4', 'page=0', 'page=01', 'page=x', 'page=1&page=2', 'page=1001', 'page=']) {
+      assert.equal((await rawGet(`/sitemap.xml?${q}`, host)).status, 404, q);
+    }
+  } finally { config.storefront.sitemapPageSize = was; }
+  //  یک برگ ⇒ همان urlset ِ همیشگی؛ `?page=1` همان، `?page=2` نه
+  const one = await rawGet('/sitemap.xml', host);
+  assert.match(one.body, /<urlset /);
+  assert.equal(locsOf(one.body).length, 6);
+  assert.equal((await rawGet('/sitemap.xml?page=1', host)).body, one.body);
+  assert.equal((await rawGet('/sitemap.xml?page=2', host)).status, 404);
+  assert.equal(seo.sitemapPageOf(undefined), undefined);
+  assert.equal(seo.sitemapPageOf(['1']), null);
+});
+
 test('پول و گریز: تقسیمِ صحیح، رقمِ فارسی، JSON-LD بی `<`', () => {
   assert.equal(seo.amountOf(12050), '120.50');
   assert.equal(seo.amountOf(5), '0.05');

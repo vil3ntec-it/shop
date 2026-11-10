@@ -1,0 +1,12 @@
+{
+  "of.shop": "Shop",
+  "of.zone": "Delivery area",
+  "of.when.delivery": "Delivery time",
+  "of.when.pickup": "Pickup time",
+  "of.slot": "{d}, {h}",
+  "of.link": "Copy tracking link",
+  "of.link.l": "Tracking link",
+  "of.link.ok": "Tracking link copied.",
+  "of.link.no": "Could not copy — take the link from this box.",
+  "of.link.hint": "Anyone with this link can see the order and, until the shop accepts it, cancel it. Share it only with the person receiving the order."
+}

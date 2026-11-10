@@ -383,7 +383,8 @@ const fee0 = await text('#t-fee');
 ok(await page.isDisabled('#submit-order') && (await text('#slot-pick option:first-child')).includes('برگزینید'),
   'بی «هرچه زودتر» و بی بازه ⇒ «ثبت» بسته', await text('#slot-pick option:first-child'));
 const slotVal = await page.locator('#slot-pick option:not([disabled])').nth(1).getAttribute('value');
-ok((await page.locator(`#slot-pick option[value="${slotVal}"]`).textContent()).includes('+۲۰'), 'گزینهٔ بازه هزینهٔ اضافه را می‌گوید');
+const slotOpt = ((await page.locator(`#slot-pick option[value="${slotVal}"]`).textContent()) || '').trim();
+ok(slotOpt.includes('+۲۰'), 'گزینهٔ بازه هزینهٔ اضافه را می‌گوید');
 await page.selectOption('#slot-pick', slotVal);
 await page.waitForFunction((f) => document.getElementById('t-fee').textContent.trim() !== f, fee0, { timeout: 5000 });
 ok(true, 'هزینهٔ ارسال با بازه عوض شد', `${fee0} ⇐ ${await text('#t-fee')}`);
@@ -395,6 +396,45 @@ await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
   const dj = typeof o.delivery === 'string' ? JSON.parse(o.delivery) : o.delivery;
   ok(dj && dj.slot && dj.slot.startsAt === Number(slotVal) && dj.slot.feeMinor === 2000 && Number(o.delivery_fee_minor) >= 2000,
     'CHK-07: همان بازه و هزینهٔ ۲۰ ِ آن در سفارش، با جمعی که وب نشان داد', JSON.stringify(dj && dj.slot) + ' / ' + o.delivery_fee_minor);
+}
+
+//  CHK-20 (§۱۹.۲ بندِ ۸): صفحهٔ تأیید — دکانِ مسئول، ناحیهٔ ارسال و همان بازهٔ برگزیده (روز و ساعتِ گزینهٔ فرم، بی هزینه)؛
+//  «کپیِ نشانیِ پیگیری» = همین ویترین + `#/o/<توکن>` (بی ?…)؛ کلیپ‌بورد رد کرد ⇒ همان نشانی در کادرِ فقط‌خواندنی
+{
+  const f = (k) => text(`#o-facts dd[data-f="${k}"]`);
+  const had = await page.waitForSelector('#o-facts:not([hidden]) dd[data-f="of.when.delivery"]', { timeout: 15000 }).then(() => true, () => false);
+  ok(had, 'CHK-20: صفحهٔ تأیید خلاصهٔ «دکان، ناحیه، زمانِ تحویل» دارد');
+  //  رسیدنِ واژه‌نامهٔ خلاصه عنوانِ رسید را به «سفارش» برنمی‌گرداند (ریشهٔ `K.part` فقط گره‌های خودش)
+  ok(/^سفارشِ شمارهٔ [۰-۹]+$/.test(await text('#o-title')), 'CHK-20: پس از خلاصه عنوانِ رسید همان «سفارشِ شمارهٔ …»', await text('#o-title'));
+  const when = had ? await f('of.when.delivery') : '';
+  ok(had && when.includes('۲۳:۰۰–۲۳:۵۹') && slotOpt.startsWith(when) && !when.includes('+'),
+    'CHK-20: همان بازهٔ برگزیده (روز و ساعتِ گزینهٔ فرم، بی هزینه) روی صفحهٔ تأیید', `${when} / ${slotOpt}`);
+  ok(had && await f('of.shop') === 'ویترینِ ناحیه' && await f('of.zone') === 'کارته‌سه',
+    'CHK-20: دکانِ مسئول و ناحیهٔ ارسال روی صفحهٔ تأیید', had ? `${await f('of.shop')} / ${await f('of.zone')}` : '');
+  const u = new URL(page.url());
+  const want = `${u.origin}${u.pathname}${u.hash}`;
+  await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base });
+  const btn = await page.waitForSelector('#o-link-copy', { timeout: 5000 }).then(() => true, () => false);
+  if (btn) await page.click('#o-link-copy');
+  const copied = btn && await page.waitForFunction(() => /کپی شد/.test(document.getElementById('o-link-msg').textContent), null, { timeout: 5000 }).then(() => true, () => false);
+  const clip = copied ? await page.evaluate(() => navigator.clipboard.readText()) : '';
+  ok(copied && clip === want && /^#\/o\/[^?]+$/.test(u.hash) && clip.startsWith(`${base}/store/${slug}#/o/`),
+    'CHK-20: «کپیِ نشانیِ پیگیری» همین ویترین + #/o/<توکن> را در کلیپ‌بورد گذاشت', `${clip} / ${want}`);
+  ok(btn && /لغو/.test(await text('#o-link-hint')), 'CHK-20: کنارِ دکمه هشدار که دارندهٔ نشانی سفارش را می‌بیند و لغو می‌کند', btn ? await text('#o-link-hint') : '');
+  //  کلیپ‌بورد رد کرد (اجازه، زمینهٔ ناامن) ⇒ همان نشانی برگزیده در کادرِ فقط‌خواندنی و پیامِ «کپی نشد»
+  await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, get: () => ({ writeText: () => Promise.reject(new Error('denied')) }) }));
+  if (btn) await page.click('#o-link-copy');
+  const shownBox = btn && await page.waitForSelector('#o-link-row:not([hidden]) #o-link-url', { timeout: 5000 }).then(() => true, () => false);
+  ok(shownBox && await page.inputValue('#o-link-url') === want && /کپی نشد/.test(await text('#o-link-msg'))
+    && await page.evaluate(() => document.activeElement && document.activeElement.id === 'o-link-url'),
+    'CHK-20: کلیپ‌بورد نشد ⇒ همان نشانی در کادرِ فقط‌خواندنی، برگزیده، با پیامِ «کپی نشد»', shownBox ? await page.inputValue('#o-link-url') : '');
+  if (axeSrc && had) {
+    await page.evaluate(axeSrc);
+    const v = await page.evaluate(async () => (await window.axe.run({ include: [['#o-facts'], ['#o-link']] },
+      { runOnly: ['color-contrast', 'button-name', 'label', 'definition-list', 'dlitem', 'aria-allowed-attr'] })).violations
+      .map((x) => `${x.id}: ${x.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' ; ')}`));
+    ok(v.length === 0, 'دسترس‌پذیری (axe-core): خلاصه و «کپیِ نشانیِ پیگیری» ِ صفحهٔ تأیید', v.join(' | '));
+  }
 }
 
 //  CHK-14: «با کدام اسکناس…» — پرچمِ خاموش ⇒ نیست؛ روشن ⇒ فقط اسکناس‌هایی که سرور می‌پذیرد، و همان در سفارش

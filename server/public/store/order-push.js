@@ -122,7 +122,8 @@
       view('idle');
     }
 
-    return K.part('push', $('view-order')).then(function (ok) {
+    //  ریشه فقط کارتِ خودش (`#o-np`): `translate` ِ کلِ `#view-order` عنوانِ «سفارشِ شمارهٔ …» ِ رسید را به «سفارش» برمی‌گرداند
+    return K.part('push', $('o-np')).then(function (ok) {
       if (!ok) throw new Error('i18n');
       return { render: render };
     });
