@@ -16,8 +16,8 @@ import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import zlib from 'node:zlib';
 import { boot, assert, sameOrderLink } from './lib/harness.mjs';
+import { restoreCopy } from './lib/restore-copy.mjs';
 
 const require = createRequire(import.meta.url);
 const PASS = 'e2e-backup-passphrase-notify';
@@ -159,10 +159,8 @@ await E.step('NOTIF-08.backup', 'پشتیبانِ رمزدارِ همین لحظ
 }, { needs: ['NOTIF-07.lost'] });
 
 await E.step('NOTIF-08.restore', 'سرورِ بازیابی‌شده اعلانِ معوق را یک بار می‌فرستد؛ زدنِ دوبارهٔ مشتری همان سفارش است، نه سفارش یا اعلانِ دوم', async () => {
-  const backup = require('../../src/lib/backup');
-  const tgz = path.join(E.tmp, 'restore.tar.gz');
-  fs.writeFileSync(tgz, zlib.gzipSync(await backup.decode(file)));
-  const dir = path.join(E.tmp, 'restored-db');
+  //  محیطِ جدا با قالبِ همان پشتیبان: پوشهٔ PGlite یا دیتابیسِ تازهٔ PostgreSQL با `scripts/restore.js`
+  const url = await restoreCopy(E, file, path.join(E.tmp, 'restored-db'));
   const pick = (h) => Object.fromEntries(Object.entries(h)
     .filter(([k]) => ['content-type', 'accept', 'accept-language', 'idempotency-key', 'x-store-ticket'].includes(k)));
   const input = path.join(E.tmp, 'restore-input.json');
@@ -170,8 +168,8 @@ await E.step('NOTIF-08.restore', 'سرورِ بازیابی‌شده اعلان�
     shopId: owner.shopId, path: `/api/store/${SLUG}/checkout`, headers: pick(lost.headers), body: lost.post,
   }));
   assert.ok(pick(lost.headers)['idempotency-key'], 'مرورگر کلیدِ یکتایی نفرستاد');
-  const child = spawn(process.execPath, [path.join(import.meta.dirname, 'lib', 'restored-notify.mjs'), dir, tgz, input], {
-    env: { ...process.env, DATABASE_URL: `pglite:${dir}` }, stdio: ['ignore', 'pipe', 'pipe'],
+  const child = spawn(process.execPath, [path.join(import.meta.dirname, 'lib', 'restored-notify.mjs'), url, input], {
+    env: { ...process.env, DATABASE_URL: url }, stdio: ['ignore', 'pipe', 'pipe'],
   });
   report = await new Promise((resolve, reject) => {
     let out = '';

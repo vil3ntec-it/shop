@@ -27,6 +27,24 @@ const SERVER = path.join(ROOT, 'server');
 const outArg = process.argv.indexOf('--out');
 const OUT = outArg > 0 && process.argv[outArg + 1] ? path.resolve(process.argv[outArg + 1]) : path.join(ROOT, 'docs', 'api', 'routes.json');
 const CHECK = process.argv.includes('--check');
+//  S18: قراردادِ نسخه‌دارِ پل (`GET /api/admin/contract`) — زیرمجموعهٔ همین فایل، کنارِ سرور تا با `server/` مستقر شود
+const ADMIN = path.join(SERVER, 'src', 'lib', 'admin-contract.json');
+
+/** درهای مدیرِ routes.json ⇐ admin-contract.json (روش + نشانی + «نگهبانِ نام‌دارِ ارشد»)؛ اثرِ انگشت = sha256 ِ همان فهرست. */
+function adminContractOf(text) {
+  const routes = JSON.parse(text).routes
+    .filter((r) => r.area === 'admin' && !r.duplicateOfEarlier)
+    .map((r) => ({ method: r.method, path: r.path, superadmin: r.guards.some((g) => /\brequireSuperAdmin\b/.test(g)) }));
+  const lines = routes.map((r) => `${r.method} ${r.path}${r.superadmin ? ' !' : ''}`).join('\n');
+  const head = {
+    about: 'قراردادِ نسخه‌دارِ پلِ پنل ⇄ درهای مدیر (S18). ساخته‌شده از docs/api/routes.json؛ دستی ویرایش نکنید.',
+    generator: 'node tools/api-contract/generate.cjs (--check)',
+    source: 'docs/api/routes.json',
+    superadmin: 'فقط نگهبانِ نام‌دارِ requireSuperAdmin روی همان در؛ سنجشِ نقشِ درونِ گرداننده (و lib/admin-roles.js) این‌جا دیده نمی‌شود',
+    routesHash: require('crypto').createHash('sha256').update(lines).digest('hex').slice(0, 16),
+  };
+  return `${JSON.stringify(head, null, 2).replace(/\n}$/, '')},\n  "routes": [\n${routes.map((r) => `    ${JSON.stringify(r)}`).join(',\n')}\n  ]\n}\n`;
+}
 
 if (process.env.API_CONTRACT_CHILD !== '1') {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'api-contract-'));
@@ -59,11 +77,24 @@ if (process.env.API_CONTRACT_CHILD !== '1') {
       process.exit(1);
     }
     console.log(`✓ ${path.relative(ROOT, OUT)} تازه است`);
+    //  `--out` (آزمونِ نگهبان) فقط همان پرونده را می‌سنجد؛ بی آن، قراردادِ پل هم
+    if (outArg < 0) {
+      const had = fs.existsSync(ADMIN) ? fs.readFileSync(ADMIN, 'utf8') : '';
+      if (had !== adminContractOf(text)) {
+        console.error(`✖ ${path.relative(ROOT, ADMIN)} کهنه است: node tools/api-contract/generate.cjs`);
+        process.exit(1);
+      }
+      console.log(`✓ ${path.relative(ROOT, ADMIN)} تازه است`);
+    }
   } else {
     fs.mkdirSync(path.dirname(OUT), { recursive: true });
     fs.writeFileSync(OUT, text);
     const n = JSON.parse(text).routes.length;
     console.log(`✓ ${path.relative(ROOT, OUT)}: ${n} مسیر`);
+    if (outArg < 0) {
+      fs.writeFileSync(ADMIN, adminContractOf(text));
+      console.log(`✓ ${path.relative(ROOT, ADMIN)}: ${JSON.parse(fs.readFileSync(ADMIN, 'utf8')).routes.length} درِ مدیر`);
+    }
   }
   process.exit(0);
 }

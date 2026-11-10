@@ -197,10 +197,20 @@ async function remove(customer) {
 
 // ── نشانی‌ها (CHK-09) ─────────────────────────────────────────────
 
+/**
+ * CRM-09 (§۴.۴، مهاجرتِ ۴۹۰): کلیدهای کمکیِ فرمِ ثبت ⇐ ستون. سنجش و سقف همان `orders.addressExtras` ِ ثبت (یک قاعده)؛
+ * جای پین/نشانه/متن را نمی‌گیرند. پاسخ همیشه هر هفت کلید را دارد (نبوده ⇒ '').
+ */
+const EXTRA_COLS = Object.freeze({
+  area: 'area', gateColor: 'gate_color', province: 'province', street: 'street', house: 'house', phone2: 'phone2', plusCode: 'plus_code',
+});
+const EXTRA_KEYS = Object.keys(EXTRA_COLS);
+
 function addressView(r) {
   return {
     id: r.id, label: r.label, text: r.text, landmark: r.landmark,
     lat: r.lat === null ? null : Number(r.lat), lng: r.lng === null ? null : Number(r.lng),
+    ...Object.fromEntries(EXTRA_KEYS.map((k) => [k, r[EXTRA_COLS[k]] || ''])),
     updatedAt: Number(r.updated_at),
   };
 }
@@ -221,6 +231,10 @@ function parseAddress(body) {
   if ((lat === null) !== (lng === null)) throw badRequest('پین ناقص است', 'bad_address');
   const out = { label, text: text(b.text, 300), landmark: text(b.landmark, 200), lat, lng };
   if (lat === null && !out.text && !out.landmark) throw badRequest('نشانی، نشانه یا پین لازم است', 'bad_address');
+  //  ⛔ کلیدِ نیامده (برنامهٔ پیشین: `AddressInput` ِ برنامهٔ خرید) ⇒ null یعنی «دست نزن» در PUT و '' در افزودن؛
+  //  کلیدِ فرستاده (حتی خالی/null) جایگزین می‌شود
+  const norm = require('./orders').addressExtras(b);
+  out.extra = Object.fromEntries(EXTRA_KEYS.map((k) => [k, Object.prototype.hasOwnProperty.call(b, k) ? norm[k] : null]));
   return out;
 }
 
@@ -238,9 +252,10 @@ async function addAddress(customer, body) {
     if (n >= MAX_ADDRESSES) throw conflict(`حداکثر ${MAX_ADDRESSES} نشانی`, 'too_many_addresses');
     const at = now();
     const r = (await c.query(
-      `INSERT INTO store_customer_addresses (id, customer_id, label, text, landmark, lat, lng, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8) RETURNING *`,
-      [ulid(at), customer.id, a.label, a.text, a.landmark, a.lat, a.lng, at]
+      `INSERT INTO store_customer_addresses (id, customer_id, label, text, landmark, lat, lng, created_at, updated_at,
+                                             area, gate_color, province, street, house, phone2, plus_code)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+      [ulid(at), customer.id, a.label, a.text, a.landmark, a.lat, a.lng, at, ...EXTRA_KEYS.map((k) => a.extra[k] ?? '')]
     )).rows[0];
     return addressView(r);
   });
@@ -249,9 +264,12 @@ async function addAddress(customer, body) {
 async function updateAddress(customer, id, body) {
   const a = parseAddress(body);
   const r = await one(
-    `UPDATE store_customer_addresses SET label = $3, text = $4, landmark = $5, lat = $6, lng = $7, updated_at = $8
+    `UPDATE store_customer_addresses SET label = $3, text = $4, landmark = $5, lat = $6, lng = $7, updated_at = $8,
+            area = COALESCE($9, area), gate_color = COALESCE($10, gate_color), province = COALESCE($11, province),
+            street = COALESCE($12, street), house = COALESCE($13, house), phone2 = COALESCE($14, phone2),
+            plus_code = COALESCE($15, plus_code)
       WHERE id = $1 AND customer_id = $2 RETURNING *`,
-    [String(id || ''), customer.id, a.label, a.text, a.landmark, a.lat, a.lng, now()]
+    [String(id || ''), customer.id, a.label, a.text, a.landmark, a.lat, a.lng, now(), ...EXTRA_KEYS.map((k) => a.extra[k])]
   );
   if (!r) throw notFound('این نشانی پیدا نشد', 'address_not_found');
   return addressView(r);

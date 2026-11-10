@@ -33,7 +33,7 @@ const SELF = [
  * (مسیریابیِ Express به بزرگی و کوچکی حساس نیست).
  */
 const FINANCE = [
-  ['GET', /^\/admin\/(me|features|stats|audit)$/],
+  ['GET', /^\/admin\/(me|features|stats|audit|contract)$/],
   ['GET', /^\/admin\/shops$/],
   ['GET', /^\/admin\/shops\/[^/]+(\/(history|health|holds))?$/],
   ['GET', /^\/admin\/(subscriptions|pump\/subscriptions)(\/[^/]+(\/addons)?|\/expiring)?$/],

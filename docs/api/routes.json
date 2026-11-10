@@ -20,10 +20,10 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1006,
+    "routes": 1009,
     "byAuth": {
-      "none-detected": 193,
-      "admin": 276,
+      "none-detected": 194,
+      "admin": 278,
       "inline": 2,
       "user": 492,
       "device": 42,
@@ -31,7 +31,7 @@
     },
     "byShape": {
       "extracted": 702,
-      "empty": 302,
+      "empty": 305,
       "unresolved": 2
     }
   },
@@ -75,6 +75,7 @@
     {"method":"POST","path":"/api/admin/campaigns","area":"admin","source":"server/src/routes/admin-sales.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[201],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/admin/campaigns/:id/stats","area":"admin","source":"server/src/routes/admin-sales.js","auth":"admin","guards":["requireAdmin"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"PATCH","path":"/api/admin/config","area":"admin","source":"server/src/routes/admin.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["config"]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/admin/contract","area":"admin","source":"server/src/routes/admin-bridge.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/admin/delivery/connectivity","area":"admin","source":"server/src/routes/admin-delivery.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/admin/delivery/events","area":"admin","source":"server/src/routes/admin-delivery.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/admin/delivery/overview","area":"admin","source":"server/src/routes/admin-delivery.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
@@ -286,6 +287,7 @@
     {"method":"POST","path":"/api/admin/subscriptions/:id/status","area":"admin","source":"server/src/routes/admin.js","auth":"admin","guards":["requireAdmin"],"params":["id"],"query":[],"body":["status"],"response":{"statuses":[200],"keys":["state","subscription"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/admin/subscriptions/expiring","area":"admin","source":"server/src/routes/admin-platform.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":["days","expired","limit"],"body":[],"response":{"statuses":[200],"keys":["expiring","serverTime"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/admin/subscriptions/notify-expiring","area":"admin","source":"server/src/routes/admin-platform.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"GET","path":"/api/admin/subscriptions/period-end","area":"admin","source":"server/src/routes/admin-bridge.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":["amount","app","from","unit"],"body":[],"response":{"statuses":[200],"keys":["amount","app","base","endsAt","rule","serverTime","unit","zone"]},"errors":["400 bad_amount","400 bad_app","400 bad_from","400 bad_unit"],"shape":"extracted"},
     {"method":"POST","path":"/api/admin/support/broadcast","area":"admin","source":"server/src/routes/admin-platform.js","auth":"admin","guards":["requireAdmin","rateLimit({ max: require('../config').rateLimit.broadcastMax, keyPrefix: 'admin-"],"params":[],"query":[],"body":["app","body","limit","target"],"response":{"statuses":[200],"keys":["app","failed","sent","target","targets"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/admin/support/media/:mid","area":"admin","source":"server/src/routes/admin-platform.js","auth":"admin","guards":["requireAdmin"],"params":["mid"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":["404 media_gone"],"shape":"empty"},
     {"method":"GET","path":"/api/admin/support/threads","area":"admin","source":"server/src/routes/admin-platform.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":["app","limit","offset","q","status"],"body":[],"response":{"statuses":[200],"keys":["threads","unread"]},"errors":[],"shape":"extracted"},
@@ -294,7 +296,7 @@
     {"method":"POST","path":"/api/admin/support/threads/:id/messages","area":"admin","source":"server/src/routes/admin-platform.js","auth":"admin","guards":["requireAdmin"],"params":["id"],"query":[],"body":["body","kind","mediaId","text"],"response":{"statuses":[201],"keys":["message"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/admin/support/threads/:id/status","area":"admin","source":"server/src/routes/admin-platform.js","auth":"admin","guards":["requireAdmin"],"params":["id"],"query":[],"body":["status"],"response":{"statuses":[200],"keys":["thread"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/admin/sync/conflicts","area":"admin","source":"server/src/routes/admin-sync.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":["account","all","app","limit"],"body":[],"response":{"statuses":[200],"keys":["conflicts"]},"errors":["400 account_required"],"shape":"extracted"},
-    {"method":"POST","path":"/api/admin/sync/conflicts/:id/restore","area":"admin","source":"server/src/routes/admin-sync.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","ok"]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/admin/sync/conflicts/:id/restore","area":"admin","source":"server/src/routes/admin-sync.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/admin/sync/errors","area":"admin","source":"server/src/routes/admin-sync.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":["app","limit"],"body":[],"response":{"statuses":[200],"keys":["errors"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/admin/sync/status","area":"admin","source":"server/src/routes/admin-sync.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":["account","app","limit"],"body":[],"response":{"statuses":[200],"keys":["app","devices"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/admin/sync/version-health","area":"admin","source":"server/src/routes/admin-sync.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":["app","version"],"body":[],"response":{"statuses":[200],"keys":["app","crashes","installs","version"]},"errors":["400 app_required","400 bad_version"],"shape":"extracted"},
@@ -948,6 +950,7 @@
     {"method":"GET","path":"/api/store/:slug/delivery","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":["lat","lng"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/store/:slug/eta","area":"store","source":"server/src/routes/storefront-eta-store.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/store/:slug/filters","area":"store","source":"server/src/routes/storefront-finder-store.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/store/:slug/funnel/:step","area":"store","source":"server/src/routes/storefront-funnel-store.js","auth":"none-detected","guards":[],"params":["slug","step"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/store/:slug/highlights","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/store/:slug/media/:kind/:version","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["kind","slug","version"],"query":[],"body":[],"response":{"statuses":[304],"keys":[]},"errors":["404 media_not_found"],"shape":"empty"},
     {"method":"GET","path":"/api/store/:slug/orders","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":["orders"]},"errors":[],"shape":"extracted"},

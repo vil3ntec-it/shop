@@ -94,11 +94,15 @@ await E.step('E2E-ADM.suspend', 'تعلیق با دلیل ⇐ صفِ شاگرد 
 
 await E.step('E2E-ADM.counts', 'پنل «اطلاعاتِ ثبت‌شده»ی دکان همان دفترِ برنامه‌ها را نشان می‌دهد (کالا و فروش)', async () => {
   const { page } = P;
-  await openShop(page);
-  await page.waitForFunction(() => (document.getElementById('shop-counts')?.children.length || 0) > 0, null, { timeout: 10_000 });
-  const text = await page.locator('#shop-counts').innerText();
   const sales = A.ledger.sales.length;
-  assert.ok(text.includes('محصولات: ۱') && text.includes(`فروش‌ها: ${String(sales).replace(/[0-9]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[+d])}`),
+  const want = ['محصولات: ۱', `فروش‌ها: ${String(sales).replace(/[0-9]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[+d])}`];
+  await openShop(page);
+  //  ⚠️ `#shop-counts` از بازکردنِ پیشینِ همین دکان (پیش از رسیدنِ فروشِ صف‌شدهٔ شاگرد) پر مانده است: «children > 0» با همان
+  //  DOM ِ کهنه همان دم راست بود و شمارِ کهنه خوانده می‌شد. صبر تا پاسخِ تازه (یا سقف) — داوری همان assert ِ پایین است.
+  await page.waitForFunction((w) => w.every((x) => (document.getElementById('shop-counts')?.textContent || '').includes(x)), want, { timeout: 10_000 })
+    .catch(() => {});
+  const text = await page.locator('#shop-counts').innerText();
+  assert.ok(want.every((x) => text.includes(x)),
     `پنل شمارِ دفترِ برنامه را نشان نمی‌دهد (Sync v1 شمرده نمی‌شود): ${text.replace(/\s+/g, ' ').slice(0, 160)}`);
 }, { needs: ['E2E-ADM.suspend'] });
 
@@ -109,7 +113,8 @@ await E.step('E2E-ADM.user', 'مدیر با دلیل حسابِ شاگرد را 
   const row = page.locator('#users-body tr', { hasText: staff.email });
   await row.waitFor({ timeout: 10_000 });
   await row.locator('button', { hasText: 'غیرفعال' }).click();
-  await page.waitForFunction((em) => [...document.querySelectorAll('#users-body tr')].some((tr) => tr.textContent.includes(em) && /فعال$/.test(tr.querySelector('td:last-child button')?.textContent.trim() || '')), staff.email, { timeout: 10_000 });
+  //  ⚠️ دکمه دقیقاً «فعال» (حسابِ بسته)؛ `/فعال$/` «غیرفعال» ِ پیش از کلیک را هم می‌گرفت ⇒ سابقه پیش از پاسخِ سرور خوانده می‌شد
+  await page.waitForFunction((em) => [...document.querySelectorAll('#users-body tr')].some((tr) => tr.textContent.includes(em) && /^فعال$/.test(tr.querySelector('td:last-child button')?.textContent.trim() || '')), staff.email, { timeout: 10_000 });
   await E.shot(P, '03-admin-user-disabled');
   const d = await audit('admin.user_status', staff.user.id);
   assert.equal(d.at(-1).detail.reason, 'گوشیِ شاگرد گم شده است');

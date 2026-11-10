@@ -15,7 +15,8 @@
  *               • نسخهٔ اصلاح‌شده (همان نامِ فایل) اعمال می‌شود؛ داده و جمع‌ها حفظ و برنامه ادامه
  *                 می‌دهد.
  *
- * ⚠️ PGlite (همان پایگاهِ سرورِ خانگی، D-01). روی PostgreSQL همان `migrate.run` با BEGIN/ROLLBACK است.
+ * هر دو پایگاه: PGlite (سرورِ خانگی، D-01) ⇒ پوشهٔ تازه؛ PostgreSQL (`E2E_DATABASE_URL`) ⇒ دیتابیسِ تازه با `scripts/restore.js`
+ * (`lib/restore-copy.mjs`). مهاجرت روی هر دو همان `migrate.run` با BEGIN/ROLLBACK است.
  * پرچم‌ها فقط برای همین دکان (live_config): shop.orders، shop.orders.refunds.
  * اجرا:  node test/e2e/recovery.e2e.mjs
  */
@@ -24,11 +25,11 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
-import zlib from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { boot, assert, sleep } from './lib/harness.mjs';
 import { NativeDevice } from './lib/native.mjs';
 import { fingerprint, diff } from './lib/control-sums.mjs';
+import { restoreCopy, cutPower, isPgUrl } from './lib/restore-copy.mjs';
 
 const require = createRequire(import.meta.url);
 const SERVER = path.join(import.meta.dirname, '..', '..');
@@ -55,9 +56,9 @@ function run(args, env = {}, ms = 120_000) {
     c.on('exit', (code, signal) => { clearTimeout(t); resolve({ code, signal, out }); });
   });
 }
-/** fingerprint ِ پوشه در فرایندِ جدا (سرور خاموش) */
-async function sumsOf(dir) {
-  const r = await run([SUMS, 'sums', dir]);
+/** fingerprint ِ دیتابیسِ بازیابی‌شده (پوشهٔ PGlite یا نشانیِ PostgreSQL) در فرایندِ جدا (سرور خاموش) */
+async function sumsOf(url) {
+  const r = await run([SUMS, 'sums', url.replace(/^pglite:/, '')]);
   assert.equal(r.code, 0, `شمارش و جمعِ کنترل: ${r.out.slice(-600)}`);
   return JSON.parse(r.out.trim().split('\n').at(-1));
 }
@@ -81,14 +82,14 @@ function release(name, sql = null) {
 }
 
 /**
- * `src/index.js` ِ یک نسخه روی پوشهٔ PGlite — همان دستورِ راه‌اندازیِ سرورِ واقعی.
+ * `src/index.js` ِ یک نسخه روی دیتابیسِ بازیابی‌شده — همان دستورِ راه‌اندازیِ سرورِ واقعی.
  * ⇒ { child, port, log(), exited: Promise<{code, signal}>, stop() }
  */
-async function serve(root, dir) {
+async function serve(root, url) {
   const port = await freePort();
   const child = spawn(process.execPath, [path.join(root, 'src', 'index.js')], {
     cwd: root,
-    env: { ...process.env, DATABASE_URL: `pglite:${dir}`, PORT: String(port), HOST: '127.0.0.1', BACKUP_ENABLED: 'false' },
+    env: { ...process.env, DATABASE_URL: url, PORT: String(port), HOST: '127.0.0.1', BACKUP_ENABLED: 'false' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let out = '';
@@ -144,6 +145,7 @@ const summary = (fp) => `${Object.keys(fp.tables).length} جدول، ${Object.va
 let A; let B; let rice; let oil; let debtor; let orderId; let file; let origin; let originTotals; let originOrder; let originRecon;
 const DRILL = path.join(E.tmp, 'drill');          //  «محیطِ جدا»: پوشه‌ای که سرورِ مبدأ هرگز ندیده
 const DIR = path.join(DRILL, 'db');
+let TARGET = '';                                   //  DATABASE_URL ِ همان محیطِ جدا (`restore-copy.mjs`)
 let fpServed;
 
 /* ════════════════════════ REC-01 ════════════════════════ */
@@ -195,26 +197,21 @@ await E.step('REC-01.backup', 'پشتیبانِ رمزدار؛ شمارش و ج�
 }, { needs: ['REC-01.0'] });
 
 await E.step('REC-01', 'بازیابی در محیطِ جدا (پوشهٔ تازه، فرایندِ جدا): شمار، هش و جمعِ هر جدول و هر مجموعهٔ دفتر = مبدأ؛ verify-data سالم', async () => {
-  const backup = require('../../src/lib/backup');
-  fs.mkdirSync(DRILL, { recursive: true });
-  const tgz = path.join(DRILL, 'restore.tar.gz');
-  fs.writeFileSync(tgz, zlib.gzipSync(await backup.decode(file)));
-  const l = await run([SUMS, 'load', DIR, tgz]);
-  assert.equal(l.code, 0, l.out.slice(-600));
-  const restored = await sumsOf(DIR);
+  TARGET = await restoreCopy(E, file, DIR);
+  const restored = await sumsOf(TARGET);
   same(origin, restored, 'بازیابی با مبدأ نمی‌خواند');
   //  جمعِ کنترلِ پولی صفر نیست (سنجش تهی نیست)
   assert.ok(Number(restored.tables.online_orders.sums.total_minor) > 0, JSON.stringify(restored.tables.online_orders));
   assert.ok(Number(restored.tables.online_order_refunds.sums.amount_minor) === 5000, JSON.stringify(restored.tables.online_order_refunds));
   const sales = Object.entries(restored.ledger).find(([k]) => k.endsWith('/sales'));
   assert.ok(sales && Number(sales[1].sums.finalTotal) > 0, JSON.stringify(sales));
-  const v = await run([path.join(SERVER, 'scripts', 'verify-data.js')], { DATABASE_URL: `pglite:${DIR}` });
+  const v = await run([path.join(SERVER, 'scripts', 'verify-data.js')], { DATABASE_URL: TARGET });
   assert.equal(v.code, 0, `verify-data روی بازیابی‌شده: ${v.out.slice(-800)}`);
   console.log(`     بازیابی‌شده: ${summary(restored)}`);
 }, { needs: ['REC-01.backup'] });
 
 await E.step('REC-01.app', 'سرورِ واقعی روی پوشهٔ بازیابی‌شده: دستگاهِ نو همان جمعِ فروش، قرض و موجودی؛ سفارش، رویدادها و تطبیق همان', async () => {
-  const S = await serve(SERVER, DIR);
+  const S = await serve(SERVER, TARGET);
   try {
     await S.ready();
     const N = new NativeDevice(at(S), 'N-new-device');
@@ -234,7 +231,7 @@ await E.step('REC-01.app', 'سرورِ واقعی روی پوشهٔ بازیاب
   } finally {
     await S.stop();
   }
-  fpServed = await sumsOf(DIR);
+  fpServed = await sumsOf(TARGET);
 }, { needs: ['REC-01'] });
 
 /* ════════════════════════ REL-01 ════════════════════════ */
@@ -249,12 +246,12 @@ await E.step('REL-01.failed', 'نسخهٔ تازه با مهاجرتی که وس
     'UPDATE oplog SET server_seq = server_seq;',
     'SELECT 1 / 0;',
   ].join('\n'));
-  const S = await serve(broken, DIR);
+  const S = await serve(broken, TARGET);
   const x = await Promise.race([S.exited, sleep(90_000).then(() => null)]);
   if (!x) { S.child.kill('SIGKILL'); throw new Error(`نسخهٔ خراب بالا ماند: ${S.log().slice(-400)}`); }
   assert.equal(x.code, 1, `کدِ خروج ${x.code ?? x.signal}: ${S.log().slice(-400)}`);
   assert.match(S.log(), new RegExp(`${MIG}.*شکست خورد`), 'پیام نامِ مهاجرت را نمی‌گوید');
-  const after = await sumsOf(DIR);
+  const after = await sumsOf(TARGET);
   assert.equal(after.tables.rel01_probe, undefined, 'جدولِ نیمه ماند');
   same(fpServed, after, 'مهاجرتِ شکسته چیزی را عوض کرد');
 }, { needs: ['REC-01.app'] });
@@ -265,10 +262,11 @@ await E.step('REL-01.killed', 'فرایندِ نسخهٔ تازه وسطِ مه�
     "UPDATE online_orders SET rel01_note = 'نیمه';",
     'CREATE TABLE rel01_probe (id int PRIMARY KEY);',
     'INSERT INTO rel01_probe SELECT generate_series(1, 100);',
-    //  کارِ طولانی (فقط پردازنده، بی دیسک) تا کشتن وسطِ همین تراکنش بیفتد
-    'SELECT count(*) FROM generate_series(1, 3000000000);',
+    //  کارِ طولانی تا کشتن وسطِ همین تراکنش بیفتد — PGlite: فقط پردازنده؛ PostgreSQL: خواب (`generate_series` آن‌جا
+    //  پیش از شمردن روی دیسکِ موقت نوشته می‌شود)
+    isPgUrl(TARGET) ? 'SELECT pg_sleep(600);' : 'SELECT count(*) FROM generate_series(1, 3000000000);',
   ].join('\n'));
-  const S = await serve(slow, DIR);
+  const S = await serve(slow, TARGET);
   const until = Date.now() + 90_000;
   while (!S.log().includes(`↑ ${MIG}`)) {
     if (S.child.exitCode !== null || Date.now() > until) throw new Error(`مهاجرت شروع نشد: ${S.log().slice(-400)}`);
@@ -278,7 +276,8 @@ await E.step('REL-01.killed', 'فرایندِ نسخهٔ تازه وسطِ مه�
   assert.equal(S.child.exitCode, null, `پیش از کشتن تمام شد: ${S.log().slice(-300)}`);
   S.child.kill('SIGKILL');
   assert.equal((await S.exited).signal, 'SIGKILL');
-  const after = await sumsOf(DIR);
+  await cutPower(TARGET);
+  const after = await sumsOf(TARGET);
   assert.equal(after.tables.rel01_probe, undefined, 'جدولِ نیمه ماند');
   same(fpServed, after, 'کشتنِ وسطِ مهاجرت چیزی را عوض کرد');
 }, { needs: ['REC-01.app'] });
@@ -289,7 +288,7 @@ await E.step('REL-01.rollback', 'طرحِ برگشت: نسخهٔ پیش روی �
   const sold = A.sell({ lines: [{ id: oil, qty: 1 }] });
   assert.equal((await A.sync()).ok, false, 'سرورِ خاموش «موفق» گفت');
   assert.ok(A.queue.length > 0);
-  const S = await serve(SERVER, DIR);
+  const S = await serve(SERVER, TARGET);
   try {
     await S.ready();
     A.E = at(S);
@@ -303,27 +302,27 @@ await E.step('REL-01.rollback', 'طرحِ برگشت: نسخهٔ پیش روی �
   } finally {
     await S.stop();
   }
-  const fp = await sumsOf(DIR);
+  const fp = await sumsOf(TARGET);
   assert.equal(fp.tables.rel01_probe, undefined);
   assert.equal(fp.ledger[Object.keys(fp.ledger).find((k) => k.endsWith('/sales'))].rows, back.sales, 'فروش‌های دفترِ سرور');
 }, { needs: ['REL-01.failed', 'REL-01.killed'] });
 
 await E.step('REL-01.fixed', 'نسخهٔ اصلاح‌شده (همان نامِ فایل) اعمال می‌شود؛ شمار و جمعِ همهٔ جدول‌ها و دفتر حفظ؛ برنامه ادامه می‌دهد', async () => {
-  const before = await sumsOf(DIR);
+  const before = await sumsOf(TARGET);
   const fixed = release('fixed', [
     "ALTER TABLE online_orders ADD COLUMN rel01_note text NOT NULL DEFAULT '';",
     'CREATE TABLE rel01_probe (id int PRIMARY KEY);',
     'INSERT INTO rel01_probe SELECT generate_series(1, 100);',
   ].join('\n'));
-  let S = await serve(fixed, DIR);
+  let S = await serve(fixed, TARGET);
   await S.ready();
   assert.match(S.log(), new RegExp(`↑ ${MIG}`));
   await S.stop();
-  const after = await sumsOf(DIR);
+  const after = await sumsOf(TARGET);
   assert.equal(after.tables.rel01_probe.rows, 100);
   assert.equal(after.tables.schema_migrations.rows, before.tables.schema_migrations.rows + 1);
   same(before, after, 'داده پس از مهاجرت', { ignore: ['rel01_probe', 'schema_migrations'], countsOnly: ['online_orders'] });
-  S = await serve(fixed, DIR);
+  S = await serve(fixed, TARGET);
   try {
     await S.ready();
     A.E = at(S);
@@ -341,7 +340,7 @@ await E.step('REL-01.fixed', 'نسخهٔ اصلاح‌شده (همان نامِ 
   } finally {
     await S.stop();
   }
-  const v = await run([path.join(SERVER, 'scripts', 'verify-data.js')], { DATABASE_URL: `pglite:${DIR}` });
+  const v = await run([path.join(SERVER, 'scripts', 'verify-data.js')], { DATABASE_URL: TARGET });
   assert.equal(v.code, 0, `verify-data پس از به‌روزرسانی: ${v.out.slice(-800)}`);
 }, { needs: ['REL-01.rollback'] });
 

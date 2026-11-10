@@ -17,6 +17,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const W = require('../scripts/dari-words');
 const D = require('../public/kit/dari');
+const KT = require('./kt-source');
 const { FIRST_LOAD } = require('./storefront-budget');
 
 const PUB = path.join(__dirname, '..', 'public');
@@ -144,10 +145,20 @@ test('روی واژه‌نامه‌های واقعیِ وب: جای‌خالی�
   }
 });
 
-//  دورِ ۶ (پوششِ کامل): شکل‌هایی که دری‌شان فقط در جملهٔ کاملِ PHRASES می‌آید — همان فهرستِ `DariCoverageTest.farsiOnlyForms`
-const FARSI_ONLY = ['دوباره بزنید', 'دوباره بکوشید', 'مهلت', 'نمی‌خواند', 'ایستا', 'پاسخ نداد', 'شلوغ', 'خیلی'];
+//  دورِ ۶ (پوششِ کامل): شکل‌هایی که دری‌شان فقط در جملهٔ کاملِ PHRASES می‌آید و استثناهای نام‌دارشان —
+//  خوانده از خودِ `DariCoverageTest.kt` (`farsiOnlyForms`/`farsiOnlyAllowed`، `test/kt-source.js`)، نه رونوشت
+const COVERAGE_KT = 'android-native/app/src/test/java/ir/vil3ntec/tohid/core/i18n/DariCoverageTest.kt';
+const FARSI_ONLY = KT.list(COVERAGE_KT, 'private val farsiOnlyForms = listOf(');
+const FARSI_ALLOWED = KT.list(COVERAGE_KT, 'private val farsiOnlyAllowed = listOf(');
+/** همان `farsiOnlyLeft` ِ کاتلین: استثناها بیرون، سپس هر شکلِ فهرست که ماند */
+const farsiOnlyLeft = (text) => {
+  let t = text;
+  for (const a of FARSI_ALLOWED) t = t.replaceAll(a, '');
+  return FARSI_ONLY.filter((w) => t.includes(w));
+};
 
 test('دورِ ۶: هیچ متنِ دریِ وب شکلِ فقط‌فارسی ندارد؛ جملهٔ کامل با {جای‌خالی} سرِ جای خود', () => {
+  assert.ok(FARSI_ONLY.length >= 8 && FARSI_ONLY.includes('دوباره بزنید'), FARSI_ONLY.join(' '));
   const left = [];
   let n = 0;
   for (const f of dictFiles) {
@@ -155,7 +166,7 @@ test('دورِ ۶: هیچ متنِ دریِ وب شکلِ فقط‌فارسی ن
       if (D.KEYS[k] === null) continue;   //  KEYS ِ null: عمداً فارسی تا تصمیمِ صاحب‌کار
       const out = D.t(v, k);
       if (FARSI_ONLY.some((w) => v.includes(w))) n++;
-      for (const w of FARSI_ONLY) if (out.includes(w)) left.push(`${f} ${k}: «${w}» در «${out}»`);
+      for (const w of farsiOnlyLeft(out)) left.push(`${f} ${k}: «${w}» در «${out}»`);
     }
   }
   assert.deepEqual(left, [], 'شکلِ فقط‌فارسی در دریِ وب — جملهٔ کامل در DariText.PHRASES');
@@ -167,6 +178,36 @@ test('دورِ ۶: هیچ متنِ دریِ وب شکلِ فقط‌فارسی ن
   assert.equal(fill(D.t('قیمت عوض شده است. {list}مبلغِ تازه: {sum}. اگر می‌پذیرید، دوباره بزنید.', 'ck.repriced'), v),
     'قیمت تغییر کرده است. گوشی سامسونگ ۲×، مبلغِ جدید: ۱۲۰ ؋. اگر می‌پذیرید، دوباره کوشش کنید.', 'نامِ کالا دری نمی‌شود');
   assert.equal(D.t('دکان شلوغ بود', 'reason.busy'), 'دکان مصروف بود');
+});
+
+//  آینهٔ خط‌به‌خطِ همان آزمونِ کاتلین (`DariCoverageTest`، «… برنامهٔ دکان، برنامهٔ خرید و ویترین»، بخشِ خرید/وب):
+//  متن‌ها با همان `DariSources` (ShopperText.kt و regex ِ واژه‌نامه‌ها، نه JSON.parse، بی KEYS)، هر `{}` یک
+//  `protect("v<i>")` و همان `DariText.of` (`D.of`). سرخ این‌جا = سرخِ CI ِ اندروید، پیش از آن.
+test('آینهٔ DariCoverageTest: برنامهٔ خرید و ویترین با همان of(protect) شکلِ فقط‌فارسی ندارند', () => {
+  //  خودِ سنجه می‌تواند سرخ شود (مثلِ دستهٔ ۳۹: np.fail بی جملهٔ PHRASES) و استثنا همان استثنای کاتلین است؛
+  //  جملهٔ نمونه ساختگی است تا جملهٔ تازهٔ PHRASES سنجه را بی‌اثر نکند
+  const sample = `${D.protect('v0')} آینه؛ دوباره بزنید.`;
+  assert.ok(!(D.shape(sample) in D.DATA.phrases), D.shape(sample));
+  assert.deepEqual(farsiOnlyLeft(D.of(sample)), ['دوباره بزنید']);
+  assert.deepEqual(farsiOnlyLeft('رمز را دوباره بزنید؛ مهلت'), ['مهلت']);
+  const shopper = KT.shopperTexts();
+  const web = KT.webTexts();
+  const bad = [];
+  for (const k of new Set([...shopper, ...web])) {
+    let i = 0;
+    const marked = k.split('{}').reduce((a, b) => a + D.protect(`v${i++}`) + b);
+    for (const w of farsiOnlyLeft(D.of(marked))) bad.push(`خرید/وب: «${w}» در «${k}»`);
+  }
+  assert.deepEqual(bad, [], 'شکلِ فقط‌فارسی در دری ماند — جملهٔ کاملِ دری در DariText.PHRASES بنویسید (و node scripts/dari-words.js --write)');
+  assert.ok(shopper.size > 150 && web.size > 300, `خرید ${shopper.size}، وب ${web.size}`);
+  //  همان خواندنِ ShopperText: `${…}` و `$نام` ⇒ `{}`، `"…" + "…"` یکی، `x.t(` نه
+  const fake = KT.shopperTexts(`${Array.from({ length: 150 }, (_, i) => `a = t("w${i}", "")`).join('\n')}
+b = t("x\${f(1)} y", "")
+c = t("p" +
+  "q$n", "")
+d = o.t("z", "")`);
+  assert.ok(fake.size === 152 && fake.has('x{} y') && fake.has('pq{}') && !fake.has('z'), [...fake].slice(-3).join(' | '));
+  assert.throws(() => KT.shopperTexts('t("تنها", "")'), /خوانده نشد/);
 });
 
 test('جملهٔ کاملِ دری با {} (کلید‌به‌کلید): مقدار و {جای‌خالی} بایت‌به‌بایت سرِ جای خود', () => {

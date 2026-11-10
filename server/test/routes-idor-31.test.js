@@ -487,11 +487,15 @@ test('ورودی: پرس‌وجوی فهرست (status/limit آرایه، منف
     assert.ok([400, 404].includes(mm.status), `${id}: ${mm.status}`);
   }
   //  شناسهٔ پرونده: آرایه، شیء، `__proto__`، `erased:` و `ph:` ⇐ فهرستِ خالی و ۲۰۰؛ سقفِ نادرست ⇐ ۴۰۰
-  for (const q of ['customerId=d-ev&customerId=d-ev', 'customerId[]=d-ev', 'customerId[a]=d-ev', 'customerId=__proto__', 'customerId=erased:x', 'customerId=ph:abc', 'customerId=d-ev%00']) {
+  for (const q of ['customerId=d-ev&customerId=d-ev', 'customerId[]=d-ev', 'customerId[a]=d-ev', 'customerId=__proto__', 'customerId=erased:x', 'customerId=ph:abc']) {
     const r = await call(A.owner, 'GET', `/api/shop/customer-access?${q}`);
     assert.equal(r.status, 200, q);
     assert.deepEqual(r.body.entries, [], q);
   }
+  //  ممیزیِ ۳۵ (X2): شناسهٔ NUL‌دار «نیافته» نیست، نادرست است ⇒ ۴۰۰ ِ سراسریِ `bad_query` پیش از در (همان شناسه در مسیر
+  //  `bad_path` است)؛ هنوز نه ۵۰۰ و نه ردیفِ `d-ev`
+  const nul = await call(A.owner, 'GET', '/api/shop/customer-access?customerId=d-ev%00');
+  assert.deepEqual([nul.status, nul.body.error?.code, nul.body.entries], [400, 'bad_query', undefined]);
   for (const q of ['limit=-1', 'limit=201', 'limit=abc', 'limit=5&limit=6']) {
     const r = await call(A.owner, 'GET', `/api/shop/customer-access?customerId=d-ev&${q}`);
     assert.equal(r.status, 400, q);
