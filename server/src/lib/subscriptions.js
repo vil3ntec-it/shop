@@ -27,6 +27,20 @@ const idempotency = require('./idempotency');
 const DAY = 24 * 60 * 60 * 1000;
 
 /**
+ * پایانِ دورهٔ «مقدار + واحد» از `base` — **تنها** حسابِ اعطا، و همان که پلِ پنل از `GET /admin/subscriptions/period-end`
+ * می‌خواند (S15 ِ ممیزیِ پنلِ مرکزی: تصمیمِ اشتراک فقط این‌جا).
+ * ⛔ SUB-03 (فقط دکان؛ پمپ بیت‌به‌بیت همان): «همین روز در ماهِ بعد» به روزِ کابل — هرگز کمتر از حسابِ UTC ِ پیشین.
+ * منطقهٔ نادرست در `DEFAULT_TIMEZONE` (RangeError ِ Intl) تمدید را نمی‌شکند ⇒ همان حسابِ UTC.
+ */
+function periodEnd(T, base, amount, unit) {
+  let end = plans.endOfPeriod(base, amount, unit);
+  if (T === tenancy.SHOP) {
+    try { end = Math.max(end, plans.endOfPeriodIn(base, amount, unit, require('./finance-window').tz())); } catch { /* UTC */ }
+  }
+  return end;
+}
+
+/**
  * نقشهٔ گذارهای مجازِ وضعیتِ اشتراک — تنها جای این قاعده.
  *
  *   pending ──▶ active ──▶ suspended ──▶ active
@@ -380,12 +394,7 @@ function build(T) {
     } else {
       const p = await plans.getPlan(plan, T.app, run);
       if (!p || !p.amount || !p.unit) throw badRequest('مدت اشتراک مشخص نیست', 'missing_duration');
-      end = plans.endOfPeriod(base, p.amount, p.unit);
-      //  ⛔ SUB-03 (فقط دکان؛ پمپ بیت‌به‌بیت همان): «همین روز در ماهِ بعد» به روزِ کابل — هرگز کمتر از حسابِ UTC ِ پیشین
-      //  منطقهٔ نادرست در `DEFAULT_TIMEZONE` (RangeError ِ Intl) تمدید را نمی‌شکند ⇒ همان حسابِ UTC
-      if (T === tenancy.SHOP) {
-        try { end = Math.max(end, plans.endOfPeriodIn(base, p.amount, p.unit, require('./finance-window').tz())); } catch { /* UTC */ }
-      }
+      end = periodEnd(T, base, p.amount, p.unit);
       start = if_live(existing, t) ?? start;
       maxDevices = maxDevices || p.max_devices;
     }
@@ -655,5 +664,6 @@ module.exports = {
   pump,
   forApp: (app) => (app === 'pump' ? pump : shop),
   stateOf,
+  periodEnd,
   DAY,
 };

@@ -123,6 +123,8 @@
 | `GET /admin/shops/:id/history` | مدیر | دکان | — | خواندنِ سراسری | — | `admin.js:304` |
 | `GET /admin/subscriptions` | مدیر | سراسری | — | خواندنِ سراسری | — | `admin.js:311` |
 | `POST /admin/subscriptions` | مدیر | سراسری | دارد | مالی/اشتراک | G2, G3 | `admin.js:328` |
+| `GET /admin/subscriptions/period-end` ★ | مدیر (هر نقش) + سقفِ IP پیش از احراز | سراسری | — | خواندنِ سراسری (فقط حساب، بی داده) | — | `admin-bridge.js:32` |
+| `GET /admin/contract` ★ | مدیر (هر نقش) + سقفِ IP پیش از احراز | سراسری | — | خواندنِ سراسری (فهرستِ درها) | — | `admin-bridge.js:22` |
 | `PUT /admin/subscriptions/:id` | مدیر | اشتراکِ یک حساب | دارد | مالی/اشتراک | G2, G3 | `admin.js:395` |
 | `POST /admin/subscriptions/:id/status` | مدیر | اشتراکِ یک حساب | دارد | مالی/اشتراک | G2, G3 | `admin.js:418` |
 | `GET /admin/sms` | مدیر | سراسری | — | خواندنِ سراسری | — | `admin.js:434` |
@@ -165,7 +167,7 @@
 | `POST /admin/otp/password-reset` | مدیر | سراسری | دارد | عملیات | — | `admin-otp.js:115` |
 | `GET /admin/sync/status` | مدیر | سراسری | — | خواندنِ سراسری | — | `admin-sync.js:26` |
 | `GET /admin/sync/conflicts` | مدیر | حساب (account=) | دارد ★ | خواندنِ دادهٔ شخصی | — | `admin-sync.js:39` |
-| `POST /admin/sync/conflicts/:id/restore` | ارشد ★ + دلیل | حساب (account=) | دارد ★ | خروجی/بازگردانی | — | `admin-sync.js:64` |
+| `POST /admin/sync/conflicts/:id/restore` | ارشد ★ + دلیل؛ یک بار ★ (شناسهٔ یک‌شکل، ۴۰۹ `already_restored`/`restore_in_progress`، `Idempotency-Key`) | حساب (account=) | دارد ★ | خروجی/بازگردانی | — | `admin-sync.js:68` |
 | `GET /admin/sync/errors` | مدیر | سراسری | — | خواندنِ سراسری | — | `admin-sync.js:77` |
 | `GET /admin/sync/version-health` | مدیر | سراسری | — | خواندنِ سراسری | — | `admin-sync.js:94` |
 | `PUT /admin/plans/:code/discount` | ارشد | سراسری | دارد | مالی/اشتراک | — | `admin-platform.js:46` |
@@ -428,6 +430,9 @@
 - **بازیابی (فقط از پوستهٔ همان سرور):** `ADMIN_BOOTSTRAP_PASSWORD` ِ تازه در محیط ⇒ رمز برمی‌گردد، حساب فعال، TOTP خاموش؛ یا
   `node scripts/create-admin.js <نامِ مالک> <رمزِ تازه>` ⇒ همان، نقشِ مالک همیشه ارشد می‌ماند و نشست‌های پیشین بسته می‌شوند.
 - جابه‌جاییِ مالکیت API ندارد (عمداً)؛ اگر لازم شد: پوسته و `UPDATE admins SET is_owner=…` در یک تراکنش، با پشتیبان.
+- ★ (۱۴۰۵/۰۸/۲۰) مالک فقط **ارشدِ فعال** است: پایگاهِ بی‌نشان ⇒ پیشین‌ترین ارشدِ فعال (نه پیشین‌ترین ارشد)؛ نشانِ مانده روی حسابِ نافعال/غیرِارشد
+  (فقط مهاجرتِ ۱۶۸ یا پوسته چنین می‌کند) ⇒ در نخستین خواندن و هنگامِ بالا آمدن به پیشین‌ترین ارشدِ فعال، زیرِ قفل، با `admin.owner_reassigned`.
+  هیچ API ای رمز یا دوعاملیِ مدیرِ دیگری را نمی‌نویسد (نگهبانِ سورس: `admin-owner-active.test.js`).
 
 ### ۱۲.۵ رده‌بندیِ درهای تازه برای ماتریسِ جداسازی (#582، `tenant-matrix.test.js` → `ADMIN_SUBJECT`)
 
@@ -513,3 +518,14 @@
 - ⚠️ وقتی #582 (`tenant-matrix.test.js`) مرج شد، `GET /api/admin/finance/payments/:id` (تنها درِ شناسه‌دارِ مالی) در `ADMIN_SUBJECT`
   رده می‌گیرد — خطِ آماده در بندِ ۱۲.۵؛ بقیهٔ `GET /api/admin/finance/*` بی‌شناسه‌اند (دادهٔ پولیِ پلتفرم به‌ازای دکان؛ فقط مدیر).
 
+### ۱۲.۱۰ قراردادِ نسخه‌دارِ پل و پایانِ دوره از سرور (۱۴۰۵/۰۸/۲۰، شاخهٔ `claude/acct-console`) — یافته‌های S15 و S18
+
+- **S18:** سرآیندِ `X-Admin-API-Version: 1` روی هر پاسخِ `/api[/v1]/admin/*` (۴۰۱ و ۴۰۴ هم؛ `app.js` ⇐ `adminApiVersion`)، و
+  `GET /api/admin/contract` ⇒ `{ version, routesHash, count, generatedFrom, serverVersion, capabilities, routes: [{method, path, superadmin}] }`.
+  فهرست `server/src/lib/admin-contract.json` است که `tools/api-contract/generate.cjs` از `docs/api/routes.json` می‌سازد (`--check` هر دو را
+  می‌سنجد)؛ `superadmin` فقط نگهبانِ نام‌دارِ `requireSuperAdmin` است. **نسخه فقط با شکستنِ یک درِ موجود بالا می‌رود**؛ درِ تازه فقط
+  `routesHash` را عوض می‌کند. پنلِ کهنه هیچ‌کدام را نمی‌خواند ⇒ همان کار. توانایی: `admin-contract.v1`.
+- **S15:** `GET /api/admin/subscriptions/period-end?app=&amount=&unit=&from=` ⇒ `{ base, endsAt, rule, zone, serverTime }` با همان
+  `subscriptions.periodEnd` که اعطا می‌کند (دکان: روزِ تقویمِ کابل، هرگز کمتر از UTC؛ پمپ: UTC). پایه = بیشینهٔ `from` و همین حالا.
+  توانایی: `subscription-period.v1`.
+- **بازگرداندنِ تعارض یک بار:** توانایی `sync-restore-once.v1` (بالا، جدولِ بند ۶).

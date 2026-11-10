@@ -91,6 +91,9 @@ router.post('/login', adminLimit, async (req, res, next) => {
 
 //  OPS-09: «مصرفِ پیام» چند جدول را می‌شمارد ⇒ سطلِ IP ِ خودش پیش از احراز (CodeQL ِ js/missing-rate-limiting)
 router.use('/system/notify-usage', rateLimit({ max: 30, windowMs: 60 * 1000, keyPrefix: 'admin-notify-usage-ip' }));
+//  دو درِ قراردادِ پل (`routes/admin-bridge.js`، S15 و S18) — سقفِ IP پیش از احراز؛ پل همه از یک IP است، پس گشاد
+router.use('/contract', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-contract-ip' }));
+router.use('/subscriptions/period-end', rateLimit({ max: 240, windowMs: 60 * 1000, keyPrefix: 'admin-period-end-ip' }));
 
 router.use(requireAdmin);
 
@@ -114,6 +117,7 @@ router.get('/me', (req, res) => {
 });
 
 router.get('/features', (req, res) => res.json({ features: FEATURES }));
+router.use(require('./admin-bridge'));
 
 //  F0-15: تأییدِ دومرحله‌ایِ اختیاری — هر مدیر برای خودش
 router.use('/2fa', require('./admin-2fa'));

@@ -54,6 +54,15 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/acct-console` (بندهای سمتِ سرورِ حسابِ ممیزیِ پنلِ مرکزی §۹: بازگرداندنِ یک‌باره، S12، S15، S18؛ روی main ‏ed8009d7 = دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) `POST /admin/sync/conflicts/:id/restore` یک بار — شناسهٔ یک‌شکل (۴۰۰ `bad_id`)، ۴۰۹ `already_restored`/`restore_in_progress` با نشانِ پایگاه
+  (`sync_conflict_restore_claims`، مهاجرتِ ۴۹۵)، `Idempotency-Key` (`lib/sync-restore-once.js`؛ `sync-v1.js` دست نخورد). (۲) S12: نگهبانِ مالک از پیش بود
+  (بستن/تنزل/نشست/کلیدِ سرویس)؛ شکافِ مانده «مالک = پیشین‌ترین ارشد، فعال یا نه» بسته شد (`lib/admin-owner.js`: فقط ارشدِ فعال، جابه‌جاییِ نشانِ
+  مانده با سابقه). (۳) S15: `GET /admin/subscriptions/period-end` با همان `subscriptions.periodEnd` ِ اعطا. (۴) S18: `X-Admin-API-Version` و
+  `GET /admin/contract` از `server/src/lib/admin-contract.json` (ساختهٔ `generate.cjs` از `docs/api/routes.json`). آزمون‌ها: `admin-sync-restore-once` ۸،
+  `admin-owner-active` ۷، `admin-bridge-contract` ۸ (پیش از تغییر ۱۹ از ۲۳ سرخ؛ چهار سبزِ ماندنی نگهبانِ پسرفت‌اند)، روی PGlite و PostgreSQL ِ محلی؛ شرح در RULES «v3 · پنلِ مدیر» و بندِ ۱۲.۱۰ ِ ADMIN-CONTROL-PLANE.
+- نیمه‌کاره: سمتِ پنل (ریپوی server) — فرستادنِ `Idempotency-Key` به بالادست، جایگزینیِ `addPeriod` با `period-end`، خواندنِ `/admin/contract`؛ S14 فقط پیشنهاد (تصمیمِ صاحب محصول).
+- قدمِ بعدی: شاهدِ CI ِ سه آزمونِ تازه؛ تغییرِ پنل پشتِ توانایی‌های `sync-restore-once.v1`، `subscription-period.v1` و `admin-contract.v1`.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-39` (بازبینیِ امنیتیِ مستقلِ دستهٔ ۳۹؛ روی `ccr-3a0d593c-ac0jpj-batch-39`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: تفاضلِ `server/src`، `server/public` و `license` ِ دستهٔ ۳۸..۳۹ خوانده و به آن حمله شد (پوشِ وب ِ سفارش و «خبرم کن»، SSRF، رمز، کاتالوگِ پرچم‌ها،
   `vip.js`، ۴۰۱ ِ پنل، بانکِ تصویر، تمرکزِ `kit`/`chat`، `upgrade-rehearsal`، `verification()`). دو یافتهٔ Low بسته شد (`docs/SECURITY-AUDIT-fa.md` B4):
