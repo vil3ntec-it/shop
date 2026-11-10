@@ -84,6 +84,7 @@ fun main() {
   runCatching { ir.vil3ntec.tohid.desktop.hub.HubBoot.startIfEnabled(context) }
   val prefs = context.getSharedPreferences("tohid", 0)
   ir.vil3ntec.tohid.ui.components.keys.KeyHelpPref.load(context) //  S50، پیش‌فرض روشن (تنظیماتِ کم، ۱۴۰۵/۰۸/۱۱)
+  ir.vil3ntec.tohid.sync.LicenseGuard.warm() // وضعِ سراسریِ Compose پیش از کارِ پس‌زمینه و نخستین ترکیب (#1028)
   val store = ShopStore(context)
   val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   scope.launch { store.loadAndSummarize() }

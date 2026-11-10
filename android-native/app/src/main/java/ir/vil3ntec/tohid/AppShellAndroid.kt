@@ -37,6 +37,7 @@ object AppStart {
 
   /** تنظیم‌هایی که پیش از نخستین کشیدنِ صفحه خوانده می‌شوند (کلیدِ انیمیشن، زبان، روزِ دکان، …) */
   fun loadSettings(context: Context) {
+    ir.vil3ntec.tohid.sync.LicenseGuard.warm() // وضعِ سراسری پیش از کارِ پس‌زمینه و نخستین ترکیب
     Motion.load(context)
     LocaleChoice.load(context)
     ShopDayChoice.load(context)
