@@ -14,12 +14,13 @@
   ⛔ هیچ چیزی از مرورگر پاک یا نوشته نمی‌شود (نه localStorage، نه IndexedDB؛ پایگاهی که نیست ساخته هم نمی‌شود).
   ⛔ سرویس‌ورکر ثبت نمی‌شود؛ فقط کارگرِ کهنهٔ همین نشانی `update()` می‌گیرد تا `sw.js` ِ خداحافظی خودش را بردارد.
   CSP: اسکریپت و سبکِ درون‌خطی فقط با همان هشِ sha256 (بی unsafe-inline)؛ هر ویرایشِ آن دو هش را عوض می‌کند —
-  `node server/test/web-shop-gone.mjs` هشِ درست را می‌گوید. `connect-src 'self'` (هیچ درخواستی به سرور نیست).
+  `node server/test/web-shop-gone.mjs` هشِ درست را می‌گوید. `connect-src 'self' blob:` (هیچ درخواستی به سرور نیست؛ `blob:` فقط
+  برای پلِ دانلودِ پوستهٔ WebViewِ بازنشستهٔ `android/` که فایلِ پشتیبان را با fetch ِ همان blob به اندروید می‌دهد).
 -->
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-OF56yyC4Nw9zGHT4xlPQeVMQHB2IiKuufjnTFX4HyXw='; style-src 'sha256-RrAFBogg38k3Pe4Kv7JTfL/vG8WutBxGukhDATowj6E='; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-OF56yyC4Nw9zGHT4xlPQeVMQHB2IiKuufjnTFX4HyXw='; style-src 'sha256-RrAFBogg38k3Pe4Kv7JTfL/vG8WutBxGukhDATowj6E='; img-src 'self' data:; font-src 'self'; connect-src 'self' blob:; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <title>فروشگاه من — برنامه را نصب کنید</title>

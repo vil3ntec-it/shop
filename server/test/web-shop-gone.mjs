@@ -11,7 +11,7 @@
  *      settings؛ فایلِ خام بی رمز و توکن؛ هیچ کلیدی عوض یا پاک نمی‌شود.
  *   ۴) دفتر در IndexedDB با عکس: ZIP ِ پشتیبانِ کاملِ برنامه (`shop-data.json` + `photos/<id>.jpg`، CRC درست، بایت‌به‌بایت
  *      همان عکس)، «فقط دفتر» همان JSON؛ IndexedDB دست نمی‌خورد. نبودِ `indexedDB.databases()` هم پایگاهی نمی‌سازد.
- *   ۵) دفترِ خراب ⇒ فقط فایلِ خام و پیامِ روشن.
+ *   ۵) دفترِ خراب ⇒ فقط فایلِ خام و پیامِ روشن؛ پلِ دانلودِ پوستهٔ WebViewِ بازنشستهٔ `android/` همان فایل را می‌گیرد.
  *   ۶) سرویس‌ورکرِ کهنه (همان رفتارِ پیشین: کش‌های `tohid-shop-v…`، منتظرِ دکمه) ⇒ با بازکردنِ صفحه sw.js ِ تازه
  *      فعال می‌شود، فقط کشِ همان کانال را پاک می‌کند (نه `/beta/`، نه برنامهٔ دیگرِ همین دامنه)، خودش را برمی‌دارد و
  *      برگهٔ بازِ کهنه را دوباره بار می‌کند؛ سپس همان برای `/beta/`. داده دست نمی‌خورد.
@@ -52,7 +52,7 @@ async function step(name, fn) {
 }
 
 /* ---------------------------------- ۱) ایستا ---------------------------------- */
-await step('CSP: هشِ اسکریپت و سبکِ درون‌خطی، بی unsafe-inline/eval، connect-src فقط self', () => {
+await step('CSP: هشِ اسکریپت و سبکِ درون‌خطی، بی unsafe-inline/eval، connect-src فقط self و blob:', () => {
   const csp = (/http-equiv="Content-Security-Policy"\s+content="([^"]+)"/.exec(html) || [])[1];
   assert.ok(csp, 'CSP نیست');
   const dir = Object.fromEntries(csp.split(';').map((d) => d.trim().split(/\s+/)).filter((d) => d[0]).map((d) => [d[0], d.slice(1)]));
@@ -63,7 +63,8 @@ await step('CSP: هشِ اسکریپت و سبکِ درون‌خطی، بی unsa
   assert.equal(styles.length, 1);
   assert.deepEqual(dir['script-src'], [hash(scripts[0])], `هشِ درستِ اسکریپت: ${hash(scripts[0])}`);
   assert.deepEqual(dir['style-src'], [hash(styles[0])], `هشِ درستِ سبک: ${hash(styles[0])}`);
-  assert.deepEqual(dir['connect-src'], ["'self'"]);
+  //  `blob:`: پلِ دانلودِ پوستهٔ WebViewِ بازنشستهٔ `android/` فایل را با fetch ِ همان blob می‌خواند (WebViewHardeningTest می‌پذیرد)
+  assert.deepEqual(dir['connect-src'], ["'self'", 'blob:']);
   for (const k of ['object-src', 'base-uri', 'form-action']) assert.deepEqual(dir[k], ["'none'"], k);
   assert.doesNotMatch(csp, /unsafe-inline|unsafe-eval|\*|https?:|wss?:/);
   assert.doesNotMatch(html, /<script\s+src=|\son[a-z]+\s*=\s*["']|\sstyle\s*=\s*["']|javascript:/i, 'بی اسکریپتِ بیرونی، رویداد یا style ِ درون‌خطی');
@@ -377,6 +378,29 @@ try {
     const [dr] = await Promise.all([pg.waitForEvent('download'), pg.click('#btn-raw')]);
     assert.equal(JSON.parse(await readFile(dr)).localStorage['tohid-shop-data-v1'], '{"products":[{"id":"p1"');
     assert.deepEqual(bad, []);
+    await ctx.close();
+  });
+
+  await step('پوستهٔ WebViewِ بازنشستهٔ android/: پلِ دانلودِ خودش (DOWNLOAD_BRIDGE) فایلِ پشتیبان را زیرِ همین CSP می‌گیرد', async () => {
+    const kt = fs.readFileSync(path.join(ROOT, 'android/app/src/main/java/af/tohid/shop/MainActivity.kt'), 'utf8');
+    const bridge = (/const val DOWNLOAD_BRIDGE = """([\s\S]*?)"""/.exec(kt) || [])[1];
+    assert.ok(bridge, 'DOWNLOAD_BRIDGE در MainActivity.kt پیدا نشد');
+    const ctx = await browser.newContext();
+    await ctx.addInitScript(() => { window.__saved = []; window.ShopAndroid = { saveFile: (b64, name, type) => window.__saved.push({ b64, name, type }) }; });
+    await ctx.addInitScript(bridge);
+    const seed = await ctx.newPage();
+    await seed.goto(`${base}/other/blank.html`);
+    await seed.evaluate((L) => localStorage.setItem('tohid-shop-data-v1', JSON.stringify(L)), LEDGER);
+    const { pg, bad } = await openPage(ctx);
+    let downloads = 0;
+    pg.on('download', () => { downloads++; });
+    await pg.click('#btn-backup');
+    await pg.waitForFunction(() => window.__saved.length === 1, null, { timeout: 5000 });
+    const [got] = await pg.evaluate(() => window.__saved);
+    assert.match(got.name, /^tohid-shop-backup-\d{4}-\d{2}-\d{2}\.json$/);
+    assert.deepEqual(JSON.parse(Buffer.from(got.b64, 'base64').toString('utf8')).products, LEDGER.products);
+    assert.equal(downloads, 0, 'دانلودِ مرورگر نه؛ همان پل');
+    assert.deepEqual(bad, [], 'بی نقضِ CSP (connect-src blob:)');
     await ctx.close();
   });
 
