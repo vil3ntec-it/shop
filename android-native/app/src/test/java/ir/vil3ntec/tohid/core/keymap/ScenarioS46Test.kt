@@ -62,7 +62,8 @@ class ScenarioS46Test {
       Regex(
         """LaunchedEffect\(lockAsk\) \{\s*if \(lockAsk == lockSeen\) return@LaunchedEffect\s*lockSeen = lockAsk\s*""" +
           """when \(AppLockKey\.after\(ir\.vil3ntec\.tohid\.data\.TillUser\.lock\(context, lockStore\.enabled\), lockStore\.enabled\)\) \{\s*""" +
-          """AppLockKey\.Then\.TILL -> Unit\s*""" +
+          //  STF-04 (`claude/stf-2`): قفلِ صندوق نوبتِ سرورِ همان دستگاه را هم می‌بندد (`TillUser.serverEnd`)
+          """AppLockKey\.Then\.TILL -> ir\.vil3ntec\.tohid\.data\.TillUser\.serverEnd\(context\)[^\n]*\s*""" +
           """AppLockKey\.Then\.APP -> unlocked = false\s*""" +
           """AppLockKey\.Then\.HINT -> toasts\.show\(ir\.vil3ntec\.tohid\.core\.i18n\.StrTill\.lockNeedsPassword"""
       ).containsMatchIn(v3)
