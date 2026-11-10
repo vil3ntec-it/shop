@@ -27,7 +27,8 @@
  *     (`costMicros`) روی همان `tried` می‌ماند.
  *     شمارش با `phone_key` (HMAC ِ شماره)، نه خودِ شماره.
  *   • بی دادهٔ حساس (§۳۰.۱ بندِ ۴): متن فقط نامِ ویترین، شمارهٔ سفارش و وضعیت — نه نام، شماره،
- *     نشانی، اقلام یا مبلغ. لینکِ پیگیری (همان توکنِ HMAC ِ صفحهٔ «سفارشِ من») فقط اگر
+ *     نشانی، اقلام یا مبلغ (تنها استثنا NTF-08: پیامِ هر بازپرداخت مبلغِ همان بازپرداخت را دارد، پشتِ همان پرچمِ
+ *     پیگیریِ بازپرداخت که آن را در صفحهٔ پیگیری نشان می‌دهد — `EXTRA.order_refund`). لینکِ پیگیری (همان توکنِ HMAC ِ صفحهٔ «سفارشِ من») فقط اگر
  *     `STORE_PUBLIC_URL` داده شده باشد. شماره فقط به خودِ سرویس‌دهنده می‌رسد، هرگز به لاگ.
  *   • ⛔ واتس‌اپ، تلگرام و پیامک: هیچ سرویس‌دهنده‌ای وصل نیست (D-09: بودجه و حساب بیرونی‌اند) ⇒ حالِ صادقانهٔ
  *     `no_channel`. پیامکِ کدِ ورود (`lib/otp`) این‌جا به کار نمی‌رود. رابط `setProviders` است؛ امروز فقط آزمون
@@ -76,12 +77,31 @@ const MATRIX = Object.freeze({
   order_cancelled: URGENT,
 });
 const EVENTS = Object.freeze(Object.keys(MATRIX));
+const REFUND_EVENT = 'order_refund';
+/** رویدادِ ردیف برای بیرون: پیامِ بازپرداخت (ستونِ `refund_id`) همیشه `order_refund`، بی شناسهٔ دفتر */
+const eventOf = (row) => (row && row.refund_id ? REFUND_EVENT : row && row.event);
 
 /**
  * NTF-10: رویدادِ سیستمیِ بی گذارِ وضعیت (نه در `EVENT_OF`/`MATRIX`) — کانال‌ها و قالبِ خودش. فقط کانال‌های رایگان
  * (پوزش فوری نیست)؛ همان سقفِ هر مشتری و سقفِ هزینهٔ NTF-02. جای‌نگهدار همان `{no}` و `{shop}`.
  */
 const EXTRA = Object.freeze({
+  /**
+   * NTF-08: هر ردیفِ دفترِ بازپرداخت (`order-refunds.record`) ⇒ یک پیام (مهاجرتِ ۴۹۶). رویدادِ ردیف `order_refund:<refund_id>`
+   * است (یکتاییِ (order_id, event) ِ همان ۱۴۳ برای هر بازپرداخت)؛ بیرون از این پرونده همیشه `order_refund`. افزون بر
+   * پرچمِ اعلان، پرچمِ پیگیریِ بازپرداخت (`flag`، همان که مبلغ را در صفحهٔ پیگیری نشان می‌دهد) هنگامِ صف و فرستادن.
+   * ⛔ تنها پیامی که مبلغ دارد: فقط مبلغِ **همین** بازپرداخت (نه کلِ سفارش، نه اقلام، نه دلیلِ کارمند) — همان که
+   * صفحهٔ پیگیری با همین پرچم به همان مشتری نشان می‌دهد. فوری نیست ⇒ فقط کانال‌های رایگان.
+   */
+  order_refund: Object.freeze({
+    channels: FREE,
+    flag: 'shop.orders.refund_tracking',
+    text: Object.freeze({
+      fa: 'بازپرداختِ {amount} برای سفارشِ شمارهٔ {no} در «{shop}» ثبت شد؛ جزئیات در صفحهٔ پیگیریِ سفارش است.',
+      ps: 'د «{shop}» د فرمایش شمېره {no} لپاره د {amount} بېرته ورکړه ثبت شوه؛ جزئیات د فرمایش د تعقیب په پاڼه کې دي.',
+      en: 'A refund of {amount} for order #{no} at {shop} was recorded. Details are on your order page.',
+    }),
+  }),
   order_late_apology: Object.freeze({
     channels: FREE,
     text: Object.freeze({
@@ -218,7 +238,8 @@ async function onStatusIn(run, { shopId, order, to, at = now() }) {
  * @returns {Promise<string|null>} شناسهٔ ردیف (تکرار یا پرچمِ خاموش ⇒ null)
  */
 async function onExtraIn(run, { shopId, order, event, at = now() }) {
-  if (!EXTRA[event] || !order || order.source !== 'storefront' || order.is_test === true || !order.customer_phone) return null;
+  //  پیامِ بازپرداخت فقط از `onRefundIn` (به ردیفِ دفتر بسته است)
+  if (!EXTRA[event] || event === REFUND_EVENT || !order || order.source !== 'storefront' || order.is_test === true || !order.customer_phone) return null;
   if (!(await flagIn(run, shopId))) return null;
   const r = await run(
     `INSERT INTO customer_notify_outbox (id, shop_id, order_id, event, lang, phone_key, status,
@@ -226,6 +247,36 @@ async function onExtraIn(run, { shopId, order, event, at = now() }) {
      VALUES ($1,$2,$3,$4,$5,$6,'pending',$7,$7,$7)
      ON CONFLICT (order_id, event) DO NOTHING RETURNING id`,
     [ulid(at), shopId, order.id, event, langOf(order.customer_lang) || 'fa', phoneKey(order.customer_phone), at]
+  );
+  if (!r.rows[0]) return null;
+  soon();
+  return r.rows[0].id;
+}
+
+/** پیامِ بازپرداخت برای این دکان روشن است؟ اعلانِ مشتری + پیگیریِ بازپرداخت (+ خودِ دفتر). `run` ⇐ اتصالِ تراکنش (RSK-07). */
+async function refundOn(shopId, run = null) {
+  const orders = require('./orders');
+  if (!(await flagIn(run || ((t, p) => query(t, p)), shopId))) return false;
+  return (await orders.flagOf(shopId, EXTRA[REFUND_EVENT].flag, run))
+    && (await orders.flagOf(shopId, require('./order-refunds').FLAG_KEY, run));
+}
+
+/**
+ * NTF-08: ردیفِ دفترِ بازپرداخت ⇒ یک پیام — درونِ همان تراکنشِ `order-refunds.record` (پس از درجِ ردیفِ دفتر). ردیف
+ * از خودِ دفتر ساخته می‌شود (همان دکان و همان سفارش) و یکتاییِ پایگاه (۴۹۶) دومی را نمی‌سازد؛ پیامِ دیگری را کنار
+ * نمی‌زند. `order` همان ردیفِ قفل‌شدهٔ `online_orders`.
+ * @returns {Promise<string|null>} شناسهٔ ردیف (تکرار، پرچمِ خاموش یا سفارشِ نامشمول ⇒ null)
+ */
+async function onRefundIn(run, { shopId, order, refundId, at = now() }) {
+  if (!refundId || !order || order.source !== 'storefront' || order.is_test === true || !order.customer_phone) return null;
+  if (!(await refundOn(shopId, run))) return null;
+  const r = await run(
+    `INSERT INTO customer_notify_outbox (id, shop_id, order_id, event, refund_id, lang, phone_key, status,
+                                          next_attempt_at, created_at, updated_at)
+     SELECT $1, f.shop_id, f.order_id, 'order_refund:' || f.id, f.id, $5, $6, 'pending', $7, $7, $7
+       FROM online_order_refunds f WHERE f.id=$2 AND f.order_id=$3 AND f.shop_id=$4
+     ON CONFLICT (order_id, event) DO NOTHING RETURNING id`,
+    [ulid(at), String(refundId), order.id, shopId, langOf(order.customer_lang) || 'fa', phoneKey(order.customer_phone), at]
   );
   if (!r.rows[0]) return null;
   soon();
@@ -324,13 +375,23 @@ function cleanName(s) {
     .replace(/\s+/g, ' ').trim().slice(0, 60);
 }
 
-/** NTF-03: متنِ رویداد به زبانِ مشتری (زبانِ ناشناس ⇒ fa). */
-function render(event, lang, { no, shop }) {
+/**
+ * NTF-03: متنِ رویداد به زبانِ مشتری (زبانِ ناشناس ⇒ fa). `amountMinor` فقط برای قالبِ دارای `{amount}` (NTF-08؛ همان
+ * `store-alert-push.money`: رقم و واحدِ هر زبان). جایگزینی با تابع: نامِ ویترین هرگز الگوی `$&` یا جای‌نگهدار نمی‌شود.
+ */
+function render(event, lang, { no, shop, amountMinor }) {
   const l = LANGS.includes(lang) ? lang : 'fa';
   const tpl = TEMPLATES[l][event] || (EXTRA[event] && EXTRA[event].text[l]);
   if (!tpl) throw new Error(`no template: ${event}`);
+  let out = tpl;
+  if (out.includes('{amount}')) {
+    const a = Number(amountMinor);
+    if (amountMinor === undefined || amountMinor === null || !Number.isSafeInteger(a) || a <= 0) throw new Error(`no amount: ${event}`);
+    const money = require('./store-alert-push').money(a, l);
+    out = out.replace('{amount}', () => money);
+  }
   const digits = l === 'en' ? String(no) : faNum(no);
-  return tpl.replace('{no}', digits).replace('{shop}', cleanName(shop));
+  return out.replace('{no}', () => digits).replace('{shop}', () => cleanName(shop));
 }
 
 /** لینکِ صفحهٔ «سفارشِ من» به زبانِ مشتری — فقط اگر نشانیِ عمومیِ ویترین داده شده باشد. */
@@ -434,8 +495,17 @@ async function processRow(row, at) {
   if (!order || order.source !== 'storefront' || !order.customer_phone) {
     return settle(row, lock, { status: 'cancelled', last_error: 'order_missing', updated_at: at });
   }
-  //  کلیدِ قطعِ فوری: پرچم خاموش شد ⇒ هیچ پیامِ دیگری
+  const event = eventOf(row);
+  //  کلیدِ قطعِ فوری: پرچم خاموش شد ⇒ هیچ پیامِ دیگری (پیامِ بازپرداخت: پیگیریِ بازپرداخت هم)
   if (!(await flagOf(row.shop_id))) return settle(row, lock, { status: 'cancelled', last_error: 'flag_off', updated_at: at });
+  if (EXTRA[event] && EXTRA[event].flag && !(await require('./orders').flagOf(row.shop_id, EXTRA[event].flag))) {
+    return settle(row, lock, { status: 'cancelled', last_error: 'flag_off', updated_at: at });
+  }
+  //  NTF-08: مبلغ فقط از خودِ ردیفِ دفترِ همان سفارش و همان دکان
+  const refund = row.refund_id ? await one(
+    'SELECT amount_minor FROM online_order_refunds WHERE id=$1 AND order_id=$2 AND shop_id=$3', [row.refund_id, row.order_id, row.shop_id]
+  ) : null;
+  if (row.refund_id && !refund) return settle(row, lock, { status: 'cancelled', last_error: 'refund_missing', updated_at: at });
   if (at - Number(row.created_at) > MAX_AGE_MS) return settle(row, lock, { status: 'expired', updated_at: at });
   if (await overCap(row, at)) return settle(row, lock, { status: 'rate_limited', updated_at: at });
 
@@ -443,8 +513,8 @@ async function processRow(row, at) {
   const shop = cleanName(order.title) || '—';
   const msg = {
     channel: '', key: '', to: { phone: order.customer_phone }, shopId: row.shop_id, orderId: row.order_id,
-    event: row.event, lang, title: shop,
-    text: render(row.event, lang, { no: Number(order.order_no), shop }),
+    event, lang, title: shop, ...(row.refund_id ? { refundId: row.refund_id } : {}),
+    text: render(event, lang, { no: Number(order.order_no), shop, amountMinor: refund ? Number(refund.amount_minor) : undefined }),
     //  TEN-03: پرچمِ `shop.storefront.link_expiry` روشن ⇒ لینکِ v2 با نسلِ جاری (پس از «باطل کردن» هم کار می‌کند)
     link: linkFor({ shopId: row.shop_id, orderId: row.order_id, slug: order.slug, lang,
       token: await require('./storefront').currentTokenOf(row.shop_id, row.order_id) }),
@@ -452,7 +522,7 @@ async function processRow(row, at) {
 
   const tried = [];
   //  `only_channel` (مهاجرتِ ۴۷۰): فرستادنِ دوباره‌ای که خودِ مشتری برانگیخت (`catchUp`) فقط از همان کانالِ رایگان
-  const chain = (MATRIX[row.event] || (EXTRA[row.event] && EXTRA[row.event].channels) || [])
+  const chain = (MATRIX[event] || (EXTRA[event] && EXTRA[event].channels) || [])
     .filter((ch) => !row.only_channel || ch === row.only_channel);
   for (const channel of chain) {
     const p = providers[channel] || await builtin(channel, row.shop_id);
@@ -533,7 +603,7 @@ const asJson = (x) => (Array.isArray(x) ? x : decode(x) || []);
 function shape(r) {
   return {
     id: r.id,
-    event: r.event,
+    event: eventOf(r),
     lang: r.lang,
     status: r.status,
     channel: r.channel,
@@ -569,6 +639,7 @@ async function forOrder(shopId, orderId) {
 
 module.exports = {
   FLAG_KEY, CHANNELS, LANGS, EVENT_OF, MATRIX, EVENTS, TEMPLATES, MAX_ATTEMPTS, PER_HOUR, PER_DAY, MAX_AGE_MS,
-  EXTRA, onExtraIn, flagOf, onStatusIn, onCreatedIn, setProviders, channelState, render, linkFor, phoneKey,
+  EXTRA, REFUND_EVENT, eventOf, onExtraIn, onRefundIn, refundOn, flagOf, onStatusIn, onCreatedIn, setProviders, channelState,
+  render, linkFor, phoneKey,
   tick, start, stop, soon, forOrder, shape, providerOf, callProvider, spentToday, cleanName, catchUp,
 };

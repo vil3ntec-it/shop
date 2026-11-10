@@ -85,6 +85,8 @@ object StrOrderOps {
   val noticeEventRetry: String get() = t("تحویلِ دوباره", "Redelivery", "بیا سپارل")
   val noticeEventCompleted: String get() = t("تحویل شد", "Delivered", "وسپارل شو")
   val noticeEventCancelled: String get() = t("لغو شد", "Cancelled", "لغوه شو")
+  val noticeEventLateApology: String get() = t("پوزشِ تأخیر", "Delay apology", "د ځنډ بښنه")
+  val noticeEventRefund: String get() = t("بازپرداخت", "Refund", "بېرته ورکړه")
   val noticeSent: String get() = t("رفت", "Sent", "ولېږل شو")
   val noticePending: String get() = t("در صف", "Queued", "په کتار کې")
   val noticeNoChannel: String get() = t("هیچ کانالی وصل نبود", "No channel connected", "هېڅ چینل نښلول شوی نه و")

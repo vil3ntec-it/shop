@@ -26,7 +26,7 @@
     var ATT = 'store-push-at:' + slug;       //  { توکن: نشانیِ اشتراک } — سفارش‌هایی که همین حالا وصل‌اند
     var page = P.page(slug);
     var supported = P.supported;
-    var box = null; var cur = { token: '', key: '' }; var busy = false;
+    var box = null; var cur = { token: '', key: '', rf: false }; var busy = false; var shown = '';
 
     function ensure() {
       if (box) return box;
@@ -52,8 +52,10 @@
 
     function view(state, note) {
       ensure().hidden = false;
+      shown = state;
       var on = state === 'on';
-      $('o-np-state').textContent = t(on ? 'np.state.on' : (state === 'denied' ? 'np.denied' : (state === 'off' ? 'np.state.off' : 'np.hint')));
+      //  NTF-08: سفارشِ تحویل‌شده فقط برای خبرِ بازپرداخت باز است (`push.refund` ِ سرور) ⇒ شرحِ همان
+      $('o-np-state').textContent = t(on ? 'np.state.on' : (state === 'denied' ? 'np.denied' : (state === 'off' ? 'np.state.off' : (cur.rf ? 'np.hint.rf' : 'np.hint'))));
       $('o-np-on').hidden = on || state === 'denied';
       $('o-np-off').hidden = !on;
       $('o-np-on').disabled = busy; $('o-np-off').disabled = busy;
@@ -101,8 +103,13 @@
     /** با هر کشیدنِ صفحه (پیگیری هر ۲۰ ثانیه): فقط بارِ نخستِ هر سفارش کاری می‌کند */
     function render(o, token) {
       if (!supported || !o.push || !o.push.key) { if (box) box.hidden = true; return; }
-      if (cur.token === token && cur.key === o.push.key) { box.hidden = false; return; }
-      cur = { token: token, key: o.push.key };
+      var rf = o.push.refund === true;
+      if (cur.token === token && cur.key === o.push.key) {
+        box.hidden = false;
+        if (cur.rf !== rf) { cur.rf = rf; if (shown === 'idle' && !busy) view('idle'); }
+        return;
+      }
+      cur = { token: token, key: o.push.key, rf: rf };
       if (Notification.permission === 'denied') { view('denied'); return; }
       if (attached()[token]) { view('on'); return; }
       //  همین مرورگر در همین دکان پیش‌تر «خبرم کن» زده و اجازه دارد ⇒ سفارشِ تازه هم، بی پرسش

@@ -98,7 +98,7 @@ async function resend(shopId, orderId, noticeId, { key, actor }) {
          actor_type, actor_id, reason, note, detail, created_at)
        VALUES ($1,$2,$3,$4,'note',$5,$5,$6,$7,'','',$8::jsonb,$9)`,
       [ulid(at), order.id, shopId, seq, order.status, actor.type, actor.id || '',
-        JSON.stringify({ type: EVENT_TYPE, noticeId: row.id, event: row.event, prevStatus: row.status, count: used + 1, key }), at]
+        JSON.stringify({ type: EVENT_TYPE, noticeId: row.id, event: notify.eventOf(row), prevStatus: row.status, count: used + 1, key }), at]
     );
     return { replayed: false, row: next, prevStatus: row.status, orderNo: Number(order.order_no) };
   });
