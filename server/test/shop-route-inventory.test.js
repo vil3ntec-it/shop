@@ -204,6 +204,8 @@ FLAGS.push('shop.storefront.campaigns');
 FLAGS.push('shop.storefront.promo_guard');
 //  ORD-16: «فرستادنِ دوبارهٔ» پیامِ مشتری
 FLAGS.push('shop.orders.notice_resend', 'shop.customer_notify');
+//  AI-02/AI-05: استودیوی عکس (`/shop/images/studio/…`، مهاجرتِ ۵۹۰)
+FLAGS.push('shop.image_studio');
 //  ORD-14: تسویهٔ تفاوتِ ویرایشِ سفارشِ پرداخت‌شده
 FLAGS.push('shop.orders.amend_paid');
 //  SEC-10: حذفِ دادهٔ شخصیِ مشتری به درخواستِ صاحبِ دکان
@@ -350,6 +352,10 @@ async function seedShop(a) {
     { token: a.accessToken });
   assert.equal(change.status, 201, JSON.stringify(change.body));
   ids.imageChange = change.body.change.id;
+  //  دستهٔ استودیوی عکسِ «الف» (AI-05) — «ب» نه می‌بیند، نه متوقف/لغو می‌کند، نه نسخهٔ «الف» را بررسی
+  const studioBatch = await h.post('/api/shop/images/studio/batches', { key: fresh('studio'), image_ids: [ids.image] }, { token: a.accessToken });
+  assert.equal(studioBatch.status, 201, JSON.stringify(studioBatch.body));
+  ids.studioBatch = studioBatch.body.id;
 
   //  سفارشِ مشتری (اعلانِ سفارش) — از لایهٔ سفارش، همان راهِ ویترین
   await orders.create(a.shopId, {
@@ -649,6 +655,8 @@ function concreteFor(ids) {
     [/^(\/shop\/storefront\/area-requests\/):id/, ids.areaRequest],
     [/^(\/shop\/images\/products\/):productId/, ids.product],
     [/^(\/shop\/images\/changes\/):id/, ids.imageChange],
+    [/^(\/shop\/images\/studio\/batches\/):id/, ids.studioBatch],
+    [/^(\/shop\/images\/studio\/images\/):id/, ids.image],
     [/^(\/shop\/images\/file\/):id/, ids.image],
     [/^(\/shop\/images\/):id/, ids.image],
     [/(\/):version\b/, '1'],
@@ -733,6 +741,9 @@ function bodyFor(r, ids) {
     'POST /shop/images/:id/process': { step: 'strip_metadata' },
     'POST /shop/images/:id/propose': { consent: true },
     'POST /shop/images/changes/:id/rollback': { reason: 'آزمون' },
+    'POST /shop/images/studio/batches': { key: fresh('studio-b'), image_ids: [ids.image] },
+    'POST /shop/images/studio/batches/:id/action': { action: 'cancel' },
+    'POST /shop/images/studio/images/:id/versions/:version/review': { decision: 'reject' },
     'PATCH /shop/members/:id': { role: 'manager' },
     'PUT /shop/permissions/members/:id': { perms: {} },
     'PUT /shop/staff-scope/members/:id': { places: ['warehouse'] },

@@ -20,18 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1014,
+    "routes": 1021,
     "byAuth": {
       "none-detected": 195,
       "admin": 279,
       "inline": 2,
-      "user": 495,
+      "user": 502,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-      "extracted": 702,
-      "empty": 310,
+      "extracted": 706,
+      "empty": 313,
       "unresolved": 2
     }
   },
@@ -720,6 +720,13 @@
     {"method":"GET","path":"/api/shop/images/products/:productId","area":"shop","source":"server/src/routes/shop-images.js","auth":"user","guards":["requireUser","requireShop","requirePermission('data.read')","rateLimit({ max: config.rateLimit.syncMax, keyPrefix: 'imgbank', key: (req) => r"],"params":["productId"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/shop/images/search","area":"shop","source":"server/src/routes/shop-images.js","auth":"user","guards":["requireUser","requireShop","requirePermission('data.read')","rateLimit({ max: config.rateLimit.syncMax, keyPrefix: 'imgbank', key: (req) => r"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/images/select","area":"shop","source":"server/src/routes/shop-images.js","auth":"user","guards":["requireUser","requireShop","requirePermission('data.read')","rateLimit({ max: config.rateLimit.syncMax, keyPrefix: 'imgbank', key: (req) => r"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"GET","path":"/api/shop/images/studio/batches","area":"shop","source":"server/src/routes/shop-image-studio.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'imgstudio-ip' })","requireUser","requireShop","requirePermission('data.read')","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'imgstudio', key: (req) => "],"params":[],"query":["limit"],"body":[],"response":{"statuses":[200],"keys":["items"]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/shop/images/studio/batches","area":"shop","source":"server/src/routes/shop-image-studio.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'imgstudio-ip' })","requireUser","requireShop","requirePermission('data.read')","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'imgstudio', key: (req) => "],"params":[],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"GET","path":"/api/shop/images/studio/batches/:id","area":"shop","source":"server/src/routes/shop-image-studio.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'imgstudio-ip' })","requireUser","requireShop","requirePermission('data.read')","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'imgstudio', key: (req) => "],"params":["id"],"query":["after"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/shop/images/studio/batches/:id/action","area":"shop","source":"server/src/routes/shop-image-studio.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'imgstudio-ip' })","requireUser","requireShop","requirePermission('data.read')","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'imgstudio', key: (req) => "],"params":["id"],"query":[],"body":["action"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/images/studio/config","area":"shop","source":"server/src/routes/shop-image-studio.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'imgstudio-ip' })","requireUser","requireShop","requirePermission('data.read')","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'imgstudio', key: (req) => "],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["aspects","enabled","limits","presets"]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/images/studio/images/:id/versions","area":"shop","source":"server/src/routes/shop-image-studio.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'imgstudio-ip' })","requireUser","requireShop","requirePermission('data.read')","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'imgstudio', key: (req) => "],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/shop/images/studio/images/:id/versions/:version/review","area":"shop","source":"server/src/routes/shop-image-studio.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'imgstudio-ip' })","requireUser","requireShop","requirePermission('data.read')","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'imgstudio', key: (req) => "],"params":["id","version"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/invite","area":"shop","source":"server/src/routes/shop.js","auth":"user","guards":["requireUser","requireShop","requirePermission('staffcode.create')","requireFeature('multi_device')"],"params":[],"query":[],"body":["expiresInDays","maxUses","role"],"response":{"statuses":[201],"keys":["code","expiresAt","id","maxUses","role"]},"errors":["400 courier_invite_expiry","400 courier_invite_single_use","403 subscription_required","404 delivery_disabled"],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/join","area":"shop","source":"server/src/routes/shop.js","auth":"user","guards":["requireUser"],"params":[],"query":[],"body":["code"],"response":{"statuses":[201],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/leave","area":"shop","source":"server/src/routes/shop.js","auth":"user","guards":["requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["ok"]},"errors":["400 owner_cannot_leave"],"shape":"extracted"},

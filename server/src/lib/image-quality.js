@@ -452,4 +452,20 @@ function hamming(a, b) {
 const HEX16 = /^[0-9a-f]{16}$/;
 const isNearDuplicate = (a, b) => HEX16.test(a) && HEX16.test(b) && hamming(a, b) <= LIMITS.DUP_HAMMING_MAX;
 
-module.exports = { analyze, fingerprint, flagsFrom, hamming, isNearDuplicate, jpegQuality, pngLuma, jpegLuma, LIMITS };
+/**
+ * استودیوی عکس (‎lib/image-studio.js‎): همان شبکه و همان سنجه‌های `analyze` روی روشناییِ آماده
+ * ({ w, h, luma }) ⇒ همان `sharpness`/`p05`/`p95`/`background_std` ِ IMG-15، یا null (کم‌تر از ۹×۸).
+ */
+function lumaMetrics(px) {
+  const gr = grid(px);
+  if (!gr) return null;
+  const m = measure(gr);
+  delete m.dhash;
+  return m;
+}
+
+module.exports = {
+  analyze, fingerprint, flagsFrom, hamming, isNearDuplicate, jpegQuality, pngLuma, jpegLuma, lumaMetrics, LIMITS,
+  //  رمزگشای رنگیِ ‎lib/image-codec.js‎ همان جدول‌خوان و همان ضریب‌ها را به کار می‌برد (یک پیاده‌سازی)
+  jpegTables, ZZ, COS,
+};
