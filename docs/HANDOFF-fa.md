@@ -54,6 +54,13 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/sec-review-40` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۰، PR #1024؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: سه یافتهٔ Low، هر سه با آزمونِ سرخ‌پیش‌از‌رفع روی PGlite و PostgreSQL ِ محلی (`server/test/security-review-40.test.js`، ۵ آزمون):
+  SR40-1 واحدِ نامتنی (عدد/آرایه/`$inc`) قفلِ واحدِ PRD-07 را در یک op دور می‌زد (v1 و v3) ⇒ `oddUnit`؛ SR40-2 NUL در پرسشِ `sync/v3` ⇒ ۵۰۰
+  (استثنای `RAW_SYNC` بیش از اندازه، `V3` ِ بزرگ هم) ⇒ v3 بیرون از استثنا؛ SR40-3 تپشِ قیف از سایتِ دیگر (sendBeacon) ⇒ `Sec-Fetch-Site: cross-site` شمرده نمی‌شود.
+  شرح و «حمله شد و سالم ماند» در `docs/SECURITY-AUDIT-fa.md` B5؛ سه خطِ RULES.
+- نیمه‌کاره: هیچ. باز برای صاحب‌کار (B5): R2 (PRD-07 در دو op با «واحدِ خالی»، همان قاعدهٔ برنامه)، R3 (چرخاندنِ User-Agent از یک IP در قیف؛ ترازو با CGNAT)، R4 Info ِ مشترکِ پمپ.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد؛ اگر صاحب‌کار R2 را بخواهد، «واحدِ خالی روی کالای گردش‌دار = قفل» در `ProductDraftRules` و سرور با هم.
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/acct-console` (بندهای سمتِ سرورِ حسابِ ممیزیِ پنلِ مرکزی §۹: بازگرداندنِ یک‌باره، S12، S15، S18؛ روی main ‏ed8009d7 = دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) `POST /admin/sync/conflicts/:id/restore` یک بار — شناسهٔ یک‌شکل (۴۰۰ `bad_id`)، ۴۰۹ `already_restored`/`restore_in_progress` با نشانِ پایگاه
   (`sync_conflict_restore_claims`، مهاجرتِ ۴۹۵)، `Idempotency-Key` (`lib/sync-restore-once.js`؛ `sync-v1.js` دست نخورد). (۲) S12: نگهبانِ مالک از پیش بود

@@ -111,12 +111,11 @@ async function createApp({ runMigrations = true } = {}) {
     next();
   });
 
-  //  ⛔ ممیزیِ ۳۵: NUL (`%00`) در مسیر (B4 ⇒ `bad_path`) یا پرسش، کلید یا مقدار (X2 ⇒ `bad_query`) ⇒ ۴۰۰ پیش از هر کار (PostgreSQL
-  //  ۲۲۰۲۱ ⇒ ۵۰۰؛ در-به-در هفت درِ مدیر جا افتاده بود). شناسهٔ NUL‌دار نادرست است نه «نیافته»؛ `%2500` NUL نیست؛ پرسشِ `RAW_SYNC` دست‌نخورده.
-  const { RAW_SYNC } = require('./middleware/json-body');   //  همان استثنای پارسرِ بدنه (همگام‌سازی و پمپ)
+  //  ⛔ ممیزیِ ۳۵: NUL (`%00`) در مسیر (B4 ⇒ `bad_path`) یا پرسش (X2 ⇒ `bad_query`) ⇒ ۴۰۰ پیش از هر کار، نه ۵۰۰ ِ ۲۲۰۲۱؛ `%2500` NUL نیست؛ پرسشِ `RAW_SYNC` دست‌نخورده جز v3 ِ فقط‌دکان (SR40-2، `i`).
+  const { RAW_SYNC } = require('./middleware/json-body'), V3 = /^\/api(?:\/v1)?\/sync\/v3(?:\/|$)/i;
   app.use((req, res, next) => {
     const [p, ...q] = req.url.split('?');
-    const bad = /%00/.test(p) ? 'bad_path' : (/%00/.test(q.join('?')) && !RAW_SYNC.test(req.path) ? 'bad_query' : '');
+    const bad = /%00/.test(p) ? 'bad_path' : (/%00/.test(q.join('?')) && (!RAW_SYNC.test(req.path) || V3.test(req.path)) ? 'bad_query' : '');
     return bad ? res.status(400).json({ error: { code: bad, message: 'نشانیِ درخواست درست نیست' } }) : next();
   });
 
