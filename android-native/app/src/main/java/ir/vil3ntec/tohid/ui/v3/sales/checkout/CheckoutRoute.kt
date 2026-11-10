@@ -103,6 +103,10 @@ fun RouteScope.CheckoutRoute() {
     //  PAY-24: کارتِ هدیه و اعتبار در روش‌های پنل فقط با `GiftCardPref` ِ همین دستگاه (پیش‌فرض خاموش ⇒ همان روش‌ها)
     val giftOn = remember { GiftCardPref.on(context) }
     if (CheckoutSession.pay.stored != giftOn) CheckoutSession.pay.stored = giftOn
+    //  PAY-10: ارزِ نقد فقط با تنظیمِ روشنِ دکان (`FxTillPref`، پیش‌فرض خاموش ⇒ جدولِ خالی، بی کادرِ ارز و همان پنل)
+    val fxRates = remember { ir.vil3ntec.tohid.data.FxTillPref.tillRates(context) }
+    if (CheckoutSession.pay.fxRates != fxRates) CheckoutSession.pay.fxRates = fxRates
+    CheckoutSession.pay.clock = ir.vil3ntec.tohid.data.ReportBridge::nowMs
     //  PAY-09: پلهٔ گردکردنِ نقدیِ همین دستگاه (`CashRoundPref`، پیش‌فرض خاموش) — پنلِ ترکیبی یا نقدِ کاملِ ساده
     val cashStep = remember { CashRoundPref.step(context) }
     if (CheckoutSession.pay.cashRounding != cashStep) CheckoutSession.pay.cashRounding = cashStep

@@ -43,6 +43,7 @@
         { "id": "mp", "kind": "wallet", "name": "M-Paisa", "needsRef": true, "limit": 100000, "enabled": false } ] } },
     { "name": "شناسهٔ تکراری", "input": [{ "id": "cash", "kind": "cash", "name": "نقد" }, { "id": "cash", "kind": "wallet", "name": "x" }], "expect": { "ok": false, "error": "BAD_METHOD", "index": 1 } },
     { "name": "account رزرو است", "input": [{ "id": "cash", "kind": "cash", "name": "نقد" }, { "id": "account", "kind": "other", "name": "حساب" }], "expect": { "ok": false, "error": "BAD_METHOD", "index": 1 } },
+    { "name": "PAY-10: fx (ارزِ نقد) هم رزرو است", "input": [{ "id": "cash", "kind": "cash", "name": "نقد" }, { "id": "fx", "kind": "other", "name": "ارز" }], "expect": { "ok": false, "error": "BAD_METHOD", "index": 1 } },
     { "name": "نوعِ ناشناخته", "input": [{ "id": "cash", "kind": "cash", "name": "نقد" }, { "id": "btc", "kind": "crypto", "name": "BTC" }], "expect": { "ok": false, "error": "BAD_METHOD", "index": 1 } },
     { "name": "نامِ خالی", "input": [{ "id": "cash", "kind": "cash", "name": "  " }], "expect": { "ok": false, "error": "BAD_METHOD", "index": 0 } },
     { "name": "سقفِ صفر", "input": [{ "id": "cash", "kind": "cash", "name": "نقد" }, { "id": "w", "kind": "wallet", "name": "w", "limit": 0 }], "expect": { "ok": false, "error": "BAD_METHOD", "index": 1 } },
@@ -136,9 +137,9 @@
   ],
   "exchange": [
     { "name": "۱۰ دالر به نرخِ ۷۰٫۲۵", "input": { "from": { "currency": "USD", "amount": 1000 }, "to": "AFN", "rate": 7025, "source": "د افغانستان بانک", "at": 1760000000000, "approvedBy": " مدیر " },
-      "expect": { "ok": true, "record": { "from": { "currency": "USD", "amount": 1000 }, "to": { "currency": "AFN", "amount": 70300 }, "rate": 7025, "source": "د افغانستان بانک", "at": 1760000000000, "approvedBy": "مدیر" } } },
+      "expect": { "ok": true, "record": { "from": { "currency": "USD", "amount": 1000 }, "to": { "currency": "AFN", "amount": 70300 }, "rate": 7025, "per": 1, "source": "د افغانستان بانک", "at": 1760000000000, "approvedBy": "مدیر" } } },
     { "name": "۱۲٫۳۴ دالر، گرد به یک افغانی", "input": { "from": { "currency": "USD", "amount": 1234 }, "rate": 7025, "source": "سرای شهزاده", "at": 1760000000000, "approvedBy": "u1" },
-      "expect": { "ok": true, "record": { "from": { "currency": "USD", "amount": 1234 }, "to": { "currency": "AFN", "amount": 86700 }, "rate": 7025, "source": "سرای شهزاده", "at": 1760000000000, "approvedBy": "u1" } } },
+      "expect": { "ok": true, "record": { "from": { "currency": "USD", "amount": 1234 }, "to": { "currency": "AFN", "amount": 86700 }, "rate": 7025, "per": 1, "source": "سرای شهزاده", "at": 1760000000000, "approvedBy": "u1" } } },
     { "name": "هم‌ارز", "input": { "from": { "currency": "AFN", "amount": 1000 }, "to": "AFN", "rate": 100, "source": "x", "at": 1, "approvedBy": "u" }, "expect": { "ok": false, "error": "EXCHANGE_SAME_CURRENCY" } },
     { "name": "بی منبع", "input": { "from": { "currency": "USD", "amount": 1000 }, "rate": 7025, "source": " ", "at": 1, "approvedBy": "u" }, "expect": { "ok": false, "error": "EXCHANGE_FIELDS", "field": "source" } },
     { "name": "بی زمان", "input": { "from": { "currency": "USD", "amount": 1000 }, "rate": 7025, "source": "x", "approvedBy": "u" }, "expect": { "ok": false, "error": "EXCHANGE_FIELDS", "field": "at" } },
@@ -148,9 +149,20 @@
     { "name": "ارزِ ناشناخته", "input": { "from": { "currency": "EUR", "amount": 1000 }, "rate": 7025, "source": "x", "at": 1, "approvedBy": "u" }, "expect": { "ok": false, "error": "UNKNOWN_CURRENCY" } },
     {"name": "فاز: ارزِ «constructor» ناشناخته است (کلیدِ پروتوتایپ)", "input": {"from": {"currency": "constructor", "amount": 1000}, "rate": 7025, "source": "x", "at": 1, "approvedBy": "u"}, "expect": {"ok": false, "error": "UNKNOWN_CURRENCY"}},
     {"name": "فاز: مقصدِ خالی همان AFN (`||` ِ JS)", "input": {"from": {"currency": "AFN", "amount": 1000}, "to": "", "rate": 7025, "source": "x", "at": 1, "approvedBy": "u"}, "expect": {"ok": false, "error": "EXCHANGE_SAME_CURRENCY"}},
-    {"name": "فاز: تأییدکنندهٔ فقط BOM خالی است", "input": {"from": {"currency": "USD", "amount": 1000}, "rate": 7025, "source": "x", "at": 1, "approvedBy": "\ufeff"}, "expect": {"ok": false, "error": "EXCHANGE_FIELDS", "field": "approvedBy"}}
+    {"name": "فاز: تأییدکنندهٔ فقط BOM خالی است", "input": {"from": {"currency": "USD", "amount": 1000}, "rate": 7025, "source": "x", "at": 1, "approvedBy": "\ufeff"}, "expect": {"ok": false, "error": "EXCHANGE_FIELDS", "field": "approvedBy"}},
+    { "name": "PAY-10: ۱۰۰۰ کلدار به نرخِ ۲۴۶ افغانی برای هر ۱۰۰۰", "input": { "from": { "currency": "PKR", "amount": 100000 }, "rate": 24600, "per": 1000, "source": "سرای شهزاده", "at": 1760000000000, "approvedBy": "مدیر" },
+      "expect": { "ok": true, "record": { "from": { "currency": "PKR", "amount": 100000 }, "to": { "currency": "AFN", "amount": 24600 }, "rate": 24600, "per": 1000, "source": "سرای شهزاده", "at": 1760000000000, "approvedBy": "مدیر" } } },
+    { "name": "PAY-10: ۲۵۰ کلدار ⇐ ۶۱٫۵ افغانی، نیمه رو به بالا ۶۲", "input": { "from": { "currency": "PKR", "amount": 25000 }, "rate": 24600, "per": 1000, "source": "x", "at": 1, "approvedBy": "u" },
+      "expect": { "ok": true, "record": { "from": { "currency": "PKR", "amount": 25000 }, "to": { "currency": "AFN", "amount": 6200 }, "rate": 24600, "per": 1000, "source": "x", "at": 1, "approvedBy": "u" } } },
+    { "name": "PAY-10: ۷٬۵۰۰٬۰۰۰ ریال به نرخِ ۶۶ افغانی برای یک میلیون ⇐ ۴۹۵", "input": { "from": { "currency": "IRR", "amount": 7500000 }, "rate": 6600, "per": 1000000, "source": "x", "at": 1, "approvedBy": "u" },
+      "expect": { "ok": true, "record": { "from": { "currency": "IRR", "amount": 7500000 }, "to": { "currency": "AFN", "amount": 49500 }, "rate": 6600, "per": 1000000, "source": "x", "at": 1, "approvedBy": "u" } } },
+    { "name": "PAY-10: واحدِ نرخِ بیرون از فهرست", "input": { "from": { "currency": "PKR", "amount": 1000 }, "rate": 246, "per": 7, "source": "x", "at": 1, "approvedBy": "u" }, "expect": { "ok": false, "error": "INVALID_RATE" } },
+    { "name": "PAY-10: واحدِ نرخِ صفر", "input": { "from": { "currency": "PKR", "amount": 1000 }, "rate": 246, "per": 0, "source": "x", "at": 1, "approvedBy": "u" }, "expect": { "ok": false, "error": "INVALID_RATE" } }
   ],
   "refund": [
+    { "name": "PAY-10: سهمِ ارز به نقدِ افغانی پس داده می‌شود، نه به خودِ ارز", "input": { "payments": [{ "method": "fx", "amount": 50000, "status": "confirmed" }, { "method": "cash", "amount": 20000, "status": "confirmed" }], "amount": 60000, "mode": "original", "approvedBy": "m1" },
+      "expect": { "ok": true, "currency": "AFN", "amount": 60000, "approvedBy": "m1", "payouts": [{ "method": "cash", "kind": "cash", "amount": 60000 }],
+        "payments": [{ "method": "fx", "amount": 50000, "refunded": 40000, "status": "partially_refunded" }, { "method": "cash", "amount": 20000, "refunded": 20000, "status": "refunded" }] } },
     { "name": "به روشِ اصلی: اول نقد (آخرین روش)", "input": { "payments": [{ "method": "hesabpay", "amount": 100000, "status": "confirmed" }, { "method": "cash", "amount": 150000, "status": "confirmed" }], "amount": 50000, "mode": "original", "approvedBy": "m1" },
       "expect": { "ok": true, "currency": "AFN", "amount": 50000, "approvedBy": "m1", "payouts": [{ "method": "cash", "kind": "cash", "amount": 50000 }],
         "payments": [{ "method": "hesabpay", "amount": 100000, "refunded": 0, "status": "confirmed" }, { "method": "cash", "amount": 150000, "refunded": 50000, "status": "partially_refunded" }] } },
@@ -346,6 +358,18 @@
           "methods": { "cash": { "sales": 100000, "refunds": 0, "receipts": 0, "net": 100000 }, "hesabpay": { "sales": 145000, "refunds": 0, "receipts": 0, "net": 145000 } },
           "moves": { "in": 0, "out": 0 }, "expected": { "cash": 100000, "hesabpay": 145000 },
           "events": { "sales": 1, "refunds": 0, "receipts": 0, "cashIn": 0, "cashOut": 0, "noSale": 0 } } } }
+      ] },
+    { "name": "PAY-10 · ارز در شیفت: ردیفِ `fx` در روش‌ها هست ولی «مورد انتظار» ِ افغانی و شمارشِ روش نیست؛ پولِ پسِ افغانی خروجِ نقد است",
+      "steps": [
+        { "op": "open", "input": { "id": "fx1", "at": 0, "float": 100000 }, "expect": { "ok": true } },
+        { "op": "record", "input": { "id": "fx1-sale", "type": "sale", "at": 5, "rows": [{ "method": "fx", "amount": 50000 }] }, "expect": { "ok": true } },
+        { "op": "record", "input": { "id": "fx1-chg", "type": "cash_out", "at": 5, "amount": 20300, "reason": "other", "note": "پولِ پسِ ارز" }, "expect": { "ok": true } },
+        { "op": "x", "input": { "at": 10 }, "expect": { "ok": true, "report": {
+          "kind": "X", "shiftId": "fx1", "currency": "AFN", "at": 10, "by": null, "openedAt": 0, "openedBy": null, "float": 100000,
+          "methods": { "fx": { "sales": 50000, "refunds": 0, "receipts": 0, "net": 50000 } },
+          "moves": { "in": 0, "out": 20300 }, "expected": { "cash": 79700 },
+          "events": { "sales": 1, "refunds": 0, "receipts": 0, "cashIn": 0, "cashOut": 1, "noSale": 0 } } } },
+        { "op": "close", "input": { "id": "fx1-z", "at": 11, "counts": { "1000": 1 }, "methodCounts": { "fx": 50000 } }, "expect": { "ok": false, "error": "UNKNOWN_METHOD", "method": "fx" } }
       ] },
     { "name": "S12 · شمارشِ کور با کسریِ ۱۰ افغانی: دلیل اختیاری، اختلاف برای مدیر می‌ماند",
       "steps": [

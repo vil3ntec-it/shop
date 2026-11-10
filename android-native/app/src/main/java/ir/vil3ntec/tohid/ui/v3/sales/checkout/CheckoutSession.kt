@@ -48,6 +48,7 @@ object CheckoutSession {
     form = null
     pay.cash = ""
     pay.rows.clear()
+    pay.fxAmount = ""
     approval = null
     capSlips = emptyMap()
     capPending = false

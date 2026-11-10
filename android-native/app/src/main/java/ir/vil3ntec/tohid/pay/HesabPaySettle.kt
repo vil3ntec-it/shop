@@ -97,7 +97,13 @@ object HesabPaySettle {
       if (a != null && !a.isNaN() && a > 0) tenders += Tender(r.method, PayFlow.minor(a), ref = r.ref.trim().ifEmpty { null })
     }
     tenders += Tender(METHOD, confirmed.amount, ref = confirmed.ref)
-    val settled = when (val s = Pay.settle(SettleInput(total = PayFlow.minor(total), tenders = tenders, customerId = base.customerId?.trim()?.ifEmpty { null }))) {
+    //  PAY-10: ارزِ نقدِ همان پنل (رکوردِ همان لحظه)؛ بی ارز ⇒ خالی و همان تسویهٔ امروز
+    val fx: List<ir.vil3ntec.tohid.core.pay.ExchangeRecord> = when (val r = ir.vil3ntec.tohid.data.FxTillFlow.record(base.fx)) {
+      null -> emptyList()
+      is PayResult.Ok -> listOf(r.value)
+      is PayResult.Err -> return bad(r.code)
+    }
+    val settled = when (val s = Pay.settle(SettleInput(total = PayFlow.minor(total), tenders = tenders, customerId = base.customerId?.trim()?.ifEmpty { null }, fx = fx))) {
       is PayResult.Ok -> s.value
       is PayResult.Err -> return bad(s.code)
     }

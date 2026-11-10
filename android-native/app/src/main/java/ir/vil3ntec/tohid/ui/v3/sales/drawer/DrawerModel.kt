@@ -87,6 +87,17 @@ object DrawerModel {
     }
   }
 
+  /**
+   *  PAY-10 — X/Z: ارزِ نقدِ دریافتیِ بازه به تفکیکِ ارز (`FxTillFlow.totals`) — همان اسکناسی که جدا از افغانی شمرده
+   *  می‌شود؛ ارزشِ افغانی به نرخِ هر فاکتور. شاگرد (شمارشِ کور) فقط شمار را می‌بیند. بی ارز ⇒ هیچ خط.
+   */
+  fun fxLines(d: ShopData, from: Long, to: Long, seesMoney: Boolean): List<String> =
+    ir.vil3ntec.tohid.data.FxTillFlow.totals(d, from, to).map { t ->
+      if (seesMoney) ir.vil3ntec.tohid.core.i18n.StrFx.xzLine(
+        t.currency, ir.vil3ntec.tohid.core.pay.FxTill.format(t.amount, t.currency), PhoneSaleText.amount(PayFlow.major(t.afnMinor)), t.count,
+      ) else ir.vil3ntec.tohid.core.i18n.StrFx.xzCount(t.currency, t.count)
+    }
+
   fun diff(counted: Double?, expected: Double): DrawerDiff? {
     counted ?: return null
     val d = counted - expected

@@ -34,6 +34,14 @@ class PrinterDrawerTest {
     assertTrue(DrawerRule.opensAfter(DrawerRule.Sale("cash", payments = listOf(cash(100_00)))))
   }
 
+  @Test fun `ارز نقد PAY-10 کشو را باز می‌کند - اسکناس ارز در دخل و پول پس افغانی`() {
+    //  `PayFlow.legacyMethod` ارزِ نقد را برای خوانندهٔ کهنه `cash` می‌نویسد؛ ردیفِ `fx` خودش هم نقدِ دخل است
+    assertTrue(DrawerRule.opensAfter(DrawerRule.Sale("cash", payments = listOf(DrawerRule.Payment("fx", 500_00)))))
+    assertTrue(DrawerRule.opensAfter(DrawerRule.Sale("mixed", payments = listOf(DrawerRule.Payment("fx", 500_00), card(100_00)))))
+    assertFalse(DrawerRule.opensAfter(DrawerRule.Sale("cash", payments = listOf(DrawerRule.Payment("fx", 0)))))
+    assertTrue(DrawerRule.legacy(DrawerRule.Sale("cash", payments = listOf(DrawerRule.Payment("fx", 500_00)))))
+  }
+
   @Test fun `کارت، حواله، کیف پول و نسیه خالص کشو را باز نمی‌کنند`() {
     assertFalse(DrawerRule.opensAfter(DrawerRule.Sale("card", payments = listOf(card(100_00)))))
     assertFalse(DrawerRule.opensAfter(DrawerRule.Sale("transfer", payments = listOf(DrawerRule.Payment("transfer", 100_00)))))

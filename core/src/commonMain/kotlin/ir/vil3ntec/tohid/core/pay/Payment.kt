@@ -54,8 +54,8 @@ class MethodTable internal constructor(val methods: List<PayMethod>) {
 
   operator fun get(id: String): PayMethod? = byId[id]
 
-  /** نوعِ روش؛ `account` رزرو است (باقی‌ماندهٔ پرداختِ جزئی) */
-  fun kindOf(id: String): String? = if (id == Pay.ACCOUNT) Pay.ACCOUNT else byId[id]?.kind
+  /** نوعِ روش؛ `account` (باقی‌ماندهٔ پرداختِ جزئی) و `fx` (ارزِ نقدِ تبادل‌شده، PAY-10) رزروند */
+  fun kindOf(id: String): String? = if (id == Pay.ACCOUNT || id == Pay.FX) id else byId[id]?.kind
 }
 
 data class Tender(val method: String, val amount: Long, val currency: String? = null, val ref: String? = null)
@@ -68,6 +68,8 @@ data class SettleInput(
   val cashRounding: Long = 0,
   val customerId: String? = null,
   val methods: List<PayMethod>? = null,
+  /** PAY-10 — ارزِ نقدِ دیگر، فقط رکوردِ [Pay.exchange] (هر رکورد یک ردیفِ `fx`)؛ خالی ⇒ همان تسویهٔ امروز */
+  val fx: List<ExchangeRecord> = emptyList(),
 )
 
 data class PaymentRow(
@@ -80,6 +82,8 @@ data class PaymentRow(
   val verification: String?,
   /** حساب‌پیِ دکان: اثرِ انگشتِ حسابِ گیرنده (سرور: `hesabpay-guard`) ⇐ گزارشِ «پول به کدام حساب رفت»؛ بقیه null */
   val payee: String? = null,
+  /** PAY-10 — فقط ردیفِ `fx`: رکوردِ تبادلِ ثابت‌شده (مبلغ و ارزِ اصلی، نرخ، منبع، زمان، تأییدکننده)؛ `amount` سهمِ افغانیِ همین فاکتور */
+  val fx: ExchangeRecord? = null,
 )
 
 data class Settlement(
@@ -102,11 +106,13 @@ data class ExchangeInput(
   val fromCurrency: String,
   val fromAmount: Long,
   val to: String = "AFN",
-  /** چند واحدِ کوچکِ ارزِ مقصد برای یک واحدِ اصلیِ مبدأ (۷۰٫۲۵ افغانی ⇐ 7025) */
+  /** چند واحدِ کوچکِ ارزِ مقصد برای [per] واحدِ اصلیِ مبدأ (۷۰٫۲۵ افغانی ⇐ 7025) */
   val rate: Long,
   val source: String?,
   val at: Long?,
   val approvedBy: String?,
+  /** نرخ برای چند واحدِ مبدأ (یکی از [Pay.FX_PER]: ۱۰۰۰ کلدار، یک میلیون ریال)؛ ۱ ⇒ همان رفتارِ پیشین */
+  val per: Long = 1,
 )
 
 data class ExchangeRecord(
@@ -118,6 +124,7 @@ data class ExchangeRecord(
   val source: String,
   val at: Long,
   val approvedBy: String,
+  val per: Long = 1,
 )
 
 /** ردیفِ پرداختِ یک فاکتور، از نگاهِ بازپرداخت */
@@ -147,6 +154,10 @@ internal fun posExact(v: Long): Boolean = v in 1..MAX_EXACT
 object Pay {
   const val ACCOUNT = "account"
   const val CASH = "cash"
+  /** PAY-10 — روش و نوعِ رزروِ ارزِ نقدِ تبادل‌شده (مثلِ `account` بیرون از جدولِ دکان؛ شمردنیِ افغانی نیست) */
+  const val FX = "fx"
+  /** واحدهای مجازِ نرخ: نرخ برای ۱، ۱۰، … تا یک میلیون واحدِ ارز */
+  val FX_PER: List<Long> = listOf(1, 10, 100, 1_000, 10_000, 100_000, 1_000_000)
   const val STORE_CREDIT = "store_credit"
   val KINDS = listOf("cash", "wallet", "card", "transfer", "store_credit", "gift_card", "other")
   internal val COUNTABLE = setOf("cash", "wallet", "card", "transfer", "other")
@@ -195,7 +206,7 @@ object Pay {
       val id = JsText.trim(x.id)
       val name = JsText.trim(x.name)
       val limit = x.limit
-      if (id.isEmpty() || id == ACCOUNT || id in seen || x.kind !in KINDS || name.isEmpty() ||
+      if (id.isEmpty() || id == ACCOUNT || id == FX || id in seen || x.kind !in KINDS || name.isEmpty() ||
         (limit != null && !posExact(limit))
       ) return PayResult.Err("BAD_METHOD", index = i)
       seen += id
@@ -228,6 +239,8 @@ object Pay {
   private class Analysis(
     val currency: String, val t: MethodTable, val total: Long, val cash: Long, val nonCash: Long, val rounded: Long,
     val rounding: Long, val change: Long, val kept: Long, val remaining: Long, val rows: List<PaymentRow?>,
+    /** PAY-10: جمعِ افغانیِ رکوردهای ارز، نقدِ افغانیِ ماندهٔ فاکتور پس از ارز، و ردیف‌های `fx` */
+    val fxTotal: Long = 0, val afnKept: Long = kept, val fxRows: List<PaymentRow> = emptyList(),
   )
 
   private fun analyse(input: SettleInput): PayResult<Analysis> {
@@ -257,17 +270,38 @@ object Pay {
         rows += PaymentRow(m.id, m.kind, x.amount, ref.ifEmpty { null }, "pending", "manual")
       }
     }
+    // PAY-10: ارزِ دیگر فقط رکوردِ همین `exchange`؛ بازسازی و برابر ⇐ رکوردِ دست‌خورده یا ناقص رد می‌شود
+    var fxTotal = 0L
+    input.fx.forEachIndexed { j, r ->
+      val again = try {
+        exchange(ExchangeInput(r.fromCurrency, r.fromAmount, r.toCurrency, r.rate, r.source, r.at, r.approvedBy, per = r.per))
+      } catch (e: ArithmeticException) { null }
+      if (again !is PayResult.Ok || again.value != r || r.toAmount <= 0) return PayResult.Err("FX_INVALID", index = j, field = "fx")
+      if (r.toCurrency != cur.code) return PayResult.Err("CURRENCY_MISMATCH", index = j, field = "fx")
+      fxTotal = addExact(fxTotal, r.toAmount)
+    }
     // پولِ پس فقط از نقد: بیش‌پرداختِ کیف پول یا کارت پس داده نمی‌شود
     if (nonCash > input.total) return PayResult.Err("NON_CASH_OVERPAY")
 
     val cashDue = input.total - nonCash
     val rounded = if (step > 0) mulExact(Rounding.roundHalfUp(cashDue, step), step) else cashDue
+    // نقدِ افغانی و ارزِ نقد یک «نقد» اند؛ پولِ پس همیشه افغانیِ نقد (بی ارز: همان `cash` ِ امروز)
+    val pool = addExact(cash, fxTotal)
     // گردکردنِ نقدی فقط وقتی نقد فاکتور را می‌بندد؛ هرگز بیش از مبلغِ دقیق نمی‌خواهد
-    val rounding = if (cash > 0 && step > 0 && cash >= rounded) rounded - cashDue else 0L
+    val rounding = if (pool > 0 && step > 0 && pool >= rounded) rounded - cashDue else 0L
     val due = addExact(cashDue, rounding)
-    val change = if (cash >= due) cash - due else 0L
-    val kept = cash - change
-    return PayResult.Ok(Analysis(cur.code, t, input.total, cash, nonCash, rounded, rounding, change, kept, due - kept, rows))
+    val change = if (pool >= due) pool - due else 0L
+    val kept = pool - change
+    // ارز اول به فاکتور می‌نشیند؛ ارزی که هیچ سهمی نمی‌گیرد لازم نبود (صندوق صرافی نیست)
+    var left = kept
+    val fxRows = ArrayList<PaymentRow>()
+    input.fx.forEachIndexed { j, r ->
+      val take = minOf(r.toAmount, left)
+      if (take <= 0) return PayResult.Err("FX_EXCESS", index = j, field = "fx")
+      left -= take
+      fxRows += PaymentRow(FX, FX, take, null, "confirmed", null, fx = r)
+    }
+    return PayResult.Ok(Analysis(cur.code, t, input.total, cash, nonCash, rounded, rounding, change, kept, due - kept, rows, fxTotal, left, fxRows))
   }
 
   fun settle(input: SettleInput): PayResult<Settlement> {
@@ -277,8 +311,9 @@ object Pay {
     val payments = ArrayList<PaymentRow>()
     a.rows.forEach { r ->
       if (r != null) payments += r
-      else if (a.kept > 0) payments += PaymentRow(a.t.cashId, CASH, a.kept, null, "confirmed", null)
+      else if (a.afnKept > 0) payments += PaymentRow(a.t.cashId, CASH, a.afnKept, null, "confirmed", null)
     }
+    payments += a.fxRows
     if (toAccount > 0) payments += PaymentRow(ACCOUNT, ACCOUNT, toAccount, null, "confirmed", null)
     return PayResult.Ok(
       Settlement(
@@ -291,7 +326,7 @@ object Pay {
         total = a.total,
         rounding = a.rounding,
         due = addExact(a.total, a.rounding),
-        tendered = addExact(a.cash, a.nonCash),
+        tendered = addExact(addExact(a.cash, a.nonCash), a.fxTotal),
         change = a.change,
         remaining = a.remaining,
         toAccount = toAccount,
@@ -302,12 +337,15 @@ object Pay {
 
   /** PAY-04 — نقدی که با آن فاکتور دقیق بسته می‌شود (با گردکردن، اگر روشن باشد) */
   fun exactCash(input: SettleInput): PayResult<Long> = when (val r = analyse(input)) {
-    is PayResult.Ok -> PayResult.Ok(if (r.value.remaining == 0L) 0L else r.value.rounded - r.value.cash)
+    is PayResult.Ok -> PayResult.Ok(if (r.value.remaining == 0L) 0L else r.value.rounded - r.value.cash - r.value.fxTotal)
     is PayResult.Err -> r
   }
 
   // ── تبادلِ ارز (PAY-10) ─────────────────────────────────
-  /** مبلغِ مقصد به پلهٔ ارزِ مقصد گرد و در خودِ رکورد ثابت می‌شود؛ نرخِ بعدی آن را عوض نمی‌کند. */
+  /**
+   *  مبلغِ مقصد به پلهٔ ارزِ مقصد گرد (نیمه رو به بالا) و در خودِ رکورد ثابت می‌شود؛ نرخِ بعدی آن را عوض نمی‌کند.
+   *  مقصد = round(مبلغِ مبدأ × نرخ ÷ (واحدِ مبدأ × [ExchangeInput.per] × پلهٔ مقصد)) × پلهٔ مقصد.
+   */
   fun exchange(op: ExchangeInput): PayResult<ExchangeRecord> {
     val src: Currency
     val dst: Currency
@@ -316,17 +354,17 @@ object Pay {
     }
     if (src == dst) return PayResult.Err("EXCHANGE_SAME_CURRENCY")
     if (!posExact(op.fromAmount)) return PayResult.Err("INVALID_AMOUNT")
-    if (!posExact(op.rate)) return PayResult.Err("INVALID_RATE")
+    if (!posExact(op.rate) || op.per !in FX_PER) return PayResult.Err("INVALID_RATE")
     val source = op.source?.let(JsText::trim).orEmpty()
     val approver = op.approvedBy?.let(JsText::trim).orEmpty()
     if (source.isEmpty()) return PayResult.Err("EXCHANGE_FIELDS", field = "source")
     if (op.at == null || !posExact(op.at)) return PayResult.Err("EXCHANGE_FIELDS", field = "at")
     if (approver.isEmpty()) return PayResult.Err("EXCHANGE_FIELDS", field = "approvedBy")
     val amount = mulExact(
-      Rounding.roundHalfUp(mulExact(op.fromAmount, op.rate), mulExact(src.minorPerMajor, dst.stepMinor)),
+      Rounding.roundHalfUp(mulExact(op.fromAmount, op.rate), mulExact(mulExact(src.minorPerMajor, op.per), dst.stepMinor)),
       dst.stepMinor,
     )
-    return PayResult.Ok(ExchangeRecord(src.code, op.fromAmount, dst.code, amount, op.rate, source, op.at, approver))
+    return PayResult.Ok(ExchangeRecord(src.code, op.fromAmount, dst.code, amount, op.rate, source, op.at, approver, op.per))
   }
 
   // ── بازپرداخت (PAY-23) ──────────────────────────────────
@@ -376,7 +414,8 @@ object Pay {
         pay(ACCOUNT, debt)
         pay(fallback, take - debt) // بدهیِ تسویه‌شده: پولش جدا آمده، پس نقد یا اعتبار
       } else {
-        pay(if (mode == "original") pays[idx].method else fallback, take)
+        // PAY-10: سهمِ ارز به افغانی پس داده می‌شود (نقد یا اعتبار)، نه اسکناسِ ارز
+        pay(if (mode == "original" && pays[idx].method != FX) pays[idx].method else fallback, take)
       }
     }
     return PayResult.Ok(

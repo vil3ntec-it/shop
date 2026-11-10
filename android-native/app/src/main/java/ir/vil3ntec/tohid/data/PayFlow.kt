@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrFx
 import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.pay.CloseShiftInput
 import ir.vil3ntec.tohid.core.pay.EventCounts
@@ -75,6 +76,7 @@ object PayFlow {
   // ── روش‌ها ────────────────────────────────────────────────
   fun method(id: String): PayMethod? =
     if (id == ACCOUNT) PayMethod(ACCOUNT, ACCOUNT, "به حسابِ مشتری") else Pay.DEFAULT_METHODS.firstOrNull { it.id == id }  // داده: نامِ روش هم‌شکلِ `Pay.DEFAULT_METHODS` ِ هسته (یادداشتِ سابقه)
+      ?: if (id == Pay.FX) PayMethod(Pay.FX, Pay.FX, "ارز") else null  // داده: PAY-10 — روشِ رزروِ ارزِ نقد، هم‌شکلِ `KIND_LABELS`
 
   fun methodName(id: String): String = method(id)?.name ?: id
 
@@ -112,6 +114,12 @@ object PayFlow {
       "SHIFT_OPEN_ALREADY" -> StrLedger.tillAlreadyOpen
       "INVALID_TIME" -> StrLedger.clockBehind
       "BAD_DENOMINATION", "INVALID_COUNT" -> StrLedger.notesCountBad
+      //  PAY-10: ارزِ نقد (کادرِ ارز، `FxTillFlow`)
+      "FX_NO_RATE" -> StrFx.noRate
+      "FX_STALE" -> StrFx.stale
+      "FX_EXCESS" -> StrFx.excess
+      "FX_INVALID", "CURRENCY_MISMATCH" -> StrFx.invalid
+      "INVALID_AMOUNT" -> if (p.method == Pay.FX) StrFx.amountBad else StrLedger.amountInvalid
       //  PAY-24: کارتِ هدیه و اعتبارِ فروشگاه (فقط با تنظیم)
       "BAD_CODE", "UNKNOWN_CARD", "CARD_VOID", "INSUFFICIENT_BALANCE", "NO_CUSTOMER", "INSUFFICIENT_CREDIT" -> GiftCards.message(p.code)
       else -> StrLedger.amountInvalid
@@ -133,6 +141,8 @@ object PayFlow {
     val stored: Boolean = false,
     /** PAY-09 — پلهٔ گردکردنِ نقدی به پول (`CashRoundPref`)؛ ۰ ⇒ همان امروز. هسته فقط سهمِ نقد را گرد می‌کند */
     val cashRounding: Long = 0,
+    /** PAY-10 — کادرِ ارزِ نقد (`FxTillPref`، پیش‌فرض خاموش)؛ `null` یا مبلغِ خالی ⇒ همان تسویهٔ امروز */
+    val fx: FxTillFlow.Tender? = null,
   )
 
   sealed interface Outcome<out T> {
@@ -171,7 +181,13 @@ object PayFlow {
     }
     val methods = if (d.stored) StoredPay.methods(true) else null
     val total = minor(d.total)
-    return Outcome.Ok(Built(SettleInput(total = total, tenders = tenders, cashRounding = TillRounding.stepFor(total, d.cashRounding), customerId = d.customerId?.trim()?.ifEmpty { null }, methods = methods), at))
+    //  PAY-10: ارزِ نقد ⇒ رکوردِ تبادلِ همین لحظه با نرخِ دکان (کهنه ⇒ رد)؛ هسته از نو می‌سازد و برابر می‌سنجد
+    val fx: List<ir.vil3ntec.tohid.core.pay.ExchangeRecord> = when (val r = FxTillFlow.record(d.fx)) {
+      null -> emptyList()
+      is PayResult.Ok -> listOf(r.value)
+      is PayResult.Err -> return Outcome.Bad(Problem(r.code, method = Pay.FX))
+    }
+    return Outcome.Ok(Built(SettleInput(total = total, tenders = tenders, cashRounding = TillRounding.stepFor(total, d.cashRounding), customerId = d.customerId?.trim()?.ifEmpty { null }, methods = methods, fx = fx), at))
   }
 
   /** پیش‌نمایشِ زنده: همان `settle`ِ هسته؛ خطا با شمارهٔ ردیف و روش */
@@ -181,6 +197,8 @@ object PayFlow {
       //  PAY-24: ردیفِ کارت/اعتبار «تأییدشده با دفتر» است (`StoredPay.confirm`)؛ تسویهٔ بی آن همان شیء
       is PayResult.Ok -> Outcome.Ok(StoredPay.confirm(s.value))
       is PayResult.Err -> {
+        //  PAY-10: خطای رکوردِ ارز شمارهٔ ردیفِ ارز دارد، نه ردیفِ پنل
+        if (s.field == "fx") return Outcome.Bad(Problem(s.code, method = Pay.FX))
         val i = s.index?.takeIf { it >= 0 }?.let { b.at[it] } ?: -1
         Outcome.Bad(Problem(s.code, i, if (i >= 0) d.rows[i].method else null))
       }
@@ -222,7 +240,8 @@ object PayFlow {
    */
   fun legacyMethod(s: Settlement): String {
     if (s.toAccount > 0) return "credit"
-    val kinds = s.payments.filter { it.kind != ACCOUNT && it.amount > 0 }.map { it.kind }.toSet()
+    //  PAY-10: ارزِ نقد برای خوانندهٔ کهنه نقد است (کشو، فیلترِ «نقدی»، نوعِ رسید)؛ ریزش در `payments`
+    val kinds = s.payments.filter { it.kind != ACCOUNT && it.amount > 0 }.map { if (it.kind == Pay.FX) CASH else it.kind }.toSet()
     return when {
       kinds.isEmpty() || kinds == setOf(Pay.CASH) -> CASH
       kinds.size == 1 -> kinds.single()
@@ -235,7 +254,7 @@ object PayFlow {
     paidAmount = major(s.due - s.toAccount), // PAY-09: `due` = جمع + ردیفِ گرد؛ بی گرد همان `total`
     remaining = major(s.toAccount),
     debtGiven = major(s.toAccount),
-    payments = s.payments.map { SalePayment(it.method, it.kind, it.amount, it.status, it.ref, it.verification, payee = it.payee) },
+    payments = s.payments.map { SalePayment(it.method, it.kind, it.amount, it.status, it.ref, it.verification, payee = it.payee, fx = it.fx?.let(FxTillFlow::saleFx)) },
     tenderedMinor = s.tendered,
     changeMinor = s.change,
   )
@@ -255,6 +274,7 @@ object PayFlow {
     //  «به حساب» همان نسیه است (واژهٔ دکان)؛ «به حسابِ مشتری» فقط متنِ ردیفِ رسید/جزئیات ([receiptLines])
     CASH to "نقد", "credit" to "نسیه", ACCOUNT to "نسیه", "card" to "کارت", "transfer" to "حواله",  // داده: برچسبِ روشِ پرداخت — هم‌شکلِ `ReportTables`/`report-core.js` و ستونِ خروجی (منتظرِ تصمیمِ صاحب‌کار)
     "wallet" to "کیف پول", "store_credit" to "اعتبار فروشگاه", "gift_card" to "کارت هدیه", "other" to "سایر", MIXED to "ترکیبی",  // داده: برچسبِ روشِ پرداخت — هم‌شکلِ `ReportTables`/`report-core.js` و ستونِ خروجی (منتظرِ تصمیمِ صاحب‌کار)
+    Pay.FX to "ارز",  // داده: PAY-10 — ردیفِ ارزِ نقد (ریزِ ارز و نرخ کنارش، `FxTillFlow.detail`)
     //  فاکتورِ W ِ سفارشِ اینترنتی (#321): روشِ سفارش، نه نوعِ ردیف
     ONLINE to "پرداختِ آنلاین", COD to "نقد هنگامِ تحویل",  // داده: برچسبِ روشِ پرداخت — هم‌شکلِ `ReportTables`/`report-core.js` و ستونِ خروجی (منتظرِ تصمیمِ صاحب‌کار)
   )
@@ -284,7 +304,7 @@ object PayFlow {
     }
     return when {
       ACCOUNT in k -> "credit"
-      k == setOf(CASH) -> CASH
+      k.all { it == CASH || it == Pay.FX } -> CASH // PAY-10: ارزِ نقد هم نقد است
       else -> NON_CASH
     }
   }
@@ -337,7 +357,9 @@ object PayFlow {
     return buildList {
       list.filter { it.amountMinor > 0 }.forEach { p ->
         //  PAY-24: کدِ کارتِ هدیه خودش پول است ⇒ روی رسید فقط چهار نویسهٔ آخر
-        add(name(rowName(p)) + pendingNote(p) + (p.ref?.let { " — " + if (p.kind == StoredPay.GIFT) GiftCards.mask(it) else it } ?: "") to major(p.amountMinor))
+        //  PAY-10: ردیفِ ارز مبلغِ اصلیِ ارز و نرخِ همان لحظه را کنارش دارد (مبلغِ ردیف سهمِ افغانیِ فاکتور است)
+        add(name(rowName(p)) + pendingNote(p) + (p.fx?.let { " — " + FxTillFlow.detail(it) } ?: "") +
+          (p.ref?.let { " — " + if (p.kind == StoredPay.GIFT) GiftCards.mask(it) else it } ?: "") to major(p.amountMinor))
       }
       s.tenderedMinor?.takeIf { it > 0 }?.let { add(StrLedger.tendered to major(it)) }
       s.changeMinor?.takeIf { it > 0 }?.let { add(StrLedger.change to major(it)) }
@@ -346,6 +368,9 @@ object PayFlow {
 
   // ── صندوق (PAY-11..15، 19) ───────────────────────────────
   private val AUDIT_TYPES = setOf("cash_in", "cash_out", "no_sale")
+
+  /** PAY-10 — یادداشتِ خروجِ نقدِ «پولِ پسِ ارز» در شیفت */
+  private const val FX_CHANGE_NOTE = "پولِ پسِ ارز"  // داده: دلیلِ رویدادِ شیفت درونِ گزارشِ Z ِ ذخیره‌شده
 
   /**
    *  ردیف‌های فروشِ یک فاکتور: `payments` اگر هست، وگرنه همان حسابِ امروز. با [fixes] (POS-40، `PayFixFlow.bySale`)
@@ -398,6 +423,10 @@ object PayFlow {
       if (s.status == "cancelled" || s.id in online || !counts(s.shiftId, s.createdAt)) return@forEach
       val rows = PayStatusFlow.received(saleRows(s, fixes[s.id].orEmpty(), to), PayStatusFlow.unreceived(s, statuses[s.id].orEmpty(), to))
       if (rows.isNotEmpty()) ev += 0 to ShiftEventInput(id = "sale:${s.id}", type = "sale", at = s.createdAt, rows = rows)
+      //  PAY-10: پولِ پسِ افغانیِ ارز از همین دخل رفت ⇒ خروجِ نقد درست پس از همان فروش (ارز «مورد انتظار» ِ افغانی نیست)
+      FxTillFlow.changeOut(s).takeIf { it > 0 }?.let {
+        ev += 0 to ShiftEventInput(id = "sale:${s.id}:fx", type = "cash_out", at = s.createdAt, amount = it, reason = "other", note = FX_CHANGE_NOTE)
+      }
     }
     d.transactions.forEach { t ->
       //  رسیدِ ساختهٔ لغو (فقط بستنِ بدهی) پولِ دخل نیست — همان `CashShift.isCashReceipt`

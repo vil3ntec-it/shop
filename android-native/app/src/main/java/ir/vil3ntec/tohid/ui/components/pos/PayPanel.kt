@@ -105,10 +105,21 @@ class PayPanelState {
   var stored by mutableStateOf(false)
   /** PAY-09 — پلهٔ گردکردنِ نقدی به پول (`CashRoundPref`)؛ ۰ (پیش‌فرض) ⇒ همان پنلِ امروز */
   var cashRounding by mutableStateOf(0L)
+  /** PAY-10 — جدولِ نرخِ دکان، فقط با تنظیمِ روشن (`FxTillPref.tillRates`)؛ خالی (پیش‌فرض) ⇒ بی کادرِ ارز، همان پنلِ امروز */
+  var fxRates by mutableStateOf<List<ir.vil3ntec.tohid.core.pay.FxRate>>(emptyList())
+  var fxCurrency by mutableStateOf("")
+  var fxAmount by mutableStateOf("")
+  /** «اکنون» ِ صفحه برای کهنگیِ نرخ (`CheckoutRoute`)؛ حالت نیست تا هر کشیدن دوباره نکشد */
+  var clock: () -> Long = { 0L }
 
   fun methods(): List<PayMethod> = PayFlow.panelMethods(stored)
 
-  fun draft(total: Double, customerId: String?) = PayFlow.Draft(total, cash, rows.toList(), customerId, stored, cashRounding)
+  /** کادرِ ارزِ همین لحظه؛ بی جدول ⇒ `null` */
+  fun fxTender(): ir.vil3ntec.tohid.data.FxTillFlow.Tender? = fxRates.takeIf { it.isNotEmpty() }?.let { r ->
+    ir.vil3ntec.tohid.data.FxTillFlow.Tender(r, fxCurrency.takeIf { c -> r.any { it.currency == c } } ?: r.first().currency, fxAmount, clock())
+  }
+
+  fun draft(total: Double, customerId: String?) = PayFlow.Draft(total, cash, rows.toList(), customerId, stored, cashRounding, fxTender())
 
   fun addRow(): Int {
     rows += PayFlow.DraftRow(methods().firstOrNull()?.id.orEmpty())
