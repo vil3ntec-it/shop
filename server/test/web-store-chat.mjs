@@ -308,6 +308,9 @@ qp = await qOpen();
 ok(await until(async () => (await countFrom(conv1.id, 'پیامِ ماندگار')) === 1, 20000), 'گشودنِ دوبارهٔ گفت‌وگو ⇒ پیامِ ماندهٔ صف رفت');
 ok(Number((await one('SELECT COUNT(*)::int AS n FROM shop_chat_messages WHERE client_id=$1', [keptId])).n) === 1, 'همان clientId، یک پیام روی سرور');
 await qp.waitForFunction(() => /پیامِ ماندگار/.test(document.getElementById('ct-list').textContent), null, { timeout: 15000 });
+//  درخواستِ برگهٔ بسته‌شده گاه پیش از بازفرستِ همین برگه به سرور می‌رسد ⇒ فهرست پیام را نشان می‌دهد و بازفرستِ همان
+//  clientId هنوز در راه است (POST ِ ۲۰۰ ِ پس از این سنجه در لاگِ #1028). پایانِ صف را صبر کن، نه نخستین دیدنِ پیام.
+await until(async () => (await stored(qp)) === null && await queued('پیامِ ماندگار', qp) === '', 15000);
 ok(await bubbles('پیامِ ماندگار', qp) === 1 && await queued('پیامِ ماندگار', qp) === '' && (await stored(qp)) === null &&
   await countFrom(conv1.id, 'پیامِ لغوشدنی') === 0, 'رسید: یک حباب، صفِ تهی؛ پیامِ لغوشده هرگز نرفت');
 
