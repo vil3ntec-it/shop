@@ -41,6 +41,17 @@
         el('input', { attrs: { id: f[0], type: 'text', maxlength: String(f[2]) } })));
     });
     function extra(id) { return $(id) ? $(id).value.trim() : ''; }
+    //  CHK-08 (همان پرچم): پین از پیوند یا مختصاتِ برنامهٔ نقشه — برای کسی که برای جای دیگری سفارش می‌دهد یا مرورگرش موقعیت
+    //  ندارد. خواندنِ نوشته در `store/pin-text.js` ِ دیربار (همزادِ `PinText` ِ برنامهٔ خرید، بی شبکه)؛ پین همان راهِ «موقعیتِ
+    //  من» را می‌رود (`setPin` ⇒ `GET /delivery`) و ناحیه را فقط سرور می‌گوید
+    var pinTextP = null;
+    if (c.store.addressExtra && K.has('pin.paste.l') && !$('pin-paste')) {
+      var pinRow = $('pin-btn').parentNode;
+      pinRow.parentNode.insertBefore(el('div', { class: 'pin-row' },
+        el('label', { class: 'field' }, el('span', { text: t('pin.paste.l'), attrs: { 'data-t': 'pin.paste.l' } }),
+          el('input', { attrs: { id: 'pin-paste', type: 'text', class: 'ltr', inputmode: 'url', autocomplete: 'off', maxlength: '2000', placeholder: '34.5281, 69.1723' } })),
+        el('button', { class: 'btn btn-soft btn-sm', text: t('pin.paste.use'), attrs: { id: 'pin-use', type: 'button', 'data-t': 'pin.paste.use' } })), pinRow.nextSibling);
+    }
 
     // ── MKT-01/09 و CHK-04: تخفیف (پرچمِ `shop.storefront.promos`؛ ‏`GET /promos` ِ ۴۰۴ ⇒ خاموش، همان فرمِ امروز) ──
     //  حساب فقط از سرور (`/promos/quote` = همان حسابِ ثبت)؛ تخفیفِ دیده‌شده در `expectedTotalMinor` می‌رود و
@@ -357,6 +368,16 @@
       $('pin-btn').textContent = p ? t('pin.again') : t('pin.btn');
       if (p) locate(); else renderCheckout();
     }
+    function pastePin() {
+      var raw = $('pin-paste').value;
+      if (!raw.trim()) { $('pin-paste').focus(); return; }
+      pinTextP = pinTextP || K.js('/store/pin-text.js').then(function () { return window.StorePinText; }, function (e) { pinTextP = null; throw e; });
+      pinTextP.then(function (P) {
+        var p = P.parse(raw);
+        if (!p) { $('pin-text').textContent = t('pin.paste.bad'); return; }
+        setPin(p, t('pin.paste.ok', { c: K.fa(p.lat, 5) + ', ' + K.fa(p.lng, 5) }));
+      }, function () { $('pin-text').textContent = t('pin.paste.bad'); });
+    }
     function takePin() {
       if (!navigator.geolocation) { $('pin-text').textContent = t('pin.none'); return; }
       $('pin-text').textContent = t('pin.wait');
@@ -523,6 +544,11 @@
     $('verify-check').addEventListener('click', checkCode);
     $('v-code').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); checkCode(); } });
     $('pin-btn').addEventListener('click', takePin);
+    if ($('pin-use')) {
+      $('pin-use').addEventListener('click', pastePin);
+      //  Enter در کادر برگه را نفرستد
+      $('pin-paste').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); pastePin(); } });
+    }
     $('checkout-form').addEventListener('submit', submitOrder);
     $('zone-pick').addEventListener('change', function () {
       var id = $('zone-pick').value;

@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.core.shopper
 
 import ir.vil3ntec.tohid.core.text.LocaleFormat
 import kotlin.math.abs
+import kotlin.math.floor
 import kotlin.math.round
 import kotlinx.serialization.Serializable
 
@@ -52,8 +53,15 @@ object AddressRules {
   const val TEXT_MAX = 300
   const val LANDMARK_MAX = 200
 
-  /** شش رقمِ اعشار (~۱۰ سانتی‌متر)، همان گردِ `coord` ِ سرور */
-  fun round6(v: Double): Double = round(v * 1e6) / 1e6
+  /**
+   *  شش رقمِ اعشار (~۱۰ سانتی‌متر)، همان گردِ `coord` ِ سرور: `Math.round` ِ JS، نیمه رو به بالا. `kotlin.math.round` نیمه را
+   *  زوج می‌کرد (34.5000005 ⇒ 34.5، سرور 34.500001). بردارِ `core/test-vectors/delivery-zone-v1.json` (`round6`).
+   */
+  fun round6(v: Double): Double {
+    val x = v * 1e6
+    val f = floor(x)
+    return (if (x - f >= 0.5) f + 1 else f) / 1e6
+  }
 
   fun validPin(lat: Double, lng: Double): Boolean =
     lat.isFinite() && lng.isFinite() && lat in -90.0..90.0 && lng in -180.0..180.0 &&

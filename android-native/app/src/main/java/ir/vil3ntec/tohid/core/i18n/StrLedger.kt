@@ -66,6 +66,12 @@ object StrLedger {
     "The Plus Code isn't valid (for example V75V+8Q)",
     "Plus Code سم نه دی (لکه V75V+8Q)",
   )
+  /** CRM-09 — پینِ نشانیِ تحویل */
+  val addressPinBad: String get() = t(
+    "از این متن پین پیدا نشد؛ مختصات (مثلاً 34.5281, 69.1723) یا پیوندِ کاملِ برنامهٔ نقشه را بچسبانید",
+    "No pin found in this text; paste coordinates (for example 34.5281, 69.1723) or the full link from a maps app",
+    "له دې متن څخه پن ونه موندل شو؛ مختصات (لکه 34.5281, 69.1723) یا د نقشې له اپ څخه بشپړ لینک کېږدئ",
+  )
   val postalDigitsOnly: String get() = t("کدِ پستی فقط رقم است", "The postal code is digits only", "پوستي کوډ یوازې عددونه دي")
   val consentSourceNeeded: String get() = t(
     "برای «بله» منبعِ رضایت را بنویسید (مثلاً «حضوری» یا «تلفنی»)",

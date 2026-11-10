@@ -95,6 +95,7 @@ data class StorefrontZoneDto(
     radiusKm = radiusM?.let { (it / 1000.0).toString().removeSuffix(".0") } ?: "2",
     polygon = StorefrontDelivery.formatPolygon(polygon.filter { it.size == 2 }.map { StorefrontDelivery.LatLng(it[0], it[1]) }),
     active = active,
+    savedPolygon = StorefrontDelivery.formatPolygon(polygon.filter { it.size == 2 }.map { StorefrontDelivery.LatLng(it[0], it[1]) }),
   )
 }
 

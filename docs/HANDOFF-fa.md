@@ -54,6 +54,19 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/chk-addr` (CHK-08، CHK-10 و پینِ CRM-09؛ روی main ‏cceb5930 (#1027)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: CHK-10 — سرور تنها داور با یک خانه برای «کجا؟»، ثبت و «خبرم کن» (`storefront-delivery.pinCell`: گردِ شش‌رقمیِ `orders.coord` سپس
+  شبکه؛ پیش‌تر پینِ رقمِ هفتمِ کنارِ خطِ شبکه پیش از ثبت «بیرون» و در ثبت «درون» بود)؛ لبه و رأسِ چندضلعی درون؛ پاپیون (دو نقطهٔ جابه‌جا) ⇒ ۴۰۰ `bad_zone` با
+  شمارهٔ نقطه‌ها (`crossing`، BigInt)، چندضلعیِ ذخیره‌شدهٔ پیشین بی تغییر می‌گذرد؛ همان سنجش کنارِ کادرِ برنامه (`StorefrontDelivery.crossing` + `savedPolygon`)؛
+  بردارِ `core/test-vectors/delivery-zone-v1.json` (فاصله و خانه با پایتونِ جدا). CHK-08 — وب: «پین از برنامهٔ نقشه» پشتِ `shop.storefront.address_extra`
+  (`store/pin-text.js` ِ دیربار، همزادِ `PinText` با `pin-text-v1.json`)؛ `AddressRules.round6` ِ هسته نیمه را زوج می‌کرد ⇒ همان `Math.round` ِ سرور.
+  CRM-09 — پینِ قرض‌دار: فیلدِ **جدای** `Debtor.deliveryPin` (نه درونِ `DeliveryAddress`: RULES ِ همان بند)، برگهٔ ویرایش، سطرِ پرونده، ادغام، خروجیِ صاحب، و
+  فیلدِ تماس در `lib/customer-contact.js`. `Models.kt` با یک‌خطی کردنِ حاشیه‌نویسیِ `cardCode` زیرِ سقفِ ۹۲۵ ماند.
+- نیمه‌کاره: آزمون‌های Kotlin (`StorefrontDeliveryVectorsTest`، `AddressRoundVectorsTest`، `PinTextVectorsTest`، چهار آزمونِ تازهٔ
+  `CustomerDeliveryAddressTest`) فقط در CI؛ محلی فقط با kotlinc ِ درونِ Gradle (بی دانلود، با جانشینِ JUnit) سبز و روی main سرخ — جز `CustomerDeliveryAddressTest`
+  که بی افزونهٔ serialization محلی ساخته نمی‌شود. `routes/data.js` (ثبتِ «چه کسی پرونده را دید») `deliveryPin` را در `full` نمی‌شمارد — بیرون از دامنهٔ این شاخه.
+- قدمِ بعدی: CI ِ PR را ببینید (Kotlin)؛ تصمیمِ صاحب‌کار: نقشه روی صفحه، کدِ پستیِ اختیاری (LOC-10)، Plus Code ِ کوتاه بی پین برای «داخلِ محدوده»، و
+  مرزِ دقتِ موقعیتِ مرورگر (پینِ ±چند کیلومتریِ کامپیوتر امروز پذیرفته است).
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/sec-review-43` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۳، ادغامِ `reserve-off`، `syn-12`، `posted-docs` و `app-gaps-4` روی `ccr-…-batch-42`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: دو یافتهٔ Low در نگهبانِ S89 (`lib/finalized-sales.js`، پرچمِ خاموشِ `shop.doc_chain`)، هر دو با آزمونِ سرخ‌پیش‌از‌رفع
   (`server/test/security-review-43.test.js`، ۳ آزمون، PGlite و PostgreSQL): SR43-1 ادغامِ «خیالی» (op ِ ردشده/تکراری/کهنه) قرض یا فاکتورِ نسیهٔ ثبت‌شده را

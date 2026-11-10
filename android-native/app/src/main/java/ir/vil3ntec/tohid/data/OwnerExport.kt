@@ -120,6 +120,7 @@ object OwnerExport {
     "cardCode" to "کارت مشتری",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  نشانیِ تحویلِ مشتری (CRM-09) — همان `license/owner-export.js`
     "deliveryAddress" to "نشانی تحویل",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "deliveryPin" to "پین تحویل",  // داده: CRM-09، همان `license/owner-export.js`
     "specialPrices" to "قیمت‌های خاص مشتری",  // داده: POS-18، همان `license/owner-export.js`
     "notes" to "یادداشت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "createdAt" to "زمان ثبت (UTC)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)

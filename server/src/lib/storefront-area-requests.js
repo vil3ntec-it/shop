@@ -48,7 +48,7 @@ function pinOf(body) {
     || typeof lng !== 'number' || !Number.isFinite(lng) || lng < -180 || lng > 180) {
     throw badRequest('مختصاتِ پین معتبر نیست', 'bad_address');
   }
-  return sfd.snapPin(lat, lng);
+  return sfd.pinCell(lat, lng);   //  همان خانهٔ «کجا؟» و ثبت (گردِ شش‌رقمی، سپس شبکه)
 }
 
 const activeZones = async (shopId, run) => (await sfd.zonesOf(shopId, run)).filter((z) => z.active);
