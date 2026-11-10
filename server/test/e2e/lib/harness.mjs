@@ -191,12 +191,22 @@ class Harness {
     return { email, name, password, token: d.accessToken, refreshToken: d.refreshToken, user: d.user };
   }
 
-  /** صاحبِ دکان: ثبت‌نام + ساختنِ دکان (+ پرچم‌های `E2E_FLAGS_ON`، مگر `flagsOn: false` برای دکانِ شاهدِ خاموش) */
-  async owner(email, name, shopName, { flagsOn = true } = {}) {
+  /**
+   * صاحبِ دکان: ثبت‌نام + ساختنِ دکان (+ پرچم‌های `E2E_FLAGS_ON`، مگر `flagsOn: false` برای دکانِ شاهدِ خاموش).
+   * `subscribe: false` ⇒ بی اشتراکِ «همه روشن» (پایین): سناریوی خودِ اشتراک (آزمایشیِ تمام‌شده، دادن و تمدید) دکانِ آزمایشی می‌خواهد.
+   */
+  async owner(email, name, shopName, { flagsOn = true, subscribe = true } = {}) {
     const a = await this.register(email, name);
     const r = this.ok(await this.post('/api/shop', { name: shopName }, a.token), `ساختنِ دکانِ ${shopName}`);
     a.shopId = r.shop.id;
     if (flagsOn) for (const k of this.flagsOn) await this.flag(a.shopId, k, true);
+    //  `shop.orders.subscribers_only` (SUB-10): سفارشِ تازهٔ مشتری فقط برای دکانِ مشترک ⇒ «همه روشن» یعنی دکانی که صاحب‌کار
+    //  پس از روشن کردنش واقعاً سفارش می‌گیرد: اشتراکِ فعال، همان `web-store-allflags.mjs`. بی آن هر ثبتِ سفارش ۴۰۳ بود و هر
+    //  پرچمِ پس از سفارش (پیک، جمع‌آوری، پیگیری) اصلاً سنجیده نمی‌شد. خودِ دروازه را `orders-subscribers-only.test.js` می‌سنجد.
+    if (flagsOn && subscribe && this.flagsOn.includes('shop.orders.subscribers_only')) {
+      this.ok(await this.post('/api/admin/subscriptions', { shopId: a.shopId, plan: 'pro', days: 30, reason: 'E2E_FLAGS_ON' },
+        await this.adminToken(), { 'Idempotency-Key': `e2e-sub-${a.shopId}` }), `اشتراکِ ${shopName}`);
+    }
     return a;
   }
 

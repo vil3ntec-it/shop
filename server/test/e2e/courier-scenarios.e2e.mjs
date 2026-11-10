@@ -242,13 +242,16 @@ await E.step('S99', 'اختلافِ نقد: پیک کمتر می‌گیرد ⇐ 
 await E.step('S57', 'COD و تسویهٔ پیک: پیک بیشتر هم می‌گیرد (با توضیح)؛ تسویه با کسری و دلیل؛ نقدِ پیک صفر؛ هیچ جمعی دو بار شمرده نمی‌شود', async () => {
   o.s57 = await placeOrder(1, 'پشتِ بانک');
   await prepare(o.s57.id);
-  o.s57.asg = E.ok(await assign(o.s57.id, c1), 'سپردن', 201).assignment.id;
+  const s57 = E.ok(await assign(o.s57.id, c1), 'سپردن', 201);
+  o.s57.asg = s57.assignment.id;
+  //  `code`: با `shop.delivery_code_rule` (DLV-08، مثلاً `E2E_FLAGS_ON`) سپردنِ نقد کدِ مشتری می‌خواهد؛ پیک همان کد را از مشتری می‌گیرد
+  const code = s57.code ? { code: s57.code } : {};
   const due = RICE_MINOR + FEE_MINOR;
   await applied(K1, ['assigned', 'picked_up'].map((t) => ev(K1, o.s57.asg, t)));
   const more = due + 1000;
-  const noNote = await send(K1, [ev(K1, o.s57.asg, 'delivered', { cashCollectedMinor: more, cashReason: 'other' })]);
+  const noNote = await send(K1, [ev(K1, o.s57.asg, 'delivered', { cashCollectedMinor: more, cashReason: 'other', ...code })]);
   assert.equal(noNote[0].code, 'note_required');
-  await applied(K1, [ev(K1, o.s57.asg, 'delivered', { cashCollectedMinor: more, cashReason: 'other', note: 'مشتری پولِ خُرد نداشت؛ ۱۰ افغانی بیشتر داد' })]);
+  await applied(K1, [ev(K1, o.s57.asg, 'delivered', { cashCollectedMinor: more, cashReason: 'other', note: 'مشتری پولِ خُرد نداشت؛ ۱۰ افغانی بیشتر داد', ...code })]);
   const pv = E.ok(await A.api('GET', `/shop/delivery/couriers/${c1}/settlement-preview`), 'پیش‌نمایش');
   const ids = [o.s98.asg, o.s99.asg, o.s57.asg];
   assert.deepEqual(pv.rows.map((x) => x.assignmentId).sort(), [...ids].sort());

@@ -32,6 +32,8 @@ const { one, query, many, newId, now } = require('../src/db');
 const acc = require('../src/lib/hesabpay-account');
 const pay = require('../src/lib/payment-intents');
 const push = require('../src/lib/push');
+const tokens = require('../src/lib/tokens');
+const guard = require('../src/lib/hesabpay-guard');
 
 const PIN = '258014';
 const NAME = 'دکانِ آزمون';
@@ -427,7 +429,24 @@ test('دکانِ دیگر: حال، نما و کلیدِ «الف» را نمی�
   await setPin(b);
   const ob = await h.post(`${URL}/open`, { pin: PIN, shopId: a.shopId }, { token: b.t });
   assert.equal(ob.body.mode, 'off');
-  assert.ok(!JSON.stringify(ob.body).includes('9999'));
+  /*
+   *  «ب» هیچ نشانی از «الف» نمی‌بیند: نه چهار رقمِ آخرِ کلید («9999»)، نه کلید و راز، نه نشانیِ وب‌هوک و شناسهٔ «الف».
+   *  ⛔ لرزان بود (~۰٫۰۶٪): «9999» در کلِ متن به `device.trustedAfter` ِ خودِ «ب» (زمانِ ms ِ نشست + ۷ روز) هم می‌خورد.
+   *  تنها عددِ زمانیِ پاسخ اول با مقدارِ دقیقش (session_at ِ توکنِ «ب» + TRUST_MS) سنجیده و بعد از متن برداشته می‌شود؛
+   *  بقیهٔ متن مثلِ پیش و سخت‌تر سنجیده می‌شود. بازتولید: ساعتی که «اکنون + ۷ روز» را در 17999… بگذارد.
+   */
+  assert.deepEqual([ob.body.lockedUntil, ob.body.holdUntil, ob.body.sectionLockedUntil], [null, null, null]);
+  //  جاهایی که کلید/حسابِ دکان در نما می‌نشیند برای «ب» تهی‌اند
+  assert.deepEqual([ob.body.auto, ob.body.payee, ob.body.pending, ob.body.account, ob.body.qrPayload], [null, null, null, '', '']);
+  const sessB = await one('SELECT session_at FROM tokens WHERE token_hash=$1', [tokens.hashToken(b.t)]);
+  assert.equal(ob.body.device.trustedAfter, Number(sessB.session_at) + guard.TRUST_MS, 'زمانِ نشستِ خودِ «ب»');
+  const rowA = await one('SELECT key_last4, webhook_token FROM shop_hesabpay WHERE shop_id=$1', [a.shopId]);
+  assert.equal(rowA.key_last4, '9999');
+  assert.match(rowA.webhook_token, /^[\w-]{32}$/);
+  const viewB = JSON.stringify({ ...ob.body, device: { ...ob.body.device, trustedAfter: '<B>' } });
+  for (const leak of [rowA.key_last4, 'KEY-ISO-A', 'whsec-ISO-A', rowA.webhook_token, a.shopId]) {
+    assert.ok(!viewB.includes(leak), `بی ${leak}: ${viewB}`);
+  }
   assert.equal((await createPos(b)).body.error.code, 'hesabpay_disabled', '«ب» با کلیدِ «الف» قصد نمی‌سازد');
   assert.deepEqual(await one('SELECT * FROM shop_hesabpay WHERE shop_id=$1', [a.shopId]), before);
 });

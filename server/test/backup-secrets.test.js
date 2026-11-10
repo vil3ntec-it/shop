@@ -51,6 +51,8 @@ const LICENSE_KID = crypto.createHash('sha256').update(Buffer.from(SPKI, 'base64
 const PLANTED = {
   license_private_key: PEM,
   vapid_private: `${MARK}-vapid`,
+  //  کلیدِ خصوصیِ پوشِ وب ِ ویترین (`lib/store-push.js`، مهاجرتِ ۴۷۰) — جدا از کلیدِ پوشِ پمپ
+  store_vapid_private: `${MARK}-store-vapid`,
   email_pass: `${MARK}-smtp-pass`,
   email_key: `${MARK}-mail-api`,
   sms_key: `${MARK}-sms\\key\twith-escapes`,

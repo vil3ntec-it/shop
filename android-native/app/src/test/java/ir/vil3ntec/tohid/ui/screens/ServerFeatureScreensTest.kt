@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
 import ir.vil3ntec.tohid.core.crm.CustomerErasure
+import ir.vil3ntec.tohid.core.i18n.StrErasure
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.orders.LateApology
@@ -18,6 +19,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -369,6 +371,22 @@ class ServerFeatureScreensTest {
     assertFalse(CustomerErasure.usable("12"))
     assertTrue(CustomerErasure.usable("0700123456"))
     assertFalse(CustomerErasure.confirmOk("", "0700123456"))
+  }
+
+  @Test
+  fun `کلیدهای شمارش همان کلیدهای سرورند به همان ترتیب و هر کدام نام دارند`() {
+    val server = File(listOf("../../server/src/lib/customer-erasure.js", "../server/src/lib/customer-erasure.js", "server/src/lib/customer-erasure.js")
+      .first { File(it).isFile }).readText()
+    val block = Regex("""const COUNT_KEYS = Object\.freeze\(\[([^\]]*)\]\)""").find(server)!!.groupValues[1]
+    val keys = Regex("""'(\w+)'""").findAll(block).map { it.groupValues[1] }.toList()
+    assertTrue("کلیدهای سرور خوانده شدند: $keys", keys.size >= 20)
+    assertEquals("همان کلیدهای سرور، به همان ترتیب", keys, CustomerErasure.COUNT_KEYS)
+    for (k in CustomerErasure.COUNT_KEYS) assertNotEquals("$k نامِ خودش را دارد", k, StrErasure.label(k))
+    //  کلیدهای «فهرستِ خرید»، پوشِ سفارش و پوشِ «خبرم کن» در خلاصهٔ پاسخ می‌آیند (پیش‌تر دور ریخته می‌شدند)
+    val r = CustomerErasure.result(json("""{"dryRun":true,"mode":"phone","openOrders":0,
+      "counts":{"lists":1,"pushSubs":2,"alertPushSubs":3,"unknownKey":9},"total":6,"kept":[]}"""))!!
+    assertEquals(listOf("lists" to 1, "pushSubs" to 2, "alertPushSubs" to 3), r.counts)
+    assertEquals(3, erasureCountLines(r).size)
   }
 
   // ═════════════════════════════ سیم‌کشی ═════════════════════════════

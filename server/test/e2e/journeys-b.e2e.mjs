@@ -293,11 +293,14 @@ await E.step('JB4', 'سفارشِ اینترنتی: ویترین ⇐ قبول �
   for (const [to, from, x] of [['accepted', 'new', { readyInMinutes: 15 }], ['picking', 'accepted'], ['packed', 'picking']]) {
     E.ok(await A.api('POST', `/shop/orders/${id}/transition`, { to, from, ...(x || {}) }), `${from} ⇐ ${to}`);
   }
-  const asg = E.ok(await A.api('POST', `/shop/delivery/orders/${id}/assign`, { mode: 'shop_courier', courierId: cid, fareMinor: 5000 }, { headers: { 'Idempotency-Key': E.key('asg') } }), 'سپردن به پیک', 201).assignment.id;
+  const given = E.ok(await A.api('POST', `/shop/delivery/orders/${id}/assign`, { mode: 'shop_courier', courierId: cid, fareMinor: 5000 }, { headers: { 'Idempotency-Key': E.key('asg') } }), 'سپردن به پیک', 201);
+  const asg = given.assignment.id;
+  //  `code`: با `shop.delivery_code_rule` (DLV-08، مثلاً `E2E_FLAGS_ON`) سپردنِ نقد کدِ مشتری می‌خواهد؛ پیک همان کد را از مشتری می‌گیرد
+  const code = given.code ? { code: given.code } : {};
   const due = 3 * 15000 + 4000;
   let n = 0;
   const ev = (type, extra = {}) => ({ eventId: `${K.deviceId}-j-${++n}`, assignmentId: asg, type, deviceTime: Date.now() - 60_000 + n * 1000, deviceSeq: n, ...extra });
-  const res = E.ok(await K.api('POST', '/courier/events', { deviceId: K.deviceId, events: [ev('assigned'), ev('picked_up'), ev('moving'), ev('arrived'), ev('delivered', { cashCollectedMinor: due })] }), 'صفِ پیک').results;
+  const res = E.ok(await K.api('POST', '/courier/events', { deviceId: K.deviceId, events: [ev('assigned'), ev('picked_up'), ev('moving'), ev('arrived'), ev('delivered', { cashCollectedMinor: due, ...code })] }), 'صفِ پیک').results;
   assert.ok(res.every((x) => x.status === 'applied'), JSON.stringify(res));
   assert.equal((await db.one('SELECT status FROM online_orders WHERE id=$1', [id])).status, 'delivered');
 

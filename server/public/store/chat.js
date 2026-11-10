@@ -117,7 +117,8 @@
       loop++;
       $('ct-verify').hidden = false; $('ct-body').hidden = true; $('ct-form').hidden = true;
       $('ct-issue').hidden = true; $('ct-new').hidden = true; $('ct-state').hidden = true;
-      setTimeout(function () { $('ct-phone').focus(); }, 80);
+      //  ⛔ تمرکزِ دیر کادری را که مشتری همین حالا در فرم در آن است نمی‌رباید (پیش‌تر کدِ در حالِ نوشتن به کادرِ شماره می‌رفت ⇒ ۴۰۰)
+      setTimeout(function () { if (!$('ct-verify').contains(document.activeElement)) $('ct-phone').focus(); }, 80);
     }
     function sendCode() {
       var b = $('ct-vsend'); b.disabled = true;
@@ -472,7 +473,9 @@
     function poll(my, first) {
       if (my !== loop || K.sheetOpen() !== sheet || !conv) return;
       var id = conv.id;
-      api(path(id, '/messages?after=' + cursor + '&wait=' + (first ? 0 : WAIT))).then(function (r) {
+      //  CHAT-04: رسیدهای دانسته (`pd`/`pr`) ⇒ رسیدِ دکان که میانِ دو پرسش نشست همان دم می‌رسد، نه پس از مهلت (`chat-wait.js`)
+      var rc = conv.receipts || {};
+      api(path(id, '/messages?after=' + cursor + '&wait=' + (first ? 0 : WAIT) + '&pd=' + (Number(rc.peerDeliveredSeq) || 0) + '&pr=' + (Number(rc.peerReadSeq) || 0))).then(function (r) {
         if (my !== loop || !conv || conv.id !== id) return;
         if (r.conversation) { conv = r.conversation; state(); }
         cursor = r.cursor;

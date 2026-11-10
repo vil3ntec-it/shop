@@ -11,7 +11,7 @@
  * نبودِ پلی‌رایت قرمز است، نه «رد» (F0-17)؛ ردِ آگاهانه فقط با SKIP_BROWSER_TESTS=1.
  */
 import { createRequire } from 'node:module';
-import { missingTool, PLAYWRIGHT_INSTALL, SKIP } from './browser-guard.mjs';
+import { animationsSettled, missingTool, PLAYWRIGHT_INSTALL, SKIP } from './browser-guard.mjs';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import http from 'node:http';
@@ -241,13 +241,16 @@ await step('دسترس‌پذیری (axe): حساب با جزئیات، رسید
     }, sel);
     await pg.evaluate(() => goTo('debtors'));
     await pg.waitForTimeout(900);
+    await animationsSettled(pg, '#page-debtors');
     (await run('#page-debtors')).forEach((v) => bad.push(`${scheme} جدول — ${v}`));
     await pg.evaluate(() => openAccount('c1'));
     await pg.waitForTimeout(900);
+    await animationsSettled(pg, '#page-debtor-account');
     (await run('#page-debtor-account')).forEach((v) => bad.push(`${scheme} حساب — ${v}`));
     await pg.locator('[data-open-receipt="t1"]').click();
     await pg.waitForSelector('#modal-debt-receipt.open');
     await pg.waitForTimeout(500);
+    await animationsSettled(pg, '#modal-debt-receipt');
     (await run('#modal-debt-receipt')).forEach((v) => bad.push(`${scheme} رسید — ${v}`));
     await pg.close();
   }

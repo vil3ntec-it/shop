@@ -112,11 +112,14 @@ function compare(before, after, { critical = CRITICAL } = {}) {
 
 /* ── HTTP ───────────────────────────────────────────────────────────── */
 
+//  ⛔ هر درخواست اتصالِ تازه (`Connection: close`): پس از کارِ همگامِ بلند (fingerprint، مهاجرت روی PGlite زیرِ بار)
+//  fetch درخواستِ بعدی را روی سوکتِ keep-alive ِ بیکاری می‌نوشت که مهلتِ ۵ ثانیه‌ایِ سرور همان دم می‌بستش ⇒ ECONNRESET و
+//  «fetch failed» در دودآزمایی. خطای واقعیِ سرور (۵xx، افتادن، بستنِ میانِ پاسخ) همان‌طور خطاست؛ فقط استفادهٔ دوباره نیست.
 async function http(base, method, path, { token, body, headers = {} } = {}) {
   const res = await fetch(`${base}${path}`, {
     method,
     headers: {
-      'Content-Type': 'application/json', 'X-App': 'shop',
+      'Content-Type': 'application/json', 'X-App': 'shop', Connection: 'close',
       ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers,
     },
     body: body === undefined ? undefined : JSON.stringify(body),

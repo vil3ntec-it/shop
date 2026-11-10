@@ -14,7 +14,7 @@
 const express = require('express');
 const config = require('../config');
 const chat = require('../lib/shop-chat');
-const { goneSignal } = require('../lib/chat-wait');
+const { goneSignal, knownOf } = require('../lib/chat-wait');
 const { can } = require('../lib/permissions');
 const contact = require('../lib/customer-contact');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
@@ -92,7 +92,7 @@ router.put('/conversations/:id/status', on, reply, async (req, res) => {
 
 router.get('/conversations/:id/messages', on, async (req, res) => {
   const out = await chat.changes(viewerOf(req), req.params.id, {
-    after: req.query.after, limit: req.query.limit, wait: req.query.wait, signal: goneSignal(res),
+    after: req.query.after, limit: req.query.limit, wait: req.query.wait, signal: goneSignal(res), known: knownOf(req.query),
   });
   if (out) res.json(out); //  null ⇒ کلاینت وسطِ long-poll رفت
 });

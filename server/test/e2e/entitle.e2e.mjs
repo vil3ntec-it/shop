@@ -20,7 +20,8 @@ const require = createRequire(import.meta.url);
 const E = await boot({ name: 'entitle' });
 const { db } = E;
 const DAY = 86_400_000;
-const owner = await E.owner('owner-ent@e2e.local', 'صاحبِ اشتراک', 'دکانِ اشتراک');
+//  `subscribe: false`: این سناریو خودش آزمایشیِ تمام‌شده و دادنِ اشتراک را می‌سنجد (نه اشتراکِ «همه روشن» ِ `harness.mjs`)
+const owner = await E.owner('owner-ent@e2e.local', 'صاحبِ اشتراک', 'دکانِ اشتراک', { subscribe: false });
 const staff = await E.staff(owner, 'staff-ent@e2e.local', 'شاگردِ اشتراک');
 //  «یک ماه بعد»: آزمایشیِ دکان (از created_at ِ خودش) تمام شده است
 await db.query('UPDATE shops SET created_at=$1 WHERE id=$2', [Date.now() - 30 * DAY, owner.shopId]);

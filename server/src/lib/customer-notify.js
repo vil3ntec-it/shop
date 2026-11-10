@@ -29,9 +29,10 @@
  *   • بی دادهٔ حساس (§۳۰.۱ بندِ ۴): متن فقط نامِ ویترین، شمارهٔ سفارش و وضعیت — نه نام، شماره،
  *     نشانی، اقلام یا مبلغ. لینکِ پیگیری (همان توکنِ HMAC ِ صفحهٔ «سفارشِ من») فقط اگر
  *     `STORE_PUBLIC_URL` داده شده باشد. شماره فقط به خودِ سرویس‌دهنده می‌رسد، هرگز به لاگ.
- *   • ⛔ هیچ پیامِ واقعی: امروز هیچ سرویس‌دهنده‌ای وصل نیست (D-09: بودجه و حساب بیرونی‌اند) ⇒
- *     حالِ صادقانهٔ `no_channel`. پیامکِ کدِ ورود (`lib/otp`) این‌جا به کار نمی‌رود. رابط
- *     `setProviders` است؛ امروز فقط آزمون آن را با سرویس‌دهندهٔ جعلی می‌نشاند.
+ *   • ⛔ واتس‌اپ، تلگرام و پیامک: هیچ سرویس‌دهنده‌ای وصل نیست (D-09: بودجه و حساب بیرونی‌اند) ⇒ حالِ صادقانهٔ
+ *     `no_channel`. پیامکِ کدِ ورود (`lib/otp`) این‌جا به کار نمی‌رود. رابط `setProviders` است؛ امروز فقط آزمون
+ *     آن را با سرویس‌دهندهٔ جعلی می‌نشاند. تنها کانالِ بی حسابِ بیرونی پوشِ وب ِ مشتریِ ویترین است (`builtin`،
+ *     `lib/store-push.js`، پرچمِ خاموشِ `shop.storefront.web_push`، مهاجرتِ ۴۷۰).
  */
 const crypto = require('crypto');
 const { query, one, many, now } = require('../db');
@@ -273,8 +274,41 @@ function setProviders(map) {
 /** سرویس‌دهندهٔ نشانده‌شدهٔ همین کانال — یا null (خبرِ «موجود/ارزان شد» ِ `storefront-alerts` همان زنجیره را می‌خواند) */
 const providerOf = (channel) => providers[channel] || null;
 
+/**
+ * کانالِ بی حسابِ بیرونی که خودِ سرور دارد: `push` = پوشِ وب ِ مشتریِ ویترین (`lib/store-push.js`، §۳.۱۲ «پوشِ PWA»)،
+ * فقط برای دکانِ با پرچمِ `shop.storefront.web_push`؛ خاموش ⇒ null (همان `not_configured` ِ پیشین). سرویس‌دهندهٔ
+ * نشانده‌شده (`setProviders`) همیشه جلوتر است.
+ */
+async function builtin(channel, shopId) {
+  if (channel !== 'push') return null;
+  const sp = require('./store-push');
+  return (await sp.ownFlagOn(shopId)) ? sp.provider : null;
+}
+
 function channelState() {
   return Object.fromEntries(CHANNELS.map((ch) => [ch, providers[ch] ? 'configured' : 'not_configured']));
+}
+
+/**
+ * مشتری همین حالا کانالِ تازه‌ای برای این سفارش روشن کرد (پوشِ وب ِ صفحهٔ پیگیری): آخرین پیامِ همان سفارش اگر نرفته بود
+ * (`no_channel`) و هنوز به کار می‌آید (`MAX_AGE_MS`)، یک بار دیگر و **فقط** از همان کانال (`only_channel`). ⛔ فقط
+ * کانالِ رایگان (کارِ مشتری هرگز پیامِ پولی برنمی‌انگیزد)؛ سقفِ هر مشتری و یکتاییِ ردیف همان؛ ردیفِ رفته، در صف یا
+ * کنارزده دست نمی‌خورد. ⇒ شناسهٔ ردیف یا null.
+ */
+async function catchUp(shopId, orderId, channel, at = now()) {
+  if (channel !== 'push' || cost.costMicros(channel, '-') > 0) return null;
+  const last = await one(
+    `SELECT id, status, created_at FROM customer_notify_outbox WHERE shop_id=$1 AND order_id=$2
+      ORDER BY created_at DESC, id DESC LIMIT 1`, [shopId, orderId]
+  );
+  if (!last || last.status !== 'no_channel' || at - Number(last.created_at) > MAX_AGE_MS) return null;
+  const r = await query(
+    `UPDATE customer_notify_outbox SET status='pending', next_attempt_at=$2, only_channel=$3, updated_at=$2
+      WHERE id=$1 AND status='no_channel' RETURNING id`, [last.id, at, channel]
+  );
+  if (!r.rows[0]) return null;
+  soon();
+  return r.rows[0].id;
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -417,8 +451,11 @@ async function processRow(row, at) {
   };
 
   const tried = [];
-  for (const channel of MATRIX[row.event] || (EXTRA[row.event] && EXTRA[row.event].channels) || []) {
-    const p = providers[channel];
+  //  `only_channel` (مهاجرتِ ۴۷۰): فرستادنِ دوباره‌ای که خودِ مشتری برانگیخت (`catchUp`) فقط از همان کانالِ رایگان
+  const chain = (MATRIX[row.event] || (EXTRA[row.event] && EXTRA[row.event].channels) || [])
+    .filter((ch) => !row.only_channel || ch === row.only_channel);
+  for (const channel of chain) {
+    const p = providers[channel] || await builtin(channel, row.shop_id);
     if (!p) { tried.push({ channel, result: 'not_configured' }); continue; }
     //  NTF-02: پیامک با لینک (اگر هست) شمرده می‌شود — بخشِ بیشتر، نه کمتر
     const sized = msg.link ? `${msg.text} ${msg.link}` : msg.text;
@@ -520,10 +557,12 @@ async function forOrder(shopId, orderId) {
   const rows = await many(
     'SELECT * FROM customer_notify_outbox WHERE shop_id=$1 AND order_id=$2 ORDER BY created_at, id', [shopId, id]
   );
+  const channels = channelState();
+  if (channels.push !== 'configured' && await builtin('push', shopId)) channels.push = 'configured';
   return {
     enabled: await flagOf(shopId),
     eligible: order.source === 'storefront',
-    channels: channelState(),
+    channels,
     items: rows.map(shape),
   };
 }
@@ -531,5 +570,5 @@ async function forOrder(shopId, orderId) {
 module.exports = {
   FLAG_KEY, CHANNELS, LANGS, EVENT_OF, MATRIX, EVENTS, TEMPLATES, MAX_ATTEMPTS, PER_HOUR, PER_DAY, MAX_AGE_MS,
   EXTRA, onExtraIn, flagOf, onStatusIn, onCreatedIn, setProviders, channelState, render, linkFor, phoneKey,
-  tick, start, stop, soon, forOrder, shape, providerOf, callProvider, spentToday, cleanName,
+  tick, start, stop, soon, forOrder, shape, providerOf, callProvider, spentToday, cleanName, catchUp,
 };

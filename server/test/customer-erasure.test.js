@@ -211,6 +211,13 @@ async function extras(shopId, customerId, phone) {
       `INSERT INTO storefront_alerts (id, shop_id, phone, product_id, kind, checked_at, created_at, updated_at)
        VALUES ($1,$2,$3,'rice','stock',$4,$4,$4)`, [newId('sal'), shopId, phone, at]);
   }
+  //  پوشِ «خبرم کن» ِ همین شماره روی یک مرورگر (مهاجرتِ ۴۷۵)
+  if (await exists('store_alert_push')) {
+    await query(
+      `INSERT INTO store_alert_push (id, shop_id, phone, endpoint, p256dh, auth, page, proof, expires_at, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,'/','ticket',$7,$7,$7)`,
+      [newId('sap'), shopId, phone, `https://fcm.googleapis.com/fcm/send/${newId('ep')}`, 'B'.repeat(87), 'a'.repeat(22), at + 60_000]);
+  }
 }
 
 /** ردیف‌های ناشناس‌نشدنیِ مالی و شمارش‌ها — باید بایت‌به‌بایت همان بمانند. */
@@ -237,7 +244,7 @@ async function money(shopId) {
 const PII_TABLES = ['online_orders', 'online_order_lines', 'online_order_events', 'delivery_events', 'delivery_photos',
   'order_pick_photos', 'delivery_locations', 'customer_notify_outbox', 'shop_chat_conversations', 'shop_chat_messages',
   'shop_chat_media', 'shop_chat_pins', 'shop_chat_reports', 'store_customer_carts', 'store_customer_favorites', 'store_customer_lists', 'storefront_area_requests',
-  'storefront_alerts', 'order_issues', 'order_issue_photos', 'order_reviews'];
+  'storefront_alerts', 'order_issues', 'order_issue_photos', 'order_reviews', 'store_alert_push'];
 const BYTES = new Set(['delivery_photos', 'order_pick_photos', 'shop_chat_media', 'order_issue_photos']);
 
 /** متنِ کاملِ هر ردیفِ این دکان در جدول‌های فهرست (bytea به متن). */
@@ -327,6 +334,8 @@ test('SEC-10: صاحبِ دکان — پیش‌نمایش بی نوشتن؛ اج
     alerts: (await exists('storefront_alerts')) ? 1 : 0,
     issues: (await exists('order_issues')) ? 2 : 0, issuePhotos: (await exists('order_issues')) ? 2 : 0,
     reviews: (await exists('order_reviews')) ? 2 : 0,
+    pushSubs: 0,   //  پوشِ وب (مهاجرتِ ۴۷۰): این دکان پرچمش را ندارد ⇒ هیچ اشتراکی؛ پاک شدنِ اشتراک‌ها در store-push.test.js
+    alertPushSubs: (await exists('store_alert_push')) ? 1 : 0,   //  پوشِ «خبرم کن» (۴۷۵)؛ جزئیات در store-alert-push.test.js
   });
   assert.ok(done.body.kept.includes('order_ledger_docs') && done.body.kept.includes('device_sync_ledger'));
 

@@ -8,6 +8,8 @@
  *    خودِ پالایه را سرور می‌زند (`GET /products?brand=…`) و صفحه‌بندی همان «کالاهای بیشتر» است.
  * ⛔ «خبرم کن» فقط با شمارهٔ تأییدشده (همان بلیتِ ثبتِ سفارش، `K.ticket()`)؛ بی آن فقط یک راهنما، بی دکمه.
  *    «موجود شد» فقط برای کالایی که نشانش «تمام شده» است؛ «ارزان شد» برای هر کالای قیمت‌دار. متن فقط textContent.
+ * پوشِ وب: «هشدارهای من» با کلیدِ `push` ⇒ `store/alert-push.js` ِ دیربار؛ زیرِ «خبرم کن» ِ مسلحِ همین کالا «روی همین دستگاه
+ *    هم خبرم کن» (اجازه فقط با لمس). بی کلید (پرچمِ خاموش) ⇒ نه اسکریپت، نه کارگرِ سرویس.
  */
 (function () {
   'use strict';
@@ -75,15 +77,22 @@
     }
 
     // ── WEB-10: «خبرم کن» در برگهٔ کالا ──
-    var mine = null; var cur = null;
+    var mine = null; var cur = null; var pushKey = ''; var push = null;
     function load() {
       if (!K.ticket()) return Promise.resolve({});
       mine = mine || ctx.api('/alerts').then(function (r) {
         var m = {};
         r.items.forEach(function (a) { if (a.state === 'armed') m[a.productId + ':' + a.kind] = true; });
+        pushKey = r.push && r.push.key ? r.push.key : '';
+        if (pushKey) pusher().then(function (ap) { if (ap) ap.refresh(pushKey); });
         return m;
       }, function (e) { mine = null; throw e; });
       return mine;
+    }
+    function pusher() {
+      push = push || K.js('/store/alert-push.js').then(function () { return window.StoreAlertPush({ api: ctx.api, slug: ctx.slug }); })
+        .catch(function () { push = null; return null; });
+      return push;
     }
     function toggle(p, kind, on) {
       var path = '/alerts/' + encodeURIComponent(p.id) + '/' + kind;
@@ -118,6 +127,14 @@
           if (out) box.appendChild(button(p, 'stock', Boolean(m[p.id + ':stock'])));
           box.appendChild(button(p, 'price', Boolean(m[p.id + ':price'])));
           box.hidden = false;
+          //  «خبرم کن» ِ مسلحِ همین کالا + پوشِ روشن در سرور ⇒ «روی همین دستگاه هم»
+          if (!pushKey || !(m[p.id + ':stock'] || m[p.id + ':price'])) return null;
+          return pusher().then(function (ap) {
+            var r = ap && cur && cur.id === p.id ? ap.row(pushKey) : null;
+            var old = $('ps-ap');   //  دو نقاشیِ پشتِ هم: فقط یک بخش
+            if (old) old.parentNode.removeChild(old);
+            if (r) box.appendChild(r);
+          });
         });
       }).catch(function () { box.hidden = true; });
     }
