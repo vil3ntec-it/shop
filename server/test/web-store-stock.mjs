@@ -148,7 +148,14 @@ await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.sto
 const oilIn = await call('POST', '/api/sync/v1/push', { device_id: 'dev-owner', schema_version: 2, ops: [
   op('warehouseEntries', 'oil-e1', { productId: 'oil', units: 1, cartons: 0, perCarton: 0, unit: 'دانه', price: 200, createdAt: Date.now() }),
 ] }, T, { 'X-App': 'shop', 'X-Device': 'dev-owner' });
-ok(oilIn.status === 200, 'O-06: یک روغن به قفسه رسید');
+//  ⛔ ویترین دفترِ دستگاه را برای هر دکان حداکثر هر `CATALOG_REFRESH_THROTTLE_MS` (۵۰۰ms) یک بار می‌پرسد (`catalog.refresh`)؛
+//  push ِ درونِ پنجرهٔ پرسشِ `look()` ِ پیشین را بارِ بعدیِ ویترین هنوز نمی‌بیند و صفحه دوباره نمی‌پرسد ⇒ «ناموجود» تا ۱۰ ثانیه.
+//  پس اول خودِ رسیدن در دفترِ سرور (خواندنِ کارمند بی مهلت می‌خواند و تا کامیت صبر می‌کند)، سپس ویترین. بازتولید: پاسخِ
+//  `PUT /api/shop/storefront` ۶۰۰ms دیر، یا `CATALOG_REFRESH_THROTTLE_MS=5000` ⇒ کدِ پیشین هر بار همین‌جا سرخ
+const oilNow = await call('GET', '/api/shop/catalog/products/oil', null, T);
+const oilLv = oilNow.body && oilNow.body.product ? oilNow.body.product.stock : null;
+ok(oilIn.status === 200 && oilNow.status === 200 && oilLv && Number(oilLv.levels.shop_floor) === 1000 && Number(oilLv.sellableMilli) === 1000
+  && oilLv.badge.status === 'in_stock', 'O-06: یک روغن به قفسه رسید (در دفترِ سرور)', JSON.stringify(oilLv));
 await look();
 const oilCard = () => page.locator('#products li[data-id="oil"]');
 await page.waitForFunction(() => {

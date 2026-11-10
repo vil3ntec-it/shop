@@ -75,6 +75,15 @@
 - نیمه‌کاره: سمتِ پنل (ریپوی server) — پشتِ `idempotent-writes.v1` کلیدِ پنجره را به بالادست بفرستد (مثلِ `sync-restore-once.v1`)، دکمهٔ
   «برگرداندن» پشتِ `staff-perms.v1`، و ۴۰۹ ِ `idempotency_in_progress`/`disabled_by_other_shop` را بشناسد.
 - قدمِ بعدی: شاهدِ CI ِ آزمونِ تازه؛ تصمیمِ صاحب‌کار دربارهٔ اجباری کردنِ دلیل روی disable ِ مدیر (امروز اختیاری، پل همیشه می‌فرستد).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/stock-flake` (ریشهٔ سرخیِ گاه‌به‌گاهِ `web-store-stock.mjs:154`؛ روی `claude/stock-ui` ‏1c1c3f6c؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: ریشه = پنجرهٔ پرسشِ ۵۰۰ms ِ `catalog.refresh` (`CATALOG_REFRESH_THROTTLE_MS`) — push ِ روغنِ O-06 درونِ پنجرهٔ پرسشِ `look()` ِ پیشین
+  می‌افتاد، خواندنِ ویترین بی پرسش همان دفترِ پیش از push را می‌داد و صفحه دوباره نمی‌پرسد ⇒ دکمه تا ۱۰ ثانیه بسته. کهنگیِ تا ۵۰۰ms طراحیِ سرور است (ساختِ سفارش
+  بی مهلت می‌خواند) ⇒ رفعِ آزمون: پس از push خودِ رسیدن در دفترِ سرور با `GET /api/shop/catalog/products/oil` (قفسه ۱۰۰۰، فروختنی ۱۰۰۰، `in_stock`) و سپس ویترین.
+  شاهد: شیمِ ثبتِ پرسش‌ها ⇒ اجرای سرخ بی هیچ `hasNewer` پس از push و `oil = out_of_stock`؛ اجرای عادیِ کدِ پیشین ۲ از ۴ سرخ؛ بازتولیدِ قطعی (پاسخِ
+  `PUT /api/shop/storefront` ۶۰۰ms دیر، یا `CATALOG_REFRESH_THROTTLE_MS=5000`): کدِ پیشین PGlite ۵/۵ و ۳/۳، PostgreSQL ۲/۲ سرخ؛ کدِ تازه ۵/۵، ۵/۵ و ۲/۲ سبز؛
+  اجرای عادی ۳/۳ PGlite و ۳/۳ PostgreSQL، هر بار ۳۰ ✅. قاعده در `RULES-fa.md` «v3 · CI و آزمون».
+- نیمه‌کاره: هیچ.
+- قدمِ بعدی: ادغام در دستهٔ بعد؛ آزمونِ مرورگرِ تازه‌ای که پس از push ویترین را می‌خواند همین مانع را بگذارد.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/stock-ui` (سمتِ برنامهٔ O-06 = ب و پوشِ «سفارش به بررسی رفت»؛ روی `claude/p0-stock` ‏4cd1002c؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) برنامهٔ مدیریت (v3): `OrderDto.stockHold`/`stockReview` (پیش‌فرض‌دار؛ نبود ⇒ هیچ)، `ui/v3/online/orders/OrderStockHold` (نشان و پیام)، نشانِ
   «موجودیِ رزروشده کم آمد — بررسی کنید» نخستین برچسبِ `OrderTags` (کارت و سرِ جزئیات) و پیامِ حالِ نگه‌داشتن زیرِ سرِ جزئیات؛ متن‌ها در `StrOrdersHub`
