@@ -142,6 +142,17 @@
 - نیمه‌کاره: کامپایل و `PromoChannelTest` فقط CI. تصمیمِ صاحب‌کار: لیستِ قیمتِ نام‌دار (PRD-12)؛ فروشِ خرده به قیمتِ عمده بی سقف/مجوز (`sale-caps.refUnits` + چیپِ بی مجوزِ صندوق)؛
   چارچوبِ آزمونِ Compose برای PRM-18 (وابستگیِ تازه). وبِ دکان (`index.html` ِ یخ‌زده) نه تخفیفِ خودکار دارد نه عمده.
 - قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد؛ پس از CI ِ سبز شاهدِ PRM-11 و ارتقا اگر چیزی جز گروه در `redeem` نماند؛ دو تصمیمِ بالا برای `OWNER-PENDING-fa.md`.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/syn-3` (ردیف‌های P0 ِ SYN-04/05/06: پاسخِ push ِ v3 روی خودِ دستگاه و push ِ فشردهٔ v3؛ روی main ‏cceb5930 = دستهٔ ۴۳ (#1027)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) SYN-05/06: سرور `current` را برای درجِ سندِ ساعت‌کج (`correctedAt`) و برای «تکراری» ِ پاسخِ گم‌شده هم می‌دهد
+  (`lib/sync-v3-apply.js`، `amendOf` ِ `lib/sync-v3-time.js`)؛ وب `currentFixes` و کاتلین `V3Current` آن را پیش از بیرون رفتنِ ورودی از صف
+  روی دفتر و سایه می‌نشانند (بردارِ `core/test-vectors/v3-current-v1.json`). سه شکافِ داده بسته شد: دستگاهِ ساعت‌کج با قیمتِ بازنده می‌ماند،
+  حذف‌کنندهٔ کهنه با Pull ردیفِ نیمه می‌ساخت، `correctedAt` به دستگاهِ سازنده نمی‌رسید (سطرِ PENDING ِ `scenario-s28b` ⇒ assert).
+  (۲) SYN-04: push ِ v3 ِ فشرده پشتِ همان `sync.gzip_push` (وب و کاتلین). ⛔ `sync-v1.js`، `finalized-sales.js`، `sync.js`، `fromV2`/`unitClash`
+  و `convertFields` دست نخوردند؛ `sync-v3-engine.js` با فشرده‌نویسی در همان سقفِ ۱۲۵۸ ماند و `SyncV3Engine.kt` ۷۹۸ خط؛ بی مهاجرت، بی مسیرِ تازه.
+- نیمه‌کاره: کاتلین (`V3Current`، `V3Gzip`، `V3CurrentVectorsTest`، `V3GzipTest`، آزمونِ تازهٔ `SyncV3EngineTest`) فقط در CI؛ v3 هنوز پیش‌فرض
+  خاموش و بی دکمه (تصمیمِ صاحب‌کار)؛ push ِ v1 ِ کاتلین هنوز ساده؛ v3 روی 2G سنجیده نشد.
+- قدمِ بعدی: شاهدِ CI ِ همین آزمون‌ها و `sync-v3-current`/`sync-v3-gzip-push`/`web-sync-v3`/`scenario-s28b` ⇒ STATUS؛ سپس push ِ فشردهٔ v1 ِ
+  کاتلین با همان `V3Gzip` (پس از `gzip_push` ِ pull ِ v1).
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/sec-review-43` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۳، ادغامِ `reserve-off`، `syn-12`، `posted-docs` و `app-gaps-4` روی `ccr-…-batch-42`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: دو یافتهٔ Low در نگهبانِ S89 (`lib/finalized-sales.js`، پرچمِ خاموشِ `shop.doc_chain`)، هر دو با آزمونِ سرخ‌پیش‌از‌رفع
   (`server/test/security-review-43.test.js`، ۳ آزمون، PGlite و PostgreSQL): SR43-1 ادغامِ «خیالی» (op ِ ردشده/تکراری/کهنه) قرض یا فاکتورِ نسیهٔ ثبت‌شده را

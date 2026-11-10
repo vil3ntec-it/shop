@@ -317,11 +317,7 @@ internal class SyncV3Engine(
   fun outage(online: Boolean): SyncOutage.Verdict = SyncOutage.of(streak, meta.lastError, online, meta.attempt, now())
   fun forgetOutage() { streak = null }  // SYN-12: حساب یا دکانِ دیگر (`SyncV3Runner.forgetOutage`) ⇒ رشتهٔ پیشین در حافظه نمی‌ماند
 
-  private fun save(m: V3Meta) {
-    val next = m.copy(clock = clock.peek())
-    store.saveMeta(next)
-    meta = next
-  }
+  private fun save(m: V3Meta) { val next = m.copy(clock = clock.peek()); store.saveMeta(next); meta = next }
 
   private suspend fun call(method: String, path: String, body: JsonObject? = null): V3Response {
     val r = transport.request(method, path, body)
@@ -539,6 +535,8 @@ internal class SyncV3Engine(
     //  پرچمِ خاموش: تا سرور دوران نداده (`SYNC_EPOCH_ENABLED` خاموش یا سرورِ کهنه) دفترچه نوشته نمی‌شود
     if (meta.epoch.isNotEmpty()) store.replay?.sent(accepted)
     val q = queue.copy(outbox = queue.outbox.filter { it.key !in done }, rejected = queue.rejected + rejected, seq = seq)
+    //  SYN-05/06: `current` ِ سرور روی دفتر و سایه پیش از بیرون رفتن از صف (`V3Current`؛ بسته شدن در میانه ⇒ «تکراری» همان را می‌آورد)
+    V3Current.fixes(b.fmt == V3Entry.V3, b.entries, results, q.outbox.mapTo(HashSet()) { "${it.table}/${it.rowId}" }, LedgerDiff.toJson(ledger.read())).takeIf { it.isNotEmpty() }?.let { fx -> commit.absorb(fx, ledger.read(), null) { next -> ledger.write(next) } }
     store.saveQueue(q)
     queue = q
     save(meta.copy(

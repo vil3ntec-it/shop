@@ -20,4 +20,14 @@ function corrected(data, effHlc) {
   return data;
 }
 
-module.exports = { corrected };
+/**
+ * همان `correctedAt` ِ سرور برای **دستگاهِ سازنده**، که Pull opِ خودش را برایش نمی‌آورد (SYN-05): در پاسخِ push
+ * (`current`، `sync-v3-apply.js`) ⇒ برنامه روی دفتر و سایه می‌نشاند (`currentFix` ِ وب، `V3Current` ِ کاتلین).
+ * @param fields آنچه دستگاه فرستاد؛ @param data ردیفِ سرور ⇒ `{correctedAt}` یا null
+ */
+function amendOf(fields, data) {
+  const at = data ? data.correctedAt : undefined;
+  return Number.isSafeInteger(at) && (!fields || fields.correctedAt !== at) ? { correctedAt: at } : null;
+}
+
+module.exports = { corrected, amendOf };
