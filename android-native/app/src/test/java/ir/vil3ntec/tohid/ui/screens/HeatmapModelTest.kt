@@ -76,6 +76,25 @@ class HeatmapModelTest {
 
   /** RPT-08 روی گوشی: «گزارشِ تازه» ِ گوشی (پیش‌تر فقط امروز و بدهی) همان نقشه را با بازه‌های کوتاه نشان می‌دهد */
   @Test
+  fun rowsStartAtTheShopWeekStartAndBothScreensPassIt() {
+    //  LOC-03: پیش‌فرض شنبه (رفتارِ پیشین)؛ آغازِ یکشنبه ⇒ ردیفِ نخست یکشنبه و شنبه آخر، همان عددها
+    assertEquals(HeatmapModel.build(d, range, 270, 0).weekdays, HeatmapModel.build(d, range, 270, 0, 6).weekdays)
+    val h = HeatmapModel.build(d, range, 270, 0, weekStart = 7)
+    assertEquals(listOf(7, 1, 2, 3, 4, 5, 6), h.weekdays)
+    val (grid, _, _) = HeatmapModel.tables(h)
+    assertEquals("یکشنبه", grid.rows[0][0].content)
+    assertEquals(1, grid.rows[0][25].content.toInt())
+    assertEquals("شنبه", grid.rows[6][0].content)
+    assertEquals(2, grid.rows[6][25].content.toInt())
+    assertEquals("شنبه 18:00", HeatmapModel.peakLabel(h))
+    val src = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { java.io.File(it, "ir/vil3ntec/tohid/ui/screens/ReportFresh.kt") }.first { it.isFile }.readText()
+    val calls = Regex("""HeatmapModel\.build\([^\n]*""").findAll(src).map { it.value }.toList()
+    assertEquals(2, calls.size)
+    assertTrue(calls.toString(), calls.all { it.contains("ShopDayChoice.weekStart)") })
+  }
+
+  @Test
   fun phoneShowsTheSameHeatmapForMoneyOnlyWithShortSpans() {
     assertEquals(listOf("week", "month", "quarter"), HeatmapModel.PHONE_SPANS)
     assertTrue(HeatmapModel.PHONE_SPANS.all { it in ReportBoard.SPANS && it in ReportBoard.SPAN_LABELS })

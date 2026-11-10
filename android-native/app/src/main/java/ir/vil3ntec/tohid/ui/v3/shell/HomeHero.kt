@@ -1,7 +1,9 @@
 package ir.vil3ntec.tohid.ui.v3.shell
 
 import ir.vil3ntec.tohid.core.calendar.CivilDays
+import ir.vil3ntec.tohid.core.calendar.ShopWeek
 import ir.vil3ntec.tohid.core.calendar.SolarHijri
+import ir.vil3ntec.tohid.core.calendar.WeekRules
 import ir.vil3ntec.tohid.core.safe.SafeCore
 import ir.vil3ntec.tohid.data.Sale
 
@@ -10,7 +12,8 @@ import ir.vil3ntec.tohid.data.Sale
  *  بی Compose، بی ساعت و بی Context؛ کدِ مشترکِ اندروید و آیفون. جای دو کادرِ «صندوق» و «فروشِ امروز» را گرفته.
  *
  *  • دو صفحه: «صندوق» (فروش در بازه) و «گاوصندوق» (ماندهٔ گاوصندوق در بازه، از `SafeCore.view`).
- *  • سه بازه: امروز (۲۴ ساعت)، هفته (شنبه تا جمعه، همان هفتهٔ افغانستان) و ماه (ماهِ خورشیدیِ جاری، مثلِ آمار).
+ *  • سه بازه: امروز (۲۴ ساعت)، هفته (هفتهٔ دکان از `WeekRules`: پیش‌فرض شنبه تا جمعه، همان هفتهٔ افغانستان؛ LOC-03)
+ *    و ماه (ماهِ خورشیدیِ جاری، مثلِ آمار).
  *  • «همین حالا» خانهٔ `now` است؛ خانه‌های پس از آن هنوز نیامده‌اند و خطِ صافِ نقطه‌چین می‌گیرند.
  *  • همه از دادهٔ واقعی: فاکتورهای لغونشده (`finalTotal`، همان عددِ «فروشِ امروز») و ردیف‌های گاوصندوق — بی عددِ ساختگی.
  */
@@ -44,14 +47,14 @@ object HomeHero {
   /** ورود و خروجِ امروزِ گاوصندوق (به پول) — شمارش نه، چون شمارش پول جابه‌جا نمی‌کند */
   data class Flow(val inMinor: Long, val outMinor: Long)
 
-  /** شنبه = ۰ … جمعه = ۶ */
-  fun weekIndex(iso: String): Int? = CivilDays.isoWeekday(iso)?.let { (it + 1) % 7 }
+  /** جای روز در هفتهٔ دکان: آغازِ هفته = ۰ … ۶ (پیش‌فرض شنبه = ۰ … جمعه = ۶) — `ShopWeek.indexOf` */
+  fun weekIndex(iso: String, rules: WeekRules = WeekRules()): Int? = ShopWeek.indexOf(iso, rules)
 
   /** روزهای بازه (ISO، از آغاز) و جای امروز در آن */
-  fun days(range: Range, today: String): Pair<List<String>, Int> = when (range) {
+  fun days(range: Range, today: String, rules: WeekRules = WeekRules()): Pair<List<String>, Int> = when (range) {
     Range.TODAY -> listOf(today) to 0
     Range.WEEK -> {
-      val i = weekIndex(today) ?: 0
+      val i = weekIndex(today, rules) ?: 0
       (0 until 7).map { CivilDays.addDays(today, it - i).orEmpty() } to i
     }
     Range.MONTH -> {
@@ -61,10 +64,17 @@ object HomeHero {
     }
   }
 
-  /** برچسب‌های محور: ساعت (رقمِ لاتین؛ رقمِ صفحه از قلم می‌آید)، حرفِ روزِ هفته، روزِ ماه */
-  fun ticks(range: Range, size: Int, weekLetters: List<String>): List<String> = when (range) {
+  /**
+   *  برچسب‌های محور: ساعت (رقمِ لاتین؛ رقمِ صفحه از قلم می‌آید)، حرفِ روزِ هفته، روزِ ماه. `weekLetters` همیشه از
+   *  شنبه است (`StrHero.weekLetters`)؛ خانهٔ `i` ِ هفته حرفِ روزِ `ShopWeek.order` ِ همان آغاز را می‌گیرد.
+   */
+  fun ticks(range: Range, size: Int, weekLetters: List<String>, rules: WeekRules = WeekRules()): List<String> = when (range) {
     Range.TODAY -> (0 until size).map { if (it % HOUR_TICK == 0) it.toString() else "" }
-    Range.WEEK -> (0 until size).map { weekLetters.getOrElse(it) { "" } }
+    Range.WEEK -> {
+      val order = ShopWeek.order(rules.weekStart)
+      //  ISO ⇒ جای همان روز در فهرستِ از-شنبه: شنبه (۶) ۰، یکشنبه (۷) ۱ … جمعه (۵) ۶
+      (0 until size).map { i -> order.getOrNull(i)?.let { weekLetters.getOrElse((it + 1) % 7) { "" } }.orEmpty() }
+    }
     Range.MONTH -> (0 until size).map { if (it + 1 in MONTH_TICKS) (it + 1).toString() else "" }
   }
 
@@ -83,6 +93,7 @@ object HomeHero {
     dayStartMs: Long,
     nowMs: Long,
     weekLetters: List<String>,
+    rules: WeekRules = WeekRules(),
   ): Series {
     if (range == Range.TODAY) {
       val v = DoubleArray(HOURS)
@@ -94,9 +105,9 @@ object HomeHero {
         v[if (s.createdAt > 0L) minOf(hourOf(s.createdAt, dayStartMs), now) else now] += s.finalTotal
       }
       for (i in 1..now) v[i] += v[i - 1]
-      return Series(v.toList(), now, ticks(range, HOURS, weekLetters), !any)
+      return Series(v.toList(), now, ticks(range, HOURS, weekLetters, rules), !any)
     }
-    val (dates, now) = days(range, today)
+    val (dates, now) = days(range, today, rules)
     val at = HashMap<String, Int>(dates.size * 2).apply { dates.forEachIndexed { i, d -> if (d.isNotEmpty()) put(d, i) } }
     val v = DoubleArray(dates.size)
     var any = false
@@ -107,7 +118,7 @@ object HomeHero {
       v[i] += s.finalTotal
       any = true
     }
-    return Series(v.toList(), now, ticks(range, dates.size, weekLetters), !any)
+    return Series(v.toList(), now, ticks(range, dates.size, weekLetters, rules), !any)
   }
 
   /**
@@ -122,12 +133,13 @@ object HomeHero {
     dayStartMs: Long,
     nowMs: Long,
     weekLetters: List<String>,
+    rules: WeekRules = WeekRules(),
   ): Series {
     val lines = history.asReversed()
     val (size, now, ends) = when (range) {
       Range.TODAY -> Triple(HOURS, hourOf(nowMs, dayStartMs), (0 until HOURS).map { dayStartMs + (it + 1) * HOUR_MS })
       else -> {
-        val (dates, today0) = days(range, today)
+        val (dates, today0) = days(range, today, rules)
         Triple(dates.size, today0, dates.indices.map { dayStartMs + (it - today0 + 1) * DAY_MS })
       }
     }
@@ -140,7 +152,7 @@ object HomeHero {
       while (k < lines.size && lines[k].entry.at < end) { balance = lines[k].balanceMinor; k++ }
       v[i] = balance / 100.0
     }
-    return Series(v.toList(), now, ticks(range, size, weekLetters), lines.isEmpty())
+    return Series(v.toList(), now, ticks(range, size, weekLetters, rules), lines.isEmpty())
   }
 
   /** «واریزِ امروز» و «برداشتِ امروز» ِ گاوصندوق: اثرِ ردیف‌های امروز جز شمارش (ورود و از‌دخل + ؛ خروج، به‌دخل و به‌بانک −) */

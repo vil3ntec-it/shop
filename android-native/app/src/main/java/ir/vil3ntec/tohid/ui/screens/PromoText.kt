@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.core.calendar.ShopWeek
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrLine
 import ir.vil3ntec.tohid.core.i18n.StrMarketPages
@@ -44,8 +45,10 @@ object PromoText {
     "combine" to StrMarketPages.hintCombine,
     "exclusive" to StrMarketPages.hintExclusive,
   )
-  /** روزهای هفته به ترتیبِ دکان (شنبه اول) ⇒ شمارهٔ ISO */
-  val DAYS: List<Pair<Long, String>> get() = listOf(6L, 7L, 1L, 2L, 3L, 4L, 5L).map { it to StrReports.weekdaysShort[(it - 1).toInt()] }
+  /** روزهای هفته به ترتیبِ دکان (آغازِ هفتهٔ «تاریخ و رقم»، پیش‌فرض شنبه اول؛ LOC-03) ⇒ شمارهٔ ISO */
+  val DAYS: List<Pair<Long, String>> get() = days(ir.vil3ntec.tohid.ShopDayChoice.weekStart)
+  fun days(weekStart: Int): List<Pair<Long, String>> =
+    ShopWeek.order(weekStart).map { it.toLong() to StrReports.weekdaysShort[it - 1] }
   val ERRORS: Map<String, String> get() = mapOf(
     "id" to StrMarketPages.errId, "name" to StrMarketPages.errName, "kind" to StrMarketPages.errKind,
     "stack" to StrMarketPages.errStack, "priority" to StrMarketPages.errPriority,
