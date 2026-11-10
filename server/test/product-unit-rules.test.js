@@ -221,3 +221,15 @@ test('v1، روشن: گردش و حالِ کالا از opهای پیشینِ ه
   assert.deepEqual(outcome(await push1('owner', [v1('products', 'b1', { salePrice: 60 }, 'update'), v1('suppliers', 'sup1', { name: 'تأمین', unit: 'x' })])),
     ['applied', 'applied']);
 });
+
+test('v1Guard ِ مستقیم، روشن: بدنهٔ بی فهرستِ op (نبود، رشته، شیء، خالی) ⇒ بی خطا و بی دست‌کاریِ بدنه و پاسخ', async () => {
+  await setFlag(shopId, true);
+  for (const ops of [undefined, null, 'ops', { length: 1e9 }, []]) {
+    const req = { sync: { accountId: shopId }, body: { ops } };
+    const res = { json: () => 'اصل' };
+    const json = res.json;
+    await R.v1Guard(req, res);
+    assert.equal(req.body.ops, ops, JSON.stringify(ops));
+    assert.equal(res.json, json, 'پاسخ دست نمی‌خورد');
+  }
+});

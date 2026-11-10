@@ -111,8 +111,9 @@ function v1Hits(ops) {
 /** v1 (پس از پالایشِ `v1NewerFields`): opهای ردشده از دسته بیرون و پاسخشان سرِ جایشان (`v1-reject`) */
 async function v1Guard(req, res) {
   const ctx = req.sync;
-  const ops = req.body.ops;
-  if (!(await on(ctx.accountId))) return;
+  //  همان الگوی نگهبان‌های دیگرِ v1 (`staff-approval`، `purchase-units`): فقط فهرستِ op، وگرنه هیچ (CodeQL: loop bound)
+  const ops = Array.isArray(req.body?.ops) ? req.body.ops : null;
+  if (!ops || !ops.length || !(await on(ctx.accountId))) return;
   const { validateOp } = require('./sync-v1');
   const all = ops.map((raw) => { const v = validateOp('shop', raw); return v.ok ? v.op : null; });
   const ids = [...new Set(all.filter((o) => o && o.table === 'products').map((o) => o.row_id))];
@@ -136,7 +137,14 @@ async function v1Guard(req, res) {
       return dbMoved.has(o.row_id);
     });
     if (why) { rejected.set(i, { op_id: o.op_id, status: 'rejected', reason: why }); continue; }
-    stored.set(o.row_id, { ...(before || {}), ...o.fields });
+    //  حالِ پس از op فقط با همان سه کلیدِ ثابتی که `reasonOf` می‌خواند — ⛔ نه `{...o.fields}` (RULES: شیء از کلیدهای درخواست)
+    const f = o.fields;
+    const b = before || {};
+    stored.set(o.row_id, {
+      unit: has(f, 'unit') ? f.unit : b.unit,
+      saleUnit: has(f, 'saleUnit') ? f.saleUnit : b.saleUnit,
+      unitFactor: has(f, 'unitFactor') ? f.unitFactor : b.unitFactor,
+    });
   }
   require('./v1-reject').rejectOps(req, res, ops, rejected);
 }

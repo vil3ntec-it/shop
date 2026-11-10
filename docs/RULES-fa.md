@@ -884,6 +884,9 @@
   (`parseCsv` ِ `lib/image-bank-csv.js`: `csv_too_large`)؛ شیء از کلیدهای درخواست با `Object.fromEntries` + کنار گذاشتنِ `__proto__`/`constructor`/`prototype`، نه
   `o[k] = …`؛ احراز (`auth(...)`) بی شرطِ بیرونی روی مقدارِ کاربر — خودش ورودیِ تهی/بی‌شکل را رد می‌کند. هشدارهای `lib/sync-v1.js`
   (کلیدِ `op.fields` در `applyOp`) مشترک با پمپ‌اند و دست نمی‌خورند.
+- ⛔ نگهبانِ تازهٔ v1 (دستهٔ ۴۰، `product-unit-rules.v1Guard`): `req.body.ops` فقط با `Array.isArray(req.body?.ops) ? req.body.ops : null`
+  (همان `staff-approval`/`purchase-units`) و حالِ درونِ دسته فقط با کلیدهای ثابت، نه `{...o.fields}` — بی این دو، CodeQL پنج هشدارِ
+  تازه داد (loop bound در `v1-reject.js` و remote-property-injection در `applyOp` ِ `sync-v1.js`). سنجه: `product-unit-rules.test.js`.
 - ⛔ آزمونِ شبیه‌سازِ آیفون (`iosSimulatorArm64Test`، فرآیندِ بی بستهٔ `test.kexe`) کلیددانِ iOS ندارد (OSStatus -25291، حتی با
   `e2e/test.entitlements`): آزمونی که از `Keychain` می‌گذرد (KEK ِ `AtRest`/`SignOutVault`، هویتِ دستگاه، توکن) روی `Keychain.memory`
   می‌رود و پس از خود برمی‌گرداند؛ ردهٔ دسترسی (`kSecAttrAccessible`) با `Keychain.addRequestIs` (همان درخواستِ `SecItemAdd`) سنجیده
