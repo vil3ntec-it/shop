@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.shell
 
 import ir.vil3ntec.tohid.core.calendar.SolarHijri
+import ir.vil3ntec.tohid.core.calendar.WeekRules
 import ir.vil3ntec.tohid.data.SafeBook
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
@@ -29,6 +30,28 @@ class HomeHeroTest {
     assertEquals("2026-10-31", days.first())
     assertEquals("2026-11-06", days.last())
     assertEquals(3, now)
+  }
+
+  @Test
+  fun `هفته از آغازِ هفتهٔ دکان است و حرفِ هر خانه همان روزِ خودش - LOC-03`() {
+    //  یکشنبه: ۲۰۲۶-۱۱-۰۱ تا شنبه ۱۱-۰۷؛ سه‌شنبه خانهٔ ۲
+    val sunday = WeekRules(weekStart = 7)
+    assertEquals(0, HomeHero.weekIndex("2026-11-01", sunday))
+    assertEquals(2, HomeHero.weekIndex(today, sunday))
+    val (days, now) = HomeHero.days(HomeHero.Range.WEEK, today, sunday)
+    assertEquals("2026-11-01", days.first())
+    assertEquals("2026-11-07", days.last())
+    assertEquals(2, now)
+    assertEquals(listOf("ی", "د", "س", "چ", "پ", "ج", "ش"), HomeHero.ticks(HomeHero.Range.WEEK, 7, letters, sunday))
+    //  دوشنبه: سه‌شنبه خانهٔ ۱
+    val monday = WeekRules(weekStart = 1)
+    val s = HomeHero.sales(listOf(sale("a", "2026-11-01", 70.0), sale("b", "2026-11-02", 30.0), sale("c", today, 20.0)), HomeHero.Range.WEEK, today, dayStart, dayStart, letters, monday)
+    assertEquals(listOf(30.0, 20.0, 0.0, 0.0, 0.0, 0.0, 0.0), s.values)
+    assertEquals(1, s.now)
+    assertEquals(listOf("د", "س", "چ", "پ", "ج", "ش", "ی"), s.ticks)
+    //  پیش‌فرض همان شنبه تا جمعه
+    assertEquals(letters, HomeHero.ticks(HomeHero.Range.WEEK, 7, letters, WeekRules()))
+    assertEquals(HomeHero.days(HomeHero.Range.WEEK, today), HomeHero.days(HomeHero.Range.WEEK, today, WeekRules()))
   }
 
   @Test

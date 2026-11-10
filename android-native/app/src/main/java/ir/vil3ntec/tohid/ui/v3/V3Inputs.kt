@@ -213,8 +213,8 @@ fun V3DateField(
   }
 }
 
-private fun yesterdayIso(): String {
-  val c = java.util.Calendar.getInstance()
-  c.add(java.util.Calendar.DAY_OF_MONTH, -1)
-  return "%04d-%02d-%02d".format(c.get(java.util.Calendar.YEAR), c.get(java.util.Calendar.MONTH) + 1, c.get(java.util.Calendar.DAY_OF_MONTH))
-}
+/**
+ *  یک روز پیش از «امروز» ِ دکان (LOC-03): با «پایانِ روزِ کاری» از روزِ کاری، نه از تقویم — پیش‌تر ساعتِ ۱:۳۰ ِ
+ *  دکانی که تا ۲ باز است «دیروز» همان «امروز» می‌شد و دو تراشه یک تاریخ داشتند.
+ */
+private fun yesterdayIso(): String = ir.vil3ntec.tohid.yesterdayIso()

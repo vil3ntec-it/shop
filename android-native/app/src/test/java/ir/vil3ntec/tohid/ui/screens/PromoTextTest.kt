@@ -92,6 +92,13 @@ class PromoTextTest {
     }
   }
 
+  @Test fun `روزهای تخفیف به ترتیبِ هفتهٔ دکان - LOC-03`() {
+    assertEquals(listOf(6L, 7L, 1L, 2L, 3L, 4L, 5L), PromoText.days(6).map { it.first })
+    assertEquals(listOf(7L, 1L, 2L, 3L, 4L, 5L, 6L), PromoText.days(7).map { it.first })
+    assertEquals(listOf(1L, 2L, 3L, 4L, 5L, 6L, 7L), PromoText.days(1).map { it.first })
+    assertEquals(listOf("دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه", "یکشنبه"), PromoText.days(1).map { it.second })
+  }
+
   @Test fun `دقیقه از متن، با ارقامِ فارسی`() {
     assertEquals(1320L, PromoForm.minutes("22:00"))
     assertEquals(150L, PromoForm.minutes("۰۲:۳۰"))

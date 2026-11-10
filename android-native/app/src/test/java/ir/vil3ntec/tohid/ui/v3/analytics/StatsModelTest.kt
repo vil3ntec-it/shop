@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.analytics
 
+import ir.vil3ntec.tohid.core.calendar.ShopWeek
+import ir.vil3ntec.tohid.core.calendar.WeekRules
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
 import org.junit.Assert.assertEquals
@@ -84,6 +86,40 @@ class StatsModelTest {
     //  جمعهٔ آینده هنوز «آینده» است، نه تعطیل
     assertFalse(StatsModel.streak(ShopData(), today).last().closed)
     assertEquals(3, StatsModel.pastWorkingDays(StatsModel.streak(ShopData(), today)))
+  }
+
+  @Test
+  fun `هفتهٔ دکان از تنظیم - آغازِ یکشنبه یا دوشنبه و پیش‌فرض همان شنبه - LOC-03`() {
+    //  تنظیم‌نشده همان قاعدهٔ پیشین است
+    assertEquals(StatsModel.buckets(StatsPeriod.WEEK, today), StatsModel.buckets(StatsPeriod.WEEK, today, ShopWeek.rules(6, null)))
+    val sunday = WeekRules(weekStart = 7)
+    val b = StatsModel.buckets(StatsPeriod.WEEK, today, sunday)
+    assertEquals("2026-10-25" to today, b.last())
+    assertEquals("2026-10-18" to "2026-10-24", b[4])
+    val monday = WeekRules(weekStart = 1)
+    assertEquals(today to today, StatsModel.buckets(StatsPeriod.WEEK, today, monday).last())
+    val s = StatsModel.streak(ShopData(), today, monday)
+    assertEquals(listOf("2026-10-26", "2026-11-01"), listOf(s.first().date, s.last().date))
+    assertEquals(6, s.count { it.future })
+    //  روز و ماه و سال به آغازِ هفته کاری ندارند
+    assertEquals(StatsModel.buckets(StatsPeriod.MONTH, today), StatsModel.buckets(StatsPeriod.MONTH, today, monday))
+  }
+
+  @Test
+  fun `روزهای تعطیل از تنظیم - پنجشنبه و جمعه، یا هر هفت روز باز - LOC-03`() {
+    val friday = "2026-10-30"
+    val d = ShopData(sales = listOf(sale("a", "2026-10-24", 10.0, 9)))
+    val twoOff = StatsModel.streak(d, friday, ShopWeek.rules(6, "4,5"))
+    assertEquals(listOf(false, false, false, false, false, true, true), twoOff.map { it.closed })
+    assertEquals(5, StatsModel.pastWorkingDays(twoOff))
+    val open = StatsModel.streak(d, friday, ShopWeek.rules(6, ""))
+    assertTrue(open.none { it.closed })
+    assertEquals(7, StatsModel.pastWorkingDays(open))
+    //  آغازِ دوشنبه با تعطیلِ شنبه و یکشنبه: جمعه روزِ کاری است و شنبه/یکشنبهٔ آینده «آینده»اند، نه تعطیل
+    val weekend = StatsModel.streak(d, friday, WeekRules(weekStart = 1, weekend = setOf(6, 7)))
+    assertEquals("2026-10-26", weekend.first().date)
+    assertTrue(weekend.none { it.closed })
+    assertEquals(5, StatsModel.pastWorkingDays(weekend))
   }
 
   @Test

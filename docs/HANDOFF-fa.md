@@ -151,6 +151,16 @@
   `DesktopTextTest` (سقفِ ۵۹). فهرستِ بی‌ترجمه‌ها برای صاحب‌کار در `docs/i18n-glossary.md` («پوستهٔ کامپیوتر»).
 - نیمه‌کاره: هیچ آزمونِ کاتلینی این‌جا اجرا نشد (بی Gradle) ⇒ شاهدِ CI ِ دسته؛ STATUS ارتقا نیافت.
 - قدمِ بعدی: ترجمهٔ صاحب‌کار برای فهرستِ glossary؛ تصمیمِ `en`/`ps` در `keymap.json` برای پنجرهٔ F1؛ پس از CI ِ سبز، RPT-13 فقط با شاهد ارتقا.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/loc-03` (ردیفِ P0 ِ LOC-03: هفتهٔ دکان؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: منطقِ هفته از پیش در `BusinessDay`/`WeekRules` بود ولی هیچ‌جا تنظیم نمی‌شد و خانه شنبه را ثابت داشت. تازه: `core/calendar/ShopWeek`
+  (commonMain: آغازِ شنبه/یکشنبه/دوشنبه، متنِ روزهای تعطیل، `toggle` با نگه‌داشتنِ آخرین روزِ کاری، `order`/`indexOf`)؛ `ShopDayChoice.weekStart`/
+  `closedDays`/`rules` با کلیدهای «مالِ دکان» ِ `week_start`/`closed_days` (ShopSettingsKeys و DATA-SAFETY §۶)؛ تنظیم در «تاریخ و رقم» ِ نسخهٔ ۳؛
+  آمار، نمودارِ «هفته» ِ خانه، نقشهٔ «ساعت و روز» و روزهای تخفیف همان قاعده را می‌گیرند؛ «دیروز» ِ کادرِ تاریخِ نسخهٔ ۳ (`V3Inputs`) روزِ کاری شد.
+  بردارهای `calendar.json` (weekStart +۴ با آینهٔ CoreVectorsCommonTest، dayKind +۶)؛ JS ِ locale-vectors و common-mirror ۱۳/۱۳ محلی.
+- نیمه‌کاره: آزمون‌های کاتلین فقط در CI (ShopWeekTest، StatsModelTest، HomeHeroTest، HeatmapModelTest، PromoTextTest، ShopWeekWiringTest،
+  ShopWeekPrefDesktopTest)؛ LOC-04 در برنامه (گرفتنِ `/api/calendar/holidays` و پرکردنِ `WeekRules.holidays`) و خواندنِ تنظیمِ رسیده از دستگاهِ دیگر بی بازکردنِ
+  دوباره (`ShopSettingsSync` پرونده را می‌نویسد، `ShopDayChoice` با `load` ِ بعدی می‌خواند — همان رفتارِ «پایانِ روز»)؛ خلاصهٔ پیکِ سرور هنوز شنبهٔ ثابت.
+- قدمِ بعدی: شاهدِ CI ِ آزمون‌های بالا ⇐ LOC-03 به IMPLEMENTED-VERIFIED فقط اگر صاحب‌کار «تعطیلاتِ رسمی» را جدا (LOC-04) بپذیرد.
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/acct-console` (بندهای سمتِ سرورِ حسابِ ممیزیِ پنلِ مرکزی §۹: بازگرداندنِ یک‌باره، S12، S15، S18؛ روی main ‏ed8009d7 = دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) `POST /admin/sync/conflicts/:id/restore` یک بار — شناسهٔ یک‌شکل (۴۰۰ `bad_id`)، ۴۰۹ `already_restored`/`restore_in_progress` با نشانِ پایگاه
   (`sync_conflict_restore_claims`، مهاجرتِ ۴۹۵)، `Idempotency-Key` (`lib/sync-restore-once.js`؛ `sync-v1.js` دست نخورد). (۲) S12: نگهبانِ مالک از پیش بود

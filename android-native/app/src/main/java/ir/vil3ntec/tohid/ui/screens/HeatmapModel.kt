@@ -16,7 +16,7 @@ import kotlinx.serialization.json.JsonPrimitive
  *  رویدادها از دفتر: هر فاکتورِ لغونشدهٔ بازه با لحظهٔ ثبتش (`createdAt`) و مبلغِ نهایی، و هر برگشتِ بازه با مبلغِ
  *  **منفی** در خانهٔ لحظهٔ خودش (برگشتِ فاکتورِ لغوشده بیرون، همان قاعدهٔ `ReportEngine.sales`). بازه با تاریخِ کاریِ
  *  سند است، مثلِ زبانه‌های دیگر؛ سندِ بی لحظه (۰) جایی در نقشه ندارد و بیرون می‌ماند. حساب همه در
- *  `core/report/SalesHeatmap` است (ساعتِ دیواریِ دکان، روزِ کاری که از نیمه‌شب می‌گذرد، هفته از شنبه)؛ این‌جا فقط
+ *  `core/report/SalesHeatmap` است (ساعتِ دیواریِ دکان، روزِ کاری که از نیمه‌شب می‌گذرد، هفته از آغازِ هفتهٔ دکان)؛ این‌جا فقط
  *  جدول‌ها. پول همه `Long` ِ یک‌صدم. زبانه فقط برای کسی است که پول را می‌بیند، مثلِ «پایانِ روز».
  */
 object HeatmapModel {
@@ -52,8 +52,9 @@ object HeatmapModel {
     return sold + back
   }
 
-  fun build(d: ShopData, range: ReportBoard.Range, offsetMinutes: Int, dayStartMinutes: Int): SalesHeatmap =
-    SalesHeatmap.build(events(d, range.from, range.to), offsetMinutes, dayStartMinutes)
+  /** ردیف‌ها از آغازِ هفتهٔ دکان (`weekStart` به شمارِ ISO، پیش‌فرض ۶ = شنبه؛ LOC-03) */
+  fun build(d: ShopData, range: ReportBoard.Range, offsetMinutes: Int, dayStartMinutes: Int, weekStart: Int = 6): SalesHeatmap =
+    SalesHeatmap.build(events(d, range.from, range.to), offsetMinutes, dayStartMinutes, weekStart)
 
   private fun p(s: String) = JsonPrimitive(s)
   private fun p(n: Number) = JsonPrimitive(n)

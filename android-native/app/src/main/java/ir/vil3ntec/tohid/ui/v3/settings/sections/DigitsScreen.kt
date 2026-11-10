@@ -4,9 +4,13 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -16,16 +20,19 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.LocaleChoice
 import ir.vil3ntec.tohid.ShopDayChoice
 import ir.vil3ntec.tohid.core.calendar.ShopDay
+import ir.vil3ntec.tohid.core.calendar.ShopWeek
 import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
+import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.text.LocaleFormat
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.screens.MotionTokens
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
+import ir.vil3ntec.tohid.ui.v3.V3Chip
 import ir.vil3ntec.tohid.ui.v3.V3Segmented
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
@@ -49,9 +56,10 @@ private fun calendarLabel(c: String): String = when (c) {
 
 /**
  *  `settings/general/digits`: رقمِ صفحه و فاکتور (LOC-05)، تقویمِ نمایش، پایانِ روزِ کاری (LOC-03، همان
- *  `ShopDayChoice` ِ رابطِ امروز) و نمادِ پول (LOC-07)، با نمونهٔ زندهٔ مبلغ. چیزی که ذخیره و همگام می‌شود
- *  همیشه رقمِ لاتین است.
+ *  `ShopDayChoice` ِ رابطِ امروز)، هفتهٔ دکان (LOC-03: آغازِ هفته و روزهای کاری، `ShopWeek`) و نمادِ پول (LOC-07)،
+ *  با نمونهٔ زندهٔ مبلغ. چیزی که ذخیره و همگام می‌شود همیشه رقمِ لاتین است.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun RouteScope.DigitsScreen(onBack: (() -> Unit)?) {
   val context = LocalContext.current
@@ -87,6 +95,27 @@ internal fun RouteScope.DigitsScreen(onBack: (() -> Unit)?) {
       }
       SettingsNote(StrSettings.dayEndNote)
       if (hours != ShopDay.OFF) SettingsNote(StrSettings.dayEndNow(displayDate(todayIso())))
+    }
+    //  LOC-03: آغازِ هفته — شنبه (پیش‌فرض، رفتارِ امروز)، یکشنبه یا دوشنبه
+    item(key = "weekStart") {
+      val start = ShopWeek.clampStart(ShopDayChoice.weekStart)
+      SettingsBlock {
+        V3Segmented(ShopWeek.STARTS.map { StrReports.weekdaysShort[it - 1] }, ShopWeek.STARTS.indexOf(start).coerceAtLeast(0), { ShopDayChoice.setWeekStart(context, ShopWeek.STARTS[it]) })
+      }
+      SettingsNote(StrSettings.weekStartNote)
+    }
+    //  LOC-03: روزهای کاری — روزِ روشن کاری، خاموش تعطیلِ هفتگی (پیش‌فرض جمعه)؛ آخرین روزِ کاری خاموش نمی‌شود
+    item(key = "workDays") {
+      val closed = ShopDayChoice.closedDays
+      SettingsBlock {
+        Text(StrSettings.workDays, style = V3Type.subhead, color = PhoneV3.colors.ink, modifier = Modifier.padding(bottom = 10.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+          ShopWeek.order(ShopDayChoice.weekStart).forEach { day ->
+            V3Chip(StrReports.weekdaysShort[day - 1], selected = day !in closed, onClick = { ShopDayChoice.setClosedDays(context, ShopWeek.toggle(closed, day)) })
+          }
+        }
+      }
+      SettingsNote(StrSettings.workDaysNote)
     }
     item(key = "symbol") {
       SettingsBlock {

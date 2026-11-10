@@ -72,6 +72,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.ShopDayChoice
 import ir.vil3ntec.tohid.core.i18n.StrHero
 import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.data.ShopData
@@ -114,8 +115,10 @@ internal data class HeroFace(
 @Composable
 internal fun rememberHeroFaces(d: ShopData, view: HomeView, input: HeroInput, range: HomeHero.Range): List<HeroFace> {
   val letters = StrHero.weekLetters.split(',')
-  val sales = remember(d.sales, range, input.today, input.dayStartMs, input.hour, letters) {
-    HomeHero.sales(d.sales, range, input.today, input.dayStartMs, input.nowMs, letters)
+  //  LOC-03: بازهٔ «هفته» از آغازِ هفتهٔ دکان («تاریخ و رقم»؛ تنظیم‌نشده شنبه)
+  val week = ShopDayChoice.rules
+  val sales = remember(d.sales, range, input.today, input.dayStartMs, input.hour, letters, week) {
+    HomeHero.sales(d.sales, range, input.today, input.dayStartMs, input.nowMs, letters, week)
   }
   val till = HeroFace(
     page = HomeHero.Page.TILL,
@@ -132,8 +135,8 @@ internal fun rememberHeroFaces(d: ShopData, view: HomeView, input: HeroInput, ra
       ?: HeroStat(StrHome.todaySalesCount, view.todayCount.toString(), up = null),
   )
   val safeView = input.safe ?: return listOf(till)
-  val safeSeries = remember(safeView, range, input.today, input.dayStartMs, input.hour, letters) {
-    HomeHero.safe(safeView.history, range, input.today, input.dayStartMs, input.nowMs, letters)
+  val safeSeries = remember(safeView, range, input.today, input.dayStartMs, input.hour, letters, week) {
+    HomeHero.safe(safeView.history, range, input.today, input.dayStartMs, input.nowMs, letters, week)
   }
   val flow = remember(safeView, input.dayStartMs) { HomeHero.safeToday(safeView.history, input.dayStartMs) }
   val safe = HeroFace(
