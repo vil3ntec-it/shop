@@ -20,6 +20,7 @@
 | `server/test/sync-v3-gate.test.js` | PERF-02/04: push ِ هم‌زمانِ یک دکان = اجرای پشتِ سرِ هم؛ push ِ منتظر اتصال نمی‌گیرد؛ دروازه و صفِ استخرِ پر ⇒ ۵۰۳ ِ `db_busy` |
 | `server/scripts/load-scale.mjs` | آمیزهٔ `scale` (فروش، ویرایشِ بها از چند دستگاه، حرکتِ کالا، مشتری، نگه‌داشته، اشتراکِ صاحب، خلاصه‌های پنلِ مدیر، کاوشِ ویترینِ دکانِ دیگر) و **دفترِ درستیِ بارساز**: سرانجامِ هر op، جمعِ فروش و حرکتِ هر کالا، برندهٔ LWW، آنچه هر دستگاه در pull دید؛ با `--check` op ِ بی‌پاسخ (مهلت، ۵xx، ۵۰۳) مثلِ برنامه با همان op_id دوباره می‌رود |
 | `server/scripts/load-check.js` | سنجهٔ درستی پس از بار (درونِ سرورِ آزمون با `--check`، یا جدا: `--db … --ledger …`): ۱۲ سنجه، از «هیچ op ِ گم/دوتایی» تا «هیچ دادهٔ دکانِ دیگر» و «فقط ۵۰۳ ِ `db_busy`» |
+| `server/scripts/late-count-bench.js` | «شمارشِ دیررسیده» (`v3.lateCount` و شاخهٔ شمارشِ `STOCK_SQL`) در دکانِ ۱۰۰، ۱٬۰۰۰ و ۱۰٬۰۰۰ ردیفِ شمارش، پیش و پس از نمایهٔ ۴۶۵، به نوبت: نقشه، بافر، ردیفِ دورریخته و p50/p95 |
 | `server/test/load-correctness.test.js` | آزمونِ پایدار: `scale` ِ کوچک با `--check` (همهٔ سنجه‌ها سبز)، سپس خطای کاشته در پایگاه و دفتر ⇒ همان ۸ سنجه سرخ — **بی هیچ سنجهٔ زمانی** |
 
 بی هیچ وابستگیِ تازه: `fetch` ِ خودِ Node، `node:child_process`، `perf_hooks`. دادهٔ ساختگی از همان
@@ -43,6 +44,12 @@ node scripts/load-test.mjs --db $DB --profile scale,scale-burst --duration 600 -
 #  --store-shops N (ویترینِ گشت‌وگذار فقط N دکانِ نخست) --checkout-shops N (سفارش و میز؛ پیش‌فرض ۴) --ledger <پرونده>
 #  --check (درستی؛ سرخ ⇒ خروجِ ۱) --query-stats (فقط PostgreSQL) --setup-par 4 (کاشتن، پل، ورود و pull ِ آغاز با هم)
 node scripts/load-check.js --db $DB --ledger ledger.json                # همان سنجه، دوباره روی همان پایگاه
+#  چند پیکربندیِ سرور روی **یک** پایگاهِ کاشته (کاشتن، پل، نشست‌ها و تاریخچه یک بار؛ سرورِ تازه برای هر env؛ سنجهٔ درستی پس از هر گام):
+node scripts/load-test.mjs --db $DB --plan plan.json --duration 600 --rate 40 --shops 200 --devices 5 --scale 0.05 --small-scale 0.003 \
+  --store-shops 20 --checkout-shops 20 --check --check-each --query-stats --count-history 10000,1000,100 --max-inflight 4096 --outage-limit 240
+#  plan.json: {"steps":[{"profile":"scale-burst","label":"…","env":{"SYNC_V3_BATCH":"1"},"timeoutMs":15000,"sql":["…"]}, …]}
+#  --count-history a,b,c: شمارش‌های بستهٔ پیشینِ دکانِ ۰، ۱ تا ۹ و بقیه؛ --outage-limit: ثانیه‌های کوششِ هر دستگاه در «قطعِ سراسری»
+TEST_DATABASE_URL=postgres://…/x_bench node scripts/late-count-bench.js 400
 ```
 
 کدِ خروج: `0` همهٔ بودجه‌ها سبز؛ `1` بودجه‌ای رد شد؛ `3` بارساز خودش اشباع شد (بیش از ۱٪ درخواست جا افتاد) و
