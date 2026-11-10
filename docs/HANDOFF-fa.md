@@ -53,6 +53,20 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/flag-catalog` (کاتالوگِ کاملِ پرچم‌ها و «همه روشن» ِ سرتاسری؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) ۵۵ کلیدِ `live_config` که کدِ غیرِ پمپ می‌خواند و در `KNOWN` نبود (خانوادهٔ `shop.delivery_*`، `shop.visual_search`، `pay.hesabpay`،
+  `shop.promo_*`، `shop.owner_report`، همگام‌سازیِ دکان، بازار و کارمزدها، ops/security و تنظیم‌های عددی/شیء) با پیش‌فرضِ خودِ کد ⇒ ۱۴۲ ردیف.
+  (۲) `server/test/flag-scan.js` + سنجهٔ `console-shell.test.js`: سرور، `public/*`، `license/` و کاتلینِ برنامه‌ها؛ روی پایه سرخ با فهرستِ همان ۵۵؛
+  بیرون فقط با دلیل (`NOT_CATALOG`). (۳) `admin-flags.test.js`: برای هر ۵۵ ردیف بی ردیف = پیش‌فرضِ کاتالوگ، نوشتنِ همان پیش‌فرض بی‌اثر، مقدارِ
+  دیگر اثردار (جهشِ پیش‌فرض سرخ می‌کند). (۴) `E2E_FLAGS_ON=all` (۱۱۸ پرچم): پیش از کار ۲۲ سناریو سرخ — همه از `subscribers_only` ِ بی اشتراک ⇒
+  `harness.mjs` با آن پرچم اشتراکِ فعال می‌دهد (`subscribe: false` برای admin/entitle)؛ سپس ۱۶ گامِ سرخ، هیچ‌کدام باگِ محصول نبود:
+  `shop.delivery_code_rule` (پیک کدِ برگشته از سپردن را می‌فرستد)، `shop.delivery_near_pin` (S31 موقعیتِ پین با `nearPin`)، `shop.order_risk`
+  («بی پرچمِ ریسک» صریح در شش سناریوی سبدِ تکراری)، `shop.delivery_live_location` (فازِ «بی پرچم» ِ DLV-16 صریح)، `link_expiry` (`sameOrderLink`
+  در pick). نتیجه: ۲۶۲/۲۶۲ گام با `all`.
+- نیمه‌کاره: شاهدِ CI. تصمیمِ صاحب‌کار: `shop.orders.ledger` (هنوز `order-ledger.LEGACY_FLAGS` هنگامِ راه‌اندازی)، دو پرچمِ مشترک با پمپ
+  (`sync.device_bind`، `sync.live_expiry_close`) و `stage.*` ِ پویا بیرون از کاتالوگ‌اند. PostgreSQL ِ `E2E_DATABASE_URL`: notify، ops، recovery و pick
+  بی پرچم هم سرخ‌اند (قالبِ پشتیبانِ PGlite، DOM ِ کهنهٔ پیگیری) و `E2E-ADM.counts` با فهرستِ پیشین هم ناپایدار است (DOM ِ کهنه) — نه از این کار.
+- قدمِ بعدی: پرچمِ تازه ⇐ ردیفِ `KNOWN` با پیش‌فرضِ کد (وگرنه `console-shell.test.js` سرخ)؛ پس از CI ِ سبز همین `E2E_FLAGS_ON=all` در CI.
 ### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/sec-review-38` (بازبینیِ امنیتیِ دومِ دسته‌های ۳۷–۳۸؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: سه یافته با آزمونِ پیش‌سرخ و رفعِ کوچک (`server/test/security-review-38.test.js`، شرح در `docs/SECURITY-AUDIT-fa.md` «B3»): SR38-1 (High) پشتیبانِ
   مهرشدهٔ PGlite رازها را در `pg_statistic` ِ ANALYZE ِ دوره‌ای خام داشت ⇒ `sealPglite` آمار را هم می‌بَرد؛ SR38-2 (Medium) reviver ِ NUL پارسِ هر بدنه را پیش از

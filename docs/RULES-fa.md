@@ -876,6 +876,13 @@
 دلیلِ اجباری)؛ هر نوشتن در `live_config_history` (`GET /api/admin/flags/history`). حالتِ «غیرفعال کردنِ سرویس» ِ دکان
 (`shop_holds`) هر مقدارِ این پرچم‌ها را برای همان دکان می‌بُرد. کلیدِ اشتراک (`features`): فهرستِ خالی یعنی پلنِ کامل.
 
+⛔ کاتالوگِ `KNOWN` ِ `server/src/routes/admin-flags.js` (زبانهٔ «پرچم‌ها»، `E2E_FLAGS_ON=all`، سنجشِ نوع و scope ِ `PUT /api/admin/flags`)
+**هر** کلیدِ `live_config` را دارد که کدِ غیرِ پمپ می‌خواند — تنظیمِ عددی/شیء هم. سنجه: `server/test/flag-scan.js` (سرور، `public/*`،
+`license/`، کاتلینِ برنامه‌ها) در `console-shell.test.js`: کلیدِ تازهٔ بیرون از کاتالوگ یا ردیفِ بی خواننده ⇒ سرخ؛ بیرون فقط با دلیل در
+`NOT_CATALOG` (بازنشسته، مشترک با پمپ مثلِ `sync.device_bind`، نه `live_config`). `default` ِ ردیف = پیش‌فرضِ خودِ کد و هرگز عوض نمی‌شود
+(`admin-flags.test.js`: بی ردیف، نوشتنِ همان پیش‌فرض، مقدارِ دیگر). `E2E_FLAGS_ON=all` با `shop.orders.subscribers_only` به هر دکانِ تازه
+اشتراکِ فعال هم می‌دهد (`harness.mjs`، همان `web-store-allflags.mjs`).
+
 | کلید | scope | پیش‌فرض | چه را باز می‌کند | PR | وضعیت |
 |---|---|---|---|---|---|
 | `shop.orders` | دکان / `all` | خاموش | `/api/shop/orders/*` جز `/config` (خاموش ⇒ ۴۰۳ `orders_disabled`)؛ نوشتن کلیدِ اشتراکِ `online_orders` هم می‌خواهد؛ پایهٔ ویترین و تحویل | #227، #253 | main |
