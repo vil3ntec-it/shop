@@ -296,7 +296,7 @@ object ShopperText {
   val tenderNone get() = t("پول خرد لازم نیست", "No change needed", "پرچون ته اړتیا نشته")
   fun tenderOption(note: Long, change: Long) =
     t("${asIs(money(note))} — پول خرد: ${asIs(money(change))}", "${money(note)} — change: ${money(change)}", "${money(note)} — پرچون: ${money(change)}")
-  //  CHK-24: همان `od.prefs.*` ِ وب (`kit/i18n/order.*.json`)
+  //  CHK-24: همان `od.pf.*` و `err.delivery_locked` ِ وب (`kit/i18n/order.*.json`)
   val prefsTitle get() = t("دستورِ تحویل", "Delivery instructions", "د سپارلو لارښوونه")
   val prefsLandmark get() = t("نشانهٔ تازه (اختیاری)", "New landmark (optional)", "نوې نښه (اختیاري)")
   val prefsSave get() = t("ثبتِ دستورِ تحویل", "Save instructions", "لارښوونه ثبت کړئ")

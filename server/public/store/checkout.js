@@ -102,23 +102,14 @@
     }
 
     // ── CHK-14: «با اسکناسِ … پرداخت می‌کنم» (فقط با `features.deliveryPrefs`، پرچمِ `shop.orders.delivery_prefs`؛ ارسال و نقد) ──
-    //  گزینه‌ها همان قاعدهٔ سرور (`delivery-prefs.checkTender`): بیش از جمع، افغانیِ کامل، و پول خرد کمتر از یک اسکناسِ ۱۰۰۰.
+    //  گزینه‌ها `K.tenders` ِ order-kit.js (همان قاعدهٔ سرور `delivery-prefs.checkTender`؛ همان گزینه‌های پیگیری، CHK-24).
     //  جمع عوض شد و اسکناسِ برگزیده دیگر درست نیست ⇒ برداشته می‌شود؛ هرگز مبلغی که سرور رد می‌کند فرستاده نمی‌شود.
-    var NOTE_MINOR = 100000; var tender = 0;
-    function tenders(total) {
-      var out = [];
-      [10000, 50000, 100000].forEach(function (u) {
-        var x = Math.ceil(total / u) * u;
-        if (x === total) x += u;
-        if (x - total < NOTE_MINOR && out.indexOf(x) < 0) out.push(x);
-      });
-      return out.sort(function (a, b) { return a - b; });
-    }
+    var tender = 0;
     function renderTender(f, total) {
       var on = Boolean(c.store.features && c.store.features.deliveryPrefs) && f === 'delivery';
       $('tender-row').hidden = !on;
       if (!on) { tender = 0; return; }
-      var list = total > 0 ? tenders(total) : [];
+      var list = K.tenders(total);
       if (list.indexOf(tender) < 0) tender = 0;
       var sel = K.clear($('d-tender'));
       sel.appendChild(el('option', { attrs: { value: '' }, text: t('ck.tender.none') }));
