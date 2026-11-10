@@ -577,7 +577,7 @@ function macOf(shopId, orderId) {
 }
 
 //  TEN-03: لینکِ پیگیریِ زمان‌دار و باطل‌شدنی — `lib/storefront-links.js` (شرح همان‌جا)
-const { LINK_FLAG, tokenOf, linkPolicyOn, listTokenOf, currentTokenOf, orderIdOf, orderIdOfLink, revokeLink } = require('./storefront-links')({ tokenKey, macOf, orders, one, now, config, ApiError, notFound });
+const { LINK_FLAG, tokenOf, linkPolicyOn, listTokenOf, currentTokenOf, parseToken, orderIdOf, orderIdOfLink, revokeLink } = require('./storefront-links')({ tokenKey, macOf, orders, one, now, config, ApiError, notFound });
 
 /**
  * نمای مشتری — نه شناسهٔ کارمند، نه یادداشتِ داخلی، نه شماره و نشانی.
@@ -788,7 +788,7 @@ module.exports = {
   normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, catalogByIds, photo,
   highlights, productDetail, reorder, ordersOfPhone, verifiedPhone,
   localParts, presenceOf, statusOf,
-  parseCheckout, checkout, track, cancel, tokenOf, orderIdOf, orderIdOfLink, listTokenOf, currentTokenOf, linkPolicyOn, revokeLink, LINK_FLAG, publicOrder,
+  parseCheckout, checkout, track, cancel, tokenOf, parseToken, orderIdOf, orderIdOfLink, listTokenOf, currentTokenOf, linkPolicyOn, revokeLink, LINK_FLAG, publicOrder,
   K_ANON, ticketOf, parseTicket, verifiedPhoneOfTicket, verification, verificationAvailable, startVerification, checkVerification, myOrders,
   settingsOf, saveSettings, declarePresence, staffProducts, setProduct, ...sfc,   //  S1 و M2: storefront-catalog.js
   //  بازارچه (`lib/market.js`) همان دروازهٔ کالا را می‌خواند، نه نسخهٔ دومی از آن

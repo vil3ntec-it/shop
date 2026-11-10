@@ -53,6 +53,13 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-39` (بازبینیِ امنیتیِ مستقلِ دستهٔ ۳۹؛ روی `ccr-3a0d593c-ac0jpj-batch-39`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: تفاضلِ `server/src`، `server/public` و `license` ِ دستهٔ ۳۸..۳۹ خوانده و به آن حمله شد (پوشِ وب ِ سفارش و «خبرم کن»، SSRF، رمز، کاتالوگِ پرچم‌ها،
+  `vip.js`، ۴۰۱ ِ پنل، بانکِ تصویر، تمرکزِ `kit`/`chat`، `upgrade-rehearsal`، `verification()`). دو یافتهٔ Low بسته شد (`docs/SECURITY-AUDIT-fa.md` B4):
+  SR39-1 «باطل کردنِ لینک» وسطِ اشتراک یا وسطِ فرستادن لینکِ تازه را به دارندهٔ لینکِ باطل می‌داد؛ SR39-2 خطای خودِ سرور (`VAPID_SUBJECT` ِ نادرست)
+  همهٔ اشتراک‌ها را پاک می‌کرد. `store-push.js` + یک واژه در صادراتِ `storefront.js` (`parseToken`)؛ آزمون `security-review-39.test.js` پیش از رفع سرخ روی هر دو پایگاه.
+- نیمه‌کاره: هیچ. باز (فقط گزارش): `PUT /api/admin/pump/live-config` (کدِ پمپ) سنجشِ کاتالوگِ `admin-flags` را دور می‌زند — همان مدیرِ ارشد.
+- قدمِ بعدی: اگر صاحب محصول بخواهد، درِ پمپ هم از `checkKnown` بگذرد (کارِ کدِ پمپ، نه این شاخه).
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/flag-catalog` (کاتالوگِ کاملِ پرچم‌ها و «همه روشن» ِ سرتاسری؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) ۵۵ کلیدِ `live_config` که کدِ غیرِ پمپ می‌خواند و در `KNOWN` نبود (خانوادهٔ `shop.delivery_*`، `shop.visual_search`، `pay.hesabpay`،
   `shop.promo_*`، `shop.owner_report`، همگام‌سازیِ دکان، بازار و کارمزدها، ops/security و تنظیم‌های عددی/شیء) با پیش‌فرضِ خودِ کد ⇒ ۱۴۲ ردیف.
