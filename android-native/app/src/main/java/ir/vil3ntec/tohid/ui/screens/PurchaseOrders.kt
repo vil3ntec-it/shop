@@ -32,6 +32,7 @@ import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.i18n.StrPay
 import ir.vil3ntec.tohid.core.i18n.StrPlaces
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseOrders
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
 import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.core.i18n.StrReturnPages
@@ -153,8 +154,9 @@ private fun PoList(repo: PurchaseOrderRepository, perms: PoPermsDto, onOpen: (St
   var error by remember { mutableStateOf<String?>(null) }
   LaunchedEffect(state) {
     orders = null; error = null
-    val r = repo.list(state)
-    orders = r.valueOrNull()?.orders
+    //  PUR-02: «فرستاده/باز» فقط فرستاده و بخشی (`status=open` ِ سرور)؛ سرورِ کهنه همان `state=sent` و پالایشِ دوم در برنامه
+    val r = repo.list(state, status = if (state == PurchaseOrderCore.State.SENT) PurchaseOrderBook.OPEN_STATUS else null)
+    orders = r.valueOrNull()?.orders?.let { list -> if (state == PurchaseOrderCore.State.SENT) PoForms.openOnly(list) else list }
     error = r.errorMessage()
   }
   Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -427,10 +429,10 @@ private fun PoEditor(
   var note by remember { mutableStateOf(base?.note.orEmpty()) }
   var error by remember { mutableStateOf<String?>(null) }
   var busy by remember { mutableStateOf(false) }
-  //  PUR-09: تاریخچهٔ قیمت از دفتر؛ PUR-10: سفارش‌های فرستاده برای زمانِ تأمین و «در راه»
+  //  PUR-09: تاریخچهٔ قیمت از دفتر؛ PUR-10: سفارش‌های فرستاده برای زمانِ تأمین و «در راه» (همهٔ بازها، `planningOrders`)
   val buys = remember(d) { PurchaseOrderBook.buys(d) }
   var sentOrders by remember { mutableStateOf<List<PurchaseOrderDto>>(emptyList()) }
-  LaunchedEffect(Unit) { sentOrders = repo.list("sent").valueOrNull()?.orders.orEmpty() }
+  LaunchedEffect(Unit) { sentOrders = repo.planningOrders() }
   val lead = remember(d, sentOrders, supplierId) { PurchaseOrderBook.leadTime(sentOrders, supplierId, PurchaseOrderBook.manualLead(d, supplierId)) }
   var historyFor by remember { mutableStateOf<String?>(null) }
   var lastKey by remember { mutableStateOf<Int?>(null) }
@@ -681,6 +683,8 @@ private fun PoReceive(
       keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { if (scan.isNotBlank()) scanned(scan.trim()); scan = "" }),
       modifier = Modifier.fillMaxWidth(),
     )
+    //  PUR-04: دریافتِ کامل با یک کلیک (همان `PoForms.fillRemaining` ِ گوشی)؛ فقط کادرها پر می‌شوند، ثبت همان دکمهٔ پایین
+    DeskReceiveAll(order, rows, enabled = !busy) { filled -> rows = filled; error = null; toast(StrPurchaseOrders.filledAll) }
     Spacer(Modifier.height(8.dp))
     order.lines.forEach { l ->
       val r = rows[l.id] ?: PoForms.RecvRow()
@@ -709,5 +713,18 @@ private fun PoReceive(
     error?.let { Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall) }
     Spacer(Modifier.height(10.dp))
     Button(onClick = { submit() }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) StrSale.posting else StrLayaway.payConfirm) }
+  }
+}
+
+/**
+ *  PUR-04 «دریافتِ همهٔ باقی‌مانده» در پنجرهٔ کامپیوتر — همتای `PoReceiveAll` ِ گوشی: «رسیده» ِ هر ردیفِ باز = باقی‌ماندهٔ سرور
+ *  (`PoForms.fillRemaining`، دقیق به هزارمِ واحدِ ردیف؛ خراب و فی دست‌نخورده). سفارشی که ردیفِ باز ندارد دکمه ندارد.
+ */
+@Composable
+private fun DeskReceiveAll(o: PurchaseOrderDto, rows: Map<String, PoForms.RecvRow>, enabled: Boolean, onFilled: (Map<String, PoForms.RecvRow>) -> Unit) {
+  if (!PoForms.hasRemaining(o)) return
+  Spacer(Modifier.height(8.dp))
+  OutlinedButton(onClick = { onFilled(PoForms.fillRemaining(o, rows)) }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
+    Text(StrPurchaseOrders.receiveAll)
   }
 }

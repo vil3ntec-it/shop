@@ -71,8 +71,8 @@ object PoForms {
   }
 
   /**
-   *  پالایهٔ سرور فقط وضعیتِ **ذخیره‌شده** را می‌شناسد (`draft`/`sent`/`cancelled`)؛ «بخشی» و «کامل» از رسیدها می‌آیند و
-   *  هر دو «فرستاده»‌ی ذخیره‌شده‌اند ⇒ همان صفحهٔ «فرستاده» و پالایشِ دوم در برنامه ([shown]).
+   *  وضعیتِ **ذخیره‌شده** (`draft`/`sent`/`cancelled`)؛ «بخشی» و «کامل» هر دو «فرستاده»‌ی ذخیره‌شده‌اند. سرورِ کهنه فقط همین را
+   *  می‌پالاید ⇒ پالایشِ دوم در برنامه ([shown]) می‌ماند.
    */
   fun serverState(f: Filter): String? = when (f) {
     Filter.ALL -> null
@@ -81,8 +81,23 @@ object PoForms {
     Filter.CANCELLED -> PurchaseOrderCore.State.CANCELLED
   }
 
+  /**
+   *  PUR-02: وضعیتِ **نمایشی** برای `status` ِ سرور (فرستاده/بخشی/کامل از رسیدها روی خودِ سرور، با صفحه‌بندیِ درست) — کنارِ
+   *  [serverState] فرستاده می‌شود تا سرورِ کهنه همان پاسخِ پیشین را بدهد. پیش‌نویس و لغو با [serverState] بس‌اند.
+   */
+  fun serverStatus(f: Filter): String? = when (f) {
+    Filter.SENT, Filter.PARTIAL, Filter.COMPLETE -> f.wire
+    else -> null
+  }
+
   fun shown(orders: List<PurchaseOrderDto>, f: Filter): List<PurchaseOrderDto> =
     if (f == Filter.ALL) orders else orders.filter { PurchaseOrderBook.status(it).wire == f.wire }
+
+  /** «فرستاده/باز» ِ پنجرهٔ کامپیوتر: فقط فرستاده و بخشی — پالایشِ دوم برای سرورِ کهنه که `status=open` را نمی‌شناسد */
+  fun openOnly(orders: List<PurchaseOrderDto>): List<PurchaseOrderDto> = orders.filter {
+    val s = PurchaseOrderBook.status(it)
+    s == PurchaseOrderCore.Status.SENT || s == PurchaseOrderCore.Status.PARTIAL
+  }
 
   fun label(f: Filter): String =
     PurchaseOrderCore.Status.of(f.wire)?.let(PurchaseOrderBook::label) ?: Str.all

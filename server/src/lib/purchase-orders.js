@@ -564,50 +564,116 @@ async function get(shopId, id) {
 }
 
 /**
- * فهرست، تازه‌ترین تغییر بالا. `state` (draft|sent|cancelled) و `supplierId` پالایش در SQL؛
- * `cursor` = «updatedAt:id» ِ آخرین ردیفِ صفحهٔ پیش. وضعیتِ نمایشی برای هر ردیف حساب می‌شود.
+ * PUR-02/03: پالایهٔ «وضعیتِ نمایشی» (`status`) ⇒ وضعیتِ ذخیره‌شدهٔ لازم. draft و cancelled همان ستون‌اند؛
+ * sent/partial/complete و `open` (= sent یا partial، «در راه» ِ پیشنهادِ سفارش) از رسیدها با همان `core.status`.
  */
-async function list(shopId, { state, supplierId, cursor, limit } = {}) {
-  const n = Math.min(MAX_LIST, Math.max(1, Number.parseInt(limit, 10) || 50));
-  const where = ['shop_id=$1'];
-  const args = [shopId];
-  if (state !== undefined && state !== '') {
-    if (!core.STATES.includes(state)) throw badRequest('وضعیتِ پالایش درست نیست', 'bad_state');
-    args.push(state); where.push(`state=$${args.length}`);
-  }
-  if (typeof supplierId === 'string' && supplierId) { args.push(supplierId); where.push(`supplier_id=$${args.length}`); }
-  if (typeof cursor === 'string' && cursor) {
-    const m = /^(\d{1,16}):([A-Za-z0-9]{1,64})$/.exec(cursor);
-    if (!m) throw badRequest('نشانگرِ صفحه درست نیست', 'bad_cursor');
-    args.push(Number(m[1]), m[2]);
-    where.push(`(updated_at, id) < ($${args.length - 1}, $${args.length})`);
-  }
-  args.push(n + 1);
-  const rows = await many(
-    `SELECT * FROM purchase_orders WHERE ${where.join(' AND ')} ORDER BY updated_at DESC, id DESC LIMIT $${args.length}`, args
-  );
-  const page = rows.slice(0, n).map(orderOf);
-  const ids = page.map((o) => o.id);
+const LIST_STATUS = Object.freeze({
+  draft: core.STATE.DRAFT, cancelled: core.STATE.CANCELLED,
+  sent: core.STATE.SENT, partial: core.STATE.SENT, complete: core.STATE.SENT, open: core.STATE.SENT,
+});
+const statusMatches = (want, s) => (want === 'open' ? s === core.STATUS.SENT || s === core.STATUS.PARTIAL : s === want);
+/** سقفِ ردیف‌های پیموده در یک درخواستِ پالایهٔ رسیدی (دکانِ با هزاران سفارشِ کامل) و اندازهٔ هر دور */
+const SCAN_MAX = 500;
+const SCAN_BATCH = 100;
+
+const cursorOf = (o) => `${o.updatedAt}:${o.id}`;
+
+async function receiptsByPo(shopId, ids) {
   const byPo = new Map(ids.map((x) => [x, []]));
-  const billsBy = new Map(ids.map((x) => [x, []]));
   if (ids.length) {
     const rs = await many(
       'SELECT * FROM purchase_receipts WHERE shop_id=$1 AND po_id = ANY($2::text[]) ORDER BY created_at, id', [shopId, ids]
     );
     for (const r of rs) byPo.get(r.po_id).push(receiptOf(r));
+  }
+  return byPo;
+}
+
+/**
+ * فهرست، تازه‌ترین تغییر بالا. `state` (draft|sent|cancelled) و `supplierId` پالایش در SQL؛
+ * `cursor` = «updatedAt:id» ِ آخرین ردیفِ صفحهٔ پیش. وضعیتِ نمایشی برای هر ردیف حساب می‌شود.
+ * `status` (draft|sent|partial|complete|cancelled|open) وضعیتِ نمایشی را می‌پالاید؛ `state` کنارش فقط هم‌خوان
+ * (`state=sent&status=open`)، وگرنه ۴۰۰ `bad_status`. برای پالایهٔ رسیدی نشانگر آخرین ردیفِ **پیموده‌شده** است:
+ * صفحه‌ای کم‌تر از `limit` (حتی تهی) با `next` یعنی «هنوز ردیف هست»؛ هر درخواست حداکثر `SCAN_MAX` ردیف.
+ */
+async function list(shopId, { state, status, supplierId, cursor, limit } = {}) {
+  const n = Math.min(MAX_LIST, Math.max(1, Number.parseInt(limit, 10) || 50));
+  const want = status === undefined || status === '' ? null : status;
+  if (want !== null && (typeof want !== 'string' || !Object.hasOwn(LIST_STATUS, want))) {
+    throw badRequest('وضعیتِ پالایش درست نیست', 'bad_status');
+  }
+  if (state !== undefined && state !== '' && !core.STATES.includes(state)) throw badRequest('وضعیتِ پالایش درست نیست', 'bad_state');
+  const stored = want === null ? (state || null) : LIST_STATUS[want];
+  if (want !== null && state !== undefined && state !== '' && state !== stored) {
+    throw badRequest('وضعیتِ ذخیره‌شده با وضعیتِ نمایشی نمی‌خواند', 'bad_status');
+  }
+  const where = ['shop_id=$1'];
+  const args = [shopId];
+  if (stored) { args.push(stored); where.push(`state=$${args.length}`); }
+  if (typeof supplierId === 'string' && supplierId) { args.push(supplierId); where.push(`supplier_id=$${args.length}`); }
+  let after = null;
+  if (typeof cursor === 'string' && cursor) {
+    const m = /^(\d{1,16}):([A-Za-z0-9]{1,64})$/.exec(cursor);
+    if (!m) throw badRequest('نشانگرِ صفحه درست نیست', 'bad_cursor');
+    after = [Number(m[1]), m[2]];
+  }
+  const fetch = async (from, take) => {
+    const a = args.slice();
+    const w = where.slice();
+    if (from) { a.push(from[0], from[1]); w.push(`(updated_at, id) < ($${a.length - 1}, $${a.length})`); }
+    a.push(take);
+    return (await many(
+      `SELECT * FROM purchase_orders WHERE ${w.join(' AND ')} ORDER BY updated_at DESC, id DESC LIMIT $${a.length}`, a
+    )).map(orderOf);
+  };
+  let page;
+  let receipts;
+  let next = null;
+  if (want === null || stored !== core.STATE.SENT) {
+    const rows = await fetch(after, n + 1);
+    page = rows.slice(0, n);
+    receipts = await receiptsByPo(shopId, page.map((o) => o.id));
+    const last = page[page.length - 1];
+    next = rows.length > n && last ? cursorOf(last) : null;
+  } else {
+    //  پالایهٔ رسیدی: دور به دور تا n ردیفِ هم‌خوان، پایانِ ردیف‌ها یا سقفِ پیمایش
+    page = [];
+    receipts = new Map();
+    let scanned = 0;
+    for (;;) {
+      const take = Math.min(SCAN_BATCH, SCAN_MAX - scanned);
+      const rows = await fetch(after, take + 1);
+      const batch = rows.slice(0, take);
+      const got = await receiptsByPo(shopId, batch.map((o) => o.id));
+      let stop = -1;
+      for (let i = 0; i < batch.length; i++) {
+        const o = batch[i];
+        if (statusMatches(want, core.status(o, got.get(o.id)))) { page.push(o); receipts.set(o.id, got.get(o.id)); }
+        if (page.length === n) { stop = i; break; }
+      }
+      scanned += stop >= 0 ? stop + 1 : batch.length;
+      const more = stop >= 0 ? stop < batch.length - 1 || rows.length > take : rows.length > take;
+      const lastSeen = stop >= 0 ? batch[stop] : batch[batch.length - 1];
+      if (!more) { next = null; break; }
+      if (stop >= 0 || scanned >= SCAN_MAX) { next = cursorOf(lastSeen); break; }
+      after = [lastSeen.updatedAt, lastSeen.id];
+    }
+  }
+  const ids = page.map((o) => o.id);
+  const billsBy = new Map(ids.map((x) => [x, []]));
+  if (ids.length) {
     const bs = await many(
       'SELECT * FROM purchase_bills WHERE shop_id=$1 AND po_id = ANY($2::text[]) ORDER BY created_at, id', [shopId, ids]
     );
     for (const x of bs) billsBy.get(x.po_id).push(billOf(x));
   }
-  const last = page[page.length - 1];
   return {
-    orders: page.map((o) => view(o, byPo.get(o.id), { withReceipts: false, bills: billsBy.get(o.id) })),
-    next: rows.length > n && last ? `${last.updatedAt}:${last.id}` : null,
+    orders: page.map((o) => view(o, receipts.get(o.id), { withReceipts: false, bills: billsBy.get(o.id) })),
+    next,
   };
 }
 
 module.exports = {
-  FLAG_KEY, MAX_QTY_MILLI, MAX_PRICE_MINOR, MAX_LIST, MAX_BILL_MINOR,
+  FLAG_KEY, MAX_QTY_MILLI, MAX_PRICE_MINOR, MAX_LIST, MAX_BILL_MINOR, SCAN_MAX,
   enabled, requireEnabled, parseDraft, clientKeyOf, create, update, transition, receive, bill, voidBill, get, list,
 };

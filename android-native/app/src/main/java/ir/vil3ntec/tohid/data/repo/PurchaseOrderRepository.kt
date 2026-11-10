@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.data.repo
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiJson
 import ir.vil3ntec.tohid.core.net.ApiResult
+import ir.vil3ntec.tohid.core.purchase.PurchaseOrderCore
 import ir.vil3ntec.tohid.data.PoBillLineDto
 import ir.vil3ntec.tohid.data.PoBilledDto
 import ir.vil3ntec.tohid.data.PoConfigDto
@@ -11,6 +12,7 @@ import ir.vil3ntec.tohid.data.PoOrderDto
 import ir.vil3ntec.tohid.data.PoPageDto
 import ir.vil3ntec.tohid.data.PoReceivedDto
 import ir.vil3ntec.tohid.data.PoReceiptLineDto
+import ir.vil3ntec.tohid.data.PurchaseOrderBook
 import ir.vil3ntec.tohid.data.PurchaseOrderDto
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -28,13 +30,27 @@ class PurchaseOrderRepository(private val api: ApiClient) {
 
   suspend fun config(): ApiResult<PoConfigDto> = result { ApiJson.decode<PoConfigDto>(api.get("$ROOT/config")) }
 
-  suspend fun list(state: String? = null, cursor: String? = null): ApiResult<PoPageDto> = result {
+  /**
+   *  [status] (PUR-02/03) وضعیتِ نمایشی برای سرور (`sent`/`partial`/`complete`/`open`)؛ سرورِ کهنه نمی‌شناسد و فقط [state] را
+   *  می‌پالاید، پس پالایشِ دومِ برنامه (`PoForms.shown`، `PurchaseOrderBook.onOrderMilli`) سرِ جایش می‌ماند. صفحهٔ کم‌تر از ۵۰
+   *  (حتی تهی) با `next` یعنی «هنوز هست».
+   */
+  suspend fun list(state: String? = null, cursor: String? = null, status: String? = null): ApiResult<PoPageDto> = result {
     val q = buildString {
       append("$ROOT?limit=50")
       if (!state.isNullOrBlank()) append("&state=").append(enc(state))
+      if (!status.isNullOrBlank()) append("&status=").append(enc(status))
       if (!cursor.isNullOrBlank()) append("&cursor=").append(enc(cursor))
     }
     ApiJson.decode<PoPageDto>(api.get(q))
+  }
+
+  /**
+   *  PUR-03/10: سفارش‌های پیشنهادِ سفارش (`PurchaseOrderBook.planningOrders`) — همهٔ بازها برای «در راه» و صفحهٔ نخستِ
+   *  فرستاده‌ها برای زمانِ تأمین. پیش‌تر فقط صفحهٔ نخستِ فرستاده‌ها (۵۰ تا، پر از سفارشِ کامل) ⇒ بازِ کهنه «در راه» نبود.
+   */
+  suspend fun planningOrders(): List<PurchaseOrderDto> = PurchaseOrderBook.planningOrders { cursor, open ->
+    list(PurchaseOrderCore.State.SENT, cursor, if (open) PurchaseOrderBook.OPEN_STATUS else null).valueOrNull()
   }
 
   suspend fun get(id: String): ApiResult<PurchaseOrderDto> =
