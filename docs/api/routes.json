@@ -20,18 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1011,
+    "routes": 1021,
     "byAuth": {
       "none-detected": 194,
       "admin": 279,
       "inline": 2,
-      "user": 493,
+      "user": 503,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-      "extracted": 701,
-      "empty": 308,
+      "extracted": 706,
+      "empty": 313,
       "unresolved": 2
     }
   },
@@ -890,6 +890,16 @@
     {"method":"GET","path":"/api/shop/sync/pull","area":"shop","source":"server/src/routes/sync.js","auth":"user","guards":["requireUser","requireShop"],"params":[],"query":["deviceId","limit","since"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/sync/push","area":"shop","source":"server/src/routes/sync.js","auth":"user","guards":["requireUser","requireShop","requireDataWrite"],"params":[],"query":[],"body":["changes","clientOperationId","deviceId","operationId"],"response":{"statuses":[200],"keys":["...","replayed","serverTime"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/sync/status","area":"shop","source":"server/src/routes/sync.js","auth":"user","guards":["requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["actualRole","collections","rev","role","serverTime","shopId","subscription"]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/till-pin/config","area":"shop","source":"server/src/routes/shop-till-pin.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'till-pin-ip' })","requireUser","requireShop","limit","requirePermission('data.read')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"GET","path":"/api/shop/till-pin/current","area":"shop","source":"server/src/routes/shop-till-pin.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'till-pin-ip' })","requireUser","requireShop","limit","requirePermission('data.read')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/shop/till-pin/current/end","area":"shop","source":"server/src/routes/shop-till-pin.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'till-pin-ip' })","requireUser","requireShop","limit","requirePermission('data.read')"],"params":[],"query":[],"body":["reason"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"PUT","path":"/api/shop/till-pin/me","area":"shop","source":"server/src/routes/shop-till-pin.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'till-pin-ip' })","requireUser","requireShop","limit","requirePermission('data.read')","requireRecentAuth"],"params":[],"query":[],"body":["pin"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/till-pin/members","area":"shop","source":"server/src/routes/shop-till-pin.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'till-pin-ip' })","requireUser","requireShop","limit","requirePermission('data.read')","requirePermission('members.view')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"DELETE","path":"/api/shop/till-pin/members/:id","area":"shop","source":"server/src/routes/shop-till-pin.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'till-pin-ip' })","requireUser","requireShop","limit","requirePermission('data.read')","requireRecentAuth","requirePermission('members.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"PUT","path":"/api/shop/till-pin/members/:id","area":"shop","source":"server/src/routes/shop-till-pin.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'till-pin-ip' })","requireUser","requireShop","limit","requirePermission('data.read')","requireRecentAuth","requirePermission('members.view')"],"params":["id"],"query":[],"body":["pin"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/shop/till-pin/members/:id/unlock","area":"shop","source":"server/src/routes/shop-till-pin.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'till-pin-ip' })","requireUser","requireShop","limit","requirePermission('data.read')","requireRecentAuth","requirePermission('members.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"GET","path":"/api/shop/till-pin/sessions","area":"shop","source":"server/src/routes/shop-till-pin.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'till-pin-ip' })","requireUser","requireShop","limit","requirePermission('data.read')"],"params":[],"query":["from","member","to"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/shop/till-pin/verify","area":"shop","source":"server/src/routes/shop-till-pin.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'till-pin-ip' })","requireUser","requireShop","limit","requirePermission('data.read')"],"params":[],"query":[],"body":["memberId","pin","userId"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/trust/cases","area":"shop","source":"server/src/routes/shop-trust.js","auth":"user","guards":["requireUser","requireShop","requirePermission('trust.view')"],"params":[],"query":["before","limit","status"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/trust/cases/:id","area":"shop","source":"server/src/routes/shop-trust.js","auth":"user","guards":["requireUser","requireShop","requirePermission('trust.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["case"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/trust/cases/:id/appeal","area":"shop","source":"server/src/routes/shop-trust.js","auth":"user","guards":["requireUser","requireShop","requirePermission('trust.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},

@@ -461,6 +461,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/staff-time', require('./routes/staff-time'));
     //  STF-06: محدودهٔ مکانِ کارمندان (اجرا در `/shop/catalog`) — پشتِ `shop.staff_scope`، پیش‌فرض خاموش
     api.use('/shop/staff-scope', require('./routes/staff-scope'));
+    //  STF-04/S46: PIN ِ شخصیِ صندوق در سرور و نوبت‌های سنجیدهٔ صندوق (مهاجرتِ ۶۴۰) — پشتِ `shop.till_pin`، پیش‌فرض خاموش
+    api.use('/shop/till-pin', require('./routes/shop-till-pin'));
     //  STF-02: «درخواستِ تأیید» از راهِ دور (شاگرد می‌پرسد، صاحب/مدیر روی دستگاهِ خودش) — پشتِ `shop.approval_requests`، پیش‌فرض خاموش
     api.use('/shop/approval-requests', require('./routes/shop-approval-requests'));
     //  صندوقِ سندهای ردشده (DATA-SAFETY، مهاجرتِ ۳۱۵): صاحب/مدیر می‌بیند، دوباره ثبت می‌کند یا کنار می‌گذارد؛ دستگاهِ سازنده ردیفِ خودش را — بی پرچم
