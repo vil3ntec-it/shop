@@ -516,6 +516,14 @@
   سرور پاک نمی‌کند). دیدن: `GET /api/shop/customer-access?customerId=` و بخشِ «چه کسی این پرونده را دید»
   (`CustomerAccessPanel`، گوشیِ نسخهٔ ۳ در `DebtorFileExtras` و کامپیوتر در `DeskCustomers`) فقط `audit.view` (صاحب همیشه؛ پیش‌فرض
   مدیر و حسابدار؛ لایه می‌بندد). سنجه: `customer-access.test.js`، `CustomerAccessTest` (core)، `CustomerAccessLogTest`.
+- ⛔ CRM-15 — **درِ `app`** (`POST /api/shop/customer-access`، مهاجرتِ ۶۱۰، `lib/customer-access.noteApp`، `claude/crm-2`): دیدنی که برنامه
+  از **دفترِ خودش** گزارش می‌دهد — وب (`license/customer-access.js`) و نقشِ بی `auditLog` روی دستگاه (حسابدار، `CustomerAccessNote` ⇐
+  `CustomerAccess.noteBody`). ⛔ بیننده، نقش، دکان و دستگاه فقط از توکن؛ از بدنه فقط `customerId` و `kind`؛ `phone` ِ اصلِ بی
+  `customers.contact` ⇐ `detail`؛ `*` فقط با `export` (در فهرستِ هر پرونده با `all: true`). یکی کردنِ ۱۰ دقیقه کلیدِ «بیننده + مشتری +
+  نوع» است، **هر دری** (درِ سرور و `app` یک ردیف می‌شوند). هر عضو می‌نویسد، فقط `audit.view` می‌خواند؛ FREE ِ SUB-10. وب: مجوز از
+  `policy.effective` ِ `GET /api/v1/shop/me` (`shop-sync.js` نگهش می‌دارد و `tohid:shop-info` می‌فرستد)؛ بی `customers.contact` شمارهٔ
+  مشتری در فهرست و برگهٔ قرض‌داران `maskPhone` و کادرِ شمارهٔ ویرایش پنهان (مقدار دست نمی‌خورد)؛ index.html ِ یخ‌زده دست نمی‌خورد
+  (توابعِ صفحه پوشانده می‌شوند). سنجه: `customer-access-app.test.js`، `web-customer-access.test.js`، `web-customer-access.mjs`.
 - `shift.report` (PAY-15، گزارشِ X و Z ِ صندوقِ شیفت): پیش‌فرض همه allow (همان امروز؛ شاگرد نمای کور)، `restrict`، بی تأیید و فقط نمایشی؛ در `SERVER_EDITABLE` مثلِ `reports.money` تا «کارمندان» نشانش دهد؛ برنامه با `ShopRole.allows(…, "shift.report")` دکمهٔ X، Zِ پس از بستن و «گزارش Z» را می‌بندد، نه خودِ بستن (`claude/part-PAY-3`).
 - ⛔ STF-06 (پرچمِ خاموشِ `shop.staff_scope`، `lib/staff-scope.js`، `core/staff/StaffScope.kt`): «مکان» = قفسه یا انبار ِ موجودیِ سرور (شعبه در داده نیست). کارِ عضوِ محدود باید همهٔ مکان‌هایی را که نام می‌برد در محدوده داشته باشد و دست‌کم یکی («خراب» و «در مسیر» مکان نیستند) ⇒ وگرنه ۴۰۳ `location_out_of_scope`؛ ارسال از مبدأ، دریافت و رد در مقصد. مالک هرگز محدود نیست؛ خالی یا همهٔ مکان‌ها = همه (ردیف پاک می‌شود)؛ محدوده در هر درخواست از نو خوانده می‌شود. پرچم خاموش ⇒ هیچ خواندنی از `shop_member_scopes` و پاسخ‌ها بایت‌به‌بایت همان (`staff-scope.test.js`).
 - ⛔ STF-03 — **ویرایشِ** سندِ پولیِ Sync v1 (`lib/staff-edit-v1.js`، در `v1Guard`): هر `update` ِ v1 روی `sales` (`discount` یا `total`، عدد یا `{"$inc": n}`) یا `returns` (`amount`) که تخفیف، درصدِ تخفیف یا مبلغِ برگشت (سقفِ تجمعیِ فاکتور) را **بالا ببرد** همان نیازِ درج را می‌گیرد، با مقدارِ پس از اعمال (ردیفِ `sync_rows` + opهای پیشینِ همان دسته که رد نشدند)؛ برگه نمی‌برد ⇒ «نیازمند تأیید» = `approval_required`، نقشِ بی این کار ⇒ همان کدِ درج؛ فقط همان op رد می‌شود (بی همراه) و صندوق با `detail.edit`. کاهش و ویرایشِ بی‌پول آزاد. `Number(f.x) > 0` روی فیلدِ v1 بس نیست (`$inc` عدد نیست ⇒ NaN). ستونِ پولیِ تازهٔ سند (مثلاً `debtGiven` برای سقفِ قرضی) ⇒ همین‌جا + `staff-edit-v1.test.js`؛ `v1RoleReason` هم همان‌جاست. پرونده‌ها فقط کلیدهای ثابت (`KEYS`) را دنبال می‌کنند، نه کلیدهای درخواست.
@@ -1217,6 +1225,7 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 
+- ۶۱۰ (`610_customer_access_app_door.sql`: CHECK ِ `customer_access_log.door` + `app` — دیدنی که وب و حسابدار از دفترِ خودشان گزارش می‌دهند، CRM-15، `claude/crm-2`؛ ۵۹۰–۶۰۹ در دستِ دیگران؛ rollback در `server/migrations/rollback/`).
 - ۶۴۰ (`640_shop_till_pins.sql`: `shop_till_pins` و `shop_till_sessions` — PIN ِ صندوق در سرور و نوبت‌های سنجیدهٔ صندوق، STF-04/S46، `claude/stf-2`؛ ۱۴۰۵/۰۸/۱۹ پس از سنجشِ main (بزرگ‌ترین ۵۲۰) و شاخه‌های هم‌زمان (۵۹۰، ۶۱۰)؛ ۶۲۰–۶۳۹ برای کارهای هم‌زمان خالی ماند؛ rollback در `server/migrations/rollback/`، آزموده در همان آزمون).
 - ۵۲۰ (`520_order_review_notify.sql`: CHECK ِ `order_notify_outbox.event` + `order_review`، «سفارش به بررسی رفت» ِ O-06 = ب، `claude/stock-ui`؛ سپرده از هماهنگ‌کننده ۵۲۰–۵۲۴، ۱۴۰۵/۰۸/۱۹؛ rollback در `server/migrations/rollback/`).
 - ۴۳۵ (`435_stock_soft_reservations.sql`: `stock_reservations.kind`/`short_at`، O-06 = ب، ORD-20/CHK-18، `claude/p0-stock`؛ سپرده از هماهنگ‌کننده ۴۳۵–۴۳۹، ۱۴۰۵/۰۸/۲۰؛ rollback در `server/migrations/rollback/`).

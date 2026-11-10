@@ -77,6 +77,28 @@ class CustomerAccessTest {
     assertEquals("m80", CustomerAccess.rows(many, emptyList(), "d1").first().id)
   }
 
+  @Test fun `بدنهٔ درِ app فقط شناسه و نوع؛ شناسهٔ ناامن هیچ؛ برگهٔ همه فقط با خروجی`() {
+    assertEquals("""{"customerId":"d-1","kind":"phone"}""", CustomerAccess.noteBody(" d-1 ", Kind.PHONE).toString())
+    assertEquals(setOf("customerId", "kind"), CustomerAccess.noteBody("01JCX9-a_b.c", Kind.DETAIL)?.keys, "بیننده و دستگاه از توکنِ سرور")
+    assertEquals("""{"customerId":"*","kind":"export"}""", CustomerAccess.noteBody(CustomerAccess.ALL, Kind.EXPORT).toString())
+    assertNull(CustomerAccess.noteBody(CustomerAccess.ALL, Kind.DETAIL))
+    assertNull(CustomerAccess.noteBody(CustomerAccess.ALL, Kind.PHONE))
+    for (bad in listOf("", "a b", "x&y=1", "../d", "erased:era1", "ph:abc", "a".repeat(81), "دفتر")) assertNull(CustomerAccess.noteBody(bad, Kind.DETAIL), bad)
+  }
+
+  @Test fun `ردیفِ سرورِ برگهٔ همه مشتریِ همه می‌گیرد و در پرونده می‌ماند`() {
+    val o = Json.parseToJsonElement(
+      """{"entries":[
+        {"id":"cav1","viewerId":"u7","role":"accountant","kind":"export","door":"app","lastAt":900,"all":true},
+        {"id":"cav2","viewerId":"u7","role":"accountant","kind":"export","door":"app","lastAt":800},
+        {"id":"cav3","viewerId":"u7","kind":"export","lastAt":700,"all":"true"}
+      ]}""",
+    ) as JsonObject
+    val rows = CustomerAccess.parse(o, "d1")
+    assertEquals(listOf(CustomerAccess.ALL, "d1", "d1"), rows.map { it.customerId }, "فقط بولیِ true")
+    assertEquals(listOf("cav1", "cav2", "cav3"), CustomerAccess.rows(emptyList(), rows, "d1").map { it.id })
+  }
+
   @Test fun `برگه‌های مشتریان و نوع‌ها`() {
     assertTrue("debtors" in CustomerAccess.CUSTOMER_SHEETS)
     assertFalse("sales" in CustomerAccess.CUSTOMER_SHEETS)
