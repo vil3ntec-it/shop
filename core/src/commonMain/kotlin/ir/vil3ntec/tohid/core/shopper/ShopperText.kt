@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.core.shopper
 
+import ir.vil3ntec.tohid.core.calendar.CivilDays
+import ir.vil3ntec.tohid.core.calendar.SolarHijri
 import ir.vil3ntec.tohid.core.text.DariText
 
 /** زبانِ برنامهٔ خرید — همان چهار زبانِ برنامهٔ دکان؛ دری = فارسی + لایهٔ واژهٔ `DariText`. */
@@ -422,6 +424,80 @@ object ShopperText {
     else -> error(e)
   }
 
+  // ── پاسخ، ویرایش، سنجاق و جست‌وجو (CHAT-14؛ همان `chatacts.*` ِ وب) ──
+  val chatReply get() = t("پاسخ", "Reply", "ځواب")
+  val chatEdit get() = t("ویرایش", "Edit", "سمول")
+  val chatPin get() = t("سنجاق", "Pin", "ټاکل")
+  val chatUnpin get() = t("برداشتنِ سنجاق", "Unpin", "ټاکنه لرې کول")
+  fun chatReplyTo(snip: String) = t("پاسخ به: ${asIs(snip)}", "Replying to: $snip", "ځواب ته: $snip")
+  val chatEditing get() = t("ویرایشِ پیامِ شما", "Editing your message", "ستاسو د پیغام سمول")
+  val chatStop get() = t("انصراف", "Cancel", "پرېښودل")
+  val chatEditOk get() = t("پیام ویرایش شد.", "Message edited.", "پیغام سم شو.")
+  val chatEditOff get() = t("ویرایش نرفت؛ اینترنت وصل نیست. متن در کادر ماند.", "Edit not saved; no internet. Your text is still in the box.", "سمون ونه لېږل شو؛ انټرنېټ وصل نه دی. متن په بکس کې پاتې دی.")
+  val chatPins get() = t("سنجاق‌شده", "Pinned", "ټاکل شوي")
+  val chatPinOk get() = t("پیام سنجاق شد؛ فقط شما می‌بینید.", "Message pinned; only you can see this.", "پیغام وټاکل شو؛ یوازې تاسو یې وینئ.")
+  val chatUnpinOk get() = t("سنجاق برداشته شد.", "Unpinned.", "ټاکنه لرې شوه.")
+  val chatPinOff get() = t("سنجاق نشد؛ اینترنت وصل نیست.", "Not pinned; no internet.", "ونه ټاکل شو؛ انټرنېټ وصل نه دی.")
+  val chatFar get() = t("این پیام در این صفحه باز نیست.", "This message is not open on this page.", "دا پیغام په دې پاڼه کې نه دی پرانیستل شوی.")
+  val chatGone get() = t("پیامِ پیشین", "Earlier message", "مخکینی پیغام")
+  val chatAudio get() = t("پیامِ صوتی", "Voice message", "غږیز پیغام")
+  val chatFind get() = t("جست‌وجو در پیام‌ها", "Search messages", "په پیغامونو کې لټون")
+  val chatFindGo get() = t("بگرد", "Search", "ولټوئ")
+  val chatFinding get() = t("در جست‌وجو…", "Searching…", "لټون روان دی…")
+  fun chatHits(n: Int) = if (n == 1 && lang == ShopperLang.EN) "1 message found" else t("${asIs(num(n.toLong()))} پیام پیدا شد", "$n messages found", "${num(n.toLong())} پیغامونه وموندل شول")
+  val chatNone get() = t("پیامی پیدا نشد.", "No messages found.", "هېڅ پیغام ونه موندل شو.")
+  val chatMe get() = t("شما", "You", "تاسو")
+  val chatOther get() = t("در گفت‌وگوی دیگر", "in another chat", "په بله خبره کې")
+  val sep get() = t("، ", ", ", "، ")
+
+  // ── پیامِ صوتی (CHAT-07؛ همان `voice.*` و `ct.au.*` ِ وب — «مرورگر» ⇐ «برنامه/گوشی») ──
+  val vcTitle get() = t("ضبطِ پیامِ صوتی", "Record a voice message", "د غږیز پیغام ثبتول")
+  val vcLen get() = t("مدتِ ضبط", "Recording length", "د ثبت موده")
+  val vcPrev get() = t("شنیدنِ پیش از فرستادن", "Listen before sending", "تر لېږلو مخکې اورېدل")
+  val vcRecording get() = t("در حالِ ضبط… برای پایان «پایان و فرستادن» را بزنید.", "Recording… Press “Stop and send” when you are done.", "ثبتېږي… د پای لپاره «پای او لېږل» کېکاږئ.")
+  val vcFinish get() = t("پایان و فرستادن", "Stop and send", "پای او لېږل")
+  val vcReady get() = t("ضبط تمام شد. گوش کنید و بفرستید.", "Recording stopped. Listen, then send.", "ثبت ودرېد. واورئ او بیا یې ولېږئ.")
+  fun vcLimit(m: Int) = t("ضبط به سقفِ ${asIs(num(m.toLong()))} دقیقه رسید و تمام شد.", "The recording reached the $m-minute limit and stopped.", "ثبت د ${num(m.toLong())} دقیقو حد ته ورسېد او ودرېد.")
+  val vcFull get() = t("ضبط به سقفِ حجمِ دکان رسید و تمام شد.", "The recording reached the shop's size limit and stopped.", "ثبت د دوکان د حجم حد ته ورسېد او ودرېد.")
+  val vcBig get() = t("این ضبط از سقفِ حجمِ دکان بزرگ‌تر است؛ کوتاه‌تر ضبط کنید.", "This recording is larger than the shop accepts; record a shorter one.", "دا ثبت د دوکان له حجم څخه لوی دی؛ لنډ یې ثبت کړئ.")
+  val vcEmpty get() = t("چیزی ضبط نشد.", "Nothing was recorded.", "هېڅ ثبت نه شو.")
+  val vcCancelled get() = t("ضبط لغو شد.", "Recording cancelled.", "ثبت لغوه شو.")
+  val vcUp get() = t("در حالِ فرستادنِ صدا…", "Sending the voice message…", "غږ لېږل کېږي…")
+  val vcSent get() = t("پیامِ صوتی رفت.", "Voice message sent.", "غږیز پیغام ولاړ.")
+  val vcDenied get() = t("اجازهٔ میکروفون داده نشد. در تنظیماتِ گوشی میکروفون را برای همین برنامه باز کنید و دوباره کوشش کنید.",
+    "Microphone access was not allowed. Allow the microphone for this app in your phone settings and try again.",
+    "د مایکروفون اجازه ور نه کړل شوه. د موبایل په تنظیماتو کې د همدې پروګرام لپاره مایکروفون پرانیزئ او بیا کېکاږئ.")
+  val vcNoMic get() = t("میکروفونی پیدا نشد.", "No microphone was found.", "مایکروفون پیدا نه شو.")
+  val vcBusy get() = t("میکروفون دستِ برنامهٔ دیگری است؛ آن را ببندید و دوباره کوشش کنید.", "Another app is using the microphone; close it and try again.", "مایکروفون بل پروګرام کاروي؛ هغه وتړئ او بیا کېکاږئ.")
+  val vcFail get() = t("ضبط نشد؛ دوباره امتحان کنید.", "Recording failed; please try again.", "ثبت نه شو؛ بیا هڅه وکړئ.")
+  val auPlay get() = t("پخش", "Play", "غږول")
+  val auPause get() = t("توقف", "Pause", "ودرول")
+  val auRetry get() = t("تلاشِ دوباره", "Try again", "بیا هڅه")
+  val auGone get() = t("این پیامِ صوتی دیگر روی سرور نیست؛ پاک شده یا مهلتش گذشته است.", "This voice message is no longer on the server; it was deleted or has expired.", "دا غږیز پیغام نور په سرور کې نشته؛ پاک شوی یا یې موده تېره شوې.")
+  val auCodec get() = t("این برنامه این نوعِ صدا را پخش نمی‌کند.", "This app cannot play this audio format.", "دا پروګرام دا ډول غږ نشي غږولی.")
+  /** دقیقه:ثانیه */
+  fun mmss(ms: Long): String = (ms.coerceAtLeast(0) / 1000).let { s -> digits("${s / 60}:${(s % 60).toString().padStart(2, '0')}") }
+
+  // ── بازپرداخت (NTF-08؛ همان `ch.rf.*` ِ وب) ──
+  val rfTitle get() = t("بازپرداخت", "Refund", "بېرته ورکړه")
+  val rfRequested get() = t("درخواستِ برگشت ثبت شد؛ هنوز پولی برنگشته است.", "Your return request is recorded; no money has been returned yet.", "د بېرته ستنولو غوښتنه ثبت شوه؛ لا پیسې نه دي ستنې شوې.")
+  val rfInProgress get() = t("بخشی از پول برگشته است؛ دکان هنوز کار را نبسته.", "Part of the money has been returned; the shop has not closed it yet.", "یوه برخه پیسې ستنې شوې؛ دوکان لا کار نه دی تړلی.")
+  val rfPartial get() = t("بازپرداخت بسته شد (بخشی از مبلغ).", "Refund closed (part of the amount).", "بېرته ورکړه وتړل شوه (د مبلغ یوه برخه).")
+  val rfFull get() = t("بازپرداخت کامل شد.", "Refund complete.", "بېرته ورکړه بشپړه شوه.")
+  fun rfSum(minor: Long) = t("برگشته به شما: ${asIs(money(minor))}", "Refunded to you: ${money(minor)}", "تاسو ته بېرته: ${money(minor)}")
+  val rfCash get() = t("نقد", "Cash", "نغدې")
+  val rfOther get() = t("روشِ دیگر", "Other method", "بله لاره")
+  fun rfAsked(at: Long) = t("درخواستِ برگشت: ${asIs(stamp(at))}", "Return requested: ${stamp(at)}", "د ستنولو غوښتنه: ${stamp(at)}")
+
+  /** زمانِ سرور به وقتِ کابل (UTC+۴:۳۰، بی ساعتِ تابستانی): «۲۲ میزان ۱۴۰۵، ۱۴:۳۰»؛ انگلیسی «2026-10-14 14:30» */
+  fun stamp(at: Long): String {
+    val local = at + 270 * 60_000L
+    val day = local.floorDiv(86_400_000L)
+    val iso = CivilDays.isoOf(CivilDays.jdnOf(1970, 1, 1) + day.toInt())
+    val hm = clock(((local - day * 86_400_000L) / 60_000L).toInt())
+    return if (lang == ShopperLang.EN) "$iso $hm" else SolarHijri.formatLong(iso, if (lang == ShopperLang.PS) "ps" else "fa", "fa") + "، " + hm
+  }
+
   // ── نظر و امتیاز (NTF-09، DLV-18) ──
   val reviewTitle get() = t("نظرِ شما دربارهٔ این خرید", "Your review of this order", "د دې پېرود په اړه ستاسو نظر")
   fun stars(n: Int) = t("${asIs(num(n.toLong()))} ستاره از ۵", "$n out of 5 stars", "له ۵ څخه ${num(n.toLong())} ستوري")
@@ -686,6 +762,12 @@ object ShopperText {
     "delete_window_passed" -> t("وقتِ «حذف برای همه» ِ این پیام گذشته است؛ فقط «حذف برای من» می‌ماند.", "The time to delete this message for everyone has passed — you can still delete it for yourself.", "د دې پیغام د «ټولو لپاره پاکولو» موده تېره شوې؛ یوازې «زما لپاره پاکول» پاتې دي.")
     "delete_not_allowed" -> t("این پیام را نمی‌توانید برای همه پاک کنید.", "You can't delete this message for everyone.", "دا پیغام د ټولو لپاره نه شئ پاکولی.")
     "chat_disabled" -> t("گفت‌وگو برای این دکان روشن نیست.", "Chat isn't turned on for this shop.", "د دې دوکان لپاره خبرې فعالې نه دي.")
+    "edit_window_passed" -> t("وقتِ ویرایشِ این پیام گذشته است.", "The time to edit this message has passed.", "د دې پیغام د سمولو وخت تېر شوی.")
+    "not_author" -> t("فقط پیامِ خودتان را می‌توانید ویرایش کنید.", "You can only edit your own messages.", "یوازې خپل پیغامونه سمولی شئ.")
+    "pin_limit" -> t("حداکثر ۵ پیام سنجاق می‌شود؛ اول یکی را بردارید.", "You can pin up to 5 messages; unpin one first.", "تر ۵ پیغامونو پورې ټاکل کېږي؛ لومړی یو لرې کړئ.")
+    "bad_reply" -> t("پیامی که به آن پاسخ دادید دیگر در این گفت‌وگو نیست.", "The message you replied to is no longer in this chat.", "هغه پیغام چې ځواب مو ورکړ نور په دې خبرو کې نشته.")
+    "message_not_found" -> t("این پیام پیدا نشد.", "This message was not found.", "دا پیغام ونه موندل شو.")
+    "query_too_short" -> t("دست‌کم دو حرف بنویسید.", "Type at least two letters.", "لږ تر لږه دوه توري ولیکئ.")
     "issue_window_passed" -> t("مهلتِ «مشکل دارم» برای این سفارش گذشته است؛ با دکان تماس بگیرید.", "It's too late to report a problem here — please call the shop.", "د «ستونزه لرم» وخت تېر شوی؛ دوکان ته زنګ ووهئ.")
     "too_large" -> t("فایل بزرگ است؛ عکسِ کوچک‌تری برگزینید.", "That file is too large — choose a smaller photo.", "دوتنه لویه ده؛ کوچنی انځور وټاکئ.")
     "unsupported_media" -> chatPhotoBad

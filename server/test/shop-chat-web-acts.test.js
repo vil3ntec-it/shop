@@ -212,3 +212,32 @@ test('سنجاقِ پیامِ دیگری ⇒ ۴۰۴؛ پاسخِ سنجاق مت
   assert.equal(un.status, 200, JSON.stringify(un.body));
   assert.ok(!un.body.conversation.pinned.some((x) => x.messageId === theirs.id));
 });
+
+//  برنامهٔ خریدِ مشتری (`ShopperApi.chatEdit`): HttpURLConnection ِ اندروید و JDK روش PATCH نمی‌فرستد ⇒ همان ویرایش با
+//  POST (الگوی `POST /api/shop/chat/conversations/:id/messages/:mid/edit` ِ دکان). همان مرزها: نویسنده، مهلت، گفت‌وگوی خود.
+test('POST …/messages/:mid/edit ِ ویترین همان PATCH است: پیامِ خودم، نه دیگری، نه دیر، نه گفت‌وگوی دیگری', async () => {
+  const config = require('../src/config');
+  const mine = await say(S, T1, C1, 'پیامِ برنامهٔ خرید');
+  const ed = await h.post(`${S.base}/conversations/${C1}/messages/${mine.id}/edit`, { body: 'ویرایش از برنامه' }, as(T1));
+  assert.equal(ed.status, 200, JSON.stringify(ed.body));
+  assert.equal(ed.body.message.body, 'ویرایش از برنامه');
+  assert.equal(ed.body.message.editUntil, mine.editUntil);
+  assert.ok(ed.body.message.rev > mine.rev && ed.body.message.editedAt >= mine.createdAt);
+
+  const fromShop = await shopSay(S, C1, 'پیامِ دکان، دست‌نخورده');
+  const no = await h.post(`${S.base}/conversations/${C1}/messages/${fromShop.id}/edit`, { body: 'دست‌کاری' }, as(T1));
+  assert.deepEqual([no.status, errOf(no)], [403, 'not_author']);
+  const other = await h.post(`${S.base}/conversations/${C1}/messages/${mine.id}/edit`, { body: 'نفوذ' }, as(T2));
+  assert.deepEqual([other.status, errOf(other)], [404, 'conversation_not_found']);
+  const empty = await h.post(`${S.base}/conversations/${C1}/messages/${mine.id}/edit`, { body: '  ' }, as(T1));
+  assert.equal(empty.status, 400, JSON.stringify(empty.body));
+  const old = await say(S, T1, C1, 'پیامِ کهنهٔ برنامه');
+  await query('UPDATE shop_chat_messages SET created_at=$2 WHERE id=$1', [old.id, now() - config.shopChat.editWindowMs - 60_000]);
+  const late = await h.post(`${S.base}/conversations/${C1}/messages/${old.id}/edit`, { body: 'دیر' }, as(T1));
+  assert.deepEqual([late.status, errOf(late)], [403, 'edit_window_passed']);
+  const noTicket = await h.post(`${S.base}/conversations/${C1}/messages/${mine.id}/edit`, { body: 'بی بلیت' });
+  assert.equal(noTicket.status, 401);
+  const rows = await one('SELECT (SELECT body FROM shop_chat_messages WHERE id=$1) AS a, (SELECT body FROM shop_chat_messages WHERE id=$2) AS b, (SELECT body FROM shop_chat_messages WHERE id=$3) AS c',
+    [mine.id, fromShop.id, old.id]);
+  assert.deepEqual([rows.a, rows.b, rows.c], ['ویرایش از برنامه', 'پیامِ دکان، دست‌نخورده', 'پیامِ کهنهٔ برنامه']);
+});

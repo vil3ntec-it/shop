@@ -3,13 +3,16 @@
 
   <!--
        اینترنت، و از مرحلهٔ ۲ موقعیت (فقط برای پینِ نشانی، و فقط وقتی مشتری «موقعیتِ فعلیِ من» را می‌زند — هیچ پرسشی
-       هنگامِ باز شدن). نه دوربین، نه حافظه (عکسِ گفت‌وگو از گزینشگرِ سیستم)، نه پیامک، نه موقعیتِ پس‌زمینه.
+       هنگامِ باز شدن) و میکروفون (پیامِ صوتیِ گفت‌وگو، CHAT-07: فقط با پرچمِ دکان و فقط وقتی مشتری میکروفون را می‌زند).
+       نه دوربین، نه حافظه (عکسِ گفت‌وگو از گزینشگرِ سیستم)، نه پیامک، نه موقعیتِ پس‌زمینه.
   -->
   <uses-permission android:name="android.permission.INTERNET" />
   <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+  <uses-permission android:name="android.permission.RECORD_AUDIO" />
   <uses-feature android:name="android.hardware.location" android:required="false" />
   <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+  <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
   <!--
        allowBackup=false: سبد، بلیتِ شماره و پیوندِ پیگیری فقط روی همین گوشی می‌مانند و به پشتیبانِ ابری

@@ -29,7 +29,8 @@ import kotlinx.coroutines.withContext
 
 /**
  *  نقطهٔ ورودِ اندروید: فقط سیم‌کشیِ مرزهای سکو؛ همهٔ صفحه‌ها در `ui/` (بی android.*).
- *  مرحلهٔ ۲: اجازهٔ موقعیت فقط با زدنِ «موقعیتِ فعلیِ من»، گزینشگرِ عکسِ سیستم (بی اجازهٔ حافظه)، «نمایش روی نقشه»
+ *  مرحلهٔ ۲: اجازهٔ موقعیت فقط با زدنِ «موقعیتِ فعلیِ من»، اجازهٔ میکروفون فقط با زدنِ میکروفونِ گفت‌وگو (`VoiceAndroid`)،
+ *  گزینشگرِ عکسِ سیستم (بی اجازهٔ حافظه)، «نمایش روی نقشه»
  *  با `geo:`، و پیوندِ عمیق (`tohidshop://store/…`، `https://vill3n.top/store/…`، `<slug>.vill3n.top`) در
  *  `onCreate`/`onNewIntent`.
  */
@@ -37,6 +38,8 @@ class MainActivity : ComponentActivity() {
   private lateinit var model: CustomerModel
   private var locationDone: ((GeoPin?) -> Unit)? = null
   private var photoDone: ((ChatPhoto?) -> Unit)? = null
+  //  پیامِ صوتی (CHAT-07): پیش از onCreate ساخته می‌شود (پرسشِ اجازهٔ میکروفون با registerForActivityResult)
+  private val voice = VoiceAndroid(this)
 
   private val askLocation = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
     val done = locationDone ?: return@registerForActivityResult
@@ -85,6 +88,7 @@ class MainActivity : ComponentActivity() {
       locator = Locator { done -> locate(done) },
       secureRandom = { n -> ByteArray(n).also { random.nextBytes(it) } },
       secrets = SecretsAndroid(this),
+      voice = voice,
     )
     val platform = Platform(
       photo = { path, modifier -> ImagesAndroid.Photo(server().trimEnd('/') + path, modifier) },
@@ -121,6 +125,11 @@ class MainActivity : ComponentActivity() {
   override fun onPause() {
     if (::model.isInitialized) model.paused()
     super.onPause()
+  }
+
+  override fun onDestroy() {
+    voice.release()
+    super.onDestroy()
   }
 
   private companion object {

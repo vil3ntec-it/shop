@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.core.shopper
 
 import ir.vil3ntec.tohid.core.market.PublicOrder
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 /*
  *  برنامهٔ خریدِ مشتری، مرحلهٔ ۲ — نظر و امتیاز (NTF-09، DLV-18) و تخفیفِ ویترین (MKT-01/02/09) روی همان درهای امروز:
@@ -20,9 +21,47 @@ data class OrderReview(val stars: Int, val comment: String = "", val status: Str
 @Serializable
 data class ReviewState(val canReview: Boolean = false, val commentMax: Int = ReviewRules.COMMENT_MAX, val review: OrderReview? = null)
 
-/** کلیدهای پیگیری که در `PublicOrder` ِ قراردادِ بازار نیستند (پرچم‌دار؛ نبود ⇒ پیش‌فرض) */
+/**
+ *  کلیدهای پیگیری که در `PublicOrder` ِ قراردادِ بازار نیستند (پرچم‌دار؛ نبود ⇒ پیش‌فرض). [refund] جدا خوانده می‌شود
+ *  (`ShopperApi.trackPage`) تا شکلِ تازه یا نادرستِ آن نظر و گفت‌وگو را نبرد.
+ */
 @Serializable
-data class OrderExtras(val review: ReviewState? = null, val chat: Boolean = false)
+data class OrderExtras(val review: ReviewState? = null, val chat: Boolean = false, @Transient val refund: RefundView? = null)
+
+/** یک ردیفِ دفترِ بازپرداخت در پیگیری: فقط مبلغ، روش و زمان (سرور دلیل و کننده را نمی‌دهد) */
+@Serializable
+data class RefundEntry(val amountMinor: Long = 0, val method: String = "", val at: Long = 0)
+
+/**
+ *  کلیدِ `refund` ِ پیگیری (NTF-08، پرچمِ خاموشِ `shop.orders.refund_tracking`، `lib/order-refund-view.js`): نبود یا
+ *  `null` ⇒ هیچ کارتی. وضعیت `requested` · `in_progress` · `partial` · `full`؛ ناشناخته ⇒ همان «درخواست ثبت شد» ِ وب.
+ */
+@Serializable
+data class RefundView(
+  val status: String = "requested",
+  val requestedAt: Long? = null,
+  val refundedMinor: Long = 0,
+  val remainingMinor: Long = 0,
+  val entries: List<RefundEntry> = emptyList(),
+  val updatedAt: Long? = null,
+)
+
+/** کارتِ بازپرداختِ صفحهٔ سفارش — همان `renderRefund` ِ `store/order-changes.js` */
+object RefundRules {
+  fun note(r: RefundView): String = when (r.status) {
+    "in_progress" -> ShopperText.rfInProgress
+    "partial" -> ShopperText.rfPartial
+    "full" -> ShopperText.rfFull
+    else -> ShopperText.rfRequested
+  }
+
+  /** بسته شد ⇒ رنگِ «انجام شد»، وگرنه «آگاهی» */
+  fun closed(r: RefundView): Boolean = r.status == "partial" || r.status == "full"
+
+  /** یک ردیف: «زمان — روش» و مبلغ */
+  fun line(e: RefundEntry): Pair<String, String> =
+    (ShopperText.stamp(e.at) + " — " + if (e.method == "cash") ShopperText.rfCash else ShopperText.rfOther) to ShopperText.money(e.amountMinor)
+}
 
 class TrackPage(val order: PublicOrder, val extras: OrderExtras)
 

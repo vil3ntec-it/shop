@@ -20,9 +20,9 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1010,
+    "routes": 1011,
     "byAuth": {
-      "none-detected": 194,
+      "none-detected": 195,
       "admin": 279,
       "inline": 2,
       "user": 492,
@@ -31,7 +31,7 @@
     },
     "byShape": {
       "extracted": 701,
-      "empty": 307,
+      "empty": 308,
       "unresolved": 2
     }
   },
@@ -942,6 +942,7 @@
     {"method":"POST","path":"/api/store/:slug/chat/conversations/:id/messages","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","slug"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"DELETE","path":"/api/store/:slug/chat/conversations/:id/messages/:mid","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","mid","slug"],"query":["for"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"PATCH","path":"/api/store/:slug/chat/conversations/:id/messages/:mid","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","mid","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/store/:slug/chat/conversations/:id/messages/:mid/edit","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","mid","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"DELETE","path":"/api/store/:slug/chat/conversations/:id/pins/:mid","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","mid","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":["conversation"]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/store/:slug/chat/conversations/:id/pins/:mid","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","mid","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":["conversation"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/store/:slug/chat/conversations/:id/receipts","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
