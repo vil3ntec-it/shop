@@ -54,6 +54,12 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/rsk-platform` (تمیزکاری: بی سقفِ پلتفرمیِ تازه برای `OrderRiskListsV3.kt`؛ روی `ccr-…-batch-42` ‏1879be76؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: `090a2373` (از `claude/rsk-app`) برای یک `LocalContext` در صفحهٔ v3 سقفِ تازهٔ ۱ در `platformDeps` ِ `tools/quality/baseline.json` گذاشته بود.
+  پوستهٔ مسیرِ `RiskListsRoute` (مخزن از `Context`) به `OrderRiskListsAndroid.kt` رفت (مرزِ `*Android.kt` در `PLATFORM_DEPS.boundary`)؛ بدنه `RiskListsContent(repo)`
+  در `OrderRiskListsV3.kt` بی‌پلتفرم ماند و سطرِ سقف برداشته شد. بقیهٔ سقف‌های همان کامیت فقط پایین آمده بودند و دست نخوردند. quality، eslint، spec «سالم»، آینه‌های Kotlin و dari ۲۱/۲۱.
+- نیمه‌کاره: کامپایلِ اندروید/کامپیوتر و `V3ReachabilityTest` (`RiskListsRoute` ⇐ `RiskListsContent` ⇐ `RiskEntriesList`) فقط در CI.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد. `finish-pr.sh` با `[ -n "$BUMP" ]` می‌سنجد ⇒ `BUMP=0` هم سقف می‌افزاید؛ برای «بی سقفِ تازه» `BUMP` را خالی بگذارید.
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/sec-review-42` (بازبینیِ امنیتیِ دومِ دسته‌های ۴۱–۴۲، روی `ccr-…-batch-42` ‏a8704c12؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: دو یافتهٔ Low در نگه‌داشتنِ موجودی (O-06، پرچم‌های خاموش)، هر دو با آزمونِ سرخ‌پیش‌از‌رفع (`server/test/security-review-42.test.js`، ۴ آزمون):
   SR42-1 قلمِ بزرگ‌شده (افزودنِ مشتری) جای صفِ پیشین را نگه می‌داشت ⇒ سفارشِ دیگری به بررسی می‌رفت ⇒ بزرگ شدن ته صف؛ SR42-2 بن‌بستِ گذارِ کارمند و

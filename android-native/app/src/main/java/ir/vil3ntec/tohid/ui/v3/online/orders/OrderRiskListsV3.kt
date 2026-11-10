@@ -24,7 +24,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrKit
@@ -45,7 +44,6 @@ import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3Skeleton
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
-import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import kotlinx.coroutines.launch
 
 /**
@@ -55,12 +53,12 @@ import kotlinx.coroutines.launch
  *
  *  ⛔ فقط صاحب و مدیر (`orders.contact`) و فقط با `risk` ِ `/config` (پرچمِ `shop.order_risk`)؛ سرور هم همین را می‌سنجد
  *  (۴۰۳ `order_risk_disabled`). دلیل فقط برای خودِ دکان است؛ مشتری هرگز نمی‌بیند.
+ *
+ *  بی‌پلتفرم (راهِ آیفون): مسیر `RiskListsRoute` در `OrderRiskListsAndroid.kt` فقط [repo] را می‌سازد و همین را می‌کشد.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun RouteScope.RiskListsRoute() {
-  val context = LocalContext.current
-  val repo = remember(context) { OrdersHub.repo(context) }
+internal fun RiskListsContent(repo: OrdersRepository) {
   val cfg = OrdersLive.config.value
   val allowed = cfg != null && cfg.risk && cfg.permissions.contact
   //  (فهرست، پین؟) ِ برگهٔ باز؛ null ⇒ هیچ

@@ -389,7 +389,6 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/delivery/DeliveryRouteContent.kt": 7,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/delivery/DeskStore.kt": 2,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/delivery/InvoiceSheet.kt": 2,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/orders/OrderRiskListsV3.kt": 1,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/orders/OrdersHub.kt": 10,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/orders/OrdersModel.kt": 13,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/orders/OrdersQueueController.kt": 3,
