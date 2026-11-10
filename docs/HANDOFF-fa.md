@@ -54,6 +54,10 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/inv-2` (ردیف‌های PARTIAL ِ INV: INV-16 و INV-01، بخشِ وب؛ روی main ‏99036497 = دستهٔ ۴۲، #1026؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **INV-16** زبانهٔ «ارزش موجودی» در «گزارشِ تازه» ِ وب (`license/stock-value-core.js` = دوقلوی `StockAnalysis.valuation`، بردارِ تازهٔ `core/test-vectors/stock-value-v1.json` ۱۷ مورد؛ بها = بازپخشِ میانگینِ موزونِ `report-core.stockCost`، ارزش = جمعِ دفتر؛ کم‌بودها زیرِ جدول؛ فقط با `money`) — `stock-value-core.test.js` ۶/۶ و `web-report-fresh.mjs` ۹/۹ (هر دو پیش از تغییر سرخ). **INV-01** زبانهٔ «موجودیِ هر مکان» در پنجرهٔ «انتقالِ موجودی» ِ وب (موجودیِ سرور در قفسه/انبار/خراب/در مسیر و جمع، محدودهٔ STF-06) — `web-transfers.mjs` ۱۱/۱۱ روی PGlite و PostgreSQL 16 و `web-transfers-core.test.js` ۸/۸. بی مسیرِ سرورِ تازه، بی مهاجرت، بی Kotlin ِ برنامه؛ `sw.js` ‏v71. هر دو ردیف PARTIAL ماندند.
+- نیمه‌کاره: `StockValueVectorsTest` (core ‏jvmTest) فقط در CI. INV-09/11/13 دست نخوردند (ماندهٔ هر سه دستگاهِ واقعی است). INV-03 و INV-04@32 (رزرو) عمداً بیرون.
+- قدمِ بعدی: شاهدِ CI (خطِ `KTEST PASS ir.vil3ntec.tohid.core.stock.StockValueVectorsTest`) در STATUS ِ INV-16؛ تصمیمِ صاحب‌کار برای «ارزش موجودی (به بهای خرید)» ِ `ReportEngine.products`/`DashboardEngine` (هنوز `purchasePrice` با کیت/منفی) و `shop.stock_v2`؛ مدلِ انبار جدا از محل و شعبه (INV-01).
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-fix-43` (پیگیریِ بازبینیِ دومِ دستهٔ ۴۳: R9 و صفحه‌های `/images/mine`؛ روی `claude/sec-review-43` ‏041e8995 + main؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) R9: نامِ قدیم و واحددارِ یک فیلد در op ِ v1/v2 (`amount`+`amountMinor`) دیگر به ترتیبِ کلیدها بسته نیست — `unitClash` در `fromV2` و همزادهای
   وب/Kotlin؛ یکی ⇒ همان مقدار، ناجور ⇒ `unit_conflict` (راهِ op ِ نادرست). بردارِ `rejects`؛ `sync-v3-unit-pair.test.js` ۴/۴ (پیش از رفع ۴ سرخ، PGlite و PostgreSQL)؛

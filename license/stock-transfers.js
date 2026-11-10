@@ -15,6 +15,8 @@
  *    (`tohid:lang` ِ `web-i18n.js`) واژه‌نامهٔ همان زبان بار و پنجره دوباره نقاشی می‌شود، بی بارگذاریِ دوبارهٔ صفحه و بی گم
  *    شدنِ آنچه در فرم نوشته شده؛ نامِ کالا `data-raw` دارد (دادهٔ دفتر، هرگز ترجمه نمی‌شود).
  * ⛔ `index.html` یخ‌زده است ⇒ این پرونده را `orders-ui.js` بار می‌کند (هیچ خطی به index.html اضافه نمی‌شود).
+ * INV-01: زبانهٔ سومِ همین پنجره «موجودیِ هر مکان» — موجودیِ سرور برای هر کالا در قفسه، انبار، خراب و در مسیر (همان
+ *    `GET …/catalog/products`؛ عضوِ محدود فقط مکان‌های محدوده‌اش را می‌گیرد، STF-06) و جمعِ همان مکان‌ها؛ فقط دیدن، هیچ حسابی جز جمع.
  *
  * بخشِ بالایی («هسته») خالص است و در Node هم بار می‌شود (`server/test/web-transfers-core.test.js`).
  */
@@ -24,6 +26,9 @@
   // ══════════════════════════════ هسته ══════════════════════════════
 
   const LOCS = ['shop_floor', 'warehouse'];
+  //  همهٔ مکان‌های موجودیِ سرور (`stock.LOCATIONS`)؛ خراب و در مسیر فقط دیدنی‌اند، نه مبدأ/مقصدِ انتقال
+  const PLACES = ['shop_floor', 'warehouse', 'damaged', 'in_transit'];
+  const TABS = ['open', 'all', 'stock'];
   const OPEN = ['in_transit', 'partial'];
   const STATUSES = ['in_transit', 'partial', 'received', 'rejected'];
   const MAX_LINES = 100;
@@ -57,6 +62,13 @@
   }
 
   const isOpen = (t) => !!t && OPEN.includes(t.status);
+
+  /** INV-01 — یک کالای کاتالوگِ سرور ⇒ موجودیِ هر مکانِ `places` (عددِ ناجور یا نبود ⇒ ۰) و جمعِ همان مکان‌ها */
+  function placesRow(p, places) {
+    const lv = (p && p.stock && p.stock.levels) || {};
+    const cells = places.map((l) => (Number.isSafeInteger(lv[l]) ? lv[l] : 0));
+    return { id: String(p && p.id), name: String((p && (p.name || p.id)) || ''), cells, totalMilli: cells.reduce((a, b) => a + b, 0) };
+  }
 
   /** پیش‌نویس ⇒ بدنهٔ `POST /transfers` یا { error, n } (کلیدِ واژه‌نامه و شمارهٔ ردیف از یک) */
   function draftBody(d) {
@@ -122,7 +134,7 @@
     return LANGS.includes(l) ? l : 'fa';
   };
 
-  const core = { LOCS, OPEN, STATUSES, MAX_LINES, LANGS, latin, toMilli, qtyText, isOpen, draftBody, receiveBody, rejectBody, newKey, fill, langOf };
+  const core = { LOCS, PLACES, TABS, OPEN, STATUSES, MAX_LINES, LANGS, latin, toMilli, qtyText, isOpen, placesRow, draftBody, receiveBody, rejectBody, newKey, fill, langOf };
   if (typeof module !== 'undefined' && module.exports) { module.exports = core; return; }
   if (typeof document === 'undefined') return;
 
@@ -141,11 +153,14 @@
   const st = {
     dict: null, cfg: null, busy: false, tab: 'open', list: [], loading: false, err: '',
     view: 'list', open: null, draft: null, found: [], names: {}, act: null, key: '', listSeq: 0, findSeq: 0, dictLang: '', langSeq: 0,
+    sq: '', sItems: [], sNext: null, sFresh: null,
   };
   const t = (k, vars) => fill(st.dict && Object.prototype.hasOwnProperty.call(st.dict, k) ? st.dict[k] : k, vars);
   const loc = (l) => t(`loc.${l}`);
   const canMove = () => !!(st.cfg && st.cfg.permissions && st.cfg.permissions.move);
   const places = () => (st.cfg && Array.isArray(st.cfg.locations) ? LOCS.filter((l) => st.cfg.locations.includes(l)) : LOCS);
+  //  ستون‌های «موجودیِ هر مکان»: همان مکان‌هایی که سرور برای این عضو می‌گوید (محدوده ⇒ فقط همان‌ها)
+  const stockPlaces = () => (st.cfg && Array.isArray(st.cfg.locations) ? PLACES.filter((l) => st.cfg.locations.includes(l)) : PLACES);
   //  هر بار از نو، نه یک قالبِ ثابت از بارِ نخست: تقویم و زبانِ صفحه بی بارگذاریِ دوباره عوض می‌شوند (`web-i18n.js`)
   const WHEN = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
   const when = (ms) => {
@@ -272,8 +287,9 @@
     m.classList.add('open');
     st.view = 'list';
     paint();
-    loadList();
+    reloadTab();
   }
+  const reloadTab = () => (st.tab === 'stock' ? loadStock(false) : loadList());
   function closePanel() { const m = $('xfr-modal'); if (m) m.classList.remove('open'); st.act = null; st.key = ''; }
   function setErr(msg) { const el = $('xfr-err'); if (el) el.textContent = msg || ''; }
 
@@ -315,11 +331,12 @@
   }
 
   function listHtml() {
-    const tabs = ['open', 'all'].map((k) => `<button type="button" role="tab" class="xfr-tab${st.tab === k ? ' on' : ''}" aria-selected="${st.tab === k}" data-xfr="tab" data-tab="${k}">${esc(t(`tab.${k}`))}</button>`).join('');
+    const tabs = TABS.map((k) => `<button type="button" role="tab" class="xfr-tab${st.tab === k ? ' on' : ''}" aria-selected="${st.tab === k}" data-xfr="tab" data-tab="${k}">${esc(t(`tab.${k}`))}</button>`).join('');
     const head = `<p class="xfr-sub">${esc(t('sub'))}</p>
       <div class="xfr-bar"><div class="xfr-tabs" role="tablist">${tabs}</div>
         ${canMove() ? `<button type="button" class="btn btn-primary btn-sm" data-xfr="new">${esc(t('new'))}</button>` : ''}</div>
       ${canMove() ? '' : `<p class="xfr-note">${esc(t('readonly'))}</p>`}`;
+    if (st.tab === 'stock') return head + stockHtml();
     if (st.loading && !st.list.length) return `${head}<p class="xfr-empty">${esc(t('loading'))}</p>`;
     if (st.err) return `${head}<p class="xfr-empty">${esc(st.err)} <button type="button" class="btn btn-secondary btn-sm" data-xfr="reload">${esc(t('retry'))}</button></p>`;
     if (!st.list.length) return `${head}<p class="xfr-empty">${esc(t(st.tab === 'open' ? 'empty.open' : 'empty.all'))}</p>`;
@@ -331,6 +348,52 @@
         <span class="xfr-when">${esc(when(x.createdAt))}</span>
       </button></li>`).join('');
     return `${head}<ul class="xfr-list" id="xfr-list">${rows}</ul>`;
+  }
+
+  // ── موجودیِ هر مکان (INV-01) ───────────────────────────────────────
+
+  function stockHtml() {
+    const ps = stockPlaces();
+    const top = `<form id="xfr-stock" class="xfr-form" role="search" novalidate><div class="xfr-search"><label class="xfr-grow"><span class="sr">${esc(t('draft.search'))}</span>
+        <input type="search" name="sq" value="${esc(st.sq)}" placeholder="${esc(t('draft.search'))}" aria-label="${esc(t('draft.search'))}"></label>
+        <button type="submit" class="btn btn-secondary btn-sm">${esc(t('draft.searchBtn'))}</button></div></form>
+      <p class="xfr-note">${esc(t('stock.sub'))}</p>${st.sFresh && st.sFresh.fresh === false ? `<p class="xfr-note" role="status">${esc(t('stock.stale'))}</p>` : ''}`;
+    if (st.loading && !st.sItems.length) return `${top}<p class="xfr-empty">${esc(t('loading'))}</p>`;
+    if (st.err) return `${top}<p class="xfr-empty">${esc(st.err)} <button type="button" class="btn btn-secondary btn-sm" data-xfr="reload">${esc(t('retry'))}</button></p>`;
+    if (!st.sItems.length) return `${top}<p class="xfr-empty">${esc(t(st.sq.trim() ? 'draft.noResult' : 'stock.empty'))}</p>`;
+    const rows = st.sItems.map((p) => {
+      const r = placesRow(p, ps);
+      const cell = (q) => `<td${q < 0 ? ' class="xfr-neg"' : ''}>${esc(qtyText(q))}</td>`;
+      return `<tr data-id="${esc(r.id)}"><th scope="row" data-raw>${esc(r.name)}</th>${r.cells.map(cell).join('')}<td><b>${esc(qtyText(r.totalMilli))}</b></td></tr>`;
+    }).join('');
+    return `${top}<div class="xfr-scroll" tabindex="0" role="region" aria-label="${esc(t('tab.stock'))}"><table class="xfr-table" id="xfr-stock-table">
+      <thead><tr><th scope="col">${esc(t('detail.product'))}</th>${ps.map((l) => `<th scope="col" data-loc="${l}">${esc(loc(l))}</th>`).join('')}<th scope="col">${esc(t('stock.total'))}</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>${st.sNext ? `<div class="modal-actions"><button type="button" class="btn btn-secondary btn-sm" data-xfr="more">${esc(t('stock.more'))}</button></div>` : ''}`;
+  }
+
+  /** صفحهٔ کالاهای کاتالوگ با موجودیِ هر مکان؛ `more` ⇒ صفحهٔ بعد. همان نسلِ فهرست (`listSeq`): پاسخِ زبانهٔ پیشین نمی‌نشیند */
+  async function loadStock(more) {
+    if (more && (st.loading || !st.sNext)) return;
+    const seq = ++st.listSeq;
+    const q = st.sq.trim();
+    const cursor = more ? st.sNext : null;
+    st.loading = true; st.err = '';
+    if (!more) { st.sItems = []; st.sNext = null; }
+    paint();
+    try {
+      const r = await call(`/products?limit=50${q ? `&q=${encodeURIComponent(q)}` : ''}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+      if (seq !== st.listSeq) return;
+      const items = (Array.isArray(r.items) ? r.items : []).filter((p) => p && !p.deleted);
+      items.forEach((p) => { st.names[p.id] = p.name; });
+      st.sItems = more ? st.sItems.concat(items) : items;
+      st.sNext = r.nextCursor || null;
+      st.sFresh = r.freshness || null;
+    } catch (e) {
+      if (seq !== st.listSeq) return;
+      st.err = errText(e);
+    } finally {
+      if (seq === st.listSeq) { st.loading = false; paint(); }
+    }
   }
 
   // ── پیش‌نویس ────────────────────────────────────────────────────────
@@ -546,8 +609,9 @@
     if (!b) return;
     const a = b.dataset.xfr;
     if (a === 'close') closePanel();
-    else if (a === 'tab') { st.tab = b.dataset.tab; loadList(); }
-    else if (a === 'reload') loadList();
+    else if (a === 'tab') { st.tab = TABS.includes(b.dataset.tab) ? b.dataset.tab : 'open'; reloadTab(); }
+    else if (a === 'reload') reloadTab();
+    else if (a === 'more') loadStock(true);
     else if (a === 'new') { st.draft = loadDraft(); saveDraft(); st.found = []; st.searched = false; st.view = 'draft'; paint(); }
     else if (a === 'back') { st.view = 'list'; st.act = null; st.key = ''; paint(); if (st.open) loadList(); }
     else if (a === 'find') find();
@@ -570,6 +634,7 @@
 
   function onSubmit(e) {
     e.preventDefault();
+    if (e.target.id === 'xfr-stock') { loadStock(false); return; }
     //  Enter در کادرِ جست‌وجو یعنی «جست‌وجو»، هرگز «فرستادن» ِ انتقال
     const active = document.activeElement;
     if (e.target.id === 'xfr-draft' && active && active.name === 'q' && e.target.contains(active)) { find(true); return; }
@@ -579,6 +644,7 @@
 
   function onInput(e) {
     const el = e.target;
+    if (el.name === 'sq' && el.closest('#xfr-stock')) { st.sq = el.value; return; }
     if (!st.draft || !el.closest('#xfr-draft')) return;
     //  ⛔ کلید عوض نمی‌شود (درونِ پیش‌نویس است): ارسالِ نامعلومِ پیشین با بدنهٔ دیگر ⇒ ۴۰۹، هرگز انتقالِ دوم
     if (el.name === 'xfr-qty') st.draft.lines[Number(el.dataset.i)].qty = el.value;

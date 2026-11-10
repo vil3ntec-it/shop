@@ -26,6 +26,8 @@
 
   function core() { return window.TohidReportCore; }
   function board() { return window.TohidReportBoard; }
+  /** INV-16: هستهٔ «ارزش موجودی» (`stock-value-core.js`، دوقلوی `StockAnalysis.valuation`)؛ نبودش ⇒ بی آن زبانه */
+  function value() { return window.TohidStockValue; }
   function env() { return typeof window.tohidReportEnv === 'function' ? window.tohidReportEnv() : null; }
   function get(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
   function put(k, v) { try { window.localStorage.setItem(k, v); } catch (e) { /* حالتِ خصوصی: فقط همین بار */ } }
@@ -88,7 +90,13 @@
   /** VISUAL-DIRECTION §۱.۵: صفحهٔ مدیریت پیش‌فرض جدول؛ گوشی همیشه کارت */
   function viewMode() { return phone() ? 'card' : (get(VM_KEY) === 'card' ? 'card' : 'table'); }
 
-  function tabsFor(E) { var B = board(); return E.money ? B.TABS : B.TABS.filter(function (t) { return t.id === 'debts'; }); }
+  /** INV-16 — مثلِ «بهای میانگین» ِ برنامه (`StockCostFresh.tabs`) بیرون از تابلوی مشترک و فقط برای کسی که پول را می‌بیند */
+  var STOCK_TAB = { id: 'stock-value', label: 'ارزش موجودی', ranged: false };
+  function tabsFor(E) {
+    var B = board();
+    if (!E.money) return B.TABS.filter(function (t) { return t.id === 'debts'; });
+    return value() ? B.TABS.concat([STOCK_TAB]) : B.TABS;
+  }
 
   /* ---------------- خانه ---------------- */
 
@@ -163,8 +171,44 @@
       var d = C.debts(L, { asOf: E.today, clock: ck });
       return { tables: C.tables('debts', d), debts: d };
     }
+    if (tab === STOCK_TAB.id) return stockValueView(value().fromLedger(E.ledger, C));
     var f = C.fraud(L, { from: r.from, to: r.to, clock: ck });
     return { tables: C.tables('fraud', f), fraud: f };
+  }
+
+  /**
+   *  INV-16 — ارزشِ موجودی به بها و به قیمتِ فروش و سودِ بالقوه: بها = میانگینِ موزونِ همین دفتر (D-23)، ارزش = جمعِ دفتر.
+   *  فقط کالاهای موجودِ حساب‌شده در جدول؛ ردیفِ «جمع» همان جمعِ هسته (منفی، کیت و «حساب نشد» بیرون‌اند و زیرِ جدول گفته می‌شوند).
+   */
+  function stockValueView(sv) {
+    var v = sv.valuation;
+    var approx = !v.complete || sv.rows.some(function (r) { return r.approximate; });
+    return {
+      value: v,
+      tables: [{
+        id: STOCK_TAB.id, title: 'ارزش موجودی و سود بالقوه',
+        columns: [
+          { key: 'name', label: 'کالا', kind: 'text' }, { key: 'qty', label: 'موجودی', kind: 'qty' },
+          { key: 'unitCost', label: 'بهای یک واحد', kind: 'money' }, { key: 'costValue', label: 'ارزش موجودی', kind: 'money' },
+          { key: 'retailValue', label: 'ارزش به قیمت فروش', kind: 'money' }, { key: 'profit', label: 'سود بالقوه', kind: 'money' },
+          { key: 'approx', label: 'تقریبی', kind: 'flag' },
+        ],
+        rows: sv.rows.map(function (r) { return [r.name, r.qtyMilli, r.unitCostMinor, r.costMinor, r.retailMinor, r.profitMinor, r.approximate]; }),
+        total: ['جمع', null, null, v.costMinor, v.retailMinor, v.potentialProfitMinor, approx],
+      }],
+    };
+  }
+
+  /** زیرِ آمار: قاعده، و هر کم‌بود جدا (پنهان نمی‌شود؛ همان یادداشت‌های «تحلیلِ موجودی» ِ برنامه) */
+  function stockValueNotes(v) {
+    var out = [];
+    if (v.missingCost.length) out.push(v.missingCost.length + ' کالای موجود بی بها — در سود نیامد');
+    if (v.missingPrice.length) out.push(v.missingPrice.length + ' کالای موجود بی قیمت فروش');
+    if (v.belowCost.length) out.push(v.belowCost.length + ' کالا قیمت فروشِ زیرِ بها دارد');
+    if (v.negative.length) out.push(v.negative.length + ' کالا موجودیِ منفی دارد و در جمع نیست.');
+    if (v.outOfRange.length) out.push(v.outOfRange.length + ' کالا عددِ نامعقول دارد — حساب نشد');
+    return '<p class="rf-note">بها میانگینِ موزونِ متحرکِ همین دفتر است (D-23)؛ سود بالقوه فقط کالاهایی را می‌شمارد که هم بها و هم قیمت فروش دارند. فقط خواندنی؛ «تقریبی» یعنی بهای پایه معلوم نیست.</p>' +
+      (out.length ? '<ul class="rf-note">' + out.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '');
   }
 
   function cardKeys(id) {
@@ -173,6 +217,7 @@
     if (id.indexOf('sales.') === 0) return ['netSales', 'invoices', 'qty', 'returns'];
     if (id.indexOf('debts.') === 0) return ['balance', 'credit', 'oldestDays'];
     if (id === 'fraud') return ['discount', 'returnCount', 'voidCount', 'lineDeleteCount', 'noSaleCount'];
+    if (id === STOCK_TAB.id) return ['qty', 'costValue', 'retailValue', 'profit'];
     return [];
   }
 
@@ -222,6 +267,12 @@
       return '<div class="rf-stats">' + stat('طلب از مشتریان', af(c.totals.balance), 'تا امروز') +
         stat('مشتریانِ بدهکار', String(c.rows.filter(function (x) { return x.balance > 0; }).length), 'تا امروز') +
         stat('قرضِ بیش از ' + edge + ' روز', String(late), 'مشتری') + stat('بدهی به تأمین‌کنندگان', af(v.debts.suppliers.totals.balance), 'تا امروز') + '</div>';
+    }
+    if (v.value) {
+      var m = v.value;
+      return '<div class="rf-stats">' + stat('ارزش موجودی', af(m.costMinor), 'تا امروز') + stat('ارزش به قیمت فروش', af(m.retailMinor), 'تا امروز') +
+        stat('سود بالقوه', af(m.potentialProfitMinor), 'تا امروز') + stat('حاشیه', m.marginBp === null ? '—' : percent(m.marginBp), 'تا امروز') + '</div>' +
+        stockValueNotes(m);
     }
     if (v.fraud) {
       var f = v.fraud.totals, w = periodOf(v.fraud.from, v.fraud.to, E);
@@ -435,6 +486,14 @@
     put(KEY, on ? '1' : '0');
     syncReports();
     renderHome();
+  }
+
+  //  INV-16: index.html ِ یخ‌زده برچسبِ `stock-value-core.js` را ندارد ⇒ همین‌جا؛ رسید ⇒ صفحهٔ بازِ گزارش زبانه را می‌گیرد
+  if (!value() && document.head) {
+    var sv = document.createElement('script');
+    sv.src = 'license/stock-value-core.js?v=1';
+    sv.onload = function () { var fr = document.getElementById('rep-fresh'); if (fr && !fr.hidden) renderReports(); };
+    document.head.appendChild(sv);
   }
 
   window.TohidReportUi = {

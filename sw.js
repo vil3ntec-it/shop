@@ -82,6 +82,8 @@ const SHELL_ASSETS = [
   './license/report-core.js',
   './license/report-board.js',
   './license/report-ui.js',
+  //  INV-16: «ارزش موجودی» ِ گزارشِ تازه (دوقلوی `StockAnalysis.valuation`) — بی آن، نصبِ آفلاین زبانه را نداشت
+  './license/stock-value-core.js',
   './license/report-ui.css',
   //  RPT-11: PDF ِ مستقیمِ گزارش — دیربار با نخستین «PDF»؛ بی این، روی نصبِ آفلاین PDF ساخته نمی‌شد
   './license/report-pdf.js',

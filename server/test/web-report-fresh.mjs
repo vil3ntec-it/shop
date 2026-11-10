@@ -7,6 +7,7 @@
  *   • RPT-03: سود با روشِ مصوب (میانگینِ موزون، `costApproved`)؛ «قیمت خرید روی قلم» انتخابِ همین مرورگر و همیشه «تقریبی»
  *   • RPT-11: اکسل = ‎.xlsx‎ ِ واقعی (عدد عدد)، PDF ِ مستقیم (A4، صفحه‌بندی، سقفِ ۵۰۰ صفحه)
  *   • مرتب‌سازی با سرستون، کارت/جدول (ترجیحِ همین دستگاه)، CSV، گوشی همیشه کارت، axe
+ *   • INV-16: زبانهٔ «ارزش موجودی» (`stock-value-core.js`): همان عددِ هسته، کم‌بودها زیرِ جدول، فقط برای کسی که پول را می‌بیند
  *
  * اجرا:  node test/web-report-fresh.mjs
  */
@@ -46,6 +47,7 @@ const DATE = '2026-10-14';
 //  همان چیزی که صفحه با ساعتِ کابل می‌سازد — مستقل از مرورگر
 const B = require(path.join(ROOT, 'license/report-board.js'));
 const C = require(path.join(ROOT, 'license/report-core.js'));
+const SV = require(path.join(ROOT, 'license/stock-value-core.js'));
 const CLOCK = { offsetMinutes: 270, dayStartMinute: 0 };
 //  RPT-03: روشِ پیش‌فرضِ صفحه همان روشِ مصوب (D-23، میانگینِ موزون) با تأییدِ هسته
 const MAVG = { costing: 'mavg', costApproved: true };
@@ -408,6 +410,68 @@ await step('RPT-11: اکسل = ‎.xlsx‎ ِ واقعی (عدد عدد، راس
   await ctx.close();
 });
 
+//  INV-16 — دفترِ مرجع + کالای بی قیمتِ فروش، کالای فروخته‌شدهٔ بی ورود (منفی) و یک کیت (موجودیِ خودش را ندارد)
+const STOCK_L = (() => {
+  const L = JSON.parse(JSON.stringify(LEDGER));
+  L.products.push(
+    { id: 'p4', name: 'نمک', category: 'خوراکی', purchasePrice: 3, salePrice: 0 },
+    { id: 'p5', name: 'بی ورود', category: 'خوراکی', purchasePrice: 2, salePrice: 10 },
+    { id: 'p6', name: 'بستهٔ هدیه', category: 'هدیه', salePrice: 30, kit: [{ productId: 'p1', qty: 1 }] },
+  );
+  L.warehouseEntries.push({ id: 'w-p4', productId: 'p4', units: 2, price: 3, date: '2026-10-01', createdAt: 1790829060000 });
+  L.sales.push({ id: 's-inv16', invoiceNumber: 99, total: 40, discount: 0, finalTotal: 40, paymentMethod: 'cash', paidAmount: 40, status: 'completed', seller: 'احمد', date: '2026-10-08', createdAt: 1791437400000 });
+  L.saleItems.push(
+    { id: 'i-p5', saleId: 's-inv16', productId: 'p5', quantity: 1, unitPrice: 10, purchasePrice: 2, totalPrice: 10, returnedQty: 0 },
+    { id: 'i-p6', saleId: 's-inv16', productId: 'p6', quantity: 1, unitPrice: 30, purchasePrice: 0, totalPrice: 30, returnedQty: 0 },
+  );
+  return L;
+})();
+
+await step('INV-16: «ارزش موجودی» — همان عددِ هسته، کم‌بودها زیرِ جدول، CSV؛ صندوق‌دار نمی‌بیند', async () => {
+  const want = SV.fromLedger(STOCK_L, C);
+  const v = want.valuation;
+  //  دفترِ مرجع با دست: چای ۱۴٫۵ به میانگینِ موزونِ ۱۱۵٫۷۹ (نه آخرین قیمتِ خریدِ ۱۳۰)، قند ۴۱ × ۴۰، صابون ۱۹ × ۲۵، نمک ۲ × ۳
+  assert.equal(v.costMinor, 167895 + 164000 + 47500 + 600);
+  assert.deepEqual([v.missingPrice, v.negative, v.inStock], [['p4'], ['p5'], 4]);
+  const { pg, ctx, errors } = await open(1366, '1', STOCK_L);
+  await pg.waitForFunction(() => !!window.TohidStockValue);
+  await go(pg, 'reports');
+  await pg.click('#rep-fresh button[data-rtab="stock-value"]');
+  assert.deepEqual(await pressed(pg, 'data-rtab'), ['stock-value']);
+  assert.equal(await pg.locator('#rep-fresh button[data-span]').count(), 0, 'بازهٔ زمانی ندارد');
+  assert.equal(await pg.locator('#rep-fresh table.rf-table caption').textContent(), 'ارزش موجودی و سود بالقوه');
+  assert.equal(await footCell(pg, 'ارزش موجودی'), money(v.costMinor));
+  assert.equal(await footCell(pg, 'ارزش به قیمت فروش'), money(v.retailMinor));
+  assert.equal(await footCell(pg, 'سود بالقوه'), money(v.potentialProfitMinor));
+  const names = await pg.$$eval('#rep-fresh tbody tr', (trs) => trs.map((tr) => tr.children[0].textContent.trim()));
+  assert.deepEqual(names, want.rows.map((r) => r.name));
+  assert.ok(!names.includes('بستهٔ هدیه') && !names.includes('بی ورود'), 'کیت و منفی در جدول نیستند');
+  //  بی قیمتِ فروش ⇒ سودِ همان ردیف «—»، نه صفرِ ساختگی
+  const salt = await pg.$$eval('#rep-fresh tbody tr', (trs) => trs.find((tr) => tr.children[0].textContent.trim() === 'نمک').children[5].textContent.trim());
+  assert.equal(salt, '—');
+  const stats = await pg.locator('#rep-fresh .rf-stats').textContent();
+  assert.ok(stats.includes('سود بالقوه') && stats.includes(money(v.potentialProfitMinor)), stats);
+  const notes = await pg.locator('#rep-fresh ul.rf-note li').allTextContents();
+  assert.deepEqual(notes, ['1 کالای موجود بی قیمت فروش', '1 کالا موجودیِ منفی دارد و در جمع نیست.']);
+  assert.ok((await pg.locator('#rep-fresh p.rf-note').textContent()).includes('D-23'));
+  const [dl] = await Promise.all([pg.waitForEvent('download'), pg.click('#rep-fresh button[data-act="csv"]')]);
+  const csv = fs.readFileSync(await dl.path(), 'utf8');
+  assert.ok(csv.includes('سود بالقوه') && csv.includes((v.costMinor / 100).toFixed(2)), csv.slice(0, 300));
+  assert.deepEqual(errors, []);
+  await ctx.close();
+
+  //  صندوق‌دار (`money: false`): فقط «سنِ بدهی»، هیچ زبانهٔ ارزش
+  const staff = await open(1366, '1', STOCK_L);
+  await staff.pg.evaluate(() => localStorage.setItem('tohid-sync-state-v1', JSON.stringify({ rev: 0, lastSyncAt: 0, members: [], shop: { role: 'staff' } })));
+  await staff.pg.reload(); await staff.pg.waitForTimeout(900);
+  await staff.pg.waitForFunction(() => !!window.TohidStockValue);
+  await go(staff.pg, 'reports');
+  assert.equal(await staff.pg.evaluate(() => window.tohidReportEnv().money), false);
+  assert.equal(await staff.pg.locator('#rep-fresh button[data-rtab="stock-value"]').count(), 0);
+  assert.deepEqual(staff.errors, []);
+  await staff.ctx.close();
+});
+
 await step('گوشی (۳۹۰): همیشه کارت، بی کلیدِ نما؛ خانه دو ستونه', async () => {
   const { pg, ctx, errors } = await open(390, '1');
   await go(pg, 'dashboard');
@@ -441,7 +505,8 @@ if (axeSrc) {
       };
       await go(pg, 'dashboard'); await check('خانه');
       await go(pg, 'reports');
-      for (const t of ['today', 'sales', 'profit', 'debts', 'fraud']) {
+      await pg.waitForFunction(() => !!window.TohidStockValue);
+      for (const t of ['today', 'sales', 'profit', 'debts', 'fraud', 'stock-value']) {
         await pg.click(`#rep-fresh button[data-rtab="${t}"]`);
         await check(t);
       }
