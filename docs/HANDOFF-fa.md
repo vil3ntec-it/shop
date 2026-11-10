@@ -132,6 +132,16 @@
 - نیمه‌کاره: آزمون‌های کاتلین (`ShopperRecentTest`، `ShopperCheckoutTest.tender…`، `ShopperApiTest.recentAndDeliveryPrefs…`، `ShopperTenderVectorsTest`،
   `CustomerRecentTenderTest`) نوشته شد ولی محلی اجرا نشد (بی Gradle) — شاهدِ CI. ویرایشِ اسکناس پس از ثبت (CHK-24) در برنامهٔ خرید هنوز نیست.
 - قدمِ بعدی: پس از CI ِ سبز، ردیف‌های WEB-13 و CHK-14 ِ STATUS با شاهدِ CI؛ سپس CHK-24 (ویرایشِ دستورِ تحویل) در برگهٔ پیگیریِ برنامهٔ خرید.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/safety-kt-2` (شکافِ ماندهٔ POS-12 از شاخهٔ کهنهٔ `claude/safety-followups-kt`؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: سنجشِ فایل‌به‌فایلِ شاخهٔ کهنه (دو کامیت روی دستهٔ ۳۳، ۳۰ فایل) با main: هر ۲۴ فایلِ کد و آزمون یا عیناً در main است یا main
+  از آن جلوتر است (`HeldInvoices.kt` فروشنده، `BackupRestoreDrillTest` همان، `desktop/build.gradle.kts` گزارشِ کاملِ شکست) و هر سطرِ افزودهٔ
+  سندهایش هم در main هست — همه با دستهٔ ۳۴ (#1018) آمد ⇒ **هیچ کدی آورده نشد** (دوباره‌کاری می‌شد). شاخهٔ کهنه جانشین دارد (همین main) و دست نخورد.
+  شاهدِ CI دیده‌شده: main ‏f8134445 بومی run 42742083103 (`testReleaseUnitTest` تازه، ۳۱/۳۱ کار) و کامپیوتر run 42742083227 (`./gradlew test`)
+  سبز ⇒ `HeldClaimTest`/`HeldSyncTest`/`RecoveryPhraseSecureWiringTest`/`RecoveryPhraseFlowTest`/`BackupRestoreDrillTest`/`DataSafetyGuardTest`
+  در STATUS (POS-12، S09، OPS-02) و ردیفِ پرچمِ `shop.held_sync` ِ RULES («باز» ⇐ «main»). محلی: `shop-held-invoices` ۱۱/۱۱ (PGlite و PostgreSQL)،
+  `dari-text` ۱۵، `kotlin-file-mirrors` ۶، `core-vectors-common-mirror` ۶، `keymap` ۷.
+- نیمه‌کاره: POS-12 همچنان PARTIAL — آزمون با دو دستگاهِ واقعی و آزمونِ تصویریِ برگه‌های «در دستِ دستگاه» و «دوتایی» نیست.
+- قدمِ بعدی: آزمونِ دستیِ دو گوشی با `shop.held_sync` روشن روی دکانِ آزمایشی؛ سپس تصمیمِ ارتقای POS-12.
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/acct-console` (بندهای سمتِ سرورِ حسابِ ممیزیِ پنلِ مرکزی §۹: بازگرداندنِ یک‌باره، S12، S15، S18؛ روی main ‏ed8009d7 = دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) `POST /admin/sync/conflicts/:id/restore` یک بار — شناسهٔ یک‌شکل (۴۰۰ `bad_id`)، ۴۰۹ `already_restored`/`restore_in_progress` با نشانِ پایگاه
   (`sync_conflict_restore_claims`، مهاجرتِ ۴۹۵)، `Idempotency-Key` (`lib/sync-restore-once.js`؛ `sync-v1.js` دست نخورد). (۲) S12: نگهبانِ مالک از پیش بود
