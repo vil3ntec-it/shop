@@ -10,12 +10,19 @@
  *           شمارِ پیش از دیگری را می‌دید و همه پذیرفته می‌شدند (فقط PostgreSQL؛ PGlite تراکنش‌ها را پشتِ هم می‌برد).
  *   SR44-3  دو کارِ هم‌`digest` (همان عکس، نسخه و تنظیمات در دو دسته) که هم‌زمان برداشته شوند هر دو نسخه می‌ساختند ⇒
  *           «دوباره‌کاری هرگز نسخهٔ تکراری نمی‌سازد» نمی‌ماند (سقفِ ۳۰ نسخهٔ هر عکس با تکرار پر می‌شد).
+ *   R12     (پیگیری، `claude/sec-fix-44`) کارِ دستهٔ لغوشده که به `complete` نرسید (فرآیند افتاد ⇒ «در کار» با اجارهٔ تمام‌شده؛
+ *           شکستِ گذرای هم‌زمان با لغو ⇒ «در صف») هرگز برداشته نمی‌شد (`claim` فقط دستهٔ `active`) ⇒ تا همیشه در سقفِ ۵۰۰۰.
+ *   R11     (پیگیری) سقفِ heap ِ رشته ArrayBuffer را نمی‌بندد ⇒ بودجهٔ بایتِ پیکسلِ بازشده (`IMAGE_STUDIO_DECODE_MB`) میانِ کارگرها.
  */
 process.env.IMAGE_STUDIO_WORKERS = '2';
+//  R11: بودجهٔ ۲ مگابایت ⇒ سهمِ هر کار ۱ مگابایت؛ عکسِ ۶۰۰×۴۵۰ ِ آزمون‌های دیگر (۸۱۰ هزار بایت RGB) زیرِ آن می‌ماند
+process.env.IMAGE_STUDIO_DECODE_MB = '2';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const zlib = require('zlib');
+const path = require('path');
+const { execFileSync } = require('child_process');
 const h = require('./helpers');
 const F = require('./image-fixtures');
 const bytes = require('../src/lib/image-bytes');
@@ -164,4 +171,89 @@ test('SR44-3: دو کارِ هم‌digest ِ هم‌زمان (دو دسته، ه
   assert.deepEqual(rows.map((r) => r.status), ['done', 'done']);
   assert.equal(Number(rows[0].result_version), Number(rows[1].result_version));
   assert.deepEqual(rows.map((r) => !!r.reused).sort(), [false, true]);
+});
+
+test('R12: کارِ بازِ دستهٔ لغوشده پس از افتادنِ فرآیند بسته می‌شود؛ اجارهٔ زنده، دستهٔ فعال و متوقف دست نمی‌خورند', async () => {
+  const D = await shopOwner('د');
+  await setFlag(D.shopId, 'shop.image_studio', true);
+  const img = [];
+  for (const k of [1, 2, 3]) img.push((await upload(D, jpg(), `r12-${k}`)).body.id);
+  const K = await jobs.createBatch(D.shopId, D.user.id, { key: 'r12-cancelled', image_ids: img, preset: 'enhance' });
+  const L = await jobs.createBatch(D.shopId, D.user.id, { key: 'r12-active', image_ids: [img[0]], preset: 'catalog' });
+  const P = await jobs.createBatch(D.shopId, D.user.id, { key: 'r12-paused', image_ids: [img[1]], preset: 'ad' });
+  const t = now();
+  const set = (batch, image, status, lease, until) => query(
+    `UPDATE image_studio_jobs SET status=$3, lease=$4, lease_until=$5, attempts=1 WHERE batch_id=$1 AND image_id=$2`,
+    [batch, image, status, lease, until]);
+  //  هر سه کارِ K «در کار» هنگامِ لغو (لغو فقط «در صف» را می‌بندد)
+  for (const x of img) await set(K.id, x, 'running', `l_${x}`, t + 60000);
+  await jobs.batchAction(D.shopId, D.user.id, K.id, 'cancel');
+  await set(K.id, img[0], 'running', 'l_dead', t - 1);           //  فرآیند افتاد: اجاره تمام شد، `complete` هرگز
+  await query(`UPDATE image_studio_jobs SET status='queued', lease='', lease_until=0, next_at=0, error='timeout'
+    WHERE batch_id=$1 AND image_id=$2`, [K.id, img[1]]);          //  `failOrRetry` ِ گذرا پس از لغو ⇒ دوباره «در صف»
+  await set(K.id, img[2], 'running', 'l_live', t + 60000);       //  کارگرِ زنده هنوز روی آن است
+  await set(L.id, img[0], 'running', 'l_active', t + 60000);     //  دستهٔ فعال، اجارهٔ زنده
+  await jobs.batchAction(D.shopId, D.user.id, P.id, 'pause');
+  await set(P.id, img[1], 'running', 'l_paused', t - 1);         //  دستهٔ متوقف: «ادامه» دوباره برمی‌دارد
+  const openOf = async () => Number((await one(
+    `SELECT COUNT(*)::int AS n FROM image_studio_jobs WHERE shop_id=$1 AND status IN ('queued','running')`, [D.shopId])).n);
+  const row = (batch, image) => one('SELECT status, lease FROM image_studio_jobs WHERE batch_id=$1 AND image_id=$2', [batch, image]);
+  assert.equal(await openOf(), 5);
+
+  assert.deepEqual(await jobs.claim(4), [], 'هیچ کاری برداشته نشد');
+  assert.deepEqual(await row(K.id, img[0]), { status: 'cancelled', lease: '' }, 'اجارهٔ تمام‌شدهٔ دستهٔ لغوشده ⇒ لغو');
+  assert.deepEqual(await row(K.id, img[1]), { status: 'cancelled', lease: '' }, '«در صف» ِ دستهٔ لغوشده ⇒ لغو');
+  assert.deepEqual(await row(K.id, img[2]), { status: 'running', lease: 'l_live' }, 'اجارهٔ زنده دست نخورد');
+  assert.deepEqual(await row(L.id, img[0]), { status: 'running', lease: 'l_active' }, 'دستهٔ فعال دست نخورد');
+  assert.deepEqual(await row(P.id, img[1]), { status: 'running', lease: 'l_paused' }, 'دستهٔ متوقف دست نخورد');
+  assert.equal(await openOf(), 3, 'در سقفِ «کارِ باز» دیگر شمرده نمی‌شوند');
+  const view = await jobs.batchView(D.shopId, K.id);
+  assert.deepEqual([view.progress.cancelled, view.progress.running], [2, 1]);
+
+  //  کارگرِ زنده هم افتاد ⇒ جاروی بعدی؛ دوباره ⇒ هیچ
+  await set(K.id, img[2], 'running', 'l_live', now() - 1);
+  assert.equal(await jobs.sweep(), 1);
+  assert.equal(await jobs.sweep(), 0);
+  assert.deepEqual([(await jobs.batchView(D.shopId, K.id)).progress.cancelled], [3]);
+  //  «ادامه» ِ دستهٔ متوقف ⇒ همان `claim` اجارهٔ تمام‌شده را دوباره برمی‌دارد (کار گم نمی‌شود)
+  await jobs.batchAction(D.shopId, D.user.id, P.id, 'resume');
+  const again = await jobs.claim(4);
+  assert.deepEqual(again.map((j) => [j.batch_id, j.image_id]), [[P.id, img[1]]]);
+  for (const b of [L, P]) await jobs.batchAction(D.shopId, D.user.id, b.id, 'cancel');
+  await query(`UPDATE image_studio_jobs SET lease_until=0 WHERE shop_id=$1 AND status='running'`, [D.shopId]);
+  await jobs.sweep();
+  assert.equal(await openOf(), 0);
+});
+
+test('R11: بودجهٔ بایتِ پیکسلِ بازشده میانِ کارگرها — پیش‌فرض همان دیروز، بیشتر از سهم ⇒ `memory_budget` بی رشته و بی تلاشِ دوباره', async () => {
+  const limits = (env) => JSON.parse(execFileSync(process.execPath, ['-e',
+    "process.stdout.write(JSON.stringify(require('./src/lib/image-studio-jobs').LIMITS))"], {
+    cwd: path.join(__dirname, '..'), encoding: 'utf8',
+    env: { ...process.env, IMAGE_STUDIO_WORKERS: '', IMAGE_STUDIO_DECODE_MB: '', ...env },
+  }));
+  const MIB = 1048576, MAX = codec.MAX_PIXELS * 4;                //  بزرگ‌ترین عکسِ رمزگشاشدنی، RGBA
+  for (const [env, workers, mb] of [[{}, 2, 256], [{ IMAGE_STUDIO_WORKERS: '4' }, 4, 256], [{ IMAGE_STUDIO_WORKERS: '1' }, 1, 256],
+    [{ IMAGE_STUDIO_WORKERS: '4', IMAGE_STUDIO_DECODE_MB: '96' }, 4, 96]]) {
+    const L = limits(env);
+    assert.equal(L.WORKERS, workers, JSON.stringify(env));
+    assert.equal(L.DECODE_BYTES, Math.floor((mb * MIB) / workers), JSON.stringify(env));
+    assert.ok(L.DECODE_BYTES * L.WORKERS <= mb * MIB, 'جمعِ همهٔ کارگرها ≤ بودجه');
+    if (mb === 256) assert.ok(L.DECODE_BYTES >= MAX, 'پیش‌فرض: ۱۶ مگاپیکسل RGBA همان دیروز');
+  }
+  assert.equal(jobs.LIMITS.DECODE_BYTES, MIB, 'همین پرونده: ۲ مگابایت ÷ ۲ کارگر');
+
+  //  JPEG ِ ۸۰۰×۶۰۰ (۱٫۴۴ مگابایت RGB) و PNG ِ ۵۲۰×۵۲۰ (رمزگشا همیشه RGBA ⇒ ۱٫۰۸) بیشتر از سهم؛ JPEG ِ ۵۲۰×۵۲۰ (۰٫۸۱) نه
+  const big = (await upload(C, jpg(800, 600), 'r11-big')).body.id;
+  const wide = (await upload(C, F.pngImage(520, 520, F.scene(520, 520), { mode: 'rgb' }), 'r11-png')).body.id;
+  const fits = (await upload(C, jpg(520, 520), 'r11-fits')).body.id;
+  for (const x of [big, wide, fits]) assert.ok(x, 'بارگذاری');
+  const b = await jobs.createBatch(C.shopId, C.user.id, { key: 'r11-budget', image_ids: [big, wide, fits], preset: 'enhance' });
+  const sent = [];
+  jobs._setIsolate(async (task) => { sent.push(task.image_id); return studio.render(task.buf, task.info, task.request, task.maxBytes); });
+  try { await jobs.drain({ timeoutMs: 30000 }); } finally { jobs._setIsolate(null); }
+  const rows = await Promise.all([big, wide, fits].map((x) => one(
+    'SELECT status, error, attempts FROM image_studio_jobs WHERE batch_id=$1 AND image_id=$2', [b.id, x])));
+  assert.deepEqual(rows.map((r) => [r.status, r.error, Number(r.attempts)]),
+    [['failed', 'memory_budget', 1], ['failed', 'memory_budget', 1], ['done', '', 1]]);
+  assert.deepEqual(sent, [fits], 'فقط عکسِ زیرِ سهم به رشته رفت');
 });

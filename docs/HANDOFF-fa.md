@@ -54,6 +54,15 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-fix-44` (پیگیریِ بازبینیِ دومِ دستهٔ ۴۴: R10، R12، R11؛ روی `claude/sec-review-44` ‏671931d3؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) R10: `license/csv-cell.js` (بارکننده `shop-sync.js`، `sw.js` ‏v72) `csvCell` ِ index.html ِ یخ‌زده را با همان `finance-reports.cell` ِ سرور عوض می‌کند ⇒
+  هر چهار CSV ِ صفحه (گزارش‌ها، صورت‌حساب، انبارگردانی، «گزارشِ تازه») بی فرمول، عددِ منفی عدد. `web-csv-cell.test.js` ۴/۴، `web-csv-export.mjs` ۶/۶ (روی پایه ۵ سرخ؛
+  در `test:web`). (۲) R12: `sweep` در هر `claim` کارِ «در صف»/«در کار با اجارهٔ تمام‌شده» ِ دستهٔ لغوشده را می‌بندد. (۳) R11: بودجهٔ `IMAGE_STUDIO_DECODE_MB` میانِ
+  کارگرها (پیش‌فرض بی تغییر). `security-review-44.test.js` ۵/۵ و `image-studio-jobs.test.js` ۱۱/۱۱ روی PGlite و PostgreSQL ‏16 (R12 و R11 پیش از رفع سرخ).
+  پیگیریِ B9 ِ ممیزی، دو خطِ RULES.
+- نیمه‌کاره: هیچ. تصمیمِ صاحب‌کار: خانهٔ پولِ «گزارشِ تازه» متن است ⇒ منفی‌اش حالا `'-500.00` (همان قاعدهٔ سرور برای متن)؛ اگر عددِ ساده باید عدد بماند،
+  استثنای `^-?[0-9]+(\.[0-9]+)?$` (همان خانهٔ `g` ِ xlsx) در سرور و وب با هم. پیش‌فرضِ کم‌ترِ `IMAGE_STUDIO_DECODE_MB` برای سرورِ خانگیِ کم‌حافظه.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را پس از `claude/sec-review-44` در دسته بگذارد؛ `VERSION` ِ `sw.js` با شاخه‌های دیگرِ دسته هماهنگ شود.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-44` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۴، روی `ccr-…-batch-44` ‏6c73e73c؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: سه یافتهٔ Low در استودیوی عکس، هر سه با آزمونِ سرخ‌پیش‌از‌رفع (`server/test/security-review-44.test.js`، ۳ آزمون): SR44-1 PNG ِ دو-IHDR
   (`inspectPng` ⇒ `png-multi-ihdr`؛ `image-codec.decodePng` و `image-quality.pngLuma` IHDR ِ دوم را نمی‌گیرند)، SR44-2 سقفِ روزانه/صفِ `createBatch` زیرِ قفلِ دکان

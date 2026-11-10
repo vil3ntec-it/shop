@@ -18,7 +18,8 @@
  *    کارِ هم‌`digest` (همان عکس، نسخه و تنظیمات) خروجیِ پیشین را به کار می‌برد ⇒ تلاش یا دستهٔ دوباره هرگز
  *    نسخهٔ تکراری نمی‌سازد. خطای همیشگی (نوعِ پردازش‌نشدنی، خروجیِ بزرگ) بی تلاشِ دوباره؛ گذرا با backoff.
  * ⛔ منابع: همزمانیِ `IMAGE_STUDIO_WORKERS` (۱ تا ۴، پیش‌فرض ۲)، هر کار در رشتهٔ جدا با سقفِ حافظه و مهلت،
- *    برداشتنِ نوبتی میانِ دکان‌ها، سقفِ ۱۰۰۰ عکس در دسته، ۵۰۰۰ کارِ باز، ۲۰۰۰ عکس در روز و ۳۰ نسخه برای هر عکس.
+ *    برداشتنِ نوبتی میانِ دکان‌ها، سقفِ ۱۰۰۰ عکس در دسته، ۵۰۰۰ کارِ باز، ۲۰۰۰ عکس در روز و ۳۰ نسخه برای هر عکس؛
+ *    بایتِ پیکسلِ بازشده میانِ کارگرها با `IMAGE_STUDIO_DECODE_MB` (R11). کارِ بازِ دستهٔ لغوشده را `sweep` می‌بندد (R12).
  */
 const crypto = require('crypto');
 const path = require('path');
@@ -35,12 +36,18 @@ const FLAG = 'shop.image_studio';
 const TOOL = 'studio/1';
 const SPACE = 'shop';
 const workers = Math.min(4, Math.max(1, Math.floor(Number(process.env.IMAGE_STUDIO_WORKERS)) || 2));
+//  R11: `resourceLimits` ِ رشته فقط heap ِ JS را می‌بندد، نه ArrayBuffer ِ پیکسل‌ها را ⇒ بودجهٔ بایتِ پیکسلِ بازشده برای همهٔ
+//  کارگرها با هم (`IMAGE_STUDIO_DECODE_MB`، پیش‌فرض ۲۵۶ = ۱۶ مگاپیکسل RGBA برای هر چهار کارگر، یعنی همان دیروز)؛ سهمِ هر کار =
+//  بودجه ÷ همزمانی ⇒ بالا بردنِ `IMAGE_STUDIO_WORKERS` جمع را بالا نمی‌برد.
+const decodeMb = Math.min(4096, Math.max(1, Math.floor(Number(process.env.IMAGE_STUDIO_DECODE_MB)) || 256));
 const LIMITS = Object.freeze({
   BATCH_MAX: 1000, OPEN_MAX: 5000, DAILY_MAX: 2000, VERSIONS_MAX: 30, ITEMS_PAGE: 200, LIST_MAX: 50,
   ATTEMPTS_MAX: 3, BACKOFF_MS: 15000, BACKOFF_MAX_MS: 10 * 60 * 1000,
-  LEASE_MS: 2 * 60 * 1000, JOB_TIMEOUT_MS: 60 * 1000, TICK_MS: 2000, HEAP_MB: 256,
-  WORKERS: workers,
+  LEASE_MS: 2 * 60 * 1000, JOB_TIMEOUT_MS: 60 * 1000, TICK_MS: 2000, HEAP_MB: 256, SWEEP_MAX: 500,
+  WORKERS: workers, DECODE_BYTES: Math.floor((decodeMb * 1048576) / workers),
 });
+/** بایتِ پیکسلِ بازشدهٔ `image-codec.decode`: JPEG فقط RGB، PNG همیشه RGB + alpha */
+const decodedBytes = (info) => info.width * info.height * (info.mime === 'image/jpeg' ? 3 : 4);
 const ID_RE = /^img_[0-9A-HJKMNP-TV-Z]{26}$/;
 const KEY_RE = /^[A-Za-z0-9_.:-]{8,64}$/;
 const ACTIONS = ['pause', 'resume', 'cancel', 'retry'];
@@ -312,6 +319,7 @@ function isolate(task, timeoutMs = LIMITS.JOB_TIMEOUT_MS) {
  */
 async function claim(n) {
   const t = now(), lease = 'l_' + ulid();
+  await sweep(t);
   const due = (a) => `((${a}.status='queued' AND ${a}.next_at <= $1) OR (${a}.status='running' AND ${a}.lease_until < $1))`;
   return many(
     `WITH ranked AS (
@@ -325,6 +333,26 @@ async function claim(n) {
      UPDATE image_studio_jobs j SET status='running', lease=$2, lease_until=$3, attempts=j.attempts+1, updated_at=$1
        FROM pick WHERE j.id=pick.id
      RETURNING j.*`, [t, lease, t + LIMITS.LEASE_MS, n]);
+}
+
+/**
+ * R12: کارِ بازِ دستهٔ لغوشده که هرگز به `complete` نمی‌رسد ⇒ «لغو». `claim` فقط دستهٔ `active` را برمی‌دارد، پس «در کار» ِ
+ * فرآیندِ افتاده (اجارهٔ تمام‌شده) یا «در صف» ِ شکستِ گذرای هم‌زمان با لغو (`failOrRetry`) تا همیشه باز می‌ماند و در سقفِ
+ * ۵۰۰۰ ِ `createBatch` شمرده می‌شد. اجارهٔ زنده دست نمی‌خورد (ثبتِ همان کارگر لغو را می‌بیند)، دستهٔ `active` هرگز، و `paused`
+ * نه: «ادامه» همان را دوباره برمی‌دارد. `SKIP LOCKED` + شرطِ دوباره روی ردیفِ قفل‌شده ⇒ با `complete`/`claim` ِ نمونهٔ دیگر
+ * هیچ‌گاه هر دو نه. شمار فقط کم می‌شود ⇒ قفلِ دکانِ `createBatch` لازم نیست (شمارِ کهنه فقط سخت‌گیرتر است).
+ */
+async function sweep(t = now()) {
+  const open = (a) => `(${a}.status='queued' OR (${a}.status='running' AND ${a}.lease_until < $1))`;
+  const rows = await many(
+    `WITH stale AS (
+       SELECT s.id FROM image_studio_jobs s JOIN image_studio_batches b ON b.id=s.batch_id
+        WHERE b.state='cancelled' AND ${open('s')} LIMIT $2 FOR UPDATE OF s SKIP LOCKED
+     )
+     UPDATE image_studio_jobs j SET status='cancelled', lease='', lease_until=0, updated_at=$1
+       FROM stale WHERE j.id=stale.id AND ${open('j')}
+     RETURNING j.id`, [t, LIMITS.SWEEP_MAX]);
+  return rows.length;
 }
 
 const OWN_LEASE = 'id=$1 AND status=$2 AND lease=$3';
@@ -398,6 +426,7 @@ async function runJob(job) {
     const req = studio.normalize({ preset: b.preset, options: json(b.options, {}) });
     let info;
     try { info = bytes.inspect(file.data); } catch { return await failOrRetry(job, { code: 'source_invalid', permanent: true }); }
+    if (decodedBytes(info) > LIMITS.DECODE_BYTES) return await failOrRetry(job, { code: 'memory_budget', permanent: true });
     const out = await isolateImpl({ buf: file.data, info, request: req, maxBytes: bank.DERIV.display.bytes, image_id: job.image_id });
     await complete(job, out, null);
   } catch (e) {
@@ -454,7 +483,7 @@ function stop() {
 
 module.exports = {
   FLAG, TOOL, LIMITS, enabled, createBatch, batchView, batches, batchAction, versions, review,
-  claim, tick, drain, start, stop, digestOf,
+  claim, sweep, tick, drain, start, stop, digestOf,
   //  فقط آزمون: جای `isolate` (شکستِ گذرا، مهلت، رشتهٔ ازکارافتاده) — null ⇒ همان واقعی
   _setIsolate: (fn) => { isolateImpl = fn || isolate; },
 };
