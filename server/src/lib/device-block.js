@@ -15,7 +15,7 @@
 const tokens = require('./tokens');
 const audit = require('./audit');
 const { one, many, query, now } = require('../db');
-const { badRequest, notFound } = require('../middleware/errors');
+const { badRequest, notFound, conflict } = require('../middleware/errors');
 
 const MESSAGE = 'این دستگاه از سوی صاحب دکان غیرفعال شده است. برای بازگشت با صاحب دکان تماس بگیرید.';
 const CODE = 'device_disabled';
@@ -51,17 +51,22 @@ async function isDisabledRow(dev) {
   return true;
 }
 
-/** دستگاه‌های اعضای این دکان (عضوِ برداشته‌شده نه) */
-async function listForShop(shopId) {
+const OF_SHOP = `FROM devices d
+       JOIN shop_members m ON m.user_id = d.user_id AND m.shop_id=$1 AND m.status <> 'removed'
+       JOIN users u ON u.id = d.user_id`;
+
+/**
+ * دستگاه‌های اعضای این دکان (عضوِ برداشته‌شده نه). `page` (‎{ limit, offset }‎، پنلِ مدیر) ⇒ ترتیبِ پایدارِ «ساخت + شناسه»
+ * تا صفحه‌ها با تازه شدنِ `last_seen_at` جابه‌جا نشوند؛ بی آن همان فهرستِ کاملِ امروز.
+ */
+async function listForShop(shopId, page = null) {
   const rows = await many(
     `SELECT d.id, d.name, d.platform, d.status, d.created_at, d.last_seen_at,
             d.disabled_at, d.blocked_attempts, d.last_blocked_at,
             m.user_id, m.role, u.name AS user_name
-       FROM devices d
-       JOIN shop_members m ON m.user_id = d.user_id AND m.shop_id=$1 AND m.status <> 'removed'
-       JOIN users u ON u.id = d.user_id
-      ORDER BY d.last_seen_at DESC NULLS LAST`,
-    [shopId]
+       ${OF_SHOP}
+      ${page ? 'ORDER BY d.created_at ASC, d.id ASC LIMIT $2 OFFSET $3' : 'ORDER BY d.last_seen_at DESC NULLS LAST'}`,
+    page ? [shopId, page.limit, page.offset] : [shopId]
   );
   return rows.map((r) => ({
     id: r.id, name: r.name || '', platform: r.platform || '', status: r.status,
@@ -71,6 +76,11 @@ async function listForShop(shopId) {
     lastBlockedAt: r.last_blocked_at === null ? null : Number(r.last_blocked_at),
     member: { userId: r.user_id, role: r.role, name: r.user_name || '' },
   }));
+}
+
+/** شمارِ همان فهرست (برای صفحه‌بندی). */
+async function countForShop(shopId) {
+  return Number((await one(`SELECT COUNT(*)::int AS n ${OF_SHOP}`, [shopId])).n);
 }
 
 async function deviceOfShop(shopId, deviceId) {
@@ -84,6 +94,13 @@ async function deviceOfShop(shopId, deviceId) {
   return dev;
 }
 
+/** دستگاه را دکانِ **دیگری** انداخته که هنوز همین کاربر را دارد؟ (کاربرِ چنددکانی) */
+async function heldByOtherShop(dev, shopId) {
+  if (dev.disabled_at === null || dev.disabled_at === undefined || !dev.disabled_shop_id || dev.disabled_shop_id === shopId) return false;
+  return Boolean(await one(
+    `SELECT 1 FROM shop_members WHERE shop_id=$1 AND user_id=$2 AND status <> 'removed'`, [dev.disabled_shop_id, dev.user_id]));
+}
+
 /**
  * از کار انداختن. `currentDeviceId` = دستگاهِ همین درخواست (اگر بود).
  * @param {{actorType?: string}} [opts]  پنل: actorType='admin'
@@ -93,11 +110,16 @@ async function disable(shopId, deviceId, { byId = '', currentDeviceId = null, re
   if (currentDeviceId && dev.id === currentDeviceId) {
     throw badRequest('دستگاهی را که با آن کار می‌کنید نمی‌شود از کار انداخت', 'current_device');
   }
-  const t = now();
-  await query(
-    `UPDATE devices SET status='revoked', disabled_at=$2, disabled_by=$3, disabled_shop_id=$4 WHERE id=$1`,
-    [dev.id, t, String(byId || ''), shopId]
-  );
+  //  ⛔ انداخته‌شده به دستِ دکانِ دیگر: نشست‌ها باز هم باطل، ولی «انداخته به دستِ» همان دکان می‌ماند — وگرنه این دکان با
+  //  انداختنِ دوباره صاحبِ نشان می‌شد و بعد برش می‌گرداند (دورزدنِ `disabled_by_other_shop`)
+  const keep = await heldByOtherShop(dev, shopId);
+  const t = keep ? Number(dev.disabled_at) : now();
+  if (!keep) {
+    await query(
+      `UPDATE devices SET status='revoked', disabled_at=$2, disabled_by=$3, disabled_shop_id=$4 WHERE id=$1`,
+      [dev.id, t, String(byId || ''), shopId]
+    );
+  }
   const sessions = await tokens.revokeAllForDevice(dev.id);
   //  O-01: دستگاهِ از کار افتاده پوش هم نمی‌گیرد
   await require('./push').revokeDevice({ deviceId: dev.id, reason: 'device_disabled' });
@@ -109,21 +131,32 @@ async function disable(shopId, deviceId, { byId = '', currentDeviceId = null, re
   return { id: dev.id, disabledAt: t, sessionsRevoked: sessions };
 }
 
-/** برگرداندنِ دستگاهِ پیداشده — نشست‌ها برنمی‌گردند؛ دوباره وارد می‌شود */
-async function enable(shopId, deviceId, { byId = '', actorType = 'user', ip = '' } = {}) {
+/**
+ * برگرداندنِ دستگاهِ پیداشده — نشست‌ها برنمی‌گردند؛ دوباره وارد می‌شود.
+ * ⛔ دستگاهی را که دکانِ **دیگری** (کاربرِ عضوِ هر دو) انداخته، این دکان برنمی‌گرداند (۴۰۹ `disabled_by_other_shop`) —
+ *   مگر آن دکان دیگر این کاربر را نداشته باشد (وگرنه راه برای همیشه بسته می‌ماند).
+ * ⛔ نوشتن شرطی (`disabled_at IS NOT NULL`) ⇒ دو برگرداندنِ هم‌زمان یک سابقه، دومی همان ۴۰۰.
+ * `reason` (پنلِ مدیر) فقط وقتی آمده در سابقه می‌نشیند؛ سابقهٔ صاحبِ دکان همان پیشین.
+ */
+async function enable(shopId, deviceId, { byId = '', actorType = 'user', ip = '', reason = '' } = {}) {
   const dev = await deviceOfShop(shopId, deviceId);
-  if (dev.disabled_at === null || dev.disabled_at === undefined) {
-    throw badRequest('این دستگاه از سوی دکان از کار نیفتاده است', 'device_not_disabled');
+  const notDisabled = () => badRequest('این دستگاه از سوی دکان از کار نیفتاده است', 'device_not_disabled');
+  if (dev.disabled_at === null || dev.disabled_at === undefined) throw notDisabled();
+  if (await heldByOtherShop(dev, shopId)) {
+    throw conflict('این دستگاه را دکانِ دیگری از کار انداخته است؛ فقط همان دکان برش می‌گرداند', 'disabled_by_other_shop');
   }
-  await query(
-    `UPDATE devices SET status='active', disabled_at=NULL, disabled_by=NULL, disabled_shop_id=NULL WHERE id=$1`,
+  const r = await query(
+    `UPDATE devices SET status='active', disabled_at=NULL, disabled_by=NULL, disabled_shop_id=NULL
+      WHERE id=$1 AND disabled_at IS NOT NULL`,
     [dev.id]
   );
+  if (!r.rowCount) throw notDisabled();
+  const why = String(reason || '').slice(0, 200);
   await audit.log({
     shopId, actorType, userId: actorType === 'user' ? byId : '', action: 'device.enabled',
-    targetType: 'device', targetId: dev.id, detail: { owner: dev.user_id, by: byId }, ip,
+    targetType: 'device', targetId: dev.id, detail: { owner: dev.user_id, by: byId, ...(why ? { reason: why } : {}) }, ip,
   });
   return { id: dev.id };
 }
 
-module.exports = { MESSAGE, CODE, explain, isDisabledRow, listForShop, disable, enable };
+module.exports = { MESSAGE, CODE, explain, isDisabledRow, listForShop, countForShop, disable, enable };

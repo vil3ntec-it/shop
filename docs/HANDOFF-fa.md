@@ -54,6 +54,17 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/acct-console-2` (درهای خواستهٔ پنلِ مرکزی ۱.۵۰.۷۵ برای کارکنان، بانکِ عکس و پشتیبان؛ روی `ccr-…-batch-40` ‏76aa1657؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) `POST /api/admin/shops/:id/staff-perms/devices/:did/enable` (ارشد + دلیل، همان `deviceOfShop` و سابقه، سقفِ IP پیش از احراز)؛
+  (۲) `Idempotency-Key` روی disable/enable ِ دستگاه، بازبینیِ بانکِ عکس (approve/reject/archive/search) و `POST /admin/backups` با
+  `lib/admin-write-once.js` (نشانِ پایگاه `admin_write_claims`، مهاجرتِ ۵۰۰؛ هم‌زمان ⇒ ۴۰۹ `idempotency_in_progress`)؛ (۳) توانایی‌های
+  `staff-perms.v1`، `image-bank.v1`، `idempotent-writes.v1`؛ (۴) `?limit=&offset=` روی `GET …/staff-perms` (بی پارامتر همان پاسخ)؛ (۵) یافتهٔ
+  امنیتی: دکانِ «الف» دستگاهِ انداختهٔ دکانِ «ب» (کاربرِ هر دو) را برمی‌گرداند یا با «انداختنِ دوباره» نشانش را می‌دزدید ⇒ ۴۰۹
+  `disabled_by_other_shop`؛ دو برگرداندنِ هم‌زمان دو سابقه می‌ساخت ⇒ نوشتنِ شرطی. آزمون: `admin-console-writes` ۱۶ (PGlite و PostgreSQL ۱۶،
+  پیش از تغییر همه سرخ)، شرح در بندِ ۱۲.۱۱ ِ ADMIN-CONTROL-PLANE و RULES «v3 · پنلِ مدیر».
+- نیمه‌کاره: سمتِ پنل (ریپوی server) — پشتِ `idempotent-writes.v1` کلیدِ پنجره را به بالادست بفرستد (مثلِ `sync-restore-once.v1`)، دکمهٔ
+  «برگرداندن» پشتِ `staff-perms.v1`، و ۴۰۹ ِ `idempotency_in_progress`/`disabled_by_other_shop` را بشناسد.
+- قدمِ بعدی: شاهدِ CI ِ آزمونِ تازه؛ تصمیمِ صاحب‌کار دربارهٔ اجباری کردنِ دلیل روی disable ِ مدیر (امروز اختیاری، پل همیشه می‌فرستد).
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/acct-console` (بندهای سمتِ سرورِ حسابِ ممیزیِ پنلِ مرکزی §۹: بازگرداندنِ یک‌باره، S12، S15، S18؛ روی main ‏ed8009d7 = دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) `POST /admin/sync/conflicts/:id/restore` یک بار — شناسهٔ یک‌شکل (۴۰۰ `bad_id`)، ۴۰۹ `already_restored`/`restore_in_progress` با نشانِ پایگاه
   (`sync_conflict_restore_claims`، مهاجرتِ ۴۹۵)، `Idempotency-Key` (`lib/sync-restore-once.js`؛ `sync-v1.js` دست نخورد). (۲) S12: نگهبانِ مالک از پیش بود
