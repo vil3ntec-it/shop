@@ -311,12 +311,22 @@ await qp.click('#ct-send');
 await qp.waitForFunction(() => !document.getElementById('ct-verify').hidden, null, { timeout: 10000 });
 ok(await countFrom(conv1.id, 'پس از تأیید') === 0 && (await stored(qp)).items[0].state === 'verify',
   '۴۰۱ ⇒ فرمِ تأیید؛ پیام «منتظرِ تأیید» در صف ماند', JSON.stringify((await stored(qp)).items.map((x) => x.state)));
-const reverify = async (p, num) => {
+//  `refocus`: پیش از نوشتنِ کد، گفت‌وگو دوباره باز می‌شود (`verify()` و برگه دوباره) — تمرکزِ دیرِ ۶۰/۸۰ms ِ آن‌ها نباید کادرِ کدِ در
+//  دست را برباید: پیش‌تر تایمرِ ۸۰ms ِ verify() میانِ fill ِ کد نشست، کد در کادرِ شماره رفت و verify/check ۴۰۰ داد (CI ِ #1022).
+const reverify = async (p, num, { refocus = false } = {}) => {
   await query('UPDATE otp_codes SET created_at = created_at - $1', [10 * 60 * 1000]);   //  فاصلهٔ «کدِ تازه» (۱۲۰ ثانیه) گذشته
   await p.fill('#ct-phone', num);
   await p.click('#ct-vsend');
   await p.waitForFunction(() => /\d{4,}/.test(document.getElementById('ct-vmsg').textContent), null, { timeout: 10000 });
   const code = (await p.textContent('#ct-vmsg')).match(/(\d{4,})/)[1];
+  if (refocus) {
+    await p.evaluate(() => document.getElementById('store-chat').click());
+    //  تایمرِ صفحه با مهلتِ بلندتر پس از تایمرهای ۶۰/۸۰ms ِ همین بازگشایی اجرا می‌شود (ترتیبِ setTimeout)
+    await p.waitForFunction(() => !document.getElementById('ct-verify').hidden, null, { timeout: 10000 });
+    await p.evaluate(() => new Promise((r) => setTimeout(r, 300)));
+    const active = await p.evaluate(() => document.activeElement && document.activeElement.id);
+    ok(active === 'ct-code', 'بازگشاییِ گفت‌وگو با کادرِ کدِ در دست ⇒ تمرکزِ دیرِ برگه و فرم آن را نربود', `تمرکز روی #${active}`);
+  }
   await p.fill('#ct-code', code);
   //  CI ِ #1022 دو بار: `verify/check` ۴۰۰ (فقط کد یا شمارهٔ تهی/ناجور ۴۰۰ است؛ کدِ نادرست ۴۰۳) و فرم ماند ⇒ اگر باز شد،
   //  همان پاسخ و مقدارهای فرم در لاگ تا علت حدس نباشد (سنجش همان است: فرم باید بسته شود)
@@ -350,7 +360,7 @@ await qp.goto(`${base}/store/${slug}`);
 await qp.waitForFunction(() => { const b = document.getElementById('store-chat'); return b && !b.hidden; }, null, { timeout: 15000 });
 await qp.click('#store-chat');
 await qp.waitForFunction(() => { const v = document.getElementById('ct-verify'); return v && !v.hidden; }, null, { timeout: 15000 });
-await reverify(qp, '0791112255');
+await reverify(qp, '0791112255', { refocus: true });
 await sleep(2500);
 ok((await stored(qp)) === null && await countFrom(conv1.id, 'پیامِ نفرِ اول') === 0 &&
   Number((await one("SELECT COUNT(*)::int AS n FROM shop_chat_messages WHERE body='پیامِ نفرِ اول'")).n) === 0,

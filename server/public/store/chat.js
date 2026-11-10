@@ -117,7 +117,8 @@
       loop++;
       $('ct-verify').hidden = false; $('ct-body').hidden = true; $('ct-form').hidden = true;
       $('ct-issue').hidden = true; $('ct-new').hidden = true; $('ct-state').hidden = true;
-      setTimeout(function () { $('ct-phone').focus(); }, 80);
+      //  ⛔ تمرکزِ دیر کادری را که مشتری همین حالا در فرم در آن است نمی‌رباید (پیش‌تر کدِ در حالِ نوشتن به کادرِ شماره می‌رفت ⇒ ۴۰۰)
+      setTimeout(function () { if (!$('ct-verify').contains(document.activeElement)) $('ct-phone').focus(); }, 80);
     }
     function sendCode() {
       var b = $('ct-vsend'); b.disabled = true;

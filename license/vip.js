@@ -56,7 +56,6 @@
   const account = () => read(ACCT_KEY, {});
   const loggedIn = () => !!account().accessToken;
 
-
   /* ---------- آیکون‌ها ----------
      همه دستی کشیده شده‌اند (SVG). هیچ ایموجی در برنامه استفاده نمی‌شود،
      چون ایموجی روی هر گوشی شکل و رنگ متفاوتی دارد و در ویندوز قدیمی
@@ -142,11 +141,14 @@
   }
 
   /* ⛔ یک پرسش در هر زمان: `TohidLicense.sync()` در پایان `tohid:license-change` می‌فرستد و همین فایل با آن `refresh` می‌کند
-     (حلقهٔ بی‌پایان تا سقفِ درخواستِ سرور). رویدادی که وسطِ همین پرسش برسد به همین پرسش می‌پیوندد. */
-  let inflight = null;
+     (حلقهٔ بی‌پایان تا سقفِ درخواستِ سرور). رویدادی که وسطِ همین پرسش برسد به آن می‌پیوندد، مگر با کلیدِ حسابِ دیگر (ورود وسطِ پرسشِ مهمان روی شبکهٔ کند) ⇒ پرسشی تازه پشتِ همان، نه قفل تا بارِ دوباره. */
+  let inflight = null, inflightKey = '';
   function refresh() {
-    if (!inflight) inflight = doRefresh().finally(() => { inflight = null; });
-    return inflight;
+    const key = account().accessToken || '';
+    if (inflight && key === inflightKey) return inflight;
+    inflightKey = key;
+    const p = inflight = (inflight || Promise.resolve()).then(doRefresh, doRefresh).finally(() => { if (inflight === p) inflight = null; });
+    return p;
   }
 
   async function doRefresh() {
@@ -159,11 +161,8 @@
       const res = await fetch(base + '/api/v1/billing/status', { headers });
       if (!res.ok) return ENT;
       const next = entitlementFrom(await res.json());
-      if (next) {
-        ENT = next;
-        write(ENT_KEY, ENT);
-        apply();
-      }
+      //  پاسخی که با کلیدِ پیشین رفت (ورود یا خروج وسطِ راه) جای دسترسیِ حسابِ کنونی نمی‌نشیند
+      if (next && (account().accessToken || '') === (a.accessToken || '')) { ENT = next; write(ENT_KEY, ENT); apply(); }
     } catch { /* آفلاین: با وضعیت کش‌شده ادامه می‌دهیم */ }
     //  مجوزِ همین دستگاه — تنها جایی که سرور «سقفِ دستگاه پر است» را می‌گوید.
     //  پیش‌تر وب فقط بعد از کدِ فعال‌سازی این را می‌پرسید.

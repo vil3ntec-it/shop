@@ -900,6 +900,53 @@ await step('بانکِ تصاویر: پوشه + CSV از پنل؛ فایلِ ج�
   await page.waitForFunction(() => document.getElementById('btn-ib-run').disabled === false, null, { timeout: 10_000 });
 });
 
+// ── دو بارِ هم‌پوشانِ زبانهٔ بانک (شبکهٔ کند) ──
+//  ⛔ فهرستِ دسته‌ها و صفِ بررسی پیش از await پاک و پس از آن پر می‌شدند ⇒ دو بارِ هم‌پوشان ردیفِ دوتایی (strict mode ِ گام‌های
+//  بانک زیرِ ۹۰۰ms تأخیرِ GET). این‌جا همان ترتیب به زور: پاسخِ بارِ نخست تا پرسشِ بارِ دوم می‌ماند و پاسخِ دوم پس از رندرِ نخست.
+async function overlapped(re, run) {
+  let firstReq = null;
+  let secondReq = null;
+  let asked = () => {};
+  const second = new Promise((r) => { asked = r; });
+  let done = () => {};
+  const firstDone = new Promise((r) => { done = r; });
+  const onFinished = (r) => { if (r === firstReq) done(); };
+  page.on('requestfinished', onFinished);
+  await page.route(re, async (route) => {
+    if (!firstReq) { firstReq = route.request(); await second; }
+    else if (!secondReq) {
+      secondReq = route.request();
+      asked();
+      await firstDone;
+      await page.evaluate(() => new Promise((r) => setTimeout(r, 100))).catch(() => {});
+    }
+    await route.fallback().catch(() => {});
+  });
+  let timer = null;
+  try {
+    await run();
+    await Promise.race([second, new Promise((_, no) => { timer = setTimeout(() => no(new Error(`بارِ دومِ ${re} نیامد`)), 10_000); })]);
+    await (await secondReq.response())?.finished();
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 100)));   //  رندرِ پاسخِ دوم پیش از شمردن
+  } finally {
+    clearTimeout(timer); asked(); done();
+    await page.unroute(re).catch(() => {});
+    page.off('requestfinished', onFinished);
+  }
+}
+const uniqueRows = async (sel, key) => {
+  const ids = await page.$$eval(sel, (rows, k) => rows.map((r) => r.dataset[k]), key);
+  assert.ok(ids.length > 0, `${sel}: هیچ ردیفی`);
+  assert.equal(new Set(ids).size, ids.length, `${sel}: ردیفِ دوتایی ${JSON.stringify(ids)}`);
+};
+await step('بانکِ تصاویر: دو بارِ هم‌پوشانِ زبانه ردیفِ دوتایی نمی‌سازد (دسته‌ها و صفِ بررسی)', async () => {
+  await openTab('imgbank');
+  await overlapped(/\/api\/admin\/image-bank\/batches$/, () => page.evaluate(() => Promise.all([LOADERS.imgbank(), LOADERS.imgbank()])));
+  await uniqueRows('#ib-batches tr[data-batch]', 'batch');
+  await overlapped(/\/api\/admin\/image-bank\/review\?/, () => page.evaluate(() => Promise.all([LOADERS.imgbank(), LOADERS.imgbank()])));
+  await uniqueRows('#ib-review tr[data-image]', 'image');
+});
+
 // ── IMG-14 / IMG-PRO-06: ادامهٔ بارگذاری پس از قطع — رسیده‌ها دوباره نمی‌روند، sha256 سنجیده می‌شود ──
 await step('بانکِ تصاویر: ادامهٔ بارگذاری پس از قطعِ اینترنت؛ فایلِ رسیده دوباره نمی‌رود و هر فایل sha256 دارد', async () => {
   const F = require('./image-fixtures');
@@ -1331,6 +1378,16 @@ await step('ورودِ دومرحله‌ای: از پنل روشن می‌شود
   assert.match(secret, /^[A-Z2-7]{32}$/);
   assert.match(await page.getAttribute('#twofa-link', 'href'), /^otpauth:\/\/totp\//);
   await page.fill('#twofa-code', totp.generate(secret));
+  //  ⛔ پاسخِ دیرِ نشستِ پیشین: GET ِ حالِ پس از «روشن» تا پس از خروج و ورودِ دوباره نگه داشته می‌شود؛ ۴۰۱ ِ آن (توکنِ
+  //  باطل‌شده) پیش‌تر نشستِ تازه را می‌بست و «خاموش کردن» هرگز پیدا نمی‌شد (۹۰۰ms تأخیرِ GET: ۲ از ۲ سرخ)
+  let releaseState = () => {};
+  const stateHeld = new Promise((r) => { releaseState = r; });
+  let staleReq = null;
+  const STATE = /\/api\/admin\/2fa$/;
+  await page.route(STATE, async (route) => {
+    if (route.request().method() === 'GET' && !staleReq) { staleReq = route.request(); await stateHeld; }
+    await route.fallback().catch(() => {});
+  });
   await page.click('#btn-2fa-enable');
   await page.waitForSelector('#twofa-codes-box:not(.hidden)', { timeout: 10_000 });
   const codes = (await page.textContent('#twofa-codes')).trim().split('\n');
@@ -1349,6 +1406,16 @@ await step('ورودِ دومرحله‌ای: از پنل روشن می‌شود
   await page.fill('#in-totp', next);
   await page.click('#btn-login');
   await page.waitForSelector('#app-view:not(.hidden)', { timeout: 10_000 });
+  try {
+    assert.ok(staleReq, 'GET ِ حالِ پس از «روشن» نیامد');
+    releaseState();
+    await (await staleReq.response())?.finished();
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 100)));   //  پاسخِ ۴۰۱ ِ کهنه رسیده و خوانده شده
+  } finally {
+    releaseState();
+    await page.unroute(STATE).catch(() => {});
+  }
+  assert.equal(await page.isVisible('#app-view'), true, '۴۰۱ ِ درخواستِ نشستِ پیشین نشستِ تازه را بست');
 
   //  پاک‌کاری: خاموش با کدِ بازیابی، تا اجرای بعدی همان باشد
   await page.click('#btn-2fa');

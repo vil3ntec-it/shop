@@ -237,7 +237,7 @@
     document.body.classList.add('lock');
     requestAnimationFrame(function () { scrim.classList.add('on'); sheet.classList.add('on'); });
     var f = sheet.querySelector('[data-autofocus]') || sheet.querySelector('button, a, input');
-    setTimeout(function () { if (f) f.focus(); }, 60);
+    setTimeout(function () { if (f && !sheet.contains(document.activeElement)) f.focus(); }, 60);
   };
   K.closeSheet = function (silent) {
     if (!openSheet) return;

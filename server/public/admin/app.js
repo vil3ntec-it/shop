@@ -28,11 +28,12 @@ let currentShop = null;
 
 // ---------- ابزار ----------
 async function call(method, path, body, extraHeaders = {}, retried = false) {
+  const sent = token;
   const res = await fetch(API + path, {
     method,
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(sent ? { Authorization: `Bearer ${sent}` } : {}),
       ...extraHeaders,
     },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -40,8 +41,9 @@ async function call(method, path, body, extraHeaders = {}, retried = false) {
   const text = await res.text();
   let json = null;
   try { json = text ? JSON.parse(text) : null; } catch { json = null; }
-  //  ⚠️ ۴۰۱ِ خودِ ورود (رمز یا کدِ نادرست، «کدِ تأیید لازم است») نشست را نمی‌بندد
-  if (res.status === 401 && path !== '/admin/login') { logout(); throw new Error('نشست تمام شد، دوباره وارد شوید'); }
+  //  ⚠️ ۴۰۱ِ خودِ ورود (رمز یا کدِ نادرست، «کدِ تأیید لازم است») نشست را نمی‌بندد؛ ⛔ ۴۰۱ ِ درخواستِ دیرِ نشستِ پیشین (پس از
+  //  خروج و ورودِ دوباره روی شبکهٔ کند) هم نشستِ تازه را نمی‌بندد
+  if (res.status === 401 && path !== '/admin/login') { if (token === sent) logout(); throw new Error('نشست تمام شد، دوباره وارد شوید'); }
   if (!res.ok) {
     const err = new Error(json?.error?.message || `خطای ${res.status}`);
     err.code = json?.error?.code || '';

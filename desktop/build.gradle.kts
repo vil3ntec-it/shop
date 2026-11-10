@@ -1,5 +1,6 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import java.util.Properties
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 /*
  *  برنامهٔ کامپیوترِ فروشگاه — همان برنامهٔ اندروید، بومی روی ویندوز و
@@ -398,4 +399,15 @@ tasks.test {
   //  گزارشِ کشیدنِ صفحه‌ها (`shots/NewScreensRenderTest`، فقط کارِ «(گزارش)» ِ desktop-shots.yml): پوشهٔ PNG و render-report.json؛
   //  بی آن، آزمون کنار می‌رود و آزمونِ سدِ کامپیوتر هیچ صفحه‌ای نمی‌کشد
   System.getenv("TOHID_RENDER_OUT")?.takeIf { it.isNotBlank() }?.let { environment("TOHID_RENDER_OUT", it); outputs.upToDateWhen { false } }
+}
+
+//  شکستِ آزمون در CI با پیام، علت و stack (پیش‌فرضِ SHORT ِ Gradle فقط «AssertionError at X.kt:113» می‌نوشت؛
+//  run 41645079134 ِ `ResumableDownloadServerTest`). فقط گزارشِ آزمون؛ در ساخت و انتشار اثری ندارد.
+tasks.withType<Test>().configureEach {
+  testLogging {
+    exceptionFormat = TestExceptionFormat.FULL
+    showExceptions = true
+    showCauses = true
+    showStackTraces = true
+  }
 }
