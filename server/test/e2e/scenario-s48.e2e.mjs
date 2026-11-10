@@ -24,8 +24,8 @@ const { db } = E;
 
 /** سطرهایی که این‌جا سنجیده نمی‌شوند یا ساخته نشده‌اند — سند، نه assert */
 export const PENDING = [
-  '«Enter روی ردیفِ نقد = ریزِ تراکنش‌ها»: گزارشِ تازه (پشتِ `report_fresh` ِ خاموش) زبانه‌ها و «پایانِ روز» دارد ولی ریز شدن از ردیفِ روشِ پرداخت سنجیده نشده؛ Ctrl+P «partial» در keymap.json',
-  'گزارشِ خودکار با پرچمِ `shop.owner_report` ِ پیش‌فرض خاموش؛ کانالِ واتس‌اپ سرویس‌دهنده ندارد (D-09) — این‌جا «داخلِ برنامه»',
+  '«Enter روی ردیفِ نقد = ریزِ تراکنش‌ها» و Ctrl+P روی برنامهٔ کامپیوتر ساخته شده‌اند (زبانهٔ «پایانِ روز» ِ «گزارشِ تازه»: `KeyMap.REPORTS_DRILL` و `GLOBAL_PRINT`) و با `DayEndTest` ِ کاتلین سنجیده می‌شوند (ریزِ هر روش = رویدادهای دفترِ روز، جمع = خالصِ همان ردیف)؛ این سرتاسریِ پروتکلی دکمه‌ای در رابطِ کاتلین نمی‌زند. «گزارشِ تازه» تنظیمِ دستگاه و پیش‌فرض خاموش است (تصمیمِ صاحب‌کار)',
+  'گزارشِ خودکار با پرچمِ `shop.owner_report` ِ پیش‌فرض خاموش (تصمیمِ صاحب‌کار)؛ کانالِ واتس‌اپ سرویس‌دهنده ندارد (D-09) — این‌جا «داخلِ برنامه»',
 ];
 
 const owner = await E.owner('owner-s48@e2e.local', 'صاحبِ S48', 'دکانِ S48');
@@ -94,11 +94,14 @@ await E.step('S48', 'ساعتِ ۲۱: گزارشِ خودکار یک بار بر
   assert.equal(sum(s.payments.filter((p) => p.method !== 'cash'), (p) => p.sales), sum(credit, (x) => minor(x.finalTotal)));
 }, { needs: ['S48.0'] });
 
-await E.step('S48.keys', 'Ctrl+8 «گزارش‌ها» و Ctrl+P «چاپ» در keymap.json (تنها منبعِ میان‌برها)', async () => {
+await E.step('S48.keys', 'Ctrl+8 «گزارش‌ها»، Enter «ریز شدن در ردیف» و Ctrl+P «چاپ» در keymap.json (تنها منبعِ میان‌برها)', async () => {
   const km = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', '..', '..', 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'core', 'keymap', 'keymap.json'), 'utf8'));
   const by = (id) => km.actions.find((a) => a.id === id);
   assert.deepEqual([by('global.page8').keys, by('global.page8').page, by('global.page8').status], [['Mod+8'], 'reports', 'live']);
   assert.deepEqual(by('global.print').keys, ['Mod+P']);
+  //  «Enter روی ردیفِ نقد»: همان کلیدِ ریزِ ردیفِ گزارش (`KeyMap.REPORTS_DRILL`) در دامنهٔ «گزارش‌ها»، نه کلیدِ دیگری
+  assert.deepEqual([by('reports.drill').scope, by('reports.drill').keys], ['reports', ['Enter']]);
+  assert.ok(km.actions.filter((a) => a.scope === 'reports' && a.id !== 'reports.drill').every((a) => !a.keys.includes('Enter')), 'Enter در گزارش‌ها فقط ریز');
 });
 
 await E.finish();
