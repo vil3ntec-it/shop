@@ -14,7 +14,7 @@
  *    می‌سازد (مثلِ امروزِ عکسِ ۸۰۰ پیکسلی) و این‌جا فقط سنجیده می‌شوند.
  * ⛔ بمبِ فشرده: بیش از ۱۰٬۰۰۰ پیکسل در یک بُعد یا ۴۰ مگاپیکسل رد می‌شود —
  *    فقط از سرآیند، بی بازکردنِ zlib/VP8 (IMG-PRO-09). سرآیندِ دوم که ابعادِ
- *    دیگری بگوید (JPEG با دو SOF، WebP با جریانِ بزرگ‌تر از بومِ VP8X) «خراب» است:
+ *    دیگری بگوید (JPEG با دو SOF، PNG با دو IHDR، WebP با جریانِ بزرگ‌تر از بومِ VP8X) «خراب» است:
  *    رمزگشا ممکن است همان دیگری را بخواند و سقفِ این‌جا دور زده شود.
  */
 const { sniff } = require('./product-photos');
@@ -134,6 +134,8 @@ const PNG_DROP = new Set(['tEXt', 'zTXt', 'iTXt', 'eXIf', 'tIME']);
 function inspectPng(buf) {
   const chunks = pngChunks(buf);
   if (!chunks.length || chunks[0].type !== 'IHDR' || chunks[0].end - chunks[0].start !== 12 + 13) throw corrupt('png-ihdr');
+  //  SR44-1: رمزگشاها (`image-codec`، `image-quality`) IHDR ِ دیگری نمی‌گیرند؛ این‌جا هم «خراب»، نه ابعادِ نخست
+  if (chunks.some((c, i) => i > 0 && c.type === 'IHDR')) throw corrupt('png-multi-ihdr');
   return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20), orientation: 0, warnings: [] };
 }
 

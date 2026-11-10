@@ -31,7 +31,7 @@ function decodePng(buf) {
   const idat = [];
   while (i + 12 <= buf.length) {
     const len = buf.readUInt32BE(i), type = buf.toString('latin1', i + 4, i + 8), data = buf.subarray(i + 8, i + 8 + len);
-    if (type === 'IHDR') ihdr = data;
+    if (type === 'IHDR') { if (ihdr) return null; ihdr = data; }   // SR44-1: IHDR ِ دوم ⇒ ابعادِ سنجیده‌نشده، نه رمزگشایی
     else if (type === 'PLTE') plte = data;
     else if (type === 'tRNS') trns = data;
     else if (type === 'IDAT') idat.push(data);
