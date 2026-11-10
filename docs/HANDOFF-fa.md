@@ -60,6 +60,17 @@
   همهٔ اشتراک‌ها را پاک می‌کرد. `store-push.js` + یک واژه در صادراتِ `storefront.js` (`parseToken`)؛ آزمون `security-review-39.test.js` پیش از رفع سرخ روی هر دو پایگاه.
 - نیمه‌کاره: هیچ. باز (فقط گزارش): `PUT /api/admin/pump/live-config` (کدِ پمپ) سنجشِ کاتالوگِ `admin-flags` را دور می‌زند — همان مدیرِ ارشد.
 - قدمِ بعدی: اگر صاحب محصول بخواهد، درِ پمپ هم از `checkKnown` بگذرد (کارِ کدِ پمپ، نه این شاخه).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/e2e-pg` (سناریوهای سرتاسری روی PostgreSQL؛ روی `claude/flag-catalog` ‏4da5ef2e؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: هر ۳۷ سناریو روی PostgreSQL ِ محلی (`E2E_DATABASE_URL`) — پایه: ۲۴۳ سبز، ۵ سرخ، ۱۵ اجرانشده. هیچ‌کدام باگِ محصول نبود:
+  (۱) notify، ops، recovery: هارنس SQL ِ pg_dump را gzip کرده به `loadDataDir` ِ PGlite می‌داد (خطای gunzip) و ops قالبِ PGlite را
+  می‌خواست ⇒ `test/e2e/lib/restore-copy.mjs`: قالب از نامِ فایل؛ PostgreSQL ⇒ دیتابیسِ تازهٔ `…_rtest` و `scripts/restore.js` (راهِ
+  واقعیِ صاحب‌کار، روی PostgreSQL سالم دیده شد)، `control-sums.mjs sums` نشانیِ PostgreSQL هم می‌گیرد، `cutPower` برای «برق رفت».
+  (۲) DOM ِ کهنه: E2E-ADM.counts (شمارِ بازکردنِ پیشین)، E2E-ADM.user (`/فعال$/` «غیرفعال» را هم می‌گرفت)، E2E-PCK-06.4 (`goto` با
+  همان سند ⇒ جایگزینِ سفارشِ اول؛ رفعش `about:blank` در دستهٔ ۳۹، #1023، نه این شاخه)، S132 ِ customer با `all` (نوارِ سبد پیش از `route` ِ ویترین ⇒ `booted`).
+  (۳) خاموشیِ ظرف میانِ `DROP SCHEMA public` و `CREATE` دیتابیسِ مشترک را بی public گذاشت ⇒ ۳۷/۳۷ سرخ ⇒ `IF EXISTS` در `harness.mjs`.
+  شاهد (هر حالت سه اجرای پیاپی، با رفعِ pick ِ دستهٔ ۳۹): PostgreSQL پیش‌فرض و `all` هر بار ۲۶۳/۲۶۳، PGlite پیش‌فرض و `all` هر بار ۲۶۲/۲۶۲.
+- نیمه‌کاره: E2E روی PostgreSQL در CI نیست (فقط پیشنهاد در گزارش؛ ورک‌فلو دست نخورد).
+- قدمِ بعدی: کارِ `e2e-pg` در `server.yml` (سرویسِ postgres:16 و `E2E_DATABASE_URL`، ubuntu-24.04 برای psql/pg_dump ِ ۱۶).
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/flag-catalog` (کاتالوگِ کاملِ پرچم‌ها و «همه روشن» ِ سرتاسری؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) ۵۵ کلیدِ `live_config` که کدِ غیرِ پمپ می‌خواند و در `KNOWN` نبود (خانوادهٔ `shop.delivery_*`، `shop.visual_search`، `pay.hesabpay`،
   `shop.promo_*`، `shop.owner_report`، همگام‌سازیِ دکان، بازار و کارمزدها، ops/security و تنظیم‌های عددی/شیء) با پیش‌فرضِ خودِ کد ⇒ ۱۴۲ ردیف.

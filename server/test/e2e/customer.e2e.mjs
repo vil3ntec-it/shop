@@ -50,6 +50,15 @@ async function addToCart(page, id, times = 1) {
 async function openStore(page, slug = SLUG, hash = '') {
   await page.goto(`${E.apiBase}/store/${slug}${hash}`);
   await page.waitForSelector('#products li[data-id]', { state: 'attached', timeout: 15_000 });
+  await booted(page);
+}
+/**
+ * ⚠️ قلم‌ها پیش از پایانِ بالا آمدن می‌نشینند: `boot` ِ `store.js` کالاها، سبد و بارِ دیرِ پرچم‌ها (`loadMore`) را با هم می‌خواهد و
+ * فقط سپس `route` ⇒ `show` نمای صفحه و نوارِ سبد را می‌کشد و `#boot` را پنهان می‌کند. «نوارِ سبد پیداست/نیست» پیش از آن DOM ِ
+ * نیمه را می‌خواند (با `E2E_FLAGS_ON=all` روی PostgreSQL سرخ؛ «نیست» همان دم راستِ بی‌معنا بود).
+ */
+async function booted(page) {
+  await page.waitForSelector('#boot', { state: 'hidden', timeout: 15_000 });
 }
 async function toCheckout(page) {
   await page.click('#open-cart');
@@ -162,6 +171,7 @@ await E.step('S132', 'سبدِ مهمان با تازه‌سازی و با بس�
   for (const k of keys) assert.ok(['qtyMilli', 'priceMinor', 'name', 'unit', 'maxQtyMilli', 'photo', 'unavailable'].includes(k), `کلیدِ اضافه در سبد: ${k}`);
   await page.reload();
   await page.waitForSelector('#products li[data-id]', { state: 'attached' });
+  await booted(page);
   assert.deepEqual(await cartOf(page), before, 'سبد پس از تازه‌سازی');
   assert.ok(await page.isVisible('#cart-bar'), 'نوارِ سبد پس از تازه‌سازی');
   page = await reopen(G);

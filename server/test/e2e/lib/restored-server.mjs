@@ -1,24 +1,18 @@
 /**
  * «سرورِ تازه پس از بازیابی» — فرایندِ جدا برای `ops.e2e.mjs` (E2E-OPS-14).
  *
- * همان راهی که پیامِ `backup.restore` برای PGlite می‌گوید: پوشهٔ دیتابیسِ خالی، فایلِ
- * پشتیبان (رمزگشایی‌شده) با `PGlite.create({ loadDataDir })`، و بعد سرور روی همان پوشه.
+ * پشتیبان پیش‌تر در محیطِ جدا برگشته است (`restore-copy.mjs`: پوشهٔ PGlite یا دیتابیسِ تازهٔ PostgreSQL)؛
+ * این‌جا فقط سرور روی همان دیتابیس بالا می‌آید.
  *
- *   node restored-server.mjs <پوشهٔ دیتابیس> <فایلِ tar.gz ِ رمزگشایی‌شده>
+ *   node restored-server.mjs <DATABASE_URL ِ بازیابی‌شده>
  *   ⇐ روی stdout: READY <port>
  */
 import { createRequire } from 'node:module';
-import fs from 'node:fs';
 
 const require = createRequire(import.meta.url);
-const [dir, tarGz] = process.argv.slice(2);
-const { PGlite } = require('@electric-sql/pglite');
+const [url] = process.argv.slice(2);
 
-const blob = new File([fs.readFileSync(tarGz)], 'restore.tar.gz', { type: 'application/x-gzip' });
-const lite = await PGlite.create(dir, { loadDataDir: blob });
-await lite.close();
-
-Object.assign(process.env, { DATABASE_URL: `pglite:${dir}`, BACKUP_ENABLED: 'false' });
+Object.assign(process.env, { DATABASE_URL: url, BACKUP_ENABLED: 'false' });
 const { createApp } = require('../../../src/app');
 const live = require('../../../src/lib/sync-v1-live');
 const app = await createApp({ runMigrations: true });
