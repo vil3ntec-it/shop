@@ -2186,6 +2186,16 @@ ESC/POS.
   دست نمی‌خورد؛ انگلیسی همان. ⛔ LRI/PDI (U+2066/2069) روی کاغذ نه — Java2D آن‌ها را نامرئی نمی‌گیرد؛ LRM و LRE/PDF چرا.
   آزمون: `PaperBidiTest` (`java.text.Bidi`) و `ReceiptPaperBidiDeskTest` (پیکسل، ۵۸ و ۸۰).
 
+**چاپگرِ شبکه با mDNS (HW-12، از ۱۴۰۵/۰۸/۱۹، `claude/hw-2`):**
+- فقط `_pdl-datastream._tcp` (چاپگرِ خام؛ درگاه از SRV). ⛔ `_ipp._tcp` و `_printer._tcp` نه: درگاهشان ESC/POS نمی‌گیرد و «همان میزبان، ۹۱۰۰»
+  حدس است. پرسشِ یک‌باره از درگاهِ گذرا و پاسخِ تک‌پخش (RFC 6762 §6.7): بی عضویتِ گروه و بی `MulticastLock`؛ پاسخ‌دهندهٔ فقط‌چندپخش
+  پیدا نمی‌شود و جست‌وجوی ۹۱۰۰ کنارش می‌ماند. هیچ بایتی به چاپگر نمی‌رود.
+- منطق فقط `core/hw/Mdns.kt` (بستهٔ بدشکل ⇒ `null`، اشارهٔ فشرده‌سازی فقط به پیش‌تر، فقط IPv4 ِ RFC1918، TTL ِ صفر چاپگر نیست)؛ سوکت فقط
+  `MdnsProbe` (core/jvmMain، بسته به نشانیِ همان کارت). صدازننده (`PrinterFinderPlatform.mdnsPrinters`) پیش از هر سوکت
+  `LocalNetworkAccess.blocked` ِ گروه و کارت را می‌پرسد (HW-13)؛ آیفون فهرستِ خالی (مجوزِ چندپخشِ اپل).
+- بسته‌های `core/test-vectors/mdns-v1.json` و `out` ِ parse را رمزگذار/رمزگشای مستقل (dnspython) ساخته است؛ ردیفِ تازه هم همان‌طور، نه با
+  همین کد. آزمون: `MdnsVectorsTest` و `MdnsProbeTest` (پاسخ‌دهندهٔ ساختگی روی loopback)، `server/test/hw-mdns.test.js`.
+
 **«دستگاه‌ها» و اسکن وقتی برنامه بسته است (از ۱۴۰۵/۰۸/۱۱، نسخه 2.14.5):**
 - منطق فقط در `core/hw` (نوع‌شناسی `DeviceHub.kt`، صف `ScanQueue.kt`، حافظهٔ بارکدخوان `ScannerMemory.kt`، کارتِ
   فرمان `ScanSale.kt`) تا آیفون هم همان را بخواند؛ اندروید فقط در `*Android.kt` (`hw/DeviceSignalsAndroid.kt`،

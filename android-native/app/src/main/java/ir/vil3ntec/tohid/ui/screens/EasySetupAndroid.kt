@@ -138,6 +138,8 @@ internal fun PrinterFinderDialog(onDismiss: () -> Unit, onAdded: (String) -> Uni
               val hosts = lans.flatMap { Subnet.hosts(it.ip, it.prefix) }.distinct()
               progress = NetScan.Progress(hosts.size, 0, 0)
               netJob = scope.launch {
+                //  HW-12: هم‌زمان پرسشِ mDNS ِ چاپگرِ خام — نامِ خودِ چاپگر و درگاهِ SRV ِ آن (Discovery.merge یکی می‌کند)
+                launch { add(PrinterFinderPlatform.mdnsPrinters(context, lans)) }
                 NetPrinterScan.scan(hosts) { p, hits ->
                   scope.launch { progress = p; add(hits.map { FoundPrinter.network(it) }) }
                 }
