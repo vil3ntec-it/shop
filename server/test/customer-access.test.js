@@ -322,3 +322,15 @@ test('مهاجرتِ ۳۸۰: rollback جدول، تریگر و ردیفِ خود
   await access.settle();
   assert.equal((await rowsOf(T.owner.shopId)).length, 1);
 });
+
+test('SR46-3: پرونده‌ای که فقط پینِ تحویل (CRM-09، فیلدِ تماس) دارد هم «تماس» ثبت می‌شود، نه «پرونده»', async () => {
+  await debtor(T.owner, 'd-pin', { name: 'فقط پین', deliveryPin: { lat: 34.523456, lng: 69.181234 } });
+  await query('DELETE FROM customer_access_log WHERE shop_id=$1', [T.owner.shopId]);
+  assert.deepEqual((await h.get('/api/debtors/d-pin', tok(T.owner))).body.deliveryPin, { lat: 34.523456, lng: 69.181234 });
+  //  انبارداری که `customers.contact` ندارد پین را نمی‌بیند ⇒ همان «پرونده»
+  assert.equal((await h.get('/api/debtors/d-pin', tok(T.storekeeper))).body.deliveryPin, undefined);
+  await access.settle();
+  const rows = (await rowsOf(T.owner.shopId)).filter((r) => r.customer_ref === 'd-pin');
+  assert.deepEqual(rows.map((r) => [r.viewer_id === T.owner.userId ? 'owner' : 'storekeeper', r.kind]).sort(),
+    [['owner', 'phone'], ['storekeeper', 'detail']]);
+});

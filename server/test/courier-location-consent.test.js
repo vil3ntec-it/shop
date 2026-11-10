@@ -194,3 +194,32 @@ test('مهاجرتِ ۷۵۰: برگشت و اجرای دوباره', async () =>
   await query(fs.readFileSync(path.join(dir, '750_courier_location_consent.sql'), 'utf8'));
   assert.equal(await col(), true);
 });
+
+test('SR46-2: «نه» ِ هم‌زمان با فرستادنِ موقعیت — نقطه‌ای پس از لغو نمی‌نشیند (قفلِ ردیفِ پیک)', async () => {
+  const { tx } = require('../src/db');
+  const s = await liveShop('رضایت‌هم‌زمان');
+  await setFlag(s.shopId, consent.FLAG, true);
+  const c = await addCourier(s, 'هم‌زمان');
+  assert.equal((await setConsent(c, { granted: true })).status, 200);
+  const m = await onTheWay(s, c);
+  //  همان کارِ `consent.set` («نه»): قفلِ ردیفِ پیک، لغو و پاک کردن — و تراکنش هنوز باز است که موقعیت می‌رسد
+  let locked;
+  let release;
+  const gotLock = new Promise((r) => { locked = r; });
+  const gate = new Promise((r) => { release = r; });
+  const revoke = tx(async (t) => {
+    await t.query('SELECT 1 FROM shop_couriers WHERE shop_id=$1 AND id=$2 FOR UPDATE', [s.shopId, c.courierId]);
+    await t.query('UPDATE shop_couriers SET location_consent_at=NULL WHERE shop_id=$1 AND id=$2', [s.shopId, c.courierId]);
+    await t.query('DELETE FROM delivery_locations WHERE assignment_id=$1', [m.aid]);
+    locked();
+    await gate;
+  });
+  await gotLock;
+  const sent = location(c, m.aid);
+  await new Promise((r) => setTimeout(r, 400));
+  release();
+  await revoke;
+  const r = await sent;
+  assert.deepEqual([r.status, r.body.error?.code], [403, 'location_consent_required'], JSON.stringify(r.body));
+  assert.equal(await points(m.aid), 0, 'نقطهٔ رسیده در میانهٔ لغو نماند');
+});

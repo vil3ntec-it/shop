@@ -139,6 +139,33 @@ async function wholesaleV3(c, ctx, head) {
   return rows.length > 0 && caps.isWholesaleDebtor(rows[0].data);
 }
 
+// ---------- SR46-1: لیستِ عمدهٔ مشتری = تخفیفِ ماندگار ----------
+
+/**
+ * عمده کردنِ مشتری (درجِ مشتریِ تازه با `priceList = wholesale` یا تغییرِ لیستِ مشتریِ خرده به عمده) همان «ادعای لیست» است
+ * که تصمیمِ ۱-۱۱ (۳) از سرِ فاکتور نمی‌پذیرد — بی این، کارمندِ بی تخفیف اول مشتری را عمده می‌کرد و بعد به قیمتِ عمده می‌فروخت.
+ * پس با همین پرچم فقط «کسی که اجازه‌اش را دارد»: `sales.discount` ِ بی سقف (۱۰۰٪ و هر مبلغ) ⇒ آزاد؛ سقف‌دار، «با تأیید» یا
+ * «ممنوع» ⇒ رد (ردیفِ مشتری برگه نمی‌برد، همان `credit-limit-perm`). ویرایشِ مشتریِ عمدهٔ موجود و برگرداندن به خرده آزاد.
+ */
+const LIST_REQ = Object.freeze({ pct: 100, amount: Number.MAX_SAFE_INTEGER });
+const grantsWholesale = (prev, next) => isObj(next) && Object.prototype.hasOwnProperty.call(next, 'priceList')
+  && caps.isWholesaleDebtor(next) && !caps.isWholesaleDebtor(prev);
+const listDecision = (role, layers) => require('./perm-core').evaluate(role, layers, caps.DISCOUNT, LIST_REQ);
+
+/** `sync-v3-apply.authorize` ⇐ op ِ `debtors`: null یا رد با صندوق */
+async function judgeListV3(c, ctx, op, row, origin) {
+  if ((op.kind !== 'insert' && op.kind !== 'update') || !isObj(op.fields)) return null;
+  if (!grantsWholesale(row && !row.deleted_at ? row.data : null, op.fields)) return null;
+  if (!(await on(ctx, (s, p) => c.query(s, p)))) return null;
+  const d = listDecision(ctx.role, await require('./staff-approval').requesterLayers(ctx, c));
+  if (d.decision === 'allow') return null;
+  return {
+    reason: 'discount_not_allowed', box: 'perm_denied',
+    detail: { perm: caps.DISCOUNT, decision: 'deny', reason_core: d.reason, requester: ctx.userId || '', role: ctx.role || '',
+      debtor: op.row_id, priceList: 'wholesale', ...(d.cap ? { cap: d.cap, limit: d.limit } : {}), path: origin },
+  };
+}
+
 /** تأییدِ پذیرفته‌شدهٔ پیشینِ همین سند و کار، که همین نیاز را بپوشاند (قلمِ دیرآمده) */
 async function coveredBefore(c, shopId, n) {
   const rows = (await c.query(
@@ -222,6 +249,7 @@ function batchFromPlan(plan) {
  * (`doc-roles`/`till-guard` ِ پس از آن فقط `auditLog`/`transactions` را می‌سنجند؛ درجِ فاکتور از آن‌ها چیزی نمی‌خواهد.)
  */
 async function judgeV3(c, ctx, op, row, { plan = null, deviceId = '', origin = 'v3' } = {}) {
+  if (isObj(op) && op.table === 'debtors') return (await judgeListV3(c, ctx, op, row, origin)) || undefined;   //  SR46-1
   if (!touchesV3(op) || !(await on(ctx, (s, p) => c.query(s, p)))) return undefined;
   const batch = batchFromPlan(plan);
   const s = await judgeSaleV3(c, ctx, op, row, { batch, deviceId, origin });
@@ -253,9 +281,21 @@ async function judgeLegacy(c, ctx, changes) {
     const r = (await c.query('SELECT data FROM debtors WHERE shop_id=$1 AND id=$2 AND deleted = false', [shopId, id])).rows[0];
     return !!r && caps.isWholesaleDebtor(r.data);
   };
-  if (!heads.length && !items.length) return null;
+  const lists = [...debtorsHere.entries()].filter(([, d]) => caps.isWholesaleDebtor(d));   //  SR46-1
+  if (!heads.length && !items.length && !lists.length) return null;
   const run = (s, p) => c.query(s, p);
   if (!(await require('./orders').flagOf(shopId, FLAG, run))) return null;
+  if (lists.length) {
+    //  SR46-1: مشتریِ عمدهٔ تازه یا خرده‌ای که عمده شد (راهِ قدیم کلِ ردیف را جایگزین می‌کند) ⇒ فقط با تخفیفِ بی سقف
+    const was = new Map((await c.query('SELECT id, data FROM debtors WHERE shop_id=$1 AND id = ANY($2::text[]) AND deleted = false',
+      [shopId, lists.map(([id]) => id)])).rows.map((r) => [r.id, r.data]));
+    const grant = lists.find(([id, d]) => grantsWholesale(was.get(id) || null, d));
+    if (grant && listDecision(role, await require('./staff-perms').layersFor(shopId, role, userId, run)).decision !== 'allow') {
+      return require('../middleware/errors').forbidden(
+        `عمده کردنِ مشتری (لیستِ قیمتِ عمده) همان تخفیف است و برای نقشِ شما بی سقف نیست (debtors/${grant[0]})`, 'discount_not_allowed');
+    }
+  }
+  if (!heads.length && !items.length) return null;
   const known = async (table, ids) => new Set(ids.length ? (await c.query(
     `SELECT id FROM ${table} WHERE shop_id=$1 AND id = ANY($2::text[]) AND deleted = false`, [shopId, ids]
   )).rows.map((r) => r.id) : []);

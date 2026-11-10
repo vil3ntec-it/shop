@@ -28,10 +28,13 @@ async function stateOf(shopId, courier) {
   return { required: Boolean(await requiredOf(shopId)), granted: at(courier) !== null, grantedAt: at(courier) };
 }
 
-/** پرچمِ روشن و بی رضایت ⇒ ۴۰۳ (درونِ تراکنشِ `putLocation`، روی ردیفِ تازهٔ پیک). */
+/**
+ * پرچمِ روشن و بی رضایت ⇒ ۴۰۳ (درونِ تراکنشِ `putLocation`، روی ردیفِ تازهٔ پیک). SR46-2: `FOR SHARE` با `FOR UPDATE` ِ [set]
+ * می‌جنگد ⇒ «نه» ِ نیمه‌کاره پیش از این خواندن تمام می‌شود (و این‌جا ۴۰۳)، یا این نقطه پیش از پاک کردنِ «نه» می‌نشیند و پاک می‌شود.
+ */
 async function assertIn(c, shopId, courierId) {
   if (!(await requiredOf(shopId, (t, p) => c.query(t, p)))) return;
-  const r = (await c.query('SELECT location_consent_at FROM shop_couriers WHERE shop_id=$1 AND id=$2', [shopId, courierId])).rows[0];
+  const r = (await c.query('SELECT location_consent_at FROM shop_couriers WHERE shop_id=$1 AND id=$2 FOR SHARE', [shopId, courierId])).rows[0];
   if (at(r) === null) {
     throw new ApiError(403, 'location_consent_required', 'برای فرستادنِ موقعیت، اول خودتان «اشتراکِ موقعیت» را روشن کنید');
   }

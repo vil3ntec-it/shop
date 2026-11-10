@@ -238,7 +238,13 @@ test('تصمیمِ ۱-۱۱ (۳)، v3: قیمتِ عمده فقط برای مشت
   const head = (id, debtorId) => ({ collection: 'sales', id, updatedAt: t,
     data: { total: 800, discount: 0, finalTotal: 800, status: 'completed', date: '2026-11-08', ...(debtorId ? { debtorId } : {}) } });
   const item = (sid) => ({ collection: 'saleItems', id: `${sid}-i`, updatedAt: t, data: { saleId: sid, productId: 'pc-lrice', quantity: 1, unitPrice: 800 } });
-  const lw = await legacy([{ collection: 'debtors', id: 'pc-lw', updatedAt: t, data: { name: 'عمده‌فروش', priceList: 'wholesale' } }, head('pc-l-w', 'pc-lw'), item('pc-l-w')]);
+  const wRow = { collection: 'debtors', id: 'pc-lw', updatedAt: t, data: { name: 'عمده‌فروش', priceList: 'wholesale' } };
+  //  SR46-1: شاگردِ بی تخفیف خودش مشتریِ عمده نمی‌سازد (همان ادعای لیست)؛ صاحب می‌سازد و ردیفِ بی تغییرِ همین دسته بس است
+  const self = await legacy([wRow, head('pc-l-w', 'pc-lw'), item('pc-l-w')]);
+  assert.deepEqual([self.status, self.body.error?.code], [403, 'discount_not_allowed'], JSON.stringify(self.body));
+  const byOwner = await h.api('POST', '/api/sync/push', { token: owner.accessToken, headers: { 'X-App': 'shop' }, body: { deviceId: 'web-o', changes: [wRow] } });
+  assert.equal(byOwner.status, 200, JSON.stringify(byOwner.body));
+  const lw = await legacy([wRow, head('pc-l-w', 'pc-lw'), item('pc-l-w')]);
   assert.equal(lw.status, 200, JSON.stringify(lw.body));
   const lr = await legacy([head('pc-l-r'), item('pc-l-r')]);
   assert.equal(lr.status, 403, JSON.stringify(lr.body));
