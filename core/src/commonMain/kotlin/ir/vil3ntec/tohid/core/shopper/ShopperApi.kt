@@ -157,7 +157,18 @@ class ShopperApi(private val http: ShopperHttp, private val lang: () -> String =
   fun payCash(slug: String, token: String): ShopperResult<PublicOrder> =
     order("POST", base(slug) + "/orders/" + ShopperUrl.encode(token) + "/pay-choice", obj("method" to "cash"))
 
-  /** پیگیری با کلیدهای پرچم‌دارِ همان پاسخ (`review`، `chat`) که در قراردادِ بازار نیستند */
+  /**
+   *  CHK-24: «دستورِ تحویل» تا پیش از حرکت — [body] از [PrefsRules.body] با نسخهٔ دیده‌شده (کهنه ⇒ ۴۰۹ ِ `version_conflict`؛
+   *  همان مقدار ⇒ `unchanged`). ⛔ بدنه `body.toString()` است (متنِ خودِ شیء، بی تنظیمِ `explicitNulls` ِ [ShopperJson]) تا
+   *  `cashTenderMinor: null` (برداشتنِ اسکناس) حتماً برود.
+   */
+  fun editDelivery(slug: String, token: String, body: JsonObject): ShopperResult<PrefsSaved> =
+    call("POST", base(slug) + "/orders/" + ShopperUrl.encode(token) + "/delivery", body.toString()) { root ->
+      val o = root["order"] as? JsonObject ?: return@call null
+      PrefsSaved(o["deliveryPrefs"]?.let { decodeOrNull(CustomerDeliveryPrefs.serializer(), it) }, (root["unchanged"] as? JsonPrimitive)?.booleanOrNull == true)
+    }
+
+  /** پیگیری با کلیدهای پرچم‌دارِ همان پاسخ (`review`، `chat`، `deliveryPrefs`) که در قراردادِ بازار نیستند */
   fun trackPage(slug: String, token: String): ShopperResult<TrackPage> =
     call("GET", base(slug) + "/orders/" + ShopperUrl.encode(token), null) { root ->
       val o = root["order"] as? JsonObject ?: return@call null

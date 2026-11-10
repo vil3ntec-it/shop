@@ -182,6 +182,8 @@ class CustomerModel(
   // ── مرحلهٔ ۲: بخش‌های جدا (هر کدام فایلِ خودش) ──
   val promo = PromoModel(api, scope, io)
   val feedback = FeedbackModel(api, scope, io)
+  /** CHK-24: کارتِ «دستورِ تحویل» ِ پیگیری (`ModelPrefs.kt`) */
+  val deliveryPrefs = PrefsModel(api, scope, io) { refreshOrder() }
   val book = AddressModel({ saved.addresses }, { persist(saved.copy(addresses = it)) }, locator, clock)
   val chat = ChatModel(api, kv, scope, io, clock, { saved.ticket?.takeIf { it.expiresAt > clock() } }, { persist(saved.copy(ticket = null)) }, chatWaitMs)
   /** WEB-11/CHK-01: حسابِ مشتری — سبد، ♥ و «فهرستِ خرید» همراهِ حساب (`ModelAccount.kt`؛ [secrets] نگه‌دارِ رمزشدهٔ نشست) */
@@ -708,6 +710,7 @@ class CustomerModel(
           order = Load.Ready(r.value.order)
           orderExtras = r.value.extras
           feedback.bind(slug, r.value.order, r.value.extras)
+          deliveryPrefs.bind(r.value.order, r.value.extras.deliveryPrefs)
           poll(here, r.value.order)
         }
         is ShopperResult.Fail -> if (quiet && order is Load.Ready) orderNote = ShopperText.error(r.error) else order = Load.Failed(r.error)

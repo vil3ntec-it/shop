@@ -53,6 +53,17 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/shopper-gaps-2` (CHK-24 در برنامهٔ خرید: «دستورِ تحویل» و اسکناس پس از ثبت؛ روی `claude/shopper-gaps` ‏cf438f31؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: کارتِ «دستورِ تحویل» در پیگیریِ برنامهٔ خرید، همزادِ `#o-prefs` ِ وب (`core/.../shopper/ShopperPrefs.kt` ِ `PrefsRules`،
+  `ShopperApi.editDelivery`، `OrderExtras.deliveryPrefs`؛ `customer/ui/ModelPrefs.kt` ِ `PrefsModel`، `OrderCards.DeliveryPrefsCard`):
+  «زنگ»، «تحویل به»، نشانهٔ تازه و «با کدام اسکناس…» (فقط نقد) با همان در و `expectedVersion`؛ یک درخواست در هر لحظه، بی تکرارِ خودکار،
+  ۴۰۹ + نمای تازهٔ همان ⇒ «ثبت شد». سرور: `customerPrefs` کلیدِ `cashTenderMinor` گرفت (بی آن برنامه اسکناسِ کنونی را نمی‌دانست و
+  ذخیرهٔ کادرِ دیگر پاکش می‌کرد)؛ `order-delivery-prefs.test.js` (فهرستِ کلیدها عمداً + ویرایشِ اسکناس با توکن، کدهای خطا، تکرار) ۵/۵
+  روی PGlite و PostgreSQL، پیش از رفع سرخ. بی مهاجرت، بی درِ تازه، بی پرچمِ تازه.
+- نیمه‌کاره: آزمون‌های کاتلین (`ShopperPrefsTest`، `ShopperTenderVectorsTest.afterPlacingOptionsAreTheSameVectorAndEachIsServerValid`،
+  `CustomerDeliveryPrefsTest`) فقط CI. ⚠️ وبِ پیگیری اسکناس را پس از ثبت نمی‌پرسد: `order.fa.json` ۴۰۲۶ از ۴۰۹۶ بایت و واژه‌نامهٔ اصلی
+  ۲۱۱۵۸ از ۲۱۵۰۴ — جا نیست مگر صاحب‌کار سقف یا جای واژه‌ها را بگوید.
+- قدمِ بعدی: پس از CI ِ سبز شاهد در ردیفِ CHK-24 ِ STATUS؛ تصمیمِ صاحب‌کار دربارهٔ اسکناس در وبِ پیگیری.
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/shopper-gaps` (کاستی‌های برنامهٔ خرید در برابرِ ویترین: WEB-13 و CHK-14؛ روی `origin/main` ‏f81344458؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) WEB-13 — ردیفِ «دیده‌شده‌های اخیر» در صفحهٔ دکانِ برنامهٔ خرید با همان کلیدِ `recent` ِ `GET /api/store/:slug` و همان قاعدهٔ
   `RecentlyViewed` (core/shopper `RecentProducts`، `ShopperState.seen`؛ هر دکان ۱۲ کالا، ۳۰ روز، حداکثر ۲۰ دکان)، فقط روی دستگاه، `?ids=` با هر ورود

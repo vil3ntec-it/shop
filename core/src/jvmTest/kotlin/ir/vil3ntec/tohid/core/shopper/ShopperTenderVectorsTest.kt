@@ -38,4 +38,21 @@ class ShopperTenderVectorsTest {
       assertEquals(want, CheckoutRules.tenderOptions(total), "جمع $total")
     }
   }
+
+  /** CHK-24: «با کدام اسکناس…» پس از ثبت ([PrefsRules.tenders]) برای سفارشِ ارسال + نقد همان بردار است؛ هر گزینه را سرور می‌پذیرد */
+  @Test fun afterPlacingOptionsAreTheSameVectorAndEachIsServerValid() {
+    for (c in v.getValue("cases").jsonArray.map { it.jsonObject }) {
+      val total = c.getValue("totalMinor").jsonPrimitive.long
+      val want = c.getValue("options").jsonArray.map { it.jsonPrimitive.long }
+      val o = ir.vil3ntec.tohid.core.market.PublicOrder(
+        token = "t", orderNo = 1, status = "new", fulfillment = "delivery", paymentMethod = "cod", totalMinor = total, createdAt = 1, updatedAt = 1,
+      )
+      val p = CustomerDeliveryPrefs(editable = true, version = 1)
+      assertEquals(want, PrefsRules.tenders(o, p), "جمع $total")
+      for (x in want) assertTrue(PrefsRules.valid(x, total), "جمع $total: $x")
+      //  اسکناسِ کنونیِ برابرِ یکی از گزینه‌ها ⇒ همان فهرست (بی تکرار)
+      want.firstOrNull()?.let { assertEquals(want, PrefsRules.tenders(o, p.copy(cashTenderMinor = it)), "جمع $total") }
+      if (total > 0) assertTrue(!PrefsRules.valid(total + CheckoutRules.NOTE_MINOR, total) && !PrefsRules.valid(total - 100, total))
+    }
+  }
 }
