@@ -408,7 +408,7 @@ object KeyMap {
     web = listOf(Chord(KeyName.D6, shift = true)),
   )
   val SALE_PAYMENT_TOGGLE_PRINT = KeyAction(
-    "sale.payment.togglePrint", "sale.payment", "چاپ برای همین فاکتور: روشن یا خاموش", KeyStatus.PLANNED,
+    "sale.payment.togglePrint", "sale.payment", "چاپ برای همین فاکتور: روشن یا خاموش", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.P, alt = true)),
     web = listOf(Chord(KeyName.P, alt = true)),
   )

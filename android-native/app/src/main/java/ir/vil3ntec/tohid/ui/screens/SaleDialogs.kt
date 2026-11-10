@@ -863,8 +863,11 @@ fun DebtorPicker(
   selected: String?,
   onClose: () -> Unit,
   onPick: (String?) -> Unit,
+  /** POS-31 — کامپیوترِ لمسی (`PosTouchPrefs.extras()`): کلیدِ «حروف» و صفحه‌کلیدِ روی‌صفحه برای نامِ مشتری؛ خاموش ⇒ همان امروز */
+  touch: Boolean = false,
 ) {
   var search by remember { mutableStateOf("") }
+  val kb = ir.vil3ntec.tohid.ui.components.pos.rememberTouchKeyboard()
   val shown = ir.vil3ntec.tohid.data.CustomerCrm.active(d).filter { search.isBlank() || it.name.contains(search.trim(), ignoreCase = true) }
 
   Dialog(onDismissRequest = onClose) {
@@ -872,15 +875,13 @@ fun DebtorPicker(
       Column(Modifier.padding(16.dp).heightIn(max = 520.dp)) {
         Text(ir.vil3ntec.tohid.core.i18n.StrSalePages.chooseDebtor, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(10.dp))
-        OutlinedTextField(
-          value = search,
-          onValueChange = { search = it },
-          placeholder = { Text(ir.vil3ntec.tohid.core.i18n.StrSale.debtorNameHint) },
-          singleLine = true,
-          modifier = Modifier.fillMaxWidth(),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          OutlinedTextField(value = search, onValueChange = { search = it }, placeholder = { Text(ir.vil3ntec.tohid.core.i18n.StrSale.debtorNameHint) },
+            singleLine = true, modifier = Modifier.weight(1f))
+          ir.vil3ntec.tohid.ui.components.pos.TouchKeysToggle(kb, touch, 48.dp) {}
+        }
+        ir.vil3ntec.tohid.ui.components.pos.TouchKeysPanel(kb, touch, 48.dp) { search = ir.vil3ntec.tohid.core.pos.TouchKeyboard.apply(search, it) }
         Spacer(Modifier.height(10.dp))
-
         if (shown.isEmpty()) {
           EmptyNote(if (d.debtors.isEmpty()) ir.vil3ntec.tohid.core.i18n.StrSale.noDebtorsYet else ir.vil3ntec.tohid.core.i18n.StrSale.debtorNotFound)
         } else {
@@ -897,11 +898,7 @@ fun DebtorPicker(
               ) {
                 Column(Modifier.weight(1f)) {
                   Text(debtor.name, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
-                  Text(
-                    debtStateText(d, debtor.id),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Shop.colors.muted,
-                  )
+                  Text(debtStateText(d, debtor.id), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
                 }
               }
             }

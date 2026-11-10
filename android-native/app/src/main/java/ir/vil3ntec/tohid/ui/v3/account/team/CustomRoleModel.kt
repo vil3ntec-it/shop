@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui.v3.account.team
 
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrAccount
+import ir.vil3ntec.tohid.core.i18n.StrPayFix
 import ir.vil3ntec.tohid.core.i18n.StrSalePages
 import ir.vil3ntec.tohid.core.i18n.StrSetupPages
 import ir.vil3ntec.tohid.core.i18n.StrShiftReview
@@ -49,6 +50,7 @@ object CustomRoleModel {
     "sales.price" -> StrAccount.permPrice
     "sales.free_line" -> StrAccount.permFreeLine // POS-10، تصمیمِ ۱-۱۱ (۲)
     "customers.credit_limit" -> StrAccount.permCreditLimit // CRM-03
+    "sales.pay_fix" -> StrPayFix.menu // POS-40: سرور با پرچمِ `shop.sync.pay_fix` در v3 و v1 می‌سنجد
     "returns.create" -> StrSetupPages.permReturns
     "shift.report" -> StrShiftReview.permReports
     "safe.move" -> StrSetupPages.permSafe

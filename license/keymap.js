@@ -72,7 +72,7 @@
     "sale.payment.note100": {"scope":"sale.payment","title":"اسکناسِ ۱۰۰","status":"partial","webStatus":"planned","page":null,"web":[["D4",false,true,false]],"overrides":[]},
     "sale.payment.note500": {"scope":"sale.payment","title":"اسکناسِ ۵۰۰","status":"partial","webStatus":"planned","page":null,"web":[["D5",false,true,false]],"overrides":[]},
     "sale.payment.note1000": {"scope":"sale.payment","title":"اسکناسِ ۱۰۰۰","status":"partial","webStatus":"planned","page":null,"web":[["D6",false,true,false]],"overrides":[]},
-    "sale.payment.togglePrint": {"scope":"sale.payment","title":"چاپ برای همین فاکتور: روشن یا خاموش","status":"planned","webStatus":"planned","page":null,"web":[["P",false,false,true]],"overrides":[]},
+    "sale.payment.togglePrint": {"scope":"sale.payment","title":"چاپ برای همین فاکتور: روشن یا خاموش","status":"partial","webStatus":"planned","page":null,"web":[["P",false,false,true]],"overrides":[]},
     "sale.payment.customer": {"scope":"sale.payment","title":"مشتری (برای باقی‌ماندهٔ قرضی)","status":"partial","webStatus":"planned","page":null,"web":[["C",false,false,true]],"overrides":[]},
     "sale.payment.back": {"scope":"sale.payment","title":"برگشت به سبد، بی ثبتِ هیچ چیز","status":"partial","webStatus":"planned","page":null,"web":[["Escape",false,false,false]],"overrides":[]},
     "customers.lend": {"scope":"customers","title":"قرض دادن","status":"live","webStatus":"planned","page":null,"web":[],"overrides":[]},

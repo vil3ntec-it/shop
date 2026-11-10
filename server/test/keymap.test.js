@@ -106,3 +106,17 @@ test('#960: راهنمای وب فقط کلیدهایی را دارد که وب 
   assert.throws(bad((j) => { zoom(j).webStatus = 'live'; }), /کلیدِ وب ندارد/);
   assert.throws(bad((j) => { j.actions[0].webStatus = 'soon'; }), /وضعیتِ وبِ نادرست/);
 });
+
+test('POS-41: Alt+P ِ پنلِ پرداخت (چاپِ همین فاکتور) در کامپیوتر partial است؛ وب پنلِ پرداخت ندارد ⇒ planned و بیرون از راهنمای وب', () => {
+  const a = km.ACTIONS['sale.payment.togglePrint'];
+  assert.equal(a.status, 'partial');
+  assert.equal(a.webStatus, 'planned');
+  assert.equal(km.label('sale.payment.togglePrint'), 'Alt+P');
+  assert.ok(!km.help('sale.payment').some((r) => r.id === 'sale.payment.togglePrint'));
+  //  دو کلیدِ Tab ِ همان پنل هنوز planned اند (سنجش روی کامپیوترِ واقعی)
+  assert.equal(km.ACTIONS['sale.payment.nextField'].status, 'planned');
+  assert.equal(km.ACTIONS['sale.payment.prevField'].status, 'planned');
+  //  پنلِ کامپیوتر کلید را از keymap می‌گیرد، نه نوشتهٔ دستی
+  const panel = fs.readFileSync(path.join(ROOT, 'android-native/app/src/main/java/ir/vil3ntec/tohid/ui/components/pos/PayPanel.kt'), 'utf8');
+  assert.ok(panel.includes('hit(KeyMap.SALE_PAYMENT_TOGGLE_PRINT) -> PayPanelKey.TOGGLE_PRINT'));
+});

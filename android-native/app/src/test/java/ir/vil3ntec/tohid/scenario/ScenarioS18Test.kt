@@ -72,6 +72,29 @@ class ScenarioS18Test {
     assertTrue("لمس‌ها: $touches", touches <= 5)
   }
 
+  /**
+   *  POS-31 (§۵.۳: صفحه‌کلیدِ روی‌صفحه برای هر کادرِ متنیِ حالتِ لمسی) — گزینشِ مشتری در صندوقِ کامپیوترِ لمسی (F2 و
+   *  «دریافت»): همان کلیدِ «حروف» و همان `TouchKeyboard` کنارِ کادرِ نامِ مشتری؛ گوشی و تنظیمِ خاموش همان پنجرهٔ امروز.
+   */
+  @Test
+  fun `S18 — نامِ مشتری در صندوقِ کامپیوترِ لمسی هم با صفحه‌کلیدِ حروف`() {
+    var query = ""
+    val keys = TouchKeyboard.rows(TouchKeyboard.initial("prs")).flatten()
+    for (ch in "احم") query = TouchKeyboard.apply(query, keys.single { it == TouchKeyboard.Key.Letter(ch.toString()) })
+    val names = listOf("احمد ولی", "محمود", "زهرا")
+    assertEquals(listOf("احمد ولی"), names.filter { it.contains(query.trim(), ignoreCase = true) })
+
+    fun src(rel: String) = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { java.io.File(it, rel) }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد")
+    val picker = src("ir/vil3ntec/tohid/ui/screens/SaleDialogs.kt").substringAfter("fun DebtorPicker(").substringBefore("fun CartLineDialog(")
+    assertTrue(picker.contains("touch: Boolean = false,"))
+    assertTrue(picker.contains("TouchKeysToggle(kb, touch, 48.dp)"))
+    assertTrue(picker.contains("TouchKeysPanel(kb, touch, 48.dp) { search = ir.vil3ntec.tohid.core.pos.TouchKeyboard.apply(search, it) }"))
+    //  هر دو گزینشِ مشتریِ صندوقِ کامپیوتر (F2 و «دریافت») با `PosTouchPrefs.extras()`؛ گوشی پیش‌فرض (خاموش)
+    assertEquals(2, Regex(Regex.escape("touch = touchExtras, onClose =")).findAll(src("ir/vil3ntec/tohid/ui/screens/DeskSale.kt")).count())
+    assertFalse(src("ir/vil3ntec/tohid/ui/screens/Sale.kt").contains("touch = touchExtras"))
+  }
+
   private var seq = 0
 
   @Test

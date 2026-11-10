@@ -922,7 +922,7 @@ fun DeskSaleScreen(
   }
 
   if (receivePick) {
-    DebtorPicker(d = d, selected = null, onClose = { receivePick = false; refocus() }, onPick = { id -> receivePick = false; receiveFor = id })
+    DebtorPicker(d = d, selected = null, touch = touchExtras, onClose = { receivePick = false; refocus() }, onPick = { id -> receivePick = false; receiveFor = id })
   }
   receiveFor?.let { id ->
     val name = d.debtors.find { it.id == id }?.name
@@ -954,7 +954,7 @@ fun DeskSaleScreen(
     DebtReceiptDialog(data, debtorId, txId, onDismiss = { receiptOf = null; refocus() })
   }
   if (pickDebtor) {
-    DebtorPicker(d = d, selected = cartDebtorId, onClose = { pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true } }, onPick = { id ->
+    DebtorPicker(d = d, selected = cartDebtorId, touch = touchExtras, onClose = { pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true } }, onPick = { id ->
       cartStore.setDebtor(id); pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true }
     })
   }
@@ -1063,7 +1063,7 @@ fun DeskSaleScreen(
       //  PAY-24: کارتِ هدیه و اعتبارِ فروشگاه فقط با تنظیمِ همین دستگاه (پیش‌فرض خاموش ⇒ همان پنل)
       ledger = d,
       stored = remember { ir.vil3ntec.tohid.data.GiftCardPref.on(context) },
-      cashRounding = cashStep, onCustomer = { payOpen = false; payAfterPick = true; pickDebtor = true }, // PAY-09؛ POS-41: F2
+      cashRounding = cashStep, onCustomer = { payOpen = false; payAfterPick = true; pickDebtor = true }, print = cartStore.print.collectAsState().value.let { remember(it) { cartStore.printShown(it) } }, onTogglePrint = cartStore::togglePrint, // PAY-09؛ POS-41: F2 و Alt+P
     )
   }
   if (priceCheck) ir.vil3ntec.tohid.ui.components.pos.PriceCheckDialog(

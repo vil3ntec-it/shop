@@ -90,7 +90,7 @@
     },
     //  POS-40: اصلاحِ روشِ پرداخت پس از فروش (سندِ جدای `pay_fix`، `core/pay/PayFix`). کارِ تازه است، پس
     //  «رفتارِ امروز» ندارد: صاحب و مدیر خودشان؛ شاگرد و صندوق‌دار فقط «نیازمند تأیید» (PIN ِ مدیر یا صاحب)؛
-    //  انباردار، جمع‌آور و حسابدار نه. سرور این کلید را هنوز اجرا نمی‌کند (`staff-perms`: not_enforceable_yet)
+    //  انباردار، جمع‌آور و حسابدار نه. سرور فقط با پرچمِ `shop.sync.pay_fix` اجرا می‌کند (v3 و v1، `till-guard.js`؛ خاموش ⇒ `not_enforceable_yet`)
     'sales.pay_fix': {
       defaults: d('allow', 'allow', 'approve', 'approve', 'deny', 'deny', 'deny'),
       edit: 'restrict', approvable: true, caps: [], display: false,

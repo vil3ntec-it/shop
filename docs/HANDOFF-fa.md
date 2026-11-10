@@ -54,6 +54,18 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/pos-4` (ردیف‌های PARTIAL ِ صندوق: POS-40 در Sync v1، Alt+P ِ POS-41، حروفِ لمسیِ POS-31؛ روی `ccr-…-batch-44` ‏391148a8؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **POS-40** — یافته: برنامه پیش‌فرض با Sync v1 همگام می‌شود (`SyncChoice`؛ هیچ دکمه‌ای v3 را روشن نمی‌کند)، پس `till-guard` ِ v3 روی دستگاهِ واقعی
+  هیچ اصلاحی را نمی‌سنجید. حالا همان پرچمِ `shop.sync.pay_fix` در v1 هم (`till-guard.v1Guard` از سرِ `staff-approval.v1Guard`، صاحب هم؛ `sync-v1.js` دست نخورد):
+  شکل، فاکتور، روزِ بسته، مانده (پایگاه‌داده + opهای پیشینِ همان دسته، `batchSource`) و مجوز/برگه؛ سندِ اصلاحِ ثبت‌شده فقط‌افزودنی (`FIX_LOCKED`، سنگِ قبر)؛
+  لایهٔ نقش/کاربرِ `sales.pay_fix` با همان پرچم ویرایش‌پذیر (`staff-perms.FLAGGED`) و نامش در فرمِ مجوزِ برنامه. `finalized-sales.js` دست نخورد (`claude/rpt-04`).
+  **POS-41** — Alt+P ِ پنلِ پرداخت: `core/pos/PrintToggle`، `CartStore.print`/`togglePrint`/`printShown`، `PrintSpooler.afterSale(print)`، دکمه در `PayPanelDialog`؛
+  keymap ⇒ partial (وب planned). **POS-31** — کلیدِ «حروف» در `DebtorPicker(touch)` ِ صندوقِ کامپیوترِ لمسی (F2 و «دریافت»).
+  آزمون: `pay-fix-v1.test.js` ۷/۷ (۶ سرخ روی پایه؛ ۹ جهش کشته)، `till-guard` ۱۲/۱۲، `keymap.test.js` ۸/۸ (تازه سرخ روی پایه)؛ Kotlin (`PrintToggleTest`، `PosLogicTest`،
+  `CartStorePrintDesktopTest`، `CustomRoleModelTest`، `ScenarioS18Test`) فقط CI. یک WHATS-NEW، چهار خطِ RULES، STATUS ِ سه ردیف (همه PARTIAL).
+- نیمه‌کاره: CI ِ Kotlin. POS-41 Tab/Shift+Tab (کامپیوترِ واقعی)؛ POS-31 تشخیصِ خودکار، کادرهای دیگر، «مشتریِ تازه» و آزمونِ دستگاه؛ POS-32 فقط تصمیمِ صاحب‌کار
+  (فرستادنِ مستقیم از کامپیوتر) — کدی ننوشتم. پس از مرجِ `claude/rpt-04`: نوعِ `pay_fix` را هم به `SHIFT_DOCS` ِ `finalized-sales.js` بیفزایید تا راهِ قدیم (`/api/sync`) و `shop.doc_chain` هم سندِ اصلاح را قفل کنند.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد؛ پس از CI ِ سبز و همه‌گیر شدنِ (2.14.5) تصمیمِ صاحب‌کار دربارهٔ روشن کردنِ `shop.sync.pay_fix`.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/rpt-04` (RPT-04: گزارشِ X و Z؛ روی `ccr-…-batch-44` ‏391148a8 که خطِ ارزِ PAY-10 را دارد؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) **Z ِ بسته در سرور ثابت**: ردیف‌های صندوقِ سابقه (`shift_open`، `shift_close` با `z`، `cash_in`/`cash_out`/`no_sale`، `shift_review`، `shift_resume`) در نگهبانِ S89
   (`lib/finalized-sales.js`، همان پرچمِ خاموشِ `shop.doc_chain`، `DOC_FIXED.auditLog` + `SHIFT_DOCS`): v1، راهِ قدیم و بازگرداندنِ تعارض دیگر Z را سرِ جا عوض/پاک/زنده نمی‌کنند

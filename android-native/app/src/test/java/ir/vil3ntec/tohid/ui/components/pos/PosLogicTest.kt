@@ -420,9 +420,10 @@ class PosLogicTest {
       km.SALE_PAYMENT_SUBMIT, km.SALE_PAYMENT_NEXT_METHOD, km.SALE_PAYMENT_PREV_METHOD,
       km.SALE_PAYMENT_NOTE10, km.SALE_PAYMENT_NOTE20, km.SALE_PAYMENT_NOTE50, km.SALE_PAYMENT_NOTE100,
       km.SALE_PAYMENT_NOTE500, km.SALE_PAYMENT_NOTE1000, km.SALE_PAYMENT_CUSTOMER, km.SALE_PAYMENT_BACK,
+      km.SALE_PAYMENT_TOGGLE_PRINT,
     )
     partial.forEach { assertEquals(it.id, ir.vil3ntec.tohid.core.keymap.KeyStatus.PARTIAL, it.status) }
-    listOf(km.SALE_PAYMENT_TOGGLE_PRINT, km.SALE_PAYMENT_NEXT_FIELD, km.SALE_PAYMENT_PREV_FIELD)
+    listOf(km.SALE_PAYMENT_NEXT_FIELD, km.SALE_PAYMENT_PREV_FIELD)
       .forEach { assertEquals(it.id, ir.vil3ntec.tohid.core.keymap.KeyStatus.PLANNED, it.status) }
 
     fun press(c: ir.vil3ntec.tohid.core.keymap.Chord, canCustomer: Boolean = true) = payPanelKey({ c in it.keys }, canCustomer)
@@ -440,5 +441,33 @@ class PosLogicTest {
     assertTrue(src.contains("onCustomer = { payOpen = false; payAfterPick = true; pickDebtor = true }"))
     val picker = src.substringAfter("if (pickDebtor) {").substringBefore("QuickTillDialog")
     assertEquals(2, Regex("if \\(payAfterPick\\) \\{ payAfterPick = false; payOpen = true \\}").findAll(picker).count())
+  }
+
+  /**
+   *  POS-41 — Alt+P (`sale.payment.togglePrint`): چاپِ همین فاکتور روشن/خاموش در پنلِ پرداختِ کامپیوتر. کلید فقط با چاپگرِ
+   *  پیش‌فرض (`canPrint`) و نه هنگامِ ثبت؛ انتخاب مالِ همان سبد است (`CartStore.print`) و با ثبت به `PrintSpooler.afterSale`
+   *  می‌رسد؛ برچسبِ کلید روی خودِ دکمه از keymap.
+   */
+  @Test
+  fun `POS-41 Alt+P چاپِ همین فاکتور را در پنلِ پرداخت عوض می‌کند`() {
+    val altP = ir.vil3ntec.tohid.core.keymap.Chord(KeyName.P, alt = true)
+    fun press(c: ir.vil3ntec.tohid.core.keymap.Chord, canPrint: Boolean) = payPanelKey({ c in it.keys }, canCustomer = true, canPrint = canPrint)
+    assertEquals(PayPanelKey.TOGGLE_PRINT, press(altP, canPrint = true))
+    assertNull(press(altP, canPrint = false))
+    assertNull(press(ir.vil3ntec.tohid.core.keymap.Chord(KeyName.P), canPrint = true))
+    assertNull(press(ir.vil3ntec.tohid.core.keymap.Chord(KeyName.P, mod = true), canPrint = true))
+    assertEquals("Alt+P", ir.vil3ntec.tohid.core.keymap.KeyMap.SALE_PAYMENT_TOGGLE_PRINT.hint())
+
+    fun src(rel: String) = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { java.io.File(it, rel) }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد")
+    val panel = src("ir/vil3ntec/tohid/ui/components/pos/PayPanel.kt")
+    assertTrue(panel.contains("PayPanelKey.TOGGLE_PRINT -> { printToggle?.invoke(); true }"))
+    assertTrue(panel.contains("StrPos.printThisInvoice(print, KeyMap.SALE_PAYMENT_TOGGLE_PRINT.hint())"))
+    val cart = src("ir/vil3ntec/tohid/data/CartStore.kt")
+    assertTrue(cart.contains("PrintSpooler.afterSale(app, out.ok.data, out.ok.saleId, print = print)"))
+    assertTrue(cart.contains("val print = _print.value"))
+    val desk = src("ir/vil3ntec/tohid/ui/screens/DeskSale.kt")
+    assertTrue(desk.contains("onTogglePrint = cartStore::togglePrint"))
+    assertTrue(desk.contains("cartStore.printShown(it)"))
   }
 }

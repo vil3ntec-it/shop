@@ -120,4 +120,11 @@ class CustomRoleModelTest {
     assertEquals(listOf(null, "crl_1", "crl_2"), choices.map { it.id })
     assertTrue(choices[2].label.startsWith("حسابِ شب"))
   }
+
+  //  POS-40: سرور `sales.pay_fix` را با پرچمِ `shop.sync.pay_fix` ویرایش‌پذیر می‌کند (`staff-perms.FLAGGED`) ⇒ نامِ کار، نه کلیدِ خام
+  @Test
+  fun `اصلاحِ روشِ پرداخت در فرمِ مجوز نامِ خودش را دارد`() {
+    assertEquals(ir.vil3ntec.tohid.core.i18n.StrPayFix.menu, CustomRoleModel.permLabel("sales.pay_fix"))
+    assertEquals(CustomRoleModel.permLabel("sales.pay_fix"), ir.vil3ntec.tohid.ui.v3.account.team.MemberModel.permLabel("sales.pay_fix"))
+  }
 }
