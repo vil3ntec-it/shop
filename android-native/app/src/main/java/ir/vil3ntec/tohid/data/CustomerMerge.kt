@@ -168,10 +168,13 @@ object CustomerMerge {
         .take(ir.vil3ntec.tohid.core.sale.CustomerPrice.MAX_ENTRIES).ifEmpty { null },
       creditLimit = keep.creditLimit ?: drop.creditLimit,
       marketingConsent = consent,
-      //  CRM-09: نشانیِ ماندگار مقدم؛ بی آن نشانیِ تکراری
-      deliveryAddress = keep.deliveryAddress ?: drop.deliveryAddress,
+      //  CRM-09: نشانیِ ماندگار مقدم؛ بی آن نشانیِ تکراری — پین همراهِ همان نشانی (پینِ یکی کنارِ نشانیِ دیگری نه)
+      deliveryAddress = if (hasAddress(keep)) keep.deliveryAddress else drop.deliveryAddress,
+      deliveryPin = if (hasAddress(keep)) keep.deliveryPin else drop.deliveryPin,
     )
   }
+
+  private fun hasAddress(c: Debtor): Boolean = c.deliveryAddress != null || c.deliveryPin != null
 
   /** پیش‌نمایشِ ادغام — برای پنجرهٔ تأیید؛ چیزی را عوض نمی‌کند */
   fun preview(d: ShopData, keepId: String, dropId: String): Result {

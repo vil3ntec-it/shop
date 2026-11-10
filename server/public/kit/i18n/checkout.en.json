@@ -46,5 +46,9 @@
   "ck.eta": "Approximate delivery: {a} to {b} minutes",
   "ck.eta.pickup": "Ready for pickup, approximately: {a} to {b} minutes",
   "ck.eta.none": "Delivery time cannot be estimated right now",
-  "ck.more": "More details (optional)"
+  "ck.more": "More details (optional)",
+  "pin.paste.l": "Pin from a maps app: paste a link or coordinates",
+  "pin.paste.use": "Set pin",
+  "pin.paste.ok": "Pin set from the map ({c}).",
+  "pin.paste.bad": "No pin found in this text. In your maps app, press and hold your place, then paste the coordinates or the full link."
 }

@@ -163,6 +163,8 @@ object StrMoney {
   val addressFloor: String get() = t("طبقه", "Floor", "پوړ")
   val addressPlusCode: String get() = t("Plus Code", "Plus Code", "Plus Code")
   val addressPostal: String get() = t("کدِ پستی (اختیاری)", "Postal code (optional)", "پوستي کوډ (اختیاري)")
+  val addressPin: String get() = t("پین: مختصات یا پیوند از نقشهٔ گوشی", "Pin: coordinates or a link from your phone's maps", "پن: مختصات یا د موبایل له نقشې لینک")
+  val addressPinHint: String get() = t("مثلاً 34.5281, 69.1723", "e.g. 34.5281, 69.1723", "لکه 34.5281, 69.1723")
   fun addressLine(line: String): String = t("نشانی: ${asIs(line)}", "Address: $line", "پته: $line")
   /** CRM-11: صافیِ برچسبِ فهرستِ قرض‌داران */
   val allTags: String get() = t("همهٔ برچسب‌ها", "All tags", "ټول نښانونه")

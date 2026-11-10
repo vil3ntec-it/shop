@@ -22,3 +22,12 @@ data class DeliveryAddress(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val plusCode: String = "",
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val postalCode: String = "",
 )
+
+/**
+ *  پینِ نشانیِ تحویلِ مشتریِ دکان (`Debtor.deliveryPin`، CRM-09، §۴.۴: «پین منبعِ اصلی»): شش رقمِ اعشار با همان گردِ سرور
+ *  (`AddressRules.round6`)، در بازه و نه (۰، ۰). نوشتن فقط از `CustomerCrm.setDeliveryPin`؛ از مختصات یا پیوندِ برنامهٔ نقشه
+ *  (`core/shopper/PinText`، بی شبکه و بی ژئوکدر). ⛔ فیلدی جدا از [DeliveryAddress] (نه بخشی درونِ آن): ساختِ پیشین که
+ *  نشانی را ویرایش کند همان شیء را بی بخشِ ناشناخته بازمی‌نویسد، ولی فیلدِ ناشناختهٔ قرض‌دار را پاک نمی‌کند (A00).
+ */
+@Serializable
+data class DeliveryPin(val lat: Double, val lng: Double)

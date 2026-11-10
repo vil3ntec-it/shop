@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.sync.v1.LedgerDiff
 import ir.vil3ntec.tohid.sync.v1.SyncOp
 import ir.vil3ntec.tohid.ui.v3.money.DebtorFormsModel
@@ -95,5 +96,78 @@ class CustomerDeliveryAddressTest {
     assertEquals("۳", c1.deliveryAddress?.floor)
     val bad = DebtorFormsModel.save(withAddr, "c1", edited.copy(address = edited.address.copy(postalCode = "abc")), 1, { "n" })
     assertEquals("کدِ پستی فقط رقم است", failed(bad))
+  }
+
+  /* ------------------------------ پینِ نشانی (CRM-09، §۴.۴: «پین منبعِ اصلی») ------------------------------ */
+
+  @Test fun `پین — شش رقمِ اعشار با گردِ سرور؛ هر دو یا هیچ؛ نه بیرونِ بازه و نه صفر و صفر؛ همان پین بی op`() {
+    val d = ok(CustomerCrm.setDeliveryPin(d0, "c1", 34.5000005, 69.1723456))
+    val c1 = d.debtors.first { it.id == "c1" }
+    assertEquals(DeliveryPin(34.500001, 69.172346), c1.deliveryPin)
+    assertNull("پین نشانی را نمی‌سازد", c1.deliveryAddress)
+    assertEquals("34.50000, 69.17235", CustomerCrm.addressLineOf(c1))
+    assertSame(d, ok(CustomerCrm.setDeliveryPin(d, "c1", 34.500001, 69.172346)))
+    val withAddr = ok(CustomerCrm.setDeliveryAddress(d, "c1", home)).debtors.first { it.id == "c1" }
+    assertEquals("پشتِ مسجدِ جامع · کابل، ناحیهٔ ۵، کوچهٔ گل · دروازهٔ سبز · ۲ · V75V+8Q · 1006 · 34.50000, 69.17235", CustomerCrm.addressLineOf(withAddr))
+    assertNull(ok(CustomerCrm.setDeliveryPin(d, "c1", null, null)).debtors.first { it.id == "c1" }.deliveryPin)
+    for ((lat, lng) in listOf(34.53 to null, null to 69.17, 95.0 to 69.17, 0.0 to 0.0, Double.NaN to 69.17)) {
+      assertEquals(StrLedger.addressPinBad, failed(CustomerCrm.setDeliveryPin(d0, "c1", lat, lng)))
+    }
+    assertEquals("مشتری پیدا نشد", failed(CustomerCrm.setDeliveryPin(d0, "x", 34.53, 69.17)))
+    val merged = d0.copy(debtors = d0.debtors.map { if (it.id == "c2") it.copy(mergedInto = "c1") else it })
+    assertEquals("این مشتری با مشتریِ دیگری ادغام شده است", failed(CustomerCrm.setDeliveryPin(merged, "c2", 34.53, 69.17)))
+  }
+
+  @Test fun `پین فیلدی جدا از نشانی — قرض‌دارِ بی پین بایت‌به‌بایت همان؛ op فقط همان فیلد؛ ساختِ پیشین که کلید را ندارد پاکش نمی‌کند`() {
+    val old = Debtor(id = "c1", name = "احمد", phone = "0700", notes = "n", createdAt = 5, deliveryAddress = DeliveryAddress(landmark = "مسجد"))
+    assertEquals("""{"id":"c1","name":"احمد","phone":"0700","notes":"n","createdAt":5,"deliveryAddress":{"landmark":"مسجد"}}""",
+      json.encodeToString(Debtor.serializer(), old))
+    val withPin = old.copy(deliveryPin = DeliveryPin(34.53, 69.17))
+    val text = json.encodeToString(Debtor.serializer(), withPin)
+    assertTrue(text, text.endsWith(""","deliveryAddress":{"landmark":"مسجد"},"deliveryPin":{"lat":34.53,"lng":69.17}}"""))
+    assertEquals(withPin, json.decodeFromString(Debtor.serializer(), text))
+    val d = ok(CustomerCrm.setDeliveryPin(d0, "c1", 34.53, 69.17))
+    val op = LedgerDiff.diff(LedgerDiff.shadowOf(d0), LedgerDiff.toJson(d)).single()
+    assertEquals(setOf("deliveryPin"), op.fields!!.keys)
+    assertEquals("34.53", op.fields!!["deliveryPin"]!!.jsonObject["lat"]!!.jsonPrimitive.content)
+    //  ⛔ ساختِ پیشین `deliveryPin` را نمی‌شناسد: ویرایشِ نشانی با آن ساخت فقط `deliveryAddress` را می‌فرستد و پین می‌ماند (A00)
+    assertTrue(LedgerDiff.isModelField("debtors", "deliveryPin"))
+    val edited = ok(CustomerCrm.setDeliveryAddress(d, "c1", home))
+    assertEquals(setOf("deliveryAddress"), LedgerDiff.diff(LedgerDiff.shadowOf(d), LedgerDiff.toJson(edited)).single().fields!!.keys)
+  }
+
+  @Test fun `ادغام — پین همراهِ نشانیِ ماندگار؛ بی نشانی و پین، هر دو از ادغام‌شونده`() {
+    val d = ok(CustomerCrm.setDeliveryPin(ok(CustomerCrm.setDeliveryAddress(d0, "c2", home)), "c2", 34.53, 69.17))
+    val r = CustomerMerge.preview(d, "c1", "c2")
+    val survivor = (r as CustomerMerge.Result.Ok).preview.result
+    assertEquals("V75V+8Q", survivor.deliveryAddress?.plusCode)
+    assertEquals(DeliveryPin(34.53, 69.17), survivor.deliveryPin)
+    //  ماندگار نشانی دارد و پین ندارد ⇒ پینِ ادغام‌شونده کنارِ نشانیِ دیگری نمی‌نشیند
+    val both = ok(CustomerCrm.setDeliveryAddress(d, "c1", DeliveryAddress(landmark = "چوک")))
+    val s2 = (CustomerMerge.preview(both, "c1", "c2") as CustomerMerge.Result.Ok).preview.result
+    assertEquals("چوک", s2.deliveryAddress?.landmark)
+    assertNull(s2.deliveryPin)
+  }
+
+  @Test fun `برگهٔ نسخهٔ ۳ — پین از مختصات یا پیوندِ نقشه؛ همان پین بی تغییر؛ پیوندِ کوتاه هیچ چیز را نمی‌نویسد؛ خالی پین را برمی‌دارد`() {
+    val withPin = ok(CustomerCrm.setDeliveryPin(ok(CustomerCrm.setDeliveryAddress(d0, "c1", home)), "c1", 34.528123, 69.172346))
+    val form = DebtorFormsModel.of(withPin.debtors.first { it.id == "c1" })
+    assertEquals("34.528123, 69.172346", form.pinText)
+    assertNull(DebtorFormsModel.pinError(form))
+    val same = ok(DebtorFormsModel.save(withPin, "c1", form, 1, { "n" })).debtors.first { it.id == "c1" }
+    assertEquals(DeliveryPin(34.528123, 69.172346), same.deliveryPin)
+
+    val link = form.copy(pinText = "https://www.google.com/maps/place/x/@34.5312,69.1711,17z")
+    val linked = ok(DebtorFormsModel.save(withPin, "c1", link, 1, { "n" })).debtors.first { it.id == "c1" }
+    assertEquals(DeliveryPin(34.5312, 69.1711), linked.deliveryPin)
+    assertEquals("V75V+8Q", linked.deliveryAddress?.plusCode)
+
+    val short = form.copy(name = "احمد خان", pinText = "https://maps.app.goo.gl/AbCd")
+    assertEquals(StrLedger.addressPinBad, DebtorFormsModel.pinError(short))
+    assertEquals(StrLedger.addressPinBad, failed(DebtorFormsModel.save(withPin, "c1", short, 1, { "n" })))
+
+    val cleared = ok(DebtorFormsModel.save(withPin, "c1", form.copy(pinText = "  "), 1, { "n" })).debtors.first { it.id == "c1" }
+    assertNull(cleared.deliveryPin)
+    assertEquals("V75V+8Q", cleared.deliveryAddress?.plusCode)
   }
 }

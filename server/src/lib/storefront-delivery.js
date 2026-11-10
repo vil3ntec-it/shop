@@ -75,16 +75,81 @@ const rowsOf = async (run, sql, params) => (await (run || db.query)(sql, params)
 //  هندسه — بی سرویسِ بیرونی
 // ════════════════════════════════════════════════════════════════════
 
-/** نقطه درونِ چندضلعیِ [[lat,lng],…] (پرتو؛ لبه‌ها در مقیاسِ یک شهر تخت فرض می‌شوند). */
+//  نقطه تا این فاصله (درجه، ≈ ۰٫۱ میلی‌متر) از لبه «روی لبه» است
+const ON_EDGE_DEG = 1e-9;
+
+/** نقطه روی پاره‌خطِ a–b ِ [lat,lng] (تخت، در مقیاسِ درجه) */
+function onSegment(lat, lng, a, b) {
+  const dy = b[0] - a[0];
+  const dx = b[1] - a[1];
+  const len2 = dx * dx + dy * dy;
+  const t = len2 ? Math.max(0, Math.min(1, ((lng - a[1]) * dx + (lat - a[0]) * dy) / len2)) : 0;
+  const ey = a[0] + t * dy - lat;
+  const ex = a[1] + t * dx - lng;
+  return ey * ey + ex * ex <= ON_EDGE_DEG * ON_EDGE_DEG;
+}
+
+/**
+ * نقطه درونِ چندضلعیِ [[lat,lng],…] (پرتو؛ لبه‌ها در مقیاسِ یک شهر تخت فرض می‌شوند). روی لبه یا رأس ⇒ درون، مثلِ `<=` ِ
+ * دایره (پرتوِ تنها لبهٔ چپ را درون و راست را بیرون می‌شمرد). بردارِ `core/test-vectors/delivery-zone-v1.json`.
+ */
 function inPolygon(lat, lng, poly) {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    if (onSegment(lat, lng, poly[j], poly[i])) return true;
     const [yi, xi] = poly[i];
     const [yj, xj] = poly[j];
     if ((yi > lat) !== (yj > lat) && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
   }
   return inside;
 }
+
+/**
+ * CHK-10: دو لبهٔ ناهمسایهٔ چندضلعی هم را می‌بُرند یا به هم می‌رسند ⇒ `[[a, a2], [b, b2]]` (هر لبه با شمارهٔ نقطهٔ آغاز و
+ * پایانش از صفر، به ترتیبِ ورود؛ نخستین جفت با a < b)، وگرنه null. چندضلعیِ «پاپیونی» (دو نقطه جابه‌جا تایپ شده، بی نقشه)
+ * نیمی از ناحیه را بی هیچ خبری بیرون می‌گذاشت. حساب با عددِ صحیحِ میکرودرجه و BigInt (مختصات پیش‌تر شش‌رقمی شده‌اند) ⇒ بی خطای ممیزِ شناور؛ نقطهٔ تکراریِ پیاپی و
+ * نقطهٔ پایانیِ برابر با نخستین (که ابزارهای نقشه می‌گذارند) یک نقطه‌اند. همزادِ `StorefrontDelivery.crossing` ِ برنامه.
+ */
+function crossing(poly) {
+  const pts = [];
+  poly.forEach((p, i) => {
+    const q = { y: BigInt(Math.round(p[0] * 1e6)), x: BigInt(Math.round(p[1] * 1e6)), i };
+    const last = pts[pts.length - 1];
+    if (!last || last.y !== q.y || last.x !== q.x) pts.push(q);
+  });
+  while (pts.length > 1 && pts[0].y === pts[pts.length - 1].y && pts[0].x === pts[pts.length - 1].x) pts.pop();
+  const n = pts.length;
+  const orient = (a, b, c) => {
+    const v = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+    return v > 0n ? 1 : v < 0n ? -1 : 0;
+  };
+  const within = (a, b, c) => (a.x < b.x ? a.x : b.x) <= c.x && c.x <= (a.x > b.x ? a.x : b.x)
+    && (a.y < b.y ? a.y : b.y) <= c.y && c.y <= (a.y > b.y ? a.y : b.y);
+  const meet = (p1, p2, p3, p4) => {
+    const d1 = orient(p3, p4, p1);
+    const d2 = orient(p3, p4, p2);
+    const d3 = orient(p1, p2, p3);
+    const d4 = orient(p1, p2, p4);
+    if (d1 * d2 < 0 && d3 * d4 < 0) return true;
+    return (d1 === 0 && within(p3, p4, p1)) || (d2 === 0 && within(p3, p4, p2))
+      || (d3 === 0 && within(p1, p2, p3)) || (d4 === 0 && within(p1, p2, p4));
+  };
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue;   // همسایه از راهِ بستن
+      const a = pts[i];
+      const a2 = pts[(i + 1) % n];
+      const b = pts[j];
+      const b2 = pts[(j + 1) % n];
+      if (meet(a, a2, b, b2)) return [[a.i, a2.i], [b.i, b2.i]];
+    }
+  }
+  return null;
+}
+
+/** دو چندضلعیِ ذخیره‌شده/آمده همان نقطه‌ها را به همان ترتیب دارند؟ (هر دو شش‌رقمی) */
+const samePolygon = (a, b) => Array.isArray(a) && a.length === b.length
+  && a.every((p, k) => Number(p[0]) === b[k][0] && Number(p[1]) === b[k][1]);
 
 /** فاصلهٔ دو نقطه به متر (هاورسین). */
 function distanceM(lat1, lng1, lat2, lng2) {
@@ -128,9 +193,21 @@ function snapPin(lat, lng) {
   return { lat: cLat, lng: cLng };
 }
 
+/** شش رقمِ اعشار (≈ ۱۰ سانتی‌متر) — همان گردِ پینِ ثبت (`orders.coord`): `Math.round`، نیمه رو به بالا */
+const round6 = (v) => Math.round(v * 1e6) / 1e6;
+
+/**
+ * خانهٔ پینِ مشتری: اول همان گردِ شش‌رقمیِ ثبت، بعد `snapPin`. ⛔ «کجا؟» (`locate`)، ثبت (`forCheckout`) و «خبرم کن»
+ * هر سه همین را می‌سنجند: پیش‌تر «کجا؟» و «خبرم کن» پینِ خام را می‌چسباندند و ثبت پینِ گرد را، پس پینی با رقمِ هفتم کنارِ
+ * خطِ شبکه پیش از ثبت «درون» و در ثبت `out_of_zone` (یا وارونه) می‌شد.
+ */
+function pinCell(lat, lng) {
+  return snapPin(round6(lat), round6(lng));
+}
+
 /** ناحیهٔ پینِ مشتری — همیشه با مرکزِ خانهٔ شبکه، هرگز با مختصاتِ خام. */
 function zoneForPin(zones, lat, lng) {
-  const c = snapPin(lat, lng);
+  const c = pinCell(lat, lng);
   return zoneAt(zones, c.lat, c.lng);
 }
 
@@ -216,12 +293,19 @@ function parseZone(raw, i) {
       if (!Array.isArray(p) || p.length !== 2) throw badRequest(`${at}: هر نقطه [عرض، طول] است`, 'bad_zone');
       return [num(p[0], `${at}: عرض`, -90, 90), num(p[1], `${at}: طول`, -180, 180)];
     });
-    //  چندضلعیِ بی مساحت (همهٔ نقطه‌ها روی یک خط) هیچ پینی را نمی‌گیرد ⇒ اشتباهِ ورود است
-    let area = 0;
-    for (let k = 0, j = out.polygon.length - 1; k < out.polygon.length; j = k++) {
-      area += out.polygon[j][1] * out.polygon[k][0] - out.polygon[k][1] * out.polygon[j][0];
+    //  CHK-10: لبه‌های به‌هم‌بُریده (پاپیون) ⇒ saveSettings رد می‌کند، مگر همان چندضلعیِ ذخیره‌شده باشد؛ پاپیونِ قرینه
+    //  مساحتِ صفر هم دارد و پیش‌تر پیامِ گمراه‌کنندهٔ «مساحت ندارد» می‌گرفت
+    const x = crossing(out.polygon);
+    if (x) {
+      Object.defineProperty(out, 'crossing', { value: x });
+    } else {
+      //  چندضلعیِ بی مساحت (همهٔ نقطه‌ها روی یک خط) هیچ پینی را نمی‌گیرد ⇒ اشتباهِ ورود است
+      let area = 0;
+      for (let k = 0, j = out.polygon.length - 1; k < out.polygon.length; j = k++) {
+        area += out.polygon[j][1] * out.polygon[k][0] - out.polygon[k][1] * out.polygon[j][0];
+      }
+      if (Math.abs(area) < 1e-10) throw badRequest(`${at}: چندضلعی مساحت ندارد`, 'bad_zone');
     }
-    if (Math.abs(area) < 1e-10) throw badRequest(`${at}: چندضلعی مساحت ندارد`, 'bad_zone');
   } else {
     throw badRequest(`${at}: نوع باید چندضلعی یا دایره باشد`, 'bad_zone');
   }
@@ -327,6 +411,15 @@ async function saveSettings(shopId, body, userId) {
     const run = (t, p) => c.query(t, p);
     if (zones) {
       const prev = await zonesOf(shopId, run);
+      //  CHK-10: چندضلعیِ تازه یا تغییرکرده با لبه‌های به‌هم‌بُریده ⇒ ۴۰۰؛ همان چندضلعیِ ذخیره‌شده (پیش از این سنجش) دست‌نخورده
+      //  می‌گذرد تا ذخیرهٔ هزینه یا بازه به‌خاطرِ آن نیفتد
+      for (const [i, z] of zones.entries()) {
+        const x = z.crossing;
+        if (x && !prev.some((p) => p.kind === 'polygon' && samePolygon(p.polygon, z.polygon))) {
+          throw badRequest(`ناحیهٔ ${i + 1}: لبهٔ نقطه‌های ${x[0][0] + 1} و ${x[0][1] + 1} لبهٔ نقطه‌های ${x[1][0] + 1} و `
+            + `${x[1][1] + 1} را می‌بُرد؛ نقطه‌ها را به ترتیبِ دورِ ناحیه بنویسید`, 'bad_zone');
+        }
+      }
       await c.query('DELETE FROM storefront_zones WHERE shop_id = $1', [shopId]);
       for (const [i, z] of zones.entries()) {
         await c.query(
@@ -618,7 +711,8 @@ function orderFeeParts(o) {
 
 module.exports = {
   MAX_ZONES, MAX_RULES, RELEASED, ID_RE, DAY_MS, FLAG_KEY, flagOn,
-  GRID_M, M_PER_DEG_LAT, inPolygon, distanceM, contains, zoneAt, snapPin, zoneForPin, publicZone, epochOf, localDate, addDays,
+  GRID_M, M_PER_DEG_LAT, inPolygon, crossing, distanceM, contains, zoneAt, snapPin, round6, pinCell, zoneForPin, publicZone,
+  epochOf, localDate, addDays,
   zonesOf, rulesOf, settingsOf, saveSettings, slotsOf, slotsWithLoad, publicSlot,
   publicInfo, locate, publicSlots, forCheckout, feeParts, belowMin, orderFeeParts,
 };

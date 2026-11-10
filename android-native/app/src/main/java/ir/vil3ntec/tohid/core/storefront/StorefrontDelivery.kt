@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.core.storefront
 
+import kotlin.math.sign
+
 /**
  *  «ارسال و زمان» ِ ویترین از سمتِ صاحب دکان (CHK-06/07/10/12) — قاعده‌های
  *  خالصِ کادرها، همان که سرور (`server/src/lib/storefront-delivery.js`) و نسخهٔ
@@ -31,6 +33,8 @@ object StorefrontDelivery {
     val radiusKm: String = "2",
     val polygon: String = "",
     val active: Boolean = true,
+    /** CHK-10 — چندضلعیِ همین ناحیه همان‌طور که از سرور آمد ("" = تازه): همان چندضلعی بی تغییر از سنجشِ [crossing] می‌گذرد (سرور هم) */
+    val savedPolygon: String = "",
   )
 
   /** کادرهای یک بازه */
@@ -94,6 +98,52 @@ object StorefrontDelivery {
 
   fun formatPolygon(points: List<LatLng>): String = points.joinToString("\n") { formatLatLng(it) }
 
+  /**
+   *  CHK-10 — دو لبهٔ ناهمسایه هم را می‌بُرند یا به هم می‌رسند (پاپیون: دو نقطهٔ جابه‌جا) ⇒ `[[a, a2], [b, b2]]` (شمارهٔ
+   *  نقطهٔ آغاز و پایانِ هر لبه از صفر؛ نخستین جفت با a < b)، وگرنه null. همزادِ `crossing` ِ `server/src/lib/storefront-delivery.js`
+   *  با بردارِ `core/test-vectors/delivery-zone-v1.json`: حساب با عددِ صحیحِ میکرودرجه (Long، بی خطای ممیزِ شناور)؛ نقطهٔ
+   *  تکراریِ پیاپی و نقطهٔ پایانیِ برابر با نخستین یک نقطه‌اند.
+   */
+  fun crossing(points: List<LatLng>): List<List<Int>>? {
+    val pts = ArrayList<P>(points.size)
+    points.forEachIndexed { i, p ->
+      val q = P(Math.round(p.lat * 1e6), Math.round(p.lng * 1e6), i)
+      val last = pts.lastOrNull()
+      if (last == null || last.y != q.y || last.x != q.x) pts += q
+    }
+    while (pts.size > 1 && pts.first().y == pts.last().y && pts.first().x == pts.last().x) pts.removeAt(pts.size - 1)
+    val n = pts.size
+    fun orient(a: P, b: P, c: P): Int = ((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)).sign
+    fun within(a: P, b: P, c: P): Boolean =
+      minOf(a.x, b.x) <= c.x && c.x <= maxOf(a.x, b.x) && minOf(a.y, b.y) <= c.y && c.y <= maxOf(a.y, b.y)
+    fun meet(p1: P, p2: P, p3: P, p4: P): Boolean {
+      val d1 = orient(p3, p4, p1)
+      val d2 = orient(p3, p4, p2)
+      val d3 = orient(p1, p2, p3)
+      val d4 = orient(p1, p2, p4)
+      if (d1 * d2 < 0 && d3 * d4 < 0) return true
+      return (d1 == 0 && within(p3, p4, p1)) || (d2 == 0 && within(p3, p4, p2)) ||
+        (d3 == 0 && within(p1, p2, p3)) || (d4 == 0 && within(p1, p2, p4))
+    }
+    for (i in 0 until n) for (j in i + 2 until n) {
+      if (i == 0 && j == n - 1) continue  // همسایه از راهِ بستن
+      if (meet(pts[i], pts[(i + 1) % n], pts[j], pts[(j + 1) % n])) {
+        return listOf(listOf(pts[i].i, pts[(i + 1) % n].i), listOf(pts[j].i, pts[(j + 1) % n].i))
+      }
+    }
+    return null
+  }
+
+  /** نقطهٔ [crossing] به میکرودرجه، با شمارهٔ ورود */
+  private data class P(val y: Long, val x: Long, val i: Int)
+
+  /** پیامِ کنارِ کادرِ نقطه‌ها برای [crossing] — همان شماره‌های پیامِ سرور، با رقمِ فارسی */
+  fun crossingError(x: List<List<Int>>): String {
+    fun n(i: Int) = StorefrontOwner.toFa((i + 1).toString())
+    return "لبهٔ نقطه‌های ${n(x[0][0])} و ${n(x[0][1])} لبهٔ نقطه‌های ${n(x[1][0])} و ${n(x[1][1])} را می‌بُرد؛ " +
+      "نقطه‌ها را به ترتیبِ دورِ ناحیه بنویسید"
+  }
+
   /** «10:00-12:00» ⇒ (۶۰۰، ۷۲۰) */
   fun parseRange(raw: String): Pair<Pair<Int, Int>?, String?> {
     val d = StorefrontOwner.parseDay(raw)
@@ -141,6 +191,9 @@ object StorefrontDelivery {
       } else {
         val (pts, err) = parsePolygon(z.polygon)
         if (err != null) e["$k.polygon"] = err else poly = pts!!
+        //  CHK-10: پاپیون ⇒ خطا، مگر همان چندضلعیِ ذخیره‌شده (سرور هم همان را بی تغییر می‌پذیرد)
+        val x = if (err == null) crossing(poly) else null
+        if (x != null && parsePolygon(z.savedPolygon).first != poly) e["$k.polygon"] = crossingError(x)
       }
       ZoneOut(z.name.trim().take(60), if (z.kind == "radius") "radius" else "polygon", fee, min, free, center, radius, poly, z.active, small)
     }

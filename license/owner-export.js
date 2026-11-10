@@ -79,6 +79,7 @@
     cardCode: 'کارت مشتری',
     //  نشانیِ تحویلِ مشتری (CRM-09) — همان `OwnerExport.kt`
     deliveryAddress: 'نشانی تحویل',
+    deliveryPin: 'پین تحویل',
     //  قیمت‌های خاصِ مشتری (POS-18) — همان `OwnerExport.kt`
     specialPrices: 'قیمت‌های خاص مشتری',
     notes: 'یادداشت',

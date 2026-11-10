@@ -418,3 +418,31 @@ test('سفارش و گفت‌وگو: شمارهٔ کامل = orders.contact و c
   assert.equal((await h.get('/api/shop/orders/customer?phone=0791234567', tok('manager'))).status, 200);
   assert.equal((await h.get('/api/shop/orders/customer?phone=0791234567', tok('managerX'))).status, 403);
 });
+
+test('CRM-09: پینِ نشانیِ تحویل (`deliveryPin`، فیلدِ جدای قرض‌دار) هم تماس است — بی مجوز در REST و v1 نیست و push ِ نقشِ بسته عوضش نمی‌کند', async () => {
+  const PIN = { lat: 34.528123, lng: 69.172346 };
+  const full = { name: 'نسیم', phone: PHONE, phone2: PHONE2, deliveryAddress: ADDR, deliveryPin: PIN };
+  assert.equal((await h.post('/api/debtors', { id: 'd-pin-rest', data: full }, tok('owner'))).status, 201);
+  const seed = await v1push('owner', 'v1-owner', [v1op('d-pin', full)]);
+  assert.deepEqual(seed.body.results.map((x) => x.status), ['applied'], JSON.stringify(seed.body));
+  for (const who of [...ALLOWED, ...DENIED]) {
+    const row = (await h.get('/api/debtors/d-pin-rest', tok(who))).body;
+    const pull = await h.get(`/api/sync/v1/pull?device_id=v1-pin-${who}&since=0&limit=2000`, tok(who));
+    const ins = pull.body.ops.find((o) => o.row_id === 'd-pin' && o.type === 'insert');
+    const snap = (await v1snap(who)).find((r) => r.id === 'd-pin').data;
+    for (const [door, data] of [['REST', row], ['pull', ins.fields], ['Snapshot', snap]]) {
+      if (ALLOWED.includes(who)) assert.deepEqual(data.deliveryPin, PIN, `${who} ${door}`);
+      else assert.equal(data.deliveryPin, undefined, `${who} ${door}: ${JSON.stringify(data)}`);
+      assert.ok(ALLOWED.includes(who) || !JSON.stringify(data).includes('34.528'), `${who} ${door}: جای خانه`);
+    }
+  }
+  //  ⛔ کارمندِ بسته پین را نه پاک می‌کند نه جابه‌جا
+  const moved = await v1push('cashierX', 'v1-cx-pin', [v1op('d-pin', { name: 'نسیمِ تازه', deliveryPin: { lat: 34.6, lng: 69.3 } }, 'update')]);
+  assert.equal(moved.body.results[0].status, 'applied', JSON.stringify(moved.body));
+  assert.deepEqual(moved.body.results[0].ignored, ['deliveryPin']);
+  const wipe = await v1push('cashierX', 'v1-cx-pin', [v1op('d-pin', { deliveryPin: null }, 'update')]);
+  assert.equal(wipe.body.results[0].status, 'applied', JSON.stringify(wipe.body));
+  const back = (await v1snap('owner')).find((r) => r.id === 'd-pin').data;
+  assert.equal(back.name, 'نسیمِ تازه', 'بقیهٔ ویرایش می‌نشیند');
+  assert.deepEqual(back.deliveryPin, PIN);
+});

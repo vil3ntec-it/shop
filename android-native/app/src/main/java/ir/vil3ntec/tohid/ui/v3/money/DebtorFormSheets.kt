@@ -70,6 +70,7 @@ internal fun DebtorFormSheet(
   val limitField = remember(debtor?.id, limitRules) { CreditLimitPerm.field(limitRules, existing = debtor != null) }
   val limitError = DebtorFormsModel.limitError(f) ?: DebtorFormsModel.limitPermError(limitRules, debtor, f)
   val consentError = DebtorFormsModel.consentError(f)
+  val pinError = DebtorFormsModel.pinError(f)
   V3FormSheet(title = if (debtor == null) StrMoney.newDebtor else StrMoney.editDebtor, dirty = f != initial, onClose = onClose) { sheet ->
     Column(Modifier.v3Shake(shake)) {
       V3TextField(f.name, { f = f.copy(name = it) }, StrMoney.name, required = true, error = nameError.takeIf { tried })
@@ -106,6 +107,10 @@ internal fun DebtorFormSheet(
         V3TextField(f.address.postalCode, { f = f.copy(address = f.address.copy(postalCode = it)) }, StrMoney.addressPostal, Modifier.weight(1f),
           kind = V3FieldKind.NUMBER)
       }
+      Spacer(Modifier.height(10.dp))
+      //  پین — منبعِ اصلیِ نشانی (§۴.۴): مختصات یا پیوندِ برنامهٔ نقشه، بی شبکه (`PinText`)
+      V3TextField(f.pinText, { f = f.copy(pinText = it) }, StrMoney.addressPin, placeholder = StrMoney.addressPinHint,
+        error = pinError.takeIf { tried })
       Spacer(Modifier.height(14.dp))
       Text(StrMoney.consentTitle, style = v3Text(13, FontWeight.SemiBold, 18), color = PhoneV3.colors.inkMuted)
       Spacer(Modifier.height(6.dp))
@@ -126,7 +131,7 @@ internal fun DebtorFormSheet(
         StrKit.save,
         {
           tried = true
-          if (nameError != null || limitError != null || consentError != null) shake++
+          if (nameError != null || limitError != null || consentError != null || pinError != null) shake++
           else if (onSave(f)) sheet.finish(onSaved)
         },
         Modifier.fillMaxWidth(),

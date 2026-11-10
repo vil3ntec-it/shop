@@ -54,6 +54,19 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/chk-addr` (CHK-08، CHK-10 و پینِ CRM-09؛ روی main ‏cceb5930 (#1027)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: CHK-10 — سرور تنها داور با یک خانه برای «کجا؟»، ثبت و «خبرم کن» (`storefront-delivery.pinCell`: گردِ شش‌رقمیِ `orders.coord` سپس
+  شبکه؛ پیش‌تر پینِ رقمِ هفتمِ کنارِ خطِ شبکه پیش از ثبت «بیرون» و در ثبت «درون» بود)؛ لبه و رأسِ چندضلعی درون؛ پاپیون (دو نقطهٔ جابه‌جا) ⇒ ۴۰۰ `bad_zone` با
+  شمارهٔ نقطه‌ها (`crossing`، BigInt)، چندضلعیِ ذخیره‌شدهٔ پیشین بی تغییر می‌گذرد؛ همان سنجش کنارِ کادرِ برنامه (`StorefrontDelivery.crossing` + `savedPolygon`)؛
+  بردارِ `core/test-vectors/delivery-zone-v1.json` (فاصله و خانه با پایتونِ جدا). CHK-08 — وب: «پین از برنامهٔ نقشه» پشتِ `shop.storefront.address_extra`
+  (`store/pin-text.js` ِ دیربار، همزادِ `PinText` با `pin-text-v1.json`)؛ `AddressRules.round6` ِ هسته نیمه را زوج می‌کرد ⇒ همان `Math.round` ِ سرور.
+  CRM-09 — پینِ قرض‌دار: فیلدِ **جدای** `Debtor.deliveryPin` (نه درونِ `DeliveryAddress`: RULES ِ همان بند)، برگهٔ ویرایش، سطرِ پرونده، ادغام، خروجیِ صاحب، و
+  فیلدِ تماس در `lib/customer-contact.js`. `Models.kt` با یک‌خطی کردنِ حاشیه‌نویسیِ `cardCode` زیرِ سقفِ ۹۲۵ ماند.
+- نیمه‌کاره: آزمون‌های Kotlin (`StorefrontDeliveryVectorsTest`، `AddressRoundVectorsTest`، `PinTextVectorsTest`، چهار آزمونِ تازهٔ
+  `CustomerDeliveryAddressTest`) فقط در CI؛ محلی فقط با kotlinc ِ درونِ Gradle (بی دانلود، با جانشینِ JUnit) سبز و روی main سرخ — جز `CustomerDeliveryAddressTest`
+  که بی افزونهٔ serialization محلی ساخته نمی‌شود. `routes/data.js` (ثبتِ «چه کسی پرونده را دید») `deliveryPin` را در `full` نمی‌شمارد — بیرون از دامنهٔ این شاخه.
+- قدمِ بعدی: CI ِ PR را ببینید (Kotlin)؛ تصمیمِ صاحب‌کار: نقشه روی صفحه، کدِ پستیِ اختیاری (LOC-10)، Plus Code ِ کوتاه بی پین برای «داخلِ محدوده»، و
+  مرزِ دقتِ موقعیتِ مرورگر (پینِ ±چند کیلومتریِ کامپیوتر امروز پذیرفته است).
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/rpt-3` (RPT-13 کلیدهای گزارش و RPT-08 نقشهٔ ساعت × روز، بخشِ وب و keymap؛ روی `ccr-…-batch-44` ‏040ae52c؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) **keymap** با کد هم‌خوان: `reports.prevPeriod`/`nextPeriod`/`compare` «planned» ⇐ «partial» (در «گزارش‌ها»ی کامپیوتر با `ReportKeysPref` ِ پیش‌فرض‌روشن ساخته بودند و F1 نشانشان نمی‌داد؛ «گزارشِ تازه» ِ کامپیوتر ندارد)، `reports.drill` همان «partial» (Enter فقط در جدول‌های «گزارشِ تازه»)؛ کلیدِ وب: Enter، − / +، **Alt+C** (Ctrl+Shift+C ِ مرورگر بازرسیِ عنصر است) و `webStatus` ِ partial برای این چهار و Ctrl+P / Ctrl+E؛ `KeyMap.kt` و `license/keymap.js` دوباره ساخته شدند.
   (۲) **وب** (`license/report-ui.js`، فقط با «گزارشِ تازه»): − / + دوره (`license/report-period-core.js` = دوقلوی `ReportPeriod`، بردارِ `report-period-v1.json`؛ `ReportPeriod.MAX_DIFF` ِ Kotlin به ⌊(2^53−1)/10⁴⌋ آمد تا دو سو یک عدد بدهند)، Alt+C مقایسه (ستون‌های «دورهٔ قبل»/«تغییر» + خطِ «نسبت به …»)، Ctrl+P / Ctrl+E، Enter ِ ریز (`invoicesOf`/`dayInvoices` در `report-core.js` و رونوشتِ سرور، دوقلوی `ReportCore`، بردارِ `report-drill-v1.json`)، Esc. (۳) **RPT-08 وب**: زبانهٔ «ساعت و روز» (`license/sales-heatmap-core.js` = دوقلوی `SalesHeatmap`، بردارِ `sales-heatmap-v1.json`)، جدولِ واقعیِ ۷ × ۲۴ با عدد و سرخط؛ `sw.js` ‏v75.

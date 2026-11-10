@@ -1,0 +1,30 @@
+{
+ "version": 1,
+ "about": "CHK-08 — پین از نوشتهٔ چسبانده (پیوند یا مختصاتِ برنامهٔ نقشه)، بی شبکه و بی ژئوکدر. خواننده‌ها: PinTextVectorsTest ِ core (PinText.parse ِ برنامهٔ خرید) و server/test/store-pin-text.test.js (server/public/store/pin-text.js ِ ویترینِ وب). want = [عرض، طول] پس از گردِ شش‌رقمیِ سرور (Math.round، نیمه رو به بالا) یا null.",
+ "parse": [
+  {"name": "مختصاتِ خالی", "text": "34.5281, 69.1723", "want": [34.5281, 69.1723]},
+  {"name": "رقمِ فارسی، «٫» و «،»", "text": "۳۴٫۵۲۸۱، ۶۹٫۱۷۲۳", "want": [34.5281, 69.1723]},
+  {"name": "فاصله به‌جای ویرگول، با فاصلهٔ دو سر", "text": "  34.53 69.17  ", "want": [34.53, 69.17]},
+  {"name": "نیم‌کرهٔ جنوب و غرب", "text": "-12.5, -45.25", "want": [-12.5, -45.25]},
+  {"name": "گردِ شش‌رقمی نیمه رو به بالا (همان سرور)", "text": "34.5000005, 69.1234565", "want": [34.500001, 69.123457]},
+  {"name": "geo:", "text": "geo:34.52,69.17?q=home", "want": [34.52, 69.17]},
+  {"name": "GEO: با حرفِ بزرگ", "text": "GEO:34.52,69.17", "want": [34.52, 69.17]},
+  {"name": "گوگل: !3d/!4d پیش از @", "text": "https://www.google.com/maps/place/X/@34.5312,69.1711,17z/data=!3m1!4b1!4m5!3m4!1s0x0:0x0!8m2!3d34.5313!4d69.1712", "want": [34.5313, 69.1712]},
+  {"name": "گوگل: @", "text": "https://www.google.com/maps/@34.5312,69.1711,15z", "want": [34.5312, 69.1711]},
+  {"name": "گوگل: ?q=", "text": "https://maps.google.com/?q=34.53,69.17", "want": [34.53, 69.17]},
+  {"name": "گوگل: query= با %2C", "text": "https://www.google.com/maps/search/?api=1&query=34.53%2C69.17", "want": [34.53, 69.17]},
+  {"name": "گوگل: ?q= با «,+»", "text": "https://maps.google.com/?q=34.53,+69.17", "want": [34.53, 69.17]},
+  {"name": "OSM: mlat/mlon", "text": "https://www.openstreetmap.org/?mlat=34.53&mlon=69.17#map=17/34.5/69.1", "want": [34.53, 69.17]},
+  {"name": "OSM: &amp;", "text": "https://osm.org/?mlat=34.53&amp;mlon=69.17", "want": [34.53, 69.17]},
+  {"name": "OSM: #map=", "text": "https://www.openstreetmap.org/#map=17/34.5301/69.1702", "want": [34.5301, 69.1702]},
+  {"name": "Apple: ll=", "text": "https://maps.apple.com/?ll=34.53,69.17&q=Home", "want": [34.53, 69.17]},
+  {"name": "پیوندِ کوتاه بی شبکه باز نمی‌شود", "text": "https://maps.app.goo.gl/AbCdEf", "want": null},
+  {"name": "بی اعشار پین نیست", "text": "12 5", "want": null},
+  {"name": "بیرونِ بازه", "text": "95.1, 69.1", "want": null},
+  {"name": "صفر و صفر", "text": "0.0, 0.0", "want": null},
+  {"name": "q= بی ? یا &", "text": "q=34.53,69.17", "want": null},
+  {"name": "مختصات با متنِ دیگر", "text": "34.53,69.17 near mosque", "want": null},
+  {"name": "خالی", "text": "", "want": null},
+  {"name": "الگوی نخست بیرونِ بازه، الگوی بعد درست", "text": "https://example.com/?q=123.4,69.1#map=17/34.5/69.1", "want": [34.5, 69.1]}
+ ]
+}
