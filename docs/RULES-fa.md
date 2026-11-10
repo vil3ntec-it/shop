@@ -888,6 +888,12 @@
   `e2e/test.entitlements`): آزمونی که از `Keychain` می‌گذرد (KEK ِ `AtRest`/`SignOutVault`، هویتِ دستگاه، توکن) روی `Keychain.memory`
   می‌رود و پس از خود برمی‌گرداند؛ ردهٔ دسترسی (`kSecAttrAccessible`) با `Keychain.addRequestIs` (همان درخواستِ `SecItemAdd`) سنجیده
   می‌شود، نه با خواندنِ کلیددان. آزمونِ تازهٔ iOS پیش از ادغام یک بار روی کارِ `ios-app` سبز دیده شود (دستهٔ ۳۱ ‏#1015: اجرای خودِ شاخه‌ها لغو شد و سه آزمون از آن پس سرخ ماند).
+- ⛔ **آینهٔ JS ِ آزمون‌های کاتلینِ پرونده‌خوان (`(2.14.5)`):** CI ِ اندروید روی PR ِ فقط‌سرور (`server/public/kit/i18n`، `index.html`، `orders.js`) نمی‌دود و دیر سرخ می‌شود
+  (دستهٔ ۳۹: `np.fail`). پس هر سنجهٔ کاتلینی که پروندهٔ سرور/وب/license/docs یا بردار را با فهرستِ خودش می‌سنجد آینهٔ `node --test` در `server/test` دارد:
+  `dari-text.test.js` (DariCoverageTest، خرید + وب)، `kotlin-file-mirrors.test.js` (WhatsNewFileTest، WhatsNewTest، WebPaletteParityTest، CustomerOnlineOrdersTest)،
+  `core-vectors-common-mirror.test.js` (CoreVectorsCommonParityTest). فهرستِ مشترک فقط با `test/kt-source.js` از خودِ کاتلین خوانده می‌شود، نه رونوشت.
+  آزمونِ کاتلینِ تازه از همین نوع ⇒ آینه در همان PR؛ عوض کردنِ آن فهرست‌ها/الگوها در کاتلین ⇒ همان آینه پیش از push (CI ِ سرور روی آن پرونده‌ها نمی‌دود).
+  آینه‌نشدنی: `*VectorsTest` ِ پیاده‌سازیِ کاتلین (همتای JS ِ خودشان)، «کلیدِ زنده» ِ DariWordsTest (جدول‌های `Str*`)، `WhatsNew.plan`، Offline30، قاعده‌های KeyMapTest.
 
 ### v3 · نقشهٔ پرچم‌ها
 
