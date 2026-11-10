@@ -291,6 +291,23 @@ test('«پرداخت پس از پذیرش» روشن: پیش از قبول نه 
   assert.equal((await choose(s, o.token, { method: 'cash' })).status, 404);
 });
 
+//  ⛔ «همه روشن» (`web-store-allflags.mjs`): پاسخِ این کارِ مشتری فقط `sf.track` بود و صفحه (`renderOrder(r.order)`) هر کلیدِ نیامده را
+//  پنهان می‌کرد ⇒ کارتِ گفت‌وگو، دستورِ تحویل، زمان و روش تا پیگیریِ بعدی می‌رفتند. حالا همان نمای پیگیری (`lib/store-order-view.js`).
+test('«پرداخت پس از پذیرش» با پرچم‌های دیگرِ پیگیری: پاسخِ «نقد» همان نمای پیگیری است (گفت‌وگو، دستورِ تحویل، زمان، روش، …)', async () => {
+  const s = await liveShop('همه‌روشن', { settings: { payAfterAccept: true } });
+  await hesabpay(s);   //  بی راهِ دوم «انتخاب» نیست (همان آزمونِ بالا)
+  for (const k of ['shop.chat', 'shop.orders.delivery_prefs', 'shop.storefront.eta', 'shop.storefront.delivery_method', 'shop.orders.issue_reports', 'shop.orders.reviews', 'shop.orders.refund_tracking']) await flag(s.shopId, k);
+  const o = await storeOrder(s, { fulfillment: 'delivery' });
+  await walk(s, o.id, ['accepted']);
+  const c = await choose(s, o.token, { method: 'cash' });
+  assert.equal(c.status, 200, JSON.stringify(c.body));
+  const tr = (await track(s, o.token)).body.order;
+  assert.equal(c.body.order.chat, true, 'کارتِ گفت‌وگو با پاسخِ «نقد» نمی‌رود');
+  assert.deepEqual(Object.keys(c.body.order).sort(), Object.keys(tr).sort());
+  assert.deepEqual(c.body.order.deliveryPrefs, tr.deliveryPrefs);
+  assert.deepEqual(c.body.order.paymentStep, tr.paymentStep);
+});
+
 test('«به فاکتور»: فقط از «بسته شد»؛ یک بار زیرِ قفل (تکرار و هم‌زمان ⇒ همان)؛ آزمایشی و دکانِ دیگر نه', async () => {
   const s = await liveShop('فاکتور');
   const other = await liveShop('فاکتورِ دیگر');

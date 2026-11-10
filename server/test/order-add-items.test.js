@@ -181,6 +181,19 @@ test('پیش از جمع‌آوری: قلمِ تازه و افزودن به قل
   assert.equal(Number((await orderRow(o.id)).subtotal_minor), sumLines(await linesOf(o.id)));
 });
 
+//  ⛔ «همه روشن» (`web-store-allflags.mjs`): پاسخِ این کارِ مشتری فقط `sf.track` بود و صفحه (`renderOrder(r.order)`) هر کلیدِ نیامده را
+//  پنهان می‌کرد ⇒ کارتِ گفت‌وگو، دستورِ تحویل، زمان و روش تا پیگیریِ بعدی می‌رفتند. حالا همان نمای پیگیری (`lib/store-order-view.js`).
+test('با پرچم‌های دیگرِ پیگیری: پاسخِ «افزودن» همان نمای پیگیری است (گفت‌وگو، دستورِ تحویل، زمان، …)', async () => {
+  const s = await shop('همه‌روشن', { flags: ['shop.chat', 'shop.orders.delivery_prefs', 'shop.storefront.eta', 'shop.storefront.delivery_method', 'shop.orders.issue_reports', 'shop.orders.reviews', 'shop.orders.refund_tracking'] });
+  const o = await storeOrder(s);
+  const r = await addItems(s, o.token, { lines: [{ productId: 'salt', qtyMilli: 1000 }] });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const tr = (await track(s, o.token)).body.order;
+  assert.equal(r.body.order.chat, true, 'کارتِ گفت‌وگو با پاسخِ «افزودن» نمی‌رود');
+  assert.deepEqual(Object.keys(r.body.order).sort(), Object.keys(tr).sort());
+  assert.deepEqual(r.body.order.addItems, tr.addItems);
+});
+
 test('پس از شروعِ جمع‌آوری ⇒ ۴۰۹ order_preparing، هیچ تغییری؛ پیگیری «در حال آماده‌سازی»', async () => {
   const s = await shop('جمع‌آوری', { flags: ['shop.orders.picking'] });
   const o = await storeOrder(s);

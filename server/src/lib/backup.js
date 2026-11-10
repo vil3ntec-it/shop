@@ -67,22 +67,37 @@ function warnUnencrypted(kind) {
  */
 async function openSnapshot() {
   let client = null;
+  /*
+   *  ⛔ SR38-3: این اتصال تا پایانِ pg_dump در تراکنشِ باز و بیکار می‌ماند و pg-pool شنوندهٔ `error` ِ اتصالِ بیرون‌کشیده را
+   *  برداشته است ⇒ `PG_IDLE_TX_TIMEOUT_MS` ِ کوتاه‌تر از dump نشست را می‌بُرد و `error` ِ بی شنونده uncaughtException بود
+   *  (`index.js` سرور را خاموش می‌کرد). حالا: افتادن ثبت، اتصالِ مرده نابود (`release(err)`)، شمارِ seal از استخر.
+   */
+  let broken = null;
+  const onLost = (e) => { broken = broken || e; };
   try {
     client = await db.getPool().connect();
+    client.on('error', onLost);
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
     const id = (await client.query('SELECT pg_export_snapshot() AS id')).rows[0].id;
     const manifest = await require('./restore-drill').fingerprint((t, p) => client.query(t, p));
     const c = client;
     return {
       id, manifest,
+      //  F0-28: شمارِ رازها در **همان** snapshot (فقط در `BACKUP_SECRETS=seal`)؛ snapshot افتاد ⇒ پرس‌وجوی تازه (همان راهِ بی snapshot)
+      query: (t, p) => (broken ? db.query(t, p) : c.query(t, p)),
       async close() {
-        try { await c.query('COMMIT'); } catch { /* اتصال رفته */ }
-        c.release();
+        try { await c.query('COMMIT'); } catch (e) { broken = broken || e; }
+        c.off('error', onLost);
+        c.release(broken || undefined);
       },
     };
   } catch (err) {
     console.warn(`[backup] manifest ساخته نشد (پشتیبان بی آن ادامه می‌دهد): ${err.message}`);
-    if (client) { try { await client.query('ROLLBACK'); } catch { /* بی‌اهمیت */ } client.release(); }
+    if (client) {
+      try { await client.query('ROLLBACK'); } catch (e) { broken = broken || e; }
+      client.off('error', onLost);
+      client.release(broken || undefined);
+    }
     return null;
   }
 }
@@ -122,6 +137,39 @@ function backupError(status, code, message) {
   e.code = code;
   e.expose = true;
   return e;
+}
+
+/**
+ * F0-28 — `BACKUP_SECRETS=seal` (پیش‌فرض plain = همان امروز، `lib/backup-secrets.js`). روشن ولی بی کلیدِ آماده، یا حالتِ
+ * ناشناخته ⇒ مثلِ SEC-07: هیچ فایلی ساخته نمی‌شود، پشتیبان‌های قبلی دست نمی‌خورند، و خبرِ `backup.refused_secrets` می‌ماند.
+ * @returns {null|{state,key,kid}} کلیدِ مهر، یا null در plain
+ */
+const secretsLib = () => require('./backup-secrets');
+function sealKey(kind) {
+  const m = secretsLib().mode();
+  if (m === 'plain') return null;
+  const k = m === 'seal' ? secretsLib().keyState() : null;
+  if (k && k.state === 'ok') return k;
+  const reason = m === 'invalid' ? 'mode_invalid' : `key_${k.state}`;
+  console.error(`[backup] ⛔ ${kind}: BACKUP_SECRETS=${m === 'invalid' ? 'ناشناخته' : 'seal'} و ${m === 'invalid' ? 'فقط plain یا seal پذیرفته است' : `کلید آماده نیست (${k.state})`} — پشتیبان ساخته نشد.`);
+  require('./audit').log({ actorType: 'system', action: 'backup.refused_secrets', detail: { kind, reason } }).catch(() => {});
+  return m === 'invalid'
+    ? backupError(409, 'backup_secrets_mode_invalid', 'BACKUP_SECRETS فقط plain یا seal است؛ پشتیبان ساخته نشد و پشتیبان‌های قبلی دست نخوردند.')
+    : backupError(409, 'backup_secrets_key_missing',
+      'BACKUP_SECRETS=seal است ولی BACKUP_SECRETS_KEY (یا BACKUP_SECRETS_KEY_FILE) آماده نیست (۶۴ hex، base64 ِ ۳۲ بایت یا ≥ ۳۲ نویسه)؛ پشتیبان ساخته نشد و پشتیبان‌های قبلی دست نخوردند.');
+}
+
+/** پشتیبانِ مهری که مهرش ثابت نشد ⇒ پاک و شکست (هرگز پشتیبانِ «مهرشده» ای که راز را خام دارد) */
+async function sealFailed(tmp, kind, why) {
+  await fsp.rm(tmp, { force: true });
+  console.error(`[backup] ⛔ ${kind}: مهرِ رازها ثابت نشد (${why}) — پشتیبان کنار رفت.`);
+  require('./audit').log({ actorType: 'system', action: 'backup.secrets_seal_failed', detail: { kind, why } }).catch(() => {});
+  return backupError(500, 'backup_secrets_seal_failed', 'مهرِ رازهای پشتیبان ثابت نشد؛ پشتیبان کنار رفت و پشتیبان‌های قبلی دست نخوردند.');
+}
+
+/** بخشِ `secrets` ِ meta.json (فقط seal): نام‌ها، شمار و kid — هرگز مقدار */
+function secretsMeta(k, report) {
+  return { mode: 'seal', sealed: report.sealed, keys: report.keys, kid: k.kid, licenseKid: report.licenseKid };
 }
 
 function refuseUnencrypted(kind) {
@@ -207,10 +255,12 @@ async function dump({ kind = 'manual', dir = null } = {}) {
   //  ⛔ پیش از ensureDirs: ردشده هیچ ردی روی دیسک نمی‌گذارد
   const strict = await encryptionRequired();
   if (strict && !encrypted) throw refuseUnencrypted(kind);
+  const seal = sealKey(kind);
+  if (seal instanceof Error) throw seal;
   await ensureDirs();
   const warned = encrypted ? null : warnUnencrypted(kind);
   //  PGlite: ردیفِ همین هشدار نباید میانِ دو اثرِ انگشتِ manifest بنشیند (شکستش هم چیزی را نمی‌خواباند)
-  if (db.isPglite()) { await warned; return runPglite({ kind, dir, encrypted, strict }); }
+  if (db.isPglite()) { await warned; return runPglite({ kind, dir, encrypted, strict, seal }); }
   const base = `shop-${stamp()}.sql.gz${encrypted ? '.enc' : ''}`;
   const target = path.join(dir || dirFor(kind), base);
   const tmp = `${target}.part`;
@@ -218,14 +268,14 @@ async function dump({ kind = 'manual', dir = null } = {}) {
   //  ⚠️ پیش از spawn (قاعدهٔ «هیچ await میانِ spawn و وصل شدن به stdout» در `runPg`)
   const snap = await openSnapshot();
   try {
-    return await runPg({ kind, encrypted, base, target, tmp, snap, strict });
+    return await runPg({ kind, encrypted, base, target, tmp, snap, strict, seal });
   } finally {
     if (snap) await snap.close();
   }
 }
 
 /** pg_dump ⇒ gzip ⇒ (رمز) ⇒ فایل؛ با `snap` همان snapshot ِ manifest را می‌خواند */
-async function runPg({ kind, encrypted, base, target, tmp, snap, strict = false }) {
+async function runPg({ kind, encrypted, base, target, tmp, snap, strict = false, seal = null }) {
   //  §۹.۵: نامِ نشست تا سروری که هم‌زمان بالا می‌آید نشانِ همین پشتیبان را «برگشته از پشتیبان»
   //  نشمارد (`sync-epoch.backupRunning`)
   const dump = spawn(config.backup.pgDump, [
@@ -275,19 +325,26 @@ async function runPg({ kind, encrypted, base, target, tmp, snap, strict = false 
    *  می‌نشیند، بی‌آنکه چیزی منتظر بماند.
    */
   const file = fs.createWriteStream(tmp);
+  //  F0-28: فقط در seal، پیش از شمارنده (شمارِ بایت = همان چیزی که در فایل است، برای سنجشِ SEC-07)؛ plain ⇒ همان لوله
+  const sealer = seal ? secretsLib().sealStream(seal) : null;
+  const head = sealer ? [dump.stdout, sealer] : [dump.stdout];
 
-  if (encrypted) {
-    const salt = randomBytes(16);
-    const iv = randomBytes(12);
-    const cipher = createCipheriv('aes-256-gcm', keyFrom(config.backup.passphrase, salt), iv);
-    // سرآیند: نشانه + salt + iv؛ با همین، فایل روی هر سرور دیگری هم باز می‌شود
-    file.write(Buffer.concat([Buffer.from(MAGIC), salt, iv]));
-    await pipeline(dump.stdout, counter, gzip, cipher, file);
-    // برچسب احراز اصالت در انتها — دست‌کاری فایل لو می‌رود
-    await fsp.appendFile(tmp, cipher.getAuthTag());
-  } else {
-    await pipeline(dump.stdout, counter, gzip, file);
-  }
+  const write = async () => {
+    if (encrypted) {
+      const salt = randomBytes(16);
+      const iv = randomBytes(12);
+      const cipher = createCipheriv('aes-256-gcm', keyFrom(config.backup.passphrase, salt), iv);
+      // سرآیند: نشانه + salt + iv؛ با همین، فایل روی هر سرور دیگری هم باز می‌شود
+      file.write(Buffer.concat([Buffer.from(MAGIC), salt, iv]));
+      await pipeline(...head, counter, gzip, cipher, file);
+      // برچسب احراز اصالت در انتها — دست‌کاری فایل لو می‌رود
+      await fsp.appendFile(tmp, cipher.getAuthTag());
+    } else {
+      await pipeline(...head, counter, gzip, file);
+    }
+  };
+  //  seal: شکستِ تبدیل ⇒ `.part` هم نمی‌ماند؛ plain همان رفتارِ پیشین
+  if (sealer) { try { await write(); } catch (err) { throw await sealFailed(tmp, kind, String(err?.code || 'pipeline')); } } else await write();
 
   let code;
   try {
@@ -307,6 +364,20 @@ async function runPg({ kind, encrypted, base, target, tmp, snap, strict = false 
     throw new Error(`pg_dump چیزی نداد — پشتیبان ساخته نشد. ${stderr.trim().slice(0, 300)}`);
   }
 
+  //  F0-28: بلوکِ app_config پیدا و همهٔ رازهای ناخالیِ همان snapshot مهر شدند — وگرنه پشتیبان نمی‌نشیند
+  let secretsInfo = null;
+  if (sealer) {
+    const rep = sealer.report;
+    if (!rep.found) throw await sealFailed(tmp, kind, 'no_app_config_block');
+    //  همان snapshot ِ pg_dump؛ بی snapshot پرس‌وجوی تازه (رازی که همین دم عوض شد ⇒ این بار شکست، نه نشت)
+    const run = snap ? snap.query : (t, p) => db.query(t, p);
+    const want = Number((await run(
+      "SELECT count(*)::int AS n FROM app_config WHERE key = ANY($1::text[]) AND value <> ''", [secretsLib().SECRET_KEYS]
+    )).rows[0].n);
+    if (want !== rep.sealed) throw await sealFailed(tmp, kind, 'count_mismatch');
+    secretsInfo = secretsMeta(seal, rep);
+  }
+
   //  SEC-07: «موفق» فقط پس از بازگشاییِ همین فایل؛ ناسالم ⇒ پاک و بی هرس
   const verified = strict ? { verified: true, rawBytes: await verifyOrDrop(tmp, kind, rawBytes) } : {};
 
@@ -318,11 +389,15 @@ async function runPg({ kind, encrypted, base, target, tmp, snap, strict = false 
     encrypted, sha256: sha, format: 'pg_dump-plain-gzip', app: 'shop-server', version: 2, ...verified,
     //  فقط شمار و جمع — بی هیچ دادهٔ شخصی (lib/restore-drill.js)
     ...(snap ? { manifest: snap.manifest, manifestConsistent: true } : {}),
+    ...(secretsInfo ? { secrets: secretsInfo } : {}),
   }, null, 2));
 
   await prune(kind);
   noteSuccess(kind);
-  return { file: target, bytes: stat.size, kind, createdAt: Date.now(), encrypted, sha256: sha, manifest: snap ? snap.manifest.digest : null, ...verified };
+  return {
+    file: target, bytes: stat.size, kind, createdAt: Date.now(), encrypted, sha256: sha, manifest: snap ? snap.manifest.digest : null, ...verified,
+    ...(secretsInfo ? { secrets: { sealed: secretsInfo.sealed } } : {}),
+  };
 }
 
 /**
@@ -333,7 +408,7 @@ async function runPg({ kind, encrypted, base, target, tmp, snap, strict = false 
  * ⚠️ همان رمزنگاری و همان meta.json، تا فهرست و دانلودِ پنل فرقی نبیند؛
  * فقط پسوند `.pglite.tar.gz` است، نه `.sql.gz`، چون SQLِ متنی نیست.
  */
-async function runPglite({ kind, dir, encrypted, strict = false }) {
+async function runPglite({ kind, dir, encrypted, strict = false, seal = null }) {
   const base = `shop-${stamp()}.pglite.tar.gz${encrypted ? '.enc' : ''}`;
   const target = path.join(dir || dirFor(kind), base);
   const tmp = `${target}.part`;
@@ -350,6 +425,17 @@ async function runPglite({ kind, dir, encrypted, strict = false }) {
   }
   if (raw.length < 100) throw new Error('PGlite چیزی نداد — پشتیبان ساخته نشد.');
   const consistent = !!(before && after && before.digest === after.digest);
+
+  //  F0-28: رونوشتِ مهرشده با WAL ِ پاک (`backup-secrets.sealPglite`)؛ شکست ⇒ پشتیبان نمی‌نشیند
+  let secretsInfo = null;
+  if (seal) {
+    let sealed;
+    try { sealed = await secretsLib().sealPglite(raw, seal); } catch (err) {
+      throw await sealFailed(tmp, kind, String(err?.code || 'error'));
+    }
+    raw = sealed.tar;
+    secretsInfo = secretsMeta(seal, sealed.report);
+  }
 
   let out = raw;
   if (encrypted) {
@@ -369,10 +455,14 @@ async function runPglite({ kind, dir, encrypted, strict = false }) {
     encrypted, sha256: sha, format: 'pglite-datadir-tar-gzip', app: 'shop-server', version: 2, ...verified,
     //  دیتابیس میانِ دو اثرِ انگشت عوض شد ⇒ manifest نمی‌آید (تمرین «بی manifest» می‌گوید، نه «برابر»)
     ...(consistent ? { manifest: before, manifestConsistent: true } : (before ? { manifestConsistent: false } : {})),
+    ...(secretsInfo ? { secrets: secretsInfo } : {}),
   }, null, 2));
   await prune(kind);
   noteSuccess(kind);
-  return { file: target, bytes: stat.size, kind, createdAt: Date.now(), encrypted, sha256: sha, manifest: consistent ? before.digest : null, ...verified };
+  return {
+    file: target, bytes: stat.size, kind, createdAt: Date.now(), encrypted, sha256: sha, manifest: consistent ? before.digest : null, ...verified,
+    ...(secretsInfo ? { secrets: { sealed: secretsInfo.sealed } } : {}),
+  };
 }
 
 /** نگه داشتن تعداد مشخصی از هر نوع و پاک کردن قدیمی‌ترها. */
@@ -437,8 +527,10 @@ async function decode(file) {
 /**
  * بازگرداندن پشتیبان روی همین دیتابیس یا هر دیتابیس دیگر.
  * (روی دیتابیسِ پر، اول باید خالی شود — این کار عمداً دستی است.)
+ * F0-28: پس از psql پاکت‌های رازِ پشتیبانِ مهرشده با `BACKUP_SECRETS_KEY` باز می‌شوند (`unseal`)؛ بی کلید بازیابی موفق است و
+ * `secrets` می‌گوید چه بگذارد. پشتیبانِ بی پاکت ⇒ خروجیِ همان امروز. `unseal: false` فقط برای تمرین (خودش می‌سنجد).
  */
-async function restore(file, { databaseUrl = config.db.url } = {}) {
+async function restore(file, { databaseUrl = config.db.url, unseal = true } = {}) {
   if (db.isPglite() || /\.pglite\.tar\.gz(\.enc)?$/.test(String(file))) {
     throw new Error(
       'پشتیبانِ PGlite از داخلِ سرورِ روشن برنمی‌گردد: سرور را خاموش کنید، پوشهٔ دیتابیس را ' +
@@ -461,7 +553,16 @@ async function restore(file, { databaseUrl = config.db.url } = {}) {
       ? resolve({ ok: true, bytes: sql.length })
       : reject(new Error(`بازیابی شکست خورد: ${err.trim().slice(0, 500)}`)));
     psql.stdin.end(sql);
-  }).then((out) => afterRestore(out, databaseUrl));
+  }).then((out) => (unseal ? unsealRestored(out, databaseUrl) : out)).then((out) => afterRestore(out, databaseUrl));
+}
+
+/** داده نشسته است؛ شکستِ باز کردن بازیابی را «شکست‌خورده» نمی‌کند ولی جدا گزارش می‌شود (بی مقدار) */
+async function unsealRestored(out, databaseUrl) {
+  let r;
+  try { r = await secretsLib().unsealAt(databaseUrl); } catch (err) {
+    return { ...out, secrets: { pending: null, unsealed: 0, error: String(err?.code || 'error') } };
+  }
+  return r.pending ? { ...out, secrets: r } : out;
 }
 
 /**

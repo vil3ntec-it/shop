@@ -62,6 +62,57 @@
 - نیمه‌کاره/تصمیم: P4 (کدِ وی‌آی‌پیِ پمپ فقط IP)، P5 (`sync/v1/status?device_id=%00` ⇒ ۵۰۰ در راهِ مشترک)، X5 (`sectionOf` و پروتوتایپ) فقط
   گزارش؛ P1–P3 همان. کاتلینی عوض نشد.
 - قدمِ بعدی: P1/P4/P5 در کارِ پمپ با اجازهٔ صاحب‌کار؛ شاهدِ CI.
+### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/sec-review-38` (بازبینیِ امنیتیِ دومِ دسته‌های ۳۷–۳۸؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: سه یافته با آزمونِ پیش‌سرخ و رفعِ کوچک (`server/test/security-review-38.test.js`، شرح در `docs/SECURITY-AUDIT-fa.md` «B3»): SR38-1 (High) پشتیبانِ
+  مهرشدهٔ PGlite رازها را در `pg_statistic` ِ ANALYZE ِ دوره‌ای خام داشت ⇒ `sealPglite` آمار را هم می‌بَرد؛ SR38-2 (Medium) reviver ِ NUL پارسِ هر بدنه را پیش از
+  سقفِ نرخ ۱۰–۲۵ برابر کند می‌کرد ⇒ `middleware/json-body.js` بی reviver، همان رفتارِ B4؛ SR38-3 (Medium) `openSnapshot` با `PG_IDLE_TX_TIMEOUT_MS` و dump ِ بلند
+  سرور را با uncaughtException می‌خواباند ⇒ شنونده + `release(err)` و شمارِ seal از استخر. سطلِ مدیر، پاکتِ رازها، نمای سفارش، صدا، سبدِ حساب، کدِ خطا و مهلت سالم ماندند.
+- نیمه‌کاره: هیچ. قدمِ بعدی: پیش از ارتقای PostgreSQL ِ تولید به ۱۸، `backup-secrets.test.js` روی همان pg_dump (R1)؛ محدود کردنِ نامِ `unseal` به `SECRET_KEYS` (R2، لایهٔ دوم).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/store-allflags` (ویترین با همهٔ پرچم‌های مشتری‌رو روشن، سرتاسر در مرورگر؛ روی `ccr-3a0d593c-ac0jpj-batch-37`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) `server/test/web-store-allflags.mjs` (در `test:web-store`): ۵۲ پرچمِ خانوادهٔ ویترین/گفت‌وگو/سفارش + catalog/image_bank/customer_notify/
+  delivery_customer_view از `KNOWN`، با پیش‌نیازِ shop.delivery، shop.visual_search و pay.hesabpay؛ سفرِ کامل در ۳۶۰·fa، ۷۶۸·en، ۱۲۸۰·ps و همان صفحه‌ها در
+  شش ترکیبِ دیگر؛ هر صفحه axe ِ WCAG 2.1 A/AA پس از گذارها، بیرون‌زدگی، JS/CSP، ۴xx/۵xx و بارِ نخست؛ سنجه‌ها خودشان هم سنجیده می‌شوند.
+  محلی پنج بارِ پیاپی سبز (چهار PGlite + یک PostgreSQL ِ محلی؛ ۱۴۷/۱۴۷ صفحه، ۳۳۴/۳۳۴ سنجه، ~۳ دقیقه). (۲) چهار رفع با آزمونِ پیش‌سرخ: ۳۹ پرچمِ خوانده‌شده بیرون از `KNOWN`
+  (`console-shell.test.js`)؛ پاسخِ pay-choice/افزودن/ویرایش/لغو فقط `sf.track` بود و کارتِ گفت‌وگو، دستورِ تحویل، زمان و روش را می‌برد
+  (`lib/store-order-view.js`؛ order-flow، order-add-items، order-amend، storefront) — **برهم‌کنشِ پرچم‌ها**؛ ۴۰۴ ِ `…/rating` بی
+  `shop.delivery_ratings` (کلیدِ `deliveryRating`، delivery-ratings)؛ ردیفِ `#store-meta` ِ گوشی بی دسترسیِ صفحه‌کلید (web-store.mjs، axe).
+  (۳) سرتاسری با `E2E_FLAGS_ON` (۵۱ پرچمِ خانواده + shop.delivery): هفت گامِ سرخ بی ایرادِ محصول ⇒ گزینندهٔ «+» جدا از ♥، `sameOrderLink`
+  (TEN-03)، «بی پرچمِ نمای پیک» صریح و سه مقدارِ شمارشیِ عمومی؛ customer/order/track/notify/delivery/courier/lifecycle ۶۶/۶۶ با و بی آن.
+- نیمه‌کاره: شاهدِ CI ِ `web-store-allflags.mjs` (شغلِ ۴۵ دقیقه‌ایِ «آزمونِ ویترین» ~۳ دقیقه بیشتر). خانوادهٔ `shop.delivery_*` و پرچم‌های دیگرِ
+  بیرون از کاتالوگ (shop.visual_search، pay.hesabpay، shop.promo_uses، shop.owner_report، …) هنوز در `KNOWN` نیستند. `shop.orders.ledger` بازنشسته
+  است ولی هنوز در `order-ledger.js` خوانده می‌شود. `E2E_FLAGS_ON=all` حالا `shop.orders.subscribers_only` را هم روشن می‌کند (دکانِ بی اشتراک ⇒ بی سفارش).
+- قدمِ بعدی: شاهدِ CI؛ تصمیمِ صاحب‌کار دربارهٔ subscribers_only در «همه روشن»؛ کاتالوگِ پیک و پرداخت با همان سنجهٔ `console-shell.test.js`.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/backup-secrets` (F0-28: رازهای app_config در پشتیبانِ سرور؛ روی `ccr-3a0d593c-ac0jpj-batch-37`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: `server/src/lib/backup-secrets.js` پشتِ `BACKUP_SECRETS=seal` (پیش‌فرض plain = همان امروز، بی هیچ تبدیل): هفت رازِ app_config
+  (کلیدِ مجوز، vapid، رمز و کلیدِ ایمیل، کلیدِ پیامک، حسابِ سرویسِ پوش، `station_read_key`) در خودِ پشتیبان `sealed:<نام>` با AES-256-GCM و
+  `BACKUP_SECRETS_KEY[_FILE]`؛ pg_dump با تبدیلِ جریانیِ فقط بلوکِ `COPY public.app_config` (و سنجشِ شمار در همان snapshot)، PGlite با رونوشت +
+  `VACUUM FULL` + چرخاندنِ WAL و سنجشِ نشانیِ هر صفحهٔ WAL (بی آن مقدارِ خام در WAL می‌ماند — با جهشِ آزمون دیده شد). باز شدن (restore،
+  تمرین، راه‌اندازی پیش از نخستین درخواست) همه یا هیچ؛ بی کلید ۵۰۳ ِ روشن و هیچ کلیدِ تازه (`license.js`، و ردیفِ خالیِ `station_read_key`؛
+  کدِ پمپ دست نخورد). seal بی کلید یا حالتِ ناشناخته ⇒ ۴۰۹ و هیچ فایل. `omit` عمداً ساخته نشد (کلیدِ پمپ و vapid برنمی‌گشتند ⇒ قفلِ کارمندان).
+- آزمون: `test/backup-secrets.test.js` ⇒ PGlite ۱۱/۱۱ (+۱ فقط PostgreSQL)، PostgreSQL ۱۶ ۱۲/۱۲؛ خانوادهٔ پشتیبان/مجوز/امنیت سبز (گزارشِ شاخه).
+- نیمه‌کاره: CI ندیده (F0-28 = PARTIAL)؛ روشن کردن با صاحب محصول (OWNER-ACTIONS-fa.md §۳ گامِ ۸). قدمِ بعدی: پس از CI ِ سبز، روی سرورِ
+  خانگی گامِ ۸ و یک `npm run restore-drill` (باید «کلیدِ مجوز: همان کلیدِ پیشین» بگوید)؛ نمایشِ «رازِ مهر مانده» در «سلامت» ِ پنل هنوز نیست.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/ios-keychain` (سه آزمونِ سرخِ کارِ `ios-app`؛ روی `ccr-3a0d593c-ac0jpj-batch-37`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- ریشه (از لاگِ کارهای 128869959125 تا 129427623969): `test.kexe` کلیددانِ iOS ندارد (OSStatus -25291، همان که کاوشِ آزمونِ سرتاسری
+  در همان فرآیند می‌نویسد). `DeviceIdentityIosTest` در `keepingRealState` (`Keychain.read`، سطرِ ۱۰۷) KeychainException می‌داد؛
+  `DataSafetyIosTest.signOutVault…`: KEK ِ `AtRestKeysIos` ⇐ `KEY_UNAVAILABLE` ⇐ `SignOutVault.seal` = false (سطرِ ۱۹۱). نخستین سرخ: اجرای
+  ‎#716‎ (دستهٔ ۳۱، ‏b9cfbc736)؛ پیشینِ سبز ‎#713‎ (دستهٔ ۳۰، ‏83c283fa6) این دو کلاس را نداشت (db573a6bc و 5c019a53f؛ اجرای خودِ شاخه‌ها لغو شده بود).
+- انجام شد: هر دو آزمون روی `Keychain.memory` (برگردانده پس از خود؛ کلیددانِ دفتری که آزمونِ گاوصندوق ساخت برداشته می‌شود)؛ ردهٔ
+  «فقط همین دستگاه» با `Keychain.addRequestIs` (همان واژه‌نامهٔ `SecItemAdd` ِ `add`، `addQuery` ِ تازه) به‌جای `storedAs`. هیچ assertی کم نشد.
+- نیمه‌کاره / قدمِ بعد: فقط CI ِ macOS (کارِ `ios-app`) سه آزمون را می‌سنجد؛ کامپایل را کارِ `ios-ui-klib` ِ لینوکس. کلیددانِ واقعی در
+  `test.kexe` (امضای ad-hoc با entitlements ِ DER، `__ents_der`) آزموده نشده — اگر خواستند، آزمونی جدا و گزارشی.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/perf-load` (PERF-02: نخستین اجرای واقعیِ ۲۰۰ دکان × ۵ دستگاه و درستی زیرِ بار؛ روی `ccr-3a0d593c-ac0jpj-batch-37`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) آمیزهٔ `scale` و `scale-burst` ِ ابزارِ بار (`server/scripts/load-scale.mjs`: فروش، ویرایشِ بها از چند دستگاه، حرکت، مشتری،
+  نگه‌داشته، ویترین روی زیرمجموعهٔ دکان‌ها، اشتراکِ صاحب، پنلِ مدیر، کاوشِ ویترینِ دکانِ دیگر) با دفترِ درستی و بازفرستِ op ِ بی‌پاسخ؛
+  سنجهٔ `server/scripts/load-check.js` (۱۲ سنجه، درونِ سرورِ آزمون یا جدا)؛ `--query-stats` به‌جای `pg_stat_statements`. (۲) سه اجرای ۲۰۰ × ۵
+  روی PostgreSQL ِ محلی (۱۰ دقیقه پایدار + «قطعِ سراسری»؛ عددها و بارِ ماشین در `docs/PERF-LOAD-fa.md` «۱۴۰۵/۰۸/۱۹ (دوم)»): پایدار هر بار
+  ۲۳٬۹۹۹ درخواست و ۰ خطا؛ داده بی گم/دوتایی و دکان‌ها جدا. (۳) رفع: مهاجرتِ ۴۵۰ (نمایهٔ جزئیِ وظیفهٔ بازِ تکراری‌نشو؛ آزمونِ
+  `sync-v3-task-dedupe.test.js` پیش از رفع سرخ). (۴) آزمونِ پایدارِ `load-correctness.test.js` (بی سنجهٔ زمانی، ~۱ دقیقه، ۳/۳ روی هر دو).
+  (۵) کاشتنِ ابزارِ بار دیگر درِ پمپ (`/api/admin/pump/live-config`) را نمی‌زند؛ `/api/admin/flags`.
+- نیمه‌کاره: هیچ کدِ نیمه‌کاره. PERF-02 همان PARTIAL (شاهدِ CI نیست). یافتهٔ بی‌ربط: `upgrade-rehearsal.test.js` روی PGlite ِ ماشینِ شلوغ گاهی
+  `fetch failed` (ECONNRESET ِ اتصالِ keep-alive ِ کهنه) می‌گیرد؛ در CI سبز؛ دست نخورد.
+- قدمِ بعدی (صاحب محصول): روشن کردنِ `SYNC_V3_BATCH` و `HOT_CACHE_MS` در تولید (اجرای سوم همین سند)؛ بودجهٔ ورود؛ رفتارِ «قطعِ سراسری»
+  (مهلتِ کلاینتِ ۱۰ ثانیه در برابرِ ۸ ثانیه انتظارِ دروازه، `REQUEST_TIMEOUT_MS`/`PG_POOL_MAX_WAITING`)؛ همین اجرا روی سخت‌افزارِ جدا.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/shopper-cart` (CHK-03 در برنامهٔ خرید: سبدِ حساب؛ روی `ccr-3a0d593c-ac0jpj-batch-36` = #1020؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) core: ماشینِ کوچکِ `CartSync` (`ShopperCartSync.kt`) زیرِ گام‌های سبدِ `AccountRules`: ادغامِ سبدِ مهمان یک بار و فقط اگر هست
   (پاسخش همان خواندن)، آینهٔ نشستِ پیشین ادغام نمی‌شود؛ ۴۰۹ ⇒ همان تغییرِ دستگاه روی سبدِ تازه (`rebase`، یک بار پشتِ‌هم، سپس درنگ) به‌جای
@@ -73,6 +124,16 @@
 - نیمه‌کاره: Kotlin این‌جا ساخته نمی‌شود ⇒ `ShopperCartSyncTest`، `ShopperCartVectorsTest`، `ShopperAccountTest` (یک بندِ عمداً عوض‌شده: ۴۰۹ دیگر
   روغنِ دستگاهِ دیگر را پاک نمی‌کند) و `CustomerAccountTest` فقط در CI. وب (`acct.js`) هنوز «دستگاه برنده» است (سیزنِ دیگر روی ویترین کار دارد).
 - قدمِ بعدی: شاهدِ CI ِ آزمون‌های Kotlin ⇒ بازنگریِ متنِ CHK-03؛ هم‌قاعده کردنِ ۴۰۹ ِ `acct.js` با همان `rebase` و بردار؛ D-09 برای ورود در تولید.
+### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/acct-bucket` (سطلِ نرخِ جدای پلِ پنل و مدیر؛ روی main ‏0e2e7b36 = دستهٔ ۳۶؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: ریشهٔ «سقفِ نرخِ سرورِ حساب پر شده» (۱۴۰۵/۰۷/۱۰): پلِ پنل از 127.0.0.1 و بی XFF همان سطلِ عمومیِ ۶۰۰ ِ یک IP را
+  می‌خورد. حالا `middleware/admin-bucket.js` (پیچیده دورِ همان `general` ِ `app.js`): فقط `/api[/v1]/admin/*` (نه login/reauth/2fa/pump)
+  با کلیدِ سرویسِ فعال یا نشستِ زندهٔ مدیرِ فعال ⇒ سطلِ همان کلید/مدیر (`RATE_ADMIN_PROVEN_MAX` ۶٬۰۰۰)؛ هر چه اثبات نشد همان سطلِ IP.
+  پرسشِ پایگاه برای اعتبارنامهٔ ناشناخته سطلِ IP ِ خودش (`RATE_ADMIN_PROBE_MAX` ۶۰، فقط شکست‌ها)؛ `requireAdmin` شکست ⇒ `forget`.
+  پیش‌فرض روشن، `RATE_ADMIN_BUCKET=0` ⇒ رفتارِ پیشین. `admin-bucket.test.js` (۱۲ آزمون؛ روی کدِ پیشین ۵ سرخ، هشت جهش سرخ)، PGlite و
+  PostgreSQL ِ محلی، هر دو انبار (حافظه و pg).
+- نیمه‌کاره: هیچ. ماندهٔ آگاهانه: سقف‌های تنگِ هر درِ مدیر (`admin-census`، `admin-notify-usage-ip`، آزمونِ پیامک/ایمیل…) هنوز به‌ازای
+  IP‌اند و برای پل همه 127.0.0.1 — عمداً دست نخورد. بی `TRUST_PROXY=true` همهٔ ترافیکِ درگاه یک IP است (همان قاعدهٔ پیشین).
+- قدمِ بعدی: شاهدِ CI ِ `admin-bucket.test.js`؛ اگر پل هنوز با رمزِ ارشد می‌آید، کلیدِ سرویس (بندِ ۱۲.۲ ِ ADMIN-CONTROL-PLANE) — هر دو راه سطلِ خودشان را دارند.
 ### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/mkt-1` (ردیف‌های MKT ِ بازِ بی‌مانع؛ روی `ccr-3a0d593c-ac0jpj-batch-35` = #1019؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: MKT-06 در نسخهٔ وبِ دکان — کادرِ «چرخهٔ مصرف (روز)» در ویرایشِ کالا (`license/product-cycle.js`، بی هیچ خطی در index.html)،
   بردارِ مشترکِ `license/test-vectors/product-cycle-v1.json` با `ProductCycleVectorsTest` (Kotlin، فقط CI)، `web-product-cycle.test.js` ۸/۸ و
@@ -126,6 +187,7 @@
 - قدمِ بعدی (صاحب محصول): عددِ تولیدِ سه مهلت (پیشنهاد: ۱۵ ثانیه، ۱۵ ثانیه، ۶۰ ثانیه)؛ قاعدهٔ سرریزِ پایانِ ماه؛ CI برای `entitlement-clock`،
   `request-deadline`، `ops-paging`، `admin-notify-usage`.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sub-ten-rsk` (ردیف‌های PARTIAL ِ SUB، TEN، RSK، DATA و PRES؛ روی main ‏37f8fa4c = دستهٔ ۳۵؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sub-ten-rsk` (ردیف‌های PARTIAL ِ SUB، TEN، RSK، DATA و PRES؛ روی main ‏0e2e7b36 = دستهٔ ۳۶؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) دو باگِ مرزِ اشتراکِ دکان (`entitlement-boundaries.test.js`، پیش از رفع ۲ سرخ): تمدیدِ ماهانه/ساله از بامدادِ یکمِ ماه ِ کابل با UTC ِ خام
   تا ۲۹ ِ همان ماه می‌رسید (سه روز کم) ⇐ `plans.endOfPeriodIn` و `max` با حسابِ پیشین؛ اشتراکِ شروع‌نشده دورهٔ آزمایشیِ دکان را می‌سوزاند ⇐ نه.
   پمپ عمداً دست نخورد (همان دو باگ را دارد؛ تصمیم با صاحب‌کار). (۲) RSK-03 ِ وب: کارتِ «سابقهٔ این مشتری» در جزئیاتِ سفارشِ وب

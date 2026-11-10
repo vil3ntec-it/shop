@@ -17,7 +17,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import { boot, assert } from './lib/harness.mjs';
+import { boot, assert, sameOrderLink } from './lib/harness.mjs';
 
 const require = createRequire(import.meta.url);
 const PASS = 'e2e-backup-passphrase-notify';
@@ -80,7 +80,8 @@ await E.step('NOTIF-07.ready', 'مشتری سبد می‌چیند و شماره�
   G = await E.page('customer');
   const { page } = G;
   await openStore(page);
-  await page.locator(`#products li[data-id="${rice}"]`).getByRole('button', { name: /افزودن/ }).click();
+  //  `.p-add`: با ♥ ِ `shop.storefront.favorites` (E2E_FLAGS_ON) کارت دکمهٔ دومی با نامِ «افزودنِ … به دلخواه‌ها» هم دارد
+  { const li = page.locator(`#products li[data-id="${rice}"]`); await li.getByRole('button', { name: /افزودن/ }).and(li.locator('.p-add')).click(); }
   await page.goto(`${E.apiBase}/store/${SLUG}#/checkout`);
   await page.waitForSelector('#view-checkout:not([hidden])');
   await page.fill('#c-name', CUSTOMER_NAME);
@@ -198,7 +199,7 @@ await E.step('NOTIF-08.restore', 'سرورِ بازیابی‌شده اعلان�
   //  مشتری پس از برگشتِ سرور همان «ثبت» را دوباره می‌زند ⇒ همان سفارش
   assert.ok([200, 201].includes(report.retry.status), JSON.stringify(report.retry));
   assert.equal(report.retry.body.order.orderNo, placed.orderNo);
-  assert.equal(report.retry.body.order.token, lost.body.order.token);
+  assert.ok(sameOrderLink(report.retry.body.order.token, lost.body.order.token), `${report.retry.body.order.token} ≠ ${lost.body.order.token}`);
   //  پایان: یک سفارش، یک اعلان که به provider رسید، هیچ پیامِ دیگری
   assert.deepEqual(report.after.orders.map((o) => o.orderNo), [placed.orderNo]);
   assert.deepEqual(report.after.outbox.map((x) => [x.orderId, x.status, x.attempts]), [[placed.id, 'provider_accepted', 1]]);

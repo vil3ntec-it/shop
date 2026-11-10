@@ -27,6 +27,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
+import { scaleKit, SCALE_MIX, SCALE_BURST_MIX } from './load-scale.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (k, d) => { const i = argv.indexOf(k); return i >= 0 && argv[i + 1] !== undefined ? argv[i + 1] : d; };
@@ -55,6 +56,15 @@ const INSTANCES = Math.max(1, Math.min(8, Number(arg('--instances', 1)) || 1));
 const CLUSTER = INSTANCES > 1 && !has('--no-cluster');
 //  opهای v3 ِ پیشینِ دکانِ بزرگ (هر دکانِ کوچک ۱۵۰) — pull و push روی دفترِ پر
 const HISTORY = Number(arg('--history', Math.round(60000 * Math.max(SCALE, 0.02))));
+//  scale (۲۰۰ دکان × ۵ دستگاه): ویترینِ گشت‌وگذار و سفارش فقط روی زیرمجموعه‌ای از دکان‌ها
+const STORE_SHOPS = Math.max(1, Math.min(SHOPS, Number(arg('--store-shops', SHOPS)) || SHOPS));
+const CHECKOUT_SHOPS = Math.max(1, Math.min(SHOPS, Number(arg('--checkout-shops', Math.min(SHOPS, 4))) || 1));
+//  `--check`: opِ بی‌پاسخ مثلِ برنامه دوباره می‌رود، در پایان صف‌ها خالی و `scripts/load-check.js` روی پایگاه ⇒ خروجِ ۱ اگر سرخ
+const CHECK = has('--check');
+const LEDGER_OUT = arg('--ledger', '');
+//  `--query-stats` (فقط PostgreSQL): زمانِ هر پرس‌وجو در سرورِ آزمون، به‌جای pg_stat_statements که preload می‌خواهد
+const QSTATS = has('--query-stats');
+const SETUP_PAR = Math.max(1, Number(arg('--setup-par', 4)) || 1);
 
 /** بودجه‌ها — پیش از آزمون ثابت (بخشِ ۲۹.۶ بندِ ۵)؛ عوض کردنشان پس از اجرا یعنی سبز کردنِ شکست. */
 export const BUDGET = Object.freeze({
@@ -100,6 +110,11 @@ const PROFILE_DEFS = {
   //  نقطهٔ شکست: پله‌های پیاپی بی مکث؛ هر پله جدا گزارش می‌شود و «زانو» = آخرین پلهٔ سبز (بودجهٔ کلی سنجیده نمی‌شود)
   knee: () => ({ phases: STEPS.map((k) => ({ sec: sec(20), rps: RATE * k })), knee: true }),
   'knee-store': () => ({ phases: STEPS.map((k) => ({ sec: sec(20), rps: RATE * k, mix: STORE_MIX })), knee: true }),
+  //  PERF-02 در مقیاسِ §۹.۳: آمیزهٔ کامل (فروش، ویرایشِ کالا، حرکت، مشتری، نگه‌داشته، ویترین، اشتراک، پنلِ مدیر)، پایدار
+  scale: () => ({ phases: [{ sec: sec(600), rps: RATE, mix: SCALE_MIX }], sampleSec: 5, gcEverySec: 60, soak: true }),
+  //  «قطعِ سراسری» در همان مقیاس: هر دستگاه صفِ ۳ تا ۱۵ فروش + ویرایش/حرکت/مشتری را با هم می‌فرستد
+  'scale-burst': () => ({ phases: [{ sec: 10, rps: RATE, mix: SCALE_MIX }, { sec: 10, rps: RATE * 3, mix: SCALE_BURST_MIX, stampede: 'outage' },
+    { sec: 40, rps: RATE, mix: SCALE_MIX }], sampleSec: 2 }),
 };
 for (const p of PROFILES) if (!PROFILE_DEFS[p]) { console.error(`نمایهٔ ناشناخته: ${p} (${Object.keys(PROFILE_DEFS).join('، ')})`); process.exit(2); }
 
@@ -130,7 +145,7 @@ let rec = null;   //  نمایهٔ در حالِ اجرا؛ null ⇒ گرم‌ک
 function newRec(name) {
   return { name, t0: performance.now(), ends: 0, by: new Map(), timeline: [], dropped: 0, scheduled: 0, lagMaxMs: 0, recovery: null };
 }
-function record(label, ms, status, err, bytes, startedAt) {
+function record(label, ms, status, err, bytes, startedAt, ok, errCode) {
   if (!rec) return;
   let e = rec.by.get(label);
   if (!e) rec.by.set(label, e = { lat: [], at: [], codes: {}, errors: 0, firstError: '', bytes: 0 });
@@ -138,12 +153,13 @@ function record(label, ms, status, err, bytes, startedAt) {
   //  زمانِ **آغازِ** درخواست: پنجره بر پایهٔ پایان، کُندهای جامانده پس از پایانِ بار را در پنجرهٔ آخر جمع می‌کرد
   e.at.push((startedAt - rec.t0) / 1000);
   (e.phase ||= []).push(rec.phase || 0);
-  const code = err || String(status);
+  //  ۵xx با کدِ خطای بدنه (`503:db_busy`) — «فقط ۵۰۳ ِ کنترل‌شده» را می‌شود جدا سنجید
+  const code = err || (status >= 500 && errCode ? `${status}:${errCode}` : String(status));
   e.codes[code] = (e.codes[code] || 0) + 1;
-  if (err || status < 200 || status >= 300) { e.errors++; (e.errAt ||= []).push(rec.phase || 0); }
+  if (err || !(ok ? ok(status) : status >= 200 && status < 300)) { e.errors++; (e.errAt ||= []).push(rec.phase || 0); }
   e.bytes += bytes;
 }
-async function hit(label, method, p, { token, body, headers = {} } = {}) {
+async function hit(label, method, p, { token, body, headers = {}, shop, ok } = {}) {
   const t0 = performance.now();
   let status = 0, err = '', json = null, bytes = 0, text = '';
   try {
@@ -160,12 +176,15 @@ async function hit(label, method, p, { token, body, headers = {} } = {}) {
     err = e && (e.name === 'TimeoutError' || e.name === 'AbortError') ? 'timeout' : String((e && e.cause && e.cause.code) || (e && e.name) || 'error');
   }
   const ms = performance.now() - t0;
-  record(label, ms, status, err, bytes, t0);
-  if (rec && (err || status < 200 || status >= 300)) {
+  const code = json && json.error && typeof json.error === 'object' ? json.error.code : undefined;
+  record(label, ms, status, err, bytes, t0, ok, code);
+  if (rec && (err || !(ok ? ok(status) : status >= 200 && status < 300))) {
     const e = rec.by.get(label);
     if (e && !e.firstError) e.firstError = err || `${status} ${text.slice(0, 160)}`;
   }
-  return { status, json, err, ms };
+  //  دادهٔ دکانِ دیگر در پاسخِ این دکان (نشان‌های بارساز) ⇒ دفترِ درستی
+  if (shop !== undefined && status >= 200 && status < 300 && text) kit.note(label, shop, text);
+  return { status, json, err, ms, code, text };
 }
 
 // ── سرورِ جدا ──
@@ -193,8 +212,11 @@ let shops = [];
 let devices = [];
 let sessions = [];
 let checkoutShops = [];
+let storeShops = [];
 let opSeq = 0;
 const orders = new Map();   //  slug ⇒ توکن‌های پیگیری (حداکثر ۲۰۰ تای آخر)
+//  آمیزهٔ scale و دفترِ درستی (`load-scale.mjs`)؛ `state` همیشه همان آرایه‌های زندهٔ این‌جا
+const state = { get shops() { return shops; }, get devices() { return devices; }, get storeShops() { return storeShops; }, admin: '', orders, checkouts: {} };
 
 /** opهای v3ِ یک فروشِ واقعی: سند، قلم‌ها، حرکتِ موجودی و تراکنشِ پول (یک tx) */
 function saleOps(d, sales) {
@@ -250,7 +272,7 @@ async function withDevice(fn) {
   d.busy = true;
   try { return await fn(d); } finally { d.busy = false; }
 }
-const storeShop = () => (rnd() < 0.5 ? shops[0] : pick(shops));
+const storeShop = () => (rnd() < 0.5 ? shops[0] : pick(storeShops));
 let ticketRR = 0;
 async function checkout(sh = pick(checkoutShops)) {
   const tk = sh.tickets.filter((t) => t.used < 9);
@@ -261,31 +283,35 @@ async function checkout(sh = pick(checkoutShops)) {
   const uniq = new Map(lines.map((l) => [l.productId, l]));
   const r = await hit('store.checkout', 'POST', `/api/store/${sh.slug}/checkout`, {
     headers: { 'Idempotency-Key': `load-${randomUUID()}`, 'X-Store-Ticket': t.ticket },
-    body: { fulfillment: 'pickup', customer: { name: 'مشتریِ آزمونِ بار', phone: t.phone }, lines: [...uniq.values()] },
+    body: { fulfillment: 'pickup', customer: { name: `مشتریِ آزمونِ بار ~S${sh.index}~`, phone: t.phone }, lines: [...uniq.values()] },
+    shop: sh.index,
   });
   const tok = r.json && r.json.order && (r.json.order.token || r.json.order.trackToken);
+  //  دفترِ درستی: سفارشِ پذیرفته، و سرانجامِ نامعلوم (مهلت/۵xx) — سرور باید میانِ این دو باشد
+  const c = state.checkouts[sh.index] ||= { ok: 0, unknown: 0 };
+  if (tok) c.ok++; else if (r.err || r.status >= 500) c.unknown++;
   if (tok) { const a = orders.get(sh.slug) || []; a.push(tok); if (a.length > 200) a.shift(); orders.set(sh.slug, a); }
   return r;
 }
 const SCENARIO = {
-  'store.home': () => { const sh = storeShop(); return hit('store.home', 'GET', `/api/store/${sh.slug}`); },
-  'store.products': () => { const sh = storeShop(); return hit('store.products', 'GET', `/api/store/${sh.slug}/products`); },
-  'store.search': () => { const sh = storeShop(); return hit('store.search', 'GET', `/api/store/${sh.slug}/products?q=${encodeURIComponent(pick(sh.terms))}`); },
-  'store.product': () => { const sh = storeShop(); return hit('store.product', 'GET', `/api/store/${sh.slug}/products/${encodeURIComponent(pick(sh.products).id)}`); },
+  'store.home': () => { const sh = storeShop(); return hit('store.home', 'GET', `/api/store/${sh.slug}`, { shop: sh.index }); },
+  'store.products': () => { const sh = storeShop(); return hit('store.products', 'GET', `/api/store/${sh.slug}/products`, { shop: sh.index }); },
+  'store.search': () => { const sh = storeShop(); return hit('store.search', 'GET', `/api/store/${sh.slug}/products?q=${encodeURIComponent(pick(sh.terms))}`, { shop: sh.index }); },
+  'store.product': () => { const sh = storeShop(); return hit('store.product', 'GET', `/api/store/${sh.slug}/products/${encodeURIComponent(pick(sh.products).id)}`, { shop: sh.index }); },
   'store.checkout': () => checkout(),
   'store.track': () => {
     const sh = pick(checkoutShops);
     const a = orders.get(sh.slug);
     if (!a || !a.length) return checkout(sh);
-    return hit('store.track', 'GET', `/api/store/${sh.slug}/orders/${encodeURIComponent(pick(a))}`);
+    return hit('store.track', 'GET', `/api/store/${sh.slug}/orders/${encodeURIComponent(pick(a))}`, { shop: sh.index });
   },
   'sync3.push': () => withDevice((d) => push(d, rnd() < 0.1)),
   'sync3.pull': () => withDevice((d) => pull(d)),
   'desk.list': () => {
     const sh = rnd() < 0.6 ? pick(checkoutShops) : pick(shops);
-    return hit('desk.list', 'GET', `/api/shop/orders?tab=${pick(['new', 'preparing', 'done'])}&limit=50`, { token: sh.token });
+    return hit('desk.list', 'GET', `/api/shop/orders?tab=${pick(['new', 'preparing', 'done'])}&limit=50`, { token: sh.token, shop: sh.index });
   },
-  'desk.summary': () => hit('desk.summary', 'GET', '/api/shop/orders/summary', { token: pick(checkoutShops).token }),
+  'desk.summary': () => { const sh = pick(checkoutShops); return hit('desk.summary', 'GET', '/api/shop/orders/summary', { token: sh.token, shop: sh.index }); },
   'auth.login': () => {
     const sh = pick(shops);
     return hit('auth.login', 'POST', '/api/auth/login', {
@@ -301,6 +327,11 @@ const SCENARIO = {
     return r;
   },
 };
+const kit = scaleKit({ hit, rnd, pick, int, hlc, state, withDevice, retry: CHECK });
+for (const [k, fn] of Object.entries(kit.SCENARIOS)) {
+  //  بی `--check` push/pull ِ همیشگی همان می‌مانند (عددِ نمایه‌های پیشین هم‌سنج بماند)؛ با آن، همه از راهِ دفتر
+  if (!SCENARIO[k] || CHECK) SCENARIO[k] = fn;
+}
 
 // ── زمان‌بندِ بارِ باز ──
 const inflight = new Set();
@@ -315,7 +346,8 @@ async function runPhases(phases) {
   for (const [pi, ph] of phases.entries()) {
     if (rec) rec.phase = pi;
     const next = weighted(ph.mix || MIX);
-    if (ph.stampede) for (const d of devices) launch(async () => { if (d.busy) return; d.busy = true; try { await push(d, true, 'sync3.pushLarge'); await pull(d); } finally { d.busy = false; } });
+    if (ph.stampede === 'outage') for (const d of devices) launch(() => kit.outage(d));
+    else if (ph.stampede) for (const d of devices) launch(async () => { if (d.busy) return; d.busy = true; try { await push(d, true, 'sync3.pushLarge'); await pull(d); } finally { d.busy = false; } });
     const t0 = performance.now();
     let sent = 0;
     for (;;) {
@@ -356,11 +388,24 @@ function report(r, server) {
   }
   const gcd = server.filter((s) => s.gc);
   const knee = r.phases ? kneeOf(r) : null;
+  //  گروهِ مسیرها (p50/p95/p99 ِ همهٔ درخواست‌های گروه، نه میانگینِ مسیرها)؛ ۴۲۹ و ۵xx جدا
+  const groups = {};
+  for (const [label, e] of r.by.entries()) {
+    const g = groupOf(label);
+    const x = groups[g] ||= { lat: [], errors: 0, r429: 0, r5xx: 0 };
+    for (const v of e.lat) x.lat.push(v);   //  نه `push(...lat)`: soak ِ بلند ده‌ها هزار عدد دارد
+    x.errors += e.errors;
+    for (const [c, n] of Object.entries(e.codes)) { if (c === '429') x.r429 += n; if (/^5/.test(c)) x.r5xx += n; }
+  }
+  for (const [g, x] of Object.entries(groups)) {
+    const s = summarize(x.lat);
+    groups[g] = { ...s, rps: r1(s.n / durSec), errorPct: r1((x.errors / s.n) * 100), r429Pct: r1((x.r429 / s.n) * 100), r5xx: x.r5xx };
+  }
   const out = {
     profile: r.name, durationSec: r1(durSec), scheduled: r.scheduled, dropped: r.dropped, generatorLagMaxMs: r1(r.lagMaxMs),
     ...(r.noTicket ? { noTicket: r.noTicket } : {}), ...(r.generatorErrors ? { generatorErrors: r.generatorErrors, generatorError: r.generatorError } : {}),
     total: { ...summarize(all), rps: r1(all.length / durSec), errors: Object.values(endpoints).reduce((s, e) => s + e.errors, 0) },
-    endpoints, windowSec: win, drift, driftBy,
+    endpoints, groups, windowSec: win, drift, driftBy,
     server: {
       samples: server,
       rssMaxMB: Math.max(...server.map((s) => s.rssMB)), heapMaxMB: Math.max(...server.map((s) => s.heapMB)),
@@ -383,6 +428,11 @@ function report(r, server) {
  *  scrypt ِ p=5 و push ِ بزرگ ِ ۲۰۰ تا ۵۰۰ op، PERF-LOAD «مانده» ۱ و ۲) که جدا نشان داده می‌شوند.
  */
 const KNEE_EXEMPT = new Set(['auth.login', 'sync3.pushLarge']);
+const GROUP_OF = Object.freeze({ 'store.home': 'store.browse', 'store.products': 'store.browse', 'store.search': 'store.browse', 'store.product': 'store.browse',
+  'xt.probe': 'store.browse', 'store.checkout': 'store.order', 'store.track': 'store.order', 'desk.list': 'owner.desk', 'desk.summary': 'owner.desk',
+  'sync3.push': 'sync.push', 'sync3.edit': 'sync.push', 'sync3.stock': 'sync.push', 'sync3.customer': 'sync.push', 'sync3.pushLarge': 'sync.pushLarge',
+  'sync3.pushOutage': 'sync.outage', 'sync3.pullOutage': 'sync.outage', 'sync3.pull': 'sync.pull' });
+const groupOf = (label) => GROUP_OF[label] || (label.startsWith('admin.') ? 'admin' : label.startsWith('held.') ? 'held' : label.startsWith('auth.') ? 'auth' : label);
 const KNEE_GROUPS = Object.freeze({
   'store.read': ['store.home', 'store.products', 'store.search', 'store.product'],
   'store.checkout': ['store.checkout'], 'store.track': ['store.track'], 'sync3.push': ['sync3.push'], 'sync3.pull': ['sync3.pull'],
@@ -432,7 +482,7 @@ function evaluate(o, def) {
   if (def.overload) {
     //  PERF-04: زیرِ فشار فقط پاسخِ کنترل‌شده (۲xx، ۴۲۹، ۵۰۳) — نه ۵۰۰، نه بی‌پاسخی، نه اتصالِ بریده
     for (const [label, e] of Object.entries(o.endpoints)) {
-      const bad = Object.entries(e.codes).filter(([c]) => !/^(2\d\d|429|503)$/.test(c));
+      const bad = Object.entries(e.codes).filter(([c]) => !/^(2\d\d|429|503)(:|$)/.test(c));
       if (bad.length) fails.push(`${label}: پاسخِ کنترل‌نشده ${bad.map(([c, n]) => `${c}×${n}`).join('، ')}`);
     }
     if (!o.recovery || !o.recovery.ok) fails.push(`بازگشت پس از فشار: ${o.recovery ? o.recovery.detail : 'سنجیده نشد'}`);
@@ -458,9 +508,14 @@ function print(o, fails) {
   for (const [label, e] of Object.entries(o.endpoints)) {
     console.log(`  ${label.padEnd(18)} ${pad(e.n, 6)} ${pad(e.rps, 6)} ${pad(e.p50, 7)} ${pad(e.p95, 7)} ${pad(e.p99, 7)} ${pad(e.max, 7)}  ${e.errors ? `${e.errors} (${e.firstError})` : '0'}`);
   }
+  console.log(`  گروه‌ها: ${Object.entries(o.groups).map(([g, x]) => `${g} ${x.n}× p50 ${x.p50} p95 ${x.p95} p99 ${x.p99}${x.errorPct ? ` خطا ${x.errorPct}%` : ''}${x.r429Pct ? ` ۴۲۹ ${x.r429Pct}%` : ''}`).join(' | ')}`);
   const s = o.server;
   console.log(`  سرور: RSS ≤ ${s.rssMaxMB}MB، heap ≤ ${s.heapMaxMB}MB، heap پس از GC ${s.heapAfterGcStartMB} ⇐ ${s.heapAfterGcEndMB}MB، CPU ≤ ${s.cpuMaxPct}%، حلقهٔ رویداد ≤ ${s.loopMaxMs}ms، استخر ≤ ${s.poolTotalMax} اتصال، صفِ انتظار ≤ ${s.poolWaitingMax}، اتصالِ پشتِ قفل ≤ ${s.pgLockWaitMax}، idle-in-tx ≤ ${s.pgIdleInTxMax}، دروازهٔ push: منتظر ≤ ${s.gateWaitingMax}، در کار ≤ ${s.gateInflightMax}`);
   if (o.drift.length > 1) console.log(`  p95 در هر ${o.windowSec}s: ${o.drift.map((w) => w.p95).join(' ')}`);
+  if (o.queries) {
+    console.log('  پرس‌وجوهای پرهزینه (کلِ ms، بار، میانگین، بیشینه):');
+    for (const x of o.queries.slice(0, 12)) console.log(`   ${pad(Math.round(x.totalMs), 8)} ${pad(x.calls, 7)} ${pad(x.meanMs, 7)} ${pad(x.maxMs, 7)}  ${x.sql.slice(0, 150)}`);
+  }
   if (o.recovery) console.log(`  بازگشت: ${o.recovery.ok ? '✅' : '❌'} ${o.recovery.detail}`);
   if (o.steps) {
     console.log(`  پله‌ها (خواسته ⇒ رسیده/s، p95 ِ همه، بدترین مسیر، خطا [+استثنا]، جاافتاده؛ p95 ِ گروه‌ها):`);
@@ -499,10 +554,11 @@ genLoop.enable();
 let failed = false, invalid = false;
 
 for (const defs of groups.values()) {
-  const checkoutShopsN = Math.min(SHOPS, 4);
+  const checkoutShopsN = CHECKOUT_SHOPS;
   const phonesPerShop = Math.max(3, Math.ceil((plannedCheckouts(defs) * 1.3 + checkoutShopsN * 4) / checkoutShopsN / 9));
   const serverEnv = { ...(CLUSTER ? { CLUSTER_ENABLED: 1 } : {}), ...(defs[0].serverEnv || {}) };
-  const srv = startServer({ db: DB, shops: SHOPS, scale: SCALE, smallScale: SMALL_SCALE, checkoutShops: checkoutShopsN, phonesPerShop, serverEnv });
+  const srv = startServer({ db: DB, shops: SHOPS, scale: SCALE, smallScale: SMALL_SCALE, checkoutShops: checkoutShopsN, phonesPerShop, serverEnv,
+    queryStats: QSTATS, setupPar: SETUP_PAR });
   const tReady = performance.now();
   const ready = await srv.ready;
   base = ready.base;
@@ -513,6 +569,8 @@ for (const defs of groups.values()) {
   const servers = [srv, ...followers];
   shops = ready.shops;
   checkoutShops = shops.slice(0, checkoutShopsN);
+  storeShops = shops.slice(0, Math.max(STORE_SHOPS, checkoutShopsN));
+  state.admin = ready.admin || '';
   for (const sh of checkoutShops) for (const t of sh.tickets) t.used = 0;
   devices = shops.flatMap((sh) => Array.from({ length: DEVICES }, (_, k) => ({ shop: sh, id: `ld-${sh.index}-${k}`, cursor: 0, busy: false, wall: Date.now() })));
   orders.clear();
@@ -527,23 +585,30 @@ for (const defs of groups.values()) {
   const must = (r, what) => { if (!r || r.status < 200 || r.status >= 300) throw new Error(`${what}: ${r ? `${r.status || r.err} ${JSON.stringify(r.json).slice(0, 300)}` : 'بی پاسخ'}`); return r; };
   const login = async (sh, deviceId) => must(await hit('auth.login', 'POST', '/api/auth/login', {
     body: { identifier: sh.email, password: sh.password, app: 'shop', device: { deviceId, name: 'آزمونِ بار', platform: 'test' } } }), 'ورود').json;
+  //  چند دکان با هم (قفلِ هر دکان جداست؛ ترتیبِ کارِ هر دستگاه همان)
+  const parallel = async (xs, fn) => { for (let i = 0; i < xs.length; i += SETUP_PAR) await Promise.all(xs.slice(i, i + SETUP_PAR).map(fn)); };
   //  هر دستگاه نشستِ خودش را دارد (همان برنامهٔ واقعی) — توکنِ یک دستگاه برای دستگاهِ دیگر نیست
-  for (const d of devices) d.token = (await login(d.shop, d.id)).accessToken;
+  await parallel(devices, async (d) => { d.token = (await login(d.shop, d.id)).accessToken; });
   wstep(`${devices.length} نشستِ دستگاه`);
   let histOps = 0;
-  for (const sh of shops) {
+  await parallel(shops, async (sh) => {
     const d = { shop: sh, id: `lh-${sh.index}`, cursor: 0, busy: false, wall: Date.now() - 3_600_000 };
     d.token = (await login(sh, d.id)).accessToken;
     const target = sh.index === 0 ? HISTORY : Math.min(150, HISTORY);
     for (let n = 0; n < target;) {
-      const r = must(await push(d, true), 'تاریخچهٔ v3');
+      //  `--check`: تاریخچه هم در دفتر (همان op ها در pull ِ دستگاه‌ها سنجیده می‌شوند)
+      const r = must(CHECK ? await kit.pushUnits(d, kit.sales(d, int(45, 60)), 'sync3.pushLarge') : await push(d, true), 'تاریخچهٔ v3');
       n += r.ops; histOps += r.ops;
     }
-  }
+    //  واحدهایی که در ۵۰۰ op ِ آخر جا نشدند هم بروند (وگرنه در دفتر «نفرستاده» می‌مانند)
+    while (d.queue && d.queue.length) histOps += must(await kit.pushUnits(d, [], 'sync3.pushLarge'), 'تاریخچهٔ v3').ops;
+  });
   wstep(`تاریخچهٔ v3 (${histOps} op)`);
-  for (const d of devices) for (let i = 0; i < 100; i++) { const r = must(await pull(d), 'pull ِ آغاز'); if (!r.json.has_more) break; }
+  const pullFn = CHECK ? kit.pull : pull;
+  await parallel(devices, async (d) => { for (let i = 0; i < 100; i++) { const r = must(await pullFn(d), 'pull ِ آغاز'); if (!r.json.has_more) break; } });
   wstep('همهٔ دستگاه‌ها تا سرِ دفتر');
-  for (const sh of shops) for (let k = 0; k < 2; k++) {
+  //  نشست‌های تازه‌سازی از ۲۰ دکانِ نخست بس است (هر ورود یک scrypt ِ p=5)
+  for (const sh of shops.slice(0, 20)) for (let k = 0; k < 2; k++) {
     const j = await login(sh, `load-refresh-${sh.index}-${k}`);
     if (!j.refreshToken) throw new Error('پاسخِ ورود refreshToken نداشت');
     sessions.push({ refreshToken: j.refreshToken });
@@ -551,7 +616,7 @@ for (const defs of groups.values()) {
   for (const sh of checkoutShops) for (let k = 0; k < 3; k++) must(await checkout(sh), 'سفارشِ آغاز');
   if (!orders.size) throw new Error('پاسخِ سفارش توکنِ پیگیری نداشت');
   wstep('نشست‌ها و سفارش‌های آغاز');
-  if (WARMUP > 0) await runPhases([{ sec: WARMUP, rps: RATE }]);
+  if (WARMUP > 0) await runPhases([{ sec: WARMUP, rps: RATE, mix: defs[0].phases[0].mix }]);
   setup.warmupMs = Math.round(performance.now() - tw);
   setup.v3HistoryOps = histOps;
   result.setups.push(setup);
@@ -565,6 +630,7 @@ for (const defs of groups.values()) {
       ms.forEach((m, inst) => samples.push({ t, ...(servers.length > 1 ? { inst } : {}), ...m.stats }));
     };
     await Promise.all(servers.map((x) => x.ask({ type: 'stats' })));   //  پنجرهٔ CPU/حلقه از همین لحظه
+    if (QSTATS) await srv.ask({ type: 'qstats', reset: true });
     genLoop.reset();
     const loadStart = os.loadavg().map(r1);
     rec = newRec(def.name);
@@ -605,6 +671,7 @@ for (const defs of groups.values()) {
     o.loadAvgStart = loadStart; o.loadAvgEnd = os.loadavg().map(r1);
     o.generatorLoopMaxMs = r1(genLoop.max / 1e6);
     if (!/^pglite:/i.test(DB)) o.dbBytes = (await srv.ask({ type: 'dbsize' })).bytes;
+    if (QSTATS) o.queries = (await srv.ask({ type: 'qstats' })).top;
     rec = null;
     const fails = evaluate(o, def);
     o.budgetFails = fails;
@@ -615,6 +682,29 @@ for (const defs of groups.values()) {
     print(o, fails);
     if (JSON_OUT) fs.writeFileSync(JSON_OUT, JSON.stringify(result, null, 2));
   }
+  if (CHECK) {
+    //  درستی زیرِ بار: صف‌ها خالی، هر دستگاه تا سرِ دفتر، سپس `load-check.js` روی همان پایگاه (درونِ سرورِ آزمون)
+    const td = performance.now();
+    const drained = await kit.drain({ par: SETUP_PAR * 2 });
+    //  پوشهٔ موقتِ یکتا (mkdtemp) و ساختنِ انحصاری با ۰۶۰۰: نامِ پیش‌بینی‌پذیر در tmp راهِ symlink است (CodeQL ۲۹۳)
+    const tmpDir = LEDGER_OUT ? null : fs.mkdtempSync(path.join(os.tmpdir(), 'load-ledger-'));
+    const file = LEDGER_OUT || path.join(tmpDir, 'ledger.json');
+    //  کدهای پاسخِ همهٔ نمایه‌ها (فقط ۵۰۳ ِ `db_busy` ِ کنترل‌شده پذیرفته است)
+    const http = {};
+    for (const o of result.profiles) for (const [label, e] of Object.entries(o.endpoints)) for (const [c, n] of Object.entries(e.codes)) (http[label] ||= {})[c] = (http[label][c] || 0) + n;
+    fs.writeFileSync(file, JSON.stringify({ ...kit.ledger(), http, checkouts: state.checkouts, drained }), tmpDir ? { flag: 'wx', mode: 0o600 } : undefined);
+    const res = await srv.ask({ type: 'check', ledger: file });
+    if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
+    const check = { drain: { ...drained, ms: Math.round(performance.now() - td) }, ...(res.check || { ok: false, error: res.error || 'بی پاسخ' }) };
+    result.check = check;
+    console.log(`\n── درستی پس از بار (پایان‌دادنِ صف‌ها: ${drained.pushes} push، ${drained.pulls} pull، ${drained.left} مانده، ${check.drain.ms}ms)`);
+    for (const c of check.checks || []) {
+      console.log(`  ${c.ok ? '✅' : '❌'} ${c.name}: ${c.detail}`);
+      if (!c.ok) for (const x of c.samples || []) console.log(`       ${x}`);
+    }
+    if (check.error) console.log(`  ❌ ${check.error}`);
+    if (!check.ok) failed = true;
+  }
   for (const x of [...followers, srv]) {
     x.child.removeAllListeners('exit');
     await new Promise((resolve) => { x.child.once('exit', resolve); x.child.send({ type: 'stop' }); setTimeout(() => { x.child.kill('SIGKILL'); resolve(); }, 15000).unref(); });
@@ -622,4 +712,4 @@ for (const defs of groups.values()) {
 }
 
 if (JSON_OUT) fs.writeFileSync(JSON_OUT, JSON.stringify(result, null, 2));
-process.exit(invalid ? 3 : (failed && BUDGET_ON ? 1 : 0));
+process.exit(invalid ? 3 : ((failed && BUDGET_ON) || (CHECK && result.check && !result.check.ok) ? 1 : 0));

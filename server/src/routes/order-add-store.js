@@ -30,7 +30,8 @@ router.post(PATH, async (req, res) => {
   const out = await add.add(store, req.params.token, {
     key, body: req.body, ticket: req.get('x-store-ticket') || '', session: req.get('x-store-session') || '',
   });
-  const order = await sf.track(store, req.params.token);
+  //  همان نمای پیگیری (`lib/store-order-view.js`): صفحه با همین پاسخ دوباره می‌کشد
+  const order = await require('../lib/store-order-view').customerOrder(store, req.params.token);
   if (out.replayed) res.set('Idempotent-Replayed', 'true');
   res.status(out.replayed ? 200 : 201).json({ added: out.added, replayed: out.replayed, order });
 });

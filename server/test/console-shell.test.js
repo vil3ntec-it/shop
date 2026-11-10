@@ -199,6 +199,39 @@ test('پرچمِ شناخته: مقدارِ هم‌نوع و scope ِ خودش؛
   }
 });
 
+/*
+ *  ⛔ «همه روشن» ِ ویترین (`web-store-allflags.mjs`): ۴۰ کلیدِ ویترین، سفارشِ آنلاین و مشتری که کد می‌خواند در کاتالوگ نبود ⇒ زبانهٔ
+ *  «پرچم‌ها» و `E2E_FLAGS_ON=all` نمی‌دیدندشان و «"true"» ِ رشته‌ای بی‌صدا نوشته می‌شد و هیچ اثری نداشت.
+ */
+test('کاتالوگ: هر پرچمِ ویترین/سفارش/گفت‌وگو که کد می‌خواند شناخته، دکانی و خاموش است؛ «"true"» ِ رشته‌ای رد', async () => {
+  const fs = require('fs');
+  const path = require('path');
+  const { KNOWN } = require('../src/routes/admin-flags');
+  const { RESERVED } = require('../src/lib/live-config');
+  const RETIRED = ['shop.orders.ledger'];   //  `lib/order-ledger.js`: «دیگر خوانده نمی‌شود» (فقط کفِ تحویل هنگامِ راه‌اندازی، همان shop.catalog)
+  const fam = (k) => /^shop\.(storefront|chat|orders)(\.[a-z_]+)*$/.test(k)
+    || ['shop.catalog', 'shop.image_bank', 'shop.customer_notify', 'shop.delivery_customer_view'].includes(k);
+  const used = new Set();
+  const walk = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const f = path.join(d, e.name);
+      if (e.isDirectory()) walk(f);
+      else if (e.name.endsWith('.js')) for (const m of fs.readFileSync(f, 'utf8').matchAll(/['"`](shop\.[a-z_]+(?:\.[a-z_]+)*)['"`]/g)) used.add(m[1]);
+    }
+  };
+  walk(path.join(__dirname, '..', 'src'));
+  walk(path.join(__dirname, '..', 'public', 'store'));
+  const want = [...used].filter((k) => fam(k) && !RESERVED.includes(k) && !RETIRED.includes(k));
+  assert.ok(want.length >= 50, `فقط ${want.length} کلید پیدا شد`);
+  assert.deepEqual(want.filter((k) => !KNOWN.some((x) => x.key === k)).sort(), [], 'کلیدِ خوانده‌شده بیرون از کاتالوگ');
+  for (const k of KNOWN.filter((x) => fam(x.key))) assert.deepEqual([k.key, k.scope, k.default], [k.key, 'shop', false]);
+  const sup = await login('malek');
+  const r = await h.put('/api/admin/flags', { scope: 'all', key: 'shop.storefront.recent', value: 'true', reason: 'آزمونِ نوع' }, { token: sup });
+  assert.equal(r.status, 400, JSON.stringify(r.body));
+  assert.equal(r.body.error.code, 'bad_flag_value');
+  assert.equal((await one(`SELECT COUNT(*)::int n FROM live_config WHERE key='shop.storefront.recent'`)).n, 0);
+});
+
 /* ── ۴) تنظیماتِ مرکزی با «پیشین ⇒ تازه» ─────────────────────────── */
 
 test('PATCH /config ⇒ سابقه «پیشین ⇒ تازه» و دلیل را دارد', async () => {

@@ -15,7 +15,8 @@
  * `GET /api/admin/backups` آخرینش را نشان می‌دهند؛ تمرینِ ناموفق ⇒ «سلامت» زرد تا تمرینِ موفقِ بعدی.
  *
  * خروجی فقط عدد است (شمار، جمع، زمان) — بی هیچ دادهٔ دکان. کدِ خروج: ۰ برابر و در هدفِ D-24، ۱ نابرابر یا خطا،
- * ۲ برابر ولی بیرون از هدف (RPO > `BACKUP_RPO_HOURS` ۲۴، RTO > `BACKUP_RTO_HOURS` ۱۲، یا سنِ پشتیبان نامعلوم).
+ * ۲ برابر ولی بیرون از هدف (RPO > `BACKUP_RPO_HOURS` ۲۴، RTO > `BACKUP_RTO_HOURS` ۱۲، یا سنِ پشتیبان نامعلوم)، یا (F0-28)
+ * برابر ولی رازهای مهرشده بی BACKUP_SECRETS_KEY باز نشدند؛ پاکتِ دست‌خورده یا کلیدِ دیگر ⇒ ۱.
  * ⛔ روی دیتابیسِ زنده نمی‌نویسد؛ پشتیبانِ PGlite در حافظه برمی‌گردد. پشتیبانِ رمزدار BACKUP_PASSPHRASE
  *    همان سرور را می‌خواهد (از محیط؛ هرگز در خطِ فرمان).
  */
@@ -64,6 +65,10 @@ async function main() {
       console.log(`✖ ${r.restore.diffs.length} تفاوت با manifest:`);
       for (const d of r.restore.diffs.slice(0, 30)) console.log(`   ${d.part} ${d.key}: ${d.expected} ⇒ ${d.actual}`);
     }
+    if (r.secrets) {
+      if (r.secrets.ok) console.log(`✔ ${r.secrets.unsealed} رازِ مهرشده با BACKUP_SECRETS_KEY باز شد؛ کلیدِ مجوز: ${r.secrets.licenseKey === 'same' ? 'همان کلیدِ پیشین' : r.secrets.licenseKey}`);
+      else console.log(`✖ رازهای پشتیبان: ${r.secrets.message || `کلیدِ مجوز ${r.secrets.licenseKey}`}`);
+    }
     if (r.migration) {
       console.log(`مهاجرت روی کپی: ${r.migration.applied.length ? r.migration.applied.join('، ') : 'هیچ مهاجرتِ تازه‌ای'}`);
       if (r.migration.added.length) console.log(`   تازه: ${r.migration.added.map((x) => x.key).slice(0, 20).join('، ')}`);
@@ -71,6 +76,8 @@ async function main() {
       else for (const d of r.migration.diffs.slice(0, 30)) console.log(`   ✖ ${d.part} ${d.key}: ${d.expected} ⇒ ${d.actual}`);
     }
   }
+  //  F0-28: پاکتِ رد‌شده ⇒ ۱؛ بی کلید (داده برابر، رازها مهر) ⇒ ۲
+  if (r.secrets && !r.secrets.ok) return r.secrets.missingKey && r.ok ? 2 : 1;
   return r.ok ? (r.withinTargets ? 0 : 2) : 1;
 }
 

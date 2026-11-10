@@ -18,10 +18,11 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- *  هویتِ دستگاهِ آیفون روی شبیه‌ساز (کارِ `ios-app`؛ روی لینوکس فقط کامپایل می‌شود): آینهٔ کلیددان واقعاً «پس از نخستین
- *  بازگشایی، فقط همین دستگاه» است (نه ردهٔ جابه‌جاشونده)، پروندهٔ نشان و پوشه‌اش `NSURLIsExcludedFromBackupKey` دارند و
- *  بیرون از `filesDir` اند، و یک چرخشِ کامل روی NSUserDefaults و کلیددان و پروندهٔ واقعی. جدولِ تصمیم و بسته شدن پس از هر
- *  نوشتن روی لینوکس: ‎jvmTest/…/identity/DeviceIdentityJvmTest‎. هر چه دست خورد سرِ جایش برمی‌گردد (آزمون‌های دیگرِ همین فرآیند).
+ *  هویتِ دستگاهِ آیفون روی شبیه‌ساز (کارِ `ios-app`؛ روی لینوکس فقط کامپایل می‌شود): درخواستِ `SecItemAdd` ِ آینهٔ کلیددان
+ *  «پس از نخستین بازگشایی، فقط همین دستگاه» است (نه ردهٔ جابه‌جاشونده)، پروندهٔ نشان و پوشه‌اش `NSURLIsExcludedFromBackupKey`
+ *  دارند و بیرون از `filesDir` اند، و یک چرخشِ کامل روی NSUserDefaults و پروندهٔ واقعی. کلیددان همان API ِ برنامه (`Keychain`)
+ *  است روی کلیددانِ درونِ حافظهٔ همین فرآیند: test.kexe کلیددانِ iOS ندارد (OSStatus -25291، ‎docs/IOS-PLAN-fa.md‎). جدولِ
+ *  تصمیم و بسته شدن پس از هر نوشتن روی لینوکس: ‎jvmTest/…/identity/DeviceIdentityJvmTest‎. هر چه دست خورد سرِ جایش برمی‌گردد.
  */
 class DeviceIdentityIosTest {
 
@@ -30,8 +31,9 @@ class DeviceIdentityIosTest {
     val uid = "ios-test-identity-0001"
     IosDeviceIdentity.Store.putKeychain(uid)
     assertEquals(Probe.Value(uid), IosDeviceIdentity.Store.keychain())
-    assertTrue(Keychain.storedAs(K.KEYCHAIN_ACCOUNT, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly))
-    assertFalse(Keychain.storedAs(K.KEYCHAIN_ACCOUNT, kSecAttrAccessibleAfterFirstUnlock))
+    //  همان واژه‌نامه‌ای که `Keychain.add` (زیرِ `putKeychain` ⇐ `Keychain.put`) به `SecItemAdd` می‌دهد
+    assertTrue(Keychain.addRequestIs(K.KEYCHAIN_ACCOUNT, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly))
+    assertFalse(Keychain.addRequestIs(K.KEYCHAIN_ACCOUNT, kSecAttrAccessibleAfterFirstUnlock))
 
     IosDeviceIdentity.Store.putMarker(uid)
     assertEquals(Probe.Value(uid), IosDeviceIdentity.Store.marker())
@@ -80,7 +82,7 @@ class DeviceIdentityIosTest {
   }
 
   /**
-   *  همان انبارِ برنامه (`IosDeviceIdentity.Store`: کلیددان و پروندهٔ واقعی) با suiteهای جدا (`ios-test-…`) تا تنظیم‌های
+   *  همان انبارِ برنامه (`IosDeviceIdentity.Store`: `Keychain` و پروندهٔ واقعی) با suiteهای جدا (`ios-test-…`) تا تنظیم‌های
    *  واقعیِ همین فرآیند دست نخورند؛ «قفل نیست» چون فرآیندِ آزمون UIApplication ندارد.
    */
   private class TestSuites : DeviceIdentityGuard.Io by IosDeviceIdentity.Store {
@@ -100,16 +102,17 @@ class DeviceIdentityIosTest {
     fun clearAll() = (K.DEVICE_ONLY + K.V1_SUITE).forEach { clear(it) }
   }
 
-  /** کلیددانِ واقعی (نه درونِ حافظهٔ آزمونِ سرتاسری) و بازگرداندنِ آینه و پروندهٔ پیشینِ همین فرآیند */
+  /**
+   *  کلیددانِ تازهٔ درونِ حافظه برای همین آزمون (نه کلیددانِ آزمونِ سرتاسری، نه کلیددانِ iOS که test.kexe ندارد: پیش‌تر
+   *  `Keychain.read` همین‌جا KeychainException می‌داد) و بازگرداندنِ کلیددان و پروندهٔ نشانِ پیشینِ همین فرآیند
+   */
   private fun keepingRealState(body: () -> Unit) {
     val memory = Keychain.memory
-    Keychain.memory = null
-    val keychain = Keychain.read(K.KEYCHAIN_ACCOUNT)
+    Keychain.memory = HashMap()
     val marker = IosDeviceIdentity.markerFile().takeIf { it.exists() }?.readBytes()
     try {
       body()
     } finally {
-      if (keychain != null) Keychain.put(K.KEYCHAIN_ACCOUNT, keychain) else Keychain.delete(K.KEYCHAIN_ACCOUNT)
       if (marker != null) IosDeviceIdentity.markerFile().writeBytes(marker) else IosDeviceIdentity.markerFile().delete()
       Keychain.memory = memory
     }

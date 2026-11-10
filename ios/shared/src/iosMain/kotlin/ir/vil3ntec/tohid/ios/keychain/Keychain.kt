@@ -7,6 +7,7 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.value
 import platform.CoreFoundation.CFDictionaryAddValue
 import platform.CoreFoundation.CFDictionaryCreateMutable
+import platform.CoreFoundation.CFDictionaryGetValue
 import platform.CoreFoundation.CFMutableDictionaryRef
 import platform.CoreFoundation.CFRelease
 import platform.CoreFoundation.CFTypeRef
@@ -49,8 +50,9 @@ object Keychain {
   const val SERVICE = "ir.vil3ntec.tohid"
 
   /**
-   *  فقط آزمونِ سرتاسریِ شبیه‌ساز (گامِ ۸، `CoreFlowsE2EIosTest`): فرآیندِ بی بستهٔ آزمون (`test.kexe`) اگر اجازهٔ کلیددان
-   *  نداشت (errSecMissingEntitlement)، کلیددانی درونِ حافظهٔ همان فرآیند. در برنامه همیشه null و هر قلم در کلیددانِ iOS.
+   *  فقط آزمون‌های شبیه‌ساز (`CoreFlowsE2EIosTest`، `DataSafetyIosTest`، `DeviceIdentityIosTest`): فرآیندِ بی بستهٔ آزمون
+   *  (`test.kexe`) کلیددانِ iOS ندارد (OSStatus -25291، حتی با `e2e/test.entitlements`)، پس کلیددانی درونِ حافظهٔ همان فرآیند.
+   *  در برنامه همیشه null و هر قلم در کلیددانِ iOS.
    */
   internal var memory: HashMap<String, ByteArray>? = null
 
@@ -76,13 +78,9 @@ object Keychain {
   /** فقط اگر نیست؛ بود ⇒ false (مقدارِ پیشین دست نمی‌خورد) */
   fun add(account: String, value: ByteArray): Boolean {
     memory?.let { m -> return synchronized(m) { if (account in m) false else { m[account] = value.copyOf(); true } } }
-    val q = query(account)
-    val data = CFBridgingRetain(value.toNSData())
-    CFDictionaryAddValue(q, kSecValueData, data)
-    CFDictionaryAddValue(q, kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)
+    val q = addQuery(account, value)
     val rc = SecItemAdd(q, null)
     CFRelease(q)
-    CFRelease(data)
     return when (rc) {
       errSecSuccess -> true
       errSecDuplicateItem -> false
@@ -104,21 +102,26 @@ object Keychain {
   }
 
   /**
-   *  آیا قلمِ [account] با همین ردهٔ دسترسی (`kSecAttrAccessible`) در کلیددانِ iOS است — آزمونِ شبیه‌ساز
-   *  (`DeviceIdentityIosTest`: آینهٔ هویتِ دستگاه «فقط همین دستگاه» است، نه ردهٔ جابه‌جاشونده). کلیددانِ درونِ حافظه ردی ندارد ⇒ false.
+   *  آیا همان واژه‌نامه‌ای که [add] برای [account] به `SecItemAdd` می‌دهد ردهٔ دسترسیِ (`kSecAttrAccessible`) [accessible] را
+   *  می‌خواهد — آزمونِ شبیه‌ساز (`DeviceIdentityIosTest`: آینهٔ هویتِ دستگاه «فقط همین دستگاه» است، نه ردهٔ جابه‌جاشونده).
+   *  test.kexe کلیددانِ iOS ندارد (OSStatus -25291) ⇒ خودِ درخواستِ برنامه سنجیده می‌شود؛ هیچ قلمی نوشته نمی‌شود.
    */
-  internal fun storedAs(account: String, accessible: CFTypeRef?): Boolean {
-    if (memory != null) return false
-    val q = query(account)
-    CFDictionaryAddValue(q, kSecAttrAccessible, accessible)
-    CFDictionaryAddValue(q, kSecMatchLimit, kSecMatchLimitOne)
-    val rc = SecItemCopyMatching(q, null)
+  internal fun addRequestIs(account: String, accessible: CFTypeRef?): Boolean {
+    val q = addQuery(account, byteArrayOf(0))
+    val asked = CFDictionaryGetValue(q, kSecAttrAccessible)
+    val same = asked != null && asked == accessible
     CFRelease(q)
-    return when (rc) {
-      errSecSuccess -> true
-      errSecItemNotFound -> false
-      else -> throw KeychainException(rc, "جست‌وجوی کلیددان")
-    }
+    return same
+  }
+
+  /** درخواستِ `SecItemAdd` ِ [add]: همان پرسش، داده و «پس از نخستین بازگشایی، فقط همین دستگاه» */
+  private fun addQuery(account: String, value: ByteArray): CFMutableDictionaryRef {
+    val q = query(account)
+    val data = CFBridgingRetain(value.toNSData())
+    CFDictionaryAddValue(q, kSecValueData, data)
+    CFRelease(data)
+    CFDictionaryAddValue(q, kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)
+    return q
   }
 
   private fun query(account: String): CFMutableDictionaryRef {

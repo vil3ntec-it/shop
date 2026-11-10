@@ -117,7 +117,10 @@ await E.step('E2E-DLV-07.views', 'مشتری «تحویل شد» را می‌ب�
   assert.equal(t.status, 'delivered');
   const text = JSON.stringify(t);
   assert.equal(text.includes(placed.code), false, 'کدِ تحویل در صفحهٔ مشتری');
-  assert.equal(/courier|پیکِ دکان|courierId/.test(text), false, `اطلاعاتِ پیک به مشتری رسید: ${text.slice(0, 300)}`);
+  //  E2E_FLAGS_ON: نمای پیکِ DLV-06 (`delivery.carrier: "courier"`، `courierName: null`) و روشِ S71 (`deliveryMethod.method: "shop_courier"`)
+  //  واژهٔ courier را در مقدارِ شمارشی دارند، نه هویتِ پیک ⇒ فقط همین سه کنار می‌روند؛ هر کلید یا مقدارِ دیگرِ «courier» هنوز سرخ است
+  const pub = JSON.stringify(t, (k, v) => ((k === 'courierName' && v === null) || (k === 'carrier' && v === 'courier') || (k === 'method' && v === 'shop_courier') ? undefined : v));
+  assert.equal(/courier|پیکِ دکان|courierId/.test(pub), false, `اطلاعاتِ پیک به مشتری رسید: ${pub.slice(0, 300)}`);
   const det = E.ok(await A.api('GET', `/shop/delivery/orders/${placed.ok.id}`), 'جزئیاتِ تحویل');
   const steps = det.assignments[0].events.map((e) => e.toStatus).filter((s, i, a) => a.indexOf(s) === i);
   assert.deepEqual(steps, ['requested', 'assigned', 'picked_up', 'moving', 'arrived', 'delivered']);

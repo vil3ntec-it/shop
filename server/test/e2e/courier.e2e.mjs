@@ -179,7 +179,9 @@ await E.step('E2E-DLV-07.app', 'پیک شمارهٔ کامل را هرگز و ن
   assert.equal(JSON.stringify(done).includes('خیرخانه'), false, 'نشانی پس از پایان در کارتِ پیک ماند');
   const t = await track(placed.one.token);
   assert.equal(t.status, 'delivered');
-  assert.equal(/courier|پیکِ دوم|courierId/.test(JSON.stringify(t)), false, 'اطلاعاتِ پیک به مشتری رسید');
+  //  E2E_FLAGS_ON: نمای پیکِ DLV-06 (`delivery.carrier: "courier"`، `courierName: null`) و روشِ S71 (`deliveryMethod.method: "shop_courier"`)
+  //  واژهٔ courier را در مقدارِ شمارشی دارند، نه هویتِ پیک ⇒ فقط همین سه کنار می‌روند؛ هر کلید یا مقدارِ دیگرِ «courier» هنوز سرخ است
+  assert.equal(/courier|پیکِ دوم|courierId/.test(JSON.stringify(t, (k, v) => ((k === 'courierName' && v === null) || (k === 'carrier' && v === 'courier') || (k === 'method' && v === 'shop_courier') ? undefined : v))), false, 'اطلاعاتِ پیک به مشتری رسید');
 }, { needs: ['E2E-SYNC-12.courier'] });
 
 await E.step('DEL-02', 'مشتری کمتر می‌دهد ⇐ بی دلیل رد و پیدا در گوشی؛ با دلیل ثبت ⇐ اختلافِ مشتری جدا در پیش‌نمایش، سندِ تسویه و گزارش', async () => {

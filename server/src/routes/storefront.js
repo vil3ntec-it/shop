@@ -38,6 +38,7 @@ const erasure = require('../lib/customer-erasure');
 const { phoneKey } = require('../lib/validate');
 const pay = require('../lib/payment-intents');
 const flow = require('../lib/order-flow');
+const orderView = require('../lib/store-order-view');
 const { sniff } = require('../lib/product-photos');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { reads: replicaReads } = require('../lib/read-replica');
@@ -318,35 +319,8 @@ router.get('/:slug/orders', readLimit, store, async (req, res) => {
 });
 
 router.get('/:slug/orders/:token', readLimit, store, async (req, res) => {
-  //  PAY-21: قصدِ گذشته از زمان پیش از خواندن بسته می‌شود؛ دکمه فقط وقتی همین حالا پرداختنی است
-  //  TEN-03: نخست سنجشِ لینک (نادرست ۴۰۴؛ منقضی/باطل ۴۱۰) — هیچ نوشتنی برای لینکِ ناروا
-  const orderId = await sf.orderIdOfLink(req.store, req.params.token);
-  await pay.refreshOrder(req.store.shop_id, orderId);
-  const order = await sf.track(req.store, req.params.token);
-  //  «پرداخت پس از پذیرش» (lib/order-flow): پیش از قبول یا پس از فاکتورِ نقدی دکمه نیست؛ کارتِ «پرداخت» فقط با تنظیمِ روشن
-  const flowView = await flow.trackView(req.store.shop_id, orderId);
-  order.onlinePay = { available: !flowView.blocked && await pay.orderPayable(req.store.shop_id, orderId) };
-  if (flowView.step !== undefined) order.paymentStep = { ...flowView.step, online: order.onlinePay.available };
-  //  NTF-08: پیگیریِ بازپرداخت — فقط با پرچمِ `shop.orders.refund_tracking` (خاموش ⇒ کلید نیست)
-  const refund = await require('../lib/order-refund-view').viewOf(req.store.shop_id, orderId);
-  if (refund !== undefined) order.refund = refund;
-  //  CHK-24: «ویرایشِ دستورِ تحویل» فقط با پرچمِ `shop.orders.delivery_prefs` (خاموش ⇒ کلید نیست)
-  const prefs = await require('../lib/delivery-prefs').customerPrefs(req.store.shop_id, orderId);
-  if (prefs !== undefined) order.deliveryPrefs = prefs;
-  //  NTF-07/09: گزارشِ مشکل و نظر — فقط با پرچم‌های `shop.orders.issue_reports` / `shop.orders.reviews` (خاموش ⇒ کلید نیست)
-  const issueReports = await require('../lib/order-issues').customerView(req.store.shop_id, orderId);
-  if (issueReports !== undefined) order.issueReports = issueReports;
-  const review = await require('../lib/order-reviews').customerView(req.store.shop_id, orderId, order.status);
-  if (review !== undefined) order.review = review;
-  //  WEB-04: زمانِ تقریبیِ همین سفارش، از نو با هر مرحله — فقط با پرچمِ `shop.storefront.eta` (خاموش ⇒ کلید نیست)
-  const live = await eta.orderEta(req.store, orderId);
-  if (live !== undefined) order.eta = live;
-  //  S71/S72: روش و مسئولِ تحویل و «تغییرِ روش» — فقط با پرچمِ `shop.storefront.delivery_method` (خاموش ⇒ کلید نیست)
-  const method = await require('../lib/order-delivery-method').customerView(req.store, orderId);
-  if (method !== undefined) order.deliveryMethod = method;
-  //  گفت‌وگوی همین سفارش (یک رشته برای هر سفارش) — فقط با پرچمِ `shop.chat` (خاموش ⇒ کلید نیست)
-  if (await require('../lib/shop-chat').flagOf(req.store.shop_id)) order.chat = true;
-  res.json({ order });
+  //  همان نمای پیگیری که هر کارِ مشتری روی سفارش هم با آن پاسخ می‌دهد (`lib/store-order-view.js`)
+  res.json({ order: await orderView.customerOrder(req.store, req.params.token) });
 });
 
 /**
@@ -535,7 +509,8 @@ router.post('/:slug/account/cart/merge', cartStore, syncLimit, customer, async (
 });
 
 router.post('/:slug/orders/:token/cancel', checkoutLimit, store, async (req, res) => {
-  res.json(await sf.cancel(req.store, req.params.token));
+  const out = await sf.cancel(req.store, req.params.token);
+  res.json({ ...out, order: await orderView.customerOrder(req.store, req.params.token) });
 });
 
 //  CHK-24: ویرایشِ دستورِ تحویل تا پیش از ارسال (پرچمِ خاموشِ `shop.orders.delivery_prefs`)
