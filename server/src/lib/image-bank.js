@@ -32,6 +32,7 @@ const { ulid } = require('./ulid');
 const { stripControl } = require('./validate');
 const { ApiError, badRequest, notFound, conflict } = require('../middleware/errors');
 const { parseCsv } = require('./image-bank-csv');   //  CSV ِ ردیف‌های دسته (سقفِ طول، بی نوشتنِ پویا)
+const STUDIO = require('./image-studio');            //  درِ انتشارِ نسخهٔ خودِ دکان: فقط تأییدشده، هرگز تبلیغ
 
 const SHOP_FLAG = 'shop.image_bank';
 const CENTRAL_FLAG = 'image_bank.central';
@@ -582,8 +583,7 @@ async function selectIn(c, shopId, userId, body) {
     const img = await ownImage(c, shopId, str(body.image_id, 40));
     if (!img) throw notFound('عکس پیدا نشد');
     const version = body.version != null ? intIn(body.version, 1, 100000, 0) : Number(img.current_version);
-    const v = await q1(c, 'SELECT 1 FROM image_versions WHERE image_id=$1 AND version=$2', [img.id, version]);
-    if (!v) throw notFound('این نسخه نیست');
+    STUDIO.publishable(await q1(c, 'SELECT review, settings FROM image_versions WHERE image_id=$1 AND version=$2', [img.id, version]));
     Object.assign(row, { image_id: img.id, version, match_status: 'exact' });
   }
   await c.query(
@@ -1159,7 +1159,7 @@ async function reportsList({ status = 'open', limit = 50 } = {}) {
 
 module.exports = {
   SHOP_FLAG, CENTRAL_FLAG, SIZES, DERIV, ROLES, LICENSES, REPORT_KINDS, ROWS_MAX,
-  flagOf, shopEnabled, centralEnabled, imageRow, readFile, fileUrl, putBlob,
+  flagOf, shopEnabled, centralEnabled, imageRow, readFile, fileUrl, putBlob, addVersion, putDerivative, derivativesOf,
   productInput, insertProduct, updateProduct, productOut,
   search, shopUpload, shopCanRead, shopVersion, shopDerivative, shopList, select, selectIn, resolve, propose, report,
   adminUpload, adminPatch, adminVersion, adminDerivative, approve, reject, archive, setSearch, adminDetail, queue,

@@ -163,6 +163,7 @@ const KNOWN = Object.freeze([
     what: 'سیاستِ همان قاعده‌ها؛ هر کلید جدا، نامعتبر ⇒ پیش‌فرض، ۰ = آن قاعده خاموش؛ با `shop.order_risk`' },
   { key: 'shop.visual_search', scope: 'shop', default: false, what: '«جست‌وجو با عکس» ِ کارمند و نمایهٔ هشِ عکسِ کالاها (AI-11)؛ پایهٔ `shop.storefront.visual_search`' },
   { key: 'image_bank.quality', scope: 'shop', default: false, what: 'نشان‌های پیشنهادیِ کیفیت روی عکسِ بانک؛ هرگز رد (IMG-15)' },
+  { key: 'shop.image_studio', scope: 'shop', default: false, what: 'استودیوی عکس روی سرورِ خودمان: صفِ پردازشِ گروهی، خروجی فقط پس از تأییدِ دکان (AI-02/05)؛ با `shop.image_bank`' },
   { key: 'image_bank.resume', scope: 'all', default: false, what: 'ادامهٔ بارگذاریِ دسته‌ایِ بانکِ تصاویر بی فرستادنِ دوبارهٔ همان فایل (IMG-14)' },
   { key: 'pay.hesabpay', scope: 'shop', default: false, what: 'حساب‌پی ِ خودکار با کلیدهای خودِ دکان؛ پول مستقیم به حسابِ دکان، تأیید فقط با webhook' },
   //  ── همگام‌سازیِ دکان (پمپ هیچ‌کدام را نمی‌خواند)

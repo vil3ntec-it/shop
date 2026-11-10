@@ -452,6 +452,8 @@ async function createApp({ runMigrations = true } = {}) {
     //  بانکِ تصاویر (v3 ۳۷) — پشتِ پرچمِ `shop.image_bank`، پیش‌فرض خاموش
     //  IMG-PRO-17: تغییرِ دسته‌ایِ عکسِ کالاها و برگرداندنش — پیش از `/shop/images` (همان پرچم)
     api.use('/shop/images/changes', require('./routes/shop-image-changes'));
+    //  AI-02/AI-05: استودیوی عکس (صفِ پردازشِ محلی، بازبینی) — پیش از `/shop/images`؛ پرچمِ `shop.image_studio`
+    api.use('/shop/images/studio', require('./routes/shop-image-studio'));
     api.use('/shop/images', require('./routes/shop-images'));
     //  تحویل و پیک (۲۲.۲ C) — همان قاعده؛ درهای پیک زیرِ `/courier` (۳.۱۱)
     api.use('/shop/delivery', require('./routes/delivery'));
