@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.sales
 
+import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.SalesEngine.CartLine
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.ui.v3.sales.SalesTestLedger.ledger
@@ -108,5 +109,20 @@ class CartModelTest {
     val capped = CartModel.addCount(ledger, emptyList(), "soap", 5.0)
     assertTrue(capped.capped)
     assertTrue(capped.note!!.isNotBlank())
+  }
+
+  @Test
+  fun `گوشی — متنی که خودش بارکدِ کالاست («12x34») بی پیشوند می‌ماند و کاتالوگ همان کالا را نشان می‌دهد`() {
+    val battery = Product(id = "battery", name = "باتری", unit = "عدد", salePrice = 40.0, barcodes = listOf("12x34"))
+    val p34 = Product(id = "p34", name = "پیچ", unit = "عدد", salePrice = 2.0, barcodes = listOf("34"))
+    val d = ledger.copy(products = ledger.products + battery + p34)
+    val q = ir.vil3ntec.tohid.ui.v3.sales.cart.CatalogModel.query("12x34", d)
+    //  پیش از این (۱۲، «34») ⇒ کاشیِ «پیچ» و هر لمس دوازده تا
+    assertEquals(1.0, q.count, 1e-9)
+    assertEquals("12x34", q.term)
+    assertEquals(2.0, ir.vil3ntec.tohid.ui.v3.sales.cart.CatalogModel.query("2*12x34", d).count, 1e-9)
+    assertEquals(12.0, ir.vil3ntec.tohid.ui.v3.sales.cart.CatalogModel.query("12x35", d).count, 1e-9)
+    val index = ir.vil3ntec.tohid.ui.v3.sales.cart.CatalogModel.index(d)
+    assertEquals(listOf("battery"), ir.vil3ntec.tohid.ui.v3.sales.cart.CatalogModel.items(d, index, "12x34", null, emptyMap()).map { it.id })
   }
 }

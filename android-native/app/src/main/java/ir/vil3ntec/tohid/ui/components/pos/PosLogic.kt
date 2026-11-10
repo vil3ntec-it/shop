@@ -106,7 +106,7 @@ object PosSearch {
   /**
    *  Enter در کادر: بارکدِ کامل ⇐ همان کالا؛ وگرنه پیشنهادِ برجسته
    *  (`matches[hint]`)؛ وگرنه «پیدا نشد». «۳*» پیش از بارکد یا نام ⇐ سه تا
-   *  (`CartQuery`، رقمِ فارسی هم — F0-06).
+   *  (`CartQuery`، رقمِ فارسی هم — F0-06)، مگر خودِ متن بارکدِ کامل باشد («12x34» ⇐ همان کالا، [parse]).
    */
   fun resolve(
     query: String,
@@ -116,7 +116,7 @@ object PosSearch {
     hint: Int,
     packs: ir.vil3ntec.tohid.core.product.PackBarcodes.Index? = null,
   ): PosHit {
-    val parsed = CartQuery.parse(query)
+    val parsed = parse(query, index, packs)
     val code = parsed.term.trim()
     if (code.isEmpty()) return PosHit.None
     //  PRD-04: بارکدِ بسته (فقط کامل) ⇒ «۳*کارتن» = ۳ × ۲۴ دانه؛ همان کد بارکدِ کالا هم ⇒ مبهم
@@ -139,6 +139,17 @@ object PosSearch {
   /** کد **کاملاً** بارکدِ کالاست (رقمِ فارسی هم)، نه نیمه — همان «کاملِ» `BarcodeMatch` */
   fun isItemCode(code: String, index: Map<String, String>): Boolean =
     (BarcodeMatch.find(code, index) as? BarcodeMatch.Hit.Product)?.exact == true
+
+  /** کد کاملاً بارکدِ کالا یا بسته است (بسته‌ای که دو کالا دارند هم — همان «مبهم» ِ `PackBarcodes`) */
+  fun isFullCode(code: String, index: Map<String, String>, packs: ir.vil3ntec.tohid.core.product.PackBarcodes.Index? = null): Boolean =
+    isItemCode(code, index) || (packs != null && (packs.find(code) != null || packs.ambiguous(code)))
+
+  /**
+   *  POS-03 — «۳*کد» ⇐ (۳، «کد»)، مگر خودِ متن بارکدِ کامل باشد («12x34» ⇐ همان کالا، یکی): بارکدِ کامل بر پیشوند پیش
+   *  است، همان `decide` ِ صندوقِ وب. Enter ([resolve])، بسته (`DeskSale.addPack`) و شبکهٔ پیشنهادها همین را می‌خوانند.
+   */
+  fun parse(query: String, index: Map<String, String>, packs: ir.vil3ntec.tohid.core.product.PackBarcodes.Index? = null): CartQuery.Parsed =
+    CartQuery.parse(query) { isFullCode(it, index, packs) }
 }
 
 /** − / تعداد / + روی کاشی، ردیفِ جدول و ردیفِ سبد */

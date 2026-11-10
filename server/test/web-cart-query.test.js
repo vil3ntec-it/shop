@@ -24,6 +24,26 @@ test('پیشوند: همان بردارِ مشترکِ برنامه (رقمِ ف
   for (const c of V.parse) assert.deepEqual(X.parse(c.in), { count: c.count, term: c.term }, JSON.stringify(c.in));
 });
 
+test('بارکدِ کامل بر پیشوند پیش است: همان بخشِ `fullCode` که `PosSearch.parse` ِ برنامه می‌خواند («12x34»)', () => {
+  assert.ok(Array.isArray(V.fullCode) && V.fullCode.length >= 10, `موردها: ${V.fullCode && V.fullCode.length}`);
+  for (const c of V.fullCode) {
+    //  همان `barcodeIndex` ِ صفحه (بارکد و شکلِ رقم‌لاتینش) و `productOf` ِ cart-query.js (trim و رقمِ لاتین)
+    const index = new Set(c.codes.flatMap((k) => [k, X.latinDigits(k)]));
+    const isBarcode = (t) => index.has(X.latinDigits(String(t).trim())) || index.has(String(t).trim());
+    const d = X.decide(c.in, isBarcode);
+    const why = JSON.stringify(c);
+    if (c.count === 1 && c.term === c.in) {
+      assert.deepEqual(d, { kind: 'page' }, why);
+      continue;
+    }
+    assert.deepEqual(X.parse(c.in), { count: c.count, term: c.term }, why);
+    const code = c.term.trim();
+    assert.deepEqual(d, code ? { kind: 'add', count: c.count, code } : { kind: 'wait', count: c.count }, why);
+  }
+  const cases = V.fullCode.filter((c) => c.in === '12x34');
+  assert.ok(cases.some((c) => c.count === 1) && cases.some((c) => c.count === 12), 'هر دو رو ِ «12x34»: بارکدِ کالا و نبودنش');
+});
+
 test('بردار همان موردهای `CartQueryTest` ِ برنامه را دارد', () => {
   const kt = read('android-native/app/src/test/java/ir/vil3ntec/tohid/data/CartQueryTest.kt');
   const pairs = [...kt.matchAll(/CartQuery\.Parsed\(([0-9.]+), "([^"]*)"\), CartQuery\.parse\("([^"]*)"\)/g)];

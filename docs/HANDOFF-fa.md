@@ -54,6 +54,17 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/pos-3` (دو پیگیریِ `claude/pos-2`: بارکدِ کامل پیش از پیشوند در کامپیوتر و گوشی، و POS-04 = نامِ کالا در کادرِ صندوقِ وب؛ روی `claude/pos-2` ‏63a0bbfc؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **«12x34»** — `PosSearch.resolve` (و `DeskSale`: بسته و شبکهٔ پیشنهاد؛ `CatalogModel.query` ِ گوشی؛ شبیه‌سازِ `PosSpeed` ِ کامپیوتر) پیشوند را پیش از
+  بارکدِ کامل می‌خواند ⇒ ۱۲ تا از «34». حالا `CartQuery.parse(query, isCode)` ⇐ `PosSearch.parse`/`isFullCode` (بارکدِ کاملِ کالا یا بسته) همان `decide` ِ وب است؛ بخشِ
+  `fullCode` ِ `cart-query-v1.json` (۱۵ مورد) را `CartQueryVectorsTest` و `web-cart-query.test.js` می‌خوانند؛ JS خودش درست بود (فقط بردار تازه). **POS-04 وب** —
+  `license/catalog-match.js` همزادِ `CatalogMatch` با `text-core.js` و بردارِ `core/test-vectors/catalog-match-v1.json` (۵۳ جست‌وجو، ۲۶ تا از `CatalogMatchTest`؛ ۴۳۲ فاصله)
+  و `CatalogMatchVectorsTest` (jvmTest)؛ پشتِ تنظیمِ خاموشِ همین مرورگر `tohid-pos-name-search-v1` («تنظیمات» ⇐ «دوربین بارکدخوان»): فهرستِ شناورِ ARIA زیرِ کادر، ↑ ↓/Enter/لمس،
+  بارکدِ کامل اول، «۳*نام» با پیشوندِ روشن، افزودن با `addToCart` ِ صفحه. بارکننده `shop-sync.js`، `sw.js` v72، چهار کلیدِ تازهٔ واژه‌نامه (fa/en/ps)، `test:web` + `web-pos-name.mjs`.
+  آزمون (محلی): `web-catalog-match.test.js` ۹/۹، `web-cart-query.test.js` ۹/۹، `web-shop-i18n.test.js` ۱۷/۱۷ (PGlite)؛ `web-pos-name.mjs` ۱۲/۱۲ با axe (روی `claude/pos-2` ۱۱ سرخ)، `web-pos-qty` ۹/۹،
+  `web-shop-i18n.mjs` ۱۸/۱۸، `web-digits`/`web-pos-draft`/`web-beta-channel`/`web-vip-gate`/`web-product-cycle` سبز؛ بردارها جدا با برنامهٔ یک‌بارِ Java ِ JDK 21 هم‌خوان (۲٬۴۰۰ پرس‌وجوی تصادفی هم).
+- نیمه‌کاره: آزمون‌های Kotlin (`CartQueryVectorsTest`، `PosLogicTest`، `CartModelTest`، `CatalogMatchVectorsTest`) فقط CI؛ STATUS: POS-03 و POS-04 همان PARTIAL (گوشیِ واقعی؛ فرهنگِ مترادف OWNER-PENDING 4-1).
+- قدمِ بعدی: CI؛ سنجشِ وب روی گوشیِ واقعی (صفحه‌کلیدِ حرف و لمسِ فهرست)؛ اگر `claude/pos-2` جدا مرج شد، این شاخه روی main بازپایه شود (بخشِ «تازه‌ها» ی جدا دارد).
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/stf-2` (خانوادهٔ STF: STF-04 هویتِ سروریِ کاربرِ صندوق، STF-07 «دیر ثبت‌شده»؛ روی main ‏99036497 (#1026)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: **STF-04/S46** PIN ِ صندوق در سرور پشتِ پرچمِ خاموشِ `shop.till_pin` (مهاجرتِ ۶۴۰ ِ `shop_till_pins`/`shop_till_sessions` + rollback؛
   `lib/till-pin.js`، `routes/shop-till-pin.js`): فقط اثرِ PBKDF2، سنجش زیرِ `FOR UPDATE`، هر ۵ خطا قفلِ زمان‌دار، هر نوشتن با تأییدِ دوبارهٔ ورود، صاحب هرگز
