@@ -54,6 +54,20 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/e-rows-4` (دورِ چهارمِ ردیف‌های PARTIAL ِ ردهٔ E؛ روی `ccr-…-batch-46` ‏4e2a7459؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: S56 — اول `order-picking.js` (۷۹۳/۸۰۰) جدا شد: «جای قفسه» و «وظیفهٔ پیدا نکردم» ⇐ `lib/pick-issues.js` (همان نام‌ها دوباره
+  صادر می‌شوند)؛ سپس پرچمِ خاموشِ `shop.orders.weight_hold` (`lib/pick-weight-hold.js`، مهاجرتِ ۷۶۰ + rollback): وزنِ بیش از حدِ سفارشِ
+  پرداخت‌نشده ⇒ نگه‌داشت با مهلتِ ۱۰ دقیقه، بسته‌بندی ۴۰۹ `weight_hold_pending`، پذیرش ⇒ همان وزن، رد/مهلت ⇒ `removed` و کسر، سقفِ پولِ
+  بسته‌بندی `capOf` ⇒ ۴۰۹ `over_cap`؛ درِ مشتری در `pick-substitutes-store.js` و درِ کارمند `…/pick/weight-holds/decide`؛ `/orders/config`
+  ⇒ `weightHold`؛ تأخیرِ چشم‌به‌راهِ مشتری در `order-late-apology` هم شمرده می‌شود. `pick-weight-hold` ۸/۸ (پایه ۷ سرخ). S86 — کاتالوگ:
+  `catalog-products.rebuildProducts` و `stock-rebuild --catalog` (SAVEPOINT: پاک و از نو با `upsertProduct`، برگشت، فقط تفاوت)؛
+  `catalog-rebuild` ۲/۲ (پایه ۲ سرخ). S118 و S37: کدی نماند (آزمونِ مسیرِ «S118.customer» از e-rows-2 هست و سبز؛ S37 ⇒ C/A) — فقط متنِ STATUS.
+  همه روی PGlite و PostgreSQL ۱۶ ِ محلی؛ فهرست‌های مسیر، `upgrade-rehearsal`، `storefront*` بی‌پسرفت.
+- نیمه‌کاره: S56 کارتِ «وزنِ بیشتر» در صفحهٔ پیگیریِ ویترین (واژه‌نامهٔ `order` پر است ⇒ بخشِ تازهٔ ≥۱۰ کلید با اسکریپتِ دیربار) و برنامهٔ
+  جمع‌آور (Kotlin) ساخته نشد ⇒ پرچم «هنوز روشن نکنید» (FLAGS-ON §۱۸)؛ گرفتنِ تفاوتِ سفارشِ پرداخت‌شده تصمیمِ صاحب‌کار. S86: بازسازیِ
+  `stock_reservations` از سفارش‌های باز و آزمونِ منبعِ v3.
+- قدمِ بعدی: کارتِ وب ِ S56 (`store/weight-hold.js` + `kit/i18n/weigh.*.json` + گامِ مرورگر با axe) و دکمهٔ برنامهٔ جمع‌آور؛ پرسشِ A
+  برای صاحب‌کار: تفاوتِ وزنِ بیشترِ سفارشِ پرداخت‌شده دمِ در نقد گرفته شود یا نه؛ نامزدهای دیگر: ORD-15، S113.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/chk-addr` (CHK-08، CHK-10 و پینِ CRM-09؛ روی main ‏cceb5930 (#1027)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: CHK-10 — سرور تنها داور با یک خانه برای «کجا؟»، ثبت و «خبرم کن» (`storefront-delivery.pinCell`: گردِ شش‌رقمیِ `orders.coord` سپس
   شبکه؛ پیش‌تر پینِ رقمِ هفتمِ کنارِ خطِ شبکه پیش از ثبت «بیرون» و در ثبت «درون» بود)؛ لبه و رأسِ چندضلعی درون؛ پاپیون (دو نقطهٔ جابه‌جا) ⇒ ۴۰۰ `bad_zone` با

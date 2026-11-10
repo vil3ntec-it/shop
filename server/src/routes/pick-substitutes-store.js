@@ -1,6 +1,7 @@
 'use strict';
 /**
- * تأییدِ جایگزین توسطِ مشتری — `/api/store/:slug/orders/:token/substitutions…` (PCK-05، S37).
+ * پاسخِ مشتری هنگامِ جمع‌آوری — جایگزین (`/api/store/:slug/orders/:token/substitutions…`، PCK-05، S37) و وزنِ
+ * بیش از حد (`…/weight-holds…`، S56، پرچمِ جدای `shop.orders.weight_hold`).
  *
  * ⛔ پیش‌فرض خاموش: بی ویترینِ روشن (`sf.open`) یا بی پرچمِ `shop.orders.picking` ِ همان دکان ⇒ ۴۰۴
  * (همان «سفارش پیدا نشد») و هیچ ردیفی دست نمی‌خورد.
@@ -10,12 +11,15 @@
  *
  *   GET  /:slug/orders/:token/substitutions          پیشنهادهای جایگزینِ این سفارش
  *   POST /:slug/orders/:token/substitutions/:subId   `{decision: accept|reject}`
+ *   GET  /:slug/orders/:token/weight-holds           وزن‌های بیش از حدِ این سفارش (پذیرش = مبلغِ بیشتر)
+ *   POST /:slug/orders/:token/weight-holds/:holdId   `{decision: accept|reject}` — رد ⇒ قلم حذف و از جمع کسر
  */
 const express = require('express');
 const config = require('../config');
 const sf = require('../lib/storefront');
 const picking = require('../lib/order-picking');
 const subs = require('../lib/pick-substitutes');
+const holds = require('../lib/pick-weight-hold');
 const { rateLimit } = require('../middleware/ratelimit');
 const { notFound } = require('../middleware/errors');
 
@@ -32,12 +36,26 @@ const store = async (req, res, next) => {
   next();
 };
 
+/** S56: پرچمِ نگه‌داشتِ وزنِ همان دکان — یا همان ۴۰۴ (پس از `store`). */
+const holdStore = async (req, res, next) => {
+  if (!(await holds.flagOf(req.store.shop_id))) throw notFound('سفارش پیدا نشد', 'order_not_found');
+  next();
+};
+
 router.get('/:slug/orders/:token/substitutions', readLimit, store, async (req, res) => {
   res.json(await subs.forCustomer(req.store, req.params.token));
 });
 
 router.post('/:slug/orders/:token/substitutions/:subId', decideLimit, store, async (req, res) => {
   res.json(await subs.decideByCustomer(req.store, req.params.token, req.params.subId, req.body));
+});
+
+router.get('/:slug/orders/:token/weight-holds', readLimit, store, holdStore, async (req, res) => {
+  res.json(await holds.forCustomer(req.store, req.params.token));
+});
+
+router.post('/:slug/orders/:token/weight-holds/:holdId', decideLimit, store, holdStore, async (req, res) => {
+  res.json(await holds.decideByCustomer(req.store, req.params.token, req.params.holdId, req.body));
 });
 
 module.exports = router;

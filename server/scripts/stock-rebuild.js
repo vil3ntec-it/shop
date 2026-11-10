@@ -1,22 +1,25 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * S86 — بازسازیِ مانده‌های موجودیِ یک دکان از دفترِ حرکت‌ها (`stock.rebuild`).
+ * S86 — بازسازیِ مانده‌های موجودیِ یک دکان از دفترِ حرکت‌ها (`stock.rebuild`) و، با `--catalog`، کالاهای کاتالوگ
+ * (`catalog_products`) از دفترِ دستگاه‌ها (`catalog-products.rebuildProducts`).
  *
  *   node scripts/stock-rebuild.js --shop <شناسهٔ دکان>               فقط نشان می‌دهد (هیچ نوشتنی)
  *   node scripts/stock-rebuild.js --shop <شناسه> --apply [--by <نام>]   مانده = جمعِ دفتر، با سابقهٔ `stock.rebuild`
+ *   … --catalog                                                   کاتالوگ هم (تعداد، قیمتِ نمایش، وضعیت؛ سابقهٔ `catalog.rebuild`)
  *   … --json                                                      خروجیِ ماشینی
  *
- * دفتر (`stock_moves`) هرگز دست نمی‌خورد. پیش از `--apply` پشتیبان بگیرید (`npm run backup`).
- * کدِ خروج: ۰ مانده‌ها با دفتر می‌خوانند (یا با `--apply` درست شدند) · ۲ ناهمخوانی (بی `--apply`) · ۱ خطا
+ * دفترها (`stock_moves`، دفترِ همگام‌سازی) هرگز دست نمی‌خورند. پیش از `--apply` پشتیبان بگیرید (`npm run backup`).
+ * کدِ خروج: ۰ همه با منبع می‌خوانند (یا با `--apply` درست شدند) · ۲ ناهمخوانی (بی `--apply`) · ۱ خطا
  */
 
 function parseArgs(argv) {
-  const out = { shop: '', apply: false, by: '', json: false };
+  const out = { shop: '', apply: false, by: '', json: false, catalog: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--apply') out.apply = true;
     else if (a === '--json') out.json = true;
+    else if (a === '--catalog') out.catalog = true;
     else if (a === '--shop' && argv[i + 1]) out.shop = String(argv[++i]);
     else if (a === '--by' && argv[i + 1]) out.by = String(argv[++i]);
     else throw new Error(`گزینهٔ ناشناخته: ${a}`);
@@ -32,16 +35,27 @@ async function main(argv, print = (s) => console.log(s)) {
   if (!(await one('SELECT 1 AS x FROM shops WHERE id=$1', [opts.shop]))) throw new Error(`دکانِ ${opts.shop} پیدا نشد`);
   const stock = require('../src/lib/stock');
   const r = await stock.rebuild(opts.shop, { apply: opts.apply, by: opts.by || 'cli' });
+  const cat = opts.catalog
+    ? await require('../src/lib/catalog-products').rebuildProducts(opts.shop, { apply: opts.apply, by: opts.by || 'cli' }) : null;
   if (opts.json) {
-    print(JSON.stringify(r, null, 2));
-  } else if (!r.fixed.length) {
+    print(JSON.stringify(cat ? { stock: r, catalog: cat } : r, null, 2));
+    return r.ok && (!cat || cat.ok) ? 0 : 2;
+  }
+  if (!r.fixed.length) {
     print(`✔ ${opts.shop} — مانده‌ها با دفتر می‌خوانند (${r.moves} حرکت)`);
   } else {
     print(`${r.applied ? '✔ درست شد' : '✖ ناهمخوان'}: ${r.fixed.length} مانده (${r.moves} حرکت)`);
     for (const f of r.fixed.slice(0, 200)) print(`  ${f.productId} @ ${f.location}: ${f.levelMilli} ⇒ ${f.ledgerMilli}`);
     if (!r.applied) print('برای درست کردن همان دستور را با --apply بزنید (پیش از آن پشتیبان بگیرید).');
   }
-  return r.ok ? 0 : 2;
+  if (cat && !cat.changes.length) {
+    print(`✔ کاتالوگ (${cat.source}) — ${cat.count.source} کالا با دفترِ دستگاه‌ها می‌خواند`);
+  } else if (cat) {
+    print(`${cat.applied ? '✔ کاتالوگ درست شد' : '✖ کاتالوگ ناهمخوان'}: ${cat.changes.length} کالا (${cat.count.projection} ⇒ ${cat.count.source})`);
+    for (const ch of cat.changes.slice(0, 200)) print(`  ${ch.productId}: ${ch.kind}${ch.fields ? ` (${ch.fields.join('، ')})` : ''}`);
+    if (!cat.applied) print('برای درست کردن همان دستور را با --apply بزنید (پیش از آن پشتیبان بگیرید).');
+  }
+  return r.ok && (!cat || cat.ok) ? 0 : 2;
 }
 
 if (require.main === module) {

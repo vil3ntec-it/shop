@@ -196,6 +196,8 @@ const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat
   'shop.storefront.zones', 'shop.storefront.notify_area', 'shop.staff_time', 'shop.staff_scope', 'shop.orders.amend', 'shop.purchase_orders', 'shop.order_risk'];
 //  جمع‌آوری و بسته‌بندی (PCK) — درهای `/shop/orders/pick/…` و `/shop/orders/:id/pick…`
 FLAGS.push('shop.orders.picking');
+//  S56: وزنِ بیش از حد تا پاسخِ مشتری (`/shop/orders/:id/pick/weight-holds/decide`)
+FLAGS.push('shop.orders.weight_hold');
 //  M3: لوگو و تصویرِ سرِ ویترین
 FLAGS.push('shop.storefront.media');
 //  MKT-10/11: پیوندِ کمپین و QR ِ دکان
@@ -714,6 +716,7 @@ function bodyFor(r, ids) {
     'PUT /shop/orders/pick/products/:productId': { halal: 'halal' },
     'POST /shop/orders/:id/pick/substitutions': { eventId: fresh('psub'), lineNo: 1, productId: ids.product },
     'POST /shop/orders/:id/pick/substitutions/decide': { substitutionId: '01ARZ3NDEKTSV4RRFFQ69G5FAV', decision: 'accept' },
+    'POST /shop/orders/:id/pick/weight-holds/decide': { holdId: '01ARZ3NDEKTSV4RRFFQ69G5FAV', decision: 'accept' },
     //  قفسهٔ انتظار و جمع‌آوریِ گروهی (PCK-10/12)
     'POST /shop/orders/pick/shelf/scan': { qr: 'VLNB-1-1-1', slot: 'A1' },
     'POST /shop/orders/pick/batches': { orderIds: [ids.order, ids.order.replace(/.$/, '0')] },

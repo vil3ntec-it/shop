@@ -23,6 +23,8 @@
  *   GET  /:id/pick/substitutes?lineNo=    دو جایگزینِ امنِ پیشنهادی برای یک قلم
  *   POST /:id/pick/substitutions          پیشنهاد (با اسکن) برای قلمِ «پیدا نشد» — `orders.manage`
  *   POST /:id/pick/substitutions/decide   تصمیمِ کارمند پس از تماس/واتس‌اپ — `orders.manage`
+ *   وزنِ بیش از حد (S56، `lib/pick-weight-hold.js`، پرچمِ خاموشِ `shop.orders.weight_hold` ⇒ ۴۰۳ `weight_hold_disabled`):
+ *   POST /:id/pick/weight-holds/decide    پذیرش/ردِ وزنِ بیشتر پس از تماس با مشتری — `orders.manage`
  *   قفسهٔ انتظار و جمع‌آوریِ گروهی (PCK-10/12، `lib/pick-shelf.js`):
  *   GET  /pick/shelf                      آن‌چه روی قفسهٔ انتظار است
  *   POST /pick/shelf/scan                 اسکنِ برچسبِ کیسه روی یک جا ⇒ «آماده» — `orders.manage`
@@ -37,6 +39,7 @@ const express = require('express');
 const orders = require('../lib/orders');
 const picking = require('../lib/order-picking');
 const subs = require('../lib/pick-substitutes');
+const holds = require('../lib/pick-weight-hold');
 const shelf = require('../lib/pick-shelf');
 const photos = require('../lib/pick-photos');
 const audit = require('../lib/audit');
@@ -71,6 +74,14 @@ const needWrite = async (req, res, next) => {
 const needPick = async (req, res, next) => {
   if (!(await picking.flagOf(req.shopId))) {
     return next(forbidden('جمع‌آوری و بسته‌بندی برای این دکان روشن نیست', 'picking_disabled'));
+  }
+  next();
+};
+
+/** S56: نگه‌داشتِ وزن — پیش‌فرض خاموش. */
+const needHold = async (req, res, next) => {
+  if (!(await holds.flagOf(req.shopId))) {
+    return next(forbidden('نگه‌داشتِ وزن تا پاسخِ مشتری برای این دکان روشن نیست', 'weight_hold_disabled'));
   }
   next();
 };
@@ -154,6 +165,18 @@ router.post('/:id/pick/substitutions/decide', needOrders, manage, needWrite, nee
   if (!out.replayed) {
     await log(req, 'pick.substitute_decide', req.params.id, {
       substitutionId: out.substitution.id, lineNo: out.substitution.lineNo, status: out.substitution.status,
+    });
+  }
+  res.json(out);
+});
+
+//  S56: وزنِ بیش از حد — تصمیمِ کارمند پس از تماس (مشتری خودش از لینکِ پیگیری هم می‌تواند)
+router.post('/:id/pick/weight-holds/decide', needOrders, manage, needWrite, needPick, needHold, async (req, res) => {
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+  const out = await holds.decide(req.shopId, req.params.id, b.holdId, b, { by: 'staff', actorId: req.user.id });
+  if (!out.replayed) {
+    await log(req, 'pick.weight_hold_decide', req.params.id, {
+      holdId: out.hold.id, lineNo: out.hold.lineNo, status: out.hold.status, totalMinor: out.hold.totalMinor,
     });
   }
   res.json(out);
