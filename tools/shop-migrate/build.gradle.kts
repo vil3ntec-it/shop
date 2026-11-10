@@ -28,7 +28,7 @@ val legacyFiles = listOf(
   "ir/vil3ntec/tohid/data/SafeEntry.kt",
   //  `ShopData.setAside`: سندِ ردشدهٔ کنارگذاشته (کاتلینِ خالص)
   "ir/vil3ntec/tohid/data/SetAsideDoc.kt",
-  //  مدل‌های خالصی که `Models.kt` به آن‌ها اشاره می‌کند: کیت، قیمتِ زمان‌بندی‌شده، تنوع، سفارشِ ویژه
+  //  مدل‌های خالصی که `Models.kt` به آن‌ها اشاره می‌کند: کیت، قیمتِ زمان‌بندی‌شده، تنوع، سفارشِ ویژه، ارزِ نقد (`SaleFx`، PAY-10)
   "ir/vil3ntec/tohid/data/ModelParts.kt",
   //  CRM-09: `Debtor.deliveryAddress` — نشانیِ تحویل در پروندهٔ جدای خودش (کاتلینِ خالص)
   "ir/vil3ntec/tohid/data/DeliveryAddress.kt",

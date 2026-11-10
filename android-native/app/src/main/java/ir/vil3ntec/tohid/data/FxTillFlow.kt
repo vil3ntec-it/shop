@@ -6,7 +6,6 @@ import ir.vil3ntec.tohid.core.pay.FxRate
 import ir.vil3ntec.tohid.core.pay.FxRateInput
 import ir.vil3ntec.tohid.core.pay.FxTill
 import ir.vil3ntec.tohid.core.pay.PayResult
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -15,28 +14,6 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
-
-/**
- *  PAY-10 — ردیفِ ارزِ نقدِ یک فاکتور (`SalePayment.fx`، فقط روی ردیفِ `fx`): همان رکوردِ تبادلِ هسته (`ExchangeRecord`)
- *  که در لحظهٔ فروش ثابت شد. `amountMinor` ِ خودِ ردیف سهمِ افغانیِ همین فاکتور است؛ [afnMinor] ارزشِ همهٔ ارزِ گرفته‌شده
- *  و تفاوتشان پولِ پسِ افغانی ([FxTillFlow.changeOut]). نرخِ تازه هیچ‌کدام را عوض نمی‌کند.
- */
-@Serializable
-data class SaleFx(
-  val currency: String,
-  /** مبلغِ دریافتی به واحدِ کوچکِ همان ارز (سنت، پیسه، ریال) */
-  val amount: Long,
-  /** پولِ افغانی برای [per] واحدِ ارز */
-  val rate: Long,
-  val per: Long = 1,
-  /** ارزشِ افغانیِ همهٔ [amount] به پول */
-  val afnMinor: Long,
-  val source: String,
-  /** زمانِ گذاشتنِ نرخ */
-  val at: Long,
-  /** گذارنده/تأییدکنندهٔ نرخ */
-  val by: String,
-)
 
 /**
  *  سیم‌کشیِ PAY-10 در برنامه — خالص (نه Context، نه ساعت): تنظیمِ نرخِ دکان (`tohid-policy/fx_rates`، JSON)،
