@@ -145,10 +145,10 @@ fun main() {
       Tray(
         icon = icon,
         state = tray,
-        tooltip = "فروشگاه من",
+        tooltip = ir.vil3ntec.tohid.core.i18n.Str.appName,
         onAction = { visible = true; SingleInstance.front() },
         menu = {
-          Item("باز کردنِ فروشگاه من", onClick = { visible = true; SingleInstance.front() })
+          Item(ir.vil3ntec.tohid.core.i18n.StrDesktop.trayOpen, onClick = { visible = true; SingleInstance.front() })
           Separator()
           Item("خروج", onClick = { quit() })
         },
@@ -163,7 +163,7 @@ fun main() {
     if (customerOpen) {
       Window(
         onCloseRequest = { ir.vil3ntec.tohid.hw.CustomerFacing.open.value = false },
-        title = "نمایشگرِ مشتری — فروشگاه من",
+        title = "${ir.vil3ntec.tohid.core.i18n.StrDevices.kindDisplay} — ${ir.vil3ntec.tohid.core.i18n.Str.appName}",
         icon = icon,
         state = rememberWindowState(size = DpSize(800.dp, 600.dp)),
       ) {
@@ -195,7 +195,7 @@ fun main() {
       },
       visible = visible,
       state = windowState,
-      title = "فروشگاه من",
+      title = ir.vil3ntec.tohid.core.i18n.Str.appName,
       icon = icon,
       /*
        *  بارکدخوانِ USB/بلوتوث وقتی هیچ کادرِ نوشتنی فوکوس ندارد: نویسه‌های
@@ -399,20 +399,20 @@ private fun ShortcutsHelp() {
   //  همهٔ میان‌برها، بخش‌به‌بخش — هر کلیدی که در برنامه کار می‌کند همین‌جا نوشته شده
   val pages = ir.vil3ntec.tohid.ui.AppNav.SHORTCUTS.mapIndexed { i, (_, label) -> "Ctrl+${i + 1}" to label }
   val groups: List<Pair<String, List<Pair<String, String>>>> = listOf(
-    "همه‌جا" to pages + listOf(
+    ir.vil3ntec.tohid.core.i18n.StrCourierArea.everywhere to pages + listOf(
       "F1" to "همین فهرستِ میان‌برها",
       "Ctrl+K" to "جست‌وجوی سریع: صفحه، کالا، بارکد، مشتری",
-      "Ctrl+M" to "مرکزِ مدیریت",
+      "Ctrl+M" to ir.vil3ntec.tohid.core.i18n.Str.adminCenter,
       "Ctrl+N" to "موردِ تازه در همین صفحه",
       "F11" to "تمام‌صفحه",
       "Ctrl+= / Ctrl+− / Ctrl+0" to "بزرگ‌نمایی / کوچک‌نمایی / عادی",
       "Esc" to "بستنِ پنجره یا برگشت",
-      "دکمهٔ عقبِ ماوس" to "برگشت",
+      "دکمهٔ عقبِ ماوس" to ir.vil3ntec.tohid.core.i18n.Str.back,
       "کلیکِ راست روی ردیف" to "منوی کارها",
     ),
-    "بارکدخوان" to listOf(
-      "صندوق" to "کالا به سبد",
-      "کالاها" to "ثبت‌شده: ویرایش — تازه: ردیفِ «کالای تازه»",
+    ir.vil3ntec.tohid.core.i18n.StrSettings.scannerRow to listOf(
+      ir.vil3ntec.tohid.core.i18n.StrAdmin.register to "کالا به سبد",
+      ir.vil3ntec.tohid.core.i18n.StrProducts.listTitle to "ثبت‌شده: ویرایش — تازه: ردیفِ «کالای تازه»",
       "انبار و خرید" to "ثبت‌شده: ورودِ انبار — تازه: فرمِ کالای تازه",
       "صفحه‌های دیگر" to "صندوق باز می‌شود و کالا به سبد می‌رود",
     ),
@@ -422,26 +422,26 @@ private fun ShortcutsHelp() {
       "3*" to "تعدادِ کالای بعدی (مثلاً 3*بارکد)",
       "+ / −" to "یکی بیشتر / کمتر",
       "Delete" to "حذفِ ردیفِ انتخاب‌شده",
-      "F2" to "انتخابِ مشتری",
+      "F2" to ir.vil3ntec.tohid.core.i18n.StrPos.pickCustomer,
       "F3" to "ویرایشِ ردیف (قیمت، تخفیف)",
       "F4" to "ردیفِ آزاد بی‌کالا",
       "F8" to "چاپِ آخرین فاکتور",
-      "F9 / F12 / Ctrl+Enter" to "ثبتِ فروش",
+      "F9 / F12 / Ctrl+Enter" to ir.vil3ntec.tohid.core.i18n.StrPos.recordSaleBtn,
       "Esc" to "خالی کردنِ کادر",
     ),
-    "کالاها" to listOf(
+    ir.vil3ntec.tohid.core.i18n.StrProducts.listTitle to listOf(
       "Ctrl+F" to "جست‌وجو در جدول",
       "Tab / Enter" to "رفتن به کادرِ بعدیِ «کالای تازه» و ثبت",
       "Ctrl+S" to "ذخیرهٔ ویرایش",
       "Esc" to "بستنِ پنلِ ویرایش",
     ),
     "مشتری‌ها و قرض" to listOf(
-      "F7" to "دریافت از مشتری",
+      "F7" to ir.vil3ntec.tohid.core.i18n.StrHome.receiveFromCustomer,
       "F6" to "دادن / قرضِ تازه",
       "Enter" to "ثبتِ ردیف",
       "Ctrl+P" to "چاپِ صورت‌حساب",
-      "Ctrl+E" to "خروجیِ اکسل",
-      "Esc" to "بستن",
+      "Ctrl+E" to ir.vil3ntec.tohid.core.i18n.StrProductPages.excelExport,
+      "Esc" to ir.vil3ntec.tohid.core.i18n.Str.close,
     ),
   )
   ir.vil3ntec.tohid.ui.ProvideLang {

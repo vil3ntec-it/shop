@@ -62,7 +62,7 @@ object ReportCsv {
 
   /**
    *  RPT-13 — ستونی که «مقایسه با دورهٔ قبل» در خودِ جدول کنارش «دورهٔ قبل» و «تغییر» می‌گذارد؛ فقط برگه‌هایی که ستونِ
-   *  اولشان کلیدِ پایدار است (شرحِ سود و زیان، فروشنده). برگهٔ فهرستیِ سند (فاکتور، خرید، مصرف) ⇒ `null` (جدول همان امروز).
+   *  اولشان کلیدِ پایدار است (شرحِ سود و زیان، فروشنده). برگهٔ فهرستیِ سند (فاکتور، خرید، مصرف) ⇒ `null` (آن‌ها: [compareGroup]).
    */
   fun compareColumn(section: String): Int? = when (section) {
     "profit" -> 1
@@ -75,6 +75,33 @@ object ReportCsv {
     val col = compareColumn(section) ?: return cur
     return ir.vil3ntec.tohid.core.report.ReportCompare.column(cur.rows, prev.rows, col, prevTitle, changeTitle)?.let { cur.copy(rows = it) } ?: cur
   }
+
+  /**
+   *  RPT-13 — برگهٔ فهرستیِ سند در «مقایسه»: (ستونِ گروه، ستونِ جمع). فاکتور ⇐ «روش پرداخت» و «مبلغ نهایی» (بی فاکتورِ
+   *  لغوشده)، خرید ⇐ «تأمین‌کننده» و «جمع»، مصرف ⇐ «دسته» و «مبلغ». برگه‌های دیگر ⇒ `null`.
+   */
+  fun compareGroup(section: String): Pair<Int, Int>? = when (section) {
+    "sales" -> 7 to 4
+    "purchases" -> 1 to 6
+    "expenses" -> 2 to 3
+    else -> null
+  }
+
+  /**
+   *  برگهٔ فهرستیِ [cur] گروه‌شده با [compareGroup] و دو ستونِ دورهٔ قبل از [prev] (`ReportCompare.grouped`): شمار و جمعِ هر
+   *  گروه، «دورهٔ قبل» و «تغییر»؛ گروهِ بی نام «—». برگهٔ دیگر یا جفت‌نشدنی ⇒ همان [cur].
+   */
+  fun comparedList(section: String, cur: Sheet, prev: Sheet, countTitle: String, prevTitle: String, changeTitle: String): Sheet {
+    val (key, value) = compareGroup(section) ?: return cur
+    val isSales = section == "sales"
+    val counts: (List<String>) -> Boolean = { r -> !isSales || r.getOrNull(SALE_STATUS) != CANCELLED }
+    return ir.vil3ntec.tohid.core.report.ReportCompare.grouped(cur.rows, prev.rows, key, value, countTitle, "—", prevTitle, changeTitle, counts)
+      ?.let { cur.copy(rows = it) } ?: cur
+  }
+
+  /** ستونِ «وضعیت» ِ برگهٔ فروش و خانهٔ فاکتورِ لغوشده‌اش (همان [sales]) */
+  private const val SALE_STATUS = 8
+  private const val CANCELLED = "لغو‌شده"  // داده: خانهٔ «وضعیت» ِ برگهٔ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
 
   /** سود و زیانِ بازه — همان عددهای `ReportEngine.sales`، سطر به سطر */
   private fun profit(d: ShopData, from: String, to: String): Sheet {
@@ -153,7 +180,7 @@ object ReportCsv {
           round(s.total), round(s.discount), round(s.finalTotal),
           round(s.paidAmount), round(s.remaining),
           PayFlow.payLabel(s, cash = "نقدی"),  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-          if (s.status == "cancelled") "لغو‌شده" else "ثبت‌شده",  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+          if (s.status == "cancelled") CANCELLED else "ثبت‌شده",  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
           s.cancelReason,
           s.seller,
         )
