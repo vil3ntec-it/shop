@@ -12,8 +12,9 @@ const { notFound, conflict } = require('../middleware/errors');
 
 async function detach(shopId, id) {
   return tx(async (c) => {
-    const img = (await c.query('SELECT id, space, owner_shop_id, shop_product_id FROM images WHERE id=$1 FOR UPDATE', [String(id)])).rows[0];
-    if (!img || img.space !== 'shop' || img.owner_shop_id !== shopId) throw notFound('عکس پیدا نشد');
+    const img = (await c.query(
+      `SELECT id, shop_product_id FROM images WHERE id=$1 AND space='shop' AND owner_shop_id=$2 FOR UPDATE`, [String(id), shopId])).rows[0];
+    if (!img) throw notFound('عکس پیدا نشد');
     const pid = img.shop_product_id;
     if (!pid) return { image_id: img.id, product_id: '', detached: false };
     const shown = (await c.query(
