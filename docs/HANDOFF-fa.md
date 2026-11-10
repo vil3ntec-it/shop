@@ -53,6 +53,14 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/ci-evidence` (ردیف‌های STATUS که فقط شاهدِ CI کم داشتند؛ روی main ‏f8134445 = دستهٔ ۳۹؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: از ۱۴۱ ردیفِ PARTIAL/NOT-VERIFIED که از CI نام می‌برند فقط POS-01، WEB-11 و MKT-02 جز شاهدِ CI کمبودی نداشتند. لاگِ کاملِ کارهای main ‏f8134445
+  (PostgreSQL 129585341948، PGlite 129585342405، مرورگر 129585342400، «برنامهٔ خریدِ مشتری (گزارش)» 129585337686، «کامپایل و آزمون» 129585337797) و iOS ِ
+  سرِ PR ِ #1023 (129573624196) خوانده شد. هیچ ردیفی ارتقا نیافت: لاگِ Gradle ِ اندروید، کامپیوتر و برنامهٔ خرید فقط `> Task :test` و BUILD SUCCESSFUL
+  می‌نویسد (`testLogging` بی `events`) ⇒ `CatalogCountsTest`/`CartQueryTest` (POS-01)، `CustomerAccountTest` (WEB-11) و `CustomerStage2Test` (MKT-02)
+  نام‌به‌نام دیده نمی‌شوند. شاهدِ دیده‌شده در WEB-11 و MKT-02 ثبت شد (JS، مرورگر و `<testsuite>` ِ iOS برای `ShopperAccountTest` ۸ و `ShopperStage2Test` ۷).
+- نیمه‌کاره: سه ردیفِ بالا تا شاهدِ نام‌به‌نامِ Kotlin.
+- قدمِ بعدی: گامِ `grep -ho '<testsuite [^>]*'` (مثلِ `ios-spike.yml`) پس از آزمونِ اندروید/کامپیوتر/برنامهٔ خرید، یا `events` در `testLogging`؛ سپس همین سه ردیف.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-39` (بازبینیِ امنیتیِ مستقلِ دستهٔ ۳۹؛ روی `ccr-3a0d593c-ac0jpj-batch-39`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: تفاضلِ `server/src`، `server/public` و `license` ِ دستهٔ ۳۸..۳۹ خوانده و به آن حمله شد (پوشِ وب ِ سفارش و «خبرم کن»، SSRF، رمز، کاتالوگِ پرچم‌ها،
   `vip.js`، ۴۰۱ ِ پنل، بانکِ تصویر، تمرکزِ `kit`/`chat`، `upgrade-rehearsal`، `verification()`). دو یافتهٔ Low بسته شد (`docs/SECURITY-AUDIT-fa.md` B4):
