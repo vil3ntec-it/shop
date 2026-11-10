@@ -54,6 +54,17 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/prd-08` (PRD-08: کالای وزنی با ۳ رقمِ اعشار، سرتاسری؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: دروازهٔ یگانه `core/money/QtyExact` (+ هم‌زادِ `qtyExact` در `license/money.js`، بردارِ `core/test-vectors/qty-exact-v1.json` با سازندهٔ
+  `server/scripts/qty-exact-vectors.js`) و در برنامه `data/QtyExactWiring` پشتِ پرچمِ خاموشِ `shop.qty_exact` (کلیدِ `qtyExact` در
+  `GET /api/shop/stock-ledger/config` ⇐ `StockFlag`). روشن ⇒ مبلغِ ردیفِ مقدارِ اعشاری با قاعدهٔ ۳.۴ (= سفارشِ آنلاین)، همهٔ ۳۸ صدای
+  `SalesEngine.lineTotal` از همان؛ جمعِ سبد، جای خالی تا موجودی، قلم و حرکتِ انبار به هزارمِ دقیق؛ پیامِ کمبود با اعشار؛ کادرِ مقدارِ برگهٔ ردیف
+  (نسخهٔ ۳: پیام؛ کامپیوتر: کادر رقمِ چهارم نمی‌گیرد) و پیش‌نمایشِ مبلغِ `CartLineDialog`. مقدارِ درست و پرچمِ خاموش بیت‌به‌بیت همان. بی مهاجرت.
+- آزموده: `qty-exact.test.js` ۶/۶ (جاروب ۸۹۹٬۱۰۰ ⇒ ۱۳۱ فرق، همه +۱ افغانی؛ دو جهش کشته)، `shop-stock-ledger.test.js` ۲/۲ روی PGlite و
+  PostgreSQL. ⚠️ فقط CI: `QtyExactTest`، `QtyExactVectorsTest`، `QtyExactWiringTest` (Kotlin اینجا ساخته نمی‌شود).
+- نیمه‌کاره/کنار: گرد کردنِ دقیقِ ردیفِ **مقدارِ درست** با قیمتِ پول‌دار (۵۰ × ۰٫۲۹: امروز ۱۴، دقیق ۱۵؛ ۴۲ از ۹۰٬۰۰۰) تصمیمِ جدای صاحب‌کار
+  است و عمداً وصل نشد؛ `index.html` ِ یخ‌زده همان قاعدهٔ امروز؛ برگشتِ بخشی همان `ReturnShare`.
+- قدمِ بعدی: CI ِ سبزِ سه آزمونِ Kotlin، سپس ارتقای PRD-08 و روشن کردنِ `shop.qty_exact` برای یک دکانِ آزمایشی (`OWNER-PENDING` ۳-۱۴ب، `FLAGS-ON` §۱۴).
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/acct-console` (بندهای سمتِ سرورِ حسابِ ممیزیِ پنلِ مرکزی §۹: بازگرداندنِ یک‌باره، S12، S15، S18؛ روی main ‏ed8009d7 = دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) `POST /admin/sync/conflicts/:id/restore` یک بار — شناسهٔ یک‌شکل (۴۰۰ `bad_id`)، ۴۰۹ `already_restored`/`restore_in_progress` با نشانِ پایگاه
   (`sync_conflict_restore_claims`، مهاجرتِ ۴۹۵)، `Idempotency-Key` (`lib/sync-restore-once.js`؛ `sync-v1.js` دست نخورد). (۲) S12: نگهبانِ مالک از پیش بود

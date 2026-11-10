@@ -223,6 +223,7 @@ object StrSale {
   val totalLabel: String get() = t("جمع", "Total", "ټول")
   val nameNeeded: String get() = t("نام را بنویسید", "Type a name", "نوم ولیکئ")
   val positiveNeeded: String get() = t("بیشتر از صفر بنویسید", "Must be more than zero", "له صفر څخه زیات ولیکئ")
+  val qtyThreeDecimals: String get() = t("مقدار حداکثر سه رقمِ اعشار دارد", "Quantity takes three decimal places at most", "مقدار تر درېیو اعشاري رقمونو پورې وي")
   fun freeAdded(n: Any): String = t("«${asIs(n)}» به سبد اضافه شد", "“$n” added to the cart", "«$n» ټوکرۍ ته اضافه شو")
   val setQty: String get() = t("ثبتِ مقدار", "Set quantity", "شمېر ثبت کړئ")
   val backspace: String get() = t("پاک کردن", "Delete", "پاکول")
