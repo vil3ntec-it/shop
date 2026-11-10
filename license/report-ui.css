@@ -5,6 +5,7 @@
 .rf-kpi,.rf-stat{display:flex; flex-direction:column; gap:6px; text-align:start; padding:14px; border:1px solid var(--border);
   border-radius:12px; background:var(--surface-solid); color:var(--text); font:inherit; box-shadow:var(--shadow-sm);}
 .rf-kpi{cursor:pointer; min-height:48px;}
+.rf-sr{position:absolute; width:1px; height:1px; margin:-1px; padding:0; border:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;}
 .rf-kpi:hover{border-color:var(--primary);}
 .rf-kpi:focus-visible,.rf-pill:focus-visible,.rf-seg button:focus-visible,.rf-table th button:focus-visible,.rf-table-wrap:focus-visible{outline:2px solid var(--primary); outline-offset:2px;}
 .rf-kpi .t,.rf-stat .t{font-size:12px; color:var(--muted); font-weight:500;}

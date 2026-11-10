@@ -154,10 +154,11 @@
     var cls = k.trend === 'flat' ? 'flat' : (k.good ? 'good' : 'bad');
     var arrow = k.trend === 'up' ? '▲' : (k.trend === 'down' ? '▼' : '–');
     var delta = k.deltaText ? '<span class="d ' + cls + '"><span aria-hidden="true">' + arrow + '</span> ' + esc(k.deltaText) + '</span>' : '<span></span>';
-    return '<button type="button" class="rf-kpi" data-kpi="' + esc(k.id) + '"' + presetAttrs(k.target) +
-      ' aria-label="' + esc([k.title, value, k.deltaText, k.period].filter(Boolean).join('، ')) + ' — نمایشِ فهرست">' +
+    //  نامِ دکمه از خودِ متن‌های کارت (هر کدام یک کلیدِ واژه‌نامه) + «نمایشِ فهرست» ِ پنهان — نه یک aria-label ِ چسبیده
+    //  که در انگلیسی و پشتو کلیدی برایش نیست (پس از «گزارشِ تازه» ِ پیش‌فرض روشن، تصمیمِ ۳-۲۲)
+    return '<button type="button" class="rf-kpi" data-kpi="' + esc(k.id) + '"' + presetAttrs(k.target) + '>' +
       '<span class="t">' + esc(k.title) + '</span><span class="v">' + esc(value) + '</span>' +
-      '<span class="f">' + delta + '<span>' + esc(k.period) + '</span></span></button>';
+      '<span class="f">' + delta + '<span>' + esc(k.period) + '</span></span><span class="rf-sr">نمایشِ فهرست</span></button>';
   }
 
   function pillHtml(p) {

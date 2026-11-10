@@ -1748,6 +1748,7 @@
 "نمایش رمز": "Show password",
 "نمایشِ بیشتر ({0} فاکتورِ دیگر)": "Show more ({0} more invoices)",
 "نمایشِ عکس در فهرست‌ها و فروش": "Show photos in lists and sales",
+"نمایشِ فهرست": "show list",
 "نه": "No",
 "نه قرضِ خوابیده، نه جنسِ رو به ختم": "No stuck debts, no items running low",
 "نوشتن در IndexedDB لغو شد": "Writing to IndexedDB was cancelled",
