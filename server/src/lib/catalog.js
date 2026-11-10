@@ -27,7 +27,6 @@ const stock = require('./stock');
 const absorbLedger = require('./count-absorb-ledger');
 const { toMinor, toMilli } = require('./sync-v3-convert');
 const { badRequest, notFound, conflict, forbidden } = require('../middleware/errors');
-
 //  O-06 = ب (ORD-20/CHK-18): نگه‌داشتنِ نرم — آزاد = دفتر − نگه‌داشتهٔ فعال (پرچمِ خاموشِ `shop.stock_reserve`)
 const reserve = () => require('./stock-reserve');
 
@@ -567,9 +566,7 @@ async function publicStock(shopId, productIds, { at = now() } = {}) {
   await refresh(shopId, { maxAgeMs: 5000, at });
   const settings = await stock.settingsOf(shopId);
   const fr = await freshness(shopId, settings, at);
-  const [ps, lvs, held] = await Promise.all([
-    productsOf(shopId, ids), stock.levelsOf(null, shopId, ids), reserve().heldOf(null, shopId, ids, at),
-  ]);
+  const [ps, lvs, held] = await Promise.all([productsOf(shopId, ids), stock.levelsOf(null, shopId, ids), reserve().heldOf(null, shopId, ids, at)]);
   const out = new Map();
   //  دفترِ همگام‌شدهٔ دستگاه‌ها − نگه‌داشتهٔ فعالِ سفارش‌ها (O-06 = ب؛ بی پرچم همیشه ۰) — سرور هرگز کم نمی‌کند
   for (const id of ids) {
@@ -632,9 +629,7 @@ async function list(shopId, { q, cursor, limit } = {}) {
   const page = rows.slice(0, lim).map((r) => r.product_id);
   const settings = await stock.settingsOf(shopId);
   const fr = await freshness(shopId, settings, now());
-  const [ps, lvs, held] = await Promise.all([
-    productsOf(shopId, page), stock.levelsOf(null, shopId, page), reserve().heldOf(null, shopId, page),
-  ]);
+  const [ps, lvs, held] = await Promise.all([productsOf(shopId, page), stock.levelsOf(null, shopId, page), reserve().heldOf(null, shopId, page)]);
   const items = page.map((id) => productView(ps.get(id), lvs.get(id), held.get(id) || 0, settings, fr));
   const last = items[items.length - 1];
   return {
