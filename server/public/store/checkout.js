@@ -24,6 +24,7 @@
     //  shop.orders.subscribers_only: ویترینِ فقط‌خواندنی (`store.ordering.accepting === false`) ⇒ «ثبت» بسته
     var closed = c.closed || function () { return false; };
     var pin = null; var quoteNote = '';
+    var secondOrder = false;   //  S41: مشتری به «ادغام یا سفارشِ دوم؟» «سفارشِ دوم» گفت (فقط برای همین سبد)
     var ac = null;              // CHK-09: نشانی‌های حساب (acct.js)
     //  روش‌های دریافت و نشانهٔ پرداخت فقط در همین صفحه‌اند ⇒ این‌جا، نه در بارِ نخستِ store.js
     $('opt-delivery').hidden = !c.store.fulfillment.delivery;
@@ -388,6 +389,7 @@
         lang: K.lang,
       };
       if (lp) lp.order(body);
+      if (secondOrder) body.secondOrder = true;
       if (c.campaign) body.campaign = c.campaign;
       if (slotOf(f)) body.slotStartsAt = slotAt;
       if (promos && promos.guard && deviceId()) body.deviceId = deviceId();   //  MKT-02: «یک بار برای هر دستگاه»
@@ -432,14 +434,24 @@
         //  فقط روی همین دستگاه، برای سفارشِ بعدی (نام و آخرین نشانی)
         K.save('store-customer', { name: body.customer.name, addressText: body.address ? body.address.text : '', landmark: body.address ? body.address.landmark : '' });
         if (ac) ac.placed(body);   //  CHK-09: «این نشانی را با نام نگه دار»
-        quoteNote = ''; c.empty();
+        quoteNote = ''; secondOrder = false; c.empty();
         msg.hidden = true;
         location.hash = '#/o/' + encodeURIComponent(r.order.token);
       }).catch(function (e) {
         var d = e.data || {};
+        secondOrder = false;
         if (e.code === 'promo_code_rejected') {
           code = ''; quoted = null; qKey = '';
           K.note(msg, 'err', reason(d.promo));
+        } else if (e.code === 'duplicate_order' && d.ask === 'track_or_second' && d.token) {
+          //  S41: «ادغام یا سفارشِ دوم؟» — «همان را دنبال کن» (بی‌خطر، پیش‌فرض) ⇒ پیگیریِ همان سفارش، هیچ سفارشِ تازه‌ای نه؛
+          //  «سفارشِ دوم» ⇒ همان سبد با `secondOrder` (کلیدِ یکتاییِ تازه، چون بدنه دیگر است). پیامِ سرور برای کلاینتِ بی پرسش است
+          msg.hidden = true;
+          K.confirm(t('ck.dup.q', { no: K.fa(d.orderNo, 0) }), t('ck.dup.second'), t('ck.dup.track')).then(function (second) {
+            if (!second) { msg.hidden = true; location.hash = '#/o/' + encodeURIComponent(d.token); return; }
+            secondOrder = true;
+            submitOrder({ preventDefault: function () {} });
+          });
         } else if (e.code === 'price_changed' && d.quote) {
           //  S135: تغییر روشن نشان داده می‌شود؛ بی پذیرشِ دوباره ثبت نمی‌شود
           var changed = [];

@@ -136,6 +136,8 @@ function text(v, max) {
   const { stripControl } = require('./validate');
   return stripControl(str(v)).slice(0, max);
 }
+/** S117 — یادداشتِ آزاد (سفارش، قلم، گذار) بی شمارهٔ کاملِ کارت (`ops-errors.maskCards`). */
+const noteOf = (v, max) => require('./ops-errors').maskCards(text(v, max));
 
 function int(v, field, { min = 0, max = Number.MAX_SAFE_INTEGER, def } = {}) {
   if ((v === undefined || v === null || v === '') && def !== undefined) return def;
@@ -198,7 +200,7 @@ function parseCreate(body, at, { substitution: subOn = false } = {}) {
     if (productId && !/^[A-Za-z0-9_.:-]{1,80}$/.test(productId)) throw badRequest('شناسهٔ کالا معتبر نیست', 'bad_lines');
     return {
       lineNo: i + 1, productId, name, unit: text(x.unit, 30), qtyMilli, unitPriceMinor,
-      lineTotalMinor: S.lineTotalMinor(qtyMilli, unitPriceMinor), note: text(x.note, 200),
+      lineTotalMinor: S.lineTotalMinor(qtyMilli, unitPriceMinor), note: noteOf(x.note, 200),
       //  CHK-15: قلمِ بی ترجیح ترجیحِ کلی را می‌گیرد؛ «کالای مشخص» نامِ جایگزین می‌خواهد
       ...require('./order-substitution').staffLine(x, substitution, orderSub, subOn, i),
     };
@@ -220,7 +222,7 @@ function parseCreate(body, at, { substitution: subOn = false } = {}) {
 
   return {
     source, fulfillment, paymentMethod, customerName, customerPhone, address, delivery,
-    note: text(b.note, 500), isTest: b.test === true, lines, subtotalMinor, discountMinor,
+    note: noteOf(b.note, 500), isTest: b.test === true, lines, subtotalMinor, discountMinor,
     deliveryFeeMinor, totalMinor, scheduledFor,
     itemsCount: lines.length, substitution: orderSub,
   };
@@ -544,7 +546,7 @@ function parseTransition(input) {
   const reason = str(input?.reason);
   //  دلیل کد است، نه متن (متن در `note`)
   if (reason && !/^[a-z_]{1,40}$/.test(reason)) throw badRequest('دلیل معتبر نیست', 'bad_reason');
-  const note = text(input?.note, 300);
+  const note = noteOf(input?.note, 300);
   let readyAt;
   if (input?.readyInMinutes !== undefined && input?.readyInMinutes !== null && input?.readyInMinutes !== '') {
     if (to !== 'accepted') throw badRequest('زمانِ آماده فقط هنگامِ قبول', 'bad_ready_time');

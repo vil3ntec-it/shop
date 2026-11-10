@@ -35,8 +35,9 @@ function parse(body) {
   if (!Number.isSafeInteger(b.stars) || b.stars < 1 || b.stars > 5) throw badRequest('ستاره ۱ تا ۵', 'bad_stars');
   if (b.comment !== undefined && b.comment !== null && typeof b.comment !== 'string') throw badRequest('نوشته معتبر نیست', 'bad_comment');
   // eslint-disable-next-line no-control-regex
-  const comment = String(b.comment || '').replace(/[\u0000-\u0009\u000B-\u001F\u007F‎‏‪-‮⁦-⁩]/g, ' ').trim();
+  let comment = String(b.comment || '').replace(/[\u0000-\u0009\u000B-\u001F\u007F‎‏‪-‮⁦-⁩]/g, ' ').trim();
   if ([...comment].length > COMMENT_MAX) throw badRequest(`نوشته حداکثر ${COMMENT_MAX} نویسه`, 'bad_comment');
+  comment = require('./ops-errors').maskCards(comment);   //  S117: شمارهٔ کاملِ کارت ⇒ «[کارت]» پیش از ذخیره و هش
   return { stars: b.stars, comment, hash: crypto.createHash('sha256').update(JSON.stringify([b.stars, comment])).digest('hex') };
 }
 

@@ -54,6 +54,21 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/e-rows-1` (ردیف‌های PARTIAL ِ ردهٔ E «کدِ ساخته‌نشده»؛ روی `claude/owner-yes-1`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: S117 (`maskCards` در گفت‌وگوی مشتری ↔ دکان، یادداشتِ گزارش، یادداشتِ سفارشِ ویترین/کارمند/قلم/گذار و نظرِ مشتری؛
+  `card-data` ۷/۷)؛ S79 (`lib/order-stuck-alert.js` + پرچمِ خاموشِ `shop.orders.stuck_alert` در کاتالوگ و `workers.js`؛ رویدادِ `note`،
+  سابقه، پوش؛ وضعیت دست نمی‌خورد؛ `order-stuck-alert` ۳/۳)؛ S41 (`secondOrder` در `parseCheckout` ⇒ `order-rate.guard` ⇒
+  `order-risk.checkIn`، `ask: 'track_or_second'`، پرسشِ ویترین با `K.confirm(text, ok, no)`؛ `order-risk` ۱۰/۱۰ و مرورگرِ تازهٔ
+  `web-store-dup.mjs` در زنجیرِ `test:web-store`)؛ S93 («پیک تعیین نشده» در پیگیری؛ گامِ تازه در `track.e2e.mjs`)؛ S47 (تاریخِ دقیق در
+  بنرِ وب؛ `web-backup.mjs`). هر آزمونِ تازه پیش از رفع سرخ؛ ۳۵ مجموعهٔ مرتبط ۳۰۹/۳۰۹ روی PGlite و PostgreSQL ۱۶ ِ محلی؛
+  `web-store`، `web-store-allflags`، `web-store-changes`، `web-store-method` و سرتاسریِ `lifecycle`/`track` سبز.
+- بازطبقه‌بندی (نه کد؛ فقط متنِ STATUS): SYN-01، SYN-06، PAY-16، PRD-08، PRM-02، RPT-13 (تصمیم/دستگاه/شاهدِ CI)، OPS-09 (رابطِ پنلِ
+  ریپوی دیگر/وبِ منجمد)، CRM-10 و STF-06 (طراحیِ همگام‌سازی، نه کدِ کوچک).
+- نیمه‌کاره: S117 (یادداشت‌های کارمند و پنل)، S41 (همین پرسش در `customer-android`؛ پیش‌پرداختِ مشتریِ تازه ⇐ D-08)، S93 («جایگزینی در انتظارِ پاسخ»)، S47 (بنرِ کاتلین
+  و قالبِ اعلانِ سرور)؛ SYN-09 و LOC-06 کدِ بزرگ‌اند و شروع نشدند.
+- قدمِ بعدی: شاهدِ CI ِ همین شاخه؛ S124 (گزارشِ GMV/صندوق/آنلاین/وصول/تسویه‌نشده/بازپرداخت در پنل) و S118 (آزمونِ درِ مشتری با
+  بلیتِ منقضی) نامزدهای دورِ بعد.
+
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/owner-yes-1` («همه بله» ِ صاحب‌کار به ۱۹ بندِ `OWNER-PENDING`؛ روی دستهٔ ۴۵ + `claude/owner-decisions-4`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱-۱۱) مجوزِ هسته‌ایِ `sales.free_line` (perm-core JS×۲ و Kotlin، perm-v1، approval-core×۲، `RemoteApproval`، staff-perms FLAGGED)
   و قاعدهٔ «قلمِ آزاد» + «عمده فقط برای مشتریِ لیستِ عمده» در `sale-caps.js` = `SaleCaps.kt` (بردارِ تازهٔ sale-caps-v1)، داوریِ

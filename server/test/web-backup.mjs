@@ -444,9 +444,11 @@ await step('قفلِ نرم: اشتراکِ تمام‌شده فقط‌خوان�
     localStorage.removeItem('tohid-banner-seen-v1');
     window.TohidAccountUI._applySubscription();
     const b = document.getElementById('acct-banner');
-    return { locked: window.TohidAccountUI.isSoftLocked(), kind: b.className, text: b.textContent };
+    const end = JSON.parse(localStorage.getItem('tohid-heartbeat-v1')).subscription.endsAt;
+    return { locked: window.TohidAccountUI.isSoftLocked(), kind: b.className, text: b.textContent, date: new Date(end).toLocaleDateString('fa-AF') };
   });
   assert.equal(warn.locked, false, 'هفت روز پیش از پایان هنوز قفل نیست');
+  assert.ok(warn.text.includes(`(${warn.date})`), `S47: هشدار تاریخِ دقیقِ پایان را دارد — ${warn.text.slice(0, 120)}`);
   assert.ok(warn.kind.includes('warn'), 'بنر باید زرد باشد');
   assert.ok(warn.text.includes('تا پایانِ اشتراک'), warn.text.slice(0, 80));
 });

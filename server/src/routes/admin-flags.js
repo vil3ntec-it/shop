@@ -104,6 +104,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.orders.delay', scope: 'shop', default: false, what: '«عقب انداختنِ» زمانِ آماده‌شدنِ سفارشِ قبول‌شده (ORD-07)' },
   { key: 'shop.orders.presence', scope: 'shop', default: false, what: 'نشانگرِ «باز / بسته» در بخشِ سفارش‌های کارمند (ORD-03)' },
   { key: 'shop.orders.start_alert', scope: 'shop', default: false, what: 'هشدارِ شروعِ سفارشِ زمان‌بندی‌شده (ORD-18)' },
+  { key: 'shop.orders.stuck_alert', scope: 'shop', default: false, what: 'هشدارِ «سفارشِ گیرکرده» به دکان پس از قبول (S79)' },
   { key: 'shop.orders.bulk', scope: 'shop', default: false, what: 'تغییرِ وضعیتِ گروهیِ چند سفارش (ORD-19)' },
   { key: 'shop.orders.notice_resend', scope: 'shop', default: false, what: '«فرستادنِ دوبارهٔ» پیامِ وضعیت به مشتری (ORD-16)' },
   { key: 'shop.orders.online_report', scope: 'shop', default: false, what: 'گزارشِ فروشِ اینترنتی و جست‌وجوهای بی‌نتیجهٔ ویترین (RPT-14)' },

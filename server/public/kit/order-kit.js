@@ -61,10 +61,11 @@
   };
 
   // ── پرسشِ تأیید (dialog، نه confirm ِ مرورگر) ──
-  K.confirm = function (text, okText) {
+  //  [noText]: برچسبِ دکمهٔ «نه» (پیش‌فرض «نه»)؛ «نه» همیشه گزینهٔ بی‌خطر است و فوکوس می‌گیرد (Esc هم همان)
+  K.confirm = function (text, okText, noText) {
     return new Promise(function (resolve) {
       var d = K.el('dialog', { class: 'confirm', attrs: { 'aria-label': text } });
-      var no = K.el('button', { class: 'btn btn-ghost btn-sm', text: K.t('no'), attrs: { type: 'button' } });
+      var no = K.el('button', { class: 'btn btn-ghost btn-sm', text: noText || K.t('no'), attrs: { type: 'button' } });
       var yes = K.el('button', { class: 'btn btn-danger btn-sm', text: okText || K.t('yes'), attrs: { type: 'button' } });
       d.append(K.el('p', { text: text }), K.el('div', { class: 'row' }, no, yes));
       document.body.appendChild(d);

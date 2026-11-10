@@ -91,7 +91,7 @@
 "{0} روز از آخرین پشتیبان‌گیری گذشته": "{0} days since the last backup",
 "{0} روز از دوره آزمایشی شما باقی مانده است": "{0} days left of your trial",
 "{0} روز تا پایان اشتراک باقی مانده است.": "{0} days left until the subscription ends.",
-"{0} روز تا پایانِ اشتراک.": "{0} days until the subscription ends.",
+"{0} روز تا پایانِ اشتراک ({1}).": "{0} days until the subscription ends ({1}).",
 "{0} روز پیش": "{0} days ago",
 "{0} رویداد حساس امروز": "{0} sensitive events today",
 "{0} ساعت پیش": "{0} hours ago",
