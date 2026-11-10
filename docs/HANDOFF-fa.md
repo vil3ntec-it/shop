@@ -74,7 +74,7 @@
 - نیمه‌کاره: `ReportPeriodVectorsTest`، `SalesHeatmapVectorsTest` (core jvmTest)، `ReportDrillVectorsTest` (app) و KeyMapTest/ScenarioS50Test با keymap ِ تازه **فقط در CI**. ریزِ «سنِ بدهی»/«ضدتقلب» در وب نیست (`openDebt`/`fraudEvents` دوقلوی JS ندارند)؛ «گزارشِ تازه» ِ کامپیوتر − / + و مقایسه ندارد؛ وب پایانِ روزِ کاری و آغازِ هفتهٔ دکان را ندارد (نقشه با نیمه‌شب و شنبه).
 - قدمِ بعدی: شاهدِ CI ِ سه آزمونِ Kotlin در STATUS ِ RPT-13/RPT-08؛ دوقلوی `openDebt`/`fraudEvents` برای ریزِ بدهی و ضدتقلبِ وب؛ − / + در `DeskFreshReports`؛ پشتو/انگلیسیِ ۲۸ کلیدِ تازه را صاحب‌کار ببیند.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/inv-3` (INV-21 و INV-20؛ روی `ccr-…-batch-44` ‏040ae52c؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
-- انجام شد: **INV-21 سرور** پشتِ پرچمِ خاموشِ `shop.catalog_repack` (با `shop.catalog`؛ کاتالوگِ پرچم‌ها، RULES، FLAGS-ON §۸ی): `lib/catalog-repack.js` +
+- انجام شد: **INV-21 سرور** پشتِ پرچمِ خاموشِ `shop.catalog_repack` (با `shop.catalog`؛ کاتالوگِ پرچم‌ها، RULES، FLAGS-ON §۸ک): `lib/catalog-repack.js` +
   نوع‌های `repack`/`assemble` ِ `POST /api/shop/catalog/moves` (بی مسیرِ تازه؛ `stock.adjust`) — یک سند = `production` ِ منفی برای هر ورودی و مثبت برای
   خروجی، یک تراکنش زیرِ قفلِ دکان، همان `ref_type`/`ref_id`، دقیق به هزارم با BigInt (نادقیق ⇒ ۴۰۰ `repack_inexact`)، کمبود ⇒ ۴۰۹ بی ردیف، تکرار ⇒ همان
   حرکت‌ها؛ ردیفِ تولیدِ برنامه (`adjKind = repack`) در خواندنِ دفترِ دستگاه `production` ِ پیوسته با کلیدِ کار (نه «رسید + اصلاح»)؛ مهاجرتِ ۷۲۰ (CHECK ِ
