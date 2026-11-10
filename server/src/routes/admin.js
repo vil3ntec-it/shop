@@ -94,6 +94,8 @@ router.use('/system/notify-usage', rateLimit({ max: 30, windowMs: 60 * 1000, key
 //  دو درِ قراردادِ پل (`routes/admin-bridge.js`، S15 و S18) — سقفِ IP پیش از احراز؛ پل همه از یک IP است، پس گشاد
 router.use('/contract', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-contract-ip' }));
 router.use('/subscriptions/period-end', rateLimit({ max: 240, windowMs: 60 * 1000, keyPrefix: 'admin-period-end-ip' }));
+//  LOC-04: جدولِ تعطیلات (`routes/admin-calendar.js`، پس از این روتر سوار) — سقفِ IP پیش از همین `requireAdmin`
+router.use('/calendar', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-calendar-ip' }));
 
 router.use(requireAdmin);
 

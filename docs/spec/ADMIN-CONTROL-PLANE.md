@@ -294,8 +294,10 @@
 | `GET /admin/delivery/report` ▲ | مدیر (+ مالی) | سراسری | دارد (`admin.delivery_report_viewed`) | خواندنِ مالی | — | `admin-delivery.js` |
 | `GET /admin/delivery/thresholds` ▲ | مدیر | سراسری | — | خواندنِ سراسری | — | `admin-delivery.js` |
 | `PUT /admin/delivery/thresholds` ▲ | ارشد + دلیل | سراسری | دارد + تاریخچه (`live_config`) | عملیات | — | `admin-delivery.js` |
+| `GET /admin/calendar/holidays` ● | مدیر | سراسری | — | خواندنِ سراسری (دادهٔ همگانی) | — | `admin-calendar.js` |
+| `PUT /admin/calendar/holidays` ● | ارشد + دلیل | سراسری | دارد، در همان تراکنش (تکرارِ همان جدول ⇒ `unchanged` بی ردیفِ دوم) | عملیات | — | `admin-calendar.js` |
 
-◆ = فاز ۳ ِ پنلِ مرکزی (بند ۱۲). ▲ = ماژول‌های ۴.۶ و ۴.۷ (بند ۱۲.۸). `GET /admin/shops` حالا ستونِ `holds` و پالایشِ `?hold=` هم دارد؛
+◆ = فاز ۳ ِ پنلِ مرکزی (بند ۱۲). ▲ = ماژول‌های ۴.۶ و ۴.۷ (بند ۱۲.۸). ● = LOC-04 (جدولِ تعطیلاتِ رسمی؛ «توانایی» ِ `holidays.v1`، سقفِ IP ِ `admin-calendar-ip` پیش از احراز). `GET /admin/shops` حالا ستونِ `holds` و پالایشِ `?hold=` هم دارد؛
 `PUT/DELETE /admin/pump/live-config` و `PUT /admin/release/beta` تاریخچه می‌نویسند (دلیلِ اختیاری).
 
 ---

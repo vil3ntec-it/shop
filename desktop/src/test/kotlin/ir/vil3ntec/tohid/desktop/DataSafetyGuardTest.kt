@@ -324,6 +324,8 @@ class DataSafetyGuardTest {
       "tohid-heartbeat", "tohid-news", "tohid-promos", "tohid-storefront", "tohid-shop-chat", "order-notify",
       "tohid-doc-chain", "tohid-doc-series", "tohid-hesabpay", "tohid-courier", "tohid-staff-time", "tohid-imgbank",
       "tohid-photos", "tohid-photobot", "device-push",
+      //  LOC-04: نسخهٔ محلیِ جدولِ تعطیلاتِ رسمیِ سرور (`ShopDayChoice`، روزی یک بار)؛ تنظیمِ دکان نیست
+      "tohid-holidays",
     ).forEach { put(it, Kind.SERVER) }
     //  عمداً مالِ همین دستگاه: نشست و همگام‌سازی، سرور، قفل، زبان و ظاهر، چاپگر/دستگاه‌ها، پیش‌نویس‌ها
     listOf(

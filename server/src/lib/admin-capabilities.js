@@ -28,6 +28,8 @@ const CAPABILITIES = Object.freeze([
   'sync-restore-once.v1',   //  POST /admin/sync/conflicts/:id/restore — شناسهٔ یک‌شکل، ۴۰۹ already_restored، Idempotency-Key
   'subscription-period.v1', //  GET /admin/subscriptions/period-end — پایانِ دوره از سرور (S15)
   'admin-contract.v1',      //  GET /admin/contract + سرآیندِ X-Admin-API-Version (S18)
+  //  LOC-04: ویرایشگرِ تعطیلاتِ رسمی در پنلِ مرکزی (خواندن: هر مدیر؛ نوشتن: ارشد + دلیل، یک‌باره، قفلِ نسخه)
+  'holidays.v1',            //  GET|PUT /admin/calendar/holidays
 ]);
 
 /*

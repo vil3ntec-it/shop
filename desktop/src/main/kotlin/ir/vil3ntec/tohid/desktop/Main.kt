@@ -112,6 +112,8 @@ fun main() {
     var visible by remember { mutableStateOf(true) }
     //  پنجرهٔ پیدا ⇒ اسکنِ بارکدخوانِ COM یک‌راست به صفحهٔ باز؛ پنهان (سینی) ⇒ صفِ «اسکن‌های در انتظار»
     androidx.compose.runtime.SideEffect { ir.vil3ntec.tohid.scan.ScanInbox.foreground = visible }
+    //  LOC-04: جدولِ تعطیلاتِ رسمیِ سرور روزی یک بار (همان `AppShell` ِ اندروید و آیفون؛ بی‌شبکه نسخهٔ ذخیره‌شده)
+    LaunchedEffect(Unit) { ir.vil3ntec.tohid.ShopDayChoice.keepHolidaysFresh(context) }
     var zoom by remember { mutableFloatStateOf(prefs.getFloat("desktop_zoom", 1f).coerceIn(0.7f, 1.8f)) }
     fun setZoom(z: Float) { zoom = z.coerceIn(0.7f, 1.8f); prefs.edit().putFloat("desktop_zoom", zoom).apply() }
 

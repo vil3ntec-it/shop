@@ -379,6 +379,7 @@ const CAPABILITY_PROBES = {
   'sync-restore-once.v1': ['POST /admin/sync/conflicts/1/restore'],
   'subscription-period.v1': ['GET /admin/subscriptions/period-end?amount=1&unit=month'],
   'admin-contract.v1': ['GET /admin/contract'],
+  'holidays.v1': ['GET /admin/calendar/holidays', 'PUT /admin/calendar/holidays'],
 };
 
 test('GET /api/admin/me: فهرستِ «توانایی»ها با همان نام‌های پل، و درِ هر کدام واقعاً هست', async () => {
