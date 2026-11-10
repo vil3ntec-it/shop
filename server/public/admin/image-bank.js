@@ -168,10 +168,16 @@
   }
 
   // ---------- دسته‌ها ----------
-  async function loadBatches() {
+  //  ⛔ نسلِ بار، مثلِ `loadReview`: بارهای هم‌پوشان (زبانه، ساختن/بارگذاری/وضعیتِ دسته) ردیفِ دوتایی نمی‌سازند
+  let bGen = 0;
+  let bLatest = Promise.resolve();
+  function loadBatches() { bLatest = loadBatchesOnce(); return bLatest; }
+  async function loadBatchesOnce() {
+    const gen = ++bGen;
     const body = $('ib-batches');
     body.innerHTML = '';
     const out = await call('GET', `${IB}/batches`);
+    if (gen !== bGen) return bLatest;
     if (!out.items.length) {
       const tr = el('tr');
       const c = td('هنوز دسته‌ای ساخته نشده', 'muted');
@@ -375,14 +381,26 @@
 
   // ---------- صفِ بررسی ----------
   let rvCursor = null;
+  let rvGen = 0;
+  let rvLatest = Promise.resolve();
   const rvItems = new Map();
 
-  async function loadReview(reset = true) {
+  //  ⛔ نسلِ بار: بارِ زبانه و «بار کن» ِ کاربر روی شبکهٔ کند هم‌پوشان بودند؛ هر دو جدول را پیش از await پاک و پس از آن پر
+  //  می‌کردند ⇒ ردیفِ دوتایی یا ردیفِ صافیِ پیشین. پاسخِ باری که بارِ تازه‌تری جایش نشسته کنار می‌رود و همان بارِ تازه را
+  //  منتظر می‌ماند (`refreshCurrent` پس از آن `rvItems` ِ پر را می‌بیند).
+  function loadReview(reset = true) {
+    const p = loadReviewOnce(reset);
+    if (reset) rvLatest = p;
+    return p;
+  }
+  async function loadReviewOnce(reset) {
     const body = $('ib-review');
+    const gen = reset ? ++rvGen : rvGen;
     if (reset) { body.innerHTML = ''; rvItems.clear(); rvCursor = null; }
     const q = new URLSearchParams({ status: $('ib-rv-status').value, space: $('ib-rv-space').value });
     if (rvCursor) q.set('cursor', rvCursor);
     const out = await call('GET', `${IB}/review?${q}`);
+    if (gen !== rvGen) return rvLatest;
     rvCursor = out.next_cursor;
     $('btn-ib-rv-more').classList.toggle('hidden', !rvCursor);
     const onlyDups = $('ib-rv-dups').checked;
