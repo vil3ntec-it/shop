@@ -79,13 +79,19 @@ object PrefsRules {
 
   /**
    *  بدنهٔ `POST …/delivery` از [sent]: همیشه «زنگ» و «تحویل به»؛ اسکناس فقط با «نقد هنگامِ تحویل» (null ⇒ برداشته)؛
-   *  نشانه فقط پُر؛ و نسخهٔ دیده‌شده — پس تکرارِ همین بدنه پس از پاسخِ گم‌شده یا ۴۰۹ است یا «همان بود»، نه ویرایشِ دوم.
+   *  نقد نیست ولی اسکناسی مانده (پس از ثبت با حساب‌پی پرداخت شد) ⇒ null ِ صریح، همان وب (`store/order.js`)، وگرنه سرور
+   *  `bad_cash_tender` می‌داد؛ نشانه فقط پُر؛ و نسخهٔ دیده‌شده — پس تکرارِ همین بدنه پس از پاسخِ گم‌شده یا ۴۰۹ است یا
+   *  «همان بود»، نه ویرایشِ دوم.
    */
   fun body(o: PublicOrder, p: CustomerDeliveryPrefs, sent: PrefsForm): JsonObject {
     val d = LinkedHashMap<String, JsonElement>()
     d["callBeforeArrival"] = JsonPrimitive(sent.callBeforeArrival)
     d["leaveWith"] = JsonPrimitive(sent.leaveWith)
-    if (tenderShown(o, p)) d["cashTenderMinor"] = sent.cashTenderMinor?.let { JsonPrimitive(it) } ?: JsonNull
+    if (tenderShown(o, p)) {
+      d["cashTenderMinor"] = sent.cashTenderMinor?.let { JsonPrimitive(it) } ?: JsonNull
+    } else if (p.cashTenderMinor != null) {
+      d["cashTenderMinor"] = JsonNull
+    }
     val out = LinkedHashMap<String, JsonElement>()
     out["delivery"] = JsonObject(d)
     if (sent.landmark.isNotEmpty()) out["address"] = JsonObject(mapOf("landmark" to JsonPrimitive(sent.landmark)))

@@ -208,11 +208,11 @@ async function orderPaymentIn(c, intent, to, detail = {}) {
   }
   if (to === 'paid') {
     await c.query(
-      `UPDATE online_orders SET payment_status='paid', payment_method='online',
-              cod_status=CASE WHEN cod_status='to_collect' THEN '' ELSE cod_status END,
-              version=version+1, updated_at=$3 WHERE shop_id=$1 AND id=$2`, [intent.shop_id, o.id, at]);
+      `UPDATE online_orders SET payment_status='paid', payment_method='online', version=version+1, updated_at=$3,
+              cod_status=CASE WHEN cod_status='to_collect' THEN '' ELSE cod_status END WHERE shop_id=$1 AND id=$2`, [intent.shop_id, o.id, at]);
     await require('./order-notify').enqueueIn((t, p) => c.query(t, p), { shopId: intent.shop_id, orderId: o.id, orderNo: o.order_no, at, event: 'order_paid' });   // O-01
     await require('./delivery-due').syncIn(c, intent.shop_id, o.id, at);   //  DLV-11: پیکِ سپرده‌شده دیگر نقد نمی‌گیرد
+    await require('./delivery-prefs').dropStaleTenderIn(c, intent.shop_id, o.id, at);   //  CHK-24: آنلاین ⇒ اسکناسِ نقد دیگر نیست
     if (CLOSED_ORDER.includes(o.status)) return 'order_closed_paid';
     if (Number(o.total_minor) !== Number(intent.amount_minor)) return 'order_total_changed';
   } else {

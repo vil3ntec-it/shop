@@ -619,6 +619,7 @@ async function pack(shopId, orderId, { key, body }, actor) {
           : 'جمع‌آوری: همهٔ قلم‌ها برداشته شد', 300),
         JSON.stringify({ pick: pickDetail }), at]
     );
+    await require('./delivery-prefs').dropStaleTenderIn(c, shopId, id, at);   //  CHK-24: جایگزین/«پیدا نشد» و اسکناسِ مشتری
     await orders.transitionIn(c, shopId, id, { to: 'packed', from: 'picking' }, actor);
     await c.query(
       `UPDATE order_picks SET status='packed', bags=$2, final_total_minor=$3, pack_key=$4, packed_at=$5,

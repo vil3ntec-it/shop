@@ -12,7 +12,8 @@
  *             (`EDITABLE`)؛ پس از آن ۴۰۹ `delivery_locked`. نسخهٔ دیده‌شده (`version`) ناهمخوان ⇒
  *             ۴۰۹ `version_conflict` (ویرایشِ هم‌زمانِ دو دستگاه هرگز بی‌صدا رونویسی نمی‌شود).
  *             همان مقدار دوباره ⇒ ۲۰۰ `unchanged` بی رویداد. هر تغییر یک رویدادِ `delivery_edit`
- *             با «پیش» و «پس» در خطِ زمانی. کارتِ پیک همین JSON را زنده می‌خواند.
+ *             با «پیش» و «پس» در خطِ زمانی. کارتِ پیک همین JSON را زنده می‌خواند. جمع/روشِ پرداخت عوض شد و
+ *             اسکناس دیگر نمی‌خواند ⇒ همان تراکنش برش می‌دارد ([dropStaleTenderIn]).
  *
  * ⛔ پرچمِ جدا و پیش‌فرض خاموشِ `shop.orders.delivery_prefs` (live_config، دکان یا all): خاموش ⇒
  *    `cashTenderMinor` خوانده نمی‌شود (همان سفارشِ امروز) و ویرایش ۴۰۳ `delivery_prefs_disabled`.
@@ -58,6 +59,9 @@ function parseTender(raw) {
 /** پول خردی که پیک می‌آورد — یا null اگر داده کمتر از بدهی است. */
 const changeOf = (tenderMinor, dueMinor) => (tenderMinor >= dueMinor ? tenderMinor - dueMinor : null);
 
+const FA_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
+const faAfn = (minor) => String(Math.round(minor / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, '٬').replace(/[0-9]/g, (d) => FA_DIGITS[Number(d)]);
+
 /** قاعدهٔ اسکناس در برابرِ جمعِ همین لحظه (ثبت و ویرایش هر دو). */
 function checkTender(tenderMinor, { fulfillment, paymentMethod, totalMinor }) {
   if (tenderMinor === null) return;
@@ -69,6 +73,58 @@ function checkTender(tenderMinor, { fulfillment, paymentMethod, totalMinor }) {
   if (change >= LARGEST_NOTE_MINOR) {
     throw badRequest('پول خرد از یک اسکناسِ ۱۰۰۰ بیشتر می‌شود؛ مبلغِ اسکناس را درست بنویسید', 'cash_tender_excess');
   }
+}
+
+/** اسکناسِ ماندهٔ ردیف اگر با جمع، روشِ پرداخت و روشِ تحویلِ امروزِ همان ردیف دیگر نمی‌خواند؛ وگرنه null. */
+function staleTenderOf(row) {
+  const d = asJson(row.delivery);
+  const tender = Number.isSafeInteger(d.cashTenderMinor) ? d.cashTenderMinor : null;
+  if (tender === null) return null;
+  try {
+    checkTender(tender, { fulfillment: row.fulfillment, paymentMethod: row.payment_method, totalMinor: Number(row.total_minor) });
+    return null;
+  } catch {
+    return tender;
+  }
+}
+
+/**
+ * ⛔ CHK-24، یک قاعده: اسکناسِ ماندهٔ مشتری همیشه با سفارشِ امروز می‌خواند. هر تراکنشی که جمع، روشِ پرداخت یا روشِ تحویل را
+ * عوض می‌کند — ویرایش (ORD-14)، افزودنِ قلم (CHK-21)، بسته‌بندیِ جمع‌آوری با جایگزین/«پیدا نشد» (PCK-05/07)، روشِ تحویل (S72)
+ * و پرداختِ آنلاین (PAY-21) — پس از نوشتن و زیرِ همان قفلِ ردیف این را می‌خواند: اسکناسی که دیگر از [checkTender] نمی‌گذرد همان دم
+ * برداشته می‌شود، با رویدادِ `delivery_edit` ِ «سیستم» و یادداشتی در خطِ زمانیِ کارمند؛ پیک بر پایهٔ آن پول خرد نمی‌آورد و مشتری
+ * «با کدام اسکناس…» را از نو می‌بیند. [edit] بی کلیدِ اسکناس هم پیش از سنجش همین را می‌خواند (ردیفِ پیش از این قاعده)، پس هیچ
+ * ویرایشی به خاطرِ اسکناسِ مانده رد نمی‌شود؛ مبلغی که خودِ درخواست می‌فرستد همان سنجشِ پیشین را دارد. بی پرچم: اسکناس فقط با
+ * پرچمِ روشن نشسته و برداشتنِ مبلغِ نادرست همیشه امن‌تر از نگه داشتنش است. ⛔ هیچ اثری بر جمع، COD یا تسویه.
+ * @returns {Promise<number|null>} اسکناسِ برداشته یا null
+ */
+async function dropStaleTenderIn(c, shopId, orderId, at = now()) {
+  const row = (await c.query(
+    'SELECT id, status, fulfillment, payment_method, total_minor, delivery FROM online_orders WHERE shop_id=$1 AND id=$2',
+    [shopId, String(orderId || '')]
+  )).rows[0];
+  const tender = row ? staleTenderOf(row) : null;
+  if (tender === null) return null;
+  await c.query(
+    `UPDATE online_orders SET delivery = delivery - 'cashTenderMinor', version=version+1, updated_at=$3 WHERE shop_id=$1 AND id=$2`,
+    [shopId, row.id, at]
+  );
+  const seq = Number((await c.query(
+    'SELECT COALESCE(MAX(seq), 0) + 1 AS n FROM online_order_events WHERE order_id=$1', [row.id]
+  )).rows[0].n);
+  const detail = {
+    changed: ['cashTenderMinor'], before: { cashTenderMinor: tender }, after: { cashTenderMinor: null },
+    stale: { totalMinor: Number(row.total_minor), paymentMethod: row.payment_method, fulfillment: row.fulfillment },
+  };
+  await c.query(
+    `INSERT INTO online_order_events (id, order_id, shop_id, seq, kind, from_status, to_status,
+       actor_type, actor_id, reason, note, detail, created_at)
+     VALUES ($1,$2,$3,$4,'delivery_edit',$5,$5,'system','','',$6,$7::jsonb,$8)`,
+    [ulid(at), row.id, shopId, seq, row.status,
+      `اسکناسِ مشتری (${faAfn(tender)} افغانی) با جمع یا روشِ پرداختِ تازهٔ سفارش دیگر نمی‌خواند و برداشته شد؛ پیک برای آن پول خرد نمی‌آورد.`,
+      JSON.stringify(detail), at]
+  );
+  return tender;
 }
 
 /**
@@ -139,7 +195,14 @@ async function edit(shopId, id, body, actor, { source = null } = {}) {
       throw Object.assign(conflict('سفارش همین حالا جای دیگری عوض شد؛ دوباره ببینید', 'version_conflict'),
         { data: { version: Number(row.version) } });
     }
-    const delivery = asJson(row.delivery);
+    const at = now();
+    let delivery = asJson(row.delivery);
+    //  ⛔ بی کلیدِ اسکناس: اسکناسِ ماندهٔ نادرست (ردیفِ پیش از [dropStaleTenderIn]) ویرایش را رد نمی‌کند — همان قاعده، همین‌جا
+    if (!('cashTenderMinor' in patch) && staleTenderOf(row) !== null) {
+      await dropStaleTenderIn(c, shopId, row.id, at);
+      const { cashTenderMinor: _stale, ...rest } = delivery;
+      delivery = rest;
+    }
     const address = asJson(row.address);
     const before = prefsOf(delivery, address);
     const after = { ...before, ...patch };
@@ -155,7 +218,6 @@ async function edit(shopId, id, body, actor, { source = null } = {}) {
     const nextAddress = { ...address };
     if (after.landmark) nextAddress.landmark = after.landmark; else delete nextAddress.landmark;
 
-    const at = now();
     const seq = Number((await c.query(
       'SELECT COALESCE(MAX(seq), 0) + 1 AS n FROM online_order_events WHERE order_id=$1', [row.id]
     )).rows[0].n);
@@ -220,5 +282,5 @@ function courierCash(delivery, expectedCollectMinor) {
 
 module.exports = {
   FLAG_KEY, LARGEST_NOTE_MINOR, EDITABLE, flagOn, parseTender, changeOf, checkTender, applyOnCreate, parseEdit,
-  edit, editByToken, courierCash, customerPrefs,
+  edit, editByToken, courierCash, customerPrefs, staleTenderOf, dropStaleTenderIn,
 };

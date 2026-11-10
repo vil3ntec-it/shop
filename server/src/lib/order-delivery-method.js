@@ -241,6 +241,7 @@ async function change(sf, token, { key, body, ticket = '', session = '' }) {
         scheduledFor: d.scheduledFor,
       };
       await amend.event(c, shopId, row, CUSTOMER, detail, {}, at);
+      await require('./delivery-prefs').dropStaleTenderIn(c, shopId, row.id, at);   //  CHK-24: دریافت از دکان یا هزینهٔ تازه
       return { replayed: false, detail, row };
     });
   } catch (err) {
