@@ -71,6 +71,9 @@ async function writeOnce(req, { tenantId = '', resultId = '' } = {}, run) {
   }
   try {
     await tx(async (c) => {
+      //  ⛔ زیرِ همان قفلِ کلید: بی آن، درخواستِ هم‌زمانی که پاسخ را هنوز نیافته بود پس از این ثبت نشان را هم نمی‌دید
+      //  (برداشتِ تازهٔ READ COMMITTED) و کار را دوباره می‌کرد
+      await idempotency.lock(c, idem);
       await release(c);
       await idempotency.save(c, idem, { tenantId: String(tenantId || ''), resultId: String(resultId || ''), response });
     });

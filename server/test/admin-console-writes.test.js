@@ -329,6 +329,37 @@ test('هم‌زمان: چهار ازکارانداختن با یک کلید ⇒ 
   }
 });
 
+//  ⛔ پنجرهٔ «یافتنِ پاسخ ⇄ دیدنِ نشان»: دومی پاسخ را (هنوز ثبت‌نشده) نمی‌یابد، اولی همان دم پاسخ را ثبت و نشان را برمی‌دارد،
+//  و دومی با برداشتِ تازهٔ READ COMMITTED نشان را هم نمی‌بیند ⇒ کارِ دوم (دو ۲۰۰ ِ تازه با یک کلید). پایانِ اولی باید زیرِ
+//  همان قفلِ کلید باشد. `find` ِ دومی تا ثبتِ پاسخِ اولی (یا ۱٫۵ ثانیه) نگه داشته می‌شود تا پنجره همیشه باز شود.
+test('هم‌زمان: پایانِ کارِ اول میانِ «یافتنِ پاسخ» و «دیدنِ نشان» ِ دومی ⇒ یک اثر؛ دومی بازپخش یا ۴۰۹، نه کارِ دوم', {
+  skip: require('../src/db').isPglite() && 'PGlite یک اتصال است و تراکنش‌ها را پشتِ هم می‌چیند — این پنجره فقط روی PostgreSQL هست',
+}, async () => {
+  const t = await team('پنجرهٔ یافتن');
+  const dev = await devOf(t.staff[0]);
+  const idem = require('../src/lib/idempotency');
+  const k = key('win');
+  const origFind = idem.find;
+  let calls = 0;
+  idem.find = async (x, run) => {
+    const row = await origFind(x, run);
+    if (x.key === k && ++calls === 2 && !row) {
+      for (let i = 0; i < 30 && !(await origFind(x)); i++) await new Promise((r) => setTimeout(r, 50));
+    }
+    return row;
+  };
+  try {
+    const out = await Promise.all([1, 2].map(() =>
+      A('cw-arshad', 'POST', devPath(t.shopId, dev, 'disable'), { reason: 'گم شد' }, withKey(k))));
+    const fresh = out.filter((r) => r.status === 200 && r.headers.get('idempotent-replayed') === null);
+    assert.equal(fresh.length, 1, JSON.stringify(out.map((r) => [r.status, r.headers.get('idempotent-replayed'), r.body?.error?.code])));
+    for (const r of out) if (r !== fresh[0]) assert.ok(r.status === 409 || r.headers.get('idempotent-replayed') === 'true', String(r.status));
+    assert.equal((await audits('device.disabled', dev)).length, 1, 'فقط یک اثر');
+  } finally {
+    idem.find = origFind;
+  }
+});
+
 test('هم‌زمان: دو برگرداندنِ همان دستگاه با دو کلیدِ جدا (دو پنجره) ⇒ دقیقاً یکی ۲۰۰ و یک سابقه', async () => {
   for (let round = 0; round < 3; round++) {
     const t = await team(`دو پنجره ${round}`);
