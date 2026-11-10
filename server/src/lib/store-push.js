@@ -28,7 +28,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const { query, one, many, now } = db;
 const { ulid } = require('./ulid');
-const { badRequest, notFound, conflict } = require('../middleware/errors');
+const { ApiError, badRequest, notFound, conflict } = require('../middleware/errors');
 
 const FLAG = 'shop.storefront.web_push';
 const PUB_KEY = 'store_vapid_public';
@@ -179,6 +179,12 @@ async function attach(store, token, body, at = now()) {
       'SELECT id, source, status, track_gen FROM online_orders WHERE shop_id=$1 AND id=$2 FOR UPDATE', [store.shop_id, orderId]
     )).rows[0];
     if (!o || o.source !== 'storefront') throw nf();
+    //  SR39-1 (TEN-03): لینک بیرون از قفل سنجیده شد؛ «باطل کردنِ» میانِ آن و قفل ⇒ همان ۴۱۰، نه اشتراکی با نسلِ تازه
+    const sf = require('./storefront');
+    if (await require('./orders').flagOf(store.shop_id, sf.LINK_FLAG, (q, p) => c.query(q, p))
+      && sf.parseToken(store.shop_id, token).gen !== Number(o.track_gen)) {
+      throw new ApiError(410, 'link_revoked', 'این لینکِ پیگیری باطل شده است؛ سفارش را از «سفارش‌های من» با شمارهٔ خودتان ببینید');
+    }
     if (quiet(o.status)) throw conflict('این سفارش تمام شده است؛ خبرِ تازه‌ای ندارد', 'order_closed');
     const same = (await c.query('SELECT id FROM store_push_subs WHERE order_id=$1 AND endpoint=$2', [orderId, sub.endpoint])).rows[0];
     if (same) {
@@ -245,7 +251,7 @@ async function deliver(sub, payload, keys, { topic, urgency }) {
       vapidDetails: { subject: keys.subject, publicKey: keys.publicKey, privateKey: keys.privateKey },
       TTL: TTL_S, urgency, topic, contentEncoding: 'aes128gcm',
     });
-  } catch { return 'gone'; }   //  کلیدِ مرورگرِ خراب (سنجش پیش‌تر رد می‌کرد) — دیگر به کار نمی‌آید
+  } catch { return 'rejected'; }   //  SR39-2: کلیدِ مرورگر پیش‌تر سنجیده شد ⇒ خطا از این سرور است (مثلاً VAPID_SUBJECT ِ نادرست)؛ ردیف نمی‌رود
   const headers = {};
   for (const [k, v] of Object.entries(d.headers)) if (k.toLowerCase() !== 'content-length') headers[k] = String(v);
   let st;
@@ -297,7 +303,11 @@ async function send(msg) {
   const live = subs.filter((s) => Number(s.link_gen) === Number(o.track_gen));
   if (!live.length || !webpush) return { status: 'rejected', code: 'no_subscription' };
 
-  const token = await require('./storefront').currentTokenOf(msg.shopId, msg.orderId);
+  //  SR39-1: لینکِ لمس با همان نسلی که اشتراک‌ها با آن سنجیده شدند (نه نسلِ همین دم): «باطل کردنِ» وسطِ فرستادن لینکِ تازه
+  //  را به اشتراکِ لینکِ باطل نمی‌دهد
+  const sf = require('./storefront');
+  const token = (await sf.linkPolicyOn(msg.shopId))
+    ? sf.tokenOf(msg.shopId, msg.orderId, { gen: o.track_gen, at: now() }) : sf.tokenOf(msg.shopId, msg.orderId);
   const notify = require('./customer-notify');
   const urgent = (notify.MATRIX[msg.event] || []).includes('sms');
   const out = await fanOut('store_push_subs', live, (s) => ({
