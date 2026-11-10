@@ -54,6 +54,16 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/rpt-04` (RPT-04: گزارشِ X و Z؛ روی `ccr-…-batch-44` ‏391148a8 که خطِ ارزِ PAY-10 را دارد؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) **Z ِ بسته در سرور ثابت**: ردیف‌های صندوقِ سابقه (`shift_open`، `shift_close` با `z`، `cash_in`/`cash_out`/`no_sale`، `shift_review`، `shift_resume`) در نگهبانِ S89
+  (`lib/finalized-sales.js`، همان پرچمِ خاموشِ `shop.doc_chain`، `DOC_FIXED.auditLog` + `SHIFT_DOCS`): v1، راهِ قدیم و بازگرداندنِ تعارض دیگر Z را سرِ جا عوض/پاک/زنده نمی‌کنند
+  (`server/test/z-report-fixed.test.js` ۶/۶، PGlite و PostgreSQL؛ روی پایه ۴ سرخ). (۲) **شمارهٔ Z** در سریِ سندِ دستگاه (`core/pay/ZSeq`، `PayFlow.closeRow(…, series)`،
+  `ShiftReport.no/series`، ردیفِ `ShiftSlip.Kind.NUMBER`) و پیوستگی (`DrawerModel.zLines` در «سابقهٔ صندوق» و برگهٔ Z). (۳) **چاپِ X/Z در نسخهٔ ۳** (`ShiftPrintAndroid.kt`،
+  مجوزِ `shift.report`) و «چاپِ دوباره» برای Z ِ سابقه (هر دو صفحه). (۴) خط‌های ارز و حساب‌پی ِ X/Z ِ کشوی نام‌دار با مهرِ همان کشو (`CashShift.ownSale`) — همان یادداشتِ `claude/pay-10`.
+- نیمه‌کاره: همهٔ آزمون‌های Kotlin (`ZSeqTest`، `ShiftSlipTest`، `PayFlowTest`، `FxTillFlowTest`، `SalesFlowModelTest`) و کامپایلِ خودِ کدِ Kotlin فقط در CI دیده می‌شوند (Gradle این‌جا نیست)؛
+  RPT-04 PARTIAL ماند. نسخهٔ ۳ X/Z را بی مجوزِ `shift.report` هم نشان می‌دهد (فقط «چاپ» پشتِ مجوز است) — همان رفتارِ پیشین، دست نخورد.
+- قدمِ بعدی: اگر CI ِ Kotlin سرخ شد همان‌جا درست شود؛ تصمیم‌های صاحب‌کار: روشن کردنِ `shop.doc_chain` (حالا Z را هم می‌بندد)، شمارهٔ Z «هر دستگاه» (پیشنهاد، مثلِ فاکتور) یا
+  «یکتای دکان» (سرور باید بدهد)، و این‌که نسخهٔ ۳ دیدنِ X/Z را هم پشتِ `shift.report` ببرد. گزارشِ Z برای صاحب در سرور (درِ جدا یا گزارشِ خودکار) ساخته نشد.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-44` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۴، روی `ccr-…-batch-44` ‏6c73e73c؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: سه یافتهٔ Low در استودیوی عکس، هر سه با آزمونِ سرخ‌پیش‌از‌رفع (`server/test/security-review-44.test.js`، ۳ آزمون): SR44-1 PNG ِ دو-IHDR
   (`inspectPng` ⇒ `png-multi-ihdr`؛ `image-codec.decodePng` و `image-quality.pngLuma` IHDR ِ دوم را نمی‌گیرند)، SR44-2 سقفِ روزانه/صفِ `createBatch` زیرِ قفلِ دکان

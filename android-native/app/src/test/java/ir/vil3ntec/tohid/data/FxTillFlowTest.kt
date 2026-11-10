@@ -157,6 +157,27 @@ class FxTillFlowTest {
     assertEquals("ارز", PayFlow.methodName(Pay.FX))
   }
 
+  @Test fun `RPT-04 - خطِ ارزِ X و Z ِ کشوی نام‌دار فقط فروشِ مهرِ خودش را می‌شمارد و کشوی اصلی بقیه را`() {
+    val sale = recorded(ok(PayFlow.checkout(PayFlow.Draft(2450.0, fx = tender("40")))))
+    val main = AuditEntry(id = "sh", type = CashShift.OPEN, createdAt = t0, amount = 1000.0)
+    val named = AuditEntry(id = "nd", type = CashShift.OPEN, createdAt = t0, amount = 1000.0, drawer = "کشوی دوم")
+    val d = shop.copy(sales = listOf(sale.copy(id = "s-main"), sale.copy(id = "s-named", shiftId = "nd")), auditLog = listOf(main, named))
+    val to = t0 + 600_000
+    val one = listOf(FxTillFlow.Total("USD", 4000, 281000, 1))
+    assertEquals(one, FxTillFlow.totals(d, t0, to, CashShift.ownSale(d, "sh", t0, to)))
+    assertEquals(one, FxTillFlow.totals(d, t0, to, CashShift.ownSale(d, "nd", t0, to)))
+    //  بی مهر (پیش‌فرض، شیفتِ ناشناخته) همان پنجرهٔ پیشین: هر دو فروش
+    val both = listOf(FxTillFlow.Total("USD", 8000, 562000, 2))
+    assertEquals(both, FxTillFlow.totals(d, t0, to))
+    assertEquals(both, FxTillFlow.totals(d, t0, to, CashShift.ownSale(d, "gone", t0, to)))
+    //  همان شمارِ هستهٔ شیفت برای همان کشو
+    for (sh in listOf(named, main)) {
+      val x = ok(PayFlow.report(d, sh, null, to))
+      assertTrue(x.skipped.toString(), x.skipped.isEmpty())
+      assertEquals(245000L, x.report.methods.getValue(Pay.FX).sales)
+    }
+  }
+
   @Test fun `برگشت - سهمِ ارز به افغانیِ نقد پس داده می‌شود، نه به ارز`() {
     val sale = recorded(ok(PayFlow.checkout(PayFlow.Draft(2450.0, fx = tender("40")))))
     val split = (ReturnFlow.split(sale, 2450.0, ReturnFlow.ORIGINAL, "مدیر", null) as ReturnFlow.Outcome.Ok).value

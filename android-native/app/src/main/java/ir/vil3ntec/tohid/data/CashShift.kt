@@ -201,6 +201,18 @@ object CashShift {
     )
   }
 
+  /**
+   *  RPT-04 × PAY-17 — فروشی که در X/Z ِ شیفتِ [shiftId] شمرده می‌شود: همان مهر و پنجرهٔ [totals] و `PayFlow.ledgerEvents`
+   *  (`Drawers.counts`) — برای خط‌های کنارِ گزارش (ارزِ نقد، حساب‌پی) تا کشوی نام‌دار فروشِ کشوی دیگرِ همان ساعت را نشمارد.
+   *  شیفتِ ناشناخته ⇒ فقط پنجره (همان پیشین)؛ بی «چند کشو» هیچ ردیفی مهر ندارد ⇒ بایت‌به‌بایت همان پنجره.
+   */
+  fun ownSale(d: ShopData, shiftId: String, from: Long, to: Long): (Sale) -> Boolean {
+    val open = d.auditLog.firstOrNull { it.type == OPEN && it.id == shiftId } ?: return { it.createdAt in from..to }
+    val named = TillDrawer.named(d)
+    val isNamed = open.drawer != null
+    return { s -> Drawers.counts(s.shiftId, s.createdAt, open.id, isNamed = isNamed, named = named, from = from, to = to) }
+  }
+
   fun totalsOf(d: ShopData, s: Shift, now: Long): Totals =
     totals(d, s.open.createdAt, s.close?.createdAt ?: now, s.open.amount, s.open.id, named = s.open.drawer != null)
 

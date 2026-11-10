@@ -42,6 +42,7 @@ import ir.vil3ntec.tohid.core.pay.PayResult
 import ir.vil3ntec.tohid.core.pay.ShiftCore
 import ir.vil3ntec.tohid.core.pay.ShiftReport
 import ir.vil3ntec.tohid.core.pay.ShiftSlip
+import ir.vil3ntec.tohid.core.pay.ZSeq
 import ir.vil3ntec.tohid.data.AuditEntry
 import ir.vil3ntec.tohid.data.CashShift
 import ir.vil3ntec.tohid.data.PayFlow
@@ -109,14 +110,16 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
   var closeDialog by remember { mutableStateOf(false) }
   var history by remember { mutableStateOf(false) }
   var showReport by remember { mutableStateOf<ShiftReport?>(null) }
+  //  RPT-04: Z ای که از سابقه باز شد روی کاغذ «چاپِ دوباره» است (اصل فقط همان لحظهٔ بستن)
+  var reprint by remember { mutableStateOf(false) }
   var reviewing by remember { mutableStateOf<AuditEntry?>(null) }
 
   fun save(row: AuditEntry, done: String) {
     scope.launch { if (store.save(d, d.copy(auditLog = d.auditLog + row))) toast(done) else toast(StrShift.saveFailed) }
   }
 
-  /** PAY-15 — چاپِ همان نمایی که روی صفحه است، روی چاپگرِ فاکتور و از صفِ چاپ */
-  fun printReport(rep: ShiftReport) {
+  /** PAY-15 — چاپِ همان نمایی که روی صفحه است، روی چاپگرِ فاکتور و از صفِ چاپ؛ [copy] (RPT-04) ⇒ نشانِ «چاپِ دوباره» */
+  fun printReport(rep: ShiftReport, copy: Boolean = false) {
     val printer = PrinterRegistry.defaultSaved(context) ?: return toast(StrShift.noReceiptPrinter)
     val title = reportTitle(rep)
     scope.launch {
@@ -124,6 +127,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
         runCatching {
           val p = printer.profile()
           val lines = listOf(HwPages.Line(title, HwPages.Style.TITLE)) +
+            (if (copy) listOf(HwPages.Line(ir.vil3ntec.tohid.core.i18n.StrPrint.copyMark, HwPages.Style.HEAD)) else emptyList()) +
             ShiftSlip.rows(rep).map { r -> slipLine(r).let { (l, v) -> HwPages.reportLine(if (v.isEmpty()) l else "$l: $v", r.strong) } }
           EscPos.document(HwPages.text(context, p.paperDots, lines), p)
         }
@@ -161,7 +165,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
       if (shift != null) {
         OutlinedButton(onClick = { moveMode = "cash_out" }) { Text(StrShift.cashInOut) }
         OutlinedButton(onClick = { moveMode = "no_sale" }) { Text(StrShift.noSale) }
-        if (canReport) OutlinedButton(onClick = { x?.valueOrNull()?.let { showReport = it.report } ?: toast(StrShift.reportFailed) }) { Text(StrShift.xReport) }
+        if (canReport) OutlinedButton(onClick = { x?.valueOrNull()?.let { reprint = false; showReport = it.report } ?: toast(StrShift.reportFailed) }) { Text(StrShift.xReport) }
         Button(onClick = { closeDialog = true }) { Text(StrShift.closeRegister) }
       } else {
         Button(onClick = { openDialog = true }) { Text(StrShift.openRegister) }
@@ -353,7 +357,8 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
             is PayResult.Err -> { error = StrShift.badMethodCount(PayFlow.methodName(m.method.orEmpty())); return@close }
           }
           val count = PayFlow.Count(parsed, methodCounts = mc, by = me, blind = staff, reason = reason)
-          when (val r = PayFlow.closeRow(d, shift.open, count, System.currentTimeMillis(), ::newId)) {
+          //  RPT-04: شمارهٔ Z در سریِ سندِ همین دستگاه (همان سریِ فاکتور)
+          when (val r = PayFlow.closeRow(d, shift.open, count, System.currentTimeMillis(), ::newId, series = ir.vil3ntec.tohid.sync.DocSeries.current(context))) {
             is PayFlow.Outcome.Bad -> error = if (r.problem.code == "REASON_REQUIRED" && !staff) StrShift.varianceReasonRequired else PayFlow.message(r.problem)
             is PayFlow.Outcome.Ok -> {
               val z = r.value.report
@@ -366,7 +371,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
                 (if (extra.isNotEmpty()) " — $extra" else "")
               save(r.value.row.copy(date = ir.vil3ntec.tohid.todayIso(), notes = notes), StrShift.registerClosedNow)
               closeDialog = false
-              if (canReport) showReport = z
+              if (canReport) { reprint = false; showReport = z }
             }
           }
         }) { Text(StrShift.closeIt) }
@@ -393,7 +398,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
         }
       },
       confirmButton = { TextButton(onClick = { showReport = null }) { Text(Str.close) } },
-      dismissButton = { TextButton(onClick = { printReport(seen) }) { Text(StrShift.print) } },
+      dismissButton = { TextButton(onClick = { printReport(seen, copy = reprint) }) { Text(StrShift.print) } },
     )
   }
 
@@ -415,6 +420,8 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
       text = {
         Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
           if (shifts.isEmpty()) Text(StrShift.noShiftsYet, color = Shop.colors.muted)
+          //  RPT-04: Z ِ جاافتاده یا شمارهٔ تکراری در سریِ هر دستگاه
+          ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerModel.zLines(d).forEach { Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.warning) }
           shifts.forEach { sh ->
             Text(formatMillis(sh.open.createdAt) + " — " + sh.open.notes, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
             Text(
@@ -426,7 +433,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
               c.z?.let { PayFlow.reportOf(it) }?.let { z ->
                 //  PAY-14: اختلاف خودکار اصلاح نمی‌شود؛ مدیر از همین فهرست می‌بیند کدام بستن بررسی می‌خواهد و بررسی را ثبت می‌کند
                 if (!staff) ShiftReviewBadge(d, c) { history = false; reviewing = c }
-                if (canReport) TextButton(onClick = { history = false; showReport = z }) { Text(StrShift.zReport) }
+                if (canReport) TextButton(onClick = { history = false; reprint = true; showReport = z }) { Text(StrShift.zReport) }
               }
             }
             HorizontalDivider(Modifier.padding(vertical = 6.dp), color = Shop.colors.border)
@@ -446,6 +453,7 @@ private fun slipLine(r: ShiftSlip.Row): Pair<String, String> {
   //  نمای کور (`ShiftSlip.forViewer`): فروش، رسید، مرجوعی و ورود/خروج بی روش و بی مبلغ، فقط شمار
   if (r.amount == null && r.count != null) countLine(r)?.let { return it }
   return when (r.kind) {
+    ShiftSlip.Kind.NUMBER -> StrShift.zNumber to ZSeq.label(r.text.orEmpty(), r.count ?: 0L)
     ShiftSlip.Kind.OPENED -> StrShift.opened to formatMillis(r.amount ?: 0)
     ShiftSlip.Kind.AT -> StrShift.reportTime to formatMillis(r.amount ?: 0)
     ShiftSlip.Kind.CLOSED -> StrShift.closed to formatMillis(r.amount ?: 0)
