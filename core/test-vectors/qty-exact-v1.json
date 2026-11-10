@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "about": "PRD-08: مقدارِ اعشاری × قیمت. ساخته‌شده با server/scripts/qty-exact-vectors.js — دستی ویرایش نشود.",
+  "rule": "پرچمِ shop.qty_exact روشن و هزارمِ مقدار نامضربِ ۱۰۰۰ ⇒ floorDiv(qtyMilli × priceMinor + 50000, 100000) × 100؛ وگرنه Math.round(price × qty) × 100 (موتورِ امروز). مقدار = Math.round(q × 1000)، قیمت = Math.round(price × 100).",
+  "line": [
+    {"name":"S04: برچسبِ ترازو ۱٫۲۵۰ کیلو × ۳۰۰","price":300,"qty":1.25,"qtyMilli":1250,"priceMinor":30000,"legacyMinor":37500,"exactMinor":37500,"onMinor":37500},
+    {"name":"S04: وزنِ دستی ۰٫۷۵ × ۱۲۰","price":120,"qty":0.75,"qtyMilli":750,"priceMinor":12000,"legacyMinor":9000,"exactMinor":9000,"onMinor":9000},
+    {"name":"نیمهٔ دقیق: ۱٫۰۱۵ کیلو × ۱۰۰ = ۱۰۱٫۵ ⇒ ۱۰۲ (امروز ۱۰۱)","price":100,"qty":1.015,"qtyMilli":1015,"priceMinor":10000,"legacyMinor":10100,"exactMinor":10200,"onMinor":10200},
+    {"name":"نیمهٔ دقیق: ۰٫۵۸ × ۲۵ = ۱۴٫۵ ⇒ ۱۵ (امروز ۱۴)","price":25,"qty":0.58,"qtyMilli":580,"priceMinor":2500,"legacyMinor":1400,"exactMinor":1500,"onMinor":1500},
+    {"name":"نیمهٔ دقیق: ۲٫۳۲ × ۶٫۲۵","price":6.25,"qty":2.32,"qtyMilli":2320,"priceMinor":625,"legacyMinor":1400,"exactMinor":1500,"onMinor":1500},
+    {"name":"نیمه‌ای که Double درست دارد: ۱٫۵ × ۱۱۵ = ۱۷۲٫۵ ⇒ ۱۷۳","price":115,"qty":1.5,"qtyMilli":1500,"priceMinor":11500,"legacyMinor":17300,"exactMinor":17300,"onMinor":17300},
+    {"name":"۰٫۲۵ × ۱۰۰۰","price":1000,"qty":0.25,"qtyMilli":250,"priceMinor":100000,"legacyMinor":25000,"exactMinor":25000,"onMinor":25000},
+    {"name":"کوچک‌ترین مقدار: ۰٫۰۰۱ × ۴۹۹ ⇒ ۰","price":499,"qty":0.001,"qtyMilli":1,"priceMinor":49900,"legacyMinor":0,"exactMinor":0,"onMinor":0},
+    {"name":"کوچک‌ترین مقدار: ۰٫۰۰۱ × ۵۰۰ ⇒ ۱","price":500,"qty":0.001,"qtyMilli":1,"priceMinor":50000,"legacyMinor":100,"exactMinor":100,"onMinor":100},
+    {"name":"قیمتِ پول‌دار: ۱٫۵ × ۳۳٫۳۳","price":33.33,"qty":1.5,"qtyMilli":1500,"priceMinor":3333,"legacyMinor":5000,"exactMinor":5000,"onMinor":5000},
+    {"name":"۰٫۳۳۳ × ۳","price":3,"qty":0.333,"qtyMilli":333,"priceMinor":300,"legacyMinor":100,"exactMinor":100,"onMinor":100},
+    {"name":"۲٫۶۷۵ × ۱۰","price":10,"qty":2.675,"qtyMilli":2675,"priceMinor":1000,"legacyMinor":2700,"exactMinor":2700,"onMinor":2700},
+    {"name":"۰٫۰۰۵ × ۱۰۰ = ۰٫۵ ⇒ ۱","price":100,"qty":0.005,"qtyMilli":5,"priceMinor":10000,"legacyMinor":100,"exactMinor":100,"onMinor":100},
+    {"name":"رانشِ Double: ۰٫۱ + ۰٫۲ کیلو × ۱۱۵","price":115,"qty":0.30000000000000004,"qtyMilli":300,"priceMinor":11500,"legacyMinor":3500,"exactMinor":3500,"onMinor":3500},
+    {"name":"مقدارِ درست همان امروز: ۵۰ × ۰٫۲۹ (امروز ۱۴، قاعدهٔ دقیق ۱۵)","price":0.29,"qty":50,"qtyMilli":50000,"priceMinor":29,"legacyMinor":1400,"exactMinor":1500,"onMinor":1400},
+    {"name":"مقدارِ درست: ۲ × ۱۱۵","price":115,"qty":2,"qtyMilli":2000,"priceMinor":11500,"legacyMinor":23000,"exactMinor":23000,"onMinor":23000},
+    {"name":"مقدارِ درستِ کیلو: ۳ × ۹۹٫۹۹","price":99.99,"qty":3,"qtyMilli":3000,"priceMinor":9999,"legacyMinor":30000,"exactMinor":30000,"onMinor":30000},
+    {"name":"بزرگ: ۹۹۹۹٫۹۹۹ × ۹۹۹۹۹٫۹۹","price":99999.99,"qty":9999.999,"qtyMilli":9999999,"priceMinor":9999999,"legacyMinor":99999980000,"exactMinor":99999980000,"onMinor":99999980000},
+    {"name":"بیرون از بازهٔ دقیق ⇒ همان امروز","price":949062.66,"qty":94906.266,"qtyMilli":94906266,"priceMinor":94906266,"legacyMinor":9007199326100,"exactMinor":null,"onMinor":9007199326100},
+    {"name":"منفی: −۱٫۲۵ × ۱۱۵","price":115,"qty":-1.25,"qtyMilli":-1250,"priceMinor":11500,"legacyMinor":-14400,"exactMinor":-14400,"onMinor":-14400},
+    {"name":"منفیِ نیمه: −۰٫۵ × ۱۱۵","price":115,"qty":-0.5,"qtyMilli":-500,"priceMinor":11500,"legacyMinor":-5700,"exactMinor":-5700,"onMinor":-5700}
+  ],
+  "plus": [
+    {"name":"۰٫۱ + ۰٫۲","a":0.1,"b":0.2,"legacy":0.30000000000000004,"milli":300},
+    {"name":"۰٫۲ + ۰٫۱ (سه بار «+۰٫۱» در سبد)","a":0.2,"b":0.1,"legacy":0.30000000000000004,"milli":300},
+    {"name":"۱٫۲۵ + ۰٫۷۵","a":1.25,"b":0.75,"legacy":2,"milli":2000},
+    {"name":"درست: ۲ + ۱","a":2,"b":1,"legacy":3,"milli":3000},
+    {"name":"رانش + ۰٫۱","a":0.30000000000000004,"b":0.1,"legacy":0.4,"milli":400},
+    {"name":"۰٫۷ + ۰٫۱","a":0.7,"b":0.1,"legacy":0.7999999999999999,"milli":800},
+    {"name":"۱٫۰۰۵ + ۰٫۰۰۰۵","a":1.005,"b":0.0005,"legacy":1.0054999999999998,"milli":1006}
+  ],
+  "room": [
+    {"name":"موجودیِ رانش‌دار − ۰٫۱","available":0.30000000000000004,"inCart":0.1,"milli":200},
+    {"name":"بیش از موجودی ⇒ ۰","available":1,"inCart":1.5,"milli":0},
+    {"name":"درست: ۵ − ۲","available":5,"inCart":2,"milli":3000},
+    {"name":"تقریباً برابر ⇒ ۰","available":0.3,"inCart":0.30000000000000004,"milli":0},
+    {"name":"۲٫۵ − ۰٫۷۵","available":2.5,"inCart":0.75,"milli":1750}
+  ],
+  "precise": [
+    {"name":"1.25","text":"1.25","over":false},
+    {"name":"1.250","text":"1.250","over":false},
+    {"name":"1.2500","text":"1.2500","over":false},
+    {"name":"1.2505","text":"1.2505","over":true},
+    {"name":"0.0001","text":"0.0001","over":true},
+    {"name":"12","text":"12","over":false},
+    {"name":"۱٫۲۳۴۵","text":"۱٫۲۳۴۵","over":true},
+    {"name":"۱٫۲۵۰","text":"۱٫۲۵۰","over":false},
+    {"name":"1٬0001","text":"1٬0001","over":true},
+    {"name":"(خالی)","text":"","over":false},
+    {"name":".","text":".","over":false},
+    {"name":"1.000000","text":"1.000000","over":false},
+    {"name":"٠٫٠٠١٥","text":"٠٫٠٠١٥","over":true}
+  ],
+  "sweep": {
+    "qtyMilli": [1,3000], "priceMinor": [100,30000], "priceStepMinor": 100,
+    "pairs": 899100, "diffs": 131, "sumOn": 20297410500, "sumLegacy": 20297397400,
+    "first": [[145,10000,1400,1500],[175,18000,3100,3200],[205,30000,6100,6200],[285,10000,2800,2900],[285,30000,8500,8600],[290,5000,1400,1500],[345,30000,10300,10400],[350,9000,3100,3200],[350,17000,5900,6000],[410,15000,6100,6200],[565,10000,5600,5700],[565,30000,16900,17000]]
+  },
+  "whole": {
+    "qtyMilli": [1000,30000], "qtyStepMilli": 1000, "priceMinor": [1,3000],
+    "pairs": 90000, "onDiffs": 0, "exactDiffs": 42
+  }
+}
