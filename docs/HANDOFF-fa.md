@@ -54,6 +54,13 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/dari-mirror` (آینهٔ JS ِ DariCoverageTest برای جدول‌های `Str*`؛ روی main ‏99036497؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: روی `ccr-…-batch-43` ‏f067bf9c فقط CI ِ اندروید سرخ شد (`StrProductGallery.notSent`، `StrPromoHeld.releaseFailed`: «دوباره بزنید») و همهٔ JS سبز بود،
+  چون آینهٔ `dari-text.test.js` فقط خرید + وب را می‌سنجید. حالا `KT.appTexts` (`server/test/kt-source.js`) همان `rows(I18nTables.all)` را از خودِ Str*.kt می‌خواند
+  (۱۲۵ جدول، ~۹۳۷۰ فارسی؛ قالب ⇒ protect، `+`، چندسطری، `fa =`، `td`، `if … else`، `asIs(…)`، ثابتِ پروندهٔ دیگر) و آزمونِ تازهٔ آینه همان `of` + `farsiOnlyLeft` را می‌گذراند؛
+  خوانده‌نشده ۲ (`StrOnline.coded`، `StrOnline.deskActionLabel`؛ سقفِ `APP_UNREAD_MAX`). روی main سبز، روی f067bf9c دقیقاً همان دو سرخ، با دو جملهٔ PHRASES سبز. فقط آزمون (`WHATSNEW_OK=test-only`).
+- نیمه‌کاره: هیچ. یادداشت برای رفعِ دستهٔ ۴۳: جز دو سطرِ PHRASES و `dari-words.js --write`، دو ردیف در `docs/DARI-REVIEW-fa.md` هم لازم است (وگرنه آزمونِ «فهرستِ بازبینی» ِ همان پرونده سرخ).
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد؛ پس از ادغامِ رفعِ دستهٔ ۴۳ همین آینه سبز می‌ماند.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/pos-2` (ردیف‌های P0 ِ صندوق: POS-03 در نسخهٔ وب، شاهدِ وب برای POS-02، و راست کردنِ POS-04/10/21؛ روی main ‏990364974؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: **POS-03 وب** (سند: «در گوشی و وب اضافه شود») — `license/cart-query.js` همزادِ `CartQuery.parse` با `\s`/`.`/`$` ِ java.util.regex و بردارِ مشترکِ
   `license/test-vectors/cart-query-v1.json` (۵۳ مورد؛ جدا با JDK 21 ِ همین ماشین ۵۳/۵۳ و همهٔ BMP هم‌خوان؛ `CartQueryVectorsTest` ِ Kotlin فقط CI)؛ پشتِ
