@@ -20,18 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1032,
+    "routes": 1033,
     "byAuth": {
       "none-detected": 195,
       "admin": 279,
       "inline": 2,
-      "user": 513,
+      "user": 514,
       "device": 42,
       "optional": 1
     },
     "byShape": {
       "extracted": 712,
-      "empty": 318,
+      "empty": 319,
       "unresolved": 2
     }
   },
@@ -305,7 +305,7 @@
     {"method":"GET","path":"/api/admin/system/health","area":"admin","source":"server/src/routes/admin-system.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/admin/system/notify-usage","area":"admin","source":"server/src/routes/admin-system.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":["days"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/admin/system/providers","area":"admin","source":"server/src/routes/admin-system.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
-    {"method":"GET","path":"/api/admin/system/reconciliation","area":"admin","source":"server/src/routes/admin-system.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":[],"query":["from","fromDate","to","toDate"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/admin/system/reconciliation","area":"admin","source":"server/src/routes/admin-system.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":[],"query":["from","fromDate","money","to","toDate"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/admin/system/versions","area":"admin","source":"server/src/routes/admin-system.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/admin/telegram","area":"admin","source":"server/src/routes/admin-platform.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["telegram"]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/admin/telegram","area":"admin","source":"server/src/routes/admin-platform.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":[],"query":[],"body":["clearToken","enabled","token"],"response":{"statuses":[200],"keys":["...","telegram"]},"errors":["400 ?"],"shape":"extracted"},
@@ -361,6 +361,7 @@
     {"method":"GET","path":"/api/config","area":"config","source":"server/src/app.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["googleClientId","otpEnabled","pumpChatVapid","registrationOpen","serverTime","termsVersion","vipCodes","visitPing","whatsapp"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/config/server","area":"config","source":"server/src/routes/server-info.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/courier/events","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"PUT","path":"/api/courier/location-consent","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/courier/map","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["attribution","packs"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/courier/map/:id","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":["id"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":["404 map_not_found"],"shape":"empty"},
     {"method":"GET","path":"/api/courier/me","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["courier","ratingsEnabled","serverTime"]},"errors":[],"shape":"extracted"},

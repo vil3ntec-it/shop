@@ -229,22 +229,34 @@ async function rowsById(T0, table, shopId, ids, bySale = false) {
   )).rows;
 }
 
-/** دفترِ بازه: فاکتورها و برگشتی‌های بازه، فاکتورِ هر برگشت، قلم‌ها و نامِ کالاها. */
-async function ledgerOf(shopId, w) {
+/**
+ * فاکتورها و برگشتی‌های بازه و فاکتورِ هر برگشت (بی قلم و کالا). `w` = {fromAt, until (ms)، from, to (روزِ محلی)}.
+ * «گزارشِ پولِ مدیر» (S124، `admin-money.js`) فقط همین را می‌خواند؛ `ledgerOf` قلم و کالا را رویش می‌افزاید.
+ */
+async function salesLedgerOf(shopId, w) {
   const fmt = (await require('./stock').settingsOf(shopId)).syncSource === 'v3' ? 'v3' : 'v1';
   const T0 = STORES[fmt];
-  let partial = false;
-  const cap = (rows) => { if (rows.length > MAX_ROWS) { partial = true; return rows.slice(0, MAX_ROWS); } return rows; };
-  const map = (table, rows) => cap(rows).map((r) => legacyRow(fmt, table, r)).filter(Boolean);
-  const sales = map('sales', await rowsInWindow(T0, 'sales', shopId, w));
-  const returns = map('returns', await rowsInWindow(T0, 'returns', shopId, w));
-  const known = new Set(sales.map((s) => s.id));
-  const extra = [...new Set(returns.map((r) => String(r.saleId || '')).filter((id) => id && !known.has(id)))];
-  sales.push(...map('sales', await rowsById(T0, 'sales', shopId, extra)));
-  const saleItems = map('saleItems', await rowsById(T0, 'saleItems', shopId, sales.map((s) => s.id), true));
+  const L = { fmt, T0, partial: false };
+  L.map = (table, rows) => {
+    if (rows.length > MAX_ROWS) { L.partial = true; rows = rows.slice(0, MAX_ROWS); }
+    return rows.map((r) => legacyRow(fmt, table, r)).filter(Boolean);
+  };
+  L.sales = L.map('sales', await rowsInWindow(T0, 'sales', shopId, w));
+  L.returns = L.map('returns', await rowsInWindow(T0, 'returns', shopId, w));
+  const known = new Set(L.sales.map((s) => s.id));
+  const extra = [...new Set(L.returns.map((r) => String(r.saleId || '')).filter((id) => id && !known.has(id)))];
+  L.sales.push(...L.map('sales', await rowsById(T0, 'sales', shopId, extra)));
+  return L;
+}
+
+/** دفترِ بازه: فاکتورها و برگشتی‌های بازه، فاکتورِ هر برگشت، قلم‌ها و نامِ کالاها. */
+async function ledgerOf(shopId, w) {
+  const L = await salesLedgerOf(shopId, w);
+  const { sales, returns } = L;
+  const saleItems = L.map('saleItems', await rowsById(L.T0, 'saleItems', shopId, sales.map((s) => s.id), true));
   const pids = [...new Set([...saleItems, ...returns].map((x) => String(x.productId || '')).filter(Boolean))];
-  const products = map('products', await rowsById(T0, 'products', shopId, pids));
-  return { fmt, partial, raw: { sales, saleItems, returns, products } };
+  const products = L.map('products', await rowsById(L.T0, 'products', shopId, pids));
+  return { fmt: L.fmt, partial: L.partial, raw: { sales, saleItems, returns, products } };
 }
 
 /** تاریخچهٔ همان کالاها تا لحظهٔ گزارش (`productId` یا `id` ِ فاکتور) — فقط برای بهای میانگین */
@@ -524,5 +536,6 @@ function stop() {
 module.exports = {
   FLAG_KEY, PROFIT_FLAG, COST_DECIDED, FREQUENCIES, CHANNELS, CATCHUP_MS, MORNING_BEFORE, MAX_ROWS, DEFAULTS,
   flagOf, profitFlagOf, settingsOf, saveSettings, parseSettings, dueOf, clockFor, summarize, profitOf, buildSummary, render, timezoneOf,
+  salesLedgerOf, CREATED,
   runShop, sweep, viewOf, start, stop,
 };

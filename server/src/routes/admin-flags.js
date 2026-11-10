@@ -151,6 +151,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.delivery_code_rule', scope: 'shop', default: false, what: 'کدِ تحویلِ اجباری برای سپردن به پیکِ دکان وقتی نقد هنگامِ تحویل یا گران‌قیمت است (DLV-08)' },
   { key: 'shop.delivery_code_rule.min_total_minor', scope: 'shop', default: 0, what: 'آستانهٔ «گران‌قیمت» به واحدِ خرد؛ ۰ ⇒ فقط نقد هنگامِ تحویل؛ با `shop.delivery_code_rule`' },
   { key: 'shop.delivery_live_location', scope: 'shop', default: false, what: 'موقعیتِ زندهٔ پیکِ «در راه» برای مشتری (DLV-16)؛ با `shop.delivery_customer_view`' },
+  { key: 'shop.delivery_live_location.consent', scope: 'shop', default: false, what: 'موقعیتِ زندهٔ پیک فقط با رضایتِ خودِ پیک (S94)؛ «نه» نقطه‌های ذخیره‌شده را همان لحظه پاک می‌کند' },
   //  ── صاحب، گزارش، مجوز، کارمند و تخفیف
   { key: 'shop.owner_report', scope: 'shop', default: false, what: 'گزارشِ خودکارِ روزانه/هفتگیِ صاحب در ساعتِ محلیِ دکان (PAY-20، RPT-12)' },
   { key: 'shop.branches_report', scope: 'shop', default: false, what: 'خلاصهٔ هر شعبهٔ همان صاحب و جمعِ همه، فقط خواندنی (RPT-18)؛ هر شعبه با پرچمِ خودش' },

@@ -11,6 +11,7 @@ const { notFound, conflict, badRequest, ApiError } = require('../middleware/erro
 const { text, int, optInt, n } = require('./delivery-input');
 const { CODE_MAX_ATTEMPTS, derivedCode, codeMatches } = require('./delivery-codes');
 const stateOf = (shopId) => require('./delivery').stateOf(shopId);
+const consent = require('./courier-location-consent');
 
 //  S5 (قراردادِ بازار §۳): نمای پیک برای مشتری — هر دو پیش‌فرض خاموش
 const VIEW_FLAG = 'shop.delivery_customer_view';
@@ -50,7 +51,7 @@ async function customerView(shopId, orderId) {
   const st = await stateOf(shopId);
   if (!st.readable || !(await orders.flagOf(shopId, VIEW_FLAG))) return undefined;
   const a = await one(
-    `SELECT a.*, c.name AS courier_name FROM delivery_assignments a
+    `SELECT a.*, c.name AS courier_name, c.location_consent_at FROM delivery_assignments a
        LEFT JOIN shop_couriers c ON c.shop_id = a.shop_id AND c.id = a.courier_id
       WHERE a.shop_id=$1 AND a.order_id=$2 ORDER BY a.attempt_no DESC LIMIT 1`,
     [shopId, String(orderId || '')]
@@ -59,7 +60,8 @@ async function customerView(shopId, orderId) {
   const live = D.LIVE.includes(a.status);
   const onTheWay = ON_THE_WAY.includes(a.status);
   let location = null;
-  if (onTheWay && await orders.flagOf(shopId, LOCATION_FLAG)) {
+  //  S94: با پرچمِ رضایت، پیکِ بی «بله» ِ خودش هیچ موقعیتی به مشتری نمی‌دهد
+  if (onTheWay && await orders.flagOf(shopId, LOCATION_FLAG) && await consent.visible(shopId, a.location_consent_at)) {
     const p = await one(
       'SELECT lat, lng, server_time FROM delivery_locations WHERE assignment_id=$1 AND server_time >= $2',
       [a.id, now() - LOCATION_TTL_MS]
@@ -117,6 +119,7 @@ async function putLocation(shopId, assignmentId, body, actor) {
   const deviceTime = optInt(b.deviceTime, 'زمانِ دستگاه', { min: 0, max: 4102444800000 });
   return tx(async (c) => {
     const a = await onTheWayOf(c, shopId, assignmentId, actor);
+    await consent.assertIn(c, shopId, actor.courierId);   //  S94: پرچمِ رضایت و بی «بله» ⇒ ۴۰۳، هیچ نقطه
     const at = now();
     const r = await c.query(
       `INSERT INTO delivery_locations (assignment_id, shop_id, lat, lng, accuracy_m, device_time, server_time)
