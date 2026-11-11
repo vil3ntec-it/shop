@@ -613,6 +613,12 @@ async function seedShop(a) {
   assert.equal(listed.status, 201, JSON.stringify(listed.body));
   ids.riskEntry = listed.body.entry.id;
 
+  //  ۲-۹: درخواستِ واقعیِ دسترسیِ پشتیبانی روی «الف» (pending) — صاحبِ «ب» نه می‌پذیرد، نه رد یا لغو می‌کند (۴۰۴)
+  ids.accessGrant = newId('agr');
+  await query(
+    `INSERT INTO admin_access_grants (id, app, tenant_id, admin_id, requested_by, scope, consent, status, reason, minutes, created_at)
+     VALUES ($1,'shop',$2,'adm_inv','پشتیبانی','read_private','tenant','pending','آزمونِ جداسازی',60,$3)`, [ids.accessGrant, a.shopId, now()]);
+
   //  STF-09: لنگرِ واقعیِ زنجیرهٔ سابقهٔ دستگاهِ «الف» (`POST /api/sync/v1/audit-anchor`، مهاجرتِ ۴۱۰؛ درِ جدای
   //  فقط‌دکان بیرون از /api/shop) — ردپا نشان می‌دهد هیچ درِ /api/shop ِ «ب» آن را عوض نمی‌کند. پرچم فقط برای
   //  همین گزارش روشن و بعد خاموش، تا بقیهٔ آزمون همان بماند. جداسازیِ خودِ در: device-audit-anchor.test.js و tenant-matrix
@@ -653,6 +659,7 @@ function concreteFor(ids) {
     [/(\/amendments\/):amendId/, ids.amend],
     [/(\/notices\/):noticeId/, ids.notice],
     [/^(\/shop\/orders\/risk\/lists\/):entryId/, ids.riskEntry],
+    [/^(\/shop\/support-access\/):gid/, ids.accessGrant],
     [/^(\/shop\/orders\/evidence\/):id/, ids.order],
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],

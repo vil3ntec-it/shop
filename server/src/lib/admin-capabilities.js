@@ -34,6 +34,9 @@ const CAPABILITIES = Object.freeze([
   'idempotent-writes.v1',   //  Idempotency-Key روی دستگاه (disable/enable)، بازبینیِ بانکِ عکس و POST /admin/backups (lib/admin-write-once.js)
   //  LOC-04: ویرایشگرِ تعطیلاتِ رسمی در پنلِ مرکزی (خواندن: هر مدیر؛ نوشتن: ارشد + دلیل، یک‌باره، قفلِ نسخه)
   'holidays.v1',            //  GET|PUT /admin/calendar/holidays
+  //  درخواستِ پنلِ مرکزی ۱.۵۰.۸۹ و ۱.۵۰.۹۰ (تصمیم‌های ۴-۱ «ب» و ۲-۹ ِ ۱۴۰۵/۰۸/۲۰):
+  'synonyms.v1',            //  GET|PUT /admin/search/synonyms — فهرستِ مرکزیِ مترادف (نوشتن: ارشد + دلیل، قفلِ نسخه، یک‌باره)
+  'support-access.v1',      //  GET|POST /admin/shops/:id/access-grants · POST …/break-glass · POST …/:gid/revoke (مهاجرتِ ۸۱۰)
 ]);
 
 /*

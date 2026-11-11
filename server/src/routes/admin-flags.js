@@ -73,6 +73,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.storefront.cart', scope: 'shop', default: false, what: 'سبدِ حسابِ مشتری روی سرور (CHK-03)؛ با `shop.storefront.web_account`' },
   { key: 'shop.storefront.search', scope: 'shop', default: false, what: 'جست‌وجوی ویترین: غلطِ تایپی، نامِ دسته و «پیدا نشد» ِ مفید (WEB-05/06)' },
   { key: 'shop.storefront.search_core', scope: 'shop', default: false, what: 'جست‌وجوی ویترین با قاعده‌های صندوق: رقمِ فارسی = لاتین، «ي» = «ی»، هر ترتیب (SRCH-01)' },
+  { key: 'shop.storefront.synonyms', scope: 'shop', default: false, what: 'جست‌وجوی ویترین با فهرستِ مرکزیِ مترادفِ پنل («بوره» = «شکر»)؛ روی shop.storefront.search_core (۴-۱ ب، WEB-05)' },
   { key: 'shop.storefront.seo', scope: 'shop', default: false, what: 'صفحهٔ کالای `/p/<id>` با Open Graph و JSON-LD، نقشهٔ سایت و «فرستادنِ نشانی» (WEB-17/20)' },
   { key: 'shop.storefront.zones', scope: 'shop', default: false, what: 'ناحیه‌های ارسال با هزینه، حداقل و «رایگان از…» در فرمِ سفارش (CHK-05/06/07/10)' },
   { key: 'shop.storefront.notify_area', scope: 'shop', default: false, what: '«وقتی به محلِ شما رسیدیم خبرم کن» برای نشانیِ بیرون از ناحیه (CHK-10)' },

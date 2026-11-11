@@ -228,6 +228,9 @@ const MOUNTS = {
   'admin-trust.js': '/admin/trust',
   'admin-payments.js': '/admin/payments',
   'admin-calendar.js': '/admin/calendar',
+  //  ۴-۱ «ب» و ۲-۹ (پنلِ مرکزی ۱.۵۰.۸۹ و ۱.۵۰.۹۰)
+  'admin-synonyms.js': '/admin/search',
+  'admin-access-grants.js': '/admin/shops/:id',
   //  پنلِ مرکزی، فاز ۳
   'admin-shop-state.js': '/admin/shops/:id',
   'admin-flags.js': '/admin/flags',
@@ -385,6 +388,9 @@ const CAPABILITY_PROBES = {
     'POST /admin/image-bank/images/x1/reject', 'POST /admin/image-bank/images/x1/archive', 'POST /admin/image-bank/images/x1/search'],
   'idempotent-writes.v1': ['POST /admin/shops/x1/staff-perms/devices/x1/enable', 'POST /admin/image-bank/images/x1/archive'],
   'holidays.v1': ['GET /admin/calendar/holidays', 'PUT /admin/calendar/holidays'],
+  'synonyms.v1': ['GET /admin/search/synonyms', 'PUT /admin/search/synonyms'],
+  'support-access.v1': ['GET /admin/shops/x1/access-grants', 'POST /admin/shops/x1/access-grants',
+    'POST /admin/shops/x1/access-grants/break-glass', 'POST /admin/shops/x1/access-grants/x1/revoke'],
 };
 
 test('GET /api/admin/me: فهرستِ «توانایی»ها با همان نام‌های پل، و درِ هر کدام واقعاً هست', async () => {

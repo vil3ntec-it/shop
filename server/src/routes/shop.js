@@ -358,5 +358,7 @@ router.get('/audit', requireShop, requirePermission('audit.view'), async (req, r
 
 //  کارمندان، مجوزها و دستگاه‌ها (STF-01..03، STF-10) — زیرِ همان `requireUser`
 router.use(require('./shop-staff'));
+//  ۲-۹: دسترسیِ پشتیبانی — صاحبِ دکان می‌بیند، می‌پذیرد، رد یا لغو می‌کند (`lib/support-access.js`)
+router.use(require('./shop-support-access'));
 
 module.exports = router;

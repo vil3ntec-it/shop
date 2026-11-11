@@ -37,11 +37,24 @@ const SEARCH_KEY = (() => {
   return Object.freeze({ from: from + drop, to });
 })();
 
-/** تکهٔ WHERE ِ جست‌وجو: هر واژهٔ `searchKey` جایی در کلیدِ نام، به هر ترتیب؛ `params` پر می‌شود. */
-function searchWhere(raw, params) {
+/**
+ * تکهٔ WHERE ِ جست‌وجو: هر واژهٔ `searchKey` جایی در کلیدِ نام، به هر ترتیب؛ `params` پر می‌شود.
+ * ۴-۱ «ب» (`synonyms` از `search-synonyms.forShop`، پرچمِ خاموشِ `shop.storefront.synonyms`): همان `text-core.matches` با
+ * مترادف — هر واژه **یا** یکی از هم‌معناهایش؛ و اگر کلِ پرس‌وجو خودش یک واژهٔ گروه است («بادنجان رومی»)، هم‌معنای کاملش هم.
+ * بی `synonyms` ⇒ همان تکهٔ پیشین، بایت‌به‌بایت.
+ */
+function searchWhere(raw, params, synonyms = null) {
   let where = '';
   const key = `translate(COALESCE(r.data->>'name', ''), $${params.push(SEARCH_KEY.from)}, $${params.push(SEARCH_KEY.to)})`;
-  for (const word of textCore.searchKey(raw).split(' ').filter(Boolean)) {
+  const words = textCore.searchKey(raw).split(' ').filter(Boolean);
+  if (synonyms && words.length) {
+    const like = (w) => `${key} LIKE $${params.push(`%${w.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)}`;
+    const any = (alts) => (alts.length === 1 ? like(alts[0]) : `(${alts.map(like).join(' OR ')})`);
+    const each = words.map((w) => any(synonyms.alternatives(w))).join(' AND ');
+    const whole = words.length > 1 ? synonyms.alternatives(words.join('')).slice(1) : [];
+    return ` AND ${whole.length ? `((${each}) OR ${any(whole)})` : each}`;
+  }
+  for (const word of words) {
     params.push(`%${word.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
     where += ` AND ${key} LIKE $${params.length}`;
   }
@@ -65,8 +78,8 @@ function searchWhere(raw, params) {
  *   هیچ ─── `match: 'none'` و `suggest`: دسته‌های نزدیک، پرفروش/تازهٔ واقعی (همان
  *           `highlights` با k-گمنامی؛ ناموجود هرگز) و تلفنِ تماسِ خودِ ویترین.
  *
- * ⛔ مترادف این‌جا نیست: فرهنگِ مترادف باید از پنل بیاید (§۳.۱۳، POS-04) و هنوز ساخته
- *    نشده؛ هیچ فرهنگی در کد ثابت نوشته نمی‌شود.
+ * ⛔ مترادف فقط از فهرستِ مرکزیِ پنل (۴-۱ «ب»، `lib/search-synonyms.js`) و فقط در `searchWhere` ِ بالا (پرچمِ خاموشِ
+ *    `shop.storefront.synonyms` روی `search_core`)؛ غلطِ تایپی و پرش به دسته مترادف نمی‌گیرند. هیچ فرهنگی در کد ثابت نیست.
  */
 const SMART_FLAG = 'shop.storefront.search';
 const FUZZY_SCAN = 1000;
