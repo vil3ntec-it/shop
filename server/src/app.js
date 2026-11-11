@@ -602,9 +602,11 @@ async function createApp({ runMigrations = true } = {}) {
   //  ویترینِ خاموش یا ناموجود ⇒ همان پوسته با وضعیتِ ۴۰۴.
   const storeDir = path.join(__dirname, '..', 'public', 'store');
   const storefront = require('./lib/storefront');
+  //  CHK-08 / ۴-۳: مبدأِ تکه‌های نقشهٔ پین فقط با `STORE_MAP_TILES` ِ https (`lib/store-map.js`)؛ بی آن همان CSP ِ امروز
+  const mapOrigin = require('./lib/store-map').origin();
   const storeHeaders = (req, res, next) => {
     res.set('Content-Security-Policy',
-      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; font-src 'self'; " +
+      `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:${mapOrigin ? ` ${mapOrigin}` : ''}; media-src 'self' blob:; font-src 'self'; ` +
       "connect-src 'self'; manifest-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
     res.set('Permissions-Policy', 'camera=(), microphone=(self), geolocation=(self), payment=()');
     next();

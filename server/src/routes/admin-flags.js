@@ -77,6 +77,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.storefront.zones', scope: 'shop', default: false, what: 'ناحیه‌های ارسال با هزینه، حداقل و «رایگان از…» در فرمِ سفارش (CHK-05/06/07/10)' },
   { key: 'shop.storefront.notify_area', scope: 'shop', default: false, what: '«وقتی به محلِ شما رسیدیم خبرم کن» برای نشانیِ بیرون از ناحیه (CHK-10)' },
   { key: 'shop.storefront.address_extra', scope: 'shop', default: false, what: 'شمارهٔ دوم، Plus Code و ولایت/گذر/منزل در نشانیِ سفارش (CHK-08)' },
+  { key: 'shop.storefront.map_pin', scope: 'shop', default: false, what: '«انتخاب روی نقشه» (OpenStreetMap) برای پینِ نشانی در ثبتِ ویترین؛ بی STORE_MAP_TILES ِ سرور هیچ (CHK-08، ۴-۳)' },
   { key: 'shop.storefront.delivery_method', scope: 'shop', default: false, what: 'روش و مسئولِ تحویل در ثبت و پیگیری، و «تغییرِ روش» (S71/S72)' },
   { key: 'shop.storefront.stock_list', scope: 'shop', default: false, what: 'در ۴۰۹ ِ ناموجود همهٔ قلم‌های کم با «کم کن به …» (E2E-MKT-02)' },
   { key: 'shop.storefront.banners', scope: 'shop', default: false, what: 'بنرهای زمان‌دارِ ویترین برای هر ناحیه (WEB-24)' },
