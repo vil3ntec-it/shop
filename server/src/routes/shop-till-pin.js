@@ -13,6 +13,9 @@
  *   GET    /current                نوبتِ بازِ دستگاهِ همین توکن
  *   POST   /current/end            {reason:'lock'} بستنِ همان نوبت (قفلِ صندوق)
  *   GET    /sessions               نوبت‌های یک بازه (صاحب و مدیر همه؛ بقیه فقط خودشان)
+ *   GET    /ops                    S46: opهای نشستهٔ یک بازه با «کاربرِ سنجیدهٔ صندوق» و جمعِ هر کاربر (`lib/till-op-user.js`)
+ *   GET    /ops/row                S46: ?table=&row_id= همهٔ opهای یک ردیف (مثلاً فاکتور) با کاربرِ سنجیده‌شان
+ *                                  — هر دو پشتِ پرچمِ جدای `shop.till_op_user` (نه `shop.till_pin`)؛ صاحب و مدیر همه، بقیه فقط خودشان
  *
  * ✱ تأییدِ دوبارهٔ ورود (`lib/reauth.js`): شاگرد روی صندوقِ بازِ صاحب نه PIN ِ کسی را عوض می‌کند، نه قفلِ
  *   PIN ِ صاحب را باز می‌کند تا حدس را از سر بگیرد. صاحب با همان تأیید همیشه PIN ِ خودش را از نو می‌گذارد.
@@ -26,6 +29,7 @@ const express = require('express');
 const config = require('../config');
 const v = require('../lib/validate');
 const tp = require('../lib/till-pin');
+const tou = require('../lib/till-op-user');
 const perms = require('../lib/staff-perms');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
@@ -58,6 +62,21 @@ async function needFlag(req, res, next) {
 
 router.get('/config', async (req, res) => {
   res.json(await tp.config(req.shopId, actorOf(req)));
+});
+
+//  S46: «کاربرِ سنجیدهٔ صندوق» روی opها — پرچمِ خودش؛ خاموش ⇒ ۴۰۳ و هیچ خواندنی از جدولِ ۷۹۰
+async function needOpsFlag(req, res, next) {
+  if (!(await tou.flagOf(req.shopId))) return next(forbidden('«کاربرِ صندوق روی سند» برای این دکان روشن نیست', 'till_op_user_disabled'));
+  next();
+}
+
+router.get('/ops', needOpsFlag, async (req, res) => {
+  const q = req.query || {};
+  res.json(await tou.list(req.shopId, actorOf(req), { from: q.from, to: q.to, memberId: q.member, table: q.table }));
+});
+
+router.get('/ops/row', needOpsFlag, async (req, res) => {
+  res.json(await tou.forRow(req.shopId, actorOf(req), req.query?.table, req.query?.row_id));
 });
 
 router.use(needFlag);

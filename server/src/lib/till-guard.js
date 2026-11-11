@@ -5,6 +5,7 @@
  * فقط برای `insert` ِ v3/v2 روی ردیفی که هنوز ننشسته. ⛔ خاموش ⇒ پاسخ همان امروز؛ تنها کار خواندنِ پرچم است، آن هم فقط برای
  * opی از همین نوع‌ها. ⛔ `sync-v1.js` ِ مشترک با پمپ دست نمی‌خورد: ② در v1 نیست (همان مرزِ `doc-roles.js`)؛ ① در v1 از سرِ
  * میان‌افزارِ فقط‌دکانِ `staff-approval.v1Guard` (`v1Guard` ِ همین‌جا، ①′ پایین) — برنامه امروز پیش‌فرض با v1 همگام می‌شود.
+ * همان در «کاربرِ سنجیدهٔ صندوق» ِ S46 را هم برای هر op ِ v1 می‌نشاند (`till-op-user.v1Hook`، پرچمِ خاموشِ خودش).
  * پولِ هر دو دفتر خوانده می‌شود (v3 مقدم، ردیفِ v1 ِ هم‌شناسه یک بار)، همان راهِ `return-sale-cap.js`.
  *
  * ① `shop.sync.pay_fix` — POS-40، «اصلاحِ روشِ پرداخت» (`auditLog` با `type = pay_fix`، `PayFixFlow` ِ برنامه):
@@ -279,6 +280,9 @@ function batchSource(db, over) {
  * روزِ بسته ردیفی در صندوقِ تعارض (`boxV1`).
  */
 async function v1Guard(req, res) {
+  //  S46 (`shop.till_op_user`، صاحب هم): کاربرِ سنجیدهٔ صندوق برای هر op ِ نشسته — نوبت همین حالا، ردیف پس از پاسخِ موتور
+  //  (‎lib/till-op-user.js‎). ⛔ پس از پالایش‌های `newer-fields`/`contact` (پاسخِ ساختگیِ op ِ برداشته را نمی‌بیند) و پیش از هر `rejectOps`
+  await require('./till-op-user').v1Hook(req, res);
   const ctx = req.sync;
   const ops = Array.isArray(req.body?.ops) ? req.body.ops : null;
   if (!ops || !ops.length) return;

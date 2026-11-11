@@ -450,17 +450,26 @@ async function sessions(shopId, actor, { from, to, memberId } = {}) {
  * برای نسبت دادنِ کارِ آن دستگاه در آن لحظه؛ پرچمِ خاموش ⇒ null بی هیچ خواندنی.
  */
 async function whoAt(shopId, deviceId, at) {
+  const s = await sessionAt(shopId, deviceId, at);
+  return s ? s.till_member_id : null;
+}
+
+/**
+ * همان [whoAt] با خودِ نوبت (`id`، `till_member_id`، `started_at`) — برای «کاربرِ سنجیدهٔ صندوق» روی op (S46،
+ * `lib/till-op-user.js`) که آغازِ نوبت را هم می‌سنجد. پرچمِ خاموش ⇒ null بی هیچ خواندنی.
+ */
+async function sessionAt(shopId, deviceId, at) {
   if (!deviceId || !Number.isSafeInteger(Number(at)) || !(await flagOf(shopId))) return null;
   const r = await one(
-    `SELECT till_member_id FROM shop_till_sessions
+    `SELECT id, till_member_id, started_at FROM shop_till_sessions
       WHERE shop_id=$1 AND device_id=$2 AND started_at <= $3 AND $3 < COALESCE(ended_at, expires_at)
       ORDER BY started_at DESC LIMIT 1`,
     [shopId, String(deviceId), Number(at)],
   );
-  return r ? r.till_member_id : null;
+  return r ? { id: r.id, till_member_id: r.till_member_id, started_at: Number(r.started_at) } : null;
 }
 
 module.exports = {
   FLAG, MAX_FAILURES, VOID_AFTER, SESSION_MS, LOCK_BASE_MS, flagOf, rank, mayManage, pinProblem, lockMs,
-  config, members, setPin, removePin, memberGone, unlock, verify, current, endCurrent, sessions, whoAt,
+  config, members, setPin, removePin, memberGone, unlock, verify, current, endCurrent, sessions, whoAt, sessionAt,
 };

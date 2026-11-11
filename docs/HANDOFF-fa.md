@@ -54,6 +54,23 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/s46-till-user` (S46: کاربرِ سنجیدهٔ صندوق روی سندِ سرور، **بی کدِ پمپ**؛ روی `ccr-…-batch-48` ‏17f89bc25؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: هر op که Sync v1 یا v3 ِ دکان می‌نشاند «کاربرِ سنجیدهٔ صندوق» را در جدولِ کنارِ `shop_till_op_users` می‌گیرد — مهاجرتِ **۷۹۰**
+  (+ rollback؛ ۷۷۲–۷۸۹ برای شاخه‌های هم‌زمان خالی ماند)، پرچمِ خاموشِ **`shop.till_op_user`** (کاتالوگِ پرچم‌ها، `FLAGS-ON-fa.md` §۲۱)،
+  `lib/till-op-user.js`. نوبتِ `shop.till_pin` ِ **دستگاهِ توکن** در لحظهٔ رسیدن (`till-pin.sessionAt`، تازه؛ `whoAt` همان)، ردیف پس از پاسخِ
+  موتور: v1 از سرِ `till-guard.v1Guard` در میان‌افزارِ فقط‌دکانِ `staff-approval.v1Guard` (پیچشِ `res.json` پیش از هر `rejectOps` و پس از
+  پالایش‌های `newer-fields`/`contact` — پاسخِ ساختگیِ op ِ برداشته را نمی‌بیند)، v3 در `routes/sync-v3.js` ِ فقط‌دکان. فقط op ِ نشسته؛
+  عضو فقط با نوبتِ باز، op ِ نه پیش از آغازِ نوبت و نه دورتر از ۳۰ دقیقه، وگرنه NULL با `basis`. fields/hash ِ op، `oplog`، `sync_rows` و
+  پاسخِ push دست‌نخورده؛ خطای نوشتن push را نمی‌شکند. خواندن: `GET /api/shop/till-pin/ops` و `/ops/row` (صاحب/مدیر همه، بقیه خودشان).
+  ⛔ `git diff --stat 17f89bc25 HEAD -- server/src/lib/sync-v1.js server/src/routes/sync-v1.js server/src/lib/tenancy.js …` خالی؛ ۲-۶/O-19 لازم نشد
+  (یادداشت در `OWNER-DECISIONS-fa.md`). آزمون: `till-op-user.test.js` ۹/۹ روی PGlite و PostgreSQL 16 (پیش از کار ۰/۹ هر دو)؛ ۶۰ پروندهٔ
+  هم‌سایه روی PGlite (sync-v1*، sync-v3*، pump*، till-guard، staff-approval، till-pin، security-review-45، فهرست‌های مسیر، api-contract…):
+  ۴۹۲ سبز، تنها سرخ `pump-isolation` › «سرور را به کامپیوترِ دیگر ببر» که روی PGlite به `pg_dump` ِ واقعی می‌رسد (محیط؛ روی PostgreSQL
+  سبز، پایین)؛ روی PostgreSQL 16 ‏(`oys46_test`، `--test-concurrency=1`) ۲۱ پرونده (till-op-user، till-pin، security-review-45، till-guard، staff-approval، sync-v1/v3 ِ اصلی، pump-isolation، pump، pump-device، فهرست‌های مسیر…): ۲۵۰ سبز، ۰ سرخ، ۱ TODO ِ پیشین. `spec.mjs check` «سالم»، `precheck.sh` ‏fail=0.
+- نیمه‌کاره: هیچ. برنامه (Kotlin) دست نخورد: «به دستِ چه کسی» را امروز از سرور نشان نمی‌دهد؛ راهِ قدیمِ `/api/sync` (کهنه، `warnLegacy`) ستون نمی‌گیرد.
+- قدمِ بعدی: صاحب‌کار `shop.till_op_user` را برای همان دکانِ آزمایشیِ `shop.till_pin` روشن کند (§۲۱)؛ اگر برنامه روزی «فروشنده (سنجیده)» را
+  نشان دهد، از `/api/shop/till-pin/ops/row` بخواند. F6 (فاکتورِ نگه‌داشتهٔ مشترک میانِ کاربرانِ صندوق) هنوز کارِ برنامه است.
+
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/sec-review-48` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۸؛ روی `ccr-…-batch-48` ‏a57dae088؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: حملهٔ خصمانه روی `8c493593c..a57dae088` (مالیاتِ POS-37، گالریِ ویترین، دلیلِ «از کار انداختن» + R24، برداشتنِ وبِ دکان، `spec.mjs`) —
   `docs/SECURITY-AUDIT-fa.md` بخشِ **B13**. بسته: **SR48-1 High** — `return-line-cap` مالیاتِ ادعاشده را بی سنجش با نهایی و بی پرچم به سقفِ برگشت می‌افزود

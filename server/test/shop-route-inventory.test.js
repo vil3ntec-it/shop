@@ -232,6 +232,8 @@ FLAGS.push('shop.settings_sync');
 FLAGS.push('shop.held_sync');
 //  STF-04/S46: PIN ِ صندوق در سرور (`/shop/till-pin/members/:id…`، مهاجرتِ ۶۴۰) — «ب» PIN ِ عضوِ «الف» را نه می‌گذارد، نه برمی‌دارد، نه بازش می‌کند
 FLAGS.push('shop.till_pin');
+//  S46: «کاربرِ سنجیدهٔ صندوق» روی opها (`/shop/till-pin/ops…`، مهاجرتِ ۷۹۰) — «ب» فقط ردیف‌های دکانِ خودش را می‌بیند
+FLAGS.push('shop.till_op_user');
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و

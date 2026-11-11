@@ -36,6 +36,7 @@ const v = require('../lib/validate');
  */
 const contact = require('../lib/customer-contact');
 const creditReview = require('../lib/credit-limit-review');
+const tillOpUser = require('../lib/till-op-user');
 
 const gzip = promisify(zlib.gzip);
 const router = express.Router();
@@ -86,6 +87,11 @@ router.post('/push', requireSyncWrite, async (req, res, next) => {
     const fl = newerFields.filterOps(b.ops, {
       version: appVersion, shape: b.format === 'v2' ? 'v1' : 'v3', caps: b.caps, client: b.client,
     });
+    //  S46: نوبتِ سنجیدهٔ صندوقِ دستگاهِ توکن در لحظهٔ رسیدن (پرچمِ خاموشِ `shop.till_op_user` ⇒ null؛ ‎lib/till-op-user.js‎)
+    const till = Array.isArray(fl.ops) && fl.ops.length ? await tillOpUser.begin(req).catch((err) => {
+      console.error('[till-op-user] نوبتِ صندوق خوانده نشد (v3):', err.message);
+      return null;
+    }) : null;
     const out = await sync.push(req.sync, {
       deviceId: deviceOf(b),
       protocol: b.protocol,
@@ -102,6 +108,8 @@ router.post('/push', requireSyncWrite, async (req, res, next) => {
     await creditReview.v3(req.sync, deviceOf(b), fl.ops, out.results, { ip: clientIp(req) });
     //  STF-03: تخفیفِ خودکار و مصرفِ امتیاز با تعریف‌های دکان ⇒ فقط سابقهٔ بررسی (پرچمِ خاموش؛ ‎lib/promo-loyalty-review.js‎)
     await require('../lib/promo-loyalty-review').v3(req.sync, deviceOf(b), fl.ops, out.results, { ip: clientIp(req) });
+    //  S46: کاربرِ سنجیدهٔ صندوق برای هر op ِ نشسته (بهترین‌کوشش؛ پاسخ دست نمی‌خورد)
+    await tillOpUser.v3(till, fl.ops, out.results, { format: b.format === 'v2' ? 'v2' : 'v3' });
     out.results = newerFields.mergeResults(fl, out.results);
     await send(req, res, { ok: true, ...out, cursor: out.head });
   } catch (err) {
