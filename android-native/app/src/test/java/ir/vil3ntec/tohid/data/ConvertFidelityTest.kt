@@ -389,7 +389,7 @@ class ConvertFidelityTest {
   }
 
   @Test
-  fun `قاعدهٔ گردِ برگشت — برگشتِ کاملِ سه قلمِ ۱۰ با تخفیفِ ۲ ۲۷٫۹۹ پس می‌دهد نه ۲۸ (O-22 ب: هر قلم دقیق تا یک‌صدم)`() {
+  fun `قاعدهٔ گردِ برگشت — برگشتِ کاملِ سه قلمِ ۱۰ با تخفیفِ ۲ ۲۷٫۹۹ پس می‌دهد نه ۲۸ (O-22 ب، هر قلم دقیق تا یک‌صدم)`() {
     val three = listOf(SalesEngine.CartLine("a1", 1.0, 10.0, "الف"), SalesEngine.CartLine("a2", 1.0, 10.0, "ب"), SalesEngine.CartLine("a3", 1.0, 10.0, "ج"))
     val r = ok(SalesEngine.record(shop, three, SalesEngine.Checkout(discountValue = 2.0), today, t0, ::newId))
     val s = sale(r)
