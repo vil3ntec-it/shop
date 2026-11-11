@@ -11,6 +11,7 @@
     "backup": "node scripts/backup.js",
     "restore": "node scripts/restore.js",
     "restore-drill": "node scripts/restore-drill.js",
+    "anonymize": "node scripts/anonymize-backup.js",
     "verify-chain": "node scripts/verify-chain.js",
     "verify-data": "node scripts/verify-data.js",
     "stock-rebuild": "node scripts/stock-rebuild.js",
