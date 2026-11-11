@@ -211,26 +211,8 @@ test('همان نام‌های فارسیِ برنامهٔ نصبی (OwnerExport
   assert.equal(Number(konst('MAX_ROWS').replace(/_/g, '')), X.MAX_ROWS);
 });
 
-test('صفحه دکمه‌ها را دارد و فایل را بار می‌کند؛ سرویس‌ورکر هم آن را نگه می‌دارد', () => {
-  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-  const sw = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
-  assert.match(html, /<script src="license\/owner-export\.js\?v=\d+" defer><\/script>/);
-  assert.ok(html.includes('id="btn-owner-export-xlsx"') && html.includes('id="btn-owner-export-json"'));
-  assert.ok(sw.includes("'./license/owner-export.js'"));
-  const handler = html.slice(html.indexOf("'btn-owner-export-'"), html.indexOf("'btn-owner-export-'") + 900);
-  assert.ok(!/markBackupTaken|localStorage\.setItem/.test(handler), 'خروجی مُهرِ پشتیبان نمی‌زند');
-  assert.ok(handler.includes("shopRole() === 'staff'"), '۲۱.۲: فقط مالک/نقشِ مجاز');
-  assert.ok(handler.includes("logAudit('data_export'"), '۲۱.۲: خروجی در سابقهٔ عملیات ثبت می‌شود');
-  assert.ok(/data_export:'[^']+'/.test(html), 'نوعِ سابقهٔ data_export برچسبِ فارسی دارد');
-});
-
-test('F0-25: خروجیِ مالک پشتِ قفلِ اشتراک نمی‌رود', () => {
-  //  «دسترسی خواندن و export دادهٔ مالک… نباید به‌خاطر انقضا از بین برود»
-  const lic = fs.readFileSync(path.join(ROOT, 'license/license-client.js'), 'utf8');
-  const gated = lic.slice(lic.indexOf('const FEATURE_ELEMENTS'), lic.indexOf('};', lic.indexOf('const FEATURE_ELEMENTS')));
-  assert.ok(gated.length > 20, 'FEATURE_ELEMENTS پیدا نشد');
-  assert.ok(!gated.includes('btn-owner-export'), 'دکمهٔ خروجیِ کامل به قابلیتِ اشتراکی بسته شده');
-});
+//  صفحهٔ وبِ دکان (دکمه‌ها، بارکننده، سرویس‌ورکر و قفلِ اشتراکِ `license-client.js`) به تصمیمِ صاحب برداشته شد
+//  (۱۴۰۵/۰۸/۲۰)؛ خودِ `license/owner-export.js` هم‌زادِ `OwnerExport.kt` و `finance-reports.js` است و همین‌جا سنجیده می‌شود.
 
 test('قالبِ امن: متنِ شبیهِ فرمول فرمول نمی‌شود', async () => {
   //  ‎.xlsx‎ فقط عنصرِ <f> را فرمول می‌داند؛ هر رشته inlineStr است

@@ -37,9 +37,10 @@ const MANIFEST = join(DIR, 'manifest.json');
 const INDEX = join(DIR, '00-index.md');
 const STATUS = join(DIR, 'STATUS.md');
 const BLOCKERS = join(DIR, 'BLOCKERS.md');
+const RELEASE = join(DIR, 'RELEASE-1-fa.md');
 const OBSOLETE_DIR = join(DIR, 'obsolete');
 // پرونده‌های دیگری که در docs/spec مجازند (بیرون از تکه‌ها).
-const ALLOWED = new Set(['MASTER-SPEC.md', 'manifest.json', '00-index.md', 'STATUS.md', 'BLOCKERS.md', 'OWNER-ACTIONS-fa.md', 'ADMIN-CONTROL-PLANE.md', 'tools', 'bench', 'obsolete']);
+const ALLOWED = new Set(['MASTER-SPEC.md', 'manifest.json', '00-index.md', 'STATUS.md', 'BLOCKERS.md', 'OWNER-ACTIONS-fa.md', 'ADMIN-CONTROL-PLANE.md', 'RELEASE-1-fa.md', 'tools', 'bench', 'obsolete']);
 
 const FA = '۰۱۲۳۴۵۶۷۸۹';
 export const toLatin = (s) => String(s).replace(/[۰-۹]/g, (d) => String(FA.indexOf(d)));
@@ -480,6 +481,26 @@ function notesOf(text, heading) {
 
 const secLabel = (e) => [...new Set(e.locs.map((l) => `§${toFa(l.sub)}`))].join('، ');
 
+// دامنهٔ نسخهٔ ۱ (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۰): ردیفی که «مانع»ش این نشان را دارد بیرون از نسخهٔ ۱ است و فهرستش
+// در RELEASE-1-fa.md (بخشِ «شناسه‌های «پس از انتشار»») است؛ check این دو را با هم می‌سنجد.
+export const LATER = 'پس از انتشار';
+const isLater = (blocker) => String(blocker ?? '').includes(LATER);
+const RELEASE_HEAD = `## شناسه‌های «${LATER}»`;
+
+export function verifyRelease(statusText, releaseText) {
+  const marked = [...readStatus(statusText).keep].filter(([, v]) => isLater(v.blocker)).map(([k]) => k);
+  if (!releaseText) return marked.length ? [`RELEASE-1-fa.md نیست ولی ${marked.length} ردیفِ STATUS «${LATER}» دارد`] : [];
+  const listed = new Set();
+  let inside = false;
+  for (const l of String(releaseText).split('\n')) {
+    if (l.startsWith('## ')) inside = l.trim() === RELEASE_HEAD;
+    else if (inside && l.startsWith('|')) { const c = cellsOf(l)[0]; if (KEY.test(c)) listed.add(c); }
+  }
+  const errs = marked.filter((k) => !listed.has(k)).map((k) => `STATUS.md: ${k} «${LATER}» دارد ولی در RELEASE-1-fa.md نیست`);
+  for (const k of listed) if (!marked.includes(k)) errs.push(`RELEASE-1-fa.md: ${k} در فهرست است ولی «مانع»ش در STATUS.md «${LATER}» ندارد`);
+  return errs;
+}
+
 // «مانع»ِ پیش‌فرض: تصمیم‌هایی که متنِ سند برای این شناسه نام برده و در BLOCKERS.md هنوز باز‌اند.
 export const isOpen = (status) => !status || /^باز|هنوز باز/.test(status);
 
@@ -519,6 +540,15 @@ ${sumRow('**همه**', data.entries)}
 | فاز | شمار | ${STATES.join(' | ')} |
 |---|---|${STATES.map(() => '---').join('|')}|
 ${phases.map((ph) => sumRow(ph === null ? 'بی‌فاز در سند' : toFa(ph), data.entries.filter((e) => e.phase === ph))).join('\n')}
+
+## خلاصهٔ نسخهٔ ۱
+
+> دامنه: \`RELEASE-1-fa.md\`. ردیفی که «مانع»ش «${LATER}» دارد بیرون از نسخهٔ ۱ است؛ پیشرفتِ نسخهٔ ۱ = سطرِ نخست.
+
+| دامنه | شمار | ${STATES.join(' | ')} |
+|---|---|${STATES.map(() => '---').join('|')}|
+${sumRow('نسخهٔ ۱', data.entries.filter((e) => !isLater(st(e).blocker)))}
+${sumRow(LATER, data.entries.filter((e) => isLater(st(e).blocker)))}
 
 `;
   for (const f of fams) {
@@ -710,6 +740,7 @@ function main(cmd) {
     const statusText = existsSync(STATUS) ? readFileSync(STATUS, 'utf8') : '';
     all.push(...verifyStatus(data, statusText));
     if (statusText && statusText !== buildStatus(data, statusText, sha(src), readBlockers(blockersText).decisions)) all.push('STATUS.md با سند نمی‌خواند — status بزن');
+    all.push(...verifyRelease(statusText, existsSync(RELEASE) ? readFileSync(RELEASE, 'utf8') : ''));
     if (!blockersText) all.push('BLOCKERS.md نیست — status بزن');
     else {
       all.push(...verifyBlockers(data, blockersText));

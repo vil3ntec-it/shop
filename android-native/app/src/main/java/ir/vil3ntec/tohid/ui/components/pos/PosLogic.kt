@@ -195,13 +195,14 @@ data class PosSummaryRow(val label: String, val amount: Double, val negative: Bo
 
 object PosSummary {
   /**
-   *  فقط آن‌چه موتورِ فروش حساب می‌کند: جمع و (اگر هست) تخفیف. حمل، مالیات و
-   *  گردکردنِ نقدی (PAY-09، POS-37) هنوز در موتور نیستند، پس ردیف نمی‌گیرند.
+   *  فقط آن‌چه موتورِ فروش حساب می‌کند: جمع، (اگر هست) تخفیف و مالیاتِ فاکتور (POS-37، فقط با تنظیمِ روشن).
+   *  گردکردنِ نقدی (PAY-09) را صفحهٔ صندوق خودش زیرِ همین ردیف‌ها می‌گذارد.
    *  «مبلغِ قابلِ پرداخت» جدا و درشت نشان داده می‌شود (`Totals.finalTotal`).
    */
   fun rows(t: SalesEngine.Totals): List<PosSummaryRow> = buildList {
     add(PosSummaryRow(StrSale.subtotal, t.subtotal))
     if (t.discount > 0) add(PosSummaryRow(Str.discount, t.discount, negative = true))
+    if (t.tax > 0) add(PosSummaryRow(ir.vil3ntec.tohid.core.i18n.StrSaleTax.line, t.tax))
   }
 }
 

@@ -82,11 +82,3 @@ test('G با دست: خروجیِ ساختِ بسته به بهای دقیقِ �
     assert.equal(core.stockCost(strip(k), { products: ['b'] }).rows[0].valueMinor, 1133, k);
   }
 });
-
-test('هستهٔ گزارش بی stock-core بار نمی‌شود (مرورگر: پیش از report-core)', () => {
-  const fs = require('node:fs');
-  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-  const a = html.indexOf('license/stock-core.js'), b = html.indexOf('license/report-core.js');
-  assert.ok(a > 0 && a < b, 'index.html: stock-core.js پیش از report-core.js');
-  assert.ok(fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8').includes("'./license/stock-core.js'"), 'sw.js: نصبِ آفلاین');
-});

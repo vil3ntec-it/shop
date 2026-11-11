@@ -114,6 +114,7 @@ test('پرچمِ روشن + دستگاهِ زنجیره‌دار: هر ویرا�
     op('sales', 's1', 'update', { paidAmount: { $inc: -100 } }),
     op('sales', 's1', 'update', { payments: [{ method: 'cash', kind: 'cash', amount: 50000, status: 'confirmed' }] }),
     op('sales', 's1', 'update', { date: '2026-10-01' }),
+    op('sales', 's1', 'update', { taxMinor: 5000 }),   //  POS-37: مالیاتِ فاکتور مالی است
     op('sales', 's1', 'update', { createdAt: 1 }),
     op('sales', 's1', 'update', { invoiceNumber: 8 }),
     op('sales', 's1', 'update', { status: 'pending' }),
@@ -147,7 +148,7 @@ test('پرچمِ روشن + دستگاهِ زنجیره‌دار: هر ویرا�
   assert.ok(ev.every((e) => e.enforced === true && e.path === 'v1' && e.deviceId === CHAIN && e.type === 'sale'));
   assert.deepEqual(ev.map((e) => e.edits), [
     'sales/s1 update: total', 'sales/s1 update: discount,finalTotal', 'sales/s1 update: paidAmount', 'sales/s1 update: payments',
-    'sales/s1 update: date', 'sales/s1 update: createdAt', 'sales/s1 update: invoiceNumber', 'sales/s1 update: status',
+    'sales/s1 update: date', 'sales/s1 update: taxMinor', 'sales/s1 update: createdAt', 'sales/s1 update: invoiceNumber', 'sales/s1 update: status',
     'sales/s2 update: debtorId', 'saleItems/s1-i1 update: quantity', 'saleItems/s1-i1 update: unitPrice,totalPrice',
     'saleItems/s1-i2 update: saleId', 'saleItems/s1-i2 delete: *delete*', 'sales/s1 delete: *delete*', 'saleItems/s1-i3 insert: +line',
   ]);

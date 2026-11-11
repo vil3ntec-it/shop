@@ -38,6 +38,11 @@ test('فهرستِ وب همان DariText.kt است (منبعِ یکتا)', () =
   for (const w of want.words) assert.ok(w.fa && w.dari && w.fa !== w.dari, w.fa);
 });
 
+//  پیش‌تر در `web-shop-i18n.test.js` (با وبِ دکان برداشته شد، ۱۴۰۵/۰۸/۲۰): هم‌زادِ `license/dari.js` می‌ماند
+test('license/dari.js رونوشتِ بایت‌به‌بایتِ kit/dari.js است (scripts/dari-words.js --write هر دو را می‌نویسد)', () => {
+  assert.equal(fs.readFileSync(W.WEB, 'utf8'), read('kit/dari.js'), 'node server/scripts/dari-words.js --write');
+});
+
 test('سازنده سطرِ ناشناختهٔ کاتلین را بی‌صدا رد نمی‌کند', () => {
   const src = fs.readFileSync(W.KT, 'utf8');
   assert.throws(() => W.build(src.replace('Word("خیابان", "سرک"),', 'Word("خیابان", "سرک", vowel = true),')), /پارامترِ ناشناخته|سطرِ ناشناخته/);

@@ -60,6 +60,7 @@ class SaleCapsVectorsTest {
     roundingMinor = o.ln("roundingMinor") ?: 0, debtGivenMinor = o.ln("debtGivenMinor") ?: 0, date = o.s("date"),
     priorDebtMinor = o.ln("priorDebtMinor") ?: 0, loyaltyMinor = o.ln("loyaltyMinor") ?: 0,
     wholesale = (o["wholesale"] as? JsonPrimitive)?.booleanOrNull ?: false,
+    taxMinor = o.ln("taxMinor") ?: 0, // POS-37
   )
 
   private fun need(o: JsonObject) = ApprovalSlip.Need(o.s("perm"), o.s("doc"), o.ln("pctBp"), o.ln("amount"))
@@ -116,7 +117,7 @@ class SaleCapsVectorsTest {
       val o = r.getValue("out").jsonObject
       assertEquals(
         SaleCaps.Basis(o.l("discountMinor"), o.l("baseMinor"), o.l("reductionMinor"), o.l("gapMinor")),
-        SaleCaps.basis(r.l("discount"), r.l("total"), r.ln("final"), r.l("rounding"), r.l("reduction")), r.toString(),
+        SaleCaps.basis(r.l("discount"), r.l("total"), r.ln("final"), r.l("rounding"), r.l("reduction"), r.ln("tax") ?: 0), r.toString(),
       )
     }
   }

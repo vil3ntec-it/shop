@@ -334,6 +334,28 @@ test('sum.sale_final: ردیفِ جدای گردکردنِ نقدی (PAY-09، `r
   await expectOnly(o.shopId, 'sum.sale_final');
 });
 
+test('sum.sale_final: مالیاتِ فاکتور (POS-37، `taxMinor`) جزوِ نهایی است، نه تخلف', async () => {
+  const o = await cleanShop('مالیات');
+  //  ۳۶۱ − ۱۱ + ۳۵ (۱۰٪) = ۳۸۵؛ پرداخت + مانده = ۲۳۵ + ۱۵۰
+  await setField(o.shopId, 'sales', 's1', '{taxMinor}', '3500');
+  await setField(o.shopId, 'sales', 's1', '{finalTotal}', '385');
+  await setField(o.shopId, 'sales', 's1', '{paidAmount}', '235');
+  const rep = await vd.verify({ shopId: o.shopId });
+  assert.deepEqual(rep.checks.filter((c) => c.count > 0), [], JSON.stringify(rep.checks.filter((c) => c.count > 0)));
+  //  مالیاتی که با نهایی نمی‌خواند همان خطاست
+  await setField(o.shopId, 'sales', 's1', '{taxMinor}', '1000');
+  await expectOnly(o.shopId, 'sum.sale_final');
+});
+
+test('SR48-3: «مالیاتِ» منفی تخفیفِ پنهان را از sum.sale_final نمی‌پوشاند', async () => {
+  const o = await cleanShop('مالیاتِ منفی');
+  //  نهاییِ ۳۴۰ به‌جای ۳۵۰ (۱۰ افغانی تخفیفِ پنهان) با taxMinor = −۱۰۰۰؛ پرداخت + مانده = ۱۹۰ + ۱۵۰ = ۳۴۰
+  await setField(o.shopId, 'sales', 's1', '{taxMinor}', '-1000');
+  await setField(o.shopId, 'sales', 's1', '{finalTotal}', '340');
+  await setField(o.shopId, 'sales', 's1', '{paidAmount}', '190');
+  await expectOnly(o.shopId, 'sum.sale_final');
+});
+
 test('sum.sale_final: تسویه بیشتر از نسیه', async () => {
   const o = await cleanShop('تسویه');
   await setField(o.shopId, 'sales', 's1', '{debtSettled}', '151');

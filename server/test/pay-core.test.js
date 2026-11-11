@@ -6,10 +6,9 @@
  * می‌خواند (`core/test-vectors/pay-v1.json`). عددهای بردار دستی و از روی
  * قاعده نوشته شده‌اند، نه از خروجیِ کد؛ پس این آزمون دوری نیست.
  *
- * بخشِ `legacyShift` رفتارِ امروزِ صندوق را می‌سنجد: خودِ `shiftTotals`ِ
- * `index.html` (از متنِ فایل بیرون کشیده و اجرا می‌شود) روی همان داده‌ها همان
- * عددی را می‌دهد که در بردار است، و هسته روی رویدادهای هم‌ارز یا همان عدد را
- * می‌دهد یا تفاوتش ثبت و مستند است. هیچ پایگاه‌داده‌ای لازم نیست.
+ * بخشِ `legacyShift`: هسته روی رویدادهای هم‌ارزِ همان داده‌ها یا همان عددِ صندوقِ پیشینِ وب (`legacyExpected` ِ
+ * بردار) را می‌دهد یا تفاوتش ثبت و مستند است. (خودِ `shiftTotals` ِ `index.html` که آن عدد را می‌ساخت با برداشتنِ
+ * وبِ دکان به تصمیمِ صاحب رفت، ۱۴۰۵/۰۸/۲۰؛ عددِ بردار همان می‌ماند.) هیچ پایگاه‌داده‌ای لازم نیست.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -194,24 +193,8 @@ test('شیفت: رویدادِ ردشده هیچ اثری نمی‌گذارد و
   assert.deepEqual(P.zReport(closed.shift).report, closed.report);
 });
 
-/** همان `shiftTotals`ِ امروزِ وب، از خودِ index.html */
-function legacyShiftTotals() {
-  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-  const start = html.indexOf('function shiftTotals(sh, now){');
-  assert.ok(start > 0, 'shiftTotals در index.html پیدا نشد');
-  const end = html.indexOf('\n  }\n', start);
-  const src = html.slice(start, end + 4);
-  // eslint-disable-next-line no-new-func
-  return new Function('sales', 'transactions', 'returns', 'expenses', 'supplierPayments', 'purchases', src + '\nreturn shiftTotals;');
-}
-
-test('رفتارِ امروز (shiftTotals ِ index.html) و هسته روی داده‌های هم‌ارز', () => {
-  const make = legacyShiftTotals();
+test('هسته روی داده‌های هم‌ارزِ صندوقِ پیشینِ وب (legacyShift)', () => {
   for (const c of V.legacyShift) {
-    const d = c.data;
-    const totals = make(d.sales, d.transactions, d.returns, d.expenses, d.supplierPayments, d.purchases);
-    const t = totals({ open: { createdAt: c.from, amount: c.opening }, close: { createdAt: c.to } }, c.to);
-    assert.equal(t.expected, c.legacyExpected, c.name + ' — موتورِ امروز');
     const shift = runSteps(c.steps.map((s) => Object.assign({ expect: { ok: true } }, s)), c.name);
     const x = P.xReport(shift, { at: c.to });
     assert.deepEqual(x.report.expected, c.coreExpected, c.name + ' — هسته');

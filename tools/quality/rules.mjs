@@ -112,7 +112,6 @@ export const ES5_FILES = [
   'license/debt-book.js',
   'license/hash-chain.js',
   'license/keymap.js',
-  'license/ledger-store.js',
   'license/money.js',
   'license/report-board.js',
 ];

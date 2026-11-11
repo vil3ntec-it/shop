@@ -180,6 +180,7 @@
     tenderedMinor: 'دریافتی (پول)',
     changeMinor: 'پول پس (پول)',
     roundingMinor: 'گردکردن نقدی (پول)', // PAY-09 — همتای OwnerExport.kt
+    taxMinor: 'مالیات (پول)', // POS-37 — همتای OwnerExport.kt
     //  فاکتورِ نسخهٔ ۲ — توکنِ QRِ فاکتور (همتای OwnerExport.kt)
     receiptToken: 'توکنِ QRِ فاکتور',
     by: 'کاربر',

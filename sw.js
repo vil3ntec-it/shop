@@ -1,218 +1,42 @@
 /* ==========================================================
-   فروشگاه من — Service Worker
-   هدف: برنامه بدون اینترنت هم کامل باز شود.
-   - پوسته برنامه (index.html، آیکن‌ها، مانیفست) هنگام نصب کش می‌شود.
-   - ناوبری: اول شبکه، در نبود اینترنت از کش (stale-while-revalidate).
-   - فونت‌های گوگل: اولین بار از شبکه، سپس همیشه از کش.
-   داده‌های فروشگاه در localStorage است و اصلاً از اینجا عبور نمی‌کند.
+   فروشگاه من — سرویس‌ورکرِ خداحافظی (۱۴۰۵/۰۸/۲۰)
+
+   ⛔ وبِ مدیریتِ فروشگاه به تصمیمِ صاحبِ مخزن برداشته شد (docs/RULES-fa.md، بخشِ نخست). نصب‌های پیشین (PWA ِ
+   صفحهٔ اصلی و برگه‌های باز) هنوز همین نشانی را می‌پرسند و تا این فایل نرسد پوستهٔ کهنه را از کش نشان می‌دهند.
+   این کارگر:
+     ۱) بی انتظار جای کارگرِ کهنه را می‌گیرد (skipWaiting؛ کارگرِ کهنه منتظرِ دکمهٔ «به‌روزرسانی» می‌ماند)؛
+     ۲) فقط کش‌های پوستهٔ **همین کانال** را پاک می‌کند: `tohid-shop-…` در پایدار و `beta-tohid-shop-…` در `/beta/`
+        — نه کشِ کانالِ دیگر و نه کشِ برنامهٔ دیگری روی همین دامنه؛ و هرگز localStorage یا IndexedDB (دفترِ دکان)
+        را، که صفحهٔ تازه (`index.html`) از آن فایلِ پشتیبان می‌سازد؛
+     ۳) خودش را برمی‌دارد و برگه‌های بازِ خودش را دوباره بار می‌کند تا صفحهٔ «برنامه را نصب کنید» از شبکه بیاید.
+   fetch ندارد: از این پس هیچ پاسخی از کش داده نمی‌شود.
+
+   ⛔ نگه داشته می‌شود تا دیرترین نصبِ کهنه هم یک بار آنلاین شود (دست‌کم تا ۱۴۰۶/۰۲/۰۱)؛ برداشتنِ زودترش
+      نصب‌های کهنه را روی پوستهٔ کش‌شده نگه می‌دارد.
+   ⛔ همین فایل در `/beta/` هم منتشر می‌شود و هر کانال فقط کارِ خودش را می‌کند (`BETA_PATH`؛ ورک‌فلوی
+      «وب — GitHub Pages» همین نام را در هر دو می‌جوید).
+   آزمون: `server/test/web-shop-gone.mjs`.
    ========================================================== */
-/*
- *  ⛔ کانالِ آزمایشیِ وب (F0-27): همین فایل در `/beta/` هم منتشر می‌شود و کش‌ها
- *  مالِ **کلِ دامنه**اند. پس کشِ آزمایشی پیشوندِ `beta-` دارد و هر کانال فقط
- *  کشِ کهنهٔ **خودش** را پاک می‌کند — وگرنه فعال شدنِ یکی پوستهٔ آفلاینِ دیگری
- *  را می‌برد. پایدار هم به ناوبری و فایل‌های `/beta/` دست نمی‌زند
- *  (`server/test/web-beta-channel.mjs`).
- */
+'use strict';
+
 const BETA = /\/beta\/sw\.js$/.test(self.location.pathname);
 const BETA_PATH = new URL('./beta/', self.location).pathname;
-const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v76';
-const SHELL_CACHE = VERSION + '-shell';
-const FONT_CACHE = VERSION + '-fonts';
-
-const SHELL_ASSETS = [
-  './',
-  './index.html',
-  './manifest.webmanifest',
-  './icons/mark.png',
-  './icons/icon-96.png',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/apple-touch-icon.png',
-  './icons/icon-maskable-192.png',
-  './icons/icon-maskable-512.png',
-  './license/api-config.js',
-  './license/license-client.js',
-  './license/license-ui.css',
-  './license/shop-sync.js',
-  './license/shop-ui.js',
-  './license/shop-ui.css',
-  './license/vip.js',
-  './license/vip.css',
-  './license/support.js',
-  './license/support.css',
-  /*
-   *  لایهٔ Sync v1 و ورودِ کدِ ایمیلی.
-   *
-   *  ⚠️ با هر فایلِ تازه‌ای که به `index.html` اضافه می‌شود، همین فهرست
-   *  و شمارهٔ `VERSION` هم باید عوض شوند — وگرنه نصبِ روی گوشی فایلِ
-   *  تازه را ندارد و آفلاین نصفه بالا می‌آید.
-   */
-  './license/sync-core.js',
-  './license/account-code.js',
-  //  Sync v3 پشتِ تنظیمِ هر دستگاه (پیش‌فرض v1) و قاعدهٔ یگانهٔ مبلغی که مبدلش می‌خواند
-  './license/money.js',
-  './license/sync-v3-engine.js',
-  './license/sync-engine.js',
-  './license/account-ui.js',
-  './license/account-ui.css',
-  //  پشتیبانِ ابریِ خودکارِ هر دوازده ساعت — بی این، نصبِ روی گوشی آن را ندارد
-  './license/auto-backup.js',
-  /*
-   *  ⚠️ این یکی از قبل جا افتاده بود و کسی ندیده بود: چاپِ مستقیمِ حرارتی
-   *  روی نصبِ آفلاین اصلاً بار نمی‌شد. همان تله‌ای که همین بالا نوشته شده.
-   */
-  './license/thermal-print.js',
-  //  زبانِ صفحه و فاکتور (فارسی، دری، انگلیسی، پشتو): لایه و واژه‌نامه‌های کوچک. واژه‌نامهٔ بزرگِ صفحه (`i18n/web.*.json`،
-  //  ۱۰۰ تا ۲۰۰KB) و `dari.js` فقط برای همان زبان لازم‌اند: با نخستین بارِ آن زبان (برخط) همین‌جا کش می‌شوند و بعد آفلاین
-  //  هم هستند؛ پیش‌کشِ همه برای هر دکانِ فارسی نیم مگابایت دانلودِ بیهوده بود. نبودشان ⇒ صفحه فارسی می‌ماند، نه خراب.
-  './license/web-i18n.js',
-  './license/i18n/receipt.fa.json',
-  './license/i18n/receipt.en.json',
-  './license/i18n/receipt.ps.json',
-  './license/i18n/receipt.web.json',
-  './license/i18n/lang.fa.json',
-  './license/i18n/lang.en.json',
-  './license/i18n/lang.ps.json',
-  //  LOC-01/05/07/09: هستهٔ خالصِ متن و تقویم — بی آن‌ها فاکتور و تاریخ به راهِ قدیم برمی‌گردند
-  './license/text-core.js',
-  './license/calendar-core.js',
-  //  «گزارشِ تازه»: هستهٔ مشترکِ گزارش، تابلوی خانه و صفحه‌اش — بی این‌ها روی نصبِ آفلاین بار نمی‌شدند
-  //  میانگینِ موزونِ هستهٔ گزارش (RPT-03) با همین هستهٔ موجودی — بی آن report-core بار نمی‌شد
-  './license/stock-core.js',
-  './license/report-core.js',
-  './license/report-board.js',
-  './license/report-ui.js',
-  //  INV-16: «ارزش موجودی» ِ گزارشِ تازه (دوقلوی `StockAnalysis.valuation`) — بی آن، نصبِ آفلاین زبانه را نداشت
-  './license/stock-value-core.js',
-  //  RPT-13 دوره و میان‌برهای گزارش (دوقلوی `ReportPeriod` و keymap.js ِ ساخته از keymap.json) و RPT-08 «ساعت و روز»
-  //  (دوقلوی `SalesHeatmap`) — report-ui.js بارشان می‌کند؛ بی این‌ها نصبِ آفلاین دکمه، کلید و زبانه را نداشت
-  './license/report-period-core.js',
-  './license/keymap.js',
-  './license/sales-heatmap-core.js',
-  './license/report-ui.css',
-  //  RPT-11: PDF ِ مستقیمِ گزارش — دیربار با نخستین «PDF»؛ بی این، روی نصبِ آفلاین PDF ساخته نمی‌شد
-  './license/report-pdf.js',
-  './license/photo-studio.js',
-  //  جای دفتر (localStorage یا IndexedDB) — بی آن، دفترِ IndexedDB روی نصبِ آفلاین باز نمی‌شد
-  './license/ledger-store.js',
-  //  خروجیِ کاملِ مالک (OPS-08) — بی اینترنت هم باید کار کند
-  './license/owner-export.js',
-  //  دفترِ قرض‌داران (پول به واحدِ کوچک + DebtBook) — بی این دو، حسابِ ردیف‌ها روی نصبِ آفلاین نمی‌آمد
-  './license/money.js',
-  './license/debt-book.js',
-  //  بخشِ «سفارش‌ها» (فاز ۴) — پشتِ پرچمِ سرور؛ خاموش ⇒ هیچ کاری نمی‌کند
-  './license/orders-ui.js',
-  './license/orders-ui.css',
-  //  افزونهٔ پشتِ پرچمِ «سفارش‌ها» (ORD-03، ORD-07) — فقط با پرچم بار می‌شود
-  './license/orders-desk.js',
-  //  MKT-06: «چرخهٔ مصرف» در ویرایشِ کالا — بی آن، ویرایشِ بی اینترنت کادر را نشان نمی‌داد
-  './license/product-cycle.js',
-  //  POS-03: پیشوندِ شمار «۳*» در کادرِ بارکدِ فروش — بی آن، تنظیمِ روشن روی نصبِ آفلاین کاری نمی‌کرد
-  './license/cart-query.js',
-  //  POS-04: جست‌وجوی نامِ کالا در همان کادر — بی آن، تنظیمِ روشن روی نصبِ آفلاین کاری نمی‌کرد
-  './license/catalog-match.js',
-  //  CRM-15: شمارهٔ پوشیدهٔ مشتری برای اصلِ بی «شمارهٔ مشتریان» — بی اینترنت هم (دفترِ ازپیش‌همگام‌شده)
-  './license/customer-access.js',
-  //  R10: خانهٔ CSV بی «فرمول» — بی آن، خروجیِ CSV ِ نصبِ آفلاین نامِ «=…» را فرمول می‌کرد
-  './license/csv-cell.js',
-  './license/orders-risk.js',
-  //  خوانندهٔ بارکد برای آیفون — Safari «BarcodeDetector» ندارد و دوربین همیشه
-  //  همین را بار می‌کند؛ بی آن، نصبِ تازه بی اینترنت اصلاً اسکن نمی‌کرد
-  './license/vendor/zxing-0.21.3.min.js',
-  './sounds/scan-beep.mp3',
-];
+const OWN_CACHE = BETA ? 'beta-tohid-shop-' : 'tohid-shop-';
 
 self.addEventListener('install', (event) => {
-  /*
-   * عمداً skipWaiting اینجا صدا زده نمی‌شود: نسخه‌ی تازه منتظر می‌ماند
-   * تا خودِ برنامه نوار «به‌روزرسانی» را نشان دهد و کاربر دکمه را بزند.
-   * وگرنه وسط کار، صفحه بی‌خبر عوض می‌شد.
-   */
-  event.waitUntil(
-    caches.open(SHELL_CACHE)
-      // هر فایلی که نبود، کل نصب را خراب نکند
-      .then((cache) => Promise.allSettled(SHELL_ASSETS.map((url) => cache.add(url))))
-  );
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(
-        keys.filter((k) => !k.startsWith(VERSION) && k.startsWith('beta-') === BETA).map((k) => caches.delete(k))
-      ))
-      .then(() => self.clients.claim())
-  );
-});
-
-// پیام از صفحه: نسخه‌ی تازه همین حالا جای قبلی را بگیرد
-self.addEventListener('message', (event) => {
-  const d = event.data;
-  if (d === 'skip-waiting' || (d && d.type === 'SKIP_WAITING')) self.skipWaiting();
-});
-
-function isFontRequest(url) {
-  return url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com';
-}
-
-self.addEventListener('fetch', (event) => {
-  const req = event.request;
-  if (req.method !== 'GET') return;
-
-  const url = new URL(req.url);
-
-  //  نسخهٔ آزمایشی سرویس‌ورکرِ خودش را دارد؛ پایدار پاسخِ آن را جای پوستهٔ خودش کش نمی‌کند
-  if (!BETA && url.origin === self.location.origin && url.pathname.startsWith(BETA_PATH)) return;
-
-  // ---- فونت‌ها: اول کش، بعد شبکه (و ذخیره برای دفعات بعد) ----
-  if (isFontRequest(url)) {
-    event.respondWith(
-      caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-        const copy = res.clone();
-        caches.open(FONT_CACHE).then((c) => c.put(req, copy)).catch(() => {});
-        return res;
-      }).catch(() => hit))
-    );
-    return;
-  }
-
-  // ---- ناوبری: اول شبکه تا نسخه تازه بیاید، در نبود اینترنت از کش ----
-  if (req.mode === 'navigate') {
-    event.respondWith(
-      fetch(req)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(SHELL_CACHE).then((c) => c.put('./index.html', copy)).catch(() => {});
-          return res;
-        })
-        .catch(() => caches.match('./index.html').then((hit) => hit || caches.match('./')))
-    );
-    return;
-  }
-
-  /*
-   * بقیه فایل‌های خودِ برنامه: کش را فوری بده تا صفحه سریع باز شود، ولی
-   * هم‌زمان نسخه‌ی تازه را از شبکه بگیر و جای آن بگذار. قبلاً فقط «اول کش»
-   * بود و یک فایل کش‌شده تا عوض شدن نسخه‌ی سرویس‌ورکر هرگز تازه نمی‌شد.
-   */
-  if (url.origin === self.location.origin) {
-    /*
-     *  ⚠️ `index.html` فایل‌ها را با `?v=N` می‌خواند ولی پوسته بی آن کش شده؛
-     *  پس اولین باز کردنِ بی اینترنت (فقط یک بار آنلاین باز شده) اسکریپت‌های
-     *  مجوز و همگام‌سازی را نداشت. حالا اگر نسخهٔ دقیق نبود، همان فایلِ بی
-     *  پرسش‌نامه از پوسته برداشته می‌شود.
-     */
-    event.respondWith(
-      caches.match(req).then((exact) => exact || (url.search ? caches.match(req, { ignoreSearch: true }) : undefined)).then((hit) => {
-        const fresh = fetch(req).then((res) => {
-          if (res && res.ok) {
-            const copy = res.clone();
-            caches.open(SHELL_CACHE).then((c) => c.put(req, copy)).catch(() => {});
-          }
-          return res;
-        }).catch(() => hit);
-        return hit || fresh;
-      })
-    );
-  }
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter((k) => k.startsWith(OWN_CACHE)).map((k) => caches.delete(k)));
+    await self.registration.unregister();
+    const open = await self.clients.matchAll({ type: 'window' });
+    await Promise.all(open.map((c) => {
+      //  برگهٔ `/beta/` کارِ کارگرِ آزمایشیِ خودش است
+      if (!BETA && new URL(c.url).pathname.startsWith(BETA_PATH)) return null;
+      return c.navigate(c.url).catch(() => null);
+    }));
+  })());
 });

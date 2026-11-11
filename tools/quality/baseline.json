@@ -21,13 +21,9 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/SaleDialogs.kt": 1221,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Settings.kt": 1483,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Vip.kt": 1578,
-    "license/account-ui.js": 897,
-    "license/license-client.js": 1331,
-    "license/orders-ui.js": 935,
     "license/sync-core.js": 936,
     "license/sync-engine.js": 892,
     "license/sync-v3-engine.js": 1258,
-    "license/vip.js": 852,
     "server/public/admin/index.html": 1387,
     "server/src/lib/image-bank.js": 1167,
     "server/src/lib/notices.js": 825,
@@ -39,8 +35,8 @@
   },
   "frozen": {
     "index.html": {
-      "lines": 15834,
-      "bytes": 854424
+      "lines": 571,
+      "bytes": 41514
     }
   },
   "productLiterals": {
@@ -84,7 +80,7 @@
     "afn": 15,
     "minorOf": 4,
     "StatusPill": 2,
-    "html-escape": 13,
+    "html-escape": 5,
     "secret-derivation": 6,
     "express-wrap": 0
   },

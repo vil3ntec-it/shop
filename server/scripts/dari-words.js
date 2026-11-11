@@ -109,8 +109,8 @@ function current(js = fs.readFileSync(JS, 'utf8')) {
 }
 
 /**
- *  نسخهٔ وبِ دکان (`index.html` + `license/`) جدا منتشر می‌شود (GitHub Pages، بی `server/public`)؛ پس همان لایه
- *  رونوشتِ بایت‌به‌بایتِ همین dari.js در `license/dari.js` است — هیچ فهرستِ دومی نه (`web-shop-i18n.test.js`).
+ *  هم‌زادِ `license/dari.js`: رونوشتِ بایت‌به‌بایتِ همین dari.js — هیچ فهرستِ دومی نه (`dari-text.test.js`). وبِ دکان که
+ *  آن را می‌خواند به تصمیمِ صاحب برداشته شد (۱۴۰۵/۰۸/۲۰)؛ رونوشت به‌عنوانِ کتابخانهٔ مشترک می‌ماند (docs/RULES-fa.md، بخشِ نخست).
  */
 const WEB = path.join(ROOT, 'license', 'dari.js');
 

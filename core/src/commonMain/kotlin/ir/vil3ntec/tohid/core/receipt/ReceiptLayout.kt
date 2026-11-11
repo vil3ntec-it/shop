@@ -67,6 +67,8 @@ object ReceiptLayout {
     //  آگاهی، نه کسر: بی «−»
     input.included.filter { it.amount > 0 }.forEach { row(it.label, fmt.money(it.amount)) }
     input.discounts.filter { it.amount > 0 }.forEach { row(it.label, "−" + fmt.money(it.amount)) }
+    //  POS-37: مالیاتِ فاکتور — ردیفِ جدا با «+»، پیش از گرد؛ بی مالیات ⇒ همان بلوک‌های پیشین
+    if (input.tax > 0.0) row(labels.tax, "+" + fmt.money(input.tax))
     //  PAY-09: گردکردنِ نقدی — ردیفِ جدا، نه تغییرِ قیمت؛ بی گرد ⇒ همان بلوک‌های پیشین
     if (input.rounding != 0.0) row(labels.rounding, (if (input.rounding < 0) "−" else "+") + fmt.money(kotlin.math.abs(input.rounding)))
     b += ReceiptBlock.Rule(dashed = false)

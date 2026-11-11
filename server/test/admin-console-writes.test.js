@@ -112,6 +112,26 @@ test('enable: ارشد + دلیل برمی‌گرداند؛ همان سابقه�
   assert.equal((await h.get('/api/shop', { token: t.staff[0].accessToken })).status, 401);
 });
 
+test('disable: دلیلِ نوشته اجباری (تصمیمِ ۲-۲۰، ۱۴۰۵/۰۸/۲۰) — بی دلیل یا کوتاه ⇒ ۴۰۰ reason_required و دستگاه روشن می‌ماند', async () => {
+  const t = await team('دلیلِ خاموش');
+  const dev = await devOf(t.staff[0]);
+  const c0 = await claims();
+  for (const body of [{}, { reason: '' }, { reason: 'اه' }, { reason: '   ' }]) {
+    const r = await A('cw-arshad', 'POST', devPath(t.shopId, dev, 'disable'), body, withKey(key('dis')));
+    assert.equal(r.status, 400, JSON.stringify(r.body));
+    assert.equal(r.body.error.code, 'reason_required', JSON.stringify(body));
+  }
+  assert.equal((await devRow(dev)).disabled_at, null, 'بی دلیل هیچ تغییری نیست');
+  assert.equal((await audits('device.disabled', dev)).length, 0);
+  assert.equal(await claims(), c0, 'کلیدِ یکتایی پیش از دلیل مصرف نمی‌شود');
+  const off = await A('cw-arshad', 'POST', devPath(t.shopId, dev, 'disable'), { reason: 'گوشی گم شد' });
+  assert.equal(off.status, 200, JSON.stringify(off.body));
+  assert.ok((await devRow(dev)).disabled_at);
+  const [a] = await audits('device.disabled', dev);
+  const detail = typeof a.detail === 'string' ? JSON.parse(a.detail) : a.detail;
+  assert.equal(detail.reason, 'گوشی گم شد');
+});
+
 test('enable: مرزِ دکان — دستگاهِ عضوِ دکانِ دیگر ⇒ ۴۰۴ device_not_found؛ دکانِ نبوده ⇒ ۴۰۴؛ بی توکن ⇒ ۴۰۱', async () => {
   const a = await team('مرزِ الف');
   const b = await team('مرزِ ب');

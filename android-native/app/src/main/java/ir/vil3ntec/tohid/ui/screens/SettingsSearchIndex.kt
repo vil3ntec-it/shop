@@ -130,7 +130,7 @@ object SettingsSearchIndex {
     "کالای منقضی" to kw("منقضی تاریخ انقضا", "expired items expiry date", "تېر شوي توکي"),
     L.LINE_PRICING to kw("تخفیف قیمت ردیف", "discount line price", "تخفیف بیه"),
     L.LINE_SELLER to kw("فروشنده ردیف پورسانت کارمند Shift+F2", "seller line commission staff Shift+F2", "پلورونکی کرښه کمیشن کارکوونکی"), // داده: واژه‌های جست‌وجوی تنظیمات در سه زبان
-    L.AUTO_FEES to kw("هزینه خودکار کیسه بسته‌بندی مصرف خودکار", "automatic charges fee bag", "اتومات لګښت"),
+    L.AUTO_FEES to kw("هزینه خودکار کیسه بسته‌بندی مصرف خودکار مالیات فاکتور", "automatic charges fee bag invoice tax", "اتومات لګښت مالیه"), // POS-37: مالیاتِ فاکتور در همین صفحه
     L.QUOTE to kw("پیش فاکتور قیمت‌دهی", "quote estimate", "مخکینی بل"),
     L.SPECIAL_ORDER to kw("سفارش ویژه پیش پرداخت", "special order deposit", "ځانګړی فرمایش"),
     L.DELIVER_LATER to kw("تحویل بعدی", "deliver later", "وروسته سپارل"),

@@ -1,12 +1,11 @@
 'use strict';
 /**
  * POS-03 — پیشوندِ شمار «۳*» در کادرِ بارکدِ صندوقِ نسخهٔ وبِ دکان (`license/cart-query.js`)، بی مرورگر و بی پایگاه.
- * (رفتارِ صفحه در کرومیومِ واقعی: `test/web-pos-qty.mjs`.)
+ * (وبِ دکان به تصمیمِ صاحب برداشته شد، ۱۴۰۵/۰۸/۲۰: واژه‌نامهٔ صفحه، بارکننده، سرویس‌ورکر و index.html رفتند؛ هسته و بردارش همین‌جاست.)
  *
  *   ⛔ همان `data/CartQuery.kt` ِ صندوقِ کامپیوتر و گوشی: بردارِ مشترکِ `license/test-vectors/cart-query-v1.json`
  *      (`CartQueryVectorsTest` ِ Kotlin همان را می‌خواند)، با `\s`، `.` و `$` ِ java.util.regex (نه JS) — همهٔ BMP.
  *   ⛔ تصمیمِ کادر: بی پیشوند یا متنی که خودش بارکدِ کالاست ⇒ همان راهِ صفحه؛ شمارِ صفر/نادرست ⇒ هیچ افزودن.
- *   ⛔ متن: چهار کلیدِ واژه‌نامهٔ صفحه با انگلیسی و پشتو؛ بارکننده `shop-sync.js`، سرویس‌ورکر، index.html ِ یخ‌زده دست‌نخورده.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -114,32 +113,13 @@ test('تصمیمِ کادر: بی پیشوند و بارکدِ کامل ⇒ صف
   assert.deepEqual(X.decide('3*111', null), { kind: 'add', count: 3, code: '111' });
 });
 
-test('متن: چهار کلیدِ واژه‌نامهٔ صفحه، با انگلیسی و پشتو، و جای‌خالی همان', () => {
-  const fa = JSON.parse(read('license/i18n/web.fa.json'));
-  const en = JSON.parse(read('license/i18n/web.en.json'));
-  const ps = JSON.parse(read('license/i18n/web.ps.json'));
-  const keys = Object.values(X.TEXT);
-  assert.equal(keys.length, 4);
-  for (const k of keys) {
-    assert.ok(fa.includes(k), `web.fa.json: ${k}`);
-    assert.ok(en[k] && !/[؀-ۿ]/.test(en[k]), `en: ${k}`);
-    assert.ok(ps[k], `ps: ${k}`);
-  }
-  assert.match(X.TEXT.next, /\{0\}/);
-  assert.match(en[X.TEXT.next], /\{0\}/);
-  assert.match(ps[X.TEXT.next], /\{0\}/);
-});
-
 test('پیش‌فرض خاموش: کلیدِ همین مرورگر فقط با «۱» روشن است و پرونده بی مرورگر هیچ نصب نمی‌کند', () => {
   assert.equal(X.PREF, 'tohid-pos-qty-prefix-v1');
   assert.match(src, /getItem\(PREF\) === '1'/);
   assert.doesNotThrow(() => X.install(), 'در Node (بی document) کاری نمی‌کند');
 });
 
-test('بارکننده و سرویس‌ورکر؛ index.html ِ یخ‌زده دست‌نخورده؛ اسکن فقط از دستگیرهٔ صفحه؛ بی innerHTML/صفتِ style/eval', () => {
-  assert.match(read('license/shop-sync.js'), /src: 'license\/cart-query\.js\?v=1'/);
-  assert.ok(read('sw.js').includes("'./license/cart-query.js'"), 'نصبِ آفلاین هم پرونده را دارد');
-  assert.ok(!read('index.html').includes('cart-query'), 'index.html یخ‌زده است: بارکننده shop-sync.js');
+test('اسکن فقط از دستگیرهٔ صفحه؛ بی innerHTML/صفتِ style/eval', () => {
   assert.ok(!/addToCart|cart\.push|setCartQty/.test(src), 'راهِ دومِ افزودن نه: فقط `handleBarcodeScanned` ِ صفحه');
   for (const [bad, re] of [
     ['eval', /\beval\s*\(/], ['new Function', /new\s+Function\s*\(/], ['رویدادِ درون‌خطی', /\son[a-z]+\s*=\s*["']/i],

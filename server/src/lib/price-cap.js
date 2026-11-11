@@ -40,6 +40,13 @@ function on(ctx, run = null) {
   return ctx._priceCap;
 }
 
+/** POS-37 — پرچمِ `shop.sale_tax` ِ همین دکان (مالیاتِ ثبت‌شده در پایهٔ تخفیف)؛ یک بار برای هر دسته */
+function taxOn(ctx, run = null) {
+  if (!ctx || !ctx.accountId) return Promise.resolve(false);
+  if (ctx._saleTax === undefined) ctx._saleTax = require('./orders').flagOf(ctx.accountId, caps.TAX_FLAG, run);
+  return ctx._saleTax;
+}
+
 /** این op به قیمت/تخفیفِ فاکتور دست می‌زند؟ (بی پرس‌وجو) */
 function touchesV3(op) {
   return isObj(op) && op.kind === 'insert' && (op.table === 'sales' || op.table === 'saleItems') && isObj(op.fields);
@@ -189,6 +196,7 @@ async function judgeSaleV3(c, ctx, op, row, { batch = null, deviceId = '', origi
   const refs = await refsV3(c, ctx, list);
   const sale = caps.saleOf(op.row_id, op.fields, {
     loyaltyMinor: await loyaltyV3(c, ctx, op.row_id, batch), wholesale: await wholesaleV3(c, ctx, op.fields),
+    taxOn: await taxOn(ctx, (s, p) => c.query(s, p)),
   });
   const needs = caps.needs(sale, list, refs, { enforcePrice: true });
   const withDiscount = needs.some((n) => n.perm === caps.DISCOUNT);
@@ -215,6 +223,7 @@ async function judgeLineV3(c, ctx, op, row, { batch = null, deviceId = '', origi
   if (!head || !isObj(head.data)) return null;
   const sale = caps.saleOf(sid, head.data, {
     loyaltyMinor: await loyaltyV3(c, ctx, sid, batch, true), wholesale: await wholesaleV3(c, ctx, head.data),
+    taxOn: await taxOn(ctx, (s, p) => c.query(s, p)),
   });
   const me = caps.lineOf(op.fields);
   const own = await refsV3(c, ctx, [me]);
@@ -310,6 +319,7 @@ async function judgeLegacy(c, ctx, changes) {
   const core = require('./perm-core');
   const { forbidden } = require('../middleware/errors');
   const sumAfn = (vs) => vs.reduce((a, v) => a + Math.max(0, Math.round(Number(v) * 100) || 0), 0);
+  const tax = await taxOn({ accountId: shopId }, run);   //  POS-37
   for (const sid of sids) {
     const given = heads.find((h) => h.id === sid);
     const stored = given && !oldHeads.has(sid) ? null
@@ -337,9 +347,9 @@ async function judgeLegacy(c, ctx, changes) {
     const mine = spends.filter((a) => a.data.refId === sid);
     const loyaltyMinor = mine.length ? sumAfn(mine.map((a) => a.data.amount)) : kept;
     const wholesale = await wholesaleOf(head);
-    const needs = caps.needs(caps.saleOf(sid, head, { legacy: true, loyaltyMinor, wholesale }), list, refs, { enforcePrice: true });
+    const needs = caps.needs(caps.saleOf(sid, head, { legacy: true, loyaltyMinor, wholesale, taxOn: tax }), list, refs, { enforcePrice: true });
     //  نیازِ همان سند پیش از این دسته (سر و قلم‌های نشسته): آنچه بیش از آن نیست ویرایشِ بی‌پول است، آزاد
-    const prior = isObj(stored) ? caps.needs(caps.saleOf(sid, stored, { legacy: true, loyaltyMinor: kept, wholesale }), before, refs, { enforcePrice: true }) : [];
+    const prior = isObj(stored) ? caps.needs(caps.saleOf(sid, stored, { legacy: true, loyaltyMinor: kept, wholesale, taxOn: tax }), before, refs, { enforcePrice: true }) : [];
     const covered = (n) => prior.some((b) => b.perm === n.perm
       && (n.pctBp === null || (b.pctBp !== null && b.pctBp >= n.pctBp)) && (n.amount === null || (b.amount !== null && b.amount >= n.amount)));
     for (const n of needs) {

@@ -54,6 +54,71 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/sec-review-48` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۸؛ روی `ccr-…-batch-48` ‏a57dae088؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: حملهٔ خصمانه روی `8c493593c..a57dae088` (مالیاتِ POS-37، گالریِ ویترین، دلیلِ «از کار انداختن» + R24، برداشتنِ وبِ دکان، `spec.mjs`) —
+  `docs/SECURITY-AUDIT-fa.md` بخشِ **B13**. بسته: **SR48-1 High** — `return-line-cap` مالیاتِ ادعاشده را بی سنجش با نهایی و بی پرچم به سقفِ برگشت می‌افزود
+  (فاکتورِ ۱۰۰۰ با «مالیاتِ» ۱۰۰۰ ⇒ برگشتِ ۲۰۰۰، پرچمِ خاموش، همهٔ راه‌ها)؛ **SR48-2 Medium** (پیشین، PAY-09) — گردِ مثبتِ بی سقف همان‌جا؛ هر دو با `extrasOf`
+  (فقط آنچه در نهایی آمده، گرد تا ۵ افغانی). **SR48-3 Low** — `verify-data` مالیاتِ منفی را می‌پذیرفت (تخفیفِ پنهان در گزارش پنهان) ⇒ `greatest(0, …)`.
+  آزمون‌ها پیش از رفع سرخ، پس از رفع روی PGlite و PostgreSQL 16 سبز.
+- نیمه‌کاره: هیچ. باز (فقط گزارش): R25 (گردِ منفیِ بی سقف در گزارشِ `sum.sale_final`، پیشین)، R26 (پیش‌نمایشِ برگشتِ برنامه و `saleHash`، Info).
+- قدمِ بعدی: مرجِ این شاخه با دستهٔ ۴۸؛ اگر روزی `sum.sale_final` گرد را هم به `ROUND_MAX_MINOR` ببندد، R25 بسته می‌شود.
+
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/web-shop-removal` (برداشتنِ وبِ مدیریتِ فروشگاه، تصمیمِ صاحب‌کار؛ روی `ccr-…-batch-48` ‏64aa440e9؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: رابطِ وبِ دکان رفت — `index.html` ِ ۸۵۴KB، ۲۷ پروندهٔ رابطِ `license/` (`*-ui.js/css`، `shop-sync`، `license-client`،
+  `vip`، `support`، `photo-studio`، `ledger-store`، `auto-backup`، `thermal-print`، `stock-transfers`، `orders-desk/risk`،
+  `customer-access`، `area-requests`، `web-i18n`، `api-config`)، `license/i18n/` (۱۴ واژه‌نامه)، `sounds/`، `bench/web.mjs`،
+  `scripts/receipt-labels.js`. `index.html` = «برنامه را نصب کنید» (fa/دری/پښتو/English): اگر روی مرورگر دفتری مانده (localStorage،
+  IndexedDB ِ `tohid-ledger`، دفترِ حساب‌های دیگر، عکس‌های `tohid-photos`) پیش از هر چیز پشتیبانِ قابلِ بازیابی در برنامه می‌دهد
+  (قالبِ «دانلود نسخه پشتیبان» ِ وب ⇐ `BackupRestore.decode`؛ با عکس ZIP ِ `shop-data.json` + `photos/<id>.jpg` ⇐ `BackupBundle.read`)
+  و فایلِ خامِ بی رمز؛ هیچ چیزی نمی‌نویسد یا پاک نمی‌کند. `sw.js` = کارگرِ خداحافظی (فقط کشِ همان کانال، unregister، بارِ دوباره).
+  نگه داشته (هم‌زاد/آزمونِ سرور): هسته‌های با بردار، `dari.js`، `owner-export.js`، `csv-cell.js`، کلاینت‌های همگام‌سازی
+  (`sync-core/engine/v3-engine`، `account-code`)، `keymap.js`، `vendor/zxing`. آزمون‌ها: ۲۳ آزمونِ مرورگرِ وبِ دکان و ۹ آزمونِ
+  node ِ رابط و `WebPaletteParityTest.kt` رفتند؛ بخش‌های سیم‌کشیِ وب از ۱۳ آزمونِ هسته بریده شد (هسته‌ها همه سنجیده می‌مانند)؛
+  تازه: `server/test/web-shop-gone.mjs` ۱۱/۱۱ (`test:web` = web-sync-v3 + همین). `server.yml`: سه گامِ web-ui/web-idb/web-export
+  رفت. «تازه‌ها»: ۲۳ سطرِ وب و ۷ بخشِ خالی‌شده رفت، یک «برداشته» بالا. STATUS: ۶۲ ردیف یادداشت (وضعیت دست نخورد)، BLOCKERS «هـ».
+  `download.html` (آیفون «به‌زودی»، ۳۲بیتی ⇐ اندروید) و پیامِ ۳۲بیتیِ `install.ps1` و `desktop/setup-all`.
+- نیمه‌کاره / برای صاحب‌کار: ⚠️ برنامهٔ آیفون هنوز در App Store نیست (IOS-PLAN §۰.۶) — کاربرِ آیفون تا آن روز فقط اندروید/کامپیوتر دارد.
+  ورک‌فلوی انتشارِ Pages (`web-pages.yml`) دست نخورد: `WEB_PATHS` هنوز `license` و `sounds` را دارد (بی‌ضرر) و اگر Source ِ Pages
+  «GitHub Actions» است ریشه فقط با Run workflow ⇐ stable عوض می‌شود. سطرهای مشترکِ «برنامه و نسخهٔ وب» در «تازه‌ها» (۴ سطر) و
+  متنِ `StrSettings.ledgerOnlyDesc` («همان فایلی که نسخهٔ وب می‌خواند») دست نخوردند. `android/` (پوستهٔ WebViewِ بازنشسته)
+  نسخهٔ خودش را در بسته دارد و نصب‌های پیشینش دست نخوردند؛ ساختِ دوباره‌اش فقط صفحهٔ نصب را می‌آورد (پلِ دانلودش پشتیبان را می‌گیرد). `CORS_ORIGIN` ِ سرور (اگر github.io را دارد) را صاحب‌کار می‌تواند بعداً تنگ کند.
+- قدمِ بعدی: `sw.js` ِ خداحافظی تا دست‌کم ۱۴۰۶/۰۲/۰۱ بماند؛ پس از آن (و پس از انتشارِ آیفون) می‌شود صفحه را ساده‌تر کرد. کلاینت‌های
+  مرجعِ همگام‌سازی را می‌شود روزی به `server/test/` برد.
+
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/owner-yes-2` («همه با پیشنهادِ خودت» ِ صاحب‌کار و دامنهٔ نسخهٔ ۱؛ روی `ccr-…-batch-48` ‏fe84f4d5b؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد (ثبت): OWNER-PENDING ۷۳ ⇐ ۴ (۲-۱۴، ۴-۱۲ و پرسشِ ۲ ِ ۳-۱۰ و ۴-۲۴ ماند — پیشنهادشان به واقعیتی بسته است که فقط صاحب‌کار
+  می‌داند)؛ ۶۹ بند + پرسشِ ۱ ِ دو بند با متنِ کامل و «پیشنهاد پذیرفته شد» در OWNER-DECISIONS «گرفته‌شده — ۱۴۰۵/۰۸/۲۰» با یادداشتِ
+  وضعیتِ هر بند (کد لازم نیست / کارِ شما / کدِ Claude / ریپوی server / ⚠️ استثنا)؛ `spec/OWNER-ACTIONS-fa.md` §۹؛ BLOCKERS (D-01، D-02،
+  D-06، D-10، D-11، D-25 و «د) دامنهٔ نسخهٔ ۱»)؛ STATUS ۵۸ ردیف یادداشت، NTF-08 ⇐ IMPLEMENTED-VERIFIED. نسخهٔ ۱: `spec/RELEASE-1-fa.md`
+  (۲۱ ردیفِ «پس از انتشار»: MKT-01..12، AI-01، AI-06، AI-09، AI-10، AI-12، PUR-12، RPT-16، S121، S122)، نشان در ستونِ «مانع»، جدولِ
+  خودکارِ «خلاصهٔ نسخهٔ ۱» در `spec.mjs status` و سنجشِ «فهرست = نشان» در `check` (`spec.test.mjs` ۱۰/۱۰). قاعدهٔ تازهٔ همان روزِ
+  صاحب‌کار: نسخهٔ وبِ دکان (`index.html`، `license/`) قابلیتِ تازه نمی‌گیرد؛ تنها سطحِ وب ویترین و بازارچه است.
+- انجام شد (کد): (۴-۲۲) گالریِ ویترین — `lib/storefront-gallery.js`، دو درِ `GET /api/store/:slug/products/:id/gallery[/:tag/:size]`،
+  `features.gallery`، `store/gallery.js` + `gallery.{fa,en,ps}.json` ِ دیربار، پرچمِ خاموشِ `shop.storefront.gallery` (+ `shop.image_bank`)،
+  FLAGS-ON §۲۰؛ PRD-17 و PRD-27 ⇐ IMPLEMENTED-VERIFIED. (۲-۲۰) درِ مدیرِ «از کار انداختنِ دستگاه» دلیلِ نوشته می‌خواهد. آزمون‌ها:
+  `storefront-gallery` ۰/۳ ⇐ ۳/۳ و `admin-console-writes` (آزمونِ تازه ۲۰۰ ⇐ ۴۰۰) روی PGlite و PostgreSQL 16؛ `web-store-gallery.mjs`
+  بی ❌ روی هر دو؛ `web-store-allflags`، `web-store-same`، `web-store`، `web-i18n` ۳۰/۳۰، `market-web`، `paid-routes-public-entitlement`،
+  `admin-flags`، `console-shell`، `storefront-photo-version`، `admin-control-plane` سبز.
+- نیمه‌کاره: ⚠️ `admin-console-writes` «هم‌زمان: چهار ازکارانداختن با یک کلید» روی PostgreSQL گاهی دو پاسخِ تازه می‌دهد — روی پایهٔ
+  همین دسته هم (۱ از ۵) سرخ شد، پس از پیش بوده (کلیدِ یکتاییِ `lib/admin-write-once.js` زیرِ هم‌زمانی)؛ دست نخورد. گروه‌های کدِ مانده
+  به ترتیب: ۲-۲۳ (R7/R8 سابقه، `lib/finalized-sales.js`)، ۲-۲۱ (سقفِ نگه‌داشتِ هر شماره)، ۲-۸ (پوشاندنِ شماره در سفارش و تحویل)،
+  ۳-۱۳ (سه عددِ SYN-12 فقط برنامه)، ۴-۲۱ (PRM-02 ب)، ۳-۱۲ (PRD-08 الف)، ۳-۱۷ (PUR-03)، ۳-۱۶ (۲) ارزشِ موجودیِ برنامه، ۲-۱۶ (PRD-07)،
+  ۱-۲ (O-22 ب، هسته و بردار)، ۴-۲۰ (۲) متنِ «پایانِ روزِ کاری»، ۳-۴ (ابزارِ بی‌نام‌کننده)، ۴-۳ (نقشهٔ OSM)، ۳-۱۱ (`server.yml`)، ۴-۲۳ (۱)
+  صفحهٔ استودیو، ۴-۲ (وابستگیِ تازهٔ عکس). ریپوی `server`: ۲-۹، ۲-۱۱، ۲-۱۸، ۲-۲۶، ۳-۷، ۳-۹، ۳-۱۵، ۴-۱، ۴-۱۶.
+- قدمِ بعدی: هماهنگ‌کننده استثناها را صریح از صاحب‌کار بپرسد (۱-۱، ۲-۱، ۲-۶، ۲-۲۲ (۳)، ۳-۸ (۲)، ۳-۱۴، ۴-۱۳، ۴-۲۳ (۲))؛ سپس همان
+  ترتیبِ گروه‌های بالا.
+
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/missing-1` (ردیف‌های MISSING: POS-37؛ روی `ccr-…-batch-47` ‏96053218a؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: POS-37 ⇐ PARTIAL — مالیاتِ فاکتور پشتِ پرچمِ خاموشِ `shop.sale_tax` و تنظیمِ دکانِ `tohid-policy:sale_tax*` (بی نرخِ پیش‌فرض، D-11):
+  هستهٔ `core/sale/SaleTax` + هم‌زادِ `license/sale-tax.js` + بردارِ `sale-tax-v1.json` («فاکتور» یا «ردیف» با نرخِ هر کالا)، `Sale.taxMinor`،
+  `SalesEngine.totals` ⇐ `SaleTaxWiring.totals`، ردیفِ «مالیات» در برگهٔ پرداخت/خلاصهٔ صندوق/رسید (`StrSaleTax`، `ReceiptLayout`)، برگشت
+  با سهمِ مالیات (`paidRatio` = `return-line-cap.paidRatio`)، بخشِ تنظیم در صفحهٔ «هزینهٔ خودکار»؛ سرور: `SALE_FIXED`، `verify-data`، پایهٔ
+  تخفیفِ `sale-caps`/`SaleCaps` فقط با پرچم (+ بردار)، فاکتورِ عمومی، `saleTax` در `/shop/stock-ledger/config`؛ ردیفِ `s-tax` در
+  `ledger-sync-v1.json` (s-full دست نخورد ⇒ `resend-dropped-v1.json` همان). ۱۳ مجموعه ۱۲۶/۱۲۶ روی PGlite و PostgreSQL ۱۶ (تازه‌ها پیش از کد
+  سرخ)؛ FLAGS-ON §۱۹، OWNER-PENDING ۴-۶. PUR-11 ساخته نشد: D-15 «الف» ِ گرفته‌شده (تا دکانِ واقعی نخواهد؛ PR ‏#784 پیش‌نویس).
+- نیمه‌کاره: Kotlin فقط CI (`SaleTaxVectorsTest`، `SaleTaxFlowTest`، `SaleCapsVectorsTest`، `LedgerSyncCoverageTest`، کامپایلِ
+  `SaleTaxSectionAndroid`/`CheckoutRoute`/`DeskSale`)؛ اگر سرخ شد همان پرونده‌ها. گزارش‌ها (سود، X/Z، `QuarterTax`) مالیات را جدا نمی‌کنند.
+- قدمِ بعدی: CI ِ این شاخه؛ جدا کردنِ مالیات در `report-core` (سه هم‌زاد + `report-v1.json`)؛ PUR-11 فقط اگر صاحب‌کار D-15 را «ب» کند (#784).
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/ci-evidence-1` (شاهدِ CI ِ ردیف‌های ردهٔ D؛ روی `ccr-…-batch-47` ‏96053218؛ فقط سند؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: لاگِ کاملِ push ِ سبزِ main ‏5ef491d97 (#1029) خوانده شد — «سرور» 42838745057 (PostgreSQL ۴۰۰۳ سبز، PGlite و Electron هر کدام ۳۹۹۰ آزمون، همه ۰ شکست؛
   مرورگر ۱۷۸۲ ✅ / ۰ ❌؛ E2E همه ✅)، «کامپایل و آزمون» 129907899978 (۵۵۵۲ PASS)، «ساخت نسخهٔ بومی» 129907898914 (۶۹۷۴ PASS)، برنامهٔ خرید ۳۰ PASS؛ هیچ FAIL.

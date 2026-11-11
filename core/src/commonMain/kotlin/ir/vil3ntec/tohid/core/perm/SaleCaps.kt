@@ -139,12 +139,16 @@ object SaleCaps {
    */
   data class Basis(val discountMinor: Long, val baseMinor: Long, val reductionMinor: Long, val gapMinor: Long)
 
-  /** [finalTotalMinor] `null` ⇒ نامعلوم، بی شکاف */
-  fun basis(discountMinor: Long, totalMinor: Long, finalTotalMinor: Long?, roundingMinor: Long, reductionMinor: Long): Basis {
+  /**
+   *  [finalTotalMinor] `null` ⇒ نامعلوم، بی شکاف. POS-37: [taxMinor] (مالیاتِ ثبت‌شدهٔ فاکتور؛ فقط با پرچمِ `shop.sale_tax`،
+   *  وگرنه ۰ و همان امروز) بخشی از نهاییِ «باید» است: مالیاتِ ادعاشده‌ای که در نهایی نیامد همان تخفیفِ پنهان است.
+   */
+  fun basis(discountMinor: Long, totalMinor: Long, finalTotalMinor: Long?, roundingMinor: Long, reductionMinor: Long, taxMinor: Long = 0): Basis {
     val d = maxOf(0L, discountMinor)
     val s = maxOf(0L, totalMinor)
     val r = roundingMinor.coerceIn(-ROUND_MAX_MINOR, ROUND_MAX_MINOR)
-    val gap = if (finalTotalMinor == null) 0L else maxOf(0L, s - d + r - finalTotalMinor)
+    val t = maxOf(0L, taxMinor)
+    val gap = if (finalTotalMinor == null) 0L else maxOf(0L, s - d + r + t - finalTotalMinor)
     val red = maxOf(0L, reductionMinor)
     return Basis(d + red + gap, s + red, red, gap)
   }
@@ -167,6 +171,8 @@ object SaleCaps {
     val loyaltyMinor: Long = 0,
     /** تصمیمِ ۱-۱۱ (۳): لیستِ فاکتور عمده است (مشتریِ فاکتور لیستِ پیش‌فرضِ عمده دارد — `PriceList.WHOLESALE`) */
     val wholesale: Boolean = false,
+    /** POS-37: مالیاتِ ثبت‌شده — فقط وقتی پرچمِ `shop.sale_tax` روشن است، وگرنه ۰ */
+    val taxMinor: Long = 0,
   )
 
   /** خلاصهٔ ردیف‌ها: بیشترین فاصله، جمعِ کاهش‌ها و بیشترین قیمتِ واحدِ قلمِ آزاد (`-1` = بی قلمِ آزاد) */
@@ -214,7 +220,7 @@ object SaleCaps {
     val doc = "sales/${sale.id}"
     val out = ArrayList<ApprovalSlip.Need>(4)
     val sum = if (enforcePrice) SaleCaps.lines(lines, refs, sale.date, sale.loyaltyMinor, sale.wholesale) else Lines(0, 0)
-    val b = if (enforcePrice) basis(sale.discountMinor, sale.totalMinor, sale.finalTotalMinor, sale.roundingMinor, sum.reductionMinor)
+    val b = if (enforcePrice) basis(sale.discountMinor, sale.totalMinor, sale.finalTotalMinor, sale.roundingMinor, sum.reductionMinor, sale.taxMinor)
     else Basis(sale.discountMinor, sale.totalMinor, 0, 0)
     if (b.discountMinor > 0) out += ApprovalSlip.discountNeed(sale.id, b.discountMinor, b.baseMinor)
     if (enforcePrice && sum.maxDeviationBp > 0) out += ApprovalSlip.Need(PRICE, doc, sum.maxDeviationBp, null)

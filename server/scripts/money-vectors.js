@@ -6,8 +6,8 @@
  *   node scripts/money-vectors.js           ⇐ فقط می‌سنجد که فایل با خروجیِ امروز یکی است
  *   node scripts/money-vectors.js --write   ⇐ فایل را از نو می‌نویسد
  *
- * «legacyMinor» خروجیِ **موتورِ امروز** است: خودِ `lineTotal`ِ `index.html`
- * (از متنِ فایل بیرون کشیده و اجرا می‌شود، نه بازنویسی). همان عدد را
+ * «legacyMinor» خروجیِ **موتورِ پیشین** است: `lineTotal` ِ وبِ دکان، مو به مو همان یک خطِ `index.html` در روزِ
+ * برداشتنِ وبِ دکان (تصمیمِ صاحب، ۱۴۰۵/۰۸/۲۰) — پیش از آن از متنِ همان فایل بیرون کشیده و اجرا می‌شد. همان عدد را
  * `SalesEngine.lineTotal`ِ اندروید هم باید بدهد (`MoneyTest.kt` می‌سنجد).
  * «minor» قاعدهٔ بخشِ ۳.۴ است، این‌جا با BigInt و **مستقل** از
  * `license/money.js` حساب می‌شود تا آزمونِ آن دوری نباشد.
@@ -23,13 +23,14 @@ const ROOT = path.join(__dirname, '..', '..');
 const FIXTURE = path.join(ROOT, 'license', 'test-vectors', 'money-v1.json');
 const MAX_EXACT = 9007199254740991n;
 
-/** همان `lineTotal`ِ امروزِ وب، از خودِ index.html */
+/**
+ * همان `lineTotal` ِ وبِ دکان — متنِ بدنه بایت‌به‌بایت از `index.html` ِ 64aa440e9 (آخرین نسخهٔ وبِ دکان، سطرِ
+ * `function lineTotal(price, qty){ return Math.round((price||0)*(qty||0)); }`)؛ هرگز «درست» نشود: ستونِ legacy همین است.
+ */
+const WEB_LINE_TOTAL_BODY = ' return Math.round((price||0)*(qty||0)); ';
 function webLineTotal() {
-  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-  const m = html.match(/function lineTotal\(price, ?qty\)\s*\{([^\n]*)\}/);
-  if (!m) throw new Error('lineTotal در index.html پیدا نشد');
   // eslint-disable-next-line no-new-func
-  return new Function('price', 'qty', m[1]);
+  return new Function('price', 'qty', WEB_LINE_TOTAL_BODY);
 }
 
 // ── پیاده‌سازیِ مرجع با BigInt (مستقل از license/money.js) ──

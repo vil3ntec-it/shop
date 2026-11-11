@@ -223,6 +223,7 @@ object OwnerExport {
     "tenderedMinor" to "دریافتی (پول)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "changeMinor" to "پول پس (پول)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "roundingMinor" to "گردکردن نقدی (پول)", // PAY-09  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "taxMinor" to "مالیات (پول)", // POS-37  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  فاکتورِ نسخهٔ ۲ — توکنِ QRِ فاکتور (نشانیِ عمومیِ همان فروش)
     "receiptToken" to "توکنِ QRِ فاکتور",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "by" to "کاربر",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)

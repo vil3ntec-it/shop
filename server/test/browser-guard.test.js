@@ -16,7 +16,8 @@ const os = require('node:os');
 const path = require('node:path');
 
 const DIR = __dirname;
-const FILES = ['admin-panel.mjs', 'web-backup.mjs', 'web-ui.mjs', 'portal-rep.mjs', 'web-sync-v3.mjs'];
+//  وبِ دکان (web-backup/web-ui) برداشته شد (۱۴۰۵/۰۸/۲۰)؛ جایشان صفحهٔ «برنامه را نصب کنید» و بازارچه
+const FILES = ['admin-panel.mjs', 'web-shop-gone.mjs', 'web-market.mjs', 'portal-rep.mjs', 'web-sync-v3.mjs'];
 
 // محیطی که پلی‌رایت در آن پیدا نمی‌شود: `npm root -g` به پوشه‌ای خالی
 // می‌رود و NODE_PATH خالی است.
@@ -42,7 +43,7 @@ for (const file of FILES) {
 }
 
 test('SKIP_BROWSER_TESTS=1: ردِ آگاهانه با پیامِ بلند و کدِ ۰', { skip: reachable && 'پلی‌رایت از node_modulesِ محلی پیدا می‌شود' }, () => {
-  const r = run('web-ui.mjs', { SKIP_BROWSER_TESTS: '1' });
+  const r = run('web-shop-gone.mjs', { SKIP_BROWSER_TESTS: '1' });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /آگاهانه رد شد/);
 });
