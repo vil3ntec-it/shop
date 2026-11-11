@@ -598,12 +598,10 @@ async function createApp({ runMigrations = true } = {}) {
   //  امضاشده ندارد (S118) ⇒ بایت با fetch ِ بلیت‌دار و پخش از blob: ِ همین صفحه؛ blob را فقط اسکریپتِ همین مبدأ می‌سازد. نه data:.
   //  `microphone=(self)` فقط برای ضبطِ پیامِ صوتیِ مشتری (`store/chat-voice.js`، پرچمِ خاموشِ `shop.chat.voice`): فقط همین
   //  مبدأ (نه قابِ بیرونی؛ frame-ancestors 'none')، و مرورگر خودش اجازه می‌پرسد. دوربین و پرداخت همان بسته.
-  //  پوسته ایستاست و داده از `/api/store/:slug` می‌آید (همان مبدأ ⇒ بی CORS).
-  //  ویترینِ خاموش یا ناموجود ⇒ همان پوسته با وضعیتِ ۴۰۴.
+  //  پوسته ایستاست و داده از `/api/store/:slug` می‌آید (همان مبدأ ⇒ بی CORS). ویترینِ خاموش یا ناموجود ⇒ همان پوسته با ۴۰۴.
   const storeDir = path.join(__dirname, '..', 'public', 'store');
   const storefront = require('./lib/storefront');
-  //  CHK-08 / ۴-۳: مبدأِ تکه‌های نقشهٔ پین فقط با `STORE_MAP_TILES` ِ https (`lib/store-map.js`)؛ بی آن همان CSP ِ امروز
-  const mapOrigin = require('./lib/store-map').origin();
+  const mapOrigin = require('./lib/store-map').origin();   //  CHK-08/۴-۳: تکه‌های نقشهٔ پین (`STORE_MAP_TILES`)؛ بی آن همان CSP
   const storeHeaders = (req, res, next) => {
     res.set('Content-Security-Policy',
       `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:${mapOrigin ? ` ${mapOrigin}` : ''}; media-src 'self' blob:; font-src 'self'; ` +

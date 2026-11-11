@@ -53,6 +53,13 @@
           el('input', { attrs: { id: 'pin-paste', type: 'text', class: 'ltr', inputmode: 'url', autocomplete: 'off', maxlength: '2000', placeholder: '34.5281, 69.1723' } })),
         el('button', { class: 'btn btn-soft btn-sm', text: t('pin.paste.use'), attrs: { id: 'pin-use', type: 'button', 'data-t': 'pin.paste.use' } })), pinRow.nextSibling);
     }
+    //  CHK-08 / ۴-۳: «انتخاب روی نقشه» (`store/pin-map.js` و واژه‌نامهٔ `map` ِ دیربار، فقط با کلیک) — فقط با `features.mapPin`
+    var mapPin = c.store.features && c.store.features.mapPin;
+    var mapP = null; var mapOpen = null;
+    if (mapPin && typeof mapPin.tiles === 'string' && K.has('pin.map') && !$('pin-map')) {
+      $('pin-btn').parentNode.insertBefore(el('button', { class: 'btn btn-soft btn-sm', text: t('pin.map'),
+        attrs: { id: 'pin-map', type: 'button', 'data-t': 'pin.map', 'aria-expanded': 'false' } }), $('pin-btn').nextSibling);
+    }
 
     // ── MKT-01/09 و CHK-04: تخفیف (پرچمِ `shop.storefront.promos`؛ ‏`GET /promos` ِ ۴۰۴ ⇒ خاموش، همان فرمِ امروز) ──
     //  حساب فقط از سرور (`/promos/quote` = همان حسابِ ثبت)؛ تخفیفِ دیده‌شده در `expectedTotalMinor` می‌رود و
@@ -388,6 +395,28 @@
         setPin(p, t('pin.paste.ok', { c: K.fa(p.lat, 5) + ', ' + K.fa(p.lng, 5) }));
       }, function () { $('pin-text').textContent = t('pin.paste.bad'); });
     }
+    function mapPick() {
+      if (mapOpen) { mapOpen.close(); return; }
+      mapP = mapP || Promise.all([K.js('/store/pin-map.js'), K.part('map')]).then(function (r) {
+        if (!r[1] || !window.StorePinMap) throw new Error('map');
+        return window.StorePinMap;
+      }).catch(function (e) { mapP = null; throw e; });
+      mapP.then(function (M) {
+        if (mapOpen) return;
+        var row = $('pin-btn').parentNode;
+        var host = el('div');
+        row.parentNode.insertBefore(host, row.nextSibling);
+        $('pin-map').setAttribute('aria-expanded', 'true');
+        mapOpen = M.open(host, { tiles: mapPin.tiles, attribution: mapPin.attribution, copyright: mapPin.copyright, center: pin, t: t,
+          onPick: function (p, text) { setPin(p, text); },
+          onClose: function () {
+            mapOpen = null;
+            if (host.parentNode) host.parentNode.removeChild(host);
+            $('pin-map').setAttribute('aria-expanded', 'false');
+            $('pin-map').focus();
+          } });
+      }, function () { $('pin-text').textContent = t('pin.fail'); });
+    }
     function takePin() {
       if (!navigator.geolocation) { $('pin-text').textContent = t('pin.none'); return; }
       $('pin-text').textContent = t('pin.wait');
@@ -566,6 +595,7 @@
     $('verify-check').addEventListener('click', checkCode);
     $('v-code').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); checkCode(); } });
     $('pin-btn').addEventListener('click', takePin);
+    if ($('pin-map')) $('pin-map').addEventListener('click', mapPick);
     if ($('pin-use')) {
       $('pin-use').addEventListener('click', pastePin);
       //  Enter در کادر برگه را نفرستد

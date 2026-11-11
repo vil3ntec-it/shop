@@ -27,6 +27,24 @@ on:
       - 'docs/api/routes.json'
       - 'tools/api-contract/**'
       - '.github/workflows/server.yml'
+      # تصمیمِ ۳-۱۱ «الف»: پرونده‌هایی بیرون از server/ که آزمون‌های سرور می‌خوانند (آینه‌های JS ِ کاتلین، «تازه‌ها»، واژه‌نامهٔ دری،
+      # متنِ حریم‌خصوصی و مولدِ داده) — PR ای که فقط این‌ها را عوض کند همان‌جا سرخ شود، نه در PR ِ بعدیِ سرور
+      - 'docs/WHATS-NEW-fa.md'
+      - 'docs/DARI-REVIEW-fa.md'
+      - 'tools/whatsnew/**'
+      - 'privacy.html'
+      - 'bench/datagen.mjs'
+      - 'core/src/commonMain/kotlin/ir/vil3ntec/tohid/core/text/DariText.kt'
+      - 'core/src/commonTest/kotlin/ir/vil3ntec/tohid/core/text/DariTextTest.kt'
+      - 'core/src/commonMain/kotlin/ir/vil3ntec/tohid/core/guide/WhatsNew.kt'
+      - 'core/src/commonTest/kotlin/ir/vil3ntec/tohid/core/guide/WhatsNewTest.kt'
+      - 'core/src/jvmTest/kotlin/ir/vil3ntec/tohid/core/guide/WhatsNewFileTest.kt'
+      - 'core/src/commonTest/kotlin/ir/vil3ntec/tohid/core/CoreVectorsCommonTest.kt'
+      - 'core/src/jvmTest/kotlin/ir/vil3ntec/tohid/core/CoreVectorsCommonParityTest.kt'
+      - 'android-native/app/build.gradle.kts'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/CustomerOnlineOrders.kt'
+      - 'android-native/app/src/test/java/ir/vil3ntec/tohid/data/CustomerOnlineOrdersTest.kt'
+      - 'android-native/app/src/test/java/ir/vil3ntec/tohid/core/i18n/DariCoverageTest.kt'
   pull_request:
     paths:
       - 'server/**'
@@ -44,6 +62,24 @@ on:
       - 'docs/api/routes.json'
       - 'tools/api-contract/**'
       - '.github/workflows/server.yml'
+      # تصمیمِ ۳-۱۱ «الف»: پرونده‌هایی بیرون از server/ که آزمون‌های سرور می‌خوانند (آینه‌های JS ِ کاتلین، «تازه‌ها»، واژه‌نامهٔ دری،
+      # متنِ حریم‌خصوصی و مولدِ داده) — PR ای که فقط این‌ها را عوض کند همان‌جا سرخ شود، نه در PR ِ بعدیِ سرور
+      - 'docs/WHATS-NEW-fa.md'
+      - 'docs/DARI-REVIEW-fa.md'
+      - 'tools/whatsnew/**'
+      - 'privacy.html'
+      - 'bench/datagen.mjs'
+      - 'core/src/commonMain/kotlin/ir/vil3ntec/tohid/core/text/DariText.kt'
+      - 'core/src/commonTest/kotlin/ir/vil3ntec/tohid/core/text/DariTextTest.kt'
+      - 'core/src/commonMain/kotlin/ir/vil3ntec/tohid/core/guide/WhatsNew.kt'
+      - 'core/src/commonTest/kotlin/ir/vil3ntec/tohid/core/guide/WhatsNewTest.kt'
+      - 'core/src/jvmTest/kotlin/ir/vil3ntec/tohid/core/guide/WhatsNewFileTest.kt'
+      - 'core/src/commonTest/kotlin/ir/vil3ntec/tohid/core/CoreVectorsCommonTest.kt'
+      - 'core/src/jvmTest/kotlin/ir/vil3ntec/tohid/core/CoreVectorsCommonParityTest.kt'
+      - 'android-native/app/build.gradle.kts'
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/CustomerOnlineOrders.kt'
+      - 'android-native/app/src/test/java/ir/vil3ntec/tohid/data/CustomerOnlineOrdersTest.kt'
+      - 'android-native/app/src/test/java/ir/vil3ntec/tohid/core/i18n/DariCoverageTest.kt'
   workflow_dispatch:
 
 concurrency:

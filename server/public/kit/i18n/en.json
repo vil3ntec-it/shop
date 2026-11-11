@@ -216,6 +216,7 @@
   "ck.repriced": "Prices have changed. {list}New total: {sum}. If you accept, tap again.",
   "ck.short": "Not enough stock: {list}. Lower the quantity.",
   "pin.btn": "Pin my current location",
+  "pin.map": "Choose on map",
   "pin.hint": "The pin is optional — it just helps find your door.",
   "pin.none": "This browser can't share your location — the address and landmark are enough.",
   "pin.wait": "Getting your location…",

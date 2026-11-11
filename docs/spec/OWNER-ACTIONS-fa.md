@@ -369,6 +369,7 @@
 | ۷ | `SYNC_V3_ENABLED=1`، `SYNC_V3_BATCH=1`، `PG_POOL_MAX_WAITING=100` و کلیدِ همان یک دکان | ۳-۳، ۳-۸ (۱) | تطبیقِ سبز روی کپیِ بی‌نامِ ۳-۴ |
 | ۸ | پنل: `HLP_SHELL_OWNER_ONLY=1` | ۲-۱۰ | — |
 | ۹ | پنل: `HLP_REAUTH_MONEY=1` | ۲-۱۲ | — |
+| ۱۰ | `STORE_MAP_TILES=https://tile.openstreetmap.org/{z}/{x}/{y}.png` (نقشهٔ پینِ نشانی در ثبتِ ویترین) | ۴-۳ | — |
 
 ### ب) کلیدهای هر دکان در پنل
 
@@ -383,6 +384,7 @@
 | ۵ | `shop.image_studio` | ۴-۲۳ (۱) | صفحهٔ استودیو در برنامه (کارِ Claude، هنوز نه) |
 | ۶ | `shop.stock_reserve` برای دکانی با مشتریِ واقعی | ۲-۲۱ | سقفِ هر شماره (کارِ Claude، هنوز نه) |
 | ۷ | `shop.storefront.gallery` (گالریِ عکس‌های بیشترِ کالا در ویترین) | ۴-۲۲ | `shop.image_bank` ِ همان دکان؛ `../FLAGS-ON-fa.md` §۲۰ |
+| ۸ | `shop.storefront.map_pin` («انتخاب روی نقشه» در ثبتِ ویترین) | ۴-۳ | خطِ ۱۰ ِ «الف»؛ `../FLAGS-ON-fa.md` §۲۳ |
 
 ### ج) یک کلیک، یک فهرست، یک حساب
 

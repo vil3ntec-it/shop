@@ -244,3 +244,9 @@
 /* جست‌وجو، دسته یا فیلتر ⇒ بنرها و ردیف‌ها کنار می‌روند و نتیجه درست زیرِ کادر است؛ «پیدا نشد» ⇒ «پیشنهادِ همین دکان» می‌ماند (WEB-06) */
 #view-catalog:has(#q:not(:placeholder-shown), #cats > [aria-pressed="true"]:not(:first-child), #fl-count:not(:empty)) :is(#banners, #deals, #fresh, #saved, #recent, #rv),
 #view-catalog:has(#q:not(:placeholder-shown), #cats > [aria-pressed="true"]:not(:first-child), #fl-count:not(:empty)):not(:has(#catalog-empty:not([hidden]))) #picks { display: none; }
+/* CHK-08 / ۴-۳: «انتخاب روی نقشه» (store/pin-map.js) — نشانهٔ وسط ثابت، نقشه زیرش */
+.pmap { display: grid; gap: var(--s2); margin-top: var(--s2); }
+.pmap-view { position: relative; height: 240px; overflow: hidden; direction: ltr; border: 1px solid var(--line, #ccc); border-radius: 8px; background: #e5e3df; touch-action: none; cursor: grab; }
+.pmap-view:focus-visible { outline: 3px solid var(--focus, #1a73e8); outline-offset: 2px; }
+.pmap-tiles img { position: absolute; width: 256px; height: 256px; max-width: none; user-select: none; pointer-events: none; }
+.pmap-mark { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -18px 0 0 -9px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #d93025; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.4); pointer-events: none; }

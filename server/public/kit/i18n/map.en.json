@@ -1,0 +1,12 @@
+{
+  "map.view": "Map for the address pin",
+  "map.help": "Drag the map or use the arrow keys until the centre mark is on the door, then press “Here”.",
+  "map.in": "Zoom in",
+  "map.out": "Zoom out",
+  "map.pick": "Here",
+  "map.close": "Close map",
+  "pin.map.ok": "Pin chosen on the map ({c}).",
+  "map.where": "Map centre: {c}",
+  "map.src": "Map data:",
+  "map.fail": "The map did not load (internet or map server); your current location or the address is enough."
+}
