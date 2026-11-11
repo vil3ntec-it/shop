@@ -223,6 +223,16 @@ android {
       .joinToString("") { byte -> "%02x".format(byte) }
   }.getOrDefault("")
 
+  /*
+   *  F0-09 گامِ ۳ (پیش از چرخشِ کلید): اثرِ انگشت‌های پذیرفتهٔ دیگر — کلیدِ قدیم/تازهٔ چرخشِ v3 — از
+   *  `TOHID_SIGNING_SHA256_EXTRA` (جدا با «,»؛ خروجیِ keytool با «:» هم). فقط ۶۴ رقمِ هگز پذیرفته؛ بقیه دور ریخته.
+   *  بی آن ⇒ فقط همان کلیدِ ساخت (رفتارِ امروز). اگر کلیدِ ساخت خوانده نشد ⇒ خالی (بررسی خاموش، همان امروز).
+   */
+  val signingAllowed: String = if (signingFingerprint.isEmpty()) "" else
+    (listOf(signingFingerprint) + (env("TOHID_SIGNING_SHA256_EXTRA") ?: "").split(',', ';')
+      .map { it.trim().replace(":", "").lowercase() }.filter { Regex("^[0-9a-f]{64}$").matches(it) })
+      .distinct().joinToString(",")
+
   signingConfigs {
     create("release") {
       storeFile = file(keystorePath)
@@ -264,7 +274,7 @@ android {
     }
     release {
       signingConfig = signingConfigs.getByName("release")
-      buildConfigField("String", "SIGNING_SHA256", "\"$signingFingerprint\"")
+      buildConfigField("String", "SIGNING_SHA256", "\"$signingAllowed\"")
       /*
        *  نسخه‌ی دستِ کاربر: فقط دامنه‌ی عمومی.
        *

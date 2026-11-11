@@ -66,6 +66,8 @@ jobs:
         env:
           TOHID_VERSION_NAME: ${{ steps.ver.outputs.value }}
           TOHID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          #  F0-09 گامِ ۳: اثرِ انگشت‌های پذیرفتهٔ دیگر برای چرخشِ کلید (متغیرِ مخزن، نه secret — اثرِ انگشت راز نیست)
+          TOHID_SIGNING_SHA256_EXTRA: ${{ vars.TOHID_SIGNING_SHA256_EXTRA }}
           TOHID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           TOHID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           TOHID_SIGNING: ${{ steps.keystore.outputs.present }}

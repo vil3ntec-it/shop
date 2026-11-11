@@ -145,6 +145,8 @@ jobs:
         working-directory: android-native
         env:
           TOHID_KEYSTORE_PASSWORD: ${{ secrets.TOHID_KEYSTORE_PASSWORD }}
+          #  F0-09 گامِ ۳: اثرِ انگشت‌های پذیرفتهٔ دیگر برای چرخشِ کلید (متغیرِ مخزن، نه secret — اثرِ انگشت راز نیست)
+          TOHID_SIGNING_SHA256_EXTRA: ${{ vars.TOHID_SIGNING_SHA256_EXTRA }}
           TOHID_KEY_ALIAS: ${{ secrets.TOHID_KEY_ALIAS }}
           TOHID_KEY_PASSWORD: ${{ secrets.TOHID_KEY_PASSWORD }}
           #  دامنهٔ عمومیِ API.
@@ -226,6 +228,8 @@ jobs:
         working-directory: android-native
         env:
           TOHID_KEYSTORE_PASSWORD: ${{ secrets.TOHID_KEYSTORE_PASSWORD }}
+          #  F0-09 گامِ ۳: اثرِ انگشت‌های پذیرفتهٔ دیگر برای چرخشِ کلید (متغیرِ مخزن، نه secret — اثرِ انگشت راز نیست)
+          TOHID_SIGNING_SHA256_EXTRA: ${{ vars.TOHID_SIGNING_SHA256_EXTRA }}
           TOHID_KEY_ALIAS: ${{ secrets.TOHID_KEY_ALIAS }}
           TOHID_KEY_PASSWORD: ${{ secrets.TOHID_KEY_PASSWORD }}
           TOHID_API_BASE: ${{ vars.TOHID_API_BASE }}
@@ -305,6 +309,8 @@ jobs:
         working-directory: android-native
         env:
           TOHID_KEYSTORE_PASSWORD: ${{ secrets.TOHID_KEYSTORE_PASSWORD }}
+          #  F0-09 گامِ ۳: اثرِ انگشت‌های پذیرفتهٔ دیگر برای چرخشِ کلید (متغیرِ مخزن، نه secret — اثرِ انگشت راز نیست)
+          TOHID_SIGNING_SHA256_EXTRA: ${{ vars.TOHID_SIGNING_SHA256_EXTRA }}
           TOHID_KEY_ALIAS: ${{ secrets.TOHID_KEY_ALIAS }}
           TOHID_KEY_PASSWORD: ${{ secrets.TOHID_KEY_PASSWORD }}
           TOHID_API_BASE: ${{ vars.TOHID_API_BASE }}
