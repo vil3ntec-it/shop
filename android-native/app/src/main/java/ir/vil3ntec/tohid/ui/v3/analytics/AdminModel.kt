@@ -57,7 +57,8 @@ object AdminModel {
       monthNet = monthR.net,
       monthCount = monthR.count,
       monthProfit = monthR.netProfit,
-      stockValue = stock.value,
+      //  ۳-۱۶ (۲): همان «ارزش موجودی» ِ گزارش‌ها (میانگینِ موزونِ D-23)، نه جمعِ ورودی‌های انبار
+      stockValue = ReportEngine.stockValue(d).valuation.costMinor / 100.0,
       stockProducts = stock.products,
       owed = d.debtors.sumOf { ShopStore.debt(d, it.id).coerceAtLeast(0.0) },
       owingPeople = d.debtors.count { ShopStore.debt(d, it.id) > 0 },
