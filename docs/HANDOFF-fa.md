@@ -54,6 +54,26 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/owner-yes-3` (دورِ سومِ تصمیم‌های پذیرفتهٔ صاحب‌کار، «همه شونو تموم کن»؛ روی `ccr-…-batch-48` ‏17f89bc25؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد (سرور، PGlite و PostgreSQL 16، هر کدام پیش از ساخت سرخ): **۲-۲۳** R7/R8 ب — `finalized-sales` ‹`WATCH`›: برداشتنِ ادغام (`merge_undone`)
+  و بردنِ قرض/رسید به شیفتِ دیگر (`shift_moved`) آزاد با ردیفِ `security.doc_chain` (فقط نوشتنِ نشسته؛ دستهٔ فقط‌مشتری هم نگهبان می‌گیرد) —
+  `doc-chain-watch` ۴/۴. **۲-۲۱** R5 الف — `stock-reserve.phoneCapOk`: هر شماره تا نیمِ آزادِ هر کالا (دست‌کم یک دانه)، بیشتر ⇒ کلِ سفارش بی
+  نگه‌داشتن — `stock-reserve-phone-cap` ۳/۳. **۲-۸** CRM-15 الف — `orders.maskerOf` پشتِ پرچمِ خاموشِ تازهٔ `shop.orders.phone_mask` (FLAGS-ON §۲۱):
+  بی «دیدنِ تماس» فقط دو رقمِ آخر — `order-phone-mask` ۱/۱. **R25** — `verify-data` ‏`sum.sale_final` گرد را به ±۵ افغانی می‌بندد. **۲-۱۶**
+  R2 الف — `product-unit-rules` (و همتای برنامه `ProductDraftRules`): واحدِ خالی روی کالای گردش‌دار قفل، ضریبِ خوابیده با روشن شدنِ واحدِ فروش
+  سنجیده — `product-unit-rules` ۱۲/۱۲، `security-review-40` ۵/۵ (سه ادعای کهنهٔ «خالی آزاد» به قاعدهٔ تازه).
+- انجام شد (برنامه، Kotlin فقط CI): **۳-۱۳** (۱) `core/sync/SyncRetryAfter` + `ApiFailure.retryAfterMs` + `ReconnectGate.serverAsked` (سقفِ ۵ دقیقه؛
+  «همگام‌سازی حالا» همان دم). **۴-۲۱** `PromoHeld.release` (نارسیده، فقط صاحب، ۷ روز، با هشدار). **۳-۱۲** نسخهٔ ۲ ِ `QtyExact` و هم‌زادِ
+  `license/money.js` و بردارِ `qty-exact-v1.json` (مقدارِ درست هم؛ `qty-exact.test.js` ۶/۶). **۳-۱۷** `PurchaseSuggest.forSupplier` در هر دو فرمِ
+  سفارش (همان پیشنهادِ صفحه، دلیل و اطمینان در گوشی). **۳-۱۶ (۲)** `ReportEngine.stockValue` (دوقلوی `fromLedger`) در گزارشِ محصولات، گزارشِ
+  کامپیوتر و مرکزِ مدیریت. **۴-۲۰ (۲)** متنِ «پایانِ روزِ کاری». «تازه‌ها»: یک بخشِ تازه با ۸ سطر.
+- نیمه‌کاره / برای CI: آزمون‌های Kotlin ِ تازه یا عوض‌شده اجرا نشده‌اند — `SyncRetryAfterTest`، `ReconnectGateTest`، `PromoHeldTest`،
+  `QtyExactTest`/`QtyExactVectorsTest`/`QtyExactWiringTest` (ادعاهای «مقدارِ درست همان امروز» به قاعدهٔ تازه)، `PurchaseSuggestTest`،
+  `StockValueBridgeTest`، `SaleUnitExactTest`. نمانده‌ها به ترتیب: **۱-۲** (O-22 ب — هم‌زادِ `ReturnShare`/`returnShare`، بردارِ دستیِ
+  `return-share-v1.json` ⇒ v2، پیکرهٔ `core-fuzz` و ادعای «همیشه افغانیِ کامل»، `ReturnCap.capMinor` و ۳۸ آزمونِ برگشتِ Kotlin؛ شاخهٔ جدا)،
+  سپس ۳-۴، ۴-۳، ۳-۱۱، ۴-۲۳ (۱)، ۴-۲. «ارزش انبار» ِ کارتِ خانه (`WarehouseEngine.summary.value` = جمعِ ورودی‌ها) دست نخورد.
+- قدمِ بعدی: مرجِ این شاخه با دسته؛ شاهدِ CI ِ Kotlin ِ بالا؛ سپس ۱-۲ در شاخهٔ خودش.
+
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/sec-review-48` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۸؛ روی `ccr-…-batch-48` ‏a57dae088؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: حملهٔ خصمانه روی `8c493593c..a57dae088` (مالیاتِ POS-37، گالریِ ویترین، دلیلِ «از کار انداختن» + R24، برداشتنِ وبِ دکان، `spec.mjs`) —
   `docs/SECURITY-AUDIT-fa.md` بخشِ **B13**. بسته: **SR48-1 High** — `return-line-cap` مالیاتِ ادعاشده را بی سنجش با نهایی و بی پرچم به سقفِ برگشت می‌افزود
