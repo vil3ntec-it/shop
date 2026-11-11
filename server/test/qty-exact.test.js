@@ -6,9 +6,9 @@
  * می‌خوانند. ادعاها:
  *  ۱. فایل دقیقاً خروجیِ امروزِ سازنده است (کهنه نیست)؛ «legacy» خودِ `lineTotal` ِ `index.html` است.
  *  ۲. هم‌زادِ JS روی همهٔ ردیف‌ها همان عددِ هسته را می‌دهد (مبلغ، جمع، جای خالی، اعشارِ زیادی).
- *  ۳. دروازه: پرچمِ خاموش ⇒ همیشه همان موتورِ امروز؛ مقدارِ درست ⇒ همان امروز حتی با پرچمِ روشن؛ فرق فقط در
- *     مقدارِ اعشاری و فقط یک افغانی در نیمه‌های دقیق (جاروبِ ۸۹۹٬۱۰۰ جفت).
- *  ۴. مبلغِ ردیفِ اعشاری با پرچمِ روشن همان `order-states.lineTotalMinor` ِ سفارشِ آنلاینِ سرور است.
+ *  ۳. دروازه: پرچمِ خاموش ⇒ همیشه همان موتورِ امروز؛ روشن ⇒ قاعدهٔ دقیق برای **هر** مقدار (نسخهٔ ۲، تصمیمِ ۳-۱۲ ِ صاحب‌کار:
+ *     مقدارِ درست هم — ۵۰ × ۰٫۲۹ = ۱۵، نه ۱۴)؛ فرق فقط یک افغانی در نیمه‌های دقیق (جاروبِ ۸۹۹٬۱۰۰ جفتِ اعشاری و ۹۰٬۰۰۰ جفتِ درست).
+ *  ۴. مبلغِ ردیف با پرچمِ روشن همان `order-states.lineTotalMinor` ِ سفارشِ آنلاینِ سرور است (اعشاری و درست).
  * هیچ پایگاه‌داده‌ای لازم نیست.
  */
 const test = require('node:test');
@@ -26,7 +26,7 @@ const V = JSON.parse(fs.readFileSync(gen.FIXTURE, 'utf8'));
 test('بردارها همان خروجیِ امروزِ سازنده‌اند (فایل کهنه نیست)', () => {
   assert.equal(fs.readFileSync(gen.FIXTURE, 'utf8'), gen.serialize(gen.build()),
     'بردارها کهنه‌اند: cd server && node scripts/qty-exact-vectors.js --write');
-  assert.equal(V.version, 1);
+  assert.equal(V.version, 2, 'نسخهٔ ۲: مقدارِ درست هم دقیق (۳-۱۲)');
   assert.equal(Q.DECIMALS, 3);
 });
 
@@ -38,19 +38,22 @@ test('مبلغِ ردیف: هم‌زادِ JS = بردار؛ خاموش ⇒ مو
     assert.equal(Q.exactMinor(r.priceMinor, r.qtyMilli), r.exactMinor, r.name);
     assert.equal(Q.lineMinor(r.price, r.qty, false), r.legacyMinor, `${r.name}: پرچمِ خاموش همان امروز نیست`);
     assert.equal(Q.lineMinor(r.price, r.qty, true), r.onMinor, r.name);
-    if (!Q.fractional(r.qtyMilli)) assert.equal(r.onMinor, r.legacyMinor, `${r.name}: مقدارِ درست عوض شد`);
-    else if (r.exactMinor !== null) assert.equal(r.onMinor, r.exactMinor, r.name);
+    //  ۳-۱۲: روشن ⇒ قاعدهٔ دقیق برای هر مقدار؛ فقط بیرون از بازهٔ دقیق همان امروز
+    assert.equal(r.onMinor, r.exactMinor === null ? r.legacyMinor : r.exactMinor, r.name);
   }
   //  S04 و نیمهٔ دقیقی که امروز یک افغانی کم می‌آورد
   const by = (n) => V.line.find((r) => r.name.startsWith(n));
   assert.equal(by('S04: برچسبِ').onMinor, 37500);
   assert.equal(by('S04: وزنِ دستی').onMinor, 9000);
   assert.deepEqual([by('نیمهٔ دقیق: ۱٫۰۱۵').legacyMinor, by('نیمهٔ دقیق: ۱٫۰۱۵').onMinor], [10100, 10200]);
+  //  ۳-۱۲: مقدارِ درست با قیمتِ اعشاری هم نیمه را بالا می‌برد (امروز ۱۴)
+  assert.deepEqual([by('مقدارِ درست: ۵۰ × ۰٫۲۹').legacyMinor, by('مقدارِ درست: ۵۰ × ۰٫۲۹').onMinor], [1400, 1500]);
+  assert.deepEqual([by('مقدارِ درست: ۲ × ۱۱۵').legacyMinor, by('مقدارِ درست: ۲ × ۱۱۵').onMinor], [23000, 23000]);
 });
 
-test('روشن ⇒ مبلغِ ردیفِ اعشاری همان سفارشِ آنلاینِ سرور (`order-states.lineTotalMinor`)', () => {
+test('روشن ⇒ مبلغِ ردیف (اعشاری و درست) همان سفارشِ آنلاینِ سرور (`order-states.lineTotalMinor`)', () => {
   for (const r of V.line) {
-    if (r.exactMinor === null || !Q.fractional(r.qtyMilli)) continue;
+    if (r.exactMinor === null) continue;
     assert.equal(S.lineTotalMinor(r.qtyMilli, r.priceMinor), r.onMinor, r.name);
   }
 });
@@ -72,7 +75,7 @@ test('کادرِ مقدار: بیش از سه رقمِ اعشارِ معنادا
   for (const r of V.precise) assert.equal(Q.tooPrecise(r.text), r.over, r.name);
 });
 
-test('جاروب: فرق فقط در مقدارِ اعشاری، فقط +۱ افغانی، و مقدارِ درست هرگز', () => {
+test('جاروب: فرق فقط +۱ افغانی در نیمهٔ دقیق — مقدارِ اعشاری و (۳-۱۲) مقدارِ درست', () => {
   const s = V.sweep;
   let pairs = 0; let diffs = 0; let sumOn = 0; let sumLegacy = 0; const first = [];
   for (let q = s.qtyMilli[0]; q <= s.qtyMilli[1]; q++) {
@@ -95,10 +98,16 @@ test('جاروب: فرق فقط در مقدارِ اعشاری، فقط +۱ اف
     for (let p = w.priceMinor[0]; p <= w.priceMinor[1]; p++) {
       const lg = Q.lineMinor(p / 100, q / 1000, false);
       wPairs++;
-      if (Q.lineMinor(p / 100, q / 1000, true) !== lg) wOn++;
+      const on = Q.lineMinor(p / 100, q / 1000, true);
+      if (on !== lg) {
+        wOn++;
+        assert.equal(on, Q.exactMinor(p, q), `${q} × ${p}: روشن جز قاعدهٔ دقیق`);
+        assert.equal(on - lg, 100, `${q} × ${p}: فرق جز یک افغانی`);
+      }
       if (Q.exactMinor(p, q) !== lg) wExact++;
     }
   }
-  assert.deepEqual({ pairs: wPairs, onDiffs: wOn, exactDiffs: wExact }, { pairs: w.pairs, onDiffs: 0, exactDiffs: w.exactDiffs });
-  assert.ok(w.exactDiffs > 0, 'قاعدهٔ دقیق برای مقدارِ درست هم فرق می‌داشت — دروازه همین را نگه می‌دارد');
+  assert.deepEqual({ pairs: wPairs, onDiffs: wOn, exactDiffs: wExact }, { pairs: w.pairs, onDiffs: w.onDiffs, exactDiffs: w.exactDiffs });
+  assert.equal(w.onDiffs, w.exactDiffs, '۳-۱۲: روشن ⇒ مقدارِ درست هم همان قاعدهٔ دقیق');
+  assert.ok(w.exactDiffs > 0, 'مقدارِ درست با قیمتِ اعشاری گاهی یک افغانی فرق دارد');
 });

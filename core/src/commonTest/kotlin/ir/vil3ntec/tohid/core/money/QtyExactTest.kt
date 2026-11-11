@@ -28,11 +28,14 @@ class QtyExactTest {
     assertEquals(Rounding.lineTotalMinor(1015, 10000, 100), QtyExact.lineMinorOrNull(100.0, 1.015))
   }
 
-  @Test fun wholeQuantity_staysTheEngineOfToday() {
-    //  ۵۰ × ۰٫۲۹ = ۱۴٫۵: قاعدهٔ دقیق ۱۵ می‌داد، ولی کالای بی اعشار بایت‌به‌بایت همان امروز است
-    assertNull(QtyExact.lineMinorOrNull(0.29, 50.0))
-    assertEquals(1400L, QtyExact.lineMinor(0.29, 50.0, on = true))
+  @Test fun wholeQuantity_isExactWithTheFlagOn() {
+    //  ۳-۱۲ (نسخهٔ ۲): ۵۰ × ۰٫۲۹ = ۱۴٫۵ ⇒ با پرچم ۱۵ (همان سفارشِ آنلاین)؛ خاموش همان ۱۴ ِ امروز
+    assertEquals(1500L, QtyExact.lineMinorOrNull(0.29, 50.0))
+    assertEquals(1500L, QtyExact.lineMinor(0.29, 50.0, on = true))
+    assertEquals(1400L, QtyExact.lineMinor(0.29, 50.0, on = false))
+    assertEquals(23000L, QtyExact.lineMinor(115.0, 2.0, on = true), "مقدارِ درستِ بی نیمه همان")
     assertEquals(1500L, QtyExact.exactMinor(29, 50_000))
+    assertEquals(2, QtyExact.VERSION)
     assertFalse(QtyExact.fractional(3000))
     assertTrue(QtyExact.fractional(-1250))
   }

@@ -37,8 +37,8 @@ class QtyExactVectorsTest {
   private fun JsonObject.l(k: String): Long = getValue(k).jsonPrimitive.long
   private fun JsonObject.n(k: String): String = getValue(k).jsonPrimitive.content
 
-  @Test fun lineTotals_offIsTodayOnIsTheFractionalGate() {
-    assertEquals(1, v.getValue("version").jsonPrimitive.int)
+  @Test fun lineTotals_offIsTodayOnIsTheExactRule() {
+    assertEquals(2, v.getValue("version").jsonPrimitive.int)
     assertEquals(QtyExact.VERSION, v.getValue("version").jsonPrimitive.int)
     val line = rows("line")
     assertTrue(line.size >= 20)
@@ -109,7 +109,9 @@ class QtyExactVectorsTest {
       q += w.l("qtyStepMilli")
     }
     assertEquals(w.l("pairs"), wPairs)
-    assertEquals(0L, wOn, "مقدارِ درست با پرچمِ روشن عوض شد")
+    //  ۳-۱۲: روشن ⇒ مقدارِ درست هم همان قاعدهٔ دقیق (۴۲ نیمهٔ دقیق از ۹۰٬۰۰۰)
+    assertEquals(w.l("onDiffs"), wOn)
     assertEquals(w.l("exactDiffs"), wExact)
+    assertEquals(wExact, wOn, "روشن جز قاعدهٔ دقیق")
   }
 }
