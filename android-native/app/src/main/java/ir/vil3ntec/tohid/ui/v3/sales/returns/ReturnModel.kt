@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.sales.returns
 
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.ReturnLeft
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SaleItem
@@ -16,8 +17,8 @@ data class ReturnLine(val item: SaleItem, val name: String, val unit: String, va
 /**
  *  مرجوعیِ ساده (`sales/{id}/return` وقتی «برگشت و تعویض» خاموش است) — خالص: قلم‌های
  *  قابلِ برگشت (`ReturnLeft`: برگشتِ دستگاه‌های دیگر هم، JB5)، پلهٔ −/+ همان سبد (`cartStep`)، و پیش‌نمایشِ مبلغ با
- *  **همان فرمولِ ثبت** (`recordReturn`: قیمتِ همان فاکتور × سهمِ پس از تخفیفِ فاکتور) تا عددی
- *  که دیده می‌شود همان باشد که ثبت می‌شود. ثبت با خودِ موتور است.
+ *  **همان فرمولِ ثبت** (`recordReturn`: قیمتِ همان فاکتور × سهمِ پس از تخفیفِ فاکتور، گردِ تجمعیِ `ReturnShare` با
+ *  برگشت‌های پیشینِ همان قلم — O-22 ب) تا عددی که دیده می‌شود همان باشد که ثبت می‌شود. ثبت با خودِ موتور است.
  */
 object ReturnModel {
 
@@ -47,11 +48,12 @@ object ReturnModel {
     return if (v > l.left + 1e-9) StrSale.overReturnable else null
   }
 
-  /** مبلغِ برگشت — همان فرمولِ ثبت ([SalesEngine.returnAmount]) */
-  fun amount(sale: Sale, l: ReturnLine, q: Double): Double = SalesEngine.returnAmount(sale, l.item, q)
+  /** مبلغِ برگشت — همان فرمولِ ثبت ([SalesEngine.returnAmount] ِ چهارورودی: پیش‌تر سه‌ورودیِ جداگرد، ≠ ثبت در برگشتِ تکه‌ای) */
+  fun amount(d: ShopData, sale: Sale, l: ReturnLine, q: Double): Double = SalesEngine.returnAmount(d, sale, l.item, q)
 
-  fun total(sale: Sale, lines: List<ReturnLine>, texts: Map<String, String>): Double =
-    lines.sumOf { amount(sale, it, value(texts[it.item.id], it)) }
+  /** جمع به پول (مبلغِ تا یک‌صدمِ برگشتِ پایانِ قلم، O-22 ب) */
+  fun total(d: ShopData, sale: Sale, lines: List<ReturnLine>, texts: Map<String, String>): Double =
+    PayFlow.major(lines.sumOf { PayFlow.minor(amount(d, sale, it, value(texts[it.item.id], it))) })
 
   /** آنچه به `recordReturn` می‌رود: فقط مقدارهای بیش از صفر */
   fun quantities(texts: Map<String, String>): Map<String, Double> =

@@ -37,6 +37,8 @@ process.env.BACKUP_ENABLED = 'false';
 process.env.RATE_GENERAL_MAX = '100000';
 process.env.OTP_RESEND_SECONDS = '0';
 process.env.OTP_UNIFORM_MS = '0';
+//  CHK-08 / ۴-۳: الگوی تکه‌های نقشه (پاسخ از `ctx.route` ِ پایین، بی اینترنت)؛ فقط با پرچمِ `shop.storefront.map_pin` ِ دکان
+process.env.STORE_MAP_TILES = 'https://tiles.test/{z}/{x}/{y}.png';
 
 const { createApp } = require('../src/app');
 const { query, one, newId, now, closeDb } = require('../src/db');
@@ -400,6 +402,61 @@ await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
   ok(a.lat === 34.531235 && a.lng === 69.171111 && a.zone && a.zone.name === 'کارته‌سه' && a.zone.source === 'pin',
     'CHK-08: پینِ چسبانده (شش رقم، گردِ سرور) در نشانیِ سفارش و ناحیه از پین', JSON.stringify(a));
 }
+
+//  CHK-08 / ۴-۳: «انتخاب روی نقشه» — پرچم خاموش ⇒ نه دکمه، نه pin-map.js، نه هیچ تکه‌ای؛ روشن ⇒ فقط با کلیک: تکه‌ها از همان یک
+//  مبدأ (CSP)، نشانهٔ وسط روی پینِ پیشین، کلیدهای جهت نقشه را می‌برند، «همین‌جا» ⇒ همان راهِ پین (ناحیه از سرور)، بستن ⇒ فوکوس برمی‌گردد
+const tileHits = [];
+const PNG1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+await ctx.route('https://tiles.test/**', (route) => {
+  tileHits.push({ url: route.request().url(), ref: route.request().headers().referer || '' });
+  return route.fulfill({ status: 200, contentType: 'image/png', body: PNG1 });
+});
+await open();
+await addRice();
+await toCheckout();
+ok(!(await page.$('#pin-map')) && !(await page.$('script[src="/store/pin-map.js"]')) && tileHits.length === 0,
+  'پرچمِ نقشه خاموش ⇒ نه دکمه، نه pin-map.js، نه تکه');
+await flag('shop.storefront.map_pin', true);
+await open();
+await addRice();
+await toCheckout();
+ok(await page.isVisible('#pin-map') && !(await page.$('script[src="/store/pin-map.js"]')) && tileHits.length === 0,
+  'روشن ⇒ «انتخاب روی نقشه» کنارِ «موقعیتِ فعلی»، ولی هیچ بار پیش از کلیک');
+await page.fill('#pin-paste', '34.531235, 69.171111');
+await page.click('#pin-use');
+await page.waitForFunction(() => /کارته‌سه/.test(document.getElementById('zone-msg').textContent), null, { timeout: 10000 });
+await page.click('#pin-map');
+await page.waitForSelector('#pin-map-box .pmap-tiles img', { timeout: 10000 });
+await page.waitForFunction(() => Array.prototype.some.call(document.querySelectorAll('#pin-map-box .pmap-tiles img'), (i) => i.complete && i.naturalWidth > 0), null, { timeout: 10000 });
+ok(tileHits.length > 0 && tileHits.every((x) => /^https:\/\/tiles\.test\/16\/\d+\/\d+\.png$/.test(x.url)),
+  'تکه‌ها فقط از همان الگو و بزرگنماییِ ۱۶', tileHits.slice(0, 2).map((x) => x.url).join(' '));
+ok(tileHits.every((x) => !x.ref || x.ref === base + '/'), 'Referer ِ تکه فقط مبدأ (بی slug و نشانیِ برگه)', tileHits[0] && tileHits[0].ref);
+ok(await page.evaluate(() => document.activeElement && document.activeElement.classList.contains('pmap-view'))
+  && (await page.getAttribute('#pin-map', 'aria-expanded')) === 'true', 'باز ⇒ فوکوس روی نقشه و aria-expanded');
+ok((await text('#pin-map-box')).includes('۳۴٫۵۳۱۲') && (await text('#pin-map-box')).includes('OpenStreetMap'),
+  'نشانهٔ وسط روی پینِ پیشین و «©» ِ OpenStreetMap', await text('#pin-map-box'));
+if (axeSrc) {
+  await page.evaluate(axeSrc);
+  const v = await page.evaluate(async () => (await window.axe.run(document.getElementById('pin-map-box'),
+    { runOnly: ['color-contrast', 'button-name', 'image-alt', 'aria-allowed-attr', 'aria-allowed-role', 'link-name'] })).violations
+    .map((x) => `${x.id}: ${x.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' ; ')}`));
+  ok(v.length === 0, 'دسترس‌پذیری (axe-core): نقشهٔ پین', v.join(' | '));
+}
+await page.click('#pmap-close');
+ok(!(await page.$('#pin-map-box')) && await page.evaluate(() => document.activeElement && document.activeElement.id === 'pin-map')
+  && (await page.getAttribute('#pin-map', 'aria-expanded')) === 'false', 'بستن ⇒ نقشه رفت و فوکوس به دکمه');
+await page.click('#pin-map');
+await page.waitForSelector('#pin-map-box .pmap-view');
+await page.keyboard.press('ArrowUp');   //  ۶۴ پیکسل در بزرگنماییِ ۱۶ ≈ ۰٫۰۰۱۱ درجه
+await page.keyboard.press('Enter');
+await page.waitForFunction(() => !document.getElementById('pin-map-box') && /روی نقشه برگزیده/.test(document.getElementById('pin-text').textContent), null, { timeout: 10000 });
+{
+  const pt = await text('#pin-text');
+  ok(/۳۴٫۵۳۲/.test(pt) && !pt.includes('۳۴٫۵۳۱۲'), 'کلیدِ جهت (بالا) ⇒ پینِ کمی شمالی‌تر از «همین‌جا»', pt);
+}
+await page.waitForFunction(() => /کارته‌سه/.test(document.getElementById('zone-msg').textContent), null, { timeout: 10000 });
+ok(true, 'پینِ نقشه ⇒ ناحیه از سرور (همان راهِ «موقعیتِ من»)');
+await flag('shop.storefront.map_pin', false);
 
 
 //  CHK-07/12: زمانِ تحویل و هزینهٔ بازه — بی بازه ⇒ همان فرم؛ بازهٔ «ارسال» با هزینهٔ ۲۰ و بی «هرچه زودتر» ⇒ تا بازه

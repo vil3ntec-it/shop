@@ -179,11 +179,14 @@ async function restoreIsolated(file, { targetUrl = '', keep = false } = {}) {
   return {
     q: (text, params) => pool.query(text, params),
     pool,
+    //  O-15 (`anonymize-backup.js`): نشانیِ همین کپی برای اتصالِ تک و پشتیبانِ پس از بی‌نام کردن؛ `drop` با `keep`
+    url: target.url,
     where: own ? `postgres:${target.name}` : 'postgres:target',
     async close() {
       await pool.end();
       if (own && !keep) await pgAdmin(target.admin, `DROP DATABASE IF EXISTS ${ident(target.name)}`);
     },
+    async drop() { if (own) await pgAdmin(target.admin, `DROP DATABASE IF EXISTS ${ident(target.name)}`); },
   };
 }
 

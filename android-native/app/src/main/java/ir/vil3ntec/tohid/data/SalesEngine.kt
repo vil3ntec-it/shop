@@ -827,8 +827,8 @@ object SalesEngine {
     if (sale.total > 0 && sale.discount > 0) ((sale.total - sale.discount) / sale.total).coerceIn(0.0, 1.0) else 1.0)
 
   /**
-   *  مبلغِ برگشتِ `quantity` از یک قلم — قیمتِ همان قلم در همان فاکتور (نه قیمتِ امروز) با سهمِ
-   *  تخفیفِ فاکتور. [recordReturn] و پیش‌نمایشِ مرجوعیِ نسخهٔ ۳ هر دو همین را می‌خوانند.
+   *  مبلغِ برگشتِ `quantity` از یک قلم — قیمتِ همان قلم در همان فاکتور (نه قیمتِ امروز) با سهمِ تخفیفِ فاکتور،
+   *  هر برگشت جدا گرد. ثبت و پیش‌نمایش‌ها نسخهٔ چهارورودیِ پایین را می‌خوانند (تجمعی، O-22 ب).
    */
   fun returnAmount(sale: Sale, item: SaleItem, quantity: Double): Double =
     if (item.quantity > 0) (item.totalPrice / item.quantity * quantity * paidRatio(sale)).roundToLong().toDouble() else 0.0
@@ -919,11 +919,11 @@ object SalesEngine {
         refId = returnId,
         createdAt = now,
       )
-      totalAmount += amount
       any = true
     }
 
     if (!any) return Result.Failed(StrLedger.saleReturnNothing)
+    totalAmount = PayFlow.major(returns.subList(d.saleReturns.size, returns.size).sumOf { PayFlow.minor(it.amount) })   //  به پول (O-22 ب، تا یک‌صدم)
     //  PAY-09: فاکتورِ گردشده — همان `TillRounding.refund` ِ `ReturnFlow.quote`: هرگز بیش از پرداختی، کامل ⇒ دقیقاً ماندهٔ آن
     if ((sale.roundingMinor ?: 0L) != 0L) {
       val added = returns.subList(d.saleReturns.size, returns.size)

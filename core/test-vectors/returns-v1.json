@@ -1,5 +1,5 @@
 {
-  "_doc": "RET-01..08، 10، 12، 13 — برگشت و تعویض. همین فایل را ReturnFlow.kt ِ گوشی و کامپیوتر (ReturnFlowTest) می‌دواند. عددها دستی و از روی قاعدهٔ مشخصات نوشته شده‌اند (S13: ۲۵۰ − ۲۵ = ۲۲۵)، نه از خروجیِ کد. مبلغ‌ها افغانی‌اند؛ gate به پول (یک‌صدمِ افغانی). هر ردیفِ انبار و حسابی که سند می‌سازد refId = docId دارد (نشانیِ سند برای نگهبانِ کارمند، #339)؛ رسیدِ حساب kind = customer_return دارد (واژهٔ #286) — سهمِ اعتبار هم، چون کنارِ کمِ کلِ مرجوعی از دخل خنثی می‌شود و store_credit را صندوق نقد نمی‌شمارد.",
+  "_doc": "RET-01..08، 10، 12، 13 — برگشت و تعویض. همین فایل را ReturnFlow.kt ِ گوشی و کامپیوتر (ReturnFlowTest) می‌دواند. عددها دستی و از روی قاعدهٔ مشخصات نوشته شده‌اند (S13: ۲۵۰ − ۲۵ = ۲۲۵)، نه از خروجیِ کد. گردِ برگشتِ قلم O-22 «ب» ِ صاحب‌کار (۱۴۰۵/۰۸/۲۰): پیش از آخرین عدد رو به پایین تا افغانیِ کامل، برگشتِ پایانِ قلم دقیقاً باقی‌مانده تا یک‌صدم (s50: هر کیسه ۰٫۶۷ از ۱ × ۲/۳؛ پیش‌تر ۱). مبلغ‌ها افغانی‌اند؛ gate به پول (یک‌صدمِ افغانی). هر ردیفِ انبار و حسابی که سند می‌سازد refId = docId دارد (نشانیِ سند برای نگهبانِ کارمند، #339)؛ رسیدِ حساب kind = customer_return دارد (واژهٔ #286) — سهمِ اعتبار هم، چون کنارِ کمِ کلِ مرجوعی از دخل خنثی می‌شود و store_credit را صندوق نقد نمی‌شمارد.",
   "version": 1,
   "ledger": {
     "products": [
@@ -83,8 +83,8 @@
     { "name": "هیچ مقدار", "sale": "s13", "picks": { "i13b": { "qty": 0 } }, "error": "NOTHING_TO_RETURN" },
     { "name": "نیم کیلو از فروشِ نسیه", "sale": "s20", "picks": { "i20": { "qty": 0.5 } },
       "out": { "lines": [{ "saleItemId": "i20", "qty": 0.5, "amount": 150, "disposition": "restock" }], "total": 150 } },
-    { "name": "گردکردن از مبلغِ نهایی بیشتر نمی‌شود", "sale": "s50", "picks": { "i50a": { "qty": 1 }, "i50b": { "qty": 1 }, "i50c": { "qty": 1 } },
-      "out": { "lines": [{ "saleItemId": "i50a", "qty": 1, "amount": 1, "disposition": "restock" }, { "saleItemId": "i50b", "qty": 1, "amount": 1, "disposition": "restock" }, { "saleItemId": "i50c", "qty": 1, "amount": 0, "disposition": "restock" }], "total": 2 } }
+    { "name": "گردکردن از مبلغِ نهایی بیشتر نمی‌شود (O-22 ب: هر کیسه ۰٫۶۷، سومی ۰٫۶۶ تا جمع ۲)", "sale": "s50", "picks": { "i50a": { "qty": 1 }, "i50b": { "qty": 1 }, "i50c": { "qty": 1 } },
+      "out": { "lines": [{ "saleItemId": "i50a", "qty": 1, "amount": 0.67, "disposition": "restock" }, { "saleItemId": "i50b", "qty": 1, "amount": 0.67, "disposition": "restock" }, { "saleItemId": "i50c", "qty": 1, "amount": 0.66, "disposition": "restock" }], "total": 2 } }
   ],
   "quoteNoReceipt": [
     { "name": "دو A به قیمتِ ۱۵۰", "free": [{ "productId": "pA", "qty": 2, "unitPrice": 150 }], "out": { "total": 300 } },
@@ -231,9 +231,9 @@
       "out": {
         "total": 2, "split": { "account": 0, "credit": 0, "cash": 2 }, "audit": "return",
         "rows": [
-          { "saleItemId": "i50a", "productId": "", "quantity": 1, "amount": 1, "disposition": "restock", "toAccount": 0, "toCredit": 0 },
-          { "saleItemId": "i50b", "productId": "", "quantity": 1, "amount": 1, "disposition": "restock", "toAccount": 0, "toCredit": 0 },
-          { "saleItemId": "i50c", "productId": "", "quantity": 1, "amount": 0, "disposition": "restock", "toAccount": 0, "toCredit": 0 }
+          { "saleItemId": "i50a", "productId": "", "quantity": 1, "amount": 0.67, "disposition": "restock", "toAccount": 0, "toCredit": 0 },
+          { "saleItemId": "i50b", "productId": "", "quantity": 1, "amount": 0.67, "disposition": "restock", "toAccount": 0, "toCredit": 0 },
+          { "saleItemId": "i50c", "productId": "", "quantity": 1, "amount": 0.66, "disposition": "restock", "toAccount": 0, "toCredit": 0 }
         ],
         "movements": [], "entries": [], "transactions": [], "returnedQty": { "i50a": 1, "i50b": 1, "i50c": 1 }, "debtSettled": 0,
         "stock": {}

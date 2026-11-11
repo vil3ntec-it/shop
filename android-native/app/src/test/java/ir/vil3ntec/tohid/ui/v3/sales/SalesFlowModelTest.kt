@@ -236,7 +236,7 @@ class SalesFlowModelTest {
     val d = ledger.copy(sales = listOf(sale), saleItems = listOf(SaleItem("ri", "r", "soap", quantity = 4.0, unitPrice = 50.0, totalPrice = 200.0, returnedQty = 1.0)))
     val line = ReturnModel.lines(d, sale).single()
     assertEquals(3.0, line.left, 0.0)
-    assertEquals(75.0, ReturnModel.total(sale, listOf(line), mapOf("ri" to "2")), 0.0)
+    assertEquals(75.0, ReturnModel.total(d, sale, listOf(line), mapOf("ri" to "2")), 0.0)
     //  همان که موتور ثبت می‌کند
     val ok = SalesEngine.recordReturn(d, "r", mapOf("ri" to 2.0), "", "2026-10-24", 1L, newId = { "x" }) as SalesEngine.Result.Ok
     assertEquals(75.0, ok.data.saleReturns.sumOf { it.amount }, 0.0)

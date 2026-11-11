@@ -14,7 +14,8 @@ package ir.vil3ntec.tohid.core.money
  *  واحدها: مقدار به هزارم (`milli`)، پول به یک‌صدمِ افغانی (`minor`) — بی Double در حساب.
  *    برگشته   بیشینهٔ (شمارندهٔ قلم `SaleItem.returnedQty`، جمعِ مقدارِ ردیف‌های برگشتِ همان قلم)
  *    مانده    فروخته − برگشته، و سقفِ پول − پس‌داده؛ هیچ‌کدام زیرِ صفر
- *    سقفِ پول round(جمعِ قلم × سهمِ پرداخت) افغانی — همان پایانِ `ReturnShare` (برگشتِ همهٔ قلم)
+ *    سقفِ پول round(جمعِ قلم × سهمِ پرداخت × ۱۰۰) یک‌صدم — دقیق تا پول، همان پایانِ `ReturnShare` (برگشتِ همهٔ
+ *             قلم، O-22 «ب»؛ پیش‌تر گرد به افغانیِ کامل، تا نیم‌افغانی بیش از پرداختی)
  */
 object ReturnCap {
 
@@ -38,10 +39,10 @@ object ReturnCap {
   /** پولِ دفتر (افغانی، Double) ⇒ یک‌صدم */
   fun minor(afn: Double): Long = if (afn.isFinite()) mathRound(afn * 100.0) else 0L
 
-  /** سقفِ پولِ یک قلم به یک‌صدم: round(جمعِ قلم × سهمِ پرداخت) افغانیِ کامل؛ ورودیِ نامعتبر یا منفی ⇒ ۰ */
+  /** سقفِ پولِ یک قلم به یک‌صدم: round(جمعِ قلم × سهمِ پرداخت × ۱۰۰)، دقیق تا پول (O-22 ب)؛ ورودیِ نامعتبر یا منفی ⇒ ۰ */
   fun capMinor(lineTotal: Double, paidRatio: Double): Long {
     if (!lineTotal.isFinite() || !paidRatio.isFinite()) return 0L
-    return maxOf(0L, mathRound(lineTotal * paidRatio)) * 100L
+    return maxOf(0L, mathRound(lineTotal * paidRatio * 100.0))
   }
 
   fun state(soldMilli: Long, capMinor: Long, prior: List<Row>, counterMilli: Long = 0L): State {
@@ -57,8 +58,8 @@ object ReturnCap {
 
   /**
    *  همین برگشت ([req]) پس از [prior] جا دارد؟
-   *  @param tolMinorPerRow گردِ قدیم برای هر ردیف (پیشین‌ها و همین): برنامهٔ پیش از #586 هر برگشت را جدا گرد می‌کرد؛
-   *                        سرور ۵۰ می‌دهد، صفحهٔ برگشت ۰ (خودش `ReturnShare` ِ تجمعی دارد)
+   *  @param tolMinorPerRow گردِ قدیم برای هر ردیف (پیشین‌ها و همین): برنامهٔ پیش از #586 هر برگشت را جدا گرد می‌کرد و
+   *                        برنامهٔ پیش از O-22 ب نیمه را رو به بالا؛ سرور ۵۰ می‌دهد، صفحهٔ برگشت ۰ (خودش `ReturnShare` دارد)
    *  @param extraMinor     گردِ نقدیِ مثبتِ فاکتور (`Sale.roundingMinor`، PAY-09): برگشتِ کامل ماندهٔ گرد را هم می‌برد
    */
   fun check(

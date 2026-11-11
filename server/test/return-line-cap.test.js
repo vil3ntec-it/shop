@@ -110,7 +110,8 @@ test.after(async () => { await h.stop(); });
 /* ═══════════════════════════════ ① ═══════════════════════════════ */
 
 test('حساب: همهٔ بردارهای return-cap-v1 (هم‌زادِ ReturnCap ِ core)', () => {
-  assert.ok(V.cases.length >= 12 && V.caps.length >= 5);
+  assert.equal(V.version, 2);   //  O-22 ب: سقفِ پول دقیق تا پول
+  assert.ok(V.cases.length >= 12 && V.caps.length >= 7);
   const pairs = (a) => { const out = []; for (let i = 0; i < a.length; i += 2) out.push({ qtyMilli: a[i], amountMinor: a[i + 1] }); return out; };
   for (const c of V.cases) {
     const prior = pairs(c.prior);
@@ -241,6 +242,29 @@ test('پول: مقدارِ درست با پولِ بیش از قلم رد؛ گر
     v1('saleItems', 'si-nototal', { saleId: 's-nototal', productId: 'p-oil', quantity: 1, unitPrice: 100 }, t)]);
   assert.equal((await push1(owner, 'own-a', ret1('nototal-a', 's-nototal', 'si-nototal', 1, 900))).body.results[0].status, 'applied');
   assert.equal((await push1(owner, 'own-b', ret1('nototal-b', 's-nototal', 'si-nototal', 1, 0))).body.results[0].reason, 'return_exceeds_sold');
+});
+
+test('O-22 ب: ۳ × ۵ با ۱۰٪ ⇒ ۴، ۵، ۴٫۵۰ می‌نشیند؛ سقف دقیق تا پول (۱۳٫۵۰)، «الف» ِ برنامهٔ پیشین با نیم‌افغانیِ هر ردیف هنوز (v1 و v3)', async () => {
+  const t = ts();
+  const sale = (id, item) => [v1('sales', id, { total: 15, discount: 1.5, finalTotal: 13.5, status: 'completed', createdAt: t }, t),
+    v1('saleItems', item, { saleId: id, productId: 'p-oil', quantity: 3, unitPrice: 5, totalPrice: 15, returnedQty: 0, createdAt: t }, t)];
+  assert.equal(cap.capMinor(15, cap.paidRatio(15, 1.5)), 1350);
+  await push1(owner, 'own-a', sale('s-o22', 'si-o22'));
+  for (const [tag, amount] of [['o22-1', 4], ['o22-2', 5], ['o22-3', 4.5]]) {
+    assert.equal((await push1(owner, 'own-a', ret1(tag, 's-o22', 'si-o22', 1, amount))).body.results[0].status, 'applied', tag);
+  }
+  //  برگشتِ یک‌جا: یک پول بیش از سقفِ دقیق + نیم‌افغانی رد (سقفِ «الف» ۱۴۰۰ بود و ۱۴٫۰۱ را می‌پذیرفت)؛ ۱۴ ِ «الف» می‌گذرد
+  await push1(owner, 'own-a', sale('s-o22b', 'si-o22b'));
+  assert.equal((await push1(owner, 'own-a', ret1('o22-big', 's-o22b', 'si-o22b', 3, 14.01))).body.results[0].reason, 'return_exceeds_sold');
+  assert.equal((await push1(owner, 'own-b', ret1('o22-a', 's-o22b', 'si-o22b', 3, 14))).body.results[0].status, 'applied');
+  //  v3 (به پول): همان سه برگشت و همان سقف
+  await push3(owner, 'own3-a', sale3('s3-o22', 'si3-o22', 3000, 1500, { discountMinor: 150, finalTotalMinor: 1350 }));
+  for (const [tag, amount] of [['3o22-1', 400], ['3o22-2', 500], ['3o22-3', 450]]) {
+    assert.equal((await push3(owner, 'own3-a', ret3(tag, 's3-o22', 'si3-o22', 1000, amount))).body.results[0].status, 'applied', tag);
+  }
+  await push3(owner, 'own3-a', sale3('s3-o22b', 'si3-o22b', 3000, 1500, { discountMinor: 150, finalTotalMinor: 1350 }));
+  assert.equal((await push3(owner, 'own3-a', ret3('3o22-big', 's3-o22b', 'si3-o22b', 3000, 1401))).body.results[0].reason, 'return_exceeds_sold');
+  assert.equal((await push3(owner, 'own3-b', ret3('3o22-a', 's3-o22b', 'si3-o22b', 3000, 1400))).body.results[0].status, 'applied');
 });
 
 test('POS-37: برگشتِ کاملِ قلمِ فاکتورِ مالیات‌دار سهمِ مالیاتِ همان قلم را هم پس می‌دهد — بیشتر نه (v3 و v1)', async () => {

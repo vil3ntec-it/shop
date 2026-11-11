@@ -56,7 +56,7 @@ fun ReturnSheet(
   val lines = remember(d, sale.id) { ReturnModel.lines(d, sale) }
   var texts by remember { mutableStateOf(start) }
   var reason by remember { mutableStateOf("") }
-  val total = ReturnModel.total(sale, lines, texts)
+  val total = ReturnModel.total(d, sale, lines, texts)
   val shown = rememberCountUp(total)
   val bad = lines.any { ReturnModel.error(texts[it.item.id], it) != null }
   val chosen = remember { booleanArrayOf(false) }

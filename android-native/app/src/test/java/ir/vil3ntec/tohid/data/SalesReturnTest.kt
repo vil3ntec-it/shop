@@ -215,7 +215,8 @@ class SalesReturnTest {
 
     var d = ok(SalesEngine.recordReturn(sold.data, sold.saleId, mapOf(itemId to 1.0), "", "2026-08-29", 0, ::newId)).data
     d = ok(SalesEngine.recordReturn(d, sold.saleId, mapOf(itemId to 1.0), "", "2026-08-30", 0, ::newId)).data
-    assertEquals(listOf(3.0, 2.0), d.saleReturns.map { it.amount })
+    //  O-22 ب: کفِ ۲٫۵ ⇒ ۲، برگشتِ پایانِ قلم باقی‌ماندهٔ ۳ (الف: ۳ و ۲)؛ جمع همان ۵
+    assertEquals(listOf(2.0, 3.0), d.saleReturns.map { it.amount })
   }
 
   @Test
