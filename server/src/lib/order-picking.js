@@ -10,7 +10,8 @@
  *             جای قفسهٔ هر کالا (PCK-01). تکرار همان برگه را برمی‌گرداند.
  *   رویداد ── هر کارِ جمع‌آور یک رویداد با کلیدِ یکتای دستگاه (صفِ آفلاین بی‌خطر دوباره می‌فرستد؛
  *             همان کلید با بدنهٔ دیگر ⇒ رد). اسکن فقط با بارکدِ همان کالا (PCK-02؛ اشتباه ⇒ رد و
- *             شمارش)، «پیدا نکردم» همیشه (PCK-03)، وزنِ واقعی در حدِ مجاز (PCK-04).
+ *             شمارش)، «پیدا نکردم» همیشه (PCK-03)، وزنِ واقعی در حدِ مجاز (PCK-04)؛ بیش از حد ⇒ رد، یا با پرچمِ
+ *             خاموشِ `shop.orders.weight_hold` نگه‌داشت تا پاسخِ مشتری (S56، `lib/pick-weight-hold.js`).
  *   پیدانشد ─ وظیفهٔ بررسی برای مدیر و برداشتنِ کالا از ویترین تا رسیدگی (PCK-14).
  *   بسته ──── همهٔ قلم‌ها تکلیف‌دار ⇒ جمعِ تازه با `pick-core.settle` (کسرِ خودکارِ قلمِ پیدانشده و کم،
  *             PCK-07)، قلم‌های سفارش و مبلغِ نقدِ موردِ انتظارِ مأموریتِ هنوز‌نرفته در همان تراکنش، و
@@ -33,11 +34,12 @@ const { badRequest, notFound, conflict, ApiError } = require('../middleware/erro
 //  جایگزینی (PCK-05/06) — دیر بار می‌شود (آن پرونده هم پرچمِ همین‌جا را می‌خواند)
 const subs = () => require('./pick-substitutes');
 const packRefund = () => require('./order-pack-refund');   //  تصمیمِ ۱-۶ ب: «پس داده شد» ِ دستی
+//  S56: وزنِ بیش از حد تا پاسخِ مشتری (پرچمِ خاموشِ `shop.orders.weight_hold`) — دیر بار می‌شود
+const holds = () => require('./pick-weight-hold');
 
 const FLAG_KEY = 'shop.orders.picking';
 const KEY_RE = /^[A-Za-z0-9_.:-]{8,128}$/;
 const ID_RE = /^[0-9A-Z]{26}$/;
-const PRODUCT_RE = /^[A-Za-z0-9_.:-]{1,80}$/;
 const MAX_EVENTS = 100;
 const MAX_BAGS = 50;
 const MAX_QTY_MILLI = 10_000_000;
@@ -117,6 +119,9 @@ function parseEvent(raw) {
 
 //  کالا: بارکد و بودن — `lib/pick-barcodes.js`
 const { barcodesOf } = require('./pick-barcodes');
+//  جای قفسه (PCK-01) و وظیفهٔ «پیدا نکردم» (PCK-14) — `lib/pick-issues.js`
+const issuesLib = require('./pick-issues');
+const { openIssue, undoIssue } = issuesLib;
 
 // ════════════════════════════════════════════════════════════════════
 //  مدلِ خواندنی
@@ -175,6 +180,7 @@ async function loadSheet(run, shopId, orderId) {
     deliveryFeeMinor: Number(order.delivery_fee_minor),
   });
   const pending = raw.filter((l) => l.status === 'pending').length;
+  const weightHolds = await holds().forSheet(run, orderId);
   return {
     orderId,
     orderNo: Number(order.order_no),
@@ -198,6 +204,8 @@ async function loadSheet(run, shopId, orderId) {
     },
     labels: packed ? labelsOf(Number(order.order_no), Number(pick.bags)) : [],
     substitutions: await subs().forSheet(run, orderId),
+    //  S56: نگه‌داشتِ وزن — فقط وقتی ردیفی هست (پرچمِ خاموش ⇒ همان شکلِ پیشینِ برگه)
+    ...(weightHolds.length ? { weightHolds } : {}),
   };
 }
 
@@ -291,35 +299,6 @@ const REJECT = {
 
 const rejection = (code, extra = {}) => ({ status: 'rejected', code, message: REJECT[code] || 'مجاز نیست', ...extra });
 
-/** «پیدا نکردم» ⇒ وظیفهٔ باز برای مدیر (یکی برای هر کالا) — PCK-14 */
-async function openIssue(c, shopId, productId, orderId, detail, at) {
-  await c.query(
-    `INSERT INTO pick_issues (id, shop_id, kind, product_id, order_id, last_order_id, detail, created_at, updated_at)
-     VALUES ($1,$2,'not_found',$3,$4,$4,$5::jsonb,$6,$6)
-     ON CONFLICT (shop_id, product_id) WHERE status = 'open'
-     DO UPDATE SET hits = pick_issues.hits + 1, last_order_id = excluded.last_order_id,
-                   detail = excluded.detail, updated_at = excluded.updated_at`,
-    [ulid(at), shopId, productId, orderId, JSON.stringify(detail), at]
-  );
-}
-
-/** «از نو» روی قلمِ پیدانشده: اگر وظیفه فقط از همین سفارش بود، خودِ سیستم کنارش می‌گذارد */
-async function undoIssue(c, shopId, productId, orderId, at) {
-  const iss = (await c.query(
-    `SELECT id, hits, order_id FROM pick_issues WHERE shop_id=$1 AND product_id=$2 AND status='open' FOR UPDATE`,
-    [shopId, productId]
-  )).rows[0];
-  if (!iss) return;
-  if (Number(iss.hits) <= 1 && iss.order_id === orderId) {
-    await c.query(
-      `UPDATE pick_issues SET status='dismissed', resolved_by='system', resolved_at=$2, updated_at=$2,
-              note='جمع‌آور «پیدا نکردم» را برگرداند' WHERE id=$1`, [iss.id, at]
-    );
-  } else {
-    await c.query('UPDATE pick_issues SET hits = GREATEST(hits - 1, 1), updated_at=$2 WHERE id=$1', [iss.id, at]);
-  }
-}
-
 /**
  * یک رویداد در تراکنشِ خودش. ⇒ `{eventId, status: accepted|rejected, code?, line?, replayed?}`.
  * ردشده‌ها هم ثبت می‌شوند تا تکرارِ همان رویداد همان جواب را بگیرد (و اسکنِ اشتباه شمرده شود).
@@ -339,10 +318,12 @@ async function applyEvent(shopId, orderId, ev, actor) {
     if (prev) {
       if (prev.request_hash !== hash || prev.order_id !== orderId) return { eventId: ev.eventId, ...rejection('event_key_reused') };
       const line = (await c.query('SELECT * FROM order_pick_lines WHERE order_id=$1 AND line_no=$2', [orderId, ev.lineNo])).rows[0];
+      const hold = ev.type === 'weigh' && prev.outcome === 'accepted' ? await holds().ofEvent(c, shopId, ev.eventId) : null;
       return {
         eventId: ev.eventId, status: prev.outcome, replayed: true,
         ...(prev.code ? { code: prev.code, message: REJECT[prev.code] || '' } : {}),
         ...(line ? { line: lineView(line) } : {}),
+        ...(hold ? { hold } : {}),
       };
     }
 
@@ -373,6 +354,7 @@ async function applyEvent(shopId, orderId, ev, actor) {
     const picked = Number(line.picked_qty_milli);
     const open = line.status === 'pending';
     let next = null;           // { status, picked }
+    let hold = null;           // S56: نگه‌داشتِ تازهٔ وزن
     const detail = {};
 
     switch (ev.type) {
@@ -417,9 +399,18 @@ async function applyEvent(shopId, orderId, ev, actor) {
         if (codes && codes.length && Number(line.scans) === 0) return reject('scan_required');
         const verdict = P.weighVerdict(ordered, ev.qtyMilli, P.DEFAULT_TOLERANCE_BP);
         if (verdict === 'over') {
-          const maxMilli = ordered + Math.floor((ordered * P.DEFAULT_TOLERANCE_BP) / 10000);
-          return reject('over_tolerance', { actualMilli: ev.qtyMilli, maxMilli }, { maxMilli });
+          //  S56: پرچمِ روشن و سفارشِ پرداخت‌نشده ⇒ قلم باز می‌ماند و مشتری می‌پذیرد یا رد می‌کند
+          hold = await holds().openIn(c, { shopId, orderId, line, actualMilli: ev.qtyMilli, eventKey: ev.eventId, actorId: actor.id, at });
+          if (!hold) {
+            const maxMilli = ordered + Math.floor((ordered * P.DEFAULT_TOLERANCE_BP) / 10000);
+            return reject('over_tolerance', { actualMilli: ev.qtyMilli, maxMilli }, { maxMilli });
+          }
+          detail.verdict = verdict;
+          detail.hold = hold.id;
+          next = { status: 'pending', picked };
+          break;
         }
+        await holds().withdrawLine(c, orderId, ev.lineNo, actor.id, at);
         detail.verdict = verdict;
         next = { status: verdict === 'ok' ? 'picked' : 'short', picked: ev.qtyMilli };
         break;
@@ -427,6 +418,7 @@ async function applyEvent(shopId, orderId, ev, actor) {
       case 'not_found': {
         //  PCK-03: همیشه پذیرفته — مگر تکلیفِ قلم روشن شده باشد
         if (!open) return reject('line_done');
+        await holds().withdrawLine(c, orderId, ev.lineNo, actor.id, at);
         next = { status: picked > 0 ? 'short' : 'not_found', picked };
         if (line.product_id) {
           await openIssue(c, shopId, line.product_id, orderId,
@@ -436,12 +428,13 @@ async function applyEvent(shopId, orderId, ev, actor) {
         break;
       }
       case 'reset': {
-        if (open && picked === 0 && Number(line.scans) === 0) return reject('nothing_to_reset');
+        if (open && picked === 0 && Number(line.scans) === 0 && !(await holds().lineHeld(c, orderId, ev.lineNo))) return reject('nothing_to_reset');
         if ((line.status === 'not_found' || line.status === 'short' || line.status === 'substituted') && line.product_id) {
           await undoIssue(c, shopId, line.product_id, orderId, at);
         }
         //  PCK-05: پیشنهادِ باز یا پذیرفتهٔ همین قلم پس گرفته می‌شود
         await subs().withdrawLine(c, orderId, ev.lineNo, actor.id || '', at);
+        await holds().withdrawLine(c, orderId, ev.lineNo, actor.id, at);   //  S56
         detail.from = line.status;
         next = { status: 'pending', picked: 0 };
         await c.query('UPDATE order_pick_lines SET scans = 0 WHERE order_id=$1 AND line_no=$2', [orderId, ev.lineNo]);
@@ -461,7 +454,7 @@ async function applyEvent(shopId, orderId, ev, actor) {
     );
     await record('accepted', '', { ...detail, status: next.status, pickedMilli: next.picked });
     const after = (await c.query('SELECT * FROM order_pick_lines WHERE order_id=$1 AND line_no=$2', [orderId, ev.lineNo])).rows[0];
-    return { eventId: ev.eventId, status: 'accepted', line: lineView(after) };
+    return { eventId: ev.eventId, status: 'accepted', line: lineView(after), ...(hold ? { hold: holds().holdView(hold, at) } : {}) };
   });
 }
 
@@ -490,6 +483,12 @@ async function events(shopId, orderId, body, actor) {
       continue;
     }
     results.push(await applyEvent(shopId, id, ev, actor));
+  }
+  //  S56: نگه‌داشتِ تازه ⇒ لینکِ پیگیری و واتس‌اپ ِ مشتری (همان راهِ پیشنهادِ جایگزین)
+  if (results.some((r) => r.hold && !r.replayed)) {
+    const order = (await db.query('SELECT id, source, customer_phone FROM online_orders WHERE shop_id=$1 AND id=$2', [shopId, id])).rows[0];
+    const customer = await subs().customerLinks(shopId, order, actor);
+    for (const r of results) if (r.hold && !r.replayed) r.customer = customer;
   }
   return { results, sheet: await loadSheet((t, p) => db.query(t, p), shopId, id) };
 }
@@ -536,6 +535,14 @@ async function pack(shopId, orderId, { key, body }, actor) {
       err.data = { pending: waiting.length, deadlineAt: Number(waiting[0].deadline_at) };
       throw err;
     }
+    //  S56: وزنِ بیش از حد — مهلتِ گذشته ⇒ حذف و کسر؛ هنوز در انتظار ⇒ صبر (بی رضایت گران‌تر نمی‌شود)
+    await holds().applyTimeouts(c, id, now());
+    const held = await holds().pendingOf(c, id);
+    if (held.length) {
+      const err = conflict('مشتری هنوز دربارهٔ وزنِ بیشتر تصمیم نگرفته است', 'weight_hold_pending');
+      err.data = { pending: held.length, deadlineAt: Number(held[0].deadline_at) };
+      throw err;
+    }
     const lines = (await c.query('SELECT * FROM order_pick_lines WHERE order_id=$1 ORDER BY line_no', [id])).rows.map(lineView);
     const s = P.settle({
       lines: lines.map(coreLine), discountMinor: Number(order.discount_minor), deliveryFeeMinor: Number(order.delivery_fee_minor),
@@ -547,6 +554,15 @@ async function pack(shopId, orderId, { key, body }, actor) {
     }
     if (s.subtotalMinor === 0) {
       throw conflict('هیچ قلمی برداشته نشد؛ سفارش را با دلیلِ «ناموجود» لغو کنید', 'nothing_picked');
+    }
+    //  سقفِ پول (سپرِ سرور): هر قلم تا مقدارِ سفارش + حدِ وزن، یا همان مبلغی که مشتری برای وزنِ بیشتر پذیرفت (S56)
+    const accepted = await holds().acceptedOf(c, id);
+    const capMinor = holds().capOf(lines, accepted);
+    const overLines = holds().overCap(lines, s.lines, accepted);   //  SR47-2: هر قلم جدا
+    if (s.subtotalMinor > capMinor || overLines.length) {
+      const err = conflict('جمعِ اقلام از سقفِ سفارش و رضایتِ مشتری بیشتر است', 'over_cap');
+      err.data = { capMinor, subtotalMinor: s.subtotalMinor, lines: overLines };
+      throw err;
     }
     const live = (await c.query(
       'SELECT id, status FROM delivery_assignments WHERE order_id=$1 AND status = ANY($2::text[])', [id, DISPATCHED]
@@ -613,6 +629,8 @@ async function pack(shopId, orderId, { key, body }, actor) {
       substitutions: lines.filter((l) => l.status === 'substituted' && l.substitute).map((l) => ({
         lineNo: l.lineNo, from: l.productId, to: l.substitute.productId, chargedUnitPriceMinor: Number(l.substitute.chargedUnitPriceMinor),
       })),
+      //  S56: وزنِ بیشتری که مشتری پذیرفت (ردشده‌ها در `removedLines`)
+      ...(accepted.size ? { weightHolds: [...accepted].map(([lineNo, totalMinor]) => ({ lineNo, totalMinor })) } : {}),
     };
     await c.query(
       `INSERT INTO online_order_events (id, order_id, shop_id, seq, kind, from_status, to_status,
@@ -638,115 +656,6 @@ async function pack(shopId, orderId, { key, body }, actor) {
     );
     return { sheet: await loadSheet(run, shopId, id), replayed: false, deductedMinor: s.deductedMinor, refund };
   });
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  جای قفسه (PCK-01)
-// ════════════════════════════════════════════════════════════════════
-
-async function productExists(shopId, productId) {
-  const hit = await db.query(
-    `SELECT 1 FROM catalog_products WHERE shop_id=$1 AND product_id=$2 AND NOT deleted
-     UNION ALL SELECT 1 FROM sync_rows WHERE app='shop' AND account_kind='shop' AND account_id=$1
-        AND table_name='products' AND row_id=$2 AND deleted_at IS NULL
-     UNION ALL SELECT 1 FROM sync_v3_rows WHERE app='shop' AND account_kind='shop' AND account_id=$1
-        AND table_name='products' AND row_id=$2 AND deleted_at IS NULL
-     LIMIT 1`, [shopId, productId]
-  );
-  return hit.rows.length > 0;
-}
-
-/** جای کالا در دکان. هر سه خالی ⇒ پاک. فقط برای برگه‌های **تازه**؛ برگهٔ باز همان می‌ماند. */
-async function setLocation(shopId, productId, body, userId) {
-  const pid = str(productId);
-  if (!PRODUCT_RE.test(pid)) throw notFound('کالا پیدا نشد', 'product_not_found');
-  if (!(await productExists(shopId, pid))) throw notFound('کالا پیدا نشد', 'product_not_found');
-  const b = body && typeof body === 'object' ? body : {};
-  const loc = { aisle: P.locPart(text(b.aisle, 40)), shelf: P.locPart(text(b.shelf, 40)), level: P.locPart(text(b.level, 40)) };
-  const at = now();
-  if (!loc.aisle && !loc.shelf && !loc.level) {
-    await db.query('DELETE FROM pick_locations WHERE shop_id=$1 AND product_id=$2', [shopId, pid]);
-    return { productId: pid, location: null };
-  }
-  await db.query(
-    `INSERT INTO pick_locations (shop_id, product_id, aisle, shelf, level, updated_by, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)
-     ON CONFLICT (shop_id, product_id) DO UPDATE SET aisle=excluded.aisle, shelf=excluded.shelf, level=excluded.level,
-       updated_by=excluded.updated_by, updated_at=excluded.updated_at`,
-    [shopId, pid, loc.aisle, loc.shelf, loc.level, userId || '', at]
-  );
-  return { productId: pid, location: loc };
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  وظیفهٔ بررسی و ویترین (PCK-14)
-// ════════════════════════════════════════════════════════════════════
-
-function issueView(r) {
-  return {
-    id: r.id, kind: r.kind, productId: r.product_id, orderId: r.order_id, lastOrderId: r.last_order_id,
-    status: r.status, hits: Number(r.hits), detail: asJson(r.detail), createdAt: Number(r.created_at),
-    updatedAt: Number(r.updated_at), resolvedBy: r.resolved_by, resolvedAt: num(r.resolved_at), note: r.note,
-  };
-}
-
-async function issues(shopId, { status = 'open', limit } = {}) {
-  if (!['open', 'resolved', 'dismissed'].includes(status)) throw badRequest('وضعیتِ وظیفه معتبر نیست', 'bad_status');
-  const lim = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 100);
-  const rows = await many(
-    'SELECT * FROM pick_issues WHERE shop_id=$1 AND status=$2 ORDER BY created_at DESC, id DESC LIMIT $3',
-    [shopId, status, lim]
-  );
-  return { issues: rows.map(issueView) };
-}
-
-/** رسیدگیِ مدیر: «رسیدگی شد» (کالا دوباره در ویترین) یا «کنار گذاشته شد» — توضیح لازم. */
-async function resolveIssue(shopId, issueId, body, userId) {
-  const id = str(issueId);
-  if (!ID_RE.test(id)) throw notFound('وظیفهٔ باز پیدا نشد', 'issue_not_found');
-  const b = body && typeof body === 'object' ? body : {};
-  const action = str(b.action);
-  if (!['resolved', 'dismissed'].includes(action)) throw badRequest('کار: resolved یا dismissed', 'bad_action');
-  const note = text(b.note, 300);
-  if (!note) throw badRequest('توضیحِ رسیدگی لازم است', 'note_required');
-  const at = now();
-  const r = await db.query(
-    `UPDATE pick_issues SET status=$3, resolved_by=$4, resolved_at=$5, note=$6, updated_at=$5
-      WHERE shop_id=$1 AND id=$2 AND status='open' RETURNING *`, [shopId, id, action, userId || '', at, note]
-  );
-  if (!r.rows.length) throw notFound('وظیفهٔ باز پیدا نشد', 'issue_not_found');
-  return { issue: issueView(r.rows[0]) };
-}
-
-/** کالاهایی که «پیدا نشد» ِ بازشان هنوز رسیدگی نشده — پرچم خاموش ⇒ هیچ (رفتارِ پیشین). */
-async function heldIn(run, shopId, productIds) {
-  const ids = [...new Set((productIds || []).map(String).filter(Boolean))];
-  if (!ids.length || !(await flagOf(shopId, run))) return new Set();
-  const rows = (await run(
-    `SELECT product_id FROM pick_issues WHERE shop_id=$1 AND status='open' AND product_id = ANY($2::text[])`,
-    [shopId, ids]
-  )).rows;
-  return new Set(rows.map((r) => r.product_id));
-}
-
-/**
- * ثبتِ سفارشِ ویترین (`storefront.pricer`): کالاهایی که سفارش نمی‌گیرند = آن‌چه ویترین خودش رد می‌کند
- * (`gone`) + کالای «پیدا نشد» ِ رسیدگی‌نشده (PCK-14؛ پرچم خاموش ⇒ فقط `gone`، رفتارِ پیشین).
- */
-async function unorderable(run, shopId, ids, gone) {
-  const held = await heldIn(run, shopId, ids);
-  return ids.filter((id) => gone(id) || held.has(id));
-}
-
-/** نشانِ موجودیِ ویترین: کالای «پیدا نشد» تا رسیدگی «تمام شده» است (PCK-14). */
-async function applyHolds(shopId, items) {
-  if (!items || !items.length) return items;
-  const held = await heldIn((t, p) => db.query(t, p), shopId, items.map((p) => p.id));
-  if (!held.size) return items;
-  for (const p of items) {
-    if (held.has(p.id)) p.stock = { status: 'out_of_stock', reason: 'pick_review', checkedAt: now() };
-  }
-  return items;
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -788,6 +697,8 @@ async function metrics(shopId, { from, to } = {}) {
 
 module.exports = {
   FLAG_KEY, MAX_EVENTS, MAX_BAGS,
-  flagOf, parseEvent, labelsOf, sheet, start, events, pack, setLocation,
-  issues, resolveIssue, heldIn, unorderable, applyHolds, metrics,
+  flagOf, parseEvent, labelsOf, sheet, start, events, pack, metrics,
+  //  `lib/pick-issues.js` — همان نام‌ها برای خواننده‌های پیشین
+  setLocation: issuesLib.setLocation, issues: issuesLib.issues, resolveIssue: issuesLib.resolveIssue,
+  heldIn: issuesLib.heldIn, unorderable: issuesLib.unorderable, applyHolds: issuesLib.applyHolds,
 };

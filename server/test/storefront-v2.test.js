@@ -393,11 +393,17 @@ test('⛔ حریمِ جای دکان: کاوشِ دودویی با «درون/ب
   const rowM = (lat) => lat * sfd.M_PER_DEG_LAT;
   const toGrid = Math.abs(rowM(est) - Math.round(rowM(est) / sfd.GRID_M) * sfd.GRID_M);
   assert.ok(toGrid < 1, `فاصلهٔ برآورد تا خطِ شبکه ${toGrid.toFixed(2)} متر`);
-  //  هر دو نقطهٔ یک خانه یک پاسخ دارند (هندسهٔ خالص)
+  //  هر دو نقطهٔ یک خانه یک پاسخ دارند (هندسهٔ خالص). «خانه» همان `pinCell` ِ محصول است (گردِ شش‌رقمیِ ثبت، بعد شبکه —
+  //  CHK-08/10)، نه `snapPin` ِ پینِ خام: پینی که رقمِ هفتمش آن سوی خطِ شبکه است با گرد به خانهٔ کناری می‌رود (پیش‌تر
+  //  همین‌جا با نقطهٔ تصادفیِ کنارِ خط گاه‌گاه سرخ می‌شد، CI ِ #1031). نقطهٔ ثابتِ زیر همان حالت را همیشه می‌سنجد.
   const zs = [{ ...zone, id: 'Z', active: true }];
+  const nearLine = { lat: 34.4637795462161, lng: C.lng };
+  assert.notDeepEqual(sfd.pinCell(nearLine.lat, nearLine.lng), sfd.snapPin(nearLine.lat, nearLine.lng), 'نقطه واقعاً کنارِ خطِ شبکه است');
+  const nc = sfd.pinCell(nearLine.lat, nearLine.lng);
+  assert.equal(Boolean(sfd.zoneForPin(zs, nearLine.lat, nearLine.lng)), Boolean(sfd.zoneAt(zs, nc.lat, nc.lng)));
   for (let i = 0; i < 200; i++) {
     const p = { lat: edgeLat + (Math.random() - 0.5) * 0.004, lng: C.lng + (Math.random() - 0.5) * 0.004 };
-    const c = sfd.snapPin(p.lat, p.lng);
+    const c = sfd.pinCell(p.lat, p.lng);
     assert.equal(Boolean(sfd.zoneForPin(zs, p.lat, p.lng)), Boolean(sfd.zoneAt(zs, c.lat, c.lng)));
     const q = sfd.snapPin(c.lat + 0.3 * (p.lat - c.lat), c.lng - 0.3 * (p.lng - c.lng));
     assert.deepEqual(q, c, 'نقطهٔ دیگرِ همان خانه همان مرکز را دارد');

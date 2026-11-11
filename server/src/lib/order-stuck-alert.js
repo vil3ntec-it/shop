@@ -59,16 +59,21 @@ const LATEST_MISSION = `LEFT JOIN LATERAL (
                 a.recall_outcome AS a_recall_outcome, a.recall_requested_at AS a_recall_requested_at
            FROM delivery_assignments a WHERE a.order_id = o.id ORDER BY a.attempt_no DESC LIMIT 1) la ON true`;
 
-/** نامزدها (همهٔ دکان‌ها، کهنه‌ترین تغییر اول)؛ پرچم برای هر دکان جدا سنجیده می‌شود. */
-function candidates() {
+/**
+ * یک دسته از نامزدها (همهٔ دکان‌ها، کهنه‌ترین تغییر اول) پس از `after`؛ پرچم برای هر دکان جدا سنجیده می‌شود.
+ * `sweep` دسته‌ها را تا آخر می‌خواند (SR46 R20): پیش‌تر فقط دستهٔ نخست ⇒ ۳۰۰ سفارشِ بازِ کهنهٔ دکان‌های بی پرچم
+ * (هشدار `updated_at` را عوض نمی‌کند) سفارشِ دکانِ پرچم‌دار را برای همیشه بیرون می‌گذاشت.
+ */
+function candidates(after = null) {
   return many(
     `SELECT o.id, o.shop_id, o.order_no, o.status, o.fulfillment, o.created_at, o.updated_at, la.*
        FROM online_orders o
        ${LATEST_MISSION}
       WHERE o.status = ANY($1::text[]) AND o.is_test = false
+        AND ($3::bigint IS NULL OR o.updated_at > $3::bigint OR (o.updated_at = $3::bigint AND o.id > $4::text))
       ORDER BY o.updated_at, o.id
       LIMIT $2`,
-    [OPEN, BATCH]
+    [OPEN, BATCH, after ? after.updated_at : null, after ? after.id : null]
   );
 }
 
@@ -132,23 +137,25 @@ async function sweep(at = now()) {
   const thresholds = (await require('./admin-market').thresholds()).values;
   const flags = new Map();
   let n = 0;
-  for (const o of await candidates()) {
-    try {
-      const hits = stuckOf(o, thresholds, at);
-      if (!hits.length) continue;
-      if (!flags.has(o.shop_id)) flags.set(o.shop_id, await flagOf(o.shop_id));
-      if (!flags.get(o.shop_id)) continue;
-      for (const hit of hits) {
-        if (!(await record(o, hit, thresholds, at))) continue;
-        n++;
-        await require('./audit').log({
-          shopId: o.shop_id, actorType: 'system', action: 'order.stuck_alert', targetType: 'online_order', targetId: o.id,
-          detail: { orderNo: Number(o.order_no), code: hit.code, status: o.status },
-        }).catch(() => {});
-        await notify(o, hit.code);
+  for (let page = await candidates(); page.length; page = page.length < BATCH ? [] : await candidates(page[page.length - 1])) {
+    for (const o of page) {
+      try {
+        const hits = stuckOf(o, thresholds, at);
+        if (!hits.length) continue;
+        if (!flags.has(o.shop_id)) flags.set(o.shop_id, await flagOf(o.shop_id));
+        if (!flags.get(o.shop_id)) continue;
+        for (const hit of hits) {
+          if (!(await record(o, hit, thresholds, at))) continue;
+          n++;
+          await require('./audit').log({
+            shopId: o.shop_id, actorType: 'system', action: 'order.stuck_alert', targetType: 'online_order', targetId: o.id,
+            detail: { orderNo: Number(o.order_no), code: hit.code, status: o.status },
+          }).catch(() => {});
+          await notify(o, hit.code);
+        }
+      } catch (err) {
+        console.error('[order-stuck-alert]', o.id, err && err.message);
       }
-    } catch (err) {
-      console.error('[order-stuck-alert]', o.id, err && err.message);
     }
   }
   return n;

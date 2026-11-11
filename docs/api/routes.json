@@ -20,18 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1033,
+    "routes": 1036,
     "byAuth": {
-      "none-detected": 195,
+      "none-detected": 197,
       "admin": 279,
       "inline": 2,
-      "user": 514,
+      "user": 515,
       "device": 42,
       "optional": 1
     },
     "byShape": {
       "extracted": 712,
-      "empty": 319,
+      "empty": 322,
       "unresolved": 2
     }
   },
@@ -773,6 +773,7 @@
     {"method":"GET","path":"/api/shop/orders/:id/pick/substitutes","area":"shop","source":"server/src/routes/order-picking.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')"],"params":["id"],"query":["lineNo"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/orders/:id/pick/substitutions","area":"shop","source":"server/src/routes/order-picking.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/orders/:id/pick/substitutions/decide","area":"shop","source":"server/src/routes/order-picking.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/shop/orders/:id/pick/weight-holds/decide","area":"shop","source":"server/src/routes/order-picking.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/orders/:id/refunds","area":"shop","source":"server/src/routes/orders.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')","requirePermission('orders.refund')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200,201,409],"keys":["entry","error","order","replayed"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/orders/:id/review-ack","area":"shop","source":"server/src/routes/orders.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')","requirePermission('orders.refund')"],"params":["id"],"query":[],"body":["kind"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/orders/:id/risk","area":"shop","source":"server/src/routes/orders.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":["404 order_not_found"],"shape":"empty"},
@@ -997,6 +998,8 @@
     {"method":"POST","path":"/api/store/:slug/orders/:token/review","area":"store","source":"server/src/routes/order-feedback-store.js","auth":"none-detected","guards":[],"params":["slug","token"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/store/:slug/orders/:token/substitutions","area":"store","source":"server/src/routes/pick-substitutes-store.js","auth":"none-detected","guards":[],"params":["slug","token"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/store/:slug/orders/:token/substitutions/:subId","area":"store","source":"server/src/routes/pick-substitutes-store.js","auth":"none-detected","guards":[],"params":["slug","subId","token"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"GET","path":"/api/store/:slug/orders/:token/weight-holds","area":"store","source":"server/src/routes/pick-substitutes-store.js","auth":"none-detected","guards":[],"params":["slug","token"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/store/:slug/orders/:token/weight-holds/:holdId","area":"store","source":"server/src/routes/pick-substitutes-store.js","auth":"none-detected","guards":[],"params":["holdId","slug","token"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/store/:slug/products","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":["category","cursor","ids","limit","q","sort"],"body":[],"response":{"statuses":[200],"keys":["...","items"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/store/:slug/products/:id","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["id","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/store/:slug/products/:id/photo","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["id","slug"],"query":["v"],"body":[],"response":{"statuses":[304],"keys":[]},"errors":["404 photo_not_found"],"shape":"extracted"},

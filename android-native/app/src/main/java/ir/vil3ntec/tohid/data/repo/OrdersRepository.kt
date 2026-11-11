@@ -151,11 +151,14 @@ class OrdersRepository(private val api: ApiClient) {
    *  دوباره پس از قطعِ نت ردیفِ دوم نمی‌سازد. فقط نقد (سرور). [final] = بستنِ سفارش با «بازپرداختِ بخشی»؛ برابر با مانده
    *  خودبه‌خود «بازپرداختِ کامل». بیش از مانده ⇒ ۴۰۹ `refund_exceeds_remaining` و هیچ ردیفی.
    */
-  suspend fun refund(id: String, key: String, amountMinor: Long, reason: String, final: Boolean): ApiResult<OrderDto> = result {
+  suspend fun refund(
+    id: String, key: String, amountMinor: Long, reason: String, final: Boolean, method: String = "cash",
+  ): ApiResult<OrderDto> = result {
     val body = buildJsonObject {
       put("amountMinor", amountMinor)
       put("reason", reason.trim())
-      put("method", "cash")
+      //  ORD-15: «hesabpay» فقط وقتی `/config` آن را داد (`OrderRefundModel.methodFor`)؛ وگرنه همان نقد
+      put("method", method)
       put("final", final)
     }
     order(api.postKeyed("$ROOT/${enc(id)}/refunds", body, key))

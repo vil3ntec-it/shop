@@ -12,7 +12,7 @@
  *   • گیرنده: همه / یک بخش / فیلتر (شهر، پلن، رو به پایان، منقضی،
  *     دائمی) / یک نفر  →  `resolveAudience`
  *   • کانال: داخلِ برنامه، پوش، ایمیل — هر ترکیبی
- *   • متغیرها: {نام} {برنامه} {روز-مانده} {قیمت} {کد-تخفیف}، برای هر
+ *   • متغیرها: {نام} {برنامه} {روز-مانده} {تاریخ-پایان} {قیمت} {کد-تخفیف}، برای هر
  *     گیرنده جدا پر می‌شوند  →  `render`
  *   • زمان‌بندی و تکرارِ ماهانه  →  `tick` (هر دقیقه از `index.js`)
  *   • گزارشِ ارسال: یک ردیف برای هر گیرنده در هر کانال، با نتیجهٔ
@@ -48,7 +48,7 @@ const TEMPLATES = [
     body: 'حسابِ شما در بخشِ {برنامه} آماده است. اگر پرسشی داشتید همین‌جا در پشتیبانی بنویسید — پاسخ می‌دهیم.',
     channels: ['inapp', 'email'] },
   { key: 'expiring', title: 'اشتراکِ {برنامه} {روز-مانده} روز دیگر تمام می‌شود',
-    body: '{نام} عزیز، اشتراکِ شما در بخشِ {برنامه} {روز-مانده} روز دیگر تمام می‌شود. برای این‌که قابلیت‌ها بسته نشوند، تمدیدش کنید. قیمتِ تمدید: {قیمت}.',
+    body: '{نام} عزیز، اشتراکِ شما در بخشِ {برنامه} {روز-مانده} روز دیگر — روزِ {تاریخ-پایان} — تمام می‌شود. برای این‌که قابلیت‌ها بسته نشوند، تمدیدش کنید. قیمتِ تمدید: {قیمت}.',
     channels: ['inapp', 'email'] },
   { key: 'expired', title: 'اشتراکِ {برنامه} تمام شد',
     body: '{نام} عزیز، اشتراکِ شما در بخشِ {برنامه} تمام شده است. دفترِ شما سرِ جایش است و هیچ داده‌ای پاک نمی‌شود؛ با تمدید همه‌چیز همان لحظه باز می‌شود.',
@@ -131,7 +131,7 @@ function cleanChannels(input, def = ['inapp']) {
 
 /** نامِ فارسیِ متغیرها و هم‌معنی‌های انگلیسی‌شان. */
 const VAR_ALIASES = {
-  name: 'نام', app: 'برنامه', days: 'روز-مانده', price: 'قیمت', code: 'کد-تخفیف',
+  name: 'نام', app: 'برنامه', days: 'روز-مانده', endDate: 'تاریخ-پایان', price: 'قیمت', code: 'کد-تخفیف',
   shop: 'دکان', station: 'پمپ', plan: 'پلن',
 };
 
@@ -170,10 +170,10 @@ async function variablesFor(recipient, notice = {}) {
   return {
     'نام': recipient.name || recipient.tenantName || 'مشتری',
     'برنامه': APP_LABEL[recipient.app] || recipient.app,
-    //  ⚠️ رقمِ فارسی، نه لاتین: متنِ کاربر همه‌جا فارسی است و یک «45»ِ
-    //  لاتین وسطِ جمله بدقواره می‌افتد.
+    //  ⚠️ رقمِ فارسی، نه لاتین: متنِ کاربر همه‌جا فارسی است و یک «45»ِ لاتین وسطِ جمله بدقواره می‌افتد.
     'روز-مانده': recipient.daysLeft === null || recipient.daysLeft === undefined
       ? '—' : Math.max(0, recipient.daysLeft).toLocaleString('fa-AF'),
+    'تاریخ-پایان': recipient.endDay || '—',   //  S47: «۲۲ عقرب ۱۴۰۵» ِ همان لحظه‌ای که «روز-مانده» تا آن شمرده شد
     'قیمت': await priceOf(recipient),
     //  کمپینِ «both» برای هر بخش کدِ خودش را دارد (`codes: {shop, pump}`)
     'کد-تخفیف': (fixed.codes && fixed.codes[recipient.app]) || fixed['کد-تخفیف'] || fixed.code || '',
@@ -283,7 +283,7 @@ async function ownersOf(app) {
       planTitle: titles[r.plan] || '',
       status: state ? state.status : 'none',
       daysLeft: state ? Math.ceil((state.graceEndsAt - at) / DAY) : null,
-      endsAt: state ? state.endsAt : 0,
+      endsAt: state ? state.endsAt : 0, endDay: state ? subs.endDayOf(state.graceEndsAt) : '',
       price: r.price === null || r.price === undefined ? null : Number(r.price),
       currency: r.currency || (app === 'pump' ? 'USD' : 'AFN'),
       permanent: isPermanent(r, at),

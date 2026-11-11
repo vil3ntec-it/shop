@@ -66,6 +66,29 @@ data class PickSheetDto(
   val labels: List<PickLabelDto> = emptyList(),
   /** PCK-05: پیشنهادهای جایگزینِ این برگه (`forSheet` ِ سرور) */
   val substitutions: List<PickSubstitutionDto> = emptyList(),
+  /** S56: وزن‌های بیش از حد تا جوابِ مشتری (پرچمِ `shop.orders.weight_hold`؛ خاموش یا بی ردیف ⇒ نیست) */
+  val weightHolds: List<PickWeightHoldDto> = emptyList(),
+)
+
+/** S56 — یک نگه‌داشتِ وزنِ بیش از حد (`holdView` ِ `lib/pick-weight-hold.js`)؛ مبلغ و وقت را فقط سرور می‌سازد */
+@Serializable
+data class PickWeightHoldDto(
+  val id: String = "",
+  val lineNo: Int = 0,
+  val orderedQtyMilli: Long = 0,
+  val actualQtyMilli: Long = 0,
+  val unitPriceMinor: Long = 0,
+  val originalTotalMinor: Long = 0,
+  val totalMinor: Long = 0,
+  val extraMinor: Long = 0,
+  /** `pending` · `accepted` · `rejected` · `withdrawn` */
+  val status: String = "",
+  /** `customer` · `staff` · `timeout` · `picker` */
+  val decidedBy: String? = null,
+  val deadlineAt: Long = 0,
+  /** وقت گذشته و هنوز بسته نشده ⇒ رد می‌شود (`willApply`) */
+  val expired: Boolean = false,
+  val willApply: String? = null,
 )
 
 /** PCK-05 — یک پیشنهادِ جایگزین (`subView` ِ سرور)؛ مبلغ را فقط سرور می‌سازد */
@@ -135,6 +158,9 @@ data class PickResultDto(
   /** فقط برای `over_tolerance`: بیشترین وزنِ پذیرفتنی (هزارم) */
   val maxMilli: Long? = null,
   val line: PickLineDto? = null,
+  /** S56: وزنِ بیش از حد ⇒ نگه‌داشتِ تازه (قلم باز می‌ماند) و پیوندِ پیگیری/واتس‌اپ ِ مشتری */
+  val hold: PickWeightHoldDto? = null,
+  val customer: PickCustomerLinkDto? = null,
 )
 
 @Serializable

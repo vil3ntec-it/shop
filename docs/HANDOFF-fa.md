@@ -54,11 +54,74 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/ci-evidence-1` (شاهدِ CI ِ ردیف‌های ردهٔ D؛ روی `ccr-…-batch-47` ‏96053218؛ فقط سند؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: لاگِ کاملِ push ِ سبزِ main ‏5ef491d97 (#1029) خوانده شد — «سرور» 42838745057 (PostgreSQL ۴۰۰۳ سبز، PGlite و Electron هر کدام ۳۹۹۰ آزمون، همه ۰ شکست؛
+  مرورگر ۱۷۸۲ ✅ / ۰ ❌؛ E2E همه ✅)، «کامپایل و آزمون» 129907899978 (۵۵۵۲ PASS)، «ساخت نسخهٔ بومی» 129907898914 (۶۹۷۴ PASS)، برنامهٔ خرید ۳۰ PASS؛ هیچ FAIL.
+  ۶۱ ردیف ویرایش شد (روش و فهرست در «یادداشت‌ها» ِ STATUS، «دورِ شانزدهم»): **S123 و DLV-06 ⇐ IMPLEMENTED-VERIFIED** (DLV-06 با O-07 = ب ِ گرفته‌شده:
+  تماس = گفت‌وگوی سفارش)؛ ۴۱ ردیف «شاهدِ CI» را از «مانده» برداشتند یا شاهدِ «فقط CI» گرفتند و PARTIAL ماندند (کمبودِ دیگرشان سرِ جایش)؛ ۱۸ ردیف یادداشتِ
+  «شاهدِ CI روی main نیست» گرفتند. همه: ۴۴۱ IV (از ۴۳۹)، ۲۷۶ PARTIAL (از ۲۷۸)، MISSING ۱۶، BLOCKED-EXTERNAL ۳۱.
+- یافته: دسته‌های ۴۶ و ۴۷ هنوز در main نیستند ⇒ آزمون‌های `claude/e-rows-1..6`، `owner-yes-1`، `rpt-04`، `rpt-3`، `chk-addr`، `pos-4`، `nv-audit` در CI ِ main
+  اجرا نشده‌اند (S67، S68، S73، S86، S118، S41، S56، S79، S93، S94، S117، S124، S126، PRM-18، RPT-04، POS-40، CHK-08، بخشی از S33/S70/CRM-09/RPT-13/PRD-12).
+  شکافِ واقعی: `Offline30DaysDesktopTest` (SYN-01) در CI ِ main هم SKIP؛ آیفون در push ِ main هیچ کاری ندارد (CHAT-06، PRD-07).
+- نیمه‌کاره: هیچ.
+- قدمِ بعدی: پس از مرجِ دسته‌های ۴۶/۴۷ همین دور برای ۱۸ ردیفِ بالا (همان ابزار: لاگِ کارها + سنجشِ نام‌به‌نامِ نسخهٔ main)؛ STF-07 و ردیف‌هایی که فقط
+  «دیدن روی دستگاه» دارند با قاعدهٔ یکسان (ناهمسانیِ دورِ پانزدهم) تعیین‌تکلیف شوند.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/e-rows-6` (دورِ ششمِ ردیف‌های PARTIAL ِ ردهٔ E؛ روی `ccr-…-batch-47` ‏d30302a7؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: ORD-15 — بازپرداختِ باقی پس از رفتنِ پیک با تصمیمِ ۱-۶ ب: دفترِ بازپرداخت روشِ `hesabpay` ِ دستی را فقط با
+  `shop.orders.manual_refund` و `orders.refund` می‌پذیرد (`order-refunds.methodsOf`، مهاجرتِ ۷۷۰ + rollback)، `/orders/config` ⇒
+  `refundMethods`، برنامه تراشهٔ «نقد پس دادم / با حساب‌پی پس دادم» در برگهٔ بازپرداخت (Kotlin، **کامپایل‌نشده**؛ `OrderRefundModelTest`)؛
+  `order-refund-manual-method` ۴/۴ (پیش از کد ۳ سرخ)؛ FLAGS-ON §۱۶ ⇐ بخشِ «پس از رفتنِ پیک». S47 — هر دو یادآورِ سرور روزِ دقیقِ پایان
+  را دارند (`subscriptions.endDayOf`، متغیرِ `{تاریخ-پایان}`، مهاجرتِ ۷۷۱ فقط برای متنِ پیش‌فرضِ دست‌نخورده)؛ `subscription-end-day` ۴/۴
+  (پیش از کد ۴ سرخ)، گامِ «S47» ِ `entitle.e2e.mjs` روز را می‌سنجد. S46 و STF-06: ممیزی، بی کد (STATUS): ستونِ کاربرِ صندوقِ سرور مسیرِ
+  push ِ Sync v1 (کدِ پمپ) را می‌خواهد؛ صفِ پس از خروج در برنامه پیش‌تر با SYN-10 بسته است. ۲۲ مجموعه ۱۸۷/۱۸۷ روی PGlite و PostgreSQL ۱۶.
+- نیمه‌کاره: شاهدِ CI ِ کاتلین (`OrderRefundModelTest`، کامپایلِ `OrderActionSheet`/`OrdersRouteContent`)؛ اگر سرخ شد همان پرونده‌ها.
+  شمارهٔ مهاجرت‌های ۷۷۰ و ۷۷۱ را پیش از مرج با شاخه‌های هم‌زمان بسنجید (یکتا باشد).
+- قدمِ بعدی: CI ِ این شاخه؛ ردِ قلم با دستِ پیک در برنامهٔ پیک (ORD-15، کارِ بزرگ)؛ S46 پس از اجازهٔ O-19 (مهرِ `whoAt(req.device)`
+  هنگامِ push)؛ STF-06: امضای هر گام با کلیدِ هر کارمند (طراحی).
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/sec-review-47` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۷؛ روی `ccr-…-batch-47` ‏d30302a7f؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: `SECURITY-AUDIT-fa.md` §B12. SR47-1 (Medium) — `stock-reserve.rebuild` ردیفِ «نگه‌داشته» ای را که دفتر بسته بود داور می‌گرفت ⇒
+  بستنِ دوم در دفترِ فقط‌افزودنی (INV-16 برای همیشه ناهمخوان) یا نگه‌داشتهٔ شبح که نگه‌داشتنِ بازِ واقعی را آزاد می‌کرد؛ حالا گونهٔ `stale`
+  بی حرکتِ تازه (`reserve-rebuild` ۴/۴، آزمونِ تازه پیش از رفع سرخ). SR47-2 (Low) — سقفِ پولِ بسته‌بندی هر قلم را هم می‌سنجد (`overCap`)؛
+  پیش‌تر قلمِ حذف‌شده بیشیِ بی‌رضایتِ قلمِ دیگر را می‌پوشاند. `sr47-weight-hold-race.test.js` ۶/۶ (هم‌زمانیِ واقعی روی PostgreSQL 16: مشتری ×
+  کارمند، × بسته‌بندی، × وزنِ تازه، دو پذیرش، مهلت × بسته؛ IDOR ِ هم‌دکان؛ سقفِ هر قلم). جمع‌آوری، جایگزین، رزرو، بازسازی‌ها و R20 بی‌پسرفت
+  (PGlite و PostgreSQL 16)؛ `web-store-weigh.mjs` سبز.
+- نیمه‌کاره: R21–R23 (Info، فقط گزارش؛ §B12).
+- قدمِ بعدی: CI ِ این شاخه و مرج؛ اگر R22 مهم شد، `decide` ِ جایگزین و وزن وضعیتِ سفارش را هم بسنجد.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/e-rows-5` (دورِ پنجمِ ردیف‌های PARTIAL ِ ردهٔ E؛ روی `claude/e-rows-4` ‏a64466b6؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: S56 — کارتِ وب: پیگیری کلیدِ `weightHold` (`pick-weight-hold.trackView`؛ فقط هر دو پرچم و نگه‌داشتِ باز)، `GET …/weight-holds`
+  با `now` ِ سرور، `store/weight-hold.js` ِ دیربار + واژه‌نامهٔ تازهٔ `kit/i18n/weigh.*` (۱۵ کلید؛ `order` پر ماند)، گامِ مرورگرِ
+  `web-store-weigh.mjs` (axe؛ روشن/خاموش، پذیرش، رد، سر رسیدنِ مهلت) در `test:web-store`؛ `pick-weight-hold` ۹/۹ (پایه ۱ سرخ). برنامهٔ
+  جمع‌آور (Kotlin، **کامپایل‌نشده**): `PickWeightHoldDto`، `decideWeight`/`holdJson`، `PickWeightHoldUi.kt`، `PickSheet` و `StrPick.hold*`،
+  آزمونِ `PickingWireTest`؛ FLAGS-ON §۱۸ ⇐ آن‌چه درست است. S86 — `stock-reserve.rebuild` و `stock-rebuild --reserve` (`reserve-rebuild` ۳/۳،
+  پایه ۳ سرخ) و آزمونِ منبعِ v3 ِ بازسازیِ کاتالوگ (`storefront-catalog-source` ۵/۵). S113 ⇐ ردهٔ A (مدلِ پشتیبانی). OWNER-PENDING ۱-۵
+  (تفاوتِ وزنِ سفارشِ پرداخت‌شده) و ۴-۲۵ (S113). همه روی PGlite و PostgreSQL ۱۶ ِ محلی؛ `web-store*` بی‌پسرفت.
+- نیمه‌کاره: شاهدِ CI ِ کاتلین (`PickingWireTest`، کامپایلِ `PickSheet`/`PickWeightHoldUi`) — اگر سرخ شد، همان پرونده‌ها؛ روشن کردنِ
+  `shop.orders.weight_hold` (A)؛ دو پرسشِ OWNER-PENDING.
+- قدمِ بعدی: CI ِ این شاخه؛ نامزدها: ORD-15، و هر ردیفِ E ِ دیگر در STATUS.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/e-rows-4` (دورِ چهارمِ ردیف‌های PARTIAL ِ ردهٔ E؛ روی `ccr-…-batch-46` ‏4e2a7459؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: S56 — اول `order-picking.js` (۷۹۳/۸۰۰) جدا شد: «جای قفسه» و «وظیفهٔ پیدا نکردم» ⇐ `lib/pick-issues.js` (همان نام‌ها دوباره
+  صادر می‌شوند)؛ سپس پرچمِ خاموشِ `shop.orders.weight_hold` (`lib/pick-weight-hold.js`، مهاجرتِ ۷۶۰ + rollback): وزنِ بیش از حدِ سفارشِ
+  پرداخت‌نشده ⇒ نگه‌داشت با مهلتِ ۱۰ دقیقه، بسته‌بندی ۴۰۹ `weight_hold_pending`، پذیرش ⇒ همان وزن، رد/مهلت ⇒ `removed` و کسر، سقفِ پولِ
+  بسته‌بندی `capOf` ⇒ ۴۰۹ `over_cap`؛ درِ مشتری در `pick-substitutes-store.js` و درِ کارمند `…/pick/weight-holds/decide`؛ `/orders/config`
+  ⇒ `weightHold`؛ تأخیرِ چشم‌به‌راهِ مشتری در `order-late-apology` هم شمرده می‌شود. `pick-weight-hold` ۸/۸ (پایه ۷ سرخ). S86 — کاتالوگ:
+  `catalog-products.rebuildProducts` و `stock-rebuild --catalog` (SAVEPOINT: پاک و از نو با `upsertProduct`، برگشت، فقط تفاوت)؛
+  `catalog-rebuild` ۲/۲ (پایه ۲ سرخ). S118 و S37: کدی نماند (آزمونِ مسیرِ «S118.customer» از e-rows-2 هست و سبز؛ S37 ⇒ C/A) — فقط متنِ STATUS.
+  همه روی PGlite و PostgreSQL ۱۶ ِ محلی؛ فهرست‌های مسیر، `upgrade-rehearsal`، `storefront*` بی‌پسرفت.
+- نیمه‌کاره: S56 کارتِ «وزنِ بیشتر» در صفحهٔ پیگیریِ ویترین (واژه‌نامهٔ `order` پر است ⇒ بخشِ تازهٔ ≥۱۰ کلید با اسکریپتِ دیربار) و برنامهٔ
+  جمع‌آور (Kotlin) ساخته نشد ⇒ پرچم «هنوز روشن نکنید» (FLAGS-ON §۱۸)؛ گرفتنِ تفاوتِ سفارشِ پرداخت‌شده تصمیمِ صاحب‌کار. S86: بازسازیِ
+  `stock_reservations` از سفارش‌های باز و آزمونِ منبعِ v3.
+- قدمِ بعدی: کارتِ وب ِ S56 (`store/weight-hold.js` + `kit/i18n/weigh.*.json` + گامِ مرورگر با axe) و دکمهٔ برنامهٔ جمع‌آور؛ پرسشِ A
+  برای صاحب‌کار: تفاوتِ وزنِ بیشترِ سفارشِ پرداخت‌شده دمِ در نقد گرفته شود یا نه؛ نامزدهای دیگر: ORD-15، S113.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/stuck-alert-pages` (R20 ِ بازبینیِ دستهٔ ۴۶؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: R20 بسته — جاروبِ «سفارشِ گیرکرده» (`lib/order-stuck-alert.js`) نامزدها را دسته‌دسته تا آخر می‌خواند، نه فقط ۳۰۰ ِ نخست؛
+  `order-stuck-alert.test.js` ۴/۴ روی PGlite و PostgreSQL 16 (آزمونِ «S79 (R20)» پیش از رفع سرخ).
+- نیمه‌کاره: R18 و R19 همچنان تصمیمِ صاحب‌کار.
+- قدمِ بعدی: ادغام در دستهٔ ۴۷.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-46` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۶، روی 4e2a7459؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: سه یافته بسته (`docs/SECURITY-AUDIT-fa.md` بخشِ B11): SR46-1 Medium — با `shop.price_cap` عمده کردنِ مشتری (`debtors.priceList`) فقط با
   `sales.discount` ِ بی سقف (v3 و راهِ قدیم، `lib/price-cap.js`)؛ SR46-2 Low — `FOR SHARE` در سنجشِ رضایتِ موقعیتِ پیک تا نقطه پس از «نه» نماند؛
   SR46-3 Info — «سابقهٔ دسترسی» پینِ تحویلِ قرض‌دار را «تماس» می‌شمارد. هر سه پیش از رفع سرخ (`price-list-grant.test.js`، «SR46-2» و «SR46-3»).
-- نیمه‌کاره: R18 (سقفِ قیمت در v1)، R19 (سقفِ ۱۰۰ پیامکِ روزانه) و R20 (جاروبِ «سفارشِ گیرکرده» به ۳۰۰ ِ کهنه‌ترِ همهٔ دکان‌ها بسته است) فقط گزارش شدند.
+- نیمه‌کاره: R18 (سقفِ قیمت در v1)، R19 (سقفِ ۱۰۰ پیامکِ روزانه) و R20 (جاروبِ «سفارشِ گیرکرده» به ۳۰۰ ِ کهنه‌ترِ همهٔ دکان‌ها بسته بود؛ پس از آن در `claude/stuck-alert-pages` بسته شد) فقط گزارش شدند.
 - قدمِ بعدی: ادغامِ این شاخه در دسته؛ تصمیمِ صاحب‌کار دربارهٔ R18–R20.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/chk-addr` (CHK-08، CHK-10 و پینِ CRM-09؛ روی main ‏cceb5930 (#1027)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: CHK-10 — سرور تنها داور با یک خانه برای «کجا؟»، ثبت و «خبرم کن» (`storefront-delivery.pinCell`: گردِ شش‌رقمیِ `orders.coord` سپس

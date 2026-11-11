@@ -267,6 +267,8 @@ internal fun RouteScope.OrderActionRoute() {
   val perms = OrdersLive.config.value?.permissions ?: OrderPermsDto()
   //  FIN-01: دفترِ بازپرداختِ روشن ⇒ «بازپرداخت‌شده» با مبلغ و دلیل از `/refunds` (کلیدِ یکتای همین برگه)
   val ledger = OrderRefundModel.ledger(OrdersLive.config.value, to)
+  //  ORD-15: «حساب‌پیِ دستی» کنارِ نقد فقط وقتی سرور داد (`refundMethods`)؛ وگرنه هیچ تراشه‌ای
+  val methods = OrderRefundModel.methods(OrdersLive.config.value)
   //  کلیدِ تازه فقط پس از ردِ قطعیِ سرور (مبلغ عوض می‌شود ⇒ کلیدِ کهنه `idempotency_key_reused` می‌گرفت)؛ قطعِ نت ⇒ همان کلید
   var refundKey by rememberSaveable(id, to) { mutableStateOf(OrdersRepository.newKey()) }
   //  گذارِ نامجاز (پیوندِ کهنه یا وضعیتِ تازه) ⇐ برگه بسته می‌شود؛ سرور هم نمی‌پذیرفت
@@ -280,6 +282,7 @@ internal fun RouteScope.OrderActionRoute() {
     busy = busy,
     error = error,
     ledger = ledger,
+    methods = methods,
     onDismiss = { back() },
     onConfirm = { f ->
       val blocked = OrdersHub.preflight(context, store, order, to)
@@ -289,7 +292,9 @@ internal fun RouteScope.OrderActionRoute() {
       if (ledger) {
         val minor = OrderRefundModel.amountMinor(f.amount) ?: run { busy = false; return@OrderActionSheet }
         scope.launch {
-          OrdersHub.refund(context, store, order, to, minor, f.note, refundKey, say = { toasts.show(it) })
+          OrdersHub.refund(
+            context, store, order, to, minor, f.note, refundKey, say = { toasts.show(it) }, method = OrderRefundModel.methodFor(f.method, methods),
+          )
             .onSuccess {
               Haptics.success(context)
               toasts.show(StrOnline.refundRecorded(OnlineFmt.afn(minor), it.orderNo))
