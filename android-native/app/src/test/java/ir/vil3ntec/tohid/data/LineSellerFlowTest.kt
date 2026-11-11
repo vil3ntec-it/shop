@@ -204,7 +204,8 @@ class LineSellerFlowTest {
     val phone = src("ui/v3/sales/cart/PhoneTillTools.kt")
     assertTrue(phone.contains("LineSellerButton(lines.isNotEmpty()) { sellerOpen = true }"))
     assertTrue(phone.contains("LineSellerSheet(data, lines, me, preselect = null"))
-    assertTrue(src("ui/v3/sales/checkout/CheckoutRoute.kt").contains(".copy(lineSellers = lineSellers)"))
+    //  POS-37 همان `copy` مالیاتِ صندوق را هم می‌برد (`tax = taxConfig`)؛ برگهٔ فروشنده همچنان به پرداخت می‌رسد
+    assertTrue(src("ui/v3/sales/checkout/CheckoutRoute.kt").contains(".copy(lineSellers = lineSellers, tax = taxConfig)"))
     //  برگه فقط با تنظیمِ روشن کشیده می‌شود و نوشتن فقط از `CartSellers.assign` (مجوز همان‌جا)
     val sheet = src("ui/components/pos/LineSellerAndroid.kt")
     assertTrue(sheet.contains("if (!show || !LineSellerTill.on()) return"))
