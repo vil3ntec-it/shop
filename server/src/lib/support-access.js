@@ -179,16 +179,15 @@ async function notifyOwners(shopId, kind, g) {
  * ⇒ 'login' | 'reauth' | 'password' | 'panel' | 'panel_reauth'
  *   • آدم با توکنِ خودش: نشستی که در پنجرهٔ `REAUTH_WINDOW_MIN` ساخته شده یا با ‎/admin/reauth‎ تازه شده، یا `password` ِ خودش
  *     همراهِ همین درخواست (پنج اشتباه در ربع ساعت ⇒ ‎429 reauth_locked‎؛ هر اشتباه یک سابقه).
- *   • پلِ پنل با کلیدِ سرویس: پنل پیش از پل «فقط مالکِ پنل» و رمزِ همان درخواست (با دوعاملی) را سنجیده است؛ اگر
- *     ‎X-Actor-Reauth-At‎ بیاید باید تازه باشد (کهنه یا آینده ⇒ رد).
+ *   • پلِ پنل با کلیدِ سرویس: پنل پیش از پل «فقط مالکِ پنل» و رمزِ همان درخواست (با دوعاملی) را سنجیده است و
+ *     ‎X-Actor-Reauth-At‎ را **باید** بفرستد و تازه باشد (نبودن، کهنه یا آینده ⇒ ‎403 reauth_required‎؛ SR49-1).
  */
 async function assertReauth(req) {
   const win = Math.max(60_000, Number(config.tokens.reauthWindowMs) || 600_000);
   const t = now();
   if (req.service) {
-    const raw = String(req.headers['x-actor-reauth-at'] ?? '').trim();
-    if (!raw) return 'panel';
-    const at = Number(raw);
+    //  SR49-1: بی سرآیند ⇒ رد (همان قاعدهٔ `central-finance.assertReauth`)؛ کلیدِ سرویسِ لورفته بی احرازِ تازهٔ پنل شیشه نمی‌شکند
+    const at = Number(String(req.headers['x-actor-reauth-at'] ?? '').trim());
     if (!Number.isSafeInteger(at) || at > t + 60_000 || t - at > win) {
       throw forbidden('«شکستنِ شیشه» احرازِ دوبارهٔ همین چند دقیقه را می‌خواهد (رمزِ پنل)', 'reauth_required');
     }
@@ -199,15 +198,20 @@ async function assertReauth(req) {
   if (req.tokenRow?.token_hash && await require('./reauth').freshUntil(req.tokenRow.token_hash) > t) return 'reauth';
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   if (!password) throw forbidden('برای «شکستنِ شیشه» رمزِ خودتان را دوباره بزنید (یا دوباره وارد شوید)', 'reauth_required');
-  const fails = await one(
-    `SELECT COUNT(*)::int AS n FROM audit_logs WHERE action='admin.support_access_reauth_failed' AND user_id=$1 AND created_at > $2`,
-    [req.admin.id, t - REAUTH_FAIL_WINDOW]);
-  if (Number(fails?.n) >= REAUTH_FAIL_MAX) throw tooMany('رمز چند بار اشتباه بود؛ ربعِ ساعتِ دیگر دوباره امتحان کنید', 'reauth_locked');
-  const row = await one('SELECT password_hash FROM admins WHERE id=$1', [req.admin.id]);
-  if (!row || !(await require('./password').verifyPassword(password, row.password_hash))) {
-    await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.support_access_reauth_failed', targetType: 'admin', targetId: req.admin.id });
-    throw forbidden('رمز درست نیست', 'reauth_failed');
-  }
+  //  SR49-3: شمردن، سنجیدن و ثبتِ اشتباه زیرِ یک قفل برای همین مدیر ⇒ درخواست‌های هم‌زمان از سقفِ پنج نمی‌گذرند
+  const ok = await tx(async (c) => {
+    await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`support-reauth:${req.admin.id}`]);
+    const fails = (await c.query(
+      `SELECT COUNT(*)::int AS n FROM audit_logs WHERE action='admin.support_access_reauth_failed' AND user_id=$1 AND created_at > $2`,
+      [req.admin.id, t - REAUTH_FAIL_WINDOW])).rows[0];
+    if (Number(fails?.n) >= REAUTH_FAIL_MAX) throw tooMany('رمز چند بار اشتباه بود؛ ربعِ ساعتِ دیگر دوباره امتحان کنید', 'reauth_locked');
+    const row = (await c.query('SELECT password_hash FROM admins WHERE id=$1', [req.admin.id])).rows[0];
+    if (row && await require('./password').verifyPassword(password, row.password_hash)) return true;
+    await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.support_access_reauth_failed', targetType: 'admin', targetId: req.admin.id },
+      { client: c });
+    return false;
+  });
+  if (!ok) throw forbidden('رمز درست نیست', 'reauth_failed');
   return 'password';
 }
 

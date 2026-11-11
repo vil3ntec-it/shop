@@ -342,10 +342,24 @@ function onlyNumKeys(diffs, numKeys) {
   return diffs.every((d) => d.part === 'ledger' && g.has(String(d.key).split('.').pop()));
 }
 
-/** ⛔ هدف نباید دیتابیسِ زنده باشد */
+const NOT_LIVE = 'بی‌نام‌کننده فقط روی کپیِ جدا کار می‌کند — هدف همان دیتابیسِ زنده است';
+/** ⛔ هدف نباید دیتابیسِ زنده باشد — نخست همان متنِ نشانی */
 function assertNotLive(url) {
   const live = require('../config').db.url;
-  if (!url || String(url) === String(live)) throw new Error('بی‌نام‌کننده فقط روی کپیِ جدا کار می‌کند — هدف همان دیتابیسِ زنده است');
+  if (!url || String(url) === String(live)) throw new Error(NOT_LIVE);
+}
+/**
+ * SR49-4: همان دیتابیس با نوشتنِ دیگرِ نشانی (localhost/127.0.0.1، پارامترِ بیشتر) هم رد — شناسهٔ سامانهٔ PostgreSQL، نامِ
+ * دیتابیس و درگاه از خودِ دو اتصال. `query(sql)` ⇒ ردیفِ نخست؛ هر کدام نشد ⇒ رد (محتاط).
+ */
+const IDENT_SQL = `SELECT (SELECT system_identifier::text FROM pg_control_system()) AS sys, current_database() AS db,
+  current_setting('port') AS port`;
+async function assertNotLiveDb(liveQuery, targetQuery) {
+  let a; let b;
+  try { a = await liveQuery(IDENT_SQL); b = await targetQuery(IDENT_SQL); } catch (e) {
+    throw new Error(`${NOT_LIVE} (شناسهٔ دیتابیس خوانده نشد: ${e.message})`);
+  }
+  if (!a || !b || (a.sys === b.sys && a.db === b.db && String(a.port) === String(b.port))) throw new Error(NOT_LIVE);
 }
 
-module.exports = { anonymize, classify, phoneish, structural, makePseudo, walk, onlyNumKeys, assertNotLive };
+module.exports = { anonymize, classify, phoneish, structural, makePseudo, walk, onlyNumKeys, assertNotLive, assertNotLiveDb, IDENT_SQL };

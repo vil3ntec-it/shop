@@ -61,6 +61,17 @@ async function run(o) {
   if (/\.pglite\.tar\.gz(\.enc)?$/.test(o.file)) throw new Error('پشتیبانِ PGlite پذیرفته نیست (نسخه‌های کهنهٔ ردیف و WAL در پوشهٔ خام می‌مانند)؛ پشتیبانِ PostgreSQL بدهید');
   const out = path.resolve(o.out || path.join(config.backup.dir, 'anonymized'));
   await fsp.mkdir(out, { recursive: true });
+  if (o.targetUrl) {
+    //  SR49-4: `--target` با نوشتنِ دیگرِ نشانیِ همان دیتابیسِ زنده ⇒ رد، **پیش از** بازگرداندن (شناسهٔ سامانه، نام و درگاه)
+    anon.assertNotLive(o.targetUrl);
+    const { Client } = require('pg');
+    const live = new Client({ connectionString: config.db.url });
+    const tgt = new Client({ connectionString: o.targetUrl });
+    try {
+      await live.connect(); await tgt.connect();
+      await anon.assertNotLiveDb(async (q) => (await live.query(q)).rows[0], async (q) => (await tgt.query(q)).rows[0]);
+    } finally { await live.end().catch(() => {}); await tgt.end().catch(() => {}); }
+  }
   const iso = await drill.restoreIsolated(o.file, { targetUrl: o.targetUrl, keep: true });
   const r = { file: path.basename(o.file), where: iso.where };
   try {

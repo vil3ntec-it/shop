@@ -182,3 +182,18 @@ test('پشتیبانِ PGlite (پوشهٔ خام با نسخه‌های کهنه
   assert.throws(() => cli.args(['--bogus']), /ناشناخته/);
   assert.deepEqual(cli.args(['f.sql.gz', '--keep', '--no-verify']).verify, false);
 });
+
+test('SR49-4: هدفی که همان دیتابیسِ زنده است با نوشتنِ دیگرِ نشانی هم رد می‌شود (شناسهٔ سامانه، نام و درگاه)', async () => {
+  const anon = require('../src/lib/anonymize');
+  const same = { sys: '7311', db: 'shop', port: '5432' };
+  await assert.rejects(anon.assertNotLiveDb(async () => same, async () => ({ ...same })), /دیتابیسِ زنده/);
+  await assert.rejects(anon.assertNotLiveDb(async () => same, async () => { throw new Error('x'); }), /دیتابیسِ زنده/);
+  await anon.assertNotLiveDb(async () => same, async () => ({ ...same, db: 'shop_copy' }));
+  await anon.assertNotLiveDb(async () => same, async () => ({ ...same, sys: '9999' }));
+  //  روی همین دیتابیسِ آزمون: هر دو سو یک اتصال ⇒ رد
+  const { query } = require('../src/db');
+  const q = async (sql) => (await query(sql)).rows[0];
+  if (/^postgres/.test(String(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL || ''))) {
+    await assert.rejects(anon.assertNotLiveDb(q, q), /دیتابیسِ زنده/);
+  }
+});

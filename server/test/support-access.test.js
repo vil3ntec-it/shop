@@ -391,12 +391,19 @@ test('۵) پلِ پنل: کارِ خودکارِ پنل نه؛ اپراتور ن
   assert.equal(stale.body.error.code, 'reauth_required');
   assert.equal((await rows(B0.shopId)).filter((x) => x.consent === 'break_glass').length, 0);
 
-  const ok = await S('panel:1', 'superadmin', 'POST', `${base(B0.shopId)}/break-glass`, BG, { 'X-Actor-Name': encodeURIComponent('صاحبِ پنل') });
+  //  SR49-1: بی سرآیندِ احرازِ تازهٔ پنل ⇒ رد (کلیدِ سرویسِ لورفته به‌تنهایی شیشه نمی‌شکند)
+  const bare = await S('panel:1', 'superadmin', 'POST', `${base(B0.shopId)}/break-glass`, BG);
+  assert.equal(bare.status, 403, JSON.stringify(bare.body));
+  assert.equal(bare.body.error.code, 'reauth_required');
+  assert.equal((await rows(B0.shopId)).filter((x) => x.consent === 'break_glass').length, 0);
+
+  const ok = await S('panel:1', 'superadmin', 'POST', `${base(B0.shopId)}/break-glass`, BG,
+    { 'X-Actor-Name': encodeURIComponent('صاحبِ پنل'), 'X-Actor-Reauth-At': String(Date.now() - 30_000) });
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
   assert.equal(ok.body.notified, true);
   assert.equal(ok.body.grant.requestedBy, 'صاحبِ پنل');
   const bg = (await auditsOf('admin.support_access_break_glass', B0.shopId)).at(-1);
-  assert.equal(detail(bg).reauth, 'panel');
+  assert.equal(detail(bg).reauth, 'panel_reauth');
   assert.equal(detail(bg).actor.id, 'panel:1');
   //  اجازه مالِ همان انجام‌دهنده است
   const svcId = (await row(ok.body.grant.id)).admin_id;
