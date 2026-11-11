@@ -96,6 +96,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.orders.substitution', scope: 'shop', default: false, what: '«اگر نبود…» ِ کلی و هر قلم در ثبت و پیگیری (CHK-15)' },
   { key: 'shop.orders.delivery_prefs', scope: 'shop', default: false, what: 'دستورِ تحویل و «با کدام اسکناس» تا پیش از ارسال (CHK-14/24)' },
   { key: 'shop.orders.add_items', scope: 'shop', default: false, what: 'افزودنِ سبد به همان سفارش تا پیش از جمع‌آوری (CHK-21)' },
+  { key: 'shop.orders.phone_mask', scope: 'shop', default: false, what: 'شمارهٔ مشتری در کارتِ سفارش برای کسی که «دیدنِ تماس» ندارد فقط دو رقمِ آخر (CRM-15، ۲-۸)' },
   { key: 'shop.orders.amend', scope: 'shop', default: false, what: 'پیشنهادِ ویرایشِ سفارش با پذیرش/ردِ مشتری (ORD-14)' },
   { key: 'shop.orders.amend_paid', scope: 'shop', default: false, what: 'ویرایشِ سفارشِ پرداخت‌شده با تسویهٔ تفاوت (ORD-14)؛ با `shop.orders.amend`' },
   { key: 'shop.orders.manual_refund', scope: 'shop', default: false, what: 'بسته‌بندیِ سفارشِ پرداخت‌شده با کسر: «پس داده شد» ِ دستی (نقد یا حساب‌پی) و ثبتِ سرور؛ و روشِ «حساب‌پیِ دستی» در دفترِ بازپرداخت پس از رفتنِ پیک (ORD-15، PAY-23، تصمیمِ ۱-۶ ب؛ مهاجرتِ ۷۷۰)؛ با `shop.orders.picking` / `shop.orders.refunds`' },

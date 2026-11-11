@@ -206,7 +206,8 @@
   /* فقط مقدارِ اعشاری قاعدهٔ دقیق دارد؛ مقدارِ درست یا عددِ نامعتبر ⇒ null (همان حسابِ پیشین) */
   function qLineMinorOrNull(price, quantity) {
     var q = qMilli(quantity);
-    if (q === null || !qFractional(q) || typeof price !== 'number' || !isFinite(price)) return null;
+    //  نسخهٔ ۲ (۳-۱۲ ِ صاحب‌کار): مقدارِ درست هم — پیش‌تر `!qFractional(q)` ⇒ null (حسابِ پیشین)
+    if (q === null || typeof price !== 'number' || !isFinite(price)) return null;
     var p = norm(Math.round(price * 100));
     return Math.abs(p) > MAX_EXACT ? null : qExactMinor(p, q);
   }

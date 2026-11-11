@@ -56,6 +56,16 @@
  *   `*revive*` می‌گیرد (enforce ⇒ رد و ردیف حذف‌شده می‌ماند؛ درجِ دوبارهٔ همان محتوا «replay»). پیش‌تر v1 و راهِ قدیم
  *   آن را با محتوای تازه زنده می‌کردند و این نگهبان ردیف را نمی‌دید. سنگِ قبرِ بی محتوا (حذفِ ردیفِ نادیده) همان «نبود».
  *
+ * ── دیدنِ دست‌کاری بی رد (۲-۲۳ ِ صاحب‌کار: R7 ب، R8 ب؛ همان پرچم) ─────────────────────────────────
+ *   آزاد می‌مانند ولی هر بار یک ردیف در «سابقهٔ عملیاتِ» دکان (`audit_logs` ⇐ `GET /api/shop/audit`، همان `security.doc_chain`):
+ *   R7 `merge_undone` — `mergedInto` ِ پُرِ مشتری خالی یا به مقصدِ دیگر می‌رود (ادغام + جابه‌جاییِ قرض در یک دسته و
+ *      برداشتنِ ادغام در دستهٔ بعد = همان جابه‌جاییِ قرض بی یکی شدنِ دو مشتری). رد نه: ترمیمِ `CustomerMerge.sweep` ِ
+ *      برنامه خودش گاهی ادغام را برمی‌دارد. دسته‌ای که فقط مشتری دارد هم نگهبان می‌گیرد ([watches]).
+ *   R8 `shift_moved` — `shiftId` ِ قرض/رسیدِ ثبت‌شده عوض می‌شود (کشوی اصلی = خالی). رد نه: اصلاحِ درستِ رسیدی که در
+ *      شیفتِ اشتباه نشسته بسته نمی‌شود.
+ *   ردیف فقط برای نوشتنی که واقعاً نشست: پس از تراکنش ردیفِ امروز دوباره خوانده می‌شود ([Guard.finish]) ⇒ دستهٔ برگشتهٔ
+ *   راهِ قدیم و op ِ ردشده هیچ. بدنه فقط شناسه‌ها (`from`، `to`)، نه نام یا شماره.
+ *
  * ⛔ بازگرداندنِ تعارض (`restoreConflict` ِ مدیرِ ارشد، `routes/admin-sync.js`) از همین نگهبان با `enforce` و راهِ `admin`
  *    می‌گذرد: مقدارِ بازندهٔ فیلدِ مالیِ سندِ ثبت‌شده و هر نوشتن روی سندِ حذف‌شده ۴۰۹. `restoreDeleted` ِ `lib/sync-v1.js`
  *    (مشترک با پمپ) هیچ درِ HTTP ندارد و نگهبان نمی‌گیرد؛ درِ تازه برایش باید پیش از آن همین `adminRestoreCheck` را
@@ -109,6 +119,13 @@ const MAX_EVENTS = 20;
 const VOID_PROBLEM = 'void_unrecorded';
 const VOID_TEXT = 'لغوِ فاکتور نشست ولی حلقهٔ زنجیرهٔ لغو نوشته نشد';
 const SHOP_PART = /^[A-Za-z0-9_.:-]{1,180}$/;
+/** ۲-۲۳ (R7 ب، R8 ب) — آزاد، فقط ردیفِ سابقه: نوع ⇐ [جدول، فیلد، متن] */
+const WATCH = Object.freeze({
+  merge_undone: Object.freeze(['debtors', 'mergedInto',
+    'ادغامِ مشتری برداشته شد؛ قرض و رسیدی که با ادغام جابه‌جا شده بود نزدِ مشتریِ دیگر می‌ماند']),
+  shift_moved: Object.freeze(['transactions', 'shiftId',
+    'قرض یا رسیدِ ثبت‌شده به شیفتِ دیگری رفت؛ شمارِ نقدِ هر دو شیفت عوض می‌شود']),
+});
 const TEXT_MAX = 80;
 
 const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -246,6 +263,7 @@ class Guard {
     this.voidFails = new Map();
     this.relied = [];            //  راهِ قدیم: جابه‌جایی‌هایی که به ادغامِ همین دسته تکیه کردند ([settle])
     this.confirmed = new Map();  //  راهِ قدیم: مشتری ⇐ `mergedInto` ِ نوشتنی که واقعاً به نوشتن رسید
+    this.watched = [];           //  ۲-۲۳: R7/R8 ِ آزاد، تا [finish] بسنجد که نشست
   }
 
   get enforce() { return this.mode === 'enforce'; }
@@ -316,7 +334,11 @@ class Guard {
    */
   async check(c, op, live) {
     const { table, rowId, type, fields = {}, ts = 0, full = false } = op;
-    if (table === 'debtors') { this.confirm(rowId, type, fields, full); return null; }
+    if (table === 'debtors') {
+      this.confirm(rowId, type, fields, full);
+      if (live && type !== 'delete') this.watch('merge_undone', rowId, live, fields, full);
+      return null;
+    }
     if (!GUARDED(table)) return null;
     //  ردیفِ حذف‌شدهٔ با محتوا سندِ ثبت‌شده است، نه «ثبتِ تازه» (پیش‌تر نوشتن آن را با محتوای تازه زنده می‌کرد)
     const dead = !live && type !== 'delete' ? await this.deadOf(c, table, rowId) : null;
@@ -387,6 +409,8 @@ class Guard {
       }
       if (insert && !changed.length && this.enforce) return { replay: true };
       if (dead) changed.unshift('*revive*');
+      //  R8: شیفتِ قرض/رسید آزاد است، ولی صاحب می‌بیند (فقط اگر همین نوشتن می‌نشیند)
+      if (table === 'transactions' && (!changed.length || !this.enforce)) this.watch('shift_moved', rowId, cur, fields, full);
     }
     if (!changed.length) return null;
     this.note(rowId, { table, row: rowId, type, fields: changed }, table);
@@ -444,6 +468,33 @@ class Guard {
     }
   }
 
+  /**
+   * ۲-۲۳ — نوشتنِ [fields] روی ردیفِ [cur] فیلدِ [kind] را عوض می‌کند؟ ⇐ یک ردیفِ «در انتظار» (R7: فقط ادغامِ پُر).
+   * فیلدِ نیامده (نه کلِ ردیف) یعنی «همان»؛ خالی‌ها یکی.
+   */
+  watch(kind, id, cur, fields, full) {
+    const field = WATCH[kind][1];
+    if (!(full || hasOwn(fields, field)) || (kind === 'merge_undone' && isEmpty(cur[field]))) return;
+    const to = after(cur[field], fields[field], full);
+    if (same(cur[field], to) || this.watched.length >= MAX_EVENTS) return;
+    this.watched.push({ kind, id: String(id), from: text(cur[field]), to: isPlainObject(to) ? '*' : text(to) });
+  }
+
+  /** ردیف‌های ۲-۲۳ که نوشتنشان واقعاً نشست (ردیفِ امروز همان مقدارِ تازه را دارد، نه مقدارِ پیشین) */
+  async landed() {
+    const out = [];
+    for (const w of this.watched) {
+      const [table, field] = WATCH[w.kind];
+      let now;
+      try { now = await this.rowOf(db, table, w.id); } catch { now = null; }
+      if (!now) continue;
+      const v = isPlainObject(now[field]) ? '*' : text(now[field]);
+      if (v === w.to && v !== w.from) out.push(w);
+    }
+    this.watched = [];
+    return out;
+  }
+
   /** قلمِ تازه از همان ثبتِ فاکتور است؟ */
   async sameSave(c, saleId, ts) {
     if (this.newSales.has(saleId)) return true;
@@ -480,6 +531,20 @@ class Guard {
       }
     }
     this.notes.clear();
+    for (const w of await this.landed()) {
+      try {
+        await require('./audit').log({
+          shopId: this.ctx.accountId, actorType: 'user', userId: this.ctx.userId || '', ip: this.ip,
+          action: ACTION, targetType: WATCH[w.kind][0], targetId: w.id,
+          detail: {
+            problem: w.kind, enforced: this.enforce, path: this.path, deviceId: this.deviceId || '',
+            from: w.from, to: w.to, text: WATCH[w.kind][2],
+          },
+        });
+      } catch (err) {
+        console.error('[finalized-sales] ردیفِ سابقه ثبت نشد:', err.message);
+      }
+    }
     for (const [sale, error] of this.voidFails) {
       try {
         await require('./audit').log({
@@ -537,7 +602,9 @@ async function v1Guard(ctx, deviceId, ops, { ip = '' } = {}) {
   if (!ctx || ctx.app !== SHOP_V1.app || ctx.accountKind !== SHOP_V1.accountKind || !ctx.accountId || !Array.isArray(ops)) return null;
   const { tableOf } = require('./sync-v1');
   const tableOfRaw = (r) => (isPlainObject(r) ? tableOf(SHOP_V1.app, r.table ?? r.table_name ?? r.tableName) : null);
-  if (!ops.some((r) => GUARDED(tableOfRaw(r)))) return null;
+  //  ۲-۲۳ (R7): دسته‌ای که فقط ادغامِ مشتری را برمی‌دارد هم — پیش‌تر بی سند نگهبان نمی‌گرفت و ردی نمی‌ماند
+  const touchesMerge = (r) => tableOfRaw(r) === 'debtors' && isPlainObject(r.fields) && hasOwn(r.fields, 'mergedInto');
+  if (!ops.some((r) => GUARDED(tableOfRaw(r)) || touchesMerge(r))) return null;
   if (!(await flagOn(ctx.accountId))) return null;
   const merges = v1Merges(ops, tableOfRaw);
   const shopId = ctx.accountId;
@@ -612,7 +679,8 @@ const legacyRowOf = (shopId, dead) => async (c, collection, id) => {
  */
 async function legacyGuard({ shopId, userId = '', deviceId = '', boundDevice = '', ip = '' }, mode, changes) {
   if (!shopId || !mode || !Array.isArray(changes)) return null;
-  if (!changes.some((r) => r && GUARDED(String(r.collection || '')))) return null;
+  //  ۲-۲۳ (R7): کلِ ردیفِ مشتری هم (بی `mergedInto` = برداشتنِ ادغام)
+  if (!changes.some((r) => r && (GUARDED(String(r.collection || '')) || r.collection === 'debtors'))) return null;
   if (!(await flagOn(shopId))) return null;
   //  ⛔ SR43-1: هر نوشتنِ مشتری، آخرینش (راهِ قدیم کلِ ردیف را جایگزین می‌کند ⇒ بی `mergedInto` = «ادغام نیست»؛ حذف ⇒ نیست)؛
   //  جابه‌جایی‌ای که به آن تکیه کرد پس از دسته با [Guard.settle] سنجیده می‌شود (نوشتنِ کهنه یا کنارگذاشته نمی‌نشیند)

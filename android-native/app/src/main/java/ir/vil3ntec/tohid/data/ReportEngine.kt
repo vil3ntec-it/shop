@@ -154,27 +154,80 @@ object ReportEngine {
   data class ProductsReport(
     val low: List<Product>,
     val out: List<Product>,
+    /** ۳-۱۶ (۲): به بهای میانگینِ موزونِ D-23 ([stockValue])، فقط موجودیِ مثبت، بی کیت */
     val inventoryValue: Double,
     val topSelling: List<ProductStat>,
     val slowest: List<ProductStat>,
     val mostProfitable: List<ProductStat>,
     val leastProfitable: List<ProductStat>,
+    /** ۳-۱۶ (۲): کالایی بی بهای بازپخش‌شده به «قیمتِ خرید» ِ کارت شمرده شد ⇒ «تقریبی» */
+    val inventoryApprox: Boolean = false,
+    /** ۳-۱۶ (۲): کالاهای با موجودیِ منفی — در ارزش نیستند */
+    val inventoryNegative: Int = 0,
+    /** ۳-۱۶ (۲): کیت‌ها — موجودیِ خودشان را ندارند، اجزایشان شمرده شد */
+    val inventoryKits: Int = 0,
   )
 
   fun products(d: ShopData): ProductsReport {
     val stats = productStats(d)
     val stock = ShopStore.index(d)
+    val value = stockValue(d)
     return ProductsReport(
       low = d.products.filter { stock.status(it) == "low" },
       out = d.products.filter { stock.status(it) == "out" },
-      // ارزشِ موجودیِ فعلی به بهای خرید — نه به قیمتِ فروش
-      inventoryValue = d.products.sumOf { stock.stock(it.id) * it.purchasePrice },
+      // ۳-۱۶ (۲): ارزشِ موجودی به بهای میانگینِ موزون (D-23) — همان «ارزش موجودی» ِ گزارشِ تازه؛ نه قیمتِ فروش
+      inventoryValue = value.valuation.costMinor / 100.0,
+      inventoryApprox = value.approximate,
+      inventoryNegative = value.valuation.negative.size,
+      inventoryKits = value.kits,
       topSelling = stats.sortedByDescending { it.quantity }.take(5),
       // «کم‌فروش‌ها» فقط بین آن‌هایی که اصلاً فروش داشته‌اند معنی دارد
       slowest = stats.filter { it.quantity > 0 }.sortedBy { it.quantity }.take(5),
       mostProfitable = stats.sortedByDescending { it.profit }.take(5),
       leastProfitable = stats.sortedBy { it.profit }.take(5),
     )
+  }
+
+  /* ----------------------- ارزشِ موجودی (۳-۱۶ پرسشِ ۲، D-23) ----------------------- */
+
+  /** ارزشِ موجودی به بهای میانگینِ موزون: جمع‌ها، «تقریبی» و شمارِ کیت‌ها */
+  data class StockValue(val valuation: StockAnalysis.Valuation, val approximate: Boolean, val kits: Int)
+
+  @Volatile private var lastValue: Pair<ShopData, StockValue>? = null
+
+  /**
+   *  ۳-۱۶ ِ صاحب‌کار (پرسشِ ۲ الف): «ارزشِ موجودی (به بهای خرید)» ِ گزارش‌ها و مرکزِ مدیریت = همان «ارزش موجودی» ِ
+   *  گزارشِ تازه — دوقلوی `fromLedger` ِ `license/stock-value-core.js` روی همان بازپخشِ میانگینِ موزون
+   *  (`ReportBridge.stockCostOf` = `report-core.stockCost`):
+   *   • مقدار و ارزشِ هر کالا از دفترِ میانگینِ موزون (ارزش = جمعِ دفتر، نه مقدار × بهای گردشدهٔ واحد)؛
+   *   • بهای بازپخش‌نشده (نامعلوم یا صفر) ⇒ `purchasePrice` ِ کالا و «تقریبی»؛
+   *   • کیت موجودیِ خودش را ندارد (اجزایش شمرده می‌شوند) ⇒ بیرون، فقط شمرده ([StockValue.kits])؛ کالای غیرفعالِ بی موجودی
+   *     و کالای پاک‌شده نه؛ موجودیِ منفی در جمع نیست (`valuation.negative`).
+   *  هم‌ارزیِ عدد با هم‌زادِ JS: `StockValueBridgeTest` (همان دفترِ `server/test/stock-value-core.test.js`). فقط خواندن؛ آخرین
+   *  نتیجه برای همان دفتر (همانیِ شیء) دوباره حساب نمی‌شود.
+   */
+  fun stockValue(d: ShopData): StockValue {
+    lastValue?.let { (k, v) -> if (k === d) return v }
+    val by = ReportBridge.stockCostOf(d).rows.associateBy { it.productId }
+    val seen = HashSet<String>()
+    val kitIds = HashSet<String>()
+    val lines = ArrayList<StockAnalysis.ValueLine>()
+    var approx = false
+    for (p in d.products) {
+      val id = p.id
+      if (id.isEmpty() || id in seen) continue
+      if (!p.kit.isNullOrEmpty()) { kitIds += id; continue }
+      val r = by[id] ?: continue
+      if (!p.active && r.qtyMilli <= 0) continue
+      seen += id
+      val replayed = r.unitCostMinor != null && r.unitCostMinor > 0
+      val unit = if (replayed) r.unitCostMinor!! else minorOf(p.purchasePrice)
+      if (r.qtyMilli > 0 && (r.approximate || !replayed)) approx = true
+      lines += StockAnalysis.ValueLine(id, r.qtyMilli, unit, minorOf(p.salePrice), if (replayed && r.qtyMilli > 0) r.valueMinor else null)
+    }
+    val out = StockValue(StockAnalysis.valuation(lines), approx, kitIds.size)
+    lastValue = d to out
+    return out
   }
 
   /* ----------------------- تحلیلِ موجودی (INV-15، INV-16) ----------------------- */

@@ -116,6 +116,35 @@ class SaleUnitExactTest {
   }
 
   @Test
+  fun r2_blankingTheUnitOfProductWithHistory_isAlsoLocked() {
+    //  ۲-۱۶ (R2 الف): «خالی، سپس واحدِ تازه» — گامِ اول دیگر آزاد نیست؛ بی گردش آزاد
+    val rice = kilo.copy(saleUnit = "", unitFactor = 1.0)
+    val moved = ShopData(products = listOf(rice), warehouseEntries = listOf(entry))
+    for (blank in listOf("", "  ")) {
+      val msg = failed(WarehouseEngine.editProduct(moved, "rice", draftOf(rice, unit = blank), today, 0, ::newId))
+      assertTrue(msg, msg.contains("کیلو"))
+    }
+    assertEquals("", ok(WarehouseEngine.editProduct(ShopData(products = listOf(rice)), "rice", draftOf(rice, unit = ""), today, 0, ::newId)).products.single().unit)
+  }
+
+  @Test
+  fun r2_dormantInexactFactor_thenSaleUnit_isRejected() {
+    //  ۲-۱۶ (R2 الف): «ضریبِ ناجور بی واحدِ فروشِ دوم، سپس فقط واحدِ فروش» — ضریبِ خوابیده با روشن شدنِ واحدِ فروش تازه است
+    //  فرمِ برنامه با واحدِ فروشِ خالی ضریب را ۱ می‌کند؛ ضریبِ خوابیده فقط از همگام‌سازی (دستگاه/برنامهٔ دیگر) می‌رسد
+    val plain = legacy.copy(saleUnit = "", unitFactor = 1.0)
+    assertEquals(1.0, ok(WarehouseEngine.editProduct(ShopData(products = listOf(plain)), "oil", draftOf(plain, factor = 1.0 / 24), today, 0, ::newId)).products.single().unitFactor, 0.0)
+    val sleeping = legacy.copy(saleUnit = "", unitFactor = 1.0 / 24)
+    val dormant = ShopData(products = listOf(sleeping))
+    val step2 = WarehouseEngine.ProductDraft(
+      name = sleeping.name, category = sleeping.category, unit = sleeping.unit, purchasePrice = sleeping.purchasePrice,
+      salePrice = sleeping.salePrice, saleUnit = "دانه", unitFactor = sleeping.unitFactor,
+    )
+    assertTrue(failed(WarehouseEngine.editProduct(dormant, "oil", step2, today, 0, ::newId)).contains("ضریب"))
+    //  ضریبِ دقیق ⇒ آزاد؛ کالایی که واحدِ فروش داشت با ضریبِ کهنهٔ دست‌نخورده همان آزاد (legacyInexactFactor…)
+    ok(WarehouseEngine.editProduct(dormant, "oil", step2.copy(unitFactor = 0.042), today, 0, ::newId))
+  }
+
+  @Test
   fun saleIn250Grams_movesStockOnceAndExactly() {
     val d = ShopData(products = listOf(kilo), warehouseEntries = listOf(entry))
     val q = SalesEngine.toStockQty(kilo, 250.0)

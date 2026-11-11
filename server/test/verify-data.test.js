@@ -356,6 +356,26 @@ test('SR48-3: «مالیاتِ» منفی تخفیفِ پنهان را از sum.
   await expectOnly(o.shopId, 'sum.sale_final');
 });
 
+test('R25: گردِ منفیِ بیش از سقفِ گردِ نقدی (۵ افغانی) تخفیفِ پنهان را از sum.sale_final نمی‌پوشاند', async () => {
+  const o = await cleanShop('گردِ منفی');
+  //  گردِ درستِ رو به پایین تا سقف (−۵ افغانی): ۳۵۰ − ۵ = ۳۴۵ ⇒ سالم
+  await setField(o.shopId, 'sales', 's1', '{roundingMinor}', '-500');
+  await setField(o.shopId, 'sales', 's1', '{finalTotal}', '345');
+  await setField(o.shopId, 'sales', 's1', '{paidAmount}', '195');
+  const rep = await vd.verify({ shopId: o.shopId });
+  assert.deepEqual(rep.checks.filter((c) => c.count > 0), [], JSON.stringify(rep.checks.filter((c) => c.count > 0)));
+  //  نهاییِ ۳۴۰ (۱۰ افغانی کم) با «گردِ» −۱۰ افغانی؛ پرداخت + مانده = ۱۹۰ + ۱۵۰ = ۳۴۰ ⇒ پیش‌تر سالم دیده می‌شد
+  await setField(o.shopId, 'sales', 's1', '{roundingMinor}', '-1000');
+  await setField(o.shopId, 'sales', 's1', '{finalTotal}', '340');
+  await setField(o.shopId, 'sales', 's1', '{paidAmount}', '190');
+  await expectOnly(o.shopId, 'sum.sale_final');
+  //  گردِ مثبتِ بیش از سقف هم (+۱۰ افغانی ⇒ فقط +۵ پذیرفته)
+  await setField(o.shopId, 'sales', 's1', '{roundingMinor}', '1000');
+  await setField(o.shopId, 'sales', 's1', '{finalTotal}', '360');
+  await setField(o.shopId, 'sales', 's1', '{paidAmount}', '210');
+  await expectOnly(o.shopId, 'sum.sale_final');
+});
+
 test('sum.sale_final: تسویه بیشتر از نسیه', async () => {
   const o = await cleanShop('تسویه');
   await setField(o.shopId, 'sales', 's1', '{debtSettled}', '151');

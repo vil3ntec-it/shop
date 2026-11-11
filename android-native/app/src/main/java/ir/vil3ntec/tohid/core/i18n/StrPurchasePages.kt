@@ -48,6 +48,10 @@ object StrPurchasePages {
     "The ledger wasn't written (subscription or disk)",
     "دفتر ونه لیکل شو (ګډون یا ډیسک)",
   )
+  /** ۳-۱۷: زیرِ ردیفی که از «پیشنهاد با فروش و زمانِ تأمین» آمد — اطمینان و دلیلِ همان پیشنهادِ صفحهٔ «پیشنهادِ سفارش» */
+  fun planWhy(confidence: String, why: String): String = t(
+    "پیشنهاد (${asIs(confidence)}): ${asIs(why)}", "Suggested ($confidence): $why", "وړاندیز ($confidence): $why",
+  )
   fun arrivesOn(date: Any?): String = t("رسیدن: ${asIs(date)}", "Arrives: $date", "رسېدل: $date")
   fun cancelReasonIs(reason: Any?): String = t("دلیلِ لغو: ${asIs(reason)}", "Cancel reason: $reason", "د لغوې دلیل: $reason")
   val accepted: String get() = t("پذیرفته", "Accepted", "منل شوی")

@@ -128,6 +128,8 @@ internal class HttpV3Transport(private val api: ApiClient) : V3Transport {
     if (method == "GET" && path.startsWith("/pull")) gzip = (res["gzip_push"] as? JsonPrimitive)?.content == "true"
     V3Response(200, res)
   } catch (f: ApiFailure) {
+    //  ۳-۱۳: `Retry-After` ِ سرور ⇒ دورهای خودکارِ بعدی زودتر از آن نه (همان درِ `SyncV1Worker`)
+    ir.vil3ntec.tohid.sync.v1.SyncV1Worker.reconnect.serverAsked(f.retryAfterMs)
     //  status صفر یعنی اصلاً به سرور نرسید ⇒ همان «قطعِ شبکه»
     if (f.status <= 0) throw f
     V3Response(f.status, buildJsonObject {

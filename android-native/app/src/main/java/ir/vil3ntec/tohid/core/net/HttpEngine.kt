@@ -260,7 +260,7 @@ class HttpEngine(
       val text = (if (ok) connection.inputStream else connection.errorStream)
         ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
 
-      if (!ok) throw ApiFailure.fromHttp(status, text, authenticated = token != null)
+      if (!ok) throw ApiFailure.fromHttp(status, text, authenticated = token != null).withRetryAfter(connection.getHeaderField("Retry-After"))
 
       //  ۲۰۴ و پاسخِ خالی خطا نیست: «انجام شد» هم یک پاسخ است
       if (text.isBlank()) return JsonObject(emptyMap())
@@ -344,7 +344,7 @@ class HttpEngine(
         val status = connection.responseCode
         if (status !in 200..299) {
           val text = connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-          throw ApiFailure.fromHttp(status, text, authenticated = token != null)
+          throw ApiFailure.fromHttp(status, text, authenticated = token != null).withRetryAfter(connection.getHeaderField("Retry-After"))
         }
         val tooBig = { ApiFailure.Invalid("فایل بزرگ‌تر از سقفِ مجاز است", "too_large") }
         if (connection.contentLengthLong > maxBytes) throw tooBig()

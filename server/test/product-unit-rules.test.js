@@ -41,13 +41,26 @@ test('قاعده‌ها روی ردیفِ ذخیره (همان ترتیبِ Prod
   assert.equal(await R.reasonOf({ saleUnit: '', unitFactor: 1 / 24 }, tea, none), '', 'واحدِ فروشِ دوم پاک شد');
   assert.equal(await R.reasonOf({ unitFactor: 1 / 24 }, { ...tea, saleUnit: '' }, none), '', 'کالای بی واحدِ فروشِ دوم');
   assert.equal(await R.reasonOf({ name: 'چای', unitFactor: 1 / 3 }, null, none), '', 'کالای تازهٔ بی واحدِ فروشِ دوم');
+  //  ۲-۱۶ (R2 الف): گامِ دومِ «ضریبِ ناجور بی واحدِ فروشِ دوم، سپس فقط واحدِ فروش» — ضریبِ خوابیده با روشن شدنِ واحدِ فروش تازه است
+  const dormant = { ...tea, saleUnit: '', unitFactor: 1 / 24 };
+  assert.equal(await R.reasonOf({ saleUnit: 'کارتن' }, dormant, none), R.INEXACT, 'واحدِ فروش روی ضریبِ ناجورِ خوابیده');
+  assert.equal(await R.reasonOf({ saleUnit: 'کارتن' }, { ...dormant, unitFactor: 24 }, none), '', 'ضریبِ خوابیدهٔ دقیق');
+  assert.equal(await R.reasonOf({ saleUnit: 'کارتن' }, { ...dormant, unitFactor: undefined }, none), '', 'بی ضریبِ ذخیره همان امروز');
+  assert.equal(await R.reasonOf({ saleUnit: 'کارتن' }, { ...dormant, unitFactor: 0 }, none), R.INEXACT, 'ضریبِ خوابیدهٔ صفر');
+  assert.equal(await R.reasonOf({ saleUnit: 'بسته' }, { ...tea, unitFactor: 1 / 12 }, none), '', 'واحدِ فروشِ روشن با ضریبِ کهنهٔ دست‌نخورده');
+  assert.equal(await R.reasonOf({ saleUnit: 'کارتن', unitFactor: 1 / 24 }, dormant, none), R.INEXACT, 'همان ضریبِ خوابیده در همان op');
   //  واحدِ پایه: فقط کالای گردش‌دار، و فقط تغییرِ واقعی
   assert.equal(await R.reasonOf({ unit: 'کیلو' }, tea, moved), R.LOCKED);
   assert.equal(await R.reasonOf({ unit: 'کیلو' }, tea, none), '', 'کالای بی گردش');
   assert.equal(await R.reasonOf({ unit: ' دانه ' }, tea, moved), '', 'فاصله');
   assert.equal(await R.reasonOf({ unit: 'كيلو' }, { ...tea, unit: 'کیلو' }, moved), '', 'ي/ك');
-  assert.equal(await R.reasonOf({ unit: '' }, tea, moved), '', 'واحدِ خالیِ op');
-  assert.equal(await R.reasonOf({ unit: 'کیلو' }, { ...tea, unit: '' }, moved), '', 'واحدِ خالیِ کهنه تازه نوشته می‌شود');
+  //  ۲-۱۶ (R2 الف): خالی کردنِ واحدِ کالای گردش‌دار هم تغییرِ واحد است (گامِ اولِ «خالی، سپس واحدِ تازه»)؛ بی گردش آزاد
+  assert.equal(await R.reasonOf({ unit: '' }, tea, moved), R.LOCKED, 'واحدِ خالیِ op روی کالای گردش‌دار');
+  assert.equal(await R.reasonOf({ unit: null }, tea, moved), R.LOCKED, 'null همان خالی');
+  assert.equal(await R.reasonOf({ unit: '  ' }, tea, moved), R.LOCKED);
+  assert.equal(await R.reasonOf({ unit: '' }, tea, none), '', 'واحدِ خالیِ کالای بی گردش');
+  assert.equal(await R.reasonOf({ name: 'چای' }, tea, moved), '', 'بی کلیدِ واحد = همان واحد');
+  assert.equal(await R.reasonOf({ unit: 'کیلو' }, { ...tea, unit: '' }, moved), '', 'واحدِ خالیِ کهنه (پیش از قاعده) تازه نوشته می‌شود');
   assert.equal(await R.reasonOf({ unit: 'کیلو' }, null, moved), '', 'کالای تازه');
   //  نخست واحد، سپس ضریب؛ پرسشِ گردش فقط وقتی واحد واقعاً عوض شود
   assert.equal(await R.reasonOf({ unit: 'کیلو', unitFactor: 1 / 24 }, tea, moved), R.LOCKED);
@@ -55,7 +68,10 @@ test('قاعده‌ها روی ردیفِ ذخیره (همان ترتیبِ Prod
   await R.reasonOf({ unit: 'دانه', unitFactor: 12 }, tea, async () => { asked++; return true; });
   assert.equal(asked, 0);
   assert.equal(R.touches({ name: 'x', salePrice: 10 }), false, 'ویرایشِ بی واحد/ضریب هیچ پرسشی ندارد');
-  assert.equal(R.touches({ unitFactor: null, unit: '  ' }), false);
+  //  ۲-۱۶: واحدِ خالی و واحدِ فروشِ دوم هم سنجیده می‌شوند (پیش‌تر `unit: '  '` بی پرسش می‌گذشت)
+  assert.equal(R.touches({ unitFactor: null, unit: '  ' }), true);
+  assert.equal(R.touches({ saleUnit: 'کارتن' }), true);
+  assert.equal(R.touches({ saleUnit: '', unitFactor: null }), false);
   assert.equal(R.touches({ unit: 'دانه' }), true);
 });
 
@@ -220,6 +236,44 @@ test('v1، روشن: گردش و حالِ کالا از opهای پیشینِ ه
   //  op ِ بی واحد/ضریب و جدولِ دیگر بی هیچ پرسشی
   assert.deepEqual(outcome(await push1('owner', [v1('products', 'b1', { salePrice: 60 }, 'update'), v1('suppliers', 'sup1', { name: 'تأمین', unit: 'x' })])),
     ['applied', 'applied']);
+});
+
+test('۲-۱۶ (R2 الف) v1 و v3، روشن: دو راهِ دوگامی بسته — «واحدِ خالی سپس واحدِ تازه» و «ضریبِ خوابیده سپس واحدِ فروش»', async () => {
+  await setFlag(shopId, true);
+  assert.deepEqual(outcome(await push1('owner', [
+    v1('products', 'r2a', tea1()),
+    v1('warehouseEntries', 'r2a-in', { productId: 'r2a', units: 48, price: 1 }),
+    v1('products', 'r2b', tea1({ saleUnit: '' })),
+  ])), ['applied', 'applied', 'applied']);
+  //  یک دسته و دو دسته
+  assert.deepEqual(outcome(await push1('manager', [
+    v1('products', 'r2a', { unit: '' }, 'update'),
+    v1('products', 'r2a', { unit: 'گرام' }, 'update'),
+    v1('products', 'r2b', { unitFactor: 1 / 24 }, 'update'),
+    v1('products', 'r2b', { saleUnit: 'کارتن' }, 'update'),
+  ])), [R.LOCKED, R.LOCKED, 'applied', R.INEXACT]);
+  assert.deepEqual(outcome(await push1('owner', [v1('products', 'r2a', { unit: null }, 'update')])), [R.LOCKED]);
+  assert.deepEqual(outcome(await push1('owner', [v1('products', 'r2b', { saleUnit: 'کارتن' }, 'update')])), [R.INEXACT]);
+  assert.equal((await row1('r2a')).unit, 'دانه');
+  assert.equal((await row1('r2b')).saleUnit, '');
+  //  درست کردنِ ضریب، سپس واحدِ فروش ⇒ آزاد
+  assert.deepEqual(outcome(await push1('owner', [v1('products', 'r2b', { unitFactor: 24 }, 'update'), v1('products', 'r2b', { saleUnit: 'کارتن' }, 'update')])),
+    ['applied', 'applied']);
+  //  v3: همان دو راه
+  assert.deepEqual(outcome(await push3('owner', [
+    v3('products', 'r2c', tea3()),
+    v3('warehouseEntries', 'r2c-in', { productId: 'r2c', unitsMilli: 48_000, priceMinor: 100 }),
+    v3('products', 'r2d', tea3({ saleUnit: '' })),
+  ])), ['applied', 'applied', 'applied']);
+  assert.deepEqual(outcome(await push3('manager', [
+    v3('products', 'r2c', { unit: '' }, 'update'),
+    v3('products', 'r2d', { unitFactor: 1 / 24 }, 'update'),
+    v3('products', 'r2d', { saleUnit: 'کارتن' }, 'update'),
+  ])), [R.LOCKED, 'applied', R.INEXACT]);
+  assert.equal((await row3('r2c')).unit, 'دانه');
+  //  پرچمِ خاموش ⇒ همان امروز
+  await setFlag(shopId, false);
+  assert.deepEqual(outcome(await push1('owner', [v1('products', 'r2a', { unit: '' }, 'update')])), ['applied']);
 });
 
 test('v1Guard ِ مستقیم، روشن: بدنهٔ بی فهرستِ op (نبود، رشته، شیء، خالی) ⇒ بی خطا و بی دست‌کاریِ بدنه و پاسخ', async () => {

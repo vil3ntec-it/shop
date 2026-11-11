@@ -315,11 +315,27 @@ function maskPhone(p) {
   return s.slice(0, 4) + '•'.repeat(s.length - 7) + s.slice(-3);
 }
 
+/** ۲-۸ (CRM-15 الف) — پرچمِ خاموش: کارتِ بیننده‌ای که «دیدنِ تماس» ندارد فقط دو رقمِ آخر ([maskerOf]) */
+const PHONE_MASK_FLAG = 'shop.orders.phone_mask';
+
+/**
+ * پوشانندهٔ `phoneMasked` ِ کارت برای [viewer]: پرچمِ خاموش، یا بیننده‌ای که `customers.contact` دارد (صاحب، لایه‌ها) ⇒ همان
+ * [maskPhone] ِ امروز (۴+۳)؛ وگرنه همان قالبِ `ContactMask` ِ برنامه (هر رقم جز دو رقمِ آخر). شمارهٔ کامل همان `detail`
+ * (`orders.contact` و `customers.contact`) و پیکِ همان سفارش با درِ تماس (`delivery-call`)؛ این‌جا دست نمی‌خورند.
+ * `run` = اتصالِ تراکنشِ جاری (درونِ قفلِ سفارش، نه استخر).
+ */
+async function maskerOf(shopId, viewer, run = null) {
+  if (!(await flagOf(shopId, PHONE_MASK_FLAG, run))) return maskPhone;
+  const cc = require('./customer-contact');
+  if (await cc.allowed({ shopId, role: viewer && viewer.role, userId: viewer && viewer.id }, run)) return maskPhone;
+  return (p) => (p ? cc.maskPhone(p) : '');
+}
+
 const n = (x) => (x === null || x === undefined ? null : Number(x));
 const asJson = (x) => (x && typeof x === 'object' ? x : decode(x) || {});
 
-/** کارتِ سبک (ORD-11) — شمارهٔ کامل هرگز در فهرست نیست. */
-function card(row, viewer, at) {
+/** کارتِ سبک (ORD-11) — شمارهٔ کامل هرگز در فهرست نیست. [mask]: [maskerOf] (۲-۸)؛ نیامده ⇒ همان امروز. */
+function card(row, viewer, at, mask = maskPhone) {
   return {
     id: row.id,
     orderNo: Number(row.order_no),
@@ -333,7 +349,7 @@ function card(row, viewer, at) {
     paymentMethod: row.payment_method,
     paymentStatus: row.payment_status,
     codStatus: row.cod_status,
-    customer: { name: row.customer_name, phoneMasked: maskPhone(row.customer_phone) },
+    customer: { name: row.customer_name, phoneMasked: mask(row.customer_phone) },
     itemsCount: Number(row.items_count),
     currency: row.currency,
     totalMinor: Number(row.total_minor),
@@ -350,8 +366,8 @@ function card(row, viewer, at) {
  * `contact` = شمارهٔ کامل (`loadDetail`: `orders.contact` ِ نقش **و** `customers.contact` ِ دو لایه، CRM-15).
  * نیامده ⇒ فقط `orders.contact` (رفتارِ پیشین).
  */
-function detail(row, lines, events, viewer, at, contact = can(viewer.role, 'orders.contact')) {
-  const c = card(row, viewer, at);
+function detail(row, lines, events, viewer, at, contact = can(viewer.role, 'orders.contact'), mask = maskPhone) {
+  const c = card(row, viewer, at, mask);
   return {
     ...c,
     customer: { ...c.customer, ...(contact ? { phone: row.customer_phone } : {}) },
@@ -386,7 +402,7 @@ async function loadDetail(run, shopId, id, viewer) {
   const events = (await run('SELECT * FROM online_order_events WHERE order_id=$1 ORDER BY seq', [id])).rows;
   //  CRM-15: صاحب می‌تواند `customers.contact` را برای همین مدیر ببندد (‎lib/customer-contact.js‎)
   const contact = await require('./customer-contact').ordersContact({ shopId, role: viewer?.role, userId: viewer?.id }, run);
-  const out = detail(row, lines, events, viewer, now(), contact);
+  const out = detail(row, lines, events, viewer, now(), contact, await maskerOf(shopId, viewer, run));
   //  O-06 = ب: نگه‌داشتنِ موجودیِ همین سفارش (فقط اگر دارد ⇒ بی آن همان پاسخِ پیشین)
   const hold = await require('./stock-reserve').orderView(run, shopId, id);
   if (hold) out.stockHold = hold;
@@ -724,10 +740,11 @@ async function list(shopId, { tab = 'new', limit, cursor } = {}, viewer) {
   }
   //  O-06 = ب: «در بررسی» روی کارت (فروشِ حضوری نگه‌داشتهٔ سفارش را برد) — بی نگه‌داشته ⇒ همان کارتِ پیشین
   const review = await require('./stock-reserve').reviewIdsOf(viaDb, shopId, page.map((r) => r.id), at);
+  const mask = page.length ? await maskerOf(shopId, viewer) : maskPhone;
   return {
     tab,
     items: page.map((r) => ({
-      ...card(r, viewer, at), itemsPreview: preview[r.id] || [], ...(review.has(r.id) ? { stockReview: true } : {}),
+      ...card(r, viewer, at, mask), itemsPreview: preview[r.id] || [], ...(review.has(r.id) ? { stockReview: true } : {}),
     })),
     nextCursor: more ? encodeCursor(Number(last[col]), last.id) : null,
   };
@@ -772,7 +789,8 @@ async function forCustomer(shopId, phones, viewer) {
       ORDER BY created_at DESC, id DESC LIMIT $4`,
     [shopId, [...forms], CUSTOMER_STATUSES, CUSTOMER_LIMIT + 1]
   );
-  return { items: rows.slice(0, CUSTOMER_LIMIT).map((r) => card(r, viewer, at)), more: rows.length > CUSTOMER_LIMIT };
+  const mask = rows.length ? await maskerOf(shopId, viewer) : maskPhone;
+  return { items: rows.slice(0, CUSTOMER_LIMIT).map((r) => card(r, viewer, at, mask)), more: rows.length > CUSTOMER_LIMIT };
 }
 
 /** شمارشِ برگه‌های باز + قدیمی‌ترین سفارشِ تازه (هشدارِ ORD-02) + نشانگرِ تغییر — یک پرس‌وجو. */
@@ -785,7 +803,7 @@ async function summary(shopId) {
 
 module.exports = {
   FLAG_KEY, FEATURE_KEY, SUBSCRIBERS_FLAG, NOT_ACCEPTING, NOT_ACCEPTING_MESSAGE, KEY_RE, MAX_LINES, STAFF_SOURCES,
-  flagOf, entitledOf, intakeOf, stateOf, clientKeyOf, hashOf, parseCreate, parseContact, parseAddress, addressExtras, maskPhone,
+  flagOf, entitledOf, intakeOf, stateOf, clientKeyOf, hashOf, parseCreate, parseContact, parseAddress, addressExtras, maskPhone, PHONE_MASK_FLAG, maskerOf,
   create, transition, transitionIn, codIn, get, list, summary, OPEN_STATUSES, SUMMARY_SQL,
   forCustomer, CUSTOMER_LIMIT, CUSTOMER_STATUSES,
 };

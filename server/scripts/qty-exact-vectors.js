@@ -11,8 +11,8 @@
  *
  * «legacyMinor» خروجیِ **موتورِ امروز** است: خودِ `lineTotal` ِ `index.html` ِ یخ‌زده (همان استخراجِ
  * `money-vectors.webLineTotal`) = `SalesEngine.lineTotal` ِ اندروید. «exactMinor» قاعدهٔ بخشِ ۳.۴ است، این‌جا با
- * BigInt و **مستقل** از `license/money.js`. «onMinor» دروازهٔ PRD-08 با پرچمِ روشن: مقدارِ اعشاری ⇒ exact، مقدارِ
- * درست ⇒ legacy (کالای بی اعشار بایت‌به‌بایت همان). پرچمِ خاموش ⇒ همیشه legacy.
+ * BigInt و **مستقل** از `license/money.js`. «onMinor» دروازهٔ PRD-08 با پرچمِ روشن: هر مقدار ⇒ exact (نسخهٔ ۲، تصمیمِ ۳-۱۲ ِ
+ * صاحب‌کار: مقدارِ درست هم — پیش‌تر legacy می‌ماند)؛ عددِ نامعتبر یا بیرون از بازهٔ دقیق ⇒ legacy. پرچمِ خاموش ⇒ همیشه legacy.
  */
 const fs = require('fs');
 const path = require('path');
@@ -39,10 +39,10 @@ function exactMinor(qtyMilli, priceMinor) {
   const out = floorDiv(raw + 50000n, 100000n) * 100n;
   return out > MAX_EXACT || out < -MAX_EXACT ? null : Number(out);
 }
-/** همان ترتیبِ `QtyExact.lineMinorOrNull` ِ هسته: مقدارِ درست یا نامعتبر، قیمتِ نامعتبر یا بیرون از بازه ⇒ legacy */
+/** همان ترتیبِ `QtyExact.lineMinorOrNull` ِ هسته: مقدار یا قیمتِ نامعتبر، یا بیرون از بازه ⇒ legacy */
 function onMinor(price, qty) {
   const q = milli(qty);
-  if (q === null || q % 1000 === 0 || !Number.isFinite(price)) return legacyMinor(price, qty);
+  if (q === null || !Number.isFinite(price)) return legacyMinor(price, qty);
   const p = Math.round(price * 100) + 0;
   const e = Math.abs(p) > Number(MAX_EXACT) ? null : exactMinor(q, p);
   return e === null ? legacyMinor(price, qty) : e;
@@ -64,7 +64,7 @@ const LINES = [
   ['۲٫۶۷۵ × ۱۰', 10, 2.675],
   ['۰٫۰۰۵ × ۱۰۰ = ۰٫۵ ⇒ ۱', 100, 0.005],
   ['رانشِ Double: ۰٫۱ + ۰٫۲ کیلو × ۱۱۵', 115, 0.1 + 0.2],
-  ['مقدارِ درست همان امروز: ۵۰ × ۰٫۲۹ (امروز ۱۴، قاعدهٔ دقیق ۱۵)', 0.29, 50],
+  ['مقدارِ درست: ۵۰ × ۰٫۲۹ = ۱۴٫۵ ⇒ ۱۵ (امروز ۱۴؛ ۳-۱۲)', 0.29, 50],
   ['مقدارِ درست: ۲ × ۱۱۵', 115, 2],
   ['مقدارِ درستِ کیلو: ۳ × ۹۹٫۹۹', 99.99, 3],
   ['بزرگ: ۹۹۹۹٫۹۹۹ × ۹۹۹۹۹٫۹۹', 99999.99, 9999.999],
@@ -99,7 +99,7 @@ const PRECISE = [
   ['۱٫۲۳۴۵', true], ['۱٫۲۵۰', false], ['1٬0001', true], ['', false], ['.', false], ['1.000000', false], ['٠٫٠٠١٥', true],
 ];
 
-/** جاروب: مقدارِ اعشاری × قیمتِ افغانیِ درست؛ و مقدارِ درست × قیمتِ پول‌دار (دروازه باید همان امروز بماند) */
+/** جاروب: مقدارِ اعشاری × قیمتِ افغانیِ درست؛ و مقدارِ درست × قیمتِ پول‌دار (۳-۱۲: روشن ⇒ همان قاعدهٔ دقیق) */
 const SWEEP = { qtyMilli: [1, 3000], priceMinor: [100, 30000], priceStepMinor: 100 };
 const WHOLE = { qtyMilli: [1000, 30000], qtyStepMilli: 1000, priceMinor: [1, 3000] };
 
@@ -133,10 +133,10 @@ function build() {
     }
   }
   return {
-    version: 1,
-    about: 'PRD-08: مقدارِ اعشاری × قیمت. ساخته‌شده با server/scripts/qty-exact-vectors.js — دستی ویرایش نشود.',
-    rule: 'پرچمِ shop.qty_exact روشن و هزارمِ مقدار نامضربِ ۱۰۰۰ ⇒ floorDiv(qtyMilli × priceMinor + 50000, 100000) × 100؛ '
-      + 'وگرنه Math.round(price × qty) × 100 (موتورِ امروز). مقدار = Math.round(q × 1000)، قیمت = Math.round(price × 100).',
+    version: 2,
+    about: 'PRD-08: مقدار × قیمت. ساخته‌شده با server/scripts/qty-exact-vectors.js — دستی ویرایش نشود.',
+    rule: 'پرچمِ shop.qty_exact روشن ⇒ floorDiv(qtyMilli × priceMinor + 50000, 100000) × 100 برای هر مقدار (نسخهٔ ۲، ۳-۱۲: مقدارِ درست هم)؛ '
+      + 'خاموش، عددِ نامعتبر یا بیرون از بازهٔ دقیق ⇒ Math.round(price × qty) × 100 (موتورِ امروز). مقدار = Math.round(q × 1000)، قیمت = Math.round(price × 100).',
     line, plus, room, precise,
     sweep: { ...SWEEP, pairs, diffs, sumOn, sumLegacy, first },
     whole: { ...WHOLE, pairs: wPairs, onDiffs: wOnDiffs, exactDiffs: wExactDiffs },

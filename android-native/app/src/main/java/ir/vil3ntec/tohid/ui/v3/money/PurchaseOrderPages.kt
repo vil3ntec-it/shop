@@ -53,6 +53,7 @@ import ir.vil3ntec.tohid.core.i18n.StrSupplierBills
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.product.PurchaseUnits
+import ir.vil3ntec.tohid.core.purchase.DemandForecast
 import ir.vil3ntec.tohid.core.purchase.PurchaseOrderCore
 import ir.vil3ntec.tohid.core.purchase.ReorderCore
 import ir.vil3ntec.tohid.data.PoConfigDto
@@ -60,6 +61,8 @@ import ir.vil3ntec.tohid.data.PoForms
 import ir.vil3ntec.tohid.data.PoPermsDto
 import ir.vil3ntec.tohid.data.PoReceiptDto
 import ir.vil3ntec.tohid.data.PurchaseOrderBook
+import ir.vil3ntec.tohid.data.PurchaseSuggest
+import ir.vil3ntec.tohid.ui.screens.rememberSmartForecastOn
 import ir.vil3ntec.tohid.data.PurchaseOrderDto
 import ir.vil3ntec.tohid.data.repo.PurchaseOrderRepository
 import ir.vil3ntec.tohid.formatDate
@@ -535,6 +538,9 @@ private fun RouteScope.PoEditorForm(repo: PurchaseOrderRepository, base: Purchas
   LaunchedEffect(Unit) { sentOrders = repo.planningOrders() }
   val lead = remember(d, sentOrders, supplierId) { PurchaseOrderBook.leadTime(sentOrders, supplierId, PurchaseOrderBook.manualLead(d, supplierId)) }
   val supplier = d.suppliers.find { it.id == supplierId }
+  //  ۳-۱۷ (PUR-03 الف): «پیشنهاد با فروش و زمانِ تأمین» همان پیشنهادِ صفحهٔ «پیشنهادِ سفارش»؛ دلیل و اطمینانِ ردیف‌هایش زیرِ همان ردیف
+  val smart = rememberSmartForecastOn()
+  var why by remember { mutableStateOf<Map<String, DemandForecast.Forecast>>(emptyMap()) }
 
   fun addPicks(picks: List<PurchaseOrderBook.Pick>, none: String) {
     val next = PoForms.addPicks(rows, picks)
@@ -584,7 +590,11 @@ private fun RouteScope.PoEditorForm(repo: PurchaseOrderRepository, base: Purchas
   Column(Modifier.fillMaxWidth().padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     V3Button(
       StrPurchasePages.suggestBySales,
-      { addPicks(PurchaseOrderBook.planned(d, supplierId, sentOrders, todayIso()).map { it.pick }, StrPurchasePages.nothingToOrder) },
+      {
+        val plans = PurchaseSuggest.forSupplier(d, supplierId, sentOrders, todayIso(), smart)
+        why = why + plans.associate { it.pick.productId to it.forecast }
+        addPicks(plans.map { it.pick }, StrPurchasePages.nothingToOrder)
+      },
       Modifier.fillMaxWidth(), kind = V3ButtonKind.SECONDARY, enabled = picked,
     )
     V3Button(
@@ -616,6 +626,9 @@ private fun RouteScope.PoEditorForm(repo: PurchaseOrderRepository, base: Purchas
           PurchaseOrderBook.lastPriceHint(buys, r.productId, supplierId) ?: PurchaseOrderBook.NO_BUY_YET,
           style = V3Type.footnote, color = c.inkMuted,
         )
+        why[r.productId]?.let { f ->
+          Text(StrPurchasePages.planWhy(DemandForecast.confidenceText(f.confidence), DemandForecast.why(f)), style = V3Type.footnote, color = c.inkMuted)
+        }
         Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           V3TextField(
             r.qty, { v -> rows = rows.map { if (it.key == r.key) it.copy(qty = v) else it }; error = null },

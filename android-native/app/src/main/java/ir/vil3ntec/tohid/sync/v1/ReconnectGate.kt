@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.sync.v1
 
 import ir.vil3ntec.tohid.core.sync.SyncReconnect
+import ir.vil3ntec.tohid.core.sync.SyncRetryAfter
 import kotlin.random.Random
 import kotlin.time.TimeSource
 
@@ -16,6 +17,10 @@ import kotlin.time.TimeSource
  *  ⛔ فقط در حافظهٔ همین فرآیند؛ صف، بدنهٔ push و فاصلهٔ تلاشِ موتور و WorkManager دست نمی‌خورند. شکستِ سرور یا راهِ
  *     سرور (دستگاه شبکه دارد) [offline] نیست، پس تلاشِ پس از آن همان فاصلهٔ پیشین را دارد.
  *  ⛔ قفل ندارد: دو کارگرِ هم‌زمان در بدترین حالت هر کدام درنگِ خودش را می‌گیرد — هر دو درونِ همان بازه.
+ *
+ *  ۳-۱۳ (پرسشِ ۱ الف): `Retry-After` ِ پاسخِ سرور ([serverAsked]) هم همین‌جاست — دورهای خودکار تا پایانش صبر می‌کنند
+ *  (`SyncRetryAfter`، سقفِ ۵ دقیقه)؛ «همگام‌سازی حالا» نه و پایانش می‌دهد. درنگِ بلندتر از پخشِ وصلِ دوباره را کارگر در خودش
+ *  نمی‌خوابد ([SyncV1Worker]: `Result.retry()` و دورِ بعدی دوباره می‌پرسد).
  */
 internal class ReconnectGate(
   private val now: () -> Long = monotonicMs(),
@@ -24,12 +29,16 @@ internal class ReconnectGate(
   @Volatile private var away = false
   @Volatile private var until = 0L
   @Volatile private var user = false
+  @Volatile private var server = 0L
 
   /** شبکهٔ خودِ دستگاه نبود */
   fun offline() { away = true }
 
   /** دورِ بعدی را کاربر خواست («همگام‌سازی حالا») */
   fun userAsked() { user = true }
+
+  /** پاسخِ سرور `Retry-After` داشت (میلی‌ثانیه، `ApiFailure.retryAfterMs`)؛ null ⇒ هیچ */
+  fun serverAsked(hintMs: Long?) { server = SyncRetryAfter.until(server, now(), hintMs) }
 
   /** پیش از دورِ خودکاری که شبکه دارد: چند میلی‌ثانیه صبر کند (۰ = همین حالا) */
   fun beforeRound(): Long {
@@ -40,9 +49,11 @@ internal class ReconnectGate(
     }
     user = false
     away = false
-    val h = SyncReconnect.hold(until, cause, now(), random())
+    val at = now()
+    val h = SyncReconnect.hold(until, cause, at, random())
     until = h.until
-    return h.waitMs
+    if (cause == SyncReconnect.USER) server = 0L
+    return maxOf(h.waitMs, SyncRetryAfter.waitMs(server, at, cause == SyncReconnect.USER))
   }
 }
 
