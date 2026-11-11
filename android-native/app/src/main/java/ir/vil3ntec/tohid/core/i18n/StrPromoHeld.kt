@@ -58,6 +58,19 @@ object StrPromoHeld {
     "کېدای شي لا له بلې دستګاه نه وي رارسېدلی. له همغږۍ وروسته، که لغوه شوی وي، دلته د خوشې کولو وړ کېږي.",
   )
 
+  /** ۴-۲۱: همان گروه برای صاحبِ دکان — فاکتورِ نارسیدهٔ کهنه را می‌شود آزاد کرد */
+  val missingOwnerFooter: String get() = t(
+    "شاید هنوز از دستگاهِ دیگر نرسیده باشد، یا سبدی بوده که هرگز ثبت نشد. ۷ روز پس از گرفتنِ کد، صاحبِ دکان می‌تواند آن را آزاد کند.",
+    "It may not have arrived from another device yet, or it was a basket that was never saved. Seven days after the code was taken, the shop owner can release it.",
+    "کېدای شي لا له بلې دستګاه نه وي رارسېدلی، یا داسې ټوکری و چې هېڅکله ثبت نه شو. د کوډ له نیولو اوه ورځې وروسته، د دوکان څښتن یې خوشې کولی شي.",
+  )
+  val warnTitle: String get() = t("این فاکتور روی این دستگاه نیست", "This invoice is not on this device", "دا بل په دې دستګاه کې نشته")
+  val warnBody: String get() = t(
+    "شاید هنوز از دستگاهِ دیگری برسد. اگر رسید، این کد یک بار بیش از سقفش به کار رفته است. آزاد شود؟",
+    "It may still arrive from another device. If it does, this code will have been used once beyond its limit. Release it?",
+    "کېدای شي لا له بلې دستګاه راورسېږي. که راورسېد، دا کوډ یو ځل له خپل سقف څخه زیات کارول شوی دی. خوشې یې کړو؟",
+  )
+
   fun invoice(number: String): String = t("فاکتورِ ${asIs(number)}", "Invoice $number", "بل $number")
   fun codes(list: String, at: String): String = t("${asIs(list)} · ${asIs(at)}", "$list · $at", "$list · $at")
   val release: String get() = t("آزاد کن", "Release", "خوشې یې کړئ")

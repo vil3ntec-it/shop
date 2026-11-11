@@ -58,6 +58,25 @@ class PromoHeldTest {
   }
 
   @Test
+  fun `۴-۲۱ — نارسیده فقط برای صاحب و ۷ روز پس از گرفتنِ کد، با هشدار؛ لغوشده همان دم؛ زنده هرگز`() {
+    val week = PromoHeld.MISSING_AFTER_MS
+    val status = mapOf("S1" to "cancelled", "S2" to "completed")
+    val g = PromoHeld.groups(PromoHeld.parse(page).rows) { status[it] }.associateBy { it.saleId }
+    val missing = g.getValue("S3")   //  at = 3000
+    assertEquals(PromoHeld.Release.WARN, PromoHeld.release(missing, owner = true, now = 3000 + week))
+    assertEquals(PromoHeld.Release.NONE, PromoHeld.release(missing, owner = true, now = 3000 + week - 1), "کمتر از ۷ روز")
+    assertEquals(PromoHeld.Release.NONE, PromoHeld.release(missing, owner = false, now = 3000 + 10 * week), "مدیر نه")
+    assertEquals(PromoHeld.Release.NONE, PromoHeld.release(missing.copy(at = 0), owner = true, now = 10 * week), "بی زمانِ گرفتن")
+    assertEquals(PromoHeld.Release.NONE, PromoHeld.release(missing, owner = true, now = 0), "ساعتِ عقب")
+    assertFalse(missing.releasable, "دکمهٔ بی‌هشدار همان قاعدهٔ پیشین")
+    for (owner in listOf(true, false)) {
+      assertEquals(PromoHeld.Release.RELEASE, PromoHeld.release(g.getValue("S1"), owner, now = 0))
+      assertEquals(PromoHeld.Release.NONE, PromoHeld.release(g.getValue("S2"), owner, now = 10 * week), "زنده هرگز")
+    }
+    assertEquals(7L * 24 * 60 * 60 * 1000, week)
+  }
+
+  @Test
   fun `راه به صفحه فقط با شمارشِ روشن و اجازهٔ لغو`() {
     assertTrue(PromoHeld.shown(redeemOn = true, canCancel = true))
     assertFalse(PromoHeld.shown(redeemOn = false, canCancel = true))
