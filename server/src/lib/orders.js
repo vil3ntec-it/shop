@@ -308,7 +308,7 @@ function parseContact(body, fulfillment, { phoneRequired } = {}) {
 //  مدلِ خواندنی
 // ════════════════════════════════════════════════════════════════════
 
-//  پوشاندنِ شمارهٔ کارت (`maskPhone`) و ۲-۸ CRM-15 (`maskerOf`، پرچمِ خاموشِ `shop.orders.phone_mask`) — `order-phone-mask.js`
+//  پوشاندنِ شمارهٔ تلفن در کارتِ سفارش (`maskPhone`) و ۲-۸ CRM-15 (`maskerOf`، پرچمِ خاموشِ `shop.orders.phone_mask`) — `order-phone-mask.js`
 const { maskPhone, PHONE_MASK_FLAG, maskerOf } = require('./order-phone-mask');
 
 const n = (x) => (x === null || x === undefined ? null : Number(x));

@@ -94,7 +94,7 @@
       where.textContent = failed ? t('map.fail') : t('map.where', { c: K.fa(p.lat, 5) + ', ' + K.fa(p.lng, 5) });
     }
     function here() { return toLL(c.x, c.y, z); }
-    function pan(dx, dy) {
+    function move(dx, dy) {
       var n = SIZE * Math.pow(2, z);
       c.x += dx;
       c.y = Math.max(0, Math.min(n, c.y + dy));
@@ -117,8 +117,8 @@
 
     view.addEventListener('keydown', function (e) {
       var k = e.key;
-      if (k === 'ArrowLeft') pan(-STEP, 0); else if (k === 'ArrowRight') pan(STEP, 0);
-      else if (k === 'ArrowUp') pan(0, -STEP); else if (k === 'ArrowDown') pan(0, STEP);
+      if (k === 'ArrowLeft') move(-STEP, 0); else if (k === 'ArrowRight') move(STEP, 0);
+      else if (k === 'ArrowUp') move(0, -STEP); else if (k === 'ArrowDown') move(0, STEP);
       else if (k === '+' || k === '=') zoom(1); else if (k === '-') zoom(-1);
       else if (k === 'Enter') pick(); else if (k === 'Escape') close();
       else return;
@@ -133,7 +133,7 @@
       if (!drag || drag.id !== e.pointerId) return;
       var dx = e.clientX - drag.x; var dy = e.clientY - drag.y;
       drag.x = e.clientX; drag.y = e.clientY;
-      pan(-dx, -dy);
+      move(-dx, -dy);
     });
     var end = function () { drag = null; };
     view.addEventListener('pointerup', end);
