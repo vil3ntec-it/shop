@@ -373,6 +373,7 @@
 | ۸ | پنل: `HLP_SHELL_OWNER_ONLY=1` | ۲-۱۰ | — |
 | ۹ | پنل: `HLP_REAUTH_MONEY=1` | ۲-۱۲ | — |
 | ۱۰ | `STORE_MAP_TILES=https://tile.openstreetmap.org/{z}/{x}/{y}.png` (نقشهٔ پینِ نشانی در ثبتِ ویترین) | ۴-۳ | — |
+| ۱۱ | `STORE_WEBP=1` (عکسِ سبک‌ترِ ویترین با WebP؛ `docker compose build` تا کتابخانهٔ تصویر نصب شود) | ۴-۲ | — |
 
 ### ب) کلیدهای هر دکان در پنل
 
