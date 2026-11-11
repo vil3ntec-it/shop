@@ -29,6 +29,11 @@
  *   دفتر ─ هر نگه‌داشتن/آزادسازی یک حرکتِ `reserve`/`release` با کلیدِ یکتا (`res:<ردیف>:hold|release|commit`)
  *           ⇒ تطبیقِ INV-16 (`stock.reconcile`) سالم می‌ماند.
  *
+ *   سقف ─── ۲-۲۱ ِ صاحب‌کار (R5 الف): سفارشِ مشتری (ویترین/بازار، نه منبعِ کارمند) با شماره — آن شماره روی هم (سفارش‌های
+ *           بازِ دیگرش + همین) از هر کالا فقط تا نیمِ «آزاد از دیدِ خودش» (قابل‌فروش − نگه‌داشتهٔ شماره‌های دیگر) نگه می‌دارد،
+ *           دست‌کم یک دانه ([phoneCapOk]). بیشتر ⇒ سفارش مثلِ امروز ثبت می‌شود، فقط **کلش** بی نگه‌داشتن (هیچ ردیفی ⇒ قبول،
+ *           ویرایش و جمع‌آوری هم بعداً برایش نمی‌سازند؛ رد هرگز). پیش‌تر هر شمارهٔ تأییدشده با ۱۰ سفارش در ساعت همهٔ موجودیِ
+ *           آزاد را «ناموجود» نشان می‌داد. ⚠️ افزودنِ قلم به همان سفارش (CHK-21، پرچمِ خاموشِ جدا) سقف نمی‌گیرد — فقط سقفِ هر سفارش.
  *   ویرایش ─ ORD-14 و CHK-21 ([syncOrderIn]): نگه‌داشتهٔ بازِ سفارش هم‌اندازهٔ قلم‌های تازه می‌شود؛ افزودن با همان
  *           سنجشِ ساخت (نگه‌داشتهٔ خودِ سفارش «دیگران» نیست).
  *   خاموش ─ ⛔ R6: پرچمِ `shop.stock_reserve` خاموش ⇒ نگه‌داشتهٔ باز هیچ‌جا اثر ندارد (همان main): [heldOf] ⇒ ۰ (ویترین،
@@ -156,8 +161,43 @@ async function checkOrderIn(c, shopId, { lines, settings, names, at, orderId = '
   return plan ? { ...out, hold: { lines, ttlSec: plan.ttlSec } } : out;
 }
 
-/** پس از درجِ سفارش، در همان تراکنش و زیرِ همان قفل. */
+/** ۲-۲۱ — کمترین سقفِ هر شماره (یک دانه، به هزارم) */
+const PHONE_MIN_MILLI = 1000;
+
+/**
+ * ۲-۲۱ (R5 الف) — شمارهٔ سفارشِ مشتریِ [orderId] با [lines] از سقفِ خودش می‌گذرد؟ ⇐ true (نگه دار) | false (کلِ سفارش بی
+ * نگه‌داشتن). سفارشِ کارمند (`orders.STAFF_SOURCES`) یا بی شماره ⇐ true. درونِ همان تراکنش و زیرِ قفلِ موجودیِ [planIn]؛
+ * شکل‌های همان شماره با `validate.phoneForms`؛ فقط نگه‌داشتهٔ فعال (نگذشته) می‌شمارد.
+ */
+async function phoneCapOk(c, shopId, orderId, lines, at) {
+  const o = (await c.query('SELECT source, customer_phone FROM online_orders WHERE shop_id=$1 AND id=$2', [shopId, orderId])).rows[0];
+  if (!o || !o.customer_phone || require('./orders').STAFF_SOURCES.includes(o.source)) return true;
+  const forms = [...require('./validate').phoneForms(o.customer_phone)];
+  if (!forms.length) return true;
+  const ids = [...new Set(lines.map((l) => l.productId))].sort();
+  const want = new Map();
+  for (const l of lines) want.set(l.productId, (want.get(l.productId) || 0) + num(l.qtyMilli));
+  const mine = new Map((await c.query(
+    `SELECT r.product_id, COALESCE(SUM(r.qty_milli),0)::bigint AS q
+       FROM stock_reservations r JOIN online_orders o ON o.id = r.order_id AND o.shop_id = r.shop_id
+      WHERE r.shop_id=$1 AND r.kind='soft' AND r.status='held' AND r.product_id = ANY($2::text[])
+        AND (r.expires_at IS NULL OR r.expires_at > $3) AND r.order_id <> $4 AND o.customer_phone = ANY($5::text[])
+      GROUP BY r.product_id`, [shopId, ids, at, orderId, forms]
+  )).rows.map((r) => [r.product_id, num(r.q)]));
+  const all = await sumHeld(c, shopId, ids, at, orderId);
+  const settings = await stock.settingsOf(shopId, c);
+  const levels = await stock.levelsOf(c, shopId, ids);
+  for (const pid of ids) {
+    const own = mine.get(pid) || 0;
+    const free = Math.max(0, stock.sellableOnHand(levels.get(pid), settings) - Math.max(0, (all.get(pid) || 0) - own));
+    if (own + want.get(pid) > Math.max(PHONE_MIN_MILLI, Math.floor(free / 2))) return false;
+  }
+  return true;
+}
+
+/** پس از درجِ سفارش، در همان تراکنش و زیرِ همان قفل. شماره از سقفش بگذرد (۲-۲۱) ⇒ هیچ ردیفی، `{capped:true}`. */
 async function holdIn(c, shopId, { orderId, lines, ttlSec, at }) {
+  if (!(await phoneCapOk(c, shopId, orderId, lines, at))) return { expiresAt: null, capped: true };
   const expiresAt = at + ttlSec * 1000;
   await insertHolds(c, shopId, orderId, lines, expiresAt, at);
   return { expiresAt };
