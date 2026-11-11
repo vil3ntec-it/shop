@@ -259,6 +259,32 @@ test('POS-37: برگشتِ کاملِ قلمِ فاکتورِ مالیات‌د�
   assert.equal(cap.paidRatio(1000, 0, 100), 1.1);
 });
 
+//  SR48-1: `taxMinor` ادعای خودِ دستگاه است و سرور (پرچمِ `shop.sale_tax` خاموش، یا روشن برای صاحب) آن را با نهایی نمی‌سنجید
+//  ⇒ «مالیاتی» که در نهایی نیامده (مشتری نپرداخته) سهمِ پرداخت را بیش از ۱ می‌کرد و برگشت بیش از پولِ فاکتور می‌نشست.
+//  SR48-2: گردِ نقدیِ مثبت (`roundingMinor`) هم بی سقف و بی نهایی به سقفِ پول افزوده می‌شد.
+test('SR48-1/2: مالیات و گردی که در نهایی نیامده سقفِ برگشت را بالا نمی‌برد (v3 و v1)؛ مالیاتِ درست همان', async () => {
+  //  جمع = نهایی = ۱۰۰۰ افغانی، «مالیات» ِ ادعاشده ۱۰۰۰ ⇒ پیش از درمان برگشتِ ۲۰۰۰ می‌نشست
+  assert.deepEqual(statuses(await push3(owner, 'own3-a', sale3('s3-fake-tax', 'si3-fake-tax', 2000, 100000, { taxMinor: 100000 }))), ['applied', 'applied']);
+  assert.deepEqual(statuses(await push3(owner, 'own3-a', ret3('3fake-over', 's3-fake-tax', 'si3-fake-tax', 2000, 200000))),
+    ['rejected:return_exceeds_sold', 'rejected:tx_rejected', 'rejected:tx_rejected']);
+  //  گردِ منفیِ ساختگی راهِ گذرِ مالیاتِ ساختگی نیست
+  assert.deepEqual(statuses(await push3(owner, 'own3-a', sale3('s3-fake-rnd', 'si3-fake-rnd', 2000, 100000, { taxMinor: 100000, roundingMinor: -100000 }))), ['applied', 'applied']);
+  assert.deepEqual(statuses(await push3(owner, 'own3-a', ret3('3fake-rnd', 's3-fake-rnd', 'si3-fake-rnd', 2000, 200000))),
+    ['rejected:return_exceeds_sold', 'rejected:tx_rejected', 'rejected:tx_rejected']);
+  //  گردِ مثبتِ ساختگی (۱۰۰۰ افغانی، در نهایی نیامده)
+  assert.deepEqual(statuses(await push3(owner, 'own3-a', sale3('s3-fake-up', 'si3-fake-up', 2000, 100000, { roundingMinor: 100000 }))), ['applied', 'applied']);
+  assert.deepEqual(statuses(await push3(owner, 'own3-a', ret3('3fake-up', 's3-fake-up', 'si3-fake-up', 2000, 200000))),
+    ['rejected:return_exceeds_sold', 'rejected:tx_rejected', 'rejected:tx_rejected']);
+  //  v1: «مالیات» ِ ۵۰۰ افغانی روی فاکتورِ ۵۰۰ که نهایی‌اش ۵۰۰ است
+  const t = ts();
+  await push1(owner, 'own-a', [v1('sales', 's-fake1', { total: 500, discount: 0, finalTotal: 500, taxMinor: 50000, createdAt: t }, t),
+    v1('saleItems', 'si-fake1', { saleId: 's-fake1', productId: 'p-oil', quantity: 1, unitPrice: 500, totalPrice: 500 }, t)]);
+  assert.equal((await push1(owner, 'own-a', ret1('fake1-over', 's-fake1', 'si-fake1', 1, 1000))).body.results[0].reason, 'return_exceeds_sold');
+  //  مالیاتِ درست با گردِ منفیِ واقعی (۱۰۰۰ + ۱۰۰ − ۰٫۵۰ = ۱۰۹۹٫۵۰) کامل برمی‌گردد
+  assert.deepEqual(statuses(await push3(owner, 'own3-a', sale3('s3-tax-rnd', 'si3-tax-rnd', 1000, 100000, { taxMinor: 10000, roundingMinor: -50, finalTotalMinor: 109950 }))), ['applied', 'applied']);
+  assert.deepEqual(statuses(await push3(owner, 'own3-a', ret3('3tax-rnd', 's3-tax-rnd', 'si3-tax-rnd', 1000, 109950))), ['applied', 'applied', 'applied']);
+});
+
 /* ═══════════════════════════════ ④ ═══════════════════════════════ */
 
 test('تلاشِ دوباره: همان op دو بار ⇒ «تکراری»، یک بار شمرده؛ همان ردیف با op ِ تازه هم یک بار', async () => {

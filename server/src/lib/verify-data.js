@@ -17,7 +17,7 @@
  *                     `oplog` دارد؛ رویدادها و بازپرداخت‌های سفارش شماره‌های پیوسته از ۱
  *                     دارند و آخرین رویدادِ وضعیت همان وضعیتِ سفارش است؛ زنجیرهٔ هش سالم است.
  *   sum.*             جمع‌ها: جمعِ فاکتور = جمعِ قلم‌ها، نهایی = جمع − تخفیف (+ ردیفِ گردِ نقدی `roundingMinor`، PAY-09؛ + مالیاتِ
- *                     `taxMinor`، POS-37)، پرداخت + مانده
+ *                     `taxMinor`، POS-37 — منفی ⇒ ۰، SR48-3)، پرداخت + مانده
  *                     = نهایی، مرجوعی = جمعِ برگشت‌ها، جمعِ سفارش = جمعِ ردیف‌ها، موجودیِ هر جا
  *                     = جمعِ حرکت‌های دفترِ موجودی، رزروِ باز = جمعِ حرکتِ رزرو/آزادسازی، خرید: پرداخت + بدهی = جمع
  *                     و ورودِ انبارش همان کالا و مقدار (PUR-05)، …
@@ -205,7 +205,7 @@ function ledgerChecks(src) {
          WHERE ${sumWhere('s')} AND s.table_name = 'sales'
            AND ${isNum('s', 'total')} AND ${isNum('s', 'finalTotal')}
            AND (abs(${num('s', 'finalTotal')} - greatest(0, ${num('s', 'total')} - COALESCE(${num('s', 'discount')}, 0))
-                    - COALESCE(${num('s', 'roundingMinor')}, 0) / 100 - COALESCE(${num('s', 'taxMinor')}, 0) / 100) >= 0.005
+                    - COALESCE(${num('s', 'roundingMinor')}, 0) / 100 - greatest(0, COALESCE(${num('s', 'taxMinor')}, 0)) / 100) >= 0.005
              OR (${isNum('s', 'paidAmount')} AND ${isNum('s', 'remaining')}
                  AND abs(${num('s', 'paidAmount')} + ${num('s', 'remaining')} - ${num('s', 'finalTotal')}) >= 0.005)
              OR (${isNum('s', 'debtSettled')} AND ${num('s', 'debtSettled')}

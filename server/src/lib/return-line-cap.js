@@ -25,7 +25,8 @@
  * ماندهٔ قلم همان `ReturnCap` ِ core است (`core/.../money/ReturnCap.kt`؛ بردار: `license/test-vectors/return-cap-v1.json`):
  *   مقدار  فروخته − برگشته
  *   پول    round(جمعِ قلم × سهمِ پرداخت (+ سهمِ مالیاتِ فاکتور، POS-37)) افغانی − پس‌داده، به‌اضافهٔ نیم افغانی برای هر ردیف (برنامهٔ پیش از #586 هر
- *          برگشت را جدا گرد می‌کرد) و گردِ نقدیِ مثبتِ فاکتور (`roundingMinor`، PAY-09)
+ *          برگشت را جدا گرد می‌کرد) و گردِ نقدیِ مثبتِ فاکتور (`roundingMinor`، PAY-09) — مالیات و گرد فقط تا آنجا که در
+ *          نهاییِ فاکتور آمده‌اند (`extrasOf`، SR48-1/2)
  * فاکتورِ لغوشده چیزی برای برگشت ندارد (لغو همه را برگرداند). برگشتِ بی قلم (بی رسید)، و قلمی که سرور ندارد (نه در
  * دفتر، نه در همین دسته) سنجیده نمی‌شود. ردیفِ برگشتی که در یکی از دفترها حذف یا لغو شده شمرده نمی‌شود.
  *
@@ -73,6 +74,23 @@ function capMinor(lineTotal, paidRatio) {
 function paidRatio(total, discount, tax = 0) {
   const base = total > 0 && discount > 0 ? Math.min(1, Math.max(0, (total - discount) / total)) : 1;
   return total > 0 && tax > 0 ? base + tax / total : base;
+}
+
+/**
+ * ⛔ SR48-1/2: مالیات (`taxMinor`) و گردِ نقدیِ مثبت (`roundingMinor`) ادعای خودِ دستگاه‌اند ⇒ فقط تا آنجا که در نهاییِ
+ * خودِ فاکتور آمده‌اند (مشتری پرداخته) سقفِ پول را بالا می‌برند: جا = نهایی − بیشینهٔ (۰، جمع − تخفیف)؛ گرد تا
+ * `sale-caps.ROUND_MAX_MINOR` و تا همان جا، مالیات تا باقیِ جا. بی نهایی ⇒ بی مالیات و فقط گردِ تا سقف. فاکتورِ درستِ
+ * برنامه (نهایی = جمع − تخفیف + مالیات + گرد) بیت‌به‌بیت همان. به پول.
+ */
+function extrasOf(s, v3) {
+  const m = v3 ? int : minor;
+  const round = Math.min(require('./sale-caps').ROUND_MAX_MINOR, Math.max(0, int(s.roundingMinor)));
+  const tax = Math.max(0, int(s.taxMinor));
+  const fin = v3 ? s.finalTotalMinor : s.finalTotal;
+  if (num(fin) === null) return { taxMinor: 0, roundMinor: round };
+  const room = Math.max(0, m(fin) - Math.max(0, m(v3 ? s.totalMinor : s.total) - m(v3 ? s.discountMinor : s.discount)));
+  const r = Math.min(round, room);
+  return { taxMinor: Math.min(tax, room - r), roundMinor: r };
 }
 
 /** prior: [{qtyMilli, amountMinor}] */
@@ -126,12 +144,12 @@ function factsOf(item, sale, v3) {
   const sold = v3 ? num(item.quantityMilli) : num(item.quantity);
   if (sold === null) return null;
   const total = v3 ? num(item.totalPriceMinor) : num(item.totalPrice);
-  const tax = Math.max(0, int(s.taxMinor));   //  POS-37: به پول در هر دو راه (مثلِ گرد)
-  const ratio = v3 ? paidRatio(int(s.totalMinor), int(s.discountMinor), tax) : paidRatio(num(s.total) || 0, num(s.discount) || 0, tax / 100);
+  const x = extrasOf(s, v3);   //  POS-37: به پول در هر دو راه (مثلِ گرد)؛ فقط آنچه در نهایی آمده (SR48-1/2)
+  const ratio = v3 ? paidRatio(int(s.totalMinor), int(s.discountMinor), x.taxMinor) : paidRatio(num(s.total) || 0, num(s.discount) || 0, x.taxMinor / 100);
   return {
     sale: str(item.saleId), soldMilli: v3 ? Math.round(sold) : milli(sold),
     capMinor: total === null ? null : capMinor(v3 ? total / 100 : total, ratio),
-    extraMinor: Math.max(0, int(s.roundingMinor)), cancelled: s.status === 'cancelled',
+    extraMinor: x.roundMinor, cancelled: s.status === 'cancelled',
   };
 }
 
