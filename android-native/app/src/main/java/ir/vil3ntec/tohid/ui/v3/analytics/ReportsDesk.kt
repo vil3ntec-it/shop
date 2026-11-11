@@ -342,7 +342,7 @@ private fun DeskKpis(d: ShopData, rep: DeskRep, from: String, to: String) {
         val out = remember(d) { d.products.count { ShopStore.stockStatus(d, it) == "out" } }
         val low = remember(d) { d.products.count { ShopStore.stockStatus(d, it) == "low" } }
         V3Stat(StrReports.inventoryValue, value, ::afn, m, hue = V3Hue.BRAND,
-          caption = StrReports.inventoryCaption(sv.approximate, sv.valuation.negative.size, sv.kits))
+          caption = inventoryCaption(sv.approximate, sv.valuation.negative.size, sv.kits))
         V3Stat(StrReports.items, d.products.size.toDouble(), count, m)
         V3Stat(StrReports.soldOut, out.toDouble(), count, m, valueColor = if (out > 0) PhoneV3.colors.negative else null)
         V3Stat(StrReports.lowStock, low.toDouble(), count, m, hue = V3Hue.ORANGE)

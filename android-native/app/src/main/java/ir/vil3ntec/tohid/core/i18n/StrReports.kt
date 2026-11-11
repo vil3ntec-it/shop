@@ -62,13 +62,14 @@ object StrReports {
 
   // محصولات
   val inventoryValue: String get() = t("ارزش موجودی (به بهای خرید)", "Stock value (at cost)", "د موجودۍ ارزښت (په پېر بیه)")
-  /** ۳-۱۶ (۲): زیرِ «ارزش موجودی» — بهای میانگینِ موزون؛ تقریبی، کالاهای منفی و کیت‌ها (هر کدام فقط اگر هست) */
-  fun inventoryCaption(approx: Boolean, negative: Int, kits: Int): String = listOfNotNull(
-    t("به بهای میانگینِ خرید", "At average cost", "په منځنۍ پېر بیه"),
-    if (approx) t("تقریبی: کالای بی بها به قیمتِ خریدِ کارت", "approx.: items without cost at card price", "نږدې: بې بیې توکي د کارت په پېر بیه") else null,
-    if (negative > 0) t("${asIs(negative)} کالای منفی بیرون", "$negative negative left out", "$negative منفي توکي بهر") else null,
-    if (kits > 0) t("${asIs(kits)} کیت با اجزایش", "$kits kits counted by parts", "$kits کټونه د برخو له لارې") else null,
-  ).joinToString(" · ")
+  /**
+   *  ۳-۱۶ (۲): تکه‌های زیرِ «ارزش موجودی» — هر کدام یک `t()` (لایهٔ دری و نگهبانِ پوشش هر تابع را یک عبارت می‌دانند)؛
+   *  ترکیب در `ui/v3/analytics/InventoryCaption.kt`.
+   */
+  val inventoryAvgCost: String get() = t("به بهای میانگینِ خرید", "At average cost", "په منځنۍ پېر بیه")
+  val inventoryApprox: String get() = t("تقریبی: کالای بی بها به قیمتِ خریدِ کارت", "approx.: items without cost at card price", "نږدې: بې بیې توکي د کارت په پېر بیه")
+  fun inventoryNegative(negative: Int): String = t("${asIs(negative)} کالای منفی بیرون", "$negative negative left out", "$negative منفي توکي بهر")
+  fun inventoryKits(kits: Int): String = t("${asIs(kits)} کیت با اجزایش", "$kits kits counted by parts", "$kits کټونه د برخو له لارې")
   val soldOut: String get() = t("تمام‌شده", "Sold out", "خلاص شوي")
   val lowStock: String get() = t("موجودی کم", "Low stock", "لږ موجودي")
   val topSelling: String get() = t("پرفروش‌ترین", "Best sellers", "تر ټولو ډېر پلورل شوي")

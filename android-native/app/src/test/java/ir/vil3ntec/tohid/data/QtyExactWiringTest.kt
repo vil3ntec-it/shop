@@ -150,7 +150,10 @@ class QtyExactWiringTest {
     assertTrue(QtyExactWiring.preview(Double.NaN, 1.0).isNaN())
     QtyExactWiring.serverFlag = true
     assertEquals(102.0, QtyExactWiring.preview(100.0, 1.015), 0.0)
-    assertEquals(0.29 * 50.0, QtyExactWiring.preview(0.29, 50.0), 0.0)
+    //  ۳-۱۲ «الف» (۱۴۰۵/۰۸/۲۰): مقدارِ درست هم با همان پرچم دقیق گرد می‌شود — ۵۰ × ۰٫۲۹ = ۱۵ (نه ۱۴٫۴۹۹…)
+    assertEquals(15.0, QtyExactWiring.preview(0.29, 50.0), 0.0)
     assertTrue(QtyExactWiring.preview(Double.NaN, 1.25).isNaN())
+    QtyExactWiring.serverFlag = false
+    assertEquals(0.29 * 50.0, QtyExactWiring.preview(0.29, 50.0), 0.0)
   }
 }
