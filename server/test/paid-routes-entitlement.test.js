@@ -53,6 +53,8 @@ const FREE = [
     'PUT /shop/promos/settings', 'PUT /shop/promos/rules/:id', 'DELETE /shop/promos/rules/:id',
     'POST /shop/promos/redeem', 'POST /shop/promos/redeem/release',
     'POST /shop/order-notify/:id/ack']],
+  ['دسترسیِ پشتیبانی (۲-۹): صاحبِ دکان اجازه را می‌پذیرد، رد یا لغو می‌کند — کنترلِ دادهٔ خودش است و پس از پایانِ اشتراک هم باز می‌ماند؛ فقط صاحب', [
+    'POST /shop/support-access/:gid/accept', 'POST /shop/support-access/:gid/deny', 'POST /shop/support-access/:gid/revoke']],
   ['گزارشِ خودکارِ صاحب (PAY-20/RPT-12) بخشی از مدیریتِ پایهٔ دکان است و کلیدِ کاتالوگ ندارد؛ فقط پرچمِ shop.owner_report و فقط صاحب', [
     'PUT /shop/owner-report']],
   ['قاعدهٔ یکسانِ امتیازِ وفاداری (PRM-13) بخشی از صندوقِ پایه است و کلیدِ کاتالوگ ندارد؛ فقط پرچمِ shop.loyalty_rule و فقط صاحب/مدیر', [

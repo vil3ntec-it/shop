@@ -265,7 +265,7 @@ async function catalog(shopId, { q, category, cursor, limit, sort, contactPhone 
   let where = `sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT}`;
   const raw = text(q, 60);
   const p = await searchPlan(shopId, raw, text(category, 80), { categories, normalize, SQL_NAME });   //  خاموش ⇒ همان قبلی
-  if (raw && !p.jump && await orders.flagOf(shopId, SEARCH_FLAG)) where += searchWhere(raw, params);
+  if (raw && !p.jump && await orders.flagOf(shopId, SEARCH_FLAG)) where += searchWhere(raw, params, await require('./search-synonyms').forShop(shopId));
   else if (p.needle) {
     params.push(`%${p.needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
     where += ` AND ${p.name} LIKE $${params.length}`;
