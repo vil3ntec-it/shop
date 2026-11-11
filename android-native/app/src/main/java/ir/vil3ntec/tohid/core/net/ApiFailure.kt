@@ -60,6 +60,18 @@ sealed class ApiFailure(
 
   internal fun withDetail(error: JsonObject?): ApiFailure { detail = error; return this }
 
+  /**
+   *  SYN-12 / ۳-۱۳: `Retry-After` ِ همین پاسخ به میلی‌ثانیه (فقط عددِ ثانیه، تا ۵ دقیقه — `SyncRetryAfter.parse`)؛ null یعنی
+   *  سرور نگفت. فقط دورِ خودکارِ همگام‌سازی آن را می‌خواند (`ReconnectGate.serverAsked`).
+   */
+  var retryAfterMs: Long? = null
+    private set
+
+  internal fun withRetryAfter(header: String?): ApiFailure {
+    retryAfterMs = ir.vil3ntec.tohid.core.sync.SyncRetryAfter.parse(header)
+    return this
+  }
+
   /** هنوز نشانی سروری تنظیم نشده — برنامه کاملاً آفلاین کار می‌کند */
   class NotConfigured : ApiFailure(localText("نشانی سرور تنظیم نشده است"), "not_configured")
 
