@@ -265,6 +265,7 @@ R9 Info — پلِ v1⇒v3 (`convertFields`) در **درجِ** تازه با ه�
 و ویترین» فقط ۵۰ ِ نخستِ `GET /images/mine` را می‌خواند ⇒ کالای با بیش از ۵۰ عکس عکسِ ویترین را از فهرست می‌انداخت و بارگذاریِ بعدیِ دستگاه جایش
 می‌نشست ⇒ صفحه‌به‌صفحه با `next_cursor` ِ همان در (`ProductGallery.collect`، بی درِ تازه؛ `ProductGalleryTest`، `ProductGalleryRepositoryTest`، فقط CI).
 R7 و R8 همچنان تصمیمِ صاحب‌کار.
+**پیگیری (۱۴۰۵/۰۸/۲۰، شاخهٔ `claude/owner-yes-3`، تصمیمِ ۲-۲۳ ب):** R7 و R8 ✅ «دیده‌شده بی رد» — هر برداشتنِ ادغام (`merge_undone`) و هر بردنِ قرض/رسیدِ ثبت‌شده به شیفتِ دیگر (`shift_moved`) با پرچمِ `shop.doc_chain` یک ردیفِ `security.doc_chain` در سابقهٔ دکان؛ دستهٔ فقط‌مشتری هم نگهبان می‌گیرد؛ فقط نوشتنِ نشسته. سنجه: `server/test/doc-chain-watch.test.js` ۴/۴ (پیش از ساخت ۳ سرخ؛ PGlite و PostgreSQL).
 
 ### B9) بازبینیِ دومِ دستهٔ ۴۴ (۱۴۰۵/۰۸/۱۹، شاخهٔ `claude/sec-review-44`)
 
