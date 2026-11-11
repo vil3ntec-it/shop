@@ -67,12 +67,9 @@ internal fun reached(status: String): Int = when (status) {
 
 internal fun afn(minor: Long): String = ir.vil3ntec.tohid.core.i18n.StrOnline.afnAmount(money(minor / 100.0))
 
-/** ساعت:دقیقهٔ گوشی */
-internal fun clock(at: Long): String {
-  if (at <= 0) return "—"
-  val c = java.util.Calendar.getInstance().apply { timeInMillis = at }
-  return String.format(java.util.Locale.US, "%02d:%02d", c.get(java.util.Calendar.HOUR_OF_DAY), c.get(java.util.Calendar.MINUTE))
-}
+/** ساعت:دقیقهٔ گوشی (منطقهٔ زمانیِ گوشی از همان پلِ گزارش‌ها؛ متن بی java.* — راهِ آیفون) */
+internal fun clock(at: Long): String =
+  if (at <= 0) "—" else ir.vil3ntec.tohid.ui.screens.DayEndModel.hhmm(at, ir.vil3ntec.tohid.data.ReportBridge.offsetMinutes(at))
 
 /** ورودیِ پول به افغانی (رقمِ فارسی هم) ⇒ واحدِ کوچک */
 internal fun minorOf(raw: String): Long? {
