@@ -12,6 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.courier.LiveTrack
+import ir.vil3ntec.tohid.core.courier.LocationConsent
 import ir.vil3ntec.tohid.core.courier.MissionCard
 import ir.vil3ntec.tohid.core.courier.QueueState
 import ir.vil3ntec.tohid.core.net.ApiResult
@@ -29,6 +30,9 @@ import kotlinx.coroutines.delay
  *  قاعده‌ها همه در `core/…/courier/LiveTrack.kt`: فقط کارتی که سرور `tracking.location` داد و روی گوشی هنوز «در راه»
  *  است؛ هر نیم دقیقه یک نقطهٔ تازه (کهنه‌تر از یک دقیقه نه)؛ نقطهٔ نرسیده دور ریخته می‌شود، هیچ صفی نیست، و نقطه روی
  *  گوشی نوشته نمی‌شود (`DeviceLocation.current(keep = false)`). سرور داور است (`delivery-live.js` ‏`putLocation`).
+ *
+ *  S94: با پرچمِ رضایتِ دکان (`LocationConsent.required`) فقط پس از «بله» ِ خودِ پیک (`LocationConsent.mayShare`، کلیدِ
+ *  «اشتراکِ موقعیت» در برگهٔ «حساب»)؛ «نه» یا ۴۰۳ ِ `location_consent_required` ِ سرور ⇒ همان دور بسته و سرویس خاموش.
  */
 internal object CourierTrack {
 
@@ -38,8 +42,9 @@ internal object CourierTrack {
     return LiveTrack.targets(store.cards("active"), store.queue())
   }
 
-  /** سرویس روشن بماند؟ اجازهٔ موقعیت هست و دست‌کم یک مأموریت «در راه» موقعیت می‌خواهد */
-  fun wanted(context: Context): Boolean = DeviceLocation.granted(context) && targets(context).isNotEmpty()
+  /** سرویس روشن بماند؟ اجازهٔ موقعیت و رضایتِ پیک (S94) هست و دست‌کم یک مأموریت «در راه» موقعیت می‌خواهد */
+  fun wanted(context: Context): Boolean =
+    DeviceLocation.granted(context) && CourierStore(context).locationConsent.mayShare && targets(context).isNotEmpty()
 
   /** پاسخِ درِ سرور ⇒ نتیجهٔ یک فرستادن (`LiveTrack.Sent`)؛ کدِ خطا همان کدِ سرور/شبکه */
   fun sentOf(r: ApiResult<Boolean>): LiveTrack.Sent = when (r) {
@@ -72,12 +77,18 @@ internal object CourierTrack {
     while (true) {
       if (!DeviceLocation.granted(context)) return
       val store = CourierStore(context)
+      if (!store.locationConsent.mayShare) return   //  S94: «نه» ِ پیک ⇒ همین دور هیچ نقطه
       val left = tick(
         store.cards("active"), store.queue(), pacer, System.currentTimeMillis(),
         fix = { DeviceLocation.current(context, force = true, maxAgeMs = LiveTrack.MAX_FIX_AGE_MS, keep = false)?.let(::fixOf) },
-        send = { t, f -> sentOf(repo.location(t.assignmentId, f)) },
+        send = { t, f ->
+          val r = repo.location(t.assignmentId, f)
+          //  S94: سرور رضایت می‌خواهد و ندارد ⇒ گوشی هم دیگر نمی‌فرستد تا «بله» ِ پیک
+          if (r is ApiResult.Failure && r.error.code == LocationConsent.REQUIRED_CODE) store.locationConsent = store.locationConsent.refusedByServer()
+          sentOf(r)
+        },
       )
-      if (left == 0) return
+      if (left == 0 || !store.locationConsent.mayShare) return
       delay(LiveTrack.PERIOD_MS)
     }
   }
@@ -96,9 +107,11 @@ internal fun CourierLiveTrack(active: List<MissionCard>, queue: QueueState) {
   val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
     CourierTrackPlatform.sync(context, granted.values.any { it } && CourierTrack.wanted(context))
   }
+  //  S94: «نه» ِ پیک (یا هنوز «بله» نگفته با پرچمِ رضایت) ⇒ سرویس خاموش و اجازهٔ دستگاه هم پرسیده نمی‌شود؛
+  //  `CourierHome` با هر تغییرِ رضایت همین را از نو می‌سازد (`key(consent.mayShare)`)
   LaunchedEffect(targets) {
     when {
-      targets.isEmpty() -> CourierTrackPlatform.sync(context, false)
+      targets.isEmpty() || !CourierStore(context).locationConsent.mayShare -> CourierTrackPlatform.sync(context, false)
       DeviceLocation.granted(context) -> CourierTrackPlatform.sync(context, CourierTrack.wanted(context))
       !asked -> { asked = true; launcher.launch(DeviceLocation.PERMISSIONS) }
     }

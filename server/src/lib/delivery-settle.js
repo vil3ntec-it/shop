@@ -9,7 +9,7 @@ const D = require('./delivery-states');
 const orders = require('./orders');
 const { ulid } = require('./ulid');
 const { badRequest, notFound, conflict } = require('../middleware/errors');
-const { ID_RE, str, text, int, n, hashOf } = require('./delivery-input');
+const { ID_RE, str, noteText, int, n, hashOf } = require('./delivery-input');
 const { courierRowView } = require('./delivery-views');
 
 module.exports = ({ cashStats, viaDb, MAX_SETTLE }) => {
@@ -83,8 +83,8 @@ async function settle(shopId, courierId, body, actor, key) {
   const receivedMinor = int(b.receivedMinor, 'مبلغِ دریافت‌شده');
   if (b.farePaidFromCash !== undefined && typeof b.farePaidFromCash !== 'boolean') throw badRequest('نامعتبر', 'bad_fare_policy');
   const farePaidFromCash = b.farePaidFromCash === true;
-  const reason = text(b.reason, 200);
-  const note = text(b.note, 300);
+  const reason = noteText(b.reason, 200);   //  S117
+  const note = noteText(b.note, 300);
   const reqHash = hashOf({ courierId: String(courierId || ''), ids: [...ids].sort(), handedOverMinor, receivedMinor, farePaidFromCash, reason, note });
 
   return tx(async (c) => {

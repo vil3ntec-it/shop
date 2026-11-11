@@ -62,6 +62,16 @@ class CourierStore(context: Context) {
     get() = prefs.getBoolean(K_RATINGS, false)
     set(v) { prefs.edit().putBoolean(K_RATINGS, v).apply() }
 
+  /** S94: رضایتِ خودِ پیک برای موقعیتِ زنده (از `/courier/me` و پاسخِ «اشتراکِ موقعیت»؛ آفلاین همان آخرین پاسخ) */
+  var locationConsent: ir.vil3ntec.tohid.core.courier.LocationConsent
+    get() = ir.vil3ntec.tohid.core.courier.LocationConsent(
+      prefs.getBoolean(K_LC_REQUIRED, false), prefs.getBoolean(K_LC_GRANTED, false),
+      prefs.getLong(K_LC_AT, 0L).takeIf { it > 0L },
+    )
+    set(v) {
+      prefs.edit().putBoolean(K_LC_REQUIRED, v.required).putBoolean(K_LC_GRANTED, v.granted).putLong(K_LC_AT, v.grantedAt ?: 0L).commit()
+    }
+
   /** مأموریت‌هایی که پیک امتیازشان را داده (دکمه دوباره دیده نشود؛ سرور هم دومی را نمی‌پذیرد) */
   fun rated(): Set<String> = prefs.getStringSet(K_RATED, emptySet()).orEmpty().toSet()
   fun markRated(assignmentId: String) {
@@ -121,6 +131,9 @@ class CourierStore(context: Context) {
     private const val K_CALL = "call_enabled"
     private const val K_ROUTE = "route_enabled"
     private const val K_RATINGS = "ratings_enabled"
+    private const val K_LC_REQUIRED = "location_consent_required"
+    private const val K_LC_GRANTED = "location_consent_granted"
+    private const val K_LC_AT = "location_consent_at"
     private const val K_RATED = "rated"
     private const val K_LAST = "last_sync"
     private const val K_PHOTOS = "photos"
@@ -196,6 +209,7 @@ object CourierSync {
       repo.me().onSuccess {
         store.courierName = it.name; store.callEnabled = it.callEnabled
         store.routeEnabled = it.routeEnabled; store.ratingsEnabled = it.ratingsEnabled
+        store.locationConsent = it.locationConsent   //  S94
       }
       val a = repo.missions("active")
       val cards = a.valueOrNull()

@@ -23,6 +23,7 @@ const mailer = require('../lib/mailer');
 const bots = require('../lib/bots');
 const push = require('../lib/push');
 const vip = require('../lib/vip-codes');
+const maskCards = (t) => require('../lib/ops-errors').maskCards(t);   //  S117: یادداشتِ پنل بی شمارهٔ کاملِ کارت
 const visitors = require('../lib/visitors');
 const support = require('../lib/support');
 const apps = require('../lib/managed-apps');
@@ -132,7 +133,7 @@ router.post('/vip-codes', requireSuperAdmin, async (req, res, next) => {
         ? null : v.integer(req.body.days, { field: 'روزها', min: 1, max: 3650 }),
       features: req.body?.features ? sanitizeFeatures(req.body.features) : [],
       maxDevices: v.integer(req.body?.maxDevices, { field: 'تعداد دستگاه', min: 1, max: 100, def: 10 }),
-      note: v.text(req.body?.note, { max: 300 }),
+      note: maskCards(v.text(req.body?.note, { max: 300 })),
       email: email ? email.toLowerCase() : '',
       phone,
       shopId: req.body?.shopId ? v.id(req.body.shopId) : null,

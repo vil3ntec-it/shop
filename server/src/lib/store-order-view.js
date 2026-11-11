@@ -53,6 +53,10 @@ async function customerOrder(store, token) {
   //  `shop.orders.weight_hold` و نگه‌داشتِ باز (خاموش، بی نگه‌داشت یا همه بسته ⇒ کلید نیست)
   const weightHold = await require('./pick-weight-hold').trackView(store.shop_id, orderId);
   if (weightHold !== undefined) order.weightHold = weightHold;
+  //  S93: «جایگزینی در انتظارِ پاسخِ شما» — فقط با پرچمِ `shop.orders.picking`، «در حال جمع‌آوری» و پیشنهادِ بازِ مهلت‌نگذشته
+  //  (خاموش، بی پیشنهاد، پاسخ‌داده یا مهلت‌گذشته ⇒ کلید نیست)؛ وضعیتِ سفارش همان `picking`
+  const substitutionWait = await require('./pick-substitutes').trackView(store.shop_id, orderId, order.status);
+  if (substitutionWait !== undefined) order.substitutionWait = substitutionWait;
   return order;
 }
 

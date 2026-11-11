@@ -212,3 +212,141 @@ test('S117: یادداشتِ سفارش (ویترین و کارمند، هر ق�
   //  همان نوشته ⇒ همان هش (تکرارِ همان نظر «تکراری» می‌ماند، نه «بدنهٔ دیگر»)
   assert.equal(reviews.parse({ stars: 5, comment: `خوب بود؛ با کارتِ ${dashed} پرداختم` }).hash, r.hash);
 });
+
+/*  ── یادداشت‌های کارمند و پنل (تحویل، تأخیر، ویرایشِ سفارش، فراخوانی، انتقال، مدیر) ──
+ *  همان `maskCards` پیش از دیتابیس و هشِ تکرار؛ بارکد و تلفن دست نمی‌خورند. */
+const dashedCard = () => VISA.replace(/(\d{4})(?=\d)/g, '$1-');
+
+test('S117: یادداشتِ کارمند (تأخیر، ویرایشِ سفارش و رضایت، انتقالِ انبار) بی شمارهٔ کاملِ کارت', () => {
+  const delay = require('../src/lib/order-delay');
+  const amend = require('../src/lib/order-amend');
+  const xfer = require('../src/lib/stock-transfers');
+  assert.equal(delay.parse({ minutes: 15, reason: 'other', note: `مشتری کارتِ ${VISA} داد` }).note, 'مشتری کارتِ [کارت] داد');
+  const a = amend.parse({
+    changes: [{ lineNo: 1, qtyMilli: 500 }], reason: 'other', note: `کم شد؛ کارت ${dashedCard()}`,
+    consent: { via: 'phone', note: `گفت با ${AMEX} می‌پردازد` },
+  });
+  assert.equal(a.note, 'کم شد؛ کارت [کارت]');
+  assert.equal(a.consent.note, 'گفت با [کارت] می‌پردازد');
+  assert.equal(amend.parseSettle({ method: 'cash', note: `پس دادم به ${VISA}` }).note, 'پس دادم به [کارت]');
+  const s = xfer.parseSend({ from: 'warehouse', to: 'shop_floor', lines: [{ productId: 'rice', qtyMilli: 1000 }], note: `بارنامه 6261234567890، کارت ${VISA}` });
+  assert.equal(s.note, 'بارنامه 6261234567890، کارت [کارت]');
+  assert.equal(xfer.parseReceive({ lines: [], reason: `کم آمد؛ ${AMEX}` }).reason, 'کم آمد؛ [کارت]');
+  assert.equal(xfer.deviceStep({ step: 'send', note: `کارت ${VISA}`, lines: [] }).note, 'کارت [کارت]');
+  assert.equal(xfer.deviceStep({ step: 'reject', reason: `کارت ${VISA}`, lines: [] }).note, 'کارت [کارت]');
+  //  همان ورودی ⇒ همان خروجی (کلیدِ یکتاییِ تکرار همان هش را می‌بیند)
+  assert.deepEqual(delay.parse({ minutes: 15, reason: 'other', note: `مشتری کارتِ ${VISA} داد` }),
+    delay.parse({ minutes: 15, reason: 'other', note: `مشتری کارتِ ${VISA} داد` }));
+});
+
+test('S117: یادداشتِ پیک و فراخوانیِ بسته (تحویل) بی شمارهٔ کاملِ کارت؛ تکرارِ همان رویداد همان', async () => {
+  const { query, newId, now, many } = require('../src/db');
+  const pw = require('../src/lib/password');
+  await query(
+    `INSERT INTO admins (id, username, name, password_hash, role, status, created_at)
+     VALUES ($1,'card-dlv-admin','مدیر',$2,'superadmin','active',$3)`,
+    [newId('adm'), await pw.hashPassword('Admin!12345'), now()]
+  );
+  const admin = (await h.post('/api/admin/login', { username: 'card-dlv-admin', password: 'Admin!12345' })).body.token;
+  const u = await h.newUser('دکان‌دارِ تحویل', 'shop');
+  const made = await h.post('/api/shop', { name: 'دکانِ تحویلِ کارت' }, { token: u.accessToken });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const shopId = made.body.shop.id;
+  for (const key of ['shop.orders', 'shop.delivery']) {
+    const f = await h.put('/api/admin/pump/live-config', { scope: shopId, key, value: true }, { token: admin });
+    assert.equal(f.status, 200, JSON.stringify(f.body));
+  }
+  const cu = await h.newUser('پیکِ کارت', 'shop');
+  await query(`INSERT INTO shop_members (id, shop_id, user_id, role, status, created_at, updated_at) VALUES ($1,$2,$3,'staff','active',$4,$4)`,
+    [newId('mem'), shopId, cu.user.id, now()]);
+  const c = await h.post('/api/shop/delivery/couriers', { userId: cu.user.id }, { token: u.accessToken });
+  assert.equal(c.status, 201, JSON.stringify(c.body));
+  const o = await h.post('/api/shop/orders', {
+    source: 'phone', fulfillment: 'delivery', paymentMethod: 'cod', customer: { name: 'احمد', phone: '0791234567' },
+    address: { landmark: 'نزدیکِ مسجد', text: 'کوچهٔ سوم', lat: 34.5, lng: 69.1 },
+    lines: [{ name: 'برنج', qtyMilli: 1000, unitPriceMinor: 120_000 }], deliveryFeeMinor: 40_000,
+  }, { token: u.accessToken, headers: { 'Idempotency-Key': `card-dlv-order-${Date.now()}` } });
+  assert.equal(o.status, 201, JSON.stringify(o.body));
+  for (const to of ['accepted', 'picking', 'packed']) {
+    assert.equal((await h.post(`/api/shop/orders/${o.body.order.id}/transition`, { to }, { token: u.accessToken })).status, 200, to);
+  }
+  const as = await h.post(`/api/shop/delivery/orders/${o.body.order.id}/assign`,
+    { mode: 'shop_courier', courierId: c.body.courier.id, overrideCashCap: true }, { token: u.accessToken });
+  assert.equal(as.status, 201, JSON.stringify(as.body));
+  const aid = as.body.assignment.id;
+  const evs = [
+    { eventId: `ev-card-a-${Date.now()}`, assignmentId: aid, type: 'assigned', deviceTime: Date.now(), note: `مشتری گفت کارتش ${dashedCard()} است` },
+    { eventId: `ev-card-p-${Date.now()}`, assignmentId: aid, type: 'picked_up', deviceTime: Date.now(), note: `بسته گرفتم؛ ${VISA}` },
+  ];
+  for (let i = 0; i < 2; i++) {
+    const r = await h.post('/api/courier/events', { deviceId: 'courier-card', events: evs }, { token: cu.accessToken });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    for (const x of r.body.results) {
+      //  تکرارِ همان رویداد (صفِ آفلاینِ پیک) همان ردیف است، نه «کلیدِ تکراری با بدنهٔ دیگر»
+      assert.equal(x.status, i === 0 ? 'applied' : 'duplicate', JSON.stringify(x));
+    }
+  }
+  const rc = await h.post(`/api/shop/delivery/assignments/${aid}/recall`, { reason: 'other', note: `برگردان؛ کارتِ ${AMEX} (تلفن 0791234567)` },
+    { token: u.accessToken, headers: { 'Idempotency-Key': `card-recall-${Date.now()}` } });
+  assert.ok(rc.status < 300, JSON.stringify(rc.body));
+  const notes = (await many('SELECT note FROM delivery_events WHERE assignment_id=$1', [aid])).map((r) => r.note).join('\n');
+  const flat = notes.replace(/[ -]/g, '');
+  assert.ok(!flat.includes(VISA) && !flat.includes(AMEX), notes);
+  assert.match(notes, /مشتری گفت کارتش \[کارت\] است/);
+  assert.match(notes, /بسته گرفتم؛ \[کارت\]/);
+  assert.match(notes, /برگردان؛ کارتِ \[کارت\] \(تلفن 0791234567\)/);
+});
+
+test('S117: یادداشتِ پنلِ مدیر (اشتراک، پرداخت، کدِ وی‌آی‌پی ِ دکان) بی شمارهٔ کاملِ کارت', async () => {
+  const { query, newId, now, one } = require('../src/db');
+  const pw = require('../src/lib/password');
+  await query(
+    `INSERT INTO admins (id, username, name, password_hash, role, status, created_at)
+     VALUES ($1,'card-panel-admin','مدیر',$2,'superadmin','active',$3)`,
+    [newId('adm'), await pw.hashPassword('Admin!12345'), now()]
+  );
+  const admin = (await h.post('/api/admin/login', { username: 'card-panel-admin', password: 'Admin!12345' })).body.token;
+  const u = await h.newUser('دکان‌دارِ پنل', 'shop');
+  const made = await h.post('/api/shop', { name: 'دکانِ پنلِ کارت' }, { token: u.accessToken });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const shopId = made.body.shop.id;
+
+  const sub = await h.post('/api/admin/subscriptions', { shopId, days: 30, note: `پرداخت با ${VISA}` }, { token: admin });
+  assert.equal(sub.status, 201, JSON.stringify(sub.body));
+  assert.equal((await one('SELECT note FROM subscriptions WHERE id=$1', [sub.body.subscription.id])).note, 'پرداخت با [کارت]');
+  const ed = await h.put(`/api/admin/subscriptions/${sub.body.subscription.id}`, { note: `حواله؛ کارت ${dashedCard()}` }, { token: admin });
+  assert.equal(ed.status, 200, JSON.stringify(ed.body));
+  assert.equal((await one('SELECT note FROM subscriptions WHERE id=$1', [sub.body.subscription.id])).note, 'حواله؛ کارت [کارت]');
+
+  const pay = await h.post('/api/admin/payments', { app: 'shop', tenantId: shopId, amount: 500, note: `رسید ۱۲؛ کارتِ ${AMEX}` }, { token: admin });
+  assert.equal(pay.status, 201, JSON.stringify(pay.body));
+  assert.equal((await one('SELECT note FROM sub_payments WHERE id=$1', [pay.body.payment.id])).note, 'رسید ۱۲؛ کارتِ [کارت]');
+  const pe = await h.put(`/api/admin/payments/${pay.body.payment.id}`, { note: `اصلاح: ${VISA}` }, { token: admin });
+  assert.equal(pe.status, 200, JSON.stringify(pe.body));
+  assert.equal((await one('SELECT note FROM sub_payments WHERE id=$1', [pay.body.payment.id])).note, 'اصلاح: [کارت]');
+
+  const vip = await h.post('/api/admin/vip-codes', { plan: 'custom', days: 10, note: `فروش با کارتِ ${VISA}` }, { token: admin });
+  assert.equal(vip.status, 201, JSON.stringify(vip.body));
+  const vrow = await one('SELECT note FROM vip_codes ORDER BY created_at DESC LIMIT 1');
+  assert.equal(vrow.note, 'فروش با کارتِ [کارت]');
+});
+
+test('S117: هر مسیرِ نوشتنِ یادداشتِ کارمند و پنل از `maskCards` می‌گذرد (نگهبانِ منبع)', () => {
+  const src = (f) => fs.readFileSync(path.join(__dirname, '..', 'src', f), 'utf8');
+  //  [پرونده، تکهٔ همان خطِ خواندنِ یادداشت] — هر کدام باید از نویسهٔ پوشاننده بگذرد
+  const SITES = [
+    ['lib/delivery.js', 'note: noteText(e.note, 300)'],
+    ['lib/delivery-settle.js', 'const note = noteText(b.note, 300)'],
+    ['lib/delivery-settle.js', 'const reason = noteText(b.reason, 200)'],
+    ['lib/delivery-recall.js', 'const note = noteText(b.note, 300)'],
+    ['lib/order-desk.js', 'maskCards(stripControl(typeof b.note'],
+    ['lib/pick-issues.js', 'const note = maskCards(text(b.note, 300))'],
+    ['lib/approval-requests.js', 'maskCards(typeof note === \'string\''],
+    ['lib/conflict-inbox.js', 'return maskCards(s)'],
+    ['lib/order-evidence.js', 'maskCards(issues.cleanText('],
+    ['lib/stock-transfers.js', 'rejectPlan(noteText(body && body.reason, 120))'],
+    ['routes/admin-shop-offline.js', 'note: maskCards(v.text(req.body?.note, { max: 300 }))'],
+    ['routes/admin-sales.js', 'note: shopNote(app, v.text(req.body?.note, { max: 200 }))'],
+  ];
+  for (const [f, frag] of SITES) assert.ok(src(f).includes(frag), `${f}: ${frag}`);
+});

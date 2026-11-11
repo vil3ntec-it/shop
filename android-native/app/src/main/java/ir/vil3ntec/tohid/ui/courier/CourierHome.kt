@@ -44,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -63,6 +64,7 @@ import ir.vil3ntec.tohid.core.courier.CourierFlow
 import ir.vil3ntec.tohid.core.courier.CourierInputError
 import ir.vil3ntec.tohid.core.courier.CourierQueue
 import ir.vil3ntec.tohid.core.courier.CourierSummary
+import ir.vil3ntec.tohid.core.courier.LocationConsent
 import ir.vil3ntec.tohid.core.courier.MissionCard
 import ir.vil3ntec.tohid.core.courier.MissionView
 import ir.vil3ntec.tohid.core.courier.QueueState
@@ -70,6 +72,7 @@ import ir.vil3ntec.tohid.core.i18n.StrCourier
 import ir.vil3ntec.tohid.core.i18n.StrCourierApp
 import ir.vil3ntec.tohid.data.CourierStore
 import ir.vil3ntec.tohid.data.CourierSync
+import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.fa
 import ir.vil3ntec.tohid.money
@@ -116,88 +119,8 @@ import kotlinx.coroutines.launch
  *  گوشی همان را با دادهٔ نمایشی صدا می‌زند).
  */
 
-internal val STATUS_LABEL: Map<String, String> get() = mapOf(
-  "requested" to StrCourierApp.stRequested, "assigned" to StrCourierApp.stAssigned, "picked_up" to StrCourierApp.stPickedUp,
-  "moving" to StrCourierApp.stMoving, "arrived" to StrCourierApp.stArrived, "failed" to StrCourierApp.stFailed,
-  "delivered" to StrCourierApp.stDelivered, "rejected" to StrCourierApp.stRejected, "withdrawn" to StrCourierApp.stWithdrawn, "returned" to StrCourierApp.stReturned,
-)
-
-/** جملهٔ بزرگِ هر پله */
-internal fun headline(s: String): String = when (s) {
-  "requested" -> StrCourierApp.hlRequested
-  "assigned" -> StrCourierApp.hlAssigned
-  "picked_up" -> StrCourierApp.hlPickedUp
-  "moving" -> StrCourierApp.hlMoving
-  "arrived" -> StrCourierApp.hlArrived
-  "failed" -> StrCourierApp.hlFailed
-  "delivered" -> StrCourierApp.stDelivered
-  "rejected" -> StrCourierApp.hlRejected
-  "withdrawn" -> StrCourierApp.hlWithdrawn
-  "returned" -> StrCourierApp.hlReturned
-  else -> STATUS_LABEL[s] ?: s
-}
-
-internal fun actionLabel(from: String, to: String): String = when (to) {
-  "assigned" -> StrCourierApp.acAccept
-  "rejected" -> StrCourierApp.acReject
-  "picked_up" -> StrCourierApp.acPickedUp
-  "moving" -> if (from == "failed") StrCourierApp.acRetry else StrCourierApp.acMoving
-  "arrived" -> StrCourierApp.acArrived
-  "delivered" -> StrCourierApp.stDelivered
-  "failed" -> StrCourierApp.stFailed
-  else -> to
-}
-
-internal fun isNegative(to: String) = to == "rejected" || to == "failed"
-internal val REASON_LABEL: Map<String, String> get() = mapOf(
-  "busy" to StrCourierApp.rsBusy, "too_far" to StrCourierApp.rsTooFar, "cash_limit" to StrCourierApp.rsCashLimit,
-  "no_answer" to StrCourierApp.rsNoAnswer, "wrong_address" to StrCourierApp.rsWrongAddress, "refused" to StrCourierApp.rsRefused,
-  "recalled" to StrCourierApp.rsRecalled, "partial_payment" to StrCourierApp.rsPartialPayment, "refused_amount" to StrCourierApp.rsRefusedAmount,
-  "damaged_or_short" to StrCourierApp.rsDamagedOrShort, "other" to StrCourierApp.rsOther,
-)
-
-/** یادداشتِ «دکان پس خواست» روی کارت و جزئیات */
-internal val RECALL_NOTE: String get() = StrCourierApp.recallNote
-
-/** پله‌های نوارِ پیشرفت: گرفتم ⇐ در راه ⇐ رسیدم ⇐ تحویل */
-internal val STEPS: List<String> get() = listOf(StrCourierApp.stepGot, StrCourierApp.stMoving, StrCourierApp.acArrived, StrCourierApp.stepDelivered)
-
-/** چند پله رسیده — منفی یعنی نوار نشان داده نمی‌شود */
-internal fun reached(status: String): Int = when (status) {
-  "assigned" -> 0
-  "picked_up" -> 1
-  "moving" -> 2
-  "arrived" -> 3
-  "delivered" -> 4
-  else -> -1
-}
-
-internal fun afn(minor: Long): String = ir.vil3ntec.tohid.core.i18n.StrOnline.afnAmount(money(minor / 100.0))
-
-/** ساعت:دقیقهٔ گوشی */
-internal fun clock(at: Long): String {
-  if (at <= 0) return "—"
-  val c = java.util.Calendar.getInstance().apply { timeInMillis = at }
-  return String.format(java.util.Locale.US, "%02d:%02d", c.get(java.util.Calendar.HOUR_OF_DAY), c.get(java.util.Calendar.MINUTE))
-}
-
-/** ورودیِ پول به افغانی (رقمِ فارسی هم) ⇒ واحدِ کوچک */
-private fun minorOf(raw: String): Long? {
-  val t = buildString { for (c in raw) when (c) { in '0'..'9', '.' -> append(c); in '۰'..'۹' -> append('0' + (c - '۰')); '٫' -> append('.') } }
-  val v = t.toDoubleOrNull() ?: return null
-  if (v < 0 || v > 1_000_000_000) return null
-  return Math.round(v * 100)
-}
-
-/** همان پالایشِ `NumberField`: رقمِ فارسی/عربی ⇒ لاتین، فقط رقم و نقطه */
-private fun numberInput(raw: String): String = buildString {
-  for (c in raw) when (c) {
-    in '0'..'9', '.' -> append(c)
-    in '۰'..'۹' -> append('0' + (c - '۰'))
-    in '٠'..'٩' -> append('0' + (c - '٠'))
-    '٫' -> append('.')
-  }
-}
+/** S94: «اشتراکِ موقعیت» فقط آنلاین — همین کدها ⇒ «به اینترنت وصل شوید» */
+private val CONSENT_ONLINE = setOf("offline", "unreachable", "timeout")
 
 private sealed interface Ask {
   data class Reason(val card: MissionCard, val type: String) : Ask
@@ -238,11 +161,35 @@ fun CourierHome(onSignedOut: () -> Unit) {
   var summaryError by remember { mutableStateOf<String?>(null) }
   var extras by remember { mutableStateOf(CourierExtras.of(store)) }   //  پرچم‌های مسیر، امتیاز و تماس (DLV-04/18/02)
   var calling by remember { mutableStateOf(false) }   //  یک «تماس با مشتری» در هر لحظه (هر بار در سابقهٔ دکان می‌نشیند)
+  var consent by remember { mutableStateOf(store.locationConsent) }   //  S94: «اشتراکِ موقعیت» ِ خودِ پیک
+  var consentBusy by remember { mutableStateOf(false) }
 
   fun reloadLocal() {
     queue = store.queue(); active = store.cards("active"); done = store.cards("done")
     name = store.courierName; photosWaiting = store.photos().size
     summary = store.summary(); lastSyncAt = store.lastSyncAt; extras = CourierExtras.of(store)
+    consent = store.locationConsent
+  }
+
+  /**
+   *  S94: «اشتراکِ موقعیت» — فقط آنلاین و فقط پس از پاسخِ سرور (کلید حدس نمی‌زند)؛ «نه» نقطه‌های فرستاده را روی سرور پاک
+   *  می‌کند و سرویسِ موقعیت همان دم خاموش می‌شود (`key(consent.mayShare)` پایین). یک درخواست در هر لحظه.
+   */
+  fun setConsent(granted: Boolean) {
+    if (consentBusy) return
+    consentBusy = true
+    scope.launch {
+      val r = try { Backend.courier(context).setLocationConsent(granted) } finally { consentBusy = false }
+      val text = when (r) {
+        is ApiResult.Success -> {
+          store.locationConsent = store.locationConsent.answered(r.value.granted, r.value.grantedAt)
+          consent = store.locationConsent
+          if (r.value.granted) StrCourierApp.shareLocationDone else StrCourierApp.shareLocationStopped
+        }
+        is ApiResult.Failure -> if (r.error.code in CONSENT_ONLINE) StrCourierApp.shareLocationOnline else r.error.userMessage
+      }
+      snackbar.showSnackbar(text)
+    }
   }
 
   suspend fun sync() {
@@ -276,7 +223,8 @@ fun CourierHome(onSignedOut: () -> Unit) {
   //  باز شدن و هر نیم دقیقه تا صفحه باز است (همگام‌سازی بی سرویسِ پس‌زمینه — §۳.۱۱)
   LaunchedEffect(Unit) { while (true) { sync(); delay(30_000) } }
   //  DLV-16: تنها سرویسِ پیش‌زمینهٔ پیک — موقعیت فقط برای مأموریتِ «در راه» که سرور خواست (`CourierLiveTrackAndroid.kt`)
-  CourierLiveTrack(active, queue)
+  //  S94: رضایتِ پیک عوض شد ⇒ از نو (روشن/خاموش کردنِ سرویس با همان قاعده)
+  key(consent.mayShare) { CourierLiveTrack(active, queue) }
 
   CourierBoard(
     name = name,
@@ -291,6 +239,9 @@ fun CourierHome(onSignedOut: () -> Unit) {
     lastSyncAt = lastSyncAt,
     summaryError = summaryError,
     extras = extras,
+    consent = consent,
+    consentBusy = consentBusy,
+    onConsent = ::setConsent,
     onRefresh = { scope.launch { sync() } },
     onDismissRejected = { eventId ->
       val next = CourierQueue.dismissRejected(store.queue(), eventId)
@@ -362,6 +313,9 @@ internal fun CourierBoard(
   extras: CourierExtras = CourierExtras(),
   onRate: (MissionCard, Int, List<String>) -> Unit = { _, _, _ -> },
   onCallCustomer: (MissionCard) -> Unit = {},
+  consent: LocationConsent = LocationConsent(),
+  consentBusy: Boolean = false,
+  onConsent: (Boolean) -> Unit = {},
 ) {
   val p = PhoneV3.colors
   var tab by rememberSaveable { mutableStateOf(initialTab) }
@@ -500,7 +454,7 @@ internal fun CourierBoard(
             key == "t:account" -> CourierAccountTab(
               name = name, summary = summary, syncing = syncing, waiting = waitingTotal, lastError = lastError,
               lastSyncAt = lastSyncAt, onRefresh = onRefresh, onCallShop = { callShop() }, onCash = { page = "cash" },
-              onSignOut = { askSignOut = true },
+              onSignOut = { askSignOut = true }, consent = consent, consentBusy = consentBusy, onConsent = onConsent,
             )
             else -> CourierHomeTab(
               name = name, summary = summary, live = live, finished = finished, queue = queue,

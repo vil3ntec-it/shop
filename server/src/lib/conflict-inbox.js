@@ -35,6 +35,7 @@ const { one, many, query, tx, now } = require('../db');
 const { badRequest, notFound, conflict: conflictError, forbidden } = require('../middleware/errors');
 const { can } = require('./permissions');
 const audit = require('./audit');
+const maskCards = (t) => require('./ops-errors').maskCards(t);   //  S117: شمارهٔ کاملِ کارت ⇒ «[کارت]» پیش از دیتابیس و هشِ تکرار
 
 /** گونه‌های صندوقِ سند (`staff-approval.judge`، `return-line-cap`، `return-sale-cap`) */
 const BOX = Object.freeze(['perm_denied', 'approval_required', 'approval_rejected']);
@@ -69,7 +70,7 @@ function note(v, { required = false, field = 'دلیل' } = {}) {
   if (/[\u0000-\u001f\u007f]/.test(s)) throw badRequest(`${field} یک خط باشد`, 'bad_note');
   if (required && s.length < 2) throw badRequest(`${field} را بنویسید`, 'note_required');
   if (s.length > MAX_NOTE) throw badRequest(`${field} حداکثر ${MAX_NOTE} نویسه`, 'bad_note');
-  return s;
+  return maskCards(s);
 }
 
 /** «sales/<id>» یا خودِ شناسه ⇒ «sales/<id>» */

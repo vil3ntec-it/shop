@@ -7,6 +7,8 @@
  *   • پرچم‌ها خاموش ⇒ نه دکمه، نه visual-search.js، نه واژه‌نامه‌اش و نه هیچ درخواستِ جست‌وجوی تصویری؛
  *   • روشن ⇒ دکمهٔ «جست‌وجو با عکس»؛ بارگذاریِ عکسِ آزمایشی ⇒ فقط فهرستِ «مشابه» (پیوند به صفحهٔ کالا)، سبد دست نمی‌خورد؛
  *     عکسِ دور ⇒ «پیدا نشد»؛ بی نقضِ CSP و بی خطای جاوااسکریپت.
+ *   • S126 (شبکه و گوشیِ ضعیف): عکسِ ردیف ۵۰۴، بریده یا بایتِ خراب ⇒ حرفِ نخستِ نام در همان ۹۶×۹۶، بی آیکنِ شکسته؛ مرورگرِ
+ *     بی `createImageBitmap` ⇒ همان JPEG ِ کوچک (FileReader ⇒ data:) و همان نتیجه، نه فرستادنِ PNG ِ خام.
  */
 import { createRequire } from 'node:module';
 import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
@@ -143,6 +145,47 @@ await page.waitForSelector('#vs-btn', { timeout: 15000 });
 await page.setInputFiles('#vs-file', { name: 'n.png', mimeType: 'image/png', buffer: Q_NONE });
 await page.waitForFunction(() => /پیدا نشد/.test((document.getElementById('vs-msg') || {}).textContent || ''), null, { timeout: 20000 });
 ok(await page.locator('#vs-list li').count() === 0, 'عکسِ دور ⇒ «پیدا نشد»، بی ردیف');
+
+//  ── S126: عکسِ ردیف خراب یا نرسیده ⇒ حرفِ نخستِ نام در همان قاب، بی آیکنِ شکسته ──
+const THUMB = '**/api/store/web-vsearch/products/rice/thumb*';
+for (const [label, how] of [['۵۰۴', (r) => r.fulfill({ status: 504, body: '' })], ['بریده', (r) => r.abort('connectionreset')],
+  ['بایتِ خراب', (r) => r.fulfill({ status: 200, contentType: 'image/jpeg', body: Buffer.from('not-a-jpeg-at-all') })]]) {
+  await page.route(THUMB, how);
+  await page.goto(`${base}/store/${slug}`);
+  await page.waitForSelector('#vs-btn', { timeout: 15000 });
+  await page.setInputFiles('#vs-file', { name: 'q.png', mimeType: 'image/png', buffer: Q_SAME });
+  await page.waitForSelector('#vs-list li[data-vs="rice"]', { timeout: 20000 });
+  await page.waitForFunction(() => { const b = document.querySelector('#vs-list li[data-vs="rice"] .vs-img'); return b && !b.querySelector('img'); }, null, { timeout: 10000 }).catch(() => {});
+  const box = await page.$eval('#vs-list li[data-vs="rice"]', (li) => {
+    const b = li.querySelector('.vs-img'); const r = b ? b.getBoundingClientRect() : { width: 0, height: 0 };
+    const broken = [...li.querySelectorAll('img')].filter((i) => i.complete && i.naturalWidth === 0).length;
+    return { letter: b ? b.textContent : '', w: Math.round(r.width), h: Math.round(r.height), imgs: li.querySelectorAll('img').length, broken };
+  });
+  ok(box.letter === 'ب' && box.imgs === 0 && box.broken === 0 && box.w === 96 && box.h === 96,
+    `S126: عکسِ ردیف ${label} ⇒ حرفِ نخستِ نام در همان ۹۶×۹۶، بی آیکنِ شکسته`, JSON.stringify(box));
+  ok((await page.textContent('#vs-list li[data-vs="rice"]')).includes('دیدنِ کالا'), `S126 (${label}): ردیف و پیوندش همان`);
+  await page.unroute(THUMB);
+}
+
+//  ── S126: گوشیِ کهنه بی `createImageBitmap` ⇒ همان JPEG ِ کوچک و همان نتیجه ──
+const old = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
+await old.addInitScript(() => { delete window.createImageBitmap; });
+const op = await old.newPage();
+op.on('pageerror', (e) => errors.push(String(e)));
+op.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });
+const sent = [];
+op.on('request', (r) => { if (/\/visual-search\?/.test(r.url()) && r.method() === 'POST') sent.push({ type: r.headers()['content-type'] }); });
+await op.goto(`${base}/store/${slug}`);
+await op.waitForSelector('#vs-btn', { timeout: 15000 });
+ok(await op.evaluate(() => typeof window.createImageBitmap) === 'undefined', 'گوشیِ کهنه: createImageBitmap نیست');
+const BIG = F.pngImage(1600, 1200, F.scene(1600, 1200));
+await op.setInputFiles('#vs-file', { name: 'q.png', mimeType: 'image/png', buffer: BIG });
+await op.waitForSelector('#vs-list li[data-vs]', { timeout: 20000 }).catch(() => {});
+//  (بدنهٔ Blob در رخدادِ پلی‌رایت نیست؛ نوعِ فرستاده همان گواه است: کدِ پیشین PNG ِ خام را می‌فرستاد)
+ok(sent.length === 1 && sent[0].type === 'image/jpeg', 'S126: بی createImageBitmap ⇒ JPEG ِ کوچک از راهِ data: (نه PNG ِ خام)', JSON.stringify(sent));
+const oldRows = await op.locator('#vs-list li[data-vs]').evaluateAll((l) => l.map((x) => x.getAttribute('data-vs')));
+ok(oldRows.length === 1 && oldRows[0] === 'rice', 'S126: همان نتیجه («برنج»)', JSON.stringify(oldRows));
+await old.close();
 
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));

@@ -14,6 +14,7 @@ const { many, now } = db;
 const P = require('./pick-core');
 const { ulid } = require('./ulid');
 const { badRequest, notFound } = require('../middleware/errors');
+const maskCards = (t) => require('./ops-errors').maskCards(t);   //  S117: شمارهٔ کاملِ کارت ⇒ «[کارت]» پیش از دیتابیس و هشِ تکرار
 //  پرچمِ جمع‌آوری — دیر بار می‌شود (order-picking همین پرونده را بار می‌کند)
 const picking = () => require('./order-picking');
 
@@ -97,7 +98,7 @@ async function resolveIssue(shopId, issueId, body, userId) {
   const b = body && typeof body === 'object' ? body : {};
   const action = str(b.action);
   if (!['resolved', 'dismissed'].includes(action)) throw badRequest('کار: resolved یا dismissed', 'bad_action');
-  const note = text(b.note, 300);
+  const note = maskCards(text(b.note, 300));   //  S117
   if (!note) throw badRequest('توضیحِ رسیدگی لازم است', 'note_required');
   const at = now();
   const r = await db.query(

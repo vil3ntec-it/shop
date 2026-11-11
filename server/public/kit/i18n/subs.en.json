@@ -1,0 +1,13 @@
+{
+  "od.sub.title": "Substitute items",
+  "od.sub.line": "{a} was unavailable; instead: {b}",
+  "od.sub.until": "Please answer by {t}",
+  "od.sub.yes": "Accept",
+  "od.sub.no": "No, remove it",
+  "od.sub.ok": "Substitute accepted",
+  "od.sub.rm": "Removed and deducted from the total",
+  "od.sub.wait": "Substitute awaiting your reply",
+  "od.sub.wait.n": "A substitute is suggested for {n} items; please answer by {t}.",
+  "od.sub.wait.n.1": "A substitute is suggested for 1 item; please answer by {t}.",
+  "od.sub.after": "If you do not answer by then, your own “if unavailable” choice for that item applies."
+}

@@ -389,7 +389,7 @@ router.post('/subscriptions', async (req, res, next) => {
   const features = sanitizeFeatures(req.body?.features);
   const maxDevices = v.integer(req.body?.maxDevices, { field: 'تعداد دستگاه', min: 1, max: 100, def: 10 });
   const graceDays = v.integer(req.body?.graceDays, { field: 'مهلت', min: 0, max: 90, def: 0 });
-  const note = v.text(req.body?.note, { max: 300 });
+  const note = require('../lib/ops-errors').maskCards(v.text(req.body?.note, { max: 300 }));   //  S117: بی شمارهٔ کاملِ کارت
 
   /*
    *  ⛔ F0-14 — کلیدِ یکتایی. پنل برای هر ثبت یک `Idempotency-Key`
@@ -459,7 +459,7 @@ router.put('/subscriptions/:id', async (req, res, next) => {
   if (endsAt <= startsAt) return next(badRequest('تاریخ پایان باید بعد از شروع باشد'));
   const features = req.body?.features ? sanitizeFeatures(req.body.features) : current.features;
   const plan = v.text(req.body?.plan, { max: 20 }) || current.plan;
-  const note = req.body?.note === undefined ? current.note : v.text(req.body.note, { max: 300 });
+  const note = req.body?.note === undefined ? current.note : require('../lib/ops-errors').maskCards(v.text(req.body.note, { max: 300 }));
   const graceDays = v.integer(req.body?.graceDays, { min: 0, max: 90, def: current.grace_days });
   const maxDevices = v.integer(req.body?.maxDevices, { min: 1, max: 100, def: current.max_devices });
 

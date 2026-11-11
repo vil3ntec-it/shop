@@ -51,7 +51,7 @@ async function stateOf(shopId) {
 }
 
 //  ورودی (`delivery-input`) و کدِ تحویل (`delivery-codes`، PCK-11، DLV-08، DLV-15) — ماژول‌های کنار
-const { KEY_RE, ID_RE, MAX_MONEY_MINOR, str, text, int, optInt, eventKey, idOf, asJson, hashOf } = require('./delivery-input');
+const { KEY_RE, ID_RE, MAX_MONEY_MINOR, str, text, noteText, int, optInt, eventKey, idOf, asJson, hashOf } = require('./delivery-input');
 const { CODE_MAX_ATTEMPTS, codeHash, codeFor, codeMatches } = require('./delivery-codes');
 
 //  مدلِ خواندنی (نمای کارمند، کارتِ پیک، رویداد، ردیفِ پیک) — `lib/delivery-views.js`
@@ -361,7 +361,7 @@ function parseEvent(raw, { requireKey = true } = {}) {
     to,
     from,
     reason,
-    note: text(e.note, 300),
+    note: noteText(e.note, 300),   //  S117
     cashCollectedMinor: optInt(e.cashCollectedMinor, 'مبلغِ گرفته‌شده'),
     cashReason,
     code: e.code === undefined || e.code === null ? '' : String(e.code).slice(0, 12),
