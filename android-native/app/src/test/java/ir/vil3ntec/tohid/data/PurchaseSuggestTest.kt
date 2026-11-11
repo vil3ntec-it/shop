@@ -52,6 +52,32 @@ class PurchaseSuggestTest {
     assertNull(rows[2].supplierId)
   }
 
+  @Test fun `۳-۱۷ — «پیشنهاد با فروش و زمانِ تأمین» ِ فرمِ سفارش همان پیشنهادِ صفحهٔ «پیشنهادِ سفارش» است`() {
+    //  کالاهای فرم = آنچه از همان تأمین‌کننده خریده شده (`supplierPicks`) ⇒ pA یک بار از s1
+    val bought = d.copy(purchases = d.purchases + Purchase(id = "u2", productId = "pA", supplierId = "s1", quantity = 1.0, purchasePrice = 100.0, date = "2026-01-02"))
+    for (smart in listOf(false, true)) {
+      val page = PurchaseSuggest.rows(bought, emptyList(), today, smart).associateBy { it.product.id }
+      for ((sid, pid) in listOf("s1" to "pA", "s2" to "pB")) {
+        val row = page.getValue(pid)
+        val plans = PurchaseSuggest.forSupplier(bought, sid, emptyList(), today, smart)
+        assertEquals("$sid/$pid smart=$smart", if (row.due) listOf(row.forecast) else emptyList(), plans.map { it.forecast })
+        assertEquals("$sid/$pid smart=$smart", if (row.due) listOf(row.forecast.qtyMilli) else emptyList(), plans.map { it.pick.qtyMilli })
+      }
+    }
+    assertTrue(PurchaseSuggest.rows(bought, emptyList(), today).first { it.product.id == "pA" }.due)
+    //  «در راه» ِ همان سفارش‌های باز هم مثلِ صفحه کم می‌شود
+    val open = PurchaseOrderDto(
+      id = "po1", no = 1, supplierId = "s1", state = "sent", status = "sent",
+      lines = listOf(PoLineDto("l1", "pA", "چای", "عدد", 40_000, 10_000)),
+      progress = listOf(PoProgressDto(lineId = "l1", productId = "pA", orderedMilli = 40_000, remainingMilli = 10_000)),
+    )
+    assertEquals(
+      PurchaseSuggest.rows(bought, listOf(open), today).first { it.product.id == "pA" }.forecast,
+      PurchaseSuggest.forSupplier(bought, "s1", listOf(open), today).single().forecast,
+    )
+    assertTrue(PurchaseSuggest.forSupplier(bought, "nobody", emptyList(), today).isEmpty())
+  }
+
   @Test fun `پیش‌نویسِ با یک کلید فقط نیازمندهای همان تأمین‌کننده`() {
     val rows = PurchaseSuggest.rows(d, emptyList(), today)
     val lines = PurchaseSuggest.draftLines(rows, "s1")
