@@ -33,6 +33,7 @@ const { ulid } = require('./ulid');
 const { stable } = require('./idempotency');
 const orders = require('./orders');
 const { stripControl } = require('./validate');
+const maskCards = (t) => require('./ops-errors').maskCards(t);   //  S117: شمارهٔ کاملِ کارت ⇒ «[کارت]» پیش از دیتابیس و هشِ تکرار
 const { badRequest, conflict, ApiError } = require('../middleware/errors');
 
 const FLAG_KEY = 'shop.orders.desk';
@@ -177,7 +178,7 @@ function pause(shopId, { body, actor }) {
   const minutes = int(b.minutes, 'مدتِ توقف', 5, 24 * 60);
   const reason = typeof b.reason === 'string' ? b.reason.trim() : '';
   if (!PAUSE_REASONS.includes(reason)) throw badRequest('دلیلِ توقف لازم است', 'bad_reason');
-  const note = stripControl(typeof b.note === 'string' ? b.note.trim() : '').slice(0, 200);
+  const note = maskCards(stripControl(typeof b.note === 'string' ? b.note.trim() : '').slice(0, 200));
   if (reason === 'other' && !note) throw badRequest('برای «دلیلِ دیگر» توضیح لازم است', 'note_required');
   return apply(shopId, 'pause', { body: b, actor }, (row, at) => {
     const until = at + minutes * MIN;

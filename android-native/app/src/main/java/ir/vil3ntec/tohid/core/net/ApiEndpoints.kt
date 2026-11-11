@@ -243,6 +243,8 @@ object ApiEndpoints {
     const val EVENTS = "/courier/events"
     //  مرزِ روز و هفته را سرور به وقتِ دکان می‌سازد؛ ساعتِ گوشی فرستاده نمی‌شود
     const val SUMMARY = "/courier/summary"
+    /** S94: رضایتِ خودِ پیک برای موقعیتِ زنده (`PUT` با `{granted}`) — فقط خودِ پیک */
+    const val LOCATION_CONSENT = "/courier/location-consent"
     fun missions(scope: String) = "$MISSIONS?scope=${enc(scope)}"
     fun photos(assignmentId: String) = "$MISSIONS/${enc(assignmentId)}/photos"
     /** «تماس با مشتری» (DLV-02): شمارهٔ کامل فقط برای همین یک تماس */

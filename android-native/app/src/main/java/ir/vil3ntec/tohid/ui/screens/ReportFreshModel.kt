@@ -58,12 +58,48 @@ object ReportFreshModel {
   /** نتیجهٔ یک زبانه: جدول‌ها و اینکه سود تقریبی است یا نه */
   data class View(val tables: List<ReportTables.Table>, val sales: ReportCore.SalesReport?, val debts: ReportCore.DebtReport?, val fraud: ReportCore.FraudReport?)
 
-  /** [lineSeller] POS-23 — «فروشندهٔ هر ردیف» (`LineSellerPref`): تفکیکِ «کاربر» به فروشندهٔ ردیف؛ `false` همان امروز */
+  /* ---------------- RPT-13: − / + و «مقایسه با دورهٔ قبل» در «گزارشِ تازه» ِ کامپیوتر ---------------- */
+
+  /** زبانه‌هایی که بازه‌شان با − / + جابه‌جا می‌شود: همان‌هایی که [view] یا «ساعت و روز» با بازهٔ صریح می‌سازند */
+  val SHIFTABLE: Set<String> = setOf("sales", "profit", "fraud", HeatmapModel.TAB_ID)
+
+  /** زبانه‌هایی که خطِ «نسبت به دورهٔ قبل» دارند (همان کلیدهای `ReportKeys.parts`) */
+  val COMPARABLE: Set<String> = setOf("sales", "profit")
+
+  /**
+   *  بازهٔ «گزارشِ تازه» ⇒ نامِ بازهٔ `ReportKeys` (همان واحدِ `ReportPeriod`): «امروز» روز، «۷ روز» هفت روز، «این ماه» ماهِ
+   *  میلادیِ کامل؛ سه‌ماههٔ مالی و «همه» ⇒ `ALL` (جابه‌جا نمی‌شود، «مقایسه» دورهٔ قبل ندارد).
+   */
+  fun keysSpan(span: String): String = when (span) {
+    "today" -> "TODAY"
+    "week" -> "WEEK"
+    "month" -> "MONTH"
+    else -> "ALL"
+  }
+
+  /** بازهٔ مؤثر: [shift] دوره از بازهٔ [span] (منفی = گذشته)؛ ناممکن (آینده، سه‌ماهه، «همه») ⇒ همان بازهٔ پایه */
+  fun rangeOf(span: String, today: String, shift: Int): ReportBoard.Range {
+    val base = ReportBoard.range(span, today)
+    if (shift == 0) return base
+    val (from, to) = ReportKeys.range(keysSpan(span), base.from, base.to, shift, today)
+    return ReportBoard.Range(from, to)
+  }
+
+  /** [shift] دوره از بازهٔ [span] ممکن است؟ (نه آینده، نه سه‌ماهه/«همه») */
+  fun canShift(span: String, today: String, shift: Int): Boolean {
+    val base = ReportBoard.range(span, today)
+    return ReportKeys.can(keysSpan(span), base.from, base.to, shift, today)
+  }
+
+  /**
+   *  [lineSeller] POS-23 — «فروشندهٔ هر ردیف» (`LineSellerPref`): تفکیکِ «کاربر» به فروشندهٔ ردیف؛ `false` همان امروز.
+   *  [range] RPT-13 — بازهٔ صریحِ − / + ([rangeOf])؛ `null` همان بازهٔ [span].
+   */
   fun view(
     l: ReportLedger, tab: String, span: String, dim: String, today: String, clock: ReportClock?,
-    costing: ReportCore.Costing = costingOf(CostPolicy.DEFAULT), lineSeller: Boolean = false,
+    costing: ReportCore.Costing = costingOf(CostPolicy.DEFAULT), lineSeller: Boolean = false, range: ReportBoard.Range? = null,
   ): View {
-    val r = ReportBoard.range(span, today)
+    val r = range ?: ReportBoard.range(span, today)
     val ok = approvedOf(costing)
     val d = if (dim in ReportBoard.DIMS) dim else "product"
     return when (tab) {

@@ -24,8 +24,11 @@
       $('o-title').textContent = t('od.no', { n: K.fa(o.orderNo, 0) });
       var st = $('o-status');
       var why = K.reason(o.statusReason);
-      st.className = 'pill ' + K.orderKind(o.status);
-      st.textContent = K.order(o.status) + (why ? ' — ' + why : '');
+      //  S93: «جایگزینی در انتظارِ پاسخِ شما» (کلیدِ `substitutionWait` ِ سرور؛ واژه‌اش از `subs` ِ `renderSubs`) — پس از
+      //  نخستین بار همین‌جا تا پیگیریِ ۲۰ ثانیه‌ای نشان را به «جمع‌آوری» و دوباره برنگرداند
+      var subWait = o.substitutionWait && K.has('od.sub.wait');
+      st.className = 'pill ' + (subWait ? 'warn' : K.orderKind(o.status));
+      st.textContent = subWait ? t('od.sub.wait') : K.order(o.status) + (why ? ' — ' + why : '');
       $('o-meta').textContent = (o.fulfillment === 'pickup' ? t('pickup') : t('od.ship')) + t('sep') + K.when(o.createdAt);
       //  ORD-16: هر تغییر با زمانش (خلاصه در پله‌ها، همه این‌جا)
       var tl = K.clear($('o-timeline'));
@@ -296,13 +299,30 @@
 
     //  PCK-05: کالایی که پیدا نشد و دکان جایگزینِ هم‌دسته‌اش را پیشنهاد داده — مشتری همین‌جا می‌پذیرد یا رد
     //  می‌کند. مبلغ را سرور می‌سازد (قیمتِ کمتر)؛ پس از مهلت ترجیحِ خودِ مشتری. پرچمِ خاموش ⇒ ۴۰۴ ⇒ پنهان.
+    //  S93: «جایگزینی در انتظارِ پاسخِ شما» — فقط وقتی سرور کلیدِ `substitutionWait` را داد (پیشنهادِ بازِ مهلت‌نگذشته):
+    //  همان نشانِ وضعیت «در انتظار» و سرِ کارت شمار، مهلت و «بی جواب ⇒ ترجیحِ خودتان». وضعیتِ سفارش همان `picking`.
+    //  واژه‌نامهٔ جدا (`kit/i18n/subs.<زبان>.json`) فقط با همین کارت؛ نیامد ⇒ کارت پنهان تا پیگیریِ بعد (کلیدِ خام هرگز).
     function renderSubs(o, token) {
       var box = $('o-subs');
       if (o.status !== 'picking') { box.hidden = true; return; }
-      api('/orders/' + encodeURIComponent(token) + '/substitutions').then(function (r) {
+      K.part('subs', $('o-subs')).then(function (ok) {
+        if (!ok) throw new Error('subs');
+        return api('/orders/' + encodeURIComponent(token) + '/substitutions');
+      }).then(function (r) {
+        if (want !== null && want !== token) return;
         var list = r.substitutions || [];
+        var w = o.substitutionWait;
+        if (w) {
+          var st = $('o-status');
+          st.className = 'pill warn';
+          st.textContent = t('od.sub.wait');
+        }
         box.hidden = !list.length;
         var ul = K.clear($('o-sub-list'));
+        var note = $('o-sub-wait');
+        if (!note) { note = el('div', { class: 'note warn', hidden: true, attrs: { id: 'o-sub-wait', role: 'status' } }); ul.parentNode.insertBefore(note, ul); }
+        K.clear(note).hidden = !w;
+        if (w) note.append(K.icon('alert'), el('span', {}, el('b', { text: t('od.sub.wait.n', { n: K.fa(w.open, 0), t: K.clock(w.deadlineAt) }) }), ' ', el('small', { text: t('od.sub.after') })));
         list.forEach(function (s) {
           var was = s.original || {}; var n = s.substitute || {};
           ul.appendChild(el('li', {}, el('span', { class: 'grow' }, t('od.sub.line', { a: was.name || '', b: n.name || '' }),
@@ -330,10 +350,14 @@
       weigh.then(function (f) { if (f && (want === null || want === token)) f.render(o, token); });
     }
 
+    //  پس از پاسخِ سرور همان سفارش از نو (نشانِ وضعیت و `substitutionWait` از سرور، نه از حدسِ صفحه)
     function choose(o, token, id, decision) {
+      var again = function () {
+        return api('/orders/' + encodeURIComponent(token)).then(function (r) { open(token, r.order); }, function () { renderSubs(o, token); });
+      };
       api('/orders/' + encodeURIComponent(token) + '/substitutions/' + encodeURIComponent(id), { method: 'POST', body: { decision: decision } })
-        .then(function () { renderSubs(o, token); })
-        .catch(function (e) { K.note($('o-msg'), 'err', e.message); renderSubs(o, token); });
+        .then(again)
+        .catch(function (e) { K.note($('o-msg'), 'err', e.message); again(); });
     }
 
     // ── CHK-24: ویرایشِ دستورِ تحویل تا پیش از ارسال — همزادِ `PrefsRules` ِ برنامهٔ خرید (core/.../shopper/ShopperPrefs.kt) ──

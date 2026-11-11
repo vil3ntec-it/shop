@@ -7,6 +7,9 @@
  *
  * ⛔ برچسب همیشه «مشابه»، هرگز «همان کالا»؛ هیچ کالایی خودکار انتخاب یا به سبد افزوده نمی‌شود — فقط پیوند.
  * ⛔ عکس فقط برای همین یک درخواست است: نه روی دستگاه ذخیره می‌شود، نه جای دیگر. متن فقط با textContent (`K.el`).
+ * S126 (شبکه و گوشیِ ضعیف): عکسِ ردیف (`/thumb`) با `K.photo` — ۵۰۴، اتصالِ بریده یا بایتِ خراب ⇒ حرفِ نخستِ نام در همان
+ * ۹۶×۹۶، بی آیکنِ شکسته (همان کارتِ ویترین)؛ مرورگرِ بی `createImageBitmap` (گوشیِ کهنه) یا شکستِ آن ⇒ همان JPEG ِ کوچک از
+ * راهِ `FileReader` ⇒ `data:` ⇒ `<img>` (CSP ِ ویترین `img-src 'self' data:`؛ نه `blob:`)، نه فرستادنِ فایلِ چند مگابایتیِ دوربین.
  */
 (function () {
   'use strict';
@@ -25,14 +28,34 @@
     });
   }
 
-  /** عکس ⇒ JPEG ِ کوچک (سرور JPEG ِ progressive، WebP و HEIC را نمی‌سنجد)؛ مرورگرِ بی createImageBitmap ⇒ همان فایل */
+  /** S126: گشودنِ عکس بی `createImageBitmap` — FileReader ⇒ `data:` ⇒ `<img>`؛ نشد ⇒ رد (و همان فایل، `shrink`) */
+  function viaImage(file) {
+    if (!window.FileReader) return Promise.reject(new Error('no-reader'));
+    return new Promise(function (ok, no) {
+      var r = new FileReader();
+      r.onerror = no;
+      r.onload = function () {
+        var img = new Image();
+        img.onload = function () { ok(img); };
+        img.onerror = no;
+        img.src = r.result;
+      };
+      r.readAsDataURL(file);
+    });
+  }
+
+  /** عکس ⇒ JPEG ِ کوچک (سرور JPEG ِ progressive، WebP و HEIC را نمی‌سنجد)؛ گشوده نشد ⇒ همان فایل */
   function shrink(file) {
-    if (!window.createImageBitmap) return Promise.resolve(file);
-    return createImageBitmap(file).then(function (img) {
-      var k = Math.min(1, EDGE / Math.max(img.width, img.height));
+    var open = window.createImageBitmap
+      ? createImageBitmap(file).catch(function () { return viaImage(file); })
+      : viaImage(file);
+    return open.then(function (img) {
+      var w = img.naturalWidth || img.width; var h = img.naturalHeight || img.height;
+      if (!w || !h) return file;
+      var k = Math.min(1, EDGE / Math.max(w, h));
       var c = document.createElement('canvas');
-      c.width = Math.max(1, Math.round(img.width * k));
-      c.height = Math.max(1, Math.round(img.height * k));
+      c.width = Math.max(1, Math.round(w * k));
+      c.height = Math.max(1, Math.round(h * k));
       var g = c.getContext('2d');
       g.fillStyle = '#fff';
       g.fillRect(0, 0, c.width, c.height);
@@ -65,7 +88,9 @@
   function card(base, p) {
     var go = el('a', { class: 'btn btn-ghost', text: t('vs.open'), attrs: { href: '#/p/' + encodeURIComponent(p.id) } });
     return el('li', { class: 'banner card', attrs: { 'data-vs': p.id } },
-      p.photo ? el('img', { attrs: { src: base + '/products/' + encodeURIComponent(p.id) + '/thumb', alt: '', loading: 'lazy', width: '96', height: '96' } }) : null,
+      //  S126: عکسِ خراب یا نرسیده ⇒ حرفِ نخستِ نام در همان قاب (`K.photo`)، نه آیکنِ شکسته
+      p.photo ? el('span', { class: 'thumb tile vs-img', attrs: { 'aria-hidden': 'true' } },
+        K.photo({ src: base + '/products/' + encodeURIComponent(p.id) + '/thumb', alt: '', loading: 'lazy', decoding: 'async', width: '96', height: '96' }, p.name)) : null,
       el('span', { class: 'pill plain', text: t('vs.similar') }),
       el('b', { text: p.name }),
       el('span', { class: 'num', text: K.money(p.priceMinor) + (p.unit ? ' ' + t('p.per', { unit: p.unit }) : '') }),

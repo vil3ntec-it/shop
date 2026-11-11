@@ -78,6 +78,9 @@ const PARTS = {
   facts: { js: 'store/order-facts.js', root: 'o-facts' },
   //  «وزنِ بیشتر از سفارش» (S56، weight-hold.js ِ دیربار از پیگیری، فقط با کلیدِ `weightHold` = نگه‌داشتِ باز): بخش را خودِ اسکریپت می‌سازد
   weigh: { js: 'store/weight-hold.js', root: 'o-wh' },
+  //  کارتِ «کالای جایگزین» و «جایگزینی در انتظارِ پاسخِ شما» (PCK-05، S93؛ order.js فقط وقتی سفارش «در حال جمع‌آوری» است):
+  //  بخشِ `#o-subs` ِ index.html و نشانِ وضعیت با کلیدِ `substitutionWait` ِ پیگیری
+  subs: { js: 'store/order.js', from: 'id="o-subs"', to: 'data-t="od.items"', root: 'o-subs' },
 };
 const parts = Object.fromEntries(Object.keys(PARTS).map((n) => [n, Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/${n}.${l}.json`))]))]));
 const dict = Object.fromEntries(LANGS.map((l) => [l, Object.assign({}, main[l], ...Object.values(parts).map((p) => p[l]))]));

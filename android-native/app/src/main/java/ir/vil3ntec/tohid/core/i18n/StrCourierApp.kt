@@ -353,6 +353,27 @@ object StrCourierApp {
   val errBags: String get() = t(CourierInputText.BAD_BAGS, "The bag labels are not valid", "د کڅوړو لیبلونه سم نه دي")
   val errPosition: String get() = t(CourierInputText.BAD_POSITION, "The location is not valid", "ځای سم نه دی")
   val errKeyReused: String get() = t(CourierInputText.KEY_REUSED, "This id is already in the queue", "دا پېژند دمخه په کتار کې دی")
+
+  // ── S94: «اشتراکِ موقعیت» ِ خودِ پیک (برگهٔ «حساب») ──
+  val shareLocation: String get() = t("اشتراکِ موقعیت", "Share my location", "زما د ځای شریکول")
+  val shareLocationOn: String get() = t(
+    "روشن — مشتری جای شما را فقط «در راه» می‌بیند",
+    "On — the customer sees where you are only while on the way",
+    "روښانه — پېرودونکی ستاسو ځای یوازې «په لار کې» ویني",
+  )
+  val shareLocationOff: String get() = t("خاموش — هیچ موقعیتی فرستاده نمی‌شود", "Off — no location is sent", "بند — هېڅ ځای نه لېږل کېږي")
+  val shareLocationHint: String get() = t(
+    "هر وقت خواستید خاموش کنید؛ با خاموش کردن، موقعیت‌های فرستاده هم پاک می‌شوند.",
+    "Turn it off any time; turning it off also deletes the locations already sent.",
+    "هر وخت چې وغواړئ بند یې کړئ؛ په بندولو سره، لېږل شوي ځایونه هم پاکېږي.",
+  )
+  val shareLocationDone: String get() = t("اشتراکِ موقعیت روشن شد", "Location sharing is on", "د ځای شریکول روښانه شو")
+  val shareLocationStopped: String get() = t(
+    "اشتراکِ موقعیت خاموش شد و موقعیت‌های پیشین پاک شد",
+    "Location sharing is off and earlier locations were deleted",
+    "د ځای شریکول بند شو او پخواني ځایونه پاک شول",
+  )
+  val shareLocationOnline: String get() = t("برای این کار به اینترنت وصل شوید", "Connect to the internet to change this", "د دې بدلون لپاره انټرنټ ته وصل شئ")
 }
 
 /**

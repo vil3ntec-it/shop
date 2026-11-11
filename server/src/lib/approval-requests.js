@@ -40,6 +40,7 @@ const audit = require('./audit');
 const { flagOf } = require('./orders');
 const { many, one, query, tx, newId, now } = require('../db');
 const { badRequest, conflict, forbidden, notFound, tooMany } = require('../middleware/errors');
+const maskCards = (t) => require('./ops-errors').maskCards(t);   //  S117: شمارهٔ کاملِ کارت ⇒ «[کارت]» پیش از دیتابیس و هشِ تکرار
 
 const FLAG = 'shop.approval_requests';
 const APPROVER_ROLES = Object.freeze(['owner', 'manager']);
@@ -259,7 +260,7 @@ async function lockRow(c, shopId, id) {
  */
 async function decide(shopId, actor, id, decision, { note = '' } = {}) {
   if (!isApprover(actor.role)) throw forbidden('فقط صاحب دکان یا مدیر تأیید می‌کند', 'not_approver');
-  const text = typeof note === 'string' ? note.trim() : '';
+  const text = maskCards(typeof note === 'string' ? note.trim() : '');
   if (text.length > NOTE_MAX || LINE_BREAK.test(text)) throw badRequest('یادداشت نادرست است', 'bad_reason');
   const target = decision === 'approve' ? 'approved' : 'denied';
   return inTx(async (c, log) => {

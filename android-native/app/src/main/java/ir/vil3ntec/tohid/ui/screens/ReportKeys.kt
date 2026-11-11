@@ -1,16 +1,25 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrHome
+import ir.vil3ntec.tohid.core.i18n.StrReach
+import ir.vil3ntec.tohid.core.i18n.StrSimpleAsk
+import ir.vil3ntec.tohid.core.keymap.KeyMap
+import ir.vil3ntec.tohid.core.report.ReportBoard
 import ir.vil3ntec.tohid.core.report.ReportPeriod
 import ir.vil3ntec.tohid.data.ReportEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.v3.V3Chip
 
 /**
  *  RPT-13 — «دورهٔ قبل / بعد» و «مقایسه با دورهٔ قبل» در «گزارش‌ها»ی کامپیوتر (`DeskReports`).
@@ -81,4 +90,28 @@ internal fun ReportCompareLine(d: ShopData, key: String, span: String, from: Str
     style = MaterialTheme.typography.bodySmall,
     color = Shop.colors.muted,
   )
+}
+
+/**
+ *  RPT-13 — نوارِ «دورهٔ قبل / بعد» (− / +) و «مقایسه» (Ctrl+Shift+C) ِ «گزارشِ تازه» ِ کامپیوتر (`DeskFreshReports`)، با برچسبِ
+ *  کلید و «از … تا …» ِ بازهٔ جابه‌جاشده؛ همان شکلِ نوارِ «گزارش‌ها» (`ReportsDesk.kt`). هیچ‌کدام ⇒ هیچ.
+ */
+@Composable
+internal fun FreshPeriodBar(
+  shifting: Boolean, comparing: Boolean, compare: Boolean, range: ReportBoard.Range, onStep: (Int) -> Unit, onCompare: () -> Unit,
+) {
+  if (!shifting && !comparing) return
+  Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    if (shifting) {
+      V3Chip("${StrReach.prevPeriod}  ${KeyMap.REPORTS_PREV_PERIOD.hint}", false, { onStep(-1) })
+      V3Chip("${StrReach.nextPeriod}  ${KeyMap.REPORTS_NEXT_PERIOD.hint}", false, { onStep(1) })
+    }
+    if (comparing) V3Chip("${StrReach.compare}  ${KeyMap.REPORTS_COMPARE.hint}", compare, onCompare)
+    if (shifting) {
+      Text(
+        if (range.from == range.to) formatDate(range.from) else StrSimpleAsk.range(formatDate(range.from), formatDate(range.to)),
+        style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
+      )
+    }
+  }
 }

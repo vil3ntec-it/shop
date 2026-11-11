@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.data.repo
 import ir.vil3ntec.tohid.core.courier.CourierEvent
 import ir.vil3ntec.tohid.core.courier.CourierSummary
 import ir.vil3ntec.tohid.core.courier.EventResult
+import ir.vil3ntec.tohid.core.courier.LocationConsent
 import ir.vil3ntec.tohid.core.courier.MissionCard
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiEndpoints
@@ -23,21 +24,36 @@ class CourierRepository(private val api: ApiClient) {
 
   /**
    *  `callEnabled`: دکان دکمهٔ «تماس با مشتری» را روشن کرده (`shop.delivery_courier_call`)؛
-   *  `routeEnabled`/`ratingsEnabled`: «مسیرِ پیشنهادی» (DLV-04) و «امتیاز» (DLV-18) — پرچم‌های خاموشِ دکان
+   *  `routeEnabled`/`ratingsEnabled`: «مسیرِ پیشنهادی» (DLV-04) و «امتیاز» (DLV-18) — پرچم‌های خاموشِ دکان؛
+   *  `locationConsent`: رضایتِ خودِ پیک برای موقعیتِ زنده (S94؛ سرورِ کهنه بی این کلید ⇒ همان پیشین)
    */
   data class Me(
     val id: String, val name: String, val active: Boolean, val cashCapMinor: Long, val callEnabled: Boolean = false,
-    val routeEnabled: Boolean = false, val ratingsEnabled: Boolean = false,
+    val routeEnabled: Boolean = false, val ratingsEnabled: Boolean = false, val locationConsent: LocationConsent = LocationConsent(),
   )
 
   suspend fun me(): ApiResult<Me> = result {
     val out = api.get(ApiEndpoints.Courier.ME)
     val c = out["courier"] as? JsonObject ?: JsonObject(emptyMap())
+    val lc = out["locationConsent"] as? JsonObject ?: JsonObject(emptyMap())
     Me(
       CourierWire.str(c, "id"), CourierWire.str(c, "name"), CourierWire.bool(c, "active"),
       CourierWire.long(c, "cashCapMinor") ?: 0L, CourierWire.bool(out, "callEnabled"),
       CourierWire.bool(out, "routeEnabled"), CourierWire.bool(out, "ratingsEnabled"),
+      LocationConsent(CourierWire.bool(lc, "required"), CourierWire.bool(lc, "granted"), CourierWire.long(lc, "grantedAt")),
     )
+  }
+
+  /** پاسخِ «اشتراکِ موقعیت»: حالِ تازه از سرور (`unchanged` ⇒ همان پیشین) */
+  data class ConsentAnswer(val granted: Boolean, val grantedAt: Long?)
+
+  /**
+   *  S94: «اشتراکِ موقعیت» ِ خودِ پیک (`PUT /api/courier/location-consent`) — فقط آنلاین؛ «نه» نقطه‌های ذخیره‌شدهٔ
+   *  مأموریت‌های همین پیک را همان دم روی سرور پاک می‌کند. تکرارِ همان حال بی‌اثر است (سرور `unchanged`).
+   */
+  suspend fun setLocationConsent(granted: Boolean): ApiResult<ConsentAnswer> = result {
+    val out = api.put(ApiEndpoints.Courier.LOCATION_CONSENT, buildJsonObject { put("granted", JsonPrimitive(granted)) })
+    ConsentAnswer(CourierWire.bool(out, "granted"), CourierWire.long(out, "grantedAt"))
   }
 
   /**

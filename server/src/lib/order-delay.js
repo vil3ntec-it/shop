@@ -25,6 +25,7 @@ const { now, tx } = db;
 const { ulid } = require('./ulid');
 const orders = require('./orders');
 const { stripControl } = require('./validate');
+const maskCards = (t) => require('./ops-errors').maskCards(t);   //  S117: شمارهٔ کاملِ کارت ⇒ «[کارت]» پیش از دیتابیس و هشِ تکرار
 const { badRequest, notFound, conflict } = require('../middleware/errors');
 
 const FLAG_KEY = 'shop.orders.delay';
@@ -50,7 +51,7 @@ function parse(body) {
   }
   const reason = typeof b.reason === 'string' ? b.reason.trim() : '';
   if (reason && !DELAY_REASONS.includes(reason)) throw badRequest('دلیل معتبر نیست', 'bad_reason');
-  const note = stripControl(typeof b.note === 'string' ? b.note.trim() : '').slice(0, 300);
+  const note = maskCards(stripControl(typeof b.note === 'string' ? b.note.trim() : '').slice(0, 300));
   if (reason === 'other' && !note) throw badRequest('برای «دلیلِ دیگر» توضیح لازم است', 'note_required');
   let expected;
   if (Object.prototype.hasOwnProperty.call(b, 'expectedReadyAt')) {

@@ -69,6 +69,8 @@ const configOf = (pickingOn = true) => ({
 });
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
 const clean = (v, max) => stripControl(str(v)).slice(0, max);
+/** S117 — یادداشتِ آزادِ کارمند (پیشنهاد، رضایتِ مشتری، تسویه) بی شمارهٔ کاملِ کارت، پیش از دیتابیس و هشِ تکرار. */
+const noteOf = (v, max) => require('./ops-errors').maskCards(clean(v, max));
 const asJson = (x) => (x && typeof x === 'object' ? x : (() => { try { return JSON.parse(x); } catch { return {}; } })());
 
 function parse(body) {
@@ -90,14 +92,14 @@ function parse(body) {
   });
   const reason = str(b.reason);
   if (reason && !REASONS.includes(reason)) throw badRequest('دلیل معتبر نیست', 'bad_reason');
-  const note = clean(b.note, 300);
+  const note = noteOf(b.note, 300);
   if (reason === 'other' && !note) throw badRequest('برای «دلیلِ دیگر» توضیح لازم است', 'note_required');
   let consent = null;
   if (b.consent !== undefined && b.consent !== null) {
     const k = b.consent && typeof b.consent === 'object' ? b.consent : {};
     const via = str(k.via);
     if (!CONSENT_VIA.includes(via)) throw badRequest('راهِ رضایتِ مشتری معتبر نیست', 'bad_consent');
-    consent = { via, note: clean(k.note, 300) };
+    consent = { via, note: noteOf(k.note, 300) };
   }
   return { changes, reason, note, consent };
 }
@@ -414,7 +416,7 @@ function parseSettle(body) {
   const b = body && typeof body === 'object' ? body : {};
   const method = str(b.method);
   if (!SETTLE_METHODS.includes(method)) throw badRequest('روشِ تسویه فقط نقد یا حساب‌پیِ دستی است (بی درگاه)', 'bad_method');
-  return { method, note: clean(b.note, 300) };
+  return { method, note: noteOf(b.note, 300) };
 }
 
 /**
@@ -496,7 +498,7 @@ async function settlementsOf(shopId, w) {
 
 module.exports = {
   FLAG_KEY, PAID_FLAG_KEY, AMEND_STATUSES, SHEETLESS_STATUS, REASONS, CONSENT_VIA, SETTLE_METHODS, TTL_MS, TYPES,
-  flagOf, paidFlagOf, configOf, parse, plan, ledgerOf, propose, decide, settle, settlementsOf, staffOf, withAmendment,
+  flagOf, paidFlagOf, configOf, parse, parseSettle, plan, ledgerOf, propose, decide, settle, settlementsOf, staffOf, withAmendment,
   //  CHK-21 (`order-add-items.js`) همین قفل، دروازه و رویداد را به کار می‌برد — نسخهٔ دوم نه
   lockOrder, event, blockerOf, BLOCK_MESSAGE,
 };

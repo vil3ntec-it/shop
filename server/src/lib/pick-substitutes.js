@@ -551,6 +551,22 @@ async function forCustomer(store, token) {
   return { substitutions: rows.map((r) => customerView(r, lines.get(Number(r.line_no)), at)) };
 }
 
+/**
+ * S93 — کلیدِ `substitutionWait` ِ پیگیریِ ویترین (`lib/store-order-view.js`): «جایگزینی در انتظارِ پاسخِ شما».
+ * فقط با پرچمِ `shop.orders.picking`، سفارشِ «در حال جمع‌آوری» و دستِ‌کم یک پیشنهادِ «در انتظار» ِ مهلت‌نگذشته ⇒
+ * `{ open, deadlineAt }` (شمار و نزدیک‌ترین مهلت)؛ وگرنه undefined (کلید نیست). ⛔ فقط خواندن: وضعیتِ سفارش در ماشینِ
+ * وضعیت همان `picking` می‌ماند و مهلتِ گذشته «در انتظار» نیست (ترجیحِ قلم اعمال می‌شود، `applyTimeouts`).
+ */
+async function trackView(shopId, orderId, status, at = now()) {
+  if (status !== 'picking' || !(await require('./order-picking').flagOf(shopId))) return undefined;
+  const r = (await db.query(
+    `SELECT COUNT(*)::int AS n, MIN(deadline_at) AS d FROM order_pick_substitutions
+      WHERE shop_id=$1 AND order_id=$2 AND status='pending' AND deadline_at > $3`, [shopId, orderId, at]
+  )).rows[0];
+  const open = Number(r.n);
+  return open ? { open, deadlineAt: Number(r.d) } : undefined;
+}
+
 async function decideByCustomer(store, token, subId, body) {
   const id = await orderOfToken(store, token);
   const out = await decide(store.shop_id, id, subId, body, { by: 'customer', actorId: '' });
@@ -590,5 +606,5 @@ async function setAttrs(shopId, productId, body, userId) {
 module.exports = {
   DEFAULT_WAIT_MIN, MIN_WAIT_MIN, MAX_WAIT_MIN, SUGGESTIONS,
   factsOf, suggestions, propose, decide, applyTimeouts, pendingOf, withdrawLine, forSheet,
-  forCustomer, decideByCustomer, setAttrs, customerLinks,
+  forCustomer, decideByCustomer, setAttrs, customerLinks, trackView,
 };

@@ -33,6 +33,8 @@ const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { badRequest, notFound, conflict } = require('../middleware/errors');
 const idempotency = require('../lib/idempotency');
 const { reasonOf } = require('../lib/admin-access');
+/** S117 — یادداشتِ پنل برای دکان بی شمارهٔ کاملِ کارت (`ops-errors.maskCards`)؛ پمپ بیت‌به‌بیت همان (O-19). */
+const shopNote = (app, t) => (app === tenancy.PUMP.app ? t : require('../lib/ops-errors').maskCards(t));
 
 const router = express.Router();
 router.use(requireAdmin);
@@ -108,7 +110,7 @@ async function paymentInput(body, cur = null) {
     method: body?.method === undefined && cur ? cur.method
       : v.oneOf(body?.method, ['cash', 'hawala', 'exchange'], { field: 'روش', def: 'cash' }),
     receiptNo: body?.receiptNo === undefined && cur ? cur.receipt_no : v.text(body?.receiptNo, { max: 60 }),
-    note: body?.note === undefined && cur ? cur.note : v.text(body?.note, { max: 300 }),
+    note: body?.note === undefined && cur ? cur.note : shopNote(app, v.text(body?.note, { max: 300 })),
     paidAt: body?.paidAt === undefined && cur ? Number(cur.paid_at) : v.timestamp(body?.paidAt, { def: now() }),
   };
 }
@@ -551,7 +553,7 @@ for (const [prefix, app] of [['/subscriptions', 'shop'], ['/pump/subscriptions',
     try {
       const addon = await discounts.addAddon({
         app, subscriptionId: v.id(req.params.id), feature: v.text(req.body?.feature, { max: 40, required: true, field: 'قابلیت' }),
-        price: v.integer(req.body?.price, { min: 0, max: 1e9, def: 0 }), note: v.text(req.body?.note, { max: 200 }), by: req.admin.id,
+        price: v.integer(req.body?.price, { min: 0, max: 1e9, def: 0 }), note: shopNote(app, v.text(req.body?.note, { max: 200 })), by: req.admin.id,
       });
       await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.addon_added', targetType: 'subscription', targetId: req.params.id, detail: { app, feature: addon.feature } });
       res.status(201).json({ addon });

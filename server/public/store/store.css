@@ -102,6 +102,7 @@
 .banner { flex: 0 0 min(86%, 420px); display: flex; flex-direction: column; align-items: flex-start; gap: var(--s2); padding: var(--s4); scroll-snap-align: start; }
 .banner p { margin: 0; color: var(--muted); }
 .banner .btn { margin-top: auto; }
+.banner .vs-img { width: 96px; height: 96px; border-radius: var(--r-ctl); font-size: 34px; }
 /* WEB-07/10: فیلترِ کاتالوگ و «خبرم کن» (store/filters.js ِ دیربار) */
 .filters summary {
   cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: var(--s2); min-height: 44px; padding: 0 var(--s4);

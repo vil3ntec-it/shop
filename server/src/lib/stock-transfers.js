@@ -55,6 +55,8 @@ function text(v, max) {
   const { stripControl } = require('./validate');
   return stripControl(str(v)).slice(0, max);
 }
+/** S117 — یادداشت و دلیلِ آزادِ انتقال بی شمارهٔ کاملِ کارت (`ops-errors.maskCards`)، پیش از دیتابیس و هشِ تکرار. */
+const noteText = (v, max) => require('./ops-errors').maskCards(text(v, max));
 const hashOf = (body) => crypto.createHash('sha256').update(stable(body || {})).digest('hex').slice(0, 32);
 function decode(v) {
   if (v === null || v === undefined) return null;
@@ -99,7 +101,7 @@ function parseSend(body) {
     seen.add(productId);
     return { productId, sentMilli: qtyOf(l.qtyMilli) };
   });
-  return { from, to, lines, note: text(b.note, 300) };
+  return { from, to, lines, note: noteText(b.note, 300) };
 }
 
 /** درخواستِ دریافت ⇒ { given: Map<pid, milli>, reason, final } */
@@ -115,7 +117,7 @@ function parseReceive(body) {
     if (given.has(pid)) throw badRequest('هر کالا یک بار می‌آید', 'duplicate_product');
     given.set(pid, qtyOf(l.receivedMilli, { zero: true }));
   }
-  return { given, reason: text(b.reason, 120), final: b.final !== false };
+  return { given, reason: noteText(b.reason, 120), final: b.final !== false };
 }
 
 const received = (l) => (l.receivedMilli === null || l.receivedMilli === undefined ? 0 : num(l.receivedMilli));
@@ -401,7 +403,7 @@ function receive(shopId, id, { key, body, actor }) {
 
 /** رد در مقصد: ماندهٔ در مسیر به مبدأ برمی‌گردد؛ دلیل اجباری. */
 function reject(shopId, id, { key, body, actor }) {
-  const plan = rejectPlan(text(body && body.reason, 120));
+  const plan = rejectPlan(noteText(body && body.reason, 120));
   return closeApi(shopId, id, { key, body, actor }, plan);
 }
 
@@ -416,7 +418,7 @@ function deviceStep(x) {
   const lines = (Array.isArray(x.lines) ? x.lines : []).slice(0, MAX_LINES)
     .map((l) => ({ productId: str(l && l.productId).slice(0, 128), qtyMilli: Number.isSafeInteger(l && l.qtyMilli) ? l.qtyMilli : 0 }));
   const ref = { id: str(x.transferId).slice(0, 128), sendKey: str(x.sendKey).slice(0, 128) };
-  return { step, lines, ref, note: text(x.step === 'send' ? x.note : x.reason, 300) };
+  return { step, lines, ref, note: noteText(x.step === 'send' ? x.note : x.reason, 300) };
 }
 
 /**
@@ -509,5 +511,5 @@ async function steps(shopId, keys) {
 
 module.exports = {
   ENDPOINTS, STATUSES, OPEN, MAX_LINES, MAX_KEYS, DEVICE_TYPE,
-  parseSend, parseReceive, send, receive, reject, list, steps, ingestDevice, isDeviceRow,
+  parseSend, parseReceive, deviceStep, send, receive, reject, list, steps, ingestDevice, isDeviceRow,
 };
