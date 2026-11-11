@@ -372,16 +372,16 @@ class ConvertFidelityTest {
     assertEquals(333.0, s.finalTotal, 0.0)
     val its = d.saleItems.filter { it.saleId == s.id }
     val all = (ReturnFlow.quote(d, s.id, its.associate { it.id to ReturnFlow.Pick(it.quantity) }) as ReturnFlow.Outcome.Ok).value
-    //  ۲۵۶٫۵ ⇒ ۲۵۷، ۷۲، ۴٫۵ ⇒ ۵؛ اضافهٔ گرد از قلمِ آخر ⇒ ۴ و جمع همان ۳۳۳
-    assertEquals(listOf(257.0, 72.0, 4.0), all.lines.map { it.amount })
+    //  O-22 ب: برگشتِ پایانِ هر قلم دقیقاً باقی‌مانده ⇒ ۲۵۶٫۵، ۷۲، ۴٫۵ و جمع همان ۳۳۳ (الف: ۲۵۷، ۷۲، ۵ ⇒ قلمِ آخر ۴)
+    assertEquals(listOf(256.5, 72.0, 4.5), all.lines.map { it.amount })
     assertEquals(s.finalTotal, all.total, 0.0)
-    //  تکه‌تکه: ۱ چای ۸۶، سپس ۲ چای ۱۷۱ = ۲۵۷
+    //  تکه‌تکه: ۱ چای کفِ ۸۵٫۵ ⇒ ۸۵، سپس ۲ چای باقی‌ماندهٔ ۱۷۱٫۵ = ۲۵۶٫۵ (الف: ۸۶ و ۱۷۱)
     val tea = its.first { it.productId == "tea" }
     val req = ReturnFlow.Request(docId = "r1", saleId = s.id, picks = mapOf(tea.id to ReturnFlow.Pick(1.0)), reason = "خراب")
     val one = (ReturnFlow.post(d, req, today, t0 + 1, ::newId) as ReturnFlow.Outcome.Ok).value
-    assertEquals(86.0, one.total, 0.0)
+    assertEquals(85.0, one.total, 0.0)
     val two = (ReturnFlow.quote(one.data, s.id, mapOf(tea.id to ReturnFlow.Pick(2.0))) as ReturnFlow.Outcome.Ok).value
-    assertEquals(171.0, two.total, 0.0)
+    assertEquals(171.5, two.total, 0.0)
     //  قلمِ فاکتور دست نمی‌خورد جز شمارندهٔ برگشت: سری (کالا به همان سری برمی‌گردد، `StockLedger`) و بهای تمام‌شده همان
     val after = one.data.saleItems.first { it.id == tea.id }
     assertEquals(tea.copy(returnedQty = 1.0), after)
@@ -389,14 +389,16 @@ class ConvertFidelityTest {
   }
 
   @Test
-  fun `قاعدهٔ گردِ برگشت — برگشتِ کاملِ سه قلمِ ۱۰ با تخفیفِ ۲ هنوز ۲۷ پس می‌دهد نه ۲۸ (گزارش شد، عوض نشد)`() {
+  fun `قاعدهٔ گردِ برگشت — برگشتِ کاملِ سه قلمِ ۱۰ با تخفیفِ ۲ ۲۷٫۹۹ پس می‌دهد نه ۲۸ (O-22 ب: هر قلم دقیق تا یک‌صدم)`() {
     val three = listOf(SalesEngine.CartLine("a1", 1.0, 10.0, "الف"), SalesEngine.CartLine("a2", 1.0, 10.0, "ب"), SalesEngine.CartLine("a3", 1.0, 10.0, "ج"))
     val r = ok(SalesEngine.record(shop, three, SalesEngine.Checkout(discountValue = 2.0), today, t0, ::newId))
     val s = sale(r)
     assertEquals(28.0, s.finalTotal, 0.0)
     val q = (ReturnFlow.quote(r.data, s.id, items(r).associate { it.id to ReturnFlow.Pick(1.0) }) as ReturnFlow.Outcome.Ok).value
-    //  هر قلم round(۱۰ × ۲۸ ÷ ۳۰) = ۹ (SEC-DATA-01، هم‌زادِ `return-line-cap.js` با سقفِ همین ۹)؛ کفِ «برگشتِ کامل = پرداختی» نیست
-    assertEquals(27.0, q.total, 0.0)
+    //  هر قلم پولِ همان قلم تا یک‌صدم: round(۱۰ × ۲۸ ÷ ۳۰ × ۱۰۰) = ۹٫۳۳ (O-22 ب، هم‌زادِ `return-line-cap.js` با سقفِ همین ۹٫۳۳؛
+    //  الف: ۹ و جمع ۲۷)؛ کفِ «برگشتِ کامل = پرداختی» نیست
+    assertEquals(listOf(9.33, 9.33, 9.33), q.lines.map { it.amount })
+    assertEquals(27.99, q.total, 0.0)
   }
 
   @Test

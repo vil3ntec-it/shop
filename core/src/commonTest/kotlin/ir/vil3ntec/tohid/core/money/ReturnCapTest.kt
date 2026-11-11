@@ -73,10 +73,12 @@ class ReturnCapTest {
   }
 
   @Test
-  fun capIsTheWholeLineAfterInvoiceDiscountInWholeAfghani() {
+  fun capIsTheWholeLineAfterInvoiceDiscountExactToThePul() {
+    //  O-22 ب: دقیق تا یک‌صدم (الف: افغانیِ کامل، ۱۴۰۰ و ۱۰۰)
     assertEquals(500L, ReturnCap.capMinor(5.0, 1.0))
-    assertEquals(1400L, ReturnCap.capMinor(15.0, 0.9))
-    assertEquals(100L, ReturnCap.capMinor(0.5, 1.0))
+    assertEquals(1350L, ReturnCap.capMinor(15.0, 0.9))
+    assertEquals(50L, ReturnCap.capMinor(0.5, 1.0))
+    assertEquals(67L, ReturnCap.capMinor(1.0, 2.0 / 3.0))
     assertEquals(0L, ReturnCap.capMinor(500.0, -1.0))
     assertEquals(0L, ReturnCap.capMinor(Double.NaN, 1.0))
   }
@@ -84,7 +86,7 @@ class ReturnCapTest {
   @Test
   fun capMatchesAFullReturnShare() {
     //  برگشتِ همهٔ قلم با `ReturnShare` دقیقاً همان سقف است، پس صفحهٔ برگشت خودش هرگز بیش از آن نمی‌سازد
-    for ((total, qty, ratio) in listOf(Triple(5.0, 2.0, 1.0), Triple(15.0, 3.0, 0.9), Triple(1.0, 1.0, 2.0 / 3.0), Triple(375.0, 1.25, 1.0))) {
+    for ((total, qty, ratio) in listOf(Triple(5.0, 2.0, 1.0), Triple(15.0, 3.0, 0.9), Triple(1.0, 1.0, 2.0 / 3.0), Triple(375.0, 1.25, 1.0), Triple(375.0, 1.25, 0.9))) {
       assertEquals(ReturnCap.capMinor(total, ratio), ReturnCap.minor(ReturnShare.amount(total, qty, 0.0, qty, ratio)))
     }
   }

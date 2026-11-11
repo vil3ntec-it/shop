@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- *  SEC-DATA-01 — `ReturnShare.amount` روی همهٔ `license/test-vectors/return-share-v1.json`؛
+ *  SEC-DATA-01 و O-22 ب — `ReturnShare.amount` روی همهٔ `license/test-vectors/return-share-v2.json`؛
  *  همان فایل را `server/test/return-share.test.js` برای `returnShare` ِ `license/money.js` می‌خواند.
  *  core وابستگیِ JSON ندارد، پس هر ردیف (یک خط) با الگو خوانده می‌شود.
  */
@@ -15,11 +15,11 @@ class ReturnShareVectorsTest {
   private fun vectorText(): String {
     var dir: File? = File("").absoluteFile
     while (dir != null) {
-      val f = File(dir, "license/test-vectors/return-share-v1.json")
+      val f = File(dir, "license/test-vectors/return-share-v2.json")
       if (f.isFile) return f.readText()
       dir = dir.parentFile
     }
-    error("license/test-vectors/return-share-v1.json پیدا نشد")
+    error("license/test-vectors/return-share-v2.json پیدا نشد")
   }
 
   private fun num(line: String, key: String): Double =
@@ -31,8 +31,9 @@ class ReturnShareVectorsTest {
 
   @Test
   fun everyVectorCase() {
+    assertTrue(vectorText().contains("\"version\": 2"), "نسخهٔ ۲ ِ بردار (O-22 ب)")
     val rows = vectorText().lines().filter { it.trimStart().startsWith("{ \"name\"") }
-    assertTrue(rows.size >= 10, "ردیف‌ها ${rows.size}")
+    assertTrue(rows.size >= 15, "ردیف‌ها ${rows.size}")
     for (line in rows) {
       val name = Regex("\"name\": \"([^\"]*)\"").find(line)!!.groupValues[1]
       var before = 0.0
