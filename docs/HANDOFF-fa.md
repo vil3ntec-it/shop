@@ -54,6 +54,23 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۱ (ب) — هماهنگ‌کننده، دستهٔ ۴۹ (سیزنِ `session_01BwqpPed1SJuwB7Q4nZUbg9`) — **از این‌جا ادامه بده**
+
+- **انجام شد:** #1033 مرج (`21b802fe6`). در `ccr-3a0d593c-ac0jpj-batch-49`: `b8fa597cf` و main ِ تازه، سپس سه نیمه‌کاره:
+  - `claude/panel-doors`: بی تغییر؛ ۷ پروندهٔ آزمون ۵۰/۵۰ روی PGlite و PostgreSQL 16؛ با RULES ِ server «۱.۵۰.۸۹/۹۰» می‌خواند.
+  - `claude/owner-yes-4` (`3b144409d`): ۴-۳ «الف» تمام — «انتخاب روی نقشه» (`store/pin-map.js`، واژه‌نامهٔ `map`، `shop.storefront.map_pin` + `STORE_MAP_TILES`،
+    FLAGS-ON §۲۳، OWNER-ACTIONS §۹ الف ۱۰ و ب ۸؛ `store-map.test.js` ۳/۳، `web-store-zones.mjs` ۱۱۵ ✅)؛ ۳-۱۱ «الف» — ۱۷ مسیرِ دقیق در `server.yml`.
+    **مانده از owner-yes-4:** ۴-۲ (libvips/WebP، وابستگیِ تازهٔ سرور) و ۴-۲۳ پرسشِ ۱ (صفحهٔ استودیوی عکس در برنامه) — ساخته نشد.
+  - `claude/e-rows-7`: بازبینی و آزمون (سرور ۲۰۹/۰ سرخ، `subwait` ۴۲، `vsearch` ۲۹، `push` ۳۹ ✅)؛ `CourierLabels.clock` بی `java.util` (سنجهٔ راهِ آیفون).
+  - پس از ادغام: `card-data` روی «pan» ِ نقشه و توضیحِ `orders.js` سرخ شد ⇒ نام‌ها درست شد (سنجه سست نشد).
+- **آزمون روی دسته:** هستهٔ کاتلین **محلی** `gradle -p core jvmTest` ⇒ ۱۸۰۱ آزمون، ۰ شکست (با `LC_ALL=C.UTF-8` و `-Dsun.jnu.encoding=UTF-8`؛ بی آن نامِ
+  فارسیِ آزمون «Malformed input» می‌دهد). desktop/اندروید محلی به ۴۲۹ ِ Maven خورد ⇒ فقط CI. همهٔ زنجیره‌های مرورگر محلی (۲۷ اسکریپت) بی ایست سبز.
+- **SR49** (بازبینِ مستقل، `SECURITY-AUDIT-fa.md` B14): SR49-1 Medium (شکستنِ شیشهٔ پل بی `X-Actor-Reauth-At`) بسته + همتای پنل server **#139**
+  (نسخه 1.50.91)؛ SR49-3 و SR49-4 بسته؛ SR49-2 پذیرفته (قراردادِ پنل).
+- **قدمِ بعد:** PGlite ِ کامل ⇒ PR ِ دسته ⇒ CI ⇒ squash؛ server #139 پس از CI. سپس دورِ سومِ شاهدِ CI، ۴-۲ و ۴-۲۳ (۱)، کلیدِ امضا (پایین).
+- **کلیدِ امضای تازه:** کلید فقط روی کامپیوترِ صاحب‌کار ساخته می‌شود (`OWNER-ACTIONS-fa.md` §۲ گامِ ۴)؛ پیش از آن گامِ ۳ (`Integrity.kt` با فهرستِ
+  اثرِ انگشتِ قدیم و جدید) کارِ Claude است و هنوز ساخته نشده.
+
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/panel-doors` (سمتِ سرورِ حسابِ دو درِ پنل: ۴-۱ «ب» مترادف و ۲-۹ دسترسیِ پشتیبانی؛ روی `ccr-…-batch-49` ‏e260b8d74؛ پنل: `vil3ntec-it/server#138` ‏c375c3d، ۱.۵۰.۸۹ و ۱.۵۰.۹۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: **`synonyms.v1`** — `GET|PUT /api/admin/search/synonyms` (`routes/admin-synonyms.js`، `lib/search-synonyms.js`؛ سندِ `search_synonyms` ِ `app_config`، بی مهاجرت): سنجشِ همان پنل، ارشد + دلیل، قفلِ نسخه (‎409 synonyms_version‎)، `unchanged`، `Idempotency-Key`، سابقهٔ `admin.synonyms_updated`؛ ویترین پشتِ پرچمِ خاموشِ تازهٔ `shop.storefront.synonyms` (روی `search_core`) همان `text-core.matches` با گروه‌ها. **`support-access.v1`** — مهاجرتِ **۸۱۰** `admin_access_grants` (۰۷۹ ِ طرح گرفته شده بود)، `lib/support-access.js`، `routes/admin-access-grants.js` (`GET|POST /api/admin/shops/:id/access-grants`، `…/break-glass`، `…/:gid/revoke`) و سمتِ صاحب `routes/shop-support-access.js` (`/api/shop/support-access` + `accept` با تأییدِ دوباره، `deny`، `revoke`)؛ خبرِ داخلِ برنامهٔ صاحب، `notified` ِ راست، `useGrant`/`requireGrant(scope)`. سقفِ IP پیش از احراز در `routes/admin.js` (همان ۸۰۰ خط)؛ رده‌ها در `admin-control-plane`، `tenant-matrix`، `paid-routes-entitlement`، `shop-route-inventory`؛ `docs/api/routes.json` تازه.
 - آزمون: `search-synonyms` ۸/۸ و `support-access` ۱۴/۱۴ روی PGlite و PostgreSQL 16 (پیش از ساخت: بی کتابخانه هر دو پرونده سرخ؛ بی درها ۶/۸ و ۱۲ از ۱۳ آزمونِ نخست سرخ)؛ جهش‌ها همه سرخ (شرح در ردیف‌های TEN-04، POS-04، WEB-05).
