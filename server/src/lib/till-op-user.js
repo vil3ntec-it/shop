@@ -33,6 +33,7 @@ const { many, query, now } = require('../db');
 const orders = require('./orders');
 const tp = require('./till-pin');
 const { badRequest } = require('../middleware/errors');
+const { SHOP } = require('./tenancy');
 
 const FLAG = 'shop.till_op_user';
 const LATE_MS = 30 * 60 * 1000;
@@ -44,7 +45,7 @@ const MANAGERS = ['owner', 'manager'];
 const ACCEPTED_V3 = new Set(['applied', 'partial', 'conflict']);
 
 const flagOf = (shopId) => orders.flagOf(shopId, FLAG);
-const isShop = (ctx) => !!(ctx && ctx.app === 'shop' && ctx.accountKind === 'shop' && ctx.accountId);
+const isShop = (ctx) => !!(ctx && ctx.app === SHOP.app && ctx.accountKind === SHOP.app && ctx.accountId);
 const text = (v, max) => (typeof v === 'string' && v && v.length <= max ? v : '');
 
 /** دستگاهِ ردیفِ همین توکن (`devices.id`) — همان که `till-pin.verify` نوبت را رویش باز کرد؛ بی ردیف ⇒ '' */
@@ -102,7 +103,7 @@ async function record(b, path, items) {
 }
 
 const v1Item = (raw) => {
-  const v = require('./sync-v1').validateOp('shop', raw);
+  const v = require('./sync-v1').validateOp(SHOP.app, raw);
   if (!v.ok) return null;
   return { opId: v.op.op_id, table: v.op.table, rowId: v.op.row_id, type: v.op.type, ts: v.op.ts };
 };
