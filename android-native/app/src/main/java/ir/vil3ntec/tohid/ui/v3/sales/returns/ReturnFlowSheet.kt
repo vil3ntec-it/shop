@@ -27,8 +27,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrPos
+import ir.vil3ntec.tohid.core.i18n.StrRounding
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrSaleTax
 import ir.vil3ntec.tohid.core.stock.ExpiryGate
+import ir.vil3ntec.tohid.data.ExchangeTill
 import ir.vil3ntec.tohid.data.ReturnDecision
 import ir.vil3ntec.tohid.data.ReturnFlow
 import ir.vil3ntec.tohid.data.ReturnLeft
@@ -43,7 +46,6 @@ import ir.vil3ntec.tohid.data.TillGuardsPref
 import ir.vil3ntec.tohid.data.TillUser
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.sync.DocSeries
-import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.v1.Ulid
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
@@ -101,7 +103,7 @@ fun ReturnFlowSheet(
   val reasons = remember { ReturnSettings.reasons(context) }
   //  RET-09 — سیاستِ برگشتِ همین دستگاه (مهلت و غیرقابلِ برگشت)؛ خالی ⇒ بی اثر
   val policy = remember { ReturnPolicyPrefs.of(context) }
-  val me = remember { runCatching { SyncStore(context).accountName }.getOrDefault("").trim() }
+  val me = remember { TillUser.me(context).trim() } // S46: کاربرِ صندوق — فروشندهٔ فاکتورِ تعویض و نویسندهٔ برگشت؛ خاموش ⇒ نامِ حساب
   //  شناسه‌های سند و فروشِ تعویض پیش از نخستین تلاش (§۱۵.۲ بندِ ۱)
   val docId = remember { Ulid.next() }
   val saleKey = remember { Ulid.next() }
@@ -142,7 +144,8 @@ fun ReturnFlowSheet(
   val creditTo = if (mode == ReturnFlow.STORE_CREDIT) customerId else null
   val prior = remember(d, sale) { sale?.let { s -> d.saleReturns.filter { it.saleId == s.id } }.orEmpty() }
   val split = (ReturnFlow.split(sale, total, mode, me, creditTo, prior, sale?.let { ir.vil3ntec.tohid.data.PayStatusFlow.bySale(d)[it.id] }.orEmpty()) as? ReturnFlow.Outcome.Ok)?.value
-  val cartTotal = remember(d, cart) { SalesEngine.cartTotal(d, cart) }
+  //  RET-05: خریدِ تازه با مالیات و گردِ نقدیِ همین صندوق، همان حسابِ ثبت (`ExchangeTill`)
+  val bill = remember(d, cart, split?.cash) { ExchangeTill.preview(d, cart, guards.exchange(d, me, null, null), split?.cash ?: 0.0) }
   val approved = gate.decision == "allow" || (approval != null && ReturnFlow.canApprove(gate, approval!!.role))
   val requester = ReturnApproval.requester
 
@@ -295,9 +298,10 @@ fun ReturnFlowSheet(
     V3Card(radius = 16.dp, padding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) {
       MoneyLine(StrSale.returnAmount, total, strong = !exchange)
       if (exchange) {
-        MoneyLine(StrSale.newPurchase, cartTotal)
-        val due = cartTotal - (split?.cash ?: 0.0)
-        MoneyLine(if (due >= 0) StrSale.receiveFromCustomer else StrSale.payToCustomer, kotlin.math.abs(due), strong = true)
+        MoneyLine(StrSale.newPurchase, bill.goods)
+        if (bill.tax > 0) MoneyLine(StrSaleTax.line, bill.tax) // POS-37: فقط با مالیاتِ روشن
+        if (bill.rounding != 0.0) MoneyLine(StrRounding.line, bill.rounding) // PAY-09: فقط نقدی که مشتری می‌دهد
+        MoneyLine(if (bill.due >= 0) StrSale.receiveFromCustomer else StrSale.payToCustomer, kotlin.math.abs(bill.due), strong = true)
       }
       if (gate.decision != "allow") {
         Spacer(Modifier.height(8.dp))

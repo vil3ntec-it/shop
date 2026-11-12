@@ -136,7 +136,7 @@ object SalesEngine {
     val expiryApproval: ir.vil3ntec.tohid.core.stock.ExpiryGate.Approval? = null,
     /**
      *  POS-24 — قاعده‌های پیش از پایانِ فاکتور (`CheckoutRulesPref`، فقط صندوق). پیش‌فرض خاموش ⇒
-     *  همان امروز؛ تحویلِ سفارش (`OrderFulfillment`) و تعویض (`ReturnFlow`) همیشه خاموش می‌فرستند.
+     *  همان امروز؛ تحویلِ سفارش (`OrderFulfillment`) همیشه خاموش؛ فروشِ تعویض همان صندوق (`TillGuards.exchange`).
      */
     val rules: ir.vil3ntec.tohid.core.sale.CheckoutRules = ir.vil3ntec.tohid.core.sale.CheckoutRules.OFF,
     /** POS-11 — یادداشتِ فاکتور (`CartStore.note`)؛ `null` ⇒ فاکتورِ بی یادداشت، همان امروز */
@@ -145,10 +145,11 @@ object SalesEngine {
     val lineSellers: Boolean = false,
     /**
      *  PAY-09 — پلهٔ گردکردنِ نقدیِ صندوق به پول (`CashRoundPref`، فقط ۰/۵۰۰/۱۰۰۰). فقط نقدِ کامل (`payment = CASH`)
-     *  را گرد می‌کند؛ با [settlement] گرد از خودِ تسویه می‌آید. ۰ (پیش‌فرض، و هر ثبتِ بیرون از صندوق) ⇒ همان امروز.
+     *  را گرد می‌کند؛ با [settlement] گرد از خودِ تسویه می‌آید. ۰ (پیش‌فرض، و هر ثبتِ بیرون از صندوق و تعویض) ⇒ همان امروز.
      */
     val cashRounding: Long = 0,
-    val tax: ir.vil3ntec.tohid.core.sale.SaleTax.Config? = null, // POS-37: `SaleTaxPref.active`، فقط صندوق؛ null ⇒ همان امروز (`SaleTaxWiring`)
+    val tax: ir.vil3ntec.tohid.core.sale.SaleTax.Config? = null, // POS-37: `SaleTaxPref.active`، صندوق و تعویض (`TillGuards`)؛ null ⇒ همان امروز (`SaleTaxWiring`)
+    val cashCovered: Long = 0, // PAY-09 در تعویض (RET-05): نقدِ برگشتِ همان سند به پول ⇒ گرد فقط روی نقدی که مشتری می‌دهد (`ExchangeTill`)؛ ۰ ⇒ همان امروز
   )
 
   data class Totals(
@@ -330,6 +331,7 @@ object SalesEngine {
 
     return SaleTaxWiring.totals(d, cart, checkout.tax, subtotal, value, discount) // POS-37: مالیات روی (جمع − تخفیف)؛ بی تنظیم همان امروز
   }
+  fun cashRoundingMinor(finalTotal: Double, c: Checkout): Long = TillRounding.cash(PayFlow.minor(finalTotal) - c.cashCovered, c.cashRounding) // PAY-09: نقدِ کامل منهای نقدِ برگشتِ تعویض
 
   /**
    * ثبتِ فروش. اگر چیزی درست نباشد، دفتر دست‌نخورده می‌ماند و دلیلش
@@ -433,7 +435,7 @@ object SalesEngine {
     }
 
     //  PAY-09: ردیفِ جدای گردکردنِ نقدی — از تسویه، یا نقدِ کامل با پلهٔ صندوق؛ پله‌ی خاموش ⇒ ۰ و همان امروز
-    val roundingMinor = stl?.rounding ?: if (checkout.payment == Payment.CASH) TillRounding.cash(PayFlow.minor(t.finalTotal), checkout.cashRounding) else 0L
+    val roundingMinor = stl?.rounding ?: if (checkout.payment == Payment.CASH) cashRoundingMinor(t.finalTotal, checkout) else 0L
     val finalTotal = t.finalTotal + PayFlow.major(roundingMinor)
 
     // فروشِ نقدی همیشه کامل تسویه می‌شود
