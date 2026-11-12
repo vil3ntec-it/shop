@@ -342,7 +342,7 @@ object StrAccount {
   fun warnTitle(n: Any): String = t("${asIs(n)} روز تا پایانِ اشتراک", "$n ${pl(n, "day", "days")} until the subscription ends", "د ګډون تر پایه $n ورځې")
   /** S47: همان هشدار با روزِ دقیقِ پایان (`day` از `AccountFormat.date`، جدا از جهتِ جمله) */
   fun warnTitleOn(n: Any, day: String): String = t(
-    "${asIs(n)} روز تا پایانِ اشتراک — روزِ \u2066$day\u2069",
+    "${asIs(n)} روز تا پایانِ اشتراک — روزِ \u2066${asIs(day)}\u2069",
     "$n ${pl(n, "day", "days")} until the subscription ends — on $day",
     "د ګډون تر پایه $n ورځې — \u2066$day\u2069",
   )
