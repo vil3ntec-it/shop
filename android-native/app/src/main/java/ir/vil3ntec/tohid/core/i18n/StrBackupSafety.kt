@@ -29,9 +29,9 @@ object StrBackupSafety {
   val sealTitle: String get() = t("رمزِ نسخه‌های خودکار", "Encrypted automatic copies", "د خپلکاره نسخو کوډ")
   val sealToggle: String get() = t("رمز با عبارتِ بازیابی", "Encrypt with a recovery phrase", "د بېرته راګرځولو په عبارت کوډ")
   val sealFooter: String get() = t(
-    "نسخه‌های نیم‌ساعتهٔ دفتر روی همین دستگاه با کلیدی رمز می‌شوند که از عبارتِ بازیابیِ شما ساخته می‌شود. دستگاهِ تازه فقط همان عبارت را لازم دارد. خودِ دفتر و پشتیبان‌های دستی، پوشه و سرور مثلِ پیش می‌مانند.",
-    "The half-hourly copies of the ledger on this device are encrypted with a key made from your recovery phrase. A new device only needs that phrase. The ledger itself and manual, folder and server backups stay as before.",
-    "د دفتر نیم ساعته نسخې په همدې وسیله د هغې کیلي په واسطه کوډ کېږي چې ستاسو د بېرته راګرځولو له عبارت جوړېږي. نوې وسیله یوازې همغه عبارت ته اړتیا لري. پخپله دفتر او لاسي، فولډر او سرور بیک‌اپونه لکه پخوا پاتې کېږي.",
+    "نسخه‌های نیم‌ساعتهٔ دفتر روی همین دستگاه با کلیدی رمز می‌شوند که از عبارتِ بازیابیِ شما ساخته می‌شود. دستگاهِ تازه فقط همان عبارت را لازم دارد. خودِ دفتر و پشتیبانِ سرور مثلِ پیش می‌مانند؛ پشتیبانِ دستی و پوشه فقط با کلیدِ پایین رمزدار می‌شوند.",
+    "The half-hourly copies of the ledger on this device are encrypted with a key made from your recovery phrase. A new device only needs that phrase. The ledger itself and server backups stay as before; manual and folder backups are encrypted only with the switch below.",
+    "د دفتر نیم ساعته نسخې په همدې وسیله د هغې کیلي په واسطه کوډ کېږي چې ستاسو د بېرته راګرځولو له عبارت جوړېږي. نوې وسیله یوازې همغه عبارت ته اړتیا لري. پخپله دفتر او د سرور بیک‌اپ لکه پخوا پاتې کېږي؛ لاسي او فولډر بیک‌اپونه یوازې د لاندې کیلي سره کوډ کېږي.",
   )
   val sealOnLine: String get() = t("روشن — نسخه‌های تازه رمزدارند", "On — new copies are encrypted", "روښانه — نوې نسخې کوډ لري")
   val sealKeyMissing: String get() = t(
@@ -102,6 +102,30 @@ object StrBackupSafety {
     "To open: Settings ⇒ Data ⇒ Automatic copies ⇒ this phrase.",
     "د پرانیستلو لپاره: تنظیمات ⇐ معلومات ⇐ خپلکاره نسخې ⇐ همدا عبارت.",
   )
+  // ── رمزِ پشتیبانِ دستی و پوشه (`BackupSeal`) ──
+  val backupSealToggle: String get() = t("پشتیبانِ دستی و پوشه هم رمزدار", "Encrypt manual and folder backups too", "لاسي او فولډر بیک‌اپونه هم کوډ شي")
+  val backupSealOnLine: String get() = t(
+    "روشن — پشتیبانِ تازه فقط با همین عبارت باز می‌شود",
+    "On — new backups open only with this phrase",
+    "روښانه — نوی بیک‌اپ یوازې په همدې عبارت پرانیستل کېږي",
+  )
+  val backupSealKeyMissing: String get() = t(
+    "کلیدِ رمز روی این دستگاه باز نشد؛ پشتیبانِ دستی و پوشه ساخته نشد تا بی‌رمز بیرون نرود. «عبارتِ تازه» را بزنید یا این رمز را خاموش کنید.",
+    "The encryption key couldn't be opened on this device; the manual or folder backup wasn't made so it doesn't leave unencrypted. Tap “New phrase” or turn this encryption off.",
+    "د کوډ کیلي په دې وسیله پرانیستل نه شوه؛ لاسي او فولډر بیک‌اپ جوړ نه شو څو بې کوډه بهر ونه وځي. «نوی عبارت» کېکاږئ یا دا کوډ بند کړئ.",
+  )
+  val fileNeedsPhrase: String get() = t(
+    "این پشتیبان با عبارتِ بازیابی رمز شده و کلیدش روی این دستگاه نیست؛ از «تنظیمات ⇐ داده‌ها» با همان عبارت بازش کنید. هیچ چیزی عوض نشد.",
+    "This backup is encrypted with a recovery phrase and its key isn't on this device; open it from “Settings ⇐ Data” with that phrase. Nothing changed.",
+    "دا بیک‌اپ د بېرته راګرځولو په عبارت کوډ شوی او کیلي یې په دې وسیله کې نشته؛ له «امستنې ⇐ معلومات» څخه یې په همغه عبارت پرانیزئ. هېڅ شی بدل نه شو.",
+  )
+  val wrongPhraseFile: String get() = t(
+    "این عبارت این پشتیبان را باز نکرد — عبارتِ دیگری است، یا فایل دست‌خورده یا ناقص است. هیچ چیزی عوض نشد.",
+    "That phrase didn't open this backup — it's a different phrase, or the file was changed or is incomplete. Nothing changed.",
+    "دې عبارت دا بیک‌اپ پرانیستلی نه شو — بل عبارت دی، یا فایل لاس وهل شوی یا نیمګړی دی. هېڅ شی بدل نه شو.",
+  )
+  val unlockFileTitle: String get() = t("این پشتیبان رمزدار است", "This backup is encrypted", "دا بیک‌اپ کوډ لري")
+
   fun printDate(d: Any): String = t("ساخته‌شده: ${asIs(d)}", "Made: $d", "جوړ شوی: $d")
 
   // ── بازکردنِ نسخهٔ رمزدار ──

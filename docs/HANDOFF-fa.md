@@ -54,6 +54,22 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-15w زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-15w` (از `claude/batch-54`)
+
+- **OPS-02 (رمزِ پشتیبانِ دستی و پوشه درونِ برنامه):** `BackupSeal` (`data/BackupSealAndroid.kt`، تنظیمِ دستگاهِ `backup_seal`، پیش‌فرض
+  خاموش، فقط با کلیدِ عبارتِ `SnapshotSeal`) ⇐ کلِ ZIP در پاکتِ `rp1` با `PhraseBackup.sealing` ِ جریانی (بایت‌به‌بایت همان `seal`،
+  قراردادِ `phrase-backup.js`)؛ پوشه `….zip.sealed`؛ کلید باز نشد ⇒ هیچ فایلی، هرگز ساده. بازیابی با کلیدِ همین دستگاه یا برگهٔ عبارت
+  (`BackupController.unlockFile`)؛ عبارتِ اشتباه/فایلِ دست‌خورده ⇒ رد پیش از هر نوشتن. `BackupSealDrillTest` ۵/۵ (ده راهِ ردِ امن)، دو جهش سرخ؛ همسایه‌ها سبز. مانده: USB با یک لمس (دستگاه).
+- **PAY-08:** `core/pay/PayLevel` (سه سطح، `success`)، `core/terminal/DevicePay` (`VerifyingTerminal`، کلیدِ یکتایی، ازسرگیری با
+  `lookup`، `confirmed`+`device` فقط با پاسخِ کاملِ برابر، ناجوری/دیر ⇒ `needs_review`، یک ردیف) و `pay/DevicePaySettle` (همان
+  `HesabPaySettle.withRow`). `DevicePayTest` ۷/۷ (core، سه جهش سرخ)، `DevicePaySettleTest` ۳/۳. مانده: دستگاهِ واقعی با سندِ یکپارچه‌سازی و D-08 («بیرونی»).
+- **دام:** `quality.mjs` وابستگیِ پلتفرمیِ `AtRestEnvelope.kt` را سقف دارد ⇒ رمزِ جریانی در `core/atrest/platform/PhraseBackup.kt`
+  (پوشهٔ مرزی). `javax.crypto.CipherOutputStream` خطای `flush` ِ پس از برچسب را نادیده می‌گیرد ⇒ جریانِ خودمان. کامپایلِ کامپیوتر
+  با `-Xmx2g` ِ in-process «Java heap space» داد و با ۳g زیرِ بارِ عامل‌های دیگر کشته شد ⇒ `-Xmx3g -XX:+UseSerialGC --max-workers=1`.
+- **قدمِ بعد:** اجرای کاملِ کامپیوتر (`flock`، ۱۴:۰۲) ⇒ ۳۹۷۰ PASS، ۰ FAIL، ۴ SKIP ِ پیشینِ بنچ/عکس؛ precheck ⇒ `fail=0`؛ `quality.mjs` بی ❌. OPS-02: USB با یک لمس و برگهٔ عبارت روی گوشیِ واقعی؛
+  PAY-08: نخستین `VerifyingTerminal` ِ واقعی فقط با سندِ یکپارچه‌سازی (`VendorAppTerminal`)، سپس دکمه در `CardTerminalEntry`. ادغامِ
+  `claude/e-rows-15w` در دسته.
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-13u زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-13u` (از `claude/e-rows-11p`)
 
 - **ABUSE-01 (هنوز PARTIAL، فقط پنل):** ویترینِ وب «گزارشِ مشکل با این دکان» و «گزارشِ این کالا» دارد (`store/trust.js` ِ دیربار

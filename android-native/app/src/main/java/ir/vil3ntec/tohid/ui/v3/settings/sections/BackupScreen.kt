@@ -139,6 +139,19 @@ internal fun RouteScope.BackupScreen(onBack: (() -> Unit)?) {
           if (ctrl.sealOn) {
             V3Divider(start = ROW_DIVIDER_START)
             V3ListRow(StrBackupSafety.newPhrase, subtitle = StrBackupSafety.newPhraseLine, icon = Icons.Outlined.Key, tile = false, onClick = ctrl::startPhrase)
+            //  OPS-02: پشتیبانِ دستی و پوشه با همان کلیدِ عبارت (`BackupSeal`، پیش‌فرض خاموش)
+            V3Divider(start = ROW_DIVIDER_START)
+            V3ToggleRow(
+              StrBackupSafety.backupSealToggle,
+              checked = ctrl.backupSealOn,
+              onCheckedChange = ctrl::setBackupSeal,
+              subtitle = when {
+                !ctrl.backupSealOn -> null
+                ctrl.sealKeyReady -> StrBackupSafety.backupSealOnLine
+                else -> StrBackupSafety.backupSealKeyMissing
+              },
+              icon = Icons.Outlined.Lock,
+            )
           }
         }
       }
