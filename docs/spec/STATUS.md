@@ -59,7 +59,7 @@
 | PRES | ۱۰ | ۸ | ۲ | ۰ | ۰ | ۰ | ۰ |
 | CHAT | ۱۵ | ۷ | ۸ | ۰ | ۰ | ۰ | ۰ |
 | IMG | ۱۵ | ۹ | ۵ | ۰ | ۰ | ۰ | ۱ |
-| GATE-NEW | ۶ | ۱ | ۳ | ۱ | ۰ | ۰ | ۱ |
+| GATE-NEW | ۶ | ۲ | ۲ | ۱ | ۰ | ۰ | ۱ |
 | IMG-PRO | ۱۸ | ۷ | ۹ | ۰ | ۰ | ۰ | ۲ |
 | IMG-BANK | ۱۸ | ۱۸ | ۰ | ۰ | ۰ | ۰ | ۰ |
 | DEL | ۲ | ۲ | ۰ | ۰ | ۰ | ۰ | ۰ |
@@ -68,7 +68,7 @@
 | REC | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | REL | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | ABUSE | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
-| **همه** | ۷۶۴ | ۴۷۷ | ۲۴۱ | ۱۵ | ۰ | ۰ | ۳۱ |
+| **همه** | ۷۶۴ | ۴۷۸ | ۲۴۰ | ۱۵ | ۰ | ۰ | ۳۱ |
 
 ## خلاصه به تفکیکِ فاز
 
@@ -81,7 +81,7 @@
 | ۴ | ۱۴۱ | ۹۳ | ۳۸ | ۰ | ۰ | ۰ | ۱۰ |
 | ۵ | ۸۲ | ۴۵ | ۲۴ | ۱۰ | ۰ | ۰ | ۳ |
 | ۶ | ۶ | ۲ | ۴ | ۰ | ۰ | ۰ | ۰ |
-| بی‌فاز در سند | ۲۷۳ | ۱۶۶ | ۸۸ | ۳ | ۰ | ۰ | ۱۶ |
+| بی‌فاز در سند | ۲۷۳ | ۱۶۷ | ۸۷ | ۳ | ۰ | ۰ | ۱۶ |
 
 ## خلاصهٔ نسخهٔ ۱
 
@@ -89,7 +89,7 @@
 
 | دامنه | شمار | IMPLEMENTED-VERIFIED | PARTIAL | MISSING | BROKEN | NOT-VERIFIED | BLOCKED-EXTERNAL |
 |---|---|---|---|---|---|---|---|
-| نسخهٔ ۱ | ۷۴۳ | ۴۷۳ | ۲۳۵ | ۵ | ۰ | ۰ | ۳۰ |
+| نسخهٔ ۱ | ۷۴۳ | ۴۷۴ | ۲۳۴ | ۵ | ۰ | ۰ | ۳۰ |
 | پس از انتشار | ۲۱ | ۴ | ۶ | ۱۰ | ۰ | ۰ | ۱ |
 
 ## F0
@@ -1046,7 +1046,7 @@
 
 | شناسه | عنوان | بخش | فاز | اولویت | وضعیت | تأیید: دستور و نتیجه | اتصال بیرونی | مانع | commit/PR |
 |---|---|---|---|---|---|---|---|---|---|
-| GATE-NEW-01 | PRES-01 تا PRES-10 روی API و رابط‌های هدف اجرا شوند؛ تفاوت «ساعت کاری»، «حضور اعلام‌شده»،… | §۳۵ | — | — | PARTIAL | PRES روی API آزموده شد (`storefront` ⇒ ۱۶/۱۶)؛ رابطِ صاحب دکان در برنامه روی main است (#266)، بی آزمونِ رابط؛ **`claude/e-rows-8b` (۱۴۰۵/۰۸/۲۲):** آزمونِ رابط برای PRES روی برگهٔ «وضعیت» ِ ویترین (`StatusPane`): `PresenceUiTest` (تازه) ساعتِ کاری (`caption`)، حضورِ اعلام‌شده (`headline`)، تپش (`connection`) و امکانِ سفارش (`OnlineFmt.acceptance`) را جدا و هر کدام از فیلدِ خودش می‌سنجد — PRES-01 (آنلاین تا، ساعتِ دکان)، PRES-03، PRES-04/05 (سرخط حکمِ سرور، نه `declaredUntil` ِ مانده)، PRES-06 (تعطیلِ استثنایی، روزِ بی ساعت، تنظیم‌نشده، دو بازه)، PRES-07 (آفلاین ولی سفارش ثبت می‌شود)؛ رفعِ PRES-03: خطِ تپش حکمِ `connection` ِ سرور (`unconfirmed`/`lost`) را هم می‌گوید (`PresenceModel.connection`، `OnlineFmt.connectionStale/Lost`)، پیش‌تر تپشِ کهنه همان «آخرین تأییدِ اتصال» ِ تازه خوانده می‌شد؛ PRES-02/08/09 با `PresenceSenderDesktopTest` — `./desktop/gradlew -p desktop test --tests '*PresenceUiTest*' --tests '*StorefrontModelTest*' --tests '*PresenceSenderDesktopTest*'` ⇒ ۵/۵، ۷/۷، ۵/۵ (بی SKIP). مانده: شاهدِ CI؛ صفحهٔ کهنهٔ `ui/screens/Storefront.kt` همان پیشین؛ **`claude/verify-rows-i` (۱۴۰۵/۰۸/۲۲):** شاهدِ محلی (محلی، نه CI): اجرای کاملِ `./desktop/gradlew -p desktop test --offline --max-workers=2 -Dorg.gradle.jvmargs=-Xmx2g` (۳۸۸۶ آزمون، ۰ شکست، ۴ SKIP ِ پیشینِ بنچ/عکس) — `PresenceUiTest` ۵/۵، `StatusPaneUiTest` ۶/۶، `StorefrontModelTest` ۷/۷، `PresenceSenderDesktopTest` ۵/۵. مانده (PARTIAL): شاهدِ CI پس از مرج و صفحهٔ کهنهٔ `ui/screens/Storefront.kt` | — | — | #244 (ee7f572)؛ #266 (4e854de)، `claude/e-rows-8b`، `claude/verify-rows-i` |
+| GATE-NEW-01 | PRES-01 تا PRES-10 روی API و رابط‌های هدف اجرا شوند؛ تفاوت «ساعت کاری»، «حضور اعلام‌شده»،… | §۳۵ | — | — | IMPLEMENTED-VERIFIED | PRES روی API آزموده شد (`storefront` ⇒ ۱۶/۱۶)؛ رابطِ صاحب دکان در برنامه روی main است (#266)، بی آزمونِ رابط؛ **`claude/e-rows-8b` (۱۴۰۵/۰۸/۲۲):** آزمونِ رابط برای PRES روی برگهٔ «وضعیت» ِ ویترین (`StatusPane`): `PresenceUiTest` (تازه) ساعتِ کاری (`caption`)، حضورِ اعلام‌شده (`headline`)، تپش (`connection`) و امکانِ سفارش (`OnlineFmt.acceptance`) را جدا و هر کدام از فیلدِ خودش می‌سنجد — PRES-01 (آنلاین تا، ساعتِ دکان)، PRES-03، PRES-04/05 (سرخط حکمِ سرور، نه `declaredUntil` ِ مانده)، PRES-06 (تعطیلِ استثنایی، روزِ بی ساعت، تنظیم‌نشده، دو بازه)، PRES-07 (آفلاین ولی سفارش ثبت می‌شود)؛ رفعِ PRES-03: خطِ تپش حکمِ `connection` ِ سرور (`unconfirmed`/`lost`) را هم می‌گوید (`PresenceModel.connection`، `OnlineFmt.connectionStale/Lost`)، پیش‌تر تپشِ کهنه همان «آخرین تأییدِ اتصال» ِ تازه خوانده می‌شد؛ PRES-02/08/09 با `PresenceSenderDesktopTest` — `./desktop/gradlew -p desktop test --tests '*PresenceUiTest*' --tests '*StorefrontModelTest*' --tests '*PresenceSenderDesktopTest*'` ⇒ ۵/۵، ۷/۷، ۵/۵ (بی SKIP). مانده: شاهدِ CI؛ صفحهٔ کهنهٔ `ui/screens/Storefront.kt` همان پیشین؛ **`claude/verify-rows-i` (۱۴۰۵/۰۸/۲۲):** شاهدِ محلی (محلی، نه CI): اجرای کاملِ `./desktop/gradlew -p desktop test --offline --max-workers=2 -Dorg.gradle.jvmargs=-Xmx2g` (۳۸۸۶ آزمون، ۰ شکست، ۴ SKIP ِ پیشینِ بنچ/عکس) — `PresenceUiTest` ۵/۵، `StatusPaneUiTest` ۶/۶، `StorefrontModelTest` ۷/۷، `PresenceSenderDesktopTest` ۵/۵. مانده (PARTIAL): شاهدِ CI پس از مرج و صفحهٔ کهنهٔ `ui/screens/Storefront.kt`؛ **شاهدِ CI ِ main ‏719bbcf63 (push ِ #1038 که دستهٔ ۵۱ و `claude/e-rows-8b` را دارد؛ `claude/e-rows-13w`، ۱۴۰۵/۰۸/۲۲):** «کامپایل و آزمون» `actions/runs/43166463904/job/131009377943`: `ir.vil3ntec.tohid.ui.v3.online.storefront.PresenceUiTest` ۵، `ir.vil3ntec.tohid.desktop.StatusPaneUiTest` ۶، `ir.vil3ntec.tohid.ui.v3.online.storefront.StorefrontModelTest` ۷، `ir.vil3ntec.tohid.desktop.PresenceSenderDesktopTest` ۵ `KTEST PASS`؛ «ساخت نسخهٔ بومی» `actions/runs/43166463951/job/131009378755`: `PresenceUiTest` ۵ و `StorefrontModelTest` ۷ `KTEST PASS` — همه = شمارِ `@Test`، بی FAIL/SKIP. API («سرور» `actions/runs/43166464266`: PostgreSQL ‏131009379813، PGlite ‏131009379761 و ‏131009379324، Electron ‏131009380260 و ‏131009379772): `storefront` ۱۹/۱۹ و ۹ آزمونِ نام‌دارِ PRES (`storefront-hours-edge` ۵ ‹PRES-06›، `storefront-presence-order` ۳ ‹PRES-08›، `storefront-risk` ‹PRES-10: اعلامِ دکانِ دیگر یا دست‌کاری‌شده رد و در سابقه ثبت می‌شود›) نام‌به‌نام «ok» در هر سه، بی `not ok`. صفحهٔ کهنهٔ `ui/screens/Storefront.kt` رابطِ هدف نیست: `StorefrontScreen(snackbar)`، `PresencePane` و `PresenceBadge` ِ آن هیچ صدازننده‌ای ندارند (مسیرِ `storefront` ِ گوشی و کامپیوتر ⇐ `ui/v3/online/storefront/StorefrontRouteContent` ⇐ `StatusPane` ِ آزموده)؛ از آن پرونده فقط `StorefrontGate` و `SwitchRow` زنده‌اند ⇒ برداشتنِ کدِ مرده پاک‌سازی است، نه ماندهٔ این ردیف ⇒ IMPLEMENTED-VERIFIED | — | — | #244 (ee7f572)؛ #266 (4e854de)، `claude/e-rows-8b`، `claude/verify-rows-i`، `claude/e-rows-13w` (CI ِ main ‏719bbcf63) |
 | GATE-NEW-02 | INV-01 تا INV-16 با سناریوهای هم‌زمانی، آفلاین، رزرو و تطبیق دفتر گردش اجرا شوند؛ موجودی… | §۳۵ | — | — | PARTIAL | INV-01..16@32 روی API با هم‌زمانی، آفلاین، رزرو و دفتر (`catalog-stock` ⇒ ۲۱/۲۱)؛ پشتِ پرچمِ خاموشِ shop.catalog؛ رابطِ هدف نیست | — | — | #263 (4e459f8) |
 | GATE-NEW-03 | CHAT-01 تا CHAT-15 روی دستگاه‌ها/شبکه‌های هدف اجرا شوند؛ مصرف داده، ترتیب پیام، بازیابی،… | §۳۵ | — | — | MISSING | سرور آزموده شد (`shop-chat` ⇒ ۱۴/۱۴) ولی هیچ دستگاه/رابطِ هدفی نیست | — | — | #259 (0e6e0ef) |
 | GATE-NEW-04 | IMG-01 تا IMG-15 با مجموعهٔ تصویری واقعی و مجاز، قبل/بعد و بررسی انسانی اجرا شوند؛ حفظ اص… | §۳۵ | — | — | BLOCKED-EXTERNAL | مجموعهٔ تصویرِ واقعی و مجاز و بررسیِ انسانی نیست؛ پردازشِ تصویر ساخته نشده؛ O-03 گرفته‌شده ۱۴۰۵/۰۸/۱۳ (الف: فقط عکسی که صاحب‌کار یا دکان‌ها گرفته‌اند) | — | مجموعهٔ عکسِ خودِ دکان‌ها و بررسیِ انسانی | — |
