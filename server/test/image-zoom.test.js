@@ -208,3 +208,58 @@ test('IMG-11: همان zoom برای برنامه (فقط همان دکان) و 
   assert.equal(await zooms(extra), 1);
   assert.equal((await h.download(`/api/store/${a.slug}/products/app/gallery/${list.items[0].tag}/original`)).status, 404, 'اصل هرگز');
 });
+
+/**
+ * بازبینیِ ۵۴: سرور فقط عکسِ **خودِ همان دکان** را بزرگ می‌سازد. عکسِ بانکِ مرکزی (اصلش هرگز به دکان نمی‌رسد) با پرچمِ
+ * روشنِ یک دکان zoom نمی‌گیرد — وگرنه اصلِ مرکزی با وضوحِ کامل (تا ۲۴۰۰px) به همهٔ دکان‌ها می‌رسید و یک دکان روی داراییِ
+ * مشترک می‌نوشت (`rev` ِ عکسِ مرکزی بالا می‌رفت). zoom ِ مرکزی فقط از راهِ بارگذاریِ مدیر. عکسِ دکانِ دیگر هم نه (حتی اگر
+ * راهی آن را به `ensure` برساند). ۴۰۴ ِ zoom ِ گالری no-store است (پیش‌فرضِ میان‌افزارِ `store` ِ ویترین) — همین‌جا قفل.
+ */
+test('IMG-11: عکسِ بانکِ مرکزی ⇒ سرور zoom نمی‌سازد (برنامه، «کدام عکس»، ویترین)؛ ۴۰۴ ِ zoom ِ گالری no-store', { skip }, async () => {
+  const s = await liveShop('مرکزی');
+  await setFlag(s.shopId, zoom.FLAG, true);
+  await setFlag('all', 'image_bank.central', true);
+  assert.equal((await h.post('/api/admin/admins', { username: 'zclerk', password: 'Clerk!12345', role: 'admin' }, { token: admin })).status, 201);
+  const clerk = (await h.post('/api/admin/login', { username: 'zclerk', password: 'Clerk!12345' })).body.token;
+  const bp = await h.api('POST', '/api/admin/image-bank/products', { token: clerk, body: { name: 'روغنِ مرکزی', brand: 'زر' } });
+  assert.equal(bp.status, 201, JSON.stringify(bp.body));
+  const up = await h.raw('POST', `/api/admin/image-bank/images?bank_product_id=${bp.body.id}&license_status=licensed&commercial_use=true&license_source=supplier-feed`,
+    await photo(2600, 1800), { token: clerk });
+  assert.equal(up.status, 201, JSON.stringify(up.body));
+  const id = up.body.id;
+  assert.equal((await h.api('POST', `/api/admin/image-bank/images/${id}/approve`, { token: admin, body: { reason: 'تأیید' } })).status, 200);
+  const rev = String((await one('SELECT rev FROM images WHERE id = $1', [id])).rev);
+
+  //  برنامه: فایلِ zoom ِ عکسِ مرکزی ساخته نمی‌شود (اصلش هم بسته است)
+  assert.equal((await h.download(`/api/shop/images/file/${id}/1/original`, { token: s.token })).status, 404);
+  assert.equal((await h.download(`/api/shop/images/file/${id}/1/zoom`, { token: s.token })).status, 404);
+  //  «کدام عکس» برای کالای سنجاق‌شده به عکسِ مرکزی نشانیِ zoom نمی‌دهد
+  assert.equal((await push(s.token, [op('cen', { name: 'روغن', unit: 'دانه', salePrice: 50 })])).status, 200);
+  assert.equal((await h.put('/api/shop/storefront/products/cen', { published: true }, { token: s.token })).status, 200);
+  const sel = await h.post('/api/shop/images/select', { product_id: 'cen', source: 'central', image_id: id, confirm: true }, { token: s.token });
+  assert.equal(sel.status, 200, JSON.stringify(sel.body));
+  assert.equal((await h.get('/api/shop/images/products/cen', { token: s.token })).body.urls.zoom, null);
+  //  ویترین هم نمی‌سازد
+  const z = await getZoom(s, 'cen');
+  assert.equal(z.status, 404);
+  assert.equal(z.headers.get('cache-control'), 'no-store');
+  assert.equal(await zooms(id), 0, 'هیچ ردیفی روی عکسِ مرکزی');
+  assert.equal(String((await one('SELECT rev FROM images WHERE id = $1', [id])).rev), rev, 'عکسِ مشترک دست‌نخورده');
+
+  //  گالری: zoom ِ نبوده (پرچمِ خاموش) ⇒ ۴۰۴ ای که در کشِ مشترک نمی‌ماند
+  const g = await liveShop('گالری');
+  await setFlag(g.shopId, 'shop.storefront.gallery', true);
+  await productWithPhoto(g, 'gal', await photo(1600, 1200));
+  const extra = await productWithPhoto(g, 'gal', await photo(2800, 2100), { role: 'detail', select: false });
+  const list = (await h.get(`/api/store/${g.slug}/products/gal/gallery`)).body;
+  assert.equal(list.items.length, 1, JSON.stringify(list));
+  const miss = await h.download(`/api/store/${g.slug}/products/gal/gallery/${list.items[0].tag}/zoom`);
+  assert.equal(miss.status, 404);
+  assert.equal(miss.headers.get('cache-control'), 'no-store');
+  assert.match((await h.download(`/api/store/${g.slug}/products/gal/gallery/${list.items[0].tag}/display`)).headers.get('cache-control'), /public/);
+
+  //  مالکیت: دکانِ پرچم‌روشنِ «مرکزی» عکسِ دکانِ «گالری» را نمی‌سازد و برایش نشانی نمی‌دهد
+  assert.equal(await zoom.buildable(s.shopId, extra, 1), false);
+  assert.equal(await zoom.ensure(s.shopId, await one('SELECT * FROM images WHERE id = $1', [extra]), 1), null);
+  assert.equal(await zooms(extra), 0);
+});
