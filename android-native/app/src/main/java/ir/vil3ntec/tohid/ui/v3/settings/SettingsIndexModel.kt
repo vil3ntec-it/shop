@@ -26,6 +26,8 @@ internal data class SettingsFacts(
   /** شمارِ دستگاه‌های وارد شده؛ null = هنوز خوانده نشده */
   val sessions: Int? = null,
   val blockExpired: Boolean = false,
+  /** S22 — «با مجوزِ مدیر» (`ExpiryPref.approval`)؛ با `blockExpired` بی اثر */
+  val expiryApproval: Boolean = false,
   val printer: String? = null,
   val cameraGranted: Boolean = false,
   val sync: SyncState = SyncState.OFF,
@@ -71,7 +73,8 @@ internal object SettingsIndexModel {
     "قفل برنامه" -> null
     "دستگاه‌های وارد شده" -> if (!f.signedIn) StrSettings.notSignedIn else f.sessions?.toString()
     "تغییر رمز حساب" -> if (!f.signedIn) StrSettings.notSignedIn else null
-    "کالای منقضی" -> if (f.blockExpired) StrSettings.notSold else StrSettings.warnOnly
+    //  همان سه گزینهٔ صفحه (`ExpiryScreen`): «با مجوزِ مدیر» پیش‌تر «فقط هشدار» خوانده می‌شد
+    "کالای منقضی" -> if (f.blockExpired) StrSettings.notSold else if (f.expiryApproval) StrSettings.withApproval else StrSettings.warnOnly
     SettingsLayout.PRINTER -> f.printer ?: StrSettings.noPrinter
     SettingsLayout.CAMERA -> if (f.cameraGranted) StrSettings.ready else StrSettings.noPermission
     "همگام‌سازی" -> if (f.sync == SyncState.OFF) StrSettings.notSignedIn else since(f.lastSyncOk, f.now)

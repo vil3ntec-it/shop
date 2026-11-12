@@ -4,6 +4,7 @@ import ir.vil3ntec.tohid.core.i18n.StrLoyalty
 import ir.vil3ntec.tohid.core.credit.CreditGate
 import ir.vil3ntec.tohid.core.i18n.StrRounding
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.sale.CheckoutRules
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.DiscountGate
@@ -73,8 +74,15 @@ object CheckoutModel {
   fun start(presetDebtorId: String?, debtors: List<Debtor>, x: ir.vil3ntec.tohid.data.HeldExtras): CheckoutForm =
     start(presetDebtorId, debtors, x.discount, x.discountAmount, if (x.payment == SalesEngine.Payment.CREDIT) x.paid else "")
 
-  /** @param cashRounding PAY-09 — پلهٔ `CashRoundPref` برای نقدِ کاملِ پرداختِ ساده؛ ترکیبی ⇒ ۰ (گرد از پنل) */
-  fun checkout(form: CheckoutForm, canDiscount: Boolean, blockExpired: Boolean, seller: String, cashRounding: Long = 0L): SalesEngine.Checkout =
+  /**
+   *  @param cashRounding PAY-09 — پلهٔ `CashRoundPref` برای نقدِ کاملِ پرداختِ ساده؛ ترکیبی ⇒ ۰ (گرد از پنل)
+   *  @param rules        POS-24 — قاعده‌های پیش از پایانِ فاکتورِ همین دستگاه (`CheckoutRulesPref`)؛ `SalesEngine.record` می‌سنجد
+   *  @param expiryGate   S22 — «منقضی فقط با مجوزِ مدیر» (`ExpiryPref.gate`)؛ تأیید با `CheckoutExpiry` و `Checkout.expiryApproval`
+   */
+  fun checkout(
+    form: CheckoutForm, canDiscount: Boolean, blockExpired: Boolean, seller: String, cashRounding: Long = 0L,
+    rules: CheckoutRules = CheckoutRules.OFF, expiryGate: Boolean = false,
+  ): SalesEngine.Checkout =
     SalesEngine.Checkout(
       seller = seller,
       discountType = form.discountType,
@@ -84,6 +92,8 @@ object CheckoutModel {
       debtorId = form.debtorId,
       blockExpired = blockExpired,
       cashRounding = cashRounding,
+      rules = rules,
+      expiryGate = expiryGate,
     )
 
   fun numbers(d: ShopData, cart: List<SalesEngine.CartLine>, form: CheckoutForm, checkout: SalesEngine.Checkout): CheckoutNumbers {

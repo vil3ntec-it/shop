@@ -37,6 +37,12 @@ object CheckoutSession {
   var credit by mutableStateOf<CreditAsk?>(null)
   /** تأییدِ سقفِ اعتبار؛ فقط همان مشتری و تا همان برد را می‌پوشاند (`CreditGate.state` هر بار می‌سنجد) */
   var creditApproval by mutableStateOf<CreditGate.Approval?>(null)
+  /** S22 — برگهٔ «فروشِ کالای منقضی» ِ باز (`sale/checkout/expiry`) */
+  var expiry by mutableStateOf<ExpiryAsk?>(null)
+  /** تأییدِ فروشِ منقضی؛ فقط همان کالاها و تا همان مقدار را می‌پوشاند (`ExpiryGate.covers` هر بار می‌سنجد) */
+  var expiryApproval by mutableStateOf<ir.vil3ntec.tohid.core.stock.ExpiryGate.Approval?>(null)
+  /** برگهٔ تأییدِ منقضی را خودِ «ثبت» باز کرد ⇒ با رسیدنِ تأیید همان ثبت (از «حساب‌پی» ⇒ نه؛ پس از تأیید دوباره «حساب‌پی») */
+  var expiryPending by mutableStateOf(false)
   /** برگهٔ «پرداخت با حساب‌پی (NFC/QR)» ِ باز (`sale/checkout/hesabpay`، PAY-21) */
   var hesab by mutableStateOf<HesabTillModel.Ask?>(null)
   /** محیطِ حساب‌پیِ همان برگه (`HesabPayEnv.of`، از `CheckoutRoute`) */
@@ -56,6 +62,9 @@ object CheckoutSession {
     ask = null
     credit = null
     creditApproval = null
+    expiry = null
+    expiryApproval = null
+    expiryPending = false
     hesab = null
     hesabPaid = null
   }

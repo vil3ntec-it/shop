@@ -86,6 +86,7 @@ internal fun rememberSettingsFacts(theme: ThemeChoice): SettingsFacts {
     signedIn = signedIn,
     sessions = sessions,
     blockExpired = remember { ShopPolicy.blockExpired(context) },
+    expiryApproval = remember { ir.vil3ntec.tohid.data.ExpiryPref.approval(context) },
     printer = printer,
     cameraGranted = remember { cameraGranted(context) },
     sync = SettingsIndexModel.syncState(

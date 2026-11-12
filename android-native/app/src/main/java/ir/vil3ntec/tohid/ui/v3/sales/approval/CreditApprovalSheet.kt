@@ -52,9 +52,11 @@ fun CreditApprovalSheet(
   requesterUserId: String,
   onApproved: (CreditGate.Approval) -> Unit,
   onClose: () -> Unit,
+  /** S22: همین برگه برای «فروشِ کالای منقضی» (`ExpiryApprovalRoute`) — فقط سرخط فرق دارد */
+  title: String = StrPos.creditOverTitle,
 ) {
   if (CreditGate.canApprove(selfRole)) {
-    CreditSelfBody(summary, onApprove = { reason ->
+    CreditSelfBody(summary, title, onApprove = { reason ->
       onApproved(CreditGate.Approval(selfName.trim().ifBlank { creditRoleName(selfRole) }, selfRole, debtorId, addMinor, reason))
     }, onClose = onClose)
     return
@@ -63,7 +65,7 @@ fun CreditApprovalSheet(
   val store = remember { StaffPins(context) }
   val approvers = remember { runCatching { store.approvers(requesterUserId) }.getOrDefault(emptyList()) }
   ApprovalPinBody(
-    title = StrPos.creditOverTitle,
+    title = title,
     summary = summary,
     approvers = approvers,
     block = if (approvers.isEmpty()) ApprovalBlock.NO_APPROVER else null,
@@ -88,12 +90,12 @@ internal fun creditRoleName(role: String): String = if (role == "manager") StrNa
 
 /** مدیر/صاحبِ پشتِ صندوق: دلیل و «تأیید با این دلیل»، بی PIN */
 @Composable
-private fun CreditSelfBody(summary: String, onApprove: (String) -> Unit, onClose: () -> Unit) {
+private fun CreditSelfBody(summary: String, title: String, onApprove: (String) -> Unit, onClose: () -> Unit) {
   val c = PhoneV3.colors
   var reason by remember { mutableStateOf("") }
   //  `onDismiss` ِ برگه پیش از کارِ `closer` می‌آید: پس از تأیید، «بستن» دوباره برنمی‌گردد
   val chosen = remember { booleanArrayOf(false) }
-  V3Sheet(onDismiss = { if (!chosen[0]) onClose() }, title = StrPos.creditOverTitle, detents = false) { closer ->
+  V3Sheet(onDismiss = { if (!chosen[0]) onClose() }, title = title, detents = false) { closer ->
     V3StatusPill(V3Status.AWAITING, StrSale.needsApproval)
     Spacer(Modifier.height(10.dp))
     Text(summary, style = V3Type.body, color = c.ink)
