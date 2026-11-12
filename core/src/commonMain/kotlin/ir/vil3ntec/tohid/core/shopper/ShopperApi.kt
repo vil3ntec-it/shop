@@ -120,6 +120,13 @@ class ShopperApi(private val http: ShopperHttp, private val lang: () -> String =
     StorePage(shop, delivery, flag(root, "verification"), flag(root, "market"), features, recent)
   }
 
+  /**
+   *  RPT-14: تپشِ بالای قیف — همان `POST /:slug/funnel/:step` ِ بی بدنهٔ ویترینِ وب؛ پاسخ ۲۰۴ ِ تهی و هرگز چیزی دربارهٔ
+   *  شمارش نمی‌گوید. پرچمِ خاموش ⇒ ۴۰۴ ِ مسیرِ ناشناخته ⇒ شکست (صدازننده نادیده می‌گیرد). فقط با [ShopperFunnel].
+   */
+  fun funnel(slug: String, step: ShopperFunnel.Step): ShopperResult<Unit> =
+    call("POST", base(slug) + "/funnel/" + step.wire, null) { }
+
   /** کاتالوگ: جست‌وجو (`q`، حداکثر ۶۰ نویسه، مثلِ سرور)، دسته و صفحهٔ بعد (`cursor`). */
   fun products(slug: String, q: String = "", category: String = "", cursor: String? = null, limit: Int = 30): ShopperResult<CatalogPage> =
     get(base(slug) + "/products" + ShopperUrl.query(

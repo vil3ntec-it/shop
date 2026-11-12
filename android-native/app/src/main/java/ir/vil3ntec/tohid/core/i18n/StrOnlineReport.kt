@@ -57,11 +57,11 @@ object StrOnlineReport {
     "د ویټرین د لیدنو شمېر (د کیف سر) لا نشته؛ جوړ شوی شمېر نه ښودل کېږي.",
   )
 
-  val webFunnel: String get() = t("بالای قیف (ویترینِ وب)", "Top of the funnel (web storefront)", "د کیف سر (ویب ویټرین)")
+  val webFunnel: String get() = t("بالای قیف (ویترین و برنامهٔ خرید)", "Top of the funnel (storefront and shopping app)", "د کیف سر (ویټرین او د پېرودلو اپ)")
   val webFunnelNote: String get() = t(
-    "بازدیدکنندهٔ یکتای هر روز؛ نسبت از بازدید است. برنامهٔ خرید شمرده نمی‌شود.",
-    "Unique visitors per day; rates are of visits. The shopping app is not counted.",
-    "د هرې ورځې ځانګړي لیدونکي؛ نسبت د لیدنو دی. د پېرودلو اپ نه شمېرل کېږي.",
+    "بازدیدکنندهٔ یکتای هر روز در ویترینِ وب و برنامهٔ خرید (نسخهٔ تازه)؛ نسبت از بازدید است.",
+    "Unique visitors per day on the web storefront and the shopping app (new version); rates are of visits.",
+    "د ویب ویټرین او د پېرودلو اپ (نوې نسخه) د هرې ورځې ځانګړي لیدونکي؛ نسبت د لیدنو دی.",
   )
   val webFunnelCapped: String get() = t(
     "در روزی از این بازه سقفِ روزانهٔ شمارش پر شد؛ عددِ واقعی بیشتر است.",
