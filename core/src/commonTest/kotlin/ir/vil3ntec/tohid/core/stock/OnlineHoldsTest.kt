@@ -63,7 +63,7 @@ class OnlineHoldsTest {
     assertEquals(mapOf("cola" to 1.0), OnlineHolds.reserved(s, device) { it in sold })
   }
 
-  @Test fun `نمای کهنه (بی اینترنتِ دراز) یا ساعتِ برگشته ⇒ هیچ؛ لرزشِ کوچکِ ساعت ⇒ همان`() {
+  @Test fun `نمای کهنه، بی اینترنتِ دراز، یا ساعتِ برگشته ⇒ هیچ؛ لرزشِ کوچکِ ساعت ⇒ همان`() {
     val s = OnlineHolds.parse(body, device)!!
     assertTrue(OnlineHolds.reserved(s, device + OnlineHolds.MAX_AGE_MS + 1) { false }.isEmpty())
     assertTrue(OnlineHolds.reserved(s, device - OnlineHolds.CLOCK_SLACK_MS - 1) { false }.isEmpty())

@@ -37,7 +37,26 @@ test('نامِ آزمون‌های Kotlin نویسهٔ ممنوعِ نامِ پ�
   assert.deepEqual(bad, [], `نامِ آزمون با نویسهٔ ممنوعِ ویندوز:\n${bad.join('\n')}`);
 });
 
+//  آزمون‌هایی که برای Kotlin/Native (آیفون) هم کامپایل می‌شوند سخت‌گیرترند: «Name contains illegal characters» برای
+//  ( ) [ ] < > : ; / . \ — کارِ «کامپایلِ core برای iOS» در CI ِ #1041 با پرانتز در نامِ `OnlineHoldsTest` افتاد
+const NATIVE_DIRS = ['core/src/commonTest', 'core/src/iosTest', 'ios/shared/src/commonTest', 'ios/shared/src/iosTest'];
+const NATIVE_BAD = /[()\[\]<>:;/.\\*?|"]/;
+
+test('نامِ آزمون‌های Kotlin ِ مشترک با آیفون نویسهٔ ممنوعِ Kotlin/Native ندارد (( ) [ ] < > : ; / . \\)', () => {
+  const bad = [];
+  for (const d of NATIVE_DIRS) {
+    for (const f of walk(path.join(ROOT, d), [])) {
+      const src = fs.readFileSync(f, 'utf8');
+      for (const m of src.matchAll(/fun\s+`([^`]+)`/g)) {
+        if (NATIVE_BAD.test(m[1])) bad.push(`${path.relative(ROOT, f)}: ${m[1].slice(0, 80)}`);
+      }
+    }
+  }
+  assert.deepEqual(bad, [], `نامِ آزمون با نویسهٔ ممنوعِ Kotlin/Native:\n${bad.join('\n')}`);
+});
+
 test('خودِ نگهبان: نامِ «3*» را می‌گیرد', () => {
   assert.ok(BAD.test('S01 — اسکن، 3*، نوشا'));
   assert.ok(!BAD.test('S01 — اسکن، ۳ ضرب، نوشا'));
+  assert.ok(NATIVE_BAD.test('نمای کهنه (بی اینترنت)') && !NATIVE_BAD.test('نمای کهنه، بی اینترنت ⇒ هیچ؛ همان'));
 });
