@@ -111,8 +111,8 @@ class TrustRepository(private val api: ApiClient) {
 
   companion object {
     const val ROOT = "/shop/trust"
-    private fun enc(s: String): String = java.net.URLEncoder.encode(s, "UTF-8")
+    private fun enc(s: String): String = ir.vil3ntec.tohid.core.nav.RoutePaths.encode(s)
     /** شناسهٔ یک‌بارِ برگه — همان الگوی سرور (`[A-Za-z0-9_.:-]{8,128}`) */
-    fun newKey(): String = "app-" + java.util.UUID.randomUUID().toString()
+    fun newKey(): String = OrdersRepository.newKey()
   }
 }

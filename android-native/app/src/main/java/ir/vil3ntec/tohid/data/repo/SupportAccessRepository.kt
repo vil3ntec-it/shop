@@ -48,7 +48,7 @@ class SupportAccessRepository(private val api: ApiClient) {
   suspend fun revoke(id: String): ApiResult<SupportGrantDto> = decide(id, "revoke")
 
   private suspend fun decide(id: String, action: String): ApiResult<SupportGrantDto> = result {
-    ApiJson.decode<SupportGrantOut>(api.post("$ROOT/${java.net.URLEncoder.encode(id, "UTF-8")}/$action", JsonObject(emptyMap()))).grant
+    ApiJson.decode<SupportGrantOut>(api.post("$ROOT/${ir.vil3ntec.tohid.core.nav.RoutePaths.encode(id)}/$action", JsonObject(emptyMap()))).grant
   }
 
   companion object {
