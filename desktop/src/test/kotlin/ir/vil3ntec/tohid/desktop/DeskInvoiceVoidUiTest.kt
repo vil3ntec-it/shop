@@ -85,7 +85,8 @@ class DeskInvoiceVoidUiTest {
     promoPrefs.edit().remove("release-v1").commit()
     ShopRole.remember(ctx, ShopRole.OWNER)
     ShopRole.rememberPolicy(ctx, null)
-    ShopRole.rememberShopId(ctx, "")
+    //  `rememberShopId` خالی را نمی‌نویسد ⇒ شناسهٔ دکانِ آزمون مستقیم برداشته می‌شود
+    ctx.getSharedPreferences("tohid-ledger", 0).edit().remove("shop_id").commit()
     SyncChoice.set(ctx, SyncChoice.V1, 0)
     pins.remove("u-mgr-dv")
   }
