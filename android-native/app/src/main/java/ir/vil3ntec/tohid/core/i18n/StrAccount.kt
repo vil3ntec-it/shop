@@ -33,6 +33,8 @@ object StrAccount {
   fun bannerActiveDays(n: Any): String = t("اشتراک: ${asIs(n)} روزِ دیگر", "Subscription: $n more ${pl(n, "day", "days")}", "ګډون: $n نورې ورځې")
   val bannerActiveLast: String get() = t("امروز آخرین روزِ اشتراک", "Today is the last subscription day", "نن د ګډون وروستۍ ورځ ده")
   val bannerSoonBody: String get() = t("به‌زودی تمام می‌شود؛ پیش از پایان تمدید کنید", "It ends soon; renew before it does", "ژر پای ته رسېږي؛ مخکې له پایه یې تمدید کړئ")
+  fun bannerSoonBodyOn(day: String): String = t("روزِ \u2066${asIs(day)}\u2069 تمام می‌شود؛ پیش از آن تمدید کنید", "Ends on $day; renew before then", "د \u2066$day\u2069 په ورځ پای ته رسېږي؛ مخکې له هغې یې تمدید کړئ")
+  fun bannerTrialBodyOn(day: String): String = t("آزمایشی روزِ \u2066${asIs(day)}\u2069 تمام می‌شود؛ یکی از پلن‌ها را بگیرید", "The trial ends on $day; pick one of the plans", "ازمایښت د \u2066$day\u2069 په ورځ پای ته رسېږي؛ یو پلان واخلئ")
   val bannerOkBody: String get() = t("همهٔ بخش‌ها باز است", "Every section is open", "ټولې برخې پرانیستې دي")
   val bannerNoneTitle: String get() = t("بدونِ اشتراک", "No subscription", "بې ګډونه")
   val bannerNoneBody: String get() = t("برای باز شدنِ همهٔ بخش‌ها یکی از پلن‌ها را بگیرید", "Pick a plan to open every section", "د ټولو برخو د پرانیستو لپاره یو پلان واخلئ")

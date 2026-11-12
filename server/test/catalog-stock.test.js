@@ -239,6 +239,7 @@ test('INV-03: قفسه و انبار صفر ⇒ «تمام شده» و سفار�
   assert.match(o.body.error.message, /روغن/);
   assert.equal(await count('online_orders', s.shopId), before, 'سفارشِ ردشده نباید ردیف بسازد');
   assert.equal(await count('stock_reservations', s.shopId), 0);
+  await reconciled(s, 'z1');
 });
 
 test('INV-04: ۵ موجود ⇒ سفارشِ ۴ چیزی کم نمی‌کند؛ بیش از ۵ رد با مقدارِ قابلِ سفارش؛ فروشِ دستگاه کم می‌کند', async () => {
@@ -396,6 +397,7 @@ test('INV-10: واحدِ دوم (کارتن = ۲۴ دانه) با ضریب سن�
   assert.equal(over.body.error.lines[0].requestedMilli, 48000);
   assert.equal(over.body.error.lines[0].availableMilli, 30000);
   assert.equal((await stockOf(s, 'u1')).sellableMilli, 30000);
+  await reconciled(s, 'u1');
 });
 
 test('INV-11: کاربرِ دکانِ B موجودی و حرکتِ دکانِ A را نه می‌بیند نه عوض می‌کند', async () => {
@@ -416,6 +418,8 @@ test('INV-11: کاربرِ دکانِ B موجودی و حرکتِ دکانِ A 
   assert.equal(buy.status, 409);
   assert.equal(buy.body.error.code, 'product_unavailable');
   assert.equal((await stockOf(a, 'iso1')).levels.shop_floor, 3000, 'موجودیِ A دست نخورد');
+  await reconciled(a, 'iso1');
+  await reconciled(b);
 });
 
 test('INV-12: اصلاحِ دستی بی دلیل یا بی اجازه رد می‌شود؛ اصلاحِ مجاز کاربر، دلیل و زمان دارد', async () => {
@@ -468,6 +472,7 @@ test('INV-13: کالای غیرفعال، حذف‌شده یا ناشناس در
   }
   const pub = await catalog.publicStock(s.shopId, ['in1', 'dl1', 'ghost']);
   assert.deepEqual([...pub.values()].map((x) => x.status), ['unavailable', 'unavailable', 'unavailable']);
+  await reconciled(s);
 });
 
 test('INV-14: دستگاهِ کهنه یا صفِ نفرستاده ⇒ «در حال بررسی»، هرگز «موجود»', async () => {
@@ -495,6 +500,7 @@ test('INV-14: دستگاهِ کهنه یا صفِ نفرستاده ⇒ «در ح
   assert.equal(b.reason, 'pending_sync');
   await push(s, [], { queued: 0 });
   assert.equal((await stockOf(s, 'st1')).badge.status, 'in_stock');
+  await reconciled(s, 'st1');
 });
 
 test('INV-15: خرید، لغو و حرکتِ دستیِ تکراری با همان کلید اثرِ دوم ندارد', async () => {
@@ -760,3 +766,14 @@ test('خواندنِ هم‌زمانِ ویترین (#1010: کالاها، دک�
     stock.settingsOf = orig;
   }
 });
+
+test('GATE-NEW-02: هر سناریوی INV-xx ِ همین پرونده با تطبیقِ دفتر (`reconciled`: مانده = جمعِ دفتر = بازپخشِ stock-core) تمام می‌شود', () => {
+  const src = fs.readFileSync(__filename, 'utf8');
+  const blocks = src.split(/\ntest\(/).slice(1).filter((b) => /^'INV-\d\d/.test(b));
+  assert.ok(blocks.length >= 14, `سناریوهای INV: ${blocks.length}`);
+  const ids = new Set(blocks.flatMap((b) => [...b.slice(0, 80).matchAll(/INV-(\d\d)/g)].map((m) => Number(m[1]))));
+  for (let i = 1; i <= 15; i++) if (i !== 9) assert.ok(ids.has(i), `INV-${String(i).padStart(2, '0')} سناریو ندارد`);
+  const missing = blocks.filter((b) => !b.includes('await reconciled(')).map((b) => b.slice(1, 7));
+  assert.deepEqual(missing, [], 'سناریوی بی تطبیقِ دفتر');
+});
+

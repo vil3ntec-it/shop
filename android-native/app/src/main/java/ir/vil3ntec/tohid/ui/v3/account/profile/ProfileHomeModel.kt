@@ -15,8 +15,13 @@ import ir.vil3ntec.tohid.ui.v3.account.AccountPaths
  */
 object ProfileHomeModel {
 
-  data class Plan(val active: Boolean, val expired: Boolean, val trial: Boolean, val days: Int, val urgent: Boolean)
+  /** `ends` لحظهٔ پایان (میلی‌ثانیه یا ثانیه، همان شکلِ سرچشمه)؛ ۰ یعنی نامعلوم */
+  data class Plan(val active: Boolean, val expired: Boolean, val trial: Boolean, val days: Int, val urgent: Boolean, val ends: Long = 0)
 
+  /**
+   *  `localEndsAt` از مجوزِ امضاشدهٔ گوشی (بی اینترنت هم) و `serverEndsAt` از `SubscriptionPulse`؛
+   *  تاریخ از همان سرچشمه‌ای می‌آید که روزها از آن آمد (S47: هشدار با تاریخِ دقیق).
+   */
   fun plan(
     localActive: Boolean,
     localDays: Int,
@@ -25,6 +30,8 @@ object ProfileHomeModel {
     serverDays: Int,
     serverTrial: Boolean,
     warnDays: Int,
+    localEndsAt: Long = 0,
+    serverEndsAt: Long = 0,
   ): Plan {
     val serverOn = serverActive && serverDays > 0
     val active = localActive || serverOn
@@ -39,6 +46,11 @@ object ProfileHomeModel {
       trial = !localActive && serverOn && serverTrial,
       days = days,
       urgent = localExpired || (active && days <= warnDays),
+      ends = when {
+        localActive || localExpired -> localEndsAt
+        serverOn -> serverEndsAt
+        else -> 0
+      }.coerceAtLeast(0),
     )
   }
 
@@ -82,21 +94,29 @@ object ProfileHomeModel {
 
   data class Banner(val title: String, val subtitle: String, val button: String, val action: Action)
 
-  /** نوارِ تیرهٔ کارت — همیشه هست و حالِ واقعیِ اشتراک را می‌گوید */
+  /**
+   *  نوارِ تیرهٔ کارت — همیشه هست و حالِ واقعیِ اشتراک را می‌گوید. در `warnDays` روزِ آخر، اگر لحظهٔ
+   *  پایان معلوم است، خطِ دوم روزِ دقیقِ پایان را هم می‌گوید (همان روزِ `SubscriptionModel.warnTitle`).
+   */
   fun banner(signedIn: Boolean, p: Plan?, warnDays: Int): Banner = when {
     !signedIn || p == null -> Banner(StrAccount.bannerGuestTitle, StrAccount.bannerGuestBody, Str.signIn, Action.SIGN_IN)
     p.expired -> Banner(StrAccount.bannerExpiredTitle, StrAccount.bannerExpiredBody, Str.renew, Action.RENEW)
     p.active && p.trial -> Banner(
       if (p.days > 0) StrAccount.bannerTrialDays(p.days) else StrAccount.bannerTrialLast,
-      StrAccount.bannerTrialBody, StrAccount.plansButton, Action.PLANS,
+      endDay(p, warnDays)?.let { StrAccount.bannerTrialBodyOn(it) } ?: StrAccount.bannerTrialBody,
+      StrAccount.plansButton, Action.PLANS,
     )
     p.active -> Banner(
       if (p.days > 0) StrAccount.bannerActiveDays(p.days) else StrAccount.bannerActiveLast,
-      if (p.days <= warnDays) StrAccount.bannerSoonBody else StrAccount.bannerOkBody,
+      if (p.days <= warnDays) endDay(p, warnDays)?.let { StrAccount.bannerSoonBodyOn(it) } ?: StrAccount.bannerSoonBody else StrAccount.bannerOkBody,
       Str.renew, Action.RENEW,
     )
     else -> Banner(StrAccount.bannerNoneTitle, StrAccount.bannerNoneBody, StrAccount.plansButton, Action.PLANS)
   }
+
+  /** روزِ پایان برای خطِ دوم: فقط در روزهای آخر و فقط وقتی لحظه معلوم است */
+  private fun endDay(p: Plan, warnDays: Int): String? =
+    if (p.ends > 0 && p.days <= warnDays) AccountFormat.date(p.ends) else null
 
   enum class Item { EDIT, DEVICES, PLAN, STATS, SETTINGS, SUPPORT, SIGN_OUT }
 

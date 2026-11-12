@@ -1200,9 +1200,9 @@ class ShopStore(
       return billed - paid
     }
 
-    fun barcodeIndex(d: ShopData): Map<String, String> = buildMap {
-      d.products.forEach { p -> p.barcodes.forEach { code -> put(code, p.id) } }
-    }
+    fun barcodeIndex(d: ShopData): Map<String, String> = ProductIndexes.barcodes(d.products) // S125: یک بار برای همان فهرست
+    fun productsById(products: List<Product>): Map<String, Product> = ProductIndexes.byId(products)
+    fun product(d: ShopData, id: String): Product? = ProductIndexes.byId(d.products)[id] // = `products.find { it.id == id }`
 
     /**
      *  PRD-04: بارکدِ بسته‌ها (کارتن، شل…) ⇐ کالا و بسته — جدا از `barcodeIndex` تا هیچ راهِ اسکنی که

@@ -81,7 +81,7 @@ object SalesEngine {
   fun linePrice(d: ShopData, line: CartLine): Double {
     line.unitPrice?.let { return it }
     if (line.free) return 0.0
-    return d.products.find { it.id == line.productId }?.let(ProductPlansMap::price) ?: 0.0 // PRD-13: قیمتِ زمان‌بندی‌شده
+    return ShopStore.product(d, line.productId)?.let(ProductPlansMap::price) ?: 0.0 // PRD-13: قیمتِ زمان‌بندی‌شده
   }
 
   enum class DiscountType { AMOUNT, PERCENT }
@@ -305,7 +305,7 @@ object SalesEngine {
       //  شده، مثلِ قبل صفر حساب می‌شود
       if (line.free) lineTotal(line.unitPrice ?: 0.0, line.quantity)
       else {
-        val p = d.products.find { it.id == line.productId }
+        val p = ShopStore.product(d, line.productId)
         if (p == null) 0.0 else lineTotal(line.unitPrice ?: ProductPlansMap.price(p), line.quantity)
       }
     }
@@ -375,7 +375,7 @@ object SalesEngine {
       }
     // موجودی درست پیش از ثبت سنجیده می‌شود، نه بعد از آن
     for (line in cart) {
-      val p = d.products.find { it.id == line.productId } ?: continue
+      val p = ShopStore.product(d, line.productId) ?: continue
       if (!p.active) return Result.Failed(StrLedger.inactiveNoSale(p.name))
       (ProductPlansMap.kitShortage(d, cart, p) ?: SerialSale.problem(d, line, p))?.let { return Result.Failed(it) } // PRD-10: اجزای کیت؛ POS-28: سریالِ کامل
       quantityProblem(p, line.quantity)?.let { return Result.Failed(it) }
@@ -549,7 +549,7 @@ object SalesEngine {
         return@forEachIndexed
       }
 
-      val p = d.products.find { it.id == line.productId } ?: return@forEachIndexed
+      val p = ShopStore.product(d, line.productId) ?: return@forEachIndexed
       val unit = linePrice(d, line) // قیمتِ دستیِ همین ردیف، وگرنه قیمتِ خودِ کالا (PRD-13: با بازهٔ فعال)
       //  موتورِ تازه: بهای موقت = میانگینِ موزون؛ نامعلوم (کالای بی ورود) ⇒ همان قیمتِ خریدِ امروز
       val planned = stockPlan?.get(lineIndex)?.takeIf { it.ok && !it.unknownCost }
@@ -815,7 +815,7 @@ object SalesEngine {
    */
   fun itemName(d: ShopData, item: SaleItem): String {
     if (item.productId.isBlank()) return item.name.ifBlank { "قلم آزاد" }  // داده: نامِ قلمِ ذخیره‌شده (برگه و رسید هم)
-    return d.products.find { it.id == item.productId }?.name
+    return ShopStore.product(d, item.productId)?.name
       ?: item.name.ifBlank { "(محصول حذف‌شده)" }  // داده: نامِ قلمِ ذخیره‌شده (برگه و رسید هم)
   }
 

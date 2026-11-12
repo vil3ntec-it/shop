@@ -39,7 +39,7 @@ object ProductPlansMap {
   /** بهای قلمِ فروش: کیت ⇒ جمعِ قیمتِ خریدِ اجزا × مقدار، وگرنه همان `purchasePrice` */
   fun cost(d: ShopData, p: Product): Double {
     val parts = p.kit.orEmpty().ifEmpty { return p.purchasePrice }
-    val byId = d.products.associateBy { it.id }
+    val byId = ShopStore.productsById(d.products) // S125
     return parts.sumOf { (byId[it.productId]?.purchasePrice ?: 0.0) * it.qty }
   }
 

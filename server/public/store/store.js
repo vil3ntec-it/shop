@@ -226,9 +226,9 @@
     });
   }
   function renderAddSheet(p) {
-    var b = $('ps-add'); var st = K.stockOf(p); var line = cart[p.id];
-    b.disabled = !st.orderable;
-    b.textContent = !st.orderable ? st.text : (line ? t('ps.more', { q: K.qty(line.qtyMilli) }) : t('ps.add', { p: K.money(p.priceMinor) }));
+    var b = $('ps-add'); var st = K.stockOf(p); var line = cart[p.id]; var full = line && line.qtyMilli >= st.leftMilli;
+    b.disabled = !st.orderable || full;
+    b.textContent = !st.orderable ? st.text : full ? t('stock.only', { q: st.leftText }) : (line ? t('ps.more', { q: K.qty(line.qtyMilli) }) : t('ps.add', { p: K.money(p.priceMinor) }));
     b.onclick = function () { addOne(p); renderAddSheet(p); };
   }
 
@@ -256,6 +256,8 @@
     var src = p || line;
     if (!src) return;
     if (src.maxQtyMilli && milli > src.maxQtyMilli) milli = src.maxQtyMilli;
+    var f = K.stockOf(catalog.items[id] || src), had = line ? line.qtyMilli : 0; // INV-04@32
+    if (milli > f.leftMilli && milli > had) { K.toast(t('stock.only', { q: f.leftText })); if (had >= f.leftMilli) return; milli = f.leftMilli; }
     if (milli <= 0) delete cart[id];
     else {
       if (!line || milli > line.qtyMilli) beat('cart');

@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui.v3.account
 
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
+import ir.vil3ntec.tohid.core.i18n.StrAccount
 import ir.vil3ntec.tohid.ui.v3.account.profile.ProfileHomeModel
 import ir.vil3ntec.tohid.ui.v3.account.profile.ProfileHomeModel.Item
 import org.junit.After
@@ -59,6 +60,33 @@ class ProfileHomeModelTest {
     assertEquals(ProfileHomeModel.Action.PLANS, ProfileHomeModel.banner(true, plan(), 7).action)
     I18n.source = { Lang.EN }
     assertEquals("Trial: 5 more days", ProfileHomeModel.banner(true, plan(serverActive = true, serverDays = 5, serverTrial = true), 7).title)
+  }
+
+  @Test
+  fun `نوارِ تیره در روزهای آخر روزِ دقیقِ پایان را می‌گوید — S47`() {
+    val ends = 1_763_000_000_000L
+    val day = AccountFormat.date(ends)
+    //  بی اینترنت: فقط مجوزِ گوشی تاریخ را دارد
+    val local = ProfileHomeModel.plan(true, 3, false, false, 0, false, warnDays = 7, localEndsAt = ends)
+    assertEquals(ends, local.ends)
+    val soon = ProfileHomeModel.banner(true, local, 7)
+    assertTrue(soon.subtitle, soon.subtitle.contains(day))
+    assertEquals(ProfileHomeModel.Action.RENEW, soon.action)
+    //  مجوزِ گوشی مقدم بر تاریخِ سرور، همان قاعدهٔ روزها
+    assertEquals(ends, ProfileHomeModel.plan(true, 3, false, true, 9, false, 7, localEndsAt = ends, serverEndsAt = ends + 86_400_000L * 6).ends)
+    //  آزمایشیِ سرور ⇒ تاریخِ سرور
+    val trial = ProfileHomeModel.plan(false, 0, false, true, 2, true, 7, serverEndsAt = ends)
+    assertEquals(ends, trial.ends)
+    val tb = ProfileHomeModel.banner(true, trial, 7)
+    assertTrue(tb.subtitle, tb.subtitle.contains(day))
+    //  بیرون از روزهای آخر و بی تاریخ ⇒ همان متنِ پیشین
+    assertEquals(StrAccount.bannerOkBody, ProfileHomeModel.banner(true, ProfileHomeModel.plan(true, 30, false, false, 0, false, 7, localEndsAt = ends), 7).subtitle)
+    assertEquals(StrAccount.bannerSoonBody, ProfileHomeModel.banner(true, plan(localActive = true, localDays = 3), 7).subtitle)
+    assertEquals(StrAccount.bannerTrialBody, ProfileHomeModel.banner(true, plan(serverActive = true, serverDays = 2, serverTrial = true), 7).subtitle)
+    //  بی اشتراک ⇒ بی تاریخ
+    assertEquals(0L, ProfileHomeModel.plan(false, 0, false, false, 0, false, 7, localEndsAt = ends, serverEndsAt = ends).ends)
+    I18n.source = { Lang.EN }
+    assertTrue(ProfileHomeModel.banner(true, local, 7).subtitle.contains(AccountFormat.date(ends)))
   }
 
   @Test
