@@ -54,6 +54,17 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-13x زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-13x` (از `claude/e-rows-11p`) + server `claude/panel-rows-13v`
+
+- **LOC-04 ⇐ IMPLEMENTED-VERIFIED:** ویرایشگرِ جدولِ تعطیلات از 1.50.78 (server #130، `788f371`) در پنل بود («فروشگاه‌ها ← تنظیماتِ مرکزی و
+  پرچم‌ها ← تعطیلاتِ رسمی»)؛ STATUS کهنه بود. شاهد: `console-holidays.mjs` ۱۶/۱۶ و `holidays-ui.mjs` (کرومیوم) ۱۴/۱۴ روی main ِ server.
+- **IMG-PRO-17 (PARTIAL ⇒ «دستگاه»):** درِ مدیرِ `routes/admin-image-changes.js` (`image-changes.v1`): فهرست/جزئیات/برگرداندن؛ جزئیات با
+  پرچمِ `admin.support_grant` اجازهٔ `read_private` (پیش‌فرض؛ صاحب‌کار می‌تواند عوض کند)؛ برگرداندن ارشد + دلیل + همیشه اجازهٔ `restore` +
+  Idempotency-Key. `admin-image-changes.test.js` ۹/۹ (پایه ۸/۹ سرخ، شش جهش سرخ). پنل (server 1.50.96، `2011903`): پل + کارت در «بانکِ عکس»،
+  `console-image-changes.mjs` ۲۱/۲۱، `image-changes-ui.mjs` ۱۳/۱۳؛ `bridge-roles.mjs` حالا همهٔ `require` های یک `router.use` را می‌خواند.
+- **نیمه‌کاره:** هیچ. **قدمِ بعدی:** PR ِ هر دو شاخه (shop پیش از server تا `bridge-roles` روی main ِ shop هم درها را ببیند)؛ آزمونِ
+  دستیِ IMG-PRO-17 روی گوشی (PARTIAL-MAP «دستگاه»). `staff-bank-ui.mjs` ِ server روی main هم یک سرخِ «404 در کنسول» دارد (جدا از این کار).
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-11p زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-11p` (از `claude/batch-53`)
 
 - **نقشهٔ PARTIAL:** `docs/spec/PARTIAL-MAP-fa.md` — هر ردیفِ PARTIAL در یک دسته با یک عبارت از مانده و، برای دسته‌های صاحب‌کار،
