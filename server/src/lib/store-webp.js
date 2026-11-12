@@ -2,7 +2,7 @@
 /**
  * WEB-16، تصمیمِ ۴-۲ «الف» ِ صاحب‌کار — عکسِ سبک‌ترِ ویترین با WebP، با کتابخانهٔ آزادِ libvips (`sharp`) روی خودِ سرور.
  *
- *   ⛔ پیش‌فرض خاموش: فقط با `STORE_WEBP=1` ِ سرور. `sharp` وابستگیِ **اختیاری** است: اگر روی این ماشین نصب نشد یا بار نشد
+ *   ⛔ پیش‌فرض خاموش: فقط با `STORE_WEBP=1` ِ سرور، و هرگز زیرِ Electron (سرورِ درونیِ برنامهٔ کامپیوتر). `sharp` وابستگیِ **اختیاری** است: اگر روی این ماشین نصب نشد یا بار نشد
  *      ⇒ همان JPEG ِ امروز، بی خطا (`available()` = false).
  *   ⛔ فقط وقتی مرورگر `Accept: image/webp` می‌فرستد؛ پاسخ `Vary: Accept` دارد تا کشِ مشترک دو نسخه را قاطی نکند.
  *   ⛔ تبدیل از همان بایت‌های امروزِ `thumb`/`display` (اصل هرگز)، بی EXIF/GPS، با سقفِ پیکسل؛ هر خطا ⇒ همان JPEG.
@@ -20,6 +20,9 @@ const QUALITY = Object.freeze({ thumb: 70, display: 78 });
 let sharp; // undefined = هنوز نسنجیده، null = نیست
 function lib() {
   if (sharp === undefined) {
+    //  زیرِ Electron (سرورِ درونیِ برنامهٔ کامپیوتر) نه: libvips با glib ِ خودِ Electron ناسازگار است (هشدارِ
+    //  SharpElectronLinux و GLib-CRITICAL) و در CI ِ #1035 پرونده را تا کشته شدن نگه داشت؛ ویترینِ WebP آن‌جا لازم نیست
+    if (process.versions.electron) { sharp = null; return sharp; }
     try {
       sharp = require('sharp');
       sharp.cache(false);          //  کشِ درونیِ libvips نه؛ سقفِ حافظه همین‌جاست

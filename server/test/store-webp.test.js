@@ -18,7 +18,8 @@ const { resetAll } = require('../src/middleware/ratelimit');
 let admin = '';
 let seq = 0;
 const uniq = () => `${Date.now().toString(36)}${++seq}`;
-const hasSharp = (() => { try { require('sharp'); return true; } catch { return false; } })();
+//  زیرِ Electron sharp بار نمی‌شود (`store-webp.lib`) — همان‌جا «روشن» ⇒ همان JPEG (آزمونِ پایین)
+const hasSharp = !process.versions.electron && (() => { try { require('sharp'); return true; } catch { return false; } })();
 
 test.before(async () => {
   await h.start();
@@ -96,6 +97,11 @@ test('روشن: WebP ِ سبک‌تر فقط برای مرورگرِ پذیرن�
     assert.match(plain.vary, /accept/i);
     assert.doesNotMatch(plain.etag, /-webp/);
   } finally { config.storefront.webp = false; }
+});
+
+test('زیرِ Electron: روشن هم بی sharp ⇒ همان JPEG (available = false)', { skip: !process.versions.electron && 'فقط زیرِ Electron' }, async () => {
+  config.storefront.webp = true;
+  try { assert.equal(W.available(), false); } finally { config.storefront.webp = false; }
 });
 
 test('روشن: دادهٔ ناخوانا یا بی sharp ⇒ null (همان اصل)، بی پرتاب', async () => {
