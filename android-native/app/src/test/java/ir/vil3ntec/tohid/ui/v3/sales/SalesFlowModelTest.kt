@@ -308,8 +308,8 @@ class SalesFlowModelTest {
     val rel = "ir/vil3ntec/tohid/ui/v3/sales/returns/ReturnFlowSheet.kt"
     val src = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
       .map { java.io.File(it, rel) }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد")
-    assertTrue(src.contains("ReturnFlow.priorMinor(d, sale?.id)"))
-    assertTrue(src.contains("ReturnFlow.permDecision(role, layers, ReturnFlow.minor(total), priorMinor)"))
+    //  سد از `ReturnDecision.of`: پیشینِ فاکتور هم به مجوزِ نقش و هم به سقفِ دستگاه می‌رود، همان ثبت (`ReturnDecisionTest`)
+    assertTrue(src.contains("ReturnDecision.of(d, sale, q, role, layers, limit, policy, todayIso())"))
     //  سقفِ ۱۰۰ افغانی برای شاگرد: ۳۰ تنها مجاز، ۸۰ِ پیشین + ۳۰ نیازمند تأیید (#552)
     val layers = listOf(mapOf("returns.create" to mapOf("mode" to "allow", "caps" to mapOf("maxAmount" to 10_000))))
     assertEquals("allow", ir.vil3ntec.tohid.data.ReturnFlow.permDecision("staff", layers, 3_000L))

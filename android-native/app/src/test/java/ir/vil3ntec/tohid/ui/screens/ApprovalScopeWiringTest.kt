@@ -11,7 +11,7 @@ import java.io.File
  *  - صندوقِ کامپیوتر: تأییدِ سقفِ اعتبار در حالت نمی‌ماند و فقط به همان یک تلاشِ `finish` می‌رود — مثلِ
  *    `QuickSale` و `Sale` ِ گوشی؛ وگرنه اگر آن تلاش ثبت نمی‌کرد، سبدِ دیگرِ همان مشتری تا همان مبلغ با تأییدِ
  *    کهنه ثبت می‌شد.
- *  - برگشت: تأیید به مبلغ و `gate` بسته است؛ مقدار که بیشتر شد «تأیید شد» نمی‌ماند.
+ *  - برگشت (هر دو فرم): تأیید به مبلغ و `gate` بسته است؛ مقدار که بیشتر شد «تأیید شد» نمی‌ماند.
  */
 class ApprovalScopeWiringTest {
 
@@ -49,13 +49,17 @@ class ApprovalScopeWiringTest {
   }
 
   @Test fun `تأییدِ برگشت با مبلغ یا gate ِ تازه کنار می‌رود`() {
-    val s = src("ir/vil3ntec/tohid/ui/screens/ReturnsV2.kt")
     val keyed = "var approval by remember(ReturnFlow.minor(total), gate) { mutableStateOf<ReturnFlow.Approval?>(null) }"
-    assertEquals(1, Regex(Regex.escape("var approval by remember")).findAll(s).count())
-    assertTrue(s.contains(keyed))
-    //  کلید پس از ساختنِ gate است، نه پیش از آن
-    assertTrue(s.indexOf("val gate = ReturnFlow.gate(") in 0 until s.indexOf(keyed))
-    //  سقفِ دستگاه هم تجمعی سنجیده می‌شود
-    assertTrue(s.contains("ReturnFlow.minor(limit), priorMinor"))
+    //  هر دو فرمِ برگشت — کامپیوتر و برگهٔ نسخهٔ ۳ (RET-10: برگهٔ نسخهٔ ۳ تأیید را با `remember` ِ بی‌کلید نگه می‌داشت)
+    for (rel in listOf("ir/vil3ntec/tohid/ui/screens/ReturnsV2.kt", "ir/vil3ntec/tohid/ui/v3/sales/returns/ReturnFlowSheet.kt")) {
+      val s = src(rel)
+      assertEquals(rel, 1, Regex(Regex.escape("var approval by remember")).findAll(s).count())
+      assertTrue(rel, s.contains(keyed))
+      //  کلید پس از ساختنِ gate است، نه پیش از آن
+      assertTrue(rel, s.indexOf("val gate = decision.gate") in 0 until s.indexOf(keyed))
+    }
+    //  سقفِ دستگاه هم تجمعی سنجیده می‌شود — در همان سدی که ثبت هم می‌سنجد
+    assertTrue(Regex("""ReturnFlow\.minor\(limit\),\s+priorMinor, policyBreach = !verdict\.ok""").containsMatchIn(src("ir/vil3ntec/tohid/data/ReturnDecision.kt")))
+    assertTrue(src("ir/vil3ntec/tohid/data/ReturnFlow.kt").contains("ReturnDecision.gate(d, sale, quote.lines, quote.total, req.role, req.perm, req.limit, req.policy, today)"))
   }
 }

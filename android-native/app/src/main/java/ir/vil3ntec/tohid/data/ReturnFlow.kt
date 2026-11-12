@@ -545,11 +545,8 @@ object ReturnFlow {
       id
     } else null
 
-    val verdict = req.policy?.let { policyCheck(d, sale, quote.lines, it, today) } ?: ReturnPolicy.Verdict()
-    val g = gate(
-      req.role, req.perm, minor(quote.total), sale == null, quote.lines.any { it.disposition == DAMAGED }, minor(req.limit),
-      priorMinor(d, sale?.id), policyBreach = !verdict.ok,
-    )
+    //  RET-09، RET-10: همان سدی که فرمِ برگشت نشان می‌دهد (`ReturnDecision.of`) — سقفِ تجمعیِ فاکتور و سیاستِ برگشت
+    val (verdict, g) = ReturnDecision.gate(d, sale, quote.lines, quote.total, req.role, req.perm, req.limit, req.policy, today)
     if (g.decision == "deny") return Outcome.Bad(Code.RETURN_DENIED)
     val approval = req.approval?.takeIf { it.by.isNotBlank() }
     if (g.decision == "approve" && (approval == null || !canApprove(g, approval.role))) return Outcome.Bad(Code.APPROVAL_REQUIRED)
