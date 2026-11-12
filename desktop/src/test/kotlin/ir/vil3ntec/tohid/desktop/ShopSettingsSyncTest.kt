@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.desktop
 
+import ir.vil3ntec.tohid.ShopDayChoice
 import ir.vil3ntec.tohid.data.LedgerOwner
 import ir.vil3ntec.tohid.data.ShopSettingsKeys
 import ir.vil3ntec.tohid.data.ShopSettingsKeys.Scope
@@ -302,5 +303,31 @@ class ShopSettingsSyncTest {
     cycle(server)
     assertFalse(policy.contains("loyalty"))
     assertFalse("رشته جای Int نمی‌نشیند", policy.contains("return_window_days"))
+  }
+
+  @Test fun `آغازِ هفته و تعطیلِ رسیده از دستگاهِ دیگر بی بازکردنِ دوبارهٔ برنامه در صفحه‌ها می‌نشیند (LOC-03)`() {
+    try {
+      ShopDayChoice.load(ctx)
+      assertEquals(6, ShopDayChoice.weekStart)
+      val server = FakeServer()
+      server.set("week_start", "i", JsonPrimitive(7))
+      server.set("closed_days", "s", JsonPrimitive("5,6"))
+      cycle(server)
+      assertEquals(7, policy.getInt("week_start", 0))
+      //  بی `ShopDayChoice.load` ِ دوباره (همان بازکردنِ برنامه)
+      assertEquals("آغازِ هفتهٔ رسیده در صفحه ننشست", 7, ShopDayChoice.weekStart)
+      assertEquals(setOf(5, 6), ShopDayChoice.closedDays)
+      //  کلیدِ دیگری از دکان ⇒ تنظیمِ هفته دست نمی‌خورد
+      server.set("return_window_days", "i", JsonPrimitive(7))
+      cycle(server)
+      assertEquals(7, ShopDayChoice.weekStart)
+      //  برداشتن روی دستگاهِ دیگر ⇒ دوباره شنبه
+      server.rows["tohid-policy/week_start"] = FakeServer.Row("tohid-policy", "week_start", "del", JsonNull, ++server.rev)
+      cycle(server)
+      assertEquals(6, ShopDayChoice.weekStart)
+    } finally {
+      wipe()
+      ShopDayChoice.load(ctx)
+    }
   }
 }
