@@ -1,6 +1,8 @@
 package ir.vil3ntec.tohid.ui.v3.account.profile
 
+import ir.vil3ntec.tohid.core.account.PhoneClaimForm
 import ir.vil3ntec.tohid.core.i18n.StrAccount
+import ir.vil3ntec.tohid.core.i18n.StrAuth
 
 /**
  *  قاعده‌های خالصِ «ویرایش حساب و دکان» (آزمون: `ProfileEditModelTest`) — همان سه
@@ -39,4 +41,15 @@ object ProfileEditModel {
 
   /** راهنمای زیرِ ایمیل */
   fun emailNote(email: String): String = if (email.isBlank()) StrAccount.emailByPhone else StrAccount.emailLocked
+
+  /** AUTH-08: خطای درجای زیرِ کادرِ کدِ شمارهٔ تازه (حالِ کادر: `core/account/PhoneClaimForm`) */
+  fun codeError(p: PhoneClaimForm.Problem?): String? = when (p) {
+    null -> null
+    PhoneClaimForm.Problem.FORMAT -> StrAccount.codeIncomplete
+    PhoneClaimForm.Problem.WRONG -> StrAccount.codeWrong
+    PhoneClaimForm.Problem.DEAD -> StrAccount.codeDead
+  }
+
+  /** «ارسالِ دوباره» با شمارشِ مهلتی که خودِ سرور داد (`resendSeconds`) */
+  fun resendLabel(wait: Int): String = if (wait > 0) StrAuth.resendIn(wait) else StrAuth.resendCode
 }

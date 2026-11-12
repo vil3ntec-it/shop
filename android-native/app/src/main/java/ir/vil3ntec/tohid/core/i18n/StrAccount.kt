@@ -80,6 +80,27 @@ object StrAccount {
   val nameSavedOffline: String get() = td("نام روی گوشی ذخیره شد — برای ثبت روی سرور به اینترنت نیاز است", "The name was saved on this phone — saving it on the server needs internet", "نوم په تلیفون خوندي شو — په سرور د ثبت لپاره انټرنیټ پکار دی", "The name was saved on this computer — saving it on the server needs internet", "نوم په کمپیوټر خوندي شو — په سرور د ثبت لپاره انټرنیټ پکار دی")
   val phoneNeedsInternet: String get() = t("ثبتِ شماره به اینترنت نیاز دارد", "Saving the number needs internet", "د شمېرې ثبت انټرنیټ ته اړتیا لري")
   val phoneSaved: String get() = t("شماره ثبت شد و قفل شد", "The number was saved and locked", "شمېره ثبت او قفل شوه")
+  //  AUTH-08: کادرِ کدِ شمارهٔ تازه (`ProfileEditModel.codeError`؛ برچسب و «کد رفت» در `StrShellPages`)
+  val codeIncomplete: String get() = t(
+    "کد کامل نیست؛ همان کدی را بنویسید که به این شماره پیامک شد",
+    "The code is incomplete — enter the code texted to this number",
+    "کوډ بشپړ نه دی؛ هغه کوډ ولیکئ چې دې شمېرې ته واستول شو",
+  )
+  val codeWrong: String get() = t(
+    "کد درست نیست؛ کدِ پیامک‌شده را دوباره نگاه کنید",
+    "That code isn't right — check the texted code again",
+    "کوډ سم نه دی؛ استول شوی کوډ بیا وګورئ",
+  )
+  val codeDead: String get() = t(
+    "این کد دیگر کار نمی‌کند (وقتش گذشته یا بیش از اندازه امتحان شده)",
+    "This code no longer works (it expired or was tried too many times)",
+    "دا کوډ نور کار نه کوي (موده یې تېره شوې یا ډېر ځله ازمویل شوی)",
+  )
+  val codeNotNeeded: String get() = t(
+    "کدِ شماره دیگر لازم نیست؛ «ذخیره تغییرات» را دوباره بزنید",
+    "A code is no longer needed — tap “Save changes” again",
+    "د شمېرې کوډ نور اړین نه دی؛ «بدلونونه خوندي کړئ» بیا ووهئ",
+  )
   val saved: String get() = t("ذخیره شد", "Saved", "خوندي شو")
 
   // خروج از حساب

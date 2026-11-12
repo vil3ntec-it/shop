@@ -3,7 +3,7 @@ package ir.vil3ntec.tohid.core.i18n
 /**
  *  جزءهای مشترکِ قدیمی که نسخهٔ ۳ هنوز صدا می‌زند: کادر و دکمه‌های پایه (`ui/screens/Tohid.kt`)، فهرستِ موردهای نوارِ پایین
  *  (`NavCatalog`)، قرصِ «تمدیدِ اشتراک» (`PhoneNavBar`)، صفحه‌های قدیمیِ گوشی که فقط پیش‌نمایشِ `DevShot` نشانشان می‌دهد
- *  (`Profile`، `Settings`، `VoiceSearch`) و گامِ کدِ شماره (`PhoneClaimStep`). این نوشته‌ها پیش‌تر متنِ خامِ فارسی بودند و از هیچ زبانی نمی‌گذشتند.
+ *  (`Profile`، `Settings`، `VoiceSearch`) و گامِ کدِ شماره (حالا در `ui/v3/account/profile/ProfileEditScreen`). این نوشته‌ها پیش‌تر متنِ خامِ فارسی بودند و از هیچ زبانی نمی‌گذشتند.
  *  فارسی کلمه‌به‌کلمه همان پیشین است؛ هر جا همان جمله در جدولِ دیگری بود، همان دوباره به کار رفته. قاعده‌ها سرِ `I18n.kt`.
  */
 @Suppress("unused")
@@ -43,7 +43,7 @@ object StrShellPages {
   val syncNever: String get() = t("هنوز انجام نشده", "Not done yet", "لا نه ده شوې")
   val voiceSearch: String get() = t("جستجوی صوتی", "Voice search", "غږیز لټون")
 
-  // ── `PhoneClaimStep.kt` (AUTH-08: گامِ کدِ شمارهٔ تازه؛ در نسخهٔ ۳ صدازننده ندارد) و همان کادر در `Profile.kt` ──
+  // ── AUTH-08: گامِ کدِ شمارهٔ تازه در «ویرایش حساب» ِ نسخهٔ ۳ (`ProfileEditScreen`) و کادرِ شماره در `Profile.kt` ──
   val mobileOnce: String get() = t("شماره موبایل — یک بار ثبت می‌شود", "Mobile number — can be set only once", "د موبایل شمېره — یوازې یو ځل ثبتېږي")
   val smsCodeLabel: String get() = t("کدی که به همین شماره پیامک شد", "The code texted to this number", "هغه کوډ چې همدې شمېرې ته واستول شو")
   val smsCodeSent: String get() = t(

@@ -51,8 +51,9 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
 
 /*
- *  AI-11 — «جست‌وجو با عکس» در صندوق (`QuickSale`، `DeskSale`) و فهرستِ کالاها (`Products`، `DeskProducts`). منطقِ خالص در
- *  `core/product/VisualSearch`. عکس از همان برگهٔ دوربین/گالریِ عکسِ کالا (`ParcelPhotoSource` ⇐ `PhotoSourceSheet`)، کوچک
+ *  AI-11 — «جست‌وجو با عکس» در صندوق و فهرستِ کالاها: کامپیوتر (`DeskSale`، `DeskProducts`) با دکمهٔ [VisualSearchEntry]؛ گوشیِ
+ *  نسخهٔ ۳ (صندوق `ui/v3/sales/cart/SaleScreen` با ردیفِ «…»، فروشِ سریع و «کالاها» با دکمهٔ سربرگ) با [rememberVisualSearch] و
+ *  [VisualSearchHost]. منطقِ خالص در `core/product/VisualSearch`. عکس از همان برگهٔ دوربین/گالریِ عکسِ کالا (`ParcelPhotoSource` ⇐ `PhotoSourceSheet`)، کوچک
  *  و JPEG، فقط برای همین درخواست. پاسخ فقط فهرستِ «مشابه» با نام، قیمت و عکسِ دفترِ همین دستگاه.
  *  ⛔ دکمه فقط وقتی سرور «روشن» گفت (`VisualSearchLive`، مثلِ `OwnerReportLive`)؛ پرچمِ خاموش ⇒ ۴۰۴ ⇒ هیچ‌چیز رسم نمی‌شود.
  *  ⛔ زدنِ ردیف فقط `onTap` با `VisualSearch.tap` (کادرِ جست‌وجو یا بازکردنِ کالا)؛ این فایل به سبد و فاکتور راه ندارد.
@@ -107,8 +108,41 @@ internal class VisualSearchController(
   fun tap(s: VisualSearch.Suggestion): VisualSearch.Tap { close(); return VisualSearch.tap(s, place) }
 }
 
+/** «جست‌وجو با عکس» ِ یک صفحه: دکمه یا ردیفِ منو فقط [start] را می‌زند؛ برگهٔ عکس و نتیجه با [VisualSearchHost] */
+@Stable
+class VisualSearchHandle internal constructor(internal val ctl: VisualSearchController) {
+  /** برگهٔ دوربین/گالری باز است */
+  var picking by mutableStateOf(false)
+    internal set
+
+  fun start() { picking = true }
+}
+
 /**
- *  دکمه و برگهٔ «جست‌وجو با عکس». [api] null (بی حساب) یا پرچمِ خاموش ⇒ هیچ‌چیز. [products] دفترِ همین دستگاه؛
+ *  [api] null (بی حساب) یا پرچمِ خاموش (سرور «روشن» نگفته، `VisualSearchLive`) ⇒ null: نه دکمه، نه ردیف، نه برگه.
+ *  [products] دفترِ همین دستگاه (نام، قیمت و عکسِ ردیف‌ها).
+ */
+@Composable
+fun rememberVisualSearch(api: ApiClient?, products: List<Product>, place: VisualSearch.Place): VisualSearchHandle? {
+  if (api == null) return null
+  val src = remember(api) { VisualSearchRepository(api) }
+  LaunchedEffect(src) { VisualSearchLive.load(src) }
+  val byId = rememberUpdatedState(remember(products) { products.associateBy { it.id } })
+  val handle = remember(src, place) { VisualSearchHandle(VisualSearchController(src, place) { id -> visualLocal(byId.value[id]) }) }
+  return if (VisualSearchLive.visible) handle else null
+}
+
+/** برگهٔ عکس و برگهٔ «مشابه» ِ [handle]؛ [onTap] همان کارِ نتیجهٔ جست‌وجوی معمولیِ همان صفحه (هرگز سبد) */
+@Composable
+fun VisualSearchHost(handle: VisualSearchHandle, onTap: (VisualSearch.Tap) -> Unit) {
+  val ctl = handle.ctl
+  val scope = rememberCoroutineScope()
+  ParcelPhotoSource(open = handle.picking, note = StrVisualSearch.photoNote, onDismiss = { handle.picking = false }) { bytes -> scope.launch { ctl.send(bytes) } }
+  if (ctl.sheet.open) VisualSearchSheet(ctl, onAgain = handle::start, onTap = { s -> onTap(ctl.tap(s)) })
+}
+
+/**
+ *  دکمه و برگهٔ «جست‌وجو با عکس» (کامپیوتر). [api] null (بی حساب) یا پرچمِ خاموش ⇒ هیچ‌چیز. [products] دفترِ همین دستگاه؛
  *  [onTap] همان کارِ نتیجهٔ جست‌وجوی معمولیِ همان صفحه.
  */
 @Composable
@@ -119,17 +153,9 @@ fun VisualSearchEntry(
   modifier: Modifier = Modifier,
   onTap: (VisualSearch.Tap) -> Unit,
 ) {
-  if (api == null) return
-  val src = remember(api) { VisualSearchRepository(api) }
-  LaunchedEffect(src) { VisualSearchLive.load(src) }
-  if (!VisualSearchLive.visible) return
-  val byId = rememberUpdatedState(remember(products) { products.associateBy { it.id } })
-  val ctl = remember(src, place) { VisualSearchController(src, place) { id -> visualLocal(byId.value[id]) } }
-  val scope = rememberCoroutineScope()
-  var pick by remember { mutableStateOf(false) }
-  TohidSecondaryButton(StrVisualSearch.button, onClick = { pick = true }, modifier = modifier, icon = Icons.Filled.PhotoCamera)
-  ParcelPhotoSource(open = pick, note = StrVisualSearch.photoNote, onDismiss = { pick = false }) { bytes -> scope.launch { ctl.send(bytes) } }
-  if (ctl.sheet.open) VisualSearchSheet(ctl, onAgain = { pick = true }, onTap = { s -> onTap(ctl.tap(s)) })
+  val h = rememberVisualSearch(api, products, place) ?: return
+  TohidSecondaryButton(StrVisualSearch.button, onClick = h::start, modifier = modifier, icon = Icons.Filled.PhotoCamera)
+  VisualSearchHost(h, onTap)
 }
 
 @Composable
