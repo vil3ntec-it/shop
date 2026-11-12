@@ -65,7 +65,9 @@
   «با مجوزِ مدیر» را «فقط هشدار» می‌نوشت (`SettingsIndexModel`).
 - **آزمون:** `CheckoutRulesWiringTest` (۴) و `CheckoutExpiryWiringTest` (۵) — سیم‌کشی روی کدِ پیشین ۴ از ۵ سرخ (پنجمی نگهبانِ «فقط `CheckoutModel`
   در صندوقِ v3 `Checkout` می‌سازد»)، رفتار با امضای تازه؛ `CheckoutGuardsPrefDesktopTest` (۳، مقدارِ واقعیِ `tohid-policy` روی `DesktopContext`)؛
-  `SettingsModelsTest`؛ دو ردیفِ `V3ReachabilityTest`. STATUS ِ POS-24 و S22 به‌روز (IMPLEMENTED-VERIFIED می‌مانند)؛ قاعدهٔ S22 در RULES «فروش و صندوق».
+  `SettingsModelsTest`؛ دو ردیفِ `V3ReachabilityTest`. اجرای کاملِ `./desktop/gradlew -p desktop test` (۴۰۴۵ آزمون، ۰ شکست، ۴ SKIP ِ پیشین)؛
+  اجرای کاملِ اول یک شکست داشت: `LineSellerFlowTest` متنِ `.copy(lineSellers = lineSellers, tax = taxConfig)` را می‌پاید ⇒ تأییدِ منقضی در `copy` ِ جدا.
+  STATUS ِ POS-24 و S22 به‌روز (IMPLEMENTED-VERIFIED می‌مانند)؛ قاعدهٔ S22 در RULES «فروش و صندوق».
 - **قدمِ بعدی:** دیدنِ برگهٔ تأییدِ منقضی روی گوشیِ واقعی (سنجیده نشد: فقط آزمونِ JVM)؛ `ScenarioS22Test` همچنان خودش `Checkout(expiryGate = true)`
   می‌سازد — سیم‌کشی را آزمون‌های تازه می‌پایند.
 
