@@ -58,7 +58,8 @@
       pDel.hidden = !has['gate-photo'];
       pState.textContent = has['gate-photo'] ? t('am.saved') : t('am.none');
       if (!has['gate-photo']) { thumb.hidden = true; thumb.removeAttribute('src'); return; }
-      call(o.base, a.id, 'gate-photo', 'GET').then(dataUrl).then(function (u) { if (u) { thumb.src = u; thumb.hidden = false; } }, function () {});
+      //  پاسخِ دیرِ پیش‌نمایش پس از «پاک کردن» عکس را برنمی‌گرداند
+      call(o.base, a.id, 'gate-photo', 'GET').then(dataUrl).then(function (u) { if (u && has['gate-photo']) { thumb.src = u; thumb.hidden = false; } }, function () {});
     }
     pAdd.addEventListener('click', function () { pic.click(); });
     pic.addEventListener('change', function () {
