@@ -20,8 +20,8 @@ import java.io.File
 class CartStoreLineVoidDesktopTest {
   private val draft get() = File(DesktopContext.filesDir, CartStore.FILE)
 
-  @Before fun before() { draft.delete() }
-  @After fun after() { draft.delete() }
+  @Before fun before() { CartStore.awaitWrites(); draft.delete() }
+  @After fun after() { CartStore.awaitWrites(); draft.delete() }
 
   @Test
   fun `فقط حذفِ کاربر و با کلیدِ همان فاکتور`() = runBlocking<Unit> {
