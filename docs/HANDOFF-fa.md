@@ -54,6 +54,24 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-34b (ب۳) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-34b` (از سرِ `claude/batch-56`)
+
+- **ساخته شد (دو باگِ برگهٔ برگشتِ نسخهٔ ۳، `ui/v3/sales/returns/ReturnFlowSheet.kt`):** سدِ تأییدِ برگشت یک‌جا در `data/ReturnDecision.kt` —
+  `of` را هر دو فرم (`ReturnFlowDialog` ِ کامپیوتر و برگهٔ نسخهٔ ۳) صدا می‌زنند و `ReturnFlow.post` همان `gate` را می‌سنجد (برابری در ۱۸۰ حالت آزموده).
+  **RET-09:** برگه سیاستِ همین دستگاه (`ReturnPolicyPrefs.of`) را به سد و `Request(policy)` می‌دهد و هشدارِ «بیرون از سیاست» (`ReturnFlowModel.policyNotice`)
+  نشان می‌دهد؛ `WHY_POLICY` دیگر «مجوز» خوانده نمی‌شد. **RET-10:** سقفِ دستگاه در برگه هم تجمعیِ فاکتور و تأیید با `remember(minor(total), gate)`
+  (بن‌بستِ «مجاز در صفحه، APPROVAL_REQUIRED در ثبت» رفت). **یافتهٔ هم‌دسته، ساخته شد:** RET-08 — برگه دلیل‌ها را از فهرستِ ثابتِ `ReturnFlow.REASONS`
+  نشان می‌داد و `reasons` را به ثبت نمی‌داد ⇒ حالا `ReturnSettings.reasons` (یادداشت در STATUS ِ RET-08؛ ردیف همان IMPLEMENTED-VERIFIED).
+  هر دو ردیف IMPLEMENTED-VERIFIED ماندند با شاهدِ تازه؛ قاعدهٔ «سدِ دستی در صفحه نه» در RULES (بخشِ فروش). «تازه‌ها»: سه سطرِ «رفع».
+- **آزمون‌ها (سرخ پیش / سبز پس):** `ReturnDecisionTest` ۵ (تازه؛ روی مدلِ سدِ پیشینِ برگه ۴ سرخ، با جهشِ «بی پیشین و بی سیاست» دوباره سرخ (RET-10: «approve» ⇐ «allow»))، `ReturnFlowModelTest` ۲ (تازه؛
+  `whyText` سرخ بود)، `ReturnSettingsGateTest` (+۱: هر دو فرم)، `ApprovalScopeWiringTest` (برگشت: هر دو فرم)، `SalesFlowModelTest` (سیمِ برگه به `ReturnDecision`) — همه پیش
+  از رفع سرخ؛ پس از رفع ۱۰ کلاسِ برگشت ۹۴/۹۴ (با `ReturnFlowTest` ۲۱، `SalesReturnTest` ۱۵، `ReturnPolicyFlowTest` ۶، `ReturnApprovalSlipTest` ۵، `ReturnLeftTest` ۴).
+  آزمون‌های امروزِ «دروغ‌سبز»: `ReturnPolicyFlowTest` فقط `post` و `ReturnSettingsGateTest`/`ApprovalScopeWiringTest` فقط `ReturnsV2` را می‌خواندند.
+- **اجرای کامل:** __FULL__؛ `quality.mjs` بی ❌؛ precheck ‏fail=0؛ spec «سالم».
+- **دام:** دیسکِ کانتینر میانِ کار پر شد (۱۰۰ مگ آزاد ⇒ «Failed to create Jar file … gradle-api»)؛ هماهنگ‌کننده Gradle-home و `build` ِ کهنه را پاک کرد.
+  `GRADLE_USER_HOME` ِ تازه را با `cp -al /root/.gradle/wrapper` بسازید (بی جای اضافه).
+- **قدمِ بعدی:** دیدنِ برگه روی گوشیِ واقعی با «برگشت و تعویض» ِ روشن و مهلت/سقفِ پر (سنجیده نشد: فقط آزمونِ JVM و متن).
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-28l زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-28l` (از سرِ `claude/batch-55`)
 
 - **ساخته شد:** LOC-06 دورِ ۳ — متنِ خامِ `ui/screens` **۱۷۸ ⇐ ۷۳** (`DariCoverageTest.maxRawOldScreens`). (ب) ۷۴ متنِ صفحه‌های فقط‌پیش‌نمایشِ گوشی
