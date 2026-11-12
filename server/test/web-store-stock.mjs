@@ -224,6 +224,49 @@ ok(((await oilCard().textContent()) || '').includes('ناموجود') && await o
   'R6 روشن: نگه‌داشتهٔ نگذشته دوباره «ناموجود»');
 ok((await call('POST', `/api/shop/orders/${phone2.body.order.id}/transition`, { to: 'rejected', reason: 'busy' }, T)).status === 200, 'R6: سفارشِ دوم رد شد');
 
+//  INV-04@32: ۵ موجود و ۴ نگه‌داشته ⇒ ۱ آزاد؛ با «نمایشِ عدد» (`showQty = exact`) کارت و برگه همان ۱ را می‌گویند و افزودن بیش از آن
+//  در سبد نمی‌نشیند (همان عددی که «ثبت» می‌پذیرد) — بی «نمایشِ عدد» عددی بیرون نمی‌رود
+const teaIn = await call('POST', '/api/sync/v1/push', { device_id: 'dev-owner', schema_version: 2, ops: [
+  op('products', 'tea', { name: 'چای', unit: 'دانه', salePrice: 100, category: 'خوراکی', active: true }),
+  op('warehouseEntries', 'tea-e1', { productId: 'tea', units: 5, cartons: 0, perCarton: 0, unit: 'دانه', price: 80, createdAt: Date.now() }),
+] }, T, { 'X-App': 'shop', 'X-Device': 'dev-owner' });
+await call('PUT', '/api/shop/storefront/products/tea', { published: true, onlinePriceMinor: null, maxQtyMilli: null }, T);
+const hold4 = await call('POST', '/api/shop/orders', {
+  source: 'phone', fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: 'مشتریِ تلفنی' },
+  lines: [{ productId: 'tea', name: 'چای', unit: 'دانه', qtyMilli: 4000, unitPriceMinor: 10000 }],
+}, T, { 'Idempotency-Key': `web-stock-tea-${Date.now()}` });
+await call('PUT', '/api/shop/catalog/settings', { showQty: 'exact' }, T);
+const teaNow = (await call('GET', '/api/shop/catalog/products/tea', null, T)).body;
+const teaSt = teaNow && teaNow.product ? teaNow.product.stock : null;
+ok(teaIn.status === 200 && hold4.status === 201 && teaSt && Number(teaSt.levels.shop_floor) === 5000 && Number(teaSt.reservedMilli) === 4000
+  && Number(teaSt.sellableMilli) === 1000, 'INV-04@32: ۵ چای، ۴ نگه‌داشتهٔ سفارشِ تلفنی ⇒ ۱ آزاد (دفترِ سرور)', JSON.stringify(teaSt));
+await look();
+const teaCard = () => page.locator('#products li[data-id="tea"]');
+await page.waitForSelector('#products li[data-id="tea"]', { timeout: 10000 });
+ok(((await teaCard().textContent()) || '').includes('۱ دانه مانده'), 'INV-04@32: کارتِ چای «۱ دانه مانده»', (await teaCard().textContent()) || '');
+await teaCard().locator('.p-open').click();
+await page.waitForSelector('#product-sheet:not([hidden]) #ps-stock .pill', { timeout: 10000 });
+ok((await page.textContent('#ps-stock')).includes('۱ دانه مانده'), 'INV-04@32: برگهٔ کالا همان «۱ دانه مانده»');
+await page.click('#ps-add');
+ok(/۱ در سبد/.test(await page.textContent('#ps-add')) || await page.isDisabled('#ps-add'), 'INV-04@32: یک چای در سبد', await page.textContent('#ps-add'));
+ok(await page.isDisabled('#ps-add') && (await page.textContent('#ps-add')).includes('فقط ۱ دانه موجود است'),
+  'INV-04@32: پس از تنها چایِ آزاد دکمهٔ افزودن بسته با «فقط ۱ دانه موجود است»', await page.textContent('#ps-add'));
+const teaQty = () => page.evaluate(() => {
+  for (let i = 0; i < localStorage.length; i++) {
+    const v = JSON.parse(localStorage.getItem(localStorage.key(i)) || 'null');
+    if (v && typeof v === 'object' && v.tea && typeof v.tea.qtyMilli === 'number') return v.tea.qtyMilli;
+  }
+  return null;
+});
+await page.evaluate(() => document.querySelector('#ps-add').removeAttribute('disabled'));
+await page.click('#ps-add');
+ok(await teaQty() === 1000, 'INV-04@32: افزودنِ دوم (حتی با دکمهٔ دست‌کاری‌شده) در سبد نمی‌نشیند', String(await teaQty()));
+ok(/فقط ۱ دانه موجود است/.test((await page.textContent('#toast').catch(() => '')) || ''), 'INV-04@32: پیامِ «فقط ۱ دانه موجود است»');
+await call('PUT', '/api/shop/catalog/settings', { showQty: 'hidden' }, T);
+await look();
+ok(!((await teaCard().textContent()) || '').includes('مانده'), 'INV-04@32: بی «نمایشِ عدد» عددی روی کارت نیست');
+ok((await call('POST', `/api/shop/orders/${hold4.body.order.id}/transition`, { to: 'rejected', reason: 'busy' }, T)).status === 200, 'INV-04@32: سفارشِ تلفنی رد شد');
+
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));
 

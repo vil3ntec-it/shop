@@ -153,6 +153,8 @@
   "stock.out": "Out of stock",
   "stock.na": "Not available to order",
   "stock.unk": "Stock is being checked",
+  "stock.left": "{q} left",
+  "stock.only": "Only {q} available",
   "add.one": "Add {name} to cart",
   "add.more": "Add one more {name} — {q} in cart",
   "p.per": "/ {unit}",

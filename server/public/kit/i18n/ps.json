@@ -153,6 +153,8 @@
   "stock.out": "نشته",
   "stock.na": "د فرمایش وړ نه دی",
   "stock.unk": "موجودي لا کتل کېږي",
+  "stock.left": "{q} پاتې",
+  "stock.only": "یوازې {q} شته",
   "add.one": "{name} ټوکرۍ ته ور واچوئ",
   "add.more": "یو بل {name} ور واچوئ — {q} په ټوکرۍ کې",
   "p.per": "هر {unit}",
