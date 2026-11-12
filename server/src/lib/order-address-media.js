@@ -21,9 +21,8 @@ const core = require('./address-media');
 const { notFound, conflict } = require('../middleware/errors');
 
 const { FLAG, flagOn, kindOf, WIRE } = core;
-/** پس از این‌ها نشانی دیگر به کارِ تحویل نمی‌آید ⇒ گذاشتن/برداشتن بسته */
-const CLOSED = Object.freeze(['out_for_delivery', 'picked_up', 'delivered', 'rejected', 'auto_rejected', 'cancelled',
-  'cancelled_by_customer', 'returned_to_store', 'restocked', 'refunded_full']);
+/** سپرده به پیک یا پس از آن نشانی دیگر عوض نمی‌شود ⇒ گذاشتن/برداشتن بسته (`core.FINISHED` = هر وضعیتی که دیگر به ارسال برنمی‌گردد) */
+const CLOSED = Object.freeze(['out_for_delivery', ...core.FINISHED]);
 
 /** سفارشِ ویترینِ همین توکن، با قفل؛ بسته ⇒ ۴۰۹ */
 async function openOrder(c, sf, orderId) {

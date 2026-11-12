@@ -247,3 +247,40 @@ test('⛔ نقش و مالکیت: صاحب و مدیر بله، صندوق‌د�
   //  پیک از درِ دکان نه (دامنهٔ توکنِ پیک)
   assert.ok([403, 404].includes((await view(courier.token, X.id)).status));
 });
+
+test('⛔ نشانیِ ذخیره‌شده فقط برای سفارشِ باز: پس از بسته شدن نه نما نه بایت، حتی رسانه‌ای که بعداً از ویترینِ دکانِ دیگر آمد؛ FINISHED از ماشینِ وضعیت', async () => {
+  //  FINISHED = هر وضعیتی که `out_for_delivery` از آن دست‌یافتنی نیست (وضعیتِ تازه بی طبقه‌بندی ⇒ سرخ)
+  const { ORDER_TRANSITIONS } = require('../src/lib/order-states');
+  const { FINISHED } = require('../src/lib/address-media');
+  const { CLOSED } = require('../src/lib/order-address-media');
+  const reaches = (from, seen = new Set()) => {
+    if (from === 'out_for_delivery') return true;
+    seen.add(from);
+    return ORDER_TRANSITIONS[from].some((n) => !seen.has(n) && reaches(n, seen));
+  };
+  const derived = Object.keys(ORDER_TRANSITIONS).filter((s) => !reaches(s)).sort();
+  assert.deepEqual([...FINISHED].sort(), derived);
+  assert.deepEqual([...CLOSED].sort(), ['out_for_delivery', ...derived].sort(), 'گذاشتن/برداشتنِ مشتری پس از سپردن به پیک بسته');
+  for (const s of ['return_requested', 'refunded_partial']) assert.ok(CLOSED.includes(s), s);
+
+  const A = await liveStore('بسته-الف');
+  const B = await liveStore('بسته-ب');
+  const who = await shopper(A.slug, '0791240011');
+  const addr = await savedAddress(A.slug, who);
+  assert.equal((await accountPut(A, who, addr, 'gate-photo', JPEG(41))).status, 201);
+  const X = await checkout(A, who, addr);
+  assert.equal((await orderPut(A, X.token, 'voice-note', OGG(210, 4))).status, 201);
+  assert.deepEqual(sources((await view(A.token, X.id)).body), ['address', 'order'], 'باز: هر دو');
+
+  const rej = await h.post(`/api/shop/orders/${X.id}/transition`, { to: 'rejected', reason: 'busy' }, { token: A.token });
+  assert.equal(rej.status, 200, JSON.stringify(rej.body));
+  //  مشتری پس از آن از ویترینِ دکانِ دیگر برای همان نشانی صدا می‌گذارد (حسابِ سراسری)
+  assert.equal((await accountPut(B, who, addr, 'voice-note', OGG(220, 6))).status, 201);
+  const v = await view(A.token, X.id);
+  assert.equal(v.status, 200);
+  assert.deepEqual(sources(v.body), [null, 'order'], 'بسته: رسانهٔ نشانی نه؛ رسانهٔ خودِ سفارش می‌ماند');
+  assert.equal((await bytes(A.token, X.id, 'gate-photo')).status, 404);
+  assert.ok((await bytes(A.token, X.id, 'voice-note')).buffer.equals(OGG(210, 4)), 'صدای خودِ سفارش، نه صدای تازهٔ نشانی');
+  //  مشتری هم دیگر چیزی نمی‌گذارد
+  assert.equal((await orderPut(A, X.token, 'gate-photo', JPEG(42))).status, 409);
+});
