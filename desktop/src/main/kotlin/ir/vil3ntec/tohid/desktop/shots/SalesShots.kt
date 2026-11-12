@@ -161,7 +161,7 @@ private fun OverQuick(content: @Composable () -> Unit) {
 
 @Composable
 private fun LineShot(line: CartLine, form: LineForm? = null) = OverQuick {
-  LineSheet(LineModel.info(SalesDemo.ledger(), line), onSave = { _, _ -> }, onRemove = {}, onClose = {}, initial = form)
+  LineSheet(LineModel.info(SalesDemo.ledger(), line), onSave = { _, _, _ -> }, onRemove = {}, onClose = {}, initial = form)
 }
 
 @Composable

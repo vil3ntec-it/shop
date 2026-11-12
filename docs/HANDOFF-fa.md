@@ -54,6 +54,34 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-31w زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-31w` (از سرِ `claude/batch-56`)
+
+- **OPS-02 — «پاک‌سازیِ کاملِ اطلاعات» ِ نسخهٔ ۳ درست شد (باگِ پرخطرِ 28l):** قاعده در `core/backup/WipeAll` (commonMain): ردیف فقط برای
+  **صاحب** (`visible`؛ مدیر با `settings.write` دیگر نمی‌بیند)، دو مرحله در یک برگه (`WipeAllSheet`: هشدار ⇐ «ادامه» ⇐ نوشتنِ دقیقِ نامِ دکان؛
+  «پاک کن» تا نامِ درست بسته)، پیش از نوشتن نقش و نام دوباره (`BackupController.wipe(typed)` ⇐ `decide`) و «پاک شد» فقط با `true` ِ `replaceAll`
+  (`outcome`؛ وگرنه «اطلاعات پاک نشد؛ هیچ چیزی تغییر نکرد»). رابطِ پیشین دکمهٔ پشتیبانِ پیش از پاک‌سازی نداشت (فقط هشدار) ⇒ همان هشدار.
+  `WipeAllName` ⇐ `WipeAll.matches` (پیش‌نمایشِ `WipeAllDialog` هم). `WipeAllNameTest` حالا صفحهٔ زنده را می‌سنجد. ردیف PARTIAL می‌ماند (USB/دستگاه).
+- **S45 — گوشیِ نسخهٔ ۳:** `LineModel.check`/`apply` با همان `LinePolicy` (یک درِ تازهٔ `LinePolicy.checked` برای هر دو صندوق)، پیامِ رد زیرِ
+  «قیمت هر واحد»، «درخواستِ تأیید» ⇐ `PinApprovalSheet` (بدنهٔ `CreditApprovalSheet`، حالا عمومی) ⇐ «تأیید شد: …» ⇐ «ثبت» و ردیفِ سابقهٔ
+  `price_override` (اسکوپِ IO بیرون از برگه، فقط اگر سبد نشست)؛ `apply` بی تأییدِ همان قیمت سبد را دست نمی‌زند؛ قلمِ آزادِ گوشی هم سقفِ POS-10.
+- **باگِ واقعیِ تازه (کامپیوتر):** `CartLineDialog` متنِ رد (`Dialog.problem`) را جای کدِ رد به `PriceApproval.askable` می‌داد ⇒ «درخواستِ تأیید» ِ
+  S45 **هرگز** دیده نمی‌شد و `lifted` بی‌اثر بود؛ «۳/۳» ِ `ScenarioS45PriceTest` فقط متنِ کد را می‌خواند. رفع: `LinePolicy.Dialog.code`.
+- **کارِ افزودهٔ هماهنگ‌کننده (بازرسیِ v3، بندهای ۴، ۷، ۸)، سه کامیتِ جدا:** برگهٔ ردیفِ گوشیِ نسخهٔ ۳ همان کامپوننت‌های `CartLineDialog` را
+  گرفت (کپیِ دوم نه): POS-28 سریال (`posLineSerials` ⇒ `PosSerialField` ⇒ `CartSerials.set`؛ بی آن کالای سریال‌دار در گوشی فروخته نمی‌شد)،
+  POS-22 «چرا این قیمت؟» (`priceWhyOn` ⇒ `PriceWhyLine.rows` با `PromoLive` ⇒ `PriceWhyPanel`)، POS-11 یادداشتِ ردیف (`posLineNote` ⇒
+  `PosNoteField` ⇒ `CartNotes.set`).
+- **آزمون (پنجرهٔ واقعیِ Compose روی کامپیوتر، سرخ پیش/سبز پس):** `WipeAllUiTest` ۴/۴ (پیش ۴/۴ سرخ)، `WipeAllNameTest` ۴/۴،
+  core `WipeAllTest` ۶/۶؛ `ScenarioS45DeskUiTest` ۱/۱ و `ScenarioS45PhoneUiTest` ۲/۲ (پیش هر سه سرخ)، `ScenarioS45PhoneTest` ۷/۷، `ScenarioS45PriceTest` ۴/۴،
+  `LinePolicyTest` ۹/۹، `LineUnitsTest` ۷/۷، `CartSheetsModelTest` ۶/۶، core `PriceApprovalTest` ۳/۳، `LinePricingTest` ۲۰/۲۰، `WhatsNewFileTest` ۴/۴؛
+  `LineSerialsUiTest`، `LinePriceWhyUiTest`، `LineNoteUiTest` هر کدام ۲/۲ (پیش: آزمونِ «روشن» ِ هر سه سرخ، درست سرِ کادرِ نبوده).
+- **جهش‌آزمایی:** پاک‌سازی ۴ جهش (مدیر در `visible`، نادیده گرفتنِ نتیجهٔ `replaceAll`، دکمهٔ بازِ مرحلهٔ دوم، پاک کردن روی نامِ نادرست) و S45 ۳ جهش
+  (متنِ رد جای کد، `apply` بی سنجش، سقفِ قلمِ آزاد نادیده) — همه کشته (WipeAllUiTest ۳، WipeAllNameTest ۲، WipeAllTest ۲، S45: ۱۰ آزمونِ سرخ).
+- **اجرای کامل:** `./desktop/gradlew -p desktop test` (با `flock`، `test-data` ِ پاک) **۴٬۰۵۵ آزمون: ۴٬۰۵۰ PASS، ۱ FAIL، ۴ SKIP ِ پیشین** —
+  تنها شکست `LineSerialsUiTest` ِ تازه بود از **مسابقه در خودِ آزمون**: `CartStore.set` پیش‌نویس را ناهم‌زمان می‌نویسد و صفحه گاهی سبدِ خالی می‌خواند
+  (برگهٔ ردیف «ردیف دیگر نیست» و قفلِ «فروش» زیرش). `LineSheetHarness.seed` تا نشستنِ پیش‌نویس می‌ایستد (`ScenarioS45PhoneUiTest` هم)؛ پس از آن
+  چهار کلاسِ پنجره دوباره سبز (بالا). کدِ برنامه پس از اجرای کامل عوض نشد. precheck ‏fail=0؛ `quality.mjs` بی ❌؛ spec «سالم»؛ `dari-text`/نامِ آزمون سبز.
+- **قدمِ بعدی:** AI-11 («جست‌وجو با عکس» در گوشی) و AUTH-08 (گامِ کدِ شمارهٔ تازه) هنوز در نسخهٔ ۳ نیستند؛ بازرسیِ v3 (بندهای ۱–۳، ۵، ۶، ۹، ۱۰).
+  پیش‌نمایشِ قدیمِ `ui/screens/Settings.kt` («پاک‌سازی» با پیامِ شکستِ پوسته) دست نخورد — فقط DevShot است.
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-34b (ب۳) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-34b` (از سرِ `claude/batch-56`)
 
 - **ساخته شد (دو باگِ برگهٔ برگشتِ نسخهٔ ۳، `ui/v3/sales/returns/ReturnFlowSheet.kt`):** سدِ تأییدِ برگشت یک‌جا در `data/ReturnDecision.kt` —

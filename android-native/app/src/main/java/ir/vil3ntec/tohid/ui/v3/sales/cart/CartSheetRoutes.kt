@@ -2,23 +2,39 @@ package ir.vil3ntec.tohid.ui.v3.sales.cart
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.data.CartNotes
+import ir.vil3ntec.tohid.data.CartSerials
+import ir.vil3ntec.tohid.data.LinePolicyPrefs
+import ir.vil3ntec.tohid.data.PriceWhyLine
+import ir.vil3ntec.tohid.data.PromoEngine
 import ir.vil3ntec.tohid.data.StockPlacesPref
 import ir.vil3ntec.tohid.data.TillGoodsPref
 import ir.vil3ntec.tohid.scan.ScanFeedback
 import ir.vil3ntec.tohid.sync.v1.Ulid
+import ir.vil3ntec.tohid.ui.PromoLive
+import ir.vil3ntec.tohid.ui.components.pos.posLineNote
+import ir.vil3ntec.tohid.ui.components.pos.posLineSerials
+import ir.vil3ntec.tohid.ui.components.pos.priceWhyOn
 import ir.vil3ntec.tohid.ui.screens.Haptics
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 /*
  *  چسبِ برگه‌های سبد — هر کدام یک مسیر (`sale/line/{i}`، `sale/free-line`،
  *  `sale/keypad/{productId}`) روی همان سبدِ زنده (`CartStore`). ردیف یا کالایی که هنگامِ
  *  باز شدن دیگر نیست ⇒ برگشت، با یک پیامِ کوتاه.
  */
+
+/** نوشتنِ ردیفِ سابقهٔ تأییدِ قیمت بیرون از برگه — بسته شدنِ مسیر آن را نبرد؛ `ShopStore.update` خودش روی IO است */
+private val priceAudit = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 /** «تعداد و قیمتِ این ردیف»؛ `i` شمارهٔ ردیف در سبد */
 @Composable
@@ -36,9 +52,29 @@ fun RouteScope.LineRoute() {
     LaunchedEffect(Unit) { toasts.show(StrSale.lineGone, V3Tone.WARNING); back() }
     return
   }
+  //  S45 (POS-08/10/21): «قیمت و تخفیفِ ردیف» ِ همین دستگاه (پیش‌فرض خاموش) و «درخواستِ تأیید» — همان کادرِ ردیفِ کامپیوتر
+  val policy = remember { LinePolicyPrefs.of(context) }
+  //  POS-22: «چرا این قیمت؟» با تخفیف‌های خودکارِ همین سبد (`PromoLive`، همان صندوقِ گوشی)
+  val lines by cart.lines.collectAsState()
+  val debtorId by cart.debtorId.collectAsState()
+  val promo = PromoLive.rememberOutcome(data, lines, debtorId)
+  val why = if (priceWhyOn()) PriceWhyLine.rows(data, lines, PromoEngine.priced(lines, promo), promo, info.id) else null
+  val priceAsk = remember { LinePolicyPrefs.ask(context, store, priceAudit, info.name, if (info.free) null else info.id) }
   LineSheet(
     info = info,
-    onSave = { form, start -> cart.set(LineModel.apply(cart.lines.value, info, form, start)) },
+    policy = policy,
+    priceAsk = priceAsk,
+    //  POS-28: کالای سریال‌دار ⇒ سریال‌ها (همان `posLineSerials` ⇒ `CartSerials.set` ِ صندوقِ کامپیوتر)
+    why = why,
+    //  POS-11: یادداشتِ ردیف (`posLineNote` ⇒ `CartNotes.set`، تنظیمِ «یادداشت» ِ همین دستگاه)
+    note = posLineNote(line.note) { n -> cart.set(CartNotes.set(cart.lines.value, info.id, n)) },
+    serials = posLineSerials(data, line) { s -> cart.set(CartSerials.set(cart.lines.value, info.id, s)) },
+    onSave = { form, start, grant ->
+      //  تأییدی که به کار رفت ⇒ ردیفِ سابقهٔ `price_override` با درخواست‌کننده، تأییدکننده و دلیل (فقط اگر سبد نشست)
+      if (cart.set(LineModel.apply(cart.lines.value, info, form, start, policy, grant))) {
+        LineModel.check(policy, form, info, start, grant).used?.let(priceAsk.onGranted)
+      }
+    },
     onRemove = {
       cart.set(LineModel.remove(cart.lines.value, info))
       Haptics.confirm(context)
@@ -52,9 +88,12 @@ fun RouteScope.LineRoute() {
 @Composable
 fun RouteScope.FreeLineRoute() {
   val context = LocalContext.current
+  //  POS-10: سقفِ قیمتِ قلمِ آزاد (`LinePolicyPrefs`، پیش‌فرض خاموش) — همان `FreeLineDialog` ِ کامپیوتر
+  val policy = remember { LinePolicyPrefs.of(context) }
   FreeLineSheet(
+    policy = policy,
     onAdd = { form ->
-      cart.set(FreeLineModel.add(cart.lines.value, form, Ulid::next))
+      cart.set(FreeLineModel.add(cart.lines.value, form, policy, Ulid::next))
       ScanFeedback.ok(context)
       toasts.show(StrSale.freeAdded(form.label.trim()), V3Tone.SUCCESS)
     },

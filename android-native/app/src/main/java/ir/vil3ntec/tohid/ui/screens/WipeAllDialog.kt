@@ -18,6 +18,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.backup.WipeAll
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.ui.theme.Shop
@@ -28,6 +29,7 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  *  ⛔ این کار برای هر ردیف DELETE به سرور می‌فرستد و دفترِ دکان روی **همهٔ** دستگاه‌ها و سرور خالی می‌شود
  *  (`ShopStore.save` ⇐ `record`)، پس هشدار همین را می‌گوید و یک کلیکِ اشتباه کافی نیست. دکمه را فقط صاحبِ
  *  دکان می‌بیند (`Settings`). دکانِ بی‌نام (پیش از ثبت) به جای نام همان واژهٔ دکمه («پاک کن») را می‌خواهد.
+ *  قاعده‌ها در `core/backup/WipeAll` (همان که برگهٔ نسخهٔ ۳، `WipeAllSheet`، دارد).
  *
  *  [onConfirm] فقط پس از هر دو مرحله صدا زده می‌شود؛ رفتارِ همگام‌سازی همان است که بود.
  */
@@ -48,8 +50,8 @@ fun WipeAllDialog(shopName: String, onDismiss: () -> Unit, onConfirm: () -> Unit
     )
     return
   }
-  val expected = shopName.trim().ifEmpty { StrSettings.wipe }
-  val ok = remember(typed, expected) { WipeAllName.matches(typed, expected) }
+  val expected = WipeAll.expected(shopName, StrSettings.wipe)
+  val ok = remember(typed, expected) { WipeAll.matches(typed, expected) }
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = Shop.colors.surfaceSolid,
@@ -73,17 +75,4 @@ fun WipeAllDialog(shopName: String, onDismiss: () -> Unit, onConfirm: () -> Unit
     },
     dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel) } },
   )
-}
-
-/** سنجشِ نامِ نوشته‌شده — بی فاصله و نیم‌فاصله، بی اِعراب (کسرهٔ اضافه…)، «ي/ك» ِ عربی برابرِ «ی/ک»، بی بزرگی و کوچکیِ حرف */
-object WipeAllName {
-  private fun norm(s: String): String =
-    s.replace('\u064A', '\u06CC').replace('\u0643', '\u06A9')      //  ي ⇒ ی، ك ⇒ ک
-      .filter { !it.isWhitespace() && it != '\u200C' && it !in '\u064B'..'\u065F' && it != '\u0670' }
-      .lowercase()
-
-  fun matches(typed: String, expected: String): Boolean {
-    val want = norm(expected)
-    return want.isNotEmpty() && norm(typed) == want
-  }
 }

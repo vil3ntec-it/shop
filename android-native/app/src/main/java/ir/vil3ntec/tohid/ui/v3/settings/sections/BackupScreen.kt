@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.backup.WipeAll
 import ir.vil3ntec.tohid.core.i18n.StrBackupSafety
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.data.AutoBackup
@@ -63,7 +64,7 @@ import ir.vil3ntec.tohid.ui.theme.V3Tone
 /**
  *  `settings/data/backup`: پشتیبانِ دستی، خروجی، بازیابی از فایل (برگهٔ تأیید با
  *  شمارِ پیش/پس و عکس‌ها)، نسخه‌های خودکار، پشتیبان روی سرور (نوارِ جای مصرف‌شده)،
- *  پشتیبانِ کامل در پوشه، نگه‌داری، و جدا در پایان «پاک‌سازیِ کامل» با تأییدِ خطر.
+ *  پشتیبانِ کامل در پوشه، نگه‌داری، و جدا در پایان «پاک‌سازیِ کامل» (فقط صاحب، دو مرحله با نامِ دکان: `WipeAllSheet`).
  *  کارها همه در `BackupController`.
  */
 @Composable
@@ -75,8 +76,10 @@ internal fun RouteScope.BackupScreen(onBack: (() -> Unit)?) {
   //  OPS-02: نسخه‌های رمزدار با عبارت (قفل) و «رمزِ نسخه‌های خودکار» فقط برای صاحب/مدیر
   val sealed = remember(autoBackups) { autoBackups.filter { SnapshotSeal.isPhraseSealed(it.file) }.mapTo(HashSet()) { it.file.name } }
   val owner = remember { !ShopRole.isStaff(context) }
+  //  OPS-02: «پاک‌سازیِ کامل» دفترِ دکان را روی همهٔ دستگاه‌ها و سرور خالی می‌کند ⇒ فقط صاحب (نه مدیر)، مثلِ رابطِ پیشین
+  val wipeOk = remember { WipeAll.visible(ShopRole.current(context)) }
   val plan = remember(data) { LedgerArchive.plan(data) }
-  var ask by remember { mutableStateOf(if (SettingsShotState.wipeSheet) Ask.WIPE else null) }
+  var ask by remember { mutableStateOf(if (SettingsShotState.wipeSheet && wipeOk) Ask.WIPE else null) }
 
   ctrl.pendingRestore?.let { RestoreSheet(current = data, incoming = it, photos = ctrl.restorePhotos, onConfirm = ctrl::confirmRestore, onDismiss = ctrl::cancelRestore) }
   RecoveryPhraseSheet(ctrl)
@@ -86,7 +89,7 @@ internal fun RouteScope.BackupScreen(onBack: (() -> Unit)?) {
   }
   when (ask) {
     Ask.COMPACT -> V3ConfirmSheet(StrSettings.compactQ, StrSettings.compactWarn(plan.total), StrSettings.compactDo, { ctrl.compact(data) }, { ask = null }, icon = Icons.Outlined.Compress, danger = false)
-    Ask.WIPE -> V3ConfirmSheet(StrSettings.wipeQ, StrSettings.wipeWarn, StrSettings.wipe, { ctrl.wipe() }, { ask = null }, icon = Icons.Outlined.DeleteForever)
+    Ask.WIPE -> WipeAllSheet(ctrl.wipeName, onErase = ctrl::wipe, onDismiss = { ask = null })
     null -> Unit
   }
 
@@ -172,10 +175,12 @@ internal fun RouteScope.BackupScreen(onBack: (() -> Unit)?) {
         }
       }
     }
-    item(key = "wipe") {
-      Spacer(Modifier.height(12.dp))
-      V3Section(null, footer = StrSettings.wipeWarn) {
-        V3ListRow(StrSettings.wipeAll, icon = Icons.Outlined.DeleteForever, tile = false, danger = true, chevron = false, onClick = { ask = Ask.WIPE })
+    if (wipeOk) {
+      item(key = "wipe") {
+        Spacer(Modifier.height(12.dp))
+        V3Section(null, footer = StrSettings.wipeWarn) {
+          V3ListRow(StrSettings.wipeAll, icon = Icons.Outlined.DeleteForever, tile = false, danger = true, chevron = false, onClick = { ask = Ask.WIPE })
+        }
       }
     }
   }
