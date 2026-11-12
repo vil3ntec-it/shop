@@ -293,8 +293,9 @@ test('ABUSE-01: شکایت از سفارش ⇒ پرونده، مدرک، پاس�
   //  پیش از تصمیم اعتراض نمی‌شود
   assert.equal((await shopApi(s.token, 'POST', `/cases/${caseId}/appeal`, { body: 'هنوز تصمیمی نیست ولی اعتراض' })).body.error.code, 'not_appealable');
 
-  //  مدیر: صف (مدیرِ عادی ۴۰۳)، پرونده با شمارهٔ پوشیده و سابقهٔ دیدن
-  assert.equal((await adm('GET', '/cases', null, plainAdmin)).status, 403);
+  //  مدیر: صف (مدیرِ عادی از `trust-read.v1` می‌خواند، نمای کم‌ترش در `admin-trust-roles.test.js`؛ نوشتن ۴۰۳)، پرونده با
+  //  شمارهٔ پوشیده و سابقهٔ دیدن
+  assert.equal((await adm('GET', '/cases', null, plainAdmin)).status, 200);
   assert.equal((await adm('POST', `/cases/${caseId}/decide`, { outcome: 'upheld', reason: 'آزمون' }, plainAdmin)).status, 403);
   const q = await adm('GET', '/cases');
   assert.equal(q.status, 200);

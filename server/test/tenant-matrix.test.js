@@ -596,8 +596,9 @@ const ADMIN_SUBJECT = {
   //  ⛔ کدِ پمپ بی اجازهٔ صاحب‌کار دست نمی‌خورد: سابقهٔ این دو (و آزمونش) در #615 است
   'GET /api/admin/pump/stations/:id': { pending: 'کدِ پمپ — `admin.station_viewed` در #615 (`claude/sec-pump-pending`)، نیازمندِ اجازهٔ صاحب‌کار' },
   'GET /api/admin/pump/stations/:id/events': { pending: 'کدِ پمپ — `admin.station_events_viewed` در #615 (`claude/sec-pump-pending`)، نیازمندِ اجازهٔ صاحب‌کار' },
-  'GET /api/admin/trust/cases/:id': { elsewhere: 'market-trust.test.js (admin.trust_case_viewed، فقط ارشد)' },
-  'GET /api/admin/trust/cases/:id/evidence/:evidenceId': { elsewhere: 'market-trust.test.js (admin.trust_evidence_viewed، فقط ارشد)' },
+  //  ABUSE-01 (`trust-read.v1`): پروندهٔ شکایتِ یک دکان (متنِ شاکی) محتوای خصوصی است ⇒ هر دیدن با سابقه، برای هر نقشِ خواننده
+  'GET /api/admin/trust/cases/:id': { audited: 'admin.trust_case_viewed' },
+  'GET /api/admin/trust/cases/:id/evidence/:evidenceId': { elsewhere: 'market-trust.test.js (admin.trust_evidence_viewed، فقط ارشد؛ بایتِ عکس)' },
   'GET /api/admin/shops/:id/history': { exempt: 'تاریخچهٔ اشتراک — دفترِ صورت‌حسابِ خودِ پلتفرم، نه دفترِ دکان' },
   'GET /api/admin/pump/stations/:id/history': { exempt: 'تاریخچهٔ اشتراکِ پمپ — صورت‌حسابِ پلتفرم' },
   'GET /api/admin/shops/:id/staff-codes': { exempt: 'فقط فرادادهٔ کد؛ خودِ کد فقط با reveal ِ ارشد و سابقه (ACP-08)' },
@@ -636,6 +637,11 @@ test('TEN-04: هر درِ GETِ مدیر با شناسهٔ موضوع سابقه
   const st = await h.post('/api/pump', { name: 'پمپِ ماتریس', code: '' }, { token: pumpUser.accessToken });
   assert.equal(st.status, 201, JSON.stringify(st.body));
   const stationId = st.body.station.id;
+  //  ABUSE-01: پروندهٔ شکایتِ «الف» با متنِ رازدار — فقط از درِ سابقه‌دارِ پرونده بیرون بیاید (صف و جریمه‌ها متن ندارند)
+  const trustCase = `tc_${crypto.randomBytes(12).toString('hex')}`;
+  const trustBody = `رازِ-شکایت-${uniq()}`;
+  await query(`INSERT INTO trust_cases (id, shop_id, kind, subject, category, severity, body, reporter_key, reporter_hint, created_at, updated_at)
+               VALUES ($1,$2,'complaint','shop','other','low',$3,$4,'07•••12',$5,$5)`, [trustCase, a.shopId, trustBody, `rk-${uniq()}`, now()]);
 
   const routes = inventory.live(h.server().listeners('request')[0]).filter((r) => r.method === 'GET' && r.path.startsWith('/api/admin/'));
   const subject = routes.filter((r) => r.path.includes(':'));
@@ -652,6 +658,7 @@ test('TEN-04: هر درِ GETِ مدیر با شناسهٔ موضوع سابقه
     if (p.startsWith('/api/admin/accounts/')) return { app: 'shop', tenantId: a.shopId, id: a.I.backup };
     if (p.startsWith('/api/admin/pump/stations/')) return { id: stationId };
     if (p.startsWith('/api/admin/payments/')) return { id: a.I.payment };
+    if (p.startsWith('/api/admin/trust/cases/')) return { id: trustCase };
     return {};
   };
   const fillA = (r) => r.path.replace(/:([A-Za-z_]+)/g, (_, k) => ids(r)[k] ?? 'x1')
@@ -662,7 +669,7 @@ test('TEN-04: هر درِ GETِ مدیر با شناسهٔ موضوع سابقه
   //  دفترِ دکان: هیچ درِ مدیر — حتی ارشد — این‌ها را نمی‌دهد (جز دانلودِ پشتیبانِ سابقه‌دار)
   const LEDGER = Object.fromEntries(Object.entries(a.M).filter(([k]) => k.startsWith('data.') || ['legacy', 'v1', 'v3', 'event'].includes(k)));
   //  محتوای خصوصیِ دیگر: پیامِ پشتیبانی، پشتیبان، لوکیشنِ دقیق، تعارض
-  const PRIVATE = { support: a.M.support, backup: a.M.backup, location: a.M.location, v3conflict: a.M.v3conflict };
+  const PRIVATE = { support: a.M.support, backup: a.M.backup, location: a.M.location, v3conflict: a.M.v3conflict, trust: trustBody };
 
   const bad = [];
   for (const r of routes) {
