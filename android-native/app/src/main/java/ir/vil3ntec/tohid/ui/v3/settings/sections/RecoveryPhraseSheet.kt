@@ -93,13 +93,15 @@ internal fun RecoveryPhraseSheet(ctrl: BackupController) {
   }
 }
 
-/** نسخهٔ رمزدار با عبارت که کلیدش روی این دستگاه نیست — عبارت را بپرس */
+/** نسخهٔ خودکار یا پشتیبانِ (دستی/پوشه) رمزدار با عبارت که کلیدش روی این دستگاه نیست — عبارت را بپرس */
 @Composable
 internal fun SnapshotUnlockSheet(ctrl: BackupController) {
-  val snap = ctrl.unlock ?: return
+  val snap = ctrl.unlock
+  val file = ctrl.unlockFile
+  if (snap == null && file == null) return
   val c = PhoneV3.colors
-  var typed by remember(snap) { mutableStateOf("") }
-  V3Sheet(onDismiss = ctrl::cancelUnlock, title = StrBackupSafety.unlockTitle) { closer ->
+  var typed by remember(snap, file) { mutableStateOf("") }
+  V3Sheet(onDismiss = ctrl::cancelUnlock, title = if (snap != null) StrBackupSafety.unlockTitle else StrBackupSafety.unlockFileTitle) { closer ->
     //  عبارتی که برای باز کردن نوشته می‌شود هم
     ir.vil3ntec.tohid.ui.Platform.SecureWindow(true)
     Text(StrBackupSafety.unlockBody, style = V3Type.callout, color = c.inkMuted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
@@ -108,7 +110,7 @@ internal fun SnapshotUnlockSheet(ctrl: BackupController) {
     Spacer(Modifier.height(18.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
       V3Button(StrKit.cancel, { closer.close() }, Modifier.weight(1f), kind = V3ButtonKind.NEUTRAL)
-      V3Button(StrBackupSafety.unlockDo, { ctrl.readSnapshot(snap, typed) }, Modifier.weight(1f), enabled = typed.isNotBlank())
+      V3Button(StrBackupSafety.unlockDo, { ctrl.submitUnlock(typed) }, Modifier.weight(1f), enabled = typed.isNotBlank())
     }
   }
 }

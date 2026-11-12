@@ -62,12 +62,20 @@ object BackupRestore {
    */
   suspend fun writeFull(context: Context, store: ShopStore, storeName: String, open: () -> OutputStream): Int {
     val ledger = store.exportBackup(storeName)
-    return withContext(Dispatchers.IO) { open().use { BackupBundle.write(context, it, ledger).getOrThrow() } }
+    //  OPS-02: «رمزِ پشتیبانِ دستی و پوشه» روشن و کلید باز نشد ⇒ پرتاب پیش از باز کردنِ مقصد (`BackupSeal.sealer`)
+    val seal = BackupSeal.sealer(context)
+    return withContext(Dispatchers.IO) {
+      open().use { raw -> BackupBundle.write(context, seal?.invoke(raw) ?: raw, ledger).getOrThrow() }
+    }
   }
 
-  /** خواندن و سنجیدنِ فایلِ برگزیده — هنوز هیچ چیزی ننشسته */
-  fun open(context: Context, store: ShopStore, input: InputStream): Result<BackupBundle.Opened> =
-    BackupBundle.read(context, input) { store.parseBackup(it) }
+  /**
+   *  خواندن و سنجیدنِ فایلِ برگزیده — هنوز هیچ چیزی ننشسته. فایلِ رمزدار با عبارت (`BackupSeal`): کلیدِ همین دستگاه یا
+   *  [typed]؛ نبودِ هر دو ⇒ [BackupSeal.needsPhrase].
+   */
+  fun open(context: Context, store: ShopStore, input: InputStream, typed: String? = null): Result<BackupBundle.Opened> =
+    runCatching { BackupSeal.unwrap(context, input, typed) }
+      .mapCatching { plain -> BackupBundle.read(context, plain) { store.parseBackup(it) }.getOrThrow() }
       .mapCatching { o ->
         when (BackupStamp.judge(o.stamp, LedgerOwner.currentUser(context), LedgerOwner.currentShop(context))) {
           BackupStamp.Verdict.OK -> o

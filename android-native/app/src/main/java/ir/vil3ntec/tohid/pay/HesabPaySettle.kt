@@ -87,8 +87,11 @@ object HesabPaySettle {
     return withRow(total, draft, PaymentRow(METHOD, "wallet", due, clean, "confirmed", BY_CASHIER, payee?.trim()?.ifEmpty { null }))
   }
 
-  /** تسویه با تکه‌های پنل + ردیفِ حساب‌پی؛ ردیفِ ثبتِ دستیِ همان تکه ⇐ `confirmed` (همان روش، مبلغ و مرجع) */
-  private fun withRow(total: Double, draft: PayFlow.Draft?, confirmed: PaymentRow): PayFlow.Outcome<Settlement> {
+  /**
+   *  تسویه با تکه‌های پنل + ردیفِ تأییدشده (حساب‌پی، یا «تأییدِ دستگاه» ِ `DevicePaySettle`)؛ ردیفِ ثبتِ دستیِ همان تکه ⇐
+   *  `confirmed` (همان روش، مبلغ و مرجع)
+   */
+  internal fun withRow(total: Double, draft: PayFlow.Draft?, confirmed: PaymentRow): PayFlow.Outcome<Settlement> {
     val base = draft ?: PayFlow.Draft(total)
     val tenders = ArrayList<Tender>()
     PayFlow.amountOf(base.cash)?.takeIf { !it.isNaN() && it > 0 }?.let { tenders += Tender(PayFlow.CASH, PayFlow.minor(it)) }
@@ -96,7 +99,7 @@ object HesabPaySettle {
       val a = PayFlow.amountOf(r.amount)
       if (a != null && !a.isNaN() && a > 0) tenders += Tender(r.method, PayFlow.minor(a), ref = r.ref.trim().ifEmpty { null })
     }
-    tenders += Tender(METHOD, confirmed.amount, ref = confirmed.ref)
+    tenders += Tender(confirmed.method, confirmed.amount, ref = confirmed.ref)
     //  PAY-10: ارزِ نقدِ همان پنل (رکوردِ همان لحظه)؛ بی ارز ⇒ خالی و همان تسویهٔ امروز
     val fx: List<ir.vil3ntec.tohid.core.pay.ExchangeRecord> = when (val r = ir.vil3ntec.tohid.data.FxTillFlow.record(base.fx)) {
       null -> emptyList()
@@ -108,7 +111,7 @@ object HesabPaySettle {
       is PayResult.Err -> return bad(s.code)
     }
     if (settled.status != "paid") return bad("TOTAL_MISMATCH")
-    val at = settled.payments.indexOfLast { it.method == METHOD && it.amount == confirmed.amount && it.ref == confirmed.ref }
+    val at = settled.payments.indexOfLast { it.method == confirmed.method && it.amount == confirmed.amount && it.ref == confirmed.ref }
     if (at < 0) return bad("TOTAL_MISMATCH")
     return PayFlow.Outcome.Ok(settled.copy(payments = settled.payments.mapIndexed { i, p -> if (i == at) confirmed else p }))
   }
