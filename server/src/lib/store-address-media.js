@@ -21,8 +21,9 @@ const core = require('./address-media');
 
 const { FLAG, flagOn, kindOf } = core;
 
+/** نشانیِ همین حساب، **با قفل**: دو PUT ِ هم‌زمانِ یک نشانی (و PUT کنارِ حذفِ نشانی) پشتِ هم ⇒ نه ۲۳۵۰۵ ِ یکتایی، نه شیءِ یتیم */
 async function ownAddress(run, customer, addressId) {
-  const r = (await run('SELECT id FROM store_customer_addresses WHERE id = $1 AND customer_id = $2',
+  const r = (await run('SELECT id FROM store_customer_addresses WHERE id = $1 AND customer_id = $2 FOR UPDATE',
     [String(addressId || '').slice(0, 40), customer.id])).rows[0];
   if (!r) throw notFound('این نشانی پیدا نشد', 'address_not_found');
   return r.id;
@@ -87,6 +88,23 @@ async function withMedia(customer, addresses) {
 }
 
 /**
+ * حذفِ نشانی یا حساب (`store-customers.removeAddress` / `remove`)، درونِ همان تراکنش و پیش از حذفِ آبشاری: نشانی‌ها قفل (همان قفلِ
+ * [put])، ردیف‌های رسانه پاک و `{customer_id, store_key}` شان برمی‌گردد تا [drop] پس از commit شیءِ انبار (disk/s3) را هم بردارد —
+ * وگرنه عکسِ درِ خانه و صدای مشتریِ حساب‌پاک‌کرده تا `gc` ِ دستی می‌ماند. بی جدولِ ۸۳۶ (برگشته) ⇒ هیچ.
+ */
+async function detach(c, customerId, addressId = null) {
+  if (!(await c.query("SELECT to_regclass('store_address_media') AS r")).rows[0].r) return [];
+  await c.query('SELECT id FROM store_customer_addresses WHERE customer_id = $1 AND ($2::text IS NULL OR id = $2) FOR UPDATE',
+    [customerId, addressId]);
+  return (await c.query(
+    'DELETE FROM store_address_media WHERE customer_id = $1 AND ($2::text IS NULL OR address_id = $2) RETURNING customer_id, store_key',
+    [customerId, addressId])).rows;
+}
+
+/** شیءهای انبارِ ردیف‌های [detach] — فقط پس از commit (بی خطا؛ یتیمِ احتمالی را `gc` برمی‌دارد) */
+const drop = (rows) => media.drop(rows);
+
+/**
  * پس از ثبتِ ویترین (بیرون از تراکنشِ ثبت، مثلِ نسبتِ کمپین): `address.savedId` ِ بدنه و نشستِ حساب ⇒ پیوندِ سفارش به همان
  * نشانی، فقط اگر نشانی مالِ همان حساب است و پرچمِ دکان روشن. هر چیزِ دیگر ⇒ هیچ (بی خطا).
  */
@@ -106,4 +124,4 @@ async function linkOrder(shopId, orderId, session, body) {
   return !!r;
 }
 
-module.exports = { FLAG, flagOn, put, get, remove, withMedia, linkOrder };
+module.exports = { FLAG, flagOn, put, get, remove, withMedia, detach, drop, linkOrder };
