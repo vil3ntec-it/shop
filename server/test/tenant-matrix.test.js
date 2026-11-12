@@ -609,7 +609,10 @@ const ADMIN_SUBJECT = {
   'GET /api/admin/pump/stations/:id': { pending: 'کدِ پمپ — `admin.station_viewed` در #615 (`claude/sec-pump-pending`)، نیازمندِ اجازهٔ صاحب‌کار' },
   'GET /api/admin/pump/stations/:id/events': { pending: 'کدِ پمپ — `admin.station_events_viewed` در #615 (`claude/sec-pump-pending`)، نیازمندِ اجازهٔ صاحب‌کار' },
   //  ABUSE-01 (`trust-read.v1`): پروندهٔ شکایتِ یک دکان (متنِ شاکی) محتوای خصوصی است ⇒ هر دیدن با سابقه، برای هر نقشِ خواننده
-  'GET /api/admin/trust/cases/:id': { audited: 'admin.trust_case_viewed' },
+  'GET /api/admin/trust/cases/:id': {
+    audited: 'admin.trust_case_viewed',
+    noGrant: 'پروندهٔ شکایت از دکان دادهٔ رسیدگیِ خودِ پلتفرم است (ABUSE-01) — دکانِ شکایت‌شده نباید با ندادنِ اجازه رسیدگی را ببندد؛ هر دیدن سابقه دارد و زیرِ ارشد نمای کم‌تر (lib/trust-admin-view.js)',
+  },
   'GET /api/admin/trust/cases/:id/evidence/:evidenceId': { elsewhere: 'market-trust.test.js (admin.trust_evidence_viewed، فقط ارشد؛ بایتِ عکس)' },
   'GET /api/admin/shops/:id/history': { exempt: 'تاریخچهٔ اشتراک — دفترِ صورت‌حسابِ خودِ پلتفرم، نه دفترِ دکان' },
   'GET /api/admin/pump/stations/:id/history': { exempt: 'تاریخچهٔ اشتراکِ پمپ — صورت‌حسابِ پلتفرم' },
