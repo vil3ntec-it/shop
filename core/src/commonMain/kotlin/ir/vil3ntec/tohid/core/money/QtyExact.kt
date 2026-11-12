@@ -8,17 +8,17 @@ package ir.vil3ntec.tohid.core.money
  *  یکی را عوض کنی، دیگری و بردار هم.
  *
  *  - مقدار به هزارم = `Qty.fromLegacy` = پاک‌سازیِ `setCartQty`: `mathRound(q × 1000)`.
- *  - مبلغِ ردیفی که مقدارش **اعشار** دارد (هزارمِ نامضربِ ۱۰۰۰: کالای وزنی/پیمانه‌ای، واحدِ فروشِ دوم یا قلمِ آزاد)
- *    = `Rounding.lineTotalMinor(qtyMilli, priceMinor, 100)` = `order-states.lineTotalMinor` ِ سرور
+ *  - مبلغِ ردیف با پرچمِ روشن = `Rounding.lineTotalMinor(qtyMilli, priceMinor, 100)` = `order-states.lineTotalMinor` ِ سرور
  *    (`floorDiv(milli × minor + 50_000, 100_000) × 100`، نیمه به +∞، بی Double): ۱٫۰۱۵ کیلو × ۱۰۰ = ۱۰۲، نه ۱۰۱.
- *  - مقدارِ درست (۲ عدد، ۳ کیلو) همیشه همان حسابِ پیشین `Math.round(price × q)` است ⇒ کالایی که اعشار نمی‌پذیرد
- *    بایت‌به‌بایت همان امروز. روشن/خاموش با صدازننده است (پرچمِ `shop.qty_exact`)؛ این‌جا فقط حساب.
+ *  - نسخهٔ ۲ (تصمیمِ ۳-۱۲ ِ صاحب‌کار): مقدارِ **درست** (۲ عدد، ۵۰ دانه) هم همان قاعده — ۵۰ × ۰٫۲۹ = ۱۵، نه ۱۴ ِ امروز؛ فاکتور
+ *    با سفارشِ اینترنتیِ همان کالا یکی. پیش‌تر (نسخهٔ ۱) فقط هزارمِ نامضربِ ۱۰۰۰. عددِ نامعتبر یا بیرون از بازهٔ دقیق ⇒ همان
+ *    حسابِ پیشین `Math.round(price × q)`. روشن/خاموش با صدازننده است (پرچمِ `shop.qty_exact`)؛ این‌جا فقط حساب.
  *
  *  Kotlin خالص (بی java.*)، تا روی آیفون همان عدد را بدهد.
  */
 object QtyExact {
 
-  const val VERSION = 1
+  const val VERSION = 2
 
   /** رقم‌های اعشارِ مقدار — همان `Keypad.decimals(QTY)` */
   const val DECIMALS = 3
@@ -41,12 +41,11 @@ object QtyExact {
     try { Rounding.lineTotalMinor(qtyMilli, priceMinor, STEP_MINOR) } catch (e: ArithmeticException) { null }
 
   /**
-   *  مبلغِ ردیفِ [price] (افغانی) × [quantity] به پول، فقط وقتی قاعدهٔ دقیق برایش هست: مقدارِ اعشاری.
-   *  مقدارِ درست، عددِ نامعتبر یا بیرون از بازه ⇒ `null` (صدازننده همان حسابِ پیشین را می‌کند).
+   *  مبلغِ ردیفِ [price] (افغانی) × [quantity] به پول با قاعدهٔ دقیق — هر مقدار، اعشاری یا درست (نسخهٔ ۲).
+   *  عددِ نامعتبر یا بیرون از بازه ⇒ `null` (صدازننده همان حسابِ پیشین را می‌کند).
    */
   fun lineMinorOrNull(price: Double, quantity: Double): Long? {
     val q = milli(quantity) ?: return null
-    if (!fractional(q)) return null
     if (price.isNaN() || price.isInfinite()) return null
     val p = mathRound(price * 100)
     if (p > MAX_EXACT || p < -MAX_EXACT) return null
@@ -56,7 +55,7 @@ object QtyExact {
   /** حسابِ پیشینِ موتور (`SalesEngine.lineTotal` = `lineTotal` ِ وب): `Math.round(price × q)` افغانی، به پول */
   fun legacyMinor(price: Double, quantity: Double): Long = mulExact(mathRound(price * quantity), STEP_MINOR)
 
-  /** دروازه: [on] و مقدارِ اعشاری ⇒ قاعدهٔ دقیق؛ وگرنه حسابِ پیشین. به پول. */
+  /** دروازه: [on] ⇒ قاعدهٔ دقیق (هر مقدار)؛ وگرنه (یا عددِ نامعتبر) حسابِ پیشین. به پول. */
   fun lineMinor(price: Double, quantity: Double, on: Boolean): Long =
     (if (on) lineMinorOrNull(price, quantity) else null) ?: legacyMinor(price, quantity)
 

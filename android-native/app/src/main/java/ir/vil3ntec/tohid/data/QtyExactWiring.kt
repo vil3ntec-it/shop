@@ -11,7 +11,7 @@ import kotlin.math.roundToLong
  *
  *  ⛔ پرچمِ سرورِ `shop.qty_exact` (`StockFlag`، کلیدِ `qtyExact` ِ `GET /shop/stock-ledger/config`؛ پیش‌فرض خاموش):
  *  خاموش ⇒ هر تابعِ این‌جا بیت‌به‌بیت همان حسابِ پیشینِ `SalesEngine` است. روشن ⇒
- *   • مبلغِ ردیفی که مقدارش اعشار دارد = قاعدهٔ ۳.۴ (`Rounding.lineTotalMinor`، همان سفارشِ آنلاینِ سرور)؛ مقدارِ درست همان امروز؛
+ *   • مبلغِ هر ردیف = قاعدهٔ ۳.۴ (`Rounding.lineTotalMinor`، همان سفارشِ آنلاینِ سرور) — از ۳-۱۲ مقدارِ درست هم (۵۰ × ۰٫۲۹ = ۱۵)؛
  *   • جمعِ سبد، جای خالی تا موجودی و مقدارِ ثبت‌شدهٔ قلم و حرکتِ انبار به هزارمِ دقیق (۰٫۳، نه ۰٫۳۰۰۰۰۰۰۰۰۰۰۰۰۰۰۰۴)؛
  *   • پیامِ کمبودِ کالای وزنی با اعشار («۱٫۲۵ کیلو»، نه «۱»).
  *  همهٔ ۳۸ صدای `SalesEngine.lineTotal` (سبد، صفحه‌کلید، برگهٔ ردیف، امانی، تخفیف، رسید، …) از همین یک‌جا می‌گذرند.
@@ -28,8 +28,8 @@ object QtyExactWiring {
   }
 
   /**
-   *  پیش‌نمایشِ مبلغ در برگهٔ ردیف و قلمِ آزادِ کامپیوتر (`CartLineDialog`؛ گرد در `money`): خاموش یا مقدارِ درست ⇒ همان
-   *  `price × q` ِ پیشین؛ روشن و اعشاری ⇒ همان مبلغِ ثبت. NaN/بی‌نهایت مثلِ پیش بی خطا (`money` ⇒ ۰).
+   *  پیش‌نمایشِ مبلغ در برگهٔ ردیف و قلمِ آزادِ کامپیوتر (`CartLineDialog`؛ گرد در `money`): خاموش ⇒ همان `price × q` ِ پیشین؛
+   *  روشن ⇒ همان مبلغِ ثبت (اعشاری و درست). NaN/بی‌نهایت مثلِ پیش بی خطا (`money` ⇒ ۰).
    */
   fun preview(price: Double, quantity: Double, on: Boolean = serverFlag): Double =
     (if (on) QtyExact.lineMinorOrNull(price, quantity)?.let { it / 100.0 } else null) ?: (price * quantity)

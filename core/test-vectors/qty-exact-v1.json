@@ -1,7 +1,7 @@
 {
-  "version": 1,
-  "about": "PRD-08: مقدارِ اعشاری × قیمت. ساخته‌شده با server/scripts/qty-exact-vectors.js — دستی ویرایش نشود.",
-  "rule": "پرچمِ shop.qty_exact روشن و هزارمِ مقدار نامضربِ ۱۰۰۰ ⇒ floorDiv(qtyMilli × priceMinor + 50000, 100000) × 100؛ وگرنه Math.round(price × qty) × 100 (موتورِ امروز). مقدار = Math.round(q × 1000)، قیمت = Math.round(price × 100).",
+  "version": 2,
+  "about": "PRD-08: مقدار × قیمت. ساخته‌شده با server/scripts/qty-exact-vectors.js — دستی ویرایش نشود.",
+  "rule": "پرچمِ shop.qty_exact روشن ⇒ floorDiv(qtyMilli × priceMinor + 50000, 100000) × 100 برای هر مقدار (نسخهٔ ۲، ۳-۱۲: مقدارِ درست هم)؛ خاموش، عددِ نامعتبر یا بیرون از بازهٔ دقیق ⇒ Math.round(price × qty) × 100 (موتورِ امروز). مقدار = Math.round(q × 1000)، قیمت = Math.round(price × 100).",
   "line": [
     {"name":"S04: برچسبِ ترازو ۱٫۲۵۰ کیلو × ۳۰۰","price":300,"qty":1.25,"qtyMilli":1250,"priceMinor":30000,"legacyMinor":37500,"exactMinor":37500,"onMinor":37500},
     {"name":"S04: وزنِ دستی ۰٫۷۵ × ۱۲۰","price":120,"qty":0.75,"qtyMilli":750,"priceMinor":12000,"legacyMinor":9000,"exactMinor":9000,"onMinor":9000},
@@ -17,7 +17,7 @@
     {"name":"۲٫۶۷۵ × ۱۰","price":10,"qty":2.675,"qtyMilli":2675,"priceMinor":1000,"legacyMinor":2700,"exactMinor":2700,"onMinor":2700},
     {"name":"۰٫۰۰۵ × ۱۰۰ = ۰٫۵ ⇒ ۱","price":100,"qty":0.005,"qtyMilli":5,"priceMinor":10000,"legacyMinor":100,"exactMinor":100,"onMinor":100},
     {"name":"رانشِ Double: ۰٫۱ + ۰٫۲ کیلو × ۱۱۵","price":115,"qty":0.30000000000000004,"qtyMilli":300,"priceMinor":11500,"legacyMinor":3500,"exactMinor":3500,"onMinor":3500},
-    {"name":"مقدارِ درست همان امروز: ۵۰ × ۰٫۲۹ (امروز ۱۴، قاعدهٔ دقیق ۱۵)","price":0.29,"qty":50,"qtyMilli":50000,"priceMinor":29,"legacyMinor":1400,"exactMinor":1500,"onMinor":1400},
+    {"name":"مقدارِ درست: ۵۰ × ۰٫۲۹ = ۱۴٫۵ ⇒ ۱۵ (امروز ۱۴؛ ۳-۱۲)","price":0.29,"qty":50,"qtyMilli":50000,"priceMinor":29,"legacyMinor":1400,"exactMinor":1500,"onMinor":1500},
     {"name":"مقدارِ درست: ۲ × ۱۱۵","price":115,"qty":2,"qtyMilli":2000,"priceMinor":11500,"legacyMinor":23000,"exactMinor":23000,"onMinor":23000},
     {"name":"مقدارِ درستِ کیلو: ۳ × ۹۹٫۹۹","price":99.99,"qty":3,"qtyMilli":3000,"priceMinor":9999,"legacyMinor":30000,"exactMinor":30000,"onMinor":30000},
     {"name":"بزرگ: ۹۹۹۹٫۹۹۹ × ۹۹۹۹۹٫۹۹","price":99999.99,"qty":9999.999,"qtyMilli":9999999,"priceMinor":9999999,"legacyMinor":99999980000,"exactMinor":99999980000,"onMinor":99999980000},
@@ -63,6 +63,6 @@
   },
   "whole": {
     "qtyMilli": [1000,30000], "qtyStepMilli": 1000, "priceMinor": [1,3000],
-    "pairs": 90000, "onDiffs": 0, "exactDiffs": 42
+    "pairs": 90000, "onDiffs": 42, "exactDiffs": 42
   }
 }

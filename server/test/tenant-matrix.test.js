@@ -614,6 +614,7 @@ const ADMIN_SUBJECT = {
   'GET /api/admin/shops/:id/health': { exempt: 'سلامتِ همگام‌سازی و اشتراک — فقط شمار و زمان؛ بی ردیفِ فروش، مشتری، متنِ خطا یا IP (`lib/shop-health.js`)' },
   'GET /api/admin/shops/:id/holds': { exempt: 'حالت‌های مدیریتیِ خودِ پلتفرم روی دکان (تعلیق، بایگانی…) — نه دادهٔ دکان' },
   'GET /api/admin/shops/:id/census': { exempt: 'نشانِ «آزمایشی/تکراری» ِ خودِ پلتفرم برای شمارشِ منطقه‌ای (S109) — نه دادهٔ دکان' },
+  'GET /api/admin/shops/:id/access-grants': { exempt: 'اجازه‌های دسترسیِ پشتیبانیِ خودِ پلتفرم روی دکان (۲-۹) — فرادادهٔ اجازه، نه دادهٔ دکان؛ هر نوشتن و هر استفاده سابقه دارد (support-access.test.js)' },
   'GET /api/admin/admins/:id/sessions': { exempt: 'نشست‌های مدیرِ خودِ پلتفرم — فقط ارشد؛ نه دادهٔ دکان' },
   'GET /api/admin/ops/incidents/:id': { exempt: 'رخدادِ عملیاتیِ خودِ سرور' },
   'GET /api/admin/finance/payments/:id': { exempt: 'پرداختِ اشتراک — صورت‌حسابِ خودِ پلتفرم' },

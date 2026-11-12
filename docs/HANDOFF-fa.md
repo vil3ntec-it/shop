@@ -54,6 +54,28 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۱ (ب) — هماهنگ‌کننده، دستهٔ ۴۹ (سیزنِ `session_01BwqpPed1SJuwB7Q4nZUbg9`) — **از این‌جا ادامه بده**
+
+- **انجام شد:** #1033 مرج (`21b802fe6`). در `ccr-3a0d593c-ac0jpj-batch-49`: `b8fa597cf` و main ِ تازه، سپس سه نیمه‌کاره:
+  - `claude/panel-doors`: بی تغییر؛ ۷ پروندهٔ آزمون ۵۰/۵۰ روی PGlite و PostgreSQL 16؛ با RULES ِ server «۱.۵۰.۸۹/۹۰» می‌خواند.
+  - `claude/owner-yes-4` (`3b144409d`): ۴-۳ «الف» تمام — «انتخاب روی نقشه» (`store/pin-map.js`، واژه‌نامهٔ `map`، `shop.storefront.map_pin` + `STORE_MAP_TILES`،
+    FLAGS-ON §۲۳، OWNER-ACTIONS §۹ الف ۱۰ و ب ۸؛ `store-map.test.js` ۳/۳، `web-store-zones.mjs` ۱۱۵ ✅)؛ ۳-۱۱ «الف» — ۱۷ مسیرِ دقیق در `server.yml`.
+    **مانده از owner-yes-4:** ۴-۲ (libvips/WebP، وابستگیِ تازهٔ سرور) و ۴-۲۳ پرسشِ ۱ (صفحهٔ استودیوی عکس در برنامه) — ساخته نشد.
+  - `claude/e-rows-7`: بازبینی و آزمون (سرور ۲۰۹/۰ سرخ، `subwait` ۴۲، `vsearch` ۲۹، `push` ۳۹ ✅)؛ `CourierLabels.clock` بی `java.util` (سنجهٔ راهِ آیفون).
+  - پس از ادغام: `card-data` روی «pan» ِ نقشه و توضیحِ `orders.js` سرخ شد ⇒ نام‌ها درست شد (سنجه سست نشد).
+- **آزمون روی دسته:** هستهٔ کاتلین **محلی** `gradle -p core jvmTest` ⇒ ۱۸۰۱ آزمون، ۰ شکست (با `LC_ALL=C.UTF-8` و `-Dsun.jnu.encoding=UTF-8`؛ بی آن نامِ
+  فارسیِ آزمون «Malformed input» می‌دهد). desktop/اندروید محلی به ۴۲۹ ِ Maven خورد ⇒ فقط CI. همهٔ زنجیره‌های مرورگر محلی (۲۷ اسکریپت) بی ایست سبز.
+- **SR49** (بازبینِ مستقل، `SECURITY-AUDIT-fa.md` B14): SR49-1 Medium (شکستنِ شیشهٔ پل بی `X-Actor-Reauth-At`) بسته + همتای پنل server **#139**
+  (نسخه 1.50.91)؛ SR49-3 و SR49-4 بسته؛ SR49-2 پذیرفته (قراردادِ پنل).
+- **قدمِ بعد:** PGlite ِ کامل ⇒ PR ِ دسته ⇒ CI ⇒ squash؛ server #139 پس از CI. سپس دورِ سومِ شاهدِ CI، ۴-۲ و ۴-۲۳ (۱)، کلیدِ امضا (پایین).
+- **کلیدِ امضای تازه:** کلید فقط روی کامپیوترِ صاحب‌کار ساخته می‌شود (`OWNER-ACTIONS-fa.md` §۲ گامِ ۴)؛ پیش از آن گامِ ۳ (`Integrity.kt` با فهرستِ
+  اثرِ انگشتِ قدیم و جدید) کارِ Claude است و هنوز ساخته نشده.
+
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/panel-doors` (سمتِ سرورِ حسابِ دو درِ پنل: ۴-۱ «ب» مترادف و ۲-۹ دسترسیِ پشتیبانی؛ روی `ccr-…-batch-49` ‏e260b8d74؛ پنل: `vil3ntec-it/server#138` ‏c375c3d، ۱.۵۰.۸۹ و ۱.۵۰.۹۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **`synonyms.v1`** — `GET|PUT /api/admin/search/synonyms` (`routes/admin-synonyms.js`، `lib/search-synonyms.js`؛ سندِ `search_synonyms` ِ `app_config`، بی مهاجرت): سنجشِ همان پنل، ارشد + دلیل، قفلِ نسخه (‎409 synonyms_version‎)، `unchanged`، `Idempotency-Key`، سابقهٔ `admin.synonyms_updated`؛ ویترین پشتِ پرچمِ خاموشِ تازهٔ `shop.storefront.synonyms` (روی `search_core`) همان `text-core.matches` با گروه‌ها. **`support-access.v1`** — مهاجرتِ **۸۱۰** `admin_access_grants` (۰۷۹ ِ طرح گرفته شده بود)، `lib/support-access.js`، `routes/admin-access-grants.js` (`GET|POST /api/admin/shops/:id/access-grants`، `…/break-glass`، `…/:gid/revoke`) و سمتِ صاحب `routes/shop-support-access.js` (`/api/shop/support-access` + `accept` با تأییدِ دوباره، `deny`، `revoke`)؛ خبرِ داخلِ برنامهٔ صاحب، `notified` ِ راست، `useGrant`/`requireGrant(scope)`. سقفِ IP پیش از احراز در `routes/admin.js` (همان ۸۰۰ خط)؛ رده‌ها در `admin-control-plane`، `tenant-matrix`، `paid-routes-entitlement`، `shop-route-inventory`؛ `docs/api/routes.json` تازه.
+- آزمون: `search-synonyms` ۸/۸ و `support-access` ۱۴/۱۴ روی PGlite و PostgreSQL 16 (پیش از ساخت: بی کتابخانه هر دو پرونده سرخ؛ بی درها ۶/۸ و ۱۲ از ۱۳ آزمونِ نخست سرخ)؛ جهش‌ها همه سرخ (شرح در ردیف‌های TEN-04، POS-04، WEB-05).
+- نیمه‌کاره / تصمیم: `requireGrant` روی هیچ درِ محتوای خصوصی سوار نیست (درهای امروز همان سابقهٔ TEN-04 را دارند)؛ صاحب «شکستنِ شیشه» را خودش نمی‌بندد (‎409 break_glass_owner‎)؛ پلِ پنل برای شکستنِ شیشه `X-Actor-Reauth-At` نمی‌فرستد ⇒ سرورِ حساب به سنجشِ مالک/رمزِ خودِ پنل تکیه دارد. ⚠️ پنل: `synonymKey` ِ پنل رقمِ عربی (٠–٩) را پیش از تبدیل پاک می‌کند (بازهٔ اعراب ‎U+064B–U+0670‎)؛ این‌جا تبدیل می‌شود.
+- قدمِ بعدی: PR ِ همین شاخه؛ پنل `X-Actor-Reauth-At` را روی شکستنِ شیشه بفرستد و ترتیبِ `synonymKey` را درست کند؛ درِ خواندنِ مترادف برای برنامه‌ها (POS-04) و رابطِ پذیرفتنِ دسترسی در برنامهٔ دکان؛ سوار کردنِ `requireGrant` با تصمیمِ صاحب‌کار.
 ### ۱۴۰۵/۰۸/۲۱ — هماهنگ‌کننده (سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)، پایان با سقفِ هفتگی — **از این‌جا ادامه بده**
 
 **در main ِ shop رفت (همه با CI ِ سبز):** دستهٔ ۴۵ (#1029 ⇒ `5ef491d`)، ۴۶ (#1030 ⇒ `4c889d1`)، ۴۷ (#1031 ⇒ `02d3097`)، ۴۸ (#1032 ⇒ `b187c45`).
@@ -85,6 +107,53 @@
 **شمار (نسخهٔ ۱، روی شاخهٔ ۴۹ پیش از ادغامِ نیمه‌کاره‌ها):** ۷۴۳ ردیف؛ تأییدشده ۴۴۴، نیمه‌کاره ۲۶۴، ساخته‌نشده ۵، بسته به بیرون ۳۰. بازبینی‌های امنیتیِ این سیزن: SR46-1..3، SR47-1..2، SR48-1..3، R20، R24، R25، چهار هشدارِ CodeQL — همه بسته.
 
 **یادِ کار:** کامیت و عنوانِ PR فارسی با ` (2.14.5)` (server: ` (نسخه 1.50.N)`) و دو خطِ `Co-Authored-By`/`Claude-Session`؛ worktree برای هر کار (شاخهٔ checkout‌شده را دست نزن)؛ `tools/claude-ops/cres.py` برای حلِ تعارضِ HANDOFF/STATUS؛ `node docs/spec/tools/spec.mjs status` و `check`؛ PostgreSQL ِ محلی پس از ری‌استارت: `su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /home/user/pgdata -o '-p 55432 -k /tmp' -l /home/user/pgdata/log.txt -w start"`. هر سرخیِ CI ریشه‌یابی، یک push در هر دور؛ هیچ آزمونی کنار نمی‌رود.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/owner-yes-3` (دورِ سومِ تصمیم‌های پذیرفتهٔ صاحب‌کار، «همه شونو تموم کن»؛ روی `ccr-…-batch-48` ‏17f89bc25؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد (سرور، PGlite و PostgreSQL 16، هر کدام پیش از ساخت سرخ): **۲-۲۳** R7/R8 ب — `finalized-sales` ‹`WATCH`›: برداشتنِ ادغام (`merge_undone`)
+  و بردنِ قرض/رسید به شیفتِ دیگر (`shift_moved`) آزاد با ردیفِ `security.doc_chain` (فقط نوشتنِ نشسته؛ دستهٔ فقط‌مشتری هم نگهبان می‌گیرد) —
+  `doc-chain-watch` ۴/۴. **۲-۲۱** R5 الف — `stock-reserve.phoneCapOk`: هر شماره تا نیمِ آزادِ هر کالا (دست‌کم یک دانه)، بیشتر ⇒ کلِ سفارش بی
+  نگه‌داشتن — `stock-reserve-phone-cap` ۳/۳. **۲-۸** CRM-15 الف — `orders.maskerOf` پشتِ پرچمِ خاموشِ تازهٔ `shop.orders.phone_mask` (FLAGS-ON §۲۲):
+  بی «دیدنِ تماس» فقط دو رقمِ آخر — `order-phone-mask` ۱/۱. **R25** — `verify-data` ‏`sum.sale_final` گرد را به ±۵ افغانی می‌بندد. **۲-۱۶**
+  R2 الف — `product-unit-rules` (و همتای برنامه `ProductDraftRules`): واحدِ خالی روی کالای گردش‌دار قفل، ضریبِ خوابیده با روشن شدنِ واحدِ فروش
+  سنجیده — `product-unit-rules` ۱۲/۱۲، `security-review-40` ۵/۵ (سه ادعای کهنهٔ «خالی آزاد» به قاعدهٔ تازه).
+- انجام شد (برنامه، Kotlin فقط CI): **۳-۱۳** (۱) `core/sync/SyncRetryAfter` + `ApiFailure.retryAfterMs` + `ReconnectGate.serverAsked` (سقفِ ۵ دقیقه؛
+  «همگام‌سازی حالا» همان دم). **۴-۲۱** `PromoHeld.release` (نارسیده، فقط صاحب، ۷ روز، با هشدار). **۳-۱۲** نسخهٔ ۲ ِ `QtyExact` و هم‌زادِ
+  `license/money.js` و بردارِ `qty-exact-v1.json` (مقدارِ درست هم؛ `qty-exact.test.js` ۶/۶). **۳-۱۷** `PurchaseSuggest.forSupplier` در هر دو فرمِ
+  سفارش (همان پیشنهادِ صفحه، دلیل و اطمینان در گوشی). **۳-۱۶ (۲)** `ReportEngine.stockValue` (دوقلوی `fromLedger`) در گزارشِ محصولات، گزارشِ
+  کامپیوتر و مرکزِ مدیریت. **۴-۲۰ (۲)** متنِ «پایانِ روزِ کاری». «تازه‌ها»: یک بخشِ تازه با ۸ سطر.
+- نیمه‌کاره / برای CI: آزمون‌های Kotlin ِ تازه یا عوض‌شده اجرا نشده‌اند — `SyncRetryAfterTest`، `ReconnectGateTest`، `PromoHeldTest`،
+  `QtyExactTest`/`QtyExactVectorsTest`/`QtyExactWiringTest` (ادعاهای «مقدارِ درست همان امروز» به قاعدهٔ تازه)، `PurchaseSuggestTest`،
+  `StockValueBridgeTest`، `SaleUnitExactTest`. نمانده‌ها به ترتیب: **۱-۲** (O-22 ب — هم‌زادِ `ReturnShare`/`returnShare`، بردارِ دستیِ
+  `return-share-v1.json` ⇒ v2، پیکرهٔ `core-fuzz` و ادعای «همیشه افغانیِ کامل»، `ReturnCap.capMinor` و ۳۸ آزمونِ برگشتِ Kotlin؛ شاخهٔ جدا)،
+  سپس ۳-۴، ۴-۳، ۳-۱۱، ۴-۲۳ (۱)، ۴-۲. «ارزش انبار» ِ کارتِ خانه (`WarehouseEngine.summary.value` = جمعِ ورودی‌ها) دست نخورد.
+- قدمِ بعدی: مرجِ این شاخه با دسته؛ شاهدِ CI ِ Kotlin ِ بالا؛ سپس ۱-۲ در شاخهٔ خودش.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/ci-evidence-13` (دورِ دومِ شاهدِ CI پس از مرجِ دسته‌های ۴۶/۴۷، و شکافِ SYN-01؛ روی `ccr-…-batch-49` ‏bf70ca7f7؛ فقط سند؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- نامِ شاخه: `claude/ci-evidence-2` روی origin از دورِ قدیم (دستهٔ ۴۱، a5f08332a) هست و STATUS به آن ارجاع می‌دهد ⇒ بی force، نامِ آزادِ `-13`.
+- انجام شد: لاگِ push ِ سبزِ main ‏02d309771 (#1031؛ دستهٔ ۴۶ را هم دارد — push ِ #1030 در «سرور» سرخ بود، IMG-PRO-14 ِ PGlite) خوانده شد: «سرور» 42937274724
+  (PostgreSQL ۴۱۳۱/۴۱۱۴ سبز، PGlite و Electron هر کدام ۴۱۰۱، همه ۰ شکست؛ مرورگر ۱۸۸۴ ✅ / ۰ ❌؛ E2E همه ✅)، «کامپایل و آزمون» 130250330261 (۵۵۹۶ PASS)،
+  «ساخت نسخهٔ بومی» 130250329728 (۷۰۳۴ PASS). ۲۳ ردیف ویرایش شد (STATUS «یادداشت‌ها»، «دورِ هفدهم»): **S67، S68، S86، S118 ⇐ IMPLEMENTED-VERIFIED**؛ ۱۸ ردیف شاهد
+  گرفتند و PARTIAL ماندند با «مانده» ِ فقط غیرِ CI (S56: «مانع» ⇐ `shop.orders.weight_hold`)؛ آزمون‌های وبِ مدیریتِ فروشگاه شاهد شمرده نشدند. نسخهٔ ۱: ۴۴۴ IV (از ۴۴۰)، ۲۶۴ PARTIAL (از ۲۶۸).
+- SYN-01: SKIP از `OfflineBackend.available` است (`server/node_modules` در کارِ `check` ِ `tohid-desktop.yml` نیست)، نه env/ویژگی؛ آن ورک‌فلو انتشار است و سناریو ≈ ۵٫۵ دقیقه ⇒
+  **تغییری داده نشد**؛ نیاز (setup-node + `npm ci` ِ سرور پیش از «آزمون»، یا کارِ جدا در `perf.yml`) در ردیف.
+- نیمه‌کاره: هیچ.
+- قدمِ بعدی: صاحب‌کار بگوید SYN-01 در کدام ورک‌فلو اجرا شود؛ پس از مرجِ دسته‌های ۴۸/۴۹ همین دور برای ردیف‌هایی که آزمونشان فقط آن‌جاست.
+
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/s46-till-user` (S46: کاربرِ سنجیدهٔ صندوق روی سندِ سرور، **بی کدِ پمپ**؛ روی `ccr-…-batch-48` ‏17f89bc25؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: هر op که Sync v1 یا v3 ِ دکان می‌نشاند «کاربرِ سنجیدهٔ صندوق» را در جدولِ کنارِ `shop_till_op_users` می‌گیرد — مهاجرتِ **۷۹۰**
+  (+ rollback؛ ۷۷۲–۷۸۹ برای شاخه‌های هم‌زمان خالی ماند)، پرچمِ خاموشِ **`shop.till_op_user`** (کاتالوگِ پرچم‌ها، `FLAGS-ON-fa.md` §۲۱)،
+  `lib/till-op-user.js`. نوبتِ `shop.till_pin` ِ **دستگاهِ توکن** در لحظهٔ رسیدن (`till-pin.sessionAt`، تازه؛ `whoAt` همان)، ردیف پس از پاسخِ
+  موتور: v1 از سرِ `till-guard.v1Guard` در میان‌افزارِ فقط‌دکانِ `staff-approval.v1Guard` (پیچشِ `res.json` پیش از هر `rejectOps` و پس از
+  پالایش‌های `newer-fields`/`contact` — پاسخِ ساختگیِ op ِ برداشته را نمی‌بیند)، v3 در `routes/sync-v3.js` ِ فقط‌دکان. فقط op ِ نشسته؛
+  عضو فقط با نوبتِ باز، op ِ نه پیش از آغازِ نوبت و نه دورتر از ۳۰ دقیقه، وگرنه NULL با `basis`. fields/hash ِ op، `oplog`، `sync_rows` و
+  پاسخِ push دست‌نخورده؛ خطای نوشتن push را نمی‌شکند. خواندن: `GET /api/shop/till-pin/ops` و `/ops/row` (صاحب/مدیر همه، بقیه خودشان).
+  ⛔ `git diff --stat 17f89bc25 HEAD -- server/src/lib/sync-v1.js server/src/routes/sync-v1.js server/src/lib/tenancy.js …` خالی؛ ۲-۶/O-19 لازم نشد
+  (یادداشت در `OWNER-DECISIONS-fa.md`). آزمون: `till-op-user.test.js` ۹/۹ روی PGlite و PostgreSQL 16 (پیش از کار ۰/۹ هر دو)؛ ۶۰ پروندهٔ
+  هم‌سایه روی PGlite (sync-v1*، sync-v3*، pump*، till-guard، staff-approval، till-pin، security-review-45، فهرست‌های مسیر، api-contract…):
+  ۴۹۲ سبز، تنها سرخ `pump-isolation` › «سرور را به کامپیوترِ دیگر ببر» که روی PGlite به `pg_dump` ِ واقعی می‌رسد (محیط؛ روی PostgreSQL
+  سبز، پایین)؛ روی PostgreSQL 16 ‏(`oys46_test`، `--test-concurrency=1`) ۲۱ پرونده (till-op-user، till-pin، security-review-45، till-guard، staff-approval، sync-v1/v3 ِ اصلی، pump-isolation، pump، pump-device، فهرست‌های مسیر…): ۲۵۰ سبز، ۰ سرخ، ۱ TODO ِ پیشین. `spec.mjs check` «سالم»، `precheck.sh` ‏fail=0.
+- نیمه‌کاره: هیچ. برنامه (Kotlin) دست نخورد: «به دستِ چه کسی» را امروز از سرور نشان نمی‌دهد؛ راهِ قدیمِ `/api/sync` (کهنه، `warnLegacy`) ستون نمی‌گیرد.
+- قدمِ بعدی: صاحب‌کار `shop.till_op_user` را برای همان دکانِ آزمایشیِ `shop.till_pin` روشن کند (§۲۱)؛ اگر برنامه روزی «فروشنده (سنجیده)» را
+  نشان دهد، از `/api/shop/till-pin/ops/row` بخواند. F6 (فاکتورِ نگه‌داشتهٔ مشترک میانِ کاربرانِ صندوق) هنوز کارِ برنامه است.
+
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/sec-review-48` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۸؛ روی `ccr-…-batch-48` ‏a57dae088؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: حملهٔ خصمانه روی `8c493593c..a57dae088` (مالیاتِ POS-37، گالریِ ویترین، دلیلِ «از کار انداختن» + R24، برداشتنِ وبِ دکان، `spec.mjs`) —
   `docs/SECURITY-AUDIT-fa.md` بخشِ **B13**. بسته: **SR48-1 High** — `return-line-cap` مالیاتِ ادعاشده را بی سنجش با نهایی و بی پرچم به سقفِ برگشت می‌افزود

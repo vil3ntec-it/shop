@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.analytics
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -19,12 +20,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.border
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrReportPages
 import ir.vil3ntec.tohid.core.i18n.StrReports
+import ir.vil3ntec.tohid.core.keymap.KeyMap
+import ir.vil3ntec.tohid.ui.screens.matches
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -72,9 +78,12 @@ object SheetModel {
   }
 }
 
-/** جدولِ برگهٔ گزارش روی کامپیوتر — همان فایلی که اکسل و چاپ می‌شود، با توکن‌های VILL3N */
+/**
+ *  جدولِ برگهٔ گزارش روی کامپیوتر — همان فایلی که اکسل و چاپ می‌شود، با توکن‌های VILL3N. [onRow] (RPT-13) ⇒ هر ردیف دکمه است:
+ *  کلیک، یا Tab تا ردیف و Enter (`KeyMap.REPORTS_DRILL`)، «ریز» ِ همان ردیف (شمارهٔ ردیفِ پس از سرستون) را باز می‌کند.
+ */
 @Composable
-internal fun SheetTable(sheet: ReportCsv.Sheet, modifier: Modifier) {
+internal fun SheetTable(sheet: ReportCsv.Sheet, modifier: Modifier, onRow: ((Int) -> Unit)? = null) {
   val c = PhoneV3.colors
   val cols = remember(sheet) { SheetModel.columns(sheet) }
   val head = sheet.rows.firstOrNull().orEmpty()
@@ -105,7 +114,12 @@ internal fun SheetTable(sheet: ReportCsv.Sheet, modifier: Modifier) {
     }
     LazyColumn(Modifier.weight(1f, fill = false)) {
       items(body.size) { r ->
-        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(if (r % 2 == 1) c.tile else c.card)) {
+        val drill = onRow?.let { open ->
+          Modifier
+            .onPreviewKeyEvent { e -> if (e.matches(KeyMap.REPORTS_DRILL)) { open(r); true } else false }
+            .clickable(role = Role.Button, onClickLabel = StrReportPages.detailOf(body[r].firstOrNull().orEmpty())) { open(r) }
+        } ?: Modifier
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(if (r % 2 == 1) c.tile else c.card).then(drill)) {
           head.indices.forEach { i -> cell(i, display(i, body[r].getOrNull(i).orEmpty()), bold = cols.summable.getOrElse(i) { false }) }
         }
       }

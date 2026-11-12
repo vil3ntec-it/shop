@@ -8,6 +8,7 @@ const express = require('express');
 const v = require('../lib/validate');
 const offline = require('../lib/shop-offline-codes');
 const audit = require('../lib/audit');
+const maskCards = (t) => require('../lib/ops-errors').maskCards(t);   //  S117: یادداشتِ پنل بی شمارهٔ کاملِ کارت
 const { requireSuperAdmin } = require('../middleware/auth');
 
 const router = express.Router();
@@ -26,7 +27,7 @@ router.post('/', requireSuperAdmin, async (req, res, next) => {
       account: v.text(req.body?.account, { max: 200 }),
       days: req.body?.days === undefined || req.body?.days === null || req.body?.days === ''
         ? null : v.integer(req.body.days, { field: 'روزها', min: 1, max: 3650 }),
-      note: v.text(req.body?.note, { max: 300 }),
+      note: maskCards(v.text(req.body?.note, { max: 300 })),
       createdBy: req.admin.id,
     });
     await audit.log({

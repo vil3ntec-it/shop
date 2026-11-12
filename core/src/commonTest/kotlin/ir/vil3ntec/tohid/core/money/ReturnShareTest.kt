@@ -5,8 +5,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- *  SEC-DATA-01 — برگشتِ تکه‌تکه بیش از پولِ گرفته‌شده پس نمی‌دهد.
- *  سطرهای نخست همان `license/test-vectors/return-share-v1.json` اند (رونویسِ دستی تا روی Native هم بدود)؛
+ *  SEC-DATA-01 — برگشتِ تکه‌تکه بیش از پولِ گرفته‌شده پس نمی‌دهد؛ O-22 «ب» ِ صاحب‌کار (۱۴۰۵/۰۸/۲۰): پیش از
+ *  آخرین عدد رو به پایین تا افغانیِ کامل، برگشتِ پایانِ قلم دقیقاً باقی‌مانده تا یک‌صدم.
+ *  سطرهای نخست همان `license/test-vectors/return-share-v2.json` اند (رونویسِ دستی تا روی Native هم بدود)؛
  *  کلِ فایل را `ReturnShareVectorsTest` (jvmTest) و `server/test/return-share.test.js` می‌خوانند.
  */
 class ReturnShareTest {
@@ -21,26 +22,44 @@ class ReturnShareTest {
     }
   }
 
+  /** پولِ برگشت به یک‌صدم — جمعِ Double ِ چند مبلغِ دو رقمِ اعشاری دقیق نیست */
+  private fun minor(a: Double): Long = mathRound(a * 100.0)
+
   @Test
   fun twoUnitsAtTwoAndAHalfReturnFiveNotSix() {
-    assertEquals(listOf(3.0, 2.0), run(5.0, 2.0, 1.0, listOf(1.0, 1.0)))
+    //  O-22 ب: کفِ ۲٫۵ ⇒ ۲، پایان ۵ − ۲ = ۳ (الف ِ پیشین ۳، ۲)
+    assertEquals(listOf(2.0, 3.0), run(5.0, 2.0, 1.0, listOf(1.0, 1.0)))
   }
 
   @Test
   fun threeUnitsWorthTwoReturnTwoNotThree() {
-    assertEquals(listOf(1.0, 0.0, 1.0), run(2.0, 3.0, 1.0, listOf(1.0, 1.0, 1.0)))
+    //  نمونهٔ دومِ O-22: کفِ ۰٫۶۷ و ۱٫۳۳ ⇒ ۰، ۱، و پایان ۱ (الف ۱، ۰، ۱)
+    assertEquals(listOf(0.0, 1.0, 1.0), run(2.0, 3.0, 1.0, listOf(1.0, 1.0, 1.0)))
   }
 
   @Test
   fun invoiceDiscountSharesSumToTheOneShotReturn() {
-    assertEquals(listOf(5.0, 4.0, 5.0), run(15.0, 3.0, 0.9, listOf(1.0, 1.0, 1.0)))
+    //  نمونهٔ O-22: ۱۳٫۵۰ در سه برگشت ⇒ ۴، ۵، ۴٫۵۰ (الف ۵، ۴، ۵ = ۱۴)؛ یک‌جا دقیقاً ۱۳٫۵۰
+    assertEquals(listOf(4.0, 5.0, 4.5), run(15.0, 3.0, 0.9, listOf(1.0, 1.0, 1.0)))
+    assertEquals(listOf(4.0, 9.5), run(15.0, 3.0, 0.9, listOf(1.0, 2.0)))
+    assertEquals(listOf(13.5), run(15.0, 3.0, 0.9, listOf(3.0)))
     assertEquals(listOf(450.0), run(500.0, 2.0, 0.9, listOf(2.0)))
     assertEquals(listOf(225.0), run(500.0, 2.0, 0.9, listOf(1.0)))
+    assertEquals(listOf(0.67), run(1.0, 1.0, 2.0 / 3.0, listOf(1.0)))
   }
 
   @Test
   fun weighedLineReturnsInTwoParts() {
     assertEquals(listOf(150.0, 225.0), run(375.0, 1.25, 1.0, listOf(0.5, 0.75)))
+    assertEquals(listOf(135.0, 202.5), run(375.0, 1.25, 0.9, listOf(0.5, 0.75)))
+    //  کفِ میانه با هزارم، نه Double: ۵۶ × ۰٫۳۵ ÷ ۰٫۴ = ۴۹ (کفِ Double ۴۸ می‌داد)
+    assertEquals(listOf(49.0, 7.0), run(56.0, 0.4, 1.0, listOf(0.35, 0.05)))
+  }
+
+  @Test
+  fun aLineWithNoMoneyTakenGivesNothing() {
+    assertEquals(listOf(0.0, 0.0), run(-500.0, 2.0, 1.0, listOf(1.0, 1.0)))
+    assertEquals(0.0, ReturnShare.amount(500.0, 2.0, 0.0, 2.0, 0.0))
   }
 
   @Test
@@ -62,7 +81,8 @@ class ReturnShareTest {
 
   /**
    *  ویژگی: برای هر قلم و هر شکستنِ مقدار، جمعِ برگشت‌ها = برگشتِ یک‌جای همان مقدار، و برگشتِ همه =
-   *  round(جمعِ قلم × سهم). مولدِ قطعی (LCG) تا روی هر سکو همان نمونه‌ها بیاید.
+   *  round(جمعِ قلم × سهم × ۱۰۰) یک‌صدم (O-22 ب؛ الف: round(جمعِ قلم × سهم) افغانیِ کامل)؛ هر لحظه نه بیش از
+   *  سهمِ دقیقِ پولِ گرفته‌شده و هر برگشتِ میانه افغانیِ کامل. مولدِ قطعی (LCG) تا روی هر سکو همان نمونه‌ها بیاید.
    */
   @Test
   fun anySplitSumsToTheOneShotReturnAndNeverMore() {
@@ -77,11 +97,20 @@ class ReturnShareTest {
       val parts = ArrayList<Double>()
       var left = units
       while (left > 0) { val p = 1 + next(left); parts += if (weighed) p * 0.25 else p.toDouble(); left -= p }
-      val split = run(lineTotal, quantity, paidRatio, parts).sum()
+      val amounts = run(lineTotal, quantity, paidRatio, parts)
       val oneShot = ReturnShare.amount(lineTotal, quantity, 0.0, quantity, paidRatio)
-      assertEquals(oneShot, split, "قلمِ $lineTotal × $paidRatio، مقدارِ $quantity، تکه‌ها $parts")
-      assertEquals(mathRound(lineTotal * paidRatio).toDouble(), oneShot)
-      assertTrue(run(lineTotal, quantity, paidRatio, parts).all { it >= 0.0 })
+      val msg = "قلمِ $lineTotal × $paidRatio، مقدارِ $quantity، تکه‌ها $parts"
+      assertEquals(minor(oneShot), amounts.sumOf { minor(it) }, msg)
+      val net = mathRound(lineTotal * paidRatio * 100.0)
+      assertEquals(net, minor(oneShot))
+      assertTrue(amounts.all { it >= 0.0 })
+      var k = 0.0
+      var paid = 0L
+      amounts.forEachIndexed { i, a ->
+        k += parts[i]; paid += minor(a)
+        if (k < quantity) assertEquals(kotlin.math.floor(a), a, "$msg: میانه")
+        assertTrue(paid.toDouble() <= net * k / quantity + 1e-6, "$msg: گام $i")
+      }
     }
   }
   /**
@@ -93,19 +122,22 @@ class ReturnShareTest {
     assertEquals(0.0, ReturnShare.amount(2.0, 3.0, 2.0, 1.0, 1.0, refundedBefore = 2.0, refundedQty = 2.0))
     //  پیش‌تر کمتر پس داده شده (۴ برای ۳ عدد: ۱ + ۱) ⇒ برگشتِ آخر کسری را می‌دهد و جمع درست ۴ می‌شود
     assertEquals(2.0, ReturnShare.amount(4.0, 3.0, 2.0, 1.0, 1.0, refundedBefore = 2.0, refundedQty = 2.0))
-    //  پیش از پایانِ قلم هم: ۴ عدد به جمعِ ۶، دو برگشتِ کهنهٔ ۲ + ۲ = ۴ ⇒ برگشتِ سوم ۵ − ۴ = ۱ (تفاضلِ تنها ۵ − ۳ = ۲ می‌داد و جمعِ آخر ۷ > ۶)
-    assertEquals(1.0, ReturnShare.amount(6.0, 4.0, 2.0, 1.0, 1.0, refundedBefore = 4.0, refundedQty = 2.0))
+    //  پیش از پایانِ قلم هم: ۴ عدد به جمعِ ۶، دو برگشتِ کهنهٔ ۲ + ۲ = ۴ ⇒ برگشتِ سوم کفِ ۴٫۵ − ۴ = ۰ (تفاضلِ تنها
+    //  ۴ − ۳ = ۱ پولِ بیش‌داده را دوباره می‌داد؛ الف: ۵ − ۴ = ۱) و چهارمی ۶ − ۴ = ۲
+    assertEquals(0.0, ReturnShare.amount(6.0, 4.0, 2.0, 1.0, 1.0, refundedBefore = 4.0, refundedQty = 2.0))
+    assertEquals(2.0, ReturnShare.amount(6.0, 4.0, 3.0, 1.0, 1.0, refundedBefore = 4.0, refundedQty = 3.0))
     //  ردیفِ برگشتِ کهنه بی saleItemId (ردیف‌ها کمتر از returnedQty) ⇒ بخشِ بی‌ردیف «تا پیش از این» فرض می‌شود
     assertEquals(250.0, ReturnShare.amount(500.0, 2.0, 1.0, 1.0, 1.0, refundedBefore = 0.0, refundedQty = 0.0))
-    //  تاریخچهٔ یک‌دست همان پنج‌ورودی است
+    //  تاریخچهٔ یک‌دست همان پنج‌ورودی است (برگشتِ نخستِ ۱۳٫۵۰ ِ سه‌عددی با «ب» ۴ است؛ الف ۵)
     assertEquals(
       ReturnShare.amount(15.0, 3.0, 1.0, 1.0, 0.9),
-      ReturnShare.amount(15.0, 3.0, 1.0, 1.0, 0.9, refundedBefore = 5.0, refundedQty = 1.0),
+      ReturnShare.amount(15.0, 3.0, 1.0, 1.0, 0.9, refundedBefore = 4.0, refundedQty = 1.0),
     )
+    assertEquals(4.5, ReturnShare.amount(15.0, 3.0, 2.0, 1.0, 0.9, refundedBefore = 9.0, refundedQty = 2.0))
     assertEquals(0.0, ReturnShare.amount(2.0, 3.0, 2.0, -1.0, 1.0, refundedBefore = 0.0, refundedQty = 2.0))
   }
 
-  /** ویژگی: هر تاریخچهٔ کهنه (فرمولِ جداجدا، یکی‌یکی) + بقیه با این تابع ⇒ جمع = max(کهنه، round(جمعِ قلم × سهم)) */
+  /** ویژگی: هر تاریخچهٔ کهنه (فرمولِ جداجدا، یکی‌یکی) + بقیه با این تابع ⇒ جمع = max(کهنه، پولِ قلم تا یک‌صدم) */
   @Test
   fun anyLegacyPrefixThenNewNeverExceedsTheLine() {
     var seed = 5860586L
@@ -125,10 +157,10 @@ class ReturnShareTest {
         assertTrue(a >= 0.0)
         refunded += a; before += q; rowsQty += q
       }
-      val line = mathRound(lineTotal * paidRatio).toDouble()
-      val legacyOnly = legacyUnits * mathRound(lineTotal / quantity * paidRatio).toDouble()
+      val line = mathRound(lineTotal * paidRatio * 100.0)   //  O-22 ب: پولِ قلم تا یک‌صدم
+      val legacyOnly = legacyUnits * mathRound(lineTotal / quantity * paidRatio) * 100L
       val expected = if (legacyUnits.toDouble() == quantity) legacyOnly else maxOf(line, legacyOnly)
-      assertEquals(expected, refunded, "قلمِ $lineTotal × $paidRatio / $quantity، کهنه $legacyUnits")
+      assertEquals(expected, minor(refunded), "قلمِ $lineTotal × $paidRatio / $quantity، کهنه $legacyUnits")
     }
   }
 }

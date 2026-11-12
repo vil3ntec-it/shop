@@ -8,7 +8,7 @@ const { now, tx } = require('../db');
 const D = require('./delivery-states');
 const { ulid } = require('./ulid');
 const { badRequest, notFound, conflict } = require('../middleware/errors');
-const { str, text, hashOf } = require('./delivery-input');
+const { str, noteText, hashOf } = require('./delivery-input');
 const { staffView } = require('./delivery-views');
 
 module.exports = ({ appendEvent }) => {
@@ -22,7 +22,7 @@ async function recall(shopId, assignmentId, body, actor, key = '') {
   const b = body && typeof body === 'object' ? body : {};
   const reason = str(b.reason);
   if (!D.REASONS.recall.includes(reason)) throw badRequest('دلیلِ لغو لازم است', reason ? 'bad_reason' : 'reason_required');
-  const note = text(b.note, 300);
+  const note = noteText(b.note, 300);   //  S117
   if (reason === 'other' && !note) throw badRequest('توضیح لازم است', 'note_required');
   const reqHash = hashOf({ assignmentId: String(assignmentId || ''), reason, note });
 

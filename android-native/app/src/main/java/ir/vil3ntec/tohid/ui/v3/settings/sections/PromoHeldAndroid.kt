@@ -30,6 +30,16 @@ internal fun promoHeldSource(): PromoHeldSource? {
   }
 }
 
+/** ۴-۲۱: بیننده صاحبِ دکان است؟ (آزاد کردنِ فاکتورِ نارسیده فقط برای او، `PromoHeld.release`) */
+@Composable
+internal fun promoHeldOwner(): Boolean {
+  val context = LocalContext.current
+  return remember(context) { ShopRole.current(context) == ShopRole.OWNER }
+}
+
+/** ۴-۲۱: ساعتِ دستگاه برای «۷ روز پس از گرفتنِ کد» (فقط مرزِ صفحه؛ سرور همان درِ `sales.cancel`) */
+internal fun promoHeldNow(): Long = System.currentTimeMillis()
+
 /** ردیفِ «کدهای تخفیفِ نگه‌داشته» در تنظیماتِ فروش: فقط با شمارشِ روشن (آخرین حالِ تخفیف‌ها) و اجازهٔ لغوِ فاکتور */
 @Composable
 internal fun promoHeldRow(): Boolean {

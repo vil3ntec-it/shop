@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,6 +41,7 @@ import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrBranches
 import ir.vil3ntec.tohid.core.i18n.StrOnlineReport
 import ir.vil3ntec.tohid.core.i18n.StrReach
+import ir.vil3ntec.tohid.core.i18n.StrReportPages
 import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.core.i18n.StrShrink
 import ir.vil3ntec.tohid.core.i18n.StrSimpleAsk
@@ -57,6 +59,7 @@ import ir.vil3ntec.tohid.ui.screens.ReportCompareLine
 import ir.vil3ntec.tohid.ui.screens.ReportKeys
 import ir.vil3ntec.tohid.core.keymap.KeyMap
 import ir.vil3ntec.tohid.data.ReportCsv
+import ir.vil3ntec.tohid.data.ReportDrillSheet
 import ir.vil3ntec.tohid.data.ReportEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
@@ -80,6 +83,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Chip
 import ir.vil3ntec.tohid.ui.v3.V3ChipRow
 import ir.vil3ntec.tohid.ui.v3.V3Hue
+import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3Stat
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Toggle
@@ -204,6 +208,13 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState, onOpen: (String) -> Un
       else ReportCsv.comparedList(rep.key, base, past, StrReports.colCount, StrReach.prevColumn, StrReach.changeColumn)
     }
   }
+  //  RPT-13: «ریز» ِ ردیف (کلیک یا Enter ِ `reports.drill`) در «فروش» و «فروشِ هر کاربر» (`ReportDrillSheet`) — فقط برگهٔ همان
+  //  دوره بی «مقایسه» (ستون‌ها و ردیف‌های مقایسه جای ردیف را عوض می‌کنند) و بی «فروشندهٔ هر ردیف» در «فروشِ هر کاربر»
+  var rowDrill by remember(rep, from, to) { mutableStateOf<ReportCsv.Sheet?>(null) }
+  val onRow: ((Int) -> Unit)? =
+    if (sheet === base && rep.key in ReportDrillSheet.KEYS && !(rep.key == "sellers" && lineSeller)) ({ i: Int ->
+      ReportDrillSheet.of(rep.key, d, from, to, i, lineSeller)?.let { rowDrill = it }
+    }) else null
   //  «پرسشِ ساده» برگه ندارد: Ctrl+P/Ctrl+E آن‌جا کاری نمی‌کنند
   fun print() { if (rep != DeskRep.ASK) { onExport(rep.key); ReportPrint.print(context, sheet, sheet.name) } }
   fun excel() {
@@ -274,7 +285,12 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState, onOpen: (String) -> Un
       } else Text(StrReports.rightNow, style = V3Type.footnote, color = c.inkMuted)
       if (keys && compare && rep.ranged) ReportCompareLine(d, rep.key, span.name, from, to, today)
       DeskKpis(d, rep, from, to)
-      SheetTable(sheet, Modifier.weight(1f).fillMaxWidth())
+      SheetTable(sheet, Modifier.weight(1f).fillMaxWidth(), onRow)
+    }
+  }
+  rowDrill?.let { s ->
+    V3Sheet(onDismiss = { rowDrill = null }, title = StrReportPages.detailOf(s.name), scroll = false) {
+      SheetTable(s, Modifier.fillMaxWidth().heightIn(max = 480.dp).padding(horizontal = 16.dp, vertical = 8.dp))
     }
   }
 }
@@ -320,10 +336,13 @@ private fun DeskKpis(d: ShopData, rep: DeskRep, from: String, to: String) {
         V3Stat(StrReports.topCategory, 0.0, { top?.ifBlank { StrReports.noCategory } ?: "—" }, m)
       }
       DeskRep.PRODUCTS, DeskRep.STOCK, DeskRep.EXPIRY -> {
-        val value = remember(d) { d.products.sumOf { ShopStore.stock(d, it.id).coerceAtLeast(0.0) * it.purchasePrice } }
+        //  ۳-۱۶ (۲): همان ارزشِ میانگینِ موزونِ گزارشِ محصولات (`ReportEngine.stockValue`)، نه «قیمتِ خرید» ِ کارت
+        val sv = remember(d) { ReportEngine.stockValue(d) }
+        val value = sv.valuation.costMinor / 100.0
         val out = remember(d) { d.products.count { ShopStore.stockStatus(d, it) == "out" } }
         val low = remember(d) { d.products.count { ShopStore.stockStatus(d, it) == "low" } }
-        V3Stat(StrReports.inventoryValue, value, ::afn, m, hue = V3Hue.BRAND)
+        V3Stat(StrReports.inventoryValue, value, ::afn, m, hue = V3Hue.BRAND,
+          caption = inventoryCaption(sv.approximate, sv.valuation.negative.size, sv.kits))
         V3Stat(StrReports.items, d.products.size.toDouble(), count, m)
         V3Stat(StrReports.soldOut, out.toDouble(), count, m, valueColor = if (out > 0) PhoneV3.colors.negative else null)
         V3Stat(StrReports.lowStock, low.toDouble(), count, m, hue = V3Hue.ORANGE)

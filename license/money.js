@@ -167,10 +167,12 @@
   }
 
   /* مبلغِ برگشتِ بخشی از یک قلم — «گردِ تجمعی» (SEC-DATA-01). هم‌زادِ `ReturnShare.amount` ِ core؛
-     بردار: `license/test-vectors/return-share-v1.json`. مبلغِ هر برگشت = پس‌دادنیِ تا پایانِ آن − پس‌دادنیِ
+     بردار: `license/test-vectors/return-share-v2.json`. مبلغِ هر برگشت = پس‌دادنیِ تا پایانِ آن − پس‌دادنیِ
      تا پیش از آن، پس جمعِ برگشت‌های تکه‌تکهٔ یک قلم هرگز از برگشتِ یک‌جای همان مقدار بیشتر نمی‌شود
-     (پیش‌تر دو عدد به ۲٫۵ ⇒ ۳ + ۳ = ۶ پس داده می‌شد). عددهای دفترِ امروز (افغانی، Double)؛ گرد به افغانیِ
-     کامل با Math.round — همان mathRound ِ کاتلین، و ترتیبِ عمل یکی، پس خروجی بیت‌به‌بیت یکی است.
+     (پیش‌تر دو عدد به ۲٫۵ ⇒ ۳ + ۳ = ۶ پس داده می‌شد). O-22 «ب» (۱۴۰۵/۰۸/۲۰): پس‌دادنیِ «تا k» پیش از آخرین
+     عدد سهمِ دقیق رو به پایین تا افغانیِ کامل، و برگشتِ پایانِ قلم دقیقاً باقی‌مانده تا یک‌صدم (۱۳٫۵۰ در سه
+     برگشت ⇒ ۴، ۵، ۴٫۵۰). پولِ قلم Math.round(جمع × سهم × ۱۰۰) — همان mathRound ِ کاتلین؛ کفِ میانه با هزارم و
+     floorDiv (بی تقسیمِ اعشاری)، بیرون از بازهٔ دقیق همان کف با Double. ترتیبِ عمل یکی ⇒ خروجی بیت‌به‌بیت یکی.
      refundedBefore/refundedQty (اختیاری، #586، تاریخچهٔ قاطی): جمعِ amount و quantity ِ برگشت‌های پیشینِ همین
      saleItemId. برگشت‌های پیش از به‌روزرسانی با فرمولِ جداجدا ثبت شده‌اند، پس مبنا پولِ واقعاً پس‌داده است:
      max(0, upTo(پایان) − refundedBefore) — قلمِ ۲ افغانی برای ۳ عدد با دو برگشتِ کهنهٔ ۱ + ۱ دیگر یکِ سوم
@@ -179,17 +181,21 @@
     if (!(quantity > 0) || !isFinite(quantity) || !isFinite(lineTotal) || !isFinite(paidRatio)) return 0;
     if (!isFinite(qty) || !(qty > 0)) return 0;
     var before = isFinite(returnedBefore) && returnedBefore > 0 ? returnedBefore : 0;
-    var net = lineTotal * paidRatio;
+    var net = Math.round(lineTotal * paidRatio * 100);   // پولِ قلم به یک‌صدم؛ صفر، منفی یا بیرون از بازه ⇒ هیچ
+    if (!(net >= 1 && net <= MAX_EXACT)) return 0;
     function upTo(k) {
       if (k <= 0) return 0;
-      if (k >= quantity) return Math.round(net);
-      return Math.round(net * k / quantity);
+      if (k >= quantity) return net;
+      var q = Math.round(quantity * 1000), m = Math.round(k * 1000);
+      if (q >= 1 && q <= MAX_EXACT && m >= 0 && m <= q && Number.isSafeInteger(net * m)) return floorDiv(floorDiv(net * m, q), 100) * 100;
+      var whole = Math.floor(net * k / quantity / 100);   // بیرون از بازهٔ دقیق: همان کف، هرگز بیش از net
+      return whole * 100 >= net ? net : whole * 100;
     }
-    if (refundedBefore === undefined && refundedQty === undefined) return norm(upTo(before + qty) - upTo(before));
-    var paid = isFinite(refundedBefore) && refundedBefore > 0 ? refundedBefore : 0;
+    if (refundedBefore === undefined && refundedQty === undefined) return norm((upTo(before + qty) - upTo(before)) / 100);
+    var paid = isFinite(refundedBefore) && refundedBefore > 0 ? Math.round(refundedBefore * 100) : 0;
     var rowsQty = isFinite(refundedQty) && refundedQty > 0 ? refundedQty : 0;
     var base = rowsQty + 1e-9 < before ? Math.max(paid, upTo(before)) : paid;
-    return norm(Math.max(0, upTo(before + qty) - base));
+    return norm(Math.max(0, upTo(before + qty) - base) / 100);
   }
 
   // ── PRD-08: مقدارِ اعشاری (هم‌زادِ `core/money/QtyExact.kt`؛ بردارِ `core/test-vectors/qty-exact-v1.json`) ──
@@ -206,7 +212,8 @@
   /* فقط مقدارِ اعشاری قاعدهٔ دقیق دارد؛ مقدارِ درست یا عددِ نامعتبر ⇒ null (همان حسابِ پیشین) */
   function qLineMinorOrNull(price, quantity) {
     var q = qMilli(quantity);
-    if (q === null || !qFractional(q) || typeof price !== 'number' || !isFinite(price)) return null;
+    //  نسخهٔ ۲ (۳-۱۲ ِ صاحب‌کار): مقدارِ درست هم — پیش‌تر `!qFractional(q)` ⇒ null (حسابِ پیشین)
+    if (q === null || typeof price !== 'number' || !isFinite(price)) return null;
     var p = norm(Math.round(price * 100));
     return Math.abs(p) > MAX_EXACT ? null : qExactMinor(p, q);
   }

@@ -233,11 +233,11 @@ object StrSettings {
   // بخش‌های جمع‌شو
   val open: String get() = t("باز کردن", "Open", "پرانیستل")
 
-  // پایانِ روزِ کاری (LocaleSection › ShopDayRow، LOC-03)
+  // پایانِ روزِ کاری (LocaleSection › ShopDayRow، LOC-03) — ۴-۲۰ (۲ الف): تنظیمِ دکان است، نه فقط همین دستگاه (`ShopSettingsKeys`)
   val dayEndNote: String get() = t(
-    "پایانِ روزِ کاری. فروش و هر ثبتی که پس از نیمه‌شب و پیش از این ساعت باشد به نامِ دیروز نوشته می‌شود، تا یک شبِ کاری دو روز نشود. 00:00 یعنی نیمه‌شب، مثلِ همیشه. فقط روی همین دستگاه.",
-    "End of the business day. Sales and other entries made after midnight but before this time are dated to the previous day, so one working night isn't split into two days. 00:00 means midnight, as always. This device only.",
-    "د کاري ورځې پای. هغه پلور او نور ثبتونه چې له نیمې شپې وروسته او له دې وخت مخکې وي د پرون په نوم لیکل کېږي، څو یوه کاري شپه په دوو ورځو ونه وېشل شي. 00:00 یعني نیمه شپه، لکه تل. یوازې په همدې وسیله.",
+    "پایانِ روزِ کاری. فروش و هر ثبتی که پس از نیمه‌شب و پیش از این ساعت باشد به نامِ دیروز نوشته می‌شود، تا یک شبِ کاری دو روز نشود. 00:00 یعنی نیمه‌شب، مثلِ همیشه. برای همهٔ دستگاه‌های این دکان (با همگام‌سازیِ تنظیماتِ دکان به آن‌ها می‌رسد).",
+    "End of the business day. Sales and other entries made after midnight but before this time are dated to the previous day, so one working night isn't split into two days. 00:00 means midnight, as always. For all devices of this shop (it reaches them with the shop settings sync).",
+    "د کاري ورځې پای. هغه پلور او نور ثبتونه چې له نیمې شپې وروسته او له دې وخت مخکې وي د پرون په نوم لیکل کېږي، څو یوه کاري شپه په دوو ورځو ونه وېشل شي. 00:00 یعني نیمه شپه، لکه تل. د دې دوکان د ټولو وسیلو لپاره (د دوکان د تنظیماتو له همغږۍ سره ورته رسېږي).",
   )
   fun dayEndNow(d: Any): String = t("فروشِ همین حالا به تاریخِ ${asIs(d)} ثبت می‌شود", "A sale made right now is dated $d", "همدا اوس پلور د $d په نېټه ثبتېږي")
 

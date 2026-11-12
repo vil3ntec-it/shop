@@ -13,6 +13,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import ir.vil3ntec.tohid.core.sync.SyncOutage
+import ir.vil3ntec.tohid.core.sync.SyncReconnect
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.repo.Backend
 import kotlinx.coroutines.delay
@@ -48,7 +49,11 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
     //  حسابِ پیک دفترِ دکان ندارد (DLV-01): سرور ۴۰۳ می‌دهد، پس اصلاً نمی‌پرسیم
     if (ir.vil3ntec.tohid.data.ShopRole.isCourier(app)) return Result.success()
     //  SYN-12: هجومِ پس از وصلِ دوباره — نخستین دورِ خودکار پس از برگشتنِ شبکهٔ خودِ دستگاه با درنگِ کران‌دار (`ReconnectGate`)
-    if (!Backend.isOnline(app)) reconnect.offline() else reconnect.beforeRound().let { if (it > 0) delay(it) }
+    //  ۳-۱۳: `Retry-After` ِ سرور (تا ۵ دقیقه) ⇒ درنگِ بلندتر از پخش در کارگر خوابیده نمی‌ماند؛ دورِ بعدی دوباره می‌پرسد
+    if (!Backend.isOnline(app)) reconnect.offline() else reconnect.beforeRound().let {
+      if (it > SyncReconnect.SPREAD_MS) return Result.retry()
+      if (it > 0) delay(it)
+    }
     //  تنظیماتِ دکان (`shop.settings_sync`، پیش‌فرض خاموش): تغییرِ صاحب/مدیر روی همین دستگاه با همین دور می‌رود
     //  (حداکثر هر دقیقه یک بار؛ جدا از دفتر و بی اثر بر نتیجهٔ این دور)
     ir.vil3ntec.tohid.data.ShopSettingsSync.kick(app)
@@ -65,7 +70,7 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
       if (ir.vil3ntec.tohid.sync.v3.SyncChoice.isV3(app)) return Result.success()
       val engine = SyncV1Engine.of(app)
       engine.rebind()
-      return if (engine.pushPending().isSuccess) Result.success() else Result.retry()
+      return engine.pushPending().also { noteServer(it) }.let { if (it.isSuccess) Result.success() else Result.retry() }
     }
     //  Sync v3 پشتِ تنظیمِ هر دستگاه (پیش‌فرض v1): همین کارگر، موتورِ دیگر
     if (ir.vil3ntec.tohid.sync.v3.SyncChoice.isV3(app)) {
@@ -125,7 +130,13 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
     //  سرور دیده می‌شود). پرچمِ خاموشِ shop.doc_chain ⇒ هیچ؛ شکستش بی‌صدا و دورِ بعد دوباره (`AuditAnchorSync`)
     runCatching { ir.vil3ntec.tohid.sync.platform.AuditAnchorSync.cycle(app) }
     noteOffline()
+    noteServer(outcome)
     return if (outcome.isSuccess) Result.success() else Result.retry()
+  }
+
+  /** ۳-۱۳: شکستِ دور با `Retry-After` ِ سرور ⇒ دورهای خودکارِ بعدی زودتر از آن نه (`ReconnectGate.serverAsked`) */
+  private fun noteServer(outcome: kotlin.Result<*>) {
+    reconnect.serverAsked((outcome.exceptionOrNull() as? ir.vil3ntec.tohid.core.net.ApiFailure)?.retryAfterMs)
   }
 
   /** SYN-12: دور شبکهٔ خودِ دستگاه را نیافت (حکمِ موتور «آفلاین») ⇒ دورِ خودکارِ پس از برگشتنش پخش می‌شود */

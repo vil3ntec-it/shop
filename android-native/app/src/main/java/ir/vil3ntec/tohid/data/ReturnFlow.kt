@@ -42,8 +42,9 @@ import kotlin.math.roundToLong
  *
  *  ── پول ────────────────────────────────────────────────────────────
  *  مبلغِ هر قلم: قیمتِ همان قلم در همان فاکتور × سهمِ پرداخت‌شده پس از تخفیف
- *  (RET-03)، گرد به افغانیِ کامل و «تجمعی» (`ReturnShare`، SEC-DATA-01). جمعِ همهٔ برگشت‌های
- *  یک فاکتور از مبلغِ نهاییِ آن بیشتر نمی‌شود (اضافهٔ گرد از قلمِ آخر کم می‌شود).
+ *  (RET-03)، «تجمعی» (`ReturnShare`، SEC-DATA-01) و O-22 ب: رو به پایین تا افغانیِ کامل، برگشتِ پایانِ
+ *  قلم دقیقاً باقی‌مانده تا یک‌صدم. جمعِ همهٔ برگشت‌های یک فاکتور از مبلغِ نهاییِ آن بیشتر نمی‌شود (اضافهٔ گرد
+ *  از قلمِ آخر کم می‌شود).
  *  تقسیمِ بازپرداخت با `Pay.refund`ِ هستهٔ پرداخت (#237): اول بدهیِ بازِ همین
  *  فاکتور (مثلِ امروز)، بقیه به روشِ اصلی، نقد یا اعتبارِ فروشگاه.
  *  اعتبارِ فروشگاه = «رسید» روی حسابِ مشتری (ماندهٔ منفی = طلبِ مشتری)؛ پس صندوق
@@ -203,9 +204,9 @@ object ReturnFlow {
 
   fun returnable(item: SaleItem): Double = SalesEngine.returnable(item)
 
-  /** جمعِ پس‌داده از یک فاکتور تا امروز (هر دو نوعِ برگشت) */
+  /** جمعِ پس‌داده از یک فاکتور تا امروز (هر دو نوعِ برگشت)؛ به پول جمع، تا مبلغِ تا یک‌صدم (O-22 ب) بی خطای Double */
   fun returnedAmount(d: ShopData, saleId: String): Double =
-    d.saleReturns.filter { it.saleId == saleId }.sumOf { it.amount }
+    PayFlow.major(d.saleReturns.filter { it.saleId == saleId }.sumOf { PayFlow.minor(it.amount) })
 
   private fun okDisposition(v: String) = v == RESTOCK || v == DAMAGED
 
@@ -242,27 +243,13 @@ object ReturnFlow {
       lines += Line(item.id, item.productId, name, q, unit, amount, pick.disposition)
     }
     if (lines.isEmpty()) return Outcome.Bad(Code.NOTHING_TO_RETURN)
-    //  PAY-09: فاکتورِ گردشده — جمعِ برگشت‌ها هرگز بیش از پرداختی، برگشتِ کامل دقیقاً ماندهٔ آن (`TillRounding.refund`)
-    if ((sale.roundingMinor ?: 0L) != 0L) {
-      val completes = d.saleItems.filter { it.saleId == saleId }.all { it.returnedQty + (picks[it.id]?.qty ?: 0.0) >= it.quantity - 1e-9 }
-      val fixed = TillRounding.refund(lines.map { PayFlow.minor(it.amount) }, PayFlow.minor(sale.finalTotal), PayFlow.minor(returnedAmount(d, saleId)), completes)
-      lines.indices.forEach { i -> lines[i] = lines[i].copy(amount = PayFlow.major(fixed[i])) }
-      return Outcome.Ok(Quote(lines, lines.sumOf { it.amount }))
-    }
-    //  گردکردنِ هر قلم نباید جمعِ برگشت‌ها را از مبلغِ نهاییِ فاکتور بیشتر کند
-    val cap = max(0.0, sale.finalTotal - returnedAmount(d, saleId))
-    var total = lines.sumOf { it.amount }
-    if (total > cap) {
-      var extra = total - cap
-      for (i in lines.indices.reversed()) {
-        if (extra <= 0) break
-        val cut = minOf(extra, lines[i].amount)
-        lines[i] = lines[i].copy(amount = lines[i].amount - cut)
-        extra -= cut
-      }
-      total = lines.sumOf { it.amount }
-    }
-    return Outcome.Ok(Quote(lines, total))
+    //  گردِ هر قلم جمعِ برگشت‌ها را از مبلغِ نهاییِ فاکتور بیشتر نمی‌کند (اضافه از قلمِ آخر کم می‌شود)؛ PAY-09 (فاکتورِ گردشده):
+    //  برگشتِ کامل دقیقاً ماندهٔ پرداختی (`TillRounding.refund`). به پول، تا مبلغِ تا یک‌صدمِ O-22 ب بی خطای Double بماند
+    val completes = (sale.roundingMinor ?: 0L) != 0L &&
+      d.saleItems.filter { it.saleId == saleId }.all { it.returnedQty + (picks[it.id]?.qty ?: 0.0) >= it.quantity - 1e-9 }
+    val fixed = TillRounding.refund(lines.map { PayFlow.minor(it.amount) }, PayFlow.minor(sale.finalTotal), PayFlow.minor(returnedAmount(d, saleId)), completes)
+    lines.indices.forEach { i -> lines[i] = lines[i].copy(amount = PayFlow.major(fixed[i])) }
+    return Outcome.Ok(Quote(lines, PayFlow.major(fixed.sum())))
   }
 
   /** RET-04 — برگشتِ بی رسید: کالا از فهرست، قیمتِ واحد (پیش‌فرض قیمتِ امروزِ کالا) */
@@ -812,7 +799,7 @@ object ReturnFlow {
     val rows = d.saleReturns.filter { it.docId == docId }
     if (rows.isEmpty()) return null
     val first = rows.first()
-    val total = rows.sumOf { it.amount }
+    val total = PayFlow.major(rows.sumOf { PayFlow.minor(it.amount) })
     val account = rows.sumOf { it.toAccount ?: 0.0 }
     val credit = rows.sumOf { it.toCredit ?: 0.0 }
     val methods = LinkedHashMap<String, Double>()

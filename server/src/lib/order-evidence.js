@@ -24,6 +24,7 @@ const orders = require('./orders');
 const delivery = require('./delivery');
 const pickPhotos = require('./pick-photos');
 const issues = require('./order-issues');
+const maskCards = (t) => require('./ops-errors').maskCards(t);   //  S117: شمارهٔ کاملِ کارت ⇒ «[کارت]» پیش از دیتابیس و هشِ تکرار
 const { can } = require('./permissions');
 const { badRequest, notFound, conflict, forbidden } = require('../middleware/errors');
 
@@ -127,7 +128,7 @@ function parse(action, body) {
   }
   //  سپردن: یادداشت اختیاری است (نبود ⇒ '')
   out.text = action === ACTION.assign && (b.text === undefined || b.text === null || b.text === '')
-    ? '' : issues.cleanText(action === ACTION.open ? b.reason : b.text, TEXT, 'bad_text');
+    ? '' : maskCards(issues.cleanText(action === ACTION.open ? b.reason : b.text, TEXT, 'bad_text'));
   return out;
 }
 

@@ -75,6 +75,7 @@ import androidx.compose.ui.unit.sp
 import ir.vil3ntec.tohid.core.courier.CourierBoardModel
 import ir.vil3ntec.tohid.core.courier.CourierQueue
 import ir.vil3ntec.tohid.core.courier.CourierSummary
+import ir.vil3ntec.tohid.core.courier.LocationConsent
 import ir.vil3ntec.tohid.core.courier.MissionCard
 import ir.vil3ntec.tohid.core.courier.QueueState
 import ir.vil3ntec.tohid.core.i18n.Str
@@ -92,6 +93,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Segmented
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3StaggerState
 import ir.vil3ntec.tohid.ui.v3.V3StatusPill
+import ir.vil3ntec.tohid.ui.v3.V3Toggle
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
 
@@ -495,6 +497,9 @@ internal fun CourierAccountTab(
   onCallShop: () -> Unit,
   onCash: () -> Unit,
   onSignOut: () -> Unit,
+  consent: LocationConsent = LocationConsent(),
+  consentBusy: Boolean = false,
+  onConsent: (Boolean) -> Unit = {},
 ) {
   val p = PhoneV3.colors
   Column(
@@ -522,8 +527,36 @@ internal fun CourierAccountTab(
       }
       AccountRow(Icons.Outlined.Sync, StrCourierApp.sync, syncText, onClick = onRefresh, divider = false)
     }
+    //  S94: فقط وقتی دکان رضایتِ پیک را می‌خواهد (`locationConsent.required` ِ `/courier/me`)؛ وگرنه کلیدی که اثری ندارد نیست
+    if (consent.showToggle) ConsentCard(consent, consentBusy, onConsent)
     Text(lastSyncText(lastSyncAt), style = courierText(12.sp), color = p.inkMuted, modifier = Modifier.padding(horizontal = 4.dp))
     CourierSecondary(StrCourierApp.signOutTitle, onSignOut, Modifier.fillMaxWidth(), icon = Icons.AutoMirrored.Outlined.Logout, negative = true)
+  }
+}
+
+/**
+ *  S94: «اشتراکِ موقعیت» ِ خودِ پیک — روشن ⇒ مشتری جای پیک را فقط «در راه» می‌بیند؛ خاموش ⇒ هیچ نقطه و نقطه‌های فرستاده
+ *  روی سرور پاک. کلید فقط پس از پاسخِ سرور عوض می‌شود (در راه ⇒ خاموش و زدنی نیست).
+ */
+@Composable
+private fun ConsentCard(consent: LocationConsent, busy: Boolean, onConsent: (Boolean) -> Unit) {
+  val p = PhoneV3.colors
+  val ui = PhoneV3.ui
+  Column(Modifier.fillMaxWidth().courierCard(p).padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
+      Icon(Icons.Outlined.Place, contentDescription = null, tint = ui.iconActive, modifier = Modifier.size(22.dp))
+      Spacer(Modifier.width(12.dp))
+      Column(Modifier.weight(1f)) {
+        Text(StrCourierApp.shareLocation, style = courierText(15.sp, FontWeight.Medium), color = p.ink)
+        Text(
+          if (consent.granted) StrCourierApp.shareLocationOn else StrCourierApp.shareLocationOff,
+          style = courierText(13.sp), color = p.inkMuted,
+        )
+      }
+      Spacer(Modifier.width(8.dp))
+      V3Toggle(consent.granted, StrCourierApp.shareLocation, if (busy) null else onConsent)
+    }
+    Text(StrCourierApp.shareLocationHint, style = courierText(12.sp), color = p.inkMuted)
   }
 }
 

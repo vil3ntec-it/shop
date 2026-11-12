@@ -1,0 +1,22 @@
+{
+  "_doc": "SEC-DATA-01 و O-22 «ب» ِ صاحب‌کار (۱۴۰۵/۰۸/۲۰، docs/OWNER-DECISIONS-fa.md ۱-۲) — مبلغِ برگشتِ تکه‌تکهٔ یک قلم (ReturnShare.amount ِ core و returnShare ِ license/money.js). عددها دستی از قاعده نوشته شده‌اند، نه از خروجیِ کد: مبلغِ هر برگشت = پس‌دادنیِ تا پایانِ این برگشت − پس‌دادنیِ تا پیش از آن؛ پولِ قلم = round(جمعِ قلم × سهمِ پرداخت × ۱۰۰) یک‌صدم (نیمه به سمتِ +∞)؛ پس‌دادنیِ تا k پیش از پایانِ قلم = کفِ (پولِ قلم × k ÷ مقدار) تا افغانیِ کامل، و k ≥ مقدار ⇒ همهٔ پولِ قلم، دقیق تا یک‌صدم. پولِ قلمِ صفر یا منفی ⇒ هیچ. previousA = همان برگشت‌ها با «الف» ِ پیشین (نسخهٔ ۱ ِ این بردار: round(پس‌دادنی) به افغانیِ کامل) — برای نشان دادنِ آنچه عوض شد، نه برای رفتار. legacy = آن‌چه برگشتِ جدا‌جدای پیش از #586 (round(جمع ÷ مقدار × q × سهم)) پس می‌داد؛ برای نشان دادنِ نشت.",
+  "version": 2,
+  "cases": [
+    { "name": "دو عدد به ۲٫۵، یکی‌یکی", "lineTotal": 5, "quantity": 2, "paidRatio": 1, "steps": [1, 1], "amounts": [2, 3], "previousA": [3, 2], "legacy": [3, 3] },
+    { "name": "سه کیسه با جمعِ ۲، یکی‌یکی (نمونهٔ دومِ O-22)", "lineTotal": 2, "quantity": 3, "paidRatio": 1, "steps": [1, 1, 1], "amounts": [0, 1, 1], "previousA": [1, 0, 1], "legacy": [1, 1, 1] },
+    { "name": "تخفیفِ ۱۰٪ ِ فاکتور، سه عدد به ۵ (نمونهٔ O-22: ۴، ۵، ۴٫۵۰)", "lineTotal": 15, "quantity": 3, "paidRatio": 0.9, "steps": [1, 1, 1], "amounts": [4, 5, 4.5], "previousA": [5, 4, 5], "legacy": [5, 5, 5] },
+    { "name": "همان، یکی و بعد دو تا پایان", "lineTotal": 15, "quantity": 3, "paidRatio": 0.9, "steps": [1, 2], "amounts": [4, 9.5], "previousA": [5, 9], "legacy": [5, 9] },
+    { "name": "همان، یک‌جا = دقیقاً پرداختی", "lineTotal": 15, "quantity": 3, "paidRatio": 0.9, "steps": [3], "amounts": [13.5], "previousA": [14], "legacy": [14] },
+    { "name": "یک‌جا همان برگشتِ امروز است", "lineTotal": 500, "quantity": 2, "paidRatio": 0.9, "steps": [2], "amounts": [450], "previousA": [450], "legacy": [450] },
+    { "name": "S13 یکی از دو B", "lineTotal": 500, "quantity": 2, "paidRatio": 0.9, "steps": [1], "amounts": [225], "previousA": [225], "legacy": [225] },
+    { "name": "وزنی، نیم کیلو و بعد بقیه", "lineTotal": 375, "quantity": 1.25, "paidRatio": 1, "steps": [0.5, 0.75], "amounts": [150, 225], "previousA": [150, 225], "legacy": [150, 225] },
+    { "name": "وزنی با تخفیف، نیم کیلو و بعد بقیه", "lineTotal": 375, "quantity": 1.25, "paidRatio": 0.9, "steps": [0.5, 0.75], "amounts": [135, 202.5], "previousA": [135, 203], "legacy": [135, 203] },
+    { "name": "وزنی: ۰٫۳۵ از ۰٫۴ کیلو به ۵۶ دقیقاً ۴۹ (کفِ Double ۴۸ می‌داد)", "lineTotal": 56, "quantity": 0.4, "paidRatio": 1, "steps": [0.35, 0.05], "amounts": [49, 7], "previousA": [49, 7], "legacy": [49, 7] },
+    { "name": "کیسه با تخفیفِ یک از سه", "lineTotal": 1, "quantity": 1, "paidRatio": 0.6666666666666666, "steps": [1], "amounts": [0.67], "previousA": [1], "legacy": [1] },
+    { "name": "پس از برگشتِ همه، چیزی نمی‌ماند", "lineTotal": 500, "quantity": 2, "paidRatio": 1, "steps": [2, 1], "amounts": [500, 0], "previousA": [500, 0], "legacy": [500, 0] },
+    { "name": "مقدارِ صفر یا منفی هیچ", "lineTotal": 500, "quantity": 2, "paidRatio": 1, "steps": [0, -1], "amounts": [0, 0], "previousA": [0, 0], "legacy": [0, 0] },
+    { "name": "مقدارِ منفی پس از یک برگشت هم هیچ", "lineTotal": 500, "quantity": 2, "paidRatio": 1, "steps": [1, -1], "amounts": [250, 0], "previousA": [250, 0], "legacy": [250, 0] },
+    { "name": "قلمِ با مقدارِ فروشِ صفر هیچ", "lineTotal": 500, "quantity": 0, "paidRatio": 1, "steps": [1], "amounts": [0], "previousA": [0], "legacy": [0] },
+    { "name": "قلمِ با جمعِ منفی هیچ (چیزی گرفته نشده)", "lineTotal": -500, "quantity": 2, "paidRatio": 1, "steps": [1, 1], "amounts": [0, 0], "previousA": [-250, -250], "legacy": [-250, -250] }
+  ]
+}

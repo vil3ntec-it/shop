@@ -245,17 +245,26 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   val def = tabs.firstOrNull { it.id == tab } ?: tabs.first()
   val cost = ReportFresh.cost.value
   val lineSeller = remember { ir.vil3ntec.tohid.data.LineSellerPref.on(context) } // POS-23: «کاربر» به فروشندهٔ هر ردیف
-  val view = remember(ledger, def.id, span, dim, today, cost, lineSeller) {
-    ReportFreshModel.view(ledger, def.id, span, dim, today, clock, ReportFreshModel.costingOf(cost), lineSeller)
+  //  RPT-13: − / + دوره و Ctrl+Shift+C «مقایسه با دورهٔ قبل» — همان `ReportKeysPref` ِ «گزارش‌ها» (کلاسِ A، پیش‌فرض روشن)؛
+  //  فقط زبانه‌ای که بازه‌اش صریح ساخته می‌شود (`ReportFreshModel.SHIFTABLE`) و بازه‌ای که دورهٔ قبل دارد (نه سه‌ماهه و «همه»)
+  val keys = remember { ir.vil3ntec.tohid.data.ReportKeysPref.on(context) }
+  var shift by remember(span) { mutableStateOf(0) }
+  var compare by remember { mutableStateOf(false) }
+  val shifting = keys && def.ranged && def.id in ReportFreshModel.SHIFTABLE && ReportFreshModel.canShift(span, today, -1)
+  val rng = remember(span, today, shift, shifting) { ReportFreshModel.rangeOf(span, today, if (shifting) shift else 0) }
+  val comparing = keys && def.id in ReportFreshModel.COMPARABLE
+  fun step(by: Int) { if (ReportFreshModel.canShift(span, today, shift + by)) shift += by }
+  val view = remember(ledger, def.id, span, dim, today, cost, lineSeller, rng) {
+    ReportFreshModel.view(ledger, def.id, span, dim, today, clock, ReportFreshModel.costingOf(cost), lineSeller, rng)
   }
   //  RPT-04: «پایانِ روز» از شیفت‌ها و دفتر (نه فقط `ReportLedger`)
   val dayEnd = remember(d, def.id, day) {
     if (def.id == DayEndModel.TAB_ID) DayEndModel.build(d, day, clock, ReportBridge.nowMs(), ReportBridge.offsetMinutes()) else null
   }
   //  RPT-08: «ساعت و روز» از فروش‌ها و برگشت‌های دفتر در همان بازه
-  val heat = remember(d, def.id, span, today, ShopDayChoice.weekStart) {
+  val heat = remember(d, def.id, span, today, ShopDayChoice.weekStart, rng) {
     if (def.id == HeatmapModel.TAB_ID) {
-      HeatmapModel.build(d, ReportBoard.range(span, today), ReportBridge.offsetMinutes(), ShopDay.dayStartMinutes(ShopDayChoice.hours), ShopDayChoice.weekStart)
+      HeatmapModel.build(d, rng, ReportBridge.offsetMinutes(), ShopDay.dayStartMinutes(ShopDayChoice.hours), ShopDayChoice.weekStart)
     } else null
   }
   //  RPT-04 / S48: ریزِ تراکنش‌های یک روش (کلیک یا Enter روی ردیفِ «نقد» ِ «پایانِ روز»)
@@ -303,6 +312,9 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
         when {
           e.matches(KeyMap.GLOBAL_PRINT) -> { print(); true }
           e.matches(KeyMap.GLOBAL_EXPORT) -> { excel(); true }
+          shifting && e.matches(KeyMap.REPORTS_PREV_PERIOD) -> { step(-1); true }
+          shifting && e.matches(KeyMap.REPORTS_NEXT_PERIOD) -> { step(1); true }
+          comparing && e.matches(KeyMap.REPORTS_COMPARE) -> { compare = !compare; true }
           else -> false
         }
       }
@@ -338,6 +350,9 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
     }
     //  بازه در ردیفِ خودش: با دو سه‌ماههٔ مالی (LOC-02) شش گزینه است و کنارِ پنج زبانه در ۱۲۸۰ جا نمی‌شد
     if (def.ranged) SegmentedTabs(ReportBoard.SPANS.map { SegmentTab(it, ReportBoard.SPAN_LABELS.getValue(it)) }, span, { span = it })
+    //  RPT-13: دورهٔ قبل/بعد با برچسبِ کلید، «از … تا …» ِ بازهٔ جابه‌جاشده، «مقایسه» و خطِ «نسبت به دورهٔ قبل» (`ReportKeys.kt`)
+    FreshPeriodBar(shifting, comparing, compare, rng, onStep = ::step, onCompare = { compare = !compare })
+    if (comparing && compare) ReportCompareLine(d, def.id, ReportFreshModel.keysSpan(span), rng.from, rng.to, today)
     if (def.id == "sales" || def.id == "profit") {
       SegmentedTabs(ReportBoard.DIMS.map { SegmentTab(it, ReportBoard.DIM_LABELS.getValue(it)) }, dim, { dim = it })
     }
@@ -462,45 +477,6 @@ private fun Summary(view: ReportFreshModel.View, tab: String, d: ShopData, showM
         if (findings != null) AnomalyBox(findings) else if (alerts.isNotEmpty()) CashierAlertBox(alerts)
       }
     }
-  }
-}
-
-/** PRM-16 — سرِ زبانهٔ «اثرِ تخفیف»: روشِ بها (همان انتخابِ «سود و حاشیه»)، قطعی/تقریبی و قاعده */
-@Composable
-private fun PromoSummary(v: PromoFresh.View) {
-  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-    v.report?.let { r ->
-      val p = if (v.from == v.to) formatDate(v.from) else if (v.from == "0000-01-01") StrReports.allDates else StrSimpleAsk.range(formatDate(v.from), formatDate(v.to))
-      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        StatCard(StrReportPages.colPromoDiscount, "${money(r.promoDiscountMinor / 100.0)} ؋", p, Modifier.weight(1f))
-        StatCard(StrReportPages.colNetSales, "${money(r.promoRevenueMinor / 100.0)} ؋", p, Modifier.weight(1f))
-        StatCard(StrReportPages.colShare, ReportCore.bp(r.promoRevenueMinor, r.totalRevenueMinor)?.let(ReportFreshModel::percent) ?: "—", p, Modifier.weight(1f))
-      }
-    }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      Text(StrReportPages.costMethod, style = MaterialTheme.typography.labelLarge, color = Shop.colors.text)
-      SegmentedTabs(CostMethod.entries.map { SegmentTab(it, it.label) }, v.method, { ReportFresh.setCost(it) })
-    }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      val r = v.report
-      if (r != null && r.rows.isNotEmpty()) {
-        if (r.profitApproximate) StatusPill(StrReportPages.profitApprox, PillTone.WARNING) else StatusPill(StrReportPages.profitFinal, PillTone.SUCCESS)
-        Spacer(Modifier.width(8.dp))
-      }
-      Text(PromoFresh.note(v), style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
-    }
-  }
-}
-
-/** PRD-15 — سرِ زبانهٔ «بهای میانگین»: ارزشِ موجودی به بهای میانگین و قاعده (فقط خواندنی) */
-@Composable
-private fun StockCostSummary(c: ReportCore.StockCost) {
-  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-      StatCard(StrStockPages.stockValueAvg, "${money(c.totals.valueMinor / 100.0)} ؋", if (c.totals.approximate) StrReportPages.colApprox else StrReportPages.untilToday, Modifier.weight(1f))
-      StatCard(StrReportPages.colProduct, c.rows.count { it.qtyMilli > 0 }.toString(), StrReportPages.untilToday, Modifier.weight(1f))
-    }
-    Text(StockCostFresh.note(c), style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
   }
 }
 

@@ -4,6 +4,7 @@ import ir.vil3ntec.tohid.core.calendar.CivilDays
 import ir.vil3ntec.tohid.core.purchase.ReorderCore
 import ir.vil3ntec.tohid.core.purchase.SmartDemand
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -50,6 +51,36 @@ class PurchaseSuggestTest {
     assertNull(b.forecast.daysLeft)
     //  تأمین‌کنندهٔ ناشناس و بی خرید ⇒ بی «با یک کلید»
     assertNull(rows[2].supplierId)
+  }
+
+  @Test fun `۳-۱۷ — «پیشنهاد با فروش و زمانِ تأمین» ِ فرمِ سفارش همان پیشنهادِ صفحهٔ «پیشنهادِ سفارش» است`() {
+    //  کالاهای فرم = آنچه از همان تأمین‌کننده خریده شده (`supplierPicks`) ⇒ pA یک بار از s1
+    val bought = d.copy(purchases = d.purchases + Purchase(id = "u2", productId = "pA", supplierId = "s1", quantity = 1.0, purchasePrice = 100.0, date = "2026-01-02"))
+    for (smart in listOf(false, true)) {
+      val page = PurchaseSuggest.rows(bought, emptyList(), today, smart).associateBy { it.product.id }
+      for ((sid, pid) in listOf("s1" to "pA", "s2" to "pB")) {
+        val row = page.getValue(pid)
+        val plans = PurchaseSuggest.forSupplier(bought, sid, emptyList(), today, smart)
+        assertEquals("$sid/$pid smart=$smart", if (row.due) listOf(row.forecast) else emptyList(), plans.map { it.forecast })
+        assertEquals("$sid/$pid smart=$smart", if (row.due) listOf(row.forecast.qtyMilli) else emptyList(), plans.map { it.pick.qtyMilli })
+      }
+    }
+    assertTrue(PurchaseSuggest.rows(bought, emptyList(), today).first { it.product.id == "pA" }.due)
+    //  «در راه» ِ همان سفارش‌های باز هم مثلِ صفحه کم می‌شود. با خریدِ ۲۰۲۶/۰۱/۰۲ پنجره ۹۰ روز است ⇒ روزانه ۰٫۶۶۷، نقطهٔ سفارش
+    //  ۴٫۶۶۵ و پیشنهادِ بی سفارشِ باز ۱۴ ⇒ ۲ در راه هنوز نیازمند (۱۴ − ۲ = ۱۲)، ۱۰ در راه بس است و فرم هم چیزی پیشنهاد نمی‌دهد
+    fun open(remaining: Long) = PurchaseOrderDto(
+      id = "po1", no = 1, supplierId = "s1", state = "sent", status = "sent",
+      lines = listOf(PoLineDto("l1", "pA", "چای", "عدد", 40_000, 10_000)),
+      progress = listOf(PoProgressDto(lineId = "l1", productId = "pA", orderedMilli = 40_000, remainingMilli = remaining)),
+    )
+    val few = PurchaseSuggest.rows(bought, listOf(open(2_000)), today).first { it.product.id == "pA" }
+    assertTrue(few.due)
+    assertEquals(12_000L, few.forecast.qtyMilli)
+    assertEquals(few.forecast, PurchaseSuggest.forSupplier(bought, "s1", listOf(open(2_000)), today).single().forecast)
+    val enough = PurchaseSuggest.rows(bought, listOf(open(10_000)), today).first { it.product.id == "pA" }
+    assertFalse(enough.due)
+    assertTrue(PurchaseSuggest.forSupplier(bought, "s1", listOf(open(10_000)), today).isEmpty())
+    assertTrue(PurchaseSuggest.forSupplier(bought, "nobody", emptyList(), today).isEmpty())
   }
 
   @Test fun `پیش‌نویسِ با یک کلید فقط نیازمندهای همان تأمین‌کننده`() {

@@ -117,7 +117,10 @@ internal fun ProductsTab(d: ShopData, canSeeMoney: Boolean, spec: ReportListSpec
   ReportList(spec) {
     item(key = "kpi") {
       Column(spec.appear("kpi", 0).padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        if (canSeeMoney) V3Stat(StrReports.inventoryValue, r.inventoryValue, ::afn, Modifier.fillMaxWidth(), hue = V3Hue.BRAND)
+        if (canSeeMoney) V3Stat(
+          StrReports.inventoryValue, r.inventoryValue, ::afn, Modifier.fillMaxWidth(), hue = V3Hue.BRAND,
+          caption = inventoryCaption(r.inventoryApprox, r.inventoryNegative, r.inventoryKits),
+        )
         else V3Stat(StrReports.inventoryValue, 0.0, { "—" }, Modifier.fillMaxWidth(), caption = StrReports.moneyLocked)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
           V3Stat(StrReports.soldOut, r.out.size.toDouble(), { it.toLong().toString() }, Modifier.weight(1f),

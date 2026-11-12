@@ -532,6 +532,8 @@ object PurchaseOrderBook {
   /**
    *  پیشنهادِ ردیف با فروشِ واقعی و زمانِ تأمینِ همین تأمین‌کننده (و «در راه»)؛ فقط مقدارِ بیش از صفر.
    *  کالای وزنی (کیلو، لیتر…) هزارم، بقیه عددِ کامل. سفارش خودکار ثبت نمی‌شود — فقط ردیفِ فرم.
+   *  ⚠️ ۳-۱۷ (PUR-03 الف): فرم‌های سفارش دیگر این حسابِ ۳۰ روزه را نمی‌پرسند — `PurchaseSuggest.forSupplier` (همان پیشنهادِ صفحهٔ
+   *  «پیشنهادِ سفارش»)؛ این فقط مرجعِ `ReorderCore` ِ PUR-10 مانده است.
    */
   fun planned(d: ShopData, supplierId: String, orders: List<PurchaseOrderDto>, today: String): List<Planned> {
     val lead = leadTime(orders, supplierId, manualLead(d, supplierId))

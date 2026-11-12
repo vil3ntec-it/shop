@@ -87,7 +87,13 @@ function invariants(c, msg) {
   if (c.fn === 'cal.fromSolar' && o.iso && x.y < 3177) {
     assert.deepEqual(F.runCase('cal.toSolar', { iso: o.iso }).solar, { y: x.y, m: x.m, d: x.d }, msg);
   }
-  if (c.fn === 'money.returnShare') assert.ok(Number.isInteger(o), msg);  // همیشه افغانیِ کامل
+  if (c.fn === 'money.returnShare') {
+    //  O-22 ب ِ صاحب‌کار: دقیق تا یک‌صدم؛ برگشتی که قلم را تمام نمی‌کند همیشه افغانیِ کامل (پیش‌تر هر برگشت افغانیِ کامل)
+    assert.ok(Number.isFinite(o) && Math.abs(o * 100 - Math.round(o * 100)) < 1e-6, msg);
+    const b = F.D(x.returnedBefore), q = F.D(x.qty), r = F.D(x.refundedBefore);
+    const end = (Number.isFinite(b) && b > 0 ? b : 0) + q;
+    if (end < F.D(x.quantity) && (x.refundedBefore === undefined || !(r > 0) || Number.isInteger(r))) assert.ok(Number.isInteger(o), msg);
+  }
   if (c.fn === 'stock.ledger') for (const p of o.positions) assert.ok(p.reconciles, `${msg} ${p.productId}/${p.warehouseId}`);
   //  زنجیرهٔ هش: نسخهٔ سرور همان نسخهٔ license (همان قرارداد، SHA-256 ِ دیگر)
   const server = F.R2.runChainServer(c.fn, x);

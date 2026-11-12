@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.sync.v1
 
 import ir.vil3ntec.tohid.core.sync.SyncReconnect
+import ir.vil3ntec.tohid.core.sync.SyncRetryAfter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -64,5 +65,27 @@ class ReconnectGateTest {
     val g = gate()
     g.offline()
     assertEquals(0L, g.beforeRound())
+  }
+
+  @Test
+  fun `۳-۱۳ — Retry-After ِ سرور ⇒ دورهای خودکار زودتر نه، تا ۵ دقیقه؛ «همگام‌سازی حالا» همان دم و پایانش`() {
+    val g = gate()
+    g.serverAsked(null)
+    assertEquals("سرور نگفت ⇒ همان پیشین", 0L, g.beforeRound())
+    g.serverAsked(40_000L)
+    assertEquals(40_000L, g.beforeRound())
+    clock += 10_000
+    g.serverAsked(5_000L)   // پاسخِ کوتاه‌تر پایان را جلو نمی‌کشد
+    assertEquals(30_000L, g.beforeRound())
+    g.offline()   // پخشِ وصلِ دوباره کوتاه‌تر از Retry-After ⇒ همان Retry-After
+    assertEquals(30_000L, g.beforeRound())
+    g.serverAsked(60 * 60_000L)
+    assertEquals("سقفِ ۵ دقیقه", SyncRetryAfter.MAX_MS, g.beforeRound())
+    g.userAsked()
+    assertEquals(0L, g.beforeRound())
+    assertEquals("کاربر پایانش داد", 0L, g.beforeRound())
+    g.serverAsked(2_000L)
+    clock += 2_000
+    assertEquals("گذشت ⇒ همین حالا", 0L, g.beforeRound())
   }
 }

@@ -19,8 +19,8 @@ import java.io.File
 /**
  *  PRD-08 — کالای وزنی (۳ رقمِ اعشار) در موتورِ صندوقِ گوشی و کامپیوتر (`QtyExactWiring`، پرچمِ `shop.qty_exact`):
  *   • خاموش ⇒ `SalesEngine.lineTotal`، جمعِ سبد و ثبت بیت‌به‌بیت همان امروز (ستونِ legacy ِ بردارِ مشترک)؛
- *   • روشن ⇒ مبلغِ ردیفِ اعشاری همان `onMinor` ِ `core/test-vectors/qty-exact-v1.json` (= سفارشِ آنلاینِ سرور)، مقدارِ درست
- *     همان امروز، و مقدارِ سبد/قلم/حرکتِ انبار به هزارمِ دقیق؛ S04 (۱٫۲۵۰ و ۰٫۷۵) سرتاسری از سبد تا فاکتور.
+ *   • روشن ⇒ مبلغِ هر ردیف همان `onMinor` ِ `core/test-vectors/qty-exact-v1.json` (= سفارشِ آنلاینِ سرور؛ از ۳-۱۲ مقدارِ درست
+ *     هم)، و مقدارِ سبد/قلم/حرکتِ انبار به هزارمِ دقیق؛ S04 (۱٫۲۵۰ و ۰٫۷۵) سرتاسری از سبد تا فاکتور.
  */
 class QtyExactWiringTest {
 
@@ -77,16 +77,16 @@ class QtyExactWiringTest {
     assertEquals(-1.015, r.data.stockMovements.single().qty, 0.0)
   }
 
-  @Test fun wholeQuantity_isTheSameWithTheFlagOn() {
-    //  کالای «عدد» اعشار نمی‌پذیرد ⇒ ۵۰ × ۰٫۲۹ = ۱۴٫۴۹۹… ⇒ ۱۴، چه پرچم روشن چه خاموش (قاعدهٔ دقیق ۱۵ می‌داد)
+  @Test fun wholeQuantity_isExactWithTheFlagOn() {
+    //  ۳-۱۲: کالای «عدد» با قیمتِ اعشاری ⇒ ۵۰ × ۰٫۲۹ = ۱۴٫۵: خاموش همان ۱۴ ِ امروز، روشن ۱۵ (همان سفارشِ آنلاین)
     val cart = listOf(SalesEngine.CartLine("e", 50.0))
     QtyExactWiring.serverFlag = false
     val off = record(cart).data
     QtyExactWiring.serverFlag = true
     val on = record(cart).data
     assertEquals(14.0, off.saleItems.single().totalPrice, 0.0)
-    assertEquals(off.saleItems.single().totalPrice, on.saleItems.single().totalPrice, 0.0)
-    assertEquals(off.sales.single().finalTotal, on.sales.single().finalTotal, 0.0)
+    assertEquals(15.0, on.saleItems.single().totalPrice, 0.0)
+    assertEquals(15.0, on.sales.single().finalTotal, 0.0)
     assertEquals(off.stockMovements.single().qty, on.stockMovements.single().qty, 0.0)
   }
 
@@ -150,7 +150,10 @@ class QtyExactWiringTest {
     assertTrue(QtyExactWiring.preview(Double.NaN, 1.0).isNaN())
     QtyExactWiring.serverFlag = true
     assertEquals(102.0, QtyExactWiring.preview(100.0, 1.015), 0.0)
-    assertEquals(0.29 * 50.0, QtyExactWiring.preview(0.29, 50.0), 0.0)
+    //  ۳-۱۲ «الف» (۱۴۰۵/۰۸/۲۰): مقدارِ درست هم با همان پرچم دقیق گرد می‌شود — ۵۰ × ۰٫۲۹ = ۱۵ (نه ۱۴٫۴۹۹…)
+    assertEquals(15.0, QtyExactWiring.preview(0.29, 50.0), 0.0)
     assertTrue(QtyExactWiring.preview(Double.NaN, 1.25).isNaN())
+    QtyExactWiring.serverFlag = false
+    assertEquals(0.29 * 50.0, QtyExactWiring.preview(0.29, 50.0), 0.0)
   }
 }

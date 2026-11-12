@@ -7,6 +7,11 @@
  *   unit_factor_inexact  ضریبِ واحدِ فروشِ دومِ **تازه** (≠ ضریبِ ذخیره) که دقیقاً به هزارمِ واحدِ پایه نیست (`exactMilli` =
  *                        `UnitSale.exactMilli`: ۱/۲۴، ۰٫۰۰۰۵، نامثبت، بیرون از سقف) — فقط وقتی کالا واحدِ فروشِ دوم دارد.
  *                        ضریبِ کهنهٔ دست‌نخورده (همان عدد) هرگز رد نمی‌شود؛ `null` یعنی همان ضریبِ ذخیره.
+ * ⛔ ۲-۱۶ ِ صاحب‌کار (R2 الف) — دو راهِ دوگامی بسته (همان پرچم؛ برنامه همان را در `ProductDraftRules` می‌سنجد):
+ *   (۱) «واحد را خالی کن، سپس واحدِ تازه»: واحدِ خالی/null ِ op روی کالای گردش‌داری که واحدِ ذخیره دارد = تغییرِ واحد ⇒ `unit_locked`.
+ *       واحدِ خالیِ **کهنه** (پیش از قاعده) که تازه نوشته می‌شود همان آزاد می‌ماند.
+ *   (۲) «ضریبِ ناجور بی واحدِ فروشِ دوم، سپس فقط واحدِ فروش»: ضریبِ ذخیره فقط وقتی «کهنهٔ دست‌نخورده» است که کالا **همان وقت**
+ *       واحدِ فروشِ دوم داشته؛ روشن کردنِ واحدِ فروش روی ضریبِ خوابیده (یا بی ضریب) ضریبِ تازه است ⇒ `unit_factor_inexact`.
  * برای همه، صاحب دکان هم: قاعدهٔ داده است نه مجوز (برنامه هم برای همه می‌سنجد).
  *
  * پرچمِ `shop.product_unit_rules` (`live_config`، دکان یا `all`، فقط `true`؛ همان `orders.flagOf`). ⛔ پیش‌فرض خاموش ⇒ همان
@@ -58,9 +63,9 @@ function exactMilli(f) {
  */
 const oddUnit = (fields) => has(fields, 'unit') && fields.unit !== null && typeof fields.unit !== 'string';
 
-/** op ِ کالا که واحد یا ضریب می‌نویسد؟ (بی آن هیچ پرسشی نیست) */
+/** op ِ کالا که واحد (خالی هم، ۲-۱۶)، واحدِ فروشِ دوم یا ضریب می‌نویسد؟ (بی آن هیچ پرسشی نیست) */
 const touches = (fields) => isObj(fields)
-  && (filled(fields.unit) || oddUnit(fields) || (has(fields, 'unitFactor') && fields.unitFactor !== null));
+  && (has(fields, 'unit') || filled(fields.saleUnit) || (has(fields, 'unitFactor') && fields.unitFactor !== null));
 
 /**
  * @param fields  فیلدهای op (درج یا ویرایش)
@@ -71,13 +76,19 @@ const touches = (fields) => isObj(fields)
 async function reasonOf(fields, before, moved) {
   if (!isObj(fields)) return '';
   const b = isObj(before) ? before : null;
-  const changed = () => oddUnit(fields) || (filled(fields.unit) && key(fields.unit) !== key(b.unit));
+  //  ۲-۱۶ (۱): کلیدِ `unit` با خالی/null همان «خالی کردن» است
+  const blanked = has(fields, 'unit') && (fields.unit === null || (typeof fields.unit === 'string' && !filled(fields.unit)));
+  const changed = () => oddUnit(fields) || blanked || (filled(fields.unit) && key(fields.unit) !== key(b.unit));
   if (b && filled(b.unit) && changed() && await moved()) return LOCKED;
-  if (!has(fields, 'unitFactor') || fields.unitFactor === null) return '';
+  const setsFactor = has(fields, 'unitFactor') && fields.unitFactor !== null;
   const saleUnit = has(fields, 'saleUnit') && fields.saleUnit !== null ? fields.saleUnit : b?.saleUnit;
   if (!filled(saleUnit)) return '';
-  const f = numOf(fields.unitFactor);
-  if (b && f === numOf(b.unitFactor)) return '';
+  //  ۲-۱۶ (۲): ضریبِ ذخیره فقط وقتی «کهنه» است که واحدِ فروشِ دوم همان وقت روشن بود
+  const live = Boolean(b) && filled(b.saleUnit);
+  if (!setsFactor && live) return '';
+  const f = setsFactor ? numOf(fields.unitFactor) : numOf(b?.unitFactor);
+  if (!setsFactor && Number.isNaN(f)) return '';   //  بی ضریبِ ذخیره: همان امروز (برنامه خودش «ضریب لازم است» می‌گوید)
+  if (live && f === numOf(b.unitFactor)) return '';
   return exactMilli(f) === null ? INEXACT : '';
 }
 

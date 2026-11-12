@@ -95,8 +95,10 @@ router.use('/system/notify-usage', rateLimit({ max: 30, windowMs: 60 * 1000, key
 router.use('/contract', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-contract-ip' }));
 router.use('/subscriptions/period-end', rateLimit({ max: 240, windowMs: 60 * 1000, keyPrefix: 'admin-period-end-ip' }));
 router.use('/shops/:id/staff-perms/devices', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-device-state-ip' }));
-//  LOC-04: جدولِ تعطیلات (`routes/admin-calendar.js`، پس از این روتر سوار) — سقفِ IP پیش از همین `requireAdmin`
+//  LOC-04 تعطیلات (`admin-calendar.js`)، ۴-۱ «ب» مترادف (`admin-synonyms.js`) و ۲-۹ دسترسیِ پشتیبانی (`admin-access-grants.js`) — سقفِ IP پیش از همین `requireAdmin`
 router.use('/calendar', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-calendar-ip' }));
+router.use('/search/synonyms', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-synonyms-ip' }));
+router.use('/shops/:id/access-grants', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-access-grants-ip' }));
 
 router.use(requireAdmin);
 
@@ -389,7 +391,7 @@ router.post('/subscriptions', async (req, res, next) => {
   const features = sanitizeFeatures(req.body?.features);
   const maxDevices = v.integer(req.body?.maxDevices, { field: 'تعداد دستگاه', min: 1, max: 100, def: 10 });
   const graceDays = v.integer(req.body?.graceDays, { field: 'مهلت', min: 0, max: 90, def: 0 });
-  const note = v.text(req.body?.note, { max: 300 });
+  const note = require('../lib/ops-errors').maskCards(v.text(req.body?.note, { max: 300 }));   //  S117: بی شمارهٔ کاملِ کارت
 
   /*
    *  ⛔ F0-14 — کلیدِ یکتایی. پنل برای هر ثبت یک `Idempotency-Key`
@@ -459,7 +461,7 @@ router.put('/subscriptions/:id', async (req, res, next) => {
   if (endsAt <= startsAt) return next(badRequest('تاریخ پایان باید بعد از شروع باشد'));
   const features = req.body?.features ? sanitizeFeatures(req.body.features) : current.features;
   const plan = v.text(req.body?.plan, { max: 20 }) || current.plan;
-  const note = req.body?.note === undefined ? current.note : v.text(req.body.note, { max: 300 });
+  const note = req.body?.note === undefined ? current.note : require('../lib/ops-errors').maskCards(v.text(req.body.note, { max: 300 }));
   const graceDays = v.integer(req.body?.graceDays, { min: 0, max: 90, def: current.grace_days });
   const maxDevices = v.integer(req.body?.maxDevices, { min: 1, max: 100, def: current.max_devices });
 
@@ -762,8 +764,7 @@ router.use('/logins', require('./admin-logins'));
 //  میزِ «فروشگاه» — بندهای ۴.۲ و ۴.۳ سندِ ریمیک. فقط می‌خواند.
 router.use('/shop-desk', require('./admin-shop-desk'));
 router.use('/shop-offline-codes', require('./admin-shop-offline'));
-//  میزِ «کدِ شاگرد» — بندِ ۴.۴ سندِ ریمیک. ⛔ زیرِ `/shops/:id` می‌نشیند تا
-//  همان `v.id` و همان مرزِ دکان را داشته باشد، نه یک درِ موازی.
+//  میزِ «کدِ شاگرد» — بندِ ۴.۴ سندِ ریمیک. ⛔ زیرِ `/shops/:id` می‌نشیند تا همان `v.id` و همان مرزِ دکان را داشته باشد، نه یک درِ موازی.
 router.use('/shops/:id/staff-codes', require('./admin-staff-codes'));
 //  مجوزهای کارمندان و دستگاه‌های یک دکان (STF-01..03، STF-10)
 router.use('/shops/:id/staff-perms', require('./admin-staff-perms'));
@@ -774,16 +775,15 @@ router.use('/shops/:id/staff-perms', require('./admin-staff-perms'));
  *  نداشت و کدِ ثبت‌نامِ کاربرِ تازه هیچ‌جا دیده نمی‌شد.
  *
  *  ⛔ **این دو یکی نمی‌شوند**: دو جدول با دو قرارداد و دو عمرِ متفاوت.
- *  کارِ یکی کردنشان دستِ پنل است، که هر دو را می‌خواند و یک فهرست نشان
- *  می‌دهد.
+ *  کارِ یکی کردنشان دستِ پنل است، که هر دو را می‌خواند و یک فهرست نشان می‌دهد.
  */
 router.use('/otp', require('./admin-otp'));
 router.use('/sync', require('./admin-sync'));
 //  پنلِ مرکزی، فاز ۳: سلامت و حالت‌های مدیریتیِ دکان، پرچم‌ها با تاریخچه، کلیدِ سرویسِ پلِ پنل
-router.use('/shops/:id', require('./admin-shop-state'));
+router.use('/shops/:id', require('./admin-shop-state'), require('./admin-access-grants'));   //  + ۲-۹ دسترسیِ پشتیبانی
 router.use('/flags', require('./admin-flags'));
 //  پوستهٔ کنسول — جست‌وجوی سراسریِ بخشِ «فروشگاه» ِ پنل (توانایی `search.v1`)
-router.use('/search', require('./admin-search'));
+router.use('/search', require('./admin-synonyms'), require('./admin-search'));   //  + ۴-۱ «ب» فهرستِ مرکزیِ مترادف
 router.use('/service-keys', require('./admin-service-keys'));
 //  سلامتِ سرور (§۳۸.۸، OPS-01@38) — فقط عدد و وضعیت، بی هیچ راز
 router.use('/system', require('./admin-system'));

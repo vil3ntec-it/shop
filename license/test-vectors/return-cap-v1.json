@@ -1,6 +1,6 @@
 {
-  "_doc": "ماندهٔ قابلِ برگشتِ یک قلمِ فاکتور (سفرِ JB5): ReturnCap ِ core (core/.../money/ReturnCap.kt) و هم‌زادِ سرور (server/src/lib/return-line-cap.js). مقدار به هزارم (milli)، پول به یک‌صدمِ افغانی (minor). prior = ردیف‌های برگشتِ پیشینِ همان قلم، جفت‌جفت [مقدار، پول]؛ req = همین برگشت. برگشته = بیشینهٔ (شمارندهٔ قلم، جمعِ مقدارِ ردیف‌ها)؛ مانده = فروخته − برگشته و سقفِ پول − پس‌داده (هیچ‌کدام زیرِ صفر). verdict: qty اگر مقدار از ماندهٔ مقدار بگذرد؛ amount اگر پول از سقفِ پول + گردِ نقدیِ فاکتور (extraMinor) + گردِ قدیم (tolMinorPerRow برای هر ردیف، پیشین‌ها و همین) − پس‌داده بگذرد؛ وگرنه ok. سقفِ پولِ قلم (caps) = round(جمعِ قلم × سهمِ پرداخت) افغانی × ۱۰۰، همان پایانِ ReturnShare. عددها دستی از قاعده نوشته شده‌اند، نه از خروجیِ کد.",
-  "version": 1,
+  "_doc": "ماندهٔ قابلِ برگشتِ یک قلمِ فاکتور (سفرِ JB5): ReturnCap ِ core (core/.../money/ReturnCap.kt) و هم‌زادِ سرور (server/src/lib/return-line-cap.js). مقدار به هزارم (milli)، پول به یک‌صدمِ افغانی (minor). prior = ردیف‌های برگشتِ پیشینِ همان قلم، جفت‌جفت [مقدار، پول]؛ req = همین برگشت. برگشته = بیشینهٔ (شمارندهٔ قلم، جمعِ مقدارِ ردیف‌ها)؛ مانده = فروخته − برگشته و سقفِ پول − پس‌داده (هیچ‌کدام زیرِ صفر). verdict: qty اگر مقدار از ماندهٔ مقدار بگذرد؛ amount اگر پول از سقفِ پول + گردِ نقدیِ فاکتور (extraMinor) + گردِ قدیم (tolMinorPerRow برای هر ردیف، پیشین‌ها و همین) − پس‌داده بگذرد؛ وگرنه ok. سقفِ پولِ قلم (caps) = round(جمعِ قلم × سهمِ پرداخت × ۱۰۰) یک‌صدم (نیمه به سمتِ +∞)، دقیق تا پول — همان پایانِ ReturnShare (نسخهٔ ۲، O-22 «ب» ِ صاحب‌کار ۱۴۰۵/۰۸/۲۰؛ نسخهٔ ۱: round(جمعِ قلم × سهم) افغانیِ کامل × ۱۰۰، تا نیم افغانی بیش از پرداختی). عددها دستی از قاعده نوشته شده‌اند، نه از خروجیِ کد.",
+  "version": 2,
   "cases": [
     { "name": "برگشتِ کاملِ نخست", "soldMilli": 2000, "capMinor": 100000, "counterMilli": 0, "extraMinor": 0, "tolMinorPerRow": 0, "prior": [], "req": [2000, 100000], "verdict": "ok", "returnedMilli": 0, "returnedMinor": 0, "leftMilli": 2000, "leftMinor": 100000 },
     { "name": "دستگاهِ دوم همان برگشتِ کامل", "soldMilli": 2000, "capMinor": 100000, "counterMilli": 0, "extraMinor": 0, "tolMinorPerRow": 0, "prior": [2000, 100000], "req": [2000, 100000], "verdict": "qty", "returnedMilli": 2000, "returnedMinor": 100000, "leftMilli": 0, "leftMinor": 0 },
@@ -21,10 +21,11 @@
   ],
   "caps": [
     { "capName": "دو عدد به ۲٫۵ بی تخفیف", "lineTotal": 5, "paidRatio": 1, "capMinor": 500 },
-    { "capName": "تخفیفِ ۱۰٪ ِ فاکتور، سه عدد به ۵", "lineTotal": 15, "paidRatio": 0.9, "capMinor": 1400 },
-    { "capName": "کیسه با تخفیفِ یک از سه", "lineTotal": 1, "paidRatio": 0.6666666666666666, "capMinor": 100 },
+    { "capName": "تخفیفِ ۱۰٪ ِ فاکتور، سه عدد به ۵ = ۱۳٫۵۰ (نسخهٔ ۱: ۱۴۰۰)", "lineTotal": 15, "paidRatio": 0.9, "capMinor": 1350 },
+    { "capName": "کیسه با تخفیفِ یک از سه = ۰٫۶۷ (نسخهٔ ۱: ۱۰۰)", "lineTotal": 1, "paidRatio": 0.6666666666666666, "capMinor": 67 },
     { "capName": "وزنی", "lineTotal": 375, "paidRatio": 1, "capMinor": 37500 },
-    { "capName": "نیم افغانی رو به بالا", "lineTotal": 0.5, "paidRatio": 1, "capMinor": 100 },
-    { "capName": "سهمِ نامعتبر ⇒ صفر", "lineTotal": 500, "paidRatio": -1, "capMinor": 0 }
+    { "capName": "نیم افغانی همان نیم (نسخهٔ ۱: رو به بالا ۱۰۰)", "lineTotal": 0.5, "paidRatio": 1, "capMinor": 50 },
+    { "capName": "سهمِ نامعتبر ⇒ صفر", "lineTotal": 500, "paidRatio": -1, "capMinor": 0 },
+    { "capName": "یک‌سوم ِ ۱۰۰ ⇒ ۳۳٫۳۳", "lineTotal": 100, "paidRatio": 0.3333333333333333, "capMinor": 3333 }
   ]
 }

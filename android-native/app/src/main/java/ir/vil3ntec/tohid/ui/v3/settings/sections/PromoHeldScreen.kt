@@ -23,6 +23,7 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Button
+import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Type
@@ -36,7 +37,8 @@ import kotlinx.coroutines.launch
 /**
  *  PRM-02 — `settings/promo-held`: صاحب/مدیر کدِ سقف‌داری را آزاد می‌کند که لغوکنندهٔ فاکتور اجازه‌اش را نداشت
  *  (`release_not_allowed`). فهرست از `GET /api/shop/promos/redemptions`، آزاد کردن با همان `POST /redeem/release`.
- *  ⛔ دکمه فقط برای فاکتوری که در دفترِ همین دستگاه لغوشده است (`PromoHeld.groups`)؛ ردیفش در تنظیمات فقط با شمارشِ روشن
+ *  ⛔ دکمه برای فاکتوری که در دفترِ همین دستگاه لغوشده است (`PromoHeld.groups`)، و (۴-۲۱) برای فاکتورِ نارسیده فقط صاحب، ۷ روز
+ *     پس از گرفتنِ کد و پس از برگهٔ هشدارِ «شاید هنوز برسد» (`PromoHeld.release`)؛ ردیفش در تنظیمات فقط با شمارشِ روشن
  *  و اجازهٔ لغوِ فاکتور (`promoHeldRow`)؛ نشانیِ مستقیم با پرچمِ خاموش یا سرورِ کهنه فقط «روشن نیست» می‌گوید.
  */
 internal interface PromoHeldSource {
@@ -115,6 +117,10 @@ internal fun RouteScope.PromoHeldScreen(onBack: (() -> Unit)?) {
   val s = remember(src) { PromoHeldState(src) }
   var tick by remember { mutableIntStateOf(0) }
   val scope = rememberCoroutineScope()
+  val owner = promoHeldOwner()
+  //  ۴-۲۱: فاکتورِ نارسیده‌ای که صاحب «آزاد کن» زد ⇒ برگهٔ هشدار پیش از آزاد کردن
+  var warn by remember { mutableStateOf<String?>(null) }
+  val go: (String) -> Unit = { id -> scope.launch { s.release(id)?.let { toasts.show(doneText(it), doneTone(it)) } } }
   LaunchedEffect(s, tick) { s.load() }
   val page = s.page
   val sales = data.sales
@@ -141,6 +147,7 @@ internal fun RouteScope.PromoHeldScreen(onBack: (() -> Unit)?) {
       page == null -> { item(key = "loading") { SettingsNote(StrPromoHeld.loading, Modifier.padding(top = 8.dp)) }; return@SettingsPageFrame }
     }
     val p = page ?: return@SettingsPageFrame
+    val now = promoHeldNow()
     item(key = "note") { SettingsNote(StrPromoHeld.note, Modifier.padding(vertical = 8.dp)) }
     val (list, bySale) = groups
     if (list.isEmpty()) {
@@ -154,20 +161,21 @@ internal fun RouteScope.PromoHeldScreen(onBack: (() -> Unit)?) {
         val (title, footer) = when (kind) {
           PromoHeld.Sale.CANCELLED -> StrPromoHeld.cancelled to StrPromoHeld.cancelledFooter
           PromoHeld.Sale.ACTIVE -> StrPromoHeld.active to StrPromoHeld.activeFooter
-          PromoHeld.Sale.MISSING -> StrPromoHeld.missing to StrPromoHeld.missingFooter
+          PromoHeld.Sale.MISSING -> StrPromoHeld.missing to if (owner) StrPromoHeld.missingOwnerFooter else StrPromoHeld.missingFooter
         }
         V3Section(title, footer = footer) {
           for (g in part) {
             val sale = bySale[g.saleId]
+            val how = PromoHeld.release(g, owner, now)
             V3ListRow(
               title = StrPromoHeld.invoice(sale?.let { ReceiptModel.number(it) } ?: g.saleId.takeLast(6)),
               subtitle = StrPromoHeld.codes(g.codes.joinToString("، "), OrdersModel.stamp(g.at)),
               chevron = false,
-              trailing = if (!g.releasable) null else {
+              trailing = if (how == PromoHeld.Release.NONE) null else {
                 {
                   V3Button(
                     StrPromoHeld.release,
-                    { scope.launch { s.release(g.saleId)?.let { toasts.show(doneText(it), doneTone(it)) } } },
+                    { if (how == PromoHeld.Release.WARN) warn = g.saleId else go(g.saleId) },
                     kind = V3ButtonKind.SECONDARY, enabled = s.busy == null, loading = s.busy == g.saleId, height = 36.dp,
                   )
                 }
@@ -178,5 +186,14 @@ internal fun RouteScope.PromoHeldScreen(onBack: (() -> Unit)?) {
       }
     }
     if (p.more) item(key = "more") { SettingsNote(StrPromoHeld.more, Modifier.padding(vertical = 8.dp)) }
+  }
+  warn?.let { id ->
+    V3ConfirmSheet(
+      title = StrPromoHeld.warnTitle,
+      message = StrPromoHeld.warnBody,
+      confirm = StrPromoHeld.release,
+      onConfirm = { warn = null; go(id) },
+      onDismiss = { warn = null },
+    )
   }
 }

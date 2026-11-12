@@ -19,6 +19,9 @@ function text(v, max) {
   return stripControl(str(v)).slice(0, max);
 }
 
+/** S117 — یادداشتِ آزادِ کارمند/پیک بی شمارهٔ کاملِ کارت (`ops-errors.maskCards`)، پیش از دیتابیس و هشِ تکرار. */
+const noteText = (v, max) => require('./ops-errors').maskCards(text(v, max));
+
 function int(v, field, { min = 0, max = MAX_MONEY_MINOR, def } = {}) {
   if ((v === undefined || v === null || v === '') && def !== undefined) return def;
   if (typeof v !== 'number' || !Number.isSafeInteger(v)) throw badRequest(`${field} باید عددِ صحیح باشد`, 'bad_number');
@@ -53,4 +56,4 @@ const asJson = (x) => {
 };
 const hashOf = (obj) => crypto.createHash('sha256').update(stable(obj)).digest('hex');
 
-module.exports = { KEY_RE, ID_RE, MAX_MONEY_MINOR, str, text, int, optInt, eventKey, idOf, n, asJson, hashOf };
+module.exports = { KEY_RE, ID_RE, MAX_MONEY_MINOR, str, text, noteText, int, optInt, eventKey, idOf, n, asJson, hashOf };

@@ -57,7 +57,7 @@ test.beforeEach(() => resetAll());
 
 // ---------------------------------------------------------------- SR40-1
 
-test('SR40-1: واحدِ نامتنی تغییرِ واحد است (برنامه هرگز نمی‌فرستدش)؛ null و خالی همان قاعدهٔ پیشین', async () => {
+test('SR40-1: واحدِ نامتنی تغییرِ واحد است (برنامه هرگز نمی‌فرستدش)؛ null و خالی همان قاعدهٔ همتای برنامه (از ۲-۱۶: قفل روی کالای گردش‌دار)', async () => {
   const moved = async () => true;
   const tea = { unit: 'دانه', saleUnit: 'کارتن', unitFactor: 24 };
   for (const odd of [7, 0, true, false, ['کیلو'], { $inc: 1 }, { a: 1 }]) {
@@ -66,10 +66,13 @@ test('SR40-1: واحدِ نامتنی تغییرِ واحد است (برنامه
     assert.equal(await R.reasonOf({ unit: odd }, tea, async () => false), '', `بی گردش ${JSON.stringify(odd)}`);
     assert.equal(await R.reasonOf({ unit: odd }, null, moved), '', `کالای تازه ${JSON.stringify(odd)}`);
   }
-  //  همان رفتارِ همتای برنامه (`ProductDraftRules.unitLocked`) برای متن و نبود
-  assert.equal(R.touches({ unit: null }), false);
-  assert.equal(await R.reasonOf({ unit: null }, tea, moved), '');
-  assert.equal(await R.reasonOf({ unit: '' }, tea, moved), '');
+  //  همان رفتارِ همتای برنامه (`ProductDraftRules.unitLocked`) برای متن و نبود — ۲-۱۶ (R2 الف): خالی/null روی کالای گردش‌دار
+  //  هم تغییرِ واحد است (گامِ اولِ «خالی، سپس واحدِ تازه»)؛ بی گردش و کالای تازه همان آزاد
+  assert.equal(R.touches({ unit: null }), true);
+  assert.equal(await R.reasonOf({ unit: null }, tea, moved), R.LOCKED);
+  assert.equal(await R.reasonOf({ unit: '' }, tea, moved), R.LOCKED);
+  assert.equal(await R.reasonOf({ unit: null }, tea, async () => false), '');
+  assert.equal(await R.reasonOf({ unit: '' }, null, moved), '');
 });
 
 test('SR40-1: v3، پرچمِ روشن ⇒ واحدِ نامتنی روی کالای گردش‌دار رد (صاحب هم)؛ ردیف دست‌نخورده', async () => {

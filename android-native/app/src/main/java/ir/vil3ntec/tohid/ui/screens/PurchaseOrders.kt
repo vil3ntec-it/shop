@@ -50,6 +50,7 @@ import ir.vil3ntec.tohid.data.PoReceiptDto
 import ir.vil3ntec.tohid.data.PoForms
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.PurchaseOrderBook
+import ir.vil3ntec.tohid.data.PurchaseSuggest
 import ir.vil3ntec.tohid.data.PurchaseOrderDto
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
@@ -434,6 +435,7 @@ private fun PoEditor(
   var sentOrders by remember { mutableStateOf<List<PurchaseOrderDto>>(emptyList()) }
   LaunchedEffect(Unit) { sentOrders = repo.planningOrders() }
   val lead = remember(d, sentOrders, supplierId) { PurchaseOrderBook.leadTime(sentOrders, supplierId, PurchaseOrderBook.manualLead(d, supplierId)) }
+  val smart = rememberSmartForecastOn()
   var historyFor by remember { mutableStateOf<String?>(null) }
   var lastKey by remember { mutableStateOf<Int?>(null) }
 
@@ -450,7 +452,8 @@ private fun PoEditor(
   }
 
   fun addPlanned() {
-    val next = PoForms.addPicks(rows, PurchaseOrderBook.planned(d, supplierId, sentOrders, todayIso()).map { it.pick })
+    //  ۳-۱۷: همان پیشنهادِ صفحهٔ «پیشنهادِ سفارش» (`PurchaseSuggest.forSupplier`)، نه حسابِ جدای ۳۰ روزه
+    val next = PoForms.addPicks(rows, PurchaseSuggest.forSupplier(d, supplierId, sentOrders, todayIso(), smart).map { it.pick })
     if (next.size == rows.size) { toast(StrPurchasePages.nothingToOrder); return }
     rows = next
   }

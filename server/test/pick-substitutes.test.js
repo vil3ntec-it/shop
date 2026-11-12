@@ -508,6 +508,42 @@ test('PCK-05: مشتری با لینکِ پیگیری می‌بیند و می‌
   assert.equal(tr.body.order.totalMinor, 55000);
 });
 
+test('S93: پیگیریِ ویترین «جایگزینی در انتظارِ پاسخ» (`substitutionWait`) فقط تا پاسخ یا مهلت؛ وضعیتِ سفارش همان «جمع‌آوری»', async () => {
+  const { o, slug, id, token } = await storefrontOrder('جایگزین-انتظار');
+  const track = async () => (await h.get(`/api/store/${slug}/orders/${token}`)).body.order;
+  await start(o, id);
+  await missing(o, id, 1);
+  await missing(o, id, 2);
+  let tr = await track();
+  assert.equal(tr.status, 'picking');
+  assert.equal(tr.substitutionWait, undefined, 'پیش از پیشنهاد: کلید نیست');
+
+  const p1 = await propose(o, id, { lineNo: 1, productId: 'oil2', barcode: OIL2, waitMinutes: 10 });
+  assert.equal(p1.status, 201, JSON.stringify(p1.body));
+  const p2 = await propose(o, id, { lineNo: 2, productId: 'oil2', barcode: OIL2, waitMinutes: 5 });
+  assert.equal(p2.status, 201, JSON.stringify(p2.body));
+  tr = await track();
+  assert.equal(tr.status, 'picking', 'ماشینِ وضعیت دست نمی‌خورد');
+  assert.deepEqual(tr.substitutionWait, { open: 2, deadlineAt: p2.body.substitution.deadlineAt }, 'دو پیشنهادِ باز، نزدیک‌ترین مهلت');
+  //  همان شکل در پاسخِ کارِ مشتری که صفحه با آن دوباره می‌کشد (`store-order-view`)
+  const view = await require('../src/lib/store-order-view').customerOrder(await require('../src/lib/storefront').open(slug), token);
+  assert.deepEqual(view.substitutionWait, tr.substitutionWait);
+
+  //  پرچمِ خاموش ⇒ کلید نیست (پیشنهادِ مانده در پایگاه هم)
+  await setFlag(o.shopId, 'shop.orders.picking', false);
+  assert.equal((await track()).substitutionWait, undefined);
+  await setFlag(o.shopId, 'shop.orders.picking', true);
+
+  //  پاسخِ مشتری به یکی ⇒ یکی مانده؛ مهلتِ دیگری گذشت ⇒ دیگر «در انتظار» نیست (ترجیحِ قلم اعمال می‌شود)
+  const acc = await h.post(`/api/store/${slug}/orders/${token}/substitutions/${p1.body.substitution.id}`, { decision: 'accept' });
+  assert.equal(acc.status, 200, JSON.stringify(acc.body));
+  assert.deepEqual((await track()).substitutionWait, { open: 1, deadlineAt: p2.body.substitution.deadlineAt });
+  await expire(p2.body.substitution.id);
+  tr = await track();
+  assert.equal(tr.substitutionWait, undefined, 'مهلت گذشت');
+  assert.equal(tr.status, 'picking');
+});
+
 test('⛔ مشتری: توکنِ نادرست، سفارشِ دکانِ دیگر، ویترینِ دیگر و پرچمِ خاموش ⇒ ۴۰۴ و هیچ تغییر', async () => {
   const A = await storefrontOrder('جایگزین-توکن-الف');
   const B = await storefrontOrder('جایگزین-توکن-ب');

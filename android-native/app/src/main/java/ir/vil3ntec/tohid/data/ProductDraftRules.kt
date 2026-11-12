@@ -16,7 +16,10 @@ internal object ProductDraftRules {
   /** نخستین ایراد یا `null`؛ [existing] = کالای ویرایشی (`null` = کالای تازه) */
   fun problem(d: ShopData, draft: WarehouseEngine.ProductDraft, existing: Product?): String? {
     unitLocked(d, existing, draft.unit)?.let { return it }
-    factorProblem(draft.unit, draft.saleUnit ?: existing?.saleUnit, draft.unitFactor ?: existing?.unitFactor, existing?.unitFactor)?.let { return it }
+    //  ۲-۱۶ (R2 الف): ضریبِ ذخیره فقط وقتی «کهنهٔ دست‌نخورده» است که کالا همان وقت واحدِ فروشِ دوم داشت — ضریبِ خوابیده (گذاشته
+    //  بی واحدِ فروش) با روشن شدنِ واحدِ فروش تازه است و باید دقیق باشد (همان `product-unit-rules.reasonOf` ِ سرور)
+    val before = existing?.takeIf { it.saleUnit.isNotBlank() }?.unitFactor
+    factorProblem(draft.unit, draft.saleUnit ?: existing?.saleUnit, draft.unitFactor ?: existing?.unitFactor, before)?.let { return it }
     if (draft.salePrice.isNaN() || draft.salePrice < 0) return StrGoods.salePriceBad
     if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return StrGoods.buyPriceBad
     return draft.wholesalePrice?.takeIf { it.isNaN() || it < 0 }?.let { StrGoods.wholesaleBad }
@@ -34,12 +37,14 @@ internal object ProductDraftRules {
 
   /**
    *  PRD-07 — واحدِ پایه را فقط کالای بی گردش عوض می‌کند: ورود، فروش، خرید و حرکت به همان واحد نوشته شده‌اند و با واحدِ تازه
-   *  بی‌صدا دوباره خوانده می‌شدند (۴۸ کیلو ⇒ «۴۸ گرم»، قیمتِ هر کیلو ⇒ قیمتِ هر گرم). همان واحد با فاصله یا حرفِ عربی،
-   *  واحدِ خالیِ کهنه که تازه نوشته می‌شود، و فرمی که واحد را خالی می‌فرستد همان رفتارِ پیشین‌اند.
+   *  بی‌صدا دوباره خوانده می‌شدند (۴۸ کیلو ⇒ «۴۸ گرم»، قیمتِ هر کیلو ⇒ قیمتِ هر گرم). همان واحد با فاصله یا حرفِ عربی و
+   *  واحدِ خالیِ کهنه که تازه نوشته می‌شود همان رفتارِ پیشین‌اند. ⛔ ۲-۱۶ (R2 الف): خالی کردنِ واحدِ کالای گردش‌دار هم تغییرِ واحد
+   *  است (گامِ اولِ «خالی، سپس واحدِ تازه»؛ همان `product-unit-rules.reasonOf` ِ سرور).
    */
   fun unitLocked(d: ShopData, existing: Product?, unit: String): String? {
     val was = existing?.unit?.trim().orEmpty()
-    if (existing == null || was.isEmpty() || unit.isBlank() || SimilarNames.exactKey(unit) == SimilarNames.exactKey(was)) return null
+    if (existing == null || was.isEmpty()) return null
+    if (unit.isNotBlank() && SimilarNames.exactKey(unit) == SimilarNames.exactKey(was)) return null
     val id = existing.id
     val moved = d.warehouseEntries.any { it.productId == id } || d.saleItems.any { it.productId == id } ||
       d.stockMovements.any { it.productId == id } || d.purchases.any { it.productId == id }
