@@ -119,6 +119,15 @@ async function debtorRowsOf(shopId, phone) {
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).slice(0, MAX_DEBTORS);
 }
 
+/**
+ * PRM-11 (صندوق، `POST /api/shop/promos/redeem`): گروهِ خامِ قرض‌دارِ دفترِ همین دکان با همین شناسه — همان ردیفِ فاکتور،
+ * بی دنبالِ ادغام (همان `groupOf(debtors.get(sale.debtorId))` ِ داوریِ پس از فروشِ STF-03). نبود یا پاک‌شده ⇒ null.
+ */
+async function debtorGroupById(shopId, id) {
+  const r = (await liveRows(shopId, 'debtors', 'true AND $2::text IS NOT NULL', [id])).find((x) => x.id === id);
+  return r ? str(r.d.group) : null;
+}
+
 /** قرض‌دارهای همین دکان با **همین** شماره (دقیق) — شناسه‌ها، حداکثر MAX_DEBTORS */
 async function debtorsOf(shopId, phone) {
   return (await debtorRowsOf(shopId, phone)).map((r) => r.id);
@@ -288,4 +297,4 @@ async function part(sf, phone, name, opts) {
   return { balanceMinor: ledger.balanceMinor, ...pageOf(ledger.entries, opts) };
 }
 
-module.exports = { FLAG, PARTS, flagOn, summary, part, debtorsOf, debtorRowsOf, phoneKeyOf, loyaltyOf };
+module.exports = { FLAG, PARTS, flagOn, summary, part, debtorsOf, debtorRowsOf, debtorGroupById, phoneKeyOf, loyaltyOf };

@@ -62,8 +62,12 @@ data class OutboxEntry(
 
 enum class SendOutcome { CONFIRMED, HOLD, REJECTED }
 
-/** اعلامی که هنوز به سرور نرسیده (PRES-02/08/09) — همان شناسه و زمانِ دستگاه دوباره می‌رود */
-data class PresenceDeclaration(val eventId: String, val mode: String, val declaredUntil: Long?, val clientEventAt: Long) {
+/**
+ *  اعلامی که هنوز به سرور نرسیده (PRES-02/08/09) — همان شناسه و زمانِ دستگاه دوباره می‌رود. `seenAt` (PRES-08): زمانِ سرورِ
+ *  آخرین وضعی که دستگاه در لحظهٔ تصمیم دید (`settings.updatedAt`)؛ سرور اعلامی را که بی خبر از اعلامِ تازه‌ترِ دستگاهِ
+ *  دیگر ساخته شده نمی‌نشاند — مستقل از ساعتِ دستگاه. ردیفِ کهنهٔ دیسک (چهار بخش) ⇒ null.
+ */
+data class PresenceDeclaration(val eventId: String, val mode: String, val declaredUntil: Long?, val clientEventAt: Long, val seenAt: Long? = null) {
   companion object {
     private val EVENT_RE = Regex("^[A-Za-z0-9_.:-]{8,80}$")
     val MODES: Set<String> = setOf("auto", "online", "online_until", "offline", "closed")
@@ -71,24 +75,26 @@ data class PresenceDeclaration(val eventId: String, val mode: String, val declar
     fun newEventId(now: Long, random: Long): String =
       "pres-${now.toString(36)}-${(random and 0x7fffffffffffL).toString(16)}"
 
-    fun create(mode: String, declaredUntil: Long?, now: Long, random: Long): PresenceDeclaration {
+    fun create(mode: String, declaredUntil: Long?, now: Long, random: Long, seenAt: Long? = null): PresenceDeclaration {
       require(mode in MODES) { "bad mode" }
       require(mode != "online_until" || declaredUntil != null) { "declaredUntil required" }
-      return PresenceDeclaration(newEventId(now, random), mode, if (mode == "online_until") declaredUntil else null, now)
+      return PresenceDeclaration(newEventId(now, random), mode, if (mode == "online_until") declaredUntil else null, now, seenAt?.takeIf { it > 0 })
     }
 
     fun encode(p: PresenceDeclaration): String =
-      listOf(p.eventId, p.mode, p.declaredUntil?.toString() ?: "", p.clientEventAt.toString()).joinToString("|")
+      (listOf(p.eventId, p.mode, p.declaredUntil?.toString() ?: "", p.clientEventAt.toString()) + listOfNotNull(p.seenAt?.toString()))
+        .joinToString("|")
 
     fun decode(raw: String?): PresenceDeclaration? {
       val parts = raw?.split('|') ?: return null
-      if (parts.size != 4) return null
+      if (parts.size != 4 && parts.size != 5) return null
       val (id, mode, until, at) = parts
       if (!EVENT_RE.matches(id) || mode !in MODES) return null
       val clientAt = at.toLongOrNull() ?: return null
       val du = until.takeIf { it.isNotEmpty() }?.toLongOrNull()
       if (mode == "online_until" && du == null) return null
-      return PresenceDeclaration(id, mode, du, clientAt)
+      val seen = if (parts.size == 5) parts[4].toLongOrNull()?.takeIf { it > 0 } ?: return null else null
+      return PresenceDeclaration(id, mode, du, clientAt, seen)
     }
   }
 }

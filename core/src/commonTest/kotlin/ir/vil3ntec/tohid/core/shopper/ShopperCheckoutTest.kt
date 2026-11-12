@@ -149,6 +149,19 @@ class ShopperCheckoutTest {
     assertEquals(80000, pickup.expectedTotalMinor)
   }
 
+  /** RSK-04/MKT-02: شناسهٔ تصادفیِ همین نصب در هر ثبت (مثلِ وب)؛ شناسهٔ تخفیف بر آن مقدم؛ ناجور ⇒ در بدنه نمی‌رود */
+  @Test fun installDeviceIdGoesWithEveryOrderButOnlyInTheServerShape() {
+    val p = page(shop(min = 0))
+    val c = cart(line("a", 100, 1000))
+    val dev = "0123456789abcdef0123456789abcdef"
+    assertEquals(dev, CheckoutRules.request(p, c, ready, "+93700000002", "fa", null, deviceId = dev).deviceId)
+    assertNull(CheckoutRules.request(p, c, ready, "+93700000002", "fa", null).deviceId, "بی شناسه ⇒ همان بدنهٔ پیشین")
+    assertNull(CheckoutRules.request(p, c, ready, "+93700000002", "fa", null, deviceId = "bad id!").deviceId)
+    assertNull(CheckoutRules.request(p, c, ready, "+93700000002", "fa", null, deviceId = "short").deviceId)
+    val promo = AppliedPromo(0, "", "promo-device-0001")
+    assertEquals("promo-device-0001", CheckoutRules.request(p, c, ready, "+93700000002", "fa", null, promo, deviceId = dev).deviceId)
+  }
+
   @Test fun idempotencyKeyStaysForTheSameBodyAndChangesWithIt() {
     val p = page(shop(min = 0))
     val c = cart(line("a", 100, 1000))

@@ -44,6 +44,10 @@ object SubscriptionPulse {
   var active by mutableStateOf(false)
     private set
 
+  /** لحظهٔ پایان از زبانِ سرور (`endsAt`) — صفر یعنی نامعلوم */
+  var endsAt by mutableLongStateOf(0L)
+    private set
+
   /** زمانِ آخرین پرسش */
   var at by mutableLongStateOf(0L)
     private set
@@ -62,6 +66,7 @@ object SubscriptionPulse {
       Backend.account(context).subscription().onSuccess { dto ->
         at = System.currentTimeMillis()
         days = dto.daysLeft
+        endsAt = dto.endsAt ?: 0L
         trial = dto.trial
         //  «فعال» را از خودِ سرور می‌گیریم، نه از حسابِ روز: سرور
         //  می‌داند دورهٔ آزمایشی هم فعال است، ما نه.

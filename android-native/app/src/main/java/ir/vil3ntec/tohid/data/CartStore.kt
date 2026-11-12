@@ -358,6 +358,15 @@ class CartStore(context: Context) : HeldCart {
     private val pending = AtomicReference<Triple<File, SaleDraft, () -> Unit>?>(null)
     private val writer = Executors.newSingleThreadExecutor { r -> Thread(r, "sale-draft").apply { isDaemon = true } }
 
+    /**
+     *  فقط آزمون‌ها: تا نوشتنِ در صفِ همین نویسنده به دیسک برسد. بی این، نوشتنِ دیرِ آزمونِ پیشین پس از پاک کردنِ فایلِ آزمونِ
+     *  بعدی می‌رسید و نمونهٔ تازه پیش‌نویسِ کهنه را «بازیابی» می‌کرد (`CartStorePageDesktopTest`، سرخیِ گاه‌به‌گاهِ CI ِ #1040).
+     */
+    internal fun awaitWrites() {
+      //  همان `submit(Callable).get()` ِ `replace` — shim ِ آیفون (`ios/shared/.../Concurrent.kt`) get با مهلت و TimeUnit ندارد
+      runCatching { writer.submit(Callable { Unit }).get() }
+    }
+
     private fun write(target: File, draft: SaleDraft, after: () -> Unit) {
       if (pending.getAndSet(Triple(target, draft, after)) != null) return
       writer.execute {

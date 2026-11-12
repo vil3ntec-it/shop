@@ -183,4 +183,32 @@ class OrderRiskTest {
     assertEquals("", OrderRisk.typedPhone("  "))
     assertEquals("phone_required", OrderRisk.entryError(OrderRisk.BLOCK, OrderRisk.typedPhone(" - "), "سه بار نبود", 30))
   }
+
+  /** RSK-04 «دستگاه»: پاسخِ `…/risk` فقط می‌گوید «دستگاه دارد»؛ ردیفِ فهرست فقط شمارهٔ سفارش؛ بدنه همان رشتهٔ `risk-device.test.js` */
+  @Test fun deviceEntriesFormAndBodyMatchTheServer() {
+    assertTrue(OrderRisk.parse(json("""{"enabled":true,"known":false,"device":true,"flags":[]}""")).device)
+    assertFalse(OrderRisk.parse(json("""{"enabled":true,"known":false,"flags":[]}""")).device, "سرورِ کهنه ⇒ بی دکمه")
+    assertFalse(OrderRisk.parse(json("""{"enabled":true,"device":"yes","flags":[]}""")).device, "شکلِ نادرست ⇒ نه")
+    val e = OrderRisk.entries(json(
+      """{"items":[{"id":"d1","list":"block","kind":"device","device":{"orderNo":42},"reason":"سه سفارشِ ساختگی","expiresAt":7000},
+        {"id":"d2","list":"allow","kind":"device","device":{},"reason":"مشتریِ همیشگی","expiresAt":8000},
+        {"id":"x1","list":"block","kind":"face","reason":"نوعِ تازه","expiresAt":1},
+        {"id":"x2","list":"block","kind":"phone","reason":"بی شماره","expiresAt":1},
+        {"id":"x3","list":"block","kind":"pin","pin":{},"reason":"بی جا","expiresAt":1}]}""",
+    ))
+    assertEquals(listOf("d1", "d2"), e.map { it.id }, "نوعِ ناشناخته و ردیفِ بدشکل کنار")
+    assertEquals(42L, e[0].deviceOrderNo)
+    assertNull(e[0].phone)
+    assertNull(e[0].lat)
+    assertNull(e[1].deviceOrderNo)
+    assertNull(OrderRisk.deviceEntryError(OrderRisk.BLOCK, true, "سه سفارشِ ساختگی", 30))
+    assertEquals("device_unknown", OrderRisk.deviceEntryError(OrderRisk.BLOCK, false, "سه سفارشِ ساختگی", 30))
+    assertEquals("bad_list", OrderRisk.deviceEntryError("grey", true, "سه سفارشِ ساختگی", 30))
+    assertEquals("reason_required", OrderRisk.deviceEntryError(OrderRisk.ALLOW, true, " ab ", 30))
+    assertEquals("bad_expiry", OrderRisk.deviceEntryError(OrderRisk.ALLOW, true, "مشتریِ همیشگی", 366))
+    assertEquals(
+      """{"list":"block","kind":"device","orderId":"ord_1","reason":"سه سفارشِ ساختگی","expiresInDays":30}""",
+      OrderRisk.deviceEntryBody("ord_1", OrderRisk.BLOCK, "  سه   سفارشِ ساختگی ", 30).toString(),
+    )
+  }
 }

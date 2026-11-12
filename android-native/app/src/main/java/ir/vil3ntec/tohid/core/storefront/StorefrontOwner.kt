@@ -132,8 +132,8 @@ object StorefrontOwner {
 
   /** اعلامِ نرسیده — حالا در `core` (`PresenceDeclaration`، صفِ `StorefrontOutbox`) */
   fun newEventId(now: Long, random: Long): String = PresenceDeclaration.newEventId(now, random)
-  fun pending(mode: String, declaredUntil: Long?, now: Long, random: Long): PresenceDeclaration =
-    PresenceDeclaration.create(mode, declaredUntil, now, random)
+  fun pending(mode: String, declaredUntil: Long?, now: Long, random: Long, seenAt: Long? = null): PresenceDeclaration =
+    PresenceDeclaration.create(mode, declaredUntil, now, random, seenAt)
   fun encode(p: PresenceDeclaration): String = PresenceDeclaration.encode(p)
   fun decode(raw: String?): PresenceDeclaration? = PresenceDeclaration.decode(raw)
 

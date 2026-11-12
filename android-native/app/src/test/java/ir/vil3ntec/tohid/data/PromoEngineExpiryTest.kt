@@ -41,6 +41,20 @@ class PromoEngineExpiryTest {
     assertTrue(PromoEngine.lines(d, cart).all { it.lots.isEmpty() })
   }
 
+  /** S125: محموله‌ها برای همان دفتر و همان روز یک بار ساخته می‌شوند؛ دفترِ تازه (فروش) یا روزِ دیگر ⇒ از نو */
+  @Test fun `lines — محموله‌های همان دفتر یک بار؛ فروشِ تازه و روزِ دیگر از نو`() {
+    val first = PromoEngine.lines(d, cart, today).single { it.productId == "milk" }.lots
+    assertEquals(first, PromoEngine.lines(d, listOf(SalesEngine.CartLine("milk", 1.0)), today).single().lots)
+    val sold = d.copy(
+      sales = listOf(Sale(id = "s1", date = "2026-10-18")),
+      saleItems = listOf(SaleItem(id = "i1", saleId = "s1", productId = "milk", quantity = 4.0, unitPrice = 100.0)),
+    )
+    assertEquals(listOf(PromoCore.Lot(3, 1000), PromoCore.Lot(43, 10_000)), PromoEngine.lines(sold, cart, today).single { it.productId == "milk" }.lots)
+    assertEquals("دفترِ پیشین هنوز همان محموله‌های خودش", first, PromoEngine.lines(d, cart, today).single { it.productId == "milk" }.lots)
+    assertEquals(listOf(PromoCore.Lot(2, 2000), PromoCore.Lot(42, 10_000)).map { it.daysLeft },
+      PromoEngine.lines(d, cart, "2026-10-20").single { it.productId == "milk" }.lots.filter { it.daysLeft >= 0 }.map { it.daysLeft })
+  }
+
   @Test fun `lines — ماندهٔ فروخته‌شده از زودترین محموله کم می‌شود`() {
     val sold = d.copy(
       sales = listOf(Sale(id = "s1", date = "2026-10-18")),

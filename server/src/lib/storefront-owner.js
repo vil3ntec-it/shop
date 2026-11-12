@@ -214,6 +214,9 @@ async function declarePresence(shopId, body, { userId = '', deviceId = '' } = {}
   }
   const clientEventAt = b.clientEventAt === undefined || b.clientEventAt === null
     ? null : int(b.clientEventAt, 'زمانِ دستگاه', { min: 0, max: 4102444800000 });
+  //  PRES-08: زمانِ سرورِ آخرین وضعی که دستگاه هنگامِ تصمیم دید (`settings.updatedAt`)؛ نبود ⇒ برنامهٔ پیشین
+  const seenAt = b.seenAt === undefined || b.seenAt === null ? null : int(b.seenAt, 'وضعِ دیده‌شده', { min: 0, max: at });
+  const device = text(b.deviceId, 80) || deviceId;
 
   const row = await tx(async (c) => {
     const sf = (await c.query('SELECT * FROM storefronts WHERE shop_id = $1 FOR UPDATE', [shopId])).rows[0];
@@ -226,10 +229,17 @@ async function declarePresence(shopId, body, { userId = '', deviceId = '' } = {}
           AND LEAST(COALESCE(client_event_at, server_received_at), server_received_at) > $2 LIMIT 1`,
       [shopId, Math.min(clientEventAt, at)]
     )).rows[0];
-    const applied = !newer;
+    //  PRES-08، ساعتِ جلوافتاده درونِ صفِ آفلاین: اعلامی که بی خبر از اعلامِ نشستهٔ دستگاهِ دیگری (رسیده پس از وضعِ
+    //  دیده‌شده) ساخته شد آن را برنمی‌گرداند — مستقل از ساعتِ دستگاه؛ اعلام‌های صفِ همان دستگاه همدیگر را کهنه نمی‌کنند
+    const unseen = newer || seenAt === null ? null : (await c.query(
+      `SELECT 1 FROM storefront_presence_events WHERE shop_id = $1 AND kind = 'presence' AND (detail->>'applied') = 'true'
+          AND server_received_at > $2 AND COALESCE(source_device_id, '') <> $3 LIMIT 1`,
+      [shopId, seenAt, device || '']
+    )).rows[0];
+    const applied = !newer && !unseen;
     const inserted = await recordEvent(c, shopId, {
       eventId, actorId: userId, kind: 'presence', status: mode, declaredUntil, timezone: sf.timezone,
-      detail: { applied }, deviceId: text(b.deviceId, 80) || deviceId, clientEventAt, at,
+      detail: { applied }, deviceId: device, clientEventAt, at,
     });
     if (inserted && applied) {
       await c.query(

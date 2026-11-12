@@ -85,10 +85,12 @@ const PARTS = {
   //  کارتِ «کالای جایگزین» و «جایگزینی در انتظارِ پاسخِ شما» (PCK-05، S93؛ order.js فقط وقتی سفارش «در حال جمع‌آوری» است):
   //  بخشِ `#o-subs` ِ index.html و نشانِ وضعیت با کلیدِ `substitutionWait` ِ پیگیری
   subs: { js: 'store/order.js', from: 'id="o-subs"', to: 'data-t="od.items"', root: 'o-subs' },
+  //  «گزارشِ مشکل» با دکان و کالا (ABUSE-01، trust.js ِ دیربار از catalog.js، فقط با `features.trust`): بخش را خودِ اسکریپت می‌سازد
+  trust: { js: 'store/trust.js', root: 'tr-box' },
 };
 const parts = Object.fromEntries(Object.keys(PARTS).map((n) => [n, Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/${n}.${l}.json`))]))]));
 const dict = Object.fromEntries(LANGS.map((l) => [l, Object.assign({}, main[l], ...Object.values(parts).map((p) => p[l]))]));
-const SOURCES = ['kit/kit.js', 'kit/settings.js', 'kit/order-kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js', 'store/catalog.js', 'store/filters.js', 'store/order-feedback.js', 'store/order-changes.js', 'store/reviews.js', 'market/index.html', 'store/index.html', 'store/account.js', 'store/visual-search.js', 'store/delivery-method.js', 'store/chat.js', 'store/chat-out.js', 'store/chat-acts.js', 'store/chat-voice.js', 'store/pay-step.js', 'store/line-prefs.js', 'store/acct.js', 'store/cart-sync.js', 'store/erase.js', 'store/order-push.js', 'store/sw.js', 'store/alert-push.js', 'store/push-client.js', 'store/same.js', 'store/gallery.js', 'store/zoom.js', 'store/order-facts.js', 'store/pin-text.js', 'store/pin-map.js', 'store/weight-hold.js', 'store/addr-media.js'];
+const SOURCES = ['kit/kit.js', 'kit/settings.js', 'kit/order-kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js', 'store/catalog.js', 'store/filters.js', 'store/order-feedback.js', 'store/order-changes.js', 'store/reviews.js', 'market/index.html', 'store/index.html', 'store/account.js', 'store/visual-search.js', 'store/delivery-method.js', 'store/chat.js', 'store/chat-out.js', 'store/chat-acts.js', 'store/chat-voice.js', 'store/pay-step.js', 'store/line-prefs.js', 'store/acct.js', 'store/cart-sync.js', 'store/erase.js', 'store/order-push.js', 'store/sw.js', 'store/alert-push.js', 'store/push-client.js', 'store/same.js', 'store/gallery.js', 'store/zoom.js', 'store/order-facts.js', 'store/pin-text.js', 'store/pin-map.js', 'store/weight-hold.js', 'store/trust.js', 'store/addr-media.js'];
 const ARABIC = /[\u0600-\u06FF]/;
 
 function usedKeys() {
@@ -156,7 +158,7 @@ test('انگلیسی هیچ حرفِ فارسی/پشتو ندارد؛ فارسی
 });
 
 test('در JS ِ صفحه‌ها متنِ فارسیِ ثابت نمانده', () => {
-  for (const f of ['kit/kit.js', 'kit/settings.js', 'kit/order-kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/catalog.js', 'store/filters.js', 'store/reviews.js', 'store/account.js', 'store/delivery-method.js', 'store/chat.js', 'store/chat-photo.js', 'store/chat-out.js', 'store/chat-acts.js', 'store/chat-voice.js', 'store/pay-step.js', 'store/line-prefs.js', 'store/acct.js', 'store/cart-sync.js', 'store/erase.js', 'store/order-push.js', 'store/sw.js', 'store/alert-push.js', 'store/push-client.js', 'store/same.js', 'store/gallery.js', 'store/zoom.js', 'store/pin-text.js', 'store/pin-map.js', 'store/weight-hold.js']) {
+  for (const f of ['kit/kit.js', 'kit/settings.js', 'kit/order-kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/catalog.js', 'store/filters.js', 'store/reviews.js', 'store/account.js', 'store/delivery-method.js', 'store/chat.js', 'store/chat-photo.js', 'store/chat-out.js', 'store/chat-acts.js', 'store/chat-voice.js', 'store/pay-step.js', 'store/line-prefs.js', 'store/acct.js', 'store/cart-sync.js', 'store/erase.js', 'store/order-push.js', 'store/sw.js', 'store/alert-push.js', 'store/push-client.js', 'store/same.js', 'store/gallery.js', 'store/zoom.js', 'store/pin-text.js', 'store/pin-map.js', 'store/weight-hold.js', 'store/trust.js']) {
     const lines = read(f).split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l) && !/^\s*K\.FB = \{/.test(l)).map((l) => l.replace(/\s\/\/.*$/, ''));
     //  استثنا: نامِ خودِ زبان‌ها در گزینش‌گر و رقم/جداکنندهٔ فارسی (نه متن)
     const hits = lines.filter((l) => [...l.matchAll(/'([^'\\]*)'/g)].some((m) => ARABIC.test(m[1]) && !/^(فارسی|دری|پښتو|[۰-۹٬٫]+)$/.test(m[1])));

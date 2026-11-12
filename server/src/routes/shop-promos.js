@@ -44,6 +44,10 @@
  *        با فاکتورهای ساختگی ظرفیتِ کد را در یک لحظه بسوزاند؛ هر مصرف هم سابقه (`promos.redeem`) دارد.
  *    سرور پنجرهٔ زمانی را دوباره نمی‌سنجد (کارِ هستهٔ صندوق است)؛ فقط قاعدهٔ زنده، کانال و سقف را:
  *    کدِ قاعده‌ای که کانالش صندوق را ندارد (PRM-11، «فقط ویترین») ⇒ `wrong_channel` (همه یا هیچ).
+ *    PRM-11، گروهِ مشتری: برنامهٔ تازه `debtorId` ِ فاکتور را می‌فرستد (`null` = بی مشتری). کدِ قاعدهٔ گروه‌دار ⇐ گروهِ
+ *    قرض‌دارِ دفترِ همگام‌شدهٔ **همین** دکان با همان شناسه (`compareKey`، همان `PromoEngine.groupOf`)؛ گروهِ دیگر، بی گروه یا
+ *    بی مشتری ⇒ `wrong_group` (همه یا هیچ). ⛔ بی کلیدِ `debtorId` (برنامهٔ پیشین) یا قرض‌دارِ هنوز همگام‌نشده ⇒ همان
+ *    پیشین، بی ردِ نادرست؛ داوریِ پس از فروشِ STF-03 (`promo_over`) همچنان می‌ماند.
  * ⛔ PRM-11: `online` در پاسخِ GET (فقط وقتی روشن است) = پرچمِ تخفیفِ ویترین `shop.storefront.promos` ⇒ فرمِ قاعده
  *    «کجا اعمال شود» را نشان می‌دهد؛ قاعدهٔ تازه همچنان فقط صندوق (`channels: ['pos']`).
  *
@@ -158,6 +162,23 @@ function saleIdOf(body) {
   const id = body && body.saleId;
   if (typeof id !== 'string' || !SALE_RE.test(id)) throw badRequest('شناسهٔ فاکتور نادرست است', 'invalid_sale_id');
   return id;
+}
+
+/** PRM-11: `undefined` (برنامهٔ پیشین، بی کلید) · `null` (بی مشتری) · شناسهٔ قرض‌دار */
+function debtorIdOf(body) {
+  if (!body || !Object.prototype.hasOwnProperty.call(body, 'debtorId')) return undefined;
+  const id = body.debtorId;
+  if (id === null) return null;
+  if (typeof id !== 'string' || !SALE_RE.test(id)) throw badRequest('شناسهٔ مشتری نادرست است', 'invalid_debtor_id');
+  return id;
+}
+
+/** PRM-11: آیا قاعدهٔ گروه‌دار برای مشتریِ این فاکتور است؛ `raw` گروهِ خامِ دفتر */
+function inGroup(groups, raw) {
+  if (!raw || !raw.trim()) return false;
+  const { compareKey } = require('../lib/text-core');
+  const key = compareKey(raw);
+  return groups.some((g) => compareKey(g) === key);
 }
 
 /** کدهای نرمال، یکتا و به ترتیبِ آمدن؛ `optional` ⇒ نبودن = همه */
@@ -302,6 +323,10 @@ router.post('/redeem', requirePermission('data.write'), redeemLimit, async (req,
   await needUses(req);
   const saleId = saleIdOf(req.body);
   const codes = codesOf(req.body);
+  const debtorId = debtorIdOf(req.body);
+  //  گروه فقط از دفترِ همین دکان؛ `null` ⇒ قرض‌دارِ همگام‌نشده (بی داوری این‌جا)
+  const raw = typeof debtorId === 'string' ? await require('../lib/store-account-history').debtorGroupById(req.shopId, debtorId) : '';
+  const judgeGroup = debtorId !== undefined && raw !== null;
   const at = now();
   const out = await tx(async (c) => {
     //  قفلِ ردیفِ قاعده‌ها به ترتیبِ شناسه (بی بن‌بست): شمارش و نوشتنِ هر دو صندوق پشتِ سرِ هم
@@ -322,6 +347,9 @@ router.post('/redeem', requirePermission('data.write'), redeemLimit, async (req,
       //  PRM-11: کدِ «فقط ویترین» در صندوق اعمال نمی‌شود (همان `eligible` ِ هسته) ⇒ ظرفیتش این‌جا نمی‌سوزد
       const ch = Array.isArray(r.data.channels) ? r.data.channels : [];
       if (ch.length > 0 && !ch.includes('pos')) { results.push({ ...base, status: 'wrong_channel', uses: n, maxUses }); continue; }
+      //  PRM-11: قاعدهٔ «فقط این گروه‌ها» (همان `eligible` ِ هسته) با گروهِ قرض‌دارِ دفتر
+      const groups = (Array.isArray(r.data.groups) ? r.data.groups : []).filter((g) => typeof g === 'string' && g.trim());
+      if (groups.length > 0 && judgeGroup && !inGroup(groups, raw)) { results.push({ ...base, status: 'wrong_group', uses: n, maxUses }); continue; }
       const held = (await c.query(
         `SELECT 1 FROM shop_promo_redemptions WHERE shop_id=$1 AND promo_id=$2 AND sale_id=$3 AND released_at IS NULL`,
         [req.shopId, r.id, saleId])).rows.length > 0;
@@ -346,7 +374,7 @@ router.post('/redeem', requirePermission('data.write'), redeemLimit, async (req,
   });
   if (out.rejected) {
     //  پیامِ صندوق همین است (برنامه جزئیاتِ `codes` را نمی‌خواند): کدام کد و چرا
-    const why = { used_up: 'ظرفیتش پر شده', unknown_code: 'در این دکان نیست', inactive: 'خاموش است', wrong_channel: 'فقط در ویترین است' };
+    const why = { used_up: 'ظرفیتش پر شده', unknown_code: 'در این دکان نیست', inactive: 'خاموش است', wrong_channel: 'فقط در ویترین است', wrong_group: 'فقط برای گروهِ دیگری از مشتریان است' };
     const bad = out.results.filter((x) => why[x.status]).map((x) => `کدِ ${x.code} ${why[x.status]}`);
     return res.status(409).json({
       error: { code: 'coupon_rejected', message: `${bad.join('؛ ')} — آن را از سبد بردارید`, codes: out.results },

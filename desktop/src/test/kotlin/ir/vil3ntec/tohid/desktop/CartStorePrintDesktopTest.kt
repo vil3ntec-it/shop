@@ -19,8 +19,8 @@ class CartStorePrintDesktopTest {
   private val draft get() = File(DesktopContext.filesDir, CartStore.FILE)
   private var auto = false
 
-  @Before fun before() { draft.delete(); auto = PrintSpooler.autoPrint(DesktopContext); PrintSpooler.setAutoPrint(DesktopContext, false) }
-  @After fun after() { draft.delete(); PrintSpooler.setAutoPrint(DesktopContext, auto) }
+  @Before fun before() { CartStore.awaitWrites(); draft.delete(); auto = PrintSpooler.autoPrint(DesktopContext); PrintSpooler.setAutoPrint(DesktopContext, false) }
+  @After fun after() { CartStore.awaitWrites(); draft.delete(); PrintSpooler.setAutoPrint(DesktopContext, auto) }
 
   @Test
   fun `چاپِ همین فاکتور فقط تا خالی شدنِ سبد می‌ماند`() {

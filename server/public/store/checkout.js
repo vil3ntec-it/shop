@@ -175,7 +175,7 @@
       else $('slot-msg').hidden = true;
     }
     //  MKT-02/RSK-09 (`promos.guard`، پرچمِ `shop.storefront.promo_guard`): اولین خرید به شمارهٔ تأییدشده بسته است ⇒ کلیدِ پیش‌نمایش
-    //  با همان شماره عوض می‌شود؛ شناسهٔ تصادفیِ همین مرورگر (`deviceId`) فقط با همین پرچم فرستاده می‌شود
+    //  با همان شماره عوض می‌شود؛ شناسهٔ تصادفیِ همین مرورگر (`deviceId`، نه شناسهٔ سخت‌افزار) در پیش‌نمایش فقط با همین پرچم، در ثبت همیشه
     function guardPhone() { var tk = promos && promos.guard ? K.ticket() : null; return tk ? tk.phone : ''; }
     function deviceId() {
       var v = K.load('store-device', '');
@@ -452,7 +452,7 @@
       if (secondOrder) body.secondOrder = true;
       if (c.campaign) body.campaign = c.campaign;
       if (slotOf(f)) body.slotStartsAt = slotAt;
-      if (promos && promos.guard && deviceId()) body.deviceId = deviceId();   //  MKT-02: «یک بار برای هر دستگاه»
+      if (deviceId()) body.deviceId = deviceId();   //  MKT-02 «یک بار برای هر دستگاه» و RSK-04 «دستگاهِ بسته»: سرور فقط چکیدهٔ «دکان + شناسه» را و فقط با پرچمِ همان دکان نگه می‌دارد
       if (code) body.promoCode = code;   //  MKT-01: سرور در همان تراکنش می‌سنجد؛ اعمال نشد ⇒ ۴۰۹ `promo_code_rejected`   //  MKT-11: پیوندِ کمپین/QR ِ همین نشست
       if (f === 'delivery') {
         body.address = { text: $('a-text').value.trim(), landmark: $('a-landmark').value.trim(), area: $('a-area').value.trim(), gateColor: $('a-gate').value.trim() };

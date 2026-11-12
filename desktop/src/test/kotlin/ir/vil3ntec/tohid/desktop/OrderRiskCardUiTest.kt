@@ -169,6 +169,42 @@ class OrderRiskCardUiTest {
     assertEquals(1, server.hits(listsPath))
   }
 
+  /** RSK-04 «دستگاه»: دکمه فقط وقتی سرور می‌گوید این سفارش دستگاه دارد؛ برگه فقط دلیل و روز؛ بدنه با `orderId`، نه شناسهٔ دستگاه */
+  @Test fun deviceButtonsOnlyWhenTheServerKnowsTheDeviceAndSendTheOrderNotTheDevice() {
+    server.on(riskPath) { 200 to view }
+    show { OrderRiskCardV3("o1", repo(), canList = true, phone = phone) }
+    waitFor(StrRisk.blockNumber)
+    assertEquals(0, count(StrRisk.blockDevice))
+    assertEquals(0, count(StrRisk.trustDevice))
+  }
+
+  @Test fun ownerBlocksThisDeviceFromTheCardWithReasonOnly() {
+    server.on(riskPath) { 200 to view.replaceFirst("\"known\":true", "\"known\":true,\"device\":true") }
+    var body = ""
+    server.on(listsPath) { r -> body = r.body; 201 to """{"entry":{"id":"d1","list":"block","kind":"device","device":{"orderNo":7}}}""" }
+    show { OrderRiskCardV3("o1", repo(), canList = true, phone = phone) }
+    waitFor(StrRisk.blockDevice)
+    rule.onNodeWithText(StrRisk.trustDevice).assertExists()
+    rule.onNodeWithText(StrRisk.blockDevice).performClick()
+    waitFor(StrRisk.blockDeviceHelp)
+    //  نه شماره، نه جا، نه شعاع: فقط دلیل و روزهای انقضا
+    val fields = rule.onAllNodes(hasSetTextAction())
+    assertEquals(2, fields.fetchSemanticsNodes().size)
+    rule.onNodeWithText(StrKit.save).performClick()
+    waitFor(StrRisk.entryReasonError)
+    assertEquals(0, server.hits(listsPath))
+    fields[0].performTextInput("سه سفارشِ ساختگی با شماره‌های گوناگون")
+    rule.onNodeWithText(StrKit.save).performClick()
+    rule.waitUntil(10_000) { server.hits(listsPath) == 1 }
+    val sent = Json.parseToJsonElement(body).jsonObject
+    assertEquals(setOf("list", "kind", "orderId", "reason", "expiresInDays"), sent.keys)
+    assertEquals("block", sent["list"]!!.jsonPrimitive.content)
+    assertEquals("device", sent["kind"]!!.jsonPrimitive.content)
+    assertEquals("o1", sent["orderId"]!!.jsonPrimitive.content)
+    assertEquals(30, sent["expiresInDays"]!!.jsonPrimitive.int)
+    rule.waitUntil(10_000) { server.hits(riskPath) >= 2 && count(StrRisk.blockDeviceHelp) == 0 }
+  }
+
   @Test fun queueCardListsOnlyWarnedOrdersAndTapOpensThatOrder() {
     server.on(queuePath) {
       200 to """{"enabled":true,"items":[

@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
+import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.SalesEngine
@@ -41,7 +42,7 @@ object CartSummary {
 
   /** همان `of` از روی سبد و کالاها — ردیفِ آزاد نامِ خودش را دارد */
   fun of(cart: List<SalesEngine.CartLine>, products: List<Product>, total: Double): Model {
-    val byId = products.associateBy { it.id }
+    val byId = ShopStore.productsById(products)
     return of(
       cart.map { line ->
         val product = byId[line.productId]
@@ -88,7 +89,7 @@ object CartSummary {
    *  کنار می‌رود — همان قاعدهٔ پیشینِ برگه (و `cartTotal` آن را صفر می‌شمارد).
    */
   fun rows(cart: List<SalesEngine.CartLine>, products: List<Product>): List<Row> {
-    val byId = products.associateBy { it.id }
+    val byId = ShopStore.productsById(products)
     return cart.mapNotNull { line ->
       val product = byId[line.productId]
       if (product == null && !line.free) return@mapNotNull null
@@ -115,7 +116,7 @@ object CartSummary {
    *  ردیفِ آزاد قیمتِ پایه ندارد و حساب نمی‌شود. صفر ⇐ ردیف دیده نمی‌شود.
    */
   fun manualDiscount(cart: List<SalesEngine.CartLine>, products: List<Product>): Double {
-    val byId = products.associateBy { it.id }
+    val byId = ShopStore.productsById(products)
     var off = 0.0
     for (line in cart) {
       val price = line.unitPrice ?: continue

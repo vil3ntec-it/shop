@@ -16,9 +16,17 @@ const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
 const zoom = require('../src/lib/image-zoom');
 
+//  زیرِ Electron (Node ِ مرکزِ فرمان) خودِ سرور sharp را بار نمی‌کند (`lib/sharp-lib.js`) ⇒ zoom ساخته نمی‌شود و این آزمون‌ها
+//  منتظرِ ساختی می‌ماندند که هرگز نمی‌آید (کشته شدن با نگهبانِ ۱۸۰ ثانیه، CI ِ #1040). همان قاعدهٔ `store-webp.test.js`.
 let sharp = null;
-try { sharp = require('sharp'); } catch { /* بی sharp ⇒ این پرونده رد می‌شود */ }
-const skip = !sharp && 'sharp روی این ماشین نیست';
+if (!process.versions.electron) {
+  try { sharp = require('sharp'); } catch { /* بی sharp ⇒ این پرونده رد می‌شود */ }
+}
+const skip = process.versions.electron ? 'زیرِ Electron sharp بار نمی‌شود (آزمونِ پایین)' : !sharp && 'sharp روی این ماشین نیست';
+
+test('زیرِ Electron: سرور sharp را بار نمی‌کند ⇒ zoom ساخته نمی‌شود (بی انتظار)', { skip: !process.versions.electron && 'فقط زیرِ Electron' }, () => {
+  assert.equal(require('../src/lib/sharp-lib').lib(), null);
+});
 
 let admin = '';
 let seq = 0;

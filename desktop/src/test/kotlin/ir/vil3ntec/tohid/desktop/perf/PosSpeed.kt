@@ -194,7 +194,7 @@ internal object PosSpeed {
       return false
     }
     return when (val hit = BarcodeMatch.find(code, items)) {
-      is BarcodeMatch.Hit.Product -> d.products.firstOrNull { it.id == hit.id }?.let {
+      is BarcodeMatch.Hit.Product -> ShopStore.product(d, hit.id)?.let {
         if (!it.active) false
         else t.cart.set(SalesEngine.addToCartCapped(t.cart.lines.value, it.id, 1.0, ProductInfoMap.sellable(d, it.id)).cart)
       } ?: false
@@ -249,7 +249,7 @@ internal object PosSpeed {
     val totals = SalesEngine.totals(d, priced, SalesEngine.Checkout())
     val basis = DiscountGate.basis(false, d, priced, promo, totals)
     val lineViews = cart.map { line ->
-      val p = d.products.find { it.id == line.productId }
+      val p = ShopStore.product(d, line.productId)
       OrderLineView(
         id = line.productId, name = if (line.free) line.label else p?.name.orEmpty(), unit = p?.unit.orEmpty(), quantity = line.quantity,
         price = line.unitPrice ?: p?.salePrice ?: 0.0, customPrice = line.unitPrice != null, category = p?.category.orEmpty(),
