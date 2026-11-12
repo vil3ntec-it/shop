@@ -7,7 +7,10 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const sharp = require('sharp');
+//  زیرِ Electron ِ لینوکس sharp بار نمی‌شود/گیر می‌کند (همان store-webp و image-zoom) ⇒ این پرونده آن‌جا رد می‌شود؛ کارهای Node
+//  (PGlite و PostgreSQL) همین آزمون‌ها را با sharp ِ واقعی می‌دوانند. پیش‌تر نگهبانِ ۱۸۰ ثانیه می‌کشتش (CI ِ #1041)
+const skip = process.versions.electron ? 'زیرِ Electron sharp در دسترس نیست؛ کارهای Node همین را می‌آزمایند' : false;
+const sharp = skip ? null : require('sharp');
 const { stripImageMetadata } = require('../src/lib/chat-media');
 
 const GPS = Buffer.from('GPSLatitude 34.5553 69.2075', 'latin1');
@@ -35,7 +38,7 @@ function sosAt(buf, n) {
 }
 
 for (const progressive of [false, true]) {
-  test(`${progressive ? 'progressive' : 'baseline'}: دادهٔ پس از EOI (JPEG ِ دوم با EXIF/مکان، ویدیو) دور؛ پیکسل‌ها همان`, async () => {
+  test(`${progressive ? 'progressive' : 'baseline'}: دادهٔ پس از EOI (JPEG ِ دوم با EXIF/مکان، ویدیو) دور؛ پیکسل‌ها همان`, { skip }, async () => {
     const main = await photo(progressive);
     const second = Buffer.concat([await photo(false), GPS]);
     const motion = Buffer.concat([Buffer.from('\0\0\0\x18ftypmp42', 'latin1'), Buffer.from('udta\xa9xyz+34.5553+069.2075/', 'latin1')]);
@@ -49,7 +52,7 @@ for (const progressive of [false, true]) {
   });
 }
 
-test('progressive: APP1 (EXIF/مکان) ِ میانِ اسکن‌ها هم می‌رود و عکس سالم می‌ماند', async () => {
+test('progressive: APP1 (EXIF/مکان) ِ میانِ اسکن‌ها هم می‌رود و عکس سالم می‌ماند', { skip }, async () => {
   const main = await photo(true);
   const at = sosAt(main, 2);
   assert.ok(at > 0, 'اسکنِ دوم');
@@ -60,7 +63,7 @@ test('progressive: APP1 (EXIF/مکان) ِ میانِ اسکن‌ها هم می�
   assert.ok((await pixels(out)).data.equals((await pixels(main)).data));
 });
 
-test('JPEG ِ بی EOI همان‌قدر که هست می‌ماند؛ FF D9 ِ درونِ سرآیند/جدول با EOI اشتباه نمی‌شود', async () => {
+test('JPEG ِ بی EOI همان‌قدر که هست می‌ماند؛ FF D9 ِ درونِ سرآیند/جدول با EOI اشتباه نمی‌شود', { skip }, async () => {
   const main = await photo(false);
   const cut = main.slice(0, main.length - 2);
   assert.equal(stripImageMetadata(cut, 'image/jpeg').slice(-2).toString('hex') === 'ffd9', false);
