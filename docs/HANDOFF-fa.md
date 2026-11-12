@@ -54,6 +54,24 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-37e (ت۵) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-37e` (از سرِ `claude/batch-57`، e69b30114)
+
+- **فاکتورِ «تعویض» = فاکتورِ صندوقِ همین دستگاه (RET-05):** سه کمبودی که e-rows-36t دید سنجیده شد. (۱) **مالیات (POS-37) — کمبودِ واقعی، ساخته شد:**
+  برگشتِ فاکتورِ مالیات‌دار سهمِ مالیات را پس می‌دهد (`paidRatio`) ولی فروشِ تعویض مالیات نمی‌گرفت ⇒ تعویضِ همان کالا با ۱۰٪ ِ روشن ۱۰۰ از ۱۱۰۰ را به
+  مشتری می‌داد. (۲) **گردِ نقدی (PAY-09) — کمبودِ واقعی، ساخته شد:** گرد فقط روی نقدی که مشتری پس از نقدِ برگشتِ همان سند می‌دهد (همان «سهمِ نقدی که
+  فاکتور را می‌بندد» ِ `Pay.settle`؛ `Checkout.cashCovered` ⇐ `ExchangeTill.sale`، تنها حساب `SalesEngine.cashRoundingMinor`)؛ پس‌دادنی هرگز.
+  (۳) **فروشندهٔ ردیف (POS-23) — کمبود نبود (شاهد):** سبدِ تعویض ردیفِ سپرده‌شده ندارد ⇒ قلم‌ها بی `seller` و به نامِ فروشندهٔ فاکتور؛ ولی فروشندهٔ
+  **فاکتور** کمبود داشت (S46): هر دو برگه `SyncStore.accountName` می‌دادند ⇒ حالا `TillUser.me` (خاموش ⇒ همان نامِ حساب).
+- **یک خواننده:** `TillGuards` حالا `tax` و `cashRounding` هم دارد (`TillGuardsPref` ⇐ `SaleTaxPref.active`، `CashRoundPref.step`)؛ `DeskSale` و
+  `CheckoutRoute` همان را می‌خوانند و `TillGuards.exchange` همان را به فروشِ تعویض می‌دهد. پیش‌نمایشِ هر دو برگه `ExchangeTill.preview` (ردیف‌های
+  «مالیات» و «گردکردنِ نقدی»، همان اعدادِ ثبت). همه پیش‌فرض خاموش ⇒ بیت‌به‌بیت همان امروز (آزمونِ «خاموش»).
+- **آزمون (سرخ پیش/سبز پس):** روی e69b30114 پنج سرخ — `ExchangeTillPricingTest` ۳ (`expected:<10000> but was:<null>`، `expected:<-100>`/`<200> but was:<null>`)،
+  `ExchangeGuardsDeskUiTest.theExchangePreviewAndInvoiceCarryTheTillTax` («ردیفِ مالیات در پیش‌نمایشِ تعویض نیامد»)، `ScenarioS46Test` («ReturnFlowSheet.kt
+  هنوز نامِ حساب را مستقیم می‌گیرد»)؛ پس از رفع ۱۸۲ آزمونِ هدف‌دار سبز (`*Exchange*`، `*Return*`، `*Checkout*`، `*SaleTax*`، `*Rounding*`، `*LineSeller*`،
+  `*ScenarioS46*`، `PosLogicTest`…). اجرای کاملِ `rm -rf desktop/build/test-data && flock /tmp/gradle-full.lock ./desktop/gradlew --no-daemon -p desktop test` روی `ad418ea14`: ۴۱۱۰ آزمون، ۰ شکست، ۴ SKIP ِ پیشین (ACL ِ ویندوز، دو بنچ، عکسِ صفحه‌ها؛ BUILD SUCCESSFUL، ۱۰ دقیقه).
+- **نیمه‌کاره / قدمِ بعد:** هیچ. دیده‌شده و دست‌نخورده: صندوقِ رابطِ قدیمِ گوشی (`CheckoutDialog` در `SaleDialogs.kt`) هنوز مالیات و پله را جدا می‌خواند و از `TillGuards` نمی‌گیرد؛
+  تعویض برگهٔ STF-03 (سقف‌های سرور) و «فروشندهٔ ردیف» را در رابط ندارد (همان پیش از این).
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-36t (ت۴) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-36t` (از سرِ `claude/batch-56`، 0d06aa8d5)
 
 - **دورزدنِ S22 و POS-24 از راهِ «تعویض» ِ برگشت (شدتِ میانه/بالا) بسته شد:** فروشِ تعویض در گوشیِ v3 (`ReturnFlowSheet`) و کامپیوتر
