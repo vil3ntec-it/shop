@@ -54,6 +54,29 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-11o زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-11o` (از `claude/batch-53`)
+
+- **INV-01@32 ⇒ IMPLEMENTED-VERIFIED («تعریف و انتشار از یک صفحه»):** صفحهٔ هر کالا (`products/{id}`، گوشی و کامپیوتر) بخشِ «ویترینِ
+  اینترنتی» دارد (`ui/v3/online/storefront/ProductStorefront.kt` منطقِ خالص، `ProductStorefrontAndroid.kt` مرزِ پلتفرم و `ProductStorefrontSlot`).
+  سرور: `GET /api/shop/storefront/products/:productId` (`staffProduct` در `storefront-owner.js`، همان شکلِ فهرست). **۴۰۴ ِ «کالای
+  همگام‌نشده» درست حل شد:** خواندنِ ۴۰۴ `product_not_found` ⇒ «هنوز به سرور نرسیده»، کلیدِ خاموش و هیچ PUT؛ «همین حالا همگام کن»
+  (`AutoSync.now`) و پایانِ هر همگام‌سازیِ موفق (`rememberSyncV1Status().lastOkAt`) فقط کالای نرسیده را دوباره می‌پرسد — بی دست زدن به `sync/`.
+- **IMG-11 (PARTIAL ِ روشن‌تر):** zoom ِ ۲۴۰۰px روی سرور (`lib/image-zoom.js`، پرچمِ خاموشِ `image_bank.zoom` در کاتالوگ و RULES، `sharp` ِ
+  اختیاری با بارکنندهٔ مشترکِ `lib/sharp-lib.js`)، یک‌بارنویس در `image_derivatives`؛ درهای ویترین/گالری/برنامه و `urls.zoom` ِ «کدام عکس»
+  (`withUrl` در درِ `shop-images`، نه در `image-bank.js` که سقفِ اندازه دارد). وب: `store/zoom.js` + واژه‌نامهٔ جدای `zoom` (≥۱۰ کلید —
+  قاعدهٔ `web-i18n`؛ با واژه‌نامهٔ `gallery` نشد چون `web-store-gallery.mjs` «پرچمِ گالری خاموش ⇒ هیچ `i18n/gallery`» را می‌سنجد). برنامه:
+  بخشِ «نسخهٔ بزرگ‌نمایی» در «نسخه‌های عکس» با `zoomFits` و `ZoomFrame`/`ZoomMath`. مانده فقط گوشیِ اندروید ِ واقعی و تصمیمِ روشن کردنِ پرچم.
+- **آزمون‌ها (سرخ پیش/سبز پس):** `storefront-product-one` ۰/۲ ⇒ ۲/۲، `image-zoom` ۰/۳ ⇒ ۳/۳، `web-store-zoom.mjs` خروجِ ۱ ⇒ ۴۱ ✅؛ desktop
+  `ProductStorefrontUiTest` ۶/۶، `ZoomFrameUiTest` ۲/۲، `PhotoVersionsPageTest` ۸/۸؛ جهش‌ها (۳ سرور، ۳ کاتلین) همه کشته. بی‌تغییر سبز: `storefront`
+  ۱۹، `storefront-bulk` ۵، `catalog-stock` ۲۶، `image-bank` ۲۰، `storefront-gallery` ۳، `store-webp` ۳، `admin-flags` ۲، `console-shell` ۸، `web-i18n` ۳۳،
+  `web-store-gallery.mjs` ۳۵، `web-store.mjs` ۱۳۲، `admin-panel.mjs` ۴۳/۴۳. `./desktop/gradlew -p desktop test` کامل ⇒ ۳۹۳۵ آزمون (۳۹۳۱ PASS،
+  ۴ SKIP ِ پیشین)، ۰ شکست، ۱۵:۵۲. precheck `fail=0`.
+- **یافته در اجرای کامل:** `V3A11yGuardTest` قابِ بزرگ‌نماییِ تازه (`detectTransformGestures`) را بی جایگزینِ صفحه‌خوان گرفت ⇒ `customActions`
+  (بزرگ‌تر، کوچک‌تر و دیدنِ چهار سو) روی همان قاب، نه ردیفِ `ALTERNATIVES`. Gradle ِ نخست را OOM ِ cgroup کشت (عامل‌های هم‌زمان) ⇒ `-Xmx2g`.
+- **دامِ آزمونِ Compose:** یک بار `aSuccessfulSyncRechecksOnlyAProductThatHadNotArrived` در اجرای کاملِ کلاس سرخ شد (دو دورِ پرسشِ هم‌پوشان؛ تکرار
+  نشد) ⇒ پیش از «همگام‌سازیِ بعدی» ۵۰۰ms صبر و چاپِ درختِ معنایی هنگامِ شکست.
+- **قدمِ بعد:** ادغامِ `claude/e-rows-11o` در دسته؛ IMG-11 روی گوشیِ اندروید (CI ِ اندروید یا دستگاه) و تصمیمِ صاحب‌کار برای `image_bank.zoom`.
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-10m زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-10m` (از `claude/batch-52`)
 
 - **انجام شد:** IMG-BANK-10، STF-07، PUR-02 و PUR-14 ⇒ IMPLEMENTED-VERIFIED؛ S90 با آزمونِ سرتاسریِ تازه (PARTIAL ِ روشن‌تر).

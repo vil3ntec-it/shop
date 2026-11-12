@@ -198,6 +198,13 @@ router.get('/products', requirePermission('data.read'), needFlag, async (req, re
   res.json(await sf.bulkFlagOn(req.shopId) ? await sf.withReasons(req.shopId, page) : page);
 });
 
+//  INV-01@32: یک کالا برای صفحهٔ همان کالا در برنامه — همان شکلِ فهرست (با دلیلِ «نمی‌آید» فقط با پرچمِ گروهی)؛
+//  هنوز در دفترِ سرور نیست ⇒ ۴۰۴ `product_not_found` (برنامه: «هنوز همگام نشده»، انتشار خاموش)
+router.get('/products/:productId', requirePermission('data.read'), needFlag, async (req, res) => {
+  const p = await sf.staffProduct(req.shopId, req.params.productId);
+  res.json(await sf.bulkFlagOn(req.shopId) ? (await sf.withReasons(req.shopId, { items: [p] })).items[0] : p);
+});
+
 //  ── انتشارِ گروهی (M2): تا ۵۰۰ کالا در یک درخواست، کلیدِ یکتایی اجباری ──
 const needBulk = async (req, res, next) => {
   if (!(await sf.bulkFlagOn(req.shopId))) return next(forbidden('انتشارِ گروهی برای این دکان روشن نیست', 'bulk_disabled'));

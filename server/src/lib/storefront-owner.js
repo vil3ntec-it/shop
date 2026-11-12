@@ -264,17 +264,40 @@ async function staffProducts(shopId, { cursor, limit } = {}) {
   );
   const more = rows.length > lim;
   const page = more ? rows.slice(0, lim) : rows;
+  return { items: page.map(staffItem), nextCursor: more ? page[page.length - 1].id : null };
+}
+
+/** یک ردیفِ دفتر + نشانِ ویترین ⇒ همان شکلِ فهرستِ «در ویترین» (برای فهرست و برای یک کالا) */
+function staffItem(r) {
   return {
-    items: page.map((r) => ({
-      ...productView({ ...r, online_price_minor: null }),
-      published: r.published === true,
-      onlinePriceMinor: r.online_price_minor === null || r.online_price_minor === undefined ? null : Number(r.online_price_minor),
-      active: isActive(r.data),
-      description: text(r.description, 2000),
-      specs: specsOf(r.specs),
-    })),
-    nextCursor: more ? page[page.length - 1].id : null,
+    ...productView({ ...r, online_price_minor: null }),
+    published: r.published === true,
+    onlinePriceMinor: r.online_price_minor === null || r.online_price_minor === undefined ? null : Number(r.online_price_minor),
+    active: isActive(r.data),
+    description: text(r.description, 2000),
+    specs: specsOf(r.specs),
   };
+}
+
+/**
+ * INV-01@32 — یک کالا برای صفحهٔ همان کالا در برنامه (تعریف و انتشار در یک جا). همان منبع و همان شکلِ
+ * `staffProducts`. کالایی که هنوز در دفترِ سرور نیست (روی دستگاه تعریف شده و هنوز همگام نشده) ⇒ ۴۰۴
+ * `product_not_found` ِ همان `setProduct`؛ برنامه آن را «هنوز به سرور نرسیده» می‌خواند و دکمهٔ انتشار را تا
+ * همگام شدن خاموش نگه می‌دارد — نه حدس، نه انتشارِ نیمه‌کاره.
+ */
+async function staffProduct(shopId, productId) {
+  const id = String(productId || '');
+  if (!PRODUCT_ID_RE.test(id)) throw badRequest('شناسهٔ کالا معتبر نیست', 'bad_product');
+  const src = await sfc.ledgerSource(shopId, { strict: false });
+  const r = await one(
+    `SELECT r.row_id AS id, r.data, sp.published, sp.online_price_minor, sp.max_qty_milli, sp.description, sp.specs
+       FROM ${src.from}
+       LEFT JOIN storefront_products sp ON sp.shop_id = r.account_id AND sp.product_id = r.row_id
+      WHERE ${src.where} AND r.row_id = $2`,
+    [shopId, id]
+  );
+  if (!r) throw notFound('این کالا در دفترِ دکان نیست', 'product_not_found');
+  return staffItem(r);
 }
 
 /** گذاشتن یا برداشتنِ یک کالا از ویترین. */
@@ -318,5 +341,5 @@ async function setProduct(shopId, productId, body, userId) {
   };
 }
 
-  return { settingsOf, saveSettings, declarePresence, staffProducts, setProduct };
+  return { settingsOf, saveSettings, declarePresence, staffProducts, staffProduct, setProduct };
 };

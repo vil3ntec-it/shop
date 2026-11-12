@@ -137,4 +137,81 @@ class PhotoVersionsPageTest {
       .map { File(it, "ir/vil3ntec/tohid/ui/v3/products/ProductPhotoExtrasAndroid.kt") }.first { it.isFile }.readText()
     assertTrue(src.contains("if (bankOn) add(V3MenuItem(Icons.Outlined.PhotoSizeSelectLarge, StrImageChanges.versionsTitle)"))
   }
+
+  // ── IMG-11: نسخهٔ بزرگ‌نمایی (۲۴۰۰px ِ سرور) ──
+
+  private val zoomed = bank.copy(zoomUrl = "/api/shop/images/file/c1/2/zoom")
+
+  @Test
+  fun `نسخهٔ بزرگ‌نمایی خوانده، سنجیده و با نسخهٔ بزرگ سنجیده می‌شود`() = runBlocking {
+    val f = Fake(ApiResult.Success(zoomed), mapOf(
+      bank.thumbUrl!! to jpeg(400, 300, 80), bank.displayUrl!! to jpeg(1200, 900, 86), zoomed.zoomUrl!! to jpeg(2400, 1800, 85),
+    ))
+    val s = PhotoVersionsState(f, "p1")
+    s.load()
+    assertTrue(s.loaded)
+    assertEquals(listOf(bank.thumbUrl, bank.displayUrl, zoomed.zoomUrl), f.asked)
+    assertEquals(2400 to 1800, s.zoom!!.measure.width to s.zoom!!.measure.height)
+    assertEquals(true, s.zoomFits)
+    assertEquals("داوریِ دو نسخهٔ پیشین دست نخورد", emptyList<ImageQuality.Flag>(), s.flags)
+  }
+
+  @Test
+  fun `نبودِ نسخهٔ بزرگ‌نمایی صفحه را ناکام نمی‌کند و بی نشانی چیزی خواسته نمی‌شود`() = runBlocking {
+    val missing = Fake(ApiResult.Success(zoomed), mapOf(bank.thumbUrl!! to jpeg(400, 300, 80), bank.displayUrl!! to jpeg(1200, 900, 86)))
+    val s = PhotoVersionsState(missing, "p1")
+    s.load()
+    assertTrue(s.loaded)
+    assertFalse(s.failed)
+    assertNull(s.zoom)
+    assertNull(s.zoomFits)
+    val none = Fake(ApiResult.Success(bank), mapOf(bank.thumbUrl!! to jpeg(400, 300, 80), bank.displayUrl!! to jpeg(1200, 900, 86)))
+    PhotoVersionsState(none, "p1").load()
+    assertEquals(listOf(bank.thumbUrl, bank.displayUrl), none.asked)
+  }
+
+  @Test
+  fun `نسخهٔ بزرگ‌نماییِ ناجور نشان می‌گیرد`() {
+    fun m(w: Int, h: Int) = ImageQuality.Measure(ImageQuality.Kind.JPEG, w, h, 1000, 85)
+    val display = m(1200, 900)
+    assertTrue(zoomFits(display, m(2400, 1800)))
+    assertTrue("بی نسخهٔ بزرگ فقط سقف", zoomFits(null, m(2000, 1500)))
+    assertFalse("نسبتِ دیگر", zoomFits(display, m(2400, 2400)))
+    assertFalse("کوچک‌تر از نسخهٔ بزرگ", zoomFits(display, m(800, 600)))
+    assertFalse("بیش از ۲۴۰۰", zoomFits(display, m(3200, 2400)))
+    assertFalse("ناخوانا", zoomFits(display, ImageQuality.Measure(ImageQuality.Kind.OTHER, null, null, 10, null)))
+  }
+
+  @Test
+  fun `حسابِ بزرگ‌نمایی — سقفِ اندازهٔ واقعی، نقطهٔ ثابت، مرزِ قاب و دو بار زدن`() {
+    //  عکسِ ۲۴۰۰ در قابِ ۱۰۰۰×۷۵۰ ⇒ سقف ۲٫۴ (هر پیکسل یک پیکسل)
+    val max = ZoomMath.max(2400, 1000)
+    assertEquals(2.4f, max, 1e-4f)
+    assertEquals("عکسِ کوچک‌تر از قاب بزرگ نمی‌شود", 1f, ZoomMath.max(800, 800), 0f)
+    val box = floatArrayOf(1000f, 750f, 1000f, 750f)
+    fun at(st: ZoomMath.State, f: Float, cx: Float, cy: Float) = ZoomMath.zoomAt(st, f, cx, cy, box[0], box[1], box[2], box[3], max)
+    val a = at(ZoomMath.State(), 2f, 50f, 20f)
+    assertEquals(2f, a.s, 1e-4f)
+    //  همان نقطه زیرِ انگشت: c = t + s·p
+    val p = 50f
+    assertEquals(50f, a.x + a.s * p, 1e-3f)
+    assertEquals(-50f, a.x, 1e-3f)
+    assertEquals(-20f, a.y, 1e-3f)
+    val top = at(a, 10f, 0f, 0f)
+    assertEquals("سقف", max, top.s, 1e-4f)
+    val far = ZoomMath.pan(top, 1e6f, -1e6f, box[0], box[1], box[2], box[3], max)
+    assertEquals("مرزِ افقی", (1000f * max - 1000f) / 2, far.x, 1e-2f)
+    assertEquals("مرزِ عمودی", -(750f * max - 750f) / 2, far.y, 1e-2f)
+    fun same(w: ZoomMath.State, g: ZoomMath.State, why: String) {
+      assertEquals(why, w.s, g.s, 1e-4f); assertEquals(why, w.x, g.x, 1e-3f); assertEquals(why, w.y, g.y, 1e-3f)
+    }
+    same(ZoomMath.State(), at(top, 1e-6f, 0f, 0f), "کمتر از ۱ نه؛ در ۱ در مرکز")
+    same(ZoomMath.State(), ZoomMath.pan(ZoomMath.State(), 300f, 300f, box[0], box[1], box[2], box[3], max), "در ۱ جابه‌جا نه")
+    val max4 = ZoomMath.max(4000, 1000)
+    val tapped = ZoomMath.doubleTap(ZoomMath.State(), 0f, 0f, box[0], box[1], box[2], box[3], max4)
+    assertEquals(ZoomMath.TAP, tapped.s, 1e-4f)
+    same(ZoomMath.State(), ZoomMath.doubleTap(tapped, 0f, 0f, box[0], box[1], box[2], box[3], max4), "دو بار زدن در بزرگی ⇒ برگشت")
+    assertEquals("دو بار زدن هم از سقف نمی‌گذرد", max, ZoomMath.doubleTap(ZoomMath.State(), 0f, 0f, box[0], box[1], box[2], box[3], max).s, 1e-4f)
+    assertEquals(240, ZoomMath.percent(top))
+  }
 }

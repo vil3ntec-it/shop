@@ -25,6 +25,13 @@
     return galP;
   }
 
+  //  IMG-11: بزرگ‌نماییِ عکس (zoom.js ِ دیربار) فقط برای کالای عکس‌دار؛ نسخهٔ بزرگ فقط وقتی بیننده باز می‌شود
+  var zoom = null; var zoomP = null;
+  function loadZoom(slug) {
+    zoomP = zoomP || K.js('/store/zoom.js').then(function () { zoom = window.StoreZoom({ slug: slug }); return zoom; }, function (e) { zoomP = null; throw e; });
+    return zoomP;
+  }
+
   /** `ctx.rail(id, list)` از store.js (ردیفِ کارت)، `ctx.slug` دکانِ همین ویترین، `ctx.feat()` همان `features`. برمی‌گرداند `detail(r)`؛ `r` تهی ⇒ همه پاک و پنهان. */
   window.StoreProduct = function (ctx) {
     var rail = ctx.rail; var want = 0;
@@ -33,6 +40,8 @@
       var my = ++want;
       if (same) same(null);
       if (gal) gal(null);
+      if (zoom) zoom(null);
+      if (r && x.photo) loadZoom(ctx.slug).then(function (show) { if (my === want) show(x); }, function () { /* بی بزرگ‌نمایی */ });
       if (r && ctx.feat && ctx.feat().gallery) loadGal(ctx.slug).then(function (show) { if (my === want) show(x); }, function () { /* بی گالری */ });
       //  same.js ِ دیررس برگهٔ کالای دیگری را پر نمی‌کند
       if (x.bankProductId && x.sameElsewhere === true) loadSame(ctx.slug).then(function (show) { if (my === want) show(x); }, function () { /* بی بخش */ });

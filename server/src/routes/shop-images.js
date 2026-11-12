@@ -23,6 +23,7 @@
  */
 const express = require('express');
 const bank = require('../lib/image-bank');
+const zoom = require('../lib/image-zoom');   //  IMG-11: نسخهٔ بزرگِ ساختهٔ سرور
 const extras = require('../lib/image-bank-extras');   //  PRD-17: برداشتنِ عکسِ تکمیلی از کالا
 const upload = require('../lib/image-upload');
 const pipeline = require('../lib/image-pipeline');
@@ -95,7 +96,8 @@ router.post('/select', write, async (req, res) => {
 });
 
 router.get('/products/:productId', async (req, res) => {
-  res.json(await bank.resolve(req.shopId, req.params.productId, BASE));
+  //  IMG-11: `urls.zoom` وقتی سرور نسخهٔ بزرگ را می‌سازد (پرچمِ خاموشِ `image_bank.zoom`)
+  res.json(await zoom.withUrl(req.shopId, await bank.resolve(req.shopId, req.params.productId, BASE), BASE));
 });
 
 router.get('/mine', async (req, res) => {
@@ -173,7 +175,8 @@ router.get('/file/:id/:version/:size', async (req, res) => {
   if (!bank.SIZES.includes(size)) throw notFound('عکس پیدا نشد');
   const ver = version(req.params.version);
   const img = await readable(req, req.params.id, ver, size);
-  const file = await bank.readFile(img.id, ver, size);
+  //  IMG-11: zoom ِ نبوده را سرور یک بار می‌سازد (پرچمِ خاموشِ `image_bank.zoom` + `sharp`؛ `lib/image-zoom.js`)
+  const file = size === 'zoom' ? await zoom.ensure(req.shopId, img, ver) : await bank.readFile(img.id, ver, size);
   if (!file) throw notFound('این اندازه هنوز ساخته نشده', 'no_derivative');
   //  نشانی نسخه‌دار و نسخهٔ کوچک یک‌بارنویس ⇒ cache بی‌خطر؛ خصوصی، نه CDNِ عمومی
   res.set('Cache-Control', 'private, max-age=31536000, immutable');

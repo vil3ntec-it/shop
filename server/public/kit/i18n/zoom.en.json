@@ -1,0 +1,12 @@
+{
+  "zm.open": "Zoom photo",
+  "zm.title": "Large product photo",
+  "zm.in": "Zoom in",
+  "zm.out": "Zoom out",
+  "zm.reset": "Original size",
+  "zm.level": "{n}%",
+  "zm.hint": "Pinch, scroll or double-tap to zoom; drag the enlarged photo.",
+  "zm.close": "Close large photo",
+  "zm.loading": "Loading the large photo…",
+  "zm.small": "There is no larger version of this photo; the page photo is enlarged instead."
+}
