@@ -114,15 +114,16 @@ const heldRows = async (s, orderId) => (await query(
 // ---------------------------------------------------------------- SR42-1
 
 test('SR42-1: «افزودن» ِ دیر به سفارشِ زود جلوی سفارشِ پیش‌ترِ دیگری نمی‌زند — فروشِ حضوریِ بعدی همان افزاینده را به بررسی می‌برد', async () => {
-  const s = await storeShop('بازبینی۴۲-صف', 'q1', 3);
+  //  ۵ عدد: سقفِ شمارهٔ x (۲-۲۱، CHK-18) نیمِ آزادِ او = (۵ − ۱ ِ y) / ۲ = ۲ ⇒ افزودن در سقف
+  const s = await storeShop('بازبینی۴۲-صف', 'q1', 5);
   const x = await customerOrder(s, '0791110001', 'q1', 1);   //  زود: یک عدد
   const y = await customerOrder(s, '0791110002', 'q1', 1);   //  سپس مشتریِ دیگر: یک عدد
-  //  آزاد = ۳ − ۱ (y) ⇒ x تا دو عدد می‌تواند ⇒ افزودن روی همان قلم (هم‌قیمت)
+  //  افزودن روی همان قلم (هم‌قیمت)
   const a = await addItems(s, x, 'q1', 1);
   assert.equal(a.status, 201, JSON.stringify(a.body));
   assert.deepEqual(await heldRows(s, x.id), [[1, 2000]], 'همان قلم بزرگ شد');
-  //  صندوق یک عدد فروخت (INV-19، هرگز رد نمی‌شود) ⇒ ۲ قابل‌فروش، ۳ نگه‌داشته: ادعای تازه (افزودهٔ x) کم می‌آورد، نه y
-  await push(s, sale('q1-s', [['q1-i', 'q1', 1]]));
+  //  صندوق سه عدد فروخت (INV-19، هرگز رد نمی‌شود) ⇒ ۲ قابل‌فروش، ۳ نگه‌داشته: ادعای تازه (افزودهٔ x) کم می‌آورد، نه y
+  await push(s, sale('q1-s', [['q1-i', 'q1', 3]]));
   await refresh(s);
   assert.equal((await review(s, y.id)).review, false, 'سفارشِ پیش‌ترِ y پوشش دارد');
   assert.equal((await review(s, x.id)).review, true, 'افزایندهٔ دیر در بررسی');
@@ -137,9 +138,13 @@ test('SR42-1: موجودیِ کهنه — افزودنِ بی سنجشِ نگه�
   await query(`UPDATE sync_devices SET last_seen_at = $2 WHERE app='shop' AND account_id=$1`, [s.shopId, Date.now() - 3_600_000]);
   const a = await addItems(s, x, 'k1', 1);
   assert.equal(a.status, 201, JSON.stringify(a.body));
-  assert.deepEqual(await heldRows(s, x.id), [[1, 2000]]);
+  //  CHK-18 (۲-۲۱): همان افزودن از سقفِ شمارهٔ x (نیمِ آزادِ او: (۲ − ۱) / ۲ ⇒ یک دانه) می‌گذرد ⇒ ثبت، ولی ادعای تازه بی
+  //  نگه‌داشتن و نگه‌داشتهٔ پیشینِ x همان یک دانه — پس کمبودی هم ساخته نمی‌شود (پیش‌تر x به «بررسی» می‌رفت)
+  assert.deepEqual(await heldRows(s, x.id), [[1, 1000]], 'افزودهٔ بیش از سقف بی نگه‌داشتن');
+  const line = await one('SELECT qty_milli FROM online_order_lines WHERE shop_id=$1 AND order_id=$2 AND line_no=1', [s.shopId, x.id]);
+  assert.equal(Number(line.qty_milli), 2000, 'قلم بزرگ شد');
   assert.equal((await review(s, y.id)).review, false, 'نگه‌داشتهٔ پیش‌ترِ y دست‌نخورده');
-  assert.equal((await review(s, x.id)).review, true, 'کمبود مالِ همان افزودنِ تازه است');
+  assert.equal((await review(s, x.id)).review, false, 'نگه‌داشته‌ها از موجودی بیشتر نشدند');
 });
 
 test('SR42-1: کوچک شدن و همان مقدار جای صف را نگه می‌دارند (فقط بزرگ شدن یا کالای دیگر ادعای تازه است)', async () => {
