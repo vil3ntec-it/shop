@@ -597,6 +597,11 @@
         K.js('/store/share.js').then(function () { share = window.StoreShare(r.seo.productBase); if (K.sheetOpen() === $('product-sheet')) $('ps-share').hidden = false; }, function () { /* بی «فرستادن» */ });
       }
       renderHead();
+      //  S71: روش و مسئولِ تحویل روی صفحهٔ دکان، پیش از سبد (فقط با `features.deliveryMethod`؛ delivery-method.js ِ دیربار)
+      if (store.features.deliveryMethod) {
+        K.js('/store/delivery-method.js').then(function () { return window.StoreMethod({ api: api, slug: slug }); })
+          .then(function (m) { m.shop(store.features.deliveryMethod); }, function () { /* بی سطرِ روش؛ برگهٔ ثبت همان */ });
+      }
       beat('visit');
       renderCats();
       setZone({ id: K.loadS('zone:' + slug) });

@@ -1,7 +1,8 @@
 /*
- * ویترین — روش و مسئولِ تحویل (S71) در برگهٔ ثبت و پیگیری، و «تغییرِ روشِ تحویل» تا پیش از جمع‌آوری (S72).
- * فقط وقتی سرور `features.deliveryMethod` (برگهٔ ثبت) یا `deliveryMethod` (پیگیری) را داد بار می‌شود (`checkout.js`،
- * `order.js`)؛ پرچمِ خاموش ⇒ نه این اسکریپت، نه واژه‌نامه‌اش (`kit/i18n/method.<زبان>.json`)، نه هیچ گره‌ای.
+ * ویترین — روش و مسئولِ تحویل (S71) در صفحهٔ دکان (پیش از سبد)، برگهٔ ثبت و پیگیری، و «تغییرِ روشِ تحویل» تا پیش از
+ * جمع‌آوری (S72).
+ * فقط وقتی سرور `features.deliveryMethod` (صفحهٔ دکان و برگهٔ ثبت) یا `deliveryMethod` (پیگیری) را داد بار می‌شود
+ * (`store.js`، `checkout.js`، `order.js`)؛ پرچمِ خاموش ⇒ نه این اسکریپت، نه واژه‌نامه‌اش (`kit/i18n/method.<زبان>.json`)، نه هیچ گره‌ای.
  *
  * ⛔ روش، مسئول، هزینه و زمان را سرور می‌گوید (هرگز پیکِ VILL3N از این‌جا)؛ تغییر فقط پس از دیدنِ برگهٔ تازه
  *    (۴۰۹ `confirm_required`) و «بله» با همان جمع (`expectedTotalMinor`) ثبت می‌شود. متن فقط با textContent.
@@ -110,9 +111,22 @@
       }).catch(function (e) { send.disabled = false; K.note(note, 'err', e.message); });
     }
 
+    //  صفحهٔ دکان، پیش از سبد: روش و مسئولِ هر راهی که این ویترین دارد (همان دادهٔ برگهٔ ثبت، `features.deliveryMethod`)
+    function shop(dm) {
+      var box = $('store-dm');
+      var list = ['delivery', 'pickup'].map(function (k) { return dm && dm[k]; }).filter(Boolean);
+      if (!box) {
+        box = el('p', { class: 'muted small', attrs: { id: 'store-dm', role: 'note' } });
+        var at = $('store-status');
+        at.parentNode.insertBefore(box, at.nextSibling);
+      }
+      box.hidden = !list.length;
+      box.textContent = list.length ? t('dm.title') + ': ' + list.map(line).join(' · ') : '';
+    }
+
     return K.part('method', $('o-dm')).then(function (ok) {
       if (!ok) throw new Error('i18n');
-      return { checkout: checkout, order: order };
+      return { checkout: checkout, order: order, shop: shop };
     });
   };
 })();
