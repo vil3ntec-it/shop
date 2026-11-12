@@ -28,6 +28,8 @@ import ir.vil3ntec.tohid.formatMillis
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.sync.SyncStore
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -123,7 +125,14 @@ fun StaffTimeHub(d: ShopData, monthFrom: String, today: String, initial: StaffTi
       message = when (TimeClock.check(known, p)) {
         TimeClock.Rejection.SAME_KIND, TimeClock.Rejection.DUPLICATE -> StrStaffTime.sameKind
         TimeClock.Rejection.BEFORE_LAST -> StrStaffTime.beforeLast
-        else -> when (val r = repo.punch(p, forMember?.takeIf { it != c.memberId })) {
+        //  STF-07: زدن‌های صف‌شده (کهنه‌ترند) پیش از زدنِ تازه؛ وگرنه سرور آن‌ها را «پیش از آخرین زدن» رد می‌کرد و نوبتِ
+        //  بی‌شبکه گم می‌شد. ردِ قطعیِ یکی از آن‌ها ⇒ همان پیام و زدنِ تازه (که روی همان صف حساب شده بود) نمی‌رود؛
+        //  هنوز چیزی از خودم در صف مانده (شبکه نیست) ⇒ زدنِ تازه هم پشتِ همان صف، به ترتیب.
+        else -> StaffTimeQueue.flush(context, repo) ?: if (forMember == null && StaffTimeQueue.pending(context, c.memberId).isNotEmpty()) {
+          StaffTimeQueue.add(context, p)
+          queued = StaffTimeQueue.size(context)
+          null
+        } else when (val r = repo.punch(p, forMember?.takeIf { it != c.memberId })) {
           is ApiResult.Success -> null
           is ApiResult.Failure ->
             if (r.error.retryable && forMember == null) {
@@ -226,8 +235,11 @@ private object StaffTimeQueue {
 
   fun add(context: Context, p: TimeClock.Punch) = write(context, read(context) + p)
 
+  /** دو فرستادنِ هم‌زمان (بازشدنِ صفحه و زدن) یک زدن را دو بار نفرستند */
+  private val sending = Mutex()
+
   /** به ترتیبِ زمان؛ نرسیدن ⇒ می‌ماند و بقیه هم می‌مانند (ترتیب مهم است). ⇒ پیامِ ردِ قطعی، اگر بود */
-  suspend fun flush(context: Context, repo: StaffTimeRepository): String? {
+  suspend fun flush(context: Context, repo: StaffTimeRepository): String? = sending.withLock {
     val list = read(context).sortedBy { it.atMs }
     var rest = list
     var note: String? = null
@@ -242,6 +254,6 @@ private object StaffTimeQueue {
       }
     }
     if (rest.size != list.size) write(context, rest)
-    return note
+    note
   }
 }
