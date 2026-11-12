@@ -320,3 +320,14 @@ test('⛔ توکن و نوع پیش از خواندنِ بدنه: توکنِ ن�
   assert.equal((await upload(s, o.token, 'voice-note', big)).status, 413);
   assert.equal((await one('SELECT COUNT(*)::int AS n FROM order_address_media WHERE order_id=$1', [o.orderId])).n, 0);
 });
+
+test('مهاجرتِ ۸۴۷: کرانِ پایگاه — mime ِ ۳ تا ۴۰ نویسه و sha256 ِ ۶۴ رقمِ هگز', async () => {
+  const s = await liveShop('قیدِ ۸۴۷');
+  const o = await order(s);
+  const row = (mime, sha) => query(
+    `INSERT INTO order_address_media (id, shop_id, order_id, kind, mime, size, sha256, data, created_at) VALUES ($1,$2,$3,'voice_note',$4,1,$5,'\\x00',$6)`,
+    [newId('oam'), s.shopId, o.orderId, mime, sha, now()]);
+  await assert.rejects(row('x'.repeat(41), 'a'.repeat(64)), /check constraint/i);
+  await assert.rejects(row('audio/ogg', 'not-a-hash'), /check constraint/i);
+  await row('audio/ogg', 'a'.repeat(64));
+});

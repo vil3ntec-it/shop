@@ -400,4 +400,8 @@ test('مهاجرتِ ۸۵۵: برگشت و اجرای دوباره', async () =>
   await query(fs.readFileSync(path.join(dir, '855_trust_assignee_name.sql'), 'utf8'));
   await query(fs.readFileSync(path.join(dir, '855_trust_assignee_name.sql'), 'utf8'));
   assert.equal(await col(), true);
+  //  کرانِ ۸۰ نویسه در خودِ پایگاه هم (نه فقط `cleanName`)
+  const id = await seedCase();
+  await query('UPDATE trust_cases SET assignee_name=$2 WHERE id=$1', [id, 'ن'.repeat(80)]);
+  await assert.rejects(query('UPDATE trust_cases SET assignee_name=$2 WHERE id=$1', [id, 'ن'.repeat(81)]), /check constraint/i);
 });

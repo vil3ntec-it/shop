@@ -8,4 +8,4 @@
 --  rollback: `migrations/rollback/855_trust_assignee_name.down.sql`.
 -- ============================================================
 
-ALTER TABLE trust_cases ADD COLUMN IF NOT EXISTS assignee_name text NOT NULL DEFAULT '';
+ALTER TABLE trust_cases ADD COLUMN IF NOT EXISTS assignee_name text NOT NULL DEFAULT '' CHECK (char_length(assignee_name) <= 80);
