@@ -8,3 +8,5 @@
 -- ============================================================
 
 ALTER TABLE trust_cases DROP COLUMN IF EXISTS assignee_name;
+
+DELETE FROM schema_migrations WHERE version = '855_trust_assignee_name.sql';
