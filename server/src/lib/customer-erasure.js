@@ -17,6 +17,7 @@
  *   delivery_events            یادداشت پاک، `detail`/`reason` بی متنِ آزاد، شماره و مختصات (`scrub`)؛
  *                              کد، شناسه و عدد (مبلغ) می‌مانند.
  *   delivery_photos، order_pick_photos، delivery_locations   پاک.
+ *   online_order_devices       چکیدهٔ دستگاهِ همان سفارش‌ها (RSK-04، مهاجرتِ ۸۴۰) پاک؛ ردیفِ «دستگاهِ بسته» ِ فهرست مثلِ شماره می‌ماند.
  *   customer_notify_outbox     HMAC ِ شماره ⇐ `erased`، خطای متنی پاک، صفِ مانده ⇐ `expired`.
  *   shop_chat_conversations    شماره ⇐ `erased:<شناسهٔ گفت‌وگو>`، نام پاک، پیوندِ حساب NULL؛
  *     shop_chat_messages       متن/رسانه/meta پاک و «پاک‌شده» (ردیف و شمار می‌ماند)؛
@@ -63,7 +64,7 @@ const KEPT = Object.freeze([
 const COUNT_KEYS = Object.freeze([
   'orders', 'orderLines', 'orderEvents', 'deliveryEvents', 'deliveryPhotos', 'pickPhotos', 'deliveryLocations',
   'notifyOutbox', 'conversations', 'messages', 'chatMedia', 'chatPins', 'chatReports', 'carts', 'favorites', 'lists', 'areaRequests',
-  'alerts', 'issues', 'issuePhotos', 'reviews', 'pushSubs', 'alertPushSubs',
+  'alerts', 'issues', 'issuePhotos', 'reviews', 'pushSubs', 'alertPushSubs', 'orderDevices',
 ]);
 
 const flagOn = (shopId) => flagOf(shopId, FLAG);
@@ -213,6 +214,7 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
         counts.deliveryEvents = await scrubEvents(c, 'delivery_events', shopId, orderIds);
         counts.deliveryPhotos = await qk('DELETE FROM delivery_photos WHERE shop_id=$1 AND order_id = ANY($2::text[]) RETURNING store_key', [shopId, orderIds]);
         counts.pickPhotos = await qk('DELETE FROM order_pick_photos WHERE shop_id=$1 AND order_id = ANY($2::text[]) RETURNING store_key', [shopId, orderIds]);
+        counts.orderDevices = await require('./risk-device').eraseIn(c, shopId, orderIds);
         counts.deliveryLocations = await q(
           `DELETE FROM delivery_locations WHERE shop_id=$1 AND assignment_id IN (
              SELECT id FROM delivery_assignments WHERE shop_id=$1 AND order_id = ANY($2::text[])) RETURNING assignment_id`,
