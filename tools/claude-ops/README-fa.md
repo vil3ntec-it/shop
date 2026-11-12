@@ -43,6 +43,7 @@
 - `ci-status.sh shop|server <pr>…` — خلاصهٔ چک‌های head ِ PR و id ِ هر کارِ سرخ (لاگ: `gh api repos/vil3ntec-it/<repo>/actions/jobs/<id>/logs`).
 - `precheck.sh <worktree>` — همهٔ سنجه‌های ایستا پیش از push (api-contract، spec، whatsnew، quality، secret-scan، dari-words، kt-names، ثبتِ `Str*`). spec «سالم» نیست ⇒ `node docs/spec/tools/spec.mjs status`.
 - `bmerge-docs.sh <worktree> <branch>…` — ادغامِ پشتِ هم با حلِ خودکارِ HANDOFF/WHATS-NEW/STATUS؛ روی هر تعارضِ دیگر می‌ایستد.
+- `mapmerge.py <wt> <branch>` سپس `mapfix.py <wt>` — ادغامِ `docs/spec/PARTIAL-MAP-fa.md` ردیف‌به‌ردیف: از HEAD شروع، فقط ردیف‌هایی که شاخه نسبت به merge-base عوض کرده (متن یا دسته) برداشته می‌شوند؛ سپس ردیف‌های غیرِ PARTIAL ِ STATUS کنار و شمارها از نو. ⚠️ حلِ دستیِ تعارضِ نقشه با «اجتماعِ خط‌ها» جابه‌جایی�‌های شاخهٔ دیگر را برمی‌گرداند (دستهٔ ۵۴، e-rows-13u).
 - `pkg-union.py <package.json>` — اجتماعِ زنجیره‌های `&&` ِ اسکریپت‌ها در تعارضِ `package.json`.
 
 **درس‌های همین سیزن (دوباره نخور):**
