@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.sale.CheckoutRules
+import ir.vil3ntec.tohid.core.sale.SaleTax
 import ir.vil3ntec.tohid.core.stock.ExpiryGate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -130,11 +131,12 @@ class ExchangeTillGuardsTest {
     assertEquals("d1", TillGuards.OFF.exchange(d2, "", "d1", null).debtorId)
   }
 
+  private fun src(rel: String): String =
+    listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { File(it, "ir/vil3ntec/tohid/$rel") }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد (cwd=${File(".").absoluteFile})")
+
   @Test
   fun `هر دو صفحهٔ برگشت فروشِ تعویض را با سدهای صندوق می‌سازند، نه Checkout ِ خام`() {
-    fun src(rel: String): String =
-      listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
-        .map { File(it, "ir/vil3ntec/tohid/$rel") }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد (cwd=${File(".").absoluteFile})")
     val phone = src("ui/v3/sales/returns/ReturnFlowSheet.kt")
     val desk = src("ui/screens/ReturnsV2.kt")
     for ((name, s) in listOf("ReturnFlowSheet" to phone, "ReturnsV2" to desk)) {
@@ -154,5 +156,67 @@ class ExchangeTillGuardsTest {
     for (till in listOf("ui/screens/DeskSale.kt", "ui/v3/sales/checkout/CheckoutRoute.kt")) {
       assertTrue(till, src(till).contains("val tillGuards = remember { ir.vil3ntec.tohid.data.TillGuardsPref.get(context) }"))
     }
+  }
+
+  /* ------------- POS-37 مالیات و PAY-09 گردِ نقدی در تعویض (`claude/e-rows-37e`؛ رفتارِ دستگاه: `ExchangeTillPricingTest`) ------------- */
+
+  private val tenPercent = SaleTax.Config(SaleTax.Mode.INVOICE, 1_000)
+  private val bag = Product(id = "bag", name = "کیف", unit = "عدد", salePrice = 1023.0)
+
+  @Test
+  fun `فروشِ تعویض مالیات و پلهٔ گردِ همین صندوق را می‌گیرد و خاموش همان امروز است`() {
+    val c = TillGuards(tax = tenPercent, cashRounding = 500L).exchange(d0, "صندوقدار", null, null)
+    assertEquals(tenPercent, c.tax)
+    assertEquals(500L, c.cashRounding)
+    assertEquals("گردِ نقد فقط پس از برگشت معلوم است", 0L, c.cashCovered)
+    val off = TillGuards.OFF.exchange(d0, "صندوقدار", null, null)
+    assertEquals(SalesEngine.Checkout(seller = "صندوقدار"), off)
+  }
+
+  @Test
+  fun `پیش‌نمایشِ تعویض همان اعدادی است که ثبت می‌شود`() {
+    val (d1, sale) = sold(null)
+    val d = d1.copy(products = d1.products + bag, warehouseEntries = d1.warehouseEntries + WarehouseEntry(id = "w-bag", productId = "bag", units = 5.0))
+    val guards = listOf(TillGuards.OFF, TillGuards(tax = tenPercent), TillGuards(cashRounding = 500L), TillGuards(tax = tenPercent, cashRounding = 500L))
+    val carts = listOf(listOf(SalesEngine.CartLine("shoe", 1.0)), listOf(SalesEngine.CartLine("bag", 1.0)), listOf(SalesEngine.CartLine("bag", 2.0)))
+    for (g in guards) for (cart in carts) {
+      val c = g.exchange(d, "صندوقدار", null, null)
+      val ex = (exchange(d, sale, cart, c) as ReturnFlow.Outcome.Ok).value
+      val s = ex.data.sales.single { it.id == ex.saleId }
+      val p = ExchangeTill.preview(d, cart, c, ex.split.cash)
+      val tag = "$g $cart"
+      assertEquals(tag, s.finalTotal, p.total, 0.0)
+      assertEquals(tag, PayFlow.major(s.taxMinor ?: 0L), p.tax, 0.0)
+      assertEquals(tag, PayFlow.major(s.roundingMinor ?: 0L), p.rounding, 0.0)
+      assertEquals(tag, ex.due, p.due, 0.0)
+    }
+    //  هر دو روشن، دو کیف: ۲۰۴۶ + ۲۰۵ مالیات = ۲۲۵۱؛ برگشتِ نقدِ ۱۰۰۰ ⇒ ۱۲۵۱ ⇐ گرد به ۱۲۵۰ (ردیفِ −۱ روی فاکتورِ تعویض)
+    val both = ExchangeTill.preview(d, listOf(SalesEngine.CartLine("bag", 2.0)), TillGuards(tax = tenPercent, cashRounding = 500L).exchange(d, "", null, null), 1_000.0)
+    assertEquals(ExchangeTill.Preview(goods = 2_046.0, tax = 205.0, rounding = -1.0, total = 2_250.0, due = 1_250.0), both)
+    //  پس‌دادنی گرد نمی‌شود: یک کفش با برگشتِ نقدِ ۱۰۲۳ ⇒ دقیقاً ۲۳ به مشتری
+    val back = ExchangeTill.preview(d, listOf(SalesEngine.CartLine("shoe", 1.0)), TillGuards(cashRounding = 500L).exchange(d, "", null, null), 1_023.0)
+    assertEquals(0.0, back.rounding, 0.0)
+    assertEquals(-23.0, back.due, 0.0)
+  }
+
+  @Test
+  fun `صندوق‌ها و هر دو برگهٔ تعویض مالیات و پلهٔ گرد را از همان یک خواننده می‌گیرند`() {
+    val pref = src("data/TillGuardsAndroid.kt")
+    assertTrue(pref.contains("tax = SaleTaxPref.active(context)") && pref.contains("cashRounding = CashRoundPref.step(context)"))
+    val route = src("ui/v3/sales/checkout/CheckoutRoute.kt")
+    assertTrue(route.contains("val cashStep = tillGuards.cashRounding") && route.contains("val taxConfig = tillGuards.tax"))
+    val desk = src("ui/screens/DeskSale.kt")
+    assertTrue(desk.contains("val cashStep = tillGuards.cashRounding") && desk.contains("tax = tillGuards.tax,"))
+    for ((name, s) in listOf("CheckoutRoute" to route, "DeskSale" to desk)) {
+      assertFalse("$name: خواندنِ دوم", s.contains("SaleTaxPref.active(context)") || s.contains("CashRoundPref.step(context)"))
+    }
+    for (rel in listOf("ui/v3/sales/returns/ReturnFlowSheet.kt", "ui/screens/ReturnsV2.kt")) {
+      val s = src(rel)
+      assertTrue(rel, s.contains("ExchangeTill.preview(d, cart, guards.exchange(d, me, null, null), split?.cash ?: 0.0)"))
+      assertTrue("$rel: تفاوت از همان پیش‌نمایش", s.contains("kotlin.math.abs(bill.due)"))
+      assertFalse("$rel: جمعِ خامِ سبد", s.contains("SalesEngine.cartTotal("))
+      assertTrue("$rel: فروشنده کاربرِ صندوق (S46)", s.contains("val me = remember { TillUser.me(context).trim() }"))
+    }
+    assertTrue("ثبت: نقدِ برگشتِ همان سند پیش از گرد", src("data/ReturnFlow.kt").contains("SalesEngine.record(posted.data, cart, ExchangeTill.sale(checkout, posted.split),"))
   }
 }

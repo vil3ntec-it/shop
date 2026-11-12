@@ -16,7 +16,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.i18n.StrPos
-import ir.vil3ntec.tohid.data.CashRoundPref
 import ir.vil3ntec.tohid.data.DiscountGate
 import ir.vil3ntec.tohid.data.GiftCardPref
 import ir.vil3ntec.tohid.data.HeldRules
@@ -115,8 +114,8 @@ fun RouteScope.CheckoutRoute() {
     val fxRates = remember { ir.vil3ntec.tohid.data.FxTillPref.tillRates(context) }
     if (CheckoutSession.pay.fxRates != fxRates) CheckoutSession.pay.fxRates = fxRates
     CheckoutSession.pay.clock = ir.vil3ntec.tohid.data.ReportBridge::nowMs
-    //  PAY-09: پلهٔ گردکردنِ نقدیِ همین دستگاه (`CashRoundPref`، پیش‌فرض خاموش) — پنلِ ترکیبی یا نقدِ کاملِ ساده
-    val cashStep = remember { CashRoundPref.step(context) }
+    //  PAY-09: پلهٔ گردکردنِ نقدیِ همین دستگاه (`CashRoundPref` از `TillGuards`، پیش‌فرض خاموش) — پنلِ ترکیبی یا نقدِ کاملِ ساده
+    val cashStep = tillGuards.cashRounding
     if (CheckoutSession.pay.cashRounding != cashStep) CheckoutSession.pay.cashRounding = cashStep
     //  CRM-03 / S07 — سقفِ اعتبار در صندوق (`ShopPolicy.creditGate`، پیش‌فرض خاموش)
     val creditGateOn = remember { ShopPolicy.creditGate(context) }
@@ -125,8 +124,8 @@ fun RouteScope.CheckoutRoute() {
     val saleKey = remember(lines) { cart.saleKey() }
     //  POS-23: فروشندهٔ هر ردیف فقط با تنظیمِ روشنِ دکان روی قلم می‌نشیند (`LineSellerPref`)؛ خاموش ⇒ همان امروز
     val lineSellers = remember { ir.vil3ntec.tohid.data.LineSellerPref.on(context) }
-    //  POS-37: مالیاتِ فاکتور فقط با پرچمِ سرورِ `shop.sale_tax` و تنظیمِ دکان (`SaleTaxPref`)؛ خاموش ⇒ `null` و همان امروز
-    val taxConfig = remember { ir.vil3ntec.tohid.data.SaleTaxPref.active(context) }
+    //  POS-37: مالیاتِ فاکتور فقط با پرچمِ سرورِ `shop.sale_tax` و تنظیمِ دکان (`SaleTaxPref` از `TillGuards`)؛ خاموش ⇒ `null`
+    val taxConfig = tillGuards.tax
     //  «اصلاحِ فاکتور» (`SaleReopen.extras`): فروشندهٔ همان فاکتور؛ وگرنه کاربرِ صندوق. تأییدها همیشه به نامِ کاربرِ صندوق‌اند
     val invoiceSeller = HeldSession.extras(cart).seller.ifBlank { seller }
     //  همین یک `Checkout` جمع، پیش‌سنجیِ حساب‌پی و ثبت را می‌سازد ⇒ قاعده‌ها و تأییدِ منقضی همه‌جا همان‌اند

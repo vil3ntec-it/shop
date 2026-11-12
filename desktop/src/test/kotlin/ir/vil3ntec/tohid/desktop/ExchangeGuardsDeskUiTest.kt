@@ -19,11 +19,16 @@ import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.i18n.StrPos
+import ir.vil3ntec.tohid.core.i18n.StrReturnPages
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrSaleTax
 import ir.vil3ntec.tohid.core.sale.CheckoutRules
+import ir.vil3ntec.tohid.core.sale.SaleTax
 import ir.vil3ntec.tohid.data.CheckoutRulesPref
 import ir.vil3ntec.tohid.data.ExpiryPref
 import ir.vil3ntec.tohid.data.Product
+import ir.vil3ntec.tohid.data.SaleTaxPref
+import ir.vil3ntec.tohid.data.SaleTaxWiring
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopPolicy
@@ -31,6 +36,7 @@ import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.TillGuards
 import ir.vil3ntec.tohid.data.WarehouseEntry
+import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.screens.ReturnFlowDialog
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
@@ -73,6 +79,7 @@ class ExchangeGuardsDeskUiTest {
   private val sale = data.sales.single()
   private lateinit var store: ShopStore
   private val posted = mutableListOf<String>()
+  private val notes = mutableListOf<String>()
 
   private companion object { var seq = 0 }
 
@@ -80,6 +87,8 @@ class ExchangeGuardsDeskUiTest {
     ExpiryPref.setApproval(ctx, false)
     ShopPolicy.setBlockExpired(ctx, false)
     CheckoutRulesPref.set(ctx, CheckoutRules.OFF)
+    SaleTaxPref.set(ctx, null)
+    SaleTaxWiring.serverFlag = false
     ctx.filesDir.listFiles().orEmpty().filter { it.name.startsWith("shop-data.json") }.forEach { it.deleteRecursively() }
     ShopRole.remember(ctx, ShopRole.OWNER)
   }
@@ -96,7 +105,7 @@ class ExchangeGuardsDeskUiTest {
     rule.setContent {
       CompositionLocalProvider(LocalContext provides DesktopContext) {
         TohidTheme(ThemeChoice.LIGHT) {
-          ReturnFlowDialog(data, sale, store, onDismiss = {}, onPosted = { doc, _ -> posted += doc }, prefill = true)
+          ReturnFlowDialog(data, sale, store, onDismiss = {}, onPosted = { doc, note -> posted += doc; notes += note }, prefill = true)
         }
       }
     }
@@ -112,13 +121,18 @@ class ExchangeGuardsDeskUiTest {
 
   /** تعویضِ یک دانه از [p] به جای کفشِ فاکتور ⇒ «ثبتِ تعویض» */
   private fun exchangeFor(p: Product) {
+    pick(p)
+    tap(hasText(StrSale.recordExchange) and hasClickAction())
+  }
+
+  /** کلیدِ «تعویض» و افزودنِ یک دانه از [p] به سبدِ تعویض */
+  private fun pick(p: Product) {
     tap(isToggleable() and hasAnySibling(hasText(StrSale.exchangeToggle)))
     rule.waitUntil(10_000) { rule.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size >= 2 }
     rule.onAllNodes(hasSetTextAction()).let { it[it.fetchSemanticsNodes().size - 1] }.performTextInput(p.name)
     rule.waitForIdle()
     rule.waitUntil(10_000) { rule.onAllNodes(hasText(p.name) and hasClickAction() and !hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() }
     tap(hasText(p.name) and hasClickAction() and !hasSetTextAction())
-    tap(hasText(StrSale.recordExchange) and hasClickAction())
   }
 
   private fun sales() = store.data.value.sales.size
@@ -149,6 +163,27 @@ class ExchangeGuardsDeskUiTest {
     val row = store.data.value.auditLog.single { it.type == "expired_sale" }
     assertEquals("مشتری خودش خواست", row.reason)
     assertTrue(row.approvedBy.orEmpty().isNotBlank())
+  }
+
+  /**
+   *  POS-37 (`claude/e-rows-37e`): با مالیاتِ روشنِ همین دستگاه پیش‌نمایشِ تعویض ردیفِ «مالیات» و تفاوتِ با مالیات را نشان
+   *  می‌دهد و فاکتورِ تعویض همان مالیات را ثبت می‌کند. ⛔ روی e69b30114 نه ردیف بود، نه مالیات: «دریافت از مشتری ۰».
+   */
+  @Test fun theExchangePreviewAndInvoiceCarryTheTillTax() {
+    SaleTaxWiring.serverFlag = true
+    SaleTaxPref.set(ctx, SaleTax.Config(SaleTax.Mode.INVOICE, 1_000)) // ۱۰٪
+    show()
+    pick(shoe)
+    runCatching { rule.waitUntil(10_000) { has(StrSaleTax.line) } }
+      .onFailure { throw AssertionError("ردیفِ مالیات در پیش‌نمایشِ تعویض نیامد", it) }
+    val due = hasText("${money(100.0)} ؋") and hasAnySibling(hasText(StrSale.receiveFromCustomer))
+    assertTrue("کفشِ ۱۰۰۰ + ۱۰۰ مالیات − برگشتِ نقدِ ۱۰۰۰ ⇒ دریافتِ ۱۰۰", rule.onAllNodes(due).fetchSemanticsNodes().isNotEmpty())
+    tap(hasText(StrSale.recordExchange) and hasClickAction())
+    rule.waitUntil(15_000) { posted.isNotEmpty() }
+    val ex = store.data.value.sales.last()
+    assertEquals(10_000L, ex.taxMinor)
+    assertEquals(1_100.0, ex.finalTotal, 0.0)
+    assertEquals(StrReturnPages.exchangeReceive(money(100.0)), notes.single())
   }
 
   @Test fun theZeroTotalRuleBlocksAnExchangeForAFreeItem() {

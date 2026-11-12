@@ -131,7 +131,7 @@ fun ReturnFlowDialog(
   val reasons = remember { ReturnSettings.reasons(context) }
   //  RET-09 — سیاستِ برگشتِ همین دستگاه (مهلت و غیرقابلِ برگشت)؛ خالی ⇒ بی اثر
   val policy = remember { ir.vil3ntec.tohid.data.ReturnPolicyPrefs.of(context) }
-  val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("").trim() }
+  val me = remember { TillUser.me(context).trim() } // S46: کاربرِ صندوق — فروشندهٔ فاکتورِ تعویض و نویسندهٔ برگشت؛ خاموش ⇒ نامِ حساب
   //  شناسه‌های سند و فروشِ تعویض پیش از نخستین تلاش (§۱۵.۲ بندِ ۱)
   val docId = remember { newId() }
   val saleKey = remember { newId() }
@@ -173,7 +173,8 @@ fun ReturnFlowDialog(
   val creditTo = if (mode == ReturnFlow.STORE_CREDIT) customerId else null
   val prior = remember(d, sale) { sale?.let { s -> d.saleReturns.filter { it.saleId == s.id } }.orEmpty() }
   val split = (ReturnFlow.split(sale, total, mode, me, creditTo, prior, sale?.let { ir.vil3ntec.tohid.data.PayStatusFlow.bySale(d)[it.id] }.orEmpty()) as? ReturnFlow.Outcome.Ok)?.value
-  val cartTotal = remember(d, cart) { SalesEngine.cartTotal(d, cart) }
+  //  RET-05: خریدِ تازه با مالیات و گردِ نقدیِ همین صندوق، همان حسابِ ثبت (`ExchangeTill`)
+  val bill = remember(d, cart, split?.cash) { ir.vil3ntec.tohid.data.ExchangeTill.preview(d, cart, guards.exchange(d, me, null, null), split?.cash ?: 0.0) }
   val approved = gate.decision == "allow" || (approval != null && ReturnFlow.canApprove(gate, approval!!.role))
 
   /** «ثبت»؛ [expiryApproval] فقط از پنجرهٔ تأییدِ منقضیِ همین تعویض و فقط برای همین یک تلاش */
@@ -352,9 +353,10 @@ fun ReturnFlowDialog(
           ) {
             MoneyLine(StrReturnPages.returnAmount, total, strong = !exchange)
             if (exchange) {
-              MoneyLine(StrSale.newPurchase, cartTotal)
-              val due = cartTotal - (split?.cash ?: 0.0)
-              MoneyLine(if (due >= 0) StrSale.receiveFromCustomer else StrSale.payToCustomer, kotlin.math.abs(due), strong = true)
+              MoneyLine(StrSale.newPurchase, bill.goods)
+              if (bill.tax > 0) MoneyLine(ir.vil3ntec.tohid.core.i18n.StrSaleTax.line, bill.tax) // POS-37: فقط با مالیاتِ روشن
+              if (bill.rounding != 0.0) MoneyLine(ir.vil3ntec.tohid.core.i18n.StrRounding.line, bill.rounding) // PAY-09: نقدی که مشتری می‌دهد
+              MoneyLine(if (bill.due >= 0) StrSale.receiveFromCustomer else StrSale.payToCustomer, kotlin.math.abs(bill.due), strong = true)
             }
             ReturnPolicyNotice(
               verdict, policy, verdict.blockedIds.map { id -> d.products.find { it.id == id }?.name ?: id }, ReturnFlow.roleOf(role) == "staff",
