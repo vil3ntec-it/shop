@@ -702,12 +702,12 @@ fun SaleScreen(
             Icon(Icons.Outlined.PhotoCamera, contentDescription = null, tint = v.onBlackMuted, modifier = Modifier.size(30.dp))
             Spacer(Modifier.height(8.dp))
             Text(
-              if (granted) "دوربین خاموش است" else "برای اسکن، اجازهٔ دوربین لازم است",
+              if (granted) "دوربین خاموش است" else StrSale.needCameraPermission,
               color = v.onBlackMuted,
               fontSize = 13.sp,
             )
             Spacer(Modifier.height(10.dp))
-            V3Pill(if (granted) "روشن کردن دوربین" else "اجازه دادن", v.cart, v.onCart) {
+            V3Pill(if (granted) "روشن کردن دوربین" else ir.vil3ntec.tohid.core.i18n.StrDevices.allow, v.cart, v.onCart) {
               if (granted) {
                 cameraOn = true
                 gate.reset()
@@ -729,7 +729,7 @@ fun SaleScreen(
           verticalAlignment = Alignment.CenterVertically,
         ) {
           Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-            if (manual.isEmpty()) Text("یا بارکد را دستی وارد کنید", color = v.onBlackMuted, fontSize = 14.sp, maxLines = 1)
+            if (manual.isEmpty()) Text(StrSale.manualBarcode, color = v.onBlackMuted, fontSize = 14.sp, maxLines = 1)
             BasicTextField(
               value = manual,
               onValueChange = { manual = it },
@@ -743,12 +743,12 @@ fun SaleScreen(
           }
           if (manual.isNotEmpty()) {
             IconButton(onClick = { manual = "" }, modifier = Modifier.size(36.dp)) {
-              Icon(Icons.Filled.Close, contentDescription = "پاک کردن بارکد", tint = v.onBlackMuted, modifier = Modifier.size(18.dp))
+              Icon(Icons.Filled.Close, contentDescription = StrSale.clearBarcode, tint = v.onBlackMuted, modifier = Modifier.size(18.dp))
             }
           }
         }
         Spacer(Modifier.width(8.dp))
-        V3Pill("جستجو", v.cart, v.onCart) { searchManual() }
+        V3Pill(ir.vil3ntec.tohid.core.i18n.StrFields.search, v.cart, v.onCart) { searchManual() }
       }
       Spacer(Modifier.height(10.dp))
       Row(
@@ -756,7 +756,7 @@ fun SaleScreen(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
       ) {
-        Text("هر اسکن:", color = v.onBlackMuted, fontSize = 12.sp, maxLines = 1)
+        Text(StrSale.perScan, color = v.onBlackMuted, fontSize = 12.sp, maxLines = 1)
         listOf(1, 2, 5, 10).forEach { m ->
           val on = m == multiplier
           V3Pill("×${ir.vil3ntec.tohid.plain(m)}", if (on) v.cart else v.blackRaised, if (on) v.onCart else v.onBlack, height = 36.dp) {
@@ -1017,9 +1017,9 @@ fun SaleScreen(
             scanning = scanOpen,
             scanPanel = { phoneScanPanel() },
             emptyText = when {
-              d.products.isEmpty() -> "هنوز محصولی ثبت نشده."
+              d.products.isEmpty() -> StrSale.noProductsYet
               phoneSearch.isNotBlank() -> "کالایی با «${phoneSearch.trim()}» پیدا نشد"
-              else -> "محصولی در این دسته‌بندی نیست"
+              else -> StrSale.emptyCategory
             },
             bottomGap = bottomGap,
             onTap = { phoneTap(it) },
@@ -1056,12 +1056,12 @@ fun SaleScreen(
               val debtorName = cartDebtorId?.let { id -> d.debtors.find { it.id == id }?.name }
               PhoneCartInfoRow(
                 icon = Icons.Outlined.Person,
-                title = debtorName ?: "مشتری گذری",
+                title = debtorName ?: StrSale.walkIn,
                 hint = cartDebtorId?.let { id -> debtStateText(d, id) } ?: "برای فروشِ نسیه، قرض‌دار را انتخاب کنید",
                 index = rows.size,
                 revealed = revealed,
                 onClick = { pickDebtor = true },
-                onClickLabel = "انتخابِ قرض‌دار",
+                onClickLabel = StrSale.pickDebtor,
                 trailing = {
                   if (debtorName != null) PhoneCartClear("برداشتنِ قرض‌دار") { cartStore.setDebtor(null) }
                 },
@@ -1070,8 +1070,8 @@ fun SaleScreen(
               if (off > 0) {
                 PhoneCartInfoRow(
                   icon = Icons.Outlined.LocalOffer,
-                  title = "تخفیف",
-                  hint = "قیمتِ دستیِ کمتر از قیمتِ کالا — در جمع حساب شده است",
+                  title = Str.discount,
+                  hint = StrSale.manualDiscountHint,
                   index = rows.size + 1,
                   revealed = revealed,
                   onClick = null,
@@ -1085,7 +1085,7 @@ fun SaleScreen(
           ir.vil3ntec.tohid.ui.components.pos.LoyaltyBar(loyalty, Modifier.padding(top = 8.dp)) // PRM-13
           PhoneCartTotal(SalesEngine.cartTotal(d, loyal))
           Spacer(Modifier.height(36.dp))
-          PhoneCartPay("پرداخت", onClick = { checkout = true })
+          PhoneCartPay(ir.vil3ntec.tohid.core.i18n.StrDevices.pay, onClick = { checkout = true })
         },
       )
       PhoneQtyKeypad(
@@ -1140,14 +1140,14 @@ fun SaleScreen(
             is WarehouseEngine.Result.Failed -> toast(result.message)
             is WarehouseEngine.Result.Ok -> {
               scope.launch { store.save(d, result.data) }
-              toast("دسته‌بندی اضافه شد")
+              toast(ir.vil3ntec.tohid.core.i18n.StrProducts.categoryAdded)
               category = value.trim()
               newCategory = null
             }
           }
-        }) { Text("افزودن") }
+        }) { Text(ir.vil3ntec.tohid.core.i18n.StrCourier.add) }
       },
-      dismissButton = { TextButton(onClick = { newCategory = null }) { Text("انصراف") } },
+      dismissButton = { TextButton(onClick = { newCategory = null }) { Text(Str.cancel) } },
     )
   }
 
@@ -1155,7 +1155,7 @@ fun SaleScreen(
     AlertDialog(
       onDismissRequest = { confirmDeleteCategory = null },
       containerColor = Shop.colors.surfaceSolid,
-      title = { Text("حذف دسته‌بندی؟", color = Shop.colors.text) },
+      title = { Text(ir.vil3ntec.tohid.core.i18n.StrProducts.deleteCategoryTitle, color = Shop.colors.text) },
       text = {
         Text(
           "دسته‌بندی «$name» حذف می‌شود. محصولات این دسته حذف نمی‌شوند، فقط دیگر در این دسته‌بندی فیلتر نمی‌شوند.",
@@ -1169,14 +1169,14 @@ fun SaleScreen(
             is WarehouseEngine.Result.Failed -> toast(result.message)
             is WarehouseEngine.Result.Ok -> {
               scope.launch { store.save(d, result.data) }
-              toast("دسته‌بندی حذف شد")
+              toast(ir.vil3ntec.tohid.core.i18n.StrProducts.categoryDeleted)
               if (category == name) category = null
             }
           }
           confirmDeleteCategory = null
-        }) { Text("حذف", color = Shop.colors.danger) }
+        }) { Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPrices.remove, color = Shop.colors.danger) }
       },
-      dismissButton = { TextButton(onClick = { confirmDeleteCategory = null }) { Text("انصراف") } },
+      dismissButton = { TextButton(onClick = { confirmDeleteCategory = null }) { Text(Str.cancel) } },
     )
   }
 

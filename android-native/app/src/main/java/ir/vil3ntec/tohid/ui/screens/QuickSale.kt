@@ -49,6 +49,12 @@ import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrCourier
+import ir.vil3ntec.tohid.core.i18n.StrCustomerPrices
+import ir.vil3ntec.tohid.core.i18n.StrProducts
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrScanPages
 
 /**
  *  فروش سریع — «انتخاب محصول» نسخهٔ وب، به‌صورت یک صفحهٔ کامل.
@@ -199,7 +205,7 @@ fun QuickSaleScreen(
             if (t is VisualSearch.Tap.Search) { category = null; search = t.query }
           }
           TohidSecondaryButton(
-            text = "اسکن بارکد",
+            text = StrScanPages.scanBarcode,
             icon = Icons.Filled.QrCodeScanner,
             onClick = { scanning = true },
             modifier = Modifier.fillMaxWidth(),
@@ -255,11 +261,11 @@ fun QuickSaleScreen(
                 modifier = Modifier.weight(1f),
               )
               Button(onClick = {
-                applyResult(WarehouseEngine.addCategory(d, value), "دسته‌بندی اضافه شد") {
+                applyResult(WarehouseEngine.addCategory(d, value), StrProducts.categoryAdded) {
                   category = value.trim()
                   newCategory = null
                 }
-              }) { Text("افزودن") }
+              }) { Text(StrCourier.add) }
             }
           }
 
@@ -271,8 +277,8 @@ fun QuickSaleScreen(
         item(span = { GridItemSpan(maxLineSpan) }) {
           Panel {
             EmptyNote(
-              if (d.products.isEmpty()) "هنوز محصولی ثبت نشده."
-              else "محصولی در این دسته‌بندی نیست"
+              if (d.products.isEmpty()) StrSale.noProductsYet
+              else StrSale.emptyCategory
             )
           }
         }
@@ -386,7 +392,7 @@ fun QuickSaleScreen(
     AlertDialog(
       onDismissRequest = { confirmDeleteCategory = null },
       containerColor = Shop.colors.surfaceSolid,
-      title = { Text("حذف دسته‌بندی؟", color = Shop.colors.text) },
+      title = { Text(StrProducts.deleteCategoryTitle, color = Shop.colors.text) },
       text = {
         Text(
           "دسته‌بندی «$name» حذف می‌شود. محصولات این دسته حذف نمی‌شوند، فقط دیگر در این دسته‌بندی فیلتر نمی‌شوند.",
@@ -396,14 +402,14 @@ fun QuickSaleScreen(
       },
       confirmButton = {
         TextButton(onClick = {
-          applyResult(WarehouseEngine.removeCategory(d, name), "دسته‌بندی حذف شد") {
+          applyResult(WarehouseEngine.removeCategory(d, name), StrProducts.categoryDeleted) {
             if (category == name) category = null
           }
           confirmDeleteCategory = null
-        }) { Text("حذف", color = Shop.colors.danger) }
+        }) { Text(StrCustomerPrices.remove, color = Shop.colors.danger) }
       },
       dismissButton = {
-        TextButton(onClick = { confirmDeleteCategory = null }) { Text("انصراف") }
+        TextButton(onClick = { confirmDeleteCategory = null }) { Text(Str.cancel) }
       },
     )
   }
@@ -423,7 +429,7 @@ fun QuickSaleScreen(
         val found = d.products.firstOrNull { p -> p.active && p.barcodes.any { it == code } }
         if (found == null) {
           search = code
-          scope.launch { snackbar.showSnackbar("بارکد ناشناس — این کالا هنوز ثبت نشده است") }
+          scope.launch { snackbar.showSnackbar(StrSale.unknownBarcode) }
         } else {
           val added = SalesEngine.addToCartCapped(
             cart, found.id, SalesEngine.cartStep(found.unit), ir.vil3ntec.tohid.data.ProductInfoMap.sellable(d, found.id),
@@ -599,7 +605,7 @@ private fun QuickTile(
     )
     Spacer(Modifier.height(2.dp))
     Text(
-      if (out) "موجود نیست" else "${qty(stock)}${if (unit.isNotBlank()) " $unit" else ""} مانده",
+      if (out) StrSale.outOfStock else "${qty(stock)}${if (unit.isNotBlank()) " $unit" else ""} مانده",
       style = MaterialTheme.typography.labelSmall,
       color = if (out) Shop.colors.danger else Shop.colors.muted2,
       maxLines = 1,

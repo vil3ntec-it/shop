@@ -54,6 +54,28 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-22n زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-22n` (از `claude/batch-55`)
+
+- **ساخته شد:** LOC-06 — متنِ خامِ `ui/screens` **۱۴۷۰ ⇐ ۱۷۸** (`DariCoverageTest.maxRawOldScreens`). سنجشِ اعلان‌به‌اعلانِ «زنده» (ریشه: هر
+  پروندهٔ بیرون از `ui/screens` در اندروید، کامپیوتر، آیفون، هسته و آزمون؛ نامِ هم‌نامِ نسخهٔ ۳ فقط با همان بسته یا import) نشان داد «۱۴۷۰ متنِ
+  زنده» درست نبود: ~۴۲۰ زنده (۲۹۳ تا داده)، ~۲۳۰ فقط در پیش‌نمایشِ گوشیِ DevShot و ~۸۱۵ در کدِ مرده. (۱) ۳۵۴ داده «// داده:» گرفت (کلیدهای بخشِ
+  تنظیمات، واژه‌های سه‌زبانهٔ `SettingsSearchIndex.KEYWORDS`)؛ (۲) ۶۸۹ با کدِ مرده برداشته شد (`DeliveryCash.kt`، `Devices.kt` و بخشِ مردهٔ `Orders`،
+  `Reports`، `Vip`، `DeliveryDesk`، `DeliveryDialogs`، `StorefrontOwnerSettings`، `OwnerReportSettings`، `StockBook`، `SettingsParts`؛ همه جانشینِ نسخهٔ
+  ۳ دارند) و پنج آزمونِ سیم‌کشی که متنِ همان صفحه‌های مرده را می‌سنجیدند به پرونده‌های نسخهٔ ۳ رفتند؛ (۳) ۲۴۹ متن که عیناً فارسیِ ویژگیِ بی‌آرگومانِ
+  جدولی بود به همان ویژگی رفت (فارسی بایت‌به‌بایت همان؛ `const`، enum و سرستونِ دوپهلو نه).
+- **نیمه‌کاره:** ۱۷۸ مانده: ستون‌های `DayEndModel`/`HeatmapModel` (۷۳؛ صفحه و خروجیِ اکسل با هم ⇐ تصمیمِ صاحب‌کار)، صفحه‌های فقط‌پیش‌نمایش
+  (`Sale`، `QuickSale`، `Profile`، `Settings`، `Debtors`… ۷۴، با `ProfileModel`/`PhoneHomeModel` ِ فقط‌آزمون) و مرده‌های نگه‌داشته برای نسخهٔ ۳
+  (`WarehouseDialogs`، `PhoneClaimStep`، `ProductDetail`، `Receipts`؛ ۳۱) — ردیف PARTIAL.
+- **باگ/دام:** (۱) `ui/screens` و `ui/v3` نام‌های هم‌نام دارند (`CouriersTab`، `OrdersScreen`، `ReportsScreen`، `SaleScreen`، `QuickSaleScreen`…) ⇒ grep ِ
+  نام «زنده» نشان می‌دهد؛ بسته/import را ببینید. (۲) پیش‌نمایشِ گوشیِ `DevShot` (`PhonePreview`، `PhoneV3CartPreview`) هنوز صفحه‌های قدیمیِ بی‌راه را
+  عکس می‌گیرد و چند آزمونِ سیم‌کشی (`GiftCardWiringTest`، `LayawayWiringTest`، `QuoteWiringTest`، `SpecialOrderWiringTest`، `LoyaltyTillWiringTest`…)
+  سیمِ همان `Sale.kt`/`QuickSale.kt`/`Settings.kt` را می‌سنجند — سبزیِ آن‌ها دربارهٔ برنامهٔ واقعی چیزی نمی‌گوید. (۳) `ProductDetail.kt` ِ مرده
+  `movementLabelOf` ِ `Reports.kt` را می‌خواند (با آن ماند).
+- **قدمِ بعدی:** تصمیمِ صاحب‌کار: سرستون‌های گزارشِ پایانِ روز و نقشهٔ ساعت در خروجیِ اکسل هم به زبانِ صفحه بروند؟ سپس جدا کردنِ برچسبِ صفحه از
+  خروجی؛ پیش‌نمایشِ DevShot به صفحه‌های نسخهٔ ۳ و برداشتنِ صفحه‌های قدیمی (و آزمون‌های سیمِ آن‌ها)؛ مرده‌های نگه‌داشته پس از جای‌گیریِ نسخهٔ ۳.
+- **آزمون:** اجرای کاملِ کامپیوتر ۴٬۰۰۴ PASS، ۰ FAIL، ۴ SKIP؛ `dari-text.test.js` ۱۷/۱۷؛ `quality.mjs` بی ❌ (سقف‌ها فقط برای پرونده‌های همین کار
+  پایین آمد)؛ precheck ‏fail=0؛ spec «سالم».
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-25s زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-25s` (از `claude/batch-55`) + پنل `claude/panel-rows-23p` (server#147)
 
 - **ABUSE-01 — پنل (server، 1.50.97):** «فروشگاه ← مدیریتِ بازار ← گزارش‌ها و جریمه‌ها» کامل شد: صف با پالایش، «مسئولش من»، تصمیم/رأی/برداشتن

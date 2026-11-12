@@ -115,6 +115,7 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3DebtColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import ir.vil3ntec.tohid.core.i18n.StrReports
 
 /*
  *  حسابِ یک قرض‌دار — گوشی نسخهٔ ۳، از صفر (دستورِ صاحب محصول، owner-feedback-2).
@@ -192,7 +193,7 @@ internal fun DebtorDetailScreen(
         withContext(Dispatchers.IO) {
           context.contentResolver.openOutputStream(uri)?.use { out ->
             out.write(ReportCsv.text(sheet).toByteArray(Charsets.UTF_8))
-          } ?: error("فایل ساخته نشد")
+          } ?: error(StrReports.csvFailed)
         }
       }
     }

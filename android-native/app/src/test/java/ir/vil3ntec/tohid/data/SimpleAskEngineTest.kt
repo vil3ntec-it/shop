@@ -208,13 +208,13 @@ class SimpleAskEngineTest {
     val pref = src("data/SimpleAskPrefAndroid.kt")
     assertTrue(pref.contains("getBoolean(KEY, true) }.getOrDefault(false)"))
     assertFalse(pref.contains("putBoolean(KEY, true)"))
-    //  گوشی: زبانه و بخش فقط با `askOn`
-    val phone = src("ui/screens/Reports.kt")
-    assertTrue(phone.contains("val askOn = remember { ir.vil3ntec.tohid.data.SimpleAskPref.on(context) }"))
-    //  زبانه درونِ listOfNotNull ِ زبانه‌های اختیاری (کنارِ «شماره‌های جاافتاده»، RPT-17)
-    assertTrue(Regex("""listOfNotNull\([\s\S]{0,300}?\("ask" to ir\.vil3ntec\.tohid\.core\.i18n\.StrSimpleAsk\.tab\)\.takeIf \{ askOn \}""").containsMatchIn(phone))
-    assertTrue(phone.contains("\"ask\" -> if (askOn) simpleAskSection(this, d, canSeeMoney)"))
+    //  گوشی: «گزارش‌ها» ِ نسخهٔ ۳ — زبانه فقط با کلید و بخش فقط از همان زبانه (صفحهٔ قدیمیِ `ui/screens/Reports.kt`
+    //  بی‌راه بود و در LOC-06 برداشته شد)
+    val phone = src("ui/v3/analytics/ReportsScreen.kt")
+    assertTrue(phone.contains("if (SimpleAskPref.on(context)) add(ReportExtra.ASK)"))
+    assertTrue(phone.contains("ReportExtra.ASK -> ReportList(list) { simpleAskSection(this, d, canSeeMoney) }"))
     assertEquals(1, Regex("simpleAskSection\\(").findAll(phone).count())
+    assertEquals(1, Regex(Regex.escape("add(ReportExtra.ASK)")).findAll(phone).count())
     //  کامپیوتر: گزارش‌های رابطِ امروز (`DeskReports.kt`، زبانهٔ `ASK`) بی‌مرجع از نسخهٔ ۳ بود و در «پاک‌سازی، گامِ ۳»
     //  پاک شد؛ `DeskSimpleAsk` تا جای کامپیوتریِ نسخهٔ ۳ می‌ماند (STATUS، یادداشت‌ها) و هیچ صفحه‌ای آن را بی کلید نمی‌کشد
     val ui = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")

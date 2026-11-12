@@ -40,6 +40,10 @@ import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.Space
 import kotlinx.coroutines.launch
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrChat
+import ir.vil3ntec.tohid.core.i18n.StrProducts
+import ir.vil3ntec.tohid.core.i18n.StrReach
 
 /**
  *  صفحهٔ یک کالا.
@@ -63,8 +67,8 @@ fun ProductDetailScreen(
   val product = d.products.find { it.id == productId }
   if (product == null) {
     TohidErrorState(
-      title = "این کالا دیگر نیست",
-      description = "شاید حذف شده باشد. به فهرست برگردید.",
+      title = StrProducts.missingTitle,
+      description = StrProducts.missingBody,
       onRetry = onBack,
     )
     return
@@ -82,9 +86,9 @@ fun ProductDetailScreen(
     else -> Shop.colors.success
   }
   val label = when (status) {
-    "out" -> "تمام‌شده"
-    "low" -> "موجودی کم"
-    else -> "موجودی کافی"
+    "out" -> Str.finished
+    "low" -> Str.stockLow
+    else -> StrProducts.statusOk
   }
 
   /* ---------------------------- عکس ---------------------------- */
@@ -166,7 +170,7 @@ fun ProductDetailScreen(
       TextButton(onClick = onBack, contentPadding = PaddingValues(0.dp)) {
         Icon(Icons.Filled.ArrowForward, contentDescription = null, tint = Shop.colors.primary)
         Spacer(Modifier.width(Space.xxs + 2.dp))
-        Text("بازگشت", color = Shop.colors.primary)
+        Text(Str.goBack, color = Shop.colors.primary)
       }
       Spacer(Modifier.height(Space.xs))
 
@@ -193,7 +197,7 @@ fun ProductDetailScreen(
           ) {
             Icon(
               Icons.Filled.PhotoCamera,
-              contentDescription = "عکس محصول",
+              contentDescription = StrProducts.productPhoto,
               tint = Shop.colors.button.primary.text,
               modifier = Modifier.size(13.dp),
             )
@@ -221,7 +225,7 @@ fun ProductDetailScreen(
           }
         }
         IconButton(onClick = onEdit) {
-          Icon(Icons.Filled.Edit, contentDescription = "ویرایش", tint = Shop.colors.primary)
+          Icon(Icons.Filled.Edit, contentDescription = StrChat.edit, tint = Shop.colors.primary)
         }
       }
 
@@ -244,12 +248,12 @@ fun ProductDetailScreen(
               sc.requestPhoto(product.id, product.name) -> {
                 phoneMsg = "روی گوشی «گرفتنِ عکس» را بزنید…"
               }
-              else -> { phoneMsg = "گوشی وصل نیست — اینترنت و ورود به حساب را ببینید" }
+              else -> { phoneMsg = StrProducts.phoneOffline }
             }
           }) {
             Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
-            Text("عکس با دوربینِ گوشی")
+            Text(StrProducts.phoneCamera)
           }
           phoneMsg?.let {
             Spacer(Modifier.width(8.dp))
@@ -261,12 +265,12 @@ fun ProductDetailScreen(
       if (bankOn || ir.vil3ntec.tohid.scan.GuidedCapture.AVAILABLE) {
         Spacer(Modifier.height(Space.xs))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          if (bankOn) OutlinedButton(onClick = { bankOpen = true }) { Text("انتخاب از بانکِ تصاویر") }
+          if (bankOn) OutlinedButton(onClick = { bankOpen = true }) { Text(StrReach.photoBank) }
           if (ir.vil3ntec.tohid.scan.GuidedCapture.AVAILABLE) {
             OutlinedButton(onClick = { guidedOpen = true }) {
               Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
               Spacer(Modifier.width(6.dp))
-              Text("عکس با راهنما")
+              Text(StrReach.photoGuided)
             }
           }
         }
@@ -293,7 +297,7 @@ fun ProductDetailScreen(
         verticalAlignment = Alignment.CenterVertically,
       ) {
         Column(Modifier.weight(1f)) {
-          Text("موجودی فعلی", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+          Text(StrProducts.stockNow, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
           Spacer(Modifier.height(Space.xxs))
           Text(
             "${qty(stock)}${if (product.unit.isNotBlank()) " ${product.unit}" else ""}",
@@ -317,8 +321,8 @@ fun ProductDetailScreen(
 
       /* -------------------------- قیمت‌ها -------------------------- */
       TohidCard {
-        DetailLine("قیمت فروش", "${money(product.salePrice)} ؋")
-        DetailLine("قیمت خرید", "${money(product.purchasePrice)} ؋")
+        DetailLine(StrProducts.salePrice, "${money(product.salePrice)} ؋")
+        DetailLine(StrProducts.purchasePrice, "${money(product.purchasePrice)} ؋")
         HorizontalDivider(Modifier.padding(vertical = Space.xs), color = Shop.colors.border)
         DetailLine(
           "سود هر ${product.unit.ifBlank { "واحد" }}",
@@ -326,11 +330,11 @@ fun ProductDetailScreen(
           tint = if (unitProfit >= 0) Shop.colors.success else Shop.colors.danger,
         )
         DetailLine(
-          "سود موجودی فعلی",
+          StrProducts.stockProfit,
           "${money(potential)} ؋",
           tint = if (potential >= 0) Shop.colors.success else Shop.colors.danger,
         )
-        DetailLine("حداقل موجودی", qty(product.minStock))
+        DetailLine(StrProducts.minStock, qty(product.minStock))
       }
 
       Spacer(Modifier.height(Space.sm))
@@ -338,33 +342,33 @@ fun ProductDetailScreen(
       /* --------------------------- فروش --------------------------- */
       Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
         TohidStatCard(
-          label = "فروخته‌شده",
+          label = StrProducts.sold,
           value = "${qty(sold)}${if (product.unit.isNotBlank()) " ${product.unit}" else ""}",
-          hint = "از آغاز",
+          hint = StrProducts.soldCaption,
           modifier = Modifier.weight(1f),
         )
         TohidStatCard(
-          label = "سود کسب‌شده",
+          label = StrProducts.earned,
           value = "${money(profit)} ؋",
           tint = if (profit >= 0) Shop.colors.success else Shop.colors.danger,
-          hint = "پس از مرجوعی",
+          hint = StrProducts.earnedCaption,
           modifier = Modifier.weight(1f),
         )
       }
 
       Spacer(Modifier.height(Space.sm))
-      TohidButton(text = "ورود کالا به انبار", onClick = onEntry, modifier = Modifier.fillMaxWidth())
+      TohidButton(text = StrProducts.entryCta, onClick = onEntry, modifier = Modifier.fillMaxWidth())
 
       Spacer(Modifier.height(Space.lg))
-      TohidSectionHeader("حرکت‌های اخیر")
+      TohidSectionHeader(StrProducts.recentMoves)
     }
 
     if (movements.isEmpty()) {
       item {
         TohidCard {
           TohidEmptyState(
-            title = "هنوز حرکتی ثبت نشده",
-            description = "ورود کالا، فروش و مرجوعیِ این کالا اینجا فهرست می‌شود.",
+            title = StrProducts.movesEmpty,
+            description = StrProducts.movesEmptyBody,
           )
         }
       }
@@ -388,7 +392,7 @@ fun ProductDetailScreen(
     if (history.isNotEmpty()) {
       item {
         Spacer(Modifier.height(Space.lg))
-        TohidSectionHeader("تاریخچهٔ تغییرات")
+        TohidSectionHeader(StrProducts.history)
       }
       items(history.take(30), key = { it.id }) { a ->
         Text(
