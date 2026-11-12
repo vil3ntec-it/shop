@@ -38,6 +38,7 @@ object I18nTables {
     StrOnlineReport, // RPT-14: گزارشِ فروشِ اینترنتی در برنامهٔ مدیریت
     StrBranches, // RPT-18: گزارشِ همهٔ شعبه‌ها
     StrImageChanges, // IMG-PRO-17/16: تغییرِ دسته‌ایِ عکس‌ها و نسخه‌های عکس
+    StrImageStudio, // ۴-۲۳ (۱): استودیوی عکسِ سرور — دسته‌ها و تأییدِ نسخه
     StrProductGallery, // PRD-17/27: عکس‌های تکمیلیِ کالا و عکسِ جدای ویترین
     StrPromoHeld, // PRM-02: آزادِ دستیِ کدِ تخفیفِ نگه‌داشته
     StrDrawers, // PAY-17: چند کشو و شیفتِ شناور

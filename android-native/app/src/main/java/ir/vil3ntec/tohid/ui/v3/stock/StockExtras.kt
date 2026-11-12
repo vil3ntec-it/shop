@@ -19,6 +19,8 @@ enum class StockExtra(val route: String) {
   IMAGES(StockPaths.IMAGES),
   /** IMG-PRO-17 — فقط با بانکِ تصاویرِ روشن (`shop.image_bank`) و نقشِ غیرِ شاگرد (`ImageChangesGate`) */
   IMAGE_CHANGES(StockPaths.IMAGE_CHANGES),
+  /** ۴-۲۳ (۱) — استودیوی عکس: همان دروازهٔ بانکِ روشن و غیرِ شاگرد؛ پرچمِ `shop.image_studio` را صفحه از سرور می‌پرسد */
+  IMAGE_STUDIO(StockPaths.IMAGE_STUDIO),
   /** INV-11 — فقط با پرچمِ `shop.catalog` و `stock.move` ِ سرور (`StockTransferFlag.on`) */
   TRANSFERS(StockPaths.TRANSFERS),
 }
@@ -45,6 +47,7 @@ object StockExtras {
     add(StockExtra.BULK_PRODUCTS)
     if (!f.staff) add(StockExtra.IMAGES)
     if (f.imageChanges && !f.staff) add(StockExtra.IMAGE_CHANGES)
+    if (f.imageChanges && !f.staff) add(StockExtra.IMAGE_STUDIO)
     if (f.transfers) add(StockExtra.TRANSFERS)
   }
 
