@@ -52,9 +52,14 @@ internal object MoneyWriter {
    *  و بسته روی همگام‌سازیِ v3). بیرونِ صفحه اجرا می‌شود تا بسته شدنِ برگه آن را نبرد؛ پیامِ رد
    *  همان پیامِ موتور است.
    */
-  fun merge(store: ShopStore, toasts: V3Toasts?, context: Context?, keepId: String, dropId: String, done: (CustomerMerge.Preview) -> String) {
+  fun merge(
+    store: ShopStore, toasts: V3Toasts?, context: Context?, keepId: String, dropId: String,
+    /** CRM-03 — «تغییرِ سقفِ اعتبار» ِ همین کاربر؛ رد ⇒ پیامِ موتور و هیچ نوشتن */
+    limitRules: ir.vil3ntec.tohid.core.perm.CreditLimitPerm.Rules,
+    done: (CustomerMerge.Preview) -> String,
+  ) {
     scope.launch {
-      when (val r = store.mergeCustomers(keepId, dropId)) {
+      when (val r = store.mergeCustomers(keepId, dropId, limitRules)) {
         is CustomerMerge.Result.Failed -> toasts?.show(r.message, V3Tone.ERROR)
         is CustomerMerge.Result.Ok -> {
           toasts?.show(done(r.preview), V3Tone.SUCCESS)

@@ -268,16 +268,17 @@ const picture = (size) => async (req, res) => {
   //  M3) تا برداشتن/پنهان کردن دیر یا زود به کشِ مشترک هم برسد. بی `v` یا `v` ِ کهنه (پیوند، سبد، SEO) ⇒ همان
   //  عکسِ امروز با ۵ دقیقه، پس هیچ نشانیِ پیشینی نمی‌شکند و هیچ نشانی‌ای عکسِ دیگری را به‌درازا نگه نمی‌دارد.
   res.set('Cache-Control', p.tag && req.query.v === p.tag ? 'public, max-age=86400' : 'public, max-age=300');
-  //  WEB-16 / ۴-۲: WebP فقط با `STORE_WEBP` و `sharp` و `Accept: image/webp` (`lib/store-webp.js`)؛ وگرنه همان امروز، بایت‌به‌بایت
+  //  WEB-16 / ۴-۲: AVIF (`STORE_AVIF`) یا WebP (`STORE_WEBP`) فقط با `sharp` و همان `Accept` (`lib/store-webp.js`)؛ وگرنه همان امروز
   if (webp.available()) {
     res.set('Vary', 'Accept');
-    if (webp.wants(req.get('accept'))) {
-      const w = await webp.webpOf(p.data, p.hash, size);
+    const fmt = webp.pick(req.get('accept'));
+    if (fmt) {
+      const w = await webp.encodedOf(p.data, p.hash, size, fmt);
       if (w) {
-        const wtag = `"${p.hash}-webp"`;
+        const wtag = `"${p.hash}-${fmt}"`;
         res.set('ETag', wtag);
         if (req.get('if-none-match') === wtag) return res.status(304).end();
-        return res.type('image/webp').send(w);
+        return res.type(`image/${fmt}`).send(w);
       }
     }
   }

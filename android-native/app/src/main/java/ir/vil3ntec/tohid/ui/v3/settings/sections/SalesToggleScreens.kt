@@ -72,6 +72,8 @@ internal fun RouteScope.PaySettingsScreen(onBack: (() -> Unit)?) {
     }
     //  PAY-10: پرداخت با ارزِ نقد و نرخِ دکان — فقط با «ترکیبی و شیفت»؛ پیش‌فرض خاموش (`FxTillPref`)
     if (payV2) item(key = "fx") { FxTillSettings() }
+    //  PAY-06: روش‌های پنلِ پرداخت — دکان روشی را که نمی‌پذیرد برمی‌دارد (`PayMethodsPref`، خالی ⇒ همهٔ روش‌های امروز)
+    if (payV2) item(key = "methods") { PayMethodsSettings() }
     //  PAY-09: گردکردنِ نقدی (خاموش | ۵ | ۱۰ افغانی) — همان `CashRoundPref.set` ِ رابطِ امروز، پیش‌فرض خاموش
     item(key = "rounding") {
       SettingsBlock {

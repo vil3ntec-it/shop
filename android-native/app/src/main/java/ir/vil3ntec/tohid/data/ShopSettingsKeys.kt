@@ -71,6 +71,7 @@ object ShopSettingsKeys {
     shop("safe_book", "b"),                     // PAY-18: گاوصندوق
     shop("fx_tender", "b"),                     // PAY-10: پرداخت با ارزِ نقد (`FxTillPref`)
     shop("fx_rates", "s"),                      // PAY-10: جدولِ نرخِ خودِ دکان (JSON)
+    shop("pay_methods_off", "set"),             // PAY-06: روش‌هایی که دکان از پنلِ پرداخت برداشته (`PayMethodsPref`)
     //  برگشت
     shop("returns_v2", "b"),                    // ReturnSettings
     shop("return_limit", "f"),

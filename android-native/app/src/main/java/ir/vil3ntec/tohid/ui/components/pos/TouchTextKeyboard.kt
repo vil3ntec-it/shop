@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -110,6 +111,32 @@ fun TouchKeysPanel(kb: TouchKeyboardUi, show: Boolean, target: Dp, onKey: (Key) 
       }
     }
   }
+}
+
+/**
+ *  POS-31 — صفحه‌کلیدِ حروف برای هر کادرِ متنیِ دیگرِ صندوقِ کامپیوترِ لمسی (§۵.۳ «با فوکوس هر فیلد متنی در حالت لمسی
+ *  باز می‌شود»؛ نامِ قلمِ آزاد، یادداشتِ ردیف و فاکتور). [show] = `PosTouchPrefs.extras()`؛ خاموش و گوشی ⇒ هیچ.
+ */
+@Stable
+class TouchTextKeys(val ui: TouchKeyboardUi, val show: Boolean)
+
+@Composable
+fun rememberTouchTextKeys(show: Boolean = PosTouchPrefs.extras()): TouchTextKeys {
+  val ui = rememberTouchKeyboard()
+  return remember(ui, show) { TouchTextKeys(ui, show) }
+}
+
+/** فوکوسِ کادر ⇒ صفحه‌کلید باز (فقط کامپیوترِ لمسی؛ بستن فقط با کلیدِ «حروف») */
+fun Modifier.touchKeysOnFocus(keys: TouchTextKeys): Modifier =
+  if (!keys.show) this else onFocusChanged { if (it.isFocused) keys.ui.open = true }
+
+/** کلیدِ «حروف» و خودِ صفحه‌کلید زیرِ کادر؛ هر کلید با `TouchKeyboard.apply` (تا [max] نویسه) به [onValue] */
+@Composable
+fun TouchTextKeysPanel(keys: TouchTextKeys, value: String, onValue: (String) -> Unit, max: Int = TouchKeyboard.MAX) {
+  if (!keys.show) return
+  val target = TouchMode.TOUCH_TARGET_DP.dp
+  Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.End) { TouchKeysToggle(keys.ui, true, target) {} }
+  TouchKeysPanel(keys.ui, true, target) { onValue(TouchKeyboard.apply(value, it, max)) }
 }
 
 private fun text(key: Key, layout: TouchKeyboard.Layout): String = when (key) {

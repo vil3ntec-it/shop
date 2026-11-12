@@ -76,8 +76,8 @@
     { "id": "sale.clear", "scope": "sale", "title": "پاک کردنِ کادر؛ خالی کردنِ فاکتور فقط با تأیید", "status": "live", "keys": ["Escape"], "web": ["Escape"], "overrides": ["global.back"] },
 
     { "id": "sale.payment.submit", "scope": "sale.payment", "title": "ثبت؛ مبلغِ خالی = نقدِ دقیق", "status": "partial", "keys": ["Enter"], "web": ["Enter"] },
-    { "id": "sale.payment.nextField", "scope": "sale.payment", "title": "فیلدِ بعدی", "status": "planned", "keys": ["Tab"], "web": ["Tab"] },
-    { "id": "sale.payment.prevField", "scope": "sale.payment", "title": "فیلدِ قبلی", "status": "planned", "keys": ["Shift+Tab"], "web": ["Shift+Tab"] },
+    { "id": "sale.payment.nextField", "scope": "sale.payment", "title": "فیلدِ بعدی", "status": "partial", "keys": ["Tab"], "web": ["Tab"] },
+    { "id": "sale.payment.prevField", "scope": "sale.payment", "title": "فیلدِ قبلی", "status": "partial", "keys": ["Shift+Tab"], "web": ["Shift+Tab"] },
     { "id": "sale.payment.nextMethod", "scope": "sale.payment", "title": "روشِ پرداختِ بعدی", "status": "partial", "keys": ["PageDown"], "web": ["PageDown"] },
     { "id": "sale.payment.prevMethod", "scope": "sale.payment", "title": "روشِ پرداختِ قبلی", "status": "partial", "keys": ["PageUp"], "web": ["PageUp"] },
     { "id": "sale.payment.note10", "scope": "sale.payment", "title": "اسکناسِ ۱۰", "status": "partial", "keys": ["Shift+1"], "web": ["Shift+1"] },

@@ -461,6 +461,8 @@ const config = {
     assetVersions: bool(process.env.ASSET_VERSIONS, false),
     //  WEB-16 / ۴-۲: WebP ِ عکس‌های ویترین با `sharp` ِ اختیاری (`lib/store-webp.js`)؛ خاموش یا بی sharp ⇒ همان JPEG
     webp: bool(process.env.STORE_WEBP, false),
+    //  WEB-16 / ۴-۲: AVIF هم (سنگین‌تر از WebP) — جدا و پیش‌فرض خاموش؛ مرورگرِ بی AVIF همان WebP/JPEG
+    avif: bool(process.env.STORE_AVIF, false),
     //  CHK-08 / ۴-۳: الگوی تکه‌های نقشهٔ پینِ ثبت (`lib/store-map.js`)، مثلاً https://tile.openstreetmap.org/{z}/{x}/{y}.png؛ خالی ⇒ بی نقشه
     mapTiles: String(process.env.STORE_MAP_TILES || '').trim(),
     domain: String(process.env.STOREFRONT_DOMAIN ?? 'vill3n.top').trim().toLowerCase().replace(/^\.+|\.+$/g, ''),

@@ -956,6 +956,17 @@ fun DeskSaleScreen(
   if (pickDebtor) {
     DebtorPicker(d = d, selected = cartDebtorId, touch = touchExtras, onClose = { pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true } }, onPick = { id ->
       cartStore.setDebtor(id); pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true }
+    }, onAdd = if (!touchExtras) null else { name -> // POS-31/S18 گامِ ۴: همان `DebtorEngine.add` و `store.save` (نقش در `roleRefused`) ِ «مشتریان»
+      when (val r = ir.vil3ntec.tohid.data.DebtorEngine.add(d, ir.vil3ntec.tohid.data.DebtorEngine.DebtorDraft(name = name), System.currentTimeMillis(), ::newId)) {
+        is ir.vil3ntec.tohid.data.DebtorEngine.Result.Failed -> r.message
+        is ir.vil3ntec.tohid.data.DebtorEngine.Result.Ok -> {
+          scope.launch {
+            if (!store.save(d, r.data)) { toast(ir.vil3ntec.tohid.core.i18n.StrCustomerCard.notSaved); return@launch }
+            cartStore.setDebtor(r.id); pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true }
+          }
+          null
+        }
+      }
     })
   }
   if (lineSellerOpen && lineSellerOn) ir.vil3ntec.tohid.ui.components.pos.LineSellerSheet(d, cart, seller, lineSellerFor, onClose = { lineSellerOpen = false; refocus() }) { next ->
@@ -1063,6 +1074,8 @@ fun DeskSaleScreen(
       //  PAY-24: کارتِ هدیه و اعتبارِ فروشگاه فقط با تنظیمِ همین دستگاه (پیش‌فرض خاموش ⇒ همان پنل)
       ledger = d,
       stored = remember { ir.vil3ntec.tohid.data.GiftCardPref.on(context) },
+      offMethods = remember { ir.vil3ntec.tohid.data.PayMethodsPref.off(context) }, // PAY-06: روش‌هایی که دکان برداشته
+      fxRates = remember { ir.vil3ntec.tohid.data.FxTillPref.tillRates(context) }, // PAY-10: ارزِ نقد فقط با تنظیمِ روشنِ دکان
       cashRounding = cashStep, onCustomer = { payOpen = false; payAfterPick = true; pickDebtor = true }, print = cartStore.print.collectAsState().value.let { remember(it) { cartStore.printShown(it) } }, onTogglePrint = cartStore::togglePrint, // PAY-09؛ POS-41: F2 و Alt+P
     )
   }

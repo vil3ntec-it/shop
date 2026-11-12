@@ -85,7 +85,21 @@ object PayFlow {
    *  روش‌های ردیفِ پنل: روشن و غیرنقد (کیف پول، کارت، حواله). [stored] (PAY-24، `GiftCardPref`) ⇒ کارتِ هدیه و اعتبارِ
    *  فروشگاه هم؛ پیش‌فرض خاموش ⇒ همان فهرستِ امروز.
    */
-  fun panelMethods(stored: Boolean = false): List<PayMethod> = StoredPay.methods(stored).filter { it.enabled && it.kind != CASH }
+  fun panelMethods(stored: Boolean = false, off: Set<String> = emptySet()): List<PayMethod> =
+    StoredPay.methods(stored).filter { it.enabled && it.kind != CASH && it.id !in off }
+
+  /**
+   *  PAY-06 — روش‌هایی که دکان می‌تواند از پنل بردارد (`PayMethodsPref`): غیرنقد و جز کارتِ هدیه/اعتبار (که تنظیمِ
+   *  خودشان را دارند، PAY-24)، به ترتیبِ جدولِ هسته.
+   */
+  fun toggleableMethods(): List<PayMethod> = Pay.DEFAULT_METHODS.filter { it.kind != CASH && it.kind !in StoredPay.KINDS }
+
+  /** فهرستِ «خاموش» ِ ذخیره‌شده، سنجیده: فقط شناسه‌های [toggleableMethods]؛ نقد، ناشناس یا خراب نادیده ⇒ همان پنلِ امروز */
+  fun offMethods(raw: Set<String>?): Set<String> {
+    if (raw.isNullOrEmpty()) return emptySet()
+    val known = toggleableMethods().map { it.id }.toSet()
+    return raw.filterTo(LinkedHashSet()) { it in known }
+  }
 
   // ── خطا و پیام ─────────────────────────────────────────
   data class Problem(
