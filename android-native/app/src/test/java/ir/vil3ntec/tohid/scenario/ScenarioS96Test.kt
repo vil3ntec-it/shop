@@ -12,9 +12,10 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.TillSale
 import ir.vil3ntec.tohid.data.WarehouseEngine
-import ir.vil3ntec.tohid.ui.screens.HomeSections
+import ir.vil3ntec.tohid.ui.components.common.NavCatalog
 import ir.vil3ntec.tohid.ui.v3.sales.cart.CartModel
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
@@ -30,7 +31,8 @@ import java.time.ZoneId
  *  ۱۳:۰۰  سفارشِ آنلاینِ ویترین «مشتری گرفت» ⇐ فروشِ O در دفترِ گوشی (`OrderFulfillment.fulfill` ِ `OrderFlowAndroid`)، یک بار
  *  ۱۶:۰۰  رسیدِ بخشی از قرض‌دار (`DebtorEngine.addTransaction`)
  *  ۲۰:۰۰  گزارشِ روز (گزارش‌ها ← «سود و فروش» = `ReportEngine.sales`، «قرض‌داران» = `ReportEngine.debtors`) و موجودی
- *  خانهٔ گوشی همهٔ این درها را دارد (`HomeSections.tiles`). سمتِ سرورِ سفارش (ویترین ⇐ سرور ⇐ گوشی) با همان قرینهٔ
+ *  گوشی همهٔ این درها را دارد (نوار و «بیشتر» ِ نسخهٔ ۳: `NavCatalog.allowed`، هر کدام مسیرِ ثبت‌شده؛ کاشی‌های `HomeSections` ِ
+ *  r7 بی‌راه بودند و برداشته شدند). سمتِ سرورِ سفارش (ویترین ⇐ سرور ⇐ گوشی) با همان قرینهٔ
  *  `fulfillOrder` در `server/test/e2e` سنجیده می‌شود. ⛔ فقط روی گوشیِ واقعی: دوربین، چاپگرِ بلوتوث و کارِ دست با صفحهٔ کوچک.
  */
 class ScenarioS96Test {
@@ -52,9 +54,12 @@ class ScenarioS96Test {
 
   @Test
   fun `S96 — یک روزِ کامل فقط با گوشی؛ کالا، انبار، فروش، قرض‌دار، سفارشِ آنلاین و گزارشِ روز`() {
-    //  خانهٔ گوشی: کالا، انبار، قرض‌داران، گزارش‌ها و (سفارشِ آنلاینِ روشن) سفارش‌ها
-    val tiles = HomeSections.tiles(canManage = true, ordersLive = true).map { it.id }
-    assertTrue("$tiles", tiles.containsAll(listOf("products", "warehouse", "debtors", "reports", "orders")))
+    //  درهای گوشیِ نسخهٔ ۳ (نوار/«بیشتر»): کالا، انبار، قرض‌داران، گزارش‌ها و (سفارشِ آنلاینِ روشن) سفارش‌ها — هر کدام مسیرِ ثبت‌شده
+    val doors = listOf(NavCatalog.PRODUCTS, NavCatalog.WAREHOUSE, NavCatalog.DEBTORS, NavCatalog.REPORTS, NavCatalog.ORDERS)
+    val allowed = NavCatalog.allowed(canManage = true, ordersLive = true)
+    assertTrue("$allowed", allowed.containsAll(doors))
+    assertFalse(NavCatalog.ORDERS in NavCatalog.allowed(canManage = true, ordersLive = false))
+    doors.forEach { assertTrue(it, ir.vil3ntec.tohid.ui.v3.nav.V3Modules.table.resolve(NavCatalog.of(it)!!.route) != null) }
 
     //  ۸:۰۰ — سه کالای تازه از فرمِ گوشی و ورودِ انبار
     var d = ok(
