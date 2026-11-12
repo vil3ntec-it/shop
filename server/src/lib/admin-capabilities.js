@@ -40,6 +40,9 @@ const CAPABILITIES = Object.freeze([
   //  IMG-PRO-17 در پنلِ مرکزی (۱.۵۰.۹۶): خواندن مدیر/بیننده (جزئیات با `read_private` وقتی admin.support_grant روشن است)؛
   //  برگرداندن فقط ارشد + دلیل + اجازهٔ زندهٔ `restore` + Idempotency-Key
   'image-changes.v1',       //  GET /admin/shops/:id/images/changes[/:cid] · POST …/:cid/rollback
+  //  TEN-04 (۱۴۰۵/۰۸/۲۲): با پرچمِ `security / admin.support_grant` درهای خواندنِ محتوای خصوصیِ دکان اجازهٔ زندهٔ `read_private`
+  //  می‌خواهند (‎403 grant_required‎) و پرونده‌های دکان/کاربر بی اجازه فقط فراداده با `restricted` می‌دهند (`lib/admin-dossier.js`)
+  'support-grant-read.v1',  //  GET /admin/shops/:id/staff-perms · …/images/changes/:cid · /admin/sync/conflicts · /admin/shops/:id · /admin/users/:id
 ]);
 
 /*

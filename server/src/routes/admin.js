@@ -12,6 +12,7 @@ const v = require('../lib/validate');
 const pw = require('../lib/password');
 const tokens = require('../lib/tokens');
 const audit = require('../lib/audit');
+const dossier = require('../lib/admin-dossier');
 const subs = require('../lib/subscriptions');
 const idempotency = require('../lib/idempotency');
 const plans = require('../lib/plans');
@@ -177,17 +178,11 @@ router.get('/users/:id', async (req, res, next) => {
     `SELECT m.*, s.name AS shop_name FROM shop_members m JOIN shops s ON s.id=m.shop_id WHERE m.user_id=$1`,
     [id]
   );
-  const devices = await many('SELECT * FROM devices WHERE user_id=$1 ORDER BY last_seen_at DESC NULLS LAST', [id]);
-  //  لوکیشن‌های همین حساب — تازه‌ترین اول. اگر دکان جابه‌جا شده باشد،
-  //  از همین فهرست پیداست از کِی.
-  const locations = await many(
-    `SELECT lat, lng, accuracy, source, label, created_at
-       FROM device_locations WHERE user_id=$1 ORDER BY created_at DESC LIMIT 10`,
-    [id]
-  );
+  //  دستگاه‌ها و لوکیشنِ دقیق: پرچمِ `security / admin.support_grant` ⇒ فقط با اجازهٔ یکی از دکان‌هایش (TEN-04، `lib/admin-dossier.js`)
+  const view = await dossier.user(req, user, memberships);
   //  پروندهٔ کاربر لوکیشنِ دقیق و دستگاه‌هایش را دارد ⇒ هر بار دیدنش سابقه دارد
   //  (ADMIN-CONTROL-PLANE.md، v3 ۲۹.۴ بندِ ۴ و ۵)
-  await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.user_viewed', targetType: 'user', targetId: id, ip: clientIp(req) });
+  await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.user_viewed', targetType: 'user', targetId: id, ip: clientIp(req), ...view.audit });
   res.json({
     user: {
       id: user.id, name: user.name, email: user.email, phone: user.phone,
@@ -195,15 +190,9 @@ router.get('/users/:id', async (req, res, next) => {
       lastLoginAt: user.last_login_at ? Number(user.last_login_at) : null,
       termsVersion: user.terms_version || '',
       termsAcceptedAt: user.terms_accepted_at ? Number(user.terms_accepted_at) : null,
-      lastLocation: user.last_location_at
-        ? { lat: Number(user.last_lat), lng: Number(user.last_lng), at: Number(user.last_location_at) }
-        : null,
+      lastLocation: view.lastLocation,
     },
-    memberships, devices,
-    locations: locations.map(r => ({
-      lat: Number(r.lat), lng: Number(r.lng), accuracy: Number(r.accuracy),
-      source: r.source, label: r.label, at: Number(r.created_at),
-    })),
+    memberships, devices: view.devices, locations: view.locations, restricted: view.restricted,
   });
 });
 
@@ -322,34 +311,14 @@ router.get('/shops/:id', async (req, res, next) => {
     );
     counts[col] = r.n;
   }
-  /*
-   *  لوکیشنِ دکان — آخرین نقطه‌ای که از صاحبش رسیده.
-   *
-   *  دکان خودش ستونِ لوکیشن ندارد؛ نقطه‌ها به کاربر بسته‌اند (همان‌هایی
-   *  که هنگام ثبت‌نام و بعدش فرستاده می‌شوند). پس آخرینِ صاحبِ دکان را
-   *  می‌دهیم — همان چیزی که مدیر می‌خواهد بداند: این دکان کجاست.
-   */
-  const place = await one(
-    `SELECT lat, lng, accuracy, source, label, created_at
-       FROM device_locations WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1`,
-    [shop.owner_user_id]
-  );
-
+  //  جای دکان (آخرین نقطهٔ صاحبش): پرچمِ `security / admin.support_grant` ⇒ فقط با اجازهٔ همین دکان (TEN-04، `lib/admin-dossier.js`)
+  const view = await dossier.shop(req, shop);
   //  تماسِ اعضا و جای دکان ⇒ دیدنش سابقه دارد (ADMIN-CONTROL-PLANE.md)
-  await audit.log({ shopId: id, actorType: 'admin', userId: req.admin.id, action: 'admin.shop_viewed', targetType: 'shop', targetId: id, ip: clientIp(req) });
+  await audit.log({ shopId: id, actorType: 'admin', userId: req.admin.id, action: 'admin.shop_viewed', targetType: 'shop', targetId: id, ip: clientIp(req), ...view.audit });
   res.json({
     shop: { id: shop.id, name: shop.name, status: shop.status, createdAt: Number(shop.created_at), ownerUserId: shop.owner_user_id },
-    location: place
-      ? {
-        lat: Number(place.lat),
-        lng: Number(place.lng),
-        accuracy: place.accuracy === null ? null : Number(place.accuracy),
-        source: place.source,
-        label: place.label,
-        at: Number(place.created_at),
-      }
-      : null,
-    members, entitlement: ent, subscriptions: history, counts,
+    location: view.location,
+    members, entitlement: ent, subscriptions: history, counts, restricted: view.restricted,
   });
 });
 

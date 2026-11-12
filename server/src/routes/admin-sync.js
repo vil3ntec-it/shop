@@ -13,9 +13,10 @@
  */
 const express = require('express');
 const sync = require('../lib/sync-v1');
-const { many } = require('../db');
+const { one, many } = require('../db');
 const audit = require('../lib/audit');
-const { sectionOf } = require('../lib/tenancy');
+const { sectionOf, SHOP } = require('../lib/tenancy');
+const access = require('../lib/support-access');
 const { badRequest } = require('../middleware/errors');
 const { clientIp } = require('../middleware/ratelimit');
 const { requireSuperAdmin } = require('../middleware/auth');
@@ -44,6 +45,8 @@ router.get('/conflicts', async (req, res, next) => {
     const accountId = String(req.query?.account || '').slice(0, 80);
     if (!accountId) return next(badRequest('شناسهٔ حساب لازم است', 'account_required'));
     const ctx = { app, accountKind: app === 'pump' ? 'station' : 'shop', accountId };
+    //  TEN-04: پرچمِ `security / admin.support_grant` ⇒ تعارض‌های **دکان** فقط با اجازهٔ زندهٔ `read_private` (پمپ هرگز)
+    const grant = app === SHOP.app ? await access.grantForRead(req, accountId, 'sync_conflicts') : null;
     const conflicts = await sync.listConflicts(ctx, {
       limit: Math.min(500, Number(req.query?.limit || 100) || 100),
       includeRestored: req.query?.all === '1',
@@ -53,7 +56,7 @@ router.get('/conflicts', async (req, res, next) => {
     await audit.log({
       shopId: app === 'shop' ? accountId : '', actorType: 'admin', userId: req.admin.id,
       action: 'admin.sync_conflicts_viewed', targetType: 'account', targetId: accountId,
-      ip: clientIp(req), detail: { app, count: conflicts.length },
+      ip: clientIp(req), detail: { app, count: conflicts.length, ...(grant ? { grant } : {}) },
     });
     res.json({ conflicts });
   } catch (err) { next(err); }
@@ -69,7 +72,12 @@ router.post('/conflicts/:id/restore', requireSuperAdmin, async (req, res, next) 
   try {
     const id = once.conflictIdOf(req.params.id);
     const reason = requireReason(req);
+    let grant = null;
     const done = await once.restoreOnce(req, id, async () => {
+      //  TEN-04: پرچمِ `admin.support_grant` ⇒ بازگرداندنِ دادهٔ **دکان** فقط با اجازهٔ زندهٔ `restore` ِ همین آدم (پمپ هرگز)؛
+      //  ‎403‎ نشانِ «در حالِ بازگرداندن» را برمی‌دارد (`restoreOnce`) و هیچ opی نمی‌رود
+      const cf = await one('SELECT app, account_kind, account_id FROM sync_conflicts WHERE id=$1', [id]);
+      if (cf) grant = await access.grantForRestore(req, cf.app, cf.account_id, `sync_conflict ${id}`);
       //  SEC-03 (پرچمِ `shop.doc_chain`): مقدارِ بازنده فاکتورِ ثبت‌شده را سرِ جا عوض نمی‌کند ⇒ ۴۰۹ (‎lib/finalized-sales.js‎)
       await finalized.adminRestoreCheck(id, { adminId: req.admin.id, ip: clientIp(req) });
       return sync.restoreConflict(id);
@@ -82,7 +90,7 @@ router.post('/conflicts/:id/restore', requireSuperAdmin, async (req, res, next) 
     await audit.log({
       shopId: out?.ctx?.accountKind === 'shop' ? String(out.ctx.accountId || '') : '',
       actorType: 'admin', userId: req.admin.id, action: 'sync.conflict_restored', ip: clientIp(req),
-      targetType: 'sync_conflict', targetId: id, detail: { ...(out || {}), reason },
+      targetType: 'sync_conflict', targetId: id, detail: { ...(out || {}), reason, ...(grant ? { grant } : {}) },
     });
     res.json(done.response);
   } catch (err) { next(err); }
