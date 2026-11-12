@@ -160,7 +160,9 @@ await page.waitForFunction(() => /\/gallery\/[0-9a-f]{12}\/display$/.test(docume
 ok(await current(page) === 1, 'زدنِ «۲» ⇒ عکسِ دوم با aria-current');
 ok(asked.filter((u) => /\/gallery\/[0-9a-f]{12}\//.test(u)).length === 1, 'فقط همان یک عکس بار شد', asked.join(' '));
 ok((await page.textContent('#ps-gal')).includes('عکسِ ۲ از ۳'), 'شمارهٔ عکس برای صفحه‌خوان');
-ok(await page.$eval('#ps-img img', (i) => i.complete && i.naturalWidth > 0), 'عکسِ گالری واقعاً باز شد');
+//  `src` پیش از رسیدنِ بایت‌ها عوض می‌شود (CI: درخواست پس از سنجش رسید) ⇒ تا بارِ واقعی صبر، با همان ادعا و سقفِ ۵ ثانیه
+ok(await page.waitForFunction(() => { const i = document.querySelector('#ps-img img'); return !!i && i.complete && i.naturalWidth > 0; }, null, { timeout: 5000 })
+  .then(() => true, () => false), 'عکسِ گالری واقعاً باز شد');
 await page.locator('#ps-gal .dot').nth(0).click();
 ok(await current(page) === 0 && /\/products\/rice\/photo/.test(await imgSrc(page)), 'برگشت به «۱» ⇒ همان عکسِ اصلی');
 

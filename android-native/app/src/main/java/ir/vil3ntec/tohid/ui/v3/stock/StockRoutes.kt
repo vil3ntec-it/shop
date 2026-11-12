@@ -8,6 +8,7 @@ import androidx.compose.runtime.LaunchedEffect
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrLabel
 import ir.vil3ntec.tohid.core.i18n.StrImageChanges
+import ir.vil3ntec.tohid.core.i18n.StrImageStudio
 import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.core.i18n.StrTransfer
@@ -55,6 +56,10 @@ object StockPaths {
   const val IMAGE_CHANGES = "stock/images/changes"
   const val IMAGE_CHANGES_NEW = "stock/images/changes/new"
   fun imageChange(id: String) = "$IMAGE_CHANGES/" + RoutePaths.encode(id)
+  /** ۴-۲۳ (۱): استودیوی عکسِ سرور — راهش با همان بانکِ روشن؛ پرچمِ `shop.image_studio` را خودِ صفحه می‌پرسد */
+  const val IMAGE_STUDIO = "stock/images/studio"
+  const val IMAGE_STUDIO_NEW = "stock/images/studio/new"
+  fun imageStudio(id: String) = "$IMAGE_STUDIO/" + RoutePaths.encode(id)
   const val IMPORT_HISTORY = "stock/import/history"
   /** INV-11: انتقالِ موجودیِ سرور (`StockTransfer`) — راهش فقط با پرچمِ `shop.catalog` و `stock.move` (`StockTransferFlag`) */
   const val TRANSFERS = "stock/transfers"
@@ -188,6 +193,9 @@ val StockModule = AppModule(
     V3Route(StockPaths.IMAGE_CHANGES, RouteKind.PAGE, { StrImageChanges.title }, parent = StockPaths.LIST) { ImageChangesRoute() },
     V3Route(StockPaths.IMAGE_CHANGES_NEW, RouteKind.PAGE, { StrImageChanges.newBatch }, parent = StockPaths.IMAGE_CHANGES) { ImageBatchRoute() },
     V3Route("stock/images/changes/{id}", RouteKind.PAGE, { StrImageChanges.batch }, parent = StockPaths.IMAGE_CHANGES) { ImageChangeRoute(args["id"].orEmpty()) },
+    V3Route(StockPaths.IMAGE_STUDIO, RouteKind.PAGE, { StrImageStudio.title }, parent = StockPaths.LIST) { ImageStudioRoute() },
+    V3Route(StockPaths.IMAGE_STUDIO_NEW, RouteKind.PAGE, { StrImageStudio.newBatch }, parent = StockPaths.IMAGE_STUDIO) { ImageStudioNewRoute() },
+    V3Route("stock/images/studio/{id}", RouteKind.PAGE, { StrImageStudio.batch }, parent = StockPaths.IMAGE_STUDIO) { ImageStudioBatchRoute(args["id"].orEmpty()) },
     V3Route(StockPaths.IMPORT_HISTORY, RouteKind.SHEET, { StrReach.importHistory }, parent = StockPaths.IMPORT, chrome = Chrome.OWN) { ImportHistoryRoute() },
     //  INV-11 — انتقال با «در مسیر»، دریافتِ ناقص و دریافت با اسکن (`TransferRoutesAndroid.kt`)
     V3Route(StockPaths.TRANSFERS, RouteKind.PAGE, { StrTransfer.title }, parent = StockPaths.LIST, chrome = Chrome.OWN) { TransferListRoute() },

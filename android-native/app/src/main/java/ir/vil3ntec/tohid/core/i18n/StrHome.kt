@@ -227,6 +227,7 @@ object StrHome {
 
   // نوارِ اشتراک و نسخهٔ تازه (جای `notice` ِ `V3Scaffold`)
   val subNoticeEnded: String get() = t("اشتراک تمام شده — فقط‌خواندنی؛ دفتر سرِ جایش است", "Subscription ended — read-only; your ledger is safe", "ګډون پای ته رسېدلی — یوازې لوستل؛ دفتر خوندي دی")
+  val subNoticeRenew: String get() = t("این دستگاه مدتی است به اینترنت وصل نشده؛ برای ادامهٔ فروش یک بار وصل شوید تا اشتراک تازه شود — دفتر سرِ جایش است", "This device has not been online for a while; connect once to renew the subscription and keep selling — your ledger is safe", "دا دستګاه یو څه وخت انټرنېټ ته نه دی وصل شوی؛ د پلور د دوام لپاره یو ځل وصل شئ چې ګډون تازه شي — دفتر خوندي دی")
   fun subNoticeDays(n: Any): String = t("${asIs(n)} روز تا پایانِ اشتراک — هیچ داده‌ای پاک نمی‌شود", "$n ${pl(n, "day", "days")} left — no data is ever deleted", "$n ${pl(n, "ورځ", "ورځې")} پاتې — هېڅ معلومات نه ړنګېږي")
   //  O-09: صاحبِ دکان بیرون از سقفِ دستگاه — این دستگاه کار می‌کند، دستگاهِ کارمندِ اضافه نه
   fun deviceCapOver(devices: Any, max: Any): String = t("${asIs(devices)} دستگاه با اشتراکِ ${asIs(max)} دستگاهی — دستگاهِ کارمندِ اضافه بسته است", "$devices devices on a $max-device plan — extra staff devices are blocked", "$devices وسیلې د $max وسیلو ګډون سره — د کارکوونکي اضافي وسیله تړل شوې")

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import ir.vil3ntec.tohid.BuildConfig
+import ir.vil3ntec.tohid.core.platform.SigningRule
 import java.security.MessageDigest
 
 /**
@@ -38,8 +39,9 @@ object Integrity {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
         val info = pm.getPackageInfo(name, PackageManager.GET_SIGNING_CERTIFICATES)
         val signing = info.signingInfo ?: return ""
+        //  امضای **فعلی**: تاریخچه از قدیم به تازه است ⇒ آخرین (پس از چرخشِ v3 همان کلیدِ تازه؛ بی چرخش یگانه همان)
         if (signing.hasMultipleSigners()) signing.apkContentsSigners
-        else signing.signingCertificateHistory
+        else (signing.signingCertificateHistory ?: return "").reversedArray()
       } else {
         @Suppress("DEPRECATION")
         pm.getPackageInfo(name, PackageManager.GET_SIGNATURES).signatures ?: return ""
@@ -54,13 +56,14 @@ object Integrity {
   /**
    *  آیا امضا همان است.
    *
-   *  اگر اثرِ انگشتِ مرجع خالی باشد (نسخهٔ آزمایشی، یا ساختی که کلید
+   *  مرجع فهرستی از اثرِ انگشت‌هاست (کلیدِ ساخت + `TOHID_SIGNING_SHA256_EXTRA`). اگر خالی باشد (نسخهٔ آزمایشی، یا ساختی که کلید
    *  نداشته) بررسی خاموش است و جواب «بله» است — وگرنه برنامه در دستِ
    *  خودِ سازنده هم کار نمی‌کرد.
    */
   fun isGenuine(context: Context): Boolean {
     val expected = BuildConfig.SIGNING_SHA256
-    if (expected.isBlank()) return true
-    return fingerprint(context).equals(expected, ignoreCase = true)
+    if (SigningRule.off(expected)) return true
+    //  F0-09 گامِ ۳: فهرستِ «قدیم، تازه» برای چرخشِ کلید (`core/platform/SigningRule`)
+    return SigningRule.genuine(expected, fingerprint(context))
   }
 }

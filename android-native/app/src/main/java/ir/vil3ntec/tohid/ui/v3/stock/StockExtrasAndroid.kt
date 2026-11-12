@@ -10,6 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.LocalShipping
@@ -30,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrLabel
 import ir.vil3ntec.tohid.core.i18n.StrImageChanges
+import ir.vil3ntec.tohid.core.i18n.StrImageStudio
 import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.core.i18n.StrTransfer
@@ -107,6 +109,7 @@ internal fun RouteScope.rememberStockExtras(): List<V3MenuItem> {
       StockExtra.BULK_PRODUCTS -> V3MenuItem(Icons.AutoMirrored.Outlined.PlaylistAdd, StrReach.bulkProducts) { nav.open(x.route) }
       StockExtra.IMAGES -> V3MenuItem(Icons.Outlined.AddPhotoAlternate, StrReach.imageImport) { nav.open(x.route) }
       StockExtra.IMAGE_CHANGES -> V3MenuItem(Icons.Outlined.Collections, StrImageChanges.title) { nav.open(x.route) }
+      StockExtra.IMAGE_STUDIO -> V3MenuItem(Icons.Outlined.AutoFixHigh, StrImageStudio.title) { nav.open(x.route) }
       StockExtra.TRANSFERS -> V3MenuItem(Icons.Outlined.LocalShipping, StrTransfer.title) { nav.open(x.route) }
     }
   }
