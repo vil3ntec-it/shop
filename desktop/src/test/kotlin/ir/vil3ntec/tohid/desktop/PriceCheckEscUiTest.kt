@@ -3,7 +3,6 @@ package ir.vil3ntec.tohid.desktop
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -17,9 +16,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
-import androidx.compose.ui.test.isFocused
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import ir.vil3ntec.tohid.core.i18n.I18n
@@ -58,16 +59,19 @@ class PriceCheckEscUiTest {
           Column {
             OutlinedTextField(query, { query = it }, singleLine = true, modifier = Modifier.focusRequester(scan).testTag("scan"))
           }
-          LaunchedEffect(Unit) { runCatching { scan.requestFocus() } }
           //  همان شکلِ `DeskSale`: `onDismiss = { priceCheck = false; refocus() }`
           if (open) PriceCheckDialog(d, "2026-11-12", showCost = false, onDismiss = { dismissed++; open = false; runCatching { scan.requestFocus() } })
         }
       }
     }
     rule.waitForIdle()
-    //  پنجره فوکوس را به کادرِ خودش برده است
+    //  کادرِ اسکن عمداً بی فوکوس شروع می‌شود (پنجرهٔ Compose ِ کامپیوتر فوکوسِ خودش را دارد) ⇒ فوکوسِ بعدی فقط از `onDismiss` است
     rule.onNodeWithTag("scan").assertIsNotFocused()
-    rule.onNode(isFocused()).performKeyInput { pressKey(Key.Escape) }
+    val box = rule.onNode(hasSetTextAction() and !hasTestTag("scan"))
+    box.performClick()   //  صندوق‌دار در کادرِ قیمت‌پرسی است (پنجرهٔ آزمون فوکوسِ پنجره را خودکار نمی‌دهد)
+    box.assertIsFocused()
+    rule.onNodeWithTag("scan").assertIsNotFocused()
+    box.performKeyInput { pressKey(Key.Escape) }
     rule.waitForIdle()
     assertEquals(1, dismissed)
     assertEquals(false, open)
