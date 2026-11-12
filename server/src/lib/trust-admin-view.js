@@ -13,12 +13,17 @@
  *      نوشتن (مسئول، تصمیم، رأی، برداشتن) همچنان فقط ارشد + دلیل (`routes/admin-trust.js`).
  */
 const NAME_MAX = 80;
-//  نویسهٔ کنترلی و جهت‌دهیِ پنهان (RLO، LRI…) — نامی که در صف وارونه یا فریبنده نشان داده شود
-const HIDDEN = /[\u0000-\u001f\u007f-\u009f؜​-‏‪-‮⁠-⁩﻿]/g;
+//  نویسهٔ کنترلی و جهت‌دهیِ پنهان (RLO، LRI، ALM…) — نامی که در صف وارونه یا فریبنده نشان داده شود — و نویسه‌های نامرئیِ دیگر:
+//  soft hyphen، جداکنندهٔ مغولی، پُرکنندهٔ هانگول، Unicode Tags (متنِ پنهان برای ابزار/مدل). ⛔ نیم‌فاصله (U+200C) و ZWJ (U+200D)
+//  نه: بخشی از نوشتنِ درستِ نامِ فارسی‌اند («محمد‌رضا»).
+const HIDDEN = /[\u0000-\u001f\u007f-\u009f­؜ᅟᅠ᠎​‎‏‪-‮⁠-⁩ㅤ﻿ﾠ\u{e0000}-\u{e007f}]/gu;
+//  بیش از دو نشانهٔ ترکیبیِ پشتِ هم (Zalgo: نام از ردیفش بیرون می‌زند)؛ دوتا برای اعرابِ فارسی (تشدید + فتحه) بس است
+const MARKS = /(\p{M}{2})\p{M}+/gu;
 
 /** نامِ خواندنیِ کاربرِ پنل: پاک، فاصلهٔ یکی، حداکثر ۸۰ نویسه. */
 function cleanName(raw) {
-  return Array.from(String(raw == null ? '' : raw).replace(HIDDEN, '').replace(/\s+/g, ' ').trim()).slice(0, NAME_MAX).join('');
+  return Array.from(String(raw == null ? '' : raw).replace(HIDDEN, '').replace(MARKS, '$1').replace(/\s+/g, ' ').trim())
+    .slice(0, NAME_MAX).join('');
 }
 
 /** «چه کسی» برای `assignee`، `decided_by`، `appeal_decided_by`، `created_by`/`lifted_by` و `actor_id` ِ رخدادها. */

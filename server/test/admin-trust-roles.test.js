@@ -157,6 +157,18 @@ test('بند ۱: از راهِ پل مسئول/تصمیم/رأی/جریمه به
   assert.equal(long.body.assigneeName.length, 80);
 });
 
+test('بند ۱: پاک‌سازیِ نام — نیم‌فاصله و ZWJ ِ فارسی می‌مانند؛ Tags، پُرکنندهٔ هانگول، soft hyphen و بیش از دو نشانهٔ ترکیبیِ پشتِ هم نه', () => {
+  const { cleanName } = require('../src/lib/trust-admin-view');
+  assert.equal(cleanName('محمد\u200cرضا'), 'محمد\u200cرضا', 'نیم‌فاصله');
+  assert.equal(cleanName('a\u200db'), 'a\u200db', 'ZWJ');
+  assert.equal(cleanName('علی\u{E0041}\u{E0042}\u{E007F}'), 'علی', 'Unicode Tags (متنِ نامرئی)');
+  assert.equal(cleanName('A\u3164\u115F\u1160\uFFA0li'), 'Ali', 'پُرکنندهٔ هانگول');
+  assert.equal(cleanName('A\u00ADli\u180E'), 'Ali', 'soft hyphen و جداکنندهٔ مغولی');
+  assert.equal(cleanName('مُحَمَّد'), 'مُحَمَّد', 'اعرابِ فارسی (تشدید + فتحه) می‌ماند');
+  assert.equal(cleanName(`A${'\u0301'.repeat(200)}b`), 'A\u0301\u0301b', 'نشانه‌های ترکیبیِ پشتِ هم: حداکثر دو');
+  assert.equal(cleanName('\u200e\u202eعلی\u2066'), 'علی', 'جهت‌دهیِ پنهان همان پیشین');
+});
+
 /* ═══════════════════════ ۲) خواندن برای بیننده، نمای کم‌تر ═══════════════════════ */
 
 /** پرونده‌ای با همهٔ چیزهای حساس: هم‌متن، مدرک، پاسخِ دکان، مسئول، تصمیم با جریمه، اعتراض و رأی */
