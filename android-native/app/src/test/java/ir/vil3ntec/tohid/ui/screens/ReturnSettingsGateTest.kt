@@ -47,6 +47,35 @@ class ReturnSettingsGateTest {
     assertEquals(0, count(s, "SalesEngine.recordReturn("))
   }
 
+  /**
+   *  RET-09، RET-10 — هر دو فرمِ تازه (کامپیوتر و برگهٔ نسخهٔ ۳) سد را از همان تابعی می‌گیرند که ثبت دوباره می‌سنجد
+   *  (`ReturnDecision`، `ReturnDecisionTest`) و سیاستِ همین دستگاه را به ثبت می‌دهند. پیش از این برگهٔ نسخهٔ ۳
+   *  `ReturnFlow.gate` را بی `priorMinor` و بی `policyBreach` و `Request` را بی `policy` می‌ساخت.
+   */
+  @Test fun `هر دو فرمِ تازه سیاست و برگشتِ پیشین را به سد و ثبت می‌دهند`() {
+    for (rel in listOf("ir/vil3ntec/tohid/ui/screens/ReturnsV2.kt", "ir/vil3ntec/tohid/ui/v3/sales/returns/ReturnFlowSheet.kt")) {
+      val s = src(rel)
+      assertTrue(rel, s.contains("ReturnPolicyPrefs.of(context)"))
+      assertTrue(rel, s.contains("ReturnDecision.of(d, sale, q, role, layers, limit, policy, todayIso())"))
+      //  هیچ سدِ دستیِ جدا از ثبت
+      assertEquals(rel, 0, count(s, "ReturnFlow.gate("))
+      assertEquals(rel, 0, count(s, "ReturnFlow.permDecision("))
+      //  ثبت همان سیاست و همان مجوز را می‌گیرد
+      val i = s.indexOf("ReturnFlow.Request(")
+      val call = s.substring(i, s.indexOf("val now = System.currentTimeMillis()", i))
+      assertTrue(rel, call.contains("policy = policy"))
+      assertTrue(rel, call.contains("perm = decision.perm"))
+      //  RET-08: دلیل از فهرستِ همین دکان (برگهٔ نسخهٔ ۳ پیش‌تر فهرستِ ثابتِ `ReturnFlow.REASONS` را نشان می‌داد و نمی‌فرستاد)
+      assertTrue(rel, call.contains("reasons = reasons"))
+      assertTrue(rel, s.contains("ReturnSettings.reasons(context)"))
+      assertEquals(rel, 0, count(s, "ReturnFlow.REASONS"))
+      //  تأیید مالِ همان مبلغ و همان سد است؛ عوض شد ⇒ کنار می‌رود و دکمهٔ «درخواستِ تأیید» برمی‌گردد
+      assertTrue(rel, s.contains("var approval by remember(ReturnFlow.minor(total), gate) { mutableStateOf<ReturnFlow.Approval?>(null) }"))
+      //  هشدارِ «بیرون از سیاست» با همان حکم
+      assertTrue(rel, s.contains("decision.verdict"))
+    }
+  }
+
   @Test fun `صندوقِ کامپیوتر و QR ِ رسید فقط با کلیدِ روشن`() {
     val desk = src("ir/vil3ntec/tohid/ui/screens/DeskSale.kt")
     assertTrue(desk.contains("val returnsV2 = remember { ir.vil3ntec.tohid.data.ReturnSettings.enabled(context) }"))

@@ -26,8 +26,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.data.ReturnDecision
 import ir.vil3ntec.tohid.data.ReturnFlow
 import ir.vil3ntec.tohid.data.ReturnLeft
+import ir.vil3ntec.tohid.data.ReturnPolicyPrefs
 import ir.vil3ntec.tohid.data.ReturnSettings
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SalesEngine
@@ -62,10 +64,12 @@ import ir.vil3ntec.tohid.ui.v3.sales.history.ReceiptModel
 import kotlinx.coroutines.launch
 
 /**
- *  برگهٔ «برگشت و تعویض» (RET-01..08، 10، 12، 13؛ S13–S15) — جای `ReturnFlowDialog`ِ پیشین،
+ *  برگهٔ «برگشت و تعویض» (RET-01..10، 12، 13؛ S13–S15) — جای `ReturnFlowDialog`ِ پیشین،
  *  همان حساب و همان ترتیب: با رسید ([sale]) یا بی رسید، مقدار و «به موجودی | ضایعات» برای هر
- *  قلم، دلیلِ اجباری، بازپرداخت (روشِ اصلی، نقد، اعتبارِ فروشگاه)، تعویضِ اختیاری، و سدِ تأیید
- *  (`ReturnFlow.gate`). شناسه‌های سند و فروشِ تعویض پیش از نخستین تلاش ساخته می‌شوند؛ «ثبت شد»
+ *  قلم، دلیلِ اجباری از فهرستِ دکان (`ReturnSettings.reasons`)، بازپرداخت (روشِ اصلی، نقد، اعتبارِ فروشگاه)،
+ *  تعویضِ اختیاری، و سدِ تأیید (`ReturnDecision.of`، همان که `ReturnFlow.post` دوباره می‌سنجد: سقفِ نقش و
+ *  سقفِ دستگاه تجمعیِ همین فاکتور و سیاستِ برگشتِ همین دستگاه — مهلت و اقلامِ غیرقابلِ برگشت، با هشدار).
+ *  شناسه‌های سند و فروشِ تعویض پیش از نخستین تلاش ساخته می‌شوند؛ «ثبت شد»
  *  فقط پس از نوشتنِ واقعیِ دفتر (`save`؛ پایهٔ صریح همان [d] است که سند از آن ساخته شد).
  */
 @Composable
@@ -84,6 +88,10 @@ fun ReturnFlowSheet(
   val role = remember { ShopRole.current(context) }
   val layers = remember { ShopRole.layers(context) }
   val limit = remember { ReturnSettings.limit(context) }
+  //  RET-08 — فهرستِ دلیل‌های همین دکان (تنظیمات)؛ ثبت فقط با یکی از همین‌ها
+  val reasons = remember { ReturnSettings.reasons(context) }
+  //  RET-09 — سیاستِ برگشتِ همین دستگاه (مهلت و غیرقابلِ برگشت)؛ خالی ⇒ بی اثر
+  val policy = remember { ReturnPolicyPrefs.of(context) }
   val me = remember { runCatching { SyncStore(context).accountName }.getOrDefault("").trim() }
   //  شناسه‌های سند و فروشِ تعویض پیش از نخستین تلاش (§۱۵.۲ بندِ ۱)
   val docId = remember { Ulid.next() }
@@ -94,12 +102,11 @@ fun ReturnFlowSheet(
   var qtys by remember { mutableStateOf<Map<String, String>>(if (prefill) items.take(1).associate { it.id to "1" } else mapOf()) }
   var disp by remember { mutableStateOf(mapOf<String, String>()) }
   var free by remember { mutableStateOf(listOf<ReturnFree>()) }
-  var reason by remember { mutableStateOf<String?>(if (prefill) ReturnFlow.REASONS.first() else null) }
+  var reason by remember { mutableStateOf<String?>(if (prefill) reasons.first() else null) }
   var mode by remember { mutableStateOf(ReturnFlow.ORIGINAL) }
   var customerId by remember { mutableStateOf(sale?.debtorId) }
   var exchange by remember { mutableStateOf(false) }
   var cart by remember { mutableStateOf(listOf<SalesEngine.CartLine>()) }
-  var approval by remember { mutableStateOf<ReturnFlow.Approval?>(null) }
   var asking by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf<String?>(null) }
   //  تا ذخیره تمام نشده، دکمه دوباره کار نمی‌کند (دو بار زدن = یک سند)
@@ -111,11 +118,13 @@ fun ReturnFlowSheet(
   }
   val q = (quote as? ReturnFlow.Outcome.Ok)?.value
   val total = q?.total ?: 0.0
-  val damaged = q?.lines?.any { it.disposition == ReturnFlow.DAMAGED } == true
-  //  RET-10 (#552): سقفِ نقش تجمعیِ هر فاکتور است، همان سرور — برگشت‌های پیشینِ همین فاکتور + همین سند
-  val priorMinor = remember(d, sale) { ReturnFlow.priorMinor(d, sale?.id) }
-  val perm = remember(total, priorMinor) { ReturnFlow.permDecision(role, layers, ReturnFlow.minor(total), priorMinor) }
-  val gate = ReturnFlow.gate(role, perm, ReturnFlow.minor(total), sale == null, damaged, ReturnFlow.minor(limit))
+  //  RET-09، RET-10 (#552): سد همان است که `ReturnFlow.post` دوباره می‌سنجد (`ReturnDecision`) — سقفِ نقش و سقفِ دستگاه
+  //  تجمعیِ همین فاکتور (برگشت‌های پیشین + همین سند) و سیاستِ برگشتِ همین دستگاه
+  val decision = remember(d, sale, q, policy) { ReturnDecision.of(d, sale, q, role, layers, limit, policy, todayIso()) }
+  val gate = decision.gate
+  //  تأیید مالِ همان مبلغ و همان سد است: مقدار، ضایعات، سقف یا سیاست که عوض شد، تأییدِ پیشین کنار می‌رود
+  //  (وگرنه «تأیید شد» می‌ماند و دکمهٔ «درخواستِ تأیید» پنهان، ولی `post` با APPROVAL_REQUIRED رد می‌کرد)
+  var approval by remember(ReturnFlow.minor(total), gate) { mutableStateOf<ReturnFlow.Approval?>(null) }
   val creditTo = if (mode == ReturnFlow.STORE_CREDIT) customerId else null
   val prior = remember(d, sale) { sale?.let { s -> d.saleReturns.filter { it.saleId == s.id } }.orEmpty() }
   val split = (ReturnFlow.split(sale, total, mode, me, creditTo, prior, sale?.let { ir.vil3ntec.tohid.data.PayStatusFlow.bySale(d)[it.id] }.orEmpty()) as? ReturnFlow.Outcome.Ok)?.value
@@ -126,8 +135,8 @@ fun ReturnFlowSheet(
   fun submit(closer: ir.vil3ntec.tohid.ui.v3.V3SheetCloser) {
     val req = ReturnFlow.Request(
       docId = docId, saleId = sale?.id, picks = picks, free = ReturnFlowModel.freeLines(free),
-      reason = reason.orEmpty(), mode = mode, customerId = creditTo,
-      by = me, role = role, perm = perm, limit = limit, approval = approval,
+      reason = reason.orEmpty(), reasons = reasons, mode = mode, customerId = creditTo,
+      by = me, role = role, perm = decision.perm, limit = limit, approval = approval, policy = policy,
     )
     val now = System.currentTimeMillis()
     //  دفترِ تازه و پیامِ موفقیت، یا خطا — «ثبت شد» فقط پس از نوشتنِ واقعی
@@ -206,7 +215,7 @@ fun ReturnFlowSheet(
 
     Label(StrSale.returnReasonRequired)
     V3ChipRow(contentPadding = PaddingValues(0.dp)) {
-      ReturnFlow.REASONS.forEach { r -> V3Chip(r, reason == r, { reason = r }) }
+      reasons.forEach { r -> V3Chip(r, reason == r, { reason = r }) }
     }
 
     Label(StrSale.refundWord)
@@ -271,6 +280,10 @@ fun ReturnFlowSheet(
           else Text(StrSale.approverMustPost(ReturnFlowModel.approverText(gate.approver)), style = V3Type.footnote, color = c.inkMuted)
         }
       }
+    }
+    //  RET-09 — بیرون از سیاست: شاگرد در سد «تأییدِ مدیر» را می‌بیند، مدیر و صاحب «استثنا» را
+    ReturnFlowModel.policyNotice(d, decision.verdict, policy, ReturnFlow.roleOf(role) == "staff")?.let { (title, body) ->
+      Spacer(Modifier.height(8.dp)); V3Message(V3Tone.WARNING, title, body = body)
     }
     (quote as? ReturnFlow.Outcome.Bad)?.takeIf { it.code != ReturnFlow.Code.NOTHING_TO_RETURN }?.let {
       Spacer(Modifier.height(8.dp)); V3Message(V3Tone.ERROR, it.message)
