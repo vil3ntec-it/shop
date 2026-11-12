@@ -35,6 +35,7 @@ import ir.vil3ntec.tohid.core.i18n.StrBackupSafety
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.data.AutoBackup
 import ir.vil3ntec.tohid.data.BackupClock
+import ir.vil3ntec.tohid.data.BackupDevice
 import ir.vil3ntec.tohid.data.BackupMirror
 import ir.vil3ntec.tohid.data.LedgerArchive
 import ir.vil3ntec.tohid.data.ShopRole
@@ -95,7 +96,7 @@ internal fun RouteScope.BackupScreen(onBack: (() -> Unit)?) {
       V3Section(StrSettings.manualBackup) {
         V3ListRow(StrSettings.fullBackup, subtitle = StrSettings.fullBackupDesc, icon = Icons.Outlined.CloudUpload, tile = false, onClick = launch.full)
         V3Divider(start = ROW_DIVIDER_START)
-        V3ListRow(StrSettings.ledgerOnly, subtitle = StrSettings.ledgerOnlyDesc, icon = Icons.Outlined.Description, tile = false, onClick = launch.ledger)
+        V3ListRow(StrSettings.ledgerOnly, subtitle = if (ctrl.backupSealOn) StrBackupSafety.ledgerOnlySealedDesc else StrSettings.ledgerOnlyDesc, icon = Icons.Outlined.Description, tile = false, onClick = launch.ledger)
       }
     }
     item(key = "export") {
@@ -234,6 +235,8 @@ private fun MirrorSection(ctrl: BackupController, signedIn: Boolean) {
   val context = LocalContext.current
   val dir = remember(ctrl.mirrorTick) { BackupMirror.folder(context)?.path ?: "—" }
   val files = remember(ctrl.mirrorTick) { BackupMirror.list(context) }
+  //  OPS-02: شکستِ پشتیبانِ پوشه (کارِ شبانه هم) تا پشتیبانِ موفقِ بعدی دیده می‌شود
+  val failed = remember(ctrl.mirrorTick) { BackupDevice.mirrorError(context) }
   V3Section(StrSettings.folderBackup, footer = StrSettings.folder(dir)) {
     V3ListRow(
       if (ctrl.mirrorBusy) StrSettings.buildingDots else StrSettings.mirrorNow,
@@ -246,6 +249,7 @@ private fun MirrorSection(ctrl: BackupController, signedIn: Boolean) {
     V3Divider(start = ROW_DIVIDER_START)
     V3ToggleRow(StrSettings.every12h, checked = ctrl.mirrorOn, onCheckedChange = ctrl::setMirror, icon = Icons.Outlined.History)
   }
+  failed?.let { (why, at) -> V3Message(V3Tone.ERROR, StrBackupSafety.mirrorFailed(displayMillis(at), why), Modifier.padding(top = 8.dp)) }
   if (Platform.DESKTOP) {
     Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       V3TextButton(StrSettings.chooseFolder, { ctrl.pickFolder(dir) })

@@ -127,13 +127,22 @@ internal class BackupController(
     }.onFailure { toasts.show(StrSettings.backupFailed(failText(it))) }
   }
 
-  /** فقط دفتر — همان فایلی که نسخهٔ وب می‌خواند */
+  /** فقط دفتر — همان فایلی که نسخهٔ وب می‌خواند؛ رمزِ پشتیبانِ دستی روشن ⇒ همان پاکتِ عبارت (`BackupRestore.writeLedger`) */
   fun writeLedger(uri: Uri) = scope.launch {
     runCatching {
-      val out = context.contentResolver.openOutputStream(uri) ?: error(StrSettings.pathNotWritable)
-      out.use { it.write(store.exportBackup(storeName).toByteArray(Charsets.UTF_8)) }
+      BackupRestore.writeLedger(context, store, storeName) { context.contentResolver.openOutputStream(uri) ?: error(StrSettings.pathNotWritable) }
     }.onSuccess { BackupClock.mark(context); toasts.show(StrSettings.ledgerFileMade) }
       .onFailure { toasts.show(StrSettings.fileFailed(failText(it))) }
+  }
+
+  /**
+   *  OPS-02: پیش از باز کردنِ انتخابگرِ فایل — رمزِ پشتیبانِ دستی روشن و کلید باز نشد یا پشتیبان برای حافظه بزرگ است ⇒ پیامِ
+   *  روشن و انتخابگر باز نمی‌شود (وگرنه اندروید فایلِ خالیِ `….sealed` را می‌ساخت و بعد پشتیبان شکست می‌خورد).
+   */
+  fun sealBlocked(photos: Boolean): Boolean {
+    val why = BackupSeal.blocked(context, photos) ?: return false
+    toasts.show(why)
+    return true
   }
 
   /** خروجیِ کاملِ داده برای مالک — فقط مالک/مدیر، با ثبت در سابقهٔ عملیات (۲۱.۲) */
@@ -375,6 +384,7 @@ internal fun rememberBackupController(store: ShopStore, toasts: V3Toasts, signed
   //  OPS-02: پشتیبانِ رمزدار ZIP نیست (`BackupSeal.SEALED_EXT`) — نوعِ دیگر تا اندروید «.zip» نچسباند
   val fullSealed = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { it?.let(ctrl::writeFull) }
   val ledger = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { it?.let(ctrl::writeLedger) }
+  val ledgerSealed = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { it?.let(ctrl::writeLedger) }
   val json = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { it?.let { u -> ctrl.ownerExport(u, excel = false) } }
   val excel = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) {
     it?.let { u -> ctrl.ownerExport(u, excel = true) }
@@ -382,9 +392,19 @@ internal fun rememberBackupController(store: ShopStore, toasts: V3Toasts, signed
   val pick = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { it?.let { u -> ctrl.readFile(u) } }
   val launchers = BackupLaunchers(
     full = {
-      if (ctrl.backupSealOn) fullSealed.launch("tohid-backup-${todayIso()}${BackupSeal.SEALED_EXT}") else full.launch("tohid-backup-${todayIso()}.zip")
+      when {
+        ctrl.sealBlocked(photos = true) -> Unit
+        ctrl.backupSealOn -> fullSealed.launch("tohid-backup-${todayIso()}${BackupSeal.SEALED_EXT}")
+        else -> full.launch("tohid-backup-${todayIso()}.zip")
+      }
     },
-    ledger = { ledger.launch("tohid-shop-backup-${todayIso()}.json") },
+    ledger = {
+      when {
+        ctrl.sealBlocked(photos = false) -> Unit
+        ctrl.backupSealOn -> ledgerSealed.launch("tohid-shop-backup-${todayIso()}.json${BackupSeal.SEALED_SUFFIX}")
+        else -> ledger.launch("tohid-shop-backup-${todayIso()}.json")
+      }
+    },
     excel = { excel.launch("tohid-export-${todayIso()}.xlsx") },
     json = { json.launch("tohid-export-${todayIso()}.json") },
     restore = { pick.launch("*/*") },

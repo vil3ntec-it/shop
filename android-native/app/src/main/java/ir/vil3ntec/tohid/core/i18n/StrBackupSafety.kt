@@ -125,6 +125,26 @@ object StrBackupSafety {
     "دې عبارت دا بیک‌اپ پرانیستلی نه شو — بل عبارت دی، یا فایل لاس وهل شوی یا نیمګړی دی. هېڅ شی بدل نه شو.",
   )
   val unlockFileTitle: String get() = t("این پشتیبان رمزدار است", "This backup is encrypted", "دا بیک‌اپ کوډ لري")
+  fun backupTooBigToSeal(mb: Any, freeMb: Any): String = t(
+    "این پشتیبان (حدودِ ${asIs(mb)} مگابایت) برای رمز کردن روی این دستگاه بزرگ است (حافظهٔ آزاد ${asIs(freeMb)} مگابایت)؛ ساخته نشد تا بی‌رمز بیرون نرود. آن را روی کامپیوتر بگیرید یا «پشتیبانِ دستی و پوشه هم رمزدار» را خاموش کنید.",
+    "This backup (about $mb MB) is too big to encrypt on this device ($freeMb MB of memory free); it wasn't made so it doesn't leave unencrypted. Make it on the computer, or turn off “Encrypt manual and folder backups too”.",
+    "دا بیک‌اپ (نږدې $mb مېګابایټه) په دې وسیله کې د کوډ کولو لپاره لوی دی ($freeMb مېګابایټه حافظه خالي ده)؛ جوړ نه شو څو بې کوډه بهر ونه وځي. په کمپیوټر یې جوړ کړئ یا «لاسي او فولډر بیک‌اپونه هم کوډ شي» بند کړئ.",
+  )
+  fun backupTooBigToOpen(mb: Any): String = t(
+    "این پشتیبانِ رمزدار برای حافظهٔ این دستگاه بزرگ است (بیش از ${asIs(mb)} مگابایت)؛ آن را روی کامپیوتر بازیابی کنید. هیچ چیزی عوض نشد.",
+    "This encrypted backup is too big for this device's memory (over $mb MB); restore it on the computer. Nothing changed.",
+    "دا کوډ شوی بیک‌اپ د دې وسیلې د حافظې لپاره لوی دی (له $mb مېګابایټه زیات)؛ په کمپیوټر یې بېرته راوګرځوئ. هېڅ شی بدل نه شو.",
+  )
+  fun mirrorFailed(at: Any, why: Any): String = t(
+    "پشتیبانِ پوشه ساخته نشد (${asIs(at)}): ${asIs(why)}",
+    "The folder backup wasn't made ($at): $why",
+    "د فولډر بیک‌اپ جوړ نه شو ($at): $why",
+  )
+  val ledgerOnlySealedDesc: String get() = t(
+    "بدون عکس، رمزدار با عبارتِ بازیابی — برنامه بازش می‌کند، نسخهٔ وب نه",
+    "Without photos, encrypted with the recovery phrase — the app opens it, the web version doesn't",
+    "بې انځورونو، د بېرته راګرځولو په عبارت کوډ شوی — پروګرام یې پرانیزي، وېب نسخه یې نه",
+  )
 
   fun printDate(d: Any): String = t("ساخته‌شده: ${asIs(d)}", "Made: $d", "جوړ شوی: $d")
 

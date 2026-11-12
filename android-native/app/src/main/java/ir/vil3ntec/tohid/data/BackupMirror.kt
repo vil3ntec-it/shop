@@ -47,7 +47,7 @@ object BackupMirror {
 
   private val parseJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true; isLenient = true }
 
-  /** یک ZIPِ کامل در پوشه — فایلِ ساخته‌شده، یا خطا */
+  /** یک ZIPِ کامل در پوشه — فایلِ ساخته‌شده، یا خطا (ثبت در `BackupDevice.mirrorError` تا پشتیبانِ موفقِ بعدی) */
   fun write(context: Context): Result<File> = runCatching {
     val ledger = File(context.filesDir, "shop-data.json")
     require(ledger.exists() && ledger.length() > 0) { StrAppData.noLedgerToBackup }
@@ -79,5 +79,5 @@ object BackupMirror {
     }
     list(context).drop(KEEP).forEach { runCatching { it.delete() } }
     target
-  }
+  }.also { BackupDevice.noteMirror(context, it.exceptionOrNull()) } //  OPS-02: شکستِ پوشه (شبانه هم) در صفحهٔ «داده‌ها» دیده می‌شود
 }

@@ -343,6 +343,8 @@ class DataSafetyGuardTest {
       "tohid-held-sync",
       //  «اصلاح و ثبت» ِ صندوقِ سندهای ردشده: کلیدِ سبدِ همین صندوق ⇒ ردیفِ صندوقِ سرور (`ConflictFix`)؛ خودِ ردیف روی سرور است
       "tohid-conflict-fix",
+      //  OPS-02: پرچمِ «پشتیبانِ دستی و پوشه هم رمزدار» و شکستِ پشتیبانِ پوشه (`BackupDevice`)؛ کلیدِ عبارت مالِ همین دستگاه است
+      "tohid-backup-device",
     ).forEach { put(it, Kind.DEVICE) }
     //  مانده (DATA-SAFETY §۶): رمزِ کارمندان عمداً از پشتیبان بیرون است — دوباره گذاشته می‌شود
     put("tohid-staff-pins", Kind.GAP)

@@ -54,6 +54,22 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-20f زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-20f` (از `claude/batch-55`) — بازبینی و رفعِ OPS-02/PAY-08
+
+- **شد:** بازبینیِ مستقلِ `claude/e-rows-15w` و رفعِ همهٔ یافته‌ها. PAY-08 (`core/terminal/DevicePay`): کلیدِ تازه فقط پس از
+  روشن شدنِ تلاشِ باز (`Next.Run`/`Resolve`، `resolve` فقط `lookup`)، تلاشِ ردشده/لغوشده دوباره به کار نمی‌رود (`close`/`done`)،
+  «پاسخ نداد» جدا از «ندیده» (`DeviceLookup`؛ پس از مهلت ⇒ بررسی، نه لغو)، یک پرداخت یک ردیف (`Recorded.Replaced`)، فقط چهار
+  رقمِ کارت؛ `DevicePaySettle` کلید و ارز را می‌سنجد؛ `withRow` فقط `confirmed` با سطحِ غیرِدستی؛ `PayLevel` با `Pay.ACCOUNT`/`FX`.
+  OPS-02: «فقط دفتر» ِ رمزدار (`BackupRestore.writeLedger`، `phrase-backup.js` می‌شناسد)، سنجشِ کلید و حافظه پیش از انتخابگر
+  (`BackupSeal.blocked`)، سنجشِ حافظه پیش از رمز (۳×) و بازیابی (۴×) چون Conscrypt ِ اندروید کلِ ورودیِ GCM را نگه می‌دارد،
+  پرچمِ `backup_seal` در `tohid-backup-device` (بیرون از پشتیبان/انتقالِ اندروید، با مهاجرت)، شکستِ پشتیبانِ پوشه دیدنی
+  (`BackupDevice.mirrorError`)؛ shim ِ `Runtime` برای آیفون.
+- **آزمون:** همه سرخ پیش (جهش یا اجرای کدِ پیشین) و سبز پس — `DevicePayTest` ۱۳/۱۳، `BackupSealDrillTest` ۱۰/۱۰،
+  `DevicePaySettleTest` ۵/۵، `DeviceOnlyPrefsTest` ۵/۵، `phrase-backup-tool.test.js` ۵/۵؛ اجرای کاملِ desktop ‏۴۰۱۶ آزمون، ۰ شکست
+  (۴ ردشده)؛ precheck `fail=0`، `quality.mjs` بی ❌، `spec.mjs check` سالم.
+- **نیمه‌کاره/قدمِ بعدی:** پاکتِ تکه‌ایِ نسخهٔ ۲ (STREAM) عمداً ساخته نشد (STATUS ِ OPS-02)؛ ساختِ klib ِ آیفون این‌جا سنجیده نشد
+  (shim ِ تازهٔ `RuntimeShim.kt` با `NSProcessInfo.physicalMemory`) ⇒ CI ِ آیفون ببیند. ردیف‌ها همان PARTIAL و همان دسته.
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-19s زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-19s` (از `claude/batch-54`)
 
 - **S18 ⇐ دستگاه:** گامِ ۴ در پنجرهٔ واقعیِ Compose (`TillNewCustomerUiTest`، `ShopStore` ِ واقعی، زبانِ دری): کادرِ نامِ گزینشِ مشتری

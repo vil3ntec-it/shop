@@ -47,6 +47,7 @@
     <exclude domain="sharedpref" path="tohid-staff-pins.xml" />
     <exclude domain="sharedpref" path="tohid-doc-series.xml" />
     <exclude domain="sharedpref" path="tohid-sync-v1.xml" />
+    <exclude domain="sharedpref" path="tohid-backup-device.xml" />
     <exclude domain="file" path="sync-shadow" />
     <exclude domain="file" path="sync-v3" />
   </cloud-backup>
@@ -59,6 +60,7 @@
     <exclude domain="sharedpref" path="tohid-staff-pins.xml" />
     <exclude domain="sharedpref" path="tohid-doc-series.xml" />
     <exclude domain="sharedpref" path="tohid-sync-v1.xml" />
+    <exclude domain="sharedpref" path="tohid-backup-device.xml" />
     <exclude domain="file" path="sync-shadow" />
     <exclude domain="file" path="sync-v3" />
   </device-transfer>

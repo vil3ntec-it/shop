@@ -30,6 +30,9 @@ class DeviceOnlyPrefsTest {
   private val deviceOnly = listOf(
     "tohid-sync.xml", "tohid-session.xml", "tohid-session-secure.xml", "tohid-staff-pins.xml", "tohid-doc-series.xml",
     "tohid-sync-v1.xml",
+    //  OPS-02: «پشتیبانِ دستی و پوشه هم رمزدار» و شکستِ پشتیبانِ پوشه (`BackupDevice`) — کلیدِ عبارت مالِ همین دستگاه است؛
+    //  پرچمِ روشن روی گوشیِ تازهٔ بی‌کلید هر پشتیبانِ پوشه را بی‌صدا می‌شکست
+    "tohid-backup-device.xml",
   )
 
   private fun excluded(xml: String): Set<String> =
@@ -50,6 +53,12 @@ class DeviceOnlyPrefsTest {
     )) {
       for (p in deviceOnly) assertTrue("$where: $p باید بیرون بماند", p in set)
     }
+  }
+
+  @Test fun `پرچمِ رمزِ پشتیبانِ دستی در همان پرونده‌ای است که بیرون می‌ماند`() {
+    assertEquals("tohid-backup-device", BackupDevice.PREFS)
+    val seal = file("java/ir/vil3ntec/tohid/data/BackupSealAndroid.kt")
+    assertTrue("BackupSeal پرچم را از BackupDevice می‌خواند", "BackupDevice.prefs(context)" in seal)
   }
 
   @Test fun `نامِ پروندهٔ سری همان است که بیرون می‌ماند`() {
