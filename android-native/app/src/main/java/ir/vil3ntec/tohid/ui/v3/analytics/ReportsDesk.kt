@@ -208,12 +208,13 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState, onOpen: (String) -> Un
       else ReportCsv.comparedList(rep.key, base, past, StrReports.colCount, StrReach.prevColumn, StrReach.changeColumn)
     }
   }
-  //  RPT-13: «ریز» ِ ردیف (کلیک یا Enter ِ `reports.drill`) در «فروش» و «فروشِ هر کاربر» (`ReportDrillSheet`) — فقط برگهٔ همان
+  //  RPT-13: «ریز» ِ ردیف (کلیک یا Enter ِ `reports.drill`) در هر برگهٔ `ReportDrillSheet.KEYS` (فروش، فروشِ هر کاربر، سود و زیان،
+  //  ردیفِ کالا، ردیفِ مشتری؛ برگه‌های تک‌سند `RECORD_ROWS` ریز ندارند) — فقط برگهٔ همان
   //  دوره بی «مقایسه» (ستون‌ها و ردیف‌های مقایسه جای ردیف را عوض می‌کنند) و بی «فروشندهٔ هر ردیف» در «فروشِ هر کاربر»
   var rowDrill by remember(rep, from, to) { mutableStateOf<ReportCsv.Sheet?>(null) }
   val onRow: ((Int) -> Unit)? =
     if (sheet === base && rep.key in ReportDrillSheet.KEYS && !(rep.key == "sellers" && lineSeller)) ({ i: Int ->
-      ReportDrillSheet.of(rep.key, d, from, to, i, lineSeller)?.let { rowDrill = it }
+      ReportDrillSheet.of(rep.key, d, from, to, i, lineSeller, today)?.let { rowDrill = it }
     }) else null
   //  «پرسشِ ساده» برگه ندارد: Ctrl+P/Ctrl+E آن‌جا کاری نمی‌کنند
   fun print() { if (rep != DeskRep.ASK) { onExport(rep.key); ReportPrint.print(context, sheet, sheet.name) } }

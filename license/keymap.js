@@ -101,10 +101,10 @@
     "productGrid.undo": {"scope":"productGrid","title":"برگرداندن","status":"live","webStatus":"planned","page":null,"web":[],"overrides":[]},
     "productGrid.save": {"scope":"productGrid","title":"ثبتِ همهٔ تغییرها","status":"live","webStatus":"planned","page":null,"web":[],"overrides":[]},
     "productGrid.cancel": {"scope":"productGrid","title":"لغوِ ویرایشِ خانه؛ بستنِ جدول","status":"live","webStatus":"planned","page":null,"web":[],"overrides":[]},
-    "reports.drill": {"scope":"reports","title":"ریز شدن در ردیف","status":"partial","webStatus":"partial","page":null,"web":[["Enter",false,false,false]],"overrides":[]},
-    "reports.nextPeriod": {"scope":"reports","title":"دورهٔ بعد","status":"partial","webStatus":"partial","page":null,"web":[["Plus",false,false,false],["Equals",false,true,false]],"overrides":[]},
-    "reports.prevPeriod": {"scope":"reports","title":"دورهٔ قبل","status":"partial","webStatus":"partial","page":null,"web":[["Minus",false,false,false]],"overrides":[]},
-    "reports.compare": {"scope":"reports","title":"ستونِ مقایسه با دورهٔ قبل","status":"partial","webStatus":"partial","page":null,"web":[["C",false,false,true]],"overrides":[]}
+    "reports.drill": {"scope":"reports","title":"ریز شدن در ردیف","status":"live","webStatus":"partial","page":null,"web":[["Enter",false,false,false]],"overrides":[]},
+    "reports.nextPeriod": {"scope":"reports","title":"دورهٔ بعد","status":"live","webStatus":"partial","page":null,"web":[["Plus",false,false,false],["Equals",false,true,false]],"overrides":[]},
+    "reports.prevPeriod": {"scope":"reports","title":"دورهٔ قبل","status":"live","webStatus":"partial","page":null,"web":[["Minus",false,false,false]],"overrides":[]},
+    "reports.compare": {"scope":"reports","title":"ستونِ مقایسه با دورهٔ قبل","status":"live","webStatus":"partial","page":null,"web":[["C",false,false,true]],"overrides":[]}
   };
   function chordMatches(e, c) {
     return CODES[c[0]].indexOf(e.code) >= 0 &&
