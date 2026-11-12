@@ -49,12 +49,19 @@ class MarketContractTest {
       "searchProduct" to (PublicProduct.serializer() to emptySet()),
       "shopRef" to (PublicShopRef.serializer() to emptySet()),
       "stock" to (StockBadge.serializer() to emptySet()),
-      "order" to (PublicOrder.serializer() to emptySet()),
+      //  v2: `refund` جدا خوانده می‌شود (`ShopperApi.trackPage` ⇒ [PublicRefund]) تا شکلِ نادرستش پیگیری را نشکند
+      "order" to (PublicOrder.serializer() to setOf("refund")),
+      "orderRefund" to (PublicRefund.serializer() to emptySet()),
+      "refundEntry" to (PublicRefundEntry.serializer() to emptySet()),
+      "refundReceipt" to (PublicRefundReceipt.serializer() to emptySet()),
       "orderLine" to (PublicOrderLine.serializer() to emptySet()),
       "orderEvent" to (PublicOrderEvent.serializer() to emptySet()),
       "paymentStep" to (PaymentStep.serializer() to emptySet()),
       "delivery" to (PublicDelivery.serializer() to emptySet()),
     )
+    //  هر شکلِ قرارداد مدلی دارد (شکلِ تازهٔ سرور بی مدلِ کاتلین ⇒ سرخ)
+    val homeless = fields.keys - models.keys - setOf("shopCard", "onlinePay", "orderSummary", "storeRef", "reorderLine")
+    assertTrue(homeless.isEmpty(), "شکل‌های بی مدل: $homeless")
     for ((shape, model) in models) {
       val (ser, outside) = model
       val names = (0 until ser.descriptor.elementsCount).map(ser.descriptor::getElementName).toSet()
@@ -143,8 +150,38 @@ class MarketContractTest {
     assertEquals(PublicDelivery("picked_up", "shop_courier"), MarketContract.delivery(sample("delivery")))
   }
 
+  /** v2 — `order.refund?` (NTF-08) با رسیدهای اصلاحی (E2E-RET-11): همان نمونهٔ سرور، بی دلیل و کنندهٔ کارمند */
+  @Test fun refundV2() {
+    val r = MarketContract.refund(sample("orderRefund"))
+    assertEquals("partial", r.status)
+    assertEquals(1761810000000L, r.requestedAt)
+    assertEquals(25000L to 16000L, r.refundedMinor to r.remainingMinor)
+    assertEquals(listOf(PublicRefundEntry(20000, "cash", 1761810600000, false), PublicRefundEntry(5000, "cash", 1761814200000, true)), r.entries)
+    assertEquals(r.entries.last().at, r.updatedAt)
+    assertEquals(listOf("42-R1", "42-R2"), r.receipts.map { it.no })
+    assertEquals(listOf(21000L, 16000L), r.receipts.map { it.netMinor })
+    assertEquals(listOf(0L, 20000L), r.receipts.map { it.refundedBeforeMinor })
+    assertTrue(r.receipts.all { it.orderNo == 42L && it.totalMinor == 41000L })
+    //  پرچمِ رسید خاموش ⇒ بی `receipts` ⇒ فهرستِ خالی
+    val bare = root.getValue("samples").jsonObject.getValue("orderRefund").jsonObject.filterKeys { it != "receipts" }
+    assertEquals(emptyList(), MarketContract.refund(JsonObject(bare).toString()).receipts)
+    //  ورودی‌ها دلیل و کنندهٔ کارمند دارند؛ نمونهٔ عمومی هیچ‌کدام
+    assertTrue("usr_internal" in root.getValue("inputs").toString())
+    assertTrue("usr_internal" !in sample("orderRefund") && "reason" !in sample("orderRefund"))
+  }
+
   /** سرورِ تازه‌تر با فیلد و وضعیتِ تازه برنامهٔ کهنه را نمی‌شکند. */
   @Test fun toleratesNewerServer() {
+    assertTrue(MarketContract.json.configuration.ignoreUnknownKeys)
+    //  پیگیریِ v2 (با `refund`) برای مدلِ سفارشی که `refund` ندارد ⇒ همان سفارش؛ کلیدِ ناشناختهٔ آینده هم
+    val v2 = MarketContract.order(sample("order").dropLast(1) + ",\"refund\":${sample("orderRefund")},\"future\":{\"x\":[1]}}")
+    assertEquals(MarketContract.order(sample("order")), v2)
+    //  وضعیتِ تازه و کلیدِ تازه درونِ بازپرداخت و رسید ⇒ رشته همان‌گونه، بی خطا
+    val r = MarketContract.refund(
+      sample("orderRefund").replace("\"partial\"", "\"reopened\"").replace("\"no\":", "\"pdf\":\"/x\",\"no\":").dropLast(1) + ",\"eta\":3}"
+    )
+    assertEquals("reopened", r.status)
+    assertEquals(listOf("42-R1", "42-R2"), r.receipts.map { it.no })
     val p = MarketContract.product(
       """{"id":"x","name":"ن","priceMinor":null,"photo":true,"brand":"تازه","stock":{"status":"reserved_soon","eta":3}}"""
     )

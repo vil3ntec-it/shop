@@ -149,9 +149,10 @@ fun ImageBankPicker(
       }
     }
   }
-  LaunchedEffect(Unit) { search(false) }
-
   AdaptiveSheet(onDismissRequest = onDismiss, containerColor = colors.bg) {
+    //  جست‌وجوی نخست از درونِ همان برگه/پنجره، پس از آن‌که برگه ساخته شد: پاسخی که پیش از ساخته شدنِ برگه برسد (سرورِ
+    //  نزدیک، کش) حالت را می‌نوشت و برگه همان «در حالِ جست‌وجو…» را نگه می‌داشت (IMG-BANK-10، `ImageBankPickerUiTest`)
+    LaunchedEffect(Unit) { search(false) }
     Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 24.dp)) {
       Text(StrReach.photoBank, style = MaterialTheme.typography.titleMedium, color = colors.text, fontWeight = FontWeight.Bold)
       Spacer(Modifier.height(Space.xs))

@@ -1,6 +1,8 @@
 package ir.vil3ntec.tohid.core.shopper
 
 import ir.vil3ntec.tohid.core.market.PublicOrder
+import ir.vil3ntec.tohid.core.market.PublicRefund
+import ir.vil3ntec.tohid.core.market.PublicRefundEntry
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
@@ -33,23 +35,15 @@ data class OrderExtras(
   @Transient val refund: RefundView? = null,
 )
 
-/** یک ردیفِ دفترِ بازپرداخت در پیگیری: فقط مبلغ، روش و زمان (سرور دلیل و کننده را نمی‌دهد) */
-@Serializable
-data class RefundEntry(val amountMinor: Long = 0, val method: String = "", val at: Long = 0)
+/** یک ردیفِ دفترِ بازپرداخت در پیگیری — همان مدلِ قراردادِ نسخهٔ ۲ ([PublicRefundEntry]) */
+typealias RefundEntry = PublicRefundEntry
 
 /**
- *  کلیدِ `refund` ِ پیگیری (NTF-08، پرچمِ خاموشِ `shop.orders.refund_tracking`، `lib/order-refund-view.js`): نبود یا
- *  `null` ⇒ هیچ کارتی. وضعیت `requested` · `in_progress` · `partial` · `full`؛ ناشناخته ⇒ همان «درخواست ثبت شد» ِ وب.
+ *  کلیدِ `refund` ِ پیگیری (NTF-08، پرچمِ پیش‌فرض‌روشنِ `shop.orders.refund_tracking`، `lib/order-refund-view.js`) — همان مدلِ
+ *  قراردادِ نسخهٔ ۲ ([PublicRefund]، `market-public-v2.json`): نبود یا `null` ⇒ هیچ کارتی. وضعیت `requested` · `in_progress` ·
+ *  `partial` · `full`؛ ناشناخته ⇒ همان «درخواست ثبت شد» ِ وب.
  */
-@Serializable
-data class RefundView(
-  val status: String = "requested",
-  val requestedAt: Long? = null,
-  val refundedMinor: Long = 0,
-  val remainingMinor: Long = 0,
-  val entries: List<RefundEntry> = emptyList(),
-  val updatedAt: Long? = null,
-)
+typealias RefundView = PublicRefund
 
 /** کارتِ بازپرداختِ صفحهٔ سفارش — همان `renderRefund` ِ `store/order-changes.js` */
 object RefundRules {

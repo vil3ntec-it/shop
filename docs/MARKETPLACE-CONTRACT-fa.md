@@ -1,4 +1,4 @@
-# قراردادِ دادهٔ دکان ⇐ بازار (نسخهٔ ۱، ۱۴۰۵/۰۸/۰۸)
+# قراردادِ دادهٔ دکان ⇐ بازار (نسخهٔ ۱، ۱۴۰۵/۰۸/۰۸؛ نسخهٔ ۲ ِ نمای عمومی ۱۴۰۵/۰۸/۲۲ در §۳)
 
 > پایه: تصمیم‌های صاحب محصول در `docs/spec/40-owner-decisions.md` (§۴۰.۱، §۴۰.۴، §۴۰.۵) و بخش‌های ۲۳، ۳۰، ۳۱ و ۳۲ِ سند.
 > این فایل **طراحی** است؛ هیچ کدی با آن عوض نشده. هر جا «الان هست» آمده، از کدِ همین شاخه خوانده شده است (`server/`).
@@ -212,7 +212,18 @@
 | `shop` | `media?` = `{ logo, header }`، هر کدام `null` یا `{ version, width, height, mime, url }` (پرچمِ خاموش ⇒ هر دو `null`) | M3، #428 |
 | `product`، `marketProduct`، `searchProduct` | `photoVersion?` — نسخهٔ ۱۲-hex ِ عکس برای `?v=` ِ نشانیِ عکس؛ فقط وقتی عکس هست (نبود ⇒ نشانیِ بی نسخه) | IMG-12، `claude/img12` |
 
-فیلدهای پشتِ پرچم‌های خاموشِ دیگر (`order.delivery` ِ S5، `order.refund` ِ NTF-08، `store.publicId` ِ S3، جزئیاتِ M4 در جست‌وجو) هنوز در این فهرست نیستند؛ تا آن‌ها نیامده‌اند پرچمِ `market.public_views` خاموش بماند.
+فیلدهای پشتِ پرچم‌های خاموشِ دیگر (`order.delivery` ِ S5، `store.publicId` ِ S3، جزئیاتِ M4 در جست‌وجو) هنوز در این فهرست نیستند؛ تا آن‌ها نیامده‌اند پرچمِ `market.public_views` خاموش بماند.
+
+**نسخهٔ ۲ (`schemaVersion = 2`، ۱۴۰۵/۰۸/۲۲):** از دستهٔ ۵۲ پرچمِ `shop.orders.refund_tracking` پیش‌فرض روشن است (`server/src/lib/flag-defaults.js`) و پیگیری کلیدِ `refund` را برای هر دکانِ تازه می‌فرستد؛ v1 منتشر شده بود ⇒ نسخهٔ تازه، نه افزوده به v1. `core/test-vectors/market-public-v1.json` دست نخورد؛ `market-public-v2.json` همان به‌اضافهٔ فیلدهای زیر است و آزمونِ سرور می‌سنجد که نسخهٔ تازه هیچ فیلدِ نسخهٔ پیشین را برنداشته باشد. کلاینت‌ها کلیدِ ناشناخته را نادیده می‌گیرند (`ignoreUnknownKeys` ِ `MarketContract.json` و `ShopperJson`) ⇒ برنامه‌ای که با v1 ساخته شده با سرورِ v2 نمی‌شکند (`MarketContractTest.toleratesNewerServer`، `ShopperChatActsTest.refundV2ReceiptsAndKeysFromANewerServerAreTolerated`).
+
+| شکل | فیلد | منبع |
+|---|---|---|
+| `order` | `refund?` — فقط در پیگیری و فقط با `shop.orders.refund_tracking`؛ `null` تا درخواستِ برگشت یا ردیفِ دفتر نیست | NTF-08، `lib/order-refund-view.js` |
+| `orderRefund` | `status` (`requested` \| `in_progress` \| `partial` \| `full`)، `requestedAt`، `refundedMinor`، `remainingMinor`، `currency`، `entries`، `updatedAt`، `receipts?` | همان |
+| `refundEntry` | `amountMinor`، `method`، `at`، `final` — ⛔ نه دلیلِ نوشتهٔ کارمند، نه کننده | همان |
+| `refundReceipt` | `no` (`<شمارهٔ سفارش>-R<seq>`)، `seq`، `at`، `orderNo`، `currency`، `method`، `final`، `totalMinor`، `refundedBeforeMinor`، `amountMinor`، `refundedAfterMinor`، `netMinor` — فقط با `shop.orders.refund_receipt` | E2E-RET-11، `lib/order-refund-receipt.js` |
+
+مدل‌های `core`: `PublicRefund`، `PublicRefundEntry`، `PublicRefundReceipt` در `MarketContract.kt` (برنامهٔ خرید همان را با نامِ `RefundView` جدا از `PublicOrder` می‌خواند تا شکلِ نادرستِ بازپرداخت پیگیری را نشکند). آزمون: `server/test/public-views.test.js` (هم با پیش‌فرض‌ها و هم با همهٔ پیش‌فرض‌روشن‌ها `false` ِ صریح) و `MarketContractTest`.
 
 ### اولویتِ ۲ — داده‌ای که بازار به آن نیاز دارد و فقط دکان می‌تواند بسازد
 

@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.core.shopper
 
 import ir.vil3ntec.tohid.core.market.PublicOrder
+import ir.vil3ntec.tohid.core.market.PublicRefund
 import ir.vil3ntec.tohid.core.market.PublicShop
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.serialization.DeserializationStrategy
@@ -188,7 +189,7 @@ class ShopperApi(private val http: ShopperHttp, private val lang: () -> String =
       val o = root["order"] as? JsonObject ?: return@call null
       val order = decodeOrNull(PublicOrder.serializer(), o) ?: return@call null
       //  NTF-08: `refund` جدا ⇒ شکلِ نادرستش فقط کارتِ بازپرداخت را می‌برد، نه نظر و گفت‌وگو را
-      val refund = o["refund"]?.let { decodeOrNull(RefundView.serializer(), it) }
+      val refund = o["refund"]?.let { decodeOrNull(PublicRefund.serializer(), it) }
       TrackPage(order, (decodeOrNull(OrderExtras.serializer(), o) ?: OrderExtras()).copy(refund = refund))
     }
 

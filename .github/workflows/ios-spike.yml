@@ -173,8 +173,9 @@ jobs:
       #  کادرِ صندوقِ خانه و «+»، سفارشِ آنلاین تا یک فاکتور، دری — §۰.۱۳ و §۰.۱۵)
       - name: iosSimulatorArm64Test (ios/shared) — رمز، shimها و جریان‌های اصلی
         if: always()
-        #  کامپایل و پیوندِ آزمون ~۱۲، آزمونِ سرتاسری ≤ ۲۰ دقیقه (نگهبانِ خودش)؛ گیرِ دیگر کارِ ۱۱۵ دقیقه‌ای را نخورد
-        timeout-minutes: 45
+        #  کامپایل و پیوندِ آزمون ~۱۲ (در #1039 تا ۲۱)، آزمونِ سرتاسری ≤ ۲۰ دقیقه (نگهبانِ خودش) ⇒ ۶۰ تا نگهبان پیش از بُرشِ گام
+        #  به حرف بیاید (summary.md، e2e.log و sample)؛ گیرِ دیگر کارِ ۱۱۵ دقیقه‌ای را نخورد
+        timeout-minutes: 60
         env:
           TOHID_E2E_BACKEND: ${{ github.workspace }}/ios-e2e/backend.json
           TOHID_E2E_SHOTS: ${{ github.workspace }}/ios-e2e/shots
@@ -217,6 +218,14 @@ jobs:
             sips -s format jpeg -s formatOptions 50 -Z 520 "$f" --out "$t" >/dev/null 2>&1 || continue
             echo "THUMB-BEGIN $(basename "$t")"; base64 -i "$t" | fold -w 120; echo "THUMB-END"
           done
+      #  پشتهٔ گیر **پس از** THUMB ها: `get_job_logs` فقط ۵۰۰۰ خطِ آخر را می‌دهد و پشتهٔ کاملِ گامِ آزمون (پیش از عکس‌ها) بیرون
+      #  می‌افتد ⇐ از هر hang-sample فقط رشتهٔ اصلی و رشته‌های ایستاده روی NSRecursiveLock / semaphore_wait / dispatch_sync، هر کدام
+      #  ≤ ۸۰ خط (`ios/e2e/hang-threads.py`؛ همان در `ios-e2e/shots/hang-threads.txt` ِ مصنوع). بی گیر ⇐ یک سطر.
+      - name: پشتهٔ رشته‌های گیرکرده (hang-sample، کوتاه)
+        if: always()
+        run: |
+          ls ios-e2e/shots/hang-sample-*.txt >/dev/null 2>&1 || { echo "گیری نبود (hang-sample-*.txt نیست)"; exit 0; }
+          python3 ios/e2e/hang-threads.py ios-e2e/shots/hang-sample-*.txt | tee ios-e2e/shots/hang-threads.txt
       - name: پایانِ سرورِ آزمون
         if: always()
         run: |

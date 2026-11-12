@@ -2,9 +2,10 @@ package androidx.security.crypto
 
 import android.content.Context
 import android.content.SharedPreferences
-import ir.vil3ntec.tohid.ios.jvm.synchronized
 import ir.vil3ntec.tohid.ios.keychain.Keychain
 import kotlinx.serialization.json.Json
+import platform.Foundation.NSLock
+import platform.Foundation.NSRecursiveLock
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -40,6 +41,7 @@ class EncryptedSharedPreferences private constructor() {
 
   companion object {
     private val open = HashMap<String, KeychainPreferences>()
+    private val openLock = NSLock()
 
     fun create(
       fileName: String,
@@ -47,7 +49,10 @@ class EncryptedSharedPreferences private constructor() {
       context: Context,
       prefKeyEncryptionScheme: PrefKeyEncryptionScheme,
       prefValueEncryptionScheme: PrefValueEncryptionScheme,
-    ): SharedPreferences = synchronized(open) { open.getOrPut(fileName) { KeychainPreferences(fileName) } }
+    ): SharedPreferences {
+      openLock.lock()
+      try { return open.getOrPut(fileName) { KeychainPreferences(fileName) } } finally { openLock.unlock() }
+    }
   }
 }
 
@@ -57,7 +62,18 @@ internal class KeychainPreferences(name: String) : SharedPreferences {
   private val listeners = ArrayList<SharedPreferences.OnSharedPreferenceChangeListener>()
   private var cache: MutableMap<String, Any>? = null
 
-  private fun map(): MutableMap<String, Any> = synchronized(this) {
+  /*
+   *  قفلِ خودِ همین پرونده (بازگشتی: `value` ⇐ `map` تودرتوست)، نه قفلِ سراسریِ `ios/jvm/Jvm.kt`. درونش فقط `Keychain`
+   *  (قفلِ برگ) و JSON — هیچ‌گاه قفلِ سراسری؛ شنونده‌ها بیرون از قفل. پس خواندنِ توکن (`TokenStore`) روی رشتهٔ اصلی دیگر پشتِ
+   *  دارندهٔ قفلِ سراسری (`ShopStore.update` ⇐ قفلِ `engine`) نمی‌ماند — بن‌بستِ ABBA با `runLock` ِ Compose (#1037، #1039).
+   */
+  private val lock = NSRecursiveLock()
+  private inline fun <R> locked(block: () -> R): R {
+    lock.lock()
+    try { return block() } finally { lock.unlock() }
+  }
+
+  private fun map(): MutableMap<String, Any> = locked {
     cache ?: load().also { cache = it }
   }
 
@@ -66,7 +82,7 @@ internal class KeychainPreferences(name: String) : SharedPreferences {
     return runCatching { decode(Json.parseToJsonElement(raw.decodeToString()).jsonObject) }.getOrElse { LinkedHashMap() }
   }
 
-  private fun value(key: String): Any? = synchronized(this) { map()[key] }
+  private fun value(key: String): Any? = locked { map()[key] }
 
   override fun getString(key: String, defValue: String?): String? = value(key) as? String ?: defValue
   @Suppress("UNCHECKED_CAST")
@@ -76,14 +92,14 @@ internal class KeychainPreferences(name: String) : SharedPreferences {
   override fun getFloat(key: String, defValue: Float): Float = (value(key) as? Number)?.toFloat() ?: defValue
   override fun getBoolean(key: String, defValue: Boolean): Boolean = value(key) as? Boolean ?: defValue
   override fun contains(key: String): Boolean = value(key) != null
-  override val all: Map<String, *> get() = synchronized(this) { HashMap(map()) }
+  override val all: Map<String, *> get() = locked { HashMap(map()) }
 
   override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
-    synchronized(this) { listeners += listener }
+    locked { listeners += listener }
   }
 
   override fun unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
-    synchronized(this) { listeners -= listener }
+    locked { listeners -= listener }
   }
 
   override fun edit(): SharedPreferences.Editor = object : SharedPreferences.Editor {
@@ -100,7 +116,7 @@ internal class KeychainPreferences(name: String) : SharedPreferences {
     override fun clear(): SharedPreferences.Editor { wipe = true; return this }
 
     override fun commit(): Boolean {
-      val (ok, changed, heard) = synchronized(this@KeychainPreferences) {
+      val (ok, changed, heard) = locked {
         val next = LinkedHashMap(map())
         if (wipe) next.clear()
         for ((k, v) in ops) if (v == null) next.remove(k) else next[k] = v
