@@ -54,6 +54,16 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ E (موجِ ۲) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-9e` (از `claude/batch-51`)
+
+- **انجام شد:** LOC-03 (سرور: هفتهٔ خلاصهٔ پیک از تنظیمِ دکان پشتِ `shop.courier_week_rule`، FLAGS-ON §۳۰؛ برنامه: تنظیمِ هفتهٔ رسیده
+  بی بازکردنِ دوباره)، IMG-PRO-13 (`core/image/BankThumbCache`)، IMG-BANK-18 (سنجش روی PostgreSQL، هر دو هدف پاس)، S143 (`S143.series`)،
+  S10 (کشتنِ واقعیِ فرایند، `S10KillDesktopTest`).
+- **نیمه‌کاره:** IMG-BANK-10 — آزمونِ Compose ِ `ImageBankPicker` با سرورِ ساختگی (`TestHttpServer` + سیم‌کشیِ `Backend` مثلِ
+  `NewScreensRenderTest`) ساخته شد ولی نخستین جست‌وجوی هر JVM پس از رسیدنِ درخواست به سرور در «در حالِ جست‌وجو…» می‌ماند
+  (۹۰ ثانیه؛ آزمونِ سوم سبز) ⇒ کامیت نشد؛ علت را در `ImageBank.search`/`HttpEngine` زیرِ ساعتِ آزمونِ Compose بجو.
+  IMG-11 (نسخهٔ zoom در هیچ کلاینتی) و IMG-01 (رابطِ بانک) کارِ بزرگِ جدا؛ S10 قطعِ برقِ واقعی می‌خواهد.
+- **قدمِ بعد:** ادغامِ `claude/e-rows-9e` در دسته؛ شمارهٔ FLAGS-ON ۳۰ و PARITY ۵۸ را پس از ادغام دوباره بشمار.
 ### ۱۴۰۵/۰۸/۲۲ — شاخهٔ `claude/verify-rows-i` (سنجشِ خودکارِ ردیف‌های «فقط روی دستگاه/شاهدِ CI»؛ روی `claude/batch-51` ‏396171d0a؛ سیزنِ `session_01BwqpPed1SJuwB7Q4nZUbg9`)
 
 - **انجام شد:** هشت آزمونِ تازهٔ صفحهٔ Compose در `desktop/src/test` (`CountReviewUiTest`، `PoSuggestUiTest`، `WholesaleFieldUiTest`، `PromoAppliedUiTest`، `StorefrontSettingsPaneUiTest`، `StaffTimeCardUiTest`، `HeldClaimSheetsUiTest`، `HeatmapPhoneUiTest`) — ۲۶ آزمون سبز؛ تنها تغییرِ کد `CheckoutSheet.PromoApplied` ِ `private` ⇐ `internal` برای آزمون. اجرای کاملِ کامپیوتر ۳۸۸۶ آزمون بی شکست و core ِ هدف‌دار ۲۷۴/۲۷۴. IMPLEMENTED-VERIFIED: INV-09، INV-13، PRD-12، PRM-18، POS-03، RPT-08؛ بقیهٔ ۵۴ ردیف با شاهدِ محلی و «مانده»ِ روشن (سخت‌افزار: «فقط دستگاهِ واقعی — …»).

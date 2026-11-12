@@ -55,20 +55,42 @@ function courierSettlementView(s) {
 /**
  * آغازِ «امروز» و «این هفته» به وقتِ دکان — منطقهٔ زمانیِ ویترین (§۳۱، پیش‌فرض
  * Asia/Kabul؛ `storefront.localParts`) و آغازِ هفتهٔ دکان (`calendar-core.weekStartOf`،
- * همتای `BusinessDay`؛ دکان هنوز قاعدهٔ هفتهٔ جدا ندارد ⇒ قاعدهٔ پیش‌فرضِ همان‌جا).
+ * همتای `BusinessDay`). [weekStart] = روزِ آغازِ هفتهٔ دکان به شمارِ ISO (`shopWeekStart`)؛
+ * نیامده یا نادرست ⇒ شنبه (پیش‌فرضِ همان‌جا).
  * ⛔ ساعتِ گوشیِ پیک مرجع نیست: گوشیِ جلوافتاده «امروزِ آینده» نمی‌فرستد.
  * منطقه‌های زمانیِ بی ساعتِ تابستانی (کابل) دقیق‌اند؛ در منطقه‌های دیگر مرزِ
  * هفته در روزِ تغییرِ ساعت تا یک ساعت جابه‌جا می‌شود.
  */
-function periodStarts(at, timezone) {
+function periodStarts(at, timezone, weekStart) {
   const { localParts } = require('./storefront');   //  هنگامِ صدا، نه بارگذاری (حلقهٔ require نمی‌سازد)
   let tz = timezone || 'Asia/Kabul';
   let local;
   try { local = localParts(at, tz); } catch { tz = 'Asia/Kabul'; local = localParts(at, tz); }
   const today = at - local.minutes * 60_000 - (at % 60_000);
-  const weekDate = calendar.weekStartOf(local.date);
+  const start = WEEK_STARTS.includes(weekStart) ? weekStart : DEFAULT_WEEK_START;
+  const weekDate = calendar.weekStartOf(local.date, { weekStart: start });
   const back = calendar.jdnOfIso(local.date) - calendar.jdnOfIso(weekDate);
   return { timezone: tz, date: local.date, weekDate, today, week: today - back * 86_400_000 };
+}
+
+/** پرچمِ خاموش: آغازِ هفتهٔ «این هفته» ِ پیک از تنظیمِ همگام‌شدهٔ دکان (LOC-03؛ `docs/FLAGS-ON-fa.md` ۳۰) */
+const WEEK_FLAG = 'shop.courier_week_rule';
+const DEFAULT_WEEK_START = 6;               //  شنبه — همتای `ShopWeek.DEFAULT_START`
+const WEEK_STARTS = Object.freeze([6, 7, 1]);   //  همتای `ShopWeek.STARTS` (شنبه، یکشنبه، دوشنبه)
+
+/**
+ * آغازِ هفتهٔ دکان: کلیدِ `tohid-policy/week_start` ِ همگام‌سازیِ تنظیمات (`ShopSettingsKeys.kt`، هر دستگاهِ دکان
+ * همان را می‌خواند). پرچم خاموش، کلید نیست، برداشته شده (`del`) یا بیرون از فهرست ⇒ شنبه، همان رفتارِ پیشین.
+ */
+async function shopWeekStart(shopId) {
+  const { flagOf } = require('./orders');   //  هنگامِ صدا، نه بارگذاری
+  if (!(await flagOf(shopId, WEEK_FLAG))) return DEFAULT_WEEK_START;
+  const r = await one(
+    `SELECT type, value FROM shop_setting_keys WHERE shop_id=$1 AND store='tohid-policy' AND key='week_start'`,
+    [String(shopId)]
+  );
+  const v = r && r.type === 'i' ? Number(r.value) : NaN;
+  return WEEK_STARTS.includes(v) ? v : DEFAULT_WEEK_START;
 }
 
 /**
@@ -85,7 +107,7 @@ async function courierSummary(shopId, courier) {
        FROM shops s LEFT JOIN storefronts sf ON sf.shop_id = s.id WHERE s.id=$1`,
     [shopId]
   );
-  const from = periodStarts(at, shop?.timezone);
+  const from = periodStarts(at, shop?.timezone, await shopWeekStart(shopId));
   const { cashStats, viaDb, SETTLE_ROWS, settleRowView } = D();
   const st = await cashStats(viaDb, shopId, courier.id);
   const cap = Number(courier.cash_cap_minor);
@@ -147,4 +169,4 @@ async function courierSummary(shopId, courier) {
   };
 }
 
-module.exports = { withTimeline, summary: courierSummary, periodStarts, TIMELINE_KINDS };
+module.exports = { withTimeline, summary: courierSummary, periodStarts, shopWeekStart, WEEK_FLAG, TIMELINE_KINDS };

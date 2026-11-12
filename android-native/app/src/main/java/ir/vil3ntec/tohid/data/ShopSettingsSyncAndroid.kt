@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data
 
 import android.content.Context
+import ir.vil3ntec.tohid.ShopDayChoice
 import ir.vil3ntec.tohid.data.repo.Backend
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -130,6 +131,8 @@ object ShopSettingsSync {
       }
       edit.commit()
     }
+    //  LOC-03: آغازِ هفته، روزهای تعطیل و پایانِ روزِ رسیده از دستگاهِ دیگر همین حالا در صفحه‌ها، نه پس از بازکردنِ دوباره
+    if (plan.apply.keys.any { it in DAY_KEYS }) ShopDayChoice.load(app)
     val nextShadow = LinkedHashMap(plan.shadow)
     var pushed = 0
     if (plan.push.isNotEmpty()) {
@@ -153,6 +156,9 @@ object ShopSettingsSync {
     p.edit().putString("shadow:$s", writeShadow(nextShadow)).putLong("cursor:$s", since).commit()
     return Report(true, plan.apply.size, pushed)
   }
+
+  /** کلیدهای `ShopDayChoice` (همان انبارِ `tohid-policy`) */
+  private val DAY_KEYS = setOf("tohid-policy/day_end_hour", "tohid-policy/week_start", "tohid-policy/closed_days")
 
   private fun same(a: ShopSettingsKeys.Value?, b: ShopSettingsKeys.Value?): Boolean =
     if (a == null || b == null) a == null && b == null else a.same(b)
