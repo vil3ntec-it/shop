@@ -4,7 +4,7 @@ package ir.vil3ntec.tohid.core.i18n
  *  دفترِ موجودی (`ui/screens/StockBook.kt`): جایگاه‌ها، دفترِ حرکت، بررسی، شمارشِ موجودی با بازبینی، انتقال بین محل‌ها و نوارِ
  *  خلاصه. این نوشته‌ها پیش‌تر متنِ خامِ فارسی بودند و از هیچ زبانی نمی‌گذشتند (LOC-08 دری، دورِ ۳). فارسی کلمه‌به‌کلمه همان
  *  پیشین است؛ هر جا همان جمله در جدولِ دیگری بود، همان دوباره به کار رفته. نامِ پروندهٔ CSV (خروجی) و کلیدِ بخشِ تنظیمات در
- *  خودِ صفحه «// داده:» است. قاعده‌ها سرِ `I18n.kt`.
+ *  خودِ صفحه «// داده:» است. همچنین پنجره‌های قدیمِ کالا، ورود و اصلاحِ موجودی (`WarehouseDialogs.kt`). قاعده‌ها سرِ `I18n.kt`.
  */
 @Suppress("unused")
 object StrStockPages {
@@ -146,4 +146,47 @@ object StrStockPages {
   val approxD23: String get() = t("تقریبی (D-23)", "Approximate (D-23)", "نږدې (D-23)")
   val allReviewed: String get() = t("همه بررسی شده", "All reviewed", "ټول کتل شوي")
   val settingsTitle: String get() = t("موجودی و بها", "Stock & cost", "موجودي او بیه")
+
+  // ── `WarehouseDialogs.kt` (پنجره‌های قدیمِ کالا، ورود و اصلاح؛ «کمبودهای آشکارشده» تا جای‌گیریِ کاملِ نسخهٔ ۳ ماندند) ──
+  val editProduct: String get() = t("ویرایش محصول", "Edit product", "د توکي سمون")
+  val itemName: String get() = t("نام کالا", "Item name", "د توکي نوم")
+  val sameItemTail: String get() = t(" — اگر همان کالاست، ثبتِ دوباره نکنید.", " — if it's the same item, don't add it again.", " — که همغه توکی وي، بیا یې مه ثبتوئ.")
+  val priceReasonKept: String get() = t(
+    "دلیلِ تغییرِ قیمت (با نامِ شما در سابقه می‌ماند)",
+    "Reason for the price change (kept in the history with your name)",
+    "د بیې د بدلون لامل (ستاسو له نوم سره په تاریخچه کې پاتې کېږي)",
+  )
+  val subcategoryOpt: String get() = t("زیردسته (اختیاری)", "Subcategory (optional)", "فرعي ډله (اختیاري)")
+  val brandOpt: String get() = t("برند (اختیاری)", "Brand (optional)", "برانډ (اختیاري)")
+  val secondUnitOpt: String get() = t("واحدِ فروشِ دوم (اختیاری)", "Second sale unit (optional)", "د پلور دویم واحد (اختیاري)")
+  val supplierOpt: String get() = t("تأمین‌کننده (اختیاری)", "Supplier (optional)", "عرضه کوونکی (اختیاري)")
+  val saleStatus: String get() = t("وضعیت در فروش", "Sale status", "په پلور کې حالت")
+  val receiveGoods: String get() = t("ثبت ورود کالا", "Record goods in", "د توکو راتګ ثبتول")
+  fun makesQty(q: Any?): String = t("${asIs(q)} می‌شود", "Makes $q", "$q کېږي")
+  val expiryOpt: String get() = t("تاریخ انقضا (اختیاری)", "Expiry date (optional)", "د پای نېټه (اختیاري)")
+  val batchOpt: String get() = t("سری ساخت (اختیاری)", "Batch number (optional)", "د جوړښت لړۍ (اختیاري)")
+  val madeOpt: String get() = t("تاریخ تولید (اختیاری)", "Production date (optional)", "د تولید نېټه (اختیاري)")
+  val landedOpt: String get() = t(
+    "هزینهٔ جانبی (کرایه، گمرک) — اختیاری، کلِ همین ورود",
+    "Extra costs (freight, customs) — optional, for this whole delivery",
+    "اضافي لګښت (کرایه، ګمرک) — اختیاري، د همدې ټول راتګ",
+  )
+  val landedHint: String get() = t(
+    "به بهای همین کالا اضافه می‌شود (میانگینِ موزون)؛ جدا در «مصارف» ثبتش نکنید.",
+    "It is added to this item's cost (weighted average); don't record it separately under “Expenses”.",
+    "د همدې توکي په بیه ورزیاتېږي (وزن لرونکې منځنۍ)؛ جلا یې په «لګښتونه» کې مه ثبتوئ.",
+  )
+  val storagePlace: String get() = t("محلِ نگه‌داری", "Storage place", "د ساتنې ځای")
+  val newPlace: String get() = t("محلِ تازه", "New place", "نوی ځای")
+  val supplierReturnHint: String get() = t(
+    "برگشت به تأمین‌کننده: از «خرید و تأمین‌کننده» ⇐ همان تأمین‌کننده ⇐ «برگشت (سندِ کسر)»؛ هم کالا کم می‌شود هم بدهی.",
+    "Return to supplier: from “Purchases & suppliers” ⇐ that supplier ⇐ “Return (credit note)”; both the stock and the debt go down.",
+    "عرضه کوونکي ته بېرته: له «پېرود او عرضه‌کوونکي» ⇐ همغه عرضه کوونکی ⇐ «بېرته (د کسر سند)»؛ توکي هم کمېږي او پور هم.",
+  )
+  val adjustKind: String get() = t("نوعِ اصلاح", "Adjustment type", "د سمون ډول")
+  val wasteHint: String get() = t(
+    "خراب و منقضی در گزارشِ ضایعات جمع می‌شوند.",
+    "Damaged and expired items add up in the waste report.",
+    "خراب او تېرنېټه توکي د زیان په راپور کې راټولېږي.",
+  )
 }

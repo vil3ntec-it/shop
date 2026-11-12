@@ -87,8 +87,6 @@ class PromoGroupTest {
     mapOf(
       "ui/v3/sales/cart/SaleRoute.kt" to "PromoLive.rememberOutcome(data, lines, debtorId)",
       "ui/v3/sales/checkout/CheckoutRoute.kt" to "PromoLive.rememberOutcome(data, lines, form.debtorId)",
-      "ui/screens/Sale.kt" to "rememberOutcome(d, cart, cartDebtorId)",
-      "ui/screens/QuickSale.kt" to "rememberOutcome(d, cart, cartDebtorId)",
       "ui/screens/DeskSale.kt" to "rememberOutcome(d, cart, cartDebtorId)",
       "ui/screens/Promos.kt" to "FilterChip(\n              selected = g in f.groups,",
     ).forEach { (file, needle) -> assertTrue("$file ⇐ $needle", src(file).contains(needle)) }

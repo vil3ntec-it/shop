@@ -64,7 +64,7 @@ object ProfileModel {
     val role: String = "owner",
   )
 
-  const val GUEST = "مهمان"
+  val GUEST: String get() = StrAccount.guest
 
   /** نامِ روی کارت: بیرون از حساب «مهمان»، نامِ خالی «بی‌نام» */
   fun displayName(a: Account): String = when {
@@ -95,7 +95,7 @@ object ProfileModel {
   fun banner(signedIn: Boolean, p: Plan?, warnDays: Int, n: (Int) -> String = Int::toString): Banner = when {
     !signedIn || p == null -> Banner(
       StrAccount.bannerGuestTitle,
-      "با حساب، دفترِ دکان پشتیبان می‌گیرد و روی گوشیِ دیگر هم می‌آید",
+      StrAccount.bannerGuestBody,
       Str.signIn, Action.SIGN_IN,
     )
     p.expired -> Banner(
@@ -104,12 +104,12 @@ object ProfileModel {
       Str.renew, Action.RENEW,
     )
     p.active && p.trial -> Banner(
-      if (p.days > 0) "آزمایشی: ${n(p.days)} روزِ دیگر" else StrAccount.bannerTrialLast,
+      if (p.days > 0) StrAccount.bannerTrialDays(n(p.days)) else StrAccount.bannerTrialLast,
       StrAccount.bannerTrialBody,
       StrAccount.plansButton, Action.PLANS,
     )
     p.active -> Banner(
-      if (p.days > 0) "اشتراک: ${n(p.days)} روزِ دیگر" else StrAccount.bannerActiveLast,
+      if (p.days > 0) StrAccount.bannerActiveDays(n(p.days)) else StrAccount.bannerActiveLast,
       if (p.days <= warnDays) StrAccount.bannerSoonBody else StrAccount.bannerOkBody,
       Str.renew, Action.RENEW,
     )

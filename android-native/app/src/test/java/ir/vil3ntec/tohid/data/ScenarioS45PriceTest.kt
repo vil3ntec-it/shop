@@ -37,15 +37,15 @@ class ScenarioS45PriceTest {
   }
 
   @Test
-  fun `S45 کادرِ ردیف به‌جای پیامِ رد درخواستِ تأیید دارد و هر دو صندوق وصل‌اند`() {
+  fun `S45 کادرِ ردیف به‌جای پیامِ رد درخواستِ تأیید دارد و صندوقِ کامپیوتر وصل است`() {
     val dialogs = source("android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/SaleDialogs.kt")
     assertTrue(dialogs.contains("PriceApproval.askable(policy, it)"))
     assertTrue(dialogs.contains("StrTill.askApproval"))
     assertTrue(dialogs.contains("ir.vil3ntec.tohid.ui.components.staff.PinApprovalDialog("))
     assertTrue(dialogs.contains("PriceApproval.lifted(policy, granted.code)"))
-    for (rel in listOf("ui/screens/DeskSale.kt", "ui/screens/Sale.kt")) {
-      assertTrue(rel, source("android-native/app/src/main/java/ir/vil3ntec/tohid/$rel").contains("priceAsk = remember(id) { ir.vil3ntec.tohid.data.LinePolicyPrefs.ask("))
-    }
+    //  ⚠️ گوشیِ نسخهٔ ۳ (`ui/v3/sales/cart/LineSheet` ⇐ `LineModel.apply`) قاعدهٔ «قیمت و تخفیفِ ردیف» و این درخواست را ندارد —
+    //  `ui/screens/Sale.kt` که داشت فقط پیش‌نمایشِ DevShot است (STATUS ِ S45، `claude/e-rows-28l`)
+    assertTrue(source("android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/DeskSale.kt").contains("priceAsk = remember(id) { ir.vil3ntec.tohid.data.LinePolicyPrefs.ask("))
   }
 
   @Test

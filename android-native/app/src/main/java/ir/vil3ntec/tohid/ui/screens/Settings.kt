@@ -417,7 +417,7 @@ fun SettingsScreen(
         SettingsSection(
           icon = Icons.Filled.Palette,
           title = Str.appearance,
-          subtitle = "روشن، تیره، یا خودکار (مثل گوشی)",
+          subtitle = ir.vil3ntec.tohid.core.i18n.StrShellPages.themeHint,
           tint = Shop.colors.primary,
           value = themeLabel(theme),
         ) {
@@ -761,14 +761,14 @@ fun SettingsScreen(
         SettingsSection(
           icon = Icons.Filled.Sync,
           title = StrSettings.syncRow,
-          subtitle = if (!signedIn) "برای همگام‌سازی اول وارد حساب شوید"
+          subtitle = if (!signedIn) ir.vil3ntec.tohid.core.i18n.StrShellPages.syncSignInFirst
           else ir.vil3ntec.tohid.core.sync.SyncBadge.line(StrSettings.syncRow, v1.queued, lastSyncOk, v1.lastError, syncNow),
           tint = Shop.colors.accent,
           value = if (!signedIn) StrSettings.notSignedIn else ir.vil3ntec.tohid.core.sync.SyncBadge.since(lastSyncOk, syncNow),
         ) {
           Text(
-            "دفترِ دکان روی سرور پشتیبان می‌گیرد و روی گوشیِ دیگر هم می‌آید. " +
-              "آخرین همگام‌سازی: " + (if (lastSyncOk > 0) ir.vil3ntec.tohid.formatMillis(lastSyncOk) else "هنوز انجام نشده"),
+            ir.vil3ntec.tohid.core.i18n.StrShellPages.syncBody(
+              if (lastSyncOk > 0) ir.vil3ntec.tohid.formatMillis(lastSyncOk) else ir.vil3ntec.tohid.core.i18n.StrShellPages.syncNever),
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.muted2,
           )

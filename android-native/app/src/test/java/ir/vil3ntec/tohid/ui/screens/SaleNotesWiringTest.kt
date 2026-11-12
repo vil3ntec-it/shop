@@ -19,16 +19,17 @@ class SaleNotesWiringTest {
   private fun count(s: String, x: String) = Regex(Regex.escape(x)).findAll(s).count()
 
   @Test fun `هر ثبتِ سبد یادداشتِ فاکتورِ همان سبد را می‌برد`() {
-    val wired = mapOf(
-      "Sale.kt" to "options.copy(note = cartStore.note.value)",
-      "QuickSale.kt" to "options.copy(note = cartStore.note.value)",
-      "DeskSale.kt" to "sale.copy(note = cartStore.note.value)",
-    )
-    for ((f, x) in wired) {
-      val s = src("ir/vil3ntec/tohid/ui/screens/$f")
-      assertEquals(f, count(s, "cartStore.post("), count(s, x))
-      assertTrue(f, s.contains("InvoiceNoteButton(cartStore.note.collectAsState().value, cart.isNotEmpty())"))
-    }
+    //  کامپیوتر
+    val desk = src("ir/vil3ntec/tohid/ui/screens/DeskSale.kt")
+    assertEquals(count(desk, "cartStore.post("), count(desk, "sale.copy(note = cartStore.note.value)"))
+    assertTrue(desk.contains("InvoiceNoteButton(cartStore.note.collectAsState().value, cart.isNotEmpty())"))
+    //  گوشیِ نسخهٔ ۳: صندوق و فروشِ سریع هر دو با همان برگهٔ پرداخت (`CheckoutRoute`) ثبت می‌کنند و یادداشت کنارِ سبد است
+    //  (`PhoneTillTools`)؛ `ui/screens/Sale.kt` و `QuickSale.kt` فقط پیش‌نمایشِ DevShot‌اند
+    val pay = src("ir/vil3ntec/tohid/ui/v3/sales/checkout/CheckoutRoute.kt")
+    assertEquals(1, count(pay, "cart.post("))
+    assertTrue(pay.contains("val note = cart.note.value"))
+    assertTrue(Regex("""TillSale\.record\(\s*d, priced, sale, note,""").containsMatchIn(pay))
+    assertTrue(src("ir/vil3ntec/tohid/ui/v3/sales/cart/PhoneTillTools.kt").contains("InvoiceNoteButton(cart.note.collectAsState().value, lines.isNotEmpty()) { cart.setNote(it) }"))
   }
 
   @Test fun `نمای فاکتور یادداشتِ ردیف و فاکتور را نشان می‌دهد`() {

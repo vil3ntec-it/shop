@@ -94,7 +94,10 @@ class ScenarioS18Test {
     assertTrue(picker.contains("TouchKeysPanel(kb, touch, 48.dp) { search = ir.vil3ntec.tohid.core.pos.TouchKeyboard.apply(search, it) }"))
     //  هر دو گزینشِ مشتریِ صندوقِ کامپیوتر (F2 و «دریافت») با `PosTouchPrefs.extras()`؛ گوشی پیش‌فرض (خاموش)
     assertEquals(2, Regex(Regex.escape("touch = touchExtras, onClose =")).findAll(src("ir/vil3ntec/tohid/ui/screens/DeskSale.kt")).count())
-    assertFalse(src("ir/vil3ntec/tohid/ui/screens/Sale.kt").contains("touch = touchExtras"))
+    //  گوشیِ نسخهٔ ۳ (گزینشِ مشتریِ برگهٔ پرداخت) بی صفحه‌کلیدِ لمسی؛ `ui/screens/Sale.kt` فقط پیش‌نمایشِ DevShot است
+    for (rel in listOf("ui/v3/sales/checkout/CustomerPickerSheet.kt", "ui/v3/sales/checkout/CustomerRoute.kt")) {
+      assertFalse(rel, src("ir/vil3ntec/tohid/$rel").contains("touchExtras"))
+    }
   }
 
   @Test
