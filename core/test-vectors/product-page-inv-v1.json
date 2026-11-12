@@ -1,0 +1,171 @@
+{
+  "v": 1,
+  "about": "GATE-NEW-02 ⇐ server/test/catalog-stock-page.test.js؛ خواننده: ProductStorefrontInvVectorsTest",
+  "cases": [
+    {
+      "name": "not_synced",
+      "inv": "INV-01",
+      "path": "/api/v1/shop/storefront/products/pg-rice",
+      "status": 404,
+      "body": {
+        "error": {
+          "code": "product_not_found",
+          "message": "این کالا در دفترِ دکان نیست"
+        }
+      },
+      "expect": {
+        "state": "NotSynced"
+      }
+    },
+    {
+      "name": "synced_unpublished",
+      "inv": "INV-01",
+      "path": "/api/v1/shop/storefront/products/pg-rice",
+      "status": 200,
+      "body": {
+        "id": "pg-rice",
+        "name": "برنج",
+        "unit": "دانه",
+        "category": "غله",
+        "priceMinor": 12050,
+        "maxQtyMilli": null,
+        "photo": false,
+        "stock": {
+          "status": "unverified",
+          "checkedAt": null
+        },
+        "published": false,
+        "onlinePriceMinor": null,
+        "active": true,
+        "description": "",
+        "specs": []
+      },
+      "expect": {
+        "state": "Ready",
+        "published": false,
+        "active": true,
+        "subtitle": "ledgerPrice"
+      }
+    },
+    {
+      "name": "published",
+      "inv": "INV-01",
+      "path": "/api/v1/shop/storefront/products/pg-rice",
+      "status": 200,
+      "body": {
+        "id": "pg-rice",
+        "name": "برنج",
+        "unit": "دانه",
+        "category": "غله",
+        "priceMinor": 12050,
+        "maxQtyMilli": null,
+        "photo": false,
+        "stock": {
+          "status": "unverified",
+          "checkedAt": null
+        },
+        "published": true,
+        "onlinePriceMinor": null,
+        "active": true,
+        "description": "",
+        "specs": []
+      },
+      "expect": {
+        "state": "Ready",
+        "published": true,
+        "active": true,
+        "subtitle": "ledgerPrice"
+      }
+    },
+    {
+      "name": "other_shop",
+      "inv": "INV-11",
+      "path": "/api/v1/shop/storefront/products/pg-iso",
+      "status": 404,
+      "body": {
+        "error": {
+          "code": "product_not_found",
+          "message": "این کالا در دفترِ دکان نیست"
+        }
+      },
+      "expect": {
+        "state": "NotSynced"
+      }
+    },
+    {
+      "name": "inactive",
+      "inv": "INV-13",
+      "path": "/api/v1/shop/storefront/products/pg-in",
+      "status": 200,
+      "body": {
+        "id": "pg-in",
+        "name": "کالای pg-in",
+        "unit": "دانه",
+        "category": "",
+        "priceMinor": 5000,
+        "maxQtyMilli": null,
+        "photo": false,
+        "stock": {
+          "status": "unverified",
+          "checkedAt": null
+        },
+        "published": true,
+        "onlinePriceMinor": null,
+        "active": false,
+        "description": "",
+        "specs": []
+      },
+      "expect": {
+        "state": "Ready",
+        "published": true,
+        "active": false,
+        "subtitle": "inactive"
+      }
+    },
+    {
+      "name": "deleted",
+      "inv": "INV-13",
+      "path": "/api/v1/shop/storefront/products/pg-dl",
+      "status": 404,
+      "body": {
+        "error": {
+          "code": "product_not_found",
+          "message": "این کالا در دفترِ دکان نیست"
+        }
+      },
+      "expect": {
+        "state": "NotSynced"
+      }
+    },
+    {
+      "name": "stale_device",
+      "inv": "INV-14",
+      "path": "/api/v1/shop/storefront/products/pg-st",
+      "status": 200,
+      "body": {
+        "id": "pg-st",
+        "name": "کالای pg-st",
+        "unit": "دانه",
+        "category": "",
+        "priceMinor": 5000,
+        "maxQtyMilli": null,
+        "photo": false,
+        "stock": {
+          "status": "unverified",
+          "checkedAt": null
+        },
+        "published": true,
+        "onlinePriceMinor": null,
+        "active": true,
+        "description": "",
+        "specs": []
+      },
+      "expect": {
+        "state": "Ready",
+        "published": true,
+        "active": true,
+        "subtitle": "ledgerPrice"
+      }
+    }
+  ]
+}
