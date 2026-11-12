@@ -534,9 +534,9 @@ fun DeskSaleScreen(
   }
   val gridState = rememberLazyGridState()
   val tableState = rememberLazyListState()
-  LaunchedEffect(category) {
-    runCatching { gridState.scrollToItem(0) }
-    runCatching { tableState.scrollToItem(0) }
+  LaunchedEffect(category) { // فقط اگر از سر رفته: بارِ نخست (و فهرستِ پنهان) منتظرِ نخستین چیدمان نمی‌ماند (`ScenarioS01DesktopTest`)
+    if (gridState.firstVisibleItemIndex + gridState.firstVisibleItemScrollOffset > 0) runCatching { gridState.scrollToItem(0) }
+    if (tableState.firstVisibleItemIndex + tableState.firstVisibleItemScrollOffset > 0) runCatching { tableState.scrollToItem(0) }
   }
   val listState = rememberLazyListState()
   LaunchedEffect(selected, cart.size) {
