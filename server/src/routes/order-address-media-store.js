@@ -9,7 +9,8 @@
  *
  * ⛔ پیش‌فرض خاموش: بی ویترینِ روشن (`sf.open`) یا بی پرچمِ `shop.storefront.address_media` ⇒ ۴۰۴ و هیچ ردیفی.
  * ⛔ اجازه فقط توکنِ امضاشدهٔ پیگیریِ همان سفارش (انقضا و باطل‌شدنِ لینک همان)؛ دکان فقط از `slug`، سفارش فقط از توکن.
- * ⛔ سقف: سطلِ IP پیش از خواندنِ بدنه و سطلِ هر سفارش (توکن)؛ بدنهٔ بزرگ‌تر از سقف پیش از خواندن ۴۱۳ (`core.rawBody`).
+ * ⛔ سقف: سطلِ IP پیش از خواندنِ بدنه و سطلِ هر سفارش (توکن)؛ نوع و توکن پیش از خواندنِ بدنه؛ بدنهٔ بزرگ‌تر از سقف پیش از
+ *    خواندن ۴۱۳ (`core.rawBody`).
  */
 const express = require('express');
 const config = require('../config');
@@ -39,7 +40,14 @@ router.get('/:slug/orders/:token/address-media', readLimit, store, async (req, r
   res.json(await media.view(req.store.shop_id, orderId));
 });
 
-router.put('/:slug/orders/:token/address-media/:kind', ipLimit, orderLimit, store, core.rawBody, async (req, res) => {
+//  ⛔ نوع و توکنِ پیگیری **پیش از** خواندنِ بدنه (تا ۱ مگابایت) و تجزیهٔ عکس: درخواستِ بی توکنِ درست هیچ بایتی را به کار نمی‌اندازد
+const linked = async (req, res, next) => {
+  core.kindOf(req.params.kind);
+  await sf.orderIdOfLink(req.store, req.params.token);
+  next();
+};
+
+router.put('/:slug/orders/:token/address-media/:kind', ipLimit, orderLimit, store, linked, core.rawBody, async (req, res) => {
   const out = await media.put(req.store, req.params.token, req.params.kind, req.body);
   res.status(out.replaced || out.unchanged ? 200 : 201).json(out);
 });

@@ -571,8 +571,11 @@ async function sanctionsForShop(shopId) {
 //  مدیرِ سامانه
 // ════════════════════════════════════════════════════════════════════
 
-/** صفِ رسیدگی: پیش‌فرض «در انتظار» (باز، در بررسی، اعتراض‌شده)؛ اول شدیدتر، بعد قدیمی‌تر. */
-async function queue({ status, shopId, limit } = {}) {
+/**
+ * صفِ رسیدگی: پیش‌فرض «در انتظار» (باز، در بررسی، اعتراض‌شده)؛ اول شدیدتر، بعد قدیمی‌تر. [shape] (ردیفِ `adminRow`، ردیفِ پایگاه)
+ * ⇒ نمای کم‌ترِ زیرِ ارشد (`trust-admin-view.queueRow`).
+ */
+async function queue({ status, shopId, limit } = {}, shape = (row) => row) {
   const lim = intIn(limit, { min: 1, max: 200, def: 50 });
   const st = str(status) || 'pending';
   const args = [];
@@ -594,7 +597,7 @@ async function queue({ status, shopId, limit } = {}) {
       LIMIT $${args.length}`,
     args
   );
-  return rows.map(adminRow);
+  return rows.map((r) => shape(adminRow(r), r));
 }
 
 async function adminCaseRow(id, c = null, lock = false) {

@@ -65,20 +65,31 @@ const caseRow = (id) => one('SELECT * FROM trust_cases WHERE id=$1', [id]);
 const events = (id) => many('SELECT actor, actor_id, type FROM trust_case_events WHERE case_id=$1 ORDER BY created_at, id', [id]);
 const audits = (action, target) => many('SELECT * FROM audit_logs WHERE action=$1 AND target_id=$2', [action, target]);
 
-/** پروندهٔ باز با نشانهٔ شاکی، متنِ هم‌چکیده با یک پروندهٔ دیگر، مدرک و پاسخِ دکان (رخدادِ کاربرِ دکان). */
-async function seedCase({ bodyHash = '' } = {}) {
+/**
+ * پروندهٔ باز با نشانهٔ شاکی، متنِ هم‌چکیده با یک پروندهٔ دیگر، مدرک و پاسخِ دکان (رخدادِ کاربرِ دکان). با [duplicateOf] همان چیزی که
+ * `market-trust.file` برای پروندهٔ هم‌متن/هم‌IP می‌نویسد: `duplicate_of`، `flags` و رخدادِ `flagged`؛ رخدادِ مدرک همان `evidence_added`.
+ */
+async function seedCase({ bodyHash = '', duplicateOf = '' } = {}) {
   const id = `tc_${crypto.randomBytes(12).toString('hex')}`;
   const t = now();
-  await query(`INSERT INTO trust_cases (id, shop_id, kind, subject, category, severity, body, reporter_key, reporter_hint, body_hash, created_at, updated_at)
-               VALUES ($1,$2,'complaint','shop','fraud','high','پول گرفت و جنس نداد',$3,$4,$5,$6,$6)`,
-  [id, shop, `rk-${uniq()}`, HINT, bodyHash, t]);
+  const flags = duplicateOf ? ['same_text', 'same_ip'] : [];
+  await query(`INSERT INTO trust_cases (id, shop_id, kind, subject, category, severity, body, reporter_key, reporter_hint, body_hash, duplicate_of, flags, created_at, updated_at)
+               VALUES ($1,$2,'complaint','shop','fraud','high','پول گرفت و جنس نداد',$3,$4,$5,$6,$7,$8,$8)`,
+  [id, shop, `rk-${uniq()}`, HINT, bodyHash, duplicateOf, JSON.stringify(flags), t]);
   await query(`INSERT INTO trust_case_events (id, case_id, shop_id, actor, actor_id, type, created_at) VALUES ($1,$2,$3,'customer','','filed',$4)`,
     [newId('tce'), id, shop, t]);
+  if (duplicateOf) {
+    await query(`INSERT INTO trust_case_events (id, case_id, shop_id, actor, actor_id, type, data, created_at) VALUES ($1,$2,$3,'system','','flagged',$4,$5)`,
+      [newId('tce'), id, shop, JSON.stringify({ flags, duplicateOf }), t]);
+  }
   await query(`INSERT INTO trust_case_events (id, case_id, shop_id, actor, actor_id, type, body, created_at) VALUES ($1,$2,$3,'shop',$4,'shop_response','پاسخِ دکان',$5)`,
     [newId('tce'), id, shop, SHOP_USER, t + 1]);
   const bytes = crypto.randomBytes(64);
+  const ev = `tev_${crypto.randomBytes(12).toString('hex')}`;
   await query(`INSERT INTO trust_evidence (id, case_id, shop_id, mime, size, sha256, data, created_at) VALUES ($1,$2,$3,'image/jpeg',$4,$5,$6,$7)`,
-    [`tev_${crypto.randomBytes(12).toString('hex')}`, id, shop, bytes.length, crypto.createHash('sha256').update(bytes).digest('hex'), bytes, t]);
+    [ev, id, shop, bytes.length, crypto.createHash('sha256').update(bytes).digest('hex'), bytes, t]);
+  await query(`INSERT INTO trust_case_events (id, case_id, shop_id, actor, actor_id, type, data, created_at) VALUES ($1,$2,$3,'customer','','evidence_added',$4,$5)`,
+    [newId('tce'), id, shop, JSON.stringify({ evidenceId: ev }), t + 2]);
   return id;
 }
 /** همان کاری که درِ اعتراضِ دکان می‌کند (کاربرِ دکان در `appealed_by` و رخداد). */
@@ -146,25 +157,48 @@ test('بند ۱: از راهِ پل مسئول/تصمیم/رأی/جریمه به
   assert.equal(long.body.assigneeName.length, 80);
 });
 
+test('بند ۱: پاک‌سازیِ نام — نیم‌فاصله و ZWJ ِ فارسی می‌مانند؛ Tags، پُرکنندهٔ هانگول، soft hyphen و بیش از دو نشانهٔ ترکیبیِ پشتِ هم نه', () => {
+  const { cleanName } = require('../src/lib/trust-admin-view');
+  assert.equal(cleanName('محمد\u200cرضا'), 'محمد\u200cرضا', 'نیم‌فاصله');
+  assert.equal(cleanName('a\u200db'), 'a\u200db', 'ZWJ');
+  assert.equal(cleanName('علی\u{E0041}\u{E0042}\u{E007F}'), 'علی', 'Unicode Tags (متنِ نامرئی)');
+  assert.equal(cleanName('A\u3164\u115F\u1160\uFFA0li'), 'Ali', 'پُرکنندهٔ هانگول');
+  assert.equal(cleanName('A\u00ADli\u180E'), 'Ali', 'soft hyphen و جداکنندهٔ مغولی');
+  assert.equal(cleanName('مُحَمَّد'), 'مُحَمَّد', 'اعرابِ فارسی (تشدید + فتحه) می‌ماند');
+  assert.equal(cleanName(`A${'\u0301'.repeat(200)}b`), 'A\u0301\u0301b', 'نشانه‌های ترکیبیِ پشتِ هم: حداکثر دو');
+  assert.equal(cleanName('\u200e\u202eعلی\u2066'), 'علی', 'جهت‌دهیِ پنهان همان پیشین');
+});
+
 /* ═══════════════════════ ۲) خواندن برای بیننده، نمای کم‌تر ═══════════════════════ */
 
 /** پرونده‌ای با همهٔ چیزهای حساس: هم‌متن، مدرک، پاسخِ دکان، مسئول، تصمیم با جریمه، اعتراض و رأی */
 async function fullCase() {
   const bh = `bh-${uniq()}`;
-  const id = await seedCase({ bodyHash: bh });
-  await seedCase({ bodyHash: bh });
+  const original = await seedCase({ bodyHash: bh });
+  const id = await seedCase({ bodyHash: bh, duplicateOf: original });
   assert.equal((await S('panel:3', 'POST', `/cases/${id}/assign`, {}, { name: 'علی' })).status, 200);
   const d = await M('tr-arshad', 'POST', `/cases/${id}/decide`, { outcome: 'upheld', reason: 'ثابت شد', sanction: { kind: 'suspend_storefront' } });
   assert.equal(d.status, 200, JSON.stringify(d.body));
   await appealed(id);
   assert.equal((await M('tr-arshad', 'POST', `/cases/${id}/appeal-decision`, { outcome: 'upheld', reason: 'تصمیم می‌ماند' })).status, 200);
-  return { id, sanctionId: d.body.sanction.id };
+  return { id, original, sanctionId: d.body.sanction.id };
 }
 
-const SECRET_KEYS = ['reporterHint', 'reporterStats', 'sameText', 'evidence'];
+const SECRET_KEYS = ['reporterHint', 'reporterStats', 'sameText', 'evidence', 'duplicateOf'];
 
-function assertRedacted(c, who) {
+/** هم‌متن/هم‌IP (همان sameText و سابقهٔ شاکی) نه در پرونده، نه در صف، نه در دادهٔ رخداد */
+function assertNoSame(x, original, who) {
+  const json = JSON.stringify(x);
+  assert.ok(!json.includes('same_'), `${who}: پرچمِ same_* نشت کرد`);
+  assert.ok(!json.includes(original), `${who}: شناسهٔ پروندهٔ هم‌متن نشت کرد`);
+  assert.ok(!json.includes('duplicateOf'), `${who}: duplicateOf نشت کرد`);
+}
+
+function assertRedacted(c, who, original) {
   for (const k of SECRET_KEYS) assert.ok(!(k in c), `${who}: «${k}» نباید باشد`);
+  assertNoSame(c, original, who);
+  assert.ok(!c.history.some((e) => e.type === 'flagged'), `${who}: رخدادِ flagged (فقط هم‌متن/هم‌IP) نه`);
+  assert.ok(c.history.some((e) => e.type === 'evidence_added' && !('evidenceId' in e.data)), `${who}: رخدادِ مدرک بی شناسهٔ مدرک`);
   assert.ok(c.history.length >= 5, `${who}: تاریخچه هست`);
   assert.ok(c.history.every((e) => !('actorId' in e)), `${who}: history[].actorId نباید باشد`);
   assert.ok(c.history.every((e) => !('assignee' in (e.data || {}))), `${who}: شناسهٔ مسئول در دادهٔ رخداد نه`);
@@ -183,7 +217,7 @@ function assertRedacted(c, who) {
 }
 
 test('بند ۲: trust-read.v1 — ارشد کامل؛ مدیر و بیننده (انسان یا از راهِ پل) نمای کم‌تر با سابقهٔ دیدن؛ مالی ۴۰۳', async () => {
-  const { id } = await fullCase();
+  const { id, original } = await fullCase();
   const me = await h.api('GET', '/api/admin/me', { token: await tok('tr-binande') });
   assert.ok(me.body.capabilities.includes('trust-read.v1'));
 
@@ -195,16 +229,26 @@ test('بند ۲: trust-read.v1 — ارشد کامل؛ مدیر و بیننده 
   assert.ok(full.history.some((e) => e.actorId === SHOP_USER));
   assert.equal(full.decision.by, ids['tr-arshad']);
   assert.equal(full.appeal.by, SHOP_USER);
+  //  دادهٔ واقعیِ هم‌متن و مدرک در نمای کامل هست (پس نبودنش در نمای کم‌تر از پالایش است، نه از نبودِ داده)
+  assert.equal(full.duplicateOf, original);
+  assert.deepEqual(full.flags, ['same_text', 'same_ip']);
+  assert.ok(full.history.some((e) => e.type === 'flagged' && e.data.duplicateOf === original));
+  assert.ok(full.history.some((e) => e.type === 'evidence_added' && /^tev_/.test(e.data.evidenceId)));
+  const fullQ = (await M('tr-arshad', 'GET', '/cases?status=all')).body.cases.find((x) => x.id === id);
+  assert.equal(fullQ.duplicateOf, original, 'صفِ ارشد کامل');
 
   for (const who of ['tr-modir', 'tr-binande']) {
     const q = await M(who, 'GET', '/cases?status=all');
     assert.equal(q.status, 200, `${who} ⇒ ${q.status} ${JSON.stringify(q.body)}`);
-    assert.ok(q.body.cases.some((x) => x.id === id));
+    const row = q.body.cases.find((x) => x.id === id);
+    assert.ok(row);
+    assertNoSame(row, original, `${who}/صف`);
+    assert.deepEqual([row.assignee, row.assigneeName], ['panel:3', 'علی'], `${who}/صف: مسئولِ جدا از تصمیم‌گیرنده می‌ماند`);
     const before = (await audits('admin.trust_case_viewed', id)).length;
     const r = await M(who, 'GET', `/cases/${id}`);
     assert.equal(r.status, 200, JSON.stringify(r.body));
     assert.match(r.headers.get('cache-control') || '', /no-store/);
-    assertRedacted(r.body.case, who);
+    assertRedacted(r.body.case, who, original);
     const seen = await audits('admin.trust_case_viewed', id);
     assert.equal(seen.length, before + 1, `${who}: دیدنِ پرونده سابقه دارد (TEN-04)`);
     assert.ok(seen.some((x) => x.user_id === ids[who]), `${who}: سابقه به نامِ همان مدیر`);
@@ -216,7 +260,7 @@ test('بند ۲: trust-read.v1 — ارشد کامل؛ مدیر و بیننده 
   //  بیننده از راهِ پل (نقشِ مؤثر = viewer) همان نمای کم‌تر
   const viaBridge = await S('panel:8', 'GET', `/cases/${id}`, null, { role: 'viewer' });
   assert.equal(viaBridge.status, 200);
-  assertRedacted(viaBridge.body.case, 'پل/viewer');
+  assertRedacted(viaBridge.body.case, 'پل/viewer', original);
   assert.equal((await S('panel:8', 'GET', '/sanctions', null, { role: 'superadmin' })).body.sanctions.every((s) => 'createdBy' in s), true,
     'ارشدِ پل نمای کامل');
 
@@ -224,6 +268,24 @@ test('بند ۲: trust-read.v1 — ارشد کامل؛ مدیر و بیننده 
     const r = await M('tr-mali', 'GET', p);
     assert.equal(r.status, 403, `مالی ${p} ⇒ ${r.status}`);
     assert.equal(r.body.error.code, 'role_forbidden');
+  }
+});
+
+test('بند ۲: «مسئولِ» خودکار = تصمیم‌گیرنده (پروندهٔ بی مسئول) ⇒ برای زیرِ ارشد خالی، در پرونده و صف؛ ارشد همان', async () => {
+  const direct = await seedCase();
+  assert.equal((await M('tr-arshad', 'POST', `/cases/${direct}/decide`, { outcome: 'dismissed', reason: 'دلیلِ آزمون' })).status, 200);
+  const bridged = await seedCase();
+  assert.equal((await S('panel:5', 'POST', `/cases/${bridged}/decide`, { outcome: 'dismissed', reason: 'دلیلِ آزمون' }, { name: 'سارا' })).status, 200);
+  for (const [cid, decider, name] of [[direct, ids['tr-arshad'], ''], [bridged, 'panel:5', 'سارا']]) {
+    const full = (await M('tr-arshad', 'GET', `/cases/${cid}`)).body.case;
+    assert.deepEqual([full.assignee, full.assigneeName, full.decision.by], [decider, name, decider], 'ارشد: کامل');
+    for (const who of ['tr-modir', 'tr-binande']) {
+      const c = (await M(who, 'GET', `/cases/${cid}`)).body.case;
+      assert.deepEqual([c.assignee, c.assigneeName], ['', ''], `${who}: مسئولِ خودکار همان تصمیم‌گیرنده است ⇒ خالی`);
+      assert.ok(!JSON.stringify(c).includes(decider), `${who}: شناسهٔ تصمیم‌گیرنده نشت کرد`);
+      const row = (await M(who, 'GET', '/cases?status=all')).body.cases.find((x) => x.id === cid);
+      assert.deepEqual([row.assignee, row.assigneeName], ['', ''], `${who}/صف`);
+    }
   }
 });
 
@@ -338,4 +400,8 @@ test('مهاجرتِ ۸۵۵: برگشت و اجرای دوباره', async () =>
   await query(fs.readFileSync(path.join(dir, '855_trust_assignee_name.sql'), 'utf8'));
   await query(fs.readFileSync(path.join(dir, '855_trust_assignee_name.sql'), 'utf8'));
   assert.equal(await col(), true);
+  //  کرانِ ۸۰ نویسه در خودِ پایگاه هم (نه فقط `cleanName`)
+  const id = await seedCase();
+  await query('UPDATE trust_cases SET assignee_name=$2 WHERE id=$1', [id, 'ن'.repeat(80)]);
+  await assert.rejects(query('UPDATE trust_cases SET assignee_name=$2 WHERE id=$1', [id, 'ن'.repeat(81)]), /check constraint/i);
 });

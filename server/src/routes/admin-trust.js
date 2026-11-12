@@ -28,7 +28,8 @@ router.use(requireAdmin);
 const log = (req, entry) => audit.log({ actorType: 'admin', userId: req.admin.id, ip: clientIp(req), ...entry });
 
 router.get('/cases', async (req, res) => {
-  const cases = await trust.queue({ status: req.query.status, shopId: req.query.shopId, limit: req.query.limit });
+  const cases = await trust.queue({ status: req.query.status, shopId: req.query.shopId, limit: req.query.limit },
+    view.fullView(req) ? undefined : view.queueRow);
   await log(req, { action: 'admin.trust_queue_viewed', detail: { count: cases.length } });
   res.set('Cache-Control', 'no-store');
   res.json({ cases });

@@ -320,3 +320,41 @@ test('rollback ِ ۸۳۶ دو جدول را برمی‌دارد و نشانی‌
   await query('INSERT INTO schema_migrations (version, checksum, applied_at) VALUES ($1,$2,$3)', [mark.version, mark.checksum, mark.applied_at]);
   assert.equal(await exists('store_address_media'), true);
 });
+
+test('انبارِ شیء (disk/s3): حذفِ نشانی و حذفِ حساب شیءِ عکس و صدا را هم برمی‌دارند (نه تا gc ِ دستی)؛ PUT ِ دوباره شیءِ پیشین را', async (t) => {
+  const store = require('../src/lib/image-store');
+  const m = new Map();
+  store.useBackend({
+    kind: 'memory',
+    async put(k, b) { m.set(k, Buffer.from(b)); },
+    async get(k) { return m.has(k) ? Buffer.from(m.get(k)) : null; },
+    async del(k) { m.delete(k); },
+    async list() { return [...m.keys()].map((key) => ({ key, mtime: 0 })); },
+  });
+  const prev = { ...config.imageStore };
+  config.imageStore.mode = 'disk';
+  config.imageStore.read = '';
+  t.after(() => { Object.assign(config.imageStore, prev); store.useBackend(null); });
+
+  const o = await liveStore('شیء');
+  const who = await shopper(o.slug, '0791230031');
+  const a1 = await addAddress(o.slug, who, 'خانه');
+  const a2 = await addAddress(o.slug, who, 'کار');
+  assert.equal((await put(o.slug, who, a1, 'gate-photo', JPEG(1))).status, 201);
+  assert.equal((await put(o.slug, who, a1, 'voice-note', OGG(301))).status, 201);
+  assert.equal((await put(o.slug, who, a2, 'gate-photo', JPEG(2))).status, 201);
+  assert.equal(m.size, 3, 'سه شیء، بایت در پایگاه نیست');
+  assert.equal((await one(`SELECT COUNT(*)::int AS n FROM store_address_media WHERE address_id = ANY($1) AND data IS NULL`, [[a1, a2]])).n, 3);
+  //  جایگزینی ⇒ شیءِ پیشین برداشته
+  assert.equal((await put(o.slug, who, a2, 'gate-photo', JPEG(3))).status, 200);
+  assert.equal(m.size, 3);
+
+  const d1 = await h.api('DELETE', `/api/store/${o.slug}/account/addresses/${a1}`, { headers: who.headers });
+  assert.equal(d1.status, 200, JSON.stringify(d1.body));
+  assert.equal(m.size, 1, 'دو شیءِ نشانیِ حذف‌شده رفت');
+  assert.equal(await rows(a1), 0);
+  const d2 = await h.api('DELETE', `/api/store/${o.slug}/account`, { headers: who.headers });
+  assert.equal(d2.status, 200, JSON.stringify(d2.body));
+  assert.equal(m.size, 0, 'حذفِ حساب: هیچ شیئی نمی‌ماند');
+  assert.equal(await rows(a2), 0);
+});

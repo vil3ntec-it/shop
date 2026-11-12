@@ -24,6 +24,7 @@ const express = require('express');
 const config = require('../config');
 const { one, many } = require('../db');
 const chatMedia = require('./chat-media');
+const audio = require('./audio-bytes');
 const media = require('./media-store').address;
 const { rateLimit } = require('../middleware/ratelimit');
 const { ApiError, badRequest, notFound } = require('../middleware/errors');
@@ -60,10 +61,12 @@ function accept(kind, value) {
   const buf = value;
   if (buf.length > capOf(kind)) throw new ApiError(413, 'too_large', `فایل بزرگ‌تر از ${kb(capOf(kind))} است`);
   const s = chatMedia.sniff(buf);
-  if (!s || s.kind !== TYPE[kind]) {
+  //  ظرفِ صدا با ترکِ تصویر (MP4 ِ isom، WebM ِ VP8، Ogg ِ Theora) هم «صدا» نیست (`lib/audio-bytes.js`)
+  if (!s || s.kind !== TYPE[kind] || (s.kind === 'audio' && audio.hasVideo(buf, s.mime))) {
     throw new ApiError(415, 'unsupported_media', kind === 'gate_photo' ? 'فقط عکس (JPG، PNG، WebP)' : 'فقط پیامِ صوتی (Opus، AAC، MP3، AMR)');
   }
-  const data = s.kind === 'image' ? chatMedia.cleanImage(buf, s.mime, 'main') : buf;
+  //  عکس بی EXIF/XMP؛ صدای M4A/3GP بی اتمِ مکانِ ضبط
+  const data = s.kind === 'image' ? chatMedia.cleanImage(buf, s.mime, 'main') : audio.dropLocation(buf, s.mime);
   return { mime: s.mime, data, sha256: crypto.createHash('sha256').update(data).digest('hex') };
 }
 
@@ -95,9 +98,20 @@ async function orderRow(shopId, orderId) {
   return o.id;
 }
 
+/**
+ * پس از این وضعیت‌ها سفارش دیگر به «ارسال» برنمی‌گردد (ماشینِ وضعیتِ `order-states.js`؛ آزمون: هر وضعیتی که `out_for_delivery`
+ * از آن دست‌یافتنی نیست همین‌جاست) ⇒ رسانهٔ **نشانیِ ذخیره‌شدهٔ حساب** دیگر به دکان و پیکِ آن سفارش نمی‌رسد: نشانی مالِ حسابِ
+ * سراسریِ مشتری است و عکس/صدایی که بعداً (حتی از ویترینِ دکانِ دیگر) برایش بگذارد نباید به سفارشِ تمام‌شدهٔ دکانِ دیگر برسد.
+ * (رسانهٔ خودِ سفارش، `source: order`، مالِ همان سفارش است و با «حذفِ دادهٔ مشتری» می‌رود.)
+ */
+const FINISHED = Object.freeze(['ready_for_pickup', 'picked_up', 'delivered', 'rejected', 'auto_rejected', 'cancelled',
+  'cancelled_by_customer', 'returned_to_store', 'restocked', 'return_requested', 'refunded_partial', 'refunded_full']);
+
 const OWN = 'FROM order_address_media WHERE shop_id = $1 AND order_id = $2';
+//  ⛔ فقط سفارشِ هنوز باز (ثابت‌های بالا، نه ورودی)؛ پس رسانه‌ای که پس از بسته شدن گذاشته شود هم هرگز دیده نمی‌شود
 const SAVED = `FROM online_order_address_refs r JOIN store_address_media m ON m.address_id = r.address_id
-                WHERE r.shop_id = $1 AND r.order_id = $2`;
+                JOIN online_orders o ON o.id = r.order_id AND o.shop_id = r.shop_id
+                WHERE r.shop_id = $1 AND r.order_id = $2 AND o.status NOT IN (${FINISHED.map((x) => `'${x}'`).join(', ')})`;
 
 /** نما: `{enabled, gatePhoto, voiceNote}` با `source` ِ هر کدام (پرچمِ خاموش ⇒ `{enabled:false}`) */
 async function forOrder(shopId, orderId) {
@@ -159,6 +173,6 @@ function send(res, m) {
 }
 
 module.exports = {
-  FLAG, KINDS, WIRE, flagOn, caps, capOf, kindOf, accept, rawBody, viewLimit, metaOf,
+  FLAG, KINDS, WIRE, FINISHED, flagOn, caps, capOf, kindOf, accept, rawBody, viewLimit, metaOf,
   forOrder, orderMedia, forMission, missionMedia, send,
 };

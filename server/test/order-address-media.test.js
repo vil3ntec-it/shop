@@ -18,6 +18,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const M = require('../src/lib/order-address-media');
+const config = require('../src/config');
 const { resetAll } = require('../src/middleware/ratelimit');
 
 let admin = '';
@@ -305,4 +306,28 @@ test('⛔ سقفِ نرخِ هر سفارش: هفتمین بارگذاری در 
   }
   const r = await upload(s, o.token, 'voice-note', ogg(300, 99));
   assert.equal(r.status, 429, JSON.stringify(r.body));
+});
+
+test('⛔ توکن و نوع پیش از خواندنِ بدنه: توکنِ نادرست یا نوعِ ناشناخته با بدنهٔ بزرگ‌تر از سقف ⇒ ۴۰۴ (نه ۴۱۳)، بی هیچ ردیف', async () => {
+  const s = await liveShop('ترتیبِ در');
+  const o = await order(s);
+  const big = Buffer.concat([Buffer.from('OggS', 'latin1'), Buffer.alloc(config.addressMedia.voiceMax + config.addressMedia.photoMax, 1)]);
+  const bad = await upload(s, `${o.token}x`, 'voice-note', big);
+  assert.equal(bad.status, 404, JSON.stringify(bad.body));
+  const kind = await upload(s, o.token, 'selfie', big);
+  assert.equal(kind.status, 404, JSON.stringify(kind.body));
+  //  توکنِ درست و نوعِ درست ⇒ همان ۴۱۳ ِ سقف
+  assert.equal((await upload(s, o.token, 'voice-note', big)).status, 413);
+  assert.equal((await one('SELECT COUNT(*)::int AS n FROM order_address_media WHERE order_id=$1', [o.orderId])).n, 0);
+});
+
+test('مهاجرتِ ۸۴۷: کرانِ پایگاه — mime ِ ۳ تا ۴۰ نویسه و sha256 ِ ۶۴ رقمِ هگز', async () => {
+  const s = await liveShop('قیدِ ۸۴۷');
+  const o = await order(s);
+  const row = (mime, sha) => query(
+    `INSERT INTO order_address_media (id, shop_id, order_id, kind, mime, size, sha256, data, created_at) VALUES ($1,$2,$3,'voice_note',$4,1,$5,'\\x00',$6)`,
+    [newId('oam'), s.shopId, o.orderId, mime, sha, now()]);
+  await assert.rejects(row('x'.repeat(41), 'a'.repeat(64)), /check constraint/i);
+  await assert.rejects(row('audio/ogg', 'not-a-hash'), /check constraint/i);
+  await row('audio/ogg', 'a'.repeat(64));
 });

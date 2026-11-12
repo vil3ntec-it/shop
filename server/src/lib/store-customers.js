@@ -187,12 +187,18 @@ async function changePhone(customer, sessionId, phone) {
  * شماره در همهٔ دکان‌ها (مهاجرتِ ۴۷۵)؛ سفارش‌ها سندِ دکان‌اند و می‌مانند.
  */
 async function remove(customer) {
-  return tx(async (c) => {
+  const addrMedia = require('./store-address-media');
+  let gone = [];
+  const out = await tx(async (c) => {
     await revokeTickets(customer.phone, (sql, params) => c.query(sql, params));
     await c.query('DELETE FROM store_alert_push WHERE phone = $1', [customer.phone]);
+    //  CRM-09: عکسِ دروازه و یادداشتِ صوتیِ نشانی‌ها — شیءِ انبار هم، پس از commit
+    gone = await addrMedia.detach(c, customer.id);
     await c.query('DELETE FROM store_customers WHERE id = $1', [customer.id]);
     return { deleted: true };
   });
+  await addrMedia.drop(gone);
+  return out;
 }
 
 // ── نشانی‌ها (CHK-09) ─────────────────────────────────────────────
@@ -280,9 +286,16 @@ async function updateAddress(customer, id, body, opts = {}) {
 }
 
 async function removeAddress(customer, id) {
-  const r = await one('DELETE FROM store_customer_addresses WHERE id = $1 AND customer_id = $2 RETURNING id',
-    [String(id || ''), customer.id]);
+  const addrMedia = require('./store-address-media');
+  let gone = [];
+  const r = await tx(async (c) => {
+    //  CRM-09: رسانهٔ همین نشانی (شیءِ انبار پس از commit)
+    gone = await addrMedia.detach(c, customer.id, String(id || ''));
+    return (await c.query('DELETE FROM store_customer_addresses WHERE id = $1 AND customer_id = $2 RETURNING id',
+      [String(id || ''), customer.id])).rows[0];
+  });
   if (!r) throw notFound('این نشانی پیدا نشد', 'address_not_found');
+  await addrMedia.drop(gone);
   return { deleted: true };
 }
 

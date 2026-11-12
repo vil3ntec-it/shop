@@ -247,3 +247,73 @@ test('⛔ نقش و مالکیت: صاحب و مدیر بله، صندوق‌د�
   //  پیک از درِ دکان نه (دامنهٔ توکنِ پیک)
   assert.ok([403, 404].includes((await view(courier.token, X.id)).status));
 });
+
+test('⛔ نشانیِ ذخیره‌شده فقط برای سفارشِ باز: پس از بسته شدن نه نما نه بایت، حتی رسانه‌ای که بعداً از ویترینِ دکانِ دیگر آمد؛ FINISHED از ماشینِ وضعیت', async () => {
+  //  FINISHED = هر وضعیتی که `out_for_delivery` از آن دست‌یافتنی نیست (وضعیتِ تازه بی طبقه‌بندی ⇒ سرخ)
+  const { ORDER_TRANSITIONS } = require('../src/lib/order-states');
+  const { FINISHED } = require('../src/lib/address-media');
+  const { CLOSED } = require('../src/lib/order-address-media');
+  const reaches = (from, seen = new Set()) => {
+    if (from === 'out_for_delivery') return true;
+    seen.add(from);
+    return ORDER_TRANSITIONS[from].some((n) => !seen.has(n) && reaches(n, seen));
+  };
+  const derived = Object.keys(ORDER_TRANSITIONS).filter((s) => !reaches(s)).sort();
+  assert.deepEqual([...FINISHED].sort(), derived);
+  assert.deepEqual([...CLOSED].sort(), ['out_for_delivery', ...derived].sort(), 'گذاشتن/برداشتنِ مشتری پس از سپردن به پیک بسته');
+  for (const s of ['return_requested', 'refunded_partial']) assert.ok(CLOSED.includes(s), s);
+
+  const A = await liveStore('بسته-الف');
+  const B = await liveStore('بسته-ب');
+  const who = await shopper(A.slug, '0791240011');
+  const addr = await savedAddress(A.slug, who);
+  assert.equal((await accountPut(A, who, addr, 'gate-photo', JPEG(41))).status, 201);
+  const X = await checkout(A, who, addr);
+  assert.equal((await orderPut(A, X.token, 'voice-note', OGG(210, 4))).status, 201);
+  assert.deepEqual(sources((await view(A.token, X.id)).body), ['address', 'order'], 'باز: هر دو');
+
+  const rej = await h.post(`/api/shop/orders/${X.id}/transition`, { to: 'rejected', reason: 'busy' }, { token: A.token });
+  assert.equal(rej.status, 200, JSON.stringify(rej.body));
+  //  سفارشِ بازِ دیگری در همان دکان (وضعیتِ همان سفارش سنجیده می‌شود، نه «هر سفارشِ باز»)
+  await checkout(A, await shopper(A.slug, '0791240012', { account: false }));
+  //  مشتری پس از آن از ویترینِ دکانِ دیگر برای همان نشانی صدا می‌گذارد (حسابِ سراسری)
+  assert.equal((await accountPut(B, who, addr, 'voice-note', OGG(220, 6))).status, 201);
+  const v = await view(A.token, X.id);
+  assert.equal(v.status, 200);
+  assert.deepEqual(sources(v.body), [null, 'order'], 'بسته: رسانهٔ نشانی نه؛ رسانهٔ خودِ سفارش می‌ماند');
+  assert.equal((await bytes(A.token, X.id, 'gate-photo')).status, 404);
+  assert.ok((await bytes(A.token, X.id, 'voice-note')).buffer.equals(OGG(210, 4)), 'صدای خودِ سفارش، نه صدای تازهٔ نشانی');
+  //  مشتری هم دیگر چیزی نمی‌گذارد
+  assert.equal((await orderPut(A, X.token, 'gate-photo', JPEG(42))).status, 409);
+});
+
+test('یادداشتِ صوتی: فقط صدا — MP4/3GP با ترکِ تصویر، WebM با کدکِ تصویر و Ogg ِ Theora ۴۱۵؛ اتمِ مکانِ M4A (©xyz، loci) بی جابه‌جایی پاک', () => {
+  const { accept } = require('../src/lib/address-media');
+  const atom = (type, body) => { const b = Buffer.alloc(8); b.writeUInt32BE(8 + body.length); b.write(type, 4, 'latin1'); return Buffer.concat([b, body]); };
+  const hdlr = (h) => atom('hdlr', Buffer.concat([Buffer.alloc(8), Buffer.from(h, 'latin1'), Buffer.alloc(12)]));
+  const mp4 = (brand, handlers, extra = []) => Buffer.concat([atom('ftyp', Buffer.from(`${brand}\0\0\0\0${brand}`, 'latin1')),
+    atom('moov', Buffer.concat([...handlers.map((x) => atom('trak', atom('mdia', hdlr(x)))), ...extra])), atom('mdat', Buffer.alloc(64, 5))]);
+  const code = (fn) => { try { fn(); return 'ok'; } catch (e) { return `${e.status} ${e.code}`; } };
+
+  //  صدا می‌ماند
+  assert.equal(code(() => accept('voice_note', mp4('M4A ', ['soun']))), 'ok');
+  assert.equal(code(() => accept('voice_note', Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.from('\x42\x82\x84webm\x86\x86A_OPUS', 'latin1'), Buffer.alloc(40)]))), 'ok');
+  assert.equal(code(() => accept('voice_note', Buffer.concat([Buffer.from('OggS', 'latin1'), Buffer.alloc(24), Buffer.from('OpusHead', 'latin1'), Buffer.alloc(20)]))), 'ok');
+  //  تصویر نه
+  for (const [label, buf] of [
+    ['mp4 ِ isom با ترکِ vide', mp4('isom', ['soun', 'vide'])],
+    ['3gp با ترکِ vide', mp4('3gp4', ['vide'])],
+    ['webm ِ VP8', Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.from('\x42\x82\x84webm\x86\x85V_VP8', 'latin1'), Buffer.alloc(40)])],
+    ['webm ِ AV1', Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.from('\x86\x85V_AV1', 'latin1'), Buffer.alloc(40)])],
+    ['ogg ِ theora', Buffer.concat([Buffer.from('OggS', 'latin1'), Buffer.alloc(24), Buffer.from('\x80theora', 'latin1'), Buffer.alloc(20)])],
+  ]) assert.equal(code(() => accept('voice_note', buf)), '415 unsupported_media', label);
+
+  //  مکان: ©xyz (QuickTime) و loci (3GPP) ⇒ همان اندازه، اتمِ free، بی مختصات
+  const loc = Buffer.from('+34.5553+069.2075/', 'latin1');
+  const withLoc = mp4('M4A ', ['soun'], [atom('udta', Buffer.concat([atom('\xa9xyz', Buffer.concat([Buffer.alloc(4), loc])), atom('loci', loc)]))]);
+  const ok = accept('voice_note', withLoc);
+  assert.equal(ok.mime, 'audio/mp4');
+  assert.equal(ok.data.length, withLoc.length, 'هیچ offset ِ stco/co64 جابه‌جا نمی‌شود');
+  assert.ok(!ok.data.includes(loc) && !ok.data.includes(Buffer.from('\xa9xyz', 'latin1')) && !ok.data.includes(Buffer.from('loci', 'latin1')));
+  assert.equal(ok.data.indexOf(Buffer.from('mdat')), withLoc.indexOf(Buffer.from('mdat')));
+});
