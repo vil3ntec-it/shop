@@ -175,8 +175,10 @@ class TouchTextKeysUiTest {
   @Test fun deskSaleGivesNewCustomerOnlyToTheTouchTillThroughTheStore() {
     val src = File("../android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/DeskSale.kt").readText()
     val call = src.substringAfter("DebtorPicker(d = d, selected = cartDebtorId").substringBefore("if (lineSellerOpen")
-    assertEquals(true, call.contains("onAdd = if (!touchExtras) null else"))
-    assertEquals(true, call.contains("DebtorEngine.add(d,") && call.contains("store.save(d, r.data)"))
+    assertEquals(true, call.contains("onAdd = if (!touchExtras) null else { name -> tillNewCustomer(d, name, store, scope,"))
+    //  همان `DebtorEngine.add` و `store.save` ِ «مشتریان» با ساعتِ مشترک (`TillNewCustomer.kt`)
+    val helper = File("../android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/TillNewCustomer.kt").readText()
+    assertEquals(true, helper.contains("DebtorEngine.add(d, DebtorEngine.DebtorDraft(name = name), ReportBridge.nowMs(), ::newId)") && helper.contains("store.save(d, r.data)"))
   }
 
   @Test fun freeLineAndNotesUseTheSharedTouchKeys() {

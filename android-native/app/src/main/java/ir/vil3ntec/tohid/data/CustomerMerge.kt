@@ -219,7 +219,7 @@ object CustomerMerge {
     dropId: String,
     limitRules: CreditLimitPerm.Rules,
     today: String = ir.vil3ntec.tohid.todayIso(),
-    now: Long = System.currentTimeMillis(),
+    now: Long = ReportBridge.nowMs(),
     newId: () -> String = ::auditId,
   ): Result {
     val p = when (val r = preview(d, keepId, dropId)) {
