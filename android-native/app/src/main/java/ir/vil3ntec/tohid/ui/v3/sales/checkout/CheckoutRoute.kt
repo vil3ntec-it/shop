@@ -131,7 +131,7 @@ fun RouteScope.CheckoutRoute() {
     //  همین یک `Checkout` جمع، پیش‌سنجیِ حساب‌پی و ثبت را می‌سازد ⇒ قاعده‌ها و تأییدِ منقضی همه‌جا همان‌اند
     val checkout = CheckoutModel.checkout(
       form, canDiscount, blockExpired, invoiceSeller, if (payV2) 0L else cashStep, rules = checkoutRules, expiryGate = expiryGateOn,
-    ).copy(lineSellers = lineSellers, tax = taxConfig, expiryApproval = CheckoutSession.expiryApproval)
+    ).copy(lineSellers = lineSellers, tax = taxConfig).copy(expiryApproval = CheckoutSession.expiryApproval)
     val n = CheckoutModel.numbers(data, loyal, form, checkout)
     val decision = ShopRole.decide(context, "sales.discount", DiscountGate.req(n.discount, n.subtotal))
     val gate = DiscountGate.state(decision.decision, saleKey, n.discount, n.subtotal, CheckoutSession.approval)
