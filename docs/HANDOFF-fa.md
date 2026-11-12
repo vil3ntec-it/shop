@@ -54,6 +54,11 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — شاخهٔ `claude/verify-rows-i` (سنجشِ خودکارِ ردیف‌های «فقط روی دستگاه/شاهدِ CI»؛ روی `claude/batch-51` ‏396171d0a؛ سیزنِ `session_01BwqpPed1SJuwB7Q4nZUbg9`)
+
+- **انجام شد:** هشت آزمونِ تازهٔ صفحهٔ Compose در `desktop/src/test` (`CountReviewUiTest`، `PoSuggestUiTest`، `WholesaleFieldUiTest`، `PromoAppliedUiTest`، `StorefrontSettingsPaneUiTest`، `StaffTimeCardUiTest`، `HeldClaimSheetsUiTest`، `HeatmapPhoneUiTest`) — ۲۶ آزمون سبز؛ تنها تغییرِ کد `CheckoutSheet.PromoApplied` ِ `private` ⇐ `internal` برای آزمون. اجرای کاملِ کامپیوتر ۳۸۸۶ آزمون بی شکست و core ِ هدف‌دار ۲۷۴/۲۷۴. IMPLEMENTED-VERIFIED: INV-09، INV-13، PRD-12، PRM-18، POS-03، RPT-08؛ بقیهٔ ۵۴ ردیف با شاهدِ محلی و «مانده»ِ روشن (سخت‌افزار: «فقط دستگاهِ واقعی — …»).
+- **نیمه‌کاره:** صفحه‌های مسیرِ نسخهٔ ۳ (`RouteScope`/`ShellContext`، مثلِ سفارش‌های خرید PUR-02/14) و `StaffTimeHub` (STF-07) هنوز آزمونِ صفحه ندارند — نیازمندِ ساختِ ShellContext و `Backend` ِ آزمونی.
+- **قدمِ بعد:** PR و CI؛ با قفلِ کشِ Gradle ِ عامل‌های دیگر، `GRADLE_USER_HOME` ِ جدا (کپیِ `modules-2`/`jars-9`/`wrapper`) و `-Pkotlin.daemon.jvmargs=-Xmx2560m` کار کرد (Kotlin daemon ِ ۴g با OOM کشته شد).
 ### ۱۴۰۵/۰۸/۲۲ — هماهنگ‌کننده (سیزنِ `session_01BwqpPed1SJuwB7Q4nZUbg9`) — **دستورهای تازهٔ صاحب‌کار؛ از این‌جا ادامه بده**
 
 **دستورهای صاحب‌کار (همه برای هر دو حساب؛ بر بندهای پایین مقدم):**

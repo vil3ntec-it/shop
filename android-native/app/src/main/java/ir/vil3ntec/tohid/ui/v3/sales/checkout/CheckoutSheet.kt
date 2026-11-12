@@ -244,7 +244,7 @@ private fun Hero(v: CheckoutView) {
 
 /** هر تخفیفِ خودکارِ اعمال‌شده با نامِ قاعده و مبلغش (PRM-18) */
 @Composable
-private fun PromoApplied(applied: List<PromoEngine.Applied>) {
+internal fun PromoApplied(applied: List<PromoEngine.Applied>) {
   if (applied.isEmpty()) return
   val c = PhoneV3.colors
   Spacer(Modifier.height(12.dp))
