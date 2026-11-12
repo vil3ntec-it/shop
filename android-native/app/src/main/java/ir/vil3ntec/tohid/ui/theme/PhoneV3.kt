@@ -95,7 +95,7 @@ val PhoneV3Light: PhoneV3Colors = PhoneV3Colors.from(LightColors)
 val PhoneV3Dark: PhoneV3Colors = PhoneV3Colors.from(DarkColors)
 
 object PhoneV3 {
-  /** تمِ جاری از روشنیِ زمینهٔ `Shop.colors` — مثلِ `PhoneSheet` */
+  /** تمِ جاری از روشنیِ زمینهٔ `Shop.colors` */
   /** رنگ‌های گوشی برای تم و حالتِ جاری (`ThemeStore` × روز/شب) */
   val colors: PhoneV3Colors
     @Composable get() = forShop(Shop.colors)
