@@ -165,6 +165,7 @@ class TouchTextKeysUiTest {
     type("زهرا")
     rule.waitForIdle()
     rule.onNode(hasText(StrSale.newCustomerNamed("زهرا"))).performClick()
+    rule.waitForIdle()
     assertEquals(listOf("زهرا"), added)
     //  بی `onAdd` (صندوقِ موشی) دکمه نیست
     withAdd = false
@@ -175,8 +176,8 @@ class TouchTextKeysUiTest {
   @Test fun deskSaleGivesNewCustomerOnlyToTheTouchTillThroughTheStore() {
     val src = File("../android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/DeskSale.kt").readText()
     val call = src.substringAfter("DebtorPicker(d = d, selected = cartDebtorId").substringBefore("if (lineSellerOpen")
-    assertEquals(true, call.contains("onAdd = if (!touchExtras) null else { name -> tillNewCustomer(d, name, store, scope,"))
-    //  همان `DebtorEngine.add` و `store.save` ِ «مشتریان» با ساعتِ مشترک (`TillNewCustomer.kt`)
+    assertEquals(true, call.contains("onAdd = if (!touchExtras) null else { name -> tillNewCustomer(d, name, store) {"))
+    //  همان `DebtorEngine.add` و `store.save` ِ «مشتریان» با ساعتِ مشترک (`TillNewCustomer.kt`)؛ دو زدن ⇒ `TillNewCustomerUiTest`
     val helper = File("../android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/TillNewCustomer.kt").readText()
     assertEquals(true, helper.contains("DebtorEngine.add(d, DebtorEngine.DebtorDraft(name = name), ReportBridge.nowMs(), ::newId)") && helper.contains("store.save(d, r.data)"))
   }

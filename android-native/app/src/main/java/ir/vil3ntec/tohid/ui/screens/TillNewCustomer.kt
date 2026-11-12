@@ -11,9 +11,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrCustomerCard
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
@@ -21,7 +23,6 @@ import ir.vil3ntec.tohid.data.ReportBridge
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.ui.theme.Shop
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 // i18n: سه‌زبانه
@@ -32,24 +33,38 @@ import kotlinx.coroutines.launch
  */
 
 /**
- *  ثبتِ [name] روی دفترِ [d]: نادرست ⇒ پیامِ موتور (و هیچ نوشتن)؛ درست ⇒ null و پس از نوشتن [onSaved] با شناسهٔ تازه،
- *  یا [onFail] اگر دفتر در این میان عوض شد.
+ *  ثبتِ [name] روی دفترِ [d] تا پایانِ نوشتن: نادرست ⇒ پیامِ موتور (و هیچ نوشتن)؛ نوشته نشد (نقش، قفلِ نرم، دیسک) ⇒
+ *  «ذخیره نشد»؛ نوشته شد ⇒ [onSaved] با شناسهٔ تازه و null.
  */
-internal fun tillNewCustomer(
-  d: ShopData, name: String, store: ShopStore, scope: CoroutineScope, onFail: () -> Unit, onSaved: (String) -> Unit,
-): String? = when (val r = DebtorEngine.add(d, DebtorEngine.DebtorDraft(name = name), ReportBridge.nowMs(), ::newId)) {
-  is DebtorEngine.Result.Failed -> r.message
-  is DebtorEngine.Result.Ok -> { scope.launch { if (store.save(d, r.data)) onSaved(r.id) else onFail() }; null }
-}
+internal suspend fun tillNewCustomer(d: ShopData, name: String, store: ShopStore, onSaved: (String) -> Unit): String? =
+  when (val r = DebtorEngine.add(d, DebtorEngine.DebtorDraft(name = name), ReportBridge.nowMs(), ::newId)) {
+    is DebtorEngine.Result.Failed -> r.message
+    is DebtorEngine.Result.Ok -> if (store.save(d, r.data)) { onSaved(r.id); null } else StrCustomerCard.notSaved
+  }
 
-/** دکمهٔ «مشتریِ تازه: «نام»» زیرِ کادرِ گزینش — فقط با [onAdd] و نامی که در فهرستِ [shown] نیست؛ خطای ثبت زیرش */
+/**
+ *  دکمهٔ «مشتریِ تازه: «نام»» زیرِ کادرِ گزینش — فقط با [onAdd] و نامی که در فهرستِ [shown] نیست؛ خطای ثبت زیرش.
+ *  ⛔ دو زدنِ تند یک مشتری می‌سازد: `adding` از زدن تا پایانِ [onAdd] (دکمه خاموش، زدنِ دوم هیچ)؛ ناموفق، استثنا یا
+ *  بستنِ برگه ⇒ در `finally` آزاد؛ موفق ⇒ بسته می‌ماند تا برگه بسته شود (همان نام دوباره ساخته نمی‌شود). پیش‌تر هر زدن
+ *  یک `DebtorEngine.add` روی همان دفترِ کهنه بود و `ShopStore.save` هر دو را می‌نشاند ⇒ دو مشتریِ هم‌نام.
+ */
 @Composable
-internal fun TillNewCustomerButton(search: String, shown: List<Debtor>, onAdd: ((name: String) -> String?)?) {
+internal fun TillNewCustomerButton(search: String, shown: List<Debtor>, onAdd: (suspend (name: String) -> String?)?) {
   var problem by remember { mutableStateOf<String?>(null) }
   val name = search.trim().takeIf { onAdd != null && it.isNotEmpty() && shown.none { s -> s.name.trim().equals(it, ignoreCase = true) } }
+  var adding by remember(name) { mutableStateOf(false) }
+  val scope = rememberCoroutineScope()
   if (name != null && onAdd != null) {
     Spacer(Modifier.height(8.dp))
-    OutlinedButton(onClick = { problem = onAdd(name) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+    OutlinedButton(onClick = {
+      if (!adding) {
+        adding = true
+        scope.launch {
+          var saved = false
+          try { problem = onAdd(name); saved = problem == null } finally { if (!saved) adding = false }
+        }
+      }
+    }, enabled = !adding, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
       Text(StrSale.newCustomerNamed(name), maxLines = 1)
     }
   }
