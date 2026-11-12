@@ -40,7 +40,7 @@ const BLOCKERS = join(DIR, 'BLOCKERS.md');
 const RELEASE = join(DIR, 'RELEASE-1-fa.md');
 const OBSOLETE_DIR = join(DIR, 'obsolete');
 // پرونده‌های دیگری که در docs/spec مجازند (بیرون از تکه‌ها).
-const ALLOWED = new Set(['MASTER-SPEC.md', 'manifest.json', '00-index.md', 'STATUS.md', 'BLOCKERS.md', 'OWNER-ACTIONS-fa.md', 'ADMIN-CONTROL-PLANE.md', 'RELEASE-1-fa.md', 'tools', 'bench', 'obsolete']);
+const ALLOWED = new Set(['MASTER-SPEC.md', 'manifest.json', '00-index.md', 'STATUS.md', 'BLOCKERS.md', 'OWNER-ACTIONS-fa.md', 'ADMIN-CONTROL-PLANE.md', 'RELEASE-1-fa.md', 'PARTIAL-MAP-fa.md', 'tools', 'bench', 'obsolete']);
 
 const FA = '۰۱۲۳۴۵۶۷۸۹';
 export const toLatin = (s) => String(s).replace(/[۰-۹]/g, (d) => String(FA.indexOf(d)));
