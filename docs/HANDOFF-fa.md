@@ -54,6 +54,18 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-14w زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-14w` (از `claude/e-rows-13w`)
+
+- **GATE-NEW-05 ساخته شد (PARTIAL تا شاهد):** ورک‌فلوی آزمونیِ `.github/workflows/gradle-evidence.yml` (بی انتشار، `contents: read`،
+  actionهای سنجاق، بی `workflow_run`؛ push ِ main با تغییرِ Kotlin، PR ِ خودش، دستی) `desktop test` (با `android-native/app/src/test`؛
+  همهٔ شناسه‌های کارِ بومی را دارد) و core را می‌دواند و `tools/test-evidence/gradle-evidence.mjs` JUnit XML را به JSONL ِ هم‌شکلِ
+  `server/scripts/test-evidence.js` در artifact ِ `test-evidence-gradle` می‌برد. آزمون ۹/۹، شش جهش سرخ؛ ۵۶۸۶ خط روی گزارش‌های واقعی؛
+  `repro` ِ یک آزمونِ فارسیِ core با Gradle ِ محلی دقیقاً همان یک آزمون را دواند. workflow-guard ۰ خطا، ۴۰/۴۰. قاعده در RULES «CI و آزمون».
+- **دام:** `java -version` خطِ «Picked up JAVA_TOOL_OPTIONS: …» (پراکسی، truststore و رمزش) را چاپ می‌کند ⇒ از شواهد کنار می‌رود
+  (`javaLine`). KMP نامِ آزمونِ core را در XML با `[jvm]` می‌نویسد ⇒ `--tests` با آن چیزی پیدا نمی‌کند؛ برداشته می‌شود.
+- **قدمِ بعد:** پس از مرج، artifact ِ `test-evidence-gradle` ِ نخستین اجرای «شواهدِ آزمون‌های Gradle» روی main را ببین (شمارِ خط‌ها ≈
+  شمارِ KTEST ِ «کامپایل و آزمون») و GATE-NEW-05 ⇐ IMPLEMENTED-VERIFIED؛ دستهٔ CI ِ نقشه دوباره خالی می‌شود.
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-13w زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-13w` (از `claude/e-rows-11p`)
 
 - **دستهٔ «CI» ِ نقشهٔ PARTIAL (۶ ردیف)، شاهد از CI ِ push ِ main ‏719bbcf63 (#1038):** INV-16 (`StockValueBridgeTest` ۳/۳)، SYN-12
