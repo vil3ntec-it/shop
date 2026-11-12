@@ -115,8 +115,14 @@ test('۵xx ِ سرور: با کدِ پیگیری ثبت می‌شود و هیچ 
   err.code = '57P01';
   errs.recordServer({ ref: 'eopstest1', err, req: { method: 'GET', originalUrl: '/api/admin/shops/shp_0123456789abcdef?x=1' }, status: 500 });
   errs.recordServer({ ref: 'eopstest2', err, req: { method: 'GET', originalUrl: '/api/admin/shops/shp_fedcba9876543210?x=2' }, status: 500 });
-  await new Promise((r) => setTimeout(r, 100));
-  const rows = await db.many("SELECT * FROM server_errors WHERE id IN ('eopstest1','eopstest2') ORDER BY id");
+  //  `recordServer` بی انتظار می‌نویسد (پاسخِ ۵۰۰ نباید پشتِ نوشتنِ سابقه بماند)؛ ۱۰۰ms ِ ثابت روی PostgreSQL ِ پربارِ CI کم بود
+  //  (۰ ردیف، #1041) ⇒ تا رسیدنِ هر دو ردیف می‌پرسیم، با سقفِ ۵ ثانیه
+  let rows = [];
+  for (const until = Date.now() + 5000; Date.now() < until;) {
+    rows = await db.many("SELECT * FROM server_errors WHERE id IN ('eopstest1','eopstest2') ORDER BY id");
+    if (rows.length === 2) break;
+    await new Promise((r) => setTimeout(r, 50));
+  }
   assert.equal(rows.length, 2);
   const blob = JSON.stringify(rows);
   assert.ok(!blob.includes(secret), 'رازِ API');
