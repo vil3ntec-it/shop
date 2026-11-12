@@ -757,7 +757,7 @@ object ReturnFlow {
       is Outcome.Bad -> return r
       is Outcome.Ok -> r.value
     }
-    return when (val s = SalesEngine.record(posted.data, cart, checkout, today, now, newId, series, saleId = saleKey)) {
+    return when (val s = SalesEngine.record(posted.data, cart, ExchangeTill.sale(checkout, posted.split), today, now, newId, series, saleId = saleKey)) {
       is SalesEngine.Result.Failed -> Outcome.Bad(Code.EXCHANGE_FAILED, s.message)
       is SalesEngine.Result.Ok -> {
         val sale = s.data.sales.first { it.id == saleKey }
