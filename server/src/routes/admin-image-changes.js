@@ -11,7 +11,7 @@
  *    ‎404 change_not_found‎ (هر پرسش با `shop_id` ِ همین نشانی).
  * ⛔ بانکِ خاموش (`shop.image_bank` ِ همین دکان): فهرست `enabled: false` و خالی؛ جزئیات و برگرداندن ‎403 image_bank_disabled‎.
  * ⛔ جزئیات (پیش و پسِ عکسِ هر کالا) وقتی پرچمِ `security / admin.support_grant` روشن است اجازهٔ زندهٔ `read_private` ِ همین
- *    درخواست‌کننده روی همین دکان می‌خواهد (همان الگوی `grantForExport`؛ پیش‌فرض، صاحب‌کار می‌تواند عوض کند).
+ *    درخواست‌کننده روی همین دکان می‌خواهد (`access.grantForRead`؛ پیش‌فرض، صاحب‌کار می‌تواند عوض کند)؛ فهرست نه.
  * ⛔ برگرداندن دادهٔ دکان را می‌نویسد ⇒ **همیشه** اجازهٔ زندهٔ `restore` (به نامِ یک آدم؛ کارِ خودکارِ پنل ‎403 human_actor_required‎)،
  *    دلیلِ ۳ تا ۲۰۰، `Idempotency-Key` با `lib/admin-write-once.js` (اجازه درونِ همان «یک بار»: بازپخش اجازهٔ دوم نمی‌خورد)،
  *    و سابقه‌های `image.restored` / `image.changes_rolled_back` با نوعِ «مدیر» و شناسهٔ اجازه در **همان** تراکنشِ برگرداندن.
@@ -62,7 +62,8 @@ router.get('/images/changes', async (req, res) => {
     limit = +raw;
   }
   const { shop, enabled } = await enabledShop(req);
-  //  TEN-04: یادداشت و سازندهٔ دسته‌های عکس مالِ یک دکان است ⇒ دیدنش سابقه دارد، مثلِ پروندهٔ دکان (tenant-matrix)
+  //  TEN-04: یادداشت و سازندهٔ دسته‌های عکس مالِ یک دکان است ⇒ دیدنش سابقه دارد، مثلِ پروندهٔ دکان (tenant-matrix)؛ اجازه
+  //  نمی‌خواهد: فهرست جایی است که پشتیبانی دسته را می‌یابد و برای جزئیات/برگرداندن اجازه می‌خواهد
   await audit.log({
     shopId: shop.id, actorType: 'admin', userId: req.admin.id, action: 'admin.image_changes_viewed',
     targetType: 'shop', targetId: shop.id, ip: clientIp(req),
@@ -77,15 +78,12 @@ router.get('/images/changes/:cid', async (req, res) => {
   const cid = cidOf(req);
   const { shop, enabled } = await enabledShop(req);
   if (!enabled) throw disabled();
-  if (await access.enforced()) {
-    access.requester(req);
-    await access.useGrant(req, shop.id, 'read_private', { what: `image_changes ${cid}` });
-  }
+  const grant = await access.grantForRead(req, shop.id, `image_changes ${cid}`);
   const out = await changes.detail(shop.id, cid).catch(missing);
-  //  TEN-04: پیش و پسِ کالاهای یک دسته ⇒ هر بار دیدن سابقه دارد (فقط پاسخِ موفق؛ ۴۰۴ چیزی نشان نداده)
+  //  TEN-04: پیش و پسِ کالاهای یک دسته ⇒ هر بار دیدن سابقه دارد (فقط پاسخِ موفق؛ ۴۰۴ چیزی نشان نداده)، با شناسهٔ اجازه
   await audit.log({
     shopId: shop.id, actorType: 'admin', userId: req.admin.id, action: 'admin.image_change_viewed',
-    targetType: 'image_change', targetId: cid, ip: clientIp(req),
+    targetType: 'image_change', targetId: cid, ip: clientIp(req), ...(grant ? { detail: { grant } } : {}),
   });
   res.set('Cache-Control', 'no-store');
   res.json({ shopId: shop.id, change: out.change });

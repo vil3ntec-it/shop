@@ -397,6 +397,8 @@ const CAPABILITY_PROBES = {
   'image-changes.v1': ['GET /admin/shops/x1/images/changes', 'GET /admin/shops/x1/images/changes/x1',
     'POST /admin/shops/x1/images/changes/x1/rollback'],
   'trust-read.v1': ['GET /admin/trust/cases', 'GET /admin/trust/cases/x1', 'GET /admin/trust/sanctions'],
+  'support-grant-read.v1': ['GET /admin/shops/x1/staff-perms', 'GET /admin/shops/x1/images/changes/x1', 'GET /admin/sync/conflicts?account=x1',
+    'GET /admin/shops/x1', 'GET /admin/users/x1'],
 };
 
 test('GET /api/admin/me: فهرستِ «توانایی»ها با همان نام‌های پل، و درِ هر کدام واقعاً هست', async () => {

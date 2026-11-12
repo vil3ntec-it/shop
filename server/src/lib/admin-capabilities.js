@@ -45,6 +45,9 @@ const CAPABILITIES = Object.freeze([
   //  (بی نشانه و سابقهٔ شاکی، هم‌متن‌ها، مدرک و شناسهٔ آدم — lib/trust-admin-view.js)؛ نوشتن همان ارشد + دلیل؛ از راهِ پل «مسئول» و
   //  تصمیم‌گیرنده = X-Actor-Id و نامش (assigneeName)
   'trust-read.v1',          //  GET /admin/trust/cases · GET /admin/trust/cases/:id · GET /admin/trust/sanctions
+  //  TEN-04 (۱۴۰۵/۰۸/۲۲): با پرچمِ `security / admin.support_grant` درهای خواندنِ محتوای خصوصیِ دکان اجازهٔ زندهٔ `read_private`
+  //  می‌خواهند (‎403 grant_required‎) و پرونده‌های دکان/کاربر بی اجازه فقط فراداده با `restricted` می‌دهند (`lib/admin-dossier.js`)
+  'support-grant-read.v1',  //  GET /admin/shops/:id/staff-perms · …/images/changes/:cid · /admin/sync/conflicts · /admin/shops/:id · /admin/users/:id
 ]);
 
 /*

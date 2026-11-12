@@ -114,12 +114,12 @@
 | `GET /admin/features` | مدیر | سراسری | — | خواندنِ سراسری | — | `admin.js:93` |
 | `GET /admin/stats` | مدیر | سراسری | — | خواندنِ سراسری | — | `admin.js:99` |
 | `GET /admin/users` | مدیر | سراسری | — | خواندنِ دادهٔ شخصی | G4 | `admin.js:117` |
-| `GET /admin/users/:id` | مدیر | کاربر | دارد ★ | خواندنِ دادهٔ شخصی | — | `admin.js:140` |
+| `GET /admin/users/:id` | مدیر؛ با پرچمِ `admin.support_grant` دستگاه‌ها و جای دقیقِ عضوِ دکان فقط با `read_private` ِ یکی از دکان‌هایش (بی آن `restricted`) | کاربر | دارد ★ (+ `grant`) | خواندنِ دادهٔ شخصی | G1 | `admin.js`، `lib/admin-dossier.js` |
 | `POST /admin/users/:id/status` | مدیر | کاربر | دارد | عملیات | G2 | `admin.js:178` |
 | `GET /admin/users/:id/delete-preview` | مدیر | کاربر | دارد ★ (`admin.user_delete_previewed`) | خواندنِ دادهٔ شخصی | — (TEN-04) | `admin.js:193` |
 | `DELETE /admin/users/:id` | ارشد | کاربر | دارد | حذف | G2 | `admin.js:200` |
 | `GET /admin/shops` | مدیر | سراسری | — | خواندنِ سراسری | — | `admin.js:214` |
-| `GET /admin/shops/:id` | مدیر | دکان | دارد ★ | خواندنِ دادهٔ شخصی | — | `admin.js:251` |
+| `GET /admin/shops/:id` | مدیر (+ مالی)؛ با پرچمِ `admin.support_grant` جای دقیق فقط با `read_private` (بی آن فراداده و `restricted`) | دکان | دارد ★ (+ `grant`) | خواندنِ دادهٔ شخصی | G1 | `admin.js`، `lib/admin-dossier.js` |
 | `GET /admin/shops/:id/history` | مدیر | دکان | — | خواندنِ سراسری | — | `admin.js:304` |
 | `GET /admin/subscriptions` | مدیر | سراسری | — | خواندنِ سراسری | — | `admin.js:311` |
 | `POST /admin/subscriptions` | مدیر | سراسری | دارد | مالی/اشتراک | G2, G3 | `admin.js:328` |
@@ -161,7 +161,7 @@
 | `POST /admin/shop-offline-codes/:id/revoke` | مدیر | سراسری | دارد | مالی/اشتراک | G3 | `admin-shop-offline.js:41` |
 | `GET /admin/shops/:id/staff-codes` | مدیر | دکان | — | راز/پیکربندی | — | `admin-staff-codes.js:58` |
 | `POST /admin/shops/:id/staff-codes/reveal` | ارشد | دکان | دارد | راز/پیکربندی | — | `admin-staff-codes.js:98` |
-| `GET /admin/shops/:id/staff-perms` | مدیر (+ بیننده)؛ `?limit=&offset=` ★ (سقفِ ۲۰۰، بی آن همان پاسخ) | دکان | دارد (`admin.shop_staff_perms_viewed`) | خواندنِ دادهٔ دکان | — | `admin-staff-perms.js:50` |
+| `GET /admin/shops/:id/staff-perms` | مدیر (+ بیننده)؛ `?limit=&offset=` ★ (سقفِ ۲۰۰، بی آن همان پاسخ) | دکان | دارد (`admin.shop_staff_perms_viewed` + `grant`)؛ با پرچمِ `admin.support_grant` فقط با `read_private` (‎403 grant_required‎) | خواندنِ دادهٔ دکان | G1 | `admin-staff-perms.js:50` |
 | `PUT /admin/shops/:id/staff-perms/roles/:role` | ارشد | دکان | دارد | پیکربندی | — | `admin-staff-perms.js:72` |
 | `PUT /admin/shops/:id/staff-perms/members/:uid` | ارشد | دکان | دارد | پیکربندی | — | `admin-staff-perms.js:83` |
 | `POST /admin/shops/:id/staff-perms/devices/:did/disable` | ارشد؛ `Idempotency-Key` ★؛ سقفِ IP پیش از احراز ★ | دکان (`deviceOfShop`) | دارد (`device.disabled`) | عملیات | — | `admin-staff-perms.js:94` |
@@ -172,8 +172,8 @@
 | `POST /admin/otp/:id/resend` | مدیر | سراسری | دارد | عملیات | — | `admin-otp.js:77` |
 | `POST /admin/otp/password-reset` | مدیر | سراسری | دارد | عملیات | — | `admin-otp.js:115` |
 | `GET /admin/sync/status` | مدیر | سراسری | — | خواندنِ سراسری | — | `admin-sync.js:26` |
-| `GET /admin/sync/conflicts` | مدیر | حساب (account=) | دارد ★ | خواندنِ دادهٔ شخصی | — | `admin-sync.js:39` |
-| `POST /admin/sync/conflicts/:id/restore` | ارشد ★ + دلیل؛ یک بار ★ (شناسهٔ یک‌شکل، ۴۰۹ `already_restored`/`restore_in_progress`، `Idempotency-Key`) | حساب (account=) | دارد ★ | خروجی/بازگردانی | — | `admin-sync.js:68` |
+| `GET /admin/sync/conflicts` | مدیر؛ با پرچمِ `admin.support_grant` تعارض‌های دکان فقط با `read_private` (پمپ نه) | حساب (account=) | دارد ★ (+ `grant`) | خواندنِ دادهٔ شخصی | G1 | `admin-sync.js:39` |
+| `POST /admin/sync/conflicts/:id/restore` | ارشد ★ + دلیل؛ یک بار ★ (شناسهٔ یک‌شکل، ۴۰۹ `already_restored`/`restore_in_progress`، `Idempotency-Key`) | حساب (account=) | دارد ★ (+ `grant`)؛ با پرچمِ `admin.support_grant` دکان فقط با `restore` (پمپ نه) | خروجی/بازگردانی | G1 | `admin-sync.js:68` |
 | `GET /admin/sync/errors` | مدیر | سراسری | — | خواندنِ سراسری | — | `admin-sync.js:77` |
 | `GET /admin/sync/version-health` | مدیر | سراسری | — | خواندنِ سراسری | — | `admin-sync.js:94` |
 | `PUT /admin/plans/:code/discount` | ارشد | سراسری | دارد | مالی/اشتراک | — | `admin-platform.js:46` |

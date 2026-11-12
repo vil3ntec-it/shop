@@ -16,7 +16,8 @@
  * ⛔ اجازه مالِ **همان** درخواست‌کننده است (مدیر یا کلیدِ سرویس + «انجام‌دهنده»ٔ پنل)، نه هر مدیری؛ `useGrant` (همان
  *    `requireGrant(scope)` ِ طرح) فقط اجازهٔ فعالِ همان کس، همان دکان و همان دامنه را می‌پذیرد، `uses` را می‌شمارد و هر استفاده
  *    یک ردیفِ سابقه با شناسهٔ اجازه دارد. نخستین در: دانلودِ پشتیبانِ دکان پشتِ پرچمِ خاموشِ `security / admin.support_grant`
- *    (`grantForExport`)؛ درهای دیگر همان سابقهٔ TEN-04 را دارند.
+ *    (`grantForExport`)؛ درهای خواندنِ محتوای خصوصی با `grantForRead` (۴۰۳) و پرونده‌های آمیخته با `grantForDossier` (بی اجازه
+ *    فقط فراداده) — ردهٔ هر در در `tenant-matrix.test.js` › `ADMIN_SUBJECT`.
  * ⛔ پاسخ فقط فراداده: هرگز رمز، توکن یا محتوای دکان. رمزِ احرازِ دوباره در هیچ ردیف، سابقه یا هشِ کلیدِ یکتایی نمی‌نشیند.
  */
 const config = require('../config');
@@ -337,6 +338,40 @@ async function grantForExport(req, app, tenantId, what) {
   return useGrant(req, tenantId, 'export', { what });
 }
 
+/** همان قاعده برای «بازگرداندن» ِ دادهٔ **دکان** از پنل (تعارضِ همگام‌سازی): روشن ⇒ اجازهٔ زندهٔ `restore` ِ همین آدم؛ پمپ هرگز. */
+async function grantForRestore(req, app, tenantId, what) {
+  if (app !== SHOP.app || !(await enforced())) return null;
+  return useGrant(req, tenantId, 'restore', { what });
+}
+
+/**
+ * TEN-04 — درهای خواندنِ محتوای خصوصیِ **یک** دکان (اجازه‌ها و دستگاه‌های اعضا، جزئیاتِ دستهٔ عکس، تعارض‌های همگام‌سازی)، با همان
+ * پرچم: خاموش ⇒ `null` (رفتارِ امروز)؛ روشن ⇒ اجازهٔ زندهٔ `read_private` ِ همین آدم روی همین دکان ⇒ شناسهٔ اجازه (برای سابقهٔ
+ * همان در)، وگرنه ‎403 grant_required‎ (کارِ خودکارِ پنل ‎403 human_actor_required‎).
+ */
+async function grantForRead(req, shopId, what) {
+  if (!(await enforced())) return null;
+  return useGrant(req, shopId, 'read_private', { what });
+}
+
+/**
+ * پرونده‌های آمیخته (دکان، کاربرِ عضوِ دکان): فرادادهٔ پلتفرم (اشتراک، شمارها، نقش‌ها) + تماس، دستگاه و جای دقیق. پرچمِ روشن و
+ * بی اجازه ⇒ `false`: در فقط فراداده می‌دهد، نه ۴۰۳ — مالی اجازه نمی‌گیرد (`lib/admin-roles.js`) و پروندهٔ دکان همان جایی است که
+ * پشتیبانی از آن اجازه می‌خواهد. چند دکان (کاربرِ عضوِ چند دکان) ⇒ اجازهٔ هر کدام بس است.
+ */
+async function grantForDossier(req, shopIds, what) {
+  if (!(await enforced())) return null;
+  for (const id of shopIds) {
+    try {
+      return await useGrant(req, id, 'read_private', { what });
+    } catch (e) {
+      if (e?.code === 'human_actor_required') return false;
+      if (e?.code !== 'grant_required') throw e;
+    }
+  }
+  return false;
+}
+
 function requireGrant(scope) {
   if (!SCOPES.includes(scope)) throw new Error(`requireGrant: دامنهٔ ناشناختهٔ ${scope}`);
   return (req, res, next) => {
@@ -388,5 +423,5 @@ module.exports = {
   SCOPES, DEFAULT_MINUTES, MIN_MINUTES, MAX_MINUTES, PENDING_TTL, PENDING_MAX, REASON, POLICY,
   minutesOf, scopeOf, reasonOf, requester, shopOf, statusOf, shape, list,
   assertReauth, assertPlatformOwner, request, breakGlass, revoke, useGrant, requireGrant, ownerDecide, notifyOwners,
-  ENFORCE_KEY, enforced, grantForExport,
+  ENFORCE_KEY, enforced, grantForExport, grantForRestore, grantForRead, grantForDossier,
 };
