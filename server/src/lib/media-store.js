@@ -6,6 +6,7 @@
  *   shop_chat_media   `shop:<دکان>`             `chat-media.sniff` و همان mime ِ ردیف (عکس، صدا، PDF)
  *   trust_evidence    `shop:<دکان>`             همان (فقط عکس، `putEvidence`)
  *   support_media     `support:<رشته>`          `chat-media.sniff` یا جعبهٔ MP4 (ویدیو)؛ نوعِ دیگر ⇒ بایت در پایگاه
+ *   store_address_media `customer:<حساب>`       همان `chat-media.sniff` و mime ِ ردیف (عکسِ دروازه، یادداشتِ صوتی؛ CRM-09)
  *
  * همان قاعده‌های ۲۵۵: حالتِ `db` (پیش‌فرض) همان SQL و همان بایت در `data`؛ در `disk`/`s3` شیء پیش از نوشتنِ ردیف و
  * پاکِ شیء فقط پس از نشستنِ پاکِ ردیف (`drop`)؛ ردیف فقط با شناسه‌های همان دکان/گفت‌وگو/رشته پیدا می‌شود (مثلِ
@@ -17,6 +18,7 @@ const store = require('./image-store');
 const chatMedia = require('./chat-media');
 
 const supportTenant = (threadId) => `support:${threadId}`;
+const customerTenant = (customerId) => store.accountTenant('customer', customerId);
 
 /** نوعِ رسانهٔ چت (و مدرک) از روی بایت؛ با [mime] فقط همان نوع (نوعِ ردیف عوض نمی‌شود) */
 const chatCheck = (mime = '') => (buf) => {
@@ -78,4 +80,11 @@ const support = {
   drop: (rows) => dropRows(rows, threadOf),
 };
 
-module.exports = { chat, trust, support, chatCheck, supportCheck, supportTenant };
+/** CRM-09: عکسِ دروازه و یادداشتِ صوتیِ نشانیِ حسابِ مشتری (`lib/store-address-media.js`) */
+const address = {
+  put: (customerId, mime, buf, fn) => store.withStaged(customerTenant(customerId), buf, fn, { check: chatCheck(mime) }),
+  bytes: (r) => store.bytes(customerTenant(r.customer_id), r, chatCheck(r.mime)),
+  drop: (rows) => dropRows(rows, (r) => customerTenant(r.customer_id)),
+};
+
+module.exports = { chat, trust, support, address, chatCheck, supportCheck, supportTenant, customerTenant };

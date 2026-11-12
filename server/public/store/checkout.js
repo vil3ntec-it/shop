@@ -462,6 +462,7 @@
           body.address.province = extra('a-prov'); body.address.street = extra('a-street'); body.address.house = extra('a-house');
         }
         if (pin) { body.address.lat = pin.lat; body.address.lng = pin.lng; }
+        if (ac && ac.saved && ac.saved()) body.address.savedId = ac.saved();   //  CRM-09: عکسِ دروازه و یادداشتِ صوتیِ همان نشانی
         //  بی پین ⇒ ناحیهٔ برگزیده (`source: customer`)؛ با پین ناحیه را سرور از پین می‌گوید
         else if (c.zones() && c.zone) body.address.zoneId = c.zone.id;
         body.delivery = { callBeforeArrival: $('d-call').checked, leaveWith: $('d-leave').value.trim() };

@@ -142,6 +142,16 @@
         var label = el('input', { attrs: { id: 'ac-label', type: 'text', maxlength: '40', placeholder: t('ac.label'), 'aria-label': t('ac.label') }, hidden: true });
         keep = el('div', { class: 'stack', attrs: { id: 'ac-keep-row' } }, el('label', { class: 'check' }, box, ' ', el('span', { text: t('ac.keep') })), label);
         var byId = function (id) { return list.filter(function (a) { return a.id === id; })[0] || null; };
+        //  CRM-09/CHK-08: عکسِ دروازه و یادداشتِ صوتیِ نشانیِ برگزیده (store/addr-media.js ِ دیربار) فقط با `features.addressMedia`
+        var am = null; var amBox = el('details', { class: 'stack', attrs: { id: 'ac-media' }, hidden: true }, el('summary', { text: t('ac.media') }));
+        var media = function (a) {
+          if (am) { am.close(); am = null; }
+          amBox.hidden = !(a && ctx.store.features && ctx.store.features.addressMedia);
+          if (amBox.hidden) return;
+          K.js('/store/addr-media.js').then(function () {
+            if (byId(sel.value) === a) am = window.StoreAddrMedia({ base: '/api/store/' + encodeURIComponent(ctx.slug), into: amBox, address: a });
+          }, function () { amBox.hidden = true; });
+        };
         sel.addEventListener('change', function () {
           var a = byId(sel.value);
           del.hidden = !a; keep.hidden = Boolean(a);
@@ -151,6 +161,7 @@
           //  پرشده‌ها پنهان نمانند: «جزئیاتِ بیشتر» باز
           if (a && $('addr-more') && XF.some(function (f) { return $(f[0]) && a[f[1]]; })) $('addr-more').open = true;
           h.pin(a && a.lat !== null ? { lat: a.lat, lng: a.lng } : null, t('ac.pin'));
+          media(a);
         });
         box.addEventListener('change', function () { label.hidden = !box.checked; if (box.checked) label.focus(); });
         del.addEventListener('click', function () {
@@ -163,8 +174,11 @@
             pick.hidden = !list.length;
           }).catch(function (e) { K.toast(e.message); }).then(function () { del.disabled = false; });
         });
+        pick.appendChild(amBox);
         ab.insertBefore(pick, ab.firstChild);
         ab.appendChild(keep);
+        //  CRM-09: نشانیِ نام‌دارِ برگزیده ⇒ `address.savedId` ِ ثبت (سرور فقط نشانیِ همان حساب را به سفارش می‌بندد)
+        handle.saved = function () { return byId(sel.value) ? sel.value : ''; };
         handle.placed = function (body) {
           var name = label.value.trim();
           if (keep.hidden || !box.checked || !name || body.fulfillment !== 'delivery' || !body.address) return;

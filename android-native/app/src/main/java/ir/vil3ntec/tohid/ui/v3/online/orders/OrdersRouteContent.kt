@@ -247,6 +247,8 @@ internal fun RouteScope.OrderDetailRoute(id: String, embedded: Boolean = false) 
         canList = perms.contact, phone = OrderDetailModel.fullPhone(o),
         pin = OrderRisk.orderPin(o.fulfillment, o.address.lat, o.address.lng),
       )
+      //  CRM-09/CHK-08: عکسِ دروازه و یادداشتِ صوتیِ نشانی — فقط `orders.contact` و پرچمِ `shop.storefront.address_media`
+      if (o.fulfillment == "delivery") OrderAddressMediaV3(o.id, perms.contact, remember(context) { Backend.api(context) })
       //  جمع‌آوری (PCK)، ویرایش (ORD-14)، ترجیحِ تحویل (CHK-14)، جایگزینی (CHK-15/16)، پیام‌ها (ORD-16) و برگشتِ کالا (RET-11)
       OrderDetailExtras(o, cfg)
     }
