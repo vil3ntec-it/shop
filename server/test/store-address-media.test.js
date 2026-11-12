@@ -8,7 +8,8 @@
  *   ۳) فقط مالِ همان حساب: حسابِ دیگر نه می‌خواند، نه می‌نویسد، نه پاک می‌کند (۴۰۴، بی ردیف).
  *   ۴) ثبت با `address.savedId` ِ نشانیِ خودِ همان حساب ⇒ صاحب در سفارش می‌بیند (با سابقه)؛ نشانیِ حسابِ دیگر ⇒ هیچ؛
  *      شاگرد ۴۰۳، دکانِ دیگر ۴۰۴؛ پاک کردنِ مشتری ⇒ دکان هم دیگر نمی‌بیند؛ پاک شدنِ نشانی ⇒ آبشاری.
- *   ۵) rollback ِ ۸۳۶ هر دو جدول را برمی‌دارد و نشانی‌ها می‌مانند.
+ *   ۵) پیکِ همان مأموریت (پس از «قبول» و تا «تحویل شد») می‌بیند؛ پیکِ دیگر و صاحب از درِ پیک نه.
+ *   ۶) rollback ِ ۸۳۶ هر دو جدول را برمی‌دارد و نشانی‌ها می‌مانند.
  */
 process.env.RATE_STORE_CHECKOUT_MAX = '1000';
 const test = require('node:test');
@@ -217,6 +218,66 @@ test('سفارش با نشانیِ نام‌دار ⇒ صاحب عکس و صدا
   assert.equal((await h.del(url(o.slug, id, 'gate-photo'), { headers: who.headers })).body.deleted, true);
   assert.equal((await h.download(`/api/shop/orders/${orderId}/address-media/gate-photo`, { token: o.token })).status, 404);
   assert.equal((await h.get(`/api/shop/orders/${orderId}/address-media`, { token: o.token })).body.gatePhoto, null);
+});
+
+async function courierOf(o, name) {
+  const inv = await h.post('/api/shop/invite', { role: 'courier' }, { token: o.token });
+  assert.equal(inv.status, 201, JSON.stringify(inv.body));
+  const uid = `am-courier-${uniq()}`;
+  const r = await h.post('/api/auth/staff-login', { code: inv.body.code, name, device: { uid, name: 'گوشیِ پیک', platform: 'android' } });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const token = r.body.accessToken;
+  return { token, uid, id: (await h.get('/api/courier/me', { token })).body.courier.id };
+}
+
+test('پیکِ همان مأموریت عکس و صدا را تا مأموریت زنده است می‌بیند؛ پیکِ دیگر و پس از تحویل نه', async () => {
+  const o = await liveStore('پیک');
+  await setFlag(o.shopId, 'shop.delivery', true);
+  const who = await shopper(o.slug, '0791230007');
+  const id = await addAddress(o.slug, who);
+  assert.equal((await put(o.slug, who, id, 'gate-photo', JPEG(250, 4))).status, 200);
+  const orderId = await checkout(o, who, id);
+  for (const to of ['accepted', 'picking', 'packed']) {
+    const t = await h.post(`/api/shop/orders/${orderId}/transition`, { to }, { token: o.token });
+    assert.equal(t.status, 200, `${to}: ${JSON.stringify(t.body)}`);
+  }
+  const courier = await courierOf(o, 'پیکِ یک');
+  const other = await courierOf(o, 'پیکِ دو');
+  const asg = await h.post(`/api/shop/delivery/orders/${orderId}/assign`, { mode: 'shop_courier', courierId: courier.id, overrideCashCap: true },
+    { token: o.token });
+  assert.equal(asg.status, 201, JSON.stringify(asg.body));
+  const aid = asg.body.assignment.id;
+  const base = `/api/courier/missions/${aid}/address-media`;
+
+  //  پیش از «قبول» ⇒ هنوز نه (همان قاعدهٔ «تماس با مشتری»)
+  assert.equal((await h.download(`${base}/gate-photo`, { token: courier.token })).status, 404);
+  const sent = await h.post('/api/courier/events', { deviceId: courier.uid, events: [
+    { eventId: `ev-${uniq()}`, assignmentId: aid, type: 'assigned', deviceTime: Date.now(), deviceSeq: 1 },
+  ] }, { token: courier.token });
+  assert.equal(sent.status, 200, JSON.stringify(sent.body));
+  const view = await h.get(base, { token: courier.token });
+  assert.equal(view.status, 200, JSON.stringify(view.body));
+  assert.equal(view.body.gatePhoto.mime, 'image/jpeg');
+  assert.equal(view.body.voiceNote, null);
+  const bytes = await h.download(`${base}/gate-photo`, { token: courier.token });
+  assert.equal(bytes.status, 200);
+  assert.ok(bytes.buffer.equals(JPEG(250, 4)));
+  assert.equal((await one(`SELECT COUNT(*)::int AS n FROM audit_logs WHERE shop_id=$1 AND action='delivery.courier.address_media'`, [o.shopId])).n, 1);
+
+  //  پیکِ دیگرِ همان دکان ⇒ «پیدا نشد»؛ صاحب با توکنِ خودش از درِ پیک ⇒ رد
+  assert.equal((await h.get(base, { token: other.token })).status, 404);
+  assert.equal((await h.download(`${base}/gate-photo`, { token: other.token })).status, 404);
+  assert.ok([403, 404].includes((await h.get(base, { token: o.token })).status));
+
+  //  پس از «تحویل شد» ⇒ دیگر نه
+  const total = Number((await one('SELECT total_minor FROM online_orders WHERE id=$1', [orderId])).total_minor);
+  const done = await h.post('/api/courier/events', { deviceId: courier.uid, events: [
+    { eventId: `ev-${uniq()}`, assignmentId: aid, type: 'picked_up', deviceTime: Date.now(), deviceSeq: 2 },
+    { eventId: `ev-${uniq()}`, assignmentId: aid, type: 'delivered', deviceTime: Date.now(), deviceSeq: 3, cashCollectedMinor: total, code: asg.body.code },
+  ] }, { token: courier.token });
+  assert.equal(done.status, 200, JSON.stringify(done.body));
+  assert.deepEqual(done.body.results.map((x) => x.status), ['applied', 'applied'], JSON.stringify(done.body));
+  assert.equal((await h.download(`${base}/gate-photo`, { token: courier.token })).status, 404);
 });
 
 test('rollback ِ ۸۳۶ دو جدول را برمی‌دارد و نشانی‌ها می‌مانند', async () => {

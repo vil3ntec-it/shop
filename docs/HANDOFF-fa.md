@@ -59,8 +59,8 @@
 - **ساخته شد:** RPT-14 — تپشِ بالای قیف از برنامهٔ خرید (`core/shopper/ShopperFunnel` + `customer-android/…/ModelFunnel.kt`؛
   `ShopperFunnelTest` ۴/۴، جهش ۴ از ۴؛ `CustomerFunnelTest` فقط CI) ⇒ «دستگاه». CRM-09 — عکسِ دروازه و یادداشتِ صوتیِ نشانیِ
   حسابِ مشتری (مهاجرتِ ۸۳۶، `lib/store-address-media.js`، `store/addr-media.js`، `OrderAddressMediaAndroid.kt`؛ پرچمِ خاموشِ
-  `shop.storefront.address_media`؛ `store-address-media` ۴/۴ با جهش ۶ از ۶، کرومیوم `web-store-acct.mjs` ۲۷ ✅) — مانده: پیک و
-  برنامهٔ خریدِ بومی (همان ماندهٔ CHK-08؛ یک کار). LOC-06 — ۱۷ صفحهٔ تمام‌مرده و بخشِ مردهٔ `Storefront.kt` برداشته شد، سقفِ متنِ خامِ
+  `shop.storefront.address_media`؛ `store-address-media` ۴/۴ با جهش ۶ از ۶، کرومیوم `web-store-acct.mjs` ۲۷ ✅؛ پیکِ همان مأموریت هم می‌بیند) — مانده:
+  افزودن از برنامهٔ خریدِ بومی (همان ماندهٔ CHK-08؛ یک کار). LOC-06 — ۱۷ صفحهٔ تمام‌مرده و بخشِ مردهٔ `Storefront.kt` برداشته شد، سقفِ متنِ خامِ
   `ui/screens` ۱۸۳۱ ⇐ ۱۴۷۰. CRM-06 — بی کدِ تازه: قالبِ یادآوری از پیش با `ShopSettingsSync` همگام می‌شد (کلیدِ مالِ دکان)؛ آزمونش
   افزوده شد؛ دسته‌اش با عاملِ «ق».
 - **بی کد (دسته درست شد):** HW-07 ⇐ «تصمیم» (۴-۲۴ ج)، DLV-05 ⇐ «تصمیم» (نقشه‌کشِ برداری در کش نیست)، SEC-02 ⇐ «همگام/پمپ»
@@ -72,8 +72,7 @@
   سقفِ ۸۰۰ خط است: سیمِ تازه در پروندهٔ کناری (`Model*.kt`) و جایگزینیِ خط، نه افزودن.
 - **یافته برای ردیف‌های دیگر:** AUTH-08 — `PhoneClaimStep.kt` در نسخهٔ ۳ صدازننده ندارد (گامِ کدِ شمارهٔ تازه دیده نمی‌شود)؛ نوارِ
   یادآورِ مالیاتِ فصل (`TaxQuarterAndroid.kt`) هم در نسخهٔ ۳ راه ندارد؛ GATE-NEW-01 ‹صفحهٔ کهنهٔ `Storefront.kt`› حالا برداشته شده.
-- **قدمِ بعد:** CRM-09/CHK-08: درِ پیک (`/api/courier/missions/:id/address-media/:kind` فقط برای پیکِ همان مأموریت تا زنده است) و
-  کارتِ مأموریت؛ افزودن از `customer-android`. LOC-06: بخش‌های مردهٔ `Vip.kt`، `Orders.kt`، `DeliveryDialogs.kt`… و سپس جدول‌ها.
+- **قدمِ بعد:** CRM-09/CHK-08: افزودنِ عکس/صدا از `customer-android` (همان درهای `/:slug/account/addresses/:id/media/:kind`). LOC-06: بخش‌های مردهٔ `Vip.kt`، `Orders.kt`، `DeliveryDialogs.kt`… و سپس جدول‌ها.
 
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-11p زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-11p` (از `claude/batch-53`)
 

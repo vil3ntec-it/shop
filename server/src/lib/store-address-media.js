@@ -6,6 +6,7 @@
  *   مشتری (نشستِ حساب) ─▶ PUT/GET/DELETE /api/store/:slug/account/addresses/:id/media/:kind   (kind: gate-photo | voice-note)
  *   ثبتِ ویترین ────────▶ `address.savedId` ِ بدنه ⇒ linkOrder: سفارش ⇐ همان نشانی (فقط نشانیِ خودِ همان حساب)
  *   برنامهٔ دکان ───────▶ GET /api/shop/orders/:id/address-media (کدام هست) و …/:kind (بایت) — `orders.view` + `orders.contact`
+ *   برنامهٔ پیک ────────▶ GET /api/courier/missions/:id/address-media[/:kind] — فقط پیکِ همان مأموریت و تا زنده است
  *
  * ── آن‌چه این‌جا قفل است ─────────────────────────────────────────────
  *   • ⛔ پرچمِ پیش‌فرض‌خاموشِ `shop.storefront.address_media` ِ همان دکان: خاموش ⇒ درهای مشتری ۴۰۴، نمای دکان
@@ -169,6 +170,31 @@ async function orderMedia(shopId, orderId, rawKind) {
   return { mime: r.mime, data };
 }
 
+/**
+ * پیکِ همان مأموریت (برنامهٔ پیک، `routes/courier.js`): فقط مأموریتِ خودش (`shop_courier` و همان پیک)، پیکِ فعال، و فقط تا
+ * مأموریت زنده است (همان `CALLABLE` ِ تماس: پس از «قبول» تا پیش از «تحویل شد»/«لغو») — مأموریتِ دیگری یا تمام‌شده ⇒ ۴۰۴.
+ */
+async function missionOrder(shopId, assignmentId, actor) {
+  const a = await one('SELECT order_id, status, mode, courier_id FROM delivery_assignments WHERE shop_id = $1 AND id = $2',
+    [shopId, String(assignmentId || '').slice(0, 60)]);
+  if (!a || a.mode !== 'shop_courier' || !actor || a.courier_id !== actor.courierId) throw notFound('مأموریت پیدا نشد', 'assignment_not_found');
+  if (actor.active !== true) throw new ApiError(403, 'courier_inactive', 'این پیک غیرفعال است');
+  if (!require('./delivery-call').CALLABLE.includes(a.status)) throw notFound('برای این مأموریت چیزی نیست', 'media_not_found');
+  return a.order_id;
+}
+
+async function forMission(shopId, assignmentId, actor) {
+  if (!(await flagOn(shopId))) return { enabled: false };
+  return forOrder(shopId, await missionOrder(shopId, assignmentId, actor));
+}
+
+async function missionMedia(shopId, assignmentId, rawKind, actor) {
+  kindOf(rawKind);
+  if (!(await flagOn(shopId))) throw notFound('این بخش پیدا نشد', 'media_not_found');
+  return orderMedia(shopId, await missionOrder(shopId, assignmentId, actor), rawKind);
+}
+
 module.exports = {
   FLAG, PHOTO_MAX, VOICE_MAX, KINDS, flagOn, kindOf, mimeOf, put, get, remove, withMedia, linkOrder, forOrder, orderMedia,
+  forMission, missionMedia,
 };

@@ -41,27 +41,37 @@ import kotlinx.coroutines.launch
  */
 @Composable
 internal fun OrderAddressMediaV3(orderId: String, canSee: Boolean, api: ApiClient) {
-  if (!canSee || OrderAddressMedia.path(orderId) == null) return
+  val summary = OrderAddressMedia.path(orderId)
+  if (!canSee || summary == null) return
+  AddressMediaSection("order-$orderId", summary, { OrderAddressMedia.bytesPath(orderId, it) }, api)
+}
+
+/**
+ *  همان بخش برای هر درِ سرور: برنامهٔ دکان (سفارش) و برنامهٔ پیک (مأموریت، `CourierAddressMediaAndroid.kt`). [key] برای حالت و
+ *  نامِ فایلِ موقتِ پخش؛ [summary] نشانیِ نما؛ [bytes] نشانیِ بایتِ هر نوع.
+ */
+@Composable
+internal fun AddressMediaSection(key: String, summary: String, bytes: (OrderAddressMedia.Kind) -> String?, api: ApiClient) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
-  var view by remember(orderId) { mutableStateOf<OrderAddressMedia.View?>(null) }
-  var photo by remember(orderId) { mutableStateOf<ImageBitmap?>(null) }
-  var photoFailed by remember(orderId) { mutableStateOf(false) }
-  var playing by remember(orderId) { mutableStateOf(false) }
-  var voiceFailed by remember(orderId) { mutableStateOf(false) }
-  val player = remember(orderId) { ChatMedia.Player(context.applicationContext) }
-  DisposableEffect(orderId) { onDispose { player.stop() } }
+  var view by remember(key) { mutableStateOf<OrderAddressMedia.View?>(null) }
+  var photo by remember(key) { mutableStateOf<ImageBitmap?>(null) }
+  var photoFailed by remember(key) { mutableStateOf(false) }
+  var playing by remember(key) { mutableStateOf(false) }
+  var voiceFailed by remember(key) { mutableStateOf(false) }
+  val player = remember(key) { ChatMedia.Player(context.applicationContext) }
+  DisposableEffect(key) { onDispose { player.stop() } }
 
   fun loadPhoto() {
-    val p = OrderAddressMedia.bytesPath(orderId, OrderAddressMedia.Kind.GATE_PHOTO) ?: return
+    val p = bytes(OrderAddressMedia.Kind.GATE_PHOTO) ?: return
     photoFailed = false
     scope.launch {
       val img = runCatching { feedbackImage(api.getBytes(p)) }.getOrNull()
       if (img != null) photo = img else photoFailed = true
     }
   }
-  LaunchedEffect(orderId) {
-    val v = OrderAddressMedia.parse(runCatching { api.get(OrderAddressMedia.path(orderId)!!) }.getOrNull())
+  LaunchedEffect(key) {
+    val v = OrderAddressMedia.parse(runCatching { api.get(summary) }.getOrNull())
     view = v
     if (v.gatePhoto != null) loadPhoto()
   }
@@ -92,10 +102,10 @@ internal fun OrderAddressMediaV3(orderId: String, canSee: Boolean, api: ApiClien
         icon = Icons.Outlined.Mic, hue = V3Hue.MINT, chevron = false,
         onClick = {
           if (playing) { player.stop(); playing = false } else {
-            val p = OrderAddressMedia.bytesPath(orderId, OrderAddressMedia.Kind.VOICE_NOTE)
+            val p = bytes(OrderAddressMedia.Kind.VOICE_NOTE)
             if (p != null) scope.launch {
               voiceFailed = false
-              val ok = runCatching { player.play("addr-$orderId", api.getBytes(p)) { playing = false } }.isSuccess
+              val ok = runCatching { player.play("addr-$key", api.getBytes(p)) { playing = false } }.isSuccess
               playing = ok
               voiceFailed = !ok
             }

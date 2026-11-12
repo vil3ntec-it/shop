@@ -41,4 +41,10 @@ object OrderAddressMedia {
     if (OrderEvidence.validOrderId(orderId)) "/shop/orders/$orderId/address-media" else null
 
   fun bytesPath(orderId: String, kind: Kind): String? = path(orderId)?.let { "$it/${kind.wire}" }
+
+  /** برنامهٔ پیک: همان نما از درِ مأموریتِ خودش (`GET /courier/missions/:id/address-media`؛ سرور فقط تا زنده است) */
+  fun missionPath(assignmentId: String): String? =
+    if (OrderEvidence.validOrderId(assignmentId)) "/courier/missions/$assignmentId/address-media" else null
+
+  fun missionBytesPath(assignmentId: String, kind: Kind): String? = missionPath(assignmentId)?.let { "$it/${kind.wire}" }
 }

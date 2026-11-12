@@ -47,5 +47,9 @@ class OrderAddressMediaTest {
     assertEquals("/shop/orders/ord_01HZX/address-media/voice-note", OrderAddressMedia.bytesPath("ord_01HZX", OrderAddressMedia.Kind.VOICE_NOTE))
     assertNull(OrderAddressMedia.path("../../admin"))
     assertNull(OrderAddressMedia.bytesPath("", OrderAddressMedia.Kind.GATE_PHOTO))
+    //  برنامهٔ پیک: درِ مأموریتِ خودش
+    assertEquals("/courier/missions/01M77VREQ/address-media", OrderAddressMedia.missionPath("01M77VREQ"))
+    assertEquals("/courier/missions/01M77VREQ/address-media/voice-note", OrderAddressMedia.missionBytesPath("01M77VREQ", OrderAddressMedia.Kind.VOICE_NOTE))
+    assertNull(OrderAddressMedia.missionPath("a/b"))
   }
 }

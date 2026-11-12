@@ -20,18 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1056,
+    "routes": 1058,
     "byAuth": {
       "none-detected": 203,
       "admin": 285,
       "inline": 2,
-      "user": 523,
+      "user": 525,
       "device": 42,
       "optional": 1
     },
     "byShape": {
       "extracted": 719,
-      "empty": 335,
+      "empty": 337,
       "unresolved": 2
     }
   },
@@ -372,6 +372,8 @@
     {"method":"GET","path":"/api/courier/map/:id","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":["id"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":["404 map_not_found"],"shape":"empty"},
     {"method":"GET","path":"/api/courier/me","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["courier","ratingsEnabled","serverTime"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/courier/missions","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":[],"query":["limit","scope"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/courier/missions/:id/address-media","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":["id"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"GET","path":"/api/courier/missions/:id/address-media/:kind","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":["id","kind"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/courier/missions/:id/call","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["phone","status"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/courier/missions/:id/eta","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/courier/missions/:id/location","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
