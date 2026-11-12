@@ -1075,6 +1075,7 @@ fun DeskSaleScreen(
       ledger = d,
       stored = remember { ir.vil3ntec.tohid.data.GiftCardPref.on(context) },
       offMethods = remember { ir.vil3ntec.tohid.data.PayMethodsPref.off(context) }, // PAY-06: روش‌هایی که دکان برداشته
+      fxRates = remember { ir.vil3ntec.tohid.data.FxTillPref.tillRates(context) }, // PAY-10: ارزِ نقد فقط با تنظیمِ روشنِ دکان
       cashRounding = cashStep, onCustomer = { payOpen = false; payAfterPick = true; pickDebtor = true }, print = cartStore.print.collectAsState().value.let { remember(it) { cartStore.printShown(it) } }, onTogglePrint = cartStore::togglePrint, // PAY-09؛ POS-41: F2 و Alt+P
     )
   }
