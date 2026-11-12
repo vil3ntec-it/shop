@@ -28,6 +28,7 @@ import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.i18n.StrSettingsPages
 import ir.vil3ntec.tohid.core.text.TextNormalizer
+import ir.vil3ntec.tohid.data.ReturnDecision
 import ir.vil3ntec.tohid.data.ReturnFlow
 import ir.vil3ntec.tohid.data.ReturnLeft
 import ir.vil3ntec.tohid.data.ReturnSettings
@@ -152,15 +153,11 @@ fun ReturnFlowDialog(
   }
   val q = (quote as? ReturnFlow.Outcome.Ok)?.value
   val total = q?.total ?: 0.0
-  val damaged = q?.lines?.any { it.disposition == ReturnFlow.DAMAGED } == true
-  //  RET-10: سقفِ نقش تجمعیِ هر فاکتور است، همان سرور — برگشت‌های پیشینِ همین فاکتور + همین سند
-  val priorMinor = remember(d, sale) { ReturnFlow.priorMinor(d, sale?.id) }
-  val perm = remember(total, priorMinor) { ReturnFlow.permDecision(role, layers, ReturnFlow.minor(total), priorMinor) }
-  val verdict = remember(q, policy) {
-    q?.let { ReturnFlow.policyCheck(d, sale, it.lines, policy, todayIso()) } ?: ir.vil3ntec.tohid.core.returns.ReturnPolicy.Verdict()
-  }
-  //  RET-10: سقفِ دستگاه هم مثلِ سقفِ نقش تجمعیِ هر فاکتور است — چند سندِ زیرِ سقف یک برگشتِ بزرگ نمی‌سازند
-  val gate = ReturnFlow.gate(role, perm, ReturnFlow.minor(total), sale == null, damaged, ReturnFlow.minor(limit), priorMinor, policyBreach = !verdict.ok)
+  //  RET-09، RET-10: سد همان است که `ReturnFlow.post` دوباره می‌سنجد (`ReturnDecision`، مشترک با برگهٔ نسخهٔ ۳) — سقفِ نقش و
+  //  سقفِ دستگاه تجمعیِ هر فاکتور (برگشت‌های پیشین + همین سند؛ چند سندِ زیرِ سقف یک برگشتِ بزرگ نمی‌سازند) و سیاستِ برگشت
+  val decision = remember(d, sale, q, policy) { ReturnDecision.of(d, sale, q, role, layers, limit, policy, todayIso()) }
+  val verdict = decision.verdict
+  val gate = decision.gate
   //  تأیید مالِ همان مبلغ و همان دلیل‌هاست: مقدار، ضایعات یا سقف که عوض شد، تأییدِ پیشین کنار می‌رود
   //  (وگرنه «تأیید شد» می‌ماند و دکمهٔ «درخواستِ تأیید» پنهان، ولی `post` با APPROVAL_REQUIRED رد می‌کرد)
   var approval by remember(ReturnFlow.minor(total), gate) { mutableStateOf<ReturnFlow.Approval?>(null) }
@@ -352,7 +349,7 @@ fun ReturnFlowDialog(
                   picks = items.associate { it.id to ReturnFlow.Pick(number(qtys[it.id]), disp[it.id] ?: ReturnFlow.RESTOCK) },
                   free = free.map { ReturnFlow.FreeLine(it.productId, number(it.qty), number(it.price), it.disposition) },
                   reason = reason.orEmpty(), reasons = reasons, mode = mode, customerId = creditTo,
-                  by = me, role = role, perm = perm, limit = limit, approval = approval, policy = policy,
+                  by = me, role = role, perm = decision.perm, limit = limit, approval = approval, policy = policy,
                 )
                 val now = System.currentTimeMillis()
                 //  دفترِ تازه و پیامِ موفقیت، یا خطا — «ثبت شد» فقط پس از نوشتنِ واقعی

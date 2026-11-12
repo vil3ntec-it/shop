@@ -208,4 +208,16 @@ object StrSalePages {
     "The total of this detail equals the \"books net\" of this method.",
     "د دې جزئیاتو ټولګه د همدې لارې «د دفتر خالص» دی.",
   )
+
+  // ── `Sale.kt`/`QuickSale.kt` (فقط پیش‌نمایشِ گوشیِ `DevShot`؛ نسخهٔ ۳ صندوقِ `ui/v3/sales` را دارد) ──
+  val addFreeItem: String get() = t("+ قلم آزاد", "+ Custom item", "+ آزاد توکی")
+  val pickDebtorForCreditHint: String get() = t("برای فروشِ نسیه، قرض‌دار را انتخاب کنید", "For a credit sale, choose the debtor", "د پور پلور لپاره پوروړی وټاکئ")
+  val removeDebtor: String get() = t("برداشتنِ قرض‌دار", "Remove debtor", "پوروړی لرې کول")
+  val newCategory: String get() = t("دسته‌بندیِ تازه", "New category", "نوې ډله")
+  val categoryNameHint: String get() = t("نام دسته‌بندی را بنویسید…", "Write the category name…", "د ډلې نوم ولیکئ…")
+  val tapToAddOne: String get() = t("روی محصول بزنید تا یک عدد به سبد خرید اضافه شود", "Tap an item to add one to the cart", "پر توکي ټک وکړئ چې یو دانه ټوکرۍ ته زیات شي")
+  val searchNameOrBarcode: String get() = t("جستجوی نام کالا یا بارکد", "Search item name or barcode", "د توکي نوم یا بارکوډ ولټوئ")
+  val allCategories: String get() = t("همه دسته‌بندی‌ها", "All categories", "ټولې ډلې")
+  val addCategoryChip: String get() = t("+ دسته‌بندی", "+ Category", "+ ډله")
+  val deleteThisCategory: String get() = t("حذف این دسته", "Delete this category", "دا ډله ړنګول")
 }

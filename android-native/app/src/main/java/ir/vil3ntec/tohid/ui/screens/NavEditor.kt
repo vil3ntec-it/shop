@@ -148,7 +148,7 @@ private val ROW_H = 52.dp
 
 private fun slotTitle(s: Slot): String = when (s) {
   Slot.START -> StrSettings.slotStart
-  Slot.PILL -> "قرص · ${NavLayouts.MIN_PILL} تا ${NavLayouts.MAX_PILL} مورد؛ «بیشتر» همیشه هست"
+  Slot.PILL -> StrSettings.slotPill(NavLayouts.MIN_PILL, NavLayouts.MAX_PILL)
   Slot.END -> StrSettings.slotEnd
   Slot.OUT -> StrSettings.slotOut
 }
@@ -245,7 +245,7 @@ private fun ItemRow(
   Box(modifier.fillMaxSize()) {
     if (divider) Box(Modifier.align(Alignment.TopStart).padding(start = 52.dp).fillMaxWidth().height(1.dp).background(p.hairline))
     Row(
-      Modifier.fillMaxSize().clickable(role = Role.Button, onClickLabel = "جای «${def.label}»") { menu = true }.padding(start = 16.dp),
+      Modifier.fillMaxSize().clickable(role = Role.Button, onClickLabel = StrSettings.placeOf(def.label)) { menu = true }.padding(start = 16.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
       Icon(PhoneNav.icon(id, false), contentDescription = null, tint = p.icon, modifier = Modifier.size(22.dp))

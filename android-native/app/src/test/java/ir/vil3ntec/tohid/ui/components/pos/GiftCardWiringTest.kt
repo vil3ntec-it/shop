@@ -32,9 +32,10 @@ class GiftCardWiringTest {
   }
 
   @Test fun `صندوقِ گوشی و کامپیوتر و تنظیمات و پنلِ پرداخت`() {
-    val call = "GiftCardBar(d, store, ::toast"
-    for (rel in listOf("ui/screens/Sale.kt", "ui/screens/DeskSale.kt")) assertEquals(rel, 1, count("ir/vil3ntec/tohid/$rel", call))
-    assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/Settings.kt", "GiftCardSettingsWired(context)"))
+    //  کامپیوتر: `DeskSale`؛ گوشیِ نسخهٔ ۳: ابزارهای سبدِ `PhoneTillTools` که `SaleRoute` زیرِ سبد می‌گذارد (`ui/screens/Sale.kt` فقط پیش‌نمایشِ DevShot است)
+    assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/DeskSale.kt", "GiftCardBar(d, store, ::toast"))
+    assertEquals(1, count("ir/vil3ntec/tohid/ui/v3/sales/cart/PhoneTillTools.kt", "GiftCardBar(data, store, toast)"))
+    assertEquals(1, count("ir/vil3ntec/tohid/ui/v3/sales/cart/SaleRoute.kt", "tools = { PhoneTillTools("))
     //  صفحه و ردیفِ تنظیماتِ نسخهٔ ۳ (گوشی و کامپیوتر) — جای `SettingsLegacy` و فهرستِ کامپیوترِ رابطِ قدیمِ پاک‌شده
     assertEquals(1, count("ir/vil3ntec/tohid/ui/v3/settings/sections/TillMoneyScreensAndroid.kt", "GiftCardPref.set(context, it)"))
     assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/SettingsLayout.kt", "GIFT_CARD -> ir.vil3ntec.tohid.core.i18n.StrGiftCard.settingsTitle"))
@@ -71,7 +72,7 @@ class GiftCardWiringTest {
     assertEquals(1, count(data + "SalesEngine.kt", "GiftCards.forSale("))
     assertEquals(1, count(data + "SalesEngine.kt", "GiftCards.forCancel("))
     assertEquals(1, count(data + "ReturnFlow.kt", "GiftCards.forReturn("))
-    for (rel in listOf("ui/screens/Sale.kt", "ui/screens/DeskSale.kt", "ui/screens/SaleDialogs.kt", "ui/components/pos/PayPanel.kt")) {
+    for (rel in listOf("ui/v3/sales/cart/PhoneTillTools.kt", "ui/v3/sales/cart/SaleRoute.kt", "ui/screens/DeskSale.kt", "ui/screens/SaleDialogs.kt", "ui/components/pos/PayPanel.kt")) {
       val s = src("ir/vil3ntec/tohid/$rel")
       for (x in listOf("GiftCards.forSale", "GiftCards.forReturn", "GiftCards.forCancel", "GiftCards.issue(", "gift_card_redeem")) assertFalse("$rel ⇐ $x", s.contains(x))
     }

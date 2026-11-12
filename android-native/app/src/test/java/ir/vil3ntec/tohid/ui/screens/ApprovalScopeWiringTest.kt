@@ -11,7 +11,7 @@ import java.io.File
  *  - صندوقِ کامپیوتر: تأییدِ سقفِ اعتبار در حالت نمی‌ماند و فقط به همان یک تلاشِ `finish` می‌رود — مثلِ
  *    `QuickSale` و `Sale` ِ گوشی؛ وگرنه اگر آن تلاش ثبت نمی‌کرد، سبدِ دیگرِ همان مشتری تا همان مبلغ با تأییدِ
  *    کهنه ثبت می‌شد.
- *  - برگشت: تأیید به مبلغ و `gate` بسته است؛ مقدار که بیشتر شد «تأیید شد» نمی‌ماند.
+ *  - برگشت (هر دو فرم): تأیید به مبلغ و `gate` بسته است؛ مقدار که بیشتر شد «تأیید شد» نمی‌ماند.
  */
 class ApprovalScopeWiringTest {
 
@@ -29,22 +29,37 @@ class ApprovalScopeWiringTest {
     assertTrue(s.contains("CreditGate.state(over, sale.debtorId.orEmpty(), creditApproval)"))
   }
 
+  /**
+   *  گوشیِ نسخهٔ ۳ (`ui/screens/Sale.kt` و `QuickSale.kt` ِ پیشین فقط پیش‌نمایشِ DevShot‌اند): تأیید در `CheckoutSession` است،
+   *  ولی هر بار که صندوق یا فروشِ سریع برگهٔ پرداخت را باز می‌کند پاک می‌شود و سبد در برگهٔ پرداخت عوض نمی‌شود؛ هر ثبت
+   *  دوباره با `CreditGate.state` می‌سنجد (همان مشتری و تا همان برد) و تأییدِ تازه فقط همان ثبتِ در انتظار را می‌زند.
+   */
   @Test fun `گوشی همان الگو را دارد — تأیید فقط روی همان فاکتورِ در انتظار`() {
-    for (f in listOf("QuickSale.kt", "Sale.kt")) {
-      val s = src("ir/vil3ntec/tohid/ui/screens/$f")
-      assertTrue(f, s.contains("postSale(pending.copy(creditApproval = ok))"))
-      assertFalse(f, Regex("""mutableStateOf<[\w.]*CreditGate\.Approval\?>""").containsMatchIn(s))
+    val v3 = "ir/vil3ntec/tohid/ui/v3/sales/"
+    for (f in listOf("cart/SaleRoute.kt", "quick/QuickSaleRoute.kt")) {
+      assertTrue(f, Regex("""CheckoutSession\.reset\(\); nav\.open\(SalesPaths\.checkout\(""").containsMatchIn(src(v3 + f)))
     }
+    val session = src(v3 + "checkout/CheckoutSession.kt")
+    assertTrue(session.substring(session.indexOf("fun reset()")).contains("creditApproval = null"))
+    val pay = src(v3 + "checkout/CheckoutRoute.kt")
+    assertTrue(pay.contains("CheckoutModel.credited(gated, over, CheckoutSession.creditApproval)"))
+    assertTrue(pay.contains("LaunchedEffect(freshCredit) { if (freshCredit != null && !submitted) submit() }"))
+    assertTrue(src(v3 + "checkout/CheckoutModel.kt").contains("CreditGate.state(over, debtorId, approval) == CreditGate.State.APPROVED"))
+    assertFalse(Regex("""mutableStateOf<[\w.]*CreditGate\.Approval\?>""").containsMatchIn(pay))
   }
 
   @Test fun `تأییدِ برگشت با مبلغ یا gate ِ تازه کنار می‌رود`() {
-    val s = src("ir/vil3ntec/tohid/ui/screens/ReturnsV2.kt")
     val keyed = "var approval by remember(ReturnFlow.minor(total), gate) { mutableStateOf<ReturnFlow.Approval?>(null) }"
-    assertEquals(1, Regex(Regex.escape("var approval by remember")).findAll(s).count())
-    assertTrue(s.contains(keyed))
-    //  کلید پس از ساختنِ gate است، نه پیش از آن
-    assertTrue(s.indexOf("val gate = ReturnFlow.gate(") in 0 until s.indexOf(keyed))
-    //  سقفِ دستگاه هم تجمعی سنجیده می‌شود
-    assertTrue(s.contains("ReturnFlow.minor(limit), priorMinor"))
+    //  هر دو فرمِ برگشت — کامپیوتر و برگهٔ نسخهٔ ۳ (RET-10: برگهٔ نسخهٔ ۳ تأیید را با `remember` ِ بی‌کلید نگه می‌داشت)
+    for (rel in listOf("ir/vil3ntec/tohid/ui/screens/ReturnsV2.kt", "ir/vil3ntec/tohid/ui/v3/sales/returns/ReturnFlowSheet.kt")) {
+      val s = src(rel)
+      assertEquals(rel, 1, Regex(Regex.escape("var approval by remember")).findAll(s).count())
+      assertTrue(rel, s.contains(keyed))
+      //  کلید پس از ساختنِ gate است، نه پیش از آن
+      assertTrue(rel, s.indexOf("val gate = decision.gate") in 0 until s.indexOf(keyed))
+    }
+    //  سقفِ دستگاه هم تجمعی سنجیده می‌شود — در همان سدی که ثبت هم می‌سنجد
+    assertTrue(Regex("""ReturnFlow\.minor\(limit\),\s+priorMinor, policyBreach = !verdict\.ok""").containsMatchIn(src("ir/vil3ntec/tohid/data/ReturnDecision.kt")))
+    assertTrue(src("ir/vil3ntec/tohid/data/ReturnFlow.kt").contains("ReturnDecision.gate(d, sale, quote.lines, quote.total, req.role, req.perm, req.limit, req.policy, today)"))
   }
 }

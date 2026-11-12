@@ -98,12 +98,16 @@ fun V3Button(
 
 /** دکمهٔ متنیِ برندرنگ («انصراف»، «همه») — بی زمینه، با همان فشردن */
 @Composable
-fun V3TextButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, danger: Boolean = false) {
+fun V3TextButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, danger: Boolean = false, enabled: Boolean = true) {
   val c = PhoneV3.colors
   Text(
     text,
     style = v3Text(15, FontWeight.SemiBold, 22),
-    color = if (danger) PhoneV3Roles.errorText(c) else PhoneV3Roles.brandText(c),
-    modifier = modifier.v3Pressable(label = text, onClick = onClick).clip(RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 6.dp),
+    color = when {
+      !enabled -> c.inkMuted
+      danger -> PhoneV3Roles.errorText(c)
+      else -> PhoneV3Roles.brandText(c)
+    },
+    modifier = modifier.v3Pressable(enabled = enabled, label = text, onClick = onClick).clip(RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 6.dp),
   )
 }

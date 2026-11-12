@@ -1,6 +1,9 @@
 package ir.vil3ntec.tohid.ui.v3.sales.cart
 
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.pos.LinePricing
+import ir.vil3ntec.tohid.data.DiscountGate
+import ir.vil3ntec.tohid.data.LinePolicy
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.parseNumber
 
@@ -20,12 +23,16 @@ object FreeLineModel {
   fun price(f: FreeLineForm): Double? = parseNumber(f.priceText)
   fun quantity(f: FreeLineForm): Double? = parseNumber(f.qtyText)
 
-  /** خطای هر کادر (کلید: LABEL، PRICE، QTY) — خالی ⇒ درست */
-  fun errors(f: FreeLineForm): Map<String, String> = buildMap {
+  /**
+   *  خطای هر کادر (کلید: LABEL، PRICE، QTY) — خالی ⇒ درست. POS-10: با «قیمت و تخفیفِ ردیف» ِ روشن ([policy]) سقفِ قیمتِ قلمِ
+   *  آزاد برای همه جز صاحب، با همان پیامِ `FreeLineDialog` ِ کامپیوتر (`LinePricing.checkFreeLine`)؛ خاموش (پیش‌فرض) ⇒ بی سقف.
+   */
+  fun errors(f: FreeLineForm, policy: LinePricing.Policy = LinePricing.Policy()): Map<String, String> = buildMap {
     if (f.label.isBlank()) put(LABEL, StrSale.nameNeeded)
     when (val p = price(f)) {
       null -> put(PRICE, if (f.priceText.isBlank()) StrSale.positiveNeeded else StrSale.badNumberShort)
       else -> if (p <= 0) put(PRICE, StrSale.positiveNeeded)
+        else LinePolicy.message(LinePricing.checkFreeLine(policy, DiscountGate.minor(p)), policy)?.let { put(PRICE, it) }
     }
     when (val q = quantity(f)) {
       null -> put(QTY, StrSale.badNumberShort)
@@ -36,8 +43,12 @@ object FreeLineModel {
   fun total(f: FreeLineForm): Double = SalesEngine.lineTotal(price(f) ?: 0.0, quantity(f)?.takeIf { it > 0 } ?: 0.0)
 
   /** سبدِ تازه با همین قلم (درست نبود ⇒ همان سبد) */
-  fun add(lines: List<SalesEngine.CartLine>, f: FreeLineForm, newId: () -> String): List<SalesEngine.CartLine> {
-    if (errors(f).isNotEmpty()) return lines
+  fun add(lines: List<SalesEngine.CartLine>, f: FreeLineForm, newId: () -> String): List<SalesEngine.CartLine> =
+    add(lines, f, LinePricing.Policy(), newId)
+
+  /** POS-10 — همان، با سقفِ قلمِ آزاد ِ [policy] */
+  fun add(lines: List<SalesEngine.CartLine>, f: FreeLineForm, policy: LinePricing.Policy, newId: () -> String): List<SalesEngine.CartLine> {
+    if (errors(f, policy).isNotEmpty()) return lines
     return SalesEngine.addFreeLine(lines, f.label.trim(), price(f) ?: 0.0, quantity(f) ?: 1.0, newId)
   }
 }

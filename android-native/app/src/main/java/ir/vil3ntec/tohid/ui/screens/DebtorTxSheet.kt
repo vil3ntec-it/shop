@@ -139,7 +139,7 @@ internal fun TxDetailSheet(
             Column(Modifier.weight(1f)) {
               Text(l.name, style = v3Text(14, FontWeight.Medium, 20), color = c.ink)
               Text(
-                "${qty(l.quantity)}$unit × ${DebtBook.show(l.unitPrice)}" + if (l.returned > 0) " · مرجوعی ${qty(l.returned)}" else "",
+                "${qty(l.quantity)}$unit × ${DebtBook.show(l.unitPrice)}" + if (l.returned > 0) ir.vil3ntec.tohid.core.i18n.StrDebtPages.returnedDot(qty(l.returned)) else "",
                 style = v3Text(12, FontWeight.Normal, 17),
                 color = c.inkMuted,
               )
@@ -149,8 +149,8 @@ internal fun TxDetailSheet(
         }
         entry.sale?.let { s ->
           val bits = listOfNotNull(
-            s.discount.takeIf { it > 0 }?.let { "تخفیف ${DebtBook.show(DebtBook.minor(it))}" },
-            s.paidAmount.takeIf { it > 0 }?.let { "پرداختِ همان لحظه ${DebtBook.show(DebtBook.minor(it))}" },
+            s.discount.takeIf { it > 0 }?.let { ir.vil3ntec.tohid.core.i18n.StrDebtPages.discountOf(DebtBook.show(DebtBook.minor(it))) },
+            s.paidAmount.takeIf { it > 0 }?.let { ir.vil3ntec.tohid.core.i18n.StrDebtPages.paidOnSpot(DebtBook.show(DebtBook.minor(it))) },
           )
           if (bits.isNotEmpty()) {
             V3Divider(start = 14.dp)

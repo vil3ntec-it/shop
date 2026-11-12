@@ -48,6 +48,9 @@ class SettingsModelsTest {
     assertEquals("رقمِ فارسی · ؋", SettingsIndexModel.value("تاریخ و رقم", f))
     assertEquals("3", SettingsIndexModel.value("دستگاه‌های وارد شده", f))
     assertEquals("فقط هشدار", SettingsIndexModel.value("کالای منقضی", f))
+    //  S22: «با مجوزِ مدیر» همان گزینهٔ صفحه را نشان می‌دهد (پیش‌تر «فقط هشدار»)؛ «فروخته نشود» بر آن پیش است
+    assertEquals(StrSettings.withApproval, SettingsIndexModel.value("کالای منقضی", f.copy(expiryApproval = true)))
+    assertEquals(StrSettings.notSold, SettingsIndexModel.value("کالای منقضی", f.copy(expiryApproval = true, blockExpired = true)))
     assertEquals("XP-58", SettingsIndexModel.value(SettingsLayout.PRINTER, f))
     assertEquals("آماده", SettingsIndexModel.value(SettingsLayout.CAMERA, f))
     assertEquals("2 دقیقه پیش", SettingsIndexModel.value("همگام‌سازی", f))

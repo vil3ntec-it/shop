@@ -52,18 +52,40 @@ fun CreditApprovalSheet(
   requesterUserId: String,
   onApproved: (CreditGate.Approval) -> Unit,
   onClose: () -> Unit,
+  /** S22: همین برگه برای «فروشِ کالای منقضی» (`ExpiryApprovalRoute`) — فقط سرخط فرق دارد */
+  title: String = StrPos.creditOverTitle,
+) = PinApprovalSheet(
+  title, summary, selfRole, selfName, requesterUserId,
+  onApproved = { by, role, reason -> onApproved(CreditGate.Approval(by, role, debtorId, addMinor, reason)) },
+  onClose = onClose,
+)
+
+/**
+ *  همان برگهٔ «تأییدِ صریحِ مدیر یا PIN ِ مدیر/صاحب با دلیل» (`PinApprovalDialog` ِ رابطِ پیشین) برای کاری که سرور سقفش را
+ *  نمی‌سنجد، پس برگهٔ امضاشده ندارد: فروشِ نسیه بیش از سقف (S07) و تغییرِ قیمتِ بیرون از قاعده (S45، `PriceApproval`).
+ *  @param onApproved (نامِ تأییدکننده، نقشش، دلیل)
+ */
+@Composable
+fun PinApprovalSheet(
+  title: String,
+  summary: String,
+  selfRole: String,
+  selfName: String,
+  requesterUserId: String,
+  onApproved: (by: String, role: String, reason: String) -> Unit,
+  onClose: () -> Unit,
 ) {
   if (CreditGate.canApprove(selfRole)) {
-    CreditSelfBody(summary, onApprove = { reason ->
-      onApproved(CreditGate.Approval(selfName.trim().ifBlank { creditRoleName(selfRole) }, selfRole, debtorId, addMinor, reason))
+    CreditSelfBody(title, summary, onApprove = { reason ->
+      onApproved(selfName.trim().ifBlank { creditRoleName(selfRole) }, selfRole, reason)
     }, onClose = onClose)
     return
   }
   val context = LocalContext.current
   val store = remember { StaffPins(context) }
   val approvers = remember { runCatching { store.approvers(requesterUserId) }.getOrDefault(emptyList()) }
-  ApprovalPinBody(
-    title = StrPos.creditOverTitle,
+  ApprovalPinBody<Triple<String, String, String>>(
+    title = title,
     summary = summary,
     approvers = approvers,
     block = if (approvers.isEmpty()) ApprovalBlock.NO_APPROVER else null,
@@ -74,11 +96,11 @@ fun CreditApprovalSheet(
         //  PBKDF2 سنگین است؛ بیرون از رشتهٔ رابط
         val out = withContext(Dispatchers.Default) { ApproverVault.verify(r, pin) }
         store.put(out.record)
-        val approval = if (out.ok) CreditGate.Approval(r.name.ifBlank { creditRoleName(r.role) }, r.role, debtorId, addMinor, reason.trim()) else null
+        val approval = if (out.ok) Triple(r.name.ifBlank { creditRoleName(r.role) }, r.role, reason.trim()) else null
         out.record to approval
       }
     },
-    onApproved = onApproved,
+    onApproved = { (by, role, reason) -> onApproved(by, role, reason) },
     onClose = onClose,
   )
 }
@@ -88,12 +110,12 @@ internal fun creditRoleName(role: String): String = if (role == "manager") StrNa
 
 /** مدیر/صاحبِ پشتِ صندوق: دلیل و «تأیید با این دلیل»، بی PIN */
 @Composable
-private fun CreditSelfBody(summary: String, onApprove: (String) -> Unit, onClose: () -> Unit) {
+private fun CreditSelfBody(title: String, summary: String, onApprove: (String) -> Unit, onClose: () -> Unit) {
   val c = PhoneV3.colors
   var reason by remember { mutableStateOf("") }
   //  `onDismiss` ِ برگه پیش از کارِ `closer` می‌آید: پس از تأیید، «بستن» دوباره برنمی‌گردد
   val chosen = remember { booleanArrayOf(false) }
-  V3Sheet(onDismiss = { if (!chosen[0]) onClose() }, title = StrPos.creditOverTitle, detents = false) { closer ->
+  V3Sheet(onDismiss = { if (!chosen[0]) onClose() }, title = title, detents = false) { closer ->
     V3StatusPill(V3Status.AWAITING, StrSale.needsApproval)
     Spacer(Modifier.height(10.dp))
     Text(summary, style = V3Type.body, color = c.ink)

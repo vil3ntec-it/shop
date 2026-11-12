@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui.v3.stock
 
 import ir.vil3ntec.tohid.core.i18n.StrCount
 import ir.vil3ntec.tohid.core.stock.CountScan
+import ir.vil3ntec.tohid.data.CountFilter
 import ir.vil3ntec.tohid.data.CountSheetModel
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ShopData
@@ -69,14 +70,44 @@ data class CountState(val counts: Map<String, String> = emptyMap(), val note: St
       }
     }
 
-    /** ردیف‌های شمارش: کالاهای فعال، به ترتیبِ نام، با جست‌وجو در نام و بارکد */
-    fun rows(d: ShopData, query: String): List<Product> {
-      val term = query.trim()
-      return d.products.filter { it.active }
-        .filter { term.isEmpty() || it.name.contains(term, ignoreCase = true) || it.barcodes.any { b -> b.contains(term) } }
-        .sortedBy { it.name }
-    }
+    /**
+     *  ردیف‌های شمارش: کالاهای فعال، به ترتیبِ نام، با جست‌وجو در نام و بارکد و صافیِ [scope] (INV-05) — همان
+     *  `CountFilter.shown` ِ «انبارگردانیِ تازه»؛ بی صافی همان فهرستِ پیشین
+     */
+    fun rows(d: ShopData, query: String, scope: CountScope = CountScope()): List<Product> =
+      CountFilter.shown(d.products, query, scope.category, scope.supplierId, scope.brand, scope.shelf)
+
+    /** گزینه‌های تراشه‌های صافی (فقط از کالاهای فعال) — همان `CountFilter` و همان برچسبِ قفسه */
+    fun options(d: ShopData): CountScopeOptions = CountScopeOptions(
+      categories = CountFilter.categories(d.products).map { it to it },
+      suppliers = CountFilter.suppliers(d.products, d.suppliers).map { it.id to it.name.ifBlank { it.id } },
+      brands = CountFilter.brands(d.products).map { it to it },
+      shelves = CountFilter.shelves(d.products).map { it to CountFilter.shelfLabel(it) },
+    )
 
     fun system(d: ShopData): Map<String, Double> = d.products.associate { it.id to ShopStore.stock(d, it.id) }
   }
+}
+
+/**
+ *  INV-05 — صافیِ «انبارگردانی»: دسته، تأمین‌کننده، برند و قفسه (کلیدِ `CountFilter.shelfKey`)؛ `null` ⇒ بی صافی. صافی فقط
+ *  فهرستِ دیده‌شده را کم می‌کند؛ شمرده‌ها، جمع‌ها، CSV و ثبت همان‌اند (خانهٔ خالی یعنی شمرده نشد).
+ */
+data class CountScope(
+  val category: String? = null,
+  val supplierId: String? = null,
+  val brand: String? = null,
+  val shelf: String? = null,
+) {
+  val active: Boolean get() = category != null || supplierId != null || brand != null || shelf != null
+}
+
+/** گزینه‌های هر ردیفِ تراشه (شناسه ⇐ برچسب)؛ فهرستِ خالی ⇒ بی آن ردیف، همه خالی ⇒ همان صفحهٔ پیشین */
+data class CountScopeOptions(
+  val categories: List<Pair<String, String>>,
+  val suppliers: List<Pair<String, String>>,
+  val brands: List<Pair<String, String>>,
+  val shelves: List<Pair<String, String>>,
+) {
+  val isEmpty: Boolean get() = categories.isEmpty() && suppliers.isEmpty() && brands.isEmpty() && shelves.isEmpty()
 }

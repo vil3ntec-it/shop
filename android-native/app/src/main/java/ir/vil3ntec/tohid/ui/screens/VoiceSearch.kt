@@ -88,7 +88,7 @@ fun VoiceSearchField(
         ) {
           Icon(
             Icons.Filled.Mic,
-            contentDescription = "جستجوی صوتی",
+            contentDescription = ir.vil3ntec.tohid.core.i18n.StrShellPages.voiceSearch,
             tint = Shop.colors.primary,
             modifier = Modifier.size(18.dp),
           )

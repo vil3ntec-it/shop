@@ -54,6 +54,129 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-31w زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-31w` (از سرِ `claude/batch-56`)
+
+- **OPS-02 — «پاک‌سازیِ کاملِ اطلاعات» ِ نسخهٔ ۳ درست شد (باگِ پرخطرِ 28l):** قاعده در `core/backup/WipeAll` (commonMain): ردیف فقط برای
+  **صاحب** (`visible`؛ مدیر با `settings.write` دیگر نمی‌بیند)، دو مرحله در یک برگه (`WipeAllSheet`: هشدار ⇐ «ادامه» ⇐ نوشتنِ دقیقِ نامِ دکان؛
+  «پاک کن» تا نامِ درست بسته)، پیش از نوشتن نقش و نام دوباره (`BackupController.wipe(typed)` ⇐ `decide`) و «پاک شد» فقط با `true` ِ `replaceAll`
+  (`outcome`؛ وگرنه «اطلاعات پاک نشد؛ هیچ چیزی تغییر نکرد»). رابطِ پیشین دکمهٔ پشتیبانِ پیش از پاک‌سازی نداشت (فقط هشدار) ⇒ همان هشدار.
+  `WipeAllName` ⇐ `WipeAll.matches` (پیش‌نمایشِ `WipeAllDialog` هم). `WipeAllNameTest` حالا صفحهٔ زنده را می‌سنجد. ردیف PARTIAL می‌ماند (USB/دستگاه).
+- **S45 — گوشیِ نسخهٔ ۳:** `LineModel.check`/`apply` با همان `LinePolicy` (یک درِ تازهٔ `LinePolicy.checked` برای هر دو صندوق)، پیامِ رد زیرِ
+  «قیمت هر واحد»، «درخواستِ تأیید» ⇐ `PinApprovalSheet` (بدنهٔ `CreditApprovalSheet`، حالا عمومی) ⇐ «تأیید شد: …» ⇐ «ثبت» و ردیفِ سابقهٔ
+  `price_override` (اسکوپِ IO بیرون از برگه، فقط اگر سبد نشست)؛ `apply` بی تأییدِ همان قیمت سبد را دست نمی‌زند؛ قلمِ آزادِ گوشی هم سقفِ POS-10.
+- **باگِ واقعیِ تازه (کامپیوتر):** `CartLineDialog` متنِ رد (`Dialog.problem`) را جای کدِ رد به `PriceApproval.askable` می‌داد ⇒ «درخواستِ تأیید» ِ
+  S45 **هرگز** دیده نمی‌شد و `lifted` بی‌اثر بود؛ «۳/۳» ِ `ScenarioS45PriceTest` فقط متنِ کد را می‌خواند. رفع: `LinePolicy.Dialog.code`.
+- **کارِ افزودهٔ هماهنگ‌کننده (بازرسیِ v3، بندهای ۴، ۷، ۸)، سه کامیتِ جدا:** برگهٔ ردیفِ گوشیِ نسخهٔ ۳ همان کامپوننت‌های `CartLineDialog` را
+  گرفت (کپیِ دوم نه): POS-28 سریال (`posLineSerials` ⇒ `PosSerialField` ⇒ `CartSerials.set`؛ بی آن کالای سریال‌دار در گوشی فروخته نمی‌شد)،
+  POS-22 «چرا این قیمت؟» (`priceWhyOn` ⇒ `PriceWhyLine.rows` با `PromoLive` ⇒ `PriceWhyPanel`)، POS-11 یادداشتِ ردیف (`posLineNote` ⇒
+  `PosNoteField` ⇒ `CartNotes.set`).
+- **آزمون (پنجرهٔ واقعیِ Compose روی کامپیوتر، سرخ پیش/سبز پس):** `WipeAllUiTest` ۴/۴ (پیش ۴/۴ سرخ)، `WipeAllNameTest` ۴/۴،
+  core `WipeAllTest` ۶/۶؛ `ScenarioS45DeskUiTest` ۱/۱ و `ScenarioS45PhoneUiTest` ۲/۲ (پیش هر سه سرخ)، `ScenarioS45PhoneTest` ۷/۷، `ScenarioS45PriceTest` ۴/۴،
+  `LinePolicyTest` ۹/۹، `LineUnitsTest` ۷/۷، `CartSheetsModelTest` ۶/۶، core `PriceApprovalTest` ۳/۳، `LinePricingTest` ۲۰/۲۰، `WhatsNewFileTest` ۴/۴؛
+  `LineSerialsUiTest`، `LinePriceWhyUiTest`، `LineNoteUiTest` هر کدام ۲/۲ (پیش: آزمونِ «روشن» ِ هر سه سرخ، درست سرِ کادرِ نبوده).
+- **جهش‌آزمایی:** پاک‌سازی ۴ جهش (مدیر در `visible`، نادیده گرفتنِ نتیجهٔ `replaceAll`، دکمهٔ بازِ مرحلهٔ دوم، پاک کردن روی نامِ نادرست) و S45 ۳ جهش
+  (متنِ رد جای کد، `apply` بی سنجش، سقفِ قلمِ آزاد نادیده) — همه کشته (WipeAllUiTest ۳، WipeAllNameTest ۲، WipeAllTest ۲، S45: ۱۰ آزمونِ سرخ).
+- **اجرای کامل:** `./desktop/gradlew -p desktop test` (با `flock`، `test-data` ِ پاک) **۴٬۰۵۵ آزمون: ۴٬۰۵۰ PASS، ۱ FAIL، ۴ SKIP ِ پیشین** —
+  تنها شکست `LineSerialsUiTest` ِ تازه بود از **مسابقه در خودِ آزمون**: `CartStore.set` پیش‌نویس را ناهم‌زمان می‌نویسد و صفحه گاهی سبدِ خالی می‌خواند
+  (برگهٔ ردیف «ردیف دیگر نیست» و قفلِ «فروش» زیرش). `LineSheetHarness.seed` تا نشستنِ پیش‌نویس می‌ایستد (`ScenarioS45PhoneUiTest` هم)؛ پس از آن
+  چهار کلاسِ پنجره دوباره سبز (بالا). کدِ برنامه پس از اجرای کامل عوض نشد. precheck ‏fail=0؛ `quality.mjs` بی ❌؛ spec «سالم»؛ `dari-text`/نامِ آزمون سبز.
+- **قدمِ بعدی:** AI-11 («جست‌وجو با عکس» در گوشی) و AUTH-08 (گامِ کدِ شمارهٔ تازه) هنوز در نسخهٔ ۳ نیستند؛ بازرسیِ v3 (بندهای ۱–۳، ۵، ۶، ۹، ۱۰).
+  پیش‌نمایشِ قدیمِ `ui/screens/Settings.kt` («پاک‌سازی» با پیامِ شکستِ پوسته) دست نخورد — فقط DevShot است.
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-34b (ب۳) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-34b` (از سرِ `claude/batch-56`)
+
+- **ساخته شد (دو باگِ برگهٔ برگشتِ نسخهٔ ۳، `ui/v3/sales/returns/ReturnFlowSheet.kt`):** سدِ تأییدِ برگشت یک‌جا در `data/ReturnDecision.kt` —
+  `of` را هر دو فرم (`ReturnFlowDialog` ِ کامپیوتر و برگهٔ نسخهٔ ۳) صدا می‌زنند و `ReturnFlow.post` همان `gate` را می‌سنجد (برابری در ۱۸۰ حالت آزموده).
+  **RET-09:** برگه سیاستِ همین دستگاه (`ReturnPolicyPrefs.of`) را به سد و `Request(policy)` می‌دهد و هشدارِ «بیرون از سیاست» (`ReturnFlowModel.policyNotice`)
+  نشان می‌دهد؛ `WHY_POLICY` دیگر «مجوز» خوانده نمی‌شد. **RET-10:** سقفِ دستگاه در برگه هم تجمعیِ فاکتور و تأیید با `remember(minor(total), gate)`
+  (بن‌بستِ «مجاز در صفحه، APPROVAL_REQUIRED در ثبت» رفت). **یافتهٔ هم‌دسته، ساخته شد:** RET-08 — برگه دلیل‌ها را از فهرستِ ثابتِ `ReturnFlow.REASONS`
+  نشان می‌داد و `reasons` را به ثبت نمی‌داد ⇒ حالا `ReturnSettings.reasons` (یادداشت در STATUS ِ RET-08؛ ردیف همان IMPLEMENTED-VERIFIED).
+  هر دو ردیف IMPLEMENTED-VERIFIED ماندند با شاهدِ تازه؛ قاعدهٔ «سدِ دستی در صفحه نه» در RULES (بخشِ فروش). «تازه‌ها»: سه سطرِ «رفع».
+- **آزمون‌ها (سرخ پیش / سبز پس):** `ReturnDecisionTest` ۵ (تازه؛ روی مدلِ سدِ پیشینِ برگه ۴ سرخ، با جهشِ «بی پیشین و بی سیاست» دوباره سرخ (RET-10: «approve» ⇐ «allow»))، `ReturnFlowModelTest` ۲ (تازه؛
+  `whyText` سرخ بود)، `ReturnSettingsGateTest` (+۱: هر دو فرم)، `ApprovalScopeWiringTest` (برگشت: هر دو فرم)، `SalesFlowModelTest` (سیمِ برگه به `ReturnDecision`) — همه پیش
+  از رفع سرخ؛ پس از رفع ۱۰ کلاسِ برگشت ۹۴/۹۴ (با `ReturnFlowTest` ۲۱، `SalesReturnTest` ۱۵، `ReturnPolicyFlowTest` ۶، `ReturnApprovalSlipTest` ۵، `ReturnLeftTest` ۴).
+  آزمون‌های امروزِ «دروغ‌سبز»: `ReturnPolicyFlowTest` فقط `post` و `ReturnSettingsGateTest`/`ApprovalScopeWiringTest` فقط `ReturnsV2` را می‌خواندند.
+- **اجرای کامل:** __FULL__؛ `quality.mjs` بی ❌؛ precheck ‏fail=0؛ spec «سالم».
+- **دام:** دیسکِ کانتینر میانِ کار پر شد (۱۰۰ مگ آزاد ⇒ «Failed to create Jar file … gradle-api»)؛ هماهنگ‌کننده Gradle-home و `build` ِ کهنه را پاک کرد.
+  `GRADLE_USER_HOME` ِ تازه را با `cp -al /root/.gradle/wrapper` بسازید (بی جای اضافه).
+- **قدمِ بعدی:** دیدنِ برگه روی گوشیِ واقعی با «برگشت و تعویض» ِ روشن و مهلت/سقفِ پر (سنجیده نشد: فقط آزمونِ JVM و متن).
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-35h (ه۳) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-35h` (از سرِ `claude/batch-56`، a5bd4667f)
+
+- **بازرسیِ «IMPLEMENTED-VERIFIED ولی بی‌راه از نسخهٔ ۳»، بندهای ۶، ۹، ۱۰ و «نامطمئن»:** (۱) **S49** یادآورِ سررسیدِ مالیات حالا هشدارِ خانهٔ نسخهٔ ۳
+  است (`HomeAlerts.Kind.TAX` + `HomeAlerts.taxDue`: تنظیمِ روشن، فقط `canSeeMoney`، درونِ `QuarterTax.reminder`؛ کارتِ کهربایی روی خانهٔ گوشی و
+  کامپیوتر و ردیفِ «هشدارها»، لمس ⇐ `settings/data/tax-quarter`)؛ `ui/screens/TaxQuarterAndroid.kt` ِ مرده برداشته و یادداشتِ LOC-06 درست شد.
+  (۲) **INV-05** «انبارگردانی» ِ سادهٔ نسخهٔ ۳ (`stock/count`) تراشه‌های دسته/تأمین‌کننده/برند/قفسه گرفت (`CountScope`، `CountState.options`، همان
+  `CountFilter`؛ برچسبِ قفسه `CountFilter.shelfLabel`)؛ `CountFilterTest` حالا پرونده‌های نسخهٔ ۳ را می‌خواند. (۳) **CRM-14** شاهد به `ReportsModelTest`
+  (RFM فقط با `canSeeMoney`)؛ «گزارش‌ها»ی کامپیوتر عمداً سدِ پول ندارد و ردیف آن را ادعا نکرده بود ⇒ فقط یادداشت. (۴) **PAY-19** «کشو بی فروش» ِ
+  گوشیِ نسخهٔ ۳ کشو را **باز نمی‌کرد** (فقط ردیف، با سدِ «شاگرد نیست»): حالا همان `drawer.open` و با چاپگرِ پیش‌فرضِ کشودار همان
+  `PrintSpooler.openDrawer` (`DrawerNoSale.phoneAction`)؛ در «دستگاه» می‌ماند. (۵) **SYN-08** ⇐ PARTIAL/«تصمیم»: گوشیِ نسخهٔ ۳ نشانهٔ همیشه‌پیدای
+  همگام‌سازی ندارد (فقط کادرِ پنهانِ خانه، کارتِ خطا/صفِ بی‌نت، صفحهٔ همگام‌سازی)؛ سرخطِ خانه انتخابِ صاحب‌کار است ⇒ پرسش در PARTIAL-MAP.
+- **آزمون:** سرخ روی a5bd4667f (کامپایل: `HomeAlerts.taxDue`/`Kind.TAX`/`ShellTargets.TAX_QUARTER`، `CountScope`/`CountState.options`،
+  `DrawerNoSale.phoneAction`)؛ سبز: TaxDueAlertTest ۵، StockCountScopeTest ۴، CountFilterTest ۵، DrawerNoSaleTest ۷، ReportsModelTest (+۱ ِ RFM، با
+  `RFM.money = false` سرخ — جهش)؛ بی `canSeeMoney` در `HomeAlerts.taxDue` هم TaxDueAlertTest سرخ (جهش). اجرای کاملِ `flock … ./desktop/gradlew --no-daemon -p desktop test`: BUILD SUCCESSFUL، ۶۳۵ مجموعه، ۴۰۴۵ آزمون، ۰ شکست (۴ رد‌شده).
+- **درس:** پوشهٔ scratchpad میانِ عامل‌های هم‌زمانِ یک هماهنگ‌کننده مشترک است — نامِ لاگ را یکتا کنید (`scratchpad/<X>/…`)؛ `red1.log` ِ این عامل
+  را عاملِ دیگری با همان نام بازنویسی کرد.
+- **قدمِ بعدی:** پاسخِ صاحب‌کار به SYN-08 (الف/ب)؛ PAY-19 و «کشو بی فروش» ِ گوشی روی کشوی واقعی؛ شاهدِ CI پس از مرج.
+### ۱۴۰۵/۰۸/۲۲ — عاملِ ک۳ (e-rows-33k) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-33k` (از سرِ `claude/batch-56`، a5bd4667f)
+
+- **دو باگِ واقعیِ صندوقِ گوشیِ نسخهٔ ۳ بسته شد (فروشِ سریع هم، چون همان برگهٔ `sale/checkout` است):** (۱) **POS-24** — `CheckoutModel.checkout`
+  فیلدِ `rules` نداشت ⇒ «مشتری لازم از مبلغِ X» و «فاکتورِ صفر رد» ِ `CheckoutRulesPref` در گوشی هرگز سنجیده نمی‌شد؛ حالا همان `Checkout` ِ برگه
+  (جمع، پیش‌سنجیِ حساب‌پی و ثبت) قاعده‌ها را دارد و پیامِ رد بالای برگه می‌آید. (۲) **S22** — برگه فقط `blockExpired` را می‌گذاشت ⇒ با «با مجوزِ مدیر»
+  فروشِ منقضی بی تأیید ثبت می‌شد؛ حالا `ExpiryPref.gate` ⇐ `Checkout.expiryGate`، پیش از ثبت و پیش از گرفتنِ پولِ حساب‌پی `CheckoutExpiry.uncovered`
+  ⇐ برگهٔ `sale/checkout/expiry` (همان `CreditApprovalSheet` با پارامترِ تازهٔ `title`) ⇐ `CheckoutSession.expiryApproval`؛ تأیید فقط همان کالاها و
+  تا همان مقدار (`ExpiryGate.covers`)، سبدِ بزرگ‌تر دوباره می‌پرسد و با هر پرداخت پاک می‌شود. کنارش: ردیفِ «کالای منقضی» ِ فهرستِ تنظیمات
+  «با مجوزِ مدیر» را «فقط هشدار» می‌نوشت (`SettingsIndexModel`).
+- **آزمون:** `CheckoutRulesWiringTest` (۴) و `CheckoutExpiryWiringTest` (۵) — سیم‌کشی روی کدِ پیشین ۴ از ۵ سرخ (پنجمی نگهبانِ «فقط `CheckoutModel`
+  در صندوقِ v3 `Checkout` می‌سازد»)، رفتار با امضای تازه؛ `CheckoutGuardsPrefDesktopTest` (۳، مقدارِ واقعیِ `tohid-policy` روی `DesktopContext`)؛
+  `SettingsModelsTest`؛ دو ردیفِ `V3ReachabilityTest`. اجرای کاملِ `./desktop/gradlew -p desktop test` (۴۰۴۵ آزمون، ۰ شکست، ۴ SKIP ِ پیشین)؛
+  اجرای کاملِ اول یک شکست داشت: `LineSellerFlowTest` متنِ `.copy(lineSellers = lineSellers, tax = taxConfig)` را می‌پاید ⇒ تأییدِ منقضی در `copy` ِ جدا.
+  STATUS ِ POS-24 و S22 به‌روز (IMPLEMENTED-VERIFIED می‌مانند)؛ قاعدهٔ S22 در RULES «فروش و صندوق».
+- **قدمِ بعدی:** دیدنِ برگهٔ تأییدِ منقضی روی گوشیِ واقعی (سنجیده نشد: فقط آزمونِ JVM)؛ `ScenarioS22Test` همچنان خودش `Checkout(expiryGate = true)`
+  می‌سازد — سیم‌کشی را آزمون‌های تازه می‌پایند.
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-32a زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-32a` (از سرِ `claude/batch-56`)
+
+- **ساخته شد — AI-11 «جست‌وجو با عکس» در گوشیِ نسخهٔ ۳** (یافتهٔ ۲۸l): `VisualSearchEntry` به `rememberVisualSearch` (null با پرچمِ خاموش
+  یا بی حساب) + `VisualSearchHost` شکست (کامپیوتر همان دکمه). صندوقِ گوشی: ردیف در «…» (`SaleMenuSheet`، `SaleRoute` ⇐ `SaleScreen`)؛
+  فروشِ سریع: دکمهٔ دوربینِ سربرگ؛ «کالاها»: «…» ِ سربرگ (`V3Scaffold` فقط دو دکمه می‌گیرد). «مشابه» در صندوق فقط کادرِ جست‌وجو با دستهٔ
+  «همه»، در «کالاها» بازکردنِ کالا. همان درها (`/api/shop/visual-search`) و همان پرچم. **باگِ واقعیِ تازه (کامپیوتر هم):** نامِ آغاز با رقم
+  («3x3 کابل») در کادرِ صندوق پیشوندِ شمارِ POS-03 خوانده می‌شد ⇒ لمسِ بعدی سه تا؛ `VisualSearch.tillText` «1*» ِ صریح می‌گذارد.
+  ردیف در «دستگاه» می‌ماند (آستانه روی عکسِ واقعی).
+- **ساخته شد — AUTH-08 گامِ کدِ شمارهٔ تازه در نسخهٔ ۳:** «ویرایش حساب و دکان» (`ProfileEditScreen`) کادرِ کد زیرِ شماره، «ارسال دوبارهٔ کد» با
+  شمارشِ `resendSeconds` ِ پاسخِ سرور و خطای درجا (ناقص/نادرست/کهنه)؛ حالِ کادر در `core/account/PhoneClaimForm` (commonMain، کد بسته به شماره،
+  کدِ ناقص ⇒ هیچ درخواست، سقف‌ها فقط سرور)؛ `requestPhoneCode` ⇐ `ApiResult<Int>`؛ `V3TextButton(enabled)`. درِ سرور بی تغییر (فقط توضیحِ
+  `me.js`). `ui/screens/PhoneClaimStep.kt` هیچ صدازننده‌ای نداشت (`Profile.kt` فقط دو state ِ بی‌استفاده) ⇒ برداشته؛ استنادِ STATUS/`StrShellPages`
+  به پروندهٔ تازه. ردیف در «پرچم» با ماندهٔ تازه: `auth.phone_add_code` (scope `security`، سراسری) پس از رسیدنِ این نسخه به همهٔ دستگاه‌ها.
+- **آزمون:** سرخ پیش: `VisualSearchTest` ۶/۲ سرخ روی کدِ پیشین («3x3 کابل expected 1.0 but was 3.0» و سیم)؛ `PhoneClaimFormTest` سرخِ کامپایل.
+  سبز پس: `PhoneClaimFormTest` ۷/۷، `PhoneClaimTest` ۵/۵؛ ۱۲ کلاسِ هدف‌دار ۹۱ آزمون (`VisualSearchTest` ۶، `ProfileEditModelTest` ۵، `DariCoverageTest` ۲۳،
+  `PreviewPagesTextTest` ۴، `I18nCoverageTest` ۸، `DariWordsTest` ۱۷، `NoLegacyUiTest` ۵، `V3ReachabilityTest` ۹، `PhoneTillWiringTest` ۴ …) با یک سرخ:
+  «مهلت» ِ فقط‌فارسی در دری ⇐ «وقت». جهش: هسته ۴ از ۴ (`phone`، `codeToSend`، کدِ مرده، `phone_code_disabled`)، صفحه/مدل ۴ از ۴ (بی «1*»،
+  بی `picked = null`، پیامِ جابه‌جا، بی `form.phone(it)`). سرور `phone-add-code` ۷/۷، `visual-search` ۹/۹،
+  `dari-text` + نامِ آزمون ۲۰/۲۰ (PGlite محلی). اجرای کاملِ `./desktop/gradlew -p desktop test` (با `flock`) **۴٬۰۳۳ PASS، ۰ FAIL، ۴ SKIP ِ پیشین** (۶۳۳ کلاس). `quality.mjs` بی ❌، precheck ‏fail=0، spec «سالم»، `generate.cjs` تازه.
+- **قدمِ بعدی:** دو بی‌سیمِ دیگرِ ۲۸l (OPS-02 «پاک‌سازی کامل»، S45 قاعده/تأییدِ قیمتِ ردیف)؛ برگه‌های عکس و «مشابه» هنوز شکلِ کیتِ قدیم
+  (`ParcelPhotoSource`/`TohidBottomSheet`) — بازسازی با `V3Sheet` اختیاری؛ گوشیِ واقعی برای هر دو سنجیده نشد.
+
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-28l زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-28l` (از سرِ `claude/batch-55`)
+
+- **ساخته شد:** LOC-06 دورِ ۳ — متنِ خامِ `ui/screens` **۱۷۸ ⇐ ۷۳** (`DariCoverageTest.maxRawOldScreens`). (ب) ۷۴ متنِ صفحه‌های فقط‌پیش‌نمایشِ گوشی
+  (`Sale`، `QuickSale`، `Profile`، `ProfileModel`، `Settings`، `Debtors`، `DebtorDetail`، `DebtorTxSheet`، `NavEditor`، `PhoneHomeModel`، `IdleLockChoice`،
+  `VoiceSearch`) به `Str*` — اول همان جملهٔ موجودِ جدول (با آرگومان و `td` هم؛ 22n فقط بی‌آرگومان/`t` را گرفته بود)، بقیه ویژگیِ تازه در `StrSalePages`/
+  `StrDebtPages`/`StrShellPages`؛ (ج) `ui/screens/ProductDetail.kt` (+ `movementLabelOf`) و `ui/screens/Receipts.kt` برداشته شدند (جانشینِ نسخهٔ ۳
+  دارند؛ استنادِ IMG-PRO-11 به `ui/v3/products/ProductDetailScreen` برگشت؛ «`Receipts` (PRM-13)» ِ 13t اشتباه بود — آن `print/Receipts.kt` است)؛
+  `WarehouseDialogs` و `PhoneClaimStep` جانشینِ کامل ندارند ⇒ ۲۷ متنشان به `StrStockPages`/`StrShellPages`. نگهبانِ تازه `PreviewPagesTextTest` (۴).
+  (الف) ۷۳ ِ `DayEndModel`/`HeatmapModel` دست نخورد ⇒ پرسشِ `OWNER-PENDING-fa.md` ۴-۳ (پیشنهادِ پیش‌فرض الف)؛ LOC-06 در نقشه از «کد» به «تصمیم».
+- **آزمون‌های سیمِ فقط‌پیش‌نمایش ⇐ نسخهٔ ۳:** Gift/Layaway/Quote/SpecialOrder/TillReceivePhone ⇐ `PhoneTillTools`+`SaleRoute`؛ Loyalty/SaleNotes/
+  ApprovalScope/PhoneTill ⇐ `CheckoutRoute`/`CheckoutSession`/`QuickSaleRoute`؛ PromoLive ⇐ `SafeSignOut`؛ LegacySyncCall ⇐ `SyncScreen`؛ S18 ⇐
+  `CustomerPickerSheet`؛ PromoGroup/SafePanel: سطرِ پیش‌نمایش برداشته. جهش: بی `GiftCardBar`/`TillReceivePhone` در `PhoneTillTools` ⇐ دو آزمون سرخ.
+- **باگ‌های واقعی (در نسخهٔ ۳ سیم ندارد؛ یادداشت در STATUS ِ همان ردیف، ساخته نشد):** (۱) **OPS-02** «پاک‌سازی کامل اطلاعات» در
+  `v3/settings/sections/BackupScreen`: برای هر کسی با `settings.write` (مدیر هم)، یک برگهٔ تأییدِ ساده (نه دو مرحله با نامِ دکان) و «پاک شد» بی نگاه به
+  نتیجهٔ `replaceAll` — رابطِ پیشین فقط صاحب بود؛ پرخطرترین. (۲) **S45** کادرِ ردیفِ گوشیِ نسخهٔ ۳ (`LineModel.apply`) قاعدهٔ «قیمت و تخفیفِ ردیف» و
+  «درخواستِ تأیید» ندارد (ردیف IMPLEMENTED-VERIFIED است؛ وضعیتش بازبینی شود). (۳) **AI-11** «جست‌وجو با عکس» در گوشیِ نسخهٔ ۳ نیست. (۴) **AUTH-08**
+  گامِ کدِ شمارهٔ تازه در نسخهٔ ۳ نیست (پیش از روشن کردنِ `auth.phone_add_code`).
+- **قدمِ بعدی:** ساختنِ چهار سیمِ بالا در نسخهٔ ۳ (اول OPS-02)؛ پاسخِ ۴-۳ ⇐ ۷۳ ِ مانده؛ سپس پیش‌نمایشِ DevShot به نسخهٔ ۳ و برداشتنِ صفحه‌های قدیمی.
+  «تازه‌ها» سطر نمی‌خواهد (هیچ چیزِ دیدنی برای کاربر: پیش‌نمایش، مرده و آزمون؛ `WHATSNEW_OK`).
+- **آزمون:** اجرای کاملِ `./desktop/gradlew -p desktop test` (با `flock`، `test-data` ِ پاک) **۴٬۰۲۹ PASS، ۰ FAIL، ۴ SKIP ِ پیشین** (۶۳۳ کلاس)؛ هدف‌دار: ۲۳ کلاس سبز (`DariCoverageTest` ۲۳، `I18nCoverageTest` ۸، `DariWordsTest` ۱۷، `DesktopPhrasesTest` ۴، همهٔ
+  آزمون‌های سیمِ جابه‌جاشده، `V3ReachabilityTest` ۹، `NoLegacyUiTest` ۵)؛ `dari-text.test.js` ۱۷/۱۷؛ نگهبانِ نامِ آزمون ۳/۳؛ `quality.mjs` بی ❌ (فقط
+  سطرِ `ProductDetail.kt` ِ برداشته از خط‌مبنا)؛ precheck ‏fail=0؛ spec «سالم».
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-30r زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-30r` (از سرِ `claude/batch-55-m`) — اصلاحِ بازبینیِ امنیتیِ دستهٔ ۵۵
 
 - **شد:** (۱) `else` ِ سرگردانِ `store/checkout.js`: نشانیِ ذخیره‌شدهٔ بی پین در دکانِ ناحیه‌دار ۴۰۰ `zone_required` می‌گرفت؛ (۲) رسانهٔ

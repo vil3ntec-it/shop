@@ -2,6 +2,9 @@ package ir.vil3ntec.tohid.core.account
 
 import ir.vil3ntec.tohid.core.text.LocaleFormat
 import ir.vil3ntec.tohid.core.text.TextNormalizer
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.intOrNull
 
 /**
  *  AUTH-08 — افزودنِ شماره به حسابی که شماره ندارد، فقط با کدِ همان شماره.
@@ -12,7 +15,8 @@ import ir.vil3ntec.tohid.core.text.TextNormalizer
  *    ۳) `PUT /api/me { name, phone, phoneCode }` ⇒ ذخیره، یا `otp_*`، یا (فقط پس از کدِ درست) `phone_taken`.
  *
  *  پرچمِ خاموش ⇒ گامِ ۱ همان پاسخِ امروز را می‌دهد و برنامه هیچ کدی نمی‌خواهد؛ رفتار بیت‌به‌بیت همان است.
- *  این‌جا فقط دو چیز است، بی شبکه و بی رابط: گامِ بعد از روی کدِ ماشین‌خوانِ پاسخ، و پاک‌سازیِ کدِ تایپ‌شده.
+ *  این‌جا فقط سه چیز است، بی شبکه و بی رابط: گامِ بعد از روی کدِ ماشین‌خوانِ پاسخ، پاک‌سازیِ کدِ تایپ‌شده و مهلتِ
+ *  «ارسالِ دوباره» ِ پاسخِ سرور. حالِ کادرِ کد در فرمِ نسخهٔ ۳: [PhoneClaimForm].
  */
 object PhoneClaim {
 
@@ -69,4 +73,8 @@ object PhoneClaim {
     }
     return if (clean.length in 4..8 && clean.all { it in '0'..'9' }) clean else null
   }
+
+  /** `resendSeconds` ِ پاسخِ موفقِ `POST /api/me/phone/code` — فقط عددِ صریحِ نامنفی؛ هر چیزِ دیگر ⇒ ۰ (همین حالا) */
+  fun resendSeconds(o: JsonObject): Int =
+    (o["resendSeconds"] as? JsonPrimitive)?.takeIf { !it.isString }?.intOrNull?.takeIf { it > 0 } ?: 0
 }

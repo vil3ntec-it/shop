@@ -28,6 +28,20 @@ object DrawerNoSale {
     else -> null
   }
 
+  /** «کشو بی فروش» ِ صندوقِ گوشیِ نسخهٔ ۳: ضربه به کشوی چاپگر، فقط ثبتِ دلیل و تأیید، یا بسته */
+  enum class PhoneAction { KICK, RECORD, DENIED }
+
+  /**
+   *  `sales/drawer/move?mode=no_sale` ِ گوشی، با همان مجوزِ کامپیوتر (`drawer.open`، نه «شاگرد نیست»): بی مجوز بسته حتی با
+   *  چاپگر؛ با چاپگرِ پیش‌فرضِ کشودار همان `PrintSpooler.openDrawer` (ردیف فقط وقتی ضربه رسید)؛ بی آن فقط ردیفِ `no_sale`
+   *  با دلیل و تأیید (`PayFlow.moveRow`).
+   */
+  fun phoneAction(hasDrawerPrinter: Boolean, allowed: Boolean): PhoneAction = when {
+    !allowed -> PhoneAction.DENIED
+    hasDrawerPrinter -> PhoneAction.KICK
+    else -> PhoneAction.RECORD
+  }
+
   /** پیشِ ضربه: دلیلِ خالی، یا نقشی که سیاستِ دکان اجازه نداده (`drawer.open`) ⇒ پیامِ رد؛ وگرنه `null` */
   fun refusal(reason: String, allowed: Boolean): String? = when {
     reason.trim().isEmpty() -> NEED_REASON

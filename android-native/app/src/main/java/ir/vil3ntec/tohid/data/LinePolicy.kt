@@ -40,8 +40,9 @@ object LinePolicy {
    *  @param problem متنِ رد؛ `null` ⇒ ثبت مجاز است
    *  @param net مبلغِ ردیف پس از تخفیف (افغانی)؛ `null` ⇒ تخفیفی نیست
    *  @param netUnit قیمتِ واحدِ پس از تخفیف برای `CartLine.unitPrice`؛ `null` ⇒ همان قیمتِ نوشته‌شده
+   *  @param code کدِ ردِ هسته (`LinePricing.PRICE_UP_BLOCKED`…) برای `PriceApproval.askable`/`lifted` — نه [problem] که متنِ صفحه است
    */
-  data class Dialog(val canDiscount: Boolean, val problem: String?, val net: Double?, val netUnit: Double?) {
+  data class Dialog(val canDiscount: Boolean, val problem: String?, val net: Double?, val netUnit: Double?, val code: String? = null) {
     val ok: Boolean get() = problem == null
   }
 
@@ -73,7 +74,35 @@ object LinePolicy {
       )
     }.getOrNull() ?: return Dialog(canDiscount, if (p.on) StrLine.tooLarge else null, null, null)
     val net = if (e.discountMinor > 0) (e.grossMinor - e.discountMinor) / 100.0 else null
-    return Dialog(canDiscount, message(e.problem, p), net, e.netUnit)
+    return Dialog(canDiscount, message(e.problem, p), net, e.netUnit, e.problem)
+  }
+
+  /**
+   *  S45 — کادرِ ردیف با «درخواستِ تأیید» (هر دو صندوق: `CartLineDialog` و برگهٔ ردیفِ گوشیِ نسخهٔ ۳، `LineModel.check`).
+   *  @param first سنجشِ قاعده بی تأیید
+   *  @param edit با تأییدی که هنوز به همین قیمت می‌خورد ([granted]، `PriceApproval.covers`): فقط همان قاعده برداشته (`lifted`)
+   *  @param askCode ردِ برداشتنی (`PriceApproval.askable`) که هنوز تأیید ندارد ⇒ دکمهٔ «درخواستِ تأیید»؛ `null` ⇒ نه
+   */
+  data class Checked(val first: Dialog, val edit: Dialog, val granted: ir.vil3ntec.tohid.core.pos.PriceApproval.Grant?, val askCode: String?) {
+    /** تأییدی که این ثبت واقعاً به کار برد (ردیفِ سابقه فقط برای همین، `approvalAudit`) */
+    val used: ir.vil3ntec.tohid.core.pos.PriceApproval.Grant? get() = granted?.takeIf { first.problem != null }
+  }
+
+  /**
+   *  [edit] با تأییدِ [grant] — @param price قیمتِ دستیِ نوشته‌شده (`null` ⇒ قیمتِ کالا؛ تأیید فقط به قیمتِ دستی می‌خورد)
+   *  @param canAsk این کادر «درخواستِ تأیید» دارد (`PriceAsk` داده شده)
+   */
+  fun checked(
+    p: LinePricing.Policy, free: Boolean, basePrice: Double, unitPrice: Double, price: Double?, quantity: Double?,
+    percent: Boolean, discountText: String, grant: ir.vil3ntec.tohid.core.pos.PriceApproval.Grant?, canAsk: Boolean,
+  ): Checked {
+    val first = edit(p, free, basePrice, unitPrice, price, quantity, percent, discountText)
+    val typedMinor = price?.let(DiscountGate::minor)
+    val granted = grant?.takeIf { ir.vil3ntec.tohid.core.pos.PriceApproval.covers(it, typedMinor) }
+    val lifted = if (granted == null) first
+      else edit(ir.vil3ntec.tohid.core.pos.PriceApproval.lifted(p, granted.code), free, basePrice, unitPrice, price, quantity, percent, discountText)
+    val ask = first.code?.takeIf { canAsk && granted == null && typedMinor != null && ir.vil3ntec.tohid.core.pos.PriceApproval.askable(p, it) }
+    return Checked(first, lifted, granted, ask)
   }
 
   /**

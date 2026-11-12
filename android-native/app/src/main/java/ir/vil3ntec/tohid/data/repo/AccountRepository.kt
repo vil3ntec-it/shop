@@ -53,10 +53,12 @@ class AccountRepository(private val api: ApiClient) {
   /**
    *  AUTH-08: کدِ یک‌بارمصرف به همان شماره‌ای که افزوده می‌شود. پرچمِ سروری خاموش ⇒ ۴۰۴
    *  `phone_code_disabled` (برنامه همان ذخیرهٔ بی کد را می‌کند). «این شماره حسابِ دیگری دارد» این‌جا گفته نمی‌شود.
+   *  خروجی: مهلتِ «ارسالِ دوباره» به ثانیه از پاسخِ خودِ سرور (`PhoneClaim.resendSeconds`؛ نبود ⇒ ۰).
    */
-  suspend fun requestPhoneCode(phone: String): ApiResult<Unit> = result {
-    api.post(ApiEndpoints.Me.PHONE_CODE, buildJsonObject { put("phone", JsonPrimitive(phone.trim())) })
-    Unit
+  suspend fun requestPhoneCode(phone: String): ApiResult<Int> = result {
+    ir.vil3ntec.tohid.core.account.PhoneClaim.resendSeconds(
+      api.post(ApiEndpoints.Me.PHONE_CODE, buildJsonObject { put("phone", JsonPrimitive(phone.trim())) }),
+    )
   }
 
   /* ------------------------------ حذفِ حساب ------------------------------ */

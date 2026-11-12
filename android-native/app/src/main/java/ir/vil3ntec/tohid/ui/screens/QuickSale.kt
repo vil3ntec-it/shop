@@ -181,7 +181,7 @@ fun QuickSaleScreen(
            *  فرقی دارند یا نه.
            */
           Text(
-            "روی محصول بزنید تا یک عدد به سبد خرید اضافه شود",
+            ir.vil3ntec.tohid.core.i18n.StrSalePages.tapToAddOne,
             style = MaterialTheme.typography.bodySmall,
             color = Shop.colors.muted,
           )
@@ -197,7 +197,7 @@ fun QuickSaleScreen(
           VoiceSearchField(
             value = search,
             onValueChange = { search = it },
-            label = "جستجوی نام کالا یا بارکد",
+            label = ir.vil3ntec.tohid.core.i18n.StrSalePages.searchNameOrBarcode,
           )
           Spacer(Modifier.height(8.dp))
           //  AI-11: «جست‌وجو با عکس» فقط با پرچمِ روشنِ سرور؛ «مشابه» ِ زده‌شده فقط در کادرِ جست‌وجو می‌نشیند، نه در سبد
@@ -220,7 +220,7 @@ fun QuickSaleScreen(
             FilterChip(
               selected = category == null,
               onClick = { category = null },
-              label = { Text("همه دسته‌بندی‌ها") },
+              label = { Text(ir.vil3ntec.tohid.core.i18n.StrSalePages.allCategories) },
             )
             d.productCategories.forEach { c ->
               FilterChip(
@@ -232,12 +232,12 @@ fun QuickSaleScreen(
             // ساخت و حذف دسته‌بندی از همین‌جا — مثل دو دکمهٔ کنارِ کشویی وب
             AssistChip(
               onClick = { newCategory = "" },
-              label = { Text("+ دسته‌بندی") },
+              label = { Text(ir.vil3ntec.tohid.core.i18n.StrSalePages.addCategoryChip) },
             )
             if (category != null) {
               AssistChip(
                 onClick = { confirmDeleteCategory = category },
-                label = { Text("حذف این دسته") },
+                label = { Text(ir.vil3ntec.tohid.core.i18n.StrSalePages.deleteThisCategory) },
                 leadingIcon = {
                   Icon(
                     Icons.Filled.DeleteOutline,
@@ -256,7 +256,7 @@ fun QuickSaleScreen(
               OutlinedTextField(
                 value = value,
                 onValueChange = { newCategory = it },
-                placeholder = { Text("نام دسته‌بندی را بنویسید…") },
+                placeholder = { Text(ir.vil3ntec.tohid.core.i18n.StrSalePages.categoryNameHint) },
                 singleLine = true,
                 modifier = Modifier.weight(1f),
               )
@@ -302,7 +302,7 @@ fun QuickSaleScreen(
                 if (added.capped) {
                   scope.launch {
                     snackbar.showSnackbar(
-                      "${p.name} فقط ${qty(added.available)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است" +
+                      StrSale.onlyLeftOf(p.name, "${qty(added.available)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""}") +
                         ir.vil3ntec.tohid.data.ProductInfoMap.insteadSuffix(d, p, infoSearch)
                     )
                   }
@@ -395,7 +395,7 @@ fun QuickSaleScreen(
       title = { Text(StrProducts.deleteCategoryTitle, color = Shop.colors.text) },
       text = {
         Text(
-          "دسته‌بندی «$name» حذف می‌شود. محصولات این دسته حذف نمی‌شوند، فقط دیگر در این دسته‌بندی فیلتر نمی‌شوند.",
+          StrProducts.deleteCategoryBody(name),
           style = MaterialTheme.typography.bodySmall,
           color = Shop.colors.muted,
         )
@@ -437,7 +437,7 @@ fun QuickSaleScreen(
           if (added.capped) {
             scope.launch {
               snackbar.showSnackbar(
-                "${found.name} فقط ${qty(added.available)}${if (found.unit.isNotBlank()) " ${found.unit}" else ""} موجود است" +
+                StrSale.onlyLeftOf(found.name, "${qty(added.available)}${if (found.unit.isNotBlank()) " ${found.unit}" else ""}") +
                   ir.vil3ntec.tohid.data.ProductInfoMap.insteadSuffix(d, found, infoSearch)
               )
             }
@@ -493,7 +493,7 @@ fun QuickSaleScreen(
         cartOpen = false
         Haptics.success(context)
         val sold = result.data.sales.last()
-        toast("فروش به مبلغ ${money(sold.finalTotal)} ؋ ثبت شد")
+        toast(StrSale.saleRecorded(money(sold.finalTotal)))
         //  بقیهٔ اعضای دکان همان لحظه خبردار می‌شوند — صاحب دکانی
         //  که خانه است نباید تا همگام‌سازیِ بعدی بی‌خبر بماند
         ir.vil3ntec.tohid.sync.ShopNews.sale(
@@ -605,7 +605,7 @@ private fun QuickTile(
     )
     Spacer(Modifier.height(2.dp))
     Text(
-      if (out) StrSale.outOfStock else "${qty(stock)}${if (unit.isNotBlank()) " $unit" else ""} مانده",
+      if (out) StrSale.outOfStock else StrSale.leftQty("${qty(stock)}${if (unit.isNotBlank()) " $unit" else ""}"),
       style = MaterialTheme.typography.labelSmall,
       color = if (out) Shop.colors.danger else Shop.colors.muted2,
       maxLines = 1,
@@ -619,7 +619,7 @@ private fun QuickTile(
           .padding(horizontal = 8.dp, vertical = 3.dp),
       ) {
         Text(
-          "${qty(inCart)}${if (unit.isNotBlank()) " $unit" else ""} در سبد",
+          StrSale.inCartQty("${qty(inCart)}${if (unit.isNotBlank()) " $unit" else ""}"),
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.button.primary.text,
           fontWeight = FontWeight.Bold,

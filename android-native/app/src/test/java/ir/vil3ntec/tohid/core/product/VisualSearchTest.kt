@@ -157,9 +157,69 @@ class VisualSearchTest {
         .map { File(it, "ir/vil3ntec/tohid/$rel") }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد")
     val ui = code("ui/screens/VisualSearchUi.kt")
     for (bad in listOf("CartStore", "cartStore", "addToCart", "SalesEngine", "SalePost")) assertFalse(bad, ui.contains(bad))
-    assertTrue(code("ui/screens/QuickSale.kt").contains("if (t is VisualSearch.Tap.Search) { category = null; search = t.query }"))
+    //  ⚠️ صندوقِ گوشیِ نسخهٔ ۳ دکمهٔ «جست‌وجو با عکس» ندارد؛ `ui/screens/QuickSale.kt` که داشت فقط پیش‌نمایشِ DevShot است
+    //  (STATUS ِ AI-11، `claude/e-rows-28l`) — می‌ماند کامپیوتر
     assertTrue(code("ui/screens/DeskSale.kt").contains("Tap.Search) { query = t.query; refocus() }"))
     //  «باز کردن»: «محصولاتِ» گوشیِ رابطِ امروز (`Products.kt`، بی‌مرجع از نسخهٔ ۳) در «پاک‌سازی، گامِ ۳» پاک شد؛ می‌ماند کامپیوتر
     assertTrue(code("ui/screens/DeskProducts.kt").contains("Tap.Open) openId = t.productId"))
+  }
+
+  private fun code(rel: String): String =
+    listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { File(it, "ir/vil3ntec/tohid/$rel") }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد")
+
+  @Test
+  fun `نامی که با رقم آغاز می‌شود در کادرِ صندوق هرگز پیشوندِ شمار نمی‌شود`() {
+    fun s(name: String) = VisualSearch.Suggestion("p-1", name, 10.0, "", false, 90)
+    assertEquals(VisualSearch.Tap.Search("برنج"), VisualSearch.tap(s("برنج"), VisualSearch.Place.TILL))
+    assertEquals(VisualSearch.Tap.Search("روغن 5 لیتری"), VisualSearch.tap(s("روغن 5 لیتری"), VisualSearch.Place.TILL))
+    //  پیش از این «3x3 کابل» در کادرِ صندوق «سه تا از ‹3 کابل›» خوانده می‌شد و لمسِ بعدیِ کاشی سه تا می‌افزود
+    assertEquals(3.0, ir.vil3ntec.tohid.data.CartQuery.parse("3x3 کابل").count, 0.0)
+    for (name in listOf("3x3 کابل", "۲*۴ چوب", "١٠X پیچ", " 5 × 2 لوله", "7up")) {
+      val t = VisualSearch.tap(s(name), VisualSearch.Place.TILL) as VisualSearch.Tap.Search
+      val parsed = ir.vil3ntec.tohid.data.CartQuery.parse(t.query)
+      assertEquals(name, 1.0, parsed.count, 0.0)
+      assertEquals(name, name.trim(), parsed.term)
+    }
+    //  فهرستِ کالاها فقط باز می‌کند
+    assertEquals(VisualSearch.Tap.Open("p-1"), VisualSearch.tap(s("3x3 کابل"), VisualSearch.Place.LIST))
+  }
+
+  @Test
+  fun `صندوق و فروشِ سریع و کالاهای گوشیِ نسخهٔ ۳ جست‌وجو با عکس دارند`() {
+    //  دکمه/ردیف فقط با پاسخِ «روشن» ِ سرور: `rememberVisualSearch` ⇒ null با پرچمِ خاموش یا بی حساب
+    val ui = code("ui/screens/VisualSearchUi.kt")
+    assertTrue(ui.contains("return if (VisualSearchLive.visible) handle else null"))
+    assertTrue(ui.contains("val h = rememberVisualSearch(api, products, place) ?: return"))
+
+    //  صندوقِ گوشی (`sale`): ردیفِ «…» ⇐ برگهٔ عکس؛ «مشابه» فقط کادرِ جست‌وجو با دستهٔ «همه»
+    val route = code("ui/v3/sales/cart/SaleRoute.kt")
+    assertTrue(route.contains("visual = rememberVisualSearch(rememberVisualSearchApi(), data.products, VisualSearch.Place.TILL)"))
+    val sale = code("ui/v3/sales/cart/SaleScreen.kt")
+    assertTrue(sale.contains("onVisualSearch = visual?.let { v -> { v.start() } }"))
+    assertTrue(sale.contains("visual?.let { VisualSearchHost(it) { t -> if (t is VisualSearch.Tap.Search) { picked = null; search = t.query } } }"))
+    val menu = code("ui/v3/sales/cart/SaleMenuSheet.kt")
+    assertTrue(menu.contains("onVisualSearch?.let { find ->"))
+    assertTrue(menu.contains("V3ListRow(StrVisualSearch.button, icon = Icons.Outlined.PhotoCamera"))
+
+    //  فروشِ سریع (`sale/quick`، جانشینِ `ui/screens/QuickSale.kt`): دکمهٔ سربرگ
+    assertTrue(code("ui/v3/sales/quick/QuickSaleRoute.kt")
+      .contains("visual = rememberVisualSearch(rememberVisualSearchApi(), data.products, VisualSearch.Place.TILL)"))
+    val quick = code("ui/v3/sales/quick/QuickSaleScreen.kt")
+    assertTrue(quick.contains("actions = listOfNotNull(visual?.let { v -> V3Action(Icons.Outlined.PhotoCamera, StrVisualSearch.button) { v.start() } })"))
+    assertTrue(quick.contains("visual?.let { VisualSearchHost(it) { t -> if (t is VisualSearch.Tap.Search) { picked = null; query = t.query } } }"))
+
+    //  کالاها (`products`): سربرگ دو جا دارد (اسکن، شبکه/فهرست) ⇒ «…» ِ سربرگ (نه در حالتِ انتخاب)؛ «مشابه» همان بازکردنِ کالا
+    val list = code("ui/v3/products/ProductsListScreen.kt")
+    assertTrue(list.contains("val visual = rememberVisualSearch(rememberVisualSearchApi(), data.products, VisualSearch.Place.LIST)"))
+    assertTrue(list.contains("overflow = if (selecting) emptyList() else listOfNotNull(visual?.let { v -> V3MenuItem(Icons.Outlined.PhotoCamera, StrVisualSearch.button) { v.start() } })"))
+    assertTrue(list.contains("visual?.let { VisualSearchHost(it) { t -> if (t is VisualSearch.Tap.Open) nav.open(t.productId) } }"))
+
+    //  هیچ‌کدام «مشابه» را به سبد نمی‌برد
+    for (rel in listOf("ui/v3/sales/cart/SaleScreen.kt", "ui/v3/sales/quick/QuickSaleScreen.kt", "ui/v3/products/ProductsListScreen.kt")) {
+      val host = code(rel).lines().filter { it.contains("VisualSearchHost(") }
+      assertEquals(rel, 1, host.size)
+      for (bad in listOf("actions.tap", "addOne", "tapCount", "cart.")) assertFalse("$rel ⇐ $bad", host[0].contains(bad))
+    }
   }
 }

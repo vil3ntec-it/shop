@@ -1,6 +1,8 @@
 package ir.vil3ntec.tohid.ui.v3.sales.returns
 
+import ir.vil3ntec.tohid.core.i18n.StrRetPolicy
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.returns.ReturnPolicy
 import ir.vil3ntec.tohid.core.text.TextNormalizer
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ReturnFlow
@@ -62,6 +64,7 @@ object ReturnFlowModel {
       ReturnFlow.WHY_NO_RECEIPT -> StrSale.whyNoReceipt
       ReturnFlow.WHY_DAMAGED -> StrSale.damagedWord
       ReturnFlow.WHY_OVER_LIMIT -> StrSale.whyOverLimit
+      ReturnFlow.WHY_POLICY -> StrRetPolicy.why
       else -> StrSale.whyPermission
     }
   }
@@ -70,6 +73,19 @@ object ReturnFlowModel {
     gate.decision == "deny" -> StrSale.returnDenied
     approved -> StrSale.approvedBy(approval?.by.orEmpty())
     else -> StrSale.approvalNeededFor(approverText(gate.approver), whyText(gate.reasons))
+  }
+
+  /**
+   *  RET-09 — هشدارِ «بیرون از سیاست» (همان `ReturnPolicyNotice` ِ کامپیوتر): سطرهای مهلت و قلم‌های غیرقابلِ برگشت (با نامِ
+   *  کالا)، و برای مدیر و صاحب یادداشتِ «استثنا» (شاگرد «تأییدِ مدیر» را در سد می‌بیند). سیاستِ پذیرفته ⇒ `null`.
+   */
+  fun policyNotice(d: ShopData, verdict: ReturnPolicy.Verdict, policy: ReturnPolicy.Policy, staff: Boolean): Pair<String, String?>? {
+    if (verdict.ok) return null
+    val lines = buildList {
+      if (verdict.late) add(StrRetPolicy.late(verdict.ageDays ?: 0, policy.days))
+      if (verdict.blockedIds.isNotEmpty()) add(StrRetPolicy.blockedItems(verdict.blockedIds.joinToString("، ") { id -> d.products.find { it.id == id }?.name ?: id }))
+    }
+    return lines.joinToString("\n") to (if (staff) null else StrRetPolicy.exception)
   }
 
   fun hits(d: ShopData, term: String): List<Product> {

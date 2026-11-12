@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.BuildConfig
 import ir.vil3ntec.tohid.core.backup.RecoveryPhraseFlow
+import ir.vil3ntec.tohid.core.backup.WipeAll
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrBackupSafety
 import ir.vil3ntec.tohid.core.i18n.StrSettings
@@ -39,6 +40,7 @@ import ir.vil3ntec.tohid.data.repo.BackupRepository
 import ir.vil3ntec.tohid.print.ReportPrint
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.Platform
+import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Toasts
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -359,9 +361,22 @@ internal class BackupController(
     syncPhrase()
   }
 
-  fun wipe() = scope.launch {
-    store.replaceAll(ShopData())
-    toasts.show(StrSettings.wiped)
+  /** نامی که مرحلهٔ دومِ پاک‌سازی می‌خواهد — نامِ دکان؛ دکانِ بی‌نام ⇒ واژهٔ دکمه («پاک کن») */
+  val wipeName: String get() = WipeAll.expected(storeName, StrSettings.wipe)
+
+  /**
+   *  OPS-02 — پاک‌سازیِ کامل: نقش (شاید در این فاصله عوض شده) و نام دوباره سنجیده می‌شوند (`WipeAll.decide`)؛ «پاک شد» فقط
+   *  وقتی `replaceAll` نوشت — ننوشت (قفلِ نرم، سدِ نقش، دیسک) ⇒ «پاک نشد»، دلیلش را پوسته جدا می‌گوید.
+   */
+  fun wipe(typed: String) = scope.launch {
+    when (WipeAll.decide(ShopRole.current(context), typed, wipeName)) {
+      WipeAll.Decision.NOT_OWNER -> toasts.show(StrSettings.wipeOwnerOnly, V3Tone.ERROR)
+      WipeAll.Decision.WRONG_NAME -> Unit
+      WipeAll.Decision.ERASE -> when (WipeAll.outcome(store.replaceAll(ShopData()))) {
+        WipeAll.Outcome.WIPED -> toasts.show(StrSettings.wiped, V3Tone.SUCCESS)
+        WipeAll.Outcome.FAILED -> toasts.show(StrSettings.wipeFailed, V3Tone.ERROR)
+      }
+    }
   }
 }
 

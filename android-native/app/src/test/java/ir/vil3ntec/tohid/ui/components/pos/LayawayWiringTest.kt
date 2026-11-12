@@ -39,9 +39,10 @@ class LayawayWiringTest {
   }
 
   @Test fun `صندوقِ گوشی و کامپیوتر و تنظیمات`() {
-    val call = "LayawayBar(d, store, cartStore, ::toast"
-    for (rel in listOf("ui/screens/Sale.kt", "ui/screens/DeskSale.kt")) assertEquals(rel, 1, count(rel, call))
-    assertEquals(1, count("ui/screens/Settings.kt", "LayawaySettingsWired(context)"))
+    //  کامپیوتر: `DeskSale`؛ گوشیِ نسخهٔ ۳: `PhoneTillTools` زیرِ سبدِ `SaleRoute` (`ui/screens/Sale.kt` فقط پیش‌نمایشِ DevShot است)
+    assertEquals(1, count("ui/screens/DeskSale.kt", "LayawayBar(d, store, cartStore, ::toast"))
+    assertEquals(1, count("ui/v3/sales/cart/PhoneTillTools.kt", "LayawayBar(data, store, cart, toast)"))
+    assertEquals(1, count("ui/v3/sales/cart/SaleRoute.kt", "tools = { PhoneTillTools("))
     //  صفحه و ردیفِ تنظیماتِ نسخهٔ ۳ (گوشی و کامپیوتر)
     assertEquals(1, count("ui/v3/settings/sections/TillMoneyScreensAndroid.kt", "LayawayPref.set(context, it)"))
     assertEquals(1, count("ui/screens/SettingsLayout.kt", "LAYAWAY -> ir.vil3ntec.tohid.core.i18n.StrLayaway.settingsTitle"))

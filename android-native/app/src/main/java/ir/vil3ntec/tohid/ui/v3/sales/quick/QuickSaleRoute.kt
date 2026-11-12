@@ -7,10 +7,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
+import ir.vil3ntec.tohid.core.product.VisualSearch
 import ir.vil3ntec.tohid.data.PromoEngine
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.ui.PromoLive
+import ir.vil3ntec.tohid.ui.screens.rememberVisualSearch
+import ir.vil3ntec.tohid.ui.screens.rememberVisualSearchApi
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.products.ProductsPaths
 import ir.vil3ntec.tohid.ui.v3.sales.SalesPaths
@@ -40,6 +43,8 @@ fun RouteScope.QuickSaleRoute() {
     cart = lines,
     total = total,
     onBack = backOrNull,
+    //  AI-11: «جست‌وجو با عکس» در سربرگ فقط با پاسخِ «روشن» ِ سرور (پرچمِ `shop.visual_search`)
+    visual = rememberVisualSearch(rememberVisualSearchApi(), data.products, VisualSearch.Place.TILL),
     actions = QuickSaleActions(
       tap = { id, weighed -> if (weighed) nav.open(SalesPaths.keypad(id)) else feedback.addOne(data, id) },
       minus = { id -> feedback.minusOne(data, id) },

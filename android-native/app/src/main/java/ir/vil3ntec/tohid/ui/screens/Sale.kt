@@ -360,7 +360,7 @@ fun SaleScreen(
       val whole = (hit as? BarcodeMatch.Hit.Product)?.exact ?: true
       toast(
         when {
-          lotHit != null -> "${product.name} — سری ${lotHit.second} به سبد اضافه شد"
+          lotHit != null -> ir.vil3ntec.tohid.core.i18n.StrSalePages.lotAdded(product.name, lotHit.second)
           whole -> StrSale.addedToCart(product.name)
           else -> StrSale.halfBarcode(product.name)
         }
@@ -467,7 +467,7 @@ fun SaleScreen(
       //  «تمام شد»: همان پیامِ موتورِ فروش (جنس هست؟ اول ورودیِ انبار)؛ بخشی ماند ⇐ چقدر هست
       toast(
         if (added.available <= 0) SalesEngine.shortageMessage(p, SalesEngine.cartStep(p.unit), added.available)
-        else "${p.name} فقط ${qty(added.available)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است"
+        else StrSale.onlyLeftOf(p.name, "${qty(added.available)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""}")
       )
       if (added.cart === cartStore.lines.value) return
     }
@@ -482,7 +482,7 @@ fun SaleScreen(
       val p = d.products.find { it.id == row.id } ?: return
       val added = SalesEngine.addToCartCapped(lines, p.id, row.step, ir.vil3ntec.tohid.data.ProductInfoMap.sellable(d, p.id))
       if (added.capped) {
-        toast("${p.name} فقط ${qty(added.available)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است")
+        toast(StrSale.onlyLeftOf(p.name, "${qty(added.available)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""}"))
       }
       cartStore.set(added.cart)
       return
@@ -702,12 +702,12 @@ fun SaleScreen(
             Icon(Icons.Outlined.PhotoCamera, contentDescription = null, tint = v.onBlackMuted, modifier = Modifier.size(30.dp))
             Spacer(Modifier.height(8.dp))
             Text(
-              if (granted) "دوربین خاموش است" else StrSale.needCameraPermission,
+              if (granted) StrSale.cameraOff else StrSale.needCameraPermission,
               color = v.onBlackMuted,
               fontSize = 13.sp,
             )
             Spacer(Modifier.height(10.dp))
-            V3Pill(if (granted) "روشن کردن دوربین" else ir.vil3ntec.tohid.core.i18n.StrDevices.allow, v.cart, v.onCart) {
+            V3Pill(if (granted) StrSale.turnOnCamera else ir.vil3ntec.tohid.core.i18n.StrDevices.allow, v.cart, v.onCart) {
               if (granted) {
                 cameraOn = true
                 gate.reset()
@@ -765,7 +765,7 @@ fun SaleScreen(
         }
       }
       Spacer(Modifier.height(10.dp))
-      V3Pill("+ قلم آزاد", v.onBlack, v.black, height = 36.dp) { freeLine = true }
+      V3Pill(ir.vil3ntec.tohid.core.i18n.StrSalePages.addFreeItem, v.onBlack, v.black, height = 36.dp) { freeLine = true }
     }
   }
 
@@ -1018,7 +1018,7 @@ fun SaleScreen(
             scanPanel = { phoneScanPanel() },
             emptyText = when {
               d.products.isEmpty() -> StrSale.noProductsYet
-              phoneSearch.isNotBlank() -> "کالایی با «${phoneSearch.trim()}» پیدا نشد"
+              phoneSearch.isNotBlank() -> StrSale.noItemFor(phoneSearch.trim())
               else -> StrSale.emptyCategory
             },
             bottomGap = bottomGap,
@@ -1057,13 +1057,13 @@ fun SaleScreen(
               PhoneCartInfoRow(
                 icon = Icons.Outlined.Person,
                 title = debtorName ?: StrSale.walkIn,
-                hint = cartDebtorId?.let { id -> debtStateText(d, id) } ?: "برای فروشِ نسیه، قرض‌دار را انتخاب کنید",
+                hint = cartDebtorId?.let { id -> debtStateText(d, id) } ?: ir.vil3ntec.tohid.core.i18n.StrSalePages.pickDebtorForCreditHint,
                 index = rows.size,
                 revealed = revealed,
                 onClick = { pickDebtor = true },
                 onClickLabel = StrSale.pickDebtor,
                 trailing = {
-                  if (debtorName != null) PhoneCartClear("برداشتنِ قرض‌دار") { cartStore.setDebtor(null) }
+                  if (debtorName != null) PhoneCartClear(ir.vil3ntec.tohid.core.i18n.StrSalePages.removeDebtor) { cartStore.setDebtor(null) }
                 },
               )
               val off = CartSummary.manualDiscount(cart, d.products)
@@ -1099,7 +1099,7 @@ fun SaleScreen(
             p == null -> null
             SalesEngine.quantityProblem(p, q) != null -> SalesEngine.quantityProblem(p, q)
             stock <= 0 -> SalesEngine.shortageMessage(p, q, stock)
-            q > stock -> "فقط ${qty(stock)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است"
+            q > stock -> StrSale.onlyInStock("${qty(stock)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""}")
             else -> null
           }
         },
@@ -1125,12 +1125,12 @@ fun SaleScreen(
     AlertDialog(
       onDismissRequest = { newCategory = null },
       containerColor = Shop.colors.surfaceSolid,
-      title = { Text("دسته‌بندیِ تازه", color = Shop.colors.text) },
+      title = { Text(ir.vil3ntec.tohid.core.i18n.StrSalePages.newCategory, color = Shop.colors.text) },
       text = {
         OutlinedTextField(
           value = value,
           onValueChange = { newCategory = it },
-          placeholder = { Text("نام دسته‌بندی را بنویسید…") },
+          placeholder = { Text(ir.vil3ntec.tohid.core.i18n.StrSalePages.categoryNameHint) },
           singleLine = true,
         )
       },
@@ -1158,7 +1158,7 @@ fun SaleScreen(
       title = { Text(ir.vil3ntec.tohid.core.i18n.StrProducts.deleteCategoryTitle, color = Shop.colors.text) },
       text = {
         Text(
-          "دسته‌بندی «$name» حذف می‌شود. محصولات این دسته حذف نمی‌شوند، فقط دیگر در این دسته‌بندی فیلتر نمی‌شوند.",
+          ir.vil3ntec.tohid.core.i18n.StrProducts.deleteCategoryBody(name),
           style = MaterialTheme.typography.bodySmall,
           color = Shop.colors.muted,
         )

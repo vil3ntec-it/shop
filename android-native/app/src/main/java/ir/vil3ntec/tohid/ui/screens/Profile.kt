@@ -128,8 +128,6 @@ fun ProfileScreen(
   var phone by remember { mutableStateOf(state.accountPhone) }
   var createdAt by remember { mutableStateOf(state.accountCreatedAt) }
   var newPhone by remember { mutableStateOf("") }
-  var codeShown by remember { mutableStateOf(false) }   //  AUTH-08 (`PhoneClaimStep.kt`)
-  var phoneCode by remember { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
   val v1 by SyncV1Engine.of(context).status.collectAsState()
   var confirmSignOut by remember { mutableStateOf(false) }
@@ -181,7 +179,7 @@ fun ProfileScreen(
   PhotoSourceSheet(
     open = pickOpen,
     onDismiss = { pickOpen = false },
-    note = "عکسِ حساب فقط روی همین گوشی می‌ماند",
+    note = ir.vil3ntec.tohid.core.i18n.StrAccount.photoLocal,
   ) { uri ->
     PhotoStore.saveAvatar(context, state.accountId.ifBlank { "local" }, uri)
       .onSuccess { avatarVersion++; toast(ir.vil3ntec.tohid.core.i18n.StrAccount.photoSaved) }
@@ -284,7 +282,7 @@ fun ProfileScreen(
               if (!Backend.isReady(context) || !Backend.isOnline(context)) {
                 busy = false
                 toast(
-                  if (claim.isBlank()) "نام روی گوشی ذخیره شد — برای ثبت روی سرور به اینترنت نیاز است"
+                  if (claim.isBlank()) ir.vil3ntec.tohid.core.i18n.StrAccount.nameSavedOffline
                   else ir.vil3ntec.tohid.core.i18n.StrAccount.phoneNeedsInternet
                 )
                 return@launch
@@ -481,7 +479,7 @@ fun ProfileScreen(
       title = { Text(ir.vil3ntec.tohid.core.i18n.StrAccount.signOutTitle, color = colors.text) },
       text = {
         Text(
-          "برای برگشتن، ایمیل و رمزتان را دوباره می‌زنید. دفترِ دکان روی همین گوشی سرِ جایش می‌ماند.",
+          ir.vil3ntec.tohid.core.i18n.StrAccount.signOutBody,
           color = colors.muted,
         )
       },
@@ -848,8 +846,8 @@ private fun ProfileEditPage(
             ProfileAvatar(accountId, avatarVersion, 64.dp)
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-              Text("عکسِ حساب", style = v3Text(15, FontWeight.SemiBold, 22), color = c.ink)
-              Text("فقط روی همین گوشی می‌ماند", style = v3Text(12, FontWeight.Medium, 17), color = c.inkMuted)
+              Text(ir.vil3ntec.tohid.core.i18n.StrShellPages.accountPhoto, style = v3Text(15, FontWeight.SemiBold, 22), color = c.ink)
+              Text(ir.vil3ntec.tohid.core.i18n.StrShellPages.onThisPhoneOnly, style = v3Text(12, FontWeight.Medium, 17), color = c.inkMuted)
             }
             V3PillButton(ir.vil3ntec.tohid.core.i18n.StrPanelPages.change, Icons.Outlined.PhotoCamera, onPhoto)
           }
@@ -889,7 +887,7 @@ private fun ProfileEditPage(
             OutlinedTextField(
               value = newPhone,
               onValueChange = onNewPhone,
-              label = { Text("شماره موبایل — یک بار ثبت می‌شود") },
+              label = { Text(ir.vil3ntec.tohid.core.i18n.StrShellPages.mobileOnce) },
               placeholder = { Text("07XXXXXXXX") },
               singleLine = true,
               keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone),
@@ -936,7 +934,7 @@ private fun ProfileEditPage(
             icon = Icons.Outlined.Schedule,
             label = ir.vil3ntec.tohid.core.i18n.StrAccount.memberFor,
             value = if (createdAt > 0) spanText(createdAt) else "—",
-            description = if (createdAt > 0) "عضو از ${formatMillis(createdAt)}" else ir.vil3ntec.tohid.core.i18n.StrAccount.createdUnknown,
+            description = if (createdAt > 0) ir.vil3ntec.tohid.core.i18n.StrAccount.memberSince(formatMillis(createdAt)) else ir.vil3ntec.tohid.core.i18n.StrAccount.createdUnknown,
           )
         }
       }

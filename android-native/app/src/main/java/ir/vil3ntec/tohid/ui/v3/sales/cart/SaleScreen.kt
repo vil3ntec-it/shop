@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.product.VisualSearch
 import ir.vil3ntec.tohid.data.PromoEngine
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
@@ -40,6 +41,8 @@ import ir.vil3ntec.tohid.ui.components.pos.PhoneCatalog
 import ir.vil3ntec.tohid.ui.components.pos.PhoneCatalogItem
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleFrame
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
+import ir.vil3ntec.tohid.ui.screens.VisualSearchHandle
+import ir.vil3ntec.tohid.ui.screens.VisualSearchHost
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.CustomerPickerModel
 
 /** کارهای صندوق — هر کدام یک کارِ سبد یا یک مسیر در `SaleRoute` */
@@ -105,6 +108,8 @@ fun SaleScreen(
   held: Map<String, Double> = emptyMap(),
   /** POS-06: کالاهای سنجاق‌شدهٔ همین دستگاه (`TillPinsPrefs`) سرِ شبکه؛ خالی ⇒ همان شبکهٔ امروز */
   pins: List<String> = emptyList(),
+  /** AI-11: «جست‌وجو با عکس» (`rememberVisualSearch`)؛ `null` (پرچمِ خاموش، بی حساب) ⇒ بی ردیف در «…» */
+  visual: VisualSearchHandle? = null,
 ) {
   var search by rememberSaveable { mutableStateOf(start.search) }
   var picked by rememberSaveable { mutableStateOf<String?>(null) }
@@ -240,7 +245,10 @@ fun SaleScreen(
         onHold = onHold,
         onHeldList = onHeldList,
         onPriceCheck = actions.priceCheck,
+        onVisualSearch = visual?.let { v -> { v.start() } },
       )
     }
+    //  «مشابه» فقط کالا را در کادرِ جست‌وجو می‌نشاند (دستهٔ «همه» تا زیرِ دستهٔ دیگر گم نشود)؛ هرگز سبد
+    visual?.let { VisualSearchHost(it) { t -> if (t is VisualSearch.Tap.Search) { picked = null; search = t.query } } }
   }
 }

@@ -16,7 +16,8 @@ import java.io.File
  *     مشترکِ `PinApprovalDialog` است؛ سابقهٔ `credit_over_limit` با `by` (فروشنده) و `approvedBy`؛
  *   • تغییرِ قیمت (تازه): با «قیمت و تخفیفِ ردیف» ِ روشن، ردِ قاعدهٔ جهت یا سقفِ قلمِ آزاد در کادرِ ردیف دکمهٔ
  *     «درخواستِ تأیید» دارد (`PriceApproval`)، همان `PinApprovalDialog`، و پس از «ثبت» ردیفِ سابقهٔ
- *     `price_override` با درخواست‌کننده و تأییدکننده و دلیل (`LinePolicy.approvalAudit`).
+ *     `price_override` با درخواست‌کننده و تأییدکننده و دلیل (`LinePolicy.approvalAudit`). گوشیِ نسخهٔ ۳ از `claude/e-rows-31w`
+ *     همان را دارد (`LineModel.check`/`apply`، `PinApprovalSheet`)؛ پنجرهٔ واقعی: ScenarioS45DeskUiTest و ScenarioS45PhoneUiTest.
  */
 class ScenarioS45PriceTest {
 
@@ -37,15 +38,29 @@ class ScenarioS45PriceTest {
   }
 
   @Test
-  fun `S45 کادرِ ردیف به‌جای پیامِ رد درخواستِ تأیید دارد و هر دو صندوق وصل‌اند`() {
+  fun `S45 کادرِ ردیف به‌جای پیامِ رد درخواستِ تأیید دارد — کامپیوتر و گوشیِ نسخهٔ ۳ از یک در`() {
     val dialogs = source("android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/SaleDialogs.kt")
-    assertTrue(dialogs.contains("PriceApproval.askable(policy, it)"))
+    //  یک در (`LinePolicy.checked`) با کدِ ردِ هسته — پیش‌تر متنِ رد به `askable` می‌رفت و دکمه هرگز دیده نمی‌شد (ScenarioS45DeskUiTest)
+    assertTrue(dialogs.contains("ir.vil3ntec.tohid.data.LinePolicy.checked("))
     assertTrue(dialogs.contains("StrTill.askApproval"))
     assertTrue(dialogs.contains("ir.vil3ntec.tohid.ui.components.staff.PinApprovalDialog("))
-    assertTrue(dialogs.contains("PriceApproval.lifted(policy, granted.code)"))
-    for (rel in listOf("ui/screens/DeskSale.kt", "ui/screens/Sale.kt")) {
-      assertTrue(rel, source("android-native/app/src/main/java/ir/vil3ntec/tohid/$rel").contains("priceAsk = remember(id) { ir.vil3ntec.tohid.data.LinePolicyPrefs.ask("))
-    }
+    assertTrue(source("android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/DeskSale.kt").contains("priceAsk = remember(id) { ir.vil3ntec.tohid.data.LinePolicyPrefs.ask("))
+    //  گوشیِ نسخهٔ ۳ (`claude/e-rows-31w`): مسیرِ `sale/line/{i}` همان سیاست و همان در را می‌گیرد (ScenarioS45PhoneTest، ScenarioS45PhoneUiTest)
+    val route = source("android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/sales/cart/CartSheetRoutes.kt")
+    assertTrue(route.contains("LinePolicyPrefs.ask(context, store, priceAudit"))
+    assertTrue(route.contains("LineModel.apply(cart.lines.value, info, form, start, policy, grant)"))
+    val sheet = source("android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/sales/cart/LineSheet.kt")
+    assertTrue(sheet.contains("LineModel.check(policy, form, info, start, grant, canAsk = priceAsk != null)"))
+    assertTrue(sheet.contains("PinApprovalSheet("))
+  }
+
+  @Test
+  fun `S45 کدِ رد همراهِ متنِ رد است`() {
+    val upOnly = LinePricing.Policy(on = true, direction = LinePricing.Direction.UP)
+    val d = LinePolicy.edit(upOnly, false, 100.0, 100.0, 80.0, 1.0, true, "")
+    assertEquals(LinePricing.PRICE_DOWN_BLOCKED, d.code)
+    assertTrue(PriceApproval.askable(upOnly, d.code))
+    assertEquals(LinePricing.PRICE_DOWN_BLOCKED, LinePolicy.checked(upOnly, false, 100.0, 100.0, 80.0, 1.0, true, "", null, canAsk = true).askCode)
   }
 
   @Test
