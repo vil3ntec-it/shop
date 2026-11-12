@@ -66,7 +66,7 @@
 - **دام:** `quality.mjs` وابستگیِ پلتفرمیِ `AtRestEnvelope.kt` را سقف دارد ⇒ رمزِ جریانی در `core/atrest/platform/PhraseBackup.kt`
   (پوشهٔ مرزی). `javax.crypto.CipherOutputStream` خطای `flush` ِ پس از برچسب را نادیده می‌گیرد ⇒ جریانِ خودمان. کامپایلِ کامپیوتر
   با `-Xmx2g` ِ in-process «Java heap space» داد و با ۳g زیرِ بارِ عامل‌های دیگر کشته شد ⇒ `-Xmx3g -XX:+UseSerialGC --max-workers=1`.
-- **قدمِ بعد:** اجرای کاملِ کامپیوتر پشتِ صفِ `flock` (نتیجه در کامیتِ بعدیِ همین بند). OPS-02: USB با یک لمس و برگهٔ عبارت روی گوشیِ واقعی؛
+- **قدمِ بعد:** اجرای کاملِ کامپیوتر (`flock`، ۱۴:۰۲) ⇒ ۳۹۷۰ PASS، ۰ FAIL، ۴ SKIP ِ پیشینِ بنچ/عکس؛ precheck ⇒ `fail=0`؛ `quality.mjs` بی ❌. OPS-02: USB با یک لمس و برگهٔ عبارت روی گوشیِ واقعی؛
   PAY-08: نخستین `VerifyingTerminal` ِ واقعی فقط با سندِ یکپارچه‌سازی (`VendorAppTerminal`)، سپس دکمه در `CardTerminalEntry`. ادغامِ
   `claude/e-rows-15w` در دسته.
 
