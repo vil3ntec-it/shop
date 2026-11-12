@@ -16,7 +16,7 @@ import sys
 MAX_LINES = 80          # برای هر رشته، با سطرِ سرِ رشته
 HEAD_LINES = 12         # از ریشهٔ پشته (کدام کار/آزمون)
 MAX_THREADS = 24        # سقفِ رشته‌های چاپی در هر پرونده (لاگ کوتاه بماند)
-WAITS = re.compile(r"NSRecursiveLock|semaphore_wait|dispatch_sync|__DISPATCH_WAIT_FOR_QUEUE__")
+WAITS = re.compile(r"NSRecursiveLock|semaphore_wait|dispatch_sync|__DISPATCH_WAIT_FOR_QUEUE__|__psynch_cvwait|__psynch_mutexwait|SynchronizedObject")
 THREAD = re.compile(r"^\s*\d+\s+Thread_\S+")
 ADDR = re.compile(r"\s+\[0x[0-9a-fA-F]+(?:,0x[0-9a-fA-F]+)*\]")
 

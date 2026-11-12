@@ -173,8 +173,9 @@ jobs:
       #  کادرِ صندوقِ خانه و «+»، سفارشِ آنلاین تا یک فاکتور، دری — §۰.۱۳ و §۰.۱۵)
       - name: iosSimulatorArm64Test (ios/shared) — رمز، shimها و جریان‌های اصلی
         if: always()
-        #  کامپایل و پیوندِ آزمون ~۱۲، آزمونِ سرتاسری ≤ ۲۰ دقیقه (نگهبانِ خودش)؛ گیرِ دیگر کارِ ۱۱۵ دقیقه‌ای را نخورد
-        timeout-minutes: 45
+        #  کامپایل و پیوندِ آزمون ~۱۲ (در #1039 تا ۲۱)، آزمونِ سرتاسری ≤ ۲۰ دقیقه (نگهبانِ خودش) ⇒ ۶۰ تا نگهبان پیش از بُرشِ گام
+        #  به حرف بیاید (summary.md، e2e.log و sample)؛ گیرِ دیگر کارِ ۱۱۵ دقیقه‌ای را نخورد
+        timeout-minutes: 60
         env:
           TOHID_E2E_BACKEND: ${{ github.workspace }}/ios-e2e/backend.json
           TOHID_E2E_SHOTS: ${{ github.workspace }}/ios-e2e/shots

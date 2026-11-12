@@ -18,6 +18,7 @@ import platform.CoreFoundation.kCFTypeDictionaryValueCallBacks
 import platform.Foundation.CFBridgingRelease
 import platform.Foundation.CFBridgingRetain
 import platform.Foundation.NSData
+import platform.Foundation.NSLock
 import platform.Security.SecItemAdd
 import platform.Security.SecItemCopyMatching
 import platform.Security.SecItemDelete
@@ -34,7 +35,6 @@ import platform.Security.kSecMatchLimit
 import platform.Security.kSecMatchLimitOne
 import platform.Security.kSecReturnData
 import platform.Security.kSecValueData
-import ir.vil3ntec.tohid.ios.jvm.synchronized
 import java.net.toByteArray
 import java.net.toNSData
 
@@ -56,8 +56,19 @@ object Keychain {
    */
   internal var memory: HashMap<String, ByteArray>? = null
 
+  /*
+   *  قفلِ «برگ» ِ همین کلیددانِ حافظه، نه `synchronized` ِ سراسریِ `ios/jvm/Jvm.kt`: درونش هیچ قفلِ دیگری گرفته نمی‌شود، پس
+   *  ترتیبِ قفل‌ها وارونه نمی‌شود. با قفلِ سراسری، خواندنِ توکن روی رشتهٔ اصلی (درونِ `runLock` ِ Compose) پشتِ کارگری می‌ماند
+   *  که قفلِ سراسری را داشت و منتظرِ همان `runLock` بود — گیرِ گاه‌به‌گاهِ `10-online-order` در #1037 و #1039.
+   */
+  private val memoryLock = NSLock()
+  private inline fun <R> inMemory(block: () -> R): R {
+    memoryLock.lock()
+    try { return block() } finally { memoryLock.unlock() }
+  }
+
   fun read(account: String): ByteArray? {
-    memory?.let { m -> return synchronized(m) { m[account]?.copyOf() } }
+    memory?.let { m -> return inMemory { m[account]?.copyOf() } }
     return readKeychain(account)
   }
 
@@ -77,7 +88,7 @@ object Keychain {
 
   /** فقط اگر نیست؛ بود ⇒ false (مقدارِ پیشین دست نمی‌خورد) */
   fun add(account: String, value: ByteArray): Boolean {
-    memory?.let { m -> return synchronized(m) { if (account in m) false else { m[account] = value.copyOf(); true } } }
+    memory?.let { m -> return inMemory { if (account in m) false else { m[account] = value.copyOf(); true } } }
     val q = addQuery(account, value)
     val rc = SecItemAdd(q, null)
     CFRelease(q)
@@ -94,7 +105,7 @@ object Keychain {
   }
 
   fun delete(account: String) {
-    memory?.let { m -> synchronized(m) { m.remove(account) }; return }
+    memory?.let { m -> inMemory { m.remove(account) }; return }
     val q = query(account)
     val rc = SecItemDelete(q)
     CFRelease(q)
