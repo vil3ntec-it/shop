@@ -69,6 +69,10 @@
 - **دام:** `CustomerMerge.merge` با `newId` ِ آخر را بسیاری با lambda ِ پسین صدا می‌زنند ⇒ پارامترِ تازه با **هم‌بار**، نه
   افزودن به آخر. `LocalFocusManager` ِ بیرون از `Dialog` مالِ پنجرهٔ صندوق است ⇒ Tab ِ پنل باید درونِ `Dialog` بگیردش.
   `PosLogicTest` شمارِ «بازگشت به پنل پس از گزینش» را می‌شمارد (حالا ۳ با «مشتریِ تازه»).
+- **اجرای کامل:** `flock /tmp/gradle-full.lock ./desktop/gradlew -p desktop test` روی کدِ Kotlin ِ `db2f33b04` (پس از آن فقط سرور و
+  سند) ⇒ ۳۹۵۰ PASS، ۰ FAIL، ۴ SKIP ِ پیشینِ بنچ/عکس (۱۷:۳۹). سرور: `store-webp` ۴ + ۱ skip ِ Electron، `storefront-v2` ۱۹/۱۹،
+  `keymap` ۸/۸ (PGlite). precheck ⇒ `fail=0`.
+- **WEB-16 (سرور):** AVIF با `STORE_AVIF=1` ِ جدا در همان `lib/store-webp.js` (`pick`/`encodedOf`)؛ گالری از پیش با PRD-17.
 - **نیمه‌کاره / قدمِ بعد:** WEB-16: AVIF ساخته شد (پایین)؛ مانده srcset (اندازه‌های پاسخ‌گوی بیشتر). ماندهٔ همین عامل: POS-05/INV-03
   (رزروِ سفارشِ اینترنتی در صندوق: درِ سرور برای مقدارِ رزروشده + خواندن در صندوق)، PAY-08، CHK-08، OPS-02 — شروع نشد.
   ⚠️ `server/node_modules` ِ مشترک (`/home/user/wt-webp`) در میانهٔ کار پاک شد؛ این worktree به نصبِ خصوصیِ scratchpad پیوند دارد.
