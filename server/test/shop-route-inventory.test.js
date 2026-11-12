@@ -408,6 +408,12 @@ async function seedShop(a) {
                  VALUES ($1,$2,$3,'gate_photo','image/jpeg',4,$4,$5)`, [newId('sam'), cust, addr, Buffer.from([0xff, 0xd8, 0xff, 0xe0]), at]);
     await query('INSERT INTO online_order_address_refs (order_id, shop_id, address_id, created_at) VALUES ($1,$2,$3,$4)',
       [ids.order, a.shopId, addr, at]);
+    //  همین سفارش پایین‌تر «تحویل شد» می‌شود و رسانهٔ نشانیِ ذخیره‌شده فقط برای سفارشِ باز است (`address-media.FINISHED`)؛
+    //  رسانهٔ خودِ سفارش (CHK-08، ۸۴۷) می‌ماند ⇒ درِ بایت برای صاحبِ «الف» همان ۲۰۰
+    const jpg = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+    await query(`INSERT INTO order_address_media (id, shop_id, order_id, kind, mime, size, sha256, data, created_at)
+                 VALUES ($1,$2,$3,'gate_photo','image/jpeg',$4,$5,$6,$7)`,
+    [newId('oam'), a.shopId, ids.order, jpg.length, require('crypto').createHash('sha256').update(jpg).digest('hex'), jpg, at]);
   }
   for (const to of ['accepted', 'picking', 'packed']) {
     const t = await h.post(`/api/shop/orders/${ids.order}/transition`, { to }, { token: a.accessToken });

@@ -136,8 +136,8 @@ async function order(shopId, phone, { status = 'delivered', name = NAME, totalMi
   //  CHK-08: عکسِ دروازهٔ نشانی (مهاجرتِ ۸۴۷)
   await query(
     `INSERT INTO order_address_media (id, shop_id, order_id, kind, mime, size, sha256, data, created_at)
-     VALUES ($1,$2,$3,'gate_photo','image/jpeg',$4,'x',$5,$6)`,
-    [newId('oam'), shopId, id, jpeg.length, jpeg, at]
+     VALUES ($1,$2,$3,'gate_photo','image/jpeg',$4,$5,$6,$7)`,
+    [newId('oam'), shopId, id, jpeg.length, require('node:crypto').createHash('sha256').update(jpeg).digest('hex'), jpeg, at]
   );
   await query(
     'INSERT INTO delivery_locations (assignment_id, shop_id, lat, lng, server_time) VALUES ($1,$2,$3,$4,$5)',
