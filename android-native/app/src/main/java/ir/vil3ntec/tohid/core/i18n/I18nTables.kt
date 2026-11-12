@@ -36,6 +36,7 @@ object I18nTables {
     StrCourierArea, // S83: محدودهٔ خدمتِ هر پیک (فرمِ پیک، کارت و سپردنِ دستی)
     StrProductSuggest, // AI-06: پیشنهادِ دسته و نام در فرمِ کالا
     StrOnlineReport, // RPT-14: گزارشِ فروشِ اینترنتی در برنامهٔ مدیریت
+    StrAddressMedia, // CRM-09/CHK-08: عکسِ دروازه و یادداشتِ صوتیِ نشانیِ سفارش
     StrBranches, // RPT-18: گزارشِ همهٔ شعبه‌ها
     StrImageChanges, // IMG-PRO-17/16: تغییرِ دسته‌ایِ عکس‌ها و نسخه‌های عکس
     StrImageStudio, // ۴-۲۳ (۱): استودیوی عکسِ سرور — دسته‌ها و تأییدِ نسخه
