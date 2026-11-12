@@ -79,7 +79,7 @@ class ReportLedger private constructor() {
         val x = Sale(
           id = s.s("id"), total = money(s, "total"), discount = money(s, "discount"), finalTotal = money(s, "finalTotal"),
           method = s.s("paymentMethod"), cancelled = s.s("status") == "cancelled", seller = JsText.trim(s.s("seller")),
-          cancelledBy = JsText.trim(s.s("cancelledBy")), approvedBy = JsText.trim(s.s("approvedBy")), channel = s.s("channel").ifEmpty { "pos" },
+          cancelledBy = JsText.trim(s.s("cancelledBy")), approvedBy = JsText.trim(s.s("approvedBy")).ifEmpty { slipBy(s["approval"]) }, channel = s.s("channel").ifEmpty { "pos" },
           date = s.s("date"), createdAt = ms(s, "createdAt"),
         )
         l.sales += x; l.saleById[x.id] = x
@@ -147,6 +147,12 @@ class ReportLedger private constructor() {
     private fun JsonObject.list(k: String): List<JsonObject> = (this[k] as? JsonArray)?.mapNotNull { it as? JsonObject } ?: emptyList()
 
     /** همان `str()`ِ JS: نبود یا null ⇒ "" */
+    /**
+     *  S08: تأییدکنندهٔ تخفیفِ بیش از سقف روی فاکتورِ برنامه فقط در برگهٔ امضاشده (`approval.by`) است، نه در `approvedBy`؛
+     *  برگهٔ «درخواستِ از راهِ دور» (`{v, request}`) نامِ تأییدکننده ندارد ⇒ "" (همان `slipBy` ِ `license/report-core.js`)
+     */
+    private fun slipBy(a: kotlinx.serialization.json.JsonElement?): String = JsText.trim((a as? JsonObject)?.s("by").orEmpty())
+
     private fun JsonObject.s(k: String): String = (this[k] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content ?: ""
 
     /** همان `num()`ِ JS: عدد، یا رشتهٔ عددی؛ هر چیزِ دیگر ۰ */

@@ -139,4 +139,38 @@ class ReportBridgeParityTest {
     //  رویدادِ کشوی a3 تاریخ ندارد (فقط `at`) و در روزِ «۱۴» بی ساعت شمرده نمی‌شود؛ پس تابلو یکی است
     assertEquals(web, app)
   }
+
+  /**
+   *  S08 — تأییدکنندهٔ تخفیفِ بیش از سقف از برگهٔ امضاشدهٔ خودِ فاکتور (`Sale.approval`، همان `DiscountGate.json`) به ضدتقلب
+   *  (RPT-09) می‌رسد: فروشنده `overrideCount`، تأییدکننده `approvalCount`؛ «درخواستِ از راهِ دور» (`{v, request}`) نام ندارد ⇒
+   *  نه. همان قاعدهٔ `slipBy` ِ `license/report-core.js` (موردِ «S08» ِ `report-v1.json`).
+   */
+  @Test
+  fun `تأییدکنندهٔ تخفیف از برگهٔ فاکتورِ برنامه به ضدتقلب می‌رسد`() {
+    fun slip(by: String) = ir.vil3ntec.tohid.core.perm.ApprovalSlip.Slip(
+      shop = "sh1", doc = "sales/s1", perm = "sales.discount", pctBp = 1000, amount = null, by = by, key = "k1",
+      iat = 1, exp = 2, nonce = "n1", reason = "مشتریِ همیشگی",
+    )
+    fun sale(id: String, seller: String, discount: Double, approval: JsonObject?) = Sale(
+      id = id, invoiceNumber = id.drop(1).toInt(), total = 1000.0, discount = discount, finalTotal = 1000.0 - discount,
+      paidAmount = 1000.0 - discount, status = "completed", createdAt = 1_791_600_000_000L, date = "2026-10-10", seller = seller,
+      approval = approval,
+    )
+    val d = ShopData(sales = listOf(
+      sale("s1", "کریم", 100.0, DiscountGate.json(slip("مدیر"))),
+      sale("s2", "کریم", 50.0, null),
+      sale("s3", "احمد", 80.0, JsonObject(mapOf("v" to JsonPrimitive(1), "request" to JsonPrimitive("n2")))),
+    ))
+    val r = ReportCore.fraud(ReportBridge.ledgerOf(d), "2026-10-01", "2026-10-31", null)
+    val by = r.rows.associateBy { it.key }
+    assertEquals(1, by.getValue("کریم").overrideCount)
+    assertEquals(1, by.getValue("مدیر").approvalCount)
+    assertEquals(0, by.getValue("احمد").overrideCount)
+    assertEquals(1, r.totals.overrideCount)
+    assertEquals(1, r.totals.approvalCount)
+    //  ریزِ ضدتقلب همان فاکتور را با نامِ تأییدکننده نشان می‌دهد
+    val events = ReportCore.fraudEvents(ReportBridge.ledgerOf(d), "2026-10-01", "2026-10-31", "کریم")
+    assertTrue(events.toString(), events.any { it.kind == "discount" && it.docId == "s1" && it.approvedBy == "مدیر" })
+    assertTrue(events.toString(), events.any { it.kind == "discount" && it.docId == "s2" && it.approvedBy == "" })
+  }
 }
