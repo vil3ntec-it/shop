@@ -43,9 +43,12 @@ internal class RouteUiHarness(private val rule: ComposeContentTestRule) : AutoCl
   var store: ShopStore? = null
     private set
 
-  fun show(path: String, data: ShopData) {
+  fun show(path: String, data: ShopData) = show(path, memoryStore(data))
+
+  /** با دفترِ دلخواه — مثلاً دفترِ بارشدهٔ روی دیسک (`ShopStore.load`) وقتی صفحه بیرون از برگه در دفتر می‌نویسد (`update`) */
+  fun show(path: String, store: ShopStore) {
     I18n.source = { Lang.FA }
-    val store = memoryStore(data).also { this.store = it }
+    this.store = store
     rule.setContent {
       CompositionLocalProvider(
         LocalContext provides DesktopContext,

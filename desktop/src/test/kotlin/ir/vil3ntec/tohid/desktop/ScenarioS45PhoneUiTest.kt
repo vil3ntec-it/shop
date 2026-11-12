@@ -21,6 +21,7 @@ import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.LinePolicyPrefs
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopRole
+import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.TillUser
 import ir.vil3ntec.tohid.desktop.shots.MoneyDemo
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
@@ -33,6 +34,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
+import kotlinx.coroutines.runBlocking
 
 /**
  *  S45 در پنجرهٔ واقعیِ Compose ِ **گوشیِ نسخهٔ ۳** — مسیرِ `sale/line/0` (`LineRoute` ⇐ `LineSheet`) با `ShellContext` ِ واقعی
@@ -85,9 +87,13 @@ class ScenarioS45PhoneUiTest {
     rule.waitForIdle()
   }
 
+  /** دفترِ بارشده روی دیسک، مثلِ برنامه — ردیفِ سابقه بیرون از برگه با `ShopStore.update` نوشته می‌شود */
+  private fun loaded(): ShopStore = ShopStore(ctx).also { s -> runBlocking { s.load(); assertTrue(s.replaceAll(data)) } }
+
   @Test fun managerLowersAPriceAsksForApprovalAndOnlyThenItIsSavedAndAudited() {
+    val store = loaded()
     ShopRole.remember(ctx, ShopRole.MANAGER)
-    h.show("sale/line/0", data)
+    h.show("sale/line/0", store)
     h.await(StrSale.unitPrice)
     price("900")
     h.await(StrLine.priceDownBlocked)
@@ -109,8 +115,9 @@ class ScenarioS45PhoneUiTest {
 
     tap(StrSale.submit)
     h.awaitThat { cartLine()?.unitPrice == 900.0 }
-    h.awaitThat { h.store!!.data.value.auditLog.any { it.type == PriceApproval.AUDIT_TYPE } }
-    val row = h.store!!.data.value.auditLog.single { it.type == PriceApproval.AUDIT_TYPE }
+    runCatching { h.awaitThat { store.data.value.auditLog.any { it.type == PriceApproval.AUDIT_TYPE } } }
+      .onFailure { throw AssertionError("ردیفِ سابقهٔ تأیید نیامد: " + store.data.value.auditLog.map { it.type }, it) }
+    val row = store.data.value.auditLog.single { it.type == PriceApproval.AUDIT_TYPE }
     assertEquals(by, row.approvedBy)
     assertEquals("مشتریِ همیشگی", row.reason)
     assertEquals(rice.id, row.refId)

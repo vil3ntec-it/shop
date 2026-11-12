@@ -14,7 +14,9 @@ import ir.vil3ntec.tohid.sync.v1.Ulid
 import ir.vil3ntec.tohid.ui.screens.Haptics
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
-import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 /*
  *  چسبِ برگه‌های سبد — هر کدام یک مسیر (`sale/line/{i}`، `sale/free-line`،
@@ -22,8 +24,8 @@ import kotlinx.coroutines.MainScope
  *  باز شدن دیگر نیست ⇒ برگشت، با یک پیامِ کوتاه.
  */
 
-/** نوشتنِ ردیفِ سابقهٔ تأییدِ قیمت بیرون از برگه — بسته شدنِ مسیر آن را نبرد (همان `MoneyWriter`) */
-private val priceAudit = MainScope()
+/** نوشتنِ ردیفِ سابقهٔ تأییدِ قیمت بیرون از برگه — بسته شدنِ مسیر آن را نبرد؛ `ShopStore.update` خودش روی IO است */
+private val priceAudit = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 /** «تعداد و قیمتِ این ردیف»؛ `i` شمارهٔ ردیف در سبد */
 @Composable
