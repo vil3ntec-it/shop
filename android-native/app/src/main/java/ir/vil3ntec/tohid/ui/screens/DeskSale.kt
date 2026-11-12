@@ -561,8 +561,8 @@ fun DeskSaleScreen(
     },
     onFocusBack = { refocus() },
   )
-  //  POS-05: موجودیِ کاشی «قابل‌فروش» = موجودی − نگه‌داشته‌های همین صندوق (همان گوشی؛ بی نگه‌داشته همان موجودی)
-  val heldQty = held.store.book.collectAsState().value.let { b -> remember(b) { ir.vil3ntec.tohid.data.HeldStock.reserved(b) } }
+  //  POS-05/INV-03: «قابل‌فروش» = موجودی − نگه‌داشته‌های همین صندوق − رزروِ سفارشِ اینترنتی (همان گوشی؛ بی هر دو همان موجودی)
+  val heldQty = ir.vil3ntec.tohid.ui.components.pos.rememberSellableHeld(held.store.book.collectAsState().value, d)
   //  کارت و ردیفِ کالا: زدن ⇐ افزودن (با پیشوندِ «۳*» اگر نوشته شده). − / + فقط در سبد است
   val productCb = PosProductCallbacks(stockOf = { ir.vil3ntec.tohid.data.HeldStock.sellable(ShopStore.stock(d, it), it, heldQty) },
     qtyOf = { id -> PosCartOps.qtyOf(cart, id) }, onAdd = { p -> add(p, parsed.first); query = ""; refocus() })

@@ -230,8 +230,21 @@ await page.waitForSelector('#am-box', { timeout: 10000 });
 await page.setInputFiles('#am-file', { name: 'gate.jpg', mimeType: 'image/jpeg', buffer: require('./image-fixtures').jpegImage(96, 64, (x, y) => (x * 3 + y * 2) % 256) });
 await page.waitForFunction(() => /ذخیره شده/.test(document.getElementById('am-photo-state').textContent), null, { timeout: 10000 });
 const photoRow = await one(`SELECT m.mime, m.size_bytes, a.label FROM store_address_media m JOIN store_customer_addresses a ON a.id = m.address_id WHERE m.kind = 'gate_photo'`);
-ok(photoRow && photoRow.mime === 'image/jpeg' && photoRow.label === 'خانه' && await page.isVisible('#am-thumb'),
+//  پیش‌نمایش ناهمگام می‌آید (GET ⇐ FileReader ⇐ `thumb.hidden = false`) ⇒ منتظرِ دیده شدن، نه یک نگاهِ فوری
+const thumbShown = () => page.waitForSelector('#am-thumb', { state: 'visible', timeout: 5000 }).then(() => true, () => false);
+ok(photoRow && photoRow.mime === 'image/jpeg' && photoRow.label === 'خانه' && await thumbShown(),
   'عکسِ دروازه روی همین دستگاه JPEG شد، برای «خانه» ذخیره شد و پیش‌نمایشش آمد', JSON.stringify(photoRow));
+//  «پاک کردن» ِ عکس ⇒ پیش‌نمایش واقعاً پنهان (CSS ِ `.am-thumb` ویژگیِ hidden را خنثی نمی‌کند) و ردیف رفت؛ سپس دوباره برای ادامه
+await page.locator('#am-box button:has-text("پاک کردن")').first().click();
+//  نه فقط «بی src ⇒ بی اندازه»: خودِ ویژگیِ hidden باید جا را هم ببرد (`display: none`؛ CSS ِ `.am-thumb { display:block }` خنثی‌اش می‌کرد)
+const thumbHidden = await page.waitForSelector('#am-thumb[hidden]', { state: 'attached', timeout: 5000 })
+  .then(() => page.$eval('#am-thumb', (e) => getComputedStyle(e).display === 'none'), () => false);
+await page.waitForFunction(() => /ندارد/.test(document.getElementById('am-photo-state').textContent), null, { timeout: 10000 });
+ok(thumbHidden && (await one(`SELECT COUNT(*)::int AS n FROM store_address_media WHERE kind = 'gate_photo'`)).n === 0,
+  '«پاک کردن» ِ عکسِ دروازه ⇒ پیش‌نمایش پنهان و از سرور رفت');
+await page.setInputFiles('#am-file', { name: 'gate.jpg', mimeType: 'image/jpeg', buffer: require('./image-fixtures').jpegImage(96, 64, (x, y) => (x * 3 + y * 2) % 256) });
+await page.waitForFunction(() => /ذخیره شده/.test(document.getElementById('am-photo-state').textContent), null, { timeout: 10000 });
+ok(await thumbShown(), 'عکسِ دوباره ⇒ پیش‌نمایش دوباره دیده می‌شود');
 await page.click('#am-box button:has-text("ضبطِ یادداشت")');
 await page.waitForFunction(() => /در حالِ ضبط/.test(document.getElementById('am-voice-state').textContent), null, { timeout: 10000 });
 await page.waitForTimeout(1500);

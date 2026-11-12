@@ -466,7 +466,7 @@ router.get('/:id/risk', needFlag, async (req, res) => {
 //  جمع‌آوری و بسته‌بندی (PCK، §۶.۱۷) — پشتِ پرچمِ خاموشِ `shop.orders.picking`؛ مسیرها همه
 //  دو بخشی یا بیشترند (`/pick/…`، `/:id/pick…`) و با `/:id`ِ بالا قاطی نمی‌شوند.
 router.use(require('./order-picking'));
-//  CRM-09/CHK-08: عکسِ دروازه و یادداشتِ صوتیِ نشانیِ سفارش (پرچمِ خاموشِ `shop.storefront.address_media`)
+//  CRM-09 + CHK-08: عکسِ دروازه و یادداشتِ صوتیِ نشانیِ سفارش — یک در (`/:id/address-media[/:kind]`، `orders.contact`)؛ پرچمِ خاموشِ `shop.storefront.address_media`
 router.use(require('./order-address-media'));
 
 /**

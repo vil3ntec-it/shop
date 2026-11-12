@@ -125,7 +125,8 @@ data class HeldBook(val v: Int = 1, val items: List<HeldInvoice> = emptyList(), 
 /**
  *  INV-03 — «قابل‌فروش» در صندوق: مقدارِ هر کالا در فاکتورهای **نگه‌داشتهٔ** همین دستگاه (`HeldBook.items`؛ سبدِ جاری در آن
  *  نیست)، تا آخرین دانه‌ای که برای مشتریِ دیگری کنار گذاشته شده «موجود» دیده نشود. قلمِ آزاد (بی کالا) و مقدارِ نامعتبر
- *  بیرون. بی نگه‌داشته (پیش‌فرض: «چند فاکتورِ هم‌زمان» خاموش) ⇒ خالی ⇒ همان موجودیِ امروز. رزروِ سفارشِ اینترنتی (O-06) نه.
+ *  بیرون. بی نگه‌داشته (پیش‌فرض: «چند فاکتورِ هم‌زمان» خاموش) ⇒ خالی ⇒ همان موجودیِ امروز. رزروِ سفارشِ اینترنتی (O-06) با
+ *  [withOnline] (`OnlineHolds`، پرچمِ خاموشِ سرورِ `shop.stock_reserve`؛ صفحه: `rememberSellableHeld`).
  */
 object HeldStock {
   fun reserved(book: HeldBook): Map<String, Double> {
@@ -139,6 +140,10 @@ object HeldStock {
 
   /** POS-05 — موجودیِ «قابل‌فروش» ِ کاشیِ صندوق (گوشی و کامپیوتر): موجودی − مقدارِ همان کالا در نگه‌داشته‌ها ([reserved]) */
   fun sellable(stock: Double, productId: String, held: Map<String, Double>): Double = stock - (held[productId] ?: 0.0)
+
+  /** POS-05/INV-03 — نگه‌داشته‌های صندوق ([reserved]) + رزروِ سفارش‌های اینترنتی (`OnlineHolds.reserved`) ⇒ همان ورودیِ [sellable] */
+  fun withOnline(local: Map<String, Double>, online: Map<String, Double>): Map<String, Double> =
+    ir.vil3ntec.tohid.core.stock.OnlineHolds.merge(local, online)
 }
 
 object HeldInvoiceCodec {

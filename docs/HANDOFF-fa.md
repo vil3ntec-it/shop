@@ -54,6 +54,54 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-24u زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-24u` (از سرِ `claude/batch-55`)
+
+- **ادغامِ `origin/claude/e-rows-18q` و یکی‌سازیِ رسانهٔ نشانی (CRM-09 + CHK-08):** دو عامل هم‌زمان عکسِ دروازه/یادداشتِ صوتی را
+  ساخته بودند (نشانیِ ذخیره‌شدهٔ حساب، ۸۳۶؛ نشانیِ یک سفارش، ۸۴۷) با دو کتابخانه، دو سقف، دو انبار و **دو درِ هم‌مسیر با پاسخِ
+  متفاوت** برای دکان و پیک (`courier.js` حتی `const addrMedia` ِ تکراری داشت). حالا `lib/address-media.js`: یک پرچم، یک سقف
+  (`config.addressMedia`)، یک سنجشِ بایت (`accept`؛ EXIF/مکان برای هر دو پاک)، یک انبار (`media-store.address`، tenant از ردیف) و
+  **یک در و یک نما**: `GET /api/shop/orders/:id/address-media[/:kind]` و `GET /api/courier/missions/:id/address-media[/:kind]` — برای
+  هر نوع رسانهٔ سفارش اگر هست، وگرنه نشانیِ ذخیره‌شده (`source`). نقش: `orders.contact` + `requireOrdersContact` (نه `orders.view`؛
+  دلیل سرِ همان پرونده). هر دو جدول و هر دو مهاجرت ماندند (۸۴۷ فقط توضیح). erasure: `addressMediaLinks` ِ تازه + آینهٔ Kotlin و برچسب.
+  ویترین: `store/addr-media.js` (نشانی‌های من) و `store/order-addr-media.js` (پیگیری، `oam.*`، واژه‌نامهٔ `orderaddr` — کلیدهای `am.*`
+  ِ دو پرونده در یک صفحه روی هم می‌افتادند). POS-05/INV-03 ِ همان شاخه دست نخورد.
+- **CodeQL (هشدارِ PR #1041):** نگهبانِ نوعِ صریح (`typeof`/`Array.isArray`/`Buffer.isBuffer`) در `accept` و `chat-media.sniff`؛ بدنهٔ
+  JSON/آرایه ⇒ ۴۰۰ `bad_media` (رشتهٔ تنها را parser ِ strict ِ برنامه ۴۰۰ `bad_json` می‌دهد)، پرسشِ تکراری بی‌اثر — هر دو آزمون دارند.
+- **آزمون‌ها:** تازه `address-media-door.test.js` ۲/۲ (فقط نشانی، هر دو، فقط سفارش، هیچ؛ صاحب/مدیر بله، صندوق‌دار/شاگرد/مدیرِ
+  بسته‌شده ۴۰۳، دکانِ دیگر ۴۰۴، پیکِ دیگر ۴۰۴)؛ `store-address-media` ۵/۵، `order-address-media` ۴/۴، `catalog-reserved` ۴/۴،
+  `customer-erasure` ۶/۶، `tenant-matrix` ۴/۴، `card-data` ۱۱/۱۱، `api-contract` ۲/۲، `web-i18n` ۳۵/۳۵، `dari-text` ۱۷/۱۷،
+  `shop-route-inventory` ۲/۲، `image-store-migrate` ۵/۵، `media-store` ۵/۵، `shop-chat` ۱۷/۱۷، `courier-scope` ۱۲/۱۲؛ کرومیوم
+  `web-store-addr-media` ۲۸ ✅، `web-store-acct` ۲۷ ✅، `web-store` ۱۳۵ ✅ (بارِ نخست ۷۲٬۶۳۶ بایت زیرِ سقفِ ۷۲٬۷۰۴، دست نخورد)؛ core
+  `OrderAddressMediaTest` ۴/۴ و `OnlineHoldsTest` ۹/۹. Kotlin ِ هدف‌دار (`./desktop/gradlew -p desktop test --tests …`): `HeldStockTest` ۵، `HeldSyncTest` ۷،
+  `PosSellableTileUiTest` ۲، `ServerFeatureScreensTest` ۱۱ (آینهٔ `COUNT_KEYS`)، `DariCoverageTest` ۲۳ (برچسبِ تازهٔ `StrErasure`)،
+  `DataSafetyGuardTest` ۱۰ — ۵۸ PASS، ۰ FAIL. اجرای کاملِ `flock /tmp/gradle-full.lock ./desktop/gradlew -p desktop test`
+  (‎-Xmx3g، `desktop/build/test-data` ِ پاک) ⇒ ۴۰۱۶ PASS، ۰ FAIL، ۴ SKIP ِ پیشین؛ precheck ⇒ `fail=0`؛ `quality.mjs` بی ❌.
+- **سرخیِ CI ِ #1041 (`web-store-acct.mjs`):** پیش‌نمایشِ عکسِ «نشانی‌های من» ناهمگام می‌آید (GET ⇐ FileReader) ⇒ آزمون حالا منتظرِ
+  دیده شدن می‌ماند؛ «پاک کردن» ِ عکس ⇒ `#am-thumb[hidden]` با `display:none` (آزمونِ تازه) و پاسخِ دیرِ پیش‌نمایش پس از پاک کردن عکس را
+  برنمی‌گرداند. `.am-thumb[hidden]` در `store.css` افزوده شد، ولی خودِ `kit.css` از پیش `[hidden] { display:none !important }` دارد ⇒
+  بی آن هم پنهان بود (آزمون روی پایه سبز ماند؛ فقط زمان‌بندی سرخ بود). کرومیوم `web-store-acct.mjs` ۲۹ ✅.
+- **دام:** (۱) `K.part` کلیدِ موجود را بازنویسی نمی‌کند ⇒ دو واژه‌نامهٔ دیربار با پیشوندِ یکسان در یک صفحه بی‌صدا متنِ اولی را
+  نشان می‌دهند؛ پیشوندِ هر بخش یکتا باشد. (۲) حسابِ ویترین سراسری است (یک شماره ⇒ یک حساب در همهٔ آزمون‌های یک پرونده)؛
+  شمارشِ ردیف‌های حساب را نسبی بسنجید. (۳) JPEG ِ ساختگیِ `ff d8 ff e0 + پُرکننده` از `cleanImage` ۴۰۰ می‌گیرد؛ از `image-fixtures.jpeg`.
+- **قدمِ بعد:** CHK-08 فقط نقشه در برنامهٔ خرید؛ CRM-09 افزودن از برنامهٔ خریدِ بومی (دفترِ نشانیِ حساب در برنامه لازم است)؛
+  سپس پرچمِ `shop.storefront.address_media` با صاحب‌کار (FLAGS-ON §۳۱).
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-18q، شاخهٔ `claude/e-rows-18q` (از سرِ `claude/batch-54`، سپس ادغامِ سرِ تازهٔ آن)
+
+- **POS-05 و INV-03 ⇐ IMPLEMENTED-VERIFIED:** درِ سرورِ `GET /api/shop/catalog/reserved` (`stock-reserve.posView`: نگه‌داشتهٔ نرمِ فعال
+  با کلیدِ فروشِ تحویلِ هر قلم `o-<سفارش>-<قلم>`؛ `stock.view` + `orders.view`، سقفِ ۳۰/دقیقه هر کاربر؛ پرچمِ خاموشِ
+  `shop.stock_reserve` ⇒ `enabled:false`) — `catalog-reserved.test.js` ۴/۴ (پایه ۰/۴). صندوق: `core/stock/OnlineHolds.kt` (مهلت با
+  ساعتِ سرور، فروشِ تحویلِ رسیده دو بار نه، نمای کهنه‌تر از یک روز یا ساعتِ برگشته ⇒ هیچ) + `OnlineHoldsStore`
+  (`data/OnlineHoldsAndroid.kt`) + `rememberSellableHeld` (`ui/components/pos/OnlineHoldsAndroid.kt`) در `DeskSale` و `SaleRoute`
+  ⇒ `HeldStock.sellable`. `OnlineHoldsTest` ۹/۹ (core)، `HeldStockTest` ۵/۵، `HeldSyncTest` ۷/۷، `PosSellableTileUiTest` ۲/۲ (صفحهٔ خودِ کاشی، محلی)؛ اجرای کاملِ desktop ۴۰۰۳ آزمون، ۰ شکست، ۴ SKIP ِ پیشینِ بنچ/عکس. نگه‌داشته‌های دستگاهِ دیگر = `shop.held_sync` (سنجشِ تازه در `HeldSyncTest`).
+- **CHK-08 (PARTIAL، کد):** سرور (مهاجرتِ ۸۴۷، `lib/order-address-media.js`، درهای مشتری/کارمند/پیک، حذفِ دادهٔ مشتری،
+  `image-store-move.TABLES`؛ پرچمِ `shop.storefront.address_media`) — `order-address-media.test.js` ۴/۴؛ فرمِ ویترین روی صفحهٔ پیگیری
+  (`store/addr-media.js` ِ دیربار، واژه‌نامهٔ `addrmedia`) — `web-store-addr-media.mjs` ۲۲ ✅ (در زنجیرهٔ `test:web-store`).
+- **قدمِ بعد:** به گفتهٔ هماهنگ‌کننده CHK-08 این‌جا گسترش نیافت: عاملِ «ت» (`claude/e-rows-13t`، CRM-09) همین را برای نشانیِ
+  ذخیره‌شدهٔ حساب ساخته (`store_address_media`، مهاجرتِ ۸۳۶، پیک هم می‌بیند) ⇒ پس از ادغام دو جدول/در یکی شوند (هر دو `chat-media.sniff`).
+  سپس نمایشِ عکس/صدای نشانیِ سفارش در جزئیاتِ سفارشِ برنامهٔ دکان و مأموریتِ پیک (درها آماده‌اند) و نقشه در برنامهٔ خرید (منطق در core،
+  اندروید فقط CI).
+- **درس:** هر انبارِ `getSharedPreferences` ِ تازه باید در `DATA-SAFETY-fa.md` §۶ و `DataSafetyGuardTest.CLASSIFIED` رده بگیرد
+  (`tohid-online-holds` ⇐ «نسخهٔ سرور»)؛ کلیدِ تازهٔ `COUNT_KEYS` ِ حذفِ داده هم در `CustomerErasure.kt` و `StrErasure.kt`.
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-21m زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-21m` (از `claude/batch-55`)
 
 - **TEN-04 (همچنان PARTIAL، «کد»):** درهای خصوصیِ دیگرِ مدیر زیرِ نگهبانِ اجازه، پشتِ همان پرچمِ خاموشِ `security / admin.support_grant`:

@@ -1,10 +1,12 @@
 'use strict';
 /**
- * CRM-09 / CHK-08 (§۴.۴ «یادداشتِ صوتی و عکسِ دروازه، اختیاری») — `lib/store-address-media.js`، مهاجرتِ ۸۳۶.
+ * CRM-09 (§۴.۴ «یادداشتِ صوتی و عکسِ دروازه، اختیاری») — `lib/store-address-media.js`، مهاجرتِ ۸۳۶؛ طراحیِ مشترک با
+ * رسانهٔ نشانیِ یک سفارش (CHK-08) در `lib/address-media.js` (درِ یکتای دکان/پیک: `address-media-door.test.js`).
  *
  *   ۱) ⛔ پرچمِ خاموشِ `shop.storefront.address_media`: نه `features.addressMedia`، درهای مشتری ۴۰۴، نمای دکان
  *      `{enabled:false}` و هیچ پیوندِ سفارشی.
- *   ۲) نوع از بایت: عکس فقط JPEG/PNG/WebP، صدا فقط Ogg/WebM/MP4/AMR؛ جابه‌جا ⇒ ۴۱۵، بزرگ ⇒ ۴۱۳؛ هر نشانی یکی از هر نوع.
+ *   ۲) نوع از بایت: عکس فقط JPEG/PNG/WebP، صدا فقط Ogg/WebM/MP4/AMR؛ جابه‌جا ⇒ ۴۱۵، بزرگ‌تر از `config.addressMedia` ⇒ ۴۱۳؛
+ *      EXIF/مکان و توضیحِ عکس پیش از ذخیره پاک؛ هر نشانی یکی از هر نوع (تازه ۲۰۱، جایگزین ۲۰۰).
  *   ۳) فقط مالِ همان حساب: حسابِ دیگر نه می‌خواند، نه می‌نویسد، نه پاک می‌کند (۴۰۴، بی ردیف).
  *   ۴) ثبت با `address.savedId` ِ نشانیِ خودِ همان حساب ⇒ صاحب در سفارش می‌بیند (با سابقه)؛ نشانیِ حسابِ دیگر ⇒ هیچ؛
  *      شاگرد ۴۰۳، دکانِ دیگر ۴۰۴؛ پاک کردنِ مشتری ⇒ دکان هم دیگر نمی‌بیند؛ پاک شدنِ نشانی ⇒ آبشاری.
@@ -20,6 +22,9 @@ const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
 const M = require('../src/lib/store-address-media');
+const config = require('../src/config');
+const F = require('./image-fixtures');
+const { cleanImage } = require('../src/lib/chat-media');
 
 let admin = '';
 let seq = 0;
@@ -83,7 +88,9 @@ async function addAddress(slug, who, label = 'خانه') {
   return r.body.address.id;
 }
 
-const JPEG = (n = 400, b = 7) => Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(n, b)]);
+/** JPEG با EXIF ِ GPS و توضیحِ «shot at» (هر [n]/[b] یک عکسِ دیگر)؛ آن‌چه سرور نگه می‌دارد = `clean(...)` */
+const JPEG = (n = 400, b = 7) => F.jpeg(64, 48, { seed: n * 31 + b, gps: true });
+const clean = (buf) => cleanImage(buf, 'image/jpeg');
 const OGG = (n = 300) => Buffer.concat([Buffer.from('OggS', 'latin1'), Buffer.alloc(n, 3)]);
 const url = (slug, id, kind) => `/api/store/${slug}/account/addresses/${id}/media/${kind}`;
 const put = (slug, who, id, kind, buf) => h.raw('PUT', url(slug, id, kind), buf, { headers: who.headers });
@@ -128,29 +135,43 @@ test('عکس و صدا: نوع از بایت، سقف، یکی از هر نوع�
   const id = await addAddress(o.slug, who);
 
   const a = await put(o.slug, who, id, 'gate-photo', JPEG());
-  assert.equal(a.status, 200, JSON.stringify(a.body));
-  assert.deepEqual({ ...a.body.media, createdAt: 0 }, { kind: 'gatePhoto', mime: 'image/jpeg', size: 404, createdAt: 0 });
+  assert.equal(a.status, 201, JSON.stringify(a.body));
+  assert.deepEqual({ ...a.body.media, createdAt: 0 }, { kind: 'gatePhoto', mime: 'image/jpeg', size: clean(JPEG()).length, createdAt: 0 });
+  assert.equal(a.body.replaced, false);
   const v = await put(o.slug, who, id, 'voice-note', OGG());
-  assert.equal(v.status, 200, JSON.stringify(v.body));
+  assert.equal(v.status, 201, JSON.stringify(v.body));
   assert.equal(v.body.media.mime, 'audio/ogg');
 
   //  جابه‌جا، بزرگ، ناشناخته
   assert.equal((await put(o.slug, who, id, 'gate-photo', OGG())).status, 415);
   assert.equal((await put(o.slug, who, id, 'voice-note', JPEG())).status, 415);
   assert.equal((await put(o.slug, who, id, 'gate-photo', Buffer.from('<svg onload=alert(1)></svg>'.padEnd(64, ' ')))).status, 415);
-  assert.equal((await put(o.slug, who, id, 'gate-photo', JPEG(M.PHOTO_MAX))).status, 413);
-  assert.equal((await put(o.slug, who, id, 'voice-note', OGG(M.VOICE_MAX))).status, 413);
+  const big = await put(o.slug, who, id, 'gate-photo', Buffer.concat([JPEG(), Buffer.alloc(config.addressMedia.photoMax)]));
+  assert.deepEqual([big.status, big.body.error.code], [413, 'too_large']);
+  const long = await put(o.slug, who, id, 'voice-note', OGG(config.addressMedia.voiceMax));
+  assert.deepEqual([long.status, long.body.error.code], [413, 'too_large']);
+  assert.equal((await put(o.slug, who, id, 'voice-note', JPEG())).body.error.code, 'unsupported_media');
   assert.equal((await put(o.slug, who, id, 'selfie', JPEG())).status, 404);
+  //  ⛔ بدنهٔ JSON (شیء، آرایه، رشته) به‌جای بایت ⇒ ۴۰۰ `bad_media`، نه ۵۰۰ (CodeQL: type confusion)؛ پرسشِ تکراری بی‌اثر
+  for (const body of [{ a: 1 }, [1, 2, 3], 'x'.repeat(40)]) {
+    const j = await h.put(url(o.slug, id, 'gate-photo'), body, { headers: who.headers });
+    //  شیء و آرایه به درِ رسانه می‌رسند ⇒ `bad_media`؛ رشتهٔ تنها را خودِ parser ِ JSON ِ برنامه (strict) رد می‌کند ⇒ `bad_json`
+    assert.deepEqual([j.status, j.body.error.code], [400, typeof body === 'string' ? 'bad_json' : 'bad_media'], JSON.stringify(j.body));
+  }
+  assert.equal((await h.get(`${url(o.slug, id, 'gate-photo')}?kind=a&kind=b`, { headers: who.headers })).status, 200);
 
   //  جایگزینی: هنوز دو ردیف (یکی از هر نوع) و بایتِ تازه
-  assert.equal((await put(o.slug, who, id, 'gate-photo', JPEG(500, 9))).status, 200);
+  const again = await put(o.slug, who, id, 'gate-photo', JPEG(500, 9));
+  assert.deepEqual([again.status, again.body.replaced], [200, true]);
   assert.equal(await rows(id), 2);
   const got = await fetchBytes(url(o.slug, id, 'gate-photo'), who.headers);
   assert.equal(got.status, 200);
   assert.equal(got.headers.get('content-type'), 'image/jpeg');
   assert.equal(got.headers.get('cache-control'), 'private, no-store');
   assert.equal(got.headers.get('x-content-type-options'), 'nosniff');
-  assert.ok(got.buffer.equals(JPEG(500, 9)));
+  assert.ok(got.buffer.equals(clean(JPEG(500, 9))));
+  //  EXIF ِ GPS و توضیحِ عکس (مکانِ گرفتن) پیش از ذخیره رفتند — همان پاک‌سازیِ نشانیِ سفارش
+  assert.ok(!got.buffer.includes(Buffer.from('shot at', 'latin1')) && !got.buffer.includes(Buffer.from('Exif\0\0', 'latin1')));
   const list = await h.get(`/api/store/${o.slug}/account/addresses`, { headers: who.headers });
   assert.deepEqual(list.body.addresses[0].media, { gatePhoto: true, voiceNote: true });
 
@@ -176,8 +197,8 @@ test('سفارش با نشانیِ نام‌دار ⇒ صاحب عکس و صدا
   const o = await liveStore('سفارش');
   const who = await shopper(o.slug, '0791230004');
   const id = await addAddress(o.slug, who);
-  assert.equal((await put(o.slug, who, id, 'gate-photo', JPEG(300, 5))).status, 200);
-  assert.equal((await put(o.slug, who, id, 'voice-note', OGG(200))).status, 200);
+  assert.equal((await put(o.slug, who, id, 'gate-photo', JPEG(300, 5))).status, 201);
+  assert.equal((await put(o.slug, who, id, 'voice-note', OGG(200))).status, 201);
 
   const orderId = await checkout(o, who, id);
   const seen = await h.get(`/api/shop/orders/${orderId}/address-media`, { token: o.token });
@@ -187,7 +208,7 @@ test('سفارش با نشانیِ نام‌دار ⇒ صاحب عکس و صدا
   assert.equal(seen.body.voiceNote.mime, 'audio/ogg');
   const photo = await h.download(`/api/shop/orders/${orderId}/address-media/gate-photo`, { token: o.token });
   assert.equal(photo.status, 200);
-  assert.ok(photo.buffer.equals(JPEG(300, 5)));
+  assert.ok(photo.buffer.equals(clean(JPEG(300, 5))));
   assert.equal(photo.headers.get('cache-control'), 'private, no-store');
   const voice = await h.download(`/api/shop/orders/${orderId}/address-media/voice-note`, { token: o.token });
   assert.ok(voice.buffer.equals(OGG(200)));
@@ -235,7 +256,7 @@ test('پیکِ همان مأموریت عکس و صدا را تا مأموریت
   await setFlag(o.shopId, 'shop.delivery', true);
   const who = await shopper(o.slug, '0791230007');
   const id = await addAddress(o.slug, who);
-  assert.equal((await put(o.slug, who, id, 'gate-photo', JPEG(250, 4))).status, 200);
+  assert.equal((await put(o.slug, who, id, 'gate-photo', JPEG(250, 4))).status, 201);
   const orderId = await checkout(o, who, id);
   for (const to of ['accepted', 'picking', 'packed']) {
     const t = await h.post(`/api/shop/orders/${orderId}/transition`, { to }, { token: o.token });
@@ -261,7 +282,7 @@ test('پیکِ همان مأموریت عکس و صدا را تا مأموریت
   assert.equal(view.body.voiceNote, null);
   const bytes = await h.download(`${base}/gate-photo`, { token: courier.token });
   assert.equal(bytes.status, 200);
-  assert.ok(bytes.buffer.equals(JPEG(250, 4)));
+  assert.ok(bytes.buffer.equals(clean(JPEG(250, 4))));
   assert.equal((await one(`SELECT COUNT(*)::int AS n FROM audit_logs WHERE shop_id=$1 AND action='delivery.courier.address_media'`, [o.shopId])).n, 1);
 
   //  پیکِ دیگرِ همان دکان ⇒ «پیدا نشد»؛ صاحب با توکنِ خودش از درِ پیک ⇒ رد
@@ -284,7 +305,7 @@ test('rollback ِ ۸۳۶ دو جدول را برمی‌دارد و نشانی‌
   const o = await liveStore('برگشت');
   const who = await shopper(o.slug, '0791230006');
   const id = await addAddress(o.slug, who);
-  assert.equal((await put(o.slug, who, id, 'gate-photo', JPEG())).status, 200);
+  assert.equal((await put(o.slug, who, id, 'gate-photo', JPEG())).status, 201);
   const dir = path.join(__dirname, '..', 'migrations');
   const exists = async (t) => (await one('SELECT to_regclass($1) AS r', [t])).r !== null;
   const mark = await one(`SELECT * FROM schema_migrations WHERE version='836_store_address_media.sql'`);

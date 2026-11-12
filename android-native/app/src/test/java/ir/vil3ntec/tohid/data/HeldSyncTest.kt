@@ -166,6 +166,9 @@ class HeldSyncTest {
     val heldA = a.store.book.value.items.single()
     val heldB = b.store.book.value.items.single()
     assertEquals(heldA, heldB)
+    //  INV-03: نگه‌داشتهٔ دستگاهِ دیگر از «قابل‌فروش» ِ کاشیِ صندوقِ «ب» هم کم می‌شود (همان `HeldStock.reserved` ِ کاشی)
+    assertEquals(2.0, HeldStock.reserved(b.store.book.value)["p1"])
+    assertEquals(HeldStock.reserved(a.store.book.value), HeldStock.reserved(b.store.book.value))
     assertTrue("نگه‌داشتهٔ «الف» برای «ب» مالِ کسِ دیگر است", b.engine.othersHeld("K1"))
     //  بازگشت روی «ب» ⇒ سبدِ «ب» بایت‌به‌بایت همان فاکتورِ «الف»
     b.now += 1000

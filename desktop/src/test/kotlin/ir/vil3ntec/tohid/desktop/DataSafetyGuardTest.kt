@@ -328,6 +328,8 @@ class DataSafetyGuardTest {
       "tohid-holidays",
       //  POS-04: نسخهٔ محلیِ فهرستِ مرکزیِ مترادفِ سرور (`TillSynonyms`، روزی یک بار)؛ تنظیمِ دکان نیست
       "tohid-synonyms",
+      //  POS-05/INV-03: آخرین نمای رزروِ سفارش‌های اینترنتی (`OnlineHoldsStore`، هر دقیقه از سرور)؛ تنظیمِ دکان نیست
+      "tohid-online-holds",
     ).forEach { put(it, Kind.SERVER) }
     //  عمداً مالِ همین دستگاه: نشست و همگام‌سازی، سرور، قفل، زبان و ظاهر، چاپگر/دستگاه‌ها، پیش‌نویس‌ها
     listOf(

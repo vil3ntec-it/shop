@@ -131,7 +131,7 @@
       if (!K.sess() || !ab) return handle;
       Promise.all([dict, api('/account/addresses')]).then(function (r) {
         if (!r[0] || !K.sess()) return;
-        var list = r[1].addresses || [];
+        var list = r[1].addresses || []; var limits = r[1].mediaLimits || null;
         var sel = el('select', { attrs: { id: 'ac-pick' } }, el('option', { attrs: { value: '' }, text: t('ac.addr.new') }));
         list.forEach(function (a) { sel.appendChild(el('option', { attrs: { value: a.id }, text: a.label })); });
         var del = btn('btn-ghost btn-sm', t('ac.addr.del'));
@@ -142,14 +142,14 @@
         var label = el('input', { attrs: { id: 'ac-label', type: 'text', maxlength: '40', placeholder: t('ac.label'), 'aria-label': t('ac.label') }, hidden: true });
         keep = el('div', { class: 'stack', attrs: { id: 'ac-keep-row' } }, el('label', { class: 'check' }, box, ' ', el('span', { text: t('ac.keep') })), label);
         var byId = function (id) { return list.filter(function (a) { return a.id === id; })[0] || null; };
-        //  CRM-09/CHK-08: عکسِ دروازه و یادداشتِ صوتیِ نشانیِ برگزیده (store/addr-media.js ِ دیربار) فقط با `features.addressMedia`
+        //  CRM-09: عکسِ دروازه و یادداشتِ صوتیِ نشانیِ برگزیده (store/addr-media.js ِ دیربار) فقط با `features.addressMedia`
         var am = null; var amBox = el('details', { class: 'stack', attrs: { id: 'ac-media' }, hidden: true }, el('summary', { text: t('ac.media') }));
         var media = function (a) {
           if (am) { am.close(); am = null; }
           amBox.hidden = !(a && ctx.store.features && ctx.store.features.addressMedia);
           if (amBox.hidden) return;
           K.js('/store/addr-media.js').then(function () {
-            if (byId(sel.value) === a) am = window.StoreAddrMedia({ base: '/api/store/' + encodeURIComponent(ctx.slug), into: amBox, address: a });
+            if (byId(sel.value) === a) am = window.StoreAddrMedia({ base: '/api/store/' + encodeURIComponent(ctx.slug), into: amBox, address: a, limits: limits });
           }, function () { amBox.hidden = true; });
         };
         sel.addEventListener('change', function () {
