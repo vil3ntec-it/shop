@@ -16,7 +16,8 @@
  * سنجه‌ها: اسنادِ پشتیبان (قدیم) سرِ جایشان؛ اسنادی که A پس از پشتیبان ساخته (پیش و هم‌زمان با بازیابی)
  * روی سرور و A و B می‌مانند؛ هیچ opی دو بار اثر نمی‌کند (یک فاکتور، یک قرض، موجودی یک بار)؛ بی شبکه
  * بازیابی هیچ چیزی را عوض نمی‌کند؛ ردیفی که پس از پشتیبان حذف شد با بازیابی زنده نمی‌شود.
- * «سری مستقل» (شمارهٔ سندِ هر دستگاه، F0-03) در `DocSeries` ِ کاتلین است و این‌جا سنجیده نمی‌شود.
+ * «سری مستقل» (شمارهٔ سندِ هر دستگاه، F0-03؛ `DocSeries` ِ کاتلین ⇐ `ensureSeries` ِ هارنس): «S143.series» — هر دستگاه سریِ
+ * خودش، بازیابی سری را عوض نمی‌کند (`tohid-doc-series` در پشتیبان نیست) و هیچ شمارهٔ نمایشیِ «سری-شماره» دو بار نیست.
  *
  * اجرا:  node test/e2e/restore.e2e.mjs
  */
@@ -189,6 +190,47 @@ await E.step('S143.fresh.offline', 'دستگاهِ واردشدهٔ هرگز ه�
   assert.deepEqual([r.ok, r.route], [false, 'sync_first']);
   assert.equal(F.queue.length, 0);
   assert.equal(JSON.stringify(F.ledger), ledgerBefore, 'بازیابیِ بی شبکه دفتر را عوض کرد');
+}, { needs: ['S143.0'] });
+
+await E.step('S143.series', 'سری مستقل (F0-03): هر دستگاه سریِ خودش را دارد، بازیابی آن را عوض نمی‌کند و هیچ شمارهٔ نمایشیِ فاکتور دو بار نیست', async () => {
+  const sa = await A.ensureSeries();
+  const sb = await B.ensureSeries();
+  for (const s of [sa, sb]) assert.match(s, /^[A-Z][1-9][0-9]{0,3}$/);
+  assert.notEqual(sa, sb, 'دو دستگاهِ یک دکان یک سری گرفتند');
+  const b1 = B.sell({ lines: [{ id: rice, qty: 1 }] });
+  assert.equal(b1.ok, true);
+  await B.drain();
+  //  A بی اینترنت هم‌زمان با بازیابیِ B می‌فروشد
+  A.offline = true;
+  const a1 = A.sell({ lines: [{ id: rice, qty: 1 }] });
+  assert.equal(a1.ok, true);
+  const r = await B.restore(JSON.parse(JSON.stringify(backup)));
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(B.queue.length, 0, 'بازیابی op ساخت');
+  //  سریِ دستگاه مالِ همان دستگاه است و از پشتیبان نمی‌آید؛ سرور هم برای همان دستگاه همان را می‌دهد
+  assert.equal(B.series, sb, 'بازیابی سریِ دستگاه را عوض کرد');
+  const again = await B.api('POST', '/shop/series', { deviceId: B.replica() });
+  assert.equal(again.status, 200);
+  assert.equal(again.body.series, sb);
+  const b2 = B.sell({ lines: [{ id: rice, qty: 1 }] });
+  assert.equal(b2.ok, true);
+  A.offline = false;
+  await A.drain();
+  await B.drain();
+  await A.drain();
+  const shownOf = (d, id) => {
+    const s = d.ledger.sales.find((x) => x.id === id);
+    assert.ok(s, `فاکتورِ ${id} روی دستگاه نیست`);
+    return `${s.series || ''}-${s.invoiceNumber}`;
+  };
+  assert.ok(shownOf(B, b1.saleId).startsWith(`${sb}-`), shownOf(B, b1.saleId));
+  assert.ok(shownOf(B, b2.saleId).startsWith(`${sb}-`), shownOf(B, b2.saleId));
+  assert.ok(shownOf(A, a1.saleId).startsWith(`${sa}-`), shownOf(A, a1.saleId));
+  assert.notEqual(shownOf(B, b2.saleId), shownOf(B, b1.saleId), 'فاکتورِ پس از بازیابی شمارهٔ پیش از بازیابی را دوباره گرفت');
+  //  همان شماره روی هر دو دستگاه، و روی سرور هر «سری-شماره» یک فاکتور
+  for (const id of [b1.saleId, b2.saleId, a1.saleId]) assert.equal(shownOf(A, id), shownOf(B, id));
+  const shown = (await live('sales')).map((x) => `${x.data.series || ''}-${x.data.invoiceNumber}`);
+  assert.equal(new Set(shown).size, shown.length, `شمارهٔ نمایشیِ تکراری: ${shown.sort().join('، ')}`);
 }, { needs: ['S143.0'] });
 
 await E.finish();
