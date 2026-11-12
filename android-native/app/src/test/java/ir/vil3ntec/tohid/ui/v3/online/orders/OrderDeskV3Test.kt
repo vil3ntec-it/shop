@@ -14,8 +14,9 @@ import org.junit.Test
 import java.io.File
 
 /**
- *  میزِ سفارشِ نسخهٔ ۳ (ORD-03/04/07/08/09/18/19): همان حالتِ رابطِ امروز — برگهٔ توقف، تنظیمِ قبول و توقفِ خودکار،
- *  «عقب انداختن» — و هر دو رابط فقط از همان حالت و همان نوشتن می‌کشند (متن با متن، مثلِ `QuoteWiringTest`).
+ *  میزِ سفارشِ نسخهٔ ۳ (ORD-03/04/07/08/09/18/19): حالتِ مشترکِ `ui/screens/OrderDeskState` — برگهٔ توقف، تنظیمِ قبول و
+ *  توقفِ خودکار، «عقب انداختن» — و صفحهٔ نسخهٔ ۳ فقط از همان حالت و همان نوشتن می‌کشد (متن با متن، مثلِ `QuoteWiringTest`).
+ *  رابطِ امروز (`OrderDeskPanel`، برگه‌های `OrderDelayUi`/`OrderBulkUi`) بی‌راه بود و برداشته شد (`claude/e-rows-39m`).
  */
 class OrderDeskV3Test {
 
@@ -53,7 +54,6 @@ class OrderDeskV3Test {
     assertTrue(repo.contains("put(\"offlinePause\", buildJsonObject { put(\"enabled\", next.offlinePauseOn) })"))
     assertTrue(repo.contains("offlinePauseOn = op?.let { CourierWire.bool(it, \"enabled\") } ?: base.offlinePauseOn"))
     assertEquals(1, count("ui/v3/online/orders/OrderDeskStrip.kt", "V3ToggleRow(StrOrderSlip.deskOfflinePause, f.opOn"))
-    assertEquals(1, count("ui/screens/OrderDeskPanel.kt", "Switch(checked = f.opOn"))
   }
 
   @Test
@@ -89,11 +89,9 @@ class OrderDeskV3Test {
     val route = "ui/v3/online/orders/OrdersRouteContent.kt"
     listOf("OrderDeskStrip(deskCtl)", "OrderAlertNotes(", "OrderBulkBarV3(", "OrderBulkToggleV3(", "OrderDelayEntryV3(", "bulk.tap(o.id)")
       .forEach { assertEquals(it, 1, count(route, it)) }
-    //  هر دو رابط از همان حالت: هیچ نسخهٔ دومی از بار و نوشتن نیست
-    assertEquals(1, count("ui/screens/OrderDeskPanel.kt", "rememberOrderDesk(api)"))
-    assertEquals(1, count("ui/screens/OrderDelayUi.kt", "OrderDelayForm(o, maxMinutes, reasons)"))
+    //  نسخهٔ ۳ از همان حالتِ مشترک: هیچ نسخهٔ دومی از بار و نوشتن نیست
+    assertEquals(1, count(route, "rememberOrderDesk(remember(context) { Backend.api(context) })"))
     assertEquals(1, count("ui/v3/online/orders/OrderDelayV3.kt", "OrderDelayForm(o, maxMinutes, reasons)"))
-    assertEquals(1, count("ui/screens/OrderBulkUi.kt", "s.send(repo, printer, items, selected, to, reason, note, ready, onMessage)"))
     assertEquals(1, count("ui/v3/online/orders/OrderBulkV3.kt", "s.send(repo, printer, items, selected, to, reason, note, ready, onMessage)"))
     assertEquals(1, count("ui/screens/OrderDeskState.kt", "repo.state().onSuccess { desk = it"))
     assertEquals(0, count("ui/v3/online/orders/OrderDeskStrip.kt", "repo.state()"))

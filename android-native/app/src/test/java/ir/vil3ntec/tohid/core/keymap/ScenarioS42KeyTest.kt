@@ -14,8 +14,9 @@ import java.io.File
  *  سناریوی S42 (§۷.۴، ORD-08) — «Ctrl+B ‹شلوغم› برای ۳۰ دقیقه». سمتِ سرور (زمانِ تحویلِ ویترین و پایانِ خودکار)
  *  در `server/test/e2e/scenario-s42.e2e.mjs` است؛ این‌جا کلیدِ برنامهٔ کامپیوتر:
  *   • `orders.busy` در keymap.json زنده است، Mod+B، دامنهٔ «سفارش‌ها»، و هیچ کلیدِ سراسری یا همان صفحه Ctrl+B نیست؛
- *   • صفحهٔ سفارش (امروز `OrderDeskPanel` و نسخهٔ ۳ `OrderDeskStrip`) کار را با `ScreenKey` می‌گذارد، فقط همان‌جا
- *     که دکمهٔ «شلوغم» هست (`OrderDesk.busyKey`: مجوزِ مدیریت و میزِ باز) و همان `repo.busy(d, 30)` ِ دکمه را می‌زند؛
+ *   • صفحهٔ سفارشِ نسخهٔ ۳ (`OrderDeskStrip`) کار را با `ScreenKey` می‌گذارد، فقط همان‌جا که دکمهٔ «شلوغم» هست
+ *     (`OrderDesk.busyKey`: مجوزِ مدیریت و میزِ باز) و همان `repo.busy(d, 30)` ِ دکمه را می‌زند (`OrderDeskPanel` ِ
+ *     رابطِ امروز بی‌راه بود و برداشته شد، `claude/e-rows-39m`)؛
  *   • پنجرهٔ کامپیوتر کلید را با `AppNav.dispatchKey` به کارِ ثبت‌شده می‌رساند؛ planned هرگز.
  */
 class ScenarioS42KeyTest {
@@ -52,7 +53,7 @@ class ScenarioS42KeyTest {
   @Test
   fun `S42 صفحه‌های سفارش و پنجرهٔ کامپیوتر کلید را وصل کرده‌اند`() {
     val base = "android-native/app/src/main/java/ir/vil3ntec/tohid/ui"
-    for (rel in listOf("$base/screens/OrderDeskPanel.kt", "$base/v3/online/orders/OrderDeskStrip.kt")) {
+    for (rel in listOf("$base/v3/online/orders/OrderDeskStrip.kt")) {
       val f = source(rel) ?: source(rel.removePrefix("android-native/app/"))
       assertNotNull(rel, f)
       val text = f!!.readText()

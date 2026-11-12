@@ -49,7 +49,7 @@ import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
 
 /*
- *  RSK-08 — «پروندهٔ مدرک» در جزئیاتِ سفارشِ نسخهٔ ۳. همان شرط و همان حالتِ رابطِ امروز (`OrderEvidenceEntry`،
+ *  RSK-08 — «پروندهٔ مدرک» در جزئیاتِ سفارشِ نسخهٔ ۳. همان شرط و همان حالتِ رابطِ امروز (`OrderEvidenceEntry` ِ برداشته‌شده،
  *  `OrderEvidenceController`): فقط `orders.manage` و پاسخِ روشنِ سرور؛ این‌جا فقط کشیده می‌شود.
  */
 

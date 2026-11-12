@@ -109,7 +109,7 @@ internal fun OrderDeskStrip(ctl: OrderDeskController) {
   if (editing) SettingsSheet(d, onDismiss = { editing = false }) { next -> editing = false; ctl.act { repo.settings(d, next) } }
 }
 
-/** ORD-03 «اتصال قطع است» و ORD-18 «شروعِ سفارشِ زمان‌بندی‌شده» — همان `OrderAlertBanners` ِ امروز */
+/** ORD-03 «اتصال قطع است» و ORD-18 «شروعِ سفارشِ زمان‌بندی‌شده» — `OrderAlertBanners` ِ رابطِ امروز بی‌راه بود و برداشته شد */
 @Composable
 internal fun OrderAlertNotes(cfg: OrdersConfigDto, onOpen: (String) -> Unit) {
   val net = OrderAlertsLive.net.value

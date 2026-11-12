@@ -54,7 +54,7 @@ object StrOrderSlip : OrderSlip.Texts {
     "هغه فرمایش چې سرور پخپله ومانه د همدې وسیلې پر ډیفالټ چاپګر یو ځل چاپېږي. یوازې پر یوه وسیله یې فعال کړئ چې پاڼه دوه نه شي.",
   )
 
-  // میزِ سفارش (ORD-03/04/08/09، `ui/screens/OrderDeskPanel.kt`)
+  // میزِ سفارش (ORD-03/04/08/09، `ui/v3/online/orders/OrderDeskStrip.kt`)
   val deskOpen: String get() = t("باز — سفارش می‌گیریم", "Open — taking orders", "پرانیستی — فرمایش اخلو")
   fun deskBusy(min: Int): String = t("شلوغ — ${asIs(min)} دقیقهٔ دیگر", "Busy — $min more minutes", "بوخت — نورې $min دقیقې")
   fun deskPaused(min: Int): String = t("بسته — ${asIs(min)} دقیقهٔ دیگر", "Paused — $min more minutes", "تړلی — نورې $min دقیقې")

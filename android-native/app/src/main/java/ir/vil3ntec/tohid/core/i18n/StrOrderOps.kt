@@ -30,7 +30,7 @@ object StrOrderOps {
   fun delayEvent(at: String): String = t("عقب افتاد: آماده تا ${asIs(at)}", "Delayed: ready by $at", "وځنډول شو: تر $at پورې چمتو")
   fun delayEventPrev(at: String): String = t("پیش‌تر ${asIs(at)}", "was $at", "مخکې $at")
 
-  // ORD-03 «اتصال قطع است» و ORD-18 «وقتِ شروعِ سفارشِ زمان‌بندی‌شده» (`ui/screens/OrderAlertsUi.kt`)
+  // ORD-03 «اتصال قطع است» و ORD-18 «وقتِ شروعِ سفارشِ زمان‌بندی‌شده» (`ui/v3/online/orders/OrderDeskStrip.kt`، `OrderAlertNotes`)
   val netDown: String get() = t("اتصال قطع است — سفارشِ تازه دیده نمی‌شود", "Connection lost — new orders are not showing", "اړیکه پرې ده — نوي فرمایشونه نه ښکاري")
   fun netLastOk(min: Int): String = t("آخرین به‌روزرسانی: ${asIs(min)} دقیقه پیش.", "Last update: $min min ago.", "وروستی تازه کېدل: $min دقیقې مخکې.")
   val netBack: String get() = t("با برگشتِ اینترنت صف خودش تازه می‌شود.", "The queue refreshes by itself when the internet is back.", "کله چې انټرنېټ راشي، کتار پخپله تازه کېږي.")

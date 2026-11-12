@@ -22,8 +22,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /*
- *  حالتِ میزِ سفارش (ORD-03/04/08/09) برای هر دو رابط: `OrderDeskPanel` ِ امروز و `OrderDeskStrip` ِ نسخهٔ ۳
- *  فقط همین را می‌کشند، پس رفتارشان یکی است. همهٔ تصمیم‌ها با سرور (`lib/order-desk.js`)؛ پرچمِ خاموشِ
+ *  حالتِ میزِ سفارش (ORD-03/04/08/09) که `OrderDeskStrip` ِ نسخهٔ ۳ فقط همین را می‌کشد (`OrderDeskPanel` ِ رابطِ امروز
+ *  بی‌راه بود و برداشته شد، `claude/e-rows-39m`). همهٔ تصمیم‌ها با سرور (`lib/order-desk.js`)؛ پرچمِ خاموشِ
  *  `shop.orders.desk` ⇒ `{enabled:false}` ⇒ هیچ‌چیز دیده نمی‌شود.
  */
 

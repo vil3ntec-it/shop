@@ -39,7 +39,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Type
 import kotlinx.coroutines.launch
 
 /*
- *  ORD-07 — «عقب انداختن» در جزئیاتِ سفارشِ نسخهٔ ۳. همان شرطِ رابطِ امروز (`OrderDelayEntry`): فقط با `delay` ِ
+ *  ORD-07 — «عقب انداختن» در جزئیاتِ سفارشِ نسخهٔ ۳. همان شرطِ رابطِ امروز (`OrderDelayEntry`، بی‌راه بود و برداشته شد): فقط با `delay` ِ
  *  `/config` (پرچمِ خاموشِ `shop.orders.delay`)، وضعیت در فهرستِ سرور و `orders.manage`؛ همان حالت و ثبت
  *  (`OrderDelayForm`، یک کلیدِ یکتا برای هر برگه). زمانِ تازه را سرور روی زمانِ ذخیره‌شدهٔ خودش می‌سازد.
  */

@@ -2,29 +2,15 @@ package ir.vil3ntec.tohid.ui.screens
 
 // i18n: سه‌زبانه
 
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrOrderOps
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.model.OrderEventDto
-import ir.vil3ntec.tohid.core.model.OrdersConfigDto
 import ir.vil3ntec.tohid.core.orders.OrderDelay
 import ir.vil3ntec.tohid.data.repo.OrdersRepository
-import ir.vil3ntec.tohid.ui.theme.Shop
-import kotlinx.coroutines.launch
 
 /*
  *  ORD-07 — «عقب انداختن» در جزئیاتِ سفارش (برنامهٔ مدیریتِ اندروید و کامپیوتر). فقط وقتی `/config` ِ سرور
@@ -41,7 +27,7 @@ internal fun delayReasonText(r: String): String = when (r) {
 }
 
 /**
- *  حالتِ برگهٔ «عقب انداختن» برای هر دو رابط (این‌جا و `OrderDelayV3` ِ نسخهٔ ۳). یک کلید برای همین پنجره:
+ *  حالتِ برگهٔ «عقب انداختن» برای `OrderDelayV3` ِ نسخهٔ ۳ (برگهٔ رابطِ امروز بی‌راه بود و برداشته شد، `claude/e-rows-39m`). یک کلید برای همین پنجره:
  *  «تأیید» ِ دوباره (قطعِ نت پس از ثبت) همان پاسخ است، نه عقب‌انداختنِ دوم.
  */
 @Stable
@@ -83,56 +69,6 @@ internal class OrderDelayForm(o: OrderDto, val maxMinutes: Int, val reasons: Lis
       }
     busy = false
     return out
-  }
-}
-
-/** دکمهٔ «عقب انداختن» کنارِ «آماده تا …»؛ [onDone] سفارشِ تازهٔ سرور، [stamp] زمانِ محلیِ صفحهٔ سفارش‌ها */
-@Composable
-internal fun OrderDelayEntry(o: OrderDto, cfg: OrdersConfigDto, repo: OrdersRepository, stamp: (Long) -> String, onDone: (OrderDto, String) -> Unit) {
-  val d = cfg.delay
-  if (d == null || !OrderDelay.can(o.status, d.statuses, cfg.permissions.manage)) return
-  var open by remember(o.id) { mutableStateOf(false) }
-  TohidSecondaryButton(StrOrderOps.delayAction, onClick = { open = true })
-  if (open) OrderDelaySheet(o, d.maxMinutes, OrderDelay.reasons(d.reasons), repo, stamp, onClose = { open = false }) { fresh, msg ->
-    open = false
-    onDone(fresh, msg)
-  }
-}
-
-@Composable
-private fun OrderDelaySheet(
-  o: OrderDto,
-  maxMinutes: Int,
-  reasons: List<String>,
-  repo: OrdersRepository,
-  stamp: (Long) -> String,
-  onClose: () -> Unit,
-  onDone: (OrderDto, String) -> Unit,
-) {
-  val c = Shop.colors
-  val scope = rememberCoroutineScope()
-  val f = remember(o.id) { OrderDelayForm(o, maxMinutes, reasons) }
-
-  TohidBottomSheet(title = StrOrderOps.delayTitle(o.orderNo.toString()), onDismiss = onClose) {
-    SheetBody {
-      val now = f.seen.readyAt
-      Text(if (now != null) StrOrderOps.delayNow(stamp(now)) else StrOrderOps.delayNoTime, style = MaterialTheme.typography.bodySmall, color = c.muted)
-      Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        for (m in OrderDelay.minutes(maxMinutes)) TohidFilterChip(label = StrOrderOps.delayMinutes(m), selected = f.minutes == m, onClick = { f.minutes = m })
-      }
-      Text(StrOrderOps.delayReason, style = MaterialTheme.typography.labelLarge, color = c.muted)
-      Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        for (r in reasons) TohidFilterChip(label = delayReasonText(r), selected = f.reason == r, onClick = { f.pick(r) })
-      }
-      TohidTextField(f.note, f::edit, label = StrOrderOps.delayNote, supporting = StrOrderOps.delayNoteHint, singleLine = false)
-      f.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = c.danger) }
-      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TohidButton(StrOrderOps.delayConfirm, enabled = f.valid && !f.busy, busy = f.busy, onClick = {
-          scope.launch { f.submit(repo, stamp)?.let { (fresh, msg) -> onDone(fresh, msg) } }
-        })
-        TohidSecondaryButton(StrOrderOps.delayCancel, onClick = onClose)
-      }
-    }
   }
 }
 
