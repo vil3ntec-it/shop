@@ -9,6 +9,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -84,7 +85,7 @@ class ShiftNoSaleDeskUiTest {
     rule.waitUntil(15_000) { has(StrShift.noSale) }
     rule.onAllNodes(hasText(StrShift.noSale) and hasClickAction())[0].performSemanticsAction(SemanticsActions.OnClick)
     rule.waitUntil(10_000) { has(StrShift.noSaleReason) }
-    rule.onAllNodes(hasSetTextAction())[0].performTextInput("پولِ خرد برای مشتری")
+    rule.onAllNodes(hasSetTextAction() and (hasText(StrShift.noSaleReason) or hasContentDescription(StrShift.noSaleReason)))[0].performTextInput("پولِ خرد برای مشتری")
     rule.waitForIdle()
   }
 

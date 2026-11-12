@@ -129,6 +129,12 @@ class DeskInvoiceVoidUiTest {
     tap(hasText(item) and hasClickAction())
   }
 
+  /** کادرِ دلیلِ پنجرهٔ لغو (نه کادرِ جست‌وجوی جدول) */
+  private fun reason(text: String) {
+    rule.onAllNodes(hasSetTextAction() and (hasText(StrInvoices.cancelReason) or hasContentDescription(StrInvoices.cancelReason)))[0].performTextInput(text)
+    rule.waitForIdle()
+  }
+
   private fun live() = store.data.value.sales.single { it.id == sale.id }
 
   private fun released() = promoPrefs.getString("release-v1", null).orEmpty().split('\n').any { it.endsWith("\t" + sale.id) }
@@ -140,8 +146,7 @@ class DeskInvoiceVoidUiTest {
     show()
     menu(StrInvoices.cancelSale)
     rule.waitUntil(5_000) { has(StrInvoices.cancelSaleTitle) }
-    rule.onAllNodes(hasSetTextAction())[0].performTextInput("اشتباهِ صندوق")
-    rule.waitForIdle()
+    reason("اشتباهِ صندوق")
     tap(hasText(StrInvoices.cancelSale) and hasClickAction())
     rule.waitUntil(10_000) { live().status == "cancelled" }
     awaitReleased()
@@ -180,8 +185,7 @@ class DeskInvoiceVoidUiTest {
     pin.forEach { d -> tap(hasText(d.toString()) and hasClickAction() and pad) }
 
     rule.waitUntil(15_000) { has(StrInvoices.cancelSaleTitle) }
-    rule.onAllNodes(hasSetTextAction())[0].performTextInput("مشتری پشیمان شد")
-    rule.waitForIdle()
+    reason("مشتری پشیمان شد")
     tap(hasText(StrInvoices.cancelSale) and hasClickAction())
     rule.waitUntil(10_000) { live().status == "cancelled" }
     val slip = assertNotNullAnd(live().cancelApproval)
