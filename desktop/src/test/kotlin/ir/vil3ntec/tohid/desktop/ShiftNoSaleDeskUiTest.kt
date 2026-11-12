@@ -38,9 +38,10 @@ import org.junit.Test
 
 /**
  *  PAY-19 — «کشو بی فروش» ِ صندوقِ شیفتِ **جدولِ فاکتورهای کامپیوتر** (`ShiftPanelV2`، پشتِ `payV2`) با همان مجوزِ صندوقِ گوشیِ
- *  نسخهٔ ۳ (`DrawerNoSale.phoneAction` با `ShopRole.canOpenDrawer` = `drawer.open`)، نه «شاگرد نیست»: صندوق‌داری که سیاستِ دکان
- *  کشو را برایش باز کرده ثبت می‌کند؛ مدیری که سیاست برایش بسته ثبت نمی‌کند. بی چاپگرِ کشودار ⇒ فقط ردیفِ `no_sale` با دلیل و تأیید.
- *  ⛔ روی `claude/batch-57` (e69b30114) دکمهٔ «ثبت» با `ShopRole.isStaff` بود: اولی بسته و دومی ردیف می‌نوشت.
+ *  نسخهٔ ۳ (`DrawerNoSale.phoneAction` با `ShopRole.canOpenDrawer` = `drawer.open`)، نه «شاگرد نیست»: مدیری که سیاستِ دکان کشو را
+ *  برایش بسته («ممنوع» یا «نیازمندِ تأیید»؛ مجوزِ «restrict» برای شاگرد/صندوق‌دار فقط تنگ‌تر می‌شود) ثبت نمی‌کند؛ مدیرِ بی محدودیت
+ *  ثبت می‌کند. بی چاپگرِ کشودار ⇒ فقط ردیفِ `no_sale` با دلیل و تأیید.
+ *  ⛔ روی `claude/batch-57` (e69b30114) دکمهٔ «ثبت» با `ShopRole.isStaff` بود: مدیرِ بسته‌شده ردیفِ `no_sale` با تأییدِ خودش می‌نوشت.
  */
 @OptIn(ExperimentalTestApi::class)
 class ShiftNoSaleDeskUiTest {
@@ -97,16 +98,25 @@ class ShiftNoSaleDeskUiTest {
 
   private fun noSales() = store.data.value.auditLog.filter { it.type == "no_sale" }
 
-  @Test fun aCashierThePolicyLetsOpenTheDrawerRecordsTheNoSale() {
-    role(ShopRole.CASHIER, "allow")
+  @Test fun aManagerWithTheDefaultPolicyRecordsTheNoSale() {
+    ShopRole.remember(ctx, ShopRole.MANAGER)
     show()
     assertFalse("پیامِ «نیازمندِ تأیید» برای نقشی که مجوز دارد", has(StrShift.noSaleNeedsApproval))
-    assertTrue("صندوق‌دارِ دارای `drawer.open` «ثبت» را می‌زند", recordEnabled())
+    assertTrue("مدیرِ دارای `drawer.open` «ثبت» را می‌زند", recordEnabled())
     rule.onAllNodes(hasText(StrShift.record) and hasClickAction())[0].performSemanticsAction(SemanticsActions.OnClick)
     rule.waitUntil(10_000) { noSales().isNotEmpty() }
     val row = noSales().single()
     assertEquals("پولِ خرد برای مشتری", row.reason)
     assertEquals("مینا", row.approvedBy)
+  }
+
+  /** «نیازمندِ تأیید» هم مجوز نیست (`canOpenDrawer` فقط «مجاز»؛ گوشی هم همین را می‌بندد) */
+  @Test fun aManagerThePolicyAsksApprovalForCannotRecordTheNoSale() {
+    role(ShopRole.MANAGER, "approve")
+    show()
+    assertTrue("پیامِ «نیازمندِ تأیید»", has(StrShift.noSaleNeedsApproval))
+    assertFalse(recordEnabled())
+    assertTrue(noSales().isEmpty())
   }
 
   @Test fun aManagerThePolicyDeniesCannotRecordTheNoSale() {
