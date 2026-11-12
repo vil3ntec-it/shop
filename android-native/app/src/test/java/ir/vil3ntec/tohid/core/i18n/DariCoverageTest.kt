@@ -239,12 +239,12 @@ class DariCoverageTest {
   //  LOC-06 (۱۴۰۵/۰۸/۲۲): ۱۷ صفحهٔ مرده (هیچ راهی از برنامه، کامپیوتر یا آزمون؛ رسیدنِ اعلانی با بسته و import سنجیده شد) و
   //  بخشِ مردهٔ `Storefront.kt` (جز `StorefrontGate` ⇐ پروندهٔ جدا) برداشته شدند ⇒ ۱۴۷۰ در ۲۰۲ پرونده
   //  LOC-06 دورِ ۲ (۱۴۰۵/۰۸/۲۲): (۱) کلیدهای بخشِ تنظیمات (`SettingsLayout`، `SettingsTiers`، `settingsIcon`، ثابت‌های
-  //  `…_TITLE`) و واژه‌های سه‌زبانهٔ جست‌وجوی تنظیمات (`SettingsSearchIndex.KEYWORDS`) سطرِ «// داده:» گرفتند (۳۵۲)؛
+  //  `…_TITLE`) و واژه‌های سه‌زبانهٔ جست‌وجوی تنظیمات (`SettingsSearchIndex.KEYWORDS`) سطرِ «// داده:» گرفتند (۳۵۴، با یادداشتِ سابقهٔ `Settings.kt`)؛
   //  (۲) زنجیره‌های مرده (هیچ راهی از برنامه، کامپیوتر، آیفون، آزمون یا پیش‌نمایش؛ نامِ هم‌نامِ نسخهٔ ۳ با بسته و import
   //  جدا شد) برداشته شدند: `DeliveryCash`، `Devices` و بخشِ مردهٔ `Orders`، `Reports`، `Vip`، `DeliveryDesk`، `DeliveryDialogs`،
   //  `StorefrontOwnerSettings`، `OwnerReportSettings`، `StockBook`، `SettingsParts` (۶۸۹)؛ مرده‌هایی که ردیفی منتظرِ جایشان در
   //  نسخهٔ ۳ است (`WarehouseDialogs`، `PhoneClaimStep`، `ProductDetail`، `Receipts`، `movementLabelOf`) ماندند؛
-  //  (۳) ۲۵۱ متنی که عیناً ویژگیِ بی‌آرگومانِ جدولی است به همان ویژگی رفت (فارسی بایت‌به‌بایت همان) ⇒ ۱۷۸ در ۲۰۱ پرونده.
+  //  (۳) ۲۴۹ متنی که عیناً ویژگیِ بی‌آرگومانِ جدولی است به همان ویژگی رفت (فارسی بایت‌به‌بایت همان) ⇒ ۱۷۸ در ۲۰۱ پرونده.
   //  ماندهٔ همه: ستون‌های `DayEndModel`/`HeatmapModel` (صفحه و خروجی؛ تصمیمِ صاحب‌کار)، صفحه‌های فقط‌پیش‌نمایشِ گوشی
   //  (`PhonePreview` ِ DevShot: `Sale`، `QuickSale`، `Profile`، `Settings`، `Debtors`…) و مرده‌های نگه‌داشته
   private val maxRawOldScreens = 178
