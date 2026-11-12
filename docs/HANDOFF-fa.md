@@ -54,6 +54,48 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ (د) — عامل `claude/e-rows-10n` (از `claude/batch-52`): قراردادِ عمومیِ v2، پشتهٔ گیرِ آیفون، IMG-01
+
+- **قراردادِ نمای عمومی v2:** `refund` ِ پیش‌فرض‌روشن (NTF-08) و `receipts` ِ درونش (E2E-RET-11) فیلدِ اختیاریِ نسخهٔ ۲ شد:
+  `SCHEMA_VERSION = 2` (`server/src/lib/public-views.js`: `order.refund?`، `orderRefund`، `refundEntry`، `refundReceipt`)،
+  `core/test-vectors/market-public-v2.json` (v1 دست‌نخورده)، سازندهٔ خالصِ `order-refund-view.shapeOf` (نمونه از همان، با
+  دلیل/کنندهٔ کارمند در ورودی) و بُرشِ `pub('orderRefund')` با `market.public_views`. `public-views.test.js` بی `defaultOnOff`:
+  پاسخ‌های واقعی دو بار (پیش‌فرض‌ها و همه `false` ِ صریح) + آزمونِ پیگیریِ واقعی با دو بازپرداخت و رسید (کلیدها به ترتیب، بی
+  دلیل/کننده، بُرش همان پاسخ، رسید خاموش ⇒ بی `receipts`، پیگیری خاموش ⇒ بی کلید) + «نسخهٔ تازه هیچ فیلدِ پیشین را برنمی‌دارد».
+  core: `PublicRefund`/`PublicRefundEntry`/`PublicRefundReceipt` در `MarketContract.kt` (`RefundView`/`RefundEntry` ِ برنامهٔ خرید
+  حالا typealias ِ همان‌ها؛ `trackPage` هنوز `refund` را جدا از `PublicOrder` می‌خواند). `ignoreUnknownKeys` ِ `MarketContract.json`
+  و `ShopperJson` سنجیده شد (`toleratesNewerServer`، `refundV2ReceiptsAndKeysFromANewerServerAreTolerated`).
+- **آیفون (الف):** گامِ `if: always()` ِ «پشتهٔ رشته‌های گیرکرده (hang-sample، کوتاه)» **پس از** THUMB در `ios-spike.yml` با
+  `ios/e2e/hang-threads.py` (رشتهٔ اصلی + رشته‌های ایستاده روی NSRecursiveLock/semaphore_wait/dispatch_sync، هر کدام ≤۸۰ خط: ریشه
+  و تهِ پشته؛ همان در `ios-e2e/shots/hang-threads.txt`). `python3 ios/e2e/hang-threads.py --self-test` ⇒ ۷/۷.
+- **آیفون (ب) — رفع نشد (شاهد کافی نیست، فقط CI ِ مک داور است):** `synchronized` ِ iOS یک `NSRecursiveLock` ِ سراسری است و
+  `@Synchronized` هم به `synchronized(Unit)` برمی‌گردد (`unsynchronize` در `ios/shared/build.gradle.kts`) ⇒ همهٔ قفل‌های برنامه یکی‌اند.
+  چرخه‌های ممکن (فقط استدلالِ کد): ① رشته‌ای با قفل ⇐ HTTP (`Http.kt:174` FOREVER) و پاسخش روی صفِ سریالِ نمایندهٔ همان
+  NSURLSession است که `didReceiveChallenge`/`willPerformHTTPRedirection` در آن `ShimHttp.entry` ⇐ همان قفل را می‌خواهد (https یا ۳xx)؛
+  ② قفل ⇐ `IosLocation.lastNow` (`dispatch_sync(main)`) و رشتهٔ اصلی پشتِ قفل؛ ③ قفل ⇐ `Future.get` (`Concurrent.kt:56`) و کارِ صف
+  قفل بخواهد. پویشِ ایستای بدنهٔ همهٔ `synchronized`/`@Synchronized` های android-native هیچ HTTP/`get()`/`dispatch_sync` ِ مستقیمی
+  نیافت (فراخوانِ تودرتو سنجیده نشد) و آزمونِ سرتاسری http ِ ساده به 127.0.0.1 است (بی challenge) ⇒ ریشهٔ #1037 روشن نیست.
+  core هدفِ `linuxX64` دارد ولی این shim ها (Foundation/libdispatch) فقط در `ios/shared/iosMain` اند ⇒ بازتولید روی لینوکس نشد.
+  ⛔ قفلِ هر شیء به‌تنهایی **خطرناک** است: `SyncV1Engine` هم `@Synchronized` دارد هم `synchronized(this)` و `ShopStore`
+  `synchronized(SyncV1Engine.of(context))` ⇒ با `@Synchronized → synchronized(Unit)` دو قفلِ جدا و بی‌انحصاری روی دفتر؛ باید
+  `unsynchronize` ‏`synchronized(this)` (یا `this@Class` برای تابعِ extension) بنویسد — ۶۹ جا، فقط با کامپایلِ مک سنجیدنی.
+- **IMG-01 ⇒ IMPLEMENTED-VERIFIED:** «مانده» ِ STATUS کهنه بود — پنلِ مدیر (#382، `server/public/admin/image-bank.js`: پوشه + CSV،
+  پیشرفتِ «N از M فایل»، گزارشِ ردیف و فایلِ خراب) و ورودِ گروهیِ برنامه (`ImageBulkImport.kt`، #291) روی main‌اند؛ آزمون‌ها محلی سبز.
+  INV-01@32 («تعریف و انتشار از یک صفحه») و IMG-11 (نسخهٔ zoom در کلاینت‌ها) دست نخوردند: هر دو کارِ رابطِ برنامه با وابستگیِ
+  همگام‌سازی/دستگاه‌اند (انتشارِ کالای هنوز همگام‌نشده ۴۰۴ می‌گیرد ⇒ نوعِ تازه در `StorefrontOutbox` پس از push؛ zoom ⇒ ساختِ
+  ۲۴۰۰px در `ProductGalleryRepository` + نمایشگرِ بزرگ‌نمایی) — بزرگ‌تر از یک عامل، نیمه‌کاره نماندند.
+- **آزمون‌ها:** سرور (`TEST_DATABASE_URL=pglite:memory node --test --test-concurrency=1`): `public-views` ۹/۹ (با `public-views.js` ِ پیشین ۵ سرخ:
+  snapshot، آشکارساز، سازنده، پاسخ‌های واقعی با پیش‌فرض‌ها، v2 ِ بازپرداخت)؛ بی‌تغییر سبز: `order-refund-view` ۳/۳، `order-refund-receipt` ۳/۳،
+  `customer-notify-refund` ۱۵/۱۵، `flag-defaults` ۳/۳، `admin-flags` ۲/۲، `order-flow` ۱۶/۱۶، `order-amend` ۹/۹، `order-add-items` ۷/۷،
+  `storefront` ۱۹/۱۹، `storefront-consumption` ۲/۲، `storefront-photo-version` ۲/۲، `image-bank` ۲۰/۲۰، `admin-ops-image-bank` ۳/۳؛
+  `node test/admin-panel.mjs` ۴۳/۴۳. core: `jvmTest --tests 'core.market.*' --tests 'core.shopper.*'` ۱۴۱ (۰ شکست، ۲ رد ِ پیشین؛
+  `MarketContractTest` ۸/۸). `./desktop/gradlew -p desktop test` کامل ۳۸۹۹ PASS، ۰ FAIL، ۴ SKIP ِ پیشین (`BulkImportTest` ۱۱/۱۱).
+  precheck `fail=0`. فقط CI: کامپایلِ `customer-android` (بی Android SDK ِ محلی؛ `RefundView` حالا typealias) و آزمونِ iOS ِ
+  `ShopperChatActsTest` روی شبیه‌ساز.
+- **قدمِ بعد:** (۱) اجرای بعدیِ «برنامهٔ آیفون — شبیه‌ساز» که گیر کند ⇒ `hang-threads.txt`/پایانِ لاگ نشان می‌دهد کدام چرخه؛ آن‌گاه
+  کوچک‌ترین رفع (برای ①: قفلِ خصوصیِ `ShimHttp`/`IosWebSocket` به‌جای `synchronized` ِ سراسری؛ برای ②: `lastNow` بی `dispatch_sync`
+  — آخرین موقعیت را رشتهٔ اصلی در `@Volatile` نگه دارد؛ برای ③: `get` با مهلت). (۲) INV-01@32 و IMG-11 با نقشهٔ بالا.
+
 ### ۱۴۰۵/۰۸/۲۲ (ج) — هماهنگ‌کننده: دسته‌های ۵۰ تا ۵۲ و «چند سرور» (سیزنِ `session_01BwqpPed1SJuwB7Q4nZUbg9`) — **از این‌جا ادامه بده**
 
 - **انجام شد (shop):** #1035 (دستهٔ ۵۰) مرج. #1037 (دستهٔ ۵۱) باز: همهٔ کارها سبز جز «برنامهٔ آیفون — شبیه‌ساز» که در

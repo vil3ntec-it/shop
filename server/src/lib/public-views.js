@@ -11,6 +11,10 @@
  *           سنجیده می‌شود (`test/public-views.test.js`)؛ افزودن/برداشتنِ فیلد بی بالا بردنِ
  *           نسخه و بی پروندهٔ تازه آزمون را سرخ می‌کند. همان پرونده را آزمونِ `core`
  *           (`ir.vil3ntec.tohid.core.market`) هم می‌خواند ⇒ برنامهٔ خرید و سرور یک تعریف دارند.
+ *           پروندهٔ نسخهٔ پیشین دست نمی‌خورد و نسخهٔ تازه فقط می‌افزاید (کلاینتِ کهنه کلیدِ ناشناخته را
+ *           نادیده می‌گیرد: `ignoreUnknownKeys` ِ `MarketContract.json` و `ShopperJson`).
+ *           v2 (۱۴۰۵/۰۸/۲۲): `order.refund?` (NTF-08، پرچمِ پیش‌فرض‌روشنِ `shop.orders.refund_tracking`) با
+ *           `receipts?` ِ درونش (`shop.orders.refund_receipt`) — شکل در `lib/order-refund-view.js`.
  *   نشانه ── `'name?'` = اختیاری (فقط وقتی سازنده گذاشته)؛ بقیه همیشه هستند.
  *   تودرتو ─ `NESTED[شکل][فیلد]` = شکلِ زیرشیء (یا آرایه‌ای از آن)؛ زیرشیءِ بی شکل همان
  *           است که سازنده با مقدارهای ثابت ساخته (مثلِ `fulfillment`).
@@ -26,7 +30,7 @@
  *           پاسخ `gate` را می‌گذرانند که پرچم را (با همان حافظهٔ `market.gateCacheMs`) می‌خواند.
  */
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const PRESENCE = ['badge', 'mode', 'declaredUntil', 'connection', 'lastConfirmedAt', 'orderAcceptance',
   'timezone', 'localTime', 'hoursSet', 'holiday', 'today', 'notice'];
@@ -68,7 +72,9 @@ const FIELDS = Object.freeze({
   order: ['token', 'orderNo', 'status', 'statusReason', 'substitution', 'fulfillment', 'paymentMethod', 'paymentStatus',
     'currency', 'itemsCount', 'lines', 'subtotalMinor', 'discountMinor', 'deliveryFeeMinor', 'totalMinor', 'readyAt',
     'scheduledFor', 'slotEndsAt', 'zoneName', 'smallBasketFeeMinor', 'slotFeeMinor', 'createdAt', 'updatedAt',
-    'canCancel', 'timeline', 'onlinePay?', 'paymentStep?'],
+    'canCancel', 'timeline', 'onlinePay?', 'paymentStep?',
+    //  v2 — فقط در پیگیری و فقط با پرچمِ `shop.orders.refund_tracking` (پیش‌فرض روشن)؛ `null` تا درخواستِ برگشت یا ردیفِ دفتر نیست
+    'refund?'],
   //  `substitution`/`substituteName` ِ هر قلم: CHK-16 #525
   orderLine: ['productId', 'name', 'unit', 'qtyMilli', 'unitPriceMinor', 'lineTotalMinor', 'note', 'substitution',
     'substituteName'],
@@ -77,6 +83,13 @@ const FIELDS = Object.freeze({
   //  کارتِ «پرداخت» ِ پیگیری (`lib/order-flow.trackView`): حال، انتخابِ مشتری، مبلغِ سرور، نقدِ تحویل/برداشت
   paymentStep: ['state', 'choice', 'amountMinor', 'cash', 'canChoose', 'online'],
   orderEvent: ['status', 'at'],
+  //  v2 — NTF-08 (`lib/order-refund-view.js`): وضعیت (`requested` · `in_progress` · `partial` · `full`)، مبلغِ برگشته و مانده،
+  //  ردیف‌های دفتر بی دلیلِ کارمند و بی کننده؛ `receipts?` فقط با `shop.orders.refund_receipt` (E2E-RET-11، `order-refund-receipt`)
+  orderRefund: ['status', 'requestedAt', 'refundedMinor', 'remainingMinor', 'currency', 'entries', 'updatedAt', 'receipts?'],
+  refundEntry: ['amountMinor', 'method', 'at', 'final'],
+  //  رسیدِ اصلاحیِ هر ردیف: شمارهٔ `<شمارهٔ سفارش>-R<seq>` (seq ِ همان سفارش، نه شناسهٔ ردیف) و مبلغِ درستِ سفارش پس از آن
+  refundReceipt: ['no', 'seq', 'at', 'orderNo', 'currency', 'method', 'final', 'totalMinor', 'refundedBeforeMinor', 'amountMinor',
+    'refundedAfterMinor', 'netMinor'],
   //  فهرستِ «سفارش‌های من» (ویترین، حسابِ مشتری، بازار)
   orderSummary: ['orderNo', 'status', 'fulfillment?', 'totalMinor', 'itemsCount', 'createdAt', 'scheduledFor?',
     'preview?', 'token', 'store?'],
@@ -94,7 +107,8 @@ const NESTED = Object.freeze({
   product: { stock: 'stock' },
   marketProduct: { stock: 'stock', shop: 'shopRef' },
   searchProduct: { shop: 'shopRef' },
-  order: { lines: 'orderLine', timeline: 'orderEvent', onlinePay: 'onlinePay', paymentStep: 'paymentStep' },
+  order: { lines: 'orderLine', timeline: 'orderEvent', onlinePay: 'onlinePay', paymentStep: 'paymentStep', refund: 'orderRefund' },
+  orderRefund: { entries: 'refundEntry', receipts: 'refundReceipt' },
   orderSummary: { store: 'storeRef' },
   reorderLine: { stock: 'stock' },
 });

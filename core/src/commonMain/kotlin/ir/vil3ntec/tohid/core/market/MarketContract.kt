@@ -13,8 +13,9 @@ import kotlinx.serialization.json.Json
  *
  *  فقط داده + تجزیهٔ JSON؛ نه شبکه، نه UI، نه android و نه java.
  *  • نسخه: `MarketContract.SCHEMA_VERSION` = نسخهٔ سرور؛ نمونه‌ها و فهرستِ فیلدها در
- *    `core/test-vectors/market-public-v1.json` (آزمونِ سرور و `MarketContractTest` هر دو).
- *  • فیلدِ ناشناخته نادیده گرفته می‌شود (سرورِ تازه‌تر برنامهٔ کهنه را نمی‌شکند).
+ *    `core/test-vectors/market-public-v<نسخه>.json` (آزمونِ سرور و `MarketContractTest` هر دو). نسخهٔ تازه فقط می‌افزاید.
+ *  • فیلدِ ناشناخته نادیده گرفته می‌شود (سرورِ تازه‌تر برنامهٔ کهنه را نمی‌شکند): `ignoreUnknownKeys` ِ [MarketContract.json]
+ *    و `ShopperJson` ِ برنامهٔ خرید — `MarketContractTest.toleratesNewerServer` و `ShopperApiTest` می‌سنجند.
  *  • وضعیت‌ها رشته‌اند، نه enum: مقدارِ تازهٔ سرور خطای تجزیه نمی‌دهد؛ مقدارهای شناخته در `companion`.
  *  • پول به یک‌صدمِ افغانی (`…Minor`)، مقدار به هزارم (`…Milli`)، زمان میلی‌ثانیهٔ یونیکس — مثلِ سرور.
  */
@@ -226,13 +227,52 @@ data class PublicOrder(
   val paymentStep: PaymentStep? = null,
 )
 
+/** v2 — یک ردیفِ دفترِ بازپرداخت در پیگیری: فقط مبلغ، روش، زمان و «پایانی» (سرور دلیل و کننده را نمی‌دهد) */
+@Serializable
+data class PublicRefundEntry(val amountMinor: Long = 0, val method: String = "", val at: Long = 0, val final: Boolean = false)
+
+/** v2 — رسیدِ اصلاحیِ هر ردیف (E2E-RET-11، پرچمِ `shop.orders.refund_receipt`): `no` = `<شمارهٔ سفارش>-R<seq>`؛ مبلغ‌ها از سرور */
+@Serializable
+data class PublicRefundReceipt(
+  val no: String = "",
+  val seq: Int = 0,
+  val at: Long = 0,
+  val orderNo: Long = 0,
+  val currency: String = "AFN",
+  val method: String = "",
+  val final: Boolean = false,
+  val totalMinor: Long = 0,
+  val refundedBeforeMinor: Long = 0,
+  val amountMinor: Long = 0,
+  val refundedAfterMinor: Long = 0,
+  val netMinor: Long = 0,
+)
+
+/**
+ *  v2 — `order.refund?` ِ پیگیری (NTF-08، `server/src/lib/order-refund-view.js`؛ پرچمِ پیش‌فرض‌روشنِ `shop.orders.refund_tracking`):
+ *  نبود یا `null` ⇒ هیچ کارتی. وضعیت `requested` · `in_progress` · `partial` · `full`؛ ناشناخته ⇒ همان «درخواست ثبت شد».
+ *  ⛔ در [PublicOrder] نیست: برنامهٔ خرید آن را جدا می‌خواند (`ShopperApi.trackPage`) تا شکلِ نادرستش فقط کارتِ بازپرداخت را ببرد.
+ */
+@Serializable
+data class PublicRefund(
+  val status: String = "requested",
+  val requestedAt: Long? = null,
+  val refundedMinor: Long = 0,
+  val remainingMinor: Long = 0,
+  val currency: String = "AFN",
+  val entries: List<PublicRefundEntry> = emptyList(),
+  val updatedAt: Long? = null,
+  /** فقط با پرچمِ `shop.orders.refund_receipt`؛ نبود ⇒ خالی */
+  val receipts: List<PublicRefundReceipt> = emptyList(),
+)
+
 /** §۱.۸ — پیک برای مشتری (S5 وصلش می‌کند؛ امروز سرور در پاسخی نمی‌دهد). */
 @Serializable
 data class PublicDelivery(val status: String, val mode: String)
 
 object MarketContract {
   /** همان `SCHEMA_VERSION` ِ `server/src/lib/public-views.js`. */
-  const val SCHEMA_VERSION = 1
+  const val SCHEMA_VERSION = 2
 
   val json: Json = Json {
     ignoreUnknownKeys = true
@@ -249,4 +289,5 @@ object MarketContract {
   fun stock(text: String): StockBadge = parse(StockBadge.serializer(), text)
   fun order(text: String): PublicOrder = parse(PublicOrder.serializer(), text)
   fun delivery(text: String): PublicDelivery = parse(PublicDelivery.serializer(), text)
+  fun refund(text: String): PublicRefund = parse(PublicRefund.serializer(), text)
 }

@@ -211,4 +211,29 @@ class ShopperChatActsTest {
       assertTrue(p.extras.chat, "کلیدِ نادرستِ بازپرداخت گفت‌وگو را نمی‌برد: $refund")
     }
   }
+
+  /**
+   *  قراردادِ نسخهٔ ۲ (`market-public-v2.json`): `refund` با `currency`، `final` ِ هر ردیف و `receipts` (پرچمِ `shop.orders.refund_receipt`)؛
+   *  و سرورِ تازه‌تر با کلیدهای ناشناخته (درونِ سفارش، بازپرداخت، ردیف و رسید) برنامه را نمی‌شکند (`ignoreUnknownKeys` ِ [ShopperJson]).
+   */
+  @Test fun refundV2ReceiptsAndKeysFromANewerServerAreTolerated() {
+    assertTrue(ShopperJson.configuration.ignoreUnknownKeys)
+    val order = ShopperSamples.ORDER_JSON
+    val refund = """{"status":"partial","requestedAt":1761800000000,"refundedMinor":5000,"remainingMinor":22100,"currency":"AFN",
+      "entries":[{"amountMinor":5000,"method":"cash","at":1761803600000,"final":true,"proof":"x"}],"updatedAt":1761803600000,
+      "receipts":[{"no":"12-R1","seq":1,"at":1761803600000,"orderNo":12,"currency":"AFN","method":"cash","final":true,"totalMinor":27100,
+      "refundedBeforeMinor":0,"amountMinor":5000,"refundedAfterMinor":5000,"netMinor":22100,"pdf":"/r/12-R1"}],"appeal":{"open":false}}"""
+    val http = FakeHttp { ok("""{"order":${order.dropLast(1)},"chat":true,"refund":$refund,"futureCard":{"x":[1,2]}}}""") }
+    val page = assertNotNull(ShopperApi(http).trackPage("golestan", "v1.abc").valueOrNull())
+    val r = assertNotNull(page.extras.refund)
+    assertEquals("partial", r.status)
+    assertTrue(RefundRules.closed(r))
+    assertEquals(listOf(RefundEntry(5000, "cash", 1_761_803_600_000, final = true)), r.entries)
+    assertEquals(listOf("12-R1"), r.receipts.map { it.no })
+    assertEquals(22100L, r.receipts.single().netMinor)
+    assertTrue(page.extras.chat)
+    //  همان سفارش، با یا بی کلیدهای تازه
+    val plain = ShopperApi(FakeHttp { ok("""{"order":$order}""") }).track("golestan", "v1.abc").valueOrNull()
+    assertEquals(plain, page.order)
+  }
 }
