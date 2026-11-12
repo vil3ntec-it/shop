@@ -47,6 +47,8 @@ async function liveStore(label) {
   const o = { token: u.accessToken, shopId: made.body.shop.id };
   await flag(o.shopId, 'shop.orders', true);
   await flag(o.shopId, 'shop.storefront', true);
+  //  پیش‌فرض‌روشن‌ها (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) `false` ِ صریح ⇒ همان پاسخِ پیشین
+  await h.defaultOnOff(o.shopId);
   const slug = `ex-${uniq()}`;
   assert.equal((await h.put('/api/shop/storefront', { slug, enabled: true, title: `ویترینِ ${label}`, contactPhone: '0700000001' }, { token: o.token })).status, 200);
   assert.equal((await push(o.token, [

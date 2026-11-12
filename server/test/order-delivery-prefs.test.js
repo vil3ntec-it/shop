@@ -253,6 +253,8 @@ test('CHK-24: ویرایش پیش از حرکت با رویدادِ پیش/پس�
 test('CHK-24 مشتری: ویرایشِ سفارشِ ویترینِ خودش با توکن؛ توکنِ نادرست یا سفارشِ کارمند «پیدا نشد»؛ پرچمِ خاموش ۴۰۳', async () => {
   const s = await shopOwner('ویترینِ دستور', { prefs: true });
   await setFlag(s.shopId, 'shop.storefront', true);
+  //  پیش‌فرض‌روشن‌ها (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) `false` ِ صریح ⇒ «پاسخِ ویترین همان پیشین»
+  await h.defaultOnOff(s.shopId);
   const slug = `d-${uniq()}`;
   assert.equal((await h.put('/api/shop/storefront', { slug, enabled: true, title: 'ویترین', deliveryFeeMinor: 5000, minOrderMinor: 0 },
     { token: s.token })).status, 200);
