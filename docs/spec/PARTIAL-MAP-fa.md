@@ -128,7 +128,7 @@ GATE-NEW-05 به «کد» رفت: هیچ artifact ِ آزمونِ Gradle در CI
 | S56 | `shop.orders.weight_hold` | FLAGS-ON §۱۸ |
 | S70 | `market.directory` و `market.product_details` | OA §۸الف ۱۴ (`all`) |
 | S79 | `shop.orders.stuck_alert` | پرچم‌ها ⇐ `shop.orders.stuck_alert` |
-| S94 | `shop.delivery_live_location.consent`؛ برگهٔ اندروید فقط CI | پرچم‌ها ⇐ `shop.delivery_live_location.consent` |
+| S94 | `shop.delivery_live_location.consent` (برگهٔ اندروید در CI ِ main ‏719bbcf63 ساخته و آزموده شد) | پرچم‌ها ⇐ `shop.delivery_live_location.consent` |
 | S95 | `ops.critical_alerts` | پرچم‌ها ⇐ `ops.critical_alerts` |
 | S130 | دوعاملی و نقش‌های `admin`/`finance`/`viewer` برای کارِ روزانه | OA §۹الف ۱ (دوعاملی)؛ در پنل برای کارِ روزانه نقشِ غیرِ ارشد بسازید |
 | AUTH-08 | `auth.phone_add_code` (O-10) | هنوز نه: پس از به‌روز شدنِ همهٔ برنامه‌ها (OA §۸الف «—») |
