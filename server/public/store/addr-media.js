@@ -3,7 +3,7 @@
  * `shop.storefront.address_media`). فقط وقتی پاسخِ پیگیری کلیدِ `addressMedia` را دارد (سفارشِ ارسالیِ هنوز به پیک نرسیده) بار
  * می‌شود (`order.js`)؛ پرچمِ خاموش ⇒ نه این اسکریپت، نه واژه‌نامه‌اش (`kit/i18n/addrmedia.<زبان>.json`)، نه هیچ گره.
  *
- *   عکس ── «عکسِ دروازه» ⇒ انتخاب یا دوربین (`input[type=file]`) ⇒ `StoreChatPhoto.prepare` (کوچک، JPEG ِ تازه بی EXIF) ⇒
+ *   عکس ── «عکسِ دروازه» ⇒ انتخاب از عکس‌ها یا دوربین (`input[type=file]` ِ بی `capture`، تا گوشی هر دو را پیشنهاد کند) ⇒ `StoreChatPhoto.prepare` (کوچک، JPEG ِ تازه بی EXIF) ⇒
  *           `PUT …/address-media/gate_photo`. دوباره ⇒ جایگزین؛ «برداشتن» ⇒ `DELETE`.
  *   صدا ── «ضبطِ یادداشتِ صوتی» (میکروفون فقط با همین زدن) ⇒ تا [MAX_MS] ⇒ «پایان و فرستادن» یا «لغو» ⇒ `PUT …/voice_note`.
  *           بیرون رفتن از ضبط همیشه میکروفون را می‌بندد؛ پنهان شدنِ برگه ضبط را لغو می‌کند.
@@ -94,10 +94,10 @@
       navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
         var type = TYPES.filter(function (x) { return MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(x); })[0];
         var mr = type ? new MediaRecorder(stream, { mimeType: type, audioBitsPerSecond: 32000 }) : new MediaRecorder(stream);
-        rec = { mr: mr, stream: stream, chunks: [], started: Date.now(), cancelled: false, timer: 0 };
-        mr.ondataavailable = function (e) { if (e.data && e.data.size) rec.chunks.push(e.data); };
+        var cur = rec = { mr: mr, stream: stream, chunks: [], started: Date.now(), cancelled: false, timer: 0 };
+        mr.ondataavailable = function (e) { if (e.data && e.data.size) cur.chunks.push(e.data); };
         mr.onstop = function () {
-          var r = rec; rec = null;
+          var r = cur; rec = null;
           stopTracks(r);
           document.removeEventListener('visibilitychange', onHide);
           if (!r || r.cancelled || !r.chunks.length) { busy = false; draw(); K.note(msg, 'info', t('am.voice.cancelled')); return; }
@@ -107,8 +107,9 @@
         };
         document.addEventListener('visibilitychange', onHide);
         mr.start(1000);
-        rec.timer = setInterval(function () {
-          var ms = Date.now() - rec.started;
+        cur.timer = setInterval(function () {
+          if (rec !== cur) return;
+          var ms = Date.now() - cur.started;
           if (ms >= MAX_MS) { endRec(false); return; }
           var left = $('o-am-left');
           if (left) left.textContent = t('am.voice.left', { n: K.fa(Math.ceil((MAX_MS - ms) / 1000), 0) });
@@ -134,7 +135,7 @@
       if (!view) return;
       box.appendChild(el('h2', { text: t('am.title'), attrs: { id: 'o-am-h' } }));
       box.appendChild(el('p', { class: 'muted', text: t('am.hint') }));
-      var input = el('input', { attrs: { type: 'file', accept: 'image/jpeg,image/png,image/webp', capture: 'environment', 'aria-label': t('am.photo'), id: 'o-am-file' }, hidden: true,
+      var input = el('input', { attrs: { type: 'file', accept: 'image/jpeg,image/png,image/webp', 'aria-label': t('am.photo'), id: 'o-am-file' }, hidden: true,
         on: { change: function () { pickPhoto(input); } } });
       var photoActs = el('div', { class: 'row wrap-row' },
         btn(has('gate_photo') ? t('am.photo.again') : t('am.photo'), 'btn btn-accent', function () { input.click(); }, busy),
