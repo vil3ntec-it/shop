@@ -236,6 +236,8 @@ object StrSale {
   val newDebtor: String get() = t("قرض‌دارِ تازه", "New debtor", "نوی پوروړی")
   val noDebtorsYet: String get() = t("هنوز قرض‌داری ثبت نشده است", "No debtors yet", "لا هېڅ پوروړی نه دی ثبت شوی")
   val debtorNotFound: String get() = t("قرض‌داری پیدا نشد", "No debtor found", "پوروړی ونه موندل شو")
+  /** POS-31/S18 گامِ ۴ — ثبتِ مشتریِ تازه با همان نامِ کادرِ گزینشِ صندوق */
+  fun newCustomerNamed(name: String): String = t("مشتریِ تازه: «${asIs(name)}»", "New customer: “$name”", "نوی پېرودونکی: «$name»")
 
   // فاکتورِ نیمه‌کاره (draft)
   val draftTitle: String get() = t("فاکتورِ نیمه‌کاره پیدا شد", "An unfinished invoice was found", "نیمګړی بل وموندل شو")

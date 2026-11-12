@@ -9,7 +9,7 @@
  *    عکسِ ویترینِ کالاست، نقشِ `main`/`promo` و عکسِ برداشته‌شده (`detach`) نه. فقط کالای منتشرشده و زنده (همان `photo()`).
  * ⛔ شناسهٔ درونیِ عکس بیرون نمی‌رود: هر عکس با `tag` = ۱۲ hex از (عکس، نسخه) — همان `photoTag` ِ IMG-12؛ نسخهٔ تازه ⇒
  *    نشانیِ تازه و نشانیِ کهنه ۴۰۴. فایل فقط از راهِ همین فهرست: (دکان، کالا، tag) ⇒ همان ردیف، `shopCanRead` ِ بانک و
- *    اندازهٔ `thumb`/`display` (اصل هرگز).
+ *    اندازهٔ `thumb`/`display`/`zoom` (اصل هرگز؛ zoom ِ نبوده را `image-zoom` پشتِ پرچمِ خاموش می‌سازد).
  * سقف: ۸ عکس (همان `MAX_EXTRAS` ِ برنامه)، به ترتیبِ بارگذاری.
  */
 const db = require('../db');
@@ -18,7 +18,7 @@ const shelf = require('./storefront-shelf');
 
 const FLAG = 'shop.storefront.gallery';
 const EXTRA_ROLES = Object.freeze(['detail', 'back', 'label', 'variant']);
-const SIZES = Object.freeze(['thumb', 'display']);
+const SIZES = Object.freeze(['thumb', 'display', 'zoom']);   //  zoom: IMG-11، ساختِ سرور پشتِ `image_bank.zoom`
 const MAX = 8;
 const TAG_RE = /^[0-9a-f]{12}$/;
 
@@ -69,6 +69,7 @@ async function file(shopId, productId, tag, size) {
   const img = await bank.imageRow(r.id);
   const version = Number(r.current_version);
   if (!img || !(await bank.shopCanRead(shopId, img, version, size))) return null;
+  if (size === 'zoom') return require('./image-zoom').ensure(shopId, img, version);
   return bank.readFile(img.id, version, size);
 }
 

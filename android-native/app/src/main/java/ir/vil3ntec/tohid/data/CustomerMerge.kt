@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.perm.CreditLimitPerm
+
 import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.text.TextNormalizer
 import ir.vil3ntec.tohid.money
@@ -204,11 +206,27 @@ object CustomerMerge {
     today: String = ir.vil3ntec.tohid.todayIso(),
     now: Long = System.currentTimeMillis(),
     newId: () -> String = ::auditId,
+  ): Result = merge(d, keepId, dropId, CreditLimitPerm.Rules.OFF, today, now, newId)
+
+  /**
+   *  همان ادغام با قاعدهٔ «تغییرِ سقفِ اعتبار» ِ همین کاربر (CRM-03 / §۱۰.۱، `rememberCreditLimitRules`): ماندگارِ بی سقف سقفِ
+   *  تکراری را می‌گیرد ([fold]) و این همان تغییری است که سرور با `shop.credit_limit_perm` رد می‌کند ⇒ پیش از نوشتن، با همان
+   *  `CreditLimitGate.error` ِ برگهٔ مشتری. خاموش/صاحب/سقفِ بی‌تغییر ⇒ همان امروز.
+   */
+  fun merge(
+    d: ShopData,
+    keepId: String,
+    dropId: String,
+    limitRules: CreditLimitPerm.Rules,
+    today: String = ir.vil3ntec.tohid.todayIso(),
+    now: Long = ReportBridge.nowMs(),
+    newId: () -> String = ::auditId,
   ): Result {
     val p = when (val r = preview(d, keepId, dropId)) {
       is Result.Failed -> return r
       is Result.Ok -> r.preview
     }
+    CreditLimitGate.error(limitRules, p.keep, p.result.creditLimit)?.let { return Result.Failed(StrLedger.mergeChangesLimit(p.keep.name, it)) }
     val rows = d.transactions.filter { it.debtorId == dropId }.map { "transactions/${it.id}" } +
       d.sales.filter { it.debtorId == dropId }.map { "sales/${it.id}" }
     //  ادغامی که رضایتِ ماندگار را عوض کرد (فقط سخت‌گیرانه‌تر) همین‌جا سند دارد

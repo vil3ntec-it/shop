@@ -162,7 +162,8 @@ class CustomerStage2Test {
     val addr = body["address"]!!.jsonObject
     assertEquals("34.53", addr["lat"]!!.jsonPrimitive.content)
     assertNull("با پین `zoneId` نمی‌رود", addr["zoneId"])
-    assertNull("deviceId فقط با سدِ «یک بار»", body["deviceId"])
+    //  RSK-04: شناسهٔ تصادفیِ نصب در هر ثبت می‌رود (فهرستِ سیاه/سفیدِ دستگاه)، نه فقط با سدِ «یک بار» — همان مقدارِ ShopperMemory ِ بالا
+    assertEquals("deviceId در هر ثبت (RSK-04)", "07".repeat(16), body["deviceId"]!!.jsonPrimitive.content)
     assertEquals(Route.Placed("golestan", "v2.tok12345"), m.route)
 
     //  پیگیری ⇒ نظر و امتیاز

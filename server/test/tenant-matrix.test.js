@@ -96,6 +96,7 @@ const NO_TENANT = {
   'POST /api/payments/webhook/fake': 'ارائه‌دهندهٔ ساختگی، فقط بیرون از تولید؛ همان قاعدهٔ وب‌هوک (payment-intents.test.js)',
   'POST /api/payments/webhook/hesabpay/:token': 'وب‌هوکِ حساب‌پیِ یک دکان — نشانی فقط دکان را می‌گوید؛ امضا با رازِ رمزشدهٔ همان دکان و قصد فقط درونِ همان دکان (hesabpay-account.test.js)',
   'GET /api/calendar/holidays': 'تعطیلاتِ رسمی، دادهٔ همگانی بی توکن و فقط خواندن؛ نوشتن فقط مدیرِ ارشد زیرِ /api/admin (LOC-04)',
+  'GET /api/search/synonyms': 'فهرستِ مرکزیِ مترادف (گروه‌های واژه، بی دادهٔ دکان)، همگانی و فقط خواندن؛ نوشتن فقط مدیرانِ پنل زیرِ /api/admin (POS-04)',
 };
 
 /* ── دادهٔ واقعیِ دکان‌ها ─────────────────────────────────────────────── */
@@ -586,6 +587,10 @@ const ADMIN_SUBJECT = {
   'GET /api/admin/users/:id/delete-preview': { audited: 'admin.user_delete_previewed' },
   'GET /api/admin/shops/:id': { audited: 'admin.shop_viewed' },
   'GET /api/admin/shops/:id/staff-perms': { audited: 'admin.shop_staff_perms_viewed' },
+  'GET /api/admin/shops/:id/images/changes': { audited: 'admin.image_changes_viewed' },
+  //  جزئیاتِ یک دسته فقط با شناسهٔ واقعیِ دسته ۲۰۰ می‌دهد (این ماتریس دسته‌ای نمی‌سازد) ⇒ سابقهٔ «admin.image_change_viewed» ِ
+  //  هر پاسخِ موفق و اجازهٔ `read_private` در `admin-image-changes.test.js` سنجیده می‌شود
+  'GET /api/admin/shops/:id/images/changes/:cid': { exempt: 'جزئیاتِ دسته‌ای که فهرستش سابقه‌دار است؛ هر پاسخِ موفقِ خودش هم سابقه می‌نویسد (admin-image-changes.test.js)' },
   'GET /api/admin/support/threads/:id': { audited: 'admin.support_thread_viewed' },
   'GET /api/admin/accounts/:app/:tenantId/backups/:id': { audited: 'admin.account_backup_downloaded' },
   //  ⛔ کدِ پمپ بی اجازهٔ صاحب‌کار دست نمی‌خورد: سابقهٔ این دو (و آزمونش) در #615 است

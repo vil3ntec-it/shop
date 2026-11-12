@@ -232,7 +232,8 @@ async function add(store, token, { key, body, ticket = '', session = '' }) {
       [shopId, row.id, subtotalMinor, discountMinor, totalMinor, pl.after.length, at]
     );
     await require('./delivery-due').syncIn(c, shopId, row.id, at);   //  DLV-11: پیکِ سپرده‌شده جمعِ تازه را می‌گیرد
-    await require('./stock-reserve').syncOrderIn(c, shopId, row.id, at);   //  O-06 = ب: نگه‌داشته هم‌اندازهٔ قلم‌های تازه
+    //  O-06 = ب: نگه‌داشته هم‌اندازهٔ قلم‌های تازه؛ ادعای تازهٔ مشتری با همان سقفِ شماره (۲-۲۱، CHK-18)
+    await require('./stock-reserve').syncOrderIn(c, shopId, row.id, at, { phoneCap: true });
     const detail = {
       type: EVENT_TYPE, addId: `ad_${ulid(at)}`, key, hash,
       lines: pl.changes.map(({ note: _n, ...x }) => x),

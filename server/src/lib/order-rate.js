@@ -80,11 +80,15 @@ async function check(run, shopId, phone, { at = now(), rules = RULES } = {}) {
  * قاعده‌های ریسکِ ویترین (RSK-02 مشتریِ تازه، RSK-05 تکراری؛ پشتِ پرچمِ خاموشِ `shop.order_risk`،
  * `lib/order-risk`) با همان قفلِ شماره، تا دو ثبتِ هم‌زمان از لای قاعده رد نشوند.
  */
-function guard(price, { shopId, phone, secondOrder = false }) {
+function guard(price, { shopId, phone, secondOrder = false, deviceId = '', key = '' }) {
+  //  RSK-04 «دستگاه»: شناسهٔ تصادفیِ مرورگر/برنامهٔ خرید ⇒ چکیدهٔ همین دکان (`lib/risk-device`)؛ نادرست ⇒ «نامعلوم»
+  const deviceKey = require('./risk-device').keyOf(shopId, deviceId);
   return async (run, at) => {
     await check(run, shopId, phone, { at });
     const input = await price(run, at);
-    await require('./order-risk').checkIn(run, shopId, phone, input, { at, secondOrder: secondOrder === true });
+    await require('./order-risk').checkIn(run, shopId, phone, input, { at, secondOrder: secondOrder === true, deviceKey });
+    //  پذیرفته شد ⇒ دستگاهِ همین سفارش (فقط با پرچمِ روشن، همان تراکنش) تا دکان بتواند «این دستگاه» را ببندد
+    if (deviceKey) await require('./risk-device').rememberIn(run, shopId, key, deviceKey, at);
     return input;
   };
 }

@@ -78,6 +78,8 @@ object StrLedger {
     "For «Yes», write where the consent came from (for example «in person» or «by phone»)",
     "د «هو» لپاره د رضا سرچینه ولیکئ (لکه «حضوري» یا «تلیفوني»)",
   )
+  /** CRM-03 — ادغام سقفِ اعتبارِ ماندگار را عوض می‌کرد و این کاربر اجازه‌اش را ندارد ([why] همان پیامِ برگهٔ مشتری) */
+  fun mergeChangesLimit(name: String, why: String): String = t("ادغام سقفِ اعتبارِ «${asIs(name)}» را عوض می‌کند — ${asIs(why)}", "Merging would change the credit limit of “$name” — $why", "یوځای کول د «$name» د پور حد بدلوي — $why")
   val mergeSelf: String get() = t("یک مشتری با خودش ادغام نمی‌شود", "A customer can't be merged with itself", "یو پېرودونکی له ځان سره نه یوځای کېږي")
   val mergeKeepMissing: String get() = t("مشتریِ ماندگار پیدا نشد", "The customer to keep was not found", "پاتې کېدونکی پېرودونکی پیدا نه شو")
   val mergeDropMissing: String get() = t("مشتریِ تکراری پیدا نشد", "The duplicate customer was not found", "تکراري پېرودونکی پیدا نه شو")

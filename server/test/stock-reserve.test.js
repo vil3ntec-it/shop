@@ -496,7 +496,7 @@ test('CHK-21 + O-06: افزودنِ قلم به سفارشِ ویترین نگه
   const slug = `rsv-add-${Date.now().toString(36)}`;
   const put = await h.put('/api/shop/storefront', { slug, enabled: true, title: 'ویترینِ نگه‌داشتن', contactPhone: '0700000001' }, { token: s.token });
   assert.equal(put.status, 200, JSON.stringify(put.body));
-  await stocked(s, 'ad1', 2);
+  await stocked(s, 'ad1', 4);   //  سقفِ شماره (۲-۲۱): نیمِ ۴ ⇒ همین شماره روی هم تا دو عدد
   assert.equal((await h.put('/api/shop/storefront/products/ad1', { published: true }, { token: s.token })).status, 200);
   const phone = '0791112299';
   const st = await h.post(`/api/store/${slug}/verify/start`, { phone });
@@ -509,18 +509,19 @@ test('CHK-21 + O-06: افزودنِ قلم به سفارشِ ویترین نگه
   const id = (await one('SELECT id FROM online_orders WHERE shop_id=$1 AND order_no=$2', [s.shopId, ck.body.order.orderNo])).id;
   const add = (k) => h.post(`/api/store/${slug}/orders/${ck.body.order.token}/items`, { lines: [{ productId: 'ad1', qtyMilli: 1000 }] },
     { headers: { 'Idempotency-Key': k, 'X-Store-Ticket': ticket } });
-  //  دو عدد در قفسه، یکی نگه‌داشتهٔ همین سفارش ⇒ افزودنِ یکی دیگر می‌گذرد (نگه‌داشتهٔ خودی «دیگران» نیست)
+  //  چهار عدد در قفسه، یکی نگه‌داشتهٔ همین سفارش ⇒ افزودنِ یکی دیگر می‌گذرد (نگه‌داشتهٔ خودی «دیگران» نیست)
   const k1 = `rsv-add-${Date.now()}-1`;
   const a1 = await add(k1);
   assert.equal(a1.status, 201, JSON.stringify(a1.body));
   const mine = await query(`SELECT COALESCE(SUM(qty_milli),0)::bigint AS q FROM stock_reservations WHERE shop_id=$1 AND order_id=$2 AND status='held'`, [s.shopId, id]);
   assert.equal(Number(mine.rows[0].q), 2000, 'افزوده هم نگه داشته شد');
-  assert.equal((await stockOf(s, 'ad1')).sellableMilli, 0);
+  assert.equal((await stockOf(s, 'ad1')).sellableMilli, 2000);
   //  تکرارِ همان کلید ⇒ همان نتیجه، بی نگه‌داشتنِ دوم
   assert.equal((await add(k1)).status, 200);
   assert.equal(Number((await query(`SELECT COALESCE(SUM(qty_milli),0)::bigint AS q FROM stock_reservations WHERE shop_id=$1 AND status='held'`, [s.shopId])).rows[0].q), 2000);
-  //  سومی دیگر نیست
-  const a3 = await add(`rsv-add-${Date.now()}-3`);
+  //  سه عددِ دیگر (روی هم پنج) از موجودی بیشتر است
+  const a3 = await h.post(`/api/store/${slug}/orders/${ck.body.order.token}/items`, { lines: [{ productId: 'ad1', qtyMilli: 3000 }] },
+    { headers: { 'Idempotency-Key': `rsv-add-${Date.now()}-3`, 'X-Store-Ticket': ticket } });
   assert.equal(a3.status, 409, JSON.stringify(a3.body));
   assert.equal(a3.body.error.code, 'out_of_stock');
   await reconciled(s, 'ad1');

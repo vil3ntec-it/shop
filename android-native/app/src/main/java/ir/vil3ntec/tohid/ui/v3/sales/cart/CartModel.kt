@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.sales.cart
 
+import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.BarcodeMatch
 import ir.vil3ntec.tohid.data.PackScan
@@ -29,7 +30,7 @@ object CartModel {
    *  همان پیامِ موتور (`shortageMessage`) و سبد دست نمی‌خورد؛ بخشی ماند ⇒ تا موجودی و «فقط … مانده».
    */
   fun addOne(d: ShopData, lines: List<SalesEngine.CartLine>, productId: String): Step {
-    val p = d.products.find { it.id == productId } ?: return Step(null, null, false)
+    val p = ShopStore.product(d, productId) ?: return Step(null, null, false)
     val step = SalesEngine.cartStep(p.unit)
     val added = SalesEngine.addToCartCapped(lines, p.id, step, ProductInfoMap.sellable(d, p.id))
     if (!added.capped) return Step(added.cart, null, false)
@@ -43,7 +44,7 @@ object CartModel {
    *  [addOne]. شمارِ نادرست (صفر، منفی، اعشار برای کالای شمردنی) ⇒ همان یک پلهٔ امروز.
    */
   fun addCount(d: ShopData, lines: List<SalesEngine.CartLine>, productId: String, count: Double): Step {
-    val p = d.products.find { it.id == productId } ?: return Step(null, null, false)
+    val p = ShopStore.product(d, productId) ?: return Step(null, null, false)
     val weighed = SalesEngine.isFractionalUnit(p.unit)
     if (!count.isFinite() || count <= 0 || count == 1.0 || (!weighed && count != kotlin.math.floor(count))) return addOne(d, lines, productId)
     val added = SalesEngine.addToCartCapped(lines, p.id, count, ProductInfoMap.sellable(d, p.id))
@@ -55,7 +56,7 @@ object CartModel {
 
   /** یک پله کمتر («−» ِ کاشی)؛ پلهٔ آخر ردیف را برمی‌دارد */
   fun minusOne(d: ShopData, lines: List<SalesEngine.CartLine>, productId: String): List<SalesEngine.CartLine>? {
-    val p = d.products.find { it.id == productId } ?: return null
+    val p = ShopStore.product(d, productId) ?: return null
     val now = lines.find { it.productId == p.id }?.quantity ?: return null
     return SalesEngine.setCartQty(lines, p.id, now - SalesEngine.cartStep(p.unit))
   }
@@ -66,7 +67,7 @@ object CartModel {
    */
   fun step(d: ShopData, lines: List<SalesEngine.CartLine>, row: CartSummary.Row, sign: Int): Step {
     if (sign > 0 && row.hasProduct) {
-      val p = d.products.find { it.id == row.id } ?: return Step(null, null, false)
+      val p = ShopStore.product(d, row.id) ?: return Step(null, null, false)
       val added = SalesEngine.addToCartCapped(lines, p.id, row.step, ProductInfoMap.sellable(d, p.id))
       val note = if (added.capped) StrSale.onlyLeftOf(p.name, stockLeft(p, added.available)) else null
       return Step(added.cart.takeIf { it !== lines }, note, added.capped)
@@ -144,7 +145,7 @@ object CartModel {
     return when (val hit = BarcodeMatch.find(code, index)) {
       is BarcodeMatch.Hit.Several -> Scan.Several(code, hit.count)
       is BarcodeMatch.Hit.Product -> {
-        val p = d.products.find { it.id == hit.id } ?: return Scan.Unknown(code)
+        val p = ShopStore.product(d, hit.id) ?: return Scan.Unknown(code)
         if (!p.active) return Scan.Inactive(p)
         val added = SalesEngine.addToCartCapped(lines, p.id, multiplier, ProductInfoMap.sellable(d, p.id))
         Scan.Added(added.cart, p, hit.exact, added.capped, added.available)

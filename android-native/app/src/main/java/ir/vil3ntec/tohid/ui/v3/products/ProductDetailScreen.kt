@@ -53,7 +53,8 @@ internal class ProductDetailNav(
  *  صفحهٔ یک کالا (`products/{id}`): عنوانِ درشت = نامِ کالا، عکسِ بزرگ (یا کاشیِ
  *  حرف)، کارتِ عددها (موجودی — زدن ⇐ انبار؛ قیمتِ فروش؛ قیمتِ خرید)، کارتِ سودها،
  *  حرکت‌های اخیر و تاریخچهٔ تغییرات؛ دکمهٔ چسبانِ «ورود کالا به انبار». «ویرایش» در
- *  سربرگ؛ «عکس»، «عکس با دوربینِ گوشی» (کامپیوتر/گوشیِ جفت‌شده) و «حذف» در «…».
+ *  سربرگ؛ «عکس»، «عکس با دوربینِ گوشی» (کامپیوتر/گوشیِ جفت‌شده) و «حذف» در «…». زیرِ سودها بخشِ «ویترینِ
+ *  اینترنتی» ِ همین کالا (INV-01@32، `ProductStorefrontSection`).
  */
 @Composable
 internal fun ProductDetailScreen(
@@ -64,6 +65,8 @@ internal fun ProductDetailScreen(
   nav: ProductDetailNav,
   /** زیرِ عکس: کدام عکس در ویترین است و نسخه‌های بانکِ تصاویر (IMG-BANK-08/09/16؛ فقط با بانکِ روشن) */
   photoExtra: @Composable () -> Unit = {},
+  /** INV-01@32: ویترینِ همین کالا — تعریف و انتشار در یک جا (فقط با ویترینِ روشن و اجازهٔ مدیریتش) */
+  storefront: @Composable () -> Unit = {},
 ) {
   val product = data.products.find { it.id == productId }
   if (product == null) {
@@ -102,6 +105,7 @@ internal fun ProductDetailScreen(
       Spacer(Modifier.height(8.dp))
       Box(Modifier.v3Stagger(stagger, "figures", 1)) { FiguresCard(product, figures, onStock = nav.stock) }
       Box(Modifier.v3Stagger(stagger, "profit", 2)) { ProfitCard(product, figures) }
+      storefront()
       Box(Modifier.v3Stagger(stagger, "moves", 3)) { MovesSection(product, moves, moveCount, onAll = nav.movements) }
       if (history.isNotEmpty()) Box(Modifier.v3Stagger(stagger, "history", 4)) { HistorySection(history) }
       Spacer(Modifier.height(8.dp))

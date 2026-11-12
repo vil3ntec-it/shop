@@ -145,10 +145,14 @@ async function apply(shopId, userId, body = {}, { ip = '' } = {}) {
 
 /**
  * برگرداندنِ همهٔ کالاهای یک دسته به وضعِ پیش از آن — یا هیچ. ⇒ `{ change, already }`.
+ * `actorType: 'admin'` (درِ پنلِ مرکزی، `routes/admin-image-changes.js`): `userId` شناسهٔ مدیر است ⇒ سابقه با نوعِ «مدیر»،
+ * `rolled_back_by` و `updated_by` با پیشوندِ ‎admin:‎ (هرگز با شناسهٔ کاربرِ دکان یکی نمی‌شود) و شناسهٔ اجازهٔ پشتیبانی (`grant`).
  */
-async function rollback(shopId, userId, id, body = {}, { ip = '' } = {}) {
+async function rollback(shopId, userId, id, body = {}, { ip = '', actorType = 'user', grant = '' } = {}) {
   const cid = str(id, 40);
   const reason = str(body && body.reason, 200);
+  const by = actorType === 'admin' ? `admin:${userId}` : userId;
+  const extra = grant ? { grant } : {};
   return tx(async (c) => {
     const ch = await q1(c, 'SELECT * FROM shop_image_changes WHERE id=$1 AND shop_id=$2 FOR UPDATE', [cid, shopId]);
     if (!ch) throw notFound('این دسته پیدا نشد');
@@ -178,21 +182,21 @@ async function rollback(shopId, userId, id, body = {}, { ip = '' } = {}) {
               central_image_id=$8, central_version=$9, central_match=$10, central_confirmed_by=$11, bank_product_id=$12,
               updated_by=$13, updated_at=$14
             WHERE shop_id=$1 AND product_id=$2`,
-          [shopId, productId, ...COLS.map((k) => before[k]), userId, at]);
+          [shopId, productId, ...COLS.map((k) => before[k]), by, at]);
       }
       await audit.log({
-        shopId, userId, action: 'image.restored', targetType: 'product', targetId: productId, ip,
+        shopId, actorType, userId, action: 'image.restored', targetType: 'product', targetId: productId, ip,
         detail: before
-          ? { change_id: cid, source: before.source, image_id: before.image_id, version: before.version }
-          : { change_id: cid, source: 'previous_default' },
+          ? { change_id: cid, source: before.source, image_id: before.image_id, version: before.version, ...extra }
+          : { change_id: cid, source: 'previous_default', ...extra },
       }, { client: c });
     }
     await c.query(
       `UPDATE shop_image_changes SET status='rolled_back', rolled_back_by=$2, rolled_back_at=$3, rollback_reason=$4
-        WHERE id=$1`, [cid, userId, at, reason]);
+        WHERE id=$1`, [cid, by, at, reason]);
     await audit.log({
-      shopId, userId, action: 'image.changes_rolled_back', targetType: 'image_change', targetId: cid, ip,
-      detail: { items: rows.length, reason },
+      shopId, actorType, userId, action: 'image.changes_rolled_back', targetType: 'image_change', targetId: cid, ip,
+      detail: { items: rows.length, reason, ...extra },
     }, { client: c });
     const done = await q1(c, 'SELECT * FROM shop_image_changes WHERE id=$1', [cid]);
     return { change: shape(done, rows), already: false };

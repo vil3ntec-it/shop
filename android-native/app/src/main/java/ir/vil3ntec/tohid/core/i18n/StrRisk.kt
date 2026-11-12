@@ -123,6 +123,31 @@ object StrRisk {
     "د نقشې له اپ څخه لینک ولګوئ، یا لکه 34.528, 69.172",
   )
   val entryPlaceError: String get() = t("مختصات یا پیوند خوانده نشد", "Couldn't read the coordinates or link", "مختصات یا لینک ونه لوستل شو")
+  /* ---------------- RSK-04 — «دستگاه» (شناسهٔ تصادفیِ مرورگر یا برنامهٔ خریدِ همان سفارش) ---------------- */
+
+  val blockDevice: String get() = t("بستنِ این دستگاه", "Block this device", "دا وسیله بندول")
+  val trustDevice: String get() = t("دستگاهِ مطمئن", "Trust this device", "باوري وسیله")
+  val blockDeviceHelp: String get() = t(
+    "سفارشِ اینترنتیِ تازه از همان مرورگر یا برنامهٔ خریدی که این سفارش را فرستاد پذیرفته نمی‌شود، حتی با شمارهٔ دیگر؛ مشتری دلیل را نمی‌بیند.",
+    "New online orders from the browser or shopping app that sent this order are refused, even with another number; the customer never sees the reason.",
+    "له هماغه براوزر یا د پېرلو اپ څخه چې دا فرمایش یې لېږلی، نوي انلاین فرمایشونه نه منل کېږي، که څه هم بله شمېره وي؛ پیرودونکی دلیل نه ویني.",
+  )
+  val trustDeviceHelp: String get() = t(
+    "سقفِ مشتریِ تازه برای همان مرورگر یا برنامهٔ خرید برداشته می‌شود؛ بررسیِ سفارشِ تکراری می‌ماند.",
+    "The new-customer limit is lifted for that browser or shopping app; duplicate checks stay.",
+    "د هماغه براوزر یا د پېرلو اپ لپاره د نوي پیرودونکي حد لرې کېږي؛ د تکراري فرمایش څارنه پاتې کېږي.",
+  )
+  fun entryDeviceBlocked(orderNo: Any?): String = t(
+    if (orderNo == null) "دستگاهِ بسته" else "دستگاهِ بسته (از سفارشِ #${asIs(orderNo)})",
+    "Blocked device" + (orderNo?.let { " (from order #$it)" } ?: ""),
+    "بنده وسیله" + (orderNo?.let { " (له فرمایش #$it)" } ?: ""),
+  )
+  fun entryDeviceTrusted(orderNo: Any?): String = t(
+    if (orderNo == null) "دستگاهِ مطمئن" else "دستگاهِ مطمئن (از سفارشِ #${asIs(orderNo)})",
+    "Trusted device" + (orderNo?.let { " (from order #$it)" } ?: ""),
+    "باوري وسیله" + (orderNo?.let { " (له فرمایش #$it)" } ?: ""),
+  )
+
   val listsOnlyManagers: String get() = t(
     "این فهرست فقط برای صاحب و مدیر است و فقط وقتی «ریسکِ سفارش» روشن باشد.",
     "Only owners and managers can see this list, and only when order risk checks are on.",

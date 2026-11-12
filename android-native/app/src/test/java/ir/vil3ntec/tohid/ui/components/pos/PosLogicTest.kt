@@ -411,7 +411,7 @@ class PosLogicTest {
   /**
    *  POS-41: کلیدهای پنلِ پرداختِ کامپیوتر (`sale.payment.*`) دیگر «planned» نیستند — Enter (ثبت/نقدِ دقیق)، PageDown/PageUp
    *  (روشِ بعدی/قبلی)، Shift+۱..۶ (اسکناس)، Esc (برگشت) و تازه F2 (مشتری، `payPanelKey`)؛ فقط صندوقِ کامپیوتر ⇒ partial.
-   *  مانده: Alt+P (چاپِ همین فاکتور) و Tab/Shift+Tab ِ مستند.
+   *  سپس Alt+P (چاپِ همین فاکتور) و Tab/Shift+Tab (فیلدِ بعدی/قبلی، `PayTabKeysUiTest`) هم partial شدند.
    */
   @Test
   fun `POS-41 کلیدهای پنلِ پرداخت از keymap می‌آیند و F2 مشتری و Esc برگشت است`() {
@@ -420,11 +420,9 @@ class PosLogicTest {
       km.SALE_PAYMENT_SUBMIT, km.SALE_PAYMENT_NEXT_METHOD, km.SALE_PAYMENT_PREV_METHOD,
       km.SALE_PAYMENT_NOTE10, km.SALE_PAYMENT_NOTE20, km.SALE_PAYMENT_NOTE50, km.SALE_PAYMENT_NOTE100,
       km.SALE_PAYMENT_NOTE500, km.SALE_PAYMENT_NOTE1000, km.SALE_PAYMENT_CUSTOMER, km.SALE_PAYMENT_BACK,
-      km.SALE_PAYMENT_TOGGLE_PRINT,
+      km.SALE_PAYMENT_TOGGLE_PRINT, km.SALE_PAYMENT_NEXT_FIELD, km.SALE_PAYMENT_PREV_FIELD,
     )
     partial.forEach { assertEquals(it.id, ir.vil3ntec.tohid.core.keymap.KeyStatus.PARTIAL, it.status) }
-    listOf(km.SALE_PAYMENT_NEXT_FIELD, km.SALE_PAYMENT_PREV_FIELD)
-      .forEach { assertEquals(it.id, ir.vil3ntec.tohid.core.keymap.KeyStatus.PLANNED, it.status) }
 
     fun press(c: ir.vil3ntec.tohid.core.keymap.Chord, canCustomer: Boolean = true) = payPanelKey({ c in it.keys }, canCustomer)
     assertEquals(PayPanelKey.CUSTOMER, press(ir.vil3ntec.tohid.core.keymap.Chord(KeyName.F2)))
@@ -440,7 +438,8 @@ class PosLogicTest {
       ?: error("DeskSale.kt پیدا نشد")
     assertTrue(src.contains("onCustomer = { payOpen = false; payAfterPick = true; pickDebtor = true }"))
     val picker = src.substringAfter("if (pickDebtor) {").substringBefore("QuickTillDialog")
-    assertEquals(2, Regex("if \\(payAfterPick\\) \\{ payAfterPick = false; payOpen = true \\}").findAll(picker).count())
+    //  بستن، گزینش، و (POS-31/S18 گامِ ۴) ثبتِ «مشتریِ تازه» در صندوقِ لمسی — هر سه پنل را دوباره باز می‌کنند
+    assertEquals(3, Regex("if \\(payAfterPick\\) \\{ payAfterPick = false; payOpen = true \\}").findAll(picker).count())
   }
 
   /**

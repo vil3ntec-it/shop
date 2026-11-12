@@ -37,6 +37,7 @@ class ScenarioS46DesktopTest {
   private val sync get() = SyncStore(ctx)
 
   private fun clean() {
+    CartStore.awaitWrites()
     draft.delete()
     stash.deleteRecursively()
     listOf("u-owner-s46", "u-ali-s46").forEach { pins.remove(it) }

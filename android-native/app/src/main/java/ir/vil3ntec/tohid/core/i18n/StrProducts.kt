@@ -219,4 +219,16 @@ object StrProducts {
     "This photo couldn't be read. Choose another one (JPG or PNG).",
     "دا انځور ونه لوستل شو. بل انځور وټاکئ (JPG یا PNG).",
   )
+
+  // INV-01@32 — ویترینِ همین کالا روی صفحهٔ کالا (تعریف و انتشار در یک جا)
+  val storefrontChecking: String get() = t("در حالِ خواندنِ ویترین از سرور…", "Reading the storefront from the server…", "ویترین له سرور څخه لوستل کېږي…")
+  val storefrontNotSynced: String get() = t("این کالا هنوز به سرور نرسیده", "This product hasn’t reached the server yet", "دا توکی لا سرور ته نه دی رسېدلی")
+  val storefrontNotSyncedBody: String get() = t(
+    "تا همگام نشود در ویترین گذاشته نمی‌شود. پس از همگام‌سازی همین‌جا روشن می‌شود.",
+    "It can’t go in the storefront until it syncs. This switch turns on here right after syncing.",
+    "تر همغږۍ پورې ویترین ته نه ځي. تر همغږۍ وروسته همدلته فعالېږي.",
+  )
+  val storefrontDetails: String get() = t("قیمتِ آنلاین، توضیح و مشخصات", "Online price, description and specs", "آنلاین بیه، تشریح او ځانګړنې")
+  val storefrontPublished: String get() = t("در ویترین گذاشته شد", "Added to the storefront", "ویترین ته واچول شو")
+  val storefrontRemoved: String get() = t("از ویترین برداشته شد", "Removed from the storefront", "له ویترین لرې شو")
 }

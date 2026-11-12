@@ -30,12 +30,7 @@
   };
   K.has = function (key) { return own(DICT, key); };
 
-  /**
-   * واژه‌نامهٔ جدای یک صفحه (`/kit/i18n/<name>.<زبان>.json`)، فقط وقتی همان صفحه باز می‌شود — تا بارِ نخستِ
-   * ویترین کوچک بماند (web-i18n). مثلِ واژه‌نامهٔ اصلی یک بار دوباره؛ باز نیامد ⇒ همان متنِ فارسیِ HTML و
-   * واژه‌های پایه (کلیدِ خام هرگز) و بارِ بعد دوباره خواسته می‌شود. کلیدِ واژه‌نامهٔ اصلی جایش را نمی‌دهد.
-   * [root] (اختیاری) پس از رسیدن ترجمه می‌شود. هرگز رد نمی‌شود: `true` = رسید.
-   */
+  /** واژه‌نامهٔ جدای یک صفحه (`/kit/i18n/<name>.<زبان>.json`، دیربار)؛ هرگز رد نمی‌شود: `true` = رسید. قاعده: RULES «v3 · ویترین». */
   var parts = {};
   K.part = function (name, root) {
     return ready.then(function () {
@@ -317,8 +312,7 @@
     });
   }
 
-  // ── تنظیمات (پنجره): زبان، تم و شمارهٔ تأییدشدهٔ همین دستگاه — kit/settings.js ِ دیربار، فقط با زدنِ دکمه ──
-  //  (بودجهٔ بارِ نخست، WEB-15)؛ تا رسیدن زدنِ دوباره هیچ؛ نیامد (شبکه) ⇒ پیام و زدنِ بعد دوباره می‌خواهد
+  // ── تنظیمات (پنجره): kit/settings.js ِ دیربار، فقط با زدنِ دکمه (WEB-15) ──
   var setting = false;
   K.settings = function (focusLang) {
     if (setting) return;
@@ -382,9 +376,13 @@
   K.ready = function (fn) { ready.then(fn); };
 
   // ── کارتِ کالا (بازارچه و ویترین) ──
-  /** ۳۲.۳: پیامِ موجودی ساده و دقیق؛ نامعلوم هرگز «موجود» نیست. */
+  /** ۳۲.۳: پیامِ موجودی ساده و دقیق؛ نامعلوم هرگز «موجود» نیست. INV-04@32: عددِ آزاد فقط با «نمایشِ عدد». */
   K.stockOf = function (p) {
-    var s = (p && p.stock) || { status: 'unverified' };
+    var s = (p && p.stock) || { status: 'unverified' }, o = stockBase(s), n = s.sellableMilli;
+    if (o.known && o.orderable && n > 0) { o.leftMilli = n; o.leftText = K.qty(n) + (s.unit ? ' ' + s.unit : ''); o.text += ' — ' + K.t('stock.left', { q: o.leftText }); }
+    return o;
+  };
+  function stockBase(s) {
     switch (s.status) {
       case 'in_stock': return { text: K.t('stock.in'), kind: 'ok', orderable: true, known: true };
       case 'in_warehouse': return { text: s.prepMinutes ? K.t('stock.wh_prep', { m: K.fa(s.prepMinutes, 0) }) : K.t('stock.wh'), kind: 'info', orderable: true, known: true };
@@ -392,7 +390,7 @@
       case 'unavailable': return { text: K.t('stock.na'), kind: 'err', orderable: false, known: true };
       default: return { text: K.t('stock.unk'), kind: 'off', orderable: true };
     }
-  };
+  }
   /** «+» = یک واحد؛ با کالای در سبد، تعداد روی دکمه. */
   K.addBtn = function (p, qtyMilli, onAdd) {
     var st = K.stockOf(p);
@@ -430,7 +428,7 @@
     var st = K.stockOf(p);
     var li = el('li', { class: 'p-card' + (st.orderable ? '' : ' unavailable'), attrs: { 'data-id': p.id } });
     var img = el('span', { class: 'p-img' + (p.photo ? ' tile' : '') });
-    if (p.photo) img.appendChild(K.photo({ src: o.photo, alt: '', loading: 'lazy', decoding: 'async', width: '300', height: '300' }, p.name));
+    if (p.photo) img.appendChild(K.photo({ src: o.photo, srcset: o.srcset, sizes: o.srcset && '(min-width:600px) 220px,46vw', alt: '', loading: 'lazy', decoding: 'async', width: '300', height: '300' }, p.name));
     else img.appendChild(el('span', { class: 'ph', text: String(p.name || '?').slice(0, 1), attrs: { 'aria-hidden': 'true' } }));
     var deal = p.regularPriceMinor > p.priceMinor;
     var label = [p.name, K.money(p.priceMinor) + (p.unit ? ' ' + K.t('p.per', { unit: p.unit }) : '')];

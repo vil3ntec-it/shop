@@ -112,7 +112,10 @@ class PayPanelState {
   /** «اکنون» ِ صفحه برای کهنگیِ نرخ (`CheckoutRoute`)؛ حالت نیست تا هر کشیدن دوباره نکشد */
   var clock: () -> Long = { 0L }
 
-  fun methods(): List<PayMethod> = PayFlow.panelMethods(stored)
+  /** PAY-06 — روش‌هایی که دکان برداشته (`PayMethodsPref.off`)؛ خالی (پیش‌فرض) ⇒ همان پنلِ امروز */
+  var off by mutableStateOf<Set<String>>(emptySet())
+
+  fun methods(): List<PayMethod> = PayFlow.panelMethods(stored, off)
 
   /** کادرِ ارزِ همین لحظه؛ بی جدول ⇒ `null` */
   fun fxTender(): ir.vil3ntec.tohid.data.FxTillFlow.Tender? = fxRates.takeIf { it.isNotEmpty() }?.let { r ->
@@ -222,6 +225,8 @@ fun PaySplitSection(
     }
   }
   if (Platform.DESKTOP) Text(StrPos.notesKeysHint, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+  //  PAY-10: ارزِ نقد فقط با جدولِ نرخِ روشنِ دکان (`state.fxRates`؛ خالی ⇒ همان پنل) — همان `FxTillFlow` ِ گوشی
+  FxTenderBox(state, bad = preview is PayFlow.Outcome.Bad && preview.problem.method == ir.vil3ntec.tohid.core.pay.Pay.FX) { if (armed()) onSubmit() }
 
   state.rows.forEachIndexed { i, row ->
     val bad = preview is PayFlow.Outcome.Bad && preview.problem.index == i
@@ -321,6 +326,51 @@ private fun SumRow(label: String, value: String, strong: Boolean = false, warn: 
   }
 }
 
+/**
+ *  PAY-10 — کادرِ «ارزِ نقد» ِ پنلِ کامپیوتر (و پنجرهٔ پرداختِ قدیم): ارز با تراشه، مبلغ به همان ارز، خطِ نرخ با منبع و زمان،
+ *  ارزشِ افغانیِ همان لحظه و یادداشتِ «پولِ پس افغانی». حساب همه `FxTillFlow`/هسته (هم‌شکلِ `CheckoutFxBox` ِ نسخهٔ ۳).
+ */
+@Composable
+private fun FxTenderBox(state: PayPanelState, bad: Boolean, onEnter: () -> Unit) {
+  val t = state.fxTender() ?: return
+  val rate = t.rates.firstOrNull { it.currency == t.currency }
+  val afn = (ir.vil3ntec.tohid.data.FxTillFlow.record(t) as? ir.vil3ntec.tohid.core.pay.PayResult.Ok)?.value?.toAmount
+  val muted = Shop.colors.muted
+  Column(
+    Modifier.fillMaxWidth().padding(top = 8.dp).background(Shop.colors.surface2, RoundedCornerShape(10.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
+  ) {
+    Text(ir.vil3ntec.tohid.core.i18n.StrFx.tillTitle, style = MaterialTheme.typography.labelLarge, color = muted)
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+      t.rates.forEach { r ->
+        androidx.compose.material3.FilterChip(
+          selected = r.currency == t.currency,
+          onClick = { state.fxCurrency = r.currency },
+          label = { Text(ir.vil3ntec.tohid.data.FxTillFlow.name(r.currency)) },
+        )
+      }
+    }
+    OutlinedTextField(
+      value = state.fxAmount,
+      onValueChange = { state.fxAmount = numericInput(it) },
+      label = { Text(ir.vil3ntec.tohid.core.i18n.StrFx.amountIn(ir.vil3ntec.tohid.data.FxTillFlow.name(t.currency))) },
+      suffix = { Text(t.currency) },
+      singleLine = true,
+      isError = bad,
+      keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+      keyboardActions = KeyboardActions(onDone = { onEnter() }),
+      modifier = Modifier.fillMaxWidth().onPreviewKeyEvent { e -> if (e.down(Key.Enter, Key.NumPadEnter)) { onEnter(); true } else false },
+    )
+    rate?.let { r ->
+      Text(
+        ir.vil3ntec.tohid.core.i18n.StrFx.rateNote(ir.vil3ntec.tohid.core.pay.FxTill.rateLine(r.rate, r.per, r.currency), r.source, ir.vil3ntec.tohid.ui.v3.sales.history.SaleTime.stamp(r.at)),
+        style = MaterialTheme.typography.labelSmall, color = muted,
+      )
+    }
+    afn?.let { Text(ir.vil3ntec.tohid.core.i18n.StrFx.afnValue(money(PayFlow.major(it))), style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text) }
+    Text(ir.vil3ntec.tohid.core.i18n.StrFx.changeNote, style = MaterialTheme.typography.labelSmall, color = muted)
+  }
+}
+
 @Composable
 private fun MethodPicker(selected: String, methods: List<PayMethod>, target: Dp, modifier: Modifier, onPick: (String) -> Unit) {
   var open by remember { mutableStateOf(false) }
@@ -341,7 +391,7 @@ private fun MethodPicker(selected: String, methods: List<PayMethod>, target: Dp,
  *  پیش از F9 با F2 می‌گذارد؛ باقی‌مانده فقط با مشتری به حساب می‌رود.
  */
 /** POS-41 — کلیدهای سطحِ پنلِ پرداخت (`sale.payment.*` ِ keymap.json)؛ بقیه (Enter، PageUp/Down، Shift+رقم) مالِ کادرهاست */
-internal enum class PayPanelKey { BACK, CUSTOMER, TOGGLE_PRINT }
+internal enum class PayPanelKey { BACK, CUSTOMER, TOGGLE_PRINT, NEXT_FIELD, PREV_FIELD }
 
 /**
  *  خالص: [hit] = «این رویداد همین کار است؟»؛ F2 فقط وقتی صفحه گزینشِ مشتری را دارد ([canCustomer])؛ Alt+P
@@ -355,6 +405,9 @@ internal fun payPanelKey(
   hit(KeyMap.SALE_PAYMENT_BACK) -> PayPanelKey.BACK
   canCustomer && hit(KeyMap.SALE_PAYMENT_CUSTOMER) -> PayPanelKey.CUSTOMER
   canPrint && hit(KeyMap.SALE_PAYMENT_TOGGLE_PRINT) -> PayPanelKey.TOGGLE_PRINT
+  //  Tab/Shift+Tab (`sale.payment.nextField`/`prevField`): کادر یا دکمهٔ بعدی/قبلیِ همین پنل
+  hit(KeyMap.SALE_PAYMENT_NEXT_FIELD) -> PayPanelKey.NEXT_FIELD
+  hit(KeyMap.SALE_PAYMENT_PREV_FIELD) -> PayPanelKey.PREV_FIELD
   else -> null
 }
 
@@ -384,9 +437,13 @@ fun PayPanelDialog(
    */
   print: Boolean? = null,
   onTogglePrint: (() -> Unit)? = null,
+  /** PAY-06 — روش‌هایی که دکان از پنل برداشته (`PayMethodsPref.off`)؛ خالی ⇒ همان پنلِ امروز */
+  offMethods: Set<String> = emptySet(),
+  /** PAY-10 — جدولِ نرخِ دکان فقط با تنظیمِ روشن (`FxTillPref.tillRates`)؛ خالی ⇒ بی کادرِ ارز، همان پنل */
+  fxRates: List<ir.vil3ntec.tohid.core.pay.FxRate> = emptyList(),
 ) {
   val printToggle = onTogglePrint.takeIf { print != null }
-  val state = remember { PayPanelState().also { it.stored = stored; it.cashRounding = cashRounding } }
+  val state = remember { PayPanelState().also { it.stored = stored; it.cashRounding = cashRounding; it.off = offMethods; it.fxRates = fxRates; it.clock = ir.vil3ntec.tohid.data.ReportBridge::nowMs } }
   val cashFocus = remember { FocusRequester() }
   LaunchedEffect(Unit) { runCatching { cashFocus.requestFocus() } }
   var error by remember { mutableStateOf<String?>(null) }
@@ -401,6 +458,8 @@ fun PayPanelDialog(
     }
   }
   Dialog(onDismissRequest = onDismiss) {
+    //  فوکوسِ همین پنجره (نه پنجرهٔ صندوق) — Tab/Shift+Tab
+    val focus = androidx.compose.ui.platform.LocalFocusManager.current
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(14.dp), modifier = Modifier.widthIn(max = 640.dp)) {
       Column(
         Modifier.padding(18.dp).verticalScroll(rememberScrollState()).onPreviewKeyEvent { e ->
@@ -408,6 +467,8 @@ fun PayPanelDialog(
             PayPanelKey.BACK -> { onDismiss(); true }
             PayPanelKey.CUSTOMER -> { onCustomer?.invoke(); true }
             PayPanelKey.TOGGLE_PRINT -> { printToggle?.invoke(); true }
+            PayPanelKey.NEXT_FIELD -> focus.moveFocus(androidx.compose.ui.focus.FocusDirection.Next)
+            PayPanelKey.PREV_FIELD -> focus.moveFocus(androidx.compose.ui.focus.FocusDirection.Previous)
             null -> false
           }
         },

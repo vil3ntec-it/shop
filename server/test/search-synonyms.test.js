@@ -287,3 +287,30 @@ test('۴) ویترین با پرچمِ shop.storefront.synonyms: نتیجه دق
   assert.equal((await A('syn-arshad', 'PUT', { version: now2.version, groups: [], reason: 'خالی کردن' })).status, 200);
   assert.deepEqual(await search(s, 'بوره'), ['بوره ۵ کیلو']);
 });
+
+test('۵) POS-04: درِ همگانیِ صندوق `GET /api/search/synonyms` همان سندِ پنل است، بی‌توکن؛ ETag ⇒ ۳۰۴؛ فقط خواندن', async () => {
+  const cur = (await A('syn-binande', 'GET')).body;
+  const set = await A('syn-arshad', 'PUT', { version: cur.version, groups: [['ماست', 'Yogurt']], reason: R });
+  assert.equal(set.status, 200, JSON.stringify(set.body));
+  const pub = await h.get('/api/search/synonyms');
+  assert.equal(pub.status, 200, JSON.stringify(pub.body));
+  const admin = await A('syn-binande', 'GET');
+  assert.deepEqual(pub.body, admin.body, 'همان نسخه، همان گروه‌ها');
+  assert.deepEqual(pub.body.groups, [['ماست', 'Yogurt']]);
+  const etag = pub.headers.get('etag');
+  assert.equal(etag, `W/"syn-${pub.body.version}"`);
+  const again = await h.api('GET', '/api/search/synonyms', { headers: { 'If-None-Match': etag } });
+  assert.equal(again.status, 304);
+  //  نوشتنِ تازه ⇒ نسخهٔ تازه و ETag ِ تازه (برنامه نسخهٔ کهنه را نگه نمی‌دارد)
+  const w = await A('syn-arshad', 'PUT', { version: pub.body.version, groups: [...pub.body.groups, ['گوشت', 'Meat']], reason: R });
+  assert.equal(w.status, 200, JSON.stringify(w.body));
+  const fresh = await h.api('GET', '/api/search/synonyms', { headers: { 'If-None-Match': etag } });
+  assert.equal(fresh.status, 200);
+  assert.equal(fresh.body.version, w.body.version);
+  //  فقط خواندن: هیچ نوشتنی از این مسیر
+  for (const m of ['PUT', 'POST', 'DELETE']) {
+    const r = await h.api(m, '/api/search/synonyms', { body: { version: w.body.version, groups: [] } });
+    assert.ok([401, 404, 405].includes(r.status), `${m} ⇒ ${r.status}`);
+  }
+  assert.equal((await A('syn-binande', 'GET')).body.version, w.body.version, 'هیچ چیز عوض نشد');
+});

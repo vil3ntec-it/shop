@@ -132,6 +132,8 @@ router.get('/:slug', readLimit, store, async (req, res) => {
     ...await featuresOf(req.store.shop_id, req.store),
     //  WEB-20: پیوندِ قابلِ پیش‌نمایشِ کالا فقط با پرچمِ `shop.storefront.seo`؛ خاموش ⇒ این کلید نیست
     ...(seo ? { seo } : {}),
+    //  WEB-16: پهناهای srcset فقط وقتی سرور می‌سازدشان (`STORE_SIZES` + sharp)؛ وگرنه کلید نیست و کارت همان یک عکس
+    ...(webp.sizesOn() ? { imageWidths: webp.WIDTHS } : {}),
   });
 });
 
@@ -171,6 +173,8 @@ async function featuresOf(shopId, sf) {
     ...((await onlineReport.flagOf(shopId)) ? { funnel: true } : {}),
     //  PRD-17/27: گالریِ عکس‌های بیشترِ برگهٔ کالا (`store/gallery.js` ِ دیربار از product.js) با `shop.storefront.gallery` + `shop.image_bank`
     ...((await gallery.flagOn(shopId)) ? { gallery: true } : {}),
+    //  ABUSE-01: «گزارشِ مشکل» ِ وب (`store/trust.js` ِ دیربار از catalog.js، درهای `/:slug/trust/…`) با پرچمِ `market.trust`
+    ...((await require('../lib/market-trust').flagOf(shopId)) ? { trust: true } : {}),
     //  CHK-08 / ۴-۳: «انتخاب روی نقشه» (`store/pin-map.js` ِ دیربار) با `shop.storefront.map_pin` + `STORE_MAP_TILES` ِ سرور
     ...(await require('../lib/store-map').featureOf(shopId)),
   };
@@ -253,28 +257,35 @@ router.get('/:slug/products/:id', readLimit, store, async (req, res) => {
   res.json(await sf.productDetail(req.store.shop_id, req.params.id));
 });
 
-/** عکس: `display` برای صفحهٔ کالا، `thumb` برای کارت (WEB-16). */
+/** عکس: `display` برای صفحهٔ کالا، `thumb` برای کارت (WEB-16)، `zoom` برای بزرگ‌نمایی (IMG-11). */
 const webp = require('../lib/store-webp');
 const picture = (size) => async (req, res) => {
   const p = await sf.photo(req.store.shop_id, req.params.id, size);
-  if (!p) throw notFound('عکس نیست', 'photo_not_found');
+  if (!p) {
+    //  IMG-11: «zoom نیست» امروز ممکن است فردا باشد (پرچم، ساختِ نخست) ⇒ هرگز در کش نماند
+    if (size === 'zoom') res.set('Cache-Control', 'no-store');
+    throw notFound('عکس نیست', 'photo_not_found');
+  }
   const etag = `"${p.hash}"`;
   //  پاسخ‌های JSON ِ ویترین کش نمی‌شوند؛ عکس با ETag ِ محتوا می‌شود. IMG-12: `?v=` (همان `photoVersion` ِ کالا)
   //  فقط وقتی همین عکسی است که سرو می‌شود یک روز می‌ماند — عکسِ تازه نشانیِ تازه دارد؛ یک روز (نه immutable، مثلِ
   //  M3) تا برداشتن/پنهان کردن دیر یا زود به کشِ مشترک هم برسد. بی `v` یا `v` ِ کهنه (پیوند، سبد، SEO) ⇒ همان
   //  عکسِ امروز با ۵ دقیقه، پس هیچ نشانیِ پیشینی نمی‌شکند و هیچ نشانی‌ای عکسِ دیگری را به‌درازا نگه نمی‌دارد.
   res.set('Cache-Control', p.tag && req.query.v === p.tag ? 'public, max-age=86400' : 'public, max-age=300');
-  //  WEB-16 / ۴-۲: WebP فقط با `STORE_WEBP` و `sharp` و `Accept: image/webp` (`lib/store-webp.js`)؛ وگرنه همان امروز، بایت‌به‌بایت
+  //  WEB-16 / ۴-۲: AVIF (`STORE_AVIF`) یا WebP (`STORE_WEBP`) فقط با `sharp` و همان `Accept` (`lib/store-webp.js`)؛ وگرنه همان امروز
   if (webp.available()) {
     res.set('Vary', 'Accept');
-    if (webp.wants(req.get('accept'))) {
-      const w = await webp.webpOf(p.data, p.hash, size);
-      if (w) {
-        const wtag = `"${p.hash}-webp"`;
-        res.set('ETag', wtag);
-        if (req.get('if-none-match') === wtag) return res.status(304).end();
-        return res.type('image/webp').send(w);
-      }
+    //  نخستین قالبِ ساخته‌شده (AVIF ِ بیش از سقفِ پیکسل یا سرِ پر ⇒ WebP)؛ ⛔ بدنهٔ خالی هرگز — همان اصل
+    //  WEB-16 srcset: `?w=` فقط پهنای مجاز با `STORE_SIZES` (`widthOf`)؛ بی قالبِ پذیرفته همان پهنا به JPEG
+    const width = webp.widthOf(req.query.w);
+    const list = webp.formats(req.get('accept'));
+    for (const fmt of width ? [...list, null] : list) {
+      const w = await webp.encodedOf(p.data, p.hash, size, fmt, width);
+      if (!w || !w.length) continue;
+      const wtag = `"${p.hash}${width ? `-w${width}` : ''}-${fmt || 'jpeg'}"`;
+      res.set('ETag', wtag);
+      if (req.get('if-none-match') === wtag) return res.status(304).end();
+      return res.type(`image/${fmt || 'jpeg'}`).send(w);
     }
   }
   res.set('ETag', etag);
@@ -296,6 +307,8 @@ router.get('/:slug/media/:kind/:version', readLimit, store, async (req, res) => 
 });
 router.get('/:slug/products/:id/photo', readLimit, store, picture('display'));
 router.get('/:slug/products/:id/thumb', readLimit, store, picture('thumb'));
+//  IMG-11: نسخهٔ بزرگ برای بزرگ‌نمایی (پرچمِ خاموشِ `image_bank.zoom` + `sharp`؛ نبود ⇒ ۴۰۴ و کلاینت همان display را بزرگ می‌کند)
+router.get('/:slug/products/:id/zoom', readLimit, store, picture('zoom'));
 //  ── PRD-17/27 (تصمیمِ ۴-۲۲): گالریِ عکس‌های بیشترِ کالا — پشتِ `shop.storefront.gallery` + `shop.image_bank` (شرح: lib/storefront-gallery.js)
 router.get('/:slug/products/:id/gallery', readLimit, store, async (req, res) => {
   const g = await gallery.list(req.store.shop_id, req.params.id);

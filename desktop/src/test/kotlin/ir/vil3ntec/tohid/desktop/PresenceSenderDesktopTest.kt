@@ -129,6 +129,45 @@ class PresenceSenderDesktopTest {
     assertEquals(StrOnline.presenceOverridden, s.notice)
   }
 
+  /**
+   *  PRES-08، ساعتِ جلوافتاده درونِ صفِ آفلاین: اعلام «وضعِ دیده‌شده» (`settings.updatedAt` ِ سرور در لحظهٔ تصمیم) را
+   *  با خود دارد — در صف هم همان، حتی اگر پیش از رسیدن وضعِ تازه‌تری دیده شود — و پس از پاسخ، دستگاه زمانِ سرورِ همان
+   *  پاسخ را «دیده» است. اعلامِ کهنهٔ صف با «وضعِ دیده‌شده»‌ای که دکان تازه نکرده هم به همان برمی‌گردد (کد و بی‌کد).
+   */
+  @Test fun `اعلام وضعِ دیده‌شدهٔ لحظهٔ تصمیم را می‌برد و پس از پاسخ همان زمانِ سرور دیده می‌شود`() = runBlocking {
+    signIn("shop-a")
+    val seen = 1_750_000_000_000L
+    ir.vil3ntec.tohid.ui.screens.StorefrontGate.config.value = ir.vil3ntec.tohid.data.repo.StorefrontConfigDto(
+      flag = true, settings = ir.vil3ntec.tohid.data.repo.StorefrontSettingsDto(updatedAt = seen),
+    )
+    try {
+      reply = { ApiResult.Failure(ApiFailure.Offline()) }
+      val s = sender()
+      s.declare("closed", null, tz)
+      assertEquals("در صف هم وضعِ دیده‌شدهٔ لحظهٔ تصمیم", seen, s.pending?.seenAt)
+      //  پیش از رسیدن، وضعِ تازه‌تری از سرور خوانده شد ⇒ اعلامِ صف همان دیده‌شدهٔ کهنه را می‌برد (تصمیم بی خبر از آن بود)
+      ir.vil3ntec.tohid.ui.screens.StorefrontGate.config.value = ir.vil3ntec.tohid.ui.screens.StorefrontGate.config.value?.let {
+        it.copy(settings = it.settings?.copy(updatedAt = seen + 60_000))
+      }
+      reply = { ok(applied = false) }
+      s.flush(tz)
+      assertEquals(seen, sent.last().seenAt)
+      assertEquals(StrOnline.presenceOverridden, s.notice)
+      assertEquals("پاسخ ⇒ زمانِ سرورِ همان پاسخ دیده شد", receivedAt, ir.vil3ntec.tohid.ui.screens.StorefrontGate.config.value?.settings?.updatedAt)
+      //  اعلامِ بعدی بر پایهٔ همان دیده‌شدهٔ تازه
+      reply = { ok() }
+      s.declare("online", null, tz)
+      assertEquals(receivedAt, sent.last().seenAt)
+      //  دیسک: کدگذاریِ تازه با پنج بخش و خواندنِ ردیفِ کهنهٔ چهاربخشی (برنامهٔ پیشین) بی «دیده‌شده»
+      val p = PresenceDeclaration("pres-abc12345", "closed", null, 1_760_000_000_000, seenAt = seen)
+      assertEquals(p, PresenceDeclaration.decode(PresenceDeclaration.encode(p)))
+      assertEquals(null, PresenceDeclaration.decode("pres-abc12345|closed||1760000000000")?.seenAt)
+      assertEquals("closed", PresenceDeclaration.decode("pres-abc12345|closed||1760000000000")?.mode)
+    } finally {
+      ir.vil3ntec.tohid.ui.screens.StorefrontGate.config.value = null
+    }
+  }
+
   @Test fun `بی دکانِ معلوم هیچ اعلامی در صف نمی‌نشیند و فرستاده نمی‌شود`() = runBlocking {
     ShopRole.forget(ctx)
     val s = sender()

@@ -23,8 +23,39 @@ import ir.vil3ntec.tohid.data.SaleItem
  *  «ي/ی»، «ك/ک»، «ۀ/ه»، «أ/ا»، رقم‌های فارسی/عربی/لاتین، نیم‌فاصله و اعراب یکی‌اند.
  *  هر کلمهٔ پرس‌وجو باید جایی در نام باشد (به هر ترتیب)، یا پرس‌وجو بخشی از یک بارکد
  *  باشد (از سه رقم به بالا تا «۵» همهٔ بارکدها را نگیرد).
+ *
+ *  ── مترادف (POS-04) ──────────────────────────────────────────────────
+ *  [Synonyms] ِ فهرستِ مرکزی (`TillSynonyms`): هر کلمه (یا کلِ پرس‌وجوی چندکلمه‌ای) با هر واژهٔ همان گروه هم جور
+ *  است — همان قاعدهٔ `TextNormalizer.matches` و `text-core.matches` ِ ویترین. فهرستِ تهی ⇒ همان جست‌وجوی پیشین.
  */
 object CatalogSearch {
+
+  /**
+   *  گروه‌های مترادف، یک بار نرمال‌شده (کلیدِ مقایسه ⇐ همهٔ کلیدهای همان گروه) تا هر حرف فقط یک نگاه به نقشه باشد.
+   */
+  class Synonyms private constructor(private val alts: Map<String, List<String>>) {
+    /** کلیدِ نرمال ⇐ خودش و هم‌گروه‌هایش (خودش اول) */
+    fun of(key: String): List<String> = alts[key] ?: listOf(key)
+    val isEmpty: Boolean get() = alts.isEmpty()
+
+    companion object {
+      val NONE = Synonyms(emptyMap())
+
+      fun of(groups: List<List<String>>): Synonyms {
+        if (groups.isEmpty()) return NONE
+        val out = HashMap<String, MutableList<String>>()
+        for (g in groups) {
+          val keys = g.map { TextNormalizer.compareKey(it) }.filter { it.isNotEmpty() }.distinct()
+          if (keys.size < 2) continue
+          for (k in keys) {
+            val list = out.getOrPut(k) { mutableListOf(k) }
+            for (o in keys) if (o !in list) list += o
+          }
+        }
+        return if (out.isEmpty()) NONE else Synonyms(out)
+      }
+    }
+  }
 
   /** یک کالای آمادهٔ جست‌وجو */
   data class Entry(
@@ -167,18 +198,23 @@ object CatalogSearch {
    *  شناسه‌های جورشده به ترتیبِ نمایش. `category` = null ⇐ همهٔ دسته‌ها؛ پرس‌وجوی خالی
    *  ⇐ همهٔ کالاهای همان دسته به ترتیبِ پرفروش‌ترین.
    */
-  fun search(index: Index, query: String, category: String?): List<String> {
+  fun search(index: Index, query: String, category: String?, synonyms: Synonyms = Synonyms.NONE): List<String> {
     val q = TextNormalizer.searchKey(query).trim()
     val inCategory = index.entries.asSequence().filter { category == null || it.category == category }
     if (q.isEmpty()) return inCategory.map { it.id }.toList()
     val whole = q.replace(" ", "")
     val tokens = q.split(' ').filter { it.isNotEmpty() }
+    //  POS-04: هر کلمه با هم‌گروه‌هایش؛ بی فهرست هر کدام فقط خودش (همان جست‌وجوی پیشین)
+    val wholeAlts = synonyms.of(TextNormalizer.compareKey(whole))
+    val tokenAlts = tokens.map { synonyms.of(TextNormalizer.compareKey(it)) }
     val exact = ArrayList<String>()
     val rest = ArrayList<String>()
     for (e in inCategory) {
       when {
         e.codes.any { it == whole } -> exact += e.id
         e.nameKey.contains(whole) || tokens.all { e.nameKey.contains(it) } -> rest += e.id
+        !synonyms.isEmpty && (wholeAlts.any { e.nameKey.contains(it) } || tokenAlts.all { a -> a.any { e.nameKey.contains(it) } }) ->
+          rest += e.id
         whole.length >= 3 && e.codes.any { it.contains(whole) } -> rest += e.id
       }
     }

@@ -10,13 +10,15 @@ import ir.vil3ntec.tohid.ui.Platform
  *  (`core/…/pos/TouchMode.kt`).
  *
  *  پیش‌فرض **خاموش**: `on = false` ⇒ صندوقِ کامپیوتر بیت‌به‌بیت همان موشیِ امروز (هدفِ ۳۶، بی
- *  کلیدِ نوار، بی صفحه‌کلید و بی دکمهٔ صفحه). گوشی همیشه لمسی است، مثلِ امروز.
+ *  کلیدِ نوار، بی صفحه‌کلید و بی دکمهٔ صفحه). گوشی همیشه لمسی است، مثلِ امروز. فقط وقتی این دستگاه هرگز
+ *  انتخاب نکرده و صفحهٔ لمسی دارد (`TouchScreenProbe`) کلیدِ نوار دیده می‌شود و صندوق تا زدنش همان موشی است
+ *  (`TouchMode.choice`، §۵.۳ «تشخیص صفحه لمسی»)؛ هر انتخاب برای همین دستگاه ذخیره می‌شود.
  */
 object PosTouchPrefs {
   /** تنظیم: کلیدِ «حالتِ لمسی» در نوارِ صندوق دیده شود */
   val on = mutableStateOf(false)
 
-  /** خودِ کلید؛ نبوده ⇒ روشن، تا روشن کردنِ تنظیم همان دم صندوق را لمسی کند */
+  /** خودِ کلید؛ نبوده ⇒ همان تنظیمِ ذخیره‌شده، تا روشن کردنِ تنظیم همان دم صندوق را لمسی کند (`TouchMode.choice`) */
   val active = mutableStateOf(true)
 
   private var loaded = false
@@ -27,14 +29,24 @@ object PosTouchPrefs {
   fun load(context: android.content.Context) {
     if (loaded) return
     loaded = true
-    val p = context.getSharedPreferences(PREFS, 0)
-    on.value = p.getBoolean(ON, false)
-    active.value = p.getBoolean(ACTIVE, true)
+    val c = choice(context.getSharedPreferences(PREFS, 0), TouchScreenProbe.detected)
+    on.value = c.on
+    active.value = c.active
   }
 
+  /** انتخابِ ذخیره‌شده (نبوده ⇒ null) و صفحهٔ لمسیِ تشخیص‌داده ⇐ همان قاعدهٔ هسته */
+  internal fun choice(p: android.content.SharedPreferences, detected: Boolean): TouchMode.Choice = TouchMode.choice(
+    storedOn = if (p.contains(ON)) p.getBoolean(ON, false) else null,
+    storedActive = if (p.contains(ACTIVE)) p.getBoolean(ACTIVE, true) else null,
+    detected = detected,
+  )
+
   fun setOn(context: android.content.Context, value: Boolean) {
-    on.value = value
-    context.getSharedPreferences(PREFS, 0).edit().putBoolean(ON, value).apply()
+    val p = context.getSharedPreferences(PREFS, 0)
+    p.edit().putBoolean(ON, value).apply()
+    val c = choice(p, TouchScreenProbe.detected)
+    on.value = c.on
+    active.value = c.active
   }
 
   fun setActive(context: android.content.Context, value: Boolean) {

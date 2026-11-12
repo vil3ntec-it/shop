@@ -429,8 +429,8 @@ async function catalogByIds(shopId, raw) {
 }
 
 /**
- * عکسِ کالای منتشرشده — یا null. `size` = `display` (صفحهٔ کالا) یا `thumb`
- * (کارت): اول نسخهٔ همان اندازه از بانکِ تصاویر (پرچمِ دکان)، وگرنه عکسِ
+ * عکسِ کالای منتشرشده — یا null. `size` = `display` (صفحهٔ کالا)، `thumb`
+ * (کارت) یا `zoom` (بزرگ‌نمایی، IMG-11؛ فقط بانک): اول نسخهٔ همان اندازه از بانکِ تصاویر (پرچمِ دکان)، وگرنه عکسِ
  * همگام‌شدهٔ امروز — برای کارت نسخهٔ کارتِ همان عکس (۳۲۰px ِ ساختهٔ برنامه، مهاجرتِ ۳۵۰) و
  * اگر نیست همان عکسِ کامل (هرگز عکسِ شکسته یا کارتِ عکسِ پیشین).
  */
@@ -441,6 +441,8 @@ async function photo(shopId, productId, size = 'display') {
     [shopId, productId]
   );
   if (!live) return null;
+  //  IMG-11: نسخهٔ بزرگ فقط از بانک (عکسِ همگام‌شدهٔ برنامه خودش تا ۶۰۰KB است و بزرگ‌تر از display ندارد)
+  if (size === 'zoom') return shelf.bankZoom(shopId, productId);
   const banked = await shelf.bankImage(shopId, productId, size === 'thumb' ? 'thumb' : 'display');
   if (banked) return banked;
   const legacy = await require('./product-photos').forStore({ app: 'shop', accountId: shopId }, productId, size);
@@ -638,7 +640,7 @@ async function checkout(sf, { key, body, ticket, session, ip = '' }) {
   //  پرچمِ ناحیه/بازه و کاتالوگِ S1 (اگر منبع است: بی مهلت تازه؛ قیمت درونِ تراکنش از همان جدول) پیش از تراکنش (قفلِ سفارش کوتاه بماند)
   const [zonesOn, from] = await Promise.all([sfd.flagOn(sf.shop_id), sfc.productFrom(sf.shop_id, { strict: true })]);
   //  RSK-07: سقفِ شماره درونِ همان تراکنش و پس از قفلِ دکان (lib/order-rate)
-  const price = require('./order-rate').guard(await require('./storefront-promos').wrap(pricer(sf.shop_id, sf, input, { zonesOn, from }), sf, { key, body, input, phone: verified, ip }), { shopId: sf.shop_id, phone: verified, secondOrder: input.secondOrder });   //  MKT-01/02، RSK-09: تخفیفِ ویترین پشتِ پرچم‌های خاموش
+  const price = require('./order-rate').guard(await require('./storefront-promos').wrap(pricer(sf.shop_id, sf, input, { zonesOn, from }), sf, { key, body, input, phone: verified, ip }), { shopId: sf.shop_id, phone: verified, secondOrder: input.secondOrder, deviceId: obj(body).deviceId, key });   //  MKT-01/02، RSK-09: تخفیفِ ویترین پشتِ پرچم‌های خاموش؛ RSK-04: دستگاه
   const out = await orders.create(sf.shop_id, { key, body, actor: CUSTOMER, price, intakeKeys: [FEATURE_KEY] });   //  #467: دروازهٔ اشتراک با کلیدِ ویترین هم
   //  TEN-03: با پرچمِ لینکِ زمان‌دار، توکنِ v2 از همین لحظه (تکرارِ همان درخواست هم توکنِ تازه)
   const link = (await linkPolicyOn(sf.shop_id)) ? { gen: 0, at: now() } : null;
@@ -764,7 +766,7 @@ async function reorder(sf, token) {
 // ════════════════════════════════════════════════════════════════════
 
 //  تنظیمِ ویترین، اعلامِ حضور (۳۱.۱/۳۱.۲) و کالاهای «در ویترین» — `lib/storefront-owner.js` (شرح همان‌جا)
-const { settingsOf, saveSettings, declarePresence, staffProducts, setProduct } = require('./storefront-owner')({
+const { settingsOf, saveSettings, declarePresence, staffProducts, staffProduct, setProduct } = require('./storefront-owner')({
   profile, statusOf, slugOf, productView, isActive, specsOf, asJson, str, obj, int, bool, text, spid, sfc,
   PRODUCT_ID_RE, PAGE, MAX_PAGE, MAX_PRICE_MINOR, MAX_QTY_MILLI, MAX_FEE_MINOR, MAX_DECLARE_MS,
 });
@@ -792,7 +794,7 @@ module.exports = {
   localParts, presenceOf, statusOf,
   parseCheckout, checkout, track, cancel, tokenOf, parseToken, orderIdOf, orderIdOfLink, listTokenOf, currentTokenOf, linkPolicyOn, revokeLink, LINK_FLAG, publicOrder,
   K_ANON, ticketOf, parseTicket, verifiedPhoneOfTicket, verification, verificationAvailable, startVerification, checkVerification, myOrders,
-  settingsOf, saveSettings, declarePresence, staffProducts, setProduct, ...sfc,   //  S1 و M2: storefront-catalog.js
+  settingsOf, saveSettings, declarePresence, staffProducts, staffProduct, setProduct, ...sfc,   //  S1 و M2: storefront-catalog.js
   //  بازارچه (`lib/market.js`) همان دروازهٔ کالا را می‌خواند، نه نسخهٔ دومی از آن
   PRODUCT_FROM, PRODUCT_COLS, LIVE_PRODUCT, SQL_NAME, productView,
 };

@@ -8,7 +8,7 @@
   var BASE = '/api/store/' + encodeURIComponent(slug);
   var KEY_CART = K.cartKey(slug);
   var KEY_ORDERS = 'store-orders:' + slug;
-  var store = null; var marketOn = false; var verifyAvailable = true;
+  var store = null; var marketOn = false; var verifyAvailable = true; var wid;
   var stockList = false; var cap = {}; // E2E-MKT-02: سقفِ ۴۰۹، در حافظه
   var cart = sanitize(K.load(KEY_CART, {}));
   var catalog = { q: '', category: '', cursor: null, items: {} };
@@ -48,6 +48,7 @@
   }
   //  WEB-16: کارت thumb، برگه photo؛ IMG-12: v = photoVersion
   function photoUrl(id, big, v) { return BASE + '/products/' + encodeURIComponent(id) + (big ? '/photo' : '/thumb') + (v ? '?v=' + encodeURIComponent(v) : ''); }
+  function sset(id, v) { return wid && wid.map(function (w) { return photoUrl(id, 1, v) + (v ? '&w=' : '?w=') + w + ' ' + w + 'w'; }).join(); }
 
   var VIEWS = ['view-missing', 'view-catalog', 'view-checkout', 'view-order', 'view-orders'];
   function show(id) {
@@ -118,7 +119,7 @@
 
   function card(p) {
     var li = K.productCard(p, {
-      photo: photoUrl(p.id, 0, p.photoVersion), qty: cart[p.id] ? cart[p.id].qtyMilli : 0, onAdd: addOne,
+      photo: photoUrl(p.id, 0, p.photoVersion), srcset: sset(p.id, p.photoVersion), qty: cart[p.id] ? cart[p.id].qtyMilli : 0, onAdd: addOne,
       onOpen: function () { location.hash = '#/p/' + encodeURIComponent(p.id); },
     });
     if (more) more.card(li, p);
@@ -197,7 +198,7 @@
       var st = K.stockOf(x);
       $('ps-cat').textContent = x.category || '';
       $('ps-cat').hidden = !x.category;
-      K.clear($('ps-img')).appendChild(x.photo ? K.photo({ src: photoUrl(x.id, 1, x.photoVersion), alt: '', width: '300', height: '300', fetchpriority: 'high' }, x.name)
+      K.clear($('ps-img')).appendChild(x.photo ? K.photo({ src: photoUrl(x.id, 1, x.photoVersion), srcset: sset(x.id, x.photoVersion), sizes: '300px', alt: '', width: '300', height: '300', fetchpriority: 'high' }, x.name)
         : el('span', { class: 'ph', text: String(x.name || '?').slice(0, 1), attrs: { 'aria-hidden': 'true' } }));
       $('ps-img').classList.toggle('photo', Boolean(x.photo));
       $('ps-img').classList.toggle('tile', Boolean(x.photo));
@@ -225,9 +226,9 @@
     });
   }
   function renderAddSheet(p) {
-    var b = $('ps-add'); var st = K.stockOf(p); var line = cart[p.id];
-    b.disabled = !st.orderable;
-    b.textContent = !st.orderable ? st.text : (line ? t('ps.more', { q: K.qty(line.qtyMilli) }) : t('ps.add', { p: K.money(p.priceMinor) }));
+    var b = $('ps-add'); var st = K.stockOf(p); var line = cart[p.id]; var full = line && line.qtyMilli >= st.leftMilli;
+    b.disabled = !st.orderable || full;
+    b.textContent = !st.orderable ? st.text : full ? t('stock.only', { q: st.leftText }) : (line ? t('ps.more', { q: K.qty(line.qtyMilli) }) : t('ps.add', { p: K.money(p.priceMinor) }));
     b.onclick = function () { addOne(p); renderAddSheet(p); };
   }
 
@@ -255,6 +256,8 @@
     var src = p || line;
     if (!src) return;
     if (src.maxQtyMilli && milli > src.maxQtyMilli) milli = src.maxQtyMilli;
+    var f = K.stockOf(catalog.items[id] || src), had = line ? line.qtyMilli : 0; // INV-04@32
+    if (milli > f.leftMilli && milli > had) { K.toast(t('stock.only', { q: f.leftText })); if (had >= f.leftMilli) return; milli = f.leftMilli; }
     if (milli <= 0) delete cart[id];
     else {
       if (!line || milli > line.qtyMilli) beat('cart');
@@ -586,7 +589,7 @@
     $('orders-art').appendChild(K.icon('receipt'));
     if (!/^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/.test(slug)) { show('view-missing'); return; }
     api('').then(function (r) {
-      store = r.store;
+      store = r.store; wid = r.imageWidths;
       marketOn = Boolean(r.market && r.market.available);
       stockList = Boolean(r.features && r.features.stockList);
       store.addressExtra = Boolean(r.features && r.features.addressExtra);

@@ -45,8 +45,14 @@ internal class PresenceSender(context: Context, private val send: suspend (Prese
     send(p)
       .onSuccess { r ->
         StorefrontQueue.discard(app, p.eventId)
+        //  PRES-08: پاسخ وضعِ سرور در همان لحظه است ⇒ «دیده‌شده» تا همان زمان (اعلامِ بعدی بر پایهٔ آن)
         StorefrontGate.config.value = StorefrontGate.config.value?.let { c ->
-          c.copy(settings = c.settings?.copy(status = r.status, presenceMode = r.status.mode, declaredUntil = r.status.declaredUntil))
+          c.copy(settings = c.settings?.let { st ->
+            st.copy(
+              status = r.status, presenceMode = r.status.mode, declaredUntil = r.status.declaredUntil,
+              updatedAt = maxOf(st.updatedAt, r.serverReceivedAt),
+            )
+          })
         }
         notice = if (r.applied == false) StrOnline.presenceOverridden
         else StrOnline.presenceReceipt(StorefrontOwner.clock(r.serverReceivedAt, timezone))
@@ -63,7 +69,9 @@ internal class PresenceSender(context: Context, private val send: suspend (Prese
   }
 
   suspend fun declare(mode: String, until: Long?, timezone: String) {
-    val p = StorefrontOwner.pending(mode, until, System.currentTimeMillis(), kotlin.random.Random.nextLong())
+    //  PRES-08: وضعِ دیده‌شده در لحظهٔ تصمیم، نه هنگامِ فرستادن (صفِ آفلاین)
+    val seen = StorefrontGate.config.value?.settings?.updatedAt?.takeIf { it > 0 }
+    val p = StorefrontOwner.pending(mode, until, System.currentTimeMillis(), kotlin.random.Random.nextLong(), seen)
     //  شناسهٔ ردیف = `eventId`؛ دکانِ نامعلوم ⇒ null و هیچ‌چیز نوشته نمی‌شود
     if (StorefrontQueue.enqueue(app, StorefrontChange.PRESENCE, PresenceDeclaration.encode(p), "", id = p.eventId) == null) {
       notice = StrOnline.presenceNoShop

@@ -336,6 +336,7 @@ test('SEC-10: صاحبِ دکان — پیش‌نمایش بی نوشتن؛ اج
     reviews: (await exists('order_reviews')) ? 2 : 0,
     pushSubs: 0,   //  پوشِ وب (مهاجرتِ ۴۷۰): این دکان پرچمش را ندارد ⇒ هیچ اشتراکی؛ پاک شدنِ اشتراک‌ها در store-push.test.js
     alertPushSubs: (await exists('store_alert_push')) ? 1 : 0,   //  پوشِ «خبرم کن» (۴۷۵)؛ جزئیات در store-alert-push.test.js
+    orderDevices: 0,   //  RSK-04 (۸۴۰): این دکان `shop.order_risk` ندارد ⇒ هیچ دستگاهی؛ پاک شدنش در risk-device.test.js
   });
   assert.ok(done.body.kept.includes('order_ledger_docs') && done.body.kept.includes('device_sync_ledger'));
 

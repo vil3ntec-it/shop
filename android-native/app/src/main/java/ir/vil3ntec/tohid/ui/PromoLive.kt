@@ -272,8 +272,8 @@ object PromoLive {
     val today = ir.vil3ntec.tohid.todayIso()
     val minute = minuteNow()
     val group = remember(d, debtorId, s) { PromoEngine.groupOf(d, debtorId, s.rules) }
-    return remember(d, cart, s, codes, today, if (timed) minute else -1, tick, group) {
-      PromoEngine.evaluate(d, cart, s, codes, today, minute, group)
+    return remember(d, cart, s, codes, today, if (timed) minute else -1, tick, group, debtorId) {
+      PromoEngine.evaluate(d, cart, s, codes, today, minute, group, debtorId)
     }
   }
 
@@ -309,7 +309,8 @@ object PromoLive {
     if (isDemo || outcome == null) return null
     val s = PromoEngine.forAccount(snap.value, account(context))
     val out = ir.vil3ntec.tohid.data.TillSale.redeem(s.redeem, s.rules, outcome, online = { Backend.isReady(context) }) { codes ->
-      val f = (repository(context).redeem(saleKey, codes) as? ApiResult.Failure)?.error
+      //  PRM-11: مشتریِ همان سبد ⇒ سرور کدِ قاعدهٔ گروه‌دار را با دفترِ خودش می‌سنجد (`wrong_group`)
+      val f = (repository(context).redeem(saleKey, codes, outcome.debtorId) as? ApiResult.Failure)?.error
       ir.vil3ntec.tohid.data.TillSale.Reply(f == null, f?.status ?: 0, f?.code.orEmpty(), f?.userMessage)
     }
     when (out.decision) {

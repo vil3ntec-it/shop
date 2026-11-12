@@ -626,15 +626,15 @@ class ShopStore(
   fun mergeBlockedReason(): String? = if (SyncChoice.isV3(context)) StrShell.mergeNotOnV3 else null
 
   /**
-   *  CRM-10: تنها درِ ادغامِ دو مشتری — `CustomerMerge.merge` روی دفترِ همین لحظه، از همان
+   *  CRM-10: تنها درِ ادغامِ دو مشتری — `CustomerMerge.merge` (با `limitRules` ِ CRM-03؛ پیش‌فرض خاموش) روی دفترِ همین لحظه، از همان
    *  [update] (قفلِ نوشتن، قفلِ نرم، op). بسته ([mergeBlockedReason]) ⇒ `Failed` با همان دلیل:
    *  نه نوشتن، نه op.
    */
-  suspend fun mergeCustomers(keepId: String, dropId: String): CustomerMerge.Result {
+  suspend fun mergeCustomers(keepId: String, dropId: String, limitRules: ir.vil3ntec.tohid.core.perm.CreditLimitPerm.Rules = ir.vil3ntec.tohid.core.perm.CreditLimitPerm.Rules.OFF): CustomerMerge.Result {
     mergeBlockedReason()?.let { return CustomerMerge.Result.Failed(it) }
     var out: CustomerMerge.Result = CustomerMerge.Result.Failed(StrShell.mergeNotSaved)
     val wrote = update { d ->
-      when (val r = CustomerMerge.merge(d, keepId, dropId)) {
+      when (val r = CustomerMerge.merge(d, keepId, dropId, limitRules)) {
         is CustomerMerge.Result.Ok -> { out = r; r.data }
         is CustomerMerge.Result.Failed -> { out = r; null }
       }
@@ -1200,9 +1200,9 @@ class ShopStore(
       return billed - paid
     }
 
-    fun barcodeIndex(d: ShopData): Map<String, String> = buildMap {
-      d.products.forEach { p -> p.barcodes.forEach { code -> put(code, p.id) } }
-    }
+    fun barcodeIndex(d: ShopData): Map<String, String> = ProductIndexes.barcodes(d.products) // S125: یک بار برای همان فهرست
+    fun productsById(products: List<Product>): Map<String, Product> = ProductIndexes.byId(products)
+    fun product(d: ShopData, id: String): Product? = ProductIndexes.byId(d.products)[id] // = `products.find { it.id == id }`
 
     /**
      *  PRD-04: بارکدِ بسته‌ها (کارتن، شل…) ⇐ کالا و بسته — جدا از `barcodeIndex` تا هیچ راهِ اسکنی که

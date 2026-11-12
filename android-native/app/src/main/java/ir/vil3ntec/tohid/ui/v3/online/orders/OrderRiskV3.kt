@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material.icons.outlined.WrongLocation
@@ -42,7 +43,8 @@ import ir.vil3ntec.tohid.ui.v3.V3Section
  *
  *  RSK-04 — صاحب و مدیر (`orders.contact`، همان‌ها که شمارهٔ کامل را می‌بینند) از همین کارت شمارهٔ همین سفارش را با دلیل
  *  و انقضا به فهرستِ بسته یا مطمئن می‌برند، **جای** همین سفارش (پینِ ارسال) را با شعاع می‌بندند و ردیف‌های فعالِ فهرست را
- *  می‌بینند و برمی‌دارند (برگه‌ها و صفحهٔ جدای فهرست: `OrderRiskListsV3.kt`).
+ *  می‌بینند و برمی‌دارند (برگه‌ها و صفحهٔ جدای فهرست: `OrderRiskListsV3.kt`). «دستگاه» ِ همین سفارش (شناسهٔ تصادفیِ مرورگر یا
+ *  برنامهٔ خرید؛ خودش هرگز به برنامه نمی‌رسد) فقط وقتی سرور می‌گوید دارد (`OrderRisk.View.device`).
  *
  *  RSK-03 «کارت در صف» — [OrderRiskQueueCardV3] بالای صف: سفارش‌های پیش از ارسال با هشدار (`GET …/risk/queue`، یک پرسش
  *  برای همهٔ صف) و نشانِ همان هشدار روی کارتِ هر سفارش (`OrderRisk.cardFlags` ⇐ `OrderCard.risk`).
@@ -60,6 +62,7 @@ internal fun OrderRiskCardV3(
   var retry by remember(orderId) { mutableStateOf(0) }
   var adding by remember(orderId) { mutableStateOf<String?>(null) }
   var addingPin by remember(orderId) { mutableStateOf(false) }
+  var addingDevice by remember(orderId) { mutableStateOf<String?>(null) }
   var listOpen by remember(orderId) { mutableStateOf(false) }
   LaunchedEffect(orderId, rev, retry) {
     val r = repo.risk(orderId)
@@ -88,7 +91,9 @@ internal fun OrderRiskCardV3(
           Modifier.padding(top = 6.dp),
         )
       }
-      if (canList) RiskListButtons(phone, pin != null, onAdd = { adding = it }, onPin = { addingPin = true }, onList = { listOpen = true })
+      if (canList) {
+        RiskListButtons(phone, pin != null, v.device, onAdd = { adding = it }, onPin = { addingPin = true }, onDevice = { addingDevice = it }, onList = { listOpen = true })
+      }
     }
   }
   adding?.let { list ->
@@ -98,18 +103,28 @@ internal fun OrderRiskCardV3(
   if (addingPin && pin != null) {
     RiskEntrySheet(repo, OrderRisk.BLOCK, pinKind = true, fixedPhone = null, fixedPin = pin, onClose = { addingPin = false }, onDone = { addingPin = false; retry++ })
   }
+  addingDevice?.let { list ->
+    RiskEntrySheet(repo, list, pinKind = false, fixedPhone = null, fixedPin = null, deviceOrderId = orderId,
+      onClose = { addingDevice = null }, onDone = { addingDevice = null; retry++ })
+  }
   if (listOpen) RiskListSheet(repo, onClose = { listOpen = false; retry++ })
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun RiskListButtons(phone: String?, hasPin: Boolean, onAdd: (String) -> Unit, onPin: () -> Unit, onList: () -> Unit) {
+private fun RiskListButtons(
+  phone: String?, hasPin: Boolean, hasDevice: Boolean, onAdd: (String) -> Unit, onPin: () -> Unit, onDevice: (String) -> Unit, onList: () -> Unit,
+) {
   FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     if (phone != null) {
       V3Button(StrRisk.blockNumber, { onAdd(OrderRisk.BLOCK) }, kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.Block)
       V3Button(StrRisk.trustNumber, { onAdd(OrderRisk.ALLOW) }, kind = V3ButtonKind.NEUTRAL, icon = Icons.Outlined.VerifiedUser)
     }
     if (hasPin) V3Button(StrRisk.blockPlace, onPin, kind = V3ButtonKind.NEUTRAL, icon = Icons.Outlined.WrongLocation)
+    if (hasDevice) {
+      V3Button(StrRisk.blockDevice, { onDevice(OrderRisk.BLOCK) }, kind = V3ButtonKind.NEUTRAL, icon = Icons.Outlined.Devices)
+      V3Button(StrRisk.trustDevice, { onDevice(OrderRisk.ALLOW) }, kind = V3ButtonKind.NEUTRAL, icon = Icons.Outlined.VerifiedUser)
+    }
     V3Button(StrRisk.listsTitle, onList, kind = V3ButtonKind.NEUTRAL, icon = Icons.Outlined.Checklist)
   }
 }

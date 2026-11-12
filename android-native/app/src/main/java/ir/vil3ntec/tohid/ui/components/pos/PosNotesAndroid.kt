@@ -78,13 +78,15 @@ fun posLineNote(value: String?, save: (String?) -> Unit): PosLineNote? {
 /** کادرِ یادداشت با قالب‌های همین دستگاه (لمسِ قالب ⇒ افزوده به متن، `SaleNotes.insert`) */
 @Composable
 fun PosNoteField(text: String, onText: (String) -> Unit, label: String) {
+  val keys = rememberTouchTextKeys() // POS-31: کامپیوترِ لمسی ⇒ صفحه‌کلیدِ حروف با فوکوس
   OutlinedTextField(
     value = text,
     onValueChange = { onText(it.take(SaleNotes.MAX)) },
     singleLine = true,
     label = { Text(label) },
-    modifier = Modifier.fillMaxWidth(),
+    modifier = Modifier.fillMaxWidth().touchKeysOnFocus(keys),
   )
+  TouchTextKeysPanel(keys, text, onText, SaleNotes.MAX)
   val templates = PosNotesPrefs.templates.value
   if (templates.isNotEmpty()) {
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {

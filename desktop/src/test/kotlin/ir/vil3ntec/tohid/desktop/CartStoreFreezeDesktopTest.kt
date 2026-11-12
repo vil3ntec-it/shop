@@ -22,8 +22,8 @@ import java.io.File
 class CartStoreFreezeDesktopTest {
   private val draft get() = File(DesktopContext.filesDir, CartStore.FILE)
 
-  @Before fun before() { draft.delete() }
-  @After fun after() { draft.delete() }
+  @Before fun before() { CartStore.awaitWrites(); draft.delete() }
+  @After fun after() { CartStore.awaitWrites(); draft.delete() }
 
   @Test
   fun `سبدِ قفل چیزی نمی‌پذیرد و می‌گوید`() = runBlocking<Unit> {

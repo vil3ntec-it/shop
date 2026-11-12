@@ -97,7 +97,7 @@ object ProductInfoMap {
    */
   fun kitProblem(d: ShopData, info: ProductInfo, selfId: String?): String? {
     if (info.kit.isEmpty()) return null
-    val byId = d.products.associateBy { it.id }
+    val byId = ShopStore.productsById(d.products)
     for (part in info.kit) {
       val q = byId[part.productId] ?: return ir.vil3ntec.tohid.core.i18n.StrProduct.kitPartGone
       if (q.id == selfId || ProductPlansMap.isKit(q)) return ir.vil3ntec.tohid.core.i18n.StrProduct.kitNested(q.name)
@@ -151,7 +151,7 @@ object ProductInfoMap {
   fun suggestions(d: ShopData, p: Product): List<Pair<Product, Double>> {
     val ids = p.alternatives.orEmpty()
     if (ids.isEmpty()) return emptyList()
-    val byId = d.products.associateBy { it.id }
+    val byId = ShopStore.productsById(d.products)
     val stock = HashMap<String, Double>()
     fun stockOf(id: String) = stock.getOrPut(id) { ShopStore.stock(d, id) }
     return ProductAlternatives.suggest(ids, p.id) { id ->

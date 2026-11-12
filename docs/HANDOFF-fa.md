@@ -54,6 +54,168 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-13u زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-13u` (از `claude/e-rows-11p`)
+
+- **ABUSE-01 (هنوز PARTIAL، فقط پنل):** ویترینِ وب «گزارشِ مشکل با این دکان» و «گزارشِ این کالا» دارد (`store/trust.js` ِ دیربار
+  زیرِ `features.trust` ⇐ پرچمِ `market.trust`؛ تأییدِ شماره همان‌جا، «گزارش‌های من» با توکنِ روی دستگاه، سقفِ نرخِ سرور)؛ برنامهٔ دکان
+  «ویترین ← … ← شکایت و گزارشِ خریداران» با پاسخ (کلیدِ یک‌بار) و اعتراض. آزمون‌ها: `storefront-trust` ۵/۵، `trust.e2e.mjs` (کرومیوم)
+  ۵ گام، `TrustModelTest`/`TrustCasesUiTest`. مانده: صفِ رسیدگی و تصمیم در پنلِ مدیر (ریپوی server).
+- **FIN-01 ⇐ IMPLEMENTED-VERIFIED:** `OrderRefundServerDesktopTest` همان کدِ برنامه را با سرورِ واقعیِ محلی (`offline30-backend.mjs`)
+  می‌سنجد: بخشی، کامل، کلیدِ تکراری، هم‌زمان، بیش از مانده، و جمعِ دفتر = گزارشِ تطبیق.
+- **TEN-04 (هنوز PARTIAL):** نوارِ «پشتیبانی در حالِ مشاهده» در پوستهٔ برنامهٔ صاحب (`SupportAccessNotice`): چه کسی/چرا/تا کی، بستن،
+  پذیرفتن (با `ReauthHost`) و رد. مانده: نگهبانِ اجازه روی درهای خصوصیِ دیگرِ مدیر.
+- **S89 ⇐ دستهٔ «تصمیم»:** سندِ معکوس به‌جای حذفِ قرض معنای دادهٔ همگام را عوض می‌کند (دخلِ نسخه‌های پیشین، FIFO ِ کهنگی، امتیاز)؛
+  پرسش در `PARTIAL-MAP-fa.md` بخشِ «تصمیم». کدی زده نشد.
+- **دام:** Gradle ِ `--no-daemon` که با `timeout` کشته شود دیمنِ تک‌بارش را زنده و ۱۰۰٪ CPU جا می‌گذارد ⇒ پس از هر قطع `ps | grep gradle-<X>`.
+  با شش عامل `-Xmx3g` را OOM-killer می‌کشد و `-Xmx2g` کامپایلِ in-process را OOM می‌کند؛ `-Xmx2560m` کامپایل شد و آزمونِ هدف‌دار با
+  `-Xmx1536m` (کامپایلِ آماده) سبز. سرور: مسیرِ تازهٔ ویترین فقط یک کلید در `features` (بی خطِ تازه در `app.js`).
+- **اجرای کامل:** `flock /tmp/gradle-full.lock ./desktop/gradlew -p desktop test` ⇒ ۳۹۴۵ PASS، ۱ FAIL، ۴ SKIP ِ پیشینِ بنچ/عکس (۱۳:۲۷)؛
+  تنها شکست `DariCoverageTest` بود: واژهٔ فقط‌فارسیِ «خیلی» در `kit/i18n/trust.fa.json` (واژه‌نامهٔ وب هم از همان سدِ دری می‌گذرد) ⇒
+  «بیش از اندازه» و همان آزمون ۲۳/۲۳. جهش‌آزمایی (۴ جهش، همه سرخ) زیرِ همان قفل. precheck ⇒ `fail=0`؛ `quality.mjs` بی ❌.
+- **نیمه‌کاره / قدمِ بعد:** دستهٔ «کد» ِ نقشه (۴۲)؛ پنلِ ABUSE-01 و درهای TEN-04 در ریپوی server/همین سرور؛ پاسخِ صاحب‌کار به S89.
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-17v زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-17v` (از `claude/batch-54`)
+
+- **RSK-04 «دستگاه» (PARTIAL ⇒ «پرچم»):** شناسه همان رشتهٔ تصادفیِ مرورگر/نصبِ برنامهٔ خرید (MKT-02)، نه سخت‌افزار؛ ویترین و برنامهٔ خرید
+  در هر ثبت می‌فرستند، سرور فقط چکیدهٔ «دکان + شناسه» را با پرچمِ روشن نگه می‌دارد (`lib/risk-device.js`، مهاجرتِ **۸۴۰** —
+  ۸۲۱ تا ۸۳۹ خالی ماند؛ هماهنگ‌کننده شماره را تأیید کند). دکان فقط از راهِ سفارشِ خودش می‌بندد/مطمئن می‌کند؛ حذفِ دادهٔ مشتری
+  دستگاه را پاک می‌کند. `risk-device.test.js` ۱۰/۱۰ (چهار جهش سرخ)؛ برنامهٔ دکان: دو دکمه در کارتِ سابقه — `OrderRiskCardUiTest` ۸/۸، `OrderRiskTest` ۱۳/۱۳، `ShopperCheckoutTest` ۱۳/۱۳ (desktop با `-Xmx3g`؛ ۲g «Java heap space» و دو بار OOM-kill زیرِ بارِ عامل‌های دیگر).
+- **درس:** خانهٔ جدولِ STATUS هرگز `|` ندارد (`true|false` ردیف را شکست و `status` آن را NOT-VERIFIED کرد؛ از نو نوشته شد).
+- **نیمه‌کاره:** هیچ. **قدمِ بعدی:** روشن کردنِ `shop.order_risk` روی دکانِ آزمایشی؛ ثبت از برنامهٔ خریدِ واقعی و دیدنِ دکمه روی گوشی
+  (`customer-android` و `android-native` فقط در CI کامپایل می‌شوند).
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-12r زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-12r` (از `claude/e-rows-11p`)
+
+- **بسته شد (IMPLEMENTED-VERIFIED):** S47 (نوارِ «حساب من» روزِ دقیقِ پایان، بی اینترنت از مجوزِ گوشی)، OPS-09 (کلیدِ ویترینِ هر دکان در
+  پنل = server#141 ِ مرج‌شده)، PRM-11 (`POST /promos/redeem` کدِ قاعدهٔ گروه‌دار را با گروهِ قرض‌دارِ دفترِ دکان می‌سنجد ⇒
+  `wrong_group`؛ برنامه `debtorId` ِ همان سبد را همیشه می‌فرستد، بی کلید = برنامهٔ پیشین)، INV-04@32 (ویترین «… — N مانده» از
+  `sellableMilli` و سبد بیش از آن نمی‌پذیرد؛ بارِ نخستِ JS زیرِ سقف با کوتاه کردنِ دو توضیحِ `kit.js`).
+- **کدِ کامل، فقط دستگاه:** PRES-08 (`seenAt` = وضعِ دیده‌شدهٔ لحظهٔ تصمیم ⇒ اعلامِ صفِ آفلاین اعلامِ تازه‌ترِ دستگاهِ دیگر را برنمی‌گرداند)،
+  S110 (پیش‌فرضِ `Motion` = تنظیمِ گوشی؛ `V3Sheet` زیرِ کاهشِ حرکت بی انیمیشن)، S125 (نمایهٔ بارکد/شناسه برای همان `d.products`
+  یک بار، محموله‌های انقضا برای همان دفتر و روز یک بار ⇒ اسکنِ کامپیوتر با ۵۰ هزار کالا p95 ‏۱۴۳٫۷ ⇐ ۱۹٫۴ms؛ آزمونِ سقفِ صفحهٔ ۱۰۰).
+- **دسته عوض شد (نقشه):** CHAT-02/05/15 و S46 ⇐ دستگاه (گفت‌وگوی برنامهٔ خرید در #1027 ساخته است؛ F6 ِ مشترک خواستهٔ S46 نیست)،
+  IMG-04 ⇐ پرچم (قبل/بعد کنارِ هم هست؛ اسلایدر خواستهٔ سند نیست). GATE-NEW-02: هر سناریوی INV با `reconciled` و نگهبانِ همان پرونده؛
+  مانده رابطِ INV-01@32 (عاملِ دیگر). TEN-04، FIN-01، ABUSE-01، S89 و IMG-PRO-17 به عامل‌های دیگر رسید ⇒ سطرهایشان دست‌نخورده.
+- **دام:** پوشهٔ scratchpad میانِ عامل‌ها **مشترک** است — `st.py` ِ من را عاملِ دیگری با نسخهٔ خودش (نوشتن در `wt-12q`) جایگزین کرد و یک بار
+  سطرِ PRM-11 ِ `wt-12q` را خراب کردم (همان دم از HEAD ِ همان شاخه برگردانده شد). ابزارهای هر عامل در زیرپوشهٔ نام‌دارِ خودش (`r12/`).
+  `server/node_modules` ِ پیوندیِ این worktree به `wt-webp` ِ پاک‌شده اشاره می‌کرد ⇒ به `scratchpad/srvdeps/node_modules`.
+  PostgreSQL ِ محلی (پورت 55432، `/home/user/pgdata`) خاموش بود و نقشِ `shop` نداشت ⇒ روشن و `shop`/`shop_test` ساخته شد.
+  سنجهٔ ۵۰ هزار کالا در کنارِ عامل‌های دیگر دو بار با کمبودِ حافظه کشته شد (اندازهٔ نهاییِ مسیرِ «نزدیکِ انقضا» سنجیده نشد).
+- **اجرای کامل:** `flock /tmp/gradle-full.lock ./desktop/gradlew -p desktop test` ⇒ ۳۹۳۷ PASS، ۰ FAIL، ۴ SKIP ِ شناخته (اجرای نخست با
+  کشته شدنِ daemon از کمبودِ حافظه پس از ۲۴۱۴ PASS بی هیچ FAIL ماند؛ دومی با `-Xmx1536m`)؛ precheck ⇒ `fail=0`؛ `quality.mjs` بی ❌.
+- **نیمه‌کاره / قدمِ بعد:** S01 (آزمونِ Compose ِ `DeskSaleScreen` فقط با کلید: اسکن، `3*`، «نوشا»، F9، ۱۰۰۰، چاپ و فوکوس)،
+  S18 (برگهٔ «مشتریِ تازه» ِ صندوقِ کامپیوتر با صفحه‌کلیدِ لمسیِ حروف)، S96 (آزمونِ یک روزِ کامل فقط با گوشی) — هر سه کد، ساخته نشد.
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-14q، شاخهٔ `claude/e-rows-14q` (از `claude/e-rows-12q` + ادغامِ `claude/batch-54`)
+
+- **quality ِ دستهٔ ۵۴:** «مشتریِ تازه» به `ui/screens/TillNewCustomer.kt` (ساعتِ `ReportBridge.nowMs`)؛ DeskSale/SaleDialogs/ShopStore
+  دوباره زیرِ سقف، `CustomerMerge` بی `currentTimeMillis` ِ چهارم (`589566c79`، ادغام‌شده).
+- **WEB-16 ⇐ IMPLEMENTED-VERIFIED:** srcset با `STORE_SIZES` روی بازبینیِ ۵۴ب ِ `store-webp.js` (`WIDTHS`، `widthOf`، `?w=`؛ سرِ
+  ویترین `imageWidths` فقط وقتی روشن)؛ بودجهٔ بارِ نخست ۷۲٬۷۰۳ از ۷۲٬۷۰۴ (یک بایت جا مانده — شاخهٔ بعدیِ ویترین باید جا باز کند).
+  `docs/api/routes.json` پارامترِ `w` را دارد.
+- **قدمِ بعد:** CHK-08 (عکسِ دروازه و یادداشتِ صوتیِ اختیاری در فرمِ نشانی: جدولِ رسانهٔ نشانیِ سفارش + درِ بارگذاری با توکنِ
+  سفارش و سقفِ اندازه/نرخ، خواندن فقط برای `orders.view`/پیکِ همان سفارش با آزمونِ ۴۰۳، فرمِ ویترین، نمایش در برنامه؛ نقشه در
+  برنامهٔ خرید فقط CI)، POS-05/INV-03 (درِ سرورِ مقدارِ رزروشدهٔ سفارش‌های اینترنتی + خواندن در `HeldStock.sellable`) — شروع نشد.
+
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-13x زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-13x` (از `claude/e-rows-11p`) + server `claude/panel-rows-13v`
+
+- **LOC-04 ⇐ IMPLEMENTED-VERIFIED:** ویرایشگرِ جدولِ تعطیلات از 1.50.78 (server #130، `788f371`) در پنل بود («فروشگاه‌ها ← تنظیماتِ مرکزی و
+  پرچم‌ها ← تعطیلاتِ رسمی»)؛ STATUS کهنه بود. شاهد: `console-holidays.mjs` ۱۶/۱۶ و `holidays-ui.mjs` (کرومیوم) ۱۴/۱۴ روی main ِ server.
+- **IMG-PRO-17 (PARTIAL ⇒ «دستگاه»):** درِ مدیرِ `routes/admin-image-changes.js` (`image-changes.v1`): فهرست/جزئیات/برگرداندن؛ جزئیات با
+  پرچمِ `admin.support_grant` اجازهٔ `read_private` (پیش‌فرض؛ صاحب‌کار می‌تواند عوض کند)؛ برگرداندن ارشد + دلیل + همیشه اجازهٔ `restore` +
+  Idempotency-Key. `admin-image-changes.test.js` ۹/۹ (پایه ۸/۹ سرخ، شش جهش سرخ). پنل (server 1.50.96، `2011903`): پل + کارت در «بانکِ عکس»،
+  `console-image-changes.mjs` ۲۱/۲۱، `image-changes-ui.mjs` ۱۳/۱۳؛ `bridge-roles.mjs` حالا همهٔ `require` های یک `router.use` را می‌خواند.
+- **نیمه‌کاره:** هیچ. **قدمِ بعدی:** PR ِ هر دو شاخه (shop پیش از server تا `bridge-roles` روی main ِ shop هم درها را ببیند)؛ آزمونِ
+  دستیِ IMG-PRO-17 روی گوشی (PARTIAL-MAP «دستگاه»). `staff-bank-ui.mjs` ِ server روی main هم یک سرخِ «404 در کنسول» دارد (جدا از این کار).
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-14w زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-14w` (از `claude/e-rows-13w`)
+
+- **GATE-NEW-05 ساخته شد (PARTIAL تا شاهد):** ورک‌فلوی آزمونیِ `.github/workflows/gradle-evidence.yml` (بی انتشار، `contents: read`،
+  actionهای سنجاق، بی `workflow_run`؛ push ِ main با تغییرِ Kotlin، PR ِ خودش، دستی) `desktop test` (با `android-native/app/src/test`؛
+  همهٔ شناسه‌های کارِ بومی را دارد) و core را می‌دواند و `tools/test-evidence/gradle-evidence.mjs` JUnit XML را به JSONL ِ هم‌شکلِ
+  `server/scripts/test-evidence.js` در artifact ِ `test-evidence-gradle` می‌برد. آزمون ۹/۹، شش جهش سرخ؛ ۵۶۸۶ خط روی گزارش‌های واقعی؛
+  `repro` ِ یک آزمونِ فارسیِ core با Gradle ِ محلی دقیقاً همان یک آزمون را دواند. workflow-guard ۰ خطا، ۴۰/۴۰. قاعده در RULES «CI و آزمون».
+- **دام:** `java -version` خطِ «Picked up JAVA_TOOL_OPTIONS: …» (پراکسی، truststore و رمزش) را چاپ می‌کند ⇒ از شواهد کنار می‌رود
+  (`javaLine`). KMP نامِ آزمونِ core را در XML با `[jvm]` می‌نویسد ⇒ `--tests` با آن چیزی پیدا نمی‌کند؛ برداشته می‌شود.
+- **قدمِ بعد:** پس از مرج، artifact ِ `test-evidence-gradle` ِ نخستین اجرای «شواهدِ آزمون‌های Gradle» روی main را ببین (شمارِ خط‌ها ≈
+  شمارِ KTEST ِ «کامپایل و آزمون») و GATE-NEW-05 ⇐ IMPLEMENTED-VERIFIED؛ دستهٔ CI ِ نقشه دوباره خالی می‌شود.
+
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-13w زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-13w` (از `claude/e-rows-11p`)
+
+- **دستهٔ «CI» ِ نقشهٔ PARTIAL (۶ ردیف)، شاهد از CI ِ push ِ main ‏719bbcf63 (#1038):** INV-16 (`StockValueBridgeTest` ۳/۳)، SYN-12
+  (`SyncRetryAfterTest` ۴/۴، `ReconnectGateTest` ۵/۵)، S117 (`card-data` ۱۱/۱۱ در PostgreSQL، PGlite و Electron)، S124 (server#141
+  مرج شد ⇒ CI ِ main ِ server ‏f80640b86: `account-finance` ۴۱ سبز با دو بررسیِ S124؛ `admin-money` ۳/۳ در shop) و GATE-NEW-01
+  (`PresenceUiTest`، `StatusPaneUiTest`، `StorefrontModelTest`، `PresenceSenderDesktopTest` و PRES ِ سرور) ⇐ IMPLEMENTED-VERIFIED.
+  GATE-NEW-05 ⇐ «کد»: CI هیچ artifact ِ آزمونِ Gradle ندارد (فقط `test-evidence-*` ِ سرور). S94 (پرچم): شاهدِ CI ِ برگهٔ پیک
+  نوشته شد، فقط پرچم مانده. نقشه: ۲۴۰ ردیف، CI ۰، کد ۴۵. هیچ کدی عوض نشد؛ precheck ⇒ `fail=0`.
+- **روش (برای دورِ بعد):** `gh api repos/vil3ntec-it/shop/actions/jobs/<job>/logs > x.log` **کلِ** لاگ را از کانتینر می‌دهد (برخلافِ
+  `get_job_logs` با سقفِ ۵۰۰۰ خط)؛ سپس `grep -c 'KTEST PASS <کلاسِ کامل> >'`. zip ِ artifact هنوز رد می‌شود (blob در پراکسی).
+- **دام:** صفحهٔ کهنهٔ `ui/screens/Storefront.kt` (`StorefrontScreen(snackbar)`، `PresencePane`، `PresenceBadge`، `OutboxBanner`) هیچ
+  صدازننده‌ای ندارد؛ فقط `StorefrontGate` و `SwitchRow` ِ آن زنده‌اند. `DashboardEngine.board(...).stockValue` هم خوانده نمی‌شود.
+- **قدمِ بعد:** GATE-NEW-05 — ورک‌فلوی آزمونیِ جدا (مثلِ `offline30.yml`؛ `tohid-desktop.yml`/`tohid-native.yml` انتشاری‌اند و
+  `workflow_run` در workflow-guard ممنوع) با JUnit XML ⇐ JSONL ِ هم‌شکلِ `server/scripts/test-evidence.js`. پاک کردنِ کدِ مردهٔ بالا
+  (با یک اجرای کاملِ desktop). RPT-14 و CHAT-02 («کامپایلِ اندروید فقط CI») در دستهٔ «کد»اند و دست نخوردند. ادغامِ این شاخه در دسته.
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-12q زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-12q` (از `claude/e-rows-11p`)
+
+- **ساخته شد (۶ ردیف از دستهٔ «کد» ِ نقشه):** CRM-03 ⇐ IMPLEMENTED-VERIFIED (ادغامِ مشتری پیش از نوشتن «تغییرِ سقفِ اعتبار» را
+  می‌پرسد: `CustomerMerge.merge(…, limitRules)` با همان `CreditLimitGate`؛ هر دو درِ ادغام). PAY-10 ⇐ IMPLEMENTED-VERIFIED (کادرِ
+  ارزِ نقد در پنلِ F9 ِ کامپیوتر، `FxTenderBox` با `FxTillPref.tillRates`). POS-31: تشخیصِ صفحهٔ لمسی از سیستم‌عامل (هستهٔ
+  `TouchScreen` + `TouchScreenProbeDesk.kt` با JNA؛ فقط پیش‌فرضِ کلیدِ نوار، `TouchMode.choice`)، صفحه‌کلیدِ حروف با فوکوسِ نامِ
+  قلمِ آزاد و یادداشت‌ها (`TouchTextKeys`)، «مشتریِ تازه» در گزینشِ مشتریِ صندوقِ لمسی ⇒ فقط دستگاه. POS-41: Tab/Shift+Tab ِ
+  پنلِ پرداخت از keymap (partial) ⇒ فقط دستگاه. PAY-06: «روش‌های پرداختِ این دکان» (`tohid-policy:pay_methods_off`، کلیدِ دکان) در
+  هر سه صندوق ⇒ فقط بیرونی (D-08).
+- **بازبینیِ بی کد:** CRM-15 (صفِ دستگاه و فرمانِ حذف = همگام‌سازی) ⇐ همگام/پمپ. نقشه: ۲۴۳ ردیف، کد ۳۸. یافته برای عاملِ «ت»
+  (CRM-06 و HW-07 به او سپرده شد؛ سطرهایشان دست نخورد): `debt_reminder_template` از پیش کلیدِ دکان است (`ShopSettingsKeys`) و با
+  `shop.settings_sync` همگام می‌شود؛ HW-07 تصمیمِ ۴-۲۴ (۱) ج «فعلاً نه» دارد.
+- **دام:** `CustomerMerge.merge` با `newId` ِ آخر را بسیاری با lambda ِ پسین صدا می‌زنند ⇒ پارامترِ تازه با **هم‌بار**، نه
+  افزودن به آخر. `LocalFocusManager` ِ بیرون از `Dialog` مالِ پنجرهٔ صندوق است ⇒ Tab ِ پنل باید درونِ `Dialog` بگیردش.
+  `PosLogicTest` شمارِ «بازگشت به پنل پس از گزینش» را می‌شمارد (حالا ۳ با «مشتریِ تازه»).
+- **اجرای کامل:** `flock /tmp/gradle-full.lock ./desktop/gradlew -p desktop test` روی کدِ Kotlin ِ `db2f33b04` (پس از آن فقط سرور و
+  سند) ⇒ ۳۹۵۰ PASS، ۰ FAIL، ۴ SKIP ِ پیشینِ بنچ/عکس (۱۷:۳۹). سرور: `store-webp` ۴ + ۱ skip ِ Electron، `storefront-v2` ۱۹/۱۹،
+  `keymap` ۸/۸ (PGlite). precheck ⇒ `fail=0`.
+- **WEB-16 (سرور):** AVIF با `STORE_AVIF=1` ِ جدا در همان `lib/store-webp.js` (`pick`/`encodedOf`)؛ گالری از پیش با PRD-17.
+- **نیمه‌کاره / قدمِ بعد:** WEB-16: AVIF ساخته شد (پایین)؛ مانده srcset (اندازه‌های پاسخ‌گوی بیشتر). ماندهٔ همین عامل: POS-05/INV-03
+  (رزروِ سفارشِ اینترنتی در صندوق: درِ سرور برای مقدارِ رزروشده + خواندن در صندوق)، PAY-08، CHK-08، OPS-02 — شروع نشد.
+  ⚠️ `server/node_modules` ِ مشترک (`/home/user/wt-webp`) در میانهٔ کار پاک شد؛ این worktree به نصبِ خصوصیِ scratchpad پیوند دارد.
+
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-11p زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-11p` (از `claude/batch-53`)
+
+- **نقشهٔ PARTIAL:** `docs/spec/PARTIAL-MAP-fa.md` — هر ردیفِ PARTIAL در یک دسته با یک عبارت از مانده و، برای دسته‌های صاحب‌کار،
+  «دقیقاً چه کند» (پیوند به FLAGS-ON و OWNER-ACTIONS، بی تکرار). پیش از این دور ۲۴۶ ردیف: کد ۴۷، پرچم ۵۱، تصمیم ۴۷، بیرونی ۳۶،
+  دستگاه ۴۴، همگام/پمپ ۱۵، CI ۶؛ پس از آن ۲۴۵ (کد ۴۴). سازنده: اسکریپتِ کوچکِ بیرون از ریپو؛ `spec.mjs` پرونده را در فهرستِ مجاز
+  می‌شناسد (بیرون از تکه‌ها، check «سالم»). با هر تغییرِ STATUS کهنه می‌شود — مرجع همان STATUS.
+- **ساخته شد:** S90 ⇐ IMPLEMENTED-VERIFIED (پنج گامِ «پشتیبانی» در `roles.e2e.mjs`: چهار نقشِ مدیرِ پنل، دکمه‌های «فقط ارشد» ⇔
+  سرور، پنل در کرومیوم، `support-access.v1` و اجازهٔ زنده فقط برای درخواست‌کننده؛ ۱۰/۱۰ گام، چهار جهش سرخ). CHK-18: «افزودن به
+  همان سفارش» هم سقفِ نگه‌داشتنِ هر شماره را دارد (`syncOrderIn` با `phoneCap`، بازسازیِ S86 همان قاعده) — فقط گوشیِ واقعی مانده.
+  POS-04: درِ همگانیِ `GET /api/search/synonyms` و `TillSynonyms` (روزی یک بار، بی‌شبکه نسخهٔ ذخیره‌شده) ⇐ جست‌وجوی صندوق — فقط
+  فهرستِ صاحب‌کار مانده.
+- **دام:** دو آزمونِ کهنهٔ «افزودن» (`stock-reserve`، SR42-1) بی سقفِ شماره نوشته شده بودند ⇒ با موجودیِ بیشتر همان قصد را می‌سنجند
+  و حالتِ «موجودیِ کهنه» حالا محافظت را می‌سنجد. `server/src/app.js` روی سقفِ ۸۰۰ خط است ⇒ سوار کردنِ مسیرِ تازه بی خطِ تازه.
+  `remember(...)` ِ کاشی‌های صندوق کلیدِ `TillSynonyms.search` را دارد، وگرنه فهرستِ تازه تا جست‌وجوی بعد دیده نمی‌شد.
+- **اجرای کامل:** `./desktop/gradlew -p desktop test` ⇒ ۳۹۲۶ PASS، ۰ FAIL، ۴ SKIP ِ پیشینِ بنچ/عکس (۲۱:۴۷)؛ اجرای نخست انبارِ
+  تازهٔ `tohid-synonyms` ِ بی دسته را گرفت (`DataSafetyGuardTest`) ⇒ DATA-SAFETY §۶. سرتاسری با `E2E_FLAGS_ON=1` ⇒ ۲۷۳ گام سبز؛
+  precheck ⇒ `fail=0` (پروندهٔ تازه با `Context` فقط با نامِ مرزیِ `…Android.kt`).
+- **نیمه‌کاره / قدمِ بعد:** دستهٔ «کد» ِ نقشه به ترتیب (P0: POS-31، POS-41، PAY-06، CRM-03، CRM-15، CHK-08، OPS-02؛ سپس P1)؛
+  S47 (تاریخِ پایان در نوارِ «حساب من») کوچک ولی امضای `ProfileHomeModel.plan` را عوض می‌کند. ادغامِ `claude/e-rows-11p` در دسته.
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-11o زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-11o` (از `claude/batch-53`)
+
+- **INV-01@32 ⇒ IMPLEMENTED-VERIFIED («تعریف و انتشار از یک صفحه»):** صفحهٔ هر کالا (`products/{id}`، گوشی و کامپیوتر) بخشِ «ویترینِ
+  اینترنتی» دارد (`ui/v3/online/storefront/ProductStorefront.kt` منطقِ خالص، `ProductStorefrontAndroid.kt` مرزِ پلتفرم و `ProductStorefrontSlot`).
+  سرور: `GET /api/shop/storefront/products/:productId` (`staffProduct` در `storefront-owner.js`، همان شکلِ فهرست). **۴۰۴ ِ «کالای
+  همگام‌نشده» درست حل شد:** خواندنِ ۴۰۴ `product_not_found` ⇒ «هنوز به سرور نرسیده»، کلیدِ خاموش و هیچ PUT؛ «همین حالا همگام کن»
+  (`AutoSync.now`) و پایانِ هر همگام‌سازیِ موفق (`rememberSyncV1Status().lastOkAt`) فقط کالای نرسیده را دوباره می‌پرسد — بی دست زدن به `sync/`.
+- **IMG-11 (PARTIAL ِ روشن‌تر):** zoom ِ ۲۴۰۰px روی سرور (`lib/image-zoom.js`، پرچمِ خاموشِ `image_bank.zoom` در کاتالوگ و RULES، `sharp` ِ
+  اختیاری با بارکنندهٔ مشترکِ `lib/sharp-lib.js`)، یک‌بارنویس در `image_derivatives`؛ درهای ویترین/گالری/برنامه و `urls.zoom` ِ «کدام عکس»
+  (`withUrl` در درِ `shop-images`، نه در `image-bank.js` که سقفِ اندازه دارد). وب: `store/zoom.js` + واژه‌نامهٔ جدای `zoom` (≥۱۰ کلید —
+  قاعدهٔ `web-i18n`؛ با واژه‌نامهٔ `gallery` نشد چون `web-store-gallery.mjs` «پرچمِ گالری خاموش ⇒ هیچ `i18n/gallery`» را می‌سنجد). برنامه:
+  بخشِ «نسخهٔ بزرگ‌نمایی» در «نسخه‌های عکس» با `zoomFits` و `ZoomFrame`/`ZoomMath`. مانده فقط گوشیِ اندروید ِ واقعی و تصمیمِ روشن کردنِ پرچم.
+- **آزمون‌ها (سرخ پیش/سبز پس):** `storefront-product-one` ۰/۲ ⇒ ۲/۲، `image-zoom` ۰/۳ ⇒ ۳/۳، `web-store-zoom.mjs` خروجِ ۱ ⇒ ۴۱ ✅؛ desktop
+  `ProductStorefrontUiTest` ۶/۶، `ZoomFrameUiTest` ۲/۲، `PhotoVersionsPageTest` ۸/۸؛ جهش‌ها (۳ سرور، ۳ کاتلین) همه کشته. بی‌تغییر سبز: `storefront`
+  ۱۹، `storefront-bulk` ۵، `catalog-stock` ۲۶، `image-bank` ۲۰، `storefront-gallery` ۳، `store-webp` ۳، `admin-flags` ۲، `console-shell` ۸، `web-i18n` ۳۳،
+  `web-store-gallery.mjs` ۳۵، `web-store.mjs` ۱۳۲، `admin-panel.mjs` ۴۳/۴۳. `./desktop/gradlew -p desktop test` کامل ⇒ ۳۹۳۵ آزمون (۳۹۳۱ PASS،
+  ۴ SKIP ِ پیشین)، ۰ شکست، ۱۵:۵۲. precheck `fail=0`.
+- **یافته در اجرای کامل:** `V3A11yGuardTest` قابِ بزرگ‌نماییِ تازه (`detectTransformGestures`) را بی جایگزینِ صفحه‌خوان گرفت ⇒ `customActions`
+  (بزرگ‌تر، کوچک‌تر و دیدنِ چهار سو) روی همان قاب، نه ردیفِ `ALTERNATIVES`. Gradle ِ نخست را OOM ِ cgroup کشت (عامل‌های هم‌زمان) ⇒ `-Xmx2g`.
+- **دامِ آزمونِ Compose:** یک بار `aSuccessfulSyncRechecksOnlyAProductThatHadNotArrived` در اجرای کاملِ کلاس سرخ شد (دو دورِ پرسشِ هم‌پوشان؛ تکرار
+  نشد) ⇒ پیش از «همگام‌سازیِ بعدی» ۵۰۰ms صبر و چاپِ درختِ معنایی هنگامِ شکست.
+- **قدمِ بعد:** ادغامِ `claude/e-rows-11o` در دسته؛ IMG-11 روی گوشیِ اندروید (CI ِ اندروید یا دستگاه) و تصمیمِ صاحب‌کار برای `image_bank.zoom`.
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-10m زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-10m` (از `claude/batch-52`)
 
 - **انجام شد:** IMG-BANK-10، STF-07، PUR-02 و PUR-14 ⇒ IMPLEMENTED-VERIFIED؛ S90 با آزمونِ سرتاسریِ تازه (PARTIAL ِ روشن‌تر).

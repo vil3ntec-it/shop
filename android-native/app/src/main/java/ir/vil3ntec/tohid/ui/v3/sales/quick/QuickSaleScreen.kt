@@ -91,7 +91,7 @@ fun QuickSaleScreen(
   val codes = ir.vil3ntec.tohid.ui.components.product.productInfoOn() // POS-01: کدِ کالا (SKU) در همان کادر
   val index = remember(d.products, d.sales, d.saleItems, codes) { CatalogModel.index(d, codes) }
   val inCart = remember(cart) { CartModel.inCart(cart) }
-  val items = remember(index, query, category, inCart, d) { CatalogModel.items(d, index, query, category, inCart) }
+  val items = remember(index, query, category, inCart, d, ir.vil3ntec.tohid.TillSynonyms.search) { CatalogModel.items(d, index, query, category, inCart) }
   val empty = CatalogModel.empty(index, items.size, query)
   val strip = remember(cart, d.products, total) { CartSummary.of(cart, d.products, total) }
   val stagger = rememberV3Stagger(category, query.isBlank())

@@ -251,3 +251,15 @@
 .pmap-view:focus-visible { outline: 3px solid var(--focus, #1a73e8); outline-offset: 2px; }
 .pmap-tiles img { position: absolute; width: 256px; height: 256px; max-width: none; user-select: none; pointer-events: none; }
 .pmap-mark { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -18px 0 0 -9px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #d93025; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.4); pointer-events: none; }
+
+/* IMG-11: بزرگ‌نماییِ عکسِ کالا (zoom.js ِ دیربار) — جابه‌جایی فقط با CSSOM (`style.transform`) */
+.ps-img.zoomable img { cursor: zoom-in; }
+.ps-zoom { margin-top: var(--s2); }
+.zm { position: fixed; inset: 0; z-index: 70; display: flex; flex-direction: column; background: var(--bg); }
+.zm[hidden] { display: none; }
+.zm-stage { flex: 1; min-height: 0; display: grid; place-items: center; overflow: hidden; touch-action: none; cursor: zoom-in; background: #0b0d12; }
+.zm-stage.zoomed { cursor: grab; }
+.zm-img { max-width: 100%; max-height: 100%; transform-origin: center; user-select: none; -webkit-user-drag: none; }
+.zm-bar { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; justify-content: center; padding: var(--s2) var(--s4) 0; }
+.zm-level { min-width: 4.5em; text-align: center; color: var(--text); }
+.zm-hint { text-align: center; margin: var(--s2) var(--s4) calc(var(--s3) + env(safe-area-inset-bottom)); color: var(--muted); }

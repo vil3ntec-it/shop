@@ -23,8 +23,9 @@ import java.io.File
 class CartStorePageDesktopTest {
   private val draft get() = File(DesktopContext.filesDir, CartStore.FILE)
 
-  @Before fun before() { draft.delete() }
-  @After fun after() { draft.delete() }
+  //  نوشتن روی رشتهٔ جداست: پیش از پاک کردن، نوشتنِ در صفِ آزمونِ پیشین باید رسیده باشد
+  @Before fun before() { CartStore.awaitWrites(); draft.delete() }
+  @After fun after() { CartStore.awaitWrites(); draft.delete() }
 
   private val x = HeldExtras("500", SalesEngine.Payment.CREDIT, "200", discountAmount = true, seller = "زهرا")
 

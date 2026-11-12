@@ -82,4 +82,24 @@ async function bankImage(shopId, productId, size) {
   return f ? { data: f.data, hash: f.hash, mime: f.mime, tag: bankTag(row) } : null;
 }
 
-module.exports = { applyStock, suggestable, bankIds, bankImage, photoTag, catalogLib };
+/**
+ * IMG-11: نسخهٔ بزرگِ (zoom) همان عکسِ بانکِ کالا — همان ردیف، همان نسخه و همان دسترسیِ `bankImage`؛ نبودش را `image-zoom`
+ * (پرچمِ خاموشِ `image_bank.zoom` + `sharp`) یک بار می‌سازد. null ⇒ کلاینت همان display را بزرگ می‌کند.
+ */
+async function bankZoom(shopId, productId) {
+  const bank = require('./image-bank');
+  if (!(await bank.shopEnabled(shopId))) return null;
+  const row = await db.one(
+    `SELECT image_id, version FROM shop_product_images
+      WHERE shop_id = $1 AND product_id = $2 AND source <> 'none' AND image_id <> ''`,
+    [shopId, productId]
+  );
+  if (!row) return null;
+  const img = await bank.imageRow(row.image_id);
+  const version = Number(row.version);
+  if (!img || !(await bank.shopCanRead(shopId, img, version, 'zoom'))) return null;
+  const f = await require('./image-zoom').ensure(shopId, img, version);
+  return f ? { data: f.data, hash: f.hash, mime: f.mime, tag: bankTag(row) } : null;
+}
+
+module.exports = { applyStock, suggestable, bankIds, bankImage, bankZoom, photoTag, catalogLib };

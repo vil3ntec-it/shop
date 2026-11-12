@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.data.repo
 import ir.vil3ntec.tohid.core.i18n.StrEvidence
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiJson
+import ir.vil3ntec.tohid.core.nav.RoutePaths
 import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.storefront.BulkPublish
 import ir.vil3ntec.tohid.core.storefront.PresenceDeclaration
@@ -40,6 +41,7 @@ class StorefrontRepository(private val api: ApiClient) {
       put("mode", p.mode)
       p.declaredUntil?.let { put("declaredUntil", it) }
       put("clientEventAt", p.clientEventAt)
+      p.seenAt?.let { put("seenAt", it) } // PRES-08: وضعِ دیده‌شدهٔ لحظهٔ تصمیم
       if (deviceId.isNotBlank()) put("deviceId", deviceId.take(80))
     }
     ApiJson.decode<PresenceResultDto>(api.post("$ROOT/presence", body))
@@ -48,6 +50,14 @@ class StorefrontRepository(private val api: ApiClient) {
   suspend fun products(cursor: String?): ApiResult<StorefrontProductPageDto> = result {
     val q = if (cursor.isNullOrBlank()) "?limit=100" else "?limit=100&cursor=" + java.net.URLEncoder.encode(cursor, "UTF-8")
     ApiJson.decode<StorefrontProductPageDto>(api.get("$ROOT/products$q"))
+  }
+
+  /**
+   *  INV-01@32: یک کالا برای صفحهٔ همان کالا (همان شکلِ فهرست). کالایی که هنوز در دفترِ سرور نیست ⇒ `NotFound` با
+   *  `product_not_found` (روی دستگاه تعریف شده، هنوز همگام نشده) — `ProductStorefront.notSynced`.
+   */
+  suspend fun product(id: String): ApiResult<StorefrontProductDto> = result {
+    ApiJson.decode<StorefrontProductDto>(api.get("$ROOT/products/" + RoutePaths.encode(id)))
   }
 
   /** `description`/`specs` ِ null ⇒ نفرستاده ⇒ سرور همان قبلی را نگه می‌دارد */

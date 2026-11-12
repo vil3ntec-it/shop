@@ -214,6 +214,9 @@ async function declarePresence(shopId, body, { userId = '', deviceId = '' } = {}
   }
   const clientEventAt = b.clientEventAt === undefined || b.clientEventAt === null
     ? null : int(b.clientEventAt, 'زمانِ دستگاه', { min: 0, max: 4102444800000 });
+  //  PRES-08: زمانِ سرورِ آخرین وضعی که دستگاه هنگامِ تصمیم دید (`settings.updatedAt`)؛ نبود ⇒ برنامهٔ پیشین
+  const seenAt = b.seenAt === undefined || b.seenAt === null ? null : int(b.seenAt, 'وضعِ دیده‌شده', { min: 0, max: at });
+  const device = text(b.deviceId, 80) || deviceId;
 
   const row = await tx(async (c) => {
     const sf = (await c.query('SELECT * FROM storefronts WHERE shop_id = $1 FOR UPDATE', [shopId])).rows[0];
@@ -226,10 +229,17 @@ async function declarePresence(shopId, body, { userId = '', deviceId = '' } = {}
           AND LEAST(COALESCE(client_event_at, server_received_at), server_received_at) > $2 LIMIT 1`,
       [shopId, Math.min(clientEventAt, at)]
     )).rows[0];
-    const applied = !newer;
+    //  PRES-08، ساعتِ جلوافتاده درونِ صفِ آفلاین: اعلامی که بی خبر از اعلامِ نشستهٔ دستگاهِ دیگری (رسیده پس از وضعِ
+    //  دیده‌شده) ساخته شد آن را برنمی‌گرداند — مستقل از ساعتِ دستگاه؛ اعلام‌های صفِ همان دستگاه همدیگر را کهنه نمی‌کنند
+    const unseen = newer || seenAt === null ? null : (await c.query(
+      `SELECT 1 FROM storefront_presence_events WHERE shop_id = $1 AND kind = 'presence' AND (detail->>'applied') = 'true'
+          AND server_received_at > $2 AND COALESCE(source_device_id, '') <> $3 LIMIT 1`,
+      [shopId, seenAt, device || '']
+    )).rows[0];
+    const applied = !newer && !unseen;
     const inserted = await recordEvent(c, shopId, {
       eventId, actorId: userId, kind: 'presence', status: mode, declaredUntil, timezone: sf.timezone,
-      detail: { applied }, deviceId: text(b.deviceId, 80) || deviceId, clientEventAt, at,
+      detail: { applied }, deviceId: device, clientEventAt, at,
     });
     if (inserted && applied) {
       await c.query(
@@ -264,17 +274,40 @@ async function staffProducts(shopId, { cursor, limit } = {}) {
   );
   const more = rows.length > lim;
   const page = more ? rows.slice(0, lim) : rows;
+  return { items: page.map(staffItem), nextCursor: more ? page[page.length - 1].id : null };
+}
+
+/** یک ردیفِ دفتر + نشانِ ویترین ⇒ همان شکلِ فهرستِ «در ویترین» (برای فهرست و برای یک کالا) */
+function staffItem(r) {
   return {
-    items: page.map((r) => ({
-      ...productView({ ...r, online_price_minor: null }),
-      published: r.published === true,
-      onlinePriceMinor: r.online_price_minor === null || r.online_price_minor === undefined ? null : Number(r.online_price_minor),
-      active: isActive(r.data),
-      description: text(r.description, 2000),
-      specs: specsOf(r.specs),
-    })),
-    nextCursor: more ? page[page.length - 1].id : null,
+    ...productView({ ...r, online_price_minor: null }),
+    published: r.published === true,
+    onlinePriceMinor: r.online_price_minor === null || r.online_price_minor === undefined ? null : Number(r.online_price_minor),
+    active: isActive(r.data),
+    description: text(r.description, 2000),
+    specs: specsOf(r.specs),
   };
+}
+
+/**
+ * INV-01@32 — یک کالا برای صفحهٔ همان کالا در برنامه (تعریف و انتشار در یک جا). همان منبع و همان شکلِ
+ * `staffProducts`. کالایی که هنوز در دفترِ سرور نیست (روی دستگاه تعریف شده و هنوز همگام نشده) ⇒ ۴۰۴
+ * `product_not_found` ِ همان `setProduct`؛ برنامه آن را «هنوز به سرور نرسیده» می‌خواند و دکمهٔ انتشار را تا
+ * همگام شدن خاموش نگه می‌دارد — نه حدس، نه انتشارِ نیمه‌کاره.
+ */
+async function staffProduct(shopId, productId) {
+  const id = String(productId || '');
+  if (!PRODUCT_ID_RE.test(id)) throw badRequest('شناسهٔ کالا معتبر نیست', 'bad_product');
+  const src = await sfc.ledgerSource(shopId, { strict: false });
+  const r = await one(
+    `SELECT r.row_id AS id, r.data, sp.published, sp.online_price_minor, sp.max_qty_milli, sp.description, sp.specs
+       FROM ${src.from}
+       LEFT JOIN storefront_products sp ON sp.shop_id = r.account_id AND sp.product_id = r.row_id
+      WHERE ${src.where} AND r.row_id = $2`,
+    [shopId, id]
+  );
+  if (!r) throw notFound('این کالا در دفترِ دکان نیست', 'product_not_found');
+  return staffItem(r);
 }
 
 /** گذاشتن یا برداشتنِ یک کالا از ویترین. */
@@ -318,5 +351,5 @@ async function setProduct(shopId, productId, body, userId) {
   };
 }
 
-  return { settingsOf, saveSettings, declarePresence, staffProducts, setProduct };
+  return { settingsOf, saveSettings, declarePresence, staffProducts, staffProduct, setProduct };
 };

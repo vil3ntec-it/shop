@@ -204,8 +204,15 @@ object CheckoutRules {
   fun tenderOf(page: StorePage, cart: Cart?, form: CheckoutForm, slots: SlotsPage?, discountMinor: Long = 0): Long? =
     form.cashTenderMinor?.takeIf { it in tenders(page, cart, form, slots, discountMinor) }
 
-  /** بدنهٔ `POST /checkout` (همان `orderBody` ِ وب). [phone] همان E.164 ِ بلیت؛ [promo] تخفیفِ گفتهٔ سرور برای همین سبد. */
-  fun request(page: StorePage, cart: Cart, form: CheckoutForm, phone: String, lang: String, slots: SlotsPage?, promo: AppliedPromo? = null): CheckoutRequest {
+  /**
+   *  بدنهٔ `POST /checkout` (همان `orderBody` ِ وب). [phone] همان E.164 ِ بلیت؛ [promo] تخفیفِ گفتهٔ سرور برای همین سبد.
+   *  [deviceId] شناسهٔ **تصادفیِ** همین نصب (`ShopperMemory.withDevice`، نه شناسهٔ سخت‌افزار) — مثلِ وب در هر ثبت می‌رود
+   *  (MKT-02 «یک بار برای هر دستگاه»، RSK-04 «دستگاهِ بسته»)؛ سرور فقط چکیدهٔ «دکان + شناسه» را و فقط با پرچمِ دکان نگه می‌دارد.
+   */
+  fun request(
+    page: StorePage, cart: Cart, form: CheckoutForm, phone: String, lang: String, slots: SlotsPage?, promo: AppliedPromo? = null,
+    deviceId: String? = null,
+  ): CheckoutRequest {
     val f = fulfillmentOf(page.shop, form) ?: DELIVERY
     val s = summary(page, cart, form, slots)
     val slot = slotOf(slots, form.slotStartsAt)
@@ -225,13 +232,16 @@ object CheckoutRules {
         lat = form.pin?.let { AddressRules.round6(it.lat) }, lng = form.pin?.let { AddressRules.round6(it.lng) },
       ),
       promoCode = promo?.code?.takeIf { it.isNotBlank() },
-      deviceId = promo?.deviceId,
+      deviceId = (promo?.deviceId ?: deviceId)?.takeIf { DEVICE_ID.matches(it) },
       delivery = if (f != DELIVERY) null else CheckoutDelivery(
         form.callBeforeArrival, form.leaveWith.trim().take(80), tenderOf(page, cart, form, slots, promo?.discountMinor ?: 0),
       ),
     )
   }
 }
+
+/** همان الگوی `deviceId` ِ وب و سرور (`^[A-Za-z0-9_-]{8,128}$`)؛ ناجور ⇒ در بدنه نمی‌رود */
+private val DEVICE_ID = Regex("^[A-Za-z0-9_-]{8,128}$")
 
 /** کلیدِ یکتاییِ یک ثبت و همان بدنه‌ای که با آن ساخته شد (`K.keyFor` ِ وب). */
 @Serializable

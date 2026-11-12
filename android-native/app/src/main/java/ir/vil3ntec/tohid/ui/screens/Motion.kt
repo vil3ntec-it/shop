@@ -33,8 +33,8 @@ object Motion {
   private const val PREFS = "tohid"
   private const val KEY = "motion"
 
-  /** `full` یعنی همیشه روشن، `auto` یعنی مثل تنظیم گوشی */
-  var choice by mutableStateOf("full")
+  /** `full` یعنی همیشه روشن، `auto` یعنی مثل تنظیم گوشی (پیش‌فرض — S110: «کاهشِ حرکت» ِ گوشی بی هیچ کاری رعایت می‌شود) */
+  var choice by mutableStateOf("auto")
     private set
 
   /** آیا همین حالا باید انیمیشن اجرا شود */
@@ -42,8 +42,8 @@ object Motion {
     private set
 
   fun load(context: Context) {
-    // پیش‌فرض روشن است، چون کاربر انیمیشن‌ها را خواسته — مثل نسخهٔ وب
-    choice = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, "full") ?: "full"
+    //  S110: تا کاربر خودش «انیمیشن روشن» نزده، همان تنظیمِ گوشی (پیش‌تر پیش‌فرض «full» بود و «کاهشِ حرکت» ِ گوشی نادیده)
+    choice = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, "auto") ?: "auto"
     apply(context)
   }
 
@@ -54,8 +54,11 @@ object Motion {
   }
 
   private fun apply(context: Context) {
-    enabled = choice == "full" || !systemReducesMotion(context)
+    enabled = choice == "full" || !(reducedForTest ?: systemReducesMotion(context))
   }
+
+  /** فقط آزمون (`ReducedMotionTillUiTest`): جای `Settings.Global` ِ گوشی؛ null ⇒ همان تنظیمِ واقعی */
+  internal var reducedForTest: Boolean? = null
 
   /** گوشی گفته حرکت کم شود یا انیمیشن‌ها خاموش‌اند؟ */
   private fun systemReducesMotion(context: Context): Boolean = runCatching {

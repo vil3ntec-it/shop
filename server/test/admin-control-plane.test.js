@@ -231,6 +231,8 @@ const MOUNTS = {
   //  ۴-۱ «ب» و ۲-۹ (پنلِ مرکزی ۱.۵۰.۸۹ و ۱.۵۰.۹۰)
   'admin-synonyms.js': '/admin/search',
   'admin-access-grants.js': '/admin/shops/:id',
+  //  IMG-PRO-17 در پنلِ مرکزی (۱.۵۰.۹۶)
+  'admin-image-changes.js': '/admin/shops/:id',
   //  پنلِ مرکزی، فاز ۳
   'admin-shop-state.js': '/admin/shops/:id',
   'admin-flags.js': '/admin/flags',
@@ -391,6 +393,8 @@ const CAPABILITY_PROBES = {
   'synonyms.v1': ['GET /admin/search/synonyms', 'PUT /admin/search/synonyms'],
   'support-access.v1': ['GET /admin/shops/x1/access-grants', 'POST /admin/shops/x1/access-grants',
     'POST /admin/shops/x1/access-grants/break-glass', 'POST /admin/shops/x1/access-grants/x1/revoke'],
+  'image-changes.v1': ['GET /admin/shops/x1/images/changes', 'GET /admin/shops/x1/images/changes/x1',
+    'POST /admin/shops/x1/images/changes/x1/rollback'],
 };
 
 test('GET /api/admin/me: فهرستِ «توانایی»ها با همان نام‌های پل، و درِ هر کدام واقعاً هست', async () => {

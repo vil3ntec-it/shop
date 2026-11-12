@@ -30,6 +30,11 @@ object ApiEndpoints {
     const val HOLIDAYS = "/calendar/holidays"
   }
 
+  /** POS-04: فهرستِ مرکزیِ مترادف برای جست‌وجوی صندوق — بی‌توکن، روزی یک بار (`TillSynonyms.refresh`) */
+  object Search {
+    const val SYNONYMS = "/search/synonyms"
+  }
+
   /* ------------------------------ ورود ------------------------------ */
 
   object Auth {

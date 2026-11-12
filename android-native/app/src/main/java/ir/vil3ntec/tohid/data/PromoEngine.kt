@@ -93,6 +93,8 @@ object PromoEngine {
     val tags: Map<String, LineTag> = emptyMap(),
     /** همان `Snapshot.stamp` هنگامِ سنجش */
     val stamp: Boolean = false,
+    /** PRM-11 — مشتریِ سبدی که تخفیف با او سنجیده شد؛ `PromoLive.redeemGate` همان را به `POST /redeem` می‌دهد */
+    val debtorId: String? = null,
   )
 
   /** سقفِ `Sale.coupons` — کدِ هسته ۳ تا ۳۲ نویسه است */
@@ -149,17 +151,26 @@ object PromoEngine {
    *    همان کالا را به FEFO می‌گیرد (`ExpiryEngine.lots`، به هزارم). `null` ⇒ بی محموله، همان پیشین.
    */
   fun lines(d: ShopData, cart: List<SalesEngine.CartLine>, today: String? = null): List<PromoCore.Line> {
-    //  تاریخِ خرابِ یک محموله فروش را نمی‌خواباند — فقط بی تخفیفِ انقضا
-    val lots = today?.let { t ->
-      runCatching { ExpiryEngine.lots(d, t) }.getOrDefault(emptyList())
-        .groupBy({ it.product.id }) { PromoCore.Lot(it.daysLeft, (it.remaining * 1000).roundToLong()) }
-    }.orEmpty()
+    val lots = today?.let { t -> lotsOf(d, t) }.orEmpty()
     return cart.map { line -> line(d, line, lots) }
+  }
+
+  /** S125: محموله‌های همان دفتر و همان روز یک بار (هر اسکن سبد را عوض می‌کند، نه دفتر را) — کلید: همان شیءِ `d` */
+  private class LotsMemo(val d: ShopData, val today: String, val lots: Map<String, List<PromoCore.Lot>>)
+  @Volatile private var lotsMemo: LotsMemo? = null
+
+  private fun lotsOf(d: ShopData, today: String): Map<String, List<PromoCore.Lot>> {
+    lotsMemo?.let { if (it.d === d && it.today == today) return it.lots }
+    //  تاریخِ خرابِ یک محموله فروش را نمی‌خواباند — فقط بی تخفیفِ انقضا
+    val lots = runCatching { ExpiryEngine.lots(d, today) }.getOrDefault(emptyList())
+      .groupBy({ it.product.id }) { PromoCore.Lot(it.daysLeft, (it.remaining * 1000).roundToLong()) }
+    lotsMemo = LotsMemo(d, today, lots)
+    return lots
   }
 
   private fun line(d: ShopData, line: SalesEngine.CartLine, lots: Map<String, List<PromoCore.Lot>>): PromoCore.Line {
     val qtyMilli = (line.quantity * 1000).roundToLong()
-    val p = if (line.free) null else d.products.find { it.id == line.productId }
+    val p = if (line.free) null else ShopStore.product(d, line.productId)
     return if (p == null) {
       val price = line.unitPrice ?: 0.0
       PromoCore.Line(
@@ -205,6 +216,7 @@ object PromoEngine {
    *  @param date تاریخِ محلیِ دکان «YYYY-MM-DD»
    *  @param minute دقیقه از نیمه‌شب
    *  @param group PRM-11 — گروهِ مشتریِ فاکتور ([groupOf])؛ "" ⇒ همان سبدِ بی گروهِ پیشین
+   *  @param debtorId PRM-11 — همان مشتری، فقط برای [Outcome.debtorId] (سرور گروه را از دفترِ خودش می‌سنجد)
    */
   fun evaluate(
     d: ShopData,
@@ -214,6 +226,7 @@ object PromoEngine {
     date: String,
     minute: Int,
     group: String = "",
+    debtorId: String? = null,
   ): Outcome? {
     if (!snap.active || cart.isEmpty()) return null
     //  PRM-10: محموله‌ها فقط وقتی قاعدهٔ فعالِ «نزدیکِ انقضا» هست — وگرنه همان ورودیِ پیشین
@@ -229,7 +242,7 @@ object PromoEngine {
       else line.copy(unitPrice = (o.netMinor / 100.0) / line.quantity)
     }
     val tags = cart.associate { line ->
-      val p = if (line.free) null else d.products.find { it.id == line.productId }
+      val p = if (line.free) null else ShopStore.product(d, line.productId)
       val o = net[line.productId]
       val promo = if (o == null || o.discountMinor <= 0 || line.quantity <= 0) emptyList()
       //  تقسیم نشد (هرگز نباید) ⇒ جمعِ ردیف درست می‌ماند، فقط بی نامِ قاعده
@@ -245,6 +258,7 @@ object PromoEngine {
       cart = priced,
       tags = tags,
       stamp = snap.stamp,
+      debtorId = debtorId,
     )
   }
 

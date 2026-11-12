@@ -108,7 +108,9 @@ fun V3Sheet(
   val closer = remember(state) {
     V3SheetCloser { after ->
       allowHide[0] = true
-      scope.launch { state.hide() }.invokeOnCompletion { onDismiss(); after() }
+      //  S110: با «کاهشِ حرکت» برگه بی انیمیشنِ پایین‌رفتن همان دم کنار می‌رود و کارِ دکمه بی انتظار انجام می‌شود
+      if (!ir.vil3ntec.tohid.ui.screens.Motion.enabled) { onDismiss(); after() }
+      else scope.launch { state.hide() }.invokeOnCompletion { onDismiss(); after() }
     }
   }
   ModalBottomSheet(

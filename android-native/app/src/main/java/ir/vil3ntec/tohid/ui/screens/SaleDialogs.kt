@@ -53,6 +53,7 @@ import ir.vil3ntec.tohid.ui.components.staff.ApprovalDialog
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
+import ir.vil3ntec.tohid.ui.components.pos.touchKeysOnFocus
 
 /* ============================ تسویه ============================ */
 
@@ -136,7 +137,7 @@ fun CheckoutDialog(
   val discountBad = canDiscount && numberInvalid(discountText)
   //  PAY (v3 A4): پرداختِ ترکیبی — فقط با پرچم (`payV2` بالا)؛ خاموش ⇒ همان نقد/نسیهٔ امروز
   //  PAY-24: کارتِ هدیه و اعتبارِ فروشگاه در روش‌ها فقط با تنظیمِ همین دستگاه (پیش‌فرض خاموش ⇒ همان پنل)؛ PAY-09: پلهٔ گرد
-  val payState = remember { ir.vil3ntec.tohid.ui.components.pos.PayPanelState().also { it.stored = ir.vil3ntec.tohid.data.GiftCardPref.on(context); it.cashRounding = checkout.cashRounding } }
+  val payState = remember { ir.vil3ntec.tohid.ui.components.pos.PayPanelState().also { it.stored = ir.vil3ntec.tohid.data.GiftCardPref.on(context); it.off = ir.vil3ntec.tohid.data.PayMethodsPref.off(context); it.cashRounding = checkout.cashRounding } }
   val cashFocus = remember { androidx.compose.ui.focus.FocusRequester() }
   var payError by remember { mutableStateOf<String?>(null) }
   val paidBad = !payV2 && payment == SalesEngine.Payment.CREDIT && numberInvalid(paidText)
@@ -864,8 +865,8 @@ fun DebtorPicker(
   selected: String?,
   onClose: () -> Unit,
   onPick: (String?) -> Unit,
-  /** POS-31 — کامپیوترِ لمسی (`PosTouchPrefs.extras()`): کلیدِ «حروف» و صفحه‌کلیدِ روی‌صفحه برای نامِ مشتری؛ خاموش ⇒ همان امروز */
-  touch: Boolean = false,
+  /** POS-31 — کامپیوترِ لمسی (`PosTouchPrefs.extras()`): کلیدِ «حروف» و صفحه‌کلید برای نام؛ [onAdd] «مشتریِ تازه» (`TillNewCustomer`) */
+  touch: Boolean = false, onAdd: ((name: String) -> String?)? = null,
 ) {
   var search by remember { mutableStateOf("") }
   val kb = ir.vil3ntec.tohid.ui.components.pos.rememberTouchKeyboard()
@@ -882,6 +883,7 @@ fun DebtorPicker(
           ir.vil3ntec.tohid.ui.components.pos.TouchKeysToggle(kb, touch, 48.dp) {}
         }
         ir.vil3ntec.tohid.ui.components.pos.TouchKeysPanel(kb, touch, 48.dp) { search = ir.vil3ntec.tohid.core.pos.TouchKeyboard.apply(search, it) }
+        TillNewCustomerButton(search, shown, onAdd)
         Spacer(Modifier.height(10.dp))
         if (shown.isEmpty()) {
           EmptyNote(if (d.debtors.isEmpty()) ir.vil3ntec.tohid.core.i18n.StrSale.noDebtorsYet else ir.vil3ntec.tohid.core.i18n.StrSale.debtorNotFound)
@@ -1176,15 +1178,15 @@ fun FreeLineDialog(
         )
         Spacer(Modifier.height(14.dp))
 
-        OutlinedTextField(
+        val keys = ir.vil3ntec.tohid.ui.components.pos.rememberTouchTextKeys(); OutlinedTextField( // POS-31: لمسی ⇒ حروف با فوکوس
           value = label,
           onValueChange = { label = it },
           label = { Text(ir.vil3ntec.tohid.core.i18n.StrGrid.name) },
           placeholder = { Text(ir.vil3ntec.tohid.core.i18n.StrSale.freeNameHint) },
           singleLine = true,
-          modifier = Modifier.fillMaxWidth(),
+          modifier = Modifier.fillMaxWidth().touchKeysOnFocus(keys),
         )
-        Spacer(Modifier.height(12.dp))
+        ir.vil3ntec.tohid.ui.components.pos.TouchTextKeysPanel(keys, label, { label = it }); Spacer(Modifier.height(12.dp))
         AmountField(value = priceText, onValueChange = { priceText = it }, label = ir.vil3ntec.tohid.core.i18n.StrSale.unitPrice)
         Spacer(Modifier.height(12.dp))
         NumberField(

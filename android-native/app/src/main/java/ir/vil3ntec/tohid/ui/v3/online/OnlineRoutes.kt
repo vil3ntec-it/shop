@@ -14,6 +14,7 @@ import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.i18n.StrRisk
+import ir.vil3ntec.tohid.core.i18n.StrTrust
 import ir.vil3ntec.tohid.core.nav.AppMode
 import ir.vil3ntec.tohid.core.nav.MoreGroup
 import ir.vil3ntec.tohid.core.nav.Need
@@ -47,6 +48,7 @@ import ir.vil3ntec.tohid.ui.v3.online.orders.RiskListsRoute
 import ir.vil3ntec.tohid.ui.v3.online.storefront.StorefrontModel
 import ir.vil3ntec.tohid.ui.v3.online.storefront.StorefrontProductRoute
 import ir.vil3ntec.tohid.ui.v3.online.storefront.StorefrontRoute
+import ir.vil3ntec.tohid.ui.v3.online.storefront.TrustCasesRoute
 
 /** مسیرهای گروهِ فروشِ آنلاین (G8) */
 object OnlinePaths {
@@ -64,6 +66,8 @@ object OnlinePaths {
   fun storefrontProduct(id: String) = "storefront/products/" + RoutePaths.encode(id)
   const val STOREFRONT_CAMPAIGNS = "storefront/campaigns"
   const val STOREFRONT_MEDIA = "storefront/media"
+  /** ABUSE-01: شکایت و گزارشِ خریداران دربارهٔ همین دکان */
+  const val STOREFRONT_TRUST = "storefront/trust"
   const val CHAT = "chat"
   fun conversation(id: String) = "chat/" + RoutePaths.encode(id)
   /** گفت‌وگو با گزینشگرِ عکس همان دم باز (`?photo=1`) — «عکس برای مشتری» ِ سفارش */
@@ -113,6 +117,7 @@ val OnlineModule = AppModule(
     },
     V3Route(OnlinePaths.STOREFRONT_CAMPAIGNS, RouteKind.PAGE, { StrReach.campaigns }, parent = OnlinePaths.STOREFRONT, needs = setOf(Need.STOREFRONT)) { StorefrontCampaignsRoute() },
     V3Route(OnlinePaths.STOREFRONT_MEDIA, RouteKind.PAGE, { StrReach.media }, parent = OnlinePaths.STOREFRONT, needs = setOf(Need.STOREFRONT)) { StorefrontMediaRoute() },
+    V3Route(OnlinePaths.STOREFRONT_TRUST, RouteKind.PAGE, { StrTrust.title }, parent = OnlinePaths.STOREFRONT, needs = setOf(Need.STOREFRONT)) { TrustCasesRoute() },
     V3Route(OnlinePaths.CHAT, RouteKind.PAGE, { StrOnline.ctTitle }, needs = setOf(Need.CHAT), chrome = Chrome.OWN) { ChatRoute() },
     V3Route("chat/{conversationId}", RouteKind.PAGE, { StrOnline.ctTitle }, parent = OnlinePaths.CHAT, needs = setOf(Need.CHAT), chrome = Chrome.OWN) {
       ChatThreadRoute(args["conversationId"].orEmpty())

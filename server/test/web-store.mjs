@@ -141,6 +141,35 @@ ok(await page.isVisible('#stock-note') && (await page.textContent('#stock-note')
   await page.waitForFunction(() => !document.querySelector('#product-sheet.open, #product-sheet[open]'), null, { timeout: 5000 }).catch(() => {});
 }
 
+//  WEB-16 srcset: خاموش ⇒ کارت بی srcset؛ `STORE_SIZES` + sharp ⇒ سر `imageWidths` و کارت/برگهٔ کالا srcset ِ همان پهناهای `?w=`
+{
+  const sel = '#products li[data-id="rice"] img';
+  ok(await page.getAttribute(sel, 'srcset') === null, 'srcset: خاموش ⇒ کارت همان یک عکس (WEB-16)');
+  let sharpOk = false; try { require('sharp'); sharpOk = true; } catch { /* اختیاری */ }
+  if (sharpOk) {
+    const cfg = require('../src/config');
+    cfg.storefront.sizes = true;
+    try {
+      await page.reload();
+      await page.waitForSelector(sel, { timeout: 5000 });
+      const riceV = (await call('GET', `/api/store/${slug}/products?ids=rice`)).body.items[0].photoVersion;
+      const want = [160, 320, 480, 640, 960].map((w) => `/api/store/${slug}/products/rice/photo?v=${riceV}&w=${w} ${w}w`).join(',');
+      await page.waitForFunction((q) => { const i = document.querySelector(q); return Boolean(i && i.complete && i.naturalWidth > 0); }, sel, { timeout: 8000 }).catch(() => {});
+      const card = await page.$eval(sel, (i) => ({ set: i.getAttribute('srcset'), sizes: i.getAttribute('sizes'), cur: i.currentSrc, w: i.naturalWidth }));
+      ok(card.set === want && Boolean(card.sizes) && card.w > 0 && /[?&]w=\d+/.test(card.cur), 'srcset: کارت پهناهای سرور را می‌گیرد و مرورگر یکی را بار می‌کند (WEB-16)', JSON.stringify(card));
+      await page.evaluate(() => { location.hash = '#/p/rice'; });
+      await page.waitForSelector('#ps-img img', { timeout: 5000 });
+      const big = await page.$eval('#ps-img img', (i) => ({ set: i.getAttribute('srcset'), sizes: i.getAttribute('sizes') }));
+      ok(big.set === want && big.sizes === '300px', 'srcset: برگهٔ کالا همان پهناها با sizes ِ ۳۰۰px (WEB-16)', JSON.stringify(big));
+      await page.evaluate(() => { location.hash = '#/'; });
+    } finally {
+      cfg.storefront.sizes = false;
+      await page.reload();
+      await page.waitForSelector(sel, { timeout: 5000 }).catch(() => {});
+    }
+  }
+}
+
 for (const w of [320, 360, 768, 1280]) {
   await page.setViewportSize({ width: w, height: 760 });
   const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
