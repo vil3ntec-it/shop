@@ -221,6 +221,8 @@ object StrSettings {
   val wipeNameLabel: String get() = t("نامِ دکان", "Shop name", "د دوکان نوم")
   fun wipeNameHint(name: Any): String = t("برای پاک کردنِ همهٔ اطلاعات از همهٔ دستگاه‌ها و سرور، بنویسید: «${asIs(name)}»", "To erase all data from every device and the server, type: “$name”", "له ټولو وسیلو او سرور څخه د ټولو معلوماتو د پاکولو لپاره ولیکئ: «$name»")
   val wipeOwnerOnly: String get() = t("فقط صاحبِ دکان می‌تواند همهٔ اطلاعات را پاک کند", "Only the shop owner can erase all data", "یوازې د دوکان خاوند کولای شي ټول معلومات پاک کړي")
+  //  OPS-02: `replaceAll` ننوشت (قفلِ نرمِ پایانِ اشتراک، سدِ نقش، خطای دیسک) ⇒ راستش، نه «پاک شد»؛ دلیل را پوسته جدا می‌گوید
+  val wipeFailed: String get() = t("اطلاعات پاک نشد؛ هیچ چیزی تغییر نکرد", "Data was not erased; nothing changed", "معلومات پاک نه شول؛ هېڅ شی بدل نه شو")
 
   // اشتراک (برچسبِ وضعیت)
   val active: String get() = t("فعال", "Active", "فعال")

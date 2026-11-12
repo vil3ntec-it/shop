@@ -977,17 +977,13 @@ fun CartLineDialog(
   val partBad = unitNow != null && typedQty != null && ir.vil3ntec.tohid.core.product.UnitSale.partRejected(typedQty, unitNow, units?.wholeOnly == true)
   val listPrice = unitNow?.let(ir.vil3ntec.tohid.core.product.UnitSale::lineUnitPrice) // قیمتِ هر واحدِ پایه از قیمتِ بسته
   val parsedPrice = priceText.toDoubleOrNull()
-  //  POS-08/10/20: قاعدهٔ جهت، سقفِ قلمِ آزاد و تخفیفِ ردیف (`LinePolicy.edit`)؛ خاموش ⇒ بی رد و بی تخفیف
-  val firstEdit = ir.vil3ntec.tohid.data.LinePolicy.edit(
-    policy, free, basePrice, unitPrice, if (manual) parsedPrice else null, parsedQty, discountPercent, discountText,
+  //  POS-08/10/20: قاعدهٔ جهت، سقفِ قلمِ آزاد و تخفیفِ ردیف؛ خاموش ⇒ بی رد و بی تخفیف. S45: تأییدِ گرفته‌شده فقط همان قاعده را
+  //  برای همان قیمت برمی‌دارد — `LinePolicy.checked`، همان برگهٔ ردیفِ گوشیِ نسخهٔ ۳ (⛔ پیش‌تر کدِ رد جای متنِ رد بود ⇒ دکمه هرگز)
+  val gate = ir.vil3ntec.tohid.data.LinePolicy.checked(
+    policy, free, basePrice, unitPrice, if (manual) parsedPrice else null, parsedQty, discountPercent, discountText, grant, canAsk = priceAsk != null,
   )
-  //  S45: تأییدِ گرفته‌شده فقط همان قاعده را برای همان قیمت برمی‌دارد (`PriceApproval.lifted`/`covers`)
+  val firstEdit = gate.first; val edit = gate.edit; val granted = gate.granted; val askCode = gate.askCode
   val typedMinor = if (manual) parsedPrice?.let(DiscountGate::minor) else null
-  val granted = grant?.takeIf { ir.vil3ntec.tohid.core.pos.PriceApproval.covers(it, typedMinor) }
-  val edit = if (granted == null) firstEdit else ir.vil3ntec.tohid.data.LinePolicy.edit(
-    ir.vil3ntec.tohid.core.pos.PriceApproval.lifted(policy, granted.code), free, basePrice, unitPrice, parsedPrice, parsedQty, discountPercent, discountText,
-  )
-  val askCode = firstEdit.problem?.takeIf { priceAsk != null && granted == null && typedMinor != null && ir.vil3ntec.tohid.core.pos.PriceApproval.askable(policy, it) }
   val ok = parsedQty != null && parsedQty > 0 && (!manual || (parsedPrice != null && parsedPrice >= 0)) && edit.ok
 
   Dialog(onDismissRequest = onDismiss) {

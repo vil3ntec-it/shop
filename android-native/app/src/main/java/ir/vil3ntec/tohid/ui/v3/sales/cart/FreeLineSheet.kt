@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.sales.cart
 
+import ir.vil3ntec.tohid.core.pos.LinePricing
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -40,12 +41,14 @@ fun FreeLineSheet(
   /** نوشته‌های آغازِ دلخواه (عکس‌های پیش‌نمایش) */
   initial: FreeLineForm = FreeLineForm(),
   showErrors: Boolean = false,
+  /** POS-10 — سقفِ قیمتِ قلمِ آزاد (`LinePolicyPrefs.of`)؛ پیش‌فرض خاموش ⇒ بی سقف */
+  policy: LinePricing.Policy = LinePricing.Policy(),
 ) {
   val c = PhoneV3.colors
   var form by remember { mutableStateOf(initial) }
   var tried by remember { mutableStateOf(showErrors) }
   var shake by remember { mutableIntStateOf(0) }
-  val errors = if (tried) FreeLineModel.errors(form) else emptyMap()
+  val errors = if (tried) FreeLineModel.errors(form, policy) else emptyMap()
   val total = rememberCountUp(FreeLineModel.total(form))
 
   V3Sheet(onDismiss = onClose, title = StrSale.freeItem, detents = false) { closer ->
@@ -79,7 +82,7 @@ fun FreeLineSheet(
       StrKit.add,
       {
         tried = true
-        if (FreeLineModel.errors(form).isEmpty()) closer.close { onAdd(form) } else shake++
+        if (FreeLineModel.errors(form, policy).isEmpty()) closer.close { onAdd(form) } else shake++
       },
       Modifier.fillMaxWidth(),
       haptic = true,

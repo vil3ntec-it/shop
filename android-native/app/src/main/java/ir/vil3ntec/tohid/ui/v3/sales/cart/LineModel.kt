@@ -1,7 +1,11 @@
 package ir.vil3ntec.tohid.ui.v3.sales.cart
 
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.pos.LinePricing
+import ir.vil3ntec.tohid.core.pos.PriceApproval
 import ir.vil3ntec.tohid.core.product.UnitSale
+import ir.vil3ntec.tohid.data.DiscountGate
+import ir.vil3ntec.tohid.data.LinePolicy
 import ir.vil3ntec.tohid.data.PlaceQty
 import ir.vil3ntec.tohid.data.PlaceStock
 import ir.vil3ntec.tohid.data.Product
@@ -216,9 +220,36 @@ object LineModel {
 
   fun valid(form: LineForm, info: LineInfo): Boolean = qtyError(form, info) == null && priceError(form) == null
 
-  /** سبدِ تازه پس از «ثبت» */
-  fun apply(lines: List<SalesEngine.CartLine>, info: LineInfo, form: LineForm, start: LineForm): List<SalesEngine.CartLine> {
+  /**
+   *  S45 — قیمتِ **دستی**ای که قاعدهٔ «قیمت و تخفیفِ ردیف» می‌سنجد؛ `null` ⇒ قیمتِ کالا یا قیمتِ لیستِ بسته (تغییرِ دستی نیست،
+   *  همان `if (manual) parsedPrice else null` ِ `CartLineDialog`). قیمتِ دستیِ دست‌نخوردهٔ ردیف «تغییر» نیست (`LinePricing.edit`).
+   */
+  fun typedPrice(form: LineForm, info: LineInfo, start: LineForm): Double? =
+    if (info.units != null && !info.free) parseNumber(form.priceText)?.takeIf { form.priceTouched && !form.resetPrice }
+    else wantedPrice(form, info, start)
+
+  /**
+   *  S45 (POS-08/10/21) — همان قاعدهٔ کادرِ ردیفِ کامپیوتر (`LinePolicy.checked`): قاعدهٔ جهت، سقفِ قلمِ آزاد و «کاهش برای کسی که
+   *  تخفیف برایش ممنوع است»، با همان پیام‌ها؛ ردِ برداشتنی ⇒ «درخواستِ تأیید» ([canAsk])، و تأییدِ [grant] فقط همان قاعده را برای
+   *  همان قیمت برمی‌دارد. سیاستِ خاموش (پیش‌فرض) ⇒ بی رد، همان برگهٔ پیشین. تخفیفِ ردیف در برگهٔ گوشی نیست.
+   */
+  fun check(policy: LinePricing.Policy, form: LineForm, info: LineInfo, start: LineForm, grant: PriceApproval.Grant? = null, canAsk: Boolean = false): LinePolicy.Checked =
+    LinePolicy.checked(policy, info.free, info.basePrice, info.unitPrice ?: info.basePrice, typedPrice(form, info, start), quantity(form, info), true, "", grant, canAsk)
+
+  /** S45 — تأییدِ مدیر برای قیمتِ نوشته‌شده (همان `Grant` ِ `CartLineDialog`) */
+  fun grantOf(code: String, by: String, role: String, reason: String, requester: String, info: LineInfo, price: Double): PriceApproval.Grant =
+    PriceApproval.Grant(code, by, role, reason, requester, DiscountGate.minor(info.basePrice), DiscountGate.minor(price))
+
+  /**
+   *  سبدِ تازه پس از «ثبت». S45: ردِ قاعدهٔ «قیمت و تخفیفِ ردیف» ([policy]) بی تأییدِ همان قیمت ([grant]) ⇒ سبد دست نمی‌خورد —
+   *  سدِ دوم پشتِ دکمهٔ برگه؛ [policy] ِ پیش‌فرض خاموش است.
+   */
+  fun apply(
+    lines: List<SalesEngine.CartLine>, info: LineInfo, form: LineForm, start: LineForm,
+    policy: LinePricing.Policy = LinePricing.Policy(), grant: PriceApproval.Grant? = null,
+  ): List<SalesEngine.CartLine> {
     val q = quantity(form, info) ?: return lines
+    if (!check(policy, form, info, start, grant).edit.ok) return lines
     val next = SalesEngine.setCartQty(lines, info.id, q)
     return SalesEngine.setLinePrice(next, info.id, wantedPrice(form, info, start))
   }

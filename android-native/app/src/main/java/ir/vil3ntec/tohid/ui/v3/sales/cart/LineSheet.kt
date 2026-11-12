@@ -19,6 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrPlaces
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrTill
+import ir.vil3ntec.tohid.core.pos.LinePricing
+import ir.vil3ntec.tohid.core.pos.PriceApproval
+import ir.vil3ntec.tohid.data.PriceAsk
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.v3.V3Button
@@ -30,6 +34,7 @@ import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.rememberCountUp
 import ir.vil3ntec.tohid.ui.v3.v3Shake
+import ir.vil3ntec.tohid.ui.v3.sales.approval.PinApprovalSheet
 
 /**
  *  برگهٔ «تعداد و قیمتِ این ردیف» (`sale/line/{i}`، نگه داشتنِ ردیفِ سبد): واحد (اگر کالا
@@ -37,26 +42,51 @@ import ir.vil3ntec.tohid.ui.v3.v3Shake
  *  محل‌ها» (POS-16، فقط با «محل‌های نگه‌داری» ِ روشن و محلی جز محلِ اصلی)، جمعِ
  *  شمارندهٔ همین ردیف، «ثبت» و «برداشتن از سبد». خطا زیرِ همان کادر و لرزشِ کوتاه.
  *
- *  @param onSave نوشته‌های فرم و حالتِ آغاز — صدازننده `LineModel.apply` را روی سبدِ همان لحظه می‌زند
+ *  S45: با «قیمت و تخفیفِ ردیف» ِ روشن ([policy]) همان قاعده و پیام‌های کادرِ ردیفِ کامپیوتر زیرِ «قیمت هر واحد» (`LineModel.check`)؛
+ *  ردِ قاعدهٔ جهت یا سقفِ قلمِ آزاد ⇒ «درخواستِ تأیید» ([priceAsk]) با همان برگهٔ تأییدِ مدیر (`PinApprovalSheet`)، و پس از تأیید
+ *  «تأیید شد: …» و «ثبت» باز؛ رد بی تأیید ⇒ «ثبت» نمی‌نشیند (لرزش).
+ *
+ *  @param onSave نوشته‌های فرم، حالتِ آغاز و تأییدِ همان قیمت — صدازننده `LineModel.apply` را روی سبدِ همان لحظه می‌زند
  */
 @Composable
 fun LineSheet(
   info: LineInfo,
-  onSave: (form: LineForm, start: LineForm) -> Unit,
+  onSave: (form: LineForm, start: LineForm, grant: PriceApproval.Grant?) -> Unit,
   onRemove: () -> Unit,
   onClose: () -> Unit,
   /** نوشته‌های آغازِ دلخواه (عکس‌های پیش‌نمایش) */
   initial: LineForm? = null,
+  /** S45 — سیاستِ قیمتِ ردیف (`LinePolicyPrefs.of`)؛ پیش‌فرض خاموش ⇒ همان برگهٔ پیشین */
+  policy: LinePricing.Policy = LinePricing.Policy(),
+  /** S45 — «درخواستِ تأیید» (`LinePolicyPrefs.ask`)؛ `null` ⇒ فقط پیامِ رد */
+  priceAsk: PriceAsk? = null,
 ) {
   val c = PhoneV3.colors
   val start = remember(info.id) { LineModel.start(info) }
   var form by remember(info.id) { mutableStateOf(initial ?: start) }
   var tried by remember { mutableStateOf(false) }
   var shake by remember { mutableIntStateOf(0) }
+  var grant by remember(info.id) { mutableStateOf<PriceApproval.Grant?>(null) }
+  var asking by remember { mutableStateOf(false) }
+  val gate = LineModel.check(policy, form, info, start, grant, canAsk = priceAsk != null)
   val unit = LineModel.shownUnit(form, info)
   val qtyError = LineModel.qtyError(form, info).takeIf { tried || form.qtyText != start.qtyText }
-  val priceError = LineModel.priceError(form)
+  val priceError = LineModel.priceError(form) ?: gate.edit.problem
   val total = rememberCountUp(LineModel.total(form, info, start))
+
+  val ask = priceAsk
+  val askCode = gate.askCode
+  val typed = LineModel.typedPrice(form, info, start)
+  if (asking && ask != null && askCode != null && typed != null) {
+    //  برگهٔ تأیید جای همین برگه (نوشته‌ها در همین‌جا می‌مانند)؛ بستن ⇒ برگشت به ردیف
+    PinApprovalSheet(
+      StrTill.priceTitle, StrTill.priceSummary(info.name, PhoneSaleText.amount(info.basePrice), PhoneSaleText.amount(typed)),
+      ask.selfRole, ask.selfName, ask.requesterUserId,
+      onApproved = { by, role, reason -> grant = LineModel.grantOf(askCode, by, role, reason, ask.selfName, info, typed); asking = false },
+      onClose = { asking = false },
+    )
+    return
+  }
 
   V3Sheet(onDismiss = onClose, title = info.name, detents = false) { closer ->
     if (info.units != null) {
@@ -94,6 +124,8 @@ fun LineSheet(
       if (!info.free && info.unitPrice != null && !form.resetPrice) {
         V3TextButton(StrSale.backToItemPrice, { form = LineModel.resetPrice(form, info) }, Modifier.padding(top = 4.dp))
       }
+      if (askCode != null && ask != null) V3TextButton(StrTill.askApproval, { asking = true }, Modifier.padding(top = 4.dp))
+      gate.granted?.let { Text(StrTill.approvedBy(it.by), style = V3Type.footnote, color = c.positive, modifier = Modifier.padding(top = 4.dp)) }
     }
     if (info.places.isNotEmpty()) {
       //  POS-16 — موجودیِ همین کالا در هر محل (فقط خواندنی؛ جمعِ محل‌ها همان موجودیِ کالا)
@@ -116,7 +148,7 @@ fun LineSheet(
       StrSale.submit,
       {
         tried = true
-        if (LineModel.valid(form, info)) closer.close { onSave(form, start) } else shake++
+        if (LineModel.valid(form, info) && gate.edit.ok) closer.close { onSave(form, start, gate.granted) } else shake++
       },
       Modifier.fillMaxWidth(),
       haptic = true,

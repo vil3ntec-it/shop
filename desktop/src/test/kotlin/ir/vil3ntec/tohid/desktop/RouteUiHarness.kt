@@ -39,10 +39,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 internal class RouteUiHarness(private val rule: ComposeContentTestRule) : AutoCloseable {
   val backend = TestBackend()
   val server: TestHttpServer get() = backend.server
+  /** دفترِ حافظه‌ایِ آخرین [show] — برای سنجیدنِ آنچه صفحه نوشت */
+  var store: ShopStore? = null
+    private set
 
   fun show(path: String, data: ShopData) {
     I18n.source = { Lang.FA }
-    val store = memoryStore(data)
+    val store = memoryStore(data).also { this.store = it }
     rule.setContent {
       CompositionLocalProvider(
         LocalContext provides DesktopContext,
