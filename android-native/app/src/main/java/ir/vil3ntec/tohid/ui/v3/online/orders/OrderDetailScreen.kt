@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material.icons.outlined.StickyNote2
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,8 +29,10 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.i18n.StrRefundSlip
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.model.OrderPermsDto
+import ir.vil3ntec.tohid.core.model.OrderRefundReceiptDto
 import ir.vil3ntec.tohid.core.orders.OrderText
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
@@ -76,6 +79,8 @@ class DetailActions(
   val onCopy: (String) -> Unit,
   val onMap: (String) -> Unit,
   val onNote: (OrderFulfillNotes.Note) -> Unit = {},
+  /** E2E-RET-11: چاپِ یک رسیدِ اصلاحیِ بازپرداخت روی چاپگرِ همین دستگاه */
+  val onPrintRefund: (OrderRefundReceiptDto) -> Unit = {},
 )
 
 /**
@@ -140,6 +145,7 @@ fun OrderDetailScreen(
           title = StrOnline.itemsTitle,
         )
         TotalsSection(o)
+        RefundReceiptsSection(o, actions)
         if (o.note.isNotEmpty()) {
           V3Section(StrOnline.note) { V3ListRow(o.note, icon = Icons.Outlined.StickyNote2, subtitleLines = 6, chevron = false) }
         }
@@ -216,6 +222,30 @@ private fun TotalsSection(o: OrderDto) {
     if (o.deliveryFeeMinor > 0) { V3Divider(start = 22.dp); V3ListRow(StrOnline.deliveryFee, value = OnlineFmt.afn(o.deliveryFeeMinor), chevron = false, tile = false) }
     V3Divider(start = 22.dp)
     V3ListRow(StrOnline.total, chevron = false, tile = false, trailing = { Text(OnlineFmt.afn(o.totalMinor), style = V3Type.headline, color = PhoneV3.colors.ink) })
+  }
+}
+
+/**
+ *  E2E-RET-11: رسیدهای اصلاحیِ بازپرداخت — فقط وقتی سرور داد (پرچمِ `shop.orders.refund_receipt`)؛ هر ردیف شماره، همین
+ *  بازپرداخت و مبلغِ درستِ سفارش (همه از سرور) و لمس ⇒ چاپ. نبودنش ⇒ هیچ بخشی، همان صفحهٔ پیشین.
+ */
+@Composable
+private fun RefundReceiptsSection(o: OrderDto, actions: DetailActions) {
+  val receipts = o.refund?.receipts.orEmpty()
+  if (receipts.isEmpty()) return
+  V3Section(StrRefundSlip.section) {
+    receipts.forEachIndexed { i, r ->
+      if (i > 0) V3Divider(start = 64.dp)
+      V3ListRow(
+        StrRefundSlip.title(r.no),
+        subtitle = StrRefundSlip.row(OrderText.money(r.amountMinor), OrderText.money(r.netMinor)),
+        icon = Icons.Outlined.Print,
+        hue = V3Hue.SKY,
+        chevron = false,
+        trailing = { Text(StrRefundSlip.print, style = V3Type.body, color = PhoneV3.colors.accent) },
+        onClick = { actions.onPrintRefund(r) },
+      )
+    }
   }
 }
 

@@ -11,12 +11,14 @@ import ir.vil3ntec.tohid.core.purchase.PurchaseOrderCore.Status
 import ir.vil3ntec.tohid.data.PoLineDto
 import ir.vil3ntec.tohid.data.PoPostedDto
 import ir.vil3ntec.tohid.data.PoReceiptDto
+import ir.vil3ntec.tohid.data.PoForms
 import ir.vil3ntec.tohid.data.PoReceiptLineDto
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.PurchaseOrderBook
 import ir.vil3ntec.tohid.data.PurchaseOrderDto
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.data.StockLedger
 import ir.vil3ntec.tohid.data.Supplier
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -26,11 +28,10 @@ import org.junit.Test
  *  (`PurchaseOrderCore`: پیش‌نویس ⇐ فرستاده ⇐ رسیدِ اسکن با خراب) ⇐ همان رسید به شکلِ پاسخِ سرور ⇐ فاکتورِ خریدِ دفتر
  *  (`PurchaseOrderBook.post`) ⇐ برچسب‌های پذیرفته (`LabelPlan`). در برنامه پشتِ پرچمِ خاموشِ `shop.purchase_orders`.
  *
- *  ماندهٔ سناریو (pending، نه سرخ):
- *   • کرایهٔ ۲۸۰ افغانی (پرداخت به حمل‌کننده) ثبت و به نسبتِ ارزشِ پذیرفته سرشکن نمی‌شود: نه کادرِ کرایه در رسید هست و نه
- *     بهای تمام‌شدهٔ سربار؛ بهای واحد همان ۱۰۰ / ۲۰۰ / ۵۰ می‌ماند، نه ۱۱۰ / ۲۲۰ / ۵۵ (PRD-15 فقط میانگینِ موزون است).
- *   • دکمهٔ «چاپِ برچسب» ِ رسید (`PurchaseOrders.printLabels`) صفحه است و فقط در CI کامپایل می‌شود؛ این‌جا شمارِ برچسب‌ها
- *     از همان واحدهای پذیرفته با `LabelPlan` سنجیده می‌شود.
+ *  گامِ ۳ (کرایهٔ ۲۸۰ به حمل‌کننده، PUR-06): همان `freightMinorOf` ِ کادرِ «کرایه» ⇐ `freightMinor` ِ رسید ⇐ سهمِ هر ردیف
+ *  به نسبتِ ارزشِ پذیرفته (`StockLedger.spreadLanded`) ⇒ بهای واحدِ A ۱۱۰، B ۲۲۰، C ۵۵ هم در ردیفِ خرید و هم در
+ *  میانگینِ دفترِ موجودی (`StockLedger.productView`)؛ بدهیِ تأمین‌کننده همان ۲٬۸۰۰.
+ *  «چاپِ برچسب» ِ رسید (`PurchaseOrders.printLabels` ⇐ `printReceiptLabels`) شمارش را از `PoForms.labels` می‌گیرد ⇒ ۲۵.
  */
 class ScenarioS19Test {
 
@@ -48,7 +49,7 @@ class ScenarioS19Test {
   )
 
   @Test
-  fun `S19 — رسیدِ ناقص با ۲ خراب ⇒ موجودی +۱۰ +۷ +۸، B باز، بدهیِ ۲٬۸۰۰ و ۲۵ برچسب`() {
+  fun `S19 — رسیدِ ناقص با ۲ خراب ⇒ موجودی +۱۰ +۷ +۸، B باز، کرایهٔ ۲۸۰ ⇒ بهای ۱۱۰ ۲۲۰ ۵۵، بدهیِ ۲٬۸۰۰ و ۲۵ برچسب`() {
     val sent = order.copy(state = (PurchaseOrderCore.send(order, emptyList()) as PurchaseOrderCore.Outcome.Changed).state)
     //  دریافت با اسکن: A ۱۰، B ۷، C ۱۰ که ۲ تای آن خراب و در همان رسید برگشت
     val receipt = Receipt("01JS1900000000000000000R01", listOf(
@@ -73,12 +74,24 @@ class ScenarioS19Test {
         PoPostedDto(it.lineId, it.expectedMilli, it.receivedMilli, it.damagedMilli, it.acceptedMilli, it.shortMilli, it.overMilli, it.priceMinor, it.totalMinor)
       },
       totalMinor = got.totalMinor,
+      //  گامِ ۳: کرایهٔ ۲۸۰ از کادرِ «کرایه» ِ همان رسید (رقمِ فارسی)
+      freightMinor = PurchaseOrderBook.freightMinorOf("۲۸۰")!!,
     )
     val d = (PurchaseOrderBook.post(d0, dto, rdto, "2026-11-02", 1_000) as PurchaseOrderBook.Posting.Ok).data
     assertEquals(10.0, ShopStore.stock(d, "pA"), 0.0)
     assertEquals(7.0, ShopStore.stock(d, "pB"), 0.0)
     assertEquals(8.0, ShopStore.stock(d, "pC"), 0.0)
+    //  کرایه به حمل‌کننده است، نه تأمین‌کننده
     assertEquals(2800.0, ShopStore.supplierDebt(d, "s1"), 0.0)
+
+    //  کرایه به نسبتِ ارزشِ پذیرفته (۱٬۰۰۰ / ۱٬۴۰۰ / ۴۰۰ از ۲٬۸۰۰) ⇒ بهای واحد
+    val unitCost = listOf("l1", "l2", "l3").map { l ->
+      val p = d.purchases.single { it.id == PurchaseOrderBook.purchaseIdOf(receipt.id, l) }
+      (p.totalAmount + (p.landedCost ?: 0.0)) / p.quantity
+    }
+    assertEquals(listOf(110.0, 220.0, 55.0), unitCost)
+    val view = StockLedger.replay(d)
+    assertEquals(listOf(11_000L, 22_000L, 5_500L), listOf("pA", "pB", "pC").map { StockLedger.productView(view, it).unitCostMinor })
 
     //  «چاپِ برچسب»: یک برچسب برای هر واحدِ پذیرفته ⇒ ۲۵
     val plan = LabelPlan.plan(
@@ -90,5 +103,7 @@ class ScenarioS19Test {
     )
     assertEquals(25, plan.labels.size)
     assertEquals(listOf("pA" to 10, "pB" to 7, "pC" to 8), LabelPlan.runs(plan.labels))
+    //  همان شمارشِ دکمهٔ «چاپِ برچسب» ِ رسید
+    assertEquals(listOf("pA" to 10, "pB" to 7, "pC" to 8), PoForms.labels(d, dto, rdto, a4 = false).map { it.product.id to it.copies })
   }
 }

@@ -73,6 +73,10 @@ object OnlineFmt {
     else StrOnline.locAbout("%.2f".format(java.util.Locale.ROOT, lat) + "، " + "%.2f".format(java.util.Locale.ROOT, lng))
 
   /** پذیرشِ سفارشِ ویترین؛ کدِ ناشناخته ⇐ "" (صفحه آن ردیف را نشان نمی‌دهد) */
+  /** GATE-NEW-01/PRES-03: تپشِ کهنه (`connection: unconfirmed`) یا رفته (`lost`) ِ سرور — جدا از «آخرین تأیید» ِ تازه */
+  fun connectionStale(at: String): String = t("اتصالِ دستگاه‌های دکان تأیید نشده — آخرین تأیید: ${asIs(at)}", "Shop devices' connection isn't confirmed — last check: $at", "د دوکان د وسایلو اړیکه نه ده تایید شوې — وروستۍ تایید: $at")
+  fun connectionLost(at: String): String = t("دستگاه‌های دکان به سرور وصل نیستند — آخرین تأیید: ${asIs(at)}", "Shop devices aren't connected to the server — last check: $at", "د دوکان وسایل له سرور سره نه دي وصل — وروستۍ تایید: $at")
+
   fun acceptance(a: String): String = when (a) {
     "accepting" -> StrOnline.acceptAccepting
     "delayed" -> StrOnline.acceptDelayed

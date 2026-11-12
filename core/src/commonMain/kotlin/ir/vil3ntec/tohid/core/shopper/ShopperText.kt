@@ -536,6 +536,13 @@ object ShopperText {
   val promoCode get() = t("کدِ تخفیف", "Discount code", "د تخفیف کوډ")
   val promoApply get() = t("اعمال", "Apply", "پلي کول")
   val promoClear get() = t("برداشتنِ کد", "Remove code", "کوډ لرې کړئ")
+  fun dupAsk(no: Long) = t(   //  S41 — همان `ck.dup.*` ِ ویترین (`kit/i18n/checkout.*.json`)
+    "این سفارش (همان اقلام و همان نشانی) چند دقیقه پیش با شمارهٔ ${asIs(num(no))} ثبت شده است. همان را دنبال می‌کنید یا سفارشِ دومِ جدا می‌خواهید؟",
+    "This order (same items, same address) was placed a few minutes ago as number $no. Follow that one, or place a separate second order?",
+    "دا سفارش (هماغه توکي او هماغه پته) څو دقیقې مخکې د ${num(no)} شمېرې سره ثبت شوی. هماغه تعقیبوئ که دوهم جلا سفارش غواړئ؟",
+  )
+  val dupTrack get() = t("همان را دنبال کن", "Follow that order", "هماغه تعقیب کړه")
+  val dupSecond get() = t("سفارشِ دوم ثبت شود", "Place a second order", "دوهم سفارش ثبت شي")
   val promoChecking get() = t("تخفیف از دکان پرسیده می‌شود…", "Checking discounts with the shop…", "له دوکانه تخفیف پوښتل کېږي…")
   fun promoOk(code: String, d: Long) = t("کدِ ${asIs(code)} اعمال شد: ${asIs(money(d))} کمتر", "Code $code applied: ${money(d)} off", "د $code کوډ پلي شو: ${money(d)} کم")
   fun promoEnds(name: String, days: Long) = t("${asIs(name)} — تا ${asIs(num(days))} روزِ دیگر", "$name — ${days} more days", "$name — نورې ${num(days)} ورځې")
@@ -754,6 +761,7 @@ object ShopperText {
     "slot_unavailable", "slot_full" -> t("این بازه دیگر در دسترس نیست؛ بازهٔ دیگری برگزینید.", "That time slot isn't available any more — choose another.", "دا وخت نور نشته؛ بل وخت وټاکئ.")
     "store_not_accepting_orders" -> notAccepting
     "store_paused" -> t("سفارش‌گیریِ این دکان موقتاً متوقف است؛ کمی بعد دوباره بزنید.", "This shop has paused orders for a while — try again a little later.", "دې دوکان لنډمهاله فرمایش اخیستل درولي؛ لږ وروسته بیا هڅه وکړئ.")
+    "store_offline" -> t("دکان همین حالا به اینترنت وصل نیست و سفارشِ فوری گرفته نمی‌شود؛ کمی بعد دوباره امتحان کنید یا اگر دکان زمان‌بندی دارد، ساعتِ دیگری برگزینید.", "The shop is offline right now and isn't taking instant orders — try again a little later, or pick a later time if the shop offers one.", "دوکان اوس انټرنېټ ته نښلول شوی نه دی او سمدستي فرمایش نه اخلي؛ لږ وروسته بیا هڅه وکړئ، یا که دوکان وخت ټاکل لري، بل وخت وټاکئ.")   //  S30: «توقف هنگامِ قطع» ِ میزِ سفارش (مهاجرتِ ۸۲۰)
     "out_of_stock" -> t("موجودیِ برخی کالاها کم است؛ مقدار را کم کنید.", "Not enough stock for some items — lower the quantity.", "د ځینو توکو زېرمه کمه ده؛ شمېر یې کم کړئ.")
     "idempotency_key_reused" -> t("این سفارش پیش‌تر با محتوای دیگری فرستاده شده؛ دوباره بزنید.", "This order was already sent with different contents — please try again.", "دا فرمایش مخکې له بل منځپانګې سره لېږل شوی؛ بیا هڅه وکړئ.")
     ShopperError.PRICE_CHANGED -> t("قیمت عوض شده است.", "Prices have changed.", "بیه بدله شوې ده.")

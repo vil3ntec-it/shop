@@ -158,6 +158,8 @@ private fun SettingsSheet(d: Desk, onDismiss: () -> Unit, onSave: (Desk) -> Unit
       V3ToggleRow(StrOrderSlip.deskAutoAccept, f.aaOn, { f.aaOn = it })
       V3Divider(start = 16.dp)
       V3ToggleRow(StrOrderSlip.deskAutoPause, f.apOn, { f.apOn = it })
+      V3Divider(start = 16.dp)
+      V3ToggleRow(StrOrderSlip.deskOfflinePause, f.opOn, { f.opOn = it })
     }
     Spacer(Modifier.height(14.dp))
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

@@ -116,6 +116,10 @@ private fun SettingsSheet(d: Desk, onDismiss: () -> Unit, onSave: (Desk) -> Unit
       NumberField(f.apMax, { f.apMax = it }, StrOrderSlip.deskMaxOpen)
       NumberField(f.apOld, { f.apOld = it }, StrOrderSlip.deskOldestMinutes)
       NumberField(f.apMin, { f.apMin = it }, StrOrderSlip.deskPauseMinutes)
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(StrOrderSlip.deskOfflinePause, Modifier.weight(1f), color = Shop.colors.text)
+        Switch(checked = f.opOn, onCheckedChange = { f.opOn = it })
+      }
       val next = f.result(d)
       TohidButton(StrOrderSlip.deskSave, enabled = next != null, onClick = { next?.let(onSave) })
     }

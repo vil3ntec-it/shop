@@ -411,6 +411,25 @@ data class OrderRefundSummaryDto(
   val totalMinor: Long = 0,
   val refundedMinor: Long = 0,
   val remainingMinor: Long = 0,
+  /** E2E-RET-11: رسیدهای اصلاحی (`lib/order-refund-receipt.js`) — فقط با پرچمِ `shop.orders.refund_receipt`؛ خاموش یا سرورِ پیشین ⇒ خالی */
+  val receipts: List<OrderRefundReceiptDto> = emptyList(),
+)
+
+/** یک رسیدِ اصلاحیِ بازپرداخت؛ همهٔ عددها از سرور و به واحدِ خرد (`core/orders/OrderRefundSlip`) */
+@Serializable
+data class OrderRefundReceiptDto(
+  val no: String = "",
+  val seq: Int = 0,
+  val at: Long = 0,
+  val orderNo: Long = 0,
+  val method: String = "",
+  val final: Boolean = false,
+  val totalMinor: Long = 0,
+  val refundedBeforeMinor: Long = 0,
+  val amountMinor: Long = 0,
+  val refundedAfterMinor: Long = 0,
+  val netMinor: Long = 0,
+  val reason: String = "",
 )
 
 /** یک رویدادِ بازپرداخت: `r<seq>` (ردیفِ دفتر) یا `full` (گذارِ «بازپرداختِ کامل» / پولِ برگشتهٔ درگاه) */

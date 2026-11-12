@@ -96,6 +96,7 @@ internal class DeskSettingsForm(d: Desk) {
   var apMax by mutableStateOf("${d.autoPauseMaxOpen}")
   var apOld by mutableStateOf("${d.autoPauseOldestMinutes}")
   var apMin by mutableStateOf("${d.autoPauseMinutes}")
+  var opOn by mutableStateOf(d.offlinePauseOn)
 
   /** همه در بازه ⇒ میزِ تازه برای `repo.settings`؛ وگرنه null */
   fun result(d: Desk): Desk? {
@@ -107,6 +108,7 @@ internal class DeskSettingsForm(d: Desk) {
     return d.copy(
       autoAcceptOn = aaOn, autoAcceptMaxOpen = aaMaxN, autoAcceptReadyMinutes = aaReadyN,
       autoPauseOn = apOn, autoPauseMaxOpen = apMaxN, autoPauseOldestMinutes = apOldN, autoPauseMinutes = apMinN,
+      offlinePauseOn = opOn,
     )
   }
 }

@@ -340,6 +340,12 @@ object StrAccount {
   val ends: String get() = t("پایان", "End", "پای")
   val status: String get() = t("وضعیت", "Status", "حالت")
   fun warnTitle(n: Any): String = t("${asIs(n)} روز تا پایانِ اشتراک", "$n ${pl(n, "day", "days")} until the subscription ends", "د ګډون تر پایه $n ورځې")
+  /** S47: همان هشدار با روزِ دقیقِ پایان (`day` از `AccountFormat.date`، جدا از جهتِ جمله) */
+  fun warnTitleOn(n: Any, day: String): String = t(
+    "${asIs(n)} روز تا پایانِ اشتراک — روزِ \u2066${asIs(day)}\u2069",
+    "$n ${pl(n, "day", "days")} until the subscription ends — on $day",
+    "د ګډون تر پایه $n ورځې — \u2066$day\u2069",
+  )
   val warnBody: String get() = t("پس از آن برنامه فقط‌خواندنی می‌شود — هیچ داده‌ای پاک نمی‌شود و خروجی و چاپ هم کار می‌کند.", "After that the app becomes read-only — no data is deleted and export and printing keep working.", "له هغې وروسته اپ یوازې د لوستلو کېږي — هېڅ معلومات نه ړنګېږي او صادرول او چاپ کار کوي.")
   val expiredBody: String get() = t("برنامه فقط‌خواندنی است — دفترتان دست‌نخورده سرِ جایش است و خروجی و چاپ هم کار می‌کند.", "The app is read-only — your ledger is untouched and export and printing still work.", "اپ یوازې د لوستلو دی — دفتر مو روغ پاتې دی او صادرول او چاپ کار کوي.")
   val nothingYet: String get() = t("هنوز چیزی از سرور نیامده. اینترنت که وصل شد، همین‌جا پر می‌شود.", "Nothing has come from the server yet. Once you're online it fills in here.", "لا له سرور څه نه دي راغلي. انټرنیټ چې وصل شو دلته ډکېږي.")

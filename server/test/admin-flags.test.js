@@ -107,6 +107,7 @@ const PARITY = [
   ['ops.critical_alerts.max_escalations', async () => (await L('ops-paging').settings()).maxEscalations, 4],
   ['ops.sync_lag', async () => 'lag' in (await L('system-health').snapshot()).sync],
   ['backup.require_encryption', () => L('backup').encryptionRequired()],
+  ['admin.support_grant', () => L('support-access').enforced()],
   ['auth.phone_add_code', async () => (await h.post('/api/me/phone/code', { phone: '0700123456' }, { token: userToken })).status !== 404],
 ];
 
@@ -115,7 +116,7 @@ const putFlag = (scope, key, value) => h.put('/api/admin/flags', { scope, key, v
 test('کاتالوگ: هر ردیفِ تازه همان پیش‌فرضِ کد است؛ نوشتنِ پیش‌فرض بی‌اثر، مقدارِ دیگر اثردار', async () => {
   const { KNOWN } = require('../src/routes/admin-flags');
   assert.equal(new Set(PARITY.map((p) => p[0])).size, PARITY.length, 'کلیدِ تکراری در جدول');
-  assert.equal(PARITY.length, 56);
+  assert.equal(PARITY.length, 57);
   for (const [key, read, other, needs = []] of PARITY) {
     const k = KNOWN.find((x) => x.key === key);
     assert.ok(k, `${key}: در کاتالوگ نیست`);

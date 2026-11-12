@@ -15,7 +15,8 @@
  *
  * ⛔ اجازه مالِ **همان** درخواست‌کننده است (مدیر یا کلیدِ سرویس + «انجام‌دهنده»ٔ پنل)، نه هر مدیری؛ `useGrant` (همان
  *    `requireGrant(scope)` ِ طرح) فقط اجازهٔ فعالِ همان کس، همان دکان و همان دامنه را می‌پذیرد، `uses` را می‌شمارد و هر استفاده
- *    یک ردیفِ سابقه با شناسهٔ اجازه دارد. ⚠️ هنوز روی هیچ درِ محتوای خصوصی سوار نیست (درهای امروز همان سابقهٔ TEN-04 را دارند).
+ *    یک ردیفِ سابقه با شناسهٔ اجازه دارد. نخستین در: دانلودِ پشتیبانِ دکان پشتِ پرچمِ خاموشِ `security / admin.support_grant`
+ *    (`grantForExport`)؛ درهای دیگر همان سابقهٔ TEN-04 را دارند.
  * ⛔ پاسخ فقط فراداده: هرگز رمز، توکن یا محتوای دکان. رمزِ احرازِ دوباره در هیچ ردیف، سابقه یا هشِ کلیدِ یکتایی نمی‌نشیند.
  */
 const config = require('../config');
@@ -321,6 +322,21 @@ async function useGrant(req, shopId, scope, { what = '' } = {}) {
   });
 }
 
+/**
+ * TEN-04 — نخستین درِ محتوای خصوصی که اجازه می‌خواهد: پرچمِ `security / admin.support_grant` (پیش‌فرض **خاموش** ⇒ `null`،
+ * همان رفتارِ امروز: ارشد + دلیل + سابقه). روشن ⇒ خروجیِ دادهٔ **دکان** (نه بخش‌های دیگر) فقط با اجازهٔ زندهٔ `export` ِ همین
+ * درخواست‌کننده روی همین دکان، وگرنه ‎403 grant_required‎ ⇒ شناسهٔ اجازه (برای سابقهٔ همان در).
+ */
+const ENFORCE_KEY = 'admin.support_grant';
+async function enforced() {
+  const r = await one("SELECT value FROM live_config WHERE scope='security' AND key=$1", [ENFORCE_KEY]);
+  return require('./hash-chain-store').flagOn(r && r.value);
+}
+async function grantForExport(req, app, tenantId, what) {
+  if (app !== SHOP.app || !(await enforced())) return null;
+  return useGrant(req, tenantId, 'export', { what });
+}
+
 function requireGrant(scope) {
   if (!SCOPES.includes(scope)) throw new Error(`requireGrant: دامنهٔ ناشناختهٔ ${scope}`);
   return (req, res, next) => {
@@ -372,4 +388,5 @@ module.exports = {
   SCOPES, DEFAULT_MINUTES, MIN_MINUTES, MAX_MINUTES, PENDING_TTL, PENDING_MAX, REASON, POLICY,
   minutesOf, scopeOf, reasonOf, requester, shopOf, statusOf, shape, list,
   assertReauth, assertPlatformOwner, request, breakGlass, revoke, useGrant, requireGrant, ownerDecide, notifyOwners,
+  ENFORCE_KEY, enforced, grantForExport,
 };

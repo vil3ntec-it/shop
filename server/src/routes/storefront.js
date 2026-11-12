@@ -326,7 +326,8 @@ router.post('/:slug/verify/check', codeLimit, store, async (req, res) => {
 router.post('/:slug/checkout', checkoutLimit, store, async (req, res) => {
   const key = orders.clientKeyOf(req);
   //  ORD-08/09: توقفِ موقتِ سفارش‌گیری ⇒ ۴۰۹ `store_paused` (تکرارِ سفارشِ پیشین آزاد)
-  await orderDesk.guardCheckout(req.store.shop_id, key);
+  //  S30: «توقف هنگامِ قطع» ِ میز ⇒ ۴۰۹ `store_offline` برای سفارشِ فوری (زمان‌بندی‌شده آزاد)
+  await orderDesk.guardCheckout(req.store.shop_id, key, undefined, { sf: req.store, body: req.body });
   let out;
   try {
     out = await sf.checkout(req.store, { key, body: req.body, ticket: ticketOf(req), session: sessionOf(req), ip: clientIp(req) });

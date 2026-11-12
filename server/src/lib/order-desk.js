@@ -14,6 +14,11 @@
  *           `auto_pause_oldest_min` ⇒ توقف برای `auto_pause_minutes` با دلیلِ `overloaded`، سابقه و اعلان
  *           به صاحب و مدیر. کارگرِ هر دقیقه ([sweep]) و پس از هر سفارشِ ویترین ([afterOrder]). «ادامه» ِ
  *           دستی تا یک دورِ توقف مهلت دارد (دوباره بی‌درنگ متوقف نمی‌شود).
+ *   قطع ─── (S30، WEB-25، پیش‌فرض خاموش؛ مهاجرتِ ۸۲۰) `offline_pause`: وقتی ویترین به‌جای «می‌پذیرد» پیامِ تأخیر می‌داد
+ *           (دکان باز ولی هیچ دستگاهش در `staleMs` تماس نگرفته — `orderAcceptance: 'delayed'` ِ `presenceOf`)، ویترین
+ *           سفارشِ **فوری** ِ تازه نمی‌گیرد (۴۰۹ `store_offline`) و وضعیتِ
+ *           عمومی `orderAcceptance: 'paused'` با `offlinePause` است؛ سفارشِ زمان‌بندی‌شده و تکرارِ سفارشِ پیشین آزاد.
+ *           خاموش ⇒ همان «ثبت با پیامِ تأخیر» (§۳۱.۲ بندِ ۶).
  *   قبول ── (ORD-04، پیش‌فرض خاموش) سفارشِ ویترینِ فوری، وقتی دکان همان لحظه «می‌پذیرد» (اتصالِ تأییدشده،
  *           نه توقف) و کمتر از `auto_accept_max_open` سفارش در آماده‌سازی است ⇒ «قبول» با بازیگرِ سیستم و
  *           زمانِ آماده = `auto_accept_ready_min` (+ دقیقه‌های «شلوغم»). سفارشِ زمان‌بندی‌شده و آزمایشی نه.
@@ -85,6 +90,8 @@ function view(row, at) {
       enabled: r.auto_accept === true, maxOpen: Number(r.auto_accept_max_open ?? 5),
       readyMinutes: Number(r.auto_accept_ready_min ?? 15),
     },
+    //  S30: توقفِ سفارشِ فوری وقتی دستگاه‌های دکان قطع‌اند (مهاجرتِ ۸۲۰)
+    offlinePause: { enabled: r.offline_pause === true },
     version: Number(r.version ?? 0),
     updatedAt: nul(r.updated_at),
   };
@@ -216,6 +223,11 @@ function saveSettings(shopId, { body, actor }) {
     if (aa.maxOpen !== undefined) set.auto_accept_max_open = int(aa.maxOpen, 'سقفِ صف', 1, 500);
     if (aa.readyMinutes !== undefined) set.auto_accept_ready_min = int(aa.readyMinutes, 'زمانِ آماده', 1, 1440);
   }
+  const op = b.offlinePause;
+  if (op !== undefined) {
+    if (!op || typeof op !== 'object') throw badRequest('تنظیمِ توقف هنگامِ قطع معتبر نیست', 'bad_settings');
+    if (op.enabled !== undefined) set.offline_pause = op.enabled === true;
+  }
   if (!Object.keys(set).length) throw badRequest('تغییری نیامد', 'bad_settings');
   const expected = b.expectedVersion;
   if (expected !== undefined && (typeof expected !== 'number' || !Number.isSafeInteger(expected) || expected < 0)) {
@@ -237,15 +249,30 @@ function saveSettings(shopId, { body, actor }) {
  * پیش از ساختِ سفارشِ ویترین: توقفِ فعال ⇒ ۴۰۹ `store_paused` (با `pausedUntil`)، مگر همین کلید پیش‌تر
  * سفارشی ساخته باشد (پاسخِ گم‌شده ⇒ همان سفارش، `orders.create`).
  */
-async function guardCheckout(shopId, key, at = now()) {
+async function guardCheckout(shopId, key, at = now(), { sf = null, body = null } = {}) {
   if (!(await flagOf(shopId))) return;
   const row = await rowOf(shopId);
   const until = nul(row?.paused_until);
-  if (until === null || until <= at) return;
+  const paused = until !== null && until > at;
+  //  S30: «توقف هنگامِ قطع» فقط برای سفارشِ فوری (بی بازهٔ زمانی) و فقط وقتی ویترین پیامِ تأخیر می‌داد
+  let offline = null;
+  if (!paused && row?.offline_pause === true && sf && !scheduledBody(body)) {
+    const st = await require('./storefront').statusOf(sf, at);
+    if (st.orderAcceptance === 'delayed') offline = st;
+  }
+  if (!paused && !offline) return;
   if (key && (await one('SELECT 1 AS x FROM online_orders WHERE shop_id = $1 AND client_key = $2', [String(shopId), key]))) return;
+  if (offline) {
+    throw Object.assign(new ApiError(409, 'store_offline',
+      'دکان همین حالا به اینترنت وصل نیست و سفارشِ فوری موقتاً گرفته نمی‌شود؛ کمی بعد دوباره امتحان کنید یا اگر دکان زمان‌بندی دارد برای ساعتِ دیگری سفارش بدهید.'),
+    { data: { reason: 'shop_offline', lastConfirmedAt: offline.lastConfirmedAt } });
+  }
   throw Object.assign(new ApiError(409, 'store_paused', 'سفارش‌گیریِ این فروشگاه موقتاً متوقف است؛ کمی بعد دوباره امتحان کنید.'),
     { data: { pausedUntil: until } });
 }
+
+/** بدنهٔ ثبت بازهٔ زمانی دارد (سفارشِ زمان‌بندی‌شده — درستیِ بازه را `storefront.checkout` می‌سنجد) */
+const scheduledBody = (b) => !!b && typeof b === 'object' && b.slotStartsAt !== undefined && b.slotStartsAt !== null && b.slotStartsAt !== '';
 
 /**
  * وضعیتِ عمومیِ ویترین + میز: `busy` (برای زمانِ تحویلِ برنامهٔ خرید)، `pause` و `orderAcceptance: 'paused'`.
@@ -254,10 +281,13 @@ async function guardCheckout(shopId, key, at = now()) {
 async function overlay(shopId, status, at = now()) {
   if (!status || !(await flagOf(shopId))) return status;
   const v = view(await rowOf(shopId), at);
-  if (!v.busy && !v.pause) return status;
+  //  S30: «توقف هنگامِ قطع» روشن و ویترین پیامِ تأخیر می‌داد ⇒ سفارشِ فوری نه (همان `guardCheckout`)
+  const offline = !v.pause && v.offlinePause.enabled && status.orderAcceptance === 'delayed';
+  if (!v.busy && !v.pause && !offline) return status;
   const out = { ...status };
   if (v.busy) out.busy = { until: v.busy.until, extraMinutes: v.busy.extraMinutes };
   if (v.pause) { out.pause = { until: v.pause.until }; out.orderAcceptance = 'paused'; }
+  if (offline) { out.offlinePause = true; out.orderAcceptance = 'paused'; }
   return out;
 }
 

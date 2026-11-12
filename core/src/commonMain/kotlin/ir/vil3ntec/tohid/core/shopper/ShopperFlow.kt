@@ -22,6 +22,11 @@ object CheckoutFlow {
     object Rezone : After()
     /** MKT-01: کدِ تخفیف در همان تراکنش اعمال نشد ⇒ کد برداشته و پیش‌نمایش از نو (هرگز سفارشِ بی‌صدا با قیمتِ دیگر) */
     data class PromoRejected(val status: String) : After()
+    /**
+     *  S41: همین سبد و همین نشانی چند دقیقه پیش سفارشِ [orderNo] شد ⇒ پرسش: «همان را دنبال کن» (بی‌خطر، پیش‌فرض) ⇒
+     *  پیگیریِ [token]، هیچ سفارشِ تازه‌ای نه؛ «سفارشِ دوم» ⇒ همان سبد با `secondOrder` (بدنهٔ دیگر ⇒ کلیدِ یکتاییِ تازه)
+     */
+    data class Duplicate(val orderNo: Long, val token: String) : After()
     /** بقیه (شبکه، ۴۲۹، توقفِ دکان…): فقط پیام؛ کلیدِ یکتایی می‌ماند تا زدنِ دوباره همان سفارش باشد */
     object Message : After()
   }
@@ -37,6 +42,7 @@ object CheckoutFlow {
     "slot_required", "slot_unavailable", "slot_full" -> After.Slots(e.slots())
     "bad_zone", "zone_required" -> After.Rezone
     ShopperError.PROMO_REJECTED -> After.PromoRejected(e.promoStatus().orEmpty())
+    ShopperError.DUPLICATE_ORDER -> e.duplicate()?.let { (no, token) -> After.Duplicate(no, token) } ?: After.Message
     else -> After.Message
   }
 
@@ -48,6 +54,7 @@ object CheckoutFlow {
       after.totalMinor,
     )
     is After.PromoRejected -> ShopperText.promoStatus(after.status)
+    is After.Duplicate -> ShopperText.dupAsk(after.orderNo)
     else -> ShopperText.error(e)
   }
 }

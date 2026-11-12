@@ -447,3 +447,52 @@ test('هم‌زمانی: یک شناسه سه بار ⇒ یک رویداد؛ د�
   assert.equal(outs.filter((o) => o.autoAccepted).length, 2);
   assert.equal((await one(`SELECT COUNT(*)::int n FROM online_orders WHERE shop_id=$1 AND status='accepted'`, [s.shopId])).n, 2);
 });
+
+test('S30 «توقف هنگامِ قطع» (مهاجرتِ ۸۲۰): خاموش ⇒ ثبت با پیامِ تأخیر؛ روشن ⇒ سفارشِ فوری ۴۰۹ store_offline، تکرار و زمان‌بندی آزاد؛ وصل ⇒ می‌پذیرد', async () => {
+  const s = await liveStore('قطع');
+  assert.deepEqual((await deskGet(s)).body.offlinePause, { enabled: false });
+  //  «همهٔ دستگاه‌ها ۲۰ دقیقه آفلاین» (همان `scenario-s30`) ⇒ پیش‌فرض: ثبت با پیامِ تأخیر
+  const offline = () => query(`UPDATE sync_devices SET last_seen_at=$2 WHERE app='shop' AND account_kind='shop' AND account_id=$1`,
+    [s.shopId, Date.now() - 20 * MIN]);
+  await offline();
+  assert.equal((await pub(s)).orderAcceptance, 'delayed');
+  const a = await checkout(s, { phone: '0791113301' });
+  assert.equal(a.status, 201, JSON.stringify(a.body));
+
+  const on = await put(s, { eventId: ev(), offlinePause: { enabled: true } });
+  assert.equal(on.status, 200, JSON.stringify(on.body));
+  assert.deepEqual(on.body.state.offlinePause, { enabled: true });
+  const st = await pub(s);
+  assert.equal(st.orderAcceptance, 'paused');
+  assert.equal(st.offlinePause, true);
+  assert.equal(st.pause, undefined, 'توقفِ دستی نیست');
+  const b = await checkout(s, { phone: '0791113302' });
+  assert.equal(b.status, 409, JSON.stringify(b.body));
+  assert.equal(b.body.error.code, 'store_offline');
+  assert.ok(!(await rowOfKey(s, b.key)), 'هیچ سفارشی ساخته نشد');
+  //  تکرارِ سفارشِ پیشین (پاسخِ گم‌شده) همان سفارش است، نه رد
+  const again = await checkout(s, { phone: '0791113301', key: a.key });
+  assert.ok([200, 201].includes(again.status), JSON.stringify(again.body));
+  assert.equal(again.body.order.orderNo, a.body.order.orderNo);
+  //  سفارشِ زمان‌بندی‌شده از این قاعده نمی‌گذرد (درستیِ بازه را ثبت می‌سنجد ⇒ خطای دیگر، نه store_offline)
+  const sch = await checkout(s, { phone: '0791113303', over: { slotStartsAt: Date.now() + 3 * 60 * MIN } });
+  assert.notEqual(sch.body?.error?.code, 'store_offline', JSON.stringify(sch.body));
+  //  سفارشِ دستیِ کارمند آزاد
+  assert.equal((await staffOrder(s)).status, 201);
+
+  //  دستگاه دوباره وصل ⇒ همان «می‌پذیرد»
+  await query(`UPDATE sync_devices SET last_seen_at=$2 WHERE app='shop' AND account_kind='shop' AND account_id=$1`, [s.shopId, Date.now()]);
+  assert.equal((await pub(s)).orderAcceptance, 'accepting');
+  const c = await checkout(s, { phone: '0791113304' });
+  assert.equal(c.status, 201, JSON.stringify(c.body));
+  //  پرچمِ میز خاموش ⇒ همان رفتارِ پیشین حتی با ستونِ روشن
+  await offline();
+  await setFlag(s.shopId, 'shop.orders.desk', false);
+  const st2 = await pub(s);
+  assert.equal(st2.orderAcceptance, 'delayed');
+  assert.equal(st2.offlinePause, undefined);
+  assert.equal((await checkout(s, { phone: '0791113305' })).status, 201);
+  assert.equal((await put(s, { eventId: ev(), offlinePause: 'x' })).status, 403);
+  await setFlag(s.shopId, 'shop.orders.desk', true);
+  assert.equal((await put(s, { eventId: ev(), offlinePause: 'x' })).status, 400);
+});

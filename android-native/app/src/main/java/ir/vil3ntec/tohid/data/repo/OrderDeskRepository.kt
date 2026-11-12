@@ -26,6 +26,8 @@ class OrderDeskRepository(private val api: ApiClient) {
     val autoPauseMaxOpen: Int = 10,
     val autoPauseOldestMinutes: Int = 30,
     val autoPauseMinutes: Int = 30,
+    /** S30 (مهاجرتِ ۸۲۰): ویترین سفارشِ فوری را وقتی دستگاه‌های دکان قطع‌اند نمی‌گیرد (پیش‌فرض: ثبت با پیامِ تأخیر) */
+    val offlinePauseOn: Boolean = false,
     val version: Long = 0,
     val queueOpen: Int = 0,
     val serverTime: Long = 0,
@@ -41,6 +43,7 @@ class OrderDeskRepository(private val api: ApiClient) {
     val pause = obj(o, "pause")
     val aa = obj(o, "autoAccept")
     val ap = obj(o, "autoPause")
+    val op = obj(o, "offlinePause")
     val perms = obj(o, "permissions")
     return base.copy(
       enabled = o["enabled"]?.let { CourierWire.bool(o, "enabled") } ?: base.enabled,
@@ -55,6 +58,7 @@ class OrderDeskRepository(private val api: ApiClient) {
       autoPauseMaxOpen = ap?.let { CourierWire.long(it, "maxOpen") }?.toInt() ?: base.autoPauseMaxOpen,
       autoPauseOldestMinutes = ap?.let { CourierWire.long(it, "oldestMinutes") }?.toInt() ?: base.autoPauseOldestMinutes,
       autoPauseMinutes = ap?.let { CourierWire.long(it, "minutes") }?.toInt() ?: base.autoPauseMinutes,
+      offlinePauseOn = op?.let { CourierWire.bool(it, "enabled") } ?: base.offlinePauseOn,
       version = CourierWire.long(o, "version") ?: base.version,
       queueOpen = obj(o, "queue")?.let { CourierWire.long(it, "open") }?.toInt() ?: base.queueOpen,
       serverTime = CourierWire.long(o, "serverTime") ?: base.serverTime,
@@ -94,6 +98,8 @@ class OrderDeskRepository(private val api: ApiClient) {
         put("enabled", next.autoPauseOn); put("maxOpen", next.autoPauseMaxOpen)
         put("oldestMinutes", next.autoPauseOldestMinutes); put("minutes", next.autoPauseMinutes)
       })
+      //  S30: سرورِ پیش از ۸۲۰ این کلید را نمی‌شناسد و کنار می‌گذارد
+      put("offlinePause", buildJsonObject { put("enabled", next.offlinePauseOn) })
       put("eventId", OrdersRepository.newKey())
     }
     val out = api.put("$ROOT/settings", body)

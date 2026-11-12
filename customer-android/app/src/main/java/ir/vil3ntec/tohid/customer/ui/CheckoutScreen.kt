@@ -130,7 +130,14 @@ fun CheckoutScreen(model: CustomerModel, slug: String) {
       model.placeNote?.let { Note(it, if (model.placing) Tone.INFO else Tone.WARN) }
       val total = CheckoutRules.summary(page, model.cartOf(slug), f, model.slotsPage()).totalMinor -
         (model.promo.applied(model.saved.ticket, model.saved.deviceId)?.discountMinor ?: 0)
-      MainButton(if (model.repriced) ShopperText.accept(total) else ShopperText.submit(total), enabled = !model.placing) { model.placeOrder() }
+      val dup = model.duplicate
+      if (dup != null) {
+        //  S41: گزینهٔ بی‌خطر دکمهٔ اصلی است؛ «سفارشِ دوم» فقط با زدنِ صریح
+        MainButton(ShopperText.dupTrack, enabled = !model.placing) { model.trackDuplicate() }
+        OutlinedButton(onClick = { model.placeOrder(second = true) }, enabled = !model.placing, modifier = Modifier.fillMaxWidth()) { Text(ShopperText.dupSecond) }
+      } else {
+        MainButton(if (model.repriced) ShopperText.accept(total) else ShopperText.submit(total), enabled = !model.placing) { model.placeOrder() }
+      }
     }
   }
 }

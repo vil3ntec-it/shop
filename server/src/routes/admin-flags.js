@@ -217,6 +217,7 @@ const KNOWN = Object.freeze([
   { key: 'ops.critical_alerts.max_escalations', scope: 'ops', default: 2, what: 'بیشترین بارِ پیگیریِ یک هشدارِ بحرانی (۰ تا ۵)' },
   { key: 'ops.sync_lag', scope: 'ops', default: false, what: 'بخشِ «تأخیرِ همگام‌سازی» در سلامتِ سامانه (OPS-04)' },
   { key: 'backup.require_encryption', scope: 'security', default: false, what: 'پشتیبانِ سرور فقط رمزدار و پس از بازگشاییِ همان فایل (SEC-07)' },
+  { key: 'admin.support_grant', scope: 'security', default: false, what: 'دانلودِ پشتیبانِ دکان در پنل فقط با اجازهٔ زندهٔ «خروجی» ِ همان مدیر روی همان دکان (رضایتِ صاحب یا شکستنِ شیشه؛ TEN-04)' },
   { key: 'auth.phone_add_code', scope: 'security', default: false, what: 'افزودنِ شمارهٔ ورود فقط با کدِ همان شماره (AUTH-08)؛ پیش از روشن کردن برنامه‌ها `phoneCode` بفرستند' },
 ]);
 
