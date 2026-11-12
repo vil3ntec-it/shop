@@ -38,6 +38,17 @@ object PresenceModel {
     return StrOnline.shopClock(st.localTime) + " · " + today
   }
 
-  fun connection(st: PresenceStatusDto): String =
-    StrOnline.connection(st.lastConfirmedAt?.takeIf { it > 0 }?.let { StorefrontOwner.clock(it, st.timezone) })
+  /**
+   *  خطِ تپشِ دستگاه (GATE-NEW-01، PRES-03): زمانِ آخرین تماس **و** حکمِ سرور (`connection`: confirmed | unconfirmed | lost)؛
+   *  تپشِ کهنه دیگر مثلِ تأییدِ تازه خوانده نمی‌شود. سرورِ کهنه بی `connection` ⇒ همان جملهٔ پیشین.
+   */
+  fun connection(st: PresenceStatusDto): String {
+    val at = st.lastConfirmedAt?.takeIf { it > 0 }?.let { StorefrontOwner.clock(it, st.timezone) }
+    return when {
+      at == null -> StrOnline.connection(null)
+      st.connection == "lost" -> OnlineFmt.connectionLost(at)
+      st.connection == "unconfirmed" -> OnlineFmt.connectionStale(at)
+      else -> StrOnline.connection(at)
+    }
+  }
 }

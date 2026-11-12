@@ -105,7 +105,7 @@ internal fun SubscriptionContent(ui: SubscriptionUi, onBack: (() -> Unit)?, onRe
             Spacer(Modifier.height(8.dp))
             Box(Modifier.v3Stagger(stagger, "hero", 0)) { HeroCard(SubscriptionModel.hero(sub)) }
             when (SubscriptionModel.notice(sub)) {
-              SubscriptionModel.Notice.ENDING -> { Spacer(Modifier.height(12.dp)); V3Message(V3Tone.WARNING, StrAccount.warnTitle(SubscriptionModel.hero(sub).days), body = StrAccount.warnBody) }
+              SubscriptionModel.Notice.ENDING -> { Spacer(Modifier.height(12.dp)); V3Message(V3Tone.WARNING, SubscriptionModel.warnTitle(sub), body = StrAccount.warnBody) }
               SubscriptionModel.Notice.EXPIRED -> { Spacer(Modifier.height(12.dp)); V3Message(V3Tone.ERROR, StrAccount.bannerExpiredTitle, body = StrAccount.expiredBody) }
               SubscriptionModel.Notice.NONE -> Unit
             }

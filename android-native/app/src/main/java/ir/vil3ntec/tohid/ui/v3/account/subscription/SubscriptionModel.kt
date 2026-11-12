@@ -76,6 +76,15 @@ object SubscriptionModel {
     )
   }
 
+  /**
+   *  سرخطِ هشدارِ هفت روزِ آخر (S47 «هشدار … با تاریخ دقیق»): شمارِ روز و روزِ دقیقِ پایان از `endsAt` ِ سرور؛
+   *  بی تاریخِ سرور همان «N روز تا پایانِ اشتراک» ِ پیشین.
+   */
+  fun warnTitle(sub: JsonObject): String {
+    val h = hero(sub)
+    return if (h.permanent || ApiJson.long(sub, "endsAt") <= 0) StrAccount.warnTitle(h.days) else StrAccount.warnTitleOn(h.days, h.ends)
+  }
+
   fun notice(sub: JsonObject): Notice {
     val permanent = ApiJson.bool(sub, "permanent")
     val active = ApiJson.bool(sub, "active")

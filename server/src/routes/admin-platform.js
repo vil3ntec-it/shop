@@ -659,11 +659,13 @@ router.get('/accounts/:app/:tenantId/backups/:id', requireSuperAdmin, async (req
       tenantId,
       v.text(req.params.id, { max: 64, required: true, field: 'شناسه' })
     );
+    //  TEN-04: پرچمِ خاموشِ `security / admin.support_grant` ⇒ فقط با اجازهٔ زندهٔ «خروجی» ِ همین کس (`lib/support-access.js`)
+    const grant = await require('../lib/support-access').grantForExport(req, store.app, tenantId, 'backup_download');
     await audit.log({
       shopId: store.app === 'shop' ? tenantId : '',
       actorType: 'admin', userId: req.admin.id, action: 'admin.account_backup_downloaded',
       targetType: 'account_backup', targetId: row.id, ip: clientIp(req),
-      detail: { app: store.app, tenantId, reason, bytes: data.length },
+      detail: { app: store.app, tenantId, reason, bytes: data.length, ...(grant ? { grant } : {}) },
     });
     res.set('Content-Type', 'application/octet-stream');
     res.set('Content-Length', String(data.length));
