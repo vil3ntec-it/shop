@@ -153,3 +153,48 @@ test('AVIF (`STORE_AVIF`): مرورگرِ پذیرندهٔ AVIF ⇒ image/avif �
     assert.equal(W.pick('image/avifx,text/html'), null);
   } finally { config.storefront.webp = false; config.storefront.avif = false; }
 });
+
+/**
+ * بازبینیِ ۵۴ب: (۱) عکسی که WebP/AVIF اش سبک‌تر نمی‌شود — درخواستِ دوم هم همان JPEG ِ کامل است، هرگز ۲۰۰ ِ بی بدنه با
+ * image/avif|webp (کشِ «سبک‌تر نشد» بافرِ خالی را پس می‌داد و همان در کشِ عمومی می‌ماند)؛ (۲) AVIF بالای سقفِ پیکسل ⇒ WebP.
+ */
+test('درخواستِ دوم ِ عکسی که سبک‌تر نمی‌شود: همان JPEG ِ کامل برای AVIF و WebP، هرگز بدنهٔ خالی', { skip: !hasSharp && 'sharp نصب نیست' }, async () => {
+  config.storefront.webp = true;
+  config.storefront.avif = true;
+  try {
+    const crypto = require('node:crypto');
+    //  نویزِ ۱۲۰×۱۲۰ با JPEG ِ کیفیتِ ۱۰: WebP و AVIF ِ آن از خودش سنگین‌ترند
+    const jpg = await require('sharp')(crypto.randomBytes(120 * 120 * 3), { raw: { width: 120, height: 120, channels: 3 } }).jpeg({ quality: 10 }).toBuffer();
+    const slug = await storeWithPhoto(jpg);
+    for (const accept of ['image/avif,image/webp,*/*', 'image/webp,*/*', 'image/avif,*/*']) {
+      W._reset();
+      for (const round of [1, 2, 3]) {
+        const r = await get(slug, '/products/rice/photo', { Accept: accept });
+        assert.equal(r.status, 200);
+        assert.match(r.type, /^image\/jpeg/, `${accept} بارِ ${round}: ${r.type}`);
+        assert.ok(r.buf.equals(jpg), `${accept} بارِ ${round}: ${r.buf.length} بایت به جای ${jpg.length}`);
+      }
+    }
+  } finally { config.storefront.webp = false; config.storefront.avif = false; }
+});
+
+test('AVIF بالای سقفِ پیکسل ⇒ WebP ِ همان عکس (کوچک‌شده تا ضلعِ display)؛ AVIF خاموش ⇒ همان', { skip: !hasSharp && 'sharp نصب نیست' }, async () => {
+  config.storefront.webp = true;
+  config.storefront.avif = true;
+  try {
+    const sharp = require('sharp');
+    //  ۲۵۰۰×۲۰۰۰ (۵ مگاپیکسل) ِ یک‌رنگ: کم‌حجم، ولی AVIF اش سنگین
+    const png = await sharp({ create: { width: 2500, height: 2000, channels: 3, background: { r: 30, g: 90, b: 160 } } }).png().toBuffer();
+    const slug = await storeWithPhoto(png);
+    const r = await get(slug, '/products/rice/photo', { Accept: 'image/avif,image/webp,*/*' });
+    assert.equal(r.status, 200);
+    assert.match(r.type, /^image\/webp/, r.type);
+    assert.match(r.etag, /-webp"$/);
+    const m = await sharp(r.buf).metadata();
+    assert.deepEqual([m.width, m.height], [1200, 960], 'کوچک‌شده تا ضلعِ display');
+    //  فقط AVIF ⇒ همان اصل
+    const only = await get(slug, '/products/rice/photo', { Accept: 'image/avif,*/*' });
+    assert.match(only.type, /^image\/png/);
+    assert.ok(only.buf.equals(png));
+  } finally { config.storefront.webp = false; config.storefront.avif = false; }
+});
