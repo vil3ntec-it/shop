@@ -224,6 +224,7 @@ internal fun RouteScope.OrderDetailRoute(id: String, embedded: Boolean = false) 
         }
       }
     },
+    onPrintRefund = { r -> scope.launch { toasts.show(OrderSlipPrint.printRefund(context, r)) } },
   )
   //  ORD-07: «عقب انداختن» زیرِ سرِ صفحه — فقط با پرچم، وضعیتِ مجاز و `orders.manage`
   val extra: (@Composable () -> Unit)? = order?.let { o ->

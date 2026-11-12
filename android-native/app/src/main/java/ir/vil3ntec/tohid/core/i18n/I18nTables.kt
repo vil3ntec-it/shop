@@ -39,6 +39,7 @@ object I18nTables {
     StrBranches, // RPT-18: گزارشِ همهٔ شعبه‌ها
     StrImageChanges, // IMG-PRO-17/16: تغییرِ دسته‌ایِ عکس‌ها و نسخه‌های عکس
     StrImageStudio, // ۴-۲۳ (۱): استودیوی عکسِ سرور — دسته‌ها و تأییدِ نسخه
+    StrRefundSlip, // E2E-RET-11: رسیدِ اصلاحیِ بازپرداختِ سفارشِ اینترنتی (چاپ و صفحهٔ سفارش)
     StrProductGallery, // PRD-17/27: عکس‌های تکمیلیِ کالا و عکسِ جدای ویترین
     StrPromoHeld, // PRM-02: آزادِ دستیِ کدِ تخفیفِ نگه‌داشته
     StrDrawers, // PAY-17: چند کشو و شیفتِ شناور
