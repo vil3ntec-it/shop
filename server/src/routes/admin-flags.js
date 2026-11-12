@@ -157,6 +157,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.delivery_near_pin.max_m', scope: 'shop', default: 300, what: 'فاصلهٔ مجازِ «تحویل شد» از پین به متر (۲۰ تا ۵۰۰۰؛ نامعتبر ⇒ ۳۰۰)؛ با `shop.delivery_near_pin`' },
   { key: 'shop.delivery_route', scope: 'shop', default: false, what: 'ترتیبِ پیشنهادیِ مأموریت‌های پذیرفتهٔ پیک (`GET /api/courier/route`، DLV-04)' },
   { key: 'shop.delivery_ratings', scope: 'shop', default: false, what: 'امتیازِ تحویل از پیک و مشتری و فهرستِ امتیازها برای دکان (DLV-18)' },
+  { key: 'shop.courier_week_rule', scope: 'shop', default: false, what: '«این هفته» ِ خلاصهٔ پیک از آغازِ هفتهٔ همگام‌شدهٔ دکان، نه شنبهٔ ثابت (LOC-03)' },
   { key: 'shop.delivery_code_rule', scope: 'shop', default: false, what: 'کدِ تحویلِ اجباری برای سپردن به پیکِ دکان وقتی نقد هنگامِ تحویل یا گران‌قیمت است (DLV-08)' },
   { key: 'shop.delivery_code_rule.min_total_minor', scope: 'shop', default: 0, what: 'آستانهٔ «گران‌قیمت» به واحدِ خرد؛ ۰ ⇒ فقط نقد هنگامِ تحویل؛ با `shop.delivery_code_rule`' },
   { key: 'shop.delivery_live_location', scope: 'shop', default: false, what: 'موقعیتِ زندهٔ پیکِ «در راه» برای مشتری (DLV-16)؛ با `shop.delivery_customer_view`' },

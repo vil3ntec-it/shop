@@ -54,6 +54,7 @@ const PARITY = [
   ['shop.delivery_near_pin.max_m', async (s) => (await pin(s)).items[0].nearPin.maxM, 500, ['shop.delivery_near_pin']],
   ['shop.delivery_route', flagAt('routes/courier.js', 'courierRoute.FLAG', 'shop.delivery_route')],
   ['shop.delivery_ratings', flagAt('lib/delivery-ratings.js', 'FLAG', 'shop.delivery_ratings')],
+  ['shop.courier_week_rule', flagAt('lib/courier-summary.js', 'WEEK_FLAG', 'shop.courier_week_rule')],
   ['shop.delivery_code_rule', async (s) => (await L('delivery-code-rule').policyOf(s)).on],
   ['shop.delivery_code_rule.min_total_minor', async (s) => (await L('delivery-code-rule').policyOf(s)).minTotalMinor, 2_500_000, ['shop.delivery_code_rule']],
   ['shop.delivery_live_location', flagAt('lib/delivery-live.js', 'LOCATION_FLAG', 'shop.delivery_live_location')],
@@ -116,7 +117,7 @@ const putFlag = (scope, key, value) => h.put('/api/admin/flags', { scope, key, v
 test('کاتالوگ: هر ردیفِ تازه همان پیش‌فرضِ کد است؛ نوشتنِ پیش‌فرض بی‌اثر، مقدارِ دیگر اثردار', async () => {
   const { KNOWN } = require('../src/routes/admin-flags');
   assert.equal(new Set(PARITY.map((p) => p[0])).size, PARITY.length, 'کلیدِ تکراری در جدول');
-  assert.equal(PARITY.length, 57);
+  assert.equal(PARITY.length, 58);
   for (const [key, read, other, needs = []] of PARITY) {
     const k = KNOWN.find((x) => x.key === key);
     assert.ok(k, `${key}: در کاتالوگ نیست`);
