@@ -143,9 +143,10 @@ class SettingsPortTest {
     assertEquals(DESK_ONLY.keys, SettingsLayout.PHONE_HIDDEN)
     assertFalse(SettingsLayout.CRM_REPORTS in SettingsLayout.PHONE_HIDDEN)
     assertTrue(SettingsLayout.CRM_REPORTS in SettingsLayout.deskSections)
-    //  کلیدِ برگشت همان عنوانِ رابطِ امروز است
-    assertEquals(ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE, SettingsLayout.RETURNS)
-    assertEquals(ir.vil3ntec.tohid.ui.components.pos.PRICE_LIST_SETTINGS_TITLE, SettingsLayout.PRICE_LIST)
+    //  کلیدِ بخش داده است («// داده:» ِ `SettingsLayout`) و همان عنوانِ پیشین می‌ماند؛ ثابت‌های `…_TITLE` ِ رابطِ امروز بی‌راه بودند و
+    //  برداشته شدند (`claude/e-rows-39m`) ⇒ مقدار این‌جا میخ است تا کلید بی‌صدا عوض نشود
+    assertEquals("برگشت و تعویض", SettingsLayout.RETURNS)
+    assertEquals("لیستِ قیمت در صندوق (خرده/عمده)", SettingsLayout.PRICE_LIST)
   }
 
   @Test
@@ -211,17 +212,19 @@ class SettingsPortTest {
       assertTrue("$key در ستونِ کامپیوتر نیست", key in SettingsLayout.deskSections)
       assertEquals("$key فقط‌کامپیوتر؟", key in DESK_ONLY, key in SettingsLayout.PHONE_HIDDEN)
     }
-    //  کلید همان عنوانِ بخشِ رابطِ امروز است
-    assertEquals(ir.vil3ntec.tohid.ui.screens.STOCK_PLACES_TITLE, SettingsLayout.STOCK_PLACES)
-    assertEquals(ir.vil3ntec.tohid.ui.screens.SMART_FORECAST_TITLE, SettingsLayout.SMART_FORECAST)
-    assertEquals(ir.vil3ntec.tohid.ui.screens.ANOMALY_TITLE, SettingsLayout.ANOMALY)
-    assertEquals(ir.vil3ntec.tohid.ui.screens.OWNER_REPORT_TITLE, SettingsLayout.OWNER_REPORT)
-    assertEquals(ir.vil3ntec.tohid.ui.screens.STOREFRONT_ETA_TITLE, SettingsLayout.STOREFRONT_ETA)
-    assertEquals(ir.vil3ntec.tohid.ui.screens.PROMO_GUARD_TITLE, SettingsLayout.PROMO_GUARD)
-    assertEquals(ir.vil3ntec.tohid.ui.screens.EASY_SETUP_TITLE, SettingsLayout.EASY_SETUP)
-    assertEquals(ir.vil3ntec.tohid.ui.screens.SCAN_CASH_TITLE, SettingsLayout.SCAN_CASH)
-    assertEquals(ir.vil3ntec.tohid.ui.screens.TRAINING_SETTINGS_TITLE, SettingsLayout.TRAINING)
-    assertEquals(ir.vil3ntec.tohid.ui.screens.TILL_GOODS_TITLE, SettingsLayout.TILL_GOODS)
+    //  کلید همان عنوانِ پیشینِ بخش می‌ماند (ثابت‌های `…_TITLE` ِ رابطِ امروز بی‌راه بودند و برداشته شدند؛ مقدار میخ است)
+    mapOf(
+      SettingsLayout.STOCK_PLACES to "محل‌ها و بسته‌بندیِ دوباره",
+      SettingsLayout.SMART_FORECAST to "پیش‌بینیِ تقاضا (آزمایشی)",
+      SettingsLayout.ANOMALY to "تشخیصِ ناهنجاری (آزمایشی)",
+      SettingsLayout.OWNER_REPORT to "گزارشِ خودکار برای صاحب",
+      SettingsLayout.STOREFRONT_ETA to "زمانِ تقریبیِ تحویلِ ویترین",
+      SettingsLayout.PROMO_GUARD to "تخفیفِ اولین خرید و سدِ سوءاستفاده",
+      SettingsLayout.EASY_SETUP to "راه‌اندازیِ آسانِ چاپگر و بارکدخوان (آزمایشی)",
+      SettingsLayout.SCAN_CASH to "فروشِ نقدی با کارتِ فرمان",
+      SettingsLayout.TRAINING to "حالتِ آموزشی",
+      SettingsLayout.TILL_GOODS to "ثبتِ سریع و واحدِ بزرگ در صندوق",
+    ).forEach { (key, title) -> assertEquals(title, key) }
     //  حالتِ آموزشی: ورود و پاک کردن همان `TrainingLedger` و همان سدِ نقشِ `TrainingSettingsWired`
     val ops = sources.entries.first { rel(it.key) == "ui/v3/settings/sections/OpsToggleScreensAndroid.kt" }.value
     listOf("TrainingLedger.enter(", "TrainingLedger.wipe(", "TrainingMode.canEnter(role, staff)", "TrainingMode.canManage(role)", "if (!active)")

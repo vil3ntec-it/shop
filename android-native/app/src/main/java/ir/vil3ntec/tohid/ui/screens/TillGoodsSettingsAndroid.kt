@@ -3,8 +3,6 @@ package ir.vil3ntec.tohid.ui.screens
 import ir.vil3ntec.tohid.core.i18n.StrQuickRegister
 import ir.vil3ntec.tohid.core.i18n.StrSalePages
 
-/** عنوانِ بخش — صفحهٔ نسخهٔ ۳ (`SettingsLayout.TILL_GOODS`) */
-const val TILL_GOODS_TITLE = "ثبتِ سریع و واحدِ بزرگ در صندوق" // داده: کلیدِ بخشِ تنظیمات (`SettingsLayout.TILL_GOODS`)؛ نامِ صفحه `StrSettingsPages.titleTillGoods`
 val TILL_GOODS_NOTE: String get() = StrSalePages.tillGoodsNote
 val TILL_GOODS_QUICK: String get() = StrQuickRegister.title
 val TILL_GOODS_UNITS: String get() = StrSalePages.tillGoodsUnits

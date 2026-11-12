@@ -22,10 +22,6 @@ import ir.vil3ntec.tohid.core.storefront.StorefrontEtaApi
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.serialization.json.JsonObject
 
-/** عنوانِ بخش‌ها — همان کلیدِ `SettingsLayout` */
-const val STOREFRONT_ETA_TITLE: String = "زمانِ تقریبیِ تحویلِ ویترین" // داده: کلیدِ بخشِ تنظیمات (همان SettingsLayout)
-const val PROMO_GUARD_TITLE: String = "تخفیفِ اولین خرید و سدِ سوءاستفاده" // داده: کلیدِ بخشِ تنظیمات (همان SettingsLayout)
-
 /**
  *  درِ سرورِ زمانِ تقریبیِ تحویل (WEB-04) و آخرین «دیده شود؟» برای فهرستِ کامپیوتر.
  *  تا پاسخِ نخست، با پرچمِ خاموشِ `shop.storefront.eta` یا نقشِ بی `settings.write` ⇒ `visible = false`.

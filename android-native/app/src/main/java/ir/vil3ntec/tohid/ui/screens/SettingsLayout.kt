@@ -78,7 +78,7 @@ object SettingsLayout {
   const val CHECKOUT_RULES = "قاعده‌های فاکتور" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
   /** چند فاکتورِ هم‌زمان (POS-12، `HeldInvoicePrefs`) */
   const val HELD = "فاکتورهای هم‌زمان" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
-  /** برگشت و تعویض (RET، `ReturnSettings`) — همان `RETURN_SETTINGS_TITLE` */
+  /** برگشت و تعویض (RET، `ReturnSettings`) */
   const val RETURNS = "برگشت و تعویض" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
   /** پرداخت و صندوق (PAY، `ShopPolicy.payV2`) */
   const val PAY = "پرداخت و صندوق" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
@@ -108,7 +108,7 @@ object SettingsLayout {
   const val WHATS_NEW = "«تازه‌ها» پس از به‌روزرسانی" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
   /** اصلاحِ روشِ پرداخت پس از فروش (POS-40، `PayFixPref`) — همان عنوانِ `PayFixSettingsWired` */
   const val PAY_FIX = "اصلاحِ روشِ پرداخت پس از فروش" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
-  /** لیستِ قیمت در صندوق (POS-18، `PriceListPrefs`) — همان `PRICE_LIST_SETTINGS_TITLE` */
+  /** لیستِ قیمت در صندوق (POS-18، `PriceListPrefs`) */
   const val PRICE_LIST = "لیستِ قیمت در صندوق (خرده/عمده)" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
   /** پیش‌فاکتور (POS-25، `QuotePref`) — همان عنوانِ `QuoteSettingsWired` */
   const val QUOTE = "پیش‌فاکتور (قیمت‌دهی)" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
@@ -124,17 +124,17 @@ object SettingsLayout {
   const val TAX_QUARTER = "گزارشِ مالیاتِ سه‌ماهه" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
   /** کارت یا بارکدِ مشتری (CRM-16، `CustomerCardPref`) */
   const val CUSTOMER_CARD = "کارت یا بارکدِ مشتری" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
-  /** محل‌ها و بسته‌بندیِ دوباره (INV-20/21، `StockPlacesPref`) — همان `STOCK_PLACES_TITLE` */
+  /** محل‌ها و بسته‌بندیِ دوباره (INV-20/21، `StockPlacesPref`) */
   const val STOCK_PLACES = "محل‌ها و بسته‌بندیِ دوباره" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
-  /** پیش‌بینیِ تقاضا (AI-07، `SmartForecastPref`) — همان `SMART_FORECAST_TITLE` */
+  /** پیش‌بینیِ تقاضا (AI-07، `SmartForecastPref`) */
   const val SMART_FORECAST = "پیش‌بینیِ تقاضا (آزمایشی)" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
-  /** تشخیصِ ناهنجاری (AI-08، `AnomalyPref`) — همان `ANOMALY_TITLE` */
+  /** تشخیصِ ناهنجاری (AI-08، `AnomalyPref`) */
   const val ANOMALY = "تشخیصِ ناهنجاری (آزمایشی)" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
-  /** گزارشِ خودکار برای صاحب (PAY-20/RPT-12، `OwnerReportLive`، پرچمِ سرورِ `shop.owner_report`) — همان `OWNER_REPORT_TITLE` */
+  /** گزارشِ خودکار برای صاحب (PAY-20/RPT-12، `OwnerReportLive`، پرچمِ سرورِ `shop.owner_report`) */
   const val OWNER_REPORT = "گزارشِ خودکار برای صاحب" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
-  /** زمانِ تقریبیِ تحویلِ ویترین (WEB-04، `StorefrontEtaLive`، پرچمِ سرورِ `shop.storefront.eta`) — همان `STOREFRONT_ETA_TITLE` */
+  /** زمانِ تقریبیِ تحویلِ ویترین (WEB-04، `StorefrontEtaLive`، پرچمِ سرورِ `shop.storefront.eta`) */
   const val STOREFRONT_ETA = "زمانِ تقریبیِ تحویلِ ویترین" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
-  /** اولین خرید و سدِ تخفیف (MKT-02/RSK-09، `PromoGuardLive`، پرچمِ سرورِ `shop.storefront.promo_guard`) — همان `PROMO_GUARD_TITLE` */
+  /** اولین خرید و سدِ تخفیف (MKT-02/RSK-09، `PromoGuardLive`، پرچمِ سرورِ `shop.storefront.promo_guard`) */
   const val PROMO_GUARD = "تخفیفِ اولین خرید و سدِ سوءاستفاده" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
   /**
    *  «سفارشِ آنلاین» (درخواستِ صاحب‌کار ۱۴۰۵/۰۸/۱۳): «چرا سفارش نمی‌رسد؟» (`arrival` ِ `/shop/orders/config`) و «پرداخت
@@ -179,7 +179,7 @@ object SettingsLayout {
   const val LINE_PRICING = "قیمت و تخفیفِ ردیف" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
   /** فروشندهٔ هر ردیف — پایهٔ پورسانت (POS-23/STF-08، `LineSellerPref`، تنظیمِ دکان، پیش‌فرض خاموش) */
   const val LINE_SELLER = "فروشندهٔ هر ردیف" // داده: کلیدِ بخشِ تنظیمات؛ نامِ صفحه `StrLineSeller.settingsTitle`
-  /** ثبتِ سریع و واحدِ بزرگ در صندوق (S03/S05، `TillGoodsPref`) — همان `TILL_GOODS_TITLE` */
+  /** ثبتِ سریع و واحدِ بزرگ در صندوق (S03/S05، `TillGoodsPref`) */
   const val TILL_GOODS = "ثبتِ سریع و واحدِ بزرگ در صندوق" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
   /** یادداشتِ ردیف و فاکتور (POS-11، `PosNotesPrefs`) */
   const val POS_NOTES = "یادداشتِ ردیف و فاکتور" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
@@ -187,13 +187,13 @@ object SettingsLayout {
   const val AUTO_FEES = "هزینهٔ خودکار" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
   /** پرسشِ ساده از گزارش‌ها (RPT-16، `SimpleAskPref`) */
   const val SIMPLE_ASK = "پرسشِ ساده از گزارش‌ها" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
-  /** راه‌اندازیِ آسانِ دستگاه‌ها (HW-12، `EasySetupPref`) — همان `EASY_SETUP_TITLE` */
+  /** راه‌اندازیِ آسانِ دستگاه‌ها (HW-12، `EasySetupPref`) */
   const val EASY_SETUP = "راه‌اندازیِ آسانِ چاپگر و بارکدخوان (آزمایشی)" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
-  /** فروشِ نقدی با «کارتِ فرمان» از بارکدخوانِ پس‌زمینه (`ScanCashPref`، پولی ⇒ B) — همان `SCAN_CASH_TITLE` */
+  /** فروشِ نقدی با «کارتِ فرمان» از بارکدخوانِ پس‌زمینه (`ScanCashPref`، پولی ⇒ B) */
   const val SCAN_CASH = "فروشِ نقدی با کارتِ فرمان" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
   /** HW-08: وب‌کمِ کامپیوتر به‌عنوانِ بارکدخوان (`WebcamPref`، وابسته به دستگاه ⇒ B، پیش‌فرض خاموش) — فقط کامپیوتر */
   const val WEBCAM = "وب‌کم به‌عنوانِ بارکدخوان" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
-  /** حالتِ آموزشی (OPS-07، `TrainingPref` و `TrainingLedger`) — همان `TRAINING_SETTINGS_TITLE` */
+  /** حالتِ آموزشی (OPS-07، `TrainingPref` و `TrainingLedger`) */
   const val TRAINING = "حالتِ آموزشی" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
   /** سرورهای دیگر (`ServersSettings`، پرچمِ همین دستگاه `app.multi_server`؛ فقط صاحب؛ تصمیم ⇒ B) — همان `SERVERS_SECTION_TITLE` */
   const val SERVERS = "سرورها" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)

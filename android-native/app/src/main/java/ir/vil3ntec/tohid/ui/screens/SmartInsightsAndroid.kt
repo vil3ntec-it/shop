@@ -12,9 +12,6 @@ import ir.vil3ntec.tohid.data.SmartForecastPref
  *  همین پرونده است، تا «پیشنهادِ سفارش» و «گزارشِ تازه» یک خط بخواهند.
  */
 
-const val SMART_FORECAST_TITLE = "پیش‌بینیِ تقاضا (آزمایشی)" // داده: کلیدِ بخشِ تنظیمات؛ نامِ صفحه `StrSettingsPages.titleSmartForecast`
-const val ANOMALY_TITLE = "تشخیصِ ناهنجاری (آزمایشی)" // داده: کلیدِ بخشِ تنظیمات؛ نامِ صفحه `StrSettingsPages.titleAnomaly`
-
 /** توضیحِ بخش‌ها — یکی برای رابطِ امروز و صفحهٔ نسخهٔ ۳ (`settings/sales/forecast`، `settings/security/anomalies`) */
 val SMART_FORECAST_NOTE: String get() = StrSettingsPages.smartForecastNote
 val ANOMALY_NOTE: String get() = StrSettingsPages.anomalyNote

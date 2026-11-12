@@ -33,9 +33,6 @@ import ir.vil3ntec.tohid.ui.screens.SegmentedChoice
 import ir.vil3ntec.tohid.ui.screens.SettingsSection
 import ir.vil3ntec.tohid.ui.theme.Shop
 
-/** عنوانِ بخشِ تنظیمِ لیستِ قیمت — همان که ستونِ تنظیماتِ کامپیوتر (`DeskSettings` ِ `AppRoot`) نشان می‌دهد */
-const val PRICE_LIST_SETTINGS_TITLE = "لیستِ قیمت در صندوق (خرده/عمده)" // داده: کلیدِ بخشِ تنظیمات (`SettingsLayout.PRICE_LIST`)؛ نامِ صفحه `StrPos.priceListTitle`
-
 /*
  *  لیستِ قیمتِ فاکتور در صندوق — POS-18 (§۶.۱). همهٔ قاعده در `core/sale/PriceList`؛ این‌جا فقط مرزِ سکو
  *  (تنظیم، `CartStore`) و یک نشانِ قابلِ زدن.
