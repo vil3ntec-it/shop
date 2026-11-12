@@ -143,6 +143,7 @@ test('⛔ پرچمِ خاموش: درِ مشتری، کارمند و پیک هر
   assert.equal(up.status, 404, JSON.stringify(up.body));
   assert.equal((await h.get(base(s, o.token))).status, 404);
   assert.equal((await staffList(s.token, o.orderId)).status, 404);
+  assert.equal((await h.get(`/api/store/${s.slug}/orders/${o.token}`)).body.order.addressMedia, undefined, 'پیگیری بی کلیدِ addressMedia');
   assert.equal(Number((await one('SELECT COUNT(*)::int AS n FROM order_address_media WHERE shop_id=$1', [s.shopId])).n), 0);
   const { KNOWN } = require('../src/routes/admin-flags');
   const k = KNOWN.find((x) => x.key === M.FLAG);
@@ -183,6 +184,9 @@ test('CHK-08: بارگذاری با توکن — نوع از بایت، سقفِ
   assert.equal(again.body.replaced, true);
   assert.equal(Number((await one(`SELECT COUNT(*)::int AS n FROM order_address_media WHERE order_id=$1 AND kind='voice_note'`, [o.orderId])).n), 1);
 
+  //  پیگیری: کلیدِ `addressMedia` با سقف‌ها و همان فهرست (فرمِ `store/addr-media.js`)
+  const tr = (await h.get(`/api/store/${s.slug}/orders/${o.token}`)).body.order.addressMedia;
+  assert.deepEqual([tr.photoMax, tr.voiceMax, tr.items.map((x) => x.kind)], [1024 * 1024, 768 * 1024, ['gate_photo', 'voice_note']]);
   //  مشتری فهرستِ خودش را می‌بیند (بی بایت)
   const mine = await h.get(base(s, o.token));
   assert.equal(mine.status, 200);
@@ -254,6 +258,7 @@ test('⛔ ۴۰۳/۴۰۴: صندوق‌دار بله، انباردار ۴۰۳؛ 
   const evs = ['assigned', 'picked_up'].map((type, i) => ({ eventId: `ev-${uniq()}-${i}`, assignmentId: aid, type, deviceTime: Date.now() }));
   const e = await h.post('/api/courier/events', { deviceId: 'courier-phone', events: evs }, { token: s.courier.token });
   assert.equal(e.status, 200, JSON.stringify(e.body));
+  assert.equal((await h.get(`/api/store/${s.slug}/orders/${o.token}`)).body.order.addressMedia, undefined, 'سپرده به پیک ⇒ بی کلید');
   r = await upload(s, o.token, 'voice_note', ogg());
   assert.equal(r.status, 409, JSON.stringify(r.body));
   assert.equal(code(r), 'order_closed');

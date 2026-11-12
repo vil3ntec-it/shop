@@ -88,6 +88,7 @@
       renderPay(o, token);
       renderSubs(o, token);
       renderWeigh(o, token);
+      renderAddr(o, token);
       renderRate(o, token);
       renderPrefs(o, token);
       renderFeedback(o, token);
@@ -342,6 +343,15 @@
 
     //  S56: وزنِ بیش از حد تا پاسخِ مشتری — store/weight-hold.js فقط وقتی پیگیری کلیدِ `weightHold` (نگه‌داشتِ باز) را داد
     //  (پرچمِ خاموش یا بی نگه‌داشتِ باز ⇒ نه اسکریپت، نه واژه‌نامه، نه کارت؛ کارتِ پیشین پنهان)
+    //  CHK-08: عکسِ دروازه و یادداشتِ صوتیِ نشانی — store/addr-media.js فقط وقتی پیگیری کلیدِ `addressMedia` را داد
+    //  (پرچمِ خاموش، دریافت از دکان یا سپرده به پیک ⇒ نه اسکریپت، نه واژه‌نامه، نه گره)
+    var addr = null;
+    function renderAddr(o, token) {
+      if (!o.addressMedia) { if ($('o-am')) $('o-am').hidden = true; return; }
+      addr = addr || K.js('/store/addr-media.js').then(function () { return window.StoreAddrMedia({ slug: ctx.slug }); })
+        .catch(function () { addr = null; return null; });
+      addr.then(function (f) { if (f && (want === null || want === token)) f.render(o, token); });
+    }
     var weigh = null;
     function renderWeigh(o, token) {
       if (!o.weightHold) { if ($('o-wh')) $('o-wh').hidden = true; return; }

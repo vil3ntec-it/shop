@@ -9,6 +9,7 @@
  *   remove(sf, token, kind)        مشتری؛ همان اجازه و همان مهلت.
  *   listFor(shopId, orderId)       فهرست (بی بایت) برای کارمند و پیک.
  *   bytesOf(shopId, orderId, id)   بایت‌ها برای کارمند و پیک.
+ *   customerView(shopId, id, o)    کلیدِ `addressMedia` ِ پیگیریِ مشتری (فرمِ `store/addr-media.js`).
  *
  * ⛔ نوع فقط از روی بایت‌ها (`chat-media.sniff`)؛ سرآیند و پسوند ملاک نیست: `gate_photo` فقط JPEG/PNG/WebP،
  *    `voice_note` فقط صدای فشرده (Opus/WebM، AAC، MP3، AMR، 3GP/M4A) ⇒ وگرنه ۴۱۵. سقفِ اندازه پیش از هر کار (۴۱۳).
@@ -128,9 +129,18 @@ async function bytesOf(shopId, orderId, mediaId) {
   return { id: r.id, kind: r.kind, mime: r.mime, data };
 }
 
+/**
+ * کلیدِ `addressMedia` ِ پیگیریِ مشتری (`store-order-view`، `store/addr-media.js` ِ دیربار): فقط با پرچم و سفارشِ ارسالیِ هنوز
+ * باز ⇒ `{photoMax, voiceMax, items}`؛ وگرنه undefined (کلید نیست ⇒ نه اسکریپت، نه واژه‌نامه، نه گره).
+ */
+async function customerView(shopId, orderId, order) {
+  if (!order || order.fulfillment !== 'delivery' || CLOSED.includes(order.status) || !(await flagOn(shopId))) return undefined;
+  return { photoMax: config.addressMedia.photoMax, voiceMax: config.addressMedia.voiceMax, items: await listFor(shopId, orderId) };
+}
+
 /** فرستادنِ بایت با سرآیندهای امن (همان `chat-media.send`) */
 function send(res, m) {
   chatMedia.send(res, { mime: m.mime, data: m.data, size: m.data.length, kind: KINDS[m.kind] });
 }
 
-module.exports = { FLAG, KINDS, CLOSED, flagOn, put, remove, listFor, bytesOf, send };
+module.exports = { FLAG, KINDS, CLOSED, flagOn, put, remove, listFor, bytesOf, customerView, send };

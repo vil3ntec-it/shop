@@ -80,13 +80,15 @@ const PARTS = {
   facts: { js: 'store/order-facts.js', root: 'o-facts' },
   //  «وزنِ بیشتر از سفارش» (S56، weight-hold.js ِ دیربار از پیگیری، فقط با کلیدِ `weightHold` = نگه‌داشتِ باز): بخش را خودِ اسکریپت می‌سازد
   weigh: { js: 'store/weight-hold.js', root: 'o-wh' },
+  //  عکسِ دروازه و یادداشتِ صوتیِ نشانی (CHK-08، addr-media.js ِ دیربار از پیگیری، فقط با کلیدِ `addressMedia`): بخش را خودِ اسکریپت می‌سازد
+  addrmedia: { js: 'store/addr-media.js', root: 'o-am' },
   //  کارتِ «کالای جایگزین» و «جایگزینی در انتظارِ پاسخِ شما» (PCK-05، S93؛ order.js فقط وقتی سفارش «در حال جمع‌آوری» است):
   //  بخشِ `#o-subs` ِ index.html و نشانِ وضعیت با کلیدِ `substitutionWait` ِ پیگیری
   subs: { js: 'store/order.js', from: 'id="o-subs"', to: 'data-t="od.items"', root: 'o-subs' },
 };
 const parts = Object.fromEntries(Object.keys(PARTS).map((n) => [n, Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/${n}.${l}.json`))]))]));
 const dict = Object.fromEntries(LANGS.map((l) => [l, Object.assign({}, main[l], ...Object.values(parts).map((p) => p[l]))]));
-const SOURCES = ['kit/kit.js', 'kit/settings.js', 'kit/order-kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js', 'store/catalog.js', 'store/filters.js', 'store/order-feedback.js', 'store/order-changes.js', 'store/reviews.js', 'market/index.html', 'store/index.html', 'store/account.js', 'store/visual-search.js', 'store/delivery-method.js', 'store/chat.js', 'store/chat-out.js', 'store/chat-acts.js', 'store/chat-voice.js', 'store/pay-step.js', 'store/line-prefs.js', 'store/acct.js', 'store/cart-sync.js', 'store/erase.js', 'store/order-push.js', 'store/sw.js', 'store/alert-push.js', 'store/push-client.js', 'store/same.js', 'store/gallery.js', 'store/zoom.js', 'store/order-facts.js', 'store/pin-text.js', 'store/pin-map.js', 'store/weight-hold.js'];
+const SOURCES = ['kit/kit.js', 'kit/settings.js', 'kit/order-kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js', 'store/catalog.js', 'store/filters.js', 'store/order-feedback.js', 'store/order-changes.js', 'store/reviews.js', 'market/index.html', 'store/index.html', 'store/account.js', 'store/visual-search.js', 'store/delivery-method.js', 'store/chat.js', 'store/chat-out.js', 'store/chat-acts.js', 'store/chat-voice.js', 'store/pay-step.js', 'store/line-prefs.js', 'store/acct.js', 'store/cart-sync.js', 'store/erase.js', 'store/order-push.js', 'store/sw.js', 'store/alert-push.js', 'store/push-client.js', 'store/same.js', 'store/gallery.js', 'store/zoom.js', 'store/order-facts.js', 'store/pin-text.js', 'store/pin-map.js', 'store/weight-hold.js', 'store/addr-media.js'];
 const ARABIC = /[\u0600-\u06FF]/;
 
 function usedKeys() {
