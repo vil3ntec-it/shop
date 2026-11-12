@@ -151,12 +151,21 @@ object PromoEngine {
    *    همان کالا را به FEFO می‌گیرد (`ExpiryEngine.lots`، به هزارم). `null` ⇒ بی محموله، همان پیشین.
    */
   fun lines(d: ShopData, cart: List<SalesEngine.CartLine>, today: String? = null): List<PromoCore.Line> {
-    //  تاریخِ خرابِ یک محموله فروش را نمی‌خواباند — فقط بی تخفیفِ انقضا
-    val lots = today?.let { t ->
-      runCatching { ExpiryEngine.lots(d, t) }.getOrDefault(emptyList())
-        .groupBy({ it.product.id }) { PromoCore.Lot(it.daysLeft, (it.remaining * 1000).roundToLong()) }
-    }.orEmpty()
+    val lots = today?.let { t -> lotsOf(d, t) }.orEmpty()
     return cart.map { line -> line(d, line, lots) }
+  }
+
+  /** S125: محموله‌های همان دفتر و همان روز یک بار (هر اسکن سبد را عوض می‌کند، نه دفتر را) — کلید: همان شیءِ `d` */
+  private class LotsMemo(val d: ShopData, val today: String, val lots: Map<String, List<PromoCore.Lot>>)
+  @Volatile private var lotsMemo: LotsMemo? = null
+
+  private fun lotsOf(d: ShopData, today: String): Map<String, List<PromoCore.Lot>> {
+    lotsMemo?.let { if (it.d === d && it.today == today) return it.lots }
+    //  تاریخِ خرابِ یک محموله فروش را نمی‌خواباند — فقط بی تخفیفِ انقضا
+    val lots = runCatching { ExpiryEngine.lots(d, today) }.getOrDefault(emptyList())
+      .groupBy({ it.product.id }) { PromoCore.Lot(it.daysLeft, (it.remaining * 1000).roundToLong()) }
+    lotsMemo = LotsMemo(d, today, lots)
+    return lots
   }
 
   private fun line(d: ShopData, line: SalesEngine.CartLine, lots: Map<String, List<PromoCore.Lot>>): PromoCore.Line {
