@@ -122,6 +122,12 @@
 
 ## ۵. دام‌های شناخته‌شدهٔ CI
 
+- **۱۴۰۵/۰۸/۲۲ (دسته‌های ۵۳ تا ۵۶):** `sharp` زیرِ Electron ِ لینوکس گیر می‌کند ⇒ هر آزمونی که `require('sharp')` دارد زیرِ Electron
+  با `{ skip }` رد شود (`store-webp`، `image-zoom`، `jpeg-trailer`)؛ کارهای Node همان را می‌آزمایند. نامِ آزمونِ Kotlin بی `* ? < > | : " \ /`
+  (ویندوز) و در `core/src/commonTest`/`iosTest` و `ios/shared` بی `( ) [ ] ; .` هم (Native) — نگهبان: `kotlin-test-names-windows.test.js`.
+  هر `rollback/*.down.sql` باید `DELETE FROM schema_migrations WHERE version='<n>.sql'` هم داشته باشد. تعارضِ `PARTIAL-MAP-fa.md`:
+  `git checkout --ours` سپس `python3 $OPS/mapmerge.py <wt> <ref>` و `mapfix.py <wt>` (ادغامِ ردیفی؛ union جابه‌جاییِ عامل‌ها را برمی‌گرداند).
+  کلیدِ تازهٔ `COUNT_KEYS` ِ حذفِ مشتری در `CustomerErasure.kt` و `StrErasure` هم. کامپایلِ Kotlin ِ کامل با `-Xmx3g -XX:+UseSerialGC` (۲g OOM).
 - **SUB-10:** هر مسیرِ تازه در هر دو `paid-routes*.test.js` دسته می‌خواهد (STORE_PAID ⇒ ۴۰۴ `store_not_found` با `sf.open`).
 - `shop-route-inventory` برای مسیرهای `:id` ردیفِ واقعیِ کاشته‌شده؛ `route-authz-inventory`.
 - **CodeQL `js/missing-rate-limiting`:** از `(2.14.5)` model pack ِ `.github/codeql/extensions/shop-javascript` `rateLimit` ِ مخزن را می‌شناساند؛ سقفِ IP با `rateLimit` **پیش از** احراز (`router.use(rateLimit(…))`) کافی است. هشدارِ تازه یعنی مسیرِ واقعاً بی سقف (یا model کهنه: `node --test tools/security/codeql-models.test.mjs`). ساکت کردن ممنوع.
