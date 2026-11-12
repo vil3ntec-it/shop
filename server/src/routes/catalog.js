@@ -23,7 +23,7 @@ const audit = require('../lib/audit');
 const { now } = require('../db');
 const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
-const { clientIp } = require('../middleware/ratelimit');
+const { clientIp, rateLimit } = require('../middleware/ratelimit');
 const { badRequest, forbidden } = require('../middleware/errors');
 
 const router = express.Router();
@@ -108,6 +108,18 @@ router.get('/report', needFlag, requirePermission('reports.view'), async (req, r
   //  ممیزیِ ۳۵ (B4): NUL ⇒ ۵۰۰ ِ پایگاه‌داده
   if (productId.includes('\u0000')) throw badRequest('شناسهٔ کالا معتبر نیست', 'bad_product_id');
   res.json(await stock.reconcile(req.shopId, { productId }));
+});
+
+/**
+ * POS-05/INV-03 — نگه‌داشته‌های فعالِ سفارشِ آنلاین برای کاشیِ صندوق (`stock-reserve.posView`). کلیدِ هر ردیف شناسهٔ سفارش را
+ * دارد ⇒ `orders.view` هم (انباردار نه). دکان فقط از عضویت؛ سقفِ هر کاربر در دقیقه (برنامه هر دقیقه یک بار می‌پرسد).
+ */
+const reservedLimit = rateLimit({
+  max: 30, windowMs: 60 * 1000, keyPrefix: 'catalog-reserved', key: (req) => `${req.shopId || 'x'}:${req.user?.id || ''}`,
+});
+router.get('/reserved', reservedLimit, needFlag, requirePermission('orders.view'), async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(await reserve.posView(req.shopId));
 });
 
 router.get('/tasks', needFlag, async (req, res) => {

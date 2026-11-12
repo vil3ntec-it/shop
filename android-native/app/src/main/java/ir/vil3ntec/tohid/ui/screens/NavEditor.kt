@@ -66,6 +66,8 @@ import ir.vil3ntec.tohid.ui.components.common.PhoneNav
 import ir.vil3ntec.tohid.ui.components.common.PhoneNavBar
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import kotlin.math.roundToInt
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrSettings
 
 /**
  *  ویرایشگرِ نوارِ پایین — phone v3 §F2 (مسیر: `PhoneNav.EDITOR` = "nav-editor").
@@ -95,9 +97,9 @@ fun NavEditorScreen(allowed: Set<String>, onBack: () -> Unit) {
 
   Column(Modifier.fillMaxSize().background(p.bg).windowInsetsPadding(WindowInsets.statusBars)) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-      RoundButton(Icons.Outlined.ChevronRight, "بازگشت", onBack)
+      RoundButton(Icons.Outlined.ChevronRight, Str.goBack, onBack)
       Text(
-        "نوارِ پایین", modifier = Modifier.weight(1f), textAlign = TextAlign.Center, color = p.ink,
+        StrSettings.navBar, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, color = p.ink,
         style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp, fontWeight = FontWeight.Bold),
       )
       Spacer(Modifier.width(44.dp))
@@ -113,7 +115,7 @@ fun NavEditorScreen(allowed: Set<String>, onBack: () -> Unit) {
     Box(Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.Center) {
       androidx.compose.animation.Crossfade(targetState = problem, label = "navProblem") { pr ->
         Text(
-          pr?.message ?: "ردیف را با دستگیره بکشید، یا رویش بزنید و جا را انتخاب کنید",
+          pr?.message ?: StrSettings.navHint,
           color = if (pr != null) p.negative else p.inkMuted,
           textAlign = TextAlign.Center,
           style = if (pr != null) MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold)
@@ -125,7 +127,7 @@ fun NavEditorScreen(allowed: Set<String>, onBack: () -> Unit) {
       EditorList(layout, rows, allowed, ::applyEdit)
       Spacer(Modifier.height(16.dp))
       Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        PressBox(scaleTo = 0.95f, label = "بازگرداندنِ پیش‌فرض", onClick = { applyEdit(NavLayouts.Edit.Ok(NavLayouts.normalize(NavLayouts.DEFAULT, allowed))) }) {
+        PressBox(scaleTo = 0.95f, label = StrSettings.restoreDefault, onClick = { applyEdit(NavLayouts.Edit.Ok(NavLayouts.normalize(NavLayouts.DEFAULT, allowed))) }) {
           Row(
             Modifier.height(46.dp).clip(RoundedCornerShape(percent = 50)).background(p.card)
               .border(1.dp, p.hairline, RoundedCornerShape(percent = 50)).padding(horizontal = 20.dp),
@@ -133,7 +135,7 @@ fun NavEditorScreen(allowed: Set<String>, onBack: () -> Unit) {
           ) {
             Icon(Icons.Outlined.Restore, contentDescription = null, tint = p.icon, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
-            Text("بازگرداندنِ پیش‌فرض", color = p.ink, style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold))
+            Text(StrSettings.restoreDefault, color = p.ink, style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold))
           }
         }
       }
@@ -145,10 +147,10 @@ fun NavEditorScreen(allowed: Set<String>, onBack: () -> Unit) {
 private val ROW_H = 52.dp
 
 private fun slotTitle(s: Slot): String = when (s) {
-  Slot.START -> "دایرهٔ شروع · یک مورد یا خاموش"
+  Slot.START -> StrSettings.slotStart
   Slot.PILL -> "قرص · ${NavLayouts.MIN_PILL} تا ${NavLayouts.MAX_PILL} مورد؛ «بیشتر» همیشه هست"
-  Slot.END -> "دایرهٔ پایان · یک مورد یا خاموش"
-  Slot.OUT -> "بیرون از نوار"
+  Slot.END -> StrSettings.slotEnd
+  Slot.OUT -> StrSettings.slotOut
 }
 
 /**
@@ -249,15 +251,15 @@ private fun ItemRow(
       Icon(PhoneNav.icon(id, false), contentDescription = null, tint = p.icon, modifier = Modifier.size(22.dp))
       Spacer(Modifier.width(14.dp))
       Text(def.label, color = p.ink, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp))
-      if (id == NavCatalog.MORE) Icon(Icons.Outlined.Lock, contentDescription = "همیشه در قرص", tint = p.chevron, modifier = Modifier.size(16.dp))
+      if (id == NavCatalog.MORE) Icon(Icons.Outlined.Lock, contentDescription = StrSettings.alwaysInPill, tint = p.chevron, modifier = Modifier.size(16.dp))
       Box(Modifier.size(ROW_H).then(handle), contentAlignment = Alignment.Center) {
-        Icon(Icons.Outlined.DragIndicator, contentDescription = "کشیدن", tint = p.chevron, modifier = Modifier.size(22.dp))
+        Icon(Icons.Outlined.DragIndicator, contentDescription = StrSettings.drag, tint = p.chevron, modifier = Modifier.size(22.dp))
       }
     }
     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
       Slot.entries.filter { it != slot }.forEach { s ->
         DropdownMenuItem(
-          text = { Text(when (s) { Slot.START -> "به دایرهٔ شروع"; Slot.PILL -> "به قرص"; Slot.END -> "به دایرهٔ پایان"; Slot.OUT -> "بیرون از نوار" }) },
+          text = { Text(when (s) { Slot.START -> StrSettings.toStart; Slot.PILL -> StrSettings.toPill; Slot.END -> StrSettings.toEnd; Slot.OUT -> StrSettings.slotOut }) },
           onClick = { menu = false; onPlace(s) },
         )
       }

@@ -229,7 +229,8 @@ class OrderFeedbackTest {
     fun src(rel: String): String =
       listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
         .map { File(it, "ir/vil3ntec/tohid/$rel") }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد")
-    assertTrue(src("ui/screens/Orders.kt").contains("OrderFeedbackEntry(ir.vil3ntec.tohid.data.repo.Backend.api(context), cfg.permissions.manage, rev)"))
+    //  صفحهٔ سفارش‌های نسخهٔ ۳ (صفحهٔ قدیمیِ `ui/screens/Orders.kt` بی‌راه بود و در LOC-06 برداشته شد)
+    assertTrue(src("ui/v3/online/orders/OrderExtrasAndroid.kt").contains("OrderFeedbackEntry(api, c.permissions.manage, OrdersLive.rev.value)"))
     val panel = src("ui/screens/OrderFeedbackPanel.kt")
     val entry = panel.substringAfter("internal fun OrderFeedbackEntry(").substringBefore("@Composable")
     assertTrue(entry.indexOf("if (!b.visible) return") in 0 until entry.indexOf("TohidSecondaryButton("))

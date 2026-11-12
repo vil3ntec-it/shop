@@ -31,7 +31,7 @@ object CustomerErasure {
   val COUNT_KEYS: List<String> = listOf(
     "orders", "orderLines", "orderEvents", "deliveryEvents", "deliveryPhotos", "pickPhotos", "deliveryLocations",
     "notifyOutbox", "conversations", "messages", "chatMedia", "chatPins", "chatReports", "carts", "favorites", "lists", "areaRequests",
-    "alerts", "issues", "issuePhotos", "reviews", "pushSubs", "alertPushSubs", "orderDevices",
+    "alerts", "issues", "issuePhotos", "reviews", "pushSubs", "alertPushSubs", "orderDevices", "addressMedia", "addressMediaLinks",
   )
 
   /** شمارِ رقم‌هایی که برای تأیید باید نوشته شود */

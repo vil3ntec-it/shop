@@ -6,6 +6,8 @@
  *   shop_chat_media   `shop:<دکان>`             `chat-media.sniff` و همان mime ِ ردیف (عکس، صدا، PDF)
  *   trust_evidence    `shop:<دکان>`             همان (فقط عکس، `putEvidence`)
  *   support_media     `support:<رشته>`          `chat-media.sniff` یا جعبهٔ MP4 (ویدیو)؛ نوعِ دیگر ⇒ بایت در پایگاه
+ *   store_address_media `customer:<حساب>`       همان `chat-media.sniff` و mime ِ ردیف (عکسِ دروازه، یادداشتِ صوتیِ نشانیِ حساب؛ CRM-09)
+ *   order_address_media `shop:<دکان>`           همان (عکسِ دروازه، یادداشتِ صوتیِ نشانیِ یک سفارش؛ CHK-08) — هر دو از `address`
  *
  * همان قاعده‌های ۲۵۵: حالتِ `db` (پیش‌فرض) همان SQL و همان بایت در `data`؛ در `disk`/`s3` شیء پیش از نوشتنِ ردیف و
  * پاکِ شیء فقط پس از نشستنِ پاکِ ردیف (`drop`)؛ ردیف فقط با شناسه‌های همان دکان/گفت‌وگو/رشته پیدا می‌شود (مثلِ
@@ -17,6 +19,7 @@ const store = require('./image-store');
 const chatMedia = require('./chat-media');
 
 const supportTenant = (threadId) => `support:${threadId}`;
+const customerTenant = (customerId) => store.accountTenant('customer', customerId);
 
 /** نوعِ رسانهٔ چت (و مدرک) از روی بایت؛ با [mime] فقط همان نوع (نوعِ ردیف عوض نمی‌شود) */
 const chatCheck = (mime = '') => (buf) => {
@@ -78,4 +81,15 @@ const support = {
   drop: (rows) => dropRows(rows, threadOf),
 };
 
-module.exports = { chat, trust, support, chatCheck, supportCheck, supportTenant };
+/**
+ * رسانهٔ نشانی (`lib/address-media.js`): ردیفِ نشانیِ حساب (`customer_id`، CRM-09) در `customer:<حساب>`، ردیفِ نشانیِ یک سفارش
+ * (`shop_id`، CHK-08) در `shop:<دکان>`. `put` ِ نخست همان شکل را می‌گیرد: `{customer_id}` یا `{shop_id}`.
+ */
+const addressTenant = (r) => (r.customer_id ? customerTenant(r.customer_id) : store.shopTenant(r.shop_id));
+const address = {
+  put: (owner, mime, buf, fn) => store.withStaged(addressTenant(owner), buf, fn, { check: chatCheck(mime) }),
+  bytes: (r) => store.bytes(addressTenant(r), r, chatCheck(r.mime)),
+  drop: (rows) => dropRows(rows, addressTenant),
+};
+
+module.exports = { chat, trust, support, address, chatCheck, supportCheck, supportTenant, customerTenant, addressTenant };

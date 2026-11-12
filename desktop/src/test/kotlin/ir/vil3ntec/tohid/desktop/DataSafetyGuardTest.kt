@@ -328,6 +328,8 @@ class DataSafetyGuardTest {
       "tohid-holidays",
       //  POS-04: نسخهٔ محلیِ فهرستِ مرکزیِ مترادفِ سرور (`TillSynonyms`، روزی یک بار)؛ تنظیمِ دکان نیست
       "tohid-synonyms",
+      //  POS-05/INV-03: آخرین نمای رزروِ سفارش‌های اینترنتی (`OnlineHoldsStore`، هر دقیقه از سرور)؛ تنظیمِ دکان نیست
+      "tohid-online-holds",
     ).forEach { put(it, Kind.SERVER) }
     //  عمداً مالِ همین دستگاه: نشست و همگام‌سازی، سرور، قفل، زبان و ظاهر، چاپگر/دستگاه‌ها، پیش‌نویس‌ها
     listOf(
@@ -343,6 +345,8 @@ class DataSafetyGuardTest {
       "tohid-held-sync",
       //  «اصلاح و ثبت» ِ صندوقِ سندهای ردشده: کلیدِ سبدِ همین صندوق ⇒ ردیفِ صندوقِ سرور (`ConflictFix`)؛ خودِ ردیف روی سرور است
       "tohid-conflict-fix",
+      //  OPS-02: پرچمِ «پشتیبانِ دستی و پوشه هم رمزدار» و شکستِ پشتیبانِ پوشه (`BackupDevice`)؛ کلیدِ عبارت مالِ همین دستگاه است
+      "tohid-backup-device",
     ).forEach { put(it, Kind.DEVICE) }
     //  مانده (DATA-SAFETY §۶): رمزِ کارمندان عمداً از پشتیبان بیرون است — دوباره گذاشته می‌شود
     put("tohid-staff-pins", Kind.GAP)

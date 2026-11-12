@@ -44,6 +44,9 @@ class SalesContactTest {
     for (n in listOf("93792236008", "0792236008")) {
       assertTrue("شمارهٔ $n هنوز در Vip.kt ثابت است — از SalesContact بخوانید", n !in src)
     }
-    assertTrue(src.contains("SalesContact.waDigits("))
+    //  پیوندِ واتس‌اپِ خرید در صفحهٔ اشتراکِ نسخهٔ ۳ است (صفحهٔ قیمت‌های `Vip.kt` بی‌راه بود و در LOC-06 برداشته شد)
+    val plans = File(dir!!.parentFile, "v3/account/subscription/PlansScreen.kt").readText()
+    for (n in listOf("93792236008", "0792236008")) assertTrue("شمارهٔ $n در PlansScreen.kt ثابت است", n !in plans)
+    assertTrue(plans.contains("SalesContact.waDigits("))
   }
 }

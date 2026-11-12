@@ -1,6 +1,8 @@
 package ir.vil3ntec.tohid.desktop
 
 import ir.vil3ntec.tohid.ShopDayChoice
+import ir.vil3ntec.tohid.data.DebtReminder
+import ir.vil3ntec.tohid.data.DebtReminderPref
 import ir.vil3ntec.tohid.data.LedgerOwner
 import ir.vil3ntec.tohid.data.ShopSettingsKeys
 import ir.vil3ntec.tohid.data.ShopSettingsKeys.Scope
@@ -329,5 +331,27 @@ class ShopSettingsSyncTest {
       wipe()
       ShopDayChoice.load(ctx)
     }
+  }
+
+  @Test fun `متنِ یادآوریِ بدهی مالِ دکان است — نوشته‌شده روی دستگاهِ دیگر این‌جا به کار می‌رود و پیش‌فرض همه را برمی‌گرداند (CRM-06)`() {
+    val server = FakeServer()
+    assertEquals(DebtReminder.DEFAULT_TEMPLATE, DebtReminderPref.template(ctx))
+    //  مدیر روی کامپیوتر متن را نوشت
+    server.set("debt_reminder_template", "s", JsonPrimitive("{نام} جان، {مبلغ} از {دکان} مانده"))
+    cycle(server)
+    assertEquals("{نام} جان، {مبلغ} از {دکان} مانده", DebtReminderPref.template(ctx))
+    //  متنِ نادرستِ رسیده (مثلاً از نسخهٔ دیگر) جملهٔ امروز را نمی‌شکند
+    server.set("debt_reminder_template", "s", JsonPrimitive("{ناشناس}"))
+    cycle(server)
+    assertEquals(DebtReminder.DEFAULT_TEMPLATE, DebtReminderPref.template(ctx))
+    //  ویرایشِ همین دستگاه (صاحب) به سرور می‌رود
+    assertNull(DebtReminderPref.set(ctx, "{نام}، {مبلغ} تا {سررسید}"))
+    cycle(server)
+    assertEquals(JsonPrimitive("{نام}، {مبلغ} تا {سررسید}"), server.rows.getValue("tohid-policy/debt_reminder_template").v)
+    //  «برگشت به پیش‌فرض» روی دستگاهِ دیگر ⇒ این‌جا هم همان جملهٔ امروز
+    server.rows["tohid-policy/debt_reminder_template"] =
+      FakeServer.Row("tohid-policy", "debt_reminder_template", "del", JsonNull, ++server.rev)
+    cycle(server)
+    assertEquals(DebtReminder.DEFAULT_TEMPLATE, DebtReminderPref.template(ctx))
   }
 }

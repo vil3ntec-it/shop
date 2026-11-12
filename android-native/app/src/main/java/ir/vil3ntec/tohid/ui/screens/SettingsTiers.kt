@@ -29,11 +29,11 @@ object SettingsTiers {
    *  فروش می‌ماند.
    */
   val ESSENTIAL: Set<String> = setOf(
-    "ظاهر", "زبان", "تاریخ و رقم",
-    "قفل برنامه", "کد شاگرد", "تغییر رمز حساب",
+    "ظاهر", "زبان", "تاریخ و رقم", // داده: کلیدِ بخشِ تنظیمات
+    "قفل برنامه", "کد شاگرد", "تغییر رمز حساب", // داده: کلیدِ بخشِ تنظیمات
     SettingsLayout.PAY, SettingsLayout.PERIPHERALS,
     SettingsLayout.CAMERA,
-    "همگام‌سازی", "داده‌ها",
+    "همگام‌سازی", "داده‌ها", // داده: کلیدِ بخشِ تنظیمات
     SettingsLayout.ABOUT_APP,
   )
 
@@ -66,26 +66,26 @@ object SettingsHelp {
   const val LATE_APOLOGY = "settings/late-apology"
 
   fun line(key: String): String? = when (key) {
-    "ظاهر" -> H.appearanceLine
-    "زبان" -> H.languageLine
-    "تاریخ و رقم" -> H.digitsLine
-    "قفل برنامه" -> H.appLockLine
-    "کد شاگرد" -> H.staffCodeLine
-    "تغییر رمز حساب" -> H.passwordLine
+    "ظاهر" -> H.appearanceLine // داده: کلیدِ بخشِ تنظیمات
+    "زبان" -> H.languageLine // داده: کلیدِ بخشِ تنظیمات
+    "تاریخ و رقم" -> H.digitsLine // داده: کلیدِ بخشِ تنظیمات
+    "قفل برنامه" -> H.appLockLine // داده: کلیدِ بخشِ تنظیمات
+    "کد شاگرد" -> H.staffCodeLine // داده: کلیدِ بخشِ تنظیمات
+    "تغییر رمز حساب" -> H.passwordLine // داده: کلیدِ بخشِ تنظیمات
     SettingsLayout.PAY -> H.payLine
     SettingsLayout.HESAB_SHOP -> H.hesabShopLine
     SettingsLayout.PRINTER -> H.printerLine
     SettingsLayout.CAMERA -> H.cameraLine
-    "همگام‌سازی" -> H.syncLine
-    "داده‌ها" -> H.backupLine
+    "همگام‌سازی" -> H.syncLine // داده: کلیدِ بخشِ تنظیمات
+    "داده‌ها" -> H.backupLine // داده: کلیدِ بخشِ تنظیمات
     SettingsLayout.ABOUT_APP -> H.aboutLine
-    "هشدارها" -> H.alertsLine
+    "هشدارها" -> H.alertsLine // داده: کلیدِ بخشِ تنظیمات
     SettingsLayout.NAV_BAR -> H.navBarLine
     SettingsLayout.TRAINING -> H.trainingLine
     SettingsLayout.ENCRYPTION -> H.encryptionLine
-    "دستگاه‌های وارد شده" -> H.sessionsLine
+    "دستگاه‌های وارد شده" -> H.sessionsLine // داده: کلیدِ بخشِ تنظیمات
     SettingsLayout.ANOMALY -> H.anomalyLine
-    "کالای منقضی" -> H.expiryLine
+    "کالای منقضی" -> H.expiryLine // داده: کلیدِ بخشِ تنظیمات
     SettingsLayout.CHECKOUT_RULES -> H.checkoutRulesLine
     SettingsLayout.HELD -> H.heldLine
     SettingsLayout.RETURNS -> H.returnsLine
@@ -133,25 +133,25 @@ object SettingsHelp {
   }
 
   fun example(key: String): String? = when (key) {
-    "ظاهر" -> H.appearanceExample
-    "زبان" -> H.languageExample
-    "تاریخ و رقم" -> H.digitsExample
-    "قفل برنامه" -> H.appLockExample
-    "کد شاگرد" -> H.staffCodeExample
-    "تغییر رمز حساب" -> H.passwordExample
+    "ظاهر" -> H.appearanceExample // داده: کلیدِ بخشِ تنظیمات
+    "زبان" -> H.languageExample // داده: کلیدِ بخشِ تنظیمات
+    "تاریخ و رقم" -> H.digitsExample // داده: کلیدِ بخشِ تنظیمات
+    "قفل برنامه" -> H.appLockExample // داده: کلیدِ بخشِ تنظیمات
+    "کد شاگرد" -> H.staffCodeExample // داده: کلیدِ بخشِ تنظیمات
+    "تغییر رمز حساب" -> H.passwordExample // داده: کلیدِ بخشِ تنظیمات
     SettingsLayout.PAY -> H.payExample
     SettingsLayout.HESAB_SHOP -> H.hesabShopExample
     SettingsLayout.CAMERA -> H.cameraExample
-    "همگام‌سازی" -> H.syncExample
-    "داده‌ها" -> H.backupExample
+    "همگام‌سازی" -> H.syncExample // داده: کلیدِ بخشِ تنظیمات
+    "داده‌ها" -> H.backupExample // داده: کلیدِ بخشِ تنظیمات
     SettingsLayout.ABOUT_APP -> H.aboutExample
-    "هشدارها" -> H.alertsExample
+    "هشدارها" -> H.alertsExample // داده: کلیدِ بخشِ تنظیمات
     SettingsLayout.NAV_BAR -> H.navBarExample
     SettingsLayout.TRAINING -> H.trainingExample
     SettingsLayout.ENCRYPTION -> H.encryptionExample
-    "دستگاه‌های وارد شده" -> H.sessionsExample
+    "دستگاه‌های وارد شده" -> H.sessionsExample // داده: کلیدِ بخشِ تنظیمات
     SettingsLayout.ANOMALY -> H.anomalyExample
-    "کالای منقضی" -> H.expiryExample
+    "کالای منقضی" -> H.expiryExample // داده: کلیدِ بخشِ تنظیمات
     SettingsLayout.CHECKOUT_RULES -> H.checkoutRulesExample
     SettingsLayout.HELD -> H.heldExample
     SettingsLayout.RETURNS -> H.returnsExample

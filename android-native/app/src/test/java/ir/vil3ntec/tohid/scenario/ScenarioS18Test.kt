@@ -23,9 +23,11 @@ import org.junit.Test
  *  گامِ ۳ (جست‌وجوی کالا با نام فقط با صفحه‌کلیدِ روی‌صفحه): کلیدِ «حروف» ِ کادرِ اسکن (`TouchKeyboard`، فارسی/دری، پښتو،
  *  لاتین) نوشته را می‌سازد و همان جست‌وجوی صندوق (`PosCatalog.matches`) کالا را می‌یابد.
  *
- *  ماندهٔ سناریو (pending، نه سرخ):
- *   • گامِ ۴ (ثبتِ مشتریِ تازه با نامِ دری) در صندوقِ کامپیوتر برگه‌ای ندارد که صفحه‌کلیدِ حروف به آن وصل شود.
- *   • آزمونِ عملی روی کامپیوترِ لمسیِ واقعی (و شمارشِ لمس روی صفحهٔ واقعی) انجام نشده؛ شمارشِ زیر روی همان قاعده‌هاست.
+ *  گامِ ۴ (مشتریِ تازه با نامِ دری): نامِ دری با نیم‌فاصله از همان کلیدها ⇒ همان `DebtorEngine.add` ِ «مشتریِ تازه» ِ
+ *  گزینشِ مشتریِ صندوق؛ پنجرهٔ واقعیِ صندوق (فوکوسِ کادر، دو زدنِ تند ⇒ یک مشتری، دیسک): `TillNewCustomerUiTest` ِ desktop.
+ *
+ *  ماندهٔ سناریو (pending، نه سرخ): آزمونِ عملی روی کامپیوترِ لمسیِ واقعی (و شمارشِ لمس روی صفحهٔ واقعی) انجام نشده؛
+ *  شمارشِ زیر روی همان قاعده‌هاست.
  */
 class ScenarioS18Test {
 
@@ -93,6 +95,26 @@ class ScenarioS18Test {
     //  هر دو گزینشِ مشتریِ صندوقِ کامپیوتر (F2 و «دریافت») با `PosTouchPrefs.extras()`؛ گوشی پیش‌فرض (خاموش)
     assertEquals(2, Regex(Regex.escape("touch = touchExtras, onClose =")).findAll(src("ir/vil3ntec/tohid/ui/screens/DeskSale.kt")).count())
     assertFalse(src("ir/vil3ntec/tohid/ui/screens/Sale.kt").contains("touch = touchExtras"))
+  }
+
+  @Test
+  fun `S18 گامِ ۴ — مشتریِ تازه با نامِ دری فقط با صفحه‌کلیدِ حروف`() {
+    val keys = TouchKeyboard.rows(TouchKeyboard.initial("prs")).flatten()
+    fun letter(ch: Char) = keys.single { it == TouchKeyboard.Key.Letter(ch.toString()) }
+    var name = ""
+    var touches = 0
+    for (ch in "ذبیح") { name = TouchKeyboard.apply(name, letter(ch)); touches++ }
+    name = TouchKeyboard.apply(name, keys.single { it == TouchKeyboard.Key.HalfSpace }); touches++
+    for (ch in "الله") { name = TouchKeyboard.apply(name, letter(ch)); touches++ }
+    assertEquals("ذبیح\u200Cالله", name)
+    val d = ShopData(debtors = listOf(ir.vil3ntec.tohid.data.Debtor(id = "a", name = "احمد")))
+    val r = ir.vil3ntec.tohid.data.DebtorEngine.add(d, ir.vil3ntec.tohid.data.DebtorEngine.DebtorDraft(name = name), 1_000L) { "c-dari" }
+    assertTrue("$r", r is ir.vil3ntec.tohid.data.DebtorEngine.Result.Ok)
+    val made = (r as ir.vil3ntec.tohid.data.DebtorEngine.Result.Ok).data.debtors
+    assertEquals(listOf("احمد", name), made.map { it.name })
+    assertEquals("c-dari", r.id)
+    //  کلیدِ «حروف» + ۹ لمسِ نام + «مشتریِ تازه»
+    assertTrue("لمس‌ها: $touches", touches + 2 <= 12)
   }
 
   private var seq = 0

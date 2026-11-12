@@ -144,3 +144,30 @@ test('۴) خطِ فرمان: seal ⇐ open بایت‌به‌بایت، بی ر�
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('۵) «پشتیبانِ فقط دفتر» ِ رمزدارِ برنامه (`….json.sealed`): open همان JSON را با کدِ ۰ می‌دهد و check آن را می‌شناسد', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'phrase-backup-'));
+  try {
+    const ledger = Buffer.from(JSON.stringify({ products: [{ id: 'p1', name: 'زعفرانِ هرات' }], sales: [], customers: [] }));
+    const phrase = 'k7qm2-z9p4x-dh6vn-b3rtc-8wjf2';
+    //  همان پاکتی که `PhraseBackup.sealing` ِ برنامه می‌سازد (بردارِ بایت‌به‌بایت در آزمونِ ۱)
+    const sealedPath = path.join(dir, 'tohid-shop-backup.json.sealed');
+    fs.writeFileSync(sealedPath, pb.seal(ledger, phrase, { iterations: 100000 }));
+    const back = path.join(dir, 'ledger.json');
+    let r = cli(['open', sealedPath, back], phrase);
+    assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+    assert.match(r.stdout, /فقط دفتر/);
+    assert.deepEqual(fs.readFileSync(back), ledger);
+    r = cli(['check', back]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /فقط دفتر/);
+    //  نه ZIP و نه JSON ِ دفتر ⇒ همان کدِ ۴ («نوشته شد تا بررسی شود»)
+    const odd = path.join(dir, 'odd.sealed');
+    fs.writeFileSync(odd, pb.seal(Buffer.from('[1,2,3]'), phrase, { iterations: 100000 }));
+    r = cli(['open', odd, path.join(dir, 'odd.out')], phrase);
+    assert.equal(r.status, 4);
+    assert.equal(pb.jsonLedger(Buffer.from('{"a":1')).ok, false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

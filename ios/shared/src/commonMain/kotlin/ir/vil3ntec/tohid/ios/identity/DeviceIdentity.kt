@@ -89,8 +89,11 @@ internal object DeviceIdentityKeys {
   const val V1_SUITE = "tohid-sync-v1"
   const val REPLICA_SUFFIX = ".replica"
 
-  /** همان پنج پروندهٔ بیرون از پشتیبانِ اندروید (`backup_rules.xml`؛ آزمون همین را با آن می‌سنجد) */
-  val DEVICE_ONLY: List<String> = listOf(SUITE, "tohid-session", "tohid-session-secure", "tohid-staff-pins", "tohid-doc-series")
+  /**
+   *  همان شش پروندهٔ بیرون از پشتیبانِ اندروید (`backup_rules.xml`؛ آزمون همین را با آن می‌سنجد). `tohid-backup-device`:
+   *  پرچمِ «پشتیبانِ دستی و پوشه هم رمزدار» (OPS-02) تنظیمِ همین دستگاه است — کلیدِ عبارت روی گوشیِ تازه نیست، پس پرچم هم نرود.
+   */
+  val DEVICE_ONLY: List<String> = listOf(SUITE, "tohid-session", "tohid-session-secure", "tohid-staff-pins", "tohid-doc-series", "tohid-backup-device")
 
   /**
    *  کلیدهای `tohid-sync` که چرخش برنمی‌دارد: هویت (بازنویسی)، مالکِ شناسهٔ خام (با replicaها جابه‌جا می‌شود) و سایهٔ

@@ -38,6 +38,8 @@ data class ShopperState(
   val theme: String = "system",
   /** CHK-09: نشانی‌های نام‌دار با پین (حداکثر ۱۰، [AddressRules.MAX]) */
   val addresses: List<SavedAddress> = emptyList(),
+  /** CRM-09: نشانی‌های حساب که روی همین دستگاه پاک شدند و DELETE شان هنوز نرفته ([AddressSync]) */
+  val addressGone: List<String> = emptyList(),
   /** MKT-08: سفارش‌های تکرارشونده ([RepeatPlans]) */
   val plans: List<RepeatPlan> = emptyList(),
   /** MKT-02: شناسهٔ تصادفیِ همین نصب (۳۲ hex) — فقط وقتی دکان سدِ «یک بار برای هر دستگاه» دارد فرستاده می‌شود */

@@ -324,6 +324,8 @@ private fun ShipTab(c: MissionCard, live: Boolean) {
   }
   rows.forEach { (label, value, strong) -> DarkKV(label, value, strong) }
   if (live && c.phoneMasked.isNotBlank()) DarkKV(StrCourierApp.maskedPhone, c.phoneMasked, false, ltr = true)
+  //  CRM-09/CHK-08: عکسِ دروازه و یادداشتِ صوتیِ مشتری (پرچمِ `shop.storefront.address_media`؛ فقط تا مأموریت زنده است)
+  if (live) CourierAddressMediaV3(c.id)
   if (!live) {
     Spacer(Modifier.height(10.dp))
     Text(StrCourierApp.customerErased, style = courierText(13.sp), color = p.onBlackMuted)

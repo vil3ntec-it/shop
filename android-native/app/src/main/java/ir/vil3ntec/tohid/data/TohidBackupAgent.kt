@@ -55,10 +55,11 @@ class TohidBackupAgent : BackupAgent() {
     /**
      *  همان استثناهای XML: توکنِ امروز و جای قدیمی‌اش، PINهای شاگرد (STF-02/04)، سریِ سندِ همین
      *  دستگاه (DATA-06، `DocSeries`) — گوشیِ بازیابی‌شده سریِ خودش را از سرور می‌گیرد — و replica و cursor ِ
-     *  هر حساب (`tohid-sync-v1`، DATA-06؛ همان که `AtRestScope.SYNC_PREFS` هم دارد).
+     *  هر حساب (`tohid-sync-v1`، DATA-06؛ همان که `AtRestScope.SYNC_PREFS` هم دارد)؛ پرچمِ رمزِ پشتیبانِ دستی و شکستِ پوشه
+     *  (`tohid-backup-device`، OPS-02: کلیدِ عبارت مالِ همین دستگاه است).
      */
     val EXCLUDED_PREFS = setOf("tohid-sync.xml", "tohid-session.xml", "tohid-session-secure.xml", "tohid-staff-pins.xml",
-      "tohid-doc-series.xml", "tohid-sync-v1.xml")
+      "tohid-doc-series.xml", "tohid-sync-v1.xml", "tohid-backup-device.xml")
 
     /**
      *  همان `exclude domain="file"` ِ XML: سایهٔ v1 در فایلِ خودش (`sync-shadow/`، `ShadowStore.DIR`) و حالِ Sync v3 (`sync-v3/`،

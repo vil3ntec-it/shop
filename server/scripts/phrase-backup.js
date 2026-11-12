@@ -5,7 +5,8 @@
  *
  *   node scripts/phrase-backup.js check <فایل>             رمزدار است؟ با عبارت یا کلیدِ دستگاه؟ ZIP ِ کامل؟ (بی عبارت)
  *   node scripts/phrase-backup.js seal  <ZIP> <خروجی>      پشتیبانِ ساده (USB، پوشه) ⇒ پاکتِ رمز با عبارت (نمکِ تازه)
- *   node scripts/phrase-backup.js open  <پاکت> <خروجی>     پاکت ⇒ همان ZIP، تا «بازیابی از فایل» ِ برنامه آن را بگیرد
+ *   node scripts/phrase-backup.js open  <پاکت> <خروجی>     پاکت ⇒ همان ZIP (یا JSON ِ «پشتیبانِ فقط دفتر»)، تا «بازیابی از
+ *                                                          فایل» ِ برنامه یا نسخهٔ وب آن را بگیرد
  *
  * عبارت فقط از ورودیِ استاندارد (یا `TOHID_PHRASE`) خوانده می‌شود — هرگز از خطِ فرمان (تاریخچهٔ پوسته، `ps`) — و هیچ‌جا
  * چاپ نمی‌شود. خروجی هرگز رونویسی نمی‌شود (اول `.tmp`، بعد جابه‌جایی؛ پروندهٔ موجود ⇒ خطا) و فقط برای صاحبش خواندنی است.
@@ -129,6 +130,20 @@ function open(sealed, typedPhrase) {
 }
 
 /**
+ * «پشتیبانِ فقط دفتر» ِ برنامه (`BackupRestore.writeLedger`، `….json.sealed` وقتی رمزِ پشتیبانِ دستی روشن است): JSON ِ یک شیء،
+ * همان فایلی که نسخهٔ وب می‌خواند ⇐ {ok, keys} یا {ok:false}.
+ */
+function jsonLedger(b) {
+  if (!Buffer.isBuffer(b) || !b.toString('utf8', 0, 64).trimStart().startsWith('{')) return { ok: false };
+  try {
+    const v = JSON.parse(b.toString('utf8'));
+    return v && typeof v === 'object' && !Array.isArray(v) ? { ok: true, keys: Object.keys(v).length } : { ok: false };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/**
  * ZIP ِ کامل؟ — همان قاعدهٔ `ZipTail.complete` ِ برنامه: رکوردِ پایانی (END) هست و شمارِ قلم‌های فهرستِ مرکزی با آن
  * می‌خواند (ZIP ِ بریده سرِ مرزِ قلم هم «ناقص» است) ⇐ {ok, entries} یا {ok:false, reason}.
  */
@@ -223,6 +238,10 @@ async function main(argv) {
     const b = readFile(input);
     if (!isSealed(b)) {
       const z = zipComplete(b);
+      if (!z.ok && jsonLedger(b).ok) {
+        console.log('«پشتیبانِ فقط دفتر» ِ ساده (JSON، رمز ندارد)');
+        return 0;
+      }
       console.log(z.ok ? `پشتیبانِ ساده (رمز ندارد)، ZIP ِ کامل با ${z.entries} قلم` : `رمزدار نیست و ZIP ِ کامل هم نیست (${z.reason})`);
       return z.ok ? 0 : 4;
     }
@@ -247,9 +266,12 @@ async function main(argv) {
     }
     const plain = open(b, phrase);
     const z = zipComplete(plain);
+    const ledger = z.ok ? null : jsonLedger(plain);
     writeNew(output, plain);
-    console.log(z.ok ? `باز شد: ZIP ِ کامل با ${z.entries} قلم` : `باز شد ولی ZIP ِ کامل نیست (${z.reason}) — نوشته شد تا بررسی شود`);
-    return z.ok ? 0 : 4;
+    if (z.ok) console.log(`باز شد: ZIP ِ کامل با ${z.entries} قلم`);
+    else if (ledger.ok) console.log('باز شد: «پشتیبانِ فقط دفتر» (JSON)');
+    else console.log(`باز شد ولی نه ZIP ِ کامل است نه دفترِ JSON (${z.reason}) — نوشته شد تا بررسی شود`);
+    return z.ok || ledger.ok ? 0 : 4;
   }
   console.error(USAGE);
   return 1;
@@ -262,4 +284,6 @@ if (require.main === module) {
   });
 }
 
-module.exports = { PhraseError, normalize, kidOf, parseKid, deriveKey, isSealed, parse, seal, sealWith, open, zipComplete, readFile, writeNew, main };
+module.exports = {
+  PhraseError, normalize, kidOf, parseKid, deriveKey, isSealed, parse, seal, sealWith, open, zipComplete, jsonLedger, readFile, writeNew, main,
+};

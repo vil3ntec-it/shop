@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrAccount
 /**
  *  منطقِ خالصِ «حساب من» (phone-ui، تصویرِ مرجعِ ۳) — بی Compose، برای آزمونِ JVM.
  *
@@ -46,9 +48,9 @@ object ProfileModel {
 
   /** نشانِ نقش روی کارتِ حساب (گوشی نسخهٔ ۳، بندِ B: «صاحب دکان» / «مدیر» / «فروشنده») */
   fun roleLabel(role: String): String = when (role.trim().lowercase()) {
-    "manager" -> "مدیر"
-    "staff" -> "فروشنده"
-    else -> "صاحب دکان"
+    "manager" -> StrAccount.roleManager
+    "staff" -> StrAccount.roleSeller
+    else -> StrAccount.roleOwner
   }
 
   /* ===================== کارتِ «حساب من» (r4) ===================== */
@@ -67,7 +69,7 @@ object ProfileModel {
   /** نامِ روی کارت: بیرون از حساب «مهمان»، نامِ خالی «بی‌نام» */
   fun displayName(a: Account): String = when {
     !a.signedIn -> GUEST
-    a.name.isBlank() -> "بی‌نام"
+    a.name.isBlank() -> StrAccount.noName
     else -> a.name.trim()
   }
 
@@ -92,29 +94,29 @@ object ProfileModel {
    */
   fun banner(signedIn: Boolean, p: Plan?, warnDays: Int, n: (Int) -> String = Int::toString): Banner = when {
     !signedIn || p == null -> Banner(
-      "وارد حساب نشده‌اید",
+      StrAccount.bannerGuestTitle,
       "با حساب، دفترِ دکان پشتیبان می‌گیرد و روی گوشیِ دیگر هم می‌آید",
-      "ورود", Action.SIGN_IN,
+      Str.signIn, Action.SIGN_IN,
     )
     p.expired -> Banner(
-      "اشتراک تمام شده",
-      "هیچ داده‌ای پاک نمی‌شود؛ خروجی و چاپ باز می‌ماند",
-      "تمدید", Action.RENEW,
+      StrAccount.bannerExpiredTitle,
+      StrAccount.bannerExpiredBody,
+      Str.renew, Action.RENEW,
     )
     p.active && p.trial -> Banner(
-      if (p.days > 0) "آزمایشی: ${n(p.days)} روزِ دیگر" else "امروز آخرین روزِ آزمایشی",
-      "برای ادامه پس از آزمایش، یکی از پلن‌ها را بگیرید",
-      "پلن‌ها", Action.PLANS,
+      if (p.days > 0) "آزمایشی: ${n(p.days)} روزِ دیگر" else StrAccount.bannerTrialLast,
+      StrAccount.bannerTrialBody,
+      StrAccount.plansButton, Action.PLANS,
     )
     p.active -> Banner(
-      if (p.days > 0) "اشتراک: ${n(p.days)} روزِ دیگر" else "امروز آخرین روزِ اشتراک",
-      if (p.days <= warnDays) "به‌زودی تمام می‌شود؛ پیش از پایان تمدید کنید" else "همهٔ بخش‌ها باز است",
-      "تمدید", Action.RENEW,
+      if (p.days > 0) "اشتراک: ${n(p.days)} روزِ دیگر" else StrAccount.bannerActiveLast,
+      if (p.days <= warnDays) StrAccount.bannerSoonBody else StrAccount.bannerOkBody,
+      Str.renew, Action.RENEW,
     )
     else -> Banner(
-      "بدونِ اشتراک",
-      "برای باز شدنِ همهٔ بخش‌ها یکی از پلن‌ها را بگیرید",
-      "پلن‌ها", Action.PLANS,
+      StrAccount.bannerNoneTitle,
+      StrAccount.bannerNoneBody,
+      StrAccount.plansButton, Action.PLANS,
     )
   }
 
@@ -130,12 +132,12 @@ object ProfileModel {
    *  همان سدِ `ShopRole.canOpenSettings`).
    */
   fun menu(signedIn: Boolean, canSettings: Boolean): List<MenuItem> = buildList {
-    if (signedIn) add(MenuItem(EDIT, "ویرایش حساب و دکان", null))
-    add(MenuItem("devices", "دستگاه‌ها", "devices"))
-    add(MenuItem("plan", "اشتراک و پرداخت", "myplan"))
-    add(MenuItem("stats", "آمار", "reports"))
-    if (canSettings) add(MenuItem("settings", "تنظیمات", "settings"))
-    add(MenuItem("support", "پشتیبانی", "support"))
-    if (signedIn) add(MenuItem(SIGN_OUT, "خروج از حساب", null, danger = true))
+    if (signedIn) add(MenuItem(EDIT, StrAccount.menuEdit, null))
+    add(MenuItem("devices", StrAccount.menuDevices, "devices"))
+    add(MenuItem("plan", StrAccount.menuPlan, "myplan"))
+    add(MenuItem("stats", StrAccount.menuStats, "reports"))
+    if (canSettings) add(MenuItem("settings", Str.settings, "settings"))
+    add(MenuItem("support", Str.support, "support"))
+    if (signedIn) add(MenuItem(SIGN_OUT, StrAccount.menuSignOut, null, danger = true))
   }
 }

@@ -133,6 +133,12 @@ async function order(shopId, phone, { status = 'delivered', name = NAME, totalMi
      VALUES ($1,$2,$3,$4,'image/jpeg',$5,'x',$6,$7)`,
     [newId('pph'), shopId, id, `pp-${id}`, jpeg.length, jpeg, at]
   );
+  //  CHK-08: عکسِ دروازهٔ نشانی (مهاجرتِ ۸۴۷)
+  await query(
+    `INSERT INTO order_address_media (id, shop_id, order_id, kind, mime, size, sha256, data, created_at)
+     VALUES ($1,$2,$3,'gate_photo','image/jpeg',$4,$5,$6,$7)`,
+    [newId('oam'), shopId, id, jpeg.length, require('node:crypto').createHash('sha256').update(jpeg).digest('hex'), jpeg, at]
+  );
   await query(
     'INSERT INTO delivery_locations (assignment_id, shop_id, lat, lng, server_time) VALUES ($1,$2,$3,$4,$5)',
     [asg, shopId, t.lat, t.lng, at]
@@ -244,8 +250,9 @@ async function money(shopId) {
 const PII_TABLES = ['online_orders', 'online_order_lines', 'online_order_events', 'delivery_events', 'delivery_photos',
   'order_pick_photos', 'delivery_locations', 'customer_notify_outbox', 'shop_chat_conversations', 'shop_chat_messages',
   'shop_chat_media', 'shop_chat_pins', 'shop_chat_reports', 'store_customer_carts', 'store_customer_favorites', 'store_customer_lists', 'storefront_area_requests',
-  'storefront_alerts', 'order_issues', 'order_issue_photos', 'order_reviews', 'store_alert_push'];
-const BYTES = new Set(['delivery_photos', 'order_pick_photos', 'shop_chat_media', 'order_issue_photos']);
+  'storefront_alerts', 'order_issues', 'order_issue_photos', 'order_reviews', 'store_alert_push', 'order_address_media',
+  'online_order_address_refs'];
+const BYTES = new Set(['delivery_photos', 'order_pick_photos', 'shop_chat_media', 'order_issue_photos', 'order_address_media']);
 
 /** متنِ کاملِ هر ردیفِ این دکان در جدول‌های فهرست (bytea به متن). */
 async function dump(shopId, where = '') {
@@ -273,6 +280,17 @@ async function seedCustomer(s, customerId = null) {
   await chat(s.shopId, PHONE, { customerId });
   await chat(s.shopId, PHONE, { orderId: o1 });
   await extras(s.shopId, customerId, PHONE);
+  if (customerId) {
+    //  CRM-09: نشانیِ ذخیره‌شدهٔ حساب با عکسِ دروازه و هر دو سفارش با همان نشانی (پیوندِ ۸۳۶) — پیوندها پاک، رسانهٔ حساب می‌ماند
+    const [addr, at] = [newId('sca'), now()];
+    await query(`INSERT INTO store_customer_addresses (id, customer_id, label, landmark, created_at, updated_at)
+                 VALUES ($1,$2,'خانه','دروازهٔ سبز',$3,$3)`, [addr, customerId, at]);
+    await query(`INSERT INTO store_address_media (id, customer_id, address_id, kind, mime, size_bytes, data, created_at)
+                 VALUES ($1,$2,$3,'gate_photo','image/jpeg',4,$4,$5)`, [newId('sam'), customerId, addr, Buffer.from([0xff, 0xd8, 0xff, 0xe0]), at]);
+    for (const oid of [o1, o2]) {
+      await query('INSERT INTO online_order_address_refs (order_id, shop_id, address_id, created_at) VALUES ($1,$2,$3,$4)', [oid, s.shopId, addr, at]);
+    }
+  }
   //  مشتریِ دیگرِ همین دکان — نباید دست بخورد
   const other = await order(s.shopId, OTHER, { name: 'کریمِ دیگر', t: T2 });
   await chat(s.shopId, OTHER, { name: 'کریمِ دیگر', t: T2 });
@@ -323,6 +341,8 @@ test('SEC-10: صاحبِ دکان — پیش‌نمایش بی نوشتن؛ اج
   assert.deepEqual(await dump(s.shopId), before, 'پیش‌نمایش هیچ نمی‌نویسد');
   assert.equal((await one("SELECT COUNT(*)::int AS n FROM audit_logs WHERE action='shop.customer_erased'")).n, 0);
 
+  const savedMedia = async () => (await one('SELECT COUNT(*)::int AS n FROM store_address_media WHERE customer_id=$1', [acc.id])).n;
+  const savedBefore = await savedMedia();
   const done = await erase(s, { orderId: o1 });
   assert.equal(done.status, 200, JSON.stringify(done.body));
   assert.match(done.body.erasureId, /^era_[0-9a-f]{24}$/);
@@ -337,7 +357,11 @@ test('SEC-10: صاحبِ دکان — پیش‌نمایش بی نوشتن؛ اج
     pushSubs: 0,   //  پوشِ وب (مهاجرتِ ۴۷۰): این دکان پرچمش را ندارد ⇒ هیچ اشتراکی؛ پاک شدنِ اشتراک‌ها در store-push.test.js
     alertPushSubs: (await exists('store_alert_push')) ? 1 : 0,   //  پوشِ «خبرم کن» (۴۷۵)؛ جزئیات در store-alert-push.test.js
     orderDevices: 0,   //  RSK-04 (۸۴۰): این دکان `shop.order_risk` ندارد ⇒ هیچ دستگاهی؛ پاک شدنش در risk-device.test.js
+    addressMedia: 2,   //  CHK-08: عکسِ دروازهٔ نشانیِ هر دو سفارش (۸۴۷)
+    addressMediaLinks: 2,   //  CRM-09: پیوندِ هر دو سفارش به نشانیِ ذخیره‌شدهٔ حساب (۸۳۶)
   });
+  assert.equal((await one('SELECT COUNT(*)::int AS n FROM online_order_address_refs WHERE shop_id=$1', [s.shopId])).n, 0, 'دکان دیگر به رسانهٔ نشانیِ حساب نمی‌رسد');
+  assert.ok(savedBefore > 0 && (await savedMedia()) === savedBefore, 'رسانهٔ نشانیِ حسابِ سراسری می‌ماند');
   assert.ok(done.body.kept.includes('order_ledger_docs') && done.body.kept.includes('device_sync_ledger'));
 
   //  دادهٔ شخصی از هیچ جدولی برنمی‌گردد — جز ردیف‌های مشتریِ دیگر که همان مانده‌اند
@@ -425,6 +449,7 @@ test('SEC-10: رد — شاگرد، دکانِ دیگر، نشستِ بی تأی
   await query('DELETE FROM online_order_events WHERE order_id=$1', [open]);
   await query('DELETE FROM delivery_photos WHERE order_id=$1', [open]);
   await query('DELETE FROM order_pick_photos WHERE order_id=$1', [open]);
+  await query('DELETE FROM order_address_media WHERE order_id=$1', [open]);
   await query('DELETE FROM delivery_events WHERE order_id=$1', [open]);
   await query('DELETE FROM delivery_locations WHERE assignment_id IN (SELECT id FROM delivery_assignments WHERE order_id=$1)', [open]);
   await query('DELETE FROM customer_notify_outbox WHERE order_id=$1', [open]);

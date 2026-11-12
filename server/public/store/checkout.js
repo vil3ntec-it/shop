@@ -464,6 +464,8 @@
         if (pin) { body.address.lat = pin.lat; body.address.lng = pin.lng; }
         //  بی پین ⇒ ناحیهٔ برگزیده (`source: customer`)؛ با پین ناحیه را سرور از پین می‌گوید
         else if (c.zones() && c.zone) body.address.zoneId = c.zone.id;
+        //  CRM-09: عکسِ دروازه و یادداشتِ صوتیِ همان نشانی — جدا از زنجیرهٔ پین/ناحیه (checkout-saved-zone.test.js)
+        if (ac && ac.saved && ac.saved()) body.address.savedId = ac.saved();
         body.delivery = { callBeforeArrival: $('d-call').checked, leaveWith: $('d-leave').value.trim() };
         if (tender && !$('tender-row').hidden) body.delivery.cashTenderMinor = tender;
       }

@@ -24,6 +24,7 @@ const courierChecks = require('../lib/courier-checks');
 const courierRoute = require('../lib/courier-route');
 const ratings = require('../lib/delivery-ratings');
 const locationConsent = require('../lib/courier-location-consent');
+const addrMedia = require('../lib/address-media');
 const { requireUser, requireShop, allowCourierScope } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
 const { forbidden, notFound } = require('../middleware/errors');
@@ -144,6 +145,24 @@ router.post('/missions/:id/call', async (req, res) => {
 router.post('/missions/:id/rating', async (req, res) => {
   const out = await ratings.rateByCourier(req.shopId, req.params.id, req.body, req.courierActor);
   res.status(out.replayed ? 200 : 201).json(out);
+});
+
+/*
+ *  عکسِ دروازه و یادداشتِ صوتیِ نشانیِ سفارشِ همین مأموریت (پرچمِ خاموشِ `shop.storefront.address_media`) — همان نما و همان
+ *  انتخابِ درِ دکان (`lib/address-media.js`: رسانهٔ سفارش اگر هست، وگرنه نشانیِ ذخیره‌شده)؛ فقط مأموریتِ خودِ پیک و فقط تا
+ *  زنده است (پس از «قبول»، پیش از «تحویل شد»)؛ سقف: سطلِ هر کاربر؛ هر دیدنِ بایت در سابقهٔ دکان.
+ */
+router.get('/missions/:id/address-media', addrMedia.viewLimit, async (req, res) => {
+  res.set('Cache-Control', 'private, no-store').json(await addrMedia.forMission(req.shopId, req.params.id, req.courierActor));
+});
+
+router.get('/missions/:id/address-media/:kind', addrMedia.viewLimit, async (req, res) => {
+  const m = await addrMedia.missionMedia(req.shopId, req.params.id, req.params.kind, req.courierActor);
+  await audit.log({
+    shopId: req.shopId, userId: req.user.id, action: 'delivery.courier.address_media', targetType: 'delivery_assignment',
+    targetId: req.params.id, detail: { kind: req.params.kind, source: m.source, courierId: req.courier.id }, ip: clientIp(req),
+  });
+  addrMedia.send(res, m);
 });
 
 /*

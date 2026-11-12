@@ -25,9 +25,12 @@ const THUMB_SIDE = 1024;
 
 const ascii = (buf, from, to) => buf.slice(from, to).toString('latin1');
 
-/** نوع و mime از روی بایت‌ها — یا null. */
+/**
+ * نوع و mime از روی بایت‌ها — یا null. ⛔ ورودی ممکن است مستقیم از درخواست برسد (بدنهٔ خامِ درهای رسانه): رشته، آرایه یا شیئی
+ * که parser ِ دیگری ساخته پیش از هر `.length`/`.slice` ⇒ null (CodeQL ِ «type confusion»: `Buffer.isBuffer` تنها نگهبان نیست).
+ */
 function sniff(buf) {
-  if (!Buffer.isBuffer(buf) || buf.length < 12) return null;
+  if (typeof buf !== 'object' || buf === null || Array.isArray(buf) || !Buffer.isBuffer(buf) || buf.length < 12) return null;
   const image = sniffImage(buf);
   if (image) return { kind: 'image', mime: image };
   if (ascii(buf, 0, 5) === '%PDF-') return { kind: 'file', mime: 'application/pdf' };
@@ -49,7 +52,7 @@ function sniff(buf) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  JPEG — همهٔ APP1 (Exif و XMP)، APP13 (IPTC) و COM می‌روند؛ اگر جهتِ
+//  JPEG — همهٔ APP1 (Exif و XMP)، APP13 (IPTC)، COM و هر بایتِ پس از EOI می‌روند؛ اگر جهتِ
 //  عکس چیزی جز ۱ بود، یک Exif ِ کمینه فقط با همان یک برچسب برمی‌گردد.
 // ════════════════════════════════════════════════════════════════════
 
@@ -91,29 +94,54 @@ function minimalExif(orientation) {
   return seg;
 }
 
+/**
+ * پایانِ دادهٔ فشردهٔ یک اسکن: نخستین نشانگرِ واقعی (`FF` که پس از آن نه `00` ِ پُرکننده است نه `D0`–`D7` ِ RST). در دادهٔ اسکن هر `FF`
+ * با `00` می‌آید، پس `FF D9` ِ درونِ داده با EOI اشتباه نمی‌شود.
+ */
+function entropyEnd(buf, i) {
+  while (i + 1 < buf.length) {
+    if (buf[i] !== 0xff) { i++; continue; }
+    const m = buf[i + 1];
+    if (m === 0x00 || (m >= 0xd0 && m <= 0xd7)) { i += 2; continue; }
+    return i;
+  }
+  return buf.length;
+}
+
 function stripJpeg(buf) {
   const corrupt = () => badRequest('عکس خراب است', 'bad_media');
   const keep = [];
   let orientation = 0;
+  let scanned = false;   // پس از نخستین SOS
   let i = 2;
   for (;;) {
-    if (i + 2 > buf.length) throw corrupt();
+    if (i + 2 > buf.length) {
+      if (scanned) break;                                  // بی EOI پس از داده: همان‌قدر که هست
+      throw corrupt();
+    }
     if (buf[i] !== 0xff) throw corrupt();
     if (buf[i + 1] === 0xff) { i += 1; continue; }        // بایتِ پُرکننده
     const marker = buf[i + 1];
-    if (marker === 0xda) { keep.push(buf.slice(i)); break; } // آغازِ داده: بقیه دست‌نخورده
+    //  EOI: هر چه پس از آن آمده (JPEG ِ دوم ِ MPF با EXIF ِ خودش، ویدیوی Motion Photo با مکان، …) دور ریخته می‌شود
     if (marker === 0xd9) { keep.push(buf.slice(i, i + 2)); break; }
     if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { keep.push(buf.slice(i, i + 2)); i += 2; continue; }
     if (i + 4 > buf.length) throw corrupt();
     const len = buf.readUInt16BE(i + 2);
     if (len < 2 || i + 2 + len > buf.length) throw corrupt();
     const seg = buf.slice(i, i + 2 + len);
+    i += 2 + len;
     if (marker === 0xe1) {
       if (ascii(seg, 4, 10) === 'Exif\0\0') orientation = orientationOf(seg.slice(10)) || orientation;
     } else if (marker !== 0xed && marker !== 0xfe) {
       keep.push(seg);
+      //  SOS: دادهٔ اسکن دست‌نخورده تا نشانگرِ بعدی (اسکنِ بعدیِ progressive، جدول، یا EOI) — APP1/APP13/COM ِ میانِ اسکن‌ها هم می‌روند
+      if (marker === 0xda) {
+        scanned = true;
+        const end = entropyEnd(buf, i);
+        keep.push(buf.slice(i, end));
+        i = end;
+      }
     }
-    i += 2 + len;
   }
   const head = [buf.slice(0, 2)];
   if (orientation > 1) head.push(minimalExif(orientation));

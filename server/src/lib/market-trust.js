@@ -241,7 +241,7 @@ function shopView(row, events, evidenceCount, sanctions) {
 function adminRow(r) {
   return {
     id: r.id, shopId: r.shop_id, shopName: r.shop_name || '', ...base(r), severity: r.severity,
-    assignee: r.assignee || '', outcome: r.outcome || null, appealOutcome: r.appeal_outcome || null,
+    assignee: r.assignee || '', assigneeName: r.assignee_name || '', outcome: r.outcome || null, appealOutcome: r.appeal_outcome || null,
     flags: asJson(r.flags, []), duplicateOf: r.duplicate_of || null,
     evidenceCount: Number(r.evidence_count || 0),
   };
@@ -571,8 +571,11 @@ async function sanctionsForShop(shopId) {
 //  مدیرِ سامانه
 // ════════════════════════════════════════════════════════════════════
 
-/** صفِ رسیدگی: پیش‌فرض «در انتظار» (باز، در بررسی، اعتراض‌شده)؛ اول شدیدتر، بعد قدیمی‌تر. */
-async function queue({ status, shopId, limit } = {}) {
+/**
+ * صفِ رسیدگی: پیش‌فرض «در انتظار» (باز، در بررسی، اعتراض‌شده)؛ اول شدیدتر، بعد قدیمی‌تر. [shape] (ردیفِ `adminRow`، ردیفِ پایگاه)
+ * ⇒ نمای کم‌ترِ زیرِ ارشد (`trust-admin-view.queueRow`).
+ */
+async function queue({ status, shopId, limit } = {}, shape = (row) => row) {
   const lim = intIn(limit, { min: 1, max: 200, def: 50 });
   const st = str(status) || 'pending';
   const args = [];
@@ -594,7 +597,7 @@ async function queue({ status, shopId, limit } = {}) {
       LIMIT $${args.length}`,
     args
   );
-  return rows.map(adminRow);
+  return rows.map((r) => shape(adminRow(r), r));
 }
 
 async function adminCaseRow(id, c = null, lock = false) {
@@ -650,15 +653,15 @@ async function adminEvidence(caseId, evidenceId) {
   return { shopId: row.shop_id, media: await evidenceBytes(row.id, evidenceId) };
 }
 
-/** مسئولِ رسیدگی — پروندهٔ باز به «در بررسی» می‌رود. */
-async function assign(adminId, id) {
+/** مسئولِ رسیدگی — پروندهٔ باز به «در بررسی» می‌رود. `name`: نامِ کاربرِ پنل (`lib/trust-admin-view.js`)، مدیرِ مستقیم ''. */
+async function assign(adminId, id, name = '') {
   return tx(async (c) => {
     const row = await adminCaseRow(id, c, true);
     if (!['open', 'in_review', 'appealed'].includes(row.status)) throw conflict('این پرونده رسیدگی‌شده است', 'case_decided');
     const status = row.status === 'open' ? 'in_review' : row.status;
-    await c.query('UPDATE trust_cases SET assignee=$2, status=$3, updated_at=$4 WHERE id=$1', [row.id, adminId, status, now()]);
+    await c.query('UPDATE trust_cases SET assignee=$2, assignee_name=$5, status=$3, updated_at=$4 WHERE id=$1', [row.id, adminId, status, now(), name]);
     await addEvent(c, row, 'admin', adminId, 'assigned', '', { assignee: adminId });
-    return { id: row.id, shopId: row.shop_id, status, assignee: adminId };
+    return { id: row.id, shopId: row.shop_id, status, assignee: adminId, assigneeName: name };
   });
 }
 
@@ -672,7 +675,7 @@ async function productOfShop(c, shopId, productId) {
  * تصمیم با دلیلِ نوشته (`reason` از `requireReason`). جریمه فقط با «وارد است»
  * و فقط یکی از سه نوع؛ پرونده‌ای که تصمیم دارد دوباره تصمیم نمی‌گیرد.
  */
-async function decide(adminId, id, body, reason) {
+async function decide(adminId, id, body, reason, name = '') {
   const b = obj(body);
   const outcome = str(b.outcome);
   if (outcome !== 'upheld' && outcome !== 'dismissed') throw badRequest('نتیجه باید «وارد است» یا «رد» باشد', 'bad_outcome');
@@ -696,9 +699,10 @@ async function decide(adminId, id, body, reason) {
     const at = now();
     await c.query(
       `UPDATE trust_cases SET status='decided', outcome=$2, decision_reason=$3, decided_by=$4, decided_at=$5,
-              severity=COALESCE($6, severity), assignee=CASE WHEN assignee='' THEN $4 ELSE assignee END, updated_at=$5
+              severity=COALESCE($6, severity), assignee_name=CASE WHEN assignee='' THEN $7 ELSE assignee_name END,
+              assignee=CASE WHEN assignee='' THEN $4 ELSE assignee END, updated_at=$5
         WHERE id=$1`,
-      [row.id, outcome, reason, adminId, at, severity]
+      [row.id, outcome, reason, adminId, at, severity, name]
     );
     await addEvent(c, row, 'admin', adminId, 'decided', reason, { outcome });
     if (sanction) {

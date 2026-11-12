@@ -39,27 +39,36 @@ object BackupMirror {
   fun enabled(context: Context): Boolean = prefs(context).getBoolean("backup_mirror", true)
   fun setEnabled(context: Context, on: Boolean) { prefs(context).edit().putBoolean("backup_mirror", on).apply() }
 
+  /** ZIP ِ ساده و رمزدار (`BackupSeal.SEALED_EXT`) هر دو — همان ۳۰ تای آخر */
   fun list(context: Context): List<File> =
-    folder(context)?.listFiles()?.filter { it.isFile && it.name.startsWith(PREFIX) && it.name.endsWith(".zip") }
+    folder(context)?.listFiles()
+      ?.filter { it.isFile && it.name.startsWith(PREFIX) && (it.name.endsWith(".zip") || it.name.endsWith(BackupSeal.SEALED_EXT)) }
       ?.sortedByDescending { it.lastModified() }.orEmpty()
 
   private val parseJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true; isLenient = true }
 
-  /** یک ZIPِ کامل در پوشه — فایلِ ساخته‌شده، یا خطا */
+  /** یک ZIPِ کامل در پوشه — فایلِ ساخته‌شده، یا خطا (ثبت در `BackupDevice.mirrorError` تا پشتیبانِ موفقِ بعدی) */
   fun write(context: Context): Result<File> = runCatching {
     val ledger = File(context.filesDir, "shop-data.json")
     require(ledger.exists() && ledger.length() > 0) { StrAppData.noLedgerToBackup }
     val dir = folder(context) ?: error(StrAppData.backupFolderMissing)
     if (!dir.exists()) dir.mkdirs()
     require(dir.isDirectory && dir.canWrite()) { StrAppData.folderNotWritable(dir.path) }
+    //  OPS-02: «رمزِ پشتیبانِ دستی و پوشه» روشن ⇒ همان ZIP درونِ پاکتِ عبارت؛ کلید باز نشد ⇒ پرتاب، هرگز ساده (`BackupSeal`)
+    val seal = BackupSeal.sealer(context)
     val stamp = SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.US).format(Date())
-    val target = File(dir, "$PREFIX$stamp.zip")
-    val tmp = File(dir, "$PREFIX$stamp.zip.part")
+    val target = File(dir, PREFIX + stamp + if (seal != null) BackupSeal.SEALED_EXT else ".zip")
+    val tmp = File(dir, target.name + ".part")
     //  SEC-01: متنِ بازِ دفتر — پشتیبانِ پوشه با کلیدِ دستگاه رمز نمی‌شود (بند ۱۰٫۳)
     val ledgerJson = AtRest.readText(context, ledger)
     //  ⛔ DATA-SAFETY: دفترِ خراب پشتیبانِ پوشه نمی‌شود — وگرنه با هرسِ «۳۰ تای آخر» پشتیبان‌های سالم را بیرون می‌راند
     require(LedgerRecovery.decode(ledgerJson, parseJson) is LedgerRecovery.Read.Ok) { ir.vil3ntec.tohid.core.i18n.StrAppData.mirrorSkippedDamaged }
-    tmp.outputStream().use { out -> BackupBundle.write(context, out, ledgerJson).getOrThrow() }
+    try {
+      tmp.outputStream().use { out -> BackupBundle.write(context, seal?.invoke(out) ?: out, ledgerJson).getOrThrow() }
+    } catch (e: Exception) {
+      tmp.delete()
+      throw e
+    }
     //  F0-01: ضدویروسِ ویندوز ZIP ِ تازه‌بسته را لحظه‌ای قفل نگه می‌دارد و `renameTo` بی‌درنگ شکست می‌خورد —
     //  همان جابه‌جاییِ جایگزین‌کنندهٔ دفتر با چند دورِ درنگ (`DiskWrite.move`)
     try {
@@ -70,5 +79,5 @@ object BackupMirror {
     }
     list(context).drop(KEEP).forEach { runCatching { it.delete() } }
     target
-  }
+  }.also { BackupDevice.noteMirror(context, it.exceptionOrNull()) } //  OPS-02: شکستِ پوشه (شبانه هم) در صفحهٔ «داده‌ها» دیده می‌شود
 }

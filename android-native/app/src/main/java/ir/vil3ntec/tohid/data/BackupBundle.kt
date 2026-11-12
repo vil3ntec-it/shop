@@ -283,7 +283,7 @@ object BackupBundle {
     return if (changed) d.copy(products = products) else d
   }
 
-  private fun photoDir(context: Context): File =
+  internal fun photoDir(context: Context): File =
     File(context.filesDir, "product-photos").apply { if (!exists()) mkdirs() }
 
   private fun staging(context: Context): File =

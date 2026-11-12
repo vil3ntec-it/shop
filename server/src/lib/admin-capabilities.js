@@ -31,7 +31,8 @@ const CAPABILITIES = Object.freeze([
   //  درخواستِ پنلِ مرکزی ۱.۵۰.۷۵ (ممیزی §۳-۴):
   'staff-perms.v1',         //  GET /admin/shops/:id/staff-perms[?limit=&offset=] · POST …/devices/:did/disable|enable (ارشد + دلیل)
   'image-bank.v1',          //  GET /admin/image-bank/status|review|search|images/:id|reports|file · POST …/images/:id/approve|reject|archive|search
-  'idempotent-writes.v1',   //  Idempotency-Key روی دستگاه (disable/enable)، بازبینیِ بانکِ عکس و POST /admin/backups (lib/admin-write-once.js)
+  'idempotent-writes.v1',   //  Idempotency-Key روی دستگاه (disable/enable)، بازبینیِ بانکِ عکس، POST /admin/backups و (پنل ۱.۵۰.۹۷)
+                            //  چهار نوشتنِ /admin/trust (مسئول، تصمیم، رأیِ اعتراض، برداشتنِ جریمه) — lib/admin-write-once.js
   //  LOC-04: ویرایشگرِ تعطیلاتِ رسمی در پنلِ مرکزی (خواندن: هر مدیر؛ نوشتن: ارشد + دلیل، یک‌باره، قفلِ نسخه)
   'holidays.v1',            //  GET|PUT /admin/calendar/holidays
   //  درخواستِ پنلِ مرکزی ۱.۵۰.۸۹ و ۱.۵۰.۹۰ (تصمیم‌های ۴-۱ «ب» و ۲-۹ ِ ۱۴۰۵/۰۸/۲۰):
@@ -40,6 +41,13 @@ const CAPABILITIES = Object.freeze([
   //  IMG-PRO-17 در پنلِ مرکزی (۱.۵۰.۹۶): خواندن مدیر/بیننده (جزئیات با `read_private` وقتی admin.support_grant روشن است)؛
   //  برگرداندن فقط ارشد + دلیل + اجازهٔ زندهٔ `restore` + Idempotency-Key
   'image-changes.v1',       //  GET /admin/shops/:id/images/changes[/:cid] · POST …/:cid/rollback
+  //  ABUSE-01 در پنلِ مرکزی (server#147، پنل ۱.۵۰.۹۷): صف، پرونده و جریمه‌ها برای هر نقشِ خواننده (مالی نه)؛ زیرِ ارشد نمای کم‌تر
+  //  (بی نشانه و سابقهٔ شاکی، هم‌متن‌ها، مدرک و شناسهٔ آدم — lib/trust-admin-view.js)؛ نوشتن همان ارشد + دلیل؛ از راهِ پل «مسئول» و
+  //  تصمیم‌گیرنده = X-Actor-Id و نامش (assigneeName)
+  'trust-read.v1',          //  GET /admin/trust/cases · GET /admin/trust/cases/:id · GET /admin/trust/sanctions
+  //  TEN-04 (۱۴۰۵/۰۸/۲۲): با پرچمِ `security / admin.support_grant` درهای خواندنِ محتوای خصوصیِ دکان اجازهٔ زندهٔ `read_private`
+  //  می‌خواهند (‎403 grant_required‎) و پرونده‌های دکان/کاربر بی اجازه فقط فراداده با `restricted` می‌دهند (`lib/admin-dossier.js`)
+  'support-grant-read.v1',  //  GET /admin/shops/:id/staff-perms · …/images/changes/:cid · /admin/sync/conflicts · /admin/shops/:id · /admin/users/:id
 ]);
 
 /*

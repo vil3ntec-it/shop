@@ -96,7 +96,7 @@ class CustomerModel(
   secureRandom: (Int) -> ByteArray = { Random.nextBytes(it) },
   chatWaitMs: Int = 20_000,
   secrets: ShopperKeyValue? = null,
-  voice: VoiceDevice? = null,
+  internal val voice: VoiceDevice? = null,
 ) {
   var saved: ShopperState by mutableStateOf(ShopperMemory.withDevice(ShopperMemory.load(kv)) { secureRandom(16) })
     private set
@@ -187,12 +187,13 @@ class CustomerModel(
   val feedback = FeedbackModel(api, scope, io)
   /** CHK-24: کارتِ «دستورِ تحویل» ِ پیگیری (`ModelPrefs.kt`) */
   val deliveryPrefs = PrefsModel(api, scope, io) { refreshOrder() }
-  val book = AddressModel({ saved.addresses }, { persist(saved.copy(addresses = it)) }, locator, clock)
+  val book = AddressModel({ saved.addresses }, { persist(ir.vil3ntec.tohid.core.shopper.AddressSync.written(saved, it)); syncAddresses() }, locator, clock)   //  CRM-09
   val chat = ChatModel(api, kv, scope, io, clock, { saved.ticket?.takeIf { it.expiresAt > clock() } }, { persist(saved.copy(ticket = null)) }, chatWaitMs, device = voice)
   /** WEB-11/CHK-01: حسابِ مشتری — سبد، ♥ و «فهرستِ خرید» همراهِ حساب (`ModelAccount.kt`؛ [secrets] نگه‌دارِ رمزشدهٔ نشست) */
   val account = AccountBox(secrets)
   /** MKT-11: کدِ کمپینِ پیوند/QR که مشتری با آن به هر دکان آمد (فقط همین اجرا، مثلِ «همین نشست» ِ وب) */
   internal val campaigns = HashMap<String, String>()
+  internal val funnel = ir.vil3ntec.tohid.core.shopper.ShopperFunnel()   //  RPT-14: تپشِ بالای قیف (`ModelFunnel.kt`)
 
   private var shopsJob: Job? = null
   private var searchJob: Job? = null
@@ -340,7 +341,7 @@ class CustomerModel(
         persist(ShopperMemory.withRecent(saved, RecentShop(slug, page.shop.title, clock())))
         loadCatalog(reset = true)
         enteredStore(slug, page)
-        loadRecent(slug, page)   //  WEB-13: «دیده‌شده‌های اخیر» با قیمتِ امروز (فقط با `recent`)
+        storeArrived(slug, page)   //  WEB-13 «دیده‌شده‌های اخیر» و RPT-14 تپشِ «بازدید» (`ModelFunnel.kt`)
         if (page.features.reviews) feedback.loadShop(slug)
         //  ثبت پیش از رسیدنِ دکان باز شده بود (خانه ⇐ سبد ⇐ ثبت): روشِ پیش‌فرض و بازه‌ها همین حالا
         if (route is Route.Checkout) {
@@ -390,15 +391,13 @@ class CustomerModel(
     }
   }
 
-  fun retryProduct() {
-    (route as? Route.Product)?.let { loadProduct(it.slug, it.id) }
-  }
+  fun retryProduct() { (route as? Route.Product)?.let { loadProduct(it.slug, it.id) } }
 
   private fun loadProduct(slug: String, id: String) {
     product = Load.Busy
     request({ api.product(slug, id) }) { r ->
       product = r.load()
-      r.valueOrNull()?.let { sawProduct(slug, it.product) }
+      r.valueOrNull()?.let { productArrived(slug, it.product) }
     }
   }
 
@@ -409,8 +408,9 @@ class CustomerModel(
 
   fun cartOf(slug: String): Cart = ShopperMemory.cartOf(saved, slug)
 
-  private fun setCart(c: Cart) {
+  private fun setCart(c: Cart, grew: Boolean = false) {
     if (c.slug == storeSlug) duplicate = null   //  S41: سبدِ دیگر دیگر همان سفارشِ تکراری نیست
+    if (grew) cartGrew(c.slug)   //  RPT-14
     persist(ShopperMemory.withCart(saved, c))
     syncAccount(c.slug)
   }
@@ -424,7 +424,7 @@ class CustomerModel(
         else null
       return
     }
-    setCart(after)
+    setCart(after, grew = true)
   }
 
   fun step(slug: String, productId: String, up: Boolean) {
@@ -434,7 +434,7 @@ class CustomerModel(
       notice = ShopperText.maxQty(ShopperText.qty(line.maxQtyMilli ?: CartRules.MAX_QTY_MILLI))
       return
     }
-    setCart(CartRules.step(c, productId, up, clock()))
+    setCart(CartRules.step(c, productId, up, clock()), grew = up)
   }
 
   fun remove(slug: String, productId: String) = setCart(CartRules.remove(cartOf(slug), productId, clock()))
@@ -516,7 +516,7 @@ class CustomerModel(
     locatePin()
   }
 
-  private fun setPin(p: GeoPin) {
+  internal fun setPin(p: GeoPin) {
     form = form.copy(pinLat = p.lat, pinLng = p.lng, pinAccuracyM = p.accuracyM, addressId = null)
     locatePin()
   }
@@ -645,7 +645,7 @@ class CustomerModel(
     persist(saved.copy(keys = saved.keys + (slug to memo)))
     placing = true
     placeNote = ShopperText.sending
-    request({ api.checkout(slug, req, memo.key, ticket.ticket) }) { r ->
+    request({ api.checkout(slug, req, memo.key, ticket.ticket, ir.vil3ntec.tohid.core.shopper.AddressSync.checkoutSession(req, signedIn()?.session)) }) { r ->
       placing = false
       when (r) {
         is ShopperResult.Ok -> placed(page, slug, r.value.order)

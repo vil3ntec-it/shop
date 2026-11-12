@@ -32,7 +32,7 @@ import ir.vil3ntec.tohid.data.TrainingLedger
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /** OPS-07 — عنوانِ ثابتِ بخش */
-const val TRAINING_SETTINGS_TITLE = "حالتِ آموزشی"
+const val TRAINING_SETTINGS_TITLE = "حالتِ آموزشی" // داده: کلیدِ بخشِ تنظیمات (همان SettingsLayout)
 
 /**
  *  OPS-07 — قابِ برنامه در حالتِ آموزشی: نوارِ همیشه‌پیدا بالای **هر** صفحه (گوشی و کامپیوتر) و دکمهٔ خروج با

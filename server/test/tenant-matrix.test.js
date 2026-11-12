@@ -581,23 +581,39 @@ test('TEN-01 کاربرِ چنددکانی: نشستِ بسته به «الف» 
    شناسهٔ همان موضوع می‌نشیند. فهرست‌های پرتکرار سابقه نمی‌خواهند (سیلابِ سابقه). */
 
 /** درهای GETِ مدیر با شناسهٔ موضوع ⇒ سابقه‌دار (`audited`)، کنار با دلیل (`exempt`)، سنجیده در جای دیگر
- *  (`elsewhere`) یا منتظرِ اجازهٔ صاحب‌کار (`pending`، کدِ پمپ ⇐ #615). */
+ *  (`elsewhere`) یا منتظرِ اجازهٔ صاحب‌کار (`pending`، کدِ پمپ ⇐ #615).
+ *  هر درِ سابقه‌دار تکلیفِ اجازهٔ پشتیبانی (پرچمِ `security / admin.support_grant`، `lib/support-access.js`) را هم دارد:
+ *  `grant: 'read_private' | 'export'` ⇒ بی اجازهٔ زندهٔ همان دامنه ‎403 grant_required‎؛ `grant: 'dossier'` ⇒ بی اجازه فقط فراداده
+ *  (`lib/admin-dossier.js`)؛ یا `noGrant` با دلیل. */
 const ADMIN_SUBJECT = {
-  'GET /api/admin/users/:id': { audited: 'admin.user_viewed' },
-  'GET /api/admin/users/:id/delete-preview': { audited: 'admin.user_delete_previewed' },
-  'GET /api/admin/shops/:id': { audited: 'admin.shop_viewed' },
-  'GET /api/admin/shops/:id/staff-perms': { audited: 'admin.shop_staff_perms_viewed' },
-  'GET /api/admin/shops/:id/images/changes': { audited: 'admin.image_changes_viewed' },
+  'GET /api/admin/users/:id': { audited: 'admin.user_viewed', grant: 'dossier' },
+  'GET /api/admin/users/:id/delete-preview': {
+    audited: 'admin.user_delete_previewed',
+    noGrant: 'فقط شناسه، نام و نشانیِ تأییدِ حذفِ همان حساب و نام و شمارِ اعضای دکان‌ها/پمپ‌هایش — فراداده برای حذفِ حساب؛ بی جا، دستگاه یا دفتر',
+  },
+  'GET /api/admin/shops/:id': { audited: 'admin.shop_viewed', grant: 'dossier' },
+  'GET /api/admin/shops/:id/staff-perms': { audited: 'admin.shop_staff_perms_viewed', grant: 'read_private' },
+  'GET /api/admin/shops/:id/images/changes': {
+    audited: 'admin.image_changes_viewed',
+    noGrant: 'فهرستِ دسته‌ها (شمار، زمان، سازنده) جایی است که پشتیبانی دسته را می‌یابد و برای جزئیات/برگرداندن اجازه می‌خواهد؛ پیش و پسِ عکس‌ها (جزئیات) `read_private` می‌خواهد (admin-image-changes.test.js)',
+  },
   //  جزئیاتِ یک دسته فقط با شناسهٔ واقعیِ دسته ۲۰۰ می‌دهد (این ماتریس دسته‌ای نمی‌سازد) ⇒ سابقهٔ «admin.image_change_viewed» ِ
   //  هر پاسخِ موفق و اجازهٔ `read_private` در `admin-image-changes.test.js` سنجیده می‌شود
   'GET /api/admin/shops/:id/images/changes/:cid': { exempt: 'جزئیاتِ دسته‌ای که فهرستش سابقه‌دار است؛ هر پاسخِ موفقِ خودش هم سابقه می‌نویسد (admin-image-changes.test.js)' },
-  'GET /api/admin/support/threads/:id': { audited: 'admin.support_thread_viewed' },
-  'GET /api/admin/accounts/:app/:tenantId/backups/:id': { audited: 'admin.account_backup_downloaded' },
+  'GET /api/admin/support/threads/:id': {
+    audited: 'admin.support_thread_viewed',
+    noGrant: 'گفت‌وگویی که خودِ کاربر با پشتیبانی باز کرده — پاسخ دادنش کارِ پشتیبانی است و رضایتِ دکان نمی‌خواهد (صندوقش هم CONTENT_LIST_OK)؛ رشته‌های پمپ هم همین درند',
+  },
+  'GET /api/admin/accounts/:app/:tenantId/backups/:id': { audited: 'admin.account_backup_downloaded', grant: 'export' },
   //  ⛔ کدِ پمپ بی اجازهٔ صاحب‌کار دست نمی‌خورد: سابقهٔ این دو (و آزمونش) در #615 است
   'GET /api/admin/pump/stations/:id': { pending: 'کدِ پمپ — `admin.station_viewed` در #615 (`claude/sec-pump-pending`)، نیازمندِ اجازهٔ صاحب‌کار' },
   'GET /api/admin/pump/stations/:id/events': { pending: 'کدِ پمپ — `admin.station_events_viewed` در #615 (`claude/sec-pump-pending`)، نیازمندِ اجازهٔ صاحب‌کار' },
-  'GET /api/admin/trust/cases/:id': { elsewhere: 'market-trust.test.js (admin.trust_case_viewed، فقط ارشد)' },
-  'GET /api/admin/trust/cases/:id/evidence/:evidenceId': { elsewhere: 'market-trust.test.js (admin.trust_evidence_viewed، فقط ارشد)' },
+  //  ABUSE-01 (`trust-read.v1`): پروندهٔ شکایتِ یک دکان (متنِ شاکی) محتوای خصوصی است ⇒ هر دیدن با سابقه، برای هر نقشِ خواننده
+  'GET /api/admin/trust/cases/:id': {
+    audited: 'admin.trust_case_viewed',
+    noGrant: 'پروندهٔ شکایت از دکان دادهٔ رسیدگیِ خودِ پلتفرم است (ABUSE-01) — دکانِ شکایت‌شده نباید با ندادنِ اجازه رسیدگی را ببندد؛ هر دیدن سابقه دارد و زیرِ ارشد نمای کم‌تر (lib/trust-admin-view.js)',
+  },
+  'GET /api/admin/trust/cases/:id/evidence/:evidenceId': { elsewhere: 'market-trust.test.js (admin.trust_evidence_viewed، فقط ارشد؛ بایتِ عکس)' },
   'GET /api/admin/shops/:id/history': { exempt: 'تاریخچهٔ اشتراک — دفترِ صورت‌حسابِ خودِ پلتفرم، نه دفترِ دکان' },
   'GET /api/admin/pump/stations/:id/history': { exempt: 'تاریخچهٔ اشتراکِ پمپ — صورت‌حسابِ پلتفرم' },
   'GET /api/admin/shops/:id/staff-codes': { exempt: 'فقط فرادادهٔ کد؛ خودِ کد فقط با reveal ِ ارشد و سابقه (ACP-08)' },
@@ -624,6 +640,24 @@ const ADMIN_SUBJECT = {
   'GET /api/admin/ops/incidents/:id': { exempt: 'رخدادِ عملیاتیِ خودِ سرور' },
   'GET /api/admin/finance/payments/:id': { exempt: 'پرداختِ اشتراک — صورت‌حسابِ خودِ پلتفرم' },
 };
+/** درهای GETِ مدیر که موضوعشان در پرسش است، نه در نشانی (`?account=`) — همان دو رده. */
+const QUERY_SUBJECT = {
+  'GET /api/admin/sync/conflicts': { audited: 'admin.sync_conflicts_viewed', grant: 'read_private' },
+};
+/** شناسه‌های واقعیِ «الف» برای هر درِ موضوع‌دارِ مدیر، و نشانیِ پرشده (با `?account=`/`?shopId=`/`?reason=`). */
+const subjectIds = (a, stationId, trustCase) => (r) => {
+  const p = r.path;
+  if (p.startsWith('/api/admin/users/')) return { id: a.userId };
+  if (p.startsWith('/api/admin/shops/')) return { id: a.shopId };
+  if (p.startsWith('/api/admin/support/threads/')) return { id: a.I.supportThread };
+  if (p.startsWith('/api/admin/accounts/')) return { app: 'shop', tenantId: a.shopId, id: a.I.backup };
+  if (p.startsWith('/api/admin/pump/stations/')) return { id: stationId };
+  if (p.startsWith('/api/admin/payments/')) return { id: a.I.payment };
+  if (p.startsWith('/api/admin/trust/cases/')) return { id: trustCase };
+  return {};
+};
+const fillFor = (a, ids) => (r) => r.path.replace(/:([A-Za-z_]+)/g, (_, k) => ids(r)[k] ?? 'x1')
+  + `?account=${a.shopId}&shopId=${a.shopId}&app=shop&reason=${encodeURIComponent('بررسیِ آزمونِ جداسازی')}`;
 /** درهای GETی که محتوای خصوصیِ یک دکان را **می‌توانند** بدهند، بی سابقه، با دلیل. */
 const CONTENT_LIST_OK = {
   'GET /api/admin/support/threads': 'صندوقِ پشتیبانی: پیش‌نمایشِ پیامی که خودِ کاربر به پشتیبانی نوشته؛ باز کردنِ گفت‌وگو سابقه دارد',
@@ -636,6 +670,11 @@ test('TEN-04: هر درِ GETِ مدیر با شناسهٔ موضوع سابقه
   const st = await h.post('/api/pump', { name: 'پمپِ ماتریس', code: '' }, { token: pumpUser.accessToken });
   assert.equal(st.status, 201, JSON.stringify(st.body));
   const stationId = st.body.station.id;
+  //  ABUSE-01: پروندهٔ شکایتِ «الف» با متنِ رازدار — فقط از درِ سابقه‌دارِ پرونده بیرون بیاید (صف و جریمه‌ها متن ندارند)
+  const trustCase = `tc_${crypto.randomBytes(12).toString('hex')}`;
+  const trustBody = `رازِ-شکایت-${uniq()}`;
+  await query(`INSERT INTO trust_cases (id, shop_id, kind, subject, category, severity, body, reporter_key, reporter_hint, created_at, updated_at)
+               VALUES ($1,$2,'complaint','shop','other','low',$3,$4,'07•••12',$5,$5)`, [trustCase, a.shopId, trustBody, `rk-${uniq()}`, now()]);
 
   const routes = inventory.live(h.server().listeners('request')[0]).filter((r) => r.method === 'GET' && r.path.startsWith('/api/admin/'));
   const subject = routes.filter((r) => r.path.includes(':'));
@@ -644,25 +683,15 @@ test('TEN-04: هر درِ GETِ مدیر با شناسهٔ موضوع سابقه
   const stale = Object.keys(ADMIN_SUBJECT).filter((k) => !routes.some((r) => r.key === k));
   assert.deepEqual(stale, [], 'رده‌ای که دیگر مسیرش نیست');
 
-  const ids = (r) => {
-    const p = r.path;
-    if (p.startsWith('/api/admin/users/')) return { id: a.userId };
-    if (p.startsWith('/api/admin/shops/')) return { id: a.shopId };
-    if (p.startsWith('/api/admin/support/threads/')) return { id: a.I.supportThread };
-    if (p.startsWith('/api/admin/accounts/')) return { app: 'shop', tenantId: a.shopId, id: a.I.backup };
-    if (p.startsWith('/api/admin/pump/stations/')) return { id: stationId };
-    if (p.startsWith('/api/admin/payments/')) return { id: a.I.payment };
-    return {};
-  };
-  const fillA = (r) => r.path.replace(/:([A-Za-z_]+)/g, (_, k) => ids(r)[k] ?? 'x1')
-    + `?account=${a.shopId}&shopId=${a.shopId}&app=shop&reason=${encodeURIComponent('بررسیِ آزمونِ جداسازی')}`;
+  const ids = subjectIds(a, stationId, trustCase);
+  const fillA = fillFor(a, ids);
   const auditCount = async () => Number((await one(
     `SELECT COUNT(*)::int AS n FROM audit_logs WHERE actor_type='admin' AND user_id=$1`, [admin.id]
   )).n);
   //  دفترِ دکان: هیچ درِ مدیر — حتی ارشد — این‌ها را نمی‌دهد (جز دانلودِ پشتیبانِ سابقه‌دار)
   const LEDGER = Object.fromEntries(Object.entries(a.M).filter(([k]) => k.startsWith('data.') || ['legacy', 'v1', 'v3', 'event'].includes(k)));
   //  محتوای خصوصیِ دیگر: پیامِ پشتیبانی، پشتیبان، لوکیشنِ دقیق، تعارض
-  const PRIVATE = { support: a.M.support, backup: a.M.backup, location: a.M.location, v3conflict: a.M.v3conflict };
+  const PRIVATE = { support: a.M.support, backup: a.M.backup, location: a.M.location, v3conflict: a.M.v3conflict, trust: trustBody };
 
   const bad = [];
   for (const r of routes) {
@@ -713,4 +742,94 @@ test('TEN-04: هر درِ GETِ مدیر با شناسهٔ موضوع سابقه
   const row = await one(`SELECT a.action, a.target_id FROM audit_logs a JOIN admins d ON d.id=a.user_id
     WHERE d.username='ten-clerk' ORDER BY a.created_at DESC LIMIT 1`);
   assert.deepEqual(row && { ...row }, { action: 'admin.support_thread_viewed', target_id: a.I.supportThread });
+});
+
+/* ── TEN-04 (اجازه): درهای خصوصیِ مدیر پشتِ پرچمِ `security / admin.support_grant` ────────────────────
+   خاموش ⇒ همان آزمونِ بالا (رفتارِ امروز). روشن ⇒ از روی فهرستِ زندهٔ درها: هر درِ سابقه‌دار رده‌ی اجازه دارد؛ بی اجازه
+   درِ «grant» ‎403 grant_required‎ بی محتوا و بی سابقهٔ دیدن، پرونده‌ی آمیخته فقط فراداده (`restricted`)، و محتوای خصوصی
+   فقط از درِ `noGrant` (با دلیل) یا `CONTENT_LIST_OK`؛ اجازهٔ دکانِ «ب» برای «الف» بس نیست؛ با اجازهٔ زندهٔ «الف» ⇒ ۲۰۰ و
+   سابقهٔ همان در با شناسهٔ اجازه. */
+test('TEN-04 (اجازه): با پرچمِ admin.support_grant هر درِ خصوصیِ مدیر اجازهٔ زندهٔ همان آدم روی همان دکان می‌خواهد؛ بی آن ۴۰۳ یا فقط فراداده؛ با آن ۲۰۰ و سابقه با شناسهٔ اجازه', async () => {
+  const { a, b } = await getWorld();
+  const access = require('../src/lib/support-access');
+  const CLS = { ...ADMIN_SUBJECT, ...QUERY_SUBJECT };
+  const loose = Object.entries(CLS).filter(([, c]) => c.audited && !c.grant && !c.noGrant).map(([k]) => k);
+  assert.deepEqual(loose, [], `درِ سابقه‌دار بی تکلیفِ اجازه — grant یا noGrant (با دلیل):\n${loose.join('\n')}`);
+  const routes = inventory.live(h.server().listeners('request')[0]).filter((r) => r.method === 'GET' && r.path.startsWith('/api/admin/'));
+  const staleQ = Object.keys(QUERY_SUBJECT).filter((k) => !routes.some((r) => r.key === k));
+  assert.deepEqual(staleQ, [], 'رده‌ای که دیگر مسیرش نیست');
+  const fillA = fillFor(a, subjectIds(a, 'x1'));
+  const PRIVATE = { support: a.M.support, backup: a.M.backup, location: a.M.location, v3conflict: a.M.v3conflict };
+  const leaks = (text) => Object.entries(PRIVATE).filter(([, s]) => text.includes(s)).map(([k]) => k);
+  const seen = async (action, grant = '') => Number((await one(
+    `SELECT COUNT(*)::int AS n FROM audit_logs WHERE actor_type='admin' AND user_id=$1 AND action=$2 AND ($3 = '' OR detail->>'grant' = $3)`,
+    [admin.id, action, grant])).n);
+  const get = async (r) => {
+    resetAll();
+    const res = await h.api('GET', fillA(r), { token: admin.token });
+    return { res, text: JSON.stringify(res.body ?? '') };
+  };
+  const grantOn = async (o, scope) => {
+    resetAll();
+    const g = await h.api('POST', `/api/admin/shops/${o.shopId}/access-grants`, {
+      token: admin.token, headers: { 'Idempotency-Key': `ten-g-${o.tag}-${scope}` },
+      body: { scope, minutes: 30, reason: 'بررسیِ آزمونِ جداسازی', consent: 'tenant' },
+    });
+    assert.equal(g.status, 201, JSON.stringify(g.body));
+    const ok = await h.api('POST', `/api/shop/support-access/${g.body.grant.id}/accept`, { token: o.token });
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    return g.body.grant.id;
+  };
+  const setFlag = async (on) => {
+    await query("DELETE FROM live_config WHERE scope='security' AND key=$1", [access.ENFORCE_KEY]);
+    if (on) await query("INSERT INTO live_config (scope, key, value, updated_at) VALUES ('security', $1, 'true', $2)", [access.ENFORCE_KEY, now()]);
+  };
+
+  /** بی اجازهٔ «الف» (نخست هیچ، سپس فقط اجازهٔ «ب»): هیچ درِ «grant» باز نیست و هیچ محتوای خصوصی بی دلیل بیرون نمی‌آید */
+  const shut = async (why) => {
+    const bad = [];
+    for (const r of routes) {
+      const cls = CLS[r.key];
+      const before = cls?.audited ? await seen(cls.audited) : 0;
+      const { res, text } = await get(r);
+      if (res.status >= 500) bad.push(`${why}: ${r.key} ⇒ ${res.status}`);
+      if (cls?.grant === 'read_private' || cls?.grant === 'export') {
+        if (res.status !== 403 || res.body?.error?.code !== 'grant_required') bad.push(`${why}: ${r.key} ⇒ ${res.status} ${text.slice(0, 120)}، نه ‎403 grant_required‎`);
+        if (await seen(cls.audited) !== before) bad.push(`${why}: ${r.key} بسته بود ولی سابقهٔ «${cls.audited}» نوشت`);
+      }
+      if (cls?.grant === 'dossier' && (res.status !== 200 || res.body?.restricted?.code !== 'grant_required')) {
+        bad.push(`${why}: ${r.key} ⇒ ${res.status}، بی نشانِ restricted: ${text.slice(0, 160)}`);
+      }
+      const priv = leaks(text);
+      if (priv.length && !cls?.noGrant && !CONTENT_LIST_OK[r.key]) bad.push(`${why}: ${r.key} محتوای خصوصی (${priv.join('، ')}) را بی اجازه داد`);
+    }
+    assert.deepEqual(bad, [], bad.join('\n'));
+  };
+
+  await setFlag(true);
+  try {
+    await shut('بی اجازه');
+    await grantOn(b, 'read_private');
+    await grantOn(b, 'export');
+    await shut('فقط اجازهٔ دکانِ «ب»');
+
+    const gid = { read_private: await grantOn(a, 'read_private'), export: await grantOn(a, 'export') };
+    const bad = [];
+    for (const r of routes) {
+      const cls = CLS[r.key];
+      if (!cls?.grant) continue;
+      const g = gid[cls.grant === 'dossier' ? 'read_private' : cls.grant];
+      const before = await seen(cls.audited, g);
+      const { res, text } = await get(r);
+      if (res.status !== 200) bad.push(`با اجازه: ${r.key} ⇒ ${res.status} ${text.slice(0, 160)}`);
+      if (res.body?.restricted) bad.push(`با اجازه: ${r.key} هنوز restricted است`);
+      if (await seen(cls.audited, g) !== before + 1) bad.push(`با اجازه: ${r.key} سابقهٔ «${cls.audited}» با شناسهٔ اجازه ننوشت`);
+      if (cls.grant === 'dossier' && !leaks(text).includes('location')) bad.push(`با اجازه: ${r.key} جای دقیق را نداد (آزمون بی‌اثر است)`);
+    }
+    assert.deepEqual(bad, [], bad.join('\n'));
+    const used = Number((await one('SELECT uses FROM admin_access_grants WHERE id=$1', [gid.read_private])).uses);
+    assert.equal(used, routes.filter((r) => ['read_private', 'dossier'].includes(CLS[r.key]?.grant)).length, 'هر بار استفاده شمرده می‌شود');
+  } finally {
+    await setFlag(false);
+  }
 });

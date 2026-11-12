@@ -39,6 +39,10 @@ const TABLES = [
   { table: 'shop_chat_media', pk: ['id'], extra: ['shop_id', 'mime'], tenant: shop, check: (r) => media.chatCheck(r.mime) },
   { table: 'support_media', pk: ['id'], extra: ['thread_id'], tenant: (r) => media.supportTenant(r.thread_id), check: () => media.supportCheck },
   { table: 'trust_evidence', pk: ['id'], extra: ['shop_id', 'mime'], tenant: shop, check: (r) => media.chatCheck(r.mime) },
+  //  رسانهٔ نشانی (`lib/address-media.js`، `media-store.address`): حساب (۸۳۶) در `customer:<حساب>`، سفارش (۸۴۷) در `shop:<دکان>` —
+  //  بی این دو `gc` شیءشان را «بی ردیف» می‌دید
+  { table: 'store_address_media', pk: ['id'], extra: ['customer_id', 'mime'], tenant: media.addressTenant, check: (r) => media.chatCheck(r.mime) },
+  { table: 'order_address_media', pk: ['id'], extra: ['shop_id', 'mime'], tenant: media.addressTenant, check: (r) => media.chatCheck(r.mime) },
 ];
 const checkOf = (t, r) => (t.check ? t.check(r) : store.sniff);
 

@@ -54,6 +54,219 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-30r زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-30r` (از سرِ `claude/batch-55-m`) — اصلاحِ بازبینیِ امنیتیِ دستهٔ ۵۵
+
+- **شد:** (۱) `else` ِ سرگردانِ `store/checkout.js`: نشانیِ ذخیره‌شدهٔ بی پین در دکانِ ناحیه‌دار ۴۰۰ `zone_required` می‌گرفت؛ (۲) رسانهٔ
+  نشانیِ ذخیره‌شده فقط برای سفارشِ باز (`address-media.FINISHED` از ماشینِ وضعیت) و `CLOSED` ِ مشتری کامل؛ (۳) حذفِ نشانی/حساب شیءِ
+  انبار را هم برمی‌دارد و PUT پشتِ قفلِ نشانی؛ (۴) JPEG تا EOI؛ (۵-۷) نمای کم‌ترِ اعتماد در پرونده و صف بی هم‌متن/مدرک/تصمیم‌گیرنده؛
+  (۸) کلیدِ تکراریِ پرچم (CI ِ #1041)؛ (۹) نامِ پنل با نیم‌فاصله، بی Tags/Zalgo؛ (۱۰) یادداشتِ صوتی فقط صدا و بی اتمِ مکانِ M4A؛
+  توکن پیش از بدنه؛ کرانِ پایگاه در ۸۴۷/۸۵۵. هر کدام آزمونِ سرخ‌پیش/سبزپس؛ جهش‌آزمایی روی (۱) و (۲).
+- **نیمه‌کاره/تصمیم:** برچسب‌های دیگرِ صدا (`©nam`، ID3) پاک نمی‌شوند (STATUS ِ CHK-08)؛ سه «پیش‌فرض؛ صاحب‌کار تأیید کند» در STATUS:
+  متنِ شاکی برای بیننده (ABUSE-01)، پیوندِ «دریافت از دکان» (CRM-09)، `grantForDossier` (TEN-04).
+- **قدمِ بعدی:** مرجِ همین شاخه در دسته؛ تصمیمِ صاحب‌کار روی سه پیش‌فرض.
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-26c زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-26c` (از سرِ `claude/batch-55`)
+
+- **CRM-09 (افزودن از برنامهٔ خریدِ بومی) ⇐ «پرچم»:** برنامهٔ خرید حسابِ مشتری دارد ⇒ راهِ حساب، نه درِ سفارش. `core/shopper/ShopperAddressSync.kt`:
+  دفترِ نشانیِ گوشی ⇄ دفترِ حساب با یک درخواست در هر گام (DELETE ِ پاک‌شده‌ها ⇐ PUT ِ ویرایش‌های نرفته ⇐ GET ⇐ POST ِ فقط‌دستگاهی‌ها)، هر پاسخ
+  روی حالِ **اکنون** (ویرایشِ میانهٔ دور گم نمی‌شود)، همانند دوباره فرستاده نمی‌شود، سرور مرجع، خروج ⇒ نشانی‌های حساب از گوشی. شناسهٔ
+  `adr-…` یعنی فقط‌دستگاهی (حالتِ تازه فقط `ShopperState.addressGone` و `SavedAddress.dirty/media`). رسانه با همان درهای حساب
+  (`/account/addresses/:id/media/:kind`) در `AddressMediaCard.kt`/`ModelAddressSync.kt`؛ ثبت با نشانیِ حساب ⇒ `savedId` + نشست ⇒
+  `linkOrder` ِ سرور. **سرورِ تازه‌ای لازم نشد.**
+- **CHK-08 (نقشه در برنامهٔ خرید) ⇐ «پرچم»:** MapLibre در کش نیست ⇒ «کاشیِ ثابت + پین» ِ ویترین در Compose (`ShopperPinMap.kt` + `PinMapView.kt`،
+  `Platform.tile`: `MapTilesAndroid.kt` و `ImagesIos.Tile`)؛ بردارِ مشترکِ `core/test-vectors/pin-map-v1.json` از خودِ `store/pin-map.js`
+  (`server/test/store-pin-map.test.js` ۳/۳ و `PinMapVectorsTest` ۳/۳).
+- **آزمون‌ها:** core ‏`ir.vil3ntec.tohid.core.shopper.*` ۱۵۳ PASS (تازه `ShopperAddressSyncTest` ۱۲، `PinMapVectorsTest` ۳، `PlaceTextCoverageTest` ۲؛
+  جهش‌آزمایی ۲ از ۲ سرخ)؛ `customer-android` (صفحه‌ها و مدلِ مشترک) روی Compose Desktop ِ محلی کامپایل و ۳۳/۳۳ (تازه `CustomerAddressSyncTest`)؛
+  سرور `store-pin-map` ۳، `store-map` ۳، `store-pin-text` ۳، `web-i18n` ۳۵، `dari-text` ۱۷، `address-media-door` ۲، `store-address-media` ۵،
+  `kotlin-test-names-windows` ۲؛ اجرای کاملِ `flock /tmp/gradle-full.lock ./desktop/gradlew -p desktop test` (‎-Xmx3g، `desktop/build/test-data` ِ پاک) ⇒
+  ۴۰۲۵ PASS، ۰ FAIL، ۴ SKIP ِ پیشین؛ precheck ⇒ `fail=0`؛ `quality.mjs` بی ❌. کامپایلِ اندروید (`MapTilesAndroid.kt`، `MainActivity.kt`) و آیفون فقط CI.
+- **دام:** (۱) `CustomerModel.kt` درست ۸۰۰ خط است ⇒ هر سیمِ تازه در پروندهٔ جدا (`ModelAddressSync.kt`) و در خودِ مدل فقط جایگزینیِ هم‌خط با نامِ
+  کامل (`ir.vil3ntec…AddressSync`). (۲) `ShopperText.kt` ۷۹۹ خط ⇒ نوشته‌های تازه در `PlaceText` (`ShopperPlaceText.kt`) با آزمونِ پوششِ خودش.
+  (۳) قابِ نقشه در فارسی آینه می‌شود ⇒ `LayoutDirection.Ltr` و `absoluteOffset` (جهت‌های نقشه فیزیکی‌اند). (۴) `ensureStore` همان دکان را دوباره
+  وارد نمی‌شود ⇒ تازه کردنِ دفترِ حساب با باز شدنِ «نشانی‌های من» هم.
+- **قدمِ بعد:** دیدنِ CI ِ اندروید/آیفون برای پرونده‌های تازه؛ روشن کردنِ `shop.storefront.address_media` و `shop.storefront.map_pin` + `STORE_MAP_TILES`
+  با صاحب‌کار (FLAGS-ON §۲۳، §۳۱؛ هر دو حالا بخشِ «برنامهٔ خرید» دارند) و گوشیِ واقعی.
+
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-29o زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-29o` (از سرِ `claude/batch-55`) — فقط سند
+
+- **شد:** سندِ کوتاهِ صاحب‌کار [`OWNER-NEXT-fa.md`](OWNER-NEXT-fa.md) از نقشهٔ ۱۴۰۵/۰۸/۲۲ (۲۲۷ ردیف): ۱. کلیدها ۵۶ (۲۴ کم‌خطرِ «امروز،
+  ۱۵ دقیقه»، ۱۸ با هشدارِ دیسک/پول/داده، ۴ تنظیمِ سرور، ۱۰ «هنوز نه»)؛ ۲. تصمیم‌ها ۵۱ (۳۱ پرسشِ باز با پیشنهادِ Claude و اثر، S89 در جدولِ
+  هفت پیش‌فرضِ این دور، ۱۹ گرفته‌شده و منتظرِ زمان)؛ ۳. حساب‌ها ۳۹ (پیامک ۱۲، حساب‌پی ۱۲، Firebase ۵، سرورِ خودتان ۶، …)؛ ۴. دستگاه ۵۹ در
+  ۹ جلسه؛ ۵. همگام/پمپ ۱۸؛ CI ۱ در سرِ سند. هر شناسهٔ غیرِ «کد» ِ نقشه دقیقاً یک بار در سند است و هر بخش دقیقاً همان دستهٔ نقشه را دارد
+  (سنجیده با اسکریپتِ کوچکِ بیرون از ریپو). کدی عوض نشد؛ spec «سالم».
+- **دام:** شناسه‌ها را در متنِ توضیحی تکرار نکنید (مثال‌ها با «‹ردیف›»)؛ `OPS-01`/`OPS-01@29` و `OPS-02`/`OPS-02@29` دو ردیفِ جدا در دو بخش‌اند.
+- **قدمِ بعد:** پس از هر جابه‌جاییِ نقشه این سند هم به‌روز شود (یا کهنه اعلام شود)؛ پاسخ‌های صاحب‌کار به بخشِ ۲ ⇐ OWNER-DECISIONS و STATUS.
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-24u زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-24u` (از سرِ `claude/batch-55`)
+
+- **ادغامِ `origin/claude/e-rows-18q` و یکی‌سازیِ رسانهٔ نشانی (CRM-09 + CHK-08):** دو عامل هم‌زمان عکسِ دروازه/یادداشتِ صوتی را
+  ساخته بودند (نشانیِ ذخیره‌شدهٔ حساب، ۸۳۶؛ نشانیِ یک سفارش، ۸۴۷) با دو کتابخانه، دو سقف، دو انبار و **دو درِ هم‌مسیر با پاسخِ
+  متفاوت** برای دکان و پیک (`courier.js` حتی `const addrMedia` ِ تکراری داشت). حالا `lib/address-media.js`: یک پرچم، یک سقف
+  (`config.addressMedia`)، یک سنجشِ بایت (`accept`؛ EXIF/مکان برای هر دو پاک)، یک انبار (`media-store.address`، tenant از ردیف) و
+  **یک در و یک نما**: `GET /api/shop/orders/:id/address-media[/:kind]` و `GET /api/courier/missions/:id/address-media[/:kind]` — برای
+  هر نوع رسانهٔ سفارش اگر هست، وگرنه نشانیِ ذخیره‌شده (`source`). نقش: `orders.contact` + `requireOrdersContact` (نه `orders.view`؛
+  دلیل سرِ همان پرونده). هر دو جدول و هر دو مهاجرت ماندند (۸۴۷ فقط توضیح). erasure: `addressMediaLinks` ِ تازه + آینهٔ Kotlin و برچسب.
+  ویترین: `store/addr-media.js` (نشانی‌های من) و `store/order-addr-media.js` (پیگیری، `oam.*`، واژه‌نامهٔ `orderaddr` — کلیدهای `am.*`
+  ِ دو پرونده در یک صفحه روی هم می‌افتادند). POS-05/INV-03 ِ همان شاخه دست نخورد.
+- **CodeQL (هشدارِ PR #1041):** نگهبانِ نوعِ صریح (`typeof`/`Array.isArray`/`Buffer.isBuffer`) در `accept` و `chat-media.sniff`؛ بدنهٔ
+  JSON/آرایه ⇒ ۴۰۰ `bad_media` (رشتهٔ تنها را parser ِ strict ِ برنامه ۴۰۰ `bad_json` می‌دهد)، پرسشِ تکراری بی‌اثر — هر دو آزمون دارند.
+- **آزمون‌ها:** تازه `address-media-door.test.js` ۲/۲ (فقط نشانی، هر دو، فقط سفارش، هیچ؛ صاحب/مدیر بله، صندوق‌دار/شاگرد/مدیرِ
+  بسته‌شده ۴۰۳، دکانِ دیگر ۴۰۴، پیکِ دیگر ۴۰۴)؛ `store-address-media` ۵/۵، `order-address-media` ۴/۴، `catalog-reserved` ۴/۴،
+  `customer-erasure` ۶/۶، `tenant-matrix` ۴/۴، `card-data` ۱۱/۱۱، `api-contract` ۲/۲، `web-i18n` ۳۵/۳۵، `dari-text` ۱۷/۱۷،
+  `shop-route-inventory` ۲/۲، `image-store-migrate` ۵/۵، `media-store` ۵/۵، `shop-chat` ۱۷/۱۷، `courier-scope` ۱۲/۱۲؛ کرومیوم
+  `web-store-addr-media` ۲۸ ✅، `web-store-acct` ۲۷ ✅، `web-store` ۱۳۵ ✅ (بارِ نخست ۷۲٬۶۳۶ بایت زیرِ سقفِ ۷۲٬۷۰۴، دست نخورد)؛ core
+  `OrderAddressMediaTest` ۴/۴ و `OnlineHoldsTest` ۹/۹. Kotlin ِ هدف‌دار (`./desktop/gradlew -p desktop test --tests …`): `HeldStockTest` ۵، `HeldSyncTest` ۷،
+  `PosSellableTileUiTest` ۲، `ServerFeatureScreensTest` ۱۱ (آینهٔ `COUNT_KEYS`)، `DariCoverageTest` ۲۳ (برچسبِ تازهٔ `StrErasure`)،
+  `DataSafetyGuardTest` ۱۰ — ۵۸ PASS، ۰ FAIL. اجرای کاملِ `flock /tmp/gradle-full.lock ./desktop/gradlew -p desktop test`
+  (‎-Xmx3g، `desktop/build/test-data` ِ پاک) ⇒ ۴۰۱۶ PASS، ۰ FAIL، ۴ SKIP ِ پیشین؛ precheck ⇒ `fail=0`؛ `quality.mjs` بی ❌.
+- **سرخیِ CI ِ #1041 (`web-store-acct.mjs`):** پیش‌نمایشِ عکسِ «نشانی‌های من» ناهمگام می‌آید (GET ⇐ FileReader) ⇒ آزمون حالا منتظرِ
+  دیده شدن می‌ماند؛ «پاک کردن» ِ عکس ⇒ `#am-thumb[hidden]` با `display:none` (آزمونِ تازه) و پاسخِ دیرِ پیش‌نمایش پس از پاک کردن عکس را
+  برنمی‌گرداند. `.am-thumb[hidden]` در `store.css` افزوده شد، ولی خودِ `kit.css` از پیش `[hidden] { display:none !important }` دارد ⇒
+  بی آن هم پنهان بود (آزمون روی پایه سبز ماند؛ فقط زمان‌بندی سرخ بود). کرومیوم `web-store-acct.mjs` ۲۹ ✅.
+- **دام:** (۱) `K.part` کلیدِ موجود را بازنویسی نمی‌کند ⇒ دو واژه‌نامهٔ دیربار با پیشوندِ یکسان در یک صفحه بی‌صدا متنِ اولی را
+  نشان می‌دهند؛ پیشوندِ هر بخش یکتا باشد. (۲) حسابِ ویترین سراسری است (یک شماره ⇒ یک حساب در همهٔ آزمون‌های یک پرونده)؛
+  شمارشِ ردیف‌های حساب را نسبی بسنجید. (۳) JPEG ِ ساختگیِ `ff d8 ff e0 + پُرکننده` از `cleanImage` ۴۰۰ می‌گیرد؛ از `image-fixtures.jpeg`.
+- **قدمِ بعد:** CHK-08 فقط نقشه در برنامهٔ خرید؛ CRM-09 افزودن از برنامهٔ خریدِ بومی (دفترِ نشانیِ حساب در برنامه لازم است)؛
+  سپس پرچمِ `shop.storefront.address_media` با صاحب‌کار (FLAGS-ON §۳۱).
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-18q، شاخهٔ `claude/e-rows-18q` (از سرِ `claude/batch-54`، سپس ادغامِ سرِ تازهٔ آن)
+
+- **POS-05 و INV-03 ⇐ IMPLEMENTED-VERIFIED:** درِ سرورِ `GET /api/shop/catalog/reserved` (`stock-reserve.posView`: نگه‌داشتهٔ نرمِ فعال
+  با کلیدِ فروشِ تحویلِ هر قلم `o-<سفارش>-<قلم>`؛ `stock.view` + `orders.view`، سقفِ ۳۰/دقیقه هر کاربر؛ پرچمِ خاموشِ
+  `shop.stock_reserve` ⇒ `enabled:false`) — `catalog-reserved.test.js` ۴/۴ (پایه ۰/۴). صندوق: `core/stock/OnlineHolds.kt` (مهلت با
+  ساعتِ سرور، فروشِ تحویلِ رسیده دو بار نه، نمای کهنه‌تر از یک روز یا ساعتِ برگشته ⇒ هیچ) + `OnlineHoldsStore`
+  (`data/OnlineHoldsAndroid.kt`) + `rememberSellableHeld` (`ui/components/pos/OnlineHoldsAndroid.kt`) در `DeskSale` و `SaleRoute`
+  ⇒ `HeldStock.sellable`. `OnlineHoldsTest` ۹/۹ (core)، `HeldStockTest` ۵/۵، `HeldSyncTest` ۷/۷، `PosSellableTileUiTest` ۲/۲ (صفحهٔ خودِ کاشی، محلی)؛ اجرای کاملِ desktop ۴۰۰۳ آزمون، ۰ شکست، ۴ SKIP ِ پیشینِ بنچ/عکس. نگه‌داشته‌های دستگاهِ دیگر = `shop.held_sync` (سنجشِ تازه در `HeldSyncTest`).
+- **CHK-08 (PARTIAL، کد):** سرور (مهاجرتِ ۸۴۷، `lib/order-address-media.js`، درهای مشتری/کارمند/پیک، حذفِ دادهٔ مشتری،
+  `image-store-move.TABLES`؛ پرچمِ `shop.storefront.address_media`) — `order-address-media.test.js` ۴/۴؛ فرمِ ویترین روی صفحهٔ پیگیری
+  (`store/addr-media.js` ِ دیربار، واژه‌نامهٔ `addrmedia`) — `web-store-addr-media.mjs` ۲۲ ✅ (در زنجیرهٔ `test:web-store`).
+- **قدمِ بعد:** به گفتهٔ هماهنگ‌کننده CHK-08 این‌جا گسترش نیافت: عاملِ «ت» (`claude/e-rows-13t`، CRM-09) همین را برای نشانیِ
+  ذخیره‌شدهٔ حساب ساخته (`store_address_media`، مهاجرتِ ۸۳۶، پیک هم می‌بیند) ⇒ پس از ادغام دو جدول/در یکی شوند (هر دو `chat-media.sniff`).
+  سپس نمایشِ عکس/صدای نشانیِ سفارش در جزئیاتِ سفارشِ برنامهٔ دکان و مأموریتِ پیک (درها آماده‌اند) و نقشه در برنامهٔ خرید (منطق در core،
+  اندروید فقط CI).
+- **درس:** هر انبارِ `getSharedPreferences` ِ تازه باید در `DATA-SAFETY-fa.md` §۶ و `DataSafetyGuardTest.CLASSIFIED` رده بگیرد
+  (`tohid-online-holds` ⇐ «نسخهٔ سرور»)؛ کلیدِ تازهٔ `COUNT_KEYS` ِ حذفِ داده هم در `CustomerErasure.kt` و `StrErasure.kt`.
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-21m زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-21m` (از `claude/batch-55`)
+
+- **TEN-04 (همچنان PARTIAL، «کد»):** درهای خصوصیِ دیگرِ مدیر زیرِ نگهبانِ اجازه، پشتِ همان پرچمِ خاموشِ `security / admin.support_grant`:
+  نقش و دستگاهِ کارکنان (`staff-perms`) و تعارض‌های همگام‌سازیِ دکان بی اجازهٔ زندهٔ `read_private` ⇒ ‎403 grant_required‎؛ بازگرداندنِ تعارضِ
+  دکان ⇒ اجازهٔ `restore`؛ پرونده‌های دکان و کاربرِ عضوِ دکان بی اجازه فقط فراداده با `restricted` (`lib/admin-dossier.js`؛ ۴۰۳ نه، چون مالی
+  اجازه نمی‌گیرد و پرونده جای درخواستِ اجازه است). کنار با دلیل: گفت‌وگوی پشتیبانی، پیش‌نمایشِ حذف، فهرستِ دسته‌های عکس (تصمیمِ آزموده‌شدهٔ
+  `admin-image-changes.test.js` — نخست بستمش و همان آزمون سرخ شد، برگرداندم). ماتریسِ `tenant-matrix` حالا ردهٔ اجازهٔ هر درِ سابقه‌دار را
+  می‌خواهد و «TEN-04 (اجازه)» با پرچمِ روشن همهٔ درها را می‌سنجد (روی کدِ پیشین ۸ خطا)؛ `support-grant-read` ۵/۵ (PGlite و PostgreSQL ۱۶)، جهش ۱۱ از ۱۱.
+  **مانده:** پنلِ مرکزی (ریپوی server، توانایی `support-grant-read.v1`) پیش از روشن کردنِ پرچم؛ پروندهٔ پمپ (#615)؛ دامنهٔ اجازه برای نوشتنِ
+  نقش/دستگاهِ کارکنان از پنل (هیچ‌کدام از چهار دامنه نیست ⇐ تصمیم).
+- **GATE-NEW-02 ⇐ IMPLEMENTED-VERIFIED:** `server/test/catalog-stock-page.test.js` سناریوهای INV را از صفحهٔ کالا، ویترینِ عمومی و سفارشِ مشتری
+  می‌برد و هر کدام با تطبیقِ دفتر تمام می‌شود (۱۴/۱۴، PostgreSQL ۱۶ هم؛ جهش ۳ از ۳)؛ پاسخِ زندهٔ صفحهٔ کالا در
+  `core/test-vectors/product-page-inv-v1.json` و `ProductStorefrontInvVectorsTest` (۱/۱، جهشِ زیرنویسِ «غیرفعال» کشته) همان را با کلاینتِ واقعی
+  می‌خواند. یافته: نشانِ ویترین پس از فروشِ دستگاه حداکثر یک `REFRESH_THROTTLE_MS` دیر است ولی سفارش همان دم رد می‌شود (طراحی، نه باگ).
+  اجرای کاملِ `./desktop/gradlew -p desktop test` (با `flock`): ۴۰۰۵ گذشت، ۰ شکست (۴ کنار ِ همیشگی)؛ ماتریسِ TEN-04 روی PostgreSQL ۱۶ هم سبز.
+- **قدمِ بعد:** TEN-04 در ریپوی server (نمایشِ ۴۰۳ و `restricted`، درخواستِ دامنه‌های `read_private`/`restore`)؛ تصمیمِ دامنهٔ نوشتن‌های کارکنان.
+
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-22n زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-22n` (از `claude/batch-55`)
+
+- **ساخته شد:** LOC-06 — متنِ خامِ `ui/screens` **۱۴۷۰ ⇐ ۱۷۸** (`DariCoverageTest.maxRawOldScreens`). سنجشِ اعلان‌به‌اعلانِ «زنده» (ریشه: هر
+  پروندهٔ بیرون از `ui/screens` در اندروید، کامپیوتر، آیفون، هسته و آزمون؛ نامِ هم‌نامِ نسخهٔ ۳ فقط با همان بسته یا import) نشان داد «۱۴۷۰ متنِ
+  زنده» درست نبود: ~۴۲۰ زنده (۲۹۳ تا داده)، ~۲۳۰ فقط در پیش‌نمایشِ گوشیِ DevShot و ~۸۱۵ در کدِ مرده. (۱) ۳۵۴ داده «// داده:» گرفت (کلیدهای بخشِ
+  تنظیمات، واژه‌های سه‌زبانهٔ `SettingsSearchIndex.KEYWORDS`)؛ (۲) ۶۸۹ با کدِ مرده برداشته شد (`DeliveryCash.kt`، `Devices.kt` و بخشِ مردهٔ `Orders`،
+  `Reports`، `Vip`، `DeliveryDesk`، `DeliveryDialogs`، `StorefrontOwnerSettings`، `OwnerReportSettings`، `StockBook`، `SettingsParts`؛ همه جانشینِ نسخهٔ
+  ۳ دارند) و پنج آزمونِ سیم‌کشی که متنِ همان صفحه‌های مرده را می‌سنجیدند به پرونده‌های نسخهٔ ۳ رفتند؛ (۳) ۲۴۹ متن که عیناً فارسیِ ویژگیِ بی‌آرگومانِ
+  جدولی بود به همان ویژگی رفت (فارسی بایت‌به‌بایت همان؛ `const`، enum و سرستونِ دوپهلو نه).
+- **نیمه‌کاره:** ۱۷۸ مانده: ستون‌های `DayEndModel`/`HeatmapModel` (۷۳؛ صفحه و خروجیِ اکسل با هم ⇐ تصمیمِ صاحب‌کار)، صفحه‌های فقط‌پیش‌نمایش
+  (`Sale`، `QuickSale`، `Profile`، `Settings`، `Debtors`… ۷۴، با `ProfileModel`/`PhoneHomeModel` ِ فقط‌آزمون) و مرده‌های نگه‌داشته برای نسخهٔ ۳
+  (`WarehouseDialogs`، `PhoneClaimStep`، `ProductDetail`، `Receipts`؛ ۳۱) — ردیف PARTIAL.
+- **باگ/دام:** (۱) `ui/screens` و `ui/v3` نام‌های هم‌نام دارند (`CouriersTab`، `OrdersScreen`، `ReportsScreen`، `SaleScreen`، `QuickSaleScreen`…) ⇒ grep ِ
+  نام «زنده» نشان می‌دهد؛ بسته/import را ببینید. (۲) پیش‌نمایشِ گوشیِ `DevShot` (`PhonePreview`، `PhoneV3CartPreview`) هنوز صفحه‌های قدیمیِ بی‌راه را
+  عکس می‌گیرد و چند آزمونِ سیم‌کشی (`GiftCardWiringTest`، `LayawayWiringTest`، `QuoteWiringTest`، `SpecialOrderWiringTest`، `LoyaltyTillWiringTest`…)
+  سیمِ همان `Sale.kt`/`QuickSale.kt`/`Settings.kt` را می‌سنجند — سبزیِ آن‌ها دربارهٔ برنامهٔ واقعی چیزی نمی‌گوید. (۳) `ProductDetail.kt` ِ مرده
+  `movementLabelOf` ِ `Reports.kt` را می‌خواند (با آن ماند).
+- **قدمِ بعدی:** تصمیمِ صاحب‌کار: سرستون‌های گزارشِ پایانِ روز و نقشهٔ ساعت در خروجیِ اکسل هم به زبانِ صفحه بروند؟ سپس جدا کردنِ برچسبِ صفحه از
+  خروجی؛ پیش‌نمایشِ DevShot به صفحه‌های نسخهٔ ۳ و برداشتنِ صفحه‌های قدیمی (و آزمون‌های سیمِ آن‌ها)؛ مرده‌های نگه‌داشته پس از جای‌گیریِ نسخهٔ ۳.
+- **آزمون:** اجرای کاملِ کامپیوتر ۴٬۰۰۴ PASS، ۰ FAIL، ۴ SKIP؛ `dari-text.test.js` ۱۷/۱۷؛ `quality.mjs` بی ❌ (سقف‌ها فقط برای پرونده‌های همین کار
+  پایین آمد)؛ precheck ‏fail=0؛ spec «سالم».
+
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-25s زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-25s` (از `claude/batch-55`) + پنل `claude/panel-rows-23p` (server#147)
+
+- **ABUSE-01 — پنل (server، 1.50.97):** «فروشگاه ← مدیریتِ بازار ← گزارش‌ها و جریمه‌ها» کامل شد: صف با پالایش، «مسئولش من»، تصمیم/رأی/برداشتن
+  با دلیل و رمز، کلیدِ پنجره، سقفِ نرخ، ردیفِ دفتر؛ بیننده/اپراتور با `trust-read.v1` فقط می‌خوانند (پنل خودش هم نمای کم‌تر می‌بُرد، چون
+  راهِ پیشینِ پل نمای کامل می‌گیرد). **باگِ واقعی:** دوکلیکِ «مسئولش من» پنجرهٔ «تصمیم» را باز می‌کرد (برچسبِ دکمه کوتاه می‌شد).
+- **ABUSE-01 — سرورِ حساب (این شاخه):** از راهِ کلیدِ سرویس «چه کسی» = `X-Actor-Id` (پیش‌تر شناسهٔ مشترکِ کلید برای همه)، `assigneeName`
+  (مهاجرتِ ۸۵۵)؛ `trust-read.v1` با نمای کم‌تر (`lib/trust-admin-view.js`)؛ `Idempotency-Key` روی چهار نوشتن. `admin-trust-roles.test.js`
+  ۵/۵ (۴ سرخ روی پایه، ۹ جهش گرفته شد). ردیف PARTIAL در «کد» می‌ماند.
+- **قدمِ بعد:** دیدنِ مدرکِ پیوست در پنل (پلِ بایتِ عکسِ `GET /api/admin/trust/cases/:id/evidence/:eid`، فقط admin ِ پنل) ⇒ ردیف به «پرچم»
+  (`market.trust`). اختیاری: پنل کلیدِ پنجره را با `trust-read.v1` به خودِ سرورِ حساب هم بفرستد (`makeUpstreamOnce`)؛ امروز در حافظهٔ پنل است.
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-20f زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-20f` (از `claude/batch-55`) — بازبینی و رفعِ OPS-02/PAY-08
+
+- **شد:** بازبینیِ مستقلِ `claude/e-rows-15w` و رفعِ همهٔ یافته‌ها. PAY-08 (`core/terminal/DevicePay`): کلیدِ تازه فقط پس از
+  روشن شدنِ تلاشِ باز (`Next.Run`/`Resolve`، `resolve` فقط `lookup`)، تلاشِ ردشده/لغوشده دوباره به کار نمی‌رود (`close`/`done`)،
+  «پاسخ نداد» جدا از «ندیده» (`DeviceLookup`؛ پس از مهلت ⇒ بررسی، نه لغو)، یک پرداخت یک ردیف (`Recorded.Replaced`)، فقط چهار
+  رقمِ کارت؛ `DevicePaySettle` کلید و ارز را می‌سنجد؛ `withRow` فقط `confirmed` با سطحِ غیرِدستی؛ `PayLevel` با `Pay.ACCOUNT`/`FX`.
+  OPS-02: «فقط دفتر» ِ رمزدار (`BackupRestore.writeLedger`، `phrase-backup.js` می‌شناسد)، سنجشِ کلید و حافظه پیش از انتخابگر
+  (`BackupSeal.blocked`)، سنجشِ حافظه پیش از رمز (۳×) و بازیابی (۴×) چون Conscrypt ِ اندروید کلِ ورودیِ GCM را نگه می‌دارد،
+  پرچمِ `backup_seal` در `tohid-backup-device` (بیرون از پشتیبان/انتقالِ اندروید، با مهاجرت)، شکستِ پشتیبانِ پوشه دیدنی
+  (`BackupDevice.mirrorError`)؛ shim ِ `Runtime` برای آیفون.
+- **آزمون:** همه سرخ پیش (جهش یا اجرای کدِ پیشین) و سبز پس — `DevicePayTest` ۱۳/۱۳، `BackupSealDrillTest` ۱۰/۱۰،
+  `DevicePaySettleTest` ۵/۵، `DeviceOnlyPrefsTest` ۵/۵، `phrase-backup-tool.test.js` ۵/۵؛ اجرای کاملِ desktop ‏۴۰۱۶ آزمون، ۰ شکست
+  (۴ ردشده)؛ precheck `fail=0`، `quality.mjs` بی ❌، `spec.mjs check` سالم.
+- **نیمه‌کاره/قدمِ بعدی:** پاکتِ تکه‌ایِ نسخهٔ ۲ (STREAM) عمداً ساخته نشد (STATUS ِ OPS-02)؛ ساختِ klib ِ آیفون این‌جا سنجیده نشد
+  (shim ِ تازهٔ `RuntimeShim.kt` با `NSProcessInfo.physicalMemory`) ⇒ CI ِ آیفون ببیند. ردیف‌ها همان PARTIAL و همان دسته.
+
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-19s زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-19s` (از `claude/batch-54`)
+
+- **S18 ⇐ دستگاه:** گامِ ۴ در پنجرهٔ واقعیِ Compose (`TillNewCustomerUiTest`، `ShopStore` ِ واقعی، زبانِ دری): کادرِ نامِ گزینشِ مشتری
+  با فوکوس صفحه‌کلیدِ حروف را باز می‌کند؛ **باگِ واقعی** (یافتهٔ بازبین): دو زدنِ تندِ «مشتریِ تازه» دو مشتریِ هم‌نام می‌ساخت ⇒ `onAdd`
+  حالا `suspend` و دکمه `adding` دارد (آزاد در `finally`، جز پس از ثبتِ موفق که برگه بسته می‌شود)؛ خطای ثبت زیرِ دکمه، نه toast.
+- **S01 ⇐ پرچم:** `ScenarioS01DesktopTest` نخستین آزمونی است که خودِ `DeskSaleScreen` را در پنجرهٔ Compose می‌کشد (۲۰ هزار کالا، چاپگرِ
+  ساختگیِ `net:127.0.0.1`). **دام‌ها:** (۱) توزیع‌گرِ آزمون بی‌صف است ⇒ دو منتظرِ نخستین چیدمانِ یک `LazyGridState` در `AwaitFirstLayoutModifier`
+  ِ Compose 1.9.3 ‏IOOBE می‌دهند؛ `DeskSale` دیگر در بارِ نخست (و برای فهرستِ پنهان) `scrollToItem(0)` را منتظر نمی‌ماند — از خواندنِ کد،
+  نمای جدولی پیش‌تر با عوض کردنِ دسته به سر نمی‌رفت (بی آزمون). (۲) پنجرهٔ آزمون فوکوسِ آغازین (کادرِ اسکن، کادرِ نقدِ پنل) را تا نخستین زدن
+  نمی‌دهد ⇒ آزمون یک بار می‌زند؛ بازگشتِ فوکوس پس از فروش همان `refocus()` است. (۳) نوشتنِ فروش روی دفترِ ۲۰ هزار کالایی زیرِ بارِ این
+  کانتینر ۴٫۶ تا ۱۵ ثانیه تا پاک شدنِ سبد طول کشید (همان `docs/PERF-LEDGER-fa.md`؛ کدِ همگام‌سازی دست نخورد).
+- **S96 ⇐ دستگاه:** `ScenarioS96Test` یک روزِ کاملِ دکانِ بی کامپیوتر را روی همان موتورهای صفحه‌های گوشی پشتِ سرِ هم می‌گرداند (کالا و انبار،
+  فروشِ نقد با دوربین، مشتریِ تازه و قرض، سفارشِ آنلاینِ «مشتری گرفت» یک بار، رسیدِ بخشی، گزارشِ روز و موجودی)؛ سمتِ سرورِ سفارش با
+  `node test/e2e/run.mjs stock` (PGlite) ۸/۸. بی تغییرِ کد. مانده فقط گوشیِ واقعی (دوربین، چاپگرِ بلوتوث، صفحهٔ کوچک).
+- **اجرای کامل:** `flock /tmp/gradle-full.lock ./desktop/gradlew -p desktop test` روی `08b187964` ⇒ ۳۹۸۱ PASS، ۰ FAIL، ۴ SKIP ِ شناخته
+  (ACL ِ ویندوز، دو بنچِ دستی، عکس‌ها)؛ precheck ⇒ `fail=0`؛ `quality.mjs` بی ❌ (`SaleDialogs.kt` با یک خطِ ادغام‌شده زیرِ سقفِ ۱۲۲۱).
+- **نیمه‌کاره / قدمِ بعد:** هر سه ردیف فقط صاحب‌کار: S18 و S96 دستگاه، S01 پرچمِ `payV2` + کامپیوترِ مرجع. پیشنهاد: آزمون‌های تازهٔ صندوق
+  `ScenarioS01DesktopTest` را الگو بگیرند (`DeskSaleScreen` در پنجرهٔ Compose با دیسکِ آزمون و چاپگرِ `net:127.0.0.1`).
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-13t زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-13t` (از `claude/e-rows-11p`)
+
+- **ساخته شد:** RPT-14 — تپشِ بالای قیف از برنامهٔ خرید (`core/shopper/ShopperFunnel` + `customer-android/…/ModelFunnel.kt`؛
+  `ShopperFunnelTest` ۴/۴، جهش ۴ از ۴؛ `CustomerFunnelTest` فقط CI) ⇒ «دستگاه». CRM-09 — عکسِ دروازه و یادداشتِ صوتیِ نشانیِ
+  حسابِ مشتری (مهاجرتِ ۸۳۶، `lib/store-address-media.js`، `store/addr-media.js`، `OrderAddressMediaAndroid.kt`؛ پرچمِ خاموشِ
+  `shop.storefront.address_media`؛ `store-address-media` ۴/۴ با جهش ۶ از ۶، کرومیوم `web-store-acct.mjs` ۲۷ ✅؛ پیکِ همان مأموریت هم می‌بیند) — مانده:
+  افزودن از برنامهٔ خریدِ بومی (همان ماندهٔ CHK-08؛ یک کار). LOC-06 — ۱۷ صفحهٔ تمام‌مرده و بخشِ مردهٔ `Storefront.kt` برداشته شد، سقفِ متنِ خامِ
+  `ui/screens` ۱۸۳۱ ⇐ ۱۴۷۰. CRM-06 — بی کدِ تازه: قالبِ یادآوری از پیش با `ShopSettingsSync` همگام می‌شد (کلیدِ مالِ دکان)؛ آزمونش
+  افزوده شد؛ دسته‌اش با عاملِ «ق».
+- **بی کد (دسته درست شد):** HW-07 ⇐ «تصمیم» (۴-۲۴ ج)، DLV-05 ⇐ «تصمیم» (نقشه‌کشِ برداری در کش نیست)، SEC-02 ⇐ «همگام/پمپ»
+  (دیسک و دورِ زنجیره در `sync/platform/DocChainSync.kt`). RSK-04 به عاملِ «و» رفت (کدی از این شاخه ندارد).
+- **باگ/دام:** (۱) CSP ِ ویترین `img-src` ِ blob: ندارد ⇒ هر کدِ وب که `URL.createObjectURL` را به `<img>`/`Image` می‌دهد بی‌صدا
+  می‌شکند؛ از data: بخوانید. (۲) `customers.auth` ِ ویترین `{customer}` برمی‌گرداند نه خودِ مشتری. (۳) «پرونده‌ای مرده» یعنی هیچ
+  پروندهٔ ماندهٔ دیگری (حتی مرده) از آن نخواند — `Sparks.kt` را `Vip.kt` ِ نیمه‌مرده می‌خواند. (۴) `git rm` ِ زودهنگام در کامیتِ
+  بعدی (RPT-14 ‏629a30100) نشست؛ کامیتِ 82fb81946 درستش کرد — `git rm` را تا کامیتِ همان ردیف نزنید. (۵) `CustomerModel.kt` روی
+  سقفِ ۸۰۰ خط است: سیمِ تازه در پروندهٔ کناری (`Model*.kt`) و جایگزینیِ خط، نه افزودن.
+- **اجرای کامل:** `./desktop/gradlew -p desktop test` (‎-Xmx3g، زیرِ `flock`) با `desktop/build/test-data` ِ پاک ⇒ ۳٬۹۲۷ PASS، ۰ FAIL،
+  ۴ SKIP ِ پیشین. دام: (۶) با `-Xmx2g` کامپایلِ کاملِ کامپیوتر OutOfMemory داد ⇒ اجرای کامل با `-Xmx3g`؛ (۷) `desktop/build/test-data`
+  (`TOHID_DATA_DIR` ِ آزمون) میانِ اجراها می‌ماند و وضعِ کهنه‌اش `SignOutNoLossDesktopTest` را سرخ کرد ⇒ پیش از اجرای کامل پاکش کنید.
+  سرور: `store-address-media` ۵/۵، `shop-route-inventory` ۲/۲، `customer-erasure` ۶/۶، `api-contract` ۲/۲، `web-i18n` ۳۲/۳۲؛ کرومیوم
+  `web-store-acct` ۲۷ ✅، `web-store-p1` ۱۸ ✅، `web-store-erase` ۳۲ ✅، `web-store-cart-sync` ۴۶ ✅؛ precheck ⇒ `fail=0`؛ quality بی ❌.
+- **یافته برای ردیف‌های دیگر:** AUTH-08 — `PhoneClaimStep.kt` در نسخهٔ ۳ صدازننده ندارد (گامِ کدِ شمارهٔ تازه دیده نمی‌شود)؛ نوارِ
+  یادآورِ مالیاتِ فصل (`TaxQuarterAndroid.kt`) هم در نسخهٔ ۳ راه ندارد؛ GATE-NEW-01 ‹صفحهٔ کهنهٔ `Storefront.kt`› حالا برداشته شده.
+- **قدمِ بعد:** CRM-09/CHK-08: افزودنِ عکس/صدا از `customer-android` (همان درهای `/:slug/account/addresses/:id/media/:kind`). LOC-06: بخش‌های مردهٔ `Vip.kt`، `Orders.kt`، `DeliveryDialogs.kt`… و سپس جدول‌ها.
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-15w زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-15w` (از `claude/batch-54`)
+
+- **OPS-02 (رمزِ پشتیبانِ دستی و پوشه درونِ برنامه):** `BackupSeal` (`data/BackupSealAndroid.kt`، تنظیمِ دستگاهِ `backup_seal`، پیش‌فرض
+  خاموش، فقط با کلیدِ عبارتِ `SnapshotSeal`) ⇐ کلِ ZIP در پاکتِ `rp1` با `PhraseBackup.sealing` ِ جریانی (بایت‌به‌بایت همان `seal`،
+  قراردادِ `phrase-backup.js`)؛ پوشه `….zip.sealed`؛ کلید باز نشد ⇒ هیچ فایلی، هرگز ساده. بازیابی با کلیدِ همین دستگاه یا برگهٔ عبارت
+  (`BackupController.unlockFile`)؛ عبارتِ اشتباه/فایلِ دست‌خورده ⇒ رد پیش از هر نوشتن. `BackupSealDrillTest` ۵/۵ (ده راهِ ردِ امن)، دو جهش سرخ؛ همسایه‌ها سبز. مانده: USB با یک لمس (دستگاه).
+- **PAY-08:** `core/pay/PayLevel` (سه سطح، `success`)، `core/terminal/DevicePay` (`VerifyingTerminal`، کلیدِ یکتایی، ازسرگیری با
+  `lookup`، `confirmed`+`device` فقط با پاسخِ کاملِ برابر، ناجوری/دیر ⇒ `needs_review`، یک ردیف) و `pay/DevicePaySettle` (همان
+  `HesabPaySettle.withRow`). `DevicePayTest` ۷/۷ (core، سه جهش سرخ)، `DevicePaySettleTest` ۳/۳. مانده: دستگاهِ واقعی با سندِ یکپارچه‌سازی و D-08 («بیرونی»).
+- **دام:** `quality.mjs` وابستگیِ پلتفرمیِ `AtRestEnvelope.kt` را سقف دارد ⇒ رمزِ جریانی در `core/atrest/platform/PhraseBackup.kt`
+  (پوشهٔ مرزی). `javax.crypto.CipherOutputStream` خطای `flush` ِ پس از برچسب را نادیده می‌گیرد ⇒ جریانِ خودمان. کامپایلِ کامپیوتر
+  با `-Xmx2g` ِ in-process «Java heap space» داد و با ۳g زیرِ بارِ عامل‌های دیگر کشته شد ⇒ `-Xmx3g -XX:+UseSerialGC --max-workers=1`.
+- **قدمِ بعد:** اجرای کاملِ کامپیوتر (`flock`، ۱۴:۰۲) ⇒ ۳۹۷۰ PASS، ۰ FAIL، ۴ SKIP ِ پیشینِ بنچ/عکس؛ precheck ⇒ `fail=0`؛ `quality.mjs` بی ❌. OPS-02: USB با یک لمس و برگهٔ عبارت روی گوشیِ واقعی؛
+  PAY-08: نخستین `VerifyingTerminal` ِ واقعی فقط با سندِ یکپارچه‌سازی (`VendorAppTerminal`)، سپس دکمه در `CardTerminalEntry`. ادغامِ
+  `claude/e-rows-15w` در دسته.
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-13u زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-13u` (از `claude/e-rows-11p`)
 
 - **ABUSE-01 (هنوز PARTIAL، فقط پنل):** ویترینِ وب «گزارشِ مشکل با این دکان» و «گزارشِ این کالا» دارد (`store/trust.js` ِ دیربار

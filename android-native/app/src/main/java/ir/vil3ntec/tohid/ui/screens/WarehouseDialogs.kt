@@ -29,6 +29,21 @@ import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrAccount
+import ir.vil3ntec.tohid.core.i18n.StrCatalogPages
+import ir.vil3ntec.tohid.core.i18n.StrConflictInbox
+import ir.vil3ntec.tohid.core.i18n.StrCourier
+import ir.vil3ntec.tohid.core.i18n.StrCustomerPrices
+import ir.vil3ntec.tohid.core.i18n.StrExpenses
+import ir.vil3ntec.tohid.core.i18n.StrFields
+import ir.vil3ntec.tohid.core.i18n.StrGrid
+import ir.vil3ntec.tohid.core.i18n.StrHome
+import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.i18n.StrProductPages
+import ir.vil3ntec.tohid.core.i18n.StrProducts
+import ir.vil3ntec.tohid.core.i18n.StrStock
 
 /**
  *  فرم‌های انبار.
@@ -125,7 +140,7 @@ fun ProductDialog(
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text(
-          if (form.editingId == null) "کالای تازه" else "ویرایش محصول",
+          if (form.editingId == null) StrHome.newItem else "ویرایش محصول",
           style = MaterialTheme.typography.titleMedium,
           color = Shop.colors.text,
         )
@@ -141,7 +156,7 @@ fun ProductDialog(
         //  هشدار، نه رد: نامِ عیناً یکسان را موتور رد می‌کند؛ این فقط «شاید همان کالاست»
         if (similar.isNotEmpty()) {
           Text(
-            "نامِ مشابه در دکان: " + similar.joinToString("، ") { "«${it.name}»" } + " — اگر همان کالاست، ثبتِ دوباره نکنید.",
+            StrProductPages.similarName + similar.joinToString("، ") { "«${it.name}»" } + " — اگر همان کالاست، ثبتِ دوباره نکنید.",
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.warning,
           )
@@ -152,13 +167,13 @@ fun ProductDialog(
           NumberField(
             value = form.purchase,
             onValueChange = { form = form.copy(purchase = it) },
-            label = "قیمت خرید",
+            label = StrProducts.purchasePrice,
             modifier = Modifier.weight(1f),
           )
           NumberField(
             value = form.sale,
             onValueChange = { form = form.copy(sale = it) },
-            label = "قیمت فروش",
+            label = StrProducts.salePrice,
             modifier = Modifier.weight(1f),
           )
         }
@@ -168,14 +183,14 @@ fun ProductDialog(
           NumberField(
             value = form.minStock,
             onValueChange = { form = form.copy(minStock = it) },
-            label = "حد کم بودن",
+            label = StrStock.minStock,
             modifier = Modifier.weight(1f),
           )
           if (tools) {
             OutlinedTextField(
               value = form.barcodes,
               onValueChange = { form = form.copy(barcodes = it) },
-              label = { Text("بارکدها (با «،» جدا)") },
+              label = { Text(StrProductPages.barcodesSep) },
               singleLine = true,
               modifier = Modifier.weight(1f),
             )
@@ -183,7 +198,7 @@ fun ProductDialog(
             OutlinedTextField(
               value = form.barcode,
               onValueChange = { form = form.copy(barcode = it) },
-              label = { Text("بارکد") },
+              label = { Text(StrGrid.barcode) },
               singleLine = true,
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
               modifier = Modifier.weight(1f),
@@ -208,13 +223,13 @@ fun ProductDialog(
             NumberField(
               value = form.reorder,
               onValueChange = { form = form.copy(reorder = it) },
-              label = "نقطهٔ سفارش",
+              label = StrProductPages.reorderPoint,
               modifier = Modifier.weight(1f),
             )
             NumberField(
               value = form.max,
               onValueChange = { form = form.copy(max = it) },
-              label = "بیشینهٔ موجودی",
+              label = StrProductPages.maxStock,
               modifier = Modifier.weight(1f),
             )
           }
@@ -226,16 +241,16 @@ fun ProductDialog(
           options = d.productUnits,
           selected = form.unit,
           onSelect = { form = form.copy(unit = it) },
-          placeholder = "واحد تازه",
+          placeholder = StrCatalogPages.newUnit,
         )
 
         Spacer(Modifier.height(14.dp))
         ChipPicker(
-          title = "دسته‌بندی",
+          title = StrFields.category,
           options = d.productCategories,
           selected = form.category,
           onSelect = { form = form.copy(category = it) },
-          placeholder = "دسته‌بندی تازه",
+          placeholder = StrFields.newCategory,
         )
 
         Spacer(Modifier.height(10.dp))
@@ -259,7 +274,7 @@ fun ProductDialog(
             OutlinedTextField(
               value = form.tags,
               onValueChange = { form = form.copy(tags = it) },
-              label = { Text("برچسب‌ها (با «،» جدا)") },
+              label = { Text(StrProductPages.tagsSep) },
               singleLine = true,
               modifier = Modifier.weight(1f),
             )
@@ -278,14 +293,14 @@ fun ProductDialog(
             value = form.saleUnit,
             onValueChange = { form = form.copy(saleUnit = it) },
             label = { Text("واحدِ فروشِ دوم (اختیاری)") },
-            placeholder = { Text("گرم") },
+            placeholder = { Text(StrProducts.saleUnitPlaceholder) },
             singleLine = true,
             modifier = Modifier.weight(1f),
           )
           NumberField(
             value = form.unitFactor,
             onValueChange = { form = form.copy(unitFactor = it) },
-            label = if (form.unit.isBlank()) "ضریب" else "هر واحد = چند ${form.unit}",
+            label = if (form.unit.isBlank()) StrProducts.factor else "هر واحد = چند ${form.unit}",
             modifier = Modifier.weight(1f),
           )
         }
@@ -313,7 +328,7 @@ fun ProductDialog(
           Text("وضعیت در فروش", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
           Spacer(Modifier.height(6.dp))
           SegmentedChoice(
-            options = listOf("on" to "فعال", "off" to "غیرفعال"),
+            options = listOf("on" to StrAccount.stateActive, "off" to StrOnline.dlInactive),
             selected = if (form.active) "on" else "off",
             onSelect = { form = form.copy(active = it == "on") },
           )
@@ -321,7 +336,7 @@ fun ProductDialog(
 
         Spacer(Modifier.height(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
+          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(Str.cancel) }
           Button(
             onClick = {
               onSave(
@@ -354,7 +369,7 @@ fun ProductDialog(
               )
             },
             modifier = Modifier.weight(1f),
-          ) { Text(if (form.editingId == null) "ثبت" else "ذخیره تغییرات") }
+          ) { Text(if (form.editingId == null) StrCourier.send else StrAccount.saveChanges) }
         }
       }
     }
@@ -413,8 +428,8 @@ fun EntryDialog(
 
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          NumberField(cartons, { cartons = it }, "تعداد کارتن", Modifier.weight(1f))
-          NumberField(perCarton, { perCarton = it }, "در هر کارتن", Modifier.weight(1f))
+          NumberField(cartons, { cartons = it }, StrHome.cartonCount, Modifier.weight(1f))
+          NumberField(perCarton, { perCarton = it }, StrStock.perCarton, Modifier.weight(1f))
         }
 
         if (computed > 0) {
@@ -427,10 +442,10 @@ fun EntryDialog(
         }
 
         Spacer(Modifier.height(10.dp))
-        NumberField(units, { units = it }, "تعداد واحد", Modifier.fillMaxWidth())
+        NumberField(units, { units = it }, StrHome.unitCount, Modifier.fillMaxWidth())
 
         Spacer(Modifier.height(10.dp))
-        NumberField(price, { price = it }, "قیمت خرید (هر واحد)", Modifier.fillMaxWidth())
+        NumberField(price, { price = it }, StrStock.priceField, Modifier.fillMaxWidth())
 
         if (units.toDoubleOrNull() != null && price.toDoubleOrNull() != null) {
           Spacer(Modifier.height(6.dp))
@@ -443,11 +458,11 @@ fun EntryDialog(
 
         Spacer(Modifier.height(14.dp))
         ChipPicker(
-          title = "واحد اندازه‌گیری",
+          title = StrStock.unitField,
           options = d.productUnits,
           selected = unit,
           onSelect = { unit = it },
-          placeholder = "واحد تازه",
+          placeholder = StrCatalogPages.newUnit,
         )
 
         Spacer(Modifier.height(10.dp))
@@ -500,13 +515,13 @@ fun EntryDialog(
         OutlinedTextField(
           value = notes,
           onValueChange = { notes = it },
-          label = { Text("توضیحات (اختیاری)") },
+          label = { Text(StrMoney.notesField) },
           modifier = Modifier.fillMaxWidth(),
         )
 
         Spacer(Modifier.height(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
+          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(Str.cancel) }
           Button(
             onClick = {
               onSave(
@@ -530,7 +545,7 @@ fun EntryDialog(
               )
             },
             modifier = Modifier.weight(1f),
-          ) { Text("ذخیره") }
+          ) { Text(StrCustomerPrices.save) }
         }
       }
     }
@@ -561,7 +576,7 @@ fun AdjustDialog(
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text(
-          if (kind == WarehouseEngine.AdjustKind.SUPPLIER_RETURN) "برگشت به تأمین‌کننده" else "اصلاح موجودی",
+          if (kind == WarehouseEngine.AdjustKind.SUPPLIER_RETURN) StrExpenses.auditSupplierReturn else StrExpenses.auditStockAdjustment,
           style = MaterialTheme.typography.titleMedium,
           color = Shop.colors.text,
         )
@@ -582,8 +597,8 @@ fun AdjustDialog(
         } else {
           Segment(
             options = listOf(
-              "اصلاح موجودی" to WarehouseEngine.AdjustKind.ADJUSTMENT,
-              "برگشت به تأمین‌کننده" to WarehouseEngine.AdjustKind.SUPPLIER_RETURN,
+              StrExpenses.auditStockAdjustment to WarehouseEngine.AdjustKind.ADJUSTMENT,
+              StrExpenses.auditSupplierReturn to WarehouseEngine.AdjustKind.SUPPLIER_RETURN,
             ),
             selected = kind,
             onSelect = { kind = it },
@@ -592,7 +607,7 @@ fun AdjustDialog(
 
         Spacer(Modifier.height(12.dp))
         Segment(
-          options = listOf("زیاد شد" to true, "کم شد" to false),
+          options = listOf(StrStock.kindUp to true, StrStock.kindDown to false),
           selected = increase,
           onSelect = { increase = it },
         )
@@ -610,22 +625,22 @@ fun AdjustDialog(
         }
 
         Spacer(Modifier.height(12.dp))
-        NumberField(amount, { amount = it }, "مقدار", Modifier.fillMaxWidth())
+        NumberField(amount, { amount = it }, StrMoney.quantity, Modifier.fillMaxWidth())
 
         Spacer(Modifier.height(10.dp))
         OutlinedTextField(
           value = reason,
           onValueChange = { reason = it },
-          label = { Text("دلیل") },
+          label = { Text(StrConflictInbox.reasonLabel) },
           supportingText = {
-            Text("بدون دلیل، فردا معلوم نمی‌شود جنس کجا رفته.", style = MaterialTheme.typography.labelSmall)
+            Text(StrStock.reasonHelper, style = MaterialTheme.typography.labelSmall)
           },
           modifier = Modifier.fillMaxWidth(),
         )
 
         Spacer(Modifier.height(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
+          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(Str.cancel) }
           Button(
             onClick = {
               onSave(
@@ -634,7 +649,7 @@ fun AdjustDialog(
               )
             },
             modifier = Modifier.weight(1f),
-          ) { Text("ثبت") }
+          ) { Text(StrCourier.send) }
         }
       }
     }

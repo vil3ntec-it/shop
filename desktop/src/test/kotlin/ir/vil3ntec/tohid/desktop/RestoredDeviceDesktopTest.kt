@@ -111,6 +111,8 @@ class RestoredDeviceDesktopTest {
     val deviceOnly = setOf(
       "tohid-sync.xml", "tohid-session.xml", "tohid-session-secure.xml", "tohid-staff-pins.xml", "tohid-doc-series.xml",
       "tohid-sync-v1.xml",
+      //  OPS-02: پرچمِ رمزِ پشتیبانِ دستی (کلیدِ عبارت مالِ همین دستگاه است) و شکستِ پشتیبانِ پوشه
+      "tohid-backup-device.xml",
     )
     for ((where, set) in paths) assertEquals(where, deviceOnly, set)
     //  رمزِ دفتر روشن: همان فهرست به‌اضافهٔ حالِ همگام‌سازی (`AtRestScope.SYNC_PREFS`) — هیچ‌کدام کمتر از XML نیست

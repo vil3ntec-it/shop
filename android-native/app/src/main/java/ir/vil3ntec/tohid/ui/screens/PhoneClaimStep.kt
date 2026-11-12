@@ -18,6 +18,8 @@ import ir.vil3ntec.tohid.core.account.PhoneClaim.Step
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.data.repo.AccountRepository
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.StrAccount
+import ir.vil3ntec.tohid.core.i18n.StrAuth
 
 /*
  *  AUTH-08 — افزودنِ شماره به حساب فقط با کدِ همان شماره، در «ویرایشِ پروفایل».
@@ -59,7 +61,7 @@ internal fun NewPhoneField(
     )
     Spacer(Modifier.height(4.dp))
     Text(
-      "شماره پس از ثبت قفل می‌شود و از برنامه عوض نمی‌شود.",
+      StrAccount.phoneOnceHelper,
       style = MaterialTheme.typography.labelSmall,
       color = Shop.colors.warning,
     )
@@ -73,7 +75,7 @@ internal fun NewPhoneField(
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
         modifier = Modifier.fillMaxWidth(),
       )
-      TextButton(onClick = onResend, enabled = !busy) { Text("فرستادنِ دوبارهٔ کد") }
+      TextButton(onClick = onResend, enabled = !busy) { Text(StrAuth.resendCodeAlt) }
     }
   }
 }

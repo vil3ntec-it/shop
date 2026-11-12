@@ -25,6 +25,7 @@ import ir.vil3ntec.tohid.data.BackupBundle
 import ir.vil3ntec.tohid.data.BackupClock
 import ir.vil3ntec.tohid.data.BackupMirror
 import ir.vil3ntec.tohid.data.BackupRestore
+import ir.vil3ntec.tohid.data.BackupSeal
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.SnapshotSeal
 import ir.vil3ntec.tohid.data.LedgerArchive
@@ -102,6 +103,12 @@ internal class BackupController(
   /** نسخهٔ رمزدار با عبارت که کلیدش این‌جا نیست — برگهٔ پرسیدنِ عبارت */
   var unlock by mutableStateOf<AutoBackup.Snapshot?>(null)
     private set
+  /** پشتیبانِ رمزدار (دستی/پوشه، `BackupSeal`) که کلیدش این‌جا نیست — همان برگه */
+  var unlockFile by mutableStateOf<Uri?>(null)
+    private set
+  /** OPS-02: «پشتیبانِ دستی و پوشه هم رمزدار» (`BackupSeal`، پیش‌فرض خاموش) */
+  var backupSealOn by mutableStateOf(BackupSeal.on(context))
+    private set
   var unlockError by mutableStateOf<String?>(null)
     private set
 
@@ -120,13 +127,22 @@ internal class BackupController(
     }.onFailure { toasts.show(StrSettings.backupFailed(failText(it))) }
   }
 
-  /** فقط دفتر — همان فایلی که نسخهٔ وب می‌خواند */
+  /** فقط دفتر — همان فایلی که نسخهٔ وب می‌خواند؛ رمزِ پشتیبانِ دستی روشن ⇒ همان پاکتِ عبارت (`BackupRestore.writeLedger`) */
   fun writeLedger(uri: Uri) = scope.launch {
     runCatching {
-      val out = context.contentResolver.openOutputStream(uri) ?: error(StrSettings.pathNotWritable)
-      out.use { it.write(store.exportBackup(storeName).toByteArray(Charsets.UTF_8)) }
+      BackupRestore.writeLedger(context, store, storeName) { context.contentResolver.openOutputStream(uri) ?: error(StrSettings.pathNotWritable) }
     }.onSuccess { BackupClock.mark(context); toasts.show(StrSettings.ledgerFileMade) }
       .onFailure { toasts.show(StrSettings.fileFailed(failText(it))) }
+  }
+
+  /**
+   *  OPS-02: پیش از باز کردنِ انتخابگرِ فایل — رمزِ پشتیبانِ دستی روشن و کلید باز نشد یا پشتیبان برای حافظه بزرگ است ⇒ پیامِ
+   *  روشن و انتخابگر باز نمی‌شود (وگرنه اندروید فایلِ خالیِ `….sealed` را می‌ساخت و بعد پشتیبان شکست می‌خورد).
+   */
+  fun sealBlocked(photos: Boolean): Boolean {
+    val why = BackupSeal.blocked(context, photos) ?: return false
+    toasts.show(why)
+    return true
   }
 
   /** خروجیِ کاملِ داده برای مالک — فقط مالک/مدیر، با ثبت در سابقهٔ عملیات (۲۱.۲) */
@@ -159,15 +175,26 @@ internal class BackupController(
     }
   }
 
-  /** بازیابی هر دو شکل را می‌شناسد: ZIPِ کامل و JSONِ ساده */
-  fun readFile(uri: Uri) = scope.launch {
+  /**
+   *  بازیابی هر سه شکل را می‌شناسد: ZIPِ کامل، JSONِ ساده و پشتیبانِ رمزدار با عبارت (`BackupSeal`).
+   *  @param typed عبارتِ بازیابی برای پشتیبانِ رمزداری که کلیدش این‌جا نیست ([unlockFile])
+   */
+  fun readFile(uri: Uri, typed: String? = null) = scope.launch {
     withContext(Dispatchers.IO) {
       runCatching {
         val input = context.contentResolver.openInputStream(uri) ?: error(StrSettings.fileNotOpened)
-        input.use { BackupRestore.open(context, store, it).getOrThrow() }
+        input.use { BackupRestore.open(context, store, it, typed).getOrThrow() }
       }
-    }.onSuccess { pendingRestore = it.data; restorePhotos = it.photos; restoreError = null }
-      .onFailure { BackupBundle.dropStaging(context); restoreError = it.message ?: StrSettings.invalidBackup }
+    }.onSuccess { unlockFile = null; unlockError = null; pendingRestore = it.data; restorePhotos = it.photos; restoreError = null }
+      .onFailure { e ->
+        BackupBundle.dropStaging(context)
+        when {
+          typed == null && BackupSeal.needsPhrase(e) -> { unlockFile = uri; unlockError = null; restoreError = null }
+          //  عبارتِ نادرست ⇒ برگه باز می‌ماند؛ هر خطای دیگرِ پس از باز شدن (ZIP ِ ناقص، دکانِ دیگر…) ⇒ پیامِ خودش
+          typed != null && e.message == StrBackupSafety.wrongPhraseFile -> unlockError = StrBackupSafety.wrongPhraseFile
+          else -> { unlockFile = null; unlockError = null; restoreError = e.message ?: StrSettings.invalidBackup }
+        }
+      }
   }
 
   /** @param typed عبارتِ بازیابی برای نسخهٔ رمزداری که کلیدش این‌جا نیست ([unlock]) */
@@ -183,7 +210,13 @@ internal class BackupController(
       }
   }
 
-  fun cancelUnlock() { unlock = null; unlockError = null }
+  fun cancelUnlock() { unlock = null; unlockFile = null; unlockError = null }
+
+  /** همان برگهٔ عبارت برای نسخهٔ خودکار یا پشتیبانِ رمزدار */
+  fun submitUnlock(typed: String) {
+    unlock?.let { readSnapshot(it, typed); return }
+    unlockFile?.let { readFile(it, typed) }
+  }
 
   fun cancelRestore() {
     BackupBundle.dropStaging(context)
@@ -269,12 +302,22 @@ internal class BackupController(
   fun sealOff() {
     askSealOff = false
     SnapshotSeal.setOn(context, false)
+    //  کلیدِ پشتیبانِ دستی/پوشه همان کلیدِ عبارت است ⇒ با هم خاموش
+    BackupSeal.setOn(context, false)
+    backupSealOn = false
     sealOn = false
     sealKeyReady = false
     toasts.show(StrBackupSafety.sealedOff)
   }
 
   fun dismissSealOff() { askSealOff = false }
+
+  /** «پشتیبانِ دستی و پوشه هم رمزدار» — روشن فقط با کلیدِ عبارتِ همین دستگاه */
+  fun setBackupSeal(on: Boolean) {
+    val ok = BackupSeal.setOn(context, on)
+    backupSealOn = BackupSeal.on(context)
+    if (on && !ok) toasts.show(StrBackupSafety.backupSealKeyMissing)
+  }
 
   fun startPhrase() { phrase = RecoveryPhraseFlow(); phraseError = null; syncPhrase() }
   fun showPhrase() { phrase?.start(); syncPhrase() }
@@ -338,15 +381,30 @@ internal fun rememberBackupController(store: ShopStore, toasts: V3Toasts, signed
   val ctrl = remember(store) { BackupController(context, store, scope, toasts) }
   LaunchedEffect(signedIn, ctrl.cloudReload) { ctrl.loadCloud(signedIn) }
   val full = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { it?.let(ctrl::writeFull) }
+  //  OPS-02: پشتیبانِ رمزدار ZIP نیست (`BackupSeal.SEALED_EXT`) — نوعِ دیگر تا اندروید «.zip» نچسباند
+  val fullSealed = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { it?.let(ctrl::writeFull) }
   val ledger = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { it?.let(ctrl::writeLedger) }
+  val ledgerSealed = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { it?.let(ctrl::writeLedger) }
   val json = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { it?.let { u -> ctrl.ownerExport(u, excel = false) } }
   val excel = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) {
     it?.let { u -> ctrl.ownerExport(u, excel = true) }
   }
-  val pick = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { it?.let(ctrl::readFile) }
+  val pick = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { it?.let { u -> ctrl.readFile(u) } }
   val launchers = BackupLaunchers(
-    full = { full.launch("tohid-backup-${todayIso()}.zip") },
-    ledger = { ledger.launch("tohid-shop-backup-${todayIso()}.json") },
+    full = {
+      when {
+        ctrl.sealBlocked(photos = true) -> Unit
+        ctrl.backupSealOn -> fullSealed.launch("tohid-backup-${todayIso()}${BackupSeal.SEALED_EXT}")
+        else -> full.launch("tohid-backup-${todayIso()}.zip")
+      }
+    },
+    ledger = {
+      when {
+        ctrl.sealBlocked(photos = false) -> Unit
+        ctrl.backupSealOn -> ledgerSealed.launch("tohid-shop-backup-${todayIso()}.json${BackupSeal.SEALED_SUFFIX}")
+        else -> ledger.launch("tohid-shop-backup-${todayIso()}.json")
+      }
+    },
     excel = { excel.launch("tohid-export-${todayIso()}.xlsx") },
     json = { json.launch("tohid-export-${todayIso()}.json") },
     restore = { pick.launch("*/*") },

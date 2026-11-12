@@ -18,6 +18,9 @@
  *                              کد، شناسه و عدد (مبلغ) می‌مانند.
  *   delivery_photos، order_pick_photos، delivery_locations   پاک.
  *   online_order_devices       چکیدهٔ دستگاهِ همان سفارش‌ها (RSK-04، مهاجرتِ ۸۴۰) پاک؛ ردیفِ «دستگاهِ بسته» ِ فهرست مثلِ شماره می‌ماند.
+ *   order_address_media        عکسِ دروازه و یادداشتِ صوتیِ نشانیِ همان سفارش‌ها (CHK-08، مهاجرتِ ۸۴۷ — اگر جدولش هست) پاک.
+ *   online_order_address_refs  پیوندِ همان سفارش‌ها به نشانیِ ذخیره‌شدهٔ حساب (CRM-09، مهاجرتِ ۸۳۶) پاک ⇒ دکان دیگر عکس/صدای
+ *                              آن نشانی را نمی‌بیند؛ خودِ `store_address_media` با حسابِ سراسری می‌ماند (پایین).
  *   customer_notify_outbox     HMAC ِ شماره ⇐ `erased`، خطای متنی پاک، صفِ مانده ⇐ `expired`.
  *   shop_chat_conversations    شماره ⇐ `erased:<شناسهٔ گفت‌وگو>`، نام پاک، پیوندِ حساب NULL؛
  *     shop_chat_messages       متن/رسانه/meta پاک و «پاک‌شده» (ردیف و شمار می‌ماند)؛
@@ -37,7 +40,7 @@
  *   order_ledger_docs (زنجیرهٔ هش، فقط شناسه)، online_order_refunds، courier_settlements،
  *   delivery_assignments، delivery_ratings — سندِ مالی/تسویه، بی دادهٔ شخصیِ مشتری؛
  *   shop_risk_lists، shop_chat_blocks و storefront_promo_claims (HMAC ِ شماره + مبلغِ تخفیف) — بازدارندهٔ سوءاستفاده؛ trust_cases — پروندهٔ مدیرِ سامانه؛
- *   store_customers/addresses/sessions — حسابِ سراسریِ مشتری، فقط با `DELETE /api/store/:slug/account`
+ *   store_customers/addresses/sessions (و رسانهٔ نشانی‌هایش) — حسابِ سراسریِ مشتری، فقط با `DELETE /api/store/:slug/account`
  *   ِ خودش؛ دفترِ همگام‌سازیِ دستگاه (قرض‌داران و فروش‌ها) — دفترِ خودِ دستگاه است و سازوکارِ
  *   فرمانِ حذف به دستگاه نیست ⇒ تا دکان در برنامه پاکش نکند می‌ماند؛ audit_logs و پشتیبان‌ها.
  *
@@ -64,7 +67,7 @@ const KEPT = Object.freeze([
 const COUNT_KEYS = Object.freeze([
   'orders', 'orderLines', 'orderEvents', 'deliveryEvents', 'deliveryPhotos', 'pickPhotos', 'deliveryLocations',
   'notifyOutbox', 'conversations', 'messages', 'chatMedia', 'chatPins', 'chatReports', 'carts', 'favorites', 'lists', 'areaRequests',
-  'alerts', 'issues', 'issuePhotos', 'reviews', 'pushSubs', 'alertPushSubs', 'orderDevices',
+  'alerts', 'issues', 'issuePhotos', 'reviews', 'pushSubs', 'alertPushSubs', 'orderDevices', 'addressMedia', 'addressMediaLinks',
 ]);
 
 const flagOn = (shopId) => flagOf(shopId, FLAG);
@@ -215,6 +218,14 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
         counts.deliveryPhotos = await qk('DELETE FROM delivery_photos WHERE shop_id=$1 AND order_id = ANY($2::text[]) RETURNING store_key', [shopId, orderIds]);
         counts.pickPhotos = await qk('DELETE FROM order_pick_photos WHERE shop_id=$1 AND order_id = ANY($2::text[]) RETURNING store_key', [shopId, orderIds]);
         counts.orderDevices = await require('./risk-device').eraseIn(c, shopId, orderIds);
+        //  رسانهٔ نشانی (`lib/address-media.js`): رسانهٔ خودِ این سفارش‌ها (CHK-08) پاک؛ پیوندِ سفارش ⇐ نشانیِ ذخیره‌شدهٔ حساب (CRM-09)
+        //  برداشته ⇒ دکان دیگر به عکس/صدای آن نشانی نمی‌رسد (خودِ رسانهٔ نشانی مالِ حسابِ سراسریِ مشتری است و می‌ماند)
+        if (await has(c, 'order_address_media')) {
+          counts.addressMedia = await qk('DELETE FROM order_address_media WHERE shop_id=$1 AND order_id = ANY($2::text[]) RETURNING store_key', [shopId, orderIds]);
+        }
+        if (await has(c, 'online_order_address_refs')) {
+          counts.addressMediaLinks = await q('DELETE FROM online_order_address_refs WHERE shop_id=$1 AND order_id = ANY($2::text[]) RETURNING order_id', [shopId, orderIds]);
+        }
         counts.deliveryLocations = await q(
           `DELETE FROM delivery_locations WHERE shop_id=$1 AND assignment_id IN (
              SELECT id FROM delivery_assignments WHERE shop_id=$1 AND order_id = ANY($2::text[])) RETURNING assignment_id`,

@@ -398,7 +398,7 @@ class ServerFeatureScreensTest {
   @Test
   fun `هر سه صفحه وصل اند و پشت پرچم سرورند`() {
     //  پروندهٔ مدرک: فقط با `orders.manage` و پس از پاسخِ روشن
-    assertTrue(src("ui/screens/Orders.kt").contains("OrderEvidenceEntry(o.id, cfg.permissions.manage,"))
+    //  (صفحهٔ قدیمیِ `ui/screens/Orders.kt` بی‌راه بود و در LOC-06 برداشته شد؛ فقط نسخهٔ ۳)
     assertTrue(src("ui/v3/online/orders/OrdersRouteContent.kt").contains("OrderEvidenceEntryV3(o.id, cfg?.permissions?.manage == true,"))
     for (f in listOf("ui/screens/OrderEvidencePanel.kt", "ui/v3/online/orders/OrderEvidenceV3.kt")) {
       val t = src(f)

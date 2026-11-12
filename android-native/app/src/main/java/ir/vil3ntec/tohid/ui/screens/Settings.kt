@@ -295,7 +295,7 @@ fun SettingsScreen(
           cur, cur.copy(
             auditLog = cur.auditLog + ir.vil3ntec.tohid.data.AuditEntry(
               id = ir.vil3ntec.tohid.data.auditId(), type = "data_export", date = todayIso(),
-              notes = if (excel) "خروجی کامل داده — اکسل" else "خروجی کامل داده — JSON", createdAt = now,
+              notes = if (excel) "خروجی کامل داده — اکسل" else "خروجی کامل داده — JSON", createdAt = now, // داده: یادداشتِ سابقه (ذخیره می‌شود)
             ),
           ),
         )
@@ -466,7 +466,7 @@ fun SettingsScreen(
           toggle = lockOn,
           onToggle = { on ->
             if (on) askPin = true
-            else { lockStore.set(""); lockOn = false; toast("قفل برداشته شد") }
+            else { lockStore.set(""); lockOn = false; toast(StrSettings.lockRemoved) }
           },
         ) {
           Text(
@@ -555,13 +555,13 @@ fun SettingsScreen(
           title = Str.signedInDevices,
           subtitle = if (signedIn) StrSettings.lostPhone else StrSettings.signedInDevicesHint,
           tint = Shop.colors.warning,
-          value = if (signedIn) null else "وارد نشده",
+          value = if (signedIn) null else StrSettings.notSignedIn,
         ) {
           if (signedIn) {
             DeviceList(state = state, snackbarToast = ::toast)
           } else {
             Text(
-              "فهرستِ دستگاه‌ها و بستنِ نشستِ هر کدام روی سرور است؛ اول وارد حساب شوید.",
+              StrSettings.sessionsSignedOutNote,
               style = MaterialTheme.typography.labelSmall,
               color = Shop.colors.muted2,
             )
@@ -592,7 +592,7 @@ fun SettingsScreen(
           title = Str.expiredGoods,
           subtitle = if (blockExpired) StrSettings.notSold else StrSettings.warnOnly,
           tint = if (blockExpired) Shop.colors.danger else Shop.colors.warning,
-          value = if (blockExpired) "فروخته نمی‌شود" else "فقط هشدار",
+          value = if (blockExpired) StrSettings.notSold else StrSettings.warnOnly,
         ) {
           Text(
             StrSettings.expiryNote,
@@ -729,7 +729,7 @@ fun SettingsScreen(
           title = StrSettings.cameraScanner,
           subtitle = if (cameraGranted) StrSettings.permitted else StrSettings.notPermitted,
           tint = if (cameraGranted) Shop.colors.success else Shop.colors.warning,
-          value = if (cameraGranted) "آماده" else "بی‌اجازه",
+          value = if (cameraGranted) ir.vil3ntec.tohid.core.i18n.StrOnline.dlReadyState else StrSettings.noPermission,
         ) {
           Text(
             StrSettings.cameraNeeded,
@@ -760,11 +760,11 @@ fun SettingsScreen(
          */
         SettingsSection(
           icon = Icons.Filled.Sync,
-          title = "همگام‌سازی",
+          title = StrSettings.syncRow,
           subtitle = if (!signedIn) "برای همگام‌سازی اول وارد حساب شوید"
-          else ir.vil3ntec.tohid.core.sync.SyncBadge.line("همگام‌سازی", v1.queued, lastSyncOk, v1.lastError, syncNow),
+          else ir.vil3ntec.tohid.core.sync.SyncBadge.line(StrSettings.syncRow, v1.queued, lastSyncOk, v1.lastError, syncNow),
           tint = Shop.colors.accent,
-          value = if (!signedIn) "وارد نشده" else ir.vil3ntec.tohid.core.sync.SyncBadge.since(lastSyncOk, syncNow),
+          value = if (!signedIn) StrSettings.notSignedIn else ir.vil3ntec.tohid.core.sync.SyncBadge.since(lastSyncOk, syncNow),
         ) {
           Text(
             "دفترِ دکان روی سرور پشتیبان می‌گیرد و روی گوشیِ دیگر هم می‌آید. " +
@@ -778,12 +778,12 @@ fun SettingsScreen(
           }
           Spacer(Modifier.height(12.dp))
           TohidButton(
-            text = "همگام‌سازی حالا",
+            text = StrSettings.syncNow,
             enabled = signedIn,
             onClick = {
               runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Worker.reconnect.userAsked(); ir.vil3ntec.tohid.sync.v1.SyncV1Worker.now(context) }
-                .onSuccess { toast("همگام‌سازی شروع شد؛ چند ثانیه بعد «آخرین همگام‌سازی» تازه می‌شود") }
-                .onFailure { toast(it.userText("همگام‌سازی ناموفق بود")) }
+                .onSuccess { toast(StrSettings.syncStarted) }
+                .onFailure { toast(it.userText(ir.vil3ntec.tohid.core.i18n.StrAccount.syncFailed)) }
             },
             modifier = Modifier.fillMaxWidth(),
           )

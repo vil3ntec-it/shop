@@ -29,6 +29,8 @@ const views = require('../lib/public-views');
 const orders = require('../lib/orders');
 const orderTimeout = require('../lib/order-timeout');
 const campaigns = require('../lib/campaigns');
+const addrMedia = require('../lib/store-address-media');
+const addrCore = require('../lib/address-media');
 const areas = require('../lib/storefront-area-requests');
 const onlineReport = require('../lib/order-online-report');
 const orderDesk = require('../lib/order-desk');
@@ -169,6 +171,8 @@ async function featuresOf(shopId, sf) {
     ...((await erasure.flagOn(shopId)) ? { erasure: true } : {}),
     //  گفت‌وگو با دکان (`store/chat.js` ِ دیربار، `/:slug/chat/…`) با پرچمِ `shop.chat`
     ...((await require('../lib/shop-chat').flagOf(shopId)) ? { chat: true } : {}),
+    //  CRM-09/CHK-08: عکسِ دروازه و یادداشتِ صوتیِ نشانیِ حساب (`/:slug/account/addresses/:id/media/:kind`) با `shop.storefront.address_media`
+    ...((await addrMedia.flagOn(shopId)) ? { addressMedia: true } : {}),
     //  RPT-14: تپشِ بالای قیف (`POST /:slug/funnel/:step`، `storefront-funnel-store.js`) با پرچمِ `shop.orders.online_report`
     ...((await onlineReport.flagOf(shopId)) ? { funnel: true } : {}),
     //  PRD-17/27: گالریِ عکس‌های بیشترِ برگهٔ کالا (`store/gallery.js` ِ دیربار از product.js) با `shop.storefront.gallery` + `shop.image_bank`
@@ -353,6 +357,9 @@ router.post('/:slug/checkout', checkoutLimit, store, async (req, res) => {
   //  پس از ثبت: کدِ نادرست یا شکستِ این‌جا سفارش را نه می‌بندد و نه عوض می‌کند.
   await campaigns.attribute(req.store, out.orderId, req.body && req.body.campaign)
     .catch((err) => console.error('[campaigns] attribute', err.message));
+  //  CRM-09/CHK-08: سفارش ⇐ نشانیِ نام‌دارِ همان حساب (`address.savedId`)، برای عکسِ دروازه و یادداشتِ صوتی؛ بی‌صدا
+  await addrMedia.linkOrder(req.store.shop_id, out.orderId, sessionOf(req), req.body)
+    .catch((err) => console.error('[address-media] link', err.message));
   if (out.replayed) {
     res.set('Idempotent-Replayed', 'true');
     return res.status(200).json({ order: out.order, replayed: true });
@@ -488,7 +495,10 @@ router.get('/:slug/account/orders', readLimit, store, customer, async (req, res)
 });
 
 router.get('/:slug/account/addresses', readLimit, store, customer, async (req, res) => {
-  res.json({ addresses: await customers.addresses(req.customer, await pinOpt(req)) });
+  const list = await customers.addresses(req.customer, await pinOpt(req));
+  //  CRM-09: `media: {gatePhoto, voiceNote}` فقط با پرچمِ `shop.storefront.address_media`
+  if (!(await addrMedia.flagOn(req.store.shop_id))) return res.json({ addresses: list });
+  res.json({ addresses: await addrMedia.withMedia(req.customer, list), mediaLimits: addrCore.caps() });
 });
 
 router.post('/:slug/account/addresses', checkoutLimit, store, customer, async (req, res) => {
@@ -501,6 +511,26 @@ router.put('/:slug/account/addresses/:id', checkoutLimit, store, customer, async
 
 router.delete('/:slug/account/addresses/:id', checkoutLimit, store, customer, async (req, res) => {
   res.json(await customers.removeAddress(req.customer, req.params.id));
+});
+
+//  ── CRM-09: عکسِ دروازه و یادداشتِ صوتیِ نشانیِ حساب (`lib/store-address-media.js`، طراحیِ مشترکِ `lib/address-media.js`؛
+//  پرچمِ خاموش ⇒ ۴۰۴). بدنهٔ بزرگ‌تر از سقف پیش از خواندن ۴۱۳.
+const addrMediaOn = async (req, res, next) => {
+  if (!(await addrMedia.flagOn(req.store.shop_id))) throw notFound('این بخش در این ویترین نیست', 'address_media_disabled');
+  next();
+};
+
+router.put('/:slug/account/addresses/:id/media/:kind', checkoutLimit, store, customer, addrMediaOn, addrCore.rawBody, async (req, res) => {
+  const out = await addrMedia.put(req.customer, req.params.id, req.params.kind, req.body);
+  res.status(out.replaced ? 200 : 201).json(out);
+});
+
+router.get('/:slug/account/addresses/:id/media/:kind', readLimit, store, customer, addrMediaOn, async (req, res) => {
+  addrCore.send(res, await addrMedia.get(req.customer, req.params.id, req.params.kind));
+});
+
+router.delete('/:slug/account/addresses/:id/media/:kind', checkoutLimit, store, customer, addrMediaOn, async (req, res) => {
+  res.json(await addrMedia.remove(req.customer, req.params.id, req.params.kind));
 });
 
 //  ── WEB-11: علاقه‌مندی‌های حسابِ مشتری (پرچمِ خاموشِ `shop.storefront.favorites` ⇒ ۴۰۴) ──

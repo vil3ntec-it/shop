@@ -7,4 +7,4 @@ package ir.vil3ntec.tohid.ui.screens
  */
 
 /** همان کلیدِ `SettingsLayout.SCAN_CASH` */
-const val SCAN_CASH_TITLE = "فروشِ نقدی با کارتِ فرمان"
+const val SCAN_CASH_TITLE = "فروشِ نقدی با کارتِ فرمان" // داده: کلیدِ بخشِ تنظیمات (همان SettingsLayout)

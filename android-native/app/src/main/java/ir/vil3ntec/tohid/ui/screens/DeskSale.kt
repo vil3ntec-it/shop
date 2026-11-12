@@ -534,9 +534,9 @@ fun DeskSaleScreen(
   }
   val gridState = rememberLazyGridState()
   val tableState = rememberLazyListState()
-  LaunchedEffect(category) {
-    runCatching { gridState.scrollToItem(0) }
-    runCatching { tableState.scrollToItem(0) }
+  LaunchedEffect(category) { // فقط اگر از سر رفته: بارِ نخست (و فهرستِ پنهان) منتظرِ نخستین چیدمان نمی‌ماند (`ScenarioS01DesktopTest`)
+    if (gridState.firstVisibleItemIndex + gridState.firstVisibleItemScrollOffset > 0) runCatching { gridState.scrollToItem(0) }
+    if (tableState.firstVisibleItemIndex + tableState.firstVisibleItemScrollOffset > 0) runCatching { tableState.scrollToItem(0) }
   }
   val listState = rememberLazyListState()
   LaunchedEffect(selected, cart.size) {
@@ -561,8 +561,8 @@ fun DeskSaleScreen(
     },
     onFocusBack = { refocus() },
   )
-  //  POS-05: موجودیِ کاشی «قابل‌فروش» = موجودی − نگه‌داشته‌های همین صندوق (همان گوشی؛ بی نگه‌داشته همان موجودی)
-  val heldQty = held.store.book.collectAsState().value.let { b -> remember(b) { ir.vil3ntec.tohid.data.HeldStock.reserved(b) } }
+  //  POS-05/INV-03: «قابل‌فروش» = موجودی − نگه‌داشته‌های همین صندوق − رزروِ سفارشِ اینترنتی (همان گوشی؛ بی هر دو همان موجودی)
+  val heldQty = ir.vil3ntec.tohid.ui.components.pos.rememberSellableHeld(held.store.book.collectAsState().value, d)
   //  کارت و ردیفِ کالا: زدن ⇐ افزودن (با پیشوندِ «۳*» اگر نوشته شده). − / + فقط در سبد است
   val productCb = PosProductCallbacks(stockOf = { ir.vil3ntec.tohid.data.HeldStock.sellable(ShopStore.stock(d, it), it, heldQty) },
     qtyOf = { id -> PosCartOps.qtyOf(cart, id) }, onAdd = { p -> add(p, parsed.first); query = ""; refocus() })
@@ -956,7 +956,7 @@ fun DeskSaleScreen(
   if (pickDebtor) {
     DebtorPicker(d = d, selected = cartDebtorId, touch = touchExtras, onClose = { pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true } }, onPick = { id ->
       cartStore.setDebtor(id); pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true }
-    }, onAdd = if (!touchExtras) null else { name -> tillNewCustomer(d, name, store, scope, { toast(ir.vil3ntec.tohid.core.i18n.StrCustomerCard.notSaved) }) { id -> cartStore.setDebtor(id); pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true } } }) // POS-31/S18 گامِ ۴
+    }, onAdd = if (!touchExtras) null else { name -> tillNewCustomer(d, name, store) { id -> cartStore.setDebtor(id); pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true } } }) // POS-31/S18 گامِ ۴
   }
   if (lineSellerOpen && lineSellerOn) ir.vil3ntec.tohid.ui.components.pos.LineSellerSheet(d, cart, seller, lineSellerFor, onClose = { lineSellerOpen = false; refocus() }) { next ->
     cartStore.set(next).also { if (!it) toast(StrPos.cartChangedRetry) } } // POS-23 — همان برگهٔ صندوقِ گوشی

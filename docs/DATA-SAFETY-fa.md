@@ -198,9 +198,14 @@
     قاعدهٔ «سند خوردن» ِ `LedgerOwner` آن را می‌گیرد. نوشتنِ صاحب هنگامِ بازیابی کلیدِ همگام‌سازیِ پیش از ورود را عوض می‌کرد
     (`RestoredDevice`: کلیدِ پیش از ورود = صاحبِ دفتر) ⇒ نشد.
     (د) فایلِ «فقط دفتر» (JSON ِ همسازِ وب) و نسخه‌های خودکار مُهر ندارند ⇒ سنجشِ دکان برایشان نیست (نسخهٔ خودکار مالِ همین دستگاه است).
-    (ه) **USB با یک لمس** و پشتیبانِ دستی/پوشه با همین عبارت رمز نشده؛ گامِ بعد همان پاکت روی ZIP (بازکردن با عبارت).
-    بیرون از برنامه ابزارش هست (`server/scripts/phrase-backup.js` `check`/`seal`/`open`، همان پاکت و KID، بردارِ Python؛
-    `claude/p0-syn`): پشتیبانِ ساده روی کامپیوتر رمز می‌شود و برای بازیابی همان ZIP دوباره باز می‌شود؛ درونِ برنامه هنوز نه.
+    (ه) ~~پشتیبانِ دستی/پوشه با همین عبارت رمز نشده~~ ⇒ **ساخته شد** (۱۴۰۵/۰۸/۲۲، `claude/e-rows-15w`): `BackupSeal`
+    (`data/BackupSealAndroid.kt`، تنظیمِ دستگاهِ `backup_seal`، پیش‌فرض خاموش، فقط با کلیدِ عبارتِ `SnapshotSeal`) کلِ ZIP ِ
+    «پشتیبانِ کامل» و پوشه را در همان پاکت می‌گذارد (`PhraseBackup.sealing` ِ جریانی، بایت‌به‌بایت همان `seal`؛ نامِ پوشه
+    `….zip.sealed`) — همان قراردادِ ابزارِ بیرونیِ `server/scripts/phrase-backup.js`. کلیدِ دستگاه باز نشد ⇒ پشتیبانِ دستی/پوشه
+    ساخته نمی‌شود، هرگز ساده (برخلافِ نسخهٔ خودکارِ درونِ برنامه که رونوشتِ خام می‌ماند: آن کنارِ دفتر است، این بیرون می‌رود).
+    بازیابی (`BackupRestore.open` ⇐ `BackupSeal.unwrap`): کلیدِ همین دستگاه، وگرنه عبارتِ نوشته‌شده؛ عبارتِ اشتباه، بیتِ
+    دست‌خورده (رمزنوشته/برچسب/سرآیند)، بریده، تکرارِ بیرون از بازه یا پاکتِ کلیدِ دستگاه ⇒ رد پیش از هر نوشتن. بازیابیِ رمزدار
+    کلِ فایل را در حافظه باز می‌کند (برچسبِ GCM در پایان). سنجه: `BackupSealDrillTest`. **مانده (دستگاه):** USB با یک لمس.
     (و) ~~صفحهٔ عبارت جلوی عکسِ صفحه را نمی‌گیرد~~ ⇒ **بسته روی اندروید** (بندِ ۱۲-ج). هر دستگاه عبارتِ خودش (عبارتِ یکسانِ
     دکان، با همگام‌سازیِ کلید، ساخته نشد).
     (ز) آزمون‌های فقط-اندروید این‌جا اجرا نشدند؛ کشیدنِ برگهٔ عبارت و بخشِ تازهٔ «داده‌ها» آزمونِ تصویری ندارد (منطق در
@@ -279,7 +284,7 @@
 | پشتیبان | عکسِ کالا (`product-photos`) | از سرور (`PhotoSync`) و پشتیبانِ کامل |
 | پشتیبان (تازه، §۷) | پیش‌فاکتورها (`quotes.json`) | با بازیابیِ پشتیبانِ کامل/ابری (`CloudSettingsRestore`)، فقط وقتی دستگاه هیچ پیش‌فاکتوری ندارد |
 | پشتیبان (تازه، §۲ بندِ ۱۲) | فاکتورهای نگه‌داشته و سبدِ جاری (`held-invoices.json`، `sale-draft.json`) | با بازیابیِ پشتیبانِ کامل (پس از دفتر) یا ابریِ همین دستگاه، به‌شکلِ نگه‌داشته، فقط روی دستگاهِ بی فاکتورِ باز و همان دکان (نه فروخته)؛ با `shop.held_sync` از سرور |
-| نسخهٔ سرور | `tohid-heartbeat`، `tohid-news`، `tohid-promos`، `tohid-storefront`، `tohid-shop-chat`، `order-notify`، `tohid-doc-chain`، `tohid-doc-series`، `tohid-hesabpay`، `tohid-courier`، `tohid-staff-time`، `tohid-imgbank`، `tohid-photos`، `tohid-photobot`، `device-push`، `tohid-holidays` (LOC-04: جدولِ تعطیلاتِ رسمی)، `tohid-synonyms` (POS-04: فهرستِ مرکزیِ مترادفِ جست‌وجوی صندوق) | منبعش سرور است (یا صفِ فرستادنی به آن) |
+| نسخهٔ سرور | `tohid-heartbeat`، `tohid-news`، `tohid-promos`، `tohid-storefront`، `tohid-shop-chat`، `order-notify`، `tohid-doc-chain`، `tohid-doc-series`، `tohid-hesabpay`، `tohid-courier`، `tohid-staff-time`، `tohid-imgbank`، `tohid-photos`، `tohid-photobot`، `device-push`، `tohid-holidays` (LOC-04: جدولِ تعطیلاتِ رسمی)، `tohid-synonyms` (POS-04: فهرستِ مرکزیِ مترادفِ جست‌وجوی صندوق)، `tohid-online-holds` (POS-05/INV-03: آخرین نمای رزروِ سفارش‌های اینترنتیِ هر دکان برای کاشیِ صندوق؛ کهنه‌تر از یک روز شمرده نمی‌شود) | منبعش سرور است (یا صفِ فرستادنی به آن) |
 | مالِ همین دستگاه (عمداً) | نشست و همگام‌سازی (`tohid-session`، `tohid-sync*`، `tohid-api`، `tohid-config`، `tohid-servers`، `tohid-ledger*`، نشانِ یک‌بارهٔ `tohid-settings-restore`)، قفل (`tohid-lock`)، زبان و ظاهر (`tohid-locale`، `tohid-theme`، `tohid-ui`، `tohid-shell`)، چاپگر و دستگاه‌های جفت‌شده (`tohid`، `tohid-devices`)، مکان و نبض (`tohid-location*`، `tohid-visit-ping`، `tohid-watch`)، پیش‌نویس‌ها (`tohid-stock`، `tohid-stock-transfer`، `tohid-debtor-detail`)، `tohid-otp`، `tohid_preview` | دوباره روی همان دستگاه |
 | مالِ همین دستگاه (عمداً) | نشست و همگام‌سازی (`tohid-session`، `tohid-sync*`، `tohid-api`، `tohid-config`، `tohid-servers`، `tohid-ledger*`، سایهٔ تنظیماتِ دکان `tohid-settings-sync`، صف و cursor ِ پشتیبانِ نگه‌داشته‌ها `tohid-held-sync` (خودِ نگه‌داشته‌ها با پرچمِ `shop.held_sync` روی سرور)، پیوندِ «اصلاح و ثبت» ِ سبد به سندِ ردشده `tohid-conflict-fix`)، قفل (`tohid-lock`)، زبان و ظاهر (`tohid-locale`، `tohid-theme`، `tohid-ui`، `tohid-shell`)، چاپگر و دستگاه‌های جفت‌شده (`tohid`، `tohid-devices`)، مکان و نبض (`tohid-location*`، `tohid-visit-ping`، `tohid-watch`)، پیش‌نویس‌ها (`tohid-stock`، `tohid-stock-transfer`، `tohid-debtor-detail`)، `tohid-otp`، `tohid_preview` | دوباره روی همان دستگاه |
 | مانده | `tohid-staff-pins` | دوباره گذاشته می‌شود (بالا، بند ۵) |

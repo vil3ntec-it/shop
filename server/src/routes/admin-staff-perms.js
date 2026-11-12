@@ -15,6 +15,7 @@ const express = require('express');
 const { one } = require('../db');
 const v = require('../lib/validate');
 const audit = require('../lib/audit');
+const access = require('../lib/support-access');
 const perms = require('../lib/staff-perms');
 const deviceBlock = require('../lib/device-block');
 const once = require('../lib/admin-write-once');
@@ -51,10 +52,12 @@ function pageOf(req) {
 router.get('/', async (req, res) => {
   const shop = await shopOf(req);
   const page = pageOf(req);
-  //  TEN-04: اجازه‌های اعضا و دستگاه‌هایشان مالِ یک دکان است ⇒ دیدنش سابقه دارد، مثلِ پروندهٔ دکان
+  //  TEN-04: اجازه‌های اعضا و دستگاه‌هایشان مالِ یک دکان است ⇒ دیدنش سابقه دارد، مثلِ پروندهٔ دکان؛ پرچمِ
+  //  `security / admin.support_grant` ⇒ فقط با اجازهٔ زندهٔ `read_private` ِ همین آدم روی همین دکان (‎403 grant_required‎)
+  const grant = await access.grantForRead(req, shop.id, 'staff_perms');
   await audit.log({
     shopId: shop.id, actorType: 'admin', userId: req.admin.id, action: 'admin.shop_staff_perms_viewed',
-    targetType: 'shop', targetId: shop.id, ip: clientIp(req),
+    targetType: 'shop', targetId: shop.id, ip: clientIp(req), ...(grant ? { detail: { grant } } : {}),
   });
   const out = {
     shop: { id: shop.id, name: shop.name },

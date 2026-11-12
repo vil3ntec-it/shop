@@ -866,10 +866,10 @@ fun DebtorPicker(
   onClose: () -> Unit,
   onPick: (String?) -> Unit,
   /** POS-31 — کامپیوترِ لمسی (`PosTouchPrefs.extras()`): کلیدِ «حروف» و صفحه‌کلید برای نام؛ [onAdd] «مشتریِ تازه» (`TillNewCustomer`) */
-  touch: Boolean = false, onAdd: ((name: String) -> String?)? = null,
+  touch: Boolean = false, onAdd: (suspend (name: String) -> String?)? = null,
 ) {
   var search by remember { mutableStateOf("") }
-  val kb = ir.vil3ntec.tohid.ui.components.pos.rememberTouchKeyboard()
+  val kb = ir.vil3ntec.tohid.ui.components.pos.rememberTouchKeyboard(); val keys = remember(kb, touch) { ir.vil3ntec.tohid.ui.components.pos.TouchTextKeys(kb, touch) } // §۵.۳: فوکوسِ نام ⇒ صفحه‌کلید
   val shown = ir.vil3ntec.tohid.data.CustomerCrm.active(d).filter { search.isBlank() || it.name.contains(search.trim(), ignoreCase = true) }
 
   Dialog(onDismissRequest = onClose) {
@@ -879,7 +879,7 @@ fun DebtorPicker(
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
           OutlinedTextField(value = search, onValueChange = { search = it }, placeholder = { Text(ir.vil3ntec.tohid.core.i18n.StrSale.debtorNameHint) },
-            singleLine = true, modifier = Modifier.weight(1f))
+            singleLine = true, modifier = Modifier.weight(1f).touchKeysOnFocus(keys))
           ir.vil3ntec.tohid.ui.components.pos.TouchKeysToggle(kb, touch, 48.dp) {}
         }
         ir.vil3ntec.tohid.ui.components.pos.TouchKeysPanel(kb, touch, 48.dp) { search = ir.vil3ntec.tohid.core.pos.TouchKeyboard.apply(search, it) }

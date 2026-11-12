@@ -31,6 +31,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrAppData
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.StrInvoices
 
 /**
  *  کادرِ جستجو با میکروفون.
@@ -72,7 +73,7 @@ fun VoiceSearchField(
         ) {
           Icon(
             Icons.Filled.Close,
-            contentDescription = "پاک کردن جستجو",
+            contentDescription = StrInvoices.clearSearch,
             tint = Shop.colors.muted,
             modifier = Modifier.size(18.dp),
           )

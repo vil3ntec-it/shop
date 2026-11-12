@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.perm.IdleLock
 import ir.vil3ntec.tohid.data.LockStore
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.StrSettings
 
 /**
  *  «قفلِ خودکار پس از بی‌کاری» — STF-05، زیرِ بخشِ «قفل برنامه»ِ تنظیمات.
@@ -31,12 +32,12 @@ fun IdleLockChoice(lockStore: LockStore) {
   Column {
     Spacer(Modifier.height(12.dp))
     Text(
-      "قفلِ خودکار پس از بی‌کاری",
+      StrSettings.idleTitle,
       style = MaterialTheme.typography.labelLarge,
       color = Shop.colors.text,
     )
     Text(
-      "اگر دستگاه روی پیشخوان بماند، پس از این مدت بی‌کاری دوباره رمز می‌خواهد.",
+      StrSettings.idleNote,
       style = MaterialTheme.typography.bodySmall,
       color = Shop.colors.muted,
     )
@@ -49,7 +50,7 @@ fun IdleLockChoice(lockStore: LockStore) {
         FilterChip(
           selected = minutes == m,
           onClick = { lockStore.idleMinutes = m; minutes = m },
-          label = { Text(if (m == 0) "هرگز" else "$m دقیقه") },
+          label = { Text(if (m == 0) StrSettings.never else "$m دقیقه") },
         )
       }
     }

@@ -24,6 +24,14 @@ import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrConflictInbox
+import ir.vil3ntec.tohid.core.i18n.StrExpenses
+import ir.vil3ntec.tohid.core.i18n.StrHistory
+import ir.vil3ntec.tohid.core.i18n.StrHome
+import ir.vil3ntec.tohid.core.i18n.StrInvoices
+import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrNav
 
 /**
  *  رسیدها.
@@ -58,7 +66,7 @@ fun ReceiptsScreen(d: ShopData) {
         val j = Jalali.ofIso(t.date) ?: return@mapNotNull null
         Row(
           id = t.id,
-          title = d.debtors.find { it.id == t.debtorId }?.name ?: "قرض‌دار حذف‌شده",
+          title = d.debtors.find { it.id == t.debtorId }?.name ?: StrMoney.deletedDebtor,
           note = t.notes,
           amount = t.amount,
           date = t.date,
@@ -72,7 +80,7 @@ fun ReceiptsScreen(d: ShopData) {
         val j = Jalali.ofIso(x.date) ?: return@mapNotNull null
         Row(
           id = x.id,
-          title = x.title.ifBlank { "مصرف" },
+          title = x.title.ifBlank { StrHome.expense },
           note = x.category,
           amount = x.amount,
           date = x.date,
@@ -92,14 +100,14 @@ fun ReceiptsScreen(d: ShopData) {
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
     item {
       Text(
-        "دریافتی‌های هر قرض‌دار به تفکیک ماه و سال",
+        StrNav.receiptsSub,
         style = MaterialTheme.typography.bodySmall,
         color = Shop.colors.muted,
       )
       Spacer(Modifier.height(14.dp))
 
       Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        listOf("receipts" to "رسیدهای قرض‌داران", "expenses" to "مصارف").forEach { (id, label) ->
+        listOf("receipts" to StrMoney.tabDebtorReceipts, "expenses" to Str.expenses).forEach { (id, label) ->
           FilterChip(
             selected = tab == id,
             onClick = { tab = id; who = null },
@@ -110,7 +118,7 @@ fun ReceiptsScreen(d: ShopData) {
       Spacer(Modifier.height(12.dp))
 
       StatTile(
-        label = "جمع",
+        label = StrConflictInbox.total,
         value = "${money(shown.sumOf { it.amount })} ؋",
         tint = if (tab == "receipts") Shop.colors.success else Shop.colors.danger,
         hint = "${plain(shown.size)} ردیف",
@@ -126,7 +134,7 @@ fun ReceiptsScreen(d: ShopData) {
           Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
           horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-          FilterChip(selected = who == null, onClick = { who = null }, label = { Text("همه") })
+          FilterChip(selected = who == null, onClick = { who = null }, label = { Text(Str.all) })
           d.debtors.forEach { debtor ->
             FilterChip(
               selected = who == debtor.id,
@@ -151,9 +159,9 @@ fun ReceiptsScreen(d: ShopData) {
          */
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           PickerBox(
-            label = "سال",
-            value = year?.let { plain(it) } ?: "همهٔ سال‌ها",
-            options = listOf("همهٔ سال‌ها") + years.map { plain(it) },
+            label = StrHistory.year,
+            value = year?.let { plain(it) } ?: StrMoney.allYears,
+            options = listOf(StrMoney.allYears) + years.map { plain(it) },
             onPick = { index ->
               year = if (index == 0) null else years[index - 1]
               if (year == null) month = null
@@ -161,9 +169,9 @@ fun ReceiptsScreen(d: ShopData) {
             modifier = Modifier.weight(1f),
           )
           PickerBox(
-            label = "ماه",
-            value = month?.let { JALALI_MONTHS[it - 1] } ?: "همهٔ ماه‌ها",
-            options = listOf("همهٔ ماه‌ها") + JALALI_MONTHS,
+            label = StrExpenses.month,
+            value = month?.let { JALALI_MONTHS[it - 1] } ?: StrInvoices.allMonths,
+            options = listOf(StrInvoices.allMonths) + JALALI_MONTHS,
             onPick = { index -> month = if (index == 0) null else index },
             modifier = Modifier.weight(1f),
           )
@@ -176,8 +184,8 @@ fun ReceiptsScreen(d: ShopData) {
       item {
         Panel {
           EmptyNote(
-            if (tab == "receipts") "رسیدی با این فیلترها پیدا نشد."
-            else "مصرفی با این فیلترها پیدا نشد."
+            if (tab == "receipts") StrMoney.noReceipts
+            else StrMoney.noExpensesFiltered
           )
         }
       }
