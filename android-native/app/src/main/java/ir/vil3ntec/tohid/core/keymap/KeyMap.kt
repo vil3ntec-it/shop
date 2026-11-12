@@ -358,12 +358,12 @@ object KeyMap {
     web = listOf(Chord(KeyName.Enter)),
   )
   val SALE_PAYMENT_NEXT_FIELD = KeyAction(
-    "sale.payment.nextField", "sale.payment", "فیلدِ بعدی", KeyStatus.PLANNED,
+    "sale.payment.nextField", "sale.payment", "فیلدِ بعدی", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.Tab)),
     web = listOf(Chord(KeyName.Tab)),
   )
   val SALE_PAYMENT_PREV_FIELD = KeyAction(
-    "sale.payment.prevField", "sale.payment", "فیلدِ قبلی", KeyStatus.PLANNED,
+    "sale.payment.prevField", "sale.payment", "فیلدِ قبلی", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.Tab, shift = true)),
     web = listOf(Chord(KeyName.Tab, shift = true)),
   )

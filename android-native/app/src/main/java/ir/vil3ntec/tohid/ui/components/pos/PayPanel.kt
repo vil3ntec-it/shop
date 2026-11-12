@@ -341,7 +341,7 @@ private fun MethodPicker(selected: String, methods: List<PayMethod>, target: Dp,
  *  پیش از F9 با F2 می‌گذارد؛ باقی‌مانده فقط با مشتری به حساب می‌رود.
  */
 /** POS-41 — کلیدهای سطحِ پنلِ پرداخت (`sale.payment.*` ِ keymap.json)؛ بقیه (Enter، PageUp/Down، Shift+رقم) مالِ کادرهاست */
-internal enum class PayPanelKey { BACK, CUSTOMER, TOGGLE_PRINT }
+internal enum class PayPanelKey { BACK, CUSTOMER, TOGGLE_PRINT, NEXT_FIELD, PREV_FIELD }
 
 /**
  *  خالص: [hit] = «این رویداد همین کار است؟»؛ F2 فقط وقتی صفحه گزینشِ مشتری را دارد ([canCustomer])؛ Alt+P
@@ -355,6 +355,9 @@ internal fun payPanelKey(
   hit(KeyMap.SALE_PAYMENT_BACK) -> PayPanelKey.BACK
   canCustomer && hit(KeyMap.SALE_PAYMENT_CUSTOMER) -> PayPanelKey.CUSTOMER
   canPrint && hit(KeyMap.SALE_PAYMENT_TOGGLE_PRINT) -> PayPanelKey.TOGGLE_PRINT
+  //  Tab/Shift+Tab (`sale.payment.nextField`/`prevField`): کادر یا دکمهٔ بعدی/قبلیِ همین پنل
+  hit(KeyMap.SALE_PAYMENT_NEXT_FIELD) -> PayPanelKey.NEXT_FIELD
+  hit(KeyMap.SALE_PAYMENT_PREV_FIELD) -> PayPanelKey.PREV_FIELD
   else -> null
 }
 
@@ -401,6 +404,8 @@ fun PayPanelDialog(
     }
   }
   Dialog(onDismissRequest = onDismiss) {
+    //  فوکوسِ همین پنجره (نه پنجرهٔ صندوق) — Tab/Shift+Tab
+    val focus = androidx.compose.ui.platform.LocalFocusManager.current
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(14.dp), modifier = Modifier.widthIn(max = 640.dp)) {
       Column(
         Modifier.padding(18.dp).verticalScroll(rememberScrollState()).onPreviewKeyEvent { e ->
@@ -408,6 +413,8 @@ fun PayPanelDialog(
             PayPanelKey.BACK -> { onDismiss(); true }
             PayPanelKey.CUSTOMER -> { onCustomer?.invoke(); true }
             PayPanelKey.TOGGLE_PRINT -> { printToggle?.invoke(); true }
+            PayPanelKey.NEXT_FIELD -> focus.moveFocus(androidx.compose.ui.focus.FocusDirection.Next)
+            PayPanelKey.PREV_FIELD -> focus.moveFocus(androidx.compose.ui.focus.FocusDirection.Previous)
             null -> false
           }
         },

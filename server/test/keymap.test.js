@@ -101,12 +101,19 @@ test('POS-41: Alt+P ِ پنلِ پرداخت (چاپِ همین فاکتور) د
   assert.equal(a.webStatus, 'planned');
   assert.equal(km.label('sale.payment.togglePrint'), 'Alt+P');
   assert.ok(!km.help('sale.payment').some((r) => r.id === 'sale.payment.togglePrint'));
-  //  دو کلیدِ Tab ِ همان پنل هنوز planned اند (سنجش روی کامپیوترِ واقعی)
-  assert.equal(km.ACTIONS['sale.payment.nextField'].status, 'planned');
-  assert.equal(km.ACTIONS['sale.payment.prevField'].status, 'planned');
+  //  Tab/Shift+Tab ِ همان پنل (فیلدِ بعدی/قبلی) در کامپیوتر partial؛ وب پنلِ پرداخت ندارد ⇒ planned و بیرون از راهنمای وب
+  for (const id of ['sale.payment.nextField', 'sale.payment.prevField']) {
+    assert.equal(km.ACTIONS[id].status, 'partial', id);
+    assert.equal(km.ACTIONS[id].webStatus, 'planned', id);
+    assert.ok(!km.help('sale.payment').some((r) => r.id === id), id);
+  }
+  assert.equal(km.label('sale.payment.nextField'), 'Tab');
+  assert.equal(km.label('sale.payment.prevField'), 'Shift+Tab');
   //  پنلِ کامپیوتر کلید را از keymap می‌گیرد، نه نوشتهٔ دستی
   const panel = fs.readFileSync(path.join(ROOT, 'android-native/app/src/main/java/ir/vil3ntec/tohid/ui/components/pos/PayPanel.kt'), 'utf8');
   assert.ok(panel.includes('hit(KeyMap.SALE_PAYMENT_TOGGLE_PRINT) -> PayPanelKey.TOGGLE_PRINT'));
+  assert.ok(panel.includes('hit(KeyMap.SALE_PAYMENT_NEXT_FIELD) -> PayPanelKey.NEXT_FIELD'));
+  assert.ok(panel.includes('hit(KeyMap.SALE_PAYMENT_PREV_FIELD) -> PayPanelKey.PREV_FIELD'));
 });
 
 test('RPT-13: کلیدهای «گزارش‌ها» در وب — کدِ فیزیکی، بی رزروِ مرورگر، بی برخورد با کلیدِ سراسری، ', async () => {
