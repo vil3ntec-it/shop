@@ -17,7 +17,8 @@ const SLUG_OFF = 'trust-off-e2e';
 const PHONE = '0795556677';
 
 const owner = await E.owner('owner-trust@e2e.local', 'صاحبِ گزارش', 'دکانِ گزارش');
-const off = await E.owner('owner-trust-off@e2e.local', 'صاحبِ خاموش', 'دکانِ خاموش');
+//  دکانِ شاهدِ خاموش: بی پرچم‌های `E2E_FLAGS_ON` (با `all` خودِ `market.trust` هم روشن می‌شد)
+const off = await E.owner('owner-trust-off@e2e.local', 'صاحبِ خاموش', 'دکانِ خاموش', { flagsOn: false });
 for (const o of [owner, off]) for (const k of ['shop.orders', 'shop.storefront']) await E.flag(o.shopId, k, true);
 let A; let rice; let oil; let tea; let naan;
 let G;
