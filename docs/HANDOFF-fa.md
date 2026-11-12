@@ -67,7 +67,7 @@
   «1*3x3 کابل» ِ `VisualSearch.tillText` دیگر فهرست را خالی نمی‌کند.
 - **آزمون (سرخ پیش/سبز پس):** `ExchangeTillGuardsTest` ۵/۵، `ExchangeGuardsDeskUiTest` ۲/۲، `ExchangeGuardsPhoneUiTest` ۱/۱ (پنجرهٔ واقعیِ Compose)،
   `QuickSaleSearchTest` ۲/۲، نگهبانِ تنگ‌شدهٔ `CheckoutRulesWiringTest` — پیش از رفع ۶ از ۱۹ سرخ (تعویضِ منقضی/رایگان با «فروش‌ها: 2» بی پرسش ثبت شد،
-  `[]` به جای `[cable]`)؛ پس از رفع ۶۰۲ آزمونِ هدف‌دار سبز (جز یک انتظارِ نادرستِ خودِ آزمونِ تازه که اصلاح شد). اجرای کامل: (کامیتِ بعدی).
+  `[]` به جای `[cable]`)؛ پس از رفع ۶۰۲ آزمونِ هدف‌دار سبز (جز یک انتظارِ نادرستِ خودِ آزمونِ تازه که اصلاح شد). اجرای کاملِ `rm -rf desktop/build/test-data && flock /tmp/gradle-full.lock ./desktop/gradlew --no-daemon -p desktop test` روی `1dc9916b5`: ۴۱۰۱ آزمون، ۰ شکست، ۴ SKIP ِ پیشین (BUILD SUCCESSFUL، ۱۱ دقیقه).
 - **نیمه‌کاره / قدمِ بعد:** هیچ. دیده‌شده و دست‌نخورده: فروشِ تعویض مالیاتِ فاکتور (POS-37)، گردکردنِ نقدی و فروشندهٔ ردیف را ندارد (بیرون از این کار).
 
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-31w زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-31w` (از سرِ `claude/batch-56`)
