@@ -103,3 +103,40 @@ test('PRES-08: اعلام‌های هم‌زمانِ چند دستگاه با ه
   const pub = await one('SELECT presence_mode FROM storefronts WHERE shop_id = $1', [other.shopId]);
   assert.equal(pub.presence_mode, 'auto', 'دکانِ همسایه همان پیش‌فرض');
 });
+
+test('PRES-08: ساعتِ جلوافتاده درونِ صفِ آفلاین — اعلامی که بی خبر از اعلامِ تازه‌ترِ دستگاهِ دیگر ساخته شده آن را برنمی‌گرداند (seenAt)', async () => {
+  const s = await store('دیده‌شده');
+  const settings = async () => (await h.get('/api/shop/storefront/config', { token: s.token })).body.settings;
+  //  دستگاهِ الف (ساعتش دو ساعت جلو) آخرین وضعی که دید: همین حالا
+  const seenByA = (await settings()).updatedAt;
+  assert.ok(Number.isSafeInteger(seenByA) && seenByA > 0, 'زمانِ سرورِ تنظیم‌ها');
+  //  الف بی اینترنت «بسته» زد (در صف، با ساعتِ دو ساعت جلو)؛ سپس دستگاهِ ب با ساعتِ درست «آنلاین» زد و رسید
+  const aAt = Date.now() + 2 * 3600_000;
+  await new Promise((r) => setTimeout(r, 5));
+  const b = await declare(s, { mode: 'online', clientEventAt: Date.now(), deviceId: 'dev-b', seenAt: seenByA });
+  assert.equal(b.body.applied, true, JSON.stringify(b.body));
+  //  اعلامِ صفِ الف حالا می‌رسد: زمانِ دستگاهش «دیرتر» است ولی بر پایهٔ وضعِ پیش از «آنلاین» ِ ب ساخته شده
+  const a = await declare(s, { mode: 'closed', clientEventAt: aAt, deviceId: 'dev-a', seenAt: seenByA });
+  assert.equal(a.status, 200, JSON.stringify(a.body));
+  assert.equal(a.body.applied, false, 'اعلامِ بی‌خبر وضعِ تازه‌ترِ دستگاهِ دیگر را برنمی‌گرداند');
+  assert.equal(a.body.status.mode, 'online');
+  assert.equal(await modeOf(s.shopId), 'online');
+  //  همان دستگاهِ الف پس از دیدنِ وضعِ تازه ⇒ می‌نشیند
+  const seenNow = (await settings()).updatedAt;
+  const a2 = await declare(s, { mode: 'closed', clientEventAt: Date.now() + 2 * 3600_000, deviceId: 'dev-a', seenAt: seenNow });
+  assert.equal(a2.body.applied, true, JSON.stringify(a2.body));
+  assert.equal(await modeOf(s.shopId), 'closed');
+  //  دو اعلامِ پشتِ هم از صفِ همان یک دستگاه: دومی به‌خاطرِ اولیِ خودش کهنه نمی‌شود
+  const seenQ = (await settings()).updatedAt;
+  const q1 = await declare(s, { mode: 'offline', clientEventAt: Date.now(), deviceId: 'dev-c', seenAt: seenQ });
+  const q2 = await declare(s, { mode: 'auto', clientEventAt: Date.now() + 1, deviceId: 'dev-c', seenAt: seenQ });
+  assert.deepEqual([q1.body.applied, q2.body.applied], [true, true]);
+  assert.equal(await modeOf(s.shopId), 'auto');
+  //  بی `seenAt` (برنامهٔ پیشین) ⇒ همان قاعدهٔ پیشین؛ `seenAt` ِ نادرست یا آینده ⇒ ۴۰۰
+  const old = await declare(s, { mode: 'online', clientEventAt: Date.now(), deviceId: 'dev-old' });
+  assert.equal(old.body.applied, true);
+  for (const seenAt of ['x', -1, Date.now() + DAY]) {
+    const r = await declare(s, { mode: 'online', clientEventAt: Date.now(), seenAt });
+    assert.equal(r.status, 400, `${seenAt} ⇒ ${JSON.stringify(r.body)}`);
+  }
+});

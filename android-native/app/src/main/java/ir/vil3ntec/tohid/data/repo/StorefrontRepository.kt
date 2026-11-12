@@ -40,6 +40,7 @@ class StorefrontRepository(private val api: ApiClient) {
       put("mode", p.mode)
       p.declaredUntil?.let { put("declaredUntil", it) }
       put("clientEventAt", p.clientEventAt)
+      p.seenAt?.let { put("seenAt", it) } // PRES-08: وضعِ دیده‌شدهٔ لحظهٔ تصمیم
       if (deviceId.isNotBlank()) put("deviceId", deviceId.take(80))
     }
     ApiJson.decode<PresenceResultDto>(api.post("$ROOT/presence", body))
