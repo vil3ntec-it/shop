@@ -107,6 +107,7 @@
 
 ### v3 · فروش و صندوق
 
+- ⛔ S125 (۵۰ هزار کالا): در مسیرِ اسکن و سبد کالا با `ShopStore.product(d, id)`/`productsById`/`barcodeIndex` (نمایه برای همان شیءِ `d.products` یک بار، `data/ProductIndexes.kt`) و محموله‌های انقضا با همان `PromoEngine.lines` (یک بار برای همان دفتر و روز) — نه `products.find`/`associateBy` برای هر ردیف و نه ساختنِ نمایه در هر اسکن. سنجه: `TOHID_POS_SPEED=1 TOHID_POS_SPEED_PRODUCTS=50000 … --tests '*PosSpeedBenchTest*'`.
 - پیش‌نویسِ فاکتور پس از قطعِ برق برمی‌گردد؛ بستنِ پنجرهٔ بازیابی یعنی «ادامه»؛ در شک داده را نگه دار (POS-13، #234).
 - کلیدِ یکتای فاکتور همان شناسهٔ فروش است؛ برایش فیلدِ تازه به دفتر نیفزا (POS-14، #234).
 - کالای غیرفعال به فاکتور نمی‌رود (PRD-18، #234).
@@ -972,6 +973,7 @@
 
 ### v3 · ظاهر و طراحی (VISUAL-DIRECTION + DESIGN v2)
 
+- ⛔ S110: پیش‌فرضِ `Motion` همان تنظیمِ گوشی است (`auto`؛ «انیمیشن روشن» ِ کاربر برنده) و `V3Sheet` زیرِ کاهشِ حرکت بی انیمیشنِ `ModalBottomSheet` همان دم می‌بندد — هر برگهٔ تازه از `V3Sheet`، نه `ModalBottomSheet` ِ خام. شاهد: `ReducedMotionTillUiTest`.
 - مرجعِ ظاهر `docs/VISUAL-DIRECTION-fa.md` («Professional Retail OS») است و بر `DESIGN-PROMPT-fa.md` مقدم (#238).
 - صفحه‌های کار بی شیشه و آرورا؛ `decorative` فقط برای آغاز و ورود (#257).
 - وضعیت همیشه «متن + رنگ + نقطه» (`StatusPill`) (#256، #257).
