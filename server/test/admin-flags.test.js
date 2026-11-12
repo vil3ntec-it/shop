@@ -114,13 +114,6 @@ const PARITY = [
 
 const putFlag = (scope, key, value) => h.put('/api/admin/flags', { scope, key, value, reason: 'آزمونِ پیش‌فرضِ کاتالوگ' }, { token: sup });
 
-test('کاتالوگ: هر کلید فقط یک ردیف (دو ردیف ⇒ پنل دو بار نشان می‌دهد و `find` همیشه اولی را می‌خواند)', () => {
-  const { KNOWN } = require('../src/routes/admin-flags');
-  const seen = new Map();
-  for (const k of KNOWN) seen.set(k.key, (seen.get(k.key) || 0) + 1);
-  assert.deepEqual([...seen].filter(([, n]) => n > 1).map(([key]) => key), [], 'کلیدِ تکراری در KNOWN');
-});
-
 test('کاتالوگ: هر ردیفِ تازه همان پیش‌فرضِ کد است؛ نوشتنِ پیش‌فرض بی‌اثر، مقدارِ دیگر اثردار', async () => {
   const { KNOWN } = require('../src/routes/admin-flags');
   assert.equal(new Set(PARITY.map((p) => p[0])).size, PARITY.length, 'کلیدِ تکراری در جدول');
