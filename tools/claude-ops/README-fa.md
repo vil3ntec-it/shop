@@ -40,6 +40,7 @@
 10. پروژهٔ Gradle ِ تازه (مثلِ `bench/kotlin`) بی `gradle.properties` با حافظهٔ پیش‌فرض OutOfMemory می‌دهد ⇒ همان `-Xmx4g` ِ `desktop/gradle.properties`.
 11. کارهای GitHub (بستن/ادغامِ PR) با ابزارهای MCP ِ github؛ `gh pr close` از bash را حالتِ خودکار رد می‌کند.
 12. آزمونِ «۳۰ روز آفلاین» (SYN-01) در CI رد می‌شود چون کارِ `tohid-desktop.yml` ‏`npm ci` ِ سرور ندارد؛ آن workflow انتشار است ⇒ workflow ِ آزمونیِ جدا (`offline30.yml` در شاخهٔ نیمه‌کارهٔ `claude/e-rows-7`).
+13. زیرِ `offline-run.sh` کرومیوم `navigator.onLine === false` می‌گوید (فقط loopback) ⇒ کدی که با آن صبر می‌کند (`store/cart-sync.js`) چیزی نمی‌فرستد و `web-store-cart-sync.mjs` آن‌جا سرخ است ولی با اینترنت سبز — رفتارِ درستِ «بی شبکه»، نه باگ؛ گوشیِ روی وای‌فایِ بی اینترنت `onLine` ِ true دارد (`claude/verify-rows-j`). PostgreSQL ِ محلی در همان فضا فقط از سوکت: `postgres://postgres@%2Ftmp:55432/<db>`.
 
 ## ۱. قاعده‌های صاحب‌کار (همیشه)
 
