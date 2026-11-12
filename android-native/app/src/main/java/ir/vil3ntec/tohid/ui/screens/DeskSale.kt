@@ -174,7 +174,7 @@ fun DeskSaleScreen(
   val canDiscount = remember { ir.vil3ntec.tohid.data.ShopRole.mayDiscount(context) }
   val tillGuards = remember { ir.vil3ntec.tohid.data.TillGuardsPref.get(context) } // «فروخته نشود»، S22 و POS-24 ِ همین دستگاه — همان سدهای فروشِ تعویض
   val blockExpired = tillGuards.blockExpired; val checkoutRules = tillGuards.rules // POS-24: قاعده‌های پیش از پایانِ فاکتور (پیش‌فرض خاموش)
-  val cashStep = remember { ir.vil3ntec.tohid.data.CashRoundPref.step(context) } // PAY-09: گردکردنِ نقدی، پیش‌فرض خاموش
+  val cashStep = tillGuards.cashRounding // PAY-09: گردکردنِ نقدی (`CashRoundPref` از `TillGuards`، همان فروشِ تعویض)، پیش‌فرض خاموش
   //  POS-15 (پشتِ `PosPriceCheckPrefs`، پیش‌فرض روشن): Ctrl+I قیمت‌پرسی بی افزودن به فاکتور
   ir.vil3ntec.tohid.ui.components.pos.PosPriceCheckPrefs.load(context)
   var priceCheck by remember { mutableStateOf(false) }
@@ -377,7 +377,7 @@ fun DeskSaleScreen(
     debtorId = cartDebtorId,
     blockExpired = blockExpired,
     rules = checkoutRules,
-    cashRounding = cashStep, tax = remember { ir.vil3ntec.tohid.data.SaleTaxPref.active(context) }, // POS-37: خاموش ⇒ null
+    cashRounding = cashStep, tax = tillGuards.tax, // POS-37: `SaleTaxPref` از `TillGuards` (همان فروشِ تعویض)؛ خاموش ⇒ null
   )
   val totals = SalesEngine.totals(d, loyal, checkout)
   //  PAY-09: نقدِ کاملِ پرداختِ ساده ⇒ ردیفِ گرد و «قابلِ پرداخت» با آن (همان حسابِ `SalesEngine.record`)
