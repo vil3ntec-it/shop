@@ -95,10 +95,10 @@ router.use('/system/notify-usage', rateLimit({ max: 30, windowMs: 60 * 1000, key
 router.use('/contract', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-contract-ip' }));
 router.use('/subscriptions/period-end', rateLimit({ max: 240, windowMs: 60 * 1000, keyPrefix: 'admin-period-end-ip' }));
 router.use('/shops/:id/staff-perms/devices', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-device-state-ip' }));
-//  LOC-04 تعطیلات (`admin-calendar.js`)، ۴-۱ «ب» مترادف (`admin-synonyms.js`) و ۲-۹ دسترسیِ پشتیبانی (`admin-access-grants.js`) — سقفِ IP پیش از همین `requireAdmin`
-router.use('/calendar', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-calendar-ip' }));
-router.use('/search/synonyms', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-synonyms-ip' }));
-router.use('/shops/:id/access-grants', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-access-grants-ip' }));
+router.use('/calendar', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-calendar-ip' }));   //  سقفِ IP پیش از `requireAdmin`: LOC-04 (`admin-calendar.js`)
+router.use('/search/synonyms', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-synonyms-ip' }));   //  ۴-۱ «ب» (`admin-synonyms.js`)
+router.use('/shops/:id/access-grants', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-access-grants-ip' }));   //  ۲-۹ (`admin-access-grants.js`)
+router.use('/shops/:id/images/changes', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-image-changes-ip' }));   //  IMG-PRO-17 (`admin-image-changes.js`)
 
 router.use(requireAdmin);
 
@@ -780,7 +780,7 @@ router.use('/shops/:id/staff-perms', require('./admin-staff-perms'));
 router.use('/otp', require('./admin-otp'));
 router.use('/sync', require('./admin-sync'));
 //  پنلِ مرکزی، فاز ۳: سلامت و حالت‌های مدیریتیِ دکان، پرچم‌ها با تاریخچه، کلیدِ سرویسِ پلِ پنل
-router.use('/shops/:id', require('./admin-shop-state'), require('./admin-access-grants'));   //  + ۲-۹ دسترسیِ پشتیبانی
+router.use('/shops/:id', require('./admin-shop-state'), require('./admin-access-grants'), require('./admin-image-changes'));   //  + ۲-۹ دسترسیِ پشتیبانی، IMG-PRO-17
 router.use('/flags', require('./admin-flags'));
 //  پوستهٔ کنسول — جست‌وجوی سراسریِ بخشِ «فروشگاه» ِ پنل (توانایی `search.v1`)
 router.use('/search', require('./admin-synonyms'), require('./admin-search'));   //  + ۴-۱ «ب» فهرستِ مرکزیِ مترادف

@@ -20,18 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1051,
+    "routes": 1054,
     "byAuth": {
       "none-detected": 200,
-      "admin": 285,
+      "admin": 288,
       "inline": 2,
       "user": 521,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-      "extracted": 719,
-      "empty": 330,
+      "extracted": 721,
+      "empty": 331,
       "unresolved": 2
     }
   },
@@ -271,6 +271,9 @@
     {"method":"GET","path":"/api/admin/shops/:id/holds","area":"admin","source":"server/src/routes/admin-shop-state.js","auth":"admin","guards":["requireAdmin"],"params":["id"],"query":["limit"],"body":[],"response":{"statuses":[200],"keys":["...","kinds","roles","services","shopId"]},"errors":["404 not_found"],"shape":"extracted"},
     {"method":"POST","path":"/api/admin/shops/:id/holds","area":"admin","source":"server/src/routes/admin-shop-state.js","auth":"admin","guards":["requireAdmin"],"params":["id"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/admin/shops/:id/holds/:holdId/lift","area":"admin","source":"server/src/routes/admin-shop-state.js","auth":"admin","guards":["requireAdmin"],"params":["holdId","id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"GET","path":"/api/admin/shops/:id/images/changes","area":"admin","source":"server/src/routes/admin-image-changes.js","auth":"admin","guards":["requireAdmin"],"params":["id"],"query":["limit"],"body":[],"response":{"statuses":[200],"keys":["changes","enabled","shopId"]},"errors":["400 bad_limit"],"shape":"extracted"},
+    {"method":"GET","path":"/api/admin/shops/:id/images/changes/:cid","area":"admin","source":"server/src/routes/admin-image-changes.js","auth":"admin","guards":["requireAdmin"],"params":["cid","id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["change","shopId"]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/admin/shops/:id/images/changes/:cid/rollback","area":"admin","source":"server/src/routes/admin-image-changes.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["cid","id"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/admin/shops/:id/staff-codes","area":"admin","source":"server/src/routes/admin-staff-codes.js","auth":"admin","guards":["requireAdmin"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["shop","students"]},"errors":["404 not_found"],"shape":"extracted"},
     {"method":"POST","path":"/api/admin/shops/:id/staff-codes/reveal","area":"admin","source":"server/src/routes/admin-staff-codes.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["code","generation","ok","role"]},"errors":["404 no_standing_code"],"shape":"extracted"},
     {"method":"GET","path":"/api/admin/shops/:id/staff-perms","area":"admin","source":"server/src/routes/admin-staff-perms.js","auth":"admin","guards":["requireAdmin"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},

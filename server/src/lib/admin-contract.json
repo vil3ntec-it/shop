@@ -3,7 +3,7 @@
   "generator": "node tools/api-contract/generate.cjs (--check)",
   "source": "docs/api/routes.json",
   "superadmin": "فقط نگهبانِ نام‌دارِ requireSuperAdmin روی همان در؛ سنجشِ نقشِ درونِ گرداننده (و lib/admin-roles.js) این‌جا دیده نمی‌شود",
-  "routesHash": "cce5b20456c800f0",
+  "routesHash": "67b1533856f97550",
   "routes": [
     {"method":"GET","path":"/api/admin/2fa","superadmin":false},
     {"method":"POST","path":"/api/admin/2fa/disable","superadmin":false},
@@ -229,6 +229,9 @@
     {"method":"GET","path":"/api/admin/shops/:id/holds","superadmin":false},
     {"method":"POST","path":"/api/admin/shops/:id/holds","superadmin":false},
     {"method":"POST","path":"/api/admin/shops/:id/holds/:holdId/lift","superadmin":false},
+    {"method":"GET","path":"/api/admin/shops/:id/images/changes","superadmin":false},
+    {"method":"GET","path":"/api/admin/shops/:id/images/changes/:cid","superadmin":false},
+    {"method":"POST","path":"/api/admin/shops/:id/images/changes/:cid/rollback","superadmin":true},
     {"method":"GET","path":"/api/admin/shops/:id/staff-codes","superadmin":false},
     {"method":"POST","path":"/api/admin/shops/:id/staff-codes/reveal","superadmin":true},
     {"method":"GET","path":"/api/admin/shops/:id/staff-perms","superadmin":false},
