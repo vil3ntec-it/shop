@@ -9,8 +9,11 @@ import ir.vil3ntec.tohid.core.hw.EscPos
 import ir.vil3ntec.tohid.core.hw.PrintQueue
 import ir.vil3ntec.tohid.core.i18n.StrOrderOps
 import ir.vil3ntec.tohid.core.i18n.StrOrderSlip
+import ir.vil3ntec.tohid.core.i18n.StrRefundSlip
 import ir.vil3ntec.tohid.core.model.OrderDto
+import ir.vil3ntec.tohid.core.model.OrderRefundReceiptDto
 import ir.vil3ntec.tohid.core.orders.OrderAutoPrint
+import ir.vil3ntec.tohid.core.orders.OrderRefundSlip
 import ir.vil3ntec.tohid.core.orders.OrderSlip
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -158,5 +161,26 @@ object OrderSlipPrint {
       context, PrintQueue.Kind.REPORT, printer.link, StrOrderSlip.jobTitle(after.orderNo.toString()), bytes,
       done = StrOrderSlip.printed,
     )
+  }
+
+  /** رسیدِ اصلاحیِ سرور ⇐ مدلِ خالصِ کاغذ (عددها دست نمی‌خورند) */
+  fun refundOf(r: OrderRefundReceiptDto): OrderRefundSlip.Receipt = OrderRefundSlip.Receipt(
+    no = r.no, orderNo = r.orderNo, at = r.at, method = r.method, final = r.final, totalMinor = r.totalMinor,
+    refundedBeforeMinor = r.refundedBeforeMinor, amountMinor = r.amountMinor, refundedAfterMinor = r.refundedAfterMinor,
+    netMinor = r.netMinor, reason = r.reason,
+  )
+
+  /**
+   *  E2E-RET-11: چاپِ دستیِ یک رسیدِ اصلاحیِ بازپرداخت روی چاپگرِ پیش‌فرضِ همین دستگاه — یک کار در صفِ چاپ (نوعِ
+   *  گزارش: بی فروش، بی «چاپِ دوباره» ِ فاکتور). ناهمخوان ⇒ هیچ کاغذ و پیامِ روشن. خروجی: پیامِ صفحه.
+   */
+  suspend fun printRefund(context: Context, r: OrderRefundReceiptDto): String {
+    val rows = OrderRefundSlip.rows(refundOf(r), StrRefundSlip, System.currentTimeMillis(), ::stamp, ir.vil3ntec.tohid.data.TrainingMode.watermark(null))
+      ?: return StrRefundSlip.mismatch
+    val printer = PrinterRegistry.defaultSaved(context) ?: return StrOrderSlip.noPrinter
+    val bytes = withContext(Dispatchers.IO) {
+      runCatching { val p = printer.profile(); EscPos.document(HwPages.text(context, p.paperDots, rows.map(::lineOf)), p) }
+    }.getOrElse { return StrRefundSlip.failed(it.message ?: StrOrderSlip.unknown) }
+    return PrintSpooler.submitAndWait(context, PrintQueue.Kind.REPORT, printer.link, StrRefundSlip.jobTitle(r.no), bytes, done = StrRefundSlip.printed)
   }
 }
