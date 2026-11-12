@@ -68,12 +68,13 @@ function accept(kind, value) {
 }
 
 /** بدنهٔ خام تا سقفِ بزرگ‌ترین نوع؛ بزرگ‌تر پیش از خواندن ۴۱۳ (هر دو درِ مشتری) */
+const BODY_MAX = Math.max(config.addressMedia.photoMax, config.addressMedia.voiceMax);
+const parseRaw = express.raw({ type: () => true, limit: BODY_MAX });
 function rawBody(req, res, next) {
-  const max = Math.max(config.addressMedia.photoMax, config.addressMedia.voiceMax);
-  const tooBig = () => new ApiError(413, 'too_large', `فایل بزرگ‌تر از ${kb(max)} است`);
+  const tooBig = () => new ApiError(413, 'too_large', `فایل بزرگ‌تر از ${kb(BODY_MAX)} است`);
   const len = Number(req.headers['content-length']);
-  if (Number.isFinite(len) && len > max) return next(tooBig());
-  express.raw({ type: () => true, limit: max })(req, res, (err) => {
+  if (Number.isFinite(len) && len > BODY_MAX) return next(tooBig());
+  parseRaw(req, res, (err) => {
     if (err && err.type === 'entity.too.large') return next(tooBig());
     if (err) return next(badRequest('فایل درست نرسید', 'bad_media'));
     next();
