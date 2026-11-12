@@ -68,4 +68,12 @@ object StrDebtPages {
   val statementPng: String get() = t("تصویرِ صورت‌حساب (PNG)", "Statement image (PNG)", "د حساب د صورت انځور (PNG)")
 
   // ── `DebtorListModel.kt` ──
+
+  // ── `Debtors.kt`/`DebtorTxSheet.kt` (فقط پیش‌نمایشِ گوشیِ `DevShot`؛ نسخهٔ ۳ دفترِ قرضِ `ui/v3/money` را دارد) ──
+  val colPhone: String get() = t("شماره", "Phone", "شمېره")
+  val colBalance: String get() = t("مانده", "Balance", "پاتې")
+  val colAge: String get() = t("مدت", "Age", "موده")
+  val receiveMenu: String get() = t("ثبتِ رسید (پول گرفتم)", "Record a payment (money received)", "رسید ثبت کړئ (پیسې مې واخیستې)")
+  val newDebtMenu: String get() = t("قرضِ تازه", "New credit", "نوی پور")
+  fun returnedDot(qty: Any?): String = t(" · مرجوعی ${asIs(qty)}", " · returned $qty", " · بېرته $qty")
 }

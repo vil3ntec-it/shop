@@ -53,7 +53,7 @@ internal fun NewPhoneField(
     OutlinedTextField(
       value = phone,
       onValueChange = onPhone,
-      label = { Text("شماره موبایل — یک بار ثبت می‌شود") },
+      label = { Text(ir.vil3ntec.tohid.core.i18n.StrShellPages.mobileOnce) },
       placeholder = { Text("07XXXXXXXX") },
       singleLine = true,
       keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
@@ -70,7 +70,7 @@ internal fun NewPhoneField(
       OutlinedTextField(
         value = code,
         onValueChange = onCode,
-        label = { Text("کدی که به همین شماره پیامک شد") },
+        label = { Text(ir.vil3ntec.tohid.core.i18n.StrShellPages.smsCodeLabel) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
         modifier = Modifier.fillMaxWidth(),
@@ -89,7 +89,7 @@ internal suspend fun sendPhoneCode(account: AccountRepository, phone: String, to
   account.requestPhoneCode(phone)
     .onSuccess {
       open = true
-      toast("کدی به همین شماره پیامک شد؛ آن را بنویسید و «ذخیره» را بزنید")
+      toast(ir.vil3ntec.tohid.core.i18n.StrShellPages.smsCodeSent)
     }
     .onFailure { f ->
       open = when (PhoneClaim.afterSend(f.code)) {

@@ -231,7 +231,7 @@ class DariCoverageTest {
     "core/report/OwnerReportPlan.kt", "core/storefront/StorefrontEtaApi.kt", "core/storefront/PromoGuardApi.kt",
   )
 
-  /** سقفِ متنِ خامِ باقی‌ماندهٔ `ui/screens` (بی سطرهای «// داده:»)؛ چرخ‌دنده‌ای: فقط پایین بیاید — دورِ ۲: ۳۶۳۳، دورِ ۳: ۲۶۰۲، دورِ ۴: ۲۰۵۲، دورِ ۵: ۱۹۸۴، دورِ ۶: ۱۸۳۵، دورِ ۷: ۱۸۳۱، LOC-06: ۱۴۷۰، LOC-06 دورِ ۲: ۱۷۸ */
+  /** سقفِ متنِ خامِ باقی‌ماندهٔ `ui/screens` (بی سطرهای «// داده:»)؛ چرخ‌دنده‌ای: فقط پایین بیاید — دورِ ۲: ۳۶۳۳، دورِ ۳: ۲۶۰۲، دورِ ۴: ۲۰۵۲، دورِ ۵: ۱۹۸۴، دورِ ۶: ۱۸۳۵، دورِ ۷: ۱۸۳۱، LOC-06: ۱۴۷۰، LOC-06 دورِ ۲: ۱۷۸، LOC-06 دورِ ۳: ۷۳ */
   //  دستهٔ ۲۷: ۱۸۳۵ ِ دورِ ۶ روی پایه‌ای بی #971 شمرده شد؛ #971 سه سطرِ هم‌شکلِ STORE_PLACE (برچسبِ L.STORE_STOCK و
   //  کلیدواژه‌های جست‌وجوی تنظیمات در SettingsLayout/SettingsSearchIndex) پیش از آن افزوده بود ⇒ ۱۸۳۸ = همان شمارِ ادغام.
   //  دورِ ۷: هفت متنِ زندهٔ `MoreLayout`، `ReportFreshModel`، `ServerPulse`، `VoiceSearch`، `DeskMenu` و `DeliveryDesk` ⇒ ۱۸۳۱
@@ -247,7 +247,12 @@ class DariCoverageTest {
   //  (۳) ۲۴۹ متنی که عیناً ویژگیِ بی‌آرگومانِ جدولی است به همان ویژگی رفت (فارسی بایت‌به‌بایت همان) ⇒ ۱۷۸ در ۲۰۱ پرونده.
   //  ماندهٔ همه: ستون‌های `DayEndModel`/`HeatmapModel` (صفحه و خروجی؛ تصمیمِ صاحب‌کار)، صفحه‌های فقط‌پیش‌نمایشِ گوشی
   //  (`PhonePreview` ِ DevShot: `Sale`، `QuickSale`، `Profile`، `Settings`، `Debtors`…) و مرده‌های نگه‌داشته
-  private val maxRawOldScreens = 178
+  //  LOC-06 دورِ ۳ (`claude/e-rows-28l`): ۷۴ متنِ صفحه‌های فقط‌پیش‌نمایش (`Sale`، `QuickSale`، `Profile`، `ProfileModel`، `Settings`،
+  //  `Debtors`، `DebtorDetail`، `DebtorTxSheet`، `NavEditor`، `PhoneHomeModel`، `IdleLockChoice`، `VoiceSearch`) و ۲۷ ِ مرده‌های
+  //  بی جانشینِ کامل (`WarehouseDialogs`، `PhoneClaimStep`) به `Str*` (فارسی همان؛ `PreviewPagesTextTest`)؛ `ui/screens/ProductDetail.kt`
+  //  (+ `movementLabelOf`) و `ui/screens/Receipts.kt` با جانشینِ نسخهٔ ۳ (`ui/v3/products/ProductDetailScreen`، `ui/v3/money/ReceiptsScreen`)
+  //  برداشته شدند (۴) ⇒ ۷۳: فقط ستون‌های `DayEndModel` (۵۳) و `HeatmapModel` (۲۰)، صفحه و سرستونِ خروجیِ اکسل با هم — تصمیمِ صاحب‌کار
+  private val maxRawOldScreens = 73
 
   /** کفِ پوششِ دریِ نوشته‌های جابه‌جاشدهٔ دورِ ۲ (٪) — اندازهٔ همین کار؛ فقط بالا برود */
   private val minMovedPercent = 14

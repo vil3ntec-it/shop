@@ -32,7 +32,7 @@ class LegacySyncCallTest {
     while (dir != null) {
       for (rel in listOf("src/main/java", "app/src/main/java", "android-native/app/src/main/java")) {
         val f = File(dir, "$rel/ir/vil3ntec/tohid")
-        if (f.isDirectory && File(f, "ui/screens/Profile.kt").isFile) return File(dir, rel)
+        if (f.isDirectory && File(f, "ui/v3/settings/sections/SyncScreen.kt").isFile) return File(dir, rel)
       }
       dir = dir.parentFile
     }
@@ -45,9 +45,10 @@ class LegacySyncCallTest {
 
   @Test
   fun `دکمهٔ همگام‌سازی حالا دورِ v1 را می‌اندازد نه Syncer_run`() {
-    val src = withoutComments(File(mainSources(), "ir/vil3ntec/tohid/ui/screens/Profile.kt").readText())
-    assertTrue("Profile.kt هنوز Syncer(...).run() را صدا می‌زند", !legacyRun.containsMatchIn(src))
-    assertTrue("Profile.kt باید SyncV1Worker.now(context) را صدا بزند", src.contains("SyncV1Worker.now(context)"))
+    //  دکمهٔ «همگام‌سازی حالا» ِ نسخهٔ ۳ (تنظیمات ⇐ همگام‌سازی)؛ `ui/screens/Profile.kt` فقط پیش‌نمایشِ DevShot است
+    val src = withoutComments(File(mainSources(), "ir/vil3ntec/tohid/ui/v3/settings/sections/SyncScreen.kt").readText())
+    assertTrue("SyncScreen.kt هنوز Syncer(...).run() را صدا می‌زند", !legacyRun.containsMatchIn(src))
+    assertTrue("SyncScreen.kt باید SyncV1Worker.now(context) را صدا بزند", src.contains("SyncV1Worker.now(context)"))
   }
 
   @Test

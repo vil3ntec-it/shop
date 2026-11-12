@@ -44,11 +44,15 @@ class PromoLiveWiringTest {
     }
   }
 
+  /** خروجِ نسخهٔ ۳ (`profile/signout` ⇐ `SafeSignOut.finish`)؛ `ui/screens/Profile.kt` فقط پیش‌نمایشِ DevShot است */
   @Test fun `خروج از حساب reset را پس از signOut صدا می‌زند`() {
-    val p = src("ir/vil3ntec/tohid/ui/screens/Profile.kt")
-    val out = p.indexOf("state.signOut()")
-    val reset = p.indexOf("ir.vil3ntec.tohid.ui.PromoLive.reset(context)")
+    val p = src("ir/vil3ntec/tohid/data/SafeSignOut.kt")
+    val finish = p.substring(p.indexOf("suspend fun finish(context: Context)"))
+    val out = finish.indexOf("SyncStore(app).signOut()")
+    val reset = finish.indexOf("ir.vil3ntec.tohid.ui.PromoLive.reset(app)")
     assertTrue(out in 0 until reset)
     assertEquals(1, Regex("""PromoLive\.reset\(""").findAll(p).count())
+    //  برگهٔ خروجِ نسخهٔ ۳ همین راه را می‌رود
+    assertTrue(src("ir/vil3ntec/tohid/ui/v3/account/profile/SignOutSheet.kt").contains("SafeSignOut.finish(context)"))
   }
 }

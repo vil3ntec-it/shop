@@ -53,7 +53,8 @@ class PhoneTillWiringTest {
     )
     //  پایهٔ صریحِ ذخیره (`d`، همان دفتری که فاکتور با آن ساخته می‌شود) پیش از دروازه — `CartStore.post`
     val gated = Regex("""\.post\(store, d, gate = \{ key -> (ir\.vil3ntec\.tohid\.ui\.)?PromoLive\.redeemGate\(context, key, promo\) \}\)""")
-    val tills = listOf("ui/v3/sales/checkout/CheckoutRoute.kt", "ui/screens/DeskSale.kt", "ui/screens/Sale.kt", "ui/screens/QuickSale.kt")
+    //  `ui/screens/Sale.kt` و `QuickSale.kt` فقط پیش‌نمایشِ DevShot‌اند؛ صندوق و فروشِ سریعِ گوشی هر دو از `CheckoutRoute` ثبت می‌کنند
+    val tills = listOf("ui/v3/sales/checkout/CheckoutRoute.kt", "ui/screens/DeskSale.kt")
     for (rel in tills) {
       val s = src(rel)
       val posts = Regex("""\.post\(store\b""").findAll(s).count()

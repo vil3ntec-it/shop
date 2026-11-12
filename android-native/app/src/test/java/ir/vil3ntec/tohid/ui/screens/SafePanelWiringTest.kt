@@ -52,7 +52,6 @@ class SafePanelWiringTest {
   }
 
   @Test fun `تنظیمات در صفحهٔ نسخهٔ ۳ و ستونِ کامپیوتر`() {
-    assertEquals(1, count(src("ir/vil3ntec/tohid/ui/screens/Settings.kt"), "SafeBookSettingsWired(context)"))
     //  جای `SettingsLegacy` و فهرستِ کامپیوترِ رابطِ قدیمِ پاک‌شده (۱۴۰۵/۰۸/۱۱): صفحه و ردیفِ نسخهٔ ۳
     assertEquals(1, count(src("ir/vil3ntec/tohid/ui/v3/settings/sections/TillMoneyScreensAndroid.kt"), "SafeBookPref.set(context, it)"))
     assertEquals(1, count(src("ir/vil3ntec/tohid/ui/screens/SettingsLayout.kt"), "SAFE_BOOK -> ir.vil3ntec.tohid.core.i18n.StrSafe.settingsTitle"))

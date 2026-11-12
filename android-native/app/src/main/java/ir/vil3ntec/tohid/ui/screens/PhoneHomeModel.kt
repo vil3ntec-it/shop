@@ -312,12 +312,20 @@ object HomeAlerts {
  *  میلادیِ فایل است تا موتورِ گزارش (`ReportEngine`) همان را بشمارد.
  */
 object StatsBuckets {
-  enum class Period(val label: String) { WEEK("هفته"), MONTH("ماه"), YEAR("سال") }
+  enum class Period {
+    WEEK, MONTH, YEAR;
+
+    val label: String get() = when (this) {
+      WEEK -> ir.vil3ntec.tohid.core.i18n.StrReports.periodWeek
+      MONTH -> ir.vil3ntec.tohid.core.i18n.StrReports.periodMonth
+      YEAR -> ir.vil3ntec.tohid.core.i18n.StrReports.periodYear
+    }
+  }
 
   data class Bucket(val label: String, val from: String, val to: String)
 
   /** ISO ۱ دوشنبه … ۷ یکشنبه (`CivilDays.isoWeekday`) */
-  private val WEEKDAYS = listOf("دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه", "یکشنبه")
+  private val WEEKDAYS: List<String> get() = ir.vil3ntec.tohid.core.i18n.StrReports.weekdaysShort
 
   fun of(period: Period, today: String, monthNames: List<String>): List<Bucket> = when (period) {
     Period.WEEK -> (6 downTo 0).mapNotNull { back ->

@@ -140,7 +140,7 @@ fun ProductDialog(
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text(
-          if (form.editingId == null) StrHome.newItem else "ویرایش محصول",
+          if (form.editingId == null) StrHome.newItem else ir.vil3ntec.tohid.core.i18n.StrStockPages.editProduct,
           style = MaterialTheme.typography.titleMedium,
           color = Shop.colors.text,
         )
@@ -149,14 +149,14 @@ fun ProductDialog(
         OutlinedTextField(
           value = form.name,
           onValueChange = { form = form.copy(name = it) },
-          label = { Text("نام کالا") },
+          label = { Text(ir.vil3ntec.tohid.core.i18n.StrStockPages.itemName) },
           singleLine = true,
           modifier = Modifier.fillMaxWidth(),
         )
         //  هشدار، نه رد: نامِ عیناً یکسان را موتور رد می‌کند؛ این فقط «شاید همان کالاست»
         if (similar.isNotEmpty()) {
           Text(
-            StrProductPages.similarName + similar.joinToString("، ") { "«${it.name}»" } + " — اگر همان کالاست، ثبتِ دوباره نکنید.",
+            StrProductPages.similarName + similar.joinToString("، ") { "«${it.name}»" } + ir.vil3ntec.tohid.core.i18n.StrStockPages.sameItemTail,
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.warning,
           )
@@ -211,7 +211,7 @@ fun ProductDialog(
           OutlinedTextField(
             value = priceReason,
             onValueChange = { priceReason = it },
-            label = { Text("دلیلِ تغییرِ قیمت (با نامِ شما در سابقه می‌ماند)") },
+            label = { Text(ir.vil3ntec.tohid.core.i18n.StrStockPages.priceReasonKept) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
           )
@@ -237,7 +237,7 @@ fun ProductDialog(
 
         Spacer(Modifier.height(14.dp))
         ChipPicker(
-          title = "واحد",
+          title = StrProducts.unit,
           options = d.productUnits,
           selected = form.unit,
           onSelect = { form = form.copy(unit = it) },
@@ -257,7 +257,7 @@ fun ProductDialog(
         OutlinedTextField(
           value = form.subcategory,
           onValueChange = { form = form.copy(subcategory = it) },
-          label = { Text("زیردسته (اختیاری)") },
+          label = { Text(ir.vil3ntec.tohid.core.i18n.StrStockPages.subcategoryOpt) },
           singleLine = true,
           modifier = Modifier.fillMaxWidth(),
         )
@@ -267,7 +267,7 @@ fun ProductDialog(
             OutlinedTextField(
               value = form.brand,
               onValueChange = { form = form.copy(brand = it) },
-              label = { Text("برند (اختیاری)") },
+              label = { Text(ir.vil3ntec.tohid.core.i18n.StrStockPages.brandOpt) },
               singleLine = true,
               modifier = Modifier.weight(1f),
             )
@@ -292,7 +292,7 @@ fun ProductDialog(
           OutlinedTextField(
             value = form.saleUnit,
             onValueChange = { form = form.copy(saleUnit = it) },
-            label = { Text("واحدِ فروشِ دوم (اختیاری)") },
+            label = { Text(ir.vil3ntec.tohid.core.i18n.StrStockPages.secondUnitOpt) },
             placeholder = { Text(StrProducts.saleUnitPlaceholder) },
             singleLine = true,
             modifier = Modifier.weight(1f),
@@ -300,7 +300,7 @@ fun ProductDialog(
           NumberField(
             value = form.unitFactor,
             onValueChange = { form = form.copy(unitFactor = it) },
-            label = if (form.unit.isBlank()) StrProducts.factor else "هر واحد = چند ${form.unit}",
+            label = if (form.unit.isBlank()) StrProducts.factor else StrProducts.factorHelper(form.unit),
             modifier = Modifier.weight(1f),
           )
         }
@@ -314,7 +314,7 @@ fun ProductDialog(
           Spacer(Modifier.height(14.dp))
           val names = d.suppliers.map { it.name }
           ChipPicker(
-            title = "تأمین‌کننده (اختیاری)",
+            title = ir.vil3ntec.tohid.core.i18n.StrStockPages.supplierOpt,
             options = names,
             selected = d.suppliers.find { it.id == form.supplierId }?.name.orEmpty(),
             onSelect = { name -> form = form.copy(supplierId = d.suppliers.find { it.name == name }?.id.orEmpty()) },
@@ -325,7 +325,7 @@ fun ProductDialog(
 
         if (form.editingId != null) {
           Spacer(Modifier.height(14.dp))
-          Text("وضعیت در فروش", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+          Text(ir.vil3ntec.tohid.core.i18n.StrStockPages.saleStatus, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
           Spacer(Modifier.height(6.dp))
           SegmentedChoice(
             options = listOf("on" to StrAccount.stateActive, "off" to StrOnline.dlInactive),
@@ -420,7 +420,7 @@ fun EntryDialog(
     DialogEntry {
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
-        Text("ثبت ورود کالا", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Text(ir.vil3ntec.tohid.core.i18n.StrStockPages.receiveGoods, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         if (product != null) {
           Spacer(Modifier.height(4.dp))
           Text(product.name, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
@@ -435,7 +435,7 @@ fun EntryDialog(
         if (computed > 0) {
           Spacer(Modifier.height(6.dp))
           Text(
-            "${qty(computed)}${if (unit.isNotBlank()) " $unit" else ""} می‌شود",
+            ir.vil3ntec.tohid.core.i18n.StrStockPages.makesQty("${qty(computed)}${if (unit.isNotBlank()) " $unit" else ""}"),
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.primary,
           )
@@ -450,7 +450,7 @@ fun EntryDialog(
         if (units.toDoubleOrNull() != null && price.toDoubleOrNull() != null) {
           Spacer(Modifier.height(6.dp))
           Text(
-            "جمع: ${money(units.toDouble() * price.toDouble())} ؋",
+            StrStock.total(money(units.toDouble() * price.toDouble())),
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.muted,
           )
@@ -470,7 +470,7 @@ fun EntryDialog(
           OutlinedTextField(
             value = expiry,
             onValueChange = { expiry = it },
-            label = { Text("تاریخ انقضا (اختیاری)") },
+            label = { Text(ir.vil3ntec.tohid.core.i18n.StrStockPages.expiryOpt) },
             placeholder = { Text("۱۴۰۶/۰۱/۳۰") },
             singleLine = true,
             modifier = Modifier.weight(1f),
@@ -478,7 +478,7 @@ fun EntryDialog(
           OutlinedTextField(
             value = batch,
             onValueChange = { batch = it },
-            label = { Text("سری ساخت (اختیاری)") },
+            label = { Text(ir.vil3ntec.tohid.core.i18n.StrStockPages.batchOpt) },
             singleLine = true,
             modifier = Modifier.weight(1f),
           )
@@ -487,7 +487,7 @@ fun EntryDialog(
         OutlinedTextField(
           value = made,
           onValueChange = { made = it },
-          label = { Text("تاریخ تولید (اختیاری)") },
+          label = { Text(ir.vil3ntec.tohid.core.i18n.StrStockPages.madeOpt) },
           placeholder = { Text("۱۴۰۵/۰۱/۱۵") },
           singleLine = true,
           modifier = Modifier.fillMaxWidth(),
@@ -495,19 +495,19 @@ fun EntryDialog(
 
         if (stockOn) {
           Spacer(Modifier.height(10.dp))
-          NumberField(landed, { landed = it }, "هزینهٔ جانبی (کرایه، گمرک) — اختیاری، کلِ همین ورود", Modifier.fillMaxWidth())
+          NumberField(landed, { landed = it }, ir.vil3ntec.tohid.core.i18n.StrStockPages.landedOpt, Modifier.fillMaxWidth())
           Text(
-            "به بهای همین کالا اضافه می‌شود (میانگینِ موزون)؛ جدا در «مصارف» ثبتش نکنید.",
+            ir.vil3ntec.tohid.core.i18n.StrStockPages.landedHint,
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.muted,
           )
           Spacer(Modifier.height(10.dp))
           ChipPicker(
-            title = "محلِ نگه‌داری",
+            title = ir.vil3ntec.tohid.core.i18n.StrStockPages.storagePlace,
             options = ir.vil3ntec.tohid.data.StockLedger.locations(d).map { ir.vil3ntec.tohid.data.StockActions.locationLabel(it) },
             selected = location,
             onSelect = { location = it },
-            placeholder = "محلِ تازه",
+            placeholder = ir.vil3ntec.tohid.core.i18n.StrStockPages.newPlace,
           )
         }
 
@@ -590,7 +590,7 @@ fun AdjustDialog(
           //  موتورِ تازه روشن: برگشت به تأمین‌کننده فقط از «خرید و تأمین‌کننده» با سندِ کسر
           //  (`PurchaseBook.supplierReturn`) — دو راه یعنی موجودیِ دو بار کم‌شده و بدهیِ کم‌نشده
           Text(
-            "برگشت به تأمین‌کننده: از «خرید و تأمین‌کننده» ⇐ همان تأمین‌کننده ⇐ «برگشت (سندِ کسر)»؛ هم کالا کم می‌شود هم بدهی.",
+            ir.vil3ntec.tohid.core.i18n.StrStockPages.supplierReturnHint,
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.muted,
           )
@@ -614,14 +614,14 @@ fun AdjustDialog(
 
         if (stockOn && kind == WarehouseEngine.AdjustKind.ADJUSTMENT) {
           Spacer(Modifier.height(12.dp))
-          Text("نوعِ اصلاح", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+          Text(ir.vil3ntec.tohid.core.i18n.StrStockPages.adjustKind, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
           Spacer(Modifier.height(6.dp))
           Segment(
             options = ir.vil3ntec.tohid.data.StockActions.ADJ_KINDS.map { it.second to it.first },
             selected = adjKind,
             onSelect = { adjKind = it },
           )
-          Text("خراب و منقضی در گزارشِ ضایعات جمع می‌شوند.", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+          Text(ir.vil3ntec.tohid.core.i18n.StrStockPages.wasteHint, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
         }
 
         Spacer(Modifier.height(12.dp))

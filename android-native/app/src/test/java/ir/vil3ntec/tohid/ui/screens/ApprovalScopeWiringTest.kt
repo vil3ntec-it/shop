@@ -29,12 +29,23 @@ class ApprovalScopeWiringTest {
     assertTrue(s.contains("CreditGate.state(over, sale.debtorId.orEmpty(), creditApproval)"))
   }
 
+  /**
+   *  گوشیِ نسخهٔ ۳ (`ui/screens/Sale.kt` و `QuickSale.kt` ِ پیشین فقط پیش‌نمایشِ DevShot‌اند): تأیید در `CheckoutSession` است،
+   *  ولی هر بار که صندوق یا فروشِ سریع برگهٔ پرداخت را باز می‌کند پاک می‌شود و سبد در برگهٔ پرداخت عوض نمی‌شود؛ هر ثبت
+   *  دوباره با `CreditGate.state` می‌سنجد (همان مشتری و تا همان برد) و تأییدِ تازه فقط همان ثبتِ در انتظار را می‌زند.
+   */
   @Test fun `گوشی همان الگو را دارد — تأیید فقط روی همان فاکتورِ در انتظار`() {
-    for (f in listOf("QuickSale.kt", "Sale.kt")) {
-      val s = src("ir/vil3ntec/tohid/ui/screens/$f")
-      assertTrue(f, s.contains("postSale(pending.copy(creditApproval = ok))"))
-      assertFalse(f, Regex("""mutableStateOf<[\w.]*CreditGate\.Approval\?>""").containsMatchIn(s))
+    val v3 = "ir/vil3ntec/tohid/ui/v3/sales/"
+    for (f in listOf("cart/SaleRoute.kt", "quick/QuickSaleRoute.kt")) {
+      assertTrue(f, Regex("""CheckoutSession\.reset\(\); nav\.open\(SalesPaths\.checkout\(""").containsMatchIn(src(v3 + f)))
     }
+    val session = src(v3 + "checkout/CheckoutSession.kt")
+    assertTrue(session.substring(session.indexOf("fun reset()")).contains("creditApproval = null"))
+    val pay = src(v3 + "checkout/CheckoutRoute.kt")
+    assertTrue(pay.contains("CheckoutModel.credited(gated, over, CheckoutSession.creditApproval)"))
+    assertTrue(pay.contains("LaunchedEffect(freshCredit) { if (freshCredit != null && !submitted) submit() }"))
+    assertTrue(src(v3 + "checkout/CheckoutModel.kt").contains("CreditGate.state(over, debtorId, approval) == CreditGate.State.APPROVED"))
+    assertFalse(Regex("""mutableStateOf<[\w.]*CreditGate\.Approval\?>""").containsMatchIn(pay))
   }
 
   @Test fun `تأییدِ برگشت با مبلغ یا gate ِ تازه کنار می‌رود`() {

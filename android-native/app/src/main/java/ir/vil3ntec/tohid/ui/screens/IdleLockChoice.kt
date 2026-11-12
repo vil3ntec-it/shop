@@ -50,7 +50,7 @@ fun IdleLockChoice(lockStore: LockStore) {
         FilterChip(
           selected = minutes == m,
           onClick = { lockStore.idleMinutes = m; minutes = m },
-          label = { Text(if (m == 0) StrSettings.never else "$m دقیقه") },
+          label = { Text(if (m == 0) StrSettings.never else StrSettings.minutes(m)) },
         )
       }
     }

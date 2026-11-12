@@ -157,7 +157,8 @@ class VisualSearchTest {
         .map { File(it, "ir/vil3ntec/tohid/$rel") }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد")
     val ui = code("ui/screens/VisualSearchUi.kt")
     for (bad in listOf("CartStore", "cartStore", "addToCart", "SalesEngine", "SalePost")) assertFalse(bad, ui.contains(bad))
-    assertTrue(code("ui/screens/QuickSale.kt").contains("if (t is VisualSearch.Tap.Search) { category = null; search = t.query }"))
+    //  ⚠️ صندوقِ گوشیِ نسخهٔ ۳ دکمهٔ «جست‌وجو با عکس» ندارد؛ `ui/screens/QuickSale.kt` که داشت فقط پیش‌نمایشِ DevShot است
+    //  (STATUS ِ AI-11، `claude/e-rows-28l`) — می‌ماند کامپیوتر
     assertTrue(code("ui/screens/DeskSale.kt").contains("Tap.Search) { query = t.query; refocus() }"))
     //  «باز کردن»: «محصولاتِ» گوشیِ رابطِ امروز (`Products.kt`، بی‌مرجع از نسخهٔ ۳) در «پاک‌سازی، گامِ ۳» پاک شد؛ می‌ماند کامپیوتر
     assertTrue(code("ui/screens/DeskProducts.kt").contains("Tap.Open) openId = t.productId"))

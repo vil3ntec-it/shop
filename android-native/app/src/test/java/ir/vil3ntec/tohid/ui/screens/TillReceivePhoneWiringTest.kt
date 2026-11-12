@@ -38,7 +38,9 @@ class TillReceivePhoneWiringTest {
   }
 
   @Test fun `صندوقِ گوشی دکمه را دارد`() {
-    val s = src("ir/vil3ntec/tohid/ui/screens/Sale.kt")
-    assertEquals(1, Regex(Regex.escape("TillReceivePhone(d, store, cartDebtorId, ::toast)")).findAll(s).count())
+    //  گوشیِ نسخهٔ ۳: `PhoneTillTools` زیرِ سبدِ `SaleRoute` با مشتریِ همان سبد (`ui/screens/Sale.kt` فقط پیش‌نمایشِ DevShot است)
+    val s = src("ir/vil3ntec/tohid/ui/v3/sales/cart/PhoneTillTools.kt")
+    assertEquals(1, Regex(Regex.escape("TillReceivePhone(data, store, debtorId, toast)")).findAll(s).count())
+    assertTrue(src("ir/vil3ntec/tohid/ui/v3/sales/cart/SaleRoute.kt").contains("tools = { PhoneTillTools(lines, PromoEngine.priced(lines, promo), debtorId) }"))
   }
 }

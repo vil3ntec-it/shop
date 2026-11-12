@@ -428,12 +428,12 @@ private fun DrawerInfo(account: DebtorEngine.Account, book: DebtBook.Book?) {
     account.since?.let { since -> add(Triple(StrDebtor.daysInDebt(spanText(since), formatMillis(since)), dc.owe, dc.oweTint)) }
     book?.let { b ->
       if (b.overdue.isNotEmpty()) {
-        add(Triple("${b.overdue.size} برد از سررسید گذشته — ${DebtBook.show(b.overdueAmount)} افغانی", dc.owe, dc.oweTint))
+        add(Triple(ir.vil3ntec.tohid.core.i18n.StrDebtPages.overdueBanner(b.overdue.size, DebtBook.show(b.overdueAmount)), dc.owe, dc.oweTint))
       }
-      b.nextDue?.let { add(Triple("سررسیدِ بعدی ${formatDate(it.dueDate!!)} — ${DebtBook.show(it.open)} افغانی", dc.info, dc.infoTint)) }
+      b.nextDue?.let { add(Triple(ir.vil3ntec.tohid.core.i18n.StrDebtPages.nextDueBanner(formatDate(it.dueDate!!), DebtBook.show(it.open)), dc.info, dc.infoTint)) }
       b.credit?.let { cr ->
-        if (cr.over) add(Triple("${DebtBook.show(cr.excess)} افغانی بیش از سقفِ اعتبار (${DebtBook.show(cr.limit)})", dc.owe, dc.oweTint))
-        else add(Triple("سقفِ اعتبار ${DebtBook.show(cr.limit)} — تا سقف ${DebtBook.show(cr.headroom)} افغانی", dc.onPill, dc.pill))
+        if (cr.over) add(Triple(ir.vil3ntec.tohid.core.i18n.StrDebtPages.overLimitBanner(DebtBook.show(cr.excess), DebtBook.show(cr.limit)), dc.owe, dc.oweTint))
+        else add(Triple(ir.vil3ntec.tohid.core.i18n.StrDebtPages.limitBanner(DebtBook.show(cr.limit), DebtBook.show(cr.headroom)), dc.onPill, dc.pill))
       }
     }
   }

@@ -35,10 +35,11 @@ class SpecialOrderWiringTest {
 
   @Test fun `هر دو صندوق و تنظیمات`() {
     fun count(rel: String, what: String) = Regex(Regex.escape(what)).findAll(src(rel)).count()
-    val call = "SpecialOrderBar(d, store, cartDebtorId, ::toast"
-    assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/Sale.kt", call))
-    assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/DeskSale.kt", call))
-    assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/Settings.kt", "SpecialOrderSettingsWired(context)"))
+    assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/DeskSale.kt", "SpecialOrderBar(d, store, cartDebtorId, ::toast"))
+    //  گوشیِ نسخهٔ ۳: `PhoneTillTools` با مشتریِ همان سبد (`cart.debtorId` ِ `SaleRoute`)؛ `ui/screens/Sale.kt` فقط پیش‌نمایشِ DevShot است
+    assertEquals(1, count("ir/vil3ntec/tohid/ui/v3/sales/cart/PhoneTillTools.kt", "SpecialOrderBar(data, store, debtorId, toast)"))
+    assertEquals(1, count("ir/vil3ntec/tohid/ui/v3/sales/cart/SaleRoute.kt", "tools = { PhoneTillTools(lines, PromoEngine.priced(lines, promo), debtorId) }"))
+    assertEquals(1, count("ir/vil3ntec/tohid/ui/v3/sales/cart/SaleRoute.kt", "val debtorId by cart.debtorId.collectAsState()"))
     //  صفحه و ردیفِ تنظیماتِ نسخهٔ ۳ (گوشی و کامپیوتر) — جای `SettingsLegacy` و فهرستِ کامپیوترِ رابطِ قدیمِ پاک‌شده
     assertEquals(1, count("ir/vil3ntec/tohid/ui/v3/settings/sections/PosStockToggleScreensAndroid.kt", "SpecialOrderPref.set(context, it)"))
     assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/SettingsLayout.kt", "SPECIAL_ORDER -> ir.vil3ntec.tohid.core.i18n.StrSpecialOrder.settingsTitle"))

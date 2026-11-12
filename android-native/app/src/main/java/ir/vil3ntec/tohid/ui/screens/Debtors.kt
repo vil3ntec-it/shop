@@ -467,7 +467,7 @@ private fun DebtorTableHead() {
     Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Shop.colors.surface2).padding(horizontal = 12.dp, vertical = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    listOf("نام" to 0f, "شماره" to 160f, "مانده" to 150f, "مدت" to 110f, "وضعیت" to 110f).forEach { (t, w) ->
+    listOf(StrMoney.name to 0f, ir.vil3ntec.tohid.core.i18n.StrDebtPages.colPhone to 160f, ir.vil3ntec.tohid.core.i18n.StrDebtPages.colBalance to 150f, ir.vil3ntec.tohid.core.i18n.StrDebtPages.colAge to 110f, StrMoney.status to 110f).forEach { (t, w) ->
       Text(t, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Shop.colors.muted,
         modifier = if (w == 0f) Modifier.weight(1f) else Modifier.width(w.dp))
     }
@@ -510,8 +510,8 @@ private fun DebtorTableRow(
     }
     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
       DropdownMenuItem(text = { Text(StrMoney.openAccount) }, onClick = { menu = false; onOpen() })
-      DropdownMenuItem(text = { Text("ثبتِ رسید (پول گرفتم)") }, onClick = { menu = false; onReceive() })
-      DropdownMenuItem(text = { Text("قرضِ تازه") }, onClick = { menu = false; onGive() })
+      DropdownMenuItem(text = { Text(ir.vil3ntec.tohid.core.i18n.StrDebtPages.receiveMenu) }, onClick = { menu = false; onReceive() })
+      DropdownMenuItem(text = { Text(ir.vil3ntec.tohid.core.i18n.StrDebtPages.newDebtMenu) }, onClick = { menu = false; onGive() })
       DropdownMenuItem(text = { Text(StrChat.edit) }, onClick = { menu = false; onEdit() })
       DropdownMenuItem(text = { Text(StrCustomerPrices.remove, color = Shop.colors.danger) }, onClick = { menu = false; onDelete() })
     }
