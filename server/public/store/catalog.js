@@ -344,6 +344,16 @@
         .catch(function () { /* بی visual-search.js (شبکه) همان جست‌وجوی متنی */ });
     }
 
+    //  ABUSE-01: «گزارشِ مشکل» (store/trust.js ِ دیربار) فقط با `features.trust` (پرچمِ `market.trust`؛ خاموش ⇒ نه اسکریپت، نه گره)
+    var trust = null;
+    if (f.trust) {
+      new Promise(function (ok, no) {
+        document.head.appendChild(el('script', { attrs: { src: '/store/trust.js' }, on: { load: ok, error: no } }));
+      }).then(function () { return window.StoreTrust({ api: api, slug: ctx.slug, into: $('view-catalog').firstElementChild }); })
+        .then(function (x) { trust = x; if (trust && sheetP) trust.seen(sheetP); })
+        .catch(function () { /* بی trust.js (شبکه) همان کاتالوگ */ });
+    }
+
     return {
       head: head,
       picks: picks,
@@ -352,6 +362,7 @@
         sheetP = p;
         paintSheet();
         if (finder) finder.seen(p);
+        if (trust) trust.seen(p);
       },
       card: function (li, p) { if (on) li.appendChild(favBtn(p)); },
       cart: function () { if (on) drawList(); },
