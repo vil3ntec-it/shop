@@ -70,6 +70,18 @@ object BackupRestore {
   }
 
   /**
+   *  «پشتیبانِ فقط دفتر» (JSON ِ همان نسخهٔ وب). OPS-02: رمزِ پشتیبانِ دستی روشن ⇒ همان پاکتِ عبارت (`….json.sealed`؛
+   *  `phrase-backup.js open` و «بازیابی از فایل» بازش می‌کنند)؛ کلید باز نشد یا بزرگ ⇒ پرتاب پیش از باز کردنِ مقصد، هرگز ساده.
+   */
+  suspend fun writeLedger(context: Context, store: ShopStore, storeName: String, open: () -> OutputStream) {
+    val bytes = store.exportBackup(storeName).toByteArray(Charsets.UTF_8)
+    val seal = BackupSeal.sealer(context, photos = false)
+    withContext(Dispatchers.IO) {
+      open().use { raw -> (seal?.invoke(raw) ?: raw).use { it.write(bytes) } }
+    }
+  }
+
+  /**
    *  خواندن و سنجیدنِ فایلِ برگزیده — هنوز هیچ چیزی ننشسته. فایلِ رمزدار با عبارت (`BackupSeal`): کلیدِ همین دستگاه یا
    *  [typed]؛ نبودِ هر دو ⇒ [BackupSeal.needsPhrase].
    */

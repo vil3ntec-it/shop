@@ -18,12 +18,14 @@ enum class PayLevel(val wire: Set<String>) {
     fun of(verification: String?): PayLevel? = entries.firstOrNull { verification in it.wire }
 
     /**
-     *  نقد و «به حساب» تأییدِ جدا ندارند؛ بقیه فقط با سطحِ شناخته و وضعیتِ پولِ رسیده (ثبتِ دستیِ `pending` همان
-     *  «تأییدشده» ِ `PayStatus.initial`).
+     *  نقد، «به حساب» و ارزِ نقد (همان ردیف‌هایی که خودِ `Pay.settle` می‌سازد: [Pay.CASH]، [Pay.ACCOUNT]، [Pay.FX]) تأییدِ
+     *  جدا ندارند؛ بقیه فقط با سطحِ شناخته و وضعیتِ پولِ رسیده (ثبتِ دستیِ `pending` همان «تأییدشده» ِ `PayStatus.initial`).
      */
     fun success(kind: String, status: String, verification: String?): Boolean {
       val st = if (status == PayStatus.PENDING && verification == PayStatus.MANUAL) PayStatus.CONFIRMED else status
-      return st in PayStatus.RECEIVED && (kind == "cash" || kind == "on_account" || of(verification) != null)
+      return st in PayStatus.RECEIVED && (kind in NO_CHECK || of(verification) != null)
     }
+
+    private val NO_CHECK = setOf(Pay.CASH, Pay.ACCOUNT, Pay.FX)
   }
 }

@@ -6,6 +6,7 @@ import ir.vil3ntec.tohid.core.backup.RecoveryPhrase
 import ir.vil3ntec.tohid.core.i18n.StrBackupSafety
 import ir.vil3ntec.tohid.data.AtRest
 import ir.vil3ntec.tohid.data.BackupBundle
+import ir.vil3ntec.tohid.data.BackupDevice
 import ir.vil3ntec.tohid.data.BackupMirror
 import ir.vil3ntec.tohid.data.BackupRestore
 import ir.vil3ntec.tohid.data.BackupSeal
@@ -51,6 +52,7 @@ class BackupSealDrillTest {
   private lateinit var mirrorDir: File
   private var folderBefore: String? = null
   private var mirrorBefore = true
+  private val heapBefore = BackupSeal.heapFree
 
   private fun dropKeys() =
     keys.parentFile?.listFiles().orEmpty().filter { it.name.startsWith(SnapshotSeal.KEYS_FILE) }.forEach { it.delete() }
@@ -65,6 +67,7 @@ class BackupSealDrillTest {
   }
 
   @Before fun before() {
+    ctx.deleteSharedPreferences(BackupDevice.PREFS)
     LedgerOwner.remember(ctx, "", "")
     SnapshotSeal.setOn(ctx, false)
     BackupSeal.setOn(ctx, false)
@@ -77,8 +80,10 @@ class BackupSealDrillTest {
   }
 
   @After fun after() {
+    BackupSeal.heapFree = heapBefore
     SnapshotSeal.setOn(ctx, false)
     BackupSeal.setOn(ctx, false)
+    ctx.deleteSharedPreferences(BackupDevice.PREFS)
     dropKeys()
     wipe()
     BackupMirror.setFolder(ctx, folderBefore)
@@ -269,5 +274,122 @@ class BackupSealDrillTest {
     }
     assertArrayEquals(whole, out.toByteArray())
     assertArrayEquals(plain, PhraseBackup.open(out.toByteArray(), canonical))
+  }
+
+  /* ------------------------------ ۶) «فقط دفتر» ------------------------------ */
+
+  private fun ledgerBackup(store: ShopStore): ByteArray {
+    val out = ByteArrayOutputStream()
+    runBlocking { BackupRestore.writeLedger(ctx, store, "دکانِ آزمون") { out } }
+    return out.toByteArray()
+  }
+
+  /** پیش از این «پشتیبانِ فقط دفتر» با رمزِ روشن هم JSON ِ ساده می‌نوشت (مشتری‌ها، بدهی‌ها، فروش) */
+  @Test fun `پشتیبانِ فقط دفتر با رمزِ روشن رمزدار است و با عبارت روی دستگاهِ تازه برمی‌گردد`() {
+    val store = seed()
+    val original = store.data.value
+    assertEquals("خاموش ⇒ همان JSON ِ نسخهٔ وب", '{', String(ledgerBackup(store), Charsets.UTF_8).trimStart().first())
+    val phrase = sealOn()
+    assertEquals(null, BackupSeal.blocked(ctx, photos = false))
+    val sealed = ledgerBackup(store)
+    assertTrue(AtRestEnvelope.isSealed(sealed))
+    assertTrue(RecoveryPhrase.parseKid(AtRestEnvelope.keyIdOf(sealed)!!) != null)
+    assertFalse("هیچ متنِ بازی از دفتر", latin(sealed).contains("seal-p1") || String(sealed, Charsets.UTF_8).contains("زعفرانِ هرات"))
+    assertEquals(original, restore(store, sealed).getOrThrow().data)
+    wipe()
+    dropKeys()
+    val fresh = open()
+    assertTrue(BackupSeal.needsPhrase(restore(fresh, sealed).exceptionOrNull()))
+    assertEquals(canonical(original), canonical(restore(fresh, sealed, phrase).getOrThrow().data))
+    //  کلید باز نشد ⇒ پیش از باز کردنِ مقصد پرتاب، هرگز ساده
+    var opened = false
+    val failed = runCatching { runBlocking { BackupRestore.writeLedger(ctx, fresh, "دکان") { opened = true; ByteArrayOutputStream() } } }
+    assertEquals(StrBackupSafety.backupSealKeyMissing, failed.exceptionOrNull()?.message)
+    assertFalse(opened)
+  }
+
+  /* ------------------------------ ۷) پیش از انتخابگر ------------------------------ */
+
+  /** پیش از این انتخابگر باز می‌شد و اندروید فایلِ خالیِ `….sealed` را می‌ساخت، بعد پشتیبان شکست می‌خورد */
+  @Test fun `پیش از انتخابگر سنجیده می‌شود و رمزِ خاموش هرگز مانع نیست`() {
+    seed()
+    assertEquals(null, BackupSeal.blocked(ctx))
+    sealOn()
+    assertEquals(null, BackupSeal.blocked(ctx))
+    dropKeys()
+    assertEquals(StrBackupSafety.backupSealKeyMissing, BackupSeal.blocked(ctx))
+    assertEquals(StrBackupSafety.backupSealKeyMissing, BackupSeal.blocked(ctx, photos = false))
+  }
+
+  /* ------------------------------ ۸) حافظه ------------------------------ */
+
+  /**
+   *  رمزِ اندروید (Conscrypt) کلِ ZIP را تا پایان در بافرِ دوبرابرشونده نگه می‌دارد ⇒ پشتیبانِ بزرگ OOM ِ بی‌صدا می‌شد (شبانه هم)
+   *  و بازیابیِ رمزدار روی همان گوشی ناممکن. حالا پیش از هر دو با حافظهٔ آزاد سنجیده می‌شود و پیامِ روشن می‌آید.
+   */
+  @Test fun `پشتیبانِ بزرگ‌تر از حافظه پیامِ روشن می‌دهد، نه OOM؛ هیچ فایلی و هیچ نوشتنی`() {
+    val store = seed()
+    val phrase = sealOn()
+    val sealed = fullBackup(store)
+    val need = BackupSeal.estimate(ctx, photos = true)
+    assertTrue(need >= ledger.length() + 2500)
+    BackupSeal.heapFree = { need * 3 - 1 }
+    val why = BackupSeal.blocked(ctx)
+    assertEquals(StrBackupSafety.backupTooBigToSeal(need / (1L shl 20) + 1, (need * 3 - 1) / (1L shl 20)), why)
+    var opened = false
+    val manual = runCatching { runBlocking { BackupRestore.writeFull(ctx, store, "دکان") { opened = true; ByteArrayOutputStream() } } }
+    assertEquals(why, manual.exceptionOrNull()?.message)
+    assertFalse("مقصد باز نشد", opened)
+    val before = mirrorDir.listFiles().orEmpty().map { it.name }.toSet()
+    assertEquals(why, BackupMirror.write(ctx).exceptionOrNull()?.message)
+    assertEquals("هیچ فایلِ تازه یا .part", before, mirrorDir.listFiles().orEmpty().map { it.name }.toSet())
+    //  همان مرز: درست به اندازه ⇒ ساخته می‌شود
+    BackupSeal.heapFree = { need * 3 }
+    assertEquals(null, BackupSeal.blocked(ctx))
+    //  بازیابی: بیش از یک‌چهارمِ حافظهٔ آزاد خوانده نمی‌شود
+    BackupSeal.heapFree = { sealed.size * 4L - 4 }
+    val big = restore(store, sealed, phrase)
+    assertEquals(StrBackupSafety.backupTooBigToOpen(0L), big.exceptionOrNull()?.message)
+    assertFalse(staged())
+    BackupSeal.heapFree = { sealed.size * 4L }
+    assertTrue(restore(store, sealed, phrase).isSuccess)
+  }
+
+  /* ------------------------------ ۹) پرچمِ همین دستگاه ------------------------------ */
+
+  /** پرچم در `tohid` بود که با پشتیبان و انتقالِ اندروید به گوشیِ تازه می‌رفت؛ حالا در `tohid-backup-device` و مقدارِ پیشین می‌آید */
+  @Test fun `پرچمِ پیشین یک بار به پروندهٔ همین دستگاه می‌آید و از tohid پاک می‌شود`() {
+    sealOn()
+    ctx.deleteSharedPreferences(BackupDevice.PREFS)
+    prefs.edit().putBoolean(BackupSeal.PREF_KEY, true).commit()
+    assertTrue(BackupSeal.on(ctx))
+    assertFalse("از tohid پاک شد", prefs.contains(BackupSeal.PREF_KEY))
+    assertTrue(ctx.getSharedPreferences(BackupDevice.PREFS, 0).getBoolean(BackupSeal.PREF_KEY, false))
+    //  پروندهٔ همین دستگاه مقدار دارد ⇒ کهنه‌ای که دوباره پیدا شد جای آن را نمی‌گیرد، فقط پاک می‌شود
+    assertTrue(BackupSeal.setOn(ctx, false))
+    prefs.edit().putBoolean(BackupSeal.PREF_KEY, true).commit()
+    assertFalse(BackupSeal.on(ctx))
+    assertFalse(prefs.contains(BackupSeal.PREF_KEY))
+    //  روشن کردن دیگر در `tohid` نمی‌نشیند
+    assertTrue(BackupSeal.setOn(ctx, true))
+    assertFalse(prefs.contains(BackupSeal.PREF_KEY))
+  }
+
+  /* ------------------------------ ۱۰) شکستِ پوشه دیده می‌شود ------------------------------ */
+
+  /** پیش از این کارِ شبانه شکستِ پشتیبانِ پوشه را بی‌صدا رد می‌کرد (`runCatching`) */
+  @Test fun `شکستِ پشتیبانِ پوشه تا پشتیبانِ موفقِ بعدی ثبت و دیده می‌شود`() {
+    seed()
+    assertEquals(null, BackupDevice.mirrorError(ctx))
+    sealOn()
+    dropKeys()
+    assertTrue(BackupMirror.write(ctx).isFailure)
+    val (why, at) = BackupDevice.mirrorError(ctx)!!
+    assertEquals(StrBackupSafety.backupSealKeyMissing, why)
+    assertTrue(at > 0)
+    assertTrue(StrBackupSafety.mirrorFailed("x", why).contains(why))
+    assertTrue(BackupSeal.setOn(ctx, false))
+    assertTrue(BackupMirror.write(ctx).isSuccess)
+    assertEquals(null, BackupDevice.mirrorError(ctx))
   }
 }

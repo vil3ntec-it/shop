@@ -92,6 +92,8 @@ object HesabPaySettle {
    *  `confirmed` (همان روش، مبلغ و مرجع)
    */
   internal fun withRow(total: Double, draft: PayFlow.Draft?, confirmed: PaymentRow): PayFlow.Outcome<Settlement> {
+    //  فقط ردیفِ تأییدشده با سطحِ شناختهٔ غیرِدستی (درگاه/ارائه‌دهنده، صندوقدارِ حساب‌پی، دستگاه) — هرگز ردیفِ «در انتظار» یا «دستی»
+    if (confirmed.status != "confirmed" || confirmed.verification !in CONFIRMED_BY) return bad("NOT_CONFIRMED")
     val base = draft ?: PayFlow.Draft(total)
     val tenders = ArrayList<Tender>()
     PayFlow.amountOf(base.cash)?.takeIf { !it.isNaN() && it > 0 }?.let { tenders += Tender(PayFlow.CASH, PayFlow.minor(it)) }
@@ -115,6 +117,9 @@ object HesabPaySettle {
     if (at < 0) return bad("TOTAL_MISMATCH")
     return PayFlow.Outcome.Ok(settled.copy(payments = settled.payments.mapIndexed { i, p -> if (i == at) confirmed else p }))
   }
+
+  /** سطح‌هایی که `withRow` می‌پذیرد (`core/pay/PayLevel`: ارائه‌دهنده، «پول رسید» ِ حساب‌پی، دستگاه) */
+  private val CONFIRMED_BY = setOf("gateway", "provider", BY_CASHIER, ir.vil3ntec.tohid.core.terminal.DevicePay.DEVICE)
 
   private fun bad(code: String) = PayFlow.Outcome.Bad(PayFlow.Problem(code))
 }

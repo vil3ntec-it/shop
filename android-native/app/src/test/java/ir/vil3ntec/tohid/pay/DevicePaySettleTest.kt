@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.pay
 
+import ir.vil3ntec.tohid.core.pay.PaymentRow
 import ir.vil3ntec.tohid.core.terminal.DeviceAttempt
 import ir.vil3ntec.tohid.core.terminal.DevicePay
 import ir.vil3ntec.tohid.core.terminal.DeviceReceipt
@@ -46,5 +47,27 @@ class DevicePaySettleTest {
     assertEquals("TOTAL_MISMATCH", code(DevicePaySettle.settle(1500.0, null, "sale1", a, approved())))
     assertEquals("TOTAL_MISMATCH", code(DevicePaySettle.settle(1450.0, PayFlow.Draft(total = 1450.0, cash = "2000"), "sale1", a, approved())))
     assertTrue(DevicePaySettle.settle(1450.0, null, "sale1", a, approved()) is PayFlow.Outcome.Ok)
+  }
+
+  /** حکمِ تلاشِ دیگری (همان فاکتور و مبلغ) یا ارزِ دیگر فروش را نمی‌بندد — پیش از این فقط کلیدِ فاکتورِ تلاش سنجیده می‌شد */
+  @Test fun `حکمِ کلیدِ دیگر یا ارزِ غیرِافغانی فروش را نمی‌بندد`() {
+    fun code(o: PayFlow.Outcome<*>) = (o as PayFlow.Outcome.Bad).problem.code
+    val other = a.copy(key = "dev-sale1-zzzzzzzzzzzz")
+    assertEquals("OTHER_KEY", code(DevicePaySettle.settle(1450.0, null, "sale1", a, approved(other))))
+    val usd = a.copy(currency = "USD")
+    val vUsd = DevicePay.verdict(usd, DeviceReceipt(usd.key, usd.saleKey, usd.amountMinor, "USD", DeviceReceipt.Status.APPROVED, "778899"))
+    assertTrue(vUsd is DevicePay.Verdict.Confirmed)
+    assertEquals("CURRENCY_MISMATCH", code(DevicePaySettle.settle(1450.0, null, "sale1", usd, vUsd)))
+  }
+
+  /** `withRow` (کدِ مشترکِ حساب‌پی و دستگاه) فقط ردیفِ `confirmed` با سطحِ غیرِدستی را می‌نشاند */
+  @Test fun `withRow ردیفِ در انتظار یا دستی را تأییدشده نمی‌کند`() {
+    fun row(status: String, verification: String?) = PaymentRow("afpay_card", "card", 145_000, "778899", status, verification)
+    fun code(o: PayFlow.Outcome<*>) = (o as? PayFlow.Outcome.Bad)?.problem?.code
+    assertEquals("NOT_CONFIRMED", code(HesabPaySettle.withRow(1450.0, null, row("pending", "device"))))
+    assertEquals("NOT_CONFIRMED", code(HesabPaySettle.withRow(1450.0, null, row("confirmed", "manual"))))
+    assertEquals("NOT_CONFIRMED", code(HesabPaySettle.withRow(1450.0, null, row("confirmed", null))))
+    assertEquals("NOT_CONFIRMED", code(HesabPaySettle.withRow(1450.0, null, row("needs_review", "device"))))
+    for (by in listOf("device", "gateway", "cashier")) assertEquals(by, null, code(HesabPaySettle.withRow(1450.0, null, row("confirmed", by))))
   }
 }
