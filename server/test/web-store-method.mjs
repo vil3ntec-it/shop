@@ -107,6 +107,12 @@ const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });
 
+//  ── صفحهٔ دکان، پیش از سبد (S71): روش و مسئولِ هر دو راهِ این ویترین ──
+await page.goto(`${base}/store/${slug}#/`);
+await page.waitForFunction(() => { const b = document.getElementById('store-dm'); return b && !b.hidden && b.textContent.length > 0; }, null, { timeout: 15000 });
+const shopLine = await page.textContent('#store-dm');
+ok(/خودِ دکان/.test(shopLine) && /خودتان/.test(shopLine) && !/VILL3N/.test(shopLine), 'صفحهٔ دکان: «ارسال — مسئول: دکان · دریافت — مسئول: خودتان» پیش از سبد', shopLine);
+
 //  ── برگهٔ ثبت (S71) ──
 await page.goto(`${base}/store/${slug}#/checkout`);
 await page.waitForFunction(() => { const b = document.getElementById('ck-dm'); return b && !b.hidden && b.textContent.length > 0; }, null, { timeout: 15000 });
@@ -143,7 +149,7 @@ ok(row.fulfillment === 'pickup' && Number(row.delivery_fee_minor) === 0 && Numbe
 //  پرچمِ خاموش ⇒ همان صفحهٔ امروز
 await flag('shop.storefront.delivery_method', false);
 await open();   //  بارِ تازهٔ صفحه ⇒ هیچ اسکریپتِ پیشین نمی‌ماند
-ok(await page.$('#o-dm') === null && await page.$('script[src="/store/delivery-method.js"]') === null, 'پرچمِ خاموش ⇒ نه اسکریپت، نه بخشِ «روشِ تحویل»');
+ok(await page.$('#o-dm') === null && await page.$('#store-dm') === null && await page.$('script[src="/store/delivery-method.js"]') === null, 'پرچمِ خاموش ⇒ نه اسکریپت، نه بخشِ «روشِ تحویل» (پیگیری و صفحهٔ دکان)');
 
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));
