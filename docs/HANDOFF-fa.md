@@ -54,6 +54,21 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ ک۳ (e-rows-33k) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-33k` (از سرِ `claude/batch-56`، a5bd4667f)
+
+- **دو باگِ واقعیِ صندوقِ گوشیِ نسخهٔ ۳ بسته شد (فروشِ سریع هم، چون همان برگهٔ `sale/checkout` است):** (۱) **POS-24** — `CheckoutModel.checkout`
+  فیلدِ `rules` نداشت ⇒ «مشتری لازم از مبلغِ X» و «فاکتورِ صفر رد» ِ `CheckoutRulesPref` در گوشی هرگز سنجیده نمی‌شد؛ حالا همان `Checkout` ِ برگه
+  (جمع، پیش‌سنجیِ حساب‌پی و ثبت) قاعده‌ها را دارد و پیامِ رد بالای برگه می‌آید. (۲) **S22** — برگه فقط `blockExpired` را می‌گذاشت ⇒ با «با مجوزِ مدیر»
+  فروشِ منقضی بی تأیید ثبت می‌شد؛ حالا `ExpiryPref.gate` ⇐ `Checkout.expiryGate`، پیش از ثبت و پیش از گرفتنِ پولِ حساب‌پی `CheckoutExpiry.uncovered`
+  ⇐ برگهٔ `sale/checkout/expiry` (همان `CreditApprovalSheet` با پارامترِ تازهٔ `title`) ⇐ `CheckoutSession.expiryApproval`؛ تأیید فقط همان کالاها و
+  تا همان مقدار (`ExpiryGate.covers`)، سبدِ بزرگ‌تر دوباره می‌پرسد و با هر پرداخت پاک می‌شود. کنارش: ردیفِ «کالای منقضی» ِ فهرستِ تنظیمات
+  «با مجوزِ مدیر» را «فقط هشدار» می‌نوشت (`SettingsIndexModel`).
+- **آزمون:** `CheckoutRulesWiringTest` (۴) و `CheckoutExpiryWiringTest` (۵) — سیم‌کشی روی کدِ پیشین ۴ از ۵ سرخ (پنجمی نگهبانِ «فقط `CheckoutModel`
+  در صندوقِ v3 `Checkout` می‌سازد»)، رفتار با امضای تازه؛ `CheckoutGuardsPrefDesktopTest` (۳، مقدارِ واقعیِ `tohid-policy` روی `DesktopContext`)؛
+  `SettingsModelsTest`؛ دو ردیفِ `V3ReachabilityTest`. STATUS ِ POS-24 و S22 به‌روز (IMPLEMENTED-VERIFIED می‌مانند)؛ قاعدهٔ S22 در RULES «فروش و صندوق».
+- **قدمِ بعدی:** دیدنِ برگهٔ تأییدِ منقضی روی گوشیِ واقعی (سنجیده نشد: فقط آزمونِ JVM)؛ `ScenarioS22Test` همچنان خودش `Checkout(expiryGate = true)`
+  می‌سازد — سیم‌کشی را آزمون‌های تازه می‌پایند.
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-28l زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-28l` (از سرِ `claude/batch-55`)
 
 - **ساخته شد:** LOC-06 دورِ ۳ — متنِ خامِ `ui/screens` **۱۷۸ ⇐ ۷۳** (`DariCoverageTest.maxRawOldScreens`). (ب) ۷۴ متنِ صفحه‌های فقط‌پیش‌نمایشِ گوشی
