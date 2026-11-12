@@ -16,5 +16,5 @@ object StrAddressMedia {
   val play: String get() = t("پخش", "Play", "غږول")
   val stop: String get() = t("بس", "Stop", "بس")
   val loading: String get() = t("در حالِ آمدن…", "Loading…", "راځي…")
-  val failed: String get() = t("نیامد؛ دوباره بزنید.", "Did not load; tap to retry.", "رانغی؛ بیا یې ووهئ.")
+  val failed: String get() = t("نیامد؛ برای تلاشِ دوباره لمس کنید.", "Did not load; tap to retry.", "رانغی؛ د بیا هڅې لپاره یې ووهئ.")
 }
