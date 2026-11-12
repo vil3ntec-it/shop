@@ -2,17 +2,22 @@ package ir.vil3ntec.tohid.ui.v3.sales.cart
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.CartSerials
 import ir.vil3ntec.tohid.data.LinePolicyPrefs
+import ir.vil3ntec.tohid.data.PriceWhyLine
+import ir.vil3ntec.tohid.data.PromoEngine
 import ir.vil3ntec.tohid.data.StockPlacesPref
 import ir.vil3ntec.tohid.data.TillGoodsPref
 import ir.vil3ntec.tohid.scan.ScanFeedback
 import ir.vil3ntec.tohid.sync.v1.Ulid
+import ir.vil3ntec.tohid.ui.PromoLive
 import ir.vil3ntec.tohid.ui.components.pos.posLineSerials
+import ir.vil3ntec.tohid.ui.components.pos.priceWhyOn
 import ir.vil3ntec.tohid.ui.screens.Haptics
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
@@ -47,12 +52,18 @@ fun RouteScope.LineRoute() {
   }
   //  S45 (POS-08/10/21): «قیمت و تخفیفِ ردیف» ِ همین دستگاه (پیش‌فرض خاموش) و «درخواستِ تأیید» — همان کادرِ ردیفِ کامپیوتر
   val policy = remember { LinePolicyPrefs.of(context) }
+  //  POS-22: «چرا این قیمت؟» با تخفیف‌های خودکارِ همین سبد (`PromoLive`، همان صندوقِ گوشی)
+  val lines by cart.lines.collectAsState()
+  val debtorId by cart.debtorId.collectAsState()
+  val promo = PromoLive.rememberOutcome(data, lines, debtorId)
+  val why = if (priceWhyOn()) PriceWhyLine.rows(data, lines, PromoEngine.priced(lines, promo), promo, info.id) else null
   val priceAsk = remember { LinePolicyPrefs.ask(context, store, priceAudit, info.name, if (info.free) null else info.id) }
   LineSheet(
     info = info,
     policy = policy,
     priceAsk = priceAsk,
     //  POS-28: کالای سریال‌دار ⇒ سریال‌ها (همان `posLineSerials` ⇒ `CartSerials.set` ِ صندوقِ کامپیوتر)
+    why = why,
     serials = posLineSerials(data, line) { s -> cart.set(CartSerials.set(cart.lines.value, info.id, s)) },
     onSave = { form, start, grant ->
       //  تأییدی که به کار رفت ⇒ ردیفِ سابقهٔ `price_override` با درخواست‌کننده، تأییدکننده و دلیل (فقط اگر سبد نشست)

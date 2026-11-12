@@ -22,9 +22,12 @@ import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.i18n.StrTill
 import ir.vil3ntec.tohid.core.pos.LinePricing
 import ir.vil3ntec.tohid.core.pos.PriceApproval
+import ir.vil3ntec.tohid.core.pos.PriceWhy
+import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.data.PriceAsk
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
 import ir.vil3ntec.tohid.ui.components.pos.PosLineSerials
+import ir.vil3ntec.tohid.ui.components.pos.PriceWhyPanel
 import ir.vil3ntec.tohid.ui.components.pos.PosSerialField
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.v3.V3Button
@@ -64,6 +67,8 @@ fun LineSheet(
   priceAsk: PriceAsk? = null,
   /** POS-28 — سریال‌های کالای سریال‌دار (`posLineSerials`)؛ `null` (کالای دیگر یا قلمِ آزاد) ⇒ بی کادر */
   serials: PosLineSerials? = null,
+  /** POS-22 — گام‌های «چرا این قیمت؟» (`PriceWhyLine.rows`)؛ `null` (تنظیمِ خاموش) ⇒ بی پنل */
+  why: List<PriceWhy.Row>? = null,
 ) {
   val c = PhoneV3.colors
   val start = remember(info.id) { LineModel.start(info) }
@@ -94,6 +99,11 @@ fun LineSheet(
   }
 
   V3Sheet(onDismiss = onClose, title = info.name, detents = false) { closer ->
+    if (why != null) {
+      //  POS-22: همان پنلِ `CartLineDialog` بالای برگه
+      PriceWhyPanel(why) { money(it) }
+      Spacer(Modifier.height(14.dp))
+    }
     if (info.units != null) {
       //  POS-09 (S05): پایه، واحدِ دوم و بسته‌ها — فقط با «واحدِ بزرگ در صندوق» ِ همین دستگاه
       V3Segmented(LineModel.unitLabels(info), form.unitAt, { form = LineModel.switchTo(form, info, it) })
