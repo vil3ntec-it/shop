@@ -97,11 +97,12 @@ fun RouteScope.CheckoutRoute() {
     val loyal = loyalty?.cart ?: priced
     //  «نیازمند تأیید» هم کادرِ تخفیف را نشان می‌دهد؛ فقط «ممنوع» پنهانش می‌کند (STF-02)
     val canDiscount = remember { ShopRole.mayDiscount(context) }
-    val blockExpired = remember { ShopPolicy.blockExpired(context) }
-    //  S22: «منقضی فقط با مجوزِ مدیر» (`ExpiryPref.gate`، پیش‌فرض خاموش؛ با «فروخته نشود» بی اثر) — همان `DeskSale`
-    val expiryGateOn = remember { ir.vil3ntec.tohid.data.ExpiryPref.gate(context) }
-    //  POS-24: قاعده‌های پیش از پایانِ فاکتورِ همین دستگاه (`CheckoutRulesPref`، پیش‌فرض خاموش) — همان `DeskSale`/`SaleDialogs`
-    val checkoutRules = remember { ir.vil3ntec.tohid.data.CheckoutRulesPref.get(context) }
+    //  سدهای فروشِ همین دستگاه (`TillGuards`، همان `DeskSale` و فروشِ تعویض): «فروخته نشود»؛ S22 «منقضی فقط با مجوزِ مدیر»
+    //  (`ExpiryPref.gate`، با «فروخته نشود» بی اثر)؛ POS-24 قاعده‌های پیش از پایانِ فاکتور (`CheckoutRulesPref`) — همه پیش‌فرض خاموش
+    val tillGuards = remember { ir.vil3ntec.tohid.data.TillGuardsPref.get(context) }
+    val blockExpired = tillGuards.blockExpired
+    val expiryGateOn = tillGuards.expiryGate
+    val checkoutRules = tillGuards.rules
     val seller = remember { ir.vil3ntec.tohid.data.TillUser.me(context) } // S46: کاربرِ صندوق؛ خاموش ⇒ همان نامِ حساب
     val payV2 = remember { ShopPolicy.payV2(context) }
     //  PAY-24: کارتِ هدیه و اعتبار در روش‌های پنل فقط با `GiftCardPref` ِ همین دستگاه (پیش‌فرض خاموش ⇒ همان روش‌ها)
