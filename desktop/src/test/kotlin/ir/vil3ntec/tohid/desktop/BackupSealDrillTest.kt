@@ -97,7 +97,8 @@ class BackupSealDrillTest {
     val d = base.copy(products = base.products + Product(id = "seal-p1", name = "زعفرانِ هرات", salePrice = 950.0, photo = true))
     assertTrue(runBlocking { store.save(d) })
     photos.mkdirs()
-    File(photos, "seal-p1.jpg").writeBytes(ByteArray(2500) { i -> (i * 7).toByte() })
+    //  هر کالای عکس‌دار عکسش را دارد (وگرنه بازیابی پرچمِ `photo` را با دیسک یکی می‌کند و دفتر «همان» نمی‌ماند)
+    d.products.filter { it.photo }.forEach { File(photos, "${it.id}.jpg").writeBytes(ByteArray(2500) { i -> (i * 7 + it.id.length).toByte() }) }
     ctx.getSharedPreferences("tohid-policy", 0).edit().putString("seal.note", "رسیدِ آزمون").commit()
     return store
   }
@@ -164,12 +165,12 @@ class BackupSealDrillTest {
     assertTrue(BackupSeal.needsPhrase(locked.exceptionOrNull()))
     assertEquals(StrBackupSafety.fileNeedsPhrase, locked.exceptionOrNull()!!.message)
     val opened = restore(fresh, sealed, phrase.lowercase().replace("-", " ")).getOrThrow()
-    assertEquals(1, opened.photos)
+    assertEquals(original.products.count { it.photo }, opened.photos)
     assertTrue("تا تأیید هیچ چیزی ننشسته", fresh.data.value.products.isEmpty())
     val r = runBlocking { BackupRestore.confirm(ctx, fresh, opened.data) }
     assertTrue(r.message, r.ok)
     assertEquals("دفتر بایت‌به‌بایت", canonical(original), canonical(open().data.value))
-    assertArrayEquals("عکس", ByteArray(2500) { i -> (i * 7).toByte() }, File(photos, "seal-p1.jpg").readBytes())
+    assertArrayEquals("عکس", ByteArray(2500) { i -> (i * 7 + "seal-p1".length).toByte() }, File(photos, "seal-p1.jpg").readBytes())
     assertEquals("رسیدِ آزمون", ctx.getSharedPreferences("tohid-policy", 0).getString("seal.note", null))
   }
 
