@@ -24,6 +24,7 @@ const courierChecks = require('../lib/courier-checks');
 const courierRoute = require('../lib/courier-route');
 const ratings = require('../lib/delivery-ratings');
 const locationConsent = require('../lib/courier-location-consent');
+const addrMedia = require('../lib/store-address-media');
 const { requireUser, requireShop, allowCourierScope } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
 const { forbidden, notFound } = require('../middleware/errors');
@@ -151,6 +152,23 @@ router.post('/missions/:id/rating', async (req, res) => {
  *  `shop.delivery_live_location`): «تقریباً کی می‌رسم» و آخرین نقطه — فقط
  *  مأموریتِ خودِ پیک و فقط «در راه». مشتری فقط از سرور می‌خواند.
  */
+/*
+ *  CRM-09/CHK-08 (پرچمِ خاموشِ `shop.storefront.address_media`): عکسِ دروازه و یادداشتِ صوتی که مشتری برای نشانیِ همین
+ *  سفارش گذاشته — فقط مأموریتِ خودِ پیک و فقط تا زنده است (`lib/store-address-media.js`)؛ هر دیدنِ بایت در سابقهٔ دکان.
+ */
+router.get('/missions/:id/address-media', async (req, res) => {
+  res.set('Cache-Control', 'no-store').json(await addrMedia.forMission(req.shopId, req.params.id, req.courierActor));
+});
+
+router.get('/missions/:id/address-media/:kind', async (req, res) => {
+  const m = await addrMedia.missionMedia(req.shopId, req.params.id, req.params.kind, req.courierActor);
+  await audit.log({
+    shopId: req.shopId, userId: req.user.id, action: 'delivery.courier.address_media', targetType: 'delivery_assignment',
+    targetId: req.params.id, detail: { kind: req.params.kind, courierId: req.courier.id }, ip: clientIp(req),
+  });
+  res.set({ 'Content-Type': m.mime, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }).send(m.data);
+});
+
 router.post('/missions/:id/eta', async (req, res) => {
   res.json(await delivery.putEta(req.shopId, req.params.id, req.body, req.courierActor));
 });

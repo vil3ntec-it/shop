@@ -193,6 +193,7 @@ class CustomerModel(
   val account = AccountBox(secrets)
   /** MKT-11: کدِ کمپینِ پیوند/QR که مشتری با آن به هر دکان آمد (فقط همین اجرا، مثلِ «همین نشست» ِ وب) */
   internal val campaigns = HashMap<String, String>()
+  internal val funnel = ir.vil3ntec.tohid.core.shopper.ShopperFunnel()   //  RPT-14: تپشِ بالای قیف (`ModelFunnel.kt`)
 
   private var shopsJob: Job? = null
   private var searchJob: Job? = null
@@ -340,7 +341,7 @@ class CustomerModel(
         persist(ShopperMemory.withRecent(saved, RecentShop(slug, page.shop.title, clock())))
         loadCatalog(reset = true)
         enteredStore(slug, page)
-        loadRecent(slug, page)   //  WEB-13: «دیده‌شده‌های اخیر» با قیمتِ امروز (فقط با `recent`)
+        storeArrived(slug, page)   //  WEB-13 «دیده‌شده‌های اخیر» و RPT-14 تپشِ «بازدید» (`ModelFunnel.kt`)
         if (page.features.reviews) feedback.loadShop(slug)
         //  ثبت پیش از رسیدنِ دکان باز شده بود (خانه ⇐ سبد ⇐ ثبت): روشِ پیش‌فرض و بازه‌ها همین حالا
         if (route is Route.Checkout) {
@@ -390,15 +391,13 @@ class CustomerModel(
     }
   }
 
-  fun retryProduct() {
-    (route as? Route.Product)?.let { loadProduct(it.slug, it.id) }
-  }
+  fun retryProduct() { (route as? Route.Product)?.let { loadProduct(it.slug, it.id) } }
 
   private fun loadProduct(slug: String, id: String) {
     product = Load.Busy
     request({ api.product(slug, id) }) { r ->
       product = r.load()
-      r.valueOrNull()?.let { sawProduct(slug, it.product) }
+      r.valueOrNull()?.let { productArrived(slug, it.product) }
     }
   }
 
@@ -409,8 +408,9 @@ class CustomerModel(
 
   fun cartOf(slug: String): Cart = ShopperMemory.cartOf(saved, slug)
 
-  private fun setCart(c: Cart) {
+  private fun setCart(c: Cart, grew: Boolean = false) {
     if (c.slug == storeSlug) duplicate = null   //  S41: سبدِ دیگر دیگر همان سفارشِ تکراری نیست
+    if (grew) cartGrew(c.slug)   //  RPT-14
     persist(ShopperMemory.withCart(saved, c))
     syncAccount(c.slug)
   }
@@ -424,7 +424,7 @@ class CustomerModel(
         else null
       return
     }
-    setCart(after)
+    setCart(after, grew = true)
   }
 
   fun step(slug: String, productId: String, up: Boolean) {
@@ -434,7 +434,7 @@ class CustomerModel(
       notice = ShopperText.maxQty(ShopperText.qty(line.maxQtyMilli ?: CartRules.MAX_QTY_MILLI))
       return
     }
-    setCart(CartRules.step(c, productId, up, clock()))
+    setCart(CartRules.step(c, productId, up, clock()), grew = up)
   }
 
   fun remove(slug: String, productId: String) = setCart(CartRules.remove(cartOf(slug), productId, clock()))

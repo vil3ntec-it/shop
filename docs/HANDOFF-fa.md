@@ -54,6 +54,30 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-13t زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-13t` (از `claude/e-rows-11p`)
+
+- **ساخته شد:** RPT-14 — تپشِ بالای قیف از برنامهٔ خرید (`core/shopper/ShopperFunnel` + `customer-android/…/ModelFunnel.kt`؛
+  `ShopperFunnelTest` ۴/۴، جهش ۴ از ۴؛ `CustomerFunnelTest` فقط CI) ⇒ «دستگاه». CRM-09 — عکسِ دروازه و یادداشتِ صوتیِ نشانیِ
+  حسابِ مشتری (مهاجرتِ ۸۳۶، `lib/store-address-media.js`، `store/addr-media.js`، `OrderAddressMediaAndroid.kt`؛ پرچمِ خاموشِ
+  `shop.storefront.address_media`؛ `store-address-media` ۴/۴ با جهش ۶ از ۶، کرومیوم `web-store-acct.mjs` ۲۷ ✅؛ پیکِ همان مأموریت هم می‌بیند) — مانده:
+  افزودن از برنامهٔ خریدِ بومی (همان ماندهٔ CHK-08؛ یک کار). LOC-06 — ۱۷ صفحهٔ تمام‌مرده و بخشِ مردهٔ `Storefront.kt` برداشته شد، سقفِ متنِ خامِ
+  `ui/screens` ۱۸۳۱ ⇐ ۱۴۷۰. CRM-06 — بی کدِ تازه: قالبِ یادآوری از پیش با `ShopSettingsSync` همگام می‌شد (کلیدِ مالِ دکان)؛ آزمونش
+  افزوده شد؛ دسته‌اش با عاملِ «ق».
+- **بی کد (دسته درست شد):** HW-07 ⇐ «تصمیم» (۴-۲۴ ج)، DLV-05 ⇐ «تصمیم» (نقشه‌کشِ برداری در کش نیست)، SEC-02 ⇐ «همگام/پمپ»
+  (دیسک و دورِ زنجیره در `sync/platform/DocChainSync.kt`). RSK-04 به عاملِ «و» رفت (کدی از این شاخه ندارد).
+- **باگ/دام:** (۱) CSP ِ ویترین `img-src` ِ blob: ندارد ⇒ هر کدِ وب که `URL.createObjectURL` را به `<img>`/`Image` می‌دهد بی‌صدا
+  می‌شکند؛ از data: بخوانید. (۲) `customers.auth` ِ ویترین `{customer}` برمی‌گرداند نه خودِ مشتری. (۳) «پرونده‌ای مرده» یعنی هیچ
+  پروندهٔ ماندهٔ دیگری (حتی مرده) از آن نخواند — `Sparks.kt` را `Vip.kt` ِ نیمه‌مرده می‌خواند. (۴) `git rm` ِ زودهنگام در کامیتِ
+  بعدی (RPT-14 ‏629a30100) نشست؛ کامیتِ 82fb81946 درستش کرد — `git rm` را تا کامیتِ همان ردیف نزنید. (۵) `CustomerModel.kt` روی
+  سقفِ ۸۰۰ خط است: سیمِ تازه در پروندهٔ کناری (`Model*.kt`) و جایگزینیِ خط، نه افزودن.
+- **اجرای کامل:** `./desktop/gradlew -p desktop test` (‎-Xmx3g، زیرِ `flock`) با `desktop/build/test-data` ِ پاک ⇒ ۳٬۹۲۷ PASS، ۰ FAIL،
+  ۴ SKIP ِ پیشین. دام: (۶) با `-Xmx2g` کامپایلِ کاملِ کامپیوتر OutOfMemory داد ⇒ اجرای کامل با `-Xmx3g`؛ (۷) `desktop/build/test-data`
+  (`TOHID_DATA_DIR` ِ آزمون) میانِ اجراها می‌ماند و وضعِ کهنه‌اش `SignOutNoLossDesktopTest` را سرخ کرد ⇒ پیش از اجرای کامل پاکش کنید.
+  سرور: `store-address-media` ۵/۵، `shop-route-inventory` ۲/۲، `customer-erasure` ۶/۶، `api-contract` ۲/۲، `web-i18n` ۳۲/۳۲؛ کرومیوم
+  `web-store-acct` ۲۷ ✅، `web-store-p1` ۱۸ ✅، `web-store-erase` ۳۲ ✅، `web-store-cart-sync` ۴۶ ✅؛ precheck ⇒ `fail=0`؛ quality بی ❌.
+- **یافته برای ردیف‌های دیگر:** AUTH-08 — `PhoneClaimStep.kt` در نسخهٔ ۳ صدازننده ندارد (گامِ کدِ شمارهٔ تازه دیده نمی‌شود)؛ نوارِ
+  یادآورِ مالیاتِ فصل (`TaxQuarterAndroid.kt`) هم در نسخهٔ ۳ راه ندارد؛ GATE-NEW-01 ‹صفحهٔ کهنهٔ `Storefront.kt`› حالا برداشته شده.
+- **قدمِ بعد:** CRM-09/CHK-08: افزودنِ عکس/صدا از `customer-android` (همان درهای `/:slug/account/addresses/:id/media/:kind`). LOC-06: بخش‌های مردهٔ `Vip.kt`، `Orders.kt`، `DeliveryDialogs.kt`… و سپس جدول‌ها.
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-15w زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-15w` (از `claude/batch-54`)
 
 - **OPS-02 (رمزِ پشتیبانِ دستی و پوشه درونِ برنامه):** `BackupSeal` (`data/BackupSealAndroid.kt`، تنظیمِ دستگاهِ `backup_seal`، پیش‌فرض

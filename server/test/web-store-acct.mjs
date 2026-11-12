@@ -98,7 +98,9 @@ const serverCart = async () => {
   return { version: Number(r.version), items: Object.fromEntries(items.map((i) => [i.productId, i.qtyMilli])) };
 };
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium/chrome-linux/chrome' }).catch(() => chromium.launch());
+//  CRM-09: یادداشتِ صوتی با میکروفونِ ساختگیِ کرومیوم (بی پرسش)
+const FAKE_MIC = ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'];
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium/chrome-linux/chrome', args: FAKE_MIC }).catch(() => chromium.launch({ args: FAKE_MIC }));
 const errors = [];
 const violations = [];
 const acctLoads = [];
@@ -215,7 +217,36 @@ await page.selectOption('#ac-pick', { label: 'خانه' });
 ok(await page.inputValue('#a-text') === 'کارتهٔ ۴، سرکِ دوم' && await page.inputValue('#a-landmark') === 'روبه‌روی نانوایی'
   && /پینِ همین نشانی/.test(await page.textContent('#pin-text')) && await page.isHidden('#ac-keep-row'),
   '«نشانی‌های من» ⇒ همان متن، نشانه و پین؛ «نگه دار» پنهان');
+//  ── CRM-09/CHK-08: عکسِ دروازه و یادداشتِ صوتیِ همان نشانی (پرچمِ `shop.storefront.address_media` ِ همین دکان) ──
+ok(await page.$('#ac-media:not([hidden])') === null, 'پرچمِ خاموش ⇒ بخشِ «عکسِ دروازه و یادداشتِ صوتی» نیست');
+await flag('shop.storefront.address_media', true);
+await page.reload();
+await placeOrder(page, { delivery: true });
+await page.waitForSelector('#ac-addr:not([hidden]) #ac-pick', { timeout: 10000 });
+await page.selectOption('#ac-pick', { label: 'خانه' });
+await page.waitForSelector('#ac-media:not([hidden])', { timeout: 10000 });
+await page.click('#ac-media summary');
+await page.waitForSelector('#am-box', { timeout: 10000 });
+await page.setInputFiles('#am-file', { name: 'gate.jpg', mimeType: 'image/jpeg', buffer: require('./image-fixtures').jpegImage(96, 64, (x, y) => (x * 3 + y * 2) % 256) });
+await page.waitForFunction(() => /ذخیره شده/.test(document.getElementById('am-photo-state').textContent), null, { timeout: 10000 });
+const photoRow = await one(`SELECT m.mime, m.size_bytes, a.label FROM store_address_media m JOIN store_customer_addresses a ON a.id = m.address_id WHERE m.kind = 'gate_photo'`);
+ok(photoRow && photoRow.mime === 'image/jpeg' && photoRow.label === 'خانه' && await page.isVisible('#am-thumb'),
+  'عکسِ دروازه روی همین دستگاه JPEG شد، برای «خانه» ذخیره شد و پیش‌نمایشش آمد', JSON.stringify(photoRow));
+await page.click('#am-box button:has-text("ضبطِ یادداشت")');
+await page.waitForFunction(() => /در حالِ ضبط/.test(document.getElementById('am-voice-state').textContent), null, { timeout: 10000 });
+await page.waitForTimeout(1500);
+await page.click('#am-box button:has-text("پایانِ ضبط")');
+await page.waitForSelector('#am-box button:has-text("فرستادن"):not([hidden])', { timeout: 10000 });
+await page.click('#am-box button:has-text("فرستادن")');
+await page.waitForFunction(() => /ذخیره شد/.test(document.getElementById('am-msg').textContent), null, { timeout: 10000 });
+const voiceRow = await one(`SELECT mime, size_bytes FROM store_address_media WHERE kind = 'voice_note'`);
+ok(voiceRow && /^audio\//.test(voiceRow.mime) && Number(voiceRow.size_bytes) > 100, 'یادداشتِ صوتی ضبط، شنیده‌شدنی و ذخیره شد', JSON.stringify(voiceRow));
 await submit(page);
+const linked = await one(`SELECT o.id, r.address_id FROM online_orders o LEFT JOIN online_order_address_refs r ON r.order_id = o.id
+                          WHERE o.shop_id = $1 ORDER BY o.created_at DESC LIMIT 1`, [shopId]);
+const seen = await call('GET', `/api/shop/orders/${linked.id}/address-media`, null, T);
+ok(linked.address_id && seen.body.enabled === true && seen.body.gatePhoto && seen.body.voiceNote,
+  'سفارش با «خانه» ⇒ صاحبِ دکان عکسِ دروازه و یادداشتِ صوتی را در سفارش می‌بیند', JSON.stringify(seen.body).slice(0, 200));
 const last = await one(`SELECT address FROM online_orders WHERE shop_id = $1 ORDER BY created_at DESC LIMIT 1`, [shopId]);
 const addr = typeof last.address === 'string' ? JSON.parse(last.address) : last.address;
 ok(addr && addr.text === 'کارتهٔ ۴، سرکِ دوم' && Math.abs(Number(addr.lat) - 34.5553) < 1e-6 && Math.abs(Number(addr.lng) - 69.2075) < 1e-6,

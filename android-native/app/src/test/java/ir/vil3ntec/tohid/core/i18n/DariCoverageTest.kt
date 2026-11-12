@@ -231,12 +231,14 @@ class DariCoverageTest {
     "core/report/OwnerReportPlan.kt", "core/storefront/StorefrontEtaApi.kt", "core/storefront/PromoGuardApi.kt",
   )
 
-  /** سقفِ متنِ خامِ باقی‌ماندهٔ `ui/screens` (بی سطرهای «// داده:»)؛ چرخ‌دنده‌ای: فقط پایین بیاید — دورِ ۲: ۳۶۳۳، دورِ ۳: ۲۶۰۲، دورِ ۴: ۲۰۵۲، دورِ ۵: ۱۹۸۴، دورِ ۶: ۱۸۳۵، دورِ ۷: ۱۸۳۱ */
+  /** سقفِ متنِ خامِ باقی‌ماندهٔ `ui/screens` (بی سطرهای «// داده:»)؛ چرخ‌دنده‌ای: فقط پایین بیاید — دورِ ۲: ۳۶۳۳، دورِ ۳: ۲۶۰۲، دورِ ۴: ۲۰۵۲، دورِ ۵: ۱۹۸۴، دورِ ۶: ۱۸۳۵، دورِ ۷: ۱۸۳۱، LOC-06: ۱۴۷۰ */
   //  دستهٔ ۲۷: ۱۸۳۵ ِ دورِ ۶ روی پایه‌ای بی #971 شمرده شد؛ #971 سه سطرِ هم‌شکلِ STORE_PLACE (برچسبِ L.STORE_STOCK و
   //  کلیدواژه‌های جست‌وجوی تنظیمات در SettingsLayout/SettingsSearchIndex) پیش از آن افزوده بود ⇒ ۱۸۳۸ = همان شمارِ ادغام.
   //  دورِ ۷: هفت متنِ زندهٔ `MoreLayout`، `ReportFreshModel`، `ServerPulse`، `VoiceSearch`، `DeskMenu` و `DeliveryDesk` ⇒ ۱۸۳۱
   //  (بقیهٔ متنِ زنده کلیدِ تنظیمات و جدول‌های گزارشِ `DayEndModel`/`HeatmapModel` است — منتظرِ تصمیمِ صاحب‌کار؛ باقی صفحه‌های مرده)
-  private val maxRawOldScreens = 1831
+  //  LOC-06 (۱۴۰۵/۰۸/۲۲): ۱۷ صفحهٔ مرده (هیچ راهی از برنامه، کامپیوتر یا آزمون؛ رسیدنِ اعلانی با بسته و import سنجیده شد) و
+  //  بخشِ مردهٔ `Storefront.kt` (جز `StorefrontGate` ⇐ پروندهٔ جدا) برداشته شدند ⇒ ۱۴۷۰ در ۲۰۲ پرونده
+  private val maxRawOldScreens = 1470
 
   /** کفِ پوششِ دریِ نوشته‌های جابه‌جاشدهٔ دورِ ۲ (٪) — اندازهٔ همین کار؛ فقط بالا برود */
   private val minMovedPercent = 14

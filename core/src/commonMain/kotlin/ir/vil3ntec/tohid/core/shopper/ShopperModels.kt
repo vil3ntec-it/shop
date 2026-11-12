@@ -66,6 +66,8 @@ data class StoreFeatures(
   val accountCart: Boolean = false,
   /** CHK-14: «با کدام اسکناس…» در برگهٔ ثبت (`shop.orders.delivery_prefs`؛ [CheckoutRules.tenders]) */
   val deliveryPrefs: Boolean = false,
+  /** RPT-14: تپشِ بالای قیف (`shop.orders.online_report`؛ [ShopperFunnel]) */
+  val funnel: Boolean = false,
 )
 
 /** کاتالوگ با صفحه‌بندیِ نشانگری (`nextCursor`). */

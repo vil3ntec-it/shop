@@ -200,6 +200,8 @@ FLAGS.push('shop.orders.picking');
 FLAGS.push('shop.orders.weight_hold');
 //  M3: لوگو و تصویرِ سرِ ویترین
 FLAGS.push('shop.storefront.media');
+//  CRM-09/CHK-08: عکسِ دروازه و یادداشتِ صوتیِ نشانیِ سفارش (`/shop/orders/:id/address-media…`)
+FLAGS.push('shop.storefront.address_media');
 //  MKT-10/11: پیوندِ کمپین و QR ِ دکان
 FLAGS.push('shop.storefront.campaigns');
 //  MKT-02/RSK-09: اولین خرید و سدِ تخفیفِ ویترین
@@ -395,6 +397,18 @@ async function seedShop(a) {
   }, { token: a.accessToken, headers: { 'Idempotency-Key': fresh('order') } });
   assert.equal(made.status, 201, JSON.stringify(made.body));
   ids.order = made.body.order.id;
+  //  CRM-09/CHK-08: عکسِ دروازهٔ نشانیِ همین سفارش (ردیفِ مستقیم؛ درِ مشتری و پیوندِ ثبت در `store-address-media.test.js`)
+  {
+    const at = now();
+    const [cust, addr] = [newId('sc'), newId('sca')];
+    await query(`INSERT INTO store_customers (id, phone, name, created_at, updated_at) VALUES ($1,'+93791234567','احمد',$2,$2)`, [cust, at]);
+    await query(`INSERT INTO store_customer_addresses (id, customer_id, label, landmark, created_at, updated_at)
+                 VALUES ($1,$2,'خانه','نزدیکِ مسجد',$3,$3)`, [addr, cust, at]);
+    await query(`INSERT INTO store_address_media (id, customer_id, address_id, kind, mime, size_bytes, data, created_at)
+                 VALUES ($1,$2,$3,'gate_photo','image/jpeg',4,$4,$5)`, [newId('sam'), cust, addr, Buffer.from([0xff, 0xd8, 0xff, 0xe0]), at]);
+    await query('INSERT INTO online_order_address_refs (order_id, shop_id, address_id, created_at) VALUES ($1,$2,$3,$4)',
+      [ids.order, a.shopId, addr, at]);
+  }
   for (const to of ['accepted', 'picking', 'packed']) {
     const t = await h.post(`/api/shop/orders/${ids.order}/transition`, { to }, { token: a.accessToken });
     assert.equal(t.status, 200, `${to}: ${JSON.stringify(t.body)}`);
@@ -652,6 +666,7 @@ function concreteFor(ids) {
     [/(\/pick\/locations\/):productId/, ids.product],
     [/(\/pick\/products\/):productId/, ids.product],
     [/(\/pick\/batches\/):batchId/, ids.pickBatch],
+    [/(\/address-media\/):kind/, 'gate-photo'],
     [/^(\/shop\/orders\/):id(\/pick\/photos\/):photoId/, `${ids.pickPhotoOrder}$2${ids.pickPhoto}`],
     [/^(\/shop\/order-feedback\/issues\/):id(\/photos\/):photoId/, `${ids.orderIssue}$2${ids.orderIssuePhoto}`],
     [/^(\/shop\/order-feedback\/issues\/):id/, ids.orderIssue],

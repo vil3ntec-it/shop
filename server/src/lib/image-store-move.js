@@ -39,6 +39,7 @@ const TABLES = [
   { table: 'shop_chat_media', pk: ['id'], extra: ['shop_id', 'mime'], tenant: shop, check: (r) => media.chatCheck(r.mime) },
   { table: 'support_media', pk: ['id'], extra: ['thread_id'], tenant: (r) => media.supportTenant(r.thread_id), check: () => media.supportCheck },
   { table: 'trust_evidence', pk: ['id'], extra: ['shop_id', 'mime'], tenant: shop, check: (r) => media.chatCheck(r.mime) },
+  { table: 'store_address_media', pk: ['id'], extra: ['customer_id', 'mime'], tenant: (r) => media.customerTenant(r.customer_id), check: (r) => media.chatCheck(r.mime) },
 ];
 const checkOf = (t, r) => (t.check ? t.check(r) : store.sniff);
 

@@ -215,6 +215,8 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
         counts.deliveryPhotos = await qk('DELETE FROM delivery_photos WHERE shop_id=$1 AND order_id = ANY($2::text[]) RETURNING store_key', [shopId, orderIds]);
         counts.pickPhotos = await qk('DELETE FROM order_pick_photos WHERE shop_id=$1 AND order_id = ANY($2::text[]) RETURNING store_key', [shopId, orderIds]);
         counts.orderDevices = await require('./risk-device').eraseIn(c, shopId, orderIds);
+        //  CRM-09: دکان دیگر به عکسِ دروازه/یادداشتِ صوتیِ نشانیِ این سفارش‌ها نمی‌رسد (رسانه مالِ حسابِ مشتری است و می‌ماند)
+        await c.query('DELETE FROM online_order_address_refs WHERE shop_id=$1 AND order_id = ANY($2::text[])', [shopId, orderIds]);
         counts.deliveryLocations = await q(
           `DELETE FROM delivery_locations WHERE shop_id=$1 AND assignment_id IN (
              SELECT id FROM delivery_assignments WHERE shop_id=$1 AND order_id = ANY($2::text[])) RETURNING assignment_id`,

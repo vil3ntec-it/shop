@@ -20,18 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1056,
+    "routes": 1063,
     "byAuth": {
-      "none-detected": 201,
+      "none-detected": 204,
       "admin": 288,
       "inline": 2,
-      "user": 522,
+      "user": 526,
       "device": 42,
       "optional": 1
     },
     "byShape": {
       "extracted": 722,
-      "empty": 332,
+      "empty": 339,
       "unresolved": 2
     }
   },
@@ -375,6 +375,8 @@
     {"method":"GET","path":"/api/courier/map/:id","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":["id"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":["404 map_not_found"],"shape":"empty"},
     {"method":"GET","path":"/api/courier/me","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["courier","ratingsEnabled","serverTime"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/courier/missions","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":[],"query":["limit","scope"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/courier/missions/:id/address-media","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":["id"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"GET","path":"/api/courier/missions/:id/address-media/:kind","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":["id","kind"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/courier/missions/:id/call","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["phone","status"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/courier/missions/:id/eta","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/courier/missions/:id/location","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
@@ -765,6 +767,8 @@
     {"method":"GET","path":"/api/shop/orders","area":"shop","source":"server/src/routes/orders.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')"],"params":[],"query":["cursor","limit","tab"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/orders","area":"shop","source":"server/src/routes/orders.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')","requirePermission('orders.create')"],"params":[],"query":[],"body":[],"response":{"statuses":[200,201],"keys":["order","replayed"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/orders/:id","area":"shop","source":"server/src/routes/orders.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["order"]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/orders/:id/address-media","area":"shop","source":"server/src/routes/order-address-media.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')","requireOrdersContact"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"GET","path":"/api/shop/orders/:id/address-media/:kind","area":"shop","source":"server/src/routes/order-address-media.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')","requireOrdersContact"],"params":["id","kind"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/orders/:id/amendments","area":"shop","source":"server/src/routes/orders.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')","requirePermission('orders.manage')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200,201,409],"keys":["amendment","error","order","replayed"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/orders/:id/amendments/:amendId/settlement","area":"shop","source":"server/src/routes/orders.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')","requirePermission('orders.refund')"],"params":["amendId","id"],"query":[],"body":["method"],"response":{"statuses":[200],"keys":["amendment","order","replayed"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/orders/:id/amendments/:amendId/withdraw","area":"shop","source":"server/src/routes/orders.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')","requirePermission('orders.manage')"],"params":["amendId","id"],"query":[],"body":[],"response":{"statuses":[200,409],"keys":["error","order","status","unchanged"]},"errors":[],"shape":"extracted"},
@@ -947,6 +951,9 @@
     {"method":"POST","path":"/api/store/:slug/account/addresses","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[201],"keys":["address"]},"errors":[],"shape":"extracted"},
     {"method":"DELETE","path":"/api/store/:slug/account/addresses/:id","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["id","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"PUT","path":"/api/store/:slug/account/addresses/:id","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["id","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":["address"]},"errors":[],"shape":"extracted"},
+    {"method":"DELETE","path":"/api/store/:slug/account/addresses/:id/media/:kind","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["id","kind","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"GET","path":"/api/store/:slug/account/addresses/:id/media/:kind","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["id","kind","slug"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"PUT","path":"/api/store/:slug/account/addresses/:id/media/:kind","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["id","kind","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/store/:slug/account/cart","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":["cart"]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/store/:slug/account/cart","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":["cart"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/store/:slug/account/cart/merge","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":["cart"]},"errors":[],"shape":"extracted"},
