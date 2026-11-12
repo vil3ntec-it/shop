@@ -98,7 +98,8 @@ test('collect: هر پرونده و دسته، شمارها، و پوشهٔ بی
 test('runInfo: commit و اجرای CI از GITHUB_*، بی متغیرِ دیگر', () => {
   const keep = { ...process.env };
   try {
-    Object.assign(process.env, { GITHUB_SHA: 'abc123', GITHUB_RUN_ID: '42', GITHUB_REPOSITORY: 'o/r', GITHUB_REF_NAME: 'main', GITHUB_JOB: 'evidence', SECRET_X: 'nope', JAVA_TOOL_OPTIONS: '-Dtok=nope' });
+    //  در CI ِ PR خودِ GITHUB_HEAD_REF و GITHUB_SERVER_URL هست (#1040): هر دو صریح، تا آزمون به محیط بسته نباشد
+    Object.assign(process.env, { GITHUB_HEAD_REF: '', GITHUB_SERVER_URL: 'https://github.com', GITHUB_SHA: 'abc123', GITHUB_RUN_ID: '42', GITHUB_REPOSITORY: 'o/r', GITHUB_REF_NAME: 'main', GITHUB_JOB: 'evidence', SECRET_X: 'nope', JAVA_TOOL_OPTIONS: '-Dtok=nope' });
     const r = runInfo('.', ['desktop=d']);
     assert.equal(r.kind, 'run');
     assert.equal(r.commit, 'abc123');
