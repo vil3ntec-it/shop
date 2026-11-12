@@ -17,20 +17,7 @@ const CACHE_BYTES = 32 * 1024 * 1024;
 const MAX_PIXELS = 40_000_000;
 const QUALITY = Object.freeze({ thumb: 70, display: 78 });
 
-let sharp; // undefined = هنوز نسنجیده، null = نیست
-function lib() {
-  if (sharp === undefined) {
-    //  زیرِ Electron (سرورِ درونیِ برنامهٔ کامپیوتر) نه: libvips با glib ِ خودِ Electron ناسازگار است (هشدارِ
-    //  SharpElectronLinux و GLib-CRITICAL) و در CI ِ #1035 پرونده را تا کشته شدن نگه داشت؛ ویترینِ WebP آن‌جا لازم نیست
-    if (process.versions.electron) { sharp = null; return sharp; }
-    try {
-      sharp = require('sharp');
-      sharp.cache(false);          //  کشِ درونیِ libvips نه؛ سقفِ حافظه همین‌جاست
-      sharp.concurrency(1);
-    } catch { sharp = null; }
-  }
-  return sharp;
-}
+const { lib } = require('./sharp-lib');   //  بارکنندهٔ مشترک (اختیاری، هرگز زیرِ Electron)
 
 const on = () => !!config.storefront.webp;
 const available = () => on() && !!lib();

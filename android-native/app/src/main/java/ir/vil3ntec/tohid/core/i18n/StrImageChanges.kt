@@ -125,4 +125,27 @@ object StrImageChanges {
   val flagThumb: String get() = t("نسخهٔ کوچک با نسخهٔ بزرگ جور نیست (بزرگ‌تر است یا نسبتش فرق دارد).", "The small version does not match the large one (bigger, or a different shape).", "کوچنۍ نسخه له لویې سره برابره نه ده (لویه ده یا بڼه یې توپیر لري).")
   val flagSmall: String get() = t("عکسِ منبع کوچک است؛ روی صفحهٔ بزرگ کوچک دیده می‌شود تا تار نشود.", "The source photo is small; on a large screen it stays small so it does not blur.", "سرچینه انځور کوچنی دی؛ په لویه پرده کوچنی ښکاري چې تت نه شي.")
   val flagUnreadable: String get() = t("نوع یا ابعادِ یک نسخه خوانده نشد.", "The type or size of a version could not be read.", "د یوې نسخې ډول یا اندازه ونه لوستل شوه.")
+  // ── IMG-11: نسخهٔ بزرگ‌نمایی (۲۴۰۰px، ساختهٔ سرور) ──
+  val zoomVersion: String get() = t("نسخهٔ بزرگ‌نمایی", "Zoom version", "د لویولو نسخه")
+  val zoomNote: String get() = t(
+    "همان نسخه‌ای که ویترین هنگامِ بزرگ‌نمایی نشان می‌دهد. با دو انگشت، دو بار زدن یا دکمه‌ها تا اندازهٔ واقعیِ عکس بزرگ کنید.",
+    "The version the storefront shows when zooming. Pinch, double-tap or use the buttons to zoom up to the photo's real size.",
+    "هغه نسخه چې ویټرین یې د لویولو پر مهال ښيي. په دوو ګوتو، دوه ځله وهلو یا تڼیو یې د انځور تر اصلي اندازې لوی کړئ.",
+  )
+  val zoomFits: String get() = t("نسخهٔ بزرگ‌نمایی با نسخهٔ بزرگ جور است.", "The zoom version matches the large version.", "د لویولو نسخه له لویې نسخې سره برابره ده.")
+  val zoomMismatch: String get() = t(
+    "نسخهٔ بزرگ‌نمایی با نسخهٔ بزرگ جور نیست (نسبتش فرق دارد یا بزرگ‌تر نیست).",
+    "The zoom version does not match the large version (different shape, or not larger).",
+    "د لویولو نسخه له لویې نسخې سره برابره نه ده (بڼه یې توپیر لري یا لویه نه ده).",
+  )
+  val zoomIn: String get() = t("بزرگ‌تر", "Zoom in", "لوی کړئ")
+  val zoomOut: String get() = t("کوچک‌تر", "Zoom out", "کوچنی کړئ")
+  val zoomReset: String get() = t("اندازهٔ نخست", "Original size", "لومړنۍ اندازه")
+  fun zoomLevel(percent: Int): String = t("${asIs(percent)}٪", "$percent%", "$percent سلنه")
+  //  کارهای صفحه‌خوان ِ قابِ بزرگ‌نمایی (همان کشیدن با دو انگشت)
+  val zoomFrame: String get() = t("عکسِ بزرگ‌نمایی", "Zoom photo", "د لویولو انځور")
+  val zoomShowLeft: String get() = t("دیدنِ سمتِ چپِ عکس", "Show the left of the photo", "د انځور کیڼ لوری ښودل")
+  val zoomShowRight: String get() = t("دیدنِ سمتِ راستِ عکس", "Show the right of the photo", "د انځور ښي لوری ښودل")
+  val zoomShowTop: String get() = t("دیدنِ بالای عکس", "Show the top of the photo", "د انځور پورتنۍ برخه ښودل")
+  val zoomShowBottom: String get() = t("دیدنِ پایینِ عکس", "Show the bottom of the photo", "د انځور لاندینۍ برخه ښودل")
 }

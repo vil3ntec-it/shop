@@ -54,6 +54,15 @@ internal object StorefrontHub {
     return err
   }
 
+  /**
+   *  INV-01@32: ردیفی که صفحهٔ کالا تازه از سرور خواند یا ذخیره کرد — اگر فهرست بار شده، همان ردیف جایگزین یا افزوده
+   *  می‌شود تا برگهٔ «جزئیاتِ ویترین» (`storefront/products/{id}`) کالای تازه‌همگام‌شده را بیابد و برنگردد.
+   */
+  fun put(p: StorefrontProductDto) {
+    val list = products.value ?: return
+    products.value = if (list.any { it.id == p.id }) list.map { if (it.id == p.id) p else it } else list + p
+  }
+
   /** انتشار/برداشتنِ گروهی — یکی‌یکی، با گزارشِ همان `StorefrontOwner.bulkReport` */
   suspend fun bulk(repo: StorefrontRepository, ids: Set<String>, publish: Boolean): StorefrontOwner.BulkReport {
     val list = products.value.orEmpty().filter { it.id in ids }

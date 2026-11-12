@@ -25,6 +25,7 @@ import ir.vil3ntec.tohid.ui.v3.nav.ModuleEntry
 import ir.vil3ntec.tohid.ui.v3.nav.RouteKind
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.nav.V3Route
+import ir.vil3ntec.tohid.ui.v3.online.storefront.ProductStorefrontSlot
 import ir.vil3ntec.tohid.ui.v3.sales.SalesPaths
 import ir.vil3ntec.tohid.ui.v3.stock.StockPaths
 
@@ -88,6 +89,7 @@ val ProductsModule = AppModule(
           movements = { nav.open(StockPaths.movements(id)) },
         ),
         photoExtra = { BankPhotoSlot(id) },
+        storefront = { ProductStorefrontSlot(id) },
       )
     },
     //  بارکدِ ناشناس (صندوق، انبار، جست‌وجو) ⇐ همین فرم با بارکدِ پرشده؛ یک کالا ثبت شد ⇐ ورودِ انبارِ همان (مثلِ امروز)

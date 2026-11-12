@@ -253,11 +253,15 @@ router.get('/:slug/products/:id', readLimit, store, async (req, res) => {
   res.json(await sf.productDetail(req.store.shop_id, req.params.id));
 });
 
-/** عکس: `display` برای صفحهٔ کالا، `thumb` برای کارت (WEB-16). */
+/** عکس: `display` برای صفحهٔ کالا، `thumb` برای کارت (WEB-16)، `zoom` برای بزرگ‌نمایی (IMG-11). */
 const webp = require('../lib/store-webp');
 const picture = (size) => async (req, res) => {
   const p = await sf.photo(req.store.shop_id, req.params.id, size);
-  if (!p) throw notFound('عکس نیست', 'photo_not_found');
+  if (!p) {
+    //  IMG-11: «zoom نیست» امروز ممکن است فردا باشد (پرچم، ساختِ نخست) ⇒ هرگز در کش نماند
+    if (size === 'zoom') res.set('Cache-Control', 'no-store');
+    throw notFound('عکس نیست', 'photo_not_found');
+  }
   const etag = `"${p.hash}"`;
   //  پاسخ‌های JSON ِ ویترین کش نمی‌شوند؛ عکس با ETag ِ محتوا می‌شود. IMG-12: `?v=` (همان `photoVersion` ِ کالا)
   //  فقط وقتی همین عکسی است که سرو می‌شود یک روز می‌ماند — عکسِ تازه نشانیِ تازه دارد؛ یک روز (نه immutable، مثلِ
@@ -296,6 +300,8 @@ router.get('/:slug/media/:kind/:version', readLimit, store, async (req, res) => 
 });
 router.get('/:slug/products/:id/photo', readLimit, store, picture('display'));
 router.get('/:slug/products/:id/thumb', readLimit, store, picture('thumb'));
+//  IMG-11: نسخهٔ بزرگ برای بزرگ‌نمایی (پرچمِ خاموشِ `image_bank.zoom` + `sharp`؛ نبود ⇒ ۴۰۴ و کلاینت همان display را بزرگ می‌کند)
+router.get('/:slug/products/:id/zoom', readLimit, store, picture('zoom'));
 //  ── PRD-17/27 (تصمیمِ ۴-۲۲): گالریِ عکس‌های بیشترِ کالا — پشتِ `shop.storefront.gallery` + `shop.image_bank` (شرح: lib/storefront-gallery.js)
 router.get('/:slug/products/:id/gallery', readLimit, store, async (req, res) => {
   const g = await gallery.list(req.store.shop_id, req.params.id);
