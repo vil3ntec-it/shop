@@ -68,7 +68,8 @@ async function shop(label, { notify = true, tracking = true, push = false } = {}
   const s = { token: u.accessToken, shopId: made.body.shop.id, slug: `rn-${uniq()}`, title: `ویترینِ ${label}`, phone };
   for (const k of ['shop.orders', 'shop.storefront', 'shop.orders.refunds']) await setFlag(s.shopId, k, true);
   if (notify) await setFlag(s.shopId, N.FLAG_KEY, true);
-  if (tracking) await setFlag(s.shopId, TRACK, true);
+  //  پیگیری پیش‌فرض‌روشن است (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) ⇒ «بی پیگیری» `false` ِ صریح است
+  await setFlag(s.shopId, TRACK, tracking);
   if (push) await setFlag(s.shopId, P.FLAG, true);
   const put = await h.put('/api/shop/storefront', { slug: s.slug, enabled: true, title: s.title, contactPhone: '0700000001', acceptPickup: true }, { token: s.token });
   assert.equal(put.status, 200, JSON.stringify(put.body));

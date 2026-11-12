@@ -174,6 +174,9 @@ test('پاسخ‌های /store و /market: شکلِ قرارداد، بی شنا
   const shopId = made.body.shop.id;
   await setFlag(shopId, 'shop.orders', true);
   await setFlag(shopId, 'shop.storefront', true);
+  //  قرارداد v1 شکلِ پاسخِ پایه است؛ فیلدِ پرچم‌دار (مثلِ `refund` ِ `shop.orders.refund_tracking`) تا نسخهٔ تازهٔ قرارداد بیرون
+  //  از آن است ⇒ پیش‌فرض‌روشن‌ها (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) این‌جا `false` ِ صریح
+  await h.defaultOnOff(shopId);
   const slug = `pv-${uniq()}`;
   assert.equal((await h.put('/api/shop/storefront', {
     slug, enabled: true, title: 'ویترینِ قرارداد', tagline: 'کالای روزانه', contactPhone: '0700000001', deliveryFeeMinor: 5000,

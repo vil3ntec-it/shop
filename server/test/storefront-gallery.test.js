@@ -51,7 +51,8 @@ async function liveStore(label, { gallery = true } = {}) {
   assert.equal(made.status, 201, JSON.stringify(made.body));
   const o = { token: u.accessToken, shopId: made.body.shop.id, slug: `gal-${uniq()}` };
   for (const k of ['shop.orders', 'shop.storefront', 'shop.image_bank']) await setFlag(o.shopId, k, true);
-  if (gallery) await setFlag(o.shopId, 'shop.storefront.gallery', true);
+  //  پیش‌فرض‌روشن است (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) ⇒ «خاموش» `false` ِ صریح است
+  await setFlag(o.shopId, 'shop.storefront.gallery', gallery);
   const put = await h.put('/api/shop/storefront', { slug: o.slug, enabled: true, title: `ویترینِ ${label}`, deliveryFeeMinor: 0, minOrderMinor: 0 },
     { token: o.token });
   assert.equal(put.status, 200, JSON.stringify(put.body));

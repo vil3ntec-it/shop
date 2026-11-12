@@ -73,6 +73,9 @@ test('WEB-23: GET /api/store/:slug نام، ایمیل، تلفن، شهر و م
     const r = await h.put('/api/admin/pump/live-config', { scope: made.body.shop.id, key, value: true }, { token: admin });
     assert.equal(r.status, 200, JSON.stringify(r.body));
   }
+  //  پیش‌فرض‌روشن‌ها (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) `false` ِ صریح ⇒ همان پاسخِ پایه (مثلاً `features.addressExtra` ِ بولی
+  //  نامش به PERSONAL_KEY می‌خورد ولی داده نیست)
+  await h.defaultOnOff(made.body.shop.id);
   const slug = `privacy-${Date.now().toString(36)}`;
   const put = await h.put('/api/shop/storefront', {
     slug, enabled: true, title: 'ویترینِ عمومی', tagline: 'خوش آمدید', contactPhone: '0700000001',

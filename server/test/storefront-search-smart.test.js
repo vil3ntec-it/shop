@@ -63,6 +63,9 @@ async function liveStore(label, products = PRODUCTS) {
   const o = { token: u.accessToken, shopId: made.body.shop.id };
   await setFlag(o.shopId, 'shop.orders', true);
   await setFlag(o.shopId, 'shop.storefront', true);
+  //  پیش‌فرض‌روشن است (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) ⇒ «خاموش» `false` ِ صریح است
+  await setFlag(o.shopId, search.SMART_FLAG, false);
+  await setFlag(o.shopId, search.SEARCH_FLAG, false);
   const slug = `s-${uniq()}`;
   const put = await h.put('/api/shop/storefront', {
     slug, enabled: true, title: `ویترینِ ${label}`, contactPhone: '0700000002',

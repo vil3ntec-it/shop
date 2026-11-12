@@ -60,6 +60,8 @@ async function liveStore(label, { catalog = false } = {}) {
   assert.equal(made.status, 201, JSON.stringify(made.body));
   const s = { token: u.accessToken, shopId: made.body.shop.id, device: `dev-f-${uniq()}` };
   for (const key of ['shop.orders', 'shop.storefront', ...(catalog ? ['shop.catalog'] : [])]) await flag(s.shopId, key, true);
+  //  پیش‌فرض‌روشن‌ها (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) `false` ِ صریح ⇒ همان پاسخِ پیشین؛ هر آزمون کلیدِ خودش را روشن می‌کند
+  await h.defaultOnOff(s.shopId);
   s.slug = `fx-${uniq()}`;
   const put = await h.put('/api/shop/storefront', {
     slug: s.slug, enabled: true, title: `ویترینِ ${label}`, contactPhone: '0700000001', acceptPickup: true, minOrderMinor: 0,

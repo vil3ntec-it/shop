@@ -56,6 +56,8 @@ async function liveStore(label) {
   const o = { token: u.accessToken, shopId: made.body.shop.id };
   await setFlag(o.shopId, 'shop.orders', true);
   await setFlag(o.shopId, 'shop.storefront', true);
+  //  گزارش پیش‌فرض‌روشن است (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) ⇒ «خاموش» ِ این پرونده `false` ِ صریح است
+  await setFlag(o.shopId, 'shop.orders.online_report', false);
   const slug = `rpt-${uniq()}`;
   const put = await h.put('/api/shop/storefront', { slug, enabled: true, title: `ویترینِ ${label}`, contactPhone: '0700000001' }, { token: o.token });
   assert.equal(put.status, 200, JSON.stringify(put.body));

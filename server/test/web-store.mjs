@@ -75,6 +75,10 @@ const A = (await call('POST', '/api/admin/login', { username: 'admin', password:
 for (const key of ['shop.orders', 'shop.storefront']) {
   await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key, value: true }, A);
 }
+//  پیش‌فرض‌روشن‌ها (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) `false` ِ صریح ⇒ همان ویترینِ پیشین؛ هر بخش کلیدِ خودش را روشن می‌کند
+for (const key of require('../src/lib/flag-defaults').DEFAULT_ON) {
+  await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key, value: false }, A);
+}
 const slug = 'demo-store';
 const put = await call('PUT', '/api/shop/storefront', {
   slug, enabled: true, title: 'ویترینِ آزمایشی', tagline: 'کالای روزانه', contactPhone: '0700000001',
@@ -489,6 +493,7 @@ for (const lang of ['fa', 'en']) {
   const sid = (await call('POST', '/api/shop', { name: 'دکانِ موجودی' }, T)).body.shop.id;
   const flag = (key, value) => call('PUT', '/api/admin/pump/live-config', { scope: sid, key, value }, A);
   for (const key of ['shop.orders', 'shop.storefront', 'shop.catalog']) await flag(key, true);
+  for (const key of require('../src/lib/flag-defaults').DEFAULT_ON) await flag(key, false);   //  پیش‌فرض‌روشن‌ها ⇒ `false` ِ صریح
   const sslug = 'stock-store';
   await call('PUT', '/api/shop/storefront', { slug: sslug, enabled: true, title: 'ویترینِ موجودی', contactPhone: '0700000002', minOrderMinor: 0 }, T);
   const sop = (table, row, fields) => ({ op_id: `op-${row}-${Date.now()}`, ts: Date.now(), table, row_id: row, type: 'insert', fields });
