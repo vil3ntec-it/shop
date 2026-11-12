@@ -98,6 +98,10 @@ fun RouteScope.CheckoutRoute() {
     //  «نیازمند تأیید» هم کادرِ تخفیف را نشان می‌دهد؛ فقط «ممنوع» پنهانش می‌کند (STF-02)
     val canDiscount = remember { ShopRole.mayDiscount(context) }
     val blockExpired = remember { ShopPolicy.blockExpired(context) }
+    //  S22: «منقضی فقط با مجوزِ مدیر» (`ExpiryPref.gate`، پیش‌فرض خاموش؛ با «فروخته نشود» بی اثر) — همان `DeskSale`
+    val expiryGateOn = remember { ir.vil3ntec.tohid.data.ExpiryPref.gate(context) }
+    //  POS-24: قاعده‌های پیش از پایانِ فاکتورِ همین دستگاه (`CheckoutRulesPref`، پیش‌فرض خاموش) — همان `DeskSale`/`SaleDialogs`
+    val checkoutRules = remember { ir.vil3ntec.tohid.data.CheckoutRulesPref.get(context) }
     val seller = remember { ir.vil3ntec.tohid.data.TillUser.me(context) } // S46: کاربرِ صندوق؛ خاموش ⇒ همان نامِ حساب
     val payV2 = remember { ShopPolicy.payV2(context) }
     //  PAY-24: کارتِ هدیه و اعتبار در روش‌های پنل فقط با `GiftCardPref` ِ همین دستگاه (پیش‌فرض خاموش ⇒ همان روش‌ها)
@@ -124,7 +128,10 @@ fun RouteScope.CheckoutRoute() {
     val taxConfig = remember { ir.vil3ntec.tohid.data.SaleTaxPref.active(context) }
     //  «اصلاحِ فاکتور» (`SaleReopen.extras`): فروشندهٔ همان فاکتور؛ وگرنه کاربرِ صندوق. تأییدها همیشه به نامِ کاربرِ صندوق‌اند
     val invoiceSeller = HeldSession.extras(cart).seller.ifBlank { seller }
-    val checkout = CheckoutModel.checkout(form, canDiscount, blockExpired, invoiceSeller, if (payV2) 0L else cashStep).copy(lineSellers = lineSellers, tax = taxConfig)
+    //  همین یک `Checkout` جمع، پیش‌سنجیِ حساب‌پی و ثبت را می‌سازد ⇒ قاعده‌ها و تأییدِ منقضی همه‌جا همان‌اند
+    val checkout = CheckoutModel.checkout(
+      form, canDiscount, blockExpired, invoiceSeller, if (payV2) 0L else cashStep, rules = checkoutRules, expiryGate = expiryGateOn,
+    ).copy(lineSellers = lineSellers, tax = taxConfig, expiryApproval = CheckoutSession.expiryApproval)
     val n = CheckoutModel.numbers(data, loyal, form, checkout)
     val decision = ShopRole.decide(context, "sales.discount", DiscountGate.req(n.discount, n.subtotal))
     val gate = DiscountGate.state(decision.decision, saleKey, n.discount, n.subtotal, CheckoutSession.approval)
@@ -137,6 +144,16 @@ fun RouteScope.CheckoutRoute() {
     //  PAY-21: «پرداخت با حساب‌پی (NFC/QR)» — فقط با `pay.hesabpay`، گیرندهٔ معلوم و نت (`TillHesab.tillNfc`)؛ یک دقیقه در حافظه
     val hesabEnv = remember { HesabPayEnv.of(context) }
     val till by produceState(TillHesab.OFF, saleKey) { value = hesabEnv.till() }
+
+    /**
+     *  S22: برگهٔ تأییدِ فروشِ منقضی (همان PIN ِ سقفِ اعتبار، `ExpiryApprovalRoute`) برای نیازِ [need] ِ همین سبد.
+     *  [resubmit] ⇒ با رسیدنِ تأیید همان «ثبت»؛ از «حساب‌پی» نه (پس از تأیید کاربر دوباره «حساب‌پی» می‌زند)
+     */
+    fun askExpiry(need: Map<String, Long>, resubmit: Boolean) {
+      CheckoutSession.expiry = CheckoutExpiry.ask(data, need, seller, ShopRole.current(context), ir.vil3ntec.tohid.data.TillUser.meId(context))
+      CheckoutSession.expiryPending = resubmit
+      nav.open(SalesPaths.EXPIRY)
+    }
 
     /** @param paid تسویهٔ تأییدشدهٔ حساب‌پی (`HesabTillRoute`): کلِ فاکتور یا باقیِ پنل را پرداخته ⇒ نه نسیه، نه «پرداختی» */
     fun submit(paid: Settlement? = null) {
@@ -175,6 +192,10 @@ fun RouteScope.CheckoutRoute() {
         nav.open(SalesPaths.CREDIT)
         return
       }
+      //  S22 (پشتِ `ExpiryPref.gate`): فروشی که از ماندهٔ منقضی برمی‌دارد بی تأییدِ مدیر/صاحبِ همان کالاها و تا همان مقدار ثبت
+      //  نمی‌شود — ترتیبِ `DeskSale.finish` (پس از سقفِ اعتبار، پیش از سقف‌های سرور). سبدی که منقضیِ بیشتری برمی‌دارد دوباره
+      //  می‌پرسد (`ExpiryGate.covers`) و `SalesEngine.record` با همان `expiryApproval` دوباره می‌سنجد.
+      CheckoutExpiry.uncovered(data, loyal, sale, todayIso())?.let { need -> askExpiry(need, resubmit = true); return }
       //  STF-03 — پیش‌سنجی روی **همان** فاکتوری که ثبت و فرستاده می‌شود (پس از تخفیفِ خودکار و امتیاز)، با همان قاعدهٔ سرور
       //  (`SaleCaps`): «ممنوع» ⇒ پیام و هیچ ثبت؛ «نیازمندِ تأیید» ⇒ برگهٔ تأیید («پرسیدن از مدیر» یا PIN) و با رسیدنش همان ثبت
       if (capRules.active) {
@@ -245,6 +266,11 @@ fun RouteScope.CheckoutRoute() {
     //  حساب‌پی تأیید شد ⇒ همان دم ثبت با همان تسویه؛ ثبتِ ردشده (سبد عوض شد، موجودی) ⇒ همان ردیف «ثبتِ فروش» می‌شود
     val hesabPaid = CheckoutSession.hesabPaid
     LaunchedEffect(hesabPaid) { if (hesabPaid != null && !submitted) submit(hesabPaid) }
+    //  S22: تأییدِ منقضی که خودِ «ثبت» پرسید رسید ⇒ همان ثبت (با همان تسویهٔ حساب‌پی اگر پول گرفته شده بود)؛ انصراف ⇒ هیچ
+    val freshExpiry = CheckoutSession.expiryApproval
+    LaunchedEffect(freshExpiry) {
+      if (freshExpiry != null && CheckoutSession.expiryPending && !submitted) { CheckoutSession.expiryPending = false; submit(CheckoutSession.hesabPaid) }
+    }
 
     actions = CheckoutActions(
       form = { CheckoutSession.form = it },
@@ -267,10 +293,13 @@ fun RouteScope.CheckoutRoute() {
       submit = { submit() },
       close = ::close,
       hesabPay = {
+        //  S22: منقضیِ نپوشیده ⇒ تأییدِ مدیر پیش از گرفتنِ پول (پیش‌سنجیِ زیر هم با همان `checkout` رد می‌کرد)
+        val expired = if (hesabPaid == null) CheckoutExpiry.uncovered(data, loyal, checkout, todayIso()) else null
         if (hesabPaid != null) submit(hesabPaid)
+        else if (expired != null) askExpiry(expired, resubmit = false)
         else {
           val draft = if (payV2) CheckoutSession.pay.draft(n.finalTotal, form.debtorId) else null
-          //  پیش از گرفتنِ پول: همین فاکتور همین حالا ثبت‌شدنی است؟ (موجودی، تکرار) — همان سنجشِ صندوقِ کامپیوتر
+          //  پیش از گرفتنِ پول: همین فاکتور همین حالا ثبت‌شدنی است؟ (موجودی، تکرار، قاعده‌های POS-24) — همان سنجشِ صندوقِ کامپیوتر
           CheckoutSession.hesab = HesabTillModel.Ask(saleKey, n.finalTotal, draft, till) {
             HesabTillModel.precheck(data, loyal, checkout.copy(debtorId = form.debtorId), saleKey, todayIso())
           }

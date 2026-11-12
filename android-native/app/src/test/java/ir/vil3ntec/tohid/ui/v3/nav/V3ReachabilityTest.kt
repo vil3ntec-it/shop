@@ -139,6 +139,12 @@ class V3ReachabilityTest {
       "ir.vil3ntec.tohid.ui.v3.sales.checkout.HesabTillRoute", "ir.vil3ntec.tohid.pay.HesabPayIntentFlow", "ir.vil3ntec.tohid.pay.HceSlot",
     ),
     Feature("PAY-21 درِ حساب‌پی در برگهٔ تسویهٔ گوشی", "sale/checkout", "ir.vil3ntec.tohid.ui.v3.sales.checkout.HesabTillModel", root = PHONE_CHECKOUT),
+    //  S22: «منقضی فقط با مجوزِ مدیر» فقط در صندوقِ کامپیوتر اجرا می‌شد؛ گوشی بی هیچ تأییدی ثبت می‌کرد (`claude/e-rows-33k`)
+    Feature(
+      "S22 تأییدِ مدیر برای فروشِ کالای منقضی در صندوقِ گوشی", "sale/checkout/expiry",
+      "ir.vil3ntec.tohid.ui.v3.sales.checkout.ExpiryApprovalRoute", "ir.vil3ntec.tohid.ui.v3.sales.approval.CreditApprovalSheet",
+    ),
+    Feature("S22 سنجشِ منقضی پیش از ثبت در برگهٔ تسویهٔ گوشی", "sale/checkout", "ir.vil3ntec.tohid.ui.v3.sales.checkout.CheckoutExpiry", root = PHONE_CHECKOUT),
     //  ── سفارش و تحویل ──
     Feature("PCK جمع‌آوری و بسته‌بندیِ سفارش", "orders/{id}/pick", s("OrderPickHost"), s("OrderPickButton")),
     Feature("PCK-10/12 قفسه و دستهٔ جمع‌آوری", "orders", s("PickDeskEntry")),

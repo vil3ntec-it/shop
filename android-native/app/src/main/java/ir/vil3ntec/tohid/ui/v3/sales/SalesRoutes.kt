@@ -33,6 +33,7 @@ import ir.vil3ntec.tohid.ui.v3.sales.cart.LineRoute
 import ir.vil3ntec.tohid.ui.v3.sales.cart.SaleRoute
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.ApprovalRoute
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.CreditApprovalRoute
+import ir.vil3ntec.tohid.ui.v3.sales.checkout.ExpiryApprovalRoute
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.HesabTillRoute
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.CheckoutRoute
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.CustomerRoute
@@ -74,6 +75,8 @@ object SalesPaths {
   const val APPROVE = "sale/checkout/approve"
   /** برگهٔ «فروشِ نسیه بیش از سقف» (CRM-03، پشتِ `ShopPolicy.creditGate`) */
   const val CREDIT = "sale/checkout/credit"
+  /** برگهٔ «فروشِ کالای منقضی» (S22، پشتِ `ExpiryPref.gate`) — همان برگهٔ PIN ِ سقفِ اعتبار */
+  const val EXPIRY = "sale/checkout/expiry"
   /** «پرداخت با حساب‌پی (NFC/QR)» (PAY-21، پشتِ `pay.hesabpay`) */
   const val HESAB = "sale/checkout/hesabpay"
   /** «تعداد و قیمت»ِ ردیفِ `i` ِ سبد */
@@ -150,6 +153,7 @@ val SalesModule = AppModule(
     V3Route("sale/checkout/customer", RouteKind.SHEET, { StrSale.pickCustomer }, parent = SalesPaths.CHECKOUT, chrome = Chrome.OWN) { CustomerRoute() },
     V3Route(SalesPaths.APPROVE, RouteKind.SHEET, { StrSale.discountApproval }, parent = SalesPaths.CHECKOUT, chrome = Chrome.OWN) { ApprovalRoute() },
     V3Route(SalesPaths.CREDIT, RouteKind.SHEET, { StrPos.creditOverTitle }, parent = SalesPaths.CHECKOUT, chrome = Chrome.OWN) { CreditApprovalRoute() },
+    V3Route(SalesPaths.EXPIRY, RouteKind.SHEET, { StrPos.expiredSaleTitle }, parent = SalesPaths.CHECKOUT, chrome = Chrome.OWN) { ExpiryApprovalRoute() },
     V3Route(SalesPaths.HESAB, RouteKind.SHEET, { ir.vil3ntec.tohid.core.i18n.StrTillPay.title }, parent = SalesPaths.CHECKOUT, chrome = Chrome.OWN) { HesabTillRoute() },
     V3Route("sale/line/{i}", RouteKind.SHEET, { StrSale.lineDetails }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { LineRoute() },
     V3Route(SalesPaths.PRICE_CHECK, RouteKind.SHEET, { ir.vil3ntec.tohid.core.i18n.StrPriceCheck.title }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { PriceCheckRoute() },
