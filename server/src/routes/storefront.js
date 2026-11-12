@@ -271,15 +271,14 @@ const picture = (size) => async (req, res) => {
   //  WEB-16 / ۴-۲: AVIF (`STORE_AVIF`) یا WebP (`STORE_WEBP`) فقط با `sharp` و همان `Accept` (`lib/store-webp.js`)؛ وگرنه همان امروز
   if (webp.available()) {
     res.set('Vary', 'Accept');
-    const fmt = webp.pick(req.get('accept'));
-    if (fmt) {
+    //  نخستین قالبِ ساخته‌شده (AVIF ِ بیش از سقفِ پیکسل یا سرِ پر ⇒ WebP)؛ ⛔ بدنهٔ خالی هرگز — همان اصل
+    for (const fmt of webp.formats(req.get('accept'))) {
       const w = await webp.encodedOf(p.data, p.hash, size, fmt);
-      if (w) {
-        const wtag = `"${p.hash}-${fmt}"`;
-        res.set('ETag', wtag);
-        if (req.get('if-none-match') === wtag) return res.status(304).end();
-        return res.type(`image/${fmt}`).send(w);
-      }
+      if (!w || !w.length) continue;
+      const wtag = `"${p.hash}-${fmt}"`;
+      res.set('ETag', wtag);
+      if (req.get('if-none-match') === wtag) return res.status(304).end();
+      return res.type(`image/${fmt}`).send(w);
     }
   }
   res.set('ETag', etag);
