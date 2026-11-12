@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrPlaces
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrSalePages
 import ir.vil3ntec.tohid.core.i18n.StrTill
 import ir.vil3ntec.tohid.core.pos.LinePricing
 import ir.vil3ntec.tohid.core.pos.PriceApproval
@@ -26,7 +27,9 @@ import ir.vil3ntec.tohid.core.pos.PriceWhy
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.data.PriceAsk
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
+import ir.vil3ntec.tohid.ui.components.pos.PosLineNote
 import ir.vil3ntec.tohid.ui.components.pos.PosLineSerials
+import ir.vil3ntec.tohid.ui.components.pos.PosNoteField
 import ir.vil3ntec.tohid.ui.components.pos.PriceWhyPanel
 import ir.vil3ntec.tohid.ui.components.pos.PosSerialField
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -69,6 +72,8 @@ fun LineSheet(
   serials: PosLineSerials? = null,
   /** POS-22 — گام‌های «چرا این قیمت؟» (`PriceWhyLine.rows`)؛ `null` (تنظیمِ خاموش) ⇒ بی پنل */
   why: List<PriceWhy.Row>? = null,
+  /** POS-11 — یادداشتِ ردیف (`posLineNote`)؛ `null` (تنظیمِ خاموش) ⇒ بی کادر */
+  note: PosLineNote? = null,
 ) {
   val c = PhoneV3.colors
   val start = remember(info.id) { LineModel.start(info) }
@@ -78,6 +83,7 @@ fun LineSheet(
   var grant by remember(info.id) { mutableStateOf<PriceApproval.Grant?>(null) }
   var asking by remember { mutableStateOf(false) }
   var serialText by remember(info.id) { mutableStateOf(serials?.text.orEmpty()) }
+  var noteText by remember(info.id) { mutableStateOf(note?.value.orEmpty()) }
   val gate = LineModel.check(policy, form, info, start, grant, canAsk = priceAsk != null)
   val unit = LineModel.shownUnit(form, info)
   val qtyError = LineModel.qtyError(form, info).takeIf { tried || form.qtyText != start.qtyText }
@@ -143,6 +149,8 @@ fun LineSheet(
       gate.granted?.let { Text(StrTill.approvedBy(it.by), style = V3Type.footnote, color = c.positive, modifier = Modifier.padding(top = 4.dp)) }
       //  POS-28: همان کادرِ `CartLineDialog` (شمارِ «N از M» و تکرار همان‌جا؛ فروخته‌شدن را ثبت می‌سنجد)
       if (serials != null) { Spacer(Modifier.height(12.dp)); PosSerialField(serialText, { serialText = it }, LineModel.quantity(form, info)) }
+      //  POS-11: همان کادرِ یادداشت با قالب‌های همین دستگاه
+      if (note != null) { Spacer(Modifier.height(12.dp)); PosNoteField(noteText, { noteText = it }, StrSalePages.lineNote) }
     }
     if (info.places.isNotEmpty()) {
       //  POS-16 — موجودیِ همین کالا در هر محل (فقط خواندنی؛ جمعِ محل‌ها همان موجودیِ کالا)
@@ -165,7 +173,7 @@ fun LineSheet(
       StrSale.submit,
       {
         tried = true
-        if (LineModel.valid(form, info) && gate.edit.ok) closer.close { onSave(form, start, gate.granted); serials?.save(serialText) } else shake++
+        if (LineModel.valid(form, info) && gate.edit.ok) closer.close { onSave(form, start, gate.granted); serials?.save(serialText); note?.save?.invoke(noteText) } else shake++
       },
       Modifier.fillMaxWidth(),
       haptic = true,

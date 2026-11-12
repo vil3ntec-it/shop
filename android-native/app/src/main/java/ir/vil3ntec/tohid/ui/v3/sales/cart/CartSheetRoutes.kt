@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.data.CartNotes
 import ir.vil3ntec.tohid.data.CartSerials
 import ir.vil3ntec.tohid.data.LinePolicyPrefs
 import ir.vil3ntec.tohid.data.PriceWhyLine
@@ -16,6 +17,7 @@ import ir.vil3ntec.tohid.data.TillGoodsPref
 import ir.vil3ntec.tohid.scan.ScanFeedback
 import ir.vil3ntec.tohid.sync.v1.Ulid
 import ir.vil3ntec.tohid.ui.PromoLive
+import ir.vil3ntec.tohid.ui.components.pos.posLineNote
 import ir.vil3ntec.tohid.ui.components.pos.posLineSerials
 import ir.vil3ntec.tohid.ui.components.pos.priceWhyOn
 import ir.vil3ntec.tohid.ui.screens.Haptics
@@ -64,6 +66,8 @@ fun RouteScope.LineRoute() {
     priceAsk = priceAsk,
     //  POS-28: کالای سریال‌دار ⇒ سریال‌ها (همان `posLineSerials` ⇒ `CartSerials.set` ِ صندوقِ کامپیوتر)
     why = why,
+    //  POS-11: یادداشتِ ردیف (`posLineNote` ⇒ `CartNotes.set`، تنظیمِ «یادداشت» ِ همین دستگاه)
+    note = posLineNote(line.note) { n -> cart.set(CartNotes.set(cart.lines.value, info.id, n)) },
     serials = posLineSerials(data, line) { s -> cart.set(CartSerials.set(cart.lines.value, info.id, s)) },
     onSave = { form, start, grant ->
       //  تأییدی که به کار رفت ⇒ ردیفِ سابقهٔ `price_override` با درخواست‌کننده، تأییدکننده و دلیل (فقط اگر سبد نشست)
