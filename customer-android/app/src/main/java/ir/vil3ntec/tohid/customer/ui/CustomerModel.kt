@@ -638,7 +638,7 @@ class CustomerModel(
       requotePromo()
       return
     }
-    val req = CheckoutRules.request(page, cart, form, ticket.phone, lang.code, slotsPage(), promo.applied(ticket, saved.deviceId))
+    val req = CheckoutRules.request(page, cart, form, ticket.phone, lang.code, slotsPage(), promo.applied(ticket, saved.deviceId), deviceId = saved.deviceId)
       .copy(campaign = campaigns[slug], secondOrder = if (second) true else null)
     //  CHK-19: همان بدنه ⇒ همان کلید (پیش از فرستادن نگه داشته می‌شود؛ بستنِ برنامه وسطِ کار سفارشِ دوم نمی‌سازد)
     val memo = CheckoutKeys.keyFor(saved.keys[slug], req)

@@ -41,7 +41,10 @@ object OrderRisk {
     val lastOrderAt: Long? = null,
   )
 
-  data class View(val enabled: Boolean, val known: Boolean = false, val history: History? = null, val flags: List<Flag> = emptyList())
+  /** [device] = سفارش شناسهٔ دستگاهِ مشتری دارد (RSK-04؛ خودِ شناسه هرگز به برنامه نمی‌رسد) ⇒ «بستنِ این دستگاه» */
+  data class View(
+    val enabled: Boolean, val known: Boolean = false, val history: History? = null, val flags: List<Flag> = emptyList(), val device: Boolean = false,
+  )
 
   /** کدهایی که سرورِ امروز می‌فرستد (`riskOf`) — برای متنِ هر کدام */
   val CODES: List<String> = listOf(
@@ -66,7 +69,7 @@ object OrderRisk {
         returnsOrRefunds = num(x, "returnsOrRefunds") ?: 0, firstOrderAt = num(x, "firstOrderAt"), lastOrderAt = num(x, "lastOrderAt"),
       )
     }
-    return View(enabled = true, known = bool(o, "known"), history = h, flags = flagsOf(o))
+    return View(enabled = true, known = bool(o, "known"), history = h, flags = flagsOf(o), device = bool(o, "device"))
   }
 
   /** `flags` ِ هر پاسخ (`riskOf`، هر ردیفِ صف): بی کد ⇒ کنار؛ شدتِ ناشناخته ⇒ info */
@@ -144,21 +147,35 @@ object OrderRisk {
   const val RADIUS_MAX = 2000
   const val RADIUS_DEFAULT = 100
 
-  /** ردیفِ فعالِ فهرست: شماره یا پین (پین فقط «بسته»)؛ دلیل فقط برای صاحب و مدیر */
+  const val KIND_PHONE = "phone"
+  const val KIND_PIN = "pin"
+  const val KIND_DEVICE = "device"
+
+  /**
+   *  ردیفِ فعالِ فهرست: شماره، پین (فقط «بسته») یا دستگاه (فقط [deviceOrderNo]: شمارهٔ سفارشی که از آن بسته شد — خودِ دستگاه
+   *  هرگز نشان داده نمی‌شود)؛ دلیل فقط برای صاحب و مدیر.
+   */
   data class Entry(
     val id: String, val list: String, val kind: String, val phone: String?, val lat: Double?, val lng: Double?, val radiusM: Long?,
-    val reason: String, val expiresAt: Long,
+    val reason: String, val expiresAt: Long, val deviceOrderNo: Long? = null,
   )
 
-  /** `GET …/risk/lists` ⇐ ردیف‌ها (همان ترتیبِ سرور: تازه‌ترین بالا)؛ ردیفِ بدشکل کنار */
+  /** `GET …/risk/lists` ⇐ ردیف‌ها (همان ترتیبِ سرور: تازه‌ترین بالا)؛ ردیفِ بدشکل یا نوعِ ناشناخته (سرورِ تازه‌تر) کنار */
   fun entries(o: JsonObject?): List<Entry> = (o?.get("items") as? JsonArray).orEmpty().mapNotNull { e ->
     val x = e as? JsonObject ?: return@mapNotNull null
     val id = str(x, "id")?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
     val list = str(x, "list")?.takeIf { it == BLOCK || it == ALLOW } ?: return@mapNotNull null
-    val kind = str(x, "kind") ?: return@mapNotNull null
+    val kind = str(x, "kind")?.takeIf { it == KIND_PHONE || it == KIND_PIN || it == KIND_DEVICE } ?: return@mapNotNull null
     val pin = obj(x, "pin")
     fun dbl(o: JsonObject?, k: String): Double? = (o?.get(k) as? JsonPrimitive)?.takeIf { !it.isString }?.contentOrNull?.toDoubleOrNull()
-    Entry(id, list, kind, str(x, "phone"), dbl(pin, "lat"), dbl(pin, "lng"), num(pin, "radiusM"), str(x, "reason").orEmpty(), num(x, "expiresAt") ?: 0)
+    val phone = str(x, "phone")?.takeIf { kind == KIND_PHONE && it.isNotBlank() }
+    if (kind == KIND_PHONE && phone == null) return@mapNotNull null
+    if (kind == KIND_PIN && (dbl(pin, "lat") == null || dbl(pin, "lng") == null)) return@mapNotNull null
+    Entry(
+      id, list, kind, phone, dbl(pin, "lat").takeIf { kind == KIND_PIN }, dbl(pin, "lng").takeIf { kind == KIND_PIN },
+      num(pin, "radiusM").takeIf { kind == KIND_PIN }, str(x, "reason").orEmpty(), num(x, "expiresAt") ?: 0,
+      deviceOrderNo = if (kind == KIND_DEVICE) num(obj(x, "device"), "orderNo") else null,
+    )
   }
 
   /** فرمِ «بستن/مطمئن کردنِ این شماره» ⇐ کدِ خطای درجا یا `null` (همان مرزهای سرور: دلیل ۳ تا ۲۰۰، ۱ تا ۳۶۵ روز) */
@@ -180,6 +197,24 @@ object OrderRisk {
   }
 
   private fun cleanReason(reason: String): String = reason.trim().split(Regex("\\s+")).joinToString(" ")
+
+  /** فرمِ «بستن/مطمئن کردنِ این دستگاه» ِ یک سفارش ⇐ کدِ خطای درجا یا `null` (دستگاه فقط از سفارشی که [View.device] دارد) */
+  fun deviceEntryError(list: String, hasDevice: Boolean, reason: String, days: Int?): String? = when {
+    list != BLOCK && list != ALLOW -> "bad_list"
+    !hasDevice -> "device_unknown"
+    reason.trim().length !in REASON_MIN..REASON_MAX -> "reason_required"
+    days == null || days !in 1..DAYS_MAX -> "bad_expiry"
+    else -> null
+  }
+
+  /** بدنهٔ `POST …/risk/lists` برای دستگاهِ یک سفارش — سرور چکیدهٔ دستگاه را از همان سفارشِ همین دکان برمی‌دارد */
+  fun deviceEntryBody(orderId: String, list: String, reason: String, days: Int): JsonObject = buildJsonObject {
+    put("list", list)
+    put("kind", KIND_DEVICE)
+    put("orderId", orderId)
+    put("reason", cleanReason(reason))
+    put("expiresInDays", days)
+  }
 
   /** شمارهٔ تایپ‌شده در صفحهٔ فهرست: رقمِ فارسی ⇐ لاتین، فاصله و خط تیره بیرون؛ درستی‌اش را سرور می‌سنجد */
   fun typedPhone(raw: String): String = LocaleFormat.asciiDigits(raw).filter { it.isDigit() || it == '+' }

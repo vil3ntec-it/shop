@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material.icons.outlined.WrongLocation
 import androidx.compose.material3.Text
@@ -85,6 +86,7 @@ internal fun RiskListsContent(repo: OrdersRepository) {
 /**
  *  برگهٔ افزودن: [pinKind] ⇒ «جای بسته» با شعاع، وگرنه شماره در فهرستِ [list]. [fixedPhone]/[fixedPin] از همان سفارش ⇒
  *  میدانِ شماره/جا نیست؛ null ⇒ تایپ یا چسباندن. دلیل (۳ تا ۲۰۰)، انقضا (۱ تا ۳۶۵ روز، پیش‌فرض ۳۰) و شعاع (۱۰ تا ۲۰۰۰، پیش‌فرض ۱۰۰).
+ *  [deviceOrderId] ⇒ «دستگاهِ» همان سفارش در فهرستِ [list] (هیچ میدانی جز دلیل و روز؛ سرور دستگاه را از همان سفارش برمی‌دارد).
  */
 @Composable
 internal fun RiskEntrySheet(
@@ -93,6 +95,7 @@ internal fun RiskEntrySheet(
   pinKind: Boolean,
   fixedPhone: String?,
   fixedPin: GeoPin?,
+  deviceOrderId: String? = null,
   onClose: () -> Unit,
   onDone: () -> Unit,
 ) {
@@ -109,13 +112,20 @@ internal fun RiskEntrySheet(
   val r = ir.vil3ntec.tohid.latinDigits(radius).trim().toIntOrNull()
   val phone = fixedPhone ?: OrderRisk.typedPhone(phoneText)
   val pin = fixedPin ?: PinText.parse(placeText)
-  val err = if (pinKind) OrderRisk.pinEntryError(pin, r, reason, n) else OrderRisk.entryError(list, phone, reason, n)
+  val device = deviceOrderId != null
+  val err = when {
+    device -> OrderRisk.deviceEntryError(list, true, reason, n)
+    pinKind -> OrderRisk.pinEntryError(pin, r, reason, n)
+    else -> OrderRisk.entryError(list, phone, reason, n)
+  }
   val title = when {
+    device -> if (list == OrderRisk.BLOCK) StrRisk.blockDevice else StrRisk.trustDevice
     pinKind -> if (fixedPin != null) StrRisk.blockPlace else StrRisk.blockAPlace
     list == OrderRisk.BLOCK -> if (fixedPhone != null) StrRisk.blockNumber else StrRisk.blockANumber
     else -> if (fixedPhone != null) StrRisk.trustNumber else StrRisk.trustANumber
   }
   val help = when {
+    device -> if (list == OrderRisk.BLOCK) StrRisk.blockDeviceHelp else StrRisk.trustDeviceHelp
     pinKind -> StrRisk.blockPlaceHelp
     list == OrderRisk.BLOCK -> StrRisk.blockHelp
     else -> StrRisk.trustHelp
@@ -123,7 +133,7 @@ internal fun RiskEntrySheet(
   V3Sheet(onDismiss = onClose, title = title) { _ ->
     Text(help, style = V3Type.subhead, color = PhoneV3.colors.inkMuted)
     Spacer(Modifier.height(10.dp))
-    if (!pinKind && fixedPhone == null) {
+    if (!device && !pinKind && fixedPhone == null) {
       V3TextField(phoneText, { phoneText = it.take(24); failure = null }, StrRisk.entryPhone, kind = V3FieldKind.PHONE, required = true,
         error = StrRisk.entryPhoneError.takeIf { tried && err == "phone_required" })
       Spacer(Modifier.height(10.dp))
@@ -148,6 +158,7 @@ internal fun RiskEntrySheet(
     V3Button(StrKit.save, {
       tried = true
       val body = if (err != null || n == null) null
+      else if (deviceOrderId != null) OrderRisk.deviceEntryBody(deviceOrderId, list, reason, n)
       else if (pinKind) pin?.let { p -> r?.let { m -> OrderRisk.pinEntryBody(p, m, reason, n) } }
       else OrderRisk.phoneEntryBody(list, phone, reason, n)
       if (body != null && !busy) {
@@ -195,12 +206,15 @@ internal fun RiskEntriesList(repo: OrdersRepository, reloadKey: Int) {
         val open: (() -> Unit)? = geo?.let { g -> { runCatching { uri.openUri(g) }; Unit } }
         V3ListRow(
           when {
+            e.kind == OrderRisk.KIND_DEVICE && e.list == OrderRisk.BLOCK -> StrRisk.entryDeviceBlocked(e.deviceOrderNo)
+            e.kind == OrderRisk.KIND_DEVICE -> StrRisk.entryDeviceTrusted(e.deviceOrderNo)
             p != null && e.list == OrderRisk.BLOCK -> StrRisk.entryBlocked(p)
             p != null -> StrRisk.entryTrusted(p)
             else -> StrRisk.entryPin(e.radiusM ?: 0L)
           },
           subtitle = StrRisk.entrySubtitle(e.reason, ir.vil3ntec.tohid.formatMillis(e.expiresAt)),
           icon = when {
+            e.kind == OrderRisk.KIND_DEVICE -> Icons.Outlined.Devices
             p == null -> Icons.Outlined.WrongLocation
             e.list == OrderRisk.BLOCK -> Icons.Outlined.Block
             else -> Icons.Outlined.VerifiedUser

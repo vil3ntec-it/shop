@@ -161,11 +161,11 @@ function refuse(status, code, message, data) {
  * RSK-02 و RSK-05 برای سفارشِ ویترین — `input` همان خروجیِ قیمت‌گذار (`fulfillment`، `address`، `lines`،
  * `totalMinor`). پرچم خاموش ⇒ هیچ. ردِ توضیح‌دار ⇒ ApiError ِ ۴۰۹ با `data`.
  */
-async function checkIn(run, shopId, phone, input, { at = Date.now(), secondOrder = false } = {}) {
+async function checkIn(run, shopId, phone, input, { at = Date.now(), secondOrder = false, deviceKey = '' } = {}) {
   if (!phone || !input || !(await flagIn(run, shopId))) return;
-  //  RSK-04: فهرستِ بسته ⇒ ردِ خنثی (نه دلیل، نه این‌که شماره بود یا جا)؛ فهرستِ مطمئن ⇒ بی سقفِ مشتریِ تازه
+  //  RSK-04: فهرستِ بسته ⇒ ردِ خنثی (نه دلیل، نه این‌که شماره بود، دستگاه یا جا)؛ فهرستِ مطمئن ⇒ بی سقفِ مشتریِ تازه
   const listed = await require('./risk-lists').matchIn(run, shopId, {
-    phone, address: input.fulfillment === 'delivery' ? input.address : null, at,
+    phone, address: input.fulfillment === 'delivery' ? input.address : null, deviceKey, at,
   });
   if (listed.block) {
     throw refuse(403, 'order_blocked',
@@ -227,7 +227,9 @@ async function riskOf(shopId, orderId, { at = Date.now() } = {}) {
   if (!order) return null;
   if (!(await flagIn(viaDb, shopId))) return { enabled: false };
   const policy = await policyIn(viaDb, shopId);
-  if (!order.customer_phone) return { enabled: true, policy, known: false, history: null, flags: [] };
+  //  RSK-04 «دستگاه»: آیا این سفارش شناسهٔ دستگاه دارد (برای دکمهٔ «بستنِ این دستگاه»)؛ خودِ چکیده هرگز بیرون نمی‌رود
+  const deviceKey = (await require('./risk-device').ofOrderIn(viaDb, shopId, order.id))?.deviceKey || '';
+  if (!order.customer_phone) return { enabled: true, policy, known: false, device: Boolean(deviceKey), history: null, flags: [] };
 
   const forms = require('./order-rate').formsOf(require('./order-rate').canon(order.customer_phone));
   const rows = (await query(
@@ -263,7 +265,7 @@ async function riskOf(shopId, orderId, { at = Date.now() } = {}) {
   const flags = [];
   //  RSK-04: در فهرستِ بسته/مطمئن؟ (بی دلیل — دلیل در خودِ فهرست برای صاحب و مدیر است)
   const listed = await require('./risk-lists').matchIn(viaDb, shopId, {
-    phone: order.customer_phone, address: order.fulfillment === 'delivery' ? asJson(order.address) : null, at,
+    phone: order.customer_phone, address: order.fulfillment === 'delivery' ? asJson(order.address) : null, deviceKey, at,
   });
   if (listed.block) flags.push({ code: 'blocklisted', severity: 'warn', count: 1, until: Number(listed.block.expires_at) });
   if (listed.allow) flags.push({ code: 'allowlisted', severity: 'info', count: 1, until: Number(listed.allow.expires_at) });
@@ -284,7 +286,7 @@ async function riskOf(shopId, orderId, { at = Date.now() } = {}) {
     }, { from: t - windowMs, to: t + windowMs, excludeId: order.id });
     if (twin) flags.push({ code: 'possible_duplicate', severity: 'warn', count: 1, orderNo: Number(twin.order_no) });
   }
-  return { enabled: true, policy, known: history.orders > 0, history, flags };
+  return { enabled: true, policy, known: history.orders > 0, device: Boolean(deviceKey), history, flags };
 }
 
 /** «پیش از ارسال»: هنوز دستِ دکان (یا ارسالِ دوباره)؛ «در راه» و «تحویل ناموفق» دیگر صف نیستند. */
