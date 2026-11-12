@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.account
 
+import ir.vil3ntec.tohid.core.i18n.StrAccount
 import ir.vil3ntec.tohid.core.model.PlanDiscountDto
 import ir.vil3ntec.tohid.core.model.PlanDto
 import ir.vil3ntec.tohid.core.model.PlansDto
@@ -45,6 +46,22 @@ class SubscriptionModelTest {
     assertEquals(SubscriptionModel.Notice.NONE, SubscriptionModel.notice(sub("active" to true, "permanent" to true, "daysLeft" to 3)))
     assertEquals(SubscriptionModel.Notice.EXPIRED, SubscriptionModel.notice(sub("active" to false, "status" to "expired")))
     assertEquals(SubscriptionModel.Notice.NONE, SubscriptionModel.notice(sub("active" to false, "status" to "none")))
+  }
+
+  @Test
+  fun `هشدارِ هفت روزِ آخر روزِ دقیقِ پایان را هم می‌گوید — S47`() {
+    val endsAt = 1_763_500_000_000L
+    val ending = sub("active" to true, "status" to "active", "daysLeft" to 3, "endsAt" to endsAt)
+    assertEquals(SubscriptionModel.Notice.ENDING, SubscriptionModel.notice(ending))
+    val day = AccountFormat.date(endsAt)
+    assertTrue(day, day != "—" && day.any { it.isDigit() })
+    val title = SubscriptionModel.warnTitle(ending)
+    assertTrue(title, title.contains(day))
+    assertTrue(title, title.startsWith(StrAccount.warnTitle(3)))
+    //  همان روزِ کارت (`hero.ends`)، نه تاریخی جدا
+    assertEquals(SubscriptionModel.hero(ending).ends, day)
+    //  بی `endsAt` ِ سرور همان سرخطِ پیشین، بی «—»
+    assertEquals(StrAccount.warnTitle(3), SubscriptionModel.warnTitle(sub("active" to true, "daysLeft" to 3)))
   }
 
   @Test
