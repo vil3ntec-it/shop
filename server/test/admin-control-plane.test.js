@@ -388,13 +388,15 @@ const CAPABILITY_PROBES = {
     'POST /admin/shops/x1/staff-perms/devices/x1/enable'],
   'image-bank.v1': ['GET /admin/image-bank/status', 'GET /admin/image-bank/review', 'POST /admin/image-bank/images/x1/approve',
     'POST /admin/image-bank/images/x1/reject', 'POST /admin/image-bank/images/x1/archive', 'POST /admin/image-bank/images/x1/search'],
-  'idempotent-writes.v1': ['POST /admin/shops/x1/staff-perms/devices/x1/enable', 'POST /admin/image-bank/images/x1/archive'],
+  'idempotent-writes.v1': ['POST /admin/shops/x1/staff-perms/devices/x1/enable', 'POST /admin/image-bank/images/x1/archive',
+    'POST /admin/trust/cases/x1/decide', 'POST /admin/trust/sanctions/x1/lift'],
   'holidays.v1': ['GET /admin/calendar/holidays', 'PUT /admin/calendar/holidays'],
   'synonyms.v1': ['GET /admin/search/synonyms', 'PUT /admin/search/synonyms'],
   'support-access.v1': ['GET /admin/shops/x1/access-grants', 'POST /admin/shops/x1/access-grants',
     'POST /admin/shops/x1/access-grants/break-glass', 'POST /admin/shops/x1/access-grants/x1/revoke'],
   'image-changes.v1': ['GET /admin/shops/x1/images/changes', 'GET /admin/shops/x1/images/changes/x1',
     'POST /admin/shops/x1/images/changes/x1/rollback'],
+  'trust-read.v1': ['GET /admin/trust/cases', 'GET /admin/trust/cases/x1', 'GET /admin/trust/sanctions'],
 };
 
 test('GET /api/admin/me: فهرستِ «توانایی»ها با همان نام‌های پل، و درِ هر کدام واقعاً هست', async () => {
