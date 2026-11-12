@@ -261,9 +261,10 @@ class PosSpeedBenchTest {
     }
   }
 
-  /** دستی: `TOHID_POS_SPEED=1` — ۲۰ هزار کالا، ۵۰ هزار فاکتور */
+  /** دستی: `TOHID_POS_SPEED=1` — ۲۰ هزار کالا، ۵۰ هزار فاکتور؛ S125: `TOHID_POS_SPEED_PRODUCTS=50000` ⇒ ۵۰ هزار کالا در یک دکان */
   @Test fun `سنجهٔ POS-42 — اندازهٔ واقعی`() {
     assumeTrue("فقط با TOHID_POS_SPEED یا -Ptohid.posSpeed", wanted())
-    run(products = 20_000, sales = 50_000, warm = 20, rounds = 80, lines = 25, searchWarm = 3, searchRounds = 15, afterSales = 30, stageN = 200, expiryRounds = 2)
+    val products = System.getenv("TOHID_POS_SPEED_PRODUCTS")?.trim()?.toIntOrNull()?.coerceIn(1_000, 200_000) ?: 20_000
+    run(products = products, sales = 50_000, warm = 20, rounds = 80, lines = 25, searchWarm = 3, searchRounds = 15, afterSales = 30, stageN = 200, expiryRounds = 2)
   }
 }
