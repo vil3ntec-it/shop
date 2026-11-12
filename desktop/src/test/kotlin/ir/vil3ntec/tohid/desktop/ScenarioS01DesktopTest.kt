@@ -180,7 +180,7 @@ class ScenarioS01DesktopTest {
 
   private fun SemanticsNodeInteraction.enter() = performKeyInput { pressKey(Key.Enter) }
 
-  @Test fun `S01 — اسکن، 3*، نوشا، F9، ۱۰۰۰ و Enter ⇒ سه ردیف، پولِ پس، رسیدِ چاپ‌شده و فوکوس در کادرِ اسکن`() {
+  @Test fun `S01 — اسکن، ۳ ضرب، نوشا، F9، ۱۰۰۰ و Enter ⇒ سه ردیف، پولِ پس، رسیدِ چاپ‌شده و فوکوس در کادرِ اسکن`() {
     val (d, _) = shop()
     val t = open(d)
     val scan = scanBox()

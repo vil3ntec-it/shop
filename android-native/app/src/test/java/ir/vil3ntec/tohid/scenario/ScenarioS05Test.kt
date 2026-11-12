@@ -63,7 +63,7 @@ class ScenarioS05Test {
   }
 
   @Test
-  fun `S05 — کامپیوتر «۲*» و بارکدِ کارتن ⇒ همان ۲۴ دانه`() {
+  fun `S05 — کامپیوتر «۲ ضرب» و بارکدِ کارتن ⇒ همان ۲۴ دانه`() {
     val hit = PosSearch.resolve("۲*6260000000118", ShopStore.barcodeIndex(d), d.products, emptyList(), 0, ShopStore.packIndex(d))
     assertEquals(PosHit.Add(oil, 24.0), hit)
     val cart = SalesEngine.addToCart(emptyList(), "oil", 24.0)
@@ -134,7 +134,7 @@ class ScenarioS05Test {
     assertTrue(UnitLine.plan(oil, wholeOnly = true, quantity = 1.0, unitPrice = null, next = true)!!.wholeOnly)
   }
   @Test
-  fun `S05 — اسکنِ کارتن با «۲*» در گوشی و کامپیوتر قیمتِ کارتن را از لیست می‌گیرد`() {
+  fun `S05 — اسکنِ کارتن با «۲ ضرب» در گوشی و کامپیوتر قیمتِ کارتن را از لیست می‌گیرد`() {
     //  همان راهِ `CartModel.scan` (گوشی) و `DeskSale.addPack` (کامپیوتر) با «واحدِ بزرگ در صندوق»
     val withList = d.copy(products = listOf(listed))
     val r = PackScan.scan(withList, emptyList(), "6260000000118", 2.0, ShopStore.barcodeIndex(withList), listPrice = true, wholeOnly = false)
