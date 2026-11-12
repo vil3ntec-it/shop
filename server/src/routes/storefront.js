@@ -171,6 +171,8 @@ async function featuresOf(shopId, sf) {
     ...((await onlineReport.flagOf(shopId)) ? { funnel: true } : {}),
     //  PRD-17/27: گالریِ عکس‌های بیشترِ برگهٔ کالا (`store/gallery.js` ِ دیربار از product.js) با `shop.storefront.gallery` + `shop.image_bank`
     ...((await gallery.flagOn(shopId)) ? { gallery: true } : {}),
+    //  ABUSE-01: «گزارشِ مشکل» ِ وب (`store/trust.js` ِ دیربار از catalog.js، درهای `/:slug/trust/…`) با پرچمِ `market.trust`
+    ...((await require('../lib/market-trust').flagOf(shopId)) ? { trust: true } : {}),
     //  CHK-08 / ۴-۳: «انتخاب روی نقشه» (`store/pin-map.js` ِ دیربار) با `shop.storefront.map_pin` + `STORE_MAP_TILES` ِ سرور
     ...(await require('../lib/store-map').featureOf(shopId)),
   };
