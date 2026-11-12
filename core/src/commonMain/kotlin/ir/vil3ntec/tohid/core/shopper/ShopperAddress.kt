@@ -22,7 +22,11 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class GeoPin(val lat: Double, val lng: Double, val accuracyM: Int? = null)
 
-/** یک نشانیِ نام‌دار — همان `addressView` ِ سرور. */
+/**
+ *  یک نشانیِ نام‌دار — همان `addressView` ِ سرور. شناسهٔ `adr-…` یعنی فقط روی همین دستگاه؛ شناسهٔ دیگر یعنی نشانیِ دفترِ
+ *  حساب ([AddressSync]، CRM-09). [media] فقط از درِ دکانی با پرچمِ `shop.storefront.address_media`؛ [dirty] تغییرِ همین
+ *  دستگاه روی نشانیِ حساب که هنوز به سرور نرسیده.
+ */
 @Serializable
 data class SavedAddress(
   val id: String,
@@ -32,12 +36,15 @@ data class SavedAddress(
   val lat: Double? = null,
   val lng: Double? = null,
   val updatedAt: Long = 0,
+  val media: AddressMediaFlags? = null,
+  val dirty: Boolean = false,
 ) {
   val pin: GeoPin? get() = if (lat != null && lng != null) GeoPin(lat, lng) else null
 }
 
+/** [mediaLimits] فقط با پرچمِ رسانهٔ نشانیِ همان دکان */
 @Serializable
-data class AddressList(val addresses: List<SavedAddress> = emptyList())
+data class AddressList(val addresses: List<SavedAddress> = emptyList(), val mediaLimits: AddressMediaLimits? = null)
 
 /** بدنهٔ `POST`/`PUT /:slug/account/addresses` (همان کلیدهای `parseAddress`). */
 @Serializable
@@ -86,7 +93,7 @@ object AddressRules {
   }
 }
 
-/** فهرستِ نشانی‌های روی همین دستگاه (تا حسابِ مشتری بیاید) — همان سقف و قاعده‌های سرور. */
+/** فهرستِ نشانی‌های روی همین دستگاه — همان سقف و قاعده‌های سرور؛ با حساب، [AddressSync] آن را با دفترِ حساب یکی می‌کند. */
 object AddressBook {
   sealed class Saved {
     data class Ok(val list: List<SavedAddress>, val address: SavedAddress) : Saved()
@@ -98,7 +105,11 @@ object AddressBook {
     AddressRules.problem(input)?.let { return Saved.Rejected(it) }
     val old = id?.let { i -> list.firstOrNull { it.id == i } }
     if (old == null && list.size >= AddressRules.MAX) return Saved.Rejected(AddressProblem.FULL)
-    val a = SavedAddress(old?.id ?: newId(), input.label, input.text, input.landmark, input.lat, input.lng, now)
+    //  ویرایشِ نشانیِ حساب ⇒ «هنوز نرفته» تا گامِ بعدیِ [AddressSync]؛ رسانه همان می‌ماند (نشانی همان است)
+    val a = SavedAddress(
+      old?.id ?: newId(), input.label, input.text, input.landmark, input.lat, input.lng, now,
+      media = old?.media, dirty = old != null && !AddressSync.deviceOnly(old.id),
+    )
     return Saved.Ok(if (old == null) list + a else list.map { if (it.id == a.id) a else it }, a)
   }
 

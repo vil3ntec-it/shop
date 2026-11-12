@@ -230,6 +230,7 @@ object CheckoutRules {
         //  بی پین ⇒ ناحیهٔ برگزیده (`source: customer`)؛ با پین ناحیه را سرور از پین می‌گوید (همان وب)
         zoneId = if (zones(page) != null && form.pin == null) zoneOf(page, form)?.id else null,
         lat = form.pin?.let { AddressRules.round6(it.lat) }, lng = form.pin?.let { AddressRules.round6(it.lng) },
+        savedId = form.addressId?.takeIf { !AddressSync.deviceOnly(it) },
       ),
       promoCode = promo?.code?.takeIf { it.isNotBlank() },
       deviceId = (promo?.deviceId ?: deviceId)?.takeIf { DEVICE_ID.matches(it) },
