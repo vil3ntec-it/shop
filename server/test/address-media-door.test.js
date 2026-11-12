@@ -284,3 +284,34 @@ test('⛔ نشانیِ ذخیره‌شده فقط برای سفارشِ باز: 
   //  مشتری هم دیگر چیزی نمی‌گذارد
   assert.equal((await orderPut(A, X.token, 'gate-photo', JPEG(42))).status, 409);
 });
+
+test('یادداشتِ صوتی: فقط صدا — MP4/3GP با ترکِ تصویر، WebM با کدکِ تصویر و Ogg ِ Theora ۴۱۵؛ اتمِ مکانِ M4A (©xyz، loci) بی جابه‌جایی پاک', () => {
+  const { accept } = require('../src/lib/address-media');
+  const atom = (type, body) => { const b = Buffer.alloc(8); b.writeUInt32BE(8 + body.length); b.write(type, 4, 'latin1'); return Buffer.concat([b, body]); };
+  const hdlr = (h) => atom('hdlr', Buffer.concat([Buffer.alloc(8), Buffer.from(h, 'latin1'), Buffer.alloc(12)]));
+  const mp4 = (brand, handlers, extra = []) => Buffer.concat([atom('ftyp', Buffer.from(`${brand}\0\0\0\0${brand}`, 'latin1')),
+    atom('moov', Buffer.concat([...handlers.map((x) => atom('trak', atom('mdia', hdlr(x)))), ...extra])), atom('mdat', Buffer.alloc(64, 5))]);
+  const code = (fn) => { try { fn(); return 'ok'; } catch (e) { return `${e.status} ${e.code}`; } };
+
+  //  صدا می‌ماند
+  assert.equal(code(() => accept('voice_note', mp4('M4A ', ['soun']))), 'ok');
+  assert.equal(code(() => accept('voice_note', Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.from('\x42\x82\x84webm\x86\x86A_OPUS', 'latin1'), Buffer.alloc(40)]))), 'ok');
+  assert.equal(code(() => accept('voice_note', Buffer.concat([Buffer.from('OggS', 'latin1'), Buffer.alloc(24), Buffer.from('OpusHead', 'latin1'), Buffer.alloc(20)]))), 'ok');
+  //  تصویر نه
+  for (const [label, buf] of [
+    ['mp4 ِ isom با ترکِ vide', mp4('isom', ['soun', 'vide'])],
+    ['3gp با ترکِ vide', mp4('3gp4', ['vide'])],
+    ['webm ِ VP8', Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.from('\x42\x82\x84webm\x86\x85V_VP8', 'latin1'), Buffer.alloc(40)])],
+    ['webm ِ AV1', Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.from('\x86\x85V_AV1', 'latin1'), Buffer.alloc(40)])],
+    ['ogg ِ theora', Buffer.concat([Buffer.from('OggS', 'latin1'), Buffer.alloc(24), Buffer.from('\x80theora', 'latin1'), Buffer.alloc(20)])],
+  ]) assert.equal(code(() => accept('voice_note', buf)), '415 unsupported_media', label);
+
+  //  مکان: ©xyz (QuickTime) و loci (3GPP) ⇒ همان اندازه، اتمِ free، بی مختصات
+  const loc = Buffer.from('+34.5553+069.2075/', 'latin1');
+  const withLoc = mp4('M4A ', ['soun'], [atom('udta', Buffer.concat([atom('\xa9xyz', Buffer.concat([Buffer.alloc(4), loc])), atom('loci', loc)]))]);
+  const ok = accept('voice_note', withLoc);
+  assert.equal(ok.mime, 'audio/mp4');
+  assert.equal(ok.data.length, withLoc.length, 'هیچ offset ِ stco/co64 جابه‌جا نمی‌شود');
+  assert.ok(!ok.data.includes(loc) && !ok.data.includes(Buffer.from('\xa9xyz', 'latin1')) && !ok.data.includes(Buffer.from('loci', 'latin1')));
+  assert.equal(ok.data.indexOf(Buffer.from('mdat')), withLoc.indexOf(Buffer.from('mdat')));
+});

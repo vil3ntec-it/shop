@@ -24,6 +24,7 @@ const express = require('express');
 const config = require('../config');
 const { one, many } = require('../db');
 const chatMedia = require('./chat-media');
+const audio = require('./audio-bytes');
 const media = require('./media-store').address;
 const { rateLimit } = require('../middleware/ratelimit');
 const { ApiError, badRequest, notFound } = require('../middleware/errors');
@@ -60,10 +61,12 @@ function accept(kind, value) {
   const buf = value;
   if (buf.length > capOf(kind)) throw new ApiError(413, 'too_large', `فایل بزرگ‌تر از ${kb(capOf(kind))} است`);
   const s = chatMedia.sniff(buf);
-  if (!s || s.kind !== TYPE[kind]) {
+  //  ظرفِ صدا با ترکِ تصویر (MP4 ِ isom، WebM ِ VP8، Ogg ِ Theora) هم «صدا» نیست (`lib/audio-bytes.js`)
+  if (!s || s.kind !== TYPE[kind] || (s.kind === 'audio' && audio.hasVideo(buf, s.mime))) {
     throw new ApiError(415, 'unsupported_media', kind === 'gate_photo' ? 'فقط عکس (JPG، PNG، WebP)' : 'فقط پیامِ صوتی (Opus، AAC، MP3، AMR)');
   }
-  const data = s.kind === 'image' ? chatMedia.cleanImage(buf, s.mime, 'main') : buf;
+  //  عکس بی EXIF/XMP؛ صدای M4A/3GP بی اتمِ مکانِ ضبط
+  const data = s.kind === 'image' ? chatMedia.cleanImage(buf, s.mime, 'main') : audio.dropLocation(buf, s.mime);
   return { mime: s.mime, data, sha256: crypto.createHash('sha256').update(data).digest('hex') };
 }
 
