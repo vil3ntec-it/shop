@@ -90,6 +90,7 @@ object StrErasure {
     "pushSubs" -> t("اعلانِ سفارش روی دستگاه", "Order notifications on devices", "پر وسیلو د فرمایش خبرتیاوې")
     "alertPushSubs" -> t("اعلانِ «خبرم کن» روی دستگاه", "Notify-me notifications on devices", "پر وسیلو د «خبر مې کړه» خبرتیاوې")
     "orderDevices" -> t("شناسهٔ دستگاهِ سفارش", "Order device identifiers", "د فرمایش د وسیلې پېژندنې")
+    "addressMedia" -> t("عکسِ دروازه و یادداشتِ صوتیِ نشانی", "Gate photos and voice notes of addresses", "د پتې د دروازې انځورونه او غږیز یادښتونه")
     else -> t(asIs(key), key, key)
   }
 }
