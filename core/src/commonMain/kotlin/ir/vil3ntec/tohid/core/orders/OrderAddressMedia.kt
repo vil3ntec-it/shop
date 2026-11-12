@@ -7,8 +7,10 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.longOrNull
 
 /**
- *  CRM-09/CHK-08 — «عکسِ دروازه» و «یادداشتِ صوتی» ِ نشانیِ سفارشِ ویترین برای برنامهٔ دکان: نمای همان پاسخِ
- *  `GET /shop/orders/:id/address-media` ِ سرور (`routes/order-address-media.js`) و نشانیِ بایت‌ها.
+ *  CRM-09/CHK-08 — «عکسِ دروازه» و «یادداشتِ صوتی» ِ نشانیِ سفارشِ ویترین برای برنامهٔ دکان و پیک: نمای همان پاسخِ
+ *  `GET /shop/orders/:id/address-media` ِ سرور (`routes/order-address-media.js`) و نشانیِ بایت‌ها. سرور یک در برای هر دو
+ *  کاربرد دارد (`lib/address-media.js`): برای هر نوع رسانهٔ خودِ سفارش (مهمان/نشانیِ یک‌باره) اگر هست، وگرنه رسانهٔ نشانیِ
+ *  ذخیره‌شدهٔ حسابِ همان سفارش؛ کلیدِ `source` ِ پاسخ این‌جا لازم نیست (همان یک عکس و یک صدا نشان داده می‌شود).
  *
  *  ⛔ پرچمِ خاموش (`{enabled:false}`)، پاسخِ کهنه/ناجور یا نبودنِ هر دو ⇒ [visible] = false (هیچ بخشی). عکس فقط با نوعِ
  *  `image/…` و صدا فقط با `audio/…` پذیرفته است (جابه‌جا ⇒ «نیست»). نشانی فقط برای شناسهٔ درستِ سفارش ([OrderEvidence.validOrderId]).

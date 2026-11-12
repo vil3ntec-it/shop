@@ -484,6 +484,31 @@ async function reviewIdsOf(run, shopId, orderIds, at = now()) {
   return out;
 }
 
+/** سقفِ ردیف‌های یک پاسخِ صندوق ([posView]) — بیشتر ⇒ `truncated` (فقط نمایش؛ کمتر شمردن بهتر از پاسخِ بی‌سقف) */
+const POS_MAX = 2000;
+
+/**
+ * POS-05/INV-03 — نگه‌داشته‌های فعالِ سفارشِ آنلاین برای کاشیِ صندوق (`GET /api/shop/catalog/reserved`). همان شرطِ [heldOf]
+ * (نرم، نگه‌داشته، نگذشته)؛ هر قلم یک ردیف با کلیدِ فروشِ تحویلِ همان قلم (`o-<سفارش>-<قلم>` = `OrderFulfillment.itemIdOf`) تا
+ * صندوقی که آن فروش را ساخته و هنوز نفرستاده دو بار کم نکند (همان کلیدی که کسرِ قطعی با آن رزرو را می‌بندد). `expiresAt`
+ * با `now` ِ همین سرور می‌رود تا برنامه مهلت را با ساعتِ خودش نسنجد. پرچمِ خاموش (R6) ⇒ `enabled: false` و هیچ ردیف.
+ */
+async function posView(shopId, at = now()) {
+  if (!(await enabled(shopId))) return { enabled: false, now: at, lines: [], truncated: false };
+  const rows = (await query(
+    `SELECT product_id, order_id, line_no, qty_milli, expires_at FROM stock_reservations
+      WHERE shop_id=$1 AND kind='soft' AND status='held' AND (expires_at IS NULL OR expires_at > $2)
+      ORDER BY created_at, id LIMIT $3`, [shopId, at, POS_MAX + 1]
+  )).rows;
+  return {
+    enabled: true, now: at, truncated: rows.length > POS_MAX,
+    lines: rows.slice(0, POS_MAX).map((r) => ({
+      productId: r.product_id, qtyMilli: num(r.qty_milli), saleItemId: `o-${r.order_id}-${num(r.line_no)}`,
+      expiresAt: r.expires_at === null ? null : num(r.expires_at),
+    })),
+  };
+}
+
 /** جاروی دوره‌ای: نگه‌داشته‌های گذشته ⇒ بسته در ردیف و دفتر (هر دکان در تراکنش و قفلِ خودش). */
 async function sweep(at = now()) {
   const shops = await many(
@@ -696,5 +721,5 @@ function stop() {
 module.exports = {
   DEFAULT_TTL_SEC, HANDOVER_GRACE_MS, HANDED_OVER, RELEASE_ON,
   enabled, ttlSecOf, heldOf, expireDueIn, planIn, checkOrderIn, holdIn, syncOrderIn, onTransitionIn, recheckShort, afterMovesIn,
-  orderView, reviewIdsOf, sweep, start, stop, rebuild,
+  orderView, reviewIdsOf, POS_MAX, posView, sweep, start, stop, rebuild,
 };

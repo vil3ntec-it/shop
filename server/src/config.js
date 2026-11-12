@@ -563,6 +563,16 @@ const config = {
     uploadMax:      num(process.env.RATE_CHAT_UPLOAD_MAX, 60),
   },
 
+  //  CHK-08: عکسِ دروازه و یادداشتِ صوتیِ نشانیِ سفارش (`lib/order-address-media.js`، پرچمِ خاموشِ
+  //  `shop.storefront.address_media`). ویترین پیش از فرستادن عکس را کوچک می‌کند و صدا را تا یک دقیقه می‌گیرد.
+  addressMedia: {
+    photoMax:  num(process.env.ADDRESS_PHOTO_MAX_KB, 1024) * 1024,
+    voiceMax:  num(process.env.ADDRESS_VOICE_MAX_KB, 768) * 1024,
+    //  بارگذاریِ هر سفارش (توکن) و هر IP در پنجرهٔ `rateLimit.windowMs`
+    uploadMax:   num(process.env.RATE_ADDRESS_MEDIA_MAX, 20),
+    uploadIpMax: num(process.env.RATE_ADDRESS_MEDIA_IP_MAX, 60),
+  },
+
   //  اعتماد، شکایت و تخلفِ بازارچه (v3 §۳۸.۶) — پشتِ پرچمِ `market.trust`، پیش‌فرض خاموش.
   trust: {
     //  سقفِ ماندگار (در دیتابیس، پس از راه‌اندازیِ دوباره هم سر جاست) در ۲۴ ساعت

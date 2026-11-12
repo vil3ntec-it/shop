@@ -25,9 +25,12 @@ const THUMB_SIDE = 1024;
 
 const ascii = (buf, from, to) => buf.slice(from, to).toString('latin1');
 
-/** نوع و mime از روی بایت‌ها — یا null. */
+/**
+ * نوع و mime از روی بایت‌ها — یا null. ⛔ ورودی ممکن است مستقیم از درخواست برسد (بدنهٔ خامِ درهای رسانه): رشته، آرایه یا شیئی
+ * که parser ِ دیگری ساخته پیش از هر `.length`/`.slice` ⇒ null (CodeQL ِ «type confusion»: `Buffer.isBuffer` تنها نگهبان نیست).
+ */
 function sniff(buf) {
-  if (!Buffer.isBuffer(buf) || buf.length < 12) return null;
+  if (typeof buf !== 'object' || buf === null || Array.isArray(buf) || !Buffer.isBuffer(buf) || buf.length < 12) return null;
   const image = sniffImage(buf);
   if (image) return { kind: 'image', mime: image };
   if (ascii(buf, 0, 5) === '%PDF-') return { kind: 'file', mime: 'application/pdf' };

@@ -393,8 +393,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/owner-report', require('./routes/owner-report'));
     //  RPT-18: گزارشِ همهٔ شعبه‌ها (دکان‌های همین صاحب) در یک جا — پیش از `/shop`؛ پشتِ پرچمِ خاموشِ `shop.branches_report`
     api.use('/shop/branches-report', require('./routes/branches-report'));
-    //  سفارشِ آنلاین (فاز ۴) — پیش از `/shop` تا `requireUser`ِ آن دو بار نرود؛
-    //  زیرِ همان پیشوند، پس ACCOUNT_PREFIXESِ پنلِ خانگی دست نمی‌خورد
+    //  سفارشِ آنلاین (فاز ۴) — پیش از `/shop` تا `requireUser`ِ آن دو بار نرود؛ زیرِ همان پیشوند، پس ACCOUNT_PREFIXESِ پنلِ خانگی دست نمی‌خورد
     api.use('/shop/orders/desk', require('./routes/order-desk'));   // میزِ سفارش (ORD-04/08/09) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.desk`
     api.use('/shop/orders/bulk', require('./routes/order-bulk'));   // کارِ گروهی روی سفارش‌ها (ORD-19) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.bulk`
     //  پروندهٔ مدرکِ اختلاف (RSK-08) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.dispute_file`
@@ -424,6 +423,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/store', require('./routes/order-pay-store'));   // «پرداخت پس از پذیرش»: نقد هنگامِ تحویل، پشتِ تنظیمِ خاموشِ دکان
     api.use('/store', require('./routes/storefront-promos-store'));   // MKT-01/09: تخفیفِ ویترین، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/delivery-rating-store'));   // DLV-18: امتیازِ مشتری به پیک، پشتِ پرچمِ خاموش
+    api.use('/store', require('./routes/order-address-media-store'));   // CHK-08: عکسِ دروازه و یادداشتِ صوتیِ نشانی، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/store-push'));   // CHK-20/NTF-01: پوشِ وب ِ مشتری برای همین سفارش، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront-finder-store'));   // WEB-07/10: فیلتر و «خبرم کن»، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/order-feedback-store'));   // NTF-07/09: گزارشِ مشکل با عکس و نظرِ سفارش، پشتِ دو پرچمِ خاموش

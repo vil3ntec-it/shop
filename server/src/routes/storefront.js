@@ -30,6 +30,7 @@ const orders = require('../lib/orders');
 const orderTimeout = require('../lib/order-timeout');
 const campaigns = require('../lib/campaigns');
 const addrMedia = require('../lib/store-address-media');
+const addrCore = require('../lib/address-media');
 const areas = require('../lib/storefront-area-requests');
 const onlineReport = require('../lib/order-online-report');
 const orderDesk = require('../lib/order-desk');
@@ -496,7 +497,8 @@ router.get('/:slug/account/orders', readLimit, store, customer, async (req, res)
 router.get('/:slug/account/addresses', readLimit, store, customer, async (req, res) => {
   const list = await customers.addresses(req.customer, await pinOpt(req));
   //  CRM-09: `media: {gatePhoto, voiceNote}` فقط با پرچمِ `shop.storefront.address_media`
-  res.json({ addresses: (await addrMedia.flagOn(req.store.shop_id)) ? await addrMedia.withMedia(req.customer, list) : list });
+  if (!(await addrMedia.flagOn(req.store.shop_id))) return res.json({ addresses: list });
+  res.json({ addresses: await addrMedia.withMedia(req.customer, list), mediaLimits: addrCore.caps() });
 });
 
 router.post('/:slug/account/addresses', checkoutLimit, store, customer, async (req, res) => {
@@ -511,20 +513,20 @@ router.delete('/:slug/account/addresses/:id', checkoutLimit, store, customer, as
   res.json(await customers.removeAddress(req.customer, req.params.id));
 });
 
-//  ── CRM-09/CHK-08: عکسِ دروازه و یادداشتِ صوتیِ نشانی (`lib/store-address-media.js`؛ پرچمِ خاموش ⇒ ۴۰۴) ──
+//  ── CRM-09: عکسِ دروازه و یادداشتِ صوتیِ نشانیِ حساب (`lib/store-address-media.js`، طراحیِ مشترکِ `lib/address-media.js`؛
+//  پرچمِ خاموش ⇒ ۴۰۴). بدنهٔ بزرگ‌تر از سقف پیش از خواندن ۴۱۳.
 const addrMediaOn = async (req, res, next) => {
   if (!(await addrMedia.flagOn(req.store.shop_id))) throw notFound('این بخش در این ویترین نیست', 'address_media_disabled');
   next();
 };
-const addrMediaBody = express.raw({ type: () => true, limit: addrMedia.PHOTO_MAX });
 
-router.put('/:slug/account/addresses/:id/media/:kind', checkoutLimit, store, customer, addrMediaOn, addrMediaBody, async (req, res) => {
-  res.json(await addrMedia.put(req.customer, req.params.id, req.params.kind, req.body));
+router.put('/:slug/account/addresses/:id/media/:kind', checkoutLimit, store, customer, addrMediaOn, addrCore.rawBody, async (req, res) => {
+  const out = await addrMedia.put(req.customer, req.params.id, req.params.kind, req.body);
+  res.status(out.replaced ? 200 : 201).json(out);
 });
 
 router.get('/:slug/account/addresses/:id/media/:kind', readLimit, store, customer, addrMediaOn, async (req, res) => {
-  const m = await addrMedia.get(req.customer, req.params.id, req.params.kind);
-  res.set({ 'Content-Type': m.mime, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }).send(m.data);
+  addrCore.send(res, await addrMedia.get(req.customer, req.params.id, req.params.kind));
 });
 
 router.delete('/:slug/account/addresses/:id/media/:kind', checkoutLimit, store, customer, addrMediaOn, async (req, res) => {

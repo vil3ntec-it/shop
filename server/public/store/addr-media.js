@@ -1,18 +1,20 @@
 /*
- * ویترین — «عکسِ دروازه» و «یادداشتِ صوتی» ِ اختیاریِ نشانیِ نام‌دار (CRM-09/CHK-08، §۴.۴). دیربار: acct.js فقط با
+ * ویترین — «عکسِ دروازه» و «یادداشتِ صوتی» ِ اختیاریِ نشانیِ نام‌دارِ حساب (CRM-09، §۴.۴). دیربار: acct.js فقط با
  * `features.addressMedia` (پرچمِ خاموشِ `shop.storefront.address_media`)، نشستِ حساب و نشانیِ برگزیدهٔ برگهٔ ثبت می‌خواهد.
+ * همتای پیگیریِ یک سفارش `store/order-addr-media.js` است (CHK-08)؛ هر دو یک طراحیِ سرور (`lib/address-media.js`): همان
+ * سقف‌ها (`mediaLimits` ِ پاسخِ نشانی‌ها)، همان سنجشِ بایت و همان پاک کردنِ EXIF.
  *
- * عکس: انتخاب یا دوربینِ گوشی (`capture`)، کوچک‌شده روی همین دستگاه به JPEG (لبهٔ بلند ۱۲۸۰) ⇒ EXIF و مکانِ دوربین نمی‌روند.
- * صدا: ضبط با MediaRecorder تا ۶۰ ثانیه (قالب‌های chat-voice.js)، پیش‌شنوایی (blob: ِ همین صفحه)، سپس «فرستادن» یا «لغو»؛
- * بیرون رفتن از ضبط همیشه میکروفون را می‌بندد. پیش‌نمایشِ عکسِ ذخیره data: است (CSP ِ ویترین img-src blob: ندارد).
- * مرز سرور است (`lib/store-address-media.js`): نوع از بایت، سقفِ حجم، فقط نشانیِ همان حساب.
+ * عکس: انتخاب یا دوربینِ گوشی (`capture`) ⇒ `StoreChatPhoto.prepare` (JPEG ِ تازه از پیکسل، جهتِ درست، زیرِ سقف ⇒ EXIF و مکان نمی‌روند).
+ * صدا: ضبط با MediaRecorder تا ۶۰ ثانیه، پیش‌شنوایی (blob: ِ همین صفحه)، سپس «فرستادن» یا «لغو»؛ بیرون رفتن از ضبط همیشه
+ * میکروفون را می‌بندد. پیش‌نمایشِ عکسِ ذخیره data: است (CSP ِ ویترین img-src blob: ندارد). مرز سرور است.
  */
 (function () {
   'use strict';
   var el = K.el; var t = K.t;
-  var EDGE = 1280; var Q = 0.75; var VOICE_MS = 60 * 1000;
+  var VOICE_MS = 60 * 1000;
   var TYPES = ['audio/mp4;codecs=mp4a.40.2', 'audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm'];
   var btn = function (text) { return el('button', { class: 'btn btn-ghost btn-sm', attrs: { type: 'button' }, text: text }); };
+  var fail = function (code) { return new Error(K.has('am.err.' + code) ? t('am.err.' + code) : t('err.generic')); };
 
   function call(base, id, kind, method, blob) {
     var h = { Accept: 'application/json', 'Accept-Language': K.lang };
@@ -32,28 +34,16 @@
   function dataUrl(blob) {
     return new Promise(function (ok) { var r = new FileReader(); r.onload = function () { ok(String(r.result)); }; r.onerror = function () { ok(''); }; r.readAsDataURL(blob); });
   }
-  /** عکس ⇒ JPEG ِ کوچک، بی EXIF (خواندن از data: — CSP ِ ویترین img-src blob: ندارد) */
-  function shrink(file) {
-    return dataUrl(file).then(function (src) {
-      return new Promise(function (ok, no) {
-        var img = new Image();
-        var bad = function () { no(new Error(t('am.err.bad_media_type'))); };
-        img.onload = function () {
-          var s = Math.min(1, EDGE / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
-          var c = document.createElement('canvas');
-          c.width = Math.max(1, Math.round(img.naturalWidth * s)); c.height = Math.max(1, Math.round(img.naturalHeight * s));
-          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-          c.toBlob(function (b) { if (b) ok(b); else bad(); }, 'image/jpeg', Q);
-        };
-        img.onerror = bad;
-        if (src) img.src = src; else bad();
-      });
-    });
+  /** عکس ⇒ JPEG ِ تازه زیرِ سقفِ سرور (همان آماده‌سازیِ عکسِ گفت‌وگو و پیگیری) */
+  function shrink(file, max) {
+    return K.js('/store/chat-photo.js').then(function () {
+      return window.StoreChatPhoto.prepare(file, { imageMax: max, thumbMax: 16 * 1024 });
+    }).then(function (p) { return p.main; }, function () { throw fail('unsupported_media'); });
   }
 
-  /** o: { base, into, address } ⇒ `{ close() }` */
+  /** o: { base, into, address, limits: {photoMax, voiceMax} } ⇒ `{ close() }` */
   window.StoreAddrMedia = function (o) {
-    var a = o.address; var has = { 'gate-photo': Boolean(a.media && a.media.gatePhoto), 'voice-note': Boolean(a.media && a.media.voiceNote) };
+    var a = o.address; var lim = o.limits || {}; var has = { 'gate-photo': Boolean(a.media && a.media.gatePhoto), 'voice-note': Boolean(a.media && a.media.voiceNote) };
     var msg = el('p', { class: 'muted', attrs: { 'aria-live': 'polite', id: 'am-msg' } });
     var say = function (s) { msg.textContent = s; };
     var box = el('div', { class: 'stack', attrs: { id: 'am-box' } }, el('p', { class: 'muted', text: t('am.note') }));
@@ -76,7 +66,7 @@
       pic.value = '';
       if (!f) return;
       pAdd.disabled = true; say(t('am.sending'));
-      shrink(f).then(function (b) { return call(o.base, a.id, 'gate-photo', 'PUT', b); })
+      shrink(f, lim.photoMax).then(function (b) { return call(o.base, a.id, 'gate-photo', 'PUT', b); })
         .then(function () { has['gate-photo'] = true; say(t('am.sent')); photoUi(); }, function (e) { say(e.message); })
         .then(function () { pAdd.disabled = false; });
     });
@@ -122,6 +112,7 @@
     vCancel.addEventListener('click', function () { if (rec) { chunks = []; stop(); } forget(); voiceUi(); });
     vSend.addEventListener('click', function () {
       if (!take) return;
+      if (lim.voiceMax > 0 && take.size > lim.voiceMax) { say(t('am.err.too_large')); return; }
       vSend.disabled = true; say(t('am.sending'));
       call(o.base, a.id, 'voice-note', 'PUT', take).then(function () { has['voice-note'] = true; forget(); say(t('am.sent')); }, function (e) { say(e.message); })
         .then(function () { vSend.disabled = false; voiceUi(); });

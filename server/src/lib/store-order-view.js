@@ -57,6 +57,10 @@ async function customerOrder(store, token) {
   //  (خاموش، بی پیشنهاد، پاسخ‌داده یا مهلت‌گذشته ⇒ کلید نیست)؛ وضعیتِ سفارش همان `picking`
   const substitutionWait = await require('./pick-substitutes').trackView(store.shop_id, orderId, order.status);
   if (substitutionWait !== undefined) order.substitutionWait = substitutionWait;
+  //  CHK-08: عکسِ دروازه و یادداشتِ صوتیِ نشانی (`store/addr-media.js` ِ دیربار) فقط با پرچمِ `shop.storefront.address_media`
+  //  و سفارشِ ارسالیِ هنوز باز (خاموش، دریافت از دکان یا سپرده به پیک ⇒ کلید نیست)
+  const addressMedia = await require('./order-address-media').customerView(store.shop_id, orderId, order);
+  if (addressMedia !== undefined) order.addressMedia = addressMedia;
   return order;
 }
 

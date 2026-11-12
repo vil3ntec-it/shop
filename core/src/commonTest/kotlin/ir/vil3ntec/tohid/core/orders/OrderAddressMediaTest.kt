@@ -41,6 +41,17 @@ class OrderAddressMediaTest {
     assertFalse(OrderAddressMedia.visible(swapped))
   }
 
+  @Test fun unifiedDoorWithSourceReadsTheSame() {
+    //  درِ یکی‌شده: عکس از نشانیِ ذخیره‌شده، صدا از خودِ سفارش — `source` بی‌اثر بر نما
+    val v = OrderAddressMedia.parse(obj(
+      """{"enabled":true,"gatePhoto":{"kind":"gatePhoto","mime":"image/jpeg","size":900,"createdAt":1,"source":"address"},
+          "voiceNote":{"kind":"voiceNote","mime":"audio/ogg","size":304,"createdAt":2,"source":"order"}}""",
+    ))
+    assertTrue(OrderAddressMedia.visible(v))
+    assertEquals(OrderAddressMedia.Meta("image/jpeg", 900L, 1L), v.gatePhoto)
+    assertEquals(OrderAddressMedia.Meta("audio/ogg", 304L, 2L), v.voiceNote)
+  }
+
   @Test fun pathsOnlyForAValidOrderId() {
     assertEquals("/shop/orders/ord_01HZX/address-media", OrderAddressMedia.path("ord_01HZX"))
     assertEquals("/shop/orders/ord_01HZX/address-media/gate-photo", OrderAddressMedia.bytesPath("ord_01HZX", OrderAddressMedia.Kind.GATE_PHOTO))

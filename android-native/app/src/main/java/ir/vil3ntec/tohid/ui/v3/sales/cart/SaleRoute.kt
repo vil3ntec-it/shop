@@ -67,7 +67,7 @@ fun RouteScope.SaleRoute() {
     },
   )
   val heldBook by held.store.book.collectAsState()
-  val heldQty = remember(heldBook) { ir.vil3ntec.tohid.data.HeldStock.reserved(heldBook) }
+  val heldQty = ir.vil3ntec.tohid.ui.components.pos.rememberSellableHeld(heldBook, data)   //  INV-03: + رزروِ سفارشِ اینترنتی
   val gate = remember { ScanGate() }
   //  S11: Enter ِ صفحه‌کلیدِ بیرونی بی اسکن ⇒ «پرداخت»، فقط با پنلِ پرداخت (`ShopPolicy.payV2`، پیش‌فرض خاموش) — `bareEnterPays`
   val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(context) }

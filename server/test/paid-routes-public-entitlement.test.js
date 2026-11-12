@@ -42,6 +42,7 @@ const CATEGORY = {
   'order-amend-store.js': 'STORE_PAID',        //  ORD-14: رضایتِ مشتری به ویرایشِ سفارش — همان ویترینِ پولی
   'storefront-promos-store.js': 'STORE_PAID',  //  MKT-01/09: تخفیفِ ویترین — همان ویترینِ پولی (sf.open)
   'delivery-rating-store.js': 'STORE_PAID',    //  DLV-18: امتیازِ مشتری به پیک — همان ویترینِ پولی (sf.open)
+  'order-address-media-store.js': 'STORE_PAID',   //  CHK-08: عکسِ دروازه و یادداشتِ صوتیِ نشانی — همان ویترینِ پولی (sf.open)
   'storefront-finder-store.js': 'STORE_PAID',  //  WEB-07/10: فیلتر و «خبرم کن» — همان ویترینِ پولی (sf.open)
   'order-feedback-store.js': 'STORE_PAID',     //  NTF-07/09: گزارشِ مشکل و نظرِ سفارش — همان ویترینِ پولی (sf.open)
   'storefront-eta-store.js': 'STORE_PAID',    //  WEB-04: زمانِ تقریبیِ تحویل — همان ویترینِ پولی (sf.open)

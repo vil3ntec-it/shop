@@ -43,7 +43,7 @@
   "am.sent": "Saved.",
   "am.deleted": "Deleted.",
   "am.err.mic": "The microphone is not available or permission was not given.",
-  "am.err.bad_media_type": "This file is not accepted; send a photo or a recorded voice note.",
+  "am.err.unsupported_media": "This file is not accepted; send a photo or a recorded voice note.",
   "am.err.too_large": "The file is larger than allowed.",
   "am.err.address_not_found": "This address no longer exists."
 }
