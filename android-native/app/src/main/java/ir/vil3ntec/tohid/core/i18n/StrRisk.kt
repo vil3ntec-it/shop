@@ -138,12 +138,12 @@ object StrRisk {
     "د هماغه براوزر یا د پېرلو اپ لپاره د نوي پیرودونکي حد لرې کېږي؛ د تکراري فرمایش څارنه پاتې کېږي.",
   )
   fun entryDeviceBlocked(orderNo: Any?): String = t(
-    "دستگاهِ بسته" + (orderNo?.let { " (از سفارشِ #${asIs(it)})" } ?: ""),
+    if (orderNo == null) "دستگاهِ بسته" else "دستگاهِ بسته (از سفارشِ #${asIs(orderNo)})",
     "Blocked device" + (orderNo?.let { " (from order #$it)" } ?: ""),
     "بنده وسیله" + (orderNo?.let { " (له فرمایش #$it)" } ?: ""),
   )
   fun entryDeviceTrusted(orderNo: Any?): String = t(
-    "دستگاهِ مطمئن" + (orderNo?.let { " (از سفارشِ #${asIs(it)})" } ?: ""),
+    if (orderNo == null) "دستگاهِ مطمئن" else "دستگاهِ مطمئن (از سفارشِ #${asIs(orderNo)})",
     "Trusted device" + (orderNo?.let { " (from order #$it)" } ?: ""),
     "باوري وسیله" + (orderNo?.let { " (له فرمایش #$it)" } ?: ""),
   )
