@@ -98,8 +98,13 @@ class DeskInvoiceVoidUiTest {
 
   @After fun down() = clean()
 
-  private fun show() {
+  /** دفترِ آزمون با نقشِ صاحب (صندوق‌دار کالا و انبار را نمی‌نویسد: `RoleGate`) */
+  private fun seed() {
     store = ShopStore(ctx).also { s -> runBlocking { s.load(); assertTrue(s.save(data)) } }
+  }
+
+  private fun show() {
+    if (!::store.isInitialized) seed()
     val cart = CartStore(ctx)
     rule.setContent {
       CompositionLocalProvider(
@@ -163,6 +168,7 @@ class DeskInvoiceVoidUiTest {
   }
 
   @Test fun aRoleThatNeedsApprovalCancelsWithTheManagerPinSlipOnSyncV3() {
+    seed()
     ShopRole.remember(ctx, ShopRole.CASHIER)
     ShopRole.rememberPolicy(ctx, """{"v":1,"layers":[{"sales.cancel":{"mode":"approve"}}]}""")
     ShopRole.rememberShopId(ctx, "shop-dv")
