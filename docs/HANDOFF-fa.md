@@ -54,6 +54,26 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-10m زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-10m` (از `claude/batch-52`)
+
+- **انجام شد:** IMG-BANK-10، STF-07، PUR-02 و PUR-14 ⇒ IMPLEMENTED-VERIFIED؛ S90 با آزمونِ سرتاسریِ تازه (PARTIAL ِ روشن‌تر).
+  دو باگِ واقعی: (۱) «انتخاب از بانکِ تصاویر» — جست‌وجوی نخست بیرون از برگه شروع می‌شد و پاسخِ بی‌درنگ پنجره را روی «در حالِ
+  جست‌وجو…» نگه می‌داشت (کار تمام و حالت نوشته شده بود؛ با پاسخِ ۱٫۵ ثانیه‌ای سبز) ⇒ `LaunchedEffect` درونِ `AdaptiveSheet`؛
+  (۲) «ورود و خروج» — زدنِ تازه پس از برگشتِ شبکه پیش از صف می‌رفت و سرور زدنِ صف‌شده را `punch_before_last` رد می‌کرد (نوبت گم)
+  ⇒ صف نخست و `flush` زیرِ قفل. ابزارِ آزمونیِ تازه در `desktop/src/test`: `TestBackend` (`Backend.api` ⇐ سرورِ ساختگی، با
+  `online`)، `RouteUiHarness` (هر مسیرِ نسخهٔ ۳ با `ShellContext` ِ واقعی از راهِ `V3RoutePreview`)، `FakePurchaseOrders` (سرورِ
+  سفارشِ خریدِ با حالت). آزمون‌ها: `ImageBankPickerUiTest` ۴، `StaffTimeHubTest` ۳، `PurchaseOrderRoutesUiTest` ۷،
+  `SupplierBillRoutesUiTest` ۶؛ `server/test/e2e/roles.e2e.mjs` ۵ گام (هفت نقش: `/api/shop`، درهای مدیریت، سفارشِ خرید، ورود و
+  خروج، Sync v1 ⇔ `PermCore.canWrite`).
+- **دامِ محیط:** Kotlin daemon میانِ عامل‌ها مشترک است (همان `-Xmx2560m` ⇒ همان daemon) و با دو کامپایلِ هم‌زمان در GC گیر می‌کند
+  (کامپایلِ desktop از ۳۰ دقیقه گذشت). `-Pkotlin.compiler.execution.strategy=in-process -Dorg.gradle.jvmargs=-Xmx4600m` ⇒ هر
+  کامپایلِ کامل ۵ تا ۷ دقیقه، بی اثر روی عاملِ دیگر.
+- **نیمه‌کاره:** S90 — فقط «پشتیبانی» (اجازهٔ موقتِ دسترسی `support-access.v1` و نقش‌های مدیرانِ پنل) در آزمونِ سازگاریِ رابط
+  نیست؛ پیک را `courier.e2e.mjs` (گذارهای برنامهٔ پیک ⇔ `canTransition` ِ سرور) از پیش دارد.
+- **اجرای کامل:** `./desktop/gradlew -p desktop test` ⇒ ۳۹۲۳ آزمون (۳۹۱۹ PASS، ۴ SKIP ِ پیشینِ بنچ/عکس)، ۰ شکست، ۱۴:۳۹؛
+  precheck ⇒ `fail=0`.
+- **قدمِ بعد:** ادغامِ `claude/e-rows-10m` در دسته؛ برای S90 یک گامِ پشتیبانی (پنلِ مدیر در کرومیوم: دکمه‌های فقط‌ارشد برای مدیرِ
+  عادی پنهان ⇔ همان درها ۴۰۳) در همان `roles.e2e.mjs`.
 ### ۱۴۰۵/۰۸/۲۲ (د) — عامل `claude/e-rows-10n` (از `claude/batch-52`): قراردادِ عمومیِ v2، پشتهٔ گیرِ آیفون، IMG-01
 
 - **قراردادِ نمای عمومی v2:** `refund` ِ پیش‌فرض‌روشن (NTF-08) و `receipts` ِ درونش (E2E-RET-11) فیلدِ اختیاریِ نسخهٔ ۲ شد:
