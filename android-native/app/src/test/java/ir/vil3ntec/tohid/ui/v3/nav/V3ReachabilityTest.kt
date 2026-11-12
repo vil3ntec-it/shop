@@ -166,6 +166,7 @@ class V3ReachabilityTest {
     //  ── ویترین ──
     Feature("پیوند و QR ِ کارزار", "storefront/campaigns", s("CampaignsPane")),
     Feature("M3 عکس و ویدیوی ویترین", "storefront/media", s("StorefrontMediaPanel")),
+    Feature("ABUSE-01 شکایت و گزارشِ خریداران (پاسخ و اعتراض)", "storefront/trust", "ir.vil3ntec.tohid.ui.v3.online.storefront.TrustCasesContent"),
     //  ── دستگاه‌ها و تنظیمات ──
     Feature("HW صفِ چاپ، چاپگرِ برچسب، ترازو، نمایشگرِ مشتری و ابزارهای تازه", "devices", s("PrintQueuePanel"), s("LabelsPanel"), s("ScalePanel"), s("CustomerDisplayPanel"), s("HwToolsSwitch")),
     Feature("HW تنظیمِ چاپگر و کشو", "devices", s("PrinterSettingsDialog"), s("OpenDrawerDialog")),

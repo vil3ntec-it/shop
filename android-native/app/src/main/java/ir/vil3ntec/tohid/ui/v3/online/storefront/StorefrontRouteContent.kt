@@ -60,6 +60,7 @@ internal fun RouteScope.StorefrontRoute() {
     loading = false
   }
   LaunchedEffect(Unit) { reload() }
+  TrustHubEffect()
   val cfg = StorefrontGate.config.value
   var tab by rememberSaveable { mutableStateOf(StorefrontModel.initialTab(args.query("tab"), cfg)) }
   LaunchedEffect(cfg?.zones) { if (cfg != null && tab !in StorefrontModel.tabs(cfg)) tab = StorefrontModel.STATUS }
