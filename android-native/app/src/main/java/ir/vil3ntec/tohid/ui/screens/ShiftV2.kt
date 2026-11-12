@@ -45,6 +45,7 @@ import ir.vil3ntec.tohid.core.pay.ShiftSlip
 import ir.vil3ntec.tohid.core.pay.ZSeq
 import ir.vil3ntec.tohid.data.AuditEntry
 import ir.vil3ntec.tohid.data.CashShift
+import ir.vil3ntec.tohid.data.DrawerNoSale
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
@@ -210,6 +211,9 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
     val noSale = mode == "no_sale"
     //  PAY-19: کشوی وصل به چاپگرِ پیش‌فرض (HW-03) — اگر هست، «ثبت» واقعاً بازش می‌کند
     val drawer = remember { PrinterRegistry.defaultSaved(context)?.takeIf { it.drawer } }
+    //  همان مجوزِ گوشیِ نسخهٔ ۳ (`DrawerNoSale.phoneAction` با `drawer.open`)، نه «شاگرد نیست»: بی مجوز بسته حتی با چاپگر
+    val action = DrawerNoSale.phoneAction(drawer != null, remember { ir.vil3ntec.tohid.data.ShopRole.canOpenDrawer(context) })
+    val denied = action == DrawerNoSale.PhoneAction.DENIED
     AlertDialog(
       onDismissRequest = { moveMode = null },
       containerColor = Shop.colors.surfaceSolid,
@@ -244,8 +248,8 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
           if (noSale) {
             Spacer(Modifier.height(6.dp))
             Text(
-              if (staff) StrShift.noSaleNeedsApproval
-              else if (drawer != null) StrShift.noSaleApproverDrawer(me.ifBlank { StrShift.thisAccount }, drawer.name)
+              if (denied) StrShift.noSaleNeedsApproval
+              else if (action == DrawerNoSale.PhoneAction.KICK && drawer != null) StrShift.noSaleApproverDrawer(me.ifBlank { StrShift.thisAccount }, drawer.name)
               else StrShift.noSaleApprover(me.ifBlank { StrShift.thisAccount }),
               style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
             )
@@ -254,17 +258,17 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
         }
       },
       confirmButton = {
-        TextButton(enabled = !(noSale && staff), onClick = move@{
+        TextButton(enabled = !(noSale && denied), onClick = move@{
           //  PAY-19: همان راهِ «باز کردنِ کشو» ِ دستگاه‌ها (`PrintSpooler.openDrawer`): مجوزِ drawer.open، دلیل، و ردیفِ
           //  no_sale ِ همین صندوق فقط وقتی ضربه به چاپگر رسید — نه ردیفی بی کشو، نه کشویی بی ردیف
-          if (noSale && drawer != null) {
+          if (noSale && action == DrawerNoSale.PhoneAction.KICK && drawer != null) {
             if (note.isBlank()) { error = PayFlow.message(PayFlow.Problem("REASON_REQUIRED")); return@move }
             scope.launch { toast(PrintSpooler.openDrawer(context, drawer, note)) }
             moveMode = null
             return@move
           }
           //  تأییدکننده نامِ همین کاربر است؛ بی نام «policy» (سیاستِ دکان اجازه داده)، هرگز «صاحب/مدیر»ِ ساختگی — همان HW-03
-          val m = if (noSale) PayFlow.Move("no_sale", reason = note, by = me, approvedBy = if (staff) "" else me.ifBlank { "policy" })
+          val m = if (noSale) PayFlow.Move("no_sale", reason = note, by = me, approvedBy = me.ifBlank { DrawerNoSale.POLICY_APPROVER })
           else PayFlow.Move(mode, amount, reason, note, by = me)
           when (val r = PayFlow.moveRow(d, sh.open, m, System.currentTimeMillis(), ::newId)) {
             is PayFlow.Outcome.Bad -> error = PayFlow.message(r.problem)

@@ -401,10 +401,12 @@ fun DeskSaleScreen(
   )
   val gate = DiscountGate.state(discountDecision.decision, saleKey, basis.discount, basis.subtotal, approval)
 
-  //  PAY-21: درگاه‌های تسویه (حساب‌پی) — پیش از گرفتنِ پول، ثبت‌شدنیِ همین فاکتور سنجیده می‌شود
-  val gateways = ir.vil3ntec.tohid.ui.components.pos.GatewayHook(remember { ir.vil3ntec.tohid.pay.platform.HesabPayEnv.of(context) }, saleKey) {
-    (SalesEngine.record(d, loyal, checkout.copy(payment = SalesEngine.Payment.CASH), ir.vil3ntec.tohid.todayIso(), 0L, ::newId, saleId = saleKey) as? SalesEngine.Result.Failed)?.message
-  }
+  //  S22 (`ExpiryPref.gate`، پیش‌فرض خاموش): منقضی فقط با تأیید؛ تأییدِ پرسیده در `finish` در حالت نمی‌ماند و فقط به همان یک تلاشِ بعدی می‌رود
+  val expiryGateOn = tillGuards.expiryGate; val expiryOk = remember { arrayOfNulls<ir.vil3ntec.tohid.core.stock.ExpiryGate.Approval>(1) }
+  var expiryAsk by remember { mutableStateOf<Triple<Map<String, Long>, ir.vil3ntec.tohid.core.pay.Settlement?, ir.vil3ntec.tohid.core.credit.CreditGate.Approval?>?>(null) }
+  //  PAY-21 + S22: درگاه‌های تسویه — پیش از گرفتنِ پول تأییدِ منقضی و ثبت‌شدنیِ همین فاکتور با همان `expiryGate` (`DeskExpiryPay`)
+  val prePay = rememberDeskExpiryPay(saleKey)
+  val gateways = prePay.hook(remember { ir.vil3ntec.tohid.pay.platform.HesabPayEnv.of(context) }, saleKey, d, loyal, checkout.copy(expiryGate = expiryGateOn))
   //  CRM-03 / S07 (پشتِ `ShopPolicy.creditGate`، پیش‌فرض خاموش): نسیهٔ بیش از سقف ⇒ «درخواستِ تأیید»
   val creditGateOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.creditGate(context) }
   //  تأییدِ بیش از سقف در حالت نگه داشته نمی‌شود — مثلِ گوشی (`QuickSale`، `Sale`) فقط به همان یک تلاشِ
@@ -417,16 +419,13 @@ fun DeskSaleScreen(
   val capRules = remember { ir.vil3ntec.tohid.data.ShopRole.saleCaps(context) }
   var capSlips by remember(saleKey) { mutableStateOf<Map<String, ir.vil3ntec.tohid.core.perm.ApprovalSlip.Slip>>(emptyMap()) }
   var capAsk by remember { mutableStateOf<Triple<ir.vil3ntec.tohid.data.SaleCapGate.Ask, ir.vil3ntec.tohid.core.pay.Settlement?, ir.vil3ntec.tohid.core.credit.CreditGate.Approval?>?>(null) }
-  //  S22 (`ExpiryPref.gate`، پیش‌فرض خاموش): منقضی فقط با تأیید؛ تأیید در حالت نمی‌ماند و فقط به همان یک تلاشِ بعدیِ `finish` می‌رود
-  val expiryGateOn = tillGuards.expiryGate; val expiryOk = remember { arrayOfNulls<ir.vil3ntec.tohid.core.stock.ExpiryGate.Approval>(1) }
-  var expiryAsk by remember { mutableStateOf<Triple<Map<String, Long>, ir.vil3ntec.tohid.core.pay.Settlement?, ir.vil3ntec.tohid.core.credit.CreditGate.Approval?>?>(null) }
 
   /**
    *  `settled` = تسویهٔ پنلِ پرداخت (با پرچم)؛ با پرچم و بی آن (F12، Ctrl+Enter) ⇒ نقدِ دقیق.
    *  `creditApproval` فقط از «درخواستِ تأیید» ِ همین فروش و فقط برای همین یک تلاش.
    */
   fun finish(settled: ir.vil3ntec.tohid.core.pay.Settlement? = null, creditApproval: ir.vil3ntec.tohid.core.credit.CreditGate.Approval? = null) {
-    val expiryApproval = expiryOk[0]; expiryOk[0] = null
+    val expiryApproval = expiryOk[0] ?: prePay.approval; expiryOk[0] = null
     if (cart.isEmpty()) { toast(Str.cartEmpty); return }
     //  POS-12: صفحه هنوز سبدِ پیش از جابه‌جایی را دارد ⇒ ردیف‌هایش با کلیدِ فاکتورِ دیگر ثبت می‌شد
     if (!ir.vil3ntec.tohid.data.HeldRules.shownIsCurrent(pricedFrom, cartStore.lines.value) || checkout.debtorId != cartStore.debtorId.value ||
@@ -1040,15 +1039,9 @@ fun DeskSaleScreen(
       onDismiss = { creditAsk = null; refocus() },
     )
   }
-  expiryAsk?.let { (need, pending, credit) ->
-    ir.vil3ntec.tohid.ui.components.staff.CreditApprovalDialog(
-      summary = SalesEngine.expiredNeedText(d, need), debtorId = "", addMinor = 0L,
-      selfRole = remember { ir.vil3ntec.tohid.data.ShopRole.current(context) }, selfName = seller,
-      requesterUserId = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") },
-      onApproved = { ok -> expiryAsk = null; expiryOk[0] = ir.vil3ntec.tohid.core.stock.ExpiryGate.Approval(ok.by, ok.role, need, ok.reason); finish(pending, credit) },
-      onDismiss = { expiryAsk = null; refocus() }, title = StrPos.expiredSaleTitle,
-    )
-  }
+  expiryAsk?.let { (need, pending, credit) -> DeskExpiryDialog(d, need, seller, { a -> expiryAsk = null; expiryOk[0] = a; finish(pending, credit) }) { expiryAsk = null; refocus() } }
+  //  S22: تأییدِ پیش از پول (درگاه‌ها) فقط در حالتِ همین فاکتور می‌نشیند؛ برگهٔ پول با زدنِ دوباره باز می‌شود
+  prePay.ask?.let { need -> DeskExpiryDialog(d, need, seller, { a -> prePay.ask = null; prePay.approval = a; refocus() }) { prePay.ask = null; refocus() } }
   if (payOpen) {
     PayPanelDialog(
       total = totals.finalTotal,

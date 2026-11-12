@@ -72,6 +72,7 @@ internal fun RouteScope.HistoryHost() {
   val context = LocalContext.current
   val v2 = returnsV2()
   val canCancel = remember { ShopRole.canCancelSale(context) }
+  val askCancel = remember { ir.vil3ntec.tohid.data.CancelAsk.offered(context) } // STF-02: لغو با برگهٔ مدیر (Sync v3)
   val blind = remember { ShopPolicy.payV2(context) && ShopPolicy.blindHere(context) } // PAY-13: شمارشِ کورِ اختیاریِ دکان
   val query = rememberSaveable(saver = HistoryQuerySaver) {
     HistoryQuery(HistoryFilter.of(args.query("filter")), args.query("q").orEmpty(), SalesPeriods.Unit.DAY, HistoryChannel.of(args.query("where")))
@@ -105,6 +106,7 @@ internal fun RouteScope.HistoryHost() {
     book = book,
     returnsV2 = v2,
     canCancel = canCancel,
+    askCancel = askCancel,
     drawer = DrawerModel.line(d, ReportBridge.nowMs(), blind),
     query = query,
     actions = HistoryActions(

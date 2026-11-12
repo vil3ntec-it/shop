@@ -19,11 +19,16 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.audit.InvoiceVoid
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrInvoices
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.perm.ApprovalSlip
+import ir.vil3ntec.tohid.data.CancelAsk
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.invoiceLabel
 import ir.vil3ntec.tohid.data.isOnlineOrder
+import ir.vil3ntec.tohid.money
+import ir.vil3ntec.tohid.ui.components.staff.ApprovalDialog
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /*
@@ -92,6 +97,18 @@ internal fun CancelInvoiceDialog(sale: Sale, onDismiss: () -> Unit, onConfirm: (
     dismissButton = { TextButton(onClick = onDismiss) { Text(Str.goBack) } },
   )
 }
+
+/**
+ *  STF-02 — برگهٔ تأییدِ مدیر برای لغوِ [sale] در جدولِ کامپیوتر (نقشِ «نیازمندِ تأیید» روی Sync v3، `CancelAsk.offered`): همان
+ *  نیاز و همان نوشته‌های `CancelRoute` ِ نسخهٔ ۳، روی پنجرهٔ مشترکِ `ApprovalDialog` (PIN ِ تأییدکنندهٔ همین دستگاه یا «پرسیدن از مدیر»).
+ */
+@Composable
+internal fun CancelApprovalDialog(sale: Sale, shopId: String, requesterUserId: String, onApproved: (ApprovalSlip.Slip) -> Unit, onDismiss: () -> Unit) =
+  ApprovalDialog(
+    title = StrSale.cancelApproval,
+    summary = StrSale.cancelApprovalSummary(sale.invoiceLabel() ?: "0", money(sale.finalTotal)),
+    shopId = shopId, requesterUserId = requesterUserId, need = CancelAsk.need(sale), onApproved = onApproved, onDismiss = onDismiss,
+  )
 
 /** پیوندِ دفترِ امروز با `InvoiceVoid` (SEC-03) */
 internal object SalesVoid {
