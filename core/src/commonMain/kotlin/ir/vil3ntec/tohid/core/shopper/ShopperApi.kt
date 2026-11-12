@@ -50,6 +50,19 @@ class ShopperError(
   /** ۴۰۹ ِ `promo_code_rejected` (MKT-01): وضعیتِ کد (`unknown`، `inactive`، `used_up`، `no_effect`، `limit_reached`) */
   fun promoStatus(): String? = ((data?.get("promo") as? JsonObject)?.get("status") as? JsonPrimitive)?.contentOrNull
 
+  /**
+   *  S41 «ادغام یا سفارشِ دوم؟»: ۴۰۹ ِ `duplicate_order` با `ask: track_or_second` ⇒ شماره و توکنِ پیگیریِ همان
+   *  سفارشِ پیشین (`lib/order-risk.js`)؛ بی توکن یا بی پرسش ⇒ null (فقط پیامِ سرور، همان رفتارِ پیشین)
+   */
+  fun duplicate(): Pair<Long, String>? {
+    if (code != DUPLICATE_ORDER) return null
+    val d = data ?: return null
+    if ((d["ask"] as? JsonPrimitive)?.contentOrNull != "track_or_second") return null
+    val token = (d["token"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } ?: return null
+    val no = (d["orderNo"] as? JsonPrimitive)?.longOrNull ?: return null
+    return no to token
+  }
+
   override fun toString(): String = "ShopperError($status, $code)"
 
   companion object {
@@ -58,6 +71,7 @@ class ShopperError(
     const val STORE_MOVED = "store_moved"
     const val PRICE_CHANGED = "price_changed"
     const val PROMO_REJECTED = "promo_code_rejected"
+    const val DUPLICATE_ORDER = "duplicate_order"
   }
 }
 

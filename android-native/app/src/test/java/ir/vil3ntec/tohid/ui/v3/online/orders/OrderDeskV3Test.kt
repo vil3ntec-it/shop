@@ -43,6 +43,20 @@ class OrderDeskV3Test {
   }
 
   @Test
+  fun `S30 توقف سفارش فوری هنگام قطع دکان در تنظیم میز و بدنه و هر دو برگه`() {
+    val d = Desk(enabled = true, version = 3)
+    val f = DeskSettingsForm(d)
+    assertFalse(f.opOn)
+    f.opOn = true
+    assertEquals(d.copy(offlinePauseOn = true), f.result(d))
+    val repo = src("data/repo/OrderDeskRepository.kt")
+    assertTrue(repo.contains("put(\"offlinePause\", buildJsonObject { put(\"enabled\", next.offlinePauseOn) })"))
+    assertTrue(repo.contains("offlinePauseOn = op?.let { CourierWire.bool(it, \"enabled\") } ?: base.offlinePauseOn"))
+    assertEquals(1, count("ui/v3/online/orders/OrderDeskStrip.kt", "V3ToggleRow(StrOrderSlip.deskOfflinePause, f.opOn"))
+    assertEquals(1, count("ui/screens/OrderDeskPanel.kt", "Switch(checked = f.opOn"))
+  }
+
+  @Test
   fun `توقف دلیل می خواهد و دلیل دیگر توضیح`() {
     val f = DeskPauseForm()
     assertFalse(f.ok)

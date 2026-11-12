@@ -216,6 +216,8 @@ data class CheckoutRequest(
   val deviceId: String? = null,
   /** MKT-11: کدِ پیوند/QR ِ کمپین که مشتری با آن آمد — فقط نسبت داده می‌شود، مبلغ را دست نمی‌زند */
   val campaign: String? = null,
+  /** S41: پاسخِ «سفارشِ دوم» به پرسشِ تکراری — فقط `true` فرستاده می‌شود (null در بدنه نمی‌رود ⇒ بدنهٔ پیشین همان) */
+  val secondOrder: Boolean? = null,
 )
 
 /** JSON ِ برنامهٔ خرید: فیلدِ ناشناخته نادیده؛ null در بدنه نمی‌رود (همان `undefined` ِ وب). */

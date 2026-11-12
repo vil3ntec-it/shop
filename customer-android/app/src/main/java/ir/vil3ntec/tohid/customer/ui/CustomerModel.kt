@@ -158,6 +158,8 @@ class CustomerModel(
   /** پس از ۴۰۹ ِ قیمت: دکمه «پذیرفتن و ثبت» است */
   var repriced: Boolean by mutableStateOf(false)
     private set
+  var duplicate: CheckoutFlow.After.Duplicate? by mutableStateOf(null)   //  S41: ۴۰۹ ِ `duplicate_order` ⇒ «همان را دنبال کن» / «سفارشِ دوم»
+    private set
 
   // ── سفارش ──
   var order: Load<PublicOrder> by mutableStateOf(Load.Idle)
@@ -408,6 +410,7 @@ class CustomerModel(
   fun cartOf(slug: String): Cart = ShopperMemory.cartOf(saved, slug)
 
   private fun setCart(c: Cart) {
+    if (c.slug == storeSlug) duplicate = null   //  S41: سبدِ دیگر دیگر همان سفارشِ تکراری نیست
     persist(ShopperMemory.withCart(saved, c))
     syncAccount(c.slug)
   }
@@ -607,6 +610,8 @@ class CustomerModel(
     }
   }
 
+  fun trackDuplicate() { val d = duplicate ?: return; duplicate = null; placeNote = null; go(Route.Track(storeSlug, d.token)) }   //  S41: بی‌خطر
+
   fun otherNumber() {
     persist(saved.copy(ticket = null))
     codeSent = null
@@ -615,8 +620,9 @@ class CustomerModel(
     form = form.copy(phone = "")
   }
 
-  fun placeOrder() {
+  fun placeOrder(second: Boolean = false) {   //  S41 «سفارشِ دوم»: `secondOrder` ⇒ بدنهٔ دیگر و کلیدِ تازه؛ فقط قاعدهٔ تکرار کنار می‌رود
     if (placing) return
+    duplicate = null
     val page = store.valueOrNull() ?: return
     val slug = storeSlug
     val cart = cartOf(slug)
@@ -633,7 +639,7 @@ class CustomerModel(
       return
     }
     val req = CheckoutRules.request(page, cart, form, ticket.phone, lang.code, slotsPage(), promo.applied(ticket, saved.deviceId))
-      .copy(campaign = campaigns[slug])
+      .copy(campaign = campaigns[slug], secondOrder = if (second) true else null)
     //  CHK-19: همان بدنه ⇒ همان کلید (پیش از فرستادن نگه داشته می‌شود؛ بستنِ برنامه وسطِ کار سفارشِ دوم نمی‌سازد)
     val memo = CheckoutKeys.keyFor(saved.keys[slug], req)
     persist(saved.copy(keys = saved.keys + (slug to memo)))
@@ -689,6 +695,7 @@ class CustomerModel(
         loadSlots()
       }
       CheckoutFlow.After.Rezone -> form = form.copy(zoneId = null)
+      is CheckoutFlow.After.Duplicate -> if (slug == storeSlug) duplicate = after
       CheckoutFlow.After.Message -> Unit
     }
     if (slug == storeSlug) placeNote = CheckoutFlow.note(after, e)

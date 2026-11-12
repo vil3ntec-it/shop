@@ -73,6 +73,8 @@ object StrOrderSlip : OrderSlip.Texts {
   val deskSettings: String get() = t("قبول و توقفِ خودکار", "Auto-accept and auto-pause", "په خپله منل او ودرول")
   val deskAutoAccept: String get() = t("قبولِ خودکار", "Auto-accept", "په خپله منل")
   val deskAutoPause: String get() = t("توقفِ خودکار", "Auto-pause", "په خپله ودرول")
+  /** S30: به‌جای «ثبت با پیامِ تأخیر» */
+  val deskOfflinePause: String get() = t("توقفِ سفارشِ فوری هنگامِ قطعِ دکان", "Stop instant orders while the shop is offline", "د دوکان د پرې کېدو پر مهال سمدستي فرمایش ودرول")
   val deskMaxOpen: String get() = t("سقفِ صف", "Queue limit", "د کتار حد")
   val deskReadyMinutes: String get() = t("زمانِ آماده (دقیقه)", "Ready time (min)", "د چمتو کېدو وخت (دقیقې)")
   val deskOldestMinutes: String get() = t("بی‌پاسخ تا (دقیقه)", "Unanswered for (min)", "بې ځوابه تر (دقیقې)")
