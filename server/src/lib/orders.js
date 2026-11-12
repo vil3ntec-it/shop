@@ -55,8 +55,11 @@ function decode(text) {
   try { return JSON.parse(text); } catch { return null; }
 }
 
+const { DEFAULT_ON } = require('./flag-defaults');
+
 /**
- * پرچمِ دکان: مقدارِ خودِ دکان بر `all` جلو می‌افتد؛ فقط `true` روشن است.
+ * پرچمِ دکان: مقدارِ خودِ دکان بر `all` جلو می‌افتد؛ فقط `true` روشن است — مگر کلیدِ فهرستِ پیش‌فرض‌روشنِ
+ * `lib/flag-defaults.js` (بی ردیف ⇒ روشن؛ فقط `false` ِ صریح خاموش).
  * `key` نیامده ⇒ `shop.orders`؛ ویترین (`shop.storefront`) و تحویل و پیک (`shop.delivery`) همین قاعده را می‌خوانند.
  *
  * ⛔ فاز ۳ ِ پنلِ مرکزی: «غیرفعال کردنِ سرویس» (`lib/shop-holds.js`، حالتِ `service_disabled` با
@@ -80,6 +83,8 @@ async function readFlag(shopId, key, run) {
   let v;
   for (const r of rows) if (r.scope === 'all') v = decode(r.value);
   for (const r of rows) if (r.scope !== 'all') v = decode(r.value);
+  //  کلیدِ پیش‌فرض‌روشن (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲): فقط `false` ِ صریح خاموش — همان قاعدهٔ `default-on-flag.js`
+  if (DEFAULT_ON.has(key)) return v !== false;
   return v === true;
 }
 

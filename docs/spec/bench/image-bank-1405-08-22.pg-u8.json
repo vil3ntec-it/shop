@@ -1,0 +1,210 @@
+{
+  "at": "2026-11-12T01:48:31.343Z",
+  "env": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.30GHz",
+    "cores": 4,
+    "memGB": 16,
+    "os": "linux 6.18.44-fc-v378",
+    "node": "v22.23.4",
+    "driver": "postgres",
+    "network": "loopback (127.0.0.1) — بی تأخیرِ شبکهٔ واقعی"
+  },
+  "bank": {
+    "products": 10000,
+    "images": 300
+  },
+  "users": 8,
+  "opsPerUser": 30,
+  "targets": {
+    "barcode": 500,
+    "name": 1000
+  },
+  "seed": {
+    "productsMs": 3379,
+    "imagesMs": 6518
+  },
+  "cold": {
+    "barcode": {
+      "n": 48,
+      "p50": 37.8,
+      "p95": 73.4,
+      "p99": 83.8,
+      "max": 83.8
+    },
+    "name": {
+      "n": 48,
+      "p50": 85.3,
+      "p95": 136.1,
+      "p99": 199.4,
+      "max": 199.4
+    },
+    "spelling": {
+      "n": 48,
+      "p50": 94.3,
+      "p95": 150.3,
+      "p99": 162.4,
+      "max": 162.4
+    },
+    "browse": {
+      "n": 48,
+      "p50": 39.2,
+      "p95": 73.2,
+      "p99": 103.7,
+      "max": 103.7
+    },
+    "page1": {
+      "n": 48,
+      "p50": 56.7,
+      "p95": 88.9,
+      "p99": 102,
+      "max": 102
+    },
+    "page2": {
+      "n": 48,
+      "p50": 54.6,
+      "p95": 83.1,
+      "p99": 87.6,
+      "max": 87.6
+    },
+    "thumb": {
+      "n": 100,
+      "p50": 38.1,
+      "p95": 61.7,
+      "p99": 65.9,
+      "max": 70.1
+    },
+    "firstPage": {
+      "n": 48,
+      "p50": 83.2,
+      "p95": 114.6,
+      "p99": 144.6,
+      "max": 144.6
+    },
+    "errors": 0,
+    "requests": 388,
+    "wallMs": 2586,
+    "rps": 150,
+    "cpuMs": 1736
+  },
+  "warm": {
+    "barcode": {
+      "n": 48,
+      "p50": 41.6,
+      "p95": 69.2,
+      "p99": 76.9,
+      "max": 76.9
+    },
+    "name": {
+      "n": 48,
+      "p50": 70.1,
+      "p95": 105.1,
+      "p99": 142.3,
+      "max": 142.3
+    },
+    "spelling": {
+      "n": 48,
+      "p50": 73,
+      "p95": 154.7,
+      "p99": 169.2,
+      "max": 169.2
+    },
+    "browse": {
+      "n": 48,
+      "p50": 40.8,
+      "p95": 71.6,
+      "p99": 86.2,
+      "max": 86.2
+    },
+    "page1": {
+      "n": 48,
+      "p50": 52.7,
+      "p95": 78.9,
+      "p99": 99.9,
+      "max": 99.9
+    },
+    "page2": {
+      "n": 48,
+      "p50": 51.2,
+      "p95": 93.5,
+      "p99": 102.8,
+      "max": 102.8
+    },
+    "thumb": {
+      "n": 100,
+      "p50": 35.4,
+      "p95": 67.7,
+      "p99": 73.2,
+      "max": 76.4
+    },
+    "firstPage": {
+      "n": 48,
+      "p50": 82.9,
+      "p95": 120,
+      "p99": 154.2,
+      "max": 154.2
+    },
+    "errors": 0,
+    "requests": 388,
+    "wallMs": 2400,
+    "rps": 162,
+    "cpuMs": 1802
+  },
+  "accuracy": {
+    "cold": {
+      "barcode": {
+        "ok": 48,
+        "n": 48,
+        "rate": 1
+      },
+      "name": {
+        "ok": 48,
+        "n": 48,
+        "rate": 1
+      },
+      "spelling": {
+        "ok": 48,
+        "n": 48,
+        "rate": 1
+      }
+    },
+    "warm": {
+      "barcode": {
+        "ok": 48,
+        "n": 48,
+        "rate": 1
+      },
+      "name": {
+        "ok": 48,
+        "n": 48,
+        "rate": 1
+      },
+      "spelling": {
+        "ok": 48,
+        "n": 48,
+        "rate": 1
+      }
+    }
+  },
+  "payload": {
+    "maxItemsPerPage": 50,
+    "maxPageBytes": 22780,
+    "responsesWithOriginal": 0,
+    "thumbsNotImmutable": 0
+  },
+  "resources": {
+    "peakRssMB": 280,
+    "peakHeapMB": 84
+  },
+  "verdict": {
+    "barcodeP95": {
+      "ms": 69.2,
+      "target": 500,
+      "pass": true
+    },
+    "nameP95": {
+      "ms": 105.1,
+      "target": 1000,
+      "pass": true
+    }
+  }
+}

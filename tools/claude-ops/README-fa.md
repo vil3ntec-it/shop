@@ -19,6 +19,12 @@
 - نسخهٔ بستهٔ سرورِ حساب از ساعتِ کامیتِ shop می‌آید (server #140)؛ بی آن هیچ دسته‌ای به سرورِ صاحب‌کار نمی‌رسید.
 - جدولِ `Str*`: یک `t()` برای هر تابع/ویژگی؛ «ایستا…» و واژه‌های فقط‌فارسی در دری رد می‌شوند.
 - `server/node_modules` ِ پیوندی در worktree‌ها در `.git/info/exclude` است (کامیت نشود).
+- چند عاملِ Gradle ِ هم‌زمان قفلِ کش را نگه می‌دارند ⇒ هر عامل `GRADLE_USER_HOME` ِ جدا با `GRADLE_RO_DEP_CACHE=/root/.gradle/caches`
+  و `-Pkotlin.daemon.jvmargs=-Xmx2560m`؛ `verify-all.sh` فقط وقتی هیچ عاملی Gradle نمی‌دواند.
+- لاگِ کارِ آیفون پر از عکسِ base64 است و `get_job_logs` فقط ۵۰۰۰ خطِ آخر را می‌دهد ⇒ گیر را با `summary.md` و `e2e.log` بخوان، نه با
+  tail ِ بزرگ در گفت‌وگو (برای خواندنِ کاملش یک عاملِ جدا بفرست). blob ِ لاگ از کانتینر ۴۰۳ است.
+- پس از squash-merge ِ یک PR، شاخه‌ای که روی شاخهٔ همان PR ساخته شده هنگامِ ادغامِ main ناسازگاری می‌گیرد ولی درختِ دو سو یکی است ⇒
+  سمتِ شاخه را بگیر و بستهٔ وب را **از نو بساز**: نشانهٔ `<<<<<<<` در `server/public/assets/*.js` می‌ماند (server #144).
 
 ## ۰. تازه‌ترین — ۱۴۰۵/۰۸/۲۱ (پایانِ سیزنِ هماهنگ‌کننده با سقفِ هفتگی)
 
@@ -52,6 +58,7 @@
 10. پروژهٔ Gradle ِ تازه (مثلِ `bench/kotlin`) بی `gradle.properties` با حافظهٔ پیش‌فرض OutOfMemory می‌دهد ⇒ همان `-Xmx4g` ِ `desktop/gradle.properties`.
 11. کارهای GitHub (بستن/ادغامِ PR) با ابزارهای MCP ِ github؛ `gh pr close` از bash را حالتِ خودکار رد می‌کند.
 12. آزمونِ «۳۰ روز آفلاین» (SYN-01) در CI رد می‌شود چون کارِ `tohid-desktop.yml` ‏`npm ci` ِ سرور ندارد؛ آن workflow انتشار است ⇒ workflow ِ آزمونیِ جدا (`offline30.yml` در شاخهٔ نیمه‌کارهٔ `claude/e-rows-7`).
+13. زیرِ `offline-run.sh` کرومیوم `navigator.onLine === false` می‌گوید (فقط loopback) ⇒ کدی که با آن صبر می‌کند (`store/cart-sync.js`) چیزی نمی‌فرستد و `web-store-cart-sync.mjs` آن‌جا سرخ است ولی با اینترنت سبز — رفتارِ درستِ «بی شبکه»، نه باگ؛ گوشیِ روی وای‌فایِ بی اینترنت `onLine` ِ true دارد (`claude/verify-rows-j`). PostgreSQL ِ محلی در همان فضا فقط از سوکت: `postgres://postgres@%2Ftmp:55432/<db>`.
 
 ## ۱. قاعده‌های صاحب‌کار (همیشه)
 

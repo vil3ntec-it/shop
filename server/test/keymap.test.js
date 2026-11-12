@@ -125,7 +125,9 @@ test('RPT-13: کلیدهای «گزارش‌ها» در وب — کدِ فیزی
   assert.equal(km.label('reports.compare', true), 'Option+C');
   for (const id of ['reports.drill', 'reports.prevPeriod', 'reports.nextPeriod', 'reports.compare', 'global.print', 'global.export']) {
     assert.equal(km.ACTIONS[id].webStatus, 'partial', id);
-    assert.equal(km.ACTIONS[id].status, 'partial', `${id}: کامپیوتر`);
+    //  RPT-13: در کامپیوتر ریزِ ردیف در هر برگهٔ جمع‌دارِ «گزارش‌ها» (`ReportDrillSheet.KEYS`) و − / + و مقایسه در «گزارش‌ها»
+    //  (`ReportsDesk`) و «گزارشِ تازه» (`ReportFresh`/`FreshPeriodBar`) ⇒ live؛ چاپ و خروجیِ سراسری هنوز partial
+    assert.equal(km.ACTIONS[id].status, id.startsWith('reports.') ? 'live' : 'partial', `${id}: کامپیوتر`);
   }
   //  همان قاعده‌های KeyMapTest (Kotlin، فقط CI) برای وب، این‌جا هم: رزرو نه، Alt با حرفِ منو نه، و کلیدِ صفحه سراسری را نمی‌پوشاند
   const gen = await import(GEN);

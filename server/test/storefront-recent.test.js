@@ -40,6 +40,8 @@ test('پرچم: خاموش بی کلید، روشن `recent: true`؛ recent.js �
   const shop = (await h.post('/api/shop', { name: 'دکانِ اخیر' }, { token: u.accessToken })).body.shop;
   await flag(shop.id, 'shop.orders', true);
   await flag(shop.id, 'shop.storefront', true);
+  //  پیش‌فرض‌روشن است (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) ⇒ «خاموش» `false` ِ صریح است
+  await flag(shop.id, 'shop.storefront.recent', false);
   const slug = `rv-${Date.now().toString(36)}`;
   assert.equal((await h.put('/api/shop/storefront', { slug, enabled: true, title: 'ویترینِ اخیر', contactPhone: '0700000001' },
     { token: u.accessToken })).status, 200);

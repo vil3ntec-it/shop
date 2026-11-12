@@ -62,6 +62,8 @@ async function liveStore(label, { on = true } = {}) {
   const s = { token: u.accessToken, shopId: made.body.shop.id, device: `dev-${uniq()}` };
   await setFlag(s.shopId, 'shop.orders', true);
   await setFlag(s.shopId, 'shop.storefront', true);
+  //  پیش‌فرض‌روشن‌ها (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) `false` ِ صریح ⇒ همان پاسخِ پیشین
+  await h.defaultOnOff(s.shopId);
   if (on) await setFlag(s.shopId, FLAG, true);
   s.slug = `h-${uniq()}`;
   const put = await h.put('/api/shop/storefront', { slug: s.slug, enabled: true, title: `ویترینِ ${label}`, minOrderMinor: 0 }, { token: s.token });

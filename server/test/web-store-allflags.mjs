@@ -126,8 +126,10 @@ const ON = KNOWN.filter((k) => inFamily(k.key) && !isPump(k.key, k.scope) && typ
   }
   const missing = [...used].filter((k) => !KNOWN.some((x) => x.key === k)).sort();
   ok(missing.length === 0, `هر پرچمِ خانواده که کد می‌خواند در کاتالوگِ KNOWN است (${used.size} کلید در کد)`, missing.join(' '));
-  const off = KNOWN.filter((k) => inFamily(k.key) && typeof k.default === 'boolean' && k.default !== false).map((k) => k.key);
-  ok(off.length === 0, 'هر پرچمِ خانواده پیش‌فرض‌خاموش است', off.join(' '));
+  //  خاموش مگر فهرستِ پیش‌فرض‌روشنِ `lib/flag-defaults.js` (۱۴۰۵/۰۸/۲۲) — همان یک فهرست
+  const { DEFAULT_ON } = require('../src/lib/flag-defaults');
+  const off = KNOWN.filter((k) => inFamily(k.key) && typeof k.default === 'boolean' && k.default !== DEFAULT_ON.has(k.key)).map((k) => k.key);
+  ok(off.length === 0, 'هر پرچمِ خانواده پیش‌فرض‌خاموش است، جز فهرستِ پیش‌فرض‌روشن', off.join(' '));
 }
 const WHY = (k) => {
   if (isPump(k.key, k.scope)) return 'پمپ — هرگز در این مخزنِ دکان دست نمی‌خورد';

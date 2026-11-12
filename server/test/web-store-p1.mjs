@@ -73,6 +73,8 @@ const T = d1.body.accessToken;
 const shopId = (await call('POST', '/api/shop', { name: 'دکانِ P1' }, T)).body.shop.id;
 const A = (await call('POST', '/api/admin/login', { username: 'admin', password: 'Admin!12345' })).body.token;
 const flag = (key, value) => call('PUT', '/api/admin/pump/live-config', { scope: shopId, key, value }, A);
+//  پیش‌فرض‌روشن‌ها (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) `false` ِ صریح ⇒ همان ویترینِ پیشین؛ سپس کلیدهای همین آزمون
+for (const key of require('../src/lib/flag-defaults').DEFAULT_ON) await flag(key, false);
 for (const key of ['shop.orders', 'shop.storefront', 'shop.storefront.web_account', 'shop.storefront.address_extra']) await flag(key, true);
 const slug = 'p1-store';
 const put = await call('PUT', '/api/shop/storefront', { slug, enabled: true, title: 'ویترینِ P1', contactPhone: '0700000001',

@@ -553,22 +553,22 @@ object KeyMap {
     web = emptyList(),
   )
   val REPORTS_DRILL = KeyAction(
-    "reports.drill", "reports", "ریز شدن در ردیف", KeyStatus.PARTIAL,
+    "reports.drill", "reports", "ریز شدن در ردیف", KeyStatus.LIVE,
     keys = listOf(Chord(KeyName.Enter)),
     web = listOf(Chord(KeyName.Enter)),
   )
   val REPORTS_NEXT_PERIOD = KeyAction(
-    "reports.nextPeriod", "reports", "دورهٔ بعد", KeyStatus.PARTIAL,
+    "reports.nextPeriod", "reports", "دورهٔ بعد", KeyStatus.LIVE,
     keys = listOf(Chord(KeyName.Plus), Chord(KeyName.Equals, shift = true)),
     web = listOf(Chord(KeyName.Plus), Chord(KeyName.Equals, shift = true)),
   )
   val REPORTS_PREV_PERIOD = KeyAction(
-    "reports.prevPeriod", "reports", "دورهٔ قبل", KeyStatus.PARTIAL,
+    "reports.prevPeriod", "reports", "دورهٔ قبل", KeyStatus.LIVE,
     keys = listOf(Chord(KeyName.Minus)),
     web = listOf(Chord(KeyName.Minus)),
   )
   val REPORTS_COMPARE = KeyAction(
-    "reports.compare", "reports", "ستونِ مقایسه با دورهٔ قبل", KeyStatus.PARTIAL,
+    "reports.compare", "reports", "ستونِ مقایسه با دورهٔ قبل", KeyStatus.LIVE,
     keys = listOf(Chord(KeyName.C, mod = true, shift = true)),
     web = listOf(Chord(KeyName.C, alt = true)),
   )

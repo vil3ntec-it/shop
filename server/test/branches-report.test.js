@@ -80,10 +80,12 @@ test.before(async () => {
   await sale(S3, 's3-a', 111, at(10));
   await sale(SX, 'sx-a', 999, at(10));
   await sale(S4, 's4-a', 555, at(10));
+  //  پرچم پیش‌فرض‌روشن است (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) ⇒ «خاموش» این‌جا `false` ِ صریح است
+  for (const s of [S1, S2, S3, SX, S4]) await setFlag(s, false);
 });
 test.after(async () => { await h.stop(); });
 
-test('پرچم خاموش (پیش‌فرض) ⇒ فقط {enabled:false}، بی هیچ عدد', async () => {
+test('پرچم خاموش (false ِ صریح) ⇒ فقط {enabled:false}، بی هیچ عدد', async () => {
   const r = await get(O.accessToken, `?from=${DAY}`);
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.deepEqual(r.body, { enabled: false });

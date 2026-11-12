@@ -43,7 +43,8 @@ async function shop(label, { on = true } = {}) {
   assert.equal(made.status, 201, JSON.stringify(made.body));
   const o = { ...u, token: u.accessToken, shopId: made.body.shop.id };
   await setFlag(o.shopId, 'shop.orders', true);
-  if (on) await setFlag(o.shopId, 'shop.orders.start_alert', true);
+  //  هشدار پیش‌فرض‌روشن است (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) ⇒ «خاموش» `false` ِ صریح است
+  await setFlag(o.shopId, 'shop.orders.start_alert', on);
   return o;
 }
 

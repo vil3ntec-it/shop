@@ -57,6 +57,9 @@ async function storeWith(names) {
   const shopId = made.body.shop.id;
   await setFlag(shopId, 'shop.orders', true);
   await setFlag(shopId, 'shop.storefront', true);
+  //  پیش‌فرض‌روشن است (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) ⇒ «خاموش» `false` ِ صریح است
+  await setFlag(shopId, sf.SEARCH_FLAG, false);
+  await setFlag(shopId, require('../src/lib/storefront-search').SMART_FLAG, false);
   const slug = `q-${uniq()}`;
   const put = await h.put('/api/shop/storefront', { slug, enabled: true, title: 'ویترینِ جست‌وجو', contactPhone: '0700000001' },
     { token: u.accessToken });

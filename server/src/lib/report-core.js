@@ -76,6 +76,12 @@
   }
   function str(x) { return x === undefined || x === null ? '' : String(x); }
   function arr(x) { return Object.prototype.toString.call(x) === '[object Array]' ? x : []; }
+  //  S08: تأییدکنندهٔ تخفیفِ بیش از سقف روی فاکتورِ برنامه فقط در برگهٔ امضاشده (`approval.by`) است، نه در `approvedBy`؛
+  //  برگهٔ «درخواستِ از راهِ دور» (`{v, request}`) نامِ تأییدکننده ندارد ⇒ "" (همان `ReportLedger.slipBy` ِ Kotlin)
+  function slipBy(a) {
+    if (Object.prototype.toString.call(a) !== '[object Object]' || (a.by !== null && typeof a.by === 'object')) return '';
+    return str(a.by).trim();
+  }
   function cmp(a, b) { return a < b ? -1 : (a > b ? 1 : 0); }
 
   /* ---------------- تاریخ ---------------- */
@@ -140,7 +146,7 @@
       var x = {
         id: str(s.id), total: money(s.total), discount: money(s.discount), finalTotal: money(s.finalTotal),
         method: str(s.paymentMethod), status: str(s.status), cancelled: str(s.status) === 'cancelled',
-        seller: str(s.seller).trim(), cancelledBy: str(s.cancelledBy).trim(), approvedBy: str(s.approvedBy).trim(),
+        seller: str(s.seller).trim(), cancelledBy: str(s.cancelledBy).trim(), approvedBy: str(s.approvedBy).trim() || slipBy(s.approval),
         channel: str(s.channel) || 'pos', date: str(s.date), createdAt: ms(s.createdAt),
       };
       L.sales.push(x); L.saleById[x.id] = x;

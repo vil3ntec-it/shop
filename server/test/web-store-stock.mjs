@@ -72,6 +72,10 @@ const A = (await call('POST', '/api/admin/login', { username: 'admin', password:
 for (const key of ['shop.orders', 'shop.storefront', 'shop.catalog']) {
   await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key, value: true }, A);
 }
+//  پیش‌فرض‌روشن‌ها (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) `false` ِ صریح ⇒ همان ویترینِ پیشین
+for (const key of require('../src/lib/flag-defaults').DEFAULT_ON) {
+  await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key, value: false }, A);
+}
 const slug = 'stock-store';
 const put = await call('PUT', '/api/shop/storefront', {
   slug, enabled: true, title: 'ویترینِ انبار', contactPhone: '0700000001', acceptPickup: true, minOrderMinor: 0,

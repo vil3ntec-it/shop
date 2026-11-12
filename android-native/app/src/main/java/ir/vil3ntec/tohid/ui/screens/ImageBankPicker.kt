@@ -56,6 +56,7 @@ import ir.vil3ntec.tohid.core.i18n.StrProductPages
 import ir.vil3ntec.tohid.core.i18n.StrProducts
 import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.image.BankThumbCache
 import ir.vil3ntec.tohid.core.image.ImagePrep
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.data.ImageBank
@@ -224,15 +225,12 @@ private fun spec(h: ImageBank.Hit): String = listOfNotNull(
 
 /**
  *  عکس‌های کوچکِ بانک — کشِ LRU برای همهٔ بازشدن‌ها (نه نقشهٔ بی‌سقفِ هر برگه).
- *  کلید = نشانی + اندازهٔ پیکسلی.
+ *  کلید = نشانیِ نسخه‌دار + اندازهٔ پیکسلی؛ قاعده در `core/image/BankThumbCache` (آزمون: `BankThumbCacheTest`).
  */
 private object BankThumbs {
-  private const val MAX = 48
-  private val map = object : LinkedHashMap<String, ImageBitmap>(16, 0.75f, true) {
-    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap>?) = size > MAX
-  }
-  @Synchronized fun get(k: String): ImageBitmap? = map[k]
-  @Synchronized fun put(k: String, v: ImageBitmap) { map[k] = v }
+  private val cache = BankThumbCache<ImageBitmap>(max = 48)
+  @Synchronized fun get(k: String): ImageBitmap? = cache.get(k)
+  @Synchronized fun put(k: String, v: ImageBitmap) { cache.put(k, v) }
 }
 
 /** عکسِ بانک با نشستِ کاربر؛ رمزگشایی بیرون از نخِ اصلی و فقط به اندازهٔ کادر */
@@ -240,7 +238,7 @@ private object BankThumbs {
 private fun BankImage(url: String?, size: Dp, placeholder: String) {
   val context = LocalContext.current
   val px = with(LocalDensity.current) { size.roundToPx() }.coerceAtLeast(1)
-  val key = url?.let { "$it@$px" }
+  val key = BankThumbCache.key(url, px)
   var img by remember(key) { mutableStateOf(key?.let(BankThumbs::get)) }
   LaunchedEffect(key) {
     if (url == null || key == null || img != null) return@LaunchedEffect
