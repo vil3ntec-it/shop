@@ -58,6 +58,8 @@ async function liveShop(label) {
   assert.equal(made.status, 201, JSON.stringify(made.body));
   const s = { token: u.accessToken, shopId: made.body.shop.id };
   for (const k of ['shop.orders', 'shop.delivery']) await setFlag(s.shopId, k, true);
+  //  ترتیب پیش‌فرض‌روشن است (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) ⇒ «خاموش» ِ این پرونده `false` ِ صریح است
+  await setFlag(s.shopId, R.FLAG, false);
   return { ...s, courier: await courierOf(s, 'اول') };
 }
 

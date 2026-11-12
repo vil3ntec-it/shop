@@ -48,7 +48,8 @@ async function shop(label, { view = true } = {}) {
   assert.equal(made.status, 201, JSON.stringify(made.body));
   const s = { ...u, token: u.accessToken, shopId: made.body.shop.id, slug: `r-${uniq()}` };
   for (const k of ['shop.orders', 'shop.storefront', 'shop.orders.refunds']) await setFlag(s.shopId, k, true);
-  if (view) await setFlag(s.shopId, 'shop.orders.refund_tracking', true);
+  //  پیگیری پیش‌فرض‌روشن است (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) ⇒ «خاموش» `false` ِ صریح است
+  await setFlag(s.shopId, 'shop.orders.refund_tracking', view);
   assert.equal((await h.put('/api/shop/storefront', { slug: s.slug, enabled: true, title: `ویترینِ ${label}`, contactPhone: '0700000001' }, { token: s.token })).status, 200);
   assert.equal((await push(s.token, [op('rice', { name: 'برنج', unit: 'کیلو', salePrice: 120, category: 'خوراکی' })])).status, 200);
   assert.equal((await h.put('/api/shop/storefront/products/rice', { published: true }, { token: s.token })).status, 200);

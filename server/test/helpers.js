@@ -220,8 +220,22 @@ function tampered(token, suffix = 'xx') {
   return s.slice(0, -suffix.length) + alt;
 }
 
+/**
+ * پرچم‌های پیش‌فرض‌روشنِ `lib/flag-defaults.js` (۱۴۰۵/۰۸/۲۲) برای یک دکان `false` ِ صریح ⇒ همان رفتارِ پیش از آن تاریخ.
+ * برای آزمونی که «خاموش» یا شکلِ دقیقِ پاسخِ پیشین را می‌سنجد؛ آزمون هر کلیدی را که می‌خواهد پس از این خودش روشن می‌کند.
+ */
+async function defaultOnOff(shopId, keys = [...require('../src/lib/flag-defaults').DEFAULT_ON]) {
+  for (const key of keys) {
+    await query(
+      `INSERT INTO live_config (scope, key, value, updated_at) VALUES ($1,$2,'false',$3)
+       ON CONFLICT (scope, key) DO UPDATE SET value=EXCLUDED.value`, [String(shopId), key, Date.now()],
+    );
+  }
+  require('../src/lib/hot-cache').invalidate('flag');
+}
+
 module.exports = {
-  withoutEpochs, tampered,
+  withoutEpochs, tampered, defaultOnOff,
   start, stop, resetDatabase, api, get, post, put, patch, del, raw, download, newUser, signIn, query,
   base: () => base,
   //  سرورِ HTTPِ آزمون — برای سوار کردنِ سوکتِ زنده (‎index.js‎ در تولید همین کار را می‌کند)

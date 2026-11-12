@@ -45,6 +45,8 @@ async function liveStore(label) {
   assert.equal(made.status, 201, JSON.stringify(made.body));
   const o = { shopId: made.body.shop.id, slug: `map-${uniq()}` };
   for (const k of ['shop.orders', 'shop.storefront']) await setFlag(o.shopId, k, true);
+  //  پین پیش‌فرض‌روشن است (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) ⇒ «پرچمِ خاموش» ِ این پرونده `false` ِ صریح است
+  await setFlag(o.shopId, M.FLAG, false);
   const put = await h.put('/api/shop/storefront', { slug: o.slug, enabled: true, title: `ویترینِ ${label}`, deliveryFeeMinor: 0, minOrderMinor: 0 },
     { token: u.accessToken });
   assert.equal(put.status, 200, JSON.stringify(put.body));

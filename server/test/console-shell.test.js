@@ -203,7 +203,7 @@ test('پرچمِ شناخته: مقدارِ هم‌نوع و scope ِ خودش؛
  *  ⛔ «همه روشن» ِ ویترین (`web-store-allflags.mjs`): ۴۰ کلیدِ ویترین، سفارشِ آنلاین و مشتری که کد می‌خواند در کاتالوگ نبود ⇒ زبانهٔ
  *  «پرچم‌ها» و `E2E_FLAGS_ON=all` نمی‌دیدندشان و «"true"» ِ رشته‌ای بی‌صدا نوشته می‌شد و هیچ اثری نداشت.
  */
-test('کاتالوگ: هر پرچمِ ویترین/سفارش/گفت‌وگو که کد می‌خواند شناخته، دکانی و خاموش است؛ «"true"» ِ رشته‌ای رد', async () => {
+test('کاتالوگ: هر پرچمِ ویترین/سفارش/گفت‌وگو که کد می‌خواند شناخته، دکانی و خاموش (جز پیش‌فرض‌روشن‌ها) است؛ «"true"» ِ رشته‌ای رد', async () => {
   const fs = require('fs');
   const path = require('path');
   const { KNOWN } = require('../src/routes/admin-flags');
@@ -224,7 +224,9 @@ test('کاتالوگ: هر پرچمِ ویترین/سفارش/گفت‌وگو ک
   const want = [...used].filter((k) => fam(k) && !RESERVED.includes(k) && !RETIRED.includes(k));
   assert.ok(want.length >= 50, `فقط ${want.length} کلید پیدا شد`);
   assert.deepEqual(want.filter((k) => !KNOWN.some((x) => x.key === k)).sort(), [], 'کلیدِ خوانده‌شده بیرون از کاتالوگ');
-  for (const k of KNOWN.filter((x) => fam(x.key))) assert.deepEqual([k.key, k.scope, k.default], [k.key, 'shop', false]);
+  //  خاموش مگر فهرستِ پیش‌فرض‌روشنِ `lib/flag-defaults.js` (۱۴۰۵/۰۸/۲۲) — همان یک فهرست، نه ادعای جدا
+  const { DEFAULT_ON } = require('../src/lib/flag-defaults');
+  for (const k of KNOWN.filter((x) => fam(x.key))) assert.deepEqual([k.key, k.scope, k.default], [k.key, 'shop', DEFAULT_ON.has(k.key)]);
   const sup = await login('malek');
   const r = await h.put('/api/admin/flags', { scope: 'all', key: 'shop.storefront.recent', value: 'true', reason: 'آزمونِ نوع' }, { token: sup });
   assert.equal(r.status, 400, JSON.stringify(r.body));

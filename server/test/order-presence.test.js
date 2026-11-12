@@ -44,7 +44,9 @@ async function shop(label, { presence = true, storefront = true } = {}) {
   assert.equal(made.status, 201, JSON.stringify(made.body));
   const o = { ...u, token: u.accessToken, shopId: made.body.shop.id };
   await setFlag(o.shopId, 'shop.orders', true);
-  if (presence) await setFlag(o.shopId, 'shop.orders.presence', true);
+  //  پیش‌فرض‌روشن‌ها (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) `false` ِ صریح ⇒ شکلِ پاسخِ پیشین؛ نشانگر فقط با `presence`
+  await h.defaultOnOff(o.shopId);
+  await setFlag(o.shopId, 'shop.orders.presence', presence);
   if (storefront) {
     await setFlag(o.shopId, 'shop.storefront', true);
     o.slug = `pr-${uniq()}`;

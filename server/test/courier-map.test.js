@@ -86,6 +86,8 @@ const op = (rowId, fields) => ({ op_id: `op-${uniq()}`, ts: Date.now(), table: '
 async function liveShop(label) {
   const o = await shopOwner(label);
   for (const k of ['shop.orders', 'shop.storefront', 'shop.delivery']) await setFlag(o.shopId, k, true);
+  //  نقشه پیش‌فرض‌روشن است (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) ⇒ «خاموش» ِ این پرونده `false` ِ صریح است؛ هر آزمون خودش روشن می‌کند
+  await setFlag(o.shopId, courierMap.FLAG, false);
   const slug = `m-${uniq()}`;
   const put = await h.put('/api/shop/storefront', { slug, enabled: true, title: `ویترینِ ${label}`, contactPhone: '0700000001' }, { token: o.token });
   assert.equal(put.status, 200, JSON.stringify(put.body));

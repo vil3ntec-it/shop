@@ -78,6 +78,8 @@ const d1 = await call('POST', '/api/auth/register/complete', { ticket: v1.body.t
   device: { deviceId: dev, name: 'تست', platform: 'test' }, app: 'shop', terms: { accepted: true } });
 const T = d1.body.accessToken;
 const shopId = (await call('POST', '/api/shop', { name: 'دکانِ گالری' }, T)).body.shop.id;
+//  پیش‌فرض‌روشن‌ها (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) `false` ِ صریح ⇒ همان ویترینِ پیشین؛ سپس کلیدهای همین آزمون
+for (const key of require('../src/lib/flag-defaults').DEFAULT_ON) await flag(shopId, key, false);
 for (const key of ['shop.orders', 'shop.storefront', 'shop.image_bank']) await flag(shopId, key, true);
 const put = await call('PUT', '/api/shop/storefront', { slug, enabled: true, title: 'ویترینِ گالری', contactPhone: '0700000001', acceptPickup: true, minOrderMinor: 0 }, T);
 ok(put.status === 200, 'ویترین روشن شد', JSON.stringify(put.body).slice(0, 120));

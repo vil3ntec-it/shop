@@ -84,6 +84,8 @@ const A = (await call('POST', '/api/admin/login', { username: 'admin', password:
 
 async function shop(name, slug, flags, T) {
   const shopId = (await call('POST', '/api/shop', { name }, T)).body.shop.id;
+  //  پیش‌فرض‌روشن‌ها (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) `false` ِ صریح ⇒ همان ویترینِ پیشین؛ سپس کلیدهای همین آزمون
+  for (const key of require('../src/lib/flag-defaults').DEFAULT_ON) await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key, value: false }, A);
   for (const key of flags) await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key, value: true }, A);
   const put = await call('PUT', '/api/shop/storefront', { slug, enabled: true, title: name, contactPhone: '0700000001', acceptPickup: true, minOrderMinor: 0 }, T);
   ok(put.status === 200, `ویترینِ «${name}»`, JSON.stringify(put.body).slice(0, 120));
