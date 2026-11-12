@@ -397,6 +397,7 @@ private fun RouteScope.MergeConfirmRoute() {
   val keepId = args["keep"].orEmpty()
   val dropId = args["drop"].orEmpty()
   val p = remember(data, keepId, dropId) { DebtorMergeModel.preview(data, keepId, dropId) }
+  val limitRules = ir.vil3ntec.tohid.ui.components.rememberCreditLimitRules() // CRM-03: ادغامی که سقفِ ماندگار را عوض می‌کند
   if (p == null) { LandOn(MoneyPaths.MERGE); return }
   VipGate(Str.debtors) {
     V3ConfirmSheet(
@@ -407,7 +408,7 @@ private fun RouteScope.MergeConfirmRoute() {
       danger = false,
       onConfirm = {
         back()
-        MoneyWriter.merge(store, toasts, context, keepId, dropId) { r -> StrMoney.merged(r.drop.name, r.keep.name) }
+        MoneyWriter.merge(store, toasts, context, keepId, dropId, limitRules) { r -> StrMoney.merged(r.drop.name, r.keep.name) }
       },
       onDismiss = { back() },
     )

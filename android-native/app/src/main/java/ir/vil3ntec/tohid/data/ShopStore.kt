@@ -630,11 +630,16 @@ class ShopStore(
    *  [update] (قفلِ نوشتن، قفلِ نرم، op). بسته ([mergeBlockedReason]) ⇒ `Failed` با همان دلیل:
    *  نه نوشتن، نه op.
    */
-  suspend fun mergeCustomers(keepId: String, dropId: String): CustomerMerge.Result {
+  suspend fun mergeCustomers(
+    keepId: String,
+    dropId: String,
+    /** CRM-03 — «تغییرِ سقفِ اعتبار» ِ همین کاربر (`CustomerMerge.merge`)؛ پیش‌فرض خاموش ⇒ همان امروز */
+    limitRules: ir.vil3ntec.tohid.core.perm.CreditLimitPerm.Rules = ir.vil3ntec.tohid.core.perm.CreditLimitPerm.Rules.OFF,
+  ): CustomerMerge.Result {
     mergeBlockedReason()?.let { return CustomerMerge.Result.Failed(it) }
     var out: CustomerMerge.Result = CustomerMerge.Result.Failed(StrShell.mergeNotSaved)
     val wrote = update { d ->
-      when (val r = CustomerMerge.merge(d, keepId, dropId)) {
+      when (val r = CustomerMerge.merge(d, keepId, dropId, limitRules)) {
         is CustomerMerge.Result.Ok -> { out = r; r.data }
         is CustomerMerge.Result.Failed -> { out = r; null }
       }

@@ -144,6 +144,7 @@ internal fun CustomerMergeDialog(d: ShopData, store: ShopStore, onDismiss: () ->
   val scope = rememberCoroutineScope()
   val groups = remember(d) { CustomerMerge.duplicates(d) }
   val blocked = remember { store.mergeBlockedReason() }
+  val limitRules = ir.vil3ntec.tohid.ui.components.rememberCreditLimitRules() // CRM-03: ادغامی که سقفِ ماندگار را عوض می‌کند
   var pending by remember { mutableStateOf<CustomerMerge.Preview?>(null) }
   var busy by remember { mutableStateOf(false) }
   val c = Shop.colors
@@ -172,7 +173,7 @@ internal fun CustomerMergeDialog(d: ShopData, store: ShopStore, onDismiss: () ->
                   onClick = {
                     busy = true
                     scope.launch {
-                      when (val r = store.mergeCustomers(p.keep.id, p.drop.id)) {
+                      when (val r = store.mergeCustomers(p.keep.id, p.drop.id, limitRules)) {
                         is CustomerMerge.Result.Ok -> { toast(StrMoney.merged(p.drop.name, p.keep.name)); pending = null }
                         is CustomerMerge.Result.Failed -> toast(r.message)
                       }
