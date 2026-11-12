@@ -20,6 +20,8 @@
 - «بی‌توقف تا آخر». ولی سقفِ هفتگی واقعی است: سه عاملِ هم‌زمان (هر کدام ۳۰۰ تا ۷۰۰ هزار توکن) سقف را در حدودِ یک روز تمام کرد.
 
 **ابزارهای تازهٔ همین پوشه:**
+- `offline-run.sh <فرمان…>` — همان فرمان در فضای شبکهٔ تازه: **بی اینترنت واقعی** (نه DNS، نه پراکسی)، فقط 127.0.0.1؛ پیش از اجرا خودش می‌سنجد. نمونه: `web-store-zones.mjs` بی اینترنت ۱۱۵ ✅ (۱۴۰۵/۰۸/۲۲).
+- `verify-all.sh <worktree> [--offline]` — همه چیز پشتِ هم بی ایست (سرور PGlite، E2E، همهٔ زنجیره‌های مرورگر، core، desktop/android) با خلاصه در `verify-<نام>.log`؛ تنها اجرا شود.
 - `ci-status.sh shop|server <pr>…` — خلاصهٔ چک‌های head ِ PR و id ِ هر کارِ سرخ (لاگ: `gh api repos/vil3ntec-it/<repo>/actions/jobs/<id>/logs`).
 - `precheck.sh <worktree>` — همهٔ سنجه‌های ایستا پیش از push (api-contract، spec، whatsnew، quality، secret-scan، dari-words، kt-names، ثبتِ `Str*`). spec «سالم» نیست ⇒ `node docs/spec/tools/spec.mjs status`.
 - `bmerge-docs.sh <worktree> <branch>…` — ادغامِ پشتِ هم با حلِ خودکارِ HANDOFF/WHATS-NEW/STATUS؛ روی هر تعارضِ دیگر می‌ایستد.
