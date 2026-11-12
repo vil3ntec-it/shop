@@ -92,6 +92,6 @@ class PromoGroupTest {
       "ui/screens/DeskSale.kt" to "rememberOutcome(d, cart, cartDebtorId)",
       "ui/screens/Promos.kt" to "FilterChip(\n              selected = g in f.groups,",
     ).forEach { (file, needle) -> assertTrue("$file ⇐ $needle", src(file).contains(needle)) }
-    assertTrue(src("ui/PromoLive.kt").contains("PromoEngine.evaluate(d, cart, s, codes, today, minute, group)"))
+    assertTrue(src("ui/PromoLive.kt").contains("PromoEngine.evaluate(d, cart, s, codes, today, minute, group, debtorId)"))
   }
 }

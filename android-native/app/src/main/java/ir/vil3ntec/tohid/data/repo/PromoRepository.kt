@@ -7,6 +7,7 @@ import ir.vil3ntec.tohid.core.promo.PromoHeld
 import ir.vil3ntec.tohid.data.PermPolicy
 import ir.vil3ntec.tohid.data.PromoJson
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -39,11 +40,8 @@ class PromoRepository(private val api: ApiClient) {
    *  PRM-02 — کدهای سقف‌دارِ همین فاکتور پیش از ثبت (`POST /redeem`). همان `saleId` دوباره
    *  مصرفِ دوم نمی‌سازد؛ همه یا هیچ. خطا ⇒ `ApiFailure` با `status` و `code` ِ سرور (`PromoRedeem.decide`).
    */
-  suspend fun redeem(saleId: String, codes: List<String>): ApiResult<Unit> = result {
-    api.post("$ROOT/redeem", buildJsonObject {
-      put("saleId", saleId)
-      put("codes", JsonArray(codes.map { JsonPrimitive(it) }))
-    })
+  suspend fun redeem(saleId: String, codes: List<String>, debtorId: String?): ApiResult<Unit> = result {
+    api.post("$ROOT/redeem", redeemBody(saleId, codes, debtorId))
     Unit
   }
 
@@ -67,8 +65,18 @@ class PromoRepository(private val api: ApiClient) {
     PromoHeld.releasedOf(api.post(PromoHeld.RELEASE_PATH, PromoHeld.releaseBody(saleId)))
   }
 
-  private companion object {
-    const val ROOT = "/shop/promos"
-    fun enc(s: String): String = URLEncoder.encode(s, "UTF-8")
+  companion object {
+    private const val ROOT = "/shop/promos"
+    private fun enc(s: String): String = URLEncoder.encode(s, "UTF-8")
+
+    /**
+     *  بدنهٔ `POST /redeem`. PRM-11: کلیدِ `debtorId` همیشه هست (بی مشتری ⇒ `null` ِ صریح) — سرور کدِ قاعدهٔ
+     *  گروه‌دار را فقط با گروهِ قرض‌دارِ دفترِ خودش می‌گیرد؛ نبودنِ کلید یعنی برنامهٔ پیشین.
+     */
+    fun redeemBody(saleId: String, codes: List<String>, debtorId: String?): JsonObject = buildJsonObject {
+      put("saleId", saleId)
+      put("codes", JsonArray(codes.map { JsonPrimitive(it) }))
+      put("debtorId", debtorId?.let { JsonPrimitive(it) } ?: JsonNull)
+    }
   }
 }

@@ -93,6 +93,8 @@ object PromoEngine {
     val tags: Map<String, LineTag> = emptyMap(),
     /** همان `Snapshot.stamp` هنگامِ سنجش */
     val stamp: Boolean = false,
+    /** PRM-11 — مشتریِ سبدی که تخفیف با او سنجیده شد؛ `PromoLive.redeemGate` همان را به `POST /redeem` می‌دهد */
+    val debtorId: String? = null,
   )
 
   /** سقفِ `Sale.coupons` — کدِ هسته ۳ تا ۳۲ نویسه است */
@@ -205,6 +207,7 @@ object PromoEngine {
    *  @param date تاریخِ محلیِ دکان «YYYY-MM-DD»
    *  @param minute دقیقه از نیمه‌شب
    *  @param group PRM-11 — گروهِ مشتریِ فاکتور ([groupOf])؛ "" ⇒ همان سبدِ بی گروهِ پیشین
+   *  @param debtorId PRM-11 — همان مشتری، فقط برای [Outcome.debtorId] (سرور گروه را از دفترِ خودش می‌سنجد)
    */
   fun evaluate(
     d: ShopData,
@@ -214,6 +217,7 @@ object PromoEngine {
     date: String,
     minute: Int,
     group: String = "",
+    debtorId: String? = null,
   ): Outcome? {
     if (!snap.active || cart.isEmpty()) return null
     //  PRM-10: محموله‌ها فقط وقتی قاعدهٔ فعالِ «نزدیکِ انقضا» هست — وگرنه همان ورودیِ پیشین
@@ -245,6 +249,7 @@ object PromoEngine {
       cart = priced,
       tags = tags,
       stamp = snap.stamp,
+      debtorId = debtorId,
     )
   }
 

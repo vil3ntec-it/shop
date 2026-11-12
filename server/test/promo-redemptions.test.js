@@ -181,6 +181,46 @@ test('PRM-11: کدِ «فقط ویترین» در صندوق گرفته نمی�
   assert.deepEqual(ok.body.codes.map((c) => [c.code, c.status]), [['BOTH10', 'redeemed'], ['ANY10', 'redeemed']]);
 });
 
+test('PRM-11: گروهِ مشتری در صندوق — قرض‌دارِ دفترِ همین دکان با همان املای قاعده؛ گروهِ دیگر یا بی مشتری wrong_group؛ برنامهٔ پیشین (بی کلید) همان پیشین', async () => {
+  const t = await shopWithTeam('گروه');
+  const o = await shopWithTeam('گروهِ دیگر');
+  await rule(t, 'vip', { code: 'VIP10', maxUses: 9, groups: ['عمده‌فروش'] });
+  await rule(t, 'all', { code: 'ALL10', maxUses: 9, stack: 'combine' });
+  const pushed = async (who, rows) => {
+    const r = await h.api('POST', '/api/sync/v1/push', {
+      token: who, headers: { 'X-App': 'shop', 'X-Device': 'dev-redeem-grp' },
+      body: { device_id: 'dev-redeem-grp', schema_version: 2, ops: rows.map(([id, f]) => ({ op_id: `op-${id}-${saleId()}`, ts: Date.now(), table: 'debtors', row_id: id, type: 'insert', fields: f })) },
+    });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+  };
+  await pushed(t.owner, [['d-big', { name: 'احمد', group: ' عمده فروش ' }], ['d-small', { name: 'محمود', group: 'خرده' }], ['d-none', { name: 'بی‌گروه' }]]);
+  //  دکانِ دیگر همان شناسه را با گروهِ درست دارد — به این دکان نمی‌رسد
+  await pushed(o.owner, [['d-small', { name: 'دیگری', group: 'عمده‌فروش' }]]);
+  const go = (sale, codes, extra) => h.post('/api/shop/promos/redeem', { saleId: sale, codes, ...extra }, { token: t.staff });
+  const ok = await go(saleId(), ['VIP10', 'ALL10'], { debtorId: 'd-big' });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.deepEqual(ok.body.codes.map((c) => c.status), ['redeemed', 'redeemed']);
+  for (const [debtorId, why] of [['d-small', 'گروهِ دیگر'], ['d-none', 'بی گروه'], [null, 'بی مشتری']]) {
+    const r = await go(saleId(), ['ALL10', 'VIP10'], { debtorId });
+    assert.equal(r.status, 409, `${why}: ${JSON.stringify(r.body)}`);
+    assert.deepEqual(r.body.error.codes.map((c) => [c.code, c.status]), [['ALL10', 'ok'], ['VIP10', 'wrong_group']], why);
+    assert.equal(r.body.error.message, 'کدِ VIP10 فقط برای گروهِ دیگری از مشتریان است — آن را از سبد بردارید', why);
+  }
+  assert.equal(await usesOf(t, 'vip'), 1, 'ردشده‌ها ظرفیت نسوزاندند');
+  assert.equal(await usesOf(t, 'all'), 1, 'همه یا هیچ');
+  //  قاعدهٔ بی گروه با هر مشتری یا بی مشتری
+  assert.equal((await go(saleId(), ['ALL10'], { debtorId: null })).status, 200);
+  //  برنامهٔ پیشین کلیدِ `debtorId` را نمی‌فرستد ⇒ همان رفتارِ پیشین (داوریِ پس از فروشِ STF-03 می‌ماند)
+  assert.equal((await go(saleId(), ['VIP10'])).status, 200);
+  //  مشتریِ هنوز همگام‌نشده (ساخته‌شده روی همین دستگاه) ⇒ ردِ نادرست نه؛ داوری با همگام‌سازی
+  assert.equal((await go(saleId(), ['VIP10'], { debtorId: 'd-fresh-local' })).status, 200);
+  for (const debtorId of [5, 'x'.repeat(65), 'bad id', ['d-big']]) {
+    const r = await go(saleId(), ['VIP10'], { debtorId });
+    assert.equal(r.status, 400, `${JSON.stringify(debtorId)} ⇒ ${JSON.stringify(r.body)}`);
+    assert.equal(r.body.error.code, 'invalid_debtor_id');
+  }
+});
+
 test('ورودیِ نادرست ۴۰۰؛ فقط عضوِ نویسنده؛ دکانِ دیگر کد را نمی‌بیند', async () => {
   const t = await shopWithTeam('ورودی');
   const o = await shopWithTeam('دیگر');
