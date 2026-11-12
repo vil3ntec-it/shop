@@ -363,7 +363,8 @@ class CartStore(context: Context) : HeldCart {
      *  بعدی می‌رسید و نمونهٔ تازه پیش‌نویسِ کهنه را «بازیابی» می‌کرد (`CartStorePageDesktopTest`، سرخیِ گاه‌به‌گاهِ CI ِ #1040).
      */
     internal fun awaitWrites() {
-      runCatching { writer.submit {}.get(5, java.util.concurrent.TimeUnit.SECONDS) }
+      //  همان `submit(Callable).get()` ِ `replace` — shim ِ آیفون (`ios/shared/.../Concurrent.kt`) get با مهلت و TimeUnit ندارد
+      runCatching { writer.submit(Callable { Unit }).get() }
     }
 
     private fun write(target: File, draft: SaleDraft, after: () -> Unit) {
