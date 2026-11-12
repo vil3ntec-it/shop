@@ -100,7 +100,7 @@ internal fun HesabPaySimpleEntry(
   var open by remember(saleKey) { mutableStateOf(false) }
   Column(modifier) {
     OutlinedButton(
-      onClick = { open = true },
+      onClick = { if (hook.ready()) open = true },
       enabled = enabled && !busy,
       modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
     ) { Text(StrPay.payToShop) }

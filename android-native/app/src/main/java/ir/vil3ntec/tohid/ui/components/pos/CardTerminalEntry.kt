@@ -60,6 +60,8 @@ internal fun CardTerminalEntry(
   customerId: String?,
   enabled: Boolean,
   busy: Boolean,
+  /** پیش از کارت کشیدن (`GatewayHook.ready`): `false` ⇒ صفحهٔ صندوق چیزی پرسید (S22) و درخواستی به کارت‌خوان نمی‌رود */
+  ready: () -> Boolean = { true },
 ) {
   val due = HesabPaySettle.due(total, panel.draft(total, customerId))
   if (saleKey == null || due !is HesabPaySettle.Due.Amount) return
@@ -76,7 +78,8 @@ internal fun CardTerminalEntry(
 
   Column(Modifier.fillMaxWidth().padding(top = 6.dp)) {
     OutlinedButton(
-      onClick = {
+      onClick = click@{
+        if (!ready()) return@click
         note = null
         scope.launch {
           when (val r = terminal.requestPayment(due.minor, saleKey)) {
