@@ -216,5 +216,7 @@ private fun rememberPlan(): ProfileHomeModel.Plan {
     serverDays = SubscriptionPulse.days,
     serverTrial = SubscriptionPulse.trial,
     warnDays = SUBSCRIPTION_WARN_DAYS,
+    localEndsAt = status?.payload?.subscriptionEndsAt ?: 0L,
+    serverEndsAt = SubscriptionPulse.endsAt,
   )
 }
