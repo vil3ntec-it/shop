@@ -198,3 +198,47 @@ test('AVIF بالای سقفِ پیکسل ⇒ WebP ِ همان عکس (کوچک�
     assert.ok(only.buf.equals(png));
   } finally { config.storefront.webp = false; config.storefront.avif = false; }
 });
+
+test('srcset (`STORE_SIZES`): `?w=` از فهرستِ پهناها ⇒ همان عکس با همان پهنا؛ پهنای دیگر یا خاموش ⇒ همان اصل؛ سرِ ویترین پهناها را فقط روشن می‌گوید', { skip: !hasSharp && 'sharp نصب نیست' }, async () => {
+  const sharp = require('sharp');
+  const W0 = 640; const H0 = 480; const raw = Buffer.alloc(W0 * H0 * 3);
+  for (let y = 0; y < H0; y++) for (let x = 0; x < W0; x++) {
+    const i = (y * W0 + x) * 3; raw[i] = x % 256; raw[i + 1] = y % 256; raw[i + 2] = ((x ^ y) * 3) % 256;
+  }
+  const jpg = await sharp(raw, { raw: { width: W0, height: H0, channels: 3 } }).jpeg({ quality: 90 }).toBuffer();
+  config.storefront.sizes = false;
+  const slug = await storeWithPhoto(jpg);
+  try {
+    //  خاموش: `?w=` نادیده، سر بی `imageWidths`
+    let off = await get(slug, '/products/rice/photo?w=320', { Accept: 'image/jpeg' });
+    assert.ok(off.buf.equals(jpg));
+    let head = await (await fetch(`${h.base()}/api/store/${slug}`)).json();
+    assert.equal(head.imageWidths, undefined);
+
+    config.storefront.sizes = true;
+    W._reset();
+    head = await (await fetch(`${h.base()}/api/store/${slug}`)).json();
+    assert.deepEqual(head.imageWidths, W.WIDTHS);
+    const r = await get(slug, '/products/rice/photo?w=320', { Accept: 'image/jpeg,*/*' });
+    assert.equal(r.status, 200);
+    assert.match(r.type, /^image\/jpeg/);
+    assert.equal((await sharp(r.buf).metadata()).width, 320);
+    assert.match(r.vary, /accept/i);
+    assert.match(r.etag, /-w320-jpeg"$/);
+    const again = await fetch(`${h.base()}/api/store/${slug}/products/rice/photo?w=320`, { headers: { Accept: 'image/jpeg', 'If-None-Match': r.etag } });
+    assert.equal(again.status, 304);
+    //  با WebP ِ روشن همان پهنا به WebP
+    config.storefront.webp = true;
+    const w = await get(slug, '/products/rice/photo?w=160', ACCEPT);
+    assert.match(w.type, /^image\/webp/);
+    assert.equal((await sharp(w.buf).metadata()).width, 160);
+    config.storefront.webp = false;
+    //  بزرگ‌تر از اصل ⇒ بزرگ نمی‌شود؛ پهنای بیرون از فهرست ⇒ همان اصل
+    const big = await get(slug, '/products/rice/photo?w=960', { Accept: 'image/jpeg' });
+    assert.ok((await sharp(big.buf).metadata()).width <= W0);
+    off = await get(slug, '/products/rice/photo?w=333', { Accept: 'image/jpeg' });
+    assert.ok(off.buf.equals(jpg));
+    off = await get(slug, '/products/rice/photo?w=abc', { Accept: 'image/jpeg' });
+    assert.ok(off.buf.equals(jpg));
+  } finally { config.storefront.sizes = false; config.storefront.webp = false; }
+});

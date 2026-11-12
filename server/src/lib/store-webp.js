@@ -17,7 +17,10 @@
  *
  *   formats(accept) ⇒ ['avif'?, 'webp'?] — قالب‌های روشن و پذیرفتهٔ همین مرورگر، به ترتیب؛ نخستینِ ساخته‌شده فرستاده می‌شود
  *   pick(accept) ⇒ 'avif' | 'webp' | null — نخستینِ همان
- *   encodedOf(data, hash, size, fmt) ⇒ Buffer ِ همان قالب یا null (یعنی همان اصل را بفرست)
+ *   ⛔ پهناهای پاسخ‌گو (WEB-16، srcset): فقط با `STORE_SIZES=1` و فقط پهناهای `WIDTHS` (`?w=`)؛ کوچک‌تر از اصل، هرگز بزرگ‌تر.
+ *      سرِ ویترین `imageWidths` را فقط همان‌وقت می‌گوید تا مرورگر srcset ِ دروغ نسازد؛ خاموش ⇒ `?w=` نادیده.
+ *   widthOf(q) ⇒ پهنای مجاز یا null
+ *   encodedOf(data, hash, size, fmt, width) ⇒ Buffer ِ همان قالب (fmt null ⇒ JPEG، فقط با width) یا null (یعنی همان اصل را بفرست)
  *   webpOf(data, hash, size) = encodedOf(…, 'webp')
  */
 const config = require('../config');
@@ -32,12 +35,16 @@ const MAX_PIXELS = 40_000_000;
 const QUALITY = Object.freeze({ thumb: 70, display: 78 });
 //  AVIF با کیفیتِ عددیِ کمتر هم‌چشم با WebP است؛ effort ِ ۴ (از ۰ تا ۹) ⇒ زمانِ رمزگذاریِ معقول برای ۳۲۰ و اندازهٔ برگهٔ کالا
 const AVIF_QUALITY = Object.freeze({ thumb: 50, display: 55 });
+/** پهناهای srcset (پیکسل) — کارتِ ۱۵۰ تا ۳۰۰ ِ CSS در ۱x تا ۳x و برگهٔ کالا */
+const WIDTHS = Object.freeze([160, 320, 480, 640, 960]);
 
 const { lib } = require('./sharp-lib');   //  بارکنندهٔ مشترک (اختیاری، هرگز زیرِ Electron)
 
 const on = () => !!config.storefront.webp;
 const avifOn = () => !!config.storefront.avif;
-const available = () => (on() || avifOn()) && !!lib();
+const sizesOn = () => !!config.storefront.sizes && !!lib();
+const available = () => (on() || avifOn() || !!config.storefront.sizes) && !!lib();
+const widthOf = (q) => (sizesOn() && /^\d{2,4}$/.test(String(q || '')) && WIDTHS.includes(Number(q)) ? Number(q) : null);
 const accepts = (accept, type) => new RegExp(`(^|,)\\s*image\\/${type}\\s*(;|,|$)`, 'i').test(String(accept || ''));
 const wants = (accept) => accepts(accept, 'webp');
 /** قالب‌های پاسخ به ترتیب: AVIF (اگر روشن و پذیرفته) ⇐ WebP (اگر روشن و پذیرفته)؛ تهی ⇒ همان اصل */
@@ -63,9 +70,10 @@ let jobs = 0;
 let avifJobs = 0;
 const webpOf = (data, hash, size) => encodedOf(data, hash, size, 'webp');
 
-async function encodedOf(data, hash, size, fmt = 'webp') {
-  if (!available() || !Buffer.isBuffer(data) || !data.length || !QUALITY[size] || (fmt !== 'webp' && fmt !== 'avif')) return null;
-  const key = `${hash}:${size}:${fmt}`;
+async function encodedOf(data, hash, size, fmt = 'webp', width = null) {
+  if (!available() || !Buffer.isBuffer(data) || !data.length || !QUALITY[size]) return null;
+  if (fmt !== 'webp' && fmt !== 'avif' && !(fmt === null && width)) return null;
+  const key = `${hash}:${size}:${fmt}:${width || ''}`;
   const hit = cache.get(key);
   if (hit !== undefined) {
     cache.delete(key); cache.set(key, hit);
@@ -82,11 +90,11 @@ async function encodedOf(data, hash, size, fmt = 'webp') {
       const m = await sharp(data, { limitInputPixels: MAX_PIXELS }).metadata();
       if (!(Number(m.width) * Number(m.height) <= AVIF_MAX_PIXELS)) { remember(key, SKIP); return null; }
     }
-    const out = await sharp(data, { limitInputPixels: MAX_PIXELS, failOn: 'error' })
+    const img = sharp(data, { limitInputPixels: MAX_PIXELS, failOn: 'error' })
       .rotate()                                    //  جهتِ EXIF روی پیکسل؛ خروجی بی فراداده
-      .resize({ width: SIDE[size], height: SIDE[size], fit: 'inside', withoutEnlargement: true })
-      [fmt]({ quality: (avif ? AVIF_QUALITY : QUALITY)[size], effort: 4 })
-      .toBuffer();
+      .resize({ width: width || SIDE[size], height: SIDE[size], fit: 'inside', withoutEnlargement: true });
+    const out = await (fmt ? img[fmt]({ quality: (avif ? AVIF_QUALITY : QUALITY)[size], effort: 4 })
+      : img.jpeg({ quality: QUALITY[size], mozjpeg: true })).toBuffer();
     //  فقط اگر واقعاً سبک‌تر شد؛ وگرنه همان اصل
     if (!out.length || out.length >= data.length) { remember(key, SKIP); return null; }
     remember(key, out);
@@ -101,5 +109,6 @@ async function encodedOf(data, hash, size, fmt = 'webp') {
 function _reset() { cache.clear(); cached = 0; jobs = 0; avifJobs = 0; }
 
 module.exports = {
-  MAX_JOBS, AVIF_JOBS, AVIF_MAX_PIXELS, SIDE, CACHE_BYTES, on, avifOn, available, wants, formats, pick, webpOf, encodedOf, _reset,
+  MAX_JOBS, AVIF_JOBS, AVIF_MAX_PIXELS, SIDE, WIDTHS, CACHE_BYTES, on, avifOn, sizesOn, available, wants, formats, pick, widthOf, webpOf,
+  encodedOf, _reset,
 };

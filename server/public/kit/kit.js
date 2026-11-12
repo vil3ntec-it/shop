@@ -430,7 +430,7 @@
     var st = K.stockOf(p);
     var li = el('li', { class: 'p-card' + (st.orderable ? '' : ' unavailable'), attrs: { 'data-id': p.id } });
     var img = el('span', { class: 'p-img' + (p.photo ? ' tile' : '') });
-    if (p.photo) img.appendChild(K.photo({ src: o.photo, alt: '', loading: 'lazy', decoding: 'async', width: '300', height: '300' }, p.name));
+    if (p.photo) img.appendChild(K.photo({ src: o.photo, srcset: o.srcset, sizes: o.srcset && '(min-width:600px) 220px,46vw', alt: '', loading: 'lazy', decoding: 'async', width: '300', height: '300' }, p.name));
     else img.appendChild(el('span', { class: 'ph', text: String(p.name || '?').slice(0, 1), attrs: { 'aria-hidden': 'true' } }));
     var deal = p.regularPriceMinor > p.priceMinor;
     var label = [p.name, K.money(p.priceMinor) + (p.unit ? ' ' + K.t('p.per', { unit: p.unit }) : '')];

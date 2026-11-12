@@ -132,6 +132,8 @@ router.get('/:slug', readLimit, store, async (req, res) => {
     ...await featuresOf(req.store.shop_id, req.store),
     //  WEB-20: پیوندِ قابلِ پیش‌نمایشِ کالا فقط با پرچمِ `shop.storefront.seo`؛ خاموش ⇒ این کلید نیست
     ...(seo ? { seo } : {}),
+    //  WEB-16: پهناهای srcset فقط وقتی سرور می‌سازدشان (`STORE_SIZES` + sharp)؛ وگرنه کلید نیست و کارت همان یک عکس
+    ...(webp.sizesOn() ? { imageWidths: webp.WIDTHS } : {}),
   });
 });
 
@@ -272,13 +274,16 @@ const picture = (size) => async (req, res) => {
   if (webp.available()) {
     res.set('Vary', 'Accept');
     //  نخستین قالبِ ساخته‌شده (AVIF ِ بیش از سقفِ پیکسل یا سرِ پر ⇒ WebP)؛ ⛔ بدنهٔ خالی هرگز — همان اصل
-    for (const fmt of webp.formats(req.get('accept'))) {
-      const w = await webp.encodedOf(p.data, p.hash, size, fmt);
+    //  WEB-16 srcset: `?w=` فقط پهنای مجاز با `STORE_SIZES` (`widthOf`)؛ بی قالبِ پذیرفته همان پهنا به JPEG
+    const width = webp.widthOf(req.query.w);
+    const list = webp.formats(req.get('accept'));
+    for (const fmt of width ? [...list, null] : list) {
+      const w = await webp.encodedOf(p.data, p.hash, size, fmt, width);
       if (!w || !w.length) continue;
-      const wtag = `"${p.hash}-${fmt}"`;
+      const wtag = `"${p.hash}${width ? `-w${width}` : ''}-${fmt || 'jpeg'}"`;
       res.set('ETag', wtag);
       if (req.get('if-none-match') === wtag) return res.status(304).end();
-      return res.type(`image/${fmt}`).send(w);
+      return res.type(`image/${fmt || 'jpeg'}`).send(w);
     }
   }
   res.set('ETag', etag);
