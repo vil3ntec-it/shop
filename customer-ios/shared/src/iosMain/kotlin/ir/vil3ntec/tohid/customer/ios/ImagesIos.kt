@@ -54,11 +54,12 @@ object ImagesIos {
   @Composable
   fun Tile(http: HttpIos, url: String, modifier: Modifier, loaded: (Boolean) -> Unit) {
     val img by produceState(cache[url], url) {
+      //  فرستندهٔ مبدأ روی همین نخِ صفحه (نقشهٔ `origins` از چند نخ نوشته نمی‌شود)
+      val (sender, path) = if (url.startsWith("/")) http to url else {
+        val cut = url.indexOf('/', "https://".length).takeIf { url.startsWith("https://") && it > 0 }
+        if (cut == null) null to url else origins.getOrPut(url.substring(0, cut)) { HttpIos { url.substring(0, cut) } } to url.substring(cut)
+      }
       if (value == null) value = withContext(Dispatchers.IO) {
-        val (sender, path) = if (url.startsWith("/")) http to url else {
-          val cut = url.indexOf('/', "https://".length).takeIf { url.startsWith("https://") && it > 0 }
-          if (cut == null) null to url else origins.getOrPut(url.substring(0, cut)) { HttpIos { url.substring(0, cut) } } to url.substring(cut)
-        }
         val r = try { sender?.send(ShopperRequest("GET", path, binary = true)) } catch (_: Throwable) { null }
         r?.bytes?.takeIf { r.status == 200 }?.let { decode(it) }
       }?.also { b ->
