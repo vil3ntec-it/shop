@@ -54,6 +54,29 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-28l زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-28l` (از سرِ `claude/batch-55`)
+
+- **ساخته شد:** LOC-06 دورِ ۳ — متنِ خامِ `ui/screens` **۱۷۸ ⇐ ۷۳** (`DariCoverageTest.maxRawOldScreens`). (ب) ۷۴ متنِ صفحه‌های فقط‌پیش‌نمایشِ گوشی
+  (`Sale`، `QuickSale`، `Profile`، `ProfileModel`، `Settings`، `Debtors`، `DebtorDetail`، `DebtorTxSheet`، `NavEditor`، `PhoneHomeModel`، `IdleLockChoice`،
+  `VoiceSearch`) به `Str*` — اول همان جملهٔ موجودِ جدول (با آرگومان و `td` هم؛ 22n فقط بی‌آرگومان/`t` را گرفته بود)، بقیه ویژگیِ تازه در `StrSalePages`/
+  `StrDebtPages`/`StrShellPages`؛ (ج) `ui/screens/ProductDetail.kt` (+ `movementLabelOf`) و `ui/screens/Receipts.kt` برداشته شدند (جانشینِ نسخهٔ ۳
+  دارند؛ استنادِ IMG-PRO-11 به `ui/v3/products/ProductDetailScreen` برگشت؛ «`Receipts` (PRM-13)» ِ 13t اشتباه بود — آن `print/Receipts.kt` است)؛
+  `WarehouseDialogs` و `PhoneClaimStep` جانشینِ کامل ندارند ⇒ ۲۷ متنشان به `StrStockPages`/`StrShellPages`. نگهبانِ تازه `PreviewPagesTextTest` (۴).
+  (الف) ۷۳ ِ `DayEndModel`/`HeatmapModel` دست نخورد ⇒ پرسشِ `OWNER-PENDING-fa.md` ۴-۳ (پیشنهادِ پیش‌فرض الف)؛ LOC-06 در نقشه از «کد» به «تصمیم».
+- **آزمون‌های سیمِ فقط‌پیش‌نمایش ⇐ نسخهٔ ۳:** Gift/Layaway/Quote/SpecialOrder/TillReceivePhone ⇐ `PhoneTillTools`+`SaleRoute`؛ Loyalty/SaleNotes/
+  ApprovalScope/PhoneTill ⇐ `CheckoutRoute`/`CheckoutSession`/`QuickSaleRoute`؛ PromoLive ⇐ `SafeSignOut`؛ LegacySyncCall ⇐ `SyncScreen`؛ S18 ⇐
+  `CustomerPickerSheet`؛ PromoGroup/SafePanel: سطرِ پیش‌نمایش برداشته. جهش: بی `GiftCardBar`/`TillReceivePhone` در `PhoneTillTools` ⇐ دو آزمون سرخ.
+- **باگ‌های واقعی (در نسخهٔ ۳ سیم ندارد؛ یادداشت در STATUS ِ همان ردیف، ساخته نشد):** (۱) **OPS-02** «پاک‌سازی کامل اطلاعات» در
+  `v3/settings/sections/BackupScreen`: برای هر کسی با `settings.write` (مدیر هم)، یک برگهٔ تأییدِ ساده (نه دو مرحله با نامِ دکان) و «پاک شد» بی نگاه به
+  نتیجهٔ `replaceAll` — رابطِ پیشین فقط صاحب بود؛ پرخطرترین. (۲) **S45** کادرِ ردیفِ گوشیِ نسخهٔ ۳ (`LineModel.apply`) قاعدهٔ «قیمت و تخفیفِ ردیف» و
+  «درخواستِ تأیید» ندارد (ردیف IMPLEMENTED-VERIFIED است؛ وضعیتش بازبینی شود). (۳) **AI-11** «جست‌وجو با عکس» در گوشیِ نسخهٔ ۳ نیست. (۴) **AUTH-08**
+  گامِ کدِ شمارهٔ تازه در نسخهٔ ۳ نیست (پیش از روشن کردنِ `auth.phone_add_code`).
+- **قدمِ بعدی:** ساختنِ چهار سیمِ بالا در نسخهٔ ۳ (اول OPS-02)؛ پاسخِ ۴-۳ ⇐ ۷۳ ِ مانده؛ سپس پیش‌نمایشِ DevShot به نسخهٔ ۳ و برداشتنِ صفحه‌های قدیمی.
+  «تازه‌ها» سطر نمی‌خواهد (هیچ چیزِ دیدنی برای کاربر: پیش‌نمایش، مرده و آزمون؛ `WHATSNEW_OK`).
+- **آزمون:** اجرای کاملِ `./desktop/gradlew -p desktop test` (با `flock`، `test-data` ِ پاک) **۴٬۰۲۹ PASS، ۰ FAIL، ۴ SKIP ِ پیشین** (۶۳۳ کلاس)؛ هدف‌دار: ۲۳ کلاس سبز (`DariCoverageTest` ۲۳، `I18nCoverageTest` ۸، `DariWordsTest` ۱۷، `DesktopPhrasesTest` ۴، همهٔ
+  آزمون‌های سیمِ جابه‌جاشده، `V3ReachabilityTest` ۹، `NoLegacyUiTest` ۵)؛ `dari-text.test.js` ۱۷/۱۷؛ نگهبانِ نامِ آزمون ۳/۳؛ `quality.mjs` بی ❌ (فقط
+  سطرِ `ProductDetail.kt` ِ برداشته از خط‌مبنا)؛ precheck ‏fail=0؛ spec «سالم».
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-24u زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-24u` (از سرِ `claude/batch-55`)
 
 - **ادغامِ `origin/claude/e-rows-18q` و یکی‌سازیِ رسانهٔ نشانی (CRM-09 + CHK-08):** دو عامل هم‌زمان عکسِ دروازه/یادداشتِ صوتی را
