@@ -54,6 +54,28 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-32a زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-32a` (از سرِ `claude/batch-56`)
+
+- **ساخته شد — AI-11 «جست‌وجو با عکس» در گوشیِ نسخهٔ ۳** (یافتهٔ ۲۸l): `VisualSearchEntry` به `rememberVisualSearch` (null با پرچمِ خاموش
+  یا بی حساب) + `VisualSearchHost` شکست (کامپیوتر همان دکمه). صندوقِ گوشی: ردیف در «…» (`SaleMenuSheet`، `SaleRoute` ⇐ `SaleScreen`)؛
+  فروشِ سریع: دکمهٔ دوربینِ سربرگ؛ «کالاها»: «…» ِ سربرگ (`V3Scaffold` فقط دو دکمه می‌گیرد). «مشابه» در صندوق فقط کادرِ جست‌وجو با دستهٔ
+  «همه»، در «کالاها» بازکردنِ کالا. همان درها (`/api/shop/visual-search`) و همان پرچم. **باگِ واقعیِ تازه (کامپیوتر هم):** نامِ آغاز با رقم
+  («3x3 کابل») در کادرِ صندوق پیشوندِ شمارِ POS-03 خوانده می‌شد ⇒ لمسِ بعدی سه تا؛ `VisualSearch.tillText` «1*» ِ صریح می‌گذارد.
+  ردیف در «دستگاه» می‌ماند (آستانه روی عکسِ واقعی).
+- **ساخته شد — AUTH-08 گامِ کدِ شمارهٔ تازه در نسخهٔ ۳:** «ویرایش حساب و دکان» (`ProfileEditScreen`) کادرِ کد زیرِ شماره، «ارسال دوبارهٔ کد» با
+  شمارشِ `resendSeconds` ِ پاسخِ سرور و خطای درجا (ناقص/نادرست/کهنه)؛ حالِ کادر در `core/account/PhoneClaimForm` (commonMain، کد بسته به شماره،
+  کدِ ناقص ⇒ هیچ درخواست، سقف‌ها فقط سرور)؛ `requestPhoneCode` ⇐ `ApiResult<Int>`؛ `V3TextButton(enabled)`. درِ سرور بی تغییر (فقط توضیحِ
+  `me.js`). `ui/screens/PhoneClaimStep.kt` هیچ صدازننده‌ای نداشت (`Profile.kt` فقط دو state ِ بی‌استفاده) ⇒ برداشته؛ استنادِ STATUS/`StrShellPages`
+  به پروندهٔ تازه. ردیف در «پرچم» با ماندهٔ تازه: `auth.phone_add_code` (scope `security`، سراسری) پس از رسیدنِ این نسخه به همهٔ دستگاه‌ها.
+- **آزمون:** سرخ پیش: `VisualSearchTest` ۶/۲ سرخ روی کدِ پیشین («3x3 کابل expected 1.0 but was 3.0» و سیم)؛ `PhoneClaimFormTest` سرخِ کامپایل.
+  سبز پس: `PhoneClaimFormTest` ۷/۷، `PhoneClaimTest` ۵/۵؛ ۱۲ کلاسِ هدف‌دار ۹۱ آزمون (`VisualSearchTest` ۶، `ProfileEditModelTest` ۵، `DariCoverageTest` ۲۳،
+  `PreviewPagesTextTest` ۴، `I18nCoverageTest` ۸، `DariWordsTest` ۱۷، `NoLegacyUiTest` ۵، `V3ReachabilityTest` ۹، `PhoneTillWiringTest` ۴ …) با یک سرخ:
+  «مهلت» ِ فقط‌فارسی در دری ⇐ «وقت». جهش: هسته ۴ از ۴ (`phone`، `codeToSend`، کدِ مرده، `phone_code_disabled`)، صفحه/مدل ۴ از ۴ (بی «1*»،
+  بی `picked = null`، پیامِ جابه‌جا، بی `form.phone(it)`). سرور `phone-add-code` ۷/۷، `visual-search` ۹/۹،
+  `dari-text` + نامِ آزمون ۲۰/۲۰ (PGlite محلی). اجرای کاملِ `./desktop/gradlew -p desktop test` (با `flock`) **۴٬۰۳۳ PASS، ۰ FAIL، ۴ SKIP ِ پیشین** (۶۳۳ کلاس). `quality.mjs` بی ❌، precheck ‏fail=0، spec «سالم»، `generate.cjs` تازه.
+- **قدمِ بعدی:** دو بی‌سیمِ دیگرِ ۲۸l (OPS-02 «پاک‌سازی کامل»، S45 قاعده/تأییدِ قیمتِ ردیف)؛ برگه‌های عکس و «مشابه» هنوز شکلِ کیتِ قدیم
+  (`ParcelPhotoSource`/`TohidBottomSheet`) — بازسازی با `V3Sheet` اختیاری؛ گوشیِ واقعی برای هر دو سنجیده نشد.
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-28l زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-28l` (از سرِ `claude/batch-55`)
 
 - **ساخته شد:** LOC-06 دورِ ۳ — متنِ خامِ `ui/screens` **۱۷۸ ⇐ ۷۳** (`DariCoverageTest.maxRawOldScreens`). (ب) ۷۴ متنِ صفحه‌های فقط‌پیش‌نمایشِ گوشی
