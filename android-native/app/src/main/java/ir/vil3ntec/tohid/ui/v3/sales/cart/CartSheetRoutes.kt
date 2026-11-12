@@ -6,11 +6,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.data.CartSerials
 import ir.vil3ntec.tohid.data.LinePolicyPrefs
 import ir.vil3ntec.tohid.data.StockPlacesPref
 import ir.vil3ntec.tohid.data.TillGoodsPref
 import ir.vil3ntec.tohid.scan.ScanFeedback
 import ir.vil3ntec.tohid.sync.v1.Ulid
+import ir.vil3ntec.tohid.ui.components.pos.posLineSerials
 import ir.vil3ntec.tohid.ui.screens.Haptics
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
@@ -50,6 +52,8 @@ fun RouteScope.LineRoute() {
     info = info,
     policy = policy,
     priceAsk = priceAsk,
+    //  POS-28: کالای سریال‌دار ⇒ سریال‌ها (همان `posLineSerials` ⇒ `CartSerials.set` ِ صندوقِ کامپیوتر)
+    serials = posLineSerials(data, line) { s -> cart.set(CartSerials.set(cart.lines.value, info.id, s)) },
     onSave = { form, start, grant ->
       //  تأییدی که به کار رفت ⇒ ردیفِ سابقهٔ `price_override` با درخواست‌کننده، تأییدکننده و دلیل (فقط اگر سبد نشست)
       if (cart.set(LineModel.apply(cart.lines.value, info, form, start, policy, grant))) {
