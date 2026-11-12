@@ -39,6 +39,8 @@ const TABLES = [
   { table: 'shop_chat_media', pk: ['id'], extra: ['shop_id', 'mime'], tenant: shop, check: (r) => media.chatCheck(r.mime) },
   { table: 'support_media', pk: ['id'], extra: ['thread_id'], tenant: (r) => media.supportTenant(r.thread_id), check: () => media.supportCheck },
   { table: 'trust_evidence', pk: ['id'], extra: ['shop_id', 'mime'], tenant: shop, check: (r) => media.chatCheck(r.mime) },
+  //  CHK-08: عکسِ دروازه و یادداشتِ صوتیِ نشانی (مهاجرتِ ۸۴۷، `lib/order-address-media.js`) — بی این `gc` شیءشان را «بی ردیف» می‌دید
+  { table: 'order_address_media', pk: ['id'], extra: ['shop_id', 'mime'], tenant: shop, check: (r) => media.chatCheck(r.mime) },
 ];
 const checkOf = (t, r) => (t.check ? t.check(r) : store.sniff);
 

@@ -16,7 +16,8 @@
  *   online_order_events،
  *   delivery_events            یادداشت پاک، `detail`/`reason` بی متنِ آزاد، شماره و مختصات (`scrub`)؛
  *                              کد، شناسه و عدد (مبلغ) می‌مانند.
- *   delivery_photos، order_pick_photos، delivery_locations   پاک.
+ *   delivery_photos، order_pick_photos، delivery_locations،
+ *     order_address_media      (عکسِ دروازه و یادداشتِ صوتیِ نشانی، CHK-08 — اگر جدولش هست) پاک.
  *   customer_notify_outbox     HMAC ِ شماره ⇐ `erased`، خطای متنی پاک، صفِ مانده ⇐ `expired`.
  *   shop_chat_conversations    شماره ⇐ `erased:<شناسهٔ گفت‌وگو>`، نام پاک، پیوندِ حساب NULL؛
  *     shop_chat_messages       متن/رسانه/meta پاک و «پاک‌شده» (ردیف و شمار می‌ماند)؛
@@ -63,7 +64,7 @@ const KEPT = Object.freeze([
 const COUNT_KEYS = Object.freeze([
   'orders', 'orderLines', 'orderEvents', 'deliveryEvents', 'deliveryPhotos', 'pickPhotos', 'deliveryLocations',
   'notifyOutbox', 'conversations', 'messages', 'chatMedia', 'chatPins', 'chatReports', 'carts', 'favorites', 'lists', 'areaRequests',
-  'alerts', 'issues', 'issuePhotos', 'reviews', 'pushSubs', 'alertPushSubs',
+  'alerts', 'issues', 'issuePhotos', 'reviews', 'pushSubs', 'alertPushSubs', 'addressMedia',
 ]);
 
 const flagOn = (shopId) => flagOf(shopId, FLAG);
@@ -213,6 +214,9 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
         counts.deliveryEvents = await scrubEvents(c, 'delivery_events', shopId, orderIds);
         counts.deliveryPhotos = await qk('DELETE FROM delivery_photos WHERE shop_id=$1 AND order_id = ANY($2::text[]) RETURNING store_key', [shopId, orderIds]);
         counts.pickPhotos = await qk('DELETE FROM order_pick_photos WHERE shop_id=$1 AND order_id = ANY($2::text[]) RETURNING store_key', [shopId, orderIds]);
+        if (await has(c, 'order_address_media')) {
+          counts.addressMedia = await qk('DELETE FROM order_address_media WHERE shop_id=$1 AND order_id = ANY($2::text[]) RETURNING store_key', [shopId, orderIds]);
+        }
         counts.deliveryLocations = await q(
           `DELETE FROM delivery_locations WHERE shop_id=$1 AND assignment_id IN (
              SELECT id FROM delivery_assignments WHERE shop_id=$1 AND order_id = ANY($2::text[])) RETURNING assignment_id`,

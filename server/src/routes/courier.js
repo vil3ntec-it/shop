@@ -115,6 +115,30 @@ router.post('/events', async (req, res) => {
   res.json(await delivery.courierEvents(req.shopId, req.body, req.courierActor));
 });
 
+/**
+ * CHK-08: عکسِ دروازه و یادداشتِ صوتیِ نشانیِ سفارشِ همین مأموریت (`lib/order-address-media.js`) — فقط مأموریتِ زندهٔ
+ * همین پیک (`delivery-states.LIVE`)؛ مأموریتِ دیگری، تمام‌شده یا پرچمِ خاموشِ `shop.storefront.address_media` ⇒ ۴۰۴.
+ */
+const addrMedia = require('../lib/order-address-media');
+router.use('/missions/:id/address-media', async (req, res, next) => {
+  res.set('Cache-Control', 'private, no-store');
+  const lost = () => notFound('مأموریت پیدا نشد', 'assignment_not_found');
+  if (!(await addrMedia.flagOn(req.shopId))) throw lost();
+  const a = await require('../db').one(
+    'SELECT order_id, status FROM delivery_assignments WHERE shop_id=$1 AND id=$2 AND courier_id=$3',
+    [req.shopId, String(req.params.id || ''), req.courier.id]
+  );
+  if (!a || !require('../lib/delivery-states').LIVE.includes(a.status)) throw lost();
+  req.addrOrderId = a.order_id;
+  next();
+});
+router.get('/missions/:id/address-media', async (req, res) => {
+  res.json({ items: await addrMedia.listFor(req.shopId, req.addrOrderId) });
+});
+router.get('/missions/:id/address-media/:mediaId', async (req, res) => {
+  addrMedia.send(res, await addrMedia.bytesOf(req.shopId, req.addrOrderId, req.params.mediaId));
+});
+
 router.post('/missions/:id/photos', async (req, res) => {
   const out = await delivery.putPhoto(req.shopId, req.params.id, req.body, req.courierActor);
   res.status(out.replayed ? 200 : 201).json(out);

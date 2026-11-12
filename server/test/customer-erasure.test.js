@@ -133,6 +133,12 @@ async function order(shopId, phone, { status = 'delivered', name = NAME, totalMi
      VALUES ($1,$2,$3,$4,'image/jpeg',$5,'x',$6,$7)`,
     [newId('pph'), shopId, id, `pp-${id}`, jpeg.length, jpeg, at]
   );
+  //  CHK-08: عکسِ دروازهٔ نشانی (مهاجرتِ ۸۴۷)
+  await query(
+    `INSERT INTO order_address_media (id, shop_id, order_id, kind, mime, size, sha256, data, created_at)
+     VALUES ($1,$2,$3,'gate_photo','image/jpeg',$4,'x',$5,$6)`,
+    [newId('oam'), shopId, id, jpeg.length, jpeg, at]
+  );
   await query(
     'INSERT INTO delivery_locations (assignment_id, shop_id, lat, lng, server_time) VALUES ($1,$2,$3,$4,$5)',
     [asg, shopId, t.lat, t.lng, at]
@@ -244,8 +250,8 @@ async function money(shopId) {
 const PII_TABLES = ['online_orders', 'online_order_lines', 'online_order_events', 'delivery_events', 'delivery_photos',
   'order_pick_photos', 'delivery_locations', 'customer_notify_outbox', 'shop_chat_conversations', 'shop_chat_messages',
   'shop_chat_media', 'shop_chat_pins', 'shop_chat_reports', 'store_customer_carts', 'store_customer_favorites', 'store_customer_lists', 'storefront_area_requests',
-  'storefront_alerts', 'order_issues', 'order_issue_photos', 'order_reviews', 'store_alert_push'];
-const BYTES = new Set(['delivery_photos', 'order_pick_photos', 'shop_chat_media', 'order_issue_photos']);
+  'storefront_alerts', 'order_issues', 'order_issue_photos', 'order_reviews', 'store_alert_push', 'order_address_media'];
+const BYTES = new Set(['delivery_photos', 'order_pick_photos', 'shop_chat_media', 'order_issue_photos', 'order_address_media']);
 
 /** متنِ کاملِ هر ردیفِ این دکان در جدول‌های فهرست (bytea به متن). */
 async function dump(shopId, where = '') {
@@ -336,6 +342,7 @@ test('SEC-10: صاحبِ دکان — پیش‌نمایش بی نوشتن؛ اج
     reviews: (await exists('order_reviews')) ? 2 : 0,
     pushSubs: 0,   //  پوشِ وب (مهاجرتِ ۴۷۰): این دکان پرچمش را ندارد ⇒ هیچ اشتراکی؛ پاک شدنِ اشتراک‌ها در store-push.test.js
     alertPushSubs: (await exists('store_alert_push')) ? 1 : 0,   //  پوشِ «خبرم کن» (۴۷۵)؛ جزئیات در store-alert-push.test.js
+    addressMedia: 2,   //  CHK-08: عکسِ دروازهٔ نشانیِ هر دو سفارش (۸۴۷)
   });
   assert.ok(done.body.kept.includes('order_ledger_docs') && done.body.kept.includes('device_sync_ledger'));
 
@@ -424,6 +431,7 @@ test('SEC-10: رد — شاگرد، دکانِ دیگر، نشستِ بی تأی
   await query('DELETE FROM online_order_events WHERE order_id=$1', [open]);
   await query('DELETE FROM delivery_photos WHERE order_id=$1', [open]);
   await query('DELETE FROM order_pick_photos WHERE order_id=$1', [open]);
+  await query('DELETE FROM order_address_media WHERE order_id=$1', [open]);
   await query('DELETE FROM delivery_events WHERE order_id=$1', [open]);
   await query('DELETE FROM delivery_locations WHERE assignment_id IN (SELECT id FROM delivery_assignments WHERE order_id=$1)', [open]);
   await query('DELETE FROM customer_notify_outbox WHERE order_id=$1', [open]);
