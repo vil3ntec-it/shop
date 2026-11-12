@@ -37,6 +37,9 @@ const CAPABILITIES = Object.freeze([
   //  درخواستِ پنلِ مرکزی ۱.۵۰.۸۹ و ۱.۵۰.۹۰ (تصمیم‌های ۴-۱ «ب» و ۲-۹ ِ ۱۴۰۵/۰۸/۲۰):
   'synonyms.v1',            //  GET|PUT /admin/search/synonyms — فهرستِ مرکزیِ مترادف (نوشتن: ارشد + دلیل، قفلِ نسخه، یک‌باره)
   'support-access.v1',      //  GET|POST /admin/shops/:id/access-grants · POST …/break-glass · POST …/:gid/revoke (مهاجرتِ ۸۱۰)
+  //  IMG-PRO-17 در پنلِ مرکزی (۱.۵۰.۹۶): خواندن مدیر/بیننده (جزئیات با `read_private` وقتی admin.support_grant روشن است)؛
+  //  برگرداندن فقط ارشد + دلیل + اجازهٔ زندهٔ `restore` + Idempotency-Key
+  'image-changes.v1',       //  GET /admin/shops/:id/images/changes[/:cid] · POST …/:cid/rollback
 ]);
 
 /*
