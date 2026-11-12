@@ -54,6 +54,24 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-18q، شاخهٔ `claude/e-rows-18q` (از سرِ `claude/batch-54`، سپس ادغامِ سرِ تازهٔ آن)
+
+- **POS-05 و INV-03 ⇐ IMPLEMENTED-VERIFIED:** درِ سرورِ `GET /api/shop/catalog/reserved` (`stock-reserve.posView`: نگه‌داشتهٔ نرمِ فعال
+  با کلیدِ فروشِ تحویلِ هر قلم `o-<سفارش>-<قلم>`؛ `stock.view` + `orders.view`، سقفِ ۳۰/دقیقه هر کاربر؛ پرچمِ خاموشِ
+  `shop.stock_reserve` ⇒ `enabled:false`) — `catalog-reserved.test.js` ۴/۴ (پایه ۰/۴). صندوق: `core/stock/OnlineHolds.kt` (مهلت با
+  ساعتِ سرور، فروشِ تحویلِ رسیده دو بار نه، نمای کهنه‌تر از یک روز یا ساعتِ برگشته ⇒ هیچ) + `OnlineHoldsStore`
+  (`data/OnlineHoldsAndroid.kt`) + `rememberSellableHeld` (`ui/components/pos/OnlineHoldsAndroid.kt`) در `DeskSale` و `SaleRoute`
+  ⇒ `HeldStock.sellable`. `OnlineHoldsTest` ۹/۹ (core)، `HeldStockTest` ۵/۵، `HeldSyncTest` ۷/۷، `PosSellableTileUiTest` ۲/۲ (صفحهٔ خودِ کاشی، محلی)؛ اجرای کاملِ desktop ۴۰۰۳ آزمون، ۰ شکست، ۴ SKIP ِ پیشینِ بنچ/عکس. نگه‌داشته‌های دستگاهِ دیگر = `shop.held_sync` (سنجشِ تازه در `HeldSyncTest`).
+- **CHK-08 (PARTIAL، کد):** سرور (مهاجرتِ ۸۴۷، `lib/order-address-media.js`، درهای مشتری/کارمند/پیک، حذفِ دادهٔ مشتری،
+  `image-store-move.TABLES`؛ پرچمِ `shop.storefront.address_media`) — `order-address-media.test.js` ۴/۴؛ فرمِ ویترین روی صفحهٔ پیگیری
+  (`store/addr-media.js` ِ دیربار، واژه‌نامهٔ `addrmedia`) — `web-store-addr-media.mjs` ۲۲ ✅ (در زنجیرهٔ `test:web-store`).
+- **قدمِ بعد:** به گفتهٔ هماهنگ‌کننده CHK-08 این‌جا گسترش نیافت: عاملِ «ت» (`claude/e-rows-13t`، CRM-09) همین را برای نشانیِ
+  ذخیره‌شدهٔ حساب ساخته (`store_address_media`، مهاجرتِ ۸۳۶، پیک هم می‌بیند) ⇒ پس از ادغام دو جدول/در یکی شوند (هر دو `chat-media.sniff`).
+  سپس نمایشِ عکس/صدای نشانیِ سفارش در جزئیاتِ سفارشِ برنامهٔ دکان و مأموریتِ پیک (درها آماده‌اند) و نقشه در برنامهٔ خرید (منطق در core،
+  اندروید فقط CI).
+- **درس:** هر انبارِ `getSharedPreferences` ِ تازه باید در `DATA-SAFETY-fa.md` §۶ و `DataSafetyGuardTest.CLASSIFIED` رده بگیرد
+  (`tohid-online-holds` ⇐ «نسخهٔ سرور»)؛ کلیدِ تازهٔ `COUNT_KEYS` ِ حذفِ داده هم در `CustomerErasure.kt` و `StrErasure.kt`.
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-13u زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-13u` (از `claude/e-rows-11p`)
 
 - **ABUSE-01 (هنوز PARTIAL، فقط پنل):** ویترینِ وب «گزارشِ مشکل با این دکان» و «گزارشِ این کالا» دارد (`store/trust.js` ِ دیربار
