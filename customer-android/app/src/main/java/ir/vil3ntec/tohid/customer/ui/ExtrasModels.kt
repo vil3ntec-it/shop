@@ -225,8 +225,9 @@ class FeedbackModel(private val api: ShopperApi, private val scope: CoroutineSco
 }
 
 /**
- *  برگهٔ «نشانیِ تازه/ویرایش» (CHK-09) و گرفتنِ پین (CHK-08): «موقعیتِ من» با [Locator]، یا پیوند/مختصاتِ برنامهٔ نقشه
- *  ([PinText]). ذخیره با همان قاعده و سقفِ سرور ([AddressBook]) روی همین دستگاه.
+ *  برگهٔ «نشانیِ تازه/ویرایش» (CHK-09) و گرفتنِ پین (CHK-08): «موقعیتِ من» با [Locator]، پیوند/مختصاتِ برنامهٔ نقشه
+ *  ([PinText]) یا «انتخاب روی نقشه». ذخیره با همان قاعده و سقفِ سرور ([AddressBook]) روی همین دستگاه؛ با حساب، دفترِ حساب
+ *  را `ModelAddressSync.kt` یکی می‌کند ([write] همان را صدا می‌زند).
  */
 class AddressModel(
   private val read: () -> List<SavedAddress>,
@@ -276,6 +277,18 @@ class AddressModel(
   }
 
   fun clearPin() { pin = null }
+
+  /** CHK-08: «همین‌جا» ِ نقشه */
+  fun mapPin(p: GeoPin) {
+    pin = p
+    paste = ""
+    note = null
+  }
+
+  /** CRM-09: نشانیِ باز در دفترِ حساب شناسهٔ تازه گرفت ⇒ ذخیره همان نشانی را عوض کند، نه نشانیِ دوم */
+  fun follow(old: String, new: String) {
+    if (editingId == old) editingId = new
+  }
 
   /** درست ⇒ نشانیِ ذخیره‌شده؛ نادرست ⇒ null و پیامِ روشن */
   fun save(): SavedAddress? {

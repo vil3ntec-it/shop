@@ -172,6 +172,18 @@ class ShopperAddressSyncTest {
     assertIs<AddressStep.Push>(AddressSync.next(ShopperState(addresses = listOf(p)), r))
   }
 
+  @Test fun renamedIdsLetAnOpenEditorFollowTheSameAddress() {
+    val sent = dev(1, "خانه")
+    val r = AddressRound(pulled = true)
+    val before = listOf(sent, srv("01B", "دفتر"))
+    val adopted = AddressSync.apply(ShopperState(addresses = before), AddressStep.Add(sent), AddressReply(true, address = srv("01S", "خانه", "کوچهٔ 1")), r).first
+    assertEquals(mapOf("adr-01" to "01S"), AddressSync.renamed(before, adopted.addresses))
+    val dirtyLost = ShopperState(addresses = listOf(srv("01B", "دفتر").copy(dirty = true)))
+    val moved = AddressSync.apply(dirtyLost, AddressStep.Push(dirtyLost.addresses[0]), AddressReply(false, error = ShopperError(404, "address_not_found")), r).first
+    assertEquals(mapOf("01B" to "adr-01B"), AddressSync.renamed(dirtyLost.addresses, moved.addresses))
+    assertEquals(emptyMap(), AddressSync.renamed(before, before))
+  }
+
   @Test fun editOfAnAddressDeletedElsewhereIsKeptAndSentAgain() {
     val book = Book()
     val api = ShopperApi(book.http)

@@ -49,6 +49,8 @@ class AccountBox(private val secrets: ShopperKeyValue?) {
   internal var features: Map<String, AccountFeatures> = emptyMap()
   /** CHK-03: دورِ بعدِ هر دکان پس از سکوت یا درنگ ([CartSync.waitMs]) */
   internal val wakes = HashMap<String, Job>()
+  /** CRM-09: دفترِ نشانیِ حساب و رسانهٔ نشانیِ باز (`ModelAddressSync.kt`) */
+  val places = AddressBox()
 
   private fun load(): AccountSession? = try {
     secrets?.get(KEY)?.let { ShopperJson.decodeFromString(AccountSession.serializer(), it) }
@@ -117,6 +119,7 @@ fun CustomerModel.accountSignIn(slug: String) {
       account.codeSent = false
       account.note = ShopperText.signedIn
       syncAccount(slug, AccountPulls.ALL)
+      syncAddresses(slug)
     }
   }
 }
@@ -129,12 +132,16 @@ fun CustomerModel.accountSignOut() {
   account.keep(null)
   persist(AccountRules.signedOut(saved))
   account.note = null
+  closeAddressMedia()
+  account.places.note = null
 }
 
 /** دکان باز شد: درهای روشنِ همین دکان، نامِ ♥ و قلم‌های فهرست از کاتالوگِ امروز، و دورِ کاملِ هم‌گامی */
 fun CustomerModel.enteredStore(slug: String, page: StorePage) {
   val f = page.features
-  account.features = account.features + (slug to AccountFeatures(favorites = f.favorites, cart = f.webAccount && f.accountCart))
+  account.features = account.features + (slug to AccountFeatures(
+    favorites = f.favorites, cart = f.webAccount && f.accountCart, addresses = f.webAccount, addressMedia = f.webAccount && f.addressMedia,
+  ))
   if (f.favorites) {
     val need = (AccountRules.favsOf(saved, slug) + AccountRules.listFor(saved, slug).map { it.id })
       .distinct().filter { AccountBox.key(slug, it) !in account.products }
@@ -143,6 +150,7 @@ fun CustomerModel.enteredStore(slug: String, page: StorePage) {
     }
   }
   syncAccount(slug, AccountPulls.ALL)
+  syncAddresses(slug)
 }
 
 /** دورِ هم‌گامیِ [slug]: یک درخواست در هر بار و حالِ **اکنون** پس از هر پاسخ (کارِ تازه در میانه گم نمی‌شود) */

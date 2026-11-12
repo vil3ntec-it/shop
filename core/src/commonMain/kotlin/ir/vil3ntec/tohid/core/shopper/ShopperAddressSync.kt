@@ -178,6 +178,19 @@ object AddressSync {
   fun signedOut(s: ShopperState): ShopperState =
     s.copy(addresses = s.addresses.filter { deviceOnly(it.id) }, addressGone = emptyList())
 
+  /**
+   *  شناسه‌هایی که در یک گام عوض شدند (POST ⇐ شناسهٔ سرور، همانندِ حساب، PUT ِ ۴۰۴ ⇐ فقط‌دستگاهی): کهنه ⇐ تازه — تا برگهٔ
+   *  ویرایشِ باز و نشانیِ برگزیدهٔ برگهٔ ثبت همان نشانی را دنبال کنند (نه نشانیِ دوم)
+   */
+  fun renamed(before: List<SavedAddress>, after: List<SavedAddress>): Map<String, String> {
+    val was = before.map { it.id }.toHashSet()
+    val now = after.map { it.id }.toHashSet()
+    val fresh = after.filter { it.id !in was }
+    return before.filter { it.id !in now }.mapNotNull { a ->
+      (fresh.firstOrNull { it.id == LOCAL + a.id || (a.id.startsWith(LOCAL) && same(it, a)) } ?: fresh.firstOrNull { same(it, a) })?.let { a.id to it.id }
+    }.toMap()
+  }
+
   /** چند نشانی پس از دورِ کامل هنوز فقط روی همین دستگاه است (دفترِ حساب پر بود) */
   fun leftOnDevice(s: ShopperState): Int = s.addresses.count { deviceOnly(it.id) }
 

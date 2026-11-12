@@ -24,7 +24,8 @@ import ir.vil3ntec.tohid.core.shopper.ChatPhoto
  *  [photo] مسیرِ نسبی (`/api/store/…/thumb?v=…`) می‌گیرد؛ پیاده‌سازیِ اندروید `ImagesAndroid.Photo` است.
  *  مرحلهٔ ۲: [openMap] پیوندِ `geo:` ِ پین را به برنامهٔ نقشهٔ گوشی می‌دهد؛ [pickPhoto] عکسی از گالری می‌گیرد و
  *  **آماده** برمی‌گرداند (چرخیده با EXIF، شفافیت روی سفید، ≤ ۱۶۰۰px، JPEG ِ تازه بی EXIF — `ShopperPhoto`)؛
- *  [picture] بایت‌های عکسِ گفت‌وگو را می‌کشد.
+ *  [picture] بایت‌های عکسِ گفت‌وگو را می‌کشد. CHK-08: [tile] یک تکهٔ ۲۵۶ ِ نقشه (مسیرِ همین سرور یا https ِ سرورِ تکه‌های
+ *  ویترین) را بی کوکی می‌کشد و [loaded] را یک بار با «آمد؟» صدا می‌زند؛ null ⇒ «انتخاب روی نقشه» نیست.
  */
 class Platform(
   val photo: @Composable (path: String, modifier: Modifier) -> Unit,
@@ -36,6 +37,7 @@ class Platform(
   val canPickPhoto: Boolean = false,
   val pickPhoto: (done: (ChatPhoto?) -> Unit) -> Unit = { it(null) },
   val picture: @Composable (bytes: ByteArray, modifier: Modifier) -> Unit = { _, m -> Box(m) },
+  val tile: (@Composable (url: String, modifier: Modifier, loaded: (Boolean) -> Unit) -> Unit)? = null,
 )
 
 val LocalPlatform = staticCompositionLocalOf<Platform> { error("Platform داده نشده") }
