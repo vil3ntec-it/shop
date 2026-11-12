@@ -184,8 +184,8 @@ fun ProfileScreen(
     note = "عکسِ حساب فقط روی همین گوشی می‌ماند",
   ) { uri ->
     PhotoStore.saveAvatar(context, state.accountId.ifBlank { "local" }, uri)
-      .onSuccess { avatarVersion++; toast("عکس حساب ثبت شد") }
-      .onFailure { toast("عکس ذخیره نشد") }
+      .onSuccess { avatarVersion++; toast(ir.vil3ntec.tohid.core.i18n.StrAccount.photoSaved) }
+      .onFailure { toast(ir.vil3ntec.tohid.core.i18n.StrAccount.photoFailed) }
   }
 
   val ledger by store.data.collectAsState()
@@ -221,9 +221,9 @@ fun ProfileScreen(
           accountId = accountId,
           avatarVersion = avatarVersion,
           stats = listOf(
-            "فاکتور" to ledger.sales.size,
-            "کالا" to ledger.products.size,
-            "قرض‌دار" to ledger.debtors.size,
+            ir.vil3ntec.tohid.core.i18n.StrAccount.statInvoices to ledger.sales.size,
+            ir.vil3ntec.tohid.core.i18n.Str.product to ledger.products.size,
+            ir.vil3ntec.tohid.core.i18n.Str.debtor to ledger.debtors.size,
           ),
           banner = ProfileModel.banner(signedIn, plan, SUBSCRIPTION_WARN_DAYS, ::plain),
           menu = ProfileModel.menu(signedIn, canSettings),
@@ -268,7 +268,7 @@ fun ProfileScreen(
           onSave = save@{
             val cleanName = name.trim()
             if (cleanName.isBlank()) {
-              toast("نام را بنویسید")
+              toast(ir.vil3ntec.tohid.core.i18n.StrAccount.nameRequired)
               return@save
             }
             //  نامِ دکان همین‌جا و همان لحظه می‌نشیند؛ روی گوشی است و اینترنت نمی‌خواهد
@@ -285,7 +285,7 @@ fun ProfileScreen(
                 busy = false
                 toast(
                   if (claim.isBlank()) "نام روی گوشی ذخیره شد — برای ثبت روی سرور به اینترنت نیاز است"
-                  else "ثبتِ شماره به اینترنت نیاز دارد"
+                  else ir.vil3ntec.tohid.core.i18n.StrAccount.phoneNeedsInternet
                 )
                 return@launch
               }
@@ -299,7 +299,7 @@ fun ProfileScreen(
                   email = done.user.email.orEmpty()
                   phone = done.user.phone.orEmpty()
                   newPhone = ""
-                  toast(if (claim.isNotBlank()) "شماره ثبت شد و قفل شد" else "ذخیره شد")
+                  toast(if (claim.isNotBlank()) ir.vil3ntec.tohid.core.i18n.StrAccount.phoneSaved else ir.vil3ntec.tohid.core.i18n.StrAccount.saved)
                 }
                 .onFailure { toast(it.userMessage) }
               busy = false
@@ -314,9 +314,9 @@ fun ProfileScreen(
   if (alertsOpen) {
     AdaptiveSheet(onDismissRequest = { alertsOpen = false }, containerColor = c.bg) {
       Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 28.dp)) {
-        Text("هشدارهای فروشگاه", style = v3Text(17, FontWeight.Bold, 24), color = c.ink, modifier = Modifier.padding(start = 6.dp, bottom = 12.dp))
+        Text(ir.vil3ntec.tohid.core.i18n.StrNav.shopAlerts, style = v3Text(17, FontWeight.Bold, 24), color = c.ink, modifier = Modifier.padding(start = 6.dp, bottom = 12.dp))
         if (alerts.isEmpty()) {
-          EmptyNote("همه‌چیز مرتب است — هشداری نیست.")
+          EmptyNote(ir.vil3ntec.tohid.core.i18n.StrHome.alertsEmpty)
         } else {
           V3Card {
             alerts.forEach { alert ->
@@ -360,7 +360,7 @@ fun ProfileScreen(
       ir.vil3ntec.tohid.ui.PromoLive.reset(context)
       busy = false
       page = ROOT
-      toast("از حساب خارج شدید")
+      toast(ir.vil3ntec.tohid.core.i18n.StrAccount.signedOut)
       onBack()
     }
   }
@@ -380,13 +380,13 @@ fun ProfileScreen(
     AlertDialog(
       onDismissRequest = { if (!busy) blockSignOut = false },
       containerColor = colors.bg,
-      title = { Text(if (verdict is LogoutGuard.Block) LogoutGuard.TITLE else "همه‌چیز به سرور رسید", color = colors.text) },
+      title = { Text(if (verdict is LogoutGuard.Block) LogoutGuard.TITLE else ir.vil3ntec.tohid.core.i18n.StrAccount.allSentTitle, color = colors.text) },
       text = {
         Column {
           Text(
             when (verdict) {
               is LogoutGuard.Block -> LogoutGuard.message(verdict.pending, online)
-              LogoutGuard.Allow -> "صف خالی است؛ حالا می‌توانید از حساب خارج شوید."
+              LogoutGuard.Allow -> ir.vil3ntec.tohid.core.i18n.StrAccount.allSentBody
             },
             color = colors.muted,
           )
@@ -409,9 +409,9 @@ fun ProfileScreen(
                 busy = false
                 written
                   .onSuccess { forcedBackup = it.absolutePath; blockSignOut = false }
-                  .onFailure { toast(it.userText("پشتیبان نوشته نشد؛ خروجِ اجباری انجام نشد")) }
+                  .onFailure { toast(it.userText(ir.vil3ntec.tohid.core.i18n.StrAccount.backupFailed)) }
               }
-            }) { Text(if (busy) "در حالِ نوشتنِ پشتیبان…" else LogoutGuard.FORCE, color = colors.danger) }
+            }) { Text(if (busy) ir.vil3ntec.tohid.core.i18n.StrAccount.writingBackup else LogoutGuard.FORCE, color = colors.danger) }
           }
         }
       },
@@ -419,12 +419,12 @@ fun ProfileScreen(
         if (verdict is LogoutGuard.Block) {
           TextButton(enabled = !busy, onClick = {
             runCatching { SyncV1Worker.reconnect.userAsked(); SyncV1Worker.now(context) }
-              .onSuccess { toast("همگام‌سازی شروع شد") }
-              .onFailure { toast(it.userText("همگام‌سازی ناموفق بود")) }
+              .onSuccess { toast(ir.vil3ntec.tohid.core.i18n.StrAccount.syncStarted) }
+              .onFailure { toast(it.userText(ir.vil3ntec.tohid.core.i18n.StrAccount.syncFailed)) }
           }) { Text(LogoutGuard.SYNC_NOW, color = colors.primary) }
         } else {
           TextButton(enabled = !busy, onClick = { blockSignOut = false; confirmSignOut = true }) {
-            Text("خروج", color = colors.danger)
+            Text(ir.vil3ntec.tohid.core.i18n.StrAccount.signOutAction, color = colors.danger)
           }
         }
       },
@@ -446,7 +446,7 @@ fun ProfileScreen(
           forceUnreadable = false
           //  کلیکِ «خروج بی پشتیبان» تأییدِ اول بود، این دومی است
           if (LogoutGuard.canForceUnreadable(unreadable != null, confirmations = 2)) signOutNow(forced = true)
-        }) { Text("باز هم خارج شو", color = colors.danger) }
+        }) { Text(ir.vil3ntec.tohid.core.i18n.StrAccount.signOutAnyway, color = colors.danger) }
       },
       dismissButton = {
         TextButton(onClick = { forceUnreadable = false }) { Text(LogoutGuard.STAY, color = colors.muted) }
@@ -466,7 +466,7 @@ fun ProfileScreen(
           forcedBackup = null
           //  کلیکِ «خروجِ اجباری» تأییدِ اول بود، این دومی است
           if (LogoutGuard.canForce(backupWritten = true, confirmations = 2)) signOutNow(forced = true)
-        }) { Text("باز هم خارج شو", color = colors.danger) }
+        }) { Text(ir.vil3ntec.tohid.core.i18n.StrAccount.signOutAnyway, color = colors.danger) }
       },
       dismissButton = {
         TextButton(onClick = { forcedBackup = null }) { Text(LogoutGuard.STAY, color = colors.muted) }
@@ -478,7 +478,7 @@ fun ProfileScreen(
     AlertDialog(
       onDismissRequest = { confirmSignOut = false },
       containerColor = colors.bg,
-      title = { Text("خروج از حساب؟", color = colors.text) },
+      title = { Text(ir.vil3ntec.tohid.core.i18n.StrAccount.signOutTitle, color = colors.text) },
       text = {
         Text(
           "برای برگشتن، ایمیل و رمزتان را دوباره می‌زنید. دفترِ دکان روی همین گوشی سرِ جایش می‌ماند.",
@@ -497,10 +497,10 @@ fun ProfileScreen(
           //  میانِ دو کلیک چیزی ثبت شده باشد، قفل دوباره سر می‌رسد (SYN-10)
           if (LogoutGuard.decide(v1.queued, AutoSync.pendingCount) is LogoutGuard.Block) blockSignOut = true
           else signOutNow()
-        }) { Text("خروج", color = colors.danger) }
+        }) { Text(ir.vil3ntec.tohid.core.i18n.StrAccount.signOutAction, color = colors.danger) }
       },
       dismissButton = {
-        TextButton(onClick = { confirmSignOut = false }) { Text("ماندن", color = colors.muted) }
+        TextButton(onClick = { confirmSignOut = false }) { Text(ir.vil3ntec.tohid.core.i18n.StrAccount.stay, color = colors.muted) }
       },
     )
   }
@@ -539,12 +539,12 @@ private fun ProfileRoot(
         Spacer(Modifier.height(6.dp))
         Row(Modifier.fillMaxWidth().height(64.dp), verticalAlignment = Alignment.CenterVertically) {
           Text(
-            "حساب من",
+            ir.vil3ntec.tohid.core.i18n.Str.myAccount,
             style = v3Text(30, FontWeight.Bold, 40),
             color = c.ink,
             modifier = Modifier.weight(1f).padding(start = 2.dp),
           )
-          V3RoundButton(Icons.Outlined.Notifications, "هشدارها", size = 54.dp, iconSize = 24.dp, dot = alerts > 0, onClick = onBell)
+          V3RoundButton(Icons.Outlined.Notifications, ir.vil3ntec.tohid.core.i18n.Str.alerts, size = 54.dp, iconSize = 24.dp, dot = alerts > 0, onClick = onBell)
         }
       } else Spacer(Modifier.height(24.dp))
 
@@ -570,7 +570,7 @@ private fun ProfileRoot(
           modifier = Modifier
             .align(Alignment.TopCenter)
             .zIndex(1f)
-            .clickable(role = Role.Button, onClickLabel = "عوض کردنِ عکس حساب", onClick = onAvatar),
+            .clickable(role = Role.Button, onClickLabel = ir.vil3ntec.tohid.core.i18n.StrAccount.changePhotoA11y, onClick = onAvatar),
         )
       }
       Spacer(Modifier.height(if (ownHeader) 0.dp else 12.dp))
@@ -795,7 +795,7 @@ private fun ProfileAvatar(accountId: String, version: Int, size: Dp, modifier: M
     when {
       image != null -> Image(
         bitmap = image.asImageBitmap(),
-        contentDescription = "عکس حساب",
+        contentDescription = ir.vil3ntec.tohid.core.i18n.StrAccount.accountPhoto,
         contentScale = ContentScale.Crop,
         modifier = Modifier.fillMaxSize(),
       )
@@ -832,7 +832,7 @@ private fun ProfileEditPage(
       .windowInsetsPadding(WindowInsets.statusBars)
       .imePadding(),
   ) {
-    V3Header("ویرایش حساب و دکان", onBack)
+    V3Header(ir.vil3ntec.tohid.core.i18n.StrAccount.menuEdit, onBack)
     Column(
       Modifier
         .fillMaxSize()
@@ -851,17 +851,17 @@ private fun ProfileEditPage(
               Text("عکسِ حساب", style = v3Text(15, FontWeight.SemiBold, 22), color = c.ink)
               Text("فقط روی همین گوشی می‌ماند", style = v3Text(12, FontWeight.Medium, 17), color = c.inkMuted)
             }
-            V3PillButton("عوض کردن", Icons.Outlined.PhotoCamera, onPhoto)
+            V3PillButton(ir.vil3ntec.tohid.core.i18n.StrPanelPages.change, Icons.Outlined.PhotoCamera, onPhoto)
           }
         }
 
         /* --- حساب --- */
-        V3GroupTitle("حساب", Modifier.padding(top = 18.dp))
+        V3GroupTitle(ir.vil3ntec.tohid.core.i18n.StrAccount.groupAccount, Modifier.padding(top = 18.dp))
         V3Card(padding = PaddingValues(16.dp)) {
           OutlinedTextField(
             value = name,
             onValueChange = onName,
-            label = { Text("نام و نام خانوادگی") },
+            label = { Text(ir.vil3ntec.tohid.core.i18n.StrAccount.fullName) },
             singleLine = true,
             colors = v3FieldColors(c),
             shape = RoundedCornerShape(12.dp),
@@ -874,10 +874,10 @@ private fun ProfileEditPage(
            */
           LockedRow(
             icon = Icons.Outlined.AlternateEmail,
-            label = "ایمیل",
-            value = email.ifBlank { "ثبت نشده" },
-            note = if (email.isBlank()) "شما با شماره وارد شده‌اید"
-            else "ایمیلِ حساب عوض نمی‌شود — راهِ ورود و بازیابیِ رمز همین است",
+            label = ir.vil3ntec.tohid.core.i18n.StrAccount.email,
+            value = email.ifBlank { ir.vil3ntec.tohid.core.i18n.StrAccount.emailNone },
+            note = if (email.isBlank()) ir.vil3ntec.tohid.core.i18n.StrAccount.emailByPhone
+            else ir.vil3ntec.tohid.core.i18n.StrAccount.emailLocked,
             ltr = email.isNotBlank(),
           )
           Spacer(Modifier.height(12.dp))
@@ -898,27 +898,27 @@ private fun ProfileEditPage(
               modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(4.dp))
-            Text("شماره پس از ثبت قفل می‌شود و از برنامه عوض نمی‌شود.", style = v3Text(12, FontWeight.Medium, 17), color = c.inkMuted)
+            Text(ir.vil3ntec.tohid.core.i18n.StrAccount.phoneOnceHelper, style = v3Text(12, FontWeight.Medium, 17), color = c.inkMuted)
           } else {
             LockedRow(
               icon = Icons.Outlined.Lock,
-              label = "شماره موبایل",
+              label = ir.vil3ntec.tohid.core.i18n.StrAccount.phone,
               value = phone,
-              note = "شماره ثبت شده و قفل است",
+              note = ir.vil3ntec.tohid.core.i18n.StrAccount.phoneLocked,
               ltr = true,
             )
           }
           Spacer(Modifier.height(16.dp))
-          V3PrimaryButton(if (busy) "در حال ذخیره…" else "ذخیره تغییرات", enabled = !busy, onClick = onSave)
+          V3PrimaryButton(if (busy) ir.vil3ntec.tohid.core.i18n.StrAccount.saving else ir.vil3ntec.tohid.core.i18n.StrAccount.saveChanges, enabled = !busy, onClick = onSave)
         }
 
         /* --- دکان --- */
-        V3GroupTitle("دکان", Modifier.padding(top = 18.dp))
+        V3GroupTitle(ir.vil3ntec.tohid.core.i18n.Str.shop, Modifier.padding(top = 18.dp))
         V3Card(padding = PaddingValues(16.dp)) {
           OutlinedTextField(
             value = shopName,
             onValueChange = onShopName,
-            label = { Text("نام فروشگاه") },
+            label = { Text(ir.vil3ntec.tohid.core.i18n.StrAccount.shopName) },
             leadingIcon = { Icon(Icons.Outlined.Storefront, contentDescription = null, tint = c.icon) },
             singleLine = true,
             colors = v3FieldColors(c),
@@ -926,17 +926,17 @@ private fun ProfileEditPage(
             modifier = Modifier.fillMaxWidth(),
           )
           Spacer(Modifier.height(4.dp))
-          Text("این نام روی سربرگ فاکتور چاپ می‌شود.", style = v3Text(12, FontWeight.Medium, 17), color = c.inkMuted)
+          Text(ir.vil3ntec.tohid.core.i18n.StrAccount.shopNameHelper, style = v3Text(12, FontWeight.Medium, 17), color = c.inkMuted)
         }
 
         /* --- عضویت --- */
-        V3GroupTitle("عضویت", Modifier.padding(top = 18.dp))
+        V3GroupTitle(ir.vil3ntec.tohid.core.i18n.StrAccount.groupMembership, Modifier.padding(top = 18.dp))
         V3Card {
           V3Row(
             icon = Icons.Outlined.Schedule,
-            label = "مدت عضویت",
+            label = ir.vil3ntec.tohid.core.i18n.StrAccount.memberFor,
             value = if (createdAt > 0) spanText(createdAt) else "—",
-            description = if (createdAt > 0) "عضو از ${formatMillis(createdAt)}" else "روزِ ساختنِ حساب معلوم نیست",
+            description = if (createdAt > 0) "عضو از ${formatMillis(createdAt)}" else ir.vil3ntec.tohid.core.i18n.StrAccount.createdUnknown,
           )
         }
       }
@@ -1052,7 +1052,7 @@ private fun LockedRow(
           Text(value, style = v3Text(14, FontWeight.Medium, 20), color = c.ink, textAlign = TextAlign.Start)
         }
       }
-      Icon(Icons.Outlined.Lock, contentDescription = "قابل تغییر نیست", tint = c.inkMuted, modifier = Modifier.size(15.dp))
+      Icon(Icons.Outlined.Lock, contentDescription = ir.vil3ntec.tohid.core.i18n.StrAccount.notEditable, tint = c.inkMuted, modifier = Modifier.size(15.dp))
     }
     Spacer(Modifier.height(4.dp))
     Text(note, style = v3Text(11, FontWeight.Medium, 16), color = c.inkMuted)

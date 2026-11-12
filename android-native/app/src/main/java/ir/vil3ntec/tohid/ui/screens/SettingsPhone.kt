@@ -28,12 +28,16 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.v3.nav.LocalV3Nav
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsPaths
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrCount
+import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.i18n.StrSettings
 
 /** نامِ تم در تنظیمات (بندِ C: روشن / تیره / خودکار) */
 internal fun themeLabel(t: ThemeChoice): String = when (t) {
-  ThemeChoice.LIGHT -> "روشن"
-  ThemeChoice.DARK -> "تیره"
-  ThemeChoice.SYSTEM -> "خودکار"
+  ThemeChoice.LIGHT -> StrCount.on
+  ThemeChoice.DARK -> StrSettings.dark
+  ThemeChoice.SYSTEM -> StrOnline.dlAuto
 }
 
 /**
@@ -70,7 +74,7 @@ private fun RoutedSettingsFrame(target: SettingsTarget, onBack: () -> Unit, open
       else -> PhoneSettingsMode.Root(open)
     }
   }
-  val title = target.section?.let(SettingsLayout::labelOf) ?: target.group ?: "تنظیمات"
+  val title = target.section?.let(SettingsLayout::labelOf) ?: target.group ?: Str.settings
   SettingsFrameBody(title, onBack, mode, rememberLazyListState(), top = if (mode is PhoneSettingsMode.Root) 0.dp else 8.dp, body)
 }
 
@@ -104,7 +108,7 @@ private fun LocalSettingsFrame(onBack: (() -> Unit)?, body: LazyListScope.() -> 
       title = when (mode) {
         is PhoneSettingsMode.Detail -> SettingsLayout.labelOf(mode.title)
         is PhoneSettingsMode.Group -> mode.title
-        else -> "تنظیمات"
+        else -> Str.settings
       },
       onBack = if (key != null) ({ if (detail != null) detail = null else group = null }) else (onBack ?: { AppNav.go(SettingsNav.origin) }),
       mode = mode,

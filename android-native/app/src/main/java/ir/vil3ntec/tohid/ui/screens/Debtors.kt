@@ -82,6 +82,12 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3Debt
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
+import ir.vil3ntec.tohid.core.i18n.StrAccount
+import ir.vil3ntec.tohid.core.i18n.StrChat
+import ir.vil3ntec.tohid.core.i18n.StrCustomerPrices
+import ir.vil3ntec.tohid.core.i18n.StrExpenses
+import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrMoney
 
 /**
  *  قرض‌داران.
@@ -192,7 +198,7 @@ fun DebtorsScreen(
 
   //  ⛔ ثبت روی دفترِ همین لحظهٔ دیسک (`DebtEntry`)، نه `d` ِ صفحه؛ کلید = شناسهٔ ردیف، یکی برای هر برگه ⇒ دو ضربه یک ردیف
   val txKey = remember(txFor) { newId() }
-  fun record(p: PendingTx, over: Boolean) { scope.launch { DebtEntry.record(store, txKey, p.entry(over), todayIso(), System.currentTimeMillis()).show(::toast, "با موفقیت ثبت شد") { if (txFor?.first == p.debtorId) txFor = null } } }
+  fun record(p: PendingTx, over: Boolean) { scope.launch { DebtEntry.record(store, txKey, p.entry(over), todayIso(), System.currentTimeMillis()).show(::toast, StrExpenses.saved) { if (txFor?.first == p.debtorId) txFor = null } } }
 
   // قرض‌داری که حذف شده نباید صفحه‌اش باز بماند
   LaunchedEffect(d.debtors.size) {
@@ -295,16 +301,16 @@ fun DebtorsScreen(
               if (d.debtors.isEmpty()) {
                 DebtorsEmptyCard(
                   icon = Icons.Filled.Groups,
-                  title = "هنوز قرض‌داری ثبت نشده",
-                  description = "کسانی که از شما نسیه می‌برند را اینجا اضافه کنید تا حساب هرکدام جدا بماند.",
-                  actionText = "قرض‌دار تازه",
+                  title = StrMoney.emptyDebtorsTitle,
+                  description = StrMoney.emptyDebtorsBody,
+                  actionText = StrDebtor.newDebtor,
                   onAction = { form = DebtorFormState() },
                 )
               } else {
                 DebtorsEmptyCard(
                   icon = Icons.Filled.Search,
-                  title = "چیزی پیدا نشد",
-                  description = "قرض‌داری با این نام یا شماره نیست.",
+                  title = StrKit.nothingFound,
+                  description = StrMoney.noDebtorMatchBody,
                 )
               }
             }
@@ -365,7 +371,7 @@ fun DebtorsScreen(
         } else {
           DebtorEngine.editWithLimit(d, state.editingId, draft)
         }
-        apply(result, if (state.editingId == null) "با موفقیت ثبت شد" else "با موفقیت ویرایش شد") {
+        apply(result, if (state.editingId == null) StrExpenses.saved else StrExpenses.edited) {
           form = null
         }
       },
@@ -435,7 +441,7 @@ fun DebtorsScreen(
       V3MaterialColors { DueDateDialog(
         entry = entry,
         onDismiss = { dueFor = null },
-        onSave = { due -> apply(DebtorEngine.setDueDate(d, txId, due), "سررسید ثبت شد") { dueFor = null } },
+        onSave = { due -> apply(DebtorEngine.setDueDate(d, txId, due), StrMoney.dueSaved) { dueFor = null } },
       ) }
     }
   }
@@ -491,7 +497,7 @@ private fun DebtorTableRow(
         .padding(horizontal = 12.dp, vertical = 9.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      Text(row.debtor.name.ifBlank { "بی‌نام" }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold,
+      Text(row.debtor.name.ifBlank { StrAccount.noName }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold,
         color = Shop.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
       Text(ir.vil3ntec.tohid.LocaleText.phoneDisplay(row.debtor.phone).ifBlank { "—" }, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
         maxLines = 1, modifier = Modifier.width(160.dp))
@@ -503,11 +509,11 @@ private fun DebtorTableRow(
         maxLines = 1, modifier = Modifier.width(110.dp))
     }
     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-      DropdownMenuItem(text = { Text("باز کردنِ حساب") }, onClick = { menu = false; onOpen() })
+      DropdownMenuItem(text = { Text(StrMoney.openAccount) }, onClick = { menu = false; onOpen() })
       DropdownMenuItem(text = { Text("ثبتِ رسید (پول گرفتم)") }, onClick = { menu = false; onReceive() })
       DropdownMenuItem(text = { Text("قرضِ تازه") }, onClick = { menu = false; onGive() })
-      DropdownMenuItem(text = { Text("ویرایش") }, onClick = { menu = false; onEdit() })
-      DropdownMenuItem(text = { Text("حذف", color = Shop.colors.danger) }, onClick = { menu = false; onDelete() })
+      DropdownMenuItem(text = { Text(StrChat.edit) }, onClick = { menu = false; onEdit() })
+      DropdownMenuItem(text = { Text(StrCustomerPrices.remove, color = Shop.colors.danger) }, onClick = { menu = false; onDelete() })
     }
   }
 }

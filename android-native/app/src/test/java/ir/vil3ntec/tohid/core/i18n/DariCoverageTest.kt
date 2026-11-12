@@ -231,14 +231,23 @@ class DariCoverageTest {
     "core/report/OwnerReportPlan.kt", "core/storefront/StorefrontEtaApi.kt", "core/storefront/PromoGuardApi.kt",
   )
 
-  /** سقفِ متنِ خامِ باقی‌ماندهٔ `ui/screens` (بی سطرهای «// داده:»)؛ چرخ‌دنده‌ای: فقط پایین بیاید — دورِ ۲: ۳۶۳۳، دورِ ۳: ۲۶۰۲، دورِ ۴: ۲۰۵۲، دورِ ۵: ۱۹۸۴، دورِ ۶: ۱۸۳۵، دورِ ۷: ۱۸۳۱، LOC-06: ۱۴۷۰ */
+  /** سقفِ متنِ خامِ باقی‌ماندهٔ `ui/screens` (بی سطرهای «// داده:»)؛ چرخ‌دنده‌ای: فقط پایین بیاید — دورِ ۲: ۳۶۳۳، دورِ ۳: ۲۶۰۲، دورِ ۴: ۲۰۵۲، دورِ ۵: ۱۹۸۴، دورِ ۶: ۱۸۳۵، دورِ ۷: ۱۸۳۱، LOC-06: ۱۴۷۰، LOC-06 دورِ ۲: ۱۷۸ */
   //  دستهٔ ۲۷: ۱۸۳۵ ِ دورِ ۶ روی پایه‌ای بی #971 شمرده شد؛ #971 سه سطرِ هم‌شکلِ STORE_PLACE (برچسبِ L.STORE_STOCK و
   //  کلیدواژه‌های جست‌وجوی تنظیمات در SettingsLayout/SettingsSearchIndex) پیش از آن افزوده بود ⇒ ۱۸۳۸ = همان شمارِ ادغام.
   //  دورِ ۷: هفت متنِ زندهٔ `MoreLayout`، `ReportFreshModel`، `ServerPulse`، `VoiceSearch`، `DeskMenu` و `DeliveryDesk` ⇒ ۱۸۳۱
   //  (بقیهٔ متنِ زنده کلیدِ تنظیمات و جدول‌های گزارشِ `DayEndModel`/`HeatmapModel` است — منتظرِ تصمیمِ صاحب‌کار؛ باقی صفحه‌های مرده)
   //  LOC-06 (۱۴۰۵/۰۸/۲۲): ۱۷ صفحهٔ مرده (هیچ راهی از برنامه، کامپیوتر یا آزمون؛ رسیدنِ اعلانی با بسته و import سنجیده شد) و
   //  بخشِ مردهٔ `Storefront.kt` (جز `StorefrontGate` ⇐ پروندهٔ جدا) برداشته شدند ⇒ ۱۴۷۰ در ۲۰۲ پرونده
-  private val maxRawOldScreens = 1470
+  //  LOC-06 دورِ ۲ (۱۴۰۵/۰۸/۲۲): (۱) کلیدهای بخشِ تنظیمات (`SettingsLayout`، `SettingsTiers`، `settingsIcon`، ثابت‌های
+  //  `…_TITLE`) و واژه‌های سه‌زبانهٔ جست‌وجوی تنظیمات (`SettingsSearchIndex.KEYWORDS`) سطرِ «// داده:» گرفتند (۳۵۲)؛
+  //  (۲) زنجیره‌های مرده (هیچ راهی از برنامه، کامپیوتر، آیفون، آزمون یا پیش‌نمایش؛ نامِ هم‌نامِ نسخهٔ ۳ با بسته و import
+  //  جدا شد) برداشته شدند: `DeliveryCash`، `Devices` و بخشِ مردهٔ `Orders`، `Reports`، `Vip`، `DeliveryDesk`، `DeliveryDialogs`،
+  //  `StorefrontOwnerSettings`، `OwnerReportSettings`، `StockBook`، `SettingsParts` (۶۸۹)؛ مرده‌هایی که ردیفی منتظرِ جایشان در
+  //  نسخهٔ ۳ است (`WarehouseDialogs`، `PhoneClaimStep`، `ProductDetail`، `Receipts`، `movementLabelOf`) ماندند؛
+  //  (۳) ۲۵۱ متنی که عیناً ویژگیِ بی‌آرگومانِ جدولی است به همان ویژگی رفت (فارسی بایت‌به‌بایت همان) ⇒ ۱۷۸ در ۲۰۱ پرونده.
+  //  ماندهٔ همه: ستون‌های `DayEndModel`/`HeatmapModel` (صفحه و خروجی؛ تصمیمِ صاحب‌کار)، صفحه‌های فقط‌پیش‌نمایشِ گوشی
+  //  (`PhonePreview` ِ DevShot: `Sale`، `QuickSale`، `Profile`، `Settings`، `Debtors`…) و مرده‌های نگه‌داشته
+  private val maxRawOldScreens = 178
 
   /** کفِ پوششِ دریِ نوشته‌های جابه‌جاشدهٔ دورِ ۲ (٪) — اندازهٔ همین کار؛ فقط بالا برود */
   private val minMovedPercent = 14

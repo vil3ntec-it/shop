@@ -101,17 +101,23 @@ class EasySetupWiringTest {
     assertTrue(pref.contains("getBoolean(KEY, false)"))
     assertEquals("easy_setup", EasySetupPref.KEY)
     assertFalse(EasySetupPref.on.value)
-    val devices = main.resolve("ui/screens/Devices.kt").readText().lines()
+    //  «دستگاه‌ها ⇐ چاپگر» ِ نسخهٔ ۳ (صفحهٔ قدیمیِ `ui/screens/Devices.kt` بی‌راه بود و در LOC-06 برداشته شد)
+    val text = main.resolve("ui/v3/settings/devices/DevicesHwAndroid.kt").readText()
+    val devices = text.lines()
     fun guarded(call: String, guard: String) {
       val at = devices.indexOfFirst { it.contains(call) }
-      assertTrue("$call در Devices نیست", at >= 0)
+      assertTrue("$call در DevicesHwAndroid نیست", at >= 0)
       assertEquals("$call یک بار", 1, devices.count { it.contains(call) })
       assertTrue("$call پشتِ $guard نیست", devices.subList(maxOf(0, at - 3), at + 1).any { it.contains(guard) })
     }
-    guarded("PrinterFinderDialog(", "if (finding && easy && canAdmin)")
-    guarded("finding = true", "if (easy) {")
-    guarded("ScannerSetupTools(", "EasySetupPref.on.value && canAdmin")
-    assertTrue(devices.any { it.contains("val easy = ir.vil3ntec.tohid.print.EasySetupPref.on.value") })
+    guarded("PrinterFinderDialog(", "if (finding) {")
+    guarded("{ finding = true }", "if (easy) {")
+    guarded("ScannerSetupTools(", "if (easy) {")
+    assertTrue(devices.any { it.contains("val easy = EasySetupPref.on.value") })
+    //  دکمهٔ «یافتنِ چاپگر» و ابزارِ بارکدخوان فقط درونِ بخشِ مدیر (`if (canAdmin)`)؛ `finding` جای دیگری روشن نمی‌شود
+    val admin = text.substringAfter("if (canAdmin) {").substringBefore("PrintQueuePanel(")
+    assertTrue(admin.contains("if (easy) {"))
+    assertEquals(1, Regex(Regex.escape("finding = true")).findAll(text).count())
     //  بارکدخوانِ صندوق دست نمی‌خورد: همان HwTools
     val scan = main.resolve("scan/ScanPrefs.kt").readText()
     assertFalse(scan.contains("EasySetup"))

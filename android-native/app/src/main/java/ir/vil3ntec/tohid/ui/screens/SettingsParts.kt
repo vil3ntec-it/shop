@@ -8,19 +8,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.EventBusy
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.Password
-import androidx.compose.material.icons.filled.Devices
-import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CallToAction
@@ -43,7 +30,6 @@ import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -60,7 +46,6 @@ import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.Space
 import androidx.compose.runtime.saveable.rememberSaveable
-import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.i18n.Str
 
 /**
@@ -124,21 +109,21 @@ object SettingsShot {
 
 /** آیکنِ خطیِ ردیفِ هر بخش و هر گروه (r5) — همه تک‌رنگ */
 internal fun settingsIcon(key: String): ImageVector? = when (key) {
-  "هشدارها" -> Icons.Outlined.Notifications
-  "ظاهر" -> Icons.Outlined.LightMode
+  "هشدارها" -> Icons.Outlined.Notifications // داده: کلیدِ بخشِ تنظیمات
+  "ظاهر" -> Icons.Outlined.LightMode // داده: کلیدِ بخشِ تنظیمات
   SettingsLayout.NAV_BAR -> Icons.Outlined.CallToAction
-  "زبان" -> Icons.Outlined.Language
-  "تاریخ و رقم" -> Icons.Outlined.CalendarToday
-  "قفل برنامه" -> Icons.Outlined.Lock
-  "کد شاگرد" -> Icons.Outlined.Key
-  "دستگاه‌های وارد شده" -> Icons.Outlined.PhoneAndroid
-  "تغییر رمز حساب" -> Icons.Outlined.Password
-  "کالای منقضی" -> Icons.Outlined.EventBusy
+  "زبان" -> Icons.Outlined.Language // داده: کلیدِ بخشِ تنظیمات
+  "تاریخ و رقم" -> Icons.Outlined.CalendarToday // داده: کلیدِ بخشِ تنظیمات
+  "قفل برنامه" -> Icons.Outlined.Lock // داده: کلیدِ بخشِ تنظیمات
+  "کد شاگرد" -> Icons.Outlined.Key // داده: کلیدِ بخشِ تنظیمات
+  "دستگاه‌های وارد شده" -> Icons.Outlined.PhoneAndroid // داده: کلیدِ بخشِ تنظیمات
+  "تغییر رمز حساب" -> Icons.Outlined.Password // داده: کلیدِ بخشِ تنظیمات
+  "کالای منقضی" -> Icons.Outlined.EventBusy // داده: کلیدِ بخشِ تنظیمات
   SettingsLayout.PRINTER -> Icons.Outlined.Print
-  "دوربین بارکدخوان" -> Icons.Outlined.QrCodeScanner
-  "همگام‌سازی" -> Icons.Outlined.Sync
-  "داده‌ها" -> Icons.Outlined.Backup
-  "درباره برنامه" -> Icons.Outlined.Info
+  "دوربین بارکدخوان" -> Icons.Outlined.QrCodeScanner // داده: کلیدِ بخشِ تنظیمات
+  "همگام‌سازی" -> Icons.Outlined.Sync // داده: کلیدِ بخشِ تنظیمات
+  "داده‌ها" -> Icons.Outlined.Backup // داده: کلیدِ بخشِ تنظیمات
+  "درباره برنامه" -> Icons.Outlined.Info // داده: کلیدِ بخشِ تنظیمات
   //  شش دسته (صفحهٔ اولِ تنظیمات و گروهِ «تنظیمات»ِ صفحهٔ «بیشتر»؛ «داده‌ها» همان کلیدِ بخشِ پشتیبان است)
   SettingsLayout.SHOP -> Icons.Outlined.Shield
   SettingsLayout.GOODS -> Icons.Outlined.Inventory2
@@ -169,22 +154,6 @@ internal fun settingsHue(key: String): ir.vil3ntec.tohid.ui.v3.V3Hue? = when (Se
   SettingsLayout.ABOUT -> ir.vil3ntec.tohid.ui.v3.V3Hue.BLUE
   else -> null
 }
-
-/** فهرستِ ستونِ کناریِ تنظیماتِ کامپیوتر (پیش‌تر درونِ `AppRoot`) */
-fun deskSettingsSections(): List<Pair<String, ImageVector>> = listOf(
-  "هشدارها" to Icons.Filled.NotificationsActive,
-  "ظاهر" to Icons.Filled.Palette,
-  "تاریخ و رقم" to Icons.Filled.Event,
-  "کالای منقضی" to Icons.Filled.EventBusy,
-  RETURN_SETTINGS_TITLE to Icons.Filled.SwapHoriz,
-  "قفل برنامه" to Icons.Filled.Lock,
-  SECURITY_SECTION_TITLE to Icons.Filled.Security,
-  "تغییر رمز حساب" to Icons.Filled.Password,
-  "دستگاه‌های وارد شده" to Icons.Filled.Devices,
-  "کد شاگرد" to Icons.Filled.Key,
-  "داده‌ها" to Icons.Filled.Storage,
-  "درباره برنامه" to Icons.Filled.Info,
-)
 
 /**
  *  یک بخشِ تنظیمات.
@@ -474,7 +443,6 @@ private fun V3Segmented(
     }
   }
 }
-
 
 /** کامپیوتر: عنوانِ بخشی که ستونِ راستِ تنظیمات نشان می‌دهد؛ null یعنی گوشی */
 val LocalSettingsPick = staticCompositionLocalOf<String?> { null }
