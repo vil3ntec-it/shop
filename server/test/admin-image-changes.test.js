@@ -136,9 +136,10 @@ test('نقش: مالی ۴۰۳ همه؛ بیننده فقط می‌خواند؛ �
   assert.equal(d.body.change.items[0].before.image_id, y1);
   assert.equal(d.body.change.items[1].before, null);
   assert.equal(d.body.change.items[0].after.image_id, y2);
-  for (const who of ['aic-binande', 'aic-modir']) {
+  for (const [who, code] of [['aic-binande', 'role_forbidden'], ['aic-modir', 'forbidden']]) {
     const r = await M(who, 'POST', `${base(A)}/${b2}/rollback`, { reason: REASON });
     assert.equal(r.status, 403, `${who} ⇒ ${r.status}`);
+    assert.equal(r.body.error.code, code, `${who}: فقط ارشد`);
   }
   assert.deepEqual({ sel: await selRows(A), ch: await changeRow(b2) }, before);
   assert.equal((await audits(A, 'image.changes_rolled_back')).length, 0);
@@ -229,6 +230,11 @@ test('برگرداندن: دلیل پیش از اجازه؛ کارِ خودکا�
   assert.equal(sys.status, 403, JSON.stringify(sys.body));
   assert.equal(sys.body.error.code, 'human_actor_required');
   const g7 = await grant(A, 'restore', { actor: 'panel:7' });
+  //  ⛔ همان «انجام‌دهنده» با نقشِ اپراتور (admin) ِ پنل، با اجازهٔ زنده هم نه — برگرداندن فقط ارشد
+  const weak = await h.api('POST', `${base(A)}/${b2}/rollback`, { body: { reason: REASON },
+    headers: { Authorization: `Bearer ${svc.key}`, 'X-Actor-Id': 'panel:7', 'X-Actor-Role': 'admin' } });
+  assert.equal(weak.status, 403, JSON.stringify(weak.body));
+  assert.equal(weak.body.error.code, 'forbidden');
   const other = await S('panel:9', 'POST', `${base(A)}/${b2}/rollback`, { reason: REASON });
   assert.equal(other.body.error.code, 'grant_required', 'اجازهٔ «انجام‌دهنده»ٔ دیگر نه');
   assert.equal((await M('aic-arshad', 'POST', `${base(A)}/${b2}/rollback`, { reason: REASON })).body.error.code, 'grant_required', 'مدیرِ پشتِ کلید هم نه');
