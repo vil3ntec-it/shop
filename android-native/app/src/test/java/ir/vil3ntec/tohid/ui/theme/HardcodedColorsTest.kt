@@ -51,7 +51,6 @@ class HardcodedColorsTest {
     //  تصویرسازیِ صفحهٔ خوش‌آمد، نشانِ گوگل و طلای اشتراک — رنگِ برندِ دیگران، نه رنگِ سطح.
     //  VILL3N: بنفشِ صفحهٔ ورود، آسمان، موج و حباب‌ها و «طلای» بنفشِ VIP از توکن ⇒ ۱۴/۱۴/۱۲ ⇐ ۸/۱/۷
     "ui/screens/Welcome.kt" to 8,
-    "ui/screens/WelcomeDecor.kt" to 1,
     "ui/screens/Vip.kt" to 7,
     //  DeskDashboard: پالتِ دونات از ۱۴۰۵/۰۷/۲۸ از `Shop.colors.chart` (VILL3N) ⇒ از فهرست بیرون
     //  Dashboard: ایستگاهِ میانیِ گرادیان از ۱۴۰۵/۰۷/۲۸ `Brand.blue` ⇒ از فهرست بیرون
