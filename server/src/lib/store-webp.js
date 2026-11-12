@@ -8,7 +8,12 @@
  *   ⛔ تبدیل از همان بایت‌های امروزِ `thumb`/`display` (اصل هرگز)، بی EXIF/GPS، با سقفِ پیکسل؛ هر خطا ⇒ همان JPEG.
  *   ⛔ بار: حداکثر `MAX_JOBS` تبدیلِ هم‌زمان (بیشتر ⇒ همان JPEG، نه صف) و کشِ حافظه با سقفِ بایت (LRU، کلید = هشِ محتوا + اندازه).
  *
- *   webpOf(data, hash, size) ⇒ Buffer ِ WebP یا null (یعنی همان اصل را بفرست)
+ *   ⛔ AVIF (WEB-16، همان تصمیمِ ۴-۲): فقط با `STORE_AVIF=1` ِ سرور (جدا، پیش‌فرض خاموش؛ رمزگذاریِ AVIF سنگین‌تر است) و
+ *      فقط برای مرورگری که `image/avif` می‌پذیرد؛ وگرنه همان WebP یا JPEG. همان سقفِ کار، همان کش (کلید با قالب).
+ *
+ *   pick(accept) ⇒ 'avif' | 'webp' | null — قالبِ پاسخ برای همین مرورگر
+ *   encodedOf(data, hash, size, fmt) ⇒ Buffer ِ همان قالب یا null (یعنی همان اصل را بفرست)
+ *   webpOf(data, hash, size) = encodedOf(…, 'webp')
  */
 const config = require('../config');
 
@@ -16,6 +21,8 @@ const MAX_JOBS = 2;
 const CACHE_BYTES = 32 * 1024 * 1024;
 const MAX_PIXELS = 40_000_000;
 const QUALITY = Object.freeze({ thumb: 70, display: 78 });
+//  AVIF با کیفیتِ عددیِ کمتر هم‌چشم با WebP است؛ effort ِ ۴ (از ۰ تا ۹) ⇒ زمانِ رمزگذاریِ معقول برای ۳۲۰ و اندازهٔ برگهٔ کالا
+const AVIF_QUALITY = Object.freeze({ thumb: 50, display: 55 });
 
 let sharp; // undefined = هنوز نسنجیده، null = نیست
 function lib() {
@@ -33,8 +40,12 @@ function lib() {
 }
 
 const on = () => !!config.storefront.webp;
-const available = () => on() && !!lib();
-const wants = (accept) => /(^|,)\s*image\/webp\s*(;|,|$)/i.test(String(accept || ''));
+const avifOn = () => !!config.storefront.avif;
+const available = () => (on() || avifOn()) && !!lib();
+const accepts = (accept, type) => new RegExp(`(^|,)\\s*image\\/${type}\\s*(;|,|$)`, 'i').test(String(accept || ''));
+const wants = (accept) => accepts(accept, 'webp');
+/** قالبِ پاسخ: AVIF (اگر روشن و پذیرفته) ⇐ WebP (اگر روشن و پذیرفته) ⇐ null (همان اصل) */
+const pick = (accept) => (avifOn() && accepts(accept, 'avif') ? 'avif' : on() && wants(accept) ? 'webp' : null);
 
 const cache = new Map(); // key ⇒ Buffer (ترتیبِ درج = تازگی)
 let cached = 0;
@@ -48,9 +59,11 @@ function remember(key, buf) {
 }
 
 let jobs = 0;
-async function webpOf(data, hash, size) {
-  if (!available() || !Buffer.isBuffer(data) || !data.length || !QUALITY[size]) return null;
-  const key = `${hash}:${size}`;
+const webpOf = (data, hash, size) => encodedOf(data, hash, size, 'webp');
+
+async function encodedOf(data, hash, size, fmt = 'webp') {
+  if (!available() || !Buffer.isBuffer(data) || !data.length || !QUALITY[size] || (fmt !== 'webp' && fmt !== 'avif')) return null;
+  const key = `${hash}:${size}:${fmt}`;
   const hit = cache.get(key);
   if (hit) { cache.delete(key); cache.set(key, hit); return hit; }
   if (jobs >= MAX_JOBS) return null;
@@ -58,7 +71,7 @@ async function webpOf(data, hash, size) {
   try {
     const out = await lib()(data, { limitInputPixels: MAX_PIXELS, failOn: 'error' })
       .rotate()                                    //  جهتِ EXIF روی پیکسل؛ خروجی بی فراداده
-      .webp({ quality: QUALITY[size], effort: 4 })
+      [fmt]({ quality: (fmt === 'avif' ? AVIF_QUALITY : QUALITY)[size], effort: 4 })
       .toBuffer();
     //  فقط اگر واقعاً سبک‌تر شد؛ وگرنه همان اصل
     if (!out.length || out.length >= data.length) { remember(key, Buffer.alloc(0)); return null; }
@@ -70,4 +83,4 @@ async function webpOf(data, hash, size) {
 /** برای آزمون */
 function _reset() { cache.clear(); cached = 0; jobs = 0; }
 
-module.exports = { MAX_JOBS, CACHE_BYTES, on, available, wants, webpOf, _reset };
+module.exports = { MAX_JOBS, CACHE_BYTES, on, avifOn, available, wants, pick, webpOf, encodedOf, _reset };

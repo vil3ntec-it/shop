@@ -115,3 +115,41 @@ test('روشن: دادهٔ ناخوانا یا بی sharp ⇒ null (همان ا�
     assert.equal(W.wants(''), false);
   } finally { config.storefront.webp = false; }
 });
+
+test('AVIF (`STORE_AVIF`): مرورگرِ پذیرندهٔ AVIF ⇒ image/avif ِ سبک‌تر با ETag ِ خودش؛ فقط WebP ⇒ WebP؛ خاموش ⇒ همان WebP', { skip: !hasSharp && 'sharp نصب نیست' }, async () => {
+  config.storefront.webp = true;
+  config.storefront.avif = true;
+  try {
+    const W0 = 640; const H0 = 480; const raw = Buffer.alloc(W0 * H0 * 3);
+    for (let y = 0; y < H0; y++) for (let x = 0; x < W0; x++) {
+      const i = (y * W0 + x) * 3; raw[i] = x % 256; raw[i + 1] = y % 256; raw[i + 2] = ((x ^ y) * 3) % 256;
+    }
+    const jpg = await require('sharp')(raw, { raw: { width: W0, height: H0, channels: 3 } }).jpeg({ quality: 90 }).toBuffer();
+    const slug = await storeWithPhoto(jpg);
+    const a = await get(slug, '/products/rice/photo', ACCEPT);
+    assert.equal(a.status, 200);
+    assert.match(a.type, /^image\/avif/);
+    assert.equal(a.buf.subarray(4, 8).toString('latin1'), 'ftyp');
+    assert.match(a.buf.subarray(8, 12).toString('latin1'), /^avi[fs]$/);
+    assert.ok(a.buf.length < jpg.length, `${a.buf.length} < ${jpg.length}`);
+    assert.match(a.vary, /accept/i);
+    assert.match(a.etag, /-avif"$/);
+    const again = await fetch(`${h.base()}/api/store/${slug}/products/rice/photo`, { headers: { ...ACCEPT, 'If-None-Match': a.etag } });
+    assert.equal(again.status, 304);
+    //  فقط WebP ⇒ WebP (نه AVIF)؛ کارتِ کوچک هم AVIF
+    const w = await get(slug, '/products/rice/photo', { Accept: 'image/webp,*/*' });
+    assert.match(w.type, /^image\/webp/);
+    const t = await get(slug, '/products/rice/thumb', ACCEPT);
+    assert.match(t.type, /^image\/avif/);
+    //  AVIF خاموش ⇒ همان WebP ِ امروز برای همان مرورگر
+    config.storefront.avif = false;
+    W._reset();
+    const off = await get(slug, '/products/rice/photo', ACCEPT);
+    assert.match(off.type, /^image\/webp/);
+    assert.equal(W.pick('image/avif,image/webp'), 'webp');
+    config.storefront.avif = true;
+    assert.equal(W.pick('image/avif,image/webp'), 'avif');
+    assert.equal(W.pick('image/webp'), 'webp');
+    assert.equal(W.pick('image/avifx,text/html'), null);
+  } finally { config.storefront.webp = false; config.storefront.avif = false; }
+});
