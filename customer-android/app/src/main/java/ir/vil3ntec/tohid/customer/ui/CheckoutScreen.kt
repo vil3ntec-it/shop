@@ -80,6 +80,7 @@ fun CheckoutScreen(model: CustomerModel, slug: String) {
         PinBlock(
           pin = f.pin, busy = model.pinBusy, note = model.pinNote,
           onMine = { model.takePin() }, onPaste = { model.pastePin(it) }, onClear = { model.clearPin() },
+          map = model.mapFeature(), onMap = { model.setPin(it) },
         )
         if (f.addressId == null && (f.pin != null || f.addressText.isNotBlank() || f.landmark.isNotBlank())) {
           TextButton(onClick = { model.go(Route.AddressEdit(null, fromCheckout = true)) }) { Text(ShopperText.saveThisAddress) }

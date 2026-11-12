@@ -54,6 +54,29 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-26c زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-26c` (از سرِ `claude/batch-55`)
+
+- **CRM-09 (افزودن از برنامهٔ خریدِ بومی) ⇐ «پرچم»:** برنامهٔ خرید حسابِ مشتری دارد ⇒ راهِ حساب، نه درِ سفارش. `core/shopper/ShopperAddressSync.kt`:
+  دفترِ نشانیِ گوشی ⇄ دفترِ حساب با یک درخواست در هر گام (DELETE ِ پاک‌شده‌ها ⇐ PUT ِ ویرایش‌های نرفته ⇐ GET ⇐ POST ِ فقط‌دستگاهی‌ها)، هر پاسخ
+  روی حالِ **اکنون** (ویرایشِ میانهٔ دور گم نمی‌شود)، همانند دوباره فرستاده نمی‌شود، سرور مرجع، خروج ⇒ نشانی‌های حساب از گوشی. شناسهٔ
+  `adr-…` یعنی فقط‌دستگاهی (حالتِ تازه فقط `ShopperState.addressGone` و `SavedAddress.dirty/media`). رسانه با همان درهای حساب
+  (`/account/addresses/:id/media/:kind`) در `AddressMediaCard.kt`/`ModelAddressSync.kt`؛ ثبت با نشانیِ حساب ⇒ `savedId` + نشست ⇒
+  `linkOrder` ِ سرور. **سرورِ تازه‌ای لازم نشد.**
+- **CHK-08 (نقشه در برنامهٔ خرید) ⇐ «پرچم»:** MapLibre در کش نیست ⇒ «کاشیِ ثابت + پین» ِ ویترین در Compose (`ShopperPinMap.kt` + `PinMapView.kt`،
+  `Platform.tile`: `MapTilesAndroid.kt` و `ImagesIos.Tile`)؛ بردارِ مشترکِ `core/test-vectors/pin-map-v1.json` از خودِ `store/pin-map.js`
+  (`server/test/store-pin-map.test.js` ۳/۳ و `PinMapVectorsTest` ۳/۳).
+- **آزمون‌ها:** core ‏`ir.vil3ntec.tohid.core.shopper.*` ۱۵۳ PASS (تازه `ShopperAddressSyncTest` ۱۲، `PinMapVectorsTest` ۳، `PlaceTextCoverageTest` ۲؛
+  جهش‌آزمایی ۲ از ۲ سرخ)؛ `customer-android` (صفحه‌ها و مدلِ مشترک) روی Compose Desktop ِ محلی کامپایل و ۳۳/۳۳ (تازه `CustomerAddressSyncTest`)؛
+  سرور `store-pin-map` ۳، `store-map` ۳، `store-pin-text` ۳، `web-i18n` ۳۵، `dari-text` ۱۷، `address-media-door` ۲، `store-address-media` ۵،
+  `kotlin-test-names-windows` ۲؛ اجرای کاملِ `flock /tmp/gradle-full.lock ./desktop/gradlew -p desktop test` (‎-Xmx3g، `desktop/build/test-data` ِ پاک) ⇒
+  ۴۰۲۵ PASS، ۰ FAIL، ۴ SKIP ِ پیشین؛ precheck ⇒ `fail=0`؛ `quality.mjs` بی ❌. کامپایلِ اندروید (`MapTilesAndroid.kt`، `MainActivity.kt`) و آیفون فقط CI.
+- **دام:** (۱) `CustomerModel.kt` درست ۸۰۰ خط است ⇒ هر سیمِ تازه در پروندهٔ جدا (`ModelAddressSync.kt`) و در خودِ مدل فقط جایگزینیِ هم‌خط با نامِ
+  کامل (`ir.vil3ntec…AddressSync`). (۲) `ShopperText.kt` ۷۹۹ خط ⇒ نوشته‌های تازه در `PlaceText` (`ShopperPlaceText.kt`) با آزمونِ پوششِ خودش.
+  (۳) قابِ نقشه در فارسی آینه می‌شود ⇒ `LayoutDirection.Ltr` و `absoluteOffset` (جهت‌های نقشه فیزیکی‌اند). (۴) `ensureStore` همان دکان را دوباره
+  وارد نمی‌شود ⇒ تازه کردنِ دفترِ حساب با باز شدنِ «نشانی‌های من» هم.
+- **قدمِ بعد:** دیدنِ CI ِ اندروید/آیفون برای پرونده‌های تازه؛ روشن کردنِ `shop.storefront.address_media` و `shop.storefront.map_pin` + `STORE_MAP_TILES`
+  با صاحب‌کار (FLAGS-ON §۲۳، §۳۱؛ هر دو حالا بخشِ «برنامهٔ خرید» دارند) و گوشیِ واقعی.
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-29o زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-29o` (از سرِ `claude/batch-55`) — فقط سند
 
 - **شد:** سندِ کوتاهِ صاحب‌کار [`OWNER-NEXT-fa.md`](OWNER-NEXT-fa.md) از نقشهٔ ۱۴۰۵/۰۸/۲۲ (۲۲۷ ردیف): ۱. کلیدها ۵۶ (۲۴ کم‌خطرِ «امروز،

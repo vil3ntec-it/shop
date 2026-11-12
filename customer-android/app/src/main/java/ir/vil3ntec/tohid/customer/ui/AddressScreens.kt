@@ -26,6 +26,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,14 +40,18 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.shopper.AddressRules
 import ir.vil3ntec.tohid.core.shopper.GeoPin
+import ir.vil3ntec.tohid.core.shopper.MapPinFeature
+import ir.vil3ntec.tohid.core.shopper.PlaceText
 import ir.vil3ntec.tohid.core.shopper.PinText
 import ir.vil3ntec.tohid.core.shopper.SavedAddress
 import ir.vil3ntec.tohid.core.shopper.ShopperText
 
-/** «نشانی‌های من» (CHK-09): نام‌دار، با پین، حداکثر ۱۰، فقط روی همین گوشی تا حسابِ مشتری بیاید. */
+/** «نشانی‌های من» (CHK-09): نام‌دار، با پین، حداکثر ۱۰؛ بی حساب فقط روی همین گوشی، با حساب همراهِ دفترِ حساب (CRM-09). */
 @Composable
 fun AddressesScreen(model: CustomerModel) {
   val list = model.saved.addresses
+  //  CRM-09: با حساب، دفترِ حساب از نو (نشانیِ تازهٔ وب یا گوشیِ دیگر)
+  LaunchedEffect(Unit) { model.syncAddresses() }
   Column(Modifier.fillMaxSize()) {
     TopBar(ShopperText.myAddresses, onBack = { model.back() }) {
       if (list.size < AddressRules.MAX) {
@@ -56,7 +62,8 @@ fun AddressesScreen(model: CustomerModel) {
       model.notice?.let { n -> item { Note(n, Tone.OK) } }
       if (list.isEmpty()) item { Note(ShopperText.noAddresses) }
       items(list, key = { it.id }) { a -> AddressRow(a, onOpen = { model.go(Route.AddressEdit(a.id)) }, onDelete = { model.deleteAddress(a.id) }) }
-      item { Text(ShopperText.addressesLocal, style = MaterialTheme.typography.bodySmall) }
+      model.account.places.note?.let { n -> item { Note(n, Tone.WARN) } }
+      item { Text(if (model.signedIn() != null) PlaceText.addressesAccount else ShopperText.addressesLocal, style = MaterialTheme.typography.bodySmall) }
     }
   }
 }
@@ -69,16 +76,29 @@ private fun AddressRow(a: SavedAddress, onOpen: () -> Unit, onDelete: () -> Unit
         Text(a.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         listOf(a.text, a.landmark).filter { it.isNotBlank() }.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
         a.pin?.let { Text(ShopperText.pinSet(PinText.short(it)), style = MaterialTheme.typography.bodySmall) }
+        a.media?.let { m ->
+          if (m.gatePhoto) Text(PlaceText.amPhoto + ": " + PlaceText.amSaved, style = MaterialTheme.typography.bodySmall)
+          if (m.voiceNote) Text(PlaceText.amVoice + ": " + PlaceText.amSaved, style = MaterialTheme.typography.bodySmall)
+        }
       }
       IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = ShopperText.deleteAddress(a.label)) }
     }
   }
 }
 
-/** برگهٔ نشانی: نام، نشانی، نشانه و پین (موقعیتِ من، یا پیوند/مختصاتِ برنامهٔ نقشه)؛ ذخیره با قاعده‌های سرور. */
+/**
+ *  برگهٔ نشانی: نام، نشانی، نشانه و پین (موقعیتِ من، پیوند/مختصاتِ برنامهٔ نقشه، یا «انتخاب روی نقشه»)؛ ذخیره با قاعده‌های
+ *  سرور. CRM-09: نشانیِ حساب در دکانی با پرچم ⇒ عکسِ دروازه و یادداشتِ صوتی ([AddressMediaCard]).
+ */
 @Composable
 fun AddressEditScreen(model: CustomerModel, id: String?) {
   val b = model.book
+  //  شناسهٔ همان نشانی (پس از رسیدن به دفترِ حساب شناسهٔ سرور می‌گیرد: `AddressModel.follow`)
+  val editing = b.editingId
+  DisposableEffect(editing) {
+    model.openAddressMedia(editing)
+    onDispose { model.closeAddressMedia() }
+  }
   Column(Modifier.fillMaxSize()) {
     TopBar(if (id == null) ShopperText.addAddress else ShopperText.editAddress, onBack = { model.back() })
     Column(
@@ -91,7 +111,9 @@ fun AddressEditScreen(model: CustomerModel, id: String?) {
       PinBlock(
         pin = b.pin, busy = b.locating, note = b.note,
         onMine = { b.useMyLocation() }, onPaste = { text -> b.paste = text; b.pastePin() }, onClear = { b.clearPin() },
+        map = model.mapFeature(), onMap = { b.mapPin(it) },
       )
+      AddressMediaCard(model, editing)
     }
     Column(Modifier.padding(16.dp)) { MainButton(ShopperText.save) { model.saveAddress() } }
   }
@@ -99,11 +121,16 @@ fun AddressEditScreen(model: CustomerModel, id: String?) {
 
 /**
  *  پینِ موقعیت (CHK-08): «موقعیتِ فعلیِ من» (اجازه را سکو می‌پرسد)، چسباندنِ پیوند/مختصات از برنامهٔ نقشه، «نمایش روی
- *  نقشه» با پیوندِ `geo:` (فقط مختصات) و برداشتن. کاشیِ نقشه گرفته نمی‌شود (سیاستِ OSMF).
+ *  نقشه» با پیوندِ `geo:` (فقط مختصات) و برداشتن. «انتخاب روی نقشه» فقط با [map] (پرچمِ `shop.storefront.map_pin` +
+ *  `STORE_MAP_TILES` ِ همان سرور؛ برنامه خودش سرورِ نقشه‌ای نمی‌شناسد) و سکویی که تکه می‌کشد.
  */
 @Composable
-fun PinBlock(pin: GeoPin?, busy: Boolean, note: String?, onMine: () -> Unit, onPaste: (String) -> Boolean, onClear: () -> Unit) {
+fun PinBlock(
+  pin: GeoPin?, busy: Boolean, note: String?, onMine: () -> Unit, onPaste: (String) -> Boolean, onClear: () -> Unit,
+  map: MapPinFeature? = null, onMap: (GeoPin) -> Unit = {},
+) {
   var paste by remember { mutableStateOf("") }
+  var mapOpen by remember { mutableStateOf(false) }
   val platform = LocalPlatform.current
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     SectionTitle(ShopperText.pinTitle)
@@ -122,6 +149,13 @@ fun PinBlock(pin: GeoPin?, busy: Boolean, note: String?, onMine: () -> Unit, onP
     }
     OutlinedButton(onClick = onMine, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
       Text(if (busy) ShopperText.pinWait else ShopperText.pinMine)
+    }
+    if (map != null && platform.tile != null) {
+      if (!mapOpen) {
+        OutlinedButton(onClick = { mapOpen = true }, modifier = Modifier.fillMaxWidth()) { Text(PlaceText.mapOpen) }
+      } else {
+        PinMapBox(map, pin, onPick = { onMap(it); mapOpen = false }, onClose = { mapOpen = false })
+      }
     }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       OutlinedTextField(

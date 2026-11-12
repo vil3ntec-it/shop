@@ -96,7 +96,13 @@ data class AccountSync(
 )
 
 /** درهای روشنِ همین دکان (`features` ِ `GET /:slug`) */
-data class AccountFeatures(val favorites: Boolean = false, val cart: Boolean = false)
+data class AccountFeatures(
+  val favorites: Boolean = false,
+  val cart: Boolean = false,
+  /** CRM-09: دفترِ نشانیِ حساب ([AddressSync]) و رسانهٔ آن در همین دکان */
+  val addresses: Boolean = false,
+  val addressMedia: Boolean = false,
+)
 
 /** چه چیزی هنوز در این دور از سرور تازه خوانده نشده (ورود به دکان، برگشتِ برنامه ⇒ هر سه) */
 data class AccountPulls(val cart: Boolean = false, val fav: Boolean = false, val list: Boolean = false) {
@@ -179,8 +185,11 @@ object AccountRules {
     return base.copy(sync = base.sync + (slug to fresh))
   }
 
-  /** خروج ⇒ همهٔ صف‌ها و نسخه‌ها پاک؛ سبدی که آینهٔ حساب بود هم ([CartSync.forget])؛ ♥، فهرست و سبدِ مهمان روی دستگاه می‌مانند */
-  fun signedOut(s: ShopperState): ShopperState = CartSync.forget(s).copy(sync = emptyMap())
+  /**
+   *  خروج ⇒ همهٔ صف‌ها و نسخه‌ها پاک؛ سبدی که آینهٔ حساب بود هم ([CartSync.forget]) و نشانی‌های حساب ([AddressSync.signedOut])؛
+   *  ♥، فهرست، سبدِ مهمان و نشانی‌های فقط‌دستگاهی روی دستگاه می‌مانند
+   */
+  fun signedOut(s: ShopperState): ShopperState = AddressSync.signedOut(CartSync.forget(s).copy(sync = emptyMap()))
 
   // ── کارهای دستگاه ──
 

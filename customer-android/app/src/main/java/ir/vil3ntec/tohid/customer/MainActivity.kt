@@ -31,7 +31,7 @@ import kotlinx.coroutines.withContext
  *  نقطهٔ ورودِ اندروید: فقط سیم‌کشیِ مرزهای سکو؛ همهٔ صفحه‌ها در `ui/` (بی android.*).
  *  مرحلهٔ ۲: اجازهٔ موقعیت فقط با زدنِ «موقعیتِ فعلیِ من»، اجازهٔ میکروفون فقط با زدنِ میکروفونِ گفت‌وگو (`VoiceAndroid`)،
  *  گزینشگرِ عکسِ سیستم (بی اجازهٔ حافظه)، «نمایش روی نقشه»
- *  با `geo:`، و پیوندِ عمیق (`tohidshop://store/…`، `https://vill3n.top/store/…`، `<slug>.vill3n.top`) در
+ *  با `geo:`، تکه‌های «انتخاب روی نقشه» (`MapTilesAndroid`، CHK-08)، و پیوندِ عمیق (`tohidshop://store/…`، `https://vill3n.top/store/…`، `<slug>.vill3n.top`) در
  *  `onCreate`/`onNewIntent`.
  */
 class MainActivity : ComponentActivity() {
@@ -103,6 +103,7 @@ class MainActivity : ComponentActivity() {
         pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
       },
       picture = { bytes, modifier -> PhotoAndroid.Picture(bytes, modifier) },
+      tile = { url, modifier, loaded -> MapTilesAndroid.Tile(server(), url, "TohidShop/${BuildConfig.VERSION_NAME} (Android)", modifier, loaded) },
     )
     if (savedInstanceState == null) intent?.dataString?.let { model.openLink(it) }
     setContent {

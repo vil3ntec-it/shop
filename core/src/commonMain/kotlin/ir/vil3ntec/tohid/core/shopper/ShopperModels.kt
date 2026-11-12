@@ -68,6 +68,10 @@ data class StoreFeatures(
   val deliveryPrefs: Boolean = false,
   /** RPT-14: تپشِ بالای قیف (`shop.orders.online_report`؛ [ShopperFunnel]) */
   val funnel: Boolean = false,
+  /** CRM-09: عکسِ دروازه و یادداشتِ صوتیِ نشانیِ حساب (`shop.storefront.address_media`؛ [AddressMedia]) */
+  val addressMedia: Boolean = false,
+  /** CHK-08 / ۴-۳: «انتخاب روی نقشه» (`shop.storefront.map_pin` + `STORE_MAP_TILES` ِ سرور؛ [PinMap]) */
+  val mapPin: MapPinFeature? = null,
 )
 
 /** کاتالوگ با صفحه‌بندیِ نشانگری (`nextCursor`). */
@@ -192,6 +196,8 @@ data class CheckoutAddress(
   /** CHK-08: پین (هر دو یا هیچ)؛ با پین ناحیه را سرور می‌گوید */
   val lat: Double? = null,
   val lng: Double? = null,
+  /** CRM-09: نشانیِ حسابِ برگزیده (با نشستِ حساب ⇒ سرور عکسِ دروازه/یادداشتِ همان نشانی را به سفارش می‌بندد)؛ null در بدنه نمی‌رود */
+  val savedId: String? = null,
 )
 
 /** [cashTenderMinor] (CHK-14): اسکناسِ مشتری هنگامِ تحویل؛ null ⇒ در بدنه نیست (همان سفارشِ بی پرچم) */

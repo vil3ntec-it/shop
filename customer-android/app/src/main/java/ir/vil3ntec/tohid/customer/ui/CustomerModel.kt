@@ -96,7 +96,7 @@ class CustomerModel(
   secureRandom: (Int) -> ByteArray = { Random.nextBytes(it) },
   chatWaitMs: Int = 20_000,
   secrets: ShopperKeyValue? = null,
-  voice: VoiceDevice? = null,
+  internal val voice: VoiceDevice? = null,
 ) {
   var saved: ShopperState by mutableStateOf(ShopperMemory.withDevice(ShopperMemory.load(kv)) { secureRandom(16) })
     private set
@@ -187,7 +187,7 @@ class CustomerModel(
   val feedback = FeedbackModel(api, scope, io)
   /** CHK-24: کارتِ «دستورِ تحویل» ِ پیگیری (`ModelPrefs.kt`) */
   val deliveryPrefs = PrefsModel(api, scope, io) { refreshOrder() }
-  val book = AddressModel({ saved.addresses }, { persist(saved.copy(addresses = it)) }, locator, clock)
+  val book = AddressModel({ saved.addresses }, { persist(ir.vil3ntec.tohid.core.shopper.AddressSync.written(saved, it)); syncAddresses() }, locator, clock)   //  CRM-09
   val chat = ChatModel(api, kv, scope, io, clock, { saved.ticket?.takeIf { it.expiresAt > clock() } }, { persist(saved.copy(ticket = null)) }, chatWaitMs, device = voice)
   /** WEB-11/CHK-01: حسابِ مشتری — سبد، ♥ و «فهرستِ خرید» همراهِ حساب (`ModelAccount.kt`؛ [secrets] نگه‌دارِ رمزشدهٔ نشست) */
   val account = AccountBox(secrets)
@@ -516,7 +516,7 @@ class CustomerModel(
     locatePin()
   }
 
-  private fun setPin(p: GeoPin) {
+  internal fun setPin(p: GeoPin) {
     form = form.copy(pinLat = p.lat, pinLng = p.lng, pinAccuracyM = p.accuracyM, addressId = null)
     locatePin()
   }
@@ -645,7 +645,7 @@ class CustomerModel(
     persist(saved.copy(keys = saved.keys + (slug to memo)))
     placing = true
     placeNote = ShopperText.sending
-    request({ api.checkout(slug, req, memo.key, ticket.ticket) }) { r ->
+    request({ api.checkout(slug, req, memo.key, ticket.ticket, ir.vil3ntec.tohid.core.shopper.AddressSync.checkoutSession(req, signedIn()?.session)) }) { r ->
       placing = false
       when (r) {
         is ShopperResult.Ok -> placed(page, slug, r.value.order)

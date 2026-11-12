@@ -59,6 +59,7 @@ private val platform: Platform by lazy {
     canPickPhoto = true,
     pickPhoto = { done -> PhotoIos.pick(done) },
     picture = { bytes, modifier -> ImagesIos.Picture(bytes, modifier) },
+    tile = { url, modifier, loaded -> ImagesIos.Tile(http, url, modifier, loaded) },
   )
 }
 

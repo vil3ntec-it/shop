@@ -378,9 +378,9 @@ object ShopperText {
     AddressProblem.FULL -> t("حداکثر ۱۰ نشانی؛ یکی را پاک کنید.", "Up to 10 addresses — delete one first.", "تر ۱۰ پتو؛ لومړی یوه ړنګه کړئ.")
   }
   val addressesLocal get() = t(
-    "این نشانی‌ها فقط روی همین گوشی‌اند؛ با آمدنِ حسابِ مشتری به همه‌جا می‌روند.",
-    "These addresses are on this phone only; they will follow you once customer accounts arrive.",
-    "دا پتې یوازې په دې موبایل کې دي؛ د پیرودونکي حساب سره به هر ځای درسره وي.",
+    "این نشانی‌ها فقط روی همین گوشی‌اند؛ با ورود به حساب در یک دکان، همراهِ حسابِ شما می‌شوند.",
+    "These addresses are on this phone only; sign in to your account in a shop and they will follow your account.",
+    "دا پتې یوازې په دې موبایل کې دي؛ په یوه دوکان کې خپل حساب ته ننوځئ، بیا به له حساب سره وي.",
   )
 
   // ── گفت‌وگو با دکان (CHAT-02/06) ──

@@ -44,6 +44,35 @@ object ImagesIos {
     else Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant))
   }
 
+  /** فرستندهٔ هر مبدأ ِ سرورِ تکه‌ها (نشانیِ کامل؛ `PinMap.valid` فقط https می‌پذیرد) */
+  private val origins = HashMap<String, HttpIos>()
+
+  /**
+   *  CHK-08 — یک تکهٔ «انتخاب روی نقشه» (`PinMapView.kt`)، همتای `MapTilesAndroid.Tile`: مسیرِ همین سرور با [http]، نشانیِ
+   *  https ِ سرورِ تکه‌ها با فرستندهٔ همان مبدأ؛ بی کوکی (نشستِ ephemeral ِ `HttpIos`)، [loaded] یک بار با «آمد؟».
+   */
+  @Composable
+  fun Tile(http: HttpIos, url: String, modifier: Modifier, loaded: (Boolean) -> Unit) {
+    val img by produceState(cache[url], url) {
+      //  فرستندهٔ مبدأ روی همین نخِ صفحه (نقشهٔ `origins` از چند نخ نوشته نمی‌شود)
+      val (sender, path) = if (url.startsWith("/")) http to url else {
+        val cut = url.indexOf('/', "https://".length).takeIf { url.startsWith("https://") && it > 0 }
+        if (cut == null) null to url else origins.getOrPut(url.substring(0, cut)) { HttpIos { url.substring(0, cut) } } to url.substring(cut)
+      }
+      if (value == null) value = withContext(Dispatchers.IO) {
+        val r = try { sender?.send(ShopperRequest("GET", path, binary = true)) } catch (_: Throwable) { null }
+        r?.bytes?.takeIf { r.status == 200 }?.let { decode(it) }
+      }?.also { b ->
+        cache[url] = b
+        while (cache.size > 40) cache.remove(cache.keys.first())
+      }
+      loaded(value != null)
+    }
+    val b = img
+    if (b != null) Image(b, contentDescription = null, modifier = modifier, contentScale = ContentScale.FillBounds)
+    else Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant))
+  }
+
   @Composable
   fun Picture(bytes: ByteArray, modifier: Modifier) {
     val img = remember(bytes) { decode(bytes) }
