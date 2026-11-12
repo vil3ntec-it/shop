@@ -172,8 +172,8 @@ fun DeskSaleScreen(
 
   //  «نیازمند تأیید» هم کادرِ تخفیف را نشان می‌دهد؛ فقط «ممنوع» پنهانش می‌کند (STF-02)
   val canDiscount = remember { ir.vil3ntec.tohid.data.ShopRole.mayDiscount(context) }
-  val blockExpired = remember { ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context) }
-  val checkoutRules = remember { ir.vil3ntec.tohid.data.CheckoutRulesPref.get(context) } // POS-24: قاعده‌های پیش از پایانِ فاکتورِ همین دستگاه (پیش‌فرض خاموش)
+  val tillGuards = remember { ir.vil3ntec.tohid.data.TillGuardsPref.get(context) } // «فروخته نشود»، S22 و POS-24 ِ همین دستگاه — همان سدهای فروشِ تعویض
+  val blockExpired = tillGuards.blockExpired; val checkoutRules = tillGuards.rules // POS-24: قاعده‌های پیش از پایانِ فاکتور (پیش‌فرض خاموش)
   val cashStep = remember { ir.vil3ntec.tohid.data.CashRoundPref.step(context) } // PAY-09: گردکردنِ نقدی، پیش‌فرض خاموش
   //  POS-15 (پشتِ `PosPriceCheckPrefs`، پیش‌فرض روشن): Ctrl+I قیمت‌پرسی بی افزودن به فاکتور
   ir.vil3ntec.tohid.ui.components.pos.PosPriceCheckPrefs.load(context)
@@ -418,7 +418,7 @@ fun DeskSaleScreen(
   var capSlips by remember(saleKey) { mutableStateOf<Map<String, ir.vil3ntec.tohid.core.perm.ApprovalSlip.Slip>>(emptyMap()) }
   var capAsk by remember { mutableStateOf<Triple<ir.vil3ntec.tohid.data.SaleCapGate.Ask, ir.vil3ntec.tohid.core.pay.Settlement?, ir.vil3ntec.tohid.core.credit.CreditGate.Approval?>?>(null) }
   //  S22 (`ExpiryPref.gate`، پیش‌فرض خاموش): منقضی فقط با تأیید؛ تأیید در حالت نمی‌ماند و فقط به همان یک تلاشِ بعدیِ `finish` می‌رود
-  val expiryGateOn = remember { ir.vil3ntec.tohid.data.ExpiryPref.gate(context) }; val expiryOk = remember { arrayOfNulls<ir.vil3ntec.tohid.core.stock.ExpiryGate.Approval>(1) }
+  val expiryGateOn = tillGuards.expiryGate; val expiryOk = remember { arrayOfNulls<ir.vil3ntec.tohid.core.stock.ExpiryGate.Approval>(1) }
   var expiryAsk by remember { mutableStateOf<Triple<Map<String, Long>, ir.vil3ntec.tohid.core.pay.Settlement?, ir.vil3ntec.tohid.core.credit.CreditGate.Approval?>?>(null) }
 
   /**

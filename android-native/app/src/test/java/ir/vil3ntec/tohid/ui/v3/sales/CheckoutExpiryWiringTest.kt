@@ -34,7 +34,9 @@ class CheckoutExpiryWiringTest {
 
   @Test
   fun `برگهٔ پرداختِ گوشی تنظیمِ «با مجوزِ مدیر» را به ثبت می‌دهد`() {
-    assertTrue("تنظیمِ همین دستگاه، همان `DeskSale`", route.contains("val expiryGateOn = remember { ir.vil3ntec.tohid.data.ExpiryPref.gate(context) }"))
+    //  تنظیمِ همین دستگاه از همان یک خواننده (`TillGuardsPref` ⇐ `ExpiryPref.gate`) که `DeskSale` و فروشِ تعویض هم می‌خوانند
+    assertTrue(route.contains("val tillGuards = remember { ir.vil3ntec.tohid.data.TillGuardsPref.get(context) }") && route.contains("val expiryGateOn = tillGuards.expiryGate"))
+    assertTrue(src("data/TillGuardsAndroid.kt").contains("ExpiryPref.gate(context)"))
     val checkout = route.substringAfter("val checkout = ", "").substringBefore("val n = ")
     assertTrue(checkout.startsWith("CheckoutModel.checkout(") && checkout.contains("expiryGate = expiryGateOn"))
     assertTrue("تأییدِ گرفته‌شده روی همان `Checkout`", checkout.contains("expiryApproval = CheckoutSession.expiryApproval"))

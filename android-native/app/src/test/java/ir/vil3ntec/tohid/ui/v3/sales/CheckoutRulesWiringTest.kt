@@ -33,7 +33,9 @@ class CheckoutRulesWiringTest {
 
   @Test
   fun `برگهٔ پرداختِ گوشی قاعده‌های همین دستگاه را می‌خواند و به ثبت می‌دهد`() {
-    assertTrue("خواندنِ تنظیمِ همین دستگاه", route.contains("val checkoutRules = remember { ir.vil3ntec.tohid.data.CheckoutRulesPref.get(context) }"))
+    //  خواندنِ تنظیمِ همین دستگاه از همان یک خواننده (`TillGuardsPref` ⇐ `CheckoutRulesPref.get`) که `DeskSale` و فروشِ تعویض هم می‌خوانند
+    assertTrue(route.contains("val tillGuards = remember { ir.vil3ntec.tohid.data.TillGuardsPref.get(context) }") && route.contains("val checkoutRules = tillGuards.rules"))
+    assertTrue(src("data/TillGuardsAndroid.kt").contains("CheckoutRulesPref.get(context)"))
     //  همان یک `Checkout` ِ برگه: جمع، پیش‌سنجیِ حساب‌پی (`HesabTillModel.precheck`) و ثبت همه از آن‌اند
     val checkout = route.substringAfter("val checkout = ", "").substringBefore("val n = ")
     assertTrue(checkout.startsWith("CheckoutModel.checkout("))
@@ -47,10 +49,11 @@ class CheckoutRulesWiringTest {
   fun `فروشِ سریع همان برگه است و هیچ ثبتِ دیگری در صندوقِ نسخهٔ ۳ نیست`() {
     assertTrue(src("ui/v3/sales/quick/QuickSaleRoute.kt").contains("nav.open(SalesPaths.checkout(quick = true))"))
     assertTrue(src("ui/v3/sales/SalesRoutes.kt").contains("V3Route(SalesPaths.CHECKOUT, RouteKind.SHEET, { StrSale.checkoutTitle }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { CheckoutRoute() }"))
-    //  `SalesEngine.Checkout(` ِ فروش در صندوقِ گوشی فقط از `CheckoutModel` ساخته می‌شود (تعویضِ برگشت عمداً بی قاعده است، RULES POS-24)
+    //  `SalesEngine.Checkout(` ِ فروش در صندوقِ گوشی فقط از `CheckoutModel` ساخته می‌شود؛ تعویضِ برگشت از `TillGuards.exchange`
+    //  (همان سدها؛ پیش‌تر `returns` بیرون می‌ماند و `ReturnFlowSheet` `Checkout` ِ خام بی قاعده و بی S22 می‌ساخت)
     val v3 = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
       .map { File(it, "ir/vil3ntec/tohid/ui/v3/sales") }.first { it.isDirectory }
-    val makers = v3.walkTopDown().filter { it.isFile && it.extension == "kt" && "returns" !in it.parentFile.name }
+    val makers = v3.walkTopDown().filter { it.isFile && it.extension == "kt" }
       .filter { it.readText().contains("SalesEngine.Checkout(") }.map { it.name }.toList()
     assertEquals(listOf("CheckoutModel.kt"), makers)
   }
