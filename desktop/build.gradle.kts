@@ -98,6 +98,8 @@ val replaced = listOf(
   "print/LabelSheetPrint.kt",
   //  کلیکِ راست = منوی کارها (گوشی: لمسِ طولانی)
   "ui/PressMenu.kt",
+  //  POS-31: صفحهٔ لمسیِ کامپیوتر از سیستم‌عامل (‎ui/components/pos/TouchScreenProbeDesk.kt‎)؛ گوشی همیشه لمسی است
+  "ui/components/pos/TouchScreenProbe.kt",
   //  «این کامپیوتر است» — اندازه‌ها، پنجره‌ها و نوارهای کامپیوتری (‎ui/Platform.kt‎)
   "ui/Platform.kt",
   //  OPS-02: `FLAG_SECURE` ِ برگهٔ عبارتِ بازیابی — کامپیوتر پنجرهٔ امن ندارد (`Platform.SecureWindow` ِ بی‌اثر)

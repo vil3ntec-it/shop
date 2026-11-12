@@ -53,6 +53,7 @@ import ir.vil3ntec.tohid.ui.components.staff.ApprovalDialog
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
+import ir.vil3ntec.tohid.ui.components.pos.touchKeysOnFocus
 
 /* ============================ تسویه ============================ */
 
@@ -1176,14 +1177,16 @@ fun FreeLineDialog(
         )
         Spacer(Modifier.height(14.dp))
 
+        val keys = ir.vil3ntec.tohid.ui.components.pos.rememberTouchTextKeys() // POS-31: کامپیوترِ لمسی ⇒ صفحه‌کلیدِ حروف با فوکوس
         OutlinedTextField(
           value = label,
           onValueChange = { label = it },
           label = { Text(ir.vil3ntec.tohid.core.i18n.StrGrid.name) },
           placeholder = { Text(ir.vil3ntec.tohid.core.i18n.StrSale.freeNameHint) },
           singleLine = true,
-          modifier = Modifier.fillMaxWidth(),
+          modifier = Modifier.fillMaxWidth().touchKeysOnFocus(keys),
         )
+        ir.vil3ntec.tohid.ui.components.pos.TouchTextKeysPanel(keys, label, { label = it })
         Spacer(Modifier.height(12.dp))
         AmountField(value = priceText, onValueChange = { priceText = it }, label = ir.vil3ntec.tohid.core.i18n.StrSale.unitPrice)
         Spacer(Modifier.height(12.dp))
