@@ -67,12 +67,13 @@ fun SubscriptionNotice() {
   val context = LocalContext.current
   val nav = LocalV3Nav.current
   val locked by SoftLock.locked.collectAsState()
+  val why by SoftLock.reason.collectAsState()
   LaunchedEffect(Unit) { runCatching { SoftLock.refresh(context) } }
   val warn = remember(locked) { runCatching { SoftLock.warnDays(context) }.getOrNull() }
   if (!locked && warn == null) return
   DraftNoticeBar(
     tone = if (locked) V3Tone.ERROR else V3Tone.WARNING,
-    text = if (locked) StrHome.subNoticeEnded else StrHome.subNoticeDays(warn ?: 0),
+    text = if (!locked) StrHome.subNoticeDays(warn ?: 0) else if (why == SoftLock.Reason.RENEW) StrHome.subNoticeRenew else StrHome.subNoticeEnded,
     action = Str.mySubscription,
     onAction = { openRoute(nav, ShellTargets.SUBSCRIPTION) },
     onClick = { openRoute(nav, ShellTargets.SUBSCRIPTION) },

@@ -27,27 +27,47 @@ object SoftLock {
   private val _locked = MutableStateFlow(false)
   val locked: StateFlow<Boolean> = _locked.asStateFlow()
 
+  /** چرا بسته است — برای متنِ نوار (`ShellNotices`)؛ باز ⇒ null */
+  enum class Reason {
+    /** اشتراک تمام شده (تپشِ سرور، یا تاریخِ پایانِ کش‌شده با ساعتِ مطمئن گذشته) */
+    ENDED,
+    /** مجوزِ امضاشدهٔ این دستگاه تمام شده: بیش از عمرِ مجوز (۱۰ روز؛ با پرچم ۳۵) به اینترنت وصل نشده */
+    RENEW,
+  }
+  private val _reason = MutableStateFlow<Reason?>(null)
+  val reason: StateFlow<Reason?> = _reason.asStateFlow()
+
   /** آخرین باری که یک نوشتن پشتِ قفل ماند — تا صفحه پیام بدهد. */
   @Volatile var lastBlockedAt: Long = 0
     private set
 
   /**
-   *  ⛔ یک منبع با `VipGate`: مجوزی که همین حالا فعال است (یا در مهلت، یا
-   *  کدِ آفلاینِ همین کامپیوتر) قفل را باز می‌کند، هرچه تپشِ کهنه بگوید.
-   *  پیش از این دو منبع با هم نمی‌خواندند: صفحهٔ فروش باز بود ولی نوشتنش
-   *  بی‌صدا دور ریخته می‌شد، و تمدید با کد تا تپشِ بعدی قفل را باز نمی‌کرد.
+   *  خواستِ صاحب‌کار ۱۴۰۵/۰۸/۲۲ («بی اینترنت تا ابد کار می‌کند»): پیش از این قفل **فقط** با تپشِ «تمام‌شده» ِ سرور بسته
+   *  می‌شد ⇒ دستگاهی که آنلاین نمی‌شد هرگز قفل نمی‌شد، هرچند مجوزش پس از ۱۰ روز تمام شده بود. حالا:
+   *    • مجوزِ فعال یا در مهلت (یا کدِ آفلاینِ همین کامپیوتر) ⇒ باز (همان `VipGate`)؛
+   *    • تپشِ کش‌شده با ساعتِ مطمئن «تمام‌شده» ⇒ [Reason.ENDED]؛
+   *    • مجوزی بوده و تمام شده (`EXPIRED`) ⇒ [Reason.RENEW]: یک بار وصل شدن مجوز را تازه می‌کند و همان دم باز می‌شود.
+   *  ⛔ دستگاهی که هرگز مجوز نگرفته (`NONE`، بی حساب) همان امروز: فقط تپشِ سرور.
    */
-  fun refresh(context: Context): Boolean {
-    val heartbeat = runCatching { HeartbeatCache(context).softLocked() }.getOrDefault(false)
-    val licensed = heartbeat && runCatching {
-      val st = ir.vil3ntec.tohid.sync.LicenseGuard.status(context, ir.vil3ntec.tohid.sync.SyncStore(context)).state
-      st == ir.vil3ntec.tohid.sync.License.State.ACTIVE || st == ir.vil3ntec.tohid.sync.License.State.GRACE
-    }.getOrDefault(false)
-    val on = heartbeat && !licensed
-    _locked.value = on
-    return on
+  fun decide(license: ir.vil3ntec.tohid.sync.License.State?, cacheEnded: Boolean): Reason? = when {
+    license == ir.vil3ntec.tohid.sync.License.State.ACTIVE || license == ir.vil3ntec.tohid.sync.License.State.GRACE -> null
+    cacheEnded -> Reason.ENDED
+    license == ir.vil3ntec.tohid.sync.License.State.EXPIRED -> Reason.RENEW
+    else -> null
   }
 
+  fun refresh(context: Context): Boolean {
+    val ended = runCatching { HeartbeatCache(context).softLocked() }.getOrDefault(false)
+    val st = runCatching {
+      ir.vil3ntec.tohid.sync.LicenseGuard.status(context, ir.vil3ntec.tohid.sync.SyncStore(context)).state
+    }.getOrNull()
+    val r = decide(st, ended)
+    _reason.value = r
+    _locked.value = r != null
+    return r != null
+  }
+
+  /** هر نوشتن تازه می‌سنجد: تمدید یا تپشِ تازه همان دم دیده شود (`CrmSweepDiskTest`) */
   fun isLocked(context: Context): Boolean = refresh(context)
 
   internal fun noteBlocked() { lastBlockedAt = System.currentTimeMillis() }
