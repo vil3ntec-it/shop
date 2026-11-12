@@ -15,7 +15,7 @@ import ir.vil3ntec.tohid.ui.theme.V3Tone
  *  قرض‌دار، تأمین‌کنندهٔ تنها ⇐ صفحهٔ خودش، پشتیبان ⇐ صفحهٔ پشتیبان.
  */
 object ShopAlerts {
-  enum class Kind { ORDERS, SUBSCRIPTION, SYNC, STOCK, DEBTS, EXPIRY, PRODUCT_OUT, PRODUCT_LOW, SUPPLIER, BACKUP, DEBTOR }
+  enum class Kind { ORDERS, SUBSCRIPTION, SYNC, STOCK, DEBTS, EXPIRY, TAX, PRODUCT_OUT, PRODUCT_LOW, SUPPLIER, BACKUP, DEBTOR }
 
   data class Item(
     /** کلیدِ پایدار برای فهرست و حرکتِ ورود */
@@ -67,6 +67,7 @@ object ShopAlerts {
       HomeAlerts.Kind.STOCK -> Kind.STOCK
       HomeAlerts.Kind.DEBTS -> Kind.DEBTS
       HomeAlerts.Kind.EXPIRY -> Kind.EXPIRY
+      HomeAlerts.Kind.TAX -> Kind.TAX
     },
     title = a.title,
     subtitle = a.body,

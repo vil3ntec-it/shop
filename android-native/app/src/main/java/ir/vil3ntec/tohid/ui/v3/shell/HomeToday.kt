@@ -21,6 +21,7 @@ import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.outlined.Receipt
 import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.outlined.SyncProblem
 import androidx.compose.material.icons.outlined.WorkspacePremium
@@ -134,6 +135,7 @@ internal fun alertIcon(k: HomeAlerts.Kind): ImageVector = when (k) {
   HomeAlerts.Kind.STOCK -> Icons.Outlined.Inventory2
   HomeAlerts.Kind.DEBTS -> Icons.Outlined.Group
   HomeAlerts.Kind.EXPIRY -> Icons.Outlined.EventBusy
+  HomeAlerts.Kind.TAX -> Icons.Outlined.Receipt
 }
 
 /**

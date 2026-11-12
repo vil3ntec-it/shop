@@ -67,4 +67,27 @@ class DrawerNoSaleTest {
     assertEquals(DrawerNoSale.NEED_APPROVAL, DrawerNoSale.keyGate(hasDrawerPrinter = true, allowed = false))
     assertNull(DrawerNoSale.keyGate(hasDrawerPrinter = true, allowed = true))
   }
+
+  /**
+   *  PAY-19 — «کشو بی فروش» ِ صندوقِ گوشیِ نسخهٔ ۳ (`sales/drawer/move?mode=no_sale`): پیش‌تر فقط ردیف می‌نوشت (حتی با چاپگرِ
+   *  کشودار کشو باز نمی‌شد) و سدش «شاگرد نیست» بود نه مجوزِ `drawer.open` ِ کامپیوتر. حالا همان سد؛ با چاپگرِ پیش‌فرضِ کشودار
+   *  همان ضربهٔ `PrintSpooler.openDrawer` (که ردیف را فقط وقتی ضربه رسید می‌نویسد)، بی آن همان ثبتِ دلیل و تأیید.
+   */
+  @Test
+  fun `کشو بی فروش ِ گوشی — بی مجوز بسته حتی با چاپگر، با مجوز ضربه یا فقط ثبت`() {
+    assertEquals(DrawerNoSale.PhoneAction.DENIED, DrawerNoSale.phoneAction(hasDrawerPrinter = true, allowed = false))
+    assertEquals(DrawerNoSale.PhoneAction.DENIED, DrawerNoSale.phoneAction(hasDrawerPrinter = false, allowed = false))
+    assertEquals(DrawerNoSale.PhoneAction.KICK, DrawerNoSale.phoneAction(hasDrawerPrinter = true, allowed = true))
+    assertEquals(DrawerNoSale.PhoneAction.RECORD, DrawerNoSale.phoneAction(hasDrawerPrinter = false, allowed = true))
+  }
+
+  @Test
+  fun `برگهٔ کشو بی فروش ِ گوشی همان مجوز و همان ضربهٔ کامپیوتر را به کار می‌برد`() {
+    val route = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { java.io.File(it, "ir/vil3ntec/tohid/ui/v3/sales/drawer/DrawerRoutes.kt") }.first { it.isFile }.readText()
+    assertTrue(route.contains("ShopRole.canOpenDrawer(context)"))
+    assertTrue(route.contains("DrawerNoSale.phoneAction(drawer != null, allowed)"))
+    assertTrue(route.contains("PrintSpooler.openDrawer(context, kick, why)"))
+    assertTrue(route.contains("DrawerNoSale.refusal(why, allowed)"))
+  }
 }

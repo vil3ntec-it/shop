@@ -1,7 +1,7 @@
 package ir.vil3ntec.tohid.data
 
 /*
- *  INV-05 — صافیِ «انبارگردانی» (`StockCountSheet`): فقط کالاهای یک دسته یا یک تأمین‌کننده دیده شوند تا
+ *  INV-05 — صافیِ «انبارگردانی» (`stock/count` ِ نسخهٔ ۳ با `CountState.rows`، و «انبارگردانیِ تازه»): فقط کالاهای یک دسته یا یک تأمین‌کننده دیده شوند تا
  *  شمارشِ جزئی (یک قفسه، یک تأمین‌کننده) آسان شود. صافی فقط فهرستِ دیده‌شده را کم می‌کند؛ شمرده‌ها و ثبت
  *  همان است (خانهٔ خالی یعنی شمرده نشد). بی صافی همان فهرستِ پیشین.
  *  برند (PRD-06، `Product.brand`) و قفسه (PRD-26، راهرو + قفسهٔ `ShelfLocation`؛ طبقه جدا نمی‌شود) هم صافی‌اند؛
@@ -33,6 +33,15 @@ object CountFilter {
 
   /** راهرو و قفسهٔ یک کلید (برای برچسبِ تراشه) */
   fun shelfParts(key: String): Pair<String, String> = key.substringBefore(SEP) to key.substringAfter(SEP, "")
+
+  /** برچسبِ تراشهٔ قفسه: «راهرو ۲ · قفسه ۱» (هر بخشِ خالی نمی‌آید) — هر دو پنجرهٔ انبارگردانی */
+  fun shelfLabel(key: String): String {
+    val (aisle, shelf) = shelfParts(key)
+    return listOfNotNull(
+      aisle.takeIf { it.isNotEmpty() }?.let { ir.vil3ntec.tohid.core.i18n.StrProduct.aisleIs(it) },
+      shelf.takeIf { it.isNotEmpty() }?.let { ir.vil3ntec.tohid.core.i18n.StrProduct.shelfIs(it) },
+    ).joinToString(" · ")
+  }
 
   /** قفسه‌های کالاهای فعال، یکتا و مرتب */
   fun shelves(products: List<Product>): List<String> =

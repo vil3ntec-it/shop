@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- *  INV-05 — صافیِ دسته و تأمین‌کننده در «انبارگردانی» (`StockCountSheet`): بی صافی همان فهرستِ پیشین
+ *  INV-05 — صافیِ دسته و تأمین‌کننده در «انبارگردانی» (`stock/count` ِ نسخهٔ ۳ و «انبارگردانیِ تازه»): بی صافی همان فهرستِ پیشین
  *  (فعال‌ها، جست‌وجوی نام/بارکد، الفبایی)؛ با صافی فقط کالاهای همان دسته یا همان تأمین‌کننده.
  */
 class CountFilterTest {
@@ -75,17 +75,22 @@ class CountFilterTest {
   }
 
   @Test
-  fun `هر دو پنجرهٔ انبارگردانی تراشهٔ برند و قفسه را می‌کشند`() {
+  fun `هر دو پنجرهٔ انبارگردانی صافیِ دسته، تأمین‌کننده، برند و قفسه را می‌کشند`() {
     fun src(rel: String) = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
       .map { java.io.File(it, "ir/vil3ntec/tohid/$rel") }.first { it.isFile }.readText()
-    for (rel in listOf("ui/screens/BulkSheets.kt", "ui/screens/StockCountTools.kt")) {
-      val s = src(rel)
-      org.junit.Assert.assertTrue(rel, s.contains("CountBrandShelfChips(brands, brand, { brand = it }, shelves, shelf, { shelf = it })"))
-      org.junit.Assert.assertTrue(rel, s.contains("CountFilter.shown(d.products, term, category, supplierId, brand, shelf)"))
-    }
+    //  «انبارگردانیِ تازه» (`stock/count/tools`)
+    val tools = src("ui/screens/StockCountTools.kt")
+    org.junit.Assert.assertTrue(tools.contains("CountBrandShelfChips(brands, brand, { brand = it }, shelves, shelf, { shelf = it })"))
+    org.junit.Assert.assertTrue(tools.contains("CountFilter.shown(d.products, term, category, supplierId, brand, shelf)"))
+    //  «انبارگردانی» ِ سادهٔ نسخهٔ ۳ (`stock/count`؛ برگهٔ پیشینِ `StockCountSheet` بی‌راه است)
+    val model = src("ui/v3/stock/StockCountModel.kt")
+    org.junit.Assert.assertTrue(model.contains("CountFilter.shown(d.products, query, scope.category, scope.supplierId, scope.brand, scope.shelf)"))
+    val screen = src("ui/v3/stock/StockCountScreen.kt")
+    org.junit.Assert.assertTrue(screen.contains("CountState.rows(data, query, scope)"))
+    org.junit.Assert.assertTrue(screen.contains("CountScopeChips(options, scope) { scope = it }"))
     //  تراشه‌ها فقط با گزینه
-    val chips = src("ui/screens/BulkSheets.kt")
-    org.junit.Assert.assertTrue(chips.contains("if (brands.isNotEmpty()) CountFilterChips("))
-    org.junit.Assert.assertTrue(chips.contains("if (shelves.isNotEmpty()) CountFilterChips("))
+    for (row in listOf("o.categories", "o.suppliers", "o.brands", "o.shelves")) {
+      org.junit.Assert.assertTrue(row, screen.contains("if ($row.isNotEmpty()) ScopeRow("))
+    }
   }
 }

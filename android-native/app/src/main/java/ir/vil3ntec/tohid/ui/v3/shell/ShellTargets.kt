@@ -36,6 +36,8 @@ object ShellTargets {
   /** همان کاشی وقتی بخشِ سفارش خاموش است: «تنظیمات ← سفارشِ آنلاین» — «چرا نمی‌رسد؟» و دکمهٔ هر کار (صف بی بخشِ روشن نیست) */
   val ORDERS_SETUP: String = SettingsPaths.ROOT + "/sales/online-orders"
   val SUBSCRIPTION: String = AccountPaths.SUBSCRIPTION
+  /** S49/RPT-10: یادآورِ سررسیدِ مالیات ⇐ «گزارشِ مالیاتِ سه‌ماهه» (تنظیم، پیش‌نمایشِ سه‌ماهه، CSV و چاپ) */
+  val TAX_QUARTER: String = SettingsPaths.section(ir.vil3ntec.tohid.ui.screens.SettingsLayout.TAX_QUARTER)
   val PLANS: String = AccountPaths.PLANS
   fun stock(anyOut: Boolean): String = ProductsPaths.list(filter = if (anyOut) "out" else "low")
   val OVERDUE_DEBTS: String = MoneyPaths.debtors(sort = "oldest")

@@ -11,11 +11,14 @@ import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.AuditEntry
 import ir.vil3ntec.tohid.data.CashShift
+import ir.vil3ntec.tohid.data.DrawerNoSale
 import ir.vil3ntec.tohid.data.MultiDrawerPref
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.TillDrawer
+import ir.vil3ntec.tohid.print.PrintSpooler
+import ir.vil3ntec.tohid.print.PrinterRegistry
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.v1.Ulid
 import ir.vil3ntec.tohid.todayIso
@@ -182,23 +185,46 @@ fun RouteScope.DrawerCloseRoute() {
   )
 }
 
-/** `sales/drawer/move?mode=no_sale|cash` — `PayFlow.moveRow` با همان یادداشتِ سابقه */
+/**
+ *  `sales/drawer/move?mode=no_sale|cash` — `PayFlow.moveRow` با همان یادداشتِ سابقه. PAY-19: کشو بی فروش با همان مجوز و
+ *  همان ضربهٔ کامپیوتر (`DrawerNoSale.phoneAction`): چاپگرِ پیش‌فرضِ کشودار ⇒ `PrintSpooler.openDrawer` (مجوز و دلیل را
+ *  دوباره می‌سنجد و ردیفِ `no_sale` را فقط وقتی ضربه رسید می‌نویسد)؛ بی آن فقط ردیفِ دلیل و تأیید.
+ */
 @Composable
 fun RouteScope.DrawerMoveRoute() {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val shift = remember(data) { CashShift.current(data) }
   if (shift == null) { LaunchedEffect(Unit) { back() }; return }
-  val staff = remember { ShopRole.isStaff(context) }
-  val me = remember { me(context) }
   val noSale = args.query("mode") == SalesPaths.MOVE_NO_SALE
+  val allowed = remember { ShopRole.canOpenDrawer(context) }
+  val drawer = remember { if (noSale) PrinterRegistry.defaultSaved(context)?.takeIf { it.drawer } else null }
+  val action = DrawerNoSale.phoneAction(drawer != null, allowed)
+  //  ورود/خروجِ نقد همان «شاگرد نیست»؛ کشو بی فروش مجوزِ `drawer.open`
+  val staff = remember(noSale) { if (noSale) action == DrawerNoSale.PhoneAction.DENIED else ShopRole.isStaff(context) }
+  val me = remember { me(context) }
   var error by remember { mutableStateOf<String?>(null) }
+  var kicking by remember { mutableStateOf(false) }
   DrawerMoveSheet(
     noSale = noSale,
     staff = staff,
     me = me,
     error = error,
-    onSubmit = { m ->
+    drawer = drawer?.name?.takeIf { action == DrawerNoSale.PhoneAction.KICK },
+    onSubmit = submit@{ m ->
+      val kick = drawer
+      if (noSale && action == DrawerNoSale.PhoneAction.KICK && kick != null) {
+        if (kicking) return@submit
+        val why = m.reason.orEmpty().trim()
+        DrawerNoSale.refusal(why, allowed)?.let { error = it; return@submit }
+        kicking = true
+        //  پیام پس از ضربه (یا خطای چاپگر)؛ برگه تا پایانِ ضربه می‌ماند تا زدنِ دوباره ضربهٔ دوم نشود
+        scope.launch {
+          toasts.show(PrintSpooler.openDrawer(context, kick, why))
+          back()
+        }
+        return@submit
+      }
       when (val r = PayFlow.moveRow(data, shift.open, m, System.currentTimeMillis(), Ulid::next)) {
         is PayFlow.Outcome.Bad -> error = PayFlow.message(r.problem)
         is PayFlow.Outcome.Ok -> {

@@ -16,6 +16,7 @@ import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Receipt
 import androidx.compose.material.icons.outlined.RemoveShoppingCart
 import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.outlined.WorkspacePremium
@@ -50,6 +51,7 @@ internal fun kindIcon(k: ShopAlerts.Kind): ImageVector = when (k) {
   ShopAlerts.Kind.STOCK -> Icons.Outlined.Inventory2
   ShopAlerts.Kind.DEBTS -> Icons.Outlined.Group
   ShopAlerts.Kind.EXPIRY -> Icons.Outlined.EventBusy
+  ShopAlerts.Kind.TAX -> Icons.Outlined.Receipt
   ShopAlerts.Kind.PRODUCT_OUT -> Icons.Outlined.RemoveShoppingCart
   ShopAlerts.Kind.PRODUCT_LOW -> Icons.AutoMirrored.Outlined.TrendingDown
   ShopAlerts.Kind.SUPPLIER -> Icons.Outlined.LocalShipping

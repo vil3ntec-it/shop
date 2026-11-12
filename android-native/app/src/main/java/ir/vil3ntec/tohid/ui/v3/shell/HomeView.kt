@@ -110,6 +110,7 @@ fun rememberHomeView(d: ShopData): HomeView {
       outOfStock = nums.outOfStock.size, lowStock = nums.lowStock.size,
       overdueDebtors = nums.overdue.size, overdueTotal = "${money(nums.overdueTotal)} ؋",
       expiring = nums.expiring.size,
+      taxDue = rememberTaxDue(canSeeMoney, today),
     ),
   )
   LaunchedEffect(signedIn) { if (signedIn) ShopFeed.refresh(context) else ShopFeed.load(context) }
