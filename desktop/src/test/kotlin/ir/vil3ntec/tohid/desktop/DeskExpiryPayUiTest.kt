@@ -162,7 +162,7 @@ class DeskExpiryPayUiTest {
       .onFailure { throw AssertionError("پس از «پول رسید» فروش ثبت نشد؛ پرسشِ منقضی پس از پول: ${has(StrPos.expiredSaleTitle)}", it) }
     assertFalse("پس از گرفتنِ پول پرسشی نمی‌ماند", has(StrPos.expiredSaleTitle))
     val sale = store.data.value.sales.single()
-    assertTrue("تسویهٔ حساب‌پی روی همان فاکتور", sale.payments.isNotEmpty())
+    assertTrue("تسویهٔ حساب‌پی روی همان فاکتور", !sale.payments.isNullOrEmpty())
     val row = store.data.value.auditLog.single { it.type == "expired_sale" }
     assertEquals("مشتری خودش خواست", row.reason)
   }
