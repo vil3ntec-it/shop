@@ -161,7 +161,7 @@ object PromoEngine {
 
   private fun line(d: ShopData, line: SalesEngine.CartLine, lots: Map<String, List<PromoCore.Lot>>): PromoCore.Line {
     val qtyMilli = (line.quantity * 1000).roundToLong()
-    val p = if (line.free) null else d.products.find { it.id == line.productId }
+    val p = if (line.free) null else ShopStore.product(d, line.productId)
     return if (p == null) {
       val price = line.unitPrice ?: 0.0
       PromoCore.Line(
@@ -233,7 +233,7 @@ object PromoEngine {
       else line.copy(unitPrice = (o.netMinor / 100.0) / line.quantity)
     }
     val tags = cart.associate { line ->
-      val p = if (line.free) null else d.products.find { it.id == line.productId }
+      val p = if (line.free) null else ShopStore.product(d, line.productId)
       val o = net[line.productId]
       val promo = if (o == null || o.discountMinor <= 0 || line.quantity <= 0) emptyList()
       //  تقسیم نشد (هرگز نباید) ⇒ جمعِ ردیف درست می‌ماند، فقط بی نامِ قاعده

@@ -291,7 +291,7 @@ fun DeskSaleScreen(
 
   fun addLot(code: String, dd: ShopData = d): Boolean {
     val (pid, lot) = ir.vil3ntec.tohid.data.StockActions.lotForCode(dd, code) ?: return false
-    val product = dd.products.firstOrNull { it.id == pid && it.active } ?: return false
+    val product = ShopStore.product(dd, pid)?.takeIf { it.active } ?: return false
     val added = SalesEngine.addToCartCapped(cartStore.lines.value, pid, 1.0, ir.vil3ntec.tohid.data.ProductInfoMap.sellable(dd, pid))
     if (applyAdded(product, added.copy(cart = SalesEngine.setLineLot(added.cart, pid, lot))) && !added.capped) toast(ir.vil3ntec.tohid.core.i18n.StrSalePages.lotAdded(product.name, lot))
     return true
@@ -345,7 +345,7 @@ fun DeskSaleScreen(
     val items = ShopStore.barcodeIndex(dd)
     if (addPack(code, 1.0, dd, items)) return true
     when (val hit = BarcodeMatch.find(code, items)) {
-      is BarcodeMatch.Hit.Product -> dd.products.firstOrNull { it.id == hit.id }?.let {
+      is BarcodeMatch.Hit.Product -> ShopStore.product(dd, hit.id)?.let {
         if (!it.active) toast(StrSale.inactive(it.name)) else add(it, 1.0)
       }
       //  CRM-16: کارتِ مشتری (`CustomerCardPref`، پیش‌فرض خاموش) — فقط کدی که هیچ کالایی نمی‌خواند
@@ -508,7 +508,7 @@ fun DeskSaleScreen(
 
   fun step(id: String, sign: Int) {
     if (cart.none { it.productId == id }) return
-    val unit = d.products.find { it.id == id }?.unit.orEmpty()
+    val unit = ShopStore.product(d, id)?.unit.orEmpty()
     cartStore.set(PosCartOps.step(cart, id, unit, sign))
   }
   fun moveSel(delta: Int) {
@@ -520,7 +520,7 @@ fun DeskSaleScreen(
   val debtor = cartDebtorId?.let { id -> d.debtors.find { it.id == id } }
   val lineViews = remember(cart, d.products) {
     cart.map { line ->
-      val p = d.products.find { it.id == line.productId }
+      val p = ShopStore.product(d, line.productId)
       OrderLineView(
         id = line.productId,
         name = if (line.free) line.label else p?.name.orEmpty(),
@@ -808,7 +808,7 @@ fun DeskSaleScreen(
   @Composable
   fun CartArea(modifier: Modifier) {
     val line = cart.find { it.productId == selected }
-    val product = line?.let { l -> d.products.find { it.id == l.productId } }
+    val product = line?.let { l -> ShopStore.product(d, l.productId) }
     if (!touchExtras) Cart(modifier) else TouchCartColumn(
       pad, listState, line?.let { if (it.free) it.label else product?.name.orEmpty() }, target,
       onApply = { if (!pad.apply(cart, selected, product) { cartStore.set(it) }) toast(StrPos.cartChangedRetry) },
@@ -969,7 +969,7 @@ fun DeskSaleScreen(
   editLine?.let { id ->
     val line = cart.find { it.productId == id }
     if (line == null) { editLine = null; rowDiscount = false } else {
-      val p = d.products.find { it.id == id }
+      val p = ShopStore.product(d, id)
       val base = if (line.free) (line.unitPrice ?: 0.0) else (p?.salePrice ?: 0.0)
       CartLineDialog(
         name = if (line.free) line.label else p?.name.orEmpty(),

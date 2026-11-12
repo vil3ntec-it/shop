@@ -54,11 +54,11 @@ object Motion {
   }
 
   private fun apply(context: Context) {
-    enabled = choice == "full" || !systemReduces(context)
+    enabled = choice == "full" || !(reducedForTest ?: systemReducesMotion(context))
   }
 
-  /** سنجشِ تنظیمِ گوشی — آزمون (`ReducedMotionTillUiTest`) آن را جای `Settings.Global` می‌گذارد */
-  internal var systemReduces: (Context) -> Boolean = ::systemReducesMotion
+  /** فقط آزمون (`ReducedMotionTillUiTest`): جای `Settings.Global` ِ گوشی؛ null ⇒ همان تنظیمِ واقعی */
+  internal var reducedForTest: Boolean? = null
 
   /** گوشی گفته حرکت کم شود یا انیمیشن‌ها خاموش‌اند؟ */
   private fun systemReducesMotion(context: Context): Boolean = runCatching {

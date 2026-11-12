@@ -42,20 +42,20 @@ class ReducedMotionTillUiTest {
   @Before fun setUp() { I18n.source = { Lang.FA }; forgetChoice() }
 
   @After fun tearDown() {
-    Motion.systemReduces = { false }
+    Motion.reducedForTest = null
     forgetChoice()
     Motion.load(ctx)
   }
 
   @Test fun phoneReduceMotionIsTheDefaultAndTheUsersOwnChoiceStillWins() {
-    Motion.systemReduces = { true }
+    Motion.reducedForTest = true
     Motion.load(ctx)
     assertEquals("auto", Motion.choice)
     assertFalse("گوشیِ «کاهشِ حرکت» ⇒ برنامه بی‌حرکت، بی هیچ تنظیمی", Motion.enabled)
     assertEquals(0, MotionTokens.ms(MotionTokens.LONG))
     Motion.set(ctx, "full")
     assertTrue("«انیمیشن روشن» ِ خودِ کاربر برنده است", Motion.enabled)
-    Motion.systemReduces = { false }
+    Motion.reducedForTest = false
     forgetChoice()
     Motion.load(ctx)
     assertTrue("گوشیِ بی «کاهشِ حرکت» ⇒ حرکت روشن", Motion.enabled)
@@ -77,13 +77,13 @@ class ReducedMotionTillUiTest {
   }
 
   @Test fun underReducedMotionTheKeypadAddsInTheSameFrameWithoutWaitingForTheSheet() {
-    Motion.systemReduces = { true }
+    Motion.reducedForTest = true
     Motion.load(ctx)
     assertEquals(3.0, addAfterFrames(2) ?: -1.0, 0.0)
   }
 
   @Test fun withMotionOnTheSameAddWaitsForTheSheetAnimation() {
-    Motion.systemReduces = { false }
+    Motion.reducedForTest = false
     Motion.load(ctx)
     assertTrue(Motion.enabled)
     assertEquals("با حرکتِ روشن برگه پیش از کار پایین می‌رود", null, addAfterFrames(2))

@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
+import ir.vil3ntec.tohid.data.ShopStore
 import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -65,7 +66,7 @@ object CustomerPricePrefs {
 
 /** سبد ⇐ لیست: فقط ردیفِ کالادار و غیرِدستی؛ بی تغییر ⇒ همان شیء */
 internal fun repriceCart(d: ShopData, lines: List<SalesEngine.CartLine>, list: String): List<SalesEngine.CartLine> {
-  val byId = d.products.associateBy { it.id }
+  val byId = ShopStore.productsById(d.products)
   var changed = false
   val out = lines.map { l ->
     val p = byId[l.productId]
