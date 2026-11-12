@@ -54,6 +54,44 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-39m (پ۴) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-39m` (از سرِ `claude/batch-57`، e69b30114)
+
+- **هدف: هیچ آزمونی روی کدِ مرده سبزِ دروغ نشان ندهد.** گرافِ دسترسی‌پذیریِ نام‌محور روی همین worktree از نو ساخته شد با ریشه‌های
+  محافظه‌کار: `ui/v3/**`، `AppRoot`/`MainActivity`/`AppShellAndroid`، **کلِ** `desktop/src/main/kotlin/**` (پیش‌نمایش‌های گوشیِ `PhonePreview*`
+  و `shots` هم)، `ios/shared/src/iosMain/**`، کلاس‌های مانیفست (با `backupAgent`) و `SyncV1Worker`. نتیجه: ۷ پروندهٔ کامل‌مرده (نه ۲۹ ِ
+  بازرسی) — بیشترِ «مرده»های بازرسی را `PhonePreview` (`SettingsScreen`، `SaleScreen`، `QuickSaleScreen`، `DebtorsScreen`…) هنوز صدا می‌زند و
+  طبقِ دستور زنده‌اند؛ `TohidBackupAgent` از مانیفست زنده است.
+- **برداشته شد (۵ پروندهٔ برنامه + ۱ آزمون، ۴۶ بخشِ سطحِ بالا + `MissionView.tableLines` ِ core)، هر کدام بی هیچ صدازننده در برنامه، کامپیوتر،
+  پیش‌نمایش و آیفون (grep + گراف):**
+  - میزِ سفارشِ رابطِ امروز: `OrderDeskPanel.kt` و `OrderAlertsUi.kt` (کامل)، `OrderDelayEntry`/`OrderDelaySheet`، نوار/برگهٔ گروهی
+    (`OrderBulkToggle`/`Row`/`Bar`/`Confirm`)، دکمه و برگهٔ «پروندهٔ مدرک» (`OrderEvidenceEntry` و یاورهای خصوصی‌اش). حالت‌های مشترک
+    (`OrderDeskState`، `OrderDelayForm`، `OrderBulkState`، `evidenceMoney`) ماندند. آزمون‌ها: `OrderDeskV3Test` (به‌جای `rememberOrderDesk(api)` ِ
+    پنل اکنون همان در `OrdersRouteContent` ِ نسخهٔ ۳)، `ScenarioS42KeyTest` و `ServerFeatureScreensTest` فقط نسخهٔ ۳ را می‌خوانند.
+  - ثابت‌های عنوانِ مرده (`RETURN_SETTINGS_TITLE` در `ReturnsV2` — فقط همین یک سطر —، `PRICE_LIST_SETTINGS_TITLE`، `STOCK_PLACES_TITLE`،
+    `SMART_FORECAST_TITLE`، `ANOMALY_TITLE`، `OWNER_REPORT_TITLE`، `STOREFRONT_ETA_TITLE`، `PROMO_GUARD_TITLE`، `EASY_SETUP_TITLE`،
+    `TRAINING_SETTINGS_TITLE`، `TILL_GOODS_TITLE`، و `ScanCashSettingsAndroid.kt` که فقط `SCAN_CASH_TITLE` بود). `SettingsPortTest` به‌جای برابری با
+    ثابتِ مرده، مقدارِ کلیدِ `SettingsLayout` را میخ می‌کند (سنجه سست نشد).
+  - `ui/theme/PhoneSheet.kt` + `PhoneSheetContrastTest` (جانشین: `PhoneV3`)، `ui/screens/Sparks.kt` (بی هیچ ارجاع).
+  - `HomeSections` و `StatsBuckets` (`PhoneHomeModel.kt`) با ۵ آزمونشان ⇒ `PhoneHomeModelTest` ۲۱؛ شاهدِ S96 و `ShellTargetsTest` به درهای
+    نسخهٔ ۳ (`NavCatalog.allowed`/`BUILT_IN` و مسیرِ `V3Modules`).
+  - `CourierCall.tableLines` و `MissionView.tableLines` (core): ردیفِ تبلت `rowLines` است و نشانیِ کنارِ نشانه را عمداً نمی‌گذارد، پس آزمونِ core
+    رفتاری را می‌سنجید که صفحه ندارد ⇒ آن آزمون رفت (`MissionAddressTest` ۵)، شاهدِ DLV-02 فقط `CourierCallV3Test`.
+- **عمداً نماند/ماند (با دلیل):** `CheckoutDialog` (`SaleDialogs.kt`، که پس از ادغامِ `claude/batch-57` ‏e98f1e282 هنوز مالیات و پله را جدا می‌خواند) مرده نیست ⇒ برداشته نشد؛ `GiftCardWiringTest:43,45` (`CheckoutDialog`) و `CustomerPricesWiringTest:79` (`PriceListSettingsWired`،
+  `Settings.kt:689`) دست نخوردند: `PhoneV3CartPreview` ⇐ `SaleScreen`/`QuickSaleScreen` ⇐ `CheckoutDialog` و `PhonePreview` ⇐ `SettingsScreen` ⇐
+  همان سطر هنوز صدا می‌زنند. `QuickSaleSearch` (+ آزمونش) هم از همین راه زنده است. `pay/DevicePaySettle` پلِ پیش‌ساختهٔ PAY-08 تا D-08 است، نه
+  رابطِ کهنه ⇒ ماند و kdoc ِ آزمون و STATUS صریح شدند «هنوز هیچ صفحه‌ای صدا نمی‌زند». `core/i18n/I18nTables` فهرستِ جدول‌ها برای آزمون‌های پوشش
+  است (و `server/test/kt-source.js` آن را می‌خواند) ⇒ ماند.
+- **STATUS:** یادداشتِ «بازرسیِ کدِ مرده» در ORD-03/04/07/08/09/19، S42، S96، PAY-08، DLV-02؛ **هیچ وضعیتی عوض نشد**؛ PARTIAL-MAP: یک بند و متنِ PAY-08.
+- **سنجه‌ها:** `compileTestKotlin` ِ desktop دو بار سبز (پس از بخشِ سفارش؛ پس از همه و ادغامِ `origin/claude/batch-57` ‏e98f1e282، تعارض فقط در دو ردیفِ
+  STATUS: سمتِ batch-57 + یادداشتِ همین دور)؛ `(cd core && ../desktop/gradlew --no-daemon jvmTest)` زیرِ flock: ۱۹۰۳ آزمون، ۰ شکست (۲ SKIP ِ سرورِ
+  زنده)، `MissionAddressTest` ۵/۵؛ نگهبان‌های سرور `dari-text`، `kotlin-file-mirrors`، `kotlin-test-names-windows` ۲۴/۲۴؛ `spec.mjs check` سالم؛
+  `quality.mjs` بی ❌؛ precheck fail=0. اجرای کاملِ `rm -rf desktop/build/test-data && flock /tmp/gradle-full.lock ./desktop/gradlew --no-daemon -p desktop test`
+  روی f47a07491: ۴۱۰۳ آزمون، ۰ شکست، ۴ SKIP ِ پیشین (ACL ِ ویندوزِ `AtRestDiskTest`، دو سنجهٔ perf، `NewScreensRenderTest`)؛ هیچ skip ِ تازه‌ای نیست.
+  سنجه‌های جابه‌جاشده روی کدِ زنده سبزند: `OrderDeskV3Test` ۵، `ScenarioS42KeyTest` ۳، `SettingsPortTest` ۸، `ScenarioS96Test` ۱، `ShellTargetsTest` ۵.
+- **نیمه‌کاره / قدمِ بعد:** نیمه‌مرده‌های درونِ پرونده‌های زنده (۲۵ پروندهٔ نیمه‌مرده در کلِ برنامه؛ ۴۲ بخشِ مرده در `ui/screens`/`ui/components`؛ گرافِ نام‌محورِ
+  این دور در scratchpad ِ سیزن ماند، در ریپو نیست) دست نخوردند؛ تنها موردی که هنوز آزمون دارد `crmTabs` (`CustomerReportsPhone.kt`؛ `CustomerReportsPhoneTest` و
+  دو سنجهٔ `DariCoverageTest`). `SERVERS_SECTION_TITLE` (`Servers.kt`) هم مرده ولی بی آزمون.
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-37e (ت۵) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-37e` (از سرِ `claude/batch-57`، e69b30114)
 
 - **فاکتورِ «تعویض» = فاکتورِ صندوقِ همین دستگاه (RET-05):** سه کمبودی که e-rows-36t دید سنجیده شد. (۱) **مالیات (POS-37) — کمبودِ واقعی، ساخته شد:**
