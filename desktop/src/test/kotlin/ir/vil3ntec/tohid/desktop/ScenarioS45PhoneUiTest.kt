@@ -68,7 +68,7 @@ class ScenarioS45PhoneUiTest {
     clean()
     LinePolicyPrefs.setOn(ctx, true)
     LinePolicyPrefs.setDirection(ctx, LinePricing.Direction.UP)
-    CartStore(ctx).set(listOf(SalesEngine.CartLine(rice.id, 2.0)))
+    LineSheetHarness.seed(listOf(SalesEngine.CartLine(rice.id, 2.0)))
     h = RouteUiHarness(rule)
   }
 

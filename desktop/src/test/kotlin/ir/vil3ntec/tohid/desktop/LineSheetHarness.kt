@@ -1,6 +1,8 @@
 package ir.vil3ntec.tohid.desktop
 
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasClickAction
@@ -33,12 +35,29 @@ internal class LineSheetHarness(private val rule: ComposeContentTestRule) : Auto
 
   /** سبد با همین ردیف‌ها و برگهٔ ردیفِ نخست */
   fun open(vararg lines: SalesEngine.CartLine) {
-    CartStore(ctx).set(lines.toList())
+    seed(lines.toList())
     h.show("sale/line/0", data)
-    h.await(StrSale.unitPrice)
+    runCatching { h.await(StrSale.unitPrice) }.onFailure { throw AssertionError("برگهٔ ردیف باز نشد؛ سبد: ${line()} — روی صفحه: ${shown()}", it) }
   }
 
+  /** نوشته‌های روی صفحه (همهٔ ریشه‌ها، برگه‌ها هم) — برای پیامِ شکست */
+  fun shown(): List<String> = rule.onAllNodes(SemanticsMatcher("any") { true }, useUnmergedTree = true).fetchSemanticsNodes()
+    .mapNotNull { n -> n.config.getOrNull(SemanticsProperties.Text)?.joinToString { it.text } }.filter { it.isNotBlank() }.take(60)
+
   fun line(): SalesEngine.CartLine? = CartStore(ctx).lines.value.firstOrNull()
+
+  companion object {
+    /**
+     *  سبدِ روی دیسک با همین ردیف‌ها. ⛔ نوشتنِ پیش‌نویس ناهم‌زمان است (`CartStore.write` روی رشتهٔ نویسنده) ⇒ تا روی دیسک ننشسته
+     *  صفحه باز نشود، وگرنه `CartStore` ِ صفحه سبدِ خالی می‌خواند و برگهٔ ردیف «ردیف دیگر نیست» می‌گوید (شکستِ گاه‌به‌گاه).
+     */
+    fun seed(lines: List<SalesEngine.CartLine>) {
+      CartStore(DesktopContext).set(lines)
+      val until = System.currentTimeMillis() + 10_000
+      while (CartStore(DesktopContext).lines.value != lines && System.currentTimeMillis() < until) Thread.sleep(20)
+      check(CartStore(DesktopContext).lines.value == lines) { "سبد روی دیسک ننشست" }
+    }
+  }
 
   /** کادرِ نوشتن با همین برچسب (`V3TextField`: توضیحِ محتوا؛ کادرِ Material: نوشتهٔ برچسب) — جای متنِ پیشین */
   fun type(label: String, value: String) {
