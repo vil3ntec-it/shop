@@ -544,8 +544,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/admin/finance', require('./routes/admin-finance'));
     //  بانکِ مرکزیِ تصاویر (v3 ۳۷.۳) — پشتِ پرچمِ `image_bank.central`، پیش‌فرض خاموش
     api.use('/admin/image-bank', require('./routes/admin-image-bank'));
-    //  LOC-04: جدولِ تعطیلاتِ رسمی — خواندنِ همگانی، نوشتنِ مدیرِ ارشد
-    api.use('/calendar', require('./routes/calendar'));
+    //  LOC-04 جدولِ تعطیلاتِ رسمی و POS-04 فهرستِ مرکزیِ مترادفِ صندوق — خواندنِ همگانی؛ نوشتن فقط مدیر (admin-calendar، admin-synonyms)
+    api.use('/calendar', require('./routes/calendar')).use('/search', require('./routes/search-synonyms'));
     api.use('/admin/calendar', require('./routes/admin-calendar'));
     /*
      *  ⛔ مسیرِ ناشناختهٔ مدیر ⇒ ۴۰۴ `route_not_found`، نه ۴۰۱ (چسبِ پنلِ مرکزی، بندِ ۱۲.۶ ِ

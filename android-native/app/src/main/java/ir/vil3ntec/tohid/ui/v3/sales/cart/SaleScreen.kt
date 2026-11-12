@@ -123,7 +123,7 @@ fun SaleScreen(
   val codes = ir.vil3ntec.tohid.ui.components.product.productInfoOn() // POS-01: کدِ کالا (SKU) در همان کادر
   val index = remember(d.products, d.sales, d.saleItems, codes) { CatalogModel.index(d, codes) }
   val inCart = remember(cart) { CartModel.inCart(cart) }
-  val items = remember(index, search, category, inCart, d, held, pins) { CatalogModel.items(d, index, search, category, inCart, held, pins) }
+  val items = remember(index, search, category, inCart, d, held, pins, ir.vil3ntec.tohid.TillSynonyms.search) { CatalogModel.items(d, index, search, category, inCart, held, pins) }
   val best = remember(index, inCart, d, held) { CatalogModel.bestsellers(d, index, inCart, held) }
   val rows = remember(cart, d.products) { CartSummary.rows(cart, d.products) }
 

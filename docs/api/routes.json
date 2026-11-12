@@ -20,9 +20,9 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1050,
+    "routes": 1051,
     "byAuth": {
-      "none-detected": 199,
+      "none-detected": 200,
       "admin": 285,
       "inline": 2,
       "user": 521,
@@ -30,7 +30,7 @@
       "optional": 1
     },
     "byShape": {
-      "extracted": 718,
+      "extracted": 719,
       "empty": 330,
       "unresolved": 2
     }
@@ -608,6 +608,7 @@
     {"method":"GET","path":"/api/sales/:id","area":"sales","source":"server/src/routes/data.js","auth":"user","guards":["requireUser","requireShop"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","createdAt","id","rev","updatedAt","userId","version"]},"errors":["404 not_found"],"shape":"extracted"},
     {"method":"PUT","path":"/api/sales/:id","area":"sales","source":"server/src/routes/data.js","auth":"user","guards":["requireUser","requireShop","requireDataWrite"],"params":["id"],"query":[],"body":["data","updatedAt"],"response":{"statuses":[200],"keys":["...","id"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/sales/full","area":"sales","source":"server/src/routes/data.js","auth":"user","guards":["requireUser","requireShop","requireDataWrite"],"params":[],"query":[],"body":["items","payment","sale","stockMovements","updatedAt"],"response":{"statuses":[201],"keys":["...","saleId"]},"errors":["400 empty_sale"],"shape":"extracted"},
+    {"method":"GET","path":"/api/search/synonyms","area":"search","source":"server/src/routes/search-synonyms.js","auth":"none-detected","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'search-synonyms-ip' })"],"params":[],"query":[],"body":[],"response":{"statuses":[200,304],"keys":["groups","updatedAt","version"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop","area":"shop","source":"server/src/routes/shop.js","auth":"user","guards":["requireUser","optionalShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["permissions","role","shop"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop","area":"shop","source":"server/src/routes/shop.js","auth":"user","guards":["requireUser"],"params":[],"query":[],"body":["name"],"response":{"statuses":[201],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/shop","area":"shop","source":"server/src/routes/shop.js","auth":"user","guards":["requireUser","requireShop","requirePermission('shop.update')"],"params":[],"query":[],"body":["name"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
