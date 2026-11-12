@@ -39,7 +39,7 @@
   "tr.bad.product": "این کالا را نمی‌شود گزارش داد.",
   "err.too_many_reports": "امروز گزارش زیاد شد؛ فردا دوباره بفرستید.",
   "err.bad_category": "موضوع را برگزینید.",
-  "err.text_too_long": "شرح خیلی بلند است.",
+  "err.text_too_long": "شرح بیش از اندازه بلند است.",
   "err.product_not_found": "این کالا دیگر در ویترین نیست.",
   "err.case_not_found": "این گزارش پیدا نشد.",
   "err.trust_unavailable": "گزارشِ مشکل هنوز روی این سرور آماده نیست."
