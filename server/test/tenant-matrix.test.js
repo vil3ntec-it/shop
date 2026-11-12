@@ -587,6 +587,10 @@ const ADMIN_SUBJECT = {
   'GET /api/admin/users/:id/delete-preview': { audited: 'admin.user_delete_previewed' },
   'GET /api/admin/shops/:id': { audited: 'admin.shop_viewed' },
   'GET /api/admin/shops/:id/staff-perms': { audited: 'admin.shop_staff_perms_viewed' },
+  'GET /api/admin/shops/:id/images/changes': { audited: 'admin.image_changes_viewed' },
+  //  جزئیاتِ یک دسته فقط با شناسهٔ واقعیِ دسته ۲۰۰ می‌دهد (این ماتریس دسته‌ای نمی‌سازد) ⇒ سابقهٔ «admin.image_change_viewed» ِ
+  //  هر پاسخِ موفق و اجازهٔ `read_private` در `admin-image-changes.test.js` سنجیده می‌شود
+  'GET /api/admin/shops/:id/images/changes/:cid': { exempt: 'جزئیاتِ دسته‌ای که فهرستش سابقه‌دار است؛ هر پاسخِ موفقِ خودش هم سابقه می‌نویسد (admin-image-changes.test.js)' },
   'GET /api/admin/support/threads/:id': { audited: 'admin.support_thread_viewed' },
   'GET /api/admin/accounts/:app/:tenantId/backups/:id': { audited: 'admin.account_backup_downloaded' },
   //  ⛔ کدِ پمپ بی اجازهٔ صاحب‌کار دست نمی‌خورد: سابقهٔ این دو (و آزمونش) در #615 است

@@ -136,6 +136,11 @@ test('نقش: مالی ۴۰۳ همه؛ بیننده فقط می‌خواند؛ �
   assert.equal(d.body.change.items[0].before.image_id, y1);
   assert.equal(d.body.change.items[1].before, null);
   assert.equal(d.body.change.items[0].after.image_id, y2);
+  //  TEN-04: دیدنِ فهرست و جزئیات هر دو سابقهٔ «مدیر» دارند، با شناسهٔ موضوع (دکان / دسته)
+  const seenList = await audits(A, 'admin.image_changes_viewed');
+  assert.ok(seenList.length >= 1 && seenList.every((r) => r.actor_type === 'admin' && r.target_id === A.shopId), JSON.stringify(seenList));
+  const seenOne = await audits(A, 'admin.image_change_viewed');
+  assert.ok(seenOne.some((r) => r.actor_type === 'admin' && r.target_id === b1), JSON.stringify(seenOne));
   for (const [who, code] of [['aic-binande', 'role_forbidden'], ['aic-modir', 'forbidden']]) {
     const r = await M(who, 'POST', `${base(A)}/${b2}/rollback`, { reason: REASON });
     assert.equal(r.status, 403, `${who} ⇒ ${r.status}`);

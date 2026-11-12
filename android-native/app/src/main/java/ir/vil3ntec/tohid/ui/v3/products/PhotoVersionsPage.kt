@@ -167,7 +167,7 @@ internal object ZoomMath {
     return clamp(ns, cx - (cx - st.x) * k, cy - (cy - st.y) * k, fw, fh, bw, bh, max)
   }
 
-  fun pan(st: State, dx: Float, dy: Float, fw: Float, fh: Float, bw: Float, bh: Float, max: Float): State =
+  fun drag(st: State, dx: Float, dy: Float, fw: Float, fh: Float, bw: Float, bh: Float, max: Float): State =
     clamp(st.s, st.x + dx, st.y + dy, fw, fh, bw, bh, max)
 
   /** دو بار زدن: بزرگ ⇒ برگشت؛ وگرنه [TAP] گردِ همان نقطه */
@@ -326,10 +326,10 @@ internal fun ZoomFrame(bmp: ImageBitmap?, m: ImageQuality.Measure, boxW: Dp, box
     Box(
       Modifier.size(boxW, boxH).clipToBounds().background(c.card).border(1.dp, c.hairline)
         .pointerInput(bmp, fw, fh) {
-          detectTransformGestures { centroid, pan, zoom, _ ->
+          detectTransformGestures { centroid, move, zoom, _ ->
             val cx = centroid.x - bx / 2
             val cy = centroid.y - by / 2
-            z = ZoomMath.pan(ZoomMath.zoomAt(z, zoom, cx, cy, f, g, bx, by, max), pan.x, pan.y, f, g, bx, by, max)
+            z = ZoomMath.drag(ZoomMath.zoomAt(z, zoom, cx, cy, f, g, bx, by, max), move.x, move.y, f, g, bx, by, max)
           }
         }
         .pointerInput(bmp, fw, fh) {
@@ -343,10 +343,10 @@ internal fun ZoomFrame(bmp: ImageBitmap?, m: ImageQuality.Measure, boxW: Dp, box
           customActions = listOf(
             act(StrImageChanges.zoomIn) { ZoomMath.zoomAt(z, ZoomMath.STEP, 0f, 0f, f, g, bx, by, max) },
             act(StrImageChanges.zoomOut) { ZoomMath.zoomAt(z, 1 / ZoomMath.STEP, 0f, 0f, f, g, bx, by, max) },
-            act(StrImageChanges.zoomShowLeft) { ZoomMath.pan(z, bx / 4, 0f, f, g, bx, by, max) },
-            act(StrImageChanges.zoomShowRight) { ZoomMath.pan(z, -bx / 4, 0f, f, g, bx, by, max) },
-            act(StrImageChanges.zoomShowTop) { ZoomMath.pan(z, 0f, by / 4, f, g, bx, by, max) },
-            act(StrImageChanges.zoomShowBottom) { ZoomMath.pan(z, 0f, -by / 4, f, g, bx, by, max) },
+            act(StrImageChanges.zoomShowLeft) { ZoomMath.drag(z, bx / 4, 0f, f, g, bx, by, max) },
+            act(StrImageChanges.zoomShowRight) { ZoomMath.drag(z, -bx / 4, 0f, f, g, bx, by, max) },
+            act(StrImageChanges.zoomShowTop) { ZoomMath.drag(z, 0f, by / 4, f, g, bx, by, max) },
+            act(StrImageChanges.zoomShowBottom) { ZoomMath.drag(z, 0f, -by / 4, f, g, bx, by, max) },
           )
         },
       contentAlignment = Alignment.Center,

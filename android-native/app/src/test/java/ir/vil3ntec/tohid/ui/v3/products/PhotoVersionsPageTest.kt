@@ -199,14 +199,14 @@ class PhotoVersionsPageTest {
     assertEquals(-20f, a.y, 1e-3f)
     val top = at(a, 10f, 0f, 0f)
     assertEquals("سقف", max, top.s, 1e-4f)
-    val far = ZoomMath.pan(top, 1e6f, -1e6f, box[0], box[1], box[2], box[3], max)
+    val far = ZoomMath.drag(top, 1e6f, -1e6f, box[0], box[1], box[2], box[3], max)
     assertEquals("مرزِ افقی", (1000f * max - 1000f) / 2, far.x, 1e-2f)
     assertEquals("مرزِ عمودی", -(750f * max - 750f) / 2, far.y, 1e-2f)
     fun same(w: ZoomMath.State, g: ZoomMath.State, why: String) {
       assertEquals(why, w.s, g.s, 1e-4f); assertEquals(why, w.x, g.x, 1e-3f); assertEquals(why, w.y, g.y, 1e-3f)
     }
     same(ZoomMath.State(), at(top, 1e-6f, 0f, 0f), "کمتر از ۱ نه؛ در ۱ در مرکز")
-    same(ZoomMath.State(), ZoomMath.pan(ZoomMath.State(), 300f, 300f, box[0], box[1], box[2], box[3], max), "در ۱ جابه‌جا نه")
+    same(ZoomMath.State(), ZoomMath.drag(ZoomMath.State(), 300f, 300f, box[0], box[1], box[2], box[3], max), "در ۱ جابه‌جا نه")
     val max4 = ZoomMath.max(4000, 1000)
     val tapped = ZoomMath.doubleTap(ZoomMath.State(), 0f, 0f, box[0], box[1], box[2], box[3], max4)
     assertEquals(ZoomMath.TAP, tapped.s, 1e-4f)

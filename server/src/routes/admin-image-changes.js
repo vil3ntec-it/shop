@@ -21,6 +21,7 @@
  */
 const express = require('express');
 const access = require('../lib/support-access');
+const audit = require('../lib/audit');
 const bank = require('../lib/image-bank');
 const changes = require('../lib/image-changes');
 const writeOnce = require('../lib/admin-write-once');
@@ -61,6 +62,11 @@ router.get('/images/changes', async (req, res) => {
     limit = +raw;
   }
   const { shop, enabled } = await enabledShop(req);
+  //  TEN-04: یادداشت و سازندهٔ دسته‌های عکس مالِ یک دکان است ⇒ دیدنش سابقه دارد، مثلِ پروندهٔ دکان (tenant-matrix)
+  await audit.log({
+    shopId: shop.id, actorType: 'admin', userId: req.admin.id, action: 'admin.image_changes_viewed',
+    targetType: 'shop', targetId: shop.id, ip: clientIp(req),
+  });
   res.set('Cache-Control', 'no-store');
   if (!enabled) return res.json({ shopId: shop.id, enabled: false, changes: [] });
   const out = await changes.list(shop.id, { limit });
@@ -76,6 +82,11 @@ router.get('/images/changes/:cid', async (req, res) => {
     await access.useGrant(req, shop.id, 'read_private', { what: `image_changes ${cid}` });
   }
   const out = await changes.detail(shop.id, cid).catch(missing);
+  //  TEN-04: پیش و پسِ کالاهای یک دسته ⇒ هر بار دیدن سابقه دارد (فقط پاسخِ موفق؛ ۴۰۴ چیزی نشان نداده)
+  await audit.log({
+    shopId: shop.id, actorType: 'admin', userId: req.admin.id, action: 'admin.image_change_viewed',
+    targetType: 'image_change', targetId: cid, ip: clientIp(req),
+  });
   res.set('Cache-Control', 'no-store');
   res.json({ shopId: shop.id, change: out.change });
 });
