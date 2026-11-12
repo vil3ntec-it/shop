@@ -67,7 +67,7 @@
   همگام‌سازی ندارد (فقط کادرِ پنهانِ خانه، کارتِ خطا/صفِ بی‌نت، صفحهٔ همگام‌سازی)؛ سرخطِ خانه انتخابِ صاحب‌کار است ⇒ پرسش در PARTIAL-MAP.
 - **آزمون:** سرخ روی a5bd4667f (کامپایل: `HomeAlerts.taxDue`/`Kind.TAX`/`ShellTargets.TAX_QUARTER`، `CountScope`/`CountState.options`،
   `DrawerNoSale.phoneAction`)؛ سبز: TaxDueAlertTest ۵، StockCountScopeTest ۴، CountFilterTest ۵، DrawerNoSaleTest ۷، ReportsModelTest (+۱ ِ RFM، با
-  `RFM.money = false` سرخ — جهش)؛ بی `canSeeMoney` در `HomeAlerts.taxDue` هم TaxDueAlertTest سرخ (جهش). نتیجهٔ اجرای کامل در بندِ پایانی.
+  `RFM.money = false` سرخ — جهش)؛ بی `canSeeMoney` در `HomeAlerts.taxDue` هم TaxDueAlertTest سرخ (جهش). اجرای کاملِ `flock … ./desktop/gradlew --no-daemon -p desktop test`: BUILD SUCCESSFUL، ۶۳۵ مجموعه، ۴۰۴۵ آزمون، ۰ شکست (۴ رد‌شده).
 - **درس:** پوشهٔ scratchpad میانِ عامل‌های هم‌زمانِ یک هماهنگ‌کننده مشترک است — نامِ لاگ را یکتا کنید (`scratchpad/<X>/…`)؛ `red1.log` ِ این عامل
   را عاملِ دیگری با همان نام بازنویسی کرد.
 - **قدمِ بعدی:** پاسخِ صاحب‌کار به SYN-08 (الف/ب)؛ PAY-19 و «کشو بی فروش» ِ گوشی روی کشوی واقعی؛ شاهدِ CI پس از مرج.
