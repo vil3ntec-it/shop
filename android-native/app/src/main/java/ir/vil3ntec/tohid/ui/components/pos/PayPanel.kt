@@ -112,7 +112,10 @@ class PayPanelState {
   /** «اکنون» ِ صفحه برای کهنگیِ نرخ (`CheckoutRoute`)؛ حالت نیست تا هر کشیدن دوباره نکشد */
   var clock: () -> Long = { 0L }
 
-  fun methods(): List<PayMethod> = PayFlow.panelMethods(stored)
+  /** PAY-06 — روش‌هایی که دکان برداشته (`PayMethodsPref.off`)؛ خالی (پیش‌فرض) ⇒ همان پنلِ امروز */
+  var off by mutableStateOf<Set<String>>(emptySet())
+
+  fun methods(): List<PayMethod> = PayFlow.panelMethods(stored, off)
 
   /** کادرِ ارزِ همین لحظه؛ بی جدول ⇒ `null` */
   fun fxTender(): ir.vil3ntec.tohid.data.FxTillFlow.Tender? = fxRates.takeIf { it.isNotEmpty() }?.let { r ->
@@ -387,9 +390,11 @@ fun PayPanelDialog(
    */
   print: Boolean? = null,
   onTogglePrint: (() -> Unit)? = null,
+  /** PAY-06 — روش‌هایی که دکان از پنل برداشته (`PayMethodsPref.off`)؛ خالی ⇒ همان پنلِ امروز */
+  offMethods: Set<String> = emptySet(),
 ) {
   val printToggle = onTogglePrint.takeIf { print != null }
-  val state = remember { PayPanelState().also { it.stored = stored; it.cashRounding = cashRounding } }
+  val state = remember { PayPanelState().also { it.stored = stored; it.cashRounding = cashRounding; it.off = offMethods } }
   val cashFocus = remember { FocusRequester() }
   LaunchedEffect(Unit) { runCatching { cashFocus.requestFocus() } }
   var error by remember { mutableStateOf<String?>(null) }

@@ -137,7 +137,7 @@ fun CheckoutDialog(
   val discountBad = canDiscount && numberInvalid(discountText)
   //  PAY (v3 A4): پرداختِ ترکیبی — فقط با پرچم (`payV2` بالا)؛ خاموش ⇒ همان نقد/نسیهٔ امروز
   //  PAY-24: کارتِ هدیه و اعتبارِ فروشگاه در روش‌ها فقط با تنظیمِ همین دستگاه (پیش‌فرض خاموش ⇒ همان پنل)؛ PAY-09: پلهٔ گرد
-  val payState = remember { ir.vil3ntec.tohid.ui.components.pos.PayPanelState().also { it.stored = ir.vil3ntec.tohid.data.GiftCardPref.on(context); it.cashRounding = checkout.cashRounding } }
+  val payState = remember { ir.vil3ntec.tohid.ui.components.pos.PayPanelState().also { it.stored = ir.vil3ntec.tohid.data.GiftCardPref.on(context); it.off = ir.vil3ntec.tohid.data.PayMethodsPref.off(context); it.cashRounding = checkout.cashRounding } }
   val cashFocus = remember { androidx.compose.ui.focus.FocusRequester() }
   var payError by remember { mutableStateOf<String?>(null) }
   val paidBad = !payV2 && payment == SalesEngine.Payment.CREDIT && numberInvalid(paidText)
