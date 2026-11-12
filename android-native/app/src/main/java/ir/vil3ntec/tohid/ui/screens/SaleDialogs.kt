@@ -867,10 +867,14 @@ fun DebtorPicker(
   onPick: (String?) -> Unit,
   /** POS-31 — کامپیوترِ لمسی (`PosTouchPrefs.extras()`): کلیدِ «حروف» و صفحه‌کلیدِ روی‌صفحه برای نامِ مشتری؛ خاموش ⇒ همان امروز */
   touch: Boolean = false,
+  /** POS-31/S18 گامِ ۴ — «مشتریِ تازه» با همان نامِ کادر (فقط کامپیوترِ لمسی می‌دهدش)؛ پاسخ = پیامِ خطا یا `null` */
+  onAdd: ((name: String) -> String?)? = null,
 ) {
   var search by remember { mutableStateOf("") }
+  var addProblem by remember { mutableStateOf<String?>(null) }
   val kb = ir.vil3ntec.tohid.ui.components.pos.rememberTouchKeyboard()
   val shown = ir.vil3ntec.tohid.data.CustomerCrm.active(d).filter { search.isBlank() || it.name.contains(search.trim(), ignoreCase = true) }
+  val newName = search.trim().takeIf { onAdd != null && it.isNotEmpty() && shown.none { s -> s.name.trim().equals(it, ignoreCase = true) } }
 
   Dialog(onDismissRequest = onClose) {
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
@@ -883,6 +887,13 @@ fun DebtorPicker(
           ir.vil3ntec.tohid.ui.components.pos.TouchKeysToggle(kb, touch, 48.dp) {}
         }
         ir.vil3ntec.tohid.ui.components.pos.TouchKeysPanel(kb, touch, 48.dp) { search = ir.vil3ntec.tohid.core.pos.TouchKeyboard.apply(search, it) }
+        if (newName != null && onAdd != null) {
+          Spacer(Modifier.height(8.dp))
+          OutlinedButton(onClick = { addProblem = onAdd(newName) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+            Text(ir.vil3ntec.tohid.core.i18n.StrSale.newCustomerNamed(newName), maxLines = 1)
+          }
+        }
+        addProblem?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger) }
         Spacer(Modifier.height(10.dp))
         if (shown.isEmpty()) {
           EmptyNote(if (d.debtors.isEmpty()) ir.vil3ntec.tohid.core.i18n.StrSale.noDebtorsYet else ir.vil3ntec.tohid.core.i18n.StrSale.debtorNotFound)

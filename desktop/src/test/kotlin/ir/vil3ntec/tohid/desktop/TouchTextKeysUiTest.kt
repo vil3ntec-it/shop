@@ -17,12 +17,16 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.i18n.StrTouch
 import ir.vil3ntec.tohid.core.pos.TouchMode
 import ir.vil3ntec.tohid.core.pos.SaleNotes
 import ir.vil3ntec.tohid.ui.components.pos.PosNoteField
 import ir.vil3ntec.tohid.ui.components.pos.PosTouchPrefs
+import ir.vil3ntec.tohid.ui.screens.DebtorPicker
 import ir.vil3ntec.tohid.ui.screens.FreeLineDialog
+import ir.vil3ntec.tohid.data.Debtor
+import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
 import org.junit.After
@@ -137,6 +141,42 @@ class TouchTextKeysUiTest {
     //  هر خطای سیستم‌عامل ⇒ «نه» (همان صندوقِ امروز)، هرگز استثنا
     val first = ir.vil3ntec.tohid.ui.components.pos.TouchScreenProbe.detected
     assertEquals(first, ir.vil3ntec.tohid.ui.components.pos.TouchScreenProbe.detected)
+  }
+
+  @Test fun touchTillAddsANewCustomerWithTheOnScreenKeys() {
+    touch(true)
+    val d = ShopData(debtors = listOf(Debtor(id = "a", name = "احمد")))
+    val added = mutableListOf<String>()
+    var withAdd by mutableStateOf(true)
+    rule.setContent {
+      CompositionLocalProvider(LocalContext provides DesktopContext) {
+        TohidTheme(ThemeChoice.LIGHT) {
+          DebtorPicker(d = d, selected = null, onClose = {}, onPick = {}, touch = true, onAdd = if (withAdd) ({ n -> added += n; null }) else null)
+        }
+      }
+    }
+    rule.waitForIdle()
+    rule.onNodeWithContentDescription(StrTouch.lettersOpen).performClick()
+    rule.waitForIdle()
+    //  نامِ موجود ⇒ دکمهٔ «مشتریِ تازه» نیست
+    type("احمد")
+    rule.onAllNodes(hasText(StrSale.newCustomerNamed("احمد"))).assertCountEquals(0)
+    rule.onNodeWithContentDescription(StrTouch.clearAll).performClick()
+    type("زهرا")
+    rule.waitForIdle()
+    rule.onNode(hasText(StrSale.newCustomerNamed("زهرا"))).performClick()
+    assertEquals(listOf("زهرا"), added)
+    //  بی `onAdd` (صندوقِ موشی) دکمه نیست
+    withAdd = false
+    rule.waitForIdle()
+    rule.onAllNodes(hasText(StrSale.newCustomerNamed("زهرا"))).assertCountEquals(0)
+  }
+
+  @Test fun deskSaleGivesNewCustomerOnlyToTheTouchTillThroughTheStore() {
+    val src = File("../android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/DeskSale.kt").readText()
+    val call = src.substringAfter("DebtorPicker(d = d, selected = cartDebtorId").substringBefore("if (lineSellerOpen")
+    assertEquals(true, call.contains("onAdd = if (!touchExtras) null else"))
+    assertEquals(true, call.contains("DebtorEngine.add(d,") && call.contains("store.save(d, r.data)"))
   }
 
   @Test fun freeLineAndNotesUseTheSharedTouchKeys() {
