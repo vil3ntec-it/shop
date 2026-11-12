@@ -54,6 +54,24 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-35h (ه۳) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-35h` (از سرِ `claude/batch-56`، a5bd4667f)
+
+- **بازرسیِ «IMPLEMENTED-VERIFIED ولی بی‌راه از نسخهٔ ۳»، بندهای ۶، ۹، ۱۰ و «نامطمئن»:** (۱) **S49** یادآورِ سررسیدِ مالیات حالا هشدارِ خانهٔ نسخهٔ ۳
+  است (`HomeAlerts.Kind.TAX` + `HomeAlerts.taxDue`: تنظیمِ روشن، فقط `canSeeMoney`، درونِ `QuarterTax.reminder`؛ کارتِ کهربایی روی خانهٔ گوشی و
+  کامپیوتر و ردیفِ «هشدارها»، لمس ⇐ `settings/data/tax-quarter`)؛ `ui/screens/TaxQuarterAndroid.kt` ِ مرده برداشته و یادداشتِ LOC-06 درست شد.
+  (۲) **INV-05** «انبارگردانی» ِ سادهٔ نسخهٔ ۳ (`stock/count`) تراشه‌های دسته/تأمین‌کننده/برند/قفسه گرفت (`CountScope`، `CountState.options`، همان
+  `CountFilter`؛ برچسبِ قفسه `CountFilter.shelfLabel`)؛ `CountFilterTest` حالا پرونده‌های نسخهٔ ۳ را می‌خواند. (۳) **CRM-14** شاهد به `ReportsModelTest`
+  (RFM فقط با `canSeeMoney`)؛ «گزارش‌ها»ی کامپیوتر عمداً سدِ پول ندارد و ردیف آن را ادعا نکرده بود ⇒ فقط یادداشت. (۴) **PAY-19** «کشو بی فروش» ِ
+  گوشیِ نسخهٔ ۳ کشو را **باز نمی‌کرد** (فقط ردیف، با سدِ «شاگرد نیست»): حالا همان `drawer.open` و با چاپگرِ پیش‌فرضِ کشودار همان
+  `PrintSpooler.openDrawer` (`DrawerNoSale.phoneAction`)؛ در «دستگاه» می‌ماند. (۵) **SYN-08** ⇐ PARTIAL/«تصمیم»: گوشیِ نسخهٔ ۳ نشانهٔ همیشه‌پیدای
+  همگام‌سازی ندارد (فقط کادرِ پنهانِ خانه، کارتِ خطا/صفِ بی‌نت، صفحهٔ همگام‌سازی)؛ سرخطِ خانه انتخابِ صاحب‌کار است ⇒ پرسش در PARTIAL-MAP.
+- **آزمون:** سرخ روی a5bd4667f (کامپایل: `HomeAlerts.taxDue`/`Kind.TAX`/`ShellTargets.TAX_QUARTER`، `CountScope`/`CountState.options`،
+  `DrawerNoSale.phoneAction`)؛ سبز: TaxDueAlertTest ۵، StockCountScopeTest ۴، CountFilterTest ۵، DrawerNoSaleTest ۷، ReportsModelTest (+۱ ِ RFM، با
+  `RFM.money = false` سرخ — جهش)؛ بی `canSeeMoney` در `HomeAlerts.taxDue` هم TaxDueAlertTest سرخ (جهش). نتیجهٔ اجرای کامل در بندِ پایانی.
+- **درس:** پوشهٔ scratchpad میانِ عامل‌های هم‌زمانِ یک هماهنگ‌کننده مشترک است — نامِ لاگ را یکتا کنید (`scratchpad/<X>/…`)؛ `red1.log` ِ این عامل
+  را عاملِ دیگری با همان نام بازنویسی کرد.
+- **قدمِ بعدی:** پاسخِ صاحب‌کار به SYN-08 (الف/ب)؛ PAY-19 و «کشو بی فروش» ِ گوشی روی کشوی واقعی؛ شاهدِ CI پس از مرج.
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-28l زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-28l` (از سرِ `claude/batch-55`)
 
 - **ساخته شد:** LOC-06 دورِ ۳ — متنِ خامِ `ui/screens` **۱۷۸ ⇐ ۷۳** (`DariCoverageTest.maxRawOldScreens`). (ب) ۷۴ متنِ صفحه‌های فقط‌پیش‌نمایشِ گوشی
