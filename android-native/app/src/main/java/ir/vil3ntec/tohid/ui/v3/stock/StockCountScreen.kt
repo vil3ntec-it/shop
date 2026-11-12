@@ -41,6 +41,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrCount
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.data.Product
@@ -60,6 +61,8 @@ import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Action
 import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Card
+import ir.vil3ntec.tohid.ui.v3.V3Chip
+import ir.vil3ntec.tohid.ui.v3.V3ChipRow
 import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3FieldKind
@@ -90,7 +93,8 @@ import androidx.compose.ui.text.font.FontWeight
  *  رنگ)؛ ردیفِ شمرده نشانِ تیک می‌گیرد. نوارِ چسبانِ پایین جمع‌ها و «ثبتِ اختلاف‌ها» را
  *  دارد و ثبت از برگهٔ تأییدِ فهرستِ اختلاف‌ها می‌گذرد. نوشتهٔ ذخیره‌نشده + برگشت ⇐
  *  «دور ریخته شود؟». (`V3Form` بدنهٔ ستونی دارد؛ این فهرست تنبل است، پس همان تکه‌های
- *  کیت — `V3Scaffold` + `V3FormBar` — کنارِ هم.)
+ *  کیت — `V3Scaffold` + `V3FormBar` — کنارِ هم.) INV-05: تراشه‌های صافیِ دسته، تأمین‌کننده، برند و قفسه (همان
+ *  `CountFilter` ِ «انبارگردانیِ تازه»؛ هر ردیف فقط وقتی دست‌کم یک کالای فعال آن را دارد) فقط فهرستِ دیده‌شده را کم می‌کنند.
  *
  *  @param onSave null یعنی ثبت شد؛ وگرنه دلیلِ ردِ `WarehouseEngine.stockCount`. سومی (INV-10): لحظهٔ آخرین
  *  نوشتن یا اسکنِ هر کالا روی همین صفحه، با ساعتِ همین دستگاه
@@ -120,6 +124,9 @@ fun StockCountScreen(
     }
   }
   var query by remember { mutableStateOf("") }
+  //  INV-05: صافیِ دیدن (شمرده‌ها، جمع‌ها، CSV و ثبت همان)
+  var scope by remember { mutableStateOf(CountScope()) }
+  val options = remember(data) { CountState.options(data) }
   var confirm by remember { mutableStateOf(false) }
   var askDiscard by remember { mutableStateOf(false) }
   var failure by remember { mutableStateOf<String?>(null) }
@@ -139,7 +146,7 @@ fun StockCountScreen(
   }
   val lines = remember(data, state) { state.lines(data) }
   val system = remember(data) { CountState.system(data) }
-  val rows = remember(data, query) { CountState.rows(data, query) }
+  val rows = remember(data, query, scope) { CountState.rows(data, query, scope) }
   val stagger = rememberV3Stagger()
   var shake by remember { mutableIntStateOf(0) }
   val back = { if (state.dirty) askDiscard = true else onBack() }
@@ -174,6 +181,10 @@ fun StockCountScreen(
         Column {
           Text(StrStock.countHelper, style = V3Type.footnote, color = PhoneV3.colors.inkMuted)
           Spacer(Modifier.height(10.dp))
+          if (!options.isEmpty) {
+            CountScopeChips(options, scope) { scope = it }
+            Spacer(Modifier.height(10.dp))
+          }
           V3TextField(state.note, { state = state.copy(note = it) }, StrStock.countNote, Modifier.fillMaxWidth())
           failure?.let { V3Message(V3Tone.ERROR, it, Modifier.padding(top = 10.dp).v3Shake(shake)) }
           scanNote?.let { (ok, text) -> V3Message(if (ok) V3Tone.SUCCESS else V3Tone.WARNING, text, Modifier.padding(top = 10.dp)) }
@@ -226,6 +237,25 @@ private fun CountRow(p: Product, system: Double, state: CountState, modifier: Mo
         modifier = Modifier.padding(start = 68.dp, end = 16.dp, bottom = 10.dp),
       )
     }
+  }
+}
+
+/** INV-05: ردیف‌های تراشهٔ صافی — «همه…» و گزینه‌ها؛ زدنِ دوبارهٔ تراشهٔ انتخاب‌شده صافی را برمی‌دارد */
+@Composable
+private fun CountScopeChips(o: CountScopeOptions, scope: CountScope, onScope: (CountScope) -> Unit) {
+  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    if (o.categories.isNotEmpty()) ScopeRow(StrCount.allCategories, o.categories, scope.category) { onScope(scope.copy(category = it)) }
+    if (o.suppliers.isNotEmpty()) ScopeRow(StrCount.allSuppliers, o.suppliers, scope.supplierId) { onScope(scope.copy(supplierId = it)) }
+    if (o.brands.isNotEmpty()) ScopeRow(StrCount.allBrands, o.brands, scope.brand) { onScope(scope.copy(brand = it)) }
+    if (o.shelves.isNotEmpty()) ScopeRow(StrCount.allShelves, o.shelves, scope.shelf) { onScope(scope.copy(shelf = it)) }
+  }
+}
+
+@Composable
+private fun ScopeRow(all: String, options: List<Pair<String, String>>, picked: String?, onPick: (String?) -> Unit) {
+  V3ChipRow(contentPadding = PaddingValues(0.dp)) {
+    V3Chip(all, selected = picked == null, onClick = { onPick(null) })
+    options.forEach { (id, label) -> V3Chip(label, selected = picked == id, onClick = { onPick(if (picked == id) null else id) }) }
   }
 }
 

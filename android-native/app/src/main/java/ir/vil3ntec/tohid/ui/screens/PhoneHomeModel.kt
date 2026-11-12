@@ -4,6 +4,8 @@ import ir.vil3ntec.tohid.core.calendar.CivilDays
 import ir.vil3ntec.tohid.core.calendar.SolarHijri
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrHome
+import ir.vil3ntec.tohid.core.i18n.StrTaxQuarter
+import ir.vil3ntec.tohid.core.report.QuarterTax
 import ir.vil3ntec.tohid.core.sync.SyncBadge
 import ir.vil3ntec.tohid.ui.v3.account.AccountPaths
 import ir.vil3ntec.tohid.ui.v3.analytics.AnalyticsPaths
@@ -208,7 +210,7 @@ object HomeSections {
  *  «هشدارها و پیام‌ها» — کارت‌های بزرگِ چرخانِ r7، همه از دادهٔ واقعی.
  *
  *  ترتیب = فوریت: سفارشِ آنلاینِ تازه، اشتراکِ تمام‌شده/رو به پایان، خطای
- *  همگام‌سازی، کالای تمام‌شده/کم، قرضِ عقب‌افتاده، انقضا، صفِ همگام‌سازی.
+ *  همگام‌سازی، کالای تمام‌شده/کم، سررسیدِ مالیاتِ سه‌ماهه، قرضِ عقب‌افتاده، انقضا، صفِ همگام‌سازی.
  *  هیچ‌چیز ⇒ فهرستِ خالی (صفحه کارتِ آرامِ «همه چیز مرتب است» را نشان می‌دهد).
  *
  *  هر هشدار مستقیم سرِ کادرِ خودش می‌رود (`ShellTargets`): همگام‌سازی ⇐ صفحهٔ
@@ -217,7 +219,7 @@ object HomeSections {
  *  (`syncError`) همان‌جا می‌گوید.
  */
 object HomeAlerts {
-  enum class Kind { ORDERS, SUBSCRIPTION, SYNC, STOCK, DEBTS, EXPIRY }
+  enum class Kind { ORDERS, SUBSCRIPTION, SYNC, STOCK, DEBTS, EXPIRY, TAX }
 
   data class Alert(
     val kind: Kind,
@@ -257,7 +259,17 @@ object HomeAlerts {
     val overdueDebtors: Int = 0,
     val overdueTotal: String = "",
     val expiring: Int = 0,
+    /** S49/RPT-10: یادآورِ سررسیدِ مالیاتِ سه‌ماههٔ امروز ([taxDue])، یا `null` */
+    val taxDue: QuarterTax.Due? = null,
   )
+
+  /**
+   *  S49/RPT-10 — یادآورِ سررسیدِ مالیاتِ سه‌ماهه (جای نوارِ `TaxDueBanner` ِ رابطِ پیشین): فقط وقتی «گزارشِ مالیاتِ
+   *  سه‌ماهه» روشن است (`TaxQuarterPref.on`)، فقط برای نقشی که پولِ دکان را می‌بیند (`ShopRole.canSeeMoney` — همان سدِ
+   *  «سود و فروش» ِ گزارش‌ها) و فقط درونِ پنجرهٔ `remindDays` ِ پیش از سررسید (`QuarterTax.reminder`).
+   */
+  fun taxDue(on: Boolean, canSeeMoney: Boolean, today: String, cfg: QuarterTax.Config): QuarterTax.Due? =
+    if (on && canSeeMoney) QuarterTax.reminder(today, cfg) else null
 
   /** دلیلِ واقعیِ خطا در یک خط، یا متنِ همیشگی وقتی موتور چیزی نگفته */
   fun syncReason(error: String): String {
@@ -294,6 +306,15 @@ object HomeAlerts {
         StrHome.actionSee, ShellTargets.stock(anyOut = i.outOfStock > 0), urgent = i.outOfStock > 0,
       ),
     )
+    //  کهربایی (نه سرخ) و روی کارتِ خانه، مثلِ نوارِ پیشین؛ لمس ⇐ صفحهٔ «گزارشِ مالیاتِ سه‌ماهه» در تنظیمات
+    i.taxDue?.let { due -> add(
+      Alert(
+        Kind.TAX,
+        if (due.daysLeft == 0) StrTaxQuarter.reminderToday else StrTaxQuarter.reminderTitle(due.daysLeft),
+        StrTaxQuarter.due(ir.vil3ntec.tohid.formatDate(due.dueIso)),
+        StrTaxQuarter.open, ShellTargets.TAX_QUARTER, pressing = true,
+      ),
+    ) }
     if (i.overdueDebtors > 0) add(
       Alert(Kind.DEBTS, StrHome.alertOverdue(i.overdueDebtors), StrHome.alertOverdueBody(i.overdueTotal), StrHome.actionFollowUp, ShellTargets.OVERDUE_DEBTS),
     )

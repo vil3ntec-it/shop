@@ -164,7 +164,10 @@ fun DrawerCountSheet(
   }
 }
 
-/** ورود/خروجِ نقد با دلیل (PAY-12) یا کشو بی فروش با تأیید (PAY-19) */
+/**
+ *  ورود/خروجِ نقد با دلیل (PAY-12) یا کشو بی فروش با تأیید (PAY-19). [staff] در کشو بی فروش یعنی «بی مجوزِ `drawer.open`»؛
+ *  [drawer] نامِ چاپگرِ پیش‌فرضِ کشودار (کشو باز می‌شود)، `null` ⇒ فقط ثبت.
+ */
 @Composable
 fun DrawerMoveSheet(
   noSale: Boolean,
@@ -173,6 +176,7 @@ fun DrawerMoveSheet(
   error: String?,
   onSubmit: (PayFlow.Move) -> Unit,
   onClose: () -> Unit,
+  drawer: String? = null,
 ) {
   val c = PhoneV3.colors
   var mode by remember { mutableStateOf("cash_out") }
@@ -196,7 +200,15 @@ fun DrawerMoveSheet(
     V3TextField(note, { note = it }, if (noSale) StrSale.noSaleReason else StrSale.moveNote)
     if (noSale) {
       Spacer(Modifier.height(8.dp))
-      Text(if (staff) StrSale.noSaleStaff else StrSale.noSaleApprover(me.ifBlank { StrSale.thisAccount }), style = V3Type.footnote, color = c.inkMuted)
+      Text(
+        when {
+          staff -> StrSale.noSaleStaff
+          drawer != null -> ir.vil3ntec.tohid.core.i18n.StrShift.noSaleApproverDrawer(me.ifBlank { StrSale.thisAccount }, drawer)
+          else -> StrSale.noSaleApprover(me.ifBlank { StrSale.thisAccount })
+        },
+        style = V3Type.footnote,
+        color = c.inkMuted,
+      )
     }
     error?.let { Spacer(Modifier.height(8.dp)); V3Message(V3Tone.ERROR, it) }
     Spacer(Modifier.height(16.dp))

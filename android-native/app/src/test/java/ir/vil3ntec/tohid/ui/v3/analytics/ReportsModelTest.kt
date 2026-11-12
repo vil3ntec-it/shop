@@ -24,6 +24,30 @@ class ReportsModelTest {
     assertEquals(ReportTab.PROFIT, ReportsModel.tabOf("nope", canSeeMoney = true))
   }
 
+  /**
+   *  CRM-14 — «تحلیلِ خرید» (RFM) مبلغِ خریدِ هر مشتری است ⇒ زبانهٔ گوشیِ نسخهٔ ۳ فقط با `canSeeMoney` (جانشینِ `crmTabs` ِ
+   *  مردهٔ `CustomerReportsPhone.kt`)؛ «سنِ بدهی» پولی نیست و شاگرد هم می‌بیند؛ تنظیمِ خاموش ⇒ برای صاحب هم نه.
+   */
+  @Test
+  fun `RFM فقط با canSeeMoney و پیوندِ بستهٔ شاگرد به نخستین زبانهٔ باز — CRM-14`() {
+    val crm = setOf(ReportExtra.AGING, ReportExtra.RFM)
+    assertTrue(ReportExtra.RFM.money)
+    assertFalse(ReportExtra.RFM in ReportsModel.pages(canSeeMoney = false, extras = setOf(ReportExtra.RFM)))
+    assertTrue(ReportExtra.RFM in ReportsModel.pages(canSeeMoney = true, extras = setOf(ReportExtra.RFM)))
+    assertEquals(listOf(ReportExtra.AGING), ReportsModel.pages(canSeeMoney = false, extras = crm).filterIsInstance<ReportExtra>())
+    assertEquals(listOf(ReportExtra.AGING, ReportExtra.RFM), ReportsModel.pages(canSeeMoney = true, extras = crm).filterIsInstance<ReportExtra>())
+    assertTrue(ReportsModel.pages(canSeeMoney = true, extras = emptySet()).none { it is ReportExtra })
+    //  پیوندِ مستقیمِ `reports?tab=rfm` برای شاگرد ⇒ نخستین زبانهٔ باز، نه RFM
+    assertEquals(ReportTab.PRODUCTS, ReportsModel.pageOf("rfm", canSeeMoney = false, extras = crm))
+    assertEquals(ReportExtra.RFM, ReportsModel.pageOf("rfm", canSeeMoney = true, extras = crm))
+    //  صفحهٔ گوشی همین `pages`/`pageOf` را با نقشِ واقعی و تنظیمِ CRM می‌سازد
+    val screen = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { java.io.File(it, "ir/vil3ntec/tohid/ui/v3/analytics/ReportsScreen.kt") }.first { it.isFile }.readText()
+    assertTrue(screen.contains("if (ShopPolicy.crmReports(context)) { add(ReportExtra.AGING); add(ReportExtra.RFM) }"))
+    assertTrue(screen.contains("val tabs = ReportsModel.pages(canSeeMoney, extras)"))
+    assertTrue(screen.contains("ReportsModel.pageOf(tabArg, canSeeMoney, extras)"))
+  }
+
   @Test
   fun `خروجیِ هر زبانه همان بخشِ امروزِ ReportCsv است`() {
     assertEquals("sales", ReportTab.PROFIT.csv)

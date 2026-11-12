@@ -692,13 +692,7 @@ private fun RowEcho(text: String, warn: Boolean) {
 
 /** یک ردیفِ تراشهٔ صافی (INV-05): «همه» و هر گزینه؛ `null` ⇒ همه */
 /** INV-05: برچسبِ تراشهٔ قفسه — «راهرو ۲ · قفسه ۱» به زبانِ صفحه (`CountFilter.shelfKey`) */
-internal fun countShelfLabel(key: String): String {
-  val (aisle, shelf) = CountFilter.shelfParts(key)
-  return listOfNotNull(
-    aisle.takeIf { it.isNotEmpty() }?.let { ir.vil3ntec.tohid.core.i18n.StrProduct.aisleIs(it) },
-    shelf.takeIf { it.isNotEmpty() }?.let { ir.vil3ntec.tohid.core.i18n.StrProduct.shelfIs(it) },
-  ).joinToString(" · ")
-}
+internal fun countShelfLabel(key: String): String = CountFilter.shelfLabel(key)
 
 /** INV-05: تراشه‌های برند و قفسه — هر کدام فقط وقتی دست‌کم یک کالا آن را دارد */
 @Composable
