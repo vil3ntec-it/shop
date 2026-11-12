@@ -326,6 +326,8 @@ class DataSafetyGuardTest {
       "tohid-photos", "tohid-photobot", "device-push",
       //  LOC-04: نسخهٔ محلیِ جدولِ تعطیلاتِ رسمیِ سرور (`ShopDayChoice`، روزی یک بار)؛ تنظیمِ دکان نیست
       "tohid-holidays",
+      //  POS-04: نسخهٔ محلیِ فهرستِ مرکزیِ مترادفِ سرور (`TillSynonyms`، روزی یک بار)؛ تنظیمِ دکان نیست
+      "tohid-synonyms",
     ).forEach { put(it, Kind.SERVER) }
     //  عمداً مالِ همین دستگاه: نشست و همگام‌سازی، سرور، قفل، زبان و ظاهر، چاپگر/دستگاه‌ها، پیش‌نویس‌ها
     listOf(

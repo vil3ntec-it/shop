@@ -75,10 +75,13 @@ object CatalogModel {
     inCart: Map<String, Double>,
     held: Map<String, Double> = emptyMap(),
     pins: List<String> = emptyList(),
+    synonyms: CatalogSearch.Synonyms = ir.vil3ntec.tohid.TillSynonyms.search,
   ): List<PhoneCatalogItem> {
     val byId = d.products.associateBy { it.id }
     val term = query(query, d).term
-    val ids = CatalogSearch.search(index, term, category).let { if (term.isBlank()) TillPins.arrange(it, pins) else it }
+    //  POS-04: فهرستِ مرکزیِ مترادف (روزی یک بار از سرور، بی‌شبکه همان نسخهٔ ذخیره‌شده؛ تهی ⇒ همان جست‌وجوی پیشین)
+    val ids = CatalogSearch.search(index, term, category, synonyms)
+      .let { if (term.isBlank()) TillPins.arrange(it, pins) else it }
     return ids.mapNotNull { id -> byId[id]?.let { item(d, it, inCart[id] ?: 0.0, held) } }
   }
 

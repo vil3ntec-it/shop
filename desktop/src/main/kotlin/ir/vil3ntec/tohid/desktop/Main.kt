@@ -99,6 +99,7 @@ fun main() {
   Motion.load(context)
   ir.vil3ntec.tohid.LocaleChoice.load(context)
   ir.vil3ntec.tohid.ShopDayChoice.load(context)
+  ir.vil3ntec.tohid.TillSynonyms.load(context) // POS-04: نسخهٔ ذخیره‌شدهٔ فهرستِ مترادف
   ir.vil3ntec.tohid.data.ExpiryPref.load(context) // S22: روزِ هشدارِ انقضا
   ir.vil3ntec.tohid.ui.theme.ThemeStore.load(context)
 
@@ -115,6 +116,8 @@ fun main() {
     androidx.compose.runtime.SideEffect { ir.vil3ntec.tohid.scan.ScanInbox.foreground = visible }
     //  LOC-04: جدولِ تعطیلاتِ رسمیِ سرور روزی یک بار (همان `AppShell` ِ اندروید و آیفون؛ بی‌شبکه نسخهٔ ذخیره‌شده)
     LaunchedEffect(Unit) { ir.vil3ntec.tohid.ShopDayChoice.keepHolidaysFresh(context) }
+    //  POS-04: فهرستِ مرکزیِ مترادفِ جست‌وجوی صندوق، همان روزی یک بار
+    LaunchedEffect(Unit) { ir.vil3ntec.tohid.TillSynonyms.keepFresh(context) }
     var zoom by remember { mutableFloatStateOf(prefs.getFloat("desktop_zoom", 1f).coerceIn(0.7f, 1.8f)) }
     fun setZoom(z: Float) { zoom = z.coerceIn(0.7f, 1.8f); prefs.edit().putFloat("desktop_zoom", zoom).apply() }
 

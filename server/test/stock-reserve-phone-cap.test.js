@@ -88,8 +88,11 @@ async function customerOrder(s, phone, lines) {
     fulfillment: 'pickup', customer: { name: 'مشتری', phone }, lines: lines.map(([productId, n]) => ({ productId, qtyMilli: n * 1000 })),
   }, { headers: { 'Idempotency-Key': fresh(), 'X-Store-Ticket': ticket } });
   assert.equal(ck.status, 201, JSON.stringify(ck.body));
-  return (await one('SELECT id FROM online_orders WHERE shop_id=$1 AND order_no=$2', [s.shopId, ck.body.order.orderNo])).id;
+  const id = (await one('SELECT id FROM online_orders WHERE shop_id=$1 AND order_no=$2', [s.shopId, ck.body.order.orderNo])).id;
+  links.set(id, ck.body.order.token);
+  return id;
 }
+const links = new Map();   //  شناسهٔ سفارش ⇐ توکنِ پیگیری (درِ افزودنِ مشتری)
 const heldOf = async (s, orderId) => (await query(
   `SELECT product_id, qty_milli FROM stock_reservations WHERE shop_id=$1 AND order_id=$2 AND status='held' ORDER BY line_no`, [s.shopId, orderId]
 )).rows.map((r) => [r.product_id, Number(r.qty_milli)]);
@@ -138,4 +141,42 @@ test('نگه‌داشتهٔ گذشته یا آزادشده نمی‌شمارد؛
   }, { token: s.token, headers: { 'Idempotency-Key': fresh() } });
   assert.equal(st.status, 201, JSON.stringify(st.body));
   assert.deepEqual(await heldOf(s, st.body.order.id), [['e1', 2000]]);
+});
+
+/** CHK-21: افزودنِ قلم از ویترین به همان سفارش ⇒ همان شماره، همان سقف (پیش‌تر فقط سقفِ هر سفارش) */
+async function addItems(s, phone, orderId, lines) {
+  resetAll();
+  const st = await h.post(`/api/store/${s.slug}/verify/start`, { phone });
+  const ticket = (await h.post(`/api/store/${s.slug}/verify/check`, { phone, code: st.body.devCode })).body.ticket;
+  return h.post(`/api/store/${s.slug}/orders/${links.get(orderId)}/items`, { lines: lines.map(([productId, n]) => ({ productId, qtyMilli: n * 1000 })) },
+    { headers: { 'Idempotency-Key': fresh(), 'X-Store-Ticket': ticket } });
+}
+
+test('CHK-21: افزودن به همان سفارش هم از سقفِ شماره نمی‌گذرد — نگه‌داشتهٔ پیشین می‌ماند، افزودهٔ بیش از سقف بی نگه‌داشتن', async () => {
+  const s = await storeShop('سقف-افزودن', { f1: 4, f2: 6 });
+  await live(s.shopId, 'shop.orders.add_items', true);
+  const a = await customerOrder(s, '0791220006', [['f1', 2]]);
+  assert.deepEqual(await heldOf(s, a), [['f1', 2000]], 'نیمِ ۴ = ۲ ⇒ نگه داشته');
+  //  همان کالا، همان قیمت ⇒ همان قلم بزرگ می‌شود (۲ ⇒ ۳): ۳ از نیمِ ۴ بیشتر ⇒ ثبت، ولی نگه‌داشته همان ۲ ِ پیشین
+  const r1 = await addItems(s, '0791220006', a, [['f1', 1]]);
+  assert.equal(r1.status, 201, JSON.stringify(r1.body));
+  assert.deepEqual(await heldOf(s, a), [['f1', 2000]], 'افزودن از سقف گذشت ⇒ بی نگه‌داشتنِ افزوده و بی گم شدنِ پیشین');
+  //  کالای دیگر در سقفِ خودش (۳ از نیمِ ۶) ⇒ نگه داشته؛ کالای پیشین دست‌نخورده
+  const r2 = await addItems(s, '0791220006', a, [['f2', 3]]);
+  assert.equal(r2.status, 201, JSON.stringify(r2.body));
+  assert.deepEqual(await heldOf(s, a), [['f1', 2000], ['f2', 3000]], 'کالای تازه در سقف ⇒ نگه داشته');
+  //  همان کالای دوم بیش از سقف (۳ + ۱ از نیمِ ۶) ⇒ همان ۳
+  const r3 = await addItems(s, '0791220006', a, [['f2', 1]]);
+  assert.equal(r3.status, 201, JSON.stringify(r3.body));
+  assert.deepEqual(await heldOf(s, a), [['f1', 2000], ['f2', 3000]]);
+  const lines = (await query('SELECT product_id, qty_milli FROM online_order_lines WHERE shop_id=$1 AND order_id=$2 ORDER BY line_no', [s.shopId, a])).rows
+    .map((l) => [l.product_id, Number(l.qty_milli)]);
+  assert.deepEqual(lines, [['f1', 3000], ['f2', 4000]], 'قلم‌ها همه ثبت شدند (هیچ افزودنی رد نشد)');
+  //  بازسازی (S86) همان قاعده را دارد: قلمِ بزرگ‌شدهٔ بیش از سقف «ناهم‌اندازه» نیست و دوباره نگه داشته نمی‌شود
+  const reserve = require('../src/lib/stock-reserve');
+  const rb = await reserve.rebuild(s.shopId);
+  assert.equal(rb.ok, true, JSON.stringify(rb.changes));
+  const vd = await require('../src/lib/verify-data').verify({ shopId: s.shopId, only: ['sum'] });
+  assert.deepEqual(vd.checks.filter((x) => x.count > 0).map((x) => x.id), [], 'جمعِ نگه‌داشته با دفتر می‌خواند');
+  assert.deepEqual(await heldOf(s, a), [['f1', 2000], ['f2', 3000]], 'بازسازی چیزی عوض نکرد');
 });

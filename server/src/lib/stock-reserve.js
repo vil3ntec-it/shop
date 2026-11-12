@@ -35,7 +35,7 @@
  *           ویرایش و جمع‌آوری هم بعداً برایش نمی‌سازند؛ رد هرگز). پیش‌تر هر شمارهٔ تأییدشده با ۱۰ سفارش در ساعت همهٔ موجودیِ
  *           آزاد را «ناموجود» نشان می‌داد. ⚠️ افزودنِ قلم به همان سفارش (CHK-21، پرچمِ خاموشِ جدا) سقف نمی‌گیرد — فقط سقفِ هر سفارش.
  *   ویرایش ─ ORD-14 و CHK-21 ([syncOrderIn]): نگه‌داشتهٔ بازِ سفارش هم‌اندازهٔ قلم‌های تازه می‌شود؛ افزودن با همان
- *           سنجشِ ساخت (نگه‌داشتهٔ خودِ سفارش «دیگران» نیست).
+ *           سنجشِ ساخت (نگه‌داشتهٔ خودِ سفارش «دیگران» نیست)؛ افزودنِ مشتری (CHK-21) همان سقفِ شمارهٔ بالا را دارد.
  *   خاموش ─ ⛔ R6: پرچمِ `shop.stock_reserve` خاموش ⇒ نگه‌داشتهٔ باز هیچ‌جا اثر ندارد (همان main): [heldOf] ⇒ ۰ (ویترین،
  *           کاتالوگ، سنجش)، [orderView]/[reviewIdsOf] ⇒ هیچ، وظیفه و خبرِ بررسی نه؛ و سرور نگه‌داشته‌ای نمی‌سازد، بزرگ
  *           نمی‌کند و مهلتش را دراز نمی‌کند (قبول دست نمی‌زند، تحویل فقط کوتاه می‌کند). ردیف‌ها در جدول می‌مانند و فقط بسته
@@ -248,8 +248,11 @@ async function reholdIn(c, shopId, orderId, at) {
  * تازه ⇒ نگه‌داشتنِ تازه با همان مهلت. سنجشِ «آزاد» پیش‌تر با [checkOrderIn] (و نگه‌داشتهٔ خودی کنار) انجام شده؛ ویرایشِ
  * بی سنجش (کارمند) هرگز رد نمی‌شود و کمبود به بررسی می‌رود (INV-19). سفارشِ بی نگه‌داشتهٔ باز ⇒ هیچ. پرچمِ خاموش (R6) ⇒
  * فقط آزاد کردن و کوچک کردن؛ قلمِ تازه/بزرگ‌شده/جایگزین نگه‌داشته نمی‌گیرد.
+ * `phoneCap` (افزودنِ خودِ مشتری، CHK-21؛ CHK-18 ِ ۲-۲۱): ادعای تازه (قلمِ تازه یا بزرگ‌شده) همان سقفِ شماره را دارد
+ * ([phoneCapOk] روی کلِ مقدارِ همان کالاها در سفارش) — گذشتن ⇒ افزودن ثبت می‌شود ولی ادعای تازه بی نگه‌داشتن و نگه‌داشتهٔ
+ * پیشینِ همان قلم‌ها (اندازهٔ پیشین، جای پیشین در صف) می‌ماند؛ هیچ افزودنی رد نمی‌شود. ویرایشِ کارمند (ORD-14) سقف ندارد.
  */
-async function syncOrderIn(c, shopId, orderId, at) {
+async function syncOrderIn(c, shopId, orderId, at, { phoneCap = false } = {}) {
   const heldSql = `SELECT id, order_id, line_no, product_id, qty_milli, expires_at, created_at FROM stock_reservations
       WHERE shop_id=$1 AND order_id=$2 AND kind='soft' AND status='held' ORDER BY line_no`;
   if (!(await c.query(heldSql, [shopId, orderId])).rows.length) return;
@@ -263,19 +266,33 @@ async function syncOrderIn(c, shopId, orderId, at) {
   //  به واحدِ موجودی؛ کالایی که دیگر در کاتالوگ نیست ⇒ قلمش نگه‌داشته ندارد (آزاد می‌شود)
   const want = await wantOf(c, shopId, orderId);
   const byLine = new Map(held.map((r) => [num(r.line_no), r]));
-  const drop = held.filter((r) => {
+  let drop = held.filter((r) => {
     const w = want.get(num(r.line_no));
     return !w || w.productId !== r.product_id || w.qtyMilli !== num(r.qty_milli);
   });
   //  ⛔ SR42-1: جای صف (`created_at`) فقط برای همان کالا و نه بیشتر از پیش می‌ماند؛ بزرگ شدن یا کالای دیگر (افزودنِ مشتری،
   //  ویرایش، جایگزین) ادعای تازه است و ته صف می‌رود — وگرنه افزودهٔ دیر نگه‌داشتهٔ سفارش‌های پیش‌ترِ دیگران را به بررسی می‌برد
-  const add = [...want.values()].filter((w) => {
+  let add = [...want.values()].filter((w) => {
     const r = byLine.get(w.lineNo);
     return !r || drop.includes(r);
   }).map((w) => {
     const r = byLine.get(w.lineNo);
     return r && r.product_id === w.productId && w.qtyMilli <= num(r.qty_milli) ? { ...w, createdAt: r.created_at } : w;
   }).filter((w) => on || w.createdAt !== undefined);   //  ⛔ R6: خاموش ⇒ فقط کوچک/هم‌اندازه (همان جا)؛ تازه یا بزرگ‌شده نه
+  const claims = add.filter((w) => w.createdAt === undefined);
+  if (phoneCap && claims.length) {
+    //  هر کالا جدا (کلِ مقدارِ همان کالا در سفارش): کالایی که از سقف گذشت نگه‌داشتنِ کالای دیگرِ همان افزودن را نمی‌برد
+    const over = new Set();
+    for (const pid of new Set(claims.map((w) => w.productId))) {
+      if (!(await phoneCapOk(c, shopId, orderId, [...want.values()].filter((w) => w.productId === pid), at))) over.add(pid);
+    }
+    if (over.size) {
+      const grown = new Set(claims.filter((w) => over.has(w.productId)).map((w) => w.lineNo));
+      //  همان قلم و همان کالا که فقط بزرگ شد ⇒ ردیفِ پیشین دست نمی‌خورد؛ ادعای تازهٔ همان کالاها کنار
+      drop = drop.filter((r) => !(grown.has(num(r.line_no)) && want.get(num(r.line_no)).productId === r.product_id));
+      add = add.filter((w) => w.createdAt !== undefined || !over.has(w.productId));
+    }
+  }
   if (!drop.length && !add.length) return;
   if (drop.length) {
     const ids = drop.map((r) => r.id);
@@ -507,7 +524,7 @@ const saleKeys = (orderId, lineNo) => [`si:o-${orderId}-${lineNo}`, `si:w-${orde
  *   گذشته ─────── مهلت سر رسید ⇒ `expired` (همان `expireDueIn`)
  *   تحویل ─────── فروشِ همان قلم در دفتر نشست ⇒ `committed` (همان `afterMovesIn`)
  *   ناهم‌اندازه ── کالا/مقدار با قلمِ امروز نمی‌خواند ⇒ آزاد و، اگر قلم هست، نگه‌داشتنِ تازه با همان مهلت (همان `syncOrderIn`؛
- *                 ⛔ R6: پرچمِ خاموش ⇒ فقط کوچک/هم‌اندازه)
+ *                 ⛔ R6: پرچمِ خاموش ⇒ فقط کوچک/هم‌اندازه؛ قلمِ بزرگ‌شده‌ای که از سقفِ شماره می‌گذرد همان اندازهٔ پیشین می‌ماند)
  * هر بستن حرکتِ آزادسازیِ خودش را دارد ⇒ تطبیقِ INV-16 (`stock.reconcile`) پس از آن سالم.
  *   • پیش‌فرض فقط نشان می‌دهد (هیچ نوشتنی)؛ با `apply` زیرِ قفلِ موجودیِ دکان و در یک تراکنش با سابقهٔ `reserve.rebuild`؛
  *   • بی تفاوت ⇒ هیچ نوشتن و هیچ سابقه ⇒ بارِ دوم بی‌اثر؛ دکانِ دیگر، ردیفِ `legacy` و سفارش هرگز دست نمی‌خورند.
@@ -587,7 +604,11 @@ async function rebuild(shopId, { apply = false, by = '' } = {}) {
       else if (saleKeys(r.orderId, r.lineNo).some((k) => sold.has(k))) changes.push({ kind: 'committed', ...base, r });
       else {
         const w = r.lineNo ? (await wantOfOrder(r.orderId)).get(r.lineNo) : null;
-        if (w && w.productId === r.productId && w.qtyMilli === r.qtyMilli) {
+        //  CHK-18 (۲-۲۱): قلمی که مشتری بزرگ کرد و از سقفِ شماره گذشت عمداً همان اندازهٔ پیشین را نگه می‌دارد ([syncOrderIn]
+        //  با `phoneCap`) ⇒ «ناهم‌اندازه» نیست، وگرنه بازسازی همان سقف را دور می‌زد
+        const capped = on && w && w.productId === r.productId && w.qtyMilli > r.qtyMilli
+          && !(await phoneCapOk(c, shopId, r.orderId, [...(await wantOfOrder(r.orderId)).values()].filter((x) => x.productId === r.productId), at));
+        if (capped || (w && w.productId === r.productId && w.qtyMilli === r.qtyMilli)) {
           if (r.lost) changes.push({ kind: 'restored', ...base, r });
           continue;
         }

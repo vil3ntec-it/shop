@@ -41,6 +41,7 @@ object AppStart {
     Motion.load(context)
     LocaleChoice.load(context)
     ShopDayChoice.load(context)
+    TillSynonyms.load(context) // POS-04: نسخهٔ ذخیره‌شدهٔ فهرستِ مترادف
     ir.vil3ntec.tohid.data.ExpiryPref.load(context) // S22: روزِ هشدارِ انقضا
     ir.vil3ntec.tohid.data.MultiDrawerPref.load(context) // PAY-17: کشوی برگزیدهٔ همین دستگاه (خاموش ⇒ کشوی اصلی)
     ir.vil3ntec.tohid.ui.theme.ThemeStore.load(context)
@@ -128,6 +129,8 @@ fun AppShell(context: Context, store: ShopStore, onShopShown: (suspend () -> Uni
   if (onShopShown != null && welcomed && !courier) LaunchedEffect(Unit) { onShopShown() }
   //  LOC-04: جدولِ تعطیلاتِ رسمیِ سرور روزی یک بار (بی‌توکن؛ بی‌شبکه همان نسخهٔ ذخیره‌شده) ⇒ `ShopDayChoice.rules`
   LaunchedEffect(Unit) { ShopDayChoice.keepHolidaysFresh(context) }
+  //  POS-04: فهرستِ مرکزیِ مترادفِ جست‌وجوی صندوق، همان روزی یک بار
+  LaunchedEffect(Unit) { TillSynonyms.keepFresh(context) }
 
   //  حالتِ برنامه (دکان / پیک) — انتخابِ کاربر؛ نصبِ پیشین همان رفتارِ امروز
   val chosen = ModeState.chosen.value
