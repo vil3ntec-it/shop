@@ -54,6 +54,21 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-13w زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-13w` (از `claude/e-rows-11p`)
+
+- **دستهٔ «CI» ِ نقشهٔ PARTIAL (۶ ردیف)، شاهد از CI ِ push ِ main ‏719bbcf63 (#1038):** INV-16 (`StockValueBridgeTest` ۳/۳)، SYN-12
+  (`SyncRetryAfterTest` ۴/۴، `ReconnectGateTest` ۵/۵)، S117 (`card-data` ۱۱/۱۱ در PostgreSQL، PGlite و Electron)، S124 (server#141
+  مرج شد ⇒ CI ِ main ِ server ‏f80640b86: `account-finance` ۴۱ سبز با دو بررسیِ S124؛ `admin-money` ۳/۳ در shop) و GATE-NEW-01
+  (`PresenceUiTest`، `StatusPaneUiTest`، `StorefrontModelTest`، `PresenceSenderDesktopTest` و PRES ِ سرور) ⇐ IMPLEMENTED-VERIFIED.
+  GATE-NEW-05 ⇐ «کد»: CI هیچ artifact ِ آزمونِ Gradle ندارد (فقط `test-evidence-*` ِ سرور). S94 (پرچم): شاهدِ CI ِ برگهٔ پیک
+  نوشته شد، فقط پرچم مانده. نقشه: ۲۴۰ ردیف، CI ۰، کد ۴۵. هیچ کدی عوض نشد؛ precheck ⇒ `fail=0`.
+- **روش (برای دورِ بعد):** `gh api repos/vil3ntec-it/shop/actions/jobs/<job>/logs > x.log` **کلِ** لاگ را از کانتینر می‌دهد (برخلافِ
+  `get_job_logs` با سقفِ ۵۰۰۰ خط)؛ سپس `grep -c 'KTEST PASS <کلاسِ کامل> >'`. zip ِ artifact هنوز رد می‌شود (blob در پراکسی).
+- **دام:** صفحهٔ کهنهٔ `ui/screens/Storefront.kt` (`StorefrontScreen(snackbar)`، `PresencePane`، `PresenceBadge`، `OutboxBanner`) هیچ
+  صدازننده‌ای ندارد؛ فقط `StorefrontGate` و `SwitchRow` ِ آن زنده‌اند. `DashboardEngine.board(...).stockValue` هم خوانده نمی‌شود.
+- **قدمِ بعد:** GATE-NEW-05 — ورک‌فلوی آزمونیِ جدا (مثلِ `offline30.yml`؛ `tohid-desktop.yml`/`tohid-native.yml` انتشاری‌اند و
+  `workflow_run` در workflow-guard ممنوع) با JUnit XML ⇐ JSONL ِ هم‌شکلِ `server/scripts/test-evidence.js`. پاک کردنِ کدِ مردهٔ بالا
+  (با یک اجرای کاملِ desktop). RPT-14 و CHAT-02 («کامپایلِ اندروید فقط CI») در دستهٔ «کد»اند و دست نخوردند. ادغامِ این شاخه در دسته.
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-12q زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-12q` (از `claude/e-rows-11p`)
 
 - **ساخته شد (۶ ردیف از دستهٔ «کد» ِ نقشه):** CRM-03 ⇐ IMPLEMENTED-VERIFIED (ادغامِ مشتری پیش از نوشتن «تغییرِ سقفِ اعتبار» را
