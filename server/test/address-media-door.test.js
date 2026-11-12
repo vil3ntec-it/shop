@@ -274,6 +274,8 @@ test('⛔ نشانیِ ذخیره‌شده فقط برای سفارشِ باز: 
 
   const rej = await h.post(`/api/shop/orders/${X.id}/transition`, { to: 'rejected', reason: 'busy' }, { token: A.token });
   assert.equal(rej.status, 200, JSON.stringify(rej.body));
+  //  سفارشِ بازِ دیگری در همان دکان (وضعیتِ همان سفارش سنجیده می‌شود، نه «هر سفارشِ باز»)
+  await checkout(A, await shopper(A.slug, '0791240012', { account: false }));
   //  مشتری پس از آن از ویترینِ دکانِ دیگر برای همان نشانی صدا می‌گذارد (حسابِ سراسری)
   assert.equal((await accountPut(B, who, addr, 'voice-note', OGG(220, 6))).status, 201);
   const v = await view(A.token, X.id);
