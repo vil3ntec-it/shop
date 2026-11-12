@@ -86,8 +86,18 @@ object VisualSearch {
   }
 
   fun tap(s: Suggestion, place: Place): Tap = when (place) {
-    Place.TILL -> Tap.Search(s.name)
+    Place.TILL -> Tap.Search(tillText(s.name))
     Place.LIST -> Tap.Open(s.productId)
+  }
+
+  /**
+   *  کادرِ جست‌وجوی صندوق پیشوندِ شمارِ POS-03 را می‌خواند («۳*نام» ⇒ هر لمسِ کاشی سه تا)؛ نامی که خودش با رقم آغاز می‌شود
+   *  («3x3 کابل»، «۲*۴ چوب») پیش از این همان پیشوند خوانده می‌شد و لمسِ بعدی چند تا می‌افزود ⇒ «1*» ِ صریح پیشش (یک دانه از
+   *  همان نام). نامِ دیگر دست نمی‌خورد.
+   */
+  fun tillText(name: String): String {
+    val n = name.trim()
+    return if (n.firstOrNull()?.isDigit() == true) "1*$n" else name
   }
 
   /**

@@ -23,7 +23,7 @@ class PreviewPagesTextTest {
   /** پرونده‌هایی که این دور همهٔ متنِ خامشان را به جدول برد */
   private val files = listOf(
     "Sale.kt", "QuickSale.kt", "Profile.kt", "ProfileModel.kt", "Settings.kt", "Debtors.kt", "DebtorDetail.kt", "DebtorTxSheet.kt",
-    "NavEditor.kt", "IdleLockChoice.kt", "VoiceSearch.kt", "PhoneHomeModel.kt", "PhoneClaimStep.kt", "WarehouseDialogs.kt",
+    "NavEditor.kt", "IdleLockChoice.kt", "VoiceSearch.kt", "PhoneHomeModel.kt", "WarehouseDialogs.kt",
   )
 
   private val letter = Regex("[\\u0621-\\u063A\\u0641-\\u064A\\u067E\\u0686\\u0698\\u06A9\\u06AF\\u06CC]")

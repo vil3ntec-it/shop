@@ -17,6 +17,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material.icons.outlined.ToggleOff
@@ -35,11 +36,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrProducts
+import ir.vil3ntec.tohid.core.i18n.StrVisualSearch
+import ir.vil3ntec.tohid.core.product.VisualSearch
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.ui.components.common.Selection
+import ir.vil3ntec.tohid.ui.screens.VisualSearchHost
+import ir.vil3ntec.tohid.ui.screens.rememberVisualSearch
+import ir.vil3ntec.tohid.ui.screens.rememberVisualSearchApi
 import ir.vil3ntec.tohid.ui.screens.rememberVoiceSearch
 import ir.vil3ntec.tohid.ui.v3.V3Action
 import ir.vil3ntec.tohid.ui.v3.V3ActionBar
@@ -47,6 +53,7 @@ import ir.vil3ntec.tohid.ui.v3.V3BarAction
 import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3Fab
+import ir.vil3ntec.tohid.ui.v3.V3MenuItem
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3SearchField
 import ir.vil3ntec.tohid.ui.v3.V3Skeleton
@@ -107,6 +114,8 @@ internal fun ProductsListScreen(
   val selecting = picked.isNotEmpty()
   val stagger = rememberV3Stagger(layout)
   val voice = rememberVoiceSearch { query = query.copy(text = it) }
+  //  AI-11: «جست‌وجو با عکس» در «…» ِ سربرگ فقط با پاسخِ «روشن» ِ سرور (پرچمِ `shop.visual_search`)
+  val visual = rememberVisualSearch(rememberVisualSearchApi(), data.products, VisualSearch.Place.LIST)
 
   fun toggle(id: String) { selection = Selection.toggle(picked, id) }
 
@@ -118,6 +127,7 @@ internal fun ProductsListScreen(
       if (layout == Layout.LIST) V3Action(Icons.Outlined.GridView, StrProducts.viewGrid) { layout = Layout.GRID; saveLayout(context, Layout.GRID) }
       else V3Action(Icons.Outlined.ViewAgenda, StrProducts.viewList) { layout = Layout.LIST; saveLayout(context, Layout.LIST) },
     ),
+    overflow = if (selecting) emptyList() else listOfNotNull(visual?.let { v -> V3MenuItem(Icons.Outlined.PhotoCamera, StrVisualSearch.button) { v.start() } }),
     search = { V3SearchField(query.text, { query = query.copy(text = it) }, StrProducts.searchHint, onVoice = voice) },
     fab = if (selecting) null else ({ expanded ->
       V3Fab(Icons.Outlined.Add, StrProducts.newProduct, expanded, onClick = nav.new)
@@ -192,6 +202,8 @@ internal fun ProductsListScreen(
     }
   }
 
+  //  «مشابه» همان بازکردنِ کالاست
+  visual?.let { VisualSearchHost(it) { t -> if (t is VisualSearch.Tap.Open) nav.open(t.productId) } }
   if (sortOpen) SortSheet(query.sort, onPick = { query = query.copy(sort = it) }, onDismiss = { sortOpen = false })
   confirmDelete?.let { p ->
     V3ConfirmSheet(

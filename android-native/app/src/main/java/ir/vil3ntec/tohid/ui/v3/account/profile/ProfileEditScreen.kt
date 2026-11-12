@@ -25,11 +25,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -39,11 +41,15 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.account.AccountDeletion
+import ir.vil3ntec.tohid.core.account.PhoneClaimForm
 import ir.vil3ntec.tohid.core.i18n.StrAccount
+import ir.vil3ntec.tohid.core.i18n.StrShellPages
+import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.data.PhotoStore
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.SyncStore
@@ -56,6 +62,7 @@ import ir.vil3ntec.tohid.ui.v3.V3FieldKind
 import ir.vil3ntec.tohid.ui.v3.V3Form
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Section
+import ir.vil3ntec.tohid.ui.v3.V3TextButton
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.account.AccountFormat
@@ -65,6 +72,7 @@ import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 import ir.vil3ntec.tohid.ui.v3.v3Shake
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** فیلدهای فرمِ «ویرایش حساب و دکان» */
@@ -81,6 +89,12 @@ internal data class ProfileEditUi(
   val createdAt: Long,
   val busy: Boolean = false,
   val dirty: Boolean = false,
+  /** AUTH-08: کادرِ «کدِ همان شماره» — فقط وقتی سرور کد خواست (پرچمِ `auth.phone_add_code`) */
+  val codeShown: Boolean = false,
+  val code: String = "",
+  val codeError: String? = null,
+  /** ثانیه‌های ماندهٔ «ارسالِ دوباره» از مهلتِ پاسخِ سرور */
+  val resendWait: Int = 0,
 )
 
 /** فرمِ V3: عکس با نشانِ دوربین، گروه‌های حساب/دکان/عضویت، دکمهٔ چسبانِ «ذخیره تغییرات» */
@@ -95,6 +109,8 @@ internal fun ProfileEditContent(
   onBack: (() -> Unit)?,
   onPrivacy: () -> Unit = {},
   onDelete: () -> Unit = {},
+  onCode: (String) -> Unit = {},
+  onResend: () -> Unit = {},
 ) {
   val c = PhoneV3.colors
   V3Form(
@@ -133,6 +149,18 @@ internal fun ProfileEditContent(
           kind = V3FieldKind.PHONE, placeholder = "07XXXXXXXX",
           helper = StrAccount.phoneOnceHelper, error = ui.phoneError,
         )
+        //  AUTH-08: کدی که سرور به همین شماره فرستاد؛ شماره عوض شود ⇒ کادر بسته
+        if (ui.codeShown) {
+          Spacer(Modifier.height(14.dp))
+          V3TextField(
+            ui.code, onCode, StrShellPages.smsCodeLabel, Modifier.v3Shake(ui.codeError),
+            kind = V3FieldKind.NUMBER, error = ui.codeError, imeAction = ImeAction.Done, onImeAction = onSave,
+          )
+          V3TextButton(
+            ProfileEditModel.resendLabel(ui.resendWait), onResend, Modifier.padding(top = 4.dp),
+            enabled = !ui.busy && ui.resendWait == 0,
+          )
+        }
       }
     }
 
@@ -184,6 +212,10 @@ private fun LockedField(icon: ImageVector, label: String, value: String, note: S
 /**
  *  مسیرِ `profile/edit`: نام و نامِ دکان همان لحظه روی گوشی (`SyncStore`،
  *  `store_name`)، و اگر آنتن بود `updateProfile` روی سرور؛ عکس فقط روی گوشی.
+ *
+ *  AUTH-08 — شمارهٔ تازه با کدِ همان شماره (پرچمِ سروریِ `auth.phone_add_code`): `PUT /api/me` ⇐ `phone_code_required`
+ *  ⇐ `POST /api/me/phone/code` ⇐ کادرِ کد ⇐ `PUT` با `phoneCode`. گامِ بعد فقط از `core/account/PhoneClaimForm`؛ سقفِ
+ *  تلاش، فاصلهٔ ارسالِ دوباره و سقفِ روزانه همان سرور است. پرچمِ خاموش ⇒ کادرِ کد هرگز باز نمی‌شود — همان درخواستِ پیشین.
  */
 @Composable
 internal fun RouteScope.ProfileEditRoute() {
@@ -201,6 +233,13 @@ internal fun RouteScope.ProfileEditRoute() {
   var nameError by remember { mutableStateOf<String?>(null) }
   var phoneError by remember { mutableStateOf<String?>(null) }
   var busy by remember { mutableStateOf(false) }
+  var form by rememberSaveable(stateSaver = PhoneFormSaver) { mutableStateOf(PhoneClaimForm()) }
+  var resendWait by remember { mutableIntStateOf(0) }
+  //  شمارشِ «ارسالِ دوباره» از مهلتِ پاسخِ سرور، با هر کدِ تازه از نو
+  LaunchedEffect(form.sent) {
+    resendWait = form.resendSeconds
+    while (resendWait > 0) { delay(1000); resendWait-- }
+  }
   var version by remember { mutableIntStateOf(0) }
   var sheet by remember { mutableStateOf(false) }
   val accountId = state.accountId.ifBlank { "local" }
@@ -210,6 +249,31 @@ internal fun RouteScope.ProfileEditRoute() {
     PhotoStore.saveAvatar(context, accountId, uri)
       .onSuccess { version++; toasts.show(StrAccount.photoSaved, V3Tone.SUCCESS) }
       .onFailure { toasts.show(StrAccount.photoFailed, V3Tone.ERROR) }
+  }
+
+  /** پاسخِ ناموفقی که پیامش را خودِ سرور داده یا کد دیگر لازم نیست */
+  fun tell(what: PhoneClaimForm.Next, f: ApiFailure, tone: V3Tone) {
+    when (what) {
+      PhoneClaimForm.Next.SERVER_MESSAGE -> toasts.show(f.userMessage, tone)
+      PhoneClaimForm.Next.SAVE_AGAIN -> toasts.show(StrAccount.codeNotNeeded, V3Tone.INFO)
+      PhoneClaimForm.Next.REQUEST_CODE, PhoneClaimForm.Next.NONE -> Unit
+    }
+  }
+
+  /** کدِ همان شماره (`POST /api/me/phone/code`)؛ کادرِ کد باز می‌شود یا پیامِ سرور */
+  fun requestCode(phone: String) {
+    busy = true
+    scope.launch {
+      val account = Backend.account(context)
+      account.requestPhoneCode(phone)
+        .onSuccess { seconds -> form = form.sent(phone, seconds); toasts.show(StrShellPages.smsCodeSent, V3Tone.INFO) }
+        .onFailure { f ->
+          val (next, what) = form.sendFailed(f.code, phone)
+          form = next
+          tell(what, f, V3Tone.WARNING)
+        }
+      busy = false
+    }
   }
 
   fun save() {
@@ -225,21 +289,32 @@ internal fun RouteScope.ProfileEditRoute() {
       ProfileEditModel.Step.PHONE_NEEDS_INTERNET -> phoneError = StrAccount.phoneNeedsInternet
       ProfileEditModel.Step.SERVER -> {
         val wanted = claim.trim()
+        //  کادرِ کد باز و کدِ نادرست ⇒ هیچ درخواستی، فقط خطای درجا
+        val phoneCode = form.codeToSend() ?: run { form = form.badCode(); return }
         busy = true
         scope.launch {
-          Backend.account(context).updateProfile(clean, wanted)
+          val account = Backend.account(context)
+          account.updateProfile(clean, wanted, phoneCode)
             .onSuccess { done ->
               state.accountName = done.user.name
               state.accountEmail = done.user.email.orEmpty()
               state.accountPhone = done.user.phone.orEmpty()
               name = done.user.name; savedName = done.user.name
-              email = done.user.email.orEmpty(); phone = done.user.phone.orEmpty(); claim = ""
+              email = done.user.email.orEmpty(); phone = done.user.phone.orEmpty(); claim = ""; form = PhoneClaimForm()
               Haptics.success(context)
               toasts.show(ProfileEditModel.savedMessage(wanted), V3Tone.SUCCESS)
               busy = false
               back()
             }
-            .onFailure { toasts.show(it.userMessage, V3Tone.ERROR); busy = false }
+            .onFailure { f ->
+              busy = false
+              val (next, what) = form.afterSave(f.code, wanted)
+              form = next
+              when (what) {
+                PhoneClaimForm.Next.REQUEST_CODE -> requestCode(wanted)
+                else -> tell(what, f, V3Tone.ERROR)
+              }
+            }
         }
       }
       ProfileEditModel.Step.NAME_MISSING -> Unit
@@ -252,15 +327,24 @@ internal fun RouteScope.ProfileEditRoute() {
       name = name, nameError = nameError, email = email, phone = phone,
       newPhone = claim, phoneError = phoneError, shopName = shop, createdAt = state.accountCreatedAt,
       busy = busy, dirty = ProfileEditModel.dirty(name, savedName, shop, savedShop, claim),
+      codeShown = form.shown, code = form.code, codeError = ProfileEditModel.codeError(form.problem), resendWait = resendWait,
     ),
     onName = { name = it; nameError = null },
-    onNewPhone = { claim = it; phoneError = null },
+    onNewPhone = { claim = it; phoneError = null; form = form.phone(it) },
     onShopName = { shop = it },
     onPhoto = { sheet = true },
     onSave = ::save,
     onBack = backOrNull,
     onPrivacy = { runCatching { uri.openUri(AccountDeletion.PRIVACY_URL) } },
     onDelete = { nav.open(AccountPaths.DELETE) },
+    onCode = { form = form.code(it) },
+    onResend = { if (!busy && form.shown) requestCode(form.codeFor) },
   )
   if (sheet) AvatarSourceSheet(picker) { sheet = false }
 }
+
+/** حالِ کادرِ کد پس از چرخاندن: شماره و کدِ تایپ‌شده (مهلتِ ارسالِ دوباره از نو؛ سرور خودش می‌سنجد) */
+private val PhoneFormSaver = listSaver<PhoneClaimForm, String>(
+  save = { listOf(it.codeFor, it.code) },
+  restore = { PhoneClaimForm(codeFor = it[0], code = it[1]) },
+)

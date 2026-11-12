@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.product.VisualSearch
 import ir.vil3ntec.tohid.data.PromoEngine
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopStore
@@ -28,6 +29,8 @@ import ir.vil3ntec.tohid.ui.components.pos.HeldDialog
 import ir.vil3ntec.tohid.ui.components.pos.rememberHeldInvoices
 import ir.vil3ntec.tohid.ui.components.common.ViewModePref
 import ir.vil3ntec.tohid.ui.screens.Haptics
+import ir.vil3ntec.tohid.ui.screens.rememberVisualSearch
+import ir.vil3ntec.tohid.ui.screens.rememberVisualSearchApi
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.products.ProductsPaths
@@ -138,6 +141,8 @@ fun RouteScope.SaleRoute() {
     //  INV-03: آنچه در فاکتورهای نگه‌داشته کنار رفته از موجودیِ کاشی کم (بی نگه‌داشته ⇒ همان موجودی)
     held = heldQty,
     pins = remember { TillPinsPrefs.load(context); TillPinsPrefs.pins }.value, // POS-06: چیدمانِ همین دستگاه
+    //  AI-11: «جست‌وجو با عکس» در «…» فقط با پاسخِ «روشن» ِ سرور (پرچمِ `shop.visual_search`)
+    visual = rememberVisualSearch(rememberVisualSearchApi(), data.products, VisualSearch.Place.TILL),
     modifier = Modifier.hidScanner(
       onBareEnter = { bareEnterPays(payV2, enterGate, cart.lines.value.isEmpty()) { CheckoutSession.reset(); nav.open(SalesPaths.checkout()) } },
     ) { onCode(it, manual = true, fromPhone = false) },

@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,13 +29,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrVisualSearch
+import ir.vil3ntec.tohid.core.product.VisualSearch
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.ui.components.pos.CartSummary
 import ir.vil3ntec.tohid.ui.components.pos.PhoneTile
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.screens.MotionTokens
+import ir.vil3ntec.tohid.ui.screens.VisualSearchHandle
+import ir.vil3ntec.tohid.ui.screens.VisualSearchHost
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
+import ir.vil3ntec.tohid.ui.v3.V3Action
 import ir.vil3ntec.tohid.ui.v3.V3AddChip
 import ir.vil3ntec.tohid.ui.v3.sales.cart.CartModel
 import ir.vil3ntec.tohid.ui.v3.sales.cart.CatalogEmpty
@@ -83,6 +89,8 @@ fun QuickSaleScreen(
   actions: QuickSaleActions,
   initialQuery: String = "",
   initialCategory: String? = null,
+  /** AI-11: «جست‌وجو با عکس» (`rememberVisualSearch`)؛ `null` (پرچمِ خاموش، بی حساب) ⇒ بی دکمه */
+  visual: VisualSearchHandle? = null,
 ) {
   val c = PhoneV3.colors
   var query by rememberSaveable { mutableStateOf(initialQuery) }
@@ -100,6 +108,7 @@ fun QuickSaleScreen(
     title = StrSale.quickSale,
     subtitle = StrSale.quickHint,
     onBack = onBack,
+    actions = listOfNotNull(visual?.let { v -> V3Action(Icons.Outlined.PhotoCamera, StrVisualSearch.button) { v.start() } }),
     search = {
       V3SearchField(query, { query = it }, StrSale.catalogHint, onScan = actions.scan)
     },
@@ -155,6 +164,8 @@ fun QuickSaleScreen(
       }
     }
   }
+  //  «مشابه» فقط کالا را در کادرِ جست‌وجو می‌نشاند (دستهٔ «همه»)؛ هرگز سبد
+  visual?.let { VisualSearchHost(it) { t -> if (t is VisualSearch.Tap.Search) { picked = null; query = t.query } } }
 }
 
 /** کمینهٔ پهنای کاشی: گوشیِ ۳۹۰ ⇐ سه ستون، تبلت و کامپیوتر بیشتر */

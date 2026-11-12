@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AddCircleOutline
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.PriceCheck
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -17,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrVisualSearch
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.PauseCircleOutline
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -28,6 +30,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Sheet
 /**
  *  «…» ِ سربرگِ صندوق: سه کار، هر کدام مسیرِ خودش — «قلمِ آزاد» (`sale/free-line`)، «فروشِ
  *  سریع» (`sale/quick`) و «تاریخچهٔ فروش» (`sales`). زدن ⇒ برگه با حرکت پایین و بعد همان کار.
+ *  AI-11: «جست‌وجو با عکس» فقط وقتی سرور «روشن» گفت ([onVisualSearch] غیرِ null).
  */
 @Composable
 fun SaleMenuSheet(
@@ -40,6 +43,8 @@ fun SaleMenuSheet(
   onHeldList: (() -> Unit)? = null,
   /** POS-15: «قیمت‌پرسی» (`PosPriceCheckPrefs`)؛ `null` ⇒ بی ردیف */
   onPriceCheck: (() -> Unit)? = null,
+  /** AI-11: برگهٔ دوربین/گالریِ «جست‌وجو با عکس»؛ `null` (پرچمِ خاموش، بی حساب) ⇒ بی ردیف */
+  onVisualSearch: (() -> Unit)? = null,
 ) {
   val c = PhoneV3.colors
   val shape = RoundedCornerShape(PhoneV3.groupRadius)
@@ -55,6 +60,10 @@ fun SaleMenuSheet(
       onPriceCheck?.let { check ->
         V3Divider(start = 64.dp)
         V3ListRow(ir.vil3ntec.tohid.core.i18n.StrPriceCheck.title, subtitle = ir.vil3ntec.tohid.core.i18n.StrPriceCheck.menuHint, icon = Icons.Outlined.PriceCheck, hue = V3Hue.TEAL, onClick = { go(check) })
+      }
+      onVisualSearch?.let { find ->
+        V3Divider(start = 64.dp)
+        V3ListRow(StrVisualSearch.button, icon = Icons.Outlined.PhotoCamera, hue = V3Hue.SKY, onClick = { go(find) })
       }
       onHold?.let { hold ->
         V3Divider(start = 64.dp)
