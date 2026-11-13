@@ -197,6 +197,14 @@ class OrdersRepository(private val api: ApiClient) {
   }
 
   /** ORD-16 پیام‌های وضعیت به مشتریِ همین سفارش (`GET /:id/notices`) */
+  /**
+   *  TEN-03 «باطل کردنِ لینکِ پیگیری» (`POST /:id/track-link/revoke`، پرچمِ `shop.storefront.link_expiry`، صاحب و مدیر):
+   *  هر لینکِ پیشینِ مشتری ۴۱۰ می‌گیرد؛ پاسخ لینکِ تازه برای فرستادنِ دوباره. تکرار فقط نسلِ دیگری می‌سازد (بی زیان).
+   */
+  suspend fun revokeTrackLink(id: String): ApiResult<ir.vil3ntec.tohid.core.model.TrackLinkDto> = result {
+    ApiJson.decode<ir.vil3ntec.tohid.core.model.TrackLinkDto>(api.post("$ROOT/${enc(id)}/track-link/revoke", buildJsonObject { }))
+  }
+
   suspend fun notices(id: String): ApiResult<OrderNoticesDto> =
     result { ApiJson.decode<OrderNoticesDto>(api.get("$ROOT/${enc(id)}/notices")) }
 

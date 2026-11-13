@@ -52,6 +52,8 @@ object ApiEndpoints {
     const val APPLE_LINK_CODE = "/auth/apple/link-code"
     const val REFRESH = "/auth/refresh"
     const val LOGOUT = "/auth/logout"
+    /** AUTH-06: «خروج از همهٔ دستگاه‌ها» ِ خودِ کاربر — همهٔ نشست‌های همین حساب در همین بخش (تأییدِ دوبارهٔ ورود در سرور) */
+    const val LOGOUT_ALL = "/auth/logout-all"
     const val OTP_REQUEST = "/auth/otp/request"
     const val OTP_VERIFY = "/auth/otp/verify"
     const val PASSWORD = "/auth/password"
@@ -258,6 +260,8 @@ object ApiEndpoints {
     fun rating(assignmentId: String) = "$MISSIONS/${enc(assignmentId)}/rating"
     /** آخرین نقطهٔ پیک «در راه» (DLV-16) — فقط با هر دو پرچمِ موقعیتِ دکان */
     fun location(assignmentId: String) = "$MISSIONS/${enc(assignmentId)}/location"
+    /** «تقریباً کی می‌رسم» (DLV-06) — فقط «در راه» و با `etaEnabled` ِ `/courier/me` */
+    fun eta(assignmentId: String) = "$MISSIONS/${enc(assignmentId)}/eta"
   }
 
   /* ------------------------------ همگام‌سازی ------------------------------ */

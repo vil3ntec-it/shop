@@ -170,6 +170,8 @@ internal fun CourierDetailPage(
       }
       val actions = if (live) CourierFlow.actions(c.status) else emptyList()
       if (actions.isNotEmpty()) ActionArea(c, actions, onAction, onPhoto)
+      //  DLV-06: «تقریباً کی می‌رسم» برای صفحهٔ پیگیریِ مشتری — فقط «در راه» و با پرچمِ دکان
+      CourierOnDark { CourierEtaCard(c) }
       //  DLV-18: امتیازِ پیک به تحویلِ انجام‌شده — فقط با پرچمِ دکان و یک بار
       if (onRate != null) {
         CourierOnDark { CourierSecondary(StrCourier.rate, onRate, Modifier.fillMaxWidth().padding(16.dp), icon = Icons.Outlined.Star) }

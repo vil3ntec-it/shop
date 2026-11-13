@@ -475,15 +475,6 @@ async function ownImage(c, shopId, id) {
   return img;
 }
 
-async function shopVersion(shopId, userId, id, buf) {
-  const { info } = checkOriginal(buf, SHOP_MAX_BYTES);
-  return tx(async (c) => {
-    const img = await ownImage(c, shopId, id);
-    if (!img) throw notFound('عکس پیدا نشد');
-    return addVersion(c, img, buf, info, { tool: 'client', review: 'approved', by: userId });
-  });
-}
-
 async function shopDerivative(shopId, id, version, size, buf) {
   return tx(async (c) => {
     const img = await ownImage(c, shopId, id);
@@ -1161,7 +1152,7 @@ module.exports = {
   SHOP_FLAG, CENTRAL_FLAG, SIZES, DERIV, ROLES, LICENSES, REPORT_KINDS, ROWS_MAX,
   flagOf, shopEnabled, centralEnabled, imageRow, readFile, fileUrl, putBlob, addVersion, putDerivative, derivativesOf,
   productInput, insertProduct, updateProduct, productOut,
-  search, shopUpload, shopCanRead, shopVersion, shopDerivative, shopList, select, selectIn, resolve, propose, report,
+  search, shopUpload, shopCanRead, shopDerivative, shopList, select, selectIn, resolve, propose, report,
   adminUpload, adminPatch, adminVersion, adminDerivative, approve, reject, archive, setSearch, adminDetail, queue,
   batchCreate, batchFile, batchRows, batchStatus, batchReport, reportCsv, reportsList, parseCsv, tx,
 };

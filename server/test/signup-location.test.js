@@ -157,8 +157,8 @@ test('لوکیشن بی‌معنی رد می‌شود', async () => {
   assert.equal(r.body.error.code, 'bad_location');
 });
 
-test('متن شرایط و ضوابط از سرور خوانده می‌شود', async () => {
-  const r = await h.get('/api/terms');
+test('متن شرایط و ضوابط از سرور خوانده می‌شود (فقط `/api/auth/terms`؛ نامِ دومِ `/api/terms` رفت — B15)', async () => {
+  const r = await h.get('/api/auth/terms');
   assert.equal(r.status, 200);
   assert.ok(r.body.version);
   assert.ok(r.body.sections.length >= 9, 'همه‌ی بندها هست');
@@ -176,7 +176,7 @@ test('متن شرایط و ضوابط از سرور خوانده می‌شود',
 test('نشانی /api/v1 هم مثل /api کار می‌کند', async () => {
   assert.equal((await h.get('/api/v1/health')).status, 200);
   assert.equal((await h.get('/api/v1/config')).status, 200);
-  assert.equal((await h.get('/api/v1/terms')).status, 200);
+  assert.equal((await h.get('/api/v1/auth/terms')).status, 200);
 
   const r = await h.post('/api/v1/auth/register/start', {
     name: 'کاربر', email: 'v1@example.com', password: 'Passw0rd!test',

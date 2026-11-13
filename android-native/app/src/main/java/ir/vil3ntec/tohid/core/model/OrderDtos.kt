@@ -58,6 +58,8 @@ data class OrdersConfigDto(
   val bulk: Boolean = false,
   /** RSK-03/04 سابقهٔ مشتری، «کارت در صف» و فهرستِ بسته/مطمئن (پرچمِ `shop.order_risk`؛ خاموش یا سرورِ کهنه ⇒ کلید نیست) */
   val risk: Boolean = false,
+  /** TEN-03 «باطل کردنِ لینکِ پیگیری» (پرچمِ `shop.storefront.link_expiry` و `orders.contact`؛ خاموش یا نقشِ دیگر ⇒ کلید نیست) */
+  val trackLinkRevoke: Boolean = false,
   /** ORD-16 «پیام‌ها» و «فرستادنِ دوباره» (پرچمِ `shop.orders.notice_resend`؛ خاموش ⇒ null و هیچ بخشی) */
   val noticeResend: OrderNoticeResendCfgDto? = null,
   /** ORD-14 «ویرایشِ سفارش» (پرچمِ `shop.orders.amend`؛ `paid` با `shop.orders.amend_paid`) — خاموش ⇒ null */
@@ -470,4 +472,12 @@ data class OrderPageDto(
 data class OrderCustomerPageDto(
   val items: List<OrderDto> = emptyList(),
   val more: Boolean = false,
+)
+
+/** TEN-03: پاسخِ `POST /shop/orders/:id/track-link/revoke` — لینکِ تازهٔ نسلِ جاری و واتس‌اپ ِ مشتری (فقط با `orders.contact`) */
+@Serializable
+data class TrackLinkDto(
+  val token: String = "",
+  val link: String = "",
+  val whatsappUrl: String = "",
 )

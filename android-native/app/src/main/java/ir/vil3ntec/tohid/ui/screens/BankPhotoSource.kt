@@ -148,6 +148,9 @@ fun BankPhotoSource(
             }
         }
       }
+      //  §۳۷.۷: «گزارشِ عکسِ اشتباه یا بستهٔ قدیمی» — فقط عکسِ مرکزیِ دیده‌شده
+      Spacer(Modifier.height(Space.xxs))
+      BankPhotoReportBox(ir.vil3ntec.tohid.core.image.BankPhotoReport.reportable(s.resolved)) { id, kind, note -> ImageBank.report(context, id, kind, note) }
     }
   }
 }

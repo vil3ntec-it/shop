@@ -156,7 +156,7 @@ private fun menuIcon(item: ProfileHomeModel.Item) = when (item) {
   ProfileHomeModel.Item.STATS -> Icons.Outlined.InsertChart
   ProfileHomeModel.Item.SETTINGS -> Icons.Outlined.Settings
   ProfileHomeModel.Item.SUPPORT -> Icons.Outlined.SupportAgent
-  ProfileHomeModel.Item.SIGN_OUT -> Icons.AutoMirrored.Outlined.Logout
+  ProfileHomeModel.Item.SIGN_OUT, ProfileHomeModel.Item.SIGN_OUT_ALL -> Icons.AutoMirrored.Outlined.Logout
 }
 
 /**

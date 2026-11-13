@@ -68,18 +68,28 @@ test.before(async () => {
 test.after(async () => { await h.stop(); });
 test.beforeEach(() => resetAll());
 
-test('خاموش (پیش‌فرض): فقط /config، بقیه ۴۰۳ till_pin_disabled و هیچ ردیفی', async () => {
+test('خاموش (پیش‌فرض): فقط /config؛ درهای برنامه ۴۰۳ till_pin_disabled؛ درهای پیش‌ساخته همان درِ ناشناخته (۴۰۴)؛ هیچ ردیفی', async () => {
   const c = ok(await h.get('/api/shop/till-pin/config', { token: A.staff.token }));
   assert.deepEqual(c, { enabled: false, memberId: A.staff.memberId, role: 'staff' });
   for (const r of [
-    await setPin(A, A, PIN.owner),
+    await setPin(A, A.staff, PIN.staff),
     await verify(A, A.staff, PIN.staff),
     await h.get('/api/shop/till-pin/members', { token: A.token }),
-    await h.get('/api/shop/till-pin/current', { token: A.token }),
-    await h.get('/api/shop/till-pin/sessions', { token: A.token }),
+    await h.post('/api/shop/till-pin/current/end', { reason: 'lock' }, { token: A.token }),
   ]) {
     assert.equal(r.status, 403, JSON.stringify(r.body));
     assert.equal(r.body.error?.code, 'till_pin_disabled');
+  }
+  //  STF-04/S46: «PIN ِ خودم»، «نوبتِ این دستگاه» و «نوبت‌ها» صدازنندهٔ برنامه ندارند (PARTIAL-MAP) ⇒ با پرچمِ خاموش نیستند
+  const unknown = await h.get('/api/shop/till-pin/no-such-door', { token: A.token });
+  assert.equal(unknown.status, 404, JSON.stringify(unknown.body));
+  for (const r of [
+    await setPin(A, A, PIN.owner),
+    await h.get('/api/shop/till-pin/current', { token: A.token }),
+    await h.get('/api/shop/till-pin/sessions', { token: A.token }),
+  ]) {
+    assert.equal(r.status, 404, JSON.stringify(r.body));
+    assert.deepEqual(r.body, unknown.body, 'همان پاسخِ درِ ناشناخته');
   }
   assert.equal((await one('SELECT count(*)::int AS n FROM shop_till_pins')).n, 0);
   assert.equal((await one('SELECT count(*)::int AS n FROM shop_till_sessions')).n, 0);

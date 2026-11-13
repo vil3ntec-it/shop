@@ -188,12 +188,5 @@ async function listSettlements(shopId, { courierId, from, to, limit } = {}) {
   };
 }
 
-async function getSettlement(shopId, id) {
-  const s = await one('SELECT * FROM courier_settlements WHERE shop_id=$1 AND id=$2', [shopId, String(id || '')]);
-  if (!s) throw notFound('تسویه پیدا نشد', 'settlement_not_found');
-  const rows = await many(`${SETTLE_ROWS} WHERE a.shop_id=$1 AND a.settlement_id=$2 ORDER BY a.delivered_at, a.id`, [shopId, s.id]);
-  return { settlement: settlementView(s), rows: rows.map(settleRowView) };
-}
-
-  return { SETTLE_ROWS, settleRowView, settlementPreview, settle, listSettlements, getSettlement };
+  return { SETTLE_ROWS, settleRowView, settlementPreview, settle, listSettlements };
 };

@@ -153,4 +153,23 @@ object StrOrderOps {
   val amendEventApplied: String get() = t("سفارش ویرایش شد", "Order edited", "فرمایش سم شو")
   val amendEventClosed: String get() = t("پیشنهادِ ویرایش بسته شد", "Edit proposal closed", "د سمون وړاندیز وتړل شو")
   val amendEventSettled: String get() = t("تفاوتِ ویرایش تسویه شد", "Edit difference settled", "د سمون توپیر تصفیه شو")
+
+  // TEN-03 «باطل کردنِ لینکِ پیگیری» (جزئیاتِ سفارشِ ویترین؛ صاحب و مدیر)
+  val trackLinkTitle: String get() = t("لینکِ پیگیریِ مشتری", "Customer tracking link", "د پېرودونکي د تعقیب لینک")
+  val trackLinkHelp: String get() = t(
+    "اگر لینک به دستِ کسِ دیگری افتاده، باطلش کنید: لینک‌های پیشین دیگر باز نمی‌شوند و لینکِ تازه را برای مشتری می‌فرستید.",
+    "If the link reached someone else, revoke it: earlier links stop opening and you send the customer the new one.",
+    "که لینک بل چا ته رسېدلی، باطل یې کړئ: پخواني لینکونه نور نه پرانیستل کېږي او نوی لینک پېرودونکي ته لېږئ.",
+  )
+  val trackLinkRevoke: String get() = t("باطل کردنِ لینک", "Revoke link", "لینک باطلول")
+  val trackLinkConfirmTitle: String get() = t("لینکِ پیگیری باطل شود؟", "Revoke the tracking link?", "د تعقیب لینک باطل شي؟")
+  val trackLinkConfirmBody: String get() = t(
+    "هر لینکی که تا امروز فرستاده شده دیگر کار نمی‌کند. سفارش دست نمی‌خورد.",
+    "Every link sent so far stops working. The order itself is not changed.",
+    "تر نن هر لېږل شوی لینک نور کار نه کوي. فرمایش نه بدلېږي.",
+  )
+  val trackLinkRevoked: String get() = t("لینکِ پیشین باطل شد؛ لینکِ تازه آماده است", "Old link revoked; the new link is ready", "پخوانی لینک باطل شو؛ نوی لینک چمتو دی")
+  val trackLinkCopy: String get() = t("رونوشتِ لینکِ تازه", "Copy new link", "د نوي لینک کاپي")
+  val trackLinkCopied: String get() = t("لینک رونوشت شد", "Link copied", "لینک کاپي شو")
+  val trackLinkWhatsApp: String get() = t("فرستادن با واتس‌اپ", "Send on WhatsApp", "په واټس‌اپ لېږل")
 }

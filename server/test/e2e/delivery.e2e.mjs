@@ -248,7 +248,7 @@ await E.step('S40', 'S40: موردِ انتظار ۱۲٬۴۰۰، شمرده ۱۲
   assert.equal(st.reason, 'پیک ۴۰۰ کم آورد؛ از مزدش کم می‌شود');
   assert.equal(st.confirmedBy, managerAcct.user.id, 'تأییدکننده همان مدیر نیست');
   //  گزارشِ تسویه (RPT-15) همان کسری و دلیل را دارد
-  const one = E.ok(await A.api('GET', `/shop/delivery/settlements/${st.id}`), 'سندِ تسویه').settlement;
+  const one = E.ok(await A.api('GET', `/shop/delivery/settlements?courierId=${encodeURIComponent(st.courierId)}`), 'دفترِ تسویه').items.find((x) => x.id === st.id);
   assert.deepEqual([one.shortageMinor, one.reason], [40_000, st.reason]);
   //  پس از تسویه نقدِ در دست صفر ⇒ همان سفارشِ دوم حالا به پیک می‌رسد
   assert.equal(await held(), 0);

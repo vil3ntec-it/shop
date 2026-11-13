@@ -206,7 +206,7 @@ const KNOWN = Object.freeze([
   { key: 'market.platform_fee_fixed_minor', scope: 'shop', default: 0, what: 'مبلغِ ثابتِ کارمزدِ سامانه روی سفارشِ مشتری، واحدِ خرد' },
   { key: 'market.commission_bps', scope: 'shop', default: 0, what: 'کمیسیونِ بازار روی سفارشِ مشتری، صدمِ درصد (۰ تا ۱۰٬۰۰۰)' },
   { key: 'market.commission_fixed_minor', scope: 'shop', default: 0, what: 'مبلغِ ثابتِ کمیسیونِ بازار روی سفارشِ مشتری، واحدِ خرد' },
-  { key: 'market.account', scope: 'all', default: false, what: 'حسابِ مشتریِ بازار بی دکان (`/api/market/account/*`، S9)' },
+  { key: 'market.account', scope: 'all', default: false, what: 'گرهِ گفت‌وگوی ویترین به حسابِ مشتری (`customer_id`، S9)' },
   { key: 'market.same_in_store', scope: 'all', default: false, what: '«همین کالا در دکان‌های دیگر» روی برگهٔ کالای ویترینِ خودِ دکان هم (با `market.product_details`)؛ خاموش ⇒ فقط بازارچه (تصمیمِ ۳-۲۲)' },
   { key: 'market.product_details', scope: 'all', default: false, what: 'برند، بارکد، واحد و دستهٔ سراسری در نمای عمومیِ کالا (M4)' },
   { key: 'market.public_views', scope: 'all', default: false, what: 'پاسخ‌های عمومیِ ویترین و بازار فقط با فیلدهای مجاز (`lib/public-views.js`)' },

@@ -97,6 +97,10 @@ test('آزمونِ مرجع، پرچمِ خاموش: توکنِ v1 ِ امروز
   const r = await revoke(s, o.id);
   assert.equal(r.status, 403, JSON.stringify(r.body));
   assert.equal(r.body.error.code, 'link_policy_disabled');
+  //  TEN-03: برنامه دکمهٔ «باطل کردنِ لینکِ پیگیری» را فقط با همین کلیدِ `/config` می‌سازد ⇒ پرچمِ خاموش، کلید نیست
+  const cfg = await h.get('/api/shop/orders/config', { token: s.token });
+  assert.equal(cfg.status, 200, JSON.stringify(cfg.body));
+  assert.equal('trackLinkRevoke' in cfg.body, false);
   assert.equal((await one('SELECT track_gen FROM online_orders WHERE id=$1', [o.id])).track_gen, 0);
   assert.equal((await track(s, o.token)).status, 200);
 });
@@ -110,9 +114,14 @@ test('پرچمِ روشن: باطل کردن ⇒ هر لینکِ پیشین (v1 
   assert.equal((await track(s, o.token)).status, 200);
   assert.equal((await track(s, v1)).status, 200, 'لینکِ v1 ِ پیشین تا پیش از باطل شدن کار می‌کند');
 
+  const cfg = await h.get('/api/shop/orders/config', { token: s.token });
+  assert.equal(cfg.body.trackLinkRevoke, true, 'صاحب ⇒ دکمه در جزئیاتِ سفارش');
   const r = await revoke(s, o.id);
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.ok(isV2(r.body.token) && r.body.token !== o.token);
+  //  لینکِ تازهٔ کامل برای فرستادنِ دوباره (همان صفحهٔ پیگیریِ ویترین) — برنامه آن را نشان می‌دهد و هم‌رسانی می‌کند
+  assert.ok(r.body.link.includes(`/store/${s.slug}`) || r.body.link.includes(`${s.slug}.`), r.body.link);
+  assert.ok(r.body.link.endsWith(`#/o/${encodeURIComponent(r.body.token)}`), r.body.link);
   const log = await one(`SELECT * FROM audit_logs WHERE action='order.track_link_revoked' AND target_id=$1`, [o.id]);
   assert.ok(log, 'سابقه نشست');
 
@@ -194,6 +203,9 @@ test('پرچمِ روشن: شاگرد (بی orders.contact) لینک را باط
   assert.ok((await h.post('/api/shop/join', { code }, { token: staff.accessToken })).status < 300);
   const r = await revoke(s, o.id, staff.accessToken);
   assert.equal(r.status, 403, JSON.stringify(r.body));
+  const staffCfg = await h.get('/api/shop/orders/config', { token: staff.accessToken });
+  assert.equal(staffCfg.status, 200, JSON.stringify(staffCfg.body));
+  assert.equal('trackLinkRevoke' in staffCfg.body, false, 'شاگرد دکمه را نمی‌بیند');
   assert.equal((await one('SELECT track_gen FROM online_orders WHERE id=$1', [o.id])).track_gen, 0);
 
   const phone = await h.post('/api/shop/orders', {

@@ -58,6 +58,8 @@ router.get('/me', async (req, res) => {
     //  DLV-04/DLV-18: دکمه‌های «مسیرِ پیشنهادی» و «امتیاز» فقط با پرچمِ خودِ دکان دیده می‌شوند
     routeEnabled: await orders.flagOf(req.shopId, courierRoute.FLAG),
     ratingsEnabled: await orders.flagOf(req.shopId, ratings.FLAG),
+    //  DLV-06/S5: «تقریباً کی می‌رسم» (`POST /missions/:id/eta`) فقط با نمای پیک برای مشتری (`shop.delivery_customer_view`)
+    etaEnabled: await orders.flagOf(req.shopId, require('../lib/delivery-live').VIEW_FLAG),
     //  S94: «اشتراکِ موقعیت» ِ خودِ پیک — `required` یعنی دکان بی رضایت موقعیت نمی‌گیرد
     locationConsent: await locationConsent.stateOf(req.shopId, c),
     serverTime: Date.now(),
@@ -91,20 +93,6 @@ router.get('/missions', async (req, res) => {
   res.json(await courierChecks.decorate(req.shopId, await courierMap.decorate(req.shopId, await delivery.missions(req.shopId, req.courier.id, {
     scope: String(req.query.scope || 'active'), limit: req.query.limit,
   }))));
-});
-
-/*
- *  DLV-04 (پشتِ پرچمِ خاموشِ `shop.delivery_route`): ترتیبِ پیشنهادیِ مأموریت‌های پذیرفتهٔ همین پیک در یک مسیر.
- *  `?lat=&lng=` موقعیتِ همین لحظه است و فقط برای همین پاسخ خوانده می‌شود (نگه داشته نمی‌شود، DLV-16).
- */
-router.get('/route', async (req, res, next) => {
-  if (!(await orders.flagOf(req.shopId, courierRoute.FLAG))) {
-    return next(notFound('مسیرِ پیشنهادی برای این دکان روشن نیست', 'delivery_route_disabled'));
-  }
-  const start = courierRoute.startOf(req.query);
-  const list = await delivery.missions(req.shopId, req.courier.id, { scope: 'active', limit: 100 });
-  res.set('Cache-Control', 'no-store');
-  res.json({ ...courierRoute.routeOf(list.items, start), serverTime: list.serverTime });
 });
 
 /**

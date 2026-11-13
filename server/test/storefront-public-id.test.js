@@ -146,10 +146,7 @@ test('⛔ پرچمِ خاموش: نشانیِ کهنه ۴۰۴، بی publicId، 
   assert.equal(live.status, 200);
   assert.equal('publicId' in live.body.store, false);
 
-  const plain = await h.get('/api/store');
-  const byId = await h.get(`/api/store?id=${pid}`);
-  assert.equal(byId.status, plain.status);
-  assert.deepEqual(byId.body, plain.body);
+  //  درِ `GET /api/store?id=` نیست (B15)؛ پیوندِ پایدارِ صفحه با پرچمِ خاموش همان راهِ امروزِ `/store`
   const page = await manual(`/store?id=${pid}`);
   assert.equal(page.status, (await manual('/store')).status);
 });
@@ -185,16 +182,15 @@ test('پرچمِ روشن: نشانیِ کهنه (دو بار عوض‌شده) �
   assert.equal(followed.body.store.slug, a.slug);
   assert.equal(followed.body.store.publicId, pid);
 
-  const byId = await h.get(`/api/store?id=${pid.toLowerCase()}`);
-  assert.equal(byId.status, 200);
-  assert.deepEqual(byId.body, { publicId: pid, slug: a.slug });
-  const page = await manual(`/store?id=${pid}`);
+  //  پیوندِ پایدار فقط صفحهٔ `/store?id=` (۳۰۲ به نشانیِ امروز)؛ درِ `GET /api/store?id=` صدازننده نداشت و رفت (B15)
+  const page = await manual(`/store?id=${pid.toLowerCase()}`);
   assert.equal(page.status, 302);
   assert.equal(page.headers.get('location'), `/store/${a.slug}`);
-  //  نبود ⇒ همان پاسخِ امروزِ `/api/store`
-  const today = (await h.get('/api/store')).status;
-  assert.equal((await h.get('/api/store?id=01ARZ3NDEKTSV4RRFFQ69G5FAV')).status, today);
-  assert.equal((await h.get('/api/store?id=../etc')).status, today);
+  assert.equal((await manual(`/api/store?id=${pid}`)).status, (await manual('/api/store')).status, 'درِ API ِ شناسه نیست');
+  //  نبود ⇒ همان پاسخِ امروزِ `/store`
+  const today = (await manual('/store')).status;
+  assert.equal((await manual('/store?id=01ARZ3NDEKTSV4RRFFQ69G5FAV')).status, today);
+  assert.equal((await manual('/store?id=../etc')).status, today);
 
   //  برگشت به نشانیِ پیشین ⇒ ردیفِ پیشین پاک، نشانی زنده
   await setSlug(a, first);
@@ -225,12 +221,12 @@ test('⛔ ویترینِ بسته از راهِ نشانیِ کهنه یا شن�
   await setSlug(a, `p-${uniq()}`, { enabled: false });
   assert.equal((await manual(`/api/store/${old}`)).status, 404);
   assert.equal((await manual(`/store/${old}`)).status, 404);
-  const today = (await h.get('/api/store')).status;
-  assert.equal((await h.get(`/api/store?id=${pid}`)).status, today);
+  const today = (await manual('/store')).status;
+  assert.equal((await manual(`/store?id=${pid}`)).status, today);
   //  پرچمِ ویترین خاموش ⇒ همان
   await setSlug(a, a.slug, { enabled: true });
   assert.equal((await manual(`/api/store/${old}`)).status, 308);
   await setFlag(a.shopId, 'shop.storefront', false);
   assert.equal((await manual(`/api/store/${old}`)).status, 404);
-  assert.equal((await h.get(`/api/store?id=${pid}`)).status, today);
+  assert.equal((await manual(`/store?id=${pid}`)).status, today);
 });

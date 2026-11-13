@@ -195,20 +195,20 @@ test('IMG-12: بانکِ تصاویر — نسخه از (عکس، نسخه)ِ ب
   //  اگر نشانی با نسخهٔ عکسِ همگام‌شده خواسته شود ولی بانک سرو کند ⇒ باز هم کوتاه
   assert.equal((await pic(s, `/products/rice/thumb?v=${legacyTag}`)).cache, SHORT);
 
-  //  نسخهٔ ۲ ِ بانک ⇒ نشانیِ تازه؛ نشانیِ نسخهٔ ۱ همان عکسِ امروز با ۵ دقیقه
-  const v2 = await h.raw('POST', `/api/shop/images/${own.body.id}/versions`, F.jpeg(800, 600, { seed: 606 }), { token: s.token });
+  //  عکسِ تازهٔ بانک (همان راهِ برنامه: بارگذاریِ تازه + گزینش) ⇒ نشانیِ تازه؛ نشانیِ پیشین همان عکسِ امروز با ۵ دقیقه
+  const v2 = await h.raw('POST', '/api/shop/images/?product_id=rice', F.jpeg(800, 600, { seed: 606 }), { token: s.token });
   assert.equal(v2.status, 201, JSON.stringify(v2.body));
   const thumb2 = F.jpeg(400, 300, { seed: 607 });
-  assert.equal((await h.raw('PUT', `/api/shop/images/${own.body.id}/v/2/thumb`, thumb2, { token: s.token })).status, 200);
-  const sel2 = await h.post('/api/shop/images/select', { product_id: 'rice', source: 'shop', image_id: own.body.id, version: 2 }, { token: s.token });
-  assert.deepEqual([sel2.status, sel2.body.version], [200, 2], JSON.stringify(sel2.body));
+  assert.equal((await h.raw('PUT', `/api/shop/images/${v2.body.id}/v/1/thumb`, thumb2, { token: s.token })).status, 200);
+  const sel2 = await h.post('/api/shop/images/select', { product_id: 'rice', source: 'shop', image_id: v2.body.id }, { token: s.token });
+  assert.equal(sel2.status, 200, JSON.stringify(sel2.body));
   const b2 = await versionsOf(s, 'rice');
   const bankTag2 = b2.cat.photoVersion;
   assert.notEqual(bankTag2, bankTag, 'نسخهٔ تازهٔ بانک ⇒ نشانیِ تازه');
   assert.deepEqual(b2.all, Array(4).fill(bankTag2));
   const fresh = await pic(s, `/products/rice/thumb?v=${bankTag2}`);
   assert.deepEqual([fresh.status, fresh.cache], [200, LONG]);
-  const thumb2Bytes = await bankThumb(s, own.body.id, 2);
+  const thumb2Bytes = await bankThumb(s, v2.body.id, 1);
   assert.ok(fresh.buf.length > 0 && fresh.buf.equals(thumb2Bytes) && !fresh.buf.equals(t.buf));
   const stale = await pic(s, `/products/rice/thumb?v=${bankTag}`);
   assert.deepEqual([stale.status, stale.cache], [200, SHORT]);

@@ -61,6 +61,10 @@ class CourierStore(context: Context) {
   var ratingsEnabled: Boolean
     get() = prefs.getBoolean(K_RATINGS, false)
     set(v) { prefs.edit().putBoolean(K_RATINGS, v).apply() }
+  /** DLV-06: «تقریباً کی می‌رسم» روشن است؟ (از `/courier/me`؛ آفلاین همان آخرین پاسخ) */
+  var etaEnabled: Boolean
+    get() = prefs.getBoolean(K_ETA, false)
+    set(v) { prefs.edit().putBoolean(K_ETA, v).apply() }
 
   /** S94: رضایتِ خودِ پیک برای موقعیتِ زنده (از `/courier/me` و پاسخِ «اشتراکِ موقعیت»؛ آفلاین همان آخرین پاسخ) */
   var locationConsent: ir.vil3ntec.tohid.core.courier.LocationConsent
@@ -131,6 +135,7 @@ class CourierStore(context: Context) {
     private const val K_CALL = "call_enabled"
     private const val K_ROUTE = "route_enabled"
     private const val K_RATINGS = "ratings_enabled"
+    private const val K_ETA = "eta_enabled"
     private const val K_LC_REQUIRED = "location_consent_required"
     private const val K_LC_GRANTED = "location_consent_granted"
     private const val K_LC_AT = "location_consent_at"
@@ -208,7 +213,7 @@ object CourierSync {
     if (failure == null) {
       repo.me().onSuccess {
         store.courierName = it.name; store.callEnabled = it.callEnabled
-        store.routeEnabled = it.routeEnabled; store.ratingsEnabled = it.ratingsEnabled
+        store.routeEnabled = it.routeEnabled; store.ratingsEnabled = it.ratingsEnabled; store.etaEnabled = it.etaEnabled
         store.locationConsent = it.locationConsent   //  S94
       }
       val a = repo.missions("active")

@@ -322,6 +322,18 @@ object ImageBank {
     return shownBytes(context, productId)
   }
 
+  /**
+   *  §۳۷.۷ «گزارشِ عکسِ اشتباه یا بستهٔ قدیمی» (`POST /:id/report`، `BankPhotoReport`): نوعِ بیرون از فهرست هیچ
+   *  درخواستی نمی‌فرستد. سرور خواندنی بودنِ عکس برای همین دکان را می‌سنجد؛ مدیرِ بانک در پنل می‌بیند.
+   */
+  suspend fun report(context: Context, imageId: String, kind: String, note: String) {
+    val (k, n) = ir.vil3ntec.tohid.core.image.BankPhotoReport.body(kind, note) ?: return
+    Backend.api(context).post(ir.vil3ntec.tohid.core.image.BankPhotoReport.path(imageId), buildJsonObject {
+      put("kind", k)
+      if (n.isNotEmpty()) put("note", n)
+    })
+  }
+
   /* ------------------------- آماده‌سازی روی دستگاه ------------------------- */
 
   class Prepared(val display: ByteArray, val thumb: ByteArray?, val small: Boolean)

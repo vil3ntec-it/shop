@@ -54,6 +54,33 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-44u (د۷) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-44u` (از `main`، 64c931c3d)
+
+- **دنبالهٔ B15 (`SECURITY-AUDIT-fa.md`، جدولِ «دنبالهٔ B15»):** برای هر درِ «نامطمئن» ِ بازرسی یک تصمیم:
+  - **ساخته (رابطِ تازه):** «خروج از همهٔ دستگاه‌ها» در «حساب من» (AUTH-06، `POST /api/auth/logout-all` پس از همان برگهٔ خروجِ امن)؛
+    «باطل کردنِ لینکِ پیگیری» در جزئیاتِ سفارشِ ویترین (TEN-03؛ کلیدِ تازهٔ `trackLinkRevoke` ِ `/config`، پاسخِ سرور حالا `link`/`whatsappUrl`)؛
+    «PIN ِ صندوق» در صفحهٔ کارمند (STF-04؛ حال، باز کردنِ قفل، برداشتن با برگهٔ تأیید؛ `till-pin.mayManage`)؛ «زمانِ رسیدن برای مشتری» روی
+    مأموریتِ «در راه» ِ پیک (DLV-06؛ کلیدِ تازهٔ `etaEnabled` ِ `/courier/me`، `core/courier/CourierEta`)؛ «گزارشِ عکسِ نادرست» برای عکسِ مرکزی
+    (§۳۷.۷؛ `core/image/BankPhotoReport`). `GET …/trust/cases/:token/evidence/:evidenceId` از پیش زنده بود (`e-rows-42w`).
+  - **پیش‌ساخته (درِ سرور هست، رابط نه؛ پرچمِ خاموش = همان درِ ناشناخته با `next('router')`):** ۱۳ درِ کاتالوگِ سرور (INV-01/INV-11/CHK-18 —
+    برداشتنشان ۴۶ پروندهٔ آزمون را جابه‌جا می‌کرد، بیش از ۳۰ دقیقه)، `PUT /till-pin/me`، `GET /current|sessions|ops|ops/row` (STF-04/S46)،
+    `GET /api/courier/map(/:id)` (DLV-05). قاعدهٔ RULES («درِ بی صدازننده…») همین را حالا صریح می‌گوید.
+  - **برداشته (`dead-doors.test.js` ‹`GONE_2`›، ۱۹ در + `GET /api/courier/route`):** `/api/market/account/**` (نامِ دومِ حسابِ ویترین)،
+    `POST /shop/images/:id/versions|process`، `GET /shop/delivery/settlements/:id`، `GET /shop/trust/sanctions`، `GET /api/terms`، `GET /api/store?id=`،
+    `GET /api/courier/route` (برنامه خودش می‌سازد؛ `lib/courier-route.js` فقط پرچم). کتابخانه‌های مرده هم: `image-bank.shopVersion`،
+    `delivery-settle.getSettlement`، `market-trust.sanctionsForShop`، `courier-route.plan/routeOf`.
+  - **INV-21:** ادعای `POST /catalog/moves` درست شد — برنامه repack را محلی می‌کند و موجودیِ سرور همان سندِ تولید را از همگام‌سازی می‌گیرد.
+- **آزمون‌ها (سرخ پیش/سبز پس):** `dead-doors` ۳/۳ روی 64c931c3d سرخ؛ `till-pin`/`till-op-user` (پرچمِ خاموش ⇒ درِ ناشناخته) ۲ سرخ روی روترِ پیشین؛
+  `catalog-stock`/`catalog-transfers` ۲ سرخ؛ `storefront-link-expiry` ۱ سرخ؛ `delivery-customer-view` ۲ سرخ؛ Kotlin: `SignOutEverywhereTest`،
+  `OrderTrackLinkTest`، `TillPinMemberModelTest`، `CourierEtaRepositoryTest` (+ core: `BankPhotoReportTest`، `CourierEtaTest`) پیش از کد کامپایل‌نشدنی.
+  `market-account.test.js` حساب را از درِ ویترین می‌سازد و تغییرِ شماره را مستقیم روی `store-customers.changePhone` می‌سنجد.
+- **نتیجه:** همهٔ آزمون‌های سرور روی PGlite (دو تکه، `scripts/test-pglite.js`): ۴۲۴۷ آزمون، ۴۲۰۵ قبول، **۰ شکست**، ۴۰ SKIP و ۲ TODO ِ پیشین؛
+  e2e ِ `delivery` و `flags-on` ۱۹/۱۹ گام؛ اجرای کاملِ `./desktop/gradlew -p desktop test` (با `desktop/build/test-data` ِ پاک) ⇒ ۴۱۲۱ PASS،
+  ۰ FAIL، ۴ SKIP ِ پیشین؛ core: `BankPhotoReportTest` ۲/۲، `CourierEtaTest` ۲/۲، `BankPhotoCardTest` ۱۱/۱۱. کامپایلِ اندروید/آیفون فقط در CI.
+- **نیمه‌کاره/قدمِ بعد:** §۲۳.۴ «تغییرِ شمارهٔ مشتری» حالا در و رابط ندارد (منطق و آزمونش ماند؛ ردیفِ STATUS ندارد) — اگر خواسته شد،
+  `POST /api/store/:slug/account/phone` با رابطِ «حسابِ من» ِ ویترین. `GET /api/auth/terms` هم صدازنندهٔ برنامه ندارد (عمومی، مستند در
+  `server/README.md`؛ ماند). درهای پیش‌ساختهٔ کاتالوگ با مدلِ شعبه (فازِ ۶) رابط می‌گیرند یا می‌روند.
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-41s (س۶) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-41s` (از `main`، 62a6bac71)
 
 - **سطحِ حمله (B15 ِ `SECURITY-AUDIT-fa.md`):** ۶۳ درِ بی صدازننده برداشته شد — کلِ `routes/data.js` (۵۱ در: `/api/products|inventory|sales|

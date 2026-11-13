@@ -129,7 +129,7 @@ POST /api/auth/otp/verify      ورود با کد
 POST /api/auth/google          ورود با حساب گوگل
 POST /api/auth/refresh         تازه‌سازی نشست
 POST /api/auth/logout          خروج
-GET  /api/terms                متن شرایط و ضوابط (بدون نیاز به حساب)
+GET  /api/auth/terms           متن شرایط و ضوابط (بدون نیاز به حساب)
 POST /api/location             ثبت لوکیشن دستگاه — با حساب یا بدون حساب
 GET  /api/location/mine        لوکیشن‌های همین حساب
 GET  /api/me                   حساب، دکان، نقش، دسترسی‌ها

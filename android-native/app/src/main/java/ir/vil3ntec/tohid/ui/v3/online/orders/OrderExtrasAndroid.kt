@@ -108,6 +108,8 @@ internal fun RouteScope.OrderDetailExtras(o: OrderDto, cfg: OrdersConfigDto?) {
       }
     }
     OrderNoticesSection(o, c, repo, OrdersModel::stamp) { toasts.show(it) }
+    //  TEN-03: «باطل کردنِ لینکِ پیگیری» (فقط با کلیدِ سرور و فقط سفارشِ ویترین)
+    OrderTrackLinkSection(o, c, repo) { toasts.show(it) }
   }
   if (restocking) {
     RestockDialog(o, OrderFulfillment.restockChoices(ledger, o.id), busy, onDismiss = { restocking = false }) { chosen ->

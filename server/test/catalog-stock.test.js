@@ -158,9 +158,23 @@ test('⛔ پرچمِ shop.catalog خاموش: هیچ ردیفی، سفارش م�
   const cfg = await cat(s, '/config');
   assert.equal(cfg.status, 200);
   assert.equal(cfg.body.enabled, false);
-  const blocked = await cat(s, '/products');
-  assert.equal(blocked.status, 403);
-  assert.equal(blocked.body.error.code, 'catalog_disabled');
+  //  ⛔ درهای پیش‌ساخته (سرور هست، رابطِ برنامه نه؛ PARTIAL-MAP ِ INV-01/INV-11/CHK-18) با پرچمِ خاموش دقیقاً همان
+  //  درِ ناشناخته‌اند؛ درهایی که برنامه صدا می‌زند (`GET /transfers`، `/reserved`) همان ۴۰۳ ِ بخش
+  const unknown = await cat(s, '/no-such-door');
+  assert.equal(unknown.status, 404, JSON.stringify(unknown.body));
+  const PREBUILT = [['PUT', '/settings'], ['POST', '/refresh'], ['GET', '/products'], ['GET', '/products/off1'],
+    ['PUT', '/products/off1/low'], ['GET', '/moves'], ['GET', '/report'], ['GET', '/tasks'], ['POST', '/tasks/x1/resolve'],
+    ['POST', '/moves'], ['POST', '/transfers'], ['POST', '/transfers/x1/receive'], ['POST', '/transfers/x1/reject']];
+  for (const [m, p] of PREBUILT) {
+    const r = await h.api(m, `/api/shop/catalog${p}`, { token: s.token, body: m === 'GET' ? null : { reason: 'آزمون' }, headers: { 'Idempotency-Key': `k-${p.length}-${m}-off-key` } });
+    assert.equal(r.status, 404, `${m} ${p} ⇒ ${r.status} ${JSON.stringify(r.body)}`);
+    assert.deepEqual(r.body, unknown.body, `${m} ${p}: همان پاسخِ درِ ناشناخته`);
+  }
+  for (const p of ['/transfers', '/reserved']) {
+    const blocked = await cat(s, p);
+    assert.equal(blocked.status, 403, p);
+    assert.equal(blocked.body.error.code, 'catalog_disabled', p);
+  }
   assert.equal(await catalog.publicStock(s.shopId, ['off1']), null);
   for (const t of ['catalog_settings', 'catalog_products', 'catalog_sync_state', 'stock_moves', 'stock_levels',
     'stock_reservations', 'stock_sources', 'stock_tasks']) {

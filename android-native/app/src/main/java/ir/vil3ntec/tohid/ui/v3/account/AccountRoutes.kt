@@ -40,6 +40,8 @@ object AccountPaths {
   const val PROFILE = "profile"
   const val EDIT = "profile/edit"
   const val SIGN_OUT = "profile/signout"
+  /** AUTH-06: «خروج از همهٔ دستگاه‌ها» ِ خودِ کاربر (`POST /auth/logout-all`) */
+  const val SIGN_OUT_ALL = "profile/signout-all"
   /** «حذفِ حساب» (قاعدهٔ Google Play) — برگه‌ای روی «ویرایش حساب» */
   const val DELETE = "profile/delete"
   const val TEAM = "team"
@@ -78,6 +80,7 @@ val AccountModule = AppModule(
     V3Route(AccountPaths.PROFILE, RouteKind.TAB, { Str.myAccount }, chrome = Chrome.OWN) { ProfileRoute() },
     V3Route(AccountPaths.EDIT, RouteKind.PAGE, { StrAccount.menuEdit }, parent = AccountPaths.PROFILE, chrome = Chrome.OWN) { ProfileEditRoute() },
     V3Route(AccountPaths.SIGN_OUT, RouteKind.SHEET, { StrAccount.menuSignOut }, parent = AccountPaths.PROFILE, chrome = Chrome.OWN) { SignOutRoute() },
+    V3Route(AccountPaths.SIGN_OUT_ALL, RouteKind.SHEET, { StrAccount.menuSignOutAll }, parent = AccountPaths.PROFILE, chrome = Chrome.OWN) { SignOutRoute(everywhere = true) },
     V3Route(AccountPaths.DELETE, RouteKind.SHEET, { StrAccount.deleteAccount }, parent = AccountPaths.EDIT, chrome = Chrome.OWN) { DeleteAccountRoute() },
     V3Route(AccountPaths.TEAM, RouteKind.PAGE, { Str.staff }, needs = setOf(Need.MANAGE), chrome = Chrome.OWN) { TeamRoute() },
     V3Route(AccountPaths.NEW_CODE, RouteKind.SHEET, { StrAccount.newCodeTitle }, parent = AccountPaths.TEAM, needs = setOf(Need.MANAGE), chrome = Chrome.OWN) { NewCodeRoute() },

@@ -1,17 +1,15 @@
 'use strict';
 /**
- * چند سفارش در یک مسیر با ترتیبِ پیشنهادی — DLV-04 (`GET /api/courier/route`، پشتِ پرچمِ خاموشِ `shop.delivery_route`).
+ * چند سفارش در یک مسیر با ترتیبِ پیشنهادی — DLV-04 (پرچمِ `shop.delivery_route`).
  *
- * آن‌چه این پرونده قفل می‌کند:
- *   ۱) ترتیب همان بردارِ `core/test-vectors/courier-route-v1.json` است که `RoutePlan.kt` می‌خواند.
- *   ۲) پرچمِ خاموش ⇒ ۴۰۴ `delivery_route_disabled`؛ فهرستِ مأموریت‌ها همان پیشین.
- *   ۳) فقط مأموریتِ پذیرفته و زندهٔ **همین** پیک ایستگاه است (نه «درخواست‌شده»، نه پایان‌یافته، نه پیکِ دیگر)؛
- *      بی پین ⇒ ته؛ موقعیتِ پیک فقط برای همین پاسخ (نیمه یا نامعتبر ⇒ ۴۰۰) و `no-store`.
+ * ترتیب را برنامهٔ پیک روی دستگاه می‌سازد (`core/courier/RoutePlan.forCards`؛ بردارِ `core/test-vectors/courier-route-v1.json`
+ * در `RoutePlanVectorsTest`). آن‌چه این پرونده قفل می‌کند:
+ *   ۱) پرچم فقط دکمه را در `GET /api/courier/me` (`routeEnabled`) نشان یا پنهان می‌کند؛ فهرستِ مأموریت‌ها همان.
+ *   ۲) ⛔ درِ دوقلوی سرور `GET /api/courier/route` (بی صدازننده) با توکنِ پیک و پرچمِ روشن هم ۴۰۴ ِ «درِ ناشناختهٔ پیک»
+ *      است و موقعیتِ پیک هیچ‌جا نمی‌نشیند (B15 ِ `docs/SECURITY-AUDIT-fa.md`، `dead-doors.test.js`).
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('fs');
-const path = require('path');
 const h = require('./helpers');
 const { query, many, newId, now } = require('../src/db');
 const R = require('../src/lib/courier-route');
@@ -92,82 +90,19 @@ const route = (courier, q = '') => h.get(`/api/courier/route${q}`, { token: cour
 
 /* ══════════════════════════════════════════════════════════════════ */
 
-test('DLV-04 courier-route-v1: نزدیک‌ترین بعدی + 2-opt — همان بردارِ RoutePlan.kt', () => {
-  const V = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'core', 'test-vectors', 'courier-route-v1.json'), 'utf8'));
-  assert.equal(V.version, 1);
-  assert.ok(V.plan.length >= 8);
-  const pt = (x) => (x ? { lat: x[0], lng: x[1] } : null);
-  for (const c of V.plan) assert.deepEqual(R.plan(pt(c.start), c.pins.map(pt)), c.want, c.name);
-  //  2-opt واقعاً کار می‌کند: در دو بردار از «نزدیک‌ترین بعدیِ» تنها کوتاه‌تر است
-  const { distanceM } = require('../src/lib/courier-checks');
-  const nnTotal = (start, pins) => {
-    const left = pins.map((_, i) => i);
-    let cur = start;
-    let total = 0;
-    while (left.length) {
-      left.sort((a, b) => distanceM(cur, pins[a]) - distanceM(cur, pins[b]) || a - b);
-      const i = left.shift();
-      total += distanceM(cur, pins[i]);
-      cur = pins[i];
-    }
-    return total;
-  };
-  const twoOpt = V.plan.filter((c) => c.name.startsWith('2-opt'));
-  assert.equal(twoOpt.length, 2);
-  for (const c of twoOpt) assert.ok(c.want.totalM < nnTotal(pt(c.start), c.pins.map(pt)), c.name);
-});
-
-test('DLV-04 خاموش: ۴۰۴ delivery_route_disabled؛ فهرستِ مأموریت‌ها همان', async () => {
-  const s = await liveShop('مسیر-خاموش');
+test('DLV-04: پرچم فقط `routeEnabled` ِ `/courier/me`؛ درِ مسیرِ سرور نیست (۴۰۴ ِ درِ پیک، با پرچمِ خاموش و روشن)', async () => {
+  const s = await liveShop('مسیر');
   await mission(s, s.courier, { pin: [34.51, 69.17] });
-  const r = await route(s.courier, '?lat=34.5&lng=69.17');
-  assert.equal(r.status, 404, JSON.stringify(r.body));
-  assert.equal(r.body.error.code, 'delivery_route_disabled');
+  const gone = async () => {
+    const r = await route(s.courier, '?lat=34.5&lng=69.17');
+    assert.equal(r.status, 404, JSON.stringify(r.body));
+    assert.equal(r.body.error.code, 'not_found', 'همان پاسخِ «این نشانی در درِ پیک نیست»');
+  };
+  await gone();
   assert.equal((await h.get('/api/courier/missions', { token: s.courier.token })).body.items.length, 1);
   assert.equal((await h.get('/api/courier/me', { token: s.courier.token })).body.routeEnabled, false, 'دکمهٔ مسیر پنهان');
   await setFlag(s.shopId, R.FLAG, true);
   assert.equal((await h.get('/api/courier/me', { token: s.courier.token })).body.routeEnabled, true, 'دکمهٔ مسیر دیده می‌شود');
-});
-
-test('DLV-04: ترتیبِ پیشنهادی فقط برای مأموریتِ پذیرفتهٔ همین پیک؛ بی پین ته؛ موقعیت نیمه یا نامعتبر ۴۰۰؛ no-store', async () => {
-  const s = await liveShop('مسیر');
-  await setFlag(s.shopId, R.FLAG, true);
-  const far = await mission(s, s.courier, { pin: [34.527, 69.17], landmark: 'سه کیلومتر' });
-  const near = await mission(s, s.courier, { pin: [34.509, 69.17], landmark: 'یک کیلومتر' });
-  const bare = await mission(s, s.courier, { landmark: 'بی پین' });
-  const mid = await mission(s, s.courier, { pin: [34.518, 69.17], landmark: 'دو کیلومتر' });
-  const waiting = await mission(s, s.courier, { pin: [34.501, 69.17], accept: false });
-  const done = await mission(s, s.courier, { pin: [34.502, 69.17] });
-  await events(s.courier, [ev(done, 'picked_up'), { ...ev(done, 'delivered'), cashCollectedMinor: 1000 }]);
-  const other = await courierOf(s, 'دوم');
-  const notMine = await mission(s, other, { pin: [34.5005, 69.17] });
-  await events(s.courier, [ev(mid, 'picked_up')]);
-
-  const r = await route(s.courier, '?lat=34.5&lng=69.17');
-  assert.equal(r.status, 200, JSON.stringify(r.body));
-  assert.equal(r.headers.get('cache-control'), 'no-store');
-  assert.equal(r.body.from, 'position');
-  assert.deepEqual(r.body.stops.map((x) => [x.assignmentId, x.seq, x.legM]), [[near, 1, 1001], [mid, 2, 1001], [far, 3, 1001]]);
-  assert.equal(r.body.stops[1].status, 'picked_up');
-  assert.equal(r.body.stops[0].landmark, 'یک کیلومتر');
-  assert.deepEqual(r.body.unpinned.map((x) => x.assignmentId), [bare]);
-  assert.equal(r.body.totalM, 3003);
-  const all = JSON.stringify(r.body);
-  for (const id of [waiting, done, notMine]) assert.ok(!all.includes(id), `ایستگاهِ نابه‌جا: ${id}`);
-
-  const noPos = await route(s.courier);
-  assert.equal(noPos.status, 200);
-  assert.equal(noPos.body.from, 'first_stop');
-  assert.equal(noPos.body.stops[0].legM, 0);
-  assert.deepEqual(noPos.body.stops.map((x) => x.assignmentId).sort(), [far, near, mid].sort());
-
-  for (const q of ['?lat=34.5', '?lng=69', '?lat=91&lng=69', '?lat=x&lng=69', '?lat=34.5&lng=181']) {
-    const b = await route(s.courier, q);
-    assert.equal(b.status, 400, `${q}: ${JSON.stringify(b.body)}`);
-    assert.equal(b.body.error.code, 'bad_position');
-  }
-  //  فقط پیشنهاد: ترتیبِ فهرستِ مأموریت‌ها و وضعیت‌ها دست نخورد، و موقعیت هیچ‌جا ننشست
-  const list = (await h.get('/api/courier/missions', { token: s.courier.token })).body.items.map((x) => x.id);
-  assert.deepEqual(list, [far, near, bare, mid, waiting]);
-  assert.equal((await many('SELECT * FROM delivery_locations')).length, 0);
+  await gone();
+  assert.equal((await many('SELECT * FROM delivery_locations')).length, 0, 'موقعیت هیچ‌جا ننشست');
 });

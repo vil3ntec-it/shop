@@ -107,6 +107,16 @@ object StrAccount {
   val signOutTitle: String get() = t("خروج از حساب؟", "Sign out?", "له حساب وځئ؟")
   val signOutBody: String get() = td("برای برگشتن، ایمیل و رمزتان را دوباره می‌زنید. دفترِ دکان روی همین گوشی سرِ جایش می‌ماند.", "To come back you enter your email and password again. The shop ledger stays on this phone.", "د بیرته راتګ لپاره به بیا ایمیل او پټنوم ولیکئ. د دوکان دفتر په همدې تلیفون پاتې کېږي.", "To come back you enter your email and password again. The shop ledger stays on this computer.", "د بیرته راتګ لپاره به بیا ایمیل او پټنوم ولیکئ. د دوکان دفتر په همدې کمپیوټر پاتې کېږي.")
   val signOutAction: String get() = t("خروج", "Sign out", "وتل")
+  // AUTH-06 «خروج از همهٔ دستگاه‌ها» ِ خودِ کاربر
+  val menuSignOutAll: String get() = t("خروج از همهٔ دستگاه‌ها", "Sign out of all devices", "له ټولو وسایلو وتل")
+  val signOutAllTitle: String get() = t("خروج از همهٔ دستگاه‌ها؟", "Sign out of all devices?", "له ټولو وسایلو وځئ؟")
+  val signOutAllBody: String get() = t(
+    "همهٔ نشست‌های این حساب در دستگاه‌های دیگر هم بسته می‌شود؛ هر دستگاه برای برگشت ایمیل و رمز می‌خواهد. دفترِ دکان روی هر دستگاه سرِ جایش می‌ماند.",
+    "Every session of this account on other devices is closed too; each device needs the email and password to come back. The shop ledger stays on every device.",
+    "د دې حساب ټولې ناستې په نورو وسایلو هم تړل کېږي؛ هره وسیله د بیرته راتګ لپاره ایمیل او پټنوم غواړي. د دوکان دفتر په هره وسیله پاتې کېږي.",
+  )
+  val signOutAllAction: String get() = t("خروج از همه", "Sign out everywhere", "له ټولو ووځئ")
+  val signedOutAll: String get() = t("از همهٔ دستگاه‌ها خارج شدید", "You signed out of all devices", "له ټولو وسایلو ووتلئ")
   val stay: String get() = t("ماندن", "Stay", "پاتې کېدل")
   val pendingTitle: String get() = t("هنوز همه‌چیز به سرور نرفته", "Not everything has reached the server yet", "لا ټول شیان سرور ته نه دي رسېدلي")
   val syncNow: String get() = t("همین حالا همگام کن", "Sync now", "همدا اوس همغږي کړئ")
@@ -338,6 +348,27 @@ object StrAccount {
   )
   val logoutEverywhereConfirm: String get() = t("بیرون کن", "Sign out", "ویې باسه")
   val loggedOutEverywhere: String get() = t("کارمند از همهٔ دستگاه‌ها بیرون رفت", "Signed out of all devices", "له ټولو وسایلو ووت")
+  // STF-04 «PIN ِ صندوق» ِ هر کارمند (صفحهٔ کارمند؛ پرچمِ `shop.till_pin`)
+  val tillPinTitle: String get() = t("PIN ِ صندوق", "Till PIN", "د صندوق PIN")
+  val tillPinHelp: String get() = t(
+    "پس از پنج PIN ِ غلط قفل می‌شود. باز کردن شمارِ خطا را صفر نمی‌کند؛ برداشتن یعنی کارمند تا PIN ِ تازه صندوق را باز نمی‌کند.",
+    "It locks after five wrong PINs. Unlocking does not reset the failure count; removing means the member cannot open the till until a new PIN is set.",
+    "له پنځو غلطو PINونو وروسته تړل کېږي. پرانیستل د تېروتنو شمېر صفر نه کوي؛ لرې کول دا دي چې کارکوونکی تر نوي PIN پورې صندوق نه پرانیزي.",
+  )
+  val tillPinNone: String get() = t("PIN گذاشته نشده", "No PIN set", "PIN نه دی ایښودل شوی")
+  val tillPinSet: String get() = t("PIN گذاشته شده", "PIN set", "PIN ایښودل شوی")
+  val tillPinVoid: String get() = t("PIN باطل شده؛ PIN ِ تازه لازم است", "PIN revoked; a new PIN is needed", "PIN باطل شوی؛ نوی PIN پکار دی")
+  val tillPinLocked: String get() = t("قفل است (PIN ِ غلطِ پیاپی)", "Locked (repeated wrong PIN)", "تړل شوی دی (پرله‌پسې غلط PIN)")
+  val tillPinUnlock: String get() = t("باز کردنِ قفل", "Unlock", "قفل پرانیستل")
+  val tillPinUnlocked: String get() = t("قفلِ PIN باز شد", "PIN unlocked", "د PIN قفل پرانیستل شو")
+  val tillPinRemove: String get() = t("برداشتنِ PIN", "Remove PIN", "PIN لرې کول")
+  fun tillPinRemoveTitle(name: Any): String = t("PIN ِ ${asIs(name)} برداشته شود؟", "Remove $name's PIN?", "د $name PIN لرې شي؟")
+  val tillPinRemoveBody: String get() = t(
+    "نوبتِ بازِ صندوقِ او هم بسته می‌شود؛ تا PIN ِ تازه با PIN صندوق را باز نمی‌کند.",
+    "Their open till session is closed too; they cannot open the till with a PIN until a new one is set.",
+    "د هغه پرانیستې صندوق نوبت هم تړل کېږي؛ تر نوي PIN پورې صندوق په PIN نه پرانیزي.",
+  )
+  val tillPinRemoved: String get() = t("PIN برداشته شد", "PIN removed", "PIN لرې شو")
   fun staleHint(name: Any): String = t("شاید همان ${asIs(name)} است با دستگاهِ تازه", "Maybe the same $name on a new device", "شاید همغه $name وي په نوې وسیله")
   fun staleHintBody(device: Any): String = t(
     "دستگاهِ ${asIs(device)} پیش‌تر مالِ عضوِ کهنه بود. حساب‌ها خودبه‌خود یکی نمی‌شوند؛ اگر همان آدم است عضوِ کهنه را بردارید — فروش و سابقه‌اش می‌ماند.",

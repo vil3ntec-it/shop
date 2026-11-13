@@ -119,7 +119,7 @@ async function revokeLink(shopId, orderId) {
   );
   if (!row) throw notFound('سفارشِ ویترین پیدا نشد', 'order_not_found');
   tokenKey();
-  return { gen: Number(row.track_gen), token: tokenOf(shopId, row.id, { gen: row.track_gen, at: now() }) };
+  return { orderId: row.id, gen: Number(row.track_gen), token: tokenOf(shopId, row.id, { gen: row.track_gen, at: now() }) };
 }
 
   return { LINK_FLAG, tokenOf, linkPolicyOn, listTokenOf, currentTokenOf, parseToken, orderIdOf, orderIdOfLink, revokeLink };

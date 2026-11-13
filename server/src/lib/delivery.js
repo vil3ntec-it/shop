@@ -733,7 +733,7 @@ const { externalCompanies, externalStatement } = require('./delivery-external');
 const { putPhoto, listPhotos, getPhoto } = require('./delivery-photos')({ appendEvent, sniff, PHOTO_MAX_BYTES, MAX_PHOTOS });
 
 //  تسویهٔ پیک (DLV-11، DLV-12، S40، S57) — `lib/delivery-settle.js`
-const { SETTLE_ROWS, settleRowView, settlementPreview, settle, listSettlements, getSettlement } = require('./delivery-settle')({ cashStats, viaDb, MAX_SETTLE });
+const { SETTLE_ROWS, settleRowView, settlementPreview, settle, listSettlements } = require('./delivery-settle')({ cashStats, viaDb, MAX_SETTLE });
 
 const { customerView, putLocation, putEta, purgeLocations } = require('./delivery-live');   //  S5: نمای پیک برای مشتری
 
@@ -751,6 +751,6 @@ module.exports = {
   stateOf, staffActor, courierOfUser, listCouriers, createCourier, updateCourier, enrollCourierMember,
   assign, regenerateCode, courierEvents, staffEvent, recall, fixAddress, missions, forOrder, board, courierSummary: (...a) => require('./courier-summary').summary(...a), periodStarts: (...a) => require('./courier-summary').periodStarts(...a),
   CALL_FLAG, CALLABLE, callFlagOf, callCustomer,
-  putPhoto, listPhotos, getPhoto, settlementPreview, settle, listSettlements, getSettlement,
+  putPhoto, listPhotos, getPhoto, settlementPreview, settle, listSettlements,
   externalCompanies, externalStatement, eventKey, _forSummary: { cashStats, viaDb, SETTLE_ROWS, settleRowView },
 };

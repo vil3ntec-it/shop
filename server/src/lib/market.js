@@ -89,8 +89,8 @@ async function globalFlag(key) {
 const directoryOn = () => globalFlag(FLAG_KEY);
 
 /**
- * حسابِ مشتریِ بازار بی دکان (S9): `/api/market/account/*` و نشستِ حساب در چتِ
- * ویترین. پرچمِ سراسریِ `market.account`، پیش‌فرض خاموش.
+ * S9: گرهِ گفت‌وگوی ویترین به حسابِ مشتری (نشستِ `X-Store-Session` ِ `/api/store/:slug/account` در چت ⇒ `customer_id`).
+ * پرچمِ سراسریِ `market.account`، پیش‌فرض خاموش. (درهای `/api/market/account/*` نامِ دومِ حسابِ ویترین بودند و رفتند.)
  */
 const ACCOUNT_FLAG = 'market.account';
 const accountOn = () => globalFlag(ACCOUNT_FLAG);
@@ -747,7 +747,7 @@ async function requireStorefrontFlag(shopId) {
 
 module.exports = {
   FLAG_KEY, ACCOUNT_FLAG, CATEGORIES,
-  directoryOn, accountOn, requireOn, ordersOfPhone: mine.ordersOfPhone, clearCache, stats, eligible, overview, shops, search,
+  directoryOn, accountOn, requireOn, clearCache, stats, eligible, overview, shops, search,
   sameProduct: m4.sameProduct, feed, myOrders: mine.myOrders,
   geoOf, distanceKm, listingOf, saveListing, requireStorefrontFlag,
 };

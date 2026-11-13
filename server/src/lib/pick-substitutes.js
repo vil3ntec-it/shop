@@ -308,13 +308,16 @@ function parsePropose(body) {
   return { eventId, lineNo, productId, barcode, qtyMilli, waitMinutes };
 }
 
-/** لینکِ پیگیریِ مشتری (همان صفحهٔ سفارشِ ویترین) و واتس‌اپ — فقط سفارشِ ویترین؛ شماره فقط با `orders.contact` و `customers.contact` */
-async function customerLinks(shopId, order, actor) {
+/**
+ * لینکِ پیگیریِ مشتری (همان صفحهٔ سفارشِ ویترین) و واتس‌اپ — فقط سفارشِ ویترین؛ شماره فقط با `orders.contact` و `customers.contact`.
+ * `given`: توکنِ همین حالا صادرشده (TEN-03 «باطل کردن» همان لینکِ پاسخ را می‌خواهد، نه صدورِ دوباره)
+ */
+async function customerLinks(shopId, order, actor, given = '') {
   if (!order || order.source !== 'storefront') return { link: '', whatsappUrl: '' };
   const sfRow = (await db.query('SELECT slug FROM storefronts WHERE shop_id=$1', [shopId])).rows[0];
   if (!sfRow || !sfRow.slug) return { link: '', whatsappUrl: '' };
   const sf = require('./storefront');
-  const token = await sf.currentTokenOf(shopId, order.id);   // TEN-03: پرچمِ روشن ⇒ نسلِ جاری
+  const token = given || await sf.currentTokenOf(shopId, order.id);   // TEN-03: پرچمِ روشن ⇒ نسلِ جاری
   const base = String(config.serverUrl || '').trim().replace(/\/+$/, '');
   const page = base ? `${base}/store/${encodeURIComponent(sfRow.slug)}` : `https://${sfRow.slug}.${config.storefront.domain}/`;
   const link = `${page}#/o/${encodeURIComponent(token)}`;

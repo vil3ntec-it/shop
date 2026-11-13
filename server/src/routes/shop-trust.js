@@ -62,8 +62,4 @@ router.post('/cases/:id/appeal', on, respondPerm, writeLimit, async (req, res) =
   res.status(out.replayed ? 200 : 201).json(out);
 });
 
-router.get('/sanctions', on, async (req, res) => {
-  res.json({ sanctions: await trust.sanctionsForShop(req.shopId) });
-});
-
 module.exports = router;

@@ -2,7 +2,7 @@
 /**
  * S46 (STF-04) — «کاربرِ سنجیدهٔ صندوق» روی هر op ِ نشستهٔ دکان (`lib/till-op-user.js`، مهاجرتِ ۷۹۰، پرچمِ `shop.till_op_user`).
  *
- *  • پرچمِ خاموش (پیش‌فرض) ⇒ هیچ ردیفی، و درهای خواندن ۴۰۳ ِ `till_op_user_disabled`؛
+ *  • پرچمِ خاموش (پیش‌فرض) ⇒ هیچ ردیفی، و درهای خواندن (پیش‌ساخته، بی رابطِ برنامه) همان درِ ناشناخته (۴۰۴)؛
  *  • پرچم روشن و `shop.till_pin` خاموش ⇒ ردیف با کاربرِ NULL (`pin_off`) — هرگز حدس؛
  *  • هر دو روشن و نوبتِ سنجیده روی **دستگاهِ توکن** ⇒ همان عضو، حتی اگر op نامِ دیگری ادعا کند یا `device_id` ِ بدنه دیگر باشد؛
  *    fields و hash ِ op در `oplog` دست‌نخورده و پاسخِ push همان؛
@@ -104,15 +104,18 @@ test.before(async () => {
 test.after(async () => { await h.stop(); });
 test.beforeEach(() => resetAll());
 
-test('پرچمِ خاموش (پیش‌فرض): push همان و هیچ ردیفی؛ درهای خواندن ۴۰۳', async () => {
+test('پرچمِ خاموش (پیش‌فرض): push همان و هیچ ردیفی؛ درهای خواندنِ پیش‌ساخته همان درِ ناشناخته (۴۰۴)', async () => {
   const r = await push1(A, [v1op('off-1', sale('off-1'))]);
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.deepEqual(statuses(r), ['applied']);
   assert.deepEqual(await stamps(A), []);
+  //  S46: رابطِ «کارِ هر کاربرِ صندوق» در برنامه نیست (PARTIAL-MAP) ⇒ با پرچمِ خاموش این درها نیستند
+  const unknown = await h.get('/api/shop/till-pin/no-such-door', { token: A.token });
+  assert.equal(unknown.status, 404, JSON.stringify(unknown.body));
   for (const res of [await h.get('/api/shop/till-pin/ops', { token: A.token }),
     await h.get('/api/shop/till-pin/ops/row?table=sales&row_id=off-1', { token: A.token })]) {
-    assert.equal(res.status, 403, JSON.stringify(res.body));
-    assert.equal(res.body.error && res.body.error.code, 'till_op_user_disabled');
+    assert.equal(res.status, 404, JSON.stringify(res.body));
+    assert.deepEqual(res.body, unknown.body, 'همان پاسخِ درِ ناشناخته');
   }
 });
 
