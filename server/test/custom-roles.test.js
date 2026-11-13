@@ -141,11 +141,11 @@ test('دادن به مدیر: همان راه‌های امروز اجرا می�
   const r = await push3(manager, 'm-c', [over]);
   assert.deepEqual(why(r), ['approval_required']);
   assert.deepEqual(why(await push3(manager, 'm-c', [sale(5)])), ['applied']);
-  //  کلیدِ لایه‌پذیرِ REST از همان `requirePermission`
-  assert.equal((await h.get('/api/shop/approvals', { token: manager.accessToken })).status, 403);
+  //  کلیدِ لایه‌پذیرِ REST از همان `requirePermission` (`audit.view` ِ سابقهٔ دکان)
+  assert.equal((await h.get('/api/shop/audit', { token: manager.accessToken })).status, 403);
   //  مدیرِ بی نقشِ سفارشی: همان امروز
   assert.deepEqual(why(await push3(manager2, 'm2', [sale(20)])), ['applied']);
-  assert.equal((await h.get('/api/shop/approvals', { token: manager2.accessToken })).status, 200);
+  assert.equal((await h.get('/api/shop/audit', { token: manager2.accessToken })).status, 200);
   assert.equal((await policyOf(manager2)).layers.length, 2);
   //  صفحهٔ صاحب: نقش و عضوش
   const page = await h.get('/api/shop/permissions', { token: owner.accessToken });
@@ -193,7 +193,7 @@ test('نقشِ پایهٔ دیگر نقشِ عضو را همان می‌کند؛
   assert.equal((await call('DELETE', `/${role.id}`, owner)).status, 200);
   assert.equal((await policyOf(manager)).layers.length, 2);
   assert.deepEqual(why(await push3(manager, 'm-c', [sale(20)])), ['applied']);
-  assert.equal((await h.get('/api/shop/approvals', { token: manager.accessToken })).status, 200);
+  assert.equal((await h.get('/api/shop/audit', { token: manager.accessToken })).status, 200);
   assert.equal((await one('SELECT 1 AS x FROM shop_member_custom_roles WHERE user_id=$1', [manager.user.id])), null);
   //  صاحب و عضوِ ناشناخته نقشِ سفارشی نمی‌گیرند
   assert.equal((await call('PUT', `/members/${owner.user.id}`, owner, { roleId: cashier.body.role.id })).body.error.code, 'owner_fixed');

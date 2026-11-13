@@ -198,12 +198,12 @@ test('مصرف در Sync v3: op با ارجاع می‌نشیند، سابقه �
   const row = await reqRow(id);
   assert.equal(row.status, 'used');
   assert.equal(row.used_op_id, op.op_id);
-  const list = (await h.get('/api/shop/approvals', { token: owner.accessToken })).body.approvals;
-  const a = list.find((x) => x.nonce === `req_${id}`);
-  assert.equal(a.approverId, owner.user.id);
-  assert.equal(a.requesterId, staff.user.id);
-  assert.equal(a.keyId, 'remote');
-  assert.equal(a.opId, op.op_id);
+  //  سابقه در `shop_approvals` (درِ فهرستِ `GET /api/shop/approvals` برداشته شد)
+  const a = await one('SELECT * FROM shop_approvals WHERE shop_id=$1 AND nonce=$2', [shopId, `req_${id}`]);
+  assert.equal(a.approver_id, owner.user.id);
+  assert.equal(a.requester_id, staff.user.id);
+  assert.equal(a.key_id, 'remote');
+  assert.equal(a.op_id, op.op_id);
   assert.equal(a.doc, 'sales/s-use');
   assert.equal((await h.get(`${BASE}/${id}`, { token: staff.accessToken })).body.request.status, 'used');
   //  پاسخ گم شد ⇒ همان op دوباره «تکراری»

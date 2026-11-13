@@ -6,11 +6,11 @@
  * سنجه‌ها: پرچمِ خاموش همان امروز (سقف ذخیره نمی‌شود، قیمتِ دستی و «جمعِ نهایی» ِ کم می‌نشیند)؛ با پرچمِ روشن در Sync v3
  * کاهشِ قیمتِ ردیف و شکافِ جمعِ نهایی تخفیف‌اند (شاگردِ بی تخفیف ⇒ `discount_not_allowed`، مدیرِ سقف‌دار ⇒ تأیید)، تغییرِ
  * قیمتِ بیش از `maxPct` ⇒ `approval_required` یا `price_not_allowed`، «درخواستِ تأیید» در `priceApproval` یک‌بارمصرف؛ همهٔ
- * قلم‌ها با سرشان برمی‌گردند؛ قلمِ دیرآمده جمعِ تازه را می‌سنجد؛ قیمتِ فهرست/تخفیفِ خودکار آزاد؛ REST ۴۰۳؛ صاحب هرگز؛
+ * قلم‌ها با سرشان برمی‌گردند؛ قلمِ دیرآمده جمعِ تازه را می‌سنجد؛ قیمتِ فهرست/تخفیفِ خودکار آزاد؛ راهِ قدیم ۴۰۳؛ صاحب هرگز؛
  * دکانِ دیگر پرچم را نمی‌بیند.
  * تصمیمِ ۱-۱۱ (۱۴۰۵/۰۸/۱۹): قیمتِ عمده فقط برای مشتریِ لیستِ عمده (ردیفِ مشتریِ همین سرور) «فهرست» است — وگرنه تخفیفِ پنهان
  * (ادعای `priceList` ِ فاکتور پذیرفته نیست)؛ قلمِ آزاد (بی کارت یا کالای ناشناخته) مجوزِ `sales.free_line` با سقفِ قیمتِ واحد،
- * «با تأیید» (`freeLineApproval`) یا «ممنوع» دارد — v3، قلمِ دیرآمده و REST؛ پرچمِ خاموش ⇒ ذخیرهٔ مجوز `not_enforceable_yet`.
+ * «با تأیید» (`freeLineApproval`) یا «ممنوع» دارد — v3، قلمِ دیرآمده و راهِ قدیم؛ پرچمِ خاموش ⇒ ذخیرهٔ مجوز `not_enforceable_yet`.
  */
 process.env.SYNC_V3_ENABLED = '1';
 
@@ -108,13 +108,16 @@ test.before(async () => {
     assert.deepEqual(why(r), ['applied', 'applied'], JSON.stringify(r.body));
   }
   for (const [who, id, price] of [[owner, 'pc-rice', 1000], [owner, 'pc-oil', 500]]) {
-    const r = await h.post('/api/products', { id, name: id, salePrice: price, wholesalePrice: 0 }, { token: who.accessToken });
-    assert.ok([200, 201].includes(r.status), JSON.stringify(r.body));
+    const r = await h.seed(who.accessToken, 'products', { id, name: id, salePrice: price, wholesalePrice: 0 });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
   }
 });
 test.after(async () => { await h.stop(); });
+//  فاکتورِ کامل در یک دستهٔ راهِ قدیم (`/api/sync`؛ جای `/api/sales/full` ِ برداشته)
+const legacyFull = (who, sale, items, deviceId = 'web-full') => h.legacyPush(who.accessToken,
+  [h.change('sales', sale), ...items.map((it) => h.change('saleItems', { ...it, saleId: sale.id }))], { deviceId });
 
-test('پرچمِ خاموش (پیش‌فرض): سقفِ قیمت ذخیره نمی‌شود و قیمتِ دستی، شکافِ جمعِ نهایی و REST همان امروز', async () => {
+test('پرچمِ خاموش (پیش‌فرض): سقفِ قیمت ذخیره نمی‌شود و قیمتِ دستی، شکافِ جمعِ نهایی و راهِ قدیم همان امروز', async () => {
   const set = await setRole('staff', { 'sales.price': { caps: { maxPct: 5 } } });
   assert.equal(set.status, 400, JSON.stringify(set.body));
   assert.equal(set.body.error.code, 'not_enforceable_yet');
@@ -126,11 +129,10 @@ test('پرچمِ خاموش (پیش‌فرض): سقفِ قیمت ذخیره نم
     [shopId, JSON.stringify({ 'sales.price': { mode: 'deny' } }), now()]);
   assert.deepEqual(why(await push3(staff, 'off', sale3('pc-off-1', [['pc-rice', 50000, 1000]]))), ['applied', 'applied']);
   assert.deepEqual(why(await push3(staff, 'off', sale3('pc-off-2', [['pc-rice', 100000, 1000]], { finalTotalMinor: 60000 }))), ['applied', 'applied']);
-  const rest = await h.post('/api/sales/full', {
-    sale: { id: 'pc-off-r', total: 500, discount: 0, finalTotal: 500, status: 'completed' },
-    items: [{ id: 'pc-off-r-i', productId: 'pc-rice', quantity: 1, unitPrice: 500 }],
-  }, { token: staff.accessToken });
-  assert.ok([200, 201].includes(rest.status), JSON.stringify(rest.body));
+  const rest = await legacyFull(staff, { id: 'pc-off-r', total: 500, discount: 0, finalTotal: 500, status: 'completed' },
+    [{ id: 'pc-off-r-i', productId: 'pc-rice', quantity: 1, unitPrice: 500 }]);
+  assert.equal(rest.status, 200, JSON.stringify(rest.body));
+  assert.equal(rest.body.applied, 2, JSON.stringify(rest.body));
   assert.equal((await many(`SELECT 1 FROM sync_v3_conflicts WHERE account_id=$1`, [shopId])).length, 0);
   await query(`DELETE FROM shop_role_perms WHERE shop_id=$1`, [shopId]);
 });
@@ -231,8 +233,8 @@ test('تصمیمِ ۱-۱۱ (۳)، v3: قیمتِ عمده فقط برای مشت
   //  مدیرِ با تخفیفِ آزاد («کسی که اجازه‌اش را دارد») همان لیست را برای مشتریِ خرده برمی‌گزیند
   assert.deepEqual(why(await push3(manager, 'w3m', sale3('pc-w-m', [['pc-rice', 80000, 1000]], { debtorId: 'pc-rcust' }))), ['applied', 'applied']);
   //  راهِ قدیم: مشتریِ عمدهٔ همین دسته یا ردیفِ نشستهٔ راهِ قدیم (کالای راهِ قدیم با عمدهٔ ۸۰۰)
-  const p = await h.post('/api/products', { id: 'pc-lrice', name: 'pc-lrice', salePrice: 1000, wholesalePrice: 800 }, { token: owner.accessToken });
-  assert.ok([200, 201].includes(p.status), JSON.stringify(p.body));
+  const p = await h.seed(owner.accessToken, 'products', { id: 'pc-lrice', name: 'pc-lrice', salePrice: 1000, wholesalePrice: 800 });
+  assert.equal(p.status, 200, JSON.stringify(p.body));
   const t = Date.now();
   const legacy = (changes) => h.api('POST', '/api/sync/push', { token: staff.accessToken, headers: { 'X-App': 'shop' }, body: { deviceId: 'web-w', changes } });
   const head = (id, debtorId) => ({ collection: 'sales', id, updatedAt: t,
@@ -292,11 +294,9 @@ test('تصمیمِ ۱-۱۱ (۲): قلمِ آزاد مجوزِ sales.free_line د
   assert.deepEqual(why(await push3(staff, 'fl', [late])), ['free_line_not_allowed']);
   assert.equal(await row3('saleItems', 'pc-f-late-i9'), null);
   assert.deepEqual(why(await push3(owner, 'fo', sale3('pc-f-own', [['', 999900, 1000]]))), ['applied', 'applied']);
-  //  REST/راهِ قدیم
-  const rest = await h.post('/api/sales/full', {
-    sale: { id: 'pc-f-r', total: 10, discount: 0, finalTotal: 10, status: 'completed', date: '2026-11-08' },
-    items: [{ id: 'pc-f-r-i', productId: '', name: 'آزاد', quantity: 1, unitPrice: 10 }],
-  }, { token: staff.accessToken });
+  //  راهِ قدیم (فاکتورِ کامل در یک دسته)
+  const rest = await legacyFull(staff, { id: 'pc-f-r', total: 10, discount: 0, finalTotal: 10, status: 'completed', date: '2026-11-08' },
+    [{ id: 'pc-f-r-i', productId: '', name: 'آزاد', quantity: 1, unitPrice: 10 }]);
   assert.equal(rest.status, 403, JSON.stringify(rest.body));
   assert.equal(rest.body.error.code, 'free_line_not_allowed');
   assert.equal((await setRole('staff', {})).status, 200);
@@ -313,11 +313,10 @@ test('پرچمِ روشن، v3: قلمِ دیرآمده (سر در دستهٔ پ
   assert.deepEqual(why(await push3(staff, 'pl', [line])), ['applied']);
 });
 
-test('پرچمِ روشن، REST/راهِ قدیم: کاهشِ قیمتِ ردیف ⇒ ۴۰۳ discount_not_allowed، تغییرِ بالای سقف ⇒ approval_required؛ فهرست آزاد', async () => {
-  const post = (id, unitPrice, extra = {}) => h.post('/api/sales/full', {
-    sale: { id, total: unitPrice, discount: 0, finalTotal: unitPrice, status: 'completed', date: '2026-11-08', ...extra },
-    items: [{ id: `${id}-i`, productId: 'pc-rice', quantity: 1, unitPrice }],
-  }, { token: staff.accessToken });
+test('پرچمِ روشن، راهِ قدیم: کاهشِ قیمتِ ردیف ⇒ ۴۰۳ discount_not_allowed، تغییرِ بالای سقف ⇒ approval_required؛ فهرست آزاد', async () => {
+  const post = (id, unitPrice, extra = {}) => legacyFull(staff,
+    { id, total: unitPrice, discount: 0, finalTotal: unitPrice, status: 'completed', date: '2026-11-08', ...extra },
+    [{ id: `${id}-i`, productId: 'pc-rice', quantity: 1, unitPrice }]);
   const low = await post('pc-r-low', 900);
   assert.equal(low.status, 403, JSON.stringify(low.body));
   assert.equal(low.body.error.code, 'discount_not_allowed');
@@ -329,12 +328,14 @@ test('پرچمِ روشن، REST/راهِ قدیم: کاهشِ قیمتِ ردی
   assert.equal(up.status, 403);
   assert.equal(up.body.error.code, 'approval_required');
   const ok = await post('pc-r-ok', 1000);
-  assert.ok([200, 201].includes(ok.status), JSON.stringify(ok.body));
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(ok.body.applied, 2, JSON.stringify(ok.body));
   //  راهِ قدیم کلِ ردیف را جایگزین می‌کند: سرِ نشسته با «جمعِ نهایی» ِ کمتر ⇒ تخفیفِ پنهان؛ همان ردیفِ بی‌تغییر آزاد
   const head = { total: 1000, discount: 0, finalTotal: 1000, status: 'completed', date: '2026-11-08' };
-  const same = await h.put('/api/sales/pc-r-ok', { ...head, note: 'یادداشت', updatedAt: Date.now() + 1000 }, { token: staff.accessToken });
+  const same = await h.seed(staff.accessToken, 'sales', { id: 'pc-r-ok', ...head, note: 'یادداشت' }, { updatedAt: Date.now() + 1000, deviceId: 'web-full' });
   assert.equal(same.status, 200, JSON.stringify(same.body));
-  const cut = await h.put('/api/sales/pc-r-ok', { ...head, finalTotal: 700, updatedAt: Date.now() + 2000 }, { token: staff.accessToken });
+  assert.equal(same.body.applied, 1, JSON.stringify(same.body));
+  const cut = await h.seed(staff.accessToken, 'sales', { id: 'pc-r-ok', ...head, finalTotal: 700 }, { updatedAt: Date.now() + 2000, deviceId: 'web-full' });
   assert.equal(cut.status, 403, JSON.stringify(cut.body));
   assert.equal(cut.body.error.code, 'discount_not_allowed');
   assert.equal((await one(`SELECT data FROM sales WHERE shop_id=$1 AND id='pc-r-ok'`, [shopId])).data.finalTotal, 1000);
