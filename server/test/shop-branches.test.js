@@ -404,3 +404,22 @@ test('کوچ: دکانِ امروز بی هیچ ردیفِ تازه «شعبهٔ
     assert.equal((await one(`SELECT COUNT(*)::int AS n FROM ${t} WHERE account_id=$1`, [key])).n, 0, t);
   }
 });
+
+test('پرچم دوباره خاموش ⇒ همان امروز، حتی با ردیف‌های شعبه و انتساب (کارمند به شعبهٔ اصلی برمی‌گردد)', async () => {
+  const w = await world('خاموش‌دوباره');
+  const { s, A } = w;
+  assert.equal((await pushV3(w.onlyA, [product3('d-a')], A)).status, 200);
+  await flag(s, 'shop.branches', false);
+  //  همگام‌سازی و درهای امروز برای کارمندِ «فقط الف»: همان امروز (شعبهٔ اصلی)
+  assert.equal((await h.get('/api/shop', { token: w.onlyA.token })).status, 200);
+  const pv1 = await v1(w.onlyA, 'GET', `pull?since=0&device_id=${w.onlyA.device}`);
+  assert.equal(pv1.status, 200, JSON.stringify(pv1.body));
+  //  سرآیندِ الف بی اثر ⇒ v3 همان حسابِ دکان
+  const p = await pushV3(w.onlyA, [product3('d-main')], A);
+  assert.equal(p.status, 200, JSON.stringify(p.body));
+  assert.deepEqual((await rowsOf(s.shopId, 'products')).map((r) => r.row_id), ['d-main']);
+  assert.deepEqual((await rowsOf(`${s.shopId}#${A}`, 'products')).map((r) => r.row_id), ['d-a']);
+  //  درهای شعبه همان مسیرِ ناشناخته
+  assert.equal((await h.get('/api/shop/branches', { token: s.token })).status, 404);
+  assert.equal((await h.get('/api/shop/branches/report', { token: s.token })).status, 404);
+});

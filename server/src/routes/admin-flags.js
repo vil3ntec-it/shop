@@ -58,6 +58,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.storefront.filters', scope: 'shop', default: true, what: 'فیلترِ کاتالوگِ ویترین (برند، قیمت، موجود، مشخصه)' },
   { key: 'shop.storefront.alerts', scope: 'shop', default: false, what: '«خبرم کن وقتی موجود/ارزان شد» ِ ویترین' },
   { key: 'shop.staff_scope', scope: 'shop', default: false, what: 'دسترسیِ کارمند محدود به مکانِ موجودی (STF-06)' },
+  { key: 'shop.branches', scope: 'shop', default: false, what: 'شعبه درونِ یک دکان: دادهٔ هر شعبه جدا، کارمند فقط شعبهٔ خودش، صاحب همه و جمع (فازِ ۱ ِ سرور؛ تا رابطِ برنامه روشن نشود)' },
   { key: 'shop.returns.sale_cap', scope: 'shop', default: false, what: 'برگشتِ کارمند بیش از جمعِ خودِ فاکتور رد می‌شود (SEC-DATA-07، DATA-04)' },
   //  ⛔ پیش‌فرض روشن (درستی، نه اجازه): فقط خاموش‌کنِ اضطراری — `false` ِ صریح ‎lib/return-line-cap.js‎ را برمی‌دارد
   { key: 'shop.returns.line_cap', scope: 'shop', default: true, what: 'هیچ‌کس (صاحب هم) بیش از فروخته‌شدهٔ هر قلمِ فاکتور برنمی‌گرداند؛ فقط false خاموش می‌کند (DATA-04، سفرِ JB5)' },
