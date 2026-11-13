@@ -194,8 +194,8 @@ await page.click('#ps-ap-on');
 await page.waitForSelector('#ps-ap-off', { state: 'visible', timeout: 15000 });
 ok(/روشن است/.test(await text('#ps-ap-state')) && !(await visible('#ps-ap-on')), '«روشن است» و «خاموش کن»', await text('#ps-ap-state'));
 const r1 = await rows();
-ok(r1.length === 1 && r1[0].endpoint === fakeSub.endpoint && r1[0].page === `/store/${slug}` && r1[0].phone === '+93791113377' && r1[0].proof === 'ticket',
-  'سرور: یک اشتراک برای همین شماره، همین مرورگر و همین ویترین (اثبات: بلیت)', JSON.stringify(r1));
+ok(r1.length === 1 && r1[0].endpoint === fakeSub.endpoint && r1[0].page === `/store/${slug}` && r1[0].phone === mailOf('0791113377') && r1[0].proof === 'ticket',
+  'سرور: یک اشتراک برای همین ایمیلِ تأییدشده، همین مرورگر و همین ویترین (اثبات: بلیت)', JSON.stringify(r1));
 const scope = await page.evaluate(async (sc) => { const r = await navigator.serviceWorker.getRegistration(sc); return r ? r.scope : ''; }, `/store/${slug}`);
 ok(scope === `${base}/store/${slug}`, 'کارگرِ سرویس با دامنهٔ همین ویترین', scope);
 const appKey = await page.evaluate(() => localStorage.getItem('test-push-sub'));
@@ -260,7 +260,7 @@ const beforeOther = posts.length;
 await open('rice');
 await page.locator('#ps-alerts button', { hasText: 'وقتی ارزان شد خبرم کن' }).click();
 await page.waitForSelector('#ps-ap-on', { state: 'visible', timeout: 15000 });
-ok(posts.length === beforeOther && (await rows()).every((r) => r.phone === '+93791113377'), 'شمارهٔ دیگر: «روشن» نیست و بی لمس هیچ اشتراکی برایش ساخته نمی‌شود');
+ok(posts.length === beforeOther && (await rows()).every((r) => r.phone === mailOf('0791113377')), 'ایمیلِ دیگر: «روشن» نیست و بی لمس هیچ اشتراکی برایش ساخته نمی‌شود');
 await open('rice', '?lang=en');
 await page.waitForFunction(() => (document.getElementById('ps-ap-on') || {}).textContent === 'Notify me on this device too', null, { timeout: 10000 });
 ok(true, 'انگلیسی: «Notify me on this device too»');

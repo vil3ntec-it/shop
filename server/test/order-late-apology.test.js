@@ -177,7 +177,7 @@ test('یک پوزش برای هر سفارش: دو دورِ پیاپی و دو �
   assert.equal((await outboxOf(o.id))[0].status, 'pending');
 });
 
-test('کوپن یک‌بارمصرف و فقط برای همان شماره؛ منقضی و لغوشده بی‌اعتبار', async () => {
+test('کوپن یک‌بارمصرف و فقط برای همان مشتری (ایمیلِ تأییدشده)؛ منقضی و لغوشده بی‌اعتبار', async () => {
   const s = await shop('کوپن');
   await policy(s, { enabled: true, lateMinutes: 10, coupon: { kind: 'amount', amountMinor: 5000, days: 7 } });
   const o = await storeOrder(s);
@@ -189,6 +189,14 @@ test('کوپن یک‌بارمصرف و فقط برای همان شماره؛ م
   assert.equal(stranger.status, 409);
   assert.equal(stranger.body.error.code, 'promo_code_rejected');
   assert.equal((await rowsOf(o.id))[0].redeemed_at, null, 'شمارهٔ دیگر مصرف نکرد');
+  //  «فقط ایمیل»: همان شمارهٔ تماس با ایمیلِ تأییدشدهٔ دیگر ⇒ رد (شماره تأیید نمی‌شود، پس هویت نیست)
+  const samePhone = await h.post(`/api/store/${s.slug}/checkout`, {
+    fulfillment: 'pickup', customer: { name: 'دیگری', phone: PHONE }, promoCode: code,
+    lines: [{ productId: 'rice', qtyMilli: 3000 }, { productId: 'oil', qtyMilli: 1000 }],
+  }, { headers: { 'Idempotency-Key': `ck-${uniq()}-key`, 'X-Store-Ticket': await ticketFor(s.slug, OTHER) } });
+  assert.equal(samePhone.status, 409, JSON.stringify(samePhone.body));
+  assert.equal(samePhone.body.error.code, 'promo_code_rejected');
+  assert.equal((await rowsOf(o.id))[0].redeemed_at, null, 'شمارهٔ تماسِ همان مشتری بی ایمیلش مصرف نکرد');
 
   const mine = await checkout(s, { body: { promoCode: code.toLowerCase().replace(/^ap/, 'ap-') } });
   assert.equal(mine.status, 201, JSON.stringify(mine.body));
@@ -260,6 +268,31 @@ test('سقفِ هزینهٔ NTF-02: کانالِ پولیِ پُر صدا زده
   assert.deepEqual(calls.map((c) => c.channel), ['telegram']);
   assert.match(calls[0].text, /پوزش/);
   assert.equal(/AP[0-9A-Z]{8}/.test(calls[0].text), false, 'کد در متنِ پیام نیست');
+});
+
+test('«فقط ایمیل»: پوزش از کانالِ ایمیلِ خودِ سرور به ایمیلِ تأییدشدهٔ همان سفارش می‌رسد (بی حسابِ بیرونی)، بی کد در متن', async (t) => {
+  const mailer = require('../src/lib/mailer');
+  const keep = { send: mailer.send, current: mailer.current };
+  t.after(() => Object.assign(mailer, keep));
+  const s = await shop('ایمیلِ پوزش');
+  await policy(s, { enabled: true, lateMinutes: 10, coupon: { kind: 'amount', amountMinor: 5000, days: 7 } });
+  const o = await storeOrder(s, { phone: '0794443366' });
+  //  پس از ثبت (کدِ آزمایشیِ تأیید فقط در راهِ log): سرویسِ ایمیلِ سرور «تنظیم‌شده» و فرستادن ضبط می‌شود
+  const sent = [];
+  mailer.current = async () => ({ provider: 'smtp' });
+  mailer.send = async (m) => { sent.push(m); };
+  const at = (await dueOf(o.id)) + 11 * MIN;
+  await A.sweep(at);
+  await query(`UPDATE customer_notify_outbox SET status='cancelled' WHERE status='pending' AND NOT (order_id=$1 AND event='order_late_apology')`, [o.id]);
+  await N.tick(at + 1000);
+  const row = (await outboxOf(o.id))[0];
+  assert.equal(row.status, 'sent', JSON.stringify(row));
+  assert.equal(row.channel, 'email');
+  const mine = sent.filter((m) => m.to === mailOf('0794443366'));
+  assert.equal(mine.length, 1, JSON.stringify(sent.map((m) => m.to)));
+  assert.match(mine[0].text, /پوزش/);
+  assert.equal(/AP[0-9A-Z]{8}/.test(mine[0].text + mine[0].html), false, 'کدِ کوپن فقط در صفحهٔ پیگیری، نه در ایمیل');
+  assert.equal(mine[0].text.includes('0794443366') || mine[0].text.includes('+93794443366'), false, 'بی شماره در متن');
 });
 
 test('تأخیرِ کارِ مشتری ⇒ بی پیام و بی کوپن؛ لغوشده هرگز نامزد نیست', async () => {

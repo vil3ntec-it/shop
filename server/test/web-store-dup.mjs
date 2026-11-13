@@ -111,6 +111,7 @@ const submitSame = async () => {
   await page.goto(`${base}/store/${slug}?r=${++loads}#/checkout`);
   await page.waitForSelector('#view-checkout:not([hidden]) #submit-order', { timeout: 15000 });
   await page.fill('#c-name', 'مشتری');
+  await page.fill('#c-phone', '0791230002');   //  «فقط ایمیل»: شمارهٔ تماسِ پیک جدا و بی کد
   await page.check('input[name="fulfillment"][value="pickup"]');
   await page.click('#submit-order');
   await page.waitForSelector('dialog.confirm .btn-danger', { timeout: 10000 });

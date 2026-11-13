@@ -165,7 +165,7 @@ ok(/"oil"/.test(await page.evaluate((k) => localStorage.getItem(k) || '', `store
     const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
     const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
     const a = await call('POST', `/api/store/${slug}/account`, {}, null, { 'X-Store-Ticket': vc.body.ticket });
-    return { token: a.body.session, expiresAt: a.body.expiresAt, phone: a.body.customer.phone, name: '' };
+    return { token: a.body.session, expiresAt: a.body.expiresAt, email: a.body.customer.email, phone: a.body.customer.phone, name: "" };
   };
   const S1 = await sessionOf();
   const favsOf = async (S) => ((await call('GET', `/api/store/${slug}/account/favorites`, null, null, { 'X-Store-Session': S.token })).body.items || []).map((p) => p.id);
@@ -221,7 +221,7 @@ ok(/"oil"/.test(await page.evaluate((k) => localStorage.getItem(k) || '', `store
     const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
     const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
     const a = await call('POST', `/api/store/${slug}/account`, {}, null, { 'X-Store-Ticket': vc.body.ticket });
-    return { token: a.body.session, expiresAt: a.body.expiresAt, phone: a.body.customer.phone, name: '' };
+    return { token: a.body.session, expiresAt: a.body.expiresAt, email: a.body.customer.email, phone: a.body.customer.phone, name: "" };
   };
   const L1 = await sessionOf();
   const listOf = async (S) => (await call('GET', listUrl, null, null, { 'X-Store-Session': S.token })).body.list;

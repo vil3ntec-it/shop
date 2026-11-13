@@ -114,14 +114,14 @@ const session = async (phone) => {
   const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
   const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
   const a = await call('POST', `/api/store/${slug}/account`, {}, null, { 'X-Store-Ticket': vc.body.ticket });
-  return { token: a.body.session, expiresAt: a.body.expiresAt, phone: a.body.customer.phone, name: '' };
+  return { token: a.body.session, expiresAt: a.body.expiresAt, email: a.body.customer.email, phone: a.body.customer.phone, name: '' };
 };
 const H = (s) => ({ 'X-Store-Session': s.token });
 const apiCart = async (s) => (await call('GET', `/api/store/${slug}/account/cart`, null, null, H(s))).body.cart;
 const qtys = (cart) => Object.fromEntries((cart ? cart.lines : []).map((l) => [l.productId, l.qtyMilli]));
-const dbCart = async (phone) => {
+const dbCart = async (email) => {   //  «فقط ایمیل»: حساب با ایمیلِ تأییدشده
   const r = await one(`SELECT c.items, c.version FROM store_customer_carts c JOIN store_customers s ON s.id = c.customer_id
-                        WHERE c.shop_id = $1 AND s.phone = $2`, [shopId, phone]);
+                        WHERE c.shop_id = $1 AND s.email = $2`, [shopId, email]);
   if (!r) return null;
   const items = typeof r.items === 'string' ? JSON.parse(r.items) : r.items;
   return { version: Number(r.version), items: Object.fromEntries(items.map((i) => [i.productId, i.qtyMilli])), notes: items.map((i) => i.note || '') };
@@ -192,7 +192,7 @@ ok(bytes <= FIRST_LOAD, `بارِ نخست ${bytes} بایت ≤ ${FIRST_LOAD} (
   await page.waitForTimeout(1200);
   ok(reqs.filter((r) => r.t >= t0).length === 0 && same(await local(page), { rice: 1000, oil: 1000 }) && !(await ls(page, SYNC)),
     'پرچمِ سبد خاموش (با نشست) ⇒ cart-sync.js و `/account/cart` خواسته نشد و سبد همان سبدِ مهمان', JSON.stringify(reqs.filter((r) => r.t >= t0)));
-  ok(await dbCart(sOff.phone) === null, 'پرچمِ خاموش ⇒ هیچ ردیفی روی سرور');
+  ok(await dbCart(sOff.email) === null, 'پرچمِ خاموش ⇒ هیچ ردیفی روی سرور');
   await go(page, '#/orders');
   await page.waitForSelector('#ac-mine button:has-text("خروج از حساب")', { timeout: 10000 });
   await page.click('#ac-mine button:has-text("خروج از حساب")');
@@ -215,7 +215,7 @@ await flag('shop.storefront.cart', true);
 
 //  ── ۲ ورود ⇒ یک ادغام؛ بارِ دوباره فقط GET؛ قیمتِ امروز از سرور ──
 const phone = '0792000002';
-const P = '+93' + phone.slice(1);
+const P = mailOf(phone);   //  کلیدِ حساب = ایمیلِ تأییدشده
 const other = await session(phone);   //  «دستگاهِ دیگرِ» همان حساب
 ok((await call('PUT', `/api/store/${slug}/account/cart`, { version: 0, items: [{ productId: 'oil', qtyMilli: 2000 }] }, null, H(other))).status === 200,
   'سبدِ حساب از دستگاهِ دیگر: روغن ×۲');
@@ -224,7 +224,7 @@ let page = watch(await ctx.newPage());
 await go(page, '#/orders');
 await page.waitForSelector('#ac-mine button:has-text("ورود به حساب")', { timeout: 15000 });
 await page.click('#ac-mine button:has-text("ورود به حساب")');
-await page.fill('#ac-mine input[type="tel"]', phone);
+await page.fill('#ac-mine input[type="email"]', mailOf(phone));
 await page.click('#ac-mine button:has-text("فرستادنِ کد")');
 await page.waitForFunction(() => /کدِ آزمایشی: \d+/.test(document.getElementById('ac-mine').textContent), null, { timeout: 5000 });
 const code = /کدِ آزمایشی: (\d+)/.exec(await page.textContent('#ac-mine'))[1];
@@ -404,7 +404,7 @@ ok(Object.keys((await ls(page, `store-cart:${slug}`)) || {}).length === 0 && !(a
   'خروج ⇒ سبدِ حساب، پایهٔ هم‌گامی و نشست از دستگاه پاک', JSON.stringify(await ls(page, `store-cart:${slug}`)));
 ok(Object.keys((await dbCart(P)).items).length === 4, 'سبدِ حساب روی سرور ماند');
 await page.click('#ac-mine button:has-text("ورود به حساب")');
-await page.fill('#ac-mine input[type="tel"]', phone);
+await page.fill('#ac-mine input[type="email"]', mailOf(phone));
 await page.click('#ac-mine button:has-text("فرستادنِ کد")');
 await page.waitForFunction(() => /کدِ آزمایشی: \d+/.test(document.getElementById('ac-mine').textContent), null, { timeout: 5000 });
 await page.fill('#ac-mine input[autocomplete="one-time-code"]', /کدِ آزمایشی: (\d+)/.exec(await page.textContent('#ac-mine'))[1]);
@@ -431,13 +431,13 @@ await until(async () => !(await ls(page, 'store-session')));
 await page.waitForTimeout(2500);
 ok(!(await ls(page, 'store-session')) && Object.keys(await local(page)).length === 0 && !(await ls(page, SYNC)) && puts(t) === 1,
   'پس از پاک شدنِ حساب: یک PUT ⇒ ۴۰۱، نشست و نسخهٔ سبد از دستگاه پاک، بی چرخه', `puts=${puts(t)}`);
-ok((await one('SELECT COUNT(*)::int AS n FROM store_customers WHERE phone = $1', [P])).n === 0 && (await dbCart(P)) === null,
+ok((await one('SELECT COUNT(*)::int AS n FROM store_customers WHERE email = $1', [P])).n === 0 && (await dbCart(P)) === null,
   'سبد با حساب رفت و دوباره ساخته نشد');
 await ctx.close();
 
 //  ── نشستِ منقضی و پرچمِ خاموشِ میانهٔ کار ──
 {
-  const old = { token: 'x'.repeat(40), expiresAt: Date.now() - 1000, phone: '+93792000009', name: '' };
+  const old = { token: 'x'.repeat(40), expiresAt: Date.now() - 1000, email: mailOf('0792000009'), name: '' };
   const cx = await device({ sess: old, cart: line('rice', 1000), sync: { v: 3, k: '[["rice",1000,""]]', merged: true } });
   const px = watch(await cx.newPage());
   await go(px);
@@ -456,7 +456,7 @@ await ctx.close();
   const cf = await device({ sess: sF, cart: line('rice', 1000) });
   const pf = watch(await cf.newPage());
   await go(pf);
-  await until(async () => (await dbCart(sF.phone))?.items.rice === 1000);
+  await until(async () => (await dbCart(sF.email))?.items.rice === 1000);
   await flag('shop.storefront.cart', false);
   t = Date.now();
   await add(pf, 'rice');

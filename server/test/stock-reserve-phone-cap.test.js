@@ -80,10 +80,10 @@ async function storeShop(name, stock) {
   return s;
 }
 /** سفارشِ ویترین با شمارهٔ تأییدشده ⇒ شناسهٔ سفارش ([lines]: [کالا، عدد]) */
-async function customerOrder(s, phone, lines) {
+async function customerOrder(s, phone, lines, { email = mailOf(phone) } = {}) {
   resetAll();
-  const st = await h.post(`/api/store/${s.slug}/verify/start`, { email: mailOf(phone) });
-  const ticket = (await h.post(`/api/store/${s.slug}/verify/check`, { email: mailOf(phone), code: st.body.devCode })).body.ticket;
+  const st = await h.post(`/api/store/${s.slug}/verify/start`, { email });
+  const ticket = (await h.post(`/api/store/${s.slug}/verify/check`, { email, code: st.body.devCode })).body.ticket;
   assert.ok(ticket, 'تیکتِ شمارهٔ تأییدشده');
   const ck = await h.post(`/api/store/${s.slug}/checkout`, {
     fulfillment: 'pickup', customer: { name: 'مشتری', phone }, lines: lines.map(([productId, n]) => ({ productId, qtyMilli: n * 1000 })),
@@ -113,6 +113,14 @@ test('یک شماره روی هم فقط نیمِ آزاد را نگه می‌د
   //  قبولِ سفارشِ بی نگه‌داشته هم نگه‌داشته نمی‌سازد
   assert.equal((await h.post(`/api/shop/orders/${b}/transition`, { to: 'accepted' }, { token: s.token })).status, 200);
   assert.deepEqual(await heldOf(s, b), []);
+});
+
+test('«فقط ایمیل»: سقف مالِ همان مشتری است — همان ایمیل با شمارهٔ تماسِ دیگر هم از نیم نمی‌گذرد', async () => {
+  const s = await storeShop('سقف-ایمیل', { c1: 4 });
+  const a = await customerOrder(s, '0791220011', [['c1', 2]]);
+  assert.deepEqual(await heldOf(s, a), [['c1', 2000]]);
+  const b = await customerOrder(s, '0791220012', [['c1', 1]], { email: mailOf('0791220011') });
+  assert.deepEqual(await heldOf(s, b), [], 'شمارهٔ تماسِ دیگر با همان ایمیلِ تأییدشده ⇒ همان سقف، بی نگه‌داشتن');
 });
 
 test('دست‌کم یک دانه؛ یک سفارشِ بیش از نیم (هر کالایش) کلاً بی نگه‌داشتن', async () => {

@@ -80,7 +80,7 @@ async function check(run, shopId, email, { at = now(), rules = RULES } = {}) {
 /**
  * `price` ِ `orders.create` با سقف پیش از قیمت‌گذاری — همان تراکنش، همان قفل. پس از قیمت‌گذاری،
  * قاعده‌های ریسکِ ویترین (RSK-02 مشتریِ تازه، RSK-05 تکراری؛ پشتِ پرچمِ خاموشِ `shop.order_risk`،
- * `lib/order-risk`) روی شمارهٔ تماسِ فرم، با قفلِ همان شماره، تا دو ثبتِ هم‌زمان از لای قاعده رد نشوند.
+ * `lib/order-risk`) روی ایمیلِ تأییدشده و شمارهٔ تماسِ فرم (معافیت فقط با ایمیل)، با قفلِ هر دو، تا دو ثبتِ هم‌زمان از لای قاعده رد نشوند.
  */
 function guard(price, { shopId, email, secondOrder = false, deviceId = '', key = '' }) {
   //  RSK-04 «دستگاه»: شناسهٔ تصادفیِ مرورگر/برنامهٔ خرید ⇒ چکیدهٔ همین دکان (`lib/risk-device`)؛ نادرست ⇒ «نامعلوم»
@@ -90,7 +90,7 @@ function guard(price, { shopId, email, secondOrder = false, deviceId = '', key =
     const input = await price(run, at);
     const phone = input && input.customerPhone;
     if (phone) await run('SELECT pg_advisory_xact_lock(hashtext($1))', [`order-phone:${canon(phone)}`]);
-    await require('./order-risk').checkIn(run, shopId, phone, input, { at, secondOrder: secondOrder === true, deviceKey });
+    await require('./order-risk').checkIn(run, shopId, phone, input, { at, secondOrder: secondOrder === true, deviceKey, email });
     //  پذیرفته شد ⇒ دستگاهِ همین سفارش (فقط با پرچمِ روشن، همان تراکنش) تا دکان بتواند «این دستگاه» را ببندد
     if (deviceKey) await require('./risk-device').rememberIn(run, shopId, key, deviceKey, at);
     return input;

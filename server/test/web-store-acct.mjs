@@ -93,7 +93,7 @@ const ticket = async (p = phone) => {
 const line = (name, priceMinor, qtyMilli = 1000) => ({ qtyMilli, name, unit: 'دانه', priceMinor, maxQtyMilli: null, photo: false, unavailable: false });
 const serverCart = async () => {
   const r = await one(`SELECT c.items, c.version FROM store_customer_carts c JOIN store_customers s ON s.id = c.customer_id
-                        WHERE c.shop_id = $1 AND s.phone = '+93791114455'`, [shopId]);
+                        WHERE c.shop_id = $1 AND s.email = 'c791114455@test.local'`, [shopId]);
   if (!r) return null;
   const items = typeof r.items === 'string' ? JSON.parse(r.items) : r.items;
   return { version: Number(r.version), items: Object.fromEntries(items.map((i) => [i.productId, i.qtyMilli])) };
@@ -125,6 +125,7 @@ const placeOrder = async (page, { delivery = false } = {}) => {
   await go(page, '#/checkout');
   await page.waitForSelector('#view-checkout:not([hidden]) #submit-order', { timeout: 15000 });
   await page.fill('#c-name', 'مشتری');
+  if (!(await page.inputValue('#c-phone'))) await page.fill('#c-phone', '0791114455');   //  «فقط ایمیل»: تماسِ پیک، بی کد
   if (delivery) await page.check('input[name="fulfillment"][value="delivery"]');
   else await page.check('input[name="fulfillment"][value="pickup"]');
 };
@@ -151,14 +152,14 @@ await submit(page);
 await page.waitForSelector('#ac-offer', { timeout: 10000 });
 const offerText = await page.textContent('#ac-offer');
 const placedFirst = await page.evaluate(() => { const p = document.getElementById('o-placed'); return p.nextElementSibling && p.nextElementSibling.id; });
-ok(/حساب بسازید/.test(offerText) && /0791114455/.test(offerText) && placedFirst === 'ac-offer', '«حساب بسازید؟» درست زیرِ «سفارش ثبت شد»، با همان شماره', offerText);
+ok(/حساب بسازید/.test(offerText) && offerText.includes('c791114455@test.local') && placedFirst === 'ac-offer', '«حساب بسازید؟» درست زیرِ «سفارش ثبت شد»، با همان ایمیلِ تأییدشده', offerText);
 const keepAge = config.storefront.accountTicketMaxMs;
 config.storefront.accountTicketMaxMs = 1;   //  بلیتِ همین سفارش برای ساختنِ حساب دیگر تازه نیست
 await page.click('#ac-offer button:has-text("ساختنِ حساب")');
 await page.waitForFunction(() => /دوباره|همین حالا با کد/.test(document.getElementById('ac-offer').textContent), null, { timeout: 5000 });
 config.storefront.accountTicketMaxMs = keepAge;
-ok(await page.isVisible('#ac-offer input[type="tel"]') && await page.evaluate(() => !localStorage.getItem('store-session')),
-  'بلیتِ کهنه ⇒ هنوز نشستی نیست؛ شماره و «فرستادنِ کد» همان‌جا');
+ok(await page.isVisible('#ac-offer input[type="email"]') && await page.evaluate(() => !localStorage.getItem('store-session')),
+  'بلیتِ کهنه ⇒ هنوز نشستی نیست؛ ایمیل و «فرستادنِ کد» همان‌جا');
 await page.click('#ac-offer button:has-text("فرستادنِ کد")');
 await page.waitForFunction(() => /کدِ آزمایشی: \d+/.test(document.getElementById('ac-offer').textContent), null, { timeout: 5000 });
 const code = /کدِ آزمایشی: (\d+)/.exec(await page.textContent('#ac-offer'))[1];
@@ -166,9 +167,9 @@ await page.fill('#ac-offer input[autocomplete="one-time-code"]', code);
 await page.click('#ac-offer button:has-text("تأیید")');
 await page.waitForFunction(() => /حسابِ شما ساخته شد/.test(document.getElementById('ac-offer').textContent), null, { timeout: 5000 });
 const sess = await page.evaluate(() => JSON.parse(localStorage.getItem('store-session')));
-const cust = await one(`SELECT name FROM store_customers WHERE phone = '+93791114455'`);
-ok(sess && /^sc1\./.test(sess.token) && sess.phone === '+93791114455' && sess.expiresAt > Date.now() + 100 * 864e5 && cust && cust.name === 'مشتری',
-  'کد ⇒ حساب ساخته شد: نشستِ بلند روی همین مرورگر، نامِ ثبت در حساب', JSON.stringify({ sess: sess && sess.phone, cust }));
+const cust = await one(`SELECT name, phone FROM store_customers WHERE email = 'c791114455@test.local'`);
+ok(sess && /^sc1\./.test(sess.token) && sess.email === 'c791114455@test.local' && sess.expiresAt > Date.now() + 100 * 864e5 && cust && cust.name === 'مشتری',
+  'کد ⇒ حساب ساخته شد: نشستِ بلند روی همین مرورگر، نامِ ثبت در حساب', JSON.stringify({ sess: sess && sess.email, cust }));
 
 //  «نه، ممنون» (مرورگرِ دیگر، همان شماره): پیشنهاد برای سفارشِ بعد نمی‌آید
 const ctxNo = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
@@ -184,7 +185,7 @@ await placeOrder(pNo);
 await pNo.fill('#c-phone', '0791114466');
 await submit(pNo);
 await pNo.waitForTimeout(800);
-ok(await pNo.$('#ac-offer') === null && (await one(`SELECT COUNT(*)::int AS n FROM store_customers WHERE phone = '+93791114466'`)).n === 0,
+ok(await pNo.$('#ac-offer') === null && (await one(`SELECT COUNT(*)::int AS n FROM store_customers WHERE email = 'c791114466@test.local'`)).n === 0,
   '«نه، ممنون» ⇒ سفارشِ بعد بی پیشنهاد و هیچ حسابی ساخته نشد');
 await ctxNo.close();
 
@@ -195,8 +196,8 @@ await page.evaluate((s) => {
 }, slug);
 await placeOrder(page, { delivery: true });
 await page.waitForSelector('#ac-keep-row', { timeout: 10000 });
-ok(await page.textContent('#verify-msg').then((x) => /تأیید شد|تأییدشده/.test(x)) && await page.inputValue('#c-phone') === '0791114455',
-  'بی بلیت، فقط با نشست: شماره پر و «تأییدشده»', await page.textContent('#verify-msg'));
+ok(await page.textContent('#verify-msg').then((x) => /تأیید شد|تأییدشده/.test(x)) && await page.inputValue('#c-email') === 'c791114455@test.local',
+  'بی بلیت، فقط با نشست: ایمیل پر و «تأییدشده»', await page.textContent('#verify-msg'));
 ok(await page.isHidden('#ac-addr'), 'هنوز نشانیِ نام‌داری نیست ⇒ گزینش پنهان');
 await page.fill('#a-text', 'کارتهٔ ۴، سرکِ دوم');
 await page.fill('#a-landmark', 'روبه‌روی نانوایی');
@@ -204,7 +205,7 @@ await page.check('#ac-keep');
 await page.fill('#ac-label', 'خانه');
 await submit(page);
 await page.waitForFunction(() => /«خانه»/.test((document.getElementById('toast') || {}).textContent || ''), null, { timeout: 5000 });
-const saved = await many(`SELECT a.label, a.text, a.landmark FROM store_customer_addresses a JOIN store_customers s ON s.id = a.customer_id WHERE s.phone = '+93791114455'`);
+const saved = await many(`SELECT a.label, a.text, a.landmark FROM store_customer_addresses a JOIN store_customers s ON s.id = a.customer_id WHERE s.email = 'c791114455@test.local'`);
 ok(saved.length === 1 && saved[0].label === 'خانه' && saved[0].text === 'کارتهٔ ۴، سرکِ دوم' && saved[0].landmark === 'روبه‌روی نانوایی',
   'سفارشِ ارسالی با نشست ثبت شد و «خانه» در حساب نگه داشته شد', JSON.stringify(saved));
 //  پینِ همان نشانی (برنامهٔ دیگری از همین حساب) ⇒ برگهٔ ثبت پین را هم می‌نشاند
@@ -313,7 +314,7 @@ const p2 = watch(await ctx2.newPage());
 await go(p2, '#/orders');
 await p2.waitForSelector('#ac-mine button:has-text("ورود به حساب")', { timeout: 15000 });
 await p2.click('#ac-mine button:has-text("ورود به حساب")');
-await p2.fill('#ac-mine input[type="tel"]', '0791114455');
+await p2.fill('#ac-mine input[type="email"]', 'c791114455@test.local');
 await p2.click('#ac-mine button:has-text("فرستادنِ کد")');
 await p2.waitForFunction(() => /کدِ آزمایشی: \d+/.test(document.getElementById('ac-mine').textContent), null, { timeout: 5000 });
 const code2 = /کدِ آزمایشی: (\d+)/.exec(await p2.textContent('#ac-mine'))[1];
@@ -322,7 +323,7 @@ await p2.click('#ac-mine button:has-text("تأیید")');
 await p2.waitForFunction(() => /خروج از حساب/.test(document.getElementById('ac-mine').textContent), null, { timeout: 5000 });
 await p2.waitForFunction((s) => { try { return Object.keys(JSON.parse(localStorage.getItem(`store-cart:${s}`)) || {}).length === 2; } catch (e) { return false; } }, slug, { timeout: 5000 });
 const cart2 = await p2.evaluate((s) => JSON.parse(localStorage.getItem(`store-cart:${s}`)), slug);
-ok(cart2.rice.qtyMilli === 2000 && cart2.oil.qtyMilli === 2000 && cart2.rice.priceMinor === 30000 && /0791114455/.test(await p2.textContent('#ac-mine')),
+ok(cart2.rice.qtyMilli === 2000 && cart2.oil.qtyMilli === 2000 && cart2.rice.priceMinor === 30000 && (await p2.textContent('#ac-mine')).includes('c791114455@test.local'),
   'دستگاهِ دوم پس از ورود همان سبد را از سرور خواند (قیمتِ امروزِ سرور)', JSON.stringify(cart2));
 
 //  «خروج از حساب» ⇒ نشست باطل (نسخهٔ سبدِ حساب از دستگاه پاک: web-store-cart-sync.mjs)

@@ -142,7 +142,7 @@
   K.loadS = function (key) { try { return JSON.parse(sessionStorage.getItem(key)); } catch (e) { return null; } };
   K.saveS = function (key, v) { try { sessionStorage.setItem(key, JSON.stringify(v)); } catch (e) { /* بی حافظه */ } };
 
-  // ── بلیتِ ایمیلِ تأییدشده (۲۳.۲؛ «فقط ایمیل») — بینِ بازارچه و همهٔ ویترین‌ها مشترک؛ بلیتِ کهنهٔ شماره دیگر نیست ──
+  // ── بلیتِ ایمیلِ تأییدشده (۲۳.۲) — مشترکِ بازارچه و ویترین‌ها ──
   var KEY_TICKET = 'store-ticket';
   K.ticket = function () {
     var t = K.load(KEY_TICKET, null);

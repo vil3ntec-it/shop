@@ -86,8 +86,9 @@ const AT = Date.UTC(2026, 9, 20, 8, 0);
 
 /** قرض‌دار با دو فروشِ حضوری (یکی نسیه)، یک فروشِ لغوشده، یک فروشِ سفارشِ آنلاین و دو ردیفِ دفتر */
 async function seedCustomer(s, id, phone, extra = {}) {
+  //  «فقط ایمیل»: پیوندِ حساب با قرض‌دار فقط با ایمیلِ تأییدشده (`email` ِ قرض‌دار)؛ شمارهٔ قرض‌دار هرگز کلید نیست
   await push(s, [
-    op('debtors', id, { name: 'نامِ قرض‌دارِ محرمانه', phone, notes: 'یادداشتِ داخلیِ دکان', createdAt: AT, ...extra }),
+    op('debtors', id, { name: 'نامِ قرض‌دارِ محرمانه', phone, email: mailOf(phone), notes: 'یادداشتِ داخلیِ دکان', createdAt: AT, ...extra }),
     op('sales', `${id}-s1`, { invoiceNumber: 41, series: 'B1', total: 500, discount: 0, finalTotal: 500, paymentMethod: 'cash', paidAmount: 500,
       remaining: 0, status: 'completed', createdAt: AT + 1000, date: '2026-10-20', seller: 'احمدِ فروشنده', debtorId: id }),
     op('saleItems', `${id}-s1-i1`, { saleId: `${id}-s1`, productId: '', name: 'چای', quantity: 2, unitPrice: 200, purchasePrice: 77, totalPrice: 400, returnedQty: 0 }),
@@ -129,7 +130,7 @@ test('CRM-13 ⛔: پرچمِ خاموش ⇒ همان پاسخِ مسیرِ نا�
   assert.deepEqual(Object.keys(rest), Object.keys(page.body), 'جز همان یک کلید، همان کلیدها');
 });
 
-test('CRM-13: حضوری، آنلاین و مانده — فقط مالِ همین شماره؛ شمارهٔ دیگر و دکانِ دیگر هیچ', async () => {
+test('CRM-13: حضوری، آنلاین و مانده — فقط مالِ همین ایمیل؛ ایمیلِ دیگر و دکانِ دیگر هیچ', async () => {
   const s = await liveStore('الف');
   const other = await liveStore('ب');
   const phone = '+93799100002';
@@ -172,13 +173,13 @@ test('CRM-13: حضوری، آنلاین و مانده — فقط مالِ همی
   assert.equal(bad.status, 401);
 });
 
-test('CRM-13: سفارشِ آنلاینِ همین شماره در «خریدهای آنلاین»', async () => {
+test('CRM-13: سفارشِ آنلاینِ همین ایمیل در «خریدهای آنلاین»؛ همان شماره با ایمیلِ دیگر نه', async () => {
   const s = await liveStore('آنلاین');
   const phone = '+93799100004';
   await query(
-    `INSERT INTO online_orders (id, shop_id, order_no, client_key, request_hash, source, status, fulfillment, customer_phone, total_minor, items_count, created_at, updated_at)
-     VALUES ($1,$2,1,'k1','h1','storefront','new','pickup',$3,45000,2,$4,$4), ($5,$2,2,'k2','h2','storefront','new','pickup','+93799100005',9000,1,$4,$4)`,
-    [newId('ord'), s.shopId, phone, now(), newId('ord')]
+    `INSERT INTO online_orders (id, shop_id, order_no, client_key, request_hash, source, status, fulfillment, customer_phone, customer_email, total_minor, items_count, created_at, updated_at)
+     VALUES ($1,$2,1,'k1','h1','storefront','new','pickup',$3,$6,45000,2,$4,$4), ($5,$2,2,'k2','h2','storefront','new','pickup',$3,$7,9000,1,$4,$4)`,
+    [newId('ord'), s.shopId, phone, now(), newId('ord'), mailOf(phone), mailOf('+93799100005')]
   ).catch((e) => { throw new Error(`ستون‌های online_orders: ${e.message}`); });
   const r = await get(s.slug, '', await ticket(s.slug, phone));
   assert.equal(r.status, 200, JSON.stringify(r.body));
@@ -188,30 +189,31 @@ test('CRM-13: سفارشِ آنلاینِ همین شماره در «خریده�
   assert.equal(r.body.linked, false);
 });
 
-test('CRM-13: یکدست‌سازیِ شماره — دقیق، نه نزدیک', async () => {
-  const s = await liveStore('شماره');
+test('CRM-13: پیوند فقط با ایمیلِ قرض‌دار — دقیق (بی بزرگی/کوچکیِ حرف)، نه نزدیک؛ شمارهٔ قرض‌دار هرگز («فقط ایمیل»)', async () => {
+  const s = await liveStore('ایمیل');
   const phone = '+93799100006';
+  const email = mailOf(phone);
   await push(s, [
-    op('debtors', 'n-fa', { name: 'x', phone: '۰۷۹۹ ۱۰۰ ۰۰۶', createdAt: AT }),
-    op('debtors', 'n-00', { name: 'x', phone: '0093-799-100-006', createdAt: AT }),
-    op('debtors', 'n-near', { name: 'x', phone: '0799100007', createdAt: AT }),
-    op('debtors', 'n-cc', { name: 'x', phone: '+1 799100006', createdAt: AT }),
-    op('debtors', 'n-two', { name: 'x', phone: '0700000000', phone2: '0799100006', createdAt: AT }),
-    op('debtors', 'n-merged', { name: 'x', phone: '0799100006', mergedInto: 'n-fa', createdAt: AT }),
-    op('debtors', 'n-gone', { name: 'x', phone: '0799100006', createdAt: AT }),
+    op('debtors', 'n-ok', { name: 'x', email, createdAt: AT }),
+    op('debtors', 'n-up', { name: 'x', email: email.toUpperCase(), createdAt: AT }),
+    op('debtors', 'n-near', { name: 'x', email: mailOf('+93799100007'), createdAt: AT }),
+    op('debtors', 'n-sub', { name: 'x', email: `x${email}`, createdAt: AT }),
+    op('debtors', 'n-phone', { name: 'x', phone: '0799100006', createdAt: AT }),
+    op('debtors', 'n-merged', { name: 'x', email, mergedInto: 'n-ok', createdAt: AT }),
+    op('debtors', 'n-gone', { name: 'x', email, createdAt: AT }),
   ]);
   await push(s, [{ op_id: `op-${uniq()}`, ts: Date.now(), table: 'debtors', row_id: 'n-gone', type: 'delete', fields: {} }]);
-  assert.deepEqual(await H.debtorsOf(s.shopId, phone), ['n-00', 'n-fa']);
-  assert.deepEqual(await H.debtorsOf(s.shopId, '0799100006'), ['n-00', 'n-fa'], 'ورودیِ 07… همان');
-  assert.deepEqual(await H.debtorsOf(s.shopId, '+93799100008'), []);
+  assert.deepEqual(await H.debtorsOf(s.shopId, email), ['n-ok', 'n-up']);
+  assert.deepEqual(await H.debtorsOf(s.shopId, email.toUpperCase()), ['n-ok', 'n-up'], 'بزرگی/کوچکیِ حرف همان');
+  assert.deepEqual(await H.debtorsOf(s.shopId, phone), [], 'شماره کلید نیست');
   assert.deepEqual(await H.debtorsOf(s.shopId, 'نامعتبر'), []);
-  assert.equal(H.phoneKeyOf('+930799100006'), H.phoneKeyOf('+93799100006'));
-  //  ردیف‌های هر دو قرض‌دارِ همان شماره یک حساب‌اند
+  //  ردیف‌های هر دو قرض‌دارِ همان ایمیل یک حساب‌اند
   await push(s, [
-    op('transactions', 'n-t1', { debtorId: 'n-fa', type: 'give', amount: 100, date: '2026-10-01', createdAt: AT }),
-    op('transactions', 'n-t2', { debtorId: 'n-00', type: 'give', amount: 50, date: '2026-10-02', createdAt: AT + 1 }),
+    op('transactions', 'n-t1', { debtorId: 'n-ok', type: 'give', amount: 100, date: '2026-10-01', createdAt: AT }),
+    op('transactions', 'n-t2', { debtorId: 'n-up', type: 'give', amount: 50, date: '2026-10-02', createdAt: AT + 1 }),
     op('transactions', 'n-t3', { debtorId: 'n-near', type: 'give', amount: 999, date: '2026-10-02', createdAt: AT + 2 }),
     op('transactions', 'n-t4', { debtorId: 'n-merged', type: 'give', amount: 999, date: '2026-10-02', createdAt: AT + 3 }),
+    op('transactions', 'n-t5', { debtorId: 'n-phone', type: 'give', amount: 999, date: '2026-10-02', createdAt: AT + 4 }),
   ]);
   const r = await get(s.slug, '/ledger', await ticket(s.slug, phone));
   assert.equal(r.status, 200, JSON.stringify(r.body));
@@ -246,7 +248,7 @@ test('CRM-13 ⛔: هیچ نامِ کارمند، قیمتِ خرید، یادد�
 test('CRM-13: صفحه‌بندیِ خریدِ حضوری و دفتر؛ پیوندِ فاکتور فقط با QR ِ روشن؛ نشانگرِ بد ۴۰۰', async () => {
   const s = await liveStore('صفحه');
   const phone = '+93799100011';
-  const ops = [op('debtors', 'p-d', { name: 'x', phone, createdAt: AT })];
+  const ops = [op('debtors', 'p-d', { name: 'x', phone, email: mailOf(phone), createdAt: AT })];
   for (let i = 1; i <= 13; i++) {
     ops.push(op('sales', `p-s${i}`, { invoiceNumber: i, finalTotal: i, total: i, paymentMethod: 'cash', paidAmount: i, status: 'completed',
       createdAt: AT + i, date: '2026-10-01', debtorId: 'p-d', receiptToken: require('../src/lib/receipt-token').encodeToken(Buffer.alloc(16, i)) }));

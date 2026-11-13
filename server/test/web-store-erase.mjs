@@ -105,7 +105,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 const errors = [];
 const violations = [];
 const loads = [];
-const session = { token: acc.body.session, expiresAt: acc.body.expiresAt, phone: acc.body.customer.phone, name: NAME };
+const session = { token: acc.body.session, expiresAt: acc.body.expiresAt, email: acc.body.customer.email, phone: acc.body.customer.phone, name: NAME };
 const seed = (c) => c.addInitScript(([s, sess, tk, order]) => {
   if (localStorage.getItem('seeded')) return;
   localStorage.setItem('seeded', '1');
@@ -184,7 +184,7 @@ await page.check('#er-sure');
 ok(!(await page.isDisabled('#er-go')), 'تأیید ⇒ دکمه باز');
 await page.click('#er-go');
 await page.waitForSelector('#er-verify', { timeout: 15000 });
-ok((await text('#er-verify')).includes('۰۷۹۱۱۱۶۶۷۷') || (await text('#er-verify')).includes('0791116677'), 'کد برای شمارهٔ همین حساب', await text('#er-verify'));
+ok((await text('#er-verify')).includes(mailOf(phone)), 'کد برای ایمیلِ همین حساب («فقط ایمیل»)', await text('#er-verify'));
 row = await piiOf();
 ok(row.customer_name === NAME, 'بلیتِ شمارهٔ دیگر چیزی پاک نکرد');
 await page.click('#er-send');

@@ -128,6 +128,7 @@ await openCheckout();
 await li('روغن').getByRole('button', { name: '+ یادداشت' }).click();
 await li('روغن').locator('input[type="text"]').fill('سرِ تازه');
 await page.fill('#c-name', 'مشتری');   //  blur ⇒ «change» ⇒ ذخیرهٔ سبد
+await page.fill('#c-phone', '0791230004');   //  «فقط ایمیل»: شمارهٔ تماسِ پیک جدا و بی کد
 await page.reload();
 await page.waitForFunction(() => document.querySelectorAll('#cart-lines li .lp').length === 2, null, { timeout: 15000 });
 const kept = await li('روغن').locator('input[type="text"]').inputValue();
@@ -161,6 +162,7 @@ ok(await flourSel.count() === 1 && await flourSel.isVisible() && await oilSel.co
 
 await flourSel.selectOption('specific');
 await page.fill('#c-name', 'مشتری');
+await page.fill('#c-phone', '0791230004');
 await page.check('input[name="fulfillment"][value="pickup"]');
 await page.click('#submit-order');
 await page.waitForFunction(() => /آرد/.test((document.getElementById('checkout-msg') || {}).textContent || ''), null, { timeout: 5000 });

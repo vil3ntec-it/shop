@@ -494,7 +494,7 @@
         }
         K.saveS('placed:' + r.order.token, true);
         //  فقط روی همین دستگاه، برای سفارشِ بعدی (نام و آخرین نشانی)
-        K.save('store-customer', { name: body.customer.name, addressText: body.address ? body.address.text : '', landmark: body.address ? body.address.landmark : '' });
+        K.save('store-customer', { name: body.customer.name, phone: body.customer.phone, addressText: body.address ? body.address.text : '', landmark: body.address ? body.address.landmark : '' });
         if (ac) ac.placed(body);   //  CHK-09: «این نشانی را با نام نگه دار»
         quoteNote = ''; secondOrder = false; c.empty();
         msg.hidden = true;
@@ -583,6 +583,7 @@
       if (c.acct) c.acct().then(function (a) { ac = a.checkout({ pin: setPin }); }, function () { ac = null; });
       if (me) {
         if (!$('c-name').value && me.name) $('c-name').value = me.name;
+        if (!$('c-phone').value && me.phone) $('c-phone').value = me.phone;   //  شمارهٔ تماسِ ثبتِ پیشینِ همین دستگاه (بی کد)
         if (!$('a-text').value && me.addressText) $('a-text').value = me.addressText;
         if (!$('a-landmark').value && me.landmark) $('a-landmark').value = me.landmark;
       }

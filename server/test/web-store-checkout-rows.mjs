@@ -110,6 +110,7 @@ async function toCheckout(fulfillment) {
   await page.goto(`${base}/store/${slug}?r=${++loads}#/checkout`);
   await page.waitForSelector('#view-checkout:not([hidden]) #submit-order', { timeout: 15000 });
   await page.fill('#c-name', 'مشتری');
+  await page.fill('#c-phone', '0791230001');   //  «فقط ایمیل»: شمارهٔ تماسِ پیک جدا و بی کد
   await page.check(`input[name="fulfillment"][value="${fulfillment}"]`);
 }
 const trackedToken = () => page.evaluate(() => (/^#\/o\//.test(location.hash) ? decodeURIComponent(location.hash.slice(4)) : ''));

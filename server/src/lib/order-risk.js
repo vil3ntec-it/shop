@@ -10,7 +10,10 @@
  * ── آن‌چه این‌جا قفل است ─────────────────────────────────────────────
  *   • ⛔ پیش‌فرض خاموش: بی کلیدِ `shop.order_risk` (دکان یا `all`) هیچ قاعده‌ای اجرا نمی‌شود و
  *     نمای سابقه فقط `{enabled:false}` می‌گوید.
- *   • ⛔ فقط سفارشِ ویترین (مشتری با شمارهٔ تأییدشده). فروشِ حضوری، صندوق و سفارشِ دستیِ کارمند هرگز
+ *   • ⛔ «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): هویتِ مشتری ایمیلِ تأییدشده است و شمارهٔ فرم فقط «تماس برای پیک» (تأییدنشده).
+ *     پس هر **معافیت** («مشتریِ آشنا»، شمارهٔ فهرستِ مطمئن) فقط با همان ایمیل؛ هر **محدودیت** (تکرار، سفارشِ بازِ مشتریِ
+ *     تازه) با ایمیل **یا** شماره (هر کدام بخورد) — شمارهٔ کسِ دیگر را نوشتن نه معافیت می‌آورد، نه از قاعده می‌رهاند.
+ *   • ⛔ فقط سفارشِ ویترین (مشتری با ایمیلِ تأییدشده). فروشِ حضوری، صندوق و سفارشِ دستیِ کارمند هرگز
  *     از این‌جا رد نمی‌شوند — قاعده فقط در قیمت‌گذارِ ویترین صدا زده می‌شود.
  *   • قاعده سمتِ سرور و درونِ همان تراکنشِ ثبت، پس از قفلِ `order-phone:<شماره>` (`order-rate.check`) ⇒
  *     دو ثبتِ هم‌زمانِ یک شماره پشتِ هم می‌نشینند و تکرار از لای آن‌ها رد نمی‌شود.
@@ -118,15 +121,21 @@ function linesKey(lines) {
 
 const asJson = (x) => (x && typeof x === 'object' ? x : decode(x) || {});
 
-/** سفارشِ زنده‌ای از همین شماره با همان جا و همان اقلام، ساخته‌شده در بازهٔ (from, to) — یا null. */
-async function duplicateOf(run, shopId, forms, input, { from, to = Number.MAX_SAFE_INTEGER, excludeId = '' }) {
+/** `who` = شکل‌های شماره (آرایه) یا `{ forms, email }` ⇒ `{ forms, email }` */
+const whoOf = (who) => (Array.isArray(who) ? { forms: who, email: '' } : { forms: (who && who.forms) || [], email: (who && who.email) || '' });
+/** شرطِ «همین مشتری» برای محدودیت‌ها: شماره **یا** ایمیلِ تأییدشده (`$f` شکل‌ها، `$e` ایمیل یا '') */
+const WHO_SQL = (a, f, e) => `(${a}customer_phone = ANY(${f}::text[]) OR (${e} <> '' AND ${a}customer_email = ${e}))`;
+
+/** سفارشِ زنده‌ای از همین مشتری (شماره یا ایمیل) با همان جا و همان اقلام، ساخته‌شده در بازهٔ (from, to) — یا null. */
+async function duplicateOf(run, shopId, who, input, { from, to = Number.MAX_SAFE_INTEGER, excludeId = '' }) {
+  const w = whoOf(who);
   const recent = (await run(
     `SELECT id, order_no, fulfillment, address, created_at FROM online_orders
-      WHERE customer_phone = ANY($1::text[]) AND source = 'storefront' AND shop_id = $2
+      WHERE ${WHO_SQL('', '$1', '$7')} AND source = 'storefront' AND shop_id = $2
         AND created_at > $3 AND created_at < $4 AND id <> $5
         AND NOT is_test AND status <> ALL($6::text[])
       ORDER BY created_at DESC LIMIT 10`,
-    [forms, shopId, from, to, excludeId, DEAD]
+    [w.forms, shopId, from, to, excludeId, DEAD, w.email]
   )).rows;
   if (!recent.length) return null;
   const place = placeKey(input.fulfillment, input.address);
@@ -142,13 +151,26 @@ async function duplicateOf(run, shopId, forms, input, { from, to = Number.MAX_SA
   return null;
 }
 
-async function countOf(run, shopId, forms, statuses) {
+async function countOf(run, shopId, who, statuses) {
+  const w = whoOf(who);
   const r = (await run(
     `SELECT COUNT(*)::int AS n FROM online_orders
-      WHERE shop_id = $1 AND customer_phone = ANY($2::text[]) AND NOT is_test AND status = ANY($3::text[])`,
-    [shopId, forms, statuses]
+      WHERE shop_id = $1 AND ${WHO_SQL('', '$2', '$4')} AND NOT is_test AND status = ANY($3::text[])`,
+    [shopId, w.forms, statuses, w.email]
   )).rows[0];
   return r.n;
+}
+
+/** معافیت فقط با ایمیلِ تأییدشده: سفارشِ این ایمیل در همین دکان با [statuses] (null = هر وضعیت)؛ با [forms] فقط همان که با
+ *  همین شماره بود؛ با [before] فقط پیش از آن لحظه. */
+async function ownCountOf(run, shopId, email, statuses, { forms = null, before = null } = {}) {
+  if (!email) return 0;
+  const params = [shopId, email];
+  let where = 'shop_id = $1 AND customer_email = $2 AND NOT is_test';
+  if (statuses) { params.push(statuses); where += ` AND status = ANY($${params.length}::text[])`; }
+  if (forms) { params.push(forms); where += ` AND customer_phone = ANY($${params.length}::text[])`; }
+  if (before !== null) { params.push(Number(before)); where += ` AND created_at < $${params.length}`; }
+  return (await run(`SELECT COUNT(*)::int AS n FROM online_orders WHERE ${where}`, params)).rows[0].n;
 }
 
 function refuse(status, code, message, data) {
@@ -161,8 +183,9 @@ function refuse(status, code, message, data) {
  * RSK-02 و RSK-05 برای سفارشِ ویترین — `input` همان خروجیِ قیمت‌گذار (`fulfillment`، `address`، `lines`،
  * `totalMinor`). پرچم خاموش ⇒ هیچ. ردِ توضیح‌دار ⇒ ApiError ِ ۴۰۹ با `data`.
  */
-async function checkIn(run, shopId, phone, input, { at = Date.now(), secondOrder = false, deviceKey = '' } = {}) {
-  if (!phone || !input || !(await flagIn(run, shopId))) return;
+async function checkIn(run, shopId, phone, input, { at = Date.now(), secondOrder = false, deviceKey = '', email = '' } = {}) {
+  //  «فقط ایمیل»: سفارشِ ویترین همیشه ایمیلِ تأییدشده دارد؛ شمارهٔ تماس اختیاری است (بی شماره هم قاعده‌ها اجرا می‌شوند)
+  if ((!phone && !email) || !input || !(await flagIn(run, shopId))) return;
   //  RSK-04: فهرستِ بسته ⇒ ردِ خنثی (نه دلیل، نه این‌که شماره بود، دستگاه یا جا)؛ فهرستِ مطمئن ⇒ بی سقفِ مشتریِ تازه
   const listed = await require('./risk-lists').matchIn(run, shopId, {
     phone, address: input.fulfillment === 'delivery' ? input.address : null, deviceKey, at,
@@ -172,13 +195,14 @@ async function checkIn(run, shopId, phone, input, { at = Date.now(), secondOrder
       'این دکان فعلاً سفارشِ اینترنتی از این شماره یا این نشانی نمی‌پذیرد؛ برای سفارش با خودِ دکان تماس بگیرید', {});
   }
   const policy = await policyIn(run, shopId);
-  const forms = require('./order-rate').formsOf(require('./order-rate').canon(phone));
+  const forms = phone ? require('./order-rate').formsOf(require('./order-rate').canon(phone)) : [];
+  const who = { forms, email };
 
   //  S41: «ادغام یا سفارشِ دوم؟» — پاسخِ صریحِ «سفارشِ دوم» (`secondOrder: true`) فقط از قاعدهٔ تکرار می‌گذرد؛
   //  سقفِ مشتریِ تازه، فهرستِ بسته و سقفِ سرعتِ شماره همان می‌مانند
   if (policy.duplicateWindowMin > 0 && secondOrder !== true) {
     const windowMs = policy.duplicateWindowMin * 60_000;
-    const dup = await duplicateOf(run, shopId, forms, input, { from: at - windowMs });
+    const dup = await duplicateOf(run, shopId, who, input, { from: at - windowMs });
     if (dup) {
       const retryAfter = Math.max(1, Math.ceil((Number(dup.created_at) + windowMs - at) / 1000));
       const err = refuse(409, 'duplicate_order',
@@ -193,15 +217,19 @@ async function checkIn(run, shopId, phone, input, { at = Date.now(), secondOrder
   const capOpen = policy.newCustomerMaxOpen;
   const capTotal = policy.newCustomerMaxTotalMinor;
   if (!capOpen && !capTotal) return;
-  if (listed.allow) return;   // مشتریِ مطمئنِ همین دکان (RSK-04) — تکرار همچنان سنجیده شد
-  if (await countOf(run, shopId, forms, COMPLETED) > 0) return;   // مشتریِ آشنای همین دکان
+  //  مشتریِ مطمئنِ همین دکان (RSK-04) — تکرار همچنان سنجیده شد. ⛔ «فقط ایمیل»: شمارهٔ فهرستِ مطمئن فقط ایمیل‌هایی را
+  //  معاف می‌کند که **پیش از** «مطمئن» شدنِ آن شماره در همین دکان با همان شماره سفارش داده بودند (دکان از روی همان سفارش
+  //  اعتماد کرد)؛ نوشتنِ شمارهٔ مشتریِ مطمئن با ایمیلِ دیگر معافیت نمی‌آورد. دستگاهِ مطمئن همان.
+  if (listed.allow && (listed.allow.kind !== 'phone'
+    || await ownCountOf(run, shopId, email, null, { forms, before: listed.allow.created_at }) > 0)) return;
+  if (await ownCountOf(run, shopId, email, COMPLETED) > 0) return;   // مشتریِ آشنای همین دکان (فقط با ایمیلِ خودش)
   if (capTotal && Number(input.totalMinor) > capTotal) {
     throw refuse(409, 'new_customer_limit',
       'برای نخستین سفارش از این دکان، مبلغِ سفارش از سقفِ مشتریِ تازه بیشتر است؛ سبد را کوچک‌تر کنید یا با دکان تماس بگیرید',
       { reason: 'amount', maxTotalMinor: capTotal });
   }
   if (capOpen) {
-    const open = await countOf(run, shopId, forms, OPEN);
+    const open = await countOf(run, shopId, who, OPEN);
     if (open >= capOpen) {
       throw refuse(409, 'new_customer_limit',
         'تا نخستین سفارشِ شما از این دکان تحویل نشده، سفارشِ بازِ بیشتری پذیرفته نمی‌شود؛ منتظر بمانید یا با دکان تماس بگیرید',

@@ -26,6 +26,7 @@ const P = require('../src/lib/store-push');
 const N = require('../src/lib/customer-notify');
 const sf = require('../src/lib/storefront');
 const customers = require('../src/lib/store-customers');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: کلیدِ اشتراک = ایمیلِ تأییدشده (همان fixture)
 
 boot();
 test.afterEach(() => { P.useTransport(null); N.setProviders({}); });
@@ -148,7 +149,7 @@ test('سرتاسر: گذار ⇒ یک پیامِ رمزشده فقط با نام
   assert.deepEqual([r.status, r.body], [200, { push: { on: true } }]);
   assert.equal(calls.length, 0, 'اشتراک خودش هیچ پیامی نمی‌فرستد');
   const [row] = await rowsOf(s.shopId);
-  assert.deepEqual([row.phone, row.proof, row.endpoint, row.page], ['+93791260004', 'ticket', b.sub.endpoint, `/store/${s.slug}`]);
+  assert.deepEqual([row.phone, row.proof, row.endpoint, row.page], [mailOf('0791260004'), 'ticket', b.sub.endpoint, `/store/${s.slug}`]);
 
   await setStock(s, 'tea-a', 2000);
   await A.tick();
@@ -217,11 +218,11 @@ test('یکتا و محدود: همان مرورگر یک ردیف؛ حداکثر
   const many3 = await Promise.all([1, 2, 3, 4].map(() => on(s, k, { subscription: browser().sub })));
   assert.deepEqual(many3.map((r) => r.status).sort(), [200, 200, 409, 409]);
   assert.ok(many3.filter((r) => r.status === 409).every((r) => code(r) === 'alert_push_limit'));
-  assert.equal((await rowsOf(s.shopId)).filter((r) => r.phone === '+93791260006').length, 3);
+  assert.equal((await rowsOf(s.shopId)).filter((r) => r.phone === mailOf('0791260006')).length, 3);
 
   //  شمارهٔ دیگر: همان مرورگرِ k را «خاموش» نمی‌تواند (ردیفِ k می‌ماند) و ردیفِ خودش جداست
   assert.deepEqual((await off(s, other, { endpoint: b.sub.endpoint })).body, { push: { on: false } });
-  assert.ok((await rowsOf(s.shopId)).some((r) => r.endpoint === b.sub.endpoint && r.phone === '+93791260006'), 'ردیفِ شمارهٔ دیگر دست نخورد');
+  assert.ok((await rowsOf(s.shopId)).some((r) => r.endpoint === b.sub.endpoint && r.phone === mailOf('0791260006')), 'ردیفِ شمارهٔ دیگر دست نخورد');
   const ob = browser();
   assert.equal((await on(s, other, { subscription: ob.sub })).status, 200);
 
@@ -245,7 +246,7 @@ test('یکتا و محدود: همان مرورگر یک ردیف؛ حداکثر
   //  «خاموش» ِ خودش: فقط همان مرورگر
   assert.deepEqual((await off(s, k, { endpoint: b.sub.endpoint })).body, { push: { on: false } });
   rows = await rowsOf(s.shopId);
-  assert.equal(rows.filter((r) => r.phone === '+93791260006').length, 2);
+  assert.equal(rows.filter((r) => r.phone === mailOf('0791260006')).length, 2);
   assert.equal((await off(s, k, { endpoint: 'https://evil.example/x-1234567' })).status, 400);
 });
 
@@ -260,7 +261,7 @@ test('⛔ بلیتِ باطل یا منقضی ⇒ هیچ پیام و اشترا�
   const k = await ticketFor(s.slug, '0791260008');
   assert.equal((await arm(s, k, 'tea-a', 'stock')).status, 201);
   assert.equal((await on(s, k, { subscription: browser().sub })).status, 200);
-  await customers.revokeTickets('+93791260008');
+  await customers.revokeTickets(mailOf('0791260008'));
   const replay = await on(s, k, { subscription: browser().sub });
   assert.deepEqual([replay.status, code(replay)], [401, 'verification_required'], 'بلیتِ باطل بازپخش نمی‌شود');
   await setStock(s, 'tea-a', 1000);
@@ -290,7 +291,7 @@ test('⛔ بلیتِ باطل یا منقضی ⇒ هیچ پیام و اشترا�
   assert.equal((await rowsOf(s.shopId)).length, 0, 'منقضی ⇒ دورِ کارگر پاکش کرد');
 });
 
-test('⛔ نشستِ حساب: بسته شدن یا عوض شدنِ شمارهٔ حساب ⇒ هیچ پیام؛ نشستِ زنده ⇒ پیام', async () => {
+test('⛔ نشستِ حساب: بسته شدن یا عوض شدنِ ایمیلِ حساب ⇒ هیچ پیام؛ نشستِ زنده ⇒ پیام', async () => {
   const s = await store('اعتبار نشست');
   const calls = service();
   const signIn = async (phone) => {
@@ -305,7 +306,7 @@ test('⛔ نشستِ حساب: بسته شدن یا عوض شدنِ شمارهٔ
   const ba = browser();
   assert.equal((await on(s, a, { subscription: ba.sub })).status, 200);
   const [row] = await rowsOf(s.shopId);
-  assert.deepEqual([row.proof, row.phone, Boolean(row.session_id)], ['session', '+93791260010', true]);
+  assert.deepEqual([row.proof, row.phone, Boolean(row.session_id)], ['session', mailOf('0791260010'), true]);
   await setStock(s, 'tea-a', 1000);
   await A.tick();
   assert.equal(calls.length, 1, 'نشستِ زنده ⇒ پیام');
@@ -318,19 +319,19 @@ test('⛔ نشستِ حساب: بسته شدن یا عوض شدنِ شمارهٔ
   assert.equal(calls.length, 1, 'نشستِ بسته ⇒ هیچ پیام');
   assert.equal((await rowsOf(s.shopId)).length, 0);
 
-  //  عوض شدنِ شمارهٔ حساب: اشتراکِ شمارهٔ پیشین (با همان نشستِ زنده) دیگر پیامی نمی‌گیرد
+  //  عوض شدنِ ایمیلِ حساب: اشتراکِ ایمیلِ پیشین (با همان نشستِ زنده) دیگر پیامی نمی‌گیرد
   const b = await signIn('0791260011');
   assert.equal((await arm(s, b, 'tea-b', 'price')).status, 201);
   assert.equal((await on(s, b, { subscription: browser().sub })).status, 200);
   const sess = await customers.auth(b.headers['X-Store-Session']);
-  await customers.changePhone(sess.customer, sess.sessionId, '+93791260012');
+  await customers.changeEmail(sess.customer, sess.sessionId, mailOf('0791260012'));
   await setPrice(s, 'tea-b', 100);
   await A.tick();
-  assert.equal(calls.length, 1, 'شمارهٔ حساب عوض شد ⇒ هیچ پیام به اشتراکِ شمارهٔ پیشین');
+  assert.equal(calls.length, 1, 'ایمیلِ حساب عوض شد ⇒ هیچ پیام به اشتراکِ ایمیلِ پیشین');
   assert.equal((await rowsOf(s.shopId)).length, 0);
 });
 
-test('تأییدِ شماره: `verification` همان تصمیمِ `verifiedPhone` است (بلیت، نشست، باطل، خالی)', async () => {
+test('تأییدِ ایمیل: `verification` همان تصمیمِ `verifiedEmail` است (بلیت، نشست، باطل، خالی)', async () => {
   const s = await store('هم‌سانیِ تأیید');
   const k = await ticketFor(s.slug, '0791260013');
   const ticket = ticketOfK(k);
@@ -338,12 +339,12 @@ test('تأییدِ شماره: `verification` همان تصمیمِ `verifiedPho
   const cases = [[ticket, ''], ['', session], [ticket, session], ['', ''], ['v2.bad', 'sc1.bad'], [h.tampered(ticket), '']];
   for (const [t, ss] of cases) {
     const v = await sf.verification(t, ss);
-    assert.equal(v ? v.phone : null, await sf.verifiedPhone(t, ss), `${t.slice(0, 8)} / ${ss.slice(0, 6)}`);
+    assert.equal(v ? v.email : null, await sf.verifiedEmail(t, ss), `${t.slice(0, 8)} / ${ss.slice(0, 6)}`);
   }
   assert.equal((await sf.verification(ticket, session)).proof, 'ticket', 'همان ترتیب: بلیت جلوتر');
-  await customers.revokeTickets('+93791260013');
+  await customers.revokeTickets(mailOf('0791260013'));
   assert.equal(await sf.verification(ticket, ''), null);
-  assert.equal((await sf.verification(ticket, '')), await sf.verifiedPhone(ticket, ''));
+  assert.equal((await sf.verification(ticket, '')), await sf.verifiedEmail(ticket, ''));
 });
 
 /* ══════════════════════════════════════════════════════════════════
@@ -428,12 +429,12 @@ test('SEC-10: حذفِ دادهٔ مشتری اشتراک‌های همین شم
   for (const [st, kk] of [[s, k], [s, k], [t, kt], [s, other]]) assert.equal((await on(st, kk, { subscription: browser().sub })).status, 200);
   const erase = require('../src/lib/customer-erasure');
   assert.ok(erase.COUNT_KEYS.includes('alertPushSubs'));
-  const dry = await erase.erase(s.shopId, { phone: '0791260020' }, { dryRun: true, by: 'owner', userId: 'u-test' });
+  const dry = await erase.erase(s.shopId, { email: mailOf('0791260020') }, { dryRun: true, by: 'owner', userId: 'u-test' });
   assert.equal(dry.counts.alertPushSubs, 2, JSON.stringify(dry.counts));
   assert.equal((await rowsOf(s.shopId)).length, 3, 'پیش‌نمایش چیزی پاک نمی‌کند');
-  const out = await erase.erase(s.shopId, { phone: '0791260020' }, { by: 'owner', userId: 'u-test' });
+  const out = await erase.erase(s.shopId, { email: mailOf('0791260020') }, { by: 'owner', userId: 'u-test' });
   assert.equal(out.counts.alertPushSubs, 2);
-  assert.deepEqual((await rowsOf(s.shopId)).map((r) => r.phone), ['+93791260021'], 'شمارهٔ دیگر می‌ماند');
+  assert.deepEqual((await rowsOf(s.shopId)).map((r) => r.phone), [mailOf('0791260021')], 'ایمیلِ دیگر می‌ماند');
   assert.equal((await rowsOf(t.shopId)).length, 1, 'دکانِ دیگر دست نمی‌خورد');
 
   //  پاک کردنِ حسابِ مشتری ⇒ اشتراک‌های همان شماره در همهٔ دکان‌ها

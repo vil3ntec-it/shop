@@ -187,9 +187,16 @@ test('RSK-04: ردیفِ گذشته بی‌اثر است و از فهرست بی
 test('RSK-04: شمارهٔ مطمئن از سقفِ مشتریِ تازه رد نمی‌شود، ولی تکرار همچنان ۴۰۹؛ یک شماره فقط در یک فهرست', async () => {
   const o = await liveStore('مطمئن', { policy: { newCustomerMaxTotalMinor: 10_000, duplicateWindowMin: 10 } });
   assert.equal((await checkout(o, cart({ phone: '0791110014' }))).body.error?.code, 'new_customer_limit');
+  //  «فقط ایمیل»: دکان از روی سفارشِ همین مشتری (ایمیلِ تأییدشده + همین شماره) اعتماد می‌کند ⇐ نخستین سفارشِ کوچک
+  assert.equal((await checkout(o, cart({ phone: '0791110014', qty: 500 }))).status, 201, 'نخستین سفارشِ زیرِ سقف');
   const add = await addEntry(o, { list: 'allow', kind: 'phone', phone: '0791110014', reason: 'دفترِ همسایه، آشنا', expiresInDays: 180 });
   assert.equal(add.status, 201);
   assert.equal((await checkout(o, cart({ phone: '0791110014' }))).status, 201, 'مطمئن');
+  //  ⛔ همان شمارهٔ مطمئن با ایمیلِ تأییدشدهٔ دیگر ⇒ معاف نیست (شماره تأیید نمی‌شود، پس هویت نیست)
+  const spoof = await h.post(`/api/store/${o.slug}/checkout`, cart({ phone: '0791110014', qty: 3000 }),
+    { headers: { 'Idempotency-Key': `ls-${uniq()}-key`, 'X-Store-Ticket': await ticketFor(o.slug, '0791119914') } });
+  assert.equal(spoof.status, 409, JSON.stringify(spoof.body));
+  assert.equal(spoof.body.error.code, 'new_customer_limit', 'نوشتنِ شمارهٔ مشتریِ مطمئن معافیت نمی‌آورد');
   assert.equal((await checkout(o, cart({ phone: '0791110014' }))).body.error?.code, 'duplicate_order', 'تکرار همچنان');
   const both = await addEntry(o, { list: 'block', kind: 'phone', phone: '0791110014', reason: 'دو فهرست', expiresInDays: 1 });
   assert.equal(both.status, 409);
