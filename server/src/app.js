@@ -32,6 +32,11 @@ async function createApp({ runMigrations = true } = {}) {
     await require('./lib/sync-epoch').rotate('boot')
       .catch(err => console.error('[sync-epoch] دورانِ تازه ساخته نشد:', err.message));
   }
+  //  SEC-10 (تصمیمِ ۱۴۰۵/۰۸/۲۳ #۱۵): پس از جایگزینیِ دیتابیس از پشتیبانِ کهنه (پوشهٔ PGlite یا pg_dump)، مشتری‌های پاک‌شده دوباره
+  //  پاک می‌شوند — دفترِ بیرون از دیتابیس؛ بی بازگردانی هیچ (هر حذف سابقه‌اش را دارد). شکستش بالا آمدن را نمی‌خواباند.
+  await require('./lib/customer-erasure').replay({ log: (m) => console.error(m) })
+    .then((r) => { if (r.replayed || r.empty || r.failed) console.log(`[customer-erasure] بازپخش: ${r.replayed} پاک، ${r.empty} بی داده، ${r.failed} ناموفق`); })
+    .catch(err => console.error('[customer-erasure] بازپخش نشد:', err.message));
   //  سرور فقط رلهٔ پیام است: پیام و رسانهٔ کهنه‌تر از CHAT_RELAY_DAYS می‌رود
   await require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
   //  شناسهٔ پایدارِ این سرور — در نخستین راه‌اندازی ساخته می‌شود (`lib/server-identity.js`)
