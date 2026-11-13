@@ -317,6 +317,9 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
       const total = COUNT_KEYS.reduce((s, k) => s + counts[k], 0);
       const out = { dryRun: Boolean(dryRun), mode: t.mode, openOrders: open, counts, total, kept: KEPT };
       if (dryRun) throw new DryRun(out);
+      //  CRM-15 (د۱۸، پرچمِ خاموشِ `shop.customer_erasure_ledger`): فرمانِ ناشناس کردنِ پرونده‌های همین شماره در دفترِ دستگاه
+      //  (`lib/customer-erasure-ledger.js`)؛ خاموش ⇒ هیچ ⇒ همان امروز
+      out.ledgerDebtors = await require('./customer-erasure-ledger').queueIn(c, shopId, t.forms, erasureId);
       //  سابقه در همان تراکنش؛ ⛔ بی شماره، نام، نشانی یا شناسهٔ سفارش/حساب — فقط شمارش‌ها
       await audit.logIn(c, {
         shopId, actorType: by === 'customer' ? 'customer' : 'user', userId: by === 'customer' ? '' : userId,
