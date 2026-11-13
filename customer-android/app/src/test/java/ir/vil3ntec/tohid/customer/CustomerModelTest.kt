@@ -151,7 +151,7 @@ class CustomerModelTest {
     assertFalse(m.canGoBack)
     m.setLanguage(ShopperLang.EN)
     assertEquals("en", ShopperMemory.load(kv).lang)
-    assertEquals("Shopping", ShopperText.appName)
+    assertEquals("Back", ShopperText.back)
   }
 
   @Test fun localPhoneShowsTheSavedNumberTheAfghanWay() {

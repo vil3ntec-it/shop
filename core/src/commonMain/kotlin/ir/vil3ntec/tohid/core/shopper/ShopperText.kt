@@ -93,7 +93,6 @@ object ShopperText {
     digits((minutes / 60).toString().padStart(2, '0') + ":" + (minutes % 60).toString().padStart(2, '0'))
 
   // ── همگانی ──
-  val appName get() = t("خرید", "Shopping", "پېرود")
   val back get() = t("برگشت", "Back", "شاته")
   val retry get() = t("دوباره بزنید", "Try again", "بیا هڅه وکړئ")
   val loading get() = t("در حالِ بار شدن…", "Loading…", "پورته کېږي…")

@@ -3,7 +3,6 @@ package ir.vil3ntec.tohid.core.i18n
 import ir.vil3ntec.tohid.core.text.DariText
 import ir.vil3ntec.tohid.ui.screens.ProductListModel
 import ir.vil3ntec.tohid.ui.screens.PromoText
-import ir.vil3ntec.tohid.ui.screens.crmTabs
 import ir.vil3ntec.tohid.ui.screens.mediaKindName
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -445,9 +444,11 @@ class DariCoverageTest {
 
   /**
    *  کفِ پوششِ دریِ کلیدهای پرونده‌های دورِ ۵ (٪) — اندازهٔ همین کار روی کامپیوتر (۱۹٫۰٪ = ۱۲ از ۶۳؛ روی کامپیوتر جدولِ `phrases`
-   *  «تنظیمات گوشی» ِ `StrSale.cameraPermissionDenied` را پیشاپیش «تنظیمات سیستم» کرده، پس دری چیزی برای عوض کردن ندارد)؛ فقط بالا برود
+   *  «تنظیمات گوشی» ِ `StrSale.cameraPermissionDenied` را پیشاپیش «تنظیمات سیستم» کرده، پس دری چیزی برای عوض کردن ندارد)؛ فقط بالا برود.
+   *  تنها پایین آمدن (۱۹ ⇐ ۱۸، ۱۴۰۵/۰۸/۲۲): برداشتنِ `crmTabs` ِ مردهٔ `CustomerReportsPhone.kt` دو کلیدِ `StrReach.tabAging`/`tabRfm`
+   *  را از این پرونده‌ها برد (۱۸٫۰٪ = ۱۱ از ۶۱) — هر دو در `ReportsScreen`/`ReportsDesk` ِ نسخهٔ ۳ زنده‌اند؛ پوششِ هیچ نوشته‌ای کم نشد.
    */
-  private val minMoved5Percent = 19
+  private val minMoved5Percent = 18
 
   @Test fun `پوششِ دریِ نوشته‌های دورِ ۵ چاپ می‌شود و از کف پایین نمی‌آید`() {
     val byKey = rows(I18nTables.all).groupBy { it.table + "." + it.key }.mapValues { (_, l) -> l.any { it.dari != it.fa } }
@@ -480,7 +481,7 @@ class DariCoverageTest {
     assertEquals("12 فروش", StrPanelPages.salesN(12))
     assertEquals(" — کهنه‌ترین 30 روز", StrPanelPages.oldestDays(30L))
     assertEquals("3 خرید · 1,200 ؋ · آخرین خرید 5 روز پیش", StrPanelPages.rfmLine(3, "1,200", 5L))
-    assertEquals(listOf("سنِ بدهی", "تحلیلِ خرید (RFM)"), crmTabs(crmOn = true, canSeeMoney = true).values.toList())
+    assertEquals(listOf("سنِ بدهی", "تحلیلِ خرید (RFM)"), listOf(StrReach.tabAging, StrReach.tabRfm))
     assertEquals("چند عدد", StrScanPages.howMany("عدد"))
     assertEquals("بارکدهای بسته (با «،» جدا)", StrScanPages.packBarcodes(StrScanPages.pack))
     assertEquals("عکسِ «برنج» را بگیرید؛ همان لحظه در کامپیوتر باز می‌شود.", StrScanPages.takePhotoOf("برنج"))
@@ -494,7 +495,7 @@ class DariCoverageTest {
     assertEquals("Logo saved", StrPanelPages.mediaSaved(mediaKindName(logo)))
     assertEquals("1 sale", StrPanelPages.salesN(1))
     assertEquals("12 sales", StrPanelPages.salesN(12))
-    assertEquals(listOf("Debt aging", "Purchase analysis (RFM)"), crmTabs(crmOn = true, canSeeMoney = true).values.toList())
+    assertEquals(listOf("Debt aging", "Purchase analysis (RFM)"), listOf(StrReach.tabAging, StrReach.tabRfm))
     assertEquals("Pack barcodes (separated by “,”)", StrScanPages.packBarcodes(StrScanPages.pack))
     //  اسکنِ یک کادر: روی گوشی از دوربین، روی کامپیوتر از بارکدخوان (`td`)
     assertEquals("Hold the barcode up to the camera — the field fills on the first read", StrScanPages.scanOnce)
