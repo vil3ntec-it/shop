@@ -4,16 +4,16 @@
  *
  *   ۱) «ببینم چه پاک می‌شود» ⇒ `dryRun` (سرور در تراکنشِ برگشتی می‌شمارد، چیزی نمی‌نویسد) ⇒ شمارِ هر دسته؛ سفارشِ باز ⇒
  *      فقط پیام (دکمهٔ پاک کردن نیست)؛ هیچ ⇒ «داده‌ای نمانده».
- *   ۲) «می‌دانم برگشت ندارد» ⇒ دکمهٔ پاک کردن باز. سرور بلیتِ **تازهٔ همان شمارهٔ حساب** می‌خواهد: ۴۰۱/۴۰۳ ⇒ همین‌جا کد
- *      برای شمارهٔ حساب (نه شمارهٔ دیگر) و پس از تأیید همان درخواست دوباره.
+ *   ۲) «می‌دانم برگشت ندارد» ⇒ دکمهٔ پاک کردن باز. سرور بلیتِ **تازهٔ همان ایمیلِ حساب** می‌خواهد («فقط ایمیل»): ۴۰۱/۴۰۳ ⇒
+ *      همین‌جا کد برای ایمیلِ حساب (نه ایمیلِ دیگر) و پس از تأیید همان درخواست دوباره.
  *   ۳) پاک شد ⇒ فهرستِ «سفارش‌های من» ِ همین دکان روی این دستگاه هم (پیوندهای پیگیری دیگر باز نمی‌شوند).
- * ⛔ همهٔ متن با textContent (`K.el`)؛ شماره فقط شمارهٔ نشستِ خودِ حساب؛ واژه‌نامهٔ `kit/i18n/erase.<زبان>.json` نیامد ⇒ هیچ گره‌ای.
+ * ⛔ همهٔ متن با textContent (`K.el`)؛ ایمیل فقط ایمیلِ نشستِ خودِ حساب؛ واژه‌نامهٔ `kit/i18n/erase.<زبان>.json` نیامد ⇒ هیچ گره‌ای.
  */
 (function () {
   'use strict';
   var $ = K.$; var el = K.el; var t = K.t;
 
-  /** `ctx` از acct.js: `api`، `slug`، `phone` (شمارهٔ نشست) و `into` (کارتِ «حسابِ من») */
+  /** `ctx` از acct.js: `api`، `slug`، `email` (ایمیلِ نشست) و `into` (کارتِ «حسابِ من») */
   window.StoreErase = function (ctx) {
     var api = ctx.api;
     return K.part('erase', $('er-box')).then(function (ok) {
@@ -63,26 +63,26 @@
         go.disabled = true;
         api('/account/erase', { method: 'POST', body: {} }).then(done).catch(function (e) {
           go.disabled = false;
-          //  بلیتِ کهنه یا بلیتِ شمارهٔ دیگر ⇒ کد برای همان شمارهٔ حساب
-          if (e.code === 'verification_required' || e.code === 'phone_mismatch') verify(go);
+          //  بلیتِ کهنه یا بلیتِ ایمیلِ دیگر ⇒ کد برای همان ایمیلِ حساب
+          if (e.code === 'verification_required' || e.code === 'email_mismatch') verify(go);
           else fail(e);
         });
       }
 
       function verify(go) {
         if ($('er-code')) { $('er-code').focus(); return; }
-        var phone = K.localPhone(ctx.phone);
+        var email = ctx.email;
         var code = el('input', { attrs: { id: 'er-code', inputmode: 'numeric', autocomplete: 'one-time-code', dir: 'ltr', maxlength: '8', 'aria-label': t('ac.code'), placeholder: t('ac.code') } });
         var send = el('button', { class: 'btn btn-soft btn-sm', attrs: { type: 'button', id: 'er-send' }, text: t('ac.send') });
         var ok = el('button', { class: 'btn btn-sm', attrs: { type: 'button', id: 'er-ok' }, text: t('ac.check') });
         var row = el('div', { class: 'code-row', hidden: true }, code, ok);
-        var form = el('div', { class: 'stack', attrs: { id: 'er-verify' } }, el('p', { class: 'small', text: t('er.verify', { phone: phone }) }), send, row);
+        var form = el('div', { class: 'stack', attrs: { id: 'er-verify' } }, el('p', { class: 'small', text: t('er.verify', { email: email }) }), send, row);
         res.insertBefore(form, go);
         K.note(msg, '', '');
         send.focus();
         send.addEventListener('click', function () {
           send.disabled = true;
-          api('/verify/start', { method: 'POST', body: { phone: phone } }).then(function (r) {
+          api('/verify/start', { method: 'POST', body: { email: email } }).then(function (r) {
             row.hidden = false;
             K.note(msg, 'info', t('ac.sent') + (r.devCode ? ' ' + t('ac.dev', { code: r.devCode }) : ''));
             code.focus();
@@ -91,7 +91,7 @@
         });
         ok.addEventListener('click', function () {
           ok.disabled = true;
-          api('/verify/check', { method: 'POST', body: { phone: phone, code: code.value } }).then(function (r) {
+          api('/verify/check', { method: 'POST', body: { email: email, code: code.value } }).then(function (r) {
             K.setTicket(r); K.account(); form.remove();
             run(go);
           }).catch(function (e) { K.note(msg, 'err', e.message); }).then(function () { ok.disabled = false; });

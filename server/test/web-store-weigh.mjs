@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { missingTool, PLAYWRIGHT_INSTALL, animationsSettled } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -86,8 +87,8 @@ T, { 'X-App': 'shop', 'X-Device': 'dev-owner' });
 for (const id of ['meat', 'oil']) await call('PUT', `/api/shop/storefront/products/${id}`, { published: true }, T);
 
 const phone = '0791112266';
-const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
-const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
 ok(vc.status === 200 && vc.body.ticket, 'شماره تأیید شد');
 
 /** سفارشِ ویترین (گوشتِ ۱ کیلو + روغن)، قبول، جمع‌آوری و گوشتِ ۱٫۴ کیلو ⇒ نگه‌داشتِ باز */

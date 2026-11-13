@@ -141,7 +141,7 @@ test('⛔ پرچم: بی اعلانِ مشتری یا بی پیگیریِ باز
 test('NTF-08: قالبِ order_refund به fa، ps و en با {amount}، {no} و {shop}؛ رقم و واحدِ هر زبان', () => {
   const tpl = N.EXTRA.order_refund;
   assert.ok(tpl, 'رویدادِ سیستمیِ order_refund');
-  assert.deepEqual(tpl.channels, ['push', 'whatsapp', 'telegram'], 'فقط کانال‌های رایگان (پیامکِ پولی نه)');
+  assert.deepEqual(tpl.channels, ['push', 'email', 'whatsapp', 'telegram'], 'فقط کانال‌های رایگان (پوش ⇒ ایمیل ⇒ …؛ پیامک دیگر در هیچ زنجیره‌ای نیست)');
   for (const lang of N.LANGS) {
     assert.deepEqual(tpl.text[lang].match(/\{[^}]*\}/g).sort(), ['{amount}', '{no}', '{shop}'], `${lang}: فقط مبلغ، شمارهٔ سفارش و نامِ ویترین`);
     assert.equal(/[؀-ۿ]/.test(tpl.text[lang]), lang !== 'en', `${lang}: خطِ همان زبان`);

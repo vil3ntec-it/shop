@@ -35,6 +35,7 @@ import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -106,8 +107,8 @@ ok(pushed.status === 200, 'کالا از راهِ همگام‌سازیِ واق
 await call('PUT', '/api/shop/storefront/products/rice', { published: true }, T);
 
 const phone = '0791112244';
-const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
-const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
 ok(vc.status === 200 && vc.body.ticket, 'شماره تأیید شد');
 let seqKey = 0;
 const checkout = async () => {
@@ -325,7 +326,7 @@ ok(await countFrom(conv1.id, 'پس از تأیید') === 0 && (await stored(qp))
 //  دست را برباید: پیش‌تر تایمرِ ۸۰ms ِ verify() میانِ fill ِ کد نشست، کد در کادرِ شماره رفت و verify/check ۴۰۰ داد (CI ِ #1022).
 const reverify = async (p, num, { refocus = false } = {}) => {
   await query('UPDATE otp_codes SET created_at = created_at - $1', [10 * 60 * 1000]);   //  فاصلهٔ «کدِ تازه» (۱۲۰ ثانیه) گذشته
-  await p.fill('#ct-phone', num);
+  await p.fill('#ct-email', mailOf(num));
   await p.click('#ct-vsend');
   await p.waitForFunction(() => /\d{4,}/.test(document.getElementById('ct-vmsg').textContent), null, { timeout: 10000 });
   const code = (await p.textContent('#ct-vmsg')).match(/(\d{4,})/)[1];

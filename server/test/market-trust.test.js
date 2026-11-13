@@ -303,7 +303,7 @@ test('ABUSE-01: شکایت از سفارش ⇒ پرونده، مدرک، پاس�
   assert.ok(q.body.cases.some((x) => x.id === caseId));
   const full = await adm('GET', `/cases/${caseId}`);
   assert.equal(full.status, 200);
-  assert.match(full.body.case.reporterHint, /^\+937•+201$/);
+  assert.match(full.body.case.reporterHint, /^c•+@test\.local$/);   //  «فقط ایمیل»: شاکی با ایمیلِ تأییدشده، پوشیده
   assert.equal(full.body.case.evidence.length, 2);
   assert.ok(await auditRow('admin.trust_case_viewed', caseId));
   const ev = await h.download(`/api/admin/trust/cases/${caseId}/evidence/${up.body.evidenceId}`, { token: admin });
@@ -554,7 +554,7 @@ test('در دیتابیس شماره و IP ِ شاکی نیست — فقط HMAC 
   const dump = JSON.stringify(row);
   assert.ok(!dump.includes('790000901'));
   assert.ok(!dump.includes('127.0.0.1') && !dump.includes('::1'));
-  assert.equal(row.reporter_hint, '+937•••••901');
+  assert.equal(row.reporter_hint, 'c•••••••••@test.local');   //  «فقط ایمیل»: ایمیلِ پوشیده، نه خام
   const ev = await one('SELECT COUNT(*)::int AS n FROM trust_case_events WHERE case_id=$1 AND actor_id<>$2', [row.id, '']);
   assert.equal(ev.n, 0, 'رویدادِ مشتری شناسه ندارد');
 });

@@ -3,7 +3,7 @@
   "cq.queued": "Queued",
   "cq.sending": "Sending…",
   "cq.wait": "Not delivered yet; it will go by itself when the internet is back.",
-  "cq.verify": "Waiting for you to confirm your number again",
+  "cq.verify": "Waiting for you to verify your email again",
   "cq.failed": "Not sent",
   "cq.retry": "Retry",
   "cq.cancel": "Cancel",

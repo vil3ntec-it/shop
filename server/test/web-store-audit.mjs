@@ -20,6 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -113,8 +114,8 @@ ok((await call('PUT', '/api/shop/market', { listed: true, category: 'grocery', a
 
 //  مشتری: تأییدِ شماره و دو سفارشِ «دریافت از دکان» (یکی برای پیشنهادِ ویرایش، یکی ردشده به‌خاطرِ «ناموجود»)
 const phone = '0791112266';
-const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
-const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
 let seq = 0;
 const checkout = async (lines) => {
   const ck = await call('POST', `/api/store/${slug}/checkout`, { fulfillment: 'pickup', customer: { name: 'مشتری', phone }, lines },

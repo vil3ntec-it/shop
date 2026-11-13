@@ -29,14 +29,14 @@ class ShopperStage2LiveTest {
     is ShopperResult.Fail -> throw AssertionError("$what: ${error.status} ${error.code} ${error.message}")
   }
 
-  private fun ticket(api: ShopperApi, local: String): PhoneTicket {
+  private fun ticket(api: ShopperApi, local: String): CustomerTicket {
     val phone = ir.vil3ntec.tohid.core.text.LocaleFormat.normalizePhone(local)!!
     val code = assertNotNull(api.verifyStart(slug, phone).ok("کد").devCode)
     return api.verifyCheck(slug, phone, code).ok("تأیید")
   }
 
   /** نشستِ حسابِ مشتری فقط برای آزمونِ درهای نشانی (ورودِ مشتری در برنامه پس از D-09 است) */
-  private fun session(http: JdkShopperHttp, t: PhoneTicket): String {
+  private fun session(http: JdkShopperHttp, t: CustomerTicket): String {
     val r = http.send(ShopperRequest("POST", "/api/store/$slug/account", mapOf("Content-Type" to "application/json", "X-Store-Ticket" to t.ticket), "{}"))
     assertEquals(201, r.status, r.body)
     return Json.parseToJsonElement(r.body).jsonObject["session"]!!.jsonPrimitive.content

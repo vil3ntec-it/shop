@@ -212,9 +212,10 @@
               <fieldset class="card card-lg plain-set">
                 <legend class="label-lg" data-t="ck.you">شما</legend>
                 <label class="field"><span data-t="ck.name.l">نام</span><input id="c-name" type="text" autocomplete="name" maxlength="80" required></label>
-                <label class="field"><span data-t="phone.l">شمارهٔ موبایل</span><input id="c-phone" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" maxlength="20" placeholder="07xx xxx xxx" required></label>
+                <label class="field"><span data-t="phone.l">شمارهٔ تماس برای پیک</span><input id="c-phone" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" maxlength="20" placeholder="07xx xxx xxx" required></label>
                 <div id="verify-box" class="verify">
-                  <p id="verify-text" class="muted small" data-t="v.text">برای ثبت، شماره با یک کدِ یک‌بارمصرف تأیید می‌شود. دیدن و سبد حساب نمی‌خواهد.</p>
+                  <label class="field"><span data-t="email.l">ایمیل</span><input id="c-email" type="email" inputmode="email" autocomplete="email" dir="ltr" maxlength="190" placeholder="you@example.com" required></label>
+                  <p id="verify-text" class="muted small" data-t="v.text">برای ثبت، ایمیلِ شما با یک کدِ یک‌بارمصرف تأیید می‌شود. دیدن و سبد حساب نمی‌خواهد.</p>
                   <button id="verify-send" class="btn btn-soft btn-sm" type="button" data-t="v.send">فرستادنِ کدِ تأیید</button>
                   <div id="verify-code-row" class="code-row" hidden>
                     <label class="field grow"><span data-t="v.code">کدِ تأیید</span><input id="v-code" class="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" dir="ltr" maxlength="8"></label>
@@ -334,7 +335,7 @@
           <div id="my-orders-empty" class="empty" hidden>
             <div class="art" id="orders-art"></div>
             <h2 data-t="my.none">هنوز سفارشی در این دستگاه نیست</h2>
-            <p data-t="my.none.p">با شمارهٔ تأییدشده، سفارش‌های همین شماره از هر دستگاهی دیده می‌شود.</p>
+            <p data-t="my.none.p">با ایمیلِ تأییدشده، سفارش‌های همین ایمیل از هر دستگاهی دیده می‌شود.</p>
           </div>
         </div>
       </section>

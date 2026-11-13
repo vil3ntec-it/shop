@@ -62,7 +62,7 @@ class CustomerModelTest {
       p.startsWith("/api/store/golestan/products?ids=") -> ShopperResponse(200, """{"items":[$price]}""")
       p.startsWith("/api/store/golestan/products") -> ShopperResponse(200, """{"items":[$price],"nextCursor":null}""")
       p.endsWith("/verify/start") -> ShopperResponse(200, """{"sent":true,"expiresAt":999}""")
-      p.endsWith("/verify/check") -> ShopperResponse(200, """{"phone":"+93700000002","ticket":"v2.ticket","expiresAt":9999999}""")
+      p.endsWith("/verify/check") -> ShopperResponse(200, """{"email":"c700000002@test.local","ticket":"v2.ticket","expiresAt":9999999}""")
       p.endsWith("/checkout") -> checkoutReplies.removeFirst()()
       p.endsWith("/cancel") -> ShopperResponse(200, order("cancelled_by_customer", 29100, false))
       p.startsWith("/api/store/golestan/orders/") -> ShopperResponse(200, order("new", 29100, true))
@@ -100,7 +100,7 @@ class CustomerModelTest {
     m.go(Route.CartPage("golestan"))
     m.go(Route.Checkout("golestan"))
     assertEquals("delivery", m.form.fulfillment)
-    m.updateForm(m.form.copy(name = "احمد", phone = "0700000002", addressText = "کارتهٔ سه"))
+    m.updateForm(m.form.copy(name = "احمد", phone = "0700000002", email = "c700000002@test.local", addressText = "کارتهٔ سه"))
     m.sendCode()
     assertTrue(m.codeSent != null)
     m.code = "۱۲۳۴۵۶"

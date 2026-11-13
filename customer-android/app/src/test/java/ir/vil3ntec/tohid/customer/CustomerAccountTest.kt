@@ -83,9 +83,9 @@ class CustomerAccountTest {
       p == "/api/store/golestan" -> ShopperResponse(200, store)
       p.startsWith("/api/store/golestan/products") -> ShopperResponse(200, """{"items":[$rice],"nextCursor":null}""")
       p.endsWith("/verify/start") -> ShopperResponse(200, """{"sent":true,"expiresAt":999}""")
-      p.endsWith("/verify/check") -> ShopperResponse(200, """{"phone":"+93700000002","ticket":"v2.ticket","expiresAt":99999999999}""")
+      p.endsWith("/verify/check") -> ShopperResponse(200, """{"email":"c700000002@test.local","ticket":"v2.ticket","expiresAt":99999999999}""")
       p == acct && r.method == "POST" ->
-        ShopperResponse(201, """{"session":"sc1.SECRET-SESSION","expiresAt":99999999999,"customer":{"id":"c1","phone":"+93700000002","name":""}}""")
+        ShopperResponse(201, """{"session":"sc1.SECRET-SESSION","expiresAt":99999999999,"customer":{"id":"c1","email":"c700000002@test.local","phone":null,"name":""}}""")
       p == "$acct/logout" -> ShopperResponse(200, """{"signedOut":true}""")
       p == "$acct/cart/merge" || (p == "$acct/cart" && r.method == "PUT") -> {
         cartJson = echo(r.body, list = false)
@@ -129,7 +129,7 @@ class CustomerAccountTest {
     assertTrue("بی نشست هیچ درِ حساب زده نمی‌شود", accountCalls().isEmpty())
 
     m.go(Route.CartPage("golestan"))
-    m.account.phone = "0700000002"
+    m.account.email = "c700000002@test.local"
     m.accountSendCode("golestan")
     assertTrue(m.account.codeSent)
     m.account.code = "۱۲۳۴۵۶"

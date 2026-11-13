@@ -256,7 +256,7 @@ test('سقفِ هزینهٔ NTF-02: کانالِ پولیِ پُر صدا زده
   assert.equal(row.status, 'sent');
   assert.equal(row.channel, 'telegram');
   const tried = typeof row.tried === 'string' ? JSON.parse(row.tried) : row.tried;
-  assert.deepEqual(tried.map((x) => [x.channel, x.result]), [['push', 'not_configured'], ['whatsapp', 'cost_cap'], ['telegram', 'accepted']]);
+  assert.deepEqual(tried.map((x) => [x.channel, x.result]), [['push', 'not_configured'], ['email', 'not_configured'], ['whatsapp', 'cost_cap'], ['telegram', 'accepted']]);   //  «فقط ایمیل»: پوش ⇒ ایمیل ⇒ …
   assert.deepEqual(calls.map((c) => c.channel), ['telegram']);
   assert.match(calls[0].text, /پوزش/);
   assert.equal(/AP[0-9A-Z]{8}/.test(calls[0].text), false, 'کد در متنِ پیام نیست');

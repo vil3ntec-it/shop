@@ -3,13 +3,14 @@
  * و دیربار از store.js (`account()`)؛ همان درهای `/api/store/<slug>/account…` ِ سرور (`lib/store-customers.js`).
  * نشست در `store-session` (کیت: `K.sess`؛ `K.api` آن را کنارِ بلیت می‌فرستد ⇒ ثبت و «سفارش‌های من» با نشستِ ۱۸۰ روزه).
  *
- *   ساختن/ورود ── فقط با بلیتِ تازهٔ «شماره تأیید شد» (`POST /account`؛ سرور ≤ ۱۰ دقیقه)؛ کهنه ⇒ همین‌جا کد و تأیید.
+ *   ساختن/ورود ── فقط با بلیتِ تازهٔ «ایمیل تأیید شد» (`POST /account`؛ سرور ≤ ۱۰ دقیقه)؛ کهنه ⇒ همین‌جا کد به ایمیل و تأیید
+ *                 («فقط ایمیل»، ۱۴۰۵/۰۸/۲۳؛ شماره فقط تماسِ پیک).
  *   پیشنهاد ──── CHK-01: صفحهٔ تأییدِ سفارشِ تازه (`offer`، فقط بی نشست)؛ «نه، ممنون» ۳۰ روز به یاد می‌ماند.
  *   نشانی ────── CHK-09: برگهٔ ثبت (`checkout`): گزینش از نشانی‌های نام‌دار، «نگه‌داشتن با نام» فقط پس از ثبتِ موفق، حذف.
  *   سبد ──────── CHK-03/WEB-14، فقط با `features.accountCart` (پرچمِ `shop.storefront.cart`): `store/cart-sync.js` ِ دیربار
  *                 (ادغامِ یک‌بارهٔ سبدِ مهمان، `PUT` با نسخه، ۴۰۹ ⇒ سه‌طرفه، درنگ). نشست رفت (خروج، ۴۰۱ ِ حساب، منقضی) ⇒
  *                 نسخهٔ سبدِ حساب از این دستگاه پاک (`gone`)؛ سبدِ مهمانِ بی حساب (بی `merged`) همان می‌ماند.
- *   شماره ────── §۲۳.۴: «تغییرِ شمارهٔ تلفن» در «حسابِ من» (`store/phone.js` ِ دیربار؛ کد به شمارهٔ تازه).
+ *   تماس/ایمیل ─ §۲۳.۴: «شمارهٔ تماس و ایمیل» در «حسابِ من» (`store/phone.js` ِ دیربار): شماره بی کد؛ ایمیلِ تازه با کد.
  * ⛔ همهٔ متن با textContent (`K.el`)؛ واژه‌نامهٔ `kit/i18n/acct.<زبان>.json` نیامد ⇒ هیچ گره‌ای (سبد همان هم‌گام می‌شود).
  */
 (function () {
@@ -26,24 +27,24 @@
     var dict = K.part('acct', $('ac-box'));
     var cs = null; var fell = false;
 
-    function save(r) { K.save(KEY, { token: r.session, expiresAt: r.expiresAt, phone: r.customer.phone, name: r.customer.name || '' }); }
+    function save(r) { K.save(KEY, { token: r.session, expiresAt: r.expiresAt, email: r.customer.email || '', phone: r.customer.phone || '', name: r.customer.name || '' }); }
     function drop() { K.save(KEY, null); K.save(SYNC, null); }
     function btn(cls, text) { return el('button', { class: 'btn ' + cls, attrs: { type: 'button' }, text: text }); }
 
     // ── ساختن/ورود (CHK-01) ──
-    /** بلیتِ تازه ⇒ یک لمس؛ وگرنه شماره ⇒ کد ⇒ تأیید ⇒ همان `POST /account`. `done` پس از نشستِ تازه؛ `make` = «ساختن» (پیشنهاد). */
+    /** بلیتِ تازه ⇒ یک لمس؛ وگرنه ایمیل ⇒ کد ⇒ تأیید ⇒ همان `POST /account`. `done` پس از نشستِ تازه؛ `make` = «ساختن» (پیشنهاد). */
     function signIn(box, name, done, make) {
       var tk = K.ticket();
       var msg = el('div', { class: 'note', attrs: { role: 'status' }, hidden: true });
-      var phone = el('input', { attrs: { type: 'tel', inputmode: 'tel', autocomplete: 'tel', dir: 'ltr', maxlength: '20', 'aria-label': t('ac.phone'), placeholder: t('ac.phone') } });
+      var email = el('input', { attrs: { type: 'email', inputmode: 'email', autocomplete: 'email', dir: 'ltr', maxlength: '190', 'aria-label': t('ac.email'), placeholder: t('ac.email') } });
       var code = el('input', { attrs: { inputmode: 'numeric', autocomplete: 'one-time-code', dir: 'ltr', maxlength: '8', 'aria-label': t('ac.code'), placeholder: t('ac.code') } });
       var send = btn('btn-soft btn-sm', t('ac.send'));
       var check = btn('btn-sm', t('ac.check'));
       var codeRow = el('div', { class: 'code-row', hidden: true }, code, check);
-      var form = el('div', { class: 'stack', hidden: true }, phone, send, codeRow);
-      var go = btn('btn-sm', tk && make ? t('ac.make', { phone: K.localPhone(tk.phone) }) : t('ac.in'));
-      phone.value = tk ? K.localPhone(tk.phone) : '';
-      function ask() { go.hidden = true; form.hidden = false; phone.focus(); }
+      var form = el('div', { class: 'stack', hidden: true }, email, send, codeRow);
+      var go = btn('btn-sm', tk && make ? t('ac.make', { email: tk.email }) : t('ac.in'));
+      email.value = tk ? tk.email : '';
+      function ask() { go.hidden = true; form.hidden = false; email.focus(); }
       function create() {
         go.disabled = true;
         return api('/account', { method: 'POST', body: { name: name || '' } }).then(function (r) {
@@ -57,7 +58,7 @@
       go.addEventListener('click', function () { if (K.ticket()) create(); else ask(); });
       send.addEventListener('click', function () {
         send.disabled = true;
-        api('/verify/start', { method: 'POST', body: { phone: phone.value } }).then(function (r) {
+        api('/verify/start', { method: 'POST', body: { email: email.value } }).then(function (r) {
           codeRow.hidden = false;
           K.note(msg, 'info', t('ac.sent') + (r.devCode ? ' ' + t('ac.dev', { code: r.devCode }) : ''));
           code.focus();
@@ -66,7 +67,7 @@
       });
       check.addEventListener('click', function () {
         check.disabled = true;
-        api('/verify/check', { method: 'POST', body: { phone: phone.value, code: code.value } }).then(function (r) {
+        api('/verify/check', { method: 'POST', body: { email: email.value, code: code.value } }).then(function (r) {
           K.setTicket(r); K.account(); code.value = '';
           return create();
         }).catch(function (e) { K.note(msg, 'err', e.message); }).then(function () { check.disabled = false; });
@@ -94,7 +95,7 @@
       });
     }
 
-    /** «سفارش‌های من»: با نشست ⇒ شماره و «خروج»؛ بی نشست ⇒ ورود (دستگاهِ تازه) */
+    /** «سفارش‌های من»: با نشست ⇒ ایمیل و «خروج»؛ بی نشست ⇒ ورود (دستگاهِ تازه) */
     function mine() {
       dict.then(function (ok) {
         var list = $('my-orders');
@@ -111,18 +112,18 @@
             return api('/account/logout', { method: 'POST' }).catch(function () { /* نشستِ سرور هم سرِ مهلت می‌میرد */ });
           }).then(function () { gone(); K.setTicket(null); K.account(); mine(); });
         });
-        box.append(el('div', { class: 'spread' }, el('b', { text: t('ac.me') }), el('span', { class: 'ltr', text: K.localPhone(s.phone) })), out);
-        //  §۲۳.۴: «تغییرِ شمارهٔ تلفن» (phone.js ِ دیربار): موفق ⇒ نشستِ همین دستگاه با شمارهٔ تازه و «حسابِ من» از نو
+        box.append(el('div', { class: 'spread' }, el('b', { text: t('ac.me') }), el('span', { class: 'ltr', text: s.email || K.localPhone(s.phone) })), out);
+        //  §۲۳.۴ ⇐ «فقط ایمیل»: «شمارهٔ تماس و ایمیل» (phone.js ِ دیربار): موفق ⇒ نشستِ همین دستگاه با ایمیل/شمارهٔ تازه و «حسابِ من» از نو
         K.js('/store/phone.js').then(function () {
-          window.StorePhone({ api: api, phone: s.phone, into: box, lost: lost, done: function (c) {
+          window.StorePhone({ api: api, email: s.email || '', phone: s.phone || '', into: box, lost: lost, done: function (c) {
             var cur = K.sess();
-            if (cur) K.save(KEY, { token: cur.token, expiresAt: cur.expiresAt, phone: c.phone, name: cur.name || '' });
+            if (cur) K.save(KEY, { token: cur.token, expiresAt: cur.expiresAt, email: c.email || '', phone: c.phone || '', name: cur.name || '' });
             mine();
           } });
         }, function () {});
-        //  SEC-10: «پاک کردنِ داده‌های من در این دکان» (erase.js ِ دیربار) فقط با `features.erasure`
-        if (ctx.store.features && ctx.store.features.erasure) {
-          K.js('/store/erase.js').then(function () { window.StoreErase({ api: api, slug: ctx.slug, phone: s.phone, into: box }); }, function () {});
+        //  SEC-10: «پاک کردنِ داده‌های من در این دکان» (erase.js ِ دیربار) فقط با `features.erasure` و ایمیلِ وصل‌شده
+        if (ctx.store.features && ctx.store.features.erasure && s.email) {
+          K.js('/store/erase.js').then(function () { window.StoreErase({ api: api, slug: ctx.slug, email: s.email, into: box }); }, function () {});
         }
       });
     }

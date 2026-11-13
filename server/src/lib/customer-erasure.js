@@ -158,8 +158,20 @@ async function resolveTarget(c, shopId, input) {
   const emails = email ? [email] : [];
   let customerIds = b.customerId ? [String(b.customerId)] : [];
   if (!b.customerId && (phones.length || emails.length)) {
-    customerIds = ids((await c.query('SELECT id FROM store_customers WHERE phone = ANY($1::text[]) OR email = ANY($2::text[])',
-      [phones, emails])).rows);
+    //  درخواستِ دکان با شماره: مشتری‌ای که در **همین دکان** با این شماره سفارش داده (ایمیلِ تأییدشده و حسابش) هم همان آدم است
+    const fromOrders = [];
+    if (phones.length) {
+      for (const r of (await c.query(
+        `SELECT DISTINCT customer_email, store_customer_id FROM online_orders
+          WHERE shop_id=$1 AND customer_phone = ANY($2::text[]) AND (customer_email <> '' OR store_customer_id IS NOT NULL)`,
+        [shopId, phones]
+      )).rows) {
+        if (r.customer_email && !emails.includes(r.customer_email)) emails.push(r.customer_email);
+        if (r.store_customer_id) fromOrders.push(r.store_customer_id);
+      }
+    }
+    customerIds = [...new Set([...ids((await c.query('SELECT id FROM store_customers WHERE phone = ANY($1::text[]) OR email = ANY($2::text[])',
+      [phones, emails])).rows), ...fromOrders])];
   }
   return { forms: [...phones, ...emails], phones, emails, orderOnly, customerIds, mode: b.customerId ? 'account' : mode };
 }

@@ -22,6 +22,7 @@ import { missingTool, PLAYWRIGHT_INSTALL, SKIP } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -648,8 +649,8 @@ async function journey(width, lang, phone) {
 
 /** همان صفحه‌ها در یک ترکیبِ دیگرِ عرض و زبان (سفارش و رشتهٔ یک سفرِ کامل؛ بی ثبتِ تازه) */
 async function sweep(width, lang, o) {
-  const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone: o.phone });
-  const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone: o.phone, code: vs.body.devCode });
+  const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(o.phone) });
+  const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(o.phone), code: vs.body.devCode });
   const P = await device(width, lang, { ticket: { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt } });
   const { page } = P;
   await goStore(P);

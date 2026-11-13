@@ -81,13 +81,14 @@ async function signIn(slug, phone, name) {
 const customers = require('../src/lib/store-customers');
 const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 /** همان «نشستِ همین حساب + بلیتِ تازهٔ شمارهٔ نو» ِ §۲۳.۴، بی در: نشست از سرور، شمارهٔ نو از بلیتِ تازه */
+//  «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): تغییرِ شماره ⇐ به‌جایش تغییرِ ایمیل با بلیتِ تازهٔ ایمیلِ نو (`store-customers.changeEmail`)
 async function changePhone(session, newLocal) {
   const a = await customers.auth(session);
   assert.ok(a, 'نشستِ زنده');
   const sf = require('../src/lib/storefront');
-  const phone = await sf.verifiedPhoneOfTicket(await ticketFor(newLocal), { maxAgeMs: require('../src/config').storefront.accountTicketMaxMs });
-  assert.ok(phone, 'بلیتِ تازهٔ شمارهٔ نو');
-  return customers.changePhone(a.customer, a.sessionId, phone);
+  const email = await sf.verifiedEmailOfTicket(await ticketFor(newLocal), { maxAgeMs: require('../src/config').storefront.accountTicketMaxMs });
+  assert.ok(email, 'بلیتِ تازهٔ ایمیلِ نو');
+  return customers.changeEmail(a.customer, a.sessionId, email);
 }
 const meOf = async (slug, session) => h.get(`/api/store/${slug}/account`, S(session));
 
@@ -182,14 +183,14 @@ test('۳ و ۴) تغییرِ شماره گفت‌وگوها را نگه می‌�
     const blk = await h.put(`/api/shop/chat/conversations/${conv.id}/block`, {}, { token: s.token });
     assert.equal(blk.status, 200, JSON.stringify(blk.body));
 
-    //  ج) تغییرِ شماره (§۲۳.۴): شمارهٔ حسابِ دیگر ⇒ ۴۰۹؛ همان شماره ⇒ ۴۰۰
+    //  ج) تغییرِ ایمیل (§۲۳.۴ ⇐ «فقط ایمیل»): ایمیلِ حسابِ دیگر ⇒ ۴۰۹؛ همان ایمیل ⇒ ۴۰۰
     const oldTicket = await ticketFor(P);
     const B = await signIn(s.slug, R, 'مشتریِ دیگر');
-    await assert.rejects(changePhone(A, R), (e) => e.status === 409 && e.code === 'phone_taken');
-    await assert.rejects(changePhone(A, P), (e) => e.status === 400 && e.code === 'same_phone');
+    await assert.rejects(changePhone(A, R), (e) => e.status === 409 && e.code === 'email_taken');
+    await assert.rejects(changePhone(A, P), (e) => e.status === 400 && e.code === 'same_email');
 
     const ch = await changePhone(A, Q);
-    assert.equal(ch.customer.phone, intl(Q));
+    assert.equal(ch.customer.email, mailOf(Q));
     assert.equal(ch.customer.id, custId);
     assert.equal(ch.sessionsRevoked, 1);
     assert.equal((await meOf(s2.slug, A2)).status, 401, 'نشستِ دیگرِ حساب لغو شد');
@@ -212,8 +213,8 @@ test('۳ و ۴) تغییرِ شماره گفت‌وگوها را نگه می‌�
     const blocked = await h.post(chatUrl(s.slug, `/${conv.id}/messages`), { clientId: cid(), kind: 'text', body: 'x' }, S(A));
     assert.equal(blocked.status, 403);
     assert.equal((await h.post(chatUrl(s.slug), { name: 'n' }, T(await ticketFor(Q)))).status, 403, 'شمارهٔ نو هم بسته است');
-    //  customer_phone برای سازگاری همان شمارهٔ پیشین ماند
-    assert.equal((await one('SELECT customer_phone FROM shop_chat_conversations WHERE id=$1', [conv.id])).customer_phone, intl(P));
+    //  کلیدِ گفت‌وگو (`customer_phone`) برای سازگاری همان کلیدِ پیشین (ایمیلِ P) ماند
+    assert.equal((await one('SELECT customer_phone FROM shop_chat_conversations WHERE id=$1', [conv.id])).customer_phone, mailOf(P));
 
     //  ه) ⛔ دارندهٔ تازهٔ P (بلیت یا حسابِ تازه) هیچ نمی‌بیند
     const newP = await ticketFor(P);

@@ -461,10 +461,10 @@ class CustomerModel(
     ensureStore(slug)
     placeNote = null
     repriced = false
-    if (form.name.isBlank() && form.phone.isBlank()) {
+    if (form.name.isBlank() && form.email.isBlank()) {
       form = form.copy(
         name = saved.name, addressText = saved.addressText, landmark = saved.landmark,
-        phone = saved.ticket?.phone?.let { localPhone(it) }.orEmpty(),
+        email = saved.ticket?.email.orEmpty(),
       )
     }
     store.valueOrNull()?.let { page -> form = form.copy(fulfillment = CheckoutRules.fulfillmentOf(page.shop, form).orEmpty()) }
@@ -577,13 +577,14 @@ class CustomerModel(
     return CheckoutRules.problems(page, cartOf(storeSlug), form, saved.ticket, slotsPage(), clock())
   }
 
+  //  «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): کد به ایمیلِ فرم؛ شمارهٔ فرم فقط تماسِ پیک است
   fun sendCode() {
-    val phone = CheckoutRules.phoneOf(form) ?: run {
-      verifyNote = ShopperText.problem(CheckoutProblem.PHONE)
+    val email = CheckoutRules.emailOf(form) ?: run {
+      verifyNote = ShopperText.problem(CheckoutProblem.EMAIL)
       return
     }
     verifyBusy = true
-    request({ api.verifyStart(storeSlug, phone) }) { r ->
+    request({ api.verifyStart(storeSlug, email) }) { r ->
       verifyBusy = false
       codeSent = r.valueOrNull()
       verifyNote = r.errorOrNull()?.let { ShopperText.error(it) } ?: ShopperText.codeSent
@@ -591,10 +592,10 @@ class CustomerModel(
   }
 
   fun checkCode() {
-    val phone = CheckoutRules.phoneOf(form) ?: return
+    val email = CheckoutRules.emailOf(form) ?: return
     val digits = LocaleFormat.asciiDigits(code).filter { it in '0'..'9' }
     verifyBusy = true
-    request({ api.verifyCheck(storeSlug, phone, digits) }) { r ->
+    request({ api.verifyCheck(storeSlug, email, digits) }) { r ->
       verifyBusy = false
       when (r) {
         is ShopperResult.Ok -> {
@@ -617,7 +618,7 @@ class CustomerModel(
     codeSent = null
     code = ""
     verifyNote = null
-    form = form.copy(phone = "")
+    form = form.copy(email = "")
   }
 
   fun placeOrder(second: Boolean = false) {   //  S41 «سفارشِ دوم»: `secondOrder` ⇒ بدنهٔ دیگر و کلیدِ تازه؛ فقط قاعدهٔ تکرار کنار می‌رود
@@ -638,7 +639,7 @@ class CustomerModel(
       requotePromo()
       return
     }
-    val req = CheckoutRules.request(page, cart, form, ticket.phone, lang.code, slotsPage(), promo.applied(ticket, saved.deviceId), deviceId = saved.deviceId)
+    val req = CheckoutRules.request(page, cart, form, CheckoutRules.phoneOf(form) ?: return, lang.code, slotsPage(), promo.applied(ticket, saved.deviceId), deviceId = saved.deviceId)
       .copy(campaign = campaigns[slug], secondOrder = if (second) true else null)
     //  CHK-19: همان بدنه ⇒ همان کلید (پیش از فرستادن نگه داشته می‌شود؛ بستنِ برنامه وسطِ کار سفارشِ دوم نمی‌سازد)
     val memo = CheckoutKeys.keyFor(saved.keys[slug], req)

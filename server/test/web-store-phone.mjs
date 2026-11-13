@@ -1,14 +1,15 @@
 /**
- * ویترین با کرومیومِ واقعی: «تغییرِ شمارهٔ تلفن» ِ حسابِ مشتری — §۲۳.۴ (صفحه: `store/phone.js` ِ دیربار از `store/acct.js`؛
- * سرور: `POST /api/store/:slug/account/phone`، `lib/store-customers.changePhone`؛ قرارداد: `storefront-account-phone.test.js`).
+ * ویترین با کرومیومِ واقعی: «شمارهٔ تماس و ایمیل» ِ حسابِ مشتری — §۲۳.۴ ⇐ «فقط ایمیل» (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۳؛ صفحه:
+ * `store/phone.js` ِ دیربار از `store/acct.js`؛ سرور: `POST /api/store/:slug/account/phone|email`، `lib/store-customers`؛
+ * قرارداد: `storefront-email-identity.test.js`).
  *
  *     npm run test:web-store      (پس از web-store-erase.mjs)
  *
- *   • ⛔ پرچمِ `shop.storefront.web_account` خاموش ⇒ phone.js خواسته نمی‌شود و درِ سرور همان درِ ناشناخته؛
- *   • روشن ⇒ «تغییرِ شمارهٔ تلفن» (بسته) زیرِ «حسابِ من»؛ شمارهٔ کنونی ⇒ پیام، بی فرستادنِ کد؛
- *   • شمارهٔ حسابِ دیگر ⇒ کد، سپس پیامِ «حسابِ جدا دارد» و هیچ تغییری (بلیتِ پیشینِ این دستگاه برمی‌گردد)؛
+ *   • ⛔ پرچمِ `shop.storefront.web_account` خاموش ⇒ phone.js خواسته نمی‌شود و درهای سرور همان درِ ناشناخته؛
+ *   • روشن ⇒ «شمارهٔ تماس و ایمیل» (بسته) زیرِ «حسابِ من»؛ شمارهٔ تماس **بی هیچ کدی** عوض می‌شود (هیچ `verify/start`)؛
+ *   • ایمیلِ کنونی ⇒ پیام، بی کد؛ ایمیلِ حسابِ دیگر ⇒ کد به همان ایمیل، سپس «حسابِ جدا دارد» و بلیتِ پیشینِ دستگاه برمی‌گردد؛
  *   • کدِ نادرست ⇒ «کد درست نیست» و کد در کادر می‌ماند؛ قطعِ شبکه پس از کد ⇒ «اتصال برقرار نشد» و تلاشِ دوباره بی کدِ تازه؛
- *   • موفق ⇒ شمارهٔ تازه در «حسابِ من» و نشست/بلیتِ همین دستگاه، شماره در پایگاه، نشستِ دستگاهِ دیگر باطل؛
+ *   • موفق ⇒ ایمیلِ تازه در «حسابِ من»، نشست/بلیتِ همین دستگاه و پایگاه؛ نشستِ دستگاهِ دیگر باطل؛
  *   • انگلیسی از واژه‌نامهٔ همان زبان؛ راست‌چین، بی بیرون‌زدگی در ۳۶۰، بی نقضِ CSP، بی خطای جاوااسکریپت و (axe-core) بی خطای
  *     دسترس‌پذیریِ همان بخش.
  */
@@ -81,28 +82,28 @@ const put = await call('PUT', '/api/shop/storefront', { slug, enabled: true, tit
   acceptPickup: true, deliveryFeeMinor: 0, minOrderMinor: 0 }, T);
 ok(put.status === 200, 'ویترین ساخته و روشن شد', JSON.stringify(put.body).slice(0, 120));
 
-const OLD = '0791117788', TAKEN = '0792227788', NEW = '0793337788';
+const OLD = 'old.buyer@store.local', TAKEN = 'taken.buyer@store.local', NEW = 'new.buyer@store.local';
 const NAME = 'کریمِ آزمونی';
-const ticket = async (p) => {
-  const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone: p });
-  const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone: p, code: vs.body.devCode });
-  return { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt };
+const ticket = async (e) => {
+  const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: e });
+  const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: e, code: vs.body.devCode });
+  return { email: vc.body.email, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt };
 };
 const mine = await ticket(OLD);
 const acc = await call('POST', `/api/store/${slug}/account`, { name: NAME }, null, { 'X-Store-Ticket': mine.ticket });
 ok(acc.status === 201, 'حسابِ وبِ مشتری ساخته شد', JSON.stringify(acc.body).slice(0, 120));
-//  دستگاهِ دیگرِ همین حساب و حسابِ دیگری با شمارهٔ TAKEN
+//  دستگاهِ دیگرِ همین حساب و حسابِ دیگری با ایمیلِ TAKEN
 const elsewhere = (await call('POST', `/api/store/${slug}/account`, {}, null, { 'X-Store-Ticket': (await ticket(OLD)).ticket })).body;
 const taken = (await call('POST', `/api/store/${slug}/account`, {}, null, { 'X-Store-Ticket': (await ticket(TAKEN)).ticket })).body;
 ok(elsewhere.customer.id === acc.body.customer.id && taken.customer.id !== acc.body.customer.id, 'دستگاهِ دوم و حسابِ دیگر آماده‌اند');
-const phoneNow = async () => (await one('SELECT phone FROM store_customers WHERE id=$1', [acc.body.customer.id])).phone;
+const row = async () => one('SELECT email, phone FROM store_customers WHERE id=$1', [acc.body.customer.id]);
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium/chrome-linux/chrome' }).catch(() => chromium.launch());
 const errors = [];
 const violations = [];
 const loads = [];
 const starts = [];
-const session = { token: acc.body.session, expiresAt: acc.body.expiresAt, phone: acc.body.customer.phone, name: NAME };
+const session = { token: acc.body.session, expiresAt: acc.body.expiresAt, email: acc.body.customer.email, phone: '', name: NAME };
 const seed = (c) => c.addInitScript(([sess, tk]) => {
   if (localStorage.getItem('seeded')) return;
   localStorage.setItem('seeded', '1');
@@ -128,63 +129,74 @@ const waitNote = (re) => page.waitForFunction((src) => new RegExp(src).test((doc
   re.source, { timeout: 15000 });
 const devCode = async () => ((await note()).match(/\d{6}/) || [])[0] || '';
 
-//  ── ⛔ پرچمِ خاموش ⇒ نه بخش، نه phone.js، و درِ سرور همان درِ ناشناخته ──
+//  ── ⛔ پرچمِ خاموش ⇒ نه بخش، نه phone.js، و درهای سرور همان درِ ناشناخته ──
 await openOrders();
 await page.waitForLoadState('networkidle');
-ok(!(await page.$('#ph-box')), 'خاموش ⇒ بخشِ تغییرِ شماره نیست');
+ok(!(await page.$('#ph-box')), 'خاموش ⇒ بخشِ تماس/ایمیل نیست');
 ok(loads.length === 0, 'خاموش ⇒ phone.js خواسته نشد', loads.join(' '));
 const fresh0 = await ticket(NEW);
 const headers0 = { 'X-Store-Session': acc.body.session, 'X-Store-Ticket': fresh0.ticket };
-const off = await call('POST', `/api/store/${slug}/account/phone`, { phone: NEW }, null, headers0);
-const unknown = await call('POST', `/api/store/${slug}/account/no-such-door`, { phone: NEW }, null, headers0);
-ok(off.status === unknown.status && JSON.stringify(off.body) === JSON.stringify(unknown.body), 'خاموش ⇒ درِ سرور همان درِ ناشناخته', `${off.status}`);
-ok(await phoneNow() === `+93${OLD.slice(1)}`, 'خاموش ⇒ شماره همان');
+for (const door of ['phone', 'email']) {
+  const off = await call('POST', `/api/store/${slug}/account/${door}`, { email: NEW, phone: '0790001122' }, null, headers0);
+  const unknown = await call('POST', `/api/store/${slug}/account/no-such-door`, { email: NEW }, null, headers0);
+  ok(off.status === unknown.status && JSON.stringify(off.body) === JSON.stringify(unknown.body), `خاموش ⇒ درِ ${door} همان درِ ناشناخته`, `${off.status}`);
+}
+ok((await row()).email === OLD, 'خاموش ⇒ ایمیل همان');
 
 //  ── روشن ──
 await flag('shop.storefront.web_account', true);
 await openOrders();
 await page.waitForSelector('#ph-box', { timeout: 15000 });
 ok(loads.length > 0, 'روشن ⇒ phone.js دیربار آمد');
-ok(await page.isHidden('#ph-send'), 'بسته تا کاربر باز کند (details)');
-ok((await text('#ph-box > summary')) === 'تغییرِ شمارهٔ تلفن', 'عنوانِ بخش از واژه‌نامه', await text('#ph-box > summary'));
+ok(await page.isHidden('#em-send'), 'بسته تا کاربر باز کند (details)');
+ok((await text('#ph-box > summary')) === 'شمارهٔ تماس و ایمیل', 'عنوانِ بخش از واژه‌نامه', await text('#ph-box > summary'));
 await page.click('#ph-box > summary');
 
-//  شمارهٔ کنونی ⇒ پیام، بی کد
-await page.fill('#ph-phone', OLD);
-await page.click('#ph-send');
-await waitNote(/همان شمارهٔ کنونی/);
-ok(starts.length === 0, 'شمارهٔ کنونی ⇒ هیچ کدی فرستاده نشد');
-ok(await page.isHidden('#ph-code'), 'کادرِ کد بسته ماند');
+//  شمارهٔ تماس: بی هیچ کدی
+await page.fill('#ph-phone', '0793337788');
+await page.click('#ph-save');
+await page.waitForFunction(() => /شمارهٔ تماس/.test((document.getElementById('toast') || {}).textContent || ''), null, { timeout: 15000 });
+ok(starts.length === 0, 'شمارهٔ تماس ⇒ هیچ کدی فرستاده نشد');
+ok((await row()).phone === '+93793337788', 'شمارهٔ تماس در پایگاه', (await row()).phone);
+await page.waitForSelector('#ph-box', { timeout: 15000 });
+if (await page.isHidden('#em-send')) await page.click('#ph-box > summary');
 
-//  شمارهٔ حسابِ دیگر ⇒ کد، سپس «حسابِ جدا دارد»، بی تغییر
-await page.fill('#ph-phone', TAKEN);
-await page.click('#ph-send');
-await page.waitForSelector('#ph-code:visible', { timeout: 15000 });
-ok(starts.length === 1, 'کد فقط برای شمارهٔ تازه فرستاده شد');
-await page.fill('#ph-code', await devCode());
-await page.click('#ph-ok');
+//  ایمیلِ کنونی ⇒ پیام، بی کد
+await page.fill('#em-email', OLD);
+await page.click('#em-send');
+await waitNote(/همان ایمیلِ کنونی/);
+ok(starts.length === 0, 'ایمیلِ کنونی ⇒ هیچ کدی فرستاده نشد');
+ok(await page.isHidden('#em-code'), 'کادرِ کد بسته ماند');
+
+//  ایمیلِ حسابِ دیگر ⇒ کد، سپس «حسابِ جدا دارد»، بی تغییر
+await page.fill('#em-email', TAKEN);
+await page.click('#em-send');
+await page.waitForSelector('#em-code:visible', { timeout: 15000 });
+ok(starts.length === 1 && /taken\.buyer/.test(starts[0]), 'کد فقط برای ایمیلِ تازه فرستاده شد', starts.join(' '));
+await page.fill('#em-code', await devCode());
+await page.click('#em-ok');
 await waitNote(/حسابِ جدا/);
-ok(await phoneNow() === `+93${OLD.slice(1)}`, 'شمارهٔ حسابِ دیگر ⇒ شماره همان');
-ok(await page.evaluate(() => JSON.parse(localStorage.getItem('store-ticket') || '{}').phone) === mine.phone, 'بلیتِ پیشینِ دستگاه برگشت');
+ok((await row()).email === OLD, 'ایمیلِ حسابِ دیگر ⇒ ایمیل همان');
+ok(await page.evaluate(() => JSON.parse(localStorage.getItem('store-ticket') || '{}').email) === mine.email, 'بلیتِ پیشینِ دستگاه برگشت');
 
-//  شمارهٔ تازه: کدِ نادرست، سپس قطعِ شبکه، سپس تلاشِ دوباره بی کدِ تازه
-await page.fill('#ph-phone', NEW);
-await page.click('#ph-send');
+//  ایمیلِ تازه: کدِ نادرست، سپس قطعِ شبکه، سپس تلاشِ دوباره بی کدِ تازه
+await page.fill('#em-email', NEW);
+await page.click('#em-send');
 await waitNote(/\d{6}/);
 const right = await devCode();
 const wrong = right === '111111' ? '222222' : '111111';
-await page.fill('#ph-code', wrong);
-await page.click('#ph-ok');
+await page.fill('#em-code', wrong);
+await page.click('#em-ok');
 await waitNote(/کد درست نیست/);
-ok((await page.inputValue('#ph-code')) === wrong, 'کدِ نادرست ⇒ کد در کادر ماند');
-ok(await phoneNow() === `+93${OLD.slice(1)}`, 'کدِ نادرست ⇒ شماره همان');
-await page.fill('#ph-code', right);
+ok((await page.inputValue('#em-code')) === wrong, 'کدِ نادرست ⇒ کد در کادر ماند');
+ok((await row()).email === OLD, 'کدِ نادرست ⇒ ایمیل همان');
+await page.fill('#em-code', right);
 let cut = true;
-await page.route('**/account/phone', (r) => (cut ? (cut = false, r.abort()) : r.continue()));
-await page.click('#ph-ok');
+await page.route('**/account/email', (r) => (cut ? (cut = false, r.abort()) : r.continue()));
+await page.click('#em-ok');
 await waitNote(/اتصال برقرار نشد/);
-ok(await phoneNow() === `+93${OLD.slice(1)}`, 'قطعِ شبکه ⇒ شماره همان');
-ok(await page.isEnabled('#ph-ok'), 'قطعِ شبکه ⇒ دکمه باز برای تلاشِ دوباره');
+ok((await row()).email === OLD, 'قطعِ شبکه ⇒ ایمیل همان');
+ok(await page.isEnabled('#em-ok'), 'قطعِ شبکه ⇒ دکمه باز برای تلاشِ دوباره');
 const startsBefore = starts.length;
 
 if (axeSrc) {
@@ -195,15 +207,15 @@ if (axeSrc) {
   await ap.goto(`${base}/store/${slug}#/orders`);
   await ap.waitForSelector('#ph-box', { timeout: 15000 });
   await ap.click('#ph-box > summary');
-  await ap.fill('#ph-phone', '0794447788');
-  await ap.click('#ph-send');
-  await ap.waitForSelector('#ph-code:visible', { timeout: 15000 });
+  await ap.fill('#em-email', 'axe.buyer@store.local');
+  await ap.click('#em-send');
+  await ap.waitForSelector('#em-code:visible', { timeout: 15000 });
   await ap.addScriptTag({ content: axeSrc });
   const v = await ap.evaluate(async () => (await window.axe.run('#ph-box',
     { runOnly: ['color-contrast', 'button-name', 'label', 'aria-allowed-attr', 'nested-interactive', 'autocomplete-valid'] })).violations
     .map((x) => `${x.id}: ${x.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' ; ')}`));
   await ax.close();
-  ok(v.length === 0, 'دسترس‌پذیری (axe-core) ِ بخشِ تغییرِ شماره', v.join(' | '));
+  ok(v.length === 0, 'دسترس‌پذیری (axe-core) ِ بخشِ تماس/ایمیل', v.join(' | '));
 } else if (SKIP) {
   console.log('⏭  axe-core نیست و SKIP_BROWSER_TESTS=1 — سنجهٔ دسترس‌پذیری اجرا نشد');
 } else {
@@ -212,22 +224,22 @@ if (axeSrc) {
 
 ok(await page.evaluate(() => getComputedStyle(document.getElementById('ph-box')).direction) === 'rtl', 'راست‌چین');
 ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'بی بیرون‌زدگی در ۳۶۰');
-await page.click('#ph-ok');
+await page.click('#em-ok');
 await page.waitForFunction((n) => (document.getElementById('ac-mine') || {}).textContent.includes(n), NEW, { timeout: 15000 });
-ok(/شمارهٔ حساب.*عوض شد/.test(await text('#toast')), 'پیامِ «شمارهٔ حساب … عوض شد»', await text('#toast'));
+ok(/ایمیلِ حساب.*شد/.test(await text('#toast')), 'پیامِ «ایمیلِ حساب … شد»', await text('#toast'));
 ok(starts.length === startsBefore, 'تلاشِ دوباره بی کدِ تازه');
-ok(await phoneNow() === `+93${NEW.slice(1)}`, 'شماره در پایگاه عوض شد');
+ok((await row()).email === NEW, 'ایمیل در پایگاه عوض شد');
 const ls = await page.evaluate(() => [JSON.parse(localStorage.getItem('store-session') || '{}'), JSON.parse(localStorage.getItem('store-ticket') || '{}')]);
-ok(ls[0].phone === `+93${NEW.slice(1)}` && ls[0].token === acc.body.session, 'نشستِ همین دستگاه ماند و شماره‌اش تازه شد');
-ok(ls[1].phone === `+93${NEW.slice(1)}`, 'بلیتِ دستگاه برای شمارهٔ تازه');
+ok(ls[0].email === NEW && ls[0].token === acc.body.session, 'نشستِ همین دستگاه ماند و ایمیلش تازه شد');
+ok(ls[1].email === NEW, 'بلیتِ دستگاه برای ایمیلِ تازه');
 ok((await call('GET', `/api/store/${slug}/account`, null, null, { 'X-Store-Session': elsewhere.session })).status === 401, 'نشستِ دستگاهِ دیگر باطل شد');
 ok((await call('GET', `/api/store/${slug}/account`, null, null, { 'X-Store-Session': acc.body.session })).status === 200, 'نشستِ همین دستگاه کار می‌کند');
-ok(await page.isHidden('#ph-send'), 'بخش پس از تغییر دوباره بسته');
+ok(starts.every((x) => !/\+93|07\d{8}/.test(x)), 'هیچ کدی به شماره نرفت', starts.join(' '));
 
 //  ── انگلیسی ──
 await openOrders('&lang=en');
 await page.waitForSelector('#ph-box', { timeout: 15000 });
-ok((await text('#ph-box > summary')) === 'Change phone number', 'انگلیسی از واژه‌نامهٔ همان زبان', await text('#ph-box > summary'));
+ok((await text('#ph-box > summary')) === 'Contact number and email', 'انگلیسی از واژه‌نامهٔ همان زبان', await text('#ph-box > summary'));
 
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));
@@ -236,5 +248,5 @@ await ctx.close();
 await browser.close();
 server.close();
 await closeDb();
-console.log(bad ? `❌ ${bad} ایراد` : '✅ ویترین: «تغییرِ شمارهٔ تلفن» ِ حسابِ مشتری');
+console.log(bad ? `❌ ${bad} ایراد` : '✅ ویترین: «شمارهٔ تماس و ایمیل» ِ حسابِ مشتری');
 process.exit(bad ? 1 : 0);

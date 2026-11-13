@@ -15,6 +15,7 @@ import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -93,8 +94,8 @@ const feat = (await call('GET', `/api/store/${slug}`)).body.features || {};
 ok(feat.addressExtra === true && feat.webAccount === true && !feat.funnel, 'پرچم‌ها: نشانیِ کامل و حساب روشن، تپشِ قیف خاموش', JSON.stringify(feat));
 //  نشستِ حسابِ مشتری از همان درهای واقعی (کد ⇐ بلیت ⇐ حساب)
 const phone = '0791117788';
-const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
-const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
 const acct = await call('POST', `/api/store/${slug}/account`, {}, null, { 'X-Store-Ticket': vc.body.ticket });
 ok(acct.status === 201 && acct.body.session, 'نشستِ حساب ساخته شد', String(acct.status));
 const session = { token: acct.body.session, phone: vc.body.phone, expiresAt: acct.body.expiresAt };

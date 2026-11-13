@@ -288,7 +288,7 @@ fun ProfileScreen(
                 return@launch
               }
 
-              Backend.account(context).updateProfile(cleanName, claim)
+              Backend.account(context).updateProfile(cleanName, claim.ifBlank { null })   //  خالی ⇒ دست نزن (`""` پاک می‌کند)
                 .onSuccess { done ->
                   state.accountName = done.user.name
                   state.accountEmail = done.user.email.orEmpty()

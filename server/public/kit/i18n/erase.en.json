@@ -13,6 +13,6 @@
   "er.open": "{n} of your orders are not finished yet; ask again after delivery or cancellation.",
   "er.sure": "I understand this cannot be undone",
   "er.go": "Delete everything for good",
-  "er.verify": "To delete, confirm the number {phone} with a code now.",
+  "er.verify": "To erase, verify your email {email} with a code now.",
   "er.done": "Your data in this shop has been deleted."
 }

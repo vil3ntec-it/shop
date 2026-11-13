@@ -15,6 +15,7 @@ import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -169,6 +170,7 @@ ok((await text('#t-total')).includes('۳۴۵'), 'جمع ۳۰۰ + ۴۵', await te
 //  تأییدِ شماره (برای «خبرم کن» و ثبت)
 await page.fill('#c-name', 'مشتریِ آزمایشی');
 await page.fill('#c-phone', '0791112255');
+await page.fill('#c-email', mailOf('0791112255'));
 await page.click('#verify-send');
 await page.waitForSelector('#verify-code-row:not([hidden])', { timeout: 10000 });
 await page.fill('#v-code', ((await text('#verify-msg')).match(/(\d{4,8})/) || [])[1] || '');

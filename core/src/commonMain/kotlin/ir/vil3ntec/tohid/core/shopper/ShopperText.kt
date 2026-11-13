@@ -241,22 +241,23 @@ object ShopperText {
   val pickup get() = t("دریافت از دکان", "Pick up at the shop", "له دوکانه اخیستل")
   val you get() = t("شما", "You", "تاسو")
   val name get() = t("نام", "Name", "نوم")
-  val phone get() = t("شمارهٔ موبایل", "Mobile number", "د موبایل شمېره")
+  val phone get() = t("شمارهٔ تماس برای پیک", "Contact number for the courier", "د پیک لپاره د اړیکې شمېره")
+  val email get() = t("ایمیل", "Email", "ایمیل")
   val verifyText get() = t(
-    "برای ثبت، شماره با یک کدِ یک‌بارمصرف تأیید می‌شود. دیدن و سبد حساب نمی‌خواهد.",
-    "To place an order, we verify your number with a one-time code. Browsing and the cart need no account.",
-    "د ثبت لپاره شمېره په یو ځلي کوډ تاییدېږي. لیدلو او ټوکرۍ ته حساب نه دی پکار.",
+    "برای ثبت، ایمیلِ شما با یک کدِ یک‌بارمصرف تأیید می‌شود. دیدن و سبد حساب نمی‌خواهد.",
+    "To place an order, we verify your email with a one-time code. Browsing and the cart need no account.",
+    "د ثبت لپاره ستاسو ایمیل په یو ځلي کوډ تاییدېږي. لیدلو او ټوکرۍ ته حساب نه دی پکار.",
   )
   val sendCode get() = t("فرستادنِ کدِ تأیید", "Send code", "د تایید کوډ ولېږئ")
   val code get() = t("کدِ تأیید", "Verification code", "د تایید کوډ")
   val check get() = t("تأیید", "Verify", "تایید")
-  val verified get() = t("شماره تأیید شده است.", "Number verified.", "شمېره تایید شوه.")
+  val verified get() = t("ایمیل تأیید شده است.", "Email verified.", "ایمیل تایید شو.")
   val codeSent get() = t("کد فرستاده شد.", "Code sent.", "کوډ ولېږل شو.")
-  val otherNumber get() = t("شمارهٔ دیگر", "Use another number", "بله شمېره")
+  val otherNumber get() = t("ایمیلِ دیگر", "Use another email", "بل ایمیل")
   val verifyOff get() = t(
-    "تأییدِ شماره هنوز روی این سرور راه‌اندازی نشده است؛ فعلاً برای سفارش با خودِ دکان تماس بگیرید.",
-    "Number verification isn't set up on this server yet — for now, contact the shop to order.",
-    "د شمېرې تایید لا پر دې سرور نه دی جوړ شوی؛ اوس د فرمایش لپاره له دوکان سره اړیکه ونیسئ.",
+    "تأییدِ ایمیل هنوز روی این سرور راه‌اندازی نشده است؛ فعلاً برای سفارش با خودِ دکان تماس بگیرید.",
+    "Email verification isn't set up on this server yet — for now, contact the shop to order.",
+    "د ایمیل تایید لا پر دې سرور نه دی جوړ شوی؛ اوس د فرمایش لپاره له دوکان سره اړیکه ونیسئ.",
   )
   val address get() = t("نشانی", "Address", "پته")
   val addressHint get() = t("ناحیه، سرک، کوچه، شمارهٔ خانه", "District, road, street, house number", "ناحیه، سړک، کوڅه، د کور شمېره")
@@ -323,8 +324,9 @@ object ShopperText {
     CheckoutProblem.UNAVAILABLE_LINES -> cartBad
     CheckoutProblem.NO_FULFILLMENT -> t("این روشِ تحویل در این دکان نیست.", "This shop doesn't offer that delivery option.", "دا دوکان دا ډول سپارل نه لري.")
     CheckoutProblem.NAME -> t("نام را بنویسید.", "Please enter your name.", "خپل نوم ولیکئ.")
-    CheckoutProblem.PHONE -> t("شمارهٔ موبایل درست نیست.", "That mobile number isn't valid.", "د موبایل شمېره سمه نه ده.")
-    CheckoutProblem.VERIFY -> t("برای ثبت، اول همین شماره را تأیید کنید.", "Please verify this number before ordering.", "د ثبت لپاره لومړی همدا شمېره تایید کړئ.")
+    CheckoutProblem.PHONE -> t("شمارهٔ تماس درست نیست.", "That contact number isn't valid.", "د اړیکې شمېره سمه نه ده.")
+    CheckoutProblem.EMAIL -> t("ایمیل را درست بنویسید.", "Please enter a valid email.", "ایمیل سم ولیکئ.")
+    CheckoutProblem.VERIFY -> t("برای ثبت، اول همین ایمیل را تأیید کنید.", "Please verify this email before ordering.", "د ثبت لپاره لومړی همدا ایمیل تایید کړئ.")
     CheckoutProblem.ADDRESS -> t("نشانی، نشانهٔ نزدیک یا پینِ موقعیت را بدهید.", "Please give an address, a nearby landmark or a map pin.", "پته، نږدې نښه یا د ځای پن ورکړئ.")
     CheckoutProblem.ZONE -> t("ناحیهٔ ارسال را برگزینید.", "Choose your delivery area.", "د لېږد سیمه وټاکئ.")
     CheckoutProblem.SLOT -> t("یک بازهٔ زمانی را برگزینید.", "Choose a time slot.", "یو وخت وټاکئ.")
@@ -706,7 +708,7 @@ object ShopperText {
   val signedIn get() = t("وارد شدید؛ سبد، دلخواه‌ها و فهرست همراهِ حساب شد.", "Signed in — your cart, favourites and list now follow your account.",
     "ننوتلئ؛ ټوکرۍ، خوښې او لړ اوس ستاسو له حساب سره دي.")
   val signOut get() = t("خروج از حساب", "Sign out", "له حساب څخه وتل")
-  fun signedInAs(phone: String) = t("واردشده با ${asIs(phone)}", "Signed in as $phone", "د $phone سره ننوتلي")
+  fun signedInAs(who: String) = t("واردشده با ${asIs(who)}", "Signed in as $who", "د $who سره ننوتلي")
   val notSignedIn get() = t("وارد نشده‌اید؛ سبد و فهرست فقط روی همین دستگاه‌اند.", "Not signed in — your cart and list are on this device only.",
     "نه یاست ننوتلي؛ ټوکرۍ او لړ یوازې په همدې وسیله کې دي.")
 
@@ -731,14 +733,15 @@ object ShopperText {
     "list_full" -> t("فهرستِ خرید پر است (حداکثر ۱۰۰ قلم).", "The shopping list is full (100 items at most).", "د پېرود لړ ډک دی (تر ۱۰۰ توکو).")
     "too_many_lists" -> t("فهرست‌های حسابِ شما پر است؛ این فهرست روی همین دستگاه می‌ماند.", "Your account has too many lists — this one stays on this device.",
       "ستاسو په حساب کې ډېر لړونه دي؛ دا لړ په همدې وسیله کې پاتې کېږي.")
-    "verification_required" -> t("برای ادامه، شمارهٔ خود را دوباره تأیید کنید.", "Please verify your number again to continue.", "د دوام لپاره خپله شمېره بیا تایید کړئ.")
+    "verification_required" -> t("برای ادامه، ایمیلِ خود را دوباره تأیید کنید.", "Please verify your email again to continue.", "د دوام لپاره خپل ایمیل بیا تایید کړئ.")
+    "email_required", "bad_email" -> problem(CheckoutProblem.EMAIL)
     "phone_not_verified" -> problem(CheckoutProblem.VERIFY)
     "otp_required" -> t("کد را بنویسید.", "Please enter the code.", "کوډ ولیکئ.")
     "otp_wrong" -> t("کد درست نیست.", "That code isn't right.", "کوډ سم نه دی.")
     "otp_expired" -> t("مهلتِ این کد تمام شده است؛ کدِ تازه بخواهید.", "This code has expired — ask for a new one.", "د دې کوډ وخت تېر شوی؛ نوی کوډ وغواړئ.")
     "otp_locked" -> t("تلاش زیاد شد؛ کدِ تازه بخواهید.", "Too many tries — ask for a new code.", "هڅې ډېرې شوې؛ نوی کوډ وغواړئ.")
     "otp_used" -> t("این کد پیش‌تر به کار رفته است؛ کدِ تازه بخواهید.", "This code was already used — ask for a new one.", "دا کوډ مخکې کارول شوی؛ نوی کوډ وغواړئ.")
-    "otp_not_found" -> t("برای این شماره کدی فرستاده نشده؛ اول «فرستادنِ کد» را بزنید.", "No code was sent to this number — tap “Send code” first.", "دې شمېرې ته کوډ نه دی لېږل شوی؛ لومړی «کوډ ولېږئ» ووهئ.")
+    "otp_not_found" -> t("برای این ایمیل کدی فرستاده نشده؛ اول «فرستادنِ کد» را بزنید.", "No code was sent to this email — tap “Send code” first.", "دې ایمیل ته کوډ نه دی لېږل شوی؛ لومړی «کوډ ولېږئ» ووهئ.")
     "otp_resend_wait" -> t("کمی صبر کنید و دوباره کد بخواهید.", "Please wait a moment before asking for another code.", "لږ صبر وکړئ او بیا کوډ وغواړئ.")
     "otp_daily_limit" -> t("امروز کد زیاد خواسته شده است؛ فردا دوباره بزنید.", "Too many codes today — please try again tomorrow.", "نن ډېر کوډونه غوښتل شوي؛ سبا بیا هڅه وکړئ.")
     "product_unavailable" -> t("برخی کالاها دیگر در ویترین نیستند؛ آن‌ها را از سبد بردارید.", "Some items are no longer in the shop — remove them from your cart.", "ځینې توکي نور په دوکان کې نشته؛ له ټوکرۍ یې لرې کړئ.")

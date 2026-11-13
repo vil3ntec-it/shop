@@ -10,6 +10,9 @@ import ir.vil3ntec.tohid.core.shopper.AccountReply
 import ir.vil3ntec.tohid.core.shopper.AccountRules
 import ir.vil3ntec.tohid.core.shopper.AccountSession
 import ir.vil3ntec.tohid.core.shopper.CartSync
+import ir.vil3ntec.tohid.core.shopper.CheckoutForm
+import ir.vil3ntec.tohid.core.shopper.CheckoutProblem
+import ir.vil3ntec.tohid.core.shopper.CheckoutRules
 import ir.vil3ntec.tohid.core.shopper.ListItem
 import ir.vil3ntec.tohid.core.shopper.ShopperError
 import ir.vil3ntec.tohid.core.shopper.ShopperJson
@@ -33,7 +36,7 @@ import kotlinx.coroutines.Job
 class AccountBox(private val secrets: ShopperKeyValue?) {
   var session: AccountSession? by mutableStateOf(load())
     private set
-  var phone: String by mutableStateOf("")
+  var email: String by mutableStateOf("")
   var code: String by mutableStateOf("")
   var codeSent: Boolean by mutableStateOf(false)
     internal set
@@ -83,11 +86,11 @@ private const val MAX_STEPS = 60
 
 fun CustomerModel.signedIn(): AccountSession? = account.live(clock())
 
-/** ورود ۱: کدِ واقعیِ سرور به همان شماره (`/verify/start`)؛ سرورِ بی راهِ پیامک ⇒ `verification_unavailable` (D-09) */
+/** ورود ۱: کدِ واقعیِ سرور به همان ایمیل (`/verify/start`؛ «فقط ایمیل»)؛ سرورِ بی راهِ ایمیل ⇒ `verification_unavailable` */
 fun CustomerModel.accountSendCode(slug: String) {
-  val phone = LocaleFormat.normalizePhone(account.phone) ?: run { account.note = ShopperText.error(badPhone()); return }
+  val email = CheckoutRules.emailOf(CheckoutForm(email = account.email)) ?: run { account.note = ShopperText.problem(CheckoutProblem.EMAIL); return }
   account.busy = true
-  request({ api.verifyStart(slug, phone) }) { r ->
+  request({ api.verifyStart(slug, email) }) { r ->
     account.busy = false
     account.codeSent = r is ShopperResult.Ok
     account.note = r.errorOrNull()?.let { ShopperText.error(it) } ?: ShopperText.codeSent
@@ -96,10 +99,10 @@ fun CustomerModel.accountSendCode(slug: String) {
 
 /** ورود ۲: کد ⇒ بلیتِ تازه ⇒ نشست (`POST /:slug/account`)؛ سپس دورِ کاملِ هم‌گامی (ادغامِ نخستینِ همین نشست) */
 fun CustomerModel.accountSignIn(slug: String) {
-  val phone = LocaleFormat.normalizePhone(account.phone) ?: return
+  val email = CheckoutRules.emailOf(CheckoutForm(email = account.email)) ?: return
   val digits = LocaleFormat.asciiDigits(account.code).filter { it in '0'..'9' }
   account.busy = true
-  request({ api.verifyCheck(slug, phone, digits) }) { r ->
+  request({ api.verifyCheck(slug, email, digits) }) { r ->
     val ticket = r.valueOrNull()
     if (ticket == null) {
       account.busy = false
@@ -293,4 +296,3 @@ fun CustomerModel.listToCart(slug: String) {
   }
 }
 
-private fun badPhone() = ShopperError(400, "bad_phone")

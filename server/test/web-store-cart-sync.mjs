@@ -23,6 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -110,8 +111,8 @@ for (const id of Object.keys(PRODUCTS)) await call('PUT', `/api/shop/storefront/
 
 /** نشستِ تازهٔ حسابِ این شماره از راهِ API — «دستگاهی دیگر» */
 const session = async (phone) => {
-  const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
-  const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+  const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+  const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
   const a = await call('POST', `/api/store/${slug}/account`, {}, null, { 'X-Store-Ticket': vc.body.ticket });
   return { token: a.body.session, expiresAt: a.body.expiresAt, phone: a.body.customer.phone, name: '' };
 };

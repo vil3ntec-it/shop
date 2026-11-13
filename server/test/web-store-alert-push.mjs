@@ -20,6 +20,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -98,8 +99,8 @@ const setStock = (productId, qtyMilli) => call('POST', '/api/shop/catalog/moves'
 ok((await setStock('rice', 5000)).status === 201, 'برنج موجود؛ چای تمام شده');
 
 const ticket = async (phone) => {
-  const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
-  const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+  const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+  const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
   return vc.body;
 };
 const tk = await ticket('0791113377');

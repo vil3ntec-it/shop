@@ -163,7 +163,8 @@ const history = (slug, auth) => { resetAll(); return h.get(`/api/store/${slug}/a
 /** مشتری با یک فاکتورِ ۶۰٬۰۰۰ (نقره‌ای)، کسبِ ۶۰۰، مصرفِ ۱۰۰ و اصلاحِ دستیِ +۵ و −۵ */
 async function seedPoints(s, id, phone, at) {
   await push(s, [
-    op('debtors', id, { name: 'مشتریِ امتیاز', phone, createdAt: at - 10 * DAY }),
+    //  «فقط ایمیل»: پیوندِ «حسابِ من» با قرض‌دار فقط با ایمیلِ تأییدشده (`data.email` ِ قرض‌دار)، نه شماره
+    op('debtors', id, { name: 'مشتریِ امتیاز', phone, email: mailOf(phone), createdAt: at - 10 * DAY }),
     op('sales', `${id}-s1`, { invoiceNumber: 1, series: 'L1', total: 60000, discount: 0, finalTotal: 60000, paymentMethod: 'cash',
       paidAmount: 60000, status: 'completed', createdAt: at - 5 * DAY, date: '2026-10-28', debtorId: id }),
     op('auditLog', `${id}-s1-lp-e`, { type: 'loyalty_earn', refId: `${id}-s1`, payRef: id, points: 600, amount: 0, createdAt: at - 5 * DAY, notes: 'یادداشتِ داخلی' }),
@@ -190,7 +191,7 @@ test('CRM-13 + PRM-13 ⛔: بی قاعدهٔ روشنِ دکان «حسابِ م
   assert.deepEqual((await history(s.slug, auth)).body, before.body);
 });
 
-test('CRM-13 + PRM-13: امتیاز و سطح فقط مالِ همین شماره (تطبیقِ دقیق)؛ شمارهٔ دیگر بی امتیاز', async () => {
+test('CRM-13 + PRM-13: امتیاز و سطح فقط مالِ همین ایمیل (تطبیقِ دقیق)؛ ایمیلِ دیگر بی امتیاز', async () => {
   const s = await liveStore('امتیازِ روشن');
   const at = Date.now();
   const phone = '+93799200002';
@@ -205,7 +206,7 @@ test('CRM-13 + PRM-13: امتیاز و سطح فقط مالِ همین شمار�
   const text = JSON.stringify(r.body);
   for (const secret of ['یادداشتِ داخلی', 'هدیه', 'a-lp', 'b-lp', 'lpa-']) assert.ok(!text.includes(secret), secret);
 
-  //  شمارهٔ تأییدشدهٔ دیگری که قرض‌دار ندارد ⇒ بی پیوند و بی امتیاز
+  //  ایمیلِ تأییدشدهٔ دیگری که قرض‌دار ندارد ⇒ بی پیوند و بی امتیاز
   const stranger = await history(s.slug, await ticket(s.slug, '+93799200009'));
   assert.equal(stranger.body.linked, false);
   assert.equal(stranger.body.loyalty, undefined);

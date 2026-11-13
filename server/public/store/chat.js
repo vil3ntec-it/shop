@@ -71,7 +71,7 @@
           el('button', { class: 'btn btn-icon btn-ghost', attrs: { id: 'ct-close', type: 'button', 'aria-label': t('close') }, on: { click: function () { K.closeSheet(); } } }, K.icon('close'))),
         el('form', { class: 'stack', attrs: { id: 'ct-verify', novalidate: '' }, hidden: true },
           el('p', { class: 'muted', text: t('ct.v.title') }),
-          el('label', { class: 'field' }, el('span', { text: t('ct.v.phone') }), el('input', { attrs: { id: 'ct-phone', type: 'tel', inputmode: 'tel', autocomplete: 'tel', dir: 'ltr' } })),
+          el('label', { class: 'field' }, el('span', { text: t('ct.v.email') }), el('input', { attrs: { id: 'ct-email', type: 'email', inputmode: 'email', autocomplete: 'email', dir: 'ltr', maxlength: '190' } })),
           el('button', { class: 'btn btn-block', attrs: { id: 'ct-vsend', type: 'button' }, text: t('ct.v.send'), on: { click: sendCode } }),
           el('label', { class: 'field', attrs: { id: 'ct-coderow' }, hidden: true }, el('span', { text: t('ct.v.code') }), el('input', { attrs: { id: 'ct-code', inputmode: 'numeric', autocomplete: 'one-time-code', dir: 'ltr' } })),
           el('button', { class: 'btn btn-accent btn-block', attrs: { id: 'ct-vcheck', type: 'submit' }, text: t('ct.v.check'), hidden: true }),
@@ -114,28 +114,28 @@
       K.note($('ct-msg'), 'err', (e && e.message) || t('ct.err'));
     }
 
-    // ── تأییدِ شماره (بلیتِ ویترین) ──
+    // ── تأییدِ ایمیل (بلیتِ ویترین؛ «فقط ایمیل») ──
     function verify() {
       loop++;
       $('ct-verify').hidden = false; $('ct-body').hidden = true; $('ct-form').hidden = true;
       $('ct-issue').hidden = true; $('ct-new').hidden = true; $('ct-state').hidden = true;
-      //  ⛔ تمرکزِ دیر کادری را که مشتری همین حالا در فرم در آن است نمی‌رباید (پیش‌تر کدِ در حالِ نوشتن به کادرِ شماره می‌رفت ⇒ ۴۰۰)
-      setTimeout(function () { if (!$('ct-verify').contains(document.activeElement)) $('ct-phone').focus(); }, 80);
+      //  ⛔ تمرکزِ دیر کادری را که مشتری همین حالا در فرم در آن است نمی‌رباید (پیش‌تر کدِ در حالِ نوشتن به کادرِ ایمیل می‌رفت ⇒ ۴۰۰)
+      setTimeout(function () { if (!$('ct-verify').contains(document.activeElement)) $('ct-email').focus(); }, 80);
     }
     function sendCode() {
       var b = $('ct-vsend'); b.disabled = true;
-      api('/verify/start', { method: 'POST', body: { phone: $('ct-phone').value } }).then(function (r) {
+      api('/verify/start', { method: 'POST', body: { email: $('ct-email').value } }).then(function (r) {
         $('ct-coderow').hidden = false; $('ct-vcheck').hidden = false;
         K.note($('ct-vmsg'), 'info', t('v.sent') + (r.devCode ? ' ' + r.devCode : ''));
         $('ct-code').focus();
-      }).catch(function (e) { K.note($('ct-vmsg'), 'err', e.code === 'bad_request' ? t('err.bad_phone') : e.message); })
+      }).catch(function (e) { K.note($('ct-vmsg'), 'err', e.code === 'bad_request' ? t('err.bad_email') : e.message); })
         .then(function () { b.disabled = false; });
     }
     function checkCode() {
       var b = $('ct-vcheck'); b.disabled = true;
-      api('/verify/check', { method: 'POST', body: { phone: $('ct-phone').value, code: $('ct-code').value } }).then(function (r) {
+      api('/verify/check', { method: 'POST', body: { email: $('ct-email').value, code: $('ct-code').value } }).then(function (r) {
         K.setTicket(r);
-        if (Q) { oq = Q.reverified(onDisk(), r.phone); saveQ(); }   //  شمارهٔ دیگر ⇒ صفِ نفرِ پیشین پاک؛ همان ⇒ دوباره در راه
+        if (Q) { oq = Q.reverified(onDisk(), r.email); saveQ(); }   //  ایمیلِ دیگر ⇒ صفِ نفرِ پیشین پاک؛ همان ⇒ دوباره در راه
         $('ct-code').value = ''; $('ct-verify').hidden = true; $('ct-vmsg').hidden = true;
         start(want || {});
       }).catch(function (e) { K.note($('ct-vmsg'), 'err', e.message); }).then(function () { b.disabled = false; });
@@ -536,7 +536,8 @@
     });
 
     // ── صفِ پیام‌های متنی (CHAT-02/11): متن از کادر به حبابِ «در صف»؛ هر گفت‌وگو فقط سرِ صفش، یکی‌یکی، با همان `clientId` ──
-    function phone() { var tk = K.ticket(); var ss = K.sess(); return (tk && tk.phone) || (ss && ss.phone) || ''; }
+    //  کلیدِ صاحبِ صف = ایمیلِ تأییدشده («فقط ایمیل»؛ نامِ تابع و فیلدِ `phone` ِ chat-out.js برای سازگاری)
+    function phone() { var tk = K.ticket(); var ss = K.sess(); return (tk && tk.email) || (ss && ss.email) || ''; }
     //  localStorage حرفِ آخر است (برگه‌های دیگرِ همین ویترین هم می‌نویسند): هر کار = خواندن ⇐ تغییر ⇐ نوشتن، و پیامِ در راهِ
     //  همین برگه «در راه» می‌ماند. «در راه» ِ برگهٔ دیگر این‌جا «در صف» است ⇒ شاید دو برگه یک پیام را بفرستند؛ همان `clientId`
     //  ⇒ سرور یکی نگه می‌دارد (`replayed`).

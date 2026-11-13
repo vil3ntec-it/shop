@@ -97,8 +97,8 @@ fun AccountCard(model: CustomerModel, slug: String) {
       return@Column
     }
     OutlinedTextField(
-      value = a.phone, onValueChange = { a.phone = it }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-      label = { Text(ShopperText.phone) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+      value = a.email, onValueChange = { a.email = it.take(190) }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+      label = { Text(ShopperText.email) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
     )
     if (a.codeSent) {
       OutlinedTextField(
@@ -113,7 +113,7 @@ fun AccountCard(model: CustomerModel, slug: String) {
   }
 }
 
-/** تنظیمات: واردشده با شمارهٔ پوشیده (CRM-15) و «خروج» */
+/** تنظیمات: واردشده با ایمیلِ پوشیده (CRM-15؛ حسابِ کهنهٔ بی‌ایمیل: شمارهٔ پوشیده) و «خروج» */
 @Composable
 fun AccountSettings(model: CustomerModel) {
   SectionTitle(ShopperText.accountTitle)
@@ -122,6 +122,7 @@ fun AccountSettings(model: CustomerModel) {
     Text(ShopperText.notSignedIn, style = MaterialTheme.typography.bodyMedium)
     return
   }
-  Text(ShopperText.signedInAs(AccountRules.maskPhone(s.customer.phone)), style = MaterialTheme.typography.bodyMedium)
+  val who = s.customer.email?.let { AccountRules.maskEmail(it) } ?: AccountRules.maskPhone(s.customer.phone.orEmpty())
+  Text(ShopperText.signedInAs(who), style = MaterialTheme.typography.bodyMedium)
   OutlinedButton(onClick = { model.accountSignOut() }, modifier = Modifier.fillMaxWidth()) { Text(ShopperText.signOut) }
 }

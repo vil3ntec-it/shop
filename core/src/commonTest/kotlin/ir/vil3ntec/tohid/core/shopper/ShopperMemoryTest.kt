@@ -23,7 +23,7 @@ class ShopperMemoryTest {
     val s = ShopperState(
       carts = listOf(Cart("golestan", listOf(line("rice", 12050, 2000)), 5)),
       orders = listOf(SavedOrder("golestan", "v2.t", 12, 27100, 6, "گلستان")),
-      ticket = PhoneTicket("+93700000002", "v2.x", 99), name = "احمد", lang = "ps", theme = "dark",
+      ticket = CustomerTicket("c700000002@test.local", "v2.x", 99), name = "احمد", lang = "ps", theme = "dark",
       keys = mapOf("golestan" to KeyMemo("{}", "app-1")),
     )
     ShopperMemory.save(kv, s)

@@ -240,22 +240,20 @@
         function verify() {
           K.note(msg, 'info', t('tr.verify'));
           if (vbox) { vbox.hidden = false; vbox.querySelector('input').focus(); return; }
-          var phone = el('input', { attrs: { id: p('phone'), type: 'tel', inputmode: 'tel', autocomplete: 'tel', dir: 'ltr', maxlength: '20' } });
+          var mail = el('input', { attrs: { id: p('email'), type: 'email', inputmode: 'email', autocomplete: 'email', dir: 'ltr', maxlength: '190' } });
           var code = el('input', { attrs: { id: p('code'), inputmode: 'numeric', autocomplete: 'one-time-code', dir: 'ltr', maxlength: '8', 'aria-label': t('v.code'), placeholder: t('v.code') } });
           var start = el('button', { class: 'btn btn-soft btn-sm', text: t('v.send'), attrs: { type: 'button', id: p('vsend') } });
           var check = el('button', { class: 'btn btn-sm', text: t('v.check'), attrs: { type: 'button', id: p('vok') } });
           var codeRow = el('div', { class: 'code-row', hidden: true, attrs: { id: p('vrow') } }, code, check);
+          //  «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): کد به ایمیل؛ شماره دیگر تأیید نمی‌شود
           vbox = el('div', { class: 'stack', attrs: { id: p('verify') } },
-            el('label', { class: 'field' }, el('span', { text: t('phone.l') }), phone), start, codeRow);
+            el('label', { class: 'field' }, el('span', { text: t('tr.email') }), mail), start, codeRow);
           wrap.insertBefore(vbox, msg);
-          var num = '';
+          var addr = '';
           start.addEventListener('click', function () {
             start.disabled = true;
-            K.js('/kit/order-kit.js').then(function () {
-              num = K.normPhone(phone.value);
-              if (!num) throw new Error(t('v.need'));
-              return api('/verify/start', { method: 'POST', body: { phone: num } });
-            }).then(function (r) {
+            addr = K.normEmail(mail.value);
+            (addr ? api('/verify/start', { method: 'POST', body: { email: addr } }) : Promise.reject(new Error(t('v.need')))).then(function (r) {
               codeRow.hidden = false;
               K.note(msg, 'info', t('v.sent') + (r.devCode ? ' ' + t('v.dev', { code: r.devCode }) : ''));
               code.focus();
@@ -264,14 +262,14 @@
           });
           check.addEventListener('click', function () {
             check.disabled = true;
-            api('/verify/check', { method: 'POST', body: { phone: num, code: digits(code.value) } }).then(function (r) {
+            api('/verify/check', { method: 'POST', body: { email: addr, code: digits(code.value) } }).then(function (r) {
               K.setTicket(r);
               code.value = '';
               vbox.hidden = true;
               send();
             }).catch(function (e) { K.note(msg, 'err', e.message); }).then(function () { check.disabled = false; });
           });
-          phone.focus();
+          mail.focus();
         }
 
         go.addEventListener('click', send);

@@ -82,6 +82,8 @@ function normalize(t) {
 
 function maskPhone(p) {
   const s = String(p || '');
+  //  «فقط ایمیل»: شاکی با ایمیلِ تأییدشده ⇒ همان پوشاندنِ CRM-15 (نویسهٔ نخست + «•» + دامنه)
+  if (s.includes('@')) return require('./customer-contact').maskPhone(s);
   if (s.length <= 7) return '•'.repeat(s.length);
   return s.slice(0, 4) + '•'.repeat(s.length - 7) + s.slice(-3);
 }

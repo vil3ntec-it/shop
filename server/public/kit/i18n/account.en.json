@@ -1,7 +1,7 @@
 {
   "ah.title": "My account at this shop",
   "ah.loading": "Loading your account…",
-  "ah.unlinked": "The shop has no customer with this number yet; in-store purchases and your balance appear once the shop records this number for you.",
+  "ah.unlinked": "The shop doesn't have a customer with this email yet; in-store purchases and your balance appear once the shop adds this email to your profile.",
   "ah.balance": "Balance",
   "ah.owe": "You owe {m}",
   "ah.credit": "You have {m} credit",

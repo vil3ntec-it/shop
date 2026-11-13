@@ -111,8 +111,8 @@ private fun Profile(role: String?, localDays: Int = 0, expired: Boolean = false,
 private fun Edit(phone: String, error: Boolean = false) {
   ProfileEditContent(
     ProfileEditUi(
-      accountId = "shot", avatarVersion = 0, name = "کریم احمدی", email = "karim@example.af", phone = phone,
-      newPhone = if (error) "0700123456" else "", phoneError = if (error) ir.vil3ntec.tohid.core.i18n.StrAccount.phoneNeedsInternet else null,
+      accountId = "shot", avatarVersion = 0, name = "کریم احمدی", email = "karim@example.af",
+      newPhone = if (error) "0700123456" else phone, phoneError = if (error) ir.vil3ntec.tohid.core.i18n.StrAccount.phoneNeedsInternet else null,
       shopName = "دکانِ نمونه", createdAt = System.currentTimeMillis() - 430 * DAY, dirty = error,
     ),
     {}, {}, {}, {}, {}, {},

@@ -136,8 +136,8 @@ object ApiEndpoints {
     const val PLANS = "/me/plans"
     const val PURCHASE_REQUEST = "/me/purchase-request"
 
-    /** AUTH-08: کدِ یک‌بارمصرف به شماره‌ای که به حساب افزوده می‌شود (پرچمِ سروریِ `auth.phone_add_code`) */
-    const val PHONE_CODE = "/me/phone/code"
+    /** AUTH-08 ⇐ «فقط ایمیل»: کدِ یک‌بارمصرف به ایمیلی که به حسابِ بی‌ایمیل افزوده می‌شود (درِ کدِ پیامکیِ شماره رفت) */
+    const val EMAIL_CODE = "/me/email/code"
 
     /** «حذفِ حساب» ِ خودِ کاربر: GET پیش‌نمایش، POST {confirm} حذف (پرچمِ سراسریِ `account.self_delete`) */
     const val ACCOUNT_DELETION = "/me/account/deletion"

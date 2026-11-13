@@ -149,11 +149,12 @@ class ShopperApi(private val http: ShopperHttp, private val lang: () -> String =
 
   // ── تأییدِ شماره (۲۳) ──
 
-  fun verifyStart(slug: String, phone: String): ShopperResult<CodeSent> =
-    post(base(slug) + "/verify/start", obj("phone" to phone), CodeSent.serializer())
+  /** «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): کدِ ۶ رقمی به ایمیل؛ شماره هرگز تأیید نمی‌شود */
+  fun verifyStart(slug: String, email: String): ShopperResult<CodeSent> =
+    post(base(slug) + "/verify/start", obj("email" to email), CodeSent.serializer())
 
-  fun verifyCheck(slug: String, phone: String, code: String): ShopperResult<PhoneTicket> =
-    post(base(slug) + "/verify/check", obj("phone" to phone, "code" to code), PhoneTicket.serializer())
+  fun verifyCheck(slug: String, email: String, code: String): ShopperResult<CustomerTicket> =
+    post(base(slug) + "/verify/check", obj("email" to email, "code" to code), CustomerTicket.serializer())
 
   // ── ثبت و پیگیری ──
 

@@ -15,6 +15,7 @@
 import { createRequire } from 'node:module';
 import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -85,8 +86,8 @@ for (const id of ['rice', 'oil']) await call('PUT', `/api/shop/storefront/produc
 
 const phone = '0791114455';
 const ticket = async (p = phone) => {
-  const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone: p });
-  const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone: p, code: vs.body.devCode });
+  const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(p) });
+  const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(p), code: vs.body.devCode });
   return { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt };
 };
 const line = (name, priceMinor, qtyMilli = 1000) => ({ qtyMilli, name, unit: 'دانه', priceMinor, maxQtyMilli: null, photo: false, unavailable: false });

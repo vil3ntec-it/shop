@@ -18,6 +18,7 @@
 import { createRequire } from 'node:module';
 import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -182,6 +183,7 @@ await page.waitForSelector('#view-checkout:not([hidden])');
 await page.check('input[name="fulfillment"][value="pickup"]');
 await page.fill('#c-name', 'مشتریِ ویترین');
 await page.fill('#c-phone', '0791112244');
+await page.fill('#c-email', mailOf('0791112244'));
 await page.click('#verify-send');
 await page.waitForSelector('#verify-code-row:not([hidden])', { timeout: 10000 });
 await page.fill('#v-code', ((await page.textContent('#verify-msg')).match(/(\d{4,8})/) || [])[1] || '');

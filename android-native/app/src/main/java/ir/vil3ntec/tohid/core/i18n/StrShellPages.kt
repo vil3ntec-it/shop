@@ -43,12 +43,12 @@ object StrShellPages {
   val syncNever: String get() = t("هنوز انجام نشده", "Not done yet", "لا نه ده شوې")
   val voiceSearch: String get() = t("جستجوی صوتی", "Voice search", "غږیز لټون")
 
-  // ── AUTH-08: گامِ کدِ شمارهٔ تازه در «ویرایش حساب» ِ نسخهٔ ۳ (`ProfileEditScreen`) و کادرِ شماره در `Profile.kt` ──
-  val mobileOnce: String get() = t("شماره موبایل — یک بار ثبت می‌شود", "Mobile number — can be set only once", "د موبایل شمېره — یوازې یو ځل ثبتېږي")
-  val smsCodeLabel: String get() = t("کدی که به همین شماره پیامک شد", "The code texted to this number", "هغه کوډ چې همدې شمېرې ته واستول شو")
+  // ── AUTH-08 ⇐ «فقط ایمیل»: گامِ کدِ ایمیلِ تازه در «ویرایش حساب» ِ نسخهٔ ۳ (`ProfileEditScreen`) و کادرِ شماره در `Profile.kt` ──
+  val mobileOnce: String get() = t("شمارهٔ تماس (برای ورود نیست)", "Contact number (not for sign-in)", "د اړیکې شمېره (د ننوتلو لپاره نه ده)")
+  val smsCodeLabel: String get() = t("کدی که به همین ایمیل فرستاده شد", "The code sent to this email", "هغه کوډ چې همدې ایمیل ته ولېږل شو")
   val smsCodeSent: String get() = t(
-    "کدی به همین شماره پیامک شد؛ آن را بنویسید و «ذخیره» را بزنید",
-    "A code was texted to this number; enter it and tap “Save”",
-    "همدې شمېرې ته کوډ واستول شو؛ هغه ولیکئ او «خوندي کول» ووهئ",
+    "کدی به همین ایمیل فرستاده شد؛ آن را بنویسید و «ذخیره» را بزنید",
+    "A code was sent to this email; enter it and tap “Save”",
+    "همدې ایمیل ته کوډ ولېږل شو؛ هغه ولیکئ او «خوندي کول» ووهئ",
   )
 }

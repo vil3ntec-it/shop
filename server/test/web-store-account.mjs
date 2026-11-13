@@ -14,6 +14,7 @@ import { missingTool, PLAYWRIGHT_INSTALL, SKIP } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -88,8 +89,8 @@ const pushed = await call('POST', '/api/sync/v1/push', { device_id: 'dev-owner',
 ok(pushed.status === 200, 'قرض‌دار، فروش و دفتر از راهِ همگام‌سازیِ واقعی رسید', JSON.stringify(pushed.body).slice(0, 120));
 
 const phone = '+93799100020';
-const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
-const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
 ok(Boolean(vc.body && vc.body.ticket), 'شماره تأیید شد');
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium/chrome-linux/chrome' }).catch(() => chromium.launch());

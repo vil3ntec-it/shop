@@ -40,8 +40,7 @@
   "ct.au.gone": "This voice message is no longer on the server; it was deleted or has expired.",
   "ct.au.codec": "This browser cannot play this audio format.",
   "ct.err": "The chat did not open; try again.",
-  "ct.v.title": "To chat with the shop, confirm your mobile number with a code.",
-  "ct.v.phone": "Mobile number",
+  "ct.v.title": "To chat with the shop, verify your email with a code.",
   "ct.v.send": "Send code",
   "ct.v.code": "Confirmation code",
   "ct.v.check": "Confirm",
@@ -60,5 +59,6 @@
   "err.chat_closed": "This chat is closed.",
   "err.issue_window_passed": "The time for “I have a problem” on this order has passed.",
   "err.chat_blocked": "This shop is not accepting your messages right now.",
-  "err.delete_window_passed": "The time to delete this message for everyone has passed."
+  "err.delete_window_passed": "The time to delete this message for everyone has passed.",
+  "ct.v.email": "Email"
 }

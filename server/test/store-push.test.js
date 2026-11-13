@@ -348,18 +348,20 @@ test('همان مرورگر ⇒ یک ردیف؛ حداکثر ۳ مرورگر (ه
    ۵) کارِ مشتری هرگز پیامکِ پولی برنمی‌انگیزد
    ══════════════════════════════════════════════════════════════════ */
 
-test('⛔ فرستادنِ دوبارهٔ مشتری فقط از پوش: پیامکِ پولی که پیش‌تر رد شده بود دوباره صدا زده نمی‌شود', async () => {
+//  «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): کانالِ غیرِپوشِ زنجیره اکنون ایمیل است (پیامک رفت)
+test('⛔ فرستادنِ دوبارهٔ مشتری فقط از پوش: ایمیلی که پیش‌تر رد شده بود دوباره صدا زده نمی‌شود', async () => {
   const s = await liveShop('پیامک');
   const o = await checkout(s);
   const calls = service();
-  const sms = fake([{ status: 'rejected', code: 'unreachable' }, { status: 'rejected', code: 'unreachable' }]);
-  N.setProviders({ sms });
+  const sms = fake();
+  sms.send = async (msg) => { sms.calls.push(msg); return { status: 'rejected', code: 'unreachable' }; };   //  ایمیلِ این مشتری همیشه رد
+  N.setProviders({ email: sms });
   await drain();
   for (const to of ['accepted', 'picking', 'packed', 'ready_for_pickup']) await go(s, o, to);
   await drain();
   const before = await rowOf(o.id, 'order_ready');
   assert.equal(before.status, 'no_channel');
-  assert.deepEqual(before.tried.map((t) => t.channel), ['push', 'whatsapp', 'telegram', 'sms'], 'رویدادِ فوری: پیامک هم آزموده شد');
+  assert.deepEqual(before.tried.map((t) => t.channel), ['push', 'email', 'whatsapp', 'telegram'], 'زنجیره: پوش ⇒ ایمیل ⇒ …؛ بی پیامک');
   const smsCalls = sms.calls.length;
   assert.ok(smsCalls >= 1);
 
@@ -369,20 +371,21 @@ test('⛔ فرستادنِ دوبارهٔ مشتری فقط از پوش: پیا�
   const row = await rowOf(o.id, 'order_ready');
   assert.equal(row.status, 'sent');
   assert.deepEqual(row.tried.map((t) => [t.channel, t.result]), [['push', 'accepted']]);
-  assert.equal(sms.calls.length, smsCalls, 'پیامک دوباره صدا زده نشد');
+  assert.equal(sms.calls.length, smsCalls, 'ایمیل دوباره صدا زده نشد');
   assert.equal(calls.length, 1);
   assert.equal(b.open(calls[0].body).body, N.render('order_ready', 'fa', { no: o.no, shop: s.title }), 'آخرین پیامِ نرفته');
-  //  پوش ِ از کار افتاده هم پیامک را برنمی‌انگیزد
+  //  پوش ِ از کار افتاده هم ایمیل را برنمی‌انگیزد
   const o2 = await checkout(s);
   await drain();
+  const mailAfterO2 = sms.calls.length;   //  «ثبت شد» ِ o2 زنجیرهٔ عادی‌اش را رفت (ایمیل هم)؛ از این‌جا فقط پوش
   service([500, 500, 500, 500, 500]);
   assert.equal((await on(s, o2, { subscription: browser().sub })).status, 200);
   for (let i = 0; i < 6; i++) await drain(now() + i * 10 * 60_000);
   const r2 = await rowOf(o2.id, 'order_received');
   assert.equal(r2.status, 'failed', JSON.stringify(r2));
   assert.ok(r2.tried.every((t) => t.channel === 'push'));
-  assert.equal(sms.calls.length, smsCalls);
-  //  اشتراکِ مرده (۴۱۰) در فرستادنِ دوبارهٔ مشتری ⇒ همان‌جا تمام: نه واتس‌اپ/تلگرام، نه پیامکِ پولی
+  assert.equal(sms.calls.length, mailAfterO2, 'پوشِ از کار افتاده ایمیل را برنینگیخت');
+  //  اشتراکِ مرده (۴۱۰) در فرستادنِ دوبارهٔ مشتری ⇒ همان‌جا تمام: نه ایمیل، نه واتس‌اپ/تلگرام
   const o3 = await checkout(s);
   for (const to of ['accepted', 'picking', 'packed', 'ready_for_pickup']) await go(s, o3, to);
   sms.calls.length = 0;
@@ -455,7 +458,7 @@ test('۴۱۰ ⇒ اشتراک پاک و زنجیره ادامه؛ ۵۰۰ ⇒ د�
   assert.equal((await subsOf(o.id)).length, 0, 'اشتراکِ مرده پاک شد');
   row = await rowOf(o.id, 'order_accepted');
   assert.equal(row.status, 'sent');
-  assert.deepEqual(row.tried.map((t) => [t.channel, t.result]), [['push', 'rejected'], ['whatsapp', 'accepted']]);
+  assert.deepEqual(row.tried.map((t) => [t.channel, t.result]), [['push', 'rejected'], ['email', 'not_configured'], ['whatsapp', 'accepted']]);
 
   //  ⛔ بی `useTransport` در NODE_ENV=test: هیچ درخواستی بیرون نمی‌رود (همان «دوباره»)
   P.useTransport(null);

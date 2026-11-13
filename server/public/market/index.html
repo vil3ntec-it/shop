@@ -161,10 +161,10 @@
           <h1 data-t="my.orders">سفارش‌های من</h1>
           <form id="verify-card" class="card card-lg stack" hidden novalidate>
             <div>
-              <h2 data-t="v.title">شماره‌تان را تأیید کنید</h2>
+              <h2 data-t="v.title">ایمیل‌تان را تأیید کنید</h2>
               <p class="muted" data-t="v.market">با یک کدِ یک‌بارمصرف، سفارش‌هایتان را از هر دستگاهی می‌بینید. دیدنِ دکان‌ها و سبد حساب نمی‌خواهد.</p>
             </div>
-            <label class="field"><span data-t="phone.l">شمارهٔ موبایل</span><input id="v-phone" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" maxlength="20" placeholder="07xx xxx xxx"></label>
+            <label class="field"><span data-t="email.l">ایمیل</span><input id="v-email" type="email" inputmode="email" autocomplete="email" dir="ltr" maxlength="190" placeholder="you@example.com"></label>
             <button id="v-send" class="btn btn-block" type="button" data-t="v.send">فرستادنِ کد</button>
             <div id="v-code-row" hidden class="stack">
               <label class="field"><span data-t="v.code">کدِ تأیید</span><input id="v-code" class="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" dir="ltr" maxlength="8"></label>
@@ -173,8 +173,8 @@
             <div id="v-msg" class="note" hidden role="status"></div>
           </form>
           <div id="who" class="spread card" hidden>
-            <span><span class="muted" data-t="who.phone">شماره:</span> <b id="who-phone" class="ltr"></b></span>
-            <button id="who-out" class="btn btn-ghost btn-sm" type="button" data-t="who.other">شمارهٔ دیگر</button>
+            <span><span class="muted" data-t="who.phone">ایمیل:</span> <b id="who-phone" class="ltr"></b></span>
+            <button id="who-out" class="btn btn-ghost btn-sm" type="button" data-t="who.other">ایمیلِ دیگر</button>
           </div>
           <div id="o-msg" class="note" hidden role="status"></div>
           <ul id="orders" class="olist"></ul>

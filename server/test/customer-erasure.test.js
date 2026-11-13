@@ -62,7 +62,7 @@ async function liveStore(label, { erasure = true } = {}) {
 }
 
 async function ticketOf(slug, phone) {
-  const s = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+  const s = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });   //  کلیدِ مشتری = ایمیل
   assert.equal(s.status, 200, JSON.stringify(s.body));
   const c = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: s.body.devCode });
   assert.equal(c.status, 200, JSON.stringify(c.body));
@@ -91,12 +91,12 @@ async function order(shopId, phone, { status = 'delivered', name = NAME, totalMi
   await query(
     `INSERT INTO online_orders (id, shop_id, order_no, client_key, request_hash, source, status, fulfillment,
        customer_name, customer_phone, address, delivery, note, items_count, subtotal_minor, delivery_fee_minor, total_minor,
-       created_at, updated_at)
-     VALUES ($1,$2,$3,$4,'h','storefront',$5,'delivery',$6,$7,$8::jsonb,$9::jsonb,$10,2,$11,5000,$12,$13,$13)`,
+       created_at, updated_at, customer_email)
+     VALUES ($1,$2,$3,$4,'h','storefront',$5,'delivery',$6,$7,$8::jsonb,$9::jsonb,$10,2,$11,5000,$12,$13,$13,$14)`,
     [id, shopId, orderNo, `ck-${id}`, status, name, phone,
       JSON.stringify({ lat: t.lat, lng: t.lng, landmark: t.landmark, text: t.text, plusCode: t.plus, zone: { id: 'z1', feeMinor: 5000 } }),
       JSON.stringify({ leaveWith: t.leave, callBeforeArrival: true, cashTenderMinor: 50000 }),
-      t.note, totalMinor - 5000, totalMinor, at]
+      t.note, totalMinor - 5000, totalMinor, at, mailOf(phone)]   //  «فقط ایمیل»: هویتِ ثبت = ایمیلِ تأییدشده
   );
   await query(
     `INSERT INTO online_order_lines (id, order_id, shop_id, line_no, product_id, name, unit, qty_milli, unit_price_minor, line_total_minor, note)
@@ -173,7 +173,7 @@ async function chat(shopId, phone, { customerId = null, orderId = '', name = NAM
   await query(
     `INSERT INTO shop_chat_conversations (id, shop_id, customer_phone, customer_name, order_id, customer_id, seq, rev, created_at, updated_at)
      VALUES ($1,$2,$3,$4,$5,$6,2,2,$7,$7)`,
-    [conv, shopId, phone, name, orderId, customerId, at]
+    [conv, shopId, mailOf(phone), name, orderId, customerId, at]   //  کلیدِ گفت‌وگو = ایمیلِ تأییدشده
   );
   const media = newId('cmd');
   const img = Buffer.from(t.photo);
@@ -211,19 +211,19 @@ async function extras(shopId, customerId, phone) {
   }
   await query(
     'INSERT INTO storefront_area_requests (id, shop_id, phone, cell_lat, cell_lng, created_at, updated_at) VALUES ($1,$2,$3,34.55,69.2,$4,$4)',
-    [newId('sar'), shopId, phone, at]
+    [newId('sar'), shopId, mailOf(phone), at]
   );
   if (await exists('storefront_alerts')) {
     await query(
       `INSERT INTO storefront_alerts (id, shop_id, phone, product_id, kind, checked_at, created_at, updated_at)
-       VALUES ($1,$2,$3,'rice','stock',$4,$4,$4)`, [newId('sal'), shopId, phone, at]);
+       VALUES ($1,$2,$3,'rice','stock',$4,$4,$4)`, [newId('sal'), shopId, mailOf(phone), at]);
   }
   //  پوشِ «خبرم کن» ِ همین شماره روی یک مرورگر (مهاجرتِ ۴۷۵)
   if (await exists('store_alert_push')) {
     await query(
       `INSERT INTO store_alert_push (id, shop_id, phone, endpoint, p256dh, auth, page, proof, expires_at, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,'/','ticket',$7,$7,$7)`,
-      [newId('sap'), shopId, phone, `https://fcm.googleapis.com/fcm/send/${newId('ep')}`, 'B'.repeat(87), 'a'.repeat(22), at + 60_000]);
+      [newId('sap'), shopId, mailOf(phone), `https://fcm.googleapis.com/fcm/send/${newId('ep')}`, 'B'.repeat(87), 'a'.repeat(22), at + 60_000]);
   }
 }
 
@@ -481,7 +481,7 @@ test('SEC-10: مشتری از حسابِ ویترین — فقط با بلیتِ
   //  مشتریِ دیگر (نشستِ خودش + بلیتِ شمارهٔ دیگر) فقط به دادهٔ خودش می‌رسد؛ بلیتِ شمارهٔ دیگر روی این حساب ⇒ ۴۰۳
   const mismatch = await h.post(url, {}, { headers: { 'X-Store-Session': acc.session, 'X-Store-Ticket': await ticketOf(s.slug, OTHER) } });
   assert.equal(mismatch.status, 403, JSON.stringify(mismatch.body));
-  assert.equal(mismatch.body.error.code, 'phone_mismatch');
+  assert.equal(mismatch.body.error.code, 'email_mismatch');   //  «فقط ایمیل»: بلیتِ ایمیلِ دیگر
   const intruder = await account(s.slug, '+93700555666');
   const theirs = await h.post(url, {}, { headers: { 'X-Store-Session': intruder.session, 'X-Store-Ticket': await ticketOf(s.slug, '+93700555666') } });
   assert.equal(theirs.status, 200, JSON.stringify(theirs.body));

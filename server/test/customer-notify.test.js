@@ -75,11 +75,11 @@ const CUSTOMER = Object.freeze({ type: 'customer', id: '' });
 const STAFF = (o) => ({ type: 'user', id: o.user.id, role: 'owner' });
 const PHONE = '+93791234567';
 
-/** همان شکلی که قیمت‌گذارِ ویترین به `orders.create` می‌دهد (بی OTP؛ سرتاسری جدا آزموده می‌شود). */
+/** همان شکلی که قیمت‌گذارِ ویترین به `orders.create` می‌دهد (بی OTP؛ سرتاسری جدا آزموده می‌شود). «فقط ایمیل»: هویت = ایمیلِ تأییدشده */
 function storefrontInput(phone = PHONE) {
   return {
     source: 'storefront', fulfillment: 'delivery', paymentMethod: 'cod',
-    customerName: 'زرمینه', customerPhone: phone,
+    customerName: 'زرمینه', customerPhone: phone, customerEmail: `c${phone.replace(/\D/g, '').slice(-9)}@test.local`,
     address: { lat: 34.5, lng: 69.2, text: 'کوچهٔ گل‌ها، خانهٔ ۷' }, delivery: {}, note: '', isTest: false,
     lines: [{ lineNo: 1, productId: 'rice', name: 'برنج', unit: 'کیلو', qtyMilli: 3000, unitPriceMinor: 12345,
       lineTotalMinor: 37035, note: '', substitution: '' }],
@@ -130,14 +130,17 @@ test('NTF-01: هر وضعیت یا رویدادِ مشتری دارد یا عم�
   }
   for (const st of Object.keys(N.EVENT_OF)) assert.ok(S.ORDER_STATUSES.includes(st), `${st} وضعیتِ واقعی است`);
   assert.deepEqual(new Set(Object.values(N.EVENT_OF)), new Set(N.EVENTS), 'هر رویداد از دست‌کم یک وضعیت می‌آید');
-  assert.deepEqual(N.CHANNELS, ['push', 'whatsapp', 'telegram', 'sms'], 'ترتیبِ §۳.۱۲: ارزان ⇒ گران');
+  //  «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): پیامک از زنجیره رفت ⇐ به‌جایش ایمیل پس از پوش
+  assert.deepEqual(N.CHANNELS, ['push', 'email', 'whatsapp', 'telegram'], 'پوش ⇒ ایمیل ⇒ …؛ بی پیامک');
   const URGENT = ['order_rejected', 'order_ready', 'order_on_the_way', 'order_delivery_failed', 'order_cancelled'];
+  assert.deepEqual([...N.URGENT_EVENTS].sort(), [...URGENT].sort(), 'رویدادهای فوری (فوریتِ پوش) همان پیشین');
   for (const ev of N.EVENTS) {
     const chans = N.MATRIX[ev];
     assert.ok(chans.length > 0, `${ev}: دست‌کم یک کانال`);
     assert.deepEqual(chans, N.CHANNELS.filter((c) => chans.includes(c)), `${ev}: به ترتیبِ زنجیره`);
-    assert.equal(chans[0], 'push', `${ev}: اول کانالِ رایگان`);
-    assert.equal(chans.includes('sms'), URGENT.includes(ev), `${ev}: پیامک فقط برای رویدادِ فوری`);
+    assert.equal(chans[0], 'push', `${ev}: اول پوش`);
+    assert.equal(chans[1], 'email', `${ev}: سپس ایمیل`);
+    assert.equal(chans.includes('sms'), false, `${ev}: هیچ پیامکی`);
   }
 });
 
@@ -174,7 +177,7 @@ test('NTF-03: هر رویداد به fa، ps و en قالب دارد؛ فقط {n
 test('⛔ پرچم خاموش: ثبت و همهٔ گذارها بی هیچ ردیف و بی هیچ پیام؛ فقط زبانِ سفارش ثبت می‌شود', async () => {
   const o = await liveShop('خاموش', { notify: false });
   const p = fake();
-  N.setProviders({ push: p, whatsapp: p, telegram: p, sms: p });
+  N.setProviders({ push: p, email: p, whatsapp: p, telegram: p, sms: p });
   const order = await placeOrder(o, { lang: 'ps' });
   await go(o, order, 'accepted');
   await go(o, order, 'cancelled', { reason: 'out_of_stock' });
@@ -215,14 +218,14 @@ test('امروز هیچ کانالی وصل نیست ⇒ no_channel با فهر�
   const done = await rowOf(order.id, 'order_received');
   assert.equal(done.status, 'no_channel');
   assert.deepEqual(done.tried.map((t) => [t.channel, t.result]),
-    [['push', 'not_configured'], ['whatsapp', 'not_configured'], ['telegram', 'not_configured']]);
+    [['push', 'not_configured'], ['email', 'not_configured'], ['whatsapp', 'not_configured'], ['telegram', 'not_configured']]);
   assert.equal(await N.tick(), 0, 'پایانی است؛ دوباره گرفته نمی‌شود');
 
   const r = await h.get(`/api/shop/orders/${order.id}/notices`, { token: o.token });
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.equal(r.body.enabled, true);
   assert.equal(r.body.eligible, true);
-  assert.deepEqual(r.body.channels, { push: 'not_configured', whatsapp: 'not_configured', telegram: 'not_configured', sms: 'not_configured' });
+  assert.deepEqual(r.body.channels, { push: 'not_configured', email: 'not_configured', whatsapp: 'not_configured', telegram: 'not_configured' });
   assert.equal(r.body.items.length, 1);
   assert.equal(r.body.items[0].status, 'no_channel');
   const text = JSON.stringify(r.body);
@@ -245,8 +248,8 @@ test('NTF-03/04: پوش رد می‌کند ⇒ واتس‌اپ می‌پذیرد
   const o = await liveShop('زنجیره', { title: 'د ګل دوکان' });
   const pushP = fake([{ status: 'rejected', code: 'no_subscription' }]);
   const wa = fake();
-  const sms = fake();
-  N.setProviders({ push: pushP, whatsapp: wa, sms });
+  const tg = fake();
+  N.setProviders({ push: pushP, whatsapp: wa, telegram: tg });
   const order = await placeOrder(o, { lang: 'ps' });
   await go(o, order, 'accepted');
   //  «ثبت شد» پیش از رفتن با «قبول شد» کنار رفت ⇒ فقط پیامِ تازه
@@ -257,10 +260,11 @@ test('NTF-03/04: پوش رد می‌کند ⇒ واتس‌اپ می‌پذیرد
   assert.equal(row.status, 'sent');
   assert.equal(row.channel, 'whatsapp');
   assert.equal(row.provider_ref, 'ref-1');
-  assert.deepEqual(row.tried.map((t) => [t.channel, t.result]), [['push', 'rejected'], ['whatsapp', 'accepted']]);
+  //  ایمیل در آزمون راهِ `log` دارد ⇒ `not_configured` (نه پیامِ واقعی)
+  assert.deepEqual(row.tried.map((t) => [t.channel, t.result]), [['push', 'rejected'], ['email', 'not_configured'], ['whatsapp', 'accepted']]);
   assert.equal(pushP.calls.length, 1);
   assert.equal(wa.calls.length, 1);
-  assert.equal(sms.calls.length, 0, 'پس از «پذیرفت» زنجیره ایستاد');
+  assert.equal(tg.calls.length, 0, 'پس از «پذیرفت» زنجیره ایستاد');
 
   const msg = wa.calls[0];
   assert.equal(msg.text, `«د ګل دوکان» د فرمایش شمېره ${'۰۱۲۳۴۵۶۷۸۹'[order.orderNo]} ومانه.`);
@@ -341,36 +345,47 @@ test('رویدادِ تازه پیامِ نرفته را کنار می‌زند�
   assert.deepEqual(p.calls.map((c) => c.event), ['order_on_the_way', 'order_delivery_retry']);
 });
 
-test('پیامک فقط برای رویدادِ فوری: تنها پیامک وصل ⇒ «قبول شد» no_channel، «لغو شد» با پیامک', async () => {
-  const o = await liveShop('پیامک');
+test('«فقط ایمیل»: پیامک دیگر کانال نیست (سرویس‌دهندهٔ پیامک نادیده)؛ ایمیل به ایمیلِ تأییدشدهٔ همان سفارش، فوری و غیرِفوری', async () => {
+  const o = await liveShop('ایمیل');
   const sms = fake();
+  const mail = fake();
   N.setProviders({ sms });
   const order = await placeOrder(o);
   await go(o, order, 'accepted');
   await N.tick();
   assert.equal((await rowOf(order.id, 'order_accepted')).status, 'no_channel');
+  assert.equal(sms.calls.length, 0, 'پیامک هرگز');
+  N.setProviders({ sms, email: mail });
   await go(o, order, 'cancelled', { reason: 'out_of_stock' });
   await N.tick();
   const row = await rowOf(order.id, 'order_cancelled');
   assert.equal(row.status, 'sent');
-  assert.equal(row.channel, 'sms');
-  assert.deepEqual(sms.calls.map((c) => c.event), ['order_cancelled']);
+  assert.equal(row.channel, 'email');
+  assert.deepEqual(mail.calls.map((c) => c.event), ['order_cancelled']);
+  const email = (await one('SELECT customer_email FROM online_orders WHERE id=$1', [order.id])).customer_email;
+  assert.ok(email.includes('@'));
+  assert.deepEqual(mail.calls.map((c) => c.to.email), [email], 'گیرنده همان ایمیلِ تأییدشدهٔ سفارش');
+  assert.equal(sms.calls.length, 0);
 });
 
-test('NTF-02: سقفِ روزانهٔ هزینهٔ پیامکِ هر دکان ⇒ کانالِ پولی صدا زده نمی‌شود (cost_cap)؛ دکانِ دیگر آزاد؛ هزینه روی tried', async () => {
+test('NTF-02: سقفِ روزانهٔ هزینهٔ کانالِ پولیِ هر دکان ⇒ صدا زده نمی‌شود (cost_cap)؛ دکانِ دیگر آزاد؛ هزینه روی tried', async (t) => {
+  //  امروز هیچ کانالی قیمت ندارد (پیامک رفت) ⇒ کانالِ پولیِ این آزمون همان ایمیل با قیمت و سقفِ env
+  process.env.CUSTOMER_NOTIFY_COST_MICROS_EMAIL = '446000';
+  process.env.CUSTOMER_NOTIFY_DAILY_CAP_MICROS_EMAIL = '2230000';
+  t.after(() => { delete process.env.CUSTOMER_NOTIFY_COST_MICROS_EMAIL; delete process.env.CUSTOMER_NOTIFY_DAILY_CAP_MICROS_EMAIL; });
   const a = await liveShop('هزینه');
   const b = await liveShop('هزینه ب');
-  const sms = fake();
-  N.setProviders({ sms });
+  const mail = fake();
+  N.setProviders({ email: mail });
   const at = Date.now();
-  //  ۲ دلار پیامکِ پذیرفتهٔ همین دکان در همین روز (پیامی دیگر = ۰٫۴۴۶ دلار ⇒ از سقفِ ۲٫۲۳ می‌گذرد)
+  //  ۲ دلار ایمیلِ پذیرفتهٔ همین دکان در همین روز (پیامی دیگر = ۰٫۴۴۶ دلار ⇒ از سقفِ ۲٫۲۳ می‌گذرد)
   const prior = await placeOrder(a, { phone: '+93795551001' });
   await query(
     `INSERT INTO customer_notify_outbox (id, shop_id, order_id, event, lang, phone_key, status, channel, tried,
        next_attempt_at, sent_at, created_at, updated_at)
-     VALUES ($1,$2,$3,'order_ready','fa','k','sent','sms',$4::jsonb,$5,$5,$5,$5)`,
+     VALUES ($1,$2,$3,'order_ready','fa','k','sent','email',$4::jsonb,$5,$5,$5,$5)`,
     [`c${uniq()}`.padEnd(26, '0').slice(0, 26), a.shopId, prior.id,
-      JSON.stringify([{ channel: 'sms', result: 'accepted', costMicros: 2_000_000 }]), at - 60_000]
+      JSON.stringify([{ channel: 'email', result: 'accepted', costMicros: 2_000_000 }]), at - 60_000]
   );
   const capped = await placeOrder(a, { phone: '+93795551002' });
   const free = await placeOrder(b, { phone: '+93795551003' });
@@ -381,14 +396,14 @@ test('NTF-02: سقفِ روزانهٔ هزینهٔ پیامکِ هر دکان �
   await N.tick();
   const row = await rowOf(capped.id, 'order_cancelled');
   assert.equal(row.status, 'no_channel');
-  assert.deepEqual(row.tried.map((t) => t.result), ['not_configured', 'not_configured', 'not_configured', 'cost_cap']);
+  assert.deepEqual(row.tried.map((x) => x.result), ['not_configured', 'cost_cap', 'not_configured', 'not_configured']);
   const ok = await rowOf(free.id, 'order_cancelled');
   assert.equal(ok.status, 'sent');
-  assert.equal(ok.channel, 'sms');
+  assert.equal(ok.channel, 'email');
   assert.equal(ok.tried.at(-1).costMicros, 446_000);
-  assert.deepEqual(sms.calls.map((c) => c.to.phone), ['+93795551003']);
+  assert.deepEqual(mail.calls.map((c) => c.to.email), [(await one('SELECT customer_email FROM online_orders WHERE id=$1', [free.id])).customer_email]);
   //  نمای دکان نتیجه را دارد، نه مبلغ
-  assert.deepEqual(N.shape(row).tried.at(-1), { channel: 'sms', result: 'cost_cap' });
+  assert.deepEqual(N.shape(row).tried[1], { channel: 'email', result: 'cost_cap' });
 });
 
 /* ══════════════════════════════════════════════════════════════════
@@ -412,7 +427,8 @@ test('پرچم پس از صف خاموش شد ⇒ cancelled و هیچ پیام؛
   assert.equal(p.calls.length, 0);
 });
 
-test('سقفِ هر مشتری روی همهٔ دکان‌ها (‎+930…‎ همان شماره) ⇒ rate_limited؛ مشتریِ دیگر آزاد', async () => {
+//  «فقط ایمیل»: کلیدِ سقفِ هر مشتری = HMAC ِ ایمیلِ تأییدشدهٔ سفارش (کهنه‌ها: شماره)
+test('سقفِ هر مشتری روی همهٔ دکان‌ها (همان ایمیلِ تأییدشده) ⇒ rate_limited؛ مشتریِ دیگر آزاد', async () => {
   const o = await liveShop('سقف');
   const p = fake();
   N.setProviders({ push: p });
@@ -420,8 +436,9 @@ test('سقفِ هر مشتری روی همهٔ دکان‌ها (‎+930…‎ ه
   //  PER_HOUR پیامِ رفته در همین ساعت، از دکانِ دیگری
   const b = await liveShop('سقف ب');
   const prior = await placeOrder(b, { phone });
-  const key = N.phoneKey('+930795550001');
-  assert.equal(key, N.phoneKey(phone));
+  const key = N.phoneKey('c795550001@test.local');
+  assert.equal(key, (await rowOf(prior.id, 'order_received')).phone_key, 'کلید از ایمیلِ سفارش');
+  assert.notEqual(key, N.phoneKey(phone), 'نه از شماره');
   const at = Date.now();
   await N.tick(at);   // ردیفِ «ثبت شد» ِ همان سفارشِ پیشین می‌رود (یک پیام) — سقف از همین هم می‌شمارد
   assert.equal((await rowOf(prior.id, 'order_received')).status, 'sent');

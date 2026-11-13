@@ -15,6 +15,7 @@ import { missingTool, PLAYWRIGHT_INSTALL, SKIP } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -86,8 +87,8 @@ await call('PUT', '/api/shop/storefront/products/rice', { published: true, onlin
 const phone = '0791116677';
 const NAME = 'رحیمِ آزمونی';
 const ticket = async (p) => {
-  const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone: p });
-  const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone: p, code: vs.body.devCode });
+  const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(p) });
+  const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(p), code: vs.body.devCode });
   return { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt };
 };
 const mine = await ticket(phone);

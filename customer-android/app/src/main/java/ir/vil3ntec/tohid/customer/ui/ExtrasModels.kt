@@ -10,7 +10,7 @@ import ir.vil3ntec.tohid.core.shopper.AppliedPromo
 import ir.vil3ntec.tohid.core.shopper.Cart
 import ir.vil3ntec.tohid.core.shopper.GeoPin
 import ir.vil3ntec.tohid.core.shopper.OrderExtras
-import ir.vil3ntec.tohid.core.shopper.PhoneTicket
+import ir.vil3ntec.tohid.core.shopper.CustomerTicket
 import ir.vil3ntec.tohid.core.shopper.PinText
 import ir.vil3ntec.tohid.core.shopper.PromoList
 import ir.vil3ntec.tohid.core.shopper.PromoQuote
@@ -74,13 +74,14 @@ class PromoModel(private val api: ShopperApi, private val scope: CoroutineScope,
     }
   }
 
-  private fun guardPhone(t: PhoneTicket?): String? = if (list.valueOrNull()?.guard == true) t?.phone else null
+  //  کلیدِ مشتری = ایمیلِ بلیت («فقط ایمیل»)
+  private fun guardPhone(t: CustomerTicket?): String? = if (list.valueOrNull()?.guard == true) t?.email else null
 
   /** پیش‌نمایشِ همین سبد هنوز نرسیده؟ (خاموش ⇒ هرگز) */
-  fun pending(cart: Cart?, t: PhoneTicket?): Boolean =
+  fun pending(cart: Cart?, t: CustomerTicket?): Boolean =
     on && PromoRules.lines(cart).isNotEmpty() && quotedKey != PromoRules.keyOf(cart, code, guardPhone(t))
 
-  fun requote(cart: Cart?, t: PhoneTicket?, deviceId: String) {
+  fun requote(cart: Cart?, t: CustomerTicket?, deviceId: String) {
     val l = list.valueOrNull() ?: return
     val lines = PromoRules.lines(cart)
     if (lines.isEmpty()) return
@@ -113,14 +114,14 @@ class PromoModel(private val api: ShopperApi, private val scope: CoroutineScope,
     }
   }
 
-  fun apply(cart: Cart?, t: PhoneTicket?, deviceId: String) {
+  fun apply(cart: Cart?, t: CustomerTicket?, deviceId: String) {
     code = PromoRules.cleanCode(input)
     input = ""
     quotedKey = ""
     requote(cart, t, deviceId)
   }
 
-  fun clear(cart: Cart?, t: PhoneTicket?, deviceId: String) {
+  fun clear(cart: Cart?, t: CustomerTicket?, deviceId: String) {
     code = ""
     note = null
     quotedKey = ""
@@ -135,7 +136,7 @@ class PromoModel(private val api: ShopperApi, private val scope: CoroutineScope,
   }
 
   /** آنچه در بدنهٔ ثبت می‌رود؛ خاموش ⇒ null (همان بدنهٔ مرحلهٔ ۱) */
-  fun applied(t: PhoneTicket?, deviceId: String): AppliedPromo? {
+  fun applied(t: CustomerTicket?, deviceId: String): AppliedPromo? {
     val l = list.valueOrNull() ?: return null
     return PromoRules.applied(quote, code, deviceId.takeIf { l.guard && it.isNotEmpty() })
   }

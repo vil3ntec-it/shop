@@ -6,7 +6,7 @@ import ir.vil3ntec.tohid.core.shopper.ChatPlayState
 import ir.vil3ntec.tohid.core.shopper.ChatThread
 import ir.vil3ntec.tohid.core.shopper.ChatVoice
 import ir.vil3ntec.tohid.core.shopper.ChatVoiceSay
-import ir.vil3ntec.tohid.core.shopper.PhoneTicket
+import ir.vil3ntec.tohid.core.shopper.CustomerTicket
 import ir.vil3ntec.tohid.core.shopper.ShopperApi
 import ir.vil3ntec.tohid.core.shopper.ShopperError
 import ir.vil3ntec.tohid.core.shopper.ShopperHttp
@@ -140,7 +140,7 @@ class CustomerChatVoiceTest {
   }
 
   private var lost = 0
-  private val ticket = PhoneTicket("+93700000002", "v2.ticket", Long.MAX_VALUE)
+  private val ticket = CustomerTicket("c700000002@test.local", "v2.ticket", Long.MAX_VALUE)
 
   private fun model(device: VoiceDevice? = FakeVoice()) = ChatModel(
     ShopperApi(http), object : ShopperKeyValue {

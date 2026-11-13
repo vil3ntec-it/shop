@@ -17,6 +17,7 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -238,6 +239,7 @@ ok(await page.isDisabled('#submit-order'), 'بی شمارهٔ تأییدشده،
 ok((await page.locator('button', { hasText: /پرداختِ آنلاین|پرداخت آنلاین/ }).count()) === 0, 'هیچ دکمهٔ پرداختِ آنلاینِ ساختگی نیست (D-08)');
 await page.fill('#c-name', 'مشتریِ آزمایشی');
 await page.fill('#c-phone', '0791112233');
+await page.fill('#c-email', mailOf('0791112233'));
 await page.click('#verify-send');
 await page.waitForSelector('#verify-code-row:not([hidden])', { timeout: 10000 });
 const code = ((await page.textContent('#verify-msg')).match(/(\d{4,8})/) || [])[1];
@@ -345,8 +347,8 @@ ok((await fetch(`${base}/store/no-such-store/manifest.webmanifest`)).status === 
   //  صابون: دستهٔ دیگر (مشابهِ برنج نیست)، قیمتِ آنلاینِ ۳۰ کمتر از ۴۰ ِ دفتر
   await call('PUT', '/api/shop/storefront/products/soap', { published: true, onlinePriceMinor: 3000 }, T);
   for (const phone of ['0792223344', '0793334455', '0794445566']) {
-    const st = await call('POST', `/api/store/${slug}/verify/start`, { phone });
-    const ck = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: st.body && st.body.devCode });
+    const st = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+    const ck = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: st.body && st.body.devCode });
     const r = await call('POST', `/api/store/${slug}/checkout`, { fulfillment: 'pickup', customer: { name: 'مشتری', phone },
       lines: [{ productId: 'rice', qtyMilli: 1000 }, { productId: 'soap', qtyMilli: 1000 }] }, null,
     { 'Idempotency-Key': `web08-${phone}-key`, 'X-Store-Ticket': ck.body && ck.body.ticket });
@@ -552,6 +554,7 @@ for (const lang of ['fa', 'en']) {
   }
   await toCheckout();
   await sg.fill('#c-phone', '0791112244');
+  await sg.fill('#c-email', mailOf('0791112244'));
   await sg.click('#verify-send');
   await sg.waitForSelector('#verify-code-row:not([hidden])', { timeout: 10000 });
   await sg.fill('#v-code', ((await sg.textContent('#verify-msg')).match(/(\d{4,8})/) || [])[1] || '');

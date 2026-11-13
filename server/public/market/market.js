@@ -387,7 +387,7 @@
       drawOrders(localOrders());
       return;
     }
-    $('who-phone').textContent = K.localPhone(tk.phone);
+    $('who-phone').textContent = tk.email;
     skeleton($('orders'), 3);
     $('orders-empty').hidden = true;
     K.api(API + '/orders').then(function (r) { drawOrders(r.orders); }).catch(function (e) {
@@ -397,22 +397,22 @@
     });
   }
   function sendCode() {
-    var phone = $('v-phone').value.trim();
-    if (!phone) { K.note($('v-msg'), 'err', t('v.need')); $('v-phone').focus(); return; }
+    var email = $('v-email').value.trim();
+    if (!email) { K.note($('v-msg'), 'err', t('v.need')); $('v-email').focus(); return; }
     var b = $('v-send'); b.disabled = true;
-    K.api(API + '/verify/start', { method: 'POST', body: { phone: phone } }).then(function (r) {
+    K.api(API + '/verify/start', { method: 'POST', body: { email: email } }).then(function (r) {
       $('v-code-row').hidden = false;
       K.note($('v-msg'), 'info', t('v.sent') + (r.devCode ? ' ' + t('v.dev', { code: r.devCode }) : ''));
       $('v-code').focus();
     }).catch(function (e) {
       if (e.code === 'verification_unavailable') { state.verifyAvailable = false; b.hidden = true; }
-      K.note($('v-msg'), e.code === 'verification_unavailable' ? 'warn' : 'err', e.code === 'bad_request' ? t('err.bad_phone') : e.message);
+      K.note($('v-msg'), e.code === 'verification_unavailable' ? 'warn' : 'err', e.code === 'bad_request' ? t('err.bad_email') : e.message);
     }).then(function () { b.disabled = false; });
   }
   function checkCode(ev) {
     if (ev) ev.preventDefault();
     var b = $('v-check'); b.disabled = true;
-    K.api(API + '/verify/check', { method: 'POST', body: { phone: $('v-phone').value, code: $('v-code').value } }).then(function (r) {
+    K.api(API + '/verify/check', { method: 'POST', body: { email: $('v-email').value, code: $('v-code').value } }).then(function (r) {
       K.setTicket(r);
       K.account();
       $('v-code').value = ''; $('v-code-row').hidden = true; $('v-msg').hidden = true;

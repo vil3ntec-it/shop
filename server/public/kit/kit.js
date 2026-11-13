@@ -142,13 +142,14 @@
   K.loadS = function (key) { try { return JSON.parse(sessionStorage.getItem(key)); } catch (e) { return null; } };
   K.saveS = function (key, v) { try { sessionStorage.setItem(key, JSON.stringify(v)); } catch (e) { /* بی حافظه */ } };
 
-  // ── بلیتِ شمارهٔ تأییدشده (۲۳.۲) — بینِ بازارچه و همهٔ ویترین‌ها مشترک ──
+  // ── بلیتِ ایمیلِ تأییدشده (۲۳.۲؛ «فقط ایمیل») — بینِ بازارچه و همهٔ ویترین‌ها مشترک؛ بلیتِ کهنهٔ شماره دیگر نیست ──
   var KEY_TICKET = 'store-ticket';
   K.ticket = function () {
     var t = K.load(KEY_TICKET, null);
-    return t && t.ticket && t.expiresAt > Date.now() ? t : null;
+    return t && t.ticket && t.email && t.expiresAt > Date.now() ? t : null;
   };
-  K.setTicket = function (t) { K.save(KEY_TICKET, t ? { phone: t.phone, ticket: t.ticket, expiresAt: t.expiresAt } : null); };
+  K.setTicket = function (t) { K.save(KEY_TICKET, t ? { email: t.email, ticket: t.ticket, expiresAt: t.expiresAt } : null); };
+  K.normEmail = function (e) { return String(e || '').trim().toLowerCase(); };
   // CHK-01: نشستِ حساب (acct.js)
   K.sess = function () { var s = K.load('store-session', null); return s && s.token && s.expiresAt > Date.now() ? s : null; };
   K.localPhone = function (p) { return String(p || '').replace(/^\+93/, '0'); };
@@ -332,7 +333,7 @@
     if (!a) return;
     var t = K.ticket();
     K.clear(a).append(K.el('span', { class: 'who' }, K.icon('user')),
-      K.el('span', { class: 'lbl' }, t ? K.t('acc.mine') : K.t('acc.orders'), K.el('small', { class: t ? 'ltr' : '', text: t ? K.localPhone(t.phone) : K.t('acc.verified') })));
+      K.el('span', { class: 'lbl' }, t ? K.t('acc.mine') : K.t('acc.orders'), K.el('small', { class: t ? 'ltr' : '', text: t ? t.email : K.t('acc.verified') })));
   };
   /** متنِ ثابتِ HTML به زبانِ صفحه: data-t (متن)، data-ta (aria-label)، data-tp (placeholder). */
   function translate(root) {
