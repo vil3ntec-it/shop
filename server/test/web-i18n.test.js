@@ -75,9 +75,11 @@ const PARTS = {
   //  cart-sync.js (سبدِ حساب) همان واژه‌نامه را دارد: دیربار فقط از acct.js و پس از آن
   //  erase.js (SEC-10، «پاک کردنِ داده‌های من»، دیربار فقط از acct.js و پس از واژه‌نامهٔ آن) کادرِ کدِ همین واژه‌نامه را به کار می‌برد
   //  addr-media.js (CRM-09، عکسِ دروازه و یادداشتِ صوتیِ نشانیِ حساب؛ دیربار فقط از acct.js با `features.addressMedia`) هم
-  acct: { js: 'store/acct.js', also: ['store/cart-sync.js', 'store/erase.js', 'store/addr-media.js'], root: 'ac-box' },
+  acct: { js: 'store/acct.js', also: ['store/cart-sync.js', 'store/erase.js', 'store/addr-media.js', 'store/phone.js'], root: 'ac-box' },
   //  «پاک کردنِ داده‌های من در این دکان» (SEC-10، erase.js ِ دیربار از acct.js، فقط با `features.erasure`): بخش را خودِ اسکریپت می‌سازد
   erase: { js: 'store/erase.js', root: 'er-box' },
+  //  §۲۳.۴ «تغییرِ شمارهٔ تلفن» (phone.js ِ دیربار از acct.js، فقط با نشستِ حساب): کادرِ کد واژه‌های acct را دارد
+  phone: { js: 'store/phone.js', root: 'ph-box' },
   //  «خبرم کن روی همین دستگاه» (پوشِ وب، CHK-20/NTF-01؛ order-push.js ِ دیربار از پیگیری، فقط با `order.push`): بخش را خودِ اسکریپت می‌سازد
   //  «روی همین دستگاه هم خبرم کن» ِ «خبرم کن» ِ کالا (WEB-10، alert-push.js ِ دیربار از filters.js، فقط با `push` ِ «هشدارهای من»)
   //  همان واژه‌نامه را دارد؛ push-client.js (کارگرِ سرویس و اشتراکِ مشترکِ هر دو) هیچ متنی ندارد
@@ -97,7 +99,7 @@ const PARTS = {
 };
 const parts = Object.fromEntries(Object.keys(PARTS).map((n) => [n, Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/${n}.${l}.json`))]))]));
 const dict = Object.fromEntries(LANGS.map((l) => [l, Object.assign({}, main[l], ...Object.values(parts).map((p) => p[l]))]));
-const SOURCES = ['kit/kit.js', 'kit/settings.js', 'kit/order-kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js', 'store/catalog.js', 'store/filters.js', 'store/order-feedback.js', 'store/order-changes.js', 'store/reviews.js', 'market/index.html', 'store/index.html', 'store/account.js', 'store/visual-search.js', 'store/delivery-method.js', 'store/chat.js', 'store/chat-out.js', 'store/chat-acts.js', 'store/chat-voice.js', 'store/pay-step.js', 'store/line-prefs.js', 'store/acct.js', 'store/cart-sync.js', 'store/erase.js', 'store/order-push.js', 'store/sw.js', 'store/alert-push.js', 'store/push-client.js', 'store/same.js', 'store/gallery.js', 'store/zoom.js', 'store/order-facts.js', 'store/pin-text.js', 'store/pin-map.js', 'store/weight-hold.js', 'store/trust.js', 'store/addr-media.js', 'store/order-addr-media.js'];
+const SOURCES = ['kit/kit.js', 'kit/settings.js', 'kit/order-kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js', 'store/catalog.js', 'store/filters.js', 'store/order-feedback.js', 'store/order-changes.js', 'store/reviews.js', 'market/index.html', 'store/index.html', 'store/account.js', 'store/visual-search.js', 'store/delivery-method.js', 'store/chat.js', 'store/chat-out.js', 'store/chat-acts.js', 'store/chat-voice.js', 'store/pay-step.js', 'store/line-prefs.js', 'store/acct.js', 'store/cart-sync.js', 'store/erase.js', 'store/phone.js', 'store/order-push.js', 'store/sw.js', 'store/alert-push.js', 'store/push-client.js', 'store/same.js', 'store/gallery.js', 'store/zoom.js', 'store/order-facts.js', 'store/pin-text.js', 'store/pin-map.js', 'store/weight-hold.js', 'store/trust.js', 'store/addr-media.js', 'store/order-addr-media.js'];
 const ARABIC = /[\u0600-\u06FF]/;
 
 /** کلیدهای ثابتِ یک متن (JS یا HTML): K.t، data-t/ta/tp و چند شکلِ دیگر */
@@ -167,7 +169,7 @@ test('انگلیسی هیچ حرفِ فارسی/پشتو ندارد؛ فارسی
 });
 
 test('در JS ِ صفحه‌ها متنِ فارسیِ ثابت نمانده', () => {
-  for (const f of ['kit/kit.js', 'kit/settings.js', 'kit/order-kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/catalog.js', 'store/filters.js', 'store/reviews.js', 'store/account.js', 'store/delivery-method.js', 'store/chat.js', 'store/chat-photo.js', 'store/chat-out.js', 'store/chat-acts.js', 'store/chat-voice.js', 'store/pay-step.js', 'store/line-prefs.js', 'store/acct.js', 'store/cart-sync.js', 'store/erase.js', 'store/order-push.js', 'store/sw.js', 'store/alert-push.js', 'store/push-client.js', 'store/same.js', 'store/gallery.js', 'store/zoom.js', 'store/pin-text.js', 'store/pin-map.js', 'store/weight-hold.js', 'store/trust.js', 'store/addr-media.js', 'store/order-addr-media.js']) {
+  for (const f of ['kit/kit.js', 'kit/settings.js', 'kit/order-kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/catalog.js', 'store/filters.js', 'store/reviews.js', 'store/account.js', 'store/delivery-method.js', 'store/chat.js', 'store/chat-photo.js', 'store/chat-out.js', 'store/chat-acts.js', 'store/chat-voice.js', 'store/pay-step.js', 'store/line-prefs.js', 'store/acct.js', 'store/cart-sync.js', 'store/erase.js', 'store/phone.js', 'store/order-push.js', 'store/sw.js', 'store/alert-push.js', 'store/push-client.js', 'store/same.js', 'store/gallery.js', 'store/zoom.js', 'store/pin-text.js', 'store/pin-map.js', 'store/weight-hold.js', 'store/trust.js', 'store/addr-media.js', 'store/order-addr-media.js']) {
     const lines = read(f).split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l) && !/^\s*K\.FB = \{/.test(l)).map((l) => l.replace(/\s\/\/.*$/, ''));
     //  استثنا: نامِ خودِ زبان‌ها در گزینش‌گر و رقم/جداکنندهٔ فارسی (نه متن)
     const hits = lines.filter((l) => [...l.matchAll(/'([^'\\]*)'/g)].some((m) => ARABIC.test(m[1]) && !/^(فارسی|دری|پښتو|[۰-۹٬٫]+)$/.test(m[1])));

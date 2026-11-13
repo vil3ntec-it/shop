@@ -9,6 +9,7 @@
  *   سبد ──────── CHK-03/WEB-14، فقط با `features.accountCart` (پرچمِ `shop.storefront.cart`): `store/cart-sync.js` ِ دیربار
  *                 (ادغامِ یک‌بارهٔ سبدِ مهمان، `PUT` با نسخه، ۴۰۹ ⇒ سه‌طرفه، درنگ). نشست رفت (خروج، ۴۰۱ ِ حساب، منقضی) ⇒
  *                 نسخهٔ سبدِ حساب از این دستگاه پاک (`gone`)؛ سبدِ مهمانِ بی حساب (بی `merged`) همان می‌ماند.
+ *   شماره ────── §۲۳.۴: «تغییرِ شمارهٔ تلفن» در «حسابِ من» (`store/phone.js` ِ دیربار؛ کد به شمارهٔ تازه).
  * ⛔ همهٔ متن با textContent (`K.el`)؛ واژه‌نامهٔ `kit/i18n/acct.<زبان>.json` نیامد ⇒ هیچ گره‌ای (سبد همان هم‌گام می‌شود).
  */
 (function () {
@@ -111,6 +112,14 @@
           }).then(function () { gone(); K.setTicket(null); K.account(); mine(); });
         });
         box.append(el('div', { class: 'spread' }, el('b', { text: t('ac.me') }), el('span', { class: 'ltr', text: K.localPhone(s.phone) })), out);
+        //  §۲۳.۴: «تغییرِ شمارهٔ تلفن» (phone.js ِ دیربار): موفق ⇒ نشستِ همین دستگاه با شمارهٔ تازه و «حسابِ من» از نو
+        K.js('/store/phone.js').then(function () {
+          window.StorePhone({ api: api, phone: s.phone, into: box, lost: lost, done: function (c) {
+            var cur = K.sess();
+            if (cur) K.save(KEY, { token: cur.token, expiresAt: cur.expiresAt, phone: c.phone, name: cur.name || '' });
+            mine();
+          } });
+        }, function () {});
         //  SEC-10: «پاک کردنِ داده‌های من در این دکان» (erase.js ِ دیربار) فقط با `features.erasure`
         if (ctx.store.features && ctx.store.features.erasure) {
           K.js('/store/erase.js').then(function () { window.StoreErase({ api: api, slug: ctx.slug, phone: s.phone, into: box }); }, function () {});

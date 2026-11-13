@@ -1,0 +1,12 @@
+{
+  "ph.title": "Change phone number",
+  "ph.p": "We send a code to the new number. After the change, your other devices are signed out and earlier orders stay under the old number.",
+  "ph.new": "New mobile number",
+  "ph.send": "Send code to the new number",
+  "ph.sent": "Code sent to the new number.",
+  "ph.code": "Code for the new number",
+  "ph.same": "This is already your account's number.",
+  "ph.again": "Verification timed out — ask for a new code.",
+  "ph.done": "Your account number is now {phone}.",
+  "err.phone_taken": "This number has its own account. To use it, sign out here and sign in with that number."
+}

@@ -37,7 +37,7 @@ const orderDesk = require('../lib/order-desk');
 const eta = require('../lib/storefront-eta');
 const audit = require('../lib/audit');
 const erasure = require('../lib/customer-erasure');
-const { phoneKey } = require('../lib/validate');
+const { phoneKey, phone: validPhone } = require('../lib/validate');
 const pay = require('../lib/payment-intents');
 const flow = require('../lib/order-flow');
 const orderView = require('../lib/store-order-view');
@@ -483,6 +483,40 @@ router.post('/:slug/account/logout-all', checkoutLimit, store, customer, async (
     targetType: 'store_customer', targetId: req.customer.id, detail: { sessions: out.signedOut }, ip: clientIp(req),
   });
   res.json(out);
+});
+
+//  §۲۳.۴ تغییرِ شمارهٔ حساب (`store/phone.js` ِ دیربار از acct.js): دو اثبات — نشستِ همین حساب و بلیتِ تازهٔ شمارهٔ نو
+//  (کدِ همان `verify/start|check`، ≤ `accountTicketMaxMs`) که با `phone` ِ بدنه یکی است. «حسابِ دیگری دارد» فقط پس از کد
+//  (به دارندهٔ همان شماره)؛ تکرار یا هم‌زمانی ⇒ ۲۰۰ ِ `unchanged`، بی اثر و سابقهٔ دوم. ⛔ پرچمِ خاموشِ
+//  `shop.storefront.web_account` ⇒ `next('route')` پیش از سقف و نشست: همان درِ ناشناخته.
+const phoneStore = async (req, res, next) => {
+  const s = await sf.open(req.params.slug);
+  if (!(await orders.flagOf(s.shop_id, WEB_ACCOUNT_FLAG))) return next('route');
+  req.store = s;
+  res.set('Cache-Control', 'no-store');
+  next();
+};
+router.post('/:slug/account/phone', phoneStore, checkoutLimit, customer, async (req, res) => {
+  const want = validPhone(req.body && req.body.phone, { required: true });
+  const phone = await sf.verifiedPhoneOfTicket(ticketOf(req), { maxAgeMs: config.storefront.accountTicketMaxMs });
+  if (!phone || phoneKey(phone) !== phoneKey(want)) {
+    throw new ApiError(401, 'verification_required', 'شمارهٔ تازه را همین حالا با کد تأیید کنید');
+  }
+  let out;
+  try {
+    out = await customers.changePhone(req.customer, req.session.sessionId, phone);
+  } catch (err) {
+    if (!err || err.code !== 'same_phone') throw err;
+    const a = await customers.auth(sessionOf(req));
+    if (!a) throw new ApiError(401, 'session_required', 'برای این کار وارد حسابِ خود شوید');
+    return res.json({ customer: customers.view(a.customer), sessionsRevoked: 0, unchanged: true });
+  }
+  await audit.log({
+    shopId: req.store.shop_id, actorType: 'customer', action: 'store_customer.phone_change',
+    targetType: 'store_customer', targetId: req.customer.id,
+    detail: { conversations: out.conversations, sessionsRevoked: out.sessionsRevoked }, ip: clientIp(req),
+  });
+  res.json({ customer: out.customer, sessionsRevoked: out.sessionsRevoked });
 });
 
 router.get('/:slug/account/orders', readLimit, store, customer, async (req, res) => {
