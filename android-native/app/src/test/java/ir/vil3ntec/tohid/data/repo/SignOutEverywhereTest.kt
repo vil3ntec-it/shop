@@ -67,7 +67,7 @@ class SignOutEverywhereTest {
     assertNull(SignOutModel.afterEverywhere(serverOk = true))
   }
 
-  @Test fun `«حساب من»: «خروج از همهٔ دستگاه‌ها» فقط برای حسابِ واردشده و پس از «خروج»`() {
+  @Test fun `«حساب من» — «خروج از همهٔ دستگاه‌ها» فقط برای حسابِ واردشده و پس از «خروج»`() {
     val full = ProfileHomeModel.menu(signedIn = true, canSettings = true)
     val items = full.map { it.item }
     assertEquals(items.indexOf(ProfileHomeModel.Item.SIGN_OUT) + 1, items.indexOf(ProfileHomeModel.Item.SIGN_OUT_ALL))

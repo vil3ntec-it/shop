@@ -55,7 +55,7 @@ class TillPinMemberModelTest {
     assertNull("عضوی که در فهرستِ سرور نیست", TillPinMemberModel.rowOf(listOf(pin("m-other")), staff, "owner", "u-owner"))
   }
 
-  @Test fun `قفل: صاحب و مدیر (برای نقشِ پایین‌تر) باز می‌کنند؛ مدیر برای مدیر و هیچ‌کس برای خودش نه`() {
+  @Test fun `قفل — صاحب و مدیر (برای نقشِ پایین‌تر) باز می‌کنند؛ مدیر برای مدیر و هیچ‌کس برای خودش نه`() {
     val pins = listOf(pin("m-staff", locked = true), pin("m-mgr", locked = true))
     val byOwner = TillPinMemberModel.rowOf(pins, staff, "owner", "u-owner")!!
     assertEquals(State.LOCKED, byOwner.state)
