@@ -48,19 +48,18 @@ test('آزمونِ مرجع: بی لایه، فهرستِ مجوزِ هر نقش
     assert.equal(shop.body.policy.v, 1);
     assert.equal(shop.body.policy.effective['reports.money'].mode, role === 'staff' ? 'deny' : 'allow');
   }
-  //  و درهای امروز همان‌طور: مدیر تنظیمات می‌نویسد، شاگرد نه
-  assert.equal((await h.put('/api/shop/settings', { settings: { a: 1 } }, { token: t.manager.accessToken })).status, 200);
-  assert.equal((await h.put('/api/shop/settings', { settings: { a: 1 } }, { token: t.staff.accessToken })).status, 403);
+  //  و درهای امروز همان‌طور: مدیر تنظیمات (سربرگِ فاکتور، `settings.write`) می‌نویسد، شاگرد نه
+  assert.equal((await h.put('/api/shop/receipt-profile', { name: 'سربرگ 1' }, { token: t.manager.accessToken })).status, 200);
+  assert.equal((await h.put('/api/shop/receipt-profile', { name: 'سربرگ 1' }, { token: t.staff.accessToken })).status, 403);
   assert.equal((await h.get('/api/shop/audit', { token: t.manager.accessToken })).status, 200);
 });
 
 test('لایهٔ نقش می‌بندد و سرور اجرایش می‌کند؛ لایهٔ کاربر برمی‌گرداند (S45)', async () => {
   const t = await shopWithTeam('بستن');
-  const put = await h.put('/api/shop/permissions/roles/manager',
-    { perms: { 'settings.write': { mode: 'deny' }, 'audit.view': { mode: 'deny' } } }, { token: t.owner.accessToken });
+  const put = await h.roleLayer(t.owner.accessToken, 'manager', { 'settings.write': { mode: 'deny' }, 'audit.view': { mode: 'deny' } });
   assert.equal(put.status, 200, JSON.stringify(put.body));
 
-  const denied = await h.put('/api/shop/settings', { settings: { a: 2 } }, { token: t.manager.accessToken });
+  const denied = await h.put('/api/shop/receipt-profile', { name: 'سربرگ 2' }, { token: t.manager.accessToken });
   assert.equal(denied.status, 403);
   assert.equal(denied.body.error.code, 'permission_denied');
   assert.equal((await h.get('/api/shop/audit', { token: t.manager.accessToken })).status, 403);
@@ -74,47 +73,50 @@ test('لایهٔ نقش می‌بندد و سرور اجرایش می‌کند؛
   const one = await h.put(`/api/shop/permissions/members/${mid}`,
     { perms: { 'settings.write': { mode: 'allow' } } }, { token: t.owner.accessToken });
   assert.equal(one.status, 200, JSON.stringify(one.body));
-  assert.equal((await h.put('/api/shop/settings', { settings: { a: 3 } }, { token: t.manager.accessToken })).status, 200);
+  assert.equal((await h.put('/api/shop/receipt-profile', { name: 'سربرگ 3' }, { token: t.manager.accessToken })).status, 200);
 
   //  صاحب خودش هرگز بسته نمی‌شود
-  assert.equal((await h.put('/api/shop/settings', { settings: { a: 4 } }, { token: t.owner.accessToken })).status, 200);
+  assert.equal((await h.put('/api/shop/receipt-profile', { name: 'سربرگ 4' }, { token: t.owner.accessToken })).status, 200);
 
   //  لایهٔ خالی = برگشت به امروز
-  await h.put('/api/shop/permissions/roles/manager', { perms: {} }, { token: t.owner.accessToken });
+  await h.roleLayer(t.owner.accessToken, 'manager', {});
   assert.equal((await h.get('/api/shop/audit', { token: t.manager.accessToken })).status, 200);
 });
 
 test('هیچ لایه‌ای بیش از نقش نمی‌دهد و چیزِ اجرانشدنی پذیرفته نمی‌شود (AUTH-09)', async () => {
   const t = await shopWithTeam('سقف');
   const tok = { token: t.owner.accessToken };
+  //  لایهٔ نقش (`staff-perms.setRoleLayer`، درِ ارشدِ پنل؛ درِ دکانش برداشته شد) — همان `cleanLayer` ِ لایهٔ کاربر
   const cases = [
-    ['/api/shop/permissions/roles/staff', { 'settings.write': { mode: 'allow' } }, 'exceeds_role'],
+    ['staff', { 'settings.write': { mode: 'allow' } }, 'exceeds_role'],
     //  تخفیف و لغو از ۱۴۰۵/۰۷/۲۷ در سرور اجرا می‌شوند (staff-approval.test.js)؛ ولی شاگرد «مجاز» نمی‌گیرد
-    ['/api/shop/permissions/roles/staff', { 'sales.discount': { mode: 'allow' } }, 'exceeds_role'],
-    ['/api/shop/permissions/roles/staff', { 'sales.cancel': { mode: 'allow' } }, 'exceeds_role'],
-    ['/api/shop/permissions/roles/manager', { 'returns.create': { caps: { maxPct: 5 } } }, 'unknown_cap'],
-    ['/api/shop/permissions/roles/manager', { 'settings.write': { mode: 'approve' } }, 'not_approvable'],
-    ['/api/shop/permissions/roles/manager', { 'data.write': { mode: 'deny' } }, 'unknown_permission'],
-    ['/api/shop/permissions/roles/owner', { 'settings.write': { mode: 'deny' } }, 'owner_fixed'],
-    ['/api/shop/permissions/roles/janitor', { 'settings.write': { mode: 'deny' } }, 'unknown_role'],
-    ['/api/shop/permissions/roles/manager', { 'settings.write': 'deny' }, 'bad_override'],
+    ['staff', { 'sales.discount': { mode: 'allow' } }, 'exceeds_role'],
+    ['staff', { 'sales.cancel': { mode: 'allow' } }, 'exceeds_role'],
+    ['manager', { 'returns.create': { caps: { maxPct: 5 } } }, 'unknown_cap'],
+    ['manager', { 'settings.write': { mode: 'approve' } }, 'not_approvable'],
+    ['manager', { 'data.write': { mode: 'deny' } }, 'unknown_permission'],
+    ['owner', { 'settings.write': { mode: 'deny' } }, 'owner_fixed'],
+    ['janitor', { 'settings.write': { mode: 'deny' } }, 'unknown_role'],
+    ['manager', { 'settings.write': 'deny' }, 'bad_override'],
   ];
-  for (const [url, perms, code] of cases) {
-    const r = await h.put(url, { perms }, tok);
-    assert.equal(r.status, 400, `${url} ${JSON.stringify(perms)}`);
-    assert.equal(r.body.error.code, code, `${url} ${JSON.stringify(perms)}`);
+  for (const [role, perms, code] of cases) {
+    const r = await h.roleLayer(tok.token, role, perms);
+    assert.equal(r.status, 400, `${role} ${JSON.stringify(perms)}`);
+    assert.equal(r.body.error.code, code, `${role} ${JSON.stringify(perms)}`);
   }
   //  کلیدهای پولی حالا که سرور اجرایشان می‌کند ذخیره می‌شوند
   for (const perms of [{ 'sales.discount': { caps: { maxPct: 5 } } }, { 'sales.cancel': { mode: 'deny' } }]) {
-    assert.equal((await h.put('/api/shop/permissions/roles/manager', { perms }, tok)).status, 200, JSON.stringify(perms));
+    assert.equal((await h.roleLayer(tok.token, 'manager', perms)).status, 200, JSON.stringify(perms));
   }
-  assert.equal((await h.put('/api/shop/permissions/roles/manager', { perms: {} }, tok)).status, 200);
+  assert.equal((await h.roleLayer(tok.token, 'manager', {})).status, 200);
   //  شاگرد با «بدنهٔ دست‌ساز» مجوز نمی‌گیرد و مدیر هم لایه نمی‌نویسد
   const sid = (await h.get('/api/shop/permissions', tok)).body.shop.members.find((m) => m.role === 'staff').userId;
   const grant = await h.put(`/api/shop/permissions/members/${sid}`, { perms: { 'audit.view': { mode: 'allow' } } }, tok);
   assert.equal(grant.body.error.code, 'exceeds_role');
-  assert.equal((await h.put('/api/shop/permissions/roles/staff', { perms: {} }, { token: t.manager.accessToken })).status, 403);
-  assert.equal((await h.put('/api/shop/permissions/roles/staff', { perms: {} }, { token: t.staff.accessToken })).status, 403);
+  for (const who of [t.manager, t.staff]) {
+    const r = await h.put(`/api/shop/permissions/members/${sid}`, { perms: {} }, { token: who.accessToken });
+    assert.equal(r.status, 403, JSON.stringify(r.body));
+  }
   //  شاگرد فقط مجوزهای خودش را می‌بیند، نه لایه‌های دیگران
   const mine = await h.get('/api/shop/permissions', { token: t.staff.accessToken });
   assert.equal(mine.status, 200);
@@ -143,7 +145,7 @@ test('CRM-15: «شمارهٔ مشتریان» (customers.contact) — پیش‌�
   assert.equal(entry.edit, 'full');
   assert.equal(entry.display, true);
   //  صاحب برای نقشِ شاگرد می‌بندد ⇒ شاگرد پوشیده می‌بیند؛ مدیر دست نمی‌خورد
-  const put = await h.put('/api/shop/permissions/roles/staff', { perms: { 'customers.contact': { mode: 'deny' } } }, tok);
+  const put = await h.roleLayer(tok.token, 'staff', { 'customers.contact': { mode: 'deny' } });
   assert.equal(put.status, 200, JSON.stringify(put.body));
   assert.equal((await h.get('/api/shop', { token: t.staff.accessToken })).body.policy.effective['customers.contact'].mode, 'deny');
   assert.equal((await h.get('/api/shop', { token: t.manager.accessToken })).body.policy.effective['customers.contact'].mode, 'allow');
@@ -155,7 +157,7 @@ test('CRM-15: «شمارهٔ مشتریان» (customers.contact) — پیش‌�
   assert.equal(staffShop.body.policy.effective['customers.contact'].mode, 'allow');
   assert.deepEqual(staffShop.body.permissions, permissionsOf('staff'));
   //  شاگرد خودش نمی‌تواند لایه بنویسد
-  assert.equal((await h.put('/api/shop/permissions/roles/staff', { perms: {} }, { token: t.staff.accessToken })).status, 403);
+  assert.equal((await h.put(`/api/shop/permissions/members/${sid}`, { perms: {} }, { token: t.staff.accessToken })).status, 403);
 });
 
 test('لایه‌ها مالِ همان دکان‌اند (دکانِ دیگر نه)', async () => {

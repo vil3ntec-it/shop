@@ -161,7 +161,7 @@ test('درهای /api/shop: مدیریتِ کارمند، تنظیمات و سا
 });
 
 test('لایهٔ نقشِ تازه: صاحب می‌بندد، ولی بیش از نقش نمی‌دهد', async () => {
-  const put = (role, perms) => h.put(`/api/shop/permissions/roles/${role}`, { perms }, { token: T.owner.accessToken });
+  const put = (role, perms) => h.roleLayer(T.owner.accessToken, role, perms);
   const ok = await put('accountant', { 'reports.money': { mode: 'deny' } });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
   assert.equal((await h.get('/api/shop', { token: T.accountant.accessToken })).body.policy.effective['reports.money'].mode, 'deny');

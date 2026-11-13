@@ -115,11 +115,10 @@ test('افزودنِ شماره (راهِ ورود) به حساب: نشستِ ک
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
 });
 
-test('مجوز و نقشِ کارمندان: هر سه مسیر با نشستِ کهنه ۴۰۳ و پس از تأیید انجام', async () => {
+test('مجوز و نقشِ کارمندان: هر دو مسیر با نشستِ کهنه ۴۰۳ و پس از تأیید انجام', async () => {
   const t = await shopWithStaff('مجوز');
   const owner = await staleSession(t.owner);
   const calls = [
-    ['PUT /shop/permissions/roles/manager', () => h.put('/api/shop/permissions/roles/manager', { perms: {} }, { token: owner.accessToken })],
     ['PUT /shop/permissions/members/:id', () => h.put(`/api/shop/permissions/members/${t.mid}`, { perms: {} }, { token: owner.accessToken })],
     ['PATCH /shop/members/:id', () => h.patch(`/api/shop/members/${t.mid}`, { role: 'manager' }, { token: owner.accessToken })],
   ];

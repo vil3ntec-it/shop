@@ -33,7 +33,7 @@ const BINDER = ['requireShop', 'requireStation', 'requireSyncAccount', 'requireD
 
 const PUBLIC = [
   ['ورود، ثبت‌نام و بازیابی — خودشان راهِ گرفتنِ توکن‌اند؛ سقفِ نرخ، قفلِ تلاش و کدِ یک‌بارمصرف (login-hardening، sec-auth)', [
-    'POST /api/auth/staff', 'POST /api/auth/staff',
+    'POST /api/auth/staff',
     'POST /api/auth/register', 'POST /api/auth/register/start', 'POST /api/auth/register/verify', 'POST /api/auth/register/complete',
     'POST /api/auth/login', 'POST /api/auth/otp/request', 'POST /api/auth/otp/verify',
     'POST /api/auth/google', 'POST /api/auth/google/link-code',
@@ -66,7 +66,7 @@ const SELF = [
     + '(staff-session-guard.test.js)', [
     'POST /api/auth/staff/device-key']],
   ['صفحهٔ «من» و پرتال: فقط ردیف‌های همین کاربر (دستگاهِ دیگری ⇒ S15، رمزِ دوباره ⇒ reauth)', [
-    'POST /api/me/notices/:id/read', 'PUT /api/me/settings', 'POST /api/me/redeem', 'POST /api/me/errors',
+    'POST /api/me/notices/:id/read',
     'POST /api/me/purchase-request', 'DELETE /api/me/devices/:id', 'PUT /api/me', 'POST /api/me/push', 'DELETE /api/me/push',
     'POST /api/me/backups', 'DELETE /api/me/backups/:id', 'POST /api/me/phone/code',
     'DELETE /api/portal/devices/:id', 'POST /api/portal/support/messages', 'POST /api/portal/notices/:id/read',

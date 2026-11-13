@@ -46,7 +46,7 @@ const row3 = (table, id) => one(
 const boxOf = (opId) => one(
   `SELECT * FROM sync_v3_conflicts WHERE account_id=$1 AND loser_op_id=$2 AND status='open'`, [shopId, opId]
 );
-const setRole = (role, perms) => h.put(`/api/shop/permissions/roles/${role}`, { perms }, { token: owner.accessToken });
+const setRole = (role, perms) => h.roleLayer(owner.accessToken, role, perms);
 
 /** کلیدِ ES256ِ یک تأییدکننده، ثبت‌شده در سرور */
 async function approverKey(who, label) {

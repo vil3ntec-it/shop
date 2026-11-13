@@ -161,7 +161,7 @@ test('ترتیبِ لایه‌ها [نقش، نقشِ سفارشی، کاربر]
   assert.deepEqual(why(await push3(manager, 'm-c', [sale(20)])), ['applied']);
   assert.equal((await h.put(`/api/shop/permissions/members/${mid}`, { perms: {} }, { token: owner.accessToken })).status, 200);
   //  لایهٔ نقشِ «staff» زیرِ نقشِ سفارشی است: نقشِ سفارشی آن را برای همین عضو برمی‌دارد
-  assert.equal((await h.put('/api/shop/permissions/roles/staff', { perms: { 'returns.create': { mode: 'deny' } } }, { token: owner.accessToken })).status, 200);
+  assert.equal((await h.roleLayer(owner.accessToken, 'staff', { 'returns.create': { mode: 'deny' } })).status, 200);
   const senior = await call('POST', '', owner, { name: 'شاگردِ ارشد', baseRole: 'staff', perms: { 'sales.discount': { mode: 'approve' }, 'returns.create': { mode: 'allow' } } });
   assert.equal(senior.status, 201, JSON.stringify(senior.body));
   assert.equal((await call('PUT', `/members/${staff.user.id}`, owner, { roleId: senior.body.role.id })).status, 200);
@@ -171,7 +171,7 @@ test('ترتیبِ لایه‌ها [نقش، نقشِ سفارشی، کاربر]
   assert.equal((await policyOf(staff2)).effective['returns.create'].mode, 'deny');
   assert.deepEqual(why(await push3(staff, 's-c', [sale(10)])), ['approval_required']);
   assert.deepEqual(why(await push3(staff2, 's-2', [sale(10)])), ['discount_not_allowed']);
-  assert.equal((await h.put('/api/shop/permissions/roles/staff', { perms: {} }, { token: owner.accessToken })).status, 200);
+  assert.equal((await h.roleLayer(owner.accessToken, 'staff', {})).status, 200);
 });
 
 test('نقشِ پایهٔ دیگر نقشِ عضو را همان می‌کند؛ برداشتن و پاک کردن عضو را روی نقشِ پایه با رفتارِ امروز می‌گذارد', async () => {

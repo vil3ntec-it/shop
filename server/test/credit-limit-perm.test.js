@@ -33,7 +33,7 @@ let clock = Date.now();
 
 const liveFlag = (key, value, scope) => h.put('/api/admin/pump/live-config', { scope, key, value }, { token: admin })
   .then((r) => assert.equal(r.status, 200, JSON.stringify(r.body)));
-const setRole = (role, perms, who = owner) => h.put(`/api/shop/permissions/roles/${role}`, { perms }, { token: who.accessToken });
+const setRole = (role, perms, who = owner) => h.roleLayer(who.accessToken, role, perms);
 const push1 = (who, device, ops, extra = {}) => h.api('POST', '/api/sync/v1/push', {
   token: who.accessToken, body: { device_id: device, schema_version: 1, ops, ...extra },
 });

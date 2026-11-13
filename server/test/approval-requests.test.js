@@ -32,7 +32,7 @@ const H = (node, wall = Date.now() + (++tick)) => hlc.format({ wall, counter: 0,
 const BASE = '/api/shop/approval-requests';
 const flag = (value, scope = 'all') => h.put('/api/admin/pump/live-config', { scope, key: 'shop.approval_requests', value }, { token: admin })
   .then((r) => assert.equal(r.status, 200, JSON.stringify(r.body)));
-const setRole = (role, perms) => h.put(`/api/shop/permissions/roles/${role}`, { perms }, { token: owner.accessToken })
+const setRole = (role, perms) => h.roleLayer(owner.accessToken, role, perms)
   .then((r) => assert.equal(r.status, 200, JSON.stringify(r.body)));
 const ask = (who, body) => { resetAll(); return h.post(BASE, { key: key(), reason: 'مشتریِ همیشگی', ...body }, { token: who.accessToken }); };
 const act = (who, id, verb, body = {}) => { resetAll(); return h.post(`${BASE}/${id}/${verb}`, body, { token: who.accessToken }); };

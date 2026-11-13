@@ -130,7 +130,7 @@ test('لایهٔ نقش (STF-01..03): مدیری که صاحب «تنظیمات�
   //  پیش از این `permissions.write` فقط نقش را می‌دید ⇒ `true`، و برنامه (`ShopSettingsPlan.plan`) تغییرِ محلی را هر دور
   //  می‌فرستاد (۴۰۳) و مقدارِ دکان را هرگز نمی‌نشاند: قاعدهٔ پولِ گوشیِ مدیر برای همیشه جدا از دکان
   resetAll();
-  const deny = await h.put('/api/shop/permissions/roles/manager', { perms: { 'settings.write': { mode: 'deny' } } }, { token: owner.accessToken });
+  const deny = await h.roleLayer(owner.accessToken, 'manager', { 'settings.write': { mode: 'deny' } });
   assert.equal(deny.status, 200, JSON.stringify(deny.body));
   try {
     const r = (await get(manager)).body;
@@ -141,7 +141,7 @@ test('لایهٔ نقش (STF-01..03): مدیری که صاحب «تنظیمات�
     assert.equal((await get(owner)).body.permissions.write, true, 'صاحب هرگز بسته نمی‌شود');
   } finally {
     resetAll();
-    assert.equal((await h.put('/api/shop/permissions/roles/manager', { perms: {} }, { token: owner.accessToken })).status, 200);
+    assert.equal((await h.roleLayer(owner.accessToken, 'manager', {})).status, 200);
   }
   assert.equal((await get(manager)).body.permissions.write, true, 'لایهٔ خالی = برگشت به نقش');
 });

@@ -67,9 +67,10 @@ test('اشتراک تمام‌شده: شاگرد دیگر نمی‌تواند ب
   assert.equal(blocked.status, 403);
   assert.equal(blocked.body.error.code, 'subscription_required');
 
-  // و راه دوم نوشتن هم بسته است، وگرنه بستن اولی بی‌معنی بود
-  const rest = await h.post('/api/products', { data: { name: 'کالا' } }, { token: staff.accessToken });
-  assert.equal(rest.status, 403, 'مسیر REST هم باید بسته باشد');
+  // و نامِ قدیمِ همان در هم بسته است، وگرنه بستن اولی بی‌معنی بود (درِ مستقیمِ `/api/products` برداشته شد)
+  const old = await h.post('/api/v1/shop/sync/push', { deviceId: 'd1', changes: [{ collection: 'products', id: 'p-old', updatedAt: Date.now(), data: { name: 'کالا' } }] }, { token: staff.accessToken });
+  assert.equal(old.status, 403, 'نامِ قدیمِ /shop/sync/push هم باید بسته باشد');
+  assert.equal(old.body.error.code, 'subscription_required');
 });
 
 test('اشتراک تمام‌شده: خواندن هرگز بسته نمی‌شود', async () => {
@@ -83,8 +84,8 @@ test('اشتراک تمام‌شده: خواندن هرگز بسته نمی‌ش
     assert.equal(pull.status, 200, `${who} باید بتواند داده‌اش را بخواند`);
     assert.ok(pull.body.changes.some(c => c.id === 'row-1'), `${who} داده را ندید`);
 
-    const list = await h.get('/api/products', { token });
-    assert.equal(list.status, 200, `${who} باید بتواند فهرست را بخواند`);
+    const list = await h.get('/api/v1/shop/sync/pull?since=0', { token });
+    assert.equal(list.status, 200, `${who} باید بتواند با نامِ قدیم هم بخواند`);
   }
 });
 

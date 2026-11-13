@@ -36,7 +36,7 @@ const H = (node) => hlc.format({ wall: Date.now() + (++tick), counter: 0, node }
 
 const liveFlag = (key, value, scope) => h.put('/api/admin/pump/live-config', { scope, key, value }, { token: admin })
   .then((r) => assert.equal(r.status, 200, JSON.stringify(r.body)));
-const setRole = (role, perms, who = owner) => h.put(`/api/shop/permissions/roles/${role}`, { perms }, { token: who.accessToken });
+const setRole = (role, perms, who = owner) => h.roleLayer(who.accessToken, role, perms);
 const push3 = (who, device, ops) => h.api('POST', '/api/sync/v3/push', { token: who.accessToken, body: { device_id: device, protocol: 3, ops } });
 const why = (r) => r.body.results.map((x) => (x.status === 'applied' || x.status === 'duplicate' ? x.status : x.reason || x.status));
 const row3 = (table, id, shop = shopId) => one(
