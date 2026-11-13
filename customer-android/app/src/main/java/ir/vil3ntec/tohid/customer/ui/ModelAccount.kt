@@ -14,7 +14,6 @@ import ir.vil3ntec.tohid.core.shopper.CheckoutForm
 import ir.vil3ntec.tohid.core.shopper.CheckoutProblem
 import ir.vil3ntec.tohid.core.shopper.CheckoutRules
 import ir.vil3ntec.tohid.core.shopper.ListItem
-import ir.vil3ntec.tohid.core.shopper.ShopperError
 import ir.vil3ntec.tohid.core.shopper.ShopperJson
 import ir.vil3ntec.tohid.core.shopper.ShopperKeyValue
 import ir.vil3ntec.tohid.core.shopper.ShopperMemory

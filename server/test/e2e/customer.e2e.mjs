@@ -240,10 +240,11 @@ await E.step('S139', 'قطعِ شبکه هنگامِ فرستادن و زدنِ 
   await page.unroute('**/checkout');
   assert.deepEqual(await ticketOf(page), tk, 'بلیت با خطای شبکه پاک شد');
   assert.equal(await page.isEnabled('#submit-order'), true, 'پس از خطای شبکه «ثبت» بسته ماند');
-  //  و با بازکردنِ دوبارهٔ صفحه هم شماره تأییدشده می‌ماند
+  //  و با بازکردنِ دوبارهٔ صفحه هم ایمیلِ تأییدشده می‌ماند و شمارهٔ تماس (بی کد) روی همین دستگاه یاد مانده است
   await page.reload();
   await page.waitForSelector('#view-checkout:not([hidden])');
   assert.deepEqual(await ticketOf(page), tk);
+  assert.equal(await page.inputValue('#c-email'), mailOf(X_E164));
   assert.equal(await page.inputValue('#c-phone'), X);
   assert.equal((await orders()).length, 0, 'درخواستِ قطع‌شده سفارش ساخت');
 }, { needs: ['S133'] });

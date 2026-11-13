@@ -596,6 +596,8 @@
 
     Array.prototype.forEach.call(document.querySelectorAll('input[name="fulfillment"]'), function (r) { r.addEventListener('change', renderCheckout); });
     $('c-phone').addEventListener('input', renderCheckout);
+    //  شمارهٔ تماس (بی کد) مثلِ نام روی همین دستگاه یاد می‌ماند تا بارِ دوباره/قطعِ شبکه دوباره نوشتنش را نخواهد
+    $('c-phone').addEventListener('change', function () { var me = K.load('store-customer', null) || {}; me.phone = $('c-phone').value.trim(); K.save('store-customer', me); });
     $('c-email').addEventListener('input', renderCheckout);
     $('verify-send').addEventListener('click', sendCode);
     $('verify-check').addEventListener('click', checkCode);

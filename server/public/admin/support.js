@@ -84,7 +84,7 @@ async function makeCode({ path, prefix, reload }) {
     msg(node, `کد: ${out.code} — همین حالا برش دارید، دیگر نشان داده نمی‌شود${sent}`,
       out.emailStatus === 'failed' || out.smsStatus === 'failed' ? 'warn' : 'ok');
     $(`${prefix}-email`).value = '';
-    $(`${prefix}-phone`).value = '';
+    if ($(`${prefix}-phone`)) $(`${prefix}-phone`).value = '';
     $(`${prefix}-note`).value = '';
     await reload();
   } catch (err) {
