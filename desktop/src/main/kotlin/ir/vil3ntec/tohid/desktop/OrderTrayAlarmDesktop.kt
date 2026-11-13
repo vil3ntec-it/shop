@@ -167,16 +167,18 @@ fun rememberOrderAlarmIcon(base: Painter, alarm: OrderTrayAlarm): Painter {
       lit = !lit
     }
   }
-  val dotted = remember(base) { DotPainter(base) }
+  //  سینی بیرون از `TohidTheme` است ⇒ همان رنگِ «لغو/خطر» ِ تمِ روشن (پیش‌فرضِ `LocalShopColors`)
+  val dot = Shop.colors.danger
+  val dotted = remember(base, dot) { DotPainter(base, dot) }
   return if (active && lit) dotted else base
 }
 
-private class DotPainter(private val base: Painter) : Painter() {
+private class DotPainter(private val base: Painter, private val dot: Color) : Painter() {
   override val intrinsicSize: Size get() = base.intrinsicSize
   override fun DrawScope.onDraw() {
     with(base) { draw(size) }
     val r = size.minDimension * 0.24f
-    drawCircle(Color(0xFFE53935), radius = r, center = Offset(size.width - r, r))
+    drawCircle(dot, radius = r, center = Offset(size.width - r, r))
   }
 }
 
