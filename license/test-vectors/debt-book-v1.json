@@ -315,6 +315,33 @@
           }
         ]
       }
+    },
+    {
+      "name": "S89 — سندِ معکوسِ رسید: جفتِ «اصل + معکوس» بیرون (سررسید و تخصیص همان حذفِ امروز)؛ معکوسِ ناجور ردیفِ عادی",
+      "debtorId": "c1",
+      "today": "2026-10-17",
+      "ledger": {
+        "debtors": [{"id": "c1", "name": "احمد", "phone": "", "notes": "", "createdAt": 0}],
+        "transactions": [
+          {"id": "g1", "debtorId": "c1", "type": "give", "amount": 400, "date": "2026-10-01", "notes": "", "createdAt": 1, "dueDate": "2026-10-05"},
+          {"id": "r1-rv", "debtorId": "c1", "type": "give", "amount": 400, "date": "2026-10-12", "notes": "سندِ معکوس", "createdAt": 12, "refId": "r1", "kind": "reversal"},
+          {"id": "g2", "debtorId": "c1", "type": "give", "amount": 600, "date": "2026-10-03", "notes": "", "createdAt": 3, "dueDate": "2026-11-01"},
+          {"id": "r1", "debtorId": "c1", "type": "receive", "amount": 400, "date": "2026-10-08", "notes": "", "createdAt": 8},
+          {"id": "x1", "debtorId": "c1", "type": "give", "amount": 100, "date": "2026-10-13", "notes": "", "createdAt": 13, "refId": "g2", "kind": "reversal"}
+        ]
+      },
+      "expect": {
+        "balanceMinor": 110000,
+        "overdueMinor": 40000,
+        "overdue": ["g1"],
+        "nextDue": "g2",
+        "credit": null,
+        "entries": [
+          {"id": "g1", "row": 1, "give": true, "balanceAfterMinor": 40000, "openMinor": 40000, "overdue": true, "due": "2026-10-05", "sale": null, "allocations": [], "lines": []},
+          {"id": "g2", "row": 2, "give": true, "balanceAfterMinor": 100000, "openMinor": 60000, "overdue": false, "due": "2026-11-01", "sale": null, "allocations": [], "lines": []},
+          {"id": "x1", "row": 3, "give": true, "balanceAfterMinor": 110000, "openMinor": 10000, "overdue": false, "due": null, "sale": null, "allocations": [], "lines": []}
+        ]
+      }
     }
   ]
 }

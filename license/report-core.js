@@ -130,6 +130,29 @@
     return x > 0 ? x : 0;
   }
 
+  /*
+   *  S89 — جفتِ «اصل + سندِ معکوس» در `transactions` (هم‌زادِ `core/debt/DebtReversal.neutral`): ردیفِ `kind = reversal` با `refId` ِ
+   *  ردیفی موجود که خودش معکوس نیست، نوعِ مخالف و همان مبلغ؛ چند معکوس ⇒ شناسهٔ پایدارِ `<اصل>-rv`، وگرنه کوچک‌ترین شناسه.
+   *  جفت جمع را عوض نمی‌کند؛ بی ردیفِ معکوس ⇒ null.
+   */
+  function reversalNeutral(rows) {
+    if (!rows.some(function (t) { return t && str(t.kind) === 'reversal'; })) return null;
+    var byId = new Map();
+    rows.forEach(function (t) { byId.set(str(t.id), t); });
+    var pick = new Map();
+    rows.forEach(function (r) {
+      if (str(r.kind) !== 'reversal' || !str(r.refId)) return;
+      var ref = str(r.refId), id = str(r.id), o = byId.get(ref);
+      if (!o || str(o.kind) === 'reversal' || str(o.type) === str(r.type) || money(o.amount) !== money(r.amount)) return;
+      var have = pick.get(ref), stable = ref + '-rv';
+      if (have === undefined || (have !== stable && (id === stable || id < have))) pick.set(ref, id);
+    });
+    if (!pick.size) return null;
+    var drop = new Set();
+    pick.forEach(function (rev, orig) { drop.add(orig); drop.add(rev); });
+    return drop;
+  }
+
   function ledger(raw) {
     if (raw && raw.__reportLedger === VERSION) return raw;
     raw = raw || {};
@@ -170,7 +193,10 @@
       });
     });
     arr(raw.debtors).forEach(function (d) { L.debtors[str(d.id)] = str(d.name); });
+    //  S89: جفتِ «اصل + سندِ معکوس» (هم‌زادِ `core/debt/DebtReversal.neutral`) بیرون — سنِ بدهی همان حذفِ امروز
+    var neutral = reversalNeutral(arr(raw.transactions));
     arr(raw.transactions).forEach(function (t) {
+      if (neutral && neutral.has(str(t.id))) return;
       L.transactions.push({
         id: str(t.id), debtorId: str(t.debtorId), give: str(t.type) === 'give', amount: money(t.amount),
         date: str(t.date), createdAt: ms(t.createdAt),

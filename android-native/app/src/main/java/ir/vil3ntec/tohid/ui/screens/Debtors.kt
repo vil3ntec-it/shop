@@ -151,7 +151,7 @@ fun DebtorsScreen(
 
   val latestData = rememberUpdatedState(d)
   fun deleteResult(data: ShopData, p: DebtorLedgerModel.PendingDelete): DebtorEngine.Result = when (p) {
-    is DebtorLedgerModel.PendingDelete.Transaction -> DebtorEngine.deleteTransaction(data, p.txId)
+    is DebtorLedgerModel.PendingDelete.Transaction -> ir.vil3ntec.tohid.ui.v3.money.removeDebtTx(data, p.txId, p.reverse)
     is DebtorLedgerModel.PendingDelete.Debtor -> DebtorEngine.delete(data, p.debtorId)
   }
   fun commit(p: DebtorLedgerModel.PendingDelete) {

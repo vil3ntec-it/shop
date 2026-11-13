@@ -75,6 +75,8 @@ internal fun DebtorTxSheet(
   receipt: DebtBook.Receipt?,
   desk: Boolean,
   actions: DebtorTxSheetActions,
+  /** S89: نوشتهٔ دکمهٔ «حذف» (`shop.doc_chain` روشن ⇒ «سندِ معکوس»)؛ `null` ⇒ این ردیف معکوس نمی‌شود و دکمه نیست */
+  removeLabel: String? = StrMoney.delete,
 ) {
   val entry = remember(book, tx.id) { book?.entry(tx.id) }
   var step by rememberSaveable { mutableStateOf(TxStep.DETAILS) }
@@ -90,7 +92,7 @@ internal fun DebtorTxSheet(
             if (tx.type == "give") {
               V3Button(StrMoney.setDue, { step = TxStep.DUE }, Modifier.weight(1f), kind = V3ButtonKind.NEUTRAL, icon = Icons.Outlined.Event)
             }
-            V3Button(StrMoney.delete, { closer.close(actions.onDelete) }, Modifier.weight(1f), kind = V3ButtonKind.DANGER, haptic = true)
+            if (removeLabel != null) V3Button(removeLabel, { closer.close(actions.onDelete) }, Modifier.weight(1f), kind = V3ButtonKind.DANGER, haptic = true)
           }
         }
         TxStep.DUE -> DueStep(

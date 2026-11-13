@@ -23,6 +23,7 @@ import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.i18n.Str
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import ir.vil3ntec.tohid.core.i18n.StrShell
 
 /**
@@ -123,6 +124,15 @@ fun DeskHeader(
         item(StrNav.nearExpiry, board.expiring.size, c.warning, "dashboard")
         item(Str.overdue60, board.debtOverdue.size, c.danger, "debtors")
       }
+    }
+    //  OPS-06: «راهنما» ِ همین صفحه — همان متنِ تأییدشدهٔ F1 در برگه، بی اینترنت؛ صفحهٔ بی راهنمای آماده ⇒ هیچ دکمه
+    val guide = ir.vil3ntec.tohid.core.guide.ScreenGuides.forScreen(ir.vil3ntec.tohid.ui.AppNav.screen.value)
+    var guideOpen by remember { mutableStateOf(false) }
+    if (guide != null) {
+      IconButton(onClick = { guideOpen = true }) {
+        Icon(Icons.AutoMirrored.Outlined.HelpOutline, ir.vil3ntec.tohid.core.i18n.StrKit.guide, tint = c.muted)
+      }
+      if (guideOpen) ir.vil3ntec.tohid.ui.v3.V3GuideSheet(guide) { guideOpen = false }
     }
     //  میان‌برها — همیشه پیدا (F1)، حالا یک آیکن با راهنما نه دکمهٔ نوشته‌دار
     IconButton(onClick = { ir.vil3ntec.tohid.ui.AppNav.help.value = true }) {

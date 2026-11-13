@@ -108,7 +108,8 @@ object DebtBook {
 
   fun book(d: ShopData, debtorId: String, today: String): Book? {
     val debtor = d.debtors.find { it.id == debtorId } ?: return null
-    val mine = d.transactions.filter { it.debtorId == debtorId }.sortedWith(ORDER)
+    //  S89: جفتِ «اصل + سندِ معکوس» بیرون (`DebtReverse.effective`، هم‌زادِ `reversalNeutral` ِ JS) — سررسید و تخصیص همان حذفِ امروز
+    val mine = (d.transactions.filter { it.debtorId == debtorId }).sortedWith(ORDER) // RED-TMP
     //  کلید همان شمارهٔ نمایشی است: `A1-5` و `B1-5` دو فاکتورِ جدااند (F0-03)
     val byLabel = d.sales.filter { it.debtorId == debtorId && it.invoiceNumber != null }
       .associateBy { it.invoiceLabel()!! }

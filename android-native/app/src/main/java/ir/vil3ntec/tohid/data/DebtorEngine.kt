@@ -276,6 +276,20 @@ object DebtorEngine {
     )
   }
 
+  /**
+   *  S89 — «حذف» ِ یک ردیفِ قرض/رسید از صفحه: تصمیم فقط در `core/debt/DebtReversal`. کلیدِ `shop.doc_chain` خاموش
+   *  ([chainOn] = `DocChainSync.enabled`) ⇒ همان [deleteTransaction] ِ امروز؛ روشن ⇒ سندِ معکوس ([DebtReverse.reverse])
+   *  یا ردِ با پیام (معکوسِ معکوس، اصلِ معکوس‌شده، ردیفِ ساختهٔ سندِ دیگر).
+   */
+  fun removeTransaction(d: ShopData, id: String, chainOn: Boolean, today: String, now: Long, newId: () -> String = ::auditId): Result {
+    val tx = d.transactions.find { it.id == id }
+    return when (val p = ir.vil3ntec.tohid.core.debt.DebtReversal.plan(chainOn, tx?.let(DebtReverse::row), d.transactions.map(DebtReverse::row))) {
+      ir.vil3ntec.tohid.core.debt.DebtReversal.Plan.Delete -> deleteTransaction(d, id, today, now, newId)
+      is ir.vil3ntec.tohid.core.debt.DebtReversal.Plan.Reverse -> Result.Ok(DebtReverse.reverse(d, tx!!, p, today, now, newId), id = p.id)
+      is ir.vil3ntec.tohid.core.debt.DebtReversal.Plan.Refused -> Result.Failed(DebtReverse.refusal(p.why))
+    }
+  }
+
   fun deleteTransaction(
     d: ShopData,
     id: String,
@@ -312,10 +326,11 @@ object DebtorEngine {
   fun account(d: ShopData, id: String): Account? {
     val debtor = d.debtors.find { it.id == id } ?: return null
     val mine = d.transactions.filter { it.debtorId == id }.sortedByDescending { it.createdAt }
+    val live = mine // RED-TMP
     return Account(
       debtor = debtor,
-      given = mine.filter { it.type == "give" }.sumOf { it.amount },
-      received = mine.filter { it.type == "receive" }.sumOf { it.amount },
+      given = live.filter { it.type == "give" }.sumOf { it.amount },
+      received = live.filter { it.type == "receive" }.sumOf { it.amount },
       balance = ShopStore.debt(d, id),
       transactions = mine,
       since = debtSince(d, id),
@@ -343,8 +358,7 @@ object DebtorEngine {
    *  اولین قرضِ بعدی می‌نشیند.
    */
   fun debtSince(d: ShopData, debtorId: String): Long? {
-    val mine = d.transactions
-      .filter { it.debtorId == debtorId }
+    val mine = (d.transactions.filter { it.debtorId == debtorId }) // RED-TMP
       .sortedWith(compareBy<DebtTransaction>({ it.date }, { it.createdAt }))
     if (mine.isEmpty()) return null
 

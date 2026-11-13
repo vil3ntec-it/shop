@@ -19,6 +19,7 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NorthEast
 import androidx.compose.material.icons.outlined.SouthWest
@@ -27,6 +28,10 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +52,8 @@ import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.v3.LocalV3Guide
+import ir.vil3ntec.tohid.ui.v3.V3GuideSheet
 import ir.vil3ntec.tohid.ui.v3.V3HeroCard
 import ir.vil3ntec.tohid.ui.v3.V3HeroChip
 import ir.vil3ntec.tohid.ui.v3.rememberCountUp
@@ -79,6 +86,19 @@ internal fun HomeHeader(view: HomeView, onOpen: (String) -> Unit, modifier: Modi
       Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null, tint = p.inkMuted, modifier = Modifier.size(22.dp))
     }
     Spacer(Modifier.weight(1f))
+    //  OPS-06: «راهنما» ِ خانه (همان راهنمای F1 ِ کامپیوتر، بی اینترنت) — فقط وقتی راهنمای آماده هست
+    LocalV3Guide.current?.let { g ->
+      var open by remember { mutableStateOf(false) }
+      Box(
+        Modifier.v3Pressable(label = StrKit.guide, scale = 0.92f) { open = true }
+          .size(42.dp).clip(CircleShape).background(p.card).border(1.dp, p.hairline, CircleShape),
+        contentAlignment = Alignment.Center,
+      ) {
+        Icon(Icons.AutoMirrored.Outlined.HelpOutline, contentDescription = StrKit.guide, tint = p.ink, modifier = Modifier.size(22.dp))
+      }
+      Spacer(Modifier.width(8.dp))
+      if (open) V3GuideSheet(g) { open = false }
+    }
     Box(
       Modifier.v3Pressable(label = StrKit.notifications, scale = 0.92f) { onOpen(ShellTargets.notifications()) }
         .size(42.dp).clip(CircleShape).background(p.card).border(1.dp, p.hairline, CircleShape),

@@ -164,6 +164,20 @@ object StrLedger {
   val txNotFound: String get() = t("تراکنش پیدا نشد", "Transaction not found", "راکړه ورکړه پیدا نه شوه")
   val dueOnlyGive: String get() = t("سررسید فقط برای برد است", "A due date is only for credit given", "د ورکړې نېټه یوازې د ورکړل شوي پور لپاره ده")
 
+  // ── S89: سندِ معکوس به‌جای حذف (`core/debt/DebtReversal`، کلیدِ `shop.doc_chain`) ──
+  val reverseIsReversal: String get() = t("سندِ معکوس خودش معکوس نمی‌شود", "A reversal can't itself be reversed", "معکوس سند پخپله نه معکوس کېږي")
+  fun debtorHasDocs(name: Any?, count: Any?): String = t(
+    "«${asIs(name)}» ${asIs(count)} ردیفِ ثبت‌شده دارد و با زنجیرهٔ اسناد پاک نمی‌شود؛ هر ردیف را با «سندِ معکوس» صاف کنید یا او را در مشتریِ دیگر ادغام کنید.",
+    "“$name” has $count recorded entries and can't be deleted while the document chain is on; settle each entry with “Reverse” or merge them into another customer.",
+    "«$name» $count ثبت شوې لیکنې لري او د سندونو له ځنځیر سره نه ړنګېږي؛ هره لیکنه په «معکوس سند» سمه کړئ یا یې له بل پېرودونکي سره یو ځای کړئ.",
+  )
+  val reverseAlready: String get() = t("این ردیف پیش‌تر معکوس شده است", "This entry has already been reversed", "دا لیکنه مخکې معکوس شوې ده")
+  val reverseFromSource: String get() = t(
+    "این ردیف را سندِ دیگری ساخته (فاکتور، برگشت، امانی…)؛ همان سند را لغو یا اصلاح کنید",
+    "Another document made this entry (invoice, return, layaway…); cancel or correct that document instead",
+    "دا لیکنه بل سند جوړه کړې (بل، بېرته راګرځول، امانت…)؛ هماغه سند لغوه یا سم کړئ",
+  )
+
   // ── کشو بی فروش (`DrawerNoSale`) ──
   val needReason: String get() = t("دلیل را بنویسید", "Write the reason", "لامل ولیکئ")
   val drawerNeedsApproval: String get() = t(
