@@ -3,15 +3,18 @@
  * ورود و ثبت‌نام.
  *
  * سه راه ورود پشتیبانی می‌شود و هر سه به یک user_id می‌رسند:
- *   ۱) شماره + کد یک‌بارمصرف
- *   ۲) حساب گوگل
- *   ۳) ایمیل یا شماره + رمز عبور
+ *   ۱) ایمیل + کد یک‌بارمصرف
+ *   ۲) حساب گوگل (و اپل ِ آیفون)
+ *   ۳) ایمیل + رمز عبور
+ *
+ * ⛔ «فقط ایمیل» (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۳): شماره هرگز برای ورود، ثبت‌نام، بازیابی یا کد به کار نمی‌رود؛
+ * فقط فیلدِ دادهٔ حساب است (`PUT /api/me`). شماره در این درها ⇒ ۴۰۰ ِ `email_required` (`test/email-only-auth.test.js`).
  *
  * ثبت‌نامِ تازه سه پله دارد و شماره‌ی موبایل نمی‌خواهد — `/register/start`،
  * `/register/verify` و `/register/complete`. مسیر قدیمیِ `/register`
  * سر جایش است تا نسخه‌های قدیمیِ برنامه از کار نیفتند.
  *
- * ایمیل و شماره فقط «راه ورود»اند؛ شناسه‌ی اصلی همیشه user_id است.
+ * ایمیل فقط «راه ورود» است؛ شناسه‌ی اصلی همیشه user_id است.
  * حساب‌ها هرگز خودبه‌خود در هم ادغام نمی‌شوند.
  */
 const express = require('express');
@@ -534,27 +537,24 @@ router.get('/terms', (req, res) => {
 
 // ---------- ورود با رمز ----------
 router.post('/login', authLimit, async (req, res, next) => {
-  const raw = String(req.body?.identifier || req.body?.email || req.body?.phone || '').trim();
-  if (!raw) return next(badRequest('ایمیل یا شماره موبایل لازم است', 'identifier_required'));
+  const raw = String(req.body?.identifier || req.body?.email || '').trim();
+  //  ⛔ «فقط ایمیل»: شماره (در `identifier` یا `phone`) راهِ ورود نیست
+  if (!raw || !raw.includes('@')) return next(badRequest('ورود فقط با ایمیل است؛ ایمیلِ حساب را بنویسید', 'email_required'));
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   //  رمزِ خالی اصلاً درخواستِ ورود نیست. زودتر ردش می‌کنیم تا نه جای
   //  قفل را بگیرد و نه یک scrypt بی‌خود اجرا شود. چیزی هم لو نمی‌دهد:
   //  جواب به این ربطی ندارد که آن ایمیل حساب دارد یا نه.
   if (!password) return next(badRequest('رمز عبور لازم است', 'password_required'));
 
-  const isEmail = raw.includes('@');
-  const identifier = isEmail ? v.email(raw, { required: true }) : v.phone(raw, { required: true });
+  const identifier = v.email(raw, { required: true });
   await assertNotLocked('user', identifier, clientIp(req));
 
-  const user = await one(
-    isEmail ? 'SELECT * FROM users WHERE email=$1' : 'SELECT * FROM users WHERE phone=$1',
-    [identifier]
-  );
+  const user = await one('SELECT * FROM users WHERE email=$1', [identifier]);
   //  حساب نبود یا هشِ کهنه؟ باز هم همان‌قدر وقت می‌گیرد (SEC-AUTH-01، `lib/auth-session-hardening`)
   const ok = await hardening.checkPassword(user, password);
 
   await noteAttempt('user', identifier, clientIp(req), ok);
-  if (!ok) return next(unauthorized('ایمیل/شماره یا رمز درست نیست', 'bad_credentials'));
+  if (!ok) return next(unauthorized('ایمیل یا رمز درست نیست', 'bad_credentials'));
   await clearAttempts('user', identifier);
   if (user.status !== 'active') return next(forbidden('این حساب غیرفعال است', 'account_disabled'));
   await hardening.upgradeHash('users', user, password);
@@ -566,18 +566,13 @@ router.post('/login', authLimit, async (req, res, next) => {
 
 // ---------- کد یک‌بارمصرف ----------
 /**
- * مقصد کد: شماره یا ایمیل.
- *
- * هر دو یک راه دارند — کاربر چیزی را که بلد است می‌زند و کد به همان
- * می‌رود. برای شماره پیامک یا واتساپ، برای ایمیل سرویس ایمیل؛ کدام
- * کدام است را خود سرور تصمیم می‌گیرد، نه برنامه.
+ * مقصد کد: فقط ایمیل. ⛔ «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): کدِ پیامکی به شماره برداشته شد ⇐ به‌جایش همان کدِ ایمیل
+ * (`lib/otp` ‹`email_only`›). شماره ⇒ ۴۰۰ ِ `email_required` پیش از هر ردیف یا ارسال.
  */
 function destinationOf(body) {
-  const raw = String(body?.phone || body?.email || body?.destination || '').trim();
-  if (!raw) throw badRequest('شماره یا ایمیل لازم است', 'destination_required');
-  return raw.includes('@')
-    ? { kind: 'email', value: v.email(raw, { required: true }) }
-    : { kind: 'phone', value: v.phone(raw, { required: true }) };
+  const raw = String(body?.email || body?.destination || body?.phone || '').trim();
+  if (!raw || !raw.includes('@')) throw badRequest('کد فقط به ایمیل فرستاده می‌شود؛ ایمیل را بنویسید', 'email_required');
+  return { kind: 'email', value: v.email(raw, { required: true }) };
 }
 
 router.post('/otp/request', rateLimit({ max: config.rateLimit.otpIpMax, keyPrefix: 'otp-ip' }), otpLimit, async (req, res, next) => {   //  S18: IP پیش از مقصد
@@ -600,20 +595,14 @@ router.post('/otp/verify', verifyLimit, async (req, res, next) => {
   //  کدِ درست هم مثل رمزِ درست، ردِ تلاش‌های ناموفق را پاک می‌کند
   await clearAttempts('otp', to.value);
 
-  let user = await one(
-    to.kind === 'email' ? 'SELECT * FROM users WHERE email=$1' : 'SELECT * FROM users WHERE phone=$1',
-    [to.value]
-  );
+  let user = await one('SELECT * FROM users WHERE email=$1', [to.value]);
   let created = false;
   if (!user) {
     if (!config.allowRegistration) return next(forbidden('ثبت‌نام روی این سرور بسته است', 'registration_closed'));
     const t = now();
     user = await one(
-      to.kind === 'email'
-        ? `INSERT INTO users (id, name, email, status, created_at, updated_at)
-           VALUES ($1,$2,$3,'active',$4,$4) RETURNING *`
-        : `INSERT INTO users (id, name, phone, status, created_at, updated_at)
-           VALUES ($1,$2,$3,'active',$4,$4) RETURNING *`,
+      `INSERT INTO users (id, name, email, status, created_at, updated_at)
+       VALUES ($1,$2,$3,'active',$4,$4) RETURNING *`,
       [newId('usr'), v.text(req.body?.name, { max: 80 }), to.value, t]
     );
     created = true;
@@ -927,18 +916,18 @@ router.post('/logout-all', requireAnyUser, reauth.requireRecentAuth, async (req,
 
 /* ---------- تأییدِ دوبارهٔ هویت برای کارهای حساس (بندِ ۲۱.۱) ---------- */
 
-/** مقصدِ کدِ تأییدِ دوباره: ایمیلِ حساب، وگرنه شمارهٔ آن. */
+/** مقصدِ کدِ تأییدِ دوباره: فقط ایمیلِ حساب («فقط ایمیل»؛ کدِ پیامکی به شمارهٔ حساب برداشته شد). */
 function reauthDestination(user) {
-  return user.email || user.phone || '';
+  return user.email || '';
 }
 
 /**
- *  کد برای تأییدِ دوباره — فقط به ایمیل/شمارهٔ **خودِ حساب**، با
- *  `purpose='reauth'`؛ نه برای ورود کار می‌کند و نه برای بازیابی.
+ *  کد برای تأییدِ دوباره — فقط به ایمیلِ **خودِ حساب**، با `purpose='reauth'`؛ نه برای ورود کار می‌کند
+ *  و نه برای بازیابی. حسابِ بی‌ایمیل ⇒ ۴۰۰ ِ `no_email` (رمز همچنان پذیرفته است).
  */
 router.post('/reauth/code', requireAnyUser, sessionLimit, async (req, res, next) => {
   const to = reauthDestination(req.user);
-  if (!to) return next(badRequest('این حساب ایمیل یا شماره ندارد که کد به آن برود', 'no_destination'));
+  if (!to) return next(badRequest('این حساب ایمیل ندارد که کد به آن برود؛ با رمز تأیید کنید', 'no_email'));
   const out = await otp.request(to, { purpose: 'reauth', ip: clientIp(req), app: req.appSection || 'shop' });
   res.json({ ok: true, sent: true, resendSeconds: Math.ceil(config.otp.resendMs / 1000), ...(out.devCode ? { devCode: out.devCode } : {}) });
 });
@@ -957,7 +946,7 @@ router.post('/reauth', requireAnyUser, sessionLimit, passwordSessionLimit, async
   if (password) {
     await provePassword(user, password, user.email || user.phone || user.id, ip, { message: 'رمز درست نیست' });
     method = 'password';
-  } else if (code) {
+  } else if (code && to) {
     await proveCode(to, code, ip, { purpose: 'reauth' });
     method = 'code';
   }

@@ -1,6 +1,11 @@
 'use strict';
 /**
- * کد یک‌بارمصرف ورود با شماره.
+ * کد یک‌بارمصرف — فقط به ایمیل.
+ *
+ * ⛔ «فقط ایمیل» (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۳): `request` مقصدِ غیرِ ایمیل را پیش از هر ردیف و هر ارسال رد
+ * می‌کند (۴۰۰ ِ `email_only`). کدِ پیامکی، سقف‌های SEC-06 ِ «SMS pumping» و دفترِ پیامکِ کدها با آن رفتند ⇐ به‌جایش
+ * همان راهِ ایمیل با همان سقف‌ها. `senders.sms` فقط برای پیامکِ کدِ VIP ِ پمپ می‌ماند (`vip-codes.sms` ⇐ `admin-pump`؛
+ * کدِ پمپ دست نمی‌خورد) و `senders.*` برای «آزمایشِ ارسال» ِ تنظیمِ همان سرویس در پنل.
  *
  * کد هرگز به شکل متن ساده ذخیره نمی‌شود — فقط HMAC آن با راز سرور.
  * هر کد: مهلت دارد، تعداد تلاش محدود دارد، بعد از یک بار استفاده باطل
@@ -18,7 +23,6 @@ const { serverSecret } = require('./server-secret');
 const settings = require('./sms-settings');
 const { sectionOf } = require('./tenancy');
 const { badRequest, tooMany, forbidden, upstream } = require('../middleware/errors');
-const { phoneKey, phoneForms } = require('./validate');
 
 function pepper() {
   return serverSecret(['otp', 'api'], 'shop-otp-pepper');
@@ -330,235 +334,51 @@ function isEmail(destination) {
 }
 
 /**
- * راه ارسال از روی خود مقصد انتخاب می‌شود: ایمیل با سرویس ایمیل، شماره
- * با پیامک یا واتساپ. هر کدام متغیر خودش را دارد.
+ * راهِ ارسالِ کد: فقط ایمیل («فقط ایمیل»، ۱۴۰۵/۰۸/۲۳). راهِ ایمیل از پنل می‌آید، نه فقط از .env؛ تا وقتی چیزی
+ * تنظیم نشده `log` است و کد فقط در لاگِ سرور می‌نشیند. مقصدِ غیرِ ایمیل ⇒ `log` (هرگز پیامک).
  */
-async function sender(destination, smsCfg = null) {
-  if (isEmail(destination)) {
-    //  راهِ ایمیل هم مثل پیامک از پنل می‌آید، نه فقط از .env. تا وقتی
-    //  چیزی تنظیم نشده باشد `log` است و کد فقط در لاگِ سرور می‌نشیند.
-    const mailer = require('./mailer');
-    const cfg = await mailer.current();
-    return cfg.provider === 'log' ? senders.log : senders.email;
-  }
-  //  راه ارسالِ شماره هم از پنل مدیریت عوض می‌شود، نه فقط از .env
-  const { provider } = smsCfg || await settings.current();
-  return senders[provider] || senders.log;
+async function sender(destination) {
+  if (!isEmail(destination)) return senders.log;
+  const cfg = await require('./mailer').current();
+  return cfg.provider === 'log' ? senders.log : senders.email;
 }
 
-/*
- *  ── SEC-06: سقفِ هزینه و ضدِ «SMS pumping» ─────────────────────────────
- *  فقط وقتی پیامکِ واقعی می‌رود (شماره، و راهِ ارسال `log` نیست). عددها از
- *  `config.otp.smsGuard` (متغیرهای OTP_SMS_*) می‌آیند.
- *
- *  ⛔ شمارهٔ «آشنا» (شماره‌ای که پیش‌تر کدی را درست زده، `otp_codes.consumed_at`،
- *  یا مشتریِ ویترین است، `store_customers`) از سقفِ IP و بلوک معاف است. پس پشتِ
- *  NAT ِ اپراتور، کافی‌نت یا وای‌فای ِ دکان، کاربرِ آشنا هرگز پشتِ سقفِ IP
- *  نمی‌ماند (همان قاعدهٔ «بی قفلِ اینترنتِ مشترک» ِ routes/auth.js)، و بستنِ
- *  عمدیِ یک بلوک یا همهٔ شماره‌های خارجی فقط شماره‌های تازه را چند دقیقه نگه می‌دارد.
- *  ⚠️ ولی آشنا شدن ارزان است (یک کدِ درست)، پس آشنا **مرزِ خودش** را دارد:
- *  سقفِ خارجیِ جدا (knownForeignPhones، کلِ سرور) و فقط knownExtra پیامک بیش از
- *  dailyMax در روز.
- *  ⚠️ `users.phone` آشنا شمرده نمی‌شود: تا AUTH-08 شماره بی کد روی حساب می‌نشیند.
- *
- *  سه سنجهٔ ساعتی از `otp_codes` (`log` شمرده نمی‌شود):
- *    - یک IP، فقط ناآشنا: ipPhones شمارهٔ جدا ⇒ ۴۲۹ sms_ip_limit
- *    - یک بلوکِ هزارتایی (شماره بی سه رقمِ آخر)، فقط ناآشنا: blockPhones ⇒ sms_prefix_limit
- *      (این دو تلاشِ ناموفق، `via = 'failed'`، را هم می‌شمارند)
- *    - شماره‌های بیرون از پیش‌شمارهٔ کشور، کلِ سرور: ناآشنا foreignPhones، آشنا
- *      knownForeignPhones ⇒ sms_foreign_limit. تلاشِ ناموفق این‌جا شمرده **نمی‌شود**
- *      تا قطعیِ سرویسِ پیامک خودش سقفِ خارجی را پر نکند.
- *  سقفِ روزانهٔ سراسری از دفترِ یگانهٔ `sms_usage` (فقط پیامکِ واقعیِ رفته،
- *  همهٔ هدف‌ها): ناآشنا dailyMax، آشنا dailyMax + knownExtra ⇒ sms_daily_ceiling.
- *  پر شدنش روزی یک بار در سابقه (`sms.daily_ceiling`) و پنل می‌نشیند.
- *  ⛔ مسیرهای پمپ (`senders.sms` ِ مستقیم در vip-codes) این‌جا نمی‌آیند.
- */
-const HOUR_MS = 60 * 60 * 1000;
-const BLOCK_DIGITS = 3;
-const HOME_CC = process.env.DEFAULT_COUNTRY_CODE || '+93';   // همان پیش‌فرضِ validate.phone
-const smsLimits = () => config.otp.smsGuard;
-const ceilingAlerted = new Set();
-
-/** شمارهٔ آشنا: پیش‌تر کدی را درست زده، یا مشتریِ ویترین است (هر شکلِ همان شماره — RSK-07). */
-async function isKnown(destination) {
-  const r = await one(
-    `SELECT (EXISTS (SELECT 1 FROM otp_codes WHERE destination = ANY($1::text[]) AND consumed_at IS NOT NULL)
-          OR EXISTS (SELECT 1 FROM store_customers WHERE phone = ANY($1::text[]))) AS known`,
-    [phoneForms(destination)]
-  );
-  return Boolean(r && r.known);
-}
-
-//  کلیدِ یکتای شماره در SQL — همان `phoneKey`: ‎+9300700…‎ ⇒ ‎+93700…‎ (RSK-07)
-const KEY_RE_SQL = `^${HOME_CC.replace(/[+]/g, '\\+')}0+`;
-/**
- * شمارِ شماره‌های **جدا**ی ساعتِ اخیر جز خودِ `$2` (کلیدِ یکتا). `{key}` در `where` همان کلیدِ ردیف است؛
- * شکل‌های یک گوشی یک شماره‌اند، پس نه شمارش را بالا می‌برند و نه دسته (`sms_prefix_limit`) را دور می‌زنند.
- */
-async function distinctPhones(where, params, { failed = true } = {}) {
-  const key = `regexp_replace(destination, $${params.length + 1}, $${params.length + 2})`;
-  const r = await one(
-    `SELECT COUNT(DISTINCT ${key})::int AS n FROM otp_codes
-      WHERE created_at > $1 AND destination NOT LIKE '%@%' AND via <> 'log' ${failed ? '' : "AND via <> 'failed'"}
-        AND ${key} <> $2 AND ${where.replace(/\{key\}/g, key)}`,
-    [...params, KEY_RE_SQL, HOME_CC]
-  );
-  return r.n;
-}
-
-/**
- * سقفِ روزانهٔ سراسری — یا null اگر جا هست، وگرنه خطای ۴۲۹.
- * ⛔ خطای خواندنِ دفتر ⇒ **باز** (فقط لاگ): این سقف پشتوانهٔ هزینه است و سه
- * سنجهٔ ساعتی و سقفِ روزانهٔ هر شماره همچنان کار می‌کنند؛ بستنِ همهٔ ورودهای
- * پیامکی به‌خاطرِ یک خطای خواندن بدتر است. اگر خودِ دیتابیس رفته باشد، ساختنِ
- * ردیفِ کد هم همان‌جا می‌شکند.
- */
-async function dailyCeiling(known, at) {
-  const lim = smsLimits();
-  let sent;
-  try {
-    sent = (await require('./sms-usage').totals({ since: at - 24 * HOUR_MS })).sent;
-  } catch (err) {
-    console.error('[otp] دفترِ پیامک خوانده نشد؛ سقفِ روزانه این بار سنجیده نشد:', err.message);
-    return null;
-  }
-  const cap = lim.dailyMax + (known ? lim.knownExtra : 0);
-  if (sent < cap) return null;
-  const tag = `${new Date(at).toISOString().slice(0, 10)}|${known ? 'known' : 'new'}`;
-  if (!ceilingAlerted.has(tag)) {
-    ceilingAlerted.add(tag);
-    console.error(`[otp] ⛔ سقفِ روزانهٔ پیامک (${cap}) پر شد`);
-    await require('./audit').log({
-      actorType: 'system', action: 'sms.daily_ceiling', detail: { cap, sent, scope: known ? 'known' : 'new' },
-    }).catch(() => {});
-    //  خبرِ پنل هرگز نباید ۴۲۹ را ۵۰۰ کند
-    try { require('./panel-live').notifyPanel('codes'); } catch (err) { console.error('[otp] پنل', err.message); }
-  }
-  return tooMany('سقفِ روزانهٔ پیامکِ سرور پر شده است؛ فعلاً با ایمیل وارد شوید یا بعداً امتحان کنید', 'sms_daily_ceiling');
-}
-
-/**
- * SEC-06، سقفِ **هزینه** (بخشِ ۳.۱۲: «سقف روزانه هزینه برای هر فروشگاه و هر کانال»): جمعِ
- * `cost_minor` ِ ۲۴ ساعتِ همین کانال (راهِ ارسال) در دفترِ sms_usage، یک بار برای کلِ سرور
- * (dailyCostMax ⇒ sms_cost_ceiling) و یک بار برای دکانِ همین درخواست (shopDailyCostMax ⇒
- * sms_shop_cost_ceiling). ۰ = خاموش (پیش‌فرض). برای همهٔ شماره‌ها، آشنا یا نه: این بودجهٔ
- * سخت است و راهِ ایمیل باز می‌ماند. خطای خواندن ⇒ باز (همان دلیلِ dailyCeiling).
- * @returns {Promise<Error|null>}
- */
-async function costCeiling({ shopId = '', via = '', at = now() } = {}) {
-  const lim = smsLimits();
-  const shares = [];
-  if (lim.dailyCostMax > 0) shares.push({ scope: 'all', cap: lim.dailyCostMax });
-  if (lim.shopDailyCostMax > 0 && shopId) shares.push({ scope: 'shop', cap: lim.shopDailyCostMax, shopId: String(shopId) });
-  for (const sh of shares) {
-    let spent;
-    try {
-      spent = await require('./sms-usage').costSince({ since: at - 24 * HOUR_MS, via, shopId: sh.shopId });
-    } catch (err) {
-      console.error('[otp] دفترِ پیامک خوانده نشد؛ سقفِ هزینه این بار سنجیده نشد:', err.message);
-      continue;
-    }
-    if (spent < sh.cap) continue;
-    const day = new Date(at).toISOString().slice(0, 10);
-    const tag = `${day}|cost|${sh.scope}|${sh.shopId || ''}|${via}`;
-    if (!ceilingAlerted.has(tag)) {
-      //  حافظه بی‌مرز نشود: برچسب‌های روزهای پیش کنار می‌روند
-      if (ceilingAlerted.size > 1000) for (const t of ceilingAlerted) if (!t.startsWith(day)) ceilingAlerted.delete(t);
-      ceilingAlerted.add(tag);
-      console.error(`[otp] ⛔ سقفِ هزینهٔ روزانهٔ پیامک (${sh.scope}، ${via}: ${spent}/${sh.cap}) پر شد`);
-      await require('./audit').log({
-        actorType: 'system', action: 'sms.cost_ceiling', targetType: sh.scope === 'shop' ? 'shop' : '', targetId: sh.shopId || '',
-        detail: { scope: sh.scope, via, cap: sh.cap, spent },
-      }).catch(() => {});
-      try { require('./panel-live').notifyPanel('codes'); } catch (err) { console.error('[otp] پنل', err.message); }
-    }
-    return sh.scope === 'shop'
-      ? tooMany('سقفِ روزانهٔ هزینهٔ پیامکِ این دکان پر شده است؛ فعلاً با ایمیل وارد شوید یا بعداً امتحان کنید', 'sms_shop_cost_ceiling')
-      : tooMany('سقفِ روزانهٔ هزینهٔ پیامکِ سرور پر شده است؛ فعلاً با ایمیل وارد شوید یا بعداً امتحان کنید', 'sms_cost_ceiling');
-  }
-  return null;
-}
-
-async function smsGuard(destination, { ip = '', at = now(), shopId = '', via = '' } = {}) {
-  const lim = smsLimits();
-  const known = await isKnown(destination);
-  const since = at - HOUR_MS;
-  const key = phoneKey(destination);
-  const fresh = !known && !(await one(
-    `SELECT 1 AS x FROM otp_codes WHERE destination = ANY($1::text[]) AND created_at > $2 LIMIT 1`, [phoneForms(destination), since]
-  ));
-  if (fresh) {
-    const block = key.slice(0, -BLOCK_DIGITS);
-    if (ip && await distinctPhones('ip = $3', [since, key, ip]) >= lim.ipPhones) {
-      throw tooMany('از این شبکه در این ساعت برای شماره‌های تازهٔ زیادی کد خواسته شده است؛ کمی بعد دوباره امتحان کنید', 'sms_ip_limit');
-    }
-    if (await distinctPhones('{key} LIKE $3', [since, key, `${block}%`]) >= lim.blockPhones) {
-      throw tooMany('فرستادنِ کد به این دسته از شماره‌ها فعلاً بسته است؛ کمی بعد دوباره امتحان کنید', 'sms_prefix_limit');
-    }
-  }
-  //  خارجی: ناآشنا (تازه) سقفِ کوچک، آشنا سقفِ جدا و بزرگ‌تر؛ تلاشِ ناموفق شمرده نمی‌شود
-  const foreignCap = known ? lim.knownForeignPhones : (fresh ? lim.foreignPhones : null);
-  if (foreignCap !== null && !destination.startsWith(HOME_CC)
-      && await distinctPhones('destination NOT LIKE $3', [since, key, `${HOME_CC}%`], { failed: false }) >= foreignCap) {
-    throw tooMany('فرستادنِ کد به شماره‌های خارجی فعلاً بسته است؛ کمی بعد دوباره امتحان کنید', 'sms_foreign_limit');
-  }
-  const full = await dailyCeiling(known, at);
-  if (full) throw full;
-  const broke = await costCeiling({ shopId, via, at });
-  if (broke) throw broke;
-}
-
-/** SEC-06: هر تلاشِ پیامک (نه ایمیل) در دفترِ یگانهٔ sms_usage — شکستش ورود را نمی‌شکند. */
-function recordSms(destination, { shopId = '', app = '', purpose = '', via = '', ok = true } = {}) {
-  if (isEmail(destination)) return Promise.resolve();
-  return require('./sms-usage').record({ shopId, app, purpose, via, ok })
-    .catch((err) => console.error('[otp] دفترِ پیامک ثبت نشد:', err.message));
-}
-
-/*
- * RSK-07: سقفِ روزانه و فاصلهٔ ارسالِ دوباره روی **همهٔ** شکل‌های یک شماره (`phoneForms` ِ validate:
- * ‎+93…‎، ‎+930…‎، ‎+9300…‎ …). پیش از این فقط یک صفر برداشته می‌شد و هر شکلِ دیگر سقفِ جدا داشت.
- */
-/** سقفِ روزانهٔ هر نشانی، همهٔ شکل‌هایش با هم (ردیف‌های ناموفق شمرده نمی‌شوند). */
+/** سقفِ روزانهٔ هر نشانی (ردیف‌های ناموفق شمرده نمی‌شوند). */
 async function overDailyMax(destination, at) {
   const { n } = await one(
     `SELECT COUNT(*)::int AS n FROM otp_codes
-      WHERE destination = ANY($1::text[]) AND created_at > $2 AND via <> 'failed'`,
-    [phoneForms(destination), at - 24 * 3600 * 1000]
+      WHERE destination = $1 AND created_at > $2 AND via <> 'failed'`,
+    [destination, at - 24 * 3600 * 1000]
   );
   return n >= config.otp.dailyMax;
 }
 
 /**
  * ساخت و فرستادن کد.
- * @param {string} destination شماره یا ایمیل\n * @returns {{sent:boolean, expiresAt:number, resendAfter:number, devCode?:string}}
+ * @param {string} destination ایمیل (هر چیزِ دیگر ⇒ ۴۰۰ ِ `email_only`)\n * @returns {{sent:boolean, expiresAt:number, resendAfter:number, devCode?:string}}
  */
-async function request(destination, { purpose = 'login', ip = '', app = '', shopId = '' } = {}) {
+async function request(destination, { purpose = 'login', ip = '', app = '' } = {}) {
+  //  ⛔ «فقط ایمیل»: شماره هرگز مقصدِ کد نیست — پیش از هر پرس‌وجو، ردیف یا ارسال
+  if (!isEmail(destination)) throw badRequest('کد فقط به ایمیل فرستاده می‌شود', 'email_only');
   const t = now();
 
-  // فاصله‌ی ارسال دوباره (همهٔ شکل‌های همان شماره — RSK-07)
+  // فاصله‌ی ارسال دوباره
   const last = await one(
-    `SELECT created_at FROM otp_codes WHERE destination = ANY($1::text[]) AND purpose=$2 AND via <> 'failed'
+    `SELECT created_at FROM otp_codes WHERE destination = $1 AND purpose=$2 AND via <> 'failed'
       ORDER BY created_at DESC LIMIT 1`,
-    [phoneForms(destination), purpose]
+    [destination, purpose]
   );
   if (last && t - Number(last.created_at) < config.otp.resendMs) {
     const wait = Math.ceil((config.otp.resendMs - (t - Number(last.created_at))) / 1000);
     throw tooMany(`${wait} ثانیه دیگر می‌توانید کد تازه بخواهید`, 'otp_resend_wait');
   }
 
-  // سقف روزانه برای یک شماره
+  // سقف روزانه برای یک نشانی
   if (await overDailyMax(destination, t)) {
     throw tooMany('امروز درخواست کد برای این نشانی زیاد بوده است', 'otp_daily_limit');
   }
 
-  //  یک بار خوانده می‌شوند و همین‌ها تا پایان به کار می‌روند
-  const smsCfg = await settings.current();
-  const send = await sender(destination, smsCfg);
-  //  SEC-06: فقط پیامکِ واقعی (نه ایمیل، نه log)
-  if (!isEmail(destination) && send !== senders.log) {
-    await smsGuard(destination, { ip, at: t, shopId, via: smsCfg.provider });
-  }
+  const send = await sender(destination);
 
   const code = randomCode(config.otp.digits);
   const expiresAt = t + config.otp.ttlMs;
@@ -571,11 +391,8 @@ async function request(destination, { purpose = 'login', ip = '', app = '', shop
      sectionOf(app) || '', config.otp.maxAttempts, expiresAt, t, ip]
   );
 
-  //  متن پیام: اگر سرویس شما قالب تأییدشده می‌خواهد، همان را در
-  //  SMS_TEMPLATE بگذارید با {code} داخلش.
-  const message = smsCfg.template
-    ? smsCfg.template.replace(/\{code\}/g, code)
-    : `کد ورود شما: ${code}`;
+  //  متنِ ساده؛ قالبِ ایمیل از `mail-templates` (همان `senders.email`)
+  const message = `کد ورود شما: ${code}`;
 
   /*
    *  ── چرا این try اینجاست ──────────────────────────────────────────
@@ -599,27 +416,15 @@ async function request(destination, { purpose = 'login', ip = '', app = '', shop
        *  جیمیل یا یک قطعیِ کوتاهِ اینترنت یعنی «کد فرستاده نشد» — همان «بعضی
        *  وقت نه». ۵xx («این گیرنده هرگز») دوباره امتحان نمی‌شود.
        */
-      if (!isEmail(destination) || (first && first.smtpCode >= 500)) throw first;
+      if (first && first.smtpCode >= 500) throw first;
       await new Promise((r) => setTimeout(r, Number(process.env.OTP_RETRY_DELAY_MS) || 1500));
       await send(...args);
     }
   } catch (err) {
-    if (isEmail(destination)) {
-      await query('DELETE FROM otp_codes WHERE id=$1', [codeRow]);
-    } else {
-      //  SEC-06: تلاشِ ناموفقِ پیامک هم در سنجه‌های IP/بلوک/خارجی بماند — ولی
-      //  بی کد، منقضی، و بیرون از «فاصلهٔ ارسالِ دوباره»، سقفِ هر شماره و verify
-      await query(
-        `UPDATE otp_codes SET via='failed', expires_at=$2, code_hash='', code_sealed=NULL WHERE id=$1`,
-        [codeRow, now()]
-      );
-      await recordSms(destination, { shopId, app: sectionOf(app) || '', purpose, via: smsCfg.provider, ok: false });
-    }
+    await query('DELETE FROM otp_codes WHERE id=$1', [codeRow]);
     console.error('[otp] فرستادن کد نشد:', err.message);
     throw upstream(
-      isEmail(destination)
-        ? 'کد به ایمیل شما فرستاده نشد. کمی بعد دوباره تلاش کنید؛ اگر باز هم نشد، سرویس ایمیل سرور تنظیم نیست.'
-        : 'کد فرستاده نشد. کمی بعد دوباره تلاش کنید؛ اگر باز هم نشد، سرویس پیامک سرور تنظیم نیست.',
+      'کد به ایمیل شما فرستاده نشد. کمی بعد دوباره تلاش کنید؛ اگر باز هم نشد، سرویس ایمیل سرور تنظیم نیست.',
       'delivery_failed'
     );
   }
@@ -633,12 +438,9 @@ async function request(destination, { purpose = 'login', ip = '', app = '', shop
    *  ⚠️ و نشستنش اجباری نیست: اگر این `UPDATE` هم نشود، کد از قبل رفته
    *  و ثبت‌نامِ کاربر نباید به‌خاطرِ یک ستونِ گزارشی بشکند.
    */
-  const via = isEmail(destination)
-    ? (await require('./mailer').current()).provider
-    : smsCfg.provider;
+  const via = (await require('./mailer').current()).provider;
   await query('UPDATE otp_codes SET via=$2, sent_at=$3 WHERE id=$1', [codeRow, String(via || ''), now()])
     .catch(() => {});
-  await recordSms(destination, { shopId, app: sectionOf(app) || '', purpose, via: String(via || '') });
 
   //  `resendSeconds` هم می‌رود چون ساعتِ گوشی ممکن است با سرور جور نباشد.
   //  با ثانیه، برنامه لازم نیست ساعتش را با سرور تنظیم کند.
@@ -719,7 +521,7 @@ async function verify(destination, code, { purpose = 'login' } = {}) {
 
 //  میزِ مدیر — «کدهای شش‌رقمی» (فهرست، ارسالِ دوبارهٔ همان کد، نمایش) — `lib/otp-desk.js`
 const { listRequests, requestById, reveal, resend } = require('./otp-desk')({
-  mask, unseal, senders, sender, isEmail, isKnown, dailyCeiling, costCeiling, overDailyMax, recordSms,
+  mask, unseal, senders, sender, isEmail, overDailyMax,
 });
 
 module.exports = {

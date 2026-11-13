@@ -68,7 +68,7 @@ const SELF = [
   ['صفحهٔ «من» و پرتال: فقط ردیف‌های همین کاربر (دستگاهِ دیگری ⇒ S15، رمزِ دوباره ⇒ reauth)', [
     'POST /api/me/notices/:id/read',
     'POST /api/me/purchase-request', 'DELETE /api/me/devices/:id', 'PUT /api/me', 'POST /api/me/push', 'DELETE /api/me/push',
-    'POST /api/me/backups', 'DELETE /api/me/backups/:id', 'POST /api/me/phone/code',
+    'POST /api/me/backups', 'DELETE /api/me/backups/:id', 'POST /api/me/email/code',
     'DELETE /api/portal/devices/:id', 'POST /api/portal/support/messages', 'POST /api/portal/notices/:id/read',
     'PUT /api/portal/settings', 'POST /api/portal/redeem', 'POST /api/portal/errors',
     'POST /api/license/sync', 'POST /api/billing/request']],
@@ -161,9 +161,14 @@ test('SEC-AUTH-11: نقش، isAdmin، ownerId، shopId، accountId و userId د�
   const meBefore = await one('SELECT kind, status, email FROM users WHERE id=$1', [a.user.id]);
   const me = await h.put('/api/me', {
     name: 'الف', id: b.user.id, userId: b.user.id, role: 'admin', isAdmin: true, is_admin: true, kind: 'admin',
-    status: 'disabled', email: 'evil@test.local', accountId: sb,
+    status: 'disabled', accountId: sb,
   }, { token: a.accessToken });
   assert.ok(me.status < 300, JSON.stringify(me.body));
+  assert.deepEqual(await one('SELECT kind, status, email FROM users WHERE id=$1', [a.user.id]), meBefore);
+  //  ایمیلِ دیگر در بدنه: «فقط ایمیل» ⇒ ۴۰۹ ِ صریحِ `email_locked` (نه نادیده‌گرفتنِ بی‌صدا)، و هیچ چیز عوض نمی‌شود
+  const evil = await h.put('/api/me', { name: 'الف', email: 'evil@test.local', emailCode: '123456' }, { token: a.accessToken });
+  assert.equal(evil.status, 409, JSON.stringify(evil.body));
+  assert.equal(evil.body.error.code, 'email_locked');
   assert.deepEqual(await one('SELECT kind, status, email FROM users WHERE id=$1', [a.user.id]), meBefore);
   assert.equal((await one('SELECT name FROM users WHERE id=$1', [b.user.id])).name, 'صاحبِ ب');
 

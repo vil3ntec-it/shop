@@ -297,8 +297,8 @@ function casesFor(I) {
   add('DELETE /api/me/devices/:id', { url: `/api/me/devices/${I.deviceRow}` });
   add('POST /api/me/push', { url: '/api/me/push', body: () => ({ token: `push-${uniq()}` }) });
   add('DELETE /api/me/push', { url: '/api/me/push', body: () => ({ token: `push-${uniq()}` }) });
-  //  AUTH-08 (#498): کدِ افزودنِ شماره — فقط حسابِ خودِ صدا زننده؛ پرچمِ خاموش ⇒ ۴۰۴
-  add('POST /api/me/phone/code', { url: '/api/me/phone/code', body: { phone: '0790000999' } });
+  //  AUTH-08 ⇐ ایمیل («فقط ایمیل»، ۱۴۰۵/۰۸/۲۳): کدِ افزودنِ ایمیل — فقط حسابِ خودِ صدا زننده (ایمیل‌دار ⇒ ۴۰۹ ِ email_locked)
+  add('POST /api/me/email/code', { url: '/api/me/email/code', body: { email: 'matrix-add@test.local' } });
   add('GET /api/me/backups', { url: '/api/me/backups', own: ['backupId'] });
   add('POST /api/me/backups', { url: '/api/me/backups?ext=json', raw: true });
   add('GET /api/me/backups/:id', { url: `/api/me/backups/${I.backup}`, own: ['backup'] });

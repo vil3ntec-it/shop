@@ -182,7 +182,7 @@ test('SEC-AUTH-06: سرورِ بی NODE_ENV کد را نه در پاسخ می‌
   assert.deepEqual(JSON.parse(bare.split('\n').pop()), { env: 'development', dev: false });
 
   //  همان سرور در آزمون (NODE_ENV=test) کد را پس می‌دهد — پس آزمون بی‌اثر نیست
-  const shown = await h.post('/api/auth/otp/request', { phone: '0790000601' });
+  const shown = await h.post('/api/auth/otp/request', { email: 'dev-shown@test.local' });
   assert.equal(shown.status, 200, JSON.stringify(shown.body));
   assert.match(String(shown.body.devCode || ''), /^\d{6}$/);
 
@@ -192,12 +192,12 @@ test('SEC-AUTH-06: سرورِ بی NODE_ENV کد را نه در پاسخ می‌
   console.log = (...a) => { logs.push(a.join(' ')); };
   t.after(() => { config.devCodes = keep; console.log = orig; });
   config.devCodes = false;   //  = NODE_ENV نیامده
-  const hidden = await h.post('/api/auth/otp/request', { phone: '0790000602' });
+  const hidden = await h.post('/api/auth/otp/request', { email: 'dev-hidden@test.local' });
   console.log = orig;
   assert.equal(hidden.status, 200, JSON.stringify(hidden.body));
   //  ⛔ پیش از اصلاح: devCode در پاسخ — ورود با شمارهٔ هر کسی
   assert.equal(hidden.body.devCode, undefined);
-  assert.ok(!logs.some((l) => /\d{6}/.test(l) && l.includes('0790000602')), logs.join('\n'));
+  assert.ok(!logs.some((l) => /\d{6}/.test(l) && l.includes('dev-hidden')), logs.join('\n'));
 });
 
 /* ── SEC-AUTH-07 ─────────────────────────────────────────────────── */

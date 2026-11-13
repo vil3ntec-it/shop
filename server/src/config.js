@@ -157,25 +157,7 @@ const config = {
      *  که کندتر برود پشتِ پاسخ ادامه می‌دهد. ۰ = بی کف (فقط برای آزمون).
      */
     uniformMs:  num(process.env.OTP_UNIFORM_MS, 1500),
-    /*
-     *  SEC-06 — سقفِ هزینه و ضدِ SMS pumping (`lib/otp.js`)؛ فقط پیامکِ واقعی.
-     *  شمارهٔ «آشنا» (پیش‌تر کدی را درست زده یا مشتریِ ویترین است) از سقفِ IP و
-     *  بلوک معاف است، سقفِ خارجیِ جدا و بالاتر دارد، و فقط knownExtra پیامک بیش
-     *  از dailyMax (آشنا شدن با یک کد ارزان است؛ سهمش کوچک می‌ماند).
-     */
-    smsGuard: {
-      ipPhones:      num(process.env.OTP_SMS_IP_PHONES, 10),        // شمارهٔ ناآشنای جدا از یک IP در ساعت
-      blockPhones:   num(process.env.OTP_SMS_BLOCK_PHONES, 10),     // در یک بلوکِ هزارتایی در ساعت
-      foreignPhones: num(process.env.OTP_SMS_FOREIGN_PHONES, 20),   // شمارهٔ خارجیِ ناآشنای جدا در ساعت، کلِ سرور
-      knownForeignPhones: num(process.env.OTP_SMS_KNOWN_FOREIGN_PHONES, 200), // همان برای آشنا
-      //  تصمیمِ ۱-۱ (D-09 ب، ۱۴۰۵/۰۸/۱۹): سقفِ کلِ سرور ۱۰۰ پیامک در روز = dailyMax + knownExtra (همان نسبتِ ۴ به ۱ ِ پیشین:
-      //  ناآشنا تا ۸۰، شمارهٔ آشنا تا ۱۰۰). پر شدن ⇒ ۴۲۹ `sms_daily_ceiling` و راهِ ایمیل/اعلانِ رایگان باز می‌ماند
-      dailyMax:      num(process.env.OTP_SMS_DAILY_MAX, 80),        // پیامکِ واقعی در ۲۴ ساعت، کلِ سرور
-      knownExtra:    num(process.env.OTP_SMS_KNOWN_EXTRA, 20),      // سهمِ افزودهٔ شمارهٔ آشنا بر dailyMax
-      //  SEC-06، سقفِ **هزینه** (واحدِ خُردِ sms_usage.cost_minor) در ۲۴ ساعت برای هر کانال؛ ۰ = خاموش
-      dailyCostMax:     num(process.env.OTP_SMS_DAILY_COST_MAX_MINOR, 0),      // کلِ سرور
-      shopDailyCostMax: num(process.env.OTP_SMS_SHOP_DAILY_COST_MAX_MINOR, 0), // هر دکان (ویترین)
-    },
+    //  SEC-06 (سقفِ هزینه و ضدِ SMS pumping ِ کدِ پیامکی، `OTP_SMS_*`) با «فقط ایمیل» (۱۴۰۵/۰۸/۲۳) رفت: هیچ کدی پیامک نمی‌شود.
   },
 
   /*
@@ -338,7 +320,7 @@ const config = {
     //  جا هیچ سقفی نداشت. سی در ربع ساعت برای یک کافی‌نت هم بس است.
     probeIpMax:   num(process.env.RATE_PROBE_IP_MAX, 30),
     //  ⛔ S18 (ممیزیِ ۳۵): `otp/request` ِ ایمیلی فقط سطلِ «هر مقصد» داشت ⇒ از یک IP به هر شمار ایمیلِ گوناگون کد
-    //  می‌رفت (فقط زیرِ سقفِ عمومیِ ۶۰۰). پیامک سقفِ IP ِ خودش را در `otp.smsGuard` دارد.
+    //  می‌رفت (فقط زیرِ سقفِ عمومیِ ۶۰۰). («فقط ایمیل»: کدِ پیامکی دیگر نیست.)
     otpIpMax:     num(process.env.RATE_OTP_IP_MAX, 30),
     /*
      *  زدنِ کد (تأییدِ ثبت‌نام، رمزِ تازه، ورود با کد) — **جدا از فرستادن**.
