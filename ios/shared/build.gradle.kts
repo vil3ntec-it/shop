@@ -42,6 +42,7 @@ val androidProps = Properties().apply {
   android.resolve("gradle.properties").inputStream().use { load(it) }
 }
 fun prop(name: String): String = (androidProps.getProperty(name) ?: "").trim()
+fun env(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
 
 /*
  *  فهرستِ بیرون‌مانده: هر سطر یک مسیر زیرِ `ir/vil3ntec/tohid/` (فایل، یا پوشه با `/` ِ پایانی)،
@@ -218,15 +219,37 @@ val iosSources by tasks.registering {
 
 /*
  *  `BuildConfig` — همان فیلدهای اندروید و کامپیوتر؛ نشانیِ سرور و شناسهٔ برنامه از
- *  `android-native/gradle.properties` (قاعدهٔ «یک سرور، یک حساب»). کلیدهای امضا خالی‌اند:
- *  آیفون نه APK دارد نه به‌روزرسانیِ درون‌برنامه‌ای (قاعدهٔ ۲.۵.۲ ِ اپل).
+ *  `android-native/gradle.properties` (قاعدهٔ «یک سرور، یک حساب»).
+ *  کلیدِ عمومیِ مجوز (`LICENSE_PUBLIC_KEY`) از همان منبعِ کامپیوتر (`desktop/build.gradle.kts`):
+ *  `TOHID_LICENSE_PUBLIC_KEY` یا `tohid.licenseKey`؛ با `-Pdev=true` (سرورِ محلی، کلیدِ تازه در هر بار) خالی.
+ *  سنجاق‌نشده ⇐ `SyncStore.publicKey` کلید را از NSUserDefaults می‌خواند که ویرایش‌پذیر است و در پشتیبان هست.
+ *  `UPDATE_PUBLIC_KEY` خالی: آیفون به‌روزرسانیِ درون‌برنامه‌ای ندارد (قاعدهٔ ۲.۵.۲ ِ اپل). `SIGNING_SHA256`
+ *  (اثرِ انگشتِ گواهیِ امضای APK برای `Integrity.isGenuine`) خالی، مثلِ کامپیوتر: آیفون APK ندارد و امضای برنامه را خودِ iOS می‌سنجد.
  */
+val dev = (project.findProperty("dev") as String?) == "true"
+val licenseKey = env("TOHID_LICENSE_PUBLIC_KEY") ?: prop("tohid.licenseKey")
+if (ios && !dev && licenseKey.isBlank()) {
+  logger.warn(
+    "\n" +
+      "──────────────────────────────────────────────────────────────\n" +
+      "  هشدار: کلیدِ عمومیِ مجوز در این نسخهٔ آیفون سنجاق نشده است.\n" +
+      "  برنامه ناچار کلید را از سرور می‌گیرد و روی گوشی نگه می‌دارد؛\n" +
+      "  کسی که به فایل‌های برنامه دست داشته باشد می‌تواند عوضش کند.\n" +
+      "  کلید را از GET /api/v1/license/public-key بگیرید و بگذارید در\n" +
+      "  android-native/gradle.properties:  tohid.licenseKey=…\n" +
+      "  یا متغیرِ محیطِ TOHID_LICENSE_PUBLIC_KEY (GitHub → Settings → Variables)\n" +
+      "──────────────────────────────────────────────────────────────"
+  )
+}
+
 val generateConfig by tasks.registering {
   val out = layout.buildDirectory.dir("generated/ios-config")
   val apiBase = prop("tohid.apiBase")
   val appId = prop("tohid.appId").ifBlank { "shop" }
+  val pinnedKey = if (dev) "" else licenseKey
   inputs.property("apiBase", apiBase)
   inputs.property("appId", appId)
+  inputs.property("licenseKey", pinnedKey)
   outputs.dir(out)
   doLast {
     val dir = out.get().asFile.resolve("ir/vil3ntec/tohid").apply { mkdirs() }
@@ -244,7 +267,7 @@ val generateConfig by tasks.registering {
       |  const val VERSION_CODE: Int = 100
       |  const val API_BASE: String = ${q(apiBase)}
       |  const val APP_ID: String = ${q(appId)}
-      |  const val LICENSE_PUBLIC_KEY: String = ""
+      |  const val LICENSE_PUBLIC_KEY: String = ${q(pinnedKey)}
       |  const val UPDATE_PUBLIC_KEY: String = ""
       |  const val SIGNING_SHA256: String = ""
       |  const val PREVIEW: Boolean = false
