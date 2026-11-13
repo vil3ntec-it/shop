@@ -395,6 +395,7 @@ async function createApp({ runMigrations = true } = {}) {
     //  پروندهٔ مدرکِ اختلاف (RSK-08) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.dispute_file`
     api.use('/shop/orders/evidence', require('./routes/order-evidence'));
     api.use('/shop/order-feedback', require('./routes/order-feedback'));   // NTF-07/09: گزارشِ مشکل و نظرِ مشتری، پشتِ دو پرچمِ خاموش
+    api.use('/shop/order-returns', require('./routes/shop-return-requests'));   // RET-11: درخواست‌های برگشتِ ویترین، پشتِ پرچمِ خاموش
     //  پوزش و کوپنِ خودکارِ تأخیر (NTF-10) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.late_apology`
     api.use('/shop/orders/late-apology', require('./routes/order-late-apology'));
     //  سفارش‌های باز/لغوشدهٔ یک مشتری برای پروندهٔ او (CRM-07) — پیش از `/shop/orders`؛ پشتِ همان پرچمِ `shop.orders`
@@ -423,6 +424,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/store', require('./routes/store-push'));   // CHK-20/NTF-01: پوشِ وب ِ مشتری برای همین سفارش، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront-finder-store'));   // WEB-07/10: فیلتر و «خبرم کن»، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/order-feedback-store'));   // NTF-07/09: گزارشِ مشکل با عکس و نظرِ سفارش، پشتِ دو پرچمِ خاموش
+    api.use('/store', require('./routes/store-return-requests'));   // RET-11: درخواستِ برگشت از ویترین، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront-eta-store'));   // WEB-04: زمانِ تقریبیِ تحویل، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront-funnel-store'));   // RPT-14: تپشِ بالای قیفِ ویترینِ وب، پشتِ پرچمِ خاموشِ گزارش
     api.use('/store', require('./routes/store-account-history'));   // CRM-13: «حسابِ من» (خرید و مانده)، پشتِ پرچمِ خاموش

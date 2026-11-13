@@ -34,6 +34,8 @@ const TABLES = [
   { table: 'storefront_media', pk: ['shop_id', 'kind', 'version'], extra: [], tenant: shop },
   { table: 'image_blobs', pk: ['hash'], extra: [], tenant: () => store.BLOBS },
   { table: 'order_issue_photos', pk: ['id'], extra: ['shop_id'], tenant: shop },
+  //  RET-11: عکسِ درخواستِ برگشتِ ویترین (مهاجرتِ ۸۶۶) — همان راهِ عکسِ گزارشِ مشکل
+  { table: 'order_return_request_photos', pk: ['id'], extra: ['shop_id'], tenant: shop },
   { table: 'order_pick_photos', pk: ['id'], extra: ['shop_id'], tenant: shop },
   { table: 'delivery_photos', pk: ['id'], extra: ['shop_id'], tenant: shop },
   { table: 'shop_chat_media', pk: ['id'], extra: ['shop_id', 'mime'], tenant: shop, check: (r) => media.chatCheck(r.mime) },
