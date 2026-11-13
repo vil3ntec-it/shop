@@ -76,7 +76,8 @@ async function stageInfo() {
     const s = it ? lib.parseStage(it.value) : null;
     stages[tag] = s ? { ...s, updatedAt: it.updatedAt || null, updatedBy: it.updatedBy || '' } : null;
   }
-  return { supported: true, controls: ['start', 'percent', 'pause', 'end'], stages, ...base };
+  //  `shops` (اول چند دکانِ مشخص) و `auto_halt` (ایستِ خودکار با خطای بالا، `lib/release-stage-guard.js`) — release-stage.v2
+  return { supported: true, controls: ['start', 'percent', 'pause', 'end', 'shops', 'auto_halt'], stages, ...base };
 }
 
 async function errorsByVersion(app, t) {
@@ -371,6 +372,7 @@ async function integrations() {
  */
 const HAS_RELEASE_STAGE = (() => { try { require.resolve('./release-stage'); return true; } catch { return false; } })();
 //  ops-paging.v1: خبرِ بحرانی به مسئول (OPS-01@29) — `GET`/`PUT /api/admin/ops/alerts/paging`
-const CAPABILITIES = Object.freeze(['ops.v1', 'ops-paging.v1', ...(HAS_RELEASE_STAGE ? ['release-stage.v1'] : [])]);
+//  release-stage.v2 (۱۴۰۵/۰۸/۲۳): فهرستِ دکان‌های مرحله (`shops`)، ایست (`halted`) و نگهبانِ خودکار (`/admin/release/stage/guard`)
+const CAPABILITIES = Object.freeze(['ops.v1', 'ops-paging.v1', ...(HAS_RELEASE_STAGE ? ['release-stage.v1', 'release-stage.v2'] : [])]);
 
 module.exports = { CAPABILITIES, PLATFORMS, DEFINITIONS, releases, health, integrations, stageInfo, credentials, policies, _withTimeout: withTimeout };

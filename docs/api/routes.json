@@ -20,18 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 986,
+    "routes": 989,
     "byAuth": {
       "none-detected": 193,
-      "admin": 288,
+      "admin": 291,
       "inline": 2,
       "user": 460,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-      "extracted": 652,
-      "empty": 332,
+      "extracted": 654,
+      "empty": 333,
       "unresolved": 2
     }
   },
@@ -235,7 +235,10 @@
     {"method":"PUT","path":"/api/admin/release/beta","area":"admin","source":"server/src/routes/admin-release.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":[],"query":[],"body":["devices","shops"],"response":{"statuses":[200],"keys":["...","changed","ok"]},"errors":["400 bad_body"],"shape":"extracted"},
     {"method":"DELETE","path":"/api/admin/release/stage","area":"admin","source":"server/src/routes/admin-release.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","ok","removed"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/admin/release/stage","area":"admin","source":"server/src/routes/admin-release.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
-    {"method":"PUT","path":"/api/admin/release/stage","area":"admin","source":"server/src/routes/admin-release.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":[],"query":[],"body":["percent","version"],"response":{"statuses":[200],"keys":["...","ok"]},"errors":["400 bad_stage"],"shape":"extracted"},
+    {"method":"PUT","path":"/api/admin/release/stage","area":"admin","source":"server/src/routes/admin-release.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":[],"query":[],"body":["percent","shops","version"],"response":{"statuses":[200],"keys":["...","ok"]},"errors":["400 bad_stage"],"shape":"extracted"},
+    {"method":"GET","path":"/api/admin/release/stage/guard","area":"admin","source":"server/src/routes/admin-release.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin","guardLimit"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"PUT","path":"/api/admin/release/stage/guard","area":"admin","source":"server/src/routes/admin-release.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin","guardLimit"],"params":[],"query":[],"body":["enabled"],"response":{"statuses":[200],"keys":["...","ok"]},"errors":["400 bad_body","400 bad_guard"],"shape":"extracted"},
+    {"method":"POST","path":"/api/admin/release/stage/guard/check","area":"admin","source":"server/src/routes/admin-release.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin","guardLimit"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["..."]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/admin/reps","area":"admin","source":"server/src/routes/admin-sales.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":["app"],"body":[],"response":{"statuses":[200],"keys":["reps"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/admin/reps","area":"admin","source":"server/src/routes/admin-sales.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[201],"keys":["rep"]},"errors":[],"shape":"extracted"},
     {"method":"PATCH","path":"/api/admin/reps/:id","area":"admin","source":"server/src/routes/admin-sales.js","auth":"admin","guards":["requireAdmin"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["rep"]},"errors":[],"shape":"extracted"},

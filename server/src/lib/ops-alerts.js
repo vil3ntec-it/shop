@@ -50,6 +50,7 @@ const RULES = Object.freeze({
   settlement_mismatch: { severity: 'high', window: 7 * DAY, what: 'تسویهٔ نقدِ پیک در ۷ روزِ گذشته با کسری یا اضافه' },
   version_incompatible: { severity: 'high', what: 'دستگاهِ فعال (۳۰ روز) زیرِ حداقل نسخهٔ پشتیبانی‌شدهٔ همان برنامه' },
   admin_suspicious: { severity: 'high', window: HOUR, min: 10, what: 'ورودِ ناموفقِ مدیر: ۱۰ بار برای یک نامِ کاربری یا ۳۰ بار از یک IP در یک ساعت؛ یا ۱۰ حالتِ دکان (تعلیق/بایگانی…) از یک مدیر در ۱۰ دقیقه' },
+  release_stage_halted: { severity: 'high', what: 'OPS-01: انتشارِ مرحله‌ایِ برنامه که نگهبانِ خودکار به‌خاطرِ خطای بالای نسخهٔ تازه ایستاند (تا تصمیمِ تازهٔ مدیر هیچ دستگاهی آن را نمی‌گیرد)' },
   critical_health: { severity: 'critical', flag: true, window: 10 * 60_000, what: 'OPS-01@29 (فقط با پرچمِ ops.critical_alerts): دیتابیسِ شلوغ (۱۰ پس‌زدنِ db_busy/اتصال در ۱۰ دقیقه یا صفِ استخرِ پر)، جهشِ ۵xx (۱۰۰ در ۱۰ دقیقه)، صفِ ایمیل/تلگرامِ گیرکرده بیش از ۳۰ دقیقه، سه شکستِ پیاپیِ تطبیقِ پرداخت' },
 });
 const SEVERITIES = Object.freeze(['critical', 'high', 'medium', 'low']);
@@ -227,6 +228,24 @@ const finders = {
       //  پول به واحدِ خُرد (AFN × ۱۰۰) — همان ستون‌ها، بی گرد کردن
       detail: { shopId: r.shop_id, settlements: Number(r.n), shortageMinor: Number(r.shortage), excessMinor: Number(r.excess), lastAt: Number(r.last) },
     }));
+  },
+
+  async release_stage_halted() {
+    let lib;
+    try { lib = require('./release-stage'); } catch { throw new Unavailable('release-stage'); }
+    const rows = await many(`SELECT key, value, updated_at FROM live_config WHERE scope = 'release' AND key LIKE $1`, [`${lib.KEY_PREFIX}%`]);
+    const out = [];
+    for (const r of rows) {
+      const s = lib.parseStage(r.value);
+      if (!s || !s.halted) continue;
+      const tag = String(r.key).slice(lib.KEY_PREFIX.length);
+      out.push({
+        target: tag,
+        title: `انتشارِ مرحله‌ایِ «${tag}» نسخهٔ ${s.version} خودکار ایستاد`,
+        detail: { tag, version: s.version, percent: s.percent, shops: (s.shops || []).length, haltedAt: s.halted.at, reason: s.halted.reason },
+      });
+    }
+    return out;
   },
 
   async version_incompatible() {

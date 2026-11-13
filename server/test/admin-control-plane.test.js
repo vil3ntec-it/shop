@@ -378,7 +378,11 @@ const CAPABILITY_PROBES = {
   'ops-paging.v1': ['GET /admin/ops/alerts/paging', 'PUT /admin/ops/alerts/paging'],
   //  فقط وقتی OPS-01 (#559) در همین نسخه است
   ...((() => { try { require.resolve('../src/lib/release-stage'); return true; } catch { return false; } })()
-    ? { 'release-stage.v1': ['GET /admin/release/stage', 'PUT /admin/release/stage', 'DELETE /admin/release/stage'] } : {}),
+    ? {
+      'release-stage.v1': ['GET /admin/release/stage', 'PUT /admin/release/stage', 'DELETE /admin/release/stage'],
+      'release-stage.v2': ['GET /admin/release/stage', 'PUT /admin/release/stage', 'DELETE /admin/release/stage',
+        'GET /admin/release/stage/guard', 'PUT /admin/release/stage/guard', 'POST /admin/release/stage/guard/check'],
+    } : {}),
   'finance.v1': ['GET /admin/finance/summary', 'GET /admin/finance/payments', 'POST /admin/finance/adjustments',
     'GET /admin/finance/discrepancies', 'GET /admin/finance/export'],
   'sync-restore-once.v1': ['POST /admin/sync/conflicts/1/restore'],
