@@ -251,7 +251,8 @@ class DariCoverageTest {
   //  بی جانشینِ کامل (`WarehouseDialogs`، `PhoneClaimStep`) به `Str*` (فارسی همان؛ `PreviewPagesTextTest`)؛ `ui/screens/ProductDetail.kt`
   //  (+ `movementLabelOf`) و `ui/screens/Receipts.kt` با جانشینِ نسخهٔ ۳ (`ui/v3/products/ProductDetailScreen`، `ui/v3/money/ReceiptsScreen`)
   //  برداشته شدند (۴) ⇒ ۷۳: فقط ستون‌های `DayEndModel` (۵۳) و `HeatmapModel` (۲۰)، صفحه و سرستونِ خروجیِ اکسل با هم — تصمیمِ صاحب‌کار
-  private val maxRawOldScreens = 73
+  //  LOC-06 دورِ ۴ (`claude/e-rows-50d`، تصمیمِ ۱۴۰۵/۰۸/۲۳ #۲۴ «به زبانِ برنامه»): همان ۷۳ به `StrDayEnd` ⇒ ۰ (`DayEndHeatmapLangTest`)
+  private val maxRawOldScreens = 0
 
   /** کفِ پوششِ دریِ نوشته‌های جابه‌جاشدهٔ دورِ ۲ (٪) — اندازهٔ همین کار؛ فقط بالا برود */
   private val minMovedPercent = 14

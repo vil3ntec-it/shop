@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.core.i18n.StrDayEnd as S
 import ir.vil3ntec.tohid.core.money.Currency
 import ir.vil3ntec.tohid.core.money.Money
 import ir.vil3ntec.tohid.core.report.HeatCell
@@ -18,10 +19,11 @@ import kotlinx.serialization.json.JsonPrimitive
  *  سند است، مثلِ زبانه‌های دیگر؛ سندِ بی لحظه (۰) جایی در نقشه ندارد و بیرون می‌ماند. حساب همه در
  *  `core/report/SalesHeatmap` است (ساعتِ دیواریِ دکان، روزِ کاری که از نیمه‌شب می‌گذرد، هفته از آغازِ هفتهٔ دکان)؛ این‌جا فقط
  *  جدول‌ها. پول همه `Long` ِ یک‌صدم. زبانه فقط برای کسی است که پول را می‌بیند، مثلِ «پایانِ روز».
+ *  LOC-06 (تصمیمِ ۱۴۰۵/۰۸/۲۳ #۲۴): برچسب‌ها و سرستون‌ها از `StrDayEnd` — صفحه و خروجیِ اکسل/چاپ/PDF به زبانِ برنامه.
  */
 object HeatmapModel {
   const val TAB_ID = "heatmap"
-  val TAB = ReportBoard.TabDef(TAB_ID, "ساعت و روز", true)
+  val TAB: ReportBoard.TabDef get() = ReportBoard.TabDef(TAB_ID, S.heatTab, true)
 
   /**
    *  گوشی (RPT-08): همان نقشه زیرِ «پایانِ امروز» با سه بازهٔ کوتاه‌تر از «همه» (نخستین پیش‌فرض) — «امروز» یک ردیف
@@ -33,7 +35,7 @@ object HeatmapModel {
   fun tabs(base: List<ReportBoard.TabDef>, money: Boolean): List<ReportBoard.TabDef> = if (money) base + TAB else base
 
   /** روزِ هفتهٔ ISO (۱ دوشنبه … ۷ یکشنبه) */
-  private val DAY_NAMES = listOf("دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه", "یکشنبه")
+  private val DAY_NAMES: List<String> get() = listOf(S.monday, S.tuesday, S.wednesday, S.thursday, S.friday, S.saturday, S.sunday)
 
   fun dayName(isoWeekday: Int): String = DAY_NAMES.getOrElse(isoWeekday - 1) { "" }
 
@@ -65,19 +67,19 @@ object HeatmapModel {
   fun tables(h: SalesHeatmap): List<ReportTables.Table> {
     val hours = 0 until SalesHeatmap.HOURS
     val grid = ReportTables.Table(
-      "heatmap.grid", "شمارِ فروش: روز × ساعت",
-      listOf(col("day", "روز", "text")) + hours.map { col("h$it", hourLabel(it), "count") } + col("total", "جمع", "count"),
+      "heatmap.grid", S.heatGridTitle,
+      listOf(col("day", S.colDay, "text")) + hours.map { col("h$it", hourLabel(it), "count") } + col("total", S.total, "count"),
       h.weekdays.indices.map { r -> listOf(p(dayName(h.weekdays[r]))) + hours.map { p(h.cell(r, it).count) } + p(h.rowTotals[r].count) },
-      listOf(p("جمع")) + hours.map { p(h.hourTotals[it].count) } + p(h.total.count),
+      listOf(p(S.total)) + hours.map { p(h.hourTotals[it].count) } + p(h.total.count),
     )
-    val cols = listOf(col("name", "", "text"), col("count", "شمارِ فروش", "count"), col("net", "خالصِ مبلغ", "money"))
+    val cols = listOf(col("name", "", "text"), col("count", S.colSalesCount, "count"), col("net", S.colNetAmount, "money"))
     val byHour = ReportTables.Table(
-      "heatmap.hours", "به تفکیکِ ساعت", listOf(cols[0].copy(label = "ساعت")) + cols.drop(1),
-      hours.map { line(hourLabel(it), h.hourTotals[it]) }, line("جمع", h.total),
+      "heatmap.hours", S.byHourTitle, listOf(cols[0].copy(label = S.colHour)) + cols.drop(1),
+      hours.map { line(hourLabel(it), h.hourTotals[it]) }, line(S.total, h.total),
     )
     val byDay = ReportTables.Table(
-      "heatmap.days", "به تفکیکِ روزِ هفته", listOf(cols[0].copy(label = "روز")) + cols.drop(1),
-      h.weekdays.indices.map { line(dayName(h.weekdays[it]), h.rowTotals[it]) }, line("جمع", h.total),
+      "heatmap.days", S.byDayTitle, listOf(cols[0].copy(label = S.colDay)) + cols.drop(1),
+      h.weekdays.indices.map { line(dayName(h.weekdays[it]), h.rowTotals[it]) }, line(S.total, h.total),
     )
     return listOf(grid, byHour, byDay)
   }
