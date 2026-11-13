@@ -557,17 +557,9 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/rep', require('./routes/rep'));       // شورا چ۳: نمایندهٔ فروش — فقط فروش‌های خودش
     api.get('/downloads', require('./routes/portal').downloadsHandler);
 
-    /*
-     *  ⛔ درِ مستقیمِ داده (`/api/products`، `/api/sales`، `/api/debtors`… با PUT و DELETE، ۵۱ در، `routes/data.js`)
-     *  برداشته شد (۱۴۰۵/۰۸/۲۲): هیچ برنامه‌ای صدایش نمی‌زد و راهِ دومِ نوشتن روی دفترِ دکان بود که هر نگهبانِ تازه باید
-     *  دو بار رویش وصله می‌شد. نوشتن فقط از همگام‌سازی (`/api/sync/v1`، `/api/sync/v3` و راهِ قدیمِ `/api/sync`).
-     *
-     *  ⚠️ «دروازهٔ پایانی» ِ همان روتر **می‌ماند** (بی هیچ مسیر): هر درخواستِ ناشناختهٔ `/api` بی نشستِ دکان همان ۴۰۱
-     *  (`unauthorized`/`invalid_token`) یا ۴۰۳ ِ `requireShop` را می‌گیرد و با نشستِ دکان ۴۰۴. برنامه‌ها روی همین سوارند:
-     *  درِ پشتِ پرچمِ خاموش که `next()` می‌کند «همان درِ ناشناخته» است (`core/test-vectors/account-cart-v1.json`،
-     *  `ShopperCartSync.doorClosed`، `ShopperAddressSync.transient`، `security-review-38`)، و وجود/نبودِ مسیر به ناشناس
-     *  گفته نمی‌شود. درِ برداشته با نشستِ دکان ۴۰۴ است و بی آن همان پاسخِ درِ ناشناخته (`dead-doors.test.js`).
-     */
+    //  ⛔ درِ مستقیمِ داده (`routes/data.js`، ۵۱ در) ۱۴۰۵/۰۸/۲۲ رفت (بی صدازننده؛ نوشتن فقط از همگام‌سازی). دروازهٔ پایانی‌اش
+    //  می‌ماند: مسیرِ ناشناخته بی نشستِ دکان همان ۴۰۱ است و درِ پرچمِ خاموش «همان درِ ناشناخته» — قراردادِ برنامهٔ خرید
+    //  (`core/test-vectors/account-cart-v1.json`، `ShopperCartSync.doorClosed`)؛ با نشستِ دکان ۴۰۴ (`dead-doors.test.js`).
     api.use(requireUser, requireShop);
     return api;
   }

@@ -68,11 +68,13 @@
 - **ماندند با دلیل:** `/api/billing/status|plans|request` و `POST /api/shop/invite` (وبِ درونِ APK ِ WebView)؛ `GET`/`POST`/`PUT /api/shop` و
   `/api/shop/staff/join` (نسخهٔ بومیِ بایگانی، `server/README.md`)؛ `POST /api/shop/active` (RULES، TEN-01)؛ `GET /api/shop/audit` (RULES ِ
   `security.doc_chain` و `credit-limit-review`). همه در `KEPT` ِ `dead-doors.test.js`. بندهای نامطمئن/پیش‌ساخته ِ گزارش دست نخوردند.
-- **آزمون‌ها:** یاورهای `h.seed`/`legacyPush`/`legacyRows`/`legacyRow`/`roleLayer` (e2e: `E.roleLayer`/`E.approvals`)؛ ~۷۰ پرونده جابه‌جا شد؛
+- **آزمون‌ها:** یاورهای `h.seed`/`legacyPush`/`legacyRows`/`legacyRow`/`roleLayer` (e2e: `E.roleLayer`/`E.approvals`)؛ ۷۰ پرونده جابه‌جا شد؛
   نگهبان‌های S89/B7، SR43-2، لغو و سقف‌ها از درِ مستقیم به راهِ قدیمِ **زنجیره‌دار** رفتند (همان `pushChanges`)؛ CRM-15 ِ سابقهٔ دسترسی روی
   درِ `app` و «سفارش‌های یک مشتری». `dead-doors.test.js` ِ تازه روی 62a6bac71 ۳/۳ سرخ، پس از تغییر ۳/۳ سبز. آستانهٔ ماتریسِ نشست‌دارِ
   `tenant-matrix` ۱۲۰ ⇐ ۸۵ (۵۶ درِ برداشته؛ امروز ۸۷). SR46-3 ِ `customer-access` (کلاس‌بندیِ پین در درِ `debtor`) با همان در رفت.
-- **نتیجه:** __RESULTS__
+- **نتیجه:** همهٔ آزمون‌های سرور روی PGlite (دو تکه، `scripts/test-pglite.js`): ۴۲۴۲ آزمون، ۴۲۰۰ قبول، **۰ شکست**، ۴۰ SKIP و ۲ TODO ِ پیشین؛
+  e2e (`flags-on`، `journeys-a/b`، `scenario-s45`، `roles`، `access`) ۵۴ گامِ سبز؛ مرورگر: `web-store`، `web-store-cart-sync`، `web-store-acct`،
+  `portal-rep`، `web-shop-gone` سبز؛ precheck `fail=0`، `quality.mjs` بی ❌ (سقفِ `staff-approval.js` ۱۰۵۴ ⇐ ۱۰۵۲). Kotlin دست نخورد.
 - **نیمه‌کاره/قدمِ بعدی:** برداشتنِ درهای «ماندند» پس از داشبوردِ نسخه‌ها (یا ۴۱۰ ِ روشن). `ACCOUNT_PREFIXES` ِ پنلِ خانگی (ریپوی `server`)
   خوانده نشد؛ اگر `/products`… را دارد فقط پیکربندی است. بررسی‌نشده: `backup.test.js` و آزمونِ هم‌زمانیِ PostgreSQL ِ `sale-void-chain`
   (Postgres ِ محلی بالا نبود).
