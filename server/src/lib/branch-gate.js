@@ -3,7 +3,8 @@
  * نگهبانِ شعبه برای درهایی که هنوز شعبه نمی‌شناسند (فازِ ۱؛ `docs/BRANCHES-fa.md` §۵).
  *
  * این درها فقط دادهٔ **شعبهٔ اصلی** را دارند (حسابِ امروزِ دکان): Sync v1 (`routes/sync-v1.js`، مشترک با پمپ و
- * دست‌نخورده)، راهِ قدیمِ همگام‌سازی (`/sync`، `/shop/sync`)، همهٔ `/shop/*` جز `/shop/branches`، `/events` و
+ * دست‌نخورده)، راهِ قدیمِ همگام‌سازی (`/sync`، `/shop/sync`)، همهٔ `/shop/*` جز `/shop/branches` و `/shop/approval-requests`
+ * (شعبه‌شناس)، `/events` و
  * `/me/backups` (پشتیبانِ کاملِ دفترِ دکان). پس با پرچمِ روشنِ `shop.branches`:
  *   ⛔ عضوی که شعبهٔ اصلی را ندارد (کارمندِ فقط شعبهٔ دیگر) ⇒ ۴۰۳ `branch_main_only` — هرگز دادهٔ اصلی را نمی‌خواند
  *      و دادهٔ شعبهٔ خودش را در اصلی نمی‌نویسد.
@@ -21,11 +22,16 @@ const { forbidden } = require('../middleware/errors');
 const { SHOP } = require('./tenancy');
 
 /** کدام نوع در: 'v1' | 'rest' | null (شعبه‌شناس یا بیرون از دکان) */
-function kindOf(p) {
+function kindOf(p, method = 'GET') {
   const path = String(p || '');
+  //  ساختنِ دکانِ تازهٔ خودش یا پیوستن به دکانی با کد: دادهٔ هیچ شعبه‌ای از این دکان خوانده/نوشته نمی‌شود
+  if (method === 'POST' && /^\/shop(\/create|\/join|\/staff\/join)?\/?$/.test(path)) return null;
   if (/^\/sync\/v3(\/|$)/.test(path)) return null;
   if (/^\/sync\/v1(\/|$)/.test(path)) return 'v1';
-  if (/^\/shop\/branches(\/|$)/.test(path)) return null;
+  //  درهای شعبه‌شناس: خودشان دسترسیِ شعبه را می‌سنجند
+  if (/^\/shop\/(branches|approval-requests)(\/|$)/.test(path)) return null;
+  //  کلیدِ تأییدکنندهٔ خودِ عضو (STF-02): سطحِ دکان، بی دادهٔ هیچ شعبه — مدیرِ فقط شعبهٔ دیگر هم باید بتواند ثبت/باطل کند
+  if (/^\/shop\/approver-keys(\/|$)/.test(path)) return null;
   if (/^\/(shop|sync|events)(\/|$)/.test(path)) return 'rest';
   if (/^\/me\/backups(\/|$)/.test(path)) return 'rest';
   return null;
@@ -68,7 +74,7 @@ async function who(req, kind) {
 
 async function gate(req, res, next) {
   try {
-    const kind = kindOf(req.path);
+    const kind = kindOf(req.path, req.method);
     if (!kind || !hasBearer(req)) return next();
     const claim = branches.claimOf(req);
     if (claim === null && !(await branches.anyAssignments())) return next();

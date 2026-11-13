@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS shop_member_branches (
 );
 CREATE INDEX IF NOT EXISTS ix_shop_member_branches_user ON shop_member_branches (user_id);
 
+--  STF-06: درخواستِ تأیید از راهِ دور مالِ شعبهٔ سندِ خودش است؛ هر ردیفِ امروز ⇐ شعبهٔ اصلی ('')
+ALTER TABLE shop_approval_requests ADD COLUMN IF NOT EXISTS branch_id text NOT NULL DEFAULT '';
+
 --  پاک شدنِ ردیفِ شعبه ⇒ همهٔ ردیف‌های بخشِ همگام‌سازیِ همان شعبه و انتسابِ کارمندان به آن.
 --  کلیدِ بخش '#' دارد که در هیچ شناسهٔ دکان/پمپی نیست (newId: پیشوند_هگز) ⇒ هیچ حسابِ دیگری لمس نمی‌شود.
 CREATE OR REPLACE FUNCTION shop_branch_purge() RETURNS trigger AS $$

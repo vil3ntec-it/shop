@@ -199,6 +199,17 @@ async function accessOf(shopId, member) {
 const allows = (access, id) => !!access && access.ids.includes(id);
 
 /**
+ * STF-06: آیا این عضو (مثلاً تأییدکننده) به این شعبه می‌رسد؟ پرچم خاموش ⇒ همیشه بله (همان امروز)؛ صاحب همیشه.
+ * @param member `{role, user_id}` یا `{role, userId}`
+ */
+async function reaches(shopId, member, branchId) {
+  if (!member || member.role === 'owner') return true;
+  const shop = key.shopOf(shopId);
+  if (!(await enabled(shop))) return true;
+  return allows(await accessOf(shop, member), String(branchId || ''));
+}
+
+/**
  * ادعا ⇐ شعبهٔ مجاز. ادعای نبود ⇐ اصلی اگر مجاز است، وگرنه ۴۰۳ `branch_required` (برنامهٔ کهنهٔ کارمندِ شعبه هرگز به
  * اصلی نمی‌افتد). هر ادعای نامجاز ⇐ ۴۰۳ `branch_forbidden` (یکسان برای ناشناخته و بیگانه).
  */
@@ -225,6 +236,6 @@ function ctxFor(sync, branchId) {
 
 module.exports = {
   FLAG, MAIN, MAIN_NAME, MAX_BRANCHES, HEADER, enabled, idOf, claimOf, list, create, update, members, setMember,
-  accessOf, allows, resolve, anyAssignments, ctxFor,
+  accessOf, allows, reaches, resolve, anyAssignments, ctxFor,
   partitionOf: key.partitionOf, shopOf: key.shopOf,
 };

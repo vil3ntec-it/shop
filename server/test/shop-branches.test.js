@@ -343,6 +343,9 @@ test('v1، راهِ قدیم و درهای امروز فقط شعبهٔ اصلی
   assert.equal(g.status, 403); assert.equal(g.body.error.code, 'branch_unsupported');
   //  بی توکن همان پاسخِ امروز (نگهبان چیزی نمی‌گوید)
   assert.equal((await h.api('GET', '/api/shop', { headers: B(A) })).status, 401);
+  //  پیوستن به دکانی دیگر با کد دادهٔ این دکان را نمی‌خواند ⇒ نگهبان نمی‌بندد (کدِ نادرست همان پاسخِ خودِ در)
+  const join = await h.post('/api/shop/join', { code: 'ZZZZZZ' }, { token: w.onlyA.token });
+  assert.notEqual(join.body?.error?.code, 'branch_main_only', JSON.stringify(join.body));
 });
 
 // ── گزارشِ جمع ─────────────────────────────────────────────────────────
@@ -423,3 +426,97 @@ test('پرچم دوباره خاموش ⇒ همان امروز، حتی با ر�
   assert.equal((await h.get('/api/shop/branches', { token: s.token })).status, 404);
   assert.equal((await h.get('/api/shop/branches/report', { token: s.token })).status, 404);
 });
+
+// ── STF-06: تأییدها در محدودهٔ شعبه ────────────────────────────────────
+
+test('STF-06: درخواستِ تأیید مالِ شعبهٔ سندش است؛ مدیر فقط شعبهٔ خودش را می‌بیند و تأیید می‌کند، صاحب همه را؛ مصرف فقط در همان شعبه', async () => {
+  const w = await world('تأیید');
+  const { s, A, Bid } = w;
+  await flag(s, 'shop.approval_requests');
+  await require('../src/lib/staff-perms').setRoleLayer(s.shopId, 'staff', { 'sales.discount': { mode: 'approve' } }, 'test');
+  const aMain = await member(s, 'staff', 'اصلی‌والف تأیید');
+  assert.equal((await h.put(`/api/shop/branches/members/${aMain.memberId}`, { branches: ['', A] }, { token: s.token })).status, 200);
+  const mgrB = await member(s, 'manager', 'مدیرِ ب تأیید');
+  assert.equal((await h.put(`/api/shop/branches/members/${mgrB.memberId}`, { branches: [Bid] }, { token: s.token })).status, 200);
+  const mgrMain = await member(s, 'manager', 'مدیرِ اصلی تأیید');
+  let n = 0;
+  const ask = (who, doc, branch) => h.api('POST', '/api/shop/approval-requests', {
+    token: who.token, headers: B(branch),
+    body: { key: `brn-apr-${Date.now()}-${++n}`, perm: 'sales.discount', doc, pctBp: 2000, amount: 2000, reason: 'مشتریِ همیشگی' },
+  });
+  const act = (who, id, verb) => h.post(`/api/shop/approval-requests/${id}/${verb}`, {}, { token: who.token });
+  //  زمانِ سند «همین حالا» (درونِ عمرِ تأیید)، نه ده دقیقه پیش مثلِ `H`
+  const disc = (id, approval) => ({
+    op_id: oid(), hlc: hlc.format({ wall: Date.now(), counter: ++tick, node: 'brnapr' }), table: 'sales', row_id: id, kind: 'insert', approval,
+    fields: { totalMinor: 10000, discountMinor: 2000, finalTotalMinor: 8000, status: 'completed' },
+  });
+
+  //  کارمندِ فقط الف: بی سرآیند ⇒ «شعبه را بگو»؛ شعبهٔ ب ⇒ ۴۰۳؛ الف ⇒ ساخته
+  assert.equal((await ask(w.onlyA, 'sales/apr-x')).body.error.code, 'branch_required');
+  assert.equal((await ask(w.onlyA, 'sales/apr-x', Bid)).body.error.code, 'branch_forbidden');
+  const r1 = await ask(w.onlyA, 'sales/apr-a1', A);
+  assert.equal(r1.status, 201, JSON.stringify(r1.body));
+  const id1 = r1.body.request.id;
+  assert.equal((await one('SELECT branch_id FROM shop_approval_requests WHERE id=$1', [id1])).branch_id, A);
+
+  //  مدیرِ ب و مدیرِ اصلی: نه در فهرست، نه دیدن، نه تأیید (همان «پیدا نشد»)
+  for (const mgr of [mgrB, mgrMain]) {
+    const l = await h.get('/api/shop/approval-requests', { token: mgr.token });
+    assert.equal(l.status, 200, JSON.stringify(l.body));
+    assert.ok(!l.body.requests.some((x) => x.id === id1));
+    assert.equal((await h.get(`/api/shop/approval-requests/${id1}`, { token: mgr.token })).status, 404);
+    assert.equal((await act(mgr, id1, 'approve')).body.error.code, 'request_not_found');
+    assert.equal((await act(mgr, id1, 'deny')).body.error.code, 'request_not_found');
+  }
+  assert.equal((await reqStatus(id1)), 'pending');
+  //  مدیرِ الف‌وب: می‌بیند و تأیید می‌کند؛ صاحب همه را می‌بیند
+  assert.ok((await h.get('/api/shop/approval-requests', { token: w.aAndB.token })).body.requests.some((x) => x.id === id1));
+  assert.ok((await h.get('/api/shop/approval-requests', { token: s.token })).body.requests.some((x) => x.id === id1));
+  assert.equal((await act(w.aAndB, id1, 'approve')).status, 200);
+  //  مصرف در بخشِ الف
+  const u1 = await pushV3(w.onlyA, [disc('apr-a1', { v: 1, request: id1 })], A);
+  assert.equal(u1.status, 200, JSON.stringify(u1.body));
+  assert.equal(u1.body.results[0].status, 'applied', JSON.stringify(u1.body.results));
+
+  //  درخواستِ الف هرگز در شعبهٔ اصلی مصرف نمی‌شود (همان کاربر هر دو را دارد)
+  const r2 = await ask(aMain, 'sales/apr-a2', A);
+  assert.equal(r2.status, 201, JSON.stringify(r2.body));
+  assert.equal((await act(s, r2.body.request.id, 'approve')).status, 200);
+  const wrong = await pushV3(aMain, [disc('apr-a2', { v: 1, request: r2.body.request.id })]);
+  assert.equal(wrong.body.results[0].status, 'rejected');
+  assert.equal(wrong.body.results[0].reason, 'approval_mismatch');
+  const right = await pushV3(aMain, [disc('apr-a2', { v: 1, request: r2.body.request.id })], A);
+  assert.equal(right.body.results[0].status, 'applied', JSON.stringify(right.body.results));
+
+  //  تأییدکننده‌ای که پیش از مصرف شعبه را از دست داد ⇒ مصرف رد
+  const r3 = await ask(aMain, 'sales/apr-a3', A);
+  assert.equal((await act(w.aAndB, r3.body.request.id, 'approve')).status, 200);
+  assert.equal((await h.put(`/api/shop/branches/members/${w.aAndB.memberId}`, { branches: [Bid] }, { token: s.token })).status, 200);
+  const late = await pushV3(aMain, [disc('apr-a3', { v: 1, request: r3.body.request.id })], A);
+  assert.equal(late.body.results[0].status, 'rejected');
+  assert.equal(late.body.results[0].reason, 'approver_not_allowed');
+
+  //  برگهٔ امضاشدهٔ بی‌اینترنت (کلیدِ تأییدکننده): مدیرِ شعبهٔ ب برای سندِ الف ⇒ رد؛ پس از گرفتنِ الف ⇒ پذیرفته
+  const crypto = require('node:crypto');
+  const slipCore = require('../src/lib/approval-core');
+  const { privateKey, publicKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const kr = await h.post('/api/shop/approver-keys', { public_key: publicKey.export({ format: 'der', type: 'spki' }).toString('base64'), label: 'گوشیِ مدیرِ ب', device_id: 'pos-b' }, { token: mgrB.token });
+  assert.equal(kr.status, 201, JSON.stringify(kr.body));
+  const signed = (doc) => {
+    const iat = Date.now() - 1000;
+    const x = { v: 1, shop: s.shopId, doc, perm: 'sales.discount', pct_bp: 2000, amount: 2000, by: mgrB.userId, key: kr.body.key.id,
+      iat, exp: iat + 600_000, nonce: crypto.randomBytes(16).toString('hex'), reason: 'مشتریِ همیشگی' };
+    x.sig = crypto.sign('sha256', Buffer.from(slipCore.payload(x), 'utf8'), { key: privateKey, dsaEncoding: 'der' }).toString('base64');
+    return x;
+  };
+  const no = await pushV3(aMain, [disc('apr-s1', signed('sales/apr-s1'))], A);
+  assert.equal(no.body.results[0].status, 'rejected', JSON.stringify(no.body.results));
+  assert.equal(no.body.results[0].reason, 'approver_not_allowed');
+  assert.equal((await h.put(`/api/shop/branches/members/${mgrB.memberId}`, { branches: [Bid, A] }, { token: s.token })).status, 200);
+  const yes = await pushV3(aMain, [disc('apr-s2', signed('sales/apr-s2'))], A);
+  assert.equal(yes.body.results[0].status, 'applied', JSON.stringify(yes.body.results));
+});
+
+async function reqStatus(id) {
+  return (await one('SELECT status FROM shop_approval_requests WHERE id=$1', [id])).status;
+}

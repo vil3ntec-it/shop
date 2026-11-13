@@ -246,14 +246,14 @@ async function acceptSlip(q, ctx, need, slip, { opId, at, deviceId, path }) {
   const cover = slipCore.covers(slip, { perm: need.perm, doc: need.doc, pct_bp: need.pct_bp, amount: need.amount, at });
   if (cover) return cover;
   if (slip.by === ctx.userId) return 'approval_self';
-
   const key = (await c.query(
     'SELECT * FROM shop_approver_keys WHERE id=$1 AND shop_id=$2', [slip.key, shopId]
   )).rows[0];
   if (!key || key.revoked_at !== null || key.user_id !== slip.by) return 'approval_key_unknown';
 
   const approver = await memberPolicy(c, shopId, slip.by);
-  if (!approver || !APPROVER_ROLES.includes(approver.role)) return 'approver_not_allowed';
+  if (!approver || !APPROVER_ROLES.includes(approver.role)
+    || !(await require('./branches').reaches(shopId, { role: approver.role, userId: slip.by }, branchKey.branchOf(ctx)))) return 'approver_not_allowed';   //  STF-06: شعبهٔ سند
   const d = core.evaluate(approver.role, approver.layers, need.perm, slipCore.evalReq(slip));
   if (d.decision !== 'allow') return 'approver_not_allowed';
 

@@ -792,4 +792,4 @@
   دوباره شعبه بگیرد. پاک شدنِ دکان دادهٔ همهٔ شعبه‌ها را هم پاک می‌کند.
 - **خاموش کردن:** `false` یا حذف ⇒ همان رفتارِ امروز برای همه (شعبه‌ها و انتساب‌ها می‌مانند ولی خوانده نمی‌شوند؛ دادهٔ شعبه‌های
   دیگر دیده نمی‌شود تا دوباره روشن شود).
-- **آزمون:** `cd server && TEST_DATABASE_URL=pglite:memory node --test --test-concurrency=1 test/shop-branches.test.js` (۹/۹).
+- **آزمون:** `cd server && TEST_DATABASE_URL=pglite:memory node --test --test-concurrency=1 test/shop-branches.test.js` (۱۰/۱۰).
