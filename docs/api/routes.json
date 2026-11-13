@@ -20,9 +20,9 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 985,
+    "routes": 986,
     "byAuth": {
-      "none-detected": 192,
+      "none-detected": 193,
       "admin": 288,
       "inline": 2,
       "user": 460,
@@ -30,7 +30,7 @@
       "optional": 1
     },
     "byShape": {
-      "extracted": 651,
+      "extracted": 652,
       "empty": 332,
       "unresolved": 2
     }
@@ -891,6 +891,7 @@
     {"method":"POST","path":"/api/store/:slug/account/logout","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/store/:slug/account/logout-all","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/store/:slug/account/orders","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":["cursor","limit"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/store/:slug/account/phone","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":["phone"],"response":{"statuses":[200],"keys":["customer","sessionsRevoked","unchanged"]},"errors":["401 session_required","401 verification_required"],"shape":"extracted"},
     {"method":"GET","path":"/api/store/:slug/account/shopping-list","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":["list"]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/store/:slug/account/shopping-list","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":["list"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/store/:slug/account/shopping-list/merge","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":["list"]},"errors":[],"shape":"extracted"},

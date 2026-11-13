@@ -183,7 +183,8 @@ object ScanFeedback {
   private fun tone(hz: Double, ms: Int) =
     Thread { play(hz, ms) }.apply { isDaemon = true }.start()
 
-  private fun play(hz: Double, ms: Int) {
+  /** یک نتِ کوتاه (هم‌زمان؛ نخِ صدازننده را خودت بساز) — زنگِ سفارش (`desktop/OrderTrayAlarmDesktop.kt`) هم همین را می‌زند */
+  internal fun play(hz: Double, ms: Int) {
     runCatching {
       val rate = 44_100f
       val n = (rate * ms / 1000).toInt()

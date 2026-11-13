@@ -20,7 +20,7 @@ const db = require('../db');
 const { one, many, now, tx } = db;
 const config = require('../config');
 const { ulid } = require('./ulid');
-const { stripControl } = require('./validate');
+const { stripControl, phoneForms, phoneKey: samePhoneKey } = require('./validate');
 const { badRequest, notFound, conflict, forbidden, ApiError } = require('../middleware/errors');
 
 const MAX_ADDRESSES = 10;
@@ -151,7 +151,8 @@ async function signOutAll(customer) {
  * پیشین) و بلیتِ تازهٔ شمارهٔ نو (`phone` از همان). در یک تراکنش:
  *   گفت‌وگوهای شمارهٔ پیشین به همین حساب گره می‌خورند (`shop-chat.adoptForPhoneChange`)،
  *   بلیت‌های شمارهٔ پیشین بی‌اعتبار و نشست‌های دیگرِ حساب لغو می‌شوند؛ همین نشست می‌ماند.
- * شمارهٔ نو با حسابِ دیگر ⇒ ۴۰۹ (درخواست‌کننده مالکیتِ آن شماره را همین حالا اثبات کرده).
+ * شمارهٔ نو با حسابِ دیگر ⇒ ۴۰۹ (درخواست‌کننده مالکیتِ آن شماره را همین حالا اثبات کرده) — هر شکلِ همان شماره
+ * (‎+93…‎ / ‎+930…‎، `validate.phoneForms`)، تا یک شماره دو حساب نشود.
  * ⛔ سفارش‌ها سندِ دکان‌اند و شماره‌شان عوض نمی‌شود.
  */
 async function changePhone(customer, sessionId, phone) {
@@ -159,8 +160,9 @@ async function changePhone(customer, sessionId, phone) {
   return tx(async (c) => {
     const cur = (await c.query('SELECT * FROM store_customers WHERE id = $1 FOR UPDATE', [customer.id])).rows[0];
     if (!cur || cur.status !== 'active') throw forbidden('این حساب مسدود است؛ با دکان تماس بگیرید', 'customer_blocked');
-    if (cur.phone === phone) throw badRequest('این همان شمارهٔ کنونیِ حساب است', 'same_phone');
-    if ((await c.query('SELECT 1 FROM store_customers WHERE phone = $1', [phone])).rows[0]) {
+    if (samePhoneKey(cur.phone) === samePhoneKey(phone)) throw badRequest('این همان شمارهٔ کنونیِ حساب است', 'same_phone');
+    if ((await c.query('SELECT 1 FROM store_customers WHERE phone = ANY($1::text[]) AND id <> $2',
+      [phoneForms(phone), cur.id])).rows[0]) {
       throw conflict('این شماره حسابِ دیگری دارد', 'phone_taken');
     }
     const at = now();
