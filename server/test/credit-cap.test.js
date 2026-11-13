@@ -33,7 +33,10 @@ let clock = Date.now();
 
 const liveFlag = (key, value, scope) => h.put('/api/admin/pump/live-config', { scope, key, value }, { token: admin })
   .then((r) => assert.equal(r.status, 200, JSON.stringify(r.body)));
-const setRole = (role, perms, who = owner) => h.put(`/api/shop/permissions/roles/${role}`, { perms }, { token: who.accessToken });
+const setRole = (role, perms, who = owner) => h.roleLayer(who.accessToken, role, perms);
+//  فاکتورِ کامل در یک دستهٔ راهِ قدیم (`/api/sync`؛ جای `/api/sales/full` ِ برداشته)
+const legacyFull = (who, sale, items, deviceId = 'web-full') => h.legacyPush(who.accessToken,
+  [h.change('sales', sale), ...items.map((it) => h.change('saleItems', { ...it, saleId: sale.id }))], { deviceId });
 const push3 = (who, device, ops) => h.api('POST', '/api/sync/v3/push', { token: who.accessToken, body: { device_id: device, protocol: 3, ops } });
 const push1 = (who, device, ops) => h.api('POST', '/api/sync/v1/push', { token: who.accessToken, body: { device_id: device, schema_version: 1, ops } });
 const why = (r) => r.body.results.map((x) => (x.status === 'applied' || x.status === 'duplicate' ? x.status : x.reason || x.status));
@@ -110,7 +113,7 @@ test.before(async () => {
 });
 test.after(async () => { await h.stop(); });
 
-test('پرچمِ خاموش (پیش‌فرض): سقف ذخیره نمی‌شود، کاتالوگ «none»، و فروشِ قرضیِ بزرگ در v3، v1 و REST همان امروز', async () => {
+test('پرچمِ خاموش (پیش‌فرض): سقف ذخیره نمی‌شود، کاتالوگ «none»، و فروشِ قرضیِ بزرگ در v3، v1 و راهِ قدیم همان امروز', async () => {
   const set = await setRole('staff', { 'sales.credit': { caps: { maxAmount: 500000 } } });
   assert.equal(set.status, 400, JSON.stringify(set.body));
   assert.equal(set.body.error.code, 'not_enforceable_yet');
@@ -123,11 +126,10 @@ test('پرچمِ خاموش (پیش‌فرض): سقف ذخیره نمی‌شود
     [shopId, JSON.stringify({ 'sales.credit': { mode: 'deny' } }), now()]);
   assert.deepEqual(why(await push3(staff, 'off-3', [sale3('cc-off-3', 900000)])), ['applied']);
   assert.deepEqual(why(await push1(staff, 'off-1', sale1('cc-off-1', 9000))), ['applied', 'applied', 'applied']);
-  const rest = await h.post('/api/sales/full', {
-    sale: { id: 'cc-off-r', total: 10000, finalTotal: 10000, debtGiven: 9000, debtorId: 'd-1', status: 'completed' },
-    items: [{ id: 'cc-off-r-i', productId: 'p-cc', quantity: 1 }],
-  }, { token: staff.accessToken });
-  assert.ok([200, 201].includes(rest.status), JSON.stringify(rest.body));
+  const rest = await legacyFull(staff, { id: 'cc-off-r', total: 10000, finalTotal: 10000, debtGiven: 9000, debtorId: 'd-1', status: 'completed' },
+    [{ id: 'cc-off-r-i', productId: 'p-cc', quantity: 1 }]);
+  assert.equal(rest.status, 200, JSON.stringify(rest.body));
+  assert.equal(rest.body.applied, 2, JSON.stringify(rest.body));
   assert.equal((await many(`SELECT 1 FROM sync_v3_conflicts WHERE account_id=$1`, [shopId])).length, 0);
   await query(`DELETE FROM shop_role_perms WHERE shop_id=$1`, [shopId]);
 });
@@ -214,25 +216,25 @@ test('پرچمِ روشن، v1: درجِ بالای سقف ⇒ approval_required
   assert.equal((await row1('sales', 'cc-1c')).data.debtGiven, 7000);
 });
 
-test('پرچمِ روشن، REST: بالا بردنِ `debtGiven` بیش از سقف ⇒ ۴۰۳ و هیچ ردیف؛ «ممنوع» ⇒ credit_not_allowed', async () => {
-  const body = (id, debt) => ({
-    sale: { id, total: 10000, finalTotal: 10000, debtGiven: debt, debtorId: 'd-1', status: 'completed' },
-    items: [{ id: `${id}-i`, productId: 'p-cc', quantity: 1 }],
-  });
-  const ok = await h.post('/api/sales/full', body('cc-r1', 5000), { token: staff.accessToken });
-  assert.ok([200, 201].includes(ok.status), JSON.stringify(ok.body));
-  const over = await h.post('/api/sales/full', body('cc-r2', 5001), { token: staff.accessToken });
+test('پرچمِ روشن، راهِ قدیم (فاکتورِ کامل): بالا بردنِ `debtGiven` بیش از سقف ⇒ ۴۰۳ و هیچ ردیف؛ «ممنوع» ⇒ credit_not_allowed', async () => {
+  const full = (id, debt) => legacyFull(staff, { id, total: 10000, finalTotal: 10000, debtGiven: debt, debtorId: 'd-1', status: 'completed' },
+    [{ id: `${id}-i`, productId: 'p-cc', quantity: 1 }]);
+  const ok = await full('cc-r1', 5000);
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(ok.body.applied, 2, JSON.stringify(ok.body));
+  const over = await full('cc-r2', 5001);
   assert.equal(over.status, 403, JSON.stringify(over.body));
   assert.equal(over.body.error.code, 'approval_required');
   assert.equal((await many(`SELECT 1 FROM sales WHERE shop_id=$1 AND id='cc-r2'`, [shopId])).length, 0);
   assert.equal((await many(`SELECT 1 FROM sale_items WHERE shop_id=$1 AND id='cc-r2-i'`, [shopId])).length, 0);
   //  ویرایشِ بی بالا بردنِ قرض آزاد؛ بالا بردنش رد
-  const put = (debt) => h.put('/api/sales/cc-r1', { total: 10000, finalTotal: 10000, debtGiven: debt, debtorId: 'd-1', status: 'completed' },
-    { token: staff.accessToken });
-  assert.equal((await put(5000)).status, 200);
+  const put = (debt) => h.seed(staff.accessToken, 'sales', { id: 'cc-r1', total: 10000, finalTotal: 10000, debtGiven: debt, debtorId: 'd-1', status: 'completed' },
+    { deviceId: 'web-full', updatedAt: Date.now() });
+  const same = await put(5000);
+  assert.deepEqual([same.status, same.body.applied], [200, 1], JSON.stringify(same.body));
   assert.equal((await put(6000)).body.error.code, 'approval_required');
   assert.equal((await setRole('staff', { 'sales.credit': { mode: 'deny' } })).status, 200);
-  assert.equal((await h.post('/api/sales/full', body('cc-r3', 1), { token: staff.accessToken })).body.error.code, 'credit_not_allowed');
+  assert.equal((await full('cc-r3', 1)).body.error.code, 'credit_not_allowed');
   assert.equal((await setRole('staff', { 'sales.credit': { caps: { maxAmount: 500000 } } })).status, 200);
 });
 

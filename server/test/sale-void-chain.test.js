@@ -203,45 +203,45 @@ test('دستهٔ ردشده حلقه نمی‌گذارد؛ ویرایشِ مال
   assert.equal((await rowOf('sales', 'v-rej')).status, 'completed');
 });
 
-test('راهِ قدیم و API ِ مستقیم: لغو حلقهٔ `legacy`/`api`؛ ۴۰۹ ِ API (همه یا هیچ) هیچ حلقه‌ای', async () => {
+test('راهِ قدیم: لغو با دستگاهِ زنجیره‌دار حلقهٔ `legacy` ِ اجباری، بی زنجیره رویداد؛ ۴۰۹ (همه یا هیچ) هیچ حلقه‌ای', async () => {
   const T = owner.accessToken;
   const H = { 'X-App': 'shop' };
   const sale = { invoiceNumber: 11, series: 'A1', total: 500, finalTotal: 500, paidAmount: 500, remaining: 0, status: 'completed', date: '2026-11-01', createdAt: 5 };
+  //  درِ مستقیمِ API (`/api/sales/full`، `PUT /api/sales/:id`) برداشته شد؛ همان `pushChanges` با دستگاهِ زنجیره‌دار ⇒ همان اجبار
+  const legacy = (deviceId, changes) => h.api('POST', '/api/sync/push', {
+    token: T, headers: H, body: { deviceId, changes: changes.map((c) => ({ updatedAt: Date.now(), ...c })) },
+  });
+  const full = (id, deviceId = 'old-app') => legacy(deviceId, [
+    { collection: 'sales', id, data: { ...sale } },
+    { collection: 'saleItems', id: `${id}-i1`, data: { saleId: id, productId: 'p1', quantity: 1, unitPrice: 500, totalPrice: 500 } },
+  ]);
   for (const id of ['L1', 'L2']) {
-    const r = await h.api('POST', '/api/sales/full', {
-      token: T, headers: H,
-      body: { sale: { id, ...sale }, items: [{ id: `${id}-i1`, productId: 'p1', quantity: 1, unitPrice: 500, totalPrice: 500 }] },
-    });
-    assert.equal(r.status, 201, JSON.stringify(r.body));
+    const r = await full(id);
+    assert.deepEqual([r.status, r.body.applied], [200, 2], JSON.stringify(r.body));
   }
-  //  لغو + تغییرِ مبلغ در API ⇒ ۴۰۹ و هیچ چیزی (نه فاکتور، نه حلقه)
-  let r = await h.api('PUT', '/api/sales/L1', { token: T, headers: H, body: { data: { ...sale, status: 'cancelled', cancelReason: 'x', total: 1, finalTotal: 1 } } });
+  //  لغو + تغییرِ مبلغ با دستگاهِ زنجیره‌دار ⇒ ۴۰۹ و هیچ چیزی (نه فاکتور، نه حلقه)
+  let r = await legacy(CHAIN, [{ collection: 'sales', id: 'L1', data: { ...sale, status: 'cancelled', cancelReason: 'x', total: 1, finalTotal: 1 } }]);
   assert.equal(r.status, 409, JSON.stringify(r.body));
   assert.deepEqual(await linksFor('L1'), []);
-  r = await h.api('PUT', '/api/sales/L1', { token: T, headers: H, body: { data: { ...sale, status: 'cancelled', cancelReason: 'اشتباه' } } });
+  r = await legacy(CHAIN, [{ collection: 'sales', id: 'L1', data: { ...sale, status: 'cancelled', cancelReason: 'اشتباه' } }]);
   assert.equal(r.status, 200, JSON.stringify(r.body));
   let got = await linksFor('L1');
-  assert.deepEqual(got.map((l) => [l.path, l.enforced, l.invoiceNumber, l.series, l.total]), [['api', true, '11', 'A1', '500']]);
+  assert.deepEqual(got.map((l) => [l.path, l.enforced, l.invoiceNumber, l.series, l.total]), [['legacy', true, '11', 'A1', '500']]);
   //  همان لغو دوباره ⇒ هیچ
-  r = await h.api('PUT', '/api/sales/L1', { token: T, headers: H, body: { data: { ...sale, status: 'cancelled', cancelReason: 'اشتباه' } } });
+  r = await legacy(CHAIN, [{ collection: 'sales', id: 'L1', data: { ...sale, status: 'cancelled', cancelReason: 'اشتباه' } }]);
   assert.equal(r.status, 200);
   assert.equal((await linksFor('L1')).length, 1);
 
-  //  راهِ قدیمِ برنامهٔ کهنه
-  r = await h.api('POST', '/api/sync/push', {
-    token: T, headers: H,
-    body: { deviceId: 'old-app', changes: [{ collection: 'sales', id: 'L2', updatedAt: Date.now(), data: { ...sale, status: 'cancelled', cancelReason: 'کهنه' } }] },
-  });
+  //  راهِ قدیمِ برنامهٔ کهنه (بی زنجیره)
+  r = await legacy('old-app', [{ collection: 'sales', id: 'L2', data: { ...sale, status: 'cancelled', cancelReason: 'کهنه' } }]);
   assert.equal(r.status, 200, JSON.stringify(r.body));
   got = await linksFor('L2');
   assert.deepEqual(got.map((l) => [l.path, l.enforced, l.deviceId, l.store]), [['legacy', false, 'old-app', 'rest']]);
 
   //  همان شناسه در انبارِ دیگر فاکتورِ دیگری است: لغوِ ساختگیِ «راهِ قدیم» با شناسهٔ فاکتورِ v1 لغوِ واقعیِ آن را نمی‌پوشاند
-  r = await h.api('POST', '/api/sales/full', {
-    token: T, headers: H, body: { sale: { id: 'v-twin', ...sale }, items: [{ id: 'v-twin-li', productId: 'p1', quantity: 1, unitPrice: 500, totalPrice: 500 }] },
-  });
-  assert.equal(r.status, 201);
-  r = await h.api('PUT', '/api/sales/v-twin', { token: T, headers: H, body: { data: { ...sale, status: 'cancelled', cancelReason: 'پیش‌دستی' } } });
+  r = await full('v-twin');
+  assert.equal(r.status, 200);
+  r = await legacy('old-app', [{ collection: 'sales', id: 'v-twin', data: { ...sale, status: 'cancelled', cancelReason: 'پیش‌دستی' } }]);
   assert.equal(r.status, 200);
   await push(CHAIN, saleOps('v-twin'));
   r = await push(CHAIN, [cancel('v-twin')]);
@@ -250,7 +250,7 @@ test('راهِ قدیم و API ِ مستقیم: لغو حلقهٔ `legacy`/`api`
   assert.equal((await chainStore.verifyChain(chainOf())).ok, true);
 });
 
-test('PostgreSQL: لغوهای هم‌زمانِ v1 و API ِ یک دکان ⇒ هر فاکتور یک حلقه، زنجیرهٔ پیوسته، بی ۵۰۰ و بی بن‌بست',
+test('PostgreSQL: لغوهای هم‌زمانِ v1 و راهِ قدیمِ زنجیره‌دارِ یک دکان ⇒ هر فاکتور یک حلقه، زنجیرهٔ پیوسته، بی ۵۰۰ و بی بن‌بست',
   { skip: require('../src/db').isPglite() && 'PGlite یک اتصال دارد؛ رقابت فقط روی PostgreSQL' }, async () => {
     const T = owner.accessToken;
     const H = { 'X-App': 'shop' };
@@ -259,16 +259,19 @@ test('PostgreSQL: لغوهای هم‌زمانِ v1 و API ِ یک دکان ⇒ 
     const before = (await links()).length;
     for (let i = 0; i < N; i++) {
       await push(`dev-race-${i}`, saleOps(`r-v1-${i}`));
-      const r = await h.api('POST', '/api/sales/full', {
-        token: T, headers: H, body: { sale: { id: `r-api-${i}`, ...sale }, items: [{ id: `r-api-${i}-i1`, productId: 'p1', quantity: 1, unitPrice: 700, totalPrice: 700 }] },
-      });
-      assert.equal(r.status, 201);
+      const r = await h.api('POST', '/api/sync/push', { token: T, headers: H, body: { deviceId: 'old-race', changes: [
+        { collection: 'sales', id: `r-api-${i}`, updatedAt: Date.now(), data: { ...sale } },
+        { collection: 'saleItems', id: `r-api-${i}-i1`, updatedAt: Date.now(), data: { saleId: `r-api-${i}`, productId: 'p1', quantity: 1, unitPrice: 700, totalPrice: 700 } },
+      ] } });
+      assert.equal(r.status, 200, JSON.stringify(r.body));
     }
     const jobs = [];
     for (let i = 0; i < N; i++) {
-      //  دو دستگاه همان فاکتورِ v1 را هم‌زمان لغو می‌کنند؛ دو درخواستِ API همان فاکتور را
+      //  دو دستگاه همان فاکتورِ v1 را هم‌زمان لغو می‌کنند؛ دو درخواستِ راهِ قدیمِ زنجیره‌دار همان فاکتور را
       jobs.push(push(`dev-race-${i}`, [cancel(`r-v1-${i}`)]), push(`dev-race-b${i}`, [cancel(`r-v1-${i}`, 'دیگری')]));
-      const put = () => h.api('PUT', `/api/sales/r-api-${i}`, { token: T, headers: H, body: { data: { ...sale, status: 'cancelled', cancelReason: 'هم‌زمان' } } });
+      const put = () => h.api('POST', '/api/sync/push', { token: T, headers: H, body: { deviceId: CHAIN, changes: [
+        { collection: 'sales', id: `r-api-${i}`, updatedAt: Date.now(), data: { ...sale, status: 'cancelled', cancelReason: 'هم‌زمان' } },
+      ] } });
       jobs.push(put(), put());
     }
     const out = await Promise.all(jobs);

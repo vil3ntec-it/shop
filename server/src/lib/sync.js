@@ -98,7 +98,7 @@ async function pushChanges(ctx, changes) {
     return { applied: 0, skipped: 0, conflicts: [], rev: await currentRev(shopId) };
   }
   if (!can(role, 'data.write')) throw forbidden('اجازه‌ی ثبت اطلاعات ندارید', 'permission_denied');
-  //  A16: جدولی که این نقش نمی‌نویسد ⇒ کلِ دسته رد (همه یا هیچ؛ `/api/data/sales/full`
+  //  A16: جدولی که این نقش نمی‌نویسد ⇒ کلِ دسته رد (همه یا هیچ؛ فاکتورِ کاملِ یک دسته
   //  هم همین‌جا می‌رسد). سه نقشِ قدیم «*»اند و این‌جا هرگز گیر نمی‌کنند.
   const offTable = changes.find((ch) => {
     const col = String(ch?.collection || '');
@@ -121,7 +121,7 @@ async function pushChanges(ctx, changes) {
     ? await require('./staff-perms').layersFor(shopId, role, userId) : null;
   //  CRM-03 §۱۰.۱ (پرچمِ خاموشِ `shop.credit_limit_perm`): تغییرِ سقفِ اعتبارِ مشتری بی `customers.credit_limit` ⇒ کلِ دسته ۴۰۳
   const limitLayers = await require('./credit-limit-perm').legacyLayers({ shopId, role, userId }, changes);
-  //  S89 (پرچمِ `shop.doc_chain`): `finalized` = `log` (راهِ قدیم) یا `enforce` (API ِ مستقیم) — ‎lib/finalized-sales.js‎؛
+  //  S89 (پرچمِ `shop.doc_chain`): `finalized` = `log` (راهِ قدیم) یا `enforce` (دیگر صدازننده ندارد؛ درِ مستقیمِ API برداشته شد) — ‎lib/finalized-sales.js‎؛
   //  `boundDevice` = دستگاهِ نشست (SEC-03: نشستِ زنجیره‌دار در راهِ قدیم هم `enforce`)
   const guard = ctx.finalized
     ? await require('./finalized-sales').legacyGuard({ shopId, userId, deviceId, boundDevice: ctx.boundDevice || '', ip: ctx.ip || '' }, ctx.finalized, changes)

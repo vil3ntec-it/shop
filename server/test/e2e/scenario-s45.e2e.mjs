@@ -45,7 +45,7 @@ function slip({ doc, perm, pct_bp = null, amount = null, reason }) {
 }
 
 await E.step('S45.0', 'صاحب: تخفیفِ شاگرد «نیازمندِ تأیید»، برگشت با سقفِ ۵۰۰ افغانی؛ کلیدِ تأییدِ صاحب ثبت', async () => {
-  E.ok(await E.put('/api/shop/permissions/roles/staff', { perms: { 'sales.discount': { mode: 'approve' }, 'returns.create': { caps: { maxAmount: 50000 } } } }, owner.token), 'سقف‌ها');
+  E.ok(await E.roleLayer(owner, 'staff', { 'sales.discount': { mode: 'approve' }, 'returns.create': { caps: { maxAmount: 50000 } } }), 'سقف‌ها');
   const { privateKey, publicKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   const r = E.ok(await E.post('/api/shop/approver-keys', { public_key: publicKey.export({ format: 'der', type: 'spki' }).toString('base64'), label: 'صندوقِ ۱', device_id: 'pos-s45' }, owner.token), 'کلید', [200, 201]);
   key = { id: r.key.id, priv: privateKey };
@@ -75,7 +75,7 @@ await E.step('S45', 'صاحب تأیید می‌کند (برگهٔ امضاشد�
   const op = sale('s45-ok', 10000, 1500, { approval: s });
   const r = await push3(staffAcct.token, [op]);
   assert.equal(r.body.results[0].status, 'applied', JSON.stringify(r.body));
-  const list = E.ok(await E.get('/api/shop/approvals', owner.token), 'سابقهٔ تأییدها').approvals;
+  const list = await E.approvals(owner.shopId);
   const a = list.find((x) => x.doc === 'sales/s45-ok');
   assert.ok(a, JSON.stringify(list));
   assert.equal(a.requesterId, staffAcct.user.id, 'درخواست‌کننده');
@@ -85,8 +85,8 @@ await E.step('S45', 'صاحب تأیید می‌کند (برگهٔ امضاشد�
   //  همان برگه روی سندِ دیگر ⇒ رد (یک‌بارمصرف)
   const replay = await push3(staffAcct.token, [sale('s45-other', 10000, 1500, { approval: s })]);
   assert.equal(replay.body.results[0].status, 'rejected');
-  //  شاگرد سابقه را نمی‌بیند
-  assert.equal((await E.get('/api/shop/approvals', staffAcct.token)).status, 403);
+  //  شاگرد سابقهٔ دکان را نمی‌بیند (`audit.view`)
+  assert.equal((await E.get('/api/shop/audit', staffAcct.token)).status, 403);
 }, { needs: ['S45.0'] });
 
 await E.finish();

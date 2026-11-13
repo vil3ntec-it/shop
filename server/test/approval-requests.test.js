@@ -32,7 +32,7 @@ const H = (node, wall = Date.now() + (++tick)) => hlc.format({ wall, counter: 0,
 const BASE = '/api/shop/approval-requests';
 const flag = (value, scope = 'all') => h.put('/api/admin/pump/live-config', { scope, key: 'shop.approval_requests', value }, { token: admin })
   .then((r) => assert.equal(r.status, 200, JSON.stringify(r.body)));
-const setRole = (role, perms) => h.put(`/api/shop/permissions/roles/${role}`, { perms }, { token: owner.accessToken })
+const setRole = (role, perms) => h.roleLayer(owner.accessToken, role, perms)
   .then((r) => assert.equal(r.status, 200, JSON.stringify(r.body)));
 const ask = (who, body) => { resetAll(); return h.post(BASE, { key: key(), reason: 'مشتریِ همیشگی', ...body }, { token: who.accessToken }); };
 const act = (who, id, verb, body = {}) => { resetAll(); return h.post(`${BASE}/${id}/${verb}`, body, { token: who.accessToken }); };
@@ -198,12 +198,12 @@ test('مصرف در Sync v3: op با ارجاع می‌نشیند، سابقه �
   const row = await reqRow(id);
   assert.equal(row.status, 'used');
   assert.equal(row.used_op_id, op.op_id);
-  const list = (await h.get('/api/shop/approvals', { token: owner.accessToken })).body.approvals;
-  const a = list.find((x) => x.nonce === `req_${id}`);
-  assert.equal(a.approverId, owner.user.id);
-  assert.equal(a.requesterId, staff.user.id);
-  assert.equal(a.keyId, 'remote');
-  assert.equal(a.opId, op.op_id);
+  //  سابقه در `shop_approvals` (درِ فهرستِ `GET /api/shop/approvals` برداشته شد)
+  const a = await one('SELECT * FROM shop_approvals WHERE shop_id=$1 AND nonce=$2', [shopId, `req_${id}`]);
+  assert.equal(a.approver_id, owner.user.id);
+  assert.equal(a.requester_id, staff.user.id);
+  assert.equal(a.key_id, 'remote');
+  assert.equal(a.op_id, op.op_id);
   assert.equal(a.doc, 'sales/s-use');
   assert.equal((await h.get(`${BASE}/${id}`, { token: staff.accessToken })).body.request.status, 'used');
   //  پاسخ گم شد ⇒ همان op دوباره «تکراری»

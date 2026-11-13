@@ -176,7 +176,7 @@ test('پرچمِ روشن، v3: همان قاعده روی دفترِ v3 (`credi
   assert.equal((await flags()).slice(before).length, 1, 'درجِ دوبارهٔ همان سند سابقهٔ دوم نمی‌سازد');
 });
 
-test('پرچمِ روشن، راهِ قدیم و REST: پذیرفته و سابقه با `path`؛ ویرایشِ همان فاکتور سابقهٔ دوم نه', async () => {
+test('پرچمِ روشن، راهِ قدیم (فاکتورِ تکی و کامل): پذیرفته و سابقه با `path`؛ ویرایشِ همان فاکتور سابقهٔ دوم نه', async () => {
   const before = (await flags()).length;
   const t = Date.now();
   const r0 = await legacy(staff, 'web-1', [
@@ -190,16 +190,16 @@ test('پرچمِ روشن، راهِ قدیم و REST: پذیرفته و ساب�
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.equal(r.body.applied, 1);
   assert.equal((await legacy(staff, 'web-1', [{ collection: 'sales', id: 'sl-over', updatedAt: t + 10, data: { ...sale, seller: 'x' } }])).status, 200);
-  const rest = await h.post('/api/sales/full', {
-    sale: { id: 'sr-over', total: 10000, finalTotal: 10000, debtGiven: 1500, debtorId: 'dl-1', status: 'completed', createdAt: t + 20 },
-    items: [{ id: 'sr-over-i', productId: 'p-cl', quantity: 1 }],
-  }, { token: staff.accessToken });
-  assert.ok([200, 201].includes(rest.status), JSON.stringify(rest.body));
+  //  فاکتورِ کامل در یک دسته (جای `/api/sales/full` ِ برداشته)
+  const rest = await legacy(staff, 'web-2', [
+    { collection: 'sales', id: 'sr-over', updatedAt: t + 20, data: { total: 10000, finalTotal: 10000, debtGiven: 1500, debtorId: 'dl-1', status: 'completed', createdAt: t + 20 } },
+    { collection: 'saleItems', id: 'sr-over-i', updatedAt: t + 20, data: { saleId: 'sr-over', productId: 'p-cl', quantity: 1 } },
+  ]);
+  assert.equal(rest.status, 200, JSON.stringify(rest.body));
   const f = (await flags()).slice(before);
   //  فاکتورِ راهِ قدیم بی ردیفِ «give» آمد ⇒ بردش از `debtGiven`؛ ماندهٔ دفتر همان ۴٬۰۰۰ برای هر دو
   assert.deepEqual(f.map((x) => [x.sale, x.balanceMinor, x.excessMinor]), [['sl-over', 400000, 100000], ['sr-over', 400000, 50000]]);
-  assert.equal(f[0].path, 'legacy');
-  assert.ok(['api', 'legacy'].includes(f[1].path), f[1].path);
+  assert.deepEqual(f.map((x) => x.path), ['legacy', 'legacy']);
 });
 
 test('جداییِ دکان و دیدن: دکانِ دیگر با همان شناسهٔ مشتری پرچم و سابقه را نمی‌بیند؛ سابقه فقط برای audit.view', async () => {

@@ -172,13 +172,13 @@ test('AUTH-10: در production هیچ رمز، کد، توکن یا رازی د�
     keepSession('app-auth', appIn.body);
 
     //  کدِ شاگرد
-    const staff = await h.post('/api/auth/staff-login', { code: staffCode, name: 'شاگردِ لاگ', device: { uid: 'log-staff-dev', name: 'x', platform: 'android', keyVersion: 1 } });
+    const staff = await h.post('/api/auth/staff', { code: staffCode, name: 'شاگردِ لاگ', device: { uid: 'log-staff-dev', name: 'x', platform: 'android', keyVersion: 1 } });
     assert.equal(staff.status, 201, JSON.stringify(staff.body));
     keepSession('staff', staff.body);
     //  رازِ دستگاهِ شاگرد (۲.۱۴.۵) هم راز است: نه در پیوستن، نه در ورودِ دوباره با همان راز
     assert.equal(typeof staff.body.deviceKey, 'string');
     remember('رازِ دستگاهِ شاگرد', staff.body.deviceKey);
-    const staffAgain = await h.post('/api/auth/staff-login', { code: staffCode, device: { uid: 'log-staff-dev', key: staff.body.deviceKey, keyVersion: 1 } });
+    const staffAgain = await h.post('/api/auth/staff', { code: staffCode, device: { uid: 'log-staff-dev', key: staff.body.deviceKey, keyVersion: 1 } });
     assert.equal(staffAgain.status, 201, JSON.stringify(staffAgain.body));
     keepSession('staff-again', staffAgain.body);
 

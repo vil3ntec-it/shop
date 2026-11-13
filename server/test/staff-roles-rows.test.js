@@ -35,6 +35,12 @@ const push3 = (role, ops) => h.api('POST', '/api/sync/v3/push', {
   token: T[role].accessToken, body: { device_id: `r3-${role}`, protocol: 3, ops },
 });
 const legacy = (role, changes) => h.post('/api/sync/push', { deviceId: `lg-${role}`, changes }, { token: T[role].accessToken });
+/** فاکتورِ کامل در یک دستهٔ راهِ قدیم: سر، قلم و حرکتِ انبار با `saleId` */
+const legacyFull = (id, productId) => [
+  { collection: 'sales', id, updatedAt: Date.now(), data: { total: 10, finalTotal: 10 } },
+  { collection: 'saleItems', id: `${id}-i`, updatedAt: Date.now(), data: { saleId: id, productId, quantity: 1, unitPrice: 10 } },
+  { collection: 'stockMovements', id: `${id}-m`, updatedAt: Date.now(), data: { saleId: id, productId, qty: -1, type: 'sale' } },
+];
 const v1op = (table, rowId, fields, type = 'insert', opId = oid()) => ({ op_id: opId, table, row_id: rowId, type, ts: Date.now(), fields });
 const v3op = (node, table, rowId, fields, tx = '', opId = oid()) => ({
   op_id: opId, hlc: H(node), table, row_id: rowId, kind: 'insert', fields, ...(tx ? { tx } : {}),
@@ -278,12 +284,9 @@ test('۴ — حرکتِ انبارِ صندوق‌دار فقط از فاکتو�
   assert.deepEqual(reasons(off), ['applied'], JSON.stringify(off.body));
   const back = await push1('cashier', [v1op('stockMovements', 'm-sale-x', { productId: 'pD', type: 'sale_cancel', qty: 1, refId: 's-mv' })]);
   assert.deepEqual(reasons(back), ['applied'], JSON.stringify(back.body));
-  //  راهِ قدیم: فاکتورِ کامل (`/api/sales/full` حرکت را با saleId می‌نشاند)
-  const full = await h.post('/api/sales/full', {
-    sale: { id: 'lg-full-mv', total: 10, finalTotal: 10 }, items: [{ productId: 'pD', quantity: 1, unitPrice: 10 }],
-    stockMovements: [{ productId: 'pD', qty: -1, type: 'sale' }],
-  }, { token: T.cashier.accessToken });
-  assert.equal(full.status, 201, JSON.stringify(full.body));
+  //  راهِ قدیم: فاکتورِ کامل در یک دسته (حرکت با `saleId`، شکلِ `/api/sales/full` ِ برداشته)
+  const full = await legacy('cashier', legacyFull('lg-full-mv', 'pD'));
+  assert.deepEqual([full.status, full.body.applied], [200, 3], JSON.stringify(full.body));
 });
 
 test('۵ — حرکتِ سند سقف دارد: کالای همان فاکتور، لغو فقط برای فاکتورِ لغوشده، و هر قلم تا مقدارش (v1، v3، قدیم)', async () => {
@@ -343,11 +346,8 @@ test('۵ — حرکتِ سند سقف دارد: کالای همان فاکتور
   assert.deepEqual(reasons(s3more), [DENY], JSON.stringify(s3more.body));
 
   //  راهِ قدیم: لغوِ فاکتورِ لغونشده (همه یا هیچ)
-  const lg = await h.post('/api/sales/full', {
-    sale: { id: 'lg-cap', total: 10, finalTotal: 10 }, items: [{ productId: 'pF', quantity: 1, unitPrice: 10 }],
-    stockMovements: [{ productId: 'pF', qty: -1, type: 'sale' }],
-  }, { token: T.cashier.accessToken });
-  assert.equal(lg.status, 201, JSON.stringify(lg.body));
+  const lg = await legacy('cashier', legacyFull('lg-cap', 'pF'));
+  assert.deepEqual([lg.status, lg.body.applied], [200, 3], JSON.stringify(lg.body));
   const lgx = await legacy('cashier', [{ collection: 'stockMovements', id: 'lg-cap-x', updatedAt: Date.now(),
     data: { productId: 'pF', qty: 1, type: 'sale_cancel', refId: 'lg-cap' } }]);
   assert.equal(lgx.status, 403, JSON.stringify(lgx.body));

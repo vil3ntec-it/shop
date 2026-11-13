@@ -33,25 +33,23 @@ test('۳: هیچ اطلاعاتی بین دکان A و دکان B دیده نم�
   assert.equal(shopA.status, 201);
   assert.notEqual(shopA.body.shop.id, shopB.body.shop.id);
 
-  await h.post('/api/products', { id: 'p-a', data: { name: 'برنج', price: 100 } }, { token: a.accessToken });
-  await h.post('/api/products', { id: 'p-b', data: { name: 'روغن', price: 200 } }, { token: b.accessToken });
+  await h.seed(a.accessToken, 'products', { id: 'p-a', name: 'برنج', price: 100 });
+  await h.seed(b.accessToken, 'products', { id: 'p-b', name: 'روغن', price: 200 });
 
-  const listA = await h.get('/api/products', { token: a.accessToken });
-  const listB = await h.get('/api/products', { token: b.accessToken });
-  assert.deepEqual(listA.body.items.map(i => i.id), ['p-a']);
-  assert.deepEqual(listB.body.items.map(i => i.id), ['p-b']);
+  assert.deepEqual((await h.legacyRows(a.accessToken, 'products')).map(i => i.id), ['p-a']);
+  assert.deepEqual((await h.legacyRows(b.accessToken, 'products')).map(i => i.id), ['p-b']);
 
-  // حتی با دانستن شناسه‌ی رکورد دکان دیگر هم دیده نمی‌شود
-  const stolen = await h.get('/api/products/p-b', { token: a.accessToken });
-  assert.equal(stolen.status, 404);
+  // حتی با دانستن شناسه‌ی رکورد دکان دیگر هم نوشتن روی آن ممکن نیست: ردیفِ خودِ «الف» ساخته می‌شود
+  await h.seed(a.accessToken, 'products', { id: 'p-b', name: 'رونویسی' });
+  assert.equal((await h.legacyRow(b.accessToken, 'products', 'p-b')).name, 'روغن');
+  assert.equal((await h.legacyRow(a.accessToken, 'products', 'p-b')).name, 'رونویسی');
 
   // و فرستادن shopId دیگری در بدنه هیچ اثری ندارد
   const spoof = await h.post('/api/sync',
     { shopId: shopB.body.shop.id, changes: [{ collection: 'products', id: 'p-spoof', updatedAt: Date.now(), data: { name: 'نفوذ' } }] },
     { token: a.accessToken });
   assert.equal(spoof.status, 200);
-  const afterB = await h.get('/api/products', { token: b.accessToken });
-  assert.equal(afterB.body.items.find(i => i.id === 'p-spoof'), undefined);
+  assert.equal((await h.legacyRows(b.accessToken, 'products')).find(i => i.id === 'p-spoof'), undefined);
 });
 
 // ---------- TEST 4 و 5 و 6: کد شاگرد ----------
@@ -81,9 +79,8 @@ test('۴ و ۵ و ۶: صاحب دکان کد می‌سازد، شاگرد وار
   assert.equal(again.status, 403);
 
   // شاگرد فقط دکان خودش را می‌بیند
-  await h.post('/api/products', { id: 'p-owner', data: { name: 'شکر' } }, { token: owner.accessToken });
-  const seen = await h.get('/api/products', { token: staff.accessToken });
-  assert.deepEqual(seen.body.items.map(i => i.id), ['p-owner']);
+  await h.seed(owner.accessToken, 'products', { id: 'p-owner', name: 'شکر' });
+  assert.deepEqual((await h.legacyRows(staff.accessToken, 'products')).map(i => i.id), ['p-owner']);
 
   // و کارهای مدیریتی برایش بسته است
   const denied = await h.post('/api/shop/staff-code', { role: 'staff' }, { token: staff.accessToken });
@@ -101,11 +98,12 @@ test('۷ و ۸: فروش صاحب دکان و فروش شاگرد برای هر 
   await h.post('/api/shop/staff/join', { code }, { token: staff.accessToken });
 
   // صاحب دکان می‌فروشد
-  const saleOwner = await h.post('/api/sales/full', {
-    sale: { id: 'sale-owner', total: 500, at: Date.now() },
-    items: [{ id: 'it-1', productId: 'p1', qty: 2, price: 250 }],
-  }, { token: owner.accessToken });
-  assert.equal(saleOwner.status, 201);
+  const saleOwner = await h.legacyPush(owner.accessToken, [
+    h.change('sales', { id: 'sale-owner', total: 500, at: Date.now() }),
+    h.change('saleItems', { id: 'it-1', saleId: 'sale-owner', productId: 'p1', qty: 2, price: 250 }),
+  ], { deviceId: 'dev-owner' });
+  assert.equal(saleOwner.status, 200);
+  assert.equal(saleOwner.body.applied, 2);
 
   // شاگرد همگام می‌شود و فروش را می‌بیند
   const pull1 = await h.get('/api/sync?since=0', { token: staff.accessToken });
@@ -187,15 +185,15 @@ test('۹: دو کاربر همزمان ثبت می‌کنند و هیچ رکور
 
   await Promise.all([batch('owner', 20), batch('staff', 20), batch('owner2', 0)]);
 
-  const all = await h.get('/api/sales?limit=500', { token: owner.accessToken });
-  const ids = all.body.items.map(i => i.id);
+  const all = await h.legacyRows(owner.accessToken, 'sales');
+  const ids = all.map(i => i.id);
   for (let i = 0; i < 20; i++) {
     assert.ok(ids.includes(`owner-${i}`), `فروش owner-${i} گم شد`);
     assert.ok(ids.includes(`staff-${i}`), `فروش staff-${i} گم شد`);
   }
 
   // revها یکتا هستند — پس هیچ تغییری در همگام‌سازی از قلم نمی‌افتد
-  const revs = all.body.items.map(i => i.rev);
+  const revs = all.map(i => i.rev);
   assert.equal(new Set(revs).size, revs.length);
 });
 
@@ -216,15 +214,10 @@ test('۱۰: ارسال دوباره‌ی یک درخواست، رکورد تکر
   assert.equal(second.body.replayed, true);
   assert.equal(second.body.rev, first.body.rev, 'درخواست تکراری نباید rev تازه بگیرد');
 
-  const sales = await h.get('/api/sales', { token: owner.accessToken });
-  assert.equal(sales.body.items.filter(s => s.id === 'sale-once').length, 1);
-
-  // همان کار برای فروش کامل هم صدق می‌کند
-  const full = { operationId: 'op-fixed-2', sale: { id: 'sale-full', total: 100 }, items: [{ id: 'i1', qty: 1 }] };
-  await h.post('/api/sales/full', full, { token: owner.accessToken });
-  await h.post('/api/sales/full', full, { token: owner.accessToken });
-  const items = await h.get('/api/sale-items', { token: owner.accessToken });
-  assert.equal(items.body.items.filter(i => i.id === 'i1').length, 1);
+  const sales = await h.legacyRows(owner.accessToken, 'sales');
+  assert.equal(sales.filter(s => s.id === 'sale-once').length, 1);
+  const rows = await h.query("SELECT rev FROM sales WHERE id='sale-once'");
+  assert.equal(rows.rows.length, 1, 'یک ردیف، یک rev');
 });
 
 // ---------- TEST 11: کار آفلاین و صف ----------
@@ -241,10 +234,10 @@ test('۱۱: صف آفلاین بعد از وصل شدن، همه را یکجا �
     { token: owner.accessToken });
   assert.equal(res.body.applied, 5);
 
-  const list = await h.get('/api/expenses', { token: owner.accessToken });
-  assert.equal(list.body.items.length, 5);
+  const list = await h.legacyRows(owner.accessToken, 'expenses');
+  assert.equal(list.length, 5);
   // ترتیب و مقدارها دست‌نخورده مانده‌اند
-  assert.equal(list.body.items.find(i => i.id === 'exp-3').amount, 400);
+  assert.equal(list.find(i => i.id === 'exp-3').amount, 400);
 });
 
 // ---------- TEST 12: نصب دوباره / گوشی تازه ----------

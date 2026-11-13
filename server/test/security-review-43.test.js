@@ -25,7 +25,6 @@ const SALE = 'sale_finalized_edit_forbidden';
 let owner;
 let shopId;
 let bound;       //  دستگاهِ نشستِ صاحب (زنجیره‌دار ⇒ `enforce`)
-let clerk;       //  نشستِ دوم (API ِ مستقیم همیشه `enforce`)
 let seq = 0;
 
 const opId = () => `01JSRB${String(Date.now()).slice(-8)}${String(++seq).padStart(5, '0')}`;
@@ -45,7 +44,6 @@ const legacy = (changes) => h.api('POST', '/api/sync/push', {
   token: owner.accessToken, headers: { 'X-App': 'shop' },
   body: { deviceId: 'old-phone', changes: changes.map((c) => ({ updatedAt: 2_000_000 + (++seq), ...c })) },
 });
-const api = (method, path, body) => h.api(method, path, { token: clerk.accessToken, headers: { 'X-App': 'shop' }, body });
 const events = async (id) => (await query(
   "SELECT detail FROM audit_logs WHERE action='security.doc_chain' AND shop_id=$1 AND target_id=$2",
   [shopId, id]
@@ -64,7 +62,6 @@ test.before(async () => {
   owner = await h.newUser('صاحبِ بازبینیِ ۴۳');
   shopId = (await h.post('/api/shop', { name: 'دکانِ بازبینیِ ۴۳' }, { token: owner.accessToken })).body.shop.id;
   bound = (await query('SELECT device_uid FROM devices WHERE user_id=$1', [owner.user.id])).rows[0].device_uid;
-  clerk = await h.signIn(owner);
   await query(
     `INSERT INTO device_chain_heads (shop_id, series, epoch, device_id, reported_at, created_at) VALUES ($1,'D1',1,$2,1,1)`,
     [shopId, bound]
@@ -151,11 +148,11 @@ test('SR43-1 راهِ قدیم: ادغامِ کهنه (`stale`) یا برداش�
   assert.equal((await restRow('transactions', 'L-tx')).debtorId, 'L-deb-b');
 });
 
-test('SR43-2 API ِ مستقیم: `$inc` ِ لفظی روی مبلغ/تعدادِ سندِ ثبت‌شده ۴۰۹ و ردیف همان می‌ماند', async () => {
+test('SR43-2 کلِ ردیفِ راهِ قدیم (نشستِ زنجیره‌دار؛ درِ مستقیمِ API برداشته شد): `$inc` ِ لفظی روی مبلغ/تعدادِ سندِ ثبت‌شده ۴۰۹ و ردیف همان می‌ماند', async () => {
   const ret = { id: 'I-r', saleId: 's-x', productId: 'p1', quantity: 1, amount: 100, reason: 'خراب', date: '2026-11-01', createdAt: 5 };
-  let r = await api('POST', '/api/returns', { id: 'I-r', data: ret });
-  assert.equal(r.status, 201, JSON.stringify(r.body));
-  r = await api('PUT', '/api/returns/I-r', { data: { ...ret, quantity: { $inc: 0 }, amount: { $inc: 0 } } });
+  let r = await legacy([{ collection: 'returns', id: 'I-r', data: ret }]);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  r = await legacy([{ collection: 'returns', id: 'I-r', data: { ...ret, quantity: { $inc: 0 }, amount: { $inc: 0 } } }]);
   assert.equal(r.status, 409, JSON.stringify(r.body));
   assert.equal(r.body.error.code, DOC);
   assert.deepEqual([(await restRow('returns', 'I-r')).quantity, (await restRow('returns', 'I-r')).amount], [1, 100]);
@@ -165,23 +162,24 @@ test('SR43-2 API ِ مستقیم: `$inc` ِ لفظی روی مبلغ/تعداد�
     id: 'I-p', productId: 'p1', supplierId: 'sup-1', quantity: 10, unit: 'دانه', purchasePrice: 30, totalAmount: 300,
     date: '2026-11-01', notes: '', paidAmount: 0, debt: 300, createdAt: 5,
   };
-  r = await api('POST', '/api/purchases', { id: 'I-p', data: pur });
-  assert.equal(r.status, 201, JSON.stringify(r.body));
-  r = await api('PUT', '/api/purchases/I-p', { data: { ...pur, debt: { $inc: -300 }, paidAmount: { $inc: 300 } } });
+  r = await legacy([{ collection: 'purchases', id: 'I-p', data: pur }]);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  r = await legacy([{ collection: 'purchases', id: 'I-p', data: { ...pur, debt: { $inc: -300 }, paidAmount: { $inc: 300 } } }]);
   assert.equal(r.status, 409, JSON.stringify(r.body));
   assert.equal(r.body.error.code, DOC);
   assert.equal((await restRow('purchases', 'I-p')).debt, 300);
 
   //  فاکتور: همان (`{$inc:0}` «همان» شمرده می‌شد)
   const s = { ...creditSale('I-s', ''), paymentMethod: 'cash', paidAmount: 1000, remaining: 0, debtGiven: 0 };
-  r = await api('POST', '/api/sales', { id: 'I-s', data: s });
-  assert.equal(r.status, 201, JSON.stringify(r.body));
-  r = await api('PUT', '/api/sales/I-s', { data: { ...s, finalTotal: { $inc: 0 }, paidAmount: { $inc: 0 } } });
+  r = await legacy([{ collection: 'sales', id: 'I-s', data: s }]);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  r = await legacy([{ collection: 'sales', id: 'I-s', data: { ...s, finalTotal: { $inc: 0 }, paidAmount: { $inc: 0 } } }]);
   assert.equal(r.status, 409, JSON.stringify(r.body));
   assert.equal(r.body.error.code, SALE);
   assert.equal((await restRow('sales', 'I-s')).finalTotal, 1000);
 
   //  فیلدِ آزاد همان امروز
-  r = await api('PUT', '/api/returns/I-r', { data: { ...ret, reason: 'شکسته' } });
+  r = await legacy([{ collection: 'returns', id: 'I-r', data: { ...ret, reason: 'شکسته' } }]);
   assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal((await restRow('returns', 'I-r')).reason, 'شکسته');
 });

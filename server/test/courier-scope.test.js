@@ -82,7 +82,7 @@ async function invite(owner) {
 async function courierJoin(owner, name) {
   const code = await invite(owner);
   const uid = `courier-phone-${++seq}`;
-  const r = await h.post('/api/auth/staff-login', { code, name, device: { uid, name: 'گوشیِ پیک', platform: 'android' } });
+  const r = await h.post('/api/auth/staff', { code, name, device: { uid, name: 'گوشیِ پیک', platform: 'android' } });
   assert.equal(r.status, 201, JSON.stringify(r.body));
   assert.equal(r.body.shop.role, 'courier', 'نشستِ ورود نقشِ پیک را می‌گوید (برنامه با آن حالتِ پیک را باز می‌کند)');
   return { ...r.body, token: r.body.accessToken, uid, userId: r.body.user.id };
@@ -159,7 +159,7 @@ test('بی پرچم: دعوتِ پیک ۴۰۴ است و کدِ ساخته‌شد
   await enable(a.shopId);
   const code = await invite(a);
   await setFlag(a.shopId, 'shop.delivery', false);
-  const join = await h.post('/api/auth/staff-login', { code, name: 'پیک', device: { uid: 'off-phone-1' } });
+  const join = await h.post('/api/auth/staff', { code, name: 'پیک', device: { uid: 'off-phone-1' } });
   assert.equal(join.status, 404, JSON.stringify(join.body));
   assert.equal(join.body.error.code, 'delivery_disabled');
   assert.equal(Number((await one(`SELECT COUNT(*)::int AS n FROM shop_members WHERE shop_id=$1 AND role='courier'`, [a.shopId])).n), 0);
@@ -195,7 +195,7 @@ test('دعوت از صفحهٔ کارمندان ⇒ عضوِ courier، ردیف�
   assert.equal(me.body.courier.name, 'پیکِ دعوتی');
 
   //  ورودِ دوباره با همان کد/دستگاه کد را دوباره خرج نمی‌کند و همان دامنه را می‌دهد
-  const again = await h.post('/api/auth/staff-login', { code: 'SHG-AAAA-AAAA-AAAA', name: 'x', device: { uid: c.uid } });
+  const again = await h.post('/api/auth/staff', { code: 'SHG-AAAA-AAAA-AAAA', name: 'x', device: { uid: c.uid } });
   assert.notEqual(again.status, 201, 'کدِ ساختگی راه نمی‌دهد');
 
   //  تازه‌سازی دامنه را نگه می‌دارد (و هیچ راهی برای «پهن» کردنش نیست)
@@ -252,9 +252,9 @@ test('QA #282: دعوتِ پیک یک‌بارمصرف و با مهلت است �
     (e) => e.code === 'courier_invite_expiry');
 
   //  کد واقعاً یک‌بار است: نفرِ دوم با همان کد پیک نمی‌شود
-  const first = await h.post('/api/auth/staff-login', { code: d.body.code, name: 'پیکِ اول', device: { uid: `once-1-${t0}` } });
+  const first = await h.post('/api/auth/staff', { code: d.body.code, name: 'پیکِ اول', device: { uid: `once-1-${t0}` } });
   assert.equal(first.status, 201, JSON.stringify(first.body));
-  const second = await h.post('/api/auth/staff-login', { code: d.body.code, name: 'پیکِ دوم', device: { uid: `once-2-${t0}` } });
+  const second = await h.post('/api/auth/staff', { code: d.body.code, name: 'پیکِ دوم', device: { uid: `once-2-${t0}` } });
   assert.ok(second.status >= 400 && second.status < 500, `${second.status} ${JSON.stringify(second.body)}`);
 
   //  رفتارِ حفظ‌شده: دعوتِ شاگرد همچنان می‌تواند بی‌شمار و بی‌مهلت باشد

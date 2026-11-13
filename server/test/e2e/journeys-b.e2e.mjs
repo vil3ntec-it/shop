@@ -75,7 +75,7 @@ await E.step('JB.0', 'سه دستگاه: گوشیِ صاحب (A)، کامپیو�
 
 await E.step('JB1', 'برگشت و لغو: شاگرد زیرِ سقف؛ بالای سقف با تأییدِ صاحب از دستگاهِ خودش؛ بی تأیید یا بیش از فاکتور رد با همه‌ی همراه‌ها؛ لغوِ نقد و نسیه', async () => {
   //  سقفِ برگشتِ شاگرد ۵۰۰ افغانی (بالاتر ⇒ «نیازمندِ تأیید»)
-  E.ok(await A.api('PUT', '/shop/permissions/roles/staff', { perms: { 'returns.create': { caps: { maxAmount: 50000 } } } }), 'سقفِ برگشت');
+  E.ok(await E.roleLayer(owner, 'staff', { 'returns.create': { caps: { maxAmount: 50000 } } }), 'سقفِ برگشت');
   const s1 = sale(A, A.sell({ lines: [{ id: rice, qty: 2 }] }));                                               // ۶۰۰ نقد
   const s2 = sale(A, A.sell({ lines: [{ id: rice, qty: 3 }], payment: 'credit', debtorId: ahmad, paid: 0 })); // ۹۰۰ قرض
   const s3 = sale(A, A.sell({ lines: [{ id: tea, qty: 2 }] }));                                                // ۳۰۰ نقد ⇐ لغو
@@ -167,7 +167,7 @@ await E.step('JB1', 'برگشت و لغو: شاگرد زیرِ سقف؛ بالا
   const sys = A.ledger.transactions.filter((x) => x.refId === s4.saleId && x.kind === 'sale_cancel');
   assert.deepEqual(sys.map((x) => x.amount), [400]);
   //  شاگرد هیچ چیزی را به نامِ تأییدکننده ثبت نکرد: سابقهٔ تأیید درخواست‌کننده و تأییدکننده را دارد
-  const ap = E.ok(await A.api('GET', '/shop/approvals'), 'سابقهٔ تأییدها').approvals.find((x) => x.doc === `returns/${doc}`);
+  const ap = (await E.approvals(owner.shopId)).find((x) => x.doc === `returns/${doc}`);
   assert.ok(ap, 'سابقهٔ تأیید');
   assert.equal(ap.approverId, owner.user.id);
 }, { needs: ['JB.0'] });
@@ -380,7 +380,7 @@ await E.step('JB5', 'دو دستگاهِ صاحب، هر دو بی اینترن�
 
 await E.step('JB6', 'صندوقِ سندهای ردشده: ردِ قرضِ بالای سقف ⇐ صندوقِ کامپیوترِ صاحب ⇐ دوباره ثبت با تأیید ⇐ فروش دقیقاً یک بار، همه‌جا', async () => {
   await E.flag(owner.shopId, 'shop.credit_cap', true);
-  E.ok(await A.api('PUT', '/shop/permissions/roles/staff', { perms: { 'sales.credit': { caps: { maxAmount: 50000 } } } }), 'سقفِ قرضِ شاگرد ۵۰۰');
+  E.ok(await E.roleLayer(owner, 'staff', { 'sales.credit': { caps: { maxAmount: 50000 } } }), 'سقفِ قرضِ شاگرد ۵۰۰');
   const sugar = A.stockIn({ name: 'شکر', price: 400, cost: 300, units: 20 });
   await syncAll();
   const debtBefore = A.debt(ahmad);

@@ -240,7 +240,7 @@ test('B8: هشت «ساختنِ دکان» ِ هم‌زمانِ یک حساب �
 
 test('B4: NUL در رشته‌های بدنه ⇒ همان کارِ validate.text (انداخته می‌شود)، نه ۵۰۰ ِ پایگاه‌داده', async () => {
   for (const [path, body] of [
-    ['/api/me/redeem', { code: 'a\u0000b' }],
+    ['/api/vip/redeem', { code: 'a\u0000b' }],
     ['/api/portal/redeem', { code: 'a\u0000b' }],
     ['/api/shop/customer-erasure', { debtorId: 'a\u0000b', phone: '\u0000', reason: 'x\u0000' }],
   ]) {

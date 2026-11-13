@@ -130,7 +130,7 @@ await E.step('J2', 'شاگرد با کد روی B می‌پیوندد؛ فروش
 
 await E.step('J2.roles', 'مرزِ نقشِ شاگرد: کد و نقش نمی‌سازد؛ لغو و تخفیف از برنامهٔ دست‌کاری‌شده رد و همراه‌هایش هم؛ سرور و صاحب دست‌نخورده', async () => {
   assert.equal((await S.api('POST', '/shop/staff-code', { role: 'staff', maxUses: 1 })).status, 403);
-  assert.equal((await S.api('PUT', '/shop/permissions/roles/staff', { perms: { 'sales.cancel': { mode: 'allow' } } })).status, 403);
+  assert.equal((await S.api('PUT', '/shop/permissions/members/x', { perms: { 'sales.cancel': { mode: 'allow' } } })).status, 403);
   //  برنامهٔ دست‌کاری‌شده (رابطِ برنامه دکمهٔ لغو را به شاگرد نشان نمی‌دهد): همان دستگاه، دفترِ جدا
   const T = new NativeDevice(E, 'S-tampered', { deviceId: S.deviceId, seller: 'علی' });
   T.token = S.token;

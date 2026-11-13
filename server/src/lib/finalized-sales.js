@@ -5,7 +5,7 @@
  * پشتِ همان پرچمِ خاموشِ `shop.doc_chain` (SEC-02): خاموش ⇒ هیچ پرسش و هیچ تغییری؛ رفتارِ امروز.
  * روشن ⇒ هر نوشتنی که محتوای مالیِ فاکتوری را که سرور دارد عوض کند (`sales` یا قلمی از `saleItems`) سنجیده می‌شود:
  *
- *   enforce  دستگاهی که زنجیره دارد (ردیفی در `device_chain_heads` ِ همین دکان) و درِ مستقیمِ API (`routes/data.js`)
+ *   enforce  دستگاهی که زنجیره دارد (ردیفی در `device_chain_heads` ِ همین دکان)؛ درِ مستقیمِ API (`routes/data.js`) ۱۴۰۵/۰۸/۲۲ برداشته شد
  *            ⇒ رد با `sale_finalized_edit_forbidden` (v1: همان op «rejected»؛ API: ۴۰۹ و هیچ نوشتنی) + رویداد.
  *            «دستگاهِ زنجیره‌دار» = شناسهٔ ادعاشده **یا دستگاهِ خودِ نشست** (`tokens.device_id` ⇐ `devices.device_uid`،
  *            سرور-مرجع): شناسهٔ دستگاه در بدنه از کاربر است و بی پرچمِ `sync.device_bind` فقط ثبت می‌شود ⇒ پیش‌تر
@@ -654,7 +654,7 @@ async function adminRestoreCheck(conflictId, { adminId = '', ip = '' } = {}) {
   if (res && res.reject) throw forbiddenError(res.reject);
 }
 
-/* ------------------------------------------------------- راهِ قدیم و API ِ مستقیم */
+/* ------------------------------------------------------------------- راهِ قدیم */
 
 /** نامِ مجموعه در `lib/sync.js` ⇐ نامِ جدولِ v1 (همان نام‌ها) */
 const LEGACY = Object.freeze({
@@ -673,7 +673,7 @@ const legacyRowOf = (shopId, dead) => async (c, collection, id) => {
 
 /**
  * نگهبانِ `sync.pushChanges` ⇐ Guard یا null. `mode`: `log` برای `/api/sync` (برنامهٔ کهنه، F0-02)،
- * `enforce` برای `routes/data.js` (درِ مستقیمِ API — هیچ برنامه‌ای از آن نمی‌نویسد).
+ * `enforce` ِ صریح دیگر صدازننده ندارد (درِ مستقیمِ `routes/data.js` برداشته شد)؛ نشست/شناسهٔ زنجیره‌دار همان `enforce`.
  * `boundDevice`: دستگاهِ خودِ نشست (`req.device.device_uid`). `log` با شناسهٔ ادعاشده یا نشستِ زنجیره‌دار ⇐ `enforce`
  * (راه همان `legacy`): برنامهٔ تازه از راهِ قدیم نمی‌نویسد (F0-02)، پس این فقط دورزدنِ نگهبانِ v1 است.
  */
@@ -699,7 +699,7 @@ async function legacyGuard({ shopId, userId = '', deviceId = '', boundDevice = '
   });
 }
 
-/** ردِ درِ مستقیم: ۴۰۹ و تراکنش برمی‌گردد (هیچ بخشی از نوشتن نمی‌نشیند) */
+/** ردِ اجباری: ۴۰۹ و تراکنش برمی‌گردد (هیچ بخشی از نوشتن نمی‌نشیند) */
 const forbiddenError = (reason = REASON) => (reason === DOC_REASON
   ? conflict('سندِ مالیِ ثبت‌شده ویرایش یا حذف نمی‌شود؛ اصلاح فقط با سندِ معکوس', DOC_REASON)
   : conflict('فاکتورِ ثبت‌شده ویرایش یا حذف نمی‌شود؛ اصلاح فقط با لغو یا برگشت (سندِ معکوس)', REASON));

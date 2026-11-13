@@ -179,7 +179,7 @@ test('ترتیبِ قفل: تسویهٔ پیک و «تحویل شد» ِ دوب�
   for (const k of ['shop.orders', 'shop.delivery']) await setFlag(o.shopId, k, true);
   const inv = await h.post('/api/shop/invite', { role: 'courier' }, { token: o.token });
   assert.equal(inv.status, 201, JSON.stringify(inv.body));
-  const cl = await h.post('/api/auth/staff-login', { code: inv.body.code, name: 'کریم', device: { uid: `phone-${uniq()}`, name: 'گوشیِ پیک', platform: 'android' } });
+  const cl = await h.post('/api/auth/staff', { code: inv.body.code, name: 'کریم', device: { uid: `phone-${uniq()}`, name: 'گوشیِ پیک', platform: 'android' } });
   assert.equal(cl.status, 201, JSON.stringify(cl.body));
   const c = { token: cl.body.accessToken, id: (await h.get('/api/courier/me', { token: cl.body.accessToken })).body.courier.id };
   const says = (events) => h.post('/api/courier/events', { deviceId: 'pg-concurrency-2', events }, { token: c.token });

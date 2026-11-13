@@ -11,7 +11,7 @@
  *      بازنویسی — لغو و شمارنده‌ها می‌مانند.
  *   ۵) برنامهٔ بی زنجیره ⇒ همان امروز + رویداد (`enforced: false`).
  *   ۶) جداییِ دکان‌ها: نه پرچم، نه دستگاهِ زنجیره‌دار و نه ردیفِ دکانِ دیگر.
- *   ۷) راهِ قدیم (`/api/sync`: فقط رویداد) و API ِ مستقیم (`/api/sales`…: ۴۰۹ و هیچ نوشتنی).
+ *   ۷) راهِ قدیم (`/api/sync`): بی زنجیره فقط رویداد، دستگاهِ زنجیره‌دار ۴۰۹ و هیچ نوشتنی (درِ مستقیمِ API برداشته شد).
  */
 process.env.RATE_LOGIN_EDGE_MAX = process.env.RATE_LOGIN_EDGE_MAX || '100000';
 
@@ -285,53 +285,53 @@ test('جداییِ دکان‌ها: پرچم، دستگاهِ زنجیره‌د�
   await flag(false, otherShop);
 });
 
-test('راهِ قدیم و API ِ مستقیم: API ۴۰۹ و هیچ نوشتنی؛ `/api/sync` فقط رویداد؛ پرچمِ خاموش همان امروز', async () => {
+test('راهِ قدیم: دستگاهِ زنجیره‌دار ۴۰۹ و هیچ نوشتنی (جای درِ مستقیمِ API ِ برداشته)؛ بی زنجیره فقط رویداد؛ پرچمِ خاموش همان امروز', async () => {
   const T = owner.accessToken;
   const H = { 'X-App': 'shop' };
-  const legacy = (id) => h.api('GET', `/api/sales/${id}`, { token: T, headers: H });
+  const legacyRow = async (id) => (await one('SELECT data FROM sales WHERE shop_id=$1 AND id=$2', [shopId, id]))?.data || null;
+  const legacy = (deviceId, changes) => h.api('POST', '/api/sync/push', {
+    token: T, headers: H, body: { deviceId, changes: changes.map((c) => ({ updatedAt: Date.now(), ...c })) },
+  });
   const sale = { invoiceNumber: 9, total: 500, finalTotal: 500, paidAmount: 500, remaining: 0, status: 'completed', date: '2026-10-30', createdAt: 5 };
 
   //  ثبتِ کامل (فاکتور + قلم‌ها در یک دسته) آزاد است
-  let r = await h.api('POST', '/api/sales/full', {
-    token: T, headers: H,
-    body: { sale: { id: 'L1', ...sale }, items: [{ id: 'L1-i1', productId: 'p1', quantity: 1, unitPrice: 500, totalPrice: 500 }] },
-  });
-  assert.equal(r.status, 201, JSON.stringify(r.body));
+  let r = await legacy(CHAIN, [
+    { collection: 'sales', id: 'L1', data: { ...sale } },
+    { collection: 'saleItems', id: 'L1-i1', data: { saleId: 'L1', productId: 'p1', quantity: 1, unitPrice: 500, totalPrice: 500 } },
+  ]);
+  assert.deepEqual([r.status, r.body.applied], [200, 2], JSON.stringify(r.body));
 
-  r = await h.api('PUT', '/api/sales/L1', { token: T, headers: H, body: { data: { ...sale, total: 400, finalTotal: 400 } } });
+  r = await legacy(CHAIN, [{ collection: 'sales', id: 'L1', data: { ...sale, total: 400, finalTotal: 400 } }]);
   assert.equal(r.status, 409, JSON.stringify(r.body));
   assert.equal(r.body.error.code, REASON);
-  r = await h.api('DELETE', '/api/sales/L1', { token: T, headers: H });
+  r = await legacy(CHAIN, [{ collection: 'sales', id: 'L1', deleted: true }]);
   assert.equal(r.status, 409);
-  r = await h.api('PUT', '/api/sale-items/L1-i1', { token: T, headers: H, body: { data: { saleId: 'L1', productId: 'p1', quantity: 9, unitPrice: 500, totalPrice: 4500 } } });
+  r = await legacy(CHAIN, [{ collection: 'saleItems', id: 'L1-i1', data: { saleId: 'L1', productId: 'p1', quantity: 9, unitPrice: 500, totalPrice: 4500 } }]);
   assert.equal(r.status, 409);
-  r = await h.api('POST', '/api/sale-items', { token: T, headers: H, body: { id: 'L1-i2', data: { saleId: 'L1', productId: 'p2', quantity: 1, unitPrice: 10, totalPrice: 10 } } });
+  r = await legacy(CHAIN, [{ collection: 'saleItems', id: 'L1-i2', data: { saleId: 'L1', productId: 'p2', quantity: 1, unitPrice: 10, totalPrice: 10 } }]);
   assert.equal(r.status, 409);
-  assert.equal((await legacy('L1')).body.total, 500, 'هیچ بخشی ننشست');
-  assert.equal((await h.api('GET', '/api/sale-items/L1-i2', { token: T, headers: H })).status, 404);
+  assert.equal((await legacyRow('L1')).total, 500, 'هیچ بخشی ننشست');
+  assert.equal(await one(`SELECT 1 FROM sale_items WHERE shop_id=$1 AND id='L1-i2'`, [shopId]), null);
 
   //  لغو (کلِ ردیف با وضعیتِ لغو) آزاد است
-  r = await h.api('PUT', '/api/sales/L1', { token: T, headers: H, body: { data: { ...sale, status: 'cancelled', cancelReason: 'اشتباه' } } });
+  r = await legacy(CHAIN, [{ collection: 'sales', id: 'L1', data: { ...sale, status: 'cancelled', cancelReason: 'اشتباه' } }]);
   assert.equal(r.status, 200, JSON.stringify(r.body));
-  assert.equal((await legacy('L1')).body.status, 'cancelled');
+  assert.equal((await legacyRow('L1')).status, 'cancelled');
 
-  //  راهِ قدیمِ برنامهٔ کهنه: می‌نشیند، فقط رویداد
-  r = await h.api('POST', '/api/sync/push', {
-    token: T, headers: H,
-    body: { deviceId: 'old-web', changes: [{ collection: 'sales', id: 'L1', updatedAt: Date.now(), data: { ...sale, status: 'cancelled', total: 1 } }] },
-  });
+  //  راهِ قدیمِ برنامهٔ کهنه (بی زنجیره): می‌نشیند، فقط رویداد
+  r = await legacy('old-web', [{ collection: 'sales', id: 'L1', data: { ...sale, status: 'cancelled', total: 1 } }]);
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.equal(r.body.applied, 1);
-  assert.equal((await legacy('L1')).body.total, 1);
+  assert.equal((await legacyRow('L1')).total, 1);
 
   const ev = (await events()).filter((e) => e.sale === 'L1');
   assert.deepEqual(ev.map((e) => [e.path, e.enforced]),
-    [['api', true], ['api', true], ['api', true], ['api', true], ['legacy', false]]);
+    [['legacy', true], ['legacy', true], ['legacy', true], ['legacy', true], ['legacy', false]]);
 
-  //  پرچمِ خاموش ⇒ API همان امروز
+  //  پرچمِ خاموش ⇒ همان امروز، زنجیره‌دار هم
   await flag(false);
-  r = await h.api('PUT', '/api/sales/L1', { token: T, headers: H, body: { data: { ...sale, total: 2 } } });
+  r = await legacy(CHAIN, [{ collection: 'sales', id: 'L1', data: { ...sale, total: 2 } }]);
   assert.equal(r.status, 200);
-  assert.equal((await legacy('L1')).body.total, 2);
+  assert.equal((await legacyRow('L1')).total, 2);
   await flag(true);
 });

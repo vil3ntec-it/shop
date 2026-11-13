@@ -54,6 +54,30 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-41s (س۶) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-41s` (از `main`، 62a6bac71)
+
+- **سطحِ حمله (B15 ِ `SECURITY-AUDIT-fa.md`):** ۶۳ درِ بی صدازننده برداشته شد — کلِ `routes/data.js` (۵۱ در: `/api/products|inventory|sales|
+  sale-items|suppliers|purchases|returns|debtors|expenses|payments` و `POST /api/sales/full`)، `GET /api/shop/memberships`، `POST /api/shop/leave`،
+  `GET`/`PUT /api/shop/settings`، `PUT /api/shop/permissions/roles/:role`، `GET /api/shop/approvals` (+ `lib/approval-log.js`)، `GET`/`PUT
+  /api/me/settings` (شاگرد «همگام‌سازیِ ابری» ِ کلِ دکان را عوض می‌کرد)، `POST /api/me/redeem|errors`، `GET /api/portal/subscriptions` و نامِ دومِ
+  `POST /api/auth/staff-login`؛ `customer-access.note` ِ مرده هم. ⚠️ دروازهٔ پایانیِ `routes/data.js` (`requireUser, requireShop` روی هر
+  مسیرِ ناشناختهٔ `/api`) در `app.js` **ماند**: برنامهٔ خرید «درِ پرچمِ خاموش = ۴۰۱ ِ درِ ناشناخته» را قرارداد کرده (`account-cart-v1.json`،
+  `ShopperCartSync.doorClosed`، `ShopperAddressSync.transient`) و اجرای کاملِ نخست همین را با `storefront-cart`/`security-review-38` نشان داد.
+  شاهد: grep ِ همهٔ برنامه‌ها، `server/public/**`، وبِ دکانِ برداشته‌ای که درونِ APK ِ پوستهٔ WebView است (`git show b187c45be^`)، نسخهٔ بومیِ
+  بایگانیِ `android/native-ui-archive`، بات‌ها، `scripts`، `tools`، `bench` و قرارداد. کدِ پمپ دست نخورد (دستگیره‌های مشترکِ `portal.*` همان).
+- **ماندند با دلیل:** `/api/billing/status|plans|request` و `POST /api/shop/invite` (وبِ درونِ APK ِ WebView)؛ `GET`/`POST`/`PUT /api/shop` و
+  `/api/shop/staff/join` (نسخهٔ بومیِ بایگانی، `server/README.md`)؛ `POST /api/shop/active` (RULES، TEN-01)؛ `GET /api/shop/audit` (RULES ِ
+  `security.doc_chain` و `credit-limit-review`). همه در `KEPT` ِ `dead-doors.test.js`. بندهای نامطمئن/پیش‌ساخته ِ گزارش دست نخوردند.
+- **آزمون‌ها:** یاورهای `h.seed`/`legacyPush`/`legacyRows`/`legacyRow`/`roleLayer` (e2e: `E.roleLayer`/`E.approvals`)؛ ۷۰ پرونده جابه‌جا شد؛
+  نگهبان‌های S89/B7، SR43-2، لغو و سقف‌ها از درِ مستقیم به راهِ قدیمِ **زنجیره‌دار** رفتند (همان `pushChanges`)؛ CRM-15 ِ سابقهٔ دسترسی روی
+  درِ `app` و «سفارش‌های یک مشتری». `dead-doors.test.js` ِ تازه روی 62a6bac71 ۳/۳ سرخ، پس از تغییر ۳/۳ سبز. آستانهٔ ماتریسِ نشست‌دارِ
+  `tenant-matrix` ۱۲۰ ⇐ ۸۵ (۵۶ درِ برداشته؛ امروز ۸۷). SR46-3 ِ `customer-access` (کلاس‌بندیِ پین در درِ `debtor`) با همان در رفت.
+- **نتیجه:** همهٔ آزمون‌های سرور روی PGlite (دو تکه، `scripts/test-pglite.js`): ۴۲۴۲ آزمون، ۴۲۰۰ قبول، **۰ شکست**، ۴۰ SKIP و ۲ TODO ِ پیشین؛
+  e2e (`flags-on`، `journeys-a/b`، `scenario-s45`، `roles`، `access`) ۵۴ گامِ سبز؛ مرورگر: `web-store`، `web-store-cart-sync`، `web-store-acct`،
+  `portal-rep`، `web-shop-gone` سبز؛ precheck `fail=0`، `quality.mjs` بی ❌ (سقفِ `staff-approval.js` ۱۰۵۴ ⇐ ۱۰۵۲). Kotlin دست نخورد.
+- **نیمه‌کاره/قدمِ بعدی:** برداشتنِ درهای «ماندند» پس از داشبوردِ نسخه‌ها (یا ۴۱۰ ِ روشن). `ACCOUNT_PREFIXES` ِ پنلِ خانگی (ریپوی `server`)
+  خوانده نشد؛ اگر `/products`… را دارد فقط پیکربندی است. بررسی‌نشده: `backup.test.js` و آزمونِ هم‌زمانیِ PostgreSQL ِ `sale-void-chain`
+  (Postgres ِ محلی بالا نبود).
 ### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-43f (ز۶) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-43f` (از `claude/batch-59` ‏6216d2739)
 
 - **WEB-25 (پیامِ ۴۰۹ ِ «ثبت» در هر زبان):** `err.store_paused`/`err.store_offline` در هیچ واژه‌نامه نبود (fa.json ۲۱٬۴۷۷ از

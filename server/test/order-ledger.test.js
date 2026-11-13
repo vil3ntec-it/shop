@@ -589,7 +589,7 @@ test('handover: اجازهٔ هر سفارش از اجازهٔ مؤثرِ همی
     assert.equal(r.status, 200, JSON.stringify(r.body));
     return [plain, small, big].map((o) => r.body.items.find((x) => x.id === o.id).recordable);
   };
-  const setRole = (role, perms) => h.put(`/api/shop/permissions/roles/${role}`, { perms }, { token: a.token });
+  const setRole = (role, perms) => h.roleLayer(a.token, role, perms);
   const setMember = (u, perms) => h.put(`/api/shop/permissions/members/${u.user.id}`, { perms }, { token: a.token });
 
   assert.deepEqual(await flags(a), [true, true, true], 'صاحب');

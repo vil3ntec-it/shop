@@ -36,7 +36,9 @@ async function member(shop, role, name) {
 const get = (who, path) => { resetAll(); return h.get(`/api/shop/storefront/${path}`, { token: T[who].token }); };
 const layer = async (path, perms) => {
   resetAll();
-  const r = await h.put(`/api/shop/permissions/${path}`, { perms }, { token: T.owner.token });
+  //  لایهٔ نقش: درِ دکانش برداشته شد ⇒ همان `staff-perms.setRoleLayer` ِ درِ ارشدِ پنل (`h.roleLayer`)
+  const r = path.startsWith('roles/') ? await h.roleLayer(T.owner.token, path.slice('roles/'.length), perms)
+    : await h.put(`/api/shop/permissions/${path}`, { perms }, { token: T.owner.token });
   assert.equal(r.status, 200, JSON.stringify(r.body));
 };
 const full = (body) => PHONES.some((p) => JSON.stringify(body).includes(p.slice(4)));

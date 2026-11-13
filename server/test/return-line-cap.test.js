@@ -9,7 +9,7 @@
  *      (v1، v3، هم‌زمان، و میانِ v1 و v3)
  *   ③ برگشت‌های تکه‌ای که جمعشان از فروخته بیشتر شود؛ پولِ بیش از قلم با مقدارِ درست
  *   ④ تلاشِ دوباره: همان op دو بار یک بار شمرده می‌شود؛ همان ردیف با op ِ تازه هم؛ opِ ردشده دوباره ⇒ یک صندوق
- *   ⑤ REST (`/api/returns`) همه یا هیچ ⇒ ۴۰۹ و صندوق؛ فاکتورِ لغوشده؛ برگشتِ لغوشده دیگر شمرده نمی‌شود
+ *   ⑤ راهِ قدیم (`/api/sync`) همه یا هیچ ⇒ ۴۰۹ و صندوق؛ فاکتورِ لغوشده؛ برگشتِ لغوشده دیگر شمرده نمی‌شود
  *   ⑥ جدا از دکانِ دیگر؛ خاموش‌کنِ اضطراری (`shop.returns.line_cap` = false)؛ پمپ همان `guard` ِ پیشین
  *   ⑦ مهاجرتِ ۳۰۵ و rollback ِ آن
  */
@@ -346,12 +346,12 @@ test('تلاشِ دوباره: opِ ردشده دوباره ⇒ همان رد و
 
 /* ═══════════════════════════════ ⑤ ═══════════════════════════════ */
 
-test('REST (`/api/returns`): بیش از فروخته ⇒ ۴۰۹ ِ همه یا هیچ و صندوقِ تعارض؛ تا فروخته می‌نشیند', async () => {
-  const tok = { token: owner.accessToken };
-  assert.equal((await h.post('/api/sales', { id: 's-rest', total: 300, discount: 0, finalTotal: 300 }, tok)).status, 201);
-  assert.equal((await h.post('/api/sale-items', { id: 'si-rest', saleId: 's-rest', quantity: 3, totalPrice: 300 }, tok)).status, 201);
-  assert.equal((await h.post('/api/returns', { id: 'r-rest-1', saleId: 's-rest', saleItemId: 'si-rest', quantity: 2, amount: 200 }, tok)).status, 201);
-  const over = await h.post('/api/returns', { id: 'r-rest-2', saleId: 's-rest', saleItemId: 'si-rest', quantity: 2, amount: 200 }, tok);
+test('راهِ قدیم (`/api/sync`، همان `pushChanges` که درِ مستقیمِ برداشته می‌زد): بیش از فروخته ⇒ ۴۰۹ ِ همه یا هیچ و صندوقِ تعارض؛ تا فروخته می‌نشیند', async () => {
+  const put = (collection, row, opts = {}) => h.seed(owner.accessToken, collection, row, { deviceId: 'web-rest', ...opts });
+  assert.equal((await put('sales', { id: 's-rest', total: 300, discount: 0, finalTotal: 300 })).status, 200);
+  assert.equal((await put('saleItems', { id: 'si-rest', saleId: 's-rest', quantity: 3, totalPrice: 300 })).status, 200);
+  assert.equal((await put('returns', { id: 'r-rest-1', saleId: 's-rest', saleItemId: 'si-rest', quantity: 2, amount: 200 })).body.applied, 1);
+  const over = await put('returns', { id: 'r-rest-2', saleId: 's-rest', saleItemId: 'si-rest', quantity: 2, amount: 200 });
   assert.equal(over.status, 409, JSON.stringify(over.body));
   assert.equal(over.body.error.code, 'return_exceeds_sold');
   assert.equal(over.body.error.lines[0].left_milli, 1000);
@@ -359,9 +359,9 @@ test('REST (`/api/returns`): بیش از فروخته ⇒ ۴۰۹ ِ همه یا 
   const [box] = await boxesOf(shopId, 's-rest');
   assert.equal(box.detail.path, 'rest');
   assert.equal(box.loser_value.ops.find((o) => o.row_id === 'r-rest-2').fields.quantity, 2);
-  assert.equal((await h.post('/api/returns', { id: 'r-rest-3', saleId: 's-rest', saleItemId: 'si-rest', quantity: 1, amount: 100 }, tok)).status, 201);
+  assert.equal((await put('returns', { id: 'r-rest-3', saleId: 's-rest', saleItemId: 'si-rest', quantity: 1, amount: 100 })).body.applied, 1);
   //  ویرایشِ همان ردیف به مقدارِ بیشتر هم همان سقف
-  const edit = await h.api('PUT', '/api/returns/r-rest-3', { token: owner.accessToken, body: { saleId: 's-rest', saleItemId: 'si-rest', quantity: 2, amount: 200, updatedAt: Date.now() + 5000 } });
+  const edit = await put('returns', { id: 'r-rest-3', saleId: 's-rest', saleItemId: 'si-rest', quantity: 2, amount: 200 }, { updatedAt: Date.now() + 5000 });
   assert.equal(edit.status, 409, JSON.stringify(edit.body));
 });
 

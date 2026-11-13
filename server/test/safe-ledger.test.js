@@ -47,7 +47,7 @@ const pushA00 = (who, device, ops) => h.api('POST', '/api/sync/v1/push', {
 const push3 = (who, device, ops) => h.api('POST', '/api/sync/v3/push', {
   token: who.accessToken, body: { device_id: device, protocol: 3, ops },
 });
-const setRole = (role, perms) => h.put(`/api/shop/permissions/roles/${role}`, { perms }, { token: owner.accessToken });
+const setRole = (role, perms) => h.roleLayer(owner.accessToken, role, perms);
 const rowOf = (id) => one(
   `SELECT data FROM sync_rows WHERE app='shop' AND account_kind='shop' AND account_id=$1
       AND table_name='safeEntries' AND row_id=$2 AND deleted_at IS NULL`,

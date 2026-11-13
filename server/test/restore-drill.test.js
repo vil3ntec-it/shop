@@ -48,7 +48,7 @@ async function seedShop(name, device, { sale, items, ret, entry }) {
     body: { identifier: owner.email, password: owner.password, app: 'shop', device: { deviceId: device, name, platform: 'test' } },
   })).body;
   const token = login.accessToken;
-  await h.api('POST', '/api/products', { token, body: { id: `p-${device}`, data: { name: 'چای', salePrice: 120.5, purchasePrice: 90 } } });
+  await h.seed(token, 'products', { id: `p-${device}`, name: 'چای', salePrice: 120.5, purchasePrice: 90 });
   const op = (table, row_id, fields) => ({ op_id: opId(), ts: Date.now(), table, row_id, type: 'insert', fields });
   const ops = [
     op('sales', `s-${device}`, sale),

@@ -60,7 +60,7 @@ const DOORS = [
   ['staffcode.view', (t) => E.get('/api/shop/staff-codes', t)],
   ['staffcode.create', (t) => E.post('/api/shop/staff-code', { role: 'staff', maxUses: 1 }, t)],
   ['audit.view', (t) => E.get('/api/shop/audit?limit=5', t)],
-  ['settings.write', (t) => E.put('/api/shop/settings', { settings: { receiptNote: `نقش ${++n}` } }, t)],
+  ['settings.write', (t) => E.put('/api/shop/receipt-profile', { footer: `نقش ${++n}` }, t)],
 ];
 
 await E.step('S90.doors', 'هر نقش × هر درِ مهمِ «مدیریت» (اعضا، کدِ شاگرد، ساختنِ کد، سابقه، تنظیم): کلید در فهرستِ برنامه ⇔ سرور می‌پذیرد؛ نبودِ کلید ⇔ ۴۰۳', async () => {

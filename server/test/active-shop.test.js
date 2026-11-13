@@ -21,7 +21,6 @@ async function owner(label) {
   const made = await h.post('/api/shop', { name: `دکانِ ${label}` }, { token: u.accessToken });
   assert.equal(made.status, 201, JSON.stringify(made.body));
   const shopId = made.body.shop.id;
-  assert.equal((await h.put('/api/shop/settings', { settings: { mark: label } }, { token: u.accessToken })).status, 200);
   return { ...u, shopId };
 }
 async function addMember(shopId, userId, role = 'staff') {
@@ -32,19 +31,18 @@ async function addMember(shopId, userId, role = 'staff') {
     [newId('mem'), shopId, userId, role, t]
   );
 }
+//  نشانِ دکانِ نشست = نامِ همان دکان (`GET /api/shop/me`؛ درِ `/api/shop/settings` برداشته شد)
 const markOf = async (token) => {
-  const r = await h.get('/api/shop/settings', { token });
-  return r.status === 200 ? r.body.settings?.mark ?? r.body.data?.mark : `HTTP ${r.status} ${r.body?.error?.code}`;
+  const r = await h.get('/api/shop/me', { token });
+  return r.status === 200 ? String(r.body.shop?.name || '').replace(/^دکانِ /, '') : `HTTP ${r.status} ${r.body?.error?.code}`;
 };
 
 test('آزمونِ مرجع: کاربرِ تک‌دکانی همان رفتارِ امروز را دارد', async () => {
   const a = await owner('تک');
   assert.equal(await markOf(a.accessToken), 'تک');
-  const list = await h.get('/api/shop/memberships', { token: a.accessToken });
-  assert.equal(list.status, 200);
-  assert.equal(list.body.explicit, false);
-  assert.equal(list.body.activeShopId, a.shopId);
-  assert.equal(list.body.shops.length, 1);
+  const me = await h.get('/api/shop/me', { token: a.accessToken });
+  assert.equal(me.status, 200);
+  assert.equal(me.body.shop.id, a.shopId);
   const again = await h.signIn(a);
   assert.deepEqual(again.shops, [{ id: a.shopId, name: 'دکانِ تک', role: 'owner' }]);
 });
@@ -65,8 +63,9 @@ test('چنددکانی: پیش‌فرض همان قبلی؛ انتخابِ صر�
   assert.equal(await markOf(s.accessToken), 'ب');
   const shop = await h.get('/api/shop', { token: s.accessToken });
   assert.equal(shop.body.role, 'staff', 'نقش هم از همان دکان');
-  //  شاگردِ دکانِ «ب» نمی‌تواند تنظیماتِ «ب» را بنویسد — مجوز از همان عضویت
-  assert.equal((await h.put('/api/shop/settings', { settings: { mark: 'x' } }, { token: s.accessToken })).status, 403);
+  //  شاگردِ دکانِ «ب» نمی‌تواند نامِ «ب» را عوض کند — مجوز از همان عضویت
+  assert.equal((await h.put('/api/shop', { name: 'دکانِ x' }, { token: s.accessToken })).status, 403);
+  assert.equal(await markOf(s.accessToken), 'ب');
 
   const r = await h.post('/api/auth/refresh', { refreshToken: s.refreshToken });
   assert.equal(r.status, 200);
@@ -93,11 +92,11 @@ test('AUTH-09/TEN-01: دکانِ بی‌عضویت رد؛ شناسهٔ دکان 
   assert.equal(ghost.body.error.code, 'not_member', 'دکانِ ناموجود همان پاسخ را دارد');
   assert.equal((await h.post('/api/shop/active', { shopId: a.shopId })).status, 401, 'بی توکن');
 
-  const sneaky = await h.api('GET', `/api/shop/settings?shopId=${c.shopId}&shop_id=${c.shopId}`, {
+  const sneaky = await h.api('GET', `/api/shop/me?shopId=${c.shopId}&shop_id=${c.shopId}`, {
     token: a.accessToken, headers: { 'X-Shop-Id': c.shopId },
   });
   assert.equal(sneaky.status, 200);
-  assert.notEqual(sneaky.body.settings?.mark ?? sneaky.body.data?.mark, 'د');
+  assert.equal(sneaky.body.shop.id, a.shopId);
   assert.equal(await markOf(a.accessToken), 'ج');
 });
 
@@ -109,7 +108,7 @@ test('عضویتِ دکانِ برگزیده تمام شد ⇒ خطای روشن
   assert.equal((await h.post('/api/shop/active', { shopId: b.shopId }, { token: s.accessToken })).status, 200);
 
   await query(`UPDATE shop_members SET status='suspended' WHERE shop_id=$1 AND user_id=$2`, [b.shopId, a.user.id]);
-  for (const path of ['/api/shop/settings', '/api/shop', '/api/events']) {
+  for (const path of ['/api/shop/me', '/api/shop', '/api/events']) {
     const r = await h.get(path, { token: s.accessToken });
     assert.equal(r.status, 403, `${path} ⇒ ${r.status}`);
     assert.equal(r.body.error.code, 'active_shop_unavailable', path);

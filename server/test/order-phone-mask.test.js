@@ -88,7 +88,7 @@ test('پرچمِ خاموش همان ۴+۳؛ روشن: بی «دیدنِ تما�
   assert.equal(digits((await detail(u.accessToken)).phone).slice(-9), '791234567', 'صاحب شمارهٔ کامل');
 
   //  صاحب «دیدنِ تماس» را برای شاگرد می‌بندد ⇒ همان پوششِ تنگ
-  const lay = await h.put('/api/shop/permissions/roles/staff', { perms: { 'customers.contact': { mode: 'deny' } } }, { token: u.accessToken });
+  const lay = await h.roleLayer(u.accessToken, 'staff', { 'customers.contact': { mode: 'deny' } });
   assert.equal(lay.status, 200, JSON.stringify(lay.body));
   assert.equal(digits((await card(staff)).phoneMasked), '67', 'لایهٔ نقش');
 

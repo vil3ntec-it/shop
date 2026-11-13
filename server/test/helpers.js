@@ -220,6 +220,67 @@ function tampered(token, suffix = 'xx') {
   return s.slice(0, -suffix.length) + alt;
 }
 
+/*
+ *  ── کاشتن و خواندنِ دادهٔ دکان از راهِ زنده ─────────────────────────────
+ *  ⛔ درِ مستقیمِ داده (`/api/products`، `/api/sales/full`، `/api/debtors/:id`… با PUT و DELETE) برداشته شد
+ *  (۱۴۰۵/۰۸/۲۲، `dead-doors.test.js`). آزمون‌ها همان راهی را می‌روند که برنامهٔ کهنه می‌رود: `POST`/`GET /api/sync`
+ *  — همان `sync.pushChanges` با همهٔ نگهبان‌ها (نقش، سقف‌ها، پوشاندنِ شماره، فاکتورِ ثبت‌شده با دستگاهِ زنجیره‌دار).
+ *  ⚠️ پاسخِ نوشتن ۲۰۰ است (نه ۲۰۱) و ردِ ردیف در `conflicts` می‌آید؛ ردِ کلِ دسته همان ۴۰۳/۴۰۹ ِ پیشین است.
+ */
+/** ردیفِ `{ id, ...fields }` (یا `{ id, data }`) ⇒ یک تغییرِ راهِ قدیم */
+function change(collection, row, { updatedAt, deleted } = {}) {
+  const { id, data, updatedAt: at, ...rest } = row || {};
+  const c = { collection, id, updatedAt: updatedAt ?? at ?? Date.now() };
+  if (deleted) c.deleted = true; else c.data = data && typeof data === 'object' ? data : rest;
+  return c;
+}
+
+/** `POST /api/sync` ِ چند تغییر (`change(...)`) */
+async function legacyPush(token, changes, { deviceId, operationId, headers = {} } = {}) {
+  return api('POST', '/api/sync', { token, headers, body: { deviceId, operationId, changes } });
+}
+
+/** کاشتنِ یک یا چند ردیفِ یک مجموعه: `seed(token, 'products', { id, name })` */
+async function seed(token, collection, rows, opts = {}) {
+  return legacyPush(token, [rows].flat().map((r) => change(collection, r, opts)), opts);
+}
+
+/** ردیف‌های یک مجموعه از pull ِ راهِ قدیم (آخرین نسخهٔ هر شناسه) به شکلِ `{ id, rev, updatedAt, userId, deleted, ...data }` */
+async function legacyRows(token, collection, { headers = {}, includeDeleted = false } = {}) {
+  const out = new Map();
+  for (let since = 0; ;) {
+    const r = await api('GET', `/api/sync?since=${since}&limit=5000`, { token, headers });
+    if (r.status !== 200) throw new Error(`pull ِ راهِ قدیم نشد: ${r.status} ${JSON.stringify(r.body)}`);
+    for (const c of r.body.changes) if (c.collection === collection) { out.delete(c.id); out.set(c.id, c); }
+    if (!r.body.hasMore) break;
+    since = r.body.rev;
+  }
+  return [...out.values()].filter((c) => includeDeleted || !c.deleted)
+    .map((c) => ({ id: c.id, rev: c.rev, updatedAt: c.updatedAt, userId: c.userId, deleted: c.deleted, ...(c.data || {}) }));
+}
+
+/** یک ردیف (زنده) یا null */
+async function legacyRow(token, collection, id, opts = {}) {
+  return (await legacyRows(token, collection, opts)).find((r) => r.id === id) || null;
+}
+
+/**
+ * لایهٔ نقشِ دکانِ همین توکن — درِ دکانِ `PUT /api/shop/permissions/roles/:role` برداشته شد (هیچ برنامه‌ای
+ * صدایش نمی‌زد)؛ همان `staff-perms.setRoleLayer` که درِ ارشدِ پنل (`/api/admin/shops/:id/staff-perms/roles/:role`)
+ * می‌زند. فقط برای چیدنِ آزمون؛ مجوزِ «چه کسی لایه را عوض می‌کند» سنجهٔ درِ ارشد است.
+ */
+async function roleLayer(token, role, perms) {
+  const me = await api('GET', '/api/shop/me', { token });
+  const shopId = me.body?.shop?.id;
+  if (!shopId) throw new Error(`دکانِ این توکن پیدا نشد: ${JSON.stringify(me.body)}`);
+  try {
+    return { status: 200, body: { role, perms: await require('../src/lib/staff-perms').setRoleLayer(shopId, role, perms, 'test') } };
+  } catch (e) {
+    if (!e.status) throw e;
+    return { status: e.status, body: { error: { code: e.code, message: e.message } } };
+  }
+}
+
 /**
  * پرچم‌های پیش‌فرض‌روشنِ `lib/flag-defaults.js` (۱۴۰۵/۰۸/۲۲) برای یک دکان `false` ِ صریح ⇒ همان رفتارِ پیش از آن تاریخ.
  * برای آزمونی که «خاموش» یا شکلِ دقیقِ پاسخِ پیشین را می‌سنجد؛ آزمون هر کلیدی را که می‌خواهد پس از این خودش روشن می‌کند.
@@ -235,7 +296,7 @@ async function defaultOnOff(shopId, keys = [...require('../src/lib/flag-defaults
 }
 
 module.exports = {
-  withoutEpochs, tampered, defaultOnOff,
+  withoutEpochs, tampered, defaultOnOff, change, legacyPush, seed, legacyRows, legacyRow, roleLayer,
   start, stop, resetDatabase, api, get, post, put, patch, del, raw, download, newUser, signIn, query,
   base: () => base,
   //  سرورِ HTTPِ آزمون — برای سوار کردنِ سوکتِ زنده (‎index.js‎ در تولید همین کار را می‌کند)
