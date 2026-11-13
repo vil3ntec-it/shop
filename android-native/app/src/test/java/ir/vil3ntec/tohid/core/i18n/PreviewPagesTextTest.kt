@@ -71,7 +71,7 @@ class PreviewPagesTextTest {
     { StrShellPages.syncBody(StrShellPages.syncNever) } to
       "دفترِ دکان روی سرور پشتیبان می‌گیرد و روی گوشیِ دیگر هم می‌آید. " + "آخرین همگام‌سازی: " + "هنوز انجام نشده",
     { StrShellPages.voiceSearch } to "جستجوی صوتی",
-    { StrShellPages.mobileOnce } to "شماره موبایل — یک بار ثبت می‌شود",
+    { StrShellPages.mobileOnce } to "شمارهٔ تماس (برای ورود نیست)",   //  «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): شماره دیگر قفل و راهِ ورود نیست
     { StrShellPages.smsCodeLabel } to "کدی که به همین شماره پیامک شد",
     { StrShellPages.smsCodeSent } to "کدی به همین شماره پیامک شد؛ آن را بنویسید و «ذخیره» را بزنید",
     { StrStockPages.editProduct } to "ویرایش محصول",
