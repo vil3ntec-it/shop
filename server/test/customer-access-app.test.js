@@ -51,8 +51,8 @@ test.before(async () => {
   Object.assign(T, { owner: await shop('الف') });
   for (const role of ['manager', 'staff', 'cashier', 'storekeeper', 'accountant']) T[role] = await member(T.owner.shopId, role, `کارمندِ ${role}`);
   Object.assign(B, { owner: await shop('ب') });
-  const d = await h.post('/api/debtors', { id: 'd-app', data: { name: 'مشتریِ وب', phone: PHONE } }, tok(T.owner));
-  assert.equal(d.status, 201, JSON.stringify(d.body));
+  const d = await h.seed(T.owner.token, 'debtors', { id: 'd-app', data: { name: 'مشتریِ وب', phone: PHONE } });
+  assert.deepEqual([d.status, d.body.applied], [200, 1], JSON.stringify(d.body));
 });
 test.after(async () => { await access.settle(); await h.stop(); });
 test.beforeEach(() => resetAll());
@@ -185,7 +185,7 @@ test('سطلِ هر کاربر پس از احراز: ۱۲۰ و بعد ۴۲۹؛ �
 test('SEC-10: ردیف‌های «app» ِ همان مشتری هم ناشناس می‌شوند؛ «*» و مشتریِ دیگر می‌مانند', async () => {
   await wipe();
   const erasure = require('../src/lib/customer-erasure');
-  await h.post('/api/debtors', { id: 'd-stay', data: { name: 'دیگری', phone: '0700111999' } }, tok(T.owner));
+  await h.seed(T.owner.token, 'debtors', { id: 'd-stay', data: { name: 'دیگری', phone: '0700111999' } });
   await note(T.manager, { customerId: 'd-app', kind: 'phone' });
   await note(T.manager, { customerId: 'd-stay', kind: 'detail' });
   await note(T.accountant, { customerId: '*', kind: 'export' });
@@ -216,7 +216,7 @@ test('مهاجرتِ ۶۱۰: rollback ردیف‌های «app» و CHECK ِ تا
   await assert.rejects(access.record({ shopId: T.owner.shopId, viewerId: T.owner.userId, customerRef: 'd-app', kind: 'detail', door: 'app' }), /check/i);
   //  بی CHECK ِ تازه: درِ app ۵xx (خواندنِ پرونده نمی‌افتد)
   assert.ok((await note(T.owner, { customerId: 'd-app', kind: 'export' })).status >= 500);
-  assert.equal((await h.get('/api/debtors/d-app', tok(T.owner))).status, 200);
+  assert.ok(await h.legacyRow(T.owner.token, 'debtors', 'd-app'), 'خواندنِ پرونده (همگام‌سازی) نمی‌افتد');
   await query(up);
   await query('INSERT INTO schema_migrations (version, checksum, applied_at) VALUES ($1,$2,$3)', [mark.version, mark.checksum, mark.applied_at]);
   assert.equal((await note(T.owner, { customerId: 'd-app', kind: 'export' })).status, 200);

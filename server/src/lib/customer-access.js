@@ -3,13 +3,13 @@
  * CRM-15 — «سابقهٔ دسترسی»: چه کسی پروندهٔ یک مشتری را دید (`customer_access_log`، مهاجرتِ ۳۸۰).
  *
  * چه ثبت می‌شود — هر خواندنِ **یک** مشتری از درِ سرور به دستِ صاحب یا کارمند:
- *   door `debtor`  `GET /api/debtors/:id` (پروندهٔ قرض‌دار: شماره، نشانی، مانده) — kind `phone` اگر شماره یا
- *                  نشانیِ کامل در پاسخ رفت، وگرنه `detail`؛
+ *   door `debtor`  (درِ `GET /api/debtors/:id` ۱۴۰۵/۰۸/۲۲ برداشته شد — هیچ برنامه‌ای صدایش نمی‌زد؛ ردیف‌های کهنه‌اش
+ *                  می‌مانند و در فهرست همان‌اند)؛
  *   door `orders`  `GET /api/shop/orders/customer` (CRM-07، سفارش‌های یک مشتری با شمارهٔ او) — kind `detail`.
  *   door `app`     `POST /api/shop/customer-access` ([noteApp]، مهاجرتِ ۶۱۰): دیدنی که **برنامه** از دفترِ خودش گزارش
  *                  می‌دهد — وب (`license/customer-access.js`، دفترِ مرورگر) و نقشی که `auditLog` نمی‌نویسد (حسابدار،
  *                  `perm-core.canWrite`)؛ `*` = خروجیِ برگهٔ همهٔ مشتریان (فقط `export`).
- *   فهرست‌ها (`GET /api/debtors`) و همگام‌سازی خواندنِ «یک مشتری» نیستند و این‌جا نمی‌آیند. خواندنِ دفترِ خودِ
+ *   فهرست‌ها و همگام‌سازی خواندنِ «یک مشتری» نیستند و این‌جا نمی‌آیند. خواندنِ دفترِ خودِ
  *   دستگاه (بی‌اینترنت) را برنامه در `auditLog` ِ دفتر می‌نویسد (`type = customer_view`) و با همان همگام‌سازیِ
  *   امروز به سرور می‌رسد — نه این جدول (`data/CustomerAccessLog.kt`).
  *
@@ -17,7 +17,7 @@
  *    شناسه `ph:` + HMAC ِ کلیدِ شماره (رازِ سرور؛ همان روشِ `customer-notify.phoneKey`). نام، شماره، نشانی و متن نه.
  * ⛔ یکی کردنِ تکرار: همان بیننده + همان مشتری + همان نوع در ۱۰ دقیقه از نخستین دیدنِ ردیف ⇐ همان ردیف با
  *    `hits + 1` (قفلِ تراکنشیِ همان کلید، تا دو درخواستِ هم‌زمان دو ردیف نسازند).
- * ⛔ نوشتن هرگز خواندن را نگه نمی‌دارد و نمی‌اندازد: [note] منتظر نمی‌ماند و هر خطا فقط شمرده می‌شود ([stats]،
+ * ⛔ نوشتن هرگز خواندن را نگه نمی‌دارد و نمی‌اندازد: [noteLookup] منتظر نمی‌ماند و هر خطا فقط شمرده می‌شود ([stats]،
  *    در «سلامت» ِ پنلِ مرکزی) — پاسخِ خواندن همان پاسخِ پیشین است.
  * ⛔ فقط‌افزودنی: تریگرِ جدول جز بالا رفتنِ `hits`/`last_at` و ناشناس شدنِ `customer_ref` (⇐ `erased:…`، SEC-10)
  *    هیچ ویرایشی را نمی‌پذیرد. پاک شدن فقط با نگه‌داری ([sweep]، `CUSTOMER_ACCESS_RETENTION_DAYS`؛ ۰ = همان
@@ -63,7 +63,7 @@ function phoneRef(phone) {
 }
 
 /**
- * یک خواندن ⇒ ردیفِ تازه یا `hits + 1` ِ ردیفِ ۱۰ دقیقهٔ اخیر. خطای پایگاه داده بالا می‌رود (برای [note]).
+ * یک خواندن ⇒ ردیفِ تازه یا `hits + 1` ِ ردیفِ ۱۰ دقیقهٔ اخیر. خطای پایگاه داده بالا می‌رود ([noteLookup] می‌شمارد، [noteApp] بالا می‌برد).
  * @returns {Promise<{id: string, hits: number}>}
  */
 async function record({ shopId, viewerId, role = '', deviceId = '', customerRef, kind, door, at = now() }) {
@@ -105,30 +105,11 @@ function failed(err) {
 }
 
 /**
- * ثبتِ یک خواندن از درِ سرور — بی انتظار، بی خطا. خواندن همیشه همان پاسخِ پیشین را می‌گیرد.
- * @param {import('express').Request} req درخواستِ صاحب/کارمند (پس از `requireShop`)
- * @param {{customerRef: string|null, kind: string, door: string}} what
- */
-function note(req, { customerRef, kind, door }) {
-  try {
-    if (!customerRef || !req || !req.shopId || !req.user) return;
-    const p = Promise.resolve()
-      .then(() => api.record({
-        shopId: req.shopId, viewerId: req.user.id, role: req.role || req.member?.role || '',
-        deviceId: req.device?.device_uid || '', customerRef, kind, door,
-      }))
-      .then(() => { counters.recorded += 1; }, failed)
-      .finally(() => pending.delete(p));
-    pending.add(p);
-  } catch (err) { failed(err); }
-}
-
-/**
  * ⛔ «سفارش‌های یک مشتری» (`GET /api/shop/orders/customer`): هر شماره‌ای که پرس‌وجو **واقعاً** خواند (همان دو شمارهٔ
  * نخستِ `orders.forCustomer`) ثبت می‌شود، نه فقط نخستین و نه فقط `customerId` ِ فرستاده. پیش‌تر `?phone=x&phone=<شماره>`
  * (نخستینِ نادرست ⇒ هیچ ردیف) یا `customerId` ِ ساختگی دیدن را از پروندهٔ همان مشتری پنهان می‌کرد. `customerId` ِ درست
  * (شمارهٔ پرس‌وجو در دفترِ سرورِ همان پرونده) ⇒ فقط یک ردیف با شناسهٔ پرونده، همان پیشین؛ هر شمارهٔ دیگر ردیفِ `ph:` ِ خودش.
- * بی انتظار و بی خطا، مثلِ [note].
+ * بی انتظار و بی خطا: خواندن همیشه همان پاسخِ پیشین را می‌گیرد.
  */
 function noteLookup(req, { customerId, phones, kind = 'detail', door = 'orders' }) {
   try {
@@ -283,7 +264,7 @@ async function sweep({ at = now(), days = retentionDays() } = {}) {
 
 const api = module.exports = {
   KINDS, DOORS, WINDOW_MS, PHONE_PREFIX, ERASED_PREFIX, ALL,
-  refOf, phoneRef, record, note, noteLookup, noteApp, settle, stats, list, anonymize, sweep, retentionDays,
+  refOf, phoneRef, record, noteLookup, noteApp, settle, stats, list, anonymize, sweep, retentionDays,
   //  برای آزمون
   _debtorIdsByPhone: debtorIdsByPhone, _counters: counters,
 };

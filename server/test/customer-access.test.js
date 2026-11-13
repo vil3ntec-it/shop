@@ -3,9 +3,10 @@
  * CRM-15 — «سابقهٔ دسترسی»: چه کسی پروندهٔ مشتری را دید (`lib/customer-access.js`، مهاجرتِ ۳۸۰).
  *
  * آن‌چه این پرونده قفل می‌کند:
- *   ۱) هر خواندنِ یک مشتری از درِ سرور ثبت می‌شود: پروندهٔ قرض‌دار (`GET /api/debtors/:id`؛ `phone` با شمارهٔ
- *      کامل، `detail` بی آن) و سفارش‌های یک مشتری (`GET /api/shop/orders/customer`؛ با `customerId` همان پرونده،
- *      بی آن کلیدِ یک‌طرفهٔ `ph:`)؛ نوعِ `export` هم پذیرفته است.
+ *   ۱) هر دیدنِ یک مشتری ثبت می‌شود: گزارشِ برنامه (`POST /api/shop/customer-access`؛ `phone` ِ اصلِ بی
+ *      `customers.contact` ⇐ `detail`) و سفارش‌های یک مشتری (`GET /api/shop/orders/customer`؛ با `customerId` همان پرونده،
+ *      بی آن کلیدِ یک‌طرفهٔ `ph:`)؛ نوعِ `export` هم پذیرفته است. (درِ مستقیمِ `GET /api/debtors/:id` ِ درِ `debtor`
+ *      ۱۴۰۵/۰۸/۲۲ برداشته شد؛ ردیف‌های کهنهٔ همان در می‌مانند.)
  *   ۲) یکی کردنِ تکرار: همان بیننده + مشتری + نوع در ۱۰ دقیقه ⇐ یک ردیف با شمار؛ پس از آن ردیفِ تازه.
  *   ۳) نوشتنِ ناموفق خواندن را نمی‌اندازد (پاسخ همان) و فقط شمرده می‌شود.
  *   ۴) هیچ دادهٔ شخصیِ مشتری (نام، شماره، نشانی) در ردیف‌ها نیست.
@@ -54,9 +55,11 @@ async function setFlag(scope, key, value) {
 const tok = (who) => ({ token: who.token });
 const rowsOf = (shopId) => many('SELECT * FROM customer_access_log WHERE shop_id=$1 ORDER BY first_at, id', [shopId]);
 async function debtor(owner, id, data) {
-  const r = await h.post('/api/debtors', { id, data }, tok(owner));
-  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const r = await h.seed(owner.token, 'debtors', { id, data });
+  assert.deepEqual([r.status, r.body.applied], [200, 1], JSON.stringify(r.body));
 }
+/** دیدنِ یک پرونده که برنامه گزارش می‌دهد (درِ `app`) */
+const view = (who, customerId, kind = 'detail') => h.post('/api/shop/customer-access', { customerId, kind }, tok(who));
 
 test.before(async () => {
   await h.start();
@@ -78,48 +81,46 @@ test.before(async () => {
 test.after(async () => { await access.settle(); await h.stop(); });
 test.beforeEach(() => resetAll());
 
-test('هر نوعِ خواندن ثبت می‌شود: پرونده با شماره (phone)، بی شماره (detail)، سفارش‌های مشتری (detail) و export', async () => {
+test('هر نوعِ دیدن ثبت می‌شود: پرونده با شماره (phone)، بی مجوزِ شماره (detail)، سفارش‌های مشتری (detail) و export', async () => {
   await query('DELETE FROM customer_access_log WHERE shop_id=$1', [T.owner.shopId]);
-  const full = await h.get('/api/debtors/d-file', tok(T.owner));
-  assert.equal(full.status, 200);
-  assert.equal(full.body.phone, PHONE, 'پاسخ همان پیشین');
-  //  انباردار `customers.contact` ندارد ⇒ شمارهٔ پوشیده ⇒ فقط «پرونده»
-  const masked = await h.get('/api/debtors/d-file', tok(T.storekeeper));
+  const full = await view(T.owner, 'd-file', 'phone');
+  assert.equal(full.status, 200, JSON.stringify(full.body));
+  assert.equal(full.body.kind, 'phone');
+  //  انباردار `customers.contact` ندارد ⇒ شمارهٔ کامل هرگز به او نرسیده ⇒ فقط «پرونده»
+  const masked = await view(T.storekeeper, 'd-file', 'phone');
   assert.equal(masked.status, 200);
-  assert.notEqual(masked.body.phone, PHONE);
+  assert.equal(masked.body.kind, 'detail');
   //  پروندهٔ بی شماره و نشانی ⇒ «پرونده»، حتی برای صاحب
-  assert.equal((await h.get('/api/debtors/d-bare', tok(T.owner))).status, 200);
-  //  سفارش‌های یک مشتری (CRM-07): برنامه شناسهٔ پرونده را می‌فرستد؛ API ِ مستقیم بی آن ⇒ کلیدِ یک‌طرفه
+  assert.equal((await view(T.owner, 'd-bare', 'detail')).status, 200);
+  //  سفارش‌های یک مشتری (CRM-07): برنامه شناسهٔ پرونده را می‌فرستد؛ بی آن ⇒ کلیدِ یک‌طرفه
   const ord = await h.get(`/api/shop/orders/customer?phone=${encodeURIComponent(PHONE)}&customerId=d-file`, tok(T.manager));
   assert.equal(ord.status, 200, JSON.stringify(ord.body));
   const bare = await h.get(`/api/shop/orders/customer?phone=${encodeURIComponent(PHONE)}`, tok(T.manager));
   assert.equal(bare.status, 200);
-  //  فهرست (نه یک مشتری) ثبت نمی‌شود
-  assert.equal((await h.get('/api/debtors?limit=50', tok(T.owner))).status, 200);
   await access.settle();
 
   const rows = await rowsOf(T.owner.shopId);
   const pick = (who, door, ref) => rows.filter((r) => r.viewer_id === who.userId && r.door === door && r.customer_ref === ref);
-  assert.deepEqual(pick(T.owner, 'debtor', 'd-file').map((r) => r.kind), ['phone']);
-  assert.deepEqual(pick(T.storekeeper, 'debtor', 'd-file').map((r) => r.kind), ['detail']);
-  assert.deepEqual(pick(T.owner, 'debtor', 'd-bare').map((r) => r.kind), ['detail']);
+  assert.deepEqual(pick(T.owner, 'app', 'd-file').map((r) => r.kind), ['phone']);
+  assert.deepEqual(pick(T.storekeeper, 'app', 'd-file').map((r) => r.kind), ['detail']);
+  assert.deepEqual(pick(T.owner, 'app', 'd-bare').map((r) => r.kind), ['detail']);
   assert.deepEqual(pick(T.manager, 'orders', 'd-file').map((r) => r.kind), ['detail']);
   assert.deepEqual(pick(T.manager, 'orders', access.phoneRef(PHONE)).map((r) => r.kind), ['detail']);
   assert.equal(rows.length, 5, JSON.stringify(rows));
-  const o = pick(T.owner, 'debtor', 'd-file')[0];
+  const o = pick(T.owner, 'app', 'd-file')[0];
   assert.equal(o.role, 'owner');
   assert.match(o.device_id, /^dev-/, 'دستگاهِ نشست');
   assert.equal(Number(o.hits), 1);
-  assert.equal(pick(T.storekeeper, 'debtor', 'd-file')[0].role, 'storekeeper');
+  assert.equal(pick(T.storekeeper, 'app', 'd-file')[0].role, 'storekeeper');
   //  نوعِ «خروجی» (برنامه در دفترِ دستگاه می‌نویسد؛ لایهٔ سرور هم می‌پذیرد) و نوعِ ناشناخته رد
-  const ex = await access.record({ shopId: T.owner.shopId, viewerId: T.owner.userId, role: 'owner', customerRef: 'd-file', kind: 'export', door: 'debtor' });
+  const ex = await access.record({ shopId: T.owner.shopId, viewerId: T.owner.userId, role: 'owner', customerRef: 'd-file', kind: 'export', door: 'app' });
   assert.equal(ex.hits, 1);
-  await assert.rejects(access.record({ shopId: T.owner.shopId, viewerId: T.owner.userId, customerRef: 'd-file', kind: 'peek', door: 'debtor' }));
+  await assert.rejects(access.record({ shopId: T.owner.shopId, viewerId: T.owner.userId, customerRef: 'd-file', kind: 'peek', door: 'app' }));
   //  هر دو شمارهٔ پرونده (اول و دوم) به همان پرونده می‌رسند (خواندنِ با شمارهٔ دوم)
   const seen = await h.get('/api/shop/customer-access?customerId=d-file', tok(T.owner));
   assert.equal(seen.status, 200, JSON.stringify(seen.body));
   const kinds = seen.body.entries.map((e) => `${e.door}/${e.kind}/${e.role}`).sort();
-  assert.deepEqual(kinds, ['debtor/detail/storekeeper', 'debtor/export/owner', 'debtor/phone/owner', 'orders/detail/manager', 'orders/detail/manager']);
+  assert.deepEqual(kinds, ['app/detail/storekeeper', 'app/export/owner', 'app/phone/owner', 'orders/detail/manager', 'orders/detail/manager']);
   const e = seen.body.entries.find((x) => x.kind === 'phone');
   assert.equal(e.viewerId, T.owner.userId);
   assert.equal(e.viewerName, 'صاحبِ الف');
@@ -149,7 +150,7 @@ test('تکرار در ۱۰ دقیقه یک ردیف با شمار است؛ پس 
   assert.equal(Number(row.last_at), t0 + access.WINDOW_MS - 1);
   //  از درِ واقعی: دو بار پشتِ هم ⇒ یک ردیف با شمارِ ۲ (دو درخواستِ هم‌زمان هم یک ردیف — قفلِ همان کلید)
   await query('DELETE FROM customer_access_log WHERE shop_id=$1 AND customer_ref=$2', [T.owner.shopId, 'd-file']);
-  await Promise.all([h.get('/api/debtors/d-file', tok(T.cashier)), h.get('/api/debtors/d-file', tok(T.cashier)), h.get('/api/debtors/d-file', tok(T.cashier))]);
+  await Promise.all([view(T.cashier, 'd-file'), view(T.cashier, 'd-file'), view(T.cashier, 'd-file')]);
   await access.settle();
   const mine = await many('SELECT hits FROM customer_access_log WHERE shop_id=$1 AND customer_ref=$2 AND viewer_id=$3', [T.owner.shopId, 'd-file', T.cashier.userId]);
   assert.deepEqual(mine.map((r) => Number(r.hits)), [3]);
@@ -160,11 +161,10 @@ test('نوشتنِ ناموفقِ سابقه خواندن را نمی‌اندا
   const real = access.record;
   access.record = async () => { throw Object.assign(new Error('disk full'), { code: '53100' }); };
   try {
-    const r = await h.get('/api/debtors/d-file', tok(T.owner));
-    assert.equal(r.status, 200);
-    assert.equal(r.body.phone, PHONE);
-    const o = await h.get(`/api/shop/orders/customer?phone=${encodeURIComponent(PHONE)}&customerId=d-file`, tok(T.owner));
-    assert.equal(o.status, 200);
+    for (const phone of [PHONE, PHONE2]) {
+      const o = await h.get(`/api/shop/orders/customer?phone=${encodeURIComponent(phone)}&customerId=d-file`, tok(T.owner));
+      assert.equal(o.status, 200, 'پاسخ همان');
+    }
     await access.settle();
   } finally { access.record = real; }
   assert.equal(access.stats().failed, before + 2);
@@ -172,9 +172,8 @@ test('نوشتنِ ناموفقِ سابقه خواندن را نمی‌اندا
   //  خطای واقعیِ پایگاه داده (جدول نیست) هم همان
   await query('ALTER TABLE customer_access_log RENAME TO customer_access_log_off');
   try {
-    const r = await h.get('/api/debtors/d-file', tok(T.manager));
+    const r = await h.get(`/api/shop/orders/customer?phone=${encodeURIComponent(PHONE)}&customerId=d-file`, tok(T.manager));
     assert.equal(r.status, 200);
-    assert.equal(r.body.name, NAME);
     await access.settle();
   } finally { await query('ALTER TABLE customer_access_log_off RENAME TO customer_access_log'); }
   assert.equal(access.stats().failed, before + 3);
@@ -184,7 +183,7 @@ test('نوشتنِ ناموفقِ سابقه خواندن را نمی‌اندا
 });
 
 test('هیچ دادهٔ شخصیِ مشتری در ردیف‌ها نیست (نام، شماره، نشانی، یادداشت)', async () => {
-  await h.get('/api/debtors/d-file', tok(T.owner));
+  await view(T.owner, 'd-file', 'phone');
   await h.get(`/api/shop/orders/customer?phone=${encodeURIComponent(PHONE)}`, tok(T.owner));
   await h.get(`/api/shop/orders/customer?phone=${encodeURIComponent(PHONE2)}`, tok(T.owner));
   await access.settle();
@@ -198,16 +197,15 @@ test('هیچ دادهٔ شخصیِ مشتری در ردیف‌ها نیست (ن�
 });
 
 test('جداسازیِ دکان: «ب» با شناسهٔ پروندهٔ «الف» هیچ نمی‌بیند؛ نوشتن‌های «ب» در دکانِ خودش', async () => {
-  await h.get('/api/debtors/d-file', tok(T.owner));
+  await view(T.owner, 'd-file');
   await access.settle();
   const other = await h.get('/api/shop/customer-access?customerId=d-file', tok(B.owner));
   assert.equal(other.status, 200);
   assert.deepEqual(other.body.entries, []);
-  //  «ب» نمی‌تواند پروندهٔ «الف» را بخواند (۴۰۴) و ردیفی هم نمی‌سازد
+  //  دیدنِ «ب» با همان شناسه فقط در دکانِ خودِ «ب» می‌نشیند (شناسهٔ پرونده کلیدِ فضای هر دکان است)
   const before = (await rowsOf(T.owner.shopId)).length;
-  assert.equal((await h.get('/api/debtors/d-file', tok(B.owner))).status, 404);
   await debtor(B.owner, 'd-file', { name: 'همنامِ ب' });
-  assert.equal((await h.get('/api/debtors/d-file', tok(B.owner))).status, 200);
+  assert.equal((await view(B.owner, 'd-file')).status, 200);
   await access.settle();
   assert.equal((await rowsOf(T.owner.shopId)).length, before);
   const mineB = await rowsOf(B.owner.shopId);
@@ -246,8 +244,8 @@ test('مجوز: فقط audit.view (صاحب، مدیر، حسابدار)؛ شا�
 test('SEC-10: حذفِ دادهٔ مشتری ردیف‌های همان مشتری را ناشناس می‌کند؛ مشتریِ دیگر و دکانِ دیگر دست نمی‌خورند', async () => {
   const erasure = require('../src/lib/customer-erasure');
   await debtor(T.owner, 'd-keep', { name: 'دیگری', phone: '0700999888' });
-  await h.get('/api/debtors/d-file', tok(T.manager));
-  await h.get('/api/debtors/d-keep', tok(T.manager));
+  await view(T.manager, 'd-file');
+  await view(T.manager, 'd-keep');
   await h.get(`/api/shop/orders/customer?phone=${encodeURIComponent('+93799123456')}`, tok(T.manager));
   await access.settle();
   //  پرونده، شماره، و شمارهٔ دومِ همان پرونده (خواندنی با شمارهٔ دوم در آزمونِ پیشین)
@@ -311,26 +309,18 @@ test('مهاجرتِ ۳۸۰: rollback جدول، تریگر و ردیفِ خود
   assert.equal(await fn(), 0);
   assert.equal(await one('SELECT 1 AS x FROM schema_migrations WHERE version = $1', [name]), null);
   assert.equal((await one('SELECT COUNT(*)::int AS n FROM debtors')).n, debtors, 'دفتر دست نخورد');
-  //  بی جدول هم خواندن می‌افتد نه
-  assert.equal((await h.get('/api/debtors/d-bare', tok(T.owner))).status, 200);
+  //  بی جدول هم خواندن می‌افتد نه (سفارش‌های یک مشتری: ثبت بی انتظار)
+  const lookup = () => h.get(`/api/shop/orders/customer?phone=${encodeURIComponent('0700000000')}&customerId=d-bare`, tok(T.owner));
+  assert.equal((await lookup()).status, 200);
   await access.settle();
   await query(up);
   await query('INSERT INTO schema_migrations (version, checksum, applied_at) VALUES ($1,$2,$3)', [mark.version, mark.checksum, mark.applied_at]);
   assert.equal(await has(), 1);
   assert.equal(await fn(), 1);
-  await h.get('/api/debtors/d-bare', tok(T.owner));
+  await lookup();
   await access.settle();
-  assert.equal((await rowsOf(T.owner.shopId)).length, 1);
+  assert.equal((await rowsOf(T.owner.shopId)).filter((r) => r.customer_ref === 'd-bare').length, 1);
 });
 
-test('SR46-3: پرونده‌ای که فقط پینِ تحویل (CRM-09، فیلدِ تماس) دارد هم «تماس» ثبت می‌شود، نه «پرونده»', async () => {
-  await debtor(T.owner, 'd-pin', { name: 'فقط پین', deliveryPin: { lat: 34.523456, lng: 69.181234 } });
-  await query('DELETE FROM customer_access_log WHERE shop_id=$1', [T.owner.shopId]);
-  assert.deepEqual((await h.get('/api/debtors/d-pin', tok(T.owner))).body.deliveryPin, { lat: 34.523456, lng: 69.181234 });
-  //  انبارداری که `customers.contact` ندارد پین را نمی‌بیند ⇒ همان «پرونده»
-  assert.equal((await h.get('/api/debtors/d-pin', tok(T.storekeeper))).body.deliveryPin, undefined);
-  await access.settle();
-  const rows = (await rowsOf(T.owner.shopId)).filter((r) => r.customer_ref === 'd-pin');
-  assert.deepEqual(rows.map((r) => [r.viewer_id === T.owner.userId ? 'owner' : 'storekeeper', r.kind]).sort(),
-    [['owner', 'phone'], ['storekeeper', 'detail']]);
-});
+//  SR46-3 («پرونده‌ای که فقط پین دارد» ⇐ `phone`) قاعدهٔ درِ `GET /api/debtors/:id` بود و با همان در رفت؛ پین هم‌چنان
+//  فیلدِ تماس است (`customer-contact.test.js`، CRM-09) و نوعِ دیدن را برنامه می‌گوید (`openKind`).
