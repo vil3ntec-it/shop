@@ -152,10 +152,9 @@ DELETE /api/shop/members/:id   حذف عضو
 ```
 GET  /api/sync?since=<rev>     گرفتن تغییرات تازه
 POST /api/sync                 فرستادن تغییرات (با operationId)
-GET/POST/PUT/DELETE /api/products  /api/debtors  /api/sales
-                    /api/inventory /api/expenses /api/payments
-POST /api/sales/full           ثبت فروش + اقلام + انبار + پرداخت در یک تراکنش
+POST /api/sync/v1/push · GET /api/sync/v1/pull   همگام‌سازیِ برنامه‌ها (v3: /api/sync/v3)
 ```
+(درِ مستقیمِ `/api/products`، `/api/sales/full`… ۱۴۰۵/۰۸/۲۲ برداشته شد: هیچ برنامه‌ای صدایش نمی‌زد؛ نوشتن فقط از همگام‌سازی.)
 
 **مدیریت**
 ```

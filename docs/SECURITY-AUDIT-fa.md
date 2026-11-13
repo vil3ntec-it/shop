@@ -536,6 +536,30 @@ PostgreSQL 16 سبز.
 `STORE_MAP_TILES` (فقط مبدأ در `img-src`، بی تزریقِ سرآیند)، پرونده‌های وب فقط با `textContent`، `till-op-user` بی دست زدن به پاسخِ همگام‌سازی،
 `capMinor` سخت‌تر نه سست‌تر، ورک‌فلوها (`pull_request`، `contents: read`، اکشن با SHA، بی secret)، SQL ِ پارامتری.
 
+### B15) برداشتنِ درهای بی صدازننده — سطحِ حمله (۱۴۰۵/۰۸/۲۲، شاخهٔ `claude/e-rows-41s`)
+
+روش: بازرسیِ فقط‌خواندنی همهٔ ۱۰۶۷ درِ زنده (`inventory.live`) در برابرِ هر صدازنندهٔ ممکن: `server/public/**` (ویترین، بازارچه،
+پرتال، SDK، رسید، پنلِ مرکزی)، Kotlin/Swift ِ همهٔ برنامه‌ها (`android-native`، `core`، `desktop`، `ios`، `customer-*`،
+`admin-android`)، پوستهٔ WebView ِ `android/` **و وبِ دکانِ برداشته‌ای که هنوز درونِ APK ِ آن است** (`git show b187c45be^`)،
+نسخهٔ بومیِ بایگانی‌شدهٔ `android/native-ui-archive` (همان بستهٔ `af.tohid.shop`)، بات‌ها (درون‌فرآیندی، بی HTTP)، `server/scripts`،
+`tools/`، `bench/` و قراردادِ API. ⛔ کدِ پمپ دست نخورد: دستگیره‌های مشترک (`portal.settingsHandler`، `redeemHandler`،
+`reportErrorHandler`) زیرِ `/api/pump` همان‌اند.
+
+| # | شدت | یافته | حال | سنجه |
+|---|---|---|---|---|
+| SR-D1 | High | درِ مستقیمِ داده (`routes/data.js`، ۵۱ در: `/api/products|inventory|sales|sale-items|suppliers|purchases|returns|debtors|expenses|payments` با GET/POST و GET/PUT/DELETE ِ `/:id`، و `POST /api/sales/full`) راهِ دومِ نوشتن روی دفترِ دکان بود — هر نگهبانِ تازه (B7، SR43-2، CRM-15، سقف‌ها) باید دو بار رویش وصله می‌شد؛ روی `/` با `requireUser` هر مسیرِ ناشناختهٔ `/api` را هم با ۴۰۱ می‌قاپید (تلهٔ `/api/v1` و `admin` ِ ۴۰۱). هیچ برنامه‌ای (امروز یا در تاریخچه) صدایش نمی‌زد (`ApiEndpoints.kt`: «هر مسیری که اینجا نیست، صدا زده نمی‌شود») | بسته: برداشته؛ نوشتن فقط از همگام‌سازی (v1، v3 و راهِ قدیمِ `/api/sync`). همهٔ نگهبان‌هایش (S89/B7 با دستگاهِ زنجیره‌دار، SR43-2، سقفِ قیمت/قرض/اعتبار، برگشتِ بیش از فروخته، پوشاندنِ شمارهٔ مشتری) روی همان `pushChanges` ِ راهِ قدیم سنجیده می‌شوند. مسیرِ ناشناخته حالا ۴۰۴ | `dead-doors.test.js`؛ `posted-docs`، `security-review-43`، `finalized-sales`، `sale-void-chain`، `price-cap`، `credit-cap`، `credit-limit-perm`، `return-line-cap`، `customer-contact` |
+| SR-D2 | Medium | `PUT /api/me/settings` ِ نشستِ دکان: هر عضو (شاگرد هم) «همگام‌سازیِ ابری» ِ **کلِ دکان** را عوض می‌کرد؛ با `GET` و `POST /api/me/redeem|errors` نام‌های مرده‌ای بودند که برنامه‌ها جای دیگرش را می‌زنند (`/api/portal/*` ِ SDK، `/api/vip/redeem`، `/api/errors`) | بسته: برداشته (دستگیره‌ها برای پرتال و پمپ همان) | `dead-doors.test.js`، `tenant-matrix.test.js` |
+| SR-D3 | Low | نام‌ها و درهای مردهٔ دکان: `GET /api/shop/memberships`، `POST /api/shop/leave`، `GET`/`PUT /api/shop/settings` (کلِ سند)، `PUT /api/shop/permissions/roles/:role`، `GET /api/shop/approvals`؛ `GET /api/portal/subscriptions`؛ نامِ دومِ `POST /api/auth/staff-login` | بسته: برداشته (لایهٔ نقش از پنلِ مرکزی همان `/api/admin/shops/:id/staff-perms/roles/:role` ِ ارشد؛ سابقهٔ تأییدها در `shop_approvals`) | `dead-doors.test.js`، `route-authz-inventory`، `shop-route-inventory`، `paid-routes-entitlement` |
+
+⚠️ عمداً ماندند (برنامهٔ کهنهٔ در دست هنوز صدا می‌زند؛ هم‌دستگیرهٔ درِ زنده، پس سطحِ تازه‌ای نیستند):
+`GET /api/billing/status|plans` و `POST /api/billing/request` (`vip.js` ِ وبِ درونِ APK ِ پوستهٔ WebView)، `POST /api/shop/invite`
+(`shop-ui.js` ِ همان)، `GET`/`POST`/`PUT /api/shop` و `POST /api/shop/staff/join` (نسخهٔ بومیِ بایگانی‌شده و `server/README.md`)؛
+`POST /api/shop/active` (قاعدهٔ TEN-01، `RULES-fa.md`) و `GET /api/shop/audit` (درِ دیدنِ `security.doc_chain` و `sale.credit_over_limit`
+در RULES). برداشتنشان فقط پس از داشبوردِ نسخه‌ها (هیچ نصبِ کهنه‌ای نماند) یا ۴۱۰ ِ روشن.
+نامطمئن یا پیش‌ساخته پشتِ پرچم (دست نخوردند): `/api/market/account/**`، `…/trust/cases/:token/evidence`، `/api/shop/catalog/*`،
+`/api/shop/till-pin/*`، `…/track-link/revoke`، `/api/shop/images/:id/versions|report|process`، `/api/courier/route|map`،
+`/api/shop/delivery/settlements/:id`، `/api/shop/trust/sanctions`، `/api/terms`، `GET /api/store`، `POST /api/auth/logout-all`.
+
 ---
 
 ## C) API و دیتابیس — جدا

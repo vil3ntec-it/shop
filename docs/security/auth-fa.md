@@ -15,7 +15,7 @@ PRها: **A** = `claude/sec-auth` (همین سند) · **B** = #587 `claude/sec-
 | ثبت‌نام (سه‌پله)، ورود با رمز، کدِ یک‌بارمصرف، گوگل، کدِ ایمیلیِ هر برنامه | `routes/auth.js`، `routes/app-auth.js` | سقفِ IP و مقصد، قفلِ «شناسه + IP» و سراسری، `burnTime` |
 | تازه‌سازی (چرخشی)، خروج، خروج از همه، رمز، بازیابی | `routes/auth.js`، `lib/tokens.js` | ردِ بازپخش ⇒ بستنِ خانواده؛ عوض شدنِ رمز ⇒ بستنِ نشست‌ها |
 | تأییدِ دوباره (کارِ حساسِ دکان) | `lib/reauth.js` | پنجرهٔ ده‌دقیقه‌ای بسته به هشِ توکن |
-| ورود با کدِ شاگرد، پیوستن، نقش، برداشتن/تعلیقِ عضو | `routes/auth.js` (`/staff-login`)، `routes/shop.js`، `routes/pump.js` | `members.role`/`members.manage` فقط صاحب، صاحب تغییرناپذیر |
+| ورود با کدِ شاگرد، پیوستن، نقش، برداشتن/تعلیقِ عضو | `routes/auth.js` (`/staff`)، `routes/shop.js`، `routes/pump.js` | `members.role`/`members.manage` فقط صاحب، صاحب تغییرناپذیر |
 | دستگاه: ثبت (هنگامِ ورود)، باطل (`/me/devices`، `/shop/devices/*/disable`، پمپ `revoke/restore`) | `routes/me.js`، `routes/shop-staff.js`، `routes/pump*.js` | مالکیت در سرور |
 | ورودِ مدیر، TOTP، مدیرها | `routes/admin.js`، `routes/admin-2fa.js`، `lib/admin-2fa.js` | توکنِ `kind=admin` جدا |
 
