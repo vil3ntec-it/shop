@@ -54,6 +54,26 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-40k (ی۵) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-40k` (از سرِ `claude/batch-57`، ccfbef65e)
+
+- **کلیدِ مجوزِ آیفون (میانه، SUB-02):** `ios/shared/build.gradle.kts` ِ `generateConfig` `LICENSE_PUBLIC_KEY = ""` را ثابت می‌گذاشت ⇒
+  `SyncStore.PINNED_PUBLIC_KEY` تهی و کلید از NSUserDefaults (ویرایش‌پذیر، در پشتیبان) ⇒ `LicenseGuard`/`OfflineCode.verify` با کلیدِ
+  دست‌کاری‌پذیر. اکنون همان منبعِ کامپیوتر (`env("TOHID_LICENSE_PUBLIC_KEY") ?: prop("tohid.licenseKey")`، همان `dev`)، کلید ورودیِ کار، و
+  هشدارِ ساخت وقتی تهی است (فقط `-Pios=true`). `IosLicensePinTest` (desktop، دو پروندهٔ Gradle را می‌خواند) روی پروندهٔ پیشین ۳/۳ سرخ،
+  پس از تغییر سبز؛ اجرای واقعیِ `-p ios/shared generateConfig`: کلیدِ محیط ⇒ همان، `-Pdev=true` ⇒ «»، بی کلید ⇒ «» و هشدار. ورک‌فلوها دست
+  نخوردند: `ios-spike.yml` کلید را نمی‌دهد ⇒ سطرِ تازه در `OWNER-NEXT-fa.md` §۳ برای ساختِ انتشاریِ آیفون. `SIGNING_SHA256`/`UPDATE_PUBLIC_KEY`
+  عمداً خالی (توضیح دقیق شد).
+- **کدِ مرده:** `ShopperApi.chats` و سطرِ آزمونش؛ `ShopperText.appName` (سنجهٔ زبانِ `CustomerModelTest` ⇐ `ShopperText.back`)؛ `crmTabs`
+  (+ `CustomerReportsPhoneTest`؛ دو سنجهٔ `DariCoverageTest` مستقیم روی `StrReach.tabAging/tabRfm`) و `SERVERS_SECTION_TITLE` — گراف
+  (`39m/graph.py` روی همین شاخه) و grep ⇒ بی‌راه. ⚠️ کفِ «پوششِ دریِ دورِ ۵» ِ `DariCoverageTest` ۱۹ ⇐ ۱۸ پایین آمد (۱۱ از ۶۱): همان دو کلید
+  با `crmTabs` از پرونده‌های دورِ ۵ رفتند و در نسخهٔ ۳ زنده‌اند؛ دلیل در توضیحِ همان کف.
+- **اسناد:** DATA-06 — «آیفون `sync-v3/` را از پشتیبانِ iCloud بیرون نمی‌گذارد» کهنه بود (`NoBackupDirs`، b41c514b9؛ `NoBackupDirsJvmTest` ۷/۷
+  محلی)؛ ردیف همان PARTIAL در «دستگاه» (دو گوشیِ واقعی). شاهد در SUB-02، CRM-04، CRM-14؛ نقشهٔ PARTIAL (شمارها همان).
+- **سقفِ اندازه:** `DeskSale.kt` ۱۰۸۶ ⇐ ۱۰۷۹ و نُه پروندهٔ دیگر به اندازهٔ امروز (`ReportFresh.kt` زیرِ ۸۰۰ از فهرست رفت)؛ فقط پایین.
+- **آزمون‌ها:** `core` jvmTest ۱۹۰۳ (۰ شکست، ۲ SKIP)؛ نگهبان‌های سرور ۲۴/۲۴؛ precheck `fail=0`، `quality.mjs` بی ❌؛ اجرای کاملِ
+  `flock /tmp/gradle-full.lock ./desktop/gradlew --no-daemon -p desktop test` ⇒ ۴۱۱۲ آزمون، ۰ شکست، ۴ SKIP ِ پیشین. `customer-android` فقط CI.
+- **نیمه‌کاره/قدمِ بعدی:** هیچ. بررسی‌نشده: `NoBackupDirsIosTest` و آزمونِ سرتاسریِ آیفون با این شاخه (فقط CI ِ macOS)؛ کامپایلِ `customer-android`.
+
 ### ۱۴۰۵/۰۸/۲۲ (شب) — هماهنگ‌کننده: دسته‌های ۵۵ و ۵۶ در main، دستهٔ ۵۷ آماده
 
 - **در main:** دستهٔ ۵۵ (#1041؛ پس از رفعِ گیرِ `sharp` زیرِ Electron در `jpeg-trailer.test.js`)، server #147 (پنل 1.50.98) و دستهٔ ۵۶
