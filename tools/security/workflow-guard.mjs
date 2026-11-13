@@ -39,6 +39,8 @@ export const WRITE_JOBS = {
   'desktop-shots.yml:publish': ['contents'],
   'web-pages.yml:deploy': ['contents', 'pages', 'id-token'],
   'android-release.yml:release': ['contents'],
+  //  OPS-01: برچسبِ نسخه‌دارِ انتشارِ مرحله‌ای — فقط همان بایت‌های آزمایشیِ آزموده، بی ساخت و بی کلیدِ امضا
+  'release-stage.yml:publish': ['contents'],
   'codeql.yml:analyze': ['security-events'],
 };
 
@@ -48,12 +50,14 @@ export const RELEASE_JOBS = {
   'tohid-desktop.yml:publish': 'نصابِ کامپیوتر',
   'tohid-admin.yml:publish': 'برنامهٔ مدیر',
   'android-release.yml:release': 'پوستهٔ WebView (بازنشسته)',
+  'release-stage.yml:publish': 'برچسبِ نسخه‌دارِ انتشارِ مرحله‌ای (کپیِ آزمایشیِ آزموده)',
 };
 
-/** انتشارِ بی گامِ آزمون که آگاهانه مانده: «فایل:کار» ⇒ دلیل. «فقط از main» برایش همچنان سد است. */
-export const RELEASE_UNTESTED = {
-  'android-release.yml:release': 'پوستهٔ WebView ِ بازنشسته (۱۴۰۵/۰۷/۲۰)، فقط دستی؛ پروژهٔ android/ آزمونِ واحد ندارد',
-};
+/**
+ * انتشارِ بی گامِ آزمون که آگاهانه مانده: «فایل:کار» ⇒ دلیل. «فقط از main» برایش همچنان سد است.
+ * خالی از ۱۴۰۵/۰۸/۲۳ (S64، OA §۹د): پوستهٔ بازنشستهٔ `android-release.yml` هم کارِ «test» (`testReleaseUnitTest`) گرفت.
+ */
+export const RELEASE_UNTESTED = {};
 
 /** گامِ آزمون: gradle/gradlew با کارِ test (‎test، jvmTest، testReleaseUnitTest…)، npm test، node --test */
 const TEST_RUN = /\b(?:gradlew|gradle)\b[^\n]*?\s:?(?:[\w:]*:)?(?:test|jvmTest|test\w*UnitTest)\b|\bnpm (?:run )?test\b|\bnode --test\b/;

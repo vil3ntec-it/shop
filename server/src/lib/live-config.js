@@ -198,6 +198,37 @@ async function set(scope, key, value, by = '', meta = {}) {
 }
 
 /**
+ * همان `set`، فقط اگر متنِ ذخیره‌شدهٔ فعلی دقیقاً `expected` است (compare-and-set، زیرِ `FOR UPDATE`).
+ * برای نوشتنِ خودکارِ سرور (ایستِ خودکارِ انتشارِ مرحله‌ای، OPS-01) تا روی تصمیمِ تازه‌ترِ مدیر که میانِ
+ * خواندن و نوشتن رسیده ننشیند. ⇐ `{ changed, version }`؛ کلید نیست یا عوض شده ⇒ `changed: false` و بی هیچ اثر.
+ */
+async function setIf(scope, key, expected, value, by = '', meta = {}) {
+  const s = checkScope(scope);
+  const k = writable(checkKey(key));
+  if (value === undefined) throw badInput('مقدار لازم است', 'bad_value');
+  const text = JSON.stringify(value);
+  if (text.length > MAX_VALUE) throw badInput(`مقدار حداکثر ${MAX_VALUE} نویسه`, 'value_too_long');
+  let version = 0;
+  const changed = await tx(async (client) => {
+    const cur = await client.query('SELECT value FROM live_config WHERE scope=$1 AND key=$2 FOR UPDATE', [s, k]);
+    if (!cur.rows.length || cur.rows[0].value !== expected) return false;
+    await client.query(
+      'UPDATE live_config SET value=$3, updated_at=$4, updated_by=$5 WHERE scope=$1 AND key=$2',
+      [s, k, text, now(), String(by || '').slice(0, 80)]
+    );
+    await recordHistory(client, { scope: s, key: k, action: 'set', oldValue: expected, newValue: text, by, meta });
+    version = await bump(client, s);
+    return true;
+  });
+  if (changed) {
+    raise(s, version);
+    cluster.publish('live-config', { s, v: version });
+    flagsChanged(s);
+  }
+  return { changed, version };
+}
+
+/**
  * فقط اگر کلید نیست بنویس (کارِ سیستم، نه پنل) — دو نوشتنِ هم‌زمان ⇒ نخستین می‌ماند؛ هست ⇒ هیچ،
  * بی بالا بردنِ نسخه. سقفِ کلیدها را نمی‌سنجد (کلیدِ سیستمیِ یک‌باره). ⇒ { inserted }
  */
@@ -244,4 +275,4 @@ async function remove(scope, key, by = '', meta = {}) {
 /** فقط برای سنجه‌ها: حافظه را خالی کن تا از دیتابیس خوانده شود. */
 function _forget() { versions.clear(); }
 
-module.exports = { ALL, KEY_RE, MAX_VALUE, MAX_KEYS, RESERVED, versionOf, snapshot, list, set, setOnce, remove, history, checkScope, checkKey, _forget };
+module.exports = { ALL, KEY_RE, MAX_VALUE, MAX_KEYS, RESERVED, versionOf, snapshot, list, set, setIf, setOnce, remove, history, checkScope, checkKey, _forget };
