@@ -96,7 +96,8 @@ object BranchesReport {
   private fun JsonElement?.text(): String? = (this as? JsonPrimitive)?.takeIf { it.isString }?.content
   private fun JsonElement?.flag(): Boolean = (this as? JsonPrimitive)?.takeUnless { it.isString }?.booleanOrNull == true
 
-  private fun summaryOf(o: JsonObject?): Summary = Summary(
+  /** همان خواندنِ خلاصه برای گزارشِ شعبه‌های درونِ یک دکان (`core/branch/BranchTally`) */
+  internal fun summaryOf(o: JsonObject?): Summary = Summary(
     values = SUM_KEYS.associateWith { o?.get(it).long() },
     payments = (o?.get("payments") as? JsonArray).orEmpty().mapNotNull { e ->
       val p = e.obj() ?: return@mapNotNull null
