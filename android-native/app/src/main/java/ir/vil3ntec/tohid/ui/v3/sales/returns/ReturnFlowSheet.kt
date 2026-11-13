@@ -92,6 +92,8 @@ fun ReturnFlowSheet(
   onClose: () -> Unit,
   /** فقط عکسِ CI: یک واحد از قلمِ اول و دلیلِ اول از پیش پر */
   prefill: Boolean = false,
+  /** RET-11: درخواستِ برگشتِ ویترین — سندِ ثابتِ `o-<سفارش>-rq-<درخواست>`، مقدارها و دلیلِ پیشنهادی از پیش پر؛ بازپرداخت نقد */
+  preset: ir.vil3ntec.tohid.data.ReturnRequestPrefill.Preset? = null,
 ) {
   val context = LocalContext.current
   val c = PhoneV3.colors
@@ -105,7 +107,7 @@ fun ReturnFlowSheet(
   val policy = remember { ReturnPolicyPrefs.of(context) }
   val me = remember { TillUser.me(context).trim() } // S46: کاربرِ صندوق — فروشندهٔ فاکتورِ تعویض و نویسندهٔ برگشت؛ خاموش ⇒ نامِ حساب
   //  شناسه‌های سند و فروشِ تعویض پیش از نخستین تلاش (§۱۵.۲ بندِ ۱)
-  val docId = remember { Ulid.next() }
+  val docId = remember { preset?.docId ?: Ulid.next() }
   val saleKey = remember { Ulid.next() }
   val chosen = remember { booleanArrayOf(false) }
   //  سدهای فروشِ صندوقِ همین دستگاه برای فروشِ تعویض — همان `CheckoutRoute`/`DeskSale`، نه `Checkout` ِ خام
@@ -115,11 +117,11 @@ fun ReturnFlowSheet(
   var expiryOk by remember { mutableStateOf<ExpiryGate.Approval?>(null) }
 
   val items = remember(d, sale) { if (sale == null) emptyList() else d.saleItems.filter { it.saleId == sale.id && ReturnLeft.left(d, it) > 0 } }
-  var qtys by remember { mutableStateOf<Map<String, String>>(if (prefill) items.take(1).associate { it.id to "1" } else mapOf()) }
+  var qtys by remember { mutableStateOf<Map<String, String>>(preset?.qtys ?: if (prefill) items.take(1).associate { it.id to "1" } else mapOf()) }
   var disp by remember { mutableStateOf(mapOf<String, String>()) }
   var free by remember { mutableStateOf(listOf<ReturnFree>()) }
-  var reason by remember { mutableStateOf<String?>(if (prefill) reasons.first() else null) }
-  var mode by remember { mutableStateOf(ReturnFlow.ORIGINAL) }
+  var reason by remember { mutableStateOf<String?>(preset?.reason?.takeIf { it in reasons } ?: if (prefill) reasons.first() else null) }
+  var mode by remember { mutableStateOf(if (preset != null) ReturnFlow.CASH else ReturnFlow.ORIGINAL) }
   var customerId by remember { mutableStateOf(sale?.debtorId) }
   var exchange by remember { mutableStateOf(false) }
   var cart by remember { mutableStateOf(listOf<SalesEngine.CartLine>()) }
@@ -253,6 +255,7 @@ fun ReturnFlowSheet(
     }
 
     Label(StrSale.refundWord)
+    if (preset != null) { V3Message(V3Tone.INFO, ir.vil3ntec.tohid.core.i18n.StrReturnRequests.onlineRefund); Spacer(Modifier.height(8.dp)) }
     val modes = ReturnFlowModel.modes(sale != null)
     V3Segmented(modes.map { it.second }, modes.indexOfFirst { it.first == mode }.coerceAtLeast(0), { mode = modes[it].first })
     if (mode == ReturnFlow.STORE_CREDIT && sale?.debtorId == null) {
