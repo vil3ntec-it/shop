@@ -447,7 +447,7 @@ test('قفلِ «سفارش ⇐ مأموریت» (`delivery.lockOrderOf`، تس�
     for (const k of ['shop.orders', 'shop.delivery']) await setFlag(S.id, k, true);
     const inv = await h.post('/api/shop/invite', { role: 'courier' }, { token: S.owner.token });
     assert.equal(inv.status, 201, JSON.stringify(inv.body));
-    const cl = await h.post('/api/auth/staff-login', { code: inv.body.code, name: `پیکِ ${S.label}`, device: { uid: `cr-${uniq()}`, name: 'گوشیِ پیک', platform: 'android' } });
+    const cl = await h.post('/api/auth/staff', { code: inv.body.code, name: `پیکِ ${S.label}`, device: { uid: `cr-${uniq()}`, name: 'گوشیِ پیک', platform: 'android' } });
     assert.equal(cl.status, 201, JSON.stringify(cl.body));
     remember(`token:courier-${S.label}`, cl.body.accessToken);
     return { token: cl.body.accessToken, id: (await h.get('/api/courier/me', { token: cl.body.accessToken })).body.courier.id };

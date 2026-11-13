@@ -33,7 +33,7 @@ const BINDER = ['requireShop', 'requireStation', 'requireSyncAccount', 'requireD
 
 const PUBLIC = [
   ['ورود، ثبت‌نام و بازیابی — خودشان راهِ گرفتنِ توکن‌اند؛ سقفِ نرخ، قفلِ تلاش و کدِ یک‌بارمصرف (login-hardening، sec-auth)', [
-    'POST /api/auth/staff', 'POST /api/auth/staff-login',
+    'POST /api/auth/staff', 'POST /api/auth/staff',
     'POST /api/auth/register', 'POST /api/auth/register/start', 'POST /api/auth/register/verify', 'POST /api/auth/register/complete',
     'POST /api/auth/login', 'POST /api/auth/otp/request', 'POST /api/auth/otp/verify',
     'POST /api/auth/google', 'POST /api/auth/google/link-code',

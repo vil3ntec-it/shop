@@ -63,7 +63,7 @@ test('راهِ قدیم هنوز شمرده می‌شود و ردیفِ مشتر
   const u = await h.newUser('صاحبِ قدیمی', 'shop');
   const shop = (await h.post('/api/shop', { name: 'دکانِ قدیمی' }, { token: u.accessToken })).body.shop;
   const s = await h.signIn(u, 'shop');
-  const legacy = await h.post('/api/products', { id: 'old-1', data: { name: 'کالای قدیمی', price: 10 } }, { token: s.accessToken });
+  const legacy = await h.seed(s.accessToken, 'products', { id: 'old-1', name: 'کالای قدیمی', price: 10 });
   assert.ok([200, 201].includes(legacy.status), JSON.stringify(legacy.body));
   //  همان شناسه از راهِ v1 هم آمده (کوچ) + یک ردیفِ فقط v1
   const r = await h.api('POST', '/api/sync/v1/push', {

@@ -46,7 +46,7 @@ test('پشتیبان بدون رمز ساخته می‌شود و روی سرور
   // چند رکورد واقعی می‌سازیم
   const owner = await h.newUser('صاحب-پشتیبان');
   const shop = (await h.post('/api/shop', { name: 'دکان پشتیبان' }, { token: owner.accessToken })).body.shop;
-  await h.post('/api/products', { id: 'p-backup', data: { name: 'چای', price: 120 } }, { token: owner.accessToken });
+  assert.equal((await h.seed(owner.accessToken, 'products', { id: 'p-backup', name: 'چای', price: 120 })).status, 200);
 
   const out = await backup.run({ kind: 'manual' });
   assert.ok(out.bytes > 0);

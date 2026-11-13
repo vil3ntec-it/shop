@@ -149,7 +149,7 @@ test('بازار: دو نمونهٔ سرور نمایهٔ جست‌وجوی هم
 async function courier(o, name) {
   const inv = await h.post('/api/shop/invite', { role: 'courier' }, { token: o.token });
   assert.equal(inv.status, 201, JSON.stringify(inv.body));
-  const r = await h.post('/api/auth/staff-login', { code: inv.body.code, name, device: { uid: `phone-${uniq()}`, name: 'گوشیِ پیک', platform: 'android' } });
+  const r = await h.post('/api/auth/staff', { code: inv.body.code, name, device: { uid: `phone-${uniq()}`, name: 'گوشیِ پیک', platform: 'android' } });
   assert.equal(r.status, 201, JSON.stringify(r.body));
   const me = await h.get('/api/courier/me', { token: r.body.accessToken });
   assert.equal(me.status, 200, JSON.stringify(me.body));

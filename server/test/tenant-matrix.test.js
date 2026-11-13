@@ -11,7 +11,7 @@
  *   ۱) ردهٔ همهٔ مسیرها: هر درِ `/api` (از روترِ ساخته‌شده از همین سورس) دقیقاً در
  *      یک خانواده است. خانواده‌های پیشوندی آزمونِ خودکارِ خودشان را دارند؛ بقیه
  *      **یک‌به‌یک** نام برده شده‌اند — مسیرِ تازه‌ای که در هیچ‌کدام نباشد آزمون را سرخ می‌کند.
- *   ۲) ماتریسِ درهای نشست‌دارِ بیرون از `/api/shop` (دفترِ مستقیم `/api/<مجموعه>`،
+ *   ۲) ماتریسِ درهای نشست‌دارِ بیرون از `/api/shop` (دفترِ ده‌مجموعه‌ایِ راهِ قدیم،
  *      همگام‌سازیِ v1/v3/قدیمی، خبرها، «من»، درگاهِ حساب، پشتیبانی، پشتیبانِ حساب،
  *      عکس و صندوقِ عکس، اعلان، پرداخت و رسید، لوکیشن، مجوز): دکانِ «الف» در هر
  *      خانواده دادهٔ واقعی دارد؛ صاحبِ «ب» — که **شاگردِ «الف» هم هست** (کاربرِ
@@ -38,7 +38,9 @@ const h = require('./helpers');
 const F = require('./image-fixtures');
 const { many, one, query, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
-const DATA = require('../src/routes/data').ROUTES;
+//  ده مجموعهٔ دفترِ راهِ قدیم (`lib/sync.TABLES`) — درِ مستقیمِ `/api/<مجموعه>` برداشته شد (`dead-doors.test.js`)؛
+//  همان ده مجموعه از `POST`/`GET /api/sync` کاشته و سنجیده می‌شوند
+const LEDGER_SETS = ['products', 'warehouseEntries', 'sales', 'saleItems', 'returns', 'debtors', 'transactions', 'expenses', 'suppliers', 'purchases'];
 
 let admin = { token: '', id: '' };
 test.before(async () => {
@@ -80,7 +82,7 @@ const NO_TENANT = {
   'GET /api/releases/:tag/latest': 'انتشارِ عمومی (?shop= فقط کانالِ بتا — TEN-L4)',
   'GET /api/releases/:tag/file/:name': 'فایلِ انتشارِ عمومی',
   'GET /api/receipt/:tag/:token': 'رسیدِ QR با توکنِ HMAC — receipt-public.test.js، receipt-token.test.js',
-  'POST /api/auth/staff': 'پیوستن با کد — staff-code.test.js', 'POST /api/auth/staff-login': 'ورودِ شاگرد با کد — staff-login.test.js',
+  'POST /api/auth/staff': 'پیوستن و ورودِ شاگرد با کد — staff-code.test.js، staff-login.test.js',
   'POST /api/auth/staff/device-key': 'رازِ دستگاهِ شاگرد برای نشستِ خودش؛ دکان از عضویتِ خودِ توکن، دستگاه از ردیفِ توکن — staff-session-guard.test.js',
   'POST /api/auth/register': 'ثبت‌نام (بسته)', 'POST /api/auth/register/start': 'ثبت‌نام', 'POST /api/auth/register/verify': 'ثبت‌نام',
   'POST /api/auth/register/complete': 'ثبت‌نام', 'GET /api/auth/terms': 'شرایط', 'POST /api/auth/login': 'ورود',
@@ -139,13 +141,12 @@ async function seedShop(label) {
   mark('shopName');
   assert.equal((await h.put('/api/shop', { name: M.shopName }, { token: o.token })).status, 200);
 
-  //  دفترِ مستقیم: هر ده مجموعه یک ردیف
+  //  دفترِ راهِ قدیم: هر مجموعه یک ردیف (یک دسته)
   I.data = {};
-  for (const path of Object.keys(DATA)) {
-    I.data[path] = `ten-${path}-${tag}`;
-    const r = await h.post(`/api/${path}`, { id: I.data[path], data: { name: mark(`data.${path}`), note: M[`data.${path}`] } }, { token: o.token });
-    assert.equal(r.status, 201, `${path}: ${JSON.stringify(r.body)}`);
-  }
+  for (const set of LEDGER_SETS) I.data[set] = `ten-${set}-${tag}`;
+  const all = await h.legacyPush(o.token, LEDGER_SETS.map((set) => h.change(set, { id: I.data[set], name: mark(`data.${set}`), note: M[`data.${set}`] })), { deviceId: 'dev-ledger' });
+  assert.equal(all.status, 200, JSON.stringify(all.body));
+  assert.equal(all.body.applied, LEDGER_SETS.length, JSON.stringify(all.body));
 
   //  همگام‌سازیِ قدیمی
   I.legacy = `ten-legacy-${tag}`;
@@ -223,20 +224,11 @@ async function seedShop(label) {
 function casesFor(I) {
   const C = {};
   const add = (key, spec) => { C[key] = spec; };
-  for (const [path] of Object.entries(DATA)) {
-    add(`GET /api/${path}`, { url: `/api/${path}?limit=500`, own: [`data.${path}`] });
-    add(`GET /api/${path}/:id`, { url: `/api/${path}/${I.data[path]}`, own: [`data.${path}`] });
-    add(`POST /api/${path}`, { url: `/api/${path}`, body: { id: I.data[path], data: { name: 'نوشتهٔ دیگری' } } });
-    add(`PUT /api/${path}/:id`, { url: `/api/${path}/${I.data[path]}`, body: { data: { name: 'رونویسیِ دیگری' } } });
-    add(`DELETE /api/${path}/:id`, { url: `/api/${path}/${I.data[path]}` });
-  }
-  add('POST /api/sales/full', { url: '/api/sales/full', body: { sale: { id: I.data.sales }, items: [{ id: I.data['sale-items'], name: 'x' }] } });
-
   //  همگام‌سازیِ قدیمی (همان درها زیرِ /api/shop/sync را shop-route-inventory می‌سنجد)
   const legacyChanges = () => ({ deviceId: 'dev-x', changes: [{ collection: 'products', id: I.legacy, data: { name: 'دیگری' } }, { collection: 'products', id: I.legacy, deleted: true }] });
   add('GET /api/sync/status', { url: '/api/sync/status' });
   add('POST /api/sync', { url: '/api/sync', body: legacyChanges });
-  add('GET /api/sync', { url: '/api/sync?since=0', own: ['legacy'] });
+  add('GET /api/sync', { url: '/api/sync?since=0', own: ['legacy', ...LEDGER_SETS.map((set) => `data.${set}`)] });
   add('POST /api/sync/push', { url: '/api/sync/push', body: legacyChanges });
   add('GET /api/sync/pull', { url: '/api/sync/pull?since=0', own: ['legacy'] });
 
@@ -297,11 +289,7 @@ function casesFor(I) {
   add('GET /api/me/notices', { url: '/api/me/notices', own: ['notice'] });
   add('POST /api/me/notices/:id/read', { url: `/api/me/notices/${I.notice}/read`, body: {} });
   add('GET /api/me/payments', { url: '/api/me/payments', own: ['paymentId'] });
-  add('GET /api/me/settings', { url: '/api/me/settings' });
-  add('PUT /api/me/settings', { url: '/api/me/settings', body: { cloudSync: true } });
-  add('POST /api/me/redeem', { url: '/api/me/redeem', body: { code: 'ZZZZ-ZZZZ' } });
   add('GET /api/me/heartbeat', { url: '/api/me/heartbeat' });
-  add('POST /api/me/errors', { url: '/api/me/errors', body: { message: 'آزمون' } });
   add('GET /api/me/subscription', { url: '/api/me/subscription' });
   add('GET /api/me/plans', { url: '/api/me/plans' });
   add('POST /api/me/purchase-request', { url: '/api/me/purchase-request', body: { plan: 'basic' } });
@@ -321,7 +309,6 @@ function casesFor(I) {
 
   //  درگاهِ حساب
   add('GET /api/portal/me', { url: '/api/portal/me', own: ['shopName'] });
-  add('GET /api/portal/subscriptions', { url: '/api/portal/subscriptions' });
   add('GET /api/portal/payments', { url: '/api/portal/payments', own: ['paymentId'] });
   add('GET /api/portal/payments/:id/receipt', { url: `/api/portal/payments/${I.payment}/receipt`, own: ['shopName'] });
   add('GET /api/portal/devices', { url: '/api/portal/devices', own: ['deviceRow'] });
@@ -438,7 +425,7 @@ async function getWorld() {
 test('ردهٔ مسیرها: هر درِ /api دقیقاً یک خانوادهٔ جداسازی دارد؛ مسیرِ تازهٔ بی‌رده سرخ است', async () => {
   const routes = inventory.live(h.server().listeners('request')[0]);
   assert.ok(routes.length > 600, `فقط ${routes.length} در`);
-  const cases = casesFor({ data: Object.fromEntries(Object.keys(DATA).map((k) => [k, 'x'])) });
+  const cases = casesFor({});
   const bad = [];
   const tally = {};
   for (const r of routes) {
@@ -456,7 +443,8 @@ test('ردهٔ مسیرها: هر درِ /api دقیقاً یک خانوادهٔ
   assert.deepEqual(bad, [], bad.join('\n'));
   //  هر خانواده واقعاً مسیر دارد — فهرستِ زنده شکسته نیست
   for (const f of [...PREFIX.map((p) => p.id), 'no-tenant', 'session-matrix']) assert.ok(tally[f] > 0, `خانوادهٔ ${f} خالی است`);
-  assert.ok(tally['session-matrix'] >= 120, `ماتریسِ نشست‌دار: ${tally['session-matrix']}`);
+  //  ۵۶ درِ مرده (دفترِ مستقیم، `/api/me/settings|redeem|errors`، `/api/portal/subscriptions`) ۱۴۰۵/۰۸/۲۲ رفتند
+  assert.ok(tally['session-matrix'] >= 85, `ماتریسِ نشست‌دار: ${tally['session-matrix']}`);
 });
 
 test('TEN-01/02: هر درِ نشست‌دارِ بیرون از /api/shop — صاحبِ «ب» (شاگردِ «الف» هم) با شناسه، سرآیند، querystring، بدنه و opهای «الف» هیچ دادهٔ «الف» نمی‌گیرد و هیچ ردیفش را عوض نمی‌کند', async () => {
@@ -504,9 +492,8 @@ test('TEN-01/02: هر درِ نشست‌دارِ بیرون از /api/shop — �
   //  ج) نوشته‌های «ب» با شناسه‌های «الف» در فضای خودِ «ب» نشستند، نه در «الف»
   const bLegacy = await one('SELECT shop_id FROM products WHERE id=$1 AND shop_id=$2', [a.I.legacy, b.shopId]);
   assert.ok(bLegacy, 'نوشتنِ «ب» با شناسهٔ «الف» ردیفِ خودِ «ب» ساخت');
-  const aStill = await h.get(`/api/products/${a.I.data.products}`, { token: a.token });
-  assert.equal(aStill.status, 200);
-  assert.ok(JSON.stringify(aStill.body).includes(a.M['data.products']), 'کالای «الف» سرِ جایش است');
+  const aStill = await h.legacyRow(a.token, 'products', a.I.data.products);
+  assert.ok(JSON.stringify(aStill).includes(a.M['data.products']), 'کالای «الف» سرِ جایش است');
   const v3 = await h.get('/api/sync/v3/conflicts?status=open', { token: a.token });
   assert.ok(v3.body.conflicts.some((c) => c.id === a.I.v3conflict), 'تعارضِ «الف» باز ماند');
 });
@@ -520,9 +507,8 @@ test('TEN-01 کاربرِ چنددکانی: نشستِ بسته به «الف» 
   const token = s.accessToken;
 
   //  دادهٔ «الف» را (به اندازهٔ شاگرد) می‌بیند — نشست واقعاً به «الف» بسته است
-  const sees = await h.get(`/api/products/${a.I.data.products}`, { token });
-  assert.equal(sees.status, 200, JSON.stringify(sees.body));
-  assert.ok(JSON.stringify(sees.body).includes(a.M['data.products']));
+  const sees = await h.legacyRow(token, 'products', a.I.data.products);
+  assert.ok(JSON.stringify(sees).includes(a.M['data.products']));
 
   const specs = Object.entries(casesFor(a.I)).map(([key, spec]) => ({ key, ...spec, method: key.split(' ')[0] }));
   //  مارکِ دکانِ «ب» (نه هویتِ خودِ آدم: پشتیبانی، دستگاه، لوکیشن، اعلان مالِ خودِ اوست)
@@ -538,7 +524,7 @@ test('TEN-01 کاربرِ چنددکانی: نشستِ بسته به «الف» 
 
   //  مالک‌بودن در «ب» در «الف» اجازه نمی‌دهد
   const denied = [
-    ['DELETE', `/api/products/${a.I.data.products}`],
+    ['PUT', '/api/shop', { name: 'نامِ دیگری' }],
     ['POST', `/api/sync/v3/conflicts/${a.I.v3conflict}/resolve`, { action: 'keep' }],
     ['DELETE', `/api/me/backups/${a.I.backup}`],
   ];
@@ -560,7 +546,7 @@ test('TEN-01 کاربرِ چنددکانی: نشستِ بسته به «الف» 
     if (res.status === 403) closed += 1;
   }
   assert.deepEqual(after, [], after.join('\n'));
-  for (const url of [`/api/products/${a.I.data.products}`, '/api/events', '/api/sync/pull?since=0']) {
+  for (const url of ['/api/shop/me', '/api/events', '/api/sync/pull?since=0']) {
     const r = await h.get(url, { token });
     assert.equal(r.status, 403, `${url} ⇒ ${r.status}`);
     assert.equal(r.body.error.code, 'active_shop_unavailable', url);
