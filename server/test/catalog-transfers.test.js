@@ -111,12 +111,16 @@ const L = (productId, qtyMilli) => ({ productId, qtyMilli });
 
 // ── آزمون‌ها ─────────────────────────────────────────────────────────
 
-test('INV-11: پرچمِ shop.catalog خاموش ⇒ ۴۰۳ و هیچ ردیفی', async () => {
+test('INV-11: پرچمِ shop.catalog خاموش ⇒ فرستادنِ پیش‌ساخته ۴۰۴ ِ درِ ناشناخته، فهرست ۴۰۳، و هیچ ردیفی', async () => {
   const s = await shop('بی‌پرچم');
+  //  فرستادن از سرور پیش‌ساخته است (برنامه گام را در دفترِ خودش می‌نویسد) ⇒ با پرچمِ خاموش همان درِ ناشناخته؛
+  //  فهرستِ انتقال‌ها (صدازنندهٔ برنامه) همان ۴۰۳ ِ بخش
   const r = await send(s, { from: 'shop_floor', to: 'warehouse', lines: [L('x1', 1000)] });
-  assert.equal(r.status, 403);
-  assert.equal(r.body.error.code, 'catalog_disabled');
-  assert.equal((await cat(s, '/transfers')).status, 403);
+  assert.equal(r.status, 404, JSON.stringify(r.body));
+  assert.deepEqual(r.body, (await cat(s, '/no-such-door')).body);
+  const list = await cat(s, '/transfers');
+  assert.equal(list.status, 403);
+  assert.equal(list.body.error.code, 'catalog_disabled');
   const n = await one('SELECT COUNT(*)::int AS n FROM stock_transfers WHERE shop_id=$1', [s.shopId]);
   assert.equal(n.n, 0);
 });

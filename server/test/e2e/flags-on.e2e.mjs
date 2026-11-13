@@ -443,9 +443,9 @@ await E.step('FLAGS.OFF', 'دکانِ «ب» با پرچم‌های خاموش: 
   await B.cash.drain();
   assert.ok(!B.cash.dropped.some((o) => o.table === 'returns'));
 
-  //  انتقالِ کالا: درِ کاتالوگ بسته
+  //  انتقالِ کالا: درِ پیش‌ساختهٔ کاتالوگ با پرچمِ خاموش همان درِ ناشناخته (۴۰۴)
   const t = await xfer(ownerB, '', { from: 'shop_floor', to: 'warehouse', lines: [{ productId: B.oil, qtyMilli: 1000 }] });
-  assert.deepEqual([t.status, t.body.error.code], [403, 'catalog_disabled']);
+  assert.deepEqual([t.status, t.body.error.code], [404, 'not_found']);
 
   //  ویترین: بی حسابِ وب؛ «پنهان کن» بی دفترِ کالا هیچ کالایی را پنهان نمی‌کند
   assert.equal(E.ok(await E.get(`/api/store/${B.slug}`), 'ویترینِ «ب»').features?.webAccount, undefined);

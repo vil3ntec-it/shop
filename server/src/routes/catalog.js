@@ -32,6 +32,13 @@ router.use(requireUser, requireShop, requirePermission('stock.view'));
 const reserve = require('../lib/stock-reserve');
 const repack = require('../lib/catalog-repack');
 const needFlag = async (req, res, next) => { await catalog.requireEnabled(req.shopId); next(); };
+/**
+ * ⛔ درهای **پیش‌ساخته** (سرور هست، رابطِ برنامه نه — INV-01/INV-11/CHK-18 در `docs/spec/PARTIAL-MAP-fa.md`):
+ * برنامه موجودی، شمارش، انتقال و بسته‌بندی را روی دفترِ خودش می‌نویسد و این کاتالوگ آن را از همگام‌سازی می‌خواند؛
+ * فقط `/config`، `GET /transfers` و `/reserved` صدازنندهٔ برنامه دارند. بقیه با پرچمِ خاموش دقیقاً همان پاسخِ
+ * درِ ناشناخته‌اند (`next('router')`، ۴۰۴) — قاعدهٔ «درِ بی صدازننده نگه داشته نمی‌شود» (B15 ِ SECURITY-AUDIT).
+ */
+const prebuilt = async (req, res, next) => ((await stock.flagOf(req.shopId)) ? next() : next('router'));
 
 router.get('/config', async (req, res) => {
   const sc = await scope.scopeOfReq(req);
@@ -55,7 +62,7 @@ router.get('/config', async (req, res) => {
   });
 });
 
-router.put('/settings', needFlag, requirePermission('settings.write'), async (req, res) => {
+router.put('/settings', prebuilt, requirePermission('settings.write'), async (req, res) => {
   scope.requireAll(await scope.scopeOfReq(req));
   const settings = await stock.saveSettings(req.shopId, req.body, req.user.id, now());
   await audit.log({
@@ -71,7 +78,7 @@ router.put('/settings', needFlag, requirePermission('settings.write'), async (re
  * ⇒ فقط مالک و مدیر (QA #263). خواندنِ تفاوت همان `stock.move` می‌ماند.
  */
 const FULL_REFRESH_ROLES = new Set(['owner', 'manager']);
-router.post('/refresh', needFlag, requirePermission('stock.move'), async (req, res) => {
+router.post('/refresh', prebuilt, requirePermission('stock.move'), async (req, res) => {
   const full = req.body?.full === true;
   if (full && !FULL_REFRESH_ROLES.has(req.role)) {
     throw forbidden('خواندنِ کاملِ دفتر فقط برای مالک و مدیر است', 'full_refresh_forbidden');
@@ -79,30 +86,30 @@ router.post('/refresh', needFlag, requirePermission('stock.move'), async (req, r
   res.json(await catalog.refresh(req.shopId, { full }));
 });
 
-router.get('/products', needFlag, async (req, res) => {
+router.get('/products', prebuilt, async (req, res) => {
   const sc = await scope.scopeOfReq(req);
   const out = await catalog.list(req.shopId, { q: req.query.q, cursor: req.query.cursor, limit: req.query.limit });
   res.json(sc ? { ...out, items: out.items.map((p) => scope.trimProduct(p, sc)) } : out);
 });
 
-router.get('/products/:id', needFlag, async (req, res) => {
+router.get('/products/:id', prebuilt, async (req, res) => {
   const sc = await scope.scopeOfReq(req);
   const out = await catalog.detail(req.shopId, req.params.id);
   res.json(sc ? { ...out, product: scope.trimProduct(out.product, sc), lowByLocation: scope.trimLows(out.lowByLocation, sc) } : out);
 });
 
-router.put('/products/:id/low', needFlag, requirePermission('settings.write'), async (req, res) => {
+router.put('/products/:id/low', prebuilt, requirePermission('settings.write'), async (req, res) => {
   scope.checkLocation(await scope.scopeOfReq(req), req.body?.location);
   res.json(await catalog.setLow(req.shopId, req.params.id, req.body));
 });
 
-router.get('/moves', needFlag, async (req, res) => {
+router.get('/moves', prebuilt, async (req, res) => {
   res.json(await catalog.moves(req.shopId, {
     productId: req.query.productId, cursor: req.query.cursor, limit: req.query.limit, places: await scope.scopeOfReq(req),
   }));
 });
 
-router.get('/report', needFlag, requirePermission('reports.view'), async (req, res) => {
+router.get('/report', prebuilt, requirePermission('reports.view'), async (req, res) => {
   scope.requireAll(await scope.scopeOfReq(req));
   const productId = String(req.query.productId || '');
   //  ممیزیِ ۳۵ (B4): NUL ⇒ ۵۰۰ ِ پایگاه‌داده
@@ -122,12 +129,12 @@ router.get('/reserved', reservedLimit, needFlag, requirePermission('orders.view'
   res.json(await reserve.posView(req.shopId));
 });
 
-router.get('/tasks', needFlag, async (req, res) => {
+router.get('/tasks', prebuilt, async (req, res) => {
   const places = await scope.scopeOfReq(req);
   res.json({ tasks: await catalog.tasks(req.shopId, { status: String(req.query.status || 'open'), limit: req.query.limit, places }) });
 });
 
-router.post('/tasks/:id/resolve', needFlag, requirePermission('stock.adjust'), async (req, res) => {
+router.post('/tasks/:id/resolve', prebuilt, requirePermission('stock.adjust'), async (req, res) => {
   const sc = await scope.scopeOfReq(req);
   const task = sc ? await scope.taskOf(req.shopId, req.params.id) : null;
   if (task) scope.check(sc, scope.taskPlaces(task));
@@ -144,7 +151,7 @@ router.post('/tasks/:id/resolve', needFlag, requirePermission('stock.adjust'), a
  * (stock.adjust، با دلیل). کلیدِ یکتایی: سرآیندِ `Idempotency-Key`.
  * INV-21 (پرچمِ خاموشِ `shop.catalog_repack`): repack و assemble (stock.adjust) — یک سندِ تولید، `lib/catalog-repack.js`.
  */
-router.post('/moves', needFlag, async (req, res) => {
+router.post('/moves', prebuilt, async (req, res) => {
   const kind = String(req.body?.kind || '');
   const spec = catalog.MANUAL[kind] || (repack.isKind(kind) && await repack.enabled(req.shopId) ? repack.SPEC : null);
   if (!spec) throw badRequest('نوعِ حرکت معتبر نیست', 'bad_kind');
@@ -207,7 +214,7 @@ async function checkClose(req) {
   if (to) scope.check(sc, [to]);
 }
 
-router.post('/transfers', needFlag, requirePermission('stock.move'), async (req, res) => {
+router.post('/transfers', prebuilt, requirePermission('stock.move'), async (req, res) => {
   const sc = await scope.scopeOfReq(req);
   if (sc) scope.check(sc, [transfers.parseSend(req.body).from]);
   const out = await transfers.send(req.shopId, {
@@ -216,7 +223,7 @@ router.post('/transfers', needFlag, requirePermission('stock.move'), async (req,
   await transferDone(req, res, 'stock.transfer_send', out);
 });
 
-router.post('/transfers/:id/receive', needFlag, requirePermission('stock.move'), async (req, res) => {
+router.post('/transfers/:id/receive', prebuilt, requirePermission('stock.move'), async (req, res) => {
   await checkClose(req);
   const out = await transfers.receive(req.shopId, req.params.id, {
     key: req.get('idempotency-key') || req.body?.clientKey, body: req.body, actor: { id: req.user.id, role: req.role },
@@ -224,7 +231,7 @@ router.post('/transfers/:id/receive', needFlag, requirePermission('stock.move'),
   await transferDone(req, res, 'stock.transfer_receive', out);
 });
 
-router.post('/transfers/:id/reject', needFlag, requirePermission('stock.move'), async (req, res) => {
+router.post('/transfers/:id/reject', prebuilt, requirePermission('stock.move'), async (req, res) => {
   await checkClose(req);
   const out = await transfers.reject(req.shopId, req.params.id, {
     key: req.get('idempotency-key') || req.body?.clientKey, body: req.body, actor: { id: req.user.id, role: req.role },
