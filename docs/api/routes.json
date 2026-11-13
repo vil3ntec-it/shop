@@ -20,17 +20,17 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 995,
+    "routes": 996,
     "byAuth": {
       "none-detected": 193,
       "admin": 291,
       "inline": 2,
-      "user": 466,
+      "user": 467,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-      "extracted": 660,
+      "extracted": 661,
       "empty": 333,
       "unresolved": 2
     }
@@ -571,6 +571,7 @@
     {"method":"POST","path":"/api/shop/branches","area":"shop","source":"server/src/routes/shop-branches.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'branches-ip' })","requireUser","requireShop","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'branches', key: (req) => r","requireRecentAuth"],"params":[],"query":[],"body":["name"],"response":{"statuses":[201],"keys":["branch","branches"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/branches-report","area":"shop","source":"server/src/routes/branches-report.js","auth":"user","guards":["rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'branches-report-ip' })","requireUser","requireShop","rateLimit({ max: 20, windowMs: 60 * 1000, keyPrefix: 'branches-report', key: (re"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"PATCH","path":"/api/shop/branches/:id","area":"shop","source":"server/src/routes/shop-branches.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'branches-ip' })","requireUser","requireShop","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'branches', key: (req) => r","requireRecentAuth"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["branch","branches"]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/shop/branches/:id","area":"shop","source":"server/src/routes/shop-branches.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'branches-ip' })","requireUser","requireShop","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'branches', key: (req) => r","requireRecentAuth"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["branch","branches"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/branches/members","area":"shop","source":"server/src/routes/shop-branches.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'branches-ip' })","requireUser","requireShop","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'branches', key: (req) => r"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["branches","members"]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/shop/branches/members/:id","area":"shop","source":"server/src/routes/shop-branches.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'branches-ip' })","requireUser","requireShop","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'branches', key: (req) => r","requireRecentAuth"],"params":["id"],"query":[],"body":["branches"],"response":{"statuses":[200],"keys":["branches","members","userId"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/branches/report","area":"shop","source":"server/src/routes/shop-branches.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'branches-ip' })","requireUser","requireShop","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'branches', key: (req) => r"],"params":[],"query":["branch"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":["403 branch_forbidden"],"shape":"extracted"},

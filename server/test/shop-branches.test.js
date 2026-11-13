@@ -170,6 +170,12 @@ test('صاحب شعبه می‌سازد، نام می‌دهد، بایگانی 
   assert.equal((await h.get('/api/shop/branches', { token: s.token })).body.branches[0].name, 'مرکز');
   //  شعبهٔ اصلی بایگانی نمی‌شود
   assert.equal((await h.api('PATCH', '/api/shop/branches/main', { token: s.token, body: { status: 'archived' } })).body.error.code, 'main_branch_fixed');
+  //  فازِ ۲: همان در با POST (برنامهٔ اندروید/کامپیوتر PATCH نمی‌فرستد — `HttpURLConnection`)
+  const rp = await h.post(`/api/shop/branches/${A}`, { name: 'شعبهٔ الف ۲' }, { token: s.token });
+  assert.equal(rp.status, 200, JSON.stringify(rp.body));
+  assert.equal(rp.body.branch.name, 'شعبهٔ الف ۲');
+  assert.equal((await h.post(`/api/shop/branches/${A}`, { name: 'شعبهٔ الف' }, { token: s.token })).status, 200);
+  assert.equal((await h.post('/api/shop/branches/main', { status: 'archived' }, { token: s.token })).body.error.code, 'main_branch_fixed');
 
   //  کارمند: فقط شعبه‌های خودش، بی نامِ بقیه
   const mine = await h.get('/api/shop/branches', { token: w.onlyA.token });
@@ -214,11 +220,13 @@ test('نفوذ: کارمند و مدیر هیچ درِ نوشتنیِ شعبه �
   for (const who of [w.main, w.onlyA, w.aAndB]) {
     assert.equal((await h.post('/api/shop/branches', { name: 'دزد' }, { token: who.token })).status, 403);
     assert.equal((await h.api('PATCH', `/api/shop/branches/${w.A}`, { token: who.token, body: { name: 'دزد' } })).status, 403);
+    assert.equal((await h.post(`/api/shop/branches/${w.A}`, { name: 'دزد' }, { token: who.token })).status, 403);
     assert.equal((await h.put(`/api/shop/branches/members/${who.memberId}`, { branches: [w.A, w.Bid, ''] }, { token: who.token })).status, 403);
     assert.equal((await h.get('/api/shop/branches/members', { token: who.token })).status, 403);
   }
   //  صاحبِ دکانِ دیگر: شعبه‌های این دکان «نیست»
   assert.equal((await h.api('PATCH', `/api/shop/branches/${w.A}`, { token: other.s.token, body: { name: 'دزد' } })).body.error.code, 'branch_not_found');
+  assert.equal((await h.post(`/api/shop/branches/${w.A}`, { name: 'دزد' }, { token: other.s.token })).body.error.code, 'branch_not_found');
   assert.equal((await h.put(`/api/shop/branches/members/${other.onlyA.memberId}`, { branches: [w.A] }, { token: other.s.token })).body.error.code, 'branch_not_found');
   assert.equal((await h.put(`/api/shop/branches/members/${w.onlyA.memberId}`, { branches: [other.A] }, { token: other.s.token })).body.error.code, 'member_not_found');
   assert.equal((await pushV3(other.s, [product3('p-x')], w.A)).status, 403);

@@ -5,6 +5,7 @@
  *   GET   /                 شعبه‌های این عضو: صاحب ⇐ همه (`all: true`)؛ دیگران ⇐ فقط شعبه‌های خودش (نامِ بقیه نه)
  *   POST  /                 { name } ⇐ شعبهٔ تازه — فقط صاحب
  *   PATCH /:id              { name?, status?: active|archived } — فقط صاحب؛ `main` (یا '') = شعبهٔ اصلی (فقط نام)
+ *   POST  /:id              همان PATCH (فازِ ۲: برنامه‌ها PATCH نمی‌فرستند)
  *   GET   /members          اعضا و شعبه‌هایشان — فقط صاحب
  *   PUT   /members/:id      { branches: [...] } — فقط صاحب؛ [''] = پیش‌فرض (فقط اصلی)
  *   GET   /report           ?from&to&branch ⇐ خلاصهٔ هر شعبه؛ `totals` فقط برای صاحب (`lib/branch-report.js`)
@@ -58,11 +59,14 @@ router.post('/', needOwner, requireRecentAuth, async (req, res) => {
   res.status(201).json({ branch, branches: await branches.list(req.shopId) });
 });
 
-router.patch('/:id', needOwner, requireRecentAuth, async (req, res) => {
+async function updateBranch(req, res) {
   const branch = await branches.update(req.shopId, req.params.id, req.body, req.user.id);
   await log(req, 'branch.updated', branch.id || 'main', { name: branch.name, status: branch.status });
   res.json({ branch, branches: await branches.list(req.shopId) });
-});
+}
+router.patch('/:id', needOwner, requireRecentAuth, updateBranch);
+//  فازِ ۲: همان با POST — `HttpURLConnection` ِ برنامهٔ اندروید/کامپیوتر PATCH نمی‌فرستد
+router.post('/:id', needOwner, requireRecentAuth, updateBranch);
 
 router.get('/members', needOwner, async (req, res) => {
   res.set('Cache-Control', 'private, no-store');
