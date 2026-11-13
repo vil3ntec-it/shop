@@ -67,7 +67,7 @@ const { DEFAULT_ON } = require('./flag-defaults');
  */
 async function flagOf(shopId, key = FLAG_KEY, run = null) {
   //  بیرون از تراکنش: حافظهٔ کوتاهِ `HOT_CACHE_MS` (پیش‌فرض خاموش؛ `lib/hot-cache.js`) — باطل با هر نوشتنِ پرچم/حالتِ دکان
-  if (!run) return require('./hot-cache').get('flag', `${String(shopId)}\u0000${key}\u0000h`, () => readFlag(shopId, key, null));
+  if (!run) return require('./hot-cache').get('flag', `${require('./branch-key').shopOf(shopId)}\u0000${key}\u0000h`, () => readFlag(shopId, key, null));
   return readFlag(shopId, key, run);
 }
 async function readFlag(shopId, key, run) {
@@ -77,7 +77,8 @@ async function readFlag(shopId, key, run) {
      UNION ALL
      SELECT '#hold', 'false' FROM shop_holds
       WHERE shop_id=$3 AND kind='service_disabled' AND service=$1 AND lifted_at IS NULL`;
-  const params = [key, 'all', String(shopId)];
+  //  شعبه (`lib/branch-key.js`): پرچمِ «بخشِ» شعبه همان پرچمِ دکان است — شناسهٔ امروز همانی می‌ماند
+  const params = [key, 'all', require('./branch-key').shopOf(shopId)];
   const rows = run ? (await run(sql, params)).rows : await many(sql, params);
   if (rows.some((r) => r.scope === '#hold')) return false;
   let v;

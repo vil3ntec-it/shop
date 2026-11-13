@@ -489,6 +489,16 @@
   `ShopData.setAside` ∪ `SetAsideMarks`) هرگز، بایگانی‌شده هم. بایتِ «جاوا» ی فیکسچر صریح است، نه `JsonPrimitive(Double)`. سنجه: `DroppedResendTest`،
   `DroppedResendDesktopTest`، `server/test/sync-resend-dropped.test.js` (بردارِ `resend-dropped-v1.json`).
 
+- ⛔ **شعبه درونِ یک دکان — جداییِ داده** (تصمیمِ ۱/۱b/۳۴ ِ ۱۴۰۵/۰۸/۲۳، پرچمِ `shop.branches`، طراحی `docs/BRANCHES-fa.md`):
+  دفترِ هر شعبه «بخشِ» جدای همگام‌سازی است — اصلی = همان شناسهٔ دکان (بی کوچ)، شعبهٔ دیگر `account_id` = `<دکان>#<شعبه>`
+  (`server/src/lib/branch-key.js`)؛ فقط Sync v3 و فقط با سرآیندِ `X-Branch-Id` ِ سنجیده (`branches.resolve`؛ بدنه هرگز). هر
+  خواندنِ **سطحِ دکان** در مسیرِ همگام‌سازی (پرچم، لایه‌های مجوز، عضویت، برگه/کلید/nonce ِ تأیید، محدودهٔ مکان) با
+  `branchKey.shopOf(ctx)`، هر خواندن/نوشتنِ **ردیف** با `ctx.accountId` (بخش) — نگهبانِ تازه که شناسهٔ دکان را از `ctx.accountId`
+  برمی‌دارد باید یکی از این دو را صریح انتخاب کند. Sync v1 (مشترک با پمپ)، راهِ قدیم، `/shop/*`، `/events` و `/me/backups` فقط
+  شعبهٔ اصلی‌اند: `lib/branch-gate.js` عضوِ بی اصلی را ۴۰۳ `branch_main_only` و ادعای شعبهٔ دیگر را ۴۰۳ `branch_unsupported`
+  می‌دهد؛ درِ تازه‌ای که شعبه را می‌شناسد فقط با `branch_id`/بخش و دسترسیِ `branches.accessOf` از این نگهبان بیرون می‌رود.
+  پلِ v3⇒v1 برای بخشِ شعبه هرگز. پرچم خاموش ⇒ همه بی اثر (سنجه: `server/test/shop-branches.test.js`).
+
 ### v3 · دفترِ محلی و مهاجرتِ داده
 
 - دفترِ وب در IndexedDB فقط با نشانهٔ `tohid-ledger-store-v1 = idb` (پیش‌فرض خاموش)؛ دفتر و سایه/صف/cursorِ همگام‌سازی در یک تراکنش نوشته می‌شوند (#228).
@@ -1144,6 +1154,7 @@
 | `shop.owner_report` | دکان / `all` | خاموش | PAY-20/RPT-12: `GET/PUT /api/shop/owner-report` (خاموش ⇒ `GET` فقط `{enabled:false}`، `PUT` ۴۰۳ `owner_report_disabled`؛ نوشتن فقط صاحبِ دکان، ۴۰۳ `owner_only`) و کارگرِ `lib/owner-report.js` (گزارشِ روزانه یا هفتگی در ساعتِ محلیِ دکان با مرکزِ اعلان: داخلِ برنامه، پوش، ایمیل؛ واتس‌اپ وصل نیست)؛ بخشِ «گزارشِ خودکار برای صاحب» در تنظیماتِ برنامه؛ مهاجرتِ ۱۸۶ | `claude/owner-daily-report` | باز |
 | `shop.owner_report.profit` | دکان / `all` | خاموش | RPT-03: سطرِ «سودِ ناخالص» (میانگینِ موزون، همان «گزارشِ تازه»؛ قلمِ بی‌بها یا دفترِ ناقص ⇒ «(تقریبی)») و کلیدِ `profit` در خلاصهٔ `owner_reports`؛ فقط با `shop.owner_report`؛ خاموش ⇒ پیام و خلاصه بایت‌به‌بایت پیشین (`FLAGS-ON-fa.md` §۸د) | `claude/mavg-reports` | باز |
 | `shop.branches_report` | دکان / `all` | **روشن** (فقط `false`) | RPT-18: `GET /api/shop/branches-report` (خاموش برای دکانِ نشست ⇒ فقط `{enabled:false}`؛ هر شعبه فقط با پرچمِ خودش؛ فقط صاحب، بقیه `owner:false`) — خلاصهٔ هر دکانِ همان صاحب و جمعِ همه، فقط خواندنی | `claude/missing-rows-2` | باز |
+| `shop.branches` | دکان / `all` | خاموش | شعبه درونِ یک دکان (فازِ ۱ ِ سرور، `docs/BRANCHES-fa.md`): `/api/shop/branches*` (خاموش ⇒ همان مسیرِ ناشناخته)، بخشِ جدای Sync v3 با `X-Branch-Id`، نگهبانِ v1/راهِ قدیم/درهای امروز (فقط شعبهٔ اصلی)، گزارشِ هر شعبه و جمع؛ مهاجرتِ ۸۸۰؛ تا فازِ ۲ (رابطِ برنامه) روشن نشود | `claude/e-rows-48b` | باز |
 | `shop.orders.refunds` | دکان / `all` | خاموش | `POST /api/shop/orders/:id/refunds` (خاموش ⇒ ۴۰۳ `refund_ledger_disabled`)؛ روشن ⇒ گذارِ سادهٔ `refunded_*` ۴۰۹ `refund_via_ledger` | #255 | main |
 | `shop.orders.refund_tracking` | دکان / `all` | **روشن** (فقط `false`) | NTF-08: کلیدِ `refund` در `GET /api/store/:slug/orders/:token` (وضعیت، مبلغِ برگشته و مانده، ردیف‌ها بی دلیل و کننده)؛ خاموش ⇒ کلید نیست | `claude/new-ntf-1` | باز |
 | `shop.orders.issue_reports` | دکان / `all` | خاموش | NTF-07: `POST /api/store/:slug/orders/:token/issues` و `…/issues/:issueId/photos` (خاموش ⇒ ۴۰۴ `order_not_found`)، کلیدِ `issueReports` در پیگیری (خاموش ⇒ کلید نیست)، `/api/shop/order-feedback/issues*` (۴۰۳ `issue_reports_disabled`)؛ مهاجرتِ ۱۹۱ | `claude/ntf-order-issue-review` | باز |

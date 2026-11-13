@@ -88,6 +88,8 @@ function parsePerms(v) {
  */
 async function layersFor(shopId, role, userId, run = null) {
   if (!shopId || role === 'owner') return [{}, {}];
+  //  شعبه: لایه‌های بستهٔ صاحب در «بخشِ» شعبه هم همان لایه‌های دکان‌اند (`lib/branch-key.js`)
+  shopId = require('./branch-key').shopOf(shopId);
   const sql = `SELECT 'role' AS scope, perms FROM shop_role_perms WHERE shop_id=$1 AND role=$2
      UNION ALL
      SELECT 'member' AS scope, perms FROM shop_member_perms WHERE shop_id=$1 AND user_id=$3

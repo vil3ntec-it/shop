@@ -236,7 +236,8 @@ async function judgeLineV3(c, ctx, op, row, { batch = null, deviceId = '', origi
   for (const n of needs) {
     const d = core.evaluate(ctx.role, layers, n.perm, caps.req(n));
     if (d.decision === 'allow') continue;
-    if (d.decision === 'approve' && await coveredBefore(c, ctx.accountId, n)) continue;
+    //  شعبه: تأییدِ مصرف‌شده سطحِ دکان نشسته است (`staff-approval.acceptSlip`، `lib/branch-key.js`)
+    if (d.decision === 'approve' && await coveredBefore(c, require('./branch-key').shopOf(ctx), n)) continue;
     const slip = slipFor(op, n.perm, true);
     const denied = await sa.judge(c, ctx, needOf(n), slip, { opId: op.op_id, at: sa.wallOf(op.hlc), deviceId, path: origin });
     if (denied) return denied;

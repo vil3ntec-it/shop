@@ -193,7 +193,7 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
 
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat', 'shop.catalog',
   'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'pay.hesabpay',
-  'shop.storefront.zones', 'shop.storefront.notify_area', 'shop.staff_time', 'shop.staff_scope', 'shop.orders.amend', 'shop.purchase_orders', 'shop.order_risk'];
+  'shop.storefront.zones', 'shop.storefront.notify_area', 'shop.staff_time', 'shop.staff_scope', 'shop.orders.amend', 'shop.purchase_orders', 'shop.order_risk', 'shop.branches'];
 //  جمع‌آوری و بسته‌بندی (PCK) — درهای `/shop/orders/pick/…` و `/shop/orders/:id/pick…`
 FLAGS.push('shop.orders.picking');
 //  S56: وزنِ بیش از حد تا پاسخِ مشتری (`/shop/orders/:id/pick/weight-holds/decide`)
@@ -572,6 +572,11 @@ async function seedShop(a) {
   const crlAssign = await h.put(`/api/shop/custom-roles/members/${ids.member}`, { roleId: ids.customRole }, { token: a.accessToken });
   assert.equal(crlAssign.status, 200, JSON.stringify(crlAssign.body));
 
+  //  شعبه درونِ دکان (فازِ ۱، `shop.branches`): شعبهٔ واقعیِ «الف»
+  const brn = await h.post('/api/shop/branches', { name: 'شعبهٔ الف' }, { token: a.accessToken });
+  assert.equal(brn.status, 201, JSON.stringify(brn.body));
+  ids.branch = brn.body.branch.id;
+
   //  قاعدهٔ تخفیف — شناسه را برنامه می‌سازد؛ کلیدِ فضای خودِ دکان
   ids.promoRule = 'inv-promo-a1';
   const promo = await h.put(`/api/shop/promos/rules/${ids.promoRule}`,
@@ -704,6 +709,8 @@ function concreteFor(ids) {
     [/^(\/shop\/permissions\/roles\/):role/, 'staff'],
     [/^(\/shop\/permissions\/members\/):id/, ids.member],
     [/^(\/shop\/staff-scope\/members\/):id/, ids.member],
+    [/^(\/shop\/branches\/members\/):id/, ids.member],
+    [/^(\/shop\/branches\/):id/, ids.branch],
     [/^(\/shop\/till-pin\/members\/):id/, ids.member],
     [/^(\/shop\/devices\/):id/, ids.device],
     [/^(\/shop\/approver-keys\/):id/, ids.approverKey],
@@ -782,6 +789,8 @@ function bodyFor(r, ids) {
     'PATCH /shop/members/:id': { role: 'manager' },
     'PUT /shop/permissions/members/:id': { perms: {} },
     'PUT /shop/staff-scope/members/:id': { places: ['warehouse'] },
+    'PATCH /shop/branches/:id': { name: 'شعبهٔ دزدیده' },
+    'PUT /shop/branches/members/:id': { branches: [''] },
     'PUT /shop/till-pin/members/:id': { pin: '390471' },
     'POST /shop/till-pin/verify': { memberId: ids.member, pin: '390471' },
     'POST /shop/approval-requests/:id/approve': { note: 'تأییدِ ب' },

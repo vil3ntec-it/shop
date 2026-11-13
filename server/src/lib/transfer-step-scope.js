@@ -65,9 +65,11 @@ async function markV3(c, ctx, op, row, verdict = null) {
   if (verdict || op.kind !== 'insert' || (row && row.inserted) || !isStep(op.table, op.fields)) return verdict;
   if (!ctx || ctx.role === 'owner') return verdict;
   const run = (sql, params) => c.query(sql, params);
-  if (!memo.has(ctx)) memo.set(ctx, scopeOf(run, ctx.accountId, ctx.userId, ctx.role));
+  //  شعبه: محدودهٔ مکان سطحِ دکان است (`lib/branch-key.js`)
+  const shopId = require('./branch-key').shopOf(ctx);
+  if (!memo.has(ctx)) memo.set(ctx, scopeOf(run, shopId, ctx.userId, ctx.role));
   const places = await memo.get(ctx);
-  if (places) await mark(run, ctx.accountId, op.row_id, ctx.userId, places, 'v3');
+  if (places) await mark(run, shopId, op.row_id, ctx.userId, places, 'v3');
   return verdict;
 }
 
