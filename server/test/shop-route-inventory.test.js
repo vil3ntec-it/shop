@@ -774,7 +774,6 @@ function bodyFor(r, ids) {
     'PUT /shop/storefront/products/:productId': { published: false, onlinePriceMinor: 1 },
     'PUT /shop/storefront/campaigns/:id': { name: 'پیوندِ ب', archived: true },
     'POST /shop/images/:id/report': { kind: 'wrong_product', note: 'آزمون' },
-    'POST /shop/images/:id/process': { step: 'strip_metadata' },
     'POST /shop/images/:id/propose': { consent: true },
     'POST /shop/images/changes/:id/rollback': { reason: 'آزمون' },
     'POST /shop/images/studio/batches': { key: fresh('studio-b'), image_ids: [ids.image] },
@@ -814,7 +813,6 @@ function bodyFor(r, ids) {
 /** بدنهٔ خام (بایت) برای درهای بارگذاری */
 const RAW = new Set([
   'POST /shop/chat/conversations/:id/media',
-  'POST /shop/images/:id/versions',
   'PUT /shop/images/:id/v/:version/:size',
   'PUT /shop/storefront/media/:kind',
 ]);

@@ -93,20 +93,6 @@ router.get('/missions', async (req, res) => {
   }))));
 });
 
-/*
- *  DLV-04 (پشتِ پرچمِ خاموشِ `shop.delivery_route`): ترتیبِ پیشنهادیِ مأموریت‌های پذیرفتهٔ همین پیک در یک مسیر.
- *  `?lat=&lng=` موقعیتِ همین لحظه است و فقط برای همین پاسخ خوانده می‌شود (نگه داشته نمی‌شود، DLV-16).
- */
-router.get('/route', async (req, res, next) => {
-  if (!(await orders.flagOf(req.shopId, courierRoute.FLAG))) {
-    return next(notFound('مسیرِ پیشنهادی برای این دکان روشن نیست', 'delivery_route_disabled'));
-  }
-  const start = courierRoute.startOf(req.query);
-  const list = await delivery.missions(req.shopId, req.courier.id, { scope: 'active', limit: 100 });
-  res.set('Cache-Control', 'no-store');
-  res.json({ ...courierRoute.routeOf(list.items, start), serverTime: list.serverTime });
-});
-
 /**
  * صفِ رویدادها (DLV-10): `{deviceId?, events:[{eventId, assignmentId, type,
  * deviceTime, deviceSeq, reason?, note?, cashCollectedMinor?, cashReason?, code?, bags? (DLV-07), position? (DLV-17)}]}`.

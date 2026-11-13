@@ -249,8 +249,4 @@ router.get('/ratings', requirePermission('delivery.couriers'), async (req, res) 
   res.json(await require('../lib/delivery-ratings').forShop(req.shopId, { from: req.query.from, to: req.query.to }));
 });
 
-router.get('/settlements/:id', requirePermission('delivery.settle'), async (req, res) => {
-  res.json(await delivery.getSettlement(req.shopId, req.params.id));
-});
-
 module.exports = router;

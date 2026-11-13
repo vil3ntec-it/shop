@@ -339,11 +339,7 @@ async function createApp({ runMigrations = true } = {}) {
       } catch (err) { next(err); }
     });
 
-    /** متن شرایط و ضوابط — همان چیزی که موقع ثبت‌نام نشان داده می‌شود. */
-    api.get('/terms', (req, res) => {
-      const terms = require('./lib/terms');
-      res.json({ version: terms.VERSION, title: terms.TITLE, sections: terms.SECTIONS });
-    });
+    //  متنِ شرایط فقط `GET /api/auth/terms` (و پاسخِ گامِ ثبت‌نام)؛ نامِ دومِ `/api/terms` صدازننده نداشت (B15)
     /*
      *  قراردادِ ورودِ کدِ ایمیلی (پرامپتِ «ورودِ بی‌نقص»).
      *

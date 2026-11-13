@@ -22,7 +22,11 @@
  * ⛔ سقف: سطلِ IP پیش از احراز، سطلِ هر کاربر پس از آن، و سطل‌های تنگ‌ترِ `/verify` و گذاشتنِ PIN (هر دو PBKDF2، SR45-2)؛
  *   قفلِ PIN جدا در خودِ سرور است.
  * ⛔ shop_id و عضو فقط از عضویتِ توکن؛ دستگاه فقط از ردیفِ توکن (`req.device`). PIN هرگز در پاسخ یا سابقه نیست.
- * ⛔ پیش‌فرض خاموش: بی `shop.till_pin` همه جز `/config` ⇒ ۴۰۳ `till_pin_disabled`.
+ * ⛔ پیش‌فرض خاموش: بی `shop.till_pin` درهای برنامه (`/members…`، `/verify`، `/current/end`) ⇒ ۴۰۳ `till_pin_disabled`
+ *   (برنامه پیش از آن فقط `/config` را می‌پرسد). درهای **پیش‌ساخته** — سرور هست، رابطِ برنامه نه (STF-04/S46 در
+ *   `docs/spec/PARTIAL-MAP-fa.md`): `PUT /me`، `GET /current`، `GET /sessions` (پرچمِ `shop.till_pin`) و `GET /ops`،
+ *   `GET /ops/row` (پرچمِ `shop.till_op_user`) — با پرچمِ خاموش دقیقاً همان پاسخِ درِ ناشناخته (۴۰۴، `next('router')`).
+ *   (قاعدهٔ «درِ بی صدازننده نگه داشته نمی‌شود»، B15 ِ `docs/SECURITY-AUDIT-fa.md`؛ آزمون: `till-pin.test.js`.)
  * ⛔ SUB-10: FREE — هویتِ کاربرِ صندوق بخشی از مجوزهای هستهٔ دکان است و پس از پایانِ اشتراک هم باید کار کند.
  */
 const express = require('express');
@@ -64,11 +68,11 @@ router.get('/config', async (req, res) => {
   res.json(await tp.config(req.shopId, actorOf(req)));
 });
 
-//  S46: «کاربرِ سنجیدهٔ صندوق» روی opها — پرچمِ خودش؛ خاموش ⇒ ۴۰۳ و هیچ خواندنی از جدولِ ۷۹۰
-async function needOpsFlag(req, res, next) {
-  if (!(await tou.flagOf(req.shopId))) return next(forbidden('«کاربرِ صندوق روی سند» برای این دکان روشن نیست', 'till_op_user_disabled'));
-  next();
-}
+/** درِ پیش‌ساخته (بی رابطِ برنامه): پرچمِ خاموش ⇒ همان «درِ ناشناخته» (`next('router')`)، نه ۴۰۳ ِ بخش */
+const prebuilt = (flagOf) => async (req, res, next) => ((await flagOf(req.shopId)) ? next() : next('router'));
+//  S46: «کاربرِ سنجیدهٔ صندوق» روی opها — پرچمِ خودش؛ خاموش ⇒ درِ ناشناخته و هیچ خواندنی از جدولِ ۷۹۰
+const needOpsFlag = prebuilt((shopId) => tou.flagOf(shopId));
+const needPinFlag = prebuilt((shopId) => tp.flagOf(shopId));
 
 router.get('/ops', needOpsFlag, async (req, res) => {
   const q = req.query || {};
@@ -79,29 +83,27 @@ router.get('/ops/row', needOpsFlag, async (req, res) => {
   res.json(await tou.forRow(req.shopId, actorOf(req), req.query?.table, req.query?.row_id));
 });
 
-router.use(needFlag);
-
-router.get('/members', requirePermission('members.view'), async (req, res) => {
+router.get('/members', needFlag, requirePermission('members.view'), async (req, res) => {
   res.json(await tp.members(req.shopId));
 });
 
-router.put('/me', setLimit, requireRecentAuth, async (req, res) => {
+router.put('/me', needPinFlag, setLimit, requireRecentAuth, async (req, res) => {
   res.json(await tp.setPin(req.shopId, actorOf(req), { memberId: req.member.id }, req.body?.pin, opts(req)));
 });
 
-router.put('/members/:id', setLimit, requireRecentAuth, requirePermission('members.view'), async (req, res) => {
+router.put('/members/:id', needFlag, setLimit, requireRecentAuth, requirePermission('members.view'), async (req, res) => {
   res.json(await tp.setPin(req.shopId, actorOf(req), memberParam(req), req.body?.pin, opts(req)));
 });
 
-router.delete('/members/:id', requireRecentAuth, requirePermission('members.view'), async (req, res) => {
+router.delete('/members/:id', needFlag, requireRecentAuth, requirePermission('members.view'), async (req, res) => {
   res.json(await tp.removePin(req.shopId, actorOf(req), memberParam(req), opts(req)));
 });
 
-router.post('/members/:id/unlock', requireRecentAuth, requirePermission('members.view'), async (req, res) => {
+router.post('/members/:id/unlock', needFlag, requireRecentAuth, requirePermission('members.view'), async (req, res) => {
   res.json(await tp.unlock(req.shopId, actorOf(req), memberParam(req), opts(req)));
 });
 
-router.post('/verify', verifyLimit, async (req, res) => {
+router.post('/verify', needFlag, verifyLimit, async (req, res) => {
   const b = req.body || {};
   const target = b.memberId ? { memberId: v.id(b.memberId, { field: 'شناسه عضو' }) } : { userId: v.id(b.userId, { field: 'شناسه کاربر' }) };
   //  ⛔ R15: «PIN ندارد/باطل است» فقط برای کسی که `/members` را هم می‌بیند (و خودِ عضو، در lib)؛ بقیه همان «غلط»
@@ -109,15 +111,15 @@ router.post('/verify', verifyLimit, async (req, res) => {
   res.json(await tp.verify(req.shopId, actorOf(req), req.device, target, b.pin, { ...opts(req), seesAll }));
 });
 
-router.get('/current', async (req, res) => {
+router.get('/current', needPinFlag, async (req, res) => {
   res.json(await tp.current(req.shopId, req.device));
 });
 
-router.post('/current/end', async (req, res) => {
+router.post('/current/end', needFlag, async (req, res) => {
   res.json(await tp.endCurrent(req.shopId, actorOf(req), req.device, req.body?.reason || 'lock', opts(req)));
 });
 
-router.get('/sessions', async (req, res) => {
+router.get('/sessions', needPinFlag, async (req, res) => {
   res.json(await tp.sessions(req.shopId, actorOf(req), { from: req.query.from, to: req.query.to, memberId: req.query.member }));
 });
 

@@ -577,9 +577,12 @@ test('تسویه با کسری (S40) و وصولِ ناقص از مشتری: ا�
   assert.equal(s.excessMinor, 0);
   assert.equal(s.fareTotalMinor, 10_000);
   assert.equal((await orderRow(o1.id)).cod_status, 'settled_to_shop');
-  const g = await h.get(`/api/shop/delivery/settlements/${s.id}`, { token: a.token });
-  assert.equal(g.body.rows.length, 2);
-  assert.equal(g.body.rows.find((r) => r.assignmentId === id2).collectionDiffMinor, -40_000);
+  //  ردیف‌های همان سند در پاسخِ خودِ تسویه (تکرارِ همان کلید همان را برمی‌گرداند؛ درِ جدای «یک تسویه» نیست)
+  assert.equal(ok.body.rows.length, 2);
+  assert.equal(ok.body.rows.find((r) => r.assignmentId === id2).collectionDiffMinor, -40_000);
+  const listed = await h.get(`/api/shop/delivery/settlements?courierId=${encodeURIComponent(s.courierId)}`, { token: a.token });
+  assert.equal(listed.status, 200, JSON.stringify(listed.body));
+  assert.equal(listed.body.items.find((x) => x.id === s.id).shortageMinor, 40_000);
 });
 
 /* ══════════════════════════════════════════════════════════════════

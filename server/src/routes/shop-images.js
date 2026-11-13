@@ -8,13 +8,12 @@
  *   GET  /products/:productId         کدام عکس نمایش داده می‌شود و چرا
  *   GET  /mine                        عکس‌های اختصاصیِ همین دکان
  *   POST /                            بارگذاریِ عکسِ اختصاصی (بایت‌ها در بدنه)
- *   POST /:id/versions                نسخهٔ تازهٔ عکسِ خود (اصل دست نمی‌خورد)
  *   PUT  /:id/v/:version/:size        نسخهٔ کوچکِ ساختهٔ برنامه
  *   POST /:id/propose                 پیشنهاد به بانکِ مرکزی — فقط صاحبِ دکان، با اجازهٔ صریح
  *   POST /:id/report                  «عکسِ اشتباه / بستهٔ قدیمی»
- *   POST /:id/process                 مرحلهٔ پردازش — بیرونی‌ها ۵۰۳ و بی هیچ ارسالی
  *   POST /:id/detach                  برداشتنِ عکسِ تکمیلی از کالا (PRD-17)؛ اصل می‌ماند
  *   GET  /file/:id/:version/:size     خودِ فایل (دسترسی برای هر درخواست سنجیده می‌شود)
+ *   (نسخهٔ تازه = بارگذاریِ تازه + `/select`؛ پردازش فقط در استودیو. `/:id/versions` و `/:id/process` صدازننده نداشتند — B15)
  *
  * ⛔ پیش‌فرض خاموش: بی پرچمِ `shop.image_bank` همه‌چیز ۴۰۳ است و هیچ ردیفی
  *    نوشته نمی‌شود. عکسِ همگام‌شدهٔ امروز (`/api/sync/v1/photos`) دست نمی‌خورد.
@@ -114,12 +113,6 @@ router.post('/', write, body(bank.DERIV.display.bytes), async (req, res) => {
   res.status(201).json(out);
 });
 
-router.post('/:id/versions', write, body(bank.DERIV.display.bytes), async (req, res) => {
-  const out = await bank.shopVersion(req.shopId, req.user.id, req.params.id, bufOf(req));
-  await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'image.version_added', targetType: 'image', targetId: out.image_id, detail: { version: out.version } });
-  res.status(201).json(out);
-});
-
 router.put('/:id/v/:version/:size', write, body(bank.DERIV.zoom.bytes), async (req, res) => {
   res.json(await bank.shopDerivative(req.shopId, req.params.id, version(req.params.version), req.params.size, bufOf(req)));
 });
@@ -152,22 +145,6 @@ router.post('/:id/report', write, async (req, res) => {
   const ok = img && await readable(req, img.id, Number(img.current_version), 'thumb');
   if (!ok) throw notFound('عکس پیدا نشد');
   res.status(201).json(await bank.report(req.shopId, req.user.id, img, req.body || {}));
-});
-
-router.post('/:id/process', write, async (req, res) => {
-  const step = String(req.body?.step || '');
-  //  مرحلهٔ بیرونی/ناموجود پیش از هر خواندنی رد می‌شود: هیچ بایتی جابه‌جا نمی‌شود
-  const s = pipeline.stepOf(step);
-  if (!s || s.status !== 'available') pipeline.run(step, Buffer.alloc(0));
-  const img = await bank.imageRow(req.params.id);
-  if (!img || img.space !== 'shop' || img.owner_shop_id !== req.shopId) throw notFound('عکس پیدا نشد');
-  const file = await bank.readFile(img.id, Number(img.current_version), 'original');
-  if (step === 'strip_metadata') {
-    const out = await bank.shopVersion(req.shopId, req.user.id, img.id, pipeline.run(step, file.data));
-    return res.status(201).json({ step, ...out });
-  }
-  const result = pipeline.run(step, file.data);
-  res.json({ step, result });
 });
 
 router.get('/file/:id/:version/:size', async (req, res) => {

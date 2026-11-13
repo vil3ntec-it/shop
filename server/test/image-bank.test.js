@@ -423,16 +423,15 @@ test('IMG-07 / IMG-PRO-05: نسخهٔ تازه بی‌صدا جای نسخهٔ �
   assert.equal(rvp.body.items.find((i) => i.id === pend.body.id).versions_pending, 0);
 });
 
-test('IMG-04 (بخشِ بی AI) / IMG-08: اصل محفوظ؛ پردازشِ بیرونی ۵۰۳ و هیچ ارسال یا ردیفی', async () => {
+test('IMG-04 (بخشِ بی AI) / IMG-08: مرحلهٔ بیرونی در خودِ خطِ پردازش ۵۰۳ و هیچ ارسال؛ درِ «پردازش» ِ دکان نیست و اصل محفوظ', async () => {
   const own = await SR('POST', '/?product_id=x-1', A, F.jpeg(800, 600, { gps: true, seed: ++seed }));
+  const pipeline = require('../src/lib/image-pipeline');
+  assert.throws(() => pipeline.run('background_removal', Buffer.alloc(0)), (e) => e.status === 503 && e.code === 'step_unavailable');
   const before = await count('image_versions');
-  const ext = await S('POST', `/${own.body.id}/process`, A, { step: 'background_removal' });
-  assert.equal(ext.status, 503);
-  assert.equal(ext.body.error.code, 'step_unavailable');
+  //  `POST /:id/process` صدازننده نداشت و برداشته شد (B15 ِ SECURITY-AUDIT، `dead-doors.test.js`)؛ پردازش فقط در استودیو
+  const gone = await S('POST', `/${own.body.id}/process`, A, { step: 'strip_metadata' });
+  assert.equal(gone.status, 404, JSON.stringify(gone.body));
   assert.equal(await count('image_versions'), before);
-  const strip = await S('POST', `/${own.body.id}/process`, A, { step: 'strip_metadata' });
-  assert.equal(strip.status, 201, JSON.stringify(strip.body));
-  assert.equal(strip.body.version, 2);
   const orig = await h.download(`/api/shop/images/file/${own.body.id}/1/original`, { token: A.token });
   assert.ok(orig.buffer.indexOf(Buffer.from('Exif')) > 0);                    // اصل دست‌نخورده
   const cfg = await S('GET', '/config', A);

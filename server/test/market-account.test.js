@@ -1,11 +1,15 @@
 'use strict';
 /**
- * S9 (docs/MARKETPLACE-CONTRACT-fa.md §۳) — حسابِ مشتریِ بازار بی دکان و گرهِ گفت‌وگو به حساب.
+ * S9 (docs/MARKETPLACE-CONTRACT-fa.md §۳) — گرهِ گفت‌وگو به حسابِ مشتری و تغییرِ شماره بی گم شدنِ گفت‌وگو.
+ *
+ * درهای `/api/market/account/**` نامِ دومِ حسابِ ویترین (`/api/store/:slug/account/*`، همان `store_customers` ِ سراسری)
+ * بودند و صدازننده نداشتند ⇒ برداشته شدند (`dead-doors.test.js`، B15). حساب این‌جا از همان درِ زندهٔ ویترین ساخته
+ * می‌شود؛ منطقِ تغییرِ شماره (`store-customers.changePhone`، §۲۳.۴) درِ زنده ندارد و مستقیم سنجیده می‌شود.
  *
  * آن‌چه این پرونده قفل می‌کند:
- *   ۱) ⛔ پیش‌فرض خاموش: بی `market.account` همهٔ `/api/market/account/*` ۴۰۴، و چتِ ویترین
- *      نشستِ حساب را نادیده می‌گیرد (فقط بلیت؛ `customer_id` همیشه NULL — رفتارِ امروز).
- *   ۲) ورود فقط با بلیتِ تازه؛ همان `store_customers` ِ ویترین (یک شماره ⇒ یک حساب).
+ *   ۱) ⛔ پیش‌فرض خاموش: بی `market.account` چتِ ویترین نشستِ حساب را نادیده می‌گیرد (فقط بلیت؛ `customer_id`
+ *      همیشه NULL — رفتارِ امروز).
+ *   ۲) ورود فقط با بلیتِ تازه؛ همان `store_customers` (یک شماره ⇒ یک حساب، از هر ویترین).
  *   ۳) ⛔ تغییرِ شماره گفت‌وگوهای پیشین را گم نمی‌کند: گفت‌وگوی مهمانِ پیش از حساب و
  *      گفت‌وگوی با حساب، هر دو پس از تغییر دیده می‌شوند و پیام می‌پذیرند؛ بستنِ دکان می‌ماند.
  *   ۴) ⛔ جداسازی: دارندهٔ تازهٔ شمارهٔ کهنه (با بلیت یا حسابِ تازه) و مشتریِ دیگر هیچ گفت‌وگو،
@@ -67,11 +71,23 @@ async function ticketFor(phone) {
 const T = (t) => ({ headers: { 'X-Store-Ticket': t } });
 const S = (s) => ({ headers: { 'X-Store-Session': s } });
 
-async function signIn(phone, name) {
-  const r = await h.post('/api/market/account', { name }, T(await ticketFor(phone)));
+/** ورود از درِ زندهٔ حسابِ ویترین (هر ویترین همان حسابِ سراسری) */
+async function signIn(slug, phone, name) {
+  const r = await h.post(`/api/store/${slug}/account`, { name }, T(await ticketFor(phone)));
   assert.equal(r.status, 201, JSON.stringify(r.body));
   return r.body.session;
 }
+const customers = require('../src/lib/store-customers');
+/** همان «نشستِ همین حساب + بلیتِ تازهٔ شمارهٔ نو» ِ §۲۳.۴، بی در: نشست از سرور، شمارهٔ نو از بلیتِ تازه */
+async function changePhone(session, newLocal) {
+  const a = await customers.auth(session);
+  assert.ok(a, 'نشستِ زنده');
+  const sf = require('../src/lib/storefront');
+  const phone = await sf.verifiedPhoneOfTicket(await ticketFor(newLocal), { maxAgeMs: require('../src/config').storefront.accountTicketMaxMs });
+  assert.ok(phone, 'بلیتِ تازهٔ شمارهٔ نو');
+  return customers.changePhone(a.customer, a.sessionId, phone);
+}
+const meOf = async (slug, session) => h.get(`/api/store/${slug}/account`, S(session));
 
 const chatUrl = (slug, rest = '') => `/api/store/${slug}/chat/conversations${rest}`;
 async function say(slug, who, convId, text) {
@@ -94,16 +110,13 @@ const phones = () => {
 };
 const intl = (local) => `+93${local.slice(1)}`;
 
-test('۱) پرچمِ خاموش: درهای حساب ۴۰۴، چت نشست را نادیده می‌گیرد و customer_id نمی‌نشیند', async () => {
+test('۱) پرچمِ خاموش: چت نشستِ حساب را نادیده می‌گیرد و customer_id نمی‌نشیند', async () => {
   await setFlag('all', 'market.directory', true);
   await setFlag('all', 'market.account', false);
   const s = await liveStore('خاموش');
   const [P] = phones();
   const t = await ticketFor(P);
-  assert.equal((await h.post('/api/market/account', {}, T(t))).status, 404);
-  assert.equal((await h.get('/api/market/account', S('sc1.' + 'a'.repeat(43)))).status, 404);
-  assert.equal((await h.post('/api/market/account/phone', {}, T(t))).status, 404);
-  //  نشستِ ساخته‌شده از ویترین هم، با پرچمِ خاموش، در چت فقط سرآیندِ نادیده است
+  //  نشستِ ساخته‌شده از ویترین، با پرچمِ خاموش، در چت فقط سرآیندِ نادیده است
   const sess = (await h.post(`/api/store/${s.slug}/account`, {}, T(t))).body.session;
   assert.ok(sess);
   assert.equal((await h.get(chatUrl(s.slug), S(sess))).status, 401, 'بی بلیت ⇒ همان «شماره را تأیید کنید»');
@@ -112,44 +125,28 @@ test('۱) پرچمِ خاموش: درهای حساب ۴۰۴، چت نشست را
   assert.ok(conv.id);
   const row = await one('SELECT customer_id FROM shop_chat_conversations WHERE id=$1', [conv.id]);
   assert.equal(row.customer_id, null);
-  //  بازارچهٔ بسته ⇒ حساب هم بسته، حتی با پرچمِ حساب
-  await setFlag('all', 'market.directory', false);
-  await setFlag('all', 'market.account', true);
-  assert.equal((await h.post('/api/market/account', {}, T(t))).status, 404);
-  await setFlag('all', 'market.account', false);
 });
 
-test('۲) ورود فقط با بلیتِ تازه و همان حسابِ ویترین؛ نشانی و سفارش فقط مالِ خود', async () => {
+test('۲) یک شماره ⇒ یک حساب از هر ویترین؛ نامِ دومِ بازار نیست', async () => {
   await setFlag('all', 'market.directory', true);
   await setFlag('all', 'market.account', true);
   try {
     const s = await liveStore('حساب');
-    const [P, Q] = phones();
-    assert.equal((await h.post('/api/market/account', {})).status, 401);
-    assert.equal((await h.post('/api/market/account', {}, T('v1.forged.1.x'))).status, 401);
-    const t = await ticketFor(P);
-    const viaStore = (await h.post(`/api/store/${s.slug}/account`, { name: 'زهره' }, T(t))).body;
-    const A = await signIn(P, 'دیگری');
-    const me = await h.get('/api/market/account', S(A));
-    assert.equal(me.status, 200);
-    assert.equal(me.body.customer.id, viaStore.customer.id, 'یک شماره ⇒ یک حساب (همان store_customers)');
-    assert.equal(me.body.customer.name, 'زهره');
-    assert.equal((await h.get('/api/market/account')).status, 401);
-
-    const B = await signIn(Q);
-    const addr = await h.post('/api/market/account/addresses', { label: 'خانه', text: 'کارته‌سه' }, S(A));
-    assert.equal(addr.status, 201, JSON.stringify(addr.body));
-    assert.equal((await h.get('/api/market/account/addresses', S(B))).body.addresses.length, 0);
-    assert.equal((await h.put(`/api/market/account/addresses/${addr.body.address.id}`, { label: 'x', text: 'y' }, S(B))).status, 404);
-    assert.equal((await h.del(`/api/market/account/addresses/${addr.body.address.id}`, S(B))).status, 404);
-
-    //  سفارش‌ها: درِ بی دکان با نشست، نه بی آن
-    assert.equal((await h.get('/api/market/account/orders')).status, 401);
-    assert.equal((await h.get('/api/market/account/orders', S(B))).status, 200);
-    assert.deepEqual((await h.get('/api/market/account/orders', S(B))).body.orders, []);
-
-    assert.equal((await h.post('/api/market/account/logout', {}, S(A))).body.signedOut, true);
-    assert.equal((await h.get('/api/market/account', S(A))).status, 401);
+    const s2 = await liveStore('حسابِ دوم');
+    const [P] = phones();
+    const A = await signIn(s.slug, P, 'زهره');
+    const B = await signIn(s2.slug, P, 'دیگری');
+    const a = (await meOf(s.slug, A)).body.customer;
+    const b = (await meOf(s2.slug, B)).body.customer;
+    assert.equal(a.id, b.id, 'همان store_customers');
+    assert.equal(b.name, 'زهره', 'نامِ حسابِ موجود عوض نمی‌شود');
+    //  ⛔ پرچمِ حساب روشن هم: `/api/market/account` دیگر در نیست (همان ۴۰۴ ِ درِ ناشناخته با هر نشست)
+    for (const [m, u] of [['GET', '/api/market/account'], ['POST', '/api/market/account/phone'], ['GET', '/api/market/account/orders']]) {
+      const r = await h.api(m, u, { headers: { 'X-Store-Session': A, 'X-Store-Ticket': await ticketFor(P) }, body: m === 'GET' ? null : {} });
+      assert.notEqual(r.status, 200, `${m} ${u}`);
+      assert.notEqual(r.status, 201, `${m} ${u}`);
+      assert.ok([401, 404].includes(r.status), `${m} ${u} ⇒ ${r.status}`);
+    }
   } finally {
     await setFlag('all', 'market.account', false);
   }
@@ -168,13 +165,13 @@ test('۳ و ۴) تغییرِ شماره گفت‌وگوها را نگه می‌�
     await say(s2.slug, T(await ticketFor(P)), guest.id, 'سلام از مهمان');
 
     //  ب) حساب با P و گفت‌وگو با نشست (دکانِ اول) ⇒ customer_id می‌نشیند
-    const A = await signIn(P, 'مشتریِ الف');
-    const A2 = await signIn(P);
+    const A = await signIn(s.slug, P, 'مشتریِ الف');
+    const A2 = await signIn(s2.slug, P);
     const opened = await h.post(chatUrl(s.slug), {}, S(A));
     assert.equal(opened.status, 201, JSON.stringify(opened.body));
     const conv = opened.body.conversation;
     await say(s.slug, S(A), conv.id, 'پیامِ پیش از تغییر');
-    const custId = (await h.get('/api/market/account', S(A))).body.customer.id;
+    const custId = (await meOf(s.slug, A)).body.customer.id;
     assert.equal((await one('SELECT customer_id FROM shop_chat_conversations WHERE id=$1', [conv.id])).customer_id, custId);
     //  همان گفت‌وگو با بلیت ⇒ همان (بازگشتِ سازگار)
     assert.deepEqual(await listOf(s.slug, T(await ticketFor(P))), [conv.id]);
@@ -183,23 +180,17 @@ test('۳ و ۴) تغییرِ شماره گفت‌وگوها را نگه می‌�
     const blk = await h.put(`/api/shop/chat/conversations/${conv.id}/block`, {}, { token: s.token });
     assert.equal(blk.status, 200, JSON.stringify(blk.body));
 
-    //  ج) تغییرِ شماره: بی بلیتِ شمارهٔ نو نه؛ شمارهٔ حسابِ دیگر ⇒ ۴۰۹؛ همان شماره ⇒ ۴۰۰
+    //  ج) تغییرِ شماره (§۲۳.۴): شمارهٔ حسابِ دیگر ⇒ ۴۰۹؛ همان شماره ⇒ ۴۰۰
     const oldTicket = await ticketFor(P);
-    assert.equal((await h.post('/api/market/account/phone', {}, S(A))).status, 401);
-    assert.equal((await h.post('/api/market/account/phone', {}, T(await ticketFor(Q)))).status, 401, 'بی نشست نه');
-    const B = await signIn(R, 'مشتریِ دیگر');
-    const taken = await h.post('/api/market/account/phone', {}, { headers: { 'X-Store-Session': A, 'X-Store-Ticket': await ticketFor(R) } });
-    assert.equal(taken.status, 409);
-    assert.equal(taken.body.error.code, 'phone_taken');
-    const same = await h.post('/api/market/account/phone', {}, { headers: { 'X-Store-Session': A, 'X-Store-Ticket': await ticketFor(P) } });
-    assert.equal(same.status, 400);
+    const B = await signIn(s.slug, R, 'مشتریِ دیگر');
+    await assert.rejects(changePhone(A, R), (e) => e.status === 409 && e.code === 'phone_taken');
+    await assert.rejects(changePhone(A, P), (e) => e.status === 400 && e.code === 'same_phone');
 
-    const ch = await h.post('/api/market/account/phone', {}, { headers: { 'X-Store-Session': A, 'X-Store-Ticket': await ticketFor(Q) } });
-    assert.equal(ch.status, 200, JSON.stringify(ch.body));
-    assert.equal(ch.body.customer.phone, intl(Q));
-    assert.equal(ch.body.customer.id, custId);
-    assert.equal(ch.body.sessionsRevoked, 1);
-    assert.equal((await h.get('/api/market/account', S(A2))).status, 401, 'نشستِ دیگرِ حساب لغو شد');
+    const ch = await changePhone(A, Q);
+    assert.equal(ch.customer.phone, intl(Q));
+    assert.equal(ch.customer.id, custId);
+    assert.equal(ch.sessionsRevoked, 1);
+    assert.equal((await meOf(s2.slug, A2)).status, 401, 'نشستِ دیگرِ حساب لغو شد');
     assert.equal((await h.get(chatUrl(s.slug), T(oldTicket))).status, 401, 'بلیتِ کهنهٔ P بی‌اعتبار شد');
 
     //  د) ⛔ هیچ گفت‌وگویی گم نشد — هر دو دکان، با همین نشست
@@ -231,8 +222,8 @@ test('۳ و ۴) تغییرِ شماره گفت‌وگوها را نگه می‌�
     const srch = await h.get(`/api/store/${s2.slug}/chat/search?q=${encodeURIComponent('مهمان')}`, T(newP));
     assert.equal(srch.status, 200);
     assert.deepEqual(srch.body.results, []);
-    const C = await signIn(P, 'دارندهٔ تازه');
-    assert.notEqual((await h.get('/api/market/account', S(C))).body.customer.id, custId);
+    const C = await signIn(s2.slug, P, 'دارندهٔ تازه');
+    assert.notEqual((await meOf(s2.slug, C)).body.customer.id, custId);
     assert.deepEqual(await listOf(s2.slug, S(C)), []);
     assert.deepEqual(await listOf(s.slug, S(C)), []);
     assert.equal((await h.get(chatUrl(s2.slug, `/${guest.id}`), S(C))).status, 404);

@@ -170,7 +170,6 @@ test('پرچمِ خاموش ⇒ همهٔ درهای مشتری و دکان ۴۰�
     await shopApi(s.token, 'GET', `/cases/tc_${'0'.repeat(24)}`),
     await shopApi(s.token, 'POST', `/cases/tc_${'0'.repeat(24)}/responses`, { body: 'پاسخ' }),
     await shopApi(s.token, 'POST', `/cases/tc_${'0'.repeat(24)}/appeal`, { body: 'اعتراضِ آزمایشی دکان' }),
-    await shopApi(s.token, 'GET', '/sanctions'),
   ];
   for (const r of calls) assert.equal(r.status, 404, JSON.stringify(r.body));
   //  پرچمِ خاموش و «ویترین نیست» یک جواب‌اند
@@ -396,8 +395,10 @@ test('اعتراضِ پذیرفته جریمهٔ «پنهان کردنِ کال�
   assert.equal(ck.status, 409);
   assert.equal(ck.body.error.code, 'product_unavailable');
   assert.equal((await one('SELECT published FROM storefront_products WHERE shop_id=$1 AND product_id=$2', [s.shopId, 'oil'])).published, true);
-  const sanc = await shopApi(s.token, 'GET', '/sanctions');
-  assert.deepEqual(sanc.body.sanctions.map((x) => [x.kind, x.productId, x.active]), [['hide_listing', 'oil', true]]);
+  //  جریمه‌های دکان در نمای همان پرونده (`GET /shop/trust/cases/:id`)؛ فهرستِ جدای `/sanctions` صدازننده نداشت و رفت (B15)
+  const sanc = (await shopApi(s.token, 'GET', `/cases/${caseId}`)).body.case;
+  assert.deepEqual(sanc.sanctions.map((x) => [x.kind, x.productId, x.active]), [['hide_listing', 'oil', true]]);
+  assert.equal((await shopApi(s.token, 'GET', '/sanctions')).status, 404, 'درِ برداشته');
 
   const ap = await shopApi(s.token, 'POST', `/cases/${caseId}/appeal`, { body: 'فاکتورِ واردکننده را داریم و اصل است' });
   assert.equal(ap.status, 201, JSON.stringify(ap.body));
@@ -408,7 +409,7 @@ test('اعتراضِ پذیرفته جریمهٔ «پنهان کردنِ کال�
   assert.equal((typeof audited.detail === 'string' ? JSON.parse(audited.detail) : audited.detail).reason, 'فاکتورِ اصل ارائه شد');
   //  کالا برگشت؛ جریمه پاک نشد، «برداشته‌شده» با دلیل
   assert.deepEqual((await h.get(`/api/store/${s.slug}/products`)).body.items.map((p) => p.id).sort(), ['oil', 'rice']);
-  const sanc2 = (await shopApi(s.token, 'GET', '/sanctions')).body.sanctions[0];
+  const sanc2 = (await shopApi(s.token, 'GET', `/cases/${caseId}`)).body.case.sanctions[0];
   assert.equal(sanc2.active, false);
   assert.equal(sanc2.liftReason, 'فاکتورِ اصل ارائه شد');
   const seen = (await pub(s.slug, 'GET', `/cases/${rep.body.case.token}`)).body.case;

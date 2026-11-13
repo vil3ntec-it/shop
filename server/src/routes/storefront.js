@@ -104,13 +104,8 @@ const customer = async (req, res, next) => {
   next();
 };
 
-//  ── S3: ویترین با شناسهٔ عمومیِ پایدار — `/api/store?id=<ULID>` ⇒ نشانیِ امروز ──
-//  (پرچمِ خاموش، ویترینِ بسته یا شناسهٔ ناموجود ⇒ همان ۴۰۴ ِ امروزِ این نشانی)
-router.get('/', (req, res, next) => next(typeof req.query.id === 'string' ? undefined : 'route'), readLimit, async (req, res, next) => {
-  const hit = await sf.byPublicId(req.query.id);
-  if (!hit) return next();
-  res.set('Cache-Control', 'no-store').json(hit);
-});
+//  S3: شناسهٔ عمومیِ پایدار (`public_id`) و نشانیِ پیشین ⇐ تازه (۳۰۸ از `/:slug`) می‌مانند؛ درِ `GET /api/store?id=`
+//  صدازننده نداشت (نه ویترین، نه بازارچه، نه برنامه) و برداشته شد (B15 ِ `docs/SECURITY-AUDIT-fa.md`)
 
 router.get('/:slug', readLimit, store, async (req, res) => {
   const [cats, status, delivery, seo, media, pid] = await Promise.all([

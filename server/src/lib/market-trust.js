@@ -561,13 +561,6 @@ async function appeal(viewer, id, body) {
   return { replayed: out.replayed, case: await viewForShop(viewer.shopId, out.row.id) };
 }
 
-async function sanctionsForShop(shopId) {
-  const rows = await many(
-    'SELECT * FROM trust_sanctions WHERE shop_id=$1 ORDER BY created_at DESC, id DESC LIMIT 200', [shopId]
-  );
-  return rows.map((s) => sanctionView(s));
-}
-
 // ════════════════════════════════════════════════════════════════════
 //  مدیرِ سامانه
 // ════════════════════════════════════════════════════════════════════
@@ -796,6 +789,6 @@ module.exports = {
   FLAG_KEY, COMPLAINT, REPORT, SANCTIONS, MAX_BODY,
   flagOf, tokenOf, caseIdOf, normalize,
   storeOf, file, track, myCases, putEvidence, customerEvidence, rawEvidence,
-  listForShop, viewForShop, respond, appeal, sanctionsForShop,
+  listForShop, viewForShop, respond, appeal,
   queue, adminView, adminEvidence, assign, decide, decideAppeal, liftSanction, sanctionsForAdmin,
 };
