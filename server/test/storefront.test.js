@@ -608,3 +608,38 @@ test('D-06: `<slug>.vill3n.top` در ریشه همان ویترین است؛ ز�
   assert.doesNotMatch(html, /<script(?![^>]*\ssrc=)[^>]*>/i);
   assert.doesNotMatch(html, /\sstyle=|\son[a-z]+=/i);
 });
+
+//  ORD-21: «صفِ یکپارچه» — سفارشِ ویترین و ثبتِ دستیِ کارمند از تلفن، تلگرام، واتس‌اپ و دستی در **همان** صفِ برنامه
+//  (`GET /api/shop/orders?tab=new` و شمارشِ `summary`)، هر کدام با منبعِ خودش؛ کارمند «ویترین» نمی‌سازد و منبعِ ناشناخته ۴۰۰.
+test('ORD-21: یک صف برای ویترین، تلفن، تلگرام، واتس‌اپ و دستی — هر کدام با منبعِ خودش؛ منبعِ نادرست ۴۰۰', async () => {
+  const s = await liveStore('صفِ یکپارچه');
+  const web = await checkout(s.slug, cart(), { ticket: await ticketFor(s.slug, PHONE) });
+  assert.equal(web.status, 201, JSON.stringify(web.body));
+  const staff = (source, key = `ord21-${source}-${uniq()}`) => h.post('/api/shop/orders', {
+    source, fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: 'احمد', phone: '0791234567' },
+    lines: [{ name: 'برنج', unit: 'کیلو', qtyMilli: 1000, unitPriceMinor: 12000 }],
+  }, { token: s.token, headers: { 'Idempotency-Key': key } });
+  const made = {};
+  for (const src of ['phone', 'telegram', 'whatsapp', 'manual']) {
+    const r = await staff(src);
+    assert.equal(r.status, 201, `${src}: ${JSON.stringify(r.body)}`);
+    made[src] = r.body.order.id;
+  }
+  //  (منبعِ تهی همان «دستی» است — `orders.parseCreate`)
+  for (const bad of ['storefront', 'web', 'sms']) {
+    const r = await staff(bad);
+    assert.equal(r.status, 400, `${bad}: ${JSON.stringify(r.body)}`);
+    assert.equal(r.body.error.code, 'bad_source');
+  }
+  const q = await h.get('/api/shop/orders?tab=new&limit=50', { token: s.token });
+  assert.equal(q.status, 200, JSON.stringify(q.body));
+  const bySource = Object.fromEntries(q.body.items.map((x) => [x.source, x]));
+  assert.deepEqual(Object.keys(bySource).sort(), ['manual', 'phone', 'storefront', 'telegram', 'whatsapp']);
+  for (const [src, id] of Object.entries(made)) assert.equal(bySource[src].id, id, src);
+  assert.equal(q.body.items.length, 5, 'هر سفارش یک بار، در یک صف (رد‌شده‌ها هیچ ردیفی نساختند)');
+  //  همان ترتیبِ «قدیمی‌تر بالا» برای همه، بی صفِ جدا برای ویترین
+  const at = q.body.items.map((x) => x.createdAt);
+  assert.deepEqual(at, [...at].sort((a, b) => a - b));
+  const sum = (await h.get('/api/shop/orders/summary', { token: s.token })).body;
+  assert.equal(sum.counts.new, 5);
+});
