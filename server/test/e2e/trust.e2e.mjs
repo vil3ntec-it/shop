@@ -82,7 +82,7 @@ await E.step('ABUSE-01.web', 'شکایت از دکان: بی شماره ⇒ کد
   await page.fill('#tr-c-text', 'فروشنده با مشتری بد برخورد کرد');
   await page.click('#tr-c-send');
   await page.waitForSelector('#tr-c-verify', { timeout: 10_000 });
-  await page.fill('#tr-c-phone', PHONE);
+  await page.fill('#tr-c-email', `c${PHONE.slice(-9)}@e2e.local`);   //  «فقط ایمیل»: شاکی با کدِ ایمیل تأیید می‌شود
   await page.click('#tr-c-vsend');
   await page.waitForSelector('#tr-c-vrow:not([hidden])', { timeout: 10_000 });
   await note(page, '#tr-c-msg', /\d{4,8}/);

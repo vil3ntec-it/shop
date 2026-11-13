@@ -115,7 +115,7 @@ private fun Edit(phone: String, error: Boolean = false) {
       newPhone = if (error) "0700123456" else phone, phoneError = if (error) ir.vil3ntec.tohid.core.i18n.StrAccount.phoneNeedsInternet else null,
       shopName = "دکانِ نمونه", createdAt = System.currentTimeMillis() - 430 * DAY, dirty = error,
     ),
-    {}, {}, {}, {}, {}, {},
+    onName = {}, onNewPhone = {}, onShopName = {}, onPhoto = {}, onSave = {}, onBack = {},
   )
 }
 
