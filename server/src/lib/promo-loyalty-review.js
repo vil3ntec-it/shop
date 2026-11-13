@@ -6,7 +6,7 @@
  * تا امروز سرور اعلامِ صندوق را می‌پذیرفت: `price-cap` (`sale-caps.line`) تخفیفِ خودکارِ هر قلم و سهمِ امتیاز را پیش از
  * سنجشِ قیمت «برمی‌گرداند»، پس کارمند با `promo` ِ ساختگی یا امتیازی که مشتری ندارد قیمت را پایین می‌آورد و هیچ سقفی
  * نمی‌دید. این پرونده **هیچ ردی نمی‌کند، هیچ ردیفی از دفتر نمی‌نویسد و هیچ پاسخی را عوض نمی‌کند**؛ پس از نشستنِ push
- * (v1: `credit-debtor.flagV1`، ⛔ بی دست زدن به `sync-v1`؛ راهِ قدیم و REST: `credit-debtor.flagLegacy`؛ v3: `routes/sync-v3.js`)
+ * (v1: `credit-debtor.flagV1`، ⛔ بی دست زدن به `sync-v1`؛ راهِ قدیم: `credit-debtor.flagLegacy`؛ v3: `routes/sync-v3.js`)
  * برای هر فاکتورِ تازه (یا فاکتورِ نشسته‌ای که قلم یا مصرفِ امتیازش دیر رسید) با همان قاعدهٔ صندوق می‌سنجد:
  *
  *   تخفیف  همان `promo-core.evaluate` (= `PromoCore.kt`، بردارِ `promo-v1.json`) با ورودیِ `PromoEngine.lines` ِ صندوق:
@@ -424,7 +424,7 @@ function v3(ctx, deviceId, ops, results, { ip = '' } = {}) {
   });
 }
 
-/** راهِ قدیم و REST (از `credit-debtor.flagLegacy`): فاکتورِ تازه (`version = 1`)، قلم یا مصرفِ امتیازِ تازه */
+/** راهِ قدیم (از `credit-debtor.flagLegacy`): فاکتورِ تازه (`version = 1`)، قلم یا مصرفِ امتیازِ تازه */
 function legacy({ shopId, role, userId = '', deviceId = '', ip = '', path = 'legacy' }, changes, refused = new Set()) {
   return safely('legacy', async () => {
     if (!shopId || role === 'owner' || !Array.isArray(changes)) return 0;

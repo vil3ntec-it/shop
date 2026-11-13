@@ -8,7 +8,7 @@ const plans = require('./lib/plans');
 const subs = require('./lib/subscriptions');
 const { rateLimit } = require('./middleware/ratelimit');
 const { notFoundHandler, errorHandler, notFound } = require('./middleware/errors');
-const { requireUser, optionalShop, requireAdmin } = require('./middleware/auth');
+const { requireUser, optionalShop, requireShop, requireAdmin } = require('./middleware/auth');
 const { redactPath } = require('./lib/log-redact');
 
 async function createApp({ runMigrations = true } = {}) {
@@ -546,8 +546,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/admin/calendar', require('./routes/admin-calendar'));
     /*
      *  ⛔ مسیرِ ناشناختهٔ مدیر ⇒ ۴۰۴ `route_not_found`، نه ۴۰۱ (چسبِ پنلِ مرکزی، بندِ ۱۲.۶ ِ
-     *  ADMIN-CONTROL-PLANE). پیش‌تر درخواستِ مدیرِ **معتبر** به مسیری که این سرور ندارد به درِ
-     *  مستقیمِ دادهٔ پایین (روی `/`، با `requireUser`؛ برداشته شد) می‌افتاد و ۴۰۱ `invalid_token` می‌گرفت؛ پلِ
+     *  ADMIN-CONTROL-PLANE). بی این خط، درخواستِ مدیرِ **معتبر** به مسیری که این سرور ندارد به دروازهٔ
+     *  پایانیِ `/api` (پایین‌تر، با `requireUser`) می‌افتاد و ۴۰۱ `invalid_token` می‌گرفت؛ پلِ
      *  پنل آن را «نشستِ ارشد تمام شد» می‌خواند. `requireAdmin` همین‌جا دوباره: بی‌توکن و توکنِ دکان
      *  همان ۴۰۱ ِ همیشه را می‌گیرند تا وجود/نبودِ مسیرِ مدیر به بیرون گفته نشود. هر مسیرِ واقعی
      *  بالاتر سوار است، پس این خط به هیچ‌کدام نمی‌رسد.
@@ -558,11 +558,17 @@ async function createApp({ runMigrations = true } = {}) {
     api.get('/downloads', require('./routes/portal').downloadsHandler);
 
     /*
-     *  ⛔ درِ مستقیمِ داده (`/api/products`، `/api/sales`، `/api/debtors`… با PUT و DELETE، ۵۱ در) برداشته شد
-     *  (۱۴۰۵/۰۸/۲۲): هیچ برنامه‌ای صدایش نمی‌زد و راهِ دومِ نوشتن روی دفترِ دکان بود که هر نگهبانِ تازه باید
+     *  ⛔ درِ مستقیمِ داده (`/api/products`، `/api/sales`، `/api/debtors`… با PUT و DELETE، ۵۱ در، `routes/data.js`)
+     *  برداشته شد (۱۴۰۵/۰۸/۲۲): هیچ برنامه‌ای صدایش نمی‌زد و راهِ دومِ نوشتن روی دفترِ دکان بود که هر نگهبانِ تازه باید
      *  دو بار رویش وصله می‌شد. نوشتن فقط از همگام‌سازی (`/api/sync/v1`، `/api/sync/v3` و راهِ قدیمِ `/api/sync`).
-     *  مسیرِ ناشناخته حالا ۴۰۴ ِ `notFoundHandler` است، نه ۴۰۱ (`dead-doors.test.js`).
+     *
+     *  ⚠️ «دروازهٔ پایانی» ِ همان روتر **می‌ماند** (بی هیچ مسیر): هر درخواستِ ناشناختهٔ `/api` بی نشستِ دکان همان ۴۰۱
+     *  (`unauthorized`/`invalid_token`) یا ۴۰۳ ِ `requireShop` را می‌گیرد و با نشستِ دکان ۴۰۴. برنامه‌ها روی همین سوارند:
+     *  درِ پشتِ پرچمِ خاموش که `next()` می‌کند «همان درِ ناشناخته» است (`core/test-vectors/account-cart-v1.json`،
+     *  `ShopperCartSync.doorClosed`، `ShopperAddressSync.transient`، `security-review-38`)، و وجود/نبودِ مسیر به ناشناس
+     *  گفته نمی‌شود. درِ برداشته با نشستِ دکان ۴۰۴ است و بی آن همان پاسخِ درِ ناشناخته (`dead-doors.test.js`).
      */
+    api.use(requireUser, requireShop);
     return api;
   }
 
@@ -570,8 +576,8 @@ async function createApp({ runMigrations = true } = {}) {
    *  ترتیب این دو خط مهم است و اتفاقی نیست.
    *
    *  اگر `/api` اول سوار شود، درخواستِ `/api/v1/health` را هم **همان**
-   *  می‌قاپد و داخلش مسیر می‌شود `/v1/health`؛ آن روز به آخرین لایه (درِ
-   *  مستقیمِ داده روی `/`، حالا برداشته) می‌رسید که توکن می‌خواست و همه‌چیز
+   *  می‌قاپد و داخلش مسیر می‌شود `/v1/health`؛ چون چنین مسیری نیست، به
+   *  آخرین لایه (دروازهٔ پایانیِ `requireUser, requireShop`) می‌رسد که توکن می‌خواهد و همه‌چیز
    *  ۴۰۱ برمی‌گشت. یعنی کل `/api/v1/…` — همان چیزی که برنامه‌ها صدا
    *  می‌زنند — بسته بود.
    *

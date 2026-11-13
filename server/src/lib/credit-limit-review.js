@@ -8,7 +8,7 @@
  * ⛔ تصمیمِ صاحب‌کار هنوز باز است (STATUS، CRM-03): سرور فروشِ بیش از سقفِ بی تأیید را **رد کند** (فروشِ آفلاینِ
  *    انجام‌شده برمی‌گردد) یا فقط **به بررسی بفرستد**. این پرونده فقط راهِ دوم است و هرگز رد نمی‌کند، هیچ ردیفی از
  *    دفتر نمی‌نویسد و هیچ پاسخی را عوض نمی‌کند:
- *   - پس از نشستنِ push (v1: `credit-debtor.flagV1`، بی دست زدن به `sync-v1`؛ راهِ قدیم و REST: `credit-debtor.flagLegacy`؛
+ *   - پس از نشستنِ push (v1: `credit-debtor.flagV1`، بی دست زدن به `sync-v1`؛ راهِ قدیم: `credit-debtor.flagLegacy`؛
  *     v3: `routes/sync-v3.js`) برای هر فاکتورِ **تازهٔ** قرض‌دار، ماندهٔ دفترِ **سرور** ِ همان مشتری تا لحظهٔ همان فاکتور
  *     + بردِ همین فاکتور با سقف سنجیده می‌شود (همان `CreditGate.check`).
  *   - بیش از سقف و بی تأییدِ دستگاه (ردِ `credit_over_limit` ِ همان فاکتور با نام و دلیل) ⇒ سابقهٔ
@@ -278,7 +278,7 @@ function v1(ctx, deviceId, rows, inserted, { ip = '', ops = [] } = {}) {
 }
 
 /**
- * راهِ قدیم و REST (از `credit-debtor.flagLegacy`): ردیف‌های نشسته؛ فقط درجِ تازه (`version = 1`)، و ردیفِ «give» ِ تازهٔ
+ * راهِ قدیم (از `credit-debtor.flagLegacy`): ردیف‌های نشسته؛ فقط درجِ تازه (`version = 1`)، و ردیفِ «give» ِ تازهٔ
  * `transactions` ⇒ فاکتورهای نشستهٔ پس از آن (تراکنشِ دیررسیده).
  */
 function legacy({ shopId, role, userId = '', deviceId = '', ip = '', path = 'legacy' }, rows, { txs = [] } = {}) {

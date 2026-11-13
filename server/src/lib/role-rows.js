@@ -42,7 +42,7 @@ function viewOf(table, f, v3) {
     };
   }
   if (table === 'stockMovements') {
-    //  `/api/sales/full` ِ راهِ قدیم فاکتور را با `saleId` می‌نشاند، نه `refId`
+    //  فاکتورِ کاملِ راهِ قدیم (شکلِ `/api/sales/full` ِ برداشته) فاکتور را با `saleId` می‌نشاند، نه `refId`
     const refId = f.refId === undefined || f.refId === null ? f.saleId : f.refId;
     return { type: f.type, qty: qty('qty'), refId, productId: f.productId };
   }
@@ -365,7 +365,7 @@ function legacyDb(many, shopId, userId, TABLES) {
       )).map((r) => ({ ...saleLineOf(r.id, r.data, false), qty: numOf(r.data?.quantity) }));
     },
     async moved(refIds) {
-      //  `/api/sales/full` حرکت را با `saleId` می‌نشاند، نه `refId`
+      //  فاکتورِ کاملِ راهِ قدیم حرکت را با `saleId` می‌نشاند، نه `refId`
       return (await many(
         `SELECT data FROM ${TABLES.stockMovements} WHERE shop_id=$1 AND deleted=false
             AND COALESCE(data->>'refId', data->>'saleId') = ANY($2::text[]) AND data->>'type' = ANY($3::text[]) ORDER BY id COLLATE "C"`,

@@ -8,7 +8,8 @@
  *      دفترِ دکان که هر نگهبانِ تازه باید دو بار رویش وصله می‌شد؛ هیچ برنامه‌ای صدایش نمی‌زد.
  *   ۲) نام‌ها و درهای مردهٔ دکان، «من»، پورتال و ورود (فهرستِ `GONE`).
  *
- * با توکنِ معتبرِ صاحب هر کدام ۴۰۴ (نه ۴۰۱، نه نوشتن) — با `/api` و `/api/v1`؛ بی‌توکن هیچ‌کدام ۲xx نیست؛ هیچ ردیفی از
+ * با توکنِ معتبرِ صاحب هر کدام ۴۰۴ (نه نوشتن) — با `/api` و `/api/v1`؛ بی‌توکن همان ۴۰۱ ِ درِ ناشناخته (دروازهٔ پایانیِ
+ * `/api` که با `routes/data.js` نرفت: درِ پرچمِ خاموش «همان درِ ناشناخته» است، `account-cart-v1.json`)؛ هیچ ردیفی از
  * دفترِ دکان عوض نمی‌شود؛ و فهرستِ زندهٔ مسیرها هیچ‌کدام را ندارد. درهایی که برنامهٔ کهنهٔ در دست (APK ِ پوستهٔ
  * WebView ِ `android/` و نسخهٔ بومیِ بایگانی‌شده) هنوز صدا می‌زند عمداً ماندند و همین‌جا زنده سنجیده می‌شوند (`KEPT`)،
  * تا آزمون بی‌اثر نباشد (۴۰۴ از سوار نشدنِ کلِ `/api` نیامده باشد).
@@ -84,17 +85,18 @@ test('هر درِ برداشته با توکنِ معتبرِ صاحب ۴۰۴ ا
   for (const p of SETS) assert.ok(JSON.stringify(await h.legacyRows(owner.accessToken, { 'sale-items': 'saleItems', inventory: 'warehouseEntries', payments: 'transactions' }[p] || p)).includes(`ردیفِ ${p}`), p);
 });
 
-test('بی‌توکن هیچ درِ برداشته ۲xx نمی‌دهد؛ درِ مستقیمِ داده و نامِ دومِ ورودِ شاگرد ۴۰۴ (دیگر ۴۰۱ ِ «همه‌گیر» نیست)', async () => {
+test('بی‌توکن هر درِ برداشته همان پاسخِ درِ ناشناخته است (دروازهٔ پایانیِ `/api`: ۴۰۱، بی وجود/نبودِ مسیر)', async () => {
+  //  درِ ناشناخته‌ای که هرگز نبود ⇒ همان ۴۰۱ ِ دروازه؛ برنامه‌ها روی همین سوارند (`account-cart-v1.json`)
+  const unknown = await h.post('/api/no-such-door', { a: 1 });
+  assert.equal(unknown.status, 401, JSON.stringify(unknown.body));
   const bad = [];
   for (const key of GONE) {
     resetAll();
     const r = await h.api(key.split(' ')[0], url(key), { body: bodyOf(key) });
-    if (r.status < 300) bad.push(`${key} بی‌توکن ⇒ ${r.status}`);
-    if ((DATA.includes(key) || key === 'POST /api/auth/staff-login') && r.status !== 404) bad.push(`${key} بی‌توکن ⇒ ${r.status} (۴۰۴ می‌خواستیم)`);
+    if (r.status !== 401) bad.push(`${key} بی‌توکن ⇒ ${r.status} ${JSON.stringify(r.body).slice(0, 120)}`);
+    else if (DATA.includes(key) && JSON.stringify(r.body) !== JSON.stringify(unknown.body)) bad.push(`${key} بی‌توکن پاسخِ دیگری از درِ ناشناخته داد: ${JSON.stringify(r.body)}`);
   }
   assert.deepEqual(bad, [], bad.join('\n'));
-  //  مسیرِ ناشناخته‌ای که هرگز نبود هم همان ۴۰۴ (درِ داده دیگر روی `/` همه را با ۴۰۱ نمی‌قاپد)
-  assert.equal((await h.get('/api/no-such-door')).status, 404);
 });
 
 test('فهرستِ زندهٔ مسیرها هیچ درِ برداشته را ندارد؛ درهای ماندهٔ برنامهٔ کهنه و جانشین‌ها زنده‌اند', async () => {
