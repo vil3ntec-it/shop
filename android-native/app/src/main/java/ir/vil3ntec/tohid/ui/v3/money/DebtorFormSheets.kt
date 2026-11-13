@@ -62,7 +62,7 @@ internal fun DebtorFormSheet(
   /** CRM-03 — همین کاربر و پرچمِ دکان (`rememberCreditLimitRules`)؛ پیش‌فرض خاموش = همان امروز */
   limitRules: CreditLimitPerm.Rules = CreditLimitPerm.Rules.OFF,
 ) {
-  val initial = remember(debtor?.id) { DebtorFormsModel.of(debtor) }
+  val initial = remember(debtor?.id, limitRules) { DebtorFormsModel.of(debtor, limitRules) } // CRM-03 #۲۵: تازه ⇒ سقفِ پیش‌فرض
   var f by remember(debtor?.id) { mutableStateOf(initial) }
   var tried by rememberSaveable { mutableStateOf(false) }
   var shake by remember { mutableStateOf(0) }
@@ -83,7 +83,7 @@ internal fun DebtorFormSheet(
       Spacer(Modifier.height(12.dp))
       V3TextField(
         f.creditLimit, { f = f.copy(creditLimit = it) }, StrMoney.creditLimitField,
-        kind = V3FieldKind.MONEY, helper = CreditLimitGate.helper(limitField) ?: StrMoney.creditLimitHelper, error = limitError,
+        kind = V3FieldKind.MONEY, helper = CreditLimitGate.helper(limitField, fresh = debtor == null) ?: StrMoney.creditLimitHelper, error = limitError,
         enabled = !limitField.locked,
       )
       Spacer(Modifier.height(12.dp))

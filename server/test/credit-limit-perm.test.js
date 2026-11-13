@@ -5,7 +5,7 @@
  *
  * سنجه‌ها: پرچمِ خاموش همان امروز (لایه ذخیره نمی‌شود، لایهٔ ازپیش‌مانده بی‌اثر)؛ با پرچم، شاگردِ «ممنوع» یا بالای `maxAmount`
  * سقفِ مشتریِ موجود را در v1، v3 و راهِ قدیم عوض نمی‌کند (بالا بردن، برداشتن، پایین آوردن) و ردیفِ صندوقِ تعارض با
- * خودِ op می‌ماند؛ زیرِ سقف، مشتریِ تازه، ویرایشِ بی سقف و صاحب آزاد؛ نقشِ جعلی در بدنه/فیلد اثری ندارد؛ تکرارِ همان op
+ * خودِ op می‌ماند؛ زیرِ سقف، ویرایشِ بی سقف و صاحب آزاد؛ مشتریِ تازه (تصمیمِ ۱۴۰۵/۰۸/۲۳ #۲۵) فقط با سقفِ پیش‌فرض (صفر) یا تا سقفِ نقش؛ نقشِ جعلی در بدنه/فیلد اثری ندارد؛ تکرارِ همان op
  * «تکراری» است؛ شاگرد لایهٔ خودش را باز نمی‌کند؛ دکانِ دیگر با همان شناسهٔ مشتری دست نمی‌خورد.
  */
 process.env.SYNC_V3_ENABLED = '1';
@@ -96,7 +96,13 @@ test.after(async () => { await h.stop(); });
 
 test('قاعدهٔ خالص: فقط تغییرِ سقفِ مشتریِ موجود؛ برداشتن و عددِ نادرست ⇒ بی‌نهایت؛ ردیفِ کاملِ راهِ قدیم بی کلید = برداشتن', () => {
   const L = (f, o) => perm.limitOf(f, o);
-  assert.equal(perm.need(null, L({ creditLimit: 900000 })), null, 'مشتریِ تازه');
+  //  #۲۵ (۱۴۰۵/۰۸/۲۳): مشتریِ تازه از سقفِ پیش‌فرضِ دکان (صفر) سنجیده می‌شود؛ بی فیلد = بی سقف
+  assert.deepEqual(perm.need(null, L({ creditLimit: 9000 })).req, { amount: 900000 }, 'مشتریِ تازه با سقف');
+  assert.equal(perm.need(null, L({ creditLimit: 9000 })).fresh, true);
+  assert.equal(perm.need(null, L({ name: 'x' })).amount, Number.MAX_SAFE_INTEGER, 'مشتریِ تازهٔ بی سقف');
+  assert.equal(perm.need(null, L({ creditLimit: 0 })), null, 'مشتریِ تازه با سقفِ پیش‌فرض');
+  assert.equal(perm.need(null, L({ creditLimitMinor: 0 }, { shape: 'v3' }), 'v3'), null);
+  assert.equal(perm.DEFAULT_MINOR, 0);
   assert.equal(perm.need({ creditLimit: 5000 }, L({ name: 'x' })), null, 'بی فیلدِ سقف');
   assert.equal(perm.need({ creditLimit: 5000 }, L({ creditLimit: 5000 })), null, 'همان سقف');
   assert.equal(perm.need({ creditLimitMinor: 500000 }, L({ creditLimitMinor: 500000 }, { shape: 'v3' }), 'v3'), null);
@@ -123,7 +129,7 @@ test('پرچمِ خاموش (پیش‌فرض): لایه ذخیره نمی‌شو
   await query(`DELETE FROM shop_role_perms WHERE shop_id=$1`, [shopId]);
 });
 
-test('پرچمِ روشن، v1: بالای `maxAmount` یا برداشتن ⇒ رد و صندوق؛ زیرِ سقف، مشتریِ تازه و ویرایشِ بی سقف می‌نشیند؛ تکرار «تکراری»', async () => {
+test('پرچمِ روشن، v1: بالای `maxAmount` یا برداشتن ⇒ رد و صندوق؛ زیرِ سقف، مشتریِ تازهٔ تا سقف و ویرایشِ بی سقف می‌نشیند؛ تکرار «تکراری»', async () => {
   await liveFlag('shop.credit_limit_perm', true, shopId);
   assert.equal((await setRole('staff', { 'customers.credit_limit': { caps: { maxAmount: 800000 } } })).status, 200);
   const page = await h.get('/api/shop/permissions', { token: owner.accessToken });
@@ -150,11 +156,21 @@ test('پرچمِ روشن، v1: بالای `maxAmount` یا برداشتن ⇒ �
   assert.deepEqual(why(await push1(staff, 'pos-1', [op1('debtors', 'd-1', 'update', { creditLimit: null })], A00)), ['credit_limit_not_allowed']);
   assert.deepEqual(why(await push1(staff, 'pos-1', [op1('debtors', 'd-1', 'update', { creditLimit: null })])), ['applied']);
   assert.equal(await limit1('d-1'), 8000);
-  //  مشتریِ تازه با هر سقفی و ویرایشِ بی سقف ⇒ می‌نشیند
+  //  #۲۵: مشتریِ تازه بالای سقفِ نقش یا بی سقف ⇒ رد و صندوق (دورزدنِ پیشین)؛ تا سقف، پیش‌فرض و ویرایشِ بی سقف ⇒ می‌نشیند
+  const big = op1('debtors', 'd-new', 'insert', { name: 'تازه', phone: '0700000199', creditLimit: 999999, createdAt: clock });
+  const open = op1('debtors', 'd-open', 'insert', { name: 'بی سقف', phone: '0700000197', createdAt: clock });
   assert.deepEqual(why(await push1(staff, 'pos-1', [
-    op1('debtors', 'd-new', 'insert', { name: 'تازه', phone: '0700000199', creditLimit: 999999, createdAt: clock }),
+    big, open,
+    op1('debtors', 'd-zero', 'insert', { name: 'پیش‌فرض', phone: '0700000196', creditLimit: 0, createdAt: clock }),
+    op1('debtors', 'd-new', 'insert', { name: 'تازه', phone: '0700000199', creditLimit: 8000, createdAt: clock }),
     op1('debtors', 'd-1', 'update', { notes: 'فقط یادداشت' }),
-  ])), ['applied', 'applied']);
+  ])), ['credit_limit_not_allowed', 'credit_limit_not_allowed', 'applied', 'applied', 'applied']);
+  assert.equal(await one(`SELECT 1 FROM sync_rows WHERE app='shop' AND account_id=$1 AND row_id='d-open'`, [shopId]), null, 'هیچ ردیفی');
+  const fresh = await boxOf(big.op_id);
+  assert.deepEqual([fresh.kind, fresh.detail.amount, fresh.detail.from, fresh.detail.fresh, fresh.detail.limit],
+    ['perm_denied', 99999900, 0, true, 800000]);
+  assert.equal(fresh.loser_value.ops[0].op_id, big.op_id, 'مدیر همان op را از صندوق «دوباره ثبت با تأییدِ من» می‌کند');
+  assert.equal((await boxOf(open.op_id)).detail.amount, null, 'بی سقف');
   //  «درج» روی ردیفِ موجود ویرایش است؛ و درجِ تازه + بالا بردن در همان دسته ⇒ دومی سنجیده می‌شود
   assert.deepEqual(why(await push1(staff, 'pos-1', [
     op1('debtors', 'd-1', 'insert', { name: 'مشتریِ یک', creditLimit: 50000 }),
@@ -183,7 +199,7 @@ test('پرچمِ روشن: «ممنوع» هر تغییری را می‌بندد
   assert.equal(await limit1('d-1'), 20000);
 });
 
-test('پرچمِ روشن، v3: `creditLimitMinor` ِ مشتریِ موجود بی اجازه ⇒ رد و صندوق؛ مشتریِ تازه آزاد؛ صاحب آزاد', async () => {
+test('پرچمِ روشن، v3: `creditLimitMinor` ِ مشتریِ موجود بی اجازه ⇒ رد و صندوق؛ مشتریِ تازه فقط با پیش‌فرض؛ صاحب آزاد', async () => {
   const up = op3('debtors', 'd3-1', 'update', { creditLimitMinor: 900000 });
   const r = await push3(staff, 'pos-3', [up]);
   assert.deepEqual(why(r), ['credit_limit_not_allowed'], JSON.stringify(r.body));
@@ -193,10 +209,20 @@ test('پرچمِ روشن، v3: `creditLimitMinor` ِ مشتریِ موجود ب
   //  `creditLimit` ِ افغانی روی ردیفِ v3 هم همان
   assert.deepEqual(why(await push3(staff, 'pos-3', [op3('debtors', 'd3-1', 'update', { creditLimit: null })], A00)), ['credit_limit_not_allowed']);
   assert.deepEqual(why(await push3(staff, 'pos-3', [op3('debtors', 'd3-1', 'update', { creditLimitMinor: null })], A00)), ['credit_limit_not_allowed']);
+  //  #۲۵: شاگردِ «ممنوع» مشتریِ تازه را فقط با سقفِ پیش‌فرض (صفر) می‌سازد؛ سقفِ دیگر یا بی سقف ⇒ رد و صندوق
+  const big3 = op3('debtors', 'd3-new', 'insert', { name: 'تازهٔ v3', phone: '0700000198', creditLimitMinor: 99999900 });
+  const r3 = await push3(staff, 'pos-3', [big3]);
+  assert.deepEqual(why(r3), ['credit_limit_not_allowed'], JSON.stringify(r3.body));
+  assert.deepEqual([(await boxOf(big3.op_id)).detail.fresh, (await boxOf(big3.op_id)).detail.path], [true, 'v3']);
+  assert.deepEqual(why(await push3(staff, 'pos-3', [op3('debtors', 'd3-open', 'insert', { name: 'بی سقفِ v3' })])), ['credit_limit_not_allowed']);
   assert.deepEqual(why(await push3(staff, 'pos-3', [
-    op3('debtors', 'd3-new', 'insert', { name: 'تازهٔ v3', phone: '0700000198', creditLimitMinor: 99999900 }),
+    op3('debtors', 'd3-new', 'insert', { name: 'تازهٔ v3', phone: '0700000198', creditLimitMinor: 0 }),
     op3('debtors', 'd3-1', 'update', { notes: 'بی سقف' }),
   ])), ['applied', 'applied']);
+  assert.equal(await limit3('d3-new'), 0);
+  //  مدیرِ «ممنوع» هم؛ صاحب با هر سقف
+  assert.deepEqual(why(await push3(manager, 'mgr-3', [op3('debtors', 'd3-m', 'insert', { name: 'مدیر', creditLimitMinor: 100 })])), ['credit_limit_not_allowed']);
+  assert.deepEqual(why(await push3(owner, 'own-3', [op3('debtors', 'd3-o', 'insert', { name: 'صاحب', creditLimitMinor: 99999900 })])), ['applied']);
   //  راه‌های کناری: «دلتا» روی سقف (شمارنده نیست) و صفِ v2 (op ِ v1 از درِ v3)
   const delta = await push3(staff, 'pos-3', [op3('debtors', 'd3-1', 'delta', { creditLimitMinor: 400000 })]);
   assert.notEqual(delta.body.results[0].status, 'applied', JSON.stringify(delta.body));
@@ -212,7 +238,7 @@ test('پرچمِ روشن، v3: `creditLimitMinor` ِ مشتریِ موجود ب
   assert.equal(await limit3('d3-1'), 900000);
 });
 
-test('پرچمِ روشن، راهِ قدیم: سقفِ تازه یا ردیفِ کاملِ بی سقف ⇒ ۴۰۳ و هیچ نوشتنی؛ همان سقف و مشتریِ تازه آزاد', async () => {
+test('پرچمِ روشن، راهِ قدیم: سقفِ تازه یا ردیفِ کاملِ بی سقف ⇒ ۴۰۳ و هیچ نوشتنی؛ همان سقف و مشتریِ تازه با پیش‌فرض آزاد', async () => {
   const t = Date.now();
   const r0 = await legacy(owner, [{ collection: 'debtors', id: 'dl-1', updatedAt: t, data: { name: 'مشتریِ وب', phone: '0700000109', creditLimit: 5000 } }]);
   assert.equal(r0.status, 200, JSON.stringify(r0.body));
@@ -227,7 +253,13 @@ test('پرچمِ روشن، راهِ قدیم: سقفِ تازه یا ردیفِ
   //  همان سقف (ویرایشِ نام) و مشتریِ تازه ⇒ می‌نشیند
   const same = await legacy(staff, [{ collection: 'debtors', id: 'dl-1', updatedAt: t + 30, data: { name: 'نامِ تازه', phone: '0700000109', creditLimit: 5000 } }]);
   assert.deepEqual([same.status, same.body.applied], [200, 1], JSON.stringify(same.body));
-  const fresh = await legacy(staff, [{ collection: 'debtors', id: 'dl-2', updatedAt: t + 30, data: { name: 'تازهٔ وب', creditLimit: 99999 } }]);
+  //  #۲۵: مشتریِ تازه با سقفِ دیگر یا ردیفِ کاملِ بی سقف ⇒ ۴۰۳؛ با سقفِ پیش‌فرض (صفر) ⇒ می‌نشیند
+  for (const data of [{ name: 'تازهٔ وب', creditLimit: 99999 }, { name: 'تازهٔ وب' }]) {
+    const bad = await legacy(staff, [{ collection: 'debtors', id: 'dl-2', updatedAt: t + 30, data }]);
+    assert.deepEqual([bad.status, bad.body.error?.code], [403, 'credit_limit_not_allowed'], JSON.stringify(bad.body));
+  }
+  assert.equal(await one(`SELECT 1 FROM debtors WHERE shop_id=$1 AND id='dl-2'`, [shopId]), null);
+  const fresh = await legacy(staff, [{ collection: 'debtors', id: 'dl-2', updatedAt: t + 30, data: { name: 'تازهٔ وب', creditLimit: 0 } }]);
   assert.deepEqual([fresh.status, fresh.body.applied], [200, 1], JSON.stringify(fresh.body));
   //  صاحب ⇒ آزاد
   const own = await legacy(owner, [{ collection: 'debtors', id: 'dl-1', updatedAt: t + 40, data: { name: 'نامِ تازه', creditLimit: 30000 } }]);
