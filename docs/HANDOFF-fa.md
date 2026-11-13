@@ -74,6 +74,9 @@
   `catalog-stock`/`catalog-transfers` ۲ سرخ؛ `storefront-link-expiry` ۱ سرخ؛ `delivery-customer-view` ۲ سرخ؛ Kotlin: `SignOutEverywhereTest`،
   `OrderTrackLinkTest`، `TillPinMemberModelTest`، `CourierEtaRepositoryTest` (+ core: `BankPhotoReportTest`، `CourierEtaTest`) پیش از کد کامپایل‌نشدنی.
   `market-account.test.js` حساب را از درِ ویترین می‌سازد و تغییرِ شماره را مستقیم روی `store-customers.changePhone` می‌سنجد.
+- **نتیجه:** همهٔ آزمون‌های سرور روی PGlite (دو تکه، `scripts/test-pglite.js`): ۴۲۴۷ آزمون، ۴۲۰۵ قبول، **۰ شکست**، ۴۰ SKIP و ۲ TODO ِ پیشین؛
+  e2e ِ `delivery` و `flags-on` ۱۹/۱۹ گام؛ اجرای کاملِ `./desktop/gradlew -p desktop test` (با `desktop/build/test-data` ِ پاک) ⇒ ۴۱۲۱ PASS،
+  ۰ FAIL، ۴ SKIP ِ پیشین؛ core: `BankPhotoReportTest` ۲/۲، `CourierEtaTest` ۲/۲، `BankPhotoCardTest` ۱۱/۱۱. کامپایلِ اندروید/آیفون فقط در CI.
 - **نیمه‌کاره/قدمِ بعد:** §۲۳.۴ «تغییرِ شمارهٔ مشتری» حالا در و رابط ندارد (منطق و آزمونش ماند؛ ردیفِ STATUS ندارد) — اگر خواسته شد،
   `POST /api/store/:slug/account/phone` با رابطِ «حسابِ من» ِ ویترین. `GET /api/auth/terms` هم صدازنندهٔ برنامه ندارد (عمومی، مستند در
   `server/README.md`؛ ماند). درهای پیش‌ساختهٔ کاتالوگ با مدلِ شعبه (فازِ ۶) رابط می‌گیرند یا می‌روند.
