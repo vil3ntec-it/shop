@@ -254,7 +254,7 @@ test('کاتالوگ: فقط منتشرشده، زنده و قیمت‌دار؛ 
    ۳) تأییدِ شماره و ثبت
    ══════════════════════════════════════════════════════════════════ */
 
-test('بی شمارهٔ تأییدشده سفارشی ثبت نمی‌شود (S133)؛ بلیتِ دست‌خورده یا شمارهٔ دیگر هم نه', async () => {
+test('بی ایمیلِ تأییدشده سفارشی ثبت نمی‌شود (S133)؛ بلیتِ دست‌خورده نه؛ شمارهٔ تماسِ دیگر فقط تماس است («فقط ایمیل»)', async () => {
   const s = await liveStore('تأیید');
   const none = await checkout(s.slug, cart());
   assert.equal(none.status, 401);
@@ -266,10 +266,12 @@ test('بی شمارهٔ تأییدشده سفارشی ثبت نمی‌شود (S1
   const t = await ticketFor(s.slug, PHONE);
   const forged = t.slice(0, -2) + (t.endsWith('AA') ? 'BB' : 'AA');
   assert.equal((await checkout(s.slug, cart(), { ticket: forged })).status, 401);
-  const other = await checkout(s.slug, cart({ customer: { name: 'دیگری', phone: '0790000008' } }), { ticket: t });
-  assert.equal(other.status, 403);
-  assert.equal(other.body.error.code, 'phone_not_verified');
   assert.equal(await count(s.shopId), 0);
+  //  شمارهٔ تماسِ دیگر با همان بلیت ⇒ ثبت با همان ایمیلِ تأییدشده (شماره هویت نیست، فقط تماسِ پیک)
+  const other = await checkout(s.slug, cart({ customer: { name: 'دیگری', phone: '0790000008' } }), { ticket: t });
+  assert.equal(other.status, 201, JSON.stringify(other.body));
+  const row = await one('SELECT customer_phone, customer_email FROM online_orders WHERE shop_id=$1', [s.shopId]);
+  assert.deepEqual([row.customer_phone, row.customer_email], ['+93790000008', mailOf(PHONE)]);
 });
 
 test('ثبت: قیمت از سرور، عددِ مشتری بی‌اثر، رویدادِ «مشتری»، و همان در صفِ کارمند', async () => {

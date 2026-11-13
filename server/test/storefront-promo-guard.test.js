@@ -159,7 +159,7 @@ test('MKT-02: اولین خرید فقط یک بار برای هر شماره؛ 
   assert.equal(await discountOf(s, await checkout(s, { phone: '0791110004', deviceId: 'device-dddd-0004' })), 2800);
 
   const claims = await many(`SELECT phone_key, device_key, discount_minor FROM storefront_promo_claims WHERE shop_id=$1 AND kind='first_order' ORDER BY created_at`, [s.shopId]);
-  assert.deepEqual(claims.map((c) => [c.phone_key, Number(c.discount_minor)]), [['+93791110002', 2800], ['+93791110004', 2800]]);
+  assert.deepEqual(claims.map((c) => [c.phone_key, Number(c.discount_minor)]), [[mailOf('0791110002'), 2800], [mailOf('0791110004'), 2800]]);   //  «فقط ایمیل»: کلیدِ ادعا = ایمیلِ تأییدشده
   assert.ok(claims.every((c) => /^[0-9a-f]{32}$/.test(c.device_key)), 'فقط چکیدهٔ دستگاه، نه خودِ شناسه');
   assert.ok(!JSON.stringify(await many('SELECT * FROM storefront_promo_claims WHERE shop_id=$1', [s.shopId])).includes(DEV_A));
 
@@ -271,11 +271,11 @@ test('RSK-09: دفترِ مصرف و فهرستِ «مشکوک» برای صاح
   assert.equal(v.headers.get('cache-control'), 'no-store');
   assert.deepEqual(v.body.settings.firstOrder, { enabled: true, kind: 'percent', bp: 1000, amountMinor: 0, maxMinor: 0, minSubtotalMinor: 0, stack: 'combine' });
   assert.equal(v.body.suspicious.devices.length, 1);
-  assert.deepEqual(v.body.suspicious.devices[0].phones, ['+93791110014', '+93791110015', '+93791110016']);
+  assert.deepEqual(v.body.suspicious.devices[0].phones, [mailOf('0791110014'), mailOf('0791110015'), mailOf('0791110016')]);
   assert.equal(v.body.suspicious.devices[0].count, 3);
-  assert.deepEqual(v.body.suspicious.phones.map((p) => [p.phone, p.count]), [['+93791110017', 3]]);
+  assert.deepEqual(v.body.suspicious.phones.map((p) => [p.phone, p.count]), [[mailOf('0791110017'), 3]]);
   const firsts = v.body.recent.filter((x) => x.kind === 'first_order');
-  assert.deepEqual(firsts.map((x) => x.phone).sort(), ['+93791110014', '+93791110017'], 'دفتر: اولین خریدِ هر شماره');
+  assert.deepEqual(firsts.map((x) => x.phone).sort(), [mailOf('0791110014'), mailOf('0791110017')], 'دفتر: اولین خریدِ هر ایمیلِ تأییدشده («فقط ایمیل»)');
   assert.ok(firsts.every((x) => Number.isInteger(x.orderNo) && x.discountMinor === 2800 && /^[0-9a-f]{8}$/.test(x.device)));
 
   //  دکانِ دیگر چیزی از این دفتر نمی‌بیند

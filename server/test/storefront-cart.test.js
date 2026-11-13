@@ -238,8 +238,8 @@ test('CHK-03: فقط مالِ همان مشتری و همان ویترین؛ پ�
   //  پاک کردنِ حساب ⇒ سبدِ هر دو ویترین هم؛ سبدِ ب دست نمی‌خورد
   assert.equal((await h.del(`/api/store/${s.slug}/account`, A)).status, 200);
   assert.equal((await one(
-    `SELECT COUNT(*)::int AS n FROM store_customer_carts k JOIN store_customers c ON c.id = k.customer_id WHERE c.phone = $1`,
-    ['+93791000004']
+    `SELECT COUNT(*)::int AS n FROM store_customer_carts k JOIN store_customers c ON c.id = k.customer_id WHERE c.email = $1`,
+    [mailOf('0791000004')]
   )).n, 0);
   assert.equal((await one('SELECT COUNT(*)::int AS n FROM store_customer_carts WHERE shop_id = ANY($1)', [[s.shopId, s2.shopId]])).n,
     1, 'فقط سبدِ ب');

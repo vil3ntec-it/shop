@@ -39,13 +39,15 @@ const { phoneKey: canon, phoneForms: formsOf } = require('./validate');
  * زمانِ ساختِ max-امین سفارشِ تازه در پنجره — یا null اگر هنوز زیرِ سقف است.
  * همین زمان می‌گوید کِی یک جا باز می‌شود (Retry-After).
  */
-async function nthNewest(run, rule, shopId, email, at) {
-  const params = [email, at - rule.windowMs, rule.max - 1];
+async function nthNewest(run, rule, shopId, email, at, forms = []) {
+  const params = [email, at - rule.windowMs, rule.max - 1, forms];
   let byShop = '';
-  if (rule.scope === 'shop') { params.push(shopId); byShop = 'AND shop_id = $4'; }
+  if (rule.scope === 'shop') { params.push(shopId); byShop = 'AND shop_id = $5'; }
+  //  همان مشتری = همان ایمیلِ تأییدشده **یا** (پس از قیمت‌گذاری) همان شمارهٔ تماس — محدودیت با هر کدام که بخورد
   const r = (await run(
     `SELECT created_at FROM online_orders
-      WHERE customer_email = $1 AND source = 'storefront' AND created_at > $2 ${byShop}
+      WHERE (($1 <> '' AND customer_email = $1) OR customer_phone = ANY($4::text[]))
+        AND source = 'storefront' AND created_at > $2 ${byShop}
       ORDER BY created_at DESC OFFSET $3 LIMIT 1`,
     params
   )).rows[0];
@@ -53,17 +55,19 @@ async function nthNewest(run, rule, shopId, email, at) {
 }
 
 /**
- * با اتصالِ تراکنش (`run`): مشتری (ایمیلِ تأییدشده) زیرِ هر دو سقف است؟ وگرنه ApiError ِ ۴۲۹ با
- * `retryAfter` (ثانیه، بیشترینِ قاعده‌های پرشده). ایمیلِ خالی کارِ این‌جا نیست.
+ * با اتصالِ تراکنش (`run`): مشتری (ایمیلِ تأییدشده، و با [phone] همان شمارهٔ تماس هم) زیرِ هر دو سقف است؟ وگرنه
+ * ApiError ِ ۴۲۹ با `retryAfter` (ثانیه، بیشترینِ قاعده‌های پرشده). بی ایمیل و بی شماره کارِ این‌جا نیست.
+ * ⛔ «فقط ایمیل»: ایمیل ارزان‌تر از سیم‌کارت است، پس شمارهٔ تماسِ تأییدنشده هم **محدود** می‌کند (هرگز معاف نمی‌کند).
  */
-async function check(run, shopId, email, { at = now(), rules = RULES } = {}) {
-  if (!email) return;
-  const key = String(email).toLowerCase();
-  await run('SELECT pg_advisory_xact_lock(hashtext($1))', [`order-customer:${key}`]);
+async function check(run, shopId, email, { at = now(), rules = RULES, phone = '' } = {}) {
+  const key = String(email || '').toLowerCase();
+  const forms = phone ? [...formsOf(canon(phone))] : [];
+  if (!key && !forms.length) return;
+  if (key) await run('SELECT pg_advisory_xact_lock(hashtext($1))', [`order-customer:${key}`]);
   let retryAfter = 0;
   let scope = '';
   for (const rule of rules) {
-    const nth = await nthNewest(run, rule, shopId, key, at);
+    const nth = await nthNewest(run, rule, shopId, key, at, forms);
     if (nth === null) continue;
     const ra = Math.max(1, Math.ceil((nth + rule.windowMs - at) / 1000));
     if (ra > retryAfter) { retryAfter = ra; scope = rule.scope; }
@@ -89,7 +93,10 @@ function guard(price, { shopId, email, secondOrder = false, deviceId = '', key =
     await check(run, shopId, email, { at });
     const input = await price(run, at);
     const phone = input && input.customerPhone;
-    if (phone) await run('SELECT pg_advisory_xact_lock(hashtext($1))', [`order-phone:${canon(phone)}`]);
+    if (phone) {
+      await run('SELECT pg_advisory_xact_lock(hashtext($1))', [`order-phone:${canon(phone)}`]);
+      await check(run, shopId, email, { at, phone });   //  همان سقف با شمارهٔ تماس هم (ایمیلِ تازه از سقف نمی‌رهاند)
+    }
     await require('./order-risk').checkIn(run, shopId, phone, input, { at, secondOrder: secondOrder === true, deviceKey, email });
     //  پذیرفته شد ⇒ دستگاهِ همین سفارش (فقط با پرچمِ روشن، همان تراکنش) تا دکان بتواند «این دستگاه» را ببندد
     if (deviceKey) await require('./risk-device').rememberIn(run, shopId, key, deviceKey, at);

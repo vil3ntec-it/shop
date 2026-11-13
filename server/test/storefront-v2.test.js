@@ -504,7 +504,7 @@ test('CHK-12: ظرفیتِ بازه — پر ⇒ ۴۰۹ و هیچ سفارش؛ �
    ۵) حسابِ مشتری (۲۳، S134/S138/S140)
    ══════════════════════════════════════════════════════════════════ */
 
-test('حساب: فقط با شمارهٔ تأییدشده؛ نشست جای بلیت؛ شمارهٔ دیگر نه؛ خروج و انقضا', async () => {
+test('حساب: فقط با ایمیلِ تأییدشده؛ نشست جای بلیت؛ شمارهٔ تماسِ دیگر فقط تماس؛ خروج و انقضا', async () => {
   const s = await liveStore('حساب');
   const no = await h.post(`/api/store/${s.slug}/account`, {});
   assert.equal(no.status, 401);
@@ -516,7 +516,8 @@ test('حساب: فقط با شمارهٔ تأییدشده؛ نشست جای بل
   assert.equal(made.status, 201, JSON.stringify(made.body));
   const S1 = made.body.session;
   assert.match(S1, /^sc1\.[A-Za-z0-9_-]{43}$/);
-  assert.equal(made.body.customer.phone, '+93791112233');
+  assert.equal(made.body.customer.email, mailOf(PHONE), '«فقط ایمیل»: حساب = ایمیلِ تأییدشده');
+  assert.equal(made.body.customer.phone, null, 'شمارهٔ تماس از بلیت نمی‌آید');
   assert.equal(made.body.customer.name, 'زهره');
   const stored = await one('SELECT token_hash FROM store_customer_sessions WHERE customer_id=$1', [made.body.customer.id]);
   assert.notEqual(stored.token_hash, S1, 'توکن خام ذخیره نمی‌شود');
@@ -531,13 +532,14 @@ test('حساب: فقط با شمارهٔ تأییدشده؛ نشست جای بل
   assert.deepEqual(me.body.addresses, []);
   assert.equal((await h.get(`/api/store/${s.slug}/account`)).status, 401);
 
-  //  S134: نشست جای بلیت؛ سفارش به همان شماره
+  //  S134: نشست جای بلیت؛ سفارش به همان حساب (ایمیل)
   const o = await checkout(s.slug, body({ fulfillment: 'pickup', address: undefined }), { session: S1 });
   assert.equal(o.status, 201, JSON.stringify(o.body));
-  //  نشستِ شمارهٔ الف برای شمارهٔ ب سفارش نمی‌سازد
+  //  «فقط ایمیل»: شمارهٔ تماسِ دیگر با همان نشست ⇒ سفارشِ همین حساب با آن شمارهٔ تماس (شماره هویت نیست)
   const other = await checkout(s.slug, body({ fulfillment: 'pickup', address: undefined }, PHONE_B), { session: S1 });
-  assert.equal(other.status, 403);
-  assert.equal(other.body.error.code, 'phone_not_verified');
+  assert.equal(other.status, 201, JSON.stringify(other.body));
+  const oRow = await one('SELECT customer_email, store_customer_id FROM online_orders WHERE shop_id=$1 AND order_no=$2', [s.shopId, other.body.order.orderNo]);
+  assert.deepEqual([oRow.customer_email, oRow.store_customer_id], [mailOf(PHONE), made.body.customer.id]);
 
   //  خروج ⇒ همان نشست دیگر کار نمی‌کند؛ نشستِ دوم سالم می‌ماند
   const S2 = again.body.session;
@@ -553,7 +555,7 @@ test('حساب: فقط با شمارهٔ تأییدشده؛ نشست جای بل
   const blocked = await h.post(`/api/store/${s.slug}/account`, {}, { headers: { 'X-Store-Ticket': t } });
   assert.equal(blocked.status, 403);
   assert.equal(blocked.body.error.code, 'customer_blocked');
-  //  حساب سراسری است (به شماره)؛ برای آزمون‌های بعد برمی‌گردد
+  //  حساب سراسری است (به ایمیل)؛ برای آزمون‌های بعد برمی‌گردد
   await query(`UPDATE store_customers SET status='active' WHERE id=$1`, [made.body.customer.id]);
 });
 
@@ -562,7 +564,7 @@ test('⛔ بلیت و نشست: حساب فقط با بلیتِ چند دقیق�
   const sf = require('../src/lib/storefront');
   const s = await liveStore('بلیت');
   const LOCAL = '0795556677';
-  const PH = '+93795556677';
+  const PH = mailOf(LOCAL);   //  «فقط ایمیل»: کلیدِ بلیت و نسل = ایمیلِ تأییدشده
   const pickup = () => body({ fulfillment: 'pickup', address: undefined }, LOCAL);
   const fresh = async () => {
     const a = await h.post(`/api/store/${s.slug}/verify/start`, { email: mailOf(LOCAL) });
@@ -606,8 +608,8 @@ test('⛔ بلیت و نشست: حساب فقط با بلیتِ چند دقیق�
     const e = Date.now() + 86_400_000;
     return `v1.${Buffer.from(ph).toString('base64url')}.${e.toString(36)}.${crypto.createHmac('sha256', key).update(`customer-phone\n${ph}\n${e}`).digest('base64url').slice(0, 32)}`;
   };
-  assert.equal((await checkout(s.slug, body({ fulfillment: 'pickup', address: undefined }, '0796667788'), { ticket: v1Other('+93796667788') })).status, 201,
-    'بلیتِ v1 ِ شمارهٔ هرگز لغونشده هنوز کار می‌کند');
+  assert.equal((await checkout(s.slug, body({ fulfillment: 'pickup', address: undefined }, '0796667788'), { ticket: v1Other('+93796667788') })).status, 401,
+    '«فقط ایمیل»: بلیتِ v1 ِ شماره (حتی هرگز لغونشده) دیگر اثبات نیست');
 
   //  ۳) کدِ تازه ⇒ بلیتِ نسلِ تازه و حساب دوباره
   const t2 = await fresh();
@@ -615,13 +617,13 @@ test('⛔ بلیت و نشست: حساب فقط با بلیتِ چند دقیق�
   assert.ok(S3);
   assert.equal((await checkout(s.slug, pickup(), { ticket: t2 })).status, 201);
 
-  //  ۴) پاک کردنِ حساب ⇒ بلیتِ همین الانِ آن شماره هم بسته؛ شمارهٔ خام در جدولِ نسل نیست
+  //  ۴) پاک کردنِ حساب ⇒ بلیتِ همین الانِ آن ایمیل هم بسته؛ ایمیل و شمارهٔ خام در جدولِ نسل نیست
   assert.equal((await h.del(`/api/store/${s.slug}/account`, as(S3))).status, 200);
   assert.equal((await checkout(s.slug, pickup(), { ticket: t2 })).status, 401);
   assert.equal((await signIn(t2)).status, 401);
   const rows = await query('SELECT phone_key, gen FROM store_phone_revocations');
   assert.ok(rows.rows.some((r) => Number(r.gen) === 2), JSON.stringify(rows.rows));
-  assert.ok(!JSON.stringify(rows.rows).includes('795556677'), 'شمارهٔ خام ذخیره نمی‌شود');
+  assert.ok(!JSON.stringify(rows.rows).includes('795556677') && !JSON.stringify(rows.rows).includes('@'), 'ایمیل و شمارهٔ خام ذخیره نمی‌شود');
   //  بلیتِ دست‌خورده (نسلِ دیگر با همان امضا) رد
   const forged = t2.replace(/\.([0-9a-z]{1,7})\.([A-Za-z0-9_-]{32})$/, '.2.$2');
   assert.equal((await checkout(s.slug, pickup(), { ticket: forged })).status, 401);

@@ -120,7 +120,7 @@ test('WEB-11 علاقه‌مندی: خاموش ۴۰۴، روشن فقط فروخ
   assert.deepEqual((await h.get(base, k)).body.items.map((p) => p.id), ['oil']);
 
   //  سقف
-  const cust = await one("SELECT id FROM store_customers WHERE phone = '+93791240001'");
+  const cust = await one('SELECT id FROM store_customers WHERE email = $1', [mailOf('0791240001')]);
   for (let i = 0; i < X.MAX_FAVORITES - 1; i++) {
     await query('INSERT INTO store_customer_favorites (customer_id, shop_id, product_id, created_at) VALUES ($1,$2,$3,$4)', [cust.id, s.shopId, `fill-${i}`, 1]);
   }

@@ -256,7 +256,8 @@ test('SEC-10: حذفِ دادهٔ مشتری صدای او را هم می‌بر
   const hashA = crypto.createHash('sha256').update(clipA).digest('hex');
   assert.equal((await one('SELECT COUNT(*)::int AS n FROM shop_chat_media WHERE sha256=$1', [hashA])).n, 1);
 
-  const done = await h.post('/api/shop/customer-erasure', { phone: '0790001107' }, { token: s.token });
+  //  «فقط ایمیل»: کلیدِ گفت‌وگوی مشتری ایمیلِ تأییدشده است ⇒ صاحب با ایمیل پاک می‌کند (شماره فقط سفارش‌های همان شماره را می‌یابد)
+  const done = await h.post('/api/shop/customer-erasure', { email: mailOf('0790001107') }, { token: s.token });
   assert.equal(done.status, 200, JSON.stringify(done.body));
   assert.ok(done.body.counts.chatMedia >= 2, JSON.stringify(done.body.counts));
   assert.equal((await mediaOf(a.conv)).n, 0, 'هیچ ردیفِ رسانه‌ای از گفت‌وگوی «الف» نماند');

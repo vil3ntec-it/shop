@@ -178,7 +178,7 @@ test('S34: پینِ بیرون ⇒ ارسال ثبت نمی‌شود، «دری�
   assert.equal(again.body.request.createdAt, first.body.request.createdAt);
   const rows = await rowsOf(s.shopId);
   assert.equal(rows.length, 1);
-  assert.equal(rows[0].phone, '+93791200002');
+  assert.equal(rows[0].phone, mailOf('0791200002'));
   //  ⛔ پینِ خام نه: فقط مرکزِ خانهٔ شبکهٔ آخرین پین
   const cell = sfd.snapPin(OUTSIDE.lat + 0.002, OUTSIDE.lng);
   assert.deepEqual([Number(rows[0].cell_lat), Number(rows[0].cell_lng)], [cell.lat, cell.lng]);
@@ -226,7 +226,8 @@ test('CHK-10: دکان تقاضا را بی شماره می‌بیند؛ شما�
   assert.equal((await zonesTo(s, [ZONE, FAR])).status, 200);
   const after = (await h.get('/api/shop/storefront/area-requests', { token: s.token })).body;
   assert.deepEqual([after.total, after.covered], [3, 2]);
-  assert.deepEqual(after.contacts.map((c) => [c.phone, c.zone]), [['+93791200003', 'خیرخانه'], ['+93791200004', 'خیرخانه']]);
+  assert.deepEqual(after.contacts.map((c) => [c.email, c.zone]),   //  «فقط ایمیل»: کلیدِ تقاضا ایمیلِ تأییدشده (شمارهٔ تماس اگر حساب دارد)
+    [[mailOf('0791200003'), 'خیرخانه'], [mailOf('0791200004'), 'خیرخانه']]);
   assert.deepEqual(after.cells.map((c) => [c.count, c.coveredBy]), [[2, 'خیرخانه'], [1, null]]);
   assert.ok(!JSON.stringify(after).includes('791200005'));
   //  مشتریِ پوشیده‌شده دیگر «خبرم کن» نمی‌گیرد: همین حالا سفارش می‌دهد
@@ -243,7 +244,7 @@ test('CHK-10: دکان تقاضا را بی شماره می‌بیند؛ شما�
   assert.equal(done.status, 200, JSON.stringify(done.body));
   assert.deepEqual(done.body, { notified: true, zone: 'خیرخانه' });
   assert.equal((await h.post(`/api/shop/storefront/area-requests/${id}/notified`, {}, { token: s.token })).status, 404, 'یک بار');
-  assert.deepEqual((await rowsOf(s.shopId)).map((r) => r.phone), ['+93791200004', '+93791200005']);
+  assert.deepEqual((await rowsOf(s.shopId)).map((r) => r.phone), [mailOf('0791200004'), mailOf('0791200005')]);
   const log = await one(`SELECT detail::text AS d FROM audit_logs WHERE shop_id = $1 AND action = 'storefront.area_request_notified'`, [s.shopId]);
   assert.ok(log && log.d.includes('خیرخانه') && !log.d.includes('79120000'), `سابقه بی شماره: ${log && log.d}`);
 });
@@ -271,7 +272,7 @@ test('CHK-10: پس گرفتن با بلیت یا نشستِ حساب؛ نگه‌
   await query('UPDATE storefront_area_requests SET updated_at = $2 WHERE shop_id = $1', [s.shopId, now() - areas.RETAIN_MS - 1000]);
   assert.equal((await h.get('/api/shop/storefront/area-requests', { token: s.token })).body.total, 0);
   assert.equal((await ask(s.slug, OUTSIDE, T(await ticketFor(s.slug, '0791200007')))).status, 201);
-  assert.deepEqual((await rowsOf(s.shopId)).map((r) => r.phone), ['+93791200007']);
+  assert.deepEqual((await rowsOf(s.shopId)).map((r) => r.phone), [mailOf('0791200007')]);
 
   //  سقف: پر ⇒ شمارهٔ تازه ۴۰۹، شمارهٔ موجود هنوز تازه می‌کند
   await query(

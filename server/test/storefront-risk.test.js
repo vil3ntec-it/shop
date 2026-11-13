@@ -127,10 +127,11 @@ test('RSK-07: سفارشِ یازدهمِ یک شماره در یک ساعت ⇒
   assert.equal(anon.status, 401);
 });
 
-test('RSK-07: چهل‌ویکمین سفارشِ یک شماره در ۲۴ ساعت از همهٔ ویترین‌ها ⇒ ۴۲۹ حتی در دکانِ تازه', async () => {
+test('RSK-07: چهل‌ویکمین سفارشِ یک مشتری (ایمیل، یا همان شمارهٔ تماس) در ۲۴ ساعت از همهٔ ویترین‌ها ⇒ ۴۲۹ حتی در دکانِ تازه', async () => {
   const a = await liveStore('روزانهٔ الف');
   const b = await liveStore('روزانهٔ ب');
-  const phone = '+93795550001';
+  const tel = '+93795550001';
+  const phone = mailOf(tel);   //  «فقط ایمیل»: کلیدِ سقف ایمیلِ تأییدشده است (نامِ متغیر برای کوتاهیِ تغییر)
   const at = now();
   //  ۴۰ سفارشِ دو تا بیست ساعتِ پیش در دکانِ الف (سقفِ ساعتیِ دکان دیگر نمی‌گیرد)
   const max = orderRate.ALL_SHOPS.max;
@@ -139,10 +140,10 @@ test('RSK-07: چهل‌ویکمین سفارشِ یک شماره در ۲۴ سا�
     const t = times[i];
     await query(
       `INSERT INTO online_orders (id, shop_id, order_no, client_key, request_hash, source, fulfillment,
-                                  customer_phone, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,'h','storefront','pickup',$5,$6,$6)`,
-      //  نیمی با صفرِ پس از ‎+93‎ ذخیره شده — همان شماره است
-      [newId('ord'), a.shopId, 900000 + i, `seed-${uniq()}`, i % 2 ? '+930795550001' : phone, t]
+                                  customer_phone, customer_email, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,'h','storefront','pickup',$5,$7,$6,$6)`,
+      //  نیمی با صفرِ پس از ‎+93‎ ذخیره شده — همان شماره است؛ ایمیلِ تأییدشده روی همه
+      [newId('ord'), a.shopId, 900000 + i, `seed-${uniq()}`, i % 2 ? '+930795550001' : tel, t, phone]
     );
   }
   await assert.doesNotReject(orderRate.check(run, a.shopId, phone, { at, rules: [orderRate.PER_SHOP] }));
@@ -153,11 +154,12 @@ test('RSK-07: چهل‌ویکمین سفارشِ یک شماره در ۲۴ سا�
   assert.equal(err.data.scope, 'all');
   //  کهنه‌ترینِ چهل که بیرون برود یک جا باز می‌شود
   assert.equal(err.retryAfter, Math.ceil((times[max - 1] + 24 * 3600_000 - at) / 1000));
-  //  شمارهٔ دیگر و شمارهٔ خالی آزاد
-  await assert.doesNotReject(orderRate.check(run, b.shopId, '+93795550002', { at }));
+  //  ایمیلِ دیگر و خالی آزاد
+  await assert.doesNotReject(orderRate.check(run, b.shopId, mailOf('+93795550002'), { at }));
   await assert.doesNotReject(orderRate.check(run, b.shopId, '', { at }));
-  //  همان شماره با صفر هم همان سقف را می‌گیرد
-  assert.equal((await orderRate.check(run, b.shopId, '+930795550001', { at }).catch((e) => e)).code, 'phone_order_limit');
+  //  ⛔ ایمیلِ تازه با همان شمارهٔ تماس (هر شکلش) هم همان سقف را می‌گیرد — ایمیلِ ارزان از سقف نمی‌رهاند
+  assert.equal((await orderRate.check(run, b.shopId, mailOf('+93795550009'), { at, phone: '+930795550001' }).catch((e) => e)).code, 'phone_order_limit');
+  await assert.doesNotReject(orderRate.check(run, b.shopId, mailOf('+93795550009'), { at, phone: '+93795550008' }));
   //  پنجره می‌گذرد ⇒ آزاد
   await assert.doesNotReject(orderRate.check(run, b.shopId, phone, { at: at + 6 * 3600_000 }));
 
@@ -166,9 +168,9 @@ test('RSK-07: چهل‌ویکمین سفارشِ یک شماره در ۲۴ سا�
   for (let i = 0; i < tb.length; i++) {
     await query(
       `INSERT INTO online_orders (id, shop_id, order_no, client_key, request_hash, source, fulfillment,
-                                  customer_phone, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,'h','storefront','pickup',$5,$6,$6)`,
-      [newId('ord'), b.shopId, 900000 + i, `seed-${uniq()}`, phone, tb[i]]
+                                  customer_phone, customer_email, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,'h','storefront','pickup',$5,$7,$6,$6)`,
+      [newId('ord'), b.shopId, 900000 + i, `seed-${uniq()}`, tel, tb[i], phone]
     );
   }
   const raShop = Math.ceil((tb[tb.length - 1] + 3600_000 - at) / 1000);

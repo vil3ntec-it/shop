@@ -62,7 +62,8 @@ async function liveStore(label) {
   return { shopId, slug };
 }
 
-const start = (slug, phone, ip) => h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) },
+//  «فقط ایمیل»: کد فقط به ایمیل؛ [who] شماره‌ای که به ایمیلِ آزمونی‌اش (mailOf) برده می‌شود، یا خودِ ایمیل
+const start = (slug, who, ip) => h.post(`/api/store/${slug}/verify/start`, { email: String(who).includes('@') ? who : mailOf(who) },
   { headers: { 'X-Forwarded-For': ip } });
 const codes = async (dest) => (await one(
   'SELECT COUNT(*)::int AS n FROM otp_codes WHERE destination = $1', [dest]
@@ -83,20 +84,20 @@ test('RSK-07: درخواستِ پنجمِ کد از یک IP ⇒ ۴۲۹ با Retr
   const over = await start(b.slug, fresh, ip);
   assert.equal(over.status, 429, JSON.stringify(over.body));
   assert.ok(Number(over.headers.get('retry-after')) > 0, 'Retry-After');
-  assert.equal(await codes('+93791110099'), 0, 'کدی ساخته نشد');
+  assert.equal(await codes(mailOf(fresh)), 0, 'کدی ساخته نشد');
 
   const other = await start(b.slug, fresh, '203.0.113.9');
   assert.equal(other.status, 200, JSON.stringify(other.body));
-  assert.equal(await codes('+93791110099'), 1);
+  assert.equal(await codes(mailOf(fresh)), 1);
 });
 
-test('RSK-07: کدِ چهارمِ یک شماره در ۲۴ ساعت ⇒ ۴۲۹ otp_daily_limit از هر IP و هر ویترین؛ شمارهٔ دیگر آزاد', async () => {
+test('RSK-07: کدِ چهارمِ یک ایمیل در ۲۴ ساعت ⇒ ۴۲۹ otp_daily_limit از هر IP و هر ویترین؛ ایمیلِ دیگر آزاد', async () => {
   const a = await liveStore('کدِ شماره الف');
   const b = await liveStore('کدِ شماره ب');
   const daily = require('../src/config').otp.dailyMax;
   assert.equal(daily, 3);
   const phone = '0792220011';
-  const dest = '+93792220011';
+  const dest = mailOf(phone);
   for (let i = 0; i < daily; i++) {
     resetAll();
     const r = await start(i % 2 ? b.slug : a.slug, phone, `198.51.100.${20 + i}`);
@@ -105,8 +106,8 @@ test('RSK-07: کدِ چهارمِ یک شماره در ۲۴ ساعت ⇒ ۴۲۹ 
   assert.equal(await codes(dest), daily);
 
   resetAll();
-  //  IP ِ تازه، ویترینِ دیگر، و شکلِ ‎+930…‎ ِ همان شماره — باز هم همان سقف
-  const over = await start(b.slug, '+930792220011', '198.51.100.99');
+  //  IP ِ تازه، ویترینِ دیگر، و همان ایمیل با حرفِ بزرگ و فاصله — باز هم همان سقف
+  const over = await start(b.slug, ` ${dest.toUpperCase()} `, '198.51.100.99');
   assert.equal(over.status, 429, JSON.stringify(over.body));
   assert.equal(over.body.error.code, 'otp_daily_limit');
   assert.equal(await codes(dest), daily, 'ردیفِ تازه‌ای ساخته نشد');
@@ -115,7 +116,7 @@ test('RSK-07: کدِ چهارمِ یک شماره در ۲۴ ساعت ⇒ ۴۲۹ 
   assert.equal(other.status, 200, JSON.stringify(other.body));
 });
 
-test('RSK-07: فاصلهٔ «کدِ تازه» هم همهٔ شکل‌های شماره را می‌شناسد — ‎+930…‎ پیش از مهلت ⇒ ۴۲۹ otp_resend_wait', async (t) => {
+test('RSK-07: فاصلهٔ «کدِ تازه» همان ایمیل را با هر بزرگی/کوچکیِ حرف می‌شناسد — پیش از مهلت ⇒ ۴۲۹ otp_resend_wait', async (t) => {
   const a = await liveStore('کدِ فاصله');
   const cfg = require('../src/config').otp;
   const was = cfg.resendMs;
@@ -123,10 +124,10 @@ test('RSK-07: فاصلهٔ «کدِ تازه» هم همهٔ شکل‌های ش�
   t.after(() => { cfg.resendMs = was; });
   const first = await start(a.slug, '0793330011', '198.51.100.40');
   assert.equal(first.status, 200, JSON.stringify(first.body));
-  const alias = await start(a.slug, '+930793330011', '198.51.100.41');
+  const alias = await start(a.slug, mailOf('0793330011').toUpperCase(), '198.51.100.41');
   assert.equal(alias.status, 429, JSON.stringify(alias.body));
   assert.equal(alias.body.error.code, 'otp_resend_wait');
-  assert.equal(await codes('+930793330011'), 0);
+  assert.equal(await codes(mailOf('0793330011')), 1, 'فقط کدِ نخست');
   //  شمارهٔ دیگر منتظرِ این یکی نمی‌ماند
   const other = await start(a.slug, '0793330012', '198.51.100.41');
   assert.equal(other.status, 200, JSON.stringify(other.body));

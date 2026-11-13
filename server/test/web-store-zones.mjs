@@ -308,8 +308,8 @@ ok(Number(po.discount_minor) === 3500 && Number(po.total_minor) === 31500, 'ثب
 await flag('shop.storefront.promo_guard', true);
 const pg = await call('PUT', '/api/shop/storefront/promo-guard', { firstOrder: { enabled: true, kind: 'percent', bp: 2000 } }, T);
 ok(pg.status === 200, 'تنظیمِ اولین خرید (۲۰٪)', JSON.stringify(pg.body).slice(0, 120));
-//  «مشتریِ تازه» با همان شمارهٔ تأییدشده: سفارش‌های پیشینِ این آزمون به شمارهٔ دیگری
-await query("UPDATE online_orders SET customer_phone = '+93700000099' WHERE shop_id = $1", [shopId]);
+//  «مشتریِ تازه» با همان ایمیلِ تأییدشده و شمارهٔ تماس: سفارش‌های پیشینِ این آزمون به ایمیل و شمارهٔ دیگری
+await query("UPDATE online_orders SET customer_phone = '+93700000099', customer_email = 'someone-else@test.local' WHERE shop_id = $1", [shopId]);
 await open();
 await addRice();
 await toCheckout();

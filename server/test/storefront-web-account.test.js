@@ -16,7 +16,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
 const config = require('../src/config');
-const { query, newId, now } = require('../src/db');
+const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
 const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
@@ -121,19 +121,23 @@ test('CHK-01: ثبتِ مهمان ⇒ همان بلیتِ تازه حساب می
   const made = await h.post(`/api/store/${s.slug}/account`, { name: 'مشتری' }, { headers: { 'X-Store-Ticket': ticket } });
   assert.equal(made.status, 201, JSON.stringify(made.body));
   assert.match(made.body.session, /^sc1\./);
-  assert.equal(made.body.customer.phone, '+93791230001');
+  assert.equal(made.body.customer.email, mailOf(phone), '«فقط ایمیل»: حساب با ایمیلِ تأییدشده');
+  assert.equal(made.body.customer.phone, null, 'شمارهٔ تماس فقط با «حسابِ من» (بی کد)، نه از بلیت');
   assert.ok(made.body.expiresAt > Date.now() + 100 * 24 * 60 * 60 * 1000, 'نشستِ بلند (۱۸۰ روز)');
   const sess = { 'X-Store-Session': made.body.session };
 
   //  بی بلیت، فقط با نشست
   const second = await checkout(s.slug, phone, sess);
   assert.equal(second.status, 201, JSON.stringify(second.body));
+  //  «فقط ایمیل»: شمارهٔ تماسِ دیگر (مثلاً گوشیِ خانه برای پیک) هویت را عوض نمی‌کند — سفارش مالِ همین حساب است
   const other = await checkout(s.slug, '0791230002', sess);
-  assert.equal(other.status, 403, JSON.stringify(other.body));
-  assert.equal(other.body.error.code, 'phone_not_verified');
+  assert.equal(other.status, 201, JSON.stringify(other.body));
+  assert.equal((await one('SELECT customer_phone FROM online_orders WHERE shop_id=$1 AND order_no=$2', [s.shopId, other.body.order.orderNo])).customer_phone,
+    '+93791230002', 'شمارهٔ تماسِ همین سفارش، بی کد');
   const mine = await h.get(`/api/store/${s.slug}/orders`, { headers: sess });
   assert.equal(mine.status, 200, JSON.stringify(mine.body));
-  assert.deepEqual(mine.body.orders.map((o) => o.orderNo).sort(), [first.body.order.orderNo, second.body.order.orderNo].sort());
+  assert.deepEqual(mine.body.orders.map((o) => o.orderNo).sort(),
+    [first.body.order.orderNo, second.body.order.orderNo, other.body.order.orderNo].sort());
 
   //  خروج ⇒ نشست دیگر چیزی را باز نمی‌کند
   assert.equal((await h.post(`/api/store/${s.slug}/account/logout`, {}, { headers: sess })).status, 200);

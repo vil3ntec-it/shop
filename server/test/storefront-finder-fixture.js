@@ -99,4 +99,4 @@ async function ticketFor(slug, phone) {
   return { headers: { 'X-Store-Ticket': c.body.ticket } };
 }
 
-module.exports = { h, boot, flag, liveStore, setStock, setPrice, ticketFor, uniq, PRODUCTS };
+module.exports = { h, boot, flag, liveStore, setStock, setPrice, ticketFor, uniq, PRODUCTS, mailOf };

@@ -546,6 +546,7 @@ for (const lang of ['fa', 'en']) {
     await sg.waitForSelector('#view-checkout:not([hidden])', { timeout: 15000 });
     await sg.check('input[name="fulfillment"][value="pickup"]');
     await sg.fill('#c-name', 'مشتریِ موجودی');
+    await sg.fill('#c-phone', '0791112244');   //  «فقط ایمیل»: شمارهٔ تماسِ پیک جدا از بلیت (بارِ دوباره پاکش می‌کند)
   };
   await sg.goto(`${base}/store/${sslug}`);
   await sg.waitForSelector('#products li[data-id="tea"]', { timeout: 15000 });

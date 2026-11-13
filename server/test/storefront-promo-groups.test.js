@@ -96,7 +96,7 @@ const discountOf = async (s, r) => Number((await one('SELECT discount_minor FROM
 test('PRM-11 خاموش: قاعدهٔ گروهِ «عمده» در ویترین اعمال نمی‌شود — حتی برای مشتریِ همان گروه با بلیت', async () => {
   const s = await liveShop('گروه-خاموش', { groups: false });
   await rule(s, 'bulk10', { kind: 'percent', bp: 1000, channels: ['online'], groups: ['عمده'] });
-  assert.equal((await push(s, [op('debtors', 'd-vip', { name: 'مشتریِ عمده', phone: VIP, group: 'عمده' })])).status, 200);
+  assert.equal((await push(s, [op('debtors', 'd-vip', { name: 'مشتریِ عمده', phone: VIP, email: mailOf(VIP), group: 'عمده' })])).status, 200);
   const tk = await ticketFor(s.slug, VIP);
   const q = await quote(s, {}, tk);
   assert.equal(q.status, 200, JSON.stringify(q.body));
@@ -106,12 +106,12 @@ test('PRM-11 خاموش: قاعدهٔ گروهِ «عمده» در ویترین 
   assert.equal(await discountOf(s, r), 0, 'همان پیشین');
 });
 
-test('PRM-11: گروه از قرض‌دارِ همان شمارهٔ تأییدشده (با «ي/ی» و فاصله) — پیش‌نمایش = ثبت؛ فهرستِ عمومی بی قاعدهٔ گروه', async () => {
+test('PRM-11: گروه از قرض‌دارِ همان ایمیلِ تأییدشده (با «ي/ی» و فاصله، ایمیل با حرفِ بزرگ) — پیش‌نمایش = ثبت؛ فهرستِ عمومی بی قاعدهٔ گروه', async () => {
   const s = await liveShop('گروه-روشن');
   await rule(s, 'bulk10', { kind: 'percent', bp: 1000, channels: ['online'], groups: ['مشتری عمده'] });
   await rule(s, 'bulkpos', { kind: 'percent', bp: 5000, channels: ['pos'], groups: ['مشتری عمده'] });
   //  املای دفترِ دستگاه با «ي» ِ عربی و نیم‌فاصله؛ قاعده با «ی» و فاصله — همان `compareKey` ِ صندوق
-  assert.equal((await push(s, [op('debtors', 'd-vip', { name: 'مشتریِ عمده', phone: '۰۷۹۱ ۱۱۲ ۲۳۳', group: ' مشتري‌عمده ' })])).status, 200);
+  assert.equal((await push(s, [op('debtors', 'd-vip', { name: 'مشتریِ عمده', phone: '۰۷۹۱ ۱۱۲ ۲۳۳', email: mailOf(VIP).toUpperCase(), group: ' مشتري‌عمده ' })])).status, 200);
   const tk = await ticketFor(s.slug, VIP);
   const q = await quote(s, {}, tk);
   assert.equal(q.status, 200, JSON.stringify(q.body));
@@ -130,10 +130,10 @@ test('PRM-11: گروه از قرض‌دارِ همان شمارهٔ تأییدش
   assert.ok(!JSON.stringify(list.body).includes('عمده'), 'نامِ گروه بیرون نمی‌رود');
 });
 
-test('PRM-11: ⛔ گروه از بدنه نه؛ بی بلیت یا شمارهٔ دیگر ⇒ بی گروه؛ دکانِ دیگر قرض‌دارِ این دکان را نمی‌بیند', async () => {
+test('PRM-11: ⛔ گروه از بدنه نه؛ بی بلیت، ایمیلِ دیگر یا فقط همان شمارهٔ تماس ⇒ بی گروه؛ دکانِ دیگر قرض‌دارِ این دکان را نمی‌بیند', async () => {
   const s = await liveShop('گروه-سد');
   await rule(s, 'bulk10', { kind: 'percent', bp: 1000, channels: ['online'], groups: ['عمده'] });
-  assert.equal((await push(s, [op('debtors', 'd-vip', { name: 'مشتریِ عمده', phone: VIP, group: 'عمده' })])).status, 200);
+  assert.equal((await push(s, [op('debtors', 'd-vip', { name: 'مشتریِ عمده', phone: VIP, email: mailOf(VIP), group: 'عمده' })])).status, 200);
   //  بی بلیت، با گروه و شمارهٔ ساختگی در بدنه
   let q = await quote(s, { group: 'عمده', customer: { phone: VIP }, phone: VIP });
   assert.equal(q.status, 200, JSON.stringify(q.body));
@@ -142,14 +142,18 @@ test('PRM-11: ⛔ گروه از بدنه نه؛ بی بلیت یا شمارهٔ 
   const other = '0793334455';
   const tk = await ticketFor(s.slug, other);
   q = await quote(s, { group: 'عمده' }, tk);
-  assert.equal(q.body.discountMinor, 0, 'شمارهٔ دیگر');
+  assert.equal(q.body.discountMinor, 0, 'ایمیلِ دیگر');
+  //  ⛔ همان شمارهٔ تماسِ قرض‌دار با ایمیلِ تأییدشدهٔ دیگر ⇒ بی گروه (شماره تأیید نمی‌شود، پس هویت نیست)
+  const viaPhone = await checkout(s, VIP, tk, {});
+  assert.equal(viaPhone.status, 201, JSON.stringify(viaPhone.body));
+  assert.equal(await discountOf(s, viaPhone), 0, 'شمارهٔ قرض‌دار در فرم گروه نمی‌آورد');
   const r = await checkout(s, other, tk, { group: 'عمده' });
   assert.equal(r.status, 201, JSON.stringify(r.body));
   assert.equal(await discountOf(s, r), 0);
-  //  ۹ رقمِ آخرِ یکسان با پیش‌شمارهٔ کشورِ دیگر ⇒ همان شماره نیست
-  assert.equal((await push(s, [op('debtors', 'd-near', { name: 'x', phone: '+1 793334455', group: 'عمده' })])).status, 200);
+  //  ایمیلِ نزدیک (همان پیش از @ با پسوندِ دیگر) ⇒ همان ایمیل نیست
+  assert.equal((await push(s, [op('debtors', 'd-near', { name: 'x', email: mailOf(other).replace('@', '.x@'), group: 'عمده' })])).status, 200);
   q = await quote(s, {}, tk);
-  assert.equal(q.body.discountMinor, 0, 'تطبیقِ دقیقِ شماره، نه چند رقمِ آخر');
+  assert.equal(q.body.discountMinor, 0, 'تطبیقِ دقیقِ ایمیل، نه نزدیک');
 
   //  دکانِ دیگر با همان قاعده و همان شماره ولی بی قرض‌دار
   const t = await liveShop('گروه-دکانِ-دیگر');
@@ -158,26 +162,26 @@ test('PRM-11: ⛔ گروه از بدنه نه؛ بی بلیت یا شمارهٔ 
   assert.equal(q.body.discountMinor, 0, 'قرض‌دارِ دکانِ دیگر');
 });
 
-test('PRM-11: دو گروهِ ناهم‌سان برای یک شماره ⇒ بی گروه؛ ادغام‌شده و پاک‌شده نامزد نیستند', async () => {
+test('PRM-11: دو گروهِ ناهم‌سان برای یک ایمیل ⇒ بی گروه؛ ادغام‌شده و پاک‌شده نامزد نیستند', async () => {
   const s = await liveShop('گروه-شک');
   await rule(s, 'bulk10', { kind: 'percent', bp: 1000, channels: ['online'], groups: ['عمده'] });
   await rule(s, 'vip20', { kind: 'percent', bp: 2000, channels: ['online'], groups: ['ویژه'] });
   const tk = await ticketFor(s.slug, VIP);
   assert.equal((await push(s, [
-    op('debtors', 'd-a', { name: 'الف', phone: VIP, group: 'عمده' }),
-    op('debtors', 'd-b', { name: 'ب', phone: VIP, group: 'ویژه' }),
+    op('debtors', 'd-a', { name: 'الف', phone: VIP, email: mailOf(VIP), group: 'عمده' }),
+    op('debtors', 'd-b', { name: 'ب', phone: VIP, email: mailOf(VIP), group: 'ویژه' }),
   ])).status, 200);
   let q = await quote(s, {}, tk);
   assert.equal(q.status, 200, JSON.stringify(q.body));
   assert.deepEqual([q.body.discountMinor, q.body.applied], [0, []], 'شک ⇒ بی تخفیف');
 
   //  «ب» در «الف» ادغام شد ⇒ فقط «عمده»
-  assert.equal((await push(s, [op('debtors', 'd-b', { name: 'ب', phone: VIP, group: 'ویژه', mergedInto: 'd-a' }, 'update')])).status, 200);
+  assert.equal((await push(s, [op('debtors', 'd-b', { name: 'ب', phone: VIP, email: mailOf(VIP), group: 'ویژه', mergedInto: 'd-a' }, 'update')])).status, 200);
   q = await quote(s, {}, tk);
   assert.deepEqual(q.body.applied, [{ name: 'bulk10', discountMinor: 2800 }]);
 
   //  قرض‌دارِ بی گروه کنارِ گروه‌دار شک نمی‌سازد؛ «الف» پاک شد ⇒ فقط بی‌گروه ⇒ بی تخفیف
-  assert.equal((await push(s, [op('debtors', 'd-c', { name: 'ج', phone: VIP })])).status, 200);
+  assert.equal((await push(s, [op('debtors', 'd-c', { name: 'ج', phone: VIP, email: mailOf(VIP) })])).status, 200);
   q = await quote(s, {}, tk);
   assert.equal(q.body.discountMinor, 2800, 'قرض‌دارِ بی گروه شک نیست');
   assert.equal((await push(s, [op('debtors', 'd-a', {}, 'delete')])).status, 200);
@@ -189,7 +193,7 @@ test('PRM-11 + CHK-21: افزودنِ قلم به سفارش همان گروهِ
   const s = await liveShop('گروه-افزودن');
   await setFlag(s.shopId, 'shop.orders.add_items', true);
   await rule(s, 'bulk10', { kind: 'percent', bp: 1000, channels: ['online'], groups: ['عمده'] });
-  assert.equal((await push(s, [op('debtors', 'd-vip', { name: 'مشتریِ عمده', phone: VIP, group: 'عمده' })])).status, 200);
+  assert.equal((await push(s, [op('debtors', 'd-vip', { name: 'مشتریِ عمده', phone: VIP, email: mailOf(VIP), group: 'عمده' })])).status, 200);
   const tk = await ticketFor(s.slug, VIP);
   const add = (token) => h.post(`/api/store/${s.slug}/orders/${token}/items`, { lines: [{ productId: 'soap', qtyMilli: 1000 }] },
     { headers: { 'Idempotency-Key': `ad-${uniq()}-key`, 'X-Store-Ticket': tk } });
