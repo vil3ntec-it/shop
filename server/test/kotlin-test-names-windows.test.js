@@ -11,7 +11,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..', '..');
-const DIRS = ['desktop/src/test', 'android-native/app/src/test', 'core/src/commonTest', 'core/src/jvmTest', 'customer-android/app/src/test'];
+//  `android/app/src/test` (پوستهٔ WebView ِ بازنشسته): کارِ «test» ِ `android-release.yml` (S64، ۱۴۰۵/۰۸/۲۳) — «:» در نامِ
+//  WebViewHardeningTest (#637) همین کامپایل را روی لینوکس هم شکسته بود و هیچ CI ای آن را نمی‌دواند.
+const DIRS = ['desktop/src/test', 'android-native/app/src/test', 'core/src/commonTest', 'core/src/jvmTest', 'customer-android/app/src/test',
+  'android/app/src/test'];
 const BAD = /[*?<>|:"\\/]/;
 
 function walk(dir, out) {
