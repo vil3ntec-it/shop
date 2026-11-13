@@ -101,6 +101,9 @@ IMPLEMENTED-VERIFIED ماندند؛ PAY-19: «کشو بی فروش» ِ گوشی
 
 **اسنادِ هم‌سو (تکرار نشده‌اند):** چک‌لیستِ روشن کردنِ هر پرچم [`../FLAGS-ON-fa.md`](../FLAGS-ON-fa.md) · کارهای فقط‌صاحب‌کار
 [`OWNER-ACTIONS-fa.md`](OWNER-ACTIONS-fa.md) (در جدول‌ها «OA §…») · تصمیم‌ها [`../OWNER-DECISIONS-fa.md`](../OWNER-DECISIONS-fa.md) و
+**`claude/e-rows-46w`:** §۲۳.۴ «تغییرِ شمارهٔ تلفن» ِ حسابِ مشتری ساخته شد (درِ `POST /api/store/:slug/account/phone` و رابطِ «حسابِ من» ِ ویترین،
+پشتِ `shop.storefront.web_account`)؛ شاهد در AUTH-08 (همان «پرچم»)؛ شمارها عوض نشد. «بازیابیِ حساب بی سیم‌کارت» ِ مشتری تصمیمِ صاحب‌کار است.
+
 [`../OWNER-PENDING-fa.md`](../OWNER-PENDING-fa.md) · شماره‌های D- در [`BLOCKERS.md`](BLOCKERS.md) · «پس از نسخهٔ ۱» در [`RELEASE-1-fa.md`](RELEASE-1-fa.md).
 
 ## کد (۰)
@@ -163,7 +166,7 @@ IMPLEMENTED-VERIFIED ماندند؛ PAY-19: «کشو بی فروش» ِ گوشی
 | S94 | `shop.delivery_live_location.consent` (برگهٔ اندروید در CI ِ main ‏719bbcf63 ساخته و آزموده شد) | پرچم‌ها ⇐ `shop.delivery_live_location.consent` |
 | S95 | `ops.critical_alerts` | پرچم‌ها ⇐ `ops.critical_alerts` |
 | S130 | دوعاملی و نقش‌های `admin`/`finance`/`viewer` برای کارِ روزانه | OA §۹الف ۱ (دوعاملی)؛ در پنل برای کارِ روزانه نقشِ غیرِ ارشد بسازید |
-| AUTH-08 | `auth.phone_add_code` (O-10، scope `security` ِ سراسری)؛ گامِ کد حالا در «ویرایش حساب و دکان» ِ نسخهٔ ۳ (گوشی، کامپیوتر، آیفون) | وقتی این نسخه به همهٔ دستگاه‌ها رسید (نسخه‌های پیشین کادرِ کد ندارند) پرچم را روشن کنید؛ با یک حسابِ بی‌شماره شماره بیفزایید و کدِ پیامک را بزنید |
+| AUTH-08 | `auth.phone_add_code` (O-10، scope `security` ِ سراسری)؛ گامِ کد حالا در «ویرایش حساب و دکان» ِ نسخهٔ ۳ (گوشی، کامپیوتر، آیفون)؛ سمتِ مشتریِ ویترین (§۲۳.۴ «تغییرِ شمارهٔ تلفن»، `e-rows-46w`) پشتِ همان `shop.storefront.web_account` ِ حسابِ وب | وقتی این نسخه به همهٔ دستگاه‌ها رسید (نسخه‌های پیشین کادرِ کد ندارند) پرچم را روشن کنید؛ با یک حسابِ بی‌شماره شماره بیفزایید و کدِ پیامک را بزنید |
 | SUB-04 | کلیدِ مجوز به `.env` (F0-28) | OA §۹الف ۳ |
 | SUB-09 | `shop.device_cap` | OA §۸الف ۹ (اول به دکان‌ها خبر بدهید) |
 | TEN-03 | `shop.storefront.link_expiry` (رابطِ «باطل کردنِ لینکِ پیگیری» در جزئیاتِ سفارش در `e-rows-44u` ساخته شد) | پرچم‌ها ⇐ `shop.storefront.link_expiry` |

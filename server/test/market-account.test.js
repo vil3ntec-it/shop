@@ -4,7 +4,8 @@
  *
  * درهای `/api/market/account/**` نامِ دومِ حسابِ ویترین (`/api/store/:slug/account/*`، همان `store_customers` ِ سراسری)
  * بودند و صدازننده نداشتند ⇒ برداشته شدند (`dead-doors.test.js`، B15). حساب این‌جا از همان درِ زندهٔ ویترین ساخته
- * می‌شود؛ منطقِ تغییرِ شماره (`store-customers.changePhone`، §۲۳.۴) درِ زنده ندارد و مستقیم سنجیده می‌شود.
+ * می‌شود؛ منطقِ تغییرِ شماره (`store-customers.changePhone`، §۲۳.۴) این‌جا مستقیم سنجیده می‌شود (گرهِ گفت‌وگو)؛ درِ زندهٔ آن
+ * `POST /api/store/:slug/account/phone` و قراردادش در `storefront-account-phone.test.js`.
  *
  * آن‌چه این پرونده قفل می‌کند:
  *   ۱) ⛔ پیش‌فرض خاموش: بی `market.account` چتِ ویترین نشستِ حساب را نادیده می‌گیرد (فقط بلیت؛ `customer_id`
