@@ -3,6 +3,7 @@
 # استفاده: bash tools/claude-ops/live-log.sh "متنِ رویداد"     (جدولِ بخشِ ۳ را پیش از آن با دست به‌روز کن)
 # LIVE_WT = worktree ِ شاخهٔ claude/live-handoff (پیش‌فرض /home/user/wt-live)؛ LIVE_SESSION = نشانیِ سیزنِ خودت برای پانوشت.
 set -euo pipefail
+export LC_ALL=C.UTF-8
 WT=${LIVE_WT:-/home/user/wt-live}
 F=$WT/tools/claude-ops/LIVE-fa.md
 NOW=$(TZ=Asia/Kabul date '+%F %H:%M')
@@ -19,7 +20,7 @@ PY
 cd "$WT"
 git add -A tools/claude-ops
 git commit -q -F - <<MSG
-زنده: ${1:0:70} (2.14.5)
+زنده: $(python3 -c 'import sys; print(sys.argv[1][:70])' "$1") (2.14.5)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: ${LIVE_SESSION:-https://claude.ai/code/session_01BwqpPed1SJuwB7Q4nZUbg9}
