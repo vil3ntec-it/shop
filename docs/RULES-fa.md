@@ -499,6 +499,15 @@
   می‌دهد؛ درِ تازه‌ای که شعبه را می‌شناسد فقط با `branch_id`/بخش و دسترسیِ `branches.accessOf` از این نگهبان بیرون می‌رود.
   پلِ v3⇒v1 برای بخشِ شعبه هرگز. پرچم خاموش ⇒ همه بی اثر (سنجه: `server/test/shop-branches.test.js`).
 
+- ⛔ **گروهِ الفِ همگام‌سازی (د۱۸، `claude/e-rows-55s`)** — هر کدام پشتِ پرچمِ خاموش، پرچم پیش از بدنه، و هیچ‌کدام `sync-v1.js`/`routes/sync-v1.js`/`sync-v1-auth.js` (مشترک با پمپ) را نمی‌خوانند:
+  PRD-07 راهِ قدیم فقط `product-unit-rules.legacyGuard` پیش از `sync.pushChanges` (ردشده ⇐ تعارضِ همان ردیف با دادهٔ سرور؛ `lib/sync.js` دست نمی‌خورد)؛
+  PAY-07 آینهٔ حساب‌پی فقط **خواندنِ سرور** (`GET /shop/payments/mirror`، `core/pay/PayMirror`، `PayStatusFlow.mirror`) — هرگز سندِ دفتر، X/Z دست نمی‌خورد؛
+  CRM-15 صفِ دیدنِ حسابدار (`core/crm/CustomerAccessOutbox`، `POST /shop/customer-access/offline` با زمانِ خودِ دیدن، تکراری بی شمار) و فرمانِ پاک کردنِ
+  پرونده پس از SEC-10 (`customer_erasure_ledger`، ۸۹۵؛ «انجام شد» فقط وقتی دفترِ سرور پاک است؛ `customer_view` ِ مُهرخورده ویرایش نمی‌شود)؛
+  S44 صفِ نرفته در پشتیبان (`pending-ops.json`، `LostDevicePending`) و `POST /shop/devices/:id/replay` فقط برای دستگاهِ **غیرفعالِ** همین دکان، از همان
+  زنجیرهٔ زندهٔ push ِ v1 (`conflict-inbox.pushV1`) با همان `op_id`. کارهای پس از دورِ `SyncV1Worker` همه در `sweepAfterPull`، هر کدام در `runCatching`.
+  سنجه: `product-unit-rules`، `pay-status-mirror`، `customer-access-offline`، `customer-erasure-ledger`، `scenario-s44.e2e.mjs`، `ScenarioS76ServerDesktopTest`.
+
 ### v3 · دفترِ محلی و مهاجرتِ داده
 
 - دفترِ وب در IndexedDB فقط با نشانهٔ `tohid-ledger-store-v1 = idb` (پیش‌فرض خاموش)؛ دفتر و سایه/صف/cursorِ همگام‌سازی در یک تراکنش نوشته می‌شوند (#228).
@@ -1357,6 +1366,7 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 
+- ۸۹۵ (`895_customer_erasure_ledger.sql`: `customer_erasure_ledger` — فرمانِ پاک کردنِ پروندهٔ مشتری در دفترِ دستگاه پس از SEC-10، CRM-15، `claude/e-rows-55s`؛ ۱۴۰۵/۰۸/۲۳ پس از سنجشِ پایه (`claude/batch-62`، بزرگ‌ترین ۸۸۰)؛ ۸۸۱–۸۹۴ برای عامل‌های هم‌زمان؛ rollback در `server/migrations/rollback/`).
 - ۶۱۰ (`610_customer_access_app_door.sql`: CHECK ِ `customer_access_log.door` + `app` — دیدنی که وب و حسابدار از دفترِ خودشان گزارش می‌دهند، CRM-15، `claude/crm-2`؛ ۵۹۰–۶۰۹ در دستِ دیگران؛ rollback در `server/migrations/rollback/`).
 - ۶۴۰ (`640_shop_till_pins.sql`: `shop_till_pins` و `shop_till_sessions` — PIN ِ صندوق در سرور و نوبت‌های سنجیدهٔ صندوق، STF-04/S46، `claude/stf-2`؛ ۱۴۰۵/۰۸/۱۹ پس از سنجشِ main (بزرگ‌ترین ۵۲۰) و شاخه‌های هم‌زمان (۵۹۰، ۶۱۰)؛ ۶۲۰–۶۳۹ برای کارهای هم‌زمان خالی ماند؛ rollback در `server/migrations/rollback/`، آزموده در همان آزمون).
 - ۷۲۰ (`720_stock_moves_production.sql`: نوعِ `production` در CHECK ِ `stock_moves.type`، INV-21، `claude/inv-3`؛ ۱۴۰۵/۰۸/۱۹ پس از سنجشِ پایه و همهٔ شاخه‌های دیده‌شده: بزرگ‌ترین ۶۴۰؛ rollback در `server/migrations/rollback/` با `NOT VALID`، ردیفِ نوشته‌شده نمی‌رود).
