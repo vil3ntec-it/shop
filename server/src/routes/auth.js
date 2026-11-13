@@ -539,7 +539,9 @@ router.get('/terms', (req, res) => {
 router.post('/login', authLimit, async (req, res, next) => {
   const raw = String(req.body?.identifier || req.body?.email || '').trim();
   //  ⛔ «فقط ایمیل»: شماره (در `identifier` یا `phone`) راهِ ورود نیست
-  if (!raw || !raw.includes('@')) return next(badRequest('ورود فقط با ایمیل است؛ ایمیلِ حساب را بنویسید', 'email_required'));
+  //  کادرِ خالی: همان کدِ پیشینِ قرارداد؛ شماره در `phone` ⇒ همان «فقط ایمیل»
+  if (!raw && !req.body?.phone) return next(badRequest('ایمیل لازم است', 'identifier_required'));
+  if (!raw.includes('@')) return next(badRequest('ورود فقط با ایمیل است؛ ایمیلِ حساب را بنویسید', 'email_required'));
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   //  رمزِ خالی اصلاً درخواستِ ورود نیست. زودتر ردش می‌کنیم تا نه جای
   //  قفل را بگیرد و نه یک scrypt بی‌خود اجرا شود. چیزی هم لو نمی‌دهد:
