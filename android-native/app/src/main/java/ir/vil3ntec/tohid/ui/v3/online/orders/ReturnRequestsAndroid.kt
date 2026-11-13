@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -217,8 +220,7 @@ private fun Thumb(ctl: ReturnRequestsController, requestId: String, photoId: Str
   ) {
     when {
       img != null -> Image(img, contentDescription = StrReturnRequests.photos(1), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-      bad -> androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.Refresh, ir.vil3ntec.tohid.core.i18n.StrKit.retry, Modifier.size(22.dp), tint = c.inkMuted)
-      else -> androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.Image, null, Modifier.size(22.dp), tint = c.inkMuted)
+      bad -> Icon(Icons.Outlined.Refresh, ir.vil3ntec.tohid.core.i18n.StrKit.retry, Modifier.size(22.dp), tint = c.inkMuted)
     }
   }
 }
