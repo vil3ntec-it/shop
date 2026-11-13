@@ -70,7 +70,7 @@
 - **آزمون‌ها (سرخ پیش/سبز پس):** `order-return-requests.test.js` ۰/۷ روی main ⇒ ۷/۷؛ `web-store-returns.mjs` (کرومیوم) روی main سرخ (TimeoutError) ⇒
   ۰ ❌؛ core `OrderReturnRequestsTest` پیش از کد کامپایل‌نشدنی ⇒ ۶/۶؛ DESKTOP_EVIDENCE. فهرست‌های در/اشتراک/مجوز (`shop-route-inventory`،
   `paid-routes*`، `route-authz-inventory`، `dead-doors`، `role-route-isolation`) و `customer-erasure`، `customer-notify`، `image-store-migrate`،
-  `admin-flags`، `web-i18n`، `market-web` سبز. SERVER_FULL؛ web-store*.mjs: WEB_FULL.
+  `admin-flags`، `web-i18n`، `market-web` سبز. اجرای کاملِ سرور در دو تکه (PGlite): الف ۲۳۳۶ آزمون، ۲۳۰۵ قبول، ۱۱ شکست = ۷ شکستِ محیطیِ همان main (`backup.test.js` ×۶ و `pump-isolation` «سرور را به کامپیوترِ دیگر ببر» — pg_dump/سوکتِ PostgreSQL در این کانتینر نیست؛ روی main هم همین ۷) + ۴ که در همین شاخه درست و دوباره سبز شدند (`dari-text` ×۳: «مهلت» ⇐ «وقت»، «دوباره بزنید» ⇐ «دوباره کوشش کنید»؛ `customer-notify-refund`: نامِ رویدادهای برگشت از `StrOrderOps`)؛ ب ۱۹۵۶ آزمون، ۱۹۳۳ قبول، ۰ شکست. web-store*.mjs: هر ۳۶ پرونده ۰ ❌ (account، web و vitals در دورِ نخست زیرِ بارِ سنگین «Page crashed»/مهلت گرفتند و جدا دوباره سبز شدند).
 - **STATUS/اسناد:** RET-11 همان PARTIAL، از «تصمیم» به «بیرونی» (فقط بازپرداختِ آنلاین با حساب‌پی، D-08)؛ PARTIAL-MAP (تصمیم ۵۲، بیرونی ۴۰)،
   FLAGS-ON §۳۲، OWNER-DECISIONS (۱۴۰۵/۰۸/۲۳)، OWNER-NEXT، WHATS-NEW، RULES (نقشهٔ پرچم و قاعدهٔ «درخواستِ برگشت»)، `docs/api/routes.json`.
 - **نیمه‌کاره/قدمِ بعد:** صاحب‌کار: پرچم را برای یک دکان روشن و یک برگشت را از ویترین تا «برگشت ثبت شد» در برنامه بزند (FLAGS-ON §۳۲)؛ بازپرداختِ
