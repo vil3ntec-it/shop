@@ -73,6 +73,10 @@ internal class MemberActions(
   val logoutAll: () -> Unit = {},
   /** «برداشتنِ عضوِ کهنه» از نشانهٔ «شاید همان» — برگهٔ تأیید */
   val removeStale: (oldMemberId: String) -> Unit = {},
+  /** STF-04: «باز کردنِ قفلِ PIN ِ صندوق» ِ همین کارمند */
+  val tillPinUnlock: () -> Unit = {},
+  /** STF-04: «برداشتنِ PIN ِ صندوق» — برگهٔ تأیید */
+  val tillPinRemove: () -> Unit = {},
 )
 
 /**
@@ -81,7 +85,10 @@ internal class MemberActions(
  *  «از کار انداختن» (تأیید) یا «برگرداندن».
  */
 @Composable
-internal fun MemberContent(team: TeamData, member: MemberDto?, canEdit: Boolean, busy: Boolean, actions: MemberActions) {
+internal fun MemberContent(
+  team: TeamData, member: MemberDto?, canEdit: Boolean, busy: Boolean, actions: MemberActions,
+  tillPin: TillPinMemberModel.Row? = null,
+) {
   val c = PhoneV3.colors
   val stagger = rememberV3Stagger(member?.id)
   val row = member?.let(TeamModel::memberRow)
@@ -139,6 +146,7 @@ internal fun MemberContent(team: TeamData, member: MemberDto?, canEdit: Boolean,
                 }
               }
             }
+            TillPinMemberSection(tillPin, busy, actions.tillPinUnlock, actions.tillPinRemove)
             val devices = MemberModel.devicesOf(team.devices, member)
             V3Section(StrAccount.devicesTitle) {
               if (team.devices == null) V3Skeleton(rows = 2)
@@ -229,6 +237,31 @@ internal fun RouteScope.MemberRoute(id: String) {
   //  پیوندِ سرد (اعلان، کامپیوتر): داده هنوز خوانده نشده
   LaunchedEffect(id) { if (!team.loaded && Backend.isReady(context)) team.reload(shops, canEdit) }
   val member = team.member(id)
+  //  STF-04: حالِ PIN ِ صندوق (پرچمِ `shop.till_pin`؛ خاموش ⇒ بی بخش) و اختیارِ همان سرور
+  val tillPins = remember(context) { ir.vil3ntec.tohid.data.repo.TillPinRepository(Backend.api(context)) }
+  LaunchedEffect(id) { if (Backend.isReady(context)) team.tillPins = if (tillPins.enabled()) tillPins.members().valueOrNull() else null }
+  val viewerRole = remember { ShopRole.current(context) }
+  val viewerId = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") }
+  val pinRow = member?.let { TillPinMemberModel.rowOf(team.tillPins, it, viewerRole, viewerId) }
+  var removingPin by remember { mutableStateOf(false) }
+  fun pinWork(work: suspend () -> ir.vil3ntec.tohid.core.net.ApiResult<Unit>, done: String) {
+    busy = true
+    TeamSession.scope.launch {
+      work()
+        .onSuccess { toasts.show(done, V3Tone.SUCCESS); team.tillPins = tillPins.members().valueOrNull() }
+        .onFailure { toasts.show(it.userMessage, V3Tone.ERROR) }
+      busy = false
+    }
+  }
+  if (removingPin && member != null) {
+    ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet(
+      title = StrAccount.tillPinRemoveTitle(TeamModel.removeName(member)),
+      message = StrAccount.tillPinRemoveBody,
+      confirm = StrAccount.tillPinRemove,
+      onConfirm = { removingPin = false; pinWork({ tillPins.remove(member.id) }, StrAccount.tillPinRemoved) },
+      onDismiss = { removingPin = false },
+    )
+  }
   MemberContent(
     team, member, canEdit, busy,
     MemberActions(
@@ -281,6 +314,9 @@ internal fun RouteScope.MemberRoute(id: String) {
       revokeKey = { nav.open(AccountPaths.revokeDeviceKey(it)) },
       logoutAll = { nav.open(AccountPaths.logoutEverywhere(id)) },
       removeStale = { nav.open(AccountPaths.removeStale(id, it)) },
+      tillPinUnlock = { if (member != null && !busy) pinWork({ tillPins.unlock(member.id) }, StrAccount.tillPinUnlocked) },
+      tillPinRemove = { if (!busy) removingPin = true },
     ),
+    tillPin = pinRow,
   )
 }

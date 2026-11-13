@@ -551,6 +551,17 @@ class AuthRepository(
       ApiResult.Success(Unit) else attempt
   }
 
+  /**
+   *  AUTH-06 — «خروج از همهٔ دستگاه‌ها» (`POST /auth/logout-all`): سرور همهٔ نشست‌های همین حساب در همین بخش را
+   *  می‌بندد (و رازهای دستگاهِ شاگرد را باطل می‌کند) ⇒ شمارِ نشست‌های بسته. تأییدِ دوبارهٔ ورود را `ApiClient` با
+   *  همان `ReauthGate` می‌پرسد. ⛔ خودش هیچ توکنی پاک نمی‌کند: خروجِ همین دستگاه فقط پس از پذیرشِ سرور و از همان
+   *  راهِ امنِ `SafeSignOut.finish` است؛ ردِ سرور ⇒ خطا و حسابِ همین دستگاه همان (هرگز «خارج شدید» ِ دروغ).
+   */
+  suspend fun signOutEverywhere(): ApiResult<Int> = result {
+    val out = api.post(ApiEndpoints.Auth.LOGOUT_ALL, buildJsonObject { })
+    (out["sessions"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+  }
+
   /* ------------------------------ درونی ------------------------------ */
 
   /**

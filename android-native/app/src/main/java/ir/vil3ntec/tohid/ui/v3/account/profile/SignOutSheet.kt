@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrAccount
+import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.net.userText
 import ir.vil3ntec.tohid.core.sync.SignOutSafety
 import ir.vil3ntec.tohid.data.SafeSignOut
@@ -61,6 +62,10 @@ internal data class SignOutUi(
   val busy: Boolean = false,
   /** چرا خروج نگه داشته شد (`SafeSignOut.check`) — `NONE` یعنی فقط صفِ زنده */
   val reason: SignOutSafety.Reason = SignOutSafety.Reason.NONE,
+  /** AUTH-06: «خروج از همهٔ دستگاه‌ها» — همان مراحل، با تأییدِ سرور پیش از خروجِ همین دستگاه */
+  val everywhere: Boolean = false,
+  /** ردِ `POST /auth/logout-all` (پیامِ سرور) — زیرِ همان تأیید */
+  val serverError: String = "",
 )
 
 /** کارهای برگهٔ خروج */
@@ -86,7 +91,10 @@ internal fun SignOutContent(ui: SignOutUi, actions: SignOutActions, onDismiss: (
     V3PageSwitch(ui.stage, depth = { it.ordinal }, modifier = Modifier.fillMaxWidth()) { stage ->
       Column(Modifier.fillMaxWidth()) {
         when (stage) {
-          SignOutModel.Stage.CONFIRM -> Step(
+          SignOutModel.Stage.CONFIRM -> if (ui.everywhere) Step(
+            Icons.AutoMirrored.Outlined.Logout, V3Tone.ERROR, StrAccount.signOutAllTitle, StrAccount.signOutAllBody, ui.serverError,
+          ) { Buttons(closer, StrAccount.signOutAllAction, V3ButtonKind.DANGER, ui.busy, actions.signOut) }
+          else Step(
             Icons.AutoMirrored.Outlined.Logout, V3Tone.ERROR, StrAccount.signOutTitle, StrAccount.signOutBody,
           ) { Buttons(closer, StrAccount.signOutAction, V3ButtonKind.DANGER, ui.busy, actions.signOut) }
           SignOutModel.Stage.CHECKING -> Busy(StrAccount.checkingBeforeSignOut)
@@ -170,7 +178,7 @@ private fun Buttons(
  *  «خروجِ اجباری…» (پشتیبانِ دیدنی + گاوصندوقِ رمزدارِ همین حساب، و پرسشِ دوم).
  */
 @Composable
-internal fun RouteScope.SignOutRoute() {
+internal fun RouteScope.SignOutRoute(everywhere: Boolean = false) {
   val context = LocalContext.current
   val v1 by SyncV1Engine.of(context).status.collectAsState()
   val live = SignOutModel.pending(v1.queued, AutoSync.pendingCount)
@@ -183,16 +191,28 @@ internal fun RouteScope.SignOutRoute() {
   var busy by remember { mutableStateOf(false) }
   //  برگه وسطِ فرستادن بسته شد ⇒ خروج انجام نمی‌شود (فقط فرستادن تمام می‌شود)
   var dismissed by remember { mutableStateOf(false) }
+  var serverError by remember { mutableStateOf("") }
 
   fun leave() {
     busy = true
     //  خروج نیمه‌کاره نمی‌ماند حتی اگر برگه در این میان بسته شود
     AccountSession.scope.launch {
+      //  AUTH-06: اول سرور همهٔ نشست‌ها را می‌بندد؛ رد ⇒ همین دستگاه هم وارد می‌ماند و برگه خطا را می‌گوید
+      if (everywhere) {
+        val out = Backend.auth(context).signOutEverywhere()
+        val next = SignOutModel.afterEverywhere(serverOk = out is ApiResult.Success)
+        if (next != null) {
+          serverError = (out as? ApiResult.Failure)?.message.orEmpty()
+          busy = false
+          stage = next
+          return@launch
+        }
+      }
       SafeSignOut.finish(context)
       AccountSession.changed()
       busy = false
       Haptics.success(context)
-      toasts.show(StrAccount.signedOut, V3Tone.SUCCESS)
+      toasts.show(if (everywhere) StrAccount.signedOutAll else StrAccount.signedOut, V3Tone.SUCCESS)
       back()
     }
   }
@@ -219,7 +239,7 @@ internal fun RouteScope.SignOutRoute() {
 
   val shown = if (reason == SignOutSafety.Reason.NONE) live else maxOf(held, live)
   SignOutContent(
-    ui = SignOutUi(stage, shown, remember(v1) { Backend.isOnline(context) }, v1.lastError, backupPath, busy, reason),
+    ui = SignOutUi(stage, shown, remember(v1) { Backend.isOnline(context) }, v1.lastError, backupPath, busy, reason, everywhere, serverError),
     actions = SignOutActions(
       signOut = { checkThenLeave() },
       syncNow = { checkThenLeave() },

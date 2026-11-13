@@ -142,6 +142,8 @@ test('پیش‌فرض خاموش: پاسخِ مشتری بی `delivery`، دره
   const e = await eta(courier.token, id, 15);
   assert.equal(e.status, 404);
   assert.equal(e.body.error.code, 'customer_view_disabled');
+  //  برنامهٔ پیک دکمهٔ «تقریباً کی می‌رسم» را فقط با همین کلیدِ `/courier/me` می‌سازد (DLV-06)
+  assert.equal((await h.get('/api/courier/me', { token: courier.token })).body.etaEnabled, false);
   //  پرچمِ موقعیت به‌تنهایی هیچ دری باز نمی‌کند
   await setFlag(s.shopId, delivery.LOCATION_FLAG, true);
   const l = await location(courier.token, id, { lat: 34.5, lng: 69.1 });
@@ -176,6 +178,7 @@ test('مسیرِ کامل: وضعیت، نامِ کوچک، کد، زمانِ ت
   assert.equal((await eta(courier.token, id, 20)).body.error.code, 'not_on_the_way');
 
   await sendOk(courier.token, [ev(id, 'picked_up')]);
+  assert.equal((await h.get('/api/courier/me', { token: courier.token })).body.etaEnabled, true, 'دکمهٔ زمانِ رسیدن دیده می‌شود');
   const e = await eta(courier.token, id, 20);
   assert.equal(e.status, 200, JSON.stringify(e.body));
   assert.equal((await eta(courier.token, id, 0)).status, 400);

@@ -58,6 +58,8 @@ router.get('/me', async (req, res) => {
     //  DLV-04/DLV-18: دکمه‌های «مسیرِ پیشنهادی» و «امتیاز» فقط با پرچمِ خودِ دکان دیده می‌شوند
     routeEnabled: await orders.flagOf(req.shopId, courierRoute.FLAG),
     ratingsEnabled: await orders.flagOf(req.shopId, ratings.FLAG),
+    //  DLV-06/S5: «تقریباً کی می‌رسم» (`POST /missions/:id/eta`) فقط با نمای پیک برای مشتری (`shop.delivery_customer_view`)
+    etaEnabled: await orders.flagOf(req.shopId, require('../lib/delivery-live').VIEW_FLAG),
     //  S94: «اشتراکِ موقعیت» ِ خودِ پیک — `required` یعنی دکان بی رضایت موقعیت نمی‌گیرد
     locationConsent: await locationConsent.stateOf(req.shopId, c),
     serverTime: Date.now(),

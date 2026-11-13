@@ -1,7 +1,9 @@
 package ir.vil3ntec.tohid.data.repo
 
 import ir.vil3ntec.tohid.core.net.ApiClient
+import ir.vil3ntec.tohid.core.net.ApiJson
 import ir.vil3ntec.tohid.core.net.ApiResult
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -26,6 +28,23 @@ class TillPinRepository(private val api: ApiClient) {
     Unit
   }
 
+  /** اعضای فعال با حالِ PIN (`GET /members`، صاحب و مدیر: `members.view`) — صفحهٔ کارمند */
+  suspend fun members(): ApiResult<List<TillPinMemberDto>> = result {
+    ApiJson.decode<TillPinMembersDto>(api.get("$ROOT/members")).members
+  }
+
+  /** بازکردنِ قفلِ کنونیِ PIN ِ عضوِ دیگر (شمارِ خطا و پلهٔ دوبرابر در سرور می‌ماند؛ تأییدِ دوبارهٔ ورود) */
+  suspend fun unlock(memberId: String): ApiResult<Unit> = result {
+    api.post("$ROOT/members/${enc(memberId)}/unlock", buildJsonObject { })
+    Unit
+  }
+
+  /** برداشتنِ PIN ِ عضو و بستنِ نوبتِ بازش (تأییدِ دوبارهٔ ورود) */
+  suspend fun remove(memberId: String): ApiResult<Unit> = result {
+    api.delete("$ROOT/members/${enc(memberId)}")
+    Unit
+  }
+
   /** سنجشِ PIN ِ کاربرِ [userId] روی همین دستگاه ⇒ شناسهٔ نوبتِ سرور، یا `null` (خودِ حسابِ دستگاه) */
   suspend fun verify(userId: String, pin: String): ApiResult<String?> = result {
     val session = api.post("$ROOT/verify", buildJsonObject { put("userId", userId); put("pin", pin) })["session"] as? JsonObject
@@ -40,5 +59,23 @@ class TillPinRepository(private val api: ApiClient) {
 
   private companion object {
     const val ROOT = "/shop/till-pin"
+    fun enc(s: String): String = ir.vil3ntec.tohid.core.nav.RoutePaths.encode(s)
   }
 }
+
+/** یک ردیفِ `GET /shop/till-pin/members` (`till-pin.members`) — هرگز خودِ PIN */
+@Serializable
+data class TillPinMemberDto(
+  val memberId: String = "",
+  val userId: String = "",
+  val name: String = "",
+  val role: String = "",
+  val pinSet: Boolean = false,
+  val invalidated: Boolean = false,
+  val setAt: Long? = null,
+  val locked: Boolean = false,
+  val lockedUntil: Long? = null,
+)
+
+@Serializable
+private data class TillPinMembersDto(val members: List<TillPinMemberDto> = emptyList())

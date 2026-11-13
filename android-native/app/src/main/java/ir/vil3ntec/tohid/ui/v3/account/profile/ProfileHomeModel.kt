@@ -118,7 +118,7 @@ object ProfileHomeModel {
   private fun endDay(p: Plan, warnDays: Int): String? =
     if (p.ends > 0 && p.days <= warnDays) AccountFormat.date(p.ends) else null
 
-  enum class Item { EDIT, DEVICES, PLAN, STATS, SETTINGS, SUPPORT, SIGN_OUT }
+  enum class Item { EDIT, DEVICES, PLAN, STATS, SETTINGS, SUPPORT, SIGN_OUT, SIGN_OUT_ALL }
 
   /** ردیفِ فهرستِ زیرِ کارت با مسیرِ دقیقِ همان کار */
   data class MenuItem(val item: Item, val label: String, val route: String, val danger: Boolean = false)
@@ -136,6 +136,8 @@ object ProfileHomeModel {
     if (canSettings) add(MenuItem(Item.SETTINGS, Str.settings, AccountLinks.SETTINGS))
     add(MenuItem(Item.SUPPORT, Str.support, AccountPaths.SUPPORT))
     if (signedIn) add(MenuItem(Item.SIGN_OUT, StrAccount.menuSignOut, AccountPaths.SIGN_OUT, danger = true))
+    //  AUTH-06: همهٔ نشست‌های همین حساب (گوشیِ گم‌شده، کامپیوترِ دکانِ دیگر) — همان برگهٔ خروج با تأییدِ سرور
+    if (signedIn) add(MenuItem(Item.SIGN_OUT_ALL, StrAccount.menuSignOutAll, AccountPaths.SIGN_OUT_ALL, danger = true))
   }
 
   /** یکی از سه کادرِ آمار — هر کدام درِ بخشِ خودش */

@@ -107,4 +107,10 @@ object StrCourier {
   fun recent(orderNo: Long, stars: Int): String = t("سفارش #${asIs(orderNo)} · ${asIs(stars)} ستاره", "Order #$orderNo · $stars stars", "فرمایش #$orderNo · $stars ستوري")
   val raterCustomer: String get() = t("مشتری", "Customer", "پېرودونکی")
   val raterCourier: String get() = t("پیک", "Courier", "سپارونکی")
+
+  // DLV-06 «تقریباً کی می‌رسم» (کارتِ مأموریتِ «در راه»)
+  val etaTitle: String get() = t("زمانِ رسیدن برای مشتری", "Arrival time for the customer", "پېرودونکي ته د رسېدو وخت")
+  val etaHelp: String get() = t("مشتری در صفحهٔ پیگیری ساعتِ تقریبی را می‌بیند.", "The customer sees the approximate time on the tracking page.", "پېرودونکی د تعقیب په پاڼه کې نږدې وخت ویني.")
+  fun etaMinutes(n: Any): String = t("${asIs(n)} دقیقه", "$n min", "$n دقیقې")
+  fun etaSent(n: Any): String = t("به مشتری گفته شد: حدودِ ${asIs(n)} دقیقهٔ دیگر", "Customer told: about $n more minutes", "پېرودونکي ته وویل شول: نږدې $n نورې دقیقې")
 }

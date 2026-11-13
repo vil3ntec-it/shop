@@ -31,15 +31,15 @@ class ProfileHomeModelTest {
   @Test
   fun `فهرست — ترتیبِ r4 و مسیرِ دقیقِ هر ردیف`() {
     val full = ProfileHomeModel.menu(signedIn = true, canSettings = true)
-    assertEquals(listOf(Item.EDIT, Item.DEVICES, Item.PLAN, Item.STATS, Item.SETTINGS, Item.SUPPORT, Item.SIGN_OUT), full.map { it.item })
+    assertEquals(listOf(Item.EDIT, Item.DEVICES, Item.PLAN, Item.STATS, Item.SETTINGS, Item.SUPPORT, Item.SIGN_OUT, Item.SIGN_OUT_ALL), full.map { it.item })
     assertEquals(
-      listOf("profile/edit", "devices", "subscription", "reports?tab=profit&range=month", "settings", "support", "profile/signout"),
+      listOf("profile/edit", "devices", "subscription", "reports?tab=profit&range=month", "settings", "support", "profile/signout", "profile/signout-all"),
       full.map { it.route },
     )
-    assertEquals(listOf(Item.SIGN_OUT), full.filter { it.danger }.map { it.item })
+    assertEquals(listOf(Item.SIGN_OUT, Item.SIGN_OUT_ALL), full.filter { it.danger }.map { it.item })
     assertFalse(ProfileHomeModel.menu(true, canSettings = false).any { it.item == Item.SETTINGS })
     val guest = ProfileHomeModel.menu(signedIn = false, canSettings = true).map { it.item }
-    assertFalse(Item.EDIT in guest); assertFalse(Item.SIGN_OUT in guest)
+    assertFalse(Item.EDIT in guest); assertFalse(Item.SIGN_OUT in guest); assertFalse(Item.SIGN_OUT_ALL in guest)
   }
 
   @Test

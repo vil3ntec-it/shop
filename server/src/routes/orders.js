@@ -100,6 +100,9 @@ router.get('/config', async (req, res) => {
     //  CHK-10/S34: فهرستِ «خبرم کن» ِ ویترین (پرچمِ `shop.storefront.notify_area` روی ناحیه‌ها) فقط برای صاحب و مدیر
     //  (`settings.write`، همان درِ `GET /storefront/area-requests`) — خاموش یا نقشِ دیگر ⇒ کلید نیست (همان پاسخِ پیشین)
     ...(can(req.role, 'settings.write') && (await require('../lib/storefront-area-requests').flagOn(req.shopId)) ? { notifyArea: true } : {}),
+    //  TEN-03: «باطل کردنِ لینکِ پیگیری» در جزئیاتِ سفارشِ ویترین (پرچمِ `shop.storefront.link_expiry`؛ همان درِ
+    //  `POST /:id/track-link/revoke`) فقط برای صاحب و مدیر (`orders.contact`) — خاموش یا نقشِ دیگر ⇒ کلید نیست
+    ...(can(req.role, 'orders.contact') && (await require('../lib/storefront').linkPolicyOn(req.shopId)) ? { trackLinkRevoke: true } : {}),
     //  RSK-03: کارتِ «سابقهٔ این مشتری» (پرچمِ `shop.order_risk`؛ همان درِ `GET /:id/risk`) — خاموش ⇒ کلید نیست (همان پاسخِ پیشین)
     ...((await require('../lib/order-risk').flagIn((t, p) => require('../db').query(t, p), req.shopId)) ? { risk: true } : {}),
     //  «فروشِ تحویل در برنامه» (تصمیمِ صاحبِ مخزن): برنامه فقط وقتی سرور این را می‌گوید فروش
@@ -192,7 +195,10 @@ router.post('/:id/track-link/revoke', needFlag, requirePermission('orders.contac
     shopId: req.shopId, userId: req.user.id, action: 'order.track_link_revoked',
     targetType: 'online_order', targetId: String(req.params.id), detail: { gen: out.gen }, ip: clientIp(req),
   });
-  res.json({ ok: true, token: out.token });
+  //  لینکِ تازهٔ کامل (همان صفحهٔ پیگیریِ ویترین، نسلِ جاری) و واتس‌اپ ِ مشتری برای فرستادنِ دوباره از برنامه
+  const order = await require('../db').one("SELECT id, source, customer_phone FROM online_orders WHERE shop_id=$1 AND id=$2", [req.shopId, out.orderId]);
+  const links = await require('../lib/pick-substitutes').customerLinks(req.shopId, order, actorOf(req), out.token);
+  res.json({ ok: true, token: out.token, link: links.link, whatsappUrl: links.whatsappUrl });
 });
 
 router.get('/:id', needFlag, async (req, res) => {

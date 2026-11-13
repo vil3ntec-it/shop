@@ -39,6 +39,13 @@ object SignOutModel {
     SignOutSafety.Reason.FAILED, SignOutSafety.Reason.NONE -> StrAccount.unsyncedFailed
   }
 
+  /**
+   *  AUTH-06 «خروج از همهٔ دستگاه‌ها» (`profile/signout-all`): همان قفلِ SYN-10 و همان پشتیبان پیش از هر چیز، سپس
+   *  `POST /auth/logout-all`. فقط پذیرشِ سرور ⇒ null (خروجِ همین دستگاه با `SafeSignOut.finish`)؛ رد ⇒ همان تأیید با
+   *  خطای سرور — نشست‌های دستگاه‌های دیگر باز ماندند و برگه نباید «خارج شدید» بگوید.
+   */
+  fun afterEverywhere(serverOk: Boolean): Stage? = if (serverOk) null else Stage.CONFIRM
+
   /** خروجِ اجباری فقط با پشتیبانِ نوشته‌شده و دو تأیید («خروجِ اجباری…» + «باز هم خارج شو») */
   fun canForce(backupWritten: Boolean): Boolean = LogoutGuard.canForce(backupWritten, confirmations = 2)
 

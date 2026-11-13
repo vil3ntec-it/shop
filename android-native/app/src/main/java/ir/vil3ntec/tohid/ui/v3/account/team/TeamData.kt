@@ -39,6 +39,8 @@ internal class TeamData {
   var scope by mutableStateOf<StaffScopeMembersDto?>(null)
   /** دستگاه‌های شناختهٔ کارمندان (رازِ ورود با کد) و «شاید همان عضوِ کهنه» — `null` یعنی سرورِ قدیمی یا بی اجازه */
   var staffKeys by mutableStateOf<StaffKeysDto?>(null)
+  /** STF-04: حالِ PIN ِ صندوق ِ اعضا (`GET /shop/till-pin/members`) — `null` یعنی پرچمِ `shop.till_pin` خاموش یا بی اجازه */
+  var tillPins by mutableStateOf<List<ir.vil3ntec.tohid.data.repo.TillPinMemberDto>?>(null)
   var error by mutableStateOf<String?>(null)
   var fresh by mutableStateOf<String?>(null)
   /** کارمندی که همین حالا برداشته شد — ردیفش پیش از خواندنِ دوباره نرم جمع می‌شود (`V3Collapse`) */

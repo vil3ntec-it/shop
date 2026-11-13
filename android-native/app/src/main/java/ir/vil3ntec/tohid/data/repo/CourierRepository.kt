@@ -30,6 +30,8 @@ class CourierRepository(private val api: ApiClient) {
   data class Me(
     val id: String, val name: String, val active: Boolean, val cashCapMinor: Long, val callEnabled: Boolean = false,
     val routeEnabled: Boolean = false, val ratingsEnabled: Boolean = false, val locationConsent: LocationConsent = LocationConsent(),
+    /** DLV-06: «تقریباً کی می‌رسم» (پرچمِ `shop.delivery_customer_view`؛ سرورِ کهنه بی کلید ⇒ پنهان) */
+    val etaEnabled: Boolean = false,
   )
 
   suspend fun me(): ApiResult<Me> = result {
@@ -41,7 +43,17 @@ class CourierRepository(private val api: ApiClient) {
       CourierWire.long(c, "cashCapMinor") ?: 0L, CourierWire.bool(out, "callEnabled"),
       CourierWire.bool(out, "routeEnabled"), CourierWire.bool(out, "ratingsEnabled"),
       LocationConsent(CourierWire.bool(lc, "required"), CourierWire.bool(lc, "granted"), CourierWire.long(lc, "grantedAt")),
+      etaEnabled = CourierWire.bool(out, "etaEnabled"),
     )
+  }
+
+  /**
+   *  DLV-06 «تقریباً [minutes] دقیقهٔ دیگر می‌رسم» (`POST /api/courier/missions/:id/eta`) ⇒ لحظهٔ رسیدنِ سرور (`etaAt`).
+   *  فقط آنلاین؛ سرور مالکیت، «در راه» و بازهٔ ۱ تا ۲۴۰ را می‌سنجد (`CourierEta`).
+   */
+  suspend fun eta(assignmentId: String, minutes: Int): ApiResult<Long> = result {
+    val out = api.post(ApiEndpoints.Courier.eta(assignmentId), buildJsonObject { put("minutes", JsonPrimitive(minutes)) })
+    CourierWire.long(out, "etaAt") ?: 0L
   }
 
   /** پاسخِ «اشتراکِ موقعیت»: حالِ تازه از سرور (`unchanged` ⇒ همان پیشین) */
