@@ -9,6 +9,7 @@
  *   PUT  /api/shop/permissions/members/:id     لایهٔ یک کاربر (فقط صاحب)
  *   GET  /api/shop/devices                     دستگاه‌های اعضا (members.view)
  *   POST /api/shop/devices/:id/disable         از کار انداختنِ دستگاهِ گم‌شده (فقط صاحب)
+ *   POST /api/shop/devices/:id/replay          S44 (د۱۸): کارهای همگام‌نشدهٔ همان دستگاهِ غیرفعال از پشتیبانش (پرچمِ خاموشِ `shop.lost_device_replay`)
  *   POST /api/shop/devices/:id/enable          برگرداندنِ دستگاهِ پیداشده (فقط صاحب)
  *
  *   «برگهٔ امضاشده» (STF-02، بخشِ ۱۰.۱ — `lib/staff-approval.js`):
@@ -63,6 +64,17 @@ router.post('/devices/:id/disable', requireShop, requirePermission('members.mana
     byId: req.user.id, currentDeviceId: req.device?.id || null, reason, ip: clientIp(req),
   });
   res.json({ ok: true, ...out });
+});
+
+//  S44 (د۱۸): کارهای همگام‌نشدهٔ دستگاهِ گم‌شده از پشتیبانش (`lib/lost-device-replay.js`) — پرچمِ خاموش پیش از بدنه
+const replayLimit = require('../middleware/ratelimit').rateLimit({
+  max: 20, keyPrefix: 'lost-device-replay', key: (req) => (req.shopId ? `shop:${req.shopId}` : ''),
+});
+router.post('/devices/:id/replay', requireShop, replayLimit, requirePermission('members.manage'), async (req, res) => {
+  const lost = require('../lib/lost-device-replay');
+  await lost.requireOn(req.shopId);
+  const out = await lost.replay(req.shopId, { userId: req.user.id, role: req.role }, lost.parse(req.params.id, req.body), clientIp(req));
+  res.set('Cache-Control', 'no-store').json({ ok: true, ...out });
 });
 
 router.post('/devices/:id/enable', requireShop, requirePermission('members.manage'), async (req, res) => {

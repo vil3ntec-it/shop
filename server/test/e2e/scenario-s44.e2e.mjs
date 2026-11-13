@@ -67,4 +67,32 @@ await E.step('S44', 'opهای بعدیِ آن گوشی رد و شمرده می�
   assert.equal(A.stock(rice), 10);
 }, { needs: ['S44.disable'] });
 
+//  د۱۸: پشتیبانِ گوشی صفِ نرفته را هم دارد (`pending-ops.json` ِ `BackupBundle`) ⇒ صاحب همان opها را از برنامهٔ خودش می‌فرستد
+await E.step('S44.replay', 'بازیابی از پشتیبان (پرچمِ `shop.lost_device_replay`): همان opها با همان شناسه یک بار به دفترِ دکان؛ تکرار «تکراری»؛ خاموش ۴۰۴', async () => {
+  const body = { deviceId: W.deviceId, ops: JSON.parse(JSON.stringify(W.queue)) };
+  const off = await A.api('POST', `/shop/devices/${devId}/replay`, body);
+  assert.equal(off.status, 404, JSON.stringify(off.body));
+  assert.equal(off.body.error.code, 'lost_device_replay_off');
+  await E.flag(owner.shopId, 'shop.lost_device_replay', true);
+  //  پشتیبانِ دستگاهِ دیگر (شناسهٔ همگام‌سازیِ دیگر) رد
+  const other = await A.api('POST', `/shop/devices/${devId}/replay`, { ...body, deviceId: 'some-other-device' });
+  assert.equal(other.status, 400, JSON.stringify(other.body));
+  assert.equal(other.body.error.code, 'device_mismatch');
+  const r = E.ok(await A.api('POST', `/shop/devices/${devId}/replay`, body), 'بازیابی');
+  assert.equal(r.counts.applied, body.ops.length, JSON.stringify(r));
+  assert.equal(r.counts.rejected, 0, JSON.stringify(r.results));
+  assert.equal((await db.one('SELECT COUNT(*)::int AS n FROM oplog WHERE account_id=$1 AND row_id=$2', [owner.shopId, lost.saleId])).n, 1, 'فروشِ گوشیِ گم‌شده یک بار رسید');
+  const again = E.ok(await A.api('POST', `/shop/devices/${devId}/replay`, body), 'دوباره');
+  assert.equal(again.counts.duplicate, body.ops.length);
+  assert.equal(again.counts.applied, 0);
+  //  گوشیِ صاحب فروش را می‌گیرد؛ موجودی یکی کم شد
+  await A.drain();
+  assert.ok(A.ledger.sales.some((x) => x.id === lost.saleId), 'فروش به دستگاهِ صاحب نرسید');
+  assert.equal(A.stock(rice), 9);
+  //  گوشیِ گم‌شده هنوز بسته است
+  assert.equal((await W.sync()).ok, false);
+  const audit = await db.one("SELECT detail FROM audit_logs WHERE shop_id=$1 AND action='lost_device.replayed' ORDER BY created_at DESC LIMIT 1", [owner.shopId]);
+  assert.ok(audit, 'سابقه');
+}, { needs: ['S44'] });
+
 await E.finish();
