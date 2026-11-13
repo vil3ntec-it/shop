@@ -38,8 +38,7 @@ const slipCore = require('./approval-core');
 const staffPerms = require('./staff-perms');
 const { one, many, query, tx, newId, now } = require('../db');
 const { badRequest, forbidden, notFound, conflict } = require('../middleware/errors');
-const hlc = require('./hlc');
-const branchKey = require('./branch-key');
+const hlc = require('./hlc'), branchKey = require('./branch-key');   //  شعبه: سطحِ دکان با `shopOf`
 const { rejectOps } = require('./v1-reject');
 const roleV1 = require('./staff-role-v1'), cpay = require('./conflict-payload');   //  DATA-SAFETY: سندِ ردشده کامل در صندوق
 //  STF-02: «درخواستِ تأیید» از راهِ دور (پرچمِ خاموشِ `shop.approval_requests`) — op با `approval: {v:1, request}`
@@ -222,10 +221,9 @@ function verifySignature(publicKeyB64, text, sigB64) {
 
 /** لایه‌ها و نقشِ یک عضوِ فعالِ دکان — یا null */
 async function memberPolicy(q, shopId, userId) {
-  shopId = branchKey.shopOf(shopId);   //  شعبه: عضویت سطحِ دکان است
   const m = (await q.query(
     `SELECT role FROM shop_members WHERE shop_id=$1 AND user_id=$2 AND status='active' LIMIT 1`,
-    [shopId, String(userId || '')]
+    [branchKey.shopOf(shopId), String(userId || '')]
   )).rows[0];
   if (!m) return null;
   return { role: m.role, layers: await staffPerms.layersFor(shopId, m.role, userId, (s, p) => q.query(s, p)) };
@@ -244,8 +242,7 @@ async function acceptSlip(q, ctx, need, slip, { opId, at, deviceId, path }) {
   const c = q || dbq;
   const shape = slipCore.check(slip);
   if (shape) return 'approval_invalid';
-  const shopId = branchKey.shopOf(ctx);   //  شعبه: برگه، کلید و nonce سطحِ دکان‌اند (`lib/branch-key.js`)
-  if (slip.shop !== shopId) return 'approval_mismatch';
+  const shopId = branchKey.shopOf(ctx); if (slip.shop !== shopId) return 'approval_mismatch';   //  شعبه: برگه/کلید/nonce سطحِ دکان
   const cover = slipCore.covers(slip, { perm: need.perm, doc: need.doc, pct_bp: need.pct_bp, amount: need.amount, at });
   if (cover) return cover;
   if (slip.by === ctx.userId) return 'approval_self';

@@ -18,6 +18,7 @@
  */
 const branches = require('./branches');
 const { forbidden } = require('../middleware/errors');
+const { SHOP } = require('./tenancy');
 
 /** کدام نوع در: 'v1' | 'rest' | null (شعبه‌شناس یا بیرون از دکان) */
 function kindOf(p) {
@@ -55,7 +56,7 @@ async function who(req, kind) {
     const { requireSyncAccount } = require('./sync-v1-auth');
     if (!(await run(requireSyncAccount, probe))) return null;
     const s = probe.sync;
-    if (!s || s.app !== 'shop' || s.accountKind !== 'shop' || !s.accountId) return null;
+    if (!s || s.app !== SHOP.app || s.accountKind !== SHOP.app || !s.accountId) return null;
     return { shopId: s.accountId, member: { role: s.role, user_id: s.userId } };
   }
   const { requireUser, requireShop } = require('../middleware/auth');
