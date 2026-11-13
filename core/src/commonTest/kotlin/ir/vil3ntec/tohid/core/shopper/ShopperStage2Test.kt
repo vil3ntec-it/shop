@@ -152,7 +152,6 @@ class ShopperStage2Test {
     assertNull(upReq.body)
     assertContentEquals(png, api.chatMedia("golestan", "v2.t", "sch_1", "scf_1").ok())
     assertTrue(http.seen.last().binary)
-    assertEquals("chat_disabled", api.chats("x-shop", "v2.t").errorOrNull()?.code)
   }
 
   @Test fun deepLinksIntoAShopProductOrderOrCampaign() {

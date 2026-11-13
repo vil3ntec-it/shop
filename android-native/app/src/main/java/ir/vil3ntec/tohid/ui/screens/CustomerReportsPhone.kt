@@ -14,7 +14,6 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.CustomerInsight
 import ir.vil3ntec.tohid.core.i18n.StrCustomerPages
 import ir.vil3ntec.tohid.core.i18n.StrPanelPages
-import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.money
@@ -28,13 +27,6 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  *  همان خروجیِ اکسل و چاپ (`ReportCsv.of("aging"|"rfm")`)؛ این‌جا فقط کارتِ هر مشتری. پشتِ همان تنظیمِ
  *  خاموشِ «گزارش‌های مشتری» (`ShopPolicy.crmReports`)؛ RFM مبلغِ فروش دارد، پس فقط با `canSeeMoney`.
  */
-
-/** زبانه‌های مشتریِ گوشی؛ تنظیم خاموش ⇒ هیچ */
-internal fun crmTabs(crmOn: Boolean, canSeeMoney: Boolean): Map<String, String> = when {
-  !crmOn -> emptyMap()
-  canSeeMoney -> linkedMapOf("aging" to StrReach.tabAging, "rfm" to StrReach.tabRfm)
-  else -> linkedMapOf("aging" to StrReach.tabAging)
-}
 
 private val cardShape = RoundedCornerShape(Radius.md)
 

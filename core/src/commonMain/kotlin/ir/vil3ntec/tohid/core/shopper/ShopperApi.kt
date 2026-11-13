@@ -319,11 +319,6 @@ class ShopperApi(private val http: ShopperHttp, private val lang: () -> String =
 
   // ── گفت‌وگو با دکان (CHAT-02/06) — هویت همان شمارهٔ تأییدشده (`X-Store-Ticket`، مثلِ `store/chat.js` ِ وب) ──
 
-  fun chats(slug: String, ticket: String): ShopperResult<List<ChatConversation>> =
-    call("GET", chatBase(slug) + "/conversations", null, ticketHeader(ticket)) { root ->
-      (root["conversations"] as? JsonArray)?.mapNotNull { decodeOrNull(ChatConversation.serializer(), it) }
-    }
-
   /** گفت‌وگوی همین سفارش ([orderNo]) یا گفت‌وگوی عمومی (null)؛ همان رشته اگر هست (دورِ تازهٔ عمومیِ بسته با سرور) */
   fun chatOpen(slug: String, ticket: String, orderNo: Long?, name: String): ShopperResult<ChatConversation> =
     when (val r = chatStart(slug, ticket, orderNo, name)) {

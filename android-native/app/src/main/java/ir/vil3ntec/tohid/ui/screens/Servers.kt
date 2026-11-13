@@ -47,9 +47,6 @@ import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
 
-/** عنوانِ بخش — همان کلیدِ فهرستِ تنظیماتِ کامپیوتر (`AppRoot`) */
-const val SERVERS_SECTION_TITLE: String = "سرورها" // داده: کلیدِ بخش در فهرستِ تنظیماتِ کامپیوتر (`AppRoot`)؛ عنوانِ صفحه `StrReach.servers`
-
 /**
  *  بخشِ «سرورها» در تنظیمات (پرچمِ دستگاهیِ `app.multi_server`، پیش‌فرض خاموش) — `docs/SERVERS-fa.md`.
  *

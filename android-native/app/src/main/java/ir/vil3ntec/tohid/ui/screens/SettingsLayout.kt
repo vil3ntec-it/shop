@@ -195,7 +195,7 @@ object SettingsLayout {
   const val WEBCAM = "وب‌کم به‌عنوانِ بارکدخوان" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
   /** حالتِ آموزشی (OPS-07، `TrainingPref` و `TrainingLedger`) */
   const val TRAINING = "حالتِ آموزشی" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
-  /** سرورهای دیگر (`ServersSettings`، پرچمِ همین دستگاه `app.multi_server`؛ فقط صاحب؛ تصمیم ⇒ B) — همان `SERVERS_SECTION_TITLE` */
+  /** سرورهای دیگر (`ServersSettings`، پرچمِ همین دستگاه `app.multi_server`؛ فقط صاحب؛ تصمیم ⇒ B) */
   const val SERVERS = "سرورها" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
 
   /** پیوند به «حسابِ من» (نام و عکسِ دکان) — ردیفِ نخستِ «دکان و امنیت» */
