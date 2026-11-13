@@ -18,6 +18,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -108,9 +109,9 @@ async function orderOf(s) {
   assert.equal(p.status, 200, JSON.stringify(p.body));
   assert.equal((await h.put('/api/shop/storefront/products/rice', { published: true }, { token: s.token })).status, 200);
   const phone = '0791113344';
-  const st = await h.post(`/api/store/${s.slug}/verify/start`, { phone });
+  const st = await h.post(`/api/store/${s.slug}/verify/start`, { email: mailOf(phone) });
   assert.equal(st.status, 200, JSON.stringify(st.body));
-  const ck = await h.post(`/api/store/${s.slug}/verify/check`, { phone, code: st.body.devCode });
+  const ck = await h.post(`/api/store/${s.slug}/verify/check`, { email: mailOf(phone), code: st.body.devCode });
   assert.equal(ck.status, 200, JSON.stringify(ck.body));
   const r = await h.post(`/api/store/${s.slug}/checkout`, {
     fulfillment: 'pickup', customer: { name: 'مشتری', phone }, lines: [{ productId: 'rice', qtyMilli: 1000 }],

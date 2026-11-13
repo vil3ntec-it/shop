@@ -293,12 +293,13 @@ async function file(store, viewer, body, kind) {
     if (subject === 'order') {
       const no = Number(b.orderNo);
       if (!Number.isSafeInteger(no) || no <= 0) throw badRequest('شمارهٔ سفارش نامعتبر است', 'bad_order');
-      //  خریدِ واقعی: سفارش باید به همین شمارهٔ تأییدشده ثبت شده باشد
+      //  خریدِ واقعی: سفارش باید به همین مشتریِ تأییدشده (ایمیل یا حسابش؛ «فقط ایمیل») ثبت شده باشد
       const o = await one(
-        'SELECT id, order_no FROM online_orders WHERE shop_id=$1 AND order_no=$2 AND customer_phone=$3',
+        `SELECT id, order_no FROM online_orders WHERE shop_id=$1 AND order_no=$2
+            AND ${require('./storefront').OWNED_SQL('', '$3', "''")}`,
         [shopId, no, viewer.phone]
       );
-      if (!o) throw notFound('این سفارش به نامِ شمارهٔ شما پیدا نشد', 'order_not_found');
+      if (!o) throw notFound('این سفارش به نامِ ایمیلِ شما پیدا نشد', 'order_not_found');
       orderId = o.id;
       orderNo = Number(o.order_no);
     }

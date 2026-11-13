@@ -24,6 +24,7 @@ const { query, one, newId, now } = require('../src/db');
 const chat = require('../src/lib/shop-chat');
 const chatMedia = require('../src/lib/chat-media');
 const push = require('../src/lib/push');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -809,9 +810,9 @@ test('درِ مشتری /api/store/:slug/chat با بلیتِ ویترین', { s
   const slug = `chat-${uniq()}`;
   const put = await h.put('/api/shop/storefront', { slug, enabled: true, title: 'ویترینِ چت', contactPhone: '0700000001' }, { token: o.token });
   assert.equal(put.status, 200, JSON.stringify(put.body));
-  const start = await h.post(`/api/store/${slug}/verify/start`, { phone: '0790000031' });
+  const start = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf('0790000031') });
   assert.equal(start.status, 200, JSON.stringify(start.body));
-  const check = await h.post(`/api/store/${slug}/verify/check`, { phone: '0790000031', code: start.body.devCode });
+  const check = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf('0790000031'), code: start.body.devCode });
   assert.equal(check.status, 200, JSON.stringify(check.body));
   const ticket = check.body.ticket;
   const pub = (method, path, body, t = ticket) => h.api(method, `/api/store/${slug}/chat${path}`, { body: body || null, headers: t ? { 'X-Store-Ticket': t } : {} });

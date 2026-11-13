@@ -29,6 +29,7 @@ const syncV1 = require('../src/lib/sync-v1');
 let admin = '';
 const lib = () => require('../src/lib/stock-reserve');
 const catalog = () => require('../src/lib/catalog');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 test.before(async () => {
   await h.start();
@@ -499,8 +500,8 @@ test('CHK-21 + O-06: افزودنِ قلم به سفارشِ ویترین نگه
   await stocked(s, 'ad1', 4);   //  سقفِ شماره (۲-۲۱): نیمِ ۴ ⇒ همین شماره روی هم تا دو عدد
   assert.equal((await h.put('/api/shop/storefront/products/ad1', { published: true }, { token: s.token })).status, 200);
   const phone = '0791112299';
-  const st = await h.post(`/api/store/${slug}/verify/start`, { phone });
-  const ticket = (await h.post(`/api/store/${slug}/verify/check`, { phone, code: st.body.devCode })).body.ticket;
+  const st = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+  const ticket = (await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: st.body.devCode })).body.ticket;
   assert.ok(ticket, 'تیکتِ شمارهٔ تأییدشده');
   const ck = await h.post(`/api/store/${slug}/checkout`, {
     fulfillment: 'pickup', customer: { name: 'مشتری', phone }, lines: [{ productId: 'ad1', qtyMilli: 1000 }],

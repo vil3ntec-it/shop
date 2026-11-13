@@ -165,8 +165,9 @@ async function add(store, token, { key, body, ticket = '', session = '' }) {
   const input = parse(body);
   const hash = orders.hashOf(body);
   const orderId = await sf.orderIdOfLink(store, token);   // توکنِ نادرست/باطل ⇒ ۴۰۴
-  const phone = await sf.verifiedPhone(ticket, session);
-  if (!phone) throw new ApiError(401, 'verification_required', 'برای افزودن به سفارش، شمارهٔ خود را تأیید کنید');
+  const who = await sf.verification(ticket, session);
+  if (!who) throw new ApiError(401, 'verification_required', 'برای افزودن به سفارش، ایمیلِ خود را تأیید کنید');
+  const phone = who.email;   //  کلیدِ مشتری برای گروهِ تخفیف (PRM-11)
   //  پرچم‌ها و منبعِ کاتالوگ پیش از تراکنش (درونِ قفل فقط اتصالِ همان تراکنش)
   const [from, promosOn] = await Promise.all([
     sf.productFrom(shopId, { strict: true }),   //  S1: storefront-catalog از راهِ storefront
@@ -178,7 +179,7 @@ async function add(store, token, { key, body, ticket = '', session = '' }) {
   const out = await tx(async (c) => {
     const { row, lines, events } = await amend.lockOrder(c, shopId, orderId);
     if (row.source !== 'storefront' || row.is_test === true) throw notFound('سفارش پیدا نشد', 'order_not_found');
-    if (row.customer_phone !== phone) throw forbidden('این سفارش با شمارهٔ تأییدشدهٔ شما ثبت نشده است', 'not_your_order');
+    if (!sf.ownsOrder(row, who)) throw forbidden('این سفارش با ایمیلِ تأییدشدهٔ شما ثبت نشده است', 'not_your_order');
     for (const e of events) {
       const d = e.kind === 'note' ? asJson(e.detail) : {};
       if (d.type === EVENT_TYPE && d.key === key) {

@@ -25,6 +25,7 @@ const F = require('./image-fixtures');
 const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
 const sfd = require('../src/lib/storefront-delivery');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -88,9 +89,9 @@ const tickets = new Map();
 async function ticketFor(slug, phone) {
   const k = `${slug}|${phone}`;
   if (tickets.has(k)) return tickets.get(k);
-  const s = await h.post(`/api/store/${slug}/verify/start`, { phone });
+  const s = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
   assert.equal(s.status, 200, JSON.stringify(s.body));
-  const c = await h.post(`/api/store/${slug}/verify/check`, { phone, code: s.body.devCode });
+  const c = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: s.body.devCode });
   assert.equal(c.status, 200, JSON.stringify(c.body));
   tickets.set(k, c.body.ticket);
   return c.body.ticket;
@@ -564,8 +565,8 @@ test('⛔ بلیت و نشست: حساب فقط با بلیتِ چند دقیق�
   const PH = '+93795556677';
   const pickup = () => body({ fulfillment: 'pickup', address: undefined }, LOCAL);
   const fresh = async () => {
-    const a = await h.post(`/api/store/${s.slug}/verify/start`, { phone: LOCAL });
-    const c = await h.post(`/api/store/${s.slug}/verify/check`, { phone: LOCAL, code: a.body.devCode });
+    const a = await h.post(`/api/store/${s.slug}/verify/start`, { email: mailOf(LOCAL) });
+    const c = await h.post(`/api/store/${s.slug}/verify/check`, { email: mailOf(LOCAL), code: a.body.devCode });
     assert.equal(c.status, 200, JSON.stringify(c.body));
     return c.body.ticket;
   };

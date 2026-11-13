@@ -6,7 +6,8 @@
  *   پرچم ── `shop.chat` در «تنظیماتِ زنده» (scope = شناسهٔ دکان، یا `all`).
  *           ⛔ پیش‌فرض خاموش ⇒ همهٔ درها ۴۰۴ و هیچ ردیفی ساخته نمی‌شود.
  *   بیننده ─ `{ side: 'shop', shopId, userId, role }` (کارمند؛ shop_id فقط از
- *           عضویتِ توکن) یا `{ side: 'customer', shopId, phone, customerId? }` (مشتری؛ بلیتِ
+ *           عضویتِ توکن) یا `{ side: 'customer', shopId, phone, customerId? }` (مشتری؛ `phone` = کلیدِ مشتری:
+ *           ایمیلِ تأییدشده از «فقط ایمیل» ِ ۱۴۰۵/۰۸/۲۳ — نامِ فیلد برای سازگاری؛ بلیتِ
  *           ویترین، یا نشستِ حسابِ بازار — `shop-chat-account.js`). هر پرسش با همین دو قفل می‌شود:
  *           شناسهٔ گفت‌وگو/پیام/رسانهٔ دیگری ⇒ همان ۴۰۴ ِ «نیست» (CHAT-09).
  *   ارسال ─ با `clientId` ِ خودِ دستگاه، زیرِ قفلِ ردیفِ گفت‌وگو: تکرار ⇒ همان
@@ -189,7 +190,12 @@ function conversationView(viewer, r) {
   return {
     ...base,
     orderId: r.order_id || null,
-    customer: {
+    //  «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): کلیدِ گفت‌وگوی تازه ایمیلِ تأییدشده است ⇒ `email`/`emailMasked` (نه در جای شماره،
+    //  تا «تماس» به ایمیل زنگ نزند)؛ گفت‌وگوی کهنهٔ شماره‌ای همان `phone`/`phoneMasked`
+    customer: String(r.customer_phone || '').includes('@') ? {
+      name: r.customer_name || '', phoneMasked: '', emailMasked: maskPhone(r.customer_phone),
+      ...(contact ? { email: r.customer_phone } : {}),
+    } : {
       name: r.customer_name || '',
       phoneMasked: maskPhone(r.customer_phone),
       ...(contact ? { phone: r.customer_phone } : {}),
@@ -286,13 +292,14 @@ async function open(viewer, body) {
   let orderId = '';
   let name = '';
   if (viewer.side === 'customer') {
-    phone = viewer.phone;
+    phone = viewer.phone;   //  کلیدِ مشتری: ایمیلِ تأییدشده («فقط ایمیل»)
     name = shortText(b.name, 60);
     if (b.orderNo !== undefined && b.orderNo !== null && b.orderNo !== '') {
       const no = intIn(b.orderNo, { min: 1 });
       const o = await one(
-        'SELECT id FROM online_orders WHERE shop_id=$1 AND order_no=$2 AND customer_phone=$3',
-        [viewer.shopId, no, phone]
+        `SELECT id FROM online_orders WHERE shop_id=$1 AND order_no=$2
+            AND ${require('./storefront').OWNED_SQL('', '$3', '$4')}`,
+        [viewer.shopId, no, phone, viewer.customerId || '']
       );
       if (!o) throw notFound('این سفارش پیدا نشد', 'order_not_found');
       orderId = o.id;
@@ -300,10 +307,11 @@ async function open(viewer, body) {
   } else {
     const oid = str(b.orderId);
     if (!oid) throw badRequest('گفت‌وگوی دکان فقط از روی یک سفارش باز می‌شود', 'order_required');
-    const o = await one('SELECT id, customer_phone, customer_name FROM online_orders WHERE shop_id=$1 AND id=$2', [viewer.shopId, oid]);
+    const o = await one('SELECT id, customer_phone, customer_email, customer_name FROM online_orders WHERE shop_id=$1 AND id=$2', [viewer.shopId, oid]);
     if (!o) throw notFound('این سفارش پیدا نشد', 'order_not_found');
-    if (!o.customer_phone) throw badRequest('این سفارش شمارهٔ مشتری ندارد', 'no_customer_phone');
-    phone = o.customer_phone;
+    //  کلیدِ گفت‌وگو = هویتِ مشتری: ایمیلِ تأییدشدهٔ سفارشِ ویترین («فقط ایمیل»)، وگرنه شمارهٔ سفارشِ کهنه/دستی
+    if (!o.customer_email && !o.customer_phone) throw badRequest('این سفارش راهِ تماسی با مشتری ندارد', 'no_customer_phone');
+    phone = o.customer_email || o.customer_phone;
     orderId = o.id;
     name = shortText(o.customer_name, 60);
   }

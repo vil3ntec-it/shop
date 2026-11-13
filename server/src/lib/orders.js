@@ -468,15 +468,18 @@ async function create(shopId, { key, body, actor, price, notify, intakeKeys = []
          id, shop_id, order_no, client_key, request_hash, source, is_test, status, fulfillment,
          payment_method, payment_status, cod_status, customer_name, customer_phone, address, delivery,
          note, items_count, subtotal_minor, discount_minor, delivery_fee_minor, total_minor,
-         scheduled_for, created_by, created_at, updated_at, channel, platform_fee_minor, commission_minor, substitution)
+         scheduled_for, created_by, created_at, updated_at, channel, platform_fee_minor, commission_minor, substitution,
+         customer_email, store_customer_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,'new',$8,$9,'unpaid',$10,$11,$12,$13::jsonb,$14::jsonb,
-               $15,$16,$17,$18,$19,$20,$21,$22,$23,$23,$24,$25,$26,$27)`,
+               $15,$16,$17,$18,$19,$20,$21,$22,$23,$23,$24,$25,$26,$27,$28,$29)`,
       [id, shopId, no, key, hash, input.source, input.isTest, input.fulfillment,
         input.paymentMethod, input.paymentMethod === 'cod' ? 'to_collect' : '',
         input.customerName, input.customerPhone, JSON.stringify(input.address), JSON.stringify(input.delivery),
         input.note, input.itemsCount, input.subtotalMinor, input.discountMinor, input.deliveryFeeMinor,
         input.totalMinor, input.scheduledFor, actor.id || '', at,
-        channel, fees.platformFeeMinor, fees.commissionMinor, input.substitution || '']
+        channel, fees.platformFeeMinor, fees.commissionMinor, input.substitution || '',
+        //  «فقط ایمیل» (مهاجرتِ ۸۸۱): هویتِ مشتریِ ویترین — ایمیلِ تأییدشده و حسابش؛ سفارشِ کارمند '' و NULL
+        String(input.customerEmail || ''), input.storeCustomerId || null]
     );
     for (const l of input.lines) {
       await c.query(

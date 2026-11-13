@@ -16,6 +16,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -68,9 +69,9 @@ async function store(name) {
 
 async function ticketFor(s, phone) {
   resetAll();
-  const st = await h.post(`/api/store/${s.slug}/verify/start`, { phone });
+  const st = await h.post(`/api/store/${s.slug}/verify/start`, { email: mailOf(phone) });
   assert.equal(st.status, 200, JSON.stringify(st.body));
-  const c = await h.post(`/api/store/${s.slug}/verify/check`, { phone, code: st.body.devCode });
+  const c = await h.post(`/api/store/${s.slug}/verify/check`, { email: mailOf(phone), code: st.body.devCode });
   assert.equal(c.status, 200, JSON.stringify(c.body));
   return c.body.ticket;
 }

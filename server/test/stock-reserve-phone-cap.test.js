@@ -15,6 +15,7 @@ const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const syncV1 = require('../src/lib/sync-v1');
 const { resetAll } = require('../src/middleware/ratelimit');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 
@@ -81,8 +82,8 @@ async function storeShop(name, stock) {
 /** سفارشِ ویترین با شمارهٔ تأییدشده ⇒ شناسهٔ سفارش ([lines]: [کالا، عدد]) */
 async function customerOrder(s, phone, lines) {
   resetAll();
-  const st = await h.post(`/api/store/${s.slug}/verify/start`, { phone });
-  const ticket = (await h.post(`/api/store/${s.slug}/verify/check`, { phone, code: st.body.devCode })).body.ticket;
+  const st = await h.post(`/api/store/${s.slug}/verify/start`, { email: mailOf(phone) });
+  const ticket = (await h.post(`/api/store/${s.slug}/verify/check`, { email: mailOf(phone), code: st.body.devCode })).body.ticket;
   assert.ok(ticket, 'تیکتِ شمارهٔ تأییدشده');
   const ck = await h.post(`/api/store/${s.slug}/checkout`, {
     fulfillment: 'pickup', customer: { name: 'مشتری', phone }, lines: lines.map(([productId, n]) => ({ productId, qtyMilli: n * 1000 })),
@@ -146,8 +147,8 @@ test('نگه‌داشتهٔ گذشته یا آزادشده نمی‌شمارد؛
 /** CHK-21: افزودنِ قلم از ویترین به همان سفارش ⇒ همان شماره، همان سقف (پیش‌تر فقط سقفِ هر سفارش) */
 async function addItems(s, phone, orderId, lines) {
   resetAll();
-  const st = await h.post(`/api/store/${s.slug}/verify/start`, { phone });
-  const ticket = (await h.post(`/api/store/${s.slug}/verify/check`, { phone, code: st.body.devCode })).body.ticket;
+  const st = await h.post(`/api/store/${s.slug}/verify/start`, { email: mailOf(phone) });
+  const ticket = (await h.post(`/api/store/${s.slug}/verify/check`, { email: mailOf(phone), code: st.body.devCode })).body.ticket;
   return h.post(`/api/store/${s.slug}/orders/${links.get(orderId)}/items`, { lines: lines.map(([productId, n]) => ({ productId, qtyMilli: n * 1000 })) },
     { headers: { 'Idempotency-Key': fresh(), 'X-Store-Ticket': ticket } });
 }

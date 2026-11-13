@@ -23,6 +23,7 @@ const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
 const path = require('node:path');
 const V = require(path.join(__dirname, '..', '..', 'core', 'test-vectors', 'account-cart-v1.json'));
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -80,9 +81,9 @@ async function liveStore(label, { cart = true, products = THREE } = {}) {
 
 /** نشستِ تازهٔ حسابِ این شماره — هر بار یک «دستگاهِ» دیگر. */
 async function session(slug, phone) {
-  const s = await h.post(`/api/store/${slug}/verify/start`, { phone });
+  const s = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
   assert.equal(s.status, 200, JSON.stringify(s.body));
-  const c = await h.post(`/api/store/${slug}/verify/check`, { phone, code: s.body.devCode });
+  const c = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: s.body.devCode });
   assert.equal(c.status, 200, JSON.stringify(c.body));
   const a = await h.post(`/api/store/${slug}/account`, {}, { headers: { 'X-Store-Ticket': c.body.ticket } });
   assert.equal(a.status, 201, JSON.stringify(a.body));

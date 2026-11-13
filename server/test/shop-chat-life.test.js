@@ -19,6 +19,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const chat = require('../src/lib/shop-chat');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const DAY = 24 * 3600 * 1000;
 const base = '/api/shop/chat';
@@ -309,9 +310,9 @@ test('درِ مشتری: POST /api/store/:slug/chat/conversations/:id/issue با
   const put = await h.put('/api/shop/storefront', { slug, enabled: true, title: 'ویترینِ چت', contactPhone: '0700000001' }, { token: s.token });
   assert.equal(put.status, 200, JSON.stringify(put.body));
   const phone = '0791110061';
-  const start = await h.post(`/api/store/${slug}/verify/start`, { phone });
+  const start = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
   assert.equal(start.status, 200, JSON.stringify(start.body));
-  const check = await h.post(`/api/store/${slug}/verify/check`, { phone, code: start.body.devCode });
+  const check = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: start.body.devCode });
   const ticket = check.body.ticket;
   assert.ok(ticket, JSON.stringify(check.body));
   const o = await order(s, phone);

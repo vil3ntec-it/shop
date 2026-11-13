@@ -37,6 +37,9 @@ const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 /** همان `ContactMask.phone` ِ برنامه: هر رقم (یونیکد، واحدِ UTF-16 مثلِ `Char.isDigit`) جز [keep] رقمِ آخر ⇐ «•» */
 function maskPhone(text, keep = 2) {
   const s = String(text ?? '');
+  //  «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): کلیدِ مشتری ممکن است ایمیلِ تأییدشده باشد ⇒ بخشِ پیش از @ جز نویسهٔ نخست پوشیده
+  const at = s.indexOf('@');
+  if (at > 0) return s[0] + DOT.repeat(Math.max(1, at - 1)) + s.slice(at);
   let digits = 0;
   for (let i = 0; i < s.length; i++) if (ND.test(s[i])) digits++;
   let seen = 0;

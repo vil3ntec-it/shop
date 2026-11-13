@@ -24,6 +24,7 @@ const { one, many, query, newId, now } = require('../src/db');
 const push = require('../src/lib/push');
 const N = require('../src/lib/order-notify');
 const P = require('../src/lib/payment-providers');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 /* ── سرورِ ساختگیِ گوگل: توکنِ OAuth و messages:send ──────────────────────── */
 const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
@@ -265,8 +266,8 @@ async function liveShop(label) {
 }
 
 async function customerOrder(s, phone = '0791230007') {
-  const v = await h.post(`/api/store/${s.slug}/verify/start`, { phone });
-  const c = await h.post(`/api/store/${s.slug}/verify/check`, { phone, code: v.body.devCode });
+  const v = await h.post(`/api/store/${s.slug}/verify/start`, { email: mailOf(phone) });
+  const c = await h.post(`/api/store/${s.slug}/verify/check`, { email: mailOf(phone), code: v.body.devCode });
   const ck = await h.post(`/api/store/${s.slug}/checkout`, {
     fulfillment: 'pickup', customer: { name: 'گل‌احمدِ مشتری', phone }, lines: [{ productId: 'rice', qtyMilli: 2000 }],
   }, { headers: { 'Idempotency-Key': `ck-${uniq()}-key`, 'X-Store-Ticket': c.body.ticket } });

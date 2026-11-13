@@ -33,19 +33,19 @@ const gate = async (req, res, next) => {
 };
 
 const verified = async (req, res, next) => {
-  const phone = await sf.verifiedPhone(req.get('x-store-ticket') || '', req.get('x-store-session') || '');
-  if (!phone) throw new ApiError(401, 'verification_required', 'برای دیدنِ حساب، شمارهٔ خود را تأیید کنید');
-  req.customerPhone = phone;
+  const who = await sf.verification(req.get('x-store-ticket') || '', req.get('x-store-session') || '');
+  if (!who) throw new ApiError(401, 'verification_required', 'برای دیدنِ حساب، ایمیلِ خود را تأیید کنید');
+  req.who = who;
   next();
 };
 
 router.get('/:slug/account/history', gate, readLimit, views.gate, verified, async (req, res) => {
-  res.json(await H.summary(req.store, req.customerPhone));
+  res.json(await H.summary(req.store, req.who));
 });
 
 router.get('/:slug/account/history/:part', gate, readLimit, views.gate, verified, async (req, res) => {
   if (!H.PARTS.includes(req.params.part)) throw notFound('این بخش نیست', 'not_found');
-  res.json(await H.part(req.store, req.customerPhone, req.params.part, { cursor: req.query.cursor, limit: req.query.limit }));
+  res.json(await H.part(req.store, req.who, req.params.part, { cursor: req.query.cursor, limit: req.query.limit }));
 });
 
 module.exports = router;

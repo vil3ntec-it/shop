@@ -27,6 +27,7 @@ const { resetAll } = require('../src/middleware/ratelimit');
 const V = require('../src/lib/public-views');
 const sf = require('../src/lib/storefront');
 const refundView = require('../src/lib/order-refund-view');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const VECTORS = path.join(__dirname, '..', '..', 'core', 'test-vectors');
 const FILE = path.join(VECTORS, `market-public-v${V.SCHEMA_VERSION}.json`);
@@ -230,8 +231,8 @@ async function realResponses(defaults) {
   }, { token })).status, 200);
 
   const phone = '0791112233';
-  const vs = await h.post('/api/market/verify/start', { phone });
-  const vc = await h.post('/api/market/verify/check', { phone, code: vs.body.devCode });
+  const vs = await h.post('/api/market/verify/start', { email: mailOf(phone) });
+  const vc = await h.post('/api/market/verify/check', { email: mailOf(phone), code: vs.body.devCode });
   assert.equal(vc.status, 200, JSON.stringify(vc.body));
   const ticket = vc.body.ticket;
   const placed = await h.post(`/api/store/${slug}/checkout`, {
@@ -348,8 +349,8 @@ test('v2: پیگیری با بازپرداخت و رسید ⇒ شکلِ دقیق
   assert.equal(pushed.status, 200, JSON.stringify(pushed.body));
   assert.equal((await h.put('/api/shop/storefront/products/rice', { published: true }, { token })).status, 200);
   const phone = '0791112244';
-  const st = await h.post(`/api/store/${slug}/verify/start`, { phone });
-  const ck = await h.post(`/api/store/${slug}/verify/check`, { phone, code: st.body.devCode });
+  const st = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+  const ck = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: st.body.devCode });
   const placed = await h.post(`/api/store/${slug}/checkout`, {
     fulfillment: 'pickup', customer: { name: 'مشتری', phone }, lines: [{ productId: 'rice', qtyMilli: 5000 }],
   }, { headers: { 'Idempotency-Key': `pvr-${uniq()}-key`, 'X-Store-Ticket': ck.body.ticket } });

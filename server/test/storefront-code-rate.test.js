@@ -21,6 +21,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -61,7 +62,7 @@ async function liveStore(label) {
   return { shopId, slug };
 }
 
-const start = (slug, phone, ip) => h.post(`/api/store/${slug}/verify/start`, { phone },
+const start = (slug, phone, ip) => h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) },
   { headers: { 'X-Forwarded-For': ip } });
 const codes = async (dest) => (await one(
   'SELECT COUNT(*)::int AS n FROM otp_codes WHERE destination = $1', [dest]

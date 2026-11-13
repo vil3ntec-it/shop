@@ -16,6 +16,7 @@ const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const chat = require('../src/lib/shop-chat');
 const crypto = require('node:crypto');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -146,9 +147,9 @@ test('S118.customer: درِ مشتری (/api/store/:slug/chat) با بلیتِ �
   const slug = `s118-${Date.now().toString(36)}`;
   const put = await h.put('/api/shop/storefront', { slug, enabled: true, title: 'ویترینِ S118', contactPhone: '0700000118' }, { token: o.token });
   assert.equal(put.status, 200, JSON.stringify(put.body));
-  const start = await h.post(`/api/store/${slug}/verify/start`, { phone: '0790001182' });
+  const start = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf('0790001182') });
   assert.equal(start.status, 200, JSON.stringify(start.body));
-  const check = await h.post(`/api/store/${slug}/verify/check`, { phone: '0790001182', code: start.body.devCode });
+  const check = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf('0790001182'), code: start.body.devCode });
   assert.equal(check.status, 200, JSON.stringify(check.body));
   const ticket = check.body.ticket;
   const phone = sf.parseTicket(ticket).phone;

@@ -21,6 +21,7 @@ const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
 const timeout = require('../src/lib/order-timeout');
 const STALE = require('../src/config').storefront.staleMs;
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 const sfRow = (shopId) => one('SELECT * FROM storefronts WHERE shop_id=$1', [shopId]);
 const seenAt = (shopId, t) => query(
   `UPDATE sync_devices SET last_seen_at=$2 WHERE app='shop' AND account_kind='shop' AND account_id=$1`, [shopId, t]);
@@ -74,8 +75,8 @@ async function liveStore(label) {
 }
 
 async function ticketFor(slug, phone) {
-  const s = await h.post(`/api/store/${slug}/verify/start`, { phone });
-  const c = await h.post(`/api/store/${slug}/verify/check`, { phone, code: s.body.devCode });
+  const s = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+  const c = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: s.body.devCode });
   assert.equal(c.status, 200, JSON.stringify(c.body));
   return c.body.ticket;
 }

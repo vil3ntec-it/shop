@@ -24,6 +24,7 @@ const { resetAll } = require('../src/middleware/ratelimit');
 
 let admin = '';
 const lib = () => require('../src/lib/stock-reserve');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 test.before(async () => {
   await h.start();
@@ -95,8 +96,8 @@ async function storeShop(name, pid, units) {
 /** مشتریِ ویترین با شمارهٔ تأییدشده: سفارشِ [qty] عدد ⇒ { id, token, ticket } */
 async function customerOrder(s, phone, pid, qty) {
   resetAll();
-  const st = await h.post(`/api/store/${s.slug}/verify/start`, { phone });
-  const ticket = (await h.post(`/api/store/${s.slug}/verify/check`, { phone, code: st.body.devCode })).body.ticket;
+  const st = await h.post(`/api/store/${s.slug}/verify/start`, { email: mailOf(phone) });
+  const ticket = (await h.post(`/api/store/${s.slug}/verify/check`, { email: mailOf(phone), code: st.body.devCode })).body.ticket;
   assert.ok(ticket, 'تیکتِ شمارهٔ تأییدشده');
   const ck = await h.post(`/api/store/${s.slug}/checkout`, {
     fulfillment: 'pickup', customer: { name: 'مشتری', phone }, lines: [{ productId: pid, qtyMilli: qty * 1000 }],

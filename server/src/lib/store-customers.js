@@ -1,14 +1,17 @@
 'use strict';
 /**
  * حسابِ مشتریِ ویترین (فاز ۴؛ ۲۳.۲–۲۳.۵، CHK-01/02/09، S134/S138/S140).
- * شرحِ جدول‌ها: ‎migrations/112_store_customers.sql‎.
+ * شرحِ جدول‌ها: ‎migrations/112_store_customers.sql‎ و ‎881_store_email_identity.sql‎.
  *
- *   ساختن/ورود ── فقط با بلیتِ تازهٔ «شماره تأیید شد» (کدِ یک‌بارمصرفِ ۲۳).
- *                 همان شماره ⇒ همان حساب؛ هیچ گذرواژه‌ای نیست.
+ *   ساختن/ورود ── فقط با بلیتِ تازهٔ «ایمیل تأیید شد» (کدِ یک‌بارمصرفِ ۲۳ به ایمیل؛ «فقط ایمیل»، ۱۴۰۵/۰۸/۲۳).
+ *                 همان ایمیل ⇒ همان حساب؛ هیچ گذرواژه‌ای نیست. سفارش‌های مهمانِ همان ایمیل به حساب گره می‌خورند.
+ *   شماره ────── فقط «شمارهٔ تماس برای پیک»: بی کد، فقط شکل (`validate.phone`)، نه یکتا (`setContactPhone`).
  *   نشست ─────── `sc1.<۴۳ نویسهٔ base64url>` (۲۵۶ بیت)؛ در سرور فقط SHA-256.
  *                 انقضای مطلق (`STORE_CUSTOMER_SESSION_DAYS`، پیش‌فرض ۱۸۰ روز)،
- *                 لغو با «خروج»، «خروج از همه‌جا» یا پاک کردنِ حساب؛ حسابِ مسدود ⇒
- *                 نشستی کار نمی‌کند. دو تای آخر نسلِ بلیت‌های شماره را هم بالا می‌برند.
+ *                 لغو با «خروج»، «خروج از همه‌جا»، تغییرِ ایمیل یا پاک کردنِ حساب؛ حسابِ مسدود ⇒
+ *                 نشستی کار نمی‌کند. «خروج از همه‌جا»، تغییرِ ایمیل و پاک کردن نسلِ بلیت‌های ایمیل را هم بالا می‌برند.
+ *   حسابِ کهنه ─ فقط‌شماره (پیش از ۸۸۱، email NULL): داده می‌ماند؛ نشستِ زنده‌اش با کدِ ایمیلِ تازه یک بار ایمیل را
+ *                 وصل می‌کند (`changeEmail`) و سفارش‌های ویترینیِ همان شمارهٔ تأییدشدهٔ پیشین به حساب می‌آیند.
  *   نشانی ────── حداکثر ۱۰ نشانیِ نام‌دار؛ هر خواندن و نوشتن به شناسهٔ همین
  *                 مشتری بسته است (شناسهٔ نشانیِ دیگری ⇒ «پیدا نشد»).
  *
@@ -20,7 +23,7 @@ const db = require('../db');
 const { one, many, now, tx } = db;
 const config = require('../config');
 const { ulid } = require('./ulid');
-const { stripControl, phoneForms, phoneKey: samePhoneKey } = require('./validate');
+const { stripControl, phoneForms } = require('./validate');
 const { badRequest, notFound, conflict, forbidden, ApiError } = require('../middleware/errors');
 
 const MAX_ADDRESSES = 10;
@@ -35,45 +38,82 @@ const hashOf = (token) => crypto.createHash('sha256').update(`store-customer\n${
 const sessionMs = () => Math.max(1, Number(config.storefront.customerSessionDays) || 180) * 24 * 60 * 60 * 1000;
 
 function view(c) {
-  return { id: c.id, phone: c.phone, name: c.name, createdAt: Number(c.created_at) };
+  return { id: c.id, email: c.email || null, phone: c.phone || null, name: c.name, createdAt: Number(c.created_at) };
+}
+
+const EMAIL_RE = /^[^\s@A-Z]+@[^\s@A-Z]+$/;
+const assertEmail = (email) => {
+  if (!EMAIL_RE.test(String(email || '')) || String(email).length > 190) throw badRequest('ایمیل معتبر نیست', 'bad_email');
+};
+
+/** حسابِ همین ایمیل — یا null. */
+async function byEmail(email, run = db.query) {
+  return (await run('SELECT * FROM store_customers WHERE email = $1', [String(email || '')])).rows[0] || null;
 }
 
 /**
- * ورود یا ساختنِ حساب برای شمارهٔ تأییدشده ⇒ نشستِ تازه. نامِ آمده فقط وقتی
+ * سفارش‌های ویترینیِ بی‌حساب به حساب گره می‌خورند (فقط پیوند؛ سندِ دکان دست نمی‌خورد): همان ایمیل، و برای وصلِ
+ * حسابِ کهنهٔ فقط‌شماره، سفارش‌های همان شمارهٔ تأییدشدهٔ پیشین (هر شکلِ آن، `phoneForms`) که ایمیل نداشتند.
+ */
+async function adoptOrders(c, customerId, { email = '', legacyPhone = '' } = {}) {
+  let n = 0;
+  if (email) {
+    n += (await c.query(
+      `UPDATE online_orders SET store_customer_id = $1
+        WHERE source = 'storefront' AND customer_email = $2 AND store_customer_id IS NULL`, [customerId, email]
+    )).rowCount;
+  }
+  if (legacyPhone) {
+    n += (await c.query(
+      `UPDATE online_orders SET store_customer_id = $1
+        WHERE source = 'storefront' AND customer_email = '' AND store_customer_id IS NULL AND customer_phone = ANY($2::text[])`,
+      [customerId, phoneForms(legacyPhone)]
+    )).rowCount;
+  }
+  return n;
+}
+
+/**
+ * ورود یا ساختنِ حساب برای ایمیلِ تأییدشده ⇒ نشستِ تازه. نامِ آمده فقط وقتی
  * نشانده می‌شود که حساب هنوز نام ندارد (ورودِ دوباره نامِ قبلی را عوض نمی‌کند).
  */
-async function signIn(phone, { name } = {}) {
-  if (!/^\+[1-9]\d{7,14}$/.test(String(phone || ''))) throw badRequest('شماره معتبر نیست', 'bad_phone');
+async function signIn(email, { name } = {}) {
+  assertEmail(email);
   const nm = text(name, 80);
   const token = `sc1.${crypto.randomBytes(32).toString('base64url')}`;
   return tx(async (c) => {
     const at = now();
     const cust = (await c.query(
-      `INSERT INTO store_customers (id, phone, name, created_at, updated_at) VALUES ($1,$2,$3,$4,$4)
-       ON CONFLICT (phone) DO UPDATE SET
+      `INSERT INTO store_customers (id, email, name, created_at, updated_at) VALUES ($1,$2,$3,$4,$4)
+       ON CONFLICT (email) WHERE email IS NOT NULL DO UPDATE SET
          name = CASE WHEN store_customers.name = '' THEN EXCLUDED.name ELSE store_customers.name END,
          updated_at = EXCLUDED.updated_at
        RETURNING *`,
-      [ulid(at), phone, nm, at]
+      [ulid(at), email, nm, at]
     )).rows[0];
     if (cust.status !== 'active') throw forbidden('این حساب مسدود است؛ با دکان تماس بگیرید', 'customer_blocked');
-    //  نشست‌های کهنه پاک و بیش از سقف، قدیمی‌ترین لغو
-    await c.query('DELETE FROM store_customer_sessions WHERE customer_id = $1 AND (expires_at <= $2 OR revoked_at IS NOT NULL)',
-      [cust.id, at]);
-    await c.query(
-      `UPDATE store_customer_sessions SET revoked_at = $2 WHERE id IN (
-         SELECT id FROM store_customer_sessions WHERE customer_id = $1 AND revoked_at IS NULL
-          ORDER BY created_at DESC, id DESC OFFSET $3)`,
-      [cust.id, at, MAX_SESSIONS - 1]
-    );
-    const expiresAt = at + sessionMs();
-    await c.query(
-      `INSERT INTO store_customer_sessions (id, customer_id, token_hash, created_at, last_used_at, expires_at)
-       VALUES ($1,$2,$3,$4,$4,$5)`,
-      [ulid(at), cust.id, hashOf(token), at, expiresAt]
-    );
-    return { token, expiresAt, customer: view(cust) };
+    await adoptOrders(c, cust.id, { email });
+    return { ...(await openSession(c, cust.id, token, at)), customer: view(cust) };
   });
+}
+
+/** نشستِ تازه برای حساب (درونِ تراکنش): کهنه‌ها پاک و بیش از سقف، قدیمی‌ترین لغو. */
+async function openSession(c, customerId, token, at) {
+  await c.query('DELETE FROM store_customer_sessions WHERE customer_id = $1 AND (expires_at <= $2 OR revoked_at IS NOT NULL)',
+    [customerId, at]);
+  await c.query(
+    `UPDATE store_customer_sessions SET revoked_at = $2 WHERE id IN (
+       SELECT id FROM store_customer_sessions WHERE customer_id = $1 AND revoked_at IS NULL
+        ORDER BY created_at DESC, id DESC OFFSET $3)`,
+    [customerId, at, MAX_SESSIONS - 1]
+  );
+  const expiresAt = at + sessionMs();
+  await c.query(
+    `INSERT INTO store_customer_sessions (id, customer_id, token_hash, created_at, last_used_at, expires_at)
+     VALUES ($1,$2,$3,$4,$4,$5)`,
+    [ulid(at), customerId, hashOf(token), at, expiresAt]
+  );
+  return { token, expiresAt };
 }
 
 /** مشتریِ این نشست — یا null (بی‌شکل، ناشناخته، منقضی، لغوشده یا مسدود). */
@@ -107,37 +147,40 @@ async function rename(customer, body) {
   return view(r);
 }
 
-// ── نسلِ بلیت‌های شماره (store_phone_revocations) ──────────────────
+// ── نسلِ بلیت‌های ایمیل (store_phone_revocations) ──────────────────
+//  همان جدولِ نسلِ شماره‌های پیشین با دامنهٔ HMAC ِ جدا (`email\n…`)؛ کلید HMAC است، نه خودِ ایمیل — پس از پاک کردنِ
+//  حساب ایمیلِ خام نمی‌ماند.
 
-function phoneKey(phone) {
+function identityKey(email) {
   const secret = config.secrets.api || config.secrets.jwt;
   if (!secret) throw new ApiError(503, 'storefront_unavailable', 'ویترین هنوز روی این سرور آماده نیست');
   const key = crypto.createHash('sha256').update(`store-phone-revocation\n${secret}`).digest();
-  return crypto.createHmac('sha256', key).update(String(phone)).digest('hex');
+  return crypto.createHmac('sha256', key).update(`email\n${String(email)}`).digest('hex');
 }
 
-/** نسلِ کنونیِ بلیت‌های این شماره (۰ = هرگز لغو نشده). */
-async function ticketGen(phone, run = db.query) {
-  const r = (await run('SELECT gen FROM store_phone_revocations WHERE phone_key = $1', [phoneKey(phone)])).rows[0];
+/** نسلِ کنونیِ بلیت‌های این ایمیل (۰ = هرگز لغو نشده). */
+async function ticketGen(email, run = db.query) {
+  const r = (await run('SELECT gen FROM store_phone_revocations WHERE phone_key = $1', [identityKey(email)])).rows[0];
   return r ? Number(r.gen) : 0;
 }
 
-/** همهٔ بلیت‌های پیشینِ این شماره بی‌اعتبار ⇒ نسلِ تازه. */
-async function revokeTickets(phone, run = db.query) {
+/** همهٔ بلیت‌های پیشینِ این ایمیل بی‌اعتبار ⇒ نسلِ تازه. */
+async function revokeTickets(email, run = db.query) {
+  if (!email) return 0;
   const r = (await run(
     `INSERT INTO store_phone_revocations (phone_key, gen, updated_at) VALUES ($1, 1, $2)
      ON CONFLICT (phone_key) DO UPDATE SET gen = store_phone_revocations.gen + 1, updated_at = EXCLUDED.updated_at
      RETURNING gen`,
-    [phoneKey(phone), now()]
+    [identityKey(email), now()]
   )).rows[0];
   return Number(r.gen);
 }
 
-/** «خروج از همه‌جا»: همهٔ نشست‌های این حساب و همهٔ بلیت‌های این شماره. */
+/** «خروج از همه‌جا»: همهٔ نشست‌های این حساب و همهٔ بلیت‌های ایمیلش. */
 async function signOutAll(customer) {
   return tx(async (c) => {
     const run = (sql, params) => c.query(sql, params);
-    await revokeTickets(customer.phone, run);
+    await revokeTickets(customer.email, run);
     const r = await c.query(
       'UPDATE store_customer_sessions SET revoked_at = $2 WHERE customer_id = $1 AND revoked_at IS NULL RETURNING id',
       [customer.id, now()]
@@ -147,53 +190,78 @@ async function signOutAll(customer) {
 }
 
 /**
- * تغییرِ شماره (S9، §۲۳.۴ و §۲۹.۲ بندِ ۱۰): دو اثبات — نشستِ همین حساب (شمارهٔ
- * پیشین) و بلیتِ تازهٔ شمارهٔ نو (`phone` از همان). در یک تراکنش:
- *   گفت‌وگوهای شمارهٔ پیشین به همین حساب گره می‌خورند (`shop-chat.adoptForPhoneChange`)،
- *   بلیت‌های شمارهٔ پیشین بی‌اعتبار و نشست‌های دیگرِ حساب لغو می‌شوند؛ همین نشست می‌ماند.
- * شمارهٔ نو با حسابِ دیگر ⇒ ۴۰۹ (درخواست‌کننده مالکیتِ آن شماره را همین حالا اثبات کرده) — هر شکلِ همان شماره
- * (‎+93…‎ / ‎+930…‎، `validate.phoneForms`)، تا یک شماره دو حساب نشود.
- * ⛔ سفارش‌ها سندِ دکان‌اند و شماره‌شان عوض نمی‌شود.
+ * شمارهٔ تماس برای پیک (§۲۳.۴ ⇐ «فقط ایمیل»): فقط نشستِ همین حساب؛ بی کد، فقط شکل؛ "" ⇒ پاک (فقط حسابِ ایمیل‌دار).
+ * ⛔ نه هویت و نه یکتا: نه «گرفته شده» دارد و نه بلیت/نشستی را باطل می‌کند. سفارش‌ها دست نمی‌خورند.
  */
-async function changePhone(customer, sessionId, phone) {
-  if (!/^\+[1-9]\d{7,14}$/.test(String(phone || ''))) throw badRequest('شماره معتبر نیست', 'bad_phone');
+async function setContactPhone(customer, raw) {
+  const phone = String(raw ?? '').trim() ? require('./validate').phone(raw, { required: true }) : null;
   return tx(async (c) => {
     const cur = (await c.query('SELECT * FROM store_customers WHERE id = $1 FOR UPDATE', [customer.id])).rows[0];
     if (!cur || cur.status !== 'active') throw forbidden('این حساب مسدود است؛ با دکان تماس بگیرید', 'customer_blocked');
-    if (samePhoneKey(cur.phone) === samePhoneKey(phone)) throw badRequest('این همان شمارهٔ کنونیِ حساب است', 'same_phone');
-    if ((await c.query('SELECT 1 FROM store_customers WHERE phone = ANY($1::text[]) AND id <> $2',
-      [phoneForms(phone), cur.id])).rows[0]) {
-      throw conflict('این شماره حسابِ دیگری دارد', 'phone_taken');
-    }
-    const at = now();
-    const adopted = await require('./shop-chat').adoptForPhoneChange(c, cur.id, cur.phone, phone);
-    let up;
-    try {
-      up = (await c.query('UPDATE store_customers SET phone = $2, updated_at = $3 WHERE id = $1 RETURNING *',
-        [cur.id, phone, at])).rows[0];
-    } catch (err) {
-      if (err && err.code === '23505') throw conflict('این شماره حسابِ دیگری دارد', 'phone_taken');
-      throw err;
-    }
-    await revokeTickets(cur.phone, (sql, params) => c.query(sql, params));
-    const r = await c.query(
-      'UPDATE store_customer_sessions SET revoked_at = $3 WHERE customer_id = $1 AND id <> $2 AND revoked_at IS NULL RETURNING id',
-      [cur.id, String(sessionId || ''), at]
-    );
-    return { customer: view(up), previousPhone: cur.phone, conversations: adopted, sessionsRevoked: r.rows.length };
+    if (!phone && !cur.email) throw badRequest('پیش از پاک کردنِ شماره، ایمیل را وصل کنید', 'email_first');
+    if ((cur.phone || null) === phone) return { customer: view(cur), unchanged: true };
+    const up = (await c.query('UPDATE store_customers SET phone = $2, updated_at = $3 WHERE id = $1 RETURNING *',
+      [cur.id, phone, now()])).rows[0];
+    return { customer: view(up), unchanged: false };
   });
 }
 
 /**
- * پاک کردنِ حساب: نشست‌ها و نشانی‌ها هم (cascade)، همهٔ بلیت‌های این شماره و اشتراک‌های پوشِ «خبرم کن» ِ همین
- * شماره در همهٔ دکان‌ها (مهاجرتِ ۴۷۵)؛ سفارش‌ها سندِ دکان‌اند و می‌مانند.
+ * تغییرِ ایمیلِ حساب — یا وصلِ نخستینِ ایمیل به حسابِ کهنهٔ فقط‌شماره (S9، §۲۳.۴ و §۲۹.۲ بندِ ۱۰، «فقط ایمیل»):
+ * دو اثبات — نشستِ همین حساب و بلیتِ تازهٔ ایمیلِ نو (`email` از همان). در یک تراکنش:
+ *   سفارش‌های بی‌حسابِ ایمیلِ نو (و برای حسابِ کهنه، سفارش‌های همان شمارهٔ تأییدشدهٔ پیشین) به حساب گره می‌خورند؛
+ *   سفارش‌های ایمیلِ پیشین با `store_customer_id` در «سفارش‌های من» می‌مانند؛ گفت‌وگوهای کلیدِ پیشین به همین حساب
+ *   گره می‌خورند (`shop-chat.adoptForPhoneChange`)، بلیت‌های ایمیلِ پیشین بی‌اعتبار و نشست‌های دیگرِ حساب لغو
+ *   می‌شوند؛ همین نشست می‌ماند.
+ * ایمیلِ نو با حسابِ دیگر ⇒ ۴۰۹ (درخواست‌کننده مالکیتِ آن ایمیل را همین حالا اثبات کرده).
+ * ⛔ سفارش‌ها سندِ دکان‌اند: فقط پیوندِ حساب (`store_customer_id`) نوشته می‌شود، نه ایمیل/شمارهٔ سفارش.
+ */
+async function changeEmail(customer, sessionId, email) {
+  assertEmail(email);
+  return tx(async (c) => {
+    const cur = (await c.query('SELECT * FROM store_customers WHERE id = $1 FOR UPDATE', [customer.id])).rows[0];
+    if (!cur || cur.status !== 'active') throw forbidden('این حساب مسدود است؛ با دکان تماس بگیرید', 'customer_blocked');
+    if (cur.email === email) throw badRequest('این همان ایمیلِ کنونیِ حساب است', 'same_email');
+    if ((await c.query('SELECT 1 FROM store_customers WHERE email = $1 AND id <> $2', [email, cur.id])).rows[0]) {
+      throw conflict('این ایمیل حسابِ دیگری دارد', 'email_taken');
+    }
+    const at = now();
+    const legacy = !cur.email;
+    const previousKey = cur.email || cur.phone;
+    const adopted = previousKey ? await require('./shop-chat').adoptForPhoneChange(c, cur.id, previousKey, email) : 0;
+    //  سفارش‌های کلیدِ پیشین که هنوز حساب نداشتند (ایمیلِ پیشین؛ یا شمارهٔ تأییدشدهٔ حسابِ کهنه) + ایمیلِ نو
+    if (cur.email) await adoptOrders(c, cur.id, { email: cur.email });
+    const orders = await adoptOrders(c, cur.id, { email, legacyPhone: legacy ? cur.phone : '' });
+    let up;
+    try {
+      up = (await c.query('UPDATE store_customers SET email = $2, updated_at = $3 WHERE id = $1 RETURNING *',
+        [cur.id, email, at])).rows[0];
+    } catch (err) {
+      if (err && err.code === '23505') throw conflict('این ایمیل حسابِ دیگری دارد', 'email_taken');
+      throw err;
+    }
+    await revokeTickets(cur.email, (sql, params) => c.query(sql, params));
+    const r = await c.query(
+      'UPDATE store_customer_sessions SET revoked_at = $3 WHERE customer_id = $1 AND id <> $2 AND revoked_at IS NULL RETURNING id',
+      [cur.id, String(sessionId || ''), at]
+    );
+    return {
+      customer: view(up), previousEmail: cur.email || null, linked: legacy, orders, conversations: adopted, sessionsRevoked: r.rows.length,
+    };
+  });
+}
+
+/**
+ * پاک کردنِ حساب: نشست‌ها و نشانی‌ها هم (cascade)، همهٔ بلیت‌های ایمیلش و اشتراک‌های پوشِ «خبرم کن» ِ کلیدِ همین
+ * حساب (ایمیل؛ و شمارهٔ تأییدشدهٔ حسابِ کهنه) در همهٔ دکان‌ها (مهاجرتِ ۴۷۵)؛ سفارش‌ها سندِ دکان‌اند و می‌مانند.
  */
 async function remove(customer) {
   const addrMedia = require('./store-address-media');
   let gone = [];
   const out = await tx(async (c) => {
-    await revokeTickets(customer.phone, (sql, params) => c.query(sql, params));
-    await c.query('DELETE FROM store_alert_push WHERE phone = $1', [customer.phone]);
+    await revokeTickets(customer.email, (sql, params) => c.query(sql, params));
+    await c.query('DELETE FROM store_alert_push WHERE phone = ANY($1::text[])',
+      [[customer.email, customer.email ? '' : customer.phone].filter(Boolean)]);
     //  CRM-09: عکسِ دروازه و یادداشتِ صوتیِ نشانی‌ها — شیءِ انبار هم، پس از commit
     gone = await addrMedia.detach(c, customer.id);
     await c.query('DELETE FROM store_customers WHERE id = $1', [customer.id]);
@@ -303,5 +371,6 @@ async function removeAddress(customer, id) {
 
 module.exports = {
   MAX_ADDRESSES, MAX_SESSIONS, TOKEN_RE,
-  view, signIn, auth, signOut, signOutAll, rename, changePhone, remove, ticketGen, revokeTickets, addresses, addAddress, updateAddress, removeAddress,
+  view, byEmail, adoptOrders, signIn, auth, signOut, signOutAll, rename, setContactPhone, changeEmail, remove, ticketGen, revokeTickets,
+  addresses, addAddress, updateAddress, removeAddress,
 };

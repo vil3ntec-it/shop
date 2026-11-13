@@ -9,7 +9,8 @@
  * ⛔ سقفِ درخواست: خواندن سطلِ خودش را با `generalMax` دارد (مثلِ کیو‌آرِ
  * پمپ)، ثبتِ سفارش و فرستادنِ کد `storeCheckoutMax`، زدنِ کد `verifyMax` —
  * همه به‌ازای IP، مثلِ بقیهٔ مسیرهای عمومی. ثبتِ سفارش افزون بر آن سقفِ
- * شمارهٔ تأییدشده را هم دارد (RSK-07، `lib/order-rate`).
+ * مشتریِ تأییدشده (ایمیل) را هم دارد (RSK-07، `lib/order-rate`).
+ * ⛔ «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): تأیید، حساب و «سفارش‌های من» فقط با ایمیل؛ شماره فقط تماسِ پیک (بی کد).
  *
  * پیشوندِ تازهٔ `apiRouter` است ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی باید
  * `/store` را هم بگیرد (ریپوی دیگر؛ دستورالعمل در PR).
@@ -37,7 +38,7 @@ const orderDesk = require('../lib/order-desk');
 const eta = require('../lib/storefront-eta');
 const audit = require('../lib/audit');
 const erasure = require('../lib/customer-erasure');
-const { phoneKey, phone: validPhone } = require('../lib/validate');
+const { email: validEmail } = require('../lib/validate');
 const pay = require('../lib/payment-intents');
 const flow = require('../lib/order-flow');
 const orderView = require('../lib/store-order-view');
@@ -210,22 +211,22 @@ const areaStore = async (req, res, next) => {
   res.set('Cache-Control', 'no-store');
   next();
 };
-//  شمارهٔ تأییدشده: بلیتِ همین چند روز یا نشستِ حساب — همان که دکان با آن خبر می‌دهد
+//  مشتریِ تأییدشده (ایمیل): بلیتِ همین چند روز یا نشستِ حساب — همان که دکان با آن خبر می‌دهد
 const verified = async (req, res, next) => {
-  const phone = await sf.verifiedPhone(ticketOf(req), sessionOf(req));
-  if (!phone) throw new ApiError(401, 'verification_required', 'برای «خبرم کن»، شمارهٔ خود را با کد تأیید کنید');
-  req.verifiedPhone = phone;
+  const email = await sf.verifiedEmail(ticketOf(req), sessionOf(req));
+  if (!email) throw new ApiError(401, 'verification_required', 'برای «خبرم کن»، ایمیلِ خود را با کد تأیید کنید');
+  req.verifiedKey = email;
   next();
 };
 
 router.post('/:slug/area-request', areaStore, checkoutLimit, verified, async (req, res) => {
-  const out = await areas.request(req.store, req.verifiedPhone, req.body);
+  const out = await areas.request(req.store, req.verifiedKey, req.body);
   res.status(out.created ? 201 : 200).json({ request: out.request });
 });
 
 //  پس گرفتنِ رضایت — تکرارش همان پاسخ
 router.delete('/:slug/area-request', areaStore, checkoutLimit, verified, async (req, res) => {
-  res.json(await areas.withdraw(req.store, req.verifiedPhone));
+  res.json(await areas.withdraw(req.store, req.verifiedKey));
 });
 
 //  نسخهٔ خواندنی (`DATABASE_REPLICA_URL`، پیش‌فرض خاموش): فقط کاتالوگ/دسته/جست‌وجوی همین مسیر (`lib/read-replica.js`)
@@ -325,7 +326,7 @@ router.get('/:slug/products/:id/gallery/:tag/:size', readLimit, store, async (re
   res.type(f.mime).send(f.data);
 });
 
-//  ── ۲۳: تأییدِ شماره پیش از ثبتِ سفارش ──────────────────────────────
+//  ── ۲۳: تأییدِ ایمیل پیش از ثبتِ سفارش (کد فقط به ایمیل؛ «فقط ایمیل») ──
 router.post('/:slug/verify/start', sendCodeLimit, store, async (req, res) => {
   res.json(await sf.startVerification(req.body, { ip: clientIp(req), shopId: req.store.shop_id }));
 });
@@ -419,12 +420,12 @@ router.get('/:slug/orders/:token/reorder', readLimit, store, async (req, res) =>
 });
 
 //  ── حسابِ مشتری (۲۳، CHK-01/02/09، S134/S138/S140) ───────────────────
-//  ساختن یا ورود فقط با بلیتِ «شماره تأیید شد» که همین چند دقیقه پیش صادر شده
+//  ساختن یا ورود فقط با بلیتِ «ایمیل تأیید شد» که همین چند دقیقه پیش صادر شده
 //  (نه هر بلیتِ ۱۴ روزه) — وگرنه یک بلیت هر چند نشستِ ۱۸۰ روزه می‌ساخت
 router.post('/:slug/account', checkoutLimit, store, async (req, res) => {
-  const phone = await sf.verifiedPhoneOfTicket(ticketOf(req), { maxAgeMs: config.storefront.accountTicketMaxMs });
-  if (!phone) throw new ApiError(401, 'verification_required', 'برای ورود به حساب، همین حالا شمارهٔ خود را با کد تأیید کنید');
-  const out = await customers.signIn(phone, { name: req.body && req.body.name });
+  const email = await sf.verifiedEmailOfTicket(ticketOf(req), { maxAgeMs: config.storefront.accountTicketMaxMs });
+  if (!email) throw new ApiError(401, 'verification_required', 'برای ورود به حساب، همین حالا ایمیلِ خود را با کد تأیید کنید');
+  const out = await customers.signIn(email, { name: req.body && req.body.name });
   await audit.log({
     shopId: req.store.shop_id, actorType: 'customer', action: 'store_customer.sign_in',
     targetType: 'store_customer', targetId: out.customer.id, detail: {}, ip: clientIp(req),
@@ -454,7 +455,7 @@ router.delete('/:slug/account', checkoutLimit, store, customer, async (req, res)
 
 //  SEC-10: حذفِ دادهٔ شخصیِ خودِ مشتری در **همین** دکان (`lib/customer-erasure.js`)؛ حساب می‌ماند
 //  (پاک کردنش همان `DELETE /:slug/account`). پرچمِ `shop.customer_erasure` خاموش یا نشانیِ ناشناس ⇒
-//  `next('route')`، همان پاسخِ امروز. اجرای واقعی بلیتِ تازهٔ «شماره تأیید شد» ِ **همان** شمارهٔ حساب
+//  `next('route')`، همان پاسخِ امروز. اجرای واقعی بلیتِ تازهٔ «ایمیل تأیید شد» ِ **همان** ایمیلِ حساب
 //  می‌خواهد؛ `dryRun: true` فقط شمارش‌ها (بی نوشتن).
 const erasureOn = async (req, res, next) => {
   next((await erasure.flagOnSlug(req.params.slug)) ? undefined : 'route');
@@ -462,20 +463,20 @@ const erasureOn = async (req, res, next) => {
 router.post('/:slug/account/erase', checkoutLimit, erasureOn, store, customer, async (req, res) => {
   const dryRun = req.body && req.body.dryRun === true;
   if (!dryRun) {
-    const phone = await sf.verifiedPhoneOfTicket(ticketOf(req), { maxAgeMs: config.storefront.accountTicketMaxMs });
-    if (!phone) throw new ApiError(401, 'verification_required', 'برای حذفِ داده‌ها، همین حالا شمارهٔ خود را با کد تأیید کنید');
-    if (phoneKey(phone) !== phoneKey(req.customer.phone)) {
-      throw new ApiError(403, 'phone_mismatch', 'کدِ تأیید باید برای همان شمارهٔ این حساب باشد');
+    const email = await sf.verifiedEmailOfTicket(ticketOf(req), { maxAgeMs: config.storefront.accountTicketMaxMs });
+    if (!email) throw new ApiError(401, 'verification_required', 'برای حذفِ داده‌ها، همین حالا ایمیلِ خود را با کد تأیید کنید');
+    if (email !== req.customer.email) {
+      throw new ApiError(403, 'email_mismatch', 'کدِ تأیید باید برای همان ایمیلِ این حساب باشد');
     }
   }
-  res.json(await erasure.erase(req.store.shop_id, { phone: req.customer.phone, customerId: req.customer.id }, { dryRun, by: 'customer' }));
+  res.json(await erasure.erase(req.store.shop_id, erasure.targetOfCustomer(req.customer), { dryRun, by: 'customer' }));
 });
 
 router.post('/:slug/account/logout', checkoutLimit, store, async (req, res) => {
   res.json(await customers.signOut(sessionOf(req)));
 });
 
-//  «خروج از همه‌جا»: همهٔ نشست‌های حساب + همهٔ بلیت‌های این شماره
+//  «خروج از همه‌جا»: همهٔ نشست‌های حساب + همهٔ بلیت‌های ایمیلش
 router.post('/:slug/account/logout-all', checkoutLimit, store, customer, async (req, res) => {
   const out = await customers.signOutAll(req.customer);
   await audit.log({
@@ -485,10 +486,14 @@ router.post('/:slug/account/logout-all', checkoutLimit, store, customer, async (
   res.json(out);
 });
 
-//  §۲۳.۴ تغییرِ شمارهٔ حساب (`store/phone.js` ِ دیربار از acct.js): دو اثبات — نشستِ همین حساب و بلیتِ تازهٔ شمارهٔ نو
-//  (کدِ همان `verify/start|check`، ≤ `accountTicketMaxMs`) که با `phone` ِ بدنه یکی است. «حسابِ دیگری دارد» فقط پس از کد
-//  (به دارندهٔ همان شماره)؛ تکرار یا هم‌زمانی ⇒ ۲۰۰ ِ `unchanged`، بی اثر و سابقهٔ دوم. ⛔ پرچمِ خاموشِ
-//  `shop.storefront.web_account` ⇒ `next('route')` پیش از سقف و نشست: همان درِ ناشناخته.
+//  §۲۳.۴ ⇐ «فقط ایمیل» (۱۴۰۵/۰۸/۲۳) — درهای حساب پشتِ پرچمِ `shop.storefront.web_account` (`store/phone.js` ِ دیربار از acct.js
+//  و «حسابِ من» ِ برنامهٔ خرید). ⛔ پرچمِ خاموش ⇒ `next('route')` پیش از سقف و نشست: همان درِ ناشناخته.
+//   • `POST /:slug/account/phone` — شمارهٔ تماس برای پیک: فقط نشستِ همین حساب؛ بی کد، فقط شکل؛ "" ⇒ پاک. (کدِ پیامکیِ
+//     شمارهٔ نو ِ دیروز ⇐ به‌جایش همین ویرایشِ ساده.) تکرار ⇒ ۲۰۰ ِ `unchanged`.
+//   • `POST /:slug/account/email` — تغییرِ ایمیل (یا وصلِ نخستینِ ایمیل به حسابِ کهنهٔ فقط‌شماره): دو اثبات — نشستِ
+//     همین حساب و بلیتِ **تازهٔ** ایمیلِ نو (کدِ همان `verify/start|check`، ≤ `accountTicketMaxMs`) که با `email` ِ بدنه
+//     یکی است. «حسابِ دیگری دارد» فقط پس از کد (به دارندهٔ همان ایمیل)؛ تکرار یا هم‌زمانی ⇒ ۲۰۰ ِ `unchanged`.
+//     سفارش‌های پیشین در «سفارش‌های من» می‌مانند (`store_customer_id`).
 const phoneStore = async (req, res, next) => {
   const s = await sf.open(req.params.slug);
   if (!(await orders.flagOf(s.shop_id, WEB_ACCOUNT_FLAG))) return next('route');
@@ -497,30 +502,42 @@ const phoneStore = async (req, res, next) => {
   next();
 };
 router.post('/:slug/account/phone', phoneStore, checkoutLimit, customer, async (req, res) => {
-  const want = validPhone(req.body && req.body.phone, { required: true });
-  const phone = await sf.verifiedPhoneOfTicket(ticketOf(req), { maxAgeMs: config.storefront.accountTicketMaxMs });
-  if (!phone || phoneKey(phone) !== phoneKey(want)) {
-    throw new ApiError(401, 'verification_required', 'شمارهٔ تازه را همین حالا با کد تأیید کنید');
+  const out = await customers.setContactPhone(req.customer, req.body && req.body.phone);
+  if (!out.unchanged) {
+    await audit.log({
+      shopId: req.store.shop_id, actorType: 'customer', action: 'store_customer.contact_phone',
+      targetType: 'store_customer', targetId: req.customer.id, detail: { cleared: !out.customer.phone }, ip: clientIp(req),
+    });
+  }
+  res.json(out.unchanged ? { customer: out.customer, unchanged: true } : { customer: out.customer });
+});
+
+router.post('/:slug/account/email', phoneStore, checkoutLimit, customer, async (req, res) => {
+  const want = validEmail(req.body && req.body.email, { required: true });
+  const email = await sf.verifiedEmailOfTicket(ticketOf(req), { maxAgeMs: config.storefront.accountTicketMaxMs });
+  if (!email || email !== want) {
+    throw new ApiError(401, 'verification_required', 'ایمیلِ تازه را همین حالا با کد تأیید کنید');
   }
   let out;
   try {
-    out = await customers.changePhone(req.customer, req.session.sessionId, phone);
+    out = await customers.changeEmail(req.customer, req.session.sessionId, email);
   } catch (err) {
-    if (!err || err.code !== 'same_phone') throw err;
+    if (!err || err.code !== 'same_email') throw err;
     const a = await customers.auth(sessionOf(req));
     if (!a) throw new ApiError(401, 'session_required', 'برای این کار وارد حسابِ خود شوید');
     return res.json({ customer: customers.view(a.customer), sessionsRevoked: 0, unchanged: true });
   }
   await audit.log({
-    shopId: req.store.shop_id, actorType: 'customer', action: 'store_customer.phone_change',
+    shopId: req.store.shop_id, actorType: 'customer', action: out.linked ? 'store_customer.email_linked' : 'store_customer.email_change',
     targetType: 'store_customer', targetId: req.customer.id,
-    detail: { conversations: out.conversations, sessionsRevoked: out.sessionsRevoked }, ip: clientIp(req),
+    detail: { orders: out.orders, conversations: out.conversations, sessionsRevoked: out.sessionsRevoked }, ip: clientIp(req),
   });
-  res.json({ customer: out.customer, sessionsRevoked: out.sessionsRevoked });
+  res.json({ customer: out.customer, sessionsRevoked: out.sessionsRevoked, ...(out.linked ? { linked: true } : {}) });
 });
 
 router.get('/:slug/account/orders', readLimit, store, customer, async (req, res) => {
-  res.json(await sf.ordersOfPhone(req.store, req.customer.phone, { cursor: req.query.cursor, limit: req.query.limit }));
+  res.json(await sf.ordersOfCustomer(req.store, { email: req.customer.email || '', customerId: req.customer.id },
+    { cursor: req.query.cursor, limit: req.query.limit }));
 });
 
 router.get('/:slug/account/addresses', readLimit, store, customer, async (req, res) => {

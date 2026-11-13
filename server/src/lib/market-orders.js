@@ -1,7 +1,7 @@
 'use strict';
 /**
- * «سفارش‌های من» از همهٔ ویترین‌ها (S138) — با بلیتِ شماره (`myOrders`) و با حسابِ مشتریِ بازار
- * (`ordersOfPhone`، S9). جدا از `lib/market.js` تا آن زیرِ سقفِ اندازه بماند (`tools/quality`)؛ رفتار
+ * «سفارش‌های من» از همهٔ ویترین‌ها (S138) — با بلیتِ ایمیل (`myOrders`؛ «فقط ایمیل»، ۱۴۰۵/۰۸/۲۳) و با حسابِ
+ * مشتری (`ordersOfCustomer`، S9). جدا از `lib/market.js` تا آن زیرِ سقفِ اندازه بماند (`tools/quality`)؛ رفتار
  * همان. کمک‌های همان پرونده (`storeOpen`، `filterAsync`) تزریق می‌شوند.
  */
 const { many } = require('../db');
@@ -11,21 +11,21 @@ const views = require('./public-views');   //  S2: فهرستِ سفیدِ `orde
 
 module.exports = ({ storeOpen, filterAsync }) => {
   async function myOrders(ticket) {
-    //  ناهم‌گام: نسلِ بلیتِ شماره (خروج از همه‌جا / پاک کردنِ حساب) هم سنجیده می‌شود
-    const phone = await sf.verifiedPhoneOfTicket(ticket);
-    if (!phone) throw new ApiError(401, 'verification_required', 'برای دیدنِ سفارش‌ها، شمارهٔ خود را تأیید کنید');
-    return ordersOfPhone(phone);
+    //  ناهم‌گام: نسلِ بلیتِ ایمیل (خروج از همه‌جا / پاک کردنِ حساب) هم سنجیده می‌شود
+    const who = await sf.verification(ticket, '');
+    if (!who) throw new ApiError(401, 'verification_required', 'برای دیدنِ سفارش‌ها، ایمیلِ خود را تأیید کنید');
+    return ordersOfCustomer(who);
   }
 
-  /** سفارش‌های ویترینیِ یک شماره در همهٔ دکان‌های باز (۵۰ تای تازه). */
-  async function ordersOfPhone(phone) {
+  /** سفارش‌های ویترینیِ یک مشتری (ایمیلِ تأییدشده یا حسابش؛ `sf.OWNED_SQL`) در همهٔ دکان‌های باز (۵۰ تای تازه). */
+  async function ordersOfCustomer(who) {
     const rows = await many(
       `SELECT o.id, o.shop_id, o.order_no, o.status, o.total_minor, o.items_count, o.fulfillment, o.created_at, o.track_gen,
               sf.slug, sf.title, sf.accent
          FROM online_orders o JOIN storefronts sf ON sf.shop_id = o.shop_id
-        WHERE o.source = 'storefront' AND o.customer_phone = $1
+        WHERE o.source = 'storefront' AND ${sf.OWNED_SQL('o.', '$1', '$2')}
         ORDER BY o.created_at DESC, o.id DESC LIMIT 50`,
-      [phone]
+      [who.email, who.customerId || '']
     );
     const slugs = [...new Set(rows.map((r) => r.slug))];
     const [open, linked] = (await Promise.all([filterAsync(slugs, storeOpen), filterAsync([...new Set(rows.map((r) => r.shop_id))], sf.linkPolicyOn)])).map((x) => new Set(x));   //  linked: TEN-03، به‌ازای پرچمِ هر دکان
@@ -37,5 +37,5 @@ module.exports = ({ storeOpen, filterAsync }) => {
     }));
   }
 
-  return { myOrders, ordersOfPhone };
+  return { myOrders, ordersOfCustomer };
 };

@@ -128,32 +128,50 @@ async function scrubEvents(c, table, shopId, orderIds) {
 }
 
 /**
- * هدف: `{ phone }` (هر شکلی که validate.phone بپذیرد)، `{ orderId }` (مشتریِ همان سفارش؛ سفارشِ
- * بی شماره ⇒ فقط همان سفارش) یا — فقط برای مشتری — `{ phone, customerId }` ِ حسابِ خودش.
+ * هدف: `{ phone }` (هر شکلی که validate.phone بپذیرد)، `{ email }` (ایمیلِ تأییدشدهٔ مشتریِ ویترین)، `{ orderId }`
+ * (مشتریِ همان سفارش: ایمیل و شماره‌اش؛ سفارشِ بی هیچ‌کدام ⇒ فقط همان سفارش) یا — فقط برای مشتری —
+ * `targetOfCustomer(حسابِ خودش)`. «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): `forms` همهٔ **کلیدهای مشتری** است (شکل‌های شماره و
+ * ایمیل) — همان کلیدِ چت، «خبرم کن»، پوش و درخواستِ محدوده؛ سفارش‌ها با شماره، ایمیل یا حساب.
  */
 async function resolveTarget(c, shopId, input) {
   const b = input && typeof input === 'object' ? input : {};
   let phone = null;
+  let email = null;
   let mode = 'phone';
   const orderOnly = [];
-  if (b.orderId !== undefined && b.orderId !== null && b.orderId !== '') {
+  const given = (x) => x !== undefined && x !== null && x !== '';
+  if (given(b.orderId)) {
     mode = 'order';
-    const o = (await c.query('SELECT id, customer_phone FROM online_orders WHERE shop_id=$1 AND id=$2',
+    const o = (await c.query('SELECT id, customer_phone, customer_email FROM online_orders WHERE shop_id=$1 AND id=$2',
       [shopId, String(b.orderId).slice(0, 80)])).rows[0];
     if (!o) throw notFound('این سفارش در این دکان نیست', 'order_not_found');
     if (o.customer_phone && !o.customer_phone.startsWith(ERASED_PREFIX)) phone = o.customer_phone;
-    else orderOnly.push(o.id);
-  } else if (b.phone !== undefined && b.phone !== null && b.phone !== '') {
-    phone = v.phone(b.phone, { required: true });
+    if (o.customer_email) email = o.customer_email;
+    if (!phone && !email) orderOnly.push(o.id);
+  } else if (given(b.phone) || given(b.email)) {
+    if (given(b.phone)) phone = v.phone(b.phone, { required: true });
+    if (given(b.email)) { email = v.email(b.email, { required: true }); if (!given(b.phone)) mode = 'email'; }
   } else {
-    throw badRequest('شمارهٔ مشتری یا شناسهٔ سفارش لازم است', 'bad_target');
+    throw badRequest('شمارهٔ مشتری، ایمیل یا شناسهٔ سفارش لازم است', 'bad_target');
   }
-  const forms = phone ? v.phoneForms(phone) : [];
+  const phones = phone ? v.phoneForms(phone) : [];
+  const emails = email ? [email] : [];
   let customerIds = b.customerId ? [String(b.customerId)] : [];
-  if (forms.length && !b.customerId) {
-    customerIds = ids((await c.query('SELECT id FROM store_customers WHERE phone = ANY($1::text[])', [forms])).rows);
+  if (!b.customerId && (phones.length || emails.length)) {
+    customerIds = ids((await c.query('SELECT id FROM store_customers WHERE phone = ANY($1::text[]) OR email = ANY($2::text[])',
+      [phones, emails])).rows);
   }
-  return { forms, orderOnly, customerIds, mode: b.customerId ? 'account' : mode };
+  return { forms: [...phones, ...emails], phones, emails, orderOnly, customerIds, mode: b.customerId ? 'account' : mode };
+}
+
+/**
+ * هدفِ «پاک کردنِ دادهٔ من» ِ خودِ مشتری: ایمیل و حسابش؛ شماره فقط برای حسابِ کهنهٔ فقط‌شماره (که هویتِ تأییدشده‌اش
+ * بود). ⛔ شمارهٔ تماسِ حسابِ ایمیل‌دار هدف نیست: تأییدنشده است و ممکن است مالِ کسِ دیگری باشد.
+ */
+function targetOfCustomer(customer) {
+  return customer.email
+    ? { email: customer.email, customerId: customer.id }
+    : { phone: customer.phone, customerId: customer.id };
 }
 
 class DryRun extends Error {
@@ -177,9 +195,10 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
       const t = await resolveTarget(c, shopId, target);
       const orders = (await c.query(
         `SELECT id, status FROM online_orders
-          WHERE shop_id=$1 AND (customer_phone = ANY($2::text[]) OR id = ANY($3::text[]))
+          WHERE shop_id=$1 AND (customer_phone = ANY($2::text[]) OR id = ANY($3::text[])
+                OR customer_email = ANY($4::text[]) OR store_customer_id = ANY($5::text[]))
           ORDER BY id FOR UPDATE`,
-        [shopId, t.forms, t.orderOnly]
+        [shopId, t.phones, t.orderOnly, t.emails, t.customerIds]
       )).rows;
       const open = orders.filter((o) => !settled(o.status)).length;
       if (open && !dryRun) {
@@ -199,12 +218,12 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
 
       if (orderIds.length) {
         counts.orders = await q(
-          `UPDATE online_orders SET customer_name='',
+          `UPDATE online_orders SET customer_name='', customer_email='',
                   customer_phone = CASE WHEN customer_phone = '' OR customer_phone LIKE 'erased:%' THEN customer_phone ELSE $3 END,
                   address = CASE WHEN address->'zone' IS NOT NULL THEN jsonb_build_object('zone', address->'zone') ELSE '{}'::jsonb END,
                   delivery = delivery - 'leaveWith', note='', track_gen = track_gen + 1, version = version + 1
             WHERE shop_id=$1 AND id = ANY($2::text[])
-              AND (customer_name <> '' OR (customer_phone <> '' AND customer_phone NOT LIKE 'erased:%') OR note <> ''
+              AND (customer_name <> '' OR customer_email <> '' OR (customer_phone <> '' AND customer_phone NOT LIKE 'erased:%') OR note <> ''
                    OR (address - 'zone') <> '{}'::jsonb OR (delivery->'leaveWith') IS NOT NULL)
             RETURNING id`,
           [shopId, orderIds, placeholder]
@@ -334,4 +353,5 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
   }
 }
 
-module.exports = { FLAG, KEPT, COUNT_KEYS, ERASED_PREFIX, flagOn, flagOnSlug, erase, scrub, settled };
+module.exports = {
+  targetOfCustomer, FLAG, KEPT, COUNT_KEYS, ERASED_PREFIX, flagOn, flagOnSlug, erase, scrub, settled };

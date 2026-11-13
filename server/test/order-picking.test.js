@@ -20,6 +20,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { query, one, many, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -572,8 +573,8 @@ test('PCK-14: «پیدا نکردم» کالا را تا رسیدگیِ مدیر
   assert.notEqual((await stockOf('oil')).status, 'out_of_stock', 'فقط همان کالا');
 
   //  ثبتِ سفارشِ ویترین با همان کالا ⇒ «دیگر در ویترین نیست»
-  const v = await h.post(`/api/store/${slug}/verify/start`, { phone: '0791112299' });
-  const t = await h.post(`/api/store/${slug}/verify/check`, { phone: '0791112299', code: v.body.devCode });
+  const v = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf('0791112299') });
+  const t = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf('0791112299'), code: v.body.devCode });
   const ticket = t.body.ticket;
   const buy = (lines) => h.post(`/api/store/${slug}/checkout`, {
     fulfillment: 'pickup', customer: { name: 'مشتری', phone: '0791112299' }, lines,

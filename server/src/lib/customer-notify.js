@@ -11,29 +11,28 @@
  *   • ⛔ پیش‌فرض خاموش: بی کلیدِ `shop.customer_notify` در «تنظیماتِ زنده» (scope = دکان یا
  *     `all`) هیچ ردیفی نوشته نمی‌شود و هیچ پیامی نمی‌رود؛ خاموش شدنِ پرچم ردیفِ مانده را
  *     `cancelled` می‌کند. فقط زبانِ سفارش (`online_orders.customer_lang`) همیشه ثبت می‌شود.
- *   • فقط سفارشِ ویترین (`source = storefront`، شمارهٔ تأییدشده) و نه آزمایشی؛ سفارشِ دستیِ
- *     کارمند (تلفنی، تلگرام، …) هیچ — شماره‌اش تأیید نشده و رضایتی نداده است.
- *   • NTF-01: `EVENT_OF` (وضعیت ⇒ رویداد) و `MATRIX` (رویداد ⇒ کانال‌های مجاز، به ترتیبِ §۳.۱۲:
- *     پوش، واتس‌اپ، تلگرام، پیامک). پیامک (گران‌ترین) فقط برای رویدادی که مشتری همان دم باید
- *     بداند یا کاری بکند. وضعیت‌های درونیِ دکان (جمع‌آوری، بسته‌بندی، برگشت به قفسه) و کارِ خودِ
- *     مشتری (لغوِ او) پیام ندارند.
+ *   • فقط سفارشِ ویترین (`source = storefront`، ایمیلِ تأییدشده) و نه آزمایشی؛ سفارشِ دستیِ
+ *     کارمند (تلفنی، تلگرام، …) هیچ — راهِ تماسش تأیید نشده و رضایتی نداده است.
+ *   • NTF-01: `EVENT_OF` (وضعیت ⇒ رویداد) و `MATRIX` (رویداد ⇒ کانال‌های مجاز، به ترتیب: پوش، ایمیل، واتس‌اپ،
+ *     تلگرام). ⛔ «فقط ایمیل» (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۳): **پیامک از زنجیره برداشته شد** ⇐ به‌جایش ایمیلِ
+ *     تأییدشدهٔ همان سفارش (`lib/customer-notify-email.js`، همان سرویسِ ایمیلِ کدها؛ حسابِ پیامک لازم نیست).
+ *     وضعیت‌های درونیِ دکان (جمع‌آوری، بسته‌بندی، برگشت به قفسه) و کارِ خودِ مشتری (لغوِ او) پیام ندارند.
  *   • NTF-04: یکتایی (order_id, event)؛ زنجیره در اولین «پذیرفت» می‌ایستد. پاسخِ مبهم (خطا یا
  *     مهلت) کانالِ بعدی را صدا **نمی‌زند** — شاید پیام رفته باشد — و همان زنجیره با همان کلید
  *     (`<ردیف>:<کانال>`) بعداً دوباره، حداکثر `MAX_ATTEMPTS` بار. رویدادِ تازه‌ترِ همان سفارش
  *     ردیف‌های هنوز‌نرفته را `superseded` می‌کند: پیامِ کهنه نمی‌رود.
  *   • سقفِ هر مشتری روی همهٔ دکان‌ها (`PER_HOUR`، `PER_DAY` پیامِ رفته) ⇒ `rate_limited`.
- *   • NTF-02: سقفِ روزانهٔ هزینهٔ هر دکان و هر کانال (`notify-cost`، پیامک بخش‌به‌بخش): کانالِ پولی که پیام از سقفش
+ *   • NTF-02: سقفِ روزانهٔ هزینهٔ هر دکان و هر کانال (`notify-cost`): کانالِ پولی که پیام از سقفش
  *     می‌گذرد صدا زده نمی‌شود (`cost_cap` در `tried`) و زنجیره کانالِ بعدی را می‌آزماید؛ هزینهٔ هر پیامِ پذیرفته
- *     (`costMicros`) روی همان `tried` می‌ماند.
- *     شمارش با `phone_key` (HMAC ِ شماره)، نه خودِ شماره.
+ *     (`costMicros`) روی همان `tried` می‌ماند. امروز همهٔ کانال‌ها رایگان‌اند (پیامک رفت).
+ *     شمارش با `phone_key` (HMAC ِ کلیدِ مشتری: ایمیلِ تأییدشده، وگرنه شمارهٔ سفارشِ کهنه)، نه خودِ کلید.
  *   • بی دادهٔ حساس (§۳۰.۱ بندِ ۴): متن فقط نامِ ویترین، شمارهٔ سفارش و وضعیت — نه نام، شماره،
  *     نشانی، اقلام یا مبلغ (تنها استثنا NTF-08: پیامِ هر بازپرداخت مبلغِ همان بازپرداخت را دارد، پشتِ همان پرچمِ
  *     پیگیریِ بازپرداخت که آن را در صفحهٔ پیگیری نشان می‌دهد — `EXTRA.order_refund`). لینکِ پیگیری (همان توکنِ HMAC ِ صفحهٔ «سفارشِ من») فقط اگر
- *     `STORE_PUBLIC_URL` داده شده باشد. شماره فقط به خودِ سرویس‌دهنده می‌رسد، هرگز به لاگ.
- *   • ⛔ واتس‌اپ، تلگرام و پیامک: هیچ سرویس‌دهنده‌ای وصل نیست (D-09: بودجه و حساب بیرونی‌اند) ⇒ حالِ صادقانهٔ
- *     `no_channel`. پیامکِ کدِ ورود (`lib/otp`) این‌جا به کار نمی‌رود. رابط `setProviders` است؛ امروز فقط آزمون
- *     آن را با سرویس‌دهندهٔ جعلی می‌نشاند. تنها کانالِ بی حسابِ بیرونی پوشِ وب ِ مشتریِ ویترین است (`builtin`،
- *     `lib/store-push.js`، پرچمِ خاموشِ `shop.storefront.web_push`، مهاجرتِ ۴۷۰).
+ *     `STORE_PUBLIC_URL` داده شده باشد. شماره/ایمیل فقط به خودِ سرویس‌دهنده می‌رسد، هرگز به لاگ.
+ *   • ⛔ واتس‌اپ و تلگرام: هیچ سرویس‌دهنده‌ای وصل نیست (D-09) ⇒ `not_configured`. رابط `setProviders` است؛ امروز
+ *     فقط آزمون آن را با سرویس‌دهندهٔ جعلی می‌نشاند. کانال‌های بی حسابِ بیرونی (`builtin`): پوشِ وب ِ مشتریِ ویترین
+ *     (`lib/store-push.js`، پرچمِ خاموشِ `shop.storefront.web_push`، مهاجرتِ ۴۷۰) و ایمیل (سرویسِ ایمیلِ سرور، `log` ⇒ نه).
  */
 const crypto = require('crypto');
 const { query, one, many, now } = require('../db');
@@ -43,8 +42,8 @@ const cost = require('./notify-cost');
 
 const FLAG_KEY = 'shop.customer_notify';
 
-/** ترتیبِ زنجیره (§۳.۱۲): ارزان ⇒ گران. */
-const CHANNELS = Object.freeze(['push', 'whatsapp', 'telegram', 'sms']);
+/** ترتیبِ زنجیره (§۳.۱۲ بی پیامک): پوش ⇒ ایمیل ⇒ … */
+const CHANNELS = Object.freeze(['push', 'email', 'whatsapp', 'telegram']);
 const LANGS = Object.freeze(['fa', 'ps', 'en']);
 
 /** NTF-01، گامِ ۱: کدام وضعیت کدام رویدادِ مشتری است. نبودن ⇒ بی پیام. */
@@ -62,21 +61,22 @@ const EVENT_OF = Object.freeze({
   cancelled: 'order_cancelled',
 });
 
-const FREE = Object.freeze(['push', 'whatsapp', 'telegram']);
-const URGENT = Object.freeze([...FREE, 'sms']);
-/** NTF-01، گامِ ۲: هر رویداد از کدام کانال‌ها (به ترتیبِ `CHANNELS`). */
+const FREE = Object.freeze(['push', 'email', 'whatsapp', 'telegram']);
+/** NTF-01، گامِ ۲: هر رویداد از کدام کانال‌ها (به ترتیبِ `CHANNELS`). «فقط ایمیل»: پیامکِ رویدادهای فوری رفت ⇒ همه همان زنجیره. */
 const MATRIX = Object.freeze({
   order_received: FREE,
   order_accepted: FREE,
-  order_rejected: URGENT,          // مشتری منتظر است؛ باید جای دیگری بخرد
-  order_ready: URGENT,             // باید بیاید و ببرد
-  order_on_the_way: URGENT,        // نقد آماده و در دسترس باشد
-  order_delivery_failed: URGENT,   // پیک نرسید؛ تماس لازم است
+  order_rejected: FREE,            // مشتری منتظر است؛ باید جای دیگری بخرد
+  order_ready: FREE,               // باید بیاید و ببرد
+  order_on_the_way: FREE,          // نقد آماده و در دسترس باشد
+  order_delivery_failed: FREE,     // پیک نرسید؛ تماس لازم است
   order_delivery_retry: FREE,
   order_completed: FREE,
-  order_cancelled: URGENT,
+  order_cancelled: FREE,
 });
 const EVENTS = Object.freeze(Object.keys(MATRIX));
+/** رویدادهایی که مشتری همان دم باید بداند یا کاری بکند (پیش‌تر همان‌ها که پیامک داشتند) — فوریتِ «بالا» ِ پوشِ وب */
+const URGENT_EVENTS = Object.freeze(['order_rejected', 'order_ready', 'order_on_the_way', 'order_delivery_failed', 'order_cancelled']);
 const REFUND_EVENT = 'order_refund';
 /** رویدادِ ردیف برای بیرون: پیامِ بازپرداخت (ستونِ `refund_id`) همیشه `order_refund`، بی شناسهٔ دفتر */
 const eventOf = (row) => (row && row.refund_id ? REFUND_EVENT : row && row.event);
@@ -195,7 +195,10 @@ function langOf(v) {
   return LANGS.includes(s) ? s : '';
 }
 
-/** HMAC ِ شماره (‎+930…‎ و ‎+93…‎ یکی، همان `order-rate.canon`) — فقط برای سقفِ هر مشتری. */
+/** کلیدِ مشتریِ سفارش برای سقف: ایمیلِ تأییدشده («فقط ایمیل»)، وگرنه شمارهٔ سفارشِ کهنه. */
+const keyOfOrder = (order) => (order && (order.customer_email || order.customer_phone)) || '';
+
+/** HMAC ِ کلیدِ مشتری (شماره: ‎+930…‎ و ‎+93…‎ یکی، همان `order-rate.canon`؛ ایمیل همان) — فقط برای سقفِ هر مشتری. */
 function phoneKey(phone) {
   const canon = require('./order-rate').canon(phone);
   const key = crypto.createHash('sha256')
@@ -211,14 +214,14 @@ function phoneKey(phone) {
  */
 async function onStatusIn(run, { shopId, order, to, at = now() }) {
   const event = EVENT_OF[to];
-  if (!event || !order || order.source !== 'storefront' || order.is_test === true || !order.customer_phone) return null;
+  if (!event || !order || order.source !== 'storefront' || order.is_test === true || !keyOfOrder(order)) return null;
   if (!(await flagIn(run, shopId))) return null;
   const r = await run(
     `INSERT INTO customer_notify_outbox (id, shop_id, order_id, event, lang, phone_key, status,
                                           next_attempt_at, created_at, updated_at)
      VALUES ($1,$2,$3,$4,$5,$6,'pending',$7,$7,$7)
      ON CONFLICT (order_id, event) DO NOTHING RETURNING id`,
-    [ulid(at), shopId, order.id, event, langOf(order.customer_lang) || 'fa', phoneKey(order.customer_phone), at]
+    [ulid(at), shopId, order.id, event, langOf(order.customer_lang) || 'fa', phoneKey(keyOfOrder(order)), at]
   );
   const id = r.rows[0] ? r.rows[0].id : null;
   //  تکرارِ رویداد (مثلاً «در راه» ِ دوم پس از تحویلِ دوباره) ⇒ هیچ: نه پیامِ دوم، نه کنار زدنِ پیامِ دیگر
@@ -239,14 +242,14 @@ async function onStatusIn(run, { shopId, order, to, at = now() }) {
  */
 async function onExtraIn(run, { shopId, order, event, at = now() }) {
   //  پیامِ بازپرداخت فقط از `onRefundIn` (به ردیفِ دفتر بسته است)
-  if (!EXTRA[event] || event === REFUND_EVENT || !order || order.source !== 'storefront' || order.is_test === true || !order.customer_phone) return null;
+  if (!EXTRA[event] || event === REFUND_EVENT || !order || order.source !== 'storefront' || order.is_test === true || !keyOfOrder(order)) return null;
   if (!(await flagIn(run, shopId))) return null;
   const r = await run(
     `INSERT INTO customer_notify_outbox (id, shop_id, order_id, event, lang, phone_key, status,
                                           next_attempt_at, created_at, updated_at)
      VALUES ($1,$2,$3,$4,$5,$6,'pending',$7,$7,$7)
      ON CONFLICT (order_id, event) DO NOTHING RETURNING id`,
-    [ulid(at), shopId, order.id, event, langOf(order.customer_lang) || 'fa', phoneKey(order.customer_phone), at]
+    [ulid(at), shopId, order.id, event, langOf(order.customer_lang) || 'fa', phoneKey(keyOfOrder(order)), at]
   );
   if (!r.rows[0]) return null;
   soon();
@@ -268,7 +271,7 @@ async function refundOn(shopId, run = null) {
  * @returns {Promise<string|null>} شناسهٔ ردیف (تکرار، پرچمِ خاموش یا سفارشِ نامشمول ⇒ null)
  */
 async function onRefundIn(run, { shopId, order, refundId, at = now() }) {
-  if (!refundId || !order || order.source !== 'storefront' || order.is_test === true || !order.customer_phone) return null;
+  if (!refundId || !order || order.source !== 'storefront' || order.is_test === true || !keyOfOrder(order)) return null;
   if (!(await refundOn(shopId, run))) return null;
   const r = await run(
     `INSERT INTO customer_notify_outbox (id, shop_id, order_id, event, refund_id, lang, phone_key, status,
@@ -276,7 +279,7 @@ async function onRefundIn(run, { shopId, order, refundId, at = now() }) {
      SELECT $1, f.shop_id, f.order_id, 'order_refund:' || f.id, f.id, $5, $6, 'pending', $7, $7, $7
        FROM online_order_refunds f WHERE f.id=$2 AND f.order_id=$3 AND f.shop_id=$4
      ON CONFLICT (order_id, event) DO NOTHING RETURNING id`,
-    [ulid(at), String(refundId), order.id, shopId, langOf(order.customer_lang) || 'fa', phoneKey(order.customer_phone), at]
+    [ulid(at), String(refundId), order.id, shopId, langOf(order.customer_lang) || 'fa', phoneKey(keyOfOrder(order)), at]
   );
   if (!r.rows[0]) return null;
   soon();
@@ -291,7 +294,7 @@ async function onCreatedIn(run, { shopId, orderId, lang, at = now() }) {
   const l = langOf(lang);
   if (l) await run('UPDATE online_orders SET customer_lang=$3 WHERE shop_id=$1 AND id=$2', [shopId, orderId, l]);
   const order = (await run(
-    'SELECT id, source, is_test, customer_phone, customer_lang FROM online_orders WHERE shop_id=$1 AND id=$2',
+    'SELECT id, source, is_test, customer_phone, customer_email, customer_lang FROM online_orders WHERE shop_id=$1 AND id=$2',
     [shopId, orderId]
   )).rows[0];
   return onStatusIn(run, { shopId, order, to: 'new', at });
@@ -331,6 +334,7 @@ const providerOf = (channel) => providers[channel] || null;
  * نشانده‌شده (`setProviders`) همیشه جلوتر است.
  */
 async function builtin(channel, shopId) {
+  if (channel === 'email') return require('./customer-notify-email').builtin();
   if (channel !== 'push') return null;
   const sp = require('./store-push');
   return (await sp.ownFlagOn(shopId)) ? sp.provider : null;
@@ -487,12 +491,12 @@ async function processRow(row, at) {
     return settle(row, lock, { status: 'failed', attempts: MAX_ATTEMPTS, last_error: 'stale', updated_at: at });
   }
   const order = await one(
-    `SELECT o.id, o.order_no, o.status, o.source, o.is_test, o.customer_phone, s.slug, s.title
+    `SELECT o.id, o.order_no, o.status, o.source, o.is_test, o.customer_phone, o.customer_email, s.slug, s.title
        FROM online_orders o LEFT JOIN storefronts s ON s.shop_id = o.shop_id
       WHERE o.id=$1 AND o.shop_id=$2`,
     [row.order_id, row.shop_id]
   );
-  if (!order || order.source !== 'storefront' || !order.customer_phone) {
+  if (!order || order.source !== 'storefront' || !keyOfOrder(order)) {
     return settle(row, lock, { status: 'cancelled', last_error: 'order_missing', updated_at: at });
   }
   const event = eventOf(row);
@@ -512,7 +516,7 @@ async function processRow(row, at) {
   const lang = LANGS.includes(row.lang) ? row.lang : 'fa';
   const shop = cleanName(order.title) || '—';
   const msg = {
-    channel: '', key: '', to: { phone: order.customer_phone }, shopId: row.shop_id, orderId: row.order_id,
+    channel: '', key: '', to: { phone: order.customer_phone, email: order.customer_email || '' }, shopId: row.shop_id, orderId: row.order_id,
     event, lang, title: shop, ...(row.refund_id ? { refundId: row.refund_id } : {}),
     text: render(event, lang, { no: Number(order.order_no), shop, amountMinor: refund ? Number(refund.amount_minor) : undefined }),
     //  TEN-03: پرچمِ `shop.storefront.link_expiry` روشن ⇒ لینکِ v2 با نسلِ جاری (پس از «باطل کردن» هم کار می‌کند)
@@ -527,7 +531,7 @@ async function processRow(row, at) {
   for (const channel of chain) {
     const p = providers[channel] || await builtin(channel, row.shop_id);
     if (!p) { tried.push({ channel, result: 'not_configured' }); continue; }
-    //  NTF-02: پیامک با لینک (اگر هست) شمرده می‌شود — بخشِ بیشتر، نه کمتر
+    //  NTF-02: متن با لینک (اگر هست) شمرده می‌شود
     const sized = msg.link ? `${msg.text} ${msg.link}` : msg.text;
     const price = cost.costMicros(channel, sized);
     if (price > 0 && !cost.allows(channel, sized, await spentToday(row.shop_id, channel, at)).ok) {
@@ -638,6 +642,7 @@ async function forOrder(shopId, orderId) {
 }
 
 module.exports = {
+  URGENT_EVENTS,
   FLAG_KEY, CHANNELS, LANGS, EVENT_OF, MATRIX, EVENTS, TEMPLATES, MAX_ATTEMPTS, PER_HOUR, PER_DAY, MAX_AGE_MS,
   EXTRA, REFUND_EVENT, eventOf, onExtraIn, onRefundIn, refundOn, flagOf, onStatusIn, onCreatedIn, setProviders, channelState,
   render, linkFor, phoneKey,

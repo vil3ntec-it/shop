@@ -17,6 +17,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { one, many, query, newId, now } = require('../src/db');
 const P = require('../src/lib/payment-providers');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 test.before(async () => {
@@ -189,8 +190,8 @@ test('CHK-21 پس از سپردنِ «دریافت از دکان»: قلمی ک�
   assert.equal((await h.api('POST', '/api/sync/v1/push', { token: s.token, headers: { 'X-App': 'shop', 'X-Device': 'dev-c' }, body: { device_id: 'dev-c', schema_version: 2, ops } })).status, 200);
   for (const p of ['rice', 'salt']) assert.equal((await h.put(`/api/shop/storefront/products/${p}`, { published: true }, { token: s.token })).status, 200);
   const phone = '0791112299';
-  const v = await h.post(`/api/store/${slug}/verify/start`, { phone });
-  const ticket = (await h.post(`/api/store/${slug}/verify/check`, { phone, code: v.body.devCode })).body.ticket;
+  const v = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+  const ticket = (await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: v.body.devCode })).body.ticket;
   const ck = await h.post(`/api/store/${slug}/checkout`, { fulfillment: 'pickup', customer: { name: 'مشتری', phone }, lines: [{ productId: 'rice', qtyMilli: 1000 }] },
     { headers: { 'Idempotency-Key': key('ck'), 'X-Store-Ticket': ticket } });
   assert.equal(ck.status, 201, JSON.stringify(ck.body));

@@ -24,6 +24,7 @@ const inv = require('./route-inventory');
 const { query, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
 const { KEYS: DEFAULT_ON } = require('../src/lib/flag-defaults');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const ROUTES = nodePath.join(__dirname, '..', 'src', 'routes');
 const baseOf = (file) => (fs.readFileSync(nodePath.join(ROUTES, file), 'utf8').match(/const base = '([^']+)'/) || [])[1] || '';
@@ -78,9 +79,9 @@ test.before(async () => {
 test.after(async () => { await h.stop(); });
 
 async function ticketOf(slug, phone) {
-  const v = await h.post(`/api/store/${slug}/verify/start`, { phone });
+  const v = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
   assert.equal(v.status, 200, JSON.stringify(v.body));
-  const c = await h.post(`/api/store/${slug}/verify/check`, { phone, code: v.body.devCode });
+  const c = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: v.body.devCode });
   assert.equal(c.status, 200, JSON.stringify(c.body));
   return c.body.ticket;
 }

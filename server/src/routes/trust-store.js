@@ -31,19 +31,10 @@ const store = async (req, res, next) => {
   next();
 };
 
-/**
- * شمارهٔ تأییدشده از بلیتِ ویترین. ⛔ #301 بلیت را با «نسلِ» شماره لغوشدنی
- * می‌کند و `phoneOfTicket` ِ هم‌گام را با `verifiedPhoneOfTicket` ِ ناهم‌گام عوض
- * می‌کند؛ این لایه با هر دو ترتیبِ ادغام درست است (پس از #301 فقط شاخهٔ اول).
- */
-async function ticketPhone(ticket) {
-  const sf = require('../lib/storefront');
-  return typeof sf.verifiedPhoneOfTicket === 'function' ? sf.verifiedPhoneOfTicket(ticket) : sf.phoneOfTicket(ticket);
-}
-
+/** ایمیلِ تأییدشده از بلیتِ ویترین («فقط ایمیل»، ۱۴۰۵/۰۸/۲۳؛ لغوشدنی با نسلِ ایمیل). `phone` ِ بیننده = کلیدِ مشتری. */
 const verified = async (req, res, next) => {
-  const phone = await ticketPhone(req.get('x-store-ticket') || '');
-  if (!phone) throw new ApiError(401, 'verification_required', 'برای ثبتِ شکایت، شمارهٔ خود را تأیید کنید');
+  const phone = await require('../lib/storefront').verifiedEmailOfTicket(req.get('x-store-ticket') || '');
+  if (!phone) throw new ApiError(401, 'verification_required', 'برای ثبتِ شکایت، ایمیلِ خود را تأیید کنید');
   req.trustViewer = { phone, ip: clientIp(req) };
   next();
 };

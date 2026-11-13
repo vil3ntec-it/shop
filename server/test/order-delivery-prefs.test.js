@@ -17,6 +17,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { query, one, many, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -267,8 +268,8 @@ test('CHK-24 مشتری: ویرایشِ سفارشِ ویترینِ خودش ب�
   //  وب (checkout.js): «با اسکناسِ …» فقط با `features.deliveryPrefs` ِ همان پرچم
   assert.equal((await h.get(`/api/store/${slug}`)).body.features.deliveryPrefs, true);
   const phone = '0791112233';
-  const st = await h.post(`/api/store/${slug}/verify/start`, { phone });
-  const ticket = (await h.post(`/api/store/${slug}/verify/check`, { phone, code: st.body.devCode })).body.ticket;
+  const st = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+  const ticket = (await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: st.body.devCode })).body.ticket;
   //  ۲ کیلو = ۲۴۰ + ارسالِ ۵۰ = ۲۹۰ افغانی؛ مشتری با ۵۰۰ می‌پردازد
   const ck = await h.post(`/api/store/${slug}/checkout`, {
     fulfillment: 'delivery', customer: { name: 'مشتری', phone },

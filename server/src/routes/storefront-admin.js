@@ -178,7 +178,7 @@ router.get('/area-requests', requirePermission('settings.write'), needFlag, need
   res.set('Cache-Control', 'no-store');
   const out = await areas.forShop(req.shopId);
   //  ⛔ CRM-15: بی «شمارهٔ مشتریان» (`customers.contact`، لایهٔ نقش یا کاربر) شماره فقط پوشیده؛ «خبر دادم» با شناسه همان
-  if (await contact.hiddenForReq(req)) out.contacts = out.contacts.map((c) => ({ ...c, phone: contact.maskPhone(c.phone) }));
+  if (await contact.hiddenForReq(req)) out.contacts = out.contacts.map((c) => ({ ...c, phone: contact.maskPhone(c.phone), email: contact.maskPhone(c.email) }));
   res.json(out);
 });
 

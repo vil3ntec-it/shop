@@ -4,9 +4,11 @@
  *
  * ⛔ پیش‌فرض خاموش: پرچمِ `shop.storefront.account_history` ِ همان دکان (`live_config`). خاموش ⇒ این درها
  *    نیستند (همان پاسخِ مسیرِ ناشناخته) و `features.accountHistory` در `GET /api/store/:slug` نمی‌آید.
- * ⛔ هویت = شمارهٔ تأییدشده (بلیت یا نشستِ حساب؛ همان `sf.verifiedPhone` ِ «سفارش‌های من»)؛ shop_id فقط از slug.
- * ⛔ پیوند با دفترِ دکان فقط با تطبیقِ **دقیقِ** شماره: `validate.phone` + `phoneKey` ِ هر دو سو برابر (نه چند رقمِ
- *    آخر، نه شمارهٔ دوم). پیش‌گزینشِ SQL با ۹ رقمِ آخر فقط ردیف‌ها را کم می‌کند؛ داوری همین‌جا در JS است.
+ * ⛔ هویت = ایمیلِ تأییدشده (بلیت یا نشستِ حساب؛ همان `sf.verification` ِ «سفارش‌های من»؛ «فقط ایمیل»، ۱۴۰۵/۰۸/۲۳)؛
+ *    shop_id فقط از slug. خریدهای آنلاین = سفارش‌های همان مشتری (`sf.ordersOfCustomer`).
+ * ⛔ پیوند با دفترِ دکان فقط با تطبیقِ **دقیقِ ایمیل** (`data.email` ِ قرض‌دار، کوچک‌حرف). شماره دیگر تأیید نمی‌شود،
+ *    پس تطبیق با شمارهٔ قرض‌دار ممکن نیست (هر کسی شمارهٔ دیگری را می‌نوشت و ماندهٔ قرضش را می‌دید). دفترِ امروزِ
+ *    برنامه ایمیلِ قرض‌دار ندارد ⇒ `linked: false` تا دکان ایمیلِ مشتری را در پروفایلش بگذارد (کارِ بعدی).
  *    قرض‌دارِ پاک‌شده یا ادغام‌شده (`mergedInto`) نامزد نیست.
  * ⛔ فقط آنچه مالِ خودِ مشتری است: تاریخ، شماره و جمعِ فاکتور، شمارِ قلم، نوعِ پرداخت، پیوندِ فاکتورِ عمومی
  *    (`/r/…`، فقط با QR ِ روشنِ دکان)، مبلغ و ماندهٔ حساب — هرگز نامِ فروشنده یا کارمند، قیمتِ خرید، یادداشت،
@@ -60,13 +62,10 @@ function asObject(x) {
   return x && typeof x === 'object' && !Array.isArray(x) ? x : {};
 }
 
-/** کلیدِ دقیقِ شماره، یا '' (نامعتبر) */
-function phoneKeyOf(v) {
-  try { return validate.phoneKey(validate.phone(v) || ''); } catch { return ''; }
+/** کلیدِ دقیقِ ایمیل (کوچک‌حرف)، یا '' (نامعتبر) */
+function emailKeyOf(v) {
+  try { return validate.email(v) || ''; } catch { return ''; }
 }
-
-/** ۹ رقمِ آخرِ کلید — فقط پیش‌گزینشِ SQL */
-const tailOf = (key) => key.replace(/\D/g, '').slice(-9);
 
 /**
  * ردیف‌های زندهٔ یک جدولِ همین دکان از هر دو دفتر؛ یک شناسه در دو دفتر ⇒ تازه‌ترین. هر ردیف `{id, d}` با
@@ -105,16 +104,15 @@ async function liveRows(shopId, table, where, params) {
 }
 
 /**
- * قرض‌دارهای همین دکان با **همین** شماره (دقیق)، بی ادغام‌شده/پاک‌شده — `{id, group}` به ترتیبِ شناسه، حداکثر MAX_DEBTORS.
+ * قرض‌دارهای همین دکان با **همین** ایمیل (دقیق)، بی ادغام‌شده/پاک‌شده — `{id, group}` به ترتیبِ شناسه، حداکثر MAX_DEBTORS.
  * `group` (CRM-08) فقط برای تخفیفِ گروهِ ویترین (PRM-11، `storefront-promo-groups.js`)؛ هرگز در پاسخِ «حسابِ من» نیست.
  */
-async function debtorRowsOf(shopId, phone) {
-  const key = phoneKeyOf(phone);
+async function debtorRowsOf(shopId, email) {
+  const key = emailKeyOf(email);
   if (!key) return [];
-  const digits = `regexp_replace(translate(COALESCE(data->>'phone', ''), '۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩', '01234567890123456789'), '[^0-9]', '', 'g')`;
-  const rows = await liveRows(shopId, 'debtors', `right(${digits}, 9) = $2`, [tailOf(key)]);
+  const rows = await liveRows(shopId, 'debtors', `lower(COALESCE(data->>'email', '')) = $2`, [key]);
   return rows
-    .filter((r) => !str(r.d.mergedInto) && phoneKeyOf(r.d.phone) === key)
+    .filter((r) => !str(r.d.mergedInto) && emailKeyOf(r.d.email) === key)
     .map((r) => ({ id: r.id, group: str(r.d.group) }))
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).slice(0, MAX_DEBTORS);
 }
@@ -129,8 +127,8 @@ async function debtorGroupById(shopId, id) {
 }
 
 /** قرض‌دارهای همین دکان با **همین** شماره (دقیق) — شناسه‌ها، حداکثر MAX_DEBTORS */
-async function debtorsOf(shopId, phone) {
-  return (await debtorRowsOf(shopId, phone)).map((r) => r.id);
+async function debtorsOf(shopId, email) {
+  return (await debtorRowsOf(shopId, email)).map((r) => r.id);
 }
 
 function pageOf(list, { cursor, limit } = {}) {
@@ -220,9 +218,9 @@ async function purchasesPage(shopId, ids, opts) {
   return { items: await purchaseViews(shopId, p.items), nextCursor: p.nextCursor };
 }
 
-function onlinePage(sf, phone, opts) {
+function onlinePage(sf, who, opts) {
   const { cursor, limit } = opts || {};
-  return require('./storefront').ordersOfPhone(sf, phone, { cursor, limit: limit || PAGE })
+  return require('./storefront').ordersOfCustomer(sf, who, { cursor, limit: limit || PAGE })
     .then((r) => ({ items: r.orders, nextCursor: r.nextCursor }));
 }
 
@@ -270,11 +268,11 @@ async function loyaltyOf(shopId, ids, at = Date.now()) {
   };
 }
 
-/** نخستین صفحهٔ هر سه بخش و مانده */
-async function summary(sf, phone) {
-  const ids = await debtorsOf(sf.shop_id, phone);
+/** نخستین صفحهٔ هر سه بخش و مانده (`who` = `sf.verification(...)`: `{ email, customerId }`) */
+async function summary(sf, who) {
+  const ids = await debtorsOf(sf.shop_id, who.email);
   const [online, purchases, ledger, loyalty] = await Promise.all([
-    onlinePage(sf, phone, {}), purchasesPage(sf.shop_id, ids, {}), ledgerOf(sf.shop_id, ids), loyaltyOf(sf.shop_id, ids),
+    onlinePage(sf, who, {}), purchasesPage(sf.shop_id, ids, {}), ledgerOf(sf.shop_id, ids), loyaltyOf(sf.shop_id, ids),
   ]);
   return {
     linked: ids.length > 0,
@@ -289,12 +287,12 @@ async function summary(sf, phone) {
 const PARTS = Object.freeze(['online', 'purchases', 'ledger']);
 
 /** صفحهٔ بعدیِ یک بخش */
-async function part(sf, phone, name, opts) {
-  if (name === 'online') return onlinePage(sf, phone, opts);
-  const ids = await debtorsOf(sf.shop_id, phone);
+async function part(sf, who, name, opts) {
+  if (name === 'online') return onlinePage(sf, who, opts);
+  const ids = await debtorsOf(sf.shop_id, who.email);
   if (name === 'purchases') return purchasesPage(sf.shop_id, ids, opts);
   const ledger = await ledgerOf(sf.shop_id, ids);
   return { balanceMinor: ledger.balanceMinor, ...pageOf(ledger.entries, opts) };
 }
 
-module.exports = { FLAG, PARTS, flagOn, summary, part, debtorsOf, debtorRowsOf, debtorGroupById, phoneKeyOf, loyaltyOf };
+module.exports = { FLAG, PARTS, flagOn, summary, part, debtorsOf, debtorRowsOf, debtorGroupById, emailKeyOf, loyaltyOf };

@@ -24,6 +24,7 @@ const path = require('node:path');
 const h = require('./helpers');
 const { query, one, many, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -77,9 +78,9 @@ async function liveShop(label, { settings = {} } = {}) {
 let phoneSeq = 0;
 async function storeOrder(s, { fulfillment = 'pickup' } = {}) {
   const phone = `07966${String(++phoneSeq).padStart(5, '0')}`;
-  const v = await h.post(`/api/store/${s.slug}/verify/start`, { phone });
+  const v = await h.post(`/api/store/${s.slug}/verify/start`, { email: mailOf(phone) });
   assert.equal(v.status, 200, JSON.stringify(v.body));
-  const c = await h.post(`/api/store/${s.slug}/verify/check`, { phone, code: v.body.devCode });
+  const c = await h.post(`/api/store/${s.slug}/verify/check`, { email: mailOf(phone), code: v.body.devCode });
   const body = { fulfillment, customer: { name: 'مشتری', phone }, lines: [{ productId: 'rice', qtyMilli: 2000 }] };
   if (fulfillment === 'delivery') body.address = { text: 'کابل، کارتهٔ سه', landmark: 'کنارِ مسجد' };
   const ck = await h.post(`/api/store/${s.slug}/checkout`, body,

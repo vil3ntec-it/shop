@@ -29,6 +29,7 @@ const staffCodes = require('../src/lib/staff-codes');
 const staffPerms = require('../src/lib/staff-perms');
 const docRoles = require('../src/lib/doc-roles');
 const offline = require('../src/lib/shop-offline-codes');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 // ── لاگِ سرور (همان لاگ، به‌علاوهٔ نسخه‌ای برای سنجهٔ نشت) ─────────────────────────────────────────────
 const METHODS = ['log', 'info', 'warn', 'error', 'debug', 'trace'];
@@ -363,9 +364,9 @@ async function chatStore(S) {
   return slug;
 }
 async function ticketOf(slug, phone) {
-  const start = await h.post(`/api/store/${slug}/verify/start`, { phone });
+  const start = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
   assert.equal(start.status, 200, JSON.stringify(start.body));
-  const check = await h.post(`/api/store/${slug}/verify/check`, { phone, code: start.body.devCode });
+  const check = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: start.body.devCode });
   assert.equal(check.status, 200, JSON.stringify(check.body));
   remember(`ticket:${phone}`, check.body.ticket);
   return check.body.ticket;

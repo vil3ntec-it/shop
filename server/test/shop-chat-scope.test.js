@@ -13,6 +13,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const chat = require('../src/lib/shop-chat');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -170,8 +171,8 @@ test('CHAT-10: درِ مشتری (ویترین) هم فایلِ اجرایی، M
   }
   const slug = `scope-${uniq()}`;
   assert.equal((await h.put('/api/shop/storefront', { slug, enabled: true, title: 'ردِ ویترین', contactPhone: '0700000025' }, { token: o.token })).status, 200);
-  const start = await h.post(`/api/store/${slug}/verify/start`, { phone: '0790002525' });
-  const check = await h.post(`/api/store/${slug}/verify/check`, { phone: '0790002525', code: start.body.devCode });
+  const start = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf('0790002525') });
+  const check = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf('0790002525'), code: start.body.devCode });
   assert.equal(check.status, 200, JSON.stringify(check.body));
   const headers = { 'X-Store-Ticket': check.body.ticket };
   const conv = (await h.api('POST', `/api/store/${slug}/chat/conversations`, { body: {}, headers })).body.conversation.id;
@@ -202,8 +203,8 @@ test('CHAT-05: عکسِ مشتری از ویترین — سقف‌ها با گش
   }
   const slug = `photo-${uniq()}`;
   assert.equal((await h.put('/api/shop/storefront', { slug, enabled: true, title: 'عکسِ ویترین', contactPhone: '0700000026' }, { token: o.token })).status, 200);
-  const start = await h.post(`/api/store/${slug}/verify/start`, { phone: '0790002626' });
-  const check = await h.post(`/api/store/${slug}/verify/check`, { phone: '0790002626', code: start.body.devCode });
+  const start = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf('0790002626') });
+  const check = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf('0790002626'), code: start.body.devCode });
   assert.equal(check.status, 200, JSON.stringify(check.body));
   const headers = { 'X-Store-Ticket': check.body.ticket };
   const opened = await h.api('POST', `/api/store/${slug}/chat/conversations`, { body: {}, headers });

@@ -19,6 +19,7 @@ const path = require('node:path');
 const h = require('./helpers');
 const { query, one, many, newId, now } = require('../src/db');
 const watch = require('../src/lib/order-watch');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const MIN = 60_000;
 let seq = 0;
@@ -354,8 +355,8 @@ async function liveStore() {
   const l = await h.put('/api/shop/market', { listed: true, category: 'grocery', area: 'کارتهٔ سه' }, { token: o.token });
   assert.equal(l.status, 200, JSON.stringify(l.body));
   const phone = '0791110077';
-  const s1 = await h.post(`/api/store/${slug}/verify/start`, { phone });
-  const s2 = await h.post(`/api/store/${slug}/verify/check`, { phone, code: s1.body.devCode });
+  const s1 = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+  const s2 = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: s1.body.devCode });
   assert.equal(s2.status, 200, JSON.stringify(s2.body));
   const co = await h.post(`/api/store/${slug}/checkout`, {
     fulfillment: 'pickup', customer: { name: 'خریدارِ بازار', phone }, lines: [{ productId: 'rice', qtyMilli: 1000 }],

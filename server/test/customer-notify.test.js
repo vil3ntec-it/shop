@@ -23,6 +23,7 @@ const { query, one, many, newId, now } = require('../src/db');
 const orders = require('../src/lib/orders');
 const S = require('../src/lib/order-states');
 const N = require('../src/lib/customer-notify');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -456,8 +457,8 @@ test('سرتاسری: ثبت از ویترین با lang=en ⇒ پیامِ ان�
   assert.equal((await h.put('/api/shop/storefront/products/rice', { published: true }, { token: o.token })).status, 200);
 
   const phone = '0791230099';
-  const s = await h.post(`/api/store/${o.slug}/verify/start`, { phone });
-  const c = await h.post(`/api/store/${o.slug}/verify/check`, { phone, code: s.body.devCode });
+  const s = await h.post(`/api/store/${o.slug}/verify/start`, { email: mailOf(phone) });
+  const c = await h.post(`/api/store/${o.slug}/verify/check`, { email: mailOf(phone), code: s.body.devCode });
   assert.equal(c.status, 200, JSON.stringify(c.body));
   const r = await h.post(`/api/store/${o.slug}/checkout`, {
     fulfillment: 'pickup', customer: { name: 'Zarmina', phone }, lines: [{ productId: 'rice', qtyMilli: 1000 }], lang: 'en',

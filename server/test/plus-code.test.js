@@ -20,6 +20,7 @@ const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
 const plus = require('../src/lib/plus-code');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const VEC = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'core', 'test-vectors', 'plus-code-v1.json'), 'utf8'));
 const num = (v) => (typeof v === 'string' ? Number(v) : v);
@@ -86,8 +87,8 @@ async function liveShop(label, on) {
 
 const PHONE = '0791112233';
 async function ticketOf(s) {
-  const st = await h.post(`/api/store/${s.slug}/verify/start`, { phone: PHONE });
-  const ck = await h.post(`/api/store/${s.slug}/verify/check`, { phone: PHONE, code: st.body.devCode });
+  const st = await h.post(`/api/store/${s.slug}/verify/start`, { email: mailOf(PHONE) });
+  const ck = await h.post(`/api/store/${s.slug}/verify/check`, { email: mailOf(PHONE), code: st.body.devCode });
   assert.equal(ck.status, 200, JSON.stringify(ck.body));
   return ck.body.ticket;
 }

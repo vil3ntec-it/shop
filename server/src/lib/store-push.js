@@ -1,7 +1,8 @@
 'use strict';
 /**
  * پوشِ وب برای مشتریِ ویترین — کانالِ `push` ِ `lib/customer-notify.js` برای سفارشِ وب (§۳.۱۲ «مشتری: لینکِ پیگیری و
- * پوشِ PWA، بعد واتس‌اپ، تلگرام، پیامک»؛ CHK-20 پیامِ تأیید، NTF-01، ORD-16 «فرستادنِ دوباره»). مهاجرتِ ۴۷۰.
+ * پوشِ PWA، بعد ایمیل، واتس‌اپ، تلگرام» — پیامک با «فقط ایمیل» ِ ۱۴۰۵/۰۸/۲۳ رفت؛ CHK-20 پیامِ تأیید، NTF-01، ORD-16
+ * «فرستادنِ دوباره»). مهاجرتِ ۴۷۰.
  *
  *   صفحهٔ پیگیری «خبرم کن» ─▶ POST /api/store/:slug/orders/:token/push  {subscription, page}
  *        └─ ردیفِ `store_push_subs` (همین سفارش، همین مرورگر) + آخرین پیامِ نرفته یک بار دیگر، فقط از پوش (`catchUp`)
@@ -344,7 +345,7 @@ async function send(msg) {
   const token = (await sf.linkPolicyOn(msg.shopId))
     ? sf.tokenOf(msg.shopId, msg.orderId, { gen: o.track_gen, at: now() }) : sf.tokenOf(msg.shopId, msg.orderId);
   const notify = require('./customer-notify');
-  const urgent = (notify.MATRIX[msg.event] || []).includes('sms');
+  const urgent = notify.URGENT_EVENTS.includes(msg.event);
   const out = await fanOut('store_push_subs', live, (s) => ({
     v: 1, title: String(msg.title || '').slice(0, 80), body: String(msg.text || '').slice(0, 300), lang: msg.lang,
     //  NTF-08: هر بازپرداخت برچسبِ خودش ⇒ پیامِ بازپرداختِ دوم اولی را از روی صفحهٔ گوشی برنمی‌دارد

@@ -3,7 +3,9 @@
  * چتِ دکان ↔ حسابِ مشتریِ بازار (S9، پرچمِ `market.account`، مهاجرتِ ۱۲۹ `shop_chat_conversations.customer_id`)
  * — جدا از `lib/shop-chat.js` تا آن زیرِ سقفِ اندازه بماند (`tools/quality`)؛ رفتار همان.
  * بینندهٔ مشتری با نشستِ حساب `{ side: 'customer', shopId, phone, customerId }` است؛ با بلیتِ ویترین
- * `customerId` ندارد. پرچمِ خاموش ⇒ `customer_id` همیشه NULL و همه‌چیز همان «customer_phone = شماره».
+ * `customerId` ندارد. پرچمِ خاموش ⇒ `customer_id` همیشه NULL و همه‌چیز همان «customer_phone = کلید».
+ * «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): `phone` ِ بیننده و `customer_phone` ِ گفت‌وگو **کلیدِ مشتری**اند — ایمیلِ تأییدشده برای
+ * گفت‌وگوی تازه، شمارهٔ تأییدشدهٔ پیشین برای گفت‌وگوی کهنه.
  */
 const { one, query } = require('../db');
 
@@ -11,8 +13,8 @@ const { one, query } = require('../db');
  * «مالِ همین مشتری» — شرطِ SQL، با افزودنِ پارامترها به `args`.
  *   حساب (`customerId`) ⇒ گفت‌وگوی همین حساب، یا گفت‌وگوی بی‌حسابِ شمارهٔ کنونی؛
  *                          پس تغییرِ شماره گفت‌وگوهای پیشین را گم نمی‌کند.
- *   بلیت (فقط شماره)    ⇒ همان امروز، مگر گفت‌وگو مالِ حسابی شده باشد که شماره‌اش
- *                          دیگر این نیست (دارندهٔ تازهٔ شمارهٔ کهنه چیزی نمی‌بیند).
+ *   بلیت (فقط ایمیل)     ⇒ گفت‌وگوهای همان ایمیل، مگر گفت‌وگو مالِ حسابی شده باشد که ایمیلش
+ *                          دیگر این نیست (دارندهٔ تازهٔ ایمیلِ کهنه چیزی نمی‌بیند).
  */
 function mineSql(viewer, args, a = 'c') {
   args.push(viewer.phone);
@@ -22,7 +24,7 @@ function mineSql(viewer, args, a = 'c') {
     return `(${a}.customer_id = $${args.length} OR (${a}.customer_id IS NULL AND ${a}.customer_phone = ${p}))`;
   }
   return `(${a}.customer_phone = ${p} AND (${a}.customer_id IS NULL OR EXISTS (`
-    + `SELECT 1 FROM store_customers sc WHERE sc.id = ${a}.customer_id AND sc.phone = ${p})))`;
+    + `SELECT 1 FROM store_customers sc WHERE sc.id = ${a}.customer_id AND sc.email = ${p})))`;
 }
 
 /** گفت‌وگوی مشتری برای `open`: حساب ممکن است دو تا ببیند (یکی با شمارهٔ پیشین) — گفت‌وگوی خودِ حساب جلوتر. */
@@ -47,9 +49,9 @@ async function reopen(viewer, row, name) {
 }
 
 /**
- * تغییرِ شمارهٔ حساب (در تراکنشِ `store-customers.changePhone`): گفت‌وگوهای بی‌حسابِ شمارهٔ پیشین مالِ
- * همین حساب می‌شوند و بستن‌های آن شماره روی شمارهٔ تازه هم می‌نشیند (بستنِ دکان با عوض کردنِ شماره دور
- * زده نمی‌شود). شمارهٔ گفت‌وگوها (`customer_phone`) برای سازگاری همان می‌ماند.
+ * تغییرِ کلیدِ حساب (در تراکنشِ `store-customers.changeEmail`: ایمیلِ پیشین ⇐ تازه، یا شمارهٔ حسابِ کهنه ⇐ ایمیل):
+ * گفت‌وگوهای بی‌حسابِ کلیدِ پیشین مالِ همین حساب می‌شوند و بستن‌های آن کلید روی کلیدِ تازه هم می‌نشیند (بستنِ
+ * دکان با عوض کردنِ ایمیل دور زده نمی‌شود). کلیدِ گفت‌وگوها (`customer_phone`) برای سازگاری همان می‌ماند.
  */
 async function adoptForPhoneChange(c, customerId, fromPhone, toPhone) {
   const r = await c.query(

@@ -3,12 +3,13 @@
  * «وقتی به محلِ شما رسیدیم خبرم کن» ِ ویترین (فاز ۴؛ CHK-10، S34).
  * شرحِ جدول: ‎migrations/176_storefront_area_requests.sql‎.
  *
- *   مشتری ── پینِ بیرون از همهٔ ناحیه‌های فعال + شمارهٔ تأییدشده (بلیتِ شماره یا نشستِ
- *             حساب) ⇒ یک درخواست برای همان (دکان، شماره)؛ تکرار همان ردیف را تازه می‌کند.
+ *   مشتری ── پینِ بیرون از همهٔ ناحیه‌های فعال + مشتریِ تأییدشده (بلیتِ ایمیل یا نشستِ حساب؛ «فقط
+ *             ایمیل»، ۱۴۰۵/۰۸/۲۳) ⇒ یک درخواست برای همان (دکان، کلیدِ مشتری)؛ تکرار همان ردیف را تازه می‌کند.
+ *             ستونِ `phone` از مهاجرتِ ۸۸۱ «کلیدِ مشتری» است: ایمیلِ تأییدشده (تازه) یا شمارهٔ تأییدشدهٔ کهنه.
  *             پینِ درون (یا دکانِ بی ناحیه) ⇒ ۴۰۹ `in_zone`: همین حالا سفارش بدهید؛ هیچ ردیف.
  *             «پس گرفتن» ⇒ ردیف پاک.
- *   دکان ──── شمارِ درخواست‌ها به ازای خانهٔ شبکه (بی شماره) تا تقاضا دیده شود؛ شماره فقط
- *             برای درخواستی که ناحیهٔ فعالِ امروز آن را می‌پوشاند — همان کسی که باید خبرش کرد.
+ *   دکان ──── شمارِ درخواست‌ها به ازای خانهٔ شبکه (بی شماره) تا تقاضا دیده شود؛ راهِ تماس (ایمیل، و شمارهٔ تماسِ
+ *             حسابِ همان ایمیل اگر گذاشته) فقط برای درخواستی که ناحیهٔ فعالِ امروز آن را می‌پوشاند.
  *             «خبر دادم» ⇒ ردیف پاک می‌شود (کارِ رضایت تمام شد)؛ در سابقه شماره نمی‌آید.
  *   نگه‌داری ─ درخواستِ کهنه‌تر از `RETAIN_MS` دیده نمی‌شود و با نوشتنِ بعدیِ همان دکان پاک می‌شود.
  *
@@ -29,7 +30,7 @@ const FLAG_KEY = 'shop.storefront.notify_area';
 const MAX_PER_SHOP = 5000;
 const MAX_CONTACTS = 500;
 const RETAIN_MS = 365 * 24 * 60 * 60 * 1000;
-const PHONE_RE = /^\+[1-9]\d{7,14}$/;
+const KEY_RE = /^(\+[1-9]\d{7,14}|[^\s@A-Z]+@[^\s@A-Z]+)$/;   //  کلیدِ مشتری: ایمیلِ تأییدشده یا شمارهٔ کهنه
 
 /** هر دو پرچم: بی ناحیه «بیرون از محدوده» معنا ندارد. */
 async function flagOn(shopId) {
@@ -55,7 +56,7 @@ const activeZones = async (shopId, run) => (await sfd.zonesOf(shopId, run)).filt
 
 /** ثبت یا تازه کردنِ درخواستِ همین شماره. `{ created, request }`. */
 async function request(store, phone, body) {
-  if (!PHONE_RE.test(String(phone || ''))) throw badRequest('شماره معتبر نیست', 'bad_phone');
+  if (!KEY_RE.test(String(phone || ''))) throw badRequest('مشتری معتبر نیست', 'bad_customer');
   if (!store.accept_delivery) throw badRequest('این ویترین ارسال ندارد', 'fulfillment_unavailable');
   const cell = pinOf(body);
   return tx(async (c) => {
@@ -103,8 +104,9 @@ async function forShop(shopId, at = now()) {
   const [zones, rows] = await Promise.all([
     activeZones(shopId),
     many(
-      `SELECT id, phone, cell_lat, cell_lng, created_at, updated_at FROM storefront_area_requests
-        WHERE shop_id = $1 AND updated_at >= $2 ORDER BY created_at, id LIMIT $3`,
+      `SELECT r.id, r.phone, r.cell_lat, r.cell_lng, r.created_at, r.updated_at, sc.phone AS contact_phone
+         FROM storefront_area_requests r LEFT JOIN store_customers sc ON sc.email = r.phone
+        WHERE r.shop_id = $1 AND r.updated_at >= $2 ORDER BY r.created_at, r.id LIMIT $3`,
       [shopId, at - RETAIN_MS, MAX_PER_SHOP]
     ),
   ]);
@@ -119,7 +121,11 @@ async function forShop(shopId, at = now()) {
     cell.count += 1;
     cells.set(k, cell);
     if (z && contacts.length < MAX_CONTACTS) {
-      contacts.push({ id: r.id, phone: r.phone, zone: z.name, requestedAt: Number(r.created_at), updatedAt: Number(r.updated_at) });
+      const mail = r.phone.includes('@');
+      contacts.push({
+        id: r.id, phone: mail ? (r.contact_phone || '') : r.phone, email: mail ? r.phone : '',
+        zone: z.name, requestedAt: Number(r.created_at), updatedAt: Number(r.updated_at),
+      });
     }
   }
   return {

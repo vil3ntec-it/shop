@@ -65,8 +65,9 @@ const alertGate = async (req, res, next) => {
 };
 const verified = async (req, res, next) => {
   const v = await sf.verification(req.get('x-store-ticket') || '', req.get('x-store-session') || '');
-  if (!v) throw new ApiError(401, 'verification_required', 'برای «خبرم کن»، شمارهٔ خود را با کد تأیید کنید');
-  req.proof = v;
+  if (!v) throw new ApiError(401, 'verification_required', 'برای «خبرم کن»، ایمیلِ خود را با کد تأیید کنید');
+  //  `phone` ِ اثبات = کلیدِ مشتری (ایمیلِ تأییدشده؛ «فقط ایمیل»، مهاجرتِ ۸۸۱) — ستونِ کلیدِ `store_alert_push`
+  req.proof = { ...v, phone: v.email };
   next();
 };
 

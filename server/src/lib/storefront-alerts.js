@@ -5,9 +5,10 @@
  *
  *   پرچم ──── `shop.storefront.alerts` (`live_config`، دکان یا `all`، پیش‌فرض خاموش). خاموش ⇒ درِ مشتری همان
  *             پاسخِ مسیرِ ناشناختهٔ main، هیچ نوشتنی، و کارگر هشدارِ همان دکان را نمی‌سوزاند (فقط می‌گذرد).
- *   مشتری ─── فقط شمارهٔ تأییدشده (بلیتِ شماره یا نشستِ حساب) — همان هویتی که سفارشِ ویترین با آن ثبت می‌شود.
- *             یکتایی (دکان، شماره، کالا، نوع)؛ تکرارِ ثبت بی‌اثر؛ حداکثر `MAX_PER_SHOP` هشدارِ مسلح برای هر
- *             شماره در هر ویترین؛ سقفِ نوشتنِ هر شماره در درِ مسیر (`WRITES_PER_HOUR`). «لغو» ⇒ ردیف پاک.
+ *   مشتری ─── فقط مشتریِ تأییدشده (بلیتِ ایمیل یا نشستِ حساب؛ «فقط ایمیل»، ۱۴۰۵/۰۸/۲۳) — همان هویتی که سفارشِ
+ *             ویترین با آن ثبت می‌شود. ستونِ `phone` از مهاجرتِ ۸۸۱ «کلیدِ مشتری» است: ایمیلِ تأییدشده (تازه) یا
+ *             شمارهٔ تأییدشدهٔ کهنه. یکتایی (دکان، کلید، کالا، نوع)؛ تکرارِ ثبت بی‌اثر؛ حداکثر `MAX_PER_SHOP` هشدارِ
+ *             مسلح برای هر کلید در هر ویترین؛ سقفِ نوشتنِ هر کلید در درِ مسیر (`WRITES_PER_HOUR`). «لغو» ⇒ ردیف پاک.
  *   ثبت ───── `stock`: فقط وقتی نشانِ همان کارت «تمام شده» (یا «ناموجود») است؛ موجود ⇒ ۴۰۹ `in_stock`،
  *             موجودیِ نامعلوم ⇒ ۴۰۹ `stock_unknown` (گذار بی حالِ دانسته معنا ندارد). `price`: مبنا = قیمتِ
  *             همان لحظهٔ کارت (`priceMinor`، بی تخفیفِ سبد).
@@ -18,7 +19,7 @@
  *             (یا دو نمونهٔ سرور) فقط یک بار خبر می‌دهند. قاعدهٔ «بی اسپم»: هر هشدار پس از یک گذار مصرف
  *             می‌شود (`fired`) و دیگر خبری نمی‌دهد، حتی اگر کالا دوباره تمام و موجود شود یا باز ارزان‌تر شود؛
  *             مشتری با ثبتِ دوباره همان ردیف را با مبنای تازه مسلح می‌کند.
- *   خبر ───── فقط کانال‌های بی‌پیامکِ `customer-notify` (پوش، واتس‌اپ، تلگرام؛ هرگز پیامک) و فقط با
+ *   خبر ───── فقط کانال‌های `customer-notify` (پوش، ایمیل، واتس‌اپ، تلگرام؛ پیامک دیگر در هیچ زنجیره‌ای نیست) و فقط با
  *             `shop.customer_notify` ِ روشن (وگرنه `notify_off`)؛ سقفِ هر شماره `PER_DAY` خبر در ۲۴ ساعت؛
  *             کانالِ پولی فقط زیرِ سقفِ روزانهٔ هزینهٔ همان دکان و کانال (NTF-02) که **مشترک** است: هزینهٔ
  *             این خبرها در `customer-notify.spentToday` و هزینهٔ اعلانِ سفارش این‌جا شمرده می‌شود. پاسخِ مبهم
@@ -38,8 +39,8 @@ const { badRequest, notFound, conflict } = require('../middleware/errors');
 const FLAG_KEY = 'shop.storefront.alerts';
 const KINDS = Object.freeze(['stock', 'price']);
 const LANGS = Object.freeze(['fa', 'ps', 'en']);
-/** فقط کانال‌های بی‌پیامک، به ترتیبِ زنجیرهٔ `customer-notify` (ارزان ⇒ گران) */
-const CHANNELS = Object.freeze(['push', 'whatsapp', 'telegram']);
+/** همان زنجیرهٔ `customer-notify` (پوش ⇒ ایمیل ⇒ …؛ بی پیامک) */
+const CHANNELS = Object.freeze(['push', 'email', 'whatsapp', 'telegram']);
 const SELLABLE = Object.freeze(['in_stock', 'in_warehouse']);
 const NOT_SELLABLE = Object.freeze(['out_of_stock', 'unavailable']);
 const MAX_PER_SHOP = 50;
@@ -211,12 +212,15 @@ async function deliver(a, p, at) {
   const sized = link ? `${text} ${link}` : text;
   //  `productName`/`priceMinor`/`kind` فقط برای پوشِ وب (نام و قیمت، نه شماره)؛ `at` همان ساعتِ این دور
   const msg = {
-    to: { phone: a.phone }, shopId: a.shop_id, productId: a.product_id, event: `product_${a.kind}_alert`, lang, text, link,
+    //  کلیدِ ایمیل ⇒ گیرندهٔ کانالِ ایمیل؛ کلیدِ کهنهٔ شماره ⇒ فقط سرویس‌دهنده‌های شماره‌ای (امروز هیچ)
+    to: a.phone.includes('@') ? { email: a.phone } : { phone: a.phone },
+    shopId: a.shop_id, productId: a.product_id, event: `product_${a.kind}_alert`, lang, text, link, title: clean(shop && shop.title),
     kind: a.kind, productName: clean(p.name), priceMinor: p.priceMinor, at,
   };
   const tried = [];
   for (const channel of CHANNELS) {
-    const provider = notify.providerOf(channel) || await require('./store-alert-push').builtin(channel, a.shop_id);
+    const provider = notify.providerOf(channel) || (channel === 'email'
+      ? await require('./customer-notify-email').builtin() : await require('./store-alert-push').builtin(channel, a.shop_id));
     if (!provider) { tried.push({ channel, result: 'not_configured' }); continue; }
     const price = cost.costMicros(channel, sized);
     if (price > 0 && !cost.allows(channel, sized, await notify.spentToday(a.shop_id, channel, at)).ok) {

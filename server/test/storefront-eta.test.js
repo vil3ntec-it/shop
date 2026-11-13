@@ -22,6 +22,7 @@ const { ulid } = require('../src/lib/ulid');
 const { resetAll } = require('../src/middleware/ratelimit');
 const eta = require('../src/lib/storefront-eta');
 const config = require('../src/config');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const MIN = 60_000;
 const DAY = 24 * 60 * MIN;
@@ -74,8 +75,8 @@ async function liveStore(label, { on = true, flags = [] } = {}) {
 }
 
 async function ticketFor(slug, phone) {
-  const st = await h.post(`/api/store/${slug}/verify/start`, { phone });
-  const c = await h.post(`/api/store/${slug}/verify/check`, { phone, code: st.body.devCode });
+  const st = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+  const c = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: st.body.devCode });
   assert.equal(c.status, 200, JSON.stringify(c.body));
   return c.body.ticket;
 }

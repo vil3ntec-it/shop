@@ -17,6 +17,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const chat = require('../src/lib/shop-chat');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -215,8 +216,8 @@ test('CHAT-14: مشتری از ویترین سنجاقِ خودش را می‌گ
   const slug = `pin-${uniq()}`;
   const sf = await h.put('/api/shop/storefront', { slug, enabled: true, title: 'سنجاق', contactPhone: '0700000003' }, { token: o.token });
   assert.equal(sf.status, 200, JSON.stringify(sf.body));
-  const start = await h.post(`/api/store/${slug}/verify/start`, { phone: '0790000341' });
-  const check = await h.post(`/api/store/${slug}/verify/check`, { phone: '0790000341', code: start.body.devCode });
+  const start = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf('0790000341') });
+  const check = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf('0790000341'), code: start.body.devCode });
   assert.equal(check.status, 200, JSON.stringify(check.body));
   const headers = { 'X-Store-Ticket': check.body.ticket };
   const pub = (method, p, body) => h.api(method, `/api/store/${slug}/chat${p}`, { body: body || null, headers });
