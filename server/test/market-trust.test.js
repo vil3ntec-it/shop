@@ -15,6 +15,7 @@
  *      فقط برای مدیر، درخواستِ هم‌زمان یک پرونده.
  */
 process.env.RATE_TRUST_FILE_MAX = '6';
+process.env.RATE_TRUST_UPLOAD_MAX = '12';   //  سطلِ IP ِ بارگذاریِ مدرک — آزمونِ «مدرک: سقف‌ها» تا ۴۲۹ می‌رود
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
@@ -754,5 +755,41 @@ test('⛔ putEvidence (CodeQL type confusion): فقط Buffer؛ رشته، آرا
   assert.equal(await rows('trust_evidence', s.shopId), 0);
   const ok = await trust.putEvidence(store, made.body.case.token, jpegWithGps('type'));
   assert.equal(ok.reused, false);
+  assert.equal(await rows('trust_evidence', s.shopId), 1);
+});
+
+test('مدرک: سقفِ حجم پیش از خواندن (۴۱۳)، ابعادِ سرآیند (بمبِ پیکسل ⇒ ۴۱۳)، نوع از بایت (۴۱۵) و سطلِ IP (۴۲۹) — هیچ ردیف', async () => {
+  const F = require('./image-fixtures');
+  const s = await liveStore('سقفِ مدرک');
+  const PHONE = '0790000281';
+  const order = await placeOrder(s, PHONE);
+  const made = await pub(s.slug, 'POST', '/complaints', { subject: 'order', orderNo: order.orderNo, category: 'damaged', body: 'سقفِ مدرک' }, await ticketFor(s.slug, PHONE));
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const url = `/api/store/${s.slug}/trust/cases/${made.body.case.token}/evidence`;
+  let calls = 0;
+  const up = (buf, headers = {}) => { calls++; return h.raw('POST', url, buf, { headers }); };
+
+  //  بزرگ‌تر از سقف: با Content-Length ِ درست، و بدنهٔ بزرگ‌تر از همان سقف
+  const big = Buffer.concat([jpegWithGps('big'), Buffer.alloc(config.trust.imageMax, 1)]);
+  const r1 = await up(big);
+  assert.equal(r1.status, 413, JSON.stringify(r1.body));
+  assert.equal(r1.body.error.code, 'too_large');
+  //  بمبِ پیکسل: PNG ِ چند ده کیلوبایتی با ۱۲۰۰۰×۱۲۰۰۰ (بیش از ۱۰٬۰۰۰ در هر بُعد) — پیش‌تر پذیرفته و در پنل/مرورگر گشوده می‌شد
+  const bomb = F.pngBomb(12000, 12000);
+  assert.ok(bomb.length < config.trust.imageMax);
+  const r2 = await up(bomb, { 'Content-Type': 'image/png' });
+  assert.equal(r2.status, 413, JSON.stringify(r2.body));
+  assert.equal(r2.body.error.code, 'image_too_large_dimensions');
+  const r3 = await up(Buffer.from('<html><script>alert(1)</script></html>'), { 'Content-Type': 'image/jpeg' });
+  assert.equal(r3.status, 415, JSON.stringify(r3.body));
+  assert.equal(await rows('trust_evidence', s.shopId), 0);
+  //  عکسِ درست هنوز پذیرفته
+  assert.equal((await up(jpegWithGps('ok'))).status, 201);
+  assert.equal(await rows('trust_evidence', s.shopId), 1);
+
+  //  سطلِ IP (`RATE_TRUST_UPLOAD_MAX` = ۱۲) پیش از خواندنِ بدنه: درخواستِ سیزدهم ۴۲۹، هیچ ردیفِ تازه
+  while (calls < 12) assert.notEqual((await up(jpegWithGps('ok'))).status, 429);
+  const over = await up(jpegWithGps('over'));
+  assert.equal(over.status, 429, JSON.stringify(over.body));
   assert.equal(await rows('trust_evidence', s.shopId), 1);
 });
