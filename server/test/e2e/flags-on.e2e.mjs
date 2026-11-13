@@ -83,7 +83,7 @@ const levels = async (owner, pid) => {
 const xfer = (owner, p, body, key = E.key('xfer')) => E.post(`/api/shop/catalog/transfers${p}`, body, owner.token, { 'Idempotency-Key': key });
 const listed = async (slug) => E.ok(await E.get(`/api/store/${slug}/products`), `فهرستِ ویترینِ ${slug}`).items.map((p) => p.id);
 const fresh = async (shopId) => { await catalog.refresh(shopId); };
-const setRole = (owner, role, perms) => E.put(`/api/shop/permissions/roles/${role}`, { perms }, owner.token);
+const setRole = (owner, role, perms) => E.roleLayer(owner, role, perms);
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
 
 /* ═════════════════════════════ آماده‌سازی ═════════════════════════════ */
