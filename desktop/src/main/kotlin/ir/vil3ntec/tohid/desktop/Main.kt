@@ -109,6 +109,8 @@ fun main() {
     live = LiveSocket(context) { SyncV1Worker.now(context) }
     live?.connect()
   }
+  //  NOTIF-06: زنگِ سفارشِ تازه جدا از پنجره (پیدا، کوچک‌شده یا در سینی) — ‎OrderTrayAlarmDesktop.kt‎
+  val orderAlarm = OrderTrayAlarm.start(context, scope)
 
   application(exitProcessOnExit = true) {
     var visible by remember { mutableStateOf(true) }
@@ -149,11 +151,13 @@ fun main() {
 
     if (trayOk) {
       Tray(
-        icon = icon,
+        icon = rememberOrderAlarmIcon(icon, orderAlarm),
         state = tray,
-        tooltip = ir.vil3ntec.tohid.core.i18n.Str.appName,
-        onAction = { visible = true; SingleInstance.front() },
+        tooltip = orderAlarm.tooltip() ?: ir.vil3ntec.tohid.core.i18n.Str.appName,
+        //  کلیکِ بالنِ سفارش یا نشانِ سینی وقتی زنگ می‌زند ⇒ «دیدم» و همان سفارش
+        onAction = { orderAlarm.seen(open = true); visible = true; SingleInstance.front() },
         menu = {
+          OrderAlarmItems(orderAlarm) { visible = true; SingleInstance.front() }
           Item(ir.vil3ntec.tohid.core.i18n.StrDesktop.trayOpen, onClick = { visible = true; SingleInstance.front() })
           Separator()
           Item("خروج", onClick = { quit() })
@@ -354,6 +358,7 @@ fun main() {
                 },
               )
               ir.vil3ntec.tohid.ui.components.keys.KeyLabelsOverlay() //  S50: برچسب‌های Ctrl (تنظیمِ خاموش ⇒ هیچ)
+              OrderAlarmBanner(orderAlarm) //  NOTIF-06: نوارِ «سفارشِ تازه» تا «دیدم» (زنگ خاموش ⇒ هیچ)
             }
             SessionLostNotice(context)
           }
