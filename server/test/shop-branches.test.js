@@ -331,15 +331,23 @@ test('v1، راهِ قدیم و درهای امروز فقط شعبهٔ اصلی
   const rows = await many(`SELECT row_id FROM sync_rows WHERE app='shop' AND account_id=$1 AND table_name='expenses' ORDER BY row_id`, [s.shopId]);
   assert.deepEqual(rows.map((r) => r.row_id), ['e-v1']);
   //  درهای امروز و راهِ قدیم برای کارمندِ فقط الف
-  for (const p of ['/api/shop', '/api/shop/sync/pull', '/api/sync/pull', '/api/events', '/api/me/backups']) {
+  for (const p of ['/api/shop/members', '/api/shop/sync/pull', '/api/sync/pull', '/api/events', '/api/me/backups']) {
     const r = await h.get(p, { token: w.onlyA.token });
     assert.equal(r.status, 403, `${p} ${JSON.stringify(r.body)}`);
     assert.equal(r.body.error.code, 'branch_main_only', p);
   }
+  //  فازِ ۲: «دکانِ من» (`GET /shop`، `/shop/me`) سطحِ دکان است (نقش، مجوز، اشتراک؛ هیچ دادهٔ شعبه‌ای) ⇒ کارمندِ فقط الف
+  //  هم نقش و دکانش را می‌گیرد (وگرنه برنامه نقش را نمی‌دانست و صاحب فرض می‌کرد)؛ نوشتن روی همین نشانی‌ها نگهبان دارد
+  for (const p of ['/api/shop', '/api/shop/me']) {
+    const r = await h.get(p, { token: w.onlyA.token });
+    assert.equal(r.status, 200, `${p} ${JSON.stringify(r.body)}`);
+    assert.equal(r.body.shop.id, s.shopId);
+    assert.equal(r.body.isOwner, false);
+  }
   //  کارمندِ اصلی همان امروز
   assert.equal((await h.get('/api/shop', { token: w.main.token })).status, 200);
   //  ادعای الف روی درِ امروز ⇒ ۴۰۳ (حتی صاحب)
-  const g = await h.api('GET', '/api/shop', { token: s.token, headers: B(A) });
+  const g = await h.api('GET', '/api/shop/members', { token: s.token, headers: B(A) });
   assert.equal(g.status, 403); assert.equal(g.body.error.code, 'branch_unsupported');
   //  بی توکن همان پاسخِ امروز (نگهبان چیزی نمی‌گوید)
   assert.equal((await h.api('GET', '/api/shop', { headers: B(A) })).status, 401);

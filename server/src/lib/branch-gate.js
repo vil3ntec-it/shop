@@ -5,7 +5,7 @@
  * این درها فقط دادهٔ **شعبهٔ اصلی** را دارند (حسابِ امروزِ دکان): Sync v1 (`routes/sync-v1.js`، مشترک با پمپ و
  * دست‌نخورده)، راهِ قدیمِ همگام‌سازی (`/sync`، `/shop/sync`)، همهٔ `/shop/*` جز `/shop/branches` و `/shop/approval-requests`
  * (شعبه‌شناس)، `/events` و
- * `/me/backups` (پشتیبانِ کاملِ دفترِ دکان). پس با پرچمِ روشنِ `shop.branches`:
+ * `/me/backups` (پشتیبانِ کاملِ دفترِ دکان). بیرون: «دکانِ من» (`GET /shop`، `/shop/me`، سطحِ دکان؛ فازِ ۲). پس با پرچمِ روشنِ `shop.branches`:
  *   ⛔ عضوی که شعبهٔ اصلی را ندارد (کارمندِ فقط شعبهٔ دیگر) ⇒ ۴۰۳ `branch_main_only` — هرگز دادهٔ اصلی را نمی‌خواند
  *      و دادهٔ شعبهٔ خودش را در اصلی نمی‌نویسد.
  *   ⛔ هر ادعای شعبهٔ غیرِ اصلی (`X-Branch-Id`) روی این درها ⇒ ۴۰۳ `branch_unsupported` (حتی صاحب): وگرنه دستگاهی
@@ -32,6 +32,9 @@ function kindOf(p, method = 'GET') {
   if (/^\/shop\/(branches|approval-requests)(\/|$)/.test(path)) return null;
   //  کلیدِ تأییدکنندهٔ خودِ عضو (STF-02): سطحِ دکان، بی دادهٔ هیچ شعبه — مدیرِ فقط شعبهٔ دیگر هم باید بتواند ثبت/باطل کند
   if (/^\/shop\/approver-keys(\/|$)/.test(path)) return null;
+  //  فازِ ۲: «دکانِ من» (`GET /shop`، `/shop/me`) فقط سطحِ دکان است (دکان، نقش، مجوز، اشتراک) — برنامهٔ کارمندِ فقط شعبهٔ
+  //  دیگر نقش و دکانش را از همین می‌گیرد (وگرنه صاحب فرض می‌کرد). فقط خواندن؛ نوشتن روی همین نشانی‌ها نگهبان دارد.
+  if (method === 'GET' && /^\/shop(\/me)?\/?$/.test(path)) return null;
   if (/^\/(shop|sync|events)(\/|$)/.test(path)) return 'rest';
   if (/^\/me\/backups(\/|$)/.test(path)) return 'rest';
   return null;
