@@ -48,8 +48,7 @@ async function shopWithStaff(label) {
     const r = await h.put('/api/admin/pump/live-config', { scope: id, key, value }, { token: admin });
     assert.equal(r.status, 200, JSON.stringify(r.body));
   }
-  const cap = await h.put('/api/shop/permissions/roles/staff', { perms: { 'sales.credit': { caps: { maxAmount: 500000 } }, 'sales.discount': { mode: 'approve' } } },
-    { token: shopOf.owner.accessToken });
+  const cap = await h.roleLayer(shopOf.owner.accessToken, 'staff', { 'sales.credit': { caps: { maxAmount: 500000 } }, 'sales.discount': { mode: 'approve' } });
   assert.equal(cap.status, 200, JSON.stringify(cap.body));
   //  تأییدِ تخفیفِ شاگرد برای `sales/sap` (مصرفِ آن درونِ واحدی که بعد رد می‌شود باید برگردد)
   resetAll();

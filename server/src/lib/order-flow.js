@@ -226,13 +226,21 @@ const latestNote = async (c, orderId, type) => (await c.query(
 const withCurrent = (err, current) => Object.assign(err, { data: { current } });
 
 /**
+ * ⛔ درِ «انتخابِ روشِ پرداخت» فقط با «پرداخت پس از پذیرش» ِ روشن (و حساب‌پی، [askModeOf]) — وگرنه ۴۰۴ `not_found`،
+ * **پیش از** توکن و بدنه (CHK-13؛ «خاموش» و «نیست» یک جواب: بدنهٔ بد با تنظیمِ خاموش ۴۰۰ نمی‌گیرد).
+ */
+async function assertChoiceOpen(shopId) {
+  if ((await askModeOf(shopId)) !== MODE_AFTER) throw notFound('پیدا نشد', 'not_found');
+}
+
+/**
  * «نقد هنگامِ تحویل/برداشت» ِ مشتری (توکنِ پیگیری؛ درِ `routes/order-pay-store.js`). تکرارِ همان ⇒ بی رویدادِ دوم.
  * @returns {Promise<{changed:boolean}>}
  */
 async function choose(shopId, orderId, body) {
+  await assertChoiceOpen(shopId);
   const method = typeof body?.method === 'string' ? body.method.trim() : '';
   if (!CHOICES.includes(method)) throw badRequest('روشِ پرداخت معتبر نیست', 'bad_payment_choice');
-  if ((await askModeOf(shopId)) !== MODE_AFTER) throw notFound('پیدا نشد', 'not_found');
   return tx(async (c) => {
     const row = await lockRow(c, shopId, orderId);
     if (!row || row.source !== 'storefront') throw notFound('سفارش پیدا نشد', 'order_not_found');
@@ -300,6 +308,6 @@ async function claimInvoice(shopId, orderId, actor) {
 
 module.exports = {
   INVOICE_STATUSES, PAY_OPEN, CHOICES, MODE_AFTER, MODE_ANY,
-  saleIdOf, invoiceOf, choiceOf, payStateOf, blockOf, modeOf, askModeOf, staffView, factsOf, trackView, guardOnlinePay, guardOnlinePayIn,
+  saleIdOf, invoiceOf, choiceOf, payStateOf, blockOf, modeOf, askModeOf, assertChoiceOpen, staffView, factsOf, trackView, guardOnlinePay, guardOnlinePayIn,
   choose, claimInvoice,
 };

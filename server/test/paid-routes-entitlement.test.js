@@ -29,10 +29,10 @@ const STAFF = ['POST /shop/sync', 'POST /shop/sync/push'];
 /** نوشتنی‌های بی کلیدِ پولی — هر کدام با دلیل؛ فهرست باید با سورس یکی بماند. */
 const FREE = [
   ['هستهٔ دکان (core: settings): نام، تنظیمات، شماره‌گذاری و بستنِ دسترسیِ دیگران پس از پایانِ اشتراک هم باز است', [
-    'POST /shop', 'POST /shop/create', 'PUT /shop', 'PUT /shop/settings', 'POST /shop/series',
-    'PATCH /shop/members/:id', 'PUT /shop/members/:id', 'DELETE /shop/members/:id', 'POST /shop/members/:id/remove', 'POST /shop/leave',
+    'POST /shop', 'POST /shop/create', 'PUT /shop', 'POST /shop/series',
+    'PATCH /shop/members/:id', 'PUT /shop/members/:id', 'DELETE /shop/members/:id', 'POST /shop/members/:id/remove',
     'POST /shop/staff-code/disable', 'DELETE /shop/staff-codes/:id',
-    'PUT /shop/permissions/roles/:role', 'PUT /shop/permissions/members/:id',
+    'PUT /shop/permissions/members/:id',
     'POST /shop/devices/:id/disable', 'POST /shop/devices/:id/enable',
     'POST /shop/approver-keys', 'DELETE /shop/approver-keys/:id']],
   ['چت و شکایت کلیدِ کاتالوگ ندارند؛ فقط پرچم', [
@@ -221,7 +221,6 @@ const DATA_WRITES = {
   //  SEC-02: گزارشِ زنجیرهٔ اسنادِ دستگاه — همان قاعدهٔ push (`requireSyncWrite`)؛ پرچمِ `shop.doc_chain` روشن است
   'POST /sync/v1/chain': (t, dev) => h.api('POST', '/api/sync/v1/chain', { token: t, headers: { 'X-App': 'shop', 'X-Device': dev },
     body: { device_id: dev, format: 'tohid-hashchain-v1', heads: [], links: [] } }),
-  'POST /products': (t) => h.post('/api/products', { data: { name: 'کالا' } }, { token: t }),
 };
 /**
  * FREE ِ بیرون از /api/shop: پاسبانیِ یکپارچگی، نه نوشتنِ دادهٔ دکان — شاگرد و صاحب با هر وضعِ اشتراک، هرگز

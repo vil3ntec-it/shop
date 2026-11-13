@@ -8,7 +8,7 @@ const plans = require('./lib/plans');
 const subs = require('./lib/subscriptions');
 const { rateLimit } = require('./middleware/ratelimit');
 const { notFoundHandler, errorHandler, notFound } = require('./middleware/errors');
-const { requireUser, optionalShop, requireAdmin } = require('./middleware/auth');
+const { requireUser, optionalShop, requireShop, requireAdmin } = require('./middleware/auth');
 const { redactPath } = require('./lib/log-redact');
 
 async function createApp({ runMigrations = true } = {}) {
@@ -534,9 +534,6 @@ async function createApp({ runMigrations = true } = {}) {
      *  `routes/admin.js` پیش از این‌ها می‌دود و مسیرِ پیدا‌نشده به
      *  این‌ها می‌رسد؛ خودشان هم `requireAdmin` دارند تا به تنهایی هم
      *  بسته باشند.
-     *  ⚠️ پیش از `routes/data` — آن روتر روی `/` است و روی **هر** مسیری
-     *  `requireUser, requireShop` می‌زند؛ هر چیزی که بعدش سوار شود برای
-     *  توکنِ پمپ یا مهمان هیچ‌وقت دیده نمی‌شود (همان تلهٔ `/api/v1`).
      */
     api.use('/admin', require('./routes/admin-notices'));
     api.use('/admin', require('./routes/admin-sales'));
@@ -549,8 +546,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/admin/calendar', require('./routes/admin-calendar'));
     /*
      *  ⛔ مسیرِ ناشناختهٔ مدیر ⇒ ۴۰۴ `route_not_found`، نه ۴۰۱ (چسبِ پنلِ مرکزی، بندِ ۱۲.۶ ِ
-     *  ADMIN-CONTROL-PLANE). بی این خط، درخواستِ مدیرِ **معتبر** به مسیری که این سرور ندارد به
-     *  `routes/data` ِ پایین (روی `/`، با `requireUser`) می‌افتاد و ۴۰۱ `invalid_token` می‌گرفت؛ پلِ
+     *  ADMIN-CONTROL-PLANE). بی این خط، درخواستِ مدیرِ **معتبر** به مسیری که این سرور ندارد به دروازهٔ
+     *  پایانیِ `/api` (پایین‌تر، با `requireUser`) می‌افتاد و ۴۰۱ `invalid_token` می‌گرفت؛ پلِ
      *  پنل آن را «نشستِ ارشد تمام شد» می‌خواند. `requireAdmin` همین‌جا دوباره: بی‌توکن و توکنِ دکان
      *  همان ۴۰۱ ِ همیشه را می‌گیرند تا وجود/نبودِ مسیرِ مدیر به بیرون گفته نشود. هر مسیرِ واقعی
      *  بالاتر سوار است، پس این خط به هیچ‌کدام نمی‌رسد.
@@ -560,7 +557,10 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/rep', require('./routes/rep'));       // شورا چ۳: نمایندهٔ فروش — فقط فروش‌های خودش
     api.get('/downloads', require('./routes/portal').downloadsHandler);
 
-    api.use('/', require('./routes/data'));
+    //  ⛔ درِ مستقیمِ داده (`routes/data.js`، ۵۱ در) ۱۴۰۵/۰۸/۲۲ رفت (بی صدازننده؛ نوشتن فقط از همگام‌سازی). دروازهٔ پایانی‌اش
+    //  می‌ماند: مسیرِ ناشناخته بی نشستِ دکان همان ۴۰۱ است و درِ پرچمِ خاموش «همان درِ ناشناخته» — قراردادِ برنامهٔ خرید
+    //  (`core/test-vectors/account-cart-v1.json`، `ShopperCartSync.doorClosed`)؛ با نشستِ دکان ۴۰۴ (`dead-doors.test.js`).
+    api.use(requireUser, requireShop);
     return api;
   }
 
@@ -569,9 +569,9 @@ async function createApp({ runMigrations = true } = {}) {
    *
    *  اگر `/api` اول سوار شود، درخواستِ `/api/v1/health` را هم **همان**
    *  می‌قاپد و داخلش مسیر می‌شود `/v1/health`؛ چون چنین مسیری نیست، به
-   *  آخرین لایه (`routes/data` روی `/`) می‌رسد که توکن می‌خواهد و همه‌چیز
-   *  ۴۰۱ برمی‌گشت. یعنی کل `/api/v1/…` — همان چیزی که برنامه‌ی وب و
-   *  اندروید صدا می‌زنند — بسته بود.
+   *  آخرین لایه (دروازهٔ پایانیِ `requireUser, requireShop`) می‌رسد که توکن می‌خواهد و همه‌چیز
+   *  ۴۰۱ برمی‌گشت. یعنی کل `/api/v1/…` — همان چیزی که برنامه‌ها صدا
+   *  می‌زنند — بسته بود.
    *
    *  پس نشانیِ درازتر اول.
    */

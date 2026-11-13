@@ -245,7 +245,7 @@ async function courierOf(o, name) {
   const inv = await h.post('/api/shop/invite', { role: 'courier' }, { token: o.token });
   assert.equal(inv.status, 201, JSON.stringify(inv.body));
   const uid = `am-courier-${uniq()}`;
-  const r = await h.post('/api/auth/staff-login', { code: inv.body.code, name, device: { uid, name: 'گوشیِ پیک', platform: 'android' } });
+  const r = await h.post('/api/auth/staff', { code: inv.body.code, name, device: { uid, name: 'گوشیِ پیک', platform: 'android' } });
   assert.equal(r.status, 201, JSON.stringify(r.body));
   const token = r.body.accessToken;
   return { token, uid, id: (await h.get('/api/courier/me', { token })).body.courier.id };

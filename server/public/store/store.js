@@ -424,11 +424,11 @@
     renderBar();
   }
 
-  // ── ثبت: checkout.js + order-kit.js ِ دیربار، با سبد یا صفحهٔ ثبت ──
+  // ── ثبت: checkout.js + order-kit.js + دو واژه‌نامه، دیربار ──
   var checkout = null; var checkoutP = null;
   var ORDER_KIT = '/kit/order-kit.js';
   function loadCheckout() {
-    checkoutP = checkoutP || Promise.all([K.js('/store/checkout.js'), K.js(ORDER_KIT)]).then(function () { return K.part('checkout', $('view-checkout')); }).then(function () {
+    checkoutP = checkoutP || Promise.all([K.js('/store/checkout.js'), K.js(ORDER_KIT), K.part('checkout', $('view-checkout')), K.part('ckform', $('view-checkout'))]).then(function () {
       checkout = window.StoreCheckout({
         api: api, slug: slug, orders: KEY_ORDERS, show: show, verifyAvailable: verifyAvailable,
         ids: ids, subtotal: subtotal, feeFor: feeFor, minFor: minFor, zones: zones, setZone: setZone, get zone() { return zone; }, shipText: shipText,

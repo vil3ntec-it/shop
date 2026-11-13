@@ -10,6 +10,10 @@
  *     این‌جا هیچ تلاشِ خودکاری نیست. تکرارِ همان موضوعِ باز ⇒ همان پرونده (`duplicate`).
  *   • پیگیری با توکنِ همان پرونده که فقط روی همین دستگاه می‌ماند (`store-trust:<slug>`، حداکثر ۱۰)؛ وضعیت، نتیجه و
  *     پاسخِ دکان هر بار از `GET …/trust/cases/<توکن>` تازه می‌شود.
+ *   • مدرک (v3 §۳۸.۶ «پرونده با شواهد»): پروندهٔ «باز»/«در حالِ بررسی» در «گزارش‌های من» دکمهٔ «افزودنِ عکس» دارد ⇒
+ *     `StoreChatPhoto.prepare` (JPEG ِ تازه از پیکسل زیرِ `limits.imageMax` ِ `GET …/trust/config` ⇒ بی EXIF و مکان) ⇒ بدنهٔ خام به
+ *     `POST …/trust/cases/<توکن>/evidence` با همان توکن. مرز سرور است: نوع از بایت، سقفِ حجم پیش از خواندن، پاک کردنِ EXIF،
+ *     حداکثر `evidenceMax` برای هر پرونده، همان بایت ⇒ همان ردیف، سطلِ IP ِ بارگذاری؛ ۴۱۳/۴۱۵/۴۰۹/۴۲۹ ⇒ پیامِ خودش.
  * ⛔ همهٔ متن با textContent (`K.el`)؛ توکن نه در نشانی می‌رود نه در صفحه دیده می‌شود؛ نام و شمارهٔ خریدار به دکان نمی‌رسد.
  */
 (function () {
@@ -64,6 +68,13 @@
   if (typeof module === 'object' && module.exports) { module.exports = lib; return; }
 
   var $ = K.$; var el = K.el; var t = K.t;
+  var OPEN = ['open', 'in_review'];
+
+  /** پیامِ خطای بارگذاری از کدِ سرور (واژه‌نامهٔ همین بخش، سپس کیت) */
+  function evErr(status, code) {
+    return new Error(K.has('tr.ev.err.' + code) ? t('tr.ev.err.' + code) : K.has('err.' + code) ? t('err.' + code)
+      : status === 429 ? t('err.rate') : t('err.generic'));
+  }
 
   /**
    * ctx = { api, slug, into } از catalog.js: بخشِ «گزارشِ مشکل با این دکان» تهِ [into] می‌نشیند. برمی‌گرداند
@@ -72,6 +83,8 @@
   window.StoreTrust = function (ctx) {
     var api = ctx.api;
     var SAVE = 'store-trust:' + ctx.slug;
+    var BASE = '/api/store/' + encodeURIComponent(ctx.slug);
+    var lim = null;   //  `GET …/trust/config` ِ همان سرور، یک بار
     return K.part('trust', $('tr-box')).then(function (ok) {
       if (!ok || !ctx.into || $('tr-box')) return null;
       var mine = el('ul', { class: 'stack small', attrs: { id: 'tr-mine', 'aria-label': t('tr.mine') } });
@@ -84,20 +97,22 @@
       function track() {
         var list = keep(K.load(SAVE, []), '');
         if (!list.length) { K.clear(mine); return; }
-        Promise.all(list.map(function (tk) {
+        lim = lim || api('/trust/config').then(function (r) { return r.limits || {}; }, function () { lim = null; return {}; });
+        Promise.all([lim].concat(list.map(function (tk) {
           return api('/trust/cases/' + encodeURIComponent(tk)).then(function (r) { return r.case; }, function (e) {
             return e.status === 404 || e.status === 410 ? 'gone' : null;
           });
-        })).then(function (cases) {
+        }))).then(function (all) {
+          var limits = all[0]; var cases = all.slice(1);
           var left = list.filter(function (tk, i) { return cases[i] !== 'gone'; });
           if (left.length !== list.length) K.save(SAVE, left);
           K.clear(mine);
-          cases.forEach(function (c) { if (c && c !== 'gone') mine.appendChild(row(c)); });
+          cases.forEach(function (c) { if (c && c !== 'gone') mine.appendChild(row(c, limits)); });
           if (mine.firstChild) mine.insertBefore(el('li', { class: 'muted', text: t('tr.mine') }), mine.firstChild);
         });
       }
 
-      function row(c) {
+      function row(c, limits) {
         var cat = t((c.kind === 'report' ? 'tr.r.' : 'tr.c.') + c.category);
         var parts = [cat, t('tr.s.' + (c.status || 'open'))];
         if (c.outcome) parts.push(t('tr.o.' + c.outcome));
@@ -106,7 +121,86 @@
         (c.history || []).filter(function (h) { return h.type === 'shop_response' && h.body; }).slice(-1).forEach(function (h) {
           li.appendChild(el('p', { text: t('tr.reply', { text: h.body }) }));
         });
+        evidence(c, li, limits || {});
         return li;
+      }
+
+      /**
+       * «N عکس پیوست شد» با «دیدنِ عکس‌ها» (به خواست: `GET …/evidence/<شناسه>` ⇒ data: ِ همین صفحه، توکن در DOM نه) و، فقط
+       * برای پروندهٔ باز، «افزودنِ عکس» تا سقفِ سرور.
+       */
+      function evidence(c, li, limits) {
+        var ids = (Array.isArray(c.evidence) ? c.evidence : []).map(function (e) { return String(e && e.id); });
+        var open = OPEN.indexOf(c.status || 'open') >= 0 && TOKEN.test(String(c.token || ''));
+        var max = limits.evidenceMax || 5;
+        if (!ids.length && !open) return;
+        var state = el('span', { class: 'tr-ev-n' });
+        var view = el('button', { class: 'btn btn-ghost btn-sm tr-ev-view', text: t('tr.ev.view'), attrs: { type: 'button' } });
+        var pics = el('div', { class: 'stack tr-ev-pics', hidden: true });
+        var input = el('input', { class: 'tr-ev-file', hidden: true, attrs: { type: 'file', accept: 'image/jpeg,image/png,image/webp', 'aria-label': t('tr.ev.add') } });
+        var add = el('button', { class: 'btn btn-ghost btn-sm tr-ev-add', text: t('tr.ev.add'), attrs: { type: 'button' } });
+        //  `K.note` کلاس را از نو می‌نویسد ⇒ نشانه با data
+        var msg = el('div', { class: 'note', hidden: true, attrs: { role: 'status', 'aria-live': 'polite', 'data-ev': 'msg' } });
+        var draw = function () {
+          state.textContent = ids.length ? t('tr.ev.n', { n: K.fa(ids.length, 0) }) : '';
+          view.hidden = !ids.length || !pics.hidden;
+          add.hidden = ids.length >= max;
+        };
+        view.addEventListener('click', function () {
+          view.disabled = true;
+          Promise.all(ids.map(function (id) { return picture(c.token, id).then(null, function () { return ''; }); })).then(function (urls) {
+            K.clear(pics);
+            urls.forEach(function (u) { if (u) pics.appendChild(el('img', { class: 'am-thumb', attrs: { src: u, alt: t('tr.ev.alt') } })); });
+            pics.hidden = !pics.firstChild;
+            if (pics.hidden) K.note(msg, 'err', t('err.generic'));
+            view.disabled = false;
+            draw();
+          });
+        });
+        add.addEventListener('click', function () { input.click(); });
+        input.addEventListener('change', function () {
+          var f = input.files && input.files[0];
+          input.value = '';
+          if (!f) return;
+          add.disabled = true;
+          K.note(msg, 'info', t('tr.ev.sending'));
+          K.js('/store/chat-photo.js').then(function () {
+            return window.StoreChatPhoto.prepare(f, { imageMax: limits.imageMax || 1536 * 1024, thumbMax: 16 * 1024 });
+          }).then(function (p) { return p.main; }, function () { throw evErr(415, 'unsupported_media'); })
+            .then(function (blob) { return upload(c.token, blob); })
+            .then(function (r) {
+              if (!r.reused && ids.indexOf(String(r.evidenceId)) < 0) { ids.push(String(r.evidenceId)); K.clear(pics); pics.hidden = true; }
+              K.note(msg, 'ok', t(r.reused ? 'tr.ev.same' : 'tr.ev.done'));
+            }, function (e) { K.note(msg, 'err', e.message); })
+            .then(function () { add.disabled = false; draw(); });
+        });
+        draw();
+        li.appendChild(el('div', { class: 'muted small row wrap-row' }, state, view));
+        li.appendChild(pics);
+        if (open) li.appendChild(el('div', { class: 'row wrap-row' }, add, input, el('small', { class: 'muted', text: t('tr.ev.hint', { n: K.fa(max, 0) }) })));
+        li.appendChild(msg);
+      }
+
+      /** یک عکسِ پیوست ⇒ data: (CSP ِ ویترین img-src blob: ندارد) */
+      function picture(tk, id) {
+        return fetch(BASE + '/trust/cases/' + encodeURIComponent(tk) + '/evidence/' + encodeURIComponent(id), { credentials: 'omit', cache: 'no-store' })
+          .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.blob(); })
+          .then(function (b) {
+            return new Promise(function (ok, no) { var rd = new FileReader(); rd.onload = function () { ok(String(rd.result)); }; rd.onerror = no; rd.readAsDataURL(b); });
+          });
+      }
+
+      /** بدنهٔ خامِ عکس با توکنِ همان پرونده — بی بلیت، بی نشست (توکن خودش اجازه است) */
+      function upload(tk, blob) {
+        return fetch(BASE + '/trust/cases/' + encodeURIComponent(tk) + '/evidence', {
+          method: 'POST', body: blob, credentials: 'omit', cache: 'no-store',
+          headers: { Accept: 'application/json', 'Accept-Language': K.lang, 'Content-Type': 'application/octet-stream' },
+        }).then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (b) {
+            if (r.ok) return b;
+            throw evErr(r.status, (b && b.error && b.error.code) || '');
+          });
+        }, function () { throw new Error(t('err.network')); });
       }
 
       /** فرمِ شکایت (`complaint`) یا گزارشِ کالا (`report`)؛ [id] پیشوندِ شناسه‌ها؛ [pid] کالای برگه */

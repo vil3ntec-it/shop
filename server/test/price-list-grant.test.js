@@ -76,7 +76,7 @@ test.before(async () => {
     debtor('pl-whole', { name: 'عمده', phone: '', priceList: 'wholesale' }),
   ]);
   assert.deepEqual(why(r), ['applied', 'applied', 'applied'], JSON.stringify(r.body));
-  const p = await h.post('/api/products', { id: 'pl-lrice', name: 'pl-lrice', salePrice: 1000, wholesalePrice: 800 }, { token: owner.accessToken });
+  const p = await h.seed(owner.accessToken, 'products', { id: 'pl-lrice', name: 'pl-lrice', salePrice: 1000, wholesalePrice: 800 });
   assert.ok([200, 201].includes(p.status), JSON.stringify(p.body));
 });
 test.after(async () => { await h.stop(); });

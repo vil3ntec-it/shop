@@ -26,7 +26,7 @@
     "server/src/lib/notices.js": 825,
     "server/src/lib/payment-intents.js": 855,
     "server/src/lib/shop-chat.js": 853,
-    "server/src/lib/staff-approval.js": 1054,
+    "server/src/lib/staff-approval.js": 1052,
     "server/src/routes/auth.js": 1119,
     "server/src/routes/pump-device.js": 917
   },

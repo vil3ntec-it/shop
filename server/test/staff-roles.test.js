@@ -138,7 +138,7 @@ test('درهای /api/shop: مدیریتِ کارمند، تنظیمات و سا
   for (const role of NEW_ROLES) {
     const tok = T[role].accessToken;
     assert.equal((await h.get('/api/shop/members', { token: tok })).status, 403, `${role} members`);
-    assert.equal((await h.put('/api/shop/settings', { settings: { a: 1 } }, { token: tok })).status, 403, `${role} settings`);
+    assert.equal((await h.put('/api/shop/receipt-profile', { name: 'سربرگ' }, { token: tok })).status, 403, `${role} settings`);
     assert.equal((await h.post('/api/shop/invite', { role: 'staff' }, { token: tok })).status, 403, `${role} invite`);
     assert.equal((await h.patch(`/api/shop/members/${mid}`, { role: 'cashier' }, { token: tok })).status, 403, `${role} role`);
     const audit = await h.get('/api/shop/audit', { token: tok });
@@ -161,7 +161,7 @@ test('درهای /api/shop: مدیریتِ کارمند، تنظیمات و سا
 });
 
 test('لایهٔ نقشِ تازه: صاحب می‌بندد، ولی بیش از نقش نمی‌دهد', async () => {
-  const put = (role, perms) => h.put(`/api/shop/permissions/roles/${role}`, { perms }, { token: T.owner.accessToken });
+  const put = (role, perms) => h.roleLayer(T.owner.accessToken, role, perms);
   const ok = await put('accountant', { 'reports.money': { mode: 'deny' } });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
   assert.equal((await h.get('/api/shop', { token: T.accountant.accessToken })).body.policy.effective['reports.money'].mode, 'deny');
@@ -404,9 +404,9 @@ test('Sync v3: جدولِ بیرون از نقش کلِ tx را برمی‌گر�
   assert.deepEqual(reasons(st), ['applied'], JSON.stringify(st.body));
 });
 
-/* ------------------------------------------- راهِ قدیم: /api/sync و /api/data */
+/* ------------------------------------------------------- راهِ قدیم: /api/sync */
 
-test('راهِ قدیم: /api/sync و درهای دفترِ /api/* (routes/data) همان قاعده را دارند، همه یا هیچ', async () => {
+test('راهِ قدیم: /api/sync (فاکتورِ کامل هم) همان قاعده را دارد، همه یا هیچ', async () => {
   const legacy = (role, changes) => h.post('/api/sync/push', { deviceId: `lg-${role}`, changes }, { token: T[role].accessToken });
   const mixed = [
     { collection: 'sales', id: 'lg-s1', updatedAt: Date.now(), data: { total: 10 } },
@@ -419,18 +419,21 @@ test('راهِ قدیم: /api/sync و درهای دفترِ /api/* (routes/data)
   assert.equal((await legacy('cashier', mixed.slice(0, 1))).status, 200);
   assert.equal((await legacy('staff', [{ ...mixed[1], id: 'lg-pu2' }])).status, 200);
 
-  const full = (role, id) => h.post('/api/sales/full', {
-    sale: { id, total: 10, finalTotal: 10 }, items: [{ productId: 'p1', quantity: 1, unitPrice: 10 }],
-    stockMovements: [{ productId: 'p1', qty: -1, type: 'sale' }],
-  }, { token: T[role].accessToken });
-  assert.equal((await full('cashier', 'lg-full-1')).status, 201);
+  //  فاکتورِ کامل در یک دسته (جای `/api/sales/full` ِ برداشته): سر، قلم و حرکتِ انبار با `saleId`
+  const full = (role, id) => legacy(role, [
+    { collection: 'sales', id, updatedAt: Date.now(), data: { total: 10, finalTotal: 10 } },
+    { collection: 'saleItems', id: `${id}-i`, updatedAt: Date.now(), data: { saleId: id, productId: 'p1', quantity: 1, unitPrice: 10 } },
+    { collection: 'stockMovements', id: `${id}-m`, updatedAt: Date.now(), data: { saleId: id, productId: 'p1', qty: -1, type: 'sale' } },
+  ]);
+  const ok = await full('cashier', 'lg-full-1');
+  assert.deepEqual([ok.status, ok.body.applied], [200, 3], JSON.stringify(ok.body));
   const bad = await full('storekeeper', 'lg-full-2');
   assert.equal(bad.status, 403);
   assert.equal(bad.body.error.code, 'table_not_allowed');
   assert.equal(await one(`SELECT 1 FROM sales WHERE shop_id=$1 AND id='lg-full-2'`, [shopId]), null);
-  assert.equal((await h.post('/api/expenses', { data: { amount: 1 } }, { token: T.cashier.accessToken })).status, 403);
+  assert.equal((await legacy('cashier', [{ collection: 'expenses', id: 'lg-e1', updatedAt: Date.now(), data: { amount: 1 } }])).status, 403);
   //  رسیدِ انبارِ دستیِ صندوق‌دار از راهِ قدیم هم بسته است؛ اصلاحِ یک برگشتِ همین دسته نه
-  const inv = await h.post('/api/inventory', { data: { productId: 'p1', units: 10 } }, { token: T.cashier.accessToken });
+  const inv = await legacy('cashier', [{ collection: 'warehouseEntries', id: 'lg-w0', updatedAt: Date.now(), data: { productId: 'p1', units: 10 } }]);
   assert.equal(inv.status, 403);
   assert.equal(inv.body.error.code, 'table_not_allowed');
   const lgRet = await legacy('cashier', [
@@ -439,9 +442,9 @@ test('راهِ قدیم: /api/sync و درهای دفترِ /api/* (routes/data)
     { collection: 'stockMovements', id: 'lg-m1', updatedAt: Date.now(), data: { productId: 'p1', qty: -1, type: 'damage', refId: 'lg-r1' } },
   ]);
   assert.equal(lgRet.status, 200, JSON.stringify(lgRet.body));
-  const acc = await h.post('/api/products', { data: { name: 'x' } }, { token: T.accountant.accessToken });
+  const acc = await legacy('accountant', [{ collection: 'products', id: 'lg-p1', updatedAt: Date.now(), data: { name: 'x' } }]);
   assert.equal(acc.status, 403);
-  assert.equal((await h.get('/api/products', { token: T.accountant.accessToken })).status, 200);
+  assert.equal((await h.get('/api/sync?since=0', { token: T.accountant.accessToken })).status, 200);
 });
 
 /* ---------------------------------------- نوشتن بیرون از همگام‌سازی */

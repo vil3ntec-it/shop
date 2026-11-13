@@ -8,6 +8,7 @@
  *   • بی نشتِ داده: نه شماره و نه توکن در نشانی، در متنِ صفحه یا در نمای دکان.
  * اجرا:  node test/e2e/run.mjs trust
  */
+import { createRequire } from 'node:module';
 import { boot, assert } from './lib/harness.mjs';
 
 const E = await boot({ name: 'trust', env: { TRUST_DAILY_PER_PHONE: '3' } });
@@ -149,5 +150,92 @@ await E.step('ABUSE-01.reply', 'پاسخِ دکان از برنامه در «گ�
   await page.waitForFunction(() => /پوزش؛ با فروشنده صحبت شد/.test(document.getElementById('tr-mine')?.textContent || ''), null, { timeout: 10_000 });
   assert.equal(await page.$$eval('#tr-mine li.card', (x) => x.length), 3);
 }, { needs: ['ABUSE-01.product'] });
+
+await E.step('ABUSE-01.evidence', 'مدرک: «افزودنِ عکس» در «گزارش‌های من» ⇒ JPEG ِ تازه بی EXIF/مکان به پرونده؛ همان عکس ⇒ «پیش‌تر»؛ غیرِ عکس ⇒ پیام؛ سقف ⇒ دکمه پنهان؛ پروندهٔ بسته ⇒ بی دکمه', async () => {
+  const { page } = G;
+  const F = createRequire(import.meta.url)('../image-fixtures');
+  const ev = async () => (await db.one(`SELECT COUNT(*)::int AS n FROM trust_evidence e JOIN trust_cases c ON c.id = e.case_id
+    WHERE c.shop_id=$1 AND c.kind='complaint'`, [owner.shopId])).n;
+  const card = '#tr-mine li.card[data-status="open"]:has(.tr-ev-add)';
+  await openStore(page, SLUG);
+  await page.waitForSelector('#tr-box', { state: 'attached', timeout: 10_000 });
+  await page.click('#tr-box > summary');
+  await page.waitForSelector(card, { timeout: 10_000 });
+  const cards = await page.$$(card);
+  assert.equal(cards.length, 3, 'هر سه پروندهٔ باز دکمه دارند');
+  //  شکایت (همان که دکان پاسخ داد) — بی عکس هنوز
+  const c = page.locator(card, { hasText: 'پوزش؛ با فروشنده صحبت شد' });
+  assert.equal(await c.locator('.tr-ev-n').count(), 1);
+  assert.equal((await c.locator('.tr-ev-n').textContent()).trim(), '');
+  //  JPEG ِ واقعی (گشودنی در کرومیوم) با بخشِ توضیحِ «مکان» پس از SOI — نه این و نه هیچ metadata ای نباید برسد
+  const photo = (seed) => {
+    const j = F.jpegImage(320, 240, (x, y) => (x * seed + y * 2) % 256);
+    const com = Buffer.from(`LATLONG-SECRET 34.5,69.${seed}`, 'latin1');
+    const len = Buffer.alloc(2); len.writeUInt16BE(com.length + 2);
+    return Buffer.concat([j.subarray(0, 2), Buffer.from([0xff, 0xfe]), len, com, j.subarray(2)]);
+  };
+  const shot = photo(3);
+  const posts = [];
+  page.on('request', (r) => { if (/\/evidence$/.test(r.url()) && r.method() === 'POST') posts.push({ url: r.url(), type: r.headers()['content-type'], ticket: r.headers()['x-store-ticket'] }); });
+  await c.locator('.tr-ev-file').setInputFiles({ name: 'receipt.jpg', mimeType: 'image/jpeg', buffer: shot });
+  await page.waitForFunction(() => /پیوست شد/.test([...document.querySelectorAll('#tr-mine [data-ev="msg"]')].map((x) => x.textContent).join(' ')), null, { timeout: 15_000 });
+  assert.match(await c.locator('.tr-ev-n').textContent(), /۱ عکس پیوست شد/);
+  assert.equal(await ev(), 1);
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0].type, 'application/octet-stream');
+  assert.equal(posts[0].ticket, undefined, 'توکنِ پرونده اجازه است، نه بلیت');
+  const row = await db.one(`SELECT e.mime, e.data, e.size FROM trust_evidence e JOIN trust_cases c ON c.id = e.case_id WHERE c.shop_id=$1`, [owner.shopId]);
+  assert.equal(row.mime, 'image/jpeg');
+  assert.ok(!Buffer.from(row.data).includes(Buffer.from('LATLONG-SECRET')), 'نه مکان، نه metadata');
+  assert.ok(Number(row.size) < 1536 * 1024);
+  //  «دیدنِ عکس‌ها» ⇒ همان عکس از `GET …/evidence/<شناسه>` به‌صورتِ data: (نه نشانیِ توکن‌دار در DOM)
+  await c.locator('.tr-ev-view').click();
+  await c.locator('.tr-ev-pics img').first().waitFor({ timeout: 10_000 });
+  assert.equal(await c.locator('.tr-ev-pics img').count(), 1);
+  assert.match(await c.locator('.tr-ev-pics img').getAttribute('src'), /^data:image\/jpeg;base64,/);
+  assert.equal(await c.locator('.tr-ev-view').isHidden(), true);
+  assert.equal(await c.locator('.tr-ev-pics img').evaluate((i) => i.naturalWidth > 0), true, 'عکس گشوده شد');
+
+  //  همان عکس دوباره ⇒ همان ردیف (سرور با hash)، «پیش‌تر»، شمار همان
+  await c.locator('.tr-ev-file').setInputFiles({ name: 'receipt.jpg', mimeType: 'image/jpeg', buffer: shot });
+  await page.waitForFunction(() => /پیش‌تر پیوست/.test([...document.querySelectorAll('#tr-mine [data-ev="msg"]')].map((x) => x.textContent).join(' ')), null, { timeout: 15_000 });
+  assert.match(await c.locator('.tr-ev-n').textContent(), /۱ عکس پیوست شد/);
+  assert.equal(await ev(), 1);
+  assert.equal(posts.length, 2);
+
+  //  نه عکس ⇒ پیامِ روشن، هیچ ردیف و هیچ درخواست
+  await c.locator('.tr-ev-file').setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not a photo at all') });
+  await page.waitForFunction(() => /فقط عکس/.test([...document.querySelectorAll('#tr-mine [data-ev="msg"]')].map((x) => x.textContent).join(' ')), null, { timeout: 15_000 });
+  assert.equal(await ev(), 1);
+  assert.equal(posts.length, 2);
+  assert.equal(await c.locator('.tr-ev-add').isEnabled(), true);
+
+  //  سقفِ پرونده (۵): چهار عکسِ دیگر ⇒ دکمه پنهان
+  for (let i = 0; i < 4; i++) {
+    await c.locator('.tr-ev-file').setInputFiles({ name: `p${i}.jpg`, mimeType: 'image/jpeg', buffer: photo(5 + i) });
+    await page.waitForFunction((k) => new RegExp(`${k} عکس پیوست شد`).test(document.querySelector('#tr-mine').textContent),
+      ['۲', '۳', '۴', '۵'][i], { timeout: 15_000 });
+  }
+  assert.equal(await ev(), 5);
+  assert.equal(await c.locator('.tr-ev-add').isHidden(), true, 'سقف ⇒ بی دکمه');
+
+  //  پروندهٔ بسته ⇒ شمارِ عکس می‌ماند، دکمه نه؛ سرور هم نمی‌پذیرد
+  await db.query(`UPDATE trust_cases SET status='closed' WHERE shop_id=$1 AND kind='complaint'`, [owner.shopId]);
+  await page.click('#tr-box > summary');
+  await page.click('#tr-box > summary');
+  await page.waitForSelector('#tr-mine li.card[data-status="closed"]', { timeout: 10_000 });
+  const closed = page.locator('#tr-mine li.card[data-status="closed"]');
+  assert.match(await closed.locator('.tr-ev-n').textContent(), /۵ عکس پیوست شد/);
+  assert.equal(await closed.locator('.tr-ev-add').count(), 0);
+  await closed.locator('.tr-ev-view').click();
+  await page.waitForFunction(() => document.querySelectorAll('#tr-mine li.card[data-status="closed"] .tr-ev-pics img').length === 5, null, { timeout: 15_000 });
+  const srcs = await closed.locator('.tr-ev-pics img').evaluateAll((x) => x.map((i) => i.getAttribute('src').slice(0, 15)));
+  assert.deepEqual([...new Set(srcs)], ['data:image/jpeg']);
+  const up = await page.evaluate(([u]) => fetch(u, { method: 'POST', body: new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xd9])]) }).then((r) => r.status),
+    [`${E.apiBase}/api/store/${SLUG}/trust/cases/${encodeURIComponent((await db.one(`SELECT id FROM trust_cases WHERE shop_id=$1 AND kind='complaint'`, [owner.shopId])).id)}/evidence`]);
+  assert.equal(up, 404, 'شناسهٔ خام توکن نیست');
+  const text = await page.textContent('body');
+  assert.doesNotMatch(text, /tc_[0-9a-f]{24}/, 'توکن در صفحه نیست');
+}, { needs: ['ABUSE-01.reply'] });
 
 await E.finish();

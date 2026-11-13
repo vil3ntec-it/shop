@@ -3,11 +3,10 @@
  * CRM-15 — اجرای سرورِ `customers.contact` (شماره و نشانیِ مشتری)، نه فقط پوشاندن در صفحه.
  *
  * نقشِ بی مجوز (پیش‌فرض: انباردار و جمع‌آور؛ یا هر کارمندی که صاحب برایش بسته) از سرور هم شمارهٔ کامل و نشانی نمی‌گیرد:
- *   ۱. درهای REST (`GET /api/debtors`، `/api/debtors/:id`) ⇐ شماره پوشیده با همان قالبِ برنامه (`ContactMask`: جز دو رقمِ آخر «•»)
- *      و نشانی نه؛
+ *   ۱. (درِ مستقیمِ `/api/debtors…` با قالبِ پوشیدهٔ `ContactMask` برداشته شد، ۱۴۰۵/۰۸/۲۲)
  *   ۲. هر سه راهِ همگام‌سازی (راهِ قدیمِ `/api/sync`، v1 و v3): pull، Snapshot، حذف‌شده‌ها و صندوقِ تعارض بی شماره و نشانی
  *      (یا پوشیده در صندوقِ تعارض)؛
- *   ۳. ⛔ push ِ همان نقش (یا PUT ِ REST) هرگز شماره و نشانیِ ردیفِ موجود را عوض یا پاک نمی‌کند — نه با مقدارِ پوشیده، نه با خالی؛
+ *   ۳. ⛔ push ِ همان نقش (کلِ ردیفِ راهِ قدیم هم) هرگز شماره و نشانیِ ردیفِ موجود را عوض یا پاک نمی‌کند — نه با مقدارِ پوشیده، نه با خالی؛
  *      ردیفِ تازه شماره‌ای را که خودِ کارمند نوشته می‌گیرد (پوشیده نه)؛
  *   ۴. شمارهٔ کاملِ سفارش و گفت‌وگو = `orders.contact` **و** `customers.contact`: پیش‌فرضِ صاحب و مدیر همان، فقط بستنِ صاحب اثر دارد.
  */
@@ -118,48 +117,42 @@ test('قالبِ پوشاندن همان ContactMask ِ برنامه است (ج�
     .then((hidden) => assert.equal(hidden, false));
 });
 
-/* ------------------------------------------------------------------ REST */
+/* ------------------------------------------------- راهِ قدیم: ردیفِ کامل */
+//  درِ مستقیمِ `/api/debtors…` (پوشاندن با قالبِ `ContactMask`) برداشته شد؛ همان نگهبان‌ها روی راهِ قدیمِ `/api/sync`
+const row = async (who, id) => h.legacyRow(T[who].token, 'debtors', id);
+const legacyDebtor = (who, id, data, at) => h.seed(T[who].token, 'debtors', { id, data }, { updatedAt: at ?? Date.now() });
 
-test('REST: GET /api/debtors و /api/debtors/:id — بی مجوز شماره پوشیده و نشانی نیست؛ با مجوز کامل', async () => {
-  const made = await h.post('/api/debtors',
-    { id: 'd-rest', data: { name: 'علی', phone: PHONE, phone2: PHONE2, deliveryAddress: ADDR } }, tok('owner'));
-  assert.equal(made.status, 201, JSON.stringify(made.body));
+test('راهِ قدیم: pull ِ همان ردیف برای هر نقش — بی مجوز بی شماره و نشانی؛ با مجوز کامل', async () => {
+  const made = await legacyDebtor('owner', 'd-rest', { name: 'علی', phone: PHONE, phone2: PHONE2, deliveryAddress: ADDR });
+  assert.deepEqual([made.status, made.body.applied], [200, 1], JSON.stringify(made.body));
   for (const who of [...ALLOWED, ...DENIED]) {
-    const row = await h.get('/api/debtors/d-rest', tok(who));
-    assert.equal(row.status, 200, `${who}: ${JSON.stringify(row.body)}`);
-    assert.equal(row.body.name, 'علی');
-    seesContact(who, row.body, { masked: true });
-    const list = await h.get('/api/debtors?limit=500', tok(who));
-    assert.equal(list.status, 200, who);
-    seesContact(who, list.body.items.find((x) => x.id === 'd-rest'), { masked: true });
+    const r = await row(who, 'd-rest');
+    assert.equal(r.name, 'علی', who);
+    seesContact(who, r);
   }
 });
 
-test('REST: PUT ِ همان ردیفِ پوشیده (یا با شمارهٔ خالی) شماره و نشانی را بازنویسی نمی‌کند؛ ردیفِ تازه شمارهٔ نوشته را می‌گیرد', async () => {
-  const made = await h.post('/api/debtors',
-    { id: 'd-put', data: { name: 'رضا', phone: PHONE, phone2: PHONE2, deliveryAddress: ADDR } }, tok('owner'));
-  assert.equal(made.status, 201, JSON.stringify(made.body));
-  //  کارمندِ بسته همان چیزی را که دیده برمی‌گرداند — شمارهٔ پوشیده و بی نشانی
-  const seen = (await h.get('/api/debtors/d-put', tok('cashierX'))).body;
-  assert.equal(seen.phone, MASKED);
-  const put = await h.put('/api/debtors/d-put',
-    { data: { name: 'رضای تازه', phone: seen.phone, phone2: seen.phone2, notes: 'دیدار' }, updatedAt: Date.now() + 1000 }, tok('cashierX'));
-  assert.equal(put.status, 200, JSON.stringify(put.body));
-  const wipe = await h.put('/api/debtors/d-put',
-    { data: { name: 'رضای تازه', phone: '', phone2: null, deliveryAddress: {}, notes: 'دیدار' }, updatedAt: Date.now() + 2000 }, tok('cashierX'));
-  assert.equal(wipe.status, 200, JSON.stringify(wipe.body));
-  const back = (await h.get('/api/debtors/d-put', tok('owner'))).body;
+test('راهِ قدیم: ردیفِ کاملِ نقشِ بسته (شمارهٔ پوشیده یا خالی) شماره و نشانی را بازنویسی نمی‌کند؛ ردیفِ تازه شمارهٔ نوشته را می‌گیرد', async () => {
+  const made = await legacyDebtor('owner', 'd-put', { name: 'رضا', phone: PHONE, phone2: PHONE2, deliveryAddress: ADDR });
+  assert.deepEqual([made.status, made.body.applied], [200, 1], JSON.stringify(made.body));
+  //  کارمندِ بسته همان چیزی را که برنامهٔ کهنه نشان داده برمی‌گرداند — شمارهٔ پوشیده و بی نشانی
+  assert.equal((await row('cashierX', 'd-put')).phone, undefined);
+  const put = await legacyDebtor('cashierX', 'd-put', { name: 'رضای تازه', phone: MASKED, phone2: MASKED2, notes: 'دیدار' }, Date.now() + 1000);
+  assert.deepEqual([put.status, put.body.applied], [200, 1], JSON.stringify(put.body));
+  const wipe = await legacyDebtor('cashierX', 'd-put', { name: 'رضای تازه', phone: '', phone2: null, deliveryAddress: {}, notes: 'دیدار' }, Date.now() + 2000);
+  assert.deepEqual([wipe.status, wipe.body.applied], [200, 1], JSON.stringify(wipe.body));
+  const back = await row('owner', 'd-put');
   assert.equal(back.name, 'رضای تازه', 'بقیهٔ ویرایش می‌نشیند');
   assert.equal(back.notes, 'دیدار');
   seesContact('owner', back);
   //  ردیفِ تازه: شماره‌ای که خودِ کارمند نوشته می‌ماند؛ مقدارِ پوشیده هرگز
-  assert.equal((await h.post('/api/debtors', { id: 'd-new1', data: { name: 'تازه', phone: '0700000011' } }, tok('cashierX'))).status, 201);
-  assert.equal((await h.post('/api/debtors', { id: 'd-new2', data: { name: 'پوشیده', phone: MASKED } }, tok('cashierX'))).status, 201);
-  assert.equal((await h.get('/api/debtors/d-new1', tok('owner'))).body.phone, '0700000011');
-  assert.equal((await h.get('/api/debtors/d-new2', tok('owner'))).body.phone, undefined);
+  assert.equal((await legacyDebtor('cashierX', 'd-new1', { name: 'تازه', phone: '0700000011' })).body.applied, 1);
+  assert.equal((await legacyDebtor('cashierX', 'd-new2', { name: 'پوشیده', phone: MASKED })).body.applied, 1);
+  assert.equal((await row('owner', 'd-new1')).phone, '0700000011');
+  assert.equal((await row('owner', 'd-new2')).phone, undefined);
   //  و صاحب (با مجوز) همان امروز: شماره را عوض و پاک می‌کند
-  assert.equal((await h.put('/api/debtors/d-new1', { data: { name: 'تازه', phone: '0700000012' }, updatedAt: Date.now() + 3000 }, tok('owner'))).status, 200);
-  assert.equal((await h.get('/api/debtors/d-new1', tok('owner'))).body.phone, '0700000012');
+  assert.equal((await legacyDebtor('owner', 'd-new1', { name: 'تازه', phone: '0700000012' }, Date.now() + 3000)).body.applied, 1);
+  assert.equal((await row('owner', 'd-new1')).phone, '0700000012');
 });
 
 /* ------------------------------------------------------- راهِ قدیم /api/sync */
@@ -177,7 +170,7 @@ test('راهِ قدیم /api/sync: pull بی شماره و نشانی برای �
   ] }, tok('cashierX'));
   assert.equal(push.status, 200, JSON.stringify(push.body));
   assert.equal(push.body.applied, 1);
-  const back = (await h.get('/api/debtors/d-rest', tok('owner'))).body;
+  const back = await row('owner', 'd-rest');
   assert.equal(back.notes, 'از راهِ قدیم');
   seesContact('owner', back);
 });
@@ -320,7 +313,7 @@ test('v3: صندوقِ تعارض (lww ِ شماره و «مشتریِ تکرا�
 
 /* ------------------------------------------------- نامِ فیلدِ ناامن (#914) */
 
-test('⛔ نامِ فیلدِ ناامن (__proto__، constructor) از اصلِ بی مجوز رد می‌شود و دادهٔ ردیف دست نمی‌خورد — v1، v3، راهِ قدیم، REST', async () => {
+test('⛔ نامِ فیلدِ ناامن (__proto__، constructor) از اصلِ بی مجوز رد می‌شود و دادهٔ ردیف دست نمی‌خورد — v1، v3، راهِ قدیم', async () => {
   //  کلیدِ «خودی» ِ __proto__ فقط با JSON.parse ساخته می‌شود (در شیءِ نوشته‌شده نمونهٔ اولیه را عوض می‌کند)
   const evil = (extra) => JSON.parse(`{"name":"دستکاری","phone":"","polluted":"no",${extra}}`);
   const PROTO = '"__proto__":{"isAdmin":true,"phone":"0700000099"}';
@@ -353,18 +346,18 @@ test('⛔ نامِ فیلدِ ناامن (__proto__، constructor) از اصلِ
   assert.equal(d3.polluted, undefined);
   seesContact('owner', d3);
 
-  //  راهِ قدیم و REST: ردیف کنار می‌رود (`bad_field_name`)
+  //  راهِ قدیم: ردیف کنار می‌رود (`bad_field_name`)
   const legacy = await h.post('/api/sync', { changes: [
     { collection: 'debtors', id: 'd-rest', updatedAt: Date.now() + 9000, data: evil(PROTO) },
   ] }, tok('cashierX'));
   assert.equal(legacy.status, 200, JSON.stringify(legacy.body));
   assert.equal(legacy.body.applied, 0);
   assert.deepEqual(legacy.body.conflicts.map((c) => c.reason), ['bad_field_name']);
-  const put = await h.put('/api/debtors/d-put', { data: evil(CTOR), updatedAt: Date.now() + 9000 }, tok('cashierX'));
+  const put = await legacyDebtor('cashierX', 'd-put', evil(CTOR), Date.now() + 9000);
   assert.equal(put.status, 200, JSON.stringify(put.body));
   assert.deepEqual(put.body.conflicts.map((c) => c.reason), ['bad_field_name']);
   for (const id of ['d-rest', 'd-put']) {
-    const back = (await h.get(`/api/debtors/${id}`, tok('owner'))).body;
+    const back = await row('owner', id);
     assert.notEqual(back.name, 'دستکاری', id);
     assert.equal(back.polluted, undefined, id);
     assert.equal(back.isAdmin, undefined, id);
@@ -419,18 +412,18 @@ test('سفارش و گفت‌وگو: شمارهٔ کامل = orders.contact و c
   assert.equal((await h.get('/api/shop/orders/customer?phone=0791234567', tok('managerX'))).status, 403);
 });
 
-test('CRM-09: پینِ نشانیِ تحویل (`deliveryPin`، فیلدِ جدای قرض‌دار) هم تماس است — بی مجوز در REST و v1 نیست و push ِ نقشِ بسته عوضش نمی‌کند', async () => {
+test('CRM-09: پینِ نشانیِ تحویل (`deliveryPin`، فیلدِ جدای قرض‌دار) هم تماس است — بی مجوز در راهِ قدیم و v1 نیست و push ِ نقشِ بسته عوضش نمی‌کند', async () => {
   const PIN = { lat: 34.528123, lng: 69.172346 };
   const full = { name: 'نسیم', phone: PHONE, phone2: PHONE2, deliveryAddress: ADDR, deliveryPin: PIN };
-  assert.equal((await h.post('/api/debtors', { id: 'd-pin-rest', data: full }, tok('owner'))).status, 201);
+  assert.equal((await legacyDebtor('owner', 'd-pin-rest', full)).body.applied, 1);
   const seed = await v1push('owner', 'v1-owner', [v1op('d-pin', full)]);
   assert.deepEqual(seed.body.results.map((x) => x.status), ['applied'], JSON.stringify(seed.body));
   for (const who of [...ALLOWED, ...DENIED]) {
-    const row = (await h.get('/api/debtors/d-pin-rest', tok(who))).body;
+    const legacyRow = await row(who, 'd-pin-rest');
     const pull = await h.get(`/api/sync/v1/pull?device_id=v1-pin-${who}&since=0&limit=2000`, tok(who));
     const ins = pull.body.ops.find((o) => o.row_id === 'd-pin' && o.type === 'insert');
     const snap = (await v1snap(who)).find((r) => r.id === 'd-pin').data;
-    for (const [door, data] of [['REST', row], ['pull', ins.fields], ['Snapshot', snap]]) {
+    for (const [door, data] of [['راهِ قدیم', legacyRow], ['pull', ins.fields], ['Snapshot', snap]]) {
       if (ALLOWED.includes(who)) assert.deepEqual(data.deliveryPin, PIN, `${who} ${door}`);
       else assert.equal(data.deliveryPin, undefined, `${who} ${door}: ${JSON.stringify(data)}`);
       assert.ok(ALLOWED.includes(who) || !JSON.stringify(data).includes('34.528'), `${who} ${door}: جای خانه`);

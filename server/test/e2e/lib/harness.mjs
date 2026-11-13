@@ -182,6 +182,28 @@ class Harness {
     return r.body;
   }
 
+  /**
+   * لایهٔ نقشِ دکان — درِ دکانِ `PUT /api/shop/permissions/roles/:role` برداشته شد (هیچ برنامه‌ای صدایش نمی‌زد)؛
+   * همان `staff-perms.setRoleLayer` که درِ ارشدِ پنل (`/api/admin/shops/:id/staff-perms/roles/:role`) می‌زند. شکلِ پاسخِ پیشین.
+   */
+  async roleLayer(owner, role, perms) {
+    try {
+      return { status: 200, body: { role, perms: await require('../../../src/lib/staff-perms').setRoleLayer(owner.shopId, role, perms, 'e2e') } };
+    } catch (e) {
+      if (!e.status) throw e;
+      return { status: e.status, body: { error: { code: e.code, message: e.message } } };
+    }
+  }
+
+  /** سابقهٔ تأییدهای پذیرفتهٔ دکان (`shop_approvals`) — درِ فهرستش (`GET /api/shop/approvals`) برداشته شد */
+  async approvals(shopId) {
+    const rows = await this.db.many(
+      `SELECT a.*, ua.name AS approver_name FROM shop_approvals a LEFT JOIN users ua ON ua.id = a.approver_id
+        WHERE a.shop_id=$1 ORDER BY a.used_at DESC`, [shopId]);
+    return rows.map((r) => ({ doc: r.doc, perm: r.perm, approverId: r.approver_id, requesterId: r.requester_id,
+      approverName: r.approver_name || '', reason: r.reason }));
+  }
+
   /* ════════════════════════ حساب‌ها ════════════════════════ */
 
   /** ثبت‌نامِ سه‌پله‌ای — همان راهِ برنامه (devCode فقط بیرون از تولید برمی‌گردد) */

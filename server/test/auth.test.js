@@ -88,7 +88,7 @@ test('حذف شاگرد، همان لحظه دسترسی او را می‌بند
   const code = (await h.post('/api/shop/staff-code', {}, { token: owner.accessToken })).body.code;
   await h.post('/api/shop/staff/join', { code }, { token: staff.accessToken });
 
-  assert.equal((await h.get('/api/products', { token: staff.accessToken })).status, 200);
+  assert.equal((await h.get('/api/sync?since=0', { token: staff.accessToken })).status, 200);
 
   const members = await h.get('/api/shop/members', { token: owner.accessToken });
   const row = members.body.members.find(m => m.role === 'staff');
@@ -96,7 +96,7 @@ test('حذف شاگرد، همان لحظه دسترسی او را می‌بند
   assert.equal(removed.status, 200);
 
   // نشست شاگرد باطل شده است
-  assert.equal((await h.get('/api/products', { token: staff.accessToken })).status, 401);
+  assert.equal((await h.get('/api/sync?since=0', { token: staff.accessToken })).status, 401);
 });
 
 test('نقش مدیر (manager) دسترسی بیشتری از شاگرد دارد ولی کد نمی‌سازد', async () => {
@@ -118,24 +118,33 @@ test('شاگرد رکورد دیگری را حذف نمی‌کند ولی رکو
   const code = (await h.post('/api/shop/staff-code', {}, { token: owner.accessToken })).body.code;
   await h.post('/api/shop/staff/join', { code }, { token: staff.accessToken });
 
-  await h.post('/api/products', { id: 'p-of-owner', data: { name: 'مال صاحب' } }, { token: owner.accessToken });
-  await h.post('/api/products', { id: 'p-of-staff', data: { name: 'مال شاگرد' } }, { token: staff.accessToken });
+  await h.seed(owner.accessToken, 'products', { id: 'p-of-owner', name: 'مال صاحب' });
+  await h.seed(staff.accessToken, 'products', { id: 'p-of-staff', name: 'مال شاگرد' });
 
-  assert.equal((await h.del('/api/products/p-of-owner', { token: staff.accessToken })).status, 403);
-  assert.equal((await h.del('/api/products/p-of-staff', { token: staff.accessToken })).status, 200);
-  assert.equal((await h.del('/api/products/p-of-owner', { token: owner.accessToken })).status, 200);
+  const del = (token, id) => h.seed(token, 'products', { id }, { deleted: true, updatedAt: Date.now() + 1000 });
+  const denied = await del(staff.accessToken, 'p-of-owner');
+  assert.equal(denied.status, 200);
+  assert.deepEqual(denied.body.conflicts.map((c) => c.reason), ['delete_not_allowed']);
+  assert.ok(await h.legacyRow(owner.accessToken, 'products', 'p-of-owner'), 'ردیفِ صاحب سرِ جایش است');
+  assert.equal((await del(staff.accessToken, 'p-of-staff')).body.applied, 1);
+  assert.equal((await del(owner.accessToken, 'p-of-owner')).body.applied, 1);
+  assert.equal(await h.legacyRow(owner.accessToken, 'products', 'p-of-owner'), null);
 });
 
 test('ورودی نامعتبر با پیام فارسی رد می‌شود، نه با خطای خام دیتابیس', async () => {
   const u = await h.newUser('ورودی');
   await h.post('/api/shop', { name: 'دکان ورودی' }, { token: u.accessToken });
 
-  const bad = await h.post('/api/products', { id: 'has spaces & symbols!', data: {} }, { token: u.accessToken });
+  const bad = await h.put('/api/shop', { name: '   ' }, { token: u.accessToken });
   assert.equal(bad.status, 400);
   assert.match(bad.body.error.message, /[؀-ۿ]/);
 
-  const huge = await h.post('/api/products', { id: 'p-big', data: { blob: 'x'.repeat(70000) } }, { token: u.accessToken });
-  assert.equal(huge.status, 400);
+  //  همگام‌سازیِ راهِ قدیم: شناسهٔ بلند و ردیفِ بزرگ کنار می‌روند (نه ۵xx، نه نوشتن)
+  const huge = await h.legacyPush(u.accessToken, [
+    h.change('products', { id: 'p'.repeat(81), name: 'x' }), h.change('products', { id: 'p-big', blob: 'x'.repeat(70000) }),
+  ]);
+  assert.equal(huge.status, 200);
+  assert.deepEqual([huge.body.applied, huge.body.skipped], [0, 2]);
 });
 
 test('تنظیمات عمومی سرور بدون ورود در دسترس است و راز ندارد', async () => {

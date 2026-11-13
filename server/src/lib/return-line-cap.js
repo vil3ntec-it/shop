@@ -17,7 +17,7 @@
  *   v3/v2  `staff-approval.judgeGroup` — پیش از نقش و پولِ فاکتور، برای همه (`sync-v3.push` قفل را می‌گیرد)
  *   v1     نگهبانِ درونِ تراکنشِ push (`guard` ِ `sync-v1.push`، از `routes/sync-v1.js`؛ `lib/sync-v1.js` دست نمی‌خورد،
  *          پمپ همان `guard` ِ پیشین را می‌گیرد): نخستین `check` کلِ دسته را یک‌جا داوری می‌کند
- *   REST   `lib/sync.js` (`/api/data/returns`، `/api/data/sales/full` و راهِ قدیم): همه یا هیچ ⇒ ۴۰۹
+ *   قدیم  `lib/sync.js` (راهِ قدیمِ `/api/sync`؛ برچسبِ صندوق `rest`): همه یا هیچ ⇒ ۴۰۹
  * بیش از ماندهٔ قلم ⇒ `return_exceeds_sold`، هرگز نمی‌نشیند؛ همراه‌های همان ثبت (حرکتِ انبار، شمارندهٔ قلم، رسید، سابقه)
  * `tx_rejected` (v3: همهٔ واحد)؛ صندوقِ تعارضِ `perm_denied` با همهٔ opها (`conflict-payload`) برای صاحب. همان ردیف
  * دوباره — op ِ تکراری، یا همان شناسه با op ِ تازه — یک بار شمرده می‌شود.

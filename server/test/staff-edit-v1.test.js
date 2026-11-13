@@ -37,7 +37,7 @@ const rowOf = async (table, id) => (await one(
 const boxOf = (opId) => one(
   `SELECT kind, detail FROM sync_v3_conflicts WHERE account_id=$1 AND loser_op_id=$2 AND status='open'`, [shopId, opId]
 );
-const setRole = (role, perms) => h.put(`/api/shop/permissions/roles/${role}`, { perms }, { token: owner.accessToken });
+const setRole = (role, perms) => h.roleLayer(owner.accessToken, role, perms);
 const sale = (id, total, discount) => op('sales', id, 'insert', { total, discount, finalTotal: total - discount, status: 'completed' });
 
 test.before(async () => {

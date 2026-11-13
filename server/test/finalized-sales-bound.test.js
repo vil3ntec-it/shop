@@ -58,7 +58,7 @@ const legacyPush = (token, deviceId, id, data) => h.api('POST', '/api/sync/push'
   token, headers: { 'X-App': 'shop' },
   body: { deviceId, changes: [{ collection: 'sales', id, updatedAt: Date.now() + (++seq), data }] },
 });
-const legacyRow = async (id) => (await h.api('GET', `/api/sales/${id}`, { token: owner.accessToken, headers: { 'X-App': 'shop' } })).body;
+const legacyRow = async (id) => (await one('SELECT data FROM sales WHERE shop_id=$1 AND id=$2', [shopId, id]))?.data || {};
 
 test.before(async () => {
   await h.start();

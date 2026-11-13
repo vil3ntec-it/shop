@@ -142,7 +142,7 @@ test('شاگردِ ورود‌با‌کد (نه ایمیل، نه شماره): �
   const o = await h.newUser('صاحبِ دکانِ شاگرد', 'shop');
   assert.equal((await h.post('/api/shop', { name: 'دکانِ شاگرد' }, { token: o.accessToken })).status, 201);
   const code = (await h.get('/api/shop/staff-code', { token: o.accessToken })).body.code;
-  const s = await h.post('/api/auth/staff-login', { code, name: 'شاگردِ بی‌ایمیل', device: { uid: 'staff-phone-del', name: 'گوشی', platform: 'android' } });
+  const s = await h.post('/api/auth/staff', { code, name: 'شاگردِ بی‌ایمیل', device: { uid: 'staff-phone-del', name: 'گوشی', platform: 'android' } });
   assert.equal(s.status, 201, JSON.stringify(s.body));
   const id = s.body.user.id;
   const row = await one('SELECT email, phone FROM users WHERE id=$1', [id]);

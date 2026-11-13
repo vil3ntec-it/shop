@@ -46,7 +46,7 @@ const row3 = (table, id) => one(
 const boxOf = (opId) => one(
   `SELECT * FROM sync_v3_conflicts WHERE account_id=$1 AND loser_op_id=$2 AND status='open'`, [shopId, opId]
 );
-const setRole = (role, perms) => h.put(`/api/shop/permissions/roles/${role}`, { perms }, { token: owner.accessToken });
+const setRole = (role, perms) => h.roleLayer(owner.accessToken, role, perms);
 
 /** کلیدِ ES256ِ یک تأییدکننده، ثبت‌شده در سرور */
 async function approverKey(who, label) {
@@ -201,15 +201,15 @@ test('S08: با برگهٔ معتبرِ صاحب دکان ⇒ می‌نشیند 
   const r = await push3(manager, 'm-08', [op]);
   assert.equal(r.body.results[0].status, 'applied', JSON.stringify(r.body));
   assert.ok(await row3('sales', 's-08-ap'));
-  const list = await h.get('/api/shop/approvals', { token: owner.accessToken });
-  const a = list.body.approvals.find((x) => x.doc === 'sales/s-08-ap');
+  //  سابقه در `shop_approvals` (درِ فهرستِ `GET /api/shop/approvals` برداشته شد؛ هیچ برنامه‌ای صدایش نمی‌زد)
+  const a = await one(`SELECT a.*, ua.name AS approver_name FROM shop_approvals a LEFT JOIN users ua ON ua.id = a.approver_id
+    WHERE a.shop_id=$1 AND a.doc=$2`, [shopId, 'sales/s-08-ap']);
   assert.equal(a.perm, 'sales.discount');
-  assert.equal(a.approverId, owner.user.id);
-  assert.equal(a.requesterId, manager.user.id);
+  assert.equal(a.approver_id, owner.user.id);
+  assert.equal(a.requester_id, manager.user.id);
   assert.equal(a.reason, 'مشتریِ عمده');
-  assert.equal(a.opId, op.op_id);
-  assert.ok(a.approverName);
-  assert.equal((await h.get('/api/shop/approvals', { token: staff.accessToken })).status, 403);
+  assert.equal(a.op_id, op.op_id);
+  assert.ok(a.approver_name);
 
   //  همان op دوباره (پاسخ گم شد) ⇒ «تکراری»، نه بازپخش
   const again = await push3(manager, 'm-08', [op]);

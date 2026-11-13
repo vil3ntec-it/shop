@@ -45,7 +45,7 @@ async function push1(who, device, ops) {
 const push3 = (who, device, ops) => h.api('POST', '/api/sync/v3/push', {
   token: who.accessToken, body: { device_id: device, protocol: 3, ops },
 });
-const setRole = (role, perms) => h.put(`/api/shop/permissions/roles/${role}`, { perms }, { token: owner.accessToken });
+const setRole = (role, perms) => h.roleLayer(owner.accessToken, role, perms);
 const row1 = (table, id) => one(
   `SELECT * FROM sync_rows WHERE app='shop' AND account_id=$1 AND table_name=$2 AND row_id=$3`, [shopId, table, id]
 );

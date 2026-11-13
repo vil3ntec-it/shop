@@ -289,6 +289,12 @@ test('«پرداخت پس از پذیرش» روشن: پیش از قبول نه 
   //  تنظیم را خاموش کن ⇒ درِ انتخاب ۴۰۴
   assert.equal((await h.put('/api/shop/storefront', { payAfterAccept: false }, { token: s.token })).status, 200);
   assert.equal((await choose(s, o.token, { method: 'cash' })).status, 404);
+  //  ⛔ CHK-13: «خاموش» و «نیست» یک جواب — بدنهٔ بد، بدنهٔ تهی و توکنِ نادرست هم همان ۴۰۴ (پیش‌تر ۴۰۰ `bad_payment_choice`)
+  for (const [tk, body] of [[o.token, { method: 'hesabpay_cash' }], [o.token, {}], [o.token, { method: 7 }], [flip, { method: 'bad' }]]) {
+    const off = await choose(s, tk, body);
+    assert.equal(off.status, 404, JSON.stringify(off.body));
+    assert.equal(off.body.error.code, 'not_found', JSON.stringify(off.body));
+  }
 });
 
 //  ⛔ «همه روشن» (`web-store-allflags.mjs`): پاسخِ این کارِ مشتری فقط `sf.track` بود و صفحه (`renderOrder(r.order)`) هر کلیدِ نیامده را

@@ -7,7 +7,7 @@
  * (`perm-core` = `PermCore.kt`، بردارِ `perm-v1.json`) و لایه‌های همین دکان سنجیده می‌شود:
  *   v3            op ِ `debtors` (`creditLimitMinor` یا `creditLimit`) در `sync-v3-apply.authorize` ⇒ رد و صندوقِ تعارض
  *   v1            همان op در `v1Guard` (از `staff-role-v1.offRole`؛ ⛔ `lib/sync-v1.js` دست نمی‌خورد) ⇒ رد و صندوقِ تعارض
- *   REST/راهِ قدیم `sync.pushChanges` (`/api/sync/push`، `/api/data/debtors`) ⇒ ۴۰۳ و کلِ دسته برمی‌گردد
+ *   راهِ قدیم `sync.pushChanges` (`/api/sync/push`) ⇒ ۴۰۳ و کلِ دسته برمی‌گردد
  * صندوقِ تعارض (`perm_denied`) همان راهِ «دوباره ثبت با تأییدِ من» ِ صاحب/مدیر است (`conflict-inbox`): همان op با نقشِ
  * تأییدکننده دوباره سنجیده می‌شود، پس هیچ ویرایشی بی‌صدا گم نمی‌شود.
  *

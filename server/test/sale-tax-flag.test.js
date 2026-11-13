@@ -68,8 +68,8 @@ test.before(async () => {
   const r = await push3(owner, 'own', [{ op_id: oid(), hlc: H('own'), table: 'products', row_id: 'tx-rice', kind: 'insert',
     fields: { name: 'برنج', salePriceMinor: 100000 } }]);
   assert.deepEqual(why(r), ['applied'], JSON.stringify(r.body));
-  const rest = await h.post('/api/products', { id: 'tx-rice', name: 'برنج', salePrice: 1000, wholesalePrice: 0 }, { token: owner.accessToken });
-  assert.ok([200, 201].includes(rest.status), JSON.stringify(rest.body));
+  const rest = await h.seed(owner.accessToken, 'products', { id: 'tx-rice', name: 'برنج', salePrice: 1000, wholesalePrice: 0 });
+  assert.equal(rest.status, 200, JSON.stringify(rest.body));
   await liveFlag('shop.price_cap', true, shopId);
 });
 test.after(async () => { await h.stop(); });
@@ -106,18 +106,21 @@ test('پرچمِ روشن، v3: مالیاتی که در نهایی نیامد �
   assert.deepEqual(why(await push3(owner, 'own', sale3('tx-on-own', { taxMinor: 10000 }))), ['applied', 'applied']);
 });
 
-test('پرچمِ روشن، راهِ قدیمِ REST: همان قاعده (۴۰۳ ِ همه یا هیچ)', async () => {
+test('پرچمِ روشن، راهِ قدیم (`/api/sync`): همان قاعده (۴۰۳ ِ همه یا هیچ)', async () => {
   await liveFlag('shop.sale_tax', true, shopId);
-  const send = (id, sale) => { resetAll(); return h.post('/api/sales/full', {
-    sale: { id, total: 1000, discount: 0, finalTotal: 1000, status: 'completed', date: '2026-11-08', ...sale },
-    items: [{ id: `${id}-i`, productId: 'tx-rice', quantity: 1, unitPrice: 1000, totalPrice: 1000 }],
-  }, { token: staff.accessToken }); };
+  const send = (id, sale) => { resetAll(); return h.legacyPush(staff.accessToken, [
+    h.change('sales', { id, total: 1000, discount: 0, finalTotal: 1000, status: 'completed', date: '2026-11-08', ...sale }),
+    h.change('saleItems', { id: `${id}-i`, saleId: id, productId: 'tx-rice', quantity: 1, unitPrice: 1000, totalPrice: 1000 }),
+  ], { deviceId: 'web-st' }); };
   const gap = await send('tx-rest-gap', { taxMinor: 10000 });
   assert.equal(gap.status, 403, JSON.stringify(gap.body));
   assert.equal(gap.body.error.code, 'discount_not_allowed');
+  assert.equal(await h.legacyRow(staff.accessToken, 'sales', 'tx-rest-gap'), null, 'هیچ بخشی از دسته ننشست');
   const ok = await send('tx-rest-ok', { taxMinor: 10000, finalTotal: 1100 });
-  assert.ok([200, 201].includes(ok.status), JSON.stringify(ok.body));
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(ok.body.applied, 2, JSON.stringify(ok.body));
   await liveFlag('shop.sale_tax', false, shopId);
   const off = await send('tx-rest-off', { taxMinor: 10000 });
-  assert.ok([200, 201].includes(off.status), JSON.stringify(off.body));
+  assert.equal(off.status, 200, JSON.stringify(off.body));
+  assert.equal(off.body.applied, 2, JSON.stringify(off.body));
 });

@@ -55,7 +55,7 @@ async function member(s, role) {
   const inv = await h.post('/api/shop/invite', { role }, { token: s.token });
   assert.equal(inv.status, 201, JSON.stringify(inv.body));
   if (role === 'courier') {
-    const r = await h.post('/api/auth/staff-login', { code: inv.body.code, name: 'پیک', device: { uid: `c-${uniq()}`, name: 'گوشی', platform: 'android' } });
+    const r = await h.post('/api/auth/staff', { code: inv.body.code, name: 'پیک', device: { uid: `c-${uniq()}`, name: 'گوشی', platform: 'android' } });
     assert.equal(r.status, 201, JSON.stringify(r.body));
     return { token: r.body.accessToken };
   }

@@ -256,37 +256,38 @@ test('راهِ قدیم: نشستِ زنجیره‌دار ۴۰۹ روی ویرا
   assert.deepEqual((await events('L-m')).map((e) => [e.type, e.path, e.enforced]), [['stockMovements', 'legacy', false]]);
 });
 
-test('API ِ مستقیم: ویرایش/حذفِ قرض، خرید و برگشتِ ثبت‌شده ۴۰۹؛ زنده کردنِ فاکتور و حرکت با شناسهٔ موجود در `/sales/full` هم', async () => {
-  const api = (method, path, body) => h.api(method, path, { token: clerk.accessToken, headers: { 'X-App': 'shop' }, body });
-  let r = await api('POST', '/api/payments', { id: 'A-t', data: DOCS.transactions.row('A-t') });
-  assert.equal(r.status, 201, JSON.stringify(r.body));
-  r = await api('PUT', '/api/payments/A-t', { data: { ...DOCS.transactions.row('A-t'), amount: 1 } });
+test('راهِ قدیم با نشستِ زنجیره‌دار (جای درِ مستقیمِ برداشته): ویرایش/حذفِ قرض و خرید ۴۰۹؛ بازنویسیِ حرکتِ ثبت‌شده در دستهٔ فاکتورِ کامل و زنده کردنِ فاکتور هم', async () => {
+  const api = (changes) => legacy(owner.accessToken, 'old-phone', changes);
+  let r = await api([{ collection: 'transactions', id: 'A-t', data: DOCS.transactions.row('A-t') }]);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  r = await api([{ collection: 'transactions', id: 'A-t', data: { ...DOCS.transactions.row('A-t'), amount: 1 } }]);
   assert.equal(r.status, 409, JSON.stringify(r.body));
   assert.equal(r.body.error.code, DOC);
-  r = await api('PUT', '/api/payments/A-t', { data: { ...DOCS.transactions.row('A-t'), notes: 'یادداشت' } });
+  r = await api([{ collection: 'transactions', id: 'A-t', data: { ...DOCS.transactions.row('A-t'), notes: 'یادداشت' } }]);
   assert.equal(r.status, 200, 'فیلدِ آزاد');
-  r = await api('POST', '/api/purchases', { id: 'A-p', data: DOCS.purchases.row('A-p') });
-  assert.equal(r.status, 201);
-  r = await api('DELETE', '/api/purchases/A-p');
+  r = await api([{ collection: 'purchases', id: 'A-p', data: DOCS.purchases.row('A-p') }]);
+  assert.equal(r.status, 200);
+  r = await api([{ collection: 'purchases', id: 'A-p', deleted: true }]);
   assert.equal(r.status, 409, JSON.stringify(r.body));
   assert.equal((await restRow('purchases', 'A-p'))._deleted, false);
   assert.equal((await restRow('transactions', 'A-t')).amount, 500);
 
-  //  `/sales/full` با شناسهٔ حرکتِ موجود ⇒ بازنویسیِ حرکتِ ثبت‌شده ⇒ ۴۰۹ و هیچ بخشی (فاکتورِ تازه هم نه)
+  //  فاکتورِ کامل با شناسهٔ حرکتِ موجود ⇒ بازنویسیِ حرکتِ ثبت‌شده ⇒ ۴۰۹ و هیچ بخشی (فاکتورِ تازه هم نه)
   r = await legacy(clerk.accessToken, 'old-web', [{ collection: 'stockMovements', id: 'A-m', data: DOCS.stockMovements.row('A-m') }]);
   assert.equal(r.status, 200);
-  r = await api('POST', '/api/sales/full', {
-    sale: sale('A-s'), items: [{ productId: 'p1', quantity: 1, unitPrice: 1000, totalPrice: 1000 }],
-    stockMovements: [{ id: 'A-m', productId: 'p1', type: 'sale', qty: -1, date: '2026-11-01' }],
-  });
+  r = await api([
+    { collection: 'sales', id: 'A-s', data: sale('A-s') },
+    { collection: 'saleItems', id: 'A-s-i', data: { saleId: 'A-s', productId: 'p1', quantity: 1, unitPrice: 1000, totalPrice: 1000 } },
+    { collection: 'stockMovements', id: 'A-m', data: { saleId: 'A-s', productId: 'p1', type: 'sale', qty: -1, date: '2026-11-01' } },
+  ]);
   assert.equal(r.status, 409, JSON.stringify(r.body));
   assert.equal((await restRow('stockMovements', 'A-m')).qty, 4);
   assert.equal(await restRow('sales', 'A-s'), null);
 
-  //  فاکتورِ حذف‌شده با PUT زنده نمی‌شود
+  //  فاکتورِ حذف‌شده با ردیفِ کامل زنده نمی‌شود
   r = await legacy(clerk.accessToken, 'old-web', [{ collection: 'sales', id: 'A-d', data: sale('A-d') }]);
   r = await legacy(clerk.accessToken, 'old-web', [{ collection: 'sales', id: 'A-d', deleted: true }]);
-  r = await api('PUT', '/api/sales/A-d', { data: sale('A-d', { total: 3, finalTotal: 3 }) });
+  r = await api([{ collection: 'sales', id: 'A-d', data: sale('A-d', { total: 3, finalTotal: 3 }) }]);
   assert.equal(r.status, 409, JSON.stringify(r.body));
   assert.equal((await restRow('sales', 'A-d'))._deleted, true);
 });

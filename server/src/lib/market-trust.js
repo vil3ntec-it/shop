@@ -398,7 +398,7 @@ async function myCases(store, viewer) {
 
 const kb = (bytes) => `${Math.round(bytes / 1024)} کیلوبایت`;
 
-/** بارگذاری: نوع از روی بایت (فقط عکس)، EXIF ِ مکان پاک، همان بایت‌ها ⇒ همان ردیف. */
+/** بارگذاری: نوع از روی بایت (فقط عکس)، ابعادِ سرآیند زیرِ سقف، EXIF ِ مکان پاک، همان بایت‌ها ⇒ همان ردیف. */
 async function putEvidence(store, token, buf) {
   const pre = await caseByToken(store, token);
   if (pre.status !== 'open' && pre.status !== 'in_review') throw conflict('این پرونده دیگر مدرک نمی‌پذیرد', 'case_not_open');
@@ -406,7 +406,8 @@ async function putEvidence(store, token, buf) {
   const s = chatMedia.sniff(bytes);
   if (!s || s.kind !== 'image') throw new ApiError(415, 'unsupported_media', 'فقط عکس (JPG، PNG، WebP)');
   if (bytes.length > config.trust.imageMax) throw new ApiError(413, 'too_large', `عکس بزرگ‌تر از ${kb(config.trust.imageMax)} است`);
-  const data = chatMedia.stripImageMetadata(bytes, s.mime);
+  //  ⛔ ابعادِ سرآیند زیرِ همان سقفِ چت/نشانی (۴۱۳ `image_too_large_dimensions`) — وگرنه بمبِ پیکسلِ ۱٫۵MB در پنل و مرورگرِ شاکی باز می‌شد
+  const data = chatMedia.cleanImage(bytes, s.mime, 'main');
   const hash = sha256(data);
   return tx(async (c) => {
     const row = (await c.query('SELECT * FROM trust_cases WHERE id=$1 FOR UPDATE', [pre.id])).rows[0];

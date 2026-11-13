@@ -278,18 +278,7 @@ router.get('/me', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/subscriptions', async (req, res, next) => {
-  try {
-    const out = [];
-    for (const app of ['shop', 'pump']) {
-      const m = await membership(app, req.user.id, req.tokenRow);
-      if (!m) continue;
-      const ent = await entitlement.forApp(app).entitlementOf(m.tenantId);
-      out.push({ ...m, subscription: subscriptionView(ent, undefined, app) });
-    }
-    res.json({ subscriptions: out, serverTime: now() });
-  } catch (err) { next(err); }
-});
+//  ⛔ `GET /subscriptions` برداشته شد (۱۴۰۵/۰۸/۲۲): نه پورتال، نه SDK، نه برنامه‌ها صدایش نمی‌زدند؛ همان اشتراک‌ها در `GET /me`.
 
 router.get('/payments', async (req, res, next) => {
   try {

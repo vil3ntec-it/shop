@@ -6,7 +6,6 @@
  * عضویتِ توکن می‌آید، نه از بدنه (بخشِ ۲۹.۲ بندِ ۲).
  *
  *   GET  /api/shop/permissions                 مجوزهای خودم؛ مدیر/صاحب: همهٔ لایه‌ها
- *   PUT  /api/shop/permissions/roles/:role     لایهٔ نقش (فقط صاحب: members.role)
  *   PUT  /api/shop/permissions/members/:id     لایهٔ یک کاربر (فقط صاحب)
  *   GET  /api/shop/devices                     دستگاه‌های اعضا (members.view)
  *   POST /api/shop/devices/:id/disable         از کار انداختنِ دستگاهِ گم‌شده (فقط صاحب)
@@ -16,7 +15,9 @@
  *   POST   /api/shop/approver-keys             ثبتِ کلیدِ عمومیِ همین دستگاه (صاحب/مدیر)
  *   GET    /api/shop/approver-keys             کلیدهای خودم؛ صاحب: همه
  *   DELETE /api/shop/approver-keys/:id         باطل کردن (خودم یا صاحب)
- *   GET    /api/shop/approvals                 سابقهٔ تأییدهای پذیرفته (audit.view)
+ *
+ *   ⛔ برداشته (۱۴۰۵/۰۸/۲۲، هیچ برنامه‌ای صدایشان نمی‌زد): `PUT /permissions/roles/:role` (لایهٔ نقش از دکان؛
+ *   از پنلِ مرکزی همان `PUT /api/admin/shops/:id/staff-perms/roles/:role` ِ ارشد می‌ماند) و `GET /approvals`.
  */
 const express = require('express');
 const v = require('../lib/validate');
@@ -39,16 +40,6 @@ router.get('/permissions', requireShop, async (req, res) => {
 });
 
 //  ⛔ تغییرِ مجوزها فقط از نشستِ تازه احراز‌شده (بندِ ۲۱.۱، `lib/reauth`)
-router.put('/permissions/roles/:role', requireShop, requirePermission('members.role'), requireRecentAuth, async (req, res) => {
-  const role = v.text(req.params.role, { max: 20, required: true, field: 'نقش' });
-  const layer = await perms.setRoleLayer(req.shopId, role, req.body?.perms, req.user.id);
-  await audit.log({
-    shopId: req.shopId, userId: req.user.id, action: 'perms.role_updated',
-    targetType: 'role', targetId: role, detail: { perms: layer }, ip: clientIp(req),
-  });
-  res.json({ role, perms: layer, shop: await perms.overview(req.shopId) });
-});
-
 router.put('/permissions/members/:id', requireShop, requirePermission('members.role'), requireRecentAuth, async (req, res) => {
   const id = v.id(req.params.id, { field: 'شناسه عضو' });
   const { member, layer } = await perms.setMemberLayer(req.shopId, id, req.body?.perms, req.user.id);
@@ -106,10 +97,6 @@ router.delete('/approver-keys/:id', requireShop, async (req, res) => {
     targetType: 'approver_key', targetId: key.id, detail: { owner: key.userId }, ip: clientIp(req),
   });
   res.json({ key });
-});
-
-router.get('/approvals', requireShop, requirePermission('audit.view'), async (req, res) => {
-  res.json({ approvals: await approvals.listApprovals(req.shopId, { limit: Number(req.query?.limit || 100) }) });
 });
 
 module.exports = router;

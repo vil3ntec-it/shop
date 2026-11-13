@@ -101,7 +101,7 @@ test('ورود با ایمیل و کدِ شش‌رقمی — کدِ غلط هی�
 });
 
 test('پورتال بی توکن هیچ چیزی نمی‌دهد', async () => {
-  for (const p of ['/api/portal/me', '/api/portal/subscriptions', '/api/portal/payments',
+  for (const p of ['/api/portal/me', '/api/portal/payments',
     '/api/portal/devices', '/api/portal/support', '/api/portal/notices', '/api/portal/settings']) {
     const r = await h.get(p);
     assert.equal(r.status, 401, `${p} باید توکن بخواهد (${r.status})`);
@@ -147,8 +147,9 @@ test('رنگ و نوار: سبز > ۳۰ روز، زرد ≤ ۳۰، سرخ منق
   await query(`UPDATE subscriptions SET ends_at=$2 WHERE shop_id=$1`, [red.shopId, now() - 2 * DAY]);
   await query(`UPDATE shops SET created_at=$2 WHERE id=$1`, [red.shopId, now() - 400 * DAY]);
 
-  const view = async (u) => (await h.get('/api/portal/subscriptions', { token: u.accessToken }))
-    .body.subscriptions[0].subscription;
+  //  همان `subscriptionView` ِ «برنامه‌های من» (درِ `/api/portal/subscriptions` برداشته شد)
+  const view = async (u) => (await h.get('/api/portal/me', { token: u.accessToken }))
+    .body.memberships.find((m) => m.app === 'shop').subscription;
 
   const g = await view(green);
   assert.equal(g.color, 'green');

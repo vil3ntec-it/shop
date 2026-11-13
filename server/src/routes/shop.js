@@ -12,7 +12,6 @@ const config = require('../config');
 const v = require('../lib/validate');
 const shops = require('../lib/shops');
 const staffCodes = require('../lib/staff-codes');
-const receiptProfile = require('../lib/receipt-profile');
 const audit = require('../lib/audit');
 const { requireRecentAuth, assertFresh } = require('../lib/reauth');
 
@@ -78,17 +77,8 @@ router.post(['/', '/create'], async (req, res) => {
  *  ردیفِ توکن می‌آید (`tokens.shop_id`)، نه از درخواست؛ و هر پرسشِ دکان
  *  (`requireShop`) باز هم عضویت را در همان دکان می‌سنجد.
  */
-router.get('/memberships', async (req, res) => {
-  const bound = shops.sessionShopOf(req.tokenRow);
-  const current = await shops.membershipOf(req.user.id, { shopId: bound });
-  const all = await shops.membershipsOf(req.user.id);
-  res.json({
-    activeShopId: current ? current.shop_id : null,
-    explicit: !!bound,
-    shops: all.map((m) => ({ id: m.shop_id, name: m.shop_name || '', role: m.role })),
-  });
-});
-
+//  ⛔ `GET /memberships` (فهرستِ دکان‌های همین آدم) برداشته شد (۱۴۰۵/۰۸/۲۲): هیچ برنامه‌ای صدایش نمی‌زد.
+//  `POST /active` می‌ماند (قاعدهٔ TEN-01 در `docs/RULES-fa.md`، «حذفِ حساب»).
 router.post('/active', async (req, res, next) => {
   const shopId = v.id(req.body?.shopId || req.body?.shop_id, { field: 'شناسهٔ دکان' });
   const member = await shops.membershipOf(req.user.id, { shopId });
@@ -175,14 +165,6 @@ async function removeMember(req, res) {
 
 router.delete('/members/:id', requireShop, requirePermission('members.manage'), removeMember);
 router.post('/members/:id/remove', requireShop, requirePermission('members.manage'), removeMember);
-
-/** خروج داوطلبانه‌ی شاگرد از دکان. */
-router.post('/leave', requireShop, async (req, res, next) => {
-  if (req.member.role === 'owner') return next(badRequest('صاحب دکان نمی‌تواند از دکان خودش بیرون برود', 'owner_cannot_leave'));
-  await shops.updateMember(req.shopId, req.member.id, { status: 'removed' }, { by: req.user.id, ip: clientIp(req) });
-  await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'member.left' });
-  res.json({ ok: true });
-});
 
 // ---------- کدهای شاگرد ----------
 router.get('/staff-codes', requireShop, requirePermission('staffcode.view'), async (req, res) => {
@@ -321,29 +303,8 @@ router.post('/series', requireShop, async (req, res) => {
   res.json({ series: out.series, created: out.created });
 });
 
-router.get('/settings', requireShop, async (req, res) => {
-  const row = await one('SELECT data, rev, updated_at FROM shop_settings WHERE shop_id=$1', [req.shopId]);
-  res.json({ settings: row?.data || {}, rev: Number(row?.rev || 0), updatedAt: Number(row?.updated_at || 0) });
-});
-
-router.put('/settings', requireShop, requirePermission('settings.write'), async (req, res) => {
-  const data = v.payload(req.body?.settings, { max: 128 * 1024, field: 'تنظیمات' });
-  //  کلیدِ `receipt` (سربرگ و لوگوی فاکتور) فقط از `/api/shop/receipt-profile` نوشته
-  //  می‌شود: این جایگزینیِ کلِ سند نه آن را می‌نویسد نه پاکش می‌کند.
-  const rest = { ...data };
-  delete rest[receiptProfile.KEY];
-  const row = await one(
-    `INSERT INTO shop_settings (shop_id, data, rev, updated_at) VALUES ($1,$2::jsonb,1,$3)
-     ON CONFLICT (shop_id) DO UPDATE SET
-       data = CASE WHEN shop_settings.data ? '${receiptProfile.KEY}'
-                   THEN excluded.data || jsonb_build_object('${receiptProfile.KEY}', shop_settings.data->'${receiptProfile.KEY}')
-                   ELSE excluded.data END,
-       rev=shop_settings.rev+1, updated_at=excluded.updated_at
-     RETURNING data, rev`,
-    [req.shopId, JSON.stringify(rest), now()]
-  );
-  res.json({ settings: row.data, rev: Number(row.rev) });
-});
+//  ⛔ `GET`/`PUT /settings` (کلِ سندِ `shop_settings` یک‌جا) برداشته شد (۱۴۰۵/۰۸/۲۲): هیچ برنامه‌ای صدایش نمی‌زد؛
+//  تنظیماتِ دکان فقط از `/api/shop/settings-sync` (پرچمِ `shop.settings_sync`) و سربرگ از `/api/shop/receipt-profile`.
 
 // ---------- سابقه‌ی عملیات دکان ----------
 router.get('/audit', requireShop, requirePermission('audit.view'), async (req, res) => {

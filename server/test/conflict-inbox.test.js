@@ -89,7 +89,7 @@ test.before(async () => {
   B = await shopWith('ب');
   for (const S of [A, B]) {
     await liveFlag('shop.credit_cap', true, S.id);
-    const r = await h.put('/api/shop/permissions/roles/staff', { perms: { 'sales.credit': { caps: { maxAmount: 500000 } } } }, { token: S.owner.accessToken });
+    const r = await h.roleLayer(S.owner.accessToken, 'staff', { 'sales.credit': { caps: { maxAmount: 500000 } } });
     assert.equal(r.status, 200, JSON.stringify(r.body));
   }
   //  نامِ کالا و قرض‌دار از دفترِ سرور
@@ -218,7 +218,7 @@ test('دو «دوباره ثبت» ِ هم‌زمان ⇒ فروش دقیقاً 
 test('مدیرِ بی اجازهٔ همان مبلغ نمی‌نشاند؛ ردیفِ تازه‌ای نمی‌ماند؛ صاحب بعد می‌نشاند', async () => {
   const { box } = await rejectedSale(A, 'ci-5');
   const before = (await one(`SELECT COUNT(*)::int AS n FROM sync_v3_conflicts WHERE account_id=$1`, [A.id])).n;
-  assert.equal((await h.put('/api/shop/permissions/roles/manager', { perms: { 'sales.credit': { caps: { maxAmount: 100 } } } }, { token: A.owner.accessToken })).status, 200);
+  assert.equal((await h.roleLayer(A.owner.accessToken, 'manager', { 'sales.credit': { caps: { maxAmount: 100 } } })).status, 200);
   try {
     const r = await resubmit(A.manager, box.id);
     assert.equal(r.status, 409, JSON.stringify(r.body));
@@ -237,7 +237,7 @@ test('مدیرِ بی اجازهٔ همان مبلغ نمی‌نشاند؛ رد�
     const aud = await many(`SELECT action FROM audit_logs WHERE shop_id=$1 AND target_id=$2`, [A.id, box.id]);
     assert.deepEqual(aud.map((a) => a.action), ['conflict_inbox.resubmit_rejected']);
   } finally {
-    assert.equal((await h.put('/api/shop/permissions/roles/manager', { perms: {} }, { token: A.owner.accessToken })).status, 200);
+    assert.equal((await h.roleLayer(A.owner.accessToken, 'manager', {})).status, 200);
   }
   const ok = await resubmit(A.owner, box.id);
   assert.equal(ok.status, 200, JSON.stringify(ok.body));

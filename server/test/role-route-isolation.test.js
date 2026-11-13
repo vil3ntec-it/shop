@@ -72,7 +72,7 @@ async function liveShop(label) {
 
 async function courier(owner, name) {
   const code = (await h.post('/api/shop/invite', { role: 'courier' }, { token: owner.token })).body.code;
-  const r = await h.post('/api/auth/staff-login', { code, name, device: { uid: `cphone-${uniq()}`, name: 'گوشی', platform: 'android' } });
+  const r = await h.post('/api/auth/staff', { code, name, device: { uid: `cphone-${uniq()}`, name: 'گوشی', platform: 'android' } });
   assert.equal(r.status, 201, JSON.stringify(r.body));
   const c = { token: r.body.accessToken, uid: r.body.device?.uid };
   c.id = (await h.get('/api/courier/me', { token: c.token })).body.courier.id;

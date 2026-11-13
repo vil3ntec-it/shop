@@ -3,7 +3,8 @@
  * «پرداخت پس از پذیرش» ِ مشتری: `POST /api/store/:slug/orders/:token/pay-choice` (`lib/order-flow.choose`).
  * پس از «قبول» ِ فروشنده، مشتری «نقد هنگامِ تحویل/برداشت» را برمی‌گزیند؛ حساب‌پی همان `POST …/pay` است.
  *
- * ⛔ فقط با تنظیمِ روشنِ «پرداخت پس از پذیرش» ِ همین دکان (`storefronts.pay_after_accept`)؛ خاموش ⇒ ۴۰۴ (همان «نیست»).
+ * ⛔ فقط با تنظیمِ روشنِ «پرداخت پس از پذیرش» ِ همین دکان (`storefronts.pay_after_accept`)؛ خاموش ⇒ ۴۰۴ (همان «نیست»)،
+ *    پیش از توکن و بدنه (`flow.assertChoiceOpen`؛ CHK-13).
  * ⛔ ویترینِ روشن با اشتراکِ زنده (`sf.open` ⇒ وگرنه ۴۰۴ `store_not_found`، SUB-10 دستهٔ STORE_PAID) و توکنِ
  *    پیگیریِ همین ویترین (نادرست ۴۰۴، منقضی/باطل ۴۱۰). مشتری فقط «نقد» می‌گذارد؛ نه مبلغ، نه قبول.
  * ⛔ سقف: سطلِ جدای IP (`store-pay-choice-ip`، همان اندازهٔ «ثبت») فقط روی همین نشانی — پیش از هر کار.
@@ -22,6 +23,8 @@ router.use('/:slug/orders/:token/pay-choice', rateLimit({ max: config.rateLimit.
 router.post('/:slug/orders/:token/pay-choice', async (req, res) => {
   res.set('Cache-Control', 'no-store');
   const store = await sf.open(req.params.slug);
+  //  ⛔ CHK-13: تنظیم پیش از توکن و بدنه — خاموش ⇒ همان ۴۰۴ برای هر بدنه و هر توکن (نه ۴۰۰ `bad_payment_choice`، نه ۴۱۰)
+  await flow.assertChoiceOpen(store.shop_id);
   const orderId = await sf.orderIdOfLink(store, req.params.token);
   const out = await flow.choose(store.shop_id, orderId, req.body);
   //  همان نمای پیگیری (`GET …/orders/:token`، `lib/store-order-view.js`): صفحه با همین پاسخ دوباره می‌کشد

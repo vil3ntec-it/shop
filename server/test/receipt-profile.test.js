@@ -3,8 +3,8 @@
  * سربرگ و لوگوی فاکتورِ دکان — `/api/shop/receipt-profile` (فاکتورِ نسخهٔ ۲).
  *
  * هر عضو می‌خواند (دستگاه برای چاپِ بی اینترنت نگه می‌دارد)؛ فقط `settings.write`
- * (صاحب و مدیر) می‌نویسد. نوشتن فقط کلیدِ `receipt` را ادغام می‌کند و
- * `PUT /api/shop/settings` (جایگزینیِ کلِ سند) آن را نه می‌نویسد نه پاک می‌کند.
+ * (صاحب و مدیر) می‌نویسد. نوشتن فقط کلیدِ `receipt` را ادغام می‌کند و بقیهٔ `shop_settings` دست نمی‌خورد
+ * (درِ `PUT /api/shop/settings` ِ کلِ سند برداشته شد).
  * لوگو: نوع از محتوا، سقفِ حجم و ابعاد، بی فراداده، با ETag.
  */
 process.env.RATE_LOGIN_EDGE_MAX = process.env.RATE_LOGIN_EDGE_MAX || '100000';
@@ -65,21 +65,16 @@ test('بدنهٔ نادرست ⇒ ۴۰۰ و هیچ تغییری', async () => {
   assert.equal(long.body.profile.name.length, 80);
 });
 
-test('PUT /api/shop/settings کلیدِ receipt را نه می‌نویسد نه پاک می‌کند؛ سربرگ بقیهٔ تنظیمات را نگه می‌دارد', async () => {
+test('سربرگ فقط کلیدِ receipt را ادغام می‌کند؛ بقیهٔ تنظیماتِ ماندهٔ دکان دست نمی‌خورد', async () => {
   const t = await shopWithTeam('پ');
+  //  تنظیمِ کهنه‌ای که پیش از برداشتنِ `PUT /api/shop/settings` نوشته شده بود
+  await query(`UPDATE shop_settings SET data = data || '{"mark":1}'::jsonb WHERE shop_id=$1`, [t.shopId]);
   await h.put(P, { name: 'سربرگ' }, { token: t.owner });
-  const s = await h.put('/api/shop/settings', { settings: { mark: 1, receipt: { name: 'دست‌کاری' } } }, { token: t.owner });
-  assert.equal(s.status, 200, JSON.stringify(s.body));
-  assert.equal((await h.get(P, { token: t.owner })).body.profile.name, 'سربرگ');
   await h.put(P, { phone: '0700' }, { token: t.owner });
-  const all = (await h.get('/api/shop/settings', { token: t.owner })).body.settings;
+  const all = (await one('SELECT data FROM shop_settings WHERE shop_id=$1', [t.shopId])).data;
   assert.equal(all.mark, 1);
   assert.equal(all.receipt.name, 'سربرگ');
-
-  //  دکانی که تا امروز سربرگ نداشت: همان جایگزینیِ قدیم، بی receipt
-  const u = await shopWithTeam('ت');
-  await h.put('/api/shop/settings', { settings: { receipt: { name: 'x' }, a: 2 } }, { token: u.owner });
-  assert.deepEqual((await h.get('/api/shop/settings', { token: u.owner })).body.settings, { a: 2 });
+  assert.equal(all.receipt.phone, '0700');
 });
 
 test('لوگو: فقط عکسِ سالم، بی فراداده، با سقف؛ ETag و ۳۰۴؛ حذف', async () => {

@@ -137,7 +137,7 @@ async function paidStore(label) {
   const inviteRes = await h.post('/api/shop/invite', { role: 'courier' }, { token });
   assert.equal(inviteRes.status, 201, JSON.stringify(inviteRes.body));
   const uid = `courier-${uniq()}`;
-  const login = await h.post('/api/auth/staff-login', { code: inviteRes.body.code, name: `پیکِ ${label}`, device: { uid, name: 'گوشیِ پیک', platform: 'android' } });
+  const login = await h.post('/api/auth/staff', { code: inviteRes.body.code, name: `پیکِ ${label}`, device: { uid, name: 'گوشیِ پیک', platform: 'android' } });
   assert.equal(login.status, 201, JSON.stringify(login.body));
   const courier = { token: login.body.accessToken, uid };
   const courierId = (await h.get('/api/courier/me', { token: courier.token })).body.courier.id;

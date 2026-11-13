@@ -54,6 +54,61 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-41s (س۶) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-41s` (از `main`، 62a6bac71)
+
+- **سطحِ حمله (B15 ِ `SECURITY-AUDIT-fa.md`):** ۶۳ درِ بی صدازننده برداشته شد — کلِ `routes/data.js` (۵۱ در: `/api/products|inventory|sales|
+  sale-items|suppliers|purchases|returns|debtors|expenses|payments` و `POST /api/sales/full`)، `GET /api/shop/memberships`، `POST /api/shop/leave`،
+  `GET`/`PUT /api/shop/settings`، `PUT /api/shop/permissions/roles/:role`، `GET /api/shop/approvals` (+ `lib/approval-log.js`)، `GET`/`PUT
+  /api/me/settings` (شاگرد «همگام‌سازیِ ابری» ِ کلِ دکان را عوض می‌کرد)، `POST /api/me/redeem|errors`، `GET /api/portal/subscriptions` و نامِ دومِ
+  `POST /api/auth/staff-login`؛ `customer-access.note` ِ مرده هم. ⚠️ دروازهٔ پایانیِ `routes/data.js` (`requireUser, requireShop` روی هر
+  مسیرِ ناشناختهٔ `/api`) در `app.js` **ماند**: برنامهٔ خرید «درِ پرچمِ خاموش = ۴۰۱ ِ درِ ناشناخته» را قرارداد کرده (`account-cart-v1.json`،
+  `ShopperCartSync.doorClosed`، `ShopperAddressSync.transient`) و اجرای کاملِ نخست همین را با `storefront-cart`/`security-review-38` نشان داد.
+  شاهد: grep ِ همهٔ برنامه‌ها، `server/public/**`، وبِ دکانِ برداشته‌ای که درونِ APK ِ پوستهٔ WebView است (`git show b187c45be^`)، نسخهٔ بومیِ
+  بایگانیِ `android/native-ui-archive`، بات‌ها، `scripts`، `tools`، `bench` و قرارداد. کدِ پمپ دست نخورد (دستگیره‌های مشترکِ `portal.*` همان).
+- **ماندند با دلیل:** `/api/billing/status|plans|request` و `POST /api/shop/invite` (وبِ درونِ APK ِ WebView)؛ `GET`/`POST`/`PUT /api/shop` و
+  `/api/shop/staff/join` (نسخهٔ بومیِ بایگانی، `server/README.md`)؛ `POST /api/shop/active` (RULES، TEN-01)؛ `GET /api/shop/audit` (RULES ِ
+  `security.doc_chain` و `credit-limit-review`). همه در `KEPT` ِ `dead-doors.test.js`. بندهای نامطمئن/پیش‌ساخته ِ گزارش دست نخوردند.
+- **آزمون‌ها:** یاورهای `h.seed`/`legacyPush`/`legacyRows`/`legacyRow`/`roleLayer` (e2e: `E.roleLayer`/`E.approvals`)؛ ۷۰ پرونده جابه‌جا شد؛
+  نگهبان‌های S89/B7، SR43-2، لغو و سقف‌ها از درِ مستقیم به راهِ قدیمِ **زنجیره‌دار** رفتند (همان `pushChanges`)؛ CRM-15 ِ سابقهٔ دسترسی روی
+  درِ `app` و «سفارش‌های یک مشتری». `dead-doors.test.js` ِ تازه روی 62a6bac71 ۳/۳ سرخ، پس از تغییر ۳/۳ سبز. آستانهٔ ماتریسِ نشست‌دارِ
+  `tenant-matrix` ۱۲۰ ⇐ ۸۵ (۵۶ درِ برداشته؛ امروز ۸۷). SR46-3 ِ `customer-access` (کلاس‌بندیِ پین در درِ `debtor`) با همان در رفت.
+- **نتیجه:** همهٔ آزمون‌های سرور روی PGlite (دو تکه، `scripts/test-pglite.js`): ۴۲۴۲ آزمون، ۴۲۰۰ قبول، **۰ شکست**، ۴۰ SKIP و ۲ TODO ِ پیشین؛
+  e2e (`flags-on`، `journeys-a/b`، `scenario-s45`، `roles`، `access`) ۵۴ گامِ سبز؛ مرورگر: `web-store`، `web-store-cart-sync`، `web-store-acct`،
+  `portal-rep`، `web-shop-gone` سبز؛ precheck `fail=0`، `quality.mjs` بی ❌ (سقفِ `staff-approval.js` ۱۰۵۴ ⇐ ۱۰۵۲). Kotlin دست نخورد.
+- **نیمه‌کاره/قدمِ بعدی:** برداشتنِ درهای «ماندند» پس از داشبوردِ نسخه‌ها (یا ۴۱۰ ِ روشن). `ACCOUNT_PREFIXES` ِ پنلِ خانگی (ریپوی `server`)
+  خوانده نشد؛ اگر `/products`… را دارد فقط پیکربندی است. بررسی‌نشده: `backup.test.js` و آزمونِ هم‌زمانیِ PostgreSQL ِ `sale-void-chain`
+  (Postgres ِ محلی بالا نبود).
+### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-43f (ز۶) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-43f` (از `claude/batch-59` ‏6216d2739)
+
+- **WEB-25 (پیامِ ۴۰۹ ِ «ثبت» در هر زبان):** `err.store_paused`/`err.store_offline` در هیچ واژه‌نامه نبود (fa.json ۲۱٬۴۷۷ از
+  ۲۱٬۵۰۴ و checkout.fa.json ۴٬۰۸۳ از ۴٬۰۹۶ پر بودند) ⇒ `K.api` برای en، ps و دری (`prs` ≠ `fa`) «خطای عمومی» می‌داد. اکنون
+  واژه‌نامهٔ دیربارِ تازهٔ `kit/i18n/ckform.<زبان>.json` (۴۵ کلیدِ فرمِ ثبت: نشانی، ناحیه، پین، تأییدِ شماره، سبدِ برگهٔ ثبت + این
+  دو پیام؛ فارسی = همان متنِ سرور) که store.js در همان `Promise.all` ِ `loadCheckout` با checkout.js و `checkout` می‌گیرد
+  (هم‌زمان، نه پشتِ سرِ اسکریپت). fa.json ⇐ ۱۸٬۳۴۴، ps ⇐ ۱۸٬۲۳۶، en ⇐ ۱۳٬۷۷۳ ⇒ سقفِ اصلی ۲۱KB ⇐ ۲۰KB؛ ckform ۳٬۵۹۹/۳٬۴۱۰/۲٬۶۱۷
+  زیرِ ۴KB. JS ِ بارِ اول ۷۲٬۶۳۶ ⇐ ۷۲٬۶۳۴ (سقف دست نخورد).
+- **نگهبان:** `web-i18n.test.js` سه آزمونِ تازه: کلیدِ بارِ اول (boot/kit/store.js + HTML ِ بیرون از بخش‌ها) و هر پروندهٔ بی بخش
+  فقط در اصلی؛ کلیدِ پروندهٔ دیربار در اصلی یا بخش(های) خودش؛ دو واژه‌نامهٔ ثبت پیش از `StoreCheckout` (سه جهش ⇒ سرخ).
+  مرورگر `web-store-paused-i18n.mjs` (در `test:web-store`): پیش ۱۱ ❌، اکنون ۳۵ ✅.
+- **قدمِ بعد:** کلیدِ تازهٔ برگهٔ ثبت به `checkout` یا `ckform` (هر کدام جا دارد)، نه اصلی. شاید `pausedUntil` ِ پاسخ («تا ساعتِ …»)
+  هم در پیام بیاید — ساخته نشد (خواسته نبود).
+
+### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-42w (و۶) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-42w` (از `main` ‏62a6bac71)
+
+- **CHK-13 (پایین):** `POST /api/store/:slug/orders/:token/pay-choice` روش را پیش از تنظیمِ «پرداخت پس از پذیرش» می‌سنجید ⇒
+  خاموش + بدنهٔ بد ⇒ ۴۰۰. اکنون `order-flow.assertChoiceOpen` پیش از توکن و بدنه. نگهبانِ تازهٔ `store-flag-off-gate.test.js`
+  همهٔ درهای `/api/store/:slug/…` را با پرچم‌های خاموش و بدنهٔ بد/تهی می‌زند (۴۰۴ یا پاسخِ درِ ناشناخته؛ ۲۴ درِ بی‌پرچم با دلیل) —
+  فقط pay-choice سرخ بود. ⚠️ درِ ناشناختهٔ `/api/store/*` ۴۰۱ `unauthorized` است (نه ۴۰۴)؛ `next('route')` همان را می‌دهد.
+  CHK-24 ِ مشتری با پرچمِ خاموش ۴۰۳ `delivery_prefs_disabled` ِ مستند می‌دهد (پرچم پیش از بدنه) — دست نخورد.
+- **ABUSE-01 (درِ مدرک):** spec §۳۸.۶ «پرونده با شواهد» ⇒ رابط ساخته شد: «افزودنِ عکس»/«دیدنِ عکس‌ها» در «گزارش‌های من» ِ
+  `store/trust.js` (دیربار، بی innerHTML). باگِ سرور: مدرک فقط metadata پاک می‌کرد ⇒ بمبِ پیکسلِ ۱۲۰۰۰×۱۲۰۰۰ پذیرفته می‌شد؛
+  اکنون `chatMedia.cleanImage` ⇒ ۴۱۳. سقف‌ها سنجیده: حجم ۱٫۵MB پیش از خواندن، نوع از بایت، `evidenceMax` ۵، سطلِ IP ۳۰.
+- **ردیف‌های بی‌آزمون:** WEB-25، CHK-19، CHK-23، ORD-21 شاهدِ نام‌به‌نام در STATUS و آزمونِ تازه (`web-store-checkout-rows.mjs` در
+  `test:web-store`؛ `storefront.test.js` «ORD-21»). باگِ یافته: `accept.paused` در واژه‌نامه نبود ⇒ سرِ ویترین هنگامِ توقفِ میز خالی.
+  ⚠️ `fa.json` ۲۱٬۴۷۷ از ۲۱٬۵۰۴ بایت و `checkout.fa.json` ۴٬۰۸۳ از ۴٬۰۹۶: جا برای کلیدِ تازه نیست (پیامِ ۴۰۹ `store_offline`/`store_paused`
+  در en/ps هنوز «خطای عمومی» است؛ fa متنِ سرور را نشان می‌دهد).
+- **بند ۴ (ب):** فقط سدِ پرچمِ همهٔ درها، درِ مدرک و نمونهٔ CHK-21/CHK-22 در کد؛ سنجشِ ردیف‌به‌ردیفِ ۷۶ ردیفِ `webrows.json` نماند.
+- **قدمِ بعدی:** جدا کردنِ کلیدهای فرمِ ثبت از `fa.json` تا جای ترجمهٔ `err.store_offline`/`err.store_paused` باز شود؛ ادامهٔ بند ۴.
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-40k (ی۵) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-40k` (از سرِ `claude/batch-57`، ccfbef65e)
 
 - **کلیدِ مجوزِ آیفون (میانه، SUB-02):** `ios/shared/build.gradle.kts` ِ `generateConfig` `LICENSE_PUBLIC_KEY = ""` را ثابت می‌گذاشت ⇒

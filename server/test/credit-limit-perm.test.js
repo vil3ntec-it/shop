@@ -4,7 +4,7 @@
  * `shop.credit_limit_perm`).
  *
  * سنجه‌ها: پرچمِ خاموش همان امروز (لایه ذخیره نمی‌شود، لایهٔ ازپیش‌مانده بی‌اثر)؛ با پرچم، شاگردِ «ممنوع» یا بالای `maxAmount`
- * سقفِ مشتریِ موجود را در v1، v3 و REST/راهِ قدیم عوض نمی‌کند (بالا بردن، برداشتن، پایین آوردن) و ردیفِ صندوقِ تعارض با
+ * سقفِ مشتریِ موجود را در v1، v3 و راهِ قدیم عوض نمی‌کند (بالا بردن، برداشتن، پایین آوردن) و ردیفِ صندوقِ تعارض با
  * خودِ op می‌ماند؛ زیرِ سقف، مشتریِ تازه، ویرایشِ بی سقف و صاحب آزاد؛ نقشِ جعلی در بدنه/فیلد اثری ندارد؛ تکرارِ همان op
  * «تکراری» است؛ شاگرد لایهٔ خودش را باز نمی‌کند؛ دکانِ دیگر با همان شناسهٔ مشتری دست نمی‌خورد.
  */
@@ -33,7 +33,7 @@ let clock = Date.now();
 
 const liveFlag = (key, value, scope) => h.put('/api/admin/pump/live-config', { scope, key, value }, { token: admin })
   .then((r) => assert.equal(r.status, 200, JSON.stringify(r.body)));
-const setRole = (role, perms, who = owner) => h.put(`/api/shop/permissions/roles/${role}`, { perms }, { token: who.accessToken });
+const setRole = (role, perms, who = owner) => h.roleLayer(who.accessToken, role, perms);
 const push1 = (who, device, ops, extra = {}) => h.api('POST', '/api/sync/v1/push', {
   token: who.accessToken, body: { device_id: device, schema_version: 1, ops, ...extra },
 });
@@ -178,7 +178,6 @@ test('پرچمِ روشن: «ممنوع» هر تغییری را می‌بندد
   const uid = me.user?.id || me.id;
   const self = await h.put(`/api/shop/permissions/members/${uid}`, { perms: { 'customers.credit_limit': { mode: 'allow' } } }, { token: staff.accessToken });
   assert.equal(self.status, 403, JSON.stringify(self.body));
-  assert.equal((await setRole('staff', { 'customers.credit_limit': { mode: 'allow' } }, staff)).status, 403);
   //  صاحب: همیشه
   assert.deepEqual(why(await push1(owner, 'own-1', [op1('debtors', 'd-1', 'update', { creditLimit: 20000 })])), ['applied']);
   assert.equal(await limit1('d-1'), 20000);
@@ -213,7 +212,7 @@ test('پرچمِ روشن، v3: `creditLimitMinor` ِ مشتریِ موجود ب
   assert.equal(await limit3('d3-1'), 900000);
 });
 
-test('پرچمِ روشن، REST و راهِ قدیم: سقفِ تازه یا ردیفِ کاملِ بی سقف ⇒ ۴۰۳ و هیچ نوشتنی؛ همان سقف و مشتریِ تازه آزاد', async () => {
+test('پرچمِ روشن، راهِ قدیم: سقفِ تازه یا ردیفِ کاملِ بی سقف ⇒ ۴۰۳ و هیچ نوشتنی؛ همان سقف و مشتریِ تازه آزاد', async () => {
   const t = Date.now();
   const r0 = await legacy(owner, [{ collection: 'debtors', id: 'dl-1', updatedAt: t, data: { name: 'مشتریِ وب', phone: '0700000109', creditLimit: 5000 } }]);
   assert.equal(r0.status, 200, JSON.stringify(r0.body));
@@ -221,18 +220,19 @@ test('پرچمِ روشن، REST و راهِ قدیم: سقفِ تازه یا ر
   assert.equal(up.status, 403, JSON.stringify(up.body));
   assert.equal(up.body.error.code, 'credit_limit_not_allowed');
   //  ردیفِ کاملِ بی کلیدِ سقف = برداشتنِ سقف
-  const drop = await h.put('/api/debtors/dl-1', { data: { name: 'مشتریِ وب', phone: '0700000109' }, updatedAt: t + 20 }, { token: staff.accessToken });
+  const drop = await legacy(staff, [{ collection: 'debtors', id: 'dl-1', updatedAt: t + 20, data: { name: 'مشتریِ وب', phone: '0700000109' } }]);
   assert.equal(drop.status, 403, JSON.stringify(drop.body));
   const row = await one(`SELECT data FROM debtors WHERE shop_id=$1 AND id='dl-1'`, [shopId]);
   assert.equal(row.data.creditLimit, 5000);
   //  همان سقف (ویرایشِ نام) و مشتریِ تازه ⇒ می‌نشیند
-  const same = await h.put('/api/debtors/dl-1', { data: { name: 'نامِ تازه', phone: '0700000109', creditLimit: 5000 }, updatedAt: t + 30 }, { token: staff.accessToken });
-  assert.equal(same.status, 200, JSON.stringify(same.body));
-  const fresh = await h.post('/api/debtors', { id: 'dl-2', data: { name: 'تازهٔ وب', creditLimit: 99999 } }, { token: staff.accessToken });
-  assert.equal(fresh.status, 201, JSON.stringify(fresh.body));
+  const same = await legacy(staff, [{ collection: 'debtors', id: 'dl-1', updatedAt: t + 30, data: { name: 'نامِ تازه', phone: '0700000109', creditLimit: 5000 } }]);
+  assert.deepEqual([same.status, same.body.applied], [200, 1], JSON.stringify(same.body));
+  const fresh = await legacy(staff, [{ collection: 'debtors', id: 'dl-2', updatedAt: t + 30, data: { name: 'تازهٔ وب', creditLimit: 99999 } }]);
+  assert.deepEqual([fresh.status, fresh.body.applied], [200, 1], JSON.stringify(fresh.body));
   //  صاحب ⇒ آزاد
-  const own = await h.put('/api/debtors/dl-1', { data: { name: 'نامِ تازه', creditLimit: 30000 }, updatedAt: t + 40 }, { token: owner.accessToken });
-  assert.equal(own.status, 200, JSON.stringify(own.body));
+  const own = await legacy(owner, [{ collection: 'debtors', id: 'dl-1', updatedAt: t + 40, data: { name: 'نامِ تازه', creditLimit: 30000 } }]);
+  assert.deepEqual([own.status, own.body.applied], [200, 1], JSON.stringify(own.body));
+  assert.equal((await one(`SELECT data FROM debtors WHERE shop_id=$1 AND id='dl-1'`, [shopId])).data.creditLimit, 30000);
 });
 
 test('جداییِ دکان: همان شناسهٔ مشتری در دکانِ دیگر (پرچمِ خاموش) فقط ردیفِ همان دکان را عوض می‌کند', async () => {

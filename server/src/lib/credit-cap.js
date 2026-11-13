@@ -7,7 +7,7 @@
  * `maxAmount` به Minor) روی **جمعِ قرضِ همان فاکتور پس از همین op** سنجیده می‌شود:
  *   v3   درجِ `sales` (`debtGivenMinor` + دلتاهای پیش‌رسیده) و دلتای مثبتِ `debtGivenMinor`   (`sync-v3.authorize`)
  *   v1   درجِ `sales` (`debtGiven`) در `v1Guard`، و `update` ِ بالابرنده در `staff-edit-v1`  (⛔ `lib/sync-v1.js` دست نمی‌خورد)
- *   REST/راهِ قدیم  هر ردیفِ `sales` که `debtGiven` را از مقدارِ سرور بالاتر ببرد (`sync.pushChanges`؛ کلِ دسته رد)
+ *   راهِ قدیم  هر ردیفِ `sales` که `debtGiven` را از مقدارِ سرور بالاتر ببرد (`sync.pushChanges`؛ کلِ دسته رد)
  * تصمیم همان سه‌حالتهٔ `staff-approval.judge` است:
  *   allow    ⇒ می‌نشیند (همان امروز)
  *   deny     ⇒ `credit_not_allowed` و صندوقِ تعارض (`perm_denied`)
@@ -127,7 +127,7 @@ async function markV1(ctx, valid) {
 }
 
 /**
- * راهِ قدیم و REST (`sync.pushChanges`): ردیفِ کاملِ فاکتور. بالا بردنِ `debtGiven` از مقدارِ سرور ⇒ سنجش؛
+ * راهِ قدیم (`sync.pushChanges`): ردیفِ کاملِ فاکتور. بالا بردنِ `debtGiven` از مقدارِ سرور ⇒ سنجش؛
  * کاهش و بی‌تغییر آزاد. ⇒ null، یا خطای ۴۰۳ (کلِ دسته در همان تراکنش برمی‌گردد).
  */
 async function judgeLegacy(ctx, rowId, data, existing, layers) {

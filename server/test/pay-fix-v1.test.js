@@ -61,7 +61,7 @@ const row1 = async (table, rowId) => (await one(
 const boxOf = async (opId) => (await one(
   'SELECT kind, detail FROM sync_v3_conflicts WHERE account_id=$1 AND loser_op_id=$2', [shopId, opId]
 )) || null;
-const setRole = (role, perms) => h.put(`/api/shop/permissions/roles/${role}`, { perms }, { token: T.owner.accessToken });
+const setRole = (role, perms) => h.roleLayer(T.owner.accessToken, role, perms);
 
 /** فاکتورِ v1: نقد ۱۰۰۰ + حساب‌پی ۵۰۰ افغانی (`payments` به پول، همان `SalePayment.amount`) */
 const sale1 = (id, extra = {}) => op1('sales', id, {

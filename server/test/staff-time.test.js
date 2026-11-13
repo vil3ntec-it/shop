@@ -45,7 +45,7 @@ test.before(async () => {
   owner = await shopOf('الف');
   other = await shopOf('ب');
   const code = (await h.post('/api/shop/invite', { role: 'staff' }, { token: owner.token })).body.code;
-  const s = await h.post('/api/auth/staff-login', { code, name: 'شاگرد', device: { uid: `st-phone-${Date.now()}`, name: 'گوشی', platform: 'android' } });
+  const s = await h.post('/api/auth/staff', { code, name: 'شاگرد', device: { uid: `st-phone-${Date.now()}`, name: 'گوشی', platform: 'android' } });
   assert.equal(s.status, 201, JSON.stringify(s.body));
   staff = { token: s.body.accessToken };
   for (const who of [owner, staff, other]) {
@@ -172,7 +172,7 @@ test('نرخ‌های پورسانت: فقط صاحب و مدیر، پایه‌�
 //  می‌ساخت — نرخ دستمزد است، نه تنظیمِ دکان. پیش از درمان این آزمون سرخ بود (۲۰۰ و نسخهٔ تازه).
 test('پورسانت: مدیر نرخ‌ها را می‌بیند ولی نمی‌نویسد — نرخِ خودش را بالا نمی‌برد؛ فقط صاحب', async () => {
   const code = (await h.post('/api/shop/invite', { role: 'manager' }, { token: owner.token })).body.code;
-  const m = await h.post('/api/auth/staff-login', { code, name: 'مدیر', device: { uid: `st-mgr-${Date.now()}`, name: 'گوشی', platform: 'android' } });
+  const m = await h.post('/api/auth/staff', { code, name: 'مدیر', device: { uid: `st-mgr-${Date.now()}`, name: 'گوشی', platform: 'android' } });
   assert.equal(m.status, 201, JSON.stringify(m.body));
   const mgr = { token: m.body.accessToken };
   const cur = await h.get('/api/shop/staff-time/commission-plan', { token: mgr.token });
@@ -196,7 +196,7 @@ test('پورسانت: مدیر نرخ‌ها را می‌بیند ولی نمی�
 //  پیش از این کار پاسخ نه `recordedAt` داشت نه `late`، پس این آزمون سرخ بود.
 test('«دیر ثبت‌شده»: زدنی که بیش از نیم ساعت پس از زمانش رسید `late` است؛ داوری با ساعتِ سرور، نه بدنهٔ دستگاه', async () => {
   const code = (await h.post('/api/shop/invite', { role: 'staff' }, { token: owner.token })).body.code;
-  const s = await h.post('/api/auth/staff-login', { code, name: 'شاگردِ دیر', device: { uid: `st-late-${Date.now()}`, name: 'گوشی', platform: 'android' } });
+  const s = await h.post('/api/auth/staff', { code, name: 'شاگردِ دیر', device: { uid: `st-late-${Date.now()}`, name: 'گوشی', platform: 'android' } });
   assert.equal(s.status, 201, JSON.stringify(s.body));
   const late = { token: s.body.accessToken };
   late.memberId = (await h.get('/api/shop/staff-time/config', { token: late.token })).body.memberId;

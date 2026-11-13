@@ -145,7 +145,8 @@ test('S34: پینِ بیرون ⇒ ارسال ثبت نمی‌شود، «دری�
   assert.match(far.body.error.message, /بیرون از محدودهٔ ارسال/, 'پیامِ روشن، نه خطای مبهم');
   assert.equal(await orders(s.shopId), n0, 'سفارشِ ارسالی ثبت نشد');
   //  صفحهٔ ویترین پیش از پرداخت: همان پیام کنارِ دو گزینهٔ «دریافت از دکان» و «خبرم کن» (`store/checkout.js` با پاسخِ «کجا؟»)
-  const fa = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'public', 'kit', 'i18n', 'fa.json'), 'utf8'));
+  //  کلیدهای فرمِ ثبت در واژه‌نامهٔ دیربارِ `ckform` (web-i18n)
+  const fa = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'public', 'kit', 'i18n', 'ckform.fa.json'), 'utf8'));
   assert.match(fa['zone.out'], /این نشانی بیرون از محدودهٔ ارسال/);
   const page = fs.readFileSync(path.join(__dirname, '..', 'public', 'store', 'index.html'), 'utf8');
   for (const id of ['zone-msg', 'zone-pickup', 'zone-notify']) assert.ok(page.includes(`id="${id}"`), `#${id} در فرمِ ثبت نیست`);

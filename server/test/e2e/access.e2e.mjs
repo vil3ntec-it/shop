@@ -308,10 +308,10 @@ await E.step('S88', 'مرزِ API: بدنهٔ بزرگ و JSON ِ خراب، ص�
     assert.ok(code && /^[A-Za-z_]+$/.test(code), `${what}: بی کدِ خطا ${t.slice(0, 120)}`);
     assert.equal(/at \w+ \(|node_modules|\/src\/|stack|SELECT |pglite|syntax error at/i.test(t), false, `${what}: جزئیاتِ درونی ${t.slice(0, 200)}`);
   };
-  const big = await fetch(`${E.apiBase}/api/shop/settings`, { method: 'PUT', headers: { ...A.headers(), 'Content-Type': 'application/json' }, body: JSON.stringify({ settings: { x: 'a'.repeat(3 * 1024 * 1024) } }) });
+  const big = await fetch(`${E.apiBase}/api/shop/receipt-profile`, { method: 'PUT', headers: { ...A.headers(), 'Content-Type': 'application/json' }, body: JSON.stringify({ footer: 'a'.repeat(3 * 1024 * 1024) }) });
   assert.equal(big.status, 413);
   clean({ body: await big.json() }, 'بدنهٔ ۳ مگابایتی');
-  const broken = await fetch(`${E.apiBase}/api/shop/settings`, { method: 'PUT', headers: { ...A.headers(), 'Content-Type': 'application/json' }, body: '{"settings": {' });
+  const broken = await fetch(`${E.apiBase}/api/shop/receipt-profile`, { method: 'PUT', headers: { ...A.headers(), 'Content-Type': 'application/json' }, body: '{"footer": {' });
   assert.equal(broken.status, 400);
   clean({ body: await broken.json() }, 'JSON ِ خراب');
   for (const [p, want] of [['/shop/orders?tab=DROP%20TABLE', 400], ['/shop/orders?cursor=%27%3B--', 400], ['/shop/delivery/assignments?scope=done&before=abc', 400], ['/shop/delivery/assignments?scope=evil', 400]]) {

@@ -124,10 +124,10 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
   }
   assert.ok(routes.length > 60, `فقط ${routes.length} مسیر پیدا شد`);
 
-  //  دکانِ «الف» با دادهٔ واقعی: تنظیمات، کارمند، کدِ کارمند
+  //  دکانِ «الف» با دادهٔ واقعی: سربرگِ فاکتور، کارمند، کدِ کارمند
   const a = await owner('الف');
   const MARK = 'رازِ-دکانِ-الف-۷۳۱';
-  assert.equal((await h.put('/api/shop/settings', { settings: { mark: MARK } }, { token: a.accessToken })).status, 200);
+  assert.equal((await h.put('/api/shop/receipt-profile', { name: MARK }, { token: a.accessToken })).status, 200);
   const code = (await h.get('/api/shop/staff-code', { token: a.accessToken })).body.code;
   const staff = await h.newUser('شاگردِ الف');
   assert.ok([200, 201].includes((await h.post('/api/shop/join', { code }, { token: staff.accessToken })).status));
@@ -172,7 +172,7 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
   const after = await footprint(a.shopId);
   assert.deepEqual(after, before, 'توکنِ دکانِ «ب» هیچ ردیفی از دکانِ «الف» را عوض نکرد');
   //  و خودِ «الف» هنوز به همه‌چیزش می‌رسد — آزمون بی‌اثر نبود
-  const mine = await h.get('/api/shop/settings', { token: a.accessToken });
+  const mine = await h.get('/api/shop/receipt-profile', { token: a.accessToken });
   assert.equal(mine.status, 200);
   assert.ok(JSON.stringify(mine.body).includes(MARK));
 });
@@ -246,7 +246,7 @@ FLAGS.push('shop.till_op_user');
  * شناسهٔ دیگرِ الف برنگشت» و ردپای بایت‌به‌بایت می‌گیرد (و برای تخفیف، سنجهٔ صریحِ پایین).
  */
 const PER_SHOP_KEYS = new Set([
-  'PUT /shop/permissions/roles/:role', 'GET /shop/images/products/:productId',
+  'GET /shop/images/products/:productId',
   'PUT /shop/promos/rules/:id', 'DELETE /shop/promos/rules/:id',
   //  شناسهٔ فاکتورِ نگه‌داشته (`SaleDraft.key`) را برنامه می‌سازد؛ upsert با (shop_id, id)
   'PUT /shop/held-invoices/:id', 'DELETE /shop/held-invoices/:id',
@@ -277,7 +277,7 @@ async function courierOf(o, name) {
   const inv = await h.post('/api/shop/invite', { role: 'courier' }, { token: o.accessToken });
   assert.equal(inv.status, 201, JSON.stringify(inv.body));
   const uid = fresh('courier-phone');
-  const r = await h.post('/api/auth/staff-login', { code: inv.body.code, name, device: { uid, name: 'گوشیِ پیک', platform: 'android' } });
+  const r = await h.post('/api/auth/staff', { code: inv.body.code, name, device: { uid, name: 'گوشیِ پیک', platform: 'android' } });
   assert.equal(r.status, 201, JSON.stringify(r.body));
   const token = r.body.accessToken;
   const id = (await h.get('/api/courier/me', { token })).body.courier.id;
@@ -548,7 +548,7 @@ async function seedShop(a) {
   ids.approverKey = key.body.key.id;
   //  STF-02: درخواستِ تأییدِ شاگردِ «الف» (برگشتِ بالای سقف ⇒ «نیازمندِ تأیید») — در انتظارِ صاحب/مدیر. برگشت، نه تخفیف:
   //  تخفیفِ شاگرد (پیش‌فرضِ «ممنوع») بی Sync v3 ِ سرور درخواست نمی‌سازد (`approval_needs_v3`، approval-requests.test.js)
-  const lay = await h.put('/api/shop/permissions/roles/staff', { perms: { 'returns.create': { caps: { maxAmount: 1000 } } } }, { token: a.accessToken });
+  const lay = await h.roleLayer(a.accessToken, 'staff', { 'returns.create': { caps: { maxAmount: 1000 } } });
   assert.equal(lay.status, 200, JSON.stringify(lay.body));
   const apr = await h.post('/api/shop/approval-requests',
     { key: fresh('apr-key'), perm: 'returns.create', doc: 'returns/r-inv-a', amount: 2000, reason: 'مشتریِ الف' },
@@ -792,7 +792,6 @@ function bodyFor(r, ids) {
     'POST /shop/custom-roles': { name: 'نقشِ ب', baseRole: 'staff', perms: {} },
     'PUT /shop/custom-roles/:id': { name: 'نقشِ دزدیده', perms: {} },
     'PUT /shop/custom-roles/members/:id': { roleId: ids.customRole },
-    'PUT /shop/permissions/roles/:role': { perms: {} },
     'PUT /shop/promos/rules/:id': { rule: { name: 'تخفیفِ ب', kind: 'percent', bp: 500 } },
     'PUT /shop/held-invoices/:id': { version: 50, body: { id: ids.heldInvoice, number: 1, label: 'نگه‌داشتهٔ ب', lines: [{ productId: 'p-b', quantity: 1 }] } },
     'POST /shop/trust/cases/:id/responses': { body: 'پاسخِ ب', clientId: `client-${fresh('t')}-0000` },
@@ -882,9 +881,8 @@ test('هر مسیرِ شناسه‌دارِ /api/shop با ردیفِ واقعی
   const mOwn = await bindTo(m.shopId, 'owner');
   const mInA = await bindTo(a.shopId, 'staff');
   for (const [t, shopId] of [[mOwn, m.shopId], [mInA, a.shopId]]) {
-    const ms = await h.get('/api/shop/memberships', { token: t });
-    assert.equal(ms.body.activeShopId, shopId, JSON.stringify(ms.body));
-    assert.equal(ms.body.explicit, true);
+    const ms = await h.get('/api/shop/me', { token: t });
+    assert.equal(ms.body.shop.id, shopId, JSON.stringify(ms.body));
   }
 
   const before = await footprint(a.shopId);
