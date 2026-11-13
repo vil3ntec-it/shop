@@ -59,7 +59,7 @@ object StrReturnRequests {
   val rejected: String get() = t("درخواست رد شد.", "Request declined.", "غوښتنه رد شوه.")
   val completed: String get() = t("برگشت ثبت و به مشتری خبر داده شد.", "Return recorded and the customer was told.", "بېرته ورکول ثبت او پېرودونکي ته خبر ورکړل شو.")
   val noSale: String get() = t(
-    "فروشِ این سفارش هنوز در دفترِ همین دستگاه نیست؛ پس از همگام شدنِ تحویلِ سفارش دوباره بزنید.",
+    "فروشِ این سفارش هنوز در دفترِ همین دستگاه نیست؛ پس از همگام شدنِ تحویلِ سفارش دوباره کوشش کنید.",
     "This order's sale is not in this device's ledger yet; try again after the order handover syncs.",
     "د دې فرمایش پلور لا د دې وسیلې په دفتر کې نشته؛ د فرمایش د سپارلو له همغږي کېدو وروسته بیا یې ووهئ.",
   )
@@ -69,8 +69,4 @@ object StrReturnRequests {
     "آنلاین بېرته ورکړه لا نشته (د حساب‌پی په تمه)؛ نغدې یا د دوکان اعتبار وټاکئ.",
   )
 
-  //  رویدادهای «پیام‌ها به مشتری» (ORD-16) — همان `RETURN_EVENTS` ِ `lib/customer-notify.js`
-  val eventAccepted: String get() = t("درخواستِ برگشت پذیرفته شد", "Return request accepted", "د بېرته ورکولو غوښتنه ومنل شوه")
-  val eventRejected: String get() = t("درخواستِ برگشت رد شد", "Return request declined", "د بېرته ورکولو غوښتنه رد شوه")
-  val eventCompleted: String get() = t("برگشت ثبت شد", "Return recorded", "بېرته ورکول ثبت شول")
 }
