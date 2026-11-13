@@ -66,7 +66,7 @@ function phoneRef(phone) {
  * یک خواندن ⇒ ردیفِ تازه یا `hits + 1` ِ ردیفِ ۱۰ دقیقهٔ اخیر. خطای پایگاه داده بالا می‌رود ([noteLookup] می‌شمارد، [noteApp] بالا می‌برد).
  * @returns {Promise<{id: string, hits: number}>}
  */
-async function record({ shopId, viewerId, role = '', deviceId = '', customerRef, kind, door, at = now() }) {
+async function record({ shopId, viewerId, role = '', deviceId = '', customerRef, kind, door, at = now(), exact = false }) {
   if (!shopId || !viewerId) throw new Error('customer_access_actor');
   if (!KINDS.includes(kind) || !DOORS.includes(door)) throw new Error('customer_access_kind');
   if (typeof customerRef !== 'string' || !customerRef || customerRef.length > 120) throw new Error('customer_access_ref');
@@ -74,10 +74,19 @@ async function record({ shopId, viewerId, role = '', deviceId = '', customerRef,
   const dev = String(deviceId || '').slice(0, 80);
   return tx(async (c) => {
     await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`customer-access:${shopId}:${viewerId}:${customerRef}:${kind}`]);
+    //  CRM-15 (د۱۸): دیدنِ صفِ آفلاین با زمانِ خودش — همان دیدن دوباره (پاسخِ گم‌شده) ردیفِ هم‌زمان دارد ⇒ تکراری، بی شمار
+    if (exact) {
+      const same = (await c.query(
+        `SELECT id, hits FROM customer_access_log WHERE shop_id=$1 AND viewer_id=$2 AND customer_ref=$3 AND kind=$4
+            AND (first_at = $5 OR last_at = $5) LIMIT 1`,
+        [shopId, viewerId, customerRef, kind, at]
+      )).rows[0];
+      if (same) return { id: same.id, hits: Number(same.hits), duplicate: true };
+    }
     const bumped = (await c.query(
       `UPDATE customer_access_log SET hits = hits + 1, last_at = GREATEST(last_at, $6)
         WHERE id = (SELECT id FROM customer_access_log
-                     WHERE shop_id=$1 AND viewer_id=$2 AND customer_ref=$3 AND kind=$4 AND first_at > $5
+                     WHERE shop_id=$1 AND viewer_id=$2 AND customer_ref=$3 AND kind=$4 AND first_at > $5 AND first_at <= $6
                      ORDER BY first_at DESC LIMIT 1)
         RETURNING id, hits`,
       [shopId, viewerId, customerRef, kind, at - WINDOW_MS, at]
@@ -159,6 +168,47 @@ async function noteApp(req, { customerId, kind }) {
     counters.recorded += 1;
     return { kind: recorded, hits: r.hits };
   } catch (err) { failed(err); throw err; }
+}
+
+/**
+ * CRM-15 (د۱۸) — دیدن‌های صفِ آفلاینِ برنامه (نقشِ بی `auditLog`، بی‌اینترنت): هر کدام با زمانِ خودش (`at`، پنجرهٔ
+ * [OFFLINE_MAX_AGE_MS] ِ گذشته تا [OFFLINE_SKEW_MS] ِ آینده)، همان درِ `app` و همان قاعدهٔ [noteApp]. دیدنِ تکراری (همان
+ * زمان) ⇒ `duplicate`؛ دیدنِ نادرست ⇒ `rejected` با دلیل، بقیه می‌نشینند. پرچم و شکلِ بدنه را درِ `routes/shop-customer-access.js` می‌سنجد.
+ * @returns {Promise<Array<{id: string, status: string, reason?: string}>>}
+ */
+const OFFLINE_FLAG = 'shop.customer_access_offline';
+const OFFLINE_MAX = 50;
+const OFFLINE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const OFFLINE_SKEW_MS = 5 * 60 * 1000;
+const NOTE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+async function noteOffline(req, notes) {
+  const t = now();
+  let hidden = null;
+  const out = [];
+  for (const n of notes) {
+    const o = n && typeof n === 'object' && !Array.isArray(n) ? n : {};
+    const id = typeof o.id === 'string' && NOTE_ID_RE.test(o.id) ? o.id : '';
+    const kind = typeof o.kind === 'string' && KINDS.includes(o.kind) ? o.kind : null;
+    if (!kind) { out.push({ id, status: 'rejected', reason: 'bad_kind' }); continue; }
+    const ref = o.customerId === ALL ? (kind === 'export' ? ALL : null) : refOf(o.customerId);
+    if (!ref) { out.push({ id, status: 'rejected', reason: 'bad_customer' }); continue; }
+    const at = o.at;
+    if (!Number.isSafeInteger(at) || at < t - OFFLINE_MAX_AGE_MS || at > t + OFFLINE_SKEW_MS) {
+      out.push({ id, status: 'rejected', reason: 'bad_at' });
+      continue;
+    }
+    if (kind === 'phone' && hidden === null) hidden = await require('./customer-contact').hiddenForReq(req);
+    try {
+      const r = await api.record({
+        shopId: req.shopId, viewerId: req.user.id, role: req.role || req.member?.role || '',
+        deviceId: req.device?.device_uid || '', customerRef: ref, kind: kind === 'phone' && hidden ? 'detail' : kind,
+        door: 'app', at, exact: true,
+      });
+      if (!r.duplicate) counters.recorded += 1;
+      out.push({ id, status: r.duplicate ? 'duplicate' : 'recorded' });
+    } catch (err) { failed(err); throw err; }
+  }
+  return out;
 }
 
 /** همهٔ نوشتن‌های در راه (آزمون، و پیش از بستنِ سرور) */
@@ -265,6 +315,7 @@ async function sweep({ at = now(), days = retentionDays() } = {}) {
 const api = module.exports = {
   KINDS, DOORS, WINDOW_MS, PHONE_PREFIX, ERASED_PREFIX, ALL,
   refOf, phoneRef, record, noteLookup, noteApp, settle, stats, list, anonymize, sweep, retentionDays,
+  OFFLINE_FLAG, OFFLINE_MAX, OFFLINE_MAX_AGE_MS, OFFLINE_SKEW_MS, noteOffline,
   //  برای آزمون
   _debtorIdsByPhone: debtorIdsByPhone, _counters: counters,
 };
