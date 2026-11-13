@@ -7,7 +7,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.performSemanticsAction
 import ir.vil3ntec.tohid.core.guide.ScreenGuides
 import ir.vil3ntec.tohid.core.i18n.StrKit
-import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.ShopData
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -22,17 +21,17 @@ class GuideButtonUiTest {
 
   @get:Rule val rule = createComposeRule()
 
-  private val data = ShopData(debtors = listOf(Debtor(id = "d1", name = "احمد")))
+  private val data = ShopData()
 
   private fun guideButtons() = rule.onAllNodes(hasContentDescription(StrKit.guide) and hasClickAction()).fetchSemanticsNodes().size
 
   @Test fun rootPageHelpOpensTheApprovedTextWithoutVideo() {
     RouteUiHarness(rule).use { h ->
-      h.show("debtors", data)
+      h.show("settings", data)
       h.awaitThat { guideButtons() > 0 }
       rule.onAllNodes(hasContentDescription(StrKit.guide) and hasClickAction())[0].performSemanticsAction(SemanticsActions.OnClick)
       rule.waitForIdle()
-      val g = ScreenGuides.forScreen("debtors")!!
+      val g = ScreenGuides.forScreen("settings")!!
       h.await(StrKit.guideTitle(g.title.fa))
       for (s in g.steps) h.await(s.fa)
       h.await(StrKit.guideOffline)
@@ -43,8 +42,8 @@ class GuideButtonUiTest {
 
   @Test fun subPageHasNoHelpButton() {
     RouteUiHarness(rule).use { h ->
-      h.show("debtors/d1", data)
-      h.await("احمد")
+      h.show("settings/about", data)
+      h.await(ir.vil3ntec.tohid.ui.screens.SettingsLayout.labelOf(ir.vil3ntec.tohid.ui.screens.SettingsLayout.ABOUT_APP))
       assertEquals(0, guideButtons())
     }
   }

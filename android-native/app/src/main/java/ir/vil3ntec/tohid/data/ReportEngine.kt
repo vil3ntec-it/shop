@@ -328,7 +328,8 @@ object ReportEngine {
     //  یک گذر روی تراکنش‌ها، نه یک پیمایشِ کامل به ازای هر قرض‌دار
     val byDebtor = d.transactions.groupBy { it.debtorId }
     return d.debtors.map { debtor ->
-      val mine = byDebtor[debtor.id].orEmpty()
+      //  S89: «داده/گرفته» بی جفتِ «اصل + سندِ معکوس» (همان حذفِ امروز؛ مانده همان جمع)
+      val mine = DebtReverse.effective(byDebtor[debtor.id].orEmpty())
       //  `shop.debt_minor` (`DebtMinorFlag`): به پول، مثلِ `DebtBook` — «داده»، «گرفته» و «مانده» هم‌خوان و
       //  ماندهٔ حسابِ تسویه‌شده صفرِ دقیق (نه −9.09e-13 که «۰ ؋ موجودی» می‌شد)
       if (DebtMinorFlag.on) {

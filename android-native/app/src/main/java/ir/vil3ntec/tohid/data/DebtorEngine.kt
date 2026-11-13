@@ -326,7 +326,8 @@ object DebtorEngine {
   fun account(d: ShopData, id: String): Account? {
     val debtor = d.debtors.find { it.id == id } ?: return null
     val mine = d.transactions.filter { it.debtorId == id }.sortedByDescending { it.createdAt }
-    val live = mine // RED-TMP
+    //  S89: «داده/گرفته» بی جفتِ «اصل + معکوس» (همان حذفِ امروز)؛ فهرست هر دو ردیف را دارد (سابقه روشن)
+    val live = DebtReverse.effective(mine)
     return Account(
       debtor = debtor,
       given = live.filter { it.type == "give" }.sumOf { it.amount },
@@ -358,7 +359,8 @@ object DebtorEngine {
    *  اولین قرضِ بعدی می‌نشیند.
    */
   fun debtSince(d: ShopData, debtorId: String): Long? {
-    val mine = (d.transactions.filter { it.debtorId == debtorId }) // RED-TMP
+    //  S89: جفتِ «اصل + معکوس» بیرون — کهنگی همان حذفِ امروز (رسیدِ معکوس‌شده قدیمی‌ترین برد را نمی‌بندد)
+    val mine = DebtReverse.effective(d.transactions.filter { it.debtorId == debtorId })
       .sortedWith(compareBy<DebtTransaction>({ it.date }, { it.createdAt }))
     if (mine.isEmpty()) return null
 
