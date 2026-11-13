@@ -233,8 +233,9 @@ async function rowsById(T0, table, shopId, ids, bySale = false) {
  * فاکتورها و برگشتی‌های بازه و فاکتورِ هر برگشت (بی قلم و کالا). `w` = {fromAt, until (ms)، from, to (روزِ محلی)}.
  * «گزارشِ پولِ مدیر» (S124، `admin-money.js`) فقط همین را می‌خواند؛ `ledgerOf` قلم و کالا را رویش می‌افزاید.
  */
-async function salesLedgerOf(shopId, w) {
-  const fmt = (await require('./stock').settingsOf(shopId)).syncSource === 'v3' ? 'v3' : 'v1';
+async function salesLedgerOf(shopId, w, only = null) {
+  //  `only`: قالبِ دفترِ از پیش دانسته — بخشِ شعبهٔ غیرِ اصلی همیشه v3 است (`lib/branch-report.js`)
+  const fmt = only || ((await require('./stock').settingsOf(shopId)).syncSource === 'v3' ? 'v3' : 'v1');
   const T0 = STORES[fmt];
   const L = { fmt, T0, partial: false };
   L.map = (table, rows) => {
@@ -250,8 +251,8 @@ async function salesLedgerOf(shopId, w) {
 }
 
 /** دفترِ بازه: فاکتورها و برگشتی‌های بازه، فاکتورِ هر برگشت، قلم‌ها و نامِ کالاها. */
-async function ledgerOf(shopId, w) {
-  const L = await salesLedgerOf(shopId, w);
+async function ledgerOf(shopId, w, only = null) {
+  const L = await salesLedgerOf(shopId, w, only);
   const { sales, returns } = L;
   const saleItems = L.map('saleItems', await rowsById(L.T0, 'saleItems', shopId, sales.map((s) => s.id), true));
   const pids = [...new Set([...saleItems, ...returns].map((x) => String(x.productId || '')).filter(Boolean))];
@@ -536,6 +537,6 @@ function stop() {
 module.exports = {
   FLAG_KEY, PROFIT_FLAG, COST_DECIDED, FREQUENCIES, CHANNELS, CATCHUP_MS, MORNING_BEFORE, MAX_ROWS, DEFAULTS,
   flagOf, profitFlagOf, settingsOf, saveSettings, parseSettings, dueOf, clockFor, summarize, profitOf, buildSummary, render, timezoneOf,
-  salesLedgerOf, CREATED,
+  salesLedgerOf, ledgerOf, CREATED,
   runShop, sweep, viewOf, start, stop,
 };

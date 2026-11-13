@@ -116,7 +116,7 @@ function check(soldMilli, cap, prior, req, { tolMinorPerRow = 0, counterMilli = 
 
 /** خاموش‌کنِ اضطراری: فقط `false` ِ صریح (دکان مقدم بر all) */
 async function enabled(c, shopId) {
-  const rows = (await c.query(`SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ('all', $2)`, [FLAG, String(shopId)])).rows;
+  const rows = (await c.query(`SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ('all', $2)`, [FLAG, require('./branch-key').shopOf(shopId)])).rows;
   const decode = (t) => { try { return JSON.parse(t); } catch { return null; } };
   let v;
   for (const r of rows) if (r.scope === 'all') v = decode(r.value);

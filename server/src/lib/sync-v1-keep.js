@@ -49,7 +49,7 @@ const isShop = (ctx) => !!ctx && ctx.app === SHOP.app && ctx.accountKind === SHO
 async function flags(ctx) {
   const rows = await many(
     'SELECT scope, key, value FROM live_config WHERE key = ANY($1::text[]) AND scope IN ($2,$3)',
-    [[KEEP_PENDING, REVIVE_ROW, GZIP_PULL, GZIP_PUSH], 'all', String(ctx.accountId)]
+    [[KEEP_PENDING, REVIVE_ROW, GZIP_PULL, GZIP_PUSH], 'all', require('./branch-key').shopOf(ctx)]
   );
   const v = {};
   for (const r of rows) if (r.scope === 'all') v[r.key] = decode(r.value);

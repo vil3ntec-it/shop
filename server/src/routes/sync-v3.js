@@ -15,6 +15,10 @@
  * ⛔ تا `SYNC_V3_ENABLED` روشن نشود، **همه** همان ۴۰۴ِ سرورِ قدیمی‌اند —
  *    برنامه‌ای که امتحان می‌کند فرقی میانِ «سرورِ قدیمی» و «خاموش» نمی‌بیند.
  * ⛔ حساب از توکن (`requireSyncAccount`ِ v1، فقط خوانده می‌شود).
+ * ⛔ شعبه (فازِ ۱، `docs/BRANCHES-fa.md`؛ پرچمِ `shop.branches`): سرآیندِ `X-Branch-Id` ⇐ `branches.resolve` با دسترسیِ
+ *    همان عضو؛ شعبهٔ غیرِ اصلی ⇐ `req.syncBranch` (ردیف‌ها در بخشِ `<دکان>#<شعبه>`) و **همهٔ** خواندن/نوشتنِ دفتر
+ *    با آن (`ctxOf`). `req.sync` دست نمی‌خورد ⇒ `requireSyncWrite`، پنهان کردنِ تماس و پرچم‌ها همان دکان. پرچم خاموش ⇒
+ *    سرآیند خوانده هم نمی‌شود. شناسهٔ شعبه در بدنه هرگز خوانده نمی‌شود.
  * ⚠️ هر پاسخ `server_time` دارد (و سرآیندِ `X-Server-Time`) تا دستگاه
  *    اختلافِ ساعتش را نگه دارد (بخشِ ۳.۸.۱ بندِ ۸).
  */
@@ -37,6 +41,7 @@ const v = require('../lib/validate');
 const contact = require('../lib/customer-contact');
 const creditReview = require('../lib/credit-limit-review');
 const tillOpUser = require('../lib/till-op-user');
+const branches = require('../lib/branches');
 
 const gzip = promisify(zlib.gzip);
 const router = express.Router();
@@ -56,6 +61,18 @@ router.use(rateLimit({
   keyPrefix: 'sync3',
   key: (req) => (req.sync ? 'shop:' + req.sync.accountId : ''),
 }));
+//  شعبه: پرچم پیش از سرآیند (و پیش از بدنه)؛ خاموش ⇒ هیچ اثری
+router.use(async (req, res, next) => {
+  try {
+    if (!(await branches.enabled(req.sync.accountId))) return next();
+    const access = await branches.accessOf(req.sync.accountId, { role: req.sync.role, userId: req.sync.userId });
+    const id = branches.resolve(access, branches.claimOf(req));
+    if (id !== branches.MAIN) req.syncBranch = branches.ctxFor(req.sync, id);
+    next();
+  } catch (err) { next(err); }
+});
+/** بافتِ دفتر: بخشِ شعبه یا خودِ حساب */
+const ctxOf = (req) => req.syncBranch || req.sync;
 
 const deviceOf = (src) => v.id(src?.device_id || src?.deviceId, { field: 'شناسه دستگاه', required: true, max: 64 });
 
@@ -81,18 +98,21 @@ router.post('/push', requireSyncWrite, async (req, res, next) => {
     //  گاوصندوق (PAY-18): همان قفلِ نگهبانِ v1 تا پایانِ پاسخ — پلِ v3⇒v1 همان `sync_rows` را
     //  می‌نویسد که آن نگهبان «ردیف هست؟» را از آن می‌خواند (‎lib/safe-ledger.js‎)
     //  پرچمِ خاموش ⇒ بی قفل، همان main (opِ گاوصندوق «جدولِ ناشناخته» می‌گیرد، ‎lib/safe-flag.js‎)
-    if (require('../lib/safe-flag').on(req.sync) && safeLedger.touches(b.ops) && !(await safeLedger.hold(res, req.sync))) return;
+    if (require('../lib/safe-flag').on(req.sync) && safeLedger.touches(b.ops) && !(await safeLedger.hold(res, ctxOf(req)))) return;
     const appVersion = String(req.headers['x-app-version'] || '').slice(0, 32);
     //  A00: `null` ِ ساختِ پیش از A00 برای فیلدی که نمی‌شناسد کنار می‌رود (‎lib/newer-fields.js‎)
     const fl = newerFields.filterOps(b.ops, {
       version: appVersion, shape: b.format === 'v2' ? 'v1' : 'v3', caps: b.caps, client: b.client,
     });
     //  S46: نوبتِ سنجیدهٔ صندوقِ دستگاهِ توکن در لحظهٔ رسیدن (پرچمِ خاموشِ `shop.till_op_user` ⇒ null؛ ‎lib/till-op-user.js‎)
-    const till = Array.isArray(fl.ops) && fl.ops.length ? await tillOpUser.begin(req).catch((err) => {
+    //  شعبهٔ غیرِ اصلی (فازِ ۱): سابقه‌های بهترین‌کوششِ سطحِ دکان (کاربرِ صندوق، بررسیِ قرض/تخفیف) نوشته نمی‌شوند تا ردیفِ
+    //  شعبه در دفترِ سطحِ دکانِ اصلی نیاید — فازِ ۳ (`docs/BRANCHES-fa.md`)
+    const branchCtx = req.syncBranch || null;
+    const till = !branchCtx && Array.isArray(fl.ops) && fl.ops.length ? await tillOpUser.begin(req).catch((err) => {
       console.error('[till-op-user] نوبتِ صندوق خوانده نشد (v3):', err.message);
       return null;
     }) : null;
-    const out = await sync.push(req.sync, {
+    const out = await sync.push(ctxOf(req), {
       deviceId: deviceOf(b),
       protocol: b.protocol,
       format: b.format === 'v2' ? 'v2' : 'v3',
@@ -105,9 +125,9 @@ router.post('/push', requireSyncWrite, async (req, res, next) => {
       hideContact: await contact.hiddenForReq(req),
     });
     //  CRM-03: فروشِ نسیهٔ تازه بیش از سقفِ اعتبار ⇒ فقط سابقهٔ بررسی (پرچمِ خاموش؛ ‎lib/credit-limit-review.js‎)
-    await creditReview.v3(req.sync, deviceOf(b), fl.ops, out.results, { ip: clientIp(req) });
+    if (!branchCtx) await creditReview.v3(req.sync, deviceOf(b), fl.ops, out.results, { ip: clientIp(req) });
     //  STF-03: تخفیفِ خودکار و مصرفِ امتیاز با تعریف‌های دکان ⇒ فقط سابقهٔ بررسی (پرچمِ خاموش؛ ‎lib/promo-loyalty-review.js‎)
-    await require('../lib/promo-loyalty-review').v3(req.sync, deviceOf(b), fl.ops, out.results, { ip: clientIp(req) });
+    if (!branchCtx) await require('../lib/promo-loyalty-review').v3(req.sync, deviceOf(b), fl.ops, out.results, { ip: clientIp(req) });
     //  S46: کاربرِ سنجیدهٔ صندوق برای هر op ِ نشسته (بهترین‌کوشش؛ پاسخ دست نمی‌خورد)
     await tillOpUser.v3(till, fl.ops, out.results, { format: b.format === 'v2' ? 'v2' : 'v3' });
     out.results = newerFields.mergeResults(fl, out.results);
@@ -125,7 +145,7 @@ router.post('/push', requireSyncWrite, async (req, res, next) => {
 
 router.get('/pull', async (req, res, next) => {
   try {
-    const out = await sync.pull(req.sync, {
+    const out = await sync.pull(ctxOf(req), {
       deviceId: deviceOf(req.query),
       since: Number(req.query?.since || 0),
       maxBytes: Number(req.query?.max_bytes || 0) || undefined,
@@ -133,7 +153,7 @@ router.get('/pull', async (req, res, next) => {
     });
     //  §۹.۵: «دورانِ» سرور کنارِ هر pull — عوض شده ⇒ برنامه opهای گم‌شده را دوباره می‌فرستد
     //  (`lib/sync-epoch.js`، `SyncV3Engine.pullOnce`). خاموش ⇒ همان پاسخِ پیشین.
-    if (config.syncEpoch.enabled) out.epoch = await syncEpoch.forAccount(req.sync, 'v3');
+    if (config.syncEpoch.enabled) out.epoch = await syncEpoch.forAccount(ctxOf(req), 'v3');
     //  SYN-04: «push ات را فشرده بفرست» فقط با پرچمِ دکانِ `sync.gzip_push` (همان پرچمِ v1؛ سرور بدنهٔ فشرده را همیشه باز می‌کند)
     if ((await require('../lib/sync-v1-keep').flags(req.sync)).gzipPush) out.gzip_push = true;
     if (contact.touches(out.ops) && await contact.hiddenForReq(req)) out.ops = contact.omitV3Ops(out.ops);
@@ -143,7 +163,7 @@ router.get('/pull', async (req, res, next) => {
 
 router.get('/snapshot', async (req, res, next) => {
   try {
-    const snap = await sync.snapshot(req.sync);
+    const snap = await sync.snapshot(ctxOf(req));
     if (await contact.hiddenForReq(req)) snap.tables = contact.omitTables(snap.tables);
     await send(req, res, { ok: true, ...snap });
   } catch (err) { next(err); }
@@ -161,21 +181,21 @@ router.post('/deleted', async (req, res, next) => {
     if (!Array.isArray(rows) || rows.length > syncEpoch.MAX_ASK) {
       return next(badRequest(`فهرستِ ردیف‌ها لازم است (حداکثر ${syncEpoch.MAX_ASK})`, 'bad_rows'));
     }
-    res.json({ ok: true, deleted: await syncEpoch.deletedRows(req.sync, 'v3', rows), server_time: Date.now() });
+    res.json({ ok: true, deleted: await syncEpoch.deletedRows(ctxOf(req), 'v3', rows), server_time: Date.now() });
   } catch (err) { next(err); }
 });
 
 router.get('/status', async (req, res, next) => {
   try {
     const deviceId = String(req.query?.device_id || req.query?.deviceId || '').slice(0, 64);
-    res.json({ ok: true, ...(await sync.status(req.sync, deviceId)) });
+    res.json({ ok: true, ...(await sync.status(ctxOf(req), deviceId)) });
   } catch (err) { next(err); }
 });
 
 router.post('/report', async (req, res, next) => {
   try {
     const b = req.body || {};
-    res.json({ ok: true, ...(await sync.report(req.sync, deviceOf(b), {
+    res.json({ ok: true, ...(await sync.report(ctxOf(req), deviceOf(b), {
       queued: b.queued, lastError: b.last_error, clockOffsetMs: b.clock_offset_ms,
       appVersion: String(req.headers['x-app-version'] || '').slice(0, 32),
     })) });
@@ -184,7 +204,7 @@ router.post('/report', async (req, res, next) => {
 
 router.get('/conflicts', async (req, res, next) => {
   try {
-    const conflicts = await sync.listConflicts(req.sync, {
+    const conflicts = await sync.listConflicts(ctxOf(req), {
       status: req.query?.status === 'all' ? 'all' : 'open', limit: Number(req.query?.limit || 100),
     });
     res.json({
@@ -196,7 +216,7 @@ router.get('/conflicts', async (req, res, next) => {
 
 router.post('/conflicts/:id/resolve', requireSyncWrite, async (req, res, next) => {
   try {
-    const out = await sync.resolveConflict(req.sync, req.params.id, String(req.body?.action || ''), {
+    const out = await sync.resolveConflict(ctxOf(req), req.params.id, String(req.body?.action || ''), {
       userId: req.sync.userId,
     });
     res.json({ ok: true, ...out, server_time: Date.now() });
