@@ -1043,12 +1043,10 @@ async function heldTxs(q, ctx, deviceId, txs) {
   return out;
 }
 
-//  سابقهٔ تأییدهای پذیرفته (`GET /api/shop/approvals`): ‎lib/approval-log.js‎
-
 module.exports = {
   ALG, MAX_KEYS_PER_USER, APPROVER_ROLES, DENY_CODE, MESSAGES,
   keyIdOf, parsePublicKey, registerKey, listKeys, revokeKey,
-  needOf, needOfV1, verifySignature, acceptSlip, judge, wallOf, slipOf, v1Guard, requesterLayers, listApprovals: (...a) => require('./approval-log').listApprovals(...a),
+  needOf, needOfV1, verifySignature, acceptSlip, judge, wallOf, slipOf, v1Guard, requesterLayers,
   returnDocKey, groupReturns, returnGroupsOf, judgeGroup, companionOf, parentOf, belongs, headKey, bundleV3, HOLD_KINDS,   //  سه‌تا: `return-line-cap` ِ v1
   returnsLockKey, returnedTotal, holdInfoV3, holdV3Units, heldTxs, boxV1,   //  boxV1: ‎lib/credit-limit-perm.js‎
 };

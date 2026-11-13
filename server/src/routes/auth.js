@@ -323,7 +323,8 @@ async function loginPayload(user, session) {
  * `staff_login.failed`. کلیدِ اضطراری: پرچمِ `auth.staff_session_guard`
  * (پیش‌فرض روشن؛ فقط `false` ِ صریح).
  */
-router.post(['/staff', '/staff-login'], joinLimit, staffCodeLimit, async (req, res, next) => {
+//  ⛔ نامِ دومِ `/staff-login` برداشته شد (۱۴۰۵/۰۸/۲۲): هیچ برنامه‌ای صدایش نمی‌زد (`ApiEndpoints.Auth.STAFF`).
+router.post('/staff', joinLimit, staffCodeLimit, async (req, res, next) => {
   try {
     res.status(201).json(await staffLogin.login(req, { issueSession, loginPayload }));
   } catch (err) { next(err); }

@@ -54,7 +54,7 @@ router.get('/', async (req, res) => {
 });
 
 /*
- *  ══ اعلان‌های من · پرداخت‌های من · تنظیماتِ من ══════════════════════
+ *  ══ اعلان‌های من · پرداخت‌های من ═══════════════════════════════════
  *  منطق در `routes/portal.js` است (همان که پورتالِ وب هم می‌خواند)؛
  *  این‌جا فقط با هویتِ نشستِ **دکان** صدا زده می‌شود.
  */
@@ -62,11 +62,10 @@ const portal = require('./portal');
 router.get('/notices', (req, res, next) => portal.noticesHandler('shop', req, res, next));
 router.post('/notices/:id/read', (req, res, next) => portal.readNoticeHandler('shop', req, res, next));
 router.get('/payments', (req, res, next) => portal.paymentsHandler('shop', req, res, next));
-router.get('/settings', (req, res, next) => portal.settingsHandler('shop', req, res, next));
-router.put('/settings', (req, res, next) => portal.saveSettingsHandler('shop', req, res, next));
-router.post('/redeem', (req, res, next) => portal.redeemHandler('shop', req, res, next));
 router.get('/heartbeat', (req, res, next) => portal.heartbeatHandler('shop', req, res, next));
-router.post('/errors', (req, res, next) => portal.reportErrorHandler('shop', req, res, next));
+//  ⛔ برداشته (۱۴۰۵/۰۸/۲۲، هیچ برنامه‌ای صدایشان نمی‌زد): `GET`/`PUT /settings` (شاگرد هم «همگام‌سازیِ ابری» ِ
+//  کلِ دکان را عوض می‌کرد)، `POST /redeem` و `POST /errors`. همان کار برای برنامه‌ها: `/api/portal/settings`،
+//  `/api/portal/redeem` (SDK)، `/api/vip/redeem` (کدِ VIP) و `/api/errors`؛ پمپ همان دستگیره‌ها را زیرِ `/api/pump` دارد.
 
 /** وضعیت اشتراک — همیشه با ساعت سرور. */
 async function subscriptionHandler(req, res) {
