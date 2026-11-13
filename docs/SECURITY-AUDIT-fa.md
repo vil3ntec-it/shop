@@ -556,9 +556,34 @@ PostgreSQL 16 سبز.
 (`shop-ui.js` ِ همان)، `GET`/`POST`/`PUT /api/shop` و `POST /api/shop/staff/join` (نسخهٔ بومیِ بایگانی‌شده و `server/README.md`)؛
 `POST /api/shop/active` (قاعدهٔ TEN-01، `RULES-fa.md`) و `GET /api/shop/audit` (درِ دیدنِ `security.doc_chain` و `sale.credit_over_limit`
 در RULES). برداشتنشان فقط پس از داشبوردِ نسخه‌ها (هیچ نصبِ کهنه‌ای نماند) یا ۴۱۰ ِ روشن.
-نامطمئن یا پیش‌ساخته پشتِ پرچم (دست نخوردند): `/api/market/account/**`، `…/trust/cases/:token/evidence`، `/api/shop/catalog/*`،
+نامطمئن یا پیش‌ساخته پشتِ پرچم (در این دور دست نخوردند؛ دنباله پایین): `/api/market/account/**`، `…/trust/cases/:token/evidence`، `/api/shop/catalog/*`،
 `/api/shop/till-pin/*`، `…/track-link/revoke`، `/api/shop/images/:id/versions|report|process`، `/api/courier/route|map`،
 `/api/shop/delivery/settlements/:id`، `/api/shop/trust/sanctions`، `/api/terms`، `GET /api/store`، `POST /api/auth/logout-all`.
+
+**دنبالهٔ B15 (۱۴۰۵/۰۸/۲۲، شاخهٔ `claude/e-rows-44u`):** برای هر درِ نامطمئن یک تصمیم — تکیه‌گاه با grep در STATUS، `docs/spec/*.md` و RULES:
+
+| در | تصمیم | دلیل و تکیه‌گاه | سنجه |
+|---|---|---|---|
+| `/api/market/account/**` (۱۲) | برداشته ⇐ به‌جایش: `/api/store/:slug/account/*` | نامِ دومِ حسابِ ویترین (همان `store_customers` ِ سراسری، همان تابع‌ها)؛ ردیفِ STATUS ندارد (S9 فقط در `MARKETPLACE-CONTRACT-fa.md`). گرهِ گفت‌وگو به حساب (`market.account`) و منطقِ تغییرِ شماره (`store-customers.changePhone`، §۲۳.۴) ماندند؛ §۲۳.۴ «تغییرِ شمارهٔ مشتری» حالا در و رابط ندارد (ردیف ندارد؛ HANDOFF) | `dead-doors.test.js`، `market-account.test.js` |
+| `GET …/trust/cases/:token/evidence/:evidenceId` | زنده | `store/trust.js` «دیدنِ عکس‌ها» (`e-rows-42w`) صدایش می‌زند | `trust.e2e.mjs` |
+| کاتالوگِ سرور (۱۳ در بی صدازننده: تنظیم، تازه‌سازی، کالاها، حرکت‌ها، گزارش، کارها، ثبتِ حرکت/انتقال/دریافت/رد) | پیش‌ساخته | INV-01/INV-11/CHK-18 (PARTIAL): برنامه موجودی را روی دفترِ خودش می‌نویسد و سرور از همگام‌سازی می‌خواند؛ برداشتن ۴۶ پروندهٔ آزمون را جابه‌جا می‌کرد (بیش از ۳۰ دقیقه) ⇒ با پرچمِ خاموش همان درِ ناشناخته (`next('router')`) و ماندهٔ دقیق در PARTIAL-MAP. ⚠️ درهای نوشتنی راهِ دومِ نوشتن روی دفترِ موجودیِ سرورند؛ فقط با `shop.catalog` ِ روشن باز | `catalog-stock.test.js`، `catalog-transfers.test.js` |
+| INV-21: `POST /api/shop/catalog/moves` (repack) | ادعای ردیف درست شد | برنامه repack را روی دفترِ خودش می‌کند و سرور همان سندِ تولید را از همگام‌سازی می‌گیرد (بندِ «ب» ِ ردیف) — درِ سرور تکیهٔ ردیف نیست | STATUS ِ INV-21 |
+| `/api/shop/till-pin/members/:id/unlock`، `GET /members` (+ `DELETE /members/:id`) | ساخته | STF-04: صفحهٔ کارمند ⇐ «PIN ِ صندوق» (اختیارِ `till-pin.mayManage`، تأییدِ دوبارهٔ ورود) | `TillPinMemberModelTest` |
+| `PUT /till-pin/me`، `GET /current`، `/sessions`، `/ops`، `/ops/row` | پیش‌ساخته | STF-04/S46 (PARTIAL)؛ رابطِ «PIN ِ خودم» و گزارشِ «کارِ هر کاربر» کارِ بزرگی است و بستن را نگه نمی‌دارد ⇒ پرچمِ خاموش = درِ ناشناخته | `till-pin.test.js`، `till-op-user.test.js` |
+| `POST /api/shop/orders/:id/track-link/revoke` | ساخته | TEN-03 + RULES (`shop.storefront.link_expiry`): جزئیاتِ سفارشِ ویترین ⇐ «باطل کردنِ لینک» (فقط `orders.contact`)؛ پاسخ لینکِ تازه | `storefront-link-expiry.test.js`، `OrderTrackLinkTest` |
+| `POST /api/shop/images/:id/report` | ساخته | §۳۷.۷ «گزارشِ عکسِ اشتباه یا بستهٔ قدیمی»؛ پنلِ مدیر گزارش‌ها را می‌خواند | `BankPhotoReportTest` |
+| `POST /api/shop/images/:id/versions`، `/:id/process` | برداشته ⇐ به‌جایش: بارگذاریِ تازه + `/select`؛ پردازش فقط در استودیو | بی ردیف؛ IMG-08/IMG-12 به خودِ خطِ پردازش و راهِ برنامه تکیه دارند | `image-bank.test.js`، `storefront-photo-version.test.js` |
+| `POST /api/auth/logout-all` | ساخته | AUTH-06 و §۲۹ بندِ ۹: «حساب من» ⇐ «خروج از همهٔ دستگاه‌ها» | `SignOutEverywhereTest` |
+| `GET /api/courier/route` | برداشته ⇐ به‌جایش: `RoutePlan.forCards` روی دستگاه | DLV-04 روی برنامه بسته است؛ موقعیتِ پیک دیگر برای مسیر به سرور نمی‌رود | `courier-route.test.js` |
+| `GET /api/courier/map(/:id)` | پیش‌ساخته | DLV-05 (PARTIAL، نقشه‌کشِ تازه = تصمیم)؛ پرچمِ خاموش ⇒ ۴۰۴ | `courier-map.test.js` |
+| `POST /api/courier/missions/:id/eta` | ساخته | DLV-06 «زمانِ تقریبی» ِ پیگیری: کارتِ مأموریتِ «در راه» ⇐ «تقریباً کی می‌رسم» (`etaEnabled`) | `delivery-customer-view.test.js`، `CourierEtaTest` |
+| `GET /api/shop/delivery/settlements/:id` | برداشته ⇐ به‌جایش: ردیف‌ها در پاسخِ خودِ تسویه، سند در `GET …/settlements?courierId=` | بی ردیف (DLV-12 بسته) | `delivery.test.js` |
+| `GET /api/shop/trust/sanctions` | برداشته ⇐ به‌جایش: `sanctions` ِ نمای پرونده (`GET /shop/trust/cases/:id`) | هر جریمه پرونده دارد (`case_id NOT NULL`) | `market-trust.test.js` |
+| `GET /api/terms` | برداشته ⇐ به‌جایش: `GET /api/auth/terms` (و پاسخِ گامِ ثبت‌نام) | نامِ دوم | `signup-location.test.js` |
+| `GET /api/store?id=` | برداشته ⇐ به‌جایش: پیوندِ صفحهٔ `/store?id=` (۳۰۲) | S3 فقط در قراردادِ بازار؛ نه ویترین، نه برنامه صدا می‌زد | `storefront-public-id.test.js`، `paid-routes-public-entitlement` |
+
+⚠️ یافته در همین بازرسی: `GET /api/auth/terms` هم صدازنندهٔ برنامه ندارد (برنامه متنِ شرایط را درونِ خودش دارد؛ بازرسیِ پیشین آن را با مسیرِ
+صفحهٔ `auth/terms` ِ برنامه یکی گرفته بود) — درِ عمومی و فقط‌خواندنی، مستند در `server/README.md`؛ ماند.
 
 ---
 
