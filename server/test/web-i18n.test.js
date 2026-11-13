@@ -11,9 +11,11 @@
  *   ۴) در JS ِ صفحه‌ها هیچ متنِ فارسیِ ثابت نمانده (همه از واژه‌نامه)، جز واژه‌های پایهٔ
  *      `K.FB` (وقتی واژه‌نامه نیامد) که باید بی‌کم‌وکاست همان fa.json باشند.
  *   ۵) هر کدِ خطای سرور که صفحه نشان می‌دهد ترجمهٔ خودش را دارد.
- *   ۶) هر واژه‌نامه زیرِ ۲۱KB (بارِ نخستِ صفحه = JS + واژه‌نامه؛ شرح سرِ همان آزمون).
+ *   ۶) هر واژه‌نامه زیرِ ۲۰KB (بارِ نخستِ صفحه = JS + واژه‌نامه؛ شرح سرِ همان آزمون).
  *   ۷) واژه‌نامهٔ جدای صفحهٔ پیگیریِ سفارش (`kit/i18n/order.<زبان>.json`، `K.part('order')`) فقط کلیدهای
  *      همان صفحه را دارد، هیچ کلیدِ واژه‌نامهٔ اصلی یا `K.FB` را نه، و زیرِ ۴KB است.
+ *   ۸) جای هر کلید: هر کلیدی که JS ِ بارِ اول (و هر پروندهٔ بی واژه‌نامهٔ بخش) می‌خواند در واژه‌نامهٔ اصلی است، و هر کلیدِ
+ *      پروندهٔ دیربار در اصلی یا واژه‌نامهٔ همان صفحه؛ دو واژه‌نامهٔ ثبت پیش از ساختنِ برگهٔ ثبت می‌رسند.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -29,6 +31,9 @@ const main = Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/$
 const PARTS = {
   order: { js: 'store/order.js', from: 'id="view-order"', to: 'id="view-orders"' },
   checkout: { js: 'store/checkout.js', from: 'id="view-checkout"', to: 'id="view-order"' },
+  //  فرمِ ثبت، بخشِ دوم (`K.part('ckform')`؛ checkout.<زبان>.json پر بود): نشانی، ناحیه، پین، تأییدِ شماره و پیام‌های ۴۰۹ ِ
+  //  «ثبت» (`store_paused`/`store_offline`، WEB-25) — هم‌زمان با checkout.js و checkout در store.js، پیش از `StoreCheckout`
+  ckform: { js: 'store/checkout.js', from: 'id="view-checkout"', to: 'id="view-order"', root: 'view-checkout' },
   //  دلخواه‌ها و فهرستِ خرید (WEB-11، catalog.js ِ دیربار): فقط بخشِ `#saved` ترجمه می‌شود، نه کلِ کاتالوگ (نشانه‌های data-i)
   catalog: { js: 'store/catalog.js', from: 'id="saved"', to: 'id="recent"', root: 'saved' },
   //  فیلتر و «خبرم کن» (WEB-07/10، filters.js ِ دیربار): فرمِ `#filters`؛ دکمه‌های برگهٔ کالا را خودِ filters.js می‌سازد
@@ -95,17 +100,19 @@ const dict = Object.fromEntries(LANGS.map((l) => [l, Object.assign({}, main[l], 
 const SOURCES = ['kit/kit.js', 'kit/settings.js', 'kit/order-kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js', 'store/catalog.js', 'store/filters.js', 'store/order-feedback.js', 'store/order-changes.js', 'store/reviews.js', 'market/index.html', 'store/index.html', 'store/account.js', 'store/visual-search.js', 'store/delivery-method.js', 'store/chat.js', 'store/chat-out.js', 'store/chat-acts.js', 'store/chat-voice.js', 'store/pay-step.js', 'store/line-prefs.js', 'store/acct.js', 'store/cart-sync.js', 'store/erase.js', 'store/order-push.js', 'store/sw.js', 'store/alert-push.js', 'store/push-client.js', 'store/same.js', 'store/gallery.js', 'store/zoom.js', 'store/order-facts.js', 'store/pin-text.js', 'store/pin-map.js', 'store/weight-hold.js', 'store/trust.js', 'store/addr-media.js', 'store/order-addr-media.js'];
 const ARABIC = /[\u0600-\u06FF]/;
 
+/** کلیدهای ثابتِ یک متن (JS یا HTML): K.t، data-t/ta/tp و چند شکلِ دیگر */
+function keysIn(s, keys = new Set()) {
+  for (const m of s.matchAll(/\b(?:K\.)?t\(\s*'([a-z][\w.]*[\w])'/g)) keys.add(m[1]);
+  for (const m of s.matchAll(/\bt\(\s*[^'()]*\?\s*'([a-z][\w.]*)'\s*:\s*'([a-z][\w.]*)'/g)) { keys.add(m[1]); keys.add(m[2]); }
+  for (const m of s.matchAll(/label: '([a-z][\w.]*)'/g)) keys.add(m[1]);
+  for (const m of s.matchAll(/\['((?:od|ck)\.[\w.]+)',/g)) keys.add(m[1]);
+  for (const m of s.matchAll(/data-t[ap]?="([^"]+)"/g)) keys.add(m[1]);
+  for (const m of s.matchAll(/K\.has\('([a-z][\w.]*[\w])'\)/g)) keys.add(m[1]);
+  return keys;
+}
 function usedKeys() {
   const keys = new Set();
-  for (const f of SOURCES) {
-    const s = read(f);
-    for (const m of s.matchAll(/\b(?:K\.)?t\(\s*'([a-z][\w.]*[\w])'/g)) keys.add(m[1]);
-    for (const m of s.matchAll(/\bt\(\s*[^'()]*\?\s*'([a-z][\w.]*)'\s*:\s*'([a-z][\w.]*)'/g)) { keys.add(m[1]); keys.add(m[2]); }
-    for (const m of s.matchAll(/label: '([a-z][\w.]*)'/g)) keys.add(m[1]);
-    for (const m of s.matchAll(/\['((?:od|ck)\.[\w.]+)',/g)) keys.add(m[1]);
-    for (const m of s.matchAll(/data-t[ap]?="([^"]+)"/g)) keys.add(m[1]);
-    for (const m of s.matchAll(/K\.has\('([a-z][\w.]*[\w])'\)/g)) keys.add(m[1]);
-  }
+  for (const f of SOURCES) keysIn(read(f), keys);
   //  خانواده‌های پویا از منبعِ سرور
   const { CATEGORIES } = require('../src/lib/market');
   const { ORDER_STATUSES, REASONS } = require('../src/lib/order-states');
@@ -172,7 +179,7 @@ test('کدهای خطای سرور که صفحه نشان می‌دهد ترجم
   const codes = ['verification_unavailable', 'verification_required', 'phone_not_verified', 'otp_wrong', 'otp_expired',
     'otp_locked', 'otp_used', 'otp_not_found', 'otp_required', 'otp_resend_wait', 'otp_daily_limit', 'rate_limited',
     'product_unavailable', 'qty_over_limit', 'below_min_order', 'fulfillment_unavailable', 'bad_address', 'bad_customer',
-    'bad_lines', 'store_not_found', 'store_not_accepting_orders', 'market_not_found', 'order_not_found', 'cannot_cancel', 'query_too_short', 'bad_location'];
+    'bad_lines', 'store_not_found', 'store_not_accepting_orders', 'store_paused', 'store_offline', 'market_not_found', 'order_not_found', 'cannot_cancel', 'query_too_short', 'bad_location'];
   for (const l of LANGS) for (const c of codes) assert.ok(dict[l][`err.${c}`], `${l}: err.${c}`);
 });
 
@@ -187,10 +194,11 @@ test('واژه‌های پایهٔ K.FB (واژه‌نامه نیامد) هما�
 
 //  ۲۲KB از ۱ نوامبر ۲۰۲۶ (پیش‌تر ۲۰KB)؛ سپس صفحهٔ پیگیریِ سفارش واژه‌نامهٔ جدای خودش را گرفت (fa.json ۲۱٬۲۸۶ ⇐
 //  ۱۹٬۴۷۹ بایت) و سقف ۲۱KB شد — جا برای کلیدهای فرمِ ثبت (CHK) تا آن هم مثلِ پیگیری جدا شود، سپس ۲۰KB.
-test('هر واژه‌نامه زیرِ ۲۱KB است', () => {
+//  ۱۴۰۵/۰۸/۲۳ (claude/e-rows-43f): ۴۵ کلیدِ فرمِ ثبت به `ckform` رفت (fa.json ۲۱٬۴۷۷ ⇐ ۱۸٬۳۴۴، ps ۲۱٬۱۸۲ ⇐ ۱۸٬۲۳۶) ⇒ ۲۰KB.
+test('هر واژه‌نامه زیرِ ۲۰KB است', () => {
   for (const l of LANGS) {
     const n = fs.statSync(path.join(pub, 'kit', 'i18n', `${l}.json`)).size;
-    assert.ok(n <= 21 * 1024, `${l}.json: ${n} بایت`);
+    assert.ok(n <= 20 * 1024, `${l}.json: ${n} بایت`);
   }
 });
 
@@ -221,4 +229,44 @@ for (const [name, P] of Object.entries(PARTS)) test(`واژه‌نامهٔ ${nam
   }
   //  صفحه همان واژه‌نامه را با بارِ خودش می‌گیرد
   assert.ok((read('store/store.js') + read(P.js)).includes(`K.part('${name}', $('${P.root || `view-${name}`}'))`));
+});
+
+//  ۸) جای هر کلید. «بارِ اول» = boot.js + kit.js + store.js (همان سه‌تای storefront-budget) و HTML ِ بیرون از بخش‌های
+//  دیربار؛ هر پروندهٔ دیگری که واژه‌نامهٔ بخشِ خودش را ندارد (product.js، order-kit.js، بازارچه…) هم فقط اصلی را دارد.
+const PART_FILES = new Set(Object.values(PARTS).flatMap((p) => [p.js, ...(p.also || [])]));
+const ownParts = (f) => Object.keys(PARTS).filter((n) => PARTS[n].js === f || (PARTS[n].also || []).includes(f));
+const lacking = (keys, allowed) => [...keys].filter((k) => !LANGS.every((l) => typeof allowed[l][k] === 'string'));
+const mergeOf = (names) => Object.fromEntries(LANGS.map((l) => [l, Object.assign({}, main[l], ...names.map((n) => parts[n][l]))]));
+
+test('هر کلیدِ JS ِ بارِ اول (و پرونده‌های بی واژه‌نامهٔ بخش) در واژه‌نامهٔ اصلی است', () => {
+  const html = read('store/index.html');
+  const cut = Object.values(PARTS).filter((p) => p.from).map((p) => [html.indexOf(p.from), html.indexOf(p.to)]);
+  const first = [...html].filter((c, i) => !cut.some(([a, b]) => i >= a && i < b)).join('');
+  const keys = keysIn(first);
+  for (const f of ['kit/boot.js', 'kit/kit.js', 'store/store.js']) keysIn(read(f), keys);
+  assert.ok(keys.size > 100, `${keys.size} کلیدِ بارِ اول`);
+  assert.deepEqual(lacking(keys, main), [], 'کلیدِ بارِ اول بیرون از fa.json/en.json/ps.json');
+  for (const f of SOURCES.filter((x) => x !== 'store/index.html' && !PART_FILES.has(x))) {
+    assert.deepEqual(lacking(keysIn(read(f)), main), [], `${f}: کلیدی که فقط در واژه‌نامهٔ یک بخش است`);
+  }
+});
+
+test('هر کلیدِ صفحهٔ دیربار در واژه‌نامهٔ اصلی یا واژه‌نامهٔ همان صفحه است', () => {
+  for (const f of PART_FILES) {
+    const own = ownParts(f);
+    assert.deepEqual(lacking(keysIn(read(f)), mergeOf(own)), [], `${f} (${own.join('، ')})`);
+  }
+  const html = read('store/index.html');
+  for (const [n, P] of Object.entries(PARTS).filter(([, p]) => p.from)) {
+    const own = ownParts(P.js);
+    assert.deepEqual(lacking(keysIn(html.slice(html.indexOf(P.from), html.indexOf(P.to))), mergeOf(own)), [], `بخشِ ${n} ِ index.html (${own.join('، ')})`);
+  }
+});
+
+test('دو واژه‌نامهٔ فرمِ ثبت پیش از ساختنِ برگهٔ ثبت می‌رسند', () => {
+  //  checkout و ckform در همان Promise.all با checkout.js؛ `StoreCheckout` (نخستین K.t ِ ثبت) فقط پس از آن
+  assert.match(read('store/store.js'), /Promise\.all\(\[K\.js\('\/store\/checkout\.js'\), K\.js\(ORDER_KIT\), K\.part\('checkout', \$\('view-checkout'\)\), K\.part\('ckform', \$\('view-checkout'\)\)\]\)\.then\(function \(\) \{\s*checkout = window\.StoreCheckout\(/);
+  //  پیام‌های ۴۰۹ ِ «ثبت» (WEB-25): فقط checkout.js «ثبت» می‌فرستد، پس در واژه‌نامهٔ همان صفحه
+  for (const l of LANGS) for (const c of ['store_paused', 'store_offline']) assert.ok(parts.ckform[l][`err.${c}`], `${l}: err.${c}`);
+  assert.deepEqual(SOURCES.filter((f) => f !== 'store/checkout.js' && /'\/checkout'/.test(read(f))), [], 'درِ «ثبت» فقط از checkout.js');
 });
