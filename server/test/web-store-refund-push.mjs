@@ -170,7 +170,7 @@ async function context(t) {
     if (sessionStorage.getItem('seeded')) return;
     sessionStorage.setItem('seeded', '1');
     localStorage.setItem('store-ticket', JSON.stringify(x));
-  }, { phone: t.phone, ticket: t.ticket, expiresAt: t.expiresAt });
+  }, { email: t.email, ticket: t.ticket, expiresAt: t.expiresAt });
   await ctx.addInitScript(stubPush, fakeSub);
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(String(e)));

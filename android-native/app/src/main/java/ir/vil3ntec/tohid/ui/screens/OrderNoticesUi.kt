@@ -68,6 +68,7 @@ private fun noticeStatusText(s: String): String = when (s) {
 
 private fun channelText(c: String): String = when (c) {
   "push" -> StrOrderOps.channelPush
+  "email" -> StrOrderOps.channelEmail
   "whatsapp" -> StrOrderOps.channelWhatsapp
   "telegram" -> StrOrderOps.channelTelegram
   "sms" -> StrOrderOps.channelSms

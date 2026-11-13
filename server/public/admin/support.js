@@ -71,7 +71,7 @@ async function makeCode({ path, prefix, reload }) {
       plan: $(`${prefix}-plan`).value,
       days: days ? Number(days) : null,
       email: $(`${prefix}-email`).value.trim(),
-      phone: $(`${prefix}-phone`).value.trim(),
+      phone: $(`${prefix}-phone`) ? $(`${prefix}-phone`).value.trim() : '',   //  فقط پمپ («فقط ایمیل»: VIP ِ دکان بی پیامک)
       note: $(`${prefix}-note`).value.trim(),
     });
     //  کدِ خام فقط همین یک بار دیده می‌شود

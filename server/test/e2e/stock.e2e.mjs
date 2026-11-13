@@ -19,6 +19,7 @@
  */
 import { createRequire } from 'node:module';
 import { boot, assert } from './lib/harness.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const E = await boot({ name: 'stock' });
 const { db } = E;
@@ -28,8 +29,8 @@ for (const k of ['shop.orders', 'shop.storefront', 'shop.catalog']) await E.flag
 const SLUG = 'e2e-stock-store';
 
 async function customer(phone) {
-  const s = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { phone }), 'کدِ تأیید');
-  const v = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { phone, code: s.devCode }), 'تأییدِ شماره');
+  const s = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { email: mailOf(phone) }), 'کدِ تأیید');
+  const v = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { email: mailOf(phone), code: s.devCode }), 'تأییدِ شماره');
   return (lines, extra = {}) => E.post(`/api/store/${SLUG}/checkout`, {
     fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: `مشتری ${phone.slice(-2)}`, phone }, lines, ...extra,
   }, null, { 'X-Store-Ticket': v.ticket, 'Idempotency-Key': E.key('web') });

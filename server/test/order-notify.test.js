@@ -103,7 +103,7 @@ test('بی پرچم: سفارشِ مشتری ثبت می‌شود ولی هیچ 
   const cfg = await h.get('/api/shop/order-notify/config', { token: a.token });
   assert.equal(cfg.status, 200);
   assert.equal(cfg.body.enabled, false);
-  assert.equal(cfg.body.fallback.sms, 'not_configured');
+  assert.equal(cfg.body.fallback.email, 'not_configured');   //  «فقط ایمیل»
   const pend = await h.get('/api/shop/order-notify/pending', { token: a.token });
   assert.equal(pend.status, 403);
   assert.equal(pend.body.error.code, 'order_notify_disabled');
@@ -258,7 +258,7 @@ test('NOTIF-11: پوشِ خراب ⇒ دقیقاً MAX_ATTEMPTS تلاش با ف
   assert.equal(row.last_result, 'provider_error');
   assert.match(row.last_error, /FCM 503/);
   assert.equal(row.fallback_state, 'not_configured');
-  assert.equal(row.fallback_channel, 'sms');
+  assert.equal(row.fallback_channel, 'email');   //  «فقط ایمیل»: کانالِ پشتیبان دیگر پیامک نیست
   assert.ok(row.fallback_at);
   assert.equal(gaps.length, N.MAX_ATTEMPTS - 1);
   for (let i = 1; i < gaps.length; i++) assert.equal(gaps[i], gaps[i - 1] * 2, 'فاصلهٔ فزاینده');
@@ -276,7 +276,7 @@ test('بی دستگاهِ ثبت‌شده ⇒ no_devices، همان سقف؛ ک�
   await setFlag(a.shopId, true);
   await customerOrder(a.shopId);
   const calls = [];
-  N.setFallback({ channel: 'sms', send: async (x) => { calls.push(x); return { ok: true }; } });
+  N.setFallback({ channel: 'email', send: async (x) => { calls.push(x); return { ok: true }; } });
   try {
     let t = now() + 1000;
     for (let i = 0; i < N.MAX_ATTEMPTS + 3; i++) {

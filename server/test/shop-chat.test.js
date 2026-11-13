@@ -740,15 +740,15 @@ test('§۳۳.۳: شمارهٔ کامل فقط با orders.contact؛ بلاک د�
   assert.ok(!JSON.stringify(logs.rows).includes('پیامِ زشت'));
 });
 
-test('گفت‌وگو از روی سفارش: کارمند فقط سفارشِ دکانِ خودش؛ مشتری فقط سفارشِ شمارهٔ خودش', async () => {
+test('گفت‌وگو از روی سفارش: کارمند فقط سفارشِ دکانِ خودش؛ مشتری فقط سفارشِ ایمیلِ خودش', async () => {
   const o = await chatShop('سفارش');
   const other = await chatShop('سفارشِ دیگر');
   const t = now();
   const orderId = `ord${uniq()}`;
   await query(
-    `INSERT INTO online_orders (id, shop_id, order_no, client_key, request_hash, source, fulfillment, customer_name, customer_phone, created_at, updated_at)
-     VALUES ($1,$2,7,$3,'h','storefront','pickup','کریم','+93790000777',$4,$4)`,
-    [orderId, o.shopId, `ck-${uniq()}`, t]
+    `INSERT INTO online_orders (id, shop_id, order_no, client_key, request_hash, source, fulfillment, customer_name, customer_phone, customer_email, created_at, updated_at)
+     VALUES ($1,$2,7,$3,'h','storefront','pickup','کریم','+93790000777',$5,$4,$4)`,
+    [orderId, o.shopId, `ck-${uniq()}`, t, mailOf('+93790000777')]
   );
   const made = await h.post(`${base}/conversations`, { orderId }, { token: o.token });
   assert.equal(made.status, 201, JSON.stringify(made.body));
@@ -760,16 +760,17 @@ test('گفت‌وگو از روی سفارش: کارمند فقط سفارشِ �
   assert.equal((await h.post(`${base}/conversations`, { orderId }, { token: other.token })).status, 404);
   assert.equal((await h.post(`${base}/conversations`, {}, { token: o.token })).body.error.code, 'order_required');
 
-  //  مشتریِ همان شماره همان گفت‌وگو را با شمارهٔ سفارش می‌گیرد؛ شمارهٔ دیگر نه
-  const mine = await chat.open(customer(o.shopId, '+93790000777'), { orderNo: 7 });
+  //  «فقط ایمیل»: مشتریِ همان ایمیلِ تأییدشده همان گفت‌وگو را با شمارهٔ سفارش می‌گیرد؛ ایمیلِ دیگر نه، و خودِ شماره هم نه
+  const mine = await chat.open(customer(o.shopId, mailOf('+93790000777')), { orderNo: 7 });
   assert.equal(mine.conversation.id, made.body.conversation.id);
   assert.equal(mine.conversation.orderNo, 7);
-  await assert.rejects(chat.open(customer(o.shopId, '+93790000778'), { orderNo: 7 }), (e) => e.code === 'order_not_found');
+  await assert.rejects(chat.open(customer(o.shopId, mailOf('+93790000778')), { orderNo: 7 }), (e) => e.code === 'order_not_found');
+  await assert.rejects(chat.open(customer(o.shopId, '+93790000777'), { orderNo: 7 }), (e) => e.code === 'order_not_found', 'شماره هویت نیست');
   //  وضعیت
   const closed = await h.put(`${base}/conversations/${mine.conversation.id}/status`, { status: 'closed' }, { token: o.token });
   assert.equal(closed.body.conversation.status, 'closed');
-  await chat.send(customer(o.shopId, '+93790000777'), mine.conversation.id, { clientId: cid(), body: 'هنوز نیامده' });
-  assert.equal((await chat.viewOf(customer(o.shopId, '+93790000777'), mine.conversation.id)).status, 'open', 'پیامِ تازه گفت‌وگو را باز می‌کند');
+  await chat.send(customer(o.shopId, mailOf('+93790000777')), mine.conversation.id, { clientId: cid(), body: 'هنوز نیامده' });
+  assert.equal((await chat.viewOf(customer(o.shopId, mailOf('+93790000777')), mine.conversation.id)).status, 'open', 'پیامِ تازه گفت‌وگو را باز می‌کند');
 });
 
 test('پاک‌سازی: رسانهٔ بی‌پیام پس از یک ساعت می‌رود؛ رسانهٔ پیام می‌ماند؛ نگهداری فقط اگر روشن شود', async () => {

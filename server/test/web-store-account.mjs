@@ -79,7 +79,8 @@ ok(put.status === 200, 'ویترین ساخته و روشن شد', JSON.stringif
 const AT = Date.UTC(2026, 9, 20, 8, 0);
 const op = (table, id, fields) => ({ op_id: `op-${id}-${Date.now()}`, ts: Date.now(), table, row_id: id, type: 'insert', fields });
 const pushed = await call('POST', '/api/sync/v1/push', { device_id: 'dev-owner', schema_version: 2, ops: [
-  op('debtors', 'd1', { name: 'مشتری', phone: '0799 100 020', createdAt: AT }),
+  //  «فقط ایمیل»: پیوندِ حساب با قرض‌دارِ دفتر فقط با ایمیلِ تأییدشده (شماره هویت نیست)؛ فیلدِ `email` ِ قرض‌دار هنوز در برنامهٔ دکان نیست (HANDOFF)
+  op('debtors', 'd1', { name: 'مشتری', phone: '0799 100 020', email: mailOf('+93799100020'), createdAt: AT }),
   op('sales', 's1', { invoiceNumber: 12, total: 1500, finalTotal: 1500, paymentMethod: 'credit', paidAmount: 0, remaining: 1500,
     status: 'completed', createdAt: AT, date: '2026-10-20', seller: 'فروشنده', debtorId: 'd1' }),
   op('saleItems', 's1-i1', { saleId: 's1', productId: '', name: 'برنج', quantity: 3, unitPrice: 500, totalPrice: 1500, returnedQty: 0 }),
@@ -91,13 +92,13 @@ ok(pushed.status === 200, 'قرض‌دار، فروش و دفتر از راهِ 
 const phone = '+93799100020';
 const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
 const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
-ok(Boolean(vc.body && vc.body.ticket), 'شماره تأیید شد');
+ok(Boolean(vc.body && vc.body.ticket), 'ایمیل تأیید شد');
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium/chrome-linux/chrome' }).catch(() => chromium.launch());
 const errors = [];
 const violations = [];
 const ctx = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
-await ctx.addInitScript((t) => { localStorage.setItem('store-ticket', JSON.stringify(t)); }, { phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
+await ctx.addInitScript((t) => { localStorage.setItem('store-ticket', JSON.stringify(t)); }, { email: mailOf(phone), ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
 const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });
@@ -144,7 +145,7 @@ ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.inne
 
 if (axeSrc) {
   const axeCtx = await browser.newContext({ viewport: { width: 360, height: 760 }, bypassCSP: true });
-  await axeCtx.addInitScript((t) => { localStorage.setItem('store-ticket', JSON.stringify(t)); }, { phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
+  await axeCtx.addInitScript((t) => { localStorage.setItem('store-ticket', JSON.stringify(t)); }, { email: mailOf(phone), ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
   const ap = await axeCtx.newPage();
   await ap.goto(`${base}/store/${slug}#/orders`);
   await ap.waitForSelector('#my-account[data-state="ready"]', { timeout: 15000 });

@@ -168,3 +168,21 @@ test('AUTH-08 ⇐ ایمیل: حسابِ بی‌ایمیل ایمیل را فق�
   const audit = await one("SELECT * FROM audit_logs WHERE action='account.email_added' AND user_id=$1", [old.id]);
   assert.ok(audit, 'سابقهٔ افزودنِ ایمیل');
 });
+
+test('کدِ VIP ِ دکان دیگر پیامک نمی‌شود (حسابِ پیامک لازم نیست)؛ پیامکِ VIP فقط برای پمپ مانده', async () => {
+  const pw = require('../src/lib/password');
+  await query(`INSERT INTO admins (id, username, name, password_hash, role, status, created_at)
+               VALUES ($1,'vip-admin','مدیر',$2,'superadmin','active',$3)`, [newId('adm'), await pw.hashPassword('Admin!12345'), now()]);
+  const t = (await h.post('/api/admin/login', { username: 'vip-admin', password: 'Admin!12345' })).body.token;
+  const otp = require('../src/lib/otp');
+  const keep = otp.senders.sms;
+  const sent = [];
+  otp.senders.sms = async (...a) => { sent.push(a); };
+  try {
+    const r = await h.post('/api/admin/vip-codes', { plan: 'custom', days: 30, phone: '0790000001' }, { token: t });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    assert.equal(r.body.smsStatus, 'none');
+    assert.deepEqual(sent, [], 'هیچ پیامکی');
+    assert.equal((await one('SELECT phone FROM vip_codes WHERE id=$1', [r.body.vipCode.id])).phone, '', 'شماره هم نگه داشته نشد');
+  } finally { otp.senders.sms = keep; }
+});

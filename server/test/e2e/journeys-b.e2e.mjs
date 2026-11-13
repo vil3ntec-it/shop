@@ -36,6 +36,7 @@ import { createRequire } from 'node:module';
 import { boot, assert } from './lib/harness.mjs';
 import { NativeDevice, core } from './lib/native.mjs';
 import { assertSameEverywhere, serverLedger } from './lib/journey.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const E = await boot({ name: 'journeys-b' });
 const { db } = E;
@@ -280,8 +281,8 @@ await E.step('JB4', 'سفارشِ اینترنتی: ویترین ⇐ قبول �
   const kAcct = await E.staff(owner, 'courier-journey@e2e.local', 'پیکِ سفر');
   const K = await E.device('K-courier', kAcct.email);
   const cid = E.ok(await A.api('POST', '/shop/delivery/couriers', { userId: kAcct.user.id, cashCapMinor: 5_000_000 }), 'پیک', 201).courier.id;
-  const s = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { phone: PHONE }), 'کدِ تأیید');
-  const ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { phone: PHONE, code: s.devCode }), 'تأییدِ شماره').ticket;
+  const s = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { email: mailOf(PHONE) }), 'کدِ تأیید');
+  const ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { email: mailOf(PHONE), code: s.devCode }), 'تأییدِ شماره').ticket;
   const stockBefore = A.stock(tea);
   const placed = E.ok(await E.post(`/api/store/${SLUG}/checkout`, {
     fulfillment: 'delivery', paymentMethod: 'cod', customer: { name: 'مشتریِ سفر', phone: PHONE },

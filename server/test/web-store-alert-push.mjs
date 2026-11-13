@@ -146,7 +146,7 @@ const errors = [];
 const violations = [];
 const ctx = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
 await ctx.grantPermissions(['notifications']);
-await ctx.addInitScript(seedTicket, { phone: tk.phone, ticket: tk.ticket, expiresAt: tk.expiresAt });
+await ctx.addInitScript(seedTicket, { email: tk.email, ticket: tk.ticket, expiresAt: tk.expiresAt });
 await ctx.addInitScript(stubPush, fakeSub);
 const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push(String(e)));
@@ -255,7 +255,7 @@ ok(/روی همین دستگاه هم بگیرید/.test(await text('#ps-ap-stat
 await page.click('#ps-ap-on');
 await page.waitForSelector('#ps-ap-off', { state: 'visible', timeout: 15000 });
 const tk2 = await ticket('0791113388');
-await page.evaluate((t) => localStorage.setItem('store-ticket', JSON.stringify(t)), { phone: tk2.phone, ticket: tk2.ticket, expiresAt: tk2.expiresAt });
+await page.evaluate((t) => localStorage.setItem('store-ticket', JSON.stringify(t)), { email: tk2.email, ticket: tk2.ticket, expiresAt: tk2.expiresAt });
 const beforeOther = posts.length;
 await open('rice');
 await page.locator('#ps-alerts button', { hasText: 'وقتی ارزان شد خبرم کن' }).click();
@@ -274,7 +274,7 @@ const ctx2 = await browser.newContext({ viewport: { width: 360, height: 760 }, l
 await ctx2.addInitScript((t) => {
   localStorage.setItem('store-ticket', JSON.stringify(t));
   Object.defineProperty(Notification, 'permission', { get: () => 'denied' });
-}, { phone: tk.phone, ticket: tk.ticket, expiresAt: tk.expiresAt });
+}, { email: tk.email, ticket: tk.ticket, expiresAt: tk.expiresAt });
 const p2 = await ctx2.newPage();
 const errors2 = [];
 p2.on('pageerror', (e) => errors2.push(String(e)));
@@ -288,7 +288,7 @@ await ctx2.close();
 //  ── ۸) پرچمِ پوش خاموش ⇒ همان «خبرم کن» ِ پیشین ──
 ok((await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.storefront.web_push', value: false }, A)).status === 200, 'پرچمِ پوش خاموش شد');
 const ctx3 = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
-await ctx3.addInitScript((t) => { localStorage.setItem('store-ticket', JSON.stringify(t)); }, { phone: tk.phone, ticket: tk.ticket, expiresAt: tk.expiresAt });
+await ctx3.addInitScript((t) => { localStorage.setItem('store-ticket', JSON.stringify(t)); }, { email: tk.email, ticket: tk.ticket, expiresAt: tk.expiresAt });
 const p3 = await ctx3.newPage();
 const scripts3 = [];
 p3.on('request', (r) => { if (/\/store\/(alert-push|push-client)\.js$/.test(r.url())) scripts3.push(r.url()); });

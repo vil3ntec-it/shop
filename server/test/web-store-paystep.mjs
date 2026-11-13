@@ -97,7 +97,7 @@ await ctx.addInitScript((t) => {
   if (sessionStorage.getItem('seeded')) return;
   sessionStorage.setItem('seeded', '1');
   localStorage.setItem('store-ticket', JSON.stringify(t));
-}, { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
+}, { email: vc.body.email, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
 const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });

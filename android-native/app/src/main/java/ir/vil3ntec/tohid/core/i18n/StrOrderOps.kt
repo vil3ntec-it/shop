@@ -102,6 +102,8 @@ object StrOrderOps {
   val channelWhatsapp: String get() = t("واتس‌اپ", "WhatsApp", "واټس‌اپ")
   val channelTelegram: String get() = t("تلگرام", "Telegram", "ټلګرام")
   val channelSms: String get() = t("پیامک", "SMS", "لنډ پیغام")
+  //  «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): کانالِ ایمیلِ زنجیرهٔ اعلانِ مشتری (پیامک فقط در سابقهٔ کهنه)
+  val channelEmail: String get() = t("ایمیل", "email", "ایمیل")
   fun bulkFetchFailed(n: Int): String = t("${asIs(n)} سفارش از سرور نیامد و چاپ نشد", "$n orders did not load and were not printed", "$n فرمایشونه له سرور رانغلل او چاپ نه شول")
 
   // ORD-14 «ویرایشِ سفارش» و «تسویهٔ تفاوت» (`ui/screens/OrderAmendUi.kt`)

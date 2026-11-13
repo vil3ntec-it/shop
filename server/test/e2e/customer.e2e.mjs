@@ -13,6 +13,7 @@
  * اجرا:  node test/e2e/customer.e2e.mjs
  */
 import { boot, assert, sameOrderLink } from './lib/harness.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const E = await boot({ name: 'customer', env: { CATALOG_REFRESH_THROTTLE_MS: '0' } });
 const { db } = E;
@@ -84,8 +85,8 @@ async function devCodeIn(page, sel) {
 }
 /** مشتری از راهِ API (همان بدنهٔ ویترین) — برای Y که فقط باید سفارشی داشته باشد */
 async function apiCustomer(slug, phone) {
-  const s = E.ok(await E.post(`/api/store/${slug}/verify/start`, { phone }), 'کدِ تأیید');
-  const v = E.ok(await E.post(`/api/store/${slug}/verify/check`, { phone, code: s.devCode }), 'تأییدِ شماره');
+  const s = E.ok(await E.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) }), 'کدِ تأیید');
+  const v = E.ok(await E.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: s.devCode }), 'تأییدِ شماره');
   return v.ticket;
 }
 /** هر کلیدِ بدنهٔ عمومی که بوی دادهٔ خصوصی بدهد (بهای خرید، عمده، ایمیل، رمز، مالک) */
@@ -194,6 +195,7 @@ await E.step('S133', 'بی شمارهٔ تأییدشده سفارش نهایی �
   assert.ok(await page.isVisible('#verify-text') && hint.length <= 120 && /تأیید/.test(hint) && /کد/.test(hint), hint);
   await page.fill('#c-name', 'مشتریِ ایکس');
   await page.fill('#c-phone', X);
+  await page.fill('#c-email', mailOf(X));
   assert.equal(await page.isDisabled('#submit-order'), true, 'نوشتنِ شماره بی کد «ثبت» را باز کرد');
   assert.ok(await page.isVisible('#verify-send'));
   //  سرور: بی بلیت ⇒ ۴۰۱ با پیامِ کوتاه؛ هیچ سفارشی
@@ -229,7 +231,7 @@ await E.step('S139', 'قطعِ شبکه هنگامِ فرستادن و زدنِ 
   await page.click('#verify-check');
   await page.waitForFunction(() => !document.getElementById('submit-order').disabled, null, { timeout: 10_000 });
   const tk = await ticketOf(page);
-  assert.equal(tk && tk.phone, X_E164);
+  assert.equal(tk && tk.email, mailOf(X_E164), '«فقط ایمیل»: بلیت مالِ ایمیل است');
   //  نشستِ موجود: شکستِ شبکه در «ثبت» بلیت را پاک نمی‌کند و چیزی هم ساخته نمی‌شود
   await page.route('**/checkout', (r) => r.abort('internetdisconnected'));
   await page.check('input[name="fulfillment"][value="pickup"]');
@@ -300,6 +302,7 @@ await E.step('S140', 'سبدِ مهمان با تأییدِ شماره نه کم
   await toCheckout(p);
   await p.fill('#c-name', 'مشتریِ وای');
   await p.fill('#c-phone', Y);
+  await p.fill('#c-email', mailOf(Y));
   await p.click('#verify-send');
   await p.waitForSelector('#verify-code-row:not([hidden])', { timeout: 10_000 });
   await p.fill('#v-code', await devCodeIn(p, '#verify-msg'));
@@ -309,6 +312,7 @@ await E.step('S140', 'سبدِ مهمان با تأییدِ شماره نه کم
   assert.equal(yTicket.phone, Y_E164);
   //  کسِ دیگری پشتِ همان مرورگر شمارهٔ خودش (X) را می‌نویسد ⇒ «ثبت» تا تأییدِ X بسته
   await p.fill('#c-phone', X);
+  await p.fill('#c-email', mailOf(X));
   assert.equal(await p.isDisabled('#submit-order'), true, 'سبد با بلیتِ Y برای X باز شد');
   assert.equal(await p.isVisible('#verify-send'), true);
   //  و سرور هم بلیتِ Y را برای شمارهٔ X نمی‌پذیرد

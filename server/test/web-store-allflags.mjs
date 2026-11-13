@@ -651,7 +651,7 @@ async function journey(width, lang, phone) {
 async function sweep(width, lang, o) {
   const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(o.phone) });
   const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(o.phone), code: vs.body.devCode });
-  const P = await device(width, lang, { ticket: { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt } });
+  const P = await device(width, lang, { ticket: { email: vc.body.email, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt } });
   const { page } = P;
   await goStore(P);
   await check(P, 'ویترین');

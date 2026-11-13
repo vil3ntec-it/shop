@@ -56,13 +56,16 @@ async function shop(name) {
 }
 
 /** سفارشِ دریافت از دکان (نقد) تا [to] با گذارهای واقعیِ سرور (رویدادها هم) */
-async function order(s, phone, { upTo = 'picked_up', fulfillment = 'pickup' } = {}) {
+/** «فقط ایمیل»: سفارشِ مشتری با ایمیلِ تأییدشده‌اش به او بسته است (`customer_email`، همان که ویترین می‌نشاند)؛ `email: false` ⇒
+ *  سفارشِ دستیِ فقط‌شماره که هیچ مشتری‌ای با شماره به آن نمی‌رسد. */
+async function order(s, phone, { upTo = 'picked_up', fulfillment = 'pickup', email = true } = {}) {
   const r = await h.post('/api/shop/orders', {
     source: 'phone', fulfillment, paymentMethod: 'cod', customer: { name: 'کریم', phone },
     ...(fulfillment === 'delivery' ? { address: { landmark: 'نزدیکِ مسجد', text: 'کارتهٔ چهار', lat: 34.5, lng: 69.1 } } : {}),
     lines: [{ name: 'برنج', qtyMilli: 1000, unitPriceMinor: 12_000 }],
   }, { token: s.token, headers: { 'Idempotency-Key': `ord-${uniq()}` } });
   assert.equal(r.status, 201, JSON.stringify(r.body));
+  if (email) await query('UPDATE online_orders SET customer_email=$1 WHERE id=$2', [mailOf(phone), r.body.order.id]);
   const path = fulfillment === 'pickup'
     ? ['accepted', 'picking', 'packed', 'ready_for_pickup', 'picked_up']
     : ['accepted', 'picking', 'packed', 'out_for_delivery', 'delivered'];
@@ -73,7 +76,7 @@ async function order(s, phone, { upTo = 'picked_up', fulfillment = 'pickup' } = 
   return r.body.order;
 }
 
-const customer = (shopId, phone) => ({ side: 'customer', shopId, phone });
+const customer = (shopId, phone) => ({ side: 'customer', shopId, phone: mailOf(phone) });   //  کلیدِ مشتری = ایمیلِ تأییدشده
 const shopConv = async (s, orderId) => {
   const r = await h.post(`${base}/conversations`, { orderId }, { token: s.token });
   assert.ok(r.status === 200 || r.status === 201, JSON.stringify(r.body));
@@ -202,6 +205,9 @@ test('سفارشِ تازه ⇒ رشتهٔ تازه؛ تاریخچهٔ دکان 
   //  مشتری با شمارهٔ سفارش به همان رشتهٔ هر سفارش می‌رسد
   assert.equal((await chat.open(me, { orderNo: second.orderNo })).conversation.id, c2.id);
   assert.equal((await chat.open(me, { orderNo: first.orderNo })).conversation.id, c1.id);
+  //  سفارشِ دستیِ فقط‌شماره با همان شماره: مشتری با شماره به آن نمی‌رسد (شماره هویت نیست)
+  const phoneOnly = await order(s, '0791110021', { upTo: 'accepted', email: false });
+  await assert.rejects(chat.open(me, { orderNo: phoneOnly.orderNo }), (e) => e.code === 'order_not_found');
   //  مشتریِ دیگرِ همین دکان
   const other = await order(s, '0791110022', { upTo: 'accepted' });
   const c3 = await shopConv(s, other.id);

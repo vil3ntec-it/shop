@@ -16,6 +16,7 @@
  * اجرا:  node test/e2e/delivery.e2e.mjs
  */
 import { boot, assert } from './lib/harness.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const E = await boot({ name: 'delivery' });
 const { db } = E;
@@ -29,8 +30,8 @@ const order = (id) => db.one('SELECT status, cod_status, total_minor FROM online
 
 /** مشتری از درِ همان API که صفحهٔ ویترین می‌زند */
 async function customer(phone) {
-  const s = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { phone }), 'کدِ تأیید');
-  const v = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { phone, code: s.devCode }), 'تأییدِ شماره');
+  const s = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { email: mailOf(phone) }), 'کدِ تأیید');
+  const v = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { email: mailOf(phone), code: s.devCode }), 'تأییدِ شماره');
   const h = { 'X-Store-Ticket': v.ticket };
   return {
     checkout: (body, key = E.key('web')) => E.post(`/api/store/${SLUG}/checkout`, body, null, { ...h, 'Idempotency-Key': key }),

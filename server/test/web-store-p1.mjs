@@ -98,7 +98,7 @@ const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf
 const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
 const acct = await call('POST', `/api/store/${slug}/account`, {}, null, { 'X-Store-Ticket': vc.body.ticket });
 ok(acct.status === 201 && acct.body.session, 'نشستِ حساب ساخته شد', String(acct.status));
-const session = { token: acct.body.session, phone: vc.body.phone, expiresAt: acct.body.expiresAt };
+const session = { token: acct.body.session, email: vc.body.email, expiresAt: acct.body.expiresAt };
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium/chrome-linux/chrome' }).catch(() => chromium.launch());
 const errors = [];

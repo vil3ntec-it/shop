@@ -11,6 +11,7 @@
  * اجرا:  node test/e2e/track.e2e.mjs
  */
 import { boot, assert, fa } from './lib/harness.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const E = await boot({ name: 'track' });
 const { db } = E;
@@ -80,8 +81,8 @@ await E.step('DLV-06.0', 'کالا از برنامه، ویترین روشن، �
   E.ok(await A.api('PUT', `/shop/storefront/products/${rice}`, { published: true }), 'انتشار');
   const c = E.ok(await A.api('POST', '/shop/delivery/couriers', { userId: courierAcct.user.id, name: 'کریم احمدی', phone: COURIER_PHONE, cashCapMinor: 5_000_000 }), 'پیک', 201);
   courierId = c.courier.id;
-  const s = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { phone: PHONE }), 'کدِ تأیید');
-  ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { phone: PHONE, code: s.devCode }), 'تأییدِ شماره').ticket;
+  const s = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { email: mailOf(PHONE) }), 'کدِ تأیید');
+  ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { email: mailOf(PHONE), code: s.devCode }), 'تأییدِ شماره').ticket;
   pg = await E.page('customer', { width: 360, height: 780 });
 });
 

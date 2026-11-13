@@ -88,7 +88,7 @@ const phone = '0791114455';
 const ticket = async (p = phone) => {
   const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(p) });
   const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(p), code: vs.body.devCode });
-  return { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt };
+  return { email: vc.body.email, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt };
 };
 const line = (name, priceMinor, qtyMilli = 1000) => ({ qtyMilli, name, unit: 'دانه', priceMinor, maxQtyMilli: null, photo: false, unavailable: false });
 const serverCart = async () => {

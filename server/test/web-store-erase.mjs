@@ -89,7 +89,7 @@ const NAME = 'رحیمِ آزمونی';
 const ticket = async (p) => {
   const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(p) });
   const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(p), code: vs.body.devCode });
-  return { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt };
+  return { email: vc.body.email, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt };
 };
 const mine = await ticket(phone);
 const acc = await call('POST', `/api/store/${slug}/account`, { name: NAME }, null, { 'X-Store-Ticket': mine.ticket });

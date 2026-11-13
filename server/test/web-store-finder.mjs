@@ -120,7 +120,7 @@ await page.waitForSelector('#ps-alerts:not([hidden])', { timeout: 10000 });
 ok(await page.locator('#ps-alerts button').count() === 0 && (await page.textContent('#ps-alerts')).includes('تأیید'), 'بی شمارهٔ تأییدشده فقط راهنما');
 const st = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf('0791260001') });
 const ck = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf('0791260001'), code: st.body.devCode });
-await page.evaluate((t) => localStorage.setItem('store-ticket', JSON.stringify({ phone: t.phone, ticket: t.ticket, expiresAt: t.expiresAt })), ck.body);
+await page.evaluate((t) => localStorage.setItem('store-ticket', JSON.stringify({ email: t.email, ticket: t.ticket, expiresAt: t.expiresAt })), ck.body);
 await open();
 await page.locator('#products li[data-id="rice"] .p-open').first().click();
 await page.waitForSelector('#ps-alerts:not([hidden]) button', { timeout: 15000 });

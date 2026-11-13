@@ -152,7 +152,7 @@ test('S118.customer: درِ مشتری (/api/store/:slug/chat) با بلیتِ �
   const check = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf('0790001182'), code: start.body.devCode });
   assert.equal(check.status, 200, JSON.stringify(check.body));
   const ticket = check.body.ticket;
-  const phone = sf.parseTicket(ticket).phone;
+  const phone = sf.parseTicket(ticket).email; //  «فقط ایمیل»: کلیدِ بلیت ایمیل است
   const door = `/api/store/${slug}/chat`;
   const pub = (method, path, t, body = null) => h.api(method, `${door}${path}`, { body, headers: t ? { 'X-Store-Ticket': t } : {} });
   const bytes = async (path, t) => {

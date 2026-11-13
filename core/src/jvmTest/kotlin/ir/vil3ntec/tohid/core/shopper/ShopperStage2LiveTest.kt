@@ -29,10 +29,10 @@ class ShopperStage2LiveTest {
     is ShopperResult.Fail -> throw AssertionError("$what: ${error.status} ${error.code} ${error.message}")
   }
 
-  private fun ticket(api: ShopperApi, local: String): CustomerTicket {
-    val phone = ir.vil3ntec.tohid.core.text.LocaleFormat.normalizePhone(local)!!
-    val code = assertNotNull(api.verifyStart(slug, phone).ok("کد").devCode)
-    return api.verifyCheck(slug, phone, code).ok("تأیید")
+  /** «فقط ایمیل»: بلیت از کدِ ایمیل (شماره هرگز تأیید نمی‌شود) */
+  private fun ticket(api: ShopperApi, email: String): CustomerTicket {
+    val code = assertNotNull(api.verifyStart(slug, email).ok("کد").devCode)
+    return api.verifyCheck(slug, email, code).ok("تأیید")
   }
 
   /** نشستِ حسابِ مشتری فقط برای آزمونِ درهای نشانی (ورودِ مشتری در برنامه پس از D-09 است) */
@@ -59,9 +59,9 @@ class ShopperStage2LiveTest {
     assertEquals(PromoRules.APPLIED, quote.code?.status)
     assertTrue(quote.discountMinor in 1..2410, "۱۰٪ ِ ۲۴۱ افغانی با گردِ صندوق: ${quote.discountMinor}")
     assertEquals("unknown", api.promoQuote(slug, PromoRules.lines(cart), "NOPE99", null, null).ok("کدِ نادرست").code?.status)
-    val t = ticket(api, "0700 222 333")
-    val form = CheckoutForm(fulfillment = "pickup", name = "مشتریِ دوم", phone = "0700222333")
-    val req = CheckoutRules.request(page, cart, form, t.phone, "fa", null, PromoRules.applied(quote, "VIP10", null))
+    val t = ticket(api, "live.second@test.local")
+    val form = CheckoutForm(fulfillment = "pickup", name = "مشتریِ دوم", email = t.email, phone = "0700222333")
+    val req = CheckoutRules.request(page, cart, form, CheckoutRules.phoneOf(form)!!, "fa", null, PromoRules.applied(quote, "VIP10", null))
     assertEquals(24100 - quote.discountMinor, req.expectedTotalMinor)
     val placed = api.checkout(slug, req, CheckoutKeys.keyFor(null, req).key, t.ticket).ok("ثبت با کد")
     assertEquals(quote.discountMinor, placed.order.discountMinor)
@@ -136,8 +136,8 @@ class ShopperStage2LiveTest {
     assertEquals(ChatFailure.VERIFY, ChatOutbox.failureOf(assertNotNull(noTicket)), "بی بلیت ⇒ تأییدِ دوباره، پیام در صف می‌ماند")
 
     // ── نشانی‌های حسابِ مشتری (CHK-09): همان قاعده و سقفِ ۱۰، و به شناسهٔ همان مشتری بسته ──
-    val mine = session(http, ticket(api, "0700 444 555"))
-    val other = session(http, ticket(api, "0700 666 777"))
+    val mine = session(http, ticket(api, "live.mine@test.local"))
+    val other = session(http, ticket(api, "live.other@test.local"))
     val home = api.addAddress(slug, mine, AddressRules.clean("خانه", "", "پشتِ مسجد", GeoPin(34.528123456, 69.17))).ok("نشانیِ تازه")
     assertEquals(GeoPin(34.528123, 69.17), home.pin, "گردِ شش رقمیِ سرور = گردِ برنامه")
     assertEquals("bad_address", api.addAddress(slug, mine, AddressInput("", "x")).errorOrNull()?.code, "بی نام ⇒ همان ردِ برنامه")

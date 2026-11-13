@@ -16,6 +16,7 @@ import path from 'node:path';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { makeReference, syncRowsOf, REFERENCE } from '../../bench/datagen.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 //  خطای کاشتن پارامترهای چندمگابایتی را چاپ نکند — فقط پیام و قید
 process.on('uncaughtException', (e) => { console.error(`سرورِ آزمونِ بار: ${e && e.message}${e && e.constraint ? ` (${e.constraint})` : ''}`); process.exit(1); });
@@ -329,8 +330,8 @@ async function seedAll() {
     sh.tickets = [];
     for (let i = 0; i < CFG.phonesPerShop; i++) {
       const phone = `079${String(1000000 + (++phoneSeq)).slice(-7)}`;
-      const st = await call('POST', `/api/store/${sh.slug}/verify/start`, { body: { phone } });
-      const ck = await call('POST', `/api/store/${sh.slug}/verify/check`, { body: { phone, code: st.devCode } });
+      const st = await call('POST', `/api/store/${sh.slug}/verify/start`, { body: { email: mailOf(phone) } });
+      const ck = await call('POST', `/api/store/${sh.slug}/verify/check`, { body: { email: mailOf(phone), code: st.devCode } });
       sh.tickets.push({ phone, ticket: ck.ticket });
     }
   });

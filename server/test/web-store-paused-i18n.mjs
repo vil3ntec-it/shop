@@ -112,7 +112,7 @@ async function submitIn(lang) {
   await ctx.addInitScript(([t, s, c]) => {
     localStorage.setItem('store-ticket', JSON.stringify(t));
     localStorage.setItem(`store-cart:${s}`, JSON.stringify(c));
-  }, [{ phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt }, slug, CART]);
+  }, [{ email: vc.body.email, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt }, slug, CART]);
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(`${lang}: ${e}`));
   page.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });

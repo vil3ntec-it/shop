@@ -101,7 +101,7 @@ await ctx.addInitScript(([s, t]) => {
   localStorage.setItem(`store-cart:${s}`, JSON.stringify({
     rice: { qtyMilli: 1000, name: 'برنج', unit: 'دانه', priceMinor: 30000, maxQtyMilli: null, photo: false, unavailable: false },
   }));
-}, [slug, { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt }]);
+}, [slug, { email: vc.body.email, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt }]);
 const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });
