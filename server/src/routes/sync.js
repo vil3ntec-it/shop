@@ -39,13 +39,18 @@ async function pushHandler(req, res) {
 
   const { result, replayed } = await sync.runIdempotent(
     { shopId: req.shopId, userId: req.user.id, deviceId, operationId },
-    () => sync.pushChanges(
-      //  S89: برنامهٔ کهنه (بی زنجیره) — با پرچمِ `shop.doc_chain` فقط رویداد (F0-02)؛ SEC-03: نشست یا شناسهٔ
-      //  زنجیره‌دار ⇒ ۴۰۹ مثلِ API (`boundDevice` = دستگاهِ همین نشست، نه بدنه)
-      { shopId: req.shopId, userId: req.user.id, deviceId, boundDevice: req.device ? String(req.device.device_uid || '') : '', role: req.role, finalized: 'log',
-        ip: require('../middleware/ratelimit').clientIp(req), hideContact },
-      changes
-    )
+    async () => {
+      //  PRD-07 (پرچمِ خاموشِ `shop.product_unit_rules`): کالای ردشده ⇐ تعارضِ همان ردیف، بقیهٔ دسته همان (‎lib/product-unit-rules.js‎)
+      const cut = await require('../lib/product-unit-rules').legacyGuard(req.shopId, changes);
+      const out = await sync.pushChanges(
+        //  S89: برنامهٔ کهنه (بی زنجیره) — با پرچمِ `shop.doc_chain` فقط رویداد (F0-02)؛ SEC-03: نشست یا شناسهٔ
+        //  زنجیره‌دار ⇒ ۴۰۹ مثلِ API (`boundDevice` = دستگاهِ همین نشست، نه بدنه)
+        { shopId: req.shopId, userId: req.user.id, deviceId, boundDevice: req.device ? String(req.device.device_uid || '') : '', role: req.role, finalized: 'log',
+          ip: require('../middleware/ratelimit').clientIp(req), hideContact },
+        cut ? cut.keep : changes
+      );
+      return cut ? { ...out, skipped: out.skipped + cut.conflicts.length, conflicts: [...cut.conflicts, ...out.conflicts] } : out;
+    }
   );
 
   await touchDevice(req, deviceId);
