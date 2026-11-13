@@ -137,7 +137,7 @@
                 .catch(function () { /* عکسِ نرسیده؛ درخواست سرِ جایش است */ });
             }, Promise.resolve());
           })
-          .then(function () { cur.key = newKey(); K.toast(t('rr.sent')); refresh(); })
+          .then(function () { cur.key = newKey(); f.remove(); K.toast(t('rr.sent')); refresh(); })
           .catch(function (e) { send.disabled = false; K.note(msg, 'err', e.message); });
       });
       return f;
@@ -149,6 +149,8 @@
         var b = box();
         var v = o.returnRequest;
         if (!ok || !v) { b.hidden = true; return; }
+        //  پیگیریِ زنده (هر چند ثانیه) فرمِ نیمه‌نوشته را پاک نمی‌کند؛ پس از فرستادن فرم خودش برداشته می‌شود
+        if (cur.token === token && v.canRequest && b.querySelector('#rr-form')) return;
         if (cur.token !== token) { cur.token = token; cur.key = newKey(); }
         K.clear(b);
         b.appendChild(el('h2', { attrs: { id: 'rr-h' }, text: t('rr.title') }));

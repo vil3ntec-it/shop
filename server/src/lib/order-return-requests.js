@@ -105,11 +105,11 @@ function blockedBy(rules, item) {
 }
 
 /** دادهٔ کالاهای قلم‌ها از دفترِ همگام‌شدهٔ دکان (دسته، زیردسته، بارکد) — نبود ⇒ فقط نامِ قلم */
-async function itemsOf(shopId, lines, run) {
+async function itemsOf(shopId, lines, run, pre = {}) {
   const ids = [...new Set(lines.map((l) => l.product_id).filter(Boolean))];
   const byId = new Map();
   if (ids.length) {
-    const src = await require('./storefront').ledgerSource(shopId, { strict: false });
+    const src = pre.src || await require('./storefront').ledgerSource(shopId, { strict: false });
     const sql = `SELECT r.row_id AS id, r.data FROM ${src.from} WHERE ${src.where} AND r.row_id = ANY($2::text[])`;
     const rows = run ? (await run(sql, [shopId, ids])).rows : await db.many(sql, [shopId, ids]);
     for (const r of rows) byId.set(r.id, typeof r.data === 'string' ? JSON.parse(r.data) : r.data || {});
@@ -140,11 +140,24 @@ const requestView = (r, photos) => ({
   decidedAt: num(r.decided_at), completedAt: num(r.completed_at),
 });
 
+/** روش‌های رساندن: «آوردن به دکان» همیشه؛ «پیکِ دکان» فقط با تحویل و پیکِ روشن و مشمولِ اشتراک */
+async function methodsOf(shopId) {
+  return (await require('./delivery').stateOf(shopId)).enabled ? ['drop_off', 'courier'] : ['drop_off'];
+}
+
+/**
+ * آن‌چه بیرون از تراکنش خوانده می‌شود (پرچم/اشتراکِ پیک و منبعِ دفترِ کالا با استخر) تا درونِ تراکنشِ ساختن هیچ اتصالِ دومی
+ * از استخر گرفته نشود (همان پرهیزِ RSK-07).
+ */
+async function prepare(shopId) {
+  return { methods: await methodsOf(shopId), src: await require('./storefront').ledgerSource(shopId, { strict: false }) };
+}
+
 /**
  * همهٔ آن‌چه پیگیری و ساختن لازم دارند، با `run` ِ تراکنش (ساختن) یا استخر (پیگیری). `order` ردیفِ `online_orders`.
  * ⇒ `{lines: [{lineNo, name, unit, qtyMilli, leftMilli, blocked}], requests, why, days, lastDay, deadlineAt, methods}`
  */
-async function stateOf(run, store, order, at = now()) {
+async function stateOf(run, store, order, at = now(), pre = null) {
   const shopId = store.shop_id;
   const lines = (await run(
     `SELECT line_no, product_id, name, unit, qty_milli FROM online_order_lines WHERE shop_id=$1 AND order_id=$2 ORDER BY line_no`,
@@ -158,7 +171,7 @@ async function stateOf(run, store, order, at = now()) {
     for (const l of requestView(r, 0).lines) used.set(l.lineNo, (used.get(l.lineNo) || 0) + l.qtyMilli);
   }
   const policy = await policyOf(shopId, run);
-  const items = policy.blocked.length ? await itemsOf(shopId, lines, run) : [];
+  const items = policy.blocked.length ? await itemsOf(shopId, lines, run, pre || {}) : [];
   const zone = store.timezone || 'Asia/Kabul';
   let days = 0; let lastDay = null; let deadlineAt = null; let late = false;
   const delivered = ELIGIBLE.includes(order.status);
@@ -178,8 +191,7 @@ async function stateOf(run, store, order, at = now()) {
       blocked: Boolean(item && blockedBy(policy.blocked, item)),
     };
   });
-  const methods = ['drop_off'];
-  if ((await require('./delivery').stateOf(shopId)).enabled) methods.push('courier');
+  const methods = pre ? pre.methods : await methodsOf(shopId);
   const open = reqs.some((r) => OPEN.includes(r.status));
   const why = !delivered ? 'not_delivered'
     : late ? 'late'
@@ -194,8 +206,9 @@ async function customerView(store, orderId) {
   if (!(await flagOn(store.shop_id))) return undefined;
   const order = await db.one('SELECT * FROM online_orders WHERE shop_id=$1 AND id=$2', [store.shop_id, String(orderId || '')]);
   if (!order || order.source !== 'storefront' || order.is_test === true) return undefined;
+  //  سفارشِ هنوز ناتحویلِ بی درخواست (بیشترِ پیگیری‌ها) ⇒ بی کلید و بی پرسشِ دیگر
+  if (!ELIGIBLE.includes(order.status) && !(await db.one('SELECT 1 AS x FROM order_return_requests WHERE order_id=$1 LIMIT 1', [order.id]))) return undefined;
   const s = await stateOf((sql, args) => db.query(sql, args), store, order);
-  if (s.why === 'not_delivered' && !s.requests.length) return undefined;
   return {
     canRequest: s.why === '', why: s.why, days: s.days, lastDay: s.lastDay, deadlineAt: s.deadlineAt,
     methods: s.methods, reasons: REASONS, lines: s.lines, requests: s.requests,
@@ -241,6 +254,7 @@ async function orderOf(run, store, customer, token, lock = false) {
 /** مشتری: درخواستِ تازه ⇒ `{request, replayed}` */
 async function create(store, customer, token, body) {
   const p = parseRequest(body);
+  const pre = await prepare(store.shop_id);
   const out = await db.tx(async (c) => {
     const run = (sql, args) => c.query(sql, args);
     const o = await orderOf(run, store, customer, token, true);
@@ -250,7 +264,7 @@ async function create(store, customer, token, body) {
       const n = (await run('SELECT COUNT(*)::int AS n FROM order_return_request_photos WHERE request_id=$1', [prev.id])).rows[0].n;
       return { request: requestView(prev, n), replayed: true };
     }
-    const s = await stateOf(run, store, o);
+    const s = await stateOf(run, store, o, now(), pre);
     if (s.why === 'not_delivered') throw conflict('فقط سفارشِ تحویل‌شده برگشت می‌پذیرد', 'not_delivered');
     if (s.why === 'late') throw conflict('مهلتِ برگشتِ این سفارش گذشته است', 'return_window_passed');
     if (s.why === 'open') throw conflict('برای این سفارش یک درخواستِ برگشتِ باز هست', 'return_open');
