@@ -80,9 +80,13 @@ fun SalesHistoryScreen(
   var returnFor by remember { mutableStateOf<Sale?>(null) }
   var cancelFor by remember { mutableStateOf<Sale?>(null) }
   var payFixFor by remember { mutableStateOf<Sale?>(null) }
+  //  STF-02: نقشِ «نیازمندِ تأیید» ِ `sales.cancel` روی Sync v3 ⇒ برگهٔ PIN ِ مدیر پیش از پنجرهٔ لغو (`CancelAsk`)؛ «اصلاح» نه
+  var cancelAsk by remember { mutableStateOf<Sale?>(null) }
+  var cancelSlip by remember { mutableStateOf<ir.vil3ntec.tohid.core.perm.ApprovalSlip.Slip?>(null) }
 
   val roleContext = androidx.compose.ui.platform.LocalContext.current
   val canCancel = remember { ir.vil3ntec.tohid.data.ShopRole.canCancelSale(roleContext) }
+  val askCancel = remember { ir.vil3ntec.tohid.data.CancelAsk.offered(roleContext) }
   //  POS-40 — «اصلاحِ روشِ پرداخت» فقط با تنظیمِ روشنِ همین دستگاه (`PayFixPref`) و مجوزِ `sales.pay_fix` جز «ممنوع»
   val payFix = remember { ir.vil3ntec.tohid.data.PayFixPref.on(roleContext) && ir.vil3ntec.tohid.data.PayFixPref.decision(roleContext) != "deny" }
   //  POS-40: نشانِ «اصلاح‌شده» در ستونِ «نوع» (از هر دستگاه؛ دفترِ بی اصلاح ⇒ هیچ)
@@ -325,7 +329,7 @@ fun SalesHistoryScreen(
           onReturnReceipt = { receiptFor = it },
           //  لغو و «ویرایش در سبد» (که خودش لغو است) فقط با صاحب و مدیر —
           //  سرور هم opِ لغوِ شاگرد را رد می‌کند (`sales.cancel`)
-          onCancel = { if (canCancel) cancelFor = sale else toast(StrInvoices.cancelDenied) },
+          onCancel = { if (canCancel) cancelFor = sale else if (askCancel) cancelAsk = sale else toast(StrInvoices.cancelDenied) },
           onReopen = { if (canCancel) reopenFor = sale else toast(StrInvoices.cancelDenied) },
           onPayFix = if (payFix) ({ payFixFor = sale }) else null,
           fixed = sale.id in fixedSales,
@@ -503,25 +507,21 @@ fun SalesHistoryScreen(
   /*
    *  SEC-03 — لغو و «اصلاح»: کنترل از `InvoiceVoid.check` (core؛ همان که `CancelSheet` ِ نسخهٔ ۳ می‌خواند)،
    *  اثرِ دفتری همان `SalesEngine.cancel`، و فقط پس از نشستنِ لغو در دفتر (نه با قفلِ نرم) سندِ معکوس در
-   *  زنجیرهٔ اسنادِ دستگاه (`DocChainSync.recordVoid`؛ پرچمِ خاموشِ `shop.doc_chain` ⇒ هیچ).
+   *  زنجیرهٔ اسنادِ دستگاه (`DocChainSync.recordVoid`؛ پرچمِ خاموشِ `shop.doc_chain` ⇒ هیچ). همان `SalesVoid.run` ِ نسخهٔ ۳:
+   *  STF-02 برگهٔ لغو ([slip]) جای «اجازه» و روی `Sale.cancelApproval`؛ PRM-02 پس از لغو کدهای فاکتور آزاد (`PromoLive.releaseOnVoid`).
    */
-  fun voidSale(sale: Sale, kind: InvoiceVoid.Kind, reason: String, done: String, after: () -> Unit) {
-    when (val check = InvoiceVoid.check(SalesVoid.facts(d, sale.id), canCancel, kind, reason)) {
-      is InvoiceVoid.Decision.Denied -> toast(SalesVoid.denied(check.code, StrInvoices.cancelDenied))
-      is InvoiceVoid.Decision.Allowed ->
-        when (val r = SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId, reason = check.reason, by = trailBy)) {
-          is SalesEngine.Result.Failed -> toast(r.message)
-          is SalesEngine.Result.Ok -> {
-            val before = d
-            scope.launch {
-              if (store.save(before, r.data)) {
-                ir.vil3ntec.tohid.sync.platform.DocChainSync.recordVoid(roleContext, before, sale.id, kind, check.reason)
-              }
-            }
-            toast(done)
-            after()
-          }
-        }
+  fun voidSale(sale: Sale, kind: InvoiceVoid.Kind, reason: String, done: String, slip: ir.vil3ntec.tohid.core.perm.ApprovalSlip.Slip? = null, after: () -> Unit) {
+    val before = d
+    when (val r = SalesVoid.run(before, sale.id, canCancel, kind, reason, todayIso(), System.currentTimeMillis(), ::newId, trailBy, StrInvoices.cancelDenied, slip?.let(ir.vil3ntec.tohid.data.DiscountGate::json))) {
+      is SalesVoid.Outcome.Denied -> toast(r.message)
+      is SalesVoid.Outcome.Failed -> toast(r.message)
+      is SalesVoid.Outcome.Ok -> {
+        scope.launch { if (store.save(before, r.data)) ir.vil3ntec.tohid.sync.platform.DocChainSync.recordVoid(roleContext, before, sale.id, kind, r.reason) }
+        //  PRM-02: کدهای سقف‌دارِ فاکتور پس از نشستنِ لغو در دفتر آزاد می‌شوند (بی اینترنت ⇒ صفِ همین دستگاه)
+        ir.vil3ntec.tohid.ui.PromoLive.releaseOnVoid(roleContext, store, sale)
+        toast(done)
+        after()
+      }
     }
   }
 
@@ -546,9 +546,13 @@ fun SalesHistoryScreen(
   }
 
   payFixFor?.let { sale -> PayFixHost(d, store, sale, me, ::toast) { payFixFor = null } }
+  cancelAsk?.let { sale ->
+    CancelApprovalDialog(sale, remember { ir.vil3ntec.tohid.data.ShopRole.shopId(roleContext) }, remember { ir.vil3ntec.tohid.data.TillUser.meId(roleContext) },
+      onApproved = { cancelAsk = null; cancelSlip = it; cancelFor = sale }) { cancelAsk = null }
+  }
   cancelFor?.let { sale ->
-    CancelInvoiceDialog(sale, onDismiss = { cancelFor = null }) { reason ->
-      voidSale(sale, InvoiceVoid.Kind.VOID, reason, StrInvoices.saleCancelled) { cancelFor = null }
+    CancelInvoiceDialog(sale, onDismiss = { cancelFor = null; cancelSlip = null }) { reason ->
+      voidSale(sale, InvoiceVoid.Kind.VOID, reason, StrInvoices.saleCancelled, cancelSlip) { cancelFor = null; cancelSlip = null }
     }
   }
 }

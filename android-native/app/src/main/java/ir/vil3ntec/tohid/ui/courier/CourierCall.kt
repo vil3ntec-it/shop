@@ -15,10 +15,6 @@ import ir.vil3ntec.tohid.core.net.ApiResult
 internal fun landmarkLines(c: MissionCard): List<String> =
   MissionView.landmarkFirst(c, StrCourierApp::areaLine, StrCourierApp::gateLine)
 
-/** DLV-02 — دو خطِ ردیفِ نمای جدولیِ تبلت (`MissionView.tableLines`): نشانه یا نشانیِ متنی، سپس «ناحیه · دروازه» */
-internal fun tableLines(c: MissionCard): List<String> =
-  MissionView.tableLines(c, StrCourierApp::areaLine, StrCourierApp::gateLine)
-
 /**
  *  نمای جدولیِ تبلت (`MissionRow`): همان «اول نشانه» در دو خط — نشانه (بی نشانه، نشانیِ متنی) و «ناحیه · دروازه»؛
  *  نشانیِ متنیِ کنارِ نشانه فقط در جزئیات (ردیف جا ندارد). پیش از این ردیف فقط نشانه داشت.

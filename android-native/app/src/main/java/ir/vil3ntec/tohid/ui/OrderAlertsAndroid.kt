@@ -27,7 +27,7 @@ object OrderAlertsLive {
 
   val net = mutableStateOf(OrderAlerts.Net())
 
-  /** میزِ سفارش (`OrderDeskPanel`، پرچمِ `shop.orders.desk`) روشن است ⇒ هشدارِ قطع حتی بی `presence` */
+  /** میزِ سفارش (`OrderDeskStrip` ِ نسخهٔ ۳، پرچمِ `shop.orders.desk`) روشن است ⇒ هشدارِ قطع حتی بی `presence` */
   val deskOn = mutableStateOf(false)
 
   @Volatile private var announced: Set<String> = emptySet()

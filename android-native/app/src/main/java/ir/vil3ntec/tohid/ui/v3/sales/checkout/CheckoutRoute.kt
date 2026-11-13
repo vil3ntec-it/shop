@@ -16,7 +16,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.i18n.StrPos
-import ir.vil3ntec.tohid.data.CashRoundPref
 import ir.vil3ntec.tohid.data.DiscountGate
 import ir.vil3ntec.tohid.data.GiftCardPref
 import ir.vil3ntec.tohid.data.HeldRules
@@ -97,11 +96,12 @@ fun RouteScope.CheckoutRoute() {
     val loyal = loyalty?.cart ?: priced
     //  «نیازمند تأیید» هم کادرِ تخفیف را نشان می‌دهد؛ فقط «ممنوع» پنهانش می‌کند (STF-02)
     val canDiscount = remember { ShopRole.mayDiscount(context) }
-    val blockExpired = remember { ShopPolicy.blockExpired(context) }
-    //  S22: «منقضی فقط با مجوزِ مدیر» (`ExpiryPref.gate`، پیش‌فرض خاموش؛ با «فروخته نشود» بی اثر) — همان `DeskSale`
-    val expiryGateOn = remember { ir.vil3ntec.tohid.data.ExpiryPref.gate(context) }
-    //  POS-24: قاعده‌های پیش از پایانِ فاکتورِ همین دستگاه (`CheckoutRulesPref`، پیش‌فرض خاموش) — همان `DeskSale`/`SaleDialogs`
-    val checkoutRules = remember { ir.vil3ntec.tohid.data.CheckoutRulesPref.get(context) }
+    //  سدهای فروشِ همین دستگاه (`TillGuards`، همان `DeskSale` و فروشِ تعویض): «فروخته نشود»؛ S22 «منقضی فقط با مجوزِ مدیر»
+    //  (`ExpiryPref.gate`، با «فروخته نشود» بی اثر)؛ POS-24 قاعده‌های پیش از پایانِ فاکتور (`CheckoutRulesPref`) — همه پیش‌فرض خاموش
+    val tillGuards = remember { ir.vil3ntec.tohid.data.TillGuardsPref.get(context) }
+    val blockExpired = tillGuards.blockExpired
+    val expiryGateOn = tillGuards.expiryGate
+    val checkoutRules = tillGuards.rules
     val seller = remember { ir.vil3ntec.tohid.data.TillUser.me(context) } // S46: کاربرِ صندوق؛ خاموش ⇒ همان نامِ حساب
     val payV2 = remember { ShopPolicy.payV2(context) }
     //  PAY-24: کارتِ هدیه و اعتبار در روش‌های پنل فقط با `GiftCardPref` ِ همین دستگاه (پیش‌فرض خاموش ⇒ همان روش‌ها)
@@ -114,8 +114,8 @@ fun RouteScope.CheckoutRoute() {
     val fxRates = remember { ir.vil3ntec.tohid.data.FxTillPref.tillRates(context) }
     if (CheckoutSession.pay.fxRates != fxRates) CheckoutSession.pay.fxRates = fxRates
     CheckoutSession.pay.clock = ir.vil3ntec.tohid.data.ReportBridge::nowMs
-    //  PAY-09: پلهٔ گردکردنِ نقدیِ همین دستگاه (`CashRoundPref`، پیش‌فرض خاموش) — پنلِ ترکیبی یا نقدِ کاملِ ساده
-    val cashStep = remember { CashRoundPref.step(context) }
+    //  PAY-09: پلهٔ گردکردنِ نقدیِ همین دستگاه (`CashRoundPref` از `TillGuards`، پیش‌فرض خاموش) — پنلِ ترکیبی یا نقدِ کاملِ ساده
+    val cashStep = tillGuards.cashRounding
     if (CheckoutSession.pay.cashRounding != cashStep) CheckoutSession.pay.cashRounding = cashStep
     //  CRM-03 / S07 — سقفِ اعتبار در صندوق (`ShopPolicy.creditGate`، پیش‌فرض خاموش)
     val creditGateOn = remember { ShopPolicy.creditGate(context) }
@@ -124,8 +124,8 @@ fun RouteScope.CheckoutRoute() {
     val saleKey = remember(lines) { cart.saleKey() }
     //  POS-23: فروشندهٔ هر ردیف فقط با تنظیمِ روشنِ دکان روی قلم می‌نشیند (`LineSellerPref`)؛ خاموش ⇒ همان امروز
     val lineSellers = remember { ir.vil3ntec.tohid.data.LineSellerPref.on(context) }
-    //  POS-37: مالیاتِ فاکتور فقط با پرچمِ سرورِ `shop.sale_tax` و تنظیمِ دکان (`SaleTaxPref`)؛ خاموش ⇒ `null` و همان امروز
-    val taxConfig = remember { ir.vil3ntec.tohid.data.SaleTaxPref.active(context) }
+    //  POS-37: مالیاتِ فاکتور فقط با پرچمِ سرورِ `shop.sale_tax` و تنظیمِ دکان (`SaleTaxPref` از `TillGuards`)؛ خاموش ⇒ `null`
+    val taxConfig = tillGuards.tax
     //  «اصلاحِ فاکتور» (`SaleReopen.extras`): فروشندهٔ همان فاکتور؛ وگرنه کاربرِ صندوق. تأییدها همیشه به نامِ کاربرِ صندوق‌اند
     val invoiceSeller = HeldSession.extras(cart).seller.ifBlank { seller }
     //  همین یک `Checkout` جمع، پیش‌سنجیِ حساب‌پی و ثبت را می‌سازد ⇒ قاعده‌ها و تأییدِ منقضی همه‌جا همان‌اند

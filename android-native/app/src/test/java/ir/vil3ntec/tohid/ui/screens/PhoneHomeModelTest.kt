@@ -5,7 +5,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** خانهٔ گوشی v3: کادرِ پنهانِ کششی (HOME-V2)، کاشی‌ها و هشدارها، بازه‌های آمار (r8). */
+/**
+ *  خانهٔ گوشی v3: کادرِ پنهانِ کششی (HOME-V2) و هشدارها. (کاشی‌های r7 و بازه‌های آمارِ r8 بی‌راه بودند و با آزمونشان
+ *  برداشته شدند، `claude/e-rows-39m`؛ درهای خانه: `NavLayoutTest`، `ModuleRegistryTest`، `ScenarioS96Test`.)
+ */
 class PhoneHomeModelTest {
 
   private val cfg = PullCard.Config(open = 400f, threshold = 120f, flingMin = 40f, flingVelocity = 1500f)
@@ -140,18 +143,6 @@ class PhoneHomeModelTest {
   }
 
   @Test
-  fun `کاشی‌ها همیشه هشت تا و هشتمی بیشتر`() {
-    for (manage in listOf(true, false)) for (orders in listOf(true, false)) {
-      val t = HomeSections.tiles(manage, orders)
-      assertEquals(8, t.size)
-      assertEquals("more", t.last().route)
-      assertEquals(manage, t.any { it.route == "team" })
-      assertEquals(orders, t.any { it.route == "orders" })
-      assertEquals(t.map { it.route }.distinct(), t.map { it.route })
-    }
-  }
-
-  @Test
   fun `هشدار — هیچ چیز ⇒ خالی؛ سفارش فقط وقتی زنده است`() {
     assertTrue(HomeAlerts.build(HomeAlerts.Input()).isEmpty())
     assertTrue(HomeAlerts.build(HomeAlerts.Input(ordersLive = false, newOrders = 3)).isEmpty())
@@ -234,47 +225,5 @@ class PhoneHomeModelTest {
   fun `اشتراکِ قفل‌شده بر روزهای مانده مقدم است`() {
     val a = HomeAlerts.build(HomeAlerts.Input(subscriptionLocked = true, subscriptionDaysLeft = 5)).single()
     assertEquals("اشتراک تمام شده", a.title)
-  }
-
-  @Test
-  fun `بازهٔ هفته هفت روزِ پیاپی تا امروز است`() {
-    val b = StatsBuckets.of(StatsBuckets.Period.WEEK, "2026-10-19", emptyList())
-    assertEquals(7, b.size)
-    assertEquals("2026-10-13", b.first().from)
-    assertEquals("2026-10-19", b.last().to)
-    //  ۱۹ اکتبرِ ۲۰۲۶ دوشنبه است
-    assertEquals("دوشنبه", b.last().label)
-  }
-
-  @Test
-  fun `بازهٔ ماه شش ماهِ خورشیدی است و ماهِ جاری تا امروز`() {
-    val names = listOf("حمل", "ثور", "جوزا", "سرطان", "اسد", "سنبله", "میزان", "عقرب", "قوس", "جدی", "دلو", "حوت")
-    val b = StatsBuckets.of(StatsBuckets.Period.MONTH, "2026-10-19", names)
-    assertEquals(6, b.size)
-    //  ۱۹ اکتبر ۲۰۲۶ = ۲۷ میزان ۱۴۰۵
-    assertEquals("میزان", b.last().label)
-    assertEquals("2026-10-19", b.last().to)
-    assertEquals("ثور", b.first().label)
-    //  پیوسته: پایانِ هر ماه روزِ پیش از آغازِ بعدی
-    for (i in 1 until b.size) {
-      assertEquals(ir.vil3ntec.tohid.core.calendar.CivilDays.addDays(b[i - 1].to, 1), b[i].from)
-    }
-  }
-
-  @Test
-  fun `بازهٔ سال پنج سالِ خورشیدی است`() {
-    val b = StatsBuckets.of(StatsBuckets.Period.YEAR, "2026-10-19", emptyList())
-    assertEquals(listOf("1401", "1402", "1403", "1404", "1405"), b.map { it.label })
-    assertEquals("2026-03-21", b.last().from)
-  }
-
-  @Test
-  fun `محور گرد می‌شود و برچسبش کوتاه است`() {
-    assertEquals(40_000.0, StatsBuckets.axisMax(36_500.0), 0.0)
-    assertEquals(4.0, StatsBuckets.axisMax(0.0), 0.0)
-    assertTrue(StatsBuckets.axisMax(12_345_678.0) >= 12_345_678.0)
-    assertEquals("10K", StatsBuckets.compact(10_000.0))
-    assertEquals("1.5M", StatsBuckets.compact(1_500_000.0))
-    assertEquals("950", StatsBuckets.compact(950.0))
   }
 }

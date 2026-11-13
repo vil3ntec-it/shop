@@ -1,26 +1,18 @@
 package ir.vil3ntec.tohid.ui.screens
 
-import ir.vil3ntec.tohid.core.calendar.CivilDays
-import ir.vil3ntec.tohid.core.calendar.SolarHijri
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.core.i18n.StrTaxQuarter
 import ir.vil3ntec.tohid.core.report.QuarterTax
 import ir.vil3ntec.tohid.core.sync.SyncBadge
-import ir.vil3ntec.tohid.ui.v3.account.AccountPaths
-import ir.vil3ntec.tohid.ui.v3.analytics.AnalyticsPaths
-import ir.vil3ntec.tohid.ui.v3.money.MoneyPaths
-import ir.vil3ntec.tohid.ui.v3.online.OnlinePaths
-import ir.vil3ntec.tohid.ui.v3.products.ProductsPaths
-import ir.vil3ntec.tohid.ui.v3.sales.SalesPaths
 import ir.vil3ntec.tohid.ui.v3.shell.ShellTargets
-import ir.vil3ntec.tohid.ui.v3.stock.StockPaths
 
 /*
  *  خانهٔ گوشی، نسخهٔ ۳ (HOME-V2: خانهٔ ساده، کادرِ پنهانِ کششی، r8 آمار) — منطقِ خالص.
  *
  *  هیچ‌کدام Compose یا اندروید نمی‌خواهد تا با آزمونِ سادهٔ JVM سنجیده شود:
- *  ماشینِ حالتِ کادرِ کششی، کاشی‌های «بخش‌ها»، هشدارها و بازه‌های نمودار.
+ *  ماشینِ حالتِ کادرِ کششی و هشدارها. (کاشی‌های «بخش‌ها» ِ r7 و بازه‌های نمودارِ r8 — `HomeSections`، `StatsBuckets` —
+ *  هیچ صدازننده‌ای نداشتند و برداشته شدند، `claude/e-rows-39m`؛ درهای خانه در نسخهٔ ۳ از `NavCatalog` می‌آیند.)
  */
 
 /**
@@ -155,58 +147,6 @@ object PullCard {
 }
 
 /**
- *  «بخش‌ها» — شبکهٔ ۴×۲ِ r7؛ دسترسیِ سریعِ صاحب دکان به هر بخش.
- *
- *  هشت خانه همیشه پر است و هشتمی «بیشتر». کارمندان فقط برای مدیر (همان سدِ
- *  «بیشتر»)، سفارش‌ها فقط وقتی سفارشِ آنلاین برای این دکان روشن است؛ جای
- *  خالی با خرید و بعد تاریخچه پر می‌شود. `id` رنگ و نشانهٔ کاشی را می‌گوید و
- *  `route` مسیرِ نوع‌دارِ همان بخش است؛ نام هر بار از جدولِ نوشته خوانده می‌شود.
- */
-object HomeSections {
-  data class Tile(val id: String, val route: String) {
-    val label: String get() = labelOf(id)
-  }
-
-  private val CORE = listOf(
-    Tile("products", ProductsPaths.LIST),
-    Tile("warehouse", StockPaths.LIST),
-    Tile("debtors", MoneyPaths.DEBTORS),
-    Tile("expenses", MoneyPaths.EXPENSES),
-    Tile("reports", AnalyticsPaths.REPORTS),
-  )
-  private val TEAM = Tile("team", AccountPaths.TEAM)
-  private val ORDERS = Tile("orders", OnlinePaths.ORDERS)
-  private val FILL = listOf(
-    Tile("purchasing", MoneyPaths.PURCHASING),
-    Tile("sales", SalesPaths.HISTORY),
-    Tile("receipts", MoneyPaths.RECEIPTS),
-  )
-  val MORE = Tile("more", "more")
-
-  fun tiles(canManage: Boolean, ordersLive: Boolean): List<Tile> {
-    val out = CORE.toMutableList()
-    if (canManage) out += TEAM
-    if (ordersLive) out += ORDERS
-    for (f in FILL) { if (out.size >= 7) break; out += f }
-    return out.take(7) + MORE
-  }
-
-  fun labelOf(id: String): String = when (id) {
-    "products" -> StrHome.tileProducts
-    "warehouse" -> Str.warehouse
-    "debtors" -> Str.debtors
-    "expenses" -> Str.expenses
-    "reports" -> Str.reports
-    "team" -> StrHome.tileTeam
-    "orders" -> Str.orders
-    "purchasing" -> Str.purchases
-    "sales" -> StrHome.history
-    "receipts" -> Str.receipts
-    else -> Str.more
-  }
-}
-
-/**
  *  «هشدارها و پیام‌ها» — کارت‌های بزرگِ چرخانِ r7، همه از دادهٔ واقعی.
  *
  *  ترتیب = فوریت: سفارشِ آنلاینِ تازه، اشتراکِ تمام‌شده/رو به پایان، خطای
@@ -324,83 +264,5 @@ object HomeAlerts {
     if (i.sync == Sync.QUEUED && i.queued > 0) add(
       Alert(Kind.SYNC, StrHome.alertQueued(i.queued), StrHome.alertQueuedBody, StrHome.actionCheck, ShellTargets.SYNC),
     )
-  }
-}
-
-/**
- *  بازه‌های نمودارِ «آمار» (r8): هفته = ۷ روزِ تا امروز، ماه = ۶ ماهِ خورشیدیِ
- *  تا ماهِ جاری، سال = ۵ سالِ خورشیدی. هر بازه `from..to` به همان تاریخِ
- *  میلادیِ فایل است تا موتورِ گزارش (`ReportEngine`) همان را بشمارد.
- */
-object StatsBuckets {
-  enum class Period {
-    WEEK, MONTH, YEAR;
-
-    val label: String get() = when (this) {
-      WEEK -> ir.vil3ntec.tohid.core.i18n.StrReports.periodWeek
-      MONTH -> ir.vil3ntec.tohid.core.i18n.StrReports.periodMonth
-      YEAR -> ir.vil3ntec.tohid.core.i18n.StrReports.periodYear
-    }
-  }
-
-  data class Bucket(val label: String, val from: String, val to: String)
-
-  /** ISO ۱ دوشنبه … ۷ یکشنبه (`CivilDays.isoWeekday`) */
-  private val WEEKDAYS: List<String> get() = ir.vil3ntec.tohid.core.i18n.StrReports.weekdaysShort
-
-  fun of(period: Period, today: String, monthNames: List<String>): List<Bucket> = when (period) {
-    Period.WEEK -> (6 downTo 0).mapNotNull { back ->
-      val day = CivilDays.addDays(today, -back) ?: return@mapNotNull null
-      val wd = CivilDays.isoWeekday(day) ?: 1
-      Bucket(WEEKDAYS[wd - 1], day, day)
-    }
-    Period.MONTH -> {
-      val j = SolarHijri.toSolar(today)
-      if (j == null) emptyList() else (5 downTo 0).mapNotNull { back ->
-        var y = j.year
-        var m = j.month - back
-        while (m < 1) { m += 12; y -= 1 }
-        val from = SolarHijri.fromSolar(y, m, 1) ?: return@mapNotNull null
-        val last = SolarHijri.fromSolar(y, m, SolarHijri.monthLength(y, m)) ?: return@mapNotNull null
-        Bucket(monthNames.getOrNull(m - 1) ?: m.toString(), from, minOf(last, today))
-      }
-    }
-    Period.YEAR -> {
-      val j = SolarHijri.toSolar(today)
-      if (j == null) emptyList() else (4 downTo 0).mapNotNull { back ->
-        val y = j.year - back
-        val from = SolarHijri.fromSolar(y, 1, 1) ?: return@mapNotNull null
-        val last = SolarHijri.fromSolar(y, 12, SolarHijri.monthLength(y, 12)) ?: return@mapNotNull null
-        Bucket(y.toString(), from, minOf(last, today))
-      }
-    }
-  }
-
-  /**
-   *  پلهٔ گردِ محورِ عمودی: بیشینه به ۱، ۲ یا ۵ ضربدرِ توانِ ده گرد می‌شود و
-   *  چهار پله می‌خورد (مثلِ ۰، ۱۰k، ۲۰k، ۳۰k، ۴۰k در r8).
-   */
-  fun axisMax(max: Double): Double {
-    if (max <= 0.0 || max.isNaN()) return 4.0
-    val raw = max / 4.0
-    var p = 1.0
-    while (p * 10 <= raw) p *= 10
-    val step = listOf(1.0, 2.0, 2.5, 5.0, 10.0).first { it * p >= raw } * p
-    return step * 4
-  }
-
-  /** برچسبِ کوتاهِ محور: ۹۵۰ · ۱۲K · ۳.۵M · ۱.۲B */
-  fun compact(v: Double): String {
-    val a = kotlin.math.abs(v)
-    fun f(x: Double, s: String): String {
-      val r = Math.round(x * 10) / 10.0
-      return (if (r == Math.floor(r)) r.toLong().toString() else r.toString()) + s
-    }
-    return when {
-      a >= 1e9 -> f(v / 1e9, "B")
-      a >= 1e6 -> f(v / 1e6, "M")
-      a >= 1e3 -> f(v / 1e3, "K")
-      else -> Math.round(v).toString()
-    }
   }
 }

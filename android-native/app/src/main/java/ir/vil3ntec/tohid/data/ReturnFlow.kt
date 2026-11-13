@@ -757,7 +757,7 @@ object ReturnFlow {
       is Outcome.Bad -> return r
       is Outcome.Ok -> r.value
     }
-    return when (val s = SalesEngine.record(posted.data, cart, checkout, today, now, newId, series, saleId = saleKey)) {
+    return when (val s = SalesEngine.record(posted.data, cart, ExchangeTill.sale(checkout, posted.split), today, now, newId, series, saleId = saleKey)) {
       is SalesEngine.Result.Failed -> Outcome.Bad(Code.EXCHANGE_FAILED, s.message)
       is SalesEngine.Result.Ok -> {
         val sale = s.data.sales.first { it.id == saleKey }
@@ -770,6 +770,19 @@ object ReturnFlow {
         )
       }
     }
+  }
+
+  /**
+   *  S22 — نیازِ منقضیِ فروشِ تعویض که تأییدِ همراهِ [checkout] (`TillGuards.exchange`) نمی‌پوشاند، روی همان دفترِ پس از برگشت
+   *  که [exchange] به `SalesEngine.record` می‌دهد. `null` ⇒ ثبت آزاد: سدِ خاموش، «فروخته نشود» (بستن بر تأیید پیش است)، بی
+   *  منقضی، پوشیده، یا برگشتی که خودش رد می‌شود (پیامِ همان را [exchange] می‌دهد).
+   */
+  fun exchangeExpiry(
+    d: ShopData, req: Request, cart: List<SalesEngine.CartLine>, checkout: SalesEngine.Checkout, today: String, now: Long, newId: () -> String,
+  ): Map<String, Long>? {
+    if (!checkout.expiryGate || checkout.blockExpired || cart.isEmpty()) return null
+    val after = (post(d, req, today, now, newId) as? Outcome.Ok)?.value?.data ?: return null
+    return SalesEngine.expiredNeed(after, cart, today).takeUnless { ir.vil3ntec.tohid.core.stock.ExpiryGate.covers(it, checkout.expiryApproval) }
   }
 
   /* ============================ نمای سند (رسید) ============================ */

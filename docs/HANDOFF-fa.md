@@ -54,6 +54,121 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۲ (شب) — هماهنگ‌کننده: دسته‌های ۵۵ و ۵۶ در main، دستهٔ ۵۷ آماده
+
+- **در main:** دستهٔ ۵۵ (#1041؛ پس از رفعِ گیرِ `sharp` زیرِ Electron در `jpeg-trailer.test.js`)، server #147 (پنل 1.50.98) و دستهٔ ۵۶
+  (#1042؛ سیم‌های گم‌شدهٔ نسخهٔ ۳). پس از هر مرج `account-server.yml` ِ server روی main اجرا شد.
+- **بازرسیِ دسترس‌پذیری** (گرافِ نام‌ها از ریشه‌های v3/کامپیوتر/پیش‌نمایش؛ اسکریپت در scratchpad ِ همان سیزن، `audit-v3/graph2.py` و
+  `39m/graph.py`) ۱۴ کمبودِ واقعی یافت که همه ساخته شد: POS-24، RET-08/09/10، S22، POS-28/22/11، S49، INV-05، CRM-14، PAY-19، OPS-02، S45،
+  AI-11، AUTH-08؛ بازرسیِ دوم (هم‌سانیِ کامپیوتر) ۴ کمبود: S22 پیش از پولِ حساب‌پی، PAY-19 در `ShiftV2`، PRM-02 در `SalesHistory.voidSale`، STF-02.
+  بازبینیِ مستقلِ ایمنیِ دستهٔ ۵۶: یافتهٔ بالا/میانه نداشت؛ دورزدنِ پیشینِ «تعویض» (بی سدِ منقضی/قاعده/مالیات/گرد) در دستهٔ ۵۷ بسته شد.
+- **دستهٔ ۵۷ (`claude/batch-57`):** تعویض = فاکتورِ صندوق (`data/TillGuards.kt`، `data/ExchangeTill.kt`)، چهار سدِ کامپیوتر، برداشتنِ کدِ
+  مردهٔ آزمون‌شده (۵ پرونده، ۴۶ بخش). هر عامل اجرای کاملِ ۰ شکست داشت؛ اجرای کاملِ خودِ دسته پیش از PR.
+- **پرسش‌های تازه برای صاحب‌کار** (`docs/OWNER-NEXT-fa.md` ۲-الف): SYN-08 (نشانهٔ همیشه‌پیدای همگام‌سازی در خانهٔ گوشی) و مبنای قاعدهٔ
+  جهتِ قیمت برای بسته.
+- **مانده (کد):** `crmTabs` ِ مرده در `CustomerReportsPhone.kt` هنوز آزمون دارد؛ `CheckoutDialog` ِ قدیم (فقط پیش‌نمایشِ گوشیِ کامپیوتر)
+  مالیات/پله را جدا می‌خواند؛ سقفِ `DeskSale.kt` در `baseline.json` را می‌شود ۱۰۸۶ ⇐ ۱۰۷۹ کرد. **قدمِ بعد:** PR ِ دستهٔ ۵۷ و مرج؛ سپس
+  همان بازرسیِ دسترس‌پذیری برای برنامهٔ خریدِ مشتری (`customer-android`) و آیفون.
+- **دام‌های تازه:** scratchpad میانِ عامل‌ها مشترک است ⇒ لاگِ هر عامل در زیرپوشهٔ خودش؛ دیسک پر شد (Gradle-home ِ عامل‌های تمام‌شده را
+  پاک کن)؛ timeout ِ اجرای پس‌زمینه کمتر از زمانِ اجرای کامل نباشد.
+
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-38d (ک۴) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-38d` (از سرِ `claude/batch-57`، e69b30114؛ ادغامِ e98f1e282)
+
+- **S22 در درگاه‌های صندوقِ کامپیوتر (میانه):** `DeskSale` پیش‌سنجیِ حساب‌پی را بی `expiryGate` می‌زد و تأییدِ منقضی را فقط پس از تسویه
+  می‌پرسید؛ «انصراف» تسویهٔ گرفته‌شده را دور می‌انداخت. **سرنوشتِ پول در مسیرِ پیشین:** درگاهِ خودکار ⇒ قصدِ PAID زیرِ کلیدِ فاکتور در
+  `HesabPayAttempts` می‌ماند؛ برگه (بی پنلِ ترکیبی) در «پرداخت شد» با «ثبت» می‌ماند و بازکردنِ همان فاکتور با همان مبلغ همان تسویه را دوباره
+  پیشنهاد می‌کرد (فقط با تأیید ثبت می‌شد)؛ ولی سبدِ عوض‌شده (مثلاً برداشتنِ کالای منقضی) ⇒ `replace` ⇒ قصدِ پرداخت‌شده لغو نمی‌شود ⇒
+  `amountMismatch` و **پول بی فاکتور** (بازپرداختِ دستی). حالتِ ساده («پول رسید») هیچ ردی نگه نمی‌داشت. با پنلِ ترکیبی `payOpen = false`
+  برگه را هم می‌بست. حالا `ui/screens/DeskExpiryPayAndroid.kt` (`DeskExpiryPay`): `GatewayHook.ready` (تازه، پیش‌فرض `true`) پیش از باز
+  شدنِ برگهٔ پول — حساب‌پیِ خودکار و ساده و کارت‌خوانِ پنل — `CheckoutExpiry.uncovered` را می‌سنجد ⇒ همان پنجرهٔ PIN؛ پیش‌سنجی
+  `HesabTillModel.precheck` با همان `expiryGate` و تأیید؛ تأیید به کلیدِ فاکتور بسته و `finish` همان را می‌خواند. ادامهٔ خودکارِ قصدِ باز
+  (`resumable`) از `ready` نمی‌گذرد (پول شاید گرفته شده).
+- **PAY-19 (میانه):** «کشو بی فروش» ِ `ShiftPanelV2` ⇒ `DrawerNoSale.phoneAction` با `ShopRole.canOpenDrawer`. نکته: `drawer.open`
+  «restrict» است ⇒ شاگرد/صندوق‌دار هرگز «مجاز» نمی‌شوند؛ فرقِ واقعی مدیری است که دکان کشو را برایش «ممنوع» یا «نیازمندِ تأیید» کرده.
+- **PRM-02 (میانه):** `SalesHistory.voidSale` حالا همان `SalesVoid.run` ِ نسخهٔ ۳ (کپیِ دومِ `InvoiceVoid.check`+`SalesEngine.cancel` برداشته شد)
+  و پس از لغو/اصلاحِ موفق `PromoLive.releaseOnVoid`.
+- **STF-02 (پایین، PARTIAL می‌ماند):** خوانندهٔ یگانهٔ `data/CancelAskAndroid.kt` (`CancelAsk.offered`، `need`): گوشیِ v3 «لغو» را در صفحهٔ
+  فاکتور، کشیدنِ ردیف و برگهٔ کارها برای نقشِ «نیازمندِ تأیید» روی Sync v3 نشان می‌دهد («اصلاح» همان `canCancel`)؛ جدولِ کامپیوتر ⇒
+  `CancelApprovalDialog` (`SalesVoidDialogs.kt`، همان `ApprovalDialog`) ⇒ `voidSale(..., slip)` ⇒ `Sale.cancelApproval`. سمتِ سرور ساختنی
+  نماند؛ ماندهٔ ردیف همان D-17، پرچمِ `shop.approval_requests` و دیدن روی دستگاه.
+- **آزمون‌ها (پنجرهٔ واقعیِ Compose):** `DeskExpiryPayUiTest` ۱، `ShiftNoSaleDeskUiTest` ۳، `DeskInvoiceVoidUiTest` ۳، `CancelAskPhoneUiTest` ۲ —
+  روی e69b30114 (worktree ِ جدا با همین آزمون‌ها) سرخ به دلیلِ درست (جز دو نگهبانِ «مدیرِ بی محدودیت» و «v1 بی ورود» که پیش و پس سبزند)، پس از
+  درمان سبز. اجرای کاملِ `flock /tmp/gradle-full.lock ./desktop/gradlew --no-daemon -p desktop test` روی `033d9dec8` (پس از ادغامِ `claude/batch-57` ‏e98f1e282، محلی): ۴۱۱۹ آزمون — ۴۱۱۵ سبز، ۰ شکست، ۴ SKIP ِ پیشین (BUILD SUCCESSFUL).
+- **نیمه‌کاره/قدمِ بعدی:** هیچ کدِ نیمه‌کاره‌ای نیست. بررسی‌نشده: آیا پنلِ ترکیبیِ گوشیِ v3 (کارت‌خوان، اگر دارد) هم مثلِ دکمهٔ حساب‌پی
+  پیش از پول تأییدِ منقضی می‌پرسد؛ و سقف‌های `baseline.json` ِ `DeskSale.kt` (۱۰۸۶ ⇐ ۱۰۷۹) را می‌شود پایین آورد (`--lower-baseline`) — دست نزدم تا با
+  شاخه‌های هم‌زمان ناسازگار نشود.
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-39m (پ۴) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-39m` (از سرِ `claude/batch-57`، e69b30114)
+
+- **هدف: هیچ آزمونی روی کدِ مرده سبزِ دروغ نشان ندهد.** گرافِ دسترسی‌پذیریِ نام‌محور روی همین worktree از نو ساخته شد با ریشه‌های
+  محافظه‌کار: `ui/v3/**`، `AppRoot`/`MainActivity`/`AppShellAndroid`، **کلِ** `desktop/src/main/kotlin/**` (پیش‌نمایش‌های گوشیِ `PhonePreview*`
+  و `shots` هم)، `ios/shared/src/iosMain/**`، کلاس‌های مانیفست (با `backupAgent`) و `SyncV1Worker`. نتیجه: ۷ پروندهٔ کامل‌مرده (نه ۲۹ ِ
+  بازرسی) — بیشترِ «مرده»های بازرسی را `PhonePreview` (`SettingsScreen`، `SaleScreen`، `QuickSaleScreen`، `DebtorsScreen`…) هنوز صدا می‌زند و
+  طبقِ دستور زنده‌اند؛ `TohidBackupAgent` از مانیفست زنده است.
+- **برداشته شد (۵ پروندهٔ برنامه + ۱ آزمون، ۴۶ بخشِ سطحِ بالا + `MissionView.tableLines` ِ core)، هر کدام بی هیچ صدازننده در برنامه، کامپیوتر،
+  پیش‌نمایش و آیفون (grep + گراف):**
+  - میزِ سفارشِ رابطِ امروز: `OrderDeskPanel.kt` و `OrderAlertsUi.kt` (کامل)، `OrderDelayEntry`/`OrderDelaySheet`، نوار/برگهٔ گروهی
+    (`OrderBulkToggle`/`Row`/`Bar`/`Confirm`)، دکمه و برگهٔ «پروندهٔ مدرک» (`OrderEvidenceEntry` و یاورهای خصوصی‌اش). حالت‌های مشترک
+    (`OrderDeskState`، `OrderDelayForm`، `OrderBulkState`، `evidenceMoney`) ماندند. آزمون‌ها: `OrderDeskV3Test` (به‌جای `rememberOrderDesk(api)` ِ
+    پنل اکنون همان در `OrdersRouteContent` ِ نسخهٔ ۳)، `ScenarioS42KeyTest` و `ServerFeatureScreensTest` فقط نسخهٔ ۳ را می‌خوانند.
+  - ثابت‌های عنوانِ مرده (`RETURN_SETTINGS_TITLE` در `ReturnsV2` — فقط همین یک سطر —، `PRICE_LIST_SETTINGS_TITLE`، `STOCK_PLACES_TITLE`،
+    `SMART_FORECAST_TITLE`، `ANOMALY_TITLE`، `OWNER_REPORT_TITLE`، `STOREFRONT_ETA_TITLE`، `PROMO_GUARD_TITLE`، `EASY_SETUP_TITLE`،
+    `TRAINING_SETTINGS_TITLE`، `TILL_GOODS_TITLE`، و `ScanCashSettingsAndroid.kt` که فقط `SCAN_CASH_TITLE` بود). `SettingsPortTest` به‌جای برابری با
+    ثابتِ مرده، مقدارِ کلیدِ `SettingsLayout` را میخ می‌کند (سنجه سست نشد).
+  - `ui/theme/PhoneSheet.kt` + `PhoneSheetContrastTest` (جانشین: `PhoneV3`)، `ui/screens/Sparks.kt` (بی هیچ ارجاع).
+  - `HomeSections` و `StatsBuckets` (`PhoneHomeModel.kt`) با ۵ آزمونشان ⇒ `PhoneHomeModelTest` ۲۱؛ شاهدِ S96 و `ShellTargetsTest` به درهای
+    نسخهٔ ۳ (`NavCatalog.allowed`/`BUILT_IN` و مسیرِ `V3Modules`).
+  - `CourierCall.tableLines` و `MissionView.tableLines` (core): ردیفِ تبلت `rowLines` است و نشانیِ کنارِ نشانه را عمداً نمی‌گذارد، پس آزمونِ core
+    رفتاری را می‌سنجید که صفحه ندارد ⇒ آن آزمون رفت (`MissionAddressTest` ۵)، شاهدِ DLV-02 فقط `CourierCallV3Test`.
+- **عمداً نماند/ماند (با دلیل):** `CheckoutDialog` (`SaleDialogs.kt`، که پس از ادغامِ `claude/batch-57` ‏e98f1e282 هنوز مالیات و پله را جدا می‌خواند) مرده نیست ⇒ برداشته نشد؛ `GiftCardWiringTest:43,45` (`CheckoutDialog`) و `CustomerPricesWiringTest:79` (`PriceListSettingsWired`،
+  `Settings.kt:689`) دست نخوردند: `PhoneV3CartPreview` ⇐ `SaleScreen`/`QuickSaleScreen` ⇐ `CheckoutDialog` و `PhonePreview` ⇐ `SettingsScreen` ⇐
+  همان سطر هنوز صدا می‌زنند. `QuickSaleSearch` (+ آزمونش) هم از همین راه زنده است. `pay/DevicePaySettle` پلِ پیش‌ساختهٔ PAY-08 تا D-08 است، نه
+  رابطِ کهنه ⇒ ماند و kdoc ِ آزمون و STATUS صریح شدند «هنوز هیچ صفحه‌ای صدا نمی‌زند». `core/i18n/I18nTables` فهرستِ جدول‌ها برای آزمون‌های پوشش
+  است (و `server/test/kt-source.js` آن را می‌خواند) ⇒ ماند.
+- **STATUS:** یادداشتِ «بازرسیِ کدِ مرده» در ORD-03/04/07/08/09/19، S42، S96، PAY-08، DLV-02؛ **هیچ وضعیتی عوض نشد**؛ PARTIAL-MAP: یک بند و متنِ PAY-08.
+- **سنجه‌ها:** `compileTestKotlin` ِ desktop دو بار سبز (پس از بخشِ سفارش؛ پس از همه و ادغامِ `origin/claude/batch-57` ‏e98f1e282، تعارض فقط در دو ردیفِ
+  STATUS: سمتِ batch-57 + یادداشتِ همین دور)؛ `(cd core && ../desktop/gradlew --no-daemon jvmTest)` زیرِ flock: ۱۹۰۳ آزمون، ۰ شکست (۲ SKIP ِ سرورِ
+  زنده)، `MissionAddressTest` ۵/۵؛ نگهبان‌های سرور `dari-text`، `kotlin-file-mirrors`، `kotlin-test-names-windows` ۲۴/۲۴؛ `spec.mjs check` سالم؛
+  `quality.mjs` بی ❌؛ precheck fail=0. اجرای کاملِ `rm -rf desktop/build/test-data && flock /tmp/gradle-full.lock ./desktop/gradlew --no-daemon -p desktop test`
+  روی f47a07491: ۴۱۰۳ آزمون، ۰ شکست، ۴ SKIP ِ پیشین (ACL ِ ویندوزِ `AtRestDiskTest`، دو سنجهٔ perf، `NewScreensRenderTest`)؛ هیچ skip ِ تازه‌ای نیست.
+  سنجه‌های جابه‌جاشده روی کدِ زنده سبزند: `OrderDeskV3Test` ۵، `ScenarioS42KeyTest` ۳، `SettingsPortTest` ۸، `ScenarioS96Test` ۱، `ShellTargetsTest` ۵.
+- **نیمه‌کاره / قدمِ بعد:** نیمه‌مرده‌های درونِ پرونده‌های زنده (۲۵ پروندهٔ نیمه‌مرده در کلِ برنامه؛ ۴۲ بخشِ مرده در `ui/screens`/`ui/components`؛ گرافِ نام‌محورِ
+  این دور در scratchpad ِ سیزن ماند، در ریپو نیست) دست نخوردند؛ تنها موردی که هنوز آزمون دارد `crmTabs` (`CustomerReportsPhone.kt`؛ `CustomerReportsPhoneTest` و
+  دو سنجهٔ `DariCoverageTest`). `SERVERS_SECTION_TITLE` (`Servers.kt`) هم مرده ولی بی آزمون.
+
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-37e (ت۵) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-37e` (از سرِ `claude/batch-57`، e69b30114)
+
+- **فاکتورِ «تعویض» = فاکتورِ صندوقِ همین دستگاه (RET-05):** سه کمبودی که e-rows-36t دید سنجیده شد. (۱) **مالیات (POS-37) — کمبودِ واقعی، ساخته شد:**
+  برگشتِ فاکتورِ مالیات‌دار سهمِ مالیات را پس می‌دهد (`paidRatio`) ولی فروشِ تعویض مالیات نمی‌گرفت ⇒ تعویضِ همان کالا با ۱۰٪ ِ روشن ۱۰۰ از ۱۱۰۰ را به
+  مشتری می‌داد. (۲) **گردِ نقدی (PAY-09) — کمبودِ واقعی، ساخته شد:** گرد فقط روی نقدی که مشتری پس از نقدِ برگشتِ همان سند می‌دهد (همان «سهمِ نقدی که
+  فاکتور را می‌بندد» ِ `Pay.settle`؛ `Checkout.cashCovered` ⇐ `ExchangeTill.sale`، تنها حساب `SalesEngine.cashRoundingMinor`)؛ پس‌دادنی هرگز.
+  (۳) **فروشندهٔ ردیف (POS-23) — کمبود نبود (شاهد):** سبدِ تعویض ردیفِ سپرده‌شده ندارد ⇒ قلم‌ها بی `seller` و به نامِ فروشندهٔ فاکتور؛ ولی فروشندهٔ
+  **فاکتور** کمبود داشت (S46): هر دو برگه `SyncStore.accountName` می‌دادند ⇒ حالا `TillUser.me` (خاموش ⇒ همان نامِ حساب).
+- **یک خواننده:** `TillGuards` حالا `tax` و `cashRounding` هم دارد (`TillGuardsPref` ⇐ `SaleTaxPref.active`، `CashRoundPref.step`)؛ `DeskSale` و
+  `CheckoutRoute` همان را می‌خوانند و `TillGuards.exchange` همان را به فروشِ تعویض می‌دهد. پیش‌نمایشِ هر دو برگه `ExchangeTill.preview` (ردیف‌های
+  «مالیات» و «گردکردنِ نقدی»، همان اعدادِ ثبت). همه پیش‌فرض خاموش ⇒ بیت‌به‌بیت همان امروز (آزمونِ «خاموش»).
+- **آزمون (سرخ پیش/سبز پس):** روی e69b30114 پنج سرخ — `ExchangeTillPricingTest` ۳ (`expected:<10000> but was:<null>`، `expected:<-100>`/`<200> but was:<null>`)،
+  `ExchangeGuardsDeskUiTest.theExchangePreviewAndInvoiceCarryTheTillTax` («ردیفِ مالیات در پیش‌نمایشِ تعویض نیامد»)، `ScenarioS46Test` («ReturnFlowSheet.kt
+  هنوز نامِ حساب را مستقیم می‌گیرد»)؛ پس از رفع ۱۸۲ آزمونِ هدف‌دار سبز (`*Exchange*`، `*Return*`، `*Checkout*`، `*SaleTax*`، `*Rounding*`، `*LineSeller*`،
+  `*ScenarioS46*`، `PosLogicTest`…). اجرای کاملِ `rm -rf desktop/build/test-data && flock /tmp/gradle-full.lock ./desktop/gradlew --no-daemon -p desktop test` روی `ad418ea14`: ۴۱۱۰ آزمون، ۰ شکست، ۴ SKIP ِ پیشین (ACL ِ ویندوز، دو بنچ، عکسِ صفحه‌ها؛ BUILD SUCCESSFUL، ۱۰ دقیقه).
+- **نیمه‌کاره / قدمِ بعد:** هیچ. دیده‌شده و دست‌نخورده: صندوقِ رابطِ قدیمِ گوشی (`CheckoutDialog` در `SaleDialogs.kt`) هنوز مالیات و پله را جدا می‌خواند و از `TillGuards` نمی‌گیرد؛
+  تعویض برگهٔ STF-03 (سقف‌های سرور) و «فروشندهٔ ردیف» را در رابط ندارد (همان پیش از این).
+
+### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-36t (ت۴) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-36t` (از سرِ `claude/batch-56`، 0d06aa8d5)
+
+- **دورزدنِ S22 و POS-24 از راهِ «تعویض» ِ برگشت (شدتِ میانه/بالا) بسته شد:** فروشِ تعویض در گوشیِ v3 (`ReturnFlowSheet`) و کامپیوتر
+  (`ReturnsV2`) با `SalesEngine.Checkout(seller = me)` ِ خام ثبت می‌شد ⇒ کالای منقضی بی تأییدِ مدیر، کالای منقضی با «فروخته نشود»، فاکتورِ صفر و
+  فاکتورِ بی مشتری از راهِ تعویض. حالا `data/TillGuards` (خالص) + `TillGuardsPref` (Android) یک خوانندهٔ سدهای فروشِ همین دستگاه است که
+  `DeskSale`، `CheckoutRoute` و هر دو برگهٔ برگشت می‌خوانند؛ `TillGuards.exchange` فروشِ تعویض را می‌سازد و `ReturnFlow.exchangeExpiry` نیازِ منقضی
+  را روی دفترِ پس از برگشت می‌سنجد ⇒ همان برگهٔ PIN ِ صندوق (گوشی `CreditApprovalSheet`، کامپیوتر `CreditApprovalDialog`)؛ تأیید ⇒ همان ثبت، بستن ⇒
+  پیامِ موتور. **تصمیمِ POS-24:** قاعده‌ها روی خودِ فاکتورِ تعویض (نه تفاوت)؛ مشتریِ فاکتورِ تعویض = مشتریِ برگشت (فقط موجود و فعال)؛ بی مشتری ⇒
+  پیامِ صندوق (برگشت و فروشِ جدا). جملهٔ RULES «تعویض همیشه `CheckoutRules.OFF`» عوض شد.
+- **فروشِ سریعِ پیشین (`QuickSale`، فقط «پیش‌نمایشِ گوشی»):** صافیِ کاشی‌ها به `QuickSaleSearch` با `CatalogModel.query(search, d).term` (همان v3)؛
+  «1*3x3 کابل» ِ `VisualSearch.tillText` دیگر فهرست را خالی نمی‌کند.
+- **آزمون (سرخ پیش/سبز پس):** `ExchangeTillGuardsTest` ۵/۵، `ExchangeGuardsDeskUiTest` ۲/۲، `ExchangeGuardsPhoneUiTest` ۱/۱ (پنجرهٔ واقعیِ Compose)،
+  `QuickSaleSearchTest` ۲/۲، نگهبانِ تنگ‌شدهٔ `CheckoutRulesWiringTest` — پیش از رفع ۶ از ۱۹ سرخ (تعویضِ منقضی/رایگان با «فروش‌ها: 2» بی پرسش ثبت شد،
+  `[]` به جای `[cable]`)؛ پس از رفع ۶۰۲ آزمونِ هدف‌دار سبز (جز یک انتظارِ نادرستِ خودِ آزمونِ تازه که اصلاح شد). اجرای کاملِ `rm -rf desktop/build/test-data && flock /tmp/gradle-full.lock ./desktop/gradlew --no-daemon -p desktop test` روی `1dc9916b5`: ۴۱۰۱ آزمون، ۰ شکست، ۴ SKIP ِ پیشین (BUILD SUCCESSFUL، ۱۱ دقیقه).
+- **نیمه‌کاره / قدمِ بعد:** هیچ. دیده‌شده و دست‌نخورده: فروشِ تعویض مالیاتِ فاکتور (POS-37)، گردکردنِ نقدی و فروشندهٔ ردیف را ندارد (بیرون از این کار).
+
 ### ۱۴۰۵/۰۸/۲۲ — عاملِ e-rows-31w زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-31w` (از سرِ `claude/batch-56`)
 
 - **OPS-02 — «پاک‌سازیِ کاملِ اطلاعات» ِ نسخهٔ ۳ درست شد (باگِ پرخطرِ 28l):** قاعده در `core/backup/WipeAll` (commonMain): ردیف فقط برای

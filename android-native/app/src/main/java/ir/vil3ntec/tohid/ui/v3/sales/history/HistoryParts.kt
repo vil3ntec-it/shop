@@ -282,7 +282,7 @@ internal fun InvoiceRow(s: Sale, ctx: RowCtx, first: Boolean, last: Boolean, wit
       chevron = false,
       endActions = buildList {
         if (row.canReturn) add(V3SwipeAction(Icons.AutoMirrored.Outlined.AssignmentReturn, if (ctx.returnsV2) StrSale.returnOrExchange else StrSale.returnWord) { a.ret(row.id) })
-        if (row.canCancel && ctx.canCancel) add(V3SwipeAction(Icons.Outlined.Block, StrSale.cancelSale, V3ButtonKind.DANGER) { a.cancel(row.id) })
+        if (row.canCancel && (ctx.canCancel || ctx.askCancel)) add(V3SwipeAction(Icons.Outlined.Block, StrSale.cancelSale, V3ButtonKind.DANGER) { a.cancel(row.id) })
       },
       onLongClick = { ctx.onMenu(row.id) },
       onClick = { a.open(row.id) },
@@ -294,7 +294,7 @@ internal fun InvoiceRow(s: Sale, ctx: RowCtx, first: Boolean, last: Boolean, wit
 
 /** برگهٔ همهٔ کارهای یک فاکتور — نگه داشتنِ ردیف (کلیکِ راست در کامپیوتر) */
 @Composable
-internal fun SaleActionsSheet(row: HistoryRow, canCancel: Boolean, returnsV2: Boolean, actions: HistoryActions, onClose: () -> Unit) {
+internal fun SaleActionsSheet(row: HistoryRow, canCancel: Boolean, returnsV2: Boolean, actions: HistoryActions, askCancel: Boolean = false, onClose: () -> Unit) {
   val chosen = remember { booleanArrayOf(false) }
   V3Sheet(onDismiss = { if (!chosen[0]) onClose() }, title = "${row.number} · ${row.name}", detents = false) { closer ->
     fun pick(go: () -> Unit) { chosen[0] = true; closer.close { onClose(); go() } }
@@ -306,9 +306,10 @@ internal fun SaleActionsSheet(row: HistoryRow, canCancel: Boolean, returnsV2: Bo
     row.returnDocs.forEach { doc ->
       V3ListRow(StrSale.returnReceiptOf(ir.vil3ntec.tohid.data.ReturnFlow.label(doc)), icon = Icons.AutoMirrored.Outlined.ReceiptLong, onClick = { pick { actions.returnReceipt(doc) } })
     }
-    //  لغو و «اصلاح» (که خودش لغو است) فقط با صاحب و مدیر — سرور هم لغوِ شاگرد را رد می‌کند
-    if (row.canCancel && canCancel) {
-      V3ListRow(StrSale.fixInvoice, icon = Icons.Outlined.PointOfSale, hue = V3Hue.AMBER, onClick = { pick { actions.fix(row.id) } })
+    //  لغو و «اصلاح» (که خودش لغو است) فقط با صاحب و مدیر — سرور هم لغوِ شاگرد را رد می‌کند؛ STF-02: نقشِ «نیازمندِ تأیید» روی
+    //  Sync v3 فقط «لغو» با برگهٔ مدیر ([askCancel])
+    if (row.canCancel && canCancel) V3ListRow(StrSale.fixInvoice, icon = Icons.Outlined.PointOfSale, hue = V3Hue.AMBER, onClick = { pick { actions.fix(row.id) } })
+    if (row.canCancel && (canCancel || askCancel)) {
       V3ListRow(StrSale.cancelSale, icon = Icons.Outlined.Block, danger = true, chevron = false, onClick = { pick { actions.cancel(row.id) } })
     }
   }

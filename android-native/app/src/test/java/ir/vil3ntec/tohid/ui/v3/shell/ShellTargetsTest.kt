@@ -4,8 +4,8 @@ import ir.vil3ntec.tohid.core.nav.AppMode
 import ir.vil3ntec.tohid.core.nav.DeepLinks
 import ir.vil3ntec.tohid.data.Reminders
 import ir.vil3ntec.tohid.data.Watchman
+import ir.vil3ntec.tohid.ui.components.common.NavCatalog
 import ir.vil3ntec.tohid.ui.screens.HomeAlerts
-import ir.vil3ntec.tohid.ui.screens.HomeSections
 import ir.vil3ntec.tohid.ui.v3.nav.V3Modules
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -45,7 +45,8 @@ class ShellTargetsTest {
       ShellTargets.supplier("s1"), ShellTargets.invoice("sale-1"), ShellTargets.SCAN, ShellTargets.notifications("news"),
       ShellTargets.search("x"), TransactionPaths.LIST, ShellTargets.ORDERS, ShellTargets.ORDERS_SETUP,
     ).forEach(::resolves)
-    HomeSections.tiles(canManage = true, ordersLive = true).forEach { resolves(it.route) }
+    //  درهای نوار و «بیشتر» ِ نسخهٔ ۳ (کاشی‌های `HomeSections` ِ r7 بی‌راه بودند و برداشته شدند، `claude/e-rows-39m`)
+    NavCatalog.BUILT_IN.forEach { resolves(it.route) }
     HomeAlerts.build(
       HomeAlerts.Input(ordersLive = true, newOrders = 1, subscriptionLocked = true, sync = HomeAlerts.Sync.ERROR, outOfStock = 1, overdueDebtors = 1, expiring = 1),
     ).forEach { resolves(it.route); resolves(it.actionRoute) }

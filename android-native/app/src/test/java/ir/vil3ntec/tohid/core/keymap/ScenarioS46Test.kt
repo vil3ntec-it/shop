@@ -82,7 +82,11 @@ class ScenarioS46Test {
   fun `S46 نقش، فروشنده و درخواست‌کننده از کاربرِ صندوق`() {
     val role = source("android-native/app/src/main/java/ir/vil3ntec/tohid/data/ShopRole.kt", "src/main/java/ir/vil3ntec/tohid/data/ShopRole.kt")!!.readText()
     assertTrue(role.contains("TillUser.role(context, prefs(context).getString(KEY, \"\").orEmpty().ifBlank { OWNER })"))
-    for (rel in listOf("ui/screens/DeskSale.kt", "ui/screens/SaleDialogs.kt", "ui/v3/sales/checkout/CheckoutRoute.kt")) {
+    //  RET-05 (`claude/e-rows-37e`): هر دو برگهٔ برگشت فاکتورِ «تعویض» می‌سازند ⇒ فروشنده (و نویسندهٔ برگشت) همان کاربرِ صندوق
+    for (rel in listOf(
+      "ui/screens/DeskSale.kt", "ui/screens/SaleDialogs.kt", "ui/v3/sales/checkout/CheckoutRoute.kt",
+      "ui/v3/sales/returns/ReturnFlowSheet.kt", "ui/screens/ReturnsV2.kt",
+    )) {
       val f = source("android-native/app/src/main/java/ir/vil3ntec/tohid/$rel", "src/main/java/ir/vil3ntec/tohid/$rel")!!.readText()
       assertTrue("$rel فروشنده را از TillUser نمی‌گیرد", f.contains("TillUser.me(context)"))
       assertFalse("$rel هنوز نامِ حساب را مستقیم می‌گیرد", f.contains("SyncStore(context).accountName"))

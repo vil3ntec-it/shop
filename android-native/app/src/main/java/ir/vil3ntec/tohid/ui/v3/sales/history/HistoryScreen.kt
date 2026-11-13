@@ -142,11 +142,13 @@ fun HistoryScreen(
   reviews: Int = 0,
   money: Boolean = true,
   banner: PrintBanner? = null,
+  /** STF-02 — «لغو» با برگهٔ تأییدِ مدیر (`CancelAsk.offered`)؛ «اصلاح» همان [canCancel] */
+  askCancel: Boolean = false,
 ) {
   var searching by rememberSaveable { mutableStateOf(query.search.isNotEmpty()) }
   var filterSheet by remember { mutableStateOf(false) }
   var menuFor by remember { mutableStateOf<String?>(null) }
-  val ctx = RowCtx(d, book?.look, returnsV2, canCancel, actions) { menuFor = it }
+  val ctx = RowCtx(d, book?.look, returnsV2, canCancel, actions, askCancel) { menuFor = it }
 
   V3Scaffold(
     title = Str.salesHistory,
@@ -182,7 +184,7 @@ fun HistoryScreen(
   if (filterSheet) FilterSheet(query) { filterSheet = false }
   menuFor?.let { id ->
     d.sales.find { it.id == id }?.let { s ->
-      SaleActionsSheet(HistoryModel.row(d, s, returnsV2, look = book?.look), canCancel, returnsV2, actions, onClose = { menuFor = null })
+      SaleActionsSheet(HistoryModel.row(d, s, returnsV2, look = book?.look), canCancel, returnsV2, actions, askCancel = askCancel, onClose = { menuFor = null })
     }
   }
 }
@@ -194,6 +196,8 @@ internal class RowCtx(
   val returnsV2: Boolean,
   val canCancel: Boolean,
   val actions: HistoryActions,
+  /** STF-02 — «لغو» با برگهٔ مدیر */
+  val askCancel: Boolean,
   val onMenu: (String) -> Unit,
 )
 

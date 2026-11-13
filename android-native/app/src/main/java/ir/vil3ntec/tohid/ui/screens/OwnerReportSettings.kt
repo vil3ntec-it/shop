@@ -11,9 +11,6 @@ import ir.vil3ntec.tohid.core.report.OwnerReportPlan
 import ir.vil3ntec.tohid.data.repo.result
 import kotlinx.serialization.json.JsonObject
 
-/** عنوانِ بخش — همان کلیدِ `SettingsLayout` */
-const val OWNER_REPORT_TITLE: String = "گزارشِ خودکار برای صاحب" // داده: کلیدِ بخشِ تنظیمات (همان SettingsLayout)
-
 /**
  *  درِ سرورِ گزارشِ خودکار (`/api/shop/owner-report`، PAY-20/RPT-12) و آخرین «دیده شود؟» برای فهرستِ کامپیوتر.
  *  تا پاسخِ نخست و با پرچمِ خاموش یا نقشِ دیگر `visible = false` ⇒ نه ردیفی، نه بخشی (همان رابطِ امروز).

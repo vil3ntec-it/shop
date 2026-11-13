@@ -31,18 +31,6 @@ class MissionAddressTest {
   }
 
   @Test
-  fun tabletTableRowShowsAddressTextWhenThereIsNoLandmark() {
-    //  پیش از این ردیفِ جدولیِ تبلت فقط `landmark` را می‌گذاشت ⇒ بی نشانه «—» و پیک از فهرست نشانی نمی‌دید
-    assertEquals(listOf("کوچهٔ سوم", "ناحیه: کارتهٔ چهار · دروازهٔ سبز"), MissionView.tableLines(card().copy(landmark = "")))
-    assertEquals(listOf("پشتِ مسجدِ جامع", "ناحیه: کارتهٔ چهار · دروازهٔ سبز"), MissionView.tableLines(card()))
-    //  بی ناحیه و دروازه ⇒ خطِ دوم نشانیِ متنیِ کنارِ نشانه
-    assertEquals(listOf("پشتِ مسجدِ جامع", "کوچهٔ سوم"), MissionView.tableLines(card().copy(area = "", gateColor = " ")))
-    assertEquals(listOf("Area: کارتهٔ چهار · Gate: سبز"), MissionView.tableLines(card().copy(landmark = "", addressText = ""), { "Area: $it" }, { "Gate: $it" }))
-    //  مأموریتِ پایان‌یافته نشانی‌ای در ردیف نمی‌گذارد (صفحه «—»)
-    assertEquals(emptyList(), MissionView.tableLines(MissionView.forDisplay(card("delivered"), QueueState())))
-  }
-
-  @Test
   fun areaAndGateLabelsFollowTheScreenLanguage() {
     val en = MissionView.landmarkFirst(card(), areaLabel = { "Area: $it" }, gateLabel = { "Gate: $it" })
     assertEquals(listOf("پشتِ مسجدِ جامع", "Area: کارتهٔ چهار · Gate: سبز", "کوچهٔ سوم"), en)

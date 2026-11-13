@@ -90,8 +90,10 @@ import kotlinx.coroutines.launch
 /**
  *  آنچه صفحهٔ صندوق به درگاه‌ها می‌دهد: محیط، کلیدِ فاکتور (= شناسهٔ فروش) و سنجشِ «همین حالا ثبت‌شدنی است؟»
  *  (موجودی، تکرار) که **پیش از** گرفتنِ پول زده می‌شود — پیامِ خطا یا `null`.
+ *  `ready` پیش از باز شدنِ هر برگهٔ پول (حساب‌پی، کارت‌خوان): `false` ⇒ صفحهٔ صندوق خودش چیزی پرسید (S22: تأییدِ منقضی پیش
+ *  از پول، `DeskExpiryPay`) و برگه باز نمی‌شود. ادامهٔ خودکارِ پرداختی که پول‌اش شاید گرفته شده از آن نمی‌گذرد.
  */
-class GatewayHook(val env: HesabPayEnv, val saleKey: String?, val precheck: () -> String?)
+class GatewayHook(val env: HesabPayEnv, val saleKey: String?, val ready: () -> Boolean = { true }, val precheck: () -> String?)
 
 /**
  *  روش‌های درگاهیِ تسویه — تنها قلابِ صفحه‌های صندوق (`CheckoutDialog`، `DeskSale`، `PayPanelDialog`).
@@ -118,7 +120,7 @@ fun CheckoutGateways(
     //  حالتِ ساده: شماره/QR ِ خودِ دکان (فقط از حسابِ ذخیره‌شده در سرور)؛ تأیید فقط با «پول رسید» ِ صندوقدار
     till.simple?.let { HesabPaySimpleEntry(hook, it, till.payee, total, panel?.draft(total, customerId), enabled, busy, onPaid) }
     //  کارت‌خوان (آداپتورِ دستی) فقط جایی که ثبتِ دستیِ PAY-06 هست: پنلِ ترکیبی
-    if (panel != null && till.gateway) CardTerminalEntry(hook.saleKey, total, panel, customerId, enabled, busy)
+    if (panel != null && till.gateway) CardTerminalEntry(hook.saleKey, total, panel, customerId, enabled, busy, hook.ready)
   }
 }
 
@@ -146,7 +148,7 @@ private fun HesabPayEntry(
 
   Column(modifier) {
     OutlinedButton(
-      onClick = { open = true },
+      onClick = { if (resumable || hook.ready()) open = true },
       enabled = enabled && !busy,
       modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
     ) { Text(if (resumable) StrPay.resumeHesab else StrPay.payWithHesab) }

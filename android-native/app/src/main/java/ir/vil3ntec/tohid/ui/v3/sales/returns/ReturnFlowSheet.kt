@@ -15,6 +15,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,7 +26,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrPos
+import ir.vil3ntec.tohid.core.i18n.StrRounding
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrSaleTax
+import ir.vil3ntec.tohid.core.stock.ExpiryGate
+import ir.vil3ntec.tohid.data.ExchangeTill
 import ir.vil3ntec.tohid.data.ReturnDecision
 import ir.vil3ntec.tohid.data.ReturnFlow
 import ir.vil3ntec.tohid.data.ReturnLeft
@@ -35,9 +41,11 @@ import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopRole
+import ir.vil3ntec.tohid.data.TillGuards
+import ir.vil3ntec.tohid.data.TillGuardsPref
+import ir.vil3ntec.tohid.data.TillUser
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.sync.DocSeries
-import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.v1.Ulid
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
@@ -60,6 +68,8 @@ import ir.vil3ntec.tohid.ui.v3.V3StatusPill
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3ToggleRow
 import ir.vil3ntec.tohid.ui.v3.V3Type
+import ir.vil3ntec.tohid.ui.v3.sales.approval.CreditApprovalSheet
+import ir.vil3ntec.tohid.ui.v3.sales.checkout.CheckoutExpiry
 import ir.vil3ntec.tohid.ui.v3.sales.history.ReceiptModel
 import kotlinx.coroutines.launch
 
@@ -71,6 +81,7 @@ import kotlinx.coroutines.launch
  *  سقفِ دستگاه تجمعیِ همین فاکتور و سیاستِ برگشتِ همین دستگاه — مهلت و اقلامِ غیرقابلِ برگشت، با هشدار).
  *  شناسه‌های سند و فروشِ تعویض پیش از نخستین تلاش ساخته می‌شوند؛ «ثبت شد»
  *  فقط پس از نوشتنِ واقعیِ دفتر (`save`؛ پایهٔ صریح همان [d] است که سند از آن ساخته شد).
+ *  فروشِ تعویض همان سدهای صندوقِ همین دستگاه را دارد (`TillGuards`: «فروخته نشود»، S22 با برگهٔ تأییدِ مدیر، POS-24).
  */
 @Composable
 fun ReturnFlowSheet(
@@ -92,11 +103,16 @@ fun ReturnFlowSheet(
   val reasons = remember { ReturnSettings.reasons(context) }
   //  RET-09 — سیاستِ برگشتِ همین دستگاه (مهلت و غیرقابلِ برگشت)؛ خالی ⇒ بی اثر
   val policy = remember { ReturnPolicyPrefs.of(context) }
-  val me = remember { runCatching { SyncStore(context).accountName }.getOrDefault("").trim() }
+  val me = remember { TillUser.me(context).trim() } // S46: کاربرِ صندوق — فروشندهٔ فاکتورِ تعویض و نویسندهٔ برگشت؛ خاموش ⇒ نامِ حساب
   //  شناسه‌های سند و فروشِ تعویض پیش از نخستین تلاش (§۱۵.۲ بندِ ۱)
   val docId = remember { Ulid.next() }
   val saleKey = remember { Ulid.next() }
   val chosen = remember { booleanArrayOf(false) }
+  //  سدهای فروشِ صندوقِ همین دستگاه برای فروشِ تعویض — همان `CheckoutRoute`/`DeskSale`، نه `Checkout` ِ خام
+  val guards = remember { TillGuardsPref.get(context) }
+  //  S22: نیازِ منقضیِ نپوشیدهٔ تعویض (برگهٔ PIN باز) و تأییدی که فقط به همان یک تلاشِ بعدی می‌رود
+  var expiryAsk by remember { mutableStateOf<Map<String, Long>?>(null) }
+  var expiryOk by remember { mutableStateOf<ExpiryGate.Approval?>(null) }
 
   val items = remember(d, sale) { if (sale == null) emptyList() else d.saleItems.filter { it.saleId == sale.id && ReturnLeft.left(d, it) > 0 } }
   var qtys by remember { mutableStateOf<Map<String, String>>(if (prefill) items.take(1).associate { it.id to "1" } else mapOf()) }
@@ -128,11 +144,12 @@ fun ReturnFlowSheet(
   val creditTo = if (mode == ReturnFlow.STORE_CREDIT) customerId else null
   val prior = remember(d, sale) { sale?.let { s -> d.saleReturns.filter { it.saleId == s.id } }.orEmpty() }
   val split = (ReturnFlow.split(sale, total, mode, me, creditTo, prior, sale?.let { ir.vil3ntec.tohid.data.PayStatusFlow.bySale(d)[it.id] }.orEmpty()) as? ReturnFlow.Outcome.Ok)?.value
-  val cartTotal = remember(d, cart) { SalesEngine.cartTotal(d, cart) }
+  //  RET-05: خریدِ تازه با مالیات و گردِ نقدیِ همین صندوق، همان حسابِ ثبت (`ExchangeTill`)
+  val bill = remember(d, cart, split?.cash) { ExchangeTill.preview(d, cart, guards.exchange(d, me, null, null), split?.cash ?: 0.0) }
   val approved = gate.decision == "allow" || (approval != null && ReturnFlow.canApprove(gate, approval!!.role))
   val requester = ReturnApproval.requester
 
-  fun submit(closer: ir.vil3ntec.tohid.ui.v3.V3SheetCloser) {
+  fun submit(closer: ir.vil3ntec.tohid.ui.v3.V3SheetCloser, expiryApproval: ExpiryGate.Approval? = null) {
     val req = ReturnFlow.Request(
       docId = docId, saleId = sale?.id, picks = picks, free = ReturnFlowModel.freeLines(free),
       reason = reason.orEmpty(), reasons = reasons, mode = mode, customerId = creditTo,
@@ -141,7 +158,10 @@ fun ReturnFlowSheet(
     val now = System.currentTimeMillis()
     //  دفترِ تازه و پیامِ موفقیت، یا خطا — «ثبت شد» فقط پس از نوشتنِ واقعی
     val built: Pair<ShopData, String>? = if (exchange) {
-      when (val r = ReturnFlow.exchange(d, req, cart, SalesEngine.Checkout(seller = me), saleKey, todayIso(), now, Ulid::next, series = DocSeries.current(context))) {
+      //  مشتریِ فاکتورِ تعویض همان مشتریِ برگشت (POS-24 «مشتری از مبلغِ X» با همان)؛ منقضیِ نپوشیده ⇒ برگهٔ تأییدِ مدیر، هیچ ثبت
+      val checkout = guards.exchange(d, me, sale?.debtorId ?: creditTo, expiryApproval)
+      ReturnFlow.exchangeExpiry(d, req, cart, checkout, todayIso(), now, Ulid::next)?.let { need -> expiryAsk = need; return }
+      when (val r = ReturnFlow.exchange(d, req, cart, checkout, saleKey, todayIso(), now, Ulid::next, series = DocSeries.current(context))) {
         is ReturnFlow.Outcome.Bad -> { error = r.message; null }
         is ReturnFlow.Outcome.Ok -> r.value.data to ReturnFlowModel.exchangeNote(r.value.due)
       }
@@ -161,11 +181,25 @@ fun ReturnFlowSheet(
     }
   }
 
+  expiryAsk?.let { need ->
+    //  S22: همان برگهٔ PIN ِ صندوق (`ExpiryApprovalRoute`) جای همین برگه؛ نوشته‌ها همین‌جا می‌مانند. بستن بی تأیید ⇒ پیام و هیچ ثبت
+    CreditApprovalSheet(
+      summary = SalesEngine.expiredNeedText(d, need), debtorId = "", addMinor = 0L,
+      selfRole = role, selfName = TillUser.me(context), requesterUserId = TillUser.meId(context),
+      onApproved = { ok -> expiryAsk = null; expiryOk = CheckoutExpiry.approval(ok, need) },
+      onClose = { expiryAsk = null; error = TillGuards.expiredRefusal(d, need) },
+      title = StrPos.expiredSaleTitle,
+    )
+    return
+  }
+
   V3Sheet(
     onDismiss = { if (!chosen[0]) onClose() },
     title = if (sale != null) StrSale.returnTitle(ReceiptModel.number(sale)) else StrSale.noReceiptReturn,
     dismissible = !saving,
   ) { closer ->
+    //  S22: تأییدِ منقضی رسید ⇒ همان «ثبتِ تعویض» با همان تأیید (مثلِ `DeskSale.finish`)
+    LaunchedEffect(expiryOk) { val ok = expiryOk ?: return@LaunchedEffect; expiryOk = null; submit(closer, ok) }
     if (sale != null) Text(ReturnFlowModel.saleLine(d, sale), style = V3Type.footnote, color = c.inkMuted)
     Spacer(Modifier.height(12.dp))
     if (sale?.status == "cancelled") {
@@ -264,9 +298,10 @@ fun ReturnFlowSheet(
     V3Card(radius = 16.dp, padding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) {
       MoneyLine(StrSale.returnAmount, total, strong = !exchange)
       if (exchange) {
-        MoneyLine(StrSale.newPurchase, cartTotal)
-        val due = cartTotal - (split?.cash ?: 0.0)
-        MoneyLine(if (due >= 0) StrSale.receiveFromCustomer else StrSale.payToCustomer, kotlin.math.abs(due), strong = true)
+        MoneyLine(StrSale.newPurchase, bill.goods)
+        if (bill.tax > 0) MoneyLine(StrSaleTax.line, bill.tax) // POS-37: فقط با مالیاتِ روشن
+        if (bill.rounding != 0.0) MoneyLine(StrRounding.line, bill.rounding) // PAY-09: فقط نقدی که مشتری می‌دهد
+        MoneyLine(if (bill.due >= 0) StrSale.receiveFromCustomer else StrSale.payToCustomer, kotlin.math.abs(bill.due), strong = true)
       }
       if (gate.decision != "allow") {
         Spacer(Modifier.height(8.dp))

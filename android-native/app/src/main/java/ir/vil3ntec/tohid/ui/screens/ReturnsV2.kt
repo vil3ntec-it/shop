@@ -27,6 +27,7 @@ import ir.vil3ntec.tohid.core.i18n.StrReturnPages
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.i18n.StrSettingsPages
+import ir.vil3ntec.tohid.core.stock.ExpiryGate
 import ir.vil3ntec.tohid.core.text.TextNormalizer
 import ir.vil3ntec.tohid.data.ReturnDecision
 import ir.vil3ntec.tohid.data.ReturnFlow
@@ -37,6 +38,9 @@ import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.data.TillGuards
+import ir.vil3ntec.tohid.data.TillGuardsPref
+import ir.vil3ntec.tohid.data.TillUser
 import ir.vil3ntec.tohid.data.invoiceLabel
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
@@ -105,7 +109,8 @@ private data class FreeRow(val productId: String, val qty: String = "1", val pri
 
 /**
  *  فرمِ برگشت: با رسید ([sale]) یا بی رسید (`sale == null`)، با تعویضِ اختیاری.
- *  `onPosted(docId)` پس از ذخیره — صدازننده رسیدِ برگشت را نشان می‌دهد.
+ *  `onPosted(docId)` پس از ذخیره — صدازننده رسیدِ برگشت را نشان می‌دهد. فروشِ تعویض همان سدهای صندوقِ همین دستگاه را دارد
+ *  (`TillGuards`: «فروخته نشود»، S22 با پنجرهٔ PIN ِ `DeskSale`، POS-24).
  */
 @Composable
 fun ReturnFlowDialog(
@@ -126,10 +131,14 @@ fun ReturnFlowDialog(
   val reasons = remember { ReturnSettings.reasons(context) }
   //  RET-09 — سیاستِ برگشتِ همین دستگاه (مهلت و غیرقابلِ برگشت)؛ خالی ⇒ بی اثر
   val policy = remember { ir.vil3ntec.tohid.data.ReturnPolicyPrefs.of(context) }
-  val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("").trim() }
+  val me = remember { TillUser.me(context).trim() } // S46: کاربرِ صندوق — فروشندهٔ فاکتورِ تعویض و نویسندهٔ برگشت؛ خاموش ⇒ نامِ حساب
   //  شناسه‌های سند و فروشِ تعویض پیش از نخستین تلاش (§۱۵.۲ بندِ ۱)
   val docId = remember { newId() }
   val saleKey = remember { newId() }
+  //  سدهای فروشِ صندوقِ همین دستگاه برای فروشِ تعویض — همان `DeskSale`، نه `Checkout` ِ خام
+  val guards = remember { TillGuardsPref.get(context) }
+  //  S22: نیازِ منقضیِ نپوشیدهٔ تعویض (پنجرهٔ PIN باز)؛ تأیید در حالت نمی‌ماند و فقط به همان یک تلاشِ بعدی می‌رود (`DeskSale`)
+  var expiryAsk by remember { mutableStateOf<Map<String, Long>?>(null) }
 
   val items = remember(d, sale) { if (sale == null) emptyList() else d.saleItems.filter { it.saleId == sale.id && ReturnLeft.left(d, it) > 0 } }
   var qtys by remember { mutableStateOf<Map<String, String>>(if (prefill) items.take(1).associate { it.id to "1" } else mapOf()) }
@@ -164,8 +173,51 @@ fun ReturnFlowDialog(
   val creditTo = if (mode == ReturnFlow.STORE_CREDIT) customerId else null
   val prior = remember(d, sale) { sale?.let { s -> d.saleReturns.filter { it.saleId == s.id } }.orEmpty() }
   val split = (ReturnFlow.split(sale, total, mode, me, creditTo, prior, sale?.let { ir.vil3ntec.tohid.data.PayStatusFlow.bySale(d)[it.id] }.orEmpty()) as? ReturnFlow.Outcome.Ok)?.value
-  val cartTotal = remember(d, cart) { SalesEngine.cartTotal(d, cart) }
+  //  RET-05: خریدِ تازه با مالیات و گردِ نقدیِ همین صندوق، همان حسابِ ثبت (`ExchangeTill`)
+  val bill = remember(d, cart, split?.cash) { ir.vil3ntec.tohid.data.ExchangeTill.preview(d, cart, guards.exchange(d, me, null, null), split?.cash ?: 0.0) }
   val approved = gate.decision == "allow" || (approval != null && ReturnFlow.canApprove(gate, approval!!.role))
+
+  /** «ثبت»؛ [expiryApproval] فقط از پنجرهٔ تأییدِ منقضیِ همین تعویض و فقط برای همین یک تلاش */
+  fun submit(expiryApproval: ExpiryGate.Approval? = null) {
+    val req = ReturnFlow.Request(
+      docId = docId, saleId = sale?.id,
+      picks = items.associate { it.id to ReturnFlow.Pick(number(qtys[it.id]), disp[it.id] ?: ReturnFlow.RESTOCK) },
+      free = free.map { ReturnFlow.FreeLine(it.productId, number(it.qty), number(it.price), it.disposition) },
+      reason = reason.orEmpty(), reasons = reasons, mode = mode, customerId = creditTo,
+      by = me, role = role, perm = decision.perm, limit = limit, approval = approval, policy = policy,
+    )
+    val now = System.currentTimeMillis()
+    //  دفترِ تازه و پیامِ موفقیت، یا خطا — «ثبت شد» فقط پس از نوشتنِ واقعی
+    val built: Pair<ShopData, String>? = if (exchange) {
+      //  مشتریِ فاکتورِ تعویض همان مشتریِ برگشت (POS-24 «مشتری از مبلغِ X» با همان)؛ منقضیِ نپوشیده ⇒ پنجرهٔ PIN، هیچ ثبت
+      val checkout = guards.exchange(d, me, sale?.debtorId ?: creditTo, expiryApproval)
+      ReturnFlow.exchangeExpiry(d, req, cart, checkout, todayIso(), now, ::newId)?.let { need -> expiryAsk = need; return }
+      when (val r = ReturnFlow.exchange(
+        d, req, cart, checkout, saleKey, todayIso(), now, ::newId,
+        series = ir.vil3ntec.tohid.sync.DocSeries.current(context),
+      )) {
+        is ReturnFlow.Outcome.Bad -> { error = r.message; null }
+        is ReturnFlow.Outcome.Ok -> {
+          val due = r.value.due
+          r.value.data to (if (due >= 0) StrReturnPages.exchangeReceive(money(due)) else StrReturnPages.exchangePay(money(-due)))
+        }
+      }
+    } else {
+      when (val r = ReturnFlow.post(d, req, todayIso(), now, ::newId)) {
+        is ReturnFlow.Outcome.Bad -> { error = r.message; null }
+        is ReturnFlow.Outcome.Ok -> r.value.data to StrReturnPages.returnRecorded(money(r.value.total))
+      }
+    }
+    if (built != null) {
+      saving = true
+      scope.launch {
+        //  قفلِ نرمِ اشتراک یا خطای دیسک ⇒ `false`: هیچ «ثبت شد»ی نیست و فرم باز می‌ماند
+        if (store.save(d, built.first)) onPosted(docId, built.second)
+        else error = StrSale.returnNotSaved
+        saving = false
+      }
+    }
+  }
 
   val c = Shop.colors
   Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -301,9 +353,10 @@ fun ReturnFlowDialog(
           ) {
             MoneyLine(StrReturnPages.returnAmount, total, strong = !exchange)
             if (exchange) {
-              MoneyLine(StrSale.newPurchase, cartTotal)
-              val due = cartTotal - (split?.cash ?: 0.0)
-              MoneyLine(if (due >= 0) StrSale.receiveFromCustomer else StrSale.payToCustomer, kotlin.math.abs(due), strong = true)
+              MoneyLine(StrSale.newPurchase, bill.goods)
+              if (bill.tax > 0) MoneyLine(ir.vil3ntec.tohid.core.i18n.StrSaleTax.line, bill.tax) // POS-37: فقط با مالیاتِ روشن
+              if (bill.rounding != 0.0) MoneyLine(ir.vil3ntec.tohid.core.i18n.StrRounding.line, bill.rounding) // PAY-09: نقدی که مشتری می‌دهد
+              MoneyLine(if (bill.due >= 0) StrSale.receiveFromCustomer else StrSale.payToCustomer, kotlin.math.abs(bill.due), strong = true)
             }
             ReturnPolicyNotice(
               verdict, policy, verdict.blockedIds.map { id -> d.products.find { it.id == id }?.name ?: id }, ReturnFlow.roleOf(role) == "staff",
@@ -343,43 +396,7 @@ fun ReturnFlowDialog(
             OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(Str.cancel) }
             Button(
               enabled = !saving && q != null && reason != null && approved && (!exchange || cart.isNotEmpty()),
-              onClick = {
-                val req = ReturnFlow.Request(
-                  docId = docId, saleId = sale?.id,
-                  picks = items.associate { it.id to ReturnFlow.Pick(number(qtys[it.id]), disp[it.id] ?: ReturnFlow.RESTOCK) },
-                  free = free.map { ReturnFlow.FreeLine(it.productId, number(it.qty), number(it.price), it.disposition) },
-                  reason = reason.orEmpty(), reasons = reasons, mode = mode, customerId = creditTo,
-                  by = me, role = role, perm = decision.perm, limit = limit, approval = approval, policy = policy,
-                )
-                val now = System.currentTimeMillis()
-                //  دفترِ تازه و پیامِ موفقیت، یا خطا — «ثبت شد» فقط پس از نوشتنِ واقعی
-                val built: Pair<ShopData, String>? = if (exchange) {
-                  when (val r = ReturnFlow.exchange(
-                    d, req, cart, SalesEngine.Checkout(seller = me), saleKey, todayIso(), now, ::newId,
-                    series = ir.vil3ntec.tohid.sync.DocSeries.current(context),
-                  )) {
-                    is ReturnFlow.Outcome.Bad -> { error = r.message; null }
-                    is ReturnFlow.Outcome.Ok -> {
-                      val due = r.value.due
-                      r.value.data to (if (due >= 0) StrReturnPages.exchangeReceive(money(due)) else StrReturnPages.exchangePay(money(-due)))
-                    }
-                  }
-                } else {
-                  when (val r = ReturnFlow.post(d, req, todayIso(), now, ::newId)) {
-                    is ReturnFlow.Outcome.Bad -> { error = r.message; null }
-                    is ReturnFlow.Outcome.Ok -> r.value.data to StrReturnPages.returnRecorded(money(r.value.total))
-                  }
-                }
-                if (built != null) {
-                  saving = true
-                  scope.launch {
-                    //  قفلِ نرمِ اشتراک یا خطای دیسک ⇒ `false`: هیچ «ثبت شد»ی نیست و فرم باز می‌ماند
-                    if (store.save(d, built.first)) onPosted(docId, built.second)
-                    else error = StrSale.returnNotSaved
-                    saving = false
-                  }
-                }
-              },
+              onClick = { submit() },
               modifier = Modifier.weight(1f),
             ) { Text(if (exchange) StrSale.recordExchange else StrSale.recordReturnV2) }
           }
@@ -388,6 +405,16 @@ fun ReturnFlowDialog(
     }
   }
 
+  expiryAsk?.let { need ->
+    //  S22: همان پنجرهٔ PIN ِ صندوقِ کامپیوتر (`DeskSale`)؛ تأیید ⇒ همان ثبت، بستن ⇒ پیام و هیچ ثبت
+    ir.vil3ntec.tohid.ui.components.staff.CreditApprovalDialog(
+      summary = SalesEngine.expiredNeedText(d, need), debtorId = "", addMinor = 0L,
+      selfRole = role, selfName = TillUser.me(context), requesterUserId = TillUser.meId(context),
+      onApproved = { ok -> expiryAsk = null; submit(ExpiryGate.Approval(ok.by, ok.role, need, ok.reason)) },
+      onDismiss = { expiryAsk = null; error = TillGuards.expiredRefusal(d, need) },
+      title = StrPos.expiredSaleTitle,
+    )
+  }
   val requester = ReturnApproval.requester
   if (asking && requester != null) {
     requester(
@@ -468,9 +495,6 @@ private fun CustomerPicker(d: ShopData, selected: String?, onPick: (String) -> U
 }
 
 /* ============================ تنظیمات ============================ */
-
-/** عنوانِ بخش — همان که ستونِ «تنظیمات»ِ کامپیوتر (`AppRoot`) فهرست می‌کند */
-const val RETURN_SETTINGS_TITLE = "برگشت و تعویض" // داده: کلیدِ بخشِ تنظیمات (`SettingsLayout.RETURNS`)؛ نامِ صفحه `StrSettings.returnsRow`
 
 /**
  *  کلیدِ «برگشت و تعویضِ تازه» و سقفِ بی تأیید — فقط صاحب و مدیر (صفحهٔ تنظیمات

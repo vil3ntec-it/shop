@@ -400,11 +400,11 @@ class ServerFeatureScreensTest {
     //  پروندهٔ مدرک: فقط با `orders.manage` و پس از پاسخِ روشن
     //  (صفحهٔ قدیمیِ `ui/screens/Orders.kt` بی‌راه بود و در LOC-06 برداشته شد؛ فقط نسخهٔ ۳)
     assertTrue(src("ui/v3/online/orders/OrdersRouteContent.kt").contains("OrderEvidenceEntryV3(o.id, cfg?.permissions?.manage == true,"))
-    for (f in listOf("ui/screens/OrderEvidencePanel.kt", "ui/v3/online/orders/OrderEvidenceV3.kt")) {
-      val t = src(f)
-      assertTrue(f, t.indexOf("if (!OrderEvidenceLive.gate.visible) return") in 0 until t.indexOf("open = true"))
-      assertTrue(f, t.contains("if (!canManage"))
-    }
+    //  (`OrderEvidenceEntry` ِ رابطِ امروز در `ui/screens/OrderEvidencePanel.kt` بی‌راه بود و برداشته شد، `claude/e-rows-39m`)
+    val ev = "ui/v3/online/orders/OrderEvidenceV3.kt"
+    val t = src(ev)
+    assertTrue(ev, t.indexOf("if (!OrderEvidenceLive.gate.visible) return") in 0 until t.indexOf("open = true"))
+    assertTrue(ev, t.contains("if (!canManage"))
     //  پوزش: صفحهٔ نسخهٔ ۳ (گوشی و کامپیوتر) با همان نوشتن، ردیف فقط با پاسخِ روشنِ سرور
     assertTrue(src("ui/v3/settings/sections/LateApologyScreen.kt").contains("LateApologyLive.set("))
     assertTrue(src("ui/v3/settings/SettingsRoutes.kt").contains("shown = { lateApologyRow(lateApologyApi()) }"))

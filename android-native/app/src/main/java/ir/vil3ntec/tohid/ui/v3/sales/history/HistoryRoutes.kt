@@ -88,6 +88,8 @@ fun RouteScope.InvoiceRoute() {
   }
   val v2 = returnsV2()
   val canCancel = remember { ShopRole.canCancelSale(context) }
+  //  STF-02: نقشِ «نیازمندِ تأیید» روی Sync v3 ⇒ «لغو» به برگهٔ تأییدِ مدیر (`CancelRoute`)؛ «اصلاح» را برگه نمی‌پوشاند
+  val askCancel = remember { ir.vil3ntec.tohid.data.CancelAsk.offered(context) }
   val row = HistoryModel.row(data, sale, v2)
   //  PAY-07 — وضعیتِ ردیف‌های غیرنقد
   val payRows = ir.vil3ntec.tohid.data.PayStatusFlow.view(data, sale)
@@ -117,7 +119,7 @@ fun RouteScope.InvoiceRoute() {
       }),
       ret = if (row.canReturn) ({ nav.open(SalesPaths.returnOf(sale.id)) }) else null,
       fix = if (row.canCancel && canCancel) ({ nav.open(SalesPaths.fixOf(sale.id)) }) else null,
-      cancel = if (row.canCancel && canCancel) ({ nav.open(SalesPaths.cancelOf(sale.id)) }) else null,
+      cancel = if (row.canCancel && (canCancel || askCancel)) ({ nav.open(SalesPaths.cancelOf(sale.id)) }) else null,
       returnReceipt = { nav.open(SalesPaths.returnReceipt(it)) },
       debtor = { nav.open(MoneyPaths.debtor(it)) },
       back = backOrNull,
@@ -159,12 +161,7 @@ fun RouteScope.CancelRoute() {
   val scope = rememberCoroutineScope()
   val sale = saleOrBack() ?: return
   val canCancel = remember { ShopRole.canCancelSale(context) }
-  val askable = remember {
-    !canCancel && ir.vil3ntec.tohid.core.perm.CancelApproval.offered(
-      ShopRole.decide(context, ir.vil3ntec.tohid.core.perm.CancelApproval.PERM).decision,
-      runCatching { ir.vil3ntec.tohid.sync.v3.SyncChoice.isV3(context) }.getOrDefault(false),
-    )
-  }
+  val askable = remember { ir.vil3ntec.tohid.data.CancelAsk.offered(context) }
   if (!canCancel && !askable) { LaunchedEffect(Unit) { toasts.show(StrSale.cancelDenied, V3Tone.WARNING); back() }; return }
   var slip by remember(sale.id) { mutableStateOf<ir.vil3ntec.tohid.core.perm.ApprovalSlip.Slip?>(null) }
   if (!canCancel && slip == null) {
@@ -172,7 +169,7 @@ fun RouteScope.CancelRoute() {
       ask = ir.vil3ntec.tohid.ui.v3.sales.approval.ApprovalAsk(
         title = StrSale.cancelApproval,
         summary = StrSale.cancelApprovalSummary(ReceiptModel.number(sale), ir.vil3ntec.tohid.money(sale.finalTotal)),
-        need = ir.vil3ntec.tohid.core.perm.CancelApproval.need(sale.id, Math.round(sale.finalTotal * 100.0)),
+        need = ir.vil3ntec.tohid.data.CancelAsk.need(sale),
       ),
       shopId = remember { ShopRole.shopId(context) },
       requesterUserId = remember { ir.vil3ntec.tohid.data.TillUser.meId(context) },

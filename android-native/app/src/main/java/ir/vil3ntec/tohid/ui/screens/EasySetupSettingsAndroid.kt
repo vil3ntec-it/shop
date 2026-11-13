@@ -7,7 +7,5 @@ import ir.vil3ntec.tohid.core.i18n.StrSettingsPages
  *  کارِ اصلی در «دستگاه‌ها» است (`EasySetupAndroid.kt`).
  */
 
-const val EASY_SETUP_TITLE = "راه‌اندازیِ آسانِ چاپگر و بارکدخوان (آزمایشی)" // داده: کلیدِ بخشِ تنظیمات؛ نامِ صفحه `StrSettingsPages.titleEasySetup`
-
 /** توضیحِ بخش — یکی برای رابطِ امروز و صفحهٔ نسخهٔ ۳ (`settings/devices/easy-setup`) */
 val EASY_SETUP_NOTE: String get() = StrSettingsPages.easySetupNote
