@@ -182,6 +182,22 @@ test('release (S64): هر کارِ انتشارِ فهرست در فایلِ خ�
   const old = fs.readFileSync(path.join(dir, 'android-release.yml'), 'utf8');
   assert.deepEqual(releaseMsgs(old, 'android-release.yml'), []);
   assert.match(releaseMsgs(old.replace("github.ref == 'refs/heads/main'", 'true'), 'android-release.yml')[0], /فقط از main/);
+  //  S64 (۱۴۰۵/۰۸/۲۳): پوستهٔ بازنشسته دیگر استثنای «بی آزمون» ندارد — برداشتنِ needs ِ آزمون سد است
+  assert.match(releaseMsgs(old.replace('    needs: test\n', ''), 'android-release.yml').join(' | '), /«test» در needs/);
+  assert.match(releaseMsgs(old.replace('testReleaseUnitTest', 'assembleRelease'), 'android-release.yml').join(' | '), /هیچ گامِ آزمونِ سدکننده/);
+});
+
+test('release (OPS-01): انتشارِ مرحله‌ای فقط از main، پس از آزمون روی کپیِ موقت؛ بی‌اثر کردنش سد است', () => {
+  const dir = path.join(path.dirname(new URL(import.meta.url).pathname), '../../.github/workflows');
+  const yml = fs.readFileSync(path.join(dir, 'release-stage.yml'), 'utf8');
+  assert.deepEqual(releaseMsgs(yml, 'release-stage.yml'), []);
+  assert.deepEqual(checkWorkflow('release-stage.yml', yml), []);
+  assert.match(releaseMsgs(yml.replace("github.ref == 'refs/heads/main' && ", ''), 'release-stage.yml')[0], /فقط از main/);
+  assert.match(releaseMsgs(yml.replace('    needs: [verify, rehearse]\n', '    needs: verify\n'), 'release-stage.yml').join(' | '), /«rehearse» در needs/);
+  assert.match(releaseMsgs(yml.replace('node --test --test-concurrency=1', 'node --version'), 'release-stage.yml').join(' | '), /هیچ گامِ آزمونِ سدکننده/);
+  //  فقط کارِ publish نوشتنی است
+  assert.match(checkWorkflow('release-stage.yml', yml.replace('    timeout-minutes: 45\n', '    timeout-minutes: 45\n    permissions:\n      contents: write\n'))
+    .map((x) => x.msg).join(' | '), /«rehearse» مجوزِ نوشتنیِ «contents»/);
 });
 
 test('walk: متنِ بلوکِ run کلید شمرده نمی‌شود', () => {
