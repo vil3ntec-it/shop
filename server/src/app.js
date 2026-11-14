@@ -203,7 +203,7 @@ async function createApp({ runMigrations = true } = {}) {
   const health = async (req, res) => {
     let worker = 'down';
     try { worker = require('./lib/login-outbox').workerStatus(); } catch { worker = 'down'; }
-    res.json({
+    res.json(require('./lib/public-detail').health(req, {   //  بیرون از شبکهٔ درونی بی نسخه/مدت/کارگر
       ok: true,
       service: 'vill3n-auth',
       server: 'online',
@@ -213,7 +213,7 @@ async function createApp({ runMigrations = true } = {}) {
       version: require('../package.json').version,
       time: now(),
       uptimeSeconds: Math.round(process.uptime()),
-    });
+    }));
   };
 
   /*
@@ -228,10 +228,10 @@ async function createApp({ runMigrations = true } = {}) {
   /** حالِ کاملِ دیتابیس — برای مدیر و برای پنلِ خانگی، نه برای مسیرِ داغِ ورود. */
   const ready = async (req, res) => {
     const db = await healthy();
-    res.status(db ? 200 : 503).json({
+    res.status(db ? 200 : 503).json(require('./lib/public-detail').health(req, {
       ok: db, database: db ? 'connected' : 'unavailable',
       version: require('../package.json').version, time: now(),
-    });
+    }));
   };
   app.get('/health', health);
   app.get('/ready', ready);
