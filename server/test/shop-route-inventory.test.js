@@ -806,6 +806,8 @@ function bodyFor(r, ids) {
     'PUT /shop/permissions/members/:id': { perms: {} },
     'PUT /shop/staff-scope/members/:id': { places: ['warehouse'] },
     'PATCH /shop/branches/:id': { name: 'شعبهٔ دزدیده' },
+    //  فازِ ۲: همان PATCH با POST (برنامه PATCH نمی‌فرستد)
+    'POST /shop/branches/:id': { name: 'شعبهٔ دزدیده' },
     'PUT /shop/branches/members/:id': { branches: [''] },
     'PUT /shop/till-pin/members/:id': { pin: '390471' },
     'POST /shop/till-pin/verify': { memberId: ids.member, pin: '390471' },
