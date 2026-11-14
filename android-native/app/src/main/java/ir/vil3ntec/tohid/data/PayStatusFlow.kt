@@ -31,6 +31,13 @@ import ir.vil3ntec.tohid.core.pay.ShiftRow
  */
 object PayStatusFlow {
 
+  /**
+   *  PAY-07 (د۱۸): آینهٔ وضعیتِ بعدیِ حساب‌پیِ خودکار (فاکتور ⇐ روش ⇐ وضعیت؛ `core/pay/PayMirror`) — فقط نمایش ([view]،
+   *  [chip]، [review])؛ X/Z و جمع‌ها ([totals]، [unreceived]) دست نمی‌خورند. پرچمِ خاموشِ `shop.pay_status_mirror` ⇒ خالی ⇒
+   *  همان امروز. می‌نویسد فقط `PayMirrorAndroid` (پس از هر دورِ همگام‌سازی).
+   */
+  @Volatile var mirror: Map<String, Map<String, String>> = emptyMap()
+
   /** ردیفِ سابقه ⇒ سندِ هسته؛ ردیفِ ناقص ⇒ null */
   fun changeOf(a: AuditEntry): PayStatus.Change? {
     if (a.type != PayStatus.TYPE) return null
@@ -64,7 +71,8 @@ object PayStatusFlow {
   fun current(d: ShopData, s: Sale, changes: List<PayStatus.Change> = bySale(d)[s.id].orEmpty()): List<String> {
     val rows = rows(s)
     if (rows.isEmpty()) return emptyList()
-    return PayStatus.withRefunds(rows, PayStatus.apply(s.id, rows, changes).statuses, refunded(d, s.id))
+    val st = PayStatus.withRefunds(rows, PayStatus.apply(s.id, rows, changes).statuses, refunded(d, s.id))
+    return ir.vil3ntec.tohid.core.pay.PayMirror.overlay(rows, st, mirror[s.id].orEmpty())
   }
 
   /**
@@ -121,8 +129,9 @@ object PayStatusFlow {
 
   fun review(d: ShopData): List<ReviewItem> {
     val all = bySale(d)
-    if (all.isEmpty()) return emptyList()
-    return d.sales.filter { it.id in all && it.status != "cancelled" }
+    val mirrored = mirror
+    if (all.isEmpty() && mirrored.isEmpty()) return emptyList()
+    return d.sales.filter { (it.id in all || it.id in mirrored) && it.status != "cancelled" }
       .sortedByDescending { it.createdAt }
       .flatMap { s -> view(d, s, all[s.id].orEmpty()).filter { it.status == PayStatus.NEEDS_REVIEW }.map { ReviewItem(s, it) } }
   }

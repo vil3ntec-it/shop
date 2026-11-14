@@ -34,6 +34,8 @@ const FREE = [
     'POST /shop/staff-code/disable', 'DELETE /shop/staff-codes/:id',
     'PUT /shop/permissions/members/:id',
     'POST /shop/devices/:id/disable', 'POST /shop/devices/:id/enable',
+    //  S44 (د۱۸): کارهای همگام‌نشدهٔ دستگاهِ گم‌شدهٔ غیرفعال — بخشی از همان «دستگاهِ گم‌شده»، فقط پرچمِ shop.lost_device_replay
+    'POST /shop/devices/:id/replay',
     'POST /shop/approver-keys', 'DELETE /shop/approver-keys/:id']],
   ['چت و شکایت کلیدِ کاتالوگ ندارند؛ فقط پرچم', [
     'POST /shop/chat/conversations', 'PUT /shop/chat/conversations/:id/status', 'POST /shop/chat/conversations/:id/messages',
@@ -89,7 +91,9 @@ const FREE = [
     'POST /shop/staff-time/punches', 'PUT /shop/staff-time/commission-plan']],
   ['حذفِ دادهٔ شخصیِ مشتری (SEC-10) کلیدِ کاتالوگ ندارد، فقط پرچمِ shop.customer_erasure: حقِ حذف به اشتراک بسته نیست '
     + 'و پس از پایانِ اشتراک هم باید شدنی بماند', [
-    'POST /shop/customer-erasure']],
+    'POST /shop/customer-erasure',
+    //  CRM-15/SEC-10 (د۱۸): «انجام شد» ِ فرمانِ پاک کردنِ پرونده در دفترِ دستگاه — دنبالهٔ همان حذف، فقط پرچمِ shop.customer_erasure_ledger
+    'POST /shop/customer-erasure/ledger/applied']],
   ['محدودهٔ مکانِ کارمندان (STF-06) بخشی از مجوزهای هستهٔ دکان است و کلیدِ کاتالوگ ندارد، فقط پرچمِ shop.staff_scope؛ '
     + 'صاحب باید پس از پایانِ اشتراک هم بتواند دسترسیِ کارمند را ببندد', [
     'PUT /shop/staff-scope/members/:id']],
@@ -120,7 +124,9 @@ const FREE = [
     'POST /shop/push/devices', 'DELETE /shop/push/devices']],
   ['«سابقهٔ دسترسی» (CRM-15، درِ app ِ مهاجرتِ ۶۱۰): دیدنِ پرونده از دفترِ خودِ برنامه (وب، حسابدار) سپرِ حریمِ خصوصی است، '
     + 'نه قابلیتِ پولی؛ کلید و پرچم ندارد و پس از پایانِ اشتراک هم باید ثبت شود (customer-access-app.test.js)', [
-    'POST /shop/customer-access']],
+    'POST /shop/customer-access',
+    //  د۱۸: همان دیدن‌ها از صفِ آفلاینِ حسابدار — فقط پرچمِ shop.customer_access_offline
+    'POST /shop/customer-access/offline']],
 ];
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.orders.delay', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',

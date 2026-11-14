@@ -147,6 +147,8 @@ private fun AppRootActive(
   LaunchedEffect(askShop) {
     if (!askShop) return@LaunchedEffect
     askShop = false
+    //  PAY-07 (د۱۸): آینهٔ ذخیرهٔ وضعیتِ حساب‌پی از دیسک (بی شبکه)؛ پرچمِ خاموش ⇒ خالی
+    runCatching { ir.vil3ntec.tohid.data.PayMirrorAndroid.load(context) }
     if (!ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) return@LaunchedEffect
     ir.vil3ntec.tohid.data.repo.Backend.shop(context).current()
       .onSuccess { state ->

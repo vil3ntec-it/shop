@@ -54,6 +54,9 @@ const KNOWN = Object.freeze([
   { key: 'shop.settings_sync', scope: 'shop', default: false, what: 'همگام‌سازیِ زندهٔ تنظیماتِ دکان (قاعده‌های پول، برگشت، مالیات) بینِ دستگاه‌ها' },
   { key: 'shop.held_sync', scope: 'shop', default: false, what: 'پشتیبانِ سرورِ فاکتورهای نگه‌داشته: با پاک کردنِ برنامه گم نمی‌شوند و روی دستگاهِ دیگرِ دکان برمی‌گردند (POS-12، S09)' },
   { key: 'shop.customer_erasure', scope: 'shop', default: false, what: 'حذفِ دادهٔ شخصیِ مشتری با نگه‌داشتنِ سندِ مالیِ ناشناس (SEC-10)' },
+  { key: 'shop.lost_device_replay', scope: 'shop', default: false, what: 'بازیابیِ کارهای همگام‌نشدهٔ دستگاهِ گم‌شدهٔ غیرفعال از پشتیبانش به دفترِ دکان (S44)' },
+  { key: 'shop.customer_erasure_ledger', scope: 'shop', default: false, what: 'پس از حذفِ دادهٔ مشتری، نام/شماره/نشانیِ همان پرونده در دفترِ دستگاه‌ها هم پاک شود (فرمانِ سرور ⇐ برنامهٔ صاحب/مدیر؛ CRM-15، SEC-10)؛ با `shop.customer_erasure`' },
+  { key: 'shop.customer_access_offline', scope: 'shop', default: false, what: 'ثبتِ دیدنِ پروندهٔ مشتری به دستِ حسابدارِ بی‌اینترنت پس از وصل، با زمانِ خودِ دیدن (CRM-15)' },
   { key: 'shop.orders.dispute_file', scope: 'shop', default: false, what: 'پروندهٔ مدرکِ اختلافِ سفارش (RSK-08)' },
   { key: 'shop.storefront.filters', scope: 'shop', default: true, what: 'فیلترِ کاتالوگِ ویترین (برند، قیمت، موجود، مشخصه)' },
   { key: 'shop.storefront.alerts', scope: 'shop', default: false, what: '«خبرم کن وقتی موجود/ارزان شد» ِ ویترین' },
@@ -191,6 +194,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.image_studio', scope: 'shop', default: false, what: 'استودیوی عکس روی سرورِ خودمان: صفِ پردازشِ گروهی، خروجی فقط پس از تأییدِ دکان (AI-02/05)؛ با `shop.image_bank`' },
   { key: 'image_bank.resume', scope: 'all', default: false, what: 'ادامهٔ بارگذاریِ دسته‌ایِ بانکِ تصاویر بی فرستادنِ دوبارهٔ همان فایل (IMG-14)' },
   { key: 'pay.hesabpay', scope: 'shop', default: false, what: 'حساب‌پی ِ خودکار با کلیدهای خودِ دکان؛ پول مستقیم به حسابِ دکان، تأیید فقط با webhook' },
+  { key: 'shop.pay_status_mirror', scope: 'shop', default: false, what: 'آینهٔ وضعیتِ بعدیِ حساب‌پیِ خودکار («نیازمند بررسی»/«بازپرداخت» ِ سرور) روی ردیفِ درگاهِ فاکتورِ دستگاه (PAY-07)؛ با `pay.hesabpay`' },
   //  ── همگام‌سازیِ دکان (پمپ هیچ‌کدام را نمی‌خواند)
   { key: 'shop.sync.doc_roles', scope: 'shop', default: false, what: 'داوریِ نقشِ سندهای سابقه‌سوار (کارتِ هدیه، امتیاز، امانی…) در Sync v3' },
   { key: 'shop.sync_v3_to_v1', scope: 'shop', default: false, what: 'پلِ v3 ⇒ v1 برای دکانی که دستگاهِ کهنه و تازه با هم دارد' },

@@ -7,6 +7,9 @@
  *   POST /intents              ساختنِ قصدِ پرداخت (پرچمِ `pay.hesabpay` + کلیدهای HESABPAY_*)
  *   GET  /intents/:id[?wait=25] وضعیت؛ با wait تا ۲۵ ثانیه منتظرِ تغییر می‌ماند
  *   POST /intents/:id/cancel   فقط از created/pending
+ *   GET  /mirror[?after=<ms>~<id>&limit=]  PAY-07 (د۱۸): وضعیتِ قصدهای فروشِ صندوقِ پرداخت‌شده/بازپرداخت‌شده که پس از
+ *                              cursor عوض شد — آینهٔ «نیازمند بررسی»/«بازپرداخت» روی ردیفِ درگاهِ فاکتورِ دستگاه
+ *                              (`lib/pay-mirror.js`)؛ پشتِ پرچمِ خاموشِ `shop.pay_status_mirror` (خاموش ⇒ ۴۰۴)
  *
  * ⛔ shop_id فقط از نشستِ کاربر (`requireShop`)، هرگز از بدنه.
  * ⛔ کارمندی که فروش ثبت می‌کند (`data.write`: صاحب، مدیر، شاگرد).
@@ -39,6 +42,19 @@ const needEnabled = async (req, res, next) => {
   }
   next();
 };
+
+const mirrorLimit = rateLimit({
+  max: Number(process.env.RATE_PAY_MIRROR_MAX) || 60, windowMs: 60 * 1000, keyPrefix: 'pay-mirror', key: perUser,
+});
+
+//  PAY-07: پیش از `/intents/:id` تا هرگز شناسه خوانده نشود؛ پرچم پیش از خواندنِ پرسش
+router.get('/mirror', mirrorLimit, async (req, res) => {
+  const mirror = require('../lib/pay-mirror');
+  await mirror.requireOn(req.shopId);
+  const out = await mirror.changes(req.shopId, mirror.parseQuery(req.query));
+  res.set('Cache-Control', 'no-store');
+  res.json(out);
+});
 
 router.get('/config', async (req, res) => {
   res.json(await pay.configOf(req.shopId));

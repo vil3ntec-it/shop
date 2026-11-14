@@ -574,4 +574,6 @@ async function dismiss(shopId, actor, id, { reason, fixedDoc, ip = '' } = {}) {
 module.exports = {
   BOX, RESOLVE_PERMISSION, NO_APPROVAL, CLAIM_MS, MAX_NOTE,
   reasonOf, invoiceOf, list, get, mine, resubmit, dismiss,
+  //  S44 (د۱۸، `lost-device-replay.js`): همان زنجیرهٔ زندهٔ push ِ v1 با نقشِ صاحب و دستگاهِ سازنده
+  syncCtx, pushV1,
 };

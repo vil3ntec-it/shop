@@ -23,7 +23,10 @@
  *   v1  میان‌افزارِ فقط‌دکانِ `newer-fields.v1NewerFields` (`v1Guard`) پس از پالایش، بیرونِ تراکنش: ردیفِ ذخیره و گردش از
  *       `sync_rows` **به‌علاوهٔ opهای پیشینِ همان دسته** (حالِ کالا و ورود/فروشِ تازه) ⇒ یک دسته دورِ قاعده نمی‌زند؛ op ِ ردشده
  *       حالِ کالا را عوض نمی‌کند. ⛔ ‎lib/sync-v1.js‎ و ‎routes/sync-v1.js‎ ِ مشترک با پمپ دست نمی‌خورند.
- *   راهِ قدیم (`/api/sync`، برنامهٔ کهنه، F0-02) این‌جا نیست.
+ *   قدیم `legacyGuard` (`/api/sync`، برنامهٔ کهنه، F0-02؛ د۱۸) پیش از `sync.pushChanges`، بیرونِ تراکنش، همان قاعده روی **ردیفِ
+ *       کامل**: حالِ کالا از جدولِ قدیمِ `products` (همان ردیفی که جایگزین می‌شود)، گردش از جدول‌های قدیم **و** دفترِ v1 و
+ *       ردیف‌های پیشینِ همان دسته. ردشده ⇐ تعارضِ همان ردیف با دادهٔ سرور (`conflicts`، مثلِ `stale`) تا برنامهٔ کهنه برگردد؛
+ *       بقیهٔ دسته می‌نشیند. ⛔ ‎lib/sync.js‎ دست نخورد.
  */
 const { key } = require('./purchase-units');
 
@@ -225,4 +228,59 @@ async function v1Guard(req, res) {
   };
 }
 
-module.exports = { FLAG, LOCKED, INEXACT, HISTORY, factorMilli, exactMilli, touches, reasonOf, judgeV3, v1OpOf, v1Hits, v1Guard };
+/** گردش در جدول‌های راهِ قدیم (نامِ مجموعه ⇐ جدول، همان `TABLES` ِ ‎lib/sync.js‎) */
+const LEGACY_HISTORY = Object.freeze({ warehouseEntries: 'inventory', saleItems: 'sale_items', stockMovements: 'stock_movements', purchases: 'purchases' });
+
+/**
+ * راهِ قدیم (`/api/sync`): دسته ⇒ `null` (هیچ ردی) یا `{ keep, conflicts }` — `keep` همان ردیف‌ها بی ردشده‌ها (همان ترتیب) و
+ * `conflicts` به شکلِ تعارضِ `pushChanges` (`collection`، `id`، `reason`، و دادهٔ سرور اگر ردیف هست). دستهٔ بی کالای واحددار
+ * پرچم را هم نمی‌پرسد.
+ */
+async function legacyGuard(shopId, changes) {
+  //  دستهٔ بیش از سقف را خودِ `pushChanges` با ۴۰۰ رد می‌کند
+  if (!Array.isArray(changes) || !changes.length || changes.length > require('./sync').MAX_BATCH) return null;
+  const live = (ch) => isObj(ch) && ch.deleted !== true && isObj(ch.data);
+  const prod = (ch) => live(ch) && ch.collection === 'products' && typeof ch.id === 'string' && ch.id && ch.id.length <= 80;
+  if (!changes.some((ch) => prod(ch) && touches(ch.data)) || !(await on(shopId))) return null;
+  const { query } = require('../db');
+  const ids = [...new Set(changes.filter(prod).map((ch) => ch.id))];
+  const stored = new Map((await query(
+    'SELECT id, updated_at, version, deleted, data FROM products WHERE shop_id=$1 AND id = ANY($2::text[])', [shopId, ids]
+  )).rows.map((r) => [r.id, r]));
+  const state = new Map([...stored].map(([id, r]) => [id, isObj(r.data) ? r.data : null]));
+  let dbMoved = null;
+  const movedDb = async () => {
+    if (dbMoved) return dbMoved;
+    const old = await query(
+      Object.values(LEGACY_HISTORY).map((t) => `SELECT data->>'productId' AS pid FROM ${t}
+        WHERE shop_id=$1 AND deleted = false AND data->>'productId' = ANY($2::text[])`).join(' UNION '),
+      [shopId, ids]
+    );
+    dbMoved = new Set([...old.rows.map((x) => x.pid), ...(await movedIn(query, 'v1', shopId, ids))]);
+    return dbMoved;
+  };
+  const movedBefore = new Set();
+  const conflicts = [];
+  const keep = [];
+  for (const ch of changes) {
+    if (live(ch) && LEGACY_HISTORY[ch.collection] && typeof ch.data.productId === 'string') movedBefore.add(ch.data.productId);
+    if (!prod(ch) || !touches(ch.data)) { keep.push(ch); continue; }
+    const before = state.get(ch.id) || null;
+    const why = await reasonOf(ch.data, before, async () => movedBefore.has(ch.id) || (await movedDb()).has(ch.id));
+    if (!why) {
+      const d = ch.data;
+      state.set(ch.id, { unit: d.unit, saleUnit: d.saleUnit, unitFactor: d.unitFactor });
+      keep.push(ch);
+      continue;
+    }
+    const r = stored.get(ch.id);
+    conflicts.push(r ? {
+      collection: 'products', id: ch.id, reason: why,
+      serverUpdatedAt: Number(r.updated_at), serverVersion: r.version, deleted: r.deleted === true,
+      data: r.deleted ? null : r.data,
+    } : { collection: 'products', id: ch.id, reason: why, data: null });
+  }
+  return conflicts.length ? { keep, conflicts } : null;
+}
+
+module.exports = { FLAG, LOCKED, INEXACT, HISTORY, factorMilli, exactMilli, touches, reasonOf, judgeV3, v1OpOf, v1Hits, v1Guard, legacyGuard };

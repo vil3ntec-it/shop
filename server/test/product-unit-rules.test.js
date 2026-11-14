@@ -332,3 +332,93 @@ test('v1Guard ِ مستقیم، روشن: op ِ ردشده از **همان** ف�
     [a.op_id, 'applied', undefined], [bad.op_id, 'rejected', R.INEXACT], [c.op_id, 'applied', undefined],
   ]);
 });
+
+// ---------------------------------------------------------------- ۳: راهِ قدیم (`/api/sync`، F0-02؛ د۱۸)
+
+const pushL = (who, changes) => h.api('POST', '/api/sync', {
+  token: T[who].accessToken, body: { deviceId: `pul-${who}`, operationId: oid(), changes },
+});
+const lg = (collection, id, data, extra = {}) => ({ collection, id, updatedAt: Date.now() + (++tick), deleted: false, data, ...extra });
+const rowL = async (id) => (await one('SELECT data FROM products WHERE shop_id=$1 AND id=$2', [shopId, id]))?.data;
+const legacyOut = (r) => {
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  return r.body;
+};
+
+test('راهِ قدیم، پرچمِ خاموش ⇒ همان امروز (برابری: ضریبِ ناجور و تغییرِ واحدِ گردش‌دار می‌نشینند)', async () => {
+  await setFlag(shopId, false);
+  const a = legacyOut(await pushL('owner', [
+    lg('products', 'lgoff', tea1({ unitFactor: 1 / 24 })),
+    lg('warehouseEntries', 'lgoff-in', { productId: 'lgoff', units: 10, price: 1 }),
+  ]));
+  assert.equal(a.applied, 2);
+  assert.deepEqual(a.conflicts, []);
+  const b = legacyOut(await pushL('owner', [lg('products', 'lgoff', tea1({ unit: 'کیلو', unitFactor: 1 / 24 }))]));
+  assert.equal(b.applied, 1);
+  assert.deepEqual(b.conflicts, []);
+  assert.equal((await rowL('lgoff')).unit, 'کیلو');
+});
+
+test('راهِ قدیم، روشن: ردیفِ کاملِ کالا — ضریبِ تازهٔ ناجور و واحدِ گردش‌دار ⇒ تعارض با دادهٔ سرور، بقیهٔ دسته می‌نشیند', async () => {
+  await setFlag(shopId, false);
+  legacyOut(await pushL('owner', [
+    lg('products', 'lgold', tea1({ unitFactor: 1 / 12 })),
+    lg('products', 'lgmv', tea1()),
+    lg('warehouseEntries', 'lgmv-in', { productId: 'lgmv', units: 48, price: 1 }),
+    lg('products', 'lgfree', tea1()),
+  ]));
+  await setFlag(shopId, true);
+  const out = legacyOut(await pushL('manager', [
+    lg('products', 'lgnew', tea1({ unitFactor: 1 / 24 })),
+    lg('products', 'lgold', tea1({ name: 'چای سبز', unitFactor: 1 / 12 })),
+    lg('products', 'lgmv', tea1({ unit: 'کیلو' })),
+    lg('products', 'lgfree', tea1({ unit: 'کیلو' })),
+    lg('suppliers', 'lgsup', { name: 'تأمین' }),
+  ]));
+  assert.equal(out.applied, 3);
+  assert.deepEqual(out.conflicts.map((c) => [c.id, c.reason]), [['lgnew', R.INEXACT], ['lgmv', R.LOCKED]]);
+  const mv = out.conflicts.find((c) => c.id === 'lgmv');
+  assert.equal(mv.collection, 'products');
+  assert.equal(mv.data.unit, 'دانه', 'دادهٔ سرور همراهِ تعارض تا برنامهٔ کهنه برگردد');
+  assert.equal(mv.deleted, false);
+  assert.equal(out.conflicts[0].data, null, 'کالای تازهٔ ردشده: سرور چیزی ندارد');
+  assert.equal(await rowL('lgnew'), undefined);
+  assert.equal((await rowL('lgold')).name, 'چای سبز');
+  assert.equal((await rowL('lgmv')).unit, 'دانه');
+  assert.equal((await rowL('lgfree')).unit, 'کیلو');
+  //  صاحب هم؛ واحدِ خالی (۲-۱۶) هم تغییر است
+  const own = legacyOut(await pushL('owner', [lg('products', 'lgmv', tea1({ unit: '' }))]));
+  assert.deepEqual(own.conflicts.map((c) => [c.id, c.reason]), [['lgmv', R.LOCKED]]);
+  assert.equal((await rowL('lgmv')).unit, 'دانه');
+});
+
+test('راهِ قدیم، روشن: گردشِ همان دسته (پیش از ردیفِ کالا) و گردشِ دفترِ v1 هم شمرده می‌شود؛ حذف و همان واحد آزاد', async () => {
+  await setFlag(shopId, true);
+  const out = legacyOut(await pushL('owner', [
+    lg('products', 'lgb1', tea1()),
+    lg('saleItems', 'lgb1-s', { productId: 'lgb1', qty: 1 }),
+    lg('products', 'lgb1', tea1({ unit: 'کیلو' })),
+    lg('products', 'lgb2', tea1({ unit: ' دانه ', name: 'چای ۲' })),
+  ]));
+  assert.deepEqual(out.conflicts.map((c) => [c.id, c.reason]), [['lgb1', R.LOCKED]]);
+  assert.equal((await rowL('lgb1')).unit, 'دانه');
+  assert.equal((await rowL('lgb2')).name, 'چای ۲');
+  //  کالایی که فقط در دفترِ v1 گردش دارد
+  assert.deepEqual(outcome(await push1('owner', [v1('warehouseEntries', 'lgb2-v1', { productId: 'lgb2', units: 3, price: 1 })])), ['applied']);
+  const v = legacyOut(await pushL('owner', [lg('products', 'lgb2', tea1({ unit: 'کیلو' }))]));
+  assert.deepEqual(v.conflicts.map((c) => [c.id, c.reason]), [['lgb2', R.LOCKED]]);
+  //  حذفِ کالا و جدولِ دیگر بی پرسش
+  const d = legacyOut(await pushL('owner', [lg('products', 'lgb2', {}, { deleted: true }), lg('expenses', 'lge', { unit: 'x' })]));
+  assert.deepEqual(d.conflicts, []);
+  assert.equal(d.applied, 2);
+});
+
+test('راهِ قدیم، روشن: پاسخِ تکراری (همان operationId) همان تعارض را دارد', async () => {
+  await setFlag(shopId, true);
+  const body = { deviceId: 'pul-rep', operationId: oid(), changes: [lg('products', 'lgrep', tea1({ unitFactor: 1 / 9 }))] };
+  const a = legacyOut(await h.api('POST', '/api/sync', { token: T.owner.accessToken, body }));
+  const b = legacyOut(await h.api('POST', '/api/sync', { token: T.owner.accessToken, body }));
+  assert.deepEqual(a.conflicts.map((c) => c.reason), [R.INEXACT]);
+  assert.equal(b.replayed, true);
+  assert.deepEqual(b.conflicts.map((c) => c.reason), [R.INEXACT]);
+});
