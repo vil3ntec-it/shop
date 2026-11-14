@@ -2097,6 +2097,70 @@ web/           اپ وب فعلی (index.html و license/*.js)، با انتقا
   - PRD-26: `ProductInfoTest`، `ProductInfoMapTest`.
   - PRD-27: `server/test/storefront.test.js`، `server/test/image-bank-extras.test.js`، `ProductGalleryTest`.
 
+- **S148 — تخفیف، وفاداری و کارت هدیه (PRM):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - PRM-01: `server/test/promo-core.test.js`، `PromoCoreTest`، `PromoEngineTest`.
+  - PRM-02 (بخشی: کدِ تکی و گروهی با سقفِ مصرف؛ پشتِ پرچمِ خاموش): `PromoRedeemTest`، `TillSaleRedeemTest`، `server/test/promo-redemptions.test.js`.
+  - PRM-03: `PromoCoreTest`، `server/test/promo-core.test.js`، `PromoEngineTest`.
+  - PRM-04: `PromoCoreTest`، `server/test/promo-core.test.js`، `PromoEngineTest`.
+  - PRM-05: `PromoCoreTest`، `server/test/promo-core.test.js`، `PromoEngineTest`.
+  - PRM-06: `PromoCoreTest`، `server/test/promo-core.test.js`، `PromoEngineTest`.
+  - PRM-07: `PromoCoreTest`، `server/test/promo-core.test.js`، `PromoEngineTest`.
+  - PRM-08: `PromoBrandTest`، `PromoCoreTest`.
+  - PRM-09: `server/test/promo-core.test.js`، `PromoCoreTest`.
+  - PRM-11: `server/test/storefront-promo-groups.test.js`، `server/test/promo-redemptions.test.js`، `PromoChannelTest`.
+  - PRM-12: `PromoExpiryTest`، `PromoCoreTest`، `server/test/promo-core.test.js`.
+  - PRM-13: `LoyaltyCreditPaymentTest`، `server/test/loyalty-rule.test.js`، `server/test/loyalty-spend.test.js`.
+  - PRM-14: `GiftCardOpsTest`، `GiftCardOpsFlowTest`، `StoreCreditLifecycleTest`.
+  - PRM-15: `StoreCreditGrantTest`، `StoreCreditGrantFlowTest`، `StoreCreditLifecycleTest`.
+  - PRM-16: `PromoEffectTest`، `PromoFreshTest`، `CostVectorsTest`.
+  - PRM-17: `server/test/promo-core.test.js`، `PromoCoreTest`.
+  - PRM-18: `PromoAppliedUiTest`، `PromoLinesUiTest`.
+
+- **S149 — انبار (INV):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - INV-17: `ShrinkReportTest`، `ShrinkLossTest`.
+  - INV-20: `StockPlacesTest`، `StockPlacesLotsTest`، `StockPlacesOffTest`.
+  - INV-21: `RepackBomTest`، `RepackLotsTest`، `RepackBomOffTest`.
+
+- **S150 — خرید و تأمین‌کننده (PUR):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - PUR-01: `PurchaseBookTest`.
+  - PUR-03 (بخشی: پیشنهاد با فروش و زمانِ تأمین و «همهٔ کالاهای این تأمین‌کننده»؛ فصل و درجهٔ اطمینان تصمیمِ صاحب‌کار): `PurchaseOrderBookTest`، `PricingReorderTest`، `PoFormsTest`.
+  - PUR-05: `PurchaseBookTest`، `MoneyPagesModelTest`، `server/test/verify-data.test.js`.
+  - PUR-06: `server/test/purchase-orders.test.js`، `MoneyPagesModelTest`.
+  - PUR-07: `SupplierReturnTest`، `PurchaseBookTest`، `MoneyPagesModelTest`.
+  - PUR-09: `PricingReorderTest`، `PurchaseOrderBookTest`.
+  - PUR-10: `PricingReorderTest`، `PurchaseOrderBookTest`.
+  - PUR-14: `server/test/purchase-orders.test.js`، `PurchaseBillTest`، `SupplierBillRoutesUiTest`.
+
+- **S151 — مشتری و حساب قرض (CRM):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - CRM-01: `CartLineTest`، `CustomerEngineTest`، `DebtBookTest`.
+  - CRM-02: `CustomerCrmTest`، `CustomerProfileFormTest`، `CustomerFileV3Test`.
+  - CRM-04: `CustomerInsightTest`.
+  - CRM-05: `CustomerStatementTest`، `StatementLayoutTest`.
+  - CRM-06 (بخشی: قالب و زمان‌بندی و فرستادن با دست؛ فرستادنِ خودکار بیرونی است): `DebtReminderTest`، `ReminderTemplateTextTest`، `DebtReminderPrefDesktopTest`.
+  - CRM-07: `server/test/order-customer.test.js`، `CustomerOnlineOrdersTest`، `CustomerInvoiceOnlineTest`.
+  - CRM-08: `CrmPricingFormTest`، `PromoGroupTest`.
+  - CRM-09 (بخشی: نشانیِ حسابِ مشتری و پروندهٔ دکان؛ افزودن از برنامهٔ خریدِ بومی مانده): `server/test/store-address-extra.test.js`، `server/test/customer-contact.test.js`، `CustomerDeliveryAddressTest`.
+  - CRM-10 (بخشی: ادغامِ روی دفترِ دستگاه؛ راهِ سرورِ v3 مانده): `CustomerMergeTest`، `CrmMergeGateDiskTest`.
+  - CRM-11: `CustomerCrmTest`، `CustomerProfileFormTest`.
+  - CRM-12: `CrmPricingFormTest`، `CustomerCrmTest`.
+  - CRM-13: `server/test/store-account-history.test.js`، `server/test/loyalty-rule.test.js`، `server/test/web-store-account.mjs`.
+  - CRM-14: `CustomerInsightTest`، `ReportsModelTest`.
+  - CRM-15 (بخشی: مجوزِ شماره و سابقهٔ دیدن؛ ماسکِ نشانی و رسیدِ مشتری تصمیمِ صاحب‌کار): `ContactPrivacyTest`، `CustomerAccessLogTest`، `server/test/staff-perms.test.js`.
+  - CRM-16 (بخشی: کد و انتخابِ مشتری با کارت؛ چاپ و اسکنِ کارت روی دستگاهِ واقعی سنجیده نشده): `CustomerCardTest`، `CustomerCardsTest`.
+
+- **S152 — برگشت و تعویض (RET):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - RET-09: `ReturnPolicyTest`، `ReturnPolicyFlowTest`، `ReturnDecisionTest`.
+  - RET-11 (بخشی: برگشتِ سفارشِ اینترنتی در دکان با نقد یا اعتبار؛ بازپرداختِ آنلاین بیرونی است): `server/test/order-return-requests.test.js`، `OrderReturnRequestsTest`، `OrderRefundLedgerTest`.
+  - RET-13: `SalesEngineTest`.
+
+- **S153 — کارمندان و مجوزها (STF):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - STF-05: `IdleLockTest`.
+  - STF-06 (بخشی: محدودیت در سرور؛ رابطِ برنامه مانده): `server/test/staff-scope.test.js`، `server/test/catalog-transfer-steps-v3.test.js`، `server/test/shop-branches.test.js`.
+  - STF-07: `TimeClockTest`، `StaffReportTest`، `server/test/staff-time.test.js`.
+  - STF-08: `CommissionTest`، `StaffReportTest`، `server/test/staff-time.test.js`.
+  - STF-09: `AuditChainTest`، `AuditChainVectorsTest`، `AuditSealTest`.
+  - STF-11: `server/test/staff-code.test.js`، `server/test/staff-key-life.test.js`، `StaffCodeTest`.
+
 
 ## ۸. فازبندی و ترتیب اجرا
 
