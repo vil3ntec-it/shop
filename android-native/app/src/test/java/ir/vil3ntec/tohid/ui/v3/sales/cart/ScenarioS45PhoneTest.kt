@@ -115,6 +115,32 @@ class ScenarioS45PhoneTest {
     assertEquals(StrLine.priceDownBlocked, LineModel.check(none, typed, oi, os).edit.problem)
   }
 
+  @Test fun `با کارتنِ قیمت‌دار قاعدهٔ فقط پایین با قیمتِ همان کارتن سنجیده می‌شود`() {
+    //  تصمیمِ ۱۴۰۵/۰۸/۲۳ (#۲۱): پایه ۱۰۰، کارتنِ ۱۲ دانه‌ای ۹۶۰ (= ۸۰)، «فقط پایین» ⇒ ۹۵ برای کارتن تأیید می‌خواهد
+    val oil = Product(id = "oil", name = "روغن", unit = "دانه", salePrice = 100.0, packs = listOf(ProductPack("کارتن", 12_000, priceMinor = 96_000)))
+    val od = ShopData(products = listOf(oil))
+    val ol = SalesEngine.CartLine("oil", 12.0, unitPrice = 80.0)
+    val oi = LineModel.info(od, ol, units = true)
+    val os = LineModel.start(oi)
+    assertEquals("برگه با کارتن باز می‌شود", 1, os.unitAt)
+    val down = policy(dir = LinePricing.Direction.DOWN)
+    val up95 = os.copy(priceText = "95", priceTouched = true)
+    val c = LineModel.check(down, up95, oi, os, canAsk = true)
+    assertEquals(StrLine.priceUpBlocked, c.edit.problem)
+    assertEquals(LinePricing.PRICE_UP_BLOCKED, c.askCode)
+    val oc = listOf(ol)
+    assertSame("بی تأیید سبد دست نمی‌خورد", oc, LineModel.apply(oc, oi, up95, os, down))
+    //  زیرِ قیمتِ کارتن آزاد است؛ با دانه (واحدِ پایه) همان ۹۵ پایین آمدن از ۱۰۰ است
+    assertNull(LineModel.check(down, os.copy(priceText = "75", priceTouched = true), oi, os).edit.problem)
+    val piece = LineModel.switchTo(os, oi, 0).copy(priceText = "95", priceTouched = true)
+    assertNull(LineModel.check(down, piece, oi, os).edit.problem)
+    //  تأییدِ مدیر همان قیمت را می‌نشاند و سابقه «از ۸۰» می‌نویسد، نه «از ۱۰۰»
+    val g = LineModel.grantOf(LinePricing.PRICE_UP_BLOCKED, "مدیر", ShopRole.MANAGER, "کارتنِ آخر", "علی", oi, 95.0, up95)
+    assertEquals(8_000L, g.listMinor)
+    assertEquals(95.0, LineModel.apply(listOf(ol), oi, up95, os, down, g).single().unitPrice!!, 0.0)
+    assertEquals(80.0, LineModel.ruleList(up95, oi), 0.0)
+  }
+
   @Test fun `قلمِ آزاد سقف دارد هم در افزودن هم در ویرایش`() {
     val capped = policy(cap = 50_000L)
     val form = FreeLineForm("کیسه", "600", "1")

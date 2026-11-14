@@ -14,7 +14,10 @@
  * قاعده (خالص، `need`):
  *   • فقط **تغییر**: سقفِ ردیفِ موجودِ سرور (نبودن = بی سقف) ≠ سقفِ تازه. فیلدی که در op نیست (v1/v3) دست نمی‌خورد؛
  *     راهِ قدیم کلِ ردیف را جایگزین می‌کند، پس نبودنِ کلید همان «برداشتنِ سقف» است.
- *   • مشتریِ تازه نیست: مشتریِ بی سقف همان پیش‌فرضِ امروز است و سقفِ نخست فقط تنگ‌تر می‌کند. درجِ روی ردیفِ موجود ویرایش است.
+ *   • **مشتریِ تازه** (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۳ #۲۵، بستنِ دورزدن): همان سنجش با «پیشین» = سقفِ پیش‌فرضِ دکان
+ *     ([DEFAULT_MINOR]؛ دکان هنوز تنظیمی برایش ندارد ⇒ صفر). درجِ تازه بی فیلدِ سقف = بی سقف (بی‌نهایت). پس کارمندِ «ممنوع»
+ *     مشتریِ تازه را فقط با سقفِ صفر می‌سازد و سقفِ دیگر ⇒ همان رد و صندوقِ تعارض، که مدیر/صاحب آن‌جا «دوباره ثبت با تأییدِ
+ *     من» می‌زند (تأییدِ مدیرِ سنجیده در سرور). درجِ روی ردیفِ موجود ویرایش است؛ `update` ِ بی ردیف سنجیده نمی‌شود.
  *   • مبلغ = سقفِ تازه به Minor؛ برداشتنِ سقف یا عددِ نادرست ⇒ بی‌نهایت (بیش از هر `maxAmount`، بسته‌به‌خطا).
  *   • حالت و سقفِ `maxAmount` از لایه‌ها (نقش، نقشِ سفارشی، کاربر)؛ «نیازمند تأیید» ندارد ⇒ بیش از سقف = ممنوع.
  * صاحبِ دکان هرگز سنجیده نمی‌شود. نقش فقط از عضویتِ توکن (`ctx.role`)، هرگز از بدنه یا فیلدِ op.
@@ -27,6 +30,8 @@ const PERM = 'customers.credit_limit';
 const FLAG = 'shop.credit_limit_perm';
 const REASON = 'credit_limit_not_allowed';
 const INF = Number.MAX_SAFE_INTEGER;
+/** سقفِ پیش‌فرضِ مشتریِ تازه (Minor) — همان `CreditLimitPerm.NEW_DEFAULT_MINOR` ِ برنامه */
+const DEFAULT_MINOR = 0;
 const MAX_ROWS = 500;
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -61,14 +66,24 @@ const same = (a, b) => (a === null && b === null) || (Number.isFinite(a) && a ==
 
 /**
  * نیازِ یک نوشتن: `prev` = دادهٔ ردیفِ موجودِ سرور (یا null = مشتریِ تازه)، `next` = `limitOf` ِ همان op.
- * ⇒ null (تغییری در سقف نیست) یا `{perm, req:{amount}, amount, from, to}`
+ * مشتریِ تازه: «پیشین» = [DEFAULT_MINOR] و فیلدِ نبوده = بی سقف (درجِ تازه کلِ ردیف است).
+ * ⇒ null (تغییری در سقف نیست) یا `{perm, req:{amount}, amount, from, to, fresh}`
  */
 function need(prev, next, shape = 'v1') {
-  if (!next.present || !isObj(prev)) return null;
+  if (!isObj(prev)) return needNew(next);
+  if (!next.present) return null;
   const from = limitOf(prev, { shape }).limit;
   if (same(from, next.limit)) return null;
   const amount = next.limit === null || !Number.isSafeInteger(next.limit) || next.limit < 0 ? INF : next.limit;
   return { perm: PERM, req: { amount }, amount, from: Number.isFinite(from) ? from : null, to: Number.isFinite(next.limit) ? next.limit : null };
+}
+
+/** CRM-03 #۲۵ — مشتریِ تازه با سقفی جز پیش‌فرضِ دکان (بی سقف هم) ⇒ همان نیاز؛ سقفِ پیش‌فرض ⇒ null */
+function needNew(next) {
+  const to = next.present ? next.limit : null;
+  if (same(DEFAULT_MINOR, to)) return null;
+  const amount = to === null || !Number.isSafeInteger(to) || to < 0 ? INF : to;
+  return { perm: PERM, req: { amount }, amount, from: DEFAULT_MINOR, to: Number.isFinite(to) ? to : null, fresh: true };
 }
 
 /** داوری با لایه‌ها ⇒ null یا ردِ `{reason, box, detail}` */
@@ -79,20 +94,25 @@ function decide(ctx, layers, n, path) {
     reason: REASON, box: 'perm_denied',
     detail: {
       perm: PERM, decision: 'deny', reason_core: d.reason, reason: REASON, requester: ctx.userId || '', role: ctx.role || '',
-      amount: n.to, from: n.from, ...(d.cap ? { cap: d.cap, limit: d.limit } : {}), path,
+      amount: n.to, from: n.from, ...(d.cap ? { cap: d.cap, limit: d.limit } : {}), ...(n.fresh ? { fresh: true } : {}), path,
     },
   };
 }
 
 // ---------- v3 ----------
 
-/** `sync-v3-apply.authorize`: op ِ `debtors` ِ سقف‌دار روی مشتریِ موجود ⇒ null یا رد (با صندوق) */
+/**
+ * `sync-v3-apply.authorize`: op ِ `debtors` ِ سقف‌دار روی مشتریِ موجود، یا درجِ مشتریِ تازه (#۲۵) ⇒ null یا رد (با صندوق).
+ * ردیفِ حذف‌شده با داده هم «موجود» است (درج روی آن برگرداندن است)؛ ردیفِ بی داده ⇒ درج همان مشتریِ تازه.
+ */
 async function judgeV3(c, ctx, op, row, { origin = 'v3' } = {}) {
   if (!isObj(op) || op.table !== 'debtors' || (op.kind !== 'insert' && op.kind !== 'update')) return null;
   const next = limitOf(op.fields, { shape: 'v3' });
-  if (!next.present || !row || !isObj(row.data)) return null;
+  const prev = row && isObj(row.data) ? row.data : null;
+  const fresh = op.kind === 'insert' && !prev;
+  if (!fresh && (!next.present || !prev)) return null;
   if (!(await on(ctx, (s, p) => c.query(s, p)))) return null;
-  const n = need(row.data, next, 'v3');
+  const n = need(prev, next, 'v3');
   if (!n) return null;
   const layers = await require('./staff-approval').requesterLayers(ctx, c);
   return decide(ctx, layers, n, origin);
@@ -107,16 +127,18 @@ async function judgeV3(c, ctx, op, row, { origin = 'v3' } = {}) {
  */
 async function v1(ctx, valid, rejected, deviceId = '') {
   if (!ctx || ctx.role === 'owner' || !Array.isArray(valid)) return 0;
+  //  #۲۵: درجِ بی فیلدِ سقف هم نامزد است (اگر مشتریِ تازه باشد = بی سقف)
   const cands = valid.filter((x) => !rejected.has(x.i) && isObj(x.op) && x.op.table === 'debtors'
-    && (x.op.type === 'insert' || x.op.type === 'update') && limitOf(x.op.fields).present).slice(0, MAX_ROWS);
+    && (x.op.type === 'insert' || (x.op.type === 'update' && limitOf(x.op.fields).present))).slice(0, MAX_ROWS);
   if (!cands.length || !(await on(ctx))) return 0;
   const { many } = require('../db');
   const seen = await require('./staff-role-v1').seenOps(cands);
   const live = cands.filter((x) => !seen.has(String(x.op.op_id)));
   if (!live.length) return 0;
+  //  ردیفِ حذف‌شده هم «موجود» است (درج روی آن برگرداندن است، نه مشتریِ تازه) — همان v3
   const rows = new Map((await many(
     `SELECT row_id, data FROM sync_rows WHERE app=$1 AND account_kind=$1 AND account_id=$2 AND table_name='debtors'
-        AND row_id = ANY($3::text[]) AND deleted_at IS NULL`,
+        AND row_id = ANY($3::text[])`,
     ['shop', ctx.accountId, [...new Set(live.map((x) => String(x.op.row_id)))]]
   )).map((r) => [r.row_id, r.data]));
   const layers = await require('./staff-perms').layersFor(ctx.accountId, ctx.role, ctx.userId);
@@ -128,7 +150,8 @@ async function v1(ctx, valid, rejected, deviceId = '') {
   for (const x of live) {
     const id = String(x.op.row_id);
     const prev = after.get(id);
-    const need1 = need(prev || null, limitOf(x.op.fields));
+    //  `update` ِ بی ردیف چیزی برای سنجیدن ندارد (همان امروز)؛ درجِ بی ردیف مشتریِ تازه است
+    const need1 = !prev && x.op.type !== 'insert' ? null : need(prev || null, limitOf(x.op.fields));
     const out = need1 ? decide(ctx, layers, need1, 'v1') : null;
     if (!out) {
       after.set(id, { ...(isObj(prev) ? prev : {}), ...x.op.fields });
@@ -152,13 +175,13 @@ async function legacyLayers({ shopId, role, userId }, changes) {
 }
 
 /**
- * درونِ حلقهٔ `sync.pushChanges`: ردیفِ کاملِ مشتری روی ردیفِ موجود (حذف‌نشده) که سقف را عوض کند ⇒ خطای ۴۰۳ (کلِ دسته
- * برمی‌گردد)، وگرنه null
+ * درونِ حلقهٔ `sync.pushChanges`: ردیفِ کاملِ مشتری روی ردیفِ موجود که سقف را عوض کند، یا مشتریِ تازه با سقفی جز پیش‌فرض
+ * (#۲۵؛ ردیفِ کاملِ بی کلید = بی سقف) ⇒ خطای ۴۰۳ (کلِ دسته برمی‌گردد)، وگرنه null. ردیفِ حذف‌شده هم «موجود» است.
  */
 function judgeLegacy(role, rowId, data, existing, layers) {
-  if (!layers || !isObj(data) || !existing || existing.deleted) return null;
-  const was = typeof existing.data === 'string' ? JSON.parse(existing.data) : existing.data;
-  const n = need(was, limitOf(data, { full: true }));
+  if (!layers || !isObj(data)) return null;
+  const was = existing ? (typeof existing.data === 'string' ? JSON.parse(existing.data) : existing.data) : null;
+  const n = need(isObj(was) ? was : null, limitOf(data, { full: true }));
   if (!n) return null;
   const out = decide({ role }, layers, n, 'legacy');
   if (!out) return null;
@@ -166,4 +189,4 @@ function judgeLegacy(role, rowId, data, existing, layers) {
   return forbidden(`تغییرِ سقفِ اعتبارِ مشتری در حدِ نقشِ شما نیست (debtors/${rowId})`, REASON);
 }
 
-module.exports = { PERM, FLAG, REASON, on, limitOf, need, decide, judgeV3, v1, legacyLayers, judgeLegacy };
+module.exports = { PERM, FLAG, REASON, DEFAULT_MINOR, on, limitOf, need, needNew, decide, judgeV3, v1, legacyLayers, judgeLegacy };

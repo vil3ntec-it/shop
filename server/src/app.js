@@ -32,6 +32,8 @@ async function createApp({ runMigrations = true } = {}) {
     await require('./lib/sync-epoch').rotate('boot')
       .catch(err => console.error('[sync-epoch] دورانِ تازه ساخته نشد:', err.message));
   }
+  //  SEC-10 (#۱۵): پس از جایگزینیِ دیتابیس از پشتیبانِ کهنه، مشتری‌های پاک‌شده دوباره پاک می‌شوند (`customer-erasure.replay`)
+  await require('./lib/customer-erasure').replay({ log: (m) => console.error(m) }).catch(err => console.error('[customer-erasure]', err.message));
   //  سرور فقط رلهٔ پیام است: پیام و رسانهٔ کهنه‌تر از CHAT_RELAY_DAYS می‌رود
   await require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
   //  شناسهٔ پایدارِ این سرور — در نخستین راه‌اندازی ساخته می‌شود (`lib/server-identity.js`)

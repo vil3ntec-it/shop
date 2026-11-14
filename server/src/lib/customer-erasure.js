@@ -48,8 +48,18 @@
  *    را لازم دارند. ⛔ برگشت‌ناپذیر: هیچ نسخه‌ای از دادهٔ پاک‌شده جایی نوشته نمی‌شود. ⛔ تکرارپذیر:
  *    بارِ دوم چیزی برای پاک کردن نمی‌یابد (همهٔ شمارش‌ها صفر) و هیچ ردیفی را عوض نمی‌کند.
  * سابقه (`audit_logs`): فقط شناسهٔ حذف، روش و شمارش‌ها — نه شماره، نه نام، نه شناسهٔ سفارش.
+ *
+ * ── پس از بازگردانیِ کلِ سرور (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۳ #۱۵: «بله، خودکار») ──────────────────────────────
+ * هر حذف پیش از commit یک خط در دفترِ بیرون از دیتابیس می‌نویسد (`lib/erasure-ledger.js`: فقط شناسه، دکان، زمان و HMAC ِ
+ * شماره). [replay] — پس از `backup.restore` (`afterRestore`) و در هر بالا آمدنِ سرور (`app.js`، برای پوشهٔ PGlite ِ
+ * جایگزین‌شده) — هر خطی را که سابقه‌اش (`audit_logs`، `target_type = customer_erasure`، همان شناسه) در **این** دیتابیس
+ * نیست دوباره اجرا می‌کند: شمارهٔ هم‌کلید در جدول‌های همان دکان پیدا و با همان `erase` (بی سنجشِ «سفارشِ باز»، که در
+ * پشتیبانِ کهنه کهنه است) پاک می‌شود، و سابقه با **همان** شناسه نوشته می‌شود. چرا امن: سابقه و حذف در یک تراکنش‌اند، پس
+ * «سابقه هست» یعنی حذف در همین داده نشسته است؛ و بازپخش همیشه سابقه را می‌نویسد (حتی وقتی چیزی برای پاک کردن نیافت)، پس
+ * سفارشِ تازهٔ همان مشتری پس از حذف (یا پس از بازگردانی) هرگز دوباره پاک نمی‌شود.
  */
 const { tx, one, newId, now } = require('../db');
+const ledger = require('./erasure-ledger');
 const audit = require('./audit');
 const access = require('./customer-access');
 const imgStore = require('./image-store');
@@ -153,7 +163,7 @@ async function resolveTarget(c, shopId, input) {
   if (forms.length && !b.customerId) {
     customerIds = ids((await c.query('SELECT id FROM store_customers WHERE phone = ANY($1::text[])', [forms])).rows);
   }
-  return { forms, orderOnly, customerIds, mode: b.customerId ? 'account' : mode };
+  return { phone, forms, orderOnly, customerIds, mode: b.customerId ? 'account' : mode };
 }
 
 class DryRun extends Error {
@@ -165,15 +175,18 @@ class DryRun extends Error {
  * چیزی‌اند که اجرای واقعی می‌کند، و هیچ چیزی نوشته نمی‌شود (سابقه هم نه).
  * @param {string} shopId
  * @param {{phone?, orderId?, customerId?}} target
- * @param {{dryRun?: boolean, by: 'owner'|'customer', userId?: string, ip?: string}} opts
+ * @param {{dryRun?: boolean, by: 'owner'|'customer'|'replay', userId?: string, ip?: string}} opts
+ *   `by: 'replay'` فقط از [replay]: `erasureId` ِ همان خطِ دفتر، `run` تراکنشِ دیتابیسِ بازگردانده، بی سنجشِ «سفارشِ باز» و
+ *   بی خطِ دفترِ تازه.
  */
-async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' } = {}) {
-  const erasureId = newId('era');
+async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '', erasureId: givenId = '', run = tx } = {}) {
+  const replaying = by === 'replay';
+  const erasureId = replaying && givenId ? givenId : newId('era');
   const placeholder = ERASED_PREFIX + erasureId;
   //  شیءهای عکس‌های پاک‌شده (انبارِ عکس، `lib/image-store.js`) فقط پس از نشستنِ تراکنش پاک می‌شوند
   const gone = [];
   try {
-    const res = await tx(async (c) => {
+    const res = await run(async (c) => {
       const t = await resolveTarget(c, shopId, target);
       const orders = (await c.query(
         `SELECT id, status FROM online_orders
@@ -182,7 +195,8 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
         [shopId, t.forms, t.orderOnly]
       )).rows;
       const open = orders.filter((o) => !settled(o.status)).length;
-      if (open && !dryRun) {
+      //  بازپخش: «باز» ِ پشتیبانِ کهنه کهنه است — حذفِ اصلی فقط پس از پایانِ همهٔ سفارش‌ها پذیرفته شده بود
+      if (open && !dryRun && !replaying) {
         const e = conflict(`${open} سفارشِ بازِ این مشتری هنوز تمام نشده است؛ پس از پایانشان دوباره بخواهید`, 'open_orders');
         e.data = { openOrders: open };
         throw e;
@@ -317,16 +331,22 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
       const total = COUNT_KEYS.reduce((s, k) => s + counts[k], 0);
       const out = { dryRun: Boolean(dryRun), mode: t.mode, openOrders: open, counts, total, kept: KEPT };
       if (dryRun) throw new DryRun(out);
+      //  دفترِ بیرون از دیتابیس پیش از commit (شکست ⇒ throw ⇒ هیچ حذفی بی خطِ دفتر) — بازپخش خطِ خودش را دارد
+      if (!replaying) {
+        ledger.append({ id: erasureId, shop: shopId, at, phone: t.phone, orders: t.phone ? [] : t.orderOnly,
+          customer: t.mode === 'account' ? t.customerIds[0] || '' : '' });
+      }
       //  سابقه در همان تراکنش؛ ⛔ بی شماره، نام، نشانی یا شناسهٔ سفارش/حساب — فقط شمارش‌ها
       await audit.logIn(c, {
-        shopId, actorType: by === 'customer' ? 'customer' : 'user', userId: by === 'customer' ? '' : userId,
+        shopId, actorType: by === 'customer' ? 'customer' : replaying ? 'system' : 'user', userId: by === 'customer' || replaying ? '' : userId,
         action: by === 'customer' ? 'store_customer.erased' : 'shop.customer_erased',
         targetType: 'customer_erasure', targetId: erasureId,
-        detail: { by, mode: t.mode, counts, total }, ip: by === 'customer' ? '' : ip,
+        detail: { by, mode: t.mode, counts, total }, ip: by === 'customer' || replaying ? '' : ip,
       });
       return { ...out, erasureId };
     });
-    await imgStore.drop(imgStore.shopTenant(shopId), gone);
+    //  بازپخش روی دیتابیسی جز دیتابیسِ زنده (تمرینِ بازیابی): انبارِ عکسِ زنده دست نمی‌خورد
+    if (run === tx) await imgStore.drop(imgStore.shopTenant(shopId), gone);
     return res;
   } catch (err) {
     if (err instanceof DryRun) return err.out;
@@ -334,4 +354,73 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
   }
 }
 
-module.exports = { FLAG, KEPT, COUNT_KEYS, ERASED_PREFIX, flagOn, flagOnSlug, erase, scrub, settled };
+/* ───────────── بازپخش پس از بازگردانی (تصمیمِ ۱۴۰۵/۰۸/۲۳ #۱۵) ───────────── */
+
+/** شماره‌های زندهٔ (پاک‌نشدهٔ) دکان در این دیتابیس — هر جا `erase` با شماره پیدا می‌کند */
+async function phonesOf(c, shopId, customer) {
+  const out = new Set();
+  const add = (rows, k) => rows.forEach((r) => { const p = r[k]; if (p && !String(p).startsWith(ERASED_PREFIX)) out.add(String(p)); });
+  add((await c.query("SELECT DISTINCT customer_phone FROM online_orders WHERE shop_id=$1 AND customer_phone <> ''", [shopId])).rows, 'customer_phone');
+  add((await c.query("SELECT DISTINCT customer_phone FROM shop_chat_conversations WHERE shop_id=$1 AND customer_phone <> ''", [shopId])).rows, 'customer_phone');
+  add((await c.query('SELECT DISTINCT phone FROM storefront_area_requests WHERE shop_id=$1', [shopId])).rows, 'phone');
+  for (const t of ['storefront_alerts', 'store_alert_push']) {
+    if (await has(c, t)) add((await c.query(`SELECT DISTINCT phone FROM ${t} WHERE shop_id=$1`, [shopId])).rows, 'phone');
+  }
+  if (customer) add((await c.query('SELECT phone FROM store_customers WHERE id=$1', [customer])).rows, 'phone');
+  return [...out];
+}
+
+/** هدفِ یک خطِ دفتر در این دیتابیس: شمارهٔ هم‌کلید، وگرنه سفارش‌های بی شماره؛ هیچ ⇒ null */
+async function targetOf(c, e) {
+  if (e.key) {
+    const phone = (await phonesOf(c, e.shop, e.customer)).find((p) => ledger.keyOf(p) === e.key);
+    if (phone) return e.customer ? { phone, customerId: e.customer } : { phone };
+  }
+  for (const id of e.orders) {
+    if ((await c.query('SELECT 1 FROM online_orders WHERE shop_id=$1 AND id=$2', [e.shop, id])).rows.length) return { orderId: id };
+  }
+  return null;
+}
+
+/**
+ * هر حذفِ دفتر که سابقه‌اش در این دیتابیس نیست ⇒ دوباره، با همان شناسه. بی‌خطرِ تکرار: بارِ دوم هیچ.
+ * @param {{run?: Function, log?: Function}} o  `run` = تراکنش روی دیتابیسِ هدف (پیش‌فرض: زنده)
+ * @returns {Promise<{entries:number, bad:number, replayed:number, empty:number, failed:number}>}
+ */
+async function replay({ run = tx, log = () => {} } = {}) {
+  const { entries, bad } = await ledger.read();
+  const out = { entries: entries.length, bad, replayed: 0, empty: 0, failed: 0 };
+  if (!entries.length) return out;
+  const applied = new Set(await run(async (c) => (await c.query(
+    "SELECT target_id FROM audit_logs WHERE target_type = 'customer_erasure' AND target_id = ANY($1::text[])",
+    [entries.map((e) => e.id)]
+  )).rows.map((r) => r.target_id)));
+  for (const e of entries) {
+    if (applied.has(e.id)) continue;
+    try {
+      const shop = await run(async (c) => (await c.query('SELECT 1 FROM shops WHERE id=$1', [e.shop])).rows.length > 0);
+      if (!shop) continue;   //  دکان در این پشتیبان نیست (پیش از ساختنش) ⇒ چیزی برای پاک کردن نیست؛ بعداً که بیاید دوباره دیده می‌شود
+      const target = await run((c) => targetOf(c, e));
+      if (target) {
+        await erase(e.shop, target, { by: 'replay', erasureId: e.id, run });
+        out.replayed++;
+      } else {
+        //  دادهٔ این مشتری در این پشتیبان نیست؛ سابقه با همان شناسه تا سفارشِ تازهٔ بعدیِ او هرگز بازپخش نشود
+        await run((c) => audit.logIn(c, {
+          shopId: e.shop, actorType: 'system', action: 'shop.customer_erased', targetType: 'customer_erasure', targetId: e.id,
+          detail: { by: 'replay', mode: 'none', counts: Object.fromEntries(COUNT_KEYS.map((k) => [k, 0])), total: 0 },
+        }));
+        out.empty++;
+      }
+    } catch (err) {
+      out.failed++;
+      log(`[customer-erasure] بازپخشِ ${e.id} نشد: ${String((err && err.message) || err).slice(0, 200)}`);
+    }
+  }
+  if (run === tx && (out.replayed || out.empty || out.failed)) {
+    await require('./audit').log({ actorType: 'system', action: 'customer_erasure.replayed', detail: { ...out } }).catch(() => {});
+  }
+  return out;
+}
+
+module.exports = { FLAG, KEPT, COUNT_KEYS, ERASED_PREFIX, flagOn, flagOnSlug, erase, replay, scrub, settled };

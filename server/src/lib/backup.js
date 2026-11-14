@@ -573,6 +573,12 @@ async function unsealRestored(out, databaseUrl) {
  * از «cursor جلوتر از سرِ دفترِ سرور» برگشتن را می‌فهمند.
  */
 async function afterRestore(out, databaseUrl, { rotate = (r) => require('./sync-epoch').rotate(r) } = {}) {
+  //  SEC-10 (تصمیمِ ۱۴۰۵/۰۸/۲۳ #۱۵): مشتری‌هایی که پس از این پشتیبان پاک شده بودند دوباره پاک می‌شوند (دفترِ بیرون از
+  //  دیتابیس، `lib/customer-erasure.replay`). شکستش بازیابی را «شکست‌خورده» نمی‌کند؛ بالا آمدنِ بعدیِ سرور دوباره می‌کوشد.
+  if (databaseUrl === config.db.url) {
+    out = { ...out, erasures: await require('./customer-erasure').replay({ log: (m) => console.error(m) })
+      .catch((e) => ({ error: String((e && e.message) || e).slice(0, 200) })) };
+  }
   if (databaseUrl !== config.db.url || !config.syncEpoch.enabled) return { ...out, epoch: false };
   try {
     const e = await rotate('restore');
