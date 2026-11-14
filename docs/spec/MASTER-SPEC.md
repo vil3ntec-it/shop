@@ -2217,6 +2217,70 @@ web/           اپ وب فعلی (index.html و license/*.js)، با انتقا
   - WEB-23: `server/test/storefront-privacy.test.js`.
   - WEB-24: `server/test/storefront-extras.test.js`، `StorefrontBannersTest`، `StorefrontBannersUiTest`.
 
+- **S158 — سبد و ثبت سفارش (CHK):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - CHK-03 (بخشی: سبدِ حساب روی سرور و دستگاه؛ کدِ ورودِ واقعی بیرونی است): `server/test/storefront-cart.test.js`، `server/test/storefront-web-account.test.js`، `ShopperCartSyncTest`.
+  - CHK-04: `server/test/web-store.mjs`، `server/test/web-store-zones.mjs`.
+  - CHK-05: `server/test/web-store-zones.mjs`، `server/test/storefront-v2.test.js`.
+  - CHK-06: `server/test/storefront-delivery-fees.test.js`.
+  - CHK-07: `server/test/storefront-delivery-fees.test.js`، `server/test/storefront-v2.test.js`، `server/test/web-store-zones.mjs`.
+  - CHK-09: `server/test/storefront-v2.test.js`، `server/test/storefront-web-account.test.js`، `server/test/web-store-acct.mjs`.
+  - CHK-11: `server/test/storefront-audit.test.js`، `server/test/web-store-audit.mjs`.
+  - CHK-12: `server/test/storefront-v2.test.js`.
+  - CHK-13 (بخشی: نقد هنگامِ تحویل؛ حساب‌پی بیرونی است): `server/test/web-store-lines.mjs`، `server/test/order-flow.test.js`.
+  - CHK-14: `server/test/cash-tender-vectors.test.js`، `server/test/order-delivery-prefs.test.js`، `OrderDeliveryPrefsWireTest`.
+  - CHK-15: `server/test/order-substitution.test.js`، `OrderSubstitutionTest`، `server/test/web-store-lines.mjs`.
+  - CHK-16: `server/test/order-substitution.test.js`، `server/test/web-store-lines.mjs`.
+  - CHK-18 (بخشی: ساخته؛ دیدن روی گوشیِ واقعی مانده): `server/test/stock-reserve.test.js`، `server/test/catalog-stock.test.js`، `server/test/e2e/stock.e2e.mjs`.
+  - CHK-19: `server/test/online-orders.test.js`، `server/test/storefront.test.js`، `server/test/web-store-checkout-rows.mjs`.
+  - CHK-20 (بخشی: صفحهٔ تأیید و پوشِ خودِ سرور؛ پیامِ بیرونی بیرونی است): `server/test/web-store-zones.mjs`، `server/test/store-push.test.js`.
+  - CHK-22: `server/test/storefront.test.js`.
+  - CHK-23: `server/test/web-store-checkout-rows.mjs`.
+  - CHK-24: `server/test/order-delivery-prefs.test.js`، `DeliveryPrefsTest`.
+
+- **S159 — دریافت سفارش در فروشگاه (ORD):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - ORD-03: `OrderDeskTest`، `OrderAlertsTest`، `OrderDeskV3Test`.
+  - ORD-04: `server/test/order-desk.test.js`، `OrderDeskTest`.
+  - ORD-05: `server/test/order-timeout.test.js`، `server/test/e2e/lifecycle.e2e.mjs`.
+  - ORD-06: `server/test/order-states.test.js`، `server/test/online-orders.test.js`.
+  - ORD-07: `server/test/order-delay.test.js`، `OrderDelayTest`.
+  - ORD-11: `server/test/online-orders.test.js`.
+  - ORD-12: `server/test/order-states.test.js`، `server/test/online-orders.test.js`.
+  - ORD-14: `OrderAmendTest`، `server/test/order-amend.test.js`، `server/test/web-store-changes.mjs`.
+  - ORD-15 (بخشی: بازپرداختِ بخشی از دکان؛ ردِ قلم با دستِ پیک مانده): `server/test/order-refund-manual-method.test.js`، `OrderRefundModelTest`.
+  - ORD-16 (بخشی: خطِ زمانی و فرستادنِ دوباره؛ مشتریِ بی پوش بیرونی است): `server/test/order-notice-resend.test.js`، `OrderNoticesTest`، `server/test/store-push.test.js`.
+  - ORD-17: `server/test/online-orders.test.js`، `server/test/e2e/order.e2e.mjs`.
+  - ORD-18: `server/test/order-start-alert.test.js`، `OrderAlertsTest`.
+  - ORD-19: `server/test/order-bulk.test.js`، `OrderBulkTest`.
+  - ORD-20 (بخشی: ساخته؛ دیدن روی گوشیِ اندروید مانده): `server/test/stock-reserve.test.js`، `OnlineOrderLedgerTest`.
+  - ORD-21: `server/test/storefront.test.js`.
+
+- **S160 — جمع‌آوری و بسته‌بندی (PCK):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - PCK-01: `server/test/pick-core.test.js`، `server/test/order-picking.test.js`.
+  - PCK-04: `server/test/order-picking.test.js`، `server/test/pick-core.test.js`، `PickSheetToolsTest`.
+  - PCK-08: `server/test/pick-photos.test.js`.
+  - PCK-09: `server/test/order-picking.test.js`، `PickSheetToolsTest`.
+  - PCK-10: `server/test/pick-shelf.test.js`، `PickDeskVectorsTest`.
+  - PCK-12: `server/test/pick-shelf.test.js`، `PickDeskVectorsTest`.
+  - PCK-13: `server/test/order-picking.test.js`، `server/test/pick-core.test.js`، `PickDeskReviewTest`.
+  - PCK-14: `server/test/order-picking.test.js`، `PickDeskReviewTest`، `PickingWireTest`.
+
+- **S161 — تحویل و پیک (DLV):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - DLV-01 (بخشی: برنامهٔ پیک با ورودِ کدِ شاگرد و توکنِ محدود؛ نسخهٔ وبِ پشتیبان مانده): `server/test/courier-scope.test.js`، `server/test/e2e/courier.e2e.mjs`.
+  - DLV-02: `server/test/delivery-address.test.js`، `server/test/courier-call.test.js`، `CourierCallV3Test`.
+  - DLV-03 (بخشی: دستی و خودکار با سقفِ کارِ هم‌زمان؛ «نزدیک‌ترین پیک» تصمیمِ صاحب‌کار): `server/test/delivery-live-cap.test.js`، `AutoAssignTest`، `AutoAssignLiveCapTest`.
+  - DLV-04: `server/test/courier-route.test.js`، `RoutePlanVectorsTest`، `CourierUiLogicTest`.
+  - DLV-05: `server/test/courier-map.test.js`، `CourierWireTest`.
+  - DLV-06: `server/test/e2e/track.e2e.mjs`، `CourierEtaTest`، `CourierEtaRepositoryTest`.
+  - DLV-07: `server/test/courier-checks.test.js`، `CourierQueueChecksTest`، `CourierWireTest`.
+  - DLV-10: `CourierQueueTest`، `CourierCodecTest`، `CourierSealTest`.
+  - DLV-13: `server/test/delivery.test.js`، `CourierCashTest`، `DeliveryModelTest`.
+  - DLV-14: `server/test/storefront-v2.test.js`، `server/test/storefront-eta.test.js`، `StorefrontDeliveryTest`.
+  - DLV-16: `server/test/courier-map.test.js`، `server/test/e2e/courier.e2e.mjs`، `LiveTrackTest`.
+  - DLV-17: `server/test/courier-checks.test.js`، `CourierWireTest`، `CourierCodecTest`.
+  - DLV-18: `server/test/delivery-ratings.test.js`، `DeliveryRatingVectorsTest`، `DeliveryWireTest`.
+  - DLV-19: `server/test/delivery-desk.test.js`، `InvoiceCheckTest`.
+  - DLV-20: `CourierNoCountdownTest`.
+
 
 ## ۸. فازبندی و ترتیب اجرا
 
