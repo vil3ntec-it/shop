@@ -198,6 +198,7 @@ const KNOWN = Object.freeze([
   //  ── همگام‌سازیِ دکان (پمپ هیچ‌کدام را نمی‌خواند)
   { key: 'shop.sync.doc_roles', scope: 'shop', default: false, what: 'داوریِ نقشِ سندهای سابقه‌سوار (کارتِ هدیه، امتیاز، امانی…) در Sync v3' },
   { key: 'shop.sync_v3_to_v1', scope: 'shop', default: false, what: 'پلِ v3 ⇒ v1 برای دکانی که دستگاهِ کهنه و تازه با هم دارد' },
+  { key: 'shop.sync_v3_inbox', scope: 'shop', default: false, what: 'صندوقِ تعارضِ v3 در برنامه (SYN-07، S28): دیدنِ دو سو، نگه داشتن/برگرداندن/ادغامِ فیلدبه‌فیلد و صفِ بی‌اینترنت؛ با `SYNC_V3_ENABLED` و Sync v3 ِ دستگاه' },
   { key: 'sync.cursor_from_since', scope: 'shop', default: false, what: 'cursor ِ دستگاهِ Sync v1 = آنچه دستگاه تأیید کرد، نه آنچه سرور فرستاد (#481)' },
   { key: 'sync.safe_entries', scope: 'shop', default: false, what: 'گاوصندوق (PAY-18): پلهٔ ۴ ِ schema و جدولِ `safeEntries` در Sync v1/v3' },
   { key: 'sync.keep_pending', scope: 'shop', default: false, what: 'pull ِ Sync v1 می‌گوید تغییرِ محلیِ در صف با opِ رسیده بازنویسی نشود (`KeepPending`)' },

@@ -10,7 +10,7 @@
  *   GET  /api/sync/v3/status                نقطهٔ وضعیت (SYN-08) و دستگاه‌ها (SYN-10)
  *   POST /api/sync/v3/report                تعدادِ منتظر، خطای آخر، اختلافِ ساعت
  *   GET  /api/sync/v3/conflicts             صندوقِ تعارض و وظیفه‌ها (SYN-07)
- *   POST /api/sync/v3/conflicts/:id/resolve keep | revert
+ *   POST /api/sync/v3/conflicts/:id/resolve keep | revert (| merge با پرچمِ `shop.sync_v3_inbox`)
  *
  * ⛔ تا `SYNC_V3_ENABLED` روشن نشود، **همه** همان ۴۰۴ِ سرورِ قدیمی‌اند —
  *    برنامه‌ای که امتحان می‌کند فرقی میانِ «سرورِ قدیمی» و «خاموش» نمی‌بیند.
@@ -45,6 +45,7 @@ const creditReview = require('../lib/credit-limit-review');
 const tillOpUser = require('../lib/till-op-user');
 const branches = require('../lib/branches');
 const branchCatalog = require('../lib/branch-catalog');
+const v3inbox = require('../lib/sync-v3-inbox');
 
 const gzip = promisify(zlib.gzip);
 const router = express.Router();
@@ -216,17 +217,21 @@ router.get('/conflicts', async (req, res, next) => {
     const conflicts = await sync.listConflicts(ctxOf(req), {
       status: req.query?.status === 'all' ? 'all' : 'open', limit: Number(req.query?.limit || 100),
     });
+    //  SYN-07: پرچمِ `shop.sync_v3_inbox` ⇒ کلیدِ `inbox` (صفحهٔ برنامه)؛ خاموش ⇒ پاسخ همان امروز (`lib/sync-v3-inbox.js`)
+    const inbox = await v3inbox.enabled(req.sync) ? { inbox: v3inbox.hint() } : {};
     res.json({
       ok: true, server_time: Date.now(),
       conflicts: contact.touches(conflicts) && await contact.hiddenForReq(req) ? conflicts.map(contact.maskConflict) : conflicts,
+      ...inbox,
     });
   } catch (err) { next(err); }
 });
 
 router.post('/conflicts/:id/resolve', requireSyncWrite, async (req, res, next) => {
   try {
+    const on = await v3inbox.enabled(req.sync);
     const out = await sync.resolveConflict(ctxOf(req), req.params.id, String(req.body?.action || ''), {
-      userId: req.sync.userId,
+      userId: req.sync.userId, inbox: on, fields: on ? req.body?.fields : null,
     });
     res.json({ ok: true, ...out, server_time: Date.now() });
   } catch (err) { next(err); }

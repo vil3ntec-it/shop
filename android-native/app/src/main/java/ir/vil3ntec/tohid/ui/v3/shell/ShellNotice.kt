@@ -29,6 +29,8 @@ fun ShellNotice() {
     ApprovalInboxNotice()
     //  «N سندِ ردشده منتظرِ تصمیمِ شماست» — فقط صاحب/مدیر و فقط با سندِ باز در صندوقِ سرور (همهٔ صفحه‌ها)
     ConflictInboxNotice()
+    //  SYN-07/S28: «N تعارضِ همگام‌سازی…» — فقط Sync v3 ِ همین دستگاه، صاحب/مدیر و پرچمِ روشنِ `shop.sync_v3_inbox`
+    V3InboxNotice()
     //  O-09: صاحبِ دکانِ بیرون از سقفِ دستگاه — هشدار و راهِ برداشتن، در همهٔ صفحه‌ها (صندوق هم)
     DeviceCapNotice()
     ClockSkewNotice()

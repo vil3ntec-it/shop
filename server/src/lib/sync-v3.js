@@ -37,6 +37,7 @@ const batch = require('./sync-v3-batch');
 const { validate, merge, normPhone, isPlainObject } = require('./sync-v3-merge');
 const { SERVER_DEVICE, clock, ready, resetClock, applyOne, applyServerOp } = require('./sync-v3-apply');
 const { BRIDGE_BATCH, importV1, openToV1, drainToV1 } = require('./sync-v3-bridge');
+const v3inbox = require('./sync-v3-inbox');
 
 const PROTOCOL = 3;
 const MAX_OPS = 500;
@@ -458,9 +459,13 @@ function revertOp(cf, stamp) {
   return { ...base, kind: 'update', fields: { [cf.field]: cf.loser_value } };
 }
 
-async function resolveConflict(ctx, id, action, { userId = '' } = {}) {
+/**
+ *  `inbox` = پرچمِ `shop.sync_v3_inbox` ِ همین دکان (`sync-v3-inbox.js`): خاموش ⇒ همان سه کار و همان ۴۰۹؛ روشن ⇒ `merge`
+ *  با `fields` و تکرارِ همان تصمیمِ همان کاربر ⇒ `duplicate` (بی op ِ دوم).
+ */
+async function resolveConflict(ctx, id, action, { userId = '', inbox = false, fields = null } = {}) {
   requireShop(ctx);
-  if (!['keep', 'revert', 'dismiss'].includes(action)) throw badRequest('کار باید keep یا revert باشد', 'bad_action');
+  if (!v3inbox.actions(inbox).includes(action)) throw badRequest('کار باید keep یا revert باشد', 'bad_action');
   if (!can(ctx.role, RESOLVE_PERMISSION)) throw forbidden('فقط مالک یا مدیر تعارض را می‌بندد', 'resolve_not_allowed');
   await ready();
   const t = now();
@@ -471,19 +476,27 @@ async function resolveConflict(ctx, id, action, { userId = '' } = {}) {
       `SELECT * FROM sync_v3_conflicts WHERE ${ACC} AND id=$4 FOR UPDATE`, [...acc(ctx), String(id || '')]
     )).rows[0];
     if (!cf) throw notFound('این مورد پیدا نشد', 'conflict_not_found');
-    if (cf.status !== 'open') throw conflictError('این مورد پیش‌تر بسته شده است', 'already_resolved');
+    const who = String(userId || ctx.userId || '');
+    if (cf.status !== 'open') {
+      if (inbox && v3inbox.sameDecision(cf, action, TASKS.has(cf.kind), who)) return { conflict: shapeConflict(cf), op: null, duplicate: true };
+      throw conflictError('این مورد پیش‌تر بسته شده است', 'already_resolved');
+    }
 
     let op = null;
+    let merged = null;
     let final = TASKS.has(cf.kind) || action === 'dismiss' ? 'dismissed' : 'kept';
-    if (action === 'revert') {
+    if (action === 'revert' || action === 'merge') {
       if (!REVERTIBLE.has(cf.kind)) throw badRequest('برای این مورد برگرداندن معنا ندارد', 'not_revertible');
-      op = await applyServerOp(store.direct(c), ctx, revertOp(cf, clock.tick()), t);
+      if (action === 'merge') merged = v3inbox.mergeFields(cf, fields);
+      const stamp = clock.tick();
+      op = await applyServerOp(store.direct(c), ctx, merged ? v3inbox.mergeOp(cf, merged, stamp) : revertOp(cf, stamp), t);
       final = 'reverted';
     }
     const upd = (await c.query(
-      `UPDATE sync_v3_conflicts SET status=$2, resolved_at=$3, resolved_by=$4, resolution_op_id=$5
+      `UPDATE sync_v3_conflicts SET status=$2, resolved_at=$3, resolved_by=$4, resolution_op_id=$5,
+          detail = CASE WHEN $6::jsonb IS NULL THEN detail ELSE detail || $6::jsonb END
         WHERE id=$1 RETURNING *`,
-      [cf.id, final, t, String(userId || ctx.userId || ''), op ? op.op_id : '']
+      [cf.id, final, t, who, op ? op.op_id : '', merged ? JSON.stringify({ merged }) : null]
     )).rows[0];
     if (v1 && v1.ready && op) await drainToV1(c, ctx, t);
     return { conflict: shapeConflict(upd), op };
