@@ -10,7 +10,7 @@
  *     عنوان همان نامِ ویترین. هر نویسهٔ HTML گریز داده می‌شود.
  *   • نتیجه: پذیرفت ⇒ `accepted`؛ ردِ همیشگیِ SMTP (۵xx) ⇒ `rejected`؛ هر خطای دیگر ⇒ `retry` (همان قاعدهٔ NTF-04).
  */
-const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const { escapeHtml: esc } = require('./mail-templates');
 
 const provider = Object.freeze({
   async send(msg) {

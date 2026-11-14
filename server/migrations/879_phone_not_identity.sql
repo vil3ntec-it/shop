@@ -5,7 +5,7 @@
 --  ایمیل (`routes/auth.js`، `lib/otp` ‹email_only›). شمارهٔ حساب فقط فیلدِ داده است (`PUT /api/me`) — پس یکتایی‌اش
 --  که فقط برای «یک شماره = یک حساب» ِ ورود بود برداشته می‌شود؛ دو حساب (مثلاً دو عضوِ یک خانواده) یک شماره
 --  داشته باشند و «این شماره گرفته شده» هم دیگر نیست. دادهٔ موجود دست نمی‌خورد؛ قیدِ «ایمیل یا شماره» می‌ماند.
---  rollback: `migrations/rollback/880_phone_not_identity.down.sql`.
+--  rollback: `migrations/rollback/879_phone_not_identity.down.sql`.
 -- ============================================================
 
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_phone_key;
