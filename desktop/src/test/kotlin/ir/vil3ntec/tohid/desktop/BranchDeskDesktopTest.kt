@@ -8,6 +8,7 @@ import ir.vil3ntec.tohid.core.net.TestHttpServer
 import ir.vil3ntec.tohid.core.server.DataPartition
 import ir.vil3ntec.tohid.data.AccountBind
 import ir.vil3ntec.tohid.data.BranchDesk
+import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.LedgerOwner
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ShopData
@@ -119,6 +120,25 @@ class BranchDeskDesktopTest {
     assertEquals("«انتخابِ شعبه» دوباره پرسیده می‌شود", "", BranchDesk.pickedFor(ctx))
     assertEquals(BranchDesk.Outcome.SWITCHED, runBlocking { BranchDesk.switchTo(ctx, store, branchA) })
     assertEquals(setOf("a2-$n"), ids(store))
+  }
+
+  @Test
+  fun `کاتالوگِ فقط‌خواندنیِ شعبه — کالا و دسته از این میز نوشته نمی‌شوند، باقی آزاد، اصلی هرگز`() {
+    val store = ownerOnMain()
+    SyncChoice.set(ctx, SyncChoice.V3, 0)
+    runBlocking { BranchDesk.switchTo(ctx, store, branchA) }
+    assertTrue("پیش از hello ِ فازِ ۳ هیچ قفلی", BranchDesk.catalogReadOnly(ctx).isEmpty())
+    assertTrue(runBlocking { store.save(ShopData(products = listOf(Product(id = "a3-$n", name = "نمک", salePrice = 3.0)))) })
+    BranchDesk.rememberCatalog(ctx, A, BranchBook.CATALOG_TABLES)
+    assertEquals(BranchBook.CATALOG_TABLES, BranchDesk.catalogReadOnly(ctx))
+    val before = store.data.value
+    assertFalse(runBlocking { store.save(before.copy(products = before.products + Product(id = "a4-$n", name = "شکر", salePrice = 4.0))) })
+    assertFalse(runBlocking { store.save(before.copy(productCategories = before.productCategories + "تازه-$n")) })
+    assertEquals(before.products, store.data.value.products)
+    assertTrue("قرض و فروش و … آزاد", runBlocking { store.save(before.copy(debtors = listOf(Debtor(id = "d-$n", name = "کریم")))) })
+    runBlocking { BranchDesk.switchTo(ctx, store, main) }
+    assertTrue("اصلی هرگز فقط‌خواندنی نیست", BranchDesk.catalogReadOnly(ctx).isEmpty())
+    assertTrue(runBlocking { store.save(store.data.value.copy(products = store.data.value.products + Product(id = "m2-$n", name = "چای", salePrice = 9.0))) })
   }
 
   @Test

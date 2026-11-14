@@ -70,6 +70,12 @@ object StrBranchDesk {
     "This branch is not open to you or has been archived. Choose another branch.",
     "دا څانګه تاسو ته خلاصه نه ده یا آرشیف شوې ده. بله څانګه وټاکئ.",
   )
+  val refusalCatalogMainOnly: String get() = t(
+    "کالا، دسته، واحد و قیمتِ پایه مالِ کلِ دکان‌اند و فقط از شعبهٔ اصلی ثبت یا عوض می‌شوند؛ این شعبه همان‌ها را از اصلی می‌گیرد.",
+    "Items, categories, units and base prices belong to the whole shop and are added or changed only from the main branch; this branch receives them from the main one.",
+    "توکي، ډلې، واحدونه او اصلي بیې د ټول دوکان دي او یوازې له اصلي څانګې ثبتېږي یا بدلېږي؛ دا څانګه هغه له اصلي څخه اخلي.",
+  )
+  val catalogLocked: String get() = t("کالا در این شعبه فقط‌خواندنی است", "Items are read-only in this branch", "توکي په دې څانګه کې یوازې د لوستلو دي")
 
   //  صفحهٔ صاحب
   val ownerOnly: String get() = t("شعبه‌ها را فقط صاحبِ دکان می‌سازد و می‌دهد.", "Only the shop owner creates and assigns branches.", "څانګې یوازې د دوکان خاوند جوړوي او ټاکي.")
@@ -110,6 +116,7 @@ fun branchRefusalText(r: BranchBook.Refusal): String = when (r) {
   BranchBook.Refusal.MAIN_ONLY -> StrBranchDesk.refusalMainOnly
   BranchBook.Refusal.UNSUPPORTED -> StrBranchDesk.refusalUnsupported
   BranchBook.Refusal.FORBIDDEN -> StrBranchDesk.refusalForbidden
+  BranchBook.Refusal.CATALOG_MAIN_ONLY -> StrBranchDesk.refusalCatalogMainOnly
 }
 
 /** نامِ نمایشیِ شعبه: نامِ سرور، یا برای اصلیِ بی‌نام «شعبهٔ اصلی» (بیرون از جدول: نامِ داده از t نمی‌گذرد) */

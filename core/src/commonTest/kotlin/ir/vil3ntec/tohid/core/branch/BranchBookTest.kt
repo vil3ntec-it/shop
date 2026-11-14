@@ -110,7 +110,20 @@ class BranchBookTest {
     assertEquals(BranchBook.Refusal.MAIN_ONLY, BranchBook.refusalOf("branch_main_only"))
     assertEquals(BranchBook.Refusal.UNSUPPORTED, BranchBook.refusalOf("branch_unsupported"))
     assertEquals(BranchBook.Refusal.FORBIDDEN, BranchBook.refusalOf("branch_forbidden"))
+    assertEquals(BranchBook.Refusal.CATALOG_MAIN_ONLY, BranchBook.refusalOf("catalog_main_only"))
     assertNull(BranchBook.refusalOf("forbidden"))
     assertNull(BranchBook.refusalOf(null))
+  }
+
+  @Test
+  fun helloCatalogReadOnlyOnlyForTheSameBranch() {
+    val a = "brn_" + "a".repeat(24)
+    fun hello(s: String) = Json.parseToJsonElement(s).jsonObject
+    val list = hello("""{"ok":true,"branch":{"id":"$a","catalog_read_only":["products","productCategories","productUnits"]}}""")
+    assertEquals(BranchBook.CATALOG_TABLES, BranchBook.catalogReadOnlyOf(list, a))
+    assertEquals(BranchBook.CATALOG_TABLES, BranchBook.catalogReadOnlyOf(hello("""{"branch":{"id":"$a","catalog_read_only":true}}"""), a))
+    assertEquals(emptySet<String>(), BranchBook.catalogReadOnlyOf(hello("""{"branch":{"id":"$a","catalog_read_only":false}}"""), a))
+    assertNull(BranchBook.catalogReadOnlyOf(hello("""{"ok":true}"""), a), "hello ِ اصلی یا سرورِ پیش از فازِ ۳")
+    assertNull(BranchBook.catalogReadOnlyOf(list, "brn_" + "b".repeat(24)), "شعبهٔ دیگری در پاسخ")
   }
 }

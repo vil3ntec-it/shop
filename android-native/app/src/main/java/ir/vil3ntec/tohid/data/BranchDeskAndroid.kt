@@ -32,8 +32,11 @@ object BranchDesk {
   private const val NAME = "owner_branch_name"
   /** «حساب@دکان» ای که پس از ورودش شعبه برگزیده شد (یا یک‌شعبه‌ای بود) — «انتخابِ شعبه» فقط یک بار پس از ورود */
   private const val PICKED = "owner_branch_picked"
+  /** فازِ ۳: جدول‌های فقط‌خواندنیِ کاتالوگ در شعبهٔ روی میز (`<شعبه>|products,…` از hello ِ v3) */
+  private const val CATALOG = "owner_branch_catalog_ro"
 
   @Volatile private var cached: String? = null
+  @Volatile private var catalogCache: Pair<String, Set<String>>? = null
 
   private fun prefs(context: Context) = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -78,7 +81,7 @@ object BranchDesk {
   }
 
   /** فقط برای آزمون */
-  internal fun forgetCache() { cached = null; confirmedFor = ""; confirmedAt = 0L; offSeen = false }
+  internal fun forgetCache() { cached = null; catalogCache = null; confirmedFor = ""; confirmedAt = 0L; offSeen = false }
 
   enum class Outcome { SAME, SWITCHED, NO_SHOP, TRAINING, PENDING, V3_OFF, NOT_ARCHIVED }
 
@@ -145,6 +148,8 @@ object BranchDesk {
     }
     confirmedFor = if (ok) b else ""
     confirmedAt = if (ok) now else 0L
+    //  فازِ ۳: قفلِ کاتالوگِ همین شعبه با همان دور (یک بار در دقیقه)
+    if (ok) runCatching { refreshCatalog(app) }
     return ok
   }
 
@@ -153,6 +158,48 @@ object BranchDesk {
     confirmedFor = if (on) id else ""
     confirmedAt = if (on) System.nanoTime() / 1_000_000 else 0L
     offSeen = !on
+  }
+
+  /** جدول‌های کاتالوگی که در شعبهٔ روی میز فقط‌خواندنی‌اند (آخرین hello ِ همین شعبه)؛ اصلی ⇒ هیچ */
+  fun catalogReadOnly(context: Context): Set<String> {
+    val b = current(context)
+    if (BranchKey.isMain(b)) return emptySet()
+    val c = catalogCache ?: runCatching {
+      val raw = prefs(context).getString(CATALOG, "").orEmpty()
+      raw.substringBefore('|') to raw.substringAfter('|', "").split(',').filter { it.isNotBlank() }.toSet()
+    }.getOrDefault("" to emptySet<String>()).also { catalogCache = it }
+    return if (c.first == b) c.second else emptySet()
+  }
+
+  internal fun rememberCatalog(context: Context, branch: String, tables: Set<String>) {
+    prefs(context).edit().putString(CATALOG, branch + "|" + tables.sorted().joinToString(",")).apply()
+    catalogCache = branch to tables
+  }
+
+  /**
+   *  فازِ ۳: `GET /sync/v3/hello` با سرآیندِ همین شعبه ⇐ `branch.catalog_read_only` (`BranchBook.catalogReadOnlyOf`). بی‌اینترنت
+   *  یا خطا ⇒ همان آخرین؛ بی `branch` (سرورِ پیش از فازِ ۳) ⇒ هیچ قفلی.
+   */
+  suspend fun refreshCatalog(context: Context): Set<String> {
+    val app = context.applicationContext
+    val b = current(app)
+    if (BranchKey.isMain(b)) return emptySet()
+    val hello = try { Backend.api(app).get("/sync/v3/hello") } catch (f: ApiFailure) { return catalogReadOnly(app) }
+    return (BranchBook.catalogReadOnlyOf(hello, b) ?: emptySet()).also { rememberCatalog(app, b, it) }
+  }
+
+  /**
+   *  سدِ کاتالوگِ شعبه در `ShopStore` (پس از سدِ نقش): تغییرِ کالا/دسته/واحد در شعبه‌ای که سرور فقط‌خواندنی گفته ⇒ [say] با
+   *  پیامِ روشن و `true` (نوشته نمی‌شود؛ سرور هم op اش را با `catalog_main_only` رد می‌کرد). آینهٔ سرور از این راه نمی‌آید.
+   */
+  fun catalogRefused(context: Context, base: ShopData, next: ShopData, say: (String) -> Unit): Boolean {
+    val ro = catalogReadOnly(context)
+    if (ro.isEmpty()) return false
+    val changed = ("products" in ro && base.products != next.products) ||
+      ("productCategories" in ro && base.productCategories != next.productCategories) ||
+      ("productUnits" in ro && base.productUnits != next.productUnits)
+    if (changed) say(ir.vil3ntec.tohid.core.i18n.StrBranchDesk.refusalCatalogMainOnly)
+    return changed
   }
 
   /** سرور Sync v3 را دارد؟ (`SYNC_V3_ENABLED`؛ خاموش ⇒ همان ۴۰۴ ِ سرورِ قدیمی) */

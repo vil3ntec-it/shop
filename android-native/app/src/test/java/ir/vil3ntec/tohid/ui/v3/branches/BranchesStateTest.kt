@@ -184,5 +184,10 @@ class BranchesStateTest {
     val pages = src("ui/v3/branches/BranchesPagesAndroid.kt")
     assertTrue("ردیف فقط با پاسخِ روشن", pages.contains("if (!BranchLive.visible) return"))
     assertTrue(src("ui/v3/branches/BranchesModule.kt").contains("shown = { BranchLive.visible }"))
+    //  فازِ ۳: ساختن/ویرایشِ کالا و مدیریتِ دسته پشتِ قفلِ کاتالوگِ شعبه
+    val products = src("ui/v3/products/ProductsRoutes.kt")
+    listOf("BranchCatalogGate {\n        NewProductsScreen(", "BranchCatalogGate { EditProductScreen(", "if (use is CategoryUse.Manage) BranchCatalogGate {", "BranchCatalogGate { CategorySheet(store, data, toasts, CategoryUse.Bulk(ids)")
+      .forEach { assertTrue(it, products.contains(it)) }
+    assertTrue(src("data/ShopStore.kt").contains("?: return BranchDesk.catalogRefused(context, base, next) { _notice.tryEmit(it) }"))
   }
 }

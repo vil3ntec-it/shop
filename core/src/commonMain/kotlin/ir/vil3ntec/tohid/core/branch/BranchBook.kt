@@ -62,15 +62,34 @@ object BranchBook {
     data object None : Pick
   }
 
-  /** کدهای ردِ شعبهٔ سرور (`branches.resolve`، `lib/branch-gate.js`) */
-  enum class Refusal { REQUIRED, MAIN_ONLY, UNSUPPORTED, FORBIDDEN }
+  /** کدهای ردِ شعبهٔ سرور (`branches.resolve`، `lib/branch-gate.js`؛ فازِ ۳: `catalog_main_only` ِ `lib/branch-catalog.js`) */
+  enum class Refusal { REQUIRED, MAIN_ONLY, UNSUPPORTED, FORBIDDEN, CATALOG_MAIN_ONLY }
 
   fun refusalOf(code: String?): Refusal? = when (code) {
     "branch_required" -> Refusal.REQUIRED
     "branch_main_only" -> Refusal.MAIN_ONLY
     "branch_unsupported" -> Refusal.UNSUPPORTED
     "branch_forbidden" -> Refusal.FORBIDDEN
+    "catalog_main_only" -> Refusal.CATALOG_MAIN_ONLY
     else -> null
+  }
+
+  /** کاتالوگِ مشترکِ دکان (`TABLES` ِ `server/src/lib/branch-catalog.js`): نوشتن فقط از شعبهٔ اصلی */
+  val CATALOG_TABLES: Set<String> = setOf("products", "productCategories", "productUnits")
+
+  /**
+   *  فازِ ۳: `GET /sync/v3/hello` با سرآیندِ شعبهٔ غیرِ اصلی `branch: {id, catalog_read_only}` می‌دهد — فهرستِ جدول‌ها یا `true`
+   *  (همان [CATALOG_TABLES]) ⇒ ویرایشِ همان‌ها در این شعبه نه. بی `branch` یا شعبهٔ دیگری ⇒ null (سرورِ پیش از فازِ ۳، پرچمِ
+   *  خاموش یا شعبهٔ اصلی: هیچ قفلی).
+   */
+  fun catalogReadOnlyOf(hello: JsonObject, branch: String): Set<String>? {
+    val b = hello["branch"] as? JsonObject ?: return null
+    if (BranchKey.idOf(b["id"].text()) != branch) return null
+    return when (val ro = b["catalog_read_only"]) {
+      is JsonArray -> ro.mapNotNull { it.text() }.toSet()
+      is JsonPrimitive -> if (ro.flag()) CATALOG_TABLES else emptySet()
+      else -> emptySet()
+    }
   }
 
   /**

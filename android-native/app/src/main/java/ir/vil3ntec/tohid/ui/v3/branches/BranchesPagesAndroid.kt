@@ -82,6 +82,7 @@ fun BranchHost(store: ShopStore) {
       BranchLive.pick = null
     }
     BranchLive.current = BranchDesk.current(context)
+    BranchLive.catalogReadOnly = BranchDesk.refreshCatalog(context).isNotEmpty()
     note = BranchLive.outcomeText(o, BranchLive.label(b))
   }
 
@@ -90,6 +91,7 @@ fun BranchHost(store: ShopStore) {
     BranchLive.current = current
     val p = BranchLive.probe(ShopBranchesRepository(Backend.api(context)), current, afterSignIn = BranchDesk.pickedFor(context) != owner)
     if (BranchLive.book != null) BranchDesk.confirmed(current, BranchLive.dismissible(current))
+    BranchLive.catalogReadOnly = (if (BranchLive.book != null) BranchDesk.refreshCatalog(context) else BranchDesk.catalogReadOnly(context)).isNotEmpty()
     when {
       p == null -> if (BranchLive.off && !BranchKey.isMain(current)) go(BranchLive.main)
       p is BranchBook.Pick.Stay -> BranchDesk.markPicked(context)
@@ -315,6 +317,21 @@ private fun SummarySection(title: String, s: BranchesReport.Summary, footer: Str
     if (s.partial) {
       V3Divider()
       V3ListRow(StrBranches.partial, chevron = false, danger = true)
+    }
+  }
+}
+
+/**
+ *  فازِ ۳: در شعبه‌ای که کاتالوگش فقط‌خواندنی است (`branch.catalog_read_only` ِ hello) صفحه‌های ساختن/ویرایشِ کالا و مدیریتِ دسته
+ *  به‌جای فرم پیامِ روشن می‌دهند؛ هر نوشتنِ دیگری را هم سدِ `ShopStore` (`BranchDesk.catalogRefused`) می‌بندد. پرچمِ خاموش،
+ *  شعبهٔ اصلی یا سرورِ پیش از فازِ ۳ ⇒ همان [content].
+ */
+@Composable
+fun RouteScope.BranchCatalogGate(content: @Composable () -> Unit) {
+  if (!BranchLive.catalogReadOnly) return content()
+  V3Scaffold(title = StrBranchDesk.catalogLocked, onBack = backOrNull, largeTitle = false) { pad ->
+    Column(Modifier.fillMaxSize().padding(bottom = pad.calculateBottomPadding())) {
+      V3EmptyState(Icons.Outlined.Store, StrBranchDesk.catalogLocked, body = StrBranchDesk.refusalCatalogMainOnly)
     }
   }
 }

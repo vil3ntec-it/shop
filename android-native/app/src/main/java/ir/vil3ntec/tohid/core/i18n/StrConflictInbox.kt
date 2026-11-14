@@ -150,6 +150,7 @@ object StrConflictInbox {
     "table_not_allowed", "perm_denied", "permission_denied", "delete_not_allowed", "safe_not_allowed" ->
       t("در حدِ اجازهٔ کارمند نیست", "Beyond the staff member’s permissions", "د کارکوونکي له اجازې څخه بهر دی")
     "tx_rejected" -> t("سندِ همراهش رد شد", "Its document was rejected", "د هغه سند رد شو")
+    "catalog_main_only" -> t("کالا، دسته و واحد فقط از شعبهٔ اصلی ثبت می‌شوند", "Items, categories and units are recorded only from the main branch", "توکي، ډلې او واحدونه یوازې له اصلي څانګې ثبتېږي") // شعبه، فازِ ۳
     //  کدِ ناشناخته (سرورِ تازه‌تر) ⇒ خودِ کد کنارِ جمله، برای پشتیبانی
     else -> t("سرور این سند را نپذیرفت (${asIs(code)})", "The server did not accept this document ($code)", "سرور دا سند ونه منه ($code)")
   }

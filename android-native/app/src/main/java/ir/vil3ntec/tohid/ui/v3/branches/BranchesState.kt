@@ -31,6 +31,9 @@ object BranchLive {
   /** شعبهٔ دفترِ روی میز برای نمایش (`BranchDesk.current` ِ آخرین پرسش یا تعویض) */
   var current by mutableStateOf(BranchKey.MAIN)
 
+  /** فازِ ۳: کالا/دسته/واحد در شعبهٔ روی میز فقط‌خواندنی است (hello ِ v3) ⇒ ویرایشِ کالا بسته (`BranchCatalogGate`) */
+  var catalogReadOnly by mutableStateOf(false)
+
   /** آخرین پاسخِ روشنِ سرور: شعبه‌ها خاموش (پرچم یا سرورِ کهنه) — میزِ شعبهٔ دیگر به اصلی برمی‌گردد */
   var off by mutableStateOf(false)
     private set
@@ -51,6 +54,7 @@ object BranchLive {
     pick = null
     off = false
     current = BranchKey.MAIN
+    catalogReadOnly = false
   }
 
   /**
