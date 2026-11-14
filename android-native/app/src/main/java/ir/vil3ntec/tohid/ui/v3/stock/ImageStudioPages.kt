@@ -18,6 +18,10 @@ import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.outlined.Check
+import ir.vil3ntec.tohid.ui.v3.V3TextButton
+import ir.vil3ntec.tohid.ui.v3.V3PillAction
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -234,9 +238,10 @@ internal fun RouteScope.ImageStudioBatchRoute(id: String) {
                   V3Button(StrImageStudio.approveRisk, { scope.launch { state.review(it0, approve = true, confirmRisk = true) } },
                     kind = V3ButtonKind.DANGER, enabled = !state.busy)
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                  V3Button(StrImageStudio.approve, { scope.launch { state.review(it0, approve = true) } }, enabled = !state.busy)
-                  V3Button(StrImageStudio.reject, { scope.launch { state.review(it0, approve = false) } }, kind = V3ButtonKind.SECONDARY, enabled = !state.busy)
+                //  سادهٔ e-rows-63d: «پذیرفتن» تنها قرصِ نرمِ ردیف؛ «رد» کنارش به نوشتهٔ آرام (همان یک زدن، بی دو دکمهٔ هم‌وزن)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                  V3PillAction(StrImageStudio.approve, { scope.launch { state.review(it0, approve = true) } }, icon = Icons.Outlined.Check, enabled = !state.busy)
+                  V3TextButton(StrImageStudio.reject, { scope.launch { state.review(it0, approve = false) } }, enabled = !state.busy)
                 }
               }
               it0.review == "approved" -> Text(StrImageStudio.approved, style = V3Type.callout, color = c.inkMuted)
