@@ -156,7 +156,7 @@ router.get('/tasks', prebuilt, async (req, res) => {
 
 router.post('/tasks/:id/resolve', prebuilt, requirePermission('stock.adjust'), async (req, res) => {
   const sc = await scope.scopeOfReq(req);
-  const task = sc ? await scope.taskOf(req.shopId, req.params.id) : null;
+  const task = sc ? await scope.taskOf(req.shopId, req.params.id, req.stockBranch) : null;
   if (task) scope.check(sc, scope.taskPlaces(task));
   const out = await catalog.resolveTask(req.stockKey, req.params.id, req.body, req.user.id);
   await audit.log({
