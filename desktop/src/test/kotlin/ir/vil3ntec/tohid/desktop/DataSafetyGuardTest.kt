@@ -330,6 +330,10 @@ class DataSafetyGuardTest {
       "tohid-synonyms",
       //  POS-05/INV-03: آخرین نمای رزروِ سفارش‌های اینترنتی (`OnlineHoldsStore`، هر دقیقه از سرور)؛ تنظیمِ دکان نیست
       "tohid-online-holds",
+      //  PAY-07 (د۱۸): آینهٔ وضعیتِ حساب‌پیِ سرور روی فاکتورِ دستگاه (`PayMirrorAndroid`)؛ منبعش سرور است
+      "tohid-pay-mirror",
+      //  CRM-15 (د۱۸): صفِ «دیدنِ پرونده» ِ حسابدارِ بی‌اینترنت تا رسیدن به سرور (`CustomerAccessOutboxAndroid`)
+      "tohid-customer-access",
     ).forEach { put(it, Kind.SERVER) }
     //  عمداً مالِ همین دستگاه: نشست و همگام‌سازی، سرور، قفل، زبان و ظاهر، چاپگر/دستگاه‌ها، پیش‌نویس‌ها
     listOf(

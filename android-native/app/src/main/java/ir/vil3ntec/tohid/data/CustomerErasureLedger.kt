@@ -15,7 +15,7 @@ object CustomerErasureLedger {
   const val PATH = "/shop/customer-erasure/ledger"
   const val APPLIED = "/shop/customer-erasure/ledger/applied"
   /** نامِ پروندهٔ پاک‌شده (دادهٔ دفتر، همان در هر زبان؛ برنامه نامِ خالی را نمی‌پذیرد) */
-  const val ERASED_NAME = "مشتریِ حذف‌شده"
+  const val ERASED_NAME = "مشتریِ حذف‌شده"  // داده: نامِ جانشینِ پروندهٔ پاک‌شده در دفتر (همان دادهٔ همهٔ دستگاه‌ها، نه متنِ صفحه)
 
   /** پاسخِ `GET` ⇒ شناسهٔ پرونده‌ها */
   fun ids(o: JsonObject): List<String> = (o["debtors"] as? JsonArray).orEmpty().mapNotNull {
