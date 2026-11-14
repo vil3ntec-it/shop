@@ -64,7 +64,7 @@
   گوشی (QR یا کد + کشف)؛ mDNS ِ `_tohid-hub._tcp` بی کتابخانه (`HubMdns`، `HubAnnounce`)؛ جفت‌سازیِ یک‌بارهٔ کد/QR فقط با صاحب/مدیر
   (`HubPair`، اثباتِ HMAC ِ هاب روی سنجاق پیش از هر رازِ گوشی)؛ دفترِ فقط‌افزودنیِ opهای v1 (`HubLog`، `HubV1`) که با توکنِ خودِ هر گوشی
   از همان `POST /sync/v1/push` به سرور می‌رود؛ خوراکِ opهای گوشی‌های دیگر بی اینترنت (`HubPeerLink`/`HubExchangeV1`،
-  `SyncV1Worker` ⇐ `SyncV1Hub.kt`). کدِ پمپ (`sync-v1.js`، `routes/sync-v1.js`، `PUMP_TABLES`) و سرور دست نخوردند.
+  `SyncV1Worker` ⇐ `SyncV1HubAndroid.kt`). کدِ پمپ (`sync-v1.js`، `routes/sync-v1.js`، `PUMP_TABLES`) و سرور دست نخوردند.
 - **همگام‌سازیِ مشترک:** فقط سه خط در `SyncV1Engine` (یک خطِ «دیده از سرور» در pull با `.also`، `state`/`restore` ⇐ `internal`)، یک خط
   در `SyncV1Worker` و `SyncV1Client.pushBody` (همان بدنه، جدا شده) — برای ادغامِ ساده با `claude/e-rows-54p` (`X-Branch-Id`): هاب
   `X-Branch-Id` ِ گوشی را نگه می‌دارد و با همان دسته به سرور می‌دهد، ولی خودِ `HubLinkV1Android.identity` آن را نمی‌فرستد ⇒ پس از ادغامِ

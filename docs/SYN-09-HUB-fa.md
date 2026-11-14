@@ -108,7 +108,7 @@
 - **فرستادن به سرور** (`HubLogForwarder`): به ترتیبِ رسیدن، FIFO ِ هر دستگاه، با **توکنِ خودِ همان دستگاه** (فقط در حافظه) از همان
   `POST /sync/v1/push` ِ برنامه با همان `X-Device`، `X-App-Version` و `X-Branch-Id` ِ دستگاه (`HubCloudHttp.pushV1`). همان جدولِ خطای §۶.
   ⛔ هاب هیچ op ای را در دفترِ سرور اعمال نمی‌کند و `sync-v1.js`/`routes/sync-v1.js`/`PUMP_TABLES` دست نخوردند.
-- **سمتِ گوشی** (`SyncV1Worker` پس از `runOnce` ِ شکست‌خورده ⇐ `SyncV1Engine.hubExchange` در `SyncV1Hub.kt` ⇐ `platform/HubLinkV1Android.kt` ⇐ `HubExchangeV1`): فقط وقتی push/pull **به سرور نرسید**
+- **سمتِ گوشی** (`SyncV1Worker` پس از `runOnce` ِ شکست‌خورده ⇐ `SyncV1Engine.hubExchange` در `SyncV1HubAndroid.kt` ⇐ `platform/HubLinkV1Android.kt` ⇐ `HubExchangeV1`): فقط وقتی push/pull **به سرور نرسید**
   (خطای شبکه، نه پاسخِ HTTP). همهٔ صف دسته‌دسته (همان `OpQueue.cut`) به هاب، سپس خوراک. صف، شکست، `lastOkAt` همان «به سرور نرسیدیم».
 - **op ِ گوشیِ دیگر** با همان نشاندنِ pull و cursor ِ دست‌نخورده (`absorbRemote(…, cursor = null, keepPending = true)`) «موقت» می‌نشیند؛
   pull ِ بعدیِ سرور (از همان cursor ِ پیشین) همان opها را به ترتیبِ سرور دوباره می‌آورد و مرجع است. داده نمی‌شود: op ِ خودِ گوشی، op ِ
@@ -193,7 +193,7 @@ opهایش را هاب داشت یا فرستاده بود ذخیره نمی‌�
 - `core/hub/HubPair.kt` (برگه، QR، اثبات، کلید)، `HubLog.kt` (دفترِ v1، خوراک، فرستادن)، `HubMdns.kt`؛ `core/hw/Mdns.questions`،
   `MdnsProbe.messages`. کامپیوتر: `HubV1.kt` (درها و دیسک)، `HubAnnounce.kt` (mDNS)، `HubBoot` (روشن/خاموش، `HubPanel`، `HubCloudHttp.pushV1`).
   برنامه: `platform/HubPanel.kt`، `HubPeerLink.kt` (`HubExchangeV1`، `HubPairClient`)، `HubLinkV1Android.kt`، `HubKeyStore.kt`، `HubFindAndroid.kt` (کشف؛ آیفون `HubFindIos.kt` بی کشف، فقط QR)، کارتِ
-  `ui/v3/settings/devices/HubLanCardAndroid.kt`، `StrHub`؛ موتور: `sync/v1/SyncV1Hub.kt` (`SyncV1Engine.hubExchange`، از `SyncV1Worker` پس از دورِ شکست‌خورده)، در خودِ `SyncV1Engine` فقط یک خط («دیده از سرور» در pull) و دو `internal`، و `SyncV1Client.pushBody`.
+  `ui/v3/settings/devices/HubLanCardAndroid.kt`، `StrHub`؛ موتور: `sync/v1/SyncV1HubAndroid.kt` (`SyncV1Engine.hubExchange`، از `SyncV1Worker` پس از دورِ شکست‌خورده)، در خودِ `SyncV1Engine` فقط یک خط («دیده از سرور» در pull) و دو `internal`، و `SyncV1Client.pushBody`.
 - `HubLanServerDesktopTest` (دو گوشیِ ساختگی + هابِ واقعی + **سرورِ واقعیِ مخزن**): بی اینترنت گوشی‌ها کارهای هم را از هاب می‌گیرند؛
   با برگشت هاب و سپس خودِ گوشی‌ها ⇒ `oplog` ِ سرور هر op دقیقاً یک بار، صف‌ها خالی و دفترِ دو گوشی یکی؛ بی هاب همان راهِ مستقیم.
 - `HubV1ServerTest` (هابِ واقعی با TLS): بازپخشِ توکن/کدِ برگه رد، دستگاهِ جفت‌نشده (حتی با توکنِ درست) ۴۰۳ پیش از هر تماس با سرور،

@@ -128,7 +128,7 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
       read = { store.ledgerNow() },
       write = { next -> store.applyFromServerNow(next) },
     )
-    //  S29/SYN-09: سرور نرسید ⇒ هابِ جفت‌شدهٔ شبکهٔ دکان (پرچم یا `hub.peer` خاموش ⇒ هیچ؛ شکستش دور را نمی‌گیرد) — `SyncV1Hub.kt`
+    //  S29/SYN-09: سرور نرسید ⇒ هابِ جفت‌شدهٔ شبکهٔ دکان (پرچم یا `hub.peer` خاموش ⇒ هیچ؛ شکستش دور را نمی‌گیرد) — `SyncV1HubAndroid.kt`
     runCatching { engine.hubExchange(app, outcome.exceptionOrNull(), read = { store.ledgerNow() }, write = { next -> store.applyFromServerNow(next) }) }
     sweepAfterPull(store)
     //  STF-09: سرِ زنجیرهٔ سابقهٔ همین دستگاه پس از هر دور، فقط وقتی عوض شده — ردیف‌های هنوز نرفته هم (بریدنشان روی

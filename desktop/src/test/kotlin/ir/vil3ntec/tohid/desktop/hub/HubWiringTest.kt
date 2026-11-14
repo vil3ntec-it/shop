@@ -40,7 +40,7 @@ class HubWiringTest {
     val run = worker.indexOf("val outcome = engine.runOnce(")
     val hub = worker.indexOf("engine.hubExchange(app, outcome.exceptionOrNull()")
     assertTrue("هاب پس از دورِ سرور", run in 0 until hub)
-    val ext = src("android-native/app/src/main/java/ir/vil3ntec/tohid/sync/v1/SyncV1Hub.kt")
+    val ext = src("android-native/app/src/main/java/ir/vil3ntec/tohid/sync/v1/SyncV1HubAndroid.kt")
     assertTrue(ext.contains("if (error == null || !HubPeerLink.cloudDown(error)) return null"))
     assertTrue(ext.contains("absorbRemote(ops, read, write, cursor = null, keepPending = true)"))
     assertTrue(ext.contains("st.restorePending || st.restoredRebuild || st.recoverArchive"))
