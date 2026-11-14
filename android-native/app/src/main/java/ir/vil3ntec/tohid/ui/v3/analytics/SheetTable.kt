@@ -42,8 +42,13 @@ data class SheetColumns(val numeric: List<Boolean>, val dates: List<Boolean>, va
 /** خالص، با آزمون (`SheetModelTest`): همان قاعده‌های جدولِ امروزِ کامپیوتر */
 object SheetModel {
   private val ISO = Regex("""^\d{4}-\d{2}-\d{2}$""")
-  /** جمع فقط برای ستونِ مبلغ — نه شماره، تعداد یا روز */
-  private val NO_SUM = listOf("شماره", "تعداد", "روز", "موجودی", "حداقل", "ردیف", "مقدار", "فی", "قیمت")
+  /**
+   *  جمع فقط برای ستونِ مبلغ — نه شماره، تعداد یا روز. LOC-06 (#۲۴): سرستونِ برگه به زبانِ برنامه است، پس همان ستون‌ها در
+   *  انگلیسی و پشتوی `StrSheets` هم؛ `SheetLangTest` جمع‌پذیریِ هر برگه را در چهار زبان یکی می‌سنجد. فارسی همان فهرستِ پیشین.
+   */
+  private val NO_SUM = listOf("شماره", "تعداد", "روز", "موجودی", "حداقل", "ردیف", "مقدار", "فی", "قیمت") +
+    listOf("No.", " count", "Day", "day", "Stock", "stock", "Row", "Quantity", "quantity", "price", "Discount") +
+    listOf("شمېر", "ورځ", "موجودي", "قطار", "بیه")
 
   fun columns(sheet: ReportCsv.Sheet): SheetColumns {
     val head = sheet.rows.firstOrNull().orEmpty()

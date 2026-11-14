@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrSheets
 import ir.vil3ntec.tohid.core.perm.CreditLimitPerm
 
 import ir.vil3ntec.tohid.core.i18n.StrLedger
@@ -344,12 +345,12 @@ object CustomerMerge {
   /* --------------------------------- برگه --------------------------------- */
 
   fun duplicatesSheet(d: ShopData, today: String): ReportCsv.Sheet {
-    val rows = mutableListOf(listOf("شمارهٔ گروه", "نقش", "نام", "شماره تماس", "شمارهٔ دوم", "مانده", "تعداد تراکنش", "تعداد فاکتور", "دلیل"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    val rows = mutableListOf(listOf(StrSheets.groupNo, StrSheets.role, StrSheets.name, StrSheets.phone, StrSheets.phone2, StrSheets.balance, StrSheets.txCount, StrSheets.invoiceCount2, StrSheets.reason))
     duplicates(d).forEachIndexed { g, grp ->
       val why = grp.reasons.sortedBy { it.ordinal }.joinToString("، ") { it.label }
       grp.members.forEachIndexed { i, c ->
         rows += listOf(
-          (g + 1).toString(), if (i == 0) "پیشنهادِ ماندگار" else "تکراری", c.name, c.phone, c.phone2.orEmpty(),  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+          (g + 1).toString(), if (i == 0) StrSheets.suggestedKeep else StrSheets.duplicate, c.name, c.phone, c.phone2.orEmpty(),
           Math.round(ShopStore.debt(d, c.id)).toString(),
           d.transactions.count { it.debtorId == c.id }.toString(), d.sales.count { it.debtorId == c.id }.toString(), why,
         )

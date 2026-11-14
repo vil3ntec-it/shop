@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrSheets
+
 /**
  *  پروندهٔ مشتری — همهٔ آنچه یک مشتری با دکان داشته، از همان دفترِ فروش و قرض.
  *
@@ -151,10 +153,10 @@ object CustomerEngine {
   private fun safe(name: String) = name.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim().ifBlank { "مشتری" }  // داده: نامِ پروندهٔ خروجی
 
   fun ledgerSheet(d: ShopData, debtor: Debtor, today: String): ReportCsv.Sheet {
-    val rows = mutableListOf(listOf("ردیف", "تاریخ", "شرح", "فاکتور", "برد (بدهکار)", "رسید (بستانکار)", "مانده"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    val rows = mutableListOf(listOf(StrSheets.row, StrSheets.date, StrSheets.description, StrSheets.invoice, StrSheets.givenDebit, StrSheets.receivedCredit, StrSheets.balance))
     ledger(d, debtor.id).forEach { l ->
       rows += listOf(
-        l.row.toString(), l.tx.date, l.tx.notes.ifBlank { if (l.give > 0) "برد" else "رسید" },  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+        l.row.toString(), l.tx.date, l.tx.notes.ifBlank { if (l.give > 0) StrSheets.given else StrSheets.receivedCol },
         l.invoiceLabel.orEmpty(),
         if (l.give > 0) r(l.give) else "", if (l.receive > 0) r(l.receive) else "", r(l.balance),
       )
@@ -164,20 +166,20 @@ object CustomerEngine {
 
   fun invoicesSheet(d: ShopData, debtor: Debtor, today: String): ReportCsv.Sheet {
     val items = d.saleItems.groupBy { it.saleId }
-    val rows = mutableListOf(listOf("فاکتور", "تاریخ", "اقلام", "جمع", "تخفیف", "قابلِ پرداخت", "پرداخت‌شده", "باقی", "نوع", "وضعیت"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    val rows = mutableListOf(listOf(StrSheets.invoice, StrSheets.date, StrSheets.items, StrSheets.total, StrSheets.discount, StrSheets.payable, StrSheets.paidDone, StrSheets.left, StrSheets.type, StrSheets.status))
     invoices(d, debtor.id).forEach { s ->
       rows += listOf(
         s.invoiceLabel().orEmpty(), s.date, items[s.id].orEmpty().size.toString(),
         r(s.total), r(s.discount), r(s.finalTotal), r(s.paidAmount), r(s.remaining),
-        PayFlow.payLabel(s),
-        if (s.status == "cancelled") "لغوشده" else "ثبت‌شده",  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+        ir.vil3ntec.tohid.print.Receipts.payName(PayFlow.payLabel(s)),
+        if (s.status == "cancelled") StrSheets.cancelled else StrSheets.recorded,
       )
     }
     return ReportCsv.Sheet("فاکتورهای-${safe(debtor.name)}-$today", rows)  // داده: نامِ پروندهٔ خروجی
   }
 
   fun itemsSheet(d: ShopData, debtor: Debtor, today: String): ReportCsv.Sheet {
-    val rows = mutableListOf(listOf("تاریخ", "فاکتور", "کالا", "تعداد", "فی", "جمع", "برگشتی"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    val rows = mutableListOf(listOf(StrSheets.date, StrSheets.invoice, StrSheets.product, StrSheets.count, StrSheets.unitPrice, StrSheets.total, StrSheets.returned))
     items(d, debtor.id).forEach { l ->
       rows += listOf(l.date, l.invoiceLabel.orEmpty(), l.name, q(l.quantity), r(l.unitPrice), r(l.total), if (l.returned > 0) q(l.returned) else "")
     }
