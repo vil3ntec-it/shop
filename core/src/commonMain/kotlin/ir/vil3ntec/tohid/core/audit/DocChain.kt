@@ -100,12 +100,21 @@ data class DocChainState(
   val ackBytes: Long = 0,
   /** خالی ⇐ زنده؛ وگرنه کدِ ایستادن (`DocChain.RESTART` یا `series_owner`) */
   val halted: String = "",
+  /** «تا کجا» ِ اسنادِ بی‌شماره (برگشت، قرض، خرید — [DocChainDocs]): آغاز؛ ‎-1‎ ⇐ هنوز نه (زنجیرهٔ نسخهٔ پیشین) */
+  val docFrom: Long = -1,
+  /** تازه‌ترین زمانِ سندِ بی‌شمارهٔ زنجیره‌شده (نه جلوتر از ساعتِ دستگاه) */
+  val docAt: Long = 0,
+  /** کلیدِ اسنادِ زنجیره‌شدهٔ پنجرهٔ `DocChainDocs.SETTLE_MS` پیش از [docAt] */
+  val docIds: Set<String> = emptySet(),
 ) {
-  fun encode(): String = listOf(
+  /** بی اسنادِ بی‌شماره ([docFrom] ‎-1‎) همان متنِ پیشین، بایت‌به‌بایت */
+  fun encode(): String = (listOf(
     "v" to "1", "chain" to chain, "series" to series, "epoch" to "$epoch", "startNo" to "$startNo",
     "seq" to "$seq", "head" to head, "bytes" to "$bytes", "lastNo" to "$lastNo",
     "ackSeq" to "$ackSeq", "ackHash" to ackHash, "ackBytes" to "$ackBytes", "halted" to halted,
-  ).joinToString("\n") { (k, v) -> "$k=$v" }
+  ) + if (docFrom < 0) emptyList() else listOf(
+    "docFrom" to "$docFrom", "docAt" to "$docAt", "docIds" to docIds.sorted().joinToString(","),
+  )).joinToString("\n") { (k, v) -> "$k=$v" }
 
   companion object {
     /** متنِ [encode] ⇐ وضعیت؛ خراب یا ناقص ⇐ null */
@@ -131,6 +140,8 @@ data class DocChainState(
         bytes = long("bytes") ?: return null, lastNo = long("lastNo") ?: return null,
         ackSeq = long("ackSeq") ?: return null, ackHash = ackHash, ackBytes = long("ackBytes") ?: return null,
         halted = m["halted"].orEmpty(),
+        docFrom = long("docFrom") ?: -1, docAt = long("docAt") ?: 0,
+        docIds = m["docIds"].orEmpty().split(',').filterTo(HashSet()) { it.isNotEmpty() },
       )
     }
   }
@@ -307,11 +318,16 @@ class DocChainBook(private val disk: DocChainDisk) {
    *  دورهٔ تازه. [epoch] کمینه است: اگر فایلِ آن دوره روی دیسک چیزی دارد (دوره‌ای که هرگز به سرور
    *  نرسید)، دورهٔ بعدی برداشته می‌شود — حلقه‌ای روی حلقهٔ دیگر نمی‌نشیند.
    */
-  fun start(shopId: String, series: String, epoch: Long, startNo: Long): DocChainState? {
+  fun start(shopId: String, series: String, epoch: Long, startNo: Long, docFrom: Long = -1): DocChainState? {
     var e = maxOf(1L, epoch)
     while (disk.size(e) > 0) e++
     val chain = DocChain.chainId(shopId, series, e) ?: return null
-    return save(DocChainState(chain = chain, series = series, epoch = e, startNo = maxOf(1L, startNo)))
+    return save(
+      DocChainState(
+        chain = chain, series = series, epoch = e, startNo = maxOf(1L, startNo),
+        docFrom = maxOf(-1L, docFrom), docAt = maxOf(0L, docFrom),
+      ),
+    )
   }
 
   /** فاکتورهای تازهٔ سری ⇐ حلقه (یک بار نوشتن + fsync، بعد وضعیت). ایستاده ⇐ هیچ. */
@@ -337,6 +353,35 @@ class DocChainBook(private val disk: DocChainDisk) {
     disk.append(st.epoch, lines)
     return save(st)
   }
+
+  /**
+   *  SEC-02: اسنادِ بی‌شمارهٔ تازه ([DocChainDocs.pending]) ⇐ حلقه، یک بار نوشتن + fsync، بعد نشانِ «تا کجا».
+   *  نشانِ نساخته (زنجیرهٔ نسخهٔ پیشین) ⇐ از همین [now] آغاز می‌شود و گذشته را نمی‌سازد. ایستاده ⇐ هیچ.
+   */
+  fun catchUpDocs(state: DocChainState, by: String, docs: List<PlainFacts>, now: Long): DocChainState {
+    if (state.halted.isNotEmpty()) return state
+    if (state.docFrom < 0) return save(state.copy(docFrom = now, docAt = now, docIds = emptySet()))
+    val todo = DocChainDocs.pending(state, docs)
+    if (todo.isEmpty()) return state
+    var st = state
+    val lines = ArrayList<String>(todo.size)
+    for (f in todo) {
+      val l = try {
+        DocChain.link(st, f.type, f.id, 0, DocChainDocs.doc(st.chain, st.seq + 1, by, f))
+      } catch (e: IllegalArgumentException) {
+        continue //  سندِ ناساز (عددِ بیرون از 2^53) — بی حلقه؛ زنجیره نمی‌ایستد
+      }
+      val line = l.line()
+      lines += line
+      st = DocChain.adopt(st, l, DocChain.lineBytes(line))
+    }
+    if (lines.isNotEmpty()) disk.append(st.epoch, lines)
+    //  سندِ ناساز هم «دیده شد» (هر دور دوباره امتحان نمی‌شود)
+    return save(DocChainDocs.advance(st, todo, docs, now))
+  }
+
+  /** همهٔ حلقه‌های یک دوره (صفحهٔ «بررسیِ یکپارچگی»؛ سنگین، فقط با درخواست). خطِ نادرست ⇐ null */
+  fun links(epoch: Long): List<DocLink?> = disk.readFrom(epoch, 0).map(DocLink::parse)
 
   /**
    *  گزارشِ این دور: سر + حلقه‌های پس از تأییدِ سرور، سنجیده از همان تأیید. ایستاده ⇐ فقط سر.
