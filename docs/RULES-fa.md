@@ -510,6 +510,12 @@
   (۳) درِ REST ِ شعبه‌شناس شعبه را فقط از `branches.restOf(req)` می‌گیرد (سرآیندِ سنجیده؛ بدنه/پارامتر هرگز؛ پرچم خاموش ⇒ اصلی
   بی خواندنِ سرآیند) و درهای سطحِ دکان/فقط‌اصلیِ خودش را در شعبهٔ دیگر ۴۰۳ `branch_unsupported` می‌دهد؛ هر درِ تازه‌ای که از
   `branch-gate` بیرون برود در `tenant-matrix-branches.test.js` سنجیده می‌شود. سنجه: `shop-branches-stock.test.js`.
+- ⛔ **شعبه، فازِ ۳ب — درهای REST ِ شعبه‌دار** (`claude/e-rows-62b`، مهاجرتِ ۹۳۰): درِ تازهٔ شعبه‌شناس `branch-rest.scope` را پس از
+  احراز می‌گذارد و به کتابخانه `req.branchKey` می‌دهد (نه `req.shopId`)؛ جدولِ سرورِ شعبه‌دار ستونِ `branch_id` (پیش‌فرض `''`) و
+  **کلیدهای یکتای با شعبه** دارد و SQL فقط با `branch-key.sqlOwn(n)` (یک پارامتر = کلید؛ هرگز `shop_id=$1` ِ تنها روی جدولِ
+  شعبه‌دار)؛ پرچم/تعریف/عضو/سابقه با `shopOf` و سابقهٔ شعبه با `detail.branch`؛ کتابخانهٔ مشترک با پمپ (`lib/events.js`،
+  `account-backups`) دست نمی‌خورد — جدولِ جدا یا «فقط اصلی». سابقهٔ `once` ِ شعبه هدفِ `<شعبه>|…` می‌گیرد. هر درِ تازه در
+  `tenant-matrix-branches.test.js` (`PHASE3B`) و `shop-branches-doors.test.js`.
 
 - ⛔ **گروهِ الفِ همگام‌سازی (د۱۸، `claude/e-rows-55s`)** — هر کدام پشتِ پرچمِ خاموش، پرچم پیش از بدنه، و هیچ‌کدام `sync-v1.js`/`routes/sync-v1.js`/`sync-v1-auth.js` (مشترک با پمپ) را نمی‌خوانند:
   PRD-07 راهِ قدیم فقط `product-unit-rules.legacyGuard` پیش از `sync.pushChanges` (ردشده ⇐ تعارضِ همان ردیف با دادهٔ سرور؛ `lib/sync.js` دست نمی‌خورد)؛
