@@ -143,17 +143,16 @@ object StrUpdate {
     "The new version's file wasn't found",
     "د نوې نسخې فایل پیدا نه شو",
   )
-  @Suppress("UNUSED_PARAMETER")
+  //  ⚠️ [code] هنوز نشان داده می‌شود: صدازننده‌ها `update/Updater*.kt` ِ عاملِ دیگرند (کارِ نشانی‌های به‌روزرسانی)؛ آن‌جا بی کد شود
   fun githubError(code: Any?): String = t(
-    "سرورِ به‌روزرسانی خطا داد — کمی بعد دوباره بزنید",
-    "The update server gave an error — tap again a little later",
-    "د تازه کولو سرور تېروتنه ورکړه — لږ وروسته بیا یې ووهئ",
+    "سرورِ به‌روزرسانی خطا داد (${asIs(code)}) — کمی بعد دوباره بزنید",
+    "The update server gave an error ($code) — tap again a little later",
+    "د تازه کولو سرور تېروتنه ورکړه ($code) — لږ وروسته بیا یې ووهئ",
   )
-  @Suppress("UNUSED_PARAMETER")
   fun updateServerNoAnswer(code: Any?): String = t(
-    "سرورِ به‌روزرسانی جواب نداد",
-    "The update server didn't answer",
-    "د تازه کولو سرور ځواب ورنه کړ",
+    "سرورِ به‌روزرسانی جواب نداد (${asIs(code)})",
+    "The update server didn't answer ($code)",
+    "د تازه کولو سرور ځواب ورنه کړ ($code)",
   )
 
   // ── کامپیوتر (`UpdaterDesk`) ──

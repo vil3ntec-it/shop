@@ -282,9 +282,8 @@ object StrAppData {
     "دا صادرول د $v بڼې سره جوړ شوی او د پروګرام دا نسخه یې نه پېژني",
   )
   val serverEmpty: String get() = t("پاسخِ سرور خالی بود", "The server's answer was empty", "د سرور ځواب تش و")
-  /** [keys] (کلیدهای پاسخِ سرور) فقط برای سازگاریِ امضا؛ ⛔ دیگر نشان داده نمی‌شود — جزئیاتِ ورود فنی است */
-  @Suppress("UNUSED_PARAMETER")
-  fun noTokenSent(keys: Any?): String = t(
+  /** ⛔ کلیدهای پاسخِ سرور دیگر نشان داده نمی‌شوند — جزئیاتِ ورود فنی است */
+  val noTokenSent: String get() = t(
     "ورود کامل نشد؛ کمی بعد دوباره امتحان کنید",
     "Sign-in didn't finish; try again a little later",
     "ننوتل بشپړ نه شول؛ لږ وروسته بیا هڅه وکړئ",
