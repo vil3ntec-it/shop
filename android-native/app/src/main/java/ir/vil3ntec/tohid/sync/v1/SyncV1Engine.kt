@@ -422,8 +422,11 @@ class SyncV1Engine private constructor(context: Context) {
    *  `core/…/core/sync/PushSince.kt`. سرور فقط با پرچمِ دکانِ `sync.cursor_from_since` آن را می‌خواند؛
    *  بی پرچم (و برای پمپ) همان رفتارِ امروز.
    */
+  /** SYN-04: «فشرده بفرست» ِ سرور، ماندگار روی همین حساب؛ ردِ فشرده تا پایانِ همین اجرا (`SyncV1Client.PushGzip`) */
+  private val pushGzip = SyncV1Client.PushGzip({ state.gzipPush }, { state.gzipPush = it })
+
   private fun pushClient(): SyncV1Client =
-    SyncV1Client(Backend.api(app)) { ir.vil3ntec.tohid.core.sync.PushSince.since(state.pushSince, state.cursor) }
+    SyncV1Client(Backend.api(app), { ir.vil3ntec.tohid.core.sync.PushSince.since(state.pushSince, state.cursor) }, pushGzip)
 
   /* ==========================================================
      ۲) یک دورِ کامل: Push تا ته، بعد Pull

@@ -52,7 +52,8 @@ import kotlin.random.Random
  *   `S26_OPS=100000 S26_SPEED=1e9` — خط بی انتظارِ واقعی ولی همان بایت/بسته/بریدن و همان ساعتِ 2G (مدلِ سنجیده با
  *   `server/test/link-2g.test.js` و همین آزمون با `S26_SPEED=1`)؛ `S26_SAVE_EVERY` (سنگین ۲۰): چند کارِ دکان در یک ثبت
  *   (`SyncCommit.record`) — هر ثبت کلِ دفتر و صف را می‌نویسد، پس با ۳۳ هزار op ِ صف ثبتِ تک‌تک ساعت‌ها طول می‌کشد.
- *   `S26_REPORT=<پرونده.json>` عددها را می‌نویسد. با `cleanTest` تا «UP-TO-DATE» نشود.
+ *   `S26_ONLY=s26|syn04|v3` فقط همان یکی؛ `S26_REPORT=<پرونده.json>` عددها را می‌نویسد؛ `S26_CLASSPATH=<پرونده>` classpath ِ آزمون را (اجرای سنگین با `java` بی قفلِ
+ *   Gradle). با `cleanTest` تا «UP-TO-DATE» نشود.
  *  مرزِ راست‌گویی: شبیه‌سازیِ JVM روی کانتینر، نه گوشیِ واقعی؛ دو «گوشی» همان کدِ `HttpEngine` روی JVM‌اند
  *  (`HttpURLConnection` ِ JDK `Accept-Encoding: gzip` نمی‌فرستد؛ OkHttp ِ اندروید می‌فرستد).
  */
@@ -120,7 +121,8 @@ class S26Load2GDesktopTest {
 
   /** «همان کالا از چند دستگاه»: قیمتِ یکی از پنج کالای پرفروش — هر سه دستگاه، بی خبر از هم */
   private fun Stager.reprice(rnd: Random, clock: ShopClock, hot: List<String>) {
-    val p = dev.ledger.products.first { it.id == hot[rnd.nextInt(hot.size)] }
+    val id = hot[rnd.nextInt(hot.size)]
+    val p = dev.ledger.products.firstOrNull { it.id == id } ?: error("${dev.label}: کالای پرفروشِ $id نیست (${dev.ledger.products.size} کالا)")
     val draft = WarehouseEngine.ProductDraft(name = p.name, category = p.category, unit = p.unit, purchasePrice = p.purchasePrice, salePrice = (100 + rnd.nextInt(60)).toDouble(), minStock = p.minStock)
     (WarehouseEngine.editProduct(dev.ledger, p.id, draft, clock.today, clock.now, ::newId) as? WarehouseEngine.Result.Ok)?.let { put(it.data) }
   }
@@ -171,7 +173,7 @@ class S26Load2GDesktopTest {
 
   /* ════════════════════════ خطِ 2G و بازگشت ════════════════════════ */
 
-  private fun linkCfg(seed: Int): JsonObject = buildJsonObject {
+  private fun linkCfg(seed: Int, v3: Boolean = false): JsonObject = buildJsonObject {
     put("rttMs", env("S26_RTT")?.toDoubleOrNull() ?: 600.0)
     put("upBps", (env("S26_KBPS")?.toDoubleOrNull() ?: 50.0) * 1000)
     put("downBps", (env("S26_KBPS")?.toDoubleOrNull() ?: 50.0) * 1000)
@@ -184,7 +186,7 @@ class S26Load2GDesktopTest {
     put("seed", seed)
     //  سه بریدنِ قطعی روی هر خط: push پیش از رسیدن به سرور، پاسخِ push پس از اعمال، و پاسخِ pull
     put("forced", JsonArray(listOf(Triple("push", 2, "up"), Triple("push", 4, "down"), Triple("pull", 2, "down")).map { (k, n, dir) ->
-      buildJsonObject { put("kind", k); put("nth", n); put("dir", dir); put("frac", if (dir == "up") 0.5 else 0.6) }
+      buildJsonObject { put("kind", if (v3) "v3$k" else k); put("nth", n); put("dir", dir); put("frac", if (dir == "up") 0.5 else 0.6) }
     }))
   }
 
@@ -235,17 +237,33 @@ class S26Load2GDesktopTest {
     else -> e
   }
 
-  /** همهٔ مجموعه‌های همگام‌شدنی از درِ مدل (`modelTree`)، ردیف‌ها به ترتیبِ شناسه و کلیدها مرتب ⇒ sha256 */
-  private fun canon(tree: JsonObject): Pair<String, Int> {
+  /** هر ردیفِ همگام‌شدنی از درِ مدل (`modelTree`) با کلیدهای مرتب: «جدول/شناسه» ⇒ متن */
+  private fun canonRows(tree: JsonObject): Map<String, String> {
     val model = LedgerDiff.modelTree(tree)
-    val sb = StringBuilder()
-    for (t in LedgerDiff.COLLECTIONS + LedgerDiff.LIST_COLLECTIONS) {
-      val rows = (model[t] as? JsonArray).orEmpty().map { sorted(it) }
-        .sortedBy { r -> ((r as? JsonObject)?.get("id") as? JsonPrimitive)?.content ?: r.toString() }
-      sb.append(t).append('=').append(JsonArray(rows).toString()).append('\n')
+    val out = java.util.TreeMap<String, String>()
+    for (t in LedgerDiff.COLLECTIONS + LedgerDiff.LIST_COLLECTIONS) for (r in (model[t] as? JsonArray).orEmpty()) {
+      val id = ((r as? JsonObject)?.get("id") as? JsonPrimitive)?.content ?: r.toString()
+      out["$t/$id"] = sorted(r).toString()
     }
+    return out
+  }
+
+  /** همهٔ مجموعه‌ها، ردیف‌ها به ترتیبِ «جدول/شناسه» و کلیدها مرتب ⇒ sha256 و اندازه */
+  private fun canon(tree: JsonObject): Pair<String, Int> {
+    val sb = StringBuilder()
+    for ((k, v) in canonRows(tree)) sb.append(k).append('=').append(v).append('\n')
     val bytes = sb.toString().toByteArray(Charsets.UTF_8)
     return MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) } to bytes.size
+  }
+
+  /** «بایت‌به‌بایت» با شرحِ نخستین ردیف‌های ناهمسان */
+  private fun assertSame(label: String, want: JsonObject, got: JsonObject) {
+    val a = canonRows(want)
+    val b = canonRows(got)
+    if (a == b) return
+    val keys = (a.keys + b.keys).filter { a[it] != b[it] }
+    val first = keys.take(3).joinToString("\n") { "  $it\n    سرور: ${a[it]?.take(400)}\n    دستگاه: ${b[it]?.take(400)}" }
+    throw AssertionError("$label: ${keys.size} ردیفِ ناهمسان از ${a.size}/${b.size}\n$first")
   }
 
   /* ════════════════════════ آزمون‌ها ════════════════════════ */
@@ -262,6 +280,7 @@ class S26Load2GDesktopTest {
    *  می‌شود (موتور و ترابری تازه — همان `SyncV3Runner` پس از بسته شدن). فاصلهٔ تلاش همان `V3Step.retryInMs` ِ موتور.
    */
   @Test fun `SYN-04 v3 پشتِ SYNC_V3_ENABLED روی همان خطِ 2G ⇒ هر op یک بار و همگرایی`() {
+    only("v3")
     val root = OfflineBackend.repoRoot()
     val missing = OfflineBackend.available(root)
     assumeTrue("سرورِ واقعی در دسترس نیست: $missing", missing == null)
@@ -313,6 +332,7 @@ class S26Load2GDesktopTest {
     for (d in devs + A) v3Sync(engines.getValue(d))
     val debtors = A.ledger.debtors.map { it.id }
     val hot = A.ledger.products.take(5).map { it.id }
+    for (d in devs) assertEquals("${d.label}: روزِ صفر همهٔ کالاها", 40, d.ledger.products.size)
     val online0 = engines.values.sumOf { it.queued() }
     assertEquals(0, online0)
 
@@ -333,14 +353,16 @@ class S26Load2GDesktopTest {
       perAction = offlineOps().toDouble() / maxOf(1, actions)
     }
     val made = devs.associateWith { d -> engines.getValue(d).queue.outbox.flatMap { e -> e.ops.mapNotNull { (it["op_id"] as? JsonPrimitive)?.content } }.toSet() }
+    val offlineTotal = made.values.sumOf { it.size }
     val offlineMs = System.currentTimeMillis() - t0
 
-    /* ── روزِ ۳۱: برنامه از نو (موتور و ترابریِ تازه)، هر دستگاه روی خطِ خودش، هم‌زمان ── */
-    be.serverDay(days + 1.0 + 9 / 24.0)
+    /* ── روزِ ۳۱: برنامه از نو (موتور و ترابریِ تازه)، هر دستگاه روی خطِ خودش، هم‌زمان ──
+     *  ساعتِ سرور جابه‌جا نمی‌شود: موتورِ v3 ساعتِ واقعیِ دستگاه را با `server_time` می‌سنجد (سقفِ ۵ دقیقه) و ساعتِ
+     *  دکانِ این آزمون فقط در سندها جلو می‌رود ⇒ جابه‌جاییِ ۳۱ روزهٔ سرور «ساعتِ کج» ِ ساختگی می‌ساخت. */
     val waits = devs.associateWith { ArrayList<Long>() }
     for ((i, d) in devs.withIndex()) {
       engines[d] = v3Engine(d)
-      d.apiUrl = be.call("POST", "/link", obj("id" to d.label, "cfg" to linkCfg(360 + i))).str("url")
+      d.apiUrl = be.call("POST", "/link", obj("id" to d.label, "cfg" to linkCfg(360 + i, v3 = true))).str("url")
       d.online = true
     }
     val tNet = System.currentTimeMillis()
@@ -369,7 +391,18 @@ class S26Load2GDesktopTest {
     for (d in devs) d.apiUrl = direct
     val server = LedgerDiff.fromSnapshot(V3Convert.snapshotToLegacy(A.api.get("/sync/v3/snapshot")), LedgerDiff.toJson(ShopData()))
     val want = canon(server)
-    for (d in devs) assertEquals("${d.label} = Snapshot ِ v3 (بایت)", want, canon(LedgerDiff.toJson(d.ledger)))
+    //  ویرایشِ هم‌زمانِ همان کالا: بازندهٔ LWW در صندوقِ تعارضِ v3 (SYN-07) می‌نشیند و دفترِ همان دستگاه تا «keep/revert» ِ
+    //  صاحب مقدارِ خودش را نگه می‌دارد ⇒ هر ردیفِ ناهمسان باید یک تعارضِ باز داشته باشد؛ بقیه بایت‌به‌بایت
+    val open = engines.getValue(A).fetchConflicts().orEmpty()
+    val conflicted = open.mapTo(HashSet()) { "${(it["table"] as? JsonPrimitive)?.content}/${(it["row_id"] as? JsonPrimitive)?.content}" }
+    val want3 = canonRows(server)
+    val diverged = HashMap<String, Int>()
+    for (d in devs) {
+      val got = canonRows(LedgerDiff.toJson(d.ledger))
+      val bad = (want3.keys + got.keys).filter { want3[it] != got[it] }
+      diverged[d.label] = bad.size
+      assertTrue("${d.label}: ردیفِ ناهمسانِ بی تعارضِ باز ${bad.filter { it !in conflicted }.take(3)}", bad.all { it in conflicted })
+    }
 
     val report = ArrayList<String>()
     for (d in devs) {
@@ -388,22 +421,29 @@ class S26Load2GDesktopTest {
         "زمانِ 2G ${"%.1f".format(v2g / 60_000)} دقیقه (دیواری ${walls.getValue(d) / 1000}s)"
     }
     val json = buildJsonObject {
-      put("name", "v3"); put("ops", offlineOps()); put("speed", speed)
+      put("name", "v3"); put("ops", offlineTotal); put("speed", speed); put("openConflicts", open.size)
+      put("diverged", JsonObject(diverged.mapValues { JsonPrimitive(it.value) })); put("rows", want3.size)
       put("report", JsonArray(report.map { JsonPrimitive(it) }))
       put("links", JsonObject(linkAt.entries.associate { (d, v) -> d.label to JsonObject(v.filterKeys { it != "log" }) }))
     }.toString()
     env("S26_REPORT")?.let { File(it.replace(".json", "-v3.json")).writeText(json) }
     println(
       """
-      |── S26/v3 (${be.db}، ${offlineOps()} op ِ قطعیِ v1-شمار، سرعتِ خط ×$speed، gzip_push روشن، برنامه از نو در روزِ ۳۱) ──
+      |── S26/v3 (${be.db}، $offlineTotal op ِ قطعی، سرعتِ خط ×$speed، gzip_push روشن، برنامه از نو در روزِ ۳۱) ──
       |${report.joinToString("\n|")}
-      |سرور: sync_v3_ops ${log.str("total")} یکتا ${log.str("distinct")}، تکراری ۰؛ همگرایی: سه دفتر = Snapshot ِ v3 (sha ${want.first.take(12)})
+      |سرور: sync_v3_ops ${log.str("total")} یکتا ${log.str("distinct")}، تکراری ۰؛ تعارضِ باز ${open.size} (${open.groupingBy { (it["kind"] as? JsonPrimitive)?.content }.eachCount()})؛ ردیفِ ناهمسان با Snapshot ِ v3 (همه با تعارضِ باز): $diverged از ${want3.size} (sha ِ سرور ${want.first.take(12)})
       |زمان: قطعی ${offlineMs / 1000}s، همگام‌سازیِ هم‌زمان ${parallelMs / 1000}s
       """.trimMargin()
     )
   }
 
+  /** `S26_ONLY=s26|syn04|v3` ⇒ فقط همان (اجرای سنگین) */
+  private fun only(name: String) = assumeTrue("S26_ONLY=${env("S26_ONLY")}", env("S26_ONLY")?.let { it == name } ?: true)
+
   private fun scenario(name: String, ops: Int, gzip: Boolean) {
+    only(name)
+    //  اجرای سنگین بیرون از Gradle (`java -cp … org.junit.runner.JUnitCore`): همان classpath ِ آزمون در این پرونده
+    (env("S26_CLASSPATH") ?: env("S26_REPORT")?.replace(".json", ".classpath"))?.let { File(it).writeText(System.getProperty("java.class.path")) }
     val root = OfflineBackend.repoRoot()
     val missing = OfflineBackend.available(root)
     assumeTrue("سرورِ واقعی در دسترس نیست: $missing", missing == null)
@@ -438,6 +478,7 @@ class S26Load2GDesktopTest {
     //  گشایشِ روزِ صفر: هر گوشی یک فروش، تا هر سه دستگاه pull ِ با op ِ دیگری را دیده باشند
     for (d in listOf(B, C)) Stager(d, 1).sell(rnd, clock, false, debtors)
     for (d in devs + A) assertTrue(d.sync().isSuccess)
+    for (d in devs) assertTrue("${d.label}: روزِ صفر همهٔ کالاها (${d.ledger.products.size})", d.ledger.products.size == 40 && d.ledger.products.map { it.id }.containsAll(hot))
     val seedOps = devs.associateWith { it.made.size }
 
     /* ── ۳۰ روز بی اینترنت ── */
@@ -504,7 +545,8 @@ class S26Load2GDesktopTest {
     val want = canon(server)
     for (d in devs) {
       assertEquals("${d.label} = سرور (ردیف)", emptyList<String>(), LedgerDiff.diff(LedgerDiff.shadowOf(LedgerDiff.fromJson(server)), LedgerDiff.toJson(d.ledger), 0).map { "${it.table}/${it.rowId}" }.take(10))
-      assertEquals("${d.label} = سرور (بایت)", want, canon(LedgerDiff.toJson(d.ledger)))
+      assertSame("${d.label} = سرور (بایت)", server, LedgerDiff.toJson(d.ledger))
+      assertEquals(want, canon(LedgerDiff.toJson(d.ledger)))
     }
     for (p in A.ledger.products) for (d in listOf(B, C)) assertEquals("موجودیِ ${p.name}", ShopStore.stock(A.ledger, p.id), ShopStore.stock(d.ledger, p.id), 1e-9)
     for (id in debtors) for (d in listOf(B, C)) assertEquals("قرضِ $id", ShopStore.debt(A.ledger, id), ShopStore.debt(d.ledger, id), 1e-9)
@@ -550,7 +592,8 @@ class S26Load2GDesktopTest {
         "گم‌شده ${l.str("lostUp")}+${l.str("lostDown")}؛ زمانِ 2G ${"%.1f".format(v2g / 60_000)} دقیقه (دیواری ${r.wallMs / 1000}s، سرور ${"%.0f".format(l.str("serverMs").toDouble() / 1000)}s)"
       json.append(if (i > 0) "," else "").append("{\"label\":\"${d.label}\",\"ops\":${d.made.size},\"queued\":${queued.getValue(d)},\"pushes\":${d.pushes},\"duplicates\":${d.duplicates},")
         .append("\"failures\":${r.failures.size},\"waits\":${r.waits},\"immediatePushRetries\":$immediate,\"v2gMs\":${v2g.toLong()},\"wallMs\":${r.wallMs},\"maxBatch\":${d.maxBatch},\"maxBatchBytes\":${d.maxBatchBytes},")
-        .append("\"maxOpFieldsBytes\":${d.maxOpFieldsBytes},\"pulledOps\":${d.pulledOps},\"link\":${JsonObject(l.filterKeys { it != "log" })}}")
+        .append("\"maxOpFieldsBytes\":${d.maxOpFieldsBytes},\"pulledOps\":${d.pulledOps},\"failureKinds\":${JsonArray(r.failures.map { JsonPrimitive(it) })},")
+        .append("\"wire\":${JsonArray((l["log"] as JsonArray).map { it as JsonArray }.filter { (it[0] as JsonPrimitive).content in setOf("push", "pull", "refresh") })},\"link\":${JsonObject(l.filterKeys { it != "log" })}}")
     }
     assertTrue("پاسخِ push پس از اعمال بریده شد ($dropDown) ⇒ «تکراری» از سرور ($dups)", dropDown >= 1 && dups > 0)
     if (gzip) assertEquals("SYN-04: پرچمِ `sync.gzip_push` ⇒ هر push ِ بالای ۱KB فشرده ($gzOk از $gzBig)", gzBig, gzOk)

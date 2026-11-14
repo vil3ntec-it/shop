@@ -208,7 +208,8 @@ internal class ShopDevice(
     ),
     tokens,
   )
-  private val client = SyncV1Client(api) { PushSince.since(state.pushSince, state.cursor) }
+  /** همان `SyncV1Engine.pushClient` (SYN-04: «فشرده بفرست» ِ ماندگار در `SyncStateV1.gzipPush`) */
+  private val client = SyncV1Client(api, { PushSince.since(state.pushSince, state.cursor) }, SyncV1Client.PushGzip({ state.gzipPush }, { state.gzipPush = it }))
 
   /** همان سه تکهٔ `SyncV1Engine.parts` */
   private val parts = object : SyncCommit.Parts {
