@@ -21,7 +21,19 @@ class SyncV1Client(
   private val api: ApiClient,
   /** `since` ِ push (#481، پرچمِ دکانِ `sync.cursor_from_since`)؛ null ⇒ نمی‌رود */
   private val since: () -> Long? = { null },
+  /** SYN-04: push ِ فشرده پس از `gzip_push` ِ pull ِ با op (پرچمِ دکانِ `sync.gzip_push`)؛ null ⇒ همیشه ساده */
+  private val gzip: PushGzip? = null,
 ) {
+
+  /**
+   *  SYN-04 — «push ات را فشرده بفرست» ِ سرور (`lib/sync-v1-keep.js`): فقط pull ِ با op می‌گوید و دستگاه آخرین را
+   *  نگه می‌دارد ([get]/[set] ⇐ `SyncStateV1.gzipPush`، تا push ِ نخستِ پس از قطعی هم فشرده برود). بدنهٔ بالای
+   *  `V3Gzip.MIN_CHARS` با `Content-Encoding: gzip` (همان قاعدهٔ وب و `HttpV3Transport`)؛ ۴۱۵ یا ۴۰۰ ِ `bad_json`
+   *  (بدنه باز نشد، هیچ op اعمال نشد) ⇒ همان دم ساده و تا پایانِ همین اجرا ساده ([refused]).
+   */
+  class PushGzip(val get: () -> Boolean, val set: (Boolean) -> Unit) {
+    @Volatile var refused = false
+  }
 
   data class PushResult(
     val results: List<OpResult>,
@@ -53,7 +65,16 @@ class SyncV1Client(
   ): PushResult {
     val body = pushBody(deviceId, ops, queued, caps, schema, since())
     val res = try {
-      api.post(ApiEndpoints.SyncV1.PUSH, body)
+      val text = body.toString()
+      val g = gzip
+      if (g == null || g.refused || text.length < ir.vil3ntec.tohid.sync.v3.V3Gzip.MIN_CHARS || !g.get()) api.post(ApiEndpoints.SyncV1.PUSH, body)
+      else try {
+        api.postBytes(ApiEndpoints.SyncV1.PUSH, ir.vil3ntec.tohid.sync.v3.V3Gzip.pack(text), "application/json", mapOf("Content-Encoding" to "gzip"))
+      } catch (f: ApiFailure) {
+        if (f.status != 415 && !(f.status == 400 && f.code == "bad_json")) throw f
+        g.refused = true
+        api.post(ApiEndpoints.SyncV1.PUSH, body)
+      }
     } catch (failure: ApiFailure) {
       if (failure.status == 426) throw UpgradeRequired(failure.userMessage)
       throw failure
@@ -87,6 +108,8 @@ class SyncV1Client(
       val device = (o["device_id"] as? JsonPrimitive)?.content.orEmpty()
       if (seq > 0 && device.isNotEmpty()) seen += ReplayBook.Sent(op.opId, seq, op.toJson(), device)
     }
+    //  SYN-04: pull ِ بی op چیزی نمی‌گوید (`sync-v1-keep.pullExtras`) ⇒ همان آخرین پاسخِ با op
+    if (ops.isNotEmpty()) gzip?.set((res["gzip_push"] as? JsonPrimitive)?.content == "true")
     return PullResult(
       ops = ops,
       cursor = num(res, "cursor") ?: since,

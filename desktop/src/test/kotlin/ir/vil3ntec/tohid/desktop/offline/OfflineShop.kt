@@ -119,12 +119,14 @@ internal class OfflineBackend private constructor(private val proc: Process, val
       else -> null
     }
 
-    fun start(root: File, log: File): OfflineBackend {
+    /** [extraEnv]: متغیرِ محیطِ همان سرور (مثلاً `SYNC_V3_ENABLED` برای S26/v3) */
+    fun start(root: File, log: File, extraEnv: Map<String, String> = emptyMap()): OfflineBackend {
       val out = File(log.parentFile, "offline30-backend-${System.nanoTime()}.json")
       val pb = ProcessBuilder("node", File(root, "server/test/e2e/lib/offline30-backend.mjs").path, out.path)
         .directory(File(root, "server")).redirectErrorStream(true).redirectOutput(log)
       //  PostgreSQL ِ محلی (پایگاهِ جدا؛ schema ِ public از نو) — بی آن PGlite ِ در حافظه
       env("OFFLINE30_DATABASE_URL")?.let { pb.environment()["E2E_DATABASE_URL"] = it }
+      pb.environment().putAll(extraEnv)
       val p = pb.start()
       val until = System.currentTimeMillis() + 180_000
       while (!out.isFile || out.length() == 0L) {
@@ -163,7 +165,8 @@ internal class ShopDevice(
   val deviceId: String,
   val userId: String,
   val seller: String,
-  apiUrl: String,
+  /** نشانیِ سرور — S26 پس از قطعی همان دستگاه را به خطِ 2G ِ خودش می‌برد (`OfflineBackend` ⇐ `/link`) */
+  @Volatile var apiUrl: String,
   val tokens: MemTokens,
   root: File,
   appVersion: String,
@@ -185,6 +188,15 @@ internal class ShopDevice(
   var maxBatchBytes = 0
   var duplicates = 0
   var refused = 0
+  /** S26: بزرگ‌ترین `fields` ِ یک op (سقفِ سرور ۶۴KB، `MAX_FIELDS_BYTES`) */
+  var maxOpFieldsBytes = 0
+  /** S26: opی که سرور پیش‌تر پذیرفته بود و دوباره در دسته رفت — «ادامه از همان‌جا» یعنی صفر */
+  var resentAfterAck = 0
+  /** S26: opهای پذیرفته (applied/duplicate) تا این‌جا */
+  val acked = HashSet<String>()
+  /** S26: opهای گرفته‌شده از دیگران و این‌که آخرین pull گفت «باز هست» */
+  var pulledOps = 0
+  var lastHasMore = false
   var saveMs = 0L
   var saves = 0
   var slowestSaveMs = 0L
@@ -196,7 +208,8 @@ internal class ShopDevice(
     ),
     tokens,
   )
-  private val client = SyncV1Client(api) { PushSince.since(state.pushSince, state.cursor) }
+  /** همان `SyncV1Engine.pushClient` (SYN-04: «فشرده بفرست» ِ ماندگار در `SyncStateV1.gzipPush`) */
+  private val client = SyncV1Client(api, { PushSince.since(state.pushSince, state.cursor) }, SyncV1Client.PushGzip({ state.gzipPush }, { state.gzipPush = it }))
 
   /** همان سه تکهٔ `SyncV1Engine.parts` */
   private val parts = object : SyncCommit.Parts {
@@ -258,6 +271,8 @@ internal class ShopDevice(
       rounds++
       val got = client.pull(deviceId, state.cursor)
       if (got.ops.isNotEmpty()) onPulled(got.ops)
+      pulledOps += got.ops.size
+      lastHasMore = got.hasMore
       if (got.ops.isNotEmpty()) commit.absorb(got.ops, ledger, got.cursor) { ledger = it }
       state.cursor = got.cursor
       if (got.serverSchema > 0) state.serverSchema = got.serverSchema
@@ -284,6 +299,8 @@ internal class ShopDevice(
       if (batch.isEmpty()) break
       maxBatch = maxOf(maxBatch, batch.size)
       maxBatchBytes = maxOf(maxBatchBytes, batch.sumOf { it.toJson().toString().toByteArray().size + 1 })
+      maxOpFieldsBytes = maxOf(maxOpFieldsBytes, batch.maxOf { (it.toJson()["fields"] ?: JsonObject(emptyMap())).toString().toByteArray().size })
+      resentAfterAck += batch.count { it.opId in acked }
       pushes++
       val out = client.push(deviceId, batch, queue.size(), caps = true, schema = LedgerDiff.wireSchema(state.serverSchema))
       state.serverSchema = out.serverSchema
@@ -291,6 +308,7 @@ internal class ShopDevice(
       duplicates += out.results.count { it.status == "duplicate" }
       val rejected = out.results.filter { !it.accepted }
       if (accepted.isNotEmpty()) queue.ack(accepted)
+      acked += accepted
       if (rejected.isNotEmpty()) {
         refused += rejected.size
         rejected.groupBy { it.reason.ifBlank { "rejected" } }.forEach { (why, rs) ->
