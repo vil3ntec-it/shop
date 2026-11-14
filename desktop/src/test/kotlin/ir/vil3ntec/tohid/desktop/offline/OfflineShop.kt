@@ -257,11 +257,22 @@ internal class ShopDevice(
     while (rounds < 50) {
       rounds++
       val got = client.pull(deviceId, state.cursor)
+      if (got.ops.isNotEmpty()) onPulled(got.ops)
       if (got.ops.isNotEmpty()) commit.absorb(got.ops, ledger, got.cursor) { ledger = it }
       state.cursor = got.cursor
       if (got.serverSchema > 0) state.serverSchema = got.serverSchema
       if (!got.hasMore) break
     }
+  }
+
+  /** S29: opهای رسیده از سرور در هر Pull — حلقهٔ «دیده از سرور» ِ هاب (`HubLinkV1Android.saw`) */
+  var onPulled: (List<SyncOp>) -> Unit = {}
+
+  /** S29: op ِ دستگاهِ دیگر از هابِ کامپیوتر — همان `SyncV1Engine.absorbRemote(…, cursor = null, keepPending = true)` */
+  fun absorbFromHub(ops: List<SyncOp>) {
+    if (commit.pending()) commit.recover(ledger)
+    val use = LedgerDiff.keepPending(ops, queue.all())
+    if (use.isNotEmpty()) commit.absorb(use, ledger, null) { ledger = it }
   }
 
   /** `SyncV1Engine.pushQueue`: فقط applied/duplicate از صف بیرون؛ ردشده با دلیل در دفترِ کنار */

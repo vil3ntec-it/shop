@@ -12,12 +12,14 @@ import ir.vil3ntec.tohid.core.hub.HubCloud
 import ir.vil3ntec.tohid.core.hub.HubForwarder
 import ir.vil3ntec.tohid.core.hub.HubLimiter
 import ir.vil3ntec.tohid.core.hub.HubLimits
+import ir.vil3ntec.tohid.core.hub.HubLogLimits
 import ir.vil3ntec.tohid.core.hub.HubOffer
 import ir.vil3ntec.tohid.core.hub.HubParse
 import ir.vil3ntec.tohid.core.hub.HubPasses
 import ir.vil3ntec.tohid.core.hub.HubQueue
 import ir.vil3ntec.tohid.core.hub.HubQueueState
 import ir.vil3ntec.tohid.core.hub.HubRoute
+import ir.vil3ntec.tohid.core.hub.HubV1Cloud
 import ir.vil3ntec.tohid.core.hub.HubVerdict
 import ir.vil3ntec.tohid.data.DiskWrite
 import kotlinx.serialization.json.JsonArray
@@ -53,7 +55,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal class HubServer(
   private val dir: File,
   private val tls: HubTls,
-  private val serverId: String,
+  internal val serverId: String,
   /** دکانِ حسابِ خودِ همین کامپیوتر — فقط توکنِ همین دکان پذیرفته است */
   private val shopId: String,
   private val cloud: HubCloud,
@@ -65,6 +67,10 @@ internal class HubServer(
   private val limits: HubLimits = HubLimits(),
   private val requestsPerMinute: Int = 120,
   private val requestBurst: Int = 60,
+  /** S29: درگاهِ push ِ v1 ِ سرور ⇒ دفترِ v1، جفت‌سازی و رد و بدلِ op (`HubV1`)؛ `null` ⇒ همان برشِ v3 */
+  v1Cloud: HubV1Cloud? = null,
+  random: (Int) -> ByteArray = { n -> ByteArray(n).also { java.security.SecureRandom().nextBytes(it) } },
+  logLimits: HubLogLimits = HubLogLimits(),
 ) {
   private val lock = Any()
   private var queue: HubQueueState = loadQueue()
@@ -95,6 +101,9 @@ internal class HubServer(
   }
   private val forward = HubForwarder(box, cloud, limits)
 
+  /** S29 — دفترِ v1، جفت‌سازی و خوراکِ opهای دستگاه‌های دیگر */
+  internal val v1: HubV1? = v1Cloud?.let { HubV1(this, dir, shopId, tls.pin, it, seal, open, clock, random, logLimits) }
+
   /** بدنهٔ درخواستِ جاری تا ته خوانده شد (`readLimited` ِ موفق)؟ هر exchange از `handle` تا `ex.close()` روی یک رشتهٔ `tohid-hub` است. */
   private val bodyRead: ThreadLocal<Boolean> = ThreadLocal.withInitial { false }
 
@@ -118,7 +127,7 @@ internal class HubServer(
     pool = workers
     if (autoForward) {
       val f = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "tohid-hub-forward").apply { isDaemon = true } }
-      f.scheduleWithFixedDelay({ runCatching { box.update { HubQueue.expire(it, clock(), limits) } }; kick() }, 5, 30, TimeUnit.SECONDS)
+      f.scheduleWithFixedDelay({ runCatching { box.update { HubQueue.expire(it, clock(), limits) } }; runCatching { v1?.compact() }; kick() }, 5, 30, TimeUnit.SECONDS)
       forwarder = f
     }
   }
@@ -134,31 +143,46 @@ internal class HubServer(
 
   /** یک دورِ فرستادن، همین‌جا (آزمون و `kick`) */
   fun forwardNow(): HubForwarder.Pass {
-    val pass = forward.drain(
-      tokenOf = { d -> synchronized(lock) { tokens[d] } },
-      onAuthFailed = { d, t ->
-        synchronized(lock) {
-          if (tokens[d] == t) tokens.remove(d)
-          val n = HubAuth.revoke(passes, t)
-          if (n != passes) { save(PASSES_FILE, HubAuth.encode(n)); passes = n }
-        }
-      },
-    )
-    attempt = if (pass.retry) attempt + 1 else 0
-    notBefore = if (pass.retry) clock() + HubForwarder.backoffMs(attempt - 1) else 0L
+    val pass = forward.drain(tokenOf = ::tokenOf, onAuthFailed = ::authFailed)
+    backoff(pass.retry)
     return pass
+  }
+
+  /** S29: یک دورِ فرستادنِ دفترِ v1 (همان عقب‌نشینی) */
+  fun forwardV1Now(): HubForwarder.Pass? {
+    val pass = v1?.forwardNow() ?: return null
+    backoff(pass.retry)
+    return pass
+  }
+
+  private fun backoff(retry: Boolean) {
+    attempt = if (retry) attempt + 1 else 0
+    notBefore = if (retry) clock() + HubForwarder.backoffMs(attempt - 1) else 0L
+  }
+
+  /** توکنِ همین حالای دستگاه — ⛔ فقط حافظه */
+  internal fun tokenOf(device: String): String? = synchronized(lock) { tokens[device] }
+
+  /** سرور توکن را نپذیرفت: از حافظه و از فهرستِ سنجیده‌ها بیرون */
+  internal fun authFailed(device: String, token: String) {
+    synchronized(lock) {
+      if (tokens[device] == token) tokens.remove(device)
+      val n = HubAuth.revoke(passes, token)
+      if (n != passes) { save(PASSES_FILE, HubAuth.encode(n)); passes = n }
+    }
   }
 
   fun snapshot(): HubQueueState = box.read()
 
-  private fun kick() {
+  internal fun kick() {
     val f = forwarder ?: return
     if (clock() < notBefore || !kicked.compareAndSet(false, true)) return
     runCatching {
       f.execute {
         kicked.set(false)
         val pass = runCatching { forwardNow() }.getOrNull()
-        if (pass?.retry == true) f.schedule({ kick() }, (notBefore - clock()).coerceAtLeast(0), TimeUnit.MILLISECONDS)
+        val p1 = if (pass?.retry == true) null else runCatching { forwardV1Now() }.getOrNull()
+        if (pass?.retry == true || p1?.retry == true) f.schedule({ kick() }, (notBefore - clock()).coerceAtLeast(0), TimeUnit.MILLISECONDS)
       }
     }.onFailure { kicked.set(false) }
   }
@@ -174,28 +198,18 @@ internal class HubServer(
       if (!synchronized(lock) { requests.allow(ip, clock()) }) return reply(ex, 429, error("hub_rate_limited"), retryAfter = 10)
       val path = ex.requestURI.path
       val method = ex.requestMethod
+      val routes = v1
+      if (routes != null && HubV1.owns(path)) return routes.handle(ex, method, path, ip)
       val isHello = method == "GET" && path == "/hub/v1/hello"
       val isPush = method == "POST" && path == "/hub/v1/push"
       if (!isHello && !isPush) return reply(ex, 404, error("hub_not_found"))
 
-      val token = bearer(ex.requestHeaders.getFirst("Authorization"))
-      val device = ex.requestHeaders.getFirst("X-Device")?.trim()
-      val app = header(ex, "X-App")
-      val snap = synchronized(lock) { passes }
-      val decided = HubAuth.decide(snap, token, device, shopId, clock()) {
-        if (synchronized(lock) { verifies.allow(ip, clock()) }) cloud.verify(token!!, device!!, app)
-        else CloudAnswer(CloudCheck.UNREACHABLE)
-      }
-      synchronized(lock) {
-        val n = HubAuth.apply(passes, decided.change, shopId)
-        if (n != passes) { save(PASSES_FILE, HubAuth.encode(n)); passes = n }
-      }
-      val v = decided.verdict
-      if (v is HubVerdict.Refuse) return reply(ex, v.reason.status, error(v.reason.code))
-      synchronized(lock) { tokens[device!!] = token!! }
+      val who = authorize(ex, ip) ?: return
+      val device = who.device
+      val app = who.app
 
       if (isHello) {
-        val queued = synchronized(lock) { HubQueue.queuedFor(queue, device!!) }
+        val queued = synchronized(lock) { HubQueue.queuedFor(queue, device) }
         if (queued > 0) kick()
         return reply(ex, 200, buildJsonObject {
           put("ok", true)
@@ -205,7 +219,7 @@ internal class HubServer(
           put("server_time", clock())
         }.toString())
       }
-      push(ex, device!!, app)
+      push(ex, device, app)
     } catch (t: Throwable) {
       runCatching { reply(ex, 500, error("hub_error")) }
     } finally {
@@ -214,13 +228,50 @@ internal class HubServer(
     }
   }
 
-  private fun push(ex: HttpExchange, device: String, app: String) {
-    if (ex.requestHeaders.getFirst("X-Server-Id")?.trim() != serverId) return reply(ex, 409, error("hub_other_server"))
+  internal data class Who(val device: String, val token: String, val app: String)
+
+  /**
+   *  ورود با توکنِ سرورِ همان دستگاه (`HubAuth`: نشستِ زنده و **فقط دکانِ خودِ هاب**)؛ رد ⇒ پاسخ همین‌جا و `null`.
+   *  پذیرفته ⇒ توکن (فقط در حافظه) برای فرستادنِ دسته‌های همان دستگاه.
+   */
+  internal fun authorize(ex: HttpExchange, ip: String): Who? {
+    val token = bearer(ex.requestHeaders.getFirst("Authorization"))
+    val device = ex.requestHeaders.getFirst("X-Device")?.trim()
+    val app = header(ex, "X-App")
+    val snap = synchronized(lock) { passes }
+    val decided = HubAuth.decide(snap, token, device, shopId, clock()) {
+      if (synchronized(lock) { verifies.allow(ip, clock()) }) cloud.verify(token!!, device!!, app)
+      else CloudAnswer(CloudCheck.UNREACHABLE)
+    }
+    synchronized(lock) {
+      val n = HubAuth.apply(passes, decided.change, shopId)
+      if (n != passes) { save(PASSES_FILE, HubAuth.encode(n)); passes = n }
+    }
+    val v = decided.verdict
+    if (v is HubVerdict.Refuse) { reply(ex, v.reason.status, error(v.reason.code)); return null }
+    synchronized(lock) { tokens[device!!] = token!! }
+    return Who(device!!, token!!, app)
+  }
+
+  /** `X-Server-Id` همان سرورِ هاب؟ نه ⇒ ۴۰۹ همین‌جا */
+  internal fun sameServer(ex: HttpExchange): Boolean {
+    if (ex.requestHeaders.getFirst("X-Server-Id")?.trim() == serverId) return true
+    reply(ex, 409, error("hub_other_server"))
+    return false
+  }
+
+  /** بدنه با سقف (`Content-Length` پیش از خواندن) و UTF-8 ِ درست؛ نه ⇒ ۴۱۳/۴۰۰ همین‌جا و `null` */
+  internal fun readBody(ex: HttpExchange, max: Int = limits.maxBodyBytes): String? {
     val declared = ex.requestHeaders.getFirst("Content-Length")?.trim()?.toLongOrNull()
-    if (declared != null && declared > limits.maxBodyBytes) return reply(ex, 413, error("hub_too_large"))
-    val bytes = readLimited(ex.requestBody, limits.maxBodyBytes) ?: return reply(ex, 413, error("hub_too_large"))
+    if (declared != null && declared > max) { reply(ex, 413, error("hub_too_large")); return null }
+    val bytes = readLimited(ex.requestBody, max) ?: run { reply(ex, 413, error("hub_too_large")); return null }
     bodyRead.set(true)
-    val text = utf8(bytes) ?: return reply(ex, 400, error("hub_bad_json"))
+    return utf8(bytes) ?: run { reply(ex, 400, error("hub_bad_json")); null }
+  }
+
+  private fun push(ex: HttpExchange, device: String, app: String) {
+    if (!sameServer(ex)) return
+    val text = readBody(ex) ?: return
     val ids = when (val p = HubQueue.parse(text, device, limits)) {
       is HubParse.Bad -> return reply(ex, 400, error(p.code))
       is HubParse.Ok -> p.opIds
@@ -254,7 +305,7 @@ internal class HubServer(
 
   /* ------------------------------ کمکی ------------------------------ */
 
-  private fun reply(ex: HttpExchange, status: Int, body: String, retryAfter: Int = 0) {
+  internal fun reply(ex: HttpExchange, status: Int, body: String, retryAfter: Int = 0) {
     val b = body.toByteArray(Charsets.UTF_8)
     ex.responseHeaders.set("Content-Type", "application/json; charset=utf-8")
     ex.responseHeaders.set("Cache-Control", "no-store")
@@ -264,7 +315,7 @@ internal class HubServer(
     ex.responseBody.use { it.write(b) }
   }
 
-  private fun error(code: String) = buildJsonObject { put("ok", false); put("error", code) }.toString()
+  internal fun error(code: String) = buildJsonObject { put("ok", false); put("error", code) }.toString()
 
   /**
    *  ⛔ پاسخ پیش از خواندنِ بدنه (۴۰۱/۴۰۳/۴۰۹/۴۱۳/۴۲۹، ۴۰۴ ِ POST و ۵۰۰) ⇒ `Connection: close`.
@@ -286,7 +337,7 @@ internal class HubServer(
     h?.trim()?.takeIf { it.length > 7 && it.regionMatches(0, "Bearer ", 0, 7, ignoreCase = true) }?.substring(7)?.trim()
 
   /** `X-App`/`X-App-Version`: کوتاه و بی نویسهٔ ناامن، وگرنه خالی */
-  private fun header(ex: HttpExchange, name: String): String =
+  internal fun header(ex: HttpExchange, name: String): String =
     ex.requestHeaders.getFirst(name)?.trim()?.takeIf { v ->
       v.length <= 32 && v.all { it.isLetterOrDigit() && it.code < 128 || it in "._-+" }
     }.orEmpty()
@@ -310,9 +361,9 @@ internal class HubServer(
       .decode(ByteBuffer.wrap(b)).toString()
   }.getOrNull()
 
-  private fun save(name: String, text: String) = HubFiles.writeAtomic(File(dir, name), seal(text).toByteArray(Charsets.UTF_8))
+  internal fun save(name: String, text: String) = HubFiles.writeAtomic(File(dir, name), seal(text).toByteArray(Charsets.UTF_8))
 
-  private fun loadText(name: String): String? {
+  internal fun loadText(name: String): String? {
     val f = File(dir, name)
     if (!f.isFile) return null
     return runCatching { open(f.readText(Charsets.UTF_8)) }.getOrNull()
