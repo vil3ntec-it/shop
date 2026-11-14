@@ -57,6 +57,23 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-63t زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-63t` (از `origin/claude/batch-63` baff32f2e) — شعبه، فازِ ۴: انتقالِ میانِ شعبه‌ها و موجودیِ شعبه‌های دیگر
+
+- **ساخته شد (سرور + هسته + رابطِ کمینه، پشتِ پرچمِ خاموشِ `shop.branches` و `shop.catalog`؛ طراحی و درها: [`BRANCHES-fa.md`](BRANCHES-fa.md) §۱۰؛
+  مهاجرتِ ۹۳۵ + rollback):** INV-11/S21 **میانِ شعبه‌ها** — `/api/shop/catalog/branch-transfers` (مقصدها، فهرست، جزئیات، ارسال، دریافتِ
+  ناقص/پایانی، رد): «در مسیر» در بخشِ فرستنده، دریافت/رد فقط در مقصد، ماشینِ وضعیت در کد و پایگاه (تریگر)، کلیدِ یکتاییِ هر گام در فضای
+  شعبهٔ کننده، قفلِ هر دو بخش به ترتیبِ ثابت، شعبه فقط از سرآیندِ سنجیده، سابقه و گام برای شعبهٔ کننده. POS-16/S17 (تصمیم به ما سپرده
+  شد): `GET …/products/:id/other-branches` فقط `{branchId, branchName, qty}` با دسترسی یا مجوزِ تازهٔ `stock.view_other_branches` (فقط صاحب
+  می‌دهد: `PUT /api/shop/branches/members/:id/perms`). هسته: `core/stock/BranchTransfer`، `core/stock/BranchStock`. قیمت‌پرسیِ گوشی و
+  کامپیوتر سطرِ «در شعبه‌های دیگر» (`data/OtherBranchesStockAndroid.kt`).
+- **تصمیم‌ها:** انتقالِ **درونِ** شعبهٔ غیرِ اصلی همان `branch_unsupported` (جدول‌های `stock_transfers` و گامِ دستگاه شعبه‌شناس نیستند؛ §۱۰).
+  مجوزِ POS-16 بیرون از `perm-core` (لایه‌های آن فقط می‌بندند و کلیدِ تازه کاتالوگِ همهٔ دکان‌ها را با پرچمِ خاموش هم عوض می‌کرد).
+- **آزمون‌ها:** `branch-transfers.test.js` ۹/۹ (PGlite و PostgreSQL ۱۶ ِ محلی)، `branch-stock-peek.test.js` ۳/۳، `tenant-matrix-branches` ۱/۱ (درهای
+  تازه با شناسهٔ واقعیِ «ب»)، `shop-route-inventory` ۲/۲، `paid-routes-entitlement` ۶/۶، `route-authz-inventory` ۴/۴، `upgrade-rehearsal` ۹/۹،
+  `shop-branches` ۱۰/۱۰، `shop-branches-stock` ۷/۷، `catalog-transfers` ۹/۹، `catalog-transfer-steps` ۷/۷؛ اجرای کاملِ سرور و Kotlin: پایینِ همین بند.
+- **مانده / قدمِ بعد:** صفحهٔ «انتقال میانِ شعبه‌ها» و کلیدِ مجوز در «شعبه‌ها» ِ برنامه و سرآیندِ `X-Branch-Id` در REST ِ برنامه (فازِ ۲، کنارِ
+  «انتخابِ شعبه» ِ عاملِ دیگر)؛ دفترِ دستگاه برای انتقالِ میانِ شعبه (پیشنهاد در §۱۰)؛ دستگاهِ واقعی (فازِ ۵).
+
 ### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-59b زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-59b` (از `origin/claude/batch-62` 21e7499a8) — شعبه درونِ یک دکان، فازِ ۳ ِ سرور
 
 - **ساخته شد (فقط سرور، پشتِ پرچمِ خاموشِ `shop.branches`؛ طراحی و جدولِ درها: [`BRANCHES-fa.md`](BRANCHES-fa.md) §۹؛ مهاجرتِ ۹۰۰ + rollback):**
