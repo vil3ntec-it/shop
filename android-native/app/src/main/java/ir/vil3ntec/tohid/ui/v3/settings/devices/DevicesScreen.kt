@@ -74,6 +74,8 @@ internal fun DevicesScreen(data: ShopData, tab: String?, onBack: (() -> Unit)?) 
     item(key = DeviceTab.PHOTOS.id) { PhotosCard(lit == DeviceTab.PHOTOS) }
     //  ابزارهای سخت‌افزارِ صفحهٔ دستگاه‌هایِ پیشین (چاپگر، صفِ چاپ، برچسب، ترازو، نمایشگرِ مشتری) — `DevicesHwAndroid.kt`
     item(key = "hw") { DevicesHwExtras(data) }
+    //  SYN-09/S29: هابِ شبکهٔ دکان — فقط با پرچمِ `app.multi_server` (`HubLanCard.kt`)؛ پس از همه تا جای کارت‌های `?tab=` جابه‌جا نشود
+    item(key = "lan-hub") { HubLanCard() }
   }
   }
 }

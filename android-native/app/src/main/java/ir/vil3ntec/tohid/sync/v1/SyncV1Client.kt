@@ -51,16 +51,7 @@ class SyncV1Client(
     deviceId: String, ops: List<SyncOp>, queued: Int, caps: Boolean = true,
     schema: Int = LedgerDiff.BASE_SCHEMA,
   ): PushResult {
-    val body = buildJsonObject {
-      put("device_id", JsonPrimitive(deviceId))
-      put("schema_version", JsonPrimitive(schema))
-      put("queued", JsonPrimitive(queued))
-      //  A00: دستهٔ دارای op ِ ساختِ پیش از A00 بی نشان (`LedgerDiff.capsFor`)
-      if (caps) put("caps", LedgerDiff.capsJson())
-      put("ops", JsonArray(ops.map { it.toJson() }))
-      //  #481: «تا این‌جا را دیده بودم» — سرور فقط با پرچمِ دکان می‌خواندش
-      since()?.let { put("since", JsonPrimitive(it)) }
-    }
+    val body = pushBody(deviceId, ops, queued, caps, schema, since())
     val res = try {
       api.post(ApiEndpoints.SyncV1.PUSH, body)
     } catch (failure: ApiFailure) {
@@ -164,6 +155,18 @@ class SyncV1Client(
   class UpgradeRequired(val reason: String) : Exception(reason)
 
   companion object {
+    /** بدنهٔ `POST /sync/v1/push` — همان بایت‌ها هم به هابِ شبکهٔ دکان می‌روند (S29، `HubExchangeV1`) */
+    fun pushBody(deviceId: String, ops: List<SyncOp>, queued: Int, caps: Boolean, schema: Int, since: Long?): JsonObject = buildJsonObject {
+      put("device_id", JsonPrimitive(deviceId))
+      put("schema_version", JsonPrimitive(schema))
+      put("queued", JsonPrimitive(queued))
+      //  A00: دستهٔ دارای op ِ ساختِ پیش از A00 بی نشان (`LedgerDiff.capsFor`)
+      if (caps) put("caps", LedgerDiff.capsJson())
+      put("ops", JsonArray(ops.map { it.toJson() }))
+      //  #481: «تا این‌جا را دیده بودم» — سرور فقط با پرچمِ دکان می‌خواندش
+      since?.let { put("since", JsonPrimitive(it)) }
+    }
+
     /** سقفِ `POST /api/shop/sync-epoch/deleted` (`sync-epoch.MAX_ASK`) */
     const val DELETED_CHUNK = 500
   }
