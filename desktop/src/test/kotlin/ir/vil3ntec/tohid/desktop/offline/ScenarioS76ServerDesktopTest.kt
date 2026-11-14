@@ -152,7 +152,7 @@ class ScenarioS76ServerDesktopTest {
       waitFor("رخدادِ زندهٔ سرور Pull ِ شاگرد را نساخت") { pullsRun.submit<Double?> { B.priceOf("tea") }.get() == 15.0 }
       val c = A.price("tea", 25.0)
       waitFor("رخدادِ دوم") { pullsRun.submit<Long> { B.state.cursor }.get() >= c }
-      assertEquals(25.0, pullsRun.submit<Double?> { B.priceOf("tea") }.get())
+      assertEquals(25.0, pullsRun.submit<Double?> { B.priceOf("tea") }.get()!!, 0.0)
       assertEquals(0, pullsRun.submit<Int> { B.queue.size() }.get())
     } finally {
       live.disconnect()
