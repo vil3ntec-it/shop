@@ -57,6 +57,29 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-56c زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-56c` (از `origin/claude/batch-62` 54a9333be) — ماندهٔ کدِ د۱۸: SEC-02، S09، S44
+
+- **SEC-02 ⇒ IMPLEMENTED-VERIFIED** (پرچمِ خاموشِ `shop.doc_chain`، FLAGS-ON §۴۰): برگشت، قرض/رسید، خرید و پرداخت به تأمین‌کننده هر ردیف یک سندِ
+  زنجیره (`core/audit/DocChainDocs`، بردارِ `doc-chain-docs-v1.json` با سازندهٔ JS ِ مستقل)؛ «تا کجا» ِ سندِ بی‌شماره در `DocChainState`
+  (`docFrom`/`docAt`/`docIds`، پنجرهٔ سه‌روزهٔ دیررسیده؛ بی آن وضعیت همان)؛ گردآوری `PlainChainFacts` در `DocChainSync` روی v1 و **v3**؛ صفحهٔ
+  «بررسیِ یکپارچگیِ اسناد» (`audit/doc-chain`؛ `DocChainAudit` هر حلقه را از دفترِ امروز از نو می‌سازد). سرور دست نخورد (نوع را محدود نمی‌کند؛
+  درِ زنده آزموده شد).
+- **S44 ⇒ IMPLEMENTED-VERIFIED** (FLAGS-ON §۳۸): دکمهٔ «بازیابی از پشتیبان» زیرِ دستگاهِ غیرفعال (صفحهٔ عضو و بخشِ «دستگاه‌ها»)، فقط با `replay` ِ
+  `GET /shop/devices`؛ فقط `pending-ops.json` از فایل خوانده می‌شود؛ رمزدار ⇐ عبارت.
+- **S09 ⇒ PARTIAL / «دستگاه»** (پرچمِ تازهٔ `shop.held_twice_cancel`، FLAGS-ON §۳۹): دستگاهی که `held_conflict` گرفت فروشِ **خودش** را فقط وقتی
+  فروشِ نخست قلم‌به‌قلم یکی است از راهِ لغوِ عادی لغو می‌کند (`HeldTwice`، `HeldTwiceAndroid`) و همیشه به صندوقِ صاحب گزارش می‌دهد
+  (`POST /shop/held-invoices/:id/twice`، `lib/held-twice.js`، گونهٔ `held_twice`). مانده: دو دستگاهِ واقعی.
+- **باگِ واقعیِ یافته (شاخهٔ پایه):** آزمون‌های کامپیوترِ `batch-62` کامپایل نمی‌شدند (`ReturnRequestCardUiTest`: import ِ `onAllNodes`؛
+  `ScenarioS76ServerDesktopTest`: `@Volatile` روی متغیرِ محلی) ⇒ هیچ آزمونِ desktop اجرا نمی‌شد؛ درست شد. سه شکستِ پیشینِ نوشته‌ها هم:
+  `CustomerErasureLedger.ERASED_NAME` بی «// داده:»، و `StrReturnRequests.filter/status/reason/method` که کدِ ناشناخته را پنهان می‌کردند؛ و سه شکستِ
+  اجرای کامل (پایین). ⚠️ هر «اجرای کاملِ desktop» ِ پیش از این روی `batch-62` در واقع اجرا نشده بود.
+- **آزمون (سرخ روی پایه ⇐ سبز):** سرور (PGlite): `doc-chain-docs` ۰/۳ ⇐ ۳/۳، `lost-device-replay-button` ۱/۲ ⇐ ۲/۲، `held-twice` ۰/۳ ⇐ ۳/۳؛ ۳۰ پروندهٔ
+  هم‌بسته (held، conflict-inbox، doc-chain، hash-chain، sale-void، paid-routes، route-inventory/authz، dead-doors، staff-perms، api-contract…) ۱۹۰ آزمون:
+  ۱۸۹ قبول، ۱ رد‌شده (فقط PostgreSQL)، ۰ شکست. core: `DocChainDocsTest`/`DocChainDocsVectorsTest` روی پایه کامپایل‌نشدنی (۶۶ خطا) ⇐ سبز؛ `jvmTest` ِ کامل
+  ۱۹۵۹/۱۹۵۹. desktop (هدف‌دار): `HeldTwiceTest` ۵/۵، `DocChainLedgerTest` ۳/۳، `LostDeviceRestoreDesktopTest` ۴/۴، `RowsE56cUiTest` ۵/۵، `HeldClaimTest` ۷/۷،
+  `HeldSyncTest` ۷/۷، `HeldInvoicesTest` ۲۹/۲۹، `HeldClaimSheetsUiTest` ۳/۳، `I18nCoverageTest` ۸/۸، `DariCoverageTest` ۲۳/۲۳، `V3ReachabilityTest` ۹/۹ و
+  دیگر آزمون‌های مسیر، `VoidFlowTest` ۵/۵. اجرای کاملِ `./desktop/gradlew -p desktop test` (flock): ۴٬۱۸۴ آزمون، ۴ رد‌شده، ۳ شکست — هر سه پیشین از `e-rows-55s` (پیش از این دیده نمی‌شدند چون آزمون‌ها کامپایل نمی‌شدند) و درست‌شده: `CustomerAccessLogTest` (سنجهٔ متنی به شاخهٔ تازهٔ صف رسید، سخت‌تر)، `DataSafetyGuardTest` (`tohid-pay-mirror`، `tohid-customer-access` در DATA-SAFETY §۶)، `ScenarioS76ServerDesktopTest` (`assertEquals(double, double)` ِ بی دلتا)؛ دوباره ۷/۷، ۱۰/۱۰، ۲/۲. `precheck.sh` fail=0، `quality.mjs` بی ❌ ِ تازه، `spec.mjs check` سالم، whatsnew و secret-scan (۰ سد).
+- **قدمِ بعد:** CRM-10 (همان «کد»)؛ صاحب‌کار: سه کلید روی یک دکانِ آزمایشی (FLAGS-ON §۳۸–۴۰) و S09 با دو دستگاهِ واقعی.
 ### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-59b زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-59b` (از `origin/claude/batch-62` 21e7499a8) — شعبه درونِ یک دکان، فازِ ۳ ِ سرور
 
 - **ساخته شد (فقط سرور، پشتِ پرچمِ خاموشِ `shop.branches`؛ طراحی و جدولِ درها: [`BRANCHES-fa.md`](BRANCHES-fa.md) §۹؛ مهاجرتِ ۹۰۰ + rollback):**
@@ -77,7 +100,7 @@
 ### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-58m زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-58m` (از `origin/claude/batch-62` 07896351d) — چند دامنه برای هر برنامه
 
 - **خواسته (۱۴۰۵/۰۸/۲۲):** «برنامهٔ سرور جوری باشه که بشه چندین دامنه یا سرور متفاوت گذاشت برای هر برنامه». شرح: `docs/SERVERS-fa.md` §۳،
-  `FLAGS-ON-fa.md` §۳۹، `RULES-fa.md` («🌐 هر سرور» ← «چند نشانی برای هر برنامه»).
+  `FLAGS-ON-fa.md` §۴۱، `RULES-fa.md` («🌐 هر سرور» ← «چند نشانی برای هر برنامه»).
 - **ساخته شد (همه پشتِ کلیدِ خاموش؛ خاموش ⇒ همان امروز):** core: `ServerFailover.choose` (حلقهٔ مشترکِ گزینش، از `recheck` ِ دکان
   به core آمد)، `ServerLearn`، `ServerRouter`، `ShopperRoutedHttp`/`ShopperServers`؛ دکان و حالتِ پیک: آموختنِ `publicUrls` در
   `recheck` و سنجشِ گاه‌گاهِ سرورِ پیش‌فرضِ تک‌نشانی (`app.multi_server`)؛ خریدِ مشتری اندروید/آیفون: `tohid.multiServer` (زمانِ ساخت)؛

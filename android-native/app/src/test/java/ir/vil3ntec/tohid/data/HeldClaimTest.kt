@@ -31,6 +31,9 @@ class HeldClaimTest {
     val rows = LinkedHashMap<String, Row>()
     val series = HashMap<String, String>()
     var claims = 0
+    /** S09: پرچمِ `shop.held_twice_cancel` (`auto_cancel` ِ `GET`) و گزارش‌های رسیده به صندوقِ صاحب (`POST …/:id/twice`) */
+    var autoCancel = false
+    val twice = ArrayList<Pair<String, JsonObject>>()
 
     private fun err(code: String, extra: Pair<String, JsonObject>? = null) = buildJsonObject {
       put("code", JsonPrimitive(code)); if (extra != null) put(extra.first, extra.second)
@@ -87,6 +90,7 @@ class HeldClaimTest {
         val page = rows.values.filter { it.rev > since && (it.body != null || since > 0) }.sortedBy { it.rev }
         return buildJsonObject {
           put("enabled", JsonPrimitive(true)); put("rev", JsonPrimitive(rev))
+          if (autoCancel) put("auto_cancel", JsonPrimitive(true))
           put("items", buildJsonArray { page.filter { it.body != null }.forEach { add(view(it)) } })
           put("gone", buildJsonArray { page.filter { it.body == null }.forEach { add(view(it)) } })
         }
@@ -109,6 +113,13 @@ class HeldClaimTest {
 
       override suspend fun delete(id: String, version: Long, reason: String, base: Long): HeldSyncEngine.Reply =
         if (!online()) HeldSyncEngine.Reply(0) else remove(dev, id, version, reason, base, claiming = false, forcing = false)
+
+      override suspend fun twice(id: String, body: JsonObject): HeldSyncEngine.Reply {
+        if (!online()) return HeldSyncEngine.Reply(0)
+        if (!autoCancel) return no(404, err("held_twice_off"))
+        twice += id to body
+        return HeldSyncEngine.Reply(201, buildJsonObject { put("ok", JsonPrimitive(true)) })
+      }
 
       override suspend fun claim(id: String, version: Long, base: Long, force: Boolean): HeldSyncEngine.Reply {
         if (!online()) return HeldSyncEngine.Reply(0)

@@ -179,8 +179,11 @@ class ShopRepository(
   suspend fun revokeApproverKey(id: String): ApiResult<Unit> =
     result { api.delete(ApiEndpoints.Shop.approverKey(id)); Unit }
 
-  suspend fun devices(): ApiResult<List<ShopDeviceDto>> =
-    result { ApiJson.decode<ShopDevicesDto>(api.get(ApiEndpoints.Shop.DEVICES)).devices }
+  suspend fun devices(): ApiResult<List<ShopDeviceDto>> = devicePage().map { it.devices }
+
+  /** همان فهرست با پرچمِ «بازیابی از پشتیبان» (S44، `replay`) */
+  suspend fun devicePage(): ApiResult<ShopDevicesDto> =
+    result { ApiJson.decode<ShopDevicesDto>(api.get(ApiEndpoints.Shop.DEVICES)) }
 
   suspend fun disableDevice(deviceId: String): ApiResult<Unit> =
     result { api.post(ApiEndpoints.Shop.deviceDisable(deviceId)); Unit }

@@ -73,6 +73,8 @@ internal class MemberActions(
   val logoutAll: () -> Unit = {},
   /** «برداشتنِ عضوِ کهنه» از نشانهٔ «شاید همان» — برگهٔ تأیید */
   val removeStale: (oldMemberId: String) -> Unit = {},
+  /** S44: «بازیابی از پشتیبان» ِ دستگاهِ غیرفعال — برگهٔ خودش (`team/devices/{id}/replay`) */
+  val replay: (deviceId: String) -> Unit = {},
   /** STF-04: «باز کردنِ قفلِ PIN ِ صندوق» ِ همین کارمند */
   val tillPinUnlock: () -> Unit = {},
   /** STF-04: «برداشتنِ PIN ِ صندوق» — برگهٔ تأیید */
@@ -169,6 +171,7 @@ internal fun MemberContent(
                         MemberModel.DeviceAction.UNBLOCK -> V3TextButton(StrAccount.unblock, { actions.unblock(d.id) })
                         null -> Unit
                       }
+                      if (MemberModel.canReplay(d, canEdit, team.replay)) V3TextButton(ir.vil3ntec.tohid.core.i18n.StrLostDevice.button, { actions.replay(d.id) })
                     }
                   },
                 )
@@ -314,6 +317,7 @@ internal fun RouteScope.MemberRoute(id: String) {
       revokeKey = { nav.open(AccountPaths.revokeDeviceKey(it)) },
       logoutAll = { nav.open(AccountPaths.logoutEverywhere(id)) },
       removeStale = { nav.open(AccountPaths.removeStale(id, it)) },
+      replay = { nav.open(AccountPaths.replayDevice(it)) },
       tillPinUnlock = { if (member != null && !busy) pinWork({ tillPins.unlock(member.id) }, StrAccount.tillPinUnlocked) },
       tillPinRemove = { if (!busy) removingPin = true },
     ),

@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.sync.platform
 
 import android.content.Context
 import ir.vil3ntec.tohid.core.audit.DocChainAck
+import ir.vil3ntec.tohid.core.audit.DocChainAudit
 import ir.vil3ntec.tohid.core.audit.DocChainBook
 import ir.vil3ntec.tohid.core.audit.DocChainCycle
 import ir.vil3ntec.tohid.core.audit.DocChainDisk
@@ -14,6 +15,7 @@ import ir.vil3ntec.tohid.core.audit.HashChain
 import ir.vil3ntec.tohid.core.audit.InvoiceVoid
 import ir.vil3ntec.tohid.data.DiskWrite
 import ir.vil3ntec.tohid.data.LedgerOwner
+import ir.vil3ntec.tohid.data.PlainChainFacts
 import ir.vil3ntec.tohid.data.SaleChainFacts
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.repo.Backend
@@ -39,7 +41,7 @@ import java.io.RandomAccessFile
  *  همهٔ تصمیم‌ها در core است (آزمون: `DocChainTest`، `DocChainCycleTest`، `DocChainVectorsTest`).
  *
  *  ── کجا ─────────────────────────────────────────────────────────────
- *  در هر دورِ `SyncV1Worker` (پس از گرفتنِ «سریِ سند»، F0-03)، گوشی و کامپیوتر. Sync v3 هنوز نه.
+ *  در هر دورِ `SyncV1Worker` (پس از گرفتنِ «سریِ سند»، F0-03)، گوشی و کامپیوتر — روی Sync v1 و (از `claude/e-rows-56c`) Sync v3.
  *
  *  ── قاعده‌ها ─────────────────────────────────────────────────────────
  *  - ⛔ پرچمِ خاموشِ `shop.doc_chain` (سرور، پیش‌فرض خاموش): تا سرور «روشن» نگوید هیچ حلقه‌ای ساخته
@@ -92,6 +94,8 @@ object DocChainSync {
           series = series,
           by = account,
           sales = SaleChainFacts.of(data, series),
+          //  SEC-02: برگشت، قرض/رسید، خرید و پرداخت به تأمین‌کننده (نشانِ «تا کجا» ِ سندِ بی‌شماره در `DocChainState`)
+          docs = PlainChainFacts.of(data),
         )
         if (next != gate) prefs.edit().putBoolean("on:$key", next.enabled).putLong("at:$key", next.probedAt).apply()
       }
@@ -138,6 +142,36 @@ object DocChainSync {
       throw c
     } catch (e: Exception) {
       //  زنجیره نباید لغوِ نشسته را خراب کند؛ دورِ بعدِ همگام‌سازی هر ناهمخوانی را گزارش می‌کند
+    }
+  }
+
+  /**
+   *  SEC-02 «بررسیِ یکپارچگی» (`DocChainCheckScreen`): دورهٔ زندهٔ زنجیرهٔ همین دستگاه از دیسک، سنجیده با دفترِ [data]
+   *  (`DocChainAudit.check`). پرچمِ خاموش، حالتِ آموزشی، بی حساب/سری یا هنوز بی زنجیره ⇐ null. فقط می‌خواند؛ زیرِ همان
+   *  قفلِ دورِ همگام‌سازی تا میانهٔ نوشتن خوانده نشود.
+   */
+  suspend fun audit(context: Context, data: ShopData): DocChainAudit.Report? {
+    if (ir.vil3ntec.tohid.data.TrainingMode.on || !enabled(context)) return null
+    val app = context.applicationContext ?: context
+    val account = SyncStateV1.currentAccount(app)
+    val shop = LedgerOwner.currentShop(app)
+    val series = DocSeries.current(app)
+    if (account.isBlank() || shop.isBlank() || series.isBlank()) return null
+    return try {
+      lock.withLock {
+        withContext(Dispatchers.IO) {
+          val book = DocChainBook(DocChainFiles(File(app.noBackupFilesDir, "doc-chain/${safe(account)}/${safe(shop)}-$series")))
+          val st = book.state()?.takeIf { it.series == series } ?: return@withContext null
+          DocChainAudit.check(
+            st, book.links(st.epoch), SaleChainFacts.ofAll(data), PlainChainFacts.of(data),
+            data.sales.filter { it.status == "cancelled" }.mapTo(HashSet()) { it.id },
+          )
+        }
+      }
+    } catch (c: CancellationException) {
+      throw c
+    } catch (e: Exception) {
+      null
     }
   }
 

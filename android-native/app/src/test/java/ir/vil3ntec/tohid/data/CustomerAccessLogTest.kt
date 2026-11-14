@@ -128,12 +128,17 @@ class CustomerAccessLogTest {
     val branch = panel.indexOf("if (!PermCore.canWrite(role, \"auditLog\")) {")
     val body = panel.indexOf("val body = CustomerAccess.noteBody(customerId, kind) ?: return@runCatching false")
     val ready = panel.indexOf("if (!Backend.isReady(context)) return@runCatching false")
+    //  CRM-15 (د۱۸): همان شاخه با بازگشتِ `try` — رسید ⇒ true؛ ردِ همیشگی ⇒ پرتاب؛ بی‌اینترنت ⇒ صفِ دستگاه، و هرگز دفتر
+    val back = panel.indexOf("return@runCatching try {", ready)
     val post = panel.indexOf("Backend.api(context).post(CustomerAccess.PATH, body)")
     //  CRM-15 (د۱۸): پس از post، شکستِ دوباره‌پذیر ⇒ صفِ دستگاه (`CustomerAccessOutboxAndroid`)؛ هنوز پیش از دفتر
     val done = panel.indexOf("CustomerAccessOutboxAndroid.add(", post)
     val ledger = panel.indexOf("store.update { d -> CustomerAccessLog.record(")
     assertTrue("حالتِ آموزشی پیش از هر راهی", training in 0 until branch)
-    assertTrue("شاخهٔ حسابدار پیش از دفتر و با بازگشت", branch < body && body < ready && ready < post && post < done && done < ledger)
+    assertTrue(
+      "شاخهٔ حسابدار پیش از دفتر و با بازگشت",
+      branch in 0 until body && body < ready && ready < back && back < post && post < done && done < rethrow && rethrow < queued && queued < ledger,
+    )
     //  بدنه فقط شناسه و نوع است؛ برگهٔ همه فقط با خروجی (core: CustomerAccessTest)
     assertEquals(setOf("customerId", "kind"), CustomerAccess.noteBody("d1", Kind.DETAIL)?.keys)
     assertNull(CustomerAccess.noteBody(CustomerAccess.ALL, Kind.DETAIL))

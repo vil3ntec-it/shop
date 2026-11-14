@@ -38,13 +38,14 @@ const audit = require('./audit');
 const maskCards = (t) => require('./ops-errors').maskCards(t);   //  S117: شمارهٔ کاملِ کارت ⇒ «[کارت]» پیش از دیتابیس و هشِ تکرار
 
 /** گونه‌های صندوقِ سند (`staff-approval.judge`، `return-line-cap`، `return-sale-cap`) */
-const BOX = Object.freeze(['perm_denied', 'approval_required', 'approval_rejected']);
+//  S09: `held_twice` — «یک فاکتور در دو دستگاه» از برنامه (`held-twice.js`): فقط «کنار بگذار» یا «اصلاح و ثبت»
+const BOX = Object.freeze(['perm_denied', 'approval_required', 'approval_rejected', 'held_twice']);
 const RESOLVE_PERMISSION = 'data.delete.any';
 /**
  * ردی که هیچ تأییدی درستش نمی‌کند (برگشتِ بیش از فروخته‌شدهٔ قلم برای همه، صاحب هم — `return-line-cap`) — فقط «اصلاح» یا
  * «کنار بگذار». بقیه را خودِ زنجیرهٔ push با نقشِ تأییدکننده دوباره می‌سنجد (سقفِ کلِ فاکتور صاحب را نمی‌گیرد، مدیر را می‌گیرد).
  */
-const NO_APPROVAL = new Set(['return_exceeds_sold']);
+const NO_APPROVAL = new Set(['return_exceeds_sold', 'held_twice', 'held_twice_open']);
 const STATUSES = Object.freeze(['open', 'closed', 'all']);
 const CLAIM_MS = 60 * 1000;
 const MAX_NOTE = 200;
