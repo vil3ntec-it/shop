@@ -57,6 +57,23 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-63a زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-63a` (از `origin/claude/batch-63` cad65eb96) — RATE-01: برگهٔ «ستاره بدهید»
+
+- خواستِ صاحب‌کار (بی ردیفِ STATUS؛ «RATE-01» فقط نامِ کار است): برنامه چند بار بخواهد در فروشگاه ستاره بدهند و «دیگر نپرس» داشته
+  باشد. قاعده یک‌جا در `core/rate/RatePrompt.kt` (`RatePromptTest`)؛ قاعدهٔ RULES «⭐ ستاره دادن در فروشگاه» زیرِ «نسخهٔ Google Play».
+- دکان: `ui/v3/rate/RatePromptAndroid.kt` (میزبان در `AppRoot` پس از دروازه‌ها، فقط «خانه» با سبدِ خالی) و `RateSheet.kt`
+  (`RateSheetUiTest`)؛ فروشگاه: `rate/RateStoreAndroid.kt` (Play: نظرِ درون‌برنامه، و اگر نشد/زیرِ یک ثانیه بسته شد صفحهٔ Play؛
+  بازار: `ACTION_EDIT` ِ `bazaar://details`). کتابخانهٔ `com.google.android.play:review:2.0.2` فقط با `-Pstore=play` از
+  `src/review-play`؛ بقیه `src/review-none` (بلوکِ جدای پایانِ `app/build.gradle.kts`، `MainActivity` می‌نشاند؛ `PlayReviewSplitTest`).
+  سایت/گیت‌هاب، پیش‌نمایش و کامپیوتر: `NONE` ⇒ هیچ.
+- خریدار: `customer-android/…/ui/RatePromptShopper.kt` (کدِ مشترکِ اندروید و آیفون) + `Platform.rate`؛ اندروید فقط `-Pstore=play`
+  (`RateAndroid.kt`، پرچمِ تازهٔ `store` و `BuildConfig.STORE` ِ خریدار، پیش‌فرض `direct` ⇒ هرگز). متن: `core/shopper/RateText`.
+- ⚠️ آیفون: سیم‌کشیِ `SKStoreReviewController` در میزبان نشد (این‌جا ساخته نمی‌شود؛ چارچوبِ ایستا ⇒ پیوندِ StoreKit در Xcode).
+  App Store فقط کارتِ سیستم است، بی برگهٔ ما (اپل ۵.۶.۱، `RateTarget.ownSheet`). خطِ لازم: `docs/GOOGLE-PLAY-fa.md` §۹.
+- ⚠️ راهنمای Google می‌گوید دکمه API را صدا نزند (سهمیه)؛ ما یک بار صدا می‌زنیم و نیامدنِ کارت ⇒ صفحهٔ Play. تصمیمِ صاحب‌کار در §۹.
+- حال فقط روی دستگاه (`tohid-ui`/`rate_prompt`، خریدار `shopper.rate.v1`) — DATA-SAFETY §۵. کامپایلِ اندروید/آیفون این‌جا
+  سنجیده نشد (بی Android SDK و Xcode) — CI. قدمِ بعدی: آزمونِ داخلیِ Play برای دیدنِ کارت، و سیم‌کشیِ آیفون.
+
 ### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-56c زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-56c` (از `origin/claude/batch-62` 54a9333be) — ماندهٔ کدِ د۱۸: SEC-02، S09، S44
 
 - **SEC-02 ⇒ IMPLEMENTED-VERIFIED** (پرچمِ خاموشِ `shop.doc_chain`، FLAGS-ON §۴۰): برگشت، قرض/رسید، خرید و پرداخت به تأمین‌کننده هر ردیف یک سندِ
