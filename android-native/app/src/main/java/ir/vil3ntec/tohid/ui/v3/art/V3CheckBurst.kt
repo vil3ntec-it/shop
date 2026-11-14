@@ -62,7 +62,7 @@ fun V3CheckBurst(
   Spacer(
     modifier.drawWithCache {
       val r = size.minDimension / 2f
-      val c = center
+      val c = Offset(size.width / 2f, size.height / 2f)
       val check = Path().apply {
         moveTo(c.x - r * 0.42f, c.y + r * 0.02f)
         lineTo(c.x - r * 0.12f, c.y + r * 0.32f)
