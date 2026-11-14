@@ -15,14 +15,17 @@ object StrReturnRequests {
     "accepted" -> t("پذیرفته", "Accepted", "منل شوې")
     "completed" -> t("ثبت‌شده", "Recorded", "ثبت شوې")
     "rejected" -> t("ردشده", "Declined", "رد شوې")
-    else -> t("همه", "All", "ټولې")
+    "all" -> t("همه", "All", "ټولې")
+    //  کلیدِ ناشناخته (سرورِ تازه‌تر) ⇒ همان کلید، نه برچسبِ نادرست — همان قاعدهٔ `StrConflictInbox.reason`
+    else -> t("پالایه: ${asIs(f)}", "Filter: $f", "چاڼ: ${asIs(f)}")
   }
 
   fun status(s: String): String = when (s) {
     "pending" -> t("در انتظارِ بررسی", "Waiting for review", "کتنې ته په تمه")
     "accepted" -> t("پذیرفته؛ برگشت هنوز ثبت نشده", "Accepted; return not recorded yet", "منل شوې؛ بېرته ورکول لا نه دي ثبت")
     "completed" -> t("برگشت ثبت شد", "Return recorded", "بېرته ورکول ثبت شول")
-    else -> t("رد شد", "Declined", "رد شوه")
+    "rejected" -> t("رد شد", "Declined", "رد شوه")
+    else -> t("وضعیت: ${asIs(s)}", "Status: $s", "حالت: ${asIs(s)}")
   }
 
   fun reason(code: String): String = when (code) {
@@ -31,12 +34,14 @@ object StrReturnRequests {
     "expired" -> t("تاریخ گذشته", "Expired", "نېټه تېره")
     "not_as_described" -> t("با شرح یا اندازه جور نیست", "Not as described or wrong size", "له شرح یا اندازې سره سم نه دی")
     "changed_mind" -> t("پشیمانیِ مشتری", "Customer changed mind", "د پېرودونکي پښېمانتیا")
-    else -> t("دلیلِ دیگر", "Other reason", "بل لامل")
+    "other" -> t("دلیلِ دیگر", "Other reason", "بل لامل")
+    else -> t("دلیلِ دیگر (${asIs(code)})", "Other reason ($code)", "بل لامل (${asIs(code)})")
   }
 
   fun method(m: String): String = when (m) {
     "courier" -> t("پیکِ دکان کالا را می‌گیرد", "Shop courier collects the items", "د دوکان پیک توکي اخلي")
-    else -> t("مشتری کالا را به دکان می‌آورد", "Customer brings the items to the shop", "پېرودونکی توکي دوکان ته راوړي")
+    "drop_off" -> t("مشتری کالا را به دکان می‌آورد", "Customer brings the items to the shop", "پېرودونکی توکي دوکان ته راوړي")
+    else -> t("روشِ رساندن: ${asIs(m)}", "Delivery method: $m", "د رسولو لاره: ${asIs(m)}")
   }
 
   fun order(no: Long): String = t("سفارشِ ${asIs(no)}", "Order $no", "فرمایش $no")

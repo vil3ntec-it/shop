@@ -189,7 +189,10 @@ test('خاموش ⇒ هیچ نوشتنی: نه دوران پس از بازیاب
     let rotated = false;
     const out = await backup.afterRestore({ ok: true, bytes: 10 }, config.db.url, { rotate: async () => { rotated = true; return { id: 'ep_x' }; } });
     assert.equal(rotated, false, 'پرچمِ خاموش ⇒ rotate صدا زده نمی‌شود');
-    assert.deepEqual(out, { ok: true, bytes: 10, epoch: false });
+    //  SEC-10: بازپخشِ پاک‌کردنِ مشتری همیشه همراه است (دفترِ خالی ⇒ هیچ نوشتنی)؛ بقیهٔ نتیجه همان پیشین
+    const { erasures, ...rest } = out;
+    assert.deepEqual(rest, { ok: true, bytes: 10, epoch: false });
+    assert.deepEqual(erasures, { entries: 0, bad: 0, replayed: 0, empty: 0, failed: 0 }, 'دفترِ خالی ⇒ بازپخشِ بی هیچ نوشتن');
     //  run بی pg_dump شکست می‌خورد — ولی پیش از آن هم نشانی نمی‌نشیند
     const saved = config.backup.pgDump;
     config.backup.pgDump = '/nonexistent/pg_dump-for-test';
@@ -304,7 +307,9 @@ test('نشانِ پشتیبان ننشست یا پاک نشد ⇒ خبرِ سا�
 test('بازگرداندن: داده نشست ولی دوران تازه نشد ⇒ «بازیابی شد» با epochError ِ جدا، نه شکست', async () => {
   const backup = require('../src/lib/backup');
   const ok = await backup.afterRestore({ ok: true, bytes: 10 }, config.db.url, { rotate: async () => ({ id: 'ep_x' }) });
-  assert.deepEqual(ok, { ok: true, bytes: 10, epoch: 'ep_x' });
+  const { erasures, ...okRest } = ok;   //  SEC-10: بازپخشِ پاک‌کردن هم‌راه است
+  assert.deepEqual(okRest, { ok: true, bytes: 10, epoch: 'ep_x' });
+  assert.equal(erasures.failed, 0);
   const bad = await backup.afterRestore({ ok: true, bytes: 10 }, config.db.url, { rotate: async () => { throw new Error('locked'); } });
   assert.equal(bad.ok, true);
   assert.equal(bad.epoch, false);

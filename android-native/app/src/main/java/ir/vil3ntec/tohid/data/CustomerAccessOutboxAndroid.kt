@@ -30,7 +30,8 @@ object CustomerAccessOutboxAndroid {
   /** دیدنِ بی‌اینترنت در صف؛ `true` یعنی در صف هست (تازه یا یکی‌شده با همان دیدنِ پنجره) */
   fun add(context: Context, customerId: String, kind: CustomerAccess.Kind, now: Long): Boolean = synchronized(lock) {
     val q = queued(context)
-    val id = "n" + java.lang.Long.toString(now, 36) + java.lang.Long.toString(System.nanoTime() and 0xFFFFFF, 36)
+    //  `toString(36)` ِ خودِ Kotlin (همان خروجیِ `java.lang.Long.toString(x, 36)`) — کدِ مشترکِ آیفون `java.lang.Long` ندارد
+    val id = "n" + now.toString(36) + (System.nanoTime() and 0xFFFFFF).toString(36)
     val next = CustomerAccessOutbox.add(q, CustomerAccessOutbox.Note(id, customerId, kind, now), now)
     if (next != q) save(context, next)
     next.any { it.customerId == customerId.trim() && it.kind == kind }
