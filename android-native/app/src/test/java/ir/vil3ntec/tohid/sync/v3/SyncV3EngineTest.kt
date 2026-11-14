@@ -1110,7 +1110,7 @@ class SyncV3EngineTest {
     val txRow = server.row("transactions", "t1")!!.toMap()
     val saleRow = server.row("sales", "s1")!!.toMap()
 
-    a.edit { d -> (CustomerMerge.merge(d, "c2", "c1", ir.vil3ntec.tohid.core.perm.CreditLimitPerm.Rules.OFF, "2026-10-19", 9, { "m1" }, docs = false) as CustomerMerge.Result.Ok).data }
+    a.edit { d -> (CustomerMerge.merge(d, "c2", "c1", ir.vil3ntec.tohid.core.perm.CreditLimitPerm.Rules.OFF, false, "2026-10-19", 9) { "m1" } as CustomerMerge.Result.Ok).data }
     val before = a.engine.queue.outbox.size
     assertTrue(a.engine.record(a.ledger.data) > 0)
     val added = a.engine.queue.outbox.drop(before)

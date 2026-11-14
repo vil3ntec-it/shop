@@ -46,8 +46,8 @@ class CustomerMergeLinkTest {
   )
 
   private fun ok(r: CustomerMerge.Result) = (r as CustomerMerge.Result.Ok)
-  private fun link(d: ShopData) = ok(CustomerMerge.merge(d, "c2", "c1", CreditLimitPerm.Rules.OFF, "2026-10-19", 99, ::newId, docs = false))
-  private fun moved(d: ShopData) = ok(CustomerMerge.merge(d, "c2", "c1", CreditLimitPerm.Rules.OFF, "2026-10-19", 99, ::newId, docs = true))
+  private fun link(d: ShopData) = ok(CustomerMerge.merge(d, "c2", "c1", CreditLimitPerm.Rules.OFF, false, "2026-10-19", 99, ::newId))
+  private fun moved(d: ShopData) = ok(CustomerMerge.merge(d, "c2", "c1", CreditLimitPerm.Rules.OFF, true, "2026-10-19", 99, ::newId))
 
   private val json = Json { encodeDefaults = true }
   private fun docs(d: ShopData) =
@@ -130,7 +130,7 @@ class CustomerMergeLinkTest {
 
   @Test fun `زنجیره — ادغامِ ماندگاری که خودش پیوند دارد، همهٔ سندها زیرِ ماندگارِ آخر`() {
     val first = link(d0).data
-    val again = ok(CustomerMerge.merge(first, "c5", "c2", CreditLimitPerm.Rules.OFF, "2026-10-20", 100, ::newId, docs = false))
+    val again = ok(CustomerMerge.merge(first, "c5", "c2", CreditLimitPerm.Rules.OFF, false, "2026-10-20", 100, ::newId))
     val d = again.data
     assertEquals(docs(d0), docs(d))
     assertEquals("زنجیره صاف", "c5", d.debtors.first { it.id == "c1" }.mergedInto)

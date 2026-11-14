@@ -216,11 +216,6 @@ object CustomerMerge {
   ): Result = merge(d, keepId, dropId, CreditLimitPerm.Rules.OFF, today, now, newId)
 
   /**
-   *  @param docs `true` (v1): قرض و فاکتورهای تکراری به ماندگار می‌روند. `false` (v3): **هیچ سندی** ویرایش نمی‌شود؛ فقط
-   *    پروندهٔ مشتری‌ها و ردِ دفترچه، و خواندن از راهِ `CustomerAlias` (شرح سرِ همین فایل).
-   */
-
-  /**
    *  همان ادغام با قاعدهٔ «تغییرِ سقفِ اعتبار» ِ همین کاربر (CRM-03 / §۱۰.۱، `rememberCreditLimitRules`): ماندگارِ بی سقف سقفِ
    *  تکراری را می‌گیرد ([fold]) و این همان تغییری است که سرور با `shop.credit_limit_perm` رد می‌کند ⇒ پیش از نوشتن، با همان
    *  `CreditLimitGate.error` ِ برگهٔ مشتری. خاموش/صاحب/سقفِ بی‌تغییر ⇒ همان امروز.
@@ -233,7 +228,22 @@ object CustomerMerge {
     today: String = ir.vil3ntec.tohid.todayIso(),
     now: Long = ReportBridge.nowMs(),
     newId: () -> String = ::auditId,
-    docs: Boolean = true,
+  ): Result = merge(d, keepId, dropId, limitRules, docs = true, today = today, now = now, newId = newId)
+
+  /**
+   *  همان ادغام. [docs] `true` (v1): قرض و فاکتورهای تکراری به ماندگار می‌روند. `false` (v3): **هیچ سندی** ویرایش نمی‌شود؛ فقط
+   *  پروندهٔ مشتری‌ها و ردِ دفترچه، و خواندن از راهِ `CustomerAlias` (شرح سرِ همین فایل). [docs] پیش از `today` است تا لامبدای
+   *  انتهاییِ فراخوان‌های پیشین همان `newId` بماند.
+   */
+  fun merge(
+    d: ShopData,
+    keepId: String,
+    dropId: String,
+    limitRules: CreditLimitPerm.Rules,
+    docs: Boolean,
+    today: String = ir.vil3ntec.tohid.todayIso(),
+    now: Long = ReportBridge.nowMs(),
+    newId: () -> String = ::auditId,
   ): Result {
     val p = when (val r = preview(d, keepId, dropId)) {
       is Result.Failed -> return r
