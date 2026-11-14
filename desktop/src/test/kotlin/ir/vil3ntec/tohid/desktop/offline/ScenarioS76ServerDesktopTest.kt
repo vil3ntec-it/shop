@@ -126,7 +126,7 @@ class ScenarioS76ServerDesktopTest {
     val timers = Executors.newSingleThreadScheduledExecutor()
     val http = OkHttpClient.Builder().readTimeout(0, TimeUnit.MILLISECONDS).build()
     val lamp = mutableListOf<Boolean>()
-    @Volatile var pulls = 0
+    val pulls = java.util.concurrent.atomic.AtomicInteger(0)   //  دو رشته (Pull و آزمون) ⇒ اتمی؛ `@Volatile` روی متغیرِ محلی نمی‌نشیند
     val port = object : LivePort {
       override fun target(): LiveTarget = LiveTarget(B.tokens.accessToken.orEmpty(), direct, B.deviceId, "shop") { url, listener ->
         http.newWebSocket(Request.Builder().url(url).build(), listener)
@@ -140,13 +140,13 @@ class ScenarioS76ServerDesktopTest {
       override fun message(event: String, text: String) {}
     }
     val live = LiveSocket(port, {
-      pullsRun.execute { runBlocking { B.sync().getOrThrow() }; pulls++ }
+      pullsRun.execute { runBlocking { B.sync().getOrThrow() }; pulls.incrementAndGet() }
     }, CoroutineScope(Dispatchers.IO))
     try {
       live.connect()
       waitFor("سوکتِ شاگرد وصل نشد") { live.connected && synchronized(lamp) { lamp.lastOrNull() == true } }
       //  hello ِ پس از وصل یک Pull
-      waitFor("hello ِ سرور Pull نساخت") { pulls >= 1 }
+      waitFor("hello ِ سرور Pull نساخت") { pulls.get() >= 1 }
 
       A.price("tea", 15.0)
       waitFor("رخدادِ زندهٔ سرور Pull ِ شاگرد را نساخت") { pullsRun.submit<Double?> { B.priceOf("tea") }.get() == 15.0 }
