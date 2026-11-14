@@ -153,7 +153,6 @@ class AuthRepository(
   suspend fun register(
     name: String,
     email: String,
-    phone: String,
     password: String,
   ): ApiResult<SessionDto> = result {
     keepIfAny(
@@ -162,7 +161,6 @@ class AuthRepository(
         buildJsonObject {
           put("name", JsonPrimitive(name.trim()))
           if (email.isNotBlank()) put("email", JsonPrimitive(email.trim()))
-          if (phone.isNotBlank()) put("phone", JsonPrimitive(phone.trim()))
           put("password", JsonPrimitive(password))
           putApp()
         },
@@ -432,10 +430,7 @@ class AuthRepository(
   /* ------------------------------ کد یک‌بارمصرف ------------------------------ */
 
   /**
-   *  خواستنِ کد برای شماره یا ایمیل.
-   *
-   *  کدام‌یک را خودِ سرور از روی مقصد تشخیص می‌دهد. هر دو کلیدِ قدیمی
-   *  (`phone` / `email`) هم فرستاده می‌شود تا سرورِ به‌روزنشده هم بفهمد.
+   *  خواستنِ کدِ ورود — فقط به ایمیل («فقط ایمیل»، ۱۴۰۵/۰۸/۲۳؛ سرور شماره را ۴۰۰ `email_required` می‌کند).
    */
   suspend fun requestOtp(destination: String): ApiResult<OtpChallengeDto> = result {
     ApiJson.decode<OtpChallengeDto>(
@@ -446,8 +441,8 @@ class AuthRepository(
   /**
    *  سنجشِ کد و ورود.
    *
-   *  اگر این شماره حساب نداشته باشد، سرور همان‌جا می‌سازدش — «ثبت‌نام» و
-   *  «ورود» با شماره یک راه‌اند، نه دو تا.
+   *  اگر این ایمیل حساب نداشته باشد، سرور همان‌جا می‌سازدش — «ثبت‌نام» و
+   *  «ورود» با کدِ ایمیل یک راه‌اند، نه دو تا.
    */
   suspend fun verifyOtp(destination: String, code: String, name: String = ""): ApiResult<SessionDto> =
     result {
@@ -633,10 +628,10 @@ class AuthRepository(
     destination: String,
     extra: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit = {},
   ): JsonObject = buildJsonObject {
+    //  «فقط ایمیل»: مقصدِ کد فقط ایمیل است (کلیدِ `phone` دیگر هرگز فرستاده نمی‌شود)
     val clean = destination.trim()
     put("destination", JsonPrimitive(clean))
-    if (clean.contains("@")) put("email", JsonPrimitive(clean))
-    else put("phone", JsonPrimitive(clean))
+    put("email", JsonPrimitive(clean))
     extra()
   }
 }

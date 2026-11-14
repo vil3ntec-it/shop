@@ -18,9 +18,9 @@
  *   پیگیری ─ با توکنِ حدس‌نزدنی: `<شناسهٔ سفارش>.<HMAC>` — چیزی ذخیره
  *           نمی‌شود و تکرارِ همان درخواست همان توکن را برمی‌گرداند.
  *
- *   مشتری ─ ۲۳: دیدن و سبد آزاد؛ **ثبتِ سفارش فقط با شمارهٔ تأییدشده**
- *           (کدِ یک‌بارمصرفِ همان `lib/otp.js`). بی سرویسِ پیامک در تولید
- *           ⇒ ۵۰۳ ِ صریح، نه «فرستاده شد» ِ دروغ (BLOCKED-EXTERNAL).
+ *   مشتری ─ ۲۳: دیدن و سبد آزاد؛ **ثبتِ سفارش فقط با ایمیلِ تأییدشده**
+ *           (کدِ یک‌بارمصرفِ همان `lib/otp.js`؛ «فقط ایمیل»، ۱۴۰۵/۰۸/۲۳). شمارهٔ فرم
+ *           فقط تماسِ پیک است (بی کد). بی سرویسِ ایمیل در تولید ⇒ ۵۰۳ ِ صریح.
  *   وضعیت ─ ۳۱.۱: «باز/بسته» از ساعتِ کاری و اعلامِ مالک، «اتصال» از آخرین
  *           تماسِ واقعیِ دستگاه‌های دکان (`sync_devices.last_seen_at`)، و
  *           «پذیرشِ سفارش» جدا — هیچ زمانِ ساختگی نشان داده نمی‌شود.
@@ -622,25 +622,28 @@ function publicOrder(o, token, delivery) {
 
 const CUSTOMER = Object.freeze({ type: 'customer', id: '' });
 
-/** شمارهٔ تأییدشده: از بلیتِ تازه، وگرنه از نشستِ حسابِ مشتری — یا null (`storefront-ticket.verification`). */
-async function verifiedPhone(ticket, session) {
+/** ایمیلِ تأییدشده: از بلیتِ تازه، وگرنه از نشستِ حسابِ مشتری — یا null (`storefront-ticket.verification`). */
+async function verifiedEmail(ticket, session) {
   const v = await verification(ticket, session);
-  return v ? v.phone : null;
+  return v ? v.email : null;
 }
 
 async function checkout(sf, { key, body, ticket, session, ip = '' }) {
-  //  ۲۳.۲: نهایی‌کردنِ سفارش ⇒ شمارهٔ تأییدشده (S133) — بلیت یا نشستِ حساب (S134)
-  const verified = await verifiedPhone(ticket, session);
-  if (!verified) throw new ApiError(401, 'verification_required', 'برای ثبتِ سفارش، شمارهٔ خود را تأیید کنید');
+  //  ۲۳.۲: نهایی‌کردنِ سفارش ⇒ ایمیلِ تأییدشده (S133) — بلیت یا نشستِ حساب (S134). شمارهٔ فرم فقط تماسِ پیک (بی کد).
+  const who = await verification(ticket, session);
+  if (!who) throw new ApiError(401, 'verification_required', 'برای ثبتِ سفارش، ایمیلِ خود را تأیید کنید');
   const input = parseCheckout(body, sf, { substitution: await subst.flagOn(sf.shop_id) });
-  if (input.customerPhone !== verified) {
-    throw new ApiError(403, 'phone_not_verified', 'این شماره تأیید نشده است؛ همان شمارهٔ تأییدشده را بنویسید');
-  }
   tokenKey();   // سرورِ بی رمز سفارش نمی‌گیرد که بعد پیگیری‌اش ممکن نباشد
   //  پرچمِ ناحیه/بازه و کاتالوگِ S1 (اگر منبع است: بی مهلت تازه؛ قیمت درونِ تراکنش از همان جدول) پیش از تراکنش (قفلِ سفارش کوتاه بماند)
   const [zonesOn, from] = await Promise.all([sfd.flagOn(sf.shop_id), sfc.productFrom(sf.shop_id, { strict: true })]);
-  //  RSK-07: سقفِ شماره درونِ همان تراکنش و پس از قفلِ دکان (lib/order-rate)
-  const price = require('./order-rate').guard(await require('./storefront-promos').wrap(pricer(sf.shop_id, sf, input, { zonesOn, from }), sf, { key, body, input, phone: verified, ip }), { shopId: sf.shop_id, phone: verified, secondOrder: input.secondOrder, deviceId: obj(body).deviceId, key });   //  MKT-01/02، RSK-09: تخفیفِ ویترین پشتِ پرچم‌های خاموش؛ RSK-04: دستگاه
+  //  هویت روی سفارش: ایمیلِ تأییدشده و حسابِ همان ایمیل (درونِ همان تراکنش؛ «سفارش‌های من» با این دو)
+  const priced = pricer(sf.shop_id, sf, input, { zonesOn, from });
+  const withWho = async (run, at) => {
+    const acct = (await run('SELECT id FROM store_customers WHERE email = $1', [who.email])).rows[0];
+    return { ...(await priced(run, at)), customerEmail: who.email, storeCustomerId: acct ? acct.id : null };
+  };
+  //  RSK-07: سقفِ هر مشتری (ایمیلِ تأییدشده) درونِ همان تراکنش و پس از قفلِ دکان (lib/order-rate)
+  const price = require('./order-rate').guard(await require('./storefront-promos').wrap(withWho, sf, { key, body, input, phone: who.email, ip }), { shopId: sf.shop_id, email: who.email, secondOrder: input.secondOrder, deviceId: obj(body).deviceId, key });   //  MKT-01/02، RSK-09: تخفیفِ ویترین پشتِ پرچم‌های خاموش؛ RSK-04: دستگاه
   const out = await orders.create(sf.shop_id, { key, body, actor: CUSTOMER, price, intakeKeys: [FEATURE_KEY] });   //  #467: دروازهٔ اشتراک با کلیدِ ویترین هم
   //  TEN-03: با پرچمِ لینکِ زمان‌دار، توکنِ v2 از همین لحظه (تکرارِ همان درخواست هم توکنِ تازه)
   const link = (await linkPolicyOn(sf.shop_id)) ? { gen: 0, at: now() } : null;
@@ -672,65 +675,11 @@ async function cancel(sf, token) {
   }
 }
 
-//  ۲۳: تأییدِ شمارهٔ مشتری (بلیتِ امضاشده و کدِ یک‌بارمصرف) — `lib/storefront-ticket.js` (شرح همان‌جا)
-const { ticketOf, parseTicket, verifiedPhoneOfTicket, verification, verificationAvailable, startVerification, checkVerification } = require('./storefront-ticket')({ tokenKey, obj });
+//  ۲۳: تأییدِ ایمیلِ مشتری (بلیتِ امضاشده و کدِ یک‌بارمصرف) — `lib/storefront-ticket.js` (شرح همان‌جا)
+const { ticketOf, parseTicket, verifiedEmailOfTicket, verification, verificationAvailable, startVerification, checkVerification } = require('./storefront-ticket')({ tokenKey, obj });
 
-/** S138: سفارش‌های همین شمارهٔ تأییدشده در همین ویترین — از هر دستگاهی. */
-async function myOrders(sf, ticket, session = '') {
-  const phone = await verifiedPhone(ticket, session);
-  if (!phone) throw new ApiError(401, 'verification_required', 'برای دیدنِ سفارش‌ها، شمارهٔ خود را تأیید کنید');
-  const rows = await many(
-    `SELECT id, order_no, status, total_minor, items_count, created_at, track_gen FROM online_orders
-      WHERE shop_id = $1 AND source = 'storefront' AND customer_phone = $2
-      ORDER BY created_at DESC, id DESC LIMIT 20`,
-    [sf.shop_id, phone]
-  );
-  const on = await linkPolicyOn(sf.shop_id);
-  return views.pubList('orderSummary', rows.map((r) => ({
-    orderNo: Number(r.order_no), status: r.status, totalMinor: Number(r.total_minor),
-    itemsCount: Number(r.items_count), createdAt: Number(r.created_at), token: listTokenOf(sf.shop_id, r, on) })));
-}
-
-/**
- * تاریخچهٔ حسابِ مشتری در همین ویترین — صفحه‌بندیِ کلیدی (تازه‌ترین اول)،
- * با نامِ چند قلمِ اول. فقط همین شماره و همین دکان (S138).
- */
-async function ordersOfPhone(sf, phone, { cursor, limit } = {}) {
-  const lim = Math.min(50, Math.max(1, Number.parseInt(limit, 10) || 20));
-  const params = [sf.shop_id, phone];
-  let where = `shop_id = $1 AND source = 'storefront' AND customer_phone = $2`;
-  if (cursor) {
-    const m = /^(\d{1,15})\.([0-9A-Z]{26})$/.exec(String(cursor));
-    if (!m) throw badRequest('نشانگرِ صفحه معتبر نیست', 'bad_cursor');
-    params.push(Number(m[1]), m[2]);
-    where += ` AND (created_at, id) < ($3, $4)`;
-  }
-  params.push(lim + 1);
-  const rows = await many(
-    `SELECT id, order_no, status, fulfillment, total_minor, items_count, scheduled_for, created_at, track_gen FROM online_orders
-      WHERE ${where} ORDER BY created_at DESC, id DESC LIMIT $${params.length}`,
-    params
-  );
-  const more = rows.length > lim;
-  const page = more ? rows.slice(0, lim) : rows;
-  const names = page.length ? await many(
-    `SELECT order_id, name FROM online_order_lines WHERE shop_id = $1 AND order_id = ANY($2::text[]) AND line_no <= 3
-      ORDER BY order_id, line_no`,
-    [sf.shop_id, page.map((r) => r.id)]
-  ) : [];
-  const last = page[page.length - 1];
-  const on = await linkPolicyOn(sf.shop_id);
-  return {
-    orders: views.pubList('orderSummary', page.map((r) => ({
-      orderNo: Number(r.order_no), status: r.status, fulfillment: r.fulfillment, totalMinor: Number(r.total_minor),
-      itemsCount: Number(r.items_count), createdAt: Number(r.created_at),
-      scheduledFor: r.scheduled_for === null ? null : Number(r.scheduled_for),
-      preview: names.filter((n) => n.order_id === r.id).map((n) => n.name),
-      token: listTokenOf(sf.shop_id, r, on),
-    }))),
-    nextCursor: more ? `${Number(last.created_at)}.${last.id}` : null,
-  };
-}
+//  «سفارش‌های من»: مالکیتِ سفارش (ایمیلِ تأییدشده یا حساب) و فهرست/تاریخچهٔ همین مشتری — `lib/storefront-my-orders.js`
+const { ownsOrder, OWNED_SQL, myOrders, ordersOfCustomer } = require('./storefront-my-orders')({ verification, linkPolicyOn, listTokenOf });
 
 /**
  * WEB-12 — «خریدِ دوباره» با قیمت و موجودیِ امروز: هر قلمِ سفارشِ قبلی با
@@ -790,10 +739,10 @@ function slugFromHost(host) {
 module.exports = {
   FLAG_KEY, FEATURE_KEY, SLUG_RE, RESERVED, SEARCH_FLAG, SEARCH_KEY, PRODUCT_ID_RE, MAX_CHECKOUT_LINES, MAX_QTY_MILLI, ...spid,
   normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, catalogByIds, photo,
-  highlights, productDetail, reorder, ordersOfPhone, verifiedPhone,
+  highlights, productDetail, reorder, ordersOfCustomer, verifiedEmail, ownsOrder, OWNED_SQL,
   localParts, presenceOf, statusOf,
   parseCheckout, checkout, track, cancel, tokenOf, parseToken, orderIdOf, orderIdOfLink, listTokenOf, currentTokenOf, linkPolicyOn, revokeLink, LINK_FLAG, publicOrder,
-  K_ANON, ticketOf, parseTicket, verifiedPhoneOfTicket, verification, verificationAvailable, startVerification, checkVerification, myOrders,
+  K_ANON, ticketOf, parseTicket, verifiedEmailOfTicket, verification, verificationAvailable, startVerification, checkVerification, myOrders,
   settingsOf, saveSettings, declarePresence, staffProducts, staffProduct, setProduct, ...sfc,   //  S1 و M2: storefront-catalog.js
   //  بازارچه (`lib/market.js`) همان دروازهٔ کالا را می‌خواند، نه نسخهٔ دومی از آن
   PRODUCT_FROM, PRODUCT_COLS, LIVE_PRODUCT, SQL_NAME, productView,

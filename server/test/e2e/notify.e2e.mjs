@@ -86,6 +86,7 @@ await E.step('NOTIF-07.ready', 'مشتری سبد می‌چیند و شماره�
   await page.waitForSelector('#view-checkout:not([hidden])');
   await page.fill('#c-name', CUSTOMER_NAME);
   await page.fill('#c-phone', X);
+  await page.fill('#c-email', `c${String(X).replace(/\D/g, '').slice(-9)}@e2e.local`);   //  «فقط ایمیل»: کد به ایمیل؛ شماره فقط تماسِ پیک
   await page.click('#verify-send');
   await page.waitForSelector('#verify-code-row:not([hidden])', { timeout: 10_000 });
   await page.waitForFunction(() => /\d{4,8}/.test(document.getElementById('verify-msg')?.textContent || ''), null, { timeout: 10_000 });

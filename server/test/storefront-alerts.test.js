@@ -11,7 +11,7 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { h, boot, flag, liveStore, setStock, setPrice, ticketFor } = require('./storefront-finder-fixture');
+const { h, boot, flag, liveStore, setStock, setPrice, ticketFor, mailOf } = require('./storefront-finder-fixture');
 const { query, one, now } = require('../src/db');
 const A = require('../src/lib/storefront-alerts');
 const notify = require('../src/lib/customer-notify');
@@ -153,7 +153,7 @@ test('WEB-10 گذار دقیقاً یک بار؛ مصرف و مسلح‌سازی
   assert.equal(twins[0] + twins[1], 1);
   assert.equal(both[0].fired + both[1].fired, 0);
   assert.equal(calls.length, 1, 'هر گذار یک خبر');
-  assert.deepEqual([calls[0].channel, calls[0].to.phone, calls[0].event], ['push', '+93791250005', 'product_stock_alert']);
+  assert.deepEqual([calls[0].channel, calls[0].to.email, calls[0].event], ['push', mailOf('0791250005'), 'product_stock_alert']);
   assert.match(calls[0].text, /چای الف/);
   assert.doesNotMatch(calls[0].text, /[0-9۰-۹]{3}/, 'بی قیمت و بی شماره');
   const fired = await alertOf(s.shopId, 'tea-a', 'stock');
@@ -213,7 +213,7 @@ test('WEB-10 سقفِ هزینهٔ دکان (مشترک با اعلانِ سفا
     assert.equal(calls.length, 1, 'سقفِ دکان ⇒ سرویس‌دهنده صدا زده نمی‌شود');
     const capped = await alertOf(s.shopId, 'tea-b', 'stock');
     assert.deepEqual([capped.state, capped.notice], ['fired', 'cost_cap']);
-    assert.deepEqual(capped.tried.map((t) => `${t.channel}:${t.result}`), ['push:cost_cap', 'whatsapp:not_configured', 'telegram:not_configured']);
+    assert.deepEqual(capped.tried.map((t) => `${t.channel}:${t.result}`), ['push:cost_cap', 'email:not_configured', 'whatsapp:not_configured', 'telegram:not_configured']);   //  «فقط ایمیل»: پوش ⇒ ایمیل ⇒ …
   } finally {
     for (const [k, v] of [['CUSTOMER_NOTIFY_COST_MICROS_PUSH', saved.c], ['CUSTOMER_NOTIFY_DAILY_CAP_MICROS_PUSH', saved.m]]) {
       if (v === undefined) delete process.env[k]; else process.env[k] = v;
@@ -226,7 +226,7 @@ test('WEB-10 سقفِ هزینهٔ دکان (مشترک با اعلانِ سفا
   for (const id of ['tea-c', 'oil-a', 'soap-a', 'tea-a']) assert.equal((await sub(s, c, id, 'stock')).status, 201, id);
   for (const id of ['tea-c', 'oil-a', 'soap-a', 'tea-a']) await setStock(s, id, 1000);
   await A.tick();
-  const notices = (await query("SELECT notice FROM storefront_alerts WHERE phone = '+93791250008'")).rows.map((r) => r.notice).sort();
+  const notices = (await query("SELECT notice FROM storefront_alerts WHERE phone = $1", [mailOf('0791250008')])).rows.map((r) => r.notice).sort();
   assert.deepEqual(notices, [...Array(A.PER_DAY).fill('sent'), 'rate_limited'].sort());
 
   //  `shop.customer_notify` خاموش ⇒ هشدار می‌سوزد (در «هشدارهای من» دیده می‌شود) ولی هیچ پیامی نمی‌رود

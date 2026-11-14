@@ -2,13 +2,12 @@
 /**
  * میزِ مدیر برای دفترِ کدهای یک‌بارمصرف («کدهای شش‌رقمی»: فهرست بی خودِ کد، ارسالِ دوبارهٔ همان کد، نمایشِ
  * ثبت‌شده) — از `lib/otp.js` جدا شد تا زیرِ سقفِ اندازه بماند؛ رفتار همان. وابستگی‌های همان پرونده (پوشاندن و
- * بازکردنِ کد، راه‌های ارسال، سقف‌های SEC-06 و دفترِ پیامک) تزریق می‌شوند.
+ * بازکردنِ کد، راه‌های ارسال) تزریق می‌شوند. ⛔ «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): ردیفِ کهنهٔ شماره‌ای دوباره فرستاده نمی‌شود.
  */
 const { query, one, many, now } = require('../db');
-const settings = require('./sms-settings');
 
 module.exports = ({
-  mask, unseal, senders, sender, isEmail, isKnown, dailyCeiling, costCeiling, overDailyMax, recordSms,
+  mask, unseal, senders, sender, isEmail, overDailyMax,
 }) => {
 /**
  * چند ده کدِ آخرِ همین دفتر، با حالشان.
@@ -83,6 +82,10 @@ function shapeRow(r) {
 async function resend(id) {
   const row = await one('SELECT * FROM otp_codes WHERE id=$1', [String(id || '').slice(0, 80)]);
   if (!row) return null;
+  //  ⛔ «فقط ایمیل»: کدِ کهنهٔ شماره‌ای (پیش از ۱۴۰۵/۰۸/۲۳) هرگز پیامک نمی‌شود
+  if (!isEmail(row.destination)) {
+    return { ok: false, error: 'email_only', message: 'کد فقط به ایمیل فرستاده می‌شود؛ این ردیفِ کهنه به شماره بود' };
+  }
 
   const t = now();
   if (row.consumed_at || Number(row.expires_at) <= t) {
@@ -93,8 +96,7 @@ async function resend(id) {
     return { ok: false, error: 'code_unavailable', message: 'خودِ کد دیگر نگه داشته نشده — کدِ تازه بفرستید' };
   }
 
-  const smsCfg = await settings.current();
-  const send = await sender(row.destination, smsCfg);
+  const send = await sender(row.destination);
   if (send === senders.log) {
     return {
       ok: false,
@@ -102,34 +104,20 @@ async function resend(id) {
       message: 'رباتِ ارسال تنظیم نیست، پس این کد به دستِ کسی نمی‌رسد. SMTP را تنظیم کنید.',
     };
   }
-
-  //  SEC-06: فرستادنِ دوباره هم پیامک است — سقفِ روزانهٔ همین شماره و سقفِ سراسری
-  if (!isEmail(row.destination)) {
-    if (await overDailyMax(row.destination, t)) {
-      return { ok: false, error: 'otp_daily_limit', message: 'امروز درخواست کد برای این نشانی زیاد بوده است' };
-    }
-    const full = await dailyCeiling(await isKnown(row.destination), t)
-      || await costCeiling({ via: smsCfg.provider, at: t });
-    if (full) return { ok: false, error: full.code, message: full.message };
+  if (await overDailyMax(row.destination, t)) {
+    return { ok: false, error: 'otp_daily_limit', message: 'امروز درخواست کد برای این نشانی زیاد بوده است' };
   }
 
-  const message = smsCfg.template
-    ? smsCfg.template.replace(/\{code\}/g, code)
-    : `کد ورود شما: ${code}`;
   try {
-    await send(row.destination, code, message, { app: row.app || '', purpose: row.purpose || 'login' });
+    await send(row.destination, code, `کد ورود شما: ${code}`, { app: row.app || '', purpose: row.purpose || 'login' });
   } catch (err) {
-    await recordSms(row.destination, { app: row.app || '', purpose: row.purpose || 'login', via: smsCfg.provider, ok: false });
     return { ok: false, error: 'delivery_failed', message: String(err?.message || err).slice(0, 200) };
   }
 
-  const via = isEmail(row.destination)
-    ? (await require('./mailer').current()).provider
-    : smsCfg.provider;
+  const via = (await require('./mailer').current()).provider;
   //  ⚠️ `sent_at` جلو می‌رود تا میزِ مدیر بداند آخرین تلاش کِی بود
   await query('UPDATE otp_codes SET via=$2, sent_at=$3 WHERE id=$1', [row.id, String(via || ''), now()])
     .catch(() => {});
-  await recordSms(row.destination, { app: row.app || '', purpose: row.purpose || 'login', via: String(via || '') });
   return { ok: true, via: String(via || '') };
 }
 

@@ -62,10 +62,11 @@ object StrAccount {
   val email: String get() = t("ایمیل", "Email", "ایمیل")
   val emailNone: String get() = t("ثبت نشده", "Not set", "نه دی ثبت")
   val emailLocked: String get() = t("ایمیلِ حساب عوض نمی‌شود — راهِ ورود و بازیابیِ رمز همین است", "The account email can't change — it's how you sign in and recover the password", "د حساب ایمیل نه بدلېږي — د ننوتو او پټنوم بیرته اخیستو لار همدا ده")
-  val emailByPhone: String get() = t("شما با شماره وارد شده‌اید", "You signed in with a phone number", "تاسو په شمېره ننوتي یاست")
-  val phone: String get() = t("شماره موبایل", "Mobile number", "د موبایل شمېره")
-  val phoneOnceHelper: String get() = t("شماره پس از ثبت قفل می‌شود و از برنامه عوض نمی‌شود.", "Once saved, the number is locked and can't be changed from the app.", "شمېره له ثبت وروسته قفلېږي او له اپ نه بدلېږي.")
-  val phoneLocked: String get() = t("شماره ثبت شده و قفل است", "The number is saved and locked", "شمېره ثبت او قفل ده")
+  //  «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): ورود فقط با ایمیل؛ حسابِ کهنهٔ بی‌ایمیل ایمیل را با کدِ همان ایمیل می‌افزاید
+  val emailByPhone: String get() = t("ورود فقط با ایمیل است؛ ایمیل را بنویسید تا کدِ تأیید به همان برود", "Sign-in is by email only; enter your email and we'll send it a code", "ننوتل یوازې په ایمیل دي؛ ایمیل ولیکئ چې د تایید کوډ همغه ته ولاړ شي")
+  val phone: String get() = t("شمارهٔ تماس", "Contact number", "د اړیکې شمېره")
+  val phoneOnceHelper: String get() = t("فقط برای تماس است، نه ورود؛ هر وقت بخواهید عوض یا پاک می‌شود.", "Only for contact, not sign-in; change or clear it any time.", "یوازې د اړیکې لپاره ده، نه د ننوتلو؛ هر وخت بدلېږي یا پاکېږي.")
+  val phoneLocked: String get() = t("شمارهٔ تماس (برای ورود نیست)", "Contact number (not for sign-in)", "د اړیکې شمېره (د ننوتلو لپاره نه ده)")
   val notEditable: String get() = t("قابل تغییر نیست", "Can't be changed", "نه بدلېږي")
   val groupShop: String get() = t("دکان", "Shop", "دوکان")
   val shopName: String get() = t("نام فروشگاه", "Shop name", "د دوکان نوم")
@@ -78,28 +79,23 @@ object StrAccount {
   val saving: String get() = t("در حال ذخیره…", "Saving…", "خوندي کېږي…")
   val nameRequired: String get() = t("نام را بنویسید", "Write your name", "نوم ولیکئ")
   val nameSavedOffline: String get() = td("نام روی گوشی ذخیره شد — برای ثبت روی سرور به اینترنت نیاز است", "The name was saved on this phone — saving it on the server needs internet", "نوم په تلیفون خوندي شو — په سرور د ثبت لپاره انټرنیټ پکار دی", "The name was saved on this computer — saving it on the server needs internet", "نوم په کمپیوټر خوندي شو — په سرور د ثبت لپاره انټرنیټ پکار دی")
-  val phoneNeedsInternet: String get() = t("ثبتِ شماره به اینترنت نیاز دارد", "Saving the number needs internet", "د شمېرې ثبت انټرنیټ ته اړتیا لري")
-  val phoneSaved: String get() = t("شماره ثبت شد و قفل شد", "The number was saved and locked", "شمېره ثبت او قفل شوه")
-  //  AUTH-08: کادرِ کدِ شمارهٔ تازه (`ProfileEditModel.codeError`؛ برچسب و «کد رفت» در `StrShellPages`)
+  val phoneNeedsInternet: String get() = t("ثبتِ ایمیل و شمارهٔ تماس روی سرور به اینترنت نیاز دارد", "Saving the email and contact number needs internet", "د ایمیل او د اړیکې شمېرې ثبت انټرنیټ ته اړتیا لري")
+  val phoneSaved: String get() = t("ایمیل افزوده شد؛ از این پس با همین ایمیل وارد می‌شوید", "Email added; from now on you sign in with it", "ایمیل ورزیات شو؛ له دې وروسته په همدې ایمیل ننوځئ")
+  //  AUTH-08 ⇐ «فقط ایمیل»: کادرِ کدِ ایمیلِ تازه (`ProfileEditModel.codeError`؛ برچسب و «کد رفت» در `StrShellPages`)
   val codeIncomplete: String get() = t(
-    "کد کامل نیست؛ همان کدی را بنویسید که به این شماره پیامک شد",
-    "The code is incomplete — enter the code texted to this number",
-    "کوډ بشپړ نه دی؛ هغه کوډ ولیکئ چې دې شمېرې ته واستول شو",
+    "کد کامل نیست؛ همان کدی را بنویسید که به این ایمیل فرستاده شد",
+    "The code is incomplete — enter the code sent to this email",
+    "کوډ بشپړ نه دی؛ هغه کوډ ولیکئ چې دې ایمیل ته ولېږل شو",
   )
   val codeWrong: String get() = t(
-    "کد درست نیست؛ کدِ پیامک‌شده را دوباره نگاه کنید",
-    "That code isn't right — check the texted code again",
-    "کوډ سم نه دی؛ استول شوی کوډ بیا وګورئ",
+    "کد درست نیست؛ کدِ ایمیل‌شده را دوباره نگاه کنید",
+    "That code isn't right — check the emailed code again",
+    "کوډ سم نه دی؛ لېږل شوی کوډ بیا وګورئ",
   )
   val codeDead: String get() = t(
     "این کد دیگر کار نمی‌کند (وقتش گذشته یا بیش از اندازه امتحان شده)",
     "This code no longer works (it expired or was tried too many times)",
     "دا کوډ نور کار نه کوي (موده یې تېره شوې یا ډېر ځله ازمویل شوی)",
-  )
-  val codeNotNeeded: String get() = t(
-    "کدِ شماره دیگر لازم نیست؛ «ذخیره تغییرات» را دوباره بزنید",
-    "A code is no longer needed — tap “Save changes” again",
-    "د شمېرې کوډ نور اړین نه دی؛ «بدلونونه خوندي کړئ» بیا ووهئ",
   )
   val saved: String get() = t("ذخیره شد", "Saved", "خوندي شو")
 

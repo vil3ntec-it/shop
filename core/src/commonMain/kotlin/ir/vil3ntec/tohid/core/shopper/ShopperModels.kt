@@ -113,13 +113,16 @@ data class SlotsPage(
   val slots: List<DeliverySlot> = emptyList(),
 )
 
-/** `POST /:slug/verify/start`. `devCode` فقط سرورِ غیرِ تولید (آزمون) — برنامه هرگز خودش پُرش نمی‌کند. */
+/** `POST /:slug/verify/start` (کد به ایمیل). `devCode` فقط سرورِ غیرِ تولید (آزمون) — برنامه هرگز خودش پُرش نمی‌کند. */
 @Serializable
 data class CodeSent(val sent: Boolean = false, val expiresAt: Long? = null, val resendSeconds: Int? = null, val devCode: String? = null)
 
-/** بلیتِ شمارهٔ تأییدشده (`X-Store-Ticket`)؛ `phone` همان E.164 ِ سرور. */
+/**
+ *  بلیتِ ایمیلِ تأییدشده (`X-Store-Ticket`؛ «فقط ایمیل»، ۱۴۰۵/۰۸/۲۳)؛ `email` همان ایمیلِ کوچک‌حرفِ سرور. بلیتِ کهنهٔ
+ *  شماره‌ای که روی دستگاه مانده `email` ندارد ("" ⇒ هرگز تأییدشده نیست، [CheckoutRules.verified]).
+ */
 @Serializable
-data class PhoneTicket(val phone: String, val ticket: String, val expiresAt: Long)
+data class CustomerTicket(val email: String = "", val ticket: String, val expiresAt: Long)
 
 /** قلمِ برگهٔ قیمتِ امروز (`quoteOf` ِ سرور، درونِ ۴۰۹ ِ `price_changed`). */
 @Serializable

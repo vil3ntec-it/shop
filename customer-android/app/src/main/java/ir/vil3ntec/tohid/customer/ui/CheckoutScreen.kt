@@ -143,27 +143,27 @@ fun CheckoutScreen(model: CustomerModel, slug: String) {
   }
 }
 
-/** تأییدِ شماره با کد — برگهٔ ثبت و گفت‌وگو (هویتِ مشتری همان شمارهٔ تأییدشده است) */
+/** تأییدِ ایمیل با کد — برگهٔ ثبت و گفت‌وگو (هویتِ مشتری همان ایمیلِ تأییدشده است؛ شماره فقط تماسِ پیک، «فقط ایمیل») */
 @Composable
 fun VerifyBlock(model: CustomerModel) = Verify(model, model.store.valueOrNull()?.verificationAvailable ?: true)
 
 @Composable
 private fun Verify(model: CustomerModel, available: Boolean) {
   val f = model.form
+  Field(ShopperText.phone, f.phone, keyboard = KeyboardType.Phone) { model.updateForm(f.copy(phone = it.take(20))) }
   if (!available) {
-    Field(ShopperText.phone, f.phone, keyboard = KeyboardType.Phone) { model.updateForm(f.copy(phone = it.take(20))) }
     Note(ShopperText.verifyOff, Tone.WARN)
     return
   }
   val ok = CheckoutRules.verified(f, model.saved.ticket, model.now())
   if (ok) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Text(f.phone + " — " + ShopperText.verified, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+      Text(f.email.trim() + " — " + ShopperText.verified, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
       TextButton(onClick = { model.otherNumber() }) { Text(ShopperText.otherNumber) }
     }
     return
   }
-  Field(ShopperText.phone, f.phone, keyboard = KeyboardType.Phone) { model.updateForm(f.copy(phone = it.take(20))) }
+  Field(ShopperText.email, f.email, keyboard = KeyboardType.Email) { model.updateForm(f.copy(email = it.take(190))) }
   Text(ShopperText.verifyText, style = MaterialTheme.typography.bodySmall)
   OutlinedButton(onClick = { model.sendCode() }, enabled = !model.verifyBusy, modifier = Modifier.fillMaxWidth()) { Text(ShopperText.sendCode) }
   if (model.codeSent != null) {

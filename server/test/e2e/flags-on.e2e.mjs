@@ -28,6 +28,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { boot, assert, FLAGS_ON_BATCH } from './lib/harness.mjs';
 import { NativeDevice } from './lib/native.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const PG = /^postgres/i.test(process.env.E2E_DATABASE_URL || '');
 const IMG = fs.mkdtempSync(path.join(os.tmpdir(), 'e2e-flags-img-'));
@@ -266,8 +267,8 @@ await E.step('FLAGS.WEB', 'حسابِ مشتری در وب: ثبتِ حساب، 
   const pub = E.ok(await E.get(`/api/store/${SLUG_A}`), 'ویترین');
   assert.equal(pub.features?.webAccount, true);
   const phone = '0791230777';
-  const st = E.ok(await E.post(`/api/store/${SLUG_A}/verify/start`, { phone }), 'کدِ تأیید');
-  const ticket = E.ok(await E.post(`/api/store/${SLUG_A}/verify/check`, { phone, code: st.devCode }), 'تأییدِ شماره').ticket;
+  const st = E.ok(await E.post(`/api/store/${SLUG_A}/verify/start`, { email: mailOf(phone) }), 'کدِ تأیید');
+  const ticket = E.ok(await E.post(`/api/store/${SLUG_A}/verify/check`, { email: mailOf(phone), code: st.devCode }), 'تأییدِ شماره').ticket;
   const acct = E.ok(await E.post(`/api/store/${SLUG_A}/account`, { name: 'مریم' }, null, { 'X-Store-Ticket': ticket }), 'ساختنِ حساب', 201);
   const sess = { 'X-Store-Session': acct.session };
   const addr = { label: 'خانه', text: 'کارته‌سه، سرکِ دوم', landmark: 'پشتِ مکتب', ...INSIDE };
@@ -464,8 +465,8 @@ await E.step('FLAGS.OFF', 'دکانِ «ب» با پرچم‌های خاموش: 
   const kc = E.ok(await B.owner.api('POST', '/shop/delivery/couriers', { userId: kB.user.id }), 'پیکِ «ب»', 201).courier;
   assert.deepEqual(kc.areas, []);
   const phone = '0791230888';
-  const st = E.ok(await E.post(`/api/store/${B.slug}/verify/start`, { phone }), 'کدِ تأیید');
-  const ticket = E.ok(await E.post(`/api/store/${B.slug}/verify/check`, { phone, code: st.devCode }), 'تأییدِ شماره').ticket;
+  const st = E.ok(await E.post(`/api/store/${B.slug}/verify/start`, { email: mailOf(phone) }), 'کدِ تأیید');
+  const ticket = E.ok(await E.post(`/api/store/${B.slug}/verify/check`, { email: mailOf(phone), code: st.devCode }), 'تأییدِ شماره').ticket;
   const o = E.ok(await E.post(`/api/store/${B.slug}/checkout`, {
     fulfillment: 'delivery', paymentMethod: 'cod', customer: { name: 'مشتریِ ب', phone },
     address: { text: 'کارته‌سه', landmark: 'پشتِ مکتب', ...INSIDE }, lines: [{ productId: B.rice, qtyMilli: 1000 }],

@@ -125,7 +125,7 @@
 | بخش | منبع | وضعیت |
 |---|---|---|
 | ساخت با کلیدِ یکتایی (`client_key` + `request_hash`)، قیمتِ سرور، `expectedTotalMinor` | `POST /api/store/:slug/checkout` ⇐ `orders.create` | ✅ |
-| فقط با شمارهٔ تأییدشده (OTP) یا نشستِ حسابِ مشتری | `verify/start`، `verify/check`، `store_customer_sessions` | ✅ (بی سرویسِ پیامک ⇒ ۵۰۳ ِ صریح) |
+| فقط با **ایمیلِ** تأییدشده (کدِ ۶ رقمیِ ایمیل) یا نشستِ حسابِ مشتری — «فقط ایمیل»، ۱۴۰۵/۰۸/۲۳؛ شماره فقط تماسِ پیک، بی کد | `verify/start`، `verify/check` با `{email}` (شماره ⇒ ۴۰۰ `email_required`)، بلیتِ v3، `store_customer_sessions`، `account/email` | ✅ (بی سرویسِ ایمیل در تولید ⇒ ۵۰۳ `verification_unavailable`؛ `storefront-email-identity.test.js`) |
 | ماشینِ وضعیت (۱۹ وضعیت) و رویدادها | `online_orders`، `online_order_events` (۰۶۵)، `lib/order-states.js`، و `OrderStates.kt` در `core` | ✅ |
 | پیگیری با توکنِ حدس‌نزدنی (`<شناسه>.<HMAC>`) | `GET /api/store/:slug/orders/:token` | ✅ |
 | لغو تا پیش از قبول، خریدِ دوباره | `…/cancel`، `…/reorder` | ✅ |

@@ -21,6 +21,7 @@ const { query, many, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
 const { ulid } = require('../src/lib/ulid');
 const sfd = require('../src/lib/storefront-delivery');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const vec = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'core', 'test-vectors', 'delivery-zone-v1.json'), 'utf8'));
 
@@ -115,9 +116,9 @@ async function liveStore(label) {
 const zonesTo = (s, zones) => h.put('/api/shop/storefront/delivery', { zones }, { token: s.token });
 
 async function ticketFor(slug, phone) {
-  const st = await h.post(`/api/store/${slug}/verify/start`, { phone });
+  const st = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
   assert.equal(st.status, 200, JSON.stringify(st.body));
-  const c = await h.post(`/api/store/${slug}/verify/check`, { phone, code: st.body.devCode });
+  const c = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: st.body.devCode });
   assert.equal(c.status, 200, JSON.stringify(c.body));
   return c.body.ticket;
 }

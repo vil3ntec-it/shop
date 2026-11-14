@@ -112,12 +112,12 @@ test('حسابِ ناموجود ⇒ ۴۰۴، پیش‌نمایش هم', async ()
 const delUser = (id, body) => h.api('DELETE', `/api/admin/users/${id}`, { token: superTok, body });
 
 test('حسابِ فقط‌شماره: تأیید با همان شماره (در هر قالب)؛ کدهای یک‌بارمصرفِ آن شماره هم می‌روند', async () => {
-  const phone = '0795551234';
-  const asked = await h.post('/api/auth/otp/request', { phone });
-  assert.equal(asked.status, 200, JSON.stringify(asked.body));
-  const made = await h.post('/api/auth/otp/verify', { phone, code: asked.body.devCode, name: 'فقط‌شماره' });
-  assert.equal(made.status, 201, JSON.stringify(made.body));
-  const id = made.body.user.id;
+  //  حسابِ کهنهٔ فقط‌شماره (تا ۱۴۰۵/۰۸/۲۳ با کدِ پیامکی ساخته می‌شد؛ امروز «فقط ایمیل») و کدِ کهنهٔ همان شماره
+  const id = newId('usr');
+  await query(`INSERT INTO users (id, name, phone, status, created_at, updated_at)
+               VALUES ($1,'فقط‌شماره','+93795551234','active',$2,$2)`, [id, now()]);
+  await query(`INSERT INTO otp_codes (id, purpose, destination, code_hash, app, attempts, max_attempts, expires_at, created_at, ip, via)
+               VALUES ($1,'login','+93795551234','x','shop',0,5,$2,$2,'','sms')`, [newId('otp'), now()]);
   const stored = await one('SELECT phone, email FROM users WHERE id=$1', [id]);
   assert.ok(stored.phone && !stored.email, JSON.stringify(stored));
   assert.ok(await count('SELECT COUNT(*)::int AS n FROM otp_codes WHERE destination=$1', [stored.phone]) > 0, 'کدِ واقعیِ این شماره در دفتر');

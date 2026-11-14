@@ -63,14 +63,20 @@ async function shop(label, flags = [FLAG]) {
   return s;
 }
 
-/** مشتریِ حساب‌دار: بلیتِ شماره برای ثبت و نشستِ حساب برای درخواست */
+/**
+ * مشتریِ حساب‌دار: بلیتِ **ایمیل** برای ثبت و نشستِ حساب برای درخواست. «فقط ایمیل» (ادغامِ e-rows-47e، ۱۴۰۵/۰۸/۲۳): کد فقط به
+ * ایمیل می‌رود (`verify/*` با شماره ⇒ ۴۰۰ `email_required`)؛ `phone` فقط شمارهٔ تماسِ فرمِ ثبت است.
+ */
+const mailOf = (phone) => `rr${String(phone).replace(/\D/g, '').slice(-9)}@test.local`;
 async function shopper(s, phone = '0791112233') {
-  const st = await h.post(`/api/store/${s.slug}/verify/start`, { phone });
-  const c = await h.post(`/api/store/${s.slug}/verify/check`, { phone, code: st.body.devCode });
+  const email = mailOf(phone);
+  const st = await h.post(`/api/store/${s.slug}/verify/start`, { email });
+  assert.equal(st.status, 200, JSON.stringify(st.body));
+  const c = await h.post(`/api/store/${s.slug}/verify/check`, { email, code: st.body.devCode });
   assert.equal(c.status, 200, JSON.stringify(c.body));
   const a = await h.post(`/api/store/${s.slug}/account`, {}, { headers: { 'X-Store-Ticket': c.body.ticket } });
   assert.equal(a.status, 201, JSON.stringify(a.body));
-  return { phone, ticket: c.body.ticket, session: a.body.session, headers: { 'X-Store-Session': a.body.session } };
+  return { phone, email, ticket: c.body.ticket, session: a.body.session, headers: { 'X-Store-Session': a.body.session } };
 }
 
 async function storeOrder(s, who, lines = [{ productId: 'rice', qtyMilli: 5000 }, { productId: 'oil', qtyMilli: 2000 }]) {
@@ -154,6 +160,13 @@ test('RET-11: فقط صاحبِ همان سفارش با نشستِ حساب؛ �
   const foreign = await ask(s, o, stranger);
   assert.equal(foreign.status, 404, JSON.stringify(foreign.body));
   assert.equal(code(foreign), 'order_not_found');
+  //  «فقط ایمیل»: شمارهٔ تماسِ حساب بی کد است ⇒ حسابِ دیگری که شمارهٔ همین سفارش را برای خودش می‌نویسد صاحبِ آن نمی‌شود
+  await setFlag(s.shopId, 'shop.storefront.web_account', true);   //  درِ «شمارهٔ تماس» ِ حساب
+  const spoof = await h.post(`/api/store/${s.slug}/account/phone`, { phone: who.phone }, { headers: stranger.headers });
+  assert.equal(spoof.status, 200, JSON.stringify(spoof.body));
+  const spoofed = await ask(s, o, stranger);
+  assert.equal(spoofed.status, 404, `شمارهٔ تماسِ جعلی مالکیت نمی‌دهد: ${JSON.stringify(spoofed.body)}`);
+  assert.ok(!(await h.get(`/api/store/${s.slug}/account/orders`, { headers: stranger.headers })).body.orders.some((x) => x.orderNo === o.no));
   assert.equal((await ask(s, { token: h.tampered(o.token) }, who)).status, 404);
   //  دکانِ دیگر با همان توکن ⇒ ۴۰۴
   const other = await shop('همسایه');
@@ -318,6 +331,9 @@ test('RET-11: عکس از همان راهِ امن و سقفِ ۳؛ دکان: پ
   assert.deepEqual(events.map((e) => e.event).sort(), [`order_return_accepted:${id}`, `order_return_completed:${id}`, `order_return_rejected:${sid}`].sort());
   const cn = require('../src/lib/customer-notify');
   assert.deepEqual(events.map((e) => cn.eventOf(e)).sort(), ['order_return_accepted', 'order_return_completed', 'order_return_rejected']);
+  //  سقفِ هر مشتری با کلیدِ تأییدشده (ایمیل)، نه شمارهٔ تماسِ بی کد — همان کلیدِ پیام‌های دیگرِ همین سفارش
+  const keys = (await query('SELECT DISTINCT phone_key FROM customer_notify_outbox WHERE order_id=$1 AND return_request_id IS NOT NULL', [o.id])).rows;
+  assert.deepEqual(keys.map((k) => k.phone_key), [cn.phoneKey(who.email)]);
   assert.match(cn.render('order_return_rejected', 'en', { no: 12, shop: 'Dokan' }), /declined the return request for order #12/);
   //  پیامِ برگشت از راهِ `onExtraIn` نمی‌رود (فقط با درخواست)
   assert.equal(await cn.onExtraIn((q, p) => query(q, p), { shopId: s.shopId, order: { id: o.id, source: 'storefront', customer_phone: '+93791112233' }, event: 'order_return_accepted' }), null);

@@ -9,6 +9,7 @@
  * اجرا:  node test/e2e/run.mjs scenario-s33
  */
 import { boot, assert } from './lib/harness.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const E = await boot({ name: 'scenario-s33' });
 const { db } = E;
@@ -39,8 +40,8 @@ await E.step('S33.0', 'دکان: کالا از برنامه، ویترینِ ا�
   E.ok(await A.api('PUT', '/shop/storefront', { slug: SLUG, enabled: true, title: 'ویترینِ S33', contactPhone: '0700000033', deliveryFeeMinor: 3000, minOrderMinor: 0 }), 'ویترین');
   E.ok(await A.api('PUT', `/shop/storefront/products/${rice}`, { published: true }), 'انتشار');
   courierId = E.ok(await A.api('POST', '/shop/delivery/couriers', { userId: courierAcct.user.id, cashCapMinor: 5_000_000 }), 'پیک', 201).courier.id;
-  const st = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { phone: PHONE }), 'کدِ تأیید');
-  ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { phone: PHONE, code: st.devCode }), 'تأییدِ شماره').ticket;
+  const st = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { email: mailOf(PHONE) }), 'کدِ تأیید');
+  ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { email: mailOf(PHONE), code: st.devCode }), 'تأییدِ شماره').ticket;
 });
 
 await E.step('S33.required', 'فقط نام، شماره و پین ⇒ سفارش ثبت می‌شود؛ بی نام یا بی هیچ نشانی ⇒ رد با خطای روشن', async () => {

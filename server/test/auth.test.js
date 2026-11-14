@@ -23,35 +23,37 @@ test('ثبت‌نام بدون تأیید ایمیل بسته است — مسی�
   assert.notEqual(login.status, 200);
 });
 
-test('شماره در هر قالبی نوشته شود، یک حساب است', async () => {
-  //  حساب با کدِ یک‌بارمصرف ساخته می‌شود — تنها راهی که شماره از آن
-  //  واردِ سیستم می‌شود
-  const asked = await h.post('/api/auth/otp/request', { phone: '0792236008' });
-  await h.post('/api/auth/otp/verify', { phone: '0792236008', code: asked.body.devCode, name: 'یک' });
-
-  //  همان شماره با قالبِ دیگر، همان حساب است — نه حسابِ تازه
-  const again = await h.post('/api/auth/otp/request', { phone: '+93 792 236 008' });
-  const back = await h.post('/api/auth/otp/verify', { phone: '0093792236008', code: again.body.devCode });
+//  «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): ورود با کدِ پیامکیِ شماره برداشته شد ⇐ به‌جایش ایمیل (`email-only-auth.test.js`)
+test('شماره در هیچ قالبی راهِ ورود با کد نیست؛ ایمیل با هر بزرگی/کوچکیِ حرف یک حساب است', async () => {
+  for (const phone of ['0792236008', '+93 792 236 008', '0093792236008']) {
+    const r = await h.post('/api/auth/otp/request', { phone });
+    assert.equal(r.status, 400, phone);
+    assert.equal(r.body.error.code, 'email_required');
+  }
+  const asked = await h.post('/api/auth/otp/request', { email: 'Same.One@test.local' });
+  await h.post('/api/auth/otp/verify', { email: 'Same.One@test.local', code: asked.body.devCode, name: 'یک' });
+  const again = await h.post('/api/auth/otp/request', { email: 'same.one@TEST.local' });
+  const back = await h.post('/api/auth/otp/verify', { email: 'SAME.one@test.local', code: again.body.devCode });
   assert.equal(back.status, 200, 'حسابِ موجود، نه ساختِ تازه');
   assert.equal(back.body.created, false);
 });
 
-test('ورود با کد یک‌بارمصرف: کد اشتباه رد و کد درست قبول می‌شود', async () => {
-  const phone = '0793334444';
-  const asked = await h.post('/api/auth/otp/request', { phone });
+test('ورود با کد یک‌بارمصرفِ ایمیل: کد اشتباه رد و کد درست قبول می‌شود', async () => {
+  const email = 'code-login@test.local';
+  const asked = await h.post('/api/auth/otp/request', { email });
   assert.equal(asked.status, 200);
   assert.ok(asked.body.devCode, 'در حالت تست کد باید در دسترس باشد');
 
-  const wrong = await h.post('/api/auth/otp/verify', { phone, code: '000000' });
+  const wrong = await h.post('/api/auth/otp/verify', { email, code: '000000' });
   assert.equal(wrong.status, 403);
 
-  const ok = await h.post('/api/auth/otp/verify', { phone, code: asked.body.devCode, name: 'کدی' });
+  const ok = await h.post('/api/auth/otp/verify', { email, code: asked.body.devCode, name: 'کدی' });
   assert.equal(ok.status, 201);
   assert.equal(ok.body.created, true);
   assert.ok(ok.body.accessToken);
 
   // همان کد دوباره کار نمی‌کند
-  const replay = await h.post('/api/auth/otp/verify', { phone, code: asked.body.devCode });
+  const replay = await h.post('/api/auth/otp/verify', { email, code: asked.body.devCode });
   assert.equal(replay.status, 403);
 });
 

@@ -17,6 +17,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { query, one, many, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const MIN = 60_000;
 const DAY = 24 * 60 * MIN;
@@ -300,8 +301,8 @@ test('مشتری زمانِ تازه را در پیگیری می‌بیند؛ ر
   assert.equal(p.status, 200, JSON.stringify(p.body));
   assert.equal((await h.put('/api/shop/storefront/products/rice', { published: true }, { token: s.token })).status, 200);
   const phone = '0791113077';
-  const st = await h.post(`/api/store/${slug}/verify/start`, { phone });
-  const ck = await h.post(`/api/store/${slug}/verify/check`, { phone, code: st.body.devCode });
+  const st = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+  const ck = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: st.body.devCode });
   assert.equal(ck.status, 200, JSON.stringify(ck.body));
   const co = await h.post(`/api/store/${slug}/checkout`, {
     fulfillment: 'pickup', customer: { name: 'مشتری', phone }, lines: [{ productId: 'rice', qtyMilli: 1000 }],

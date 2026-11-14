@@ -22,6 +22,7 @@ const h = require('./helpers');
 const { query, one, many, newId, now } = require('../src/db');
 const migrate = require('../src/migrate');
 const fees = require('../src/lib/market-fees');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const MIGRATION = '130_order_market_fields.sql';
 const NEW_COLS = ['market_order_group_id', 'platform_fee_minor', 'commission_minor', 'channel'];
@@ -75,8 +76,8 @@ async function liveStore(label) {
 }
 
 async function ticketFor(slug, phone) {
-  const s = await h.post(`/api/store/${slug}/verify/start`, { phone });
-  const c = await h.post(`/api/store/${slug}/verify/check`, { phone, code: s.body.devCode });
+  const s = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+  const c = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: s.body.devCode });
   assert.equal(c.status, 200, JSON.stringify(c.body));
   return c.body.ticket;
 }
