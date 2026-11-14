@@ -137,7 +137,7 @@ class BranchDeskDesktopTest {
   }
 
   @Test
-  fun `تأییدِ شعبه پیش از هر دورِ v3: بی پاسخ نه، پس از پاسخِ روشن یک دقیقه بس`() {
+  fun `تأییدِ شعبه پیش از هر دورِ v3 — بی پاسخ نه، پس از پاسخِ روشن یک دقیقه بس`() {
     val store = ownerOnMain()
     SyncChoice.set(ctx, SyncChoice.V3, 0)
     runBlocking { BranchDesk.switchTo(ctx, store, branchA) }

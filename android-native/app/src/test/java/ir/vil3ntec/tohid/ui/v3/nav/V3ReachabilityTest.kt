@@ -66,6 +66,9 @@ class V3ReachabilityTest {
     Feature("PRD-17/27 عکس‌های تکمیلی و عکسِ جدای ویترین", "products/{id}/photo/gallery", "ir.vil3ntec.tohid.ui.v3.products.ProductGalleryPage"),
     Feature("PRM-02 آزادِ دستیِ کدِ تخفیفِ نگه‌داشته", "settings/promo-held", "ir.vil3ntec.tohid.ui.v3.settings.sections.PromoHeldScreen"),
     Feature("RPT-18 گزارشِ همهٔ شعبه‌ها", "reports/branches", "ir.vil3ntec.tohid.ui.v3.analytics.BranchesReportPage"),
+    //  ── شعبه درونِ یک دکان، فازِ ۲ (`docs/BRANCHES-fa.md` §۹؛ در فقط با پاسخِ روشنِ `shop.branches`) ──
+    Feature("شعبه‌ها — شعبهٔ این دستگاه و صفحهٔ صاحب", "branches", "ir.vil3ntec.tohid.ui.v3.branches.BranchesPage"),
+    Feature("شعبه‌ها — گزارشِ هر شعبه و جمع", "branches/report", "ir.vil3ntec.tohid.ui.v3.branches.BranchReportPage"),
     Feature(
       "PAY-17 چند کشو و شیفتِ شناور (ردهٔ B، پیش‌فرض خاموش)", "settings/sales/multi-drawer",
       "ir.vil3ntec.tohid.ui.v3.settings.sections.MultiDrawerScreen", pattern = "settings/{group}/{section}",

@@ -108,7 +108,7 @@ class BranchesStateTest {
   }
 
   @Test
-  fun `صفحهٔ صاحب: اعضا فقط برای صاحب، نوشتن با پیامِ روشن، اصلی بایگانی نمی‌شود`() = runBlocking {
+  fun `صفحهٔ صاحب — اعضا فقط برای صاحب، نوشتن با پیامِ روشن، اصلی بایگانی نمی‌شود`() = runBlocking {
     val f = Fake(book(true, "[\"\",\"$A\"]", three))
     f.members = ApiResult.Success(BranchBook.membersOf(json(
       """{"branches":$three,"members":[{"id":"m1","userId":"u1","name":"کریم","role":"staff","branches":[""]}]}""",
@@ -143,7 +143,7 @@ class BranchesStateTest {
   }
 
   @Test
-  fun `گزارش: هر شعبه از سرور و جمع فقط وقتی سرور داد (صاحب)`() = runBlocking {
+  fun `گزارش — هر شعبه از سرور و جمع فقط وقتی سرور داد (صاحب)`() = runBlocking {
     val f = Fake(ApiResult.Success(BranchBook.Answer.Off))
     val s = BranchReportState(f)
     s.load("2026-11-14")

@@ -28,6 +28,9 @@ object BranchLive {
   /** پرسشِ باز پس از ورود (`Ask`/`None`)؛ null ⇒ هیچ */
   var pick by mutableStateOf<BranchBook.Pick?>(null)
 
+  /** شعبهٔ دفترِ روی میز برای نمایش (`BranchDesk.current` ِ آخرین پرسش یا تعویض) */
+  var current by mutableStateOf(BranchKey.MAIN)
+
   /** آخرین پاسخِ روشنِ سرور: شعبه‌ها خاموش (پرچم یا سرورِ کهنه) — میزِ شعبهٔ دیگر به اصلی برمی‌گردد */
   var off by mutableStateOf(false)
     private set
@@ -47,6 +50,7 @@ object BranchLive {
     book = null
     pick = null
     off = false
+    current = BranchKey.MAIN
   }
 
   /**

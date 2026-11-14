@@ -65,13 +65,13 @@ import kotlinx.coroutines.launch
  *  ⛔ پرچمِ خاموش ⇒ `BranchLive.book` null ⇒ هیچ‌کدام دیده نمی‌شود.
  */
 
+private const val REPROBE_MS = 10 * 60_000L
+
 /** میزبانِ «انتخابِ شعبه» — یک بار زیرِ `AppRoot` */
 @Composable
 fun BranchHost(store: ShopStore) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
-  val ready = Backend.isReady(context)
-  val owner = BranchDesk.ownerOf(context)
   var tick by remember { mutableStateOf(0) }
   var note by remember { mutableStateOf<String?>(null) }
 
@@ -81,12 +81,13 @@ fun BranchHost(store: ShopStore) {
       BranchDesk.markPicked(context)
       BranchLive.pick = null
     }
+    BranchLive.current = BranchDesk.current(context)
     note = BranchLive.outcomeText(o, BranchLive.label(b))
   }
 
-  LaunchedEffect(ready, owner, tick) {
-    if (!ready || owner.isEmpty()) { BranchLive.reset(); return@LaunchedEffect }
+  suspend fun probe(owner: String) {
     val current = BranchDesk.current(context)
+    BranchLive.current = current
     val p = BranchLive.probe(ShopBranchesRepository(Backend.api(context)), current, afterSignIn = BranchDesk.pickedFor(context) != owner)
     if (BranchLive.book != null) BranchDesk.confirmed(current, BranchLive.dismissible(current))
     when {
@@ -97,9 +98,25 @@ fun BranchHost(store: ShopStore) {
     }
   }
 
+  //  ورود/خروج و دکانِ تازه بی بازسازیِ این جزء هم دیده شود؛ پرچمِ دکان هر ۱۰ دقیقه دوباره (خاموش ⇒ میز به اصلی)
+  LaunchedEffect(tick) {
+    var seen: String? = null
+    var at = 0L
+    while (true) {
+      val owner = if (Backend.isReady(context)) BranchDesk.ownerOf(context) else ""
+      val now = System.nanoTime() / 1_000_000
+      if (owner != seen || (owner.isNotEmpty() && now - at > REPROBE_MS)) {
+        seen = owner
+        at = now
+        if (owner.isEmpty()) BranchLive.reset() else probe(owner)
+      }
+      kotlinx.coroutines.delay(3_000)
+    }
+  }
+
   val pick = BranchLive.pick
   if (pick is BranchBook.Pick.Ask || pick is BranchBook.Pick.None) {
-    val current = BranchDesk.current(context)
+    val current = BranchLive.current
     val canClose = BranchLive.dismissible(current)
     V3Sheet(onDismiss = { if (canClose) { BranchDesk.markPicked(context); BranchLive.pick = null } }, title = StrBranchDesk.pickTitle, dismissible = canClose) {
       if (pick is BranchBook.Pick.Ask) {
@@ -125,12 +142,11 @@ fun BranchHost(store: ShopStore) {
 @Composable
 fun BranchProfileCard(onOpen: (String) -> Unit) {
   if (!BranchLive.visible) return
-  val context = LocalContext.current
   Spacer(Modifier.height(16.dp))
   V3Card(radius = 24.dp, padding = PaddingValues(vertical = 4.dp)) {
     V3ListRow(
       title = StrBranchDesk.title,
-      subtitle = StrBranchDesk.current(BranchLive.nameOf(BranchDesk.current(context))),
+      subtitle = StrBranchDesk.current(BranchLive.nameOf(BranchLive.current)),
       icon = Icons.Outlined.Store,
       tile = false,
       minHeight = 60.dp,
@@ -158,7 +174,7 @@ internal fun RouteScope.BranchesPage() {
         book == null && state.failed -> V3EmptyState(Icons.Outlined.CloudOff, StrBranchDesk.failed, action = StrBranchDesk.retry, onAction = { tick++ })
         book == null -> Text(StrBranchDesk.loading, style = V3Type.callout, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(top = 16.dp))
         else -> {
-          val current = BranchDesk.current(context)
+          val current = BranchLive.current
           V3Section(StrBranchDesk.currentLabel, footer = StrBranchDesk.pickNote) {
             V3ListRow(StrBranchDesk.nameOf(book.nameOf(current).orEmpty(), BranchKey.isMain(current)), icon = Icons.Outlined.Store, chevron = false)
             if (book.choices.size > 1) {
