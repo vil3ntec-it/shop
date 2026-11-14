@@ -558,19 +558,21 @@ class S26Load2GDesktopTest {
     var gzBig = 0
     var dropDown = 0
     var dups = 0
+    val fails = ArrayList<String>()
+    fun soft(msg: String, ok: Boolean) { if (!ok) fails += msg }
     for ((i, r) in runs.withIndex()) {
       val d = r.dev
       val l = r.link
       val kinds = l.obj("kinds")
       val push = kinds["push"] as? JsonObject ?: JsonObject(emptyMap())
       val pull = kinds["pull"] as? JsonObject ?: JsonObject(emptyMap())
-      assertTrue("${d.label}: دسته ≤ ${OpQueue.MAX_OPS} op (${d.maxBatch})", d.maxBatch in 1..OpQueue.MAX_OPS)
-      assertTrue("${d.label}: دسته ≤ ${OpQueue.MAX_BYTES} بایت (${d.maxBatchBytes})", d.maxBatchBytes <= OpQueue.MAX_BYTES)
-      assertTrue("${d.label}: fields ≤ ۶۴KB (${d.maxOpFieldsBytes})", d.maxOpFieldsBytes <= 64 * 1024)
-      assertTrue("${d.label}: بدنهٔ push روی سیم ≤ ۲۵۶KB (${push.str("maxReqBody")})", push.str("maxReqBody").toInt() <= OpQueue.MAX_BYTES + 1024)
-      for ((k, v) in kinds) if (k != "push") assertTrue("${d.label}: درخواستِ $k ≤ ۶۴KB", (v as JsonObject).str("maxReqBody").toInt() <= 64 * 1024)
-      assertEquals("${d.label}: ادامه از همان‌جا — هیچ op ِ پذیرفته‌ای دوباره نرفت", 0, d.resentAfterAck)
-      assertTrue("${d.label}: بریدنِ push پیش از سرور دیده شد ${push}", push.str("dropUp").toInt() >= 1)
+      soft("${d.label}: دسته ≤ ${OpQueue.MAX_OPS} op (${d.maxBatch})", d.maxBatch in 1..OpQueue.MAX_OPS)
+      soft("${d.label}: دسته ≤ ${OpQueue.MAX_BYTES} بایت (${d.maxBatchBytes})", d.maxBatchBytes <= OpQueue.MAX_BYTES)
+      soft("${d.label}: fields ≤ ۶۴KB (${d.maxOpFieldsBytes})", d.maxOpFieldsBytes <= 64 * 1024)
+      soft("${d.label}: بدنهٔ push روی سیم ≤ ۲۵۶KB (${push.str("maxReqBody")})", push.str("maxReqBody").toInt() <= OpQueue.MAX_BYTES + 1024)
+      for ((k, v) in kinds) if (k != "push") soft("${d.label}: درخواستِ $k ≤ ۶۴KB", (v as JsonObject).str("maxReqBody").toInt() <= 64 * 1024)
+      soft("${d.label}: ادامه از همان‌جا — هیچ op ِ پذیرفته‌ای دوباره نرفت (${d.resentAfterAck})", d.resentAfterAck == 0)
+      soft("${d.label}: بریدنِ push پیش از سرور دیده شد ${push}", push.str("dropUp").toInt() >= 1)
       dropDown += push.str("dropDown").toInt()
       dups += d.duplicates
       //  روی سیم: پس از هر push ِ ناکام، push ِ بعدی یا پس از فاصلهٔ تلاش است یا تنها یک تلاشِ بی‌صدای `HttpURLConnection`
@@ -579,8 +581,13 @@ class S26Load2GDesktopTest {
       fun quick(j: Int) = (wire[j + 1][1] as JsonPrimitive).content.toLong() - (wire[j][2] as JsonPrimitive).content.toLong() < 500
       val immediate = (0 until wire.size - 1).count { failed(it) && quick(it) }
       val chained = (0 until wire.size - 2).count { failed(it) && quick(it) && failed(it + 1) && quick(it + 1) }
-      assertEquals("${d.label}: هیچ زنجیرِ تکرارِ پشتِ سرِ هم (طوفانِ تلاش)", 0, chained)
-      assertTrue("${d.label}: هر انتظار ≥ ۱۰ ثانیه و دوبرابر در یک رشتهٔ شکست ${r.waits}", r.waits.all { it >= 10_000 } && r.waits.zipWithNext().all { (a, b) -> b == 10_000L || b == minOf(300_000L, a * 2) })
+      //  زمان فقط با `speed` = ۱ گواه است (با خطِ فشرده انتظارِ خودِ آزمون هم «بی‌فاصله» دیده می‌شود)؛ شمار همیشه:
+      //  هر push ِ اضافه روی سیم یا تلاشِ دوم با پیشوندِ دیگر پس از ۴۰۱ است یا یک تلاشِ دوباره پس از push ِ ناکام
+      val n401 = wire.count { (it[6] as JsonPrimitive).content == "401" }
+      val failedOnWire = wire.count { (it[3] as JsonPrimitive).content != "ok" }
+      soft("${d.label}: push ِ سیم ${wire.size} ≤ ${d.pushes} + ۴۰۱ ${n401} + ناکام ${failedOnWire}", wire.size <= d.pushes + n401 + failedOnWire)
+      if (speed == 1.0) soft("${d.label}: هیچ زنجیرِ تکرارِ پشتِ سرِ هم (طوفانِ تلاش) ($chained)", chained == 0)
+      soft("${d.label}: هر انتظار ≥ ۱۰ ثانیه و دوبرابر در یک رشتهٔ شکست ${r.waits}", r.waits.all { it >= 10_000 } && r.waits.zipWithNext().all { (a, b) -> b == 10_000L || b == minOf(300_000L, a * 2) })
       val v2g = l.str("vClockMs").toDouble() + (r.backoffVirtualMs - r.backoffRealMs)
       val bigPush = wire.count { (it[4] as JsonPrimitive).content.toInt() > 1024 }
       val gzPush = wire.count { (it[7] as JsonPrimitive).content == "1" }
@@ -595,8 +602,8 @@ class S26Load2GDesktopTest {
         .append("\"maxOpFieldsBytes\":${d.maxOpFieldsBytes},\"pulledOps\":${d.pulledOps},\"failureKinds\":${JsonArray(r.failures.map { JsonPrimitive(it) })},")
         .append("\"wire\":${JsonArray((l["log"] as JsonArray).map { it as JsonArray }.filter { (it[0] as JsonPrimitive).content in setOf("push", "pull", "refresh") })},\"link\":${JsonObject(l.filterKeys { it != "log" })}}")
     }
-    assertTrue("پاسخِ push پس از اعمال بریده شد ($dropDown) ⇒ «تکراری» از سرور ($dups)", dropDown >= 1 && dups > 0)
-    if (gzip) assertEquals("SYN-04: پرچمِ `sync.gzip_push` ⇒ هر push ِ بالای ۱KB فشرده ($gzOk از $gzBig)", gzBig, gzOk)
+    soft("پاسخِ push پس از اعمال بریده شد ($dropDown) ⇒ «تکراری» از سرور ($dups)", dropDown >= 1 && dups > 0)
+    if (gzip) soft("SYN-04: پرچمِ `sync.gzip_push` ⇒ هر push ِ بالای ۱KB فشرده ($gzOk از $gzBig)", gzBig == gzOk)
     val total = System.currentTimeMillis() - t0
     json.append("],\"finalRounds\":$rounds,\"offlineMs\":$offlineMs,\"parallelMs\":$parallelMs,\"totalMs\":$total,\"finalLinks\":${JsonObject(links.mapValues { (_, v) -> JsonObject((v as JsonObject).filterKeys { it != "log" }) })}}")
     env("S26_REPORT")?.let { File(it.replace(".json", "-$name.json")).writeText(json.toString()) }
@@ -608,5 +615,6 @@ class S26Load2GDesktopTest {
       |زمان: قطعی ${offlineMs / 1000}s، همگام‌سازیِ هم‌زمان ${parallelMs / 1000}s، کل ${total / 1000}s
       """.trimMargin()
     )
+    assertTrue(fails.joinToString("\n"), fails.isEmpty())
   }
 }
