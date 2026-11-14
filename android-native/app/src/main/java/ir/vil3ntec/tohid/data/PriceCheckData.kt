@@ -22,6 +22,11 @@ object PriceCheckData {
      *  خالی ⇒ فقط همان یک عددِ کل (تنظیمِ «محل‌های نگه‌داری» خاموش، یا کالا جز محلِ اصلی جایی ندارد)
      */
     val places: List<PlaceQty> = emptyList(),
+    /**
+     *  POS-16/S17 — موجودیِ آزادِ همین کالا در شعبه‌های دیگر (فقط عدد، از سرور: `rememberOtherBranches`)؛ پرچمِ `shop.branches`
+     *  خاموش یا بی دسترسی ⇒ خالی ⇒ همان کارتِ پیشین
+     */
+    val others: List<ir.vil3ntec.tohid.core.stock.BranchStock.Qty> = emptyList(),
   )
 
   private fun minor(afn: Double): Long = if (afn.isFinite()) (afn * 100).roundToLong() else 0L
@@ -66,6 +71,11 @@ object PriceCheckData {
     //  S17: هر محل یک سطرِ دنباله زیرِ موجودی (جمعِ محل‌ها همان موجودیِ کل؛ منفی سرخ)
     v.places.forEach { pq ->
       add(Line("", S.atPlace(pq.label, (ir.vil3ntec.tohid.qty(pq.milli / 1000.0) + " " + unit).trim()), if (pq.milli < 0) Tone.DANGER else Tone.MUTED))
+    }
+    //  POS-16/S17: یک سطرِ «در شعبه‌های دیگر» و برای هر شعبه یک سطرِ دنباله (صفر کم‌رنگ)
+    v.others.forEachIndexed { i, o ->
+      val q = (ir.vil3ntec.tohid.qty(o.qtyMilli / 1000.0) + " " + unit).trim()
+      add(Line(if (i == 0) S.otherBranches else "", S.atPlace(o.branchName, q), if (o.qtyMilli > 0) Tone.NORMAL else Tone.MUTED))
     }
     val last = v.card.last
     add(

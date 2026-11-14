@@ -61,7 +61,11 @@ fun PriceCheckDialog(d: ShopData, today: String, showCost: Boolean, onDismiss: (
   val matches = remember(term, d.products) { PosCatalog.matches(d.products, term).take(8) }
   val exact = remember(term, index) { (BarcodeMatch.find(term, index) as? BarcodeMatch.Hit.Product)?.id }
   val id = picked ?: exact ?: matches.singleOrNull()?.id
-  val view = remember(id, d, today, places) { id?.let { i -> d.products.find { it.id == i } }?.let { PriceCheckData.of(d, it, today, places) } }
+  //  POS-16/S17: عددِ شعبه‌های دیگر از سرور (پرچمِ shop.branches خاموش ⇒ خالی ⇒ همان کارت)
+  val others = ir.vil3ntec.tohid.data.rememberOtherBranches(id)
+  val view = remember(id, d, today, places, others) {
+    id?.let { i -> d.products.find { it.id == i } }?.let { PriceCheckData.of(d, it, today, places).copy(others = others) }
+  }
   val focus = remember { FocusRequester() }
   LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 

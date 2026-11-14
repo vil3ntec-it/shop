@@ -43,7 +43,11 @@ fun PriceCheckSheet(d: ShopData, today: String, showCost: Boolean, onClose: () -
   val index = remember(d.products) { ShopStore.barcodeIndex(d) }
   val matches = remember(query, d.products) { PriceCheckData.matches(d, query) }
   val id = remember(query, picked, index) { PriceCheckData.pick(d, index, query, picked) }
-  val view = remember(id, d, today, places) { id?.let { i -> d.products.find { it.id == i } }?.let { PriceCheckData.of(d, it, today, places) } }
+  //  POS-16/S17: عددِ شعبه‌های دیگر از سرور (پرچمِ shop.branches خاموش ⇒ خالی ⇒ همان کارت)
+  val others = ir.vil3ntec.tohid.data.rememberOtherBranches(id)
+  val view = remember(id, d, today, places, others) {
+    id?.let { i -> d.products.find { it.id == i } }?.let { PriceCheckData.of(d, it, today, places).copy(others = others) }
+  }
   V3Sheet(onDismiss = onClose, title = StrPriceCheck.title) {
     V3SearchField(query, { query = it; picked = null }, StrPriceCheck.hint)
     Spacer(Modifier.height(10.dp))
