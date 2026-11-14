@@ -73,6 +73,9 @@ async function printOf(shopId, branchId) {
     await q('SELECT * FROM shop_approval_requests WHERE shop_id=$1 AND branch_id=$2 ORDER BY id', [shopId, branchId]),
     await q('SELECT * FROM shop_branches WHERE shop_id=$1 AND id=$2', [shopId, branchId]),
     await q('SELECT user_id FROM shop_member_branches WHERE shop_id=$1 AND branch_id=$2 ORDER BY user_id', [shopId, branchId]),
+    //  فازِ ۴: انتقال‌هایی که یک سرشان «ب» است و گام‌های «ب»
+    await q('SELECT * FROM branch_transfers WHERE shop_id=$1 AND (from_branch=$2 OR to_branch=$2) ORDER BY id', [shopId, branchId]),
+    await q('SELECT * FROM branch_transfer_steps WHERE shop_id=$1 AND branch_id=$2 ORDER BY step_key', [shopId, branchId]),
   ];
 }
 
@@ -126,6 +129,20 @@ test('ماتریسِ شعبه: هیچ درِ /api/shop/* و /api/sync/v3/* دا�
   assert.ok(JSON.stringify(ownB.body).includes('bsec-e1'), JSON.stringify(ownB.body));
   const ownPull = await h.api('GET', `/api/sync/v3/pull?device_id=dev-own-x&since=0`, { token: s.token, headers: { 'X-Branch-Id': Bid } });
   assert.ok(JSON.stringify(ownPull.body).includes('bsec-x1'));
+  //  فازِ ۴ (INV-11 میانِ شعبه‌ها): «ب» ⇒ اصلی با یادداشتِ نشان‌دار، و «الف» ⇒ «ب» (هر دو هنوز در مسیر)
+  const xf = (who, branch, body) => h.api('POST', '/api/shop/catalog/branch-transfers', {
+    token: who.token, body, headers: { 'X-Branch-Id': branch, 'Idempotency-Key': `brm-${newId('k')}` },
+  });
+  r = await xf(mgrB, Bid, { toBranch: 'main', from: 'shop_floor', to: 'shop_floor', lines: [{ productId: 'p1', qtyMilli: 1000 }], note: 'bsec-xfer-note' });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const bXfer = r.body.transfer.id;
+  r = await xf(mgrA, A, { toBranch: Bid, from: 'shop_floor', to: 'warehouse', lines: [{ productId: 'p1', qtyMilli: 1000 }], note: 'asec-xfer' });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const abXfer = r.body.transfer.id;
+  //  بی‌اثر نیست: «ب» هر دو را می‌بیند
+  const ownX = await h.api('GET', '/api/shop/catalog/branch-transfers', { token: mgrB.token, headers: { 'X-Branch-Id': Bid } });
+  assert.deepEqual(ownX.body.transfers.map((t) => t.id).sort(), [bXfer, abXfer].sort());
+  assert.ok(JSON.stringify(ownX.body).includes('bsec-xfer-note'));
   const before = await printOf(s.shopId, Bid);
 
   const ids = [bTask, bReq, 'bsec-s1', Bid];
@@ -157,6 +174,30 @@ test('ماتریسِ شعبه: هیچ درِ /api/shop/* و /api/sync/v3/* دا�
           if (claim === Bid && d.v3) assert.equal(res.status, 403, `${d.key} ${text}`);
           if (claim === Bid && d.path.startsWith('/api/shop/catalog')) assert.equal(res.status, 403, `${d.key} ${text}`);
         }
+      }
+    }
+  }
+  //  درهای انتقالِ میانِ شعبه‌ها با شناسهٔ واقعیِ انتقال‌های «ب» (و «الف» ⇒ «ب»): هیچ نشان، و «الف» در «ب» دریافت/رد نمی‌کند
+  const X = '/api/shop/catalog/branch-transfers';
+  const xdoors = [['GET', X], ['GET', `${X}?direction=in`], ['GET', `${X}?direction=out&status=open`], ['GET', `${X}/destinations`],
+    ['GET', `${X}/${bXfer}`], ['POST', `${X}/${bXfer}/receive`, {}], ['POST', `${X}/${bXfer}/reject`, { reason: 'x' }],
+    ['GET', `${X}/${abXfer}`], ['POST', `${X}/${abXfer}/receive`, { lines: [{ productId: 'p1', receivedMilli: 1000 }] }],
+    ['POST', `${X}/${abXfer}/reject`, { reason: 'x' }],
+    ['POST', X, { toBranch: 'main', from: 'shop_floor', to: 'shop_floor', lines: [{ productId: 'p1', qtyMilli: 1 }] }]];
+  for (const who of [mgrA, staffA]) {
+    for (const [method, url, body] of xdoors) {
+      for (const claim of [Bid, undefined, A, 'brn_000000000000000000000000', `${Bid},${A}`]) {
+        //  ارسالِ «الف» با سرآیندِ «الف» کارِ درستِ خودش است (به «ب» نمی‌رسد مگر مقصد باشد) — این‌جا فقط ب ⇐ نه
+        if (method === 'POST' && url === X && claim === A) continue;
+        resetAll();
+        const res = await h.api(method, url, { token: who.token, body: body || null,
+          headers: { ...(claim === undefined ? {} : { 'X-Branch-Id': claim }), 'Idempotency-Key': `brm-${newId('k')}` } });
+        calls += 1;
+        const text = JSON.stringify(res.body || '');
+        if (text.includes('bsec') || text.includes(bXfer)) leaks.push(`${method} ${url} [${claim === undefined ? 'بی سرآیند' : claim}] ${res.status}`);
+        if (claim !== A) assert.equal(res.status, 403, `${method} ${url} ${claim} ${text}`);
+        else if (url.includes(bXfer)) assert.equal(res.status, 404, `${method} ${url} ${text}`);
+        else if (method === 'POST' && url.includes(abXfer)) assert.equal(res.body.error.code, 'transfer_wrong_branch', `${url} ${text}`);
       }
     }
   }

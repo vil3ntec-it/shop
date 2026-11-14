@@ -590,6 +590,12 @@ async function seedShop(a) {
   const brn = await h.post('/api/shop/branches', { name: 'شعبهٔ الف' }, { token: a.accessToken });
   assert.equal(brn.status, 201, JSON.stringify(brn.body));
   ids.branch = brn.body.branch.id;
+  //  انتقالِ میانِ شعبه‌ها (فازِ ۴، INV-11): «در مسیر» از اصلی به شعبهٔ «الف»
+  const bxf = await h.post('/api/shop/catalog/branch-transfers',
+    { toBranch: ids.branch, from: 'shop_floor', to: 'shop_floor', lines: [{ productId: ids.product, qtyMilli: 1000 }] },
+    { token: a.accessToken, headers: { 'Idempotency-Key': fresh('bxfer') } });
+  assert.equal(bxf.status, 201, JSON.stringify(bxf.body));
+  ids.branchTransfer = bxf.body.transfer.id;
 
   //  قاعدهٔ تخفیف — شناسه را برنامه می‌سازد؛ کلیدِ فضای خودِ دکان
   ids.promoRule = 'inv-promo-a1';
@@ -686,6 +692,7 @@ function concreteFor(ids) {
     [/^(\/shop\/catalog\/products\/):id/, ids.product],
     [/^(\/shop\/catalog\/tasks\/):id/, ids.task],
     [/^(\/shop\/catalog\/transfers\/):id/, ids.transfer],
+    [/^(\/shop\/catalog\/branch-transfers\/):id/, ids.branchTransfer],
     [/^(\/shop\/order-notify\/):id/, ids.notify],
     [/(\/pick\/issues\/):issueId/, ids.pickIssue],
     [/(\/pick\/locations\/):productId/, ids.product],
@@ -793,6 +800,8 @@ function bodyFor(r, ids) {
     'POST /shop/catalog/tasks/:id/resolve': { action: 'resolved', note: 'آزمون' },
     'POST /shop/catalog/transfers/:id/receive': { lines: [{ productId: ids.product, receivedMilli: 1000 }] },
     'POST /shop/catalog/transfers/:id/reject': { reason: 'آزمون' },
+    'POST /shop/catalog/branch-transfers/:id/receive': { lines: [{ productId: ids.product, receivedMilli: 1000 }] },
+    'POST /shop/catalog/branch-transfers/:id/reject': { reason: 'آزمون' },
     'POST /shop/order-notify/:id/ack': { kind: 'opened' },
     'PUT /shop/storefront/products/:productId': { published: false, onlinePriceMinor: 1 },
     'PUT /shop/storefront/campaigns/:id': { name: 'پیوندِ ب', archived: true },

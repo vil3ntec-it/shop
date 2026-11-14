@@ -18,7 +18,8 @@
  * سنجیدهٔ `X-Branch-Id` با دسترسیِ همین عضو (`branches.restOf`) — کارمند فقط شعبه‌های خودش، صاحب هر شعبه؛ نامجاز ⇒ ۴۰۳
  * `branch_forbidden`، بی سرآیند و بی شعبهٔ اصلی ⇒ ۴۰۳ `branch_required`. شناسهٔ شعبه در بدنه/پارامتر هرگز خوانده نمی‌شود.
  * کالاها همان کاتالوگِ مشترکِ دکان؛ موجودی، حرکت، وظیفه و تطبیق فقط از همان شعبه (کلیدِ `req.stockKey`). درهای سطحِ دکان
- * یا فقط‌اصلی (تنظیمات، نگه‌داشتهٔ سفارشِ آنلاین، انتقال — فازِ ۴) در شعبهٔ دیگر ⇒ ۴۰۳ `branch_unsupported`.
+ * یا فقط‌اصلی (تنظیمات، نگه‌داشتهٔ سفارشِ آنلاین، انتقالِ **درونِ** شعبه) در شعبهٔ دیگر ⇒ ۴۰۳ `branch_unsupported`؛
+ * انتقالِ **میانِ** شعبه‌ها (فازِ ۴، §۱۰) در `routes/branch-transfers.js` (ته همین روتر).
  * پرچمِ خاموش ⇒ سرآیند خوانده نمی‌شود و `req.stockKey` همان شناسهٔ دکان (بایت‌به‌بایت همان امروز).
  */
 const express = require('express');
@@ -258,5 +259,8 @@ router.post('/transfers/:id/reject', prebuilt, mainOnly, requirePermission('stoc
   });
   await transferDone(req, res, 'stock.transfer_reject', out);
 });
+
+//  انتقالِ میانِ شعبه‌ها (INV-11، فازِ ۴ ِ `docs/BRANCHES-fa.md` §۱۰) — پشتِ `shop.branches` و `shop.catalog`
+router.use(require('./branch-transfers'));
 
 module.exports = router;

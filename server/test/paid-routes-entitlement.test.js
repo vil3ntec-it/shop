@@ -48,6 +48,8 @@ const FREE = [
     'PUT /shop/catalog/settings', 'POST /shop/catalog/refresh', 'PUT /shop/catalog/products/:id/low',
     'POST /shop/catalog/tasks/:id/resolve', 'POST /shop/catalog/moves',
     'POST /shop/catalog/transfers', 'POST /shop/catalog/transfers/:id/receive', 'POST /shop/catalog/transfers/:id/reject',
+    //  انتقالِ میانِ شعبه‌ها (INV-11، فازِ ۴ ِ BRANCHES §۱۰) همان موجودیِ سرور است — فقط پرچم‌های shop.branches و shop.catalog
+    'POST /shop/catalog/branch-transfers', 'POST /shop/catalog/branch-transfers/:id/receive', 'POST /shop/catalog/branch-transfers/:id/reject',
     'POST /shop/images/select', 'POST /shop/images', 'PUT /shop/images/:id/v/:version/:size',
     'POST /shop/images/:id/propose', 'POST /shop/images/:id/report', 'POST /shop/images/:id/detach',
     'POST /shop/images/changes', 'POST /shop/images/changes/:id/rollback',
