@@ -277,15 +277,23 @@ object CustomerMerge {
    *  حلقه (`CustomerCrm.resolve`) دوباره فعال و بقیه مستقیم به آن؛ همهٔ دستگاه‌ها همین را
    *  می‌سازند. مقصدِ ناپیدا (ردیفِ ماندگار هنوز نرسیده) دست نمی‌خورد.
    *  برای هر ماندگار یک ردِ `customer_merge` با `refId` = همان ماندگار و ردیف‌ها در `refIds`.
-   *  [docs] = `false` (v3): فقط ترمیمِ حلقه (پروندهٔ مشتری)؛ هیچ سندی جابه‌جا نمی‌شود — `CustomerAlias` آن‌ها را می‌خواند.
    */
   fun sweep(
     d: ShopData,
     today: String = ir.vil3ntec.tohid.todayIso(),
     now: Long = System.currentTimeMillis(),
     newId: () -> String = ::auditId,
-    docs: Boolean = true,
-  ): ShopData? {
+  ): ShopData? = sweepOf(d, today, now, newId, docs = true)
+
+  /** همان [sweep] برای همگام‌سازیِ v3: فقط ترمیمِ حلقه (پروندهٔ مشتری)؛ هیچ سندی جابه‌جا نمی‌شود — `CustomerAlias` آن‌ها را می‌خواند */
+  fun sweepLinks(
+    d: ShopData,
+    today: String = ir.vil3ntec.tohid.todayIso(),
+    now: Long = ReportBridge.nowMs(),
+    newId: () -> String = ::auditId,
+  ): ShopData? = sweepOf(d, today, now, newId, docs = false)
+
+  private fun sweepOf(d: ShopData, today: String, now: Long, newId: () -> String, docs: Boolean): ShopData? {
     val merged = d.debtors.filter { !CustomerCrm.isActive(it) }
     if (merged.isEmpty()) return null
     val byId = d.debtors.associateBy { it.id }

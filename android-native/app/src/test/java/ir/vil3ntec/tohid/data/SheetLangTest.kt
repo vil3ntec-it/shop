@@ -2,7 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
-import ir.vil3ntec.tohid.core.tax.QuarterTax
+import ir.vil3ntec.tohid.core.report.QuarterTax
 import ir.vil3ntec.tohid.ui.v3.analytics.SheetModel
 import org.junit.After
 import org.junit.Assert.assertEquals

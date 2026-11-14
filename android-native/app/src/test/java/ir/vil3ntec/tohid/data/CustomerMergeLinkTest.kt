@@ -144,15 +144,15 @@ class CustomerMergeLinkTest {
     val loop = d0.copy(debtors = d0.debtors.map {
       when (it.id) { "c1" -> it.copy(mergedInto = "c2"); "c2" -> it.copy(mergedInto = "c1"); else -> it }
     })
-    val next = CustomerMerge.sweep(loop, "2026-10-20", 5, ::newId, docs = false)!!
+    val next = CustomerMerge.sweepLinks(loop, "2026-10-20", 5, ::newId)!!
     assertEquals(docs(d0), docs(next))
     assertNull("کوچک‌ترین شناسهٔ حلقه دوباره فعال", next.debtors.first { it.id == "c1" }.mergedInto)
     assertEquals("c1", next.debtors.first { it.id == "c2" }.mergedInto)
     val ops = CustomerMerge.sweepOps(loop, next)!!
     assertEquals(setOf("debtors" to SyncOp.UPDATE, "auditLog" to SyncOp.INSERT), ops.map { it.table to it.type }.toSet())
     assertEquals(d0.transactions.sumOf { if (it.type == "give") it.amount else -it.amount } - 50.0, ShopStore.debt(next, "c1"), 1e-9)
-    assertNull("دورِ دوم کاری ندارد", CustomerMerge.sweep(next, "2026-10-20", 6, ::newId, docs = false))
-    assertNull("بی حلقه هم کاری ندارد", CustomerMerge.sweep(link(d0).data, "2026-10-20", 6, ::newId, docs = false))
+    assertNull("دورِ دوم کاری ندارد", CustomerMerge.sweepLinks(next, "2026-10-20", 6, ::newId))
+    assertNull("بی حلقه هم کاری ندارد", CustomerMerge.sweepLinks(link(d0).data, "2026-10-20", 6, ::newId))
   }
 
   @Test fun `حذفِ ماندگار سندهای پیوندی را هم می‌برد — مثلِ دفترِ v1 پس از ادغام`() {

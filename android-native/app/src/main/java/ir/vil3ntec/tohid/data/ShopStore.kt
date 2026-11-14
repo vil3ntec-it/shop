@@ -235,7 +235,7 @@ class ShopStore(
       //  نمونه‌ای که پیش از عوضِ حساب بار شده روی دفترِ حسابِ تازه نمی‌نویسد (`LedgerFollow.movedLocked`)
       if (!follow.sameAccount()) return@synchronized null
       val disk = readDiskLocked() ?: return@synchronized null
-      val next = CustomerMerge.sweep(disk, docs = !SyncChoice.isV3(context)) ?: return@synchronized null
+      val next = (if (SyncChoice.isV3(context)) CustomerMerge.sweepLinks(disk) else CustomerMerge.sweep(disk)) ?: return@synchronized null
       val ops = CustomerMerge.sweepOps(disk, next) ?: return@synchronized null
       if (SoftLock.isLocked(context)) return@synchronized null
       //  همان قاعدهٔ `writeLocked`: دفتری که به دیسک نرسید op نمی‌سازد (F0-01)
