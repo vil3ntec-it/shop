@@ -56,7 +56,12 @@ function without(body, keys) {
   return out;
 }
 
-/** بدنهٔ `/health` و `/ready`: درون‌شبکه همان کامل؛ بیرون بی نسخه، مدتِ روشن بودن و حالِ کارگر */
+/** میدان‌های فقط‌درونیِ `/health` و `/ready` ([HEALTH_DETAIL]): درون‌شبکه همان، بیرون هیچ — برای `...inside(req, {…})` */
+function inside(req, detail) {
+  return internalCaller(req) ? detail : {};
+}
+
+/** بدنهٔ کاملِ `/health`/`/ready` ⇒ همان، یا بی [HEALTH_DETAIL] برای بیرون */
 function health(req, body) {
   return internalCaller(req) ? body : without(body, HEALTH_DETAIL);
 }
@@ -66,4 +71,4 @@ function identity(req, body) {
   return internalCaller(req) ? body : without(body, IDENTITY_DETAIL);
 }
 
-module.exports = { internalCaller, isPrivateAddr, health, identity, FORWARD_HEADERS, HEALTH_DETAIL, IDENTITY_DETAIL };
+module.exports = { internalCaller, isPrivateAddr, inside, health, identity, FORWARD_HEADERS, HEALTH_DETAIL, IDENTITY_DETAIL };
