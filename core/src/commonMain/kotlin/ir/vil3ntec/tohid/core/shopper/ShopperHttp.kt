@@ -19,6 +19,8 @@ class ShopperRequest(
   val body: String? = null,
   val bytes: ByteArray? = null,
   val binary: Boolean = false,
+  /** مهلتِ کوتاهِ همین درخواست (سنجشِ نشانیِ دیگرِ همان سرور، `ShopperServers`)؛ ۰ ⇒ مهلتِ همیشگیِ فرستنده */
+  val timeoutMs: Int = 0,
 ) {
   override fun toString(): String = "ShopperRequest($method $path)"
 }

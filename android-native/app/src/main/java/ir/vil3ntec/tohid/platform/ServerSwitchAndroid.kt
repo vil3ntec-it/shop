@@ -9,6 +9,7 @@ import ir.vil3ntec.tohid.core.server.DataPartition
 import ir.vil3ntec.tohid.core.server.ServerAddress
 import ir.vil3ntec.tohid.core.server.ServerCompat
 import ir.vil3ntec.tohid.core.server.ServerFailover
+import ir.vil3ntec.tohid.core.server.ServerLearn
 import ir.vil3ntec.tohid.core.server.ServerIdentity
 import ir.vil3ntec.tohid.core.server.ServerInfo
 import ir.vil3ntec.tohid.core.server.ServerProfile
@@ -94,7 +95,11 @@ object ServerSwitchAndroid {
   fun activeUrl(context: Context): String? {
     val p = activeProfile(context) ?: run { gate = null; return null }
     if (gate?.profile != p) refreshGate(context)
-    if (p.isDefault && p.urls.size == 1) return null
+    if (p.isDefault && p.urls.size == 1) {
+      //  هنوز همان یک نشانیِ زمانِ ساخت: گاه‌گاه (پس‌زمینه) شناسه‌اش و نشانی‌های تازه‌ای که خودِ سرور اعلام کرده (`ServerLearn`)
+      if (nowMs() - prefs(context).getLong("chosenAt:${p.id}", 0) > ServerLearn.LEARN_MS) recheckSoon(context)
+      return null
+    }
     val chosen = prefs(context).getString("chosen:${p.id}", null)?.takeIf { it in p.urls } ?: p.primary
     val stale = nowMs() - prefs(context).getLong("chosenAt:${p.id}", 0) > ServerFailover.RECHECK_MS
     if (stale || forceRecheck) { forceRecheck = false; recheckSoon(context) }
@@ -193,22 +198,11 @@ object ServerSwitchAndroid {
   internal fun recheck(context: Context) {
     val p = activeProfile(context) ?: return
     val p0 = prefs(context)
-    val order = ServerFailover.order(p.urls, p0.getString("chosen:${p.id}", null))
-    val probes = ArrayList<ServerFailover.Probe>()
-    var chosen: ServerFailover.Pick.Chosen? = null
-    for (u in order) {
-      val r = probe(u, p.certPinOf(u), ServerFailover.timeoutOf(u))
-      val probe = ServerFailover.Probe(u, r.info)
-      probes += probe
-      //  سرورِ پیش‌فرض: نشانیِ اصلی‌اش در خودِ نسخه است و سنجاقش اجباری نیست (صاحب محصول سرورش را جابه‌جا می‌کند)
-      val primaryOfDefault = p.isDefault && ServerAddress.normalize(u) == p.primary && r.info != null
-      if (primaryOfDefault || ServerFailover.judge(p, probe) == ServerFailover.Judgement.ACCEPT) {
-        chosen = ServerFailover.Pick.Chosen(ServerAddress.normalize(u), r.info!!)
-        break
-      }
+    //  همان حلقهٔ «شبکهٔ دکان، بعد اینترنت»، حالا در core (`ServerFailover.choose`) و مشترک با برنامهٔ خریدِ مشتری
+    val pick = ServerFailover.choose(p, p0.getString("chosen:${p.id}", null)) { u ->
+      probe(u, p.certPinOf(u), ServerFailover.timeoutOf(u)).info
     }
     val e = p0.edit().putLong("chosenAt:${p.id}", nowMs())
-    val pick = chosen ?: ServerFailover.pick(p, probes)
     when (pick) {
       is ServerFailover.Pick.Chosen -> {
         e.putString("chosen:${p.id}", pick.url).putBoolean("blocked:${p.id}", false)
@@ -228,6 +222,28 @@ object ServerSwitchAndroid {
     }
     e.commit()
     refreshGate(context)
+    //  پس از نوشتنِ نشانیِ برگزیده (سنجشِ نشانی‌های تازه چند ثانیه می‌کشد و نباید آن را نگه دارد)
+    if (pick is ServerFailover.Pick.Chosen) learn(context, pick)
+  }
+
+  /**
+   *  نشانی‌های تازهٔ همان سرور از زبانِ خودِ سرور (`publicUrls` ِ `config/server`): ⛔ فقط سرورِ سنجاق‌شده، فقط نشانیِ
+   *  عمومی، و هر کدام فقط اگر خودش همان `serverId` را بدهد (`ServerLearn`). در سابقه می‌ماند («learn_url»).
+   */
+  private fun learn(context: Context, pick: ServerFailover.Pick.Chosen) {
+    val p = profiles(context).byId(activeProfile(context)?.id ?: return) ?: return
+    //  بی نامزد ⇒ هیچ پرسشی؛ نامزدِ نرسیده یا سرورِ دیگر هر LEARN_MS یک بار دوباره پرسیده می‌شود، نه با هر سنجشِ ۱۰ دقیقه‌ای
+    if (ServerLearn.candidates(p, pick.url, pick.info, AppConfig.allowInsecure).isEmpty()) return
+    val p0 = prefs(context)
+    if (nowMs() - p0.getLong("learnAt:${p.id}", 0) < ServerLearn.LEARN_MS) return
+    p0.edit().putLong("learnAt:${p.id}", nowMs()).commit()
+    val learned = ServerLearn.learn(p, pick.url, pick.info, AppConfig.allowInsecure) { u ->
+      probe(u, null, ServerFailover.timeoutOf(u)).info
+    }
+    if (learned.urls == p.urls) return
+    val ok = profiles(context).update(learned) as? ServerProfiles.Change.Ok ?: return
+    save(context, ok.profiles)
+    for (u in learned.urls - p.urls.toSet()) log(context, "learn_url", learned, u)
   }
 
   /* ------------------------------ یک نشانی را بپرس ------------------------------ */

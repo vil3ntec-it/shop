@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import ir.vil3ntec.tohid.core.shopper.ShopperHttp
 import ir.vil3ntec.tohid.core.shopper.ShopperRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -29,7 +30,7 @@ object ImagesIos {
     try { SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap() } catch (_: Throwable) { null }
 
   @Composable
-  fun Photo(http: HttpIos, path: String, modifier: Modifier) {
+  fun Photo(http: ShopperHttp, path: String, modifier: Modifier) {
     val img by produceState(cache[path], path) {
       if (value == null) value = withContext(Dispatchers.IO) {
         val r = try { http.send(ShopperRequest("GET", path, binary = true)) } catch (_: Throwable) { null }
@@ -52,7 +53,7 @@ object ImagesIos {
    *  https ِ سرورِ تکه‌ها با فرستندهٔ همان مبدأ؛ بی کوکی (نشستِ ephemeral ِ `HttpIos`)، [loaded] یک بار با «آمد؟».
    */
   @Composable
-  fun Tile(http: HttpIos, url: String, modifier: Modifier, loaded: (Boolean) -> Unit) {
+  fun Tile(http: ShopperHttp, url: String, modifier: Modifier, loaded: (Boolean) -> Unit) {
     val img by produceState(cache[url], url) {
       //  فرستندهٔ مبدأ روی همین نخِ صفحه (نقشهٔ `origins` از چند نخ نوشته نمی‌شود)
       val (sender, path) = if (url.startsWith("/")) http to url else {

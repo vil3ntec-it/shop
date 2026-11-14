@@ -27,6 +27,11 @@ data class ServerInfo(
   val publicUrl: String,
   /** سرورِ پیش از این مسیر — فقط `/api/health` جواب داد */
   val legacy: Boolean,
+  /**
+   *  نشانی‌های عمومیِ دیگری که خودِ سرور اعلام می‌کند (`PUBLIC_BASE_URLS`). هیچ‌کدام بی سنجش به کار نمی‌رود:
+   *  فقط سرورِ سنجاق‌شده می‌گوید و هر نشانی جدا همان `serverId` را باید بدهد (`ServerLearn`).
+   */
+  val publicUrls: List<String> = emptyList(),
 ) {
 
   fun supports(feature: String): Boolean = feature in features
@@ -47,6 +52,9 @@ data class ServerInfo(
     val LEGACY_FEATURES: Set<String> = setOf("auth.password", "sync.v1", "shop", "health")
 
     private val ID = Regex("^srv_[a-z0-9]{16,40}$")
+
+    /** بیش از این از فهرستِ نشانی‌های اعلام‌شده خوانده نمی‌شود */
+    const val MAX_PUBLIC_URLS: Int = 8
 
     fun validServerId(id: String?): Boolean = id != null && ID.matches(id)
 
@@ -71,6 +79,8 @@ data class ServerInfo(
         features = features,
         publicUrl = (o["publicUrl"] as? String)?.let { ServerAddress.parse(it)?.url }.orEmpty(),
         legacy = false,
+        publicUrls = (o["publicUrls"] as? List<*>).orEmpty().take(MAX_PUBLIC_URLS)
+          .mapNotNull { (it as? String)?.let { s -> ServerAddress.parse(s)?.url } }.distinct(),
       )
     }
 

@@ -91,6 +91,7 @@ object StrSetupPages {
   val serverQr: String get() = t("کیو‌آرِ سرور", "Server QR", "د سرور QR")
   val histAdded: String get() = t("افزوده شد", "Added", "زیات شو")
   val histAddUrl: String get() = t("نشانیِ دوم", "Second address", "دویمه پته")
+  val histLearnUrl: String get() = t("نشانیِ تازه از خودِ سرور", "New address from the server itself", "له سرور څخه نوې پته")
   val histSchedule: String get() = t("رفتن (پس از بستن)", "Switch (after closing)", "تګ (له بندولو وروسته)")
   val histSwitch: String get() = t("عوض شد", "Switched", "بدل شو")
   val histFlagOn: String get() = t("روشن شد", "Turned on", "روښانه شو")

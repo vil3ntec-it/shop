@@ -30,8 +30,11 @@ val generateConfig by tasks.registering {
   val out = layout.buildDirectory.dir("generated/ios-config")
   val props = Properties().apply { androidApp.resolve("gradle.properties").inputStream().use { load(it) } }
   val apiBase = (props.getProperty("tohid.apiBase") ?: "").trim().trimEnd('/')
+  //  چند نشانیِ یک سرور (`docs/SERVERS-fa.md` §۳) — پیش‌فرض خاموش
+  val multiServer = props.getProperty("tohid.multiServer")?.trim() == "true"
   val version = Regex("versionName\\s*=\\s*\"([^\"]+)\"").find(androidApp.resolve("app/build.gradle.kts").readText())?.groupValues?.get(1) ?: "0.0.0"
   inputs.property("apiBase", apiBase)
+  inputs.property("multiServer", multiServer)
   inputs.property("version", version)
   outputs.dir(out)
   doLast {
@@ -40,7 +43,8 @@ val generateConfig by tasks.registering {
     dir.resolve("CustomerIosConfig.kt").writeText(
       "// ساخته‌شده به دستِ customer-ios/shared/build.gradle.kts — دستی ویرایش نکنید.\n" +
         "package ir.vil3ntec.tohid.customer.ios\n\n" +
-        "internal object CustomerIosConfig {\n  const val API_BASE: String = ${q(apiBase)}\n  const val VERSION_NAME: String = ${q(version)}\n}\n",
+        "internal object CustomerIosConfig {\n  const val API_BASE: String = ${q(apiBase)}\n  const val VERSION_NAME: String = ${q(version)}\n" +
+        "  val MULTI_SERVER: Boolean = $multiServer\n}\n",
       Charsets.UTF_8,
     )
   }
