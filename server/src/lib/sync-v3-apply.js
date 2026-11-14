@@ -42,7 +42,6 @@ function openTask(s, ctx, { kind, table, rowId, dedupe, detail, t }) {
  */
 async function authorize(c, ctx, op, row, deviceId, origin, groups = null, plan = null) {
   if (origin === 'v1' || origin === 'server') return null;      //  v1 خودش سنجیده بود (و `v1Guard`)
-  { const bc = require('./branch-catalog').judge(ctx, op, origin); if (bc) return bc; }   //  شعبه (فازِ ۳): کاتالوگ فقط از شعبهٔ اصلی
   { const pu = await require('./product-unit-rules').judgeV3(c, ctx, op, row); if (pu) return pu; }   //  PRD-07: واحدِ گردش‌دار و ضریبِ ناجور (صاحب هم)
   const role = ctx.role;
   const own = !!row && row.created_by === deviceId;
@@ -89,7 +88,8 @@ async function applyOne(s, ctx, op, { deviceId, origin, cursor = 0, t, groups = 
   if (dup) return retried(s, ctx, op, origin, { op_id: op.op_id, status: 'duplicate', server_seq: Number(dup.server_seq) }, hideContact);
 
   const row = await s.load(ctx, op.table, op.row_id);
-  const denied = await require('./sync-v3-roles').denied(c, ctx, op, origin, plan) || await authorize(c, ctx, op, row, deviceId, origin, groups, plan);
+  //  شعبه (فازِ ۳): کاتالوگِ دکان فقط از شعبهٔ اصلی — پیش از هر داوریِ دیگر تا دلیل همیشه همین باشد (`lib/branch-catalog.js`)
+  const denied = require('./branch-catalog').judge(ctx, op, origin) || await require('./sync-v3-roles').denied(c, ctx, op, origin, plan) || await authorize(c, ctx, op, row, deviceId, origin, groups, plan);
   if (denied) {
     const out = { op_id: op.op_id, status: 'rejected', reason: typeof denied === 'string' ? denied : denied.reason };
     //  ردیفِ صندوق بعد از برگشتِ savepoint نوشته می‌شود (`push`)؛ در پاسخ نمی‌آید

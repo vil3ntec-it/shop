@@ -344,6 +344,7 @@ async function refresh(shopId, { full = false, maxAgeMs = 0, at = now(), throttl
 }
 
 async function ingest(shopId, at, full) {
+  if (cb.isBranch(shopId)) await refresh(cb.shopOf(shopId), { maxAgeMs: 1, at, throttle: false });   //  کاتالوگِ مشترک: تعریفِ کالا از اصلی
   const out = await tx(async (c) => ingestTx(c, shopId, at, await stock.settingsOf(shopId, c), { full }));
   await afterIngest(shopId, out);
   return out;

@@ -113,6 +113,11 @@ async function movedAfter(c, shopId, productId, location, countedAt) {
   return Number(r.s);
 }
 
+/** شعبه: تعریفِ کالا از کاتالوگِ مشترکِ دکان ⇒ پیش از سنجیدنِ «کالا هست؟» دفترِ اصلی خوانده می‌شود (بی تازه ⇒ یک پرسش) */
+async function sharedCatalog(sk, at) {
+  if (bk.isBranch(sk)) await require('./catalog').refresh(bk.shopOf(sk), { maxAgeMs: 1, at, throttle: false });
+}
+
 function hashOf(body) {
   return crypto.createHash('sha256').update(stable(body || {})).digest('hex').slice(0, 32);
 }
@@ -142,6 +147,7 @@ async function manualMove(shopId, { key, body, actor }) {
   const hash = hashOf(body);
   const at = now();
   const countedAt = m.kind === 'count' ? countedAtOf(m.countedAt, at) : null;
+  await sharedCatalog(shopId, at);
   let ingested = null;
   const out = await tx(async (c) => {
     await stock.lock(c, shopId);
@@ -213,6 +219,7 @@ async function setLow(shopId, productId, body) {
     low = b.lowMilli;
   }
   const id = String(productId || '');
+  await sharedCatalog(shopId, now());
   const p = await one('SELECT 1 FROM catalog_products WHERE shop_id=$1 AND product_id=$2', [bk.shopOf(shopId), id]);
   if (!p) throw notFound('کالا پیدا نشد', 'product_not_found');
   await query(
