@@ -51,8 +51,8 @@ internal fun RouteScope.SettingsIndexScreen(onBack: (() -> Unit)?) {
   val facts = rememberSettingsFacts(theme)
   val docs = rememberSearchDocs(facts)
   var query by rememberSaveable { mutableStateOf(SettingsShotState.query) }
-  SettingsPageFrame(title = Str.settings, onBack = onBack, largeTitle = false) {
-    item(key = "search") { SettingsSearchBox(query) { query = it } }
+  //  کارِ یک‌دستی: کادرِ جست‌وجو پایینِ صفحه (`V3Dock`)
+  SettingsPageFrame(title = Str.settings, onBack = onBack, largeTitle = false, search = { SettingsSearchBox(query) { query = it } }) {
     if (query.isBlank()) {
       item(key = "home") { SettingsHomeCard(selected = null) { nav.open(SettingsPaths.home(it)) } }
       item(key = "features") { FeaturesLink { nav.open(SettingsPaths.FEATURES) } }

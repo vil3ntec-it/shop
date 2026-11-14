@@ -77,7 +77,8 @@ val AnalyticsModule = AppModule(
         if (desk) ReportsDesk(data, snackbar) { nav.open(it) }
         else ReportsScreen(
           d = data, canSeeMoney = canSeeMoney(), tabArg = args.query("tab"), rangeArg = args.query("range"),
-          onBack = backOrNull, bottomReserve = bottomReserve, onOpen = { nav.open(it) },
+          //  جای نوارِ پایین را پوسته نگه می‌دارد (`ShellFrame`)
+          onBack = backOrNull, bottomReserve = 0.dp, onOpen = { nav.open(it) },
         )
       }
     },

@@ -116,7 +116,8 @@ fun StockListScreen(
   V3Scaffold(
     title = Str.warehouse,
     onBack = onBack,
-    actions = listOf(V3Action(Icons.Outlined.QrCodeScanner, StrKit.scanBarcode, onClick = actions.scan)),
+    //  کارِ یک‌دستی: اسکن، جست‌وجو و فیلترها پایینِ صفحه (`V3Dock`)؛ «ورودِ کالا» دکمهٔ شناورِ بالای آن
+    dock = listOf(V3Action(Icons.Outlined.QrCodeScanner, StrKit.scanBarcode, onClick = actions.scan)),
     overflow = if (wide) emptyList() else listOf(
       V3MenuItem(Icons.AutoMirrored.Outlined.FactCheck, StrStock.menuCount, onClick = actions.count),
       V3MenuItem(Icons.Outlined.UploadFile, StrStock.menuImport, onClick = actions.import),
