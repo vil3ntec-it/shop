@@ -179,7 +179,7 @@ object StrAppData {
     "که بیا پېښ شو، په ایمیل یا شمېره ننوځئ او ملاتړ ته خبر ورکړئ.",
   )
   val googleBadAnswer: String get() = t("پاسخِ گوگل شناخته نشد", "Google's answer wasn't recognised", "د ګوګل ځواب ونه پېژندل شو")
-  val googleBadToken: String get() = t("ورود با گوگل کامل نشد؛ دوباره بزنید", "Google sign-in didn't finish; tap again", "د ګوګل ننوتل بشپړ نه شول؛ بیا یې ووهئ")
+  val googleBadToken: String get() = t("ورود با گوگل کامل نشد؛ دوباره امتحان کنید", "Google sign-in didn't finish; tap again", "د ګوګل ننوتل بشپړ نه شول؛ بیا یې ووهئ")
   val fpTitle: String get() = t("باز کردن فروشگاه من", "Open My Shop", "زما دوکان خلاصول")
   val fpSubtitle: String get() = t("انگشتتان را روی حسگر بگذارید", "Put your finger on the sensor", "خپله ګوته پر سېنسر کېږدئ")
   val fpUsePin: String get() = t("با رمز وارد می‌شوم", "I'll sign in with the PIN", "په رمز ننوځم")
