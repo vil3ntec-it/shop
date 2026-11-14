@@ -10,6 +10,9 @@
 --  ⛔ ماشینِ وضعیت در خودِ پایگاه هم: گذار فقط in_transit ⇒ partial ⇒ … ⇒ received | rejected؛ انتقالِ بسته دیگر
 --     عوض نمی‌شود و دو سرِ انتقال هرگز (تریگرِ `branch_transfer_guard`).
 --
+--  POS-16/S17 در همین مهاجرت: مجوزِ تازهٔ `stock.view_other_branches` (فقط صاحب می‌دهد؛ صاحب همیشه دارد) —
+--  `shop_member_branch_perms`؛ دیدنِ «فقط عدد» ِ موجودیِ همان کالا در شعبه‌های دیگر (`lib/other-branches.js`).
+--
 --  برگشت: rollback/935_branch_transfers.down.sql (انتقالِ باز ⇒ برگشت رد می‌شود؛ اول دریافت یا رد).
 -- ============================================================
 
@@ -83,3 +86,13 @@ END $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS branch_transfer_guard ON branch_transfers;
 CREATE TRIGGER branch_transfer_guard BEFORE UPDATE ON branch_transfers
   FOR EACH ROW EXECUTE FUNCTION branch_transfer_guard();
+
+--  POS-16/S17: مجوزِ شعبه‌ایِ هر عضو که صاحب می‌دهد (بی ردیف ⇒ فقط شعبه‌های خودش؛ صاحب ردیف نمی‌خواهد)
+CREATE TABLE IF NOT EXISTS shop_member_branch_perms (
+  shop_id     text   NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  user_id     text   NOT NULL,
+  perm        text   NOT NULL CHECK (perm IN ('stock.view_other_branches')),
+  granted_by  text   NOT NULL DEFAULT '',
+  granted_at  bigint NOT NULL,
+  PRIMARY KEY (shop_id, user_id, perm)
+);

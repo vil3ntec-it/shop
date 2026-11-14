@@ -7,6 +7,7 @@
  *   PATCH /:id              { name?, status?: active|archived } — فقط صاحب؛ `main` (یا '') = شعبهٔ اصلی (فقط نام)
  *   GET   /members          اعضا و شعبه‌هایشان — فقط صاحب
  *   PUT   /members/:id      { branches: [...] } — فقط صاحب؛ [''] = پیش‌فرض (فقط اصلی)
+ *   PUT   /members/:id/perms { perms: ['stock.view_other_branches'] | [] } — فقط صاحب (POS-16/S17، `lib/other-branches.js`)
  *   GET   /report           ?from&to&branch ⇐ خلاصهٔ هر شعبه؛ `totals` فقط برای صاحب (`lib/branch-report.js`)
  *
  * ⛔ پرچمِ `shop.branches` خاموش ⇒ **همه** همان پاسخِ مسیرِ ناشناخته (درِ تازه بی صدازننده تا فازِ ۲؛ STATUS/RPT-18).
@@ -18,6 +19,7 @@ const express = require('express');
 const audit = require('../lib/audit');
 const branches = require('../lib/branches');
 const report = require('../lib/branch-report');
+const other = require('../lib/other-branches');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { forbidden, notFoundHandler } = require('../middleware/errors');
 const { clientIp, rateLimit } = require('../middleware/ratelimit');
@@ -66,7 +68,7 @@ router.patch('/:id', needOwner, requireRecentAuth, async (req, res) => {
 
 router.get('/members', needOwner, async (req, res) => {
   res.set('Cache-Control', 'private, no-store');
-  res.json({ branches: await branches.list(req.shopId), members: await branches.members(req.shopId) });
+  res.json({ branches: await branches.list(req.shopId), members: await other.withPerms(req.shopId, await branches.members(req.shopId)) });
 });
 
 router.put('/members/:id', needOwner, requireRecentAuth, async (req, res) => {
@@ -75,7 +77,17 @@ router.put('/members/:id', needOwner, requireRecentAuth, async (req, res) => {
     shopId: req.shopId, userId: req.user.id, action: 'branch.member_set',
     targetType: 'member', targetId: member.user_id, detail: { branches: ids }, ip: clientIp(req),
   });
-  res.json({ userId: member.user_id, branches: ids, members: await branches.members(req.shopId) });
+  res.json({ userId: member.user_id, branches: ids, members: await other.withPerms(req.shopId, await branches.members(req.shopId)) });
+});
+
+//  POS-16/S17: «دیدنِ موجودیِ شعبه‌های دیگر» (`stock.view_other_branches`) — فقط صاحب می‌دهد/برمی‌دارد؛ صاحب همیشه دارد
+router.put('/members/:id/perms', needOwner, requireRecentAuth, async (req, res) => {
+  const { member, perms } = await other.setPerms(req.shopId, req.params.id, req.body?.perms, req.user.id);
+  await audit.log({
+    shopId: req.shopId, userId: req.user.id, action: 'branch.member_perms',
+    targetType: 'member', targetId: member.user_id, detail: { perms }, ip: clientIp(req),
+  });
+  res.json({ userId: member.user_id, perms, members: await other.withPerms(req.shopId, await branches.members(req.shopId)) });
 });
 
 //  صاحب همیشه؛ دیگران با `reports.view` (نقش + لایه‌ها) و فقط شعبه‌های خودشان

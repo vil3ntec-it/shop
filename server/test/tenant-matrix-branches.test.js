@@ -143,6 +143,8 @@ test('ماتریسِ شعبه: هیچ درِ /api/shop/* و /api/sync/v3/* دا�
   const ownX = await h.api('GET', '/api/shop/catalog/branch-transfers', { token: mgrB.token, headers: { 'X-Branch-Id': Bid } });
   assert.deepEqual(ownX.body.transfers.map((t) => t.id).sort(), [bXfer, abXfer].sort());
   assert.ok(JSON.stringify(ownX.body).includes('bsec-xfer-note'));
+  const ownPeek = await h.api('GET', '/api/shop/catalog/products/p1/other-branches', { token: s.token, headers: { 'X-Branch-Id': A } });
+  assert.deepEqual(ownPeek.body.branches.find((b) => b.branchId === Bid), { branchId: Bid, branchName: 'ب', qty: 6000 }, JSON.stringify(ownPeek.body));
   const before = await printOf(s.shopId, Bid);
 
   const ids = [bTask, bReq, 'bsec-s1', Bid];
@@ -183,7 +185,9 @@ test('ماتریسِ شعبه: هیچ درِ /api/shop/* و /api/sync/v3/* دا�
     ['GET', `${X}/${bXfer}`], ['POST', `${X}/${bXfer}/receive`, {}], ['POST', `${X}/${bXfer}/reject`, { reason: 'x' }],
     ['GET', `${X}/${abXfer}`], ['POST', `${X}/${abXfer}/receive`, { lines: [{ productId: 'p1', receivedMilli: 1000 }] }],
     ['POST', `${X}/${abXfer}/reject`, { reason: 'x' }],
-    ['POST', X, { toBranch: 'main', from: 'shop_floor', to: 'shop_floor', lines: [{ productId: 'p1', qtyMilli: 1 }] }]];
+    ['POST', X, { toBranch: 'main', from: 'shop_floor', to: 'shop_floor', lines: [{ productId: 'p1', qtyMilli: 1 }] }],
+    //  POS-16/S17: عددِ موجودیِ «ب» فقط با دسترسی به «ب» یا مجوزِ صاحب — «الف» هیچ (حتی نامِ «ب»)
+    ['GET', `/api/shop/catalog/products/p1/other-branches?branch=${Bid}&branchId=${Bid}`]];
   for (const who of [mgrA, staffA]) {
     for (const [method, url, body] of xdoors) {
       for (const claim of [Bid, undefined, A, 'brn_000000000000000000000000', `${Bid},${A}`]) {
@@ -198,6 +202,7 @@ test('ماتریسِ شعبه: هیچ درِ /api/shop/* و /api/sync/v3/* دا�
         if (claim !== A) assert.equal(res.status, 403, `${method} ${url} ${claim} ${text}`);
         else if (url.includes(bXfer)) assert.equal(res.status, 404, `${method} ${url} ${text}`);
         else if (method === 'POST' && url.includes(abXfer)) assert.equal(res.body.error.code, 'transfer_wrong_branch', `${url} ${text}`);
+        else if (url.includes('/other-branches')) assert.deepEqual(res.body, { branches: [] }, `${url} ${text}`);
       }
     }
   }

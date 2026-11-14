@@ -816,6 +816,7 @@ function bodyFor(r, ids) {
     'PUT /shop/staff-scope/members/:id': { places: ['warehouse'] },
     'PATCH /shop/branches/:id': { name: 'شعبهٔ دزدیده' },
     'PUT /shop/branches/members/:id': { branches: [''] },
+    'PUT /shop/branches/members/:id/perms': { perms: ['stock.view_other_branches'] },
     'PUT /shop/till-pin/members/:id': { pin: '390471' },
     'POST /shop/till-pin/verify': { memberId: ids.member, pin: '390471' },
     'POST /shop/approval-requests/:id/approve': { note: 'تأییدِ ب' },

@@ -262,5 +262,7 @@ router.post('/transfers/:id/reject', prebuilt, mainOnly, requirePermission('stoc
 
 //  انتقالِ میانِ شعبه‌ها (INV-11، فازِ ۴ ِ `docs/BRANCHES-fa.md` §۱۰) — پشتِ `shop.branches` و `shop.catalog`
 router.use(require('./branch-transfers'));
+//  POS-16/S17: عددِ موجودیِ همین کالا در شعبه‌های دیگر (فقط‌خواندنی، §۱۰) — همان دو پرچم
+router.use(require('./branch-stock'));
 
 module.exports = router;
