@@ -202,14 +202,16 @@ class VisualSearchTest {
     assertTrue(menu.contains("onVisualSearch?.let { find ->"))
     assertTrue(menu.contains("V3ListRow(StrVisualSearch.button, icon = Icons.Outlined.PhotoCamera"))
 
-    //  فروشِ سریع (`sale/quick`، جانشینِ `ui/screens/QuickSale.kt`): دکمهٔ سربرگ
+    //  فروشِ سریع (`sale/quick`، جانشینِ `ui/screens/QuickSale.kt`): دکمهٔ نوارِ کارهای پایین (کارِ یک‌دستی، ۶۳r:
+    //  پیش‌تر دکمهٔ سربرگ `actions = …` بود — همان دکمه، فقط پایین)
     assertTrue(code("ui/v3/sales/quick/QuickSaleRoute.kt")
       .contains("visual = rememberVisualSearch(rememberVisualSearchApi(), data.products, VisualSearch.Place.TILL)"))
     val quick = code("ui/v3/sales/quick/QuickSaleScreen.kt")
-    assertTrue(quick.contains("actions = listOfNotNull(visual?.let { v -> V3Action(Icons.Outlined.PhotoCamera, StrVisualSearch.button) { v.start() } })"))
+    assertTrue(quick.contains("dock = listOfNotNull(visual?.let { v -> V3Action(Icons.Outlined.PhotoCamera, StrVisualSearch.button) { v.start() } })"))
     assertTrue(quick.contains("visual?.let { VisualSearchHost(it) { t -> if (t is VisualSearch.Tap.Search) { picked = null; query = t.query } } }"))
 
-    //  کالاها (`products`): سربرگ دو جا دارد (اسکن، شبکه/فهرست) ⇒ «…» ِ سربرگ (نه در حالتِ انتخاب)؛ «مشابه» همان بازکردنِ کالا
+    //  کالاها (`products`): اسکن و شبکه/فهرست در نوارِ کارهای پایین‌اند و «جست‌وجو با عکس» کم‌کاربرد در «…» ِ سربرگ
+    //  (نه در حالتِ انتخاب)؛ «مشابه» همان بازکردنِ کالا
     val list = code("ui/v3/products/ProductsListScreen.kt")
     assertTrue(list.contains("val visual = rememberVisualSearch(rememberVisualSearchApi(), data.products, VisualSearch.Place.LIST)"))
     assertTrue(list.contains("overflow = if (selecting) emptyList() else listOfNotNull(visual?.let { v -> V3MenuItem(Icons.Outlined.PhotoCamera, StrVisualSearch.button) { v.start() } })"))
