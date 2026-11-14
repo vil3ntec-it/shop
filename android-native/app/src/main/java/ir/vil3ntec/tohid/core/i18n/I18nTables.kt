@@ -24,6 +24,7 @@ object I18nTables {
     StrRisk, StrPay, StrAdmin, StrShift, StrCourier, StrOrderOps, StrPayFix, StrSpecialOrder, StrSafe, StrGiftCard,
     StrTaxQuarter, StrCustomerCard, StrOrderFeedback, StrLayaway, StrVisualSearch,
     StrTill, // S28b، S45، S46، S50
+    StrStates, // دستهٔ ۶۳ (e-rows-63i): متنِ پیش‌فرضِ خطای ساده در حالت‌های مشترکِ خالی/خطا
     StrA11y, // صفحه‌خوان در نسخهٔ ۳: باز/بسته، کارِ نگه‌داشتن، QR ِ پرداخت، «نیاز به توجه»، ضبطِ صدا با زدن، جابه‌جاییِ نوار
     StrRounding, // PAY-09: گردکردنِ نقدی
     StrSaleTax, // POS-37: مالیاتِ فاکتور
