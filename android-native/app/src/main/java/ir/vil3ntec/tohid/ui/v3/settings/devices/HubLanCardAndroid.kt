@@ -187,7 +187,7 @@ private fun HubJoinCard() {
     scope.launch {
       toasts?.show(StrHub.searching)
       val r = withContext(Dispatchers.IO) {
-        val found = HubLinkV1Android.discover(context)
+        val found = ir.vil3ntec.tohid.platform.HubFind.hubs(context)
         if (found.isEmpty()) null
         else {
           val id = HubLinkV1Android.identityOf(context)

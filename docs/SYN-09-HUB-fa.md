@@ -192,7 +192,7 @@ opهایش را هاب داشت یا فرستاده بود ذخیره نمی‌�
 
 - `core/hub/HubPair.kt` (برگه، QR، اثبات، کلید)، `HubLog.kt` (دفترِ v1، خوراک، فرستادن)، `HubMdns.kt`؛ `core/hw/Mdns.questions`،
   `MdnsProbe.messages`. کامپیوتر: `HubV1.kt` (درها و دیسک)، `HubAnnounce.kt` (mDNS)، `HubBoot` (روشن/خاموش، `HubPanel`، `HubCloudHttp.pushV1`).
-  برنامه: `platform/HubPanel.kt`، `HubPeerLink.kt` (`HubExchangeV1`، `HubPairClient`)، `HubLinkV1Android.kt`، `HubKeyStore.kt`، کارتِ
+  برنامه: `platform/HubPanel.kt`، `HubPeerLink.kt` (`HubExchangeV1`، `HubPairClient`)، `HubLinkV1Android.kt`، `HubKeyStore.kt`، `HubFindAndroid.kt` (کشف؛ آیفون `HubFindIos.kt` بی کشف، فقط QR)، کارتِ
   `ui/v3/settings/devices/HubLanCardAndroid.kt`، `StrHub`؛ موتور: `sync/v1/SyncV1Hub.kt` (`SyncV1Engine.hubExchange`، از `SyncV1Worker` پس از دورِ شکست‌خورده)، در خودِ `SyncV1Engine` فقط یک خط («دیده از سرور» در pull) و دو `internal`، و `SyncV1Client.pushBody`.
 - `HubLanServerDesktopTest` (دو گوشیِ ساختگی + هابِ واقعی + **سرورِ واقعیِ مخزن**): بی اینترنت گوشی‌ها کارهای هم را از هاب می‌گیرند؛
   با برگشت هاب و سپس خودِ گوشی‌ها ⇒ `oplog` ِ سرور هر op دقیقاً یک بار، صف‌ها خالی و دفترِ دو گوشی یکی؛ بی هاب همان راهِ مستقیم.

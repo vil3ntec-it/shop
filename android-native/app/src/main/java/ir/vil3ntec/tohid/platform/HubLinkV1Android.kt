@@ -2,12 +2,9 @@ package ir.vil3ntec.tohid.platform
 
 import android.content.Context
 import ir.vil3ntec.tohid.core.config.AppConfig
-import ir.vil3ntec.tohid.core.hub.HubMdns
 import ir.vil3ntec.tohid.core.hub.HubRoute
-import ir.vil3ntec.tohid.core.hw.MdnsProbe
 import ir.vil3ntec.tohid.core.server.ServerAddress
 import ir.vil3ntec.tohid.data.repo.Backend
-import ir.vil3ntec.tohid.hw.PrinterFinderPlatform
 import ir.vil3ntec.tohid.sync.v1.SyncOp
 
 /**
@@ -122,13 +119,5 @@ class HubLinkV1Android private constructor(private val app: Context, private val
     /** سرآیندهای سرورِ همین دستگاه — برای جفت‌سازی (توکن فقط روی گواهیِ سنجاق‌شده می‌رود) */
     fun identityOf(context: Context): Map<String, String> =
       identity(context.applicationContext, ir.vil3ntec.tohid.sync.v1.SyncV1Engine.of(context).deviceId())
-
-    /** هاب‌های شبکهٔ دکان با mDNS (پرسشِ یک‌باره از هر کارت؛ همان `MdnsProbe` ِ چاپگر) */
-    fun discover(context: Context): List<HubMdns.Found> {
-      val app = context.applicationContext
-      return PrinterFinderPlatform.lanInterfaces(app).flatMap { lan ->
-        runCatching { HubMdns.hubs(MdnsProbe.messages(lan.ip, service = HubMdns.SERVICE)) }.getOrDefault(emptyList())
-      }.distinctBy { it.ip to it.port }
-    }
   }
 }
