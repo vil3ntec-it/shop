@@ -460,6 +460,18 @@ object StrAccount {
   val contactWays: String get() = t("راه‌های تماس", "Contact", "د اړیکې لارې")
   val whatsapp: String get() = t("واتساپ", "WhatsApp", "واټس اپ")
 
+  // کارتِ بازشوندهٔ پلن («اشتراک و قیمت‌ها»)
+  fun saveChip(n: Any): String = t("٪${asIs(n)} صرفه‌جویی", "Save $n%", "$n٪ سپما")
+  fun saveVs(base: Any): String = t("در برابرِ خریدِ «${asIs(base)}» برای همین مدت", "Compared with buying “$base” for the same time", "د همدې مودې لپاره د «$base» اخیستو په پرتله")
+  val factLength: String get() = t("مدت", "Length", "موده")
+  val factPerDay: String get() = t("هر روز", "Per day", "هره ورځ")
+  val factSaving: String get() = t("صرفه‌جویی", "You save", "سپما")
+  val renewEarly: String get() = t("تمدیدِ پیش از پایان: روزهای تازه به آخرِ اشتراکِ فعلی اضافه می‌شود.", "Renewing early adds the new days after your current end date.", "مخکې له پایه تمدید: نوې ورځې د اوسني ګډون په پای کې ورزیاتېږي.")
+  val noAutoRenew: String get() = t("خودکار تمدید نمی‌شود و هیچ پولی خودکار گرفته نمی‌شود.", "It doesn't renew by itself and nothing is charged automatically.", "په خپله نه تمدیدېږي او هېڅ پیسې په خپله نه اخیستل کېږي.")
+  val afterEnd: String get() = t("پس از پایان: بخش‌های رایگان باز می‌ماند و هیچ داده‌ای پاک نمی‌شود.", "After it ends: the free sections stay open and no data is deleted.", "له پای وروسته: وړیا برخې پرانیستې پاتې کېږي او هېڅ معلومات نه ړنګېږي.")
+  val showPlanDetails: String get() = t("دیدنِ جزئیاتِ پلن", "Show plan details", "د پلان جزئیات لیدل")
+  val hidePlanDetails: String get() = t("بستنِ جزئیاتِ پلن", "Hide plan details", "د پلان جزئیات پټول")
+
   // کدِ اشتراک (برگه)
   val sixDigitCode: String get() = t("کدِ شش‌رقمی", "6-digit code", "شپږ عددي کوډ")
   val sixDigitHint: String get() = t("کدِ شش‌رقمی که به ایمیلتان آمده", "The 6-digit code that came to your email", "هغه شپږ عددي کوډ چې ایمیل ته مو راغلی")
