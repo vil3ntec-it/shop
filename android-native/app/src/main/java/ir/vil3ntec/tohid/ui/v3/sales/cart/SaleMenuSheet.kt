@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.AddCircleOutline
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.History
@@ -45,6 +46,8 @@ fun SaleMenuSheet(
   onPriceCheck: (() -> Unit)? = null,
   /** AI-11: برگهٔ دوربین/گالریِ «جست‌وجو با عکس»؛ `null` (پرچمِ خاموش، بی حساب) ⇒ بی ردیف */
   onVisualSearch: (() -> Unit)? = null,
+  /** OPS-06: «راهنما» ِ صندوق (`V3GuideSheet`)؛ `null` (بی راهنمای آماده) ⇒ بی ردیف */
+  onGuide: (() -> Unit)? = null,
 ) {
   val c = PhoneV3.colors
   val shape = RoundedCornerShape(PhoneV3.groupRadius)
@@ -72,6 +75,10 @@ fun SaleMenuSheet(
       onHeldList?.let { list ->
         V3Divider(start = 64.dp)
         V3ListRow(StrPos.heldInvoices, icon = Icons.Outlined.Layers, hue = V3Hue.SKY, onClick = { go(list) })
+      }
+      onGuide?.let { help ->
+        V3Divider(start = 64.dp)
+        V3ListRow(ir.vil3ntec.tohid.core.i18n.StrKit.guide, icon = Icons.AutoMirrored.Outlined.HelpOutline, hue = V3Hue.BRAND, onClick = { go(help) })
       }
     }
   }

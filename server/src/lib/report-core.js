@@ -130,6 +130,15 @@
     return x > 0 ? x : 0;
   }
 
+  function reversalNeutral(rows) {  // S89 — جفتِ «اصل + سندِ معکوس» (هم‌زادِ `core/debt/DebtReversal.neutral`؛ چند معکوس ⇒ `<اصل>-rv`، وگرنه کوچک‌ترین شناسه)
+    var byId = new Map(rows.map(function (t) { return [str(t.id), t]; })), pick = new Map(), drop = new Set();
+    rows.forEach(function (r) {
+      var ref = str(r.refId), id = str(r.id), o = byId.get(ref), have = pick.get(ref);
+      if (str(r.kind) !== 'reversal' || !ref || !o || str(o.kind) === 'reversal' || str(o.type) === str(r.type) || money(o.amount) !== money(r.amount)) return;
+      if (have === undefined || (have !== ref + '-rv' && (id === ref + '-rv' || id < have))) pick.set(ref, id);
+    });
+    pick.forEach(function (rev, orig) { drop.add(orig).add(rev); }); return drop;
+  }
   function ledger(raw) {
     if (raw && raw.__reportLedger === VERSION) return raw;
     raw = raw || {};
@@ -170,7 +179,9 @@
       });
     });
     arr(raw.debtors).forEach(function (d) { L.debtors[str(d.id)] = str(d.name); });
+    var neutral = reversalNeutral(arr(raw.transactions));  // S89: جفتِ معکوس بیرون — سنِ بدهی همان حذفِ امروز
     arr(raw.transactions).forEach(function (t) {
+      if (neutral.has(str(t.id))) return;
       L.transactions.push({
         id: str(t.id), debtorId: str(t.debtorId), give: str(t.type) === 'give', amount: money(t.amount),
         date: str(t.date), createdAt: ms(t.createdAt),

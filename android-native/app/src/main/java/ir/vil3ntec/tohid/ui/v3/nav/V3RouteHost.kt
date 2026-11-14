@@ -27,6 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.nav.Need
+import ir.vil3ntec.tohid.core.guide.GuideHelp
+import ir.vil3ntec.tohid.ui.v3.LocalV3Guide
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Transitions
@@ -112,13 +114,21 @@ private fun RouteContent(path: String, nav: V3Nav, shell: ShellContext) {
     }
     else -> {
       val scope = RouteScope(r.args, nav, shell)
-      //  هر جا که سربرگِ کامپیوتر (DeskHeader) نیست — گوشی و تبلت، باریک یا پهن (AUDIT-NAV N9) —
-      //  صفحهٔ قدیم سربرگِ نسخهٔ ۳ می‌گیرد؛ برگشت فقط وقتی چیزی زیرش است (N8)
-      if (r.route.chrome == Chrome.SHELL && !LocalDeskLayout.current && r.route.kind != RouteKind.SHEET) {
-        V3Scaffold(title = r.route.title(), onBack = scope.backOrNull) { pad ->
-          Box(Modifier.fillMaxSize().padding(bottom = pad.calculateBottomPadding())) { r.route.content(scope) }
-        }
-      } else r.route.content(scope)
+      //  OPS-06: راهنمای آمادهٔ صفحهٔ ریشهٔ هر بخش (`GuideHelp.forRoute`) برای دکمهٔ «راهنما» ِ سربرگ؛ برگه هیچ، و کامپیوتر
+      //  دکمه را در سربرگِ خودش (`DeskHeader`) دارد
+      val desk = LocalDeskLayout.current
+      val guide = remember(path, desk) {
+        if (desk || r.route.kind == RouteKind.SHEET) null else GuideHelp.forRoute(ir.vil3ntec.tohid.core.nav.RoutePaths.parse(path).first)
+      }
+      CompositionLocalProvider(LocalV3Guide provides guide) {
+        //  هر جا که سربرگِ کامپیوتر (DeskHeader) نیست — گوشی و تبلت، باریک یا پهن (AUDIT-NAV N9) —
+        //  صفحهٔ قدیم سربرگِ نسخهٔ ۳ می‌گیرد؛ برگشت فقط وقتی چیزی زیرش است (N8)
+        if (r.route.chrome == Chrome.SHELL && !desk && r.route.kind != RouteKind.SHEET) {
+          V3Scaffold(title = r.route.title(), onBack = scope.backOrNull) { pad ->
+            Box(Modifier.fillMaxSize().padding(bottom = pad.calculateBottomPadding())) { r.route.content(scope) }
+          }
+        } else r.route.content(scope)
+      }
     }
   }
 }

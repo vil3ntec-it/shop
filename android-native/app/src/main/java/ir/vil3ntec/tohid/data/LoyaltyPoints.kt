@@ -322,14 +322,16 @@ object LoyaltyPoints {
     fun mine(id: String?) = id != null && CustomerCrm.resolve(byId, id) == customer
     //  بدهی‌ها به ترتیبِ زمان: (زمان، شناسه، مبلغِ باز، فاکتور یا null برای بردِ دستی)
     class Debt(val at: Long, val id: String, val open: Long, val sale: Sale?)
+    //  S89: جفتِ «اصل + سندِ معکوس» بیرون — رسیدِ معکوس‌شده در استخر نیست و بردِ معکوس‌شده بدهی نیست (همان حذفِ امروز)
+    val txs = DebtReverse.effective(after.transactions)
     val debts = (
       after.sales.filter { s -> s.status != "cancelled" && mine(s.debtorId) }
         .map { Debt(it.createdAt, it.id, PayFlow.minor(it.debtGiven - it.debtSettled).coerceAtLeast(0), it) } +
-        after.transactions.filter { it.type == "give" && it.kind == null && mine(it.debtorId) }
+        txs.filter { it.type == "give" && it.kind == null && mine(it.debtorId) }
           .map { Debt(it.createdAt, it.id, PayFlow.minor(it.amount).coerceAtLeast(0), null) }
       ).filter { it.open > 0 }.sortedWith(compareBy({ it.at }, { it.id }))
     if (debts.none { it.sale != null && it.at >= start }) return after
-    var pool = after.transactions.filter { it.type == "receive" && it.kind == null && mine(it.debtorId) }
+    var pool = txs.filter { it.type == "receive" && it.kind == null && mine(it.debtorId) }
       .sumOf { PayFlow.minor(it.amount).coerceAtLeast(0) }
     val ev = events(after)
     val rows = ArrayList<AuditEntry>()

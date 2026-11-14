@@ -121,13 +121,14 @@ object DebtorLedgerModel {
    *  پس «برگرداندن» هیچ داده‌ای را بازنمی‌نویسد — چیزی هنوز پاک نشده است.
    */
   sealed interface PendingDelete {
-    data class Transaction(val txId: String) : PendingDelete
+    /** [reverse] (S89، کلیدِ `shop.doc_chain`): «حذف» سندِ معکوس است — اصل می‌ماند، پس ردیف پنهان نمی‌شود */
+    data class Transaction(val txId: String, val reverse: Boolean = false) : PendingDelete
     data class Debtor(val debtorId: String) : PendingDelete
   }
 
   /** ردیف‌هایی که فهرست نباید نشان دهد */
   fun hiddenTx(pending: List<PendingDelete>): Set<String> =
-    pending.filterIsInstance<PendingDelete.Transaction>().mapTo(HashSet()) { it.txId }
+    pending.filterIsInstance<PendingDelete.Transaction>().filterNot { it.reverse }.mapTo(HashSet()) { it.txId }
 
   fun hiddenDebtors(pending: List<PendingDelete>): Set<String> =
     pending.filterIsInstance<PendingDelete.Debtor>().mapTo(HashSet()) { it.debtorId }

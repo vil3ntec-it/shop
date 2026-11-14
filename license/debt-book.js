@@ -103,11 +103,36 @@
     };
   }
 
+  /*
+   *  S89 — جفتِ «اصل + سندِ معکوس» (هم‌زادِ `core/debt/DebtReversal.neutral`): ردیفِ `kind = reversal` با `refId` ِ ردیفی موجود
+   *  که خودش معکوس نیست، نوعِ مخالف و همان مبلغ. چند معکوس برای یک اصل ⇒ شناسهٔ پایدارِ `<اصل>-rv`، وگرنه کوچک‌ترین
+   *  شناسه. جفت جمعِ حساب را عوض نمی‌کند و از دفتر بیرون می‌رود (سررسید و تخصیص همان حذفِ امروز)؛ بی ردیفِ معکوس ⇒ null.
+   */
+  function reversalNeutral(rows) {
+    if (!rows.some(function (t) { return t && t.kind === 'reversal'; })) return null;
+    var byId = new Map();
+    rows.forEach(function (t) { byId.set(t.id, t); });
+    var pick = new Map();
+    rows.forEach(function (r) {
+      if (r.kind !== 'reversal' || r.refId == null) return;
+      var o = byId.get(r.refId);
+      if (!o || o.kind === 'reversal' || o.type === r.type || minorOf(o.amount).minor !== minorOf(r.amount).minor) return;
+      var have = pick.get(r.refId), stable = r.refId + '-rv';
+      if (have === undefined || (have !== stable && (r.id === stable || r.id < have))) pick.set(r.refId, r.id);
+    });
+    if (!pick.size) return null;
+    var drop = new Set();
+    pick.forEach(function (rev, orig) { drop.add(orig); drop.add(rev); });
+    return drop;
+  }
+
   function book(data, debtorId, today) {
     var debtor = (data.debtors || []).find(function (x) { return x.id === debtorId; });
     if (!debtor) return null;
-    var mine = (data.transactions || []).filter(function (t) { return t.debtorId === debtorId; })
-      .slice().sort(order);
+    var mine = (data.transactions || []).filter(function (t) { return t.debtorId === debtorId; });
+    var neutral = reversalNeutral(mine);
+    if (neutral) mine = mine.filter(function (t) { return !neutral.has(t.id); });
+    mine = mine.slice().sort(order);
     var byLabel = new Map();
     (data.sales || []).forEach(function (s) {
       if (s.debtorId === debtorId && s.invoiceNumber != null) byLabel.set(saleLabel(s), s);

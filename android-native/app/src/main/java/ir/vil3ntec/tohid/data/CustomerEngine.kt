@@ -59,7 +59,8 @@ object CustomerEngine {
 
   fun summary(d: ShopData, debtor: Debtor, now: Long = System.currentTimeMillis()): Summary {
     val sales = d.sales.filter { it.debtorId == debtor.id && it.status != "cancelled" }
-    val receives = d.transactions.filter { it.debtorId == debtor.id && it.type != "give" }
+    //  S89: «آخرین پرداخت» بی رسیدِ معکوس‌شده و بی سندِ معکوس
+    val receives = DebtReverse.effective(d.transactions.filter { it.debtorId == debtor.id }).filter { it.type != "give" && !DebtReverse.isReversal(it) }
     return Summary(
       id = debtor.id,
       name = debtor.name,

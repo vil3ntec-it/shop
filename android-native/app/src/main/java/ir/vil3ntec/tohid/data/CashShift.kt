@@ -108,7 +108,8 @@ object CashShift {
    *  برنامهٔ قدیمی با همان متنِ ثابتِ لغو شناخته می‌شود.
    */
   fun isCashReceipt(t: DebtTransaction): Boolean = when (t.kind) {
-    CANCEL_RECEIPT, STORE_CREDIT_RECEIPT -> false
+    //  S89: سندِ معکوس هرگز رسیدِ نقد نیست (معکوسِ رسیدِ نقد جدا از دخلِ روزِ خودش کم می‌شود — [totals])
+    CANCEL_RECEIPT, STORE_CREDIT_RECEIPT, ir.vil3ntec.tohid.core.debt.DebtReversal.KIND -> false
     null -> !t.notes.startsWith(LEGACY_CANCEL_NOTE)
     else -> true
   }
@@ -184,7 +185,9 @@ object CashShift {
       opening = opening,
       sales = d.sales.filter { it.status != "cancelled" && !isOnline(it) && counts(it.shiftId, it.createdAt) }
         .sumOf { saleCash(it, fixes[it.id].orEmpty(), to) },
-      receipts = d.transactions.filter { it.type == "receive" && isCashReceipt(it) && counts(it.shiftId, it.createdAt) }.sumOf { it.amount } +
+      receipts = d.transactions.filter { it.type == "receive" && isCashReceipt(it) && counts(it.shiftId, it.createdAt) }.sumOf { it.amount } -
+        //  S89: رسیدِ نقدیِ معکوس‌شده از دخلِ **روزِ معکوس** (مهر و ساعتِ ردیفِ معکوس) کم می‌شود؛ روزِ اصل دست نمی‌خورد
+        DebtReverse.cashBack(d.transactions).filter { counts(it.shiftId, it.createdAt) }.sumOf { it.amount } +
         //  PAY-24/PRM-14: فروش و شارژِ کارتِ هدیه (نقد)؛ بی کارت ⇒ ۰
         (if (own == null) GiftCards.cashIn(d, from, to) else 0.0),
       //  برگشتی که به کیف پول/کارت/حواله پس رفت (`toMethods`، فقط RET تازه) از دخل نیست؛

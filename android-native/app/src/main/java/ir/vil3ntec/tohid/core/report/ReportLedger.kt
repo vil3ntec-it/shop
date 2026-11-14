@@ -102,7 +102,13 @@ class ReportLedger private constructor() {
         )
       }
       raw.list("debtors").forEach { d -> l.debtors[d.s("id")] = d.s("name") }
-      raw.list("transactions").forEach { t ->
+      //  S89: جفتِ «اصل + سندِ معکوس» (`core/debt/DebtReversal`، هم‌زادِ `reversalNeutral` ِ JS) بیرون — سنِ بدهی همان حذفِ امروز
+      val txs = raw.list("transactions")
+      val neutral = ir.vil3ntec.tohid.core.debt.DebtReversal.neutral(
+        txs.map { t -> ir.vil3ntec.tohid.core.debt.DebtReversal.Row(t.s("id"), t.s("type"), money(t, "amount"), t.s("kind").ifEmpty { null }, t.s("refId").ifEmpty { null }) },
+      )
+      txs.forEach { t ->
+        if (t.s("id") in neutral) return@forEach
         l.transactions += Tx(t.s("id"), t.s("debtorId"), t.s("type") == "give", money(t, "amount"), t.s("date"), ms(t, "createdAt"))
       }
       raw.list("suppliers").forEach { s -> l.suppliers[s.s("id")] = s.s("name") }

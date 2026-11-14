@@ -37,7 +37,8 @@ internal object ReceiptsModel {
 
   /** همهٔ ردیف‌های یک تب، تازه‌ترین اول; تاریخِ ناخوانا نمی‌آید (مثلِ امروز) */
   fun rows(d: ShopData, tab: Tab): List<Row> = when (tab) {
-    Tab.DEBTORS -> d.transactions.filter { it.type == "receive" }.mapNotNull { t ->
+    //  S89: رسیدِ معکوس‌شده و خودِ سندِ معکوس در فهرستِ رسیدها نیستند (سابقه در حسابِ قرض‌دار)
+    Tab.DEBTORS -> ir.vil3ntec.tohid.data.DebtReverse.effective(d.transactions).filter { it.type == "receive" && !ir.vil3ntec.tohid.data.DebtReverse.isReversal(it) }.mapNotNull { t ->
       val j = Jalali.ofIso(t.date) ?: return@mapNotNull null
       val debtor = d.debtors.find { it.id == t.debtorId }
       Row(t.id, debtor?.name ?: StrMoney.deletedDebtor, t.notes, t.amount, t.date, t.debtorId, debtor != null, j.year, j.month)

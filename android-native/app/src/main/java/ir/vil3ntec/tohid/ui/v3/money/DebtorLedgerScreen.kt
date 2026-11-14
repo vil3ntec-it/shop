@@ -219,6 +219,7 @@ private fun LazyListScope.ledgerItems(
   extras: (@Composable () -> Unit)?,
   onMenu: (String) -> Unit,
 ) {
+  val reversed = ir.vil3ntec.tohid.data.DebtReverse.reversed(account.transactions) // S89: اصل‌های معکوس‌شده
   item(key = "tx-title") {
     Text(
       "${StrMoney.transactions} · ${plain(rows.size)}",
@@ -245,7 +246,13 @@ private fun LazyListScope.ledgerItems(
     LedgerRow(
       date = MoneyText.date(tx.date),
       amount = MoneyText.signed(tx.amount, give),
-      after = book?.entry(tx.id)?.let { StrMoney.balanceAfterShort(DebtBook.show(it.balanceAfter)) },
+      //  S89: جفتِ «اصل + سندِ معکوس» در دفترِ مؤثر نیست (بی «مانده»)؛ جایش برچسبِ «معکوس»/«معکوس‌شده» تا سابقه روشن باشد
+      after = book?.entry(tx.id)?.let { StrMoney.balanceAfterShort(DebtBook.show(it.balanceAfter)) }
+        ?: when {
+          ir.vil3ntec.tohid.data.DebtReverse.isReversal(tx) -> StrMoney.reversalTag
+          tx.id in reversed -> StrMoney.reversedTag
+          else -> null
+        },
       tone = if (give) LedgerTone.OWE else LedgerTone.SETTLED,
       up = give,
       kindLabel = if (give) StrMoney.giveTag else StrMoney.receiveTag,
