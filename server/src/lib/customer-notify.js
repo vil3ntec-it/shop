@@ -324,7 +324,7 @@ async function onRefundIn(run, { shopId, order, refundId, at = now() }) {
  * @returns {Promise<string|null>} شناسهٔ ردیف (تکرار، پرچمِ خاموش یا سفارشِ نامشمول ⇒ null)
  */
 async function onReturnIn(run, { shopId, order, requestId, kind, at = now() }) {
-  if (!RETURN_EVENTS.includes(kind) || !requestId || !order || order.source !== 'storefront' || order.is_test === true || !order.customer_phone) return null;
+  if (!RETURN_EVENTS.includes(kind) || !requestId || !order || order.source !== 'storefront' || order.is_test === true || !keyOfOrder(order)) return null;
   if (!(await flagIn(run, shopId)) || !(await require('./orders').flagOf(shopId, EXTRA[kind].flag, run))) return null;
   const r = await run(
     `INSERT INTO customer_notify_outbox (id, shop_id, order_id, event, return_request_id, lang, phone_key, status,
@@ -332,7 +332,7 @@ async function onReturnIn(run, { shopId, order, requestId, kind, at = now() }) {
      SELECT $1, q.shop_id, q.order_id, $5::text || ':' || q.id, q.id, $6, $7, 'pending', $8, $8, $8
        FROM order_return_requests q WHERE q.id=$2 AND q.order_id=$3 AND q.shop_id=$4
      ON CONFLICT (order_id, event) DO NOTHING RETURNING id`,
-    [ulid(at), String(requestId), order.id, shopId, kind, langOf(order.customer_lang) || 'fa', phoneKey(order.customer_phone), at]
+    [ulid(at), String(requestId), order.id, shopId, kind, langOf(order.customer_lang) || 'fa', phoneKey(keyOfOrder(order)), at]
   );
   if (!r.rows[0]) return null;
   soon();
