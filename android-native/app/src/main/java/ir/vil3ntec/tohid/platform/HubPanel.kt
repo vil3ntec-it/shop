@@ -55,7 +55,8 @@ object HubPanel {
     /** برگهٔ تازه (کد و QR) — `null` ⇒ ساخته شد؛ وگرنه کدِ [Why] */
     fun pair(): String?
     fun cancelPairing()
-    fun unpair(deviceId: String)
+    /** `null` ⇒ جدا شد؛ وگرنه کدِ [Why] (فقط صاحب/مدیر) */
+    fun unpair(deviceId: String): String?
   }
 
   /** «وصل است» یعنی در این چند دقیقه درخواستی داد */

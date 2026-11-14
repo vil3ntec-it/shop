@@ -138,9 +138,10 @@ object HubBoot {
 
     override fun cancelPairing() { running?.v1?.cancelTicket() }
 
-    override fun unpair(deviceId: String) {
-      if (!HubPair.mayPair(ShopRole.current(app))) return
+    override fun unpair(deviceId: String): String? {
+      if (!HubPair.mayPair(ShopRole.current(app))) return HubPanel.Why.ROLE
       running?.v1?.unpair(deviceId)
+      return null
     }
   }
 }

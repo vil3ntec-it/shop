@@ -57,7 +57,7 @@ class HubWiringTest {
     assertEquals("فقط تعریف، هیچ درِ شبکه‌ای", 1, Regex("""newTicket\(""").findAll(v1).count())
     val boot = src("desktop/src/main/kotlin/ir/vil3ntec/tohid/desktop/hub/HubBoot.kt")
     assertTrue(boot.contains("v.newTicket(ShopRole.current(app), by)"))
-    assertTrue(boot.contains("if (!HubPair.mayPair(ShopRole.current(app))) return"))
+    assertTrue(boot.contains("if (!HubPair.mayPair(ShopRole.current(app))) return HubPanel.Why.ROLE"))
     assertTrue("هاب پیش‌فرض خاموش", boot.contains(".getBoolean(SETTING, false)) return"))
     assertEquals(HubPanel.State.OFF.running, false)
   }

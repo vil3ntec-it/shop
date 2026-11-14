@@ -137,7 +137,7 @@ private fun HubHostCard(port: HubPanel.Port) {
           }
           Text(line, style = V3Type.footnote, color = if (HubPanel.online(d, now)) PhoneV3Roles.toneIcon(c, V3Tone.SUCCESS) else c.inkMuted)
         }
-        V3TextButton(StrHub.unpair, { run { port.unpair(d.deviceId); null } }, danger = true)
+        V3TextButton(StrHub.unpair, { run { port.unpair(d.deviceId) } }, danger = true)
       }
     }
     Spacer(Modifier.height(12.dp))
