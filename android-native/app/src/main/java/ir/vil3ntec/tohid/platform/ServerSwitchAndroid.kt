@@ -232,6 +232,11 @@ object ServerSwitchAndroid {
    */
   private fun learn(context: Context, pick: ServerFailover.Pick.Chosen) {
     val p = profiles(context).byId(activeProfile(context)?.id ?: return) ?: return
+    //  بی نامزد ⇒ هیچ پرسشی؛ نامزدِ نرسیده یا سرورِ دیگر هر LEARN_MS یک بار دوباره پرسیده می‌شود، نه با هر سنجشِ ۱۰ دقیقه‌ای
+    if (ServerLearn.candidates(p, pick.url, pick.info, AppConfig.allowInsecure).isEmpty()) return
+    val p0 = prefs(context)
+    if (nowMs() - p0.getLong("learnAt:${p.id}", 0) < ServerLearn.LEARN_MS) return
+    p0.edit().putLong("learnAt:${p.id}", nowMs()).commit()
     val learned = ServerLearn.learn(p, pick.url, pick.info, AppConfig.allowInsecure) { u ->
       probe(u, null, ServerFailover.timeoutOf(u)).info
     }
