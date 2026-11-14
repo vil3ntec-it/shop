@@ -176,6 +176,35 @@ test('پرچمِ روشن، v3: همان قاعده روی دفترِ v3 (`credi
   assert.equal((await flags()).slice(before).length, 1, 'درجِ دوبارهٔ همان سند سابقهٔ دوم نمی‌سازد');
 });
 
+test('CRM-10، v3: ادغامِ بی ویرایشِ سند — قرضِ مانده روی مشتریِ ادغام‌شده در ماندهٔ ماندگار سنجیده می‌شود (فاکتور روی هر کدام)', async () => {
+  const before = (await flags()).length;
+  const ins = (table, id, fields) => ({ op_id: oid(), hlc: H('pos3'), table, row_id: id, kind: 'insert', fields });
+  const at = Date.now();
+  const r0 = await push3(staff, 'pos-3', [
+    ins('debtors', 'm3-keep', { name: 'ماندگار', phone: '0700000031', creditLimitMinor: 500000 }),
+    ins('debtors', 'm3-dup', { name: 'تکراری', phone: '0700000032', mergedInto: 'm3-keep' }),
+    //  قرضِ کهنهٔ تکراری روی خودش ماند (ادغامِ v3 سند را جابه‌جا نمی‌کند)
+    ins('transactions', 'm3-old', { debtorId: 'm3-dup', type: 'give', amountMinor: 400000, createdAt: at - 10000 }),
+  ]);
+  assert.deepEqual(statuses(r0), ['applied', 'applied', 'applied'], JSON.stringify(r0.body));
+  const sale = (id, who, debt) => [
+    ins('sales', id, { totalMinor: 1000000, finalTotalMinor: 1000000, paidAmountMinor: 1000000 - debt, remainingMinor: debt,
+      debtGivenMinor: debt, debtorId: who, paymentMethod: 'credit', status: 'completed', createdAt: at }),
+    ins('transactions', `${id}-give`, { debtorId: who, type: 'give', amountMinor: debt, refId: id, kind: 'sale_credit', createdAt: at }),
+  ];
+  assert.deepEqual(statuses(await push3(staff, 'pos-3', sale('m3-s1', 'm3-keep', 200000))), ['applied', 'applied']);
+  //  دستگاهِ آفلاینی که هنوز ادغام را ندیده بود روی تکراری فروخت ⇒ سقفِ ماندگار (تکراری سقف ندارد)
+  assert.deepEqual(statuses(await push3(staff, 'pos-3', sale('m3-s2', 'm3-dup', 50000))), ['applied', 'applied']);
+  const f = (await flags()).slice(before);
+  assert.deepEqual(f.map((x) => [x.sale, x.balanceMinor, x.addMinor, x.excessMinor]),
+    [['m3-s1', 400000, 200000, 100000], ['m3-s2', 600000, 50000, 150000]]);
+  //  هستهٔ خالص: بی هیچ ادغام همان شناسه؛ حلقه ⇒ کوچک‌ترین؛ مقصدِ ناپیدا ⇒ خودش
+  const known = new Map([['a', {}], ['b', {}], ['c', {}]]);
+  assert.equal(review.keeperOf(new Map(), known, 'a'), 'a');
+  assert.equal(review.keeperOf(new Map([['b', 'a'], ['a', 'b']]), known, 'b'), 'a');
+  assert.equal(review.keeperOf(new Map([['c', 'zz']]), known, 'c'), 'c');
+});
+
 test('پرچمِ روشن، راهِ قدیم (فاکتورِ تکی و کامل): پذیرفته و سابقه با `path`؛ ویرایشِ همان فاکتور سابقهٔ دوم نه', async () => {
   const before = (await flags()).length;
   const t = Date.now();

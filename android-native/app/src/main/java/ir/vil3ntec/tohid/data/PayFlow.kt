@@ -287,11 +287,11 @@ object PayFlow {
    */
   val KIND_LABELS: Map<String, String> = linkedMapOf(
     //  «به حساب» همان نسیه است (واژهٔ دکان)؛ «به حسابِ مشتری» فقط متنِ ردیفِ رسید/جزئیات ([receiptLines])
-    CASH to "نقد", "credit" to "نسیه", ACCOUNT to "نسیه", "card" to "کارت", "transfer" to "حواله",  // داده: برچسبِ روشِ پرداخت — هم‌شکلِ `ReportTables`/`report-core.js` و ستونِ خروجی (منتظرِ تصمیمِ صاحب‌کار)
-    "wallet" to "کیف پول", "store_credit" to "اعتبار فروشگاه", "gift_card" to "کارت هدیه", "other" to "سایر", MIXED to "ترکیبی",  // داده: برچسبِ روشِ پرداخت — هم‌شکلِ `ReportTables`/`report-core.js` و ستونِ خروجی (منتظرِ تصمیمِ صاحب‌کار)
+    CASH to "نقد", "credit" to "نسیه", ACCOUNT to "نسیه", "card" to "کارت", "transfer" to "حواله",  // داده: کلیدِ برچسبِ روش — هم‌شکلِ `ReportTables`/`report-core.js`؛ صفحه، رسید و اکسل با `Receipts.payName` به زبانِ برنامه
+    "wallet" to "کیف پول", "store_credit" to "اعتبار فروشگاه", "gift_card" to "کارت هدیه", "other" to "سایر", MIXED to "ترکیبی",  // داده: کلیدِ برچسبِ روش — همان؛ ترجمه در `Receipts.payName` (LOC-06 #۲۴)
     Pay.FX to "ارز",  // داده: PAY-10 — ردیفِ ارزِ نقد (ریزِ ارز و نرخ کنارش، `FxTillFlow.detail`)
     //  فاکتورِ W ِ سفارشِ اینترنتی (#321): روشِ سفارش، نه نوعِ ردیف
-    ONLINE to "پرداختِ آنلاین", COD to "نقد هنگامِ تحویل",  // داده: برچسبِ روشِ پرداخت — هم‌شکلِ `ReportTables`/`report-core.js` و ستونِ خروجی (منتظرِ تصمیمِ صاحب‌کار)
+    ONLINE to "پرداختِ آنلاین", COD to "نقد هنگامِ تحویل",  // داده: کلیدِ برچسبِ روش — همان؛ ترجمه در `Receipts.payName` (LOC-06 #۲۴)
   )
 
   /** `paymentMethod`ِ فاکتورِ W: پرداختِ آنلاین و نقد هنگامِ تحویل (دستِ پیک) — هیچ‌کدام نقدِ دخل نیست */
