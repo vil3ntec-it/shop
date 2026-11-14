@@ -801,7 +801,7 @@
 - **خاموش کردن:** `false` یا حذف ⇒ همان رفتارِ امروز برای همه (شعبه‌ها و انتساب‌ها می‌مانند ولی خوانده نمی‌شوند؛ دادهٔ شعبه‌های
   دیگر دیده نمی‌شود تا دوباره روشن شود).
 - **آزمون:** `cd server && TEST_DATABASE_URL=pglite:memory node --test --test-concurrency=1 test/shop-branches.test.js
-  test/shop-branches-stock.test.js test/tenant-matrix-branches.test.js` (۱۰/۱۰ + ۶/۶ + ۱/۱).
+  test/shop-branches-stock.test.js test/tenant-matrix-branches.test.js` (۱۰/۱۰ + ۷/۷ + ۱/۱).
 
 ## ۳۳. `shop.storefront.return_requests` — «درخواستِ برگشت» ِ مشتری از ویترین (RET-11؛ تصمیمِ ۱۳ «ب»؛ مهاجرتِ ۸۶۶، از ۱۴۰۵/۰۸/۲۳)
 
