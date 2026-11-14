@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.sync.v3
 
 import android.content.Context
+import ir.vil3ntec.tohid.core.branch.BranchKey
 import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiFailure
@@ -23,6 +24,7 @@ import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -59,6 +61,8 @@ object SyncChoice {
   fun set(context: Context, next: String, pending: Int): String {
     if (next != V1 && next != V3) return "bad_choice"
     if (pending > 0) return "pending"
+    //  شعبه (فازِ ۲): دفترِ شعبهٔ دیگر فقط با v3 — v1 آن را در شعبهٔ اصلی می‌نشاند
+    if (next == V1 && !BranchKey.isMain(runCatching { ir.vil3ntec.tohid.data.BranchDesk.current(context) }.getOrDefault(BranchKey.MAIN))) return "branch"
     val ok = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, next).commit()
     if (!ok) return "storage"
     cached = next
@@ -162,13 +166,22 @@ class SyncV3Runner private constructor(context: Context) {
     return SyncStateV1.currentAccount(app).ifBlank { store.accountName }.ifBlank { store.deviceUid }
   }
 
+  /** شعبهٔ دفترِ روی میز (`data/BranchDesk`)؛ اصلی ⇒ همان کلید و همان پوشه‌های امروز */
+  private fun branch(): String = runCatching { ir.vil3ntec.tohid.data.BranchDesk.current(app) }.getOrDefault(BranchKey.MAIN)
+
+  /** بخشِ نامِ پوشه‌های v3 ِ همین حساب و همین شعبه (`BranchKey.syncFileKey`) */
+  private fun fileKey(account: String = accountKey(), b: String = branch()): String = BranchKey.syncFileKey(OpQueue.fileKey(account), b)
+
   @Synchronized
   private fun engine(): SyncV3Engine {
-    val k = accountKey()
+    val account = accountKey()
+    val b = branch()
+    //  شعبه درونِ یک دکان (فازِ ۲): حال و صفِ هر شعبه جدا — شعبهٔ دیگر ⇒ موتورِ دیگر
+    val k = BranchKey.syncKey(account, b)
     engine?.let { if (k == key) return it }
     key = k
     //  DATA-06: حال در `filesDir/sync-v3/<کلید>/` (بیرون از پشتیبان)، صف در `sync-v3-<کلید>/` (با پشتیبان) — `V3StateDir`
-    val v3Store = V3StateDir.store(app.filesDir, OpQueue.fileKey(k))
+    val v3Store = V3StateDir.store(app.filesDir, fileKey(account, b))
     val ledger = object : V3Ledger {
       //  دفترِ همین لحظهٔ دیسک (`ShopStore.ledgerNow`) — شرح سرِ همان
       override fun read(): ShopData = shop?.ledgerNow() ?: ShopData()
@@ -260,10 +273,20 @@ class SyncV3Runner private constructor(context: Context) {
 
   fun forgetArchived(gone: Map<String, Collection<String>>): Int = engine().forget(gone).also { publish() }
 
+  /** یک «دور» در هر لحظه: [work] و تعویضِ شعبه (`BranchDesk.switchTo`) هرگز هم‌زمان نه */
+  private val round = kotlinx.coroutines.sync.Mutex()
+
+  /** [block] بیرون از هر دورِ همگام‌سازی — هیچ push/pull ِ شعبهٔ پیشین با سرآیندِ شعبهٔ تازه نمی‌رود */
+  suspend fun <T> exclusive(block: suspend () -> T): T = round.withLock { block() }
+
   /** @return آیا دورِ همگام‌سازی تمام شد (یا آگاهانه ایستاد) — `false` یعنی بعداً دوباره */
-  suspend fun work(store: ShopStore): Boolean {
+  suspend fun work(store: ShopStore): Boolean = round.withLock { workNow(store) }
+
+  private suspend fun workNow(store: ShopStore): Boolean {
     //  OPS-07: دفترِ آموزشی، یا هر دفتری در حالتِ آموزشی، هرگز به موتور نمی‌رسد
     if (store.training || !ir.vil3ntec.tohid.data.TrainingMode.networkAllowed()) return false
+    //  شعبه (فازِ ۲): دفترِ شعبهٔ دیگر فقط وقتی سرور همین حالا شعبه‌ها را روشن دارد (خاموش ⇒ سرآیند بی اثر و بخشِ اصلی)
+    if (!ir.vil3ntec.tohid.data.BranchDesk.confirm(app)) { publish(); return false }
     shop = store
     val e = engine()
     //  دیسک جلوتر بود و خوانده نشد (`ledgerNow`، فقط با پرچمِ `shop.ledger_merge`) ⇒ هیچ چیزی نشانده
@@ -302,7 +325,7 @@ class SyncV3Runner private constructor(context: Context) {
   }
 
   /** `SetAsideMarks` ِ همین حساب در پوشهٔ v3 ِ همان (DATA-SAFETY §۷) */
-  private fun marks() = File(File(app.filesDir, "sync-v3-${OpQueue.fileKey(accountKey())}"), ir.vil3ntec.tohid.sync.v1.SetAsideMarks.V3_NAME)
+  private fun marks() = File(File(app.filesDir, "sync-v3-${fileKey()}"), ir.vil3ntec.tohid.sync.v1.SetAsideMarks.V3_NAME)
     .let { f -> ir.vil3ntec.tohid.sync.v1.SetAsideMarks({ f.takeIf { it.isFile }?.readText() }, { f.parentFile?.mkdirs(); DiskWrite.text(f, it) }) }
 
   /** opهای تصمیم‌هایی که بیرون از دفتر «نشست» نشان خورده‌اند — `SetAside.openRejected` */

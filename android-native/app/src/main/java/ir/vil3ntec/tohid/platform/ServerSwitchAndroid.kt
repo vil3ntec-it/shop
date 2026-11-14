@@ -334,7 +334,8 @@ object ServerSwitchAndroid {
         val toKey = if (nextUser.isBlank()) DataPartition.deskKey(to) else DataPartition.ledgerKey(to, nextUser, nextShop)
 
         //  بایگانی ننشست ⇒ هیچ جابه‌جایی (دفترِ روی میز رونویسی نمی‌شود)؛ «سرورِ بعدی» در انتظار می‌ماند تا بارِ بعد
-        if (!store.stashTo(fromKey)) return@withContext
+        //  شعبه (فازِ ۲): دفترِ روی میز زیرِ نامِ شعبهٔ خودش (اصلی ⇒ همان [fromKey])؛ نام و عکس‌ها سطحِ دکان
+        if (!store.stashTo(if (user.isBlank()) fromKey else ir.vil3ntec.tohid.data.BranchDesk.vaultOf(app, fromKey))) return@withContext
         runCatching { PhotoStore.stashTo(app, fromKey) }
         runCatching { AccountVault.switch(app, fromKey, toKey) }
         TokenStore(app).let { t -> t.stashTo(DataPartition.scope(from)); t.openFrom(DataPartition.scope(to)) }
@@ -352,6 +353,7 @@ object ServerSwitchAndroid {
         runCatching { ShopRole.forget(app) }
         runCatching { CartStore(app).clear() }
         LedgerOwner.remember(app, nextUser, nextShop)
+        ir.vil3ntec.tohid.data.BranchDesk.reset(app)
         //  پیشوندِ API هر سرور جداست — دوباره پیدا می‌شود
         app.getSharedPreferences("tohid-api", Context.MODE_PRIVATE).edit().remove("api-prefix").commit()
       }
