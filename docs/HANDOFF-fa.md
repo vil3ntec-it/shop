@@ -57,6 +57,23 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-56c زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-56c` (از `origin/claude/batch-62` 54a9333be) — ماندهٔ کدِ د۱۸: SEC-02، S09، S44
+
+- **SEC-02 ⇒ IMPLEMENTED-VERIFIED** (پرچمِ خاموشِ `shop.doc_chain`، FLAGS-ON §۴۰): برگشت، قرض/رسید، خرید و پرداخت به تأمین‌کننده هر ردیف یک سندِ
+  زنجیره (`core/audit/DocChainDocs`، بردارِ `doc-chain-docs-v1.json` با سازندهٔ JS ِ مستقل)؛ «تا کجا» ِ سندِ بی‌شماره در `DocChainState`
+  (`docFrom`/`docAt`/`docIds`، پنجرهٔ سه‌روزهٔ دیررسیده؛ بی آن وضعیت همان)؛ گردآوری `PlainChainFacts` در `DocChainSync` روی v1 و **v3**؛ صفحهٔ
+  «بررسیِ یکپارچگیِ اسناد» (`audit/doc-chain`؛ `DocChainAudit` هر حلقه را از دفترِ امروز از نو می‌سازد). سرور دست نخورد (نوع را محدود نمی‌کند؛
+  درِ زنده آزموده شد).
+- **S44 ⇒ IMPLEMENTED-VERIFIED** (FLAGS-ON §۳۸): دکمهٔ «بازیابی از پشتیبان» زیرِ دستگاهِ غیرفعال (صفحهٔ عضو و بخشِ «دستگاه‌ها»)، فقط با `replay` ِ
+  `GET /shop/devices`؛ فقط `pending-ops.json` از فایل خوانده می‌شود؛ رمزدار ⇐ عبارت.
+- **S09 ⇒ PARTIAL / «دستگاه»** (پرچمِ تازهٔ `shop.held_twice_cancel`، FLAGS-ON §۳۹): دستگاهی که `held_conflict` گرفت فروشِ **خودش** را فقط وقتی
+  فروشِ نخست قلم‌به‌قلم یکی است از راهِ لغوِ عادی لغو می‌کند (`HeldTwice`، `HeldTwiceAndroid`) و همیشه به صندوقِ صاحب گزارش می‌دهد
+  (`POST /shop/held-invoices/:id/twice`، `lib/held-twice.js`، گونهٔ `held_twice`). مانده: دو دستگاهِ واقعی.
+- **باگِ واقعیِ یافته (شاخهٔ پایه):** آزمون‌های کامپیوترِ `batch-62` کامپایل نمی‌شدند (`ReturnRequestCardUiTest`: import ِ `onAllNodes`؛
+  `ScenarioS76ServerDesktopTest`: `@Volatile` روی متغیرِ محلی) ⇒ هیچ آزمونِ desktop اجرا نمی‌شد؛ درست شد. سه شکستِ پیشینِ نوشته‌ها هم:
+  `CustomerErasureLedger.ERASED_NAME` بی «// داده:»، و `StrReturnRequests.filter/status/reason/method` که کدِ ناشناخته را پنهان می‌کردند.
+- **آزمون:** TESTS_E56C
+- **قدمِ بعد:** CRM-10 (همان «کد»)؛ صاحب‌کار: سه کلید روی یک دکانِ آزمایشی (FLAGS-ON §۳۸–۴۰) و S09 با دو دستگاهِ واقعی.
 ### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-55s (د۱۸) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-55s` (از `origin/claude/batch-62` 1a77fe22f) — همگام‌سازی، گروهِ الف
 
 - **تصمیمِ صاحب‌کار (پرسشِ ۳۲):** ردیف‌های همگام‌سازی پس از فازِ ۱ ِ شعبه، هر کدام پشتِ کلیدِ خاموش و با آزمون؛ پمپ «نه» (فایل‌های
