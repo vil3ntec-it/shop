@@ -277,7 +277,7 @@ internal class HubV1(
     if (n.marks != old.marks) hub.save(MARKS_FILE, HubLog.encodeMarks(n.marks))
   }
 
-  private fun line(e: HubEntry): String = seal(HubLog.encodeEntry(e)).also { check('\n' !in it && '\r' !in it) { "مُهر چندخطی است" } }
+  private fun line(e: HubEntry): String = seal(HubLog.encodeEntry(e)).also { check('\n' !in it && '\r' !in it) { "sealed line must be single-line" } }
 
   private fun appendLine(e: HubEntry) {
     FileOutputStream(logFile, true).use { out ->

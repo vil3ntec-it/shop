@@ -20,7 +20,7 @@ object HubKeyStore {
       EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
       EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
     ) as SharedPreferences
-  }.getOrElse { c.applicationContext.getSharedPreferences("$SECURE_FILE-plain", Context.MODE_PRIVATE) }
+  }.getOrElse { c.applicationContext.getSharedPreferences("tohid-hub-secure-plain", Context.MODE_PRIVATE) }
 
   fun get(context: Context): String? = prefs(context).getString(KEY, null)?.takeIf { it.isNotBlank() }
 
