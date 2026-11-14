@@ -4,19 +4,6 @@ import ir.vil3ntec.tohid.core.calendar.CivilDays
 import ir.vil3ntec.tohid.core.calendar.SolarHijri
 import ir.vil3ntec.tohid.core.text.DariText
 
-/** زبانِ برنامهٔ خرید — همان چهار زبانِ برنامهٔ دکان؛ دری = فارسی + لایهٔ واژهٔ `DariText`. */
-enum class ShopperLang(val code: String, val rtl: Boolean, val native: String) {
-  FA("fa", true, "فارسی"),
-  PRS("prs", true, "دری"),
-  EN("en", false, "English"),
-  PS("ps", true, "پښتو");
-
-  companion object {
-    /** ناشناخته یا خالی ⇒ فارسی */
-    fun of(code: String?): ShopperLang = entries.firstOrNull { it.code == code } ?: FA
-  }
-}
-
 /**
  *  نوشته‌های برنامهٔ خرید (fa · en · ps، و دری از روی فارسی). واژه‌ها همان واژه‌نامهٔ ویترینِ وب‌اند
  *  (واژه‌نامه‌های `server/public/kit/i18n`) تا مشتری در وب و برنامه یک زبان ببیند.
