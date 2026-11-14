@@ -507,6 +507,17 @@
   S44 صفِ نرفته در پشتیبان (`pending-ops.json`، `LostDevicePending`) و `POST /shop/devices/:id/replay` فقط برای دستگاهِ **غیرفعالِ** همین دکان، از همان
   زنجیرهٔ زندهٔ push ِ v1 (`conflict-inbox.pushV1`) با همان `op_id`. کارهای پس از دورِ `SyncV1Worker` همه در `sweepAfterPull`، هر کدام در `runCatching`.
   سنجه: `product-unit-rules`، `pay-status-mirror`، `customer-access-offline`، `customer-erasure-ledger`، `scenario-s44.e2e.mjs`، `ScenarioS76ServerDesktopTest`.
+- ⛔ **هابِ شبکهٔ دکان (SYN-09/S29، `claude/e-rows-60h`)** — هاب **رله** است، نه مرجع: هرگز op نمی‌سازد، نمی‌بُرد، ادغام نمی‌کند و در دفترِ
+  سرور «اعمال» نمی‌کند؛ دسته‌ی push ِ v1 ِ گوشی را **همان بایت‌ها** به ته ِ دفترِ فقط‌افزودنی (`core/hub/HubLog`، هر خط مُهرشده + fsync؛
+  پیشرفت جدا در `HubMarks`) می‌افزاید و با **توکنِ خودِ همان گوشی** از همان `POST /sync/v1/push` ِ برنامه می‌فرستد (`HubCloudHttp.pushV1`)؛
+  یکتایی همان `op_id` ِ سرور («duplicate»). `sync-v1.js`/`routes/sync-v1.js`/`PUMP_TABLES` دست نمی‌خورند. گوشی فقط وقتی push/pull ِ
+  سرور **نرسید** (`HubPeerLink.cloudDown`) به هاب می‌رود (`SyncV1Engine.hubExchange`)؛ صف، شکست و `lastOkAt` همان «به سرور نرسیدیم»؛ op ِ
+  گوشیِ دیگر با `absorbRemote(…, cursor = null, keepPending = true)` «موقت» می‌نشیند و pull ِ بعدیِ سرور مرجع است؛ op ِ دیده‌شده از سرور
+  (`server_seq` ≤ cursor یا حلقهٔ `HubLinkV1Android.saw`) و op ِ ردشدهٔ سرور هرگز از هاب داده نمی‌شود. ⛔ جفت‌سازی فقط با برگهٔ صاحب/مدیر
+  روی خودِ کامپیوتر (`HubPair`؛ هیچ درِ شبکه‌ای برگه نمی‌سازد)، کد/توکن یک‌بارمصرف، ۲ دقیقه، ۵ تلاش؛ راهِ کد: اثباتِ HMAC ِ هاب روی سنجاقِ
+  گواهی **پیش از** هر رازِ گوشی؛ QR بی راز جز توکنِ یک‌باره. ⛔ دستگاهِ جفت‌نشده پیش از هر تماس با سرور ۴۰۳ `hub_not_paired` و هیچ داده؛
+  هر درخواستِ دفتر کلیدِ جفت‌شده **و** توکنِ همان دکان (`HubAuth`) می‌خواهد. دو قفلِ خاموش: `app.multi_server` و `hub.local`/`hub.peer`.
+  سنجه: `HubLanServerDesktopTest`، `HubV1ServerTest`، `HubPairLogTest`، `HubServerTest`؛ شرح: `docs/SYN-09-HUB-fa.md` §۴.۱.
 
 ### v3 · دفترِ محلی و مهاجرتِ داده
 

@@ -268,17 +268,18 @@ class HubV1ServerTest {
     val outB = HubExchangeV1(lb, sb).exchange("devB", ops("b1"), 1, { true }, 1, null, 0) { got += it }
     assertEquals(1, outB.relayed)
     assertEquals(queueA.map { it.opId }, got.map { it.opId })
-    //  دورِ دوباره: هیچ دستهٔ تازه، هیچ op ِ دوباره
-    HubExchangeV1(la, sa).exchange("devA", queueA, queueA.size, { true }, 1, null, 0) { }
+    //  دورِ دوباره: هیچ دستهٔ تازه؛ A فقط b1 را می‌گیرد و B هیچ op ِ دوباره
+    val gotA = ArrayList<SyncOp>()
+    HubExchangeV1(la, sa).exchange("devA", queueA, queueA.size, { true }, 1, null, 0) { gotA += it }
+    assertEquals(listOf("b1"), gotA.map { it.opId })
     got.clear()
     HubExchangeV1(lb, sb).exchange("devB", ops("b1"), 1, { true }, 1, null, 0) { got += it }
     assertTrue(got.isEmpty())
+    gotA.clear()
+    HubExchangeV1(la, sa).exchange("devA", emptyList(), 0, { true }, 1, null, 0) { gotA += it }
+    assertTrue(gotA.isEmpty())
     val log = h.server.v1!!.snapshot()
     assertEquals(450 + 1, log.entries.flatMap { it.opIds }.size)
-    //  A هم b1 را می‌گیرد
-    val gotA = ArrayList<SyncOp>()
-    HubExchangeV1(la, sa).exchange("devA", emptyList(), 0, { true }, 1, null, 0) { gotA += it }
-    assertEquals(listOf("b1"), gotA.map { it.opId })
     //  سرور نمی‌رسد ⇒ هیچ
     assertTrue(h.server.forwardV1Now()!!.retry)
     assertTrue(c.rows.isEmpty())

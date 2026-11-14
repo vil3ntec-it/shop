@@ -48,7 +48,7 @@ class SyncV1Engine private constructor(context: Context) {
 
   /** کلیدِ حساب — نشستِ نبوده هم کلیدِ خودش را دارد. */
   private var accountKey: String = keyOf()
-  private var state = SyncStateV1(app, accountKey)
+  internal var state = SyncStateV1(app, accountKey)
   private var queue = OpQueue(app, accountKey)
 
   /**
@@ -75,7 +75,7 @@ class SyncV1Engine private constructor(context: Context) {
     SyncCommit(SyncCommit.Journal(java.io.File(app.filesDir, "sync-journal-${OpQueue.fileKey(key)}.json")), parts)
 
   /** §۹.۵: سرور از پشتیبان برگشت — شرح سرِ `V1Restore` و `core/sync/RestoreReplay.kt` */
-  private var restore = restoreFor(accountKey)
+  internal var restore = restoreFor(accountKey)
 
   private fun restoreFor(key: String) =
     V1Restore(state, queue, FileReplayStore.inDir(app.filesDir, "sync-replay-${OpQueue.fileKey(key)}"), commit, ::clock) {
@@ -492,8 +492,7 @@ class SyncV1Engine private constructor(context: Context) {
         var rounds = 0
         while (!state.restorePending && !state.restoredRebuild && rounds < 50) {
           rounds++
-          val got = client.pull(device, state.cursor)
-          if (got.ops.isNotEmpty()) ir.vil3ntec.tohid.platform.HubLinkV1Android.saw(app, got.ops.map { it.opId })  // S29: «دیده از سرور» ِ هاب (خاموش ⇒ هیچ)
+          val got = client.pull(device, state.cursor).also { ir.vil3ntec.tohid.platform.HubLinkV1Android.saw(app, it.ops.map { o -> o.opId }) }  // S29: «دیده از سرور» ِ هاب (خاموش ⇒ هیچ)
           //  §۹.۵: opهای دیگران با شماره‌شان — **پیش از** نشاندن — برای دوباره فرستادن پس از بازیابی
           if (got.seen.isNotEmpty()) restore.seen(got.seen)
           //  §۹.۵: دوران کنارِ pull ⇔ پرچمِ سرور روشن ⇒ دورِ بعد درِ دوران پرسیده می‌شود، وگرنه هرگز
@@ -517,29 +516,12 @@ class SyncV1Engine private constructor(context: Context) {
       } catch (error: Throwable) {
         attempt++
         streak = SyncFailure.note(state, streak, error, error.message ?: "خطای نامشخص", clock())  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
-        hubExchange(error, read, write)
         Result.failure(error)
       } finally {
         busy = false
         publish()
       }
     }
-
-  /**
-   *  S29/SYN-09: سرور **نرسید** ⇒ همان دسته‌ها به هابِ جفت‌شدهٔ شبکهٔ دکان و opهای دستگاه‌های دیگر از آن، با همان
-   *  نشاندنِ pull و cursor ِ دست‌نخورده (`HubLinkV1Android`؛ پرچم یا تنظیمِ `hub.peer` خاموش ⇒ هیچ). صف، شکست و
-   *  `lastOkAt` همان «به سرور نرسیدیم» می‌مانند؛ op فقط با پاسخِ خودِ سرور از صف بیرون می‌رود.
-   */
-  private fun hubExchange(error: Throwable, read: () -> ShopData, write: (ShopData) -> Unit) {
-    if (!ir.vil3ntec.tohid.platform.HubPeerLink.cloudDown(error) || state.restorePending || state.restoredRebuild || state.recoverArchive) return
-    val link = ir.vil3ntec.tohid.platform.HubLinkV1Android.of(app, deviceId()) ?: return
-    runCatching {
-      link.exchange(
-        deviceId(), queue.all(), { b -> LedgerDiff.capsFor(b.map { it.opId }, state.legacyOpsUpTo) && b.none { restore.isReplay(it.opId) } },
-        LedgerDiff.wireSchema(state.serverSchema), ir.vil3ntec.tohid.core.sync.PushSince.since(state.pushSince, state.cursor), state.cursor,
-      ) { ops -> absorbRemote(ops, read, write, cursor = null, keepPending = true) }
-    }
-  }
 
   /**
    *  فرستادنِ صف تا ته، دسته‌دسته — همان حلقهٔ همیشگیِ `runOnce`، جدا تا دفترِ رمزدارِ
