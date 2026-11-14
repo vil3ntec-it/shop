@@ -104,6 +104,22 @@ async function slugOfHost(host) {
   return slug;
 }
 
+/**
+ * ریشهٔ نشانیِ دیگرِ ویترین (`app.get('/')`، پس از `<slug>.<domain>` ِ امروز) ⇒ `/store/<slug>` ِ **همان میزبان**: نشانیِ نسبی،
+ * slug از دفتر (نه از Host) و فقط `c` و `lang` ِ درست ⇒ نه ریدایرکتِ باز، نه تزریقِ Host. سرورِ بی دامنهٔ گرداننده ⇒ همان `next()`.
+ */
+function root(req, res, next) {
+  if (!enabled()) return next();
+  slugOfHost(req.hostname).then((alias) => {
+    if (!alias) return next();
+    const q = new URLSearchParams();
+    if (typeof req.query.c === 'string' && /^[0-9A-Za-z]{10}$/.test(req.query.c)) q.set('c', req.query.c);
+    if (typeof req.query.lang === 'string' && require('./store-seo').LANGS.includes(req.query.lang)) q.set('lang', req.query.lang);
+    const qs = q.toString();
+    res.set('Cache-Control', 'no-store').redirect(302, `/store/${encodeURIComponent(alias)}${qs ? `?${qs}` : ''}`);
+  }, next);
+}
+
 /* ------------------------------ تنظیمِ دکان ------------------------------ */
 
 async function list(shopId) {
@@ -141,4 +157,4 @@ async function replace(shopId, rawHosts, { userId = null } = {}) {
   return { hosts: await list(shopId), ...out };
 }
 
-module.exports = { FLAG, MAX_PER_SHOP, aliasDomains, enabled, validName, normalizeHost, hostOfRequest, slugOfHost, list, replace, forget };
+module.exports = { FLAG, MAX_PER_SHOP, aliasDomains, enabled, validName, normalizeHost, hostOfRequest, slugOfHost, root, list, replace, forget };
