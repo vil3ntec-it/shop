@@ -52,6 +52,8 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     lifecycleScope.launch { store.loadAndSummarize() }
     //  O-01: پوشِ گوشی (Firebase) — فقط نشاندنِ سکو؛ تا پرچمِ دکان روشن نشود هیچ کارِ Firebase ای نیست
     ir.vil3ntec.tohid.data.push.FcmPushAndroid.install()
+    //  RATE-01: نظرِ درون‌برنامهٔ Play ِ همین ساخت (`src/review-play` یا همتای بی‌کتابخانهٔ `src/review-none`)
+    ir.vil3ntec.tohid.rate.RateStoreAndroid.playReview = ir.vil3ntec.tohid.rate.PlayReview::launch
 
     /*
      *  شستنِ توکن‌هایی که نسخه‌های قبلی روی گوشی جا گذاشته‌اند.

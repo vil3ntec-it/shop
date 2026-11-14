@@ -19,6 +19,7 @@ object I18nTables {
     StrCustomerAccess, // CRM-15: «چه کسی این پرونده را دید» (سابقهٔ دسترسی)
     StrTrust, // ABUSE-01: شکایت و گزارشِ خریداران در برنامهٔ دکان
     StrSupportAccess, // TEN-04: نوارِ «پشتیبانی در حالِ مشاهده» و پذیرفتن/رد/بستن
+    StrRate, // RATE-01: برگهٔ «ستاره بدهید» (Play/بازار)
     StrOnline, StrSearch, StrTouch, StrPick, StrStaffTime, StrShiftReview, StrWhy, StrLocalNet, StrShrink,
     StrPriceCheck, StrChat, StrLabel, StrOrderSlip, StrCount, StrGift, StrRetPolicy, StrDeliver, StrProduct, StrGrid,
     StrRisk, StrPay, StrAdmin, StrShift, StrCourier, StrOrderOps, StrPayFix, StrSpecialOrder, StrSafe, StrGiftCard,

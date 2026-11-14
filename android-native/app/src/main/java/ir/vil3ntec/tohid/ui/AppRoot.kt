@@ -482,6 +482,11 @@ private fun AppRootActive(
       onNewItem = { code -> nav.open(ProductsPaths.new(barcode = code)) },
     )
   }
+  //  RATE-01: «ستاره بدهید» — فقط Play/بازار، فقط روی خانه با سبدِ خالی و پس از کارِ واقعی (`ui/v3/rate/RatePromptAndroid.kt`)
+  if (nav.gate == null) {
+    val onHome = base == "home" && !ir.vil3ntec.tohid.ui.components.pos.PhoneCartUi.sheetOpen.value
+    ir.vil3ntec.tohid.ui.v3.rate.RatePromptHost(store, data, loaded, cartStore, onHome = onHome)
+  }
 
   //  میان‌برها و پیوندهای درونی (`AppNav.go`) — نامِ قدیمی خودکار به مسیرِ امروز
   val navRequest = AppNav.request.value

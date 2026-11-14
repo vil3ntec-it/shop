@@ -115,6 +115,7 @@ class MainActivity : ComponentActivity() {
       },
       picture = { bytes, modifier -> PhotoAndroid.Picture(bytes, modifier) },
       tile = { url, modifier, loaded -> MapTilesAndroid.Tile(base(), url, "TohidShop/${BuildConfig.VERSION_NAME} (Android)", modifier, loaded) },
+      rate = RateAndroid.hook(this),   //  RATE-01: فقط ساختِ `-Pstore=play`؛ پیش‌فرض null ⇒ هرگز
     )
     if (savedInstanceState == null) intent?.dataString?.let { model.openLink(it) }
     setContent {
