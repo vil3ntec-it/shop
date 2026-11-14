@@ -40,12 +40,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import ir.vil3ntec.tohid.core.account.AccountDeletion
 import ir.vil3ntec.tohid.core.account.PhoneClaimForm
 import ir.vil3ntec.tohid.core.i18n.StrAccount
 import ir.vil3ntec.tohid.core.i18n.StrShellPages
@@ -68,6 +66,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.account.AccountFormat
 import ir.vil3ntec.tohid.ui.v3.account.AccountPaths
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
+import ir.vil3ntec.tohid.ui.v3.onboarding.OnboardingPaths
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 import ir.vil3ntec.tohid.ui.v3.v3Shake
@@ -243,7 +242,6 @@ internal fun RouteScope.ProfileEditRoute() {
   var version by remember { mutableIntStateOf(0) }
   var sheet by remember { mutableStateOf(false) }
   val accountId = state.accountId.ifBlank { "local" }
-  val uri = LocalUriHandler.current
 
   val picker = rememberAvatarPicker { uri ->
     PhotoStore.saveAvatar(context, accountId, uri)
@@ -335,7 +333,7 @@ internal fun RouteScope.ProfileEditRoute() {
     onPhoto = { sheet = true },
     onSave = ::save,
     onBack = backOrNull,
-    onPrivacy = { runCatching { uri.openUri(AccountDeletion.PRIVACY_URL) } },
+    onPrivacy = { nav.open(OnboardingPaths.PRIVACY) },   //  درونِ برنامه، نه صفحهٔ بیرونی
     onDelete = { nav.open(AccountPaths.DELETE) },
     onCode = { form = form.code(it) },
     onResend = { if (!busy && form.shown) requestCode(form.codeFor) },

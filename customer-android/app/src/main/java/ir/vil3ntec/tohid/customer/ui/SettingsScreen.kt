@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.shopper.ShopperLang
 import ir.vil3ntec.tohid.core.shopper.ShopperText
 
-/** تنظیمات: فقط زبان و ظاهر؛ نشانیِ سرور برای آزمون پایینِ صفحه (ساختِ debug ِ مرحلهٔ ۱). */
+/** تنظیمات: زبان و ظاهر، حساب، حریمِ خصوصی و شرایط؛ نشانیِ سرور برای آزمون پایینِ صفحه (ساختِ debug ِ مرحلهٔ ۱). */
 @Composable
 fun SettingsScreen(model: CustomerModel) {
   val platform = LocalPlatform.current
@@ -43,6 +43,7 @@ fun SettingsScreen(model: CustomerModel) {
         Option(label, model.saved.theme == k) { model.setTheme(k) }
       }
       AccountSettings(model)
+      LegalLinks(model)   //  حریمِ خصوصی و شرایط درونِ برنامه (`LegalScreen.kt`)
       SectionTitle(ShopperText.server)
       OutlinedTextField(
         value = server, onValueChange = { server = it.trim() }, singleLine = true, modifier = Modifier.fillMaxWidth(),

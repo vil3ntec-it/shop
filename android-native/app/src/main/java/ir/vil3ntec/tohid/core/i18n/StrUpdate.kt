@@ -133,19 +133,19 @@ object StrUpdate {
     "اخیستل شوی فایل له خپره شوې نسخې سره یو نه دی؛ پاک شو — بیا یې ووهئ",
   )
   val githubLimited: String get() = t(
-    "گیت‌هاب فعلاً جواب نمی‌دهد (سهمیهٔ ساعتی تمام شده) — کمی بعد دوباره بزنید",
-    "GitHub isn't answering right now (the hourly quota is used up) — tap again a little later",
-    "ګیټ‌هب اوس ځواب نه ورکوي (د ساعت برخه خلاصه شوې) — لږ وروسته بیا یې ووهئ",
+    "سرورِ انتشارها فعلاً جواب نمی‌دهد (سهمیهٔ ساعتی تمام شده) — کمی بعد دوباره بزنید",
+    "The release server isn't answering right now (the hourly quota is used up) — tap again a little later",
+    "د خپرونو سرور اوس ځواب نه ورکوي (د ساعت برخه خلاصه شوې) — لږ وروسته بیا یې ووهئ",
   )
   val githubNoFile: String get() = t(
-    "فایلِ نسخهٔ تازه روی گیت‌هاب پیدا نشد",
-    "The new version's file wasn't found on GitHub",
-    "د نوې نسخې فایل په ګیټ‌هب کې پیدا نه شو",
+    "فایلِ نسخهٔ تازه روی سرورِ انتشارها پیدا نشد",
+    "The new version's file wasn't found on the release server",
+    "د نوې نسخې فایل د خپرونو په سرور کې پیدا نه شو",
   )
   fun githubError(code: Any?): String = t(
-    "گیت‌هاب خطا داد (${asIs(code)}) — کمی بعد دوباره بزنید",
-    "GitHub gave an error ($code) — tap again a little later",
-    "ګیټ‌هب تېروتنه ورکړه ($code) — لږ وروسته بیا یې ووهئ",
+    "سرورِ انتشارها خطا داد (${asIs(code)}) — کمی بعد دوباره بزنید",
+    "The release server gave an error ($code) — tap again a little later",
+    "د خپرونو سرور تېروتنه ورکړه ($code) — لږ وروسته بیا یې ووهئ",
   )
   fun updateServerNoAnswer(code: Any?): String = t(
     "سرورِ به‌روزرسانی جواب نداد (${asIs(code)})",
@@ -161,8 +161,8 @@ object StrUpdate {
   )
   val installerFailedDesk: String get() = t("نصب‌کننده باز نشد", "The installer didn't open", "نصبوونکی خلاص نه شو")
   val githubBusy: String get() = t(
-    "گیت‌هاب فعلاً جواب نمی‌دهد — کمی بعد دوباره بزنید",
-    "GitHub isn't answering right now — tap again a little later",
-    "ګیټ‌هب اوس ځواب نه ورکوي — لږ وروسته بیا یې ووهئ",
+    "سرورِ انتشارها فعلاً جواب نمی‌دهد — کمی بعد دوباره بزنید",
+    "The release server isn't answering right now — tap again a little later",
+    "د خپرونو سرور اوس ځواب نه ورکوي — لږ وروسته بیا یې ووهئ",
   )
 }

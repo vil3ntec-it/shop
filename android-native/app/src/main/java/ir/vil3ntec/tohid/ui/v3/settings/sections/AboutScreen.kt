@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.Storefront
@@ -13,17 +14,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.BuildConfig
-import ir.vil3ntec.tohid.core.account.AccountDeletion
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrAccount
+import ir.vil3ntec.tohid.core.i18n.StrAuth
 import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.platform.StoreChannel
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.Terms
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
 import ir.vil3ntec.tohid.ui.screens.openWhatsNew
 import ir.vil3ntec.tohid.ui.v3.nav.LocalV3Nav
@@ -35,6 +36,7 @@ import ir.vil3ntec.tohid.ui.v3.V3IconTile
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Type
+import ir.vil3ntec.tohid.ui.v3.onboarding.OnboardingPaths
 import ir.vil3ntec.tohid.ui.v3.rememberCountUp
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsPageFrame
 
@@ -70,13 +72,18 @@ internal fun AboutScreen(data: ShopData, onBack: (() -> Unit)?) {
         V3ListRow(StrSettings.whatsNewAll, icon = Icons.Outlined.NewReleases, hue = V3Hue.BRAND, onClick = { openWhatsNew(nav) })
       }
     }
-    //  قاعدهٔ Google Play: صفحهٔ حریمِ خصوصی در خودِ برنامه، برای همه (مهمان و کارمند هم)
+    //  قاعدهٔ Google Play: حریمِ خصوصی و شرایط **درونِ خودِ برنامه** (نه صفحهٔ بیرونی)، برای همه (مهمان و کارمند هم)
     item(key = "privacy") {
-      val uri = LocalUriHandler.current
+      val nav = LocalV3Nav.current
       V3Section(StrAccount.privacyPolicy) {
         V3ListRow(
           StrAccount.privacyPolicy, subtitle = StrAccount.privacyLine, icon = Icons.Outlined.PrivacyTip, hue = V3Hue.BRAND,
-          onClick = { runCatching { uri.openUri(AccountDeletion.PRIVACY_URL) } },
+          onClick = { nav.open(OnboardingPaths.PRIVACY) },
+        )
+        V3Divider(start = 64.dp)
+        V3ListRow(
+          StrAuth.termsShort, subtitle = StrAuth.termsTap(Terms.SECTIONS.size), icon = Icons.Outlined.Description, hue = V3Hue.VIOLET,
+          onClick = { nav.open(OnboardingPaths.TERMS) },
         )
       }
     }
