@@ -35,9 +35,13 @@ import kotlinx.coroutines.launch
 /**
  *  ثبتِ [name] روی دفترِ [d] تا پایانِ نوشتن: نادرست ⇒ پیامِ موتور (و هیچ نوشتن)؛ نوشته نشد (نقش، قفلِ نرم، دیسک) ⇒
  *  «ذخیره نشد»؛ نوشته شد ⇒ [onSaved] با شناسهٔ تازه و null.
+ *  @param limitRules CRM-03 #۲۵ — کارمندی که «بی سقف» برایش مجاز نیست ⇒ سقفِ پیش‌فرضِ دکان (`CreditLimitGate.quickDraft`)
  */
-internal suspend fun tillNewCustomer(d: ShopData, name: String, store: ShopStore, onSaved: (String) -> Unit): String? =
-  when (val r = DebtorEngine.add(d, DebtorEngine.DebtorDraft(name = name), ReportBridge.nowMs(), ::newId)) {
+internal suspend fun tillNewCustomer(
+  d: ShopData, name: String, store: ShopStore,
+  limitRules: ir.vil3ntec.tohid.core.perm.CreditLimitPerm.Rules = ir.vil3ntec.tohid.core.perm.CreditLimitPerm.Rules.OFF, onSaved: (String) -> Unit,
+): String? =
+  when (val r = DebtorEngine.add(d, ir.vil3ntec.tohid.data.CreditLimitGate.quickDraft(limitRules, DebtorEngine.DebtorDraft(name = name)), ReportBridge.nowMs(), ::newId)) {
     is DebtorEngine.Result.Failed -> r.message
     is DebtorEngine.Result.Ok -> if (store.save(d, r.data)) { onSaved(r.id); null } else StrCustomerCard.notSaved
   }

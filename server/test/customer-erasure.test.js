@@ -359,6 +359,7 @@ test('SEC-10: صاحبِ دکان — پیش‌نمایش بی نوشتن؛ اج
     orderDevices: 0,   //  RSK-04 (۸۴۰): این دکان `shop.order_risk` ندارد ⇒ هیچ دستگاهی؛ پاک شدنش در risk-device.test.js
     addressMedia: 2,   //  CHK-08: عکسِ دروازهٔ نشانیِ هر دو سفارش (۸۴۷)
     addressMediaLinks: 2,   //  CRM-09: پیوندِ هر دو سفارش به نشانیِ ذخیره‌شدهٔ حساب (۸۳۶)
+    returnRequests: 0, returnPhotos: 0,   //  RET-11 (۸۶۶): پاک شدنش در order-return-requests.test.js
   });
   assert.equal((await one('SELECT COUNT(*)::int AS n FROM online_order_address_refs WHERE shop_id=$1', [s.shopId])).n, 0, 'دکان دیگر به رسانهٔ نشانیِ حساب نمی‌رسد');
   assert.ok(savedBefore > 0 && (await savedMedia()) === savedBefore, 'رسانهٔ نشانیِ حسابِ سراسری می‌ماند');

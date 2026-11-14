@@ -154,6 +154,12 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
     store.sweepMergedQuietly()
     //  سندِ ردشدهٔ همین دستگاه که صاحب «کنار گذاشت»/«اصلاح کرد» ⇒ بیرون از دفترِ شمرده (`data/SetAside`)؛ شکستش دور را نمی‌گیرد
     runCatching { ir.vil3ntec.tohid.data.SetAsideSync.afterSync(applicationContext, store) }
+    //  PAY-07 (د۱۸): آینهٔ وضعیتِ حساب‌پیِ خودکار (پرچمِ خاموشِ سرور ⇒ ۴۰۴ ⇒ هیچ)؛ شکستش دور را نمی‌گیرد
+    runCatching { ir.vil3ntec.tohid.data.PayMirrorAndroid.refresh(applicationContext) }
+    //  CRM-15 (د۱۸): دیدن‌های صفِ حسابدارِ بی‌اینترنت (پرچمِ خاموشِ سرور ⇒ ۴۰۴ ⇒ صف پاک)
+    runCatching { ir.vil3ntec.tohid.data.CustomerAccessOutboxAndroid.flush(applicationContext) }
+    //  CRM-15/SEC-10 (د۱۸): فرمانِ ناشناس کردنِ پرونده پس از حذفِ دادهٔ مشتری (پرچمِ خاموشِ سرور ⇒ ۴۰۴ ⇒ هیچ)
+    runCatching { ir.vil3ntec.tohid.data.CustomerErasureLedgerAndroid.afterSync(applicationContext, store) }
   }
 
   companion object {

@@ -44,7 +44,7 @@ object CustomerAccessNote {
    *  `true` نوشته شد؛ `null` چیزی برای نوشتن نبود (تکرارِ ۱۰ دقیقه)؛ `false` ننوشت: حالتِ آموزشی، بازسازیِ دفتر،
    *  خطای دیسک، یا نقشِ بی `auditLog` (حسابدار — سرور ردیفِ دفترش را می‌انداخت) که سرور در دسترس نبود.
    *  نقشِ بی `auditLog` ⇐ همان دیدن به درِ `app` ِ سرور ([CustomerAccess.noteBody]؛ بیننده و دستگاه از توکن، یکی کردنِ
-   *  ۱۰ دقیقه با سرور) — بی‌اینترنت ثبت نمی‌شود.
+   *  ۱۰ دقیقه با سرور) — بی‌اینترنت (شکستِ دوباره‌پذیر) در صفِ دستگاه و پس از وصل با زمانِ خودش (CRM-15، د۱۸).
    */
   suspend fun note(context: Context, store: ShopStore, customerId: String, kind: CustomerAccess.Kind): Boolean? = runCatching {
     if (store.training) return@runCatching false
@@ -52,8 +52,14 @@ object CustomerAccessNote {
     if (!PermCore.canWrite(role, "auditLog")) {
       val body = CustomerAccess.noteBody(customerId, kind) ?: return@runCatching false
       if (!Backend.isReady(context)) return@runCatching false
-      Backend.api(context).post(CustomerAccess.PATH, body)
-      return@runCatching true
+      return@runCatching try {
+        Backend.api(context).post(CustomerAccess.PATH, body)
+        true
+      } catch (e: ir.vil3ntec.tohid.core.net.ApiFailure) {
+        //  CRM-15 (د۱۸): بی‌اینترنت/سرورِ دور ⇒ صفِ دستگاه، پس از وصل با زمانِ خودِ دیدن (`CustomerAccessOutboxAndroid`)
+        if (!e.retryable) throw e
+        ir.vil3ntec.tohid.data.CustomerAccessOutboxAndroid.add(context, customerId, kind, System.currentTimeMillis())
+      }
     }
     if (ir.vil3ntec.tohid.sync.v1.SyncV1Engine.of(context).rebuilding) return@runCatching false
     val who = CustomerAccessLog.Viewer(

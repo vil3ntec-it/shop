@@ -45,4 +45,22 @@ router.post('/', requireShop, shopLimit, async (req, res) => {
   res.set('Cache-Control', 'no-store').json(out);
 });
 
+//  CRM-15 (د۱۸): فرمانِ ناشناس کردنِ پرونده در دفترِ دستگاه (`lib/customer-erasure-ledger.js`) — پرچمِ خاموشِ
+//  `shop.customer_erasure_ledger` پیش از هر بدنه (خاموش ⇒ ۴۰۴)؛ صاحب و مدیر (`data.delete.any`، همان «بستنِ تعارض»)
+const ledger = require('../lib/customer-erasure-ledger');
+const { requirePermission } = require('../middleware/auth');
+const { notFound, badRequest } = require('../middleware/errors');
+const ledgerOn = async (req, res, next) => {
+  if (!(await require('../lib/orders').flagOf(req.shopId, ledger.FLAG))) return next(notFound('فرمانِ دفترِ دستگاه روشن نیست', 'erasure_ledger_off'));
+  next();
+};
+router.get('/ledger', requireShop, shopLimit, ledgerOn, requirePermission('data.delete.any'), async (req, res) => {
+  res.set('Cache-Control', 'no-store').json({ debtors: await ledger.pending(req.shopId) });
+});
+router.post('/ledger/applied', requireShop, shopLimit, ledgerOn, requirePermission('data.delete.any'), async (req, res) => {
+  const out = await ledger.applied(req.shopId, req.body);
+  if (!out) throw badRequest('فهرستِ پرونده‌ها درست نیست', 'bad_debtors');
+  res.set('Cache-Control', 'no-store').json(out);
+});
+
 module.exports = router;

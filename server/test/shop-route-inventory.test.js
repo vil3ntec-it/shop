@@ -193,7 +193,7 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
 
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat', 'shop.catalog',
   'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'pay.hesabpay',
-  'shop.storefront.zones', 'shop.storefront.notify_area', 'shop.staff_time', 'shop.staff_scope', 'shop.orders.amend', 'shop.purchase_orders', 'shop.order_risk'];
+  'shop.storefront.zones', 'shop.storefront.notify_area', 'shop.staff_time', 'shop.staff_scope', 'shop.orders.amend', 'shop.purchase_orders', 'shop.order_risk', 'shop.branches'];
 //  جمع‌آوری و بسته‌بندی (PCK) — درهای `/shop/orders/pick/…` و `/shop/orders/:id/pick…`
 FLAGS.push('shop.orders.picking');
 //  S56: وزنِ بیش از حد تا پاسخِ مشتری (`/shop/orders/:id/pick/weight-holds/decide`)
@@ -216,6 +216,8 @@ FLAGS.push('shop.orders.amend_paid');
 FLAGS.push('shop.customer_erasure');
 //  NTF-07/09: گزارشِ مشکلِ سفارش با عکس و نظرِ سفارش (`/shop/order-feedback/…`)
 FLAGS.push('shop.orders.issue_reports', 'shop.orders.reviews');
+//  RET-11: درخواست‌های برگشتِ ویترین (`/shop/order-returns/…`)
+FLAGS.push('shop.storefront.return_requests');
 //  RSK-08: پروندهٔ مدرکِ اختلافِ سفارش (`/shop/orders/evidence/…`)
 FLAGS.push('shop.orders.dispute_file');
 //  PRM-13: قاعدهٔ یکسانِ امتیازِ وفاداری (`/shop/loyalty`) — «ب» فقط ردیفِ دکانِ خودش را می‌نویسد
@@ -483,6 +485,18 @@ async function seedShop(a) {
     `INSERT INTO order_issue_photos (id, shop_id, issue_id, mime, size, width, height, hash, data, created_at)
      VALUES ($1,$2,$3,'image/jpeg',$4,320,240,$5,$6,$7)`,
     [ids.orderIssuePhoto, a.shopId, ids.orderIssue, issueJpeg.length, crypto.createHash('sha256').update(issueJpeg).digest('hex'), issueJpeg, now()]);
+  //  RET-11: یک درخواستِ برگشتِ «در انتظار» با یک عکس برای همین سفارشِ «الف» (ردیفِ واقعی، بی درِ مشتری)
+  ids.returnRequest = ulid(now());
+  await query(
+    `INSERT INTO order_return_requests (id, shop_id, order_id, reason, body, method, lines, request_key, request_hash, created_at, updated_at)
+     VALUES ($1,$2,$3,'damaged','پاره بود','drop_off','[{"lineNo":1,"qtyMilli":1000}]'::jsonb,$4,'h',$5,$5)`,
+    [ids.returnRequest, a.shopId, ids.pickPhotoOrder, fresh('return-key'), now()]);
+  ids.returnPhoto = ulid(now());
+  const returnJpeg = F.jpeg(320, 240, { seed: 47 });
+  await query(
+    `INSERT INTO order_return_request_photos (id, shop_id, request_id, mime, size, width, height, hash, data, created_at)
+     VALUES ($1,$2,$3,'image/jpeg',$4,320,240,$5,$6,$7)`,
+    [ids.returnPhoto, a.shopId, ids.returnRequest, returnJpeg.length, crypto.createHash('sha256').update(returnJpeg).digest('hex'), returnJpeg, now()]);
   ids.orderReview = ulid(now());
   await query(
     `INSERT INTO order_reviews (id, shop_id, order_id, stars, comment, request_hash, created_at)
@@ -571,6 +585,11 @@ async function seedShop(a) {
   ids.customRole = crl.body.role.id;
   const crlAssign = await h.put(`/api/shop/custom-roles/members/${ids.member}`, { roleId: ids.customRole }, { token: a.accessToken });
   assert.equal(crlAssign.status, 200, JSON.stringify(crlAssign.body));
+
+  //  شعبه درونِ دکان (فازِ ۱، `shop.branches`): شعبهٔ واقعیِ «الف»
+  const brn = await h.post('/api/shop/branches', { name: 'شعبهٔ الف' }, { token: a.accessToken });
+  assert.equal(brn.status, 201, JSON.stringify(brn.body));
+  ids.branch = brn.body.branch.id;
 
   //  قاعدهٔ تخفیف — شناسه را برنامه می‌سازد؛ کلیدِ فضای خودِ دکان
   ids.promoRule = 'inv-promo-a1';
@@ -677,6 +696,8 @@ function concreteFor(ids) {
     [/^(\/shop\/order-feedback\/issues\/):id(\/photos\/):photoId/, `${ids.orderIssue}$2${ids.orderIssuePhoto}`],
     [/^(\/shop\/order-feedback\/issues\/):id/, ids.orderIssue],
     [/^(\/shop\/order-feedback\/reviews\/):id/, ids.orderReview],
+    [/^(\/shop\/order-returns\/):id(\/photos\/):photoId/, `${ids.returnRequest}$2${ids.returnPhoto}`],
+    [/^(\/shop\/order-returns\/):id/, ids.returnRequest],
     [/(\/amendments\/):amendId/, ids.amend],
     [/(\/notices\/):noticeId/, ids.notice],
     [/^(\/shop\/orders\/risk\/lists\/):entryId/, ids.riskEntry],
@@ -704,6 +725,8 @@ function concreteFor(ids) {
     [/^(\/shop\/permissions\/roles\/):role/, 'staff'],
     [/^(\/shop\/permissions\/members\/):id/, ids.member],
     [/^(\/shop\/staff-scope\/members\/):id/, ids.member],
+    [/^(\/shop\/branches\/members\/):id/, ids.member],
+    [/^(\/shop\/branches\/):id/, ids.branch],
     [/^(\/shop\/till-pin\/members\/):id/, ids.member],
     [/^(\/shop\/devices\/):id/, ids.device],
     [/^(\/shop\/approver-keys\/):id/, ids.approverKey],
@@ -782,6 +805,8 @@ function bodyFor(r, ids) {
     'PATCH /shop/members/:id': { role: 'manager' },
     'PUT /shop/permissions/members/:id': { perms: {} },
     'PUT /shop/staff-scope/members/:id': { places: ['warehouse'] },
+    'PATCH /shop/branches/:id': { name: 'شعبهٔ دزدیده' },
+    'PUT /shop/branches/members/:id': { branches: [''] },
     'PUT /shop/till-pin/members/:id': { pin: '390471' },
     'POST /shop/till-pin/verify': { memberId: ids.member, pin: '390471' },
     'POST /shop/approval-requests/:id/approve': { note: 'تأییدِ ب' },
@@ -799,6 +824,8 @@ function bodyFor(r, ids) {
     'POST /shop/purchase-orders/:id/cancel': { reason: 'آزمون' },
     'POST /shop/order-feedback/issues/:id/resolve': { reply: 'پاسخِ ب' },
     'POST /shop/order-feedback/reviews/:id/moderate': { decision: 'approve' },
+    'POST /shop/order-returns/:id/reject': { note: 'ردِ ب' },
+    'POST /shop/order-returns/:id/complete': { returnDocId: `o-${ids.pickPhotoOrder}-rq-${ids.returnRequest}` },
     'POST /shop/orders/evidence/:id/disputes': { kind: 'damaged', reason: 'آزمونِ اختلاف', requestKey: fresh('dispute-open') },
     'POST /shop/orders/evidence/:id/disputes/notes': { text: 'یادداشت', requestKey: fresh('dispute-note') },
     'POST /shop/orders/evidence/:id/disputes/resolve': { outcome: 'settled', text: 'بسته شد', requestKey: fresh('dispute-res') },

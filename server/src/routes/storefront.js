@@ -162,6 +162,8 @@ async function featuresOf(shopId, sf) {
     ...((await require('../lib/store-account-history').flagOn(shopId)) ? { accountHistory: true } : {}),
     //  CHK-01/09، WEB-14: «حسابِ من» ِ وب (همان درهای `/:slug/account…`)؛ سبدِ حساب (`accountCart`) فقط با `shop.storefront.cart` هم
     ...((await orders.flagOf(shopId, WEB_ACCOUNT_FLAG)) ? { webAccount: true, ...((await cart.flagOn(shopId)) ? { accountCart: true } : {}) } : {}),
+    //  RET-11: «درخواست‌های برگشتِ من» در «سفارش‌های من» (`store/return-request.js` ِ دیربار از acct.js) با `shop.storefront.return_requests`
+    ...((await require('../lib/order-return-requests').flagOn(shopId)) ? { returnRequests: true } : {}),
     //  SEC-10: «حذفِ داده‌های من در این دکان» در «حسابِ من» ِ وب (`store/erase.js` ِ دیربار از acct.js) با `shop.customer_erasure`
     ...((await erasure.flagOn(shopId)) ? { erasure: true } : {}),
     //  گفت‌وگو با دکان (`store/chat.js` ِ دیربار، `/:slug/chat/…`) با پرچمِ `shop.chat`

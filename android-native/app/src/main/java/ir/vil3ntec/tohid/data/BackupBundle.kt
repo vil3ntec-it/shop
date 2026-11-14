@@ -34,6 +34,7 @@ import java.util.zip.ZipOutputStream
  *      photos/<شناسه>.jpg  ← عکسِ هر کالا
  *      settings.json       ← تنظیماتِ دکان (`ShopSettingsBundle`)
  *      bundle.json         ← OPS-02: نسخهٔ قالب و دکانِ صاحبِ دفتر (`BackupStamp`)؛ پشتیبانِ کهنه ندارد
+ *      pending-ops.json    ← S44: صفِ نرفتهٔ همگام‌سازی با شناسهٔ همگام‌سازیِ دستگاه (`LostDevicePending`)؛ صفِ خالی ⇒ نیست
  *
  *  چون `shop-data.json`ِ داخلش دقیقاً همان قالبِ قبلی است، هرکس ZIP را
  *  باز کند همان فایلِ آشنا را دارد و می‌تواند در نسخهٔ وب هم بازش کند.
@@ -52,7 +53,13 @@ object BackupBundle {
   private const val MAX_PHOTO_BYTES = 4L * 1024 * 1024
 
   /** @param stamp مُهرِ `bundle.json` (پشتیبانِ کهنه ⇒ `BackupStamp.LEGACY`) — `BackupRestore.open` با صاحبِ دفتر می‌سنجد */
-  data class Opened(val data: ShopData, val photos: Int, val stamp: BackupStamp.Stamp = BackupStamp.LEGACY)
+  data class Opened(
+    val data: ShopData,
+    val photos: Int,
+    val stamp: BackupStamp.Stamp = BackupStamp.LEGACY,
+    /** S44 (د۱۸): صفِ نرفتهٔ همگام‌سازیِ دستگاهِ صاحبِ پشتیبان (`LostDevicePending`)؛ پشتیبانِ کهنه ندارد */
+    val pending: LostDevicePending.Pending? = null,
+  )
 
   /* ------------------------------ نوشتن ------------------------------ */
 
@@ -94,6 +101,14 @@ object BackupBundle {
         val held = DeviceDocsBundle.held(context) ?: return@runCatching
         zip.putNextEntry(ZipEntry(DeviceDocsBundle.HELD_ENTRY))
         zip.write(held.toByteArray(Charsets.UTF_8))
+        zip.closeEntry()
+      }
+
+      //  S44 (د۱۸): صفِ نرفتهٔ همگام‌سازی (همان op_id و فیلدها) — بی آن کارِ آفلاینِ گوشیِ گم‌شده با هیچ بازیابی‌ای به دکان نمی‌رسید
+      runCatching {
+        val pending = LostDevicePendingAndroid.of(context) ?: return@runCatching
+        zip.putNextEntry(ZipEntry(LostDevicePending.ENTRY))
+        zip.write(pending.toByteArray(Charsets.UTF_8))
         zip.closeEntry()
       }
 
@@ -154,6 +169,7 @@ object BackupBundle {
     var photos = 0
     var entries = 0
     var stamp = BackupStamp.LEGACY
+    var pending: LostDevicePending.Pending? = null
     val tap = BackupStampIo.Tap(head)
 
     /*
@@ -170,6 +186,10 @@ object BackupBundle {
           val name = entry.name
           when {
             !entry.isDirectory && name == BackupStamp.ENTRY -> stamp = BackupStampIo.read(zip)
+
+            //  S44 (د۱۸): فقط خوانده می‌شود؛ بازیابیِ دفتر هرگز op نمی‌سازد — فرستادنش کارِ جدای صاحب است
+            !entry.isDirectory && name == LostDevicePending.ENTRY ->
+              pending = LostDevicePending.parse(zip.readBytes().toString(Charsets.UTF_8))
 
             !entry.isDirectory && name.endsWith(LEDGER_ENTRY) && !name.contains(PHOTO_DIR) ->
               ledger = zip.readBytes().toString(Charsets.UTF_8)
@@ -225,7 +245,7 @@ object BackupBundle {
     if (stamp.formatVersion > BackupStamp.FORMAT_VERSION) error(StrBackupSafety.newerApp)
 
     val text = ledger ?: error(StrAppData.notOurBackup)
-    Opened(parse(text).getOrThrow(), photos, stamp)
+    Opened(parse(text).getOrThrow(), photos, stamp, pending)
   }
 
   /**

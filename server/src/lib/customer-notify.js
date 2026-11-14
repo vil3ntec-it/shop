@@ -78,8 +78,11 @@ const MATRIX = Object.freeze({
 });
 const EVENTS = Object.freeze(Object.keys(MATRIX));
 const REFUND_EVENT = 'order_refund';
-/** رویدادِ ردیف برای بیرون: پیامِ بازپرداخت (ستونِ `refund_id`) همیشه `order_refund`، بی شناسهٔ دفتر */
-const eventOf = (row) => (row && row.refund_id ? REFUND_EVENT : row && row.event);
+/** RET-11: پیام‌های درخواستِ برگشت (ستونِ `return_request_id`، مهاجرتِ ۸۶۶) — رویدادِ ردیف `<رویداد>:<درخواست>` */
+const RETURN_EVENTS = Object.freeze(['order_return_accepted', 'order_return_rejected', 'order_return_completed']);
+/** رویدادِ ردیف برای بیرون: پیامِ بازپرداخت (ستونِ `refund_id`) همیشه `order_refund`، بی شناسهٔ دفتر؛ برگشت بی شناسهٔ درخواست */
+const eventOf = (row) => (row && row.refund_id ? REFUND_EVENT
+  : row && row.return_request_id ? String(row.event).split(':')[0] : row && row.event);
 
 /**
  * NTF-10: رویدادِ سیستمیِ بی گذارِ وضعیت (نه در `EVENT_OF`/`MATRIX`) — کانال‌ها و قالبِ خودش. فقط کانال‌های رایگان
@@ -100,6 +103,35 @@ const EXTRA = Object.freeze({
       fa: 'بازپرداختِ {amount} برای سفارشِ شمارهٔ {no} در «{shop}» ثبت شد؛ جزئیات در صفحهٔ پیگیریِ سفارش است.',
       ps: 'د «{shop}» د فرمایش شمېره {no} لپاره د {amount} بېرته ورکړه ثبت شوه؛ جزئیات د فرمایش د تعقیب په پاڼه کې دي.',
       en: 'A refund of {amount} for order #{no} at {shop} was recorded. Details are on your order page.',
+    }),
+  }),
+  //  RET-11: تصمیمِ دکان دربارهٔ درخواستِ برگشتِ مشتری (`order-return-requests-shop`) — یک پیام برای هر تصمیمِ هر درخواست؛
+  //  فوری نیست ⇒ فقط کانال‌های رایگان؛ بی دلیل و اقلام (همان صفحهٔ پیگیری با همین پرچم نشانشان می‌دهد)
+  order_return_accepted: Object.freeze({
+    channels: FREE,
+    flag: 'shop.storefront.return_requests',
+    text: Object.freeze({
+      fa: '«{shop}» درخواستِ برگشتِ سفارشِ شمارهٔ {no} را پذیرفت؛ جزئیات در صفحهٔ پیگیریِ سفارش است.',
+      ps: '«{shop}» د فرمایش شمېره {no} د بېرته ورکولو غوښتنه ومنله؛ جزئیات د فرمایش د تعقیب په پاڼه کې دي.',
+      en: '{shop} accepted the return request for order #{no}. Details are on your order page.',
+    }),
+  }),
+  order_return_rejected: Object.freeze({
+    channels: FREE,
+    flag: 'shop.storefront.return_requests',
+    text: Object.freeze({
+      fa: '«{shop}» درخواستِ برگشتِ سفارشِ شمارهٔ {no} را نپذیرفت؛ دلیل در صفحهٔ پیگیریِ سفارش است.',
+      ps: '«{shop}» د فرمایش شمېره {no} د بېرته ورکولو غوښتنه ونه منله؛ دلیل د فرمایش د تعقیب په پاڼه کې دی.',
+      en: '{shop} declined the return request for order #{no}. The reason is on your order page.',
+    }),
+  }),
+  order_return_completed: Object.freeze({
+    channels: FREE,
+    flag: 'shop.storefront.return_requests',
+    text: Object.freeze({
+      fa: 'برگشتِ سفارشِ شمارهٔ {no} در «{shop}» ثبت شد؛ جزئیات در صفحهٔ پیگیریِ سفارش است.',
+      ps: 'په «{shop}» کې د فرمایش شمېره {no} بېرته ورکول ثبت شول؛ جزئیات د فرمایش د تعقیب په پاڼه کې دي.',
+      en: 'The return for order #{no} at {shop} was recorded. Details are on your order page.',
     }),
   }),
   order_late_apology: Object.freeze({
@@ -239,7 +271,7 @@ async function onStatusIn(run, { shopId, order, to, at = now() }) {
  */
 async function onExtraIn(run, { shopId, order, event, at = now() }) {
   //  پیامِ بازپرداخت فقط از `onRefundIn` (به ردیفِ دفتر بسته است)
-  if (!EXTRA[event] || event === REFUND_EVENT || !order || order.source !== 'storefront' || order.is_test === true || !order.customer_phone) return null;
+  if (!EXTRA[event] || event === REFUND_EVENT || RETURN_EVENTS.includes(event) || !order || order.source !== 'storefront' || order.is_test === true || !order.customer_phone) return null;
   if (!(await flagIn(run, shopId))) return null;
   const r = await run(
     `INSERT INTO customer_notify_outbox (id, shop_id, order_id, event, lang, phone_key, status,
@@ -277,6 +309,27 @@ async function onRefundIn(run, { shopId, order, refundId, at = now() }) {
        FROM online_order_refunds f WHERE f.id=$2 AND f.order_id=$3 AND f.shop_id=$4
      ON CONFLICT (order_id, event) DO NOTHING RETURNING id`,
     [ulid(at), String(refundId), order.id, shopId, langOf(order.customer_lang) || 'fa', phoneKey(order.customer_phone), at]
+  );
+  if (!r.rows[0]) return null;
+  soon();
+  return r.rows[0].id;
+}
+
+/**
+ * RET-11: تصمیمِ دکان دربارهٔ یک درخواستِ برگشت ⇒ یک پیام، درونِ همان تراکنشِ گذار. رویدادِ ردیف `<kind>:<درخواست>` و
+ * یکتاییِ (order_id, event) ِ ۱۴۳ ⇒ هر تصمیمِ هر درخواست حداکثر یک بار؛ FK ِ ۸۶۶ ⇒ فقط درخواستِ همان سفارش.
+ * @returns {Promise<string|null>} شناسهٔ ردیف (تکرار، پرچمِ خاموش یا سفارشِ نامشمول ⇒ null)
+ */
+async function onReturnIn(run, { shopId, order, requestId, kind, at = now() }) {
+  if (!RETURN_EVENTS.includes(kind) || !requestId || !order || order.source !== 'storefront' || order.is_test === true || !order.customer_phone) return null;
+  if (!(await flagIn(run, shopId)) || !(await require('./orders').flagOf(shopId, EXTRA[kind].flag, run))) return null;
+  const r = await run(
+    `INSERT INTO customer_notify_outbox (id, shop_id, order_id, event, return_request_id, lang, phone_key, status,
+                                          next_attempt_at, created_at, updated_at)
+     SELECT $1, q.shop_id, q.order_id, $5::text || ':' || q.id, q.id, $6, $7, 'pending', $8, $8, $8
+       FROM order_return_requests q WHERE q.id=$2 AND q.order_id=$3 AND q.shop_id=$4
+     ON CONFLICT (order_id, event) DO NOTHING RETURNING id`,
+    [ulid(at), String(requestId), order.id, shopId, kind, langOf(order.customer_lang) || 'fa', phoneKey(order.customer_phone), at]
   );
   if (!r.rows[0]) return null;
   soon();
@@ -639,7 +692,7 @@ async function forOrder(shopId, orderId) {
 
 module.exports = {
   FLAG_KEY, CHANNELS, LANGS, EVENT_OF, MATRIX, EVENTS, TEMPLATES, MAX_ATTEMPTS, PER_HOUR, PER_DAY, MAX_AGE_MS,
-  EXTRA, REFUND_EVENT, eventOf, onExtraIn, onRefundIn, refundOn, flagOf, onStatusIn, onCreatedIn, setProviders, channelState,
+  EXTRA, REFUND_EVENT, RETURN_EVENTS, eventOf, onExtraIn, onRefundIn, onReturnIn, refundOn, flagOf, onStatusIn, onCreatedIn, setProviders, channelState,
   render, linkFor, phoneKey,
   tick, start, stop, soon, forOrder, shape, providerOf, callProvider, spentToday, cleanName, catchUp,
 };

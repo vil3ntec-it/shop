@@ -98,6 +98,8 @@ async function setup({ subscriptionDays = 120 } = {}) {
   return {
     api, shopId: owner.shopId, ownerEmail: owner.email, staffCode: inv.code, publicKey: pk.publicKey,
     owner: dev(A), staff: dev(B, { deviceKey: B.staffKey }),
+    //  S76 (د۱۸): سوکتِ زندهٔ واقعی مستقیم به سرور — پراکسیِ «شبکهٔ دکان» فقط HTTP است (upgrade ندارد)
+    direct: E.apiBase,
   };
 }
 

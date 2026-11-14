@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.core.pos
 
+import ir.vil3ntec.tohid.core.product.UnitSale
+
 /**
  *  قیمتِ ردیفِ صندوق — تخفیفِ ردیف (POS-20)، «قاعدهٔ جهت»ِ تغییرِ قیمت (POS-08)، سقفِ
  *  قلمِ آزاد (POS-10) و پایهٔ سنجشِ سقفِ تخفیفِ نقش (POS-21) — بخشِ ۶.۱ِ مشخصات.
@@ -232,6 +234,20 @@ object LinePricing {
     val problem = priceProblem ?: checkDiscount(p, discount)
     val net = if (discount > 0) unitForNet(gross - discount, qtyMilli) else null
     return Edit(problem, gross, discount, net)
+  }
+
+  /**
+   *  S45 — تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۳ (#۲۱): قیمتِ فهرستی که قاعدهٔ جهت و «کاهش» ِ ردیف ([checkPrice]، [edit]) با آن
+   *  سنجیده می‌شوند. بسته/کارتنِ انتخاب‌شده با قیمتِ جدا در لیستِ قیمت ([selected] با `priceMinor`) ⇒ **قیمتِ همان بسته**
+   *  برای هر واحدِ پایه (گردِ نیمه رو به بالا، همان `SaleCaps.refUnits` ِ سرور)؛ بی انتخاب، واحدِ پایه یا واحدِ بی قیمتِ جدا
+   *  ⇒ قیمتِ کالا ([baseMinor]). مثال: پایه ۱۰۰، بسته ۸۰، «فقط پایین» ⇒ ۹۵ برای بسته بالا رفتن است و تأییدِ مدیر می‌خواهد.
+   *  هر دو صندوق (برگهٔ ردیفِ گوشیِ نسخهٔ ۳ و کادرِ ردیفِ کامپیوتر) از همین‌جا می‌خوانند (`LinePolicy.listMinor`).
+   *  عددِ بی‌معنا (اندازهٔ صفر، بیرون از بازهٔ امن) ⇒ همان قیمتِ کالا، نه قاعدهٔ باز.
+   */
+  fun ruleListMinor(baseMinor: Long, selected: UnitSale.Unit?): Long {
+    val pack = selected?.priceMinor ?: return baseMinor
+    if (selected.sizeMilli <= 0 || pack < 0 || pack > MAX_EXACT / 1000) return baseMinor
+    return runCatching { mulDivHalfUp(pack, 1000, selected.sizeMilli) }.getOrDefault(baseMinor)
   }
 
   /** قلمِ آزاد با قیمتِ واحدِ [unitMinor] پذیرفته است؟ `null` یعنی بله */

@@ -234,11 +234,20 @@ object LineModel {
    *  همان قیمت برمی‌دارد. سیاستِ خاموش (پیش‌فرض) ⇒ بی رد، همان برگهٔ پیشین. تخفیفِ ردیف در برگهٔ گوشی نیست.
    */
   fun check(policy: LinePricing.Policy, form: LineForm, info: LineInfo, start: LineForm, grant: PriceApproval.Grant? = null, canAsk: Boolean = false): LinePolicy.Checked =
-    LinePolicy.checked(policy, info.free, info.basePrice, info.unitPrice ?: info.basePrice, typedPrice(form, info, start), quantity(form, info), true, "", grant, canAsk)
+    LinePolicy.checked(
+      policy, info.free, info.basePrice, info.unitPrice ?: info.basePrice, typedPrice(form, info, start), quantity(form, info), true, "", grant, canAsk,
+      rulePack(form, info),
+    )
 
-  /** S45 — تأییدِ مدیر برای قیمتِ نوشته‌شده (همان `Grant` ِ `CartLineDialog`) */
-  fun grantOf(code: String, by: String, role: String, reason: String, requester: String, info: LineInfo, price: Double): PriceApproval.Grant =
-    PriceApproval.Grant(code, by, role, reason, requester, DiscountGate.minor(info.basePrice), DiscountGate.minor(price))
+  /** S45 (تصمیمِ ۱۴۰۵/۰۸/۲۳ #۲۱) — واحدِ انتخاب‌شدهٔ برگه که قاعده با قیمتِ آن سنجیده می‌شود (`LinePricing.ruleListMinor`)؛ بی `units` ⇒ `null` */
+  fun rulePack(form: LineForm, info: LineInfo): UnitSale.Unit? = info.units?.takeIf { !info.free }?.let { unitOf(it, form.unitAt) }
+
+  /** S45 — قیمتِ فهرستِ قاعده (افغانی): قیمتِ بستهٔ انتخاب‌شده اگر قیمتِ جدا دارد، وگرنه قیمتِ کالا — برای برگهٔ تأیید */
+  fun ruleList(form: LineForm, info: LineInfo): Double = LinePolicy.listMinor(info.basePrice, rulePack(form, info)) / 100.0
+
+  /** S45 — تأییدِ مدیر برای قیمتِ نوشته‌شده (همان `Grant` ِ `CartLineDialog`)؛ [form] ⇒ «از» = قیمتِ بستهٔ انتخاب‌شده ([ruleList]) */
+  fun grantOf(code: String, by: String, role: String, reason: String, requester: String, info: LineInfo, price: Double, form: LineForm? = null): PriceApproval.Grant =
+    PriceApproval.Grant(code, by, role, reason, requester, LinePolicy.listMinor(info.basePrice, form?.let { rulePack(it, info) }), DiscountGate.minor(price))
 
   /**
    *  سبدِ تازه پس از «ثبت». S45: ردِ قاعدهٔ «قیمت و تخفیفِ ردیف» ([policy]) بی تأییدِ همان قیمت ([grant]) ⇒ سبد دست نمی‌خورد —

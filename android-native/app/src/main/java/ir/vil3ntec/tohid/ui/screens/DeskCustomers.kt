@@ -788,11 +788,11 @@ internal fun HeadRow(cols: List<Pair<String, Dp>>) {
 
 @Composable
 private fun NewCustomerRow(store: ShopStore, d: ShopData, toast: (String) -> Unit, onAdded: (String) -> Unit) {
-  val scope = rememberCoroutineScope()
+  val scope = rememberCoroutineScope(); val limitRules = ir.vil3ntec.tohid.ui.components.rememberCreditLimitRules() // CRM-03 #۲۵
   var name by remember { mutableStateOf("") }
   var phone by remember { mutableStateOf("") }
   fun save() {
-    when (val r = DebtorEngine.add(d, DebtorEngine.DebtorDraft(name = name, phone = phone), System.currentTimeMillis(), ::newId)) {
+    when (val r = DebtorEngine.add(d, ir.vil3ntec.tohid.data.CreditLimitGate.quickDraft(limitRules, DebtorEngine.DebtorDraft(name = name, phone = phone)), System.currentTimeMillis(), ::newId)) {
       is DebtorEngine.Result.Failed -> toast(r.message)
       is DebtorEngine.Result.Ok -> { scope.launch { store.save(d, r.data) }; onAdded(r.id); name = ""; phone = "" }
     }

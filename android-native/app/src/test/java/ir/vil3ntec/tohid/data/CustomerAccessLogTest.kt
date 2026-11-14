@@ -129,7 +129,8 @@ class CustomerAccessLogTest {
     val body = panel.indexOf("val body = CustomerAccess.noteBody(customerId, kind) ?: return@runCatching false")
     val ready = panel.indexOf("if (!Backend.isReady(context)) return@runCatching false")
     val post = panel.indexOf("Backend.api(context).post(CustomerAccess.PATH, body)")
-    val done = panel.indexOf("return@runCatching true", post)
+    //  CRM-15 (د۱۸): پس از post، شکستِ دوباره‌پذیر ⇒ صفِ دستگاه (`CustomerAccessOutboxAndroid`)؛ هنوز پیش از دفتر
+    val done = panel.indexOf("CustomerAccessOutboxAndroid.add(", post)
     val ledger = panel.indexOf("store.update { d -> CustomerAccessLog.record(")
     assertTrue("حالتِ آموزشی پیش از هر راهی", training in 0 until branch)
     assertTrue("شاخهٔ حسابدار پیش از دفتر و با بازگشت", branch < body && body < ready && ready < post && post < done && done < ledger)

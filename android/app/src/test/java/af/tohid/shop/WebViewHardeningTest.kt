@@ -61,7 +61,7 @@ class WebViewHardeningTest {
         assertTrue(debug.contains("""cleartextTrafficPermitted="true""""))
     }
 
-    @Test fun `صفحه به http نیاز ندارد: CSP ِ connect-src فقط https و wss و self است`() {
+    @Test fun `صفحه به http نیاز ندارد — CSP ِ connect-src فقط https و wss و self است`() {
         val html = listOf("../../index.html", "../index.html", "index.html").map { File(it) }.firstOrNull { it.isFile }?.readText()
             ?: error("index.html پیدا نشد (cwd=${File(".").absoluteFile})")
         val csp = Regex("""http-equiv="Content-Security-Policy"\s+content="([^"]+)"""").find(html)?.groupValues?.get(1)

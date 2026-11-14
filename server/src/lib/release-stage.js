@@ -15,11 +15,20 @@
  *   • مقدارِ ناجور (نسخهٔ بد، درصدِ بیرون از بازه، شکلِ دیگر) ⇒ **مرحله‌ای نیست** (fail-closed):
  *     دستگاه همان برچسبِ روان را می‌گیرد، هرگز نسخه‌ای که مدیر نخواسته.
  *
+ *   اختیاری (۱۴۰۵/۰۸/۲۳، OA §۹د):
+ *   • `shops`: فهرستِ شناسهٔ دکان (حداکثر MAX_SHOPS) — «اول چند دکانِ مشخص»: هر دستگاهِ این دکان‌ها
+ *     درونِ مرحله است، هر درصدی که باشد (درصدِ ۰ + فهرست = فقط همین دکان‌ها).
+ *   • `since`: لحظهٔ شروعِ همین نسخه (پنل می‌گذارد؛ نگهبانِ ایست خطاها را از همین لحظه می‌شمارد).
+ *   • `halted`: `{at, reason, by}` — ایست (دستی یا نگهبانِ خودکارِ `release-stage-guard.js`): **هیچ**
+ *     دستگاهی تازه نمی‌گیرد، نه فهرست و نه درصد؛ همه برچسبِ روان (= نسخهٔ پایدارِ پیشین). دانلودِ
+ *     نیمه‌کاره ادامه دارد. فقط تصمیمِ تازهٔ مدیر (`PUT` ِ پنل) برش می‌دارد.
+ *   هر کدام ناجور ⇒ کلِ مرحله ناجور (fail-closed) ⇒ برچسبِ روان برای همه.
+ *
  * ── کدام دستگاه ─────────────────────────────────────────────────────
  *   سطل = SHA-256(`<برچسب>|<نسخه>|<دستگاه>`)، ۴ بایتِ اول، پیمانهٔ ۱۰۰. پایدار برای یک دستگاه
  *   در یک نسخه (بالا بردنِ درصد کسی را بیرون نمی‌اندازد)، و با هر نسخه از نو (همیشه همان
- *   دستگاه‌ها پیش‌قراول نیستند). بی شناسهٔ دستگاه ⇒ بیرون.
- *   ⛔ شناسهٔ دستگاه راز نیست: بدترین جعل، گرفتنِ زودترِ همان نصبیِ امضاشده است.
+ *   دستگاه‌ها پیش‌قراول نیستند). بی شناسهٔ دستگاه ⇒ بیرون (مگر دکانش در `shops` باشد).
+ *   ⛔ شناسهٔ دستگاه و دکان راز نیست: بدترین جعل، گرفتنِ زودترِ همان نصبیِ امضاشده است.
  *
  * فقط منطق؛ خواندنِ پیکربندی و پاسخ در `routes/releases.js`.
  */
@@ -28,6 +37,8 @@ const crypto = require('crypto');
 const KEY_PREFIX = 'stage.';
 const VERSION = /^\d{1,6}(\.\d{1,6}){1,3}$/;
 const ID = /^[A-Za-z0-9_-]{1,80}$/;
+/** سقفِ فهرستِ دکان‌های یک مرحله — مقدارِ `live_config` حداکثر ۴۰۹۶ نویسه است */
+const MAX_SHOPS = 50;
 
 /** `tohid-native` + `2.14.5` ⇒ `tohid-native-v2.14.5` */
 function versionedTag(base, version) {
@@ -56,7 +67,27 @@ function parseStage(value) {
   if (!VERSION.test(version)) return null;
   const percent = v.percent;
   if (!Number.isInteger(percent) || percent < 0 || percent > 100) return null;
-  return { version, percent };
+  const out = { version, percent };
+  if (v.shops !== undefined) {
+    const shops = v.shops;
+    if (!Array.isArray(shops) || shops.length > MAX_SHOPS || !shops.every((x) => typeof x === 'string' && ID.test(x))) return null;
+    if (shops.length) out.shops = [...new Set(shops)];
+  }
+  if (v.since !== undefined) {
+    if (!Number.isSafeInteger(v.since) || v.since <= 0) return null;
+    out.since = v.since;
+  }
+  if (v.halted !== undefined && v.halted !== null) {
+    const h = v.halted;
+    if (typeof h !== 'object' || Array.isArray(h) || !Number.isSafeInteger(h.at) || h.at <= 0) return null;
+    out.halted = { at: h.at, reason: String(h.reason ?? '').slice(0, 300), by: String(h.by ?? '').slice(0, 80) };
+  }
+  return out;
+}
+
+/** مرحله هنوز به کسی نسخهٔ تازه می‌دهد؟ (نایستاده و درصد یا فهرست دارد) */
+function isActive(stage) {
+  return !!stage && !stage.halted && (stage.percent > 0 || (stage.shops || []).length > 0);
 }
 
 /** سطلِ ۰ تا ۹۹ ِ یک دستگاه برای یک نسخه */
@@ -65,10 +96,13 @@ function bucketOf(base, version, device) {
   return h.readUInt32BE(0) % 100;
 }
 
-/** این دستگاه در مرحلهٔ جاریِ این برچسب هست؟ */
-function inStage(stage, base, device) {
+/** این دستگاه (از این دکان) در مرحلهٔ جاریِ این برچسب هست؟ ایستاده ⇒ هیچ‌کس. */
+function inStage(stage, base, device, shop = '') {
+  if (!stage || stage.halted) return false;
+  const s = String(shop || '');
+  if (stage.shops && ID.test(s) && stage.shops.includes(s)) return true;
   const d = String(device || '');
-  if (!stage || stage.percent <= 0 || !ID.test(d)) return false;
+  if (stage.percent <= 0 || !ID.test(d)) return false;
   return bucketOf(base, stage.version, d) < stage.percent;
 }
 
@@ -86,4 +120,4 @@ function stagesOf(items, bases) {
   return out;
 }
 
-module.exports = { KEY_PREFIX, VERSION, versionedTag, parseVersionedTag, parseStage, bucketOf, inStage, stagesOf };
+module.exports = { KEY_PREFIX, VERSION, ID, MAX_SHOPS, versionedTag, parseVersionedTag, parseStage, isActive, bucketOf, inStage, stagesOf };

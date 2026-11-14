@@ -120,6 +120,10 @@
             mine();
           } });
         }, function () {});
+        //  RET-11: «درخواست‌های برگشتِ من» (return-request.js ِ دیربار) فقط با `features.returnRequests`
+        if (ctx.store.features && ctx.store.features.returnRequests) {
+          K.js('/store/return-request.js').then(function () { window.StoreReturns({ api: api }).mine(box); }, function () {});
+        }
         //  SEC-10: «پاک کردنِ داده‌های من در این دکان» (erase.js ِ دیربار) فقط با `features.erasure`
         if (ctx.store.features && ctx.store.features.erasure) {
           K.js('/store/erase.js').then(function () { window.StoreErase({ api: api, slug: ctx.slug, phone: s.phone, into: box }); }, function () {});

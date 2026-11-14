@@ -24,6 +24,10 @@ const { closeDb } = require('../src/db');
 backup.restore(file)
   .then(async (out) => {
     console.log(`بازیابی انجام شد (${Math.round(out.bytes / 1024)} کیلوبایت SQL).`);
+    //  SEC-10: مشتری‌هایی که پس از این پشتیبان پاک شده بودند دوباره پاک شدند (فقط شمار)
+    const er = out.erasures;
+    if (er && er.error) console.error(`⚠️ پاک کردنِ دوبارهٔ مشتری‌های پاک‌شده نشد (${er.error}) — بالا آمدنِ سرور دوباره می‌کوشد.`);
+    else if (er && (er.replayed || er.empty || er.failed)) console.log(`مشتری‌های پاک‌شده پس از این پشتیبان: ${er.replayed} دوباره پاک شد${er.failed ? `، ${er.failed} ناموفق (بالا آمدنِ سرور دوباره می‌کوشد)` : ''}.`);
     //  F0-28: پشتیبانِ مهرشده — فقط نام، شمار و kid؛ هرگز مقدار
     const sec = out.secrets;
     if (sec && sec.unsealed && !sec.rejected) console.log(`${sec.unsealed} رازِ مهرشده با BACKUP_SECRETS_KEY باز شد${sec.conflicts?.length ? ` (روی‌نویسی‌نشده: ${sec.conflicts.join('، ')})` : ''}.`);

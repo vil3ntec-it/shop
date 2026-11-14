@@ -448,6 +448,11 @@ object PayFlow {
       if (t.type != "receive" || !CashShift.isCashReceipt(t) || !counts(t.shiftId, t.createdAt) || minor(t.amount) <= 0) return@forEach
       ev += 0 to ShiftEventInput(id = "rcv:${t.id}", type = "receipt", at = t.createdAt, method = CASH, amount = minor(t.amount))
     }
+    //  S89: رسیدِ نقدیِ معکوس‌شده در لحظهٔ ردیفِ معکوس از همین دخل بیرون می‌رود — همان `CashShift.totals` (هسته رسیدِ منفی ندارد ⇒ «پولِ پس»)
+    DebtReverse.cashBack(d.transactions).forEach { t ->
+      if (!counts(t.shiftId, t.createdAt) || minor(t.amount) <= 0) return@forEach
+      ev += 2 to ShiftEventInput(id = "rvs:${t.id}", type = "refund", at = t.createdAt, rows = listOf(ShiftRow(CASH, minor(t.amount))))
+    }
     //  PAY-24/PRM-14: فروش و شارژِ کارتِ هدیه نقد به دخل می‌آورند — همان `CashShift.totals`
     if (own == null) GiftCards.cashRows(d, from, to).forEach { a ->
       ev += 0 to ShiftEventInput(id = "gci:${a.id}", type = "receipt", at = a.createdAt, method = CASH, amount = minor(a.amount))

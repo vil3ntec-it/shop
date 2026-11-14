@@ -1335,6 +1335,55 @@
      }
     }
    ]
+  },
+  "reversal": {
+   "debtors": [
+    {
+     "id": "d1",
+     "name": "احمد"
+    }
+   ],
+   "transactions": [
+    {
+     "id": "g1",
+     "debtorId": "d1",
+     "type": "give",
+     "amount": 400,
+     "date": "2026-10-01"
+    },
+    {
+     "id": "r1-rv",
+     "debtorId": "d1",
+     "type": "give",
+     "amount": 400,
+     "date": "2026-10-12",
+     "refId": "r1",
+     "kind": "reversal"
+    },
+    {
+     "id": "g2",
+     "debtorId": "d1",
+     "type": "give",
+     "amount": 600,
+     "date": "2026-10-05"
+    },
+    {
+     "id": "r1",
+     "debtorId": "d1",
+     "type": "receive",
+     "amount": 400,
+     "date": "2026-10-08"
+    },
+    {
+     "id": "x1",
+     "debtorId": "d1",
+     "type": "give",
+     "amount": 100,
+     "date": "2026-10-13",
+     "refId": "g2",
+     "kind": "reversal"
+    }
+   ]
   }
  },
  "cases": [
@@ -5533,6 +5582,66 @@
     "from": "2026-10-01",
     "to": "2026-10-09",
     "costing": "mavg"
+   }
+  },
+  {
+   "name": "S89 — سنِ بدهی با سندِ معکوس: جفتِ «اصل + معکوس» بیرون (همان حذفِ امروز)؛ معکوسِ ناجور ردیفِ عادی",
+   "id": "RPT-06",
+   "fn": "debts",
+   "ledger": "reversal",
+   "opts": {
+    "asOf": "2026-10-14"
+   },
+   "expect": {
+    "asOf": "2026-10-14",
+    "buckets": [
+     30,
+     60,
+     90
+    ],
+    "customers": {
+     "rows": [
+      {
+       "id": "d1",
+       "name": "احمد",
+       "balance": 110000,
+       "open": 110000,
+       "credit": 0,
+       "buckets": [
+        110000,
+        0,
+        0,
+        0
+       ],
+       "oldestDays": 13
+      }
+     ],
+     "totals": {
+      "balance": 110000,
+      "open": 110000,
+      "credit": 0,
+      "buckets": [
+       110000,
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    "suppliers": {
+     "rows": [],
+     "totals": {
+      "balance": 0,
+      "open": 0,
+      "credit": 0,
+      "buckets": [
+       0,
+       0,
+       0,
+       0
+      ]
+     }
+    }
    }
   }
  ],

@@ -23,7 +23,9 @@ import ir.vil3ntec.tohid.core.i18n.StrSalePages
 import ir.vil3ntec.tohid.core.i18n.StrTill
 import ir.vil3ntec.tohid.core.pos.LinePricing
 import ir.vil3ntec.tohid.core.pos.PriceApproval
+import ir.vil3ntec.tohid.core.product.UnitSale
 import ir.vil3ntec.tohid.data.PriceAsk
+import ir.vil3ntec.tohid.data.UnitLine
 import ir.vil3ntec.tohid.ui.screens.CartLineDialog
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
@@ -101,5 +103,46 @@ class ScenarioS45DeskUiTest {
     assertEquals("مشتریِ همیشگی", g.reason)
     assertEquals(10_000L, g.listMinor)
     assertEquals(8_000L, g.priceMinor)
+  }
+
+  /**
+   *  تصمیمِ ۱۴۰۵/۰۸/۲۳ (#۲۱): با کارتنِ انتخاب‌شده که قیمتِ جدا دارد (پایه ۱۰۰، کارتن ۹۶۰ = ۸۰ برای هر دانه) «فقط پایین»
+   *  با قیمتِ همان کارتن سنجیده می‌شود ⇒ ۹۵ بالا رفتن است، پیامِ رد و «درخواستِ تأیید»؛ تأیید «از ۸۰» را در سابقه می‌نویسد.
+   */
+  @Test fun downOnlyIsMeasuredFromTheSelectedCartonPrice() {
+    val plan = UnitLine.Plan(
+      listOf(UnitSale.Unit("دانه", 1_000), UnitSale.Unit("کارتن", 12_000, 96_000)), wholeOnly = false, startAt = 1, startCount = 1.0, packPriced = true,
+    )
+    rule.setContent {
+      CompositionLocalProvider(LocalContext provides DesktopContext) {
+        TohidTheme(ThemeChoice.LIGHT) {
+          CartLineDialog(
+            name = "روغن", unit = "دانه", quantity = 12.0, unitPrice = 80.0, basePrice = 100.0, custom = true,
+            onDismiss = {}, onConfirm = { _, price -> confirmed += price },
+            linePolicy = LinePricing.Policy(on = true, exempt = false, direction = LinePricing.Direction.DOWN, mayReduce = true),
+            units = plan,
+            priceAsk = PriceAsk("manager", "مدیر", "u-manager") { granted += it },
+          )
+        }
+      }
+    }
+    rule.onAllNodes(isToggleable())[0].performSemanticsAction(SemanticsActions.OnClick)
+    rule.waitForIdle()
+    type(StrSale.unitPrice, "95")
+    rule.waitUntil(10_000) { has(StrLine.priceUpBlocked) }
+    assertTrue("ردِ قاعدهٔ جهت با قیمتِ کارتن «درخواستِ تأیید» دارد", has(StrTill.askApproval))
+
+    tap(StrTill.askApproval)
+    rule.waitUntil(10_000) { has(StrTill.priceTitle) }
+    type(StrPos.reasonKept, "کارتنِ آخر")
+    tap(StrPos.creditApproveSelf)
+    rule.waitUntil(10_000) { has(StrTill.approvedBy("مدیر")) }
+    tap(StrSalePages.record)
+    rule.waitUntil(10_000) { confirmed.isNotEmpty() }
+    assertEquals(95.0, confirmed.single()!!, 0.0)
+    val g = granted.single()
+    assertEquals(LinePricing.PRICE_UP_BLOCKED, g.code)
+    assertEquals("سابقه «از قیمتِ کارتن»", 8_000L, g.listMinor)
+    assertEquals(9_500L, g.priceMinor)
   }
 }

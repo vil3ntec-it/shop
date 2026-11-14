@@ -3,7 +3,7 @@
   "generator": "node tools/api-contract/generate.cjs (--check)",
   "source": "docs/api/routes.json",
   "superadmin": "فقط نگهبانِ نام‌دارِ requireSuperAdmin روی همان در؛ سنجشِ نقشِ درونِ گرداننده (و lib/admin-roles.js) این‌جا دیده نمی‌شود",
-  "routesHash": "51f704e0e9f0f5f9",
+  "routesHash": "3fb12709953884b6",
   "routes": [
     {"method":"GET","path":"/api/admin/2fa","superadmin":false},
     {"method":"POST","path":"/api/admin/2fa/disable","superadmin":false},
@@ -194,6 +194,9 @@
     {"method":"DELETE","path":"/api/admin/release/stage","superadmin":true},
     {"method":"GET","path":"/api/admin/release/stage","superadmin":true},
     {"method":"PUT","path":"/api/admin/release/stage","superadmin":true},
+    {"method":"GET","path":"/api/admin/release/stage/guard","superadmin":true},
+    {"method":"PUT","path":"/api/admin/release/stage/guard","superadmin":true},
+    {"method":"POST","path":"/api/admin/release/stage/guard/check","superadmin":true},
     {"method":"GET","path":"/api/admin/reps","superadmin":false},
     {"method":"POST","path":"/api/admin/reps","superadmin":false},
     {"method":"PATCH","path":"/api/admin/reps/:id","superadmin":false},

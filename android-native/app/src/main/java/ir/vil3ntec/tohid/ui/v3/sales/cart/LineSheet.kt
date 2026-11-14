@@ -96,9 +96,9 @@ fun LineSheet(
   if (asking && ask != null && askCode != null && typed != null) {
     //  برگهٔ تأیید جای همین برگه (نوشته‌ها در همین‌جا می‌مانند)؛ بستن ⇒ برگشت به ردیف
     PinApprovalSheet(
-      StrTill.priceTitle, StrTill.priceSummary(info.name, PhoneSaleText.amount(info.basePrice), PhoneSaleText.amount(typed)),
+      StrTill.priceTitle, StrTill.priceSummary(info.name, PhoneSaleText.amount(LineModel.ruleList(form, info)), PhoneSaleText.amount(typed)),
       ask.selfRole, ask.selfName, ask.requesterUserId,
-      onApproved = { by, role, reason -> grant = LineModel.grantOf(askCode, by, role, reason, ask.selfName, info, typed); asking = false },
+      onApproved = { by, role, reason -> grant = LineModel.grantOf(askCode, by, role, reason, ask.selfName, info, typed, form); asking = false },
       onClose = { asking = false },
     )
     return

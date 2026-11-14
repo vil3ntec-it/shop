@@ -38,7 +38,7 @@ const slipCore = require('./approval-core');
 const staffPerms = require('./staff-perms');
 const { one, many, query, tx, newId, now } = require('../db');
 const { badRequest, forbidden, notFound, conflict } = require('../middleware/errors');
-const hlc = require('./hlc');
+const hlc = require('./hlc'), branchKey = require('./branch-key');   //  شعبه: سطحِ دکان با `shopOf`
 const { rejectOps } = require('./v1-reject');
 const roleV1 = require('./staff-role-v1'), cpay = require('./conflict-payload');   //  DATA-SAFETY: سندِ ردشده کامل در صندوق
 //  STF-02: «درخواستِ تأیید» از راهِ دور (پرچمِ خاموشِ `shop.approval_requests`) — op با `approval: {v:1, request}`
@@ -223,7 +223,7 @@ function verifySignature(publicKeyB64, text, sigB64) {
 async function memberPolicy(q, shopId, userId) {
   const m = (await q.query(
     `SELECT role FROM shop_members WHERE shop_id=$1 AND user_id=$2 AND status='active' LIMIT 1`,
-    [shopId, String(userId || '')]
+    [branchKey.shopOf(shopId), String(userId || '')]
   )).rows[0];
   if (!m) return null;
   return { role: m.role, layers: await staffPerms.layersFor(shopId, m.role, userId, (s, p) => q.query(s, p)) };
@@ -242,18 +242,18 @@ async function acceptSlip(q, ctx, need, slip, { opId, at, deviceId, path }) {
   const c = q || dbq;
   const shape = slipCore.check(slip);
   if (shape) return 'approval_invalid';
-  if (slip.shop !== ctx.accountId) return 'approval_mismatch';
+  const shopId = branchKey.shopOf(ctx); if (slip.shop !== shopId) return 'approval_mismatch';   //  شعبه: برگه/کلید/nonce سطحِ دکان
   const cover = slipCore.covers(slip, { perm: need.perm, doc: need.doc, pct_bp: need.pct_bp, amount: need.amount, at });
   if (cover) return cover;
   if (slip.by === ctx.userId) return 'approval_self';
-
   const key = (await c.query(
-    'SELECT * FROM shop_approver_keys WHERE id=$1 AND shop_id=$2', [slip.key, ctx.accountId]
+    'SELECT * FROM shop_approver_keys WHERE id=$1 AND shop_id=$2', [slip.key, shopId]
   )).rows[0];
   if (!key || key.revoked_at !== null || key.user_id !== slip.by) return 'approval_key_unknown';
 
-  const approver = await memberPolicy(c, ctx.accountId, slip.by);
-  if (!approver || !APPROVER_ROLES.includes(approver.role)) return 'approver_not_allowed';
+  const approver = await memberPolicy(c, shopId, slip.by);
+  if (!approver || !APPROVER_ROLES.includes(approver.role)
+    || !(await require('./branches').reaches(shopId, { role: approver.role, userId: slip.by }, branchKey.branchOf(ctx)))) return 'approver_not_allowed';   //  STF-06: شعبهٔ سند
   const d = core.evaluate(approver.role, approver.layers, need.perm, slipCore.evalReq(slip));
   if (d.decision !== 'allow') return 'approver_not_allowed';
 
@@ -264,7 +264,7 @@ async function acceptSlip(q, ctx, need, slip, { opId, at, deviceId, path }) {
                                  key_id, device_id, path, reason, issued_at, used_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
      ON CONFLICT (shop_id, nonce) DO NOTHING RETURNING op_id`,
-    [ctx.accountId, slip.nonce, String(opId || ''), need.doc, need.perm,
+    [shopId, slip.nonce, String(opId || ''), need.doc, need.perm,
       Number.isInteger(slip.pct_bp) ? slip.pct_bp : null,
       Number.isInteger(slip.amount) ? slip.amount : (need.record ? need.record.amount : null),
       slip.by, String(ctx.userId || ''), key.id, String(deviceId || '').slice(0, 64), path || 'v3',
@@ -273,7 +273,7 @@ async function acceptSlip(q, ctx, need, slip, { opId, at, deviceId, path }) {
   if (used) return null;
   //  همان op که دوباره فرستاده شد (پاسخ گم شد) تکرار است، نه بازپخش
   const prev = (await c.query(
-    'SELECT op_id FROM shop_approvals WHERE shop_id=$1 AND nonce=$2', [ctx.accountId, slip.nonce]
+    'SELECT op_id FROM shop_approvals WHERE shop_id=$1 AND nonce=$2', [shopId, slip.nonce]
   )).rows[0];
   return prev && prev.op_id === String(opId || '') ? null : 'approval_replayed';
 }

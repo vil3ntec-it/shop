@@ -67,6 +67,8 @@ function backgroundJobs() {
     ['ops-alerts', () => opsAlerts.start(), () => opsAlerts.stop()],
     //  OPS-01@29: خبرِ بحرانی به مسئول + پیگیری (هر دقیقه؛ پرچمِ خاموشِ `ops.critical_alerts` ⇒ فقط پرسشِ پرچم)
     ['ops-paging', () => opsPaging.start(), () => opsPaging.stop()],
+    //  OPS-01: ایستِ خودکارِ انتشارِ مرحله‌ای وقتی خطای نسخهٔ تازه بالا رفت (هر ۵ دقیقه؛ پرچمِ خاموشِ `auto_halt` ⇒ فقط پرسشِ پرچم)
+    mod('release-stage-guard'),
     //  O-06 = ب: جاروی نگه‌داشتنِ گذشتهٔ سفارشِ آنلاین (بی پرچمِ `shop.stock_reserve` ⇒ یک پرسشِ خالی در دقیقه)
     mod('stock-reserve'),
     ['telegram', () => { if (config.telegram.autoStart) telegram.start(); }, () => telegram.stop()],
