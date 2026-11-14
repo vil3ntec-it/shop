@@ -147,7 +147,7 @@
 
 ### ۲.۹ مشخصات و STATUS
 
-- سندِ اصلی `docs/spec/MASTER-SPEC.md` (SHA-256 ‏`dfa09307…`) در ۷۲ تکه (`docs/spec/00-*.md` تا `40-*.md`).
+- سندِ اصلی `docs/spec/MASTER-SPEC.md` (SHA-256 ‏`2c9cf246…`) در ۷۳ تکه (`docs/spec/00-*.md` تا `40-*.md`).
 - `docs/spec/STATUS.md`: ۷۶۴ ردیف، هر شناسه یک ردیف با وضعیت (`IMPLEMENTED-VERIFIED`، `PARTIAL`، `MISSING`، `BROKEN`،
   `NOT-VERIFIED`، `BLOCKED-EXTERNAL`)، «تأیید: دستور و نتیجه»، «مانع» و «commit/PR». تصمیم‌ها (D-*) در `docs/spec/BLOCKERS.md`.
 - `node docs/spec/tools/spec.mjs status` جمع‌ها و ساختار را از نو می‌سازد (ستون‌های دستی می‌مانند)؛ `check` باید «سالم» بدهد.

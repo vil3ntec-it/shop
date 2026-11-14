@@ -2181,10 +2181,10 @@ web/           اپ وب فعلی (index.html و license/*.js)، با انتقا
   - SYN-10: `SyncGuardTest`، `server/test/e2e/sync.e2e.mjs`، `server/test/e2e/security.e2e.mjs`.
   - SYN-11: `server/test/sync-v3-convert.test.js`.
   - SYN-13: `server/test/sync-v3.test.js`، `server/test/sync-v3-convert.test.js`.
-  - SYN-14 (بخشی: ادامه از جای قطع و اولویتِ پایین‌تر؛ قطعِ رادیویی روی گوشیِ واقعی سنجیده نشده): `PhotoSyncPlanTest`.
+  - SYN-14 (بخشی: ادامه از جای قطع و اولویتِ پایین‌تر در طرحِ همگام‌سازیِ عکس؛ اولویت در موتورِ v3 و قطعِ رادیویی روی گوشیِ واقعی مانده): `PhotoSyncPlanTest`.
 
 - **S156 — امنیت (SEC):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
-  - SEC-02 (بخشی: زنجیرهٔ فاکتورهای فروش و ابزارِ سنجش؛ سندهای دیگر مانده): `DocChainTest`، `DocChainVectorsTest`، `DocChainCycleTest`.
+  - SEC-02 (بخشی: زنجیرهٔ فاکتورهای فروش و سنجشِ آن در سرور و پنل؛ سندهای برگشت، قرض و خرید و صفحهٔ بررسی روی دستگاه مانده): `DocChainTest`، `DocChainVectorsTest`، `server/test/doc-chain.test.js`.
   - SEC-03 (بخشی: ساخته، پشتِ پرچمِ خاموش): `server/test/doc-chain.test.js`، `server/test/finalized-sales.test.js`، `VoidFlowTest`.
   - SEC-04: `server/test/admin-totp.test.js`.
   - SEC-05: `server/test/sync-live-ticket.test.js`.
@@ -2280,6 +2280,54 @@ web/           اپ وب فعلی (index.html و license/*.js)، با انتقا
   - DLV-18: `server/test/delivery-ratings.test.js`، `DeliveryRatingVectorsTest`، `DeliveryWireTest`.
   - DLV-19: `server/test/delivery-desk.test.js`، `InvoiceCheckTest`.
   - DLV-20: `CourierNoCountdownTest`.
+
+- **S162 — اطلاع‌رسانی و پشتیبانی (NTF):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - NTF-04: `server/test/customer-notify.test.js`، `server/test/customer-notify-refund.test.js`.
+  - NTF-07: `server/test/order-feedback.test.js`، `OrderFeedbackTest`.
+  - NTF-08: `server/test/customer-notify-refund.test.js`، `server/test/order-refund-view.test.js`، `server/test/web-store-changes.mjs`.
+  - NTF-09: `server/test/order-feedback.test.js`، `server/test/web-store.mjs`.
+  - NTF-10 (بخشی: عذرخواهی و کوپنِ خودکار با پوشِ خودِ سرور؛ کانالِ بیرونی بیرونی است): `server/test/order-late-apology.test.js`.
+
+- **S163 — بازاریابی (MKT):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - MKT-01: `server/test/storefront-promos.test.js`، `PromoChannelTest`، `server/test/web-store-zones.mjs`.
+  - MKT-02: `server/test/storefront-promo-guard.test.js`، `PromoGuardApiTest`، `server/test/web-store-zones.mjs`.
+  - MKT-06 (بخشی: یادآوری درونِ برنامهٔ خرید؛ پوشِ بیرون از برنامه مانده): `server/test/storefront-consumption.test.js`، `ProductCycleTest`، `ShopperRefillTest`.
+  - MKT-08 (بخشی: تکرارِ ۷/۱۴/۳۰ روزه با یادآوریِ درونِ برنامه و تأییدِ مشتری؛ ثبتِ خودکار و برنامه در حساب مانده): `ShopperStage2Test`، `CustomerStage2Test`، `ShopperStage2LiveTest`.
+  - MKT-09: `server/test/storefront-promos.test.js`، `server/test/web-store-zones.mjs`.
+  - MKT-10 (بخشی: QR و پیوندِ کمپین؛ چاپ روی چاپگرِ واقعی سنجیده نشده): `ReceiptStoreQrTest`، `CampaignLinksTest`، `server/test/storefront-campaigns.test.js`.
+  - MKT-11: `server/test/storefront-campaigns.test.js`، `CampaignLinksTest`.
+
+- **S164 — تقلب و ریسک (RSK):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - RSK-03 (بخشی: ساخته، پشتِ پرچمِ خاموش): `server/test/order-risk.test.js`، `server/test/order-risk-queue.test.js`، `OrderRiskTest`.
+  - RSK-04 (بخشی: ساخته، پشتِ پرچمِ خاموش): `server/test/risk-lists.test.js`، `server/test/risk-device.test.js`، `OrderRiskTest`.
+  - RSK-08: `server/test/order-evidence.test.js`، `OrderEvidenceAssignTest`.
+  - RSK-09: `server/test/storefront-promo-guard.test.js`، `PromoGuardApiTest`.
+  - RSK-10: `server/test/cashier-alerts.test.js`، `CashierAlertsTest`، `CashierAlertsVectorsTest`.
+
+- **S165 — هوش مصنوعی (AI):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - AI-02 (بخشی: پردازشِ محلی و قطعی؛ پشتِ پرچمِ خاموش): `server/test/image-studio.test.js`، `server/test/image-studio-jobs.test.js`.
+  - AI-03 (بخشی: نسخه‌های جدا و برچسبِ تبلیغ؛ پشتِ پرچمِ خاموش): `server/test/image-studio.test.js`.
+  - AI-05 (بخشی: صفِ گروهی؛ پشتِ پرچمِ خاموش): `server/test/image-studio-jobs.test.js`.
+  - AI-06 (بخشی: نام و دسته از متن؛ «توضیح» و «از عکس» مدل می‌خواهند): `ProductSuggestTest`.
+  - AI-08: `AnomaliesTest`، `AnomalyBookTest`.
+  - AI-11 (بخشی: ساخته؛ آستانه روی عکسِ واقعی مانده): `server/test/visual-search.test.js`، `VisualSearchTest`، `server/test/web-store-vsearch.mjs`.
+
+- **S166 — بومی‌سازی (LOC):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - LOC-01: `LocaleTextTest`، `ReceiptLayoutTest`.
+  - LOC-03: `StatsModelTest`، `HomeHeroTest`، `PromoTextTest`.
+  - LOC-04: `server/test/holidays.test.js`، `HolidaysTest`، `HolidayVectorsTest`.
+  - LOC-05: `AsciiIsoDateTest`، `ScreenDigitsTest`، `LocaleTextTest`.
+  - LOC-06 (بخشی: سه زبان در صفحه‌ها؛ سرستون‌های خروجیِ اکسل منتظرِ تصمیمِ صاحب‌کار): `ScreenTextTest`، `DesktopTextTest`، `I18nCoverageTest`.
+  - LOC-07: `LocaleTextTest`.
+  - LOC-08: `DariWordsTest`، `DariTextTest`، `server/test/dari-text.test.js`.
+  - LOC-09: `LocaleTextTest`، `server/test/locale-vectors.test.js`.
+
+- **S167 — عملیات و پشتیبانی محصول (OPS):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - OPS-05: `WhatsNewTest`، `WhatsNewFileTest`، `tools/whatsnew/check.test.mjs`.
+  - OPS-06 (بخشی: راهنمای F1 ِ هر صفحه؛ ویدیوها «بعداً» ِ گرفته‌شده): `ScreenGuidesTest`، `GuideHelpTest`، `ScreenGuidesTextTest`.
+  - OPS-07: `TrainingModeTest`، `TrainingLedgerTest`.
+  - OPS-08: `OwnerExportTest`، `XlsxTest`، `server/test/owner-export.test.js`.
+  - OPS-09: `server/test/admin-notify-usage.test.js`، `server/test/admin-ops-sms-usage.test.js`، `server/test/admin-flags.test.js`.
 
 
 ## ۸. فازبندی و ترتیب اجرا
