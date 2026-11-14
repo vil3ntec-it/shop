@@ -61,7 +61,8 @@ async function keyOf(shopId) {
 // ════════════════════════════════════════════════════════════════════
 
 /**
- * این مرورگر برای «خبرم کن» ِ همین شماره در همین دکان ⇒ `{ push: { on: true } }`. `proof` همان `storefront.verification`.
+ * این مرورگر برای «خبرم کن» ِ همین مشتری در همین دکان ⇒ `{ push: { on: true } }`. `proof` همان `storefront.verification`
+ * با `phone` = کلیدِ مشتری (ایمیلِ تأییدشده؛ «فقط ایمیل»، ۱۴۰۵/۰۸/۲۳).
  * همان مرورگر دوباره ⇒ همان ردیف با کلید، صفحه و اثباتِ تازه (تمدید تا انقضای اثباتِ تازه).
  */
 async function attach(store, proof, body, at = now()) {
@@ -114,10 +115,11 @@ async function proofLive(r, at) {
   const customers = require('./store-customers');
   if (r.proof === 'ticket') return (await customers.ticketGen(r.phone)) === Number(r.ticket_gen);
   const s = (await query(
-    `SELECT s.revoked_at, s.expires_at, c.phone, c.status FROM store_customer_sessions s
+    `SELECT s.revoked_at, s.expires_at, c.email, c.status FROM store_customer_sessions s
        JOIN store_customers c ON c.id = s.customer_id WHERE s.id = $1`, [r.session_id]
   )).rows[0];
-  return Boolean(s) && s.revoked_at === null && Number(s.expires_at) > at && s.status === 'active' && s.phone === r.phone;
+  //  کلیدِ ردیف (ایمیل) هنوز همان ایمیلِ حساب است — تغییرِ ایمیل اشتراکِ کلیدِ پیشین را بی‌اثر می‌کند
+  return Boolean(s) && s.revoked_at === null && Number(s.expires_at) > at && s.status === 'active' && s.email === r.phone;
 }
 
 /** قیمت به زبانِ پیام: fa/ps رقمِ فارسی با «٬» و «٫»؛ en رقمِ لاتین (همان `K.money` ِ ویترین) */
@@ -143,11 +145,12 @@ function payload(msg, page) {
 }
 
 /**
- * `msg` همان پیامِ `storefront-alerts.deliver`: `{ key, shopId, to: {phone}, productId, kind, productName, priceMinor, lang, at }`.
- * شماره فقط برای پیدا کردنِ ردیف‌ها خوانده می‌شود و هرگز به سرویسِ پوش نمی‌رسد. نتیجه همان قراردادِ `setProviders`.
+ * `msg` همان پیامِ `storefront-alerts.deliver`: `{ key, shopId, to: {email|phone}, productId, kind, productName, priceMinor, lang, at }`.
+ * کلیدِ مشتری فقط برای پیدا کردنِ ردیف‌ها خوانده می‌شود و هرگز به سرویسِ پوش نمی‌رسد. نتیجه همان قراردادِ `setProviders`.
  */
 async function send(msg) {
-  const phone = msg && msg.to && msg.to.phone;
+  //  کلیدِ ردیف‌ها: ایمیلِ تأییدشده (`to.email`) یا شمارهٔ کهنه (`to.phone`)
+  const phone = msg && msg.to && (msg.to.email || msg.to.phone);
   if (!phone || !msg.shopId || !msg.productId) return { status: 'rejected', code: 'no_subscription' };
   const at = Number(msg.at) || now();
   const subs = await many(`SELECT * FROM ${TABLE} WHERE shop_id=$1 AND phone=$2 ORDER BY created_at, id`, [msg.shopId, phone]);

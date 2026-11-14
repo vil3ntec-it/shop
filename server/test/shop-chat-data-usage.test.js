@@ -19,6 +19,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { query, newId, now } = require('../src/db');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const KB = 1024;
 const SAMPLE = { thumb: 20 * KB, image: 250 * KB, voiceSeconds: 30, voiceKbps: 24 };
@@ -101,8 +102,8 @@ test('CHAT-13: بایتِ روی سیم برای متن، پیش‌نمایش، 
   }
   const slug = `usage-${uniq()}`;
   assert.equal((await h.put('/api/shop/storefront', { slug, enabled: true, title: 'مصرف', contactPhone: '0700000004' }, { token: u.accessToken })).status, 200);
-  const start = await h.post(`/api/store/${slug}/verify/start`, { phone: '0790000501' });
-  const ticket = (await h.post(`/api/store/${slug}/verify/check`, { phone: '0790000501', code: start.body.devCode })).body.ticket;
+  const start = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf('0790000501') });
+  const ticket = (await h.post(`/api/store/${slug}/verify/check`, { email: mailOf('0790000501'), code: start.body.devCode })).body.ticket;
   assert.ok(ticket);
   const C = { 'X-Store-Ticket': ticket };
   const S = { Authorization: `Bearer ${u.accessToken}` };

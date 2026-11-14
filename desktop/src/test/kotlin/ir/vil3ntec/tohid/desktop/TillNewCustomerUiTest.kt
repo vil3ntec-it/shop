@@ -183,7 +183,8 @@ class TillNewCustomerUiTest {
   @Test fun deskSaleWiresTheSuspendingHelperOnlyForTheTouchTill() {
     val src = File("../android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/DeskSale.kt").readText()
     val call = src.substringAfter("DebtorPicker(d = d, selected = cartDebtorId").substringBefore("if (lineSellerOpen")
-    assertTrue(call.contains("onAdd = if (!touchExtras) null else { name -> tillNewCustomer(d, name, store) { id ->"))
+    //  CRM-03 #۲۵: همان کمکی با قاعدهٔ سقفِ مشتریِ تازهٔ همین کاربر (`rememberCreditLimitRules`)
+    assertTrue(call.contains("onAdd = if (!touchExtras) null else { name -> tillNewCustomer(d, name, store, limitRules) { id ->"))
     val picker = File("../android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/SaleDialogs.kt").readText()
       .substringAfter("fun DebtorPicker(").substringBefore("fun CartLineDialog(")
     assertTrue(picker.contains("Modifier.weight(1f).touchKeysOnFocus(keys)"))

@@ -15,6 +15,7 @@
 import { createHash } from 'node:crypto';
 import { boot, assert } from './lib/harness.mjs';
 import { NativeDevice } from './lib/native.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const E = await boot({ name: 'security' });
 const { db } = E;
@@ -46,8 +47,8 @@ await E.step('E2E-SEC-13.0', 'دکانِ یک: کالا، سفارش، پشتی�
   E.ok(await A.api('PUT', '/shop/storefront', { slug: 'e2e-sec-one', enabled: true, title: 'یک', contactPhone: '0700000005', deliveryFeeMinor: 0, minOrderMinor: 0 }), 'ویترینِ یک');
   E.ok(await X.api('PUT', '/shop/storefront', { slug: 'e2e-sec-two', enabled: true, title: 'دو', contactPhone: '0700000006', deliveryFeeMinor: 0, minOrderMinor: 0 }), 'ویترینِ دو');
   E.ok(await A.api('PUT', `/shop/storefront/products/${product}`, { published: true }), 'انتشار');
-  const v = E.ok(await E.post('/api/store/e2e-sec-one/verify/start', { phone: '0791239999' }), 'کد');
-  const t = E.ok(await E.post('/api/store/e2e-sec-one/verify/check', { phone: '0791239999', code: v.devCode }), 'تأیید');
+  const v = E.ok(await E.post('/api/store/e2e-sec-one/verify/start', { email: mailOf('0791239999') }), 'کد');
+  const t = E.ok(await E.post('/api/store/e2e-sec-one/verify/check', { email: mailOf('0791239999'), code: v.devCode }), 'تأیید');
   const c = E.ok(await E.post('/api/store/e2e-sec-one/checkout', { fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: 'م', phone: '0791239999' }, lines: [{ productId: product, qtyMilli: 1000 }] }, null, { 'X-Store-Ticket': t.ticket, 'Idempotency-Key': E.key('w') }), 'سفارشِ ویترین', 201);
   trackToken = c.order.token;
 });

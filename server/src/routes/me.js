@@ -196,87 +196,47 @@ router.delete('/devices/:id', async (req, res) => {
 });
 
 /**
- * ویرایش حساب — نام، و یک‌بار ثبت شماره.
+ * ویرایش حساب — نام، شمارهٔ تماس، و یک‌بار افزودنِ ایمیل.
  *
- * ── چه چیزی عوض می‌شود و چه چیزی نه ──────────────────────────────────
- * نام هر وقت خواست عوض می‌شود؛ اسم آدم نشانه‌ی هویت حساب نیست.
- *
- * ایمیل و شماره **راه ورود**اند. عوض کردنشان یعنی حساب از دست صاحبش
- * در می‌آید: کسی که یک بار توکن گرفته باشد می‌توانست ایمیل را عوض کند
- * و از آن به بعد بازیابی رمز به ایمیل خودش برود. پس هیچ‌کدام از این
- * مسیر عوض نمی‌شوند.
- *
- * ولی یک حالت مانده بود: کسی که با ایمیل ثبت‌نام کرده و شماره ندارد.
- * برای او شماره «عوض کردن» نیست، «افزودن» است — و همان یک بار.
- * ثبتش که شد، دیگر از اینجا دست نمی‌خورد.
- * ────────────────────────────────────────────────────────────────────
+ * ⛔ «فقط ایمیل» (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۳: «شماره توی برنامه بشه ثبت کرد ولی برای لاگین نه اصلن»):
+ *   • شماره **فیلدِ داده** است، نه راهِ ورود: افزودن، تغییر و پاک (`""`) بی کد و بی تأییدِ دوباره؛ فقط شکلش
+ *     (`validate.phone`) سنجیده می‌شود و یکتا نیست (مهاجرتِ ۸۸۰) — پس «این شماره گرفته شده» هم نیست.
+ *     نیامدنِ `phone` یعنی دست نزن. حسابِ بی‌ایمیل شماره‌اش را پاک نمی‌کند (قیدِ `users_need_identifier`).
+ *   • ایمیل راهِ ورود است و از این‌جا **عوض** نمی‌شود (۴۰۹ `email_locked`): کسی که یک بار توکن گرفته نباید
+ *     بازیابیِ رمز را به ایمیلِ خودش ببرد.
+ *   • AUTH-08 ⇐ ایمیل (درِ کدِ پیامکیِ شماره `POST /api/me/phone/code` و پرچمِ `auth.phone_add_code` رفتند ⇐
+ *     به‌جایش): حسابِ **بی‌ایمیل** (کهنهٔ فقط‌شماره) ایمیل را فقط با نشستِ تازه (بندِ ۲۱.۱) و کدِ یک‌بارمصرفِ
+ *     **همان ایمیل** و **همان حساب** می‌افزاید:
+ *       ۱) `POST /api/me/email/code { email }` ⇒ کدِ `lib/otp` با هدفِ `email_add:<شناسهٔ حساب>`؛ «این ایمیل
+ *          حسابِ دیگری دارد» این‌جا گفته نمی‌شود (بی شمارش‌پذیری).
+ *       ۲) `PUT /api/me { email, emailCode }` ⇒ فقط پس از کدِ درست ۴۰۹ `email_taken`.
+ *     صدازننده: «ویرایشِ حساب» ِ برنامهٔ مدیریت (`core/account/EmailClaimForm`).
  */
-/*
- *  ══ AUTH-08 — افزودنِ شماره فقط با کدِ همان شماره (پرچمِ `auth.phone_add_code`) ═══════
- *
- *  شماره «راهِ ورود» است: `POST /api/auth/login` با شماره و رمز، و `otp/request` +
- *  `otp/verify` با کدِ پیامکی به همان شماره، هر دو حسابی را باز می‌کنند که آن شماره را
- *  دارد. تا امروز افزودنِ شماره فقط تأییدِ دوبارهٔ **حساب** می‌خواست، نه اثباتِ مالکیتِ
- *  **شماره** — یک رقمِ غلط (یا شمارهٔ کسِ دیگر) یعنی صاحبِ آن شماره با «ورود با کد» واردِ
- *  دکانِ این حساب می‌شد، و صاحبِ واقعیِ شماره دیگر نمی‌توانست با شماره‌اش حساب بسازد.
- *
- *  با پرچمِ روشن (scope `security`، کلید `auth.phone_add_code`، پیش‌فرض خاموش):
- *    ۱) `POST /api/me/phone/code { phone }` — نشستِ تازه (بندِ ۲۱.۱) ⇒ کدِ یک‌بارمصرفِ
- *       `lib/otp.js` به همان شماره، با هدفِ `phone_add:<شناسهٔ حساب>` (بسته به حساب، شماره
- *       و هدف؛ CSPRNG، هش‌شده، سقفِ تلاش، فاصلهٔ ارسالِ دوباره، سقفِ روزانه و SEC-06).
- *       «این شماره حسابِ دیگری دارد» این‌جا گفته **نمی‌شود** (بی شمارش‌پذیری).
- *    ۲) `PUT /api/me { phone, phoneCode }` — نشستِ تازه + کدِ درستِ همان شماره و همان حساب؛
- *       فقط پس از کدِ درست ۴۰۹ `phone_taken` (فقط صاحبِ شماره می‌فهمد).
- *  پرچمِ خاموش ⇒ دقیقاً رفتارِ امروز (فقط تأییدِ دوبارهٔ حساب)، و درِ ۱ ۴۰۴.
- *  برنامهٔ مدیریت (اندروید و کامپیوتر) گامِ کد را دارد (`core/account/PhoneClaimForm`، «ویرایش حساب» ِ نسخهٔ ۳)؛
- *  ⚠️ برنامهٔ وبِ یخ‌زده (`index.html`) `phoneCode` نمی‌فرستد — با پرچمِ روشن آن‌جا شماره افزوده نمی‌شود.
- */
-const PHONE_FLAG_SCOPE = 'security';
-const PHONE_FLAG_KEY = 'auth.phone_add_code';
-const phonePurpose = (userId) => `phone_add:${userId}`;
+const EMAIL_ADD = (userId) => `email_add:${userId}`;
 
-async function phoneCodeRequired() {
-  const r = await one('SELECT value FROM live_config WHERE scope=$1 AND key=$2', [PHONE_FLAG_SCOPE, PHONE_FLAG_KEY]);
-  if (!r) return false;
-  try { return JSON.parse(r.value) === true; } catch { return false; }
-}
-
-/** در production با راهِ پیامکِ `log` کد به هیچ‌کس نمی‌رسد ⇒ ۵۰۳ ِ صریح، نه «فرستاده شد» (همان قاعدهٔ ویترین) */
-async function smsReachesPhone() {
-  if (require('../config').env !== 'production') return true;
-  const { provider } = await require('../lib/sms-settings').current();
-  return Boolean(provider) && provider !== 'log';
-}
-
-const phoneLocked = (res) => res.status(409).json({
-  error: { code: 'phone_locked', message: 'شماره ثبت‌شده عوض نمی‌شود — با پشتیبانی تماس بگیرید' },
+const emailLocked = (res) => res.status(409).json({
+  error: { code: 'email_locked', message: 'ایمیلِ ثبت‌شده از این‌جا عوض نمی‌شود — با پشتیبانی تماس بگیرید' },
 });
-const phoneTaken = (res) => res.status(409).json({
-  error: { code: 'phone_taken', message: 'این شماره روی حساب دیگری ثبت شده' },
+const emailTaken = (res) => res.status(409).json({
+  error: { code: 'email_taken', message: 'این ایمیل روی حسابِ دیگری ثبت شده' },
 });
 
-//  هر حساب سطلِ خودش را دارد (کنارِ فاصله و سقفِ روزانهٔ خودِ `otp.request` و SEC-06)
-const phoneCodeLimit = require('../middleware/ratelimit').rateLimit({
-  max: require('../config').rateLimit.otpMax, keyPrefix: 'phone-add',
+//  هر حساب سطلِ خودش را دارد (کنارِ فاصله و سقفِ روزانهٔ خودِ `otp.request`)
+const emailCodeLimit = require('../middleware/ratelimit').rateLimit({
+  max: require('../config').rateLimit.otpMax, keyPrefix: 'email-add',
   key: (req) => (req.user ? req.user.id : null),
 });
 
-router.post('/phone/code', phoneCodeLimit, async (req, res, next) => {
+router.post('/email/code', emailCodeLimit, async (req, res, next) => {
   try {
-    if (!(await phoneCodeRequired())) {
-      return res.status(404).json({ error: { code: 'phone_code_disabled', message: 'این سرور برای افزودنِ شماره کد نمی‌فرستد' } });
-    }
+    if (req.user.email) return emailLocked(res);
     await reauth.assertFresh(req);
-    const phone = v.phone(req.body?.phone, { required: true });
-    if (req.user.phone) return phoneLocked(res);
-    if (!(await smsReachesPhone())) {
-      return res.status(503).json({ error: { code: 'verification_unavailable', message: 'پیامکِ تأییدِ شماره هنوز روی این سرور راه‌اندازی نشده است' } });
-    }
-    const out = await require('../lib/otp').request(phone, {
-      purpose: phonePurpose(req.user.id), ip: require('../middleware/ratelimit').clientIp(req), app: 'shop', shopId: req.shopId || '',
+    const email = v.email(req.body?.email, { required: true });
+    const out = await require('../lib/otp').request(email, {
+      purpose: EMAIL_ADD(req.user.id), ip: require('../middleware/ratelimit').clientIp(req), app: 'shop',
     });
     res.json({
-      ok: true, phone, sent: out.sent === true, expiresAt: out.expiresAt, resendSeconds: out.resendSeconds,
+      ok: true, email, sent: out.sent === true, expiresAt: out.expiresAt, resendSeconds: out.resendSeconds,
       ...(out.devCode ? { devCode: out.devCode } : {}),
     });
   } catch (err) { next(err); }
@@ -284,47 +244,51 @@ router.post('/phone/code', phoneCodeLimit, async (req, res, next) => {
 
 router.put('/', async (req, res) => {
   const name = v.text(req.body?.name, { max: 80 });
-  const phone = v.phone(req.body?.phone);
+  const rawPhone = req.body?.phone;
+  //  نیامد ⇒ دست نزن؛ "" ⇒ پاک؛ وگرنه فقط شکل
+  const phone = rawPhone === undefined || rawPhone === null ? undefined : (String(rawPhone).trim() ? v.phone(rawPhone) : '');
+  const rawEmail = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+  const email = rawEmail ? v.email(rawEmail, { required: true }) : '';
 
-  //  شماره‌ای که آمده و کاربر از قبل شماره داشته: بی‌صدا نادیده گرفته
-  //  نمی‌شود، وگرنه برنامه فکر می‌کند ثبت شد
-  if (phone && req.user.phone && phone !== req.user.phone) return phoneLocked(res);
-
-  const claiming = phone && !req.user.phone;
-  //  شماره «راهِ ورود» است — افزودنش کارِ حساس است (بندِ ۲۱.۱، AUTH-08)
-  if (claiming) await reauth.assertFresh(req);
-  const withCode = claiming && await phoneCodeRequired();
-  if (withCode) {
-    const code = String(req.body?.phoneCode ?? '').trim();
+  if (email && req.user.email && email !== req.user.email) return emailLocked(res);
+  const claiming = Boolean(email) && !req.user.email;
+  if (claiming) {
+    await reauth.assertFresh(req);
+    const code = String(req.body?.emailCode ?? '').trim();
     if (!code) {
       return res.status(400).json({
-        error: { code: 'phone_code_required', message: 'برای افزودنِ شماره، کدی را که به همان شماره فرستاده شد وارد کنید' },
+        error: { code: 'email_code_required', message: 'برای افزودنِ ایمیل، کدی را که به همان ایمیل فرستاده شد وارد کنید' },
       });
     }
-    //  ⛔ پیش از «این شماره گرفته شده»: فقط کسی که کدِ همان شماره را دارد آن را می‌فهمد
-    await require('../lib/otp').verify(phone, code, { purpose: phonePurpose(req.user.id) });
+    //  ⛔ پیش از «این ایمیل گرفته شده»: فقط کسی که کدِ همان ایمیل را دارد آن را می‌فهمد
+    await require('../lib/otp').verify(email, code, { purpose: EMAIL_ADD(req.user.id) });
+    const taken = await one('SELECT id FROM users WHERE email=$1 AND id<>$2', [email, req.user.id]);
+    if (taken) return emailTaken(res);
   }
-  if (claiming) {
-    const taken = await one('SELECT id FROM users WHERE phone=$1 AND id<>$2', [phone, req.user.id]);
-    if (taken) return phoneTaken(res);
+  const hasEmail = claiming || Boolean(req.user.email);
+  if (phone === '' && !hasEmail) {
+    return res.status(400).json({ error: { code: 'email_first', message: 'پیش از پاک کردنِ شماره، ایمیلِ حساب را بیفزایید' } });
   }
 
   let user;
   try {
     user = await one(
-      `UPDATE users SET name=$2, phone=COALESCE($3, phone), updated_at=$4
+      `UPDATE users SET name=$2,
+              phone = CASE WHEN $3::boolean THEN NULLIF($4, '') ELSE phone END,
+              email = COALESCE($5, email), updated_at=$6
        WHERE id=$1 RETURNING *`,
-      [req.user.id, name, claiming ? phone : null, now()]
+      [req.user.id, name, phone !== undefined, phone || '', claiming ? email : null, now()]
     );
   } catch (err) {
-    //  دو حسابِ هم‌زمان با یک شماره: یکتاییِ `users.phone` دومی را رد می‌کند — ۴۰۹، نه ۵۰۰
-    if (claiming && err && err.code === '23505') return phoneTaken(res);
+    //  دو درخواستِ هم‌زمان با یک ایمیل: یکتاییِ `users.email` دومی را رد می‌کند — ۴۰۹، نه ۵۰۰
+    if (claiming && err && err.code === '23505') return emailTaken(res);
     throw err;
   }
   if (claiming) {
-    await audit.log({
-      shopId: req.shopId, userId: req.user.id, action: 'account.phone_added', detail: withCode ? { method: 'code' } : {},
-    });
+    await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'account.email_added', detail: { method: 'code' } });
+  }
+  if (phone !== undefined && (phone || null) !== (req.user.phone || null)) {
+    await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'account.phone_changed', detail: { cleared: phone === '' } });
   }
   res.json({ user: publicUser(user) });
 });

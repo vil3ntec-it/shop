@@ -297,9 +297,11 @@ async function main() {
   const out = path.resolve(a.out || fs.mkdtempSync(path.join(os.tmpdir(), 'release-rehearsal-')));
   fs.mkdirSync(out, { recursive: true });
   const logFile = path.join(out, 'release-server.log');
+  //  یک بار باز و همان دستگیره برای خروجی و خطا (نه دو بار بازکردنِ همان مسیر — CodeQL `js/file-system-race`)
+  const logFd = fs.openSync(logFile, 'w');
   const child = spawn(process.execPath, ['src/index.js'], {
     cwd: SERVER,
-    stdio: ['ignore', fs.openSync(logFile, 'w'), fs.openSync(logFile, 'a')],
+    stdio: ['ignore', logFd, logFd],
     env: {
       ...process.env, PORT: String(port), NODE_ENV: 'test', BACKUP_ENABLED: 'false', TELEGRAM_AUTOSTART: 'false',
       API_SECRET: process.env.API_SECRET || 'rehearsal-secret-rehearsal-secret', OTP_SECRET: process.env.OTP_SECRET || 'rehearsal-otp-secret-rehearsal-ot',
@@ -308,6 +310,7 @@ async function main() {
       RATE_GENERAL_MAX: '100000', RATE_ERRORS_MAX: '10000',
     },
   });
+  fs.closeSync(logFd);   //  فرزند رونوشتِ خودش را دارد
   try {
     await waitReady(base, child, logFile);
     const login = await call(base, 'POST', '/api/admin/login', { body: admin });

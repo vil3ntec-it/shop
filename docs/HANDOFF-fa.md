@@ -72,6 +72,263 @@
 - **نیمه‌کاره/قدمِ بعد:** فازِ ۳ (آینهٔ کاتالوگ به بخشِ هر شعبه — دفترِ شعبهٔ تازه بی کالا شروع می‌شود؛ درهای `/shop/*` ِ شعبه‌شناس)،
   فازِ ۴ (انتقال میانِ شعبه‌ها؛ POS-16 با پرسش از صاحب‌کار)، فازِ ۵ (روشن کردن روی دکانِ واقعی پس از رسیدنِ این نسخه به همهٔ دستگاه‌ها).
   شعبهٔ دیگر فقط با Sync v3 کار می‌کند (دستگاهِ v1 با صفِ خالی و سرورِ دارای v3 خودکار به v3 می‌رود). آزمون روی دستگاهِ واقعی نشد.
+### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-63u زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-63u` (از `origin/claude/batch-63` baff32f2e) — چهار خواستِ صاحب‌کار از تبلت (اندرویدِ نسخهٔ ۳)
+
+- **۱. صفحه‌کلیدِ جست‌وجو:** `SearchScreen` دیگر با باز شدن `requestFocus` نمی‌کند (صفحه‌کلید فقط با زدنِ کادر). زدنِ بیرون از کادر
+  تمرکز را برمی‌دارد: `Modifier.v3ClearFocusOnTap()` (`ui/v3/V3FocusTap.kt`، `detectTapGestures` ِ زدنِ نخورده) یک جا در ریشهٔ
+  `V3Scaffold` (همهٔ صفحه‌های کیت) و ریشهٔ `SearchScreen`. صندوق (`SaleScreen` + `hidScanner`) روی `V3Scaffold` نیست ⇒ تمرکزِ بارکدخوان
+  دست نخورد. برگه‌ها (`V3Sheet`) جدا هستند و دست نخوردند.
+- **۲. «قرض‌دارِ جدید»/ویرایش (همان یک جزء):** فقط نام (لازم) + تلفن. ذخیره ⇒ `DebtorFormsModel.saveBasic` (فقط `add`/`editWithLimit`
+  با یادداشت و سقفِ همان که `of` آورد + همان سدِ CRM-03) — شمارهٔ دوم، برچسب، نشانی، پین و رضایتِ مشتریِ کهنه **نوشته نمی‌شوند**
+  (ذخیرهٔ کامل `save` برای «بله» ِ بی منبعِ کهنه رد می‌کرد؛ کادرِ پنهان یعنی ذخیرهٔ بسته). `save` ِ کامل و آزمون‌هایش ماند. ردیف‌های
+  CRM-02/03/11 در STATUS یادداشتِ همین تصمیم را گرفتند (کامپیوتر همچنان شمارهٔ دوم/برچسب/سقف را دارد؛ وضعیت‌ها همان).
+- **۳. «ثبتِ تراکنش»:** کلیدِ بزرگِ «برد — … / رسید — …»، کادرِ بزرگِ تاریخ با «امروز/دیروز»، کادرِ «سررسید (اختیاری)» و تراشهٔ
+  «یک ماه» رفتند. به‌جایشان (`ui/v3/money/TxFormParts.kt`): قوطیِ «برد/رسید» کنارِ مبلغ (`LedgerTone` ِ همان صفحه؛ پیش‌فرض `kind` ِ
+  دکمه)، تاریخِ نوشته‌ایِ سربرگ روبه‌روی عنوان (جای تازهٔ `headerEnd` در `V3Sheet`/`V3FormSheet`؛ زدن ⇒ همان `V3DateField` زیرِ سربرگ،
+  انتخاب ⇒ بسته)، تراشه‌های `DebtorTxModel.TX_DUE_PRESETS` (۷، ۱۴) + «بی سررسید». `TxForm`، `DebtorFormsModel.submit`، op و همگام‌سازی
+  همان. «سررسید» ِ ردیفِ ثبت‌شده (`DueStep` در `DebtorTxSheet`) دست نخورد و «یک ماه» را هنوز دارد (خواستِ صاحب‌کار فقط برگهٔ ثبت بود).
+- **۴. «چه کسی این پرونده را دید»:** از `DebtorFileExtras` (گوشی) و `DeskCustomers` (کامپیوتر) برداشته شد؛ ثبتِ دیدن همان («سابقهٔ عملیات»).
+  جزءِ `CustomerAccessPanel` هنوز هست (آزمونِ نمایشِ `NewScreensRenderTest`). CRM-15 در STATUS و PARTIAL-MAP یادداشت گرفت (همان PARTIAL/«تصمیم»).
+- **کامپیوتر:** «مشتریِ تازه» از پیش نام + تلفن است؛ ردیفِ ثبتِ کامپیوتر (`EntryRow`) ساختارِ دیگری دارد (یک سطرِ صفحه‌کلیدی بی کلیدِ بزرگ و
+  بی کادرِ تاریخ) و کادرِ نوشتنیِ سررسیدش ماند — عوض کردنش کارِ صفحه‌کلیدی را بزرگ عوض می‌کرد.
+- **آزمونِ عوض‌شده (عمدی):** `CustomerAccessLogTest` (بخش در دو پرونده **نیست**، ثبتِ دیدن هست)، `V3PortedFeaturesTest` (برگه شمارهٔ دوم/برچسب
+  ندارد و مسیر `saveBasic` می‌زند). **تازه:** `DebtorCompactSheetsUiTest` (۶)، `TapOutsideFocusUiTest` (۲)، `MoneyFormsModelTest` ‏+۱ (saveBasic).
+  هدف‌دار (۱۰ دسته) ۸۶/۸۶؛ اجرای کاملِ `desktop test` ‏۴۱۷۹ آزمون، ۰ شکست؛ precheck ‏fail=0، spec «سالم».
+- **قدمِ بعد:** دیدنِ برگه روی تبلتِ صاحب‌کار؛ اگر «یک ماه» در «سررسید» ِ ردیفِ ثبت‌شده هم نباید باشد، `DueDateEditor` همان یک خط است.
+
+### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-61s زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-61s` (از `origin/claude/batch-62` 21e7499a8) — S26 و SYN-04 روی 2G
+
+- **ساخته شد:** خطِ 2G ِ آزمون (`server/test/e2e/lib/link-2g.mjs` + `server/test/link-2g.test.js` ۳/۳) جلوی همان سرورِ
+  `offline30-backend.mjs` (درهای `/link`، `/links`، `/link-set`، `/oplog3`، گوشیِ دوم با `extraStaff`) و
+  `S26Load2GDesktopTest` (سه دستگاه؛ v1، v1 با پرچم‌های فشرده، v3 پشتِ `SYNC_V3_ENABLED`). سبک همیشه (≈ ۷ دقیقه، خطِ واقعاً کُند)؛
+  سنگین دستی (`S26_OPS=100000 S26_SPEED=1e9`، شرح سرِ پرونده).
+- **سنجیده (JVM روی کانتینر، نه گوشی):** ۱۰۰٬۰۰۶ op ⇒ `oplog` ۱۰۰٬۱۵۴ یکتا، تکراری ۰، سه دفتر = Snapshot بایت‌به‌بایت؛ زمانِ 2G
+  با پیش‌فرض‌ها ۱۷۸ تا ۱۹۵ دقیقه برای هر دستگاه (> سقفِ ۶۰)، با پرچم‌های فشرده ۴۷ تا ۱۰۴ دقیقه (گوشی‌ها ۴۷ و ۶۰؛ کامپیوتر ۱۰۴ که ۴۵ دقیقه‌اش انتظارِ تلاشِ بالارفته تا ۵ دقیقه است، چون رشتهٔ شکست با پیشرفت صفر نمی‌شود). همه در `docs/spec/bench/sync-2g-1405-08-23.md`.
+- **رفع (سرخ ⇐ سبز، سازگار با سیم، پیش‌فرضِ سرور همان):** push ِ v1 ِ کاتلین پس از `gzip_push` فشرده و ماندگار
+  (`SyncV1Client.PushGzip`، `SyncStateV1.gzipPush`)؛ `HttpEngine` ِ کامپیوتر `Accept-Encoding: gzip` و باز کردنِ پاسخ.
+  فایل‌های مشترکِ پمپ (`sync-v1.js`) دست نخورد؛ `HttpEngine.kt` با `claude/e-rows-54p` هم‌پوشانیِ خط ندارد (فقط `DEVICE_HEADERS` آن‌جا).
+- **یافته‌های رفع‌نشده:** بدنهٔ دستهٔ نخست با توکنِ منقضی دو بار بالا می‌رود (۴۰۱ + تلاشِ پیشوندِ `HttpEngine.once`)؛
+  رشتهٔ شکستِ `SyncV1Worker` با پیشرفت صفر نمی‌شود؛ v3 «gzip_push» را پس از باز شدنِ برنامه فراموش می‌کند و ویرایشِ هم‌زمان
+  تعارضِ LWW ِ باز با دفترِ بازندهٔ ناهمسان می‌سازد (S28).
+- **قدمِ بعد:** پرچم‌های `sync.gzip_push` و `sync.gzip_pull` برای یک دکانِ آزمایشی، سپس یک گوشی روی 2G ِ واقعی؛ S26 و SYN-04 در «پرچم».
+- ⚠️ دو اجرای سنگینِ هم‌زمان با Gradle ِ دیگران OOM خوردند (۱۶GB) — سنگین را تنها بزن (`kt.sh`-مانند بی Gradle هم شد: classpath با `S26_CLASSPATH`).
+
+### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-60h زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-60h` (از `origin/claude/batch-62` 21e7499a8) — هابِ شبکهٔ دکان (SYN-09، S29)
+
+- **ساخته شد (پشتِ `app.multi_server` و تنظیمِ خاموشِ هر دستگاه `hub.local`/`hub.peer`؛ FLAGS-ON §۴۲):** کارتِ «هابِ شبکهٔ دکان» در
+  «دستگاه‌ها» ِ کامپیوتر (روشن/خاموش، نشانی، اثرِ انگشت، دسته‌های در انتظار، دستگاه‌های جفت‌شده با «همین حالا وصل»/«جدا کردن») و کارتِ
+  گوشی (QR یا کد + کشف)؛ mDNS ِ `_tohid-hub._tcp` بی کتابخانه (`HubMdns`، `HubAnnounce`)؛ جفت‌سازیِ یک‌بارهٔ کد/QR فقط با صاحب/مدیر
+  (`HubPair`، اثباتِ HMAC ِ هاب روی سنجاق پیش از هر رازِ گوشی)؛ دفترِ فقط‌افزودنیِ opهای v1 (`HubLog`، `HubV1`) که با توکنِ خودِ هر گوشی
+  از همان `POST /sync/v1/push` به سرور می‌رود؛ خوراکِ opهای گوشی‌های دیگر بی اینترنت (`HubPeerLink`/`HubExchangeV1`،
+  `SyncV1Worker` ⇐ `SyncV1HubAndroid.kt`). کدِ پمپ (`sync-v1.js`، `routes/sync-v1.js`، `PUMP_TABLES`) و سرور دست نخوردند.
+- **همگام‌سازیِ مشترک:** فقط سه خط در `SyncV1Engine` (یک خطِ «دیده از سرور» در pull با `.also`، `state`/`restore` ⇐ `internal`)، یک خط
+  در `SyncV1Worker` و `SyncV1Client.pushBody` (همان بدنه، جدا شده) — برای ادغامِ ساده با `claude/e-rows-54p` (`X-Branch-Id`): هاب
+  `X-Branch-Id` ِ گوشی را نگه می‌دارد و با همان دسته به سرور می‌دهد، ولی خودِ `HubLinkV1Android.identity` آن را نمی‌فرستد ⇒ پس از ادغامِ
+  54p همان سرآیند را در `identity` بیفزایید.
+- **آزمون (محلی):** `HubLanServerDesktopTest` ۲/۲ (دو گوشی + هاب + سرورِ واقعی)، `HubV1ServerTest` ۹/۹، `HubPairLogTest` ۱۳/۱۳،
+  `HubWiringTest` ۳/۳، `HubServerTest` ۱۲/۱۲؛ سرخ با سه جهشِ موقت (برگهٔ یک‌باره، کلیدِ جفت‌شده، پالایشِ cursor) ⇒ ۷ شکست در ۴ کلاس.
+  اجرای کاملِ `./desktop/gradlew -p desktop test`: ۴۱۹۴ آزمون، ۲ سرخ (`DataSafetyGuardTest`: انبارِ تازهٔ هاب بی دسته؛ `DesktopTextTest`:
+  یک متنِ خامِ فارسی) ⇒ هر دو رفع و همان کلاس‌ها با آزمون‌های هاب دوباره سبز (۵۲/۵۲)؛ ۴ SKIP ِ پیشین. core: Mdns ۱۰/۱۰، `LocalHubTest` ۱۷/۱۷.
+  کامپایلِ آیفون (Kotlin/Native) این‌جا سنجیده نشد (`HubFindIos.kt` جایگزینِ کشف).
+- **مانده:** شبکه، فایروال و دو گوشیِ واقعیِ دکان (قاعدهٔ فایروالِ نصاب ساخته نشد)، رد و بدلِ v3، op ِ ردشدهٔ سرور که پیش‌تر از هاب روی
+  گوشیِ دیگر نشسته بود تا نوشتنِ بعدیِ همان ردیف می‌ماند (`docs/SYN-09-HUB-fa.md` §۴.۱).
+
+### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-57x زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-57x` (از `origin/claude/batch-62` 54a9333be) — CRM-10 و LOC-06
+
+- **CRM-10 ⇒ IMPLEMENTED-VERIFIED با طرحِ «ب» (ادغامِ بی ویرایشِ سند)، نه «الف» (op ِ فقط‌سرورِ جابه‌جاییِ `debtorId`).** چرا «ب» امن‌تر است:
+  (الف) سند را بازنویسی می‌کند — مشتریِ هر فاکتور و قرضِ ثبت‌شده پس از کار عوض می‌شود (سابقهٔ «این فاکتور به نامِ که بود» فقط در `refIds`
+  می‌ماند)، به `sync/` و `SyncV3Engine` ِ برنامه و `sync-v3-*` ِ سرور دست می‌زند (هر دو بیرون از این کار)، و برنامه‌ای که op ِ تازه را نمی‌شناسد
+  سندی متفاوت با دستگاه‌های دیگر نگه می‌دارد. (ب) فقط ردیفِ جدولِ پایهٔ `debtors` («آخرین نوشتن» ِ فیلد، که هر موتورِ v1/v3 ِ کهنه و تازه می‌پذیرد)
+  و ردِ `customer_merge` را می‌نویسد؛ **هیچ سندی عوض نمی‌شود**، پس پولی جابه‌جا نمی‌شود که گم شود، جمعِ دکان روی هر دستگاه همان است و
+  برگرداندن فقط خالی کردنِ `mergedInto` است (بی سندِ تازه). ⚠️ ساختِ کهنه‌ای که پیوند را نمی‌شناسد سندها و جمعِ کل را همان دارد و فقط ماندهٔ
+  تکراری را زیرِ ماندگار جمع نمی‌زند (تکراری را مثلِ امروز از فهرست پنهان می‌کند)؛ v1 ِ کهنه با «گزارش‌های مشتری» روشن همان `sweep` ِ امروز را
+  می‌زند. v3 هنوز دکمهٔ روشن کردن ندارد (`SyncChoice`)، پس ادغامِ پیوندی تا آن روز فقط از دستگاهِ آزمایشیِ v3 می‌آید.
+- **ساخته:** `CustomerMerge.merge(…, docs = false)` و `sweepLinks` (فقط ترمیمِ حلقه)، `ShopStore` روی v3 همین را می‌زند و دکمه باز است
+  (در جا، سقفِ ۱۲۴۱ خط ⇐ ۱۲۳۸)؛ `data/CustomerAlias` و `DebtRows` (کلیدِ ماندگار) ⇐ مانده، حساب، دفترِ قرض و سقف، صورت‌حساب، سنِ بدهی، فاکتورها،
+  رسیدها، اعتبارِ دکان، داشبورد، خلاصه، گزارشِ قرض‌داران، حذفِ قرض‌دار؛ `ReportLedger` ⇄ `keeper` ِ `license/report-core.js` (= سرور، ۸۰۰ خط
+  با فشرده کردنِ دو push) و بردارِ دستیِ «merged» در `core/test-vectors/report-v1.json`؛ سرور `credit-limit-review` (`keeperOf`/`aliased`).
+  قاعده در RULES «v3 · قرض‌داران». پمپ و `sync/` و `sync-v1*` دست نخوردند (فقط خوانده شدند).
+- **LOC-06 ⇒ IMPLEMENTED-VERIFIED:** `core/i18n/StrSheets` (ثبت در `I18nTables`) برای هر ۱۱۷ خطِ «منتظرِ تصمیمِ صاحب‌کار» (۰ مانده) + سرستونِ
+  ریزِ ردیف؛ فارسی بایت‌به‌بایت همان (اثرِ SHA-256 ِ همهٔ برگه‌ها روی همین شاخه با کدِ LOC-06 برگردانده، در worktree ِ جدا، گرفته شد: `ea86b342…a227`). `PayFlow.KIND_LABELS` و
+  کلیدهای `OwnerExport` داده ماندند (نامِ روش در اکسل با `Receipts.payName`)؛ `SheetModel.NO_SUM` در انگلیسی/پشتو (جمع‌پذیری در چهار زبان یکی)؛
+  نام‌های ورودِ کالا سرستونِ انگلیسی/پشتوی برگهٔ «محصولات» را می‌شناسند (بی آن برگهٔ انگلیسی دوباره وارد نمی‌شد). واژهٔ دریِ تازه‌ای لازم نشد
+  (`DariCoverageTest`)، پس `dari-words.js` و `DARI-REVIEW` عوض نشدند. نامِ پروندهٔ برگه‌های دیگر که از پیش «// داده: نامِ پروندهٔ خروجی» بود همان ماند.
+- **آزمون:** Kotlin (`-Xmx3g`، flock): هدف‌دار ۲۵۲ آزمون — ۶ سرخ در دورِ نخست (حسابِ دستیِ خودِ آزمون، سه انتظارِ `DebtReminderTest` که حالا بردِ ماندهٔ ادغام‌شده را در ماندگار می‌بیند، «no.» ِ انگلیسی در `NO_SUM`، شمارندهٔ صفِ v3 ِ دیسکِ بی Snapshot) ⇒ درست شد؛ اجرای کاملِ کامپیوتر روی 1f4b208a7: **۴٬۱۷۵ PASS، ۰ FAIL، ۴ SKIP** (از جمله CustomerMergeLinkTest ۷، SyncV3EngineTest ۴۱، CrmMergeGateDiskTest ۲، CrmSweepDiskTest ۸، SheetLangTest ۴، DebtReminderTest ۱۰، I18nCoverage ۸، DariCoverage ۲۳). سرخ‌پیش: `CustomerMergeLinkTest` پیش از کد کامپایل‌نشدنی؛ `SheetLangTest` روی همین شاخه با LOC-06 ِ برگردانده: فارسی سبز (اثرِ پیشین) و انگلیسی/پشتو سرخ. سرور (PGlite): `crm10-link-merge.test.js` ۳/۳، `credit-limit-review.test.js` ۱۲/۱۲ (موردِ تازه روی کدِ پیشین سرخ)، بردارِ «merged» ِ `report-core` روی هستهٔ پیشین سرخ؛ هم‌خانواده‌ها (report-core، owner-report، cost-vectors، cashier-alerts، admin-money، branches-report، store-account-history، promo-loyalty-review، finalized-sales، sync-v3، dari-text، kotlin-test-names) ۱۴۱/۱۴۱. `precheck.sh` ‏fail=0، `quality.mjs` بی ❌، `spec check` سالم، `whatsnew` ۱۵ سطر، `secret-scan --all` ۰ سد. ⚠️ نامِ لاگِ Gradle در scratchpad ِ مشترکِ عامل‌ها با عاملِ دیگری یکی افتاد (`logs/full1.log`)؛ از آن پس `logs57x/`.
+- **قدمِ بعد:** هیچ ساختنی در این دو ردیف نماند. اگر روزی v3 دکمهٔ روشن کردن گرفت، پیش از آن همهٔ دستگاه‌ها این ساخت را داشته باشند (پیوند را
+  بشناسند). `/home/user/wt-57x-old` فقط برای گرفتنِ اثرِ فارسی بود (worktree ِ جدا، پاک‌شدنی).
+### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-47e (د۱۰) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-47e` (از main ‏94eb92d90)؛ ★ «فقط ایمیل»
+
+- **تصمیم (عینِ حرفِ صاحب‌کار):** «برنامه را فقط با ایمیل قبول می‌کنم؛ شماره و OTP ِ پیامکی اصلاً.» و «شماره توی برنامه بشه ثبت کرد ولی برای
+  لاگین نه اصلن». در `OWNER-DECISIONS-fa.md` (بالا) و `RULES-fa.md` «v3 · ورود و نشست» نوشته شد؛ D-09 ِ «ب» کنار رفت، `OWNER-ACTIONS` «ب ۱» و
+  ردیفِ پیامکِ `OWNER-NEXT` خط خورد؛ `server/SMS.md` یادداشتِ «برداشته شد» است.
+- **سرور:** `/api/auth/login|otp/*|reauth` فقط ایمیل (`email_required`)؛ `lib/otp` هر مقصدِ غیرِ ایمیل را رد می‌کند (`email_only`) و سقف‌های
+  پیامکیِ SEC-06 رفت؛ AUTH-08 ⇐ `POST /api/me/email/code` + `PUT /api/me {email, emailCode}` (پرچمِ `auth.phone_add_code` و درِ شماره رفت)؛
+  مهاجرت‌های ۸۸۰ (`users.phone` نایکتا) و ۸۸۱ (`store_customers.email` یکتا، `online_orders.customer_email`/`store_customer_id`، CHECK ِ
+  کلیدها) با rollback؛ بلیتِ v3 ِ ایمیل (`lib/storefront-ticket.js`)؛ «سفارش‌های من» با `OWNED_SQL`؛ `POST /:slug/account/phone` بی کد و
+  `POST /:slug/account/email` با کدِ ایمیلِ تازه؛ چت، «خبرم کن»، پوش، درخواستِ محدوده، شکایت، حذفِ داده، تاریخچهٔ حساب، گروهِ تخفیف همه با
+  ایمیل؛ زنجیرهٔ اعلانِ مشتری «پوش ⇒ ایمیل ⇒ واتس‌اپ ⇒ تلگرام» (`lib/customer-notify-email.js`)؛ کدِ VIP ِ دکان بی پیامک؛ پشتیبانِ هشدارِ
+  دکان `email` (not_configured). **سه باگِ امنیتیِ «شمارهٔ جعلی»** (کوپنِ پوزش، معافیت‌های RSK-02/04، سقفِ RSK-07/نگه‌داشتنِ موجودی) بسته شد —
+  قاعده: شمارهٔ تأییدنشده فقط محدود می‌کند (`SECURITY-AUDIT-fa.md` B16).
+- **وب/برنامه‌ها:** ویترین، بازارچه و همهٔ دیربارها با ایمیل (+ «شمارهٔ تماس برای پیک»، که حالا مثلِ نام روی همان دستگاه یاد می‌ماند)؛ بارِ نخست
+  ۷۲٬۶۹۴ ≤ ۷۲٬۷۰۴ بایت؛ Kotlin: `core/account/EmailClaim*`، `CustomerTicket` ِ ایمیل در shopper، «ویرایشِ حساب و دکان» ِ نسخهٔ ۳ (ایمیل با کد،
+  شماره بی کد)، برنامهٔ خرید (`customer-android`) با ایمیل.
+- **آزمون‌ها:** سرور کامل در دو تکه (`TEST_SHARD=1/2` و `2/2` ِ `scripts/test-pglite.js`): ۲٬۰۲۸ + ۲٬۲۱۲ آزمون؛ شکست‌های همان اجرا (`dari-text` برچسبِ تماس، `login-contract`/`login-hardening` ِ قراردادِ ورود، و `image-studio-jobs` ِ «fetch failed» زیرِ بارِ ماشین — جدا روی شاخه ۱۱/۱۱) اصلاح و جدا سبز. آزمون‌های تازه یا سرخ‌پیش‌از‌تغییر: `email-only-auth` ۷، `storefront-email-identity` ۶، `customer-notify-email` ۲، `order-late-apology` (کوپن با شمارهٔ جعلی ⇒ ۲۰۱ روی کدِ پیشین)، `order-risk`/`risk-lists` (معافیت با شمارهٔ دیگری)، `stock-reserve-phone-cap`، `storefront-risk` (RSK-07 با شمارهٔ تماس). مرورگر: ۳۶ پروندهٔ `web-store*`/`web-market` ⇒ ۱٬۸۶۲ ✅، ۰ ❌ و `admin-panel.mjs` ۴۳/۴۳. سرتاسری: `node test/e2e/run.mjs` ⇒ ۳۹ سناریو، ۲۵۴ گامِ سبز؛ چهار سناریوی مانده پس از تبدیل جدا سبز (customer ۱۳/۱۳، notify ۸/۸، order ۱۱/۱۱، trust ۶/۶). Kotlin: core shopper+account ۱۷۹ (۰ شکست)؛ کامپیوتر هدف‌دار ۴۰ PASS (`ProfileEditModelTest` ۵/۵)، اجرای کاملِ `-p desktop test` (flock) ⇒ ۴٬۱۳۱ آزمون، ۴٬۱۲۶ PASS، ۴ SKIP، ۱ شکست: p95 ِ زمانیِ `ScenarioS01DesktopTest` زیرِ بارِ ماشینِ مشترک (۵۰۸–۷۵۰ms، سقف ۵۰۰؛ بی ربط به این شاخه — اجرای نخست با OOM ِ ماشین قطع شده بود)؛ `customer-android` روی Compose Desktop ِ محلی کامپایل و ۳۳/۳۳. precheck `fail=0`، quality بی ❌، `spec.mjs check` «سالم»، whatsnew ۷ سطر. STATUS: CHK-02، RSK-01، NTF-01/02/03، AUTH-08، CHK-03، CHK-20، ORD-16، NTF-10 ⇐ IMPLEMENTED-VERIFIED؛ PRM-11 ⇐ PARTIAL؛ PARTIAL-MAP ۲۲۴ (کد ۴).
+- **دادهٔ موجود:** حسابِ مشتریِ فقط‌شماره داده‌اش می‌ماند و با نشستِ زندهٔ خودش ایمیل را با کد وصل می‌کند (سفارش‌های ویترینیِ شمارهٔ تأییدشدهٔ
+  پیشینش به حساب می‌آیند)؛ کاربرِ دکانِ فقط‌شماره با نشستِ باز (و رمز برای تأییدِ دوباره) ایمیل را می‌افزاید.
+- **نیمه‌کاره / قدمِ بعدی:** (۱) فیلدِ **ایمیلِ قرض‌دار** در برنامهٔ دکان — بی آن CRM-13 («حسابِ من» ↔ دفتر) و PRM-11 (گروهِ مشتری) هیچ پیوندی
+  نمی‌سازند (هر دو در «کد» ِ PARTIAL-MAP)؛ (۲) کاربرِ دکانِ فقط‌شماره **بی نشستِ باز** راهِ ورود ندارد (داده می‌ماند) — درِ مدیر برای «وصلِ ایمیل با
+  کدِ همان ایمیل» یا تصمیمِ صاحب‌کار؛ (۳) CHK-10 «رسیدیم» و NOTIF-11 پشتیبانِ ایمیل به صاحب حالا بی حسابِ بیرونی ساختنی‌اند؛ (۴) برنامهٔ دکان
+  هنوز «حذفِ دادهٔ مشتری» را فقط با شماره/سفارش می‌فرستد (سرور `{email}` هم می‌پذیرد)؛ (۵) پمپ با ایمیل/گوگل وارد می‌شود (فرض از `PUMP-fa.md`،
+  کدِ پمپ دست نخورد) و پیامکِ اختیاریِ VIP ِ پمپ تنها کاربردِ پیامک است؛ (۶) کامپایلِ اندرویدِ `customer-android`/`android-native` و آیفون فقط CI.
+- **ادغام با دستهٔ ۶۲ (همان روز، هماهنگ‌کننده؛ `origin/claude/batch-62` = main + 52t، 51o، 48b، 53h، 50d، 49r، 55s):** تعارضِ معناییِ
+  «فقط ایمیل» × SEC-10 (د۱۳، بازپخشِ حذف پس از بازگردانی): دفترِ `lib/erasure-ledger.js` فقط HMAC ِ شماره داشت و حذفِ ایمیلی «bad entry» می‌داد
+  (یعنی **هیچ** حذفی پس از ادغام نمی‌نشست: ۸ آزمونِ سرخ) ⇒ خطِ **v2** `{key, ekey}` (HMAC ِ شماره و HMAC ِ ایمیلِ کوچک‌حرف با دامنهٔ جدا)؛ خطِ
+  کهنهٔ **v1** همان‌طور خوانده و بازپخش می‌شود (`ekey` ِ v1 نادیده). `erase` در هر حالت (شماره، ایمیل، حساب، سفارش) کلیدِ خودش را پیش از commit
+  می‌نویسد؛ `replay` مشتری را با شماره **یا** ایمیل در سفارش، چت، «خبرم کن»، پوشِ آن، درخواستِ محدوده و حساب پیدا می‌کند و برای «دادهٔ من» ِ
+  حسابی که ایمیلش پس از پشتیبان عوض شد با شناسهٔ همان حساب (`targetOfCustomer`)؛ همان شناسه، یک سابقه، بارِ دوم هیچ. هم‌چنین RET-11 (د۱۲):
+  «صاحبِ سفارش» شماره بود ⇒ پس از «فقط ایمیل» هم هیچ مشتری‌ای به درخواستِ برگشت نمی‌رسید و هم **شمارهٔ تماسِ بی‌کد مالکیت می‌داد** (باگِ امنیتی) ⇒
+  `sf.ownsOrder` (ایمیلِ تأییدشده/حساب)؛ `onReturnIn` و `onExtraIn` با `keyOfOrder` (+ `RETURN_EVENTS`). `acct.js` هر دو بخش (برگشت‌های من +
+  حذفِ ایمیلی). اسناد: OWNER-DECISIONS/NEXT (جدول و بخش‌های تازهٔ دسته + واقعیت‌های این شاخه)، نقشه با `mapmerge.py` (دسته = ما، 47e = آن‌ها)
+  و `mapfix.py`، `routes.json` از نو، DISASTER-RECOVERY گامِ ۷. **تغییرِ عمدیِ آزمون:** `order-return-requests.test.js` و `web-store-returns.mjs`
+  بلیتِ مشتری را با **ایمیل** می‌گیرند (درِ کدِ شماره دیگر نیست)؛ سست نشد: «شمارهٔ تماسِ جعلی ⇒ ۴۰۴» و «کلیدِ سقفِ اعلانِ برگشت = ایمیل» افزوده
+  (هر دو با جهش سرخ). سه آزمونِ تازه در `customer-erasure-restore.test.js` (حذفِ ایمیلی، «دادهٔ من» ِ حسابِ ایمیل‌عوض‌کرده، خطِ v1). آزمون‌ها:
+  ادغامِ ساده‌لوحانه ⇒ erasure/notify ۳۵/۴۳ و RET-11 ۰/۷؛ پس از رفع: erasure + ledger + restore + notify (سه پرونده) + RET-11 ۵۳/۵۳، `web-store-returns.mjs`
+  ۴۰ ✅ ۰ ❌ (PGlite، axe از scratchpad). اجرای کاملِ PGlite در دو تکه (سرِ 61d08eb90، زیرِ بارِ ۱۲ تا ۱۹؛ به خواستِ هماهنگ‌کننده پیش از پایان
+  ایستاد): ۴٬۱۲۵ آزمون، ۱۳ «not ok» = ۲ TODO ِ شناخته، ۲ `sync-epoch` (مالِ خودِ دسته؛ با faef19cfe ِ دسته رفع و پس از ادغامِ d72ec3fd2 ۳۰/۳۰ با
+  `image-studio-jobs`) و ۹ `image-studio-jobs` («fetch failed» زیرِ بار؛ تنها سبز). PostgreSQL ِ محلی (55432) خاموش و بی پوشهٔ داده بود ⇒ سنجیده نشد.
+  **مانده:** شبیه‌سازیِ squash روی main سقفِ اندازهٔ ۵ پرونده را می‌شکند (`storefront.js` ۸۲۲/۸۰۰، `shop-chat.js` ۸۶۱/۸۵۳، `ShopperText.kt`
+  ۸۰۱/۸۰۰، `CustomerModel.kt` ۸۰۱/۸۰۰ از 47e؛ `app.js` ۸۰۵/۸۰۰ از خودِ دسته) ⇒ `finish-pr.sh` «QUALITY FAIL (not UI-only)» می‌دهد مگر جدا شوند.
+### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-56c زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-56c` (از `origin/claude/batch-62` 54a9333be) — ماندهٔ کدِ د۱۸: SEC-02، S09، S44
+
+- **SEC-02 ⇒ IMPLEMENTED-VERIFIED** (پرچمِ خاموشِ `shop.doc_chain`، FLAGS-ON §۴۰): برگشت، قرض/رسید، خرید و پرداخت به تأمین‌کننده هر ردیف یک سندِ
+  زنجیره (`core/audit/DocChainDocs`، بردارِ `doc-chain-docs-v1.json` با سازندهٔ JS ِ مستقل)؛ «تا کجا» ِ سندِ بی‌شماره در `DocChainState`
+  (`docFrom`/`docAt`/`docIds`، پنجرهٔ سه‌روزهٔ دیررسیده؛ بی آن وضعیت همان)؛ گردآوری `PlainChainFacts` در `DocChainSync` روی v1 و **v3**؛ صفحهٔ
+  «بررسیِ یکپارچگیِ اسناد» (`audit/doc-chain`؛ `DocChainAudit` هر حلقه را از دفترِ امروز از نو می‌سازد). سرور دست نخورد (نوع را محدود نمی‌کند؛
+  درِ زنده آزموده شد).
+- **S44 ⇒ IMPLEMENTED-VERIFIED** (FLAGS-ON §۳۸): دکمهٔ «بازیابی از پشتیبان» زیرِ دستگاهِ غیرفعال (صفحهٔ عضو و بخشِ «دستگاه‌ها»)، فقط با `replay` ِ
+  `GET /shop/devices`؛ فقط `pending-ops.json` از فایل خوانده می‌شود؛ رمزدار ⇐ عبارت.
+- **S09 ⇒ PARTIAL / «دستگاه»** (پرچمِ تازهٔ `shop.held_twice_cancel`، FLAGS-ON §۳۹): دستگاهی که `held_conflict` گرفت فروشِ **خودش** را فقط وقتی
+  فروشِ نخست قلم‌به‌قلم یکی است از راهِ لغوِ عادی لغو می‌کند (`HeldTwice`، `HeldTwiceAndroid`) و همیشه به صندوقِ صاحب گزارش می‌دهد
+  (`POST /shop/held-invoices/:id/twice`، `lib/held-twice.js`، گونهٔ `held_twice`). مانده: دو دستگاهِ واقعی.
+- **باگِ واقعیِ یافته (شاخهٔ پایه):** آزمون‌های کامپیوترِ `batch-62` کامپایل نمی‌شدند (`ReturnRequestCardUiTest`: import ِ `onAllNodes`؛
+  `ScenarioS76ServerDesktopTest`: `@Volatile` روی متغیرِ محلی) ⇒ هیچ آزمونِ desktop اجرا نمی‌شد؛ درست شد. سه شکستِ پیشینِ نوشته‌ها هم:
+  `CustomerErasureLedger.ERASED_NAME` بی «// داده:»، و `StrReturnRequests.filter/status/reason/method` که کدِ ناشناخته را پنهان می‌کردند؛ و سه شکستِ
+  اجرای کامل (پایین). ⚠️ هر «اجرای کاملِ desktop» ِ پیش از این روی `batch-62` در واقع اجرا نشده بود.
+- **آزمون (سرخ روی پایه ⇐ سبز):** سرور (PGlite): `doc-chain-docs` ۰/۳ ⇐ ۳/۳، `lost-device-replay-button` ۱/۲ ⇐ ۲/۲، `held-twice` ۰/۳ ⇐ ۳/۳؛ ۳۰ پروندهٔ
+  هم‌بسته (held، conflict-inbox، doc-chain، hash-chain، sale-void، paid-routes، route-inventory/authz، dead-doors، staff-perms، api-contract…) ۱۹۰ آزمون:
+  ۱۸۹ قبول، ۱ رد‌شده (فقط PostgreSQL)، ۰ شکست. core: `DocChainDocsTest`/`DocChainDocsVectorsTest` روی پایه کامپایل‌نشدنی (۶۶ خطا) ⇐ سبز؛ `jvmTest` ِ کامل
+  ۱۹۵۹/۱۹۵۹. desktop (هدف‌دار): `HeldTwiceTest` ۵/۵، `DocChainLedgerTest` ۳/۳، `LostDeviceRestoreDesktopTest` ۴/۴، `RowsE56cUiTest` ۵/۵، `HeldClaimTest` ۷/۷،
+  `HeldSyncTest` ۷/۷، `HeldInvoicesTest` ۲۹/۲۹، `HeldClaimSheetsUiTest` ۳/۳، `I18nCoverageTest` ۸/۸، `DariCoverageTest` ۲۳/۲۳، `V3ReachabilityTest` ۹/۹ و
+  دیگر آزمون‌های مسیر، `VoidFlowTest` ۵/۵. اجرای کاملِ `./desktop/gradlew -p desktop test` (flock): ۴٬۱۸۴ آزمون، ۴ رد‌شده، ۳ شکست — هر سه پیشین از `e-rows-55s` (پیش از این دیده نمی‌شدند چون آزمون‌ها کامپایل نمی‌شدند) و درست‌شده: `CustomerAccessLogTest` (سنجهٔ متنی به شاخهٔ تازهٔ صف رسید، سخت‌تر)، `DataSafetyGuardTest` (`tohid-pay-mirror`، `tohid-customer-access` در DATA-SAFETY §۶)، `ScenarioS76ServerDesktopTest` (`assertEquals(double, double)` ِ بی دلتا)؛ دوباره ۷/۷، ۱۰/۱۰، ۲/۲. `precheck.sh` fail=0، `quality.mjs` بی ❌ ِ تازه، `spec.mjs check` سالم، whatsnew و secret-scan (۰ سد).
+- **قدمِ بعد:** CRM-10 (همان «کد»)؛ صاحب‌کار: سه کلید روی یک دکانِ آزمایشی (FLAGS-ON §۳۸–۴۰) و S09 با دو دستگاهِ واقعی.
+### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-59b زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-59b` (از `origin/claude/batch-62` 21e7499a8) — شعبه درونِ یک دکان، فازِ ۳ ِ سرور
+
+- **ساخته شد (فقط سرور، پشتِ پرچمِ خاموشِ `shop.branches`؛ طراحی و جدولِ درها: [`BRANCHES-fa.md`](BRANCHES-fa.md) §۹؛ مهاجرتِ ۹۰۰ + rollback):**
+  کاتالوگِ مشترک — کالا/دسته/واحد/قیمتِ پایه فقط از شعبهٔ اصلی (op ِ دستگاه در بخشِ شعبه ⇒ `catalog_main_only`، صاحب هم) و آینهٔ
+  سرور (`srv.cm.`) پیش از pull/Snapshot ِ هر شعبه (`lib/branch-catalog.js`)؛ موجودیِ سرور (`shop.catalog`) **به تفکیکِ شعبه** (INV-01) با
+  «کلیدِ موجودی» در `stock.js`/`catalog.js`/`catalog-manual.js` (`branch_id` ِ همان شعبه، کلیدِ یکتای `<شعبه>|…`، `catalog_branch_state`)؛
+  `/api/shop/catalog` شعبه‌شناس با سرآیندِ سنجیدهٔ `X-Branch-Id` (`branches.restOf`) و بیرون از `branch-gate` — تنظیمات، نگه‌داشتهٔ
+  سفارشِ آنلاین و انتقال در شعبهٔ دیگر ۴۰۳ `branch_unsupported`؛ RPT-18 با نامِ کالای دکان و «کم‌موجودِ» همان شعبه؛ hello ِ v3 ِ شعبه
+  `catalog_read_only` را می‌گوید. شعبهٔ اصلی و پرچمِ خاموش بایت‌به‌بایت همان (پاسخ و ردیف‌ها). کدِ پمپ/`sync-v1*` خوانده/دست زده نشد.
+- **یافتهٔ واقعی در کار:** خواندنِ شعبه فقط بخشِ خودش را تازه می‌کرد ⇒ کالای تازهٔ اصلی در فهرستِ شعبه نبود و حرکتِ دستی «کالا پیدا
+  نشد» می‌گرفت ⇒ خواندن/حرکت/آستانهٔ شعبه اول کاتالوگِ اصلی را تازه می‌کند (آزمونِ INV-01 و آینه سرخ بود، سپس سبز). STF-06: وظیفهٔ
+  محدودهٔ مکان حالا فقط از همان شعبه خوانده می‌شود (شناسهٔ وظیفهٔ شعبهٔ دیگر همان «نیست»).
+- **آزمون:** پیش از کد روی `origin/claude/batch-62` (همان پرونده‌های تازه): `shop-branches-stock` + `tenant-matrix-branches` **۰/۷ سرخ**؛ پس: `TEST_DATABASE_URL=pglite:memory node --test --test-concurrency=1 test/shop-branches-stock.test.js` **۷/۷** (برابریِ پرچمِ خاموش و شعبهٔ اصلی با پاسخ و ردیف‌ها، INV-01، نفوذ/سرآیندِ جعلی روی ۱۶ درِ کاتالوگ × ۵ ادعا × ۲ نقش، آینه، RPT-18، هم‌زمانی، مهاجرتِ ۹۰۰ بالا/پایین/دوباره)، `test/tenant-matrix-branches.test.js` **۱/۱** (۳۴۳ در از سورس، بیش از ۴ هزار درخواست: هیچ نشانِ «ب»، هیچ تغییرِ «ب»)، `shop-branches` ۱۰/۱۰ (سه آزمونِ فازِ ۱ آگاهانه به «کالا فقط از اصلی» رسیدند و سخت‌تر شدند)؛ بازگشت: `catalog-*`، `stock-*`، `sync-v3*`، `owner-report`، `branches-report`، `staff-scope` ۱۷۱ (۱۶۹ سبز، ۲ SKIP)، `shop-route-inventory`/`route-authz-inventory`/`tenant-matrix`/`paid-routes*`/`upgrade-rehearsal` ۴۸/۴۸، دورِ آخر روی کدِ نهایی ۹۶/۹۶. **اجرای کاملِ سرور روی PGlite** (دو تکه): ۴۳۱۶ آزمون، ۴۲۷۴ سبز، **۰ شکست**، ۴۰ SKIP و ۲ TODO ِ پیشین (outage-recovery ۳-ب، sync-v1-pull-own-newer ۵-ب). precheck `fail=0`، quality بی ❌ (app.js ِ ۸۰۵ خط از پیش)، spec «سالم»، whatsnew و secret-scan (۰ سد) و api-contract سبز. Kotlin عوض نشد ⇒ desktop/core اجرا نشد.
+- **مانده (فازِ ۳ ِ دیگر و فازِ ۴):** شیفت/صندوق، نگه‌داشته، سفارشِ خرید، صندوقِ تعارضِ صاحب، `/events`، `/me/backups` هنوز «فقط اصلی» با
+  نگهبان (امن، نه قاطی)؛ سابقه‌های بهترین‌کوشش (S46/CRM-03/STF-03) برای شعبه؛ `doc-chain`؛ ابزارهای پنل. فازِ ۴: INV-11 میانِ شعبه‌ها و
+  POS-16/S17 (پرسش از صاحب‌کار). PostgreSQL ِ محلی در این کانتینر نیست (`/home/user/pgdata` نبود) ⇒ آزمونِ هم‌زمانی فقط روی PGlite
+  (پشتِ هم) — روی PostgreSQL سنجیده نشد. ⛔ تا پایانِ فازِ ۲ کلید را روی دکانِ واقعی روشن نکنید.
+### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-58m زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-58m` (از `origin/claude/batch-62` 07896351d) — چند دامنه برای هر برنامه
+
+- **خواسته (۱۴۰۵/۰۸/۲۲):** «برنامهٔ سرور جوری باشه که بشه چندین دامنه یا سرور متفاوت گذاشت برای هر برنامه». شرح: `docs/SERVERS-fa.md` §۳،
+  `FLAGS-ON-fa.md` §۴۱، `RULES-fa.md` («🌐 هر سرور» ← «چند نشانی برای هر برنامه»).
+- **ساخته شد (همه پشتِ کلیدِ خاموش؛ خاموش ⇒ همان امروز):** core: `ServerFailover.choose` (حلقهٔ مشترکِ گزینش، از `recheck` ِ دکان
+  به core آمد)، `ServerLearn`، `ServerRouter`، `ShopperRoutedHttp`/`ShopperServers`؛ دکان و حالتِ پیک: آموختنِ `publicUrls` در
+  `recheck` و سنجشِ گاه‌گاهِ سرورِ پیش‌فرضِ تک‌نشانی (`app.multi_server`)؛ خریدِ مشتری اندروید/آیفون: `tohid.multiServer` (زمانِ ساخت)؛
+  سرور: `PUBLIC_BASE_URLS` ⇒ `publicUrls`، و نشانیِ دیگرِ ویترین (`STOREFRONT_ALIAS_DOMAINS` + `shop.storefront.host_alias`،
+  `PUT /api/shop/storefront/hosts` فقط صاحب، مهاجرتِ ۹۱۲). پمپ و `sync-v1*` دست نخوردند.
+- **آزمون:** core ⇒ `ServerRouterTest` ۱۵/۱۵، `ShopperServersTest` ۷/۷، `ServerProfilesTest` ۱۶/۱۶؛ کامپیوتر ⇒ `ServerFailoverDesktopTest` ۳/۳
+  (HTTP ِ واقعیِ محلی) و `ServerSwitchGateTest` ۲/۲؛ اجرای کاملِ desktop: ۴۱۷۰ آزمون، ۵ شکست — همه از پیش و بیرون از این کار
+  (`DariCoverageTest`/`CustomerErasureLedger`، `I18nCoverageTest`/`StrReturnRequests`، `CustomerAccessLogTest`، `DataSafetyGuardTest`
+  ِ `tohid-pay-mirror`/`tohid-customer-access`، `ScenarioS76ServerDesktopTest` ِ float — همه از ادغامِ e-rows-55s). سرور (PGlite):
+  `storefront-hosts` ۶/۶ (Host ِ دشمنی)، `server-info` ۷/۷، `paid-routes-entitlement` ۶/۶، `paid-routes-public-entitlement` ۶/۶،
+  `shop-route-inventory` ۲/۲، `route-authz-inventory` ۴/۴، `api-contract` ۲/۲، `upgrade-rehearsal` ۹/۹، `storefront` ۲۰/۲۰،
+  `storefront-seo` ۶/۶. precheck ⇒ fail=0.
+- **نیمه‌کاره / قدمِ بعد:** صفحهٔ «نشانی‌های ویترین» در برنامهٔ دکان (امروز فقط درِ سرور)؛ ساختِ اندروید/آیفونِ خریدِ مشتری در CI
+  (این‌جا SDK نبود)؛ VPS ِ واقعی، تونلِ Cloudflare و DNS ِ دامنهٔ دوم آزموده نشد.
+### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-55s (د۱۸) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-55s` (از `origin/claude/batch-62` 1a77fe22f) — همگام‌سازی، گروهِ الف
+
+- **تصمیمِ صاحب‌کار (پرسشِ ۳۲):** ردیف‌های همگام‌سازی پس از فازِ ۱ ِ شعبه، هر کدام پشتِ کلیدِ خاموش و با آزمون؛ پمپ «نه» (فایل‌های
+  مشترکِ `sync-v1*` خوانده/دست زده نشدند).
+- **ساخته شد (هر کدام پشتِ پرچمِ خاموش، رفتارِ امروز با پرچمِ خاموش همان — آزمونِ برابری):**
+  PRD-07 قاعدهٔ واحد در راهِ قدیمِ `/api/sync` (`legacyGuard`)؛ PAY-07 آینهٔ حساب‌پی (`GET /shop/payments/mirror`، `PayMirror`،
+  `PayMirrorAndroid`، `shop.pay_status_mirror`)؛ CRM-15 صفِ دیدنِ حسابدارِ بی‌اینترنت (`shop.customer_access_offline`) و فرمانِ
+  پاک کردنِ پرونده در دفترِ دستگاه پس از SEC-10 (مهاجرتِ ۸۹۵، `shop.customer_erasure_ledger`)؛ S44 صفِ نرفته در پشتیبان و
+  `POST /shop/devices/:id/replay` (`shop.lost_device_replay`)؛ S76 آزمونِ Pull/سوکتِ واقعی (`ScenarioS76ServerDesktopTest`).
+  E2E-OPS-14 از پیش ساخته بود (#335) — `ops.e2e.mjs` ۱۳/۱۳ ⇒ فقط `SYNC_EPOCH_ENABLED`.
+- **ساخته نشد (سقفِ سیزن؛ طرح در STATUS):** SEC-02، CRM-10، S09 ⇒ «کد»؛ دکمهٔ S44 ⇒ «کد».
+- **آزمون:** TESTS_PLACEHOLDER
+- **قدمِ بعد:** دکمهٔ «بازیابی از پشتیبان» ِ S44؛ SEC-02 (سندِ برگشت/قرض/خرید + صفحهٔ بررسی)؛ CRM-10 (op ِ فقط‌سرورِ جابه‌جاییِ
+  `debtorId` در v3 یا ادغامِ نام‌مستعار)؛ S09؛ سپس گروهِ ب پس از فازِ ۲ ِ شعبه.
+### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-49r (د۱۲) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-49r` (از `origin/main`، 94eb92d90)
+
+- **RET-11 (تصمیمِ ۱۳ «ب»: مشتری از ویترین درخواستِ برگشت می‌دهد):** ساخته پشتِ پرچمِ خاموشِ `shop.storefront.return_requests` (مهاجرتِ ۸۶۶).
+  ویترین: در جزئیاتِ سفارشِ **تحویل‌شده** «درخواستِ برگشت» (`store/return-request.js` ِ دیربار، واژه‌نامهٔ `returns` ِ سه‌زبانه، عکس از راهِ
+  `chat-photo.js`، بی innerHTML، بودجهٔ بارِ نخست بی‌تغییر ۷۲٬۶۳۴ ≤ ۷۲٬۷۰۴)، وضعیت در همان صفحه و «سفارش‌های من». سرور: `lib/order-return-requests.js`
+  (مشتری) و `-shop.js` (دکان)، درهای `/api/store/:slug/orders/:token/return-requests*`، `/api/store/:slug/account/return-requests` و
+  `/api/shop/order-returns*`؛ اعلانِ دکان (پوشِ اعلانِ سفارش) و مشتری (`customer-notify` ⇐ `onReturnIn`، ستونِ `return_request_id`). برنامهٔ دکان
+  (اندروید و کامپیوتر، یک کد): صندوقِ «درخواست‌های برگشت» سرِ صفِ سفارش‌ها؛ «پذیرفتن» ⇒ همان `ReturnFlowSheet` با `preset`
+  (`data/ReturnRequestPrefill.kt`) و سندِ ثابتِ `o-<سفارش>-rq-<درخواست>` ⇒ «ثبت شد» به سرور؛ پول/موجودی فقط از راهِ برگشتِ موجود.
+- ⚠️ **برای عاملِ ایمیل (هماهنگی):** هویت = حسابِ ویترین (`customer_id`)؛ «صاحبِ سفارش» یک تابع است: `ownsOrder` در
+  `lib/order-return-requests.js` (امروز شمارهٔ حساب = `customer_phone` ِ سفارش، همان قاعدهٔ `ordersOfPhone` ِ «سفارش‌های من»). وقتی «سفارش‌های من» به
+  ایمیل/شناسهٔ حساب رفت، همین تابع هم؛ آزمونِ «مالکیت = سفارش‌های من» در `order-return-requests.test.js` این دو را به هم می‌بندد. اعلانِ مشتری از همان
+  صفِ `customer-notify` (`phone_key`) است. به `lib/otp`/ورود دست نخورد.
+- **آزمون‌ها (سرخ پیش/سبز پس):** `order-return-requests.test.js` ۰/۷ روی main ⇒ ۷/۷؛ `web-store-returns.mjs` (کرومیوم) روی main سرخ (TimeoutError) ⇒
+  ۰ ❌؛ core `OrderReturnRequestsTest` پیش از کد کامپایل‌نشدنی ⇒ ۶/۶؛ DESKTOP_EVIDENCE. فهرست‌های در/اشتراک/مجوز (`shop-route-inventory`،
+  `paid-routes*`، `route-authz-inventory`، `dead-doors`، `role-route-isolation`) و `customer-erasure`، `customer-notify`، `image-store-migrate`،
+  `admin-flags`، `web-i18n`، `market-web` سبز. اجرای کاملِ سرور در دو تکه (PGlite): الف ۲۳۳۶ آزمون، ۲۳۰۵ قبول، ۱۱ شکست = ۷ شکستِ محیطیِ همان main (`backup.test.js` ×۶ و `pump-isolation` «سرور را به کامپیوترِ دیگر ببر» — pg_dump/سوکتِ PostgreSQL در این کانتینر نیست؛ روی main هم همین ۷) + ۴ که در همین شاخه درست و دوباره سبز شدند (`dari-text` ×۳: «مهلت» ⇐ «وقت»، «دوباره بزنید» ⇐ «دوباره کوشش کنید»؛ `customer-notify-refund`: نامِ رویدادهای برگشت از `StrOrderOps`)؛ ب ۱۹۵۶ آزمون، ۱۹۳۳ قبول، ۰ شکست. web-store*.mjs: هر ۳۶ پرونده ۰ ❌ (account، web و vitals در دورِ نخست زیرِ بارِ سنگین «Page crashed»/مهلت گرفتند و جدا دوباره سبز شدند).
+- **STATUS/اسناد:** RET-11 همان PARTIAL، از «تصمیم» به «بیرونی» (فقط بازپرداختِ آنلاین با حساب‌پی، D-08)؛ PARTIAL-MAP (تصمیم ۵۲، بیرونی ۴۰)،
+  FLAGS-ON §۳۳، OWNER-DECISIONS (۱۴۰۵/۰۸/۲۳)، OWNER-NEXT، WHATS-NEW، RULES (نقشهٔ پرچم و قاعدهٔ «درخواستِ برگشت»)، `docs/api/routes.json`.
+- **نیمه‌کاره/قدمِ بعد:** صاحب‌کار: پرچم را برای یک دکان روشن و یک برگشت را از ویترین تا «برگشت ثبت شد» در برنامه بزند (FLAGS-ON §۳۳)؛ بازپرداختِ
+  آنلاین پس از حساب‌پی (D-08). پیکِ برگشت فقط «روشِ رساندن» است (مأموریتِ خودکارِ پیک ساخته نشد).
+### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-50d (د۱۳) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-50d` (از main ‏94eb92d90)
+
+پنج تصمیمِ کوچکِ صاحب‌کار (`decisions-1405-08-23`، شماره‌های ۶، ۱۵، ۲۱، ۲۴، ۲۵)، هر کدام کامیتِ جدا با آزمونِ سرخ‌پیش/سبزپس:
+- **S45 (#۲۱ «قیمتِ همان بسته»):** هسته `LinePricing.ruleListMinor` ⇐ `LinePolicy.edit/checked(pack)`/`listMinor` ⇐ گوشیِ v3
+  (`LineModel.rulePack/ruleList/grantOf`) و `CartLineDialog` ِ کامپیوتر. باگِ هم‌راه: تخفیفِ درصدیِ ردیفِ کارتن از قیمتِ پایه.
+  سرور قاعدهٔ جهت ندارد (فقط `sales.price` ِ متقارن، از پیش با بسته‌ها) ⇒ دست نخورد. `PosKeypad` (صفحه‌کلیدِ لمسی) انتخابِ بسته ندارد ⇒ همان قیمتِ کالا.
+- **CRM-03 (#۲۵):** مشتریِ تازه از سقفِ پیش‌فرضِ دکان (صفر؛ تنظیمِ «سقفِ پیش‌فرض» در دکان نیست) — هسته `CreditLimitPerm.need/newLimit`،
+  برنامه (برگهٔ v3، `quickDraft` ِ صندوق و «مشتریان»)، سرور همان `credit-limit-perm` در v3/v1Guard/pushChanges. ⚠️ «تأییدِ مدیر» = راهِ
+  موجودِ این کلید (مدیر ویرایش می‌کند یا «دوباره ثبت با تأییدِ من» ِ صندوقِ تعارض)؛ PIN ِ روی دستگاه نه، چون سرور برای این کلید برگهٔ
+  امضاشده نمی‌خواند و PIN را نمی‌سنجد (اگر صاحب‌کار PIN خواست: افزودنِ `customers.credit_limit` به `approval-core`/`ApprovalSlip`).
+- **LOC-06 (#۲۴):** `StrDayEnd` برای `DayEndModel`/`HeatmapModel` (۷۳ ⇐ ۰ متنِ خامِ `ui/screens`). مانده (کد): ۱۱۷ خطِ «// داده: …
+  (منتظرِ تصمیمِ صاحب‌کار)» ِ خروجی‌های دیگرِ اکسل در `data/ReportCsv.kt` و ۹ پروندهٔ `data/` — حالا با همین تصمیم ساختنی.
+- **SEC-10 (#۱۵):** `lib/erasure-ledger.js` (بیرون از دیتابیس، کنارِ پشتیبان‌ها) + `customer-erasure.replay` در `afterRestore` و بالا آمدنِ
+  سرور ⇒ IMPLEMENTED-VERIFIED. `docs/DISASTER-RECOVERY-fa.md` گامِ ۷.
+- **POS-04/WEB-05 (#۶):** پیش‌نویسِ ۷۱ گروه `server/scripts/search-synonyms-draft.json` + `docs/SYNONYMS-draft-fa.md` + `scripts/synonyms-draft.js`
+  (افزودنی، پیش‌فرض بار نشده) ⇒ «پرچم».
+- **نیمه‌کاره/قدمِ بعد:** اجرای کاملِ desktop و سرور (دو تکه) در جریان بود — نتیجه پایینِ همین بند؛ اگر نیامد، از سرِ شاخه دوباره بزنید
+  (`-Xmx3g`؛ دو بار daemon با کمبودِ حافظهٔ کانتینر کشته شد ⇒ فقط با `flock /tmp/gradle-full.lock` و حافظهٔ آزادِ ≥ ۷ گیگ).
+### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-53h (د۱۶) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-53h` (از `claude/e-rows-52t` ‏9efeb8b45)
+
+- **S89 ⇐ IMPLEMENTED-VERIFIED (پرسشِ ۲۳):** با کلیدِ `shop.doc_chain` «حذف» ِ قرض/رسید سندِ معکوس است؛ تصمیم فقط
+  `core/debt/DebtReversal` (هم‌زادِ JS: `reversalNeutral` در `license/debt-book.js` و `report-core.js`؛ سرور رونوشتِ بایت‌به‌بایت).
+  برنامه: `DebtorEngine.removeTransaction` (خاموش ⇒ همان `deleteTransaction`)، `data/DebtReverse` (ردیفِ نوعِ مخالف، `kind = reversal`،
+  شناسهٔ `<اصل>-rv`، مهرِ شیفتِ روزِ معکوس، `debt_tx_reverse`)، نمای مؤثرِ بی جفت در کهنگی/سررسید/امتیاز/سنِ بدهی/گزارشِ قرض‌داران/رسیدها،
+  دخل: معکوسِ رسیدِ نقد از «رسیدِ قرض‌داران» ِ روزِ معکوس کم (`CashShift`) و «پولِ پس» در X/Z (`PayFlow`)؛ قرض‌دارِ دارای ردیف با کلیدِ روشن
+  پاک نمی‌شود. صفحهٔ حساب: برچسبِ «معکوس‌شده»/«معکوس»، دکمهٔ «سندِ معکوس»، ردِ با دلیل. `sync/` فقط خوانده شد (`DocChainSync.enabled`).
+- **OPS-06 ⇐ «تصمیم» (پرسشِ ۱۶، ویدیو بعداً):** دکمهٔ «راهنما» با متنِ تأییدشده (`core/guide/GuideHelp`، `V3GuideSheet`): سربرگِ
+  صفحهٔ ریشهٔ هر بخشِ دارای راهنما (`LocalV3Guide` ⇐ `V3Scaffold`)، دکمهٔ گردِ «خانه»، «…» ِ صندوق و سربرگِ کامپیوتر؛ بی اینترنت؛ ردیفِ ویدیو
+  فقط با ویدیو. مانده: ویدیوها و پشتوی گام‌ها.
+- **آزمون (سرخ ⇐ سبز):** core `DebtReversalTest` ۸/۸ (پیش‌تر کامپایل‌نشده)، `GuideHelpTest` ۳/۳ (بدلِ خالی: ۳ سرخ)؛ `DebtReverseFlowTest`
+  ۶/۶ (پیش از وصلِ مصرف‌کننده‌ها ۴ سرخ)، `DebtReverseLedgerUiTest` ۲/۲ و `GuideButtonUiTest` ۲/۲ (هر کدام ۱ سرخ)؛ هدف‌دارِ هم‌خانواده
+  ۱۱۴/۱۱۴ (۱۴ کلاس)؛ JS `debt-book` ۳/۳ و `report-core` ۱۳/۱۳ با بردارهای تازه (کدِ پیشین هر کدام ۱ سرخ)؛ سرورِ مربوط ۴۶/۴۶. {FULL}
+- **نکتهٔ محیط:** کامپایلِ کاملِ کامپیوتر با `-Xmx2g` ِ درون‌پردازه `OutOfMemoryError: Java heap space` داد و چند بار هم OOM-killer ِ
+  cgroup آن را کشت (عامل‌های هم‌زمان)؛ کامپایل‌های هدف‌دار با `-Xmx3g` و یک کارگر، پس از صبر برای ۷ گیگ حافظهٔ آزاد، گذشتند.
+  بدنهٔ کامیتِ 196fe4534 بیش از کارش گفت (فقط فشرده‌سازیِ `report-core.js` بود؛ force-push مجاز نبود).
+- نیمه‌کاره / قدمِ بعدی: هیچ ساختنی در S89 نماند (روشن کردنِ `shop.doc_chain` با صاحب‌کار، `FLAGS-ON`)؛ OPS-06 منتظرِ ویدیو/پشتو.
+  STF-06 تنها ردیفِ «کد» است (همراهِ شعبه).
+
 ### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-48b (د۱۱) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-48b` (از `origin/main` 94eb92d90) — شعبه درونِ یک دکان، فازِ ۱
 
 - **تصمیمِ صاحب‌کار (۱/۱b/۳۴):** شعبه درونِ یک دکان، دادهٔ هر شعبه کاملاً جدا، صاحب هر شعبه و جمع، کارمند فقط شعبهٔ خودش؛ همین حالا

@@ -95,6 +95,28 @@ test('server-info: publicUrl فقط نشانیِ درستِ SERVER_URL/PUBLIC_UR
   } finally { delete process.env.SERVER_NAME; }
 });
 
+test('server-info: publicUrls فقط از PUBLIC_BASE_URLS و فقط نشانیِ ریشهٔ درست؛ خالی ⇒ کلید نیست (پاسخِ امروز)', async () => {
+  const saved = config.publicBaseUrls;
+  try {
+    config.publicBaseUrls = '';
+    assert.equal((await h.get('/api/v1/config/server')).body.publicUrls, undefined);
+    config.publicBaseUrls = [
+      ' https://A.Example.com/ ', 'https://b.example.com/api', 'https://a.example.com',
+      'http://plain.example.com', 'https://user:pw@c.example.com', 'https://d.example.com/?x=1', 'https://e.example.com/#f',
+      'javascript:alert(1)', 'https://f.example.com/a b', 'https://g.example.com/..', 'ftp://h.example.com', 'http://localhost:3000',
+      `https://${'x'.repeat(200)}.example.com`, 'https://i.example.com\\@evil.com',
+    ].join(',');
+    const r = await h.get('/api/v1/config/server');
+    assert.deepEqual(r.body.publicUrls, ['https://a.example.com', 'https://b.example.com/api', 'http://localhost:3000']);
+    assert.deepEqual(Object.keys(r.body).sort(), [...KEYS, 'publicUrls'].sort());
+    //  سقفِ ۸
+    config.publicBaseUrls = Array.from({ length: 12 }, (_, i) => `https://s${i}.example.com`).join(',');
+    assert.equal((await h.get('/api/v1/config/server')).body.publicUrls.length, identity.MAX_PUBLIC_URLS);
+    //  ⛔ بی راز و بی توکن، حتی با فهرست
+    assert.ok(!/secret|private|passphrase|token/i.test(JSON.stringify((await h.get('/api/v1/config/server')).body)));
+  } finally { config.publicBaseUrls = saved; }
+});
+
 test('server-info: SUB-10 — زیرِ پیشوندِ موجودِ /config، فقط GET، بی کلیدِ پولی و بی میان‌افزارِ ورود', () => {
   const mounts = inv.mounts('/config');
   assert.deepEqual(mounts, [{ prefix: '/config/server', file: 'server-info.js' }]);

@@ -23,7 +23,7 @@ const { query, newId, now } = require('../src/db');
 const { PAID_KEYS } = require('../src/lib/features');
 
 const DAY = 24 * 60 * 60 * 1000;
-const PAID = /^(POST|PUT|PATCH|DELETE) \/shop\/(orders|order-feedback|storefront|market|delivery)(\/|$)|^POST \/shop\/(staff-code|invite|staff-code\/rotate)$/;
+const PAID = /^(POST|PUT|PATCH|DELETE) \/shop\/(orders|order-feedback|order-returns|storefront|market|delivery)(\/|$)|^POST \/shop\/(staff-code|invite|staff-code\/rotate)$/;
 const JOIN = ['POST /shop/staff/join', 'POST /shop/join'];
 const STAFF = ['POST /shop/sync', 'POST /shop/sync/push'];
 /** نوشتنی‌های بی کلیدِ پولی — هر کدام با دلیل؛ فهرست باید با سورس یکی بماند. */
@@ -34,6 +34,8 @@ const FREE = [
     'POST /shop/staff-code/disable', 'DELETE /shop/staff-codes/:id',
     'PUT /shop/permissions/members/:id',
     'POST /shop/devices/:id/disable', 'POST /shop/devices/:id/enable',
+    //  S44 (د۱۸): کارهای همگام‌نشدهٔ دستگاهِ گم‌شدهٔ غیرفعال — بخشی از همان «دستگاهِ گم‌شده»، فقط پرچمِ shop.lost_device_replay
+    'POST /shop/devices/:id/replay',
     'POST /shop/approver-keys', 'DELETE /shop/approver-keys/:id']],
   ['چت و شکایت کلیدِ کاتالوگ ندارند؛ فقط پرچم', [
     'POST /shop/chat/conversations', 'PUT /shop/chat/conversations/:id/status', 'POST /shop/chat/conversations/:id/messages',
@@ -63,7 +65,9 @@ const FREE = [
     'PUT /shop/settings-sync']],
   ['پشتیبانِ فاکتورهای نگه‌داشته (مهاجرتِ ۴۲۵، POS-12/S09) بخشی از صندوقِ پایه است و کلیدِ کاتالوگ ندارد؛ فقط پرچمِ shop.held_sync و مجوزِ فروش — '
     + 'نگه‌داشتهٔ فروشنده پس از پایانِ اشتراک هم گروگان نمی‌شود', [
-    'PUT /shop/held-invoices/:id', 'DELETE /shop/held-invoices/:id']],
+    'PUT /shop/held-invoices/:id', 'DELETE /shop/held-invoices/:id',
+    //  S09: «یک فاکتور در دو دستگاه» ⇒ صندوقِ صاحب (فقط گزارش، هیچ پولی نمی‌سازد؛ پرچمِ shop.held_twice_cancel)
+    'POST /shop/held-invoices/:id/twice']],
   ['سربرگ و لوگوی فاکتورِ نسخهٔ ۲ بخشی از صندوقِ پایه است و کلیدِ کاتالوگ ندارد (#379؛ فقط پرچمِ shop.receipt_v2)', [
     'PUT /shop/receipt-profile', 'PUT /shop/receipt-profile/logo', 'DELETE /shop/receipt-profile/logo']],
   ['پرسشِ فقط‌خواندنیِ همگام‌سازی پس از بازیابی (§۹.۵): هیچ داده‌ای نمی‌نویسد و مثلِ خودِ همگام‌سازی پس از پایانِ اشتراک هم باز است تا داده گم نشود (پشتِ پرچمِ خاموشِ SYNC_EPOCH_ENABLED)', [
@@ -89,7 +93,9 @@ const FREE = [
     'POST /shop/staff-time/punches', 'PUT /shop/staff-time/commission-plan']],
   ['حذفِ دادهٔ شخصیِ مشتری (SEC-10) کلیدِ کاتالوگ ندارد، فقط پرچمِ shop.customer_erasure: حقِ حذف به اشتراک بسته نیست '
     + 'و پس از پایانِ اشتراک هم باید شدنی بماند', [
-    'POST /shop/customer-erasure']],
+    'POST /shop/customer-erasure',
+    //  CRM-15/SEC-10 (د۱۸): «انجام شد» ِ فرمانِ پاک کردنِ پرونده در دفترِ دستگاه — دنبالهٔ همان حذف، فقط پرچمِ shop.customer_erasure_ledger
+    'POST /shop/customer-erasure/ledger/applied']],
   ['محدودهٔ مکانِ کارمندان (STF-06) بخشی از مجوزهای هستهٔ دکان است و کلیدِ کاتالوگ ندارد، فقط پرچمِ shop.staff_scope؛ '
     + 'صاحب باید پس از پایانِ اشتراک هم بتواند دسترسیِ کارمند را ببندد', [
     'PUT /shop/staff-scope/members/:id']],
@@ -120,7 +126,9 @@ const FREE = [
     'POST /shop/push/devices', 'DELETE /shop/push/devices']],
   ['«سابقهٔ دسترسی» (CRM-15، درِ app ِ مهاجرتِ ۶۱۰): دیدنِ پرونده از دفترِ خودِ برنامه (وب، حسابدار) سپرِ حریمِ خصوصی است، '
     + 'نه قابلیتِ پولی؛ کلید و پرچم ندارد و پس از پایانِ اشتراک هم باید ثبت شود (customer-access-app.test.js)', [
-    'POST /shop/customer-access']],
+    'POST /shop/customer-access',
+    //  د۱۸: همان دیدن‌ها از صفِ آفلاینِ حسابدار — فقط پرچمِ shop.customer_access_offline
+    'POST /shop/customer-access/offline']],
 ];
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.orders.delay', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',
@@ -143,6 +151,8 @@ FLAGS.push('shop.customer_erasure');
 FLAGS.push('shop.storefront.promo_guard');
 //  WEB-04: تنظیمِ زمانِ تقریبیِ تحویل (`PUT /shop/storefront/eta`) با پرچمِ خودش
 FLAGS.push('shop.storefront.eta');
+//  SERVERS §۳: نشانی‌های دیگرِ ویترین (`PUT /shop/storefront/hosts`) با پرچمِ خودش
+FLAGS.push('shop.storefront.host_alias');
 //  RSK-08: پروندهٔ مدرکِ اختلافِ سفارش (`POST /shop/orders/evidence/:id/disputes…`، PAID با needWrite) با پرچمِ خودش
 FLAGS.push('shop.orders.dispute_file');
 //  NTF-10: سیاستِ پوزش و کوپنِ تأخیر (`PUT /shop/orders/late-apology`) با پرچمِ خودش
@@ -161,6 +171,8 @@ FLAGS.push('shop.custom_roles');
 FLAGS.push('shop.settings_sync');
 //  POS-12/S09: پشتیبانِ فاکتورهای نگه‌داشته (`PUT`/`DELETE /shop/held-invoices/:id`، FREE) با پرچمِ خودش
 FLAGS.push('shop.held_sync');
+//  S09: «یک فاکتور در دو دستگاه» ⇒ صندوقِ صاحب (`POST /shop/held-invoices/:id/twice`، FREE) با پرچمِ خودش
+FLAGS.push('shop.held_twice_cancel');
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
 const paidGate = (r) => /\bneedWrite\b/.test(r.head)
   || [...`${r.uses} ${r.head}`.matchAll(/requireFeature\(\s*'([^']+)'/g)].some((m) => PAID_KEYS.includes(m[1]));

@@ -92,6 +92,8 @@ object StrErasure {
     "orderDevices" -> t("شناسهٔ دستگاهِ سفارش", "Order device identifiers", "د فرمایش د وسیلې پېژندنې")
     "addressMedia" -> t("عکسِ دروازه و یادداشتِ صوتیِ سفارش", "Gate photos and voice notes of orders", "د فرمایش د دروازې انځورونه او غږیز یادښتونه")
     "addressMediaLinks" -> t("پیوندِ سفارش به عکس و صدای نشانیِ ذخیره‌شده", "Order links to saved-address photos and voice notes", "د خوندي شوې پتې انځور او غږ ته د فرمایش تړاوونه")
+    "returnRequests" -> t("درخواستِ برگشت", "Return requests", "د بېرته ورکولو غوښتنې")
+    "returnPhotos" -> t("عکسِ درخواستِ برگشت", "Return request photos", "د بېرته ورکولو د غوښتنې انځورونه")
     else -> t(asIs(key), key, key)
   }
 }

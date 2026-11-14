@@ -126,7 +126,9 @@ object DebtorEngine {
     newId: () -> String = ::auditId,
   ): Result {
     val debtor = d.debtors.find { it.id == id } ?: return Result.Failed(StrLedger.debtorNotFound)
-    val rows = d.transactions.count { it.debtorId == id }
+    //  CRM-10: سندهای ادغام‌شده‌های پیوندی هم زیرِ همین پرونده‌اند (`CustomerAlias`) و همراهش می‌روند — مثلِ دفترِ v1 پس از ادغام
+    val own = CustomerAlias.of(d, id)
+    val rows = d.transactions.count { it.debtorId in own }
     //  ردپا: پیش‌تر قرض‌دار و همهٔ تراکنش‌هایش بی هیچ سابقه‌ای می‌رفتند
     val trace = AuditEntry(
       id = newId(), type = "debtor_delete", date = today, refId = id, createdAt = now,
@@ -135,7 +137,7 @@ object DebtorEngine {
     return Result.Ok(
       d.copy(
         debtors = d.debtors.filter { it.id != id },
-        transactions = d.transactions.filter { it.debtorId != id },
+        transactions = d.transactions.filter { it.debtorId !in own },
         auditLog = d.auditLog + trace,
       ),
       id = id,
@@ -146,7 +148,8 @@ object DebtorEngine {
   fun deleteWarning(d: ShopData, id: String): String {
     val debtor = d.debtors.find { it.id == id } ?: return ""
     val balance = ShopStore.debt(d, id)
-    val count = d.transactions.count { it.debtorId == id }
+    val own = CustomerAlias.of(d, id)
+    val count = d.transactions.count { it.debtorId in own }
     return if (balance > 0) {
       StrLedger.deleteWarnDebt(debtor.name, money(balance), money(count.toDouble()))
     } else {
@@ -276,6 +279,20 @@ object DebtorEngine {
     )
   }
 
+  /**
+   *  S89 — «حذف» ِ یک ردیفِ قرض/رسید از صفحه: تصمیم فقط در `core/debt/DebtReversal`. کلیدِ `shop.doc_chain` خاموش
+   *  ([chainOn] = `DocChainSync.enabled`) ⇒ همان [deleteTransaction] ِ امروز؛ روشن ⇒ سندِ معکوس ([DebtReverse.reverse])
+   *  یا ردِ با پیام (معکوسِ معکوس، اصلِ معکوس‌شده، ردیفِ ساختهٔ سندِ دیگر).
+   */
+  fun removeTransaction(d: ShopData, id: String, chainOn: Boolean, today: String, now: Long, newId: () -> String = ::auditId): Result {
+    val tx = d.transactions.find { it.id == id }
+    return when (val p = ir.vil3ntec.tohid.core.debt.DebtReversal.plan(chainOn, tx?.let(DebtReverse::row), d.transactions.map(DebtReverse::row))) {
+      ir.vil3ntec.tohid.core.debt.DebtReversal.Plan.Delete -> deleteTransaction(d, id, today, now, newId)
+      is ir.vil3ntec.tohid.core.debt.DebtReversal.Plan.Reverse -> Result.Ok(DebtReverse.reverse(d, tx!!, p, today, now, newId), id = p.id)
+      is ir.vil3ntec.tohid.core.debt.DebtReversal.Plan.Refused -> Result.Failed(DebtReverse.refusal(p.why))
+    }
+  }
+
   fun deleteTransaction(
     d: ShopData,
     id: String,
@@ -311,15 +328,18 @@ object DebtorEngine {
 
   fun account(d: ShopData, id: String): Account? {
     val debtor = d.debtors.find { it.id == id } ?: return null
-    val mine = d.transactions.filter { it.debtorId == id }.sortedByDescending { it.createdAt }
+    val own = CustomerAlias.of(d, id)  // CRM-10: با سندهای ادغام‌شده‌های پیوندی
+    val mine = d.transactions.filter { it.debtorId in own }.sortedByDescending { it.createdAt }
+    //  S89: «داده/گرفته» بی جفتِ «اصل + معکوس» (همان حذفِ امروز)؛ فهرست هر دو ردیف را دارد (سابقه روشن)
+    val live = DebtReverse.effective(mine)
     return Account(
       debtor = debtor,
-      given = mine.filter { it.type == "give" }.sumOf { it.amount },
-      received = mine.filter { it.type == "receive" }.sumOf { it.amount },
+      given = live.filter { it.type == "give" }.sumOf { it.amount },
+      received = live.filter { it.type == "receive" }.sumOf { it.amount },
       balance = ShopStore.debt(d, id),
       transactions = mine,
       since = debtSince(d, id),
-      sales = d.sales.filter { it.debtorId == id }.sortedByDescending { it.createdAt },
+      sales = d.sales.filter { it.debtorId in own }.sortedByDescending { it.createdAt },
     )
   }
 
@@ -343,8 +363,9 @@ object DebtorEngine {
    *  اولین قرضِ بعدی می‌نشیند.
    */
   fun debtSince(d: ShopData, debtorId: String): Long? {
-    val mine = d.transactions
-      .filter { it.debtorId == debtorId }
+    //  S89: جفتِ «اصل + معکوس» بیرون — کهنگی همان حذفِ امروز (رسیدِ معکوس‌شده قدیمی‌ترین برد را نمی‌بندد)
+    val own = CustomerAlias.of(d, debtorId)
+    val mine = DebtReverse.effective(d.transactions.filter { it.debtorId in own })
       .sortedWith(compareBy<DebtTransaction>({ it.date }, { it.createdAt }))
     if (mine.isEmpty()) return null
 

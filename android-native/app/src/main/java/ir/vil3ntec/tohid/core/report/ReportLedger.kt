@@ -72,6 +72,20 @@ class ReportLedger private constructor() {
   val audit = ArrayList<Audit>()
 
   companion object {
+    /** همان `CustomerCrm.resolve`: زنجیرهٔ `mergedInto`؛ مقصدِ ناپیدا ⇒ آخرین موجود؛ حلقه ⇒ کوچک‌ترین شناسهٔ حلقه */
+    private fun keeper(into: Map<String, String>, known: Map<String, String>, id: String): String {
+      val path = ArrayList<String>()
+      var cur = id
+      while (true) {
+        val next = into[cur] ?: return cur
+        if (next !in known) return cur
+        path += cur
+        val at = path.indexOf(next)
+        if (at >= 0) return path.subList(at, path.size).minOf { it }
+        cur = next
+      }
+    }
+
     fun parse(raw: JsonObject): ReportLedger {
       val l = ReportLedger()
       raw.list("products").forEach { p -> l.products[p.s("id")] = Product(p.s("id"), p.s("name"), JsText.trim(p.s("category"))) }
@@ -101,9 +115,18 @@ class ReportLedger private constructor() {
           date = r.s("date"), createdAt = ms(r, "createdAt"),
         )
       }
-      raw.list("debtors").forEach { d -> l.debtors[d.s("id")] = d.s("name") }
-      raw.list("transactions").forEach { t ->
-        l.transactions += Tx(t.s("id"), t.s("debtorId"), t.s("type") == "give", money(t, "amount"), t.s("date"), ms(t, "createdAt"))
+      //  CRM-10: سندِ مشتریِ ادغام‌شده (`mergedInto`) زیرِ ماندگار — ادغامِ بی ویرایشِ سندِ v3؛ هم‌زادِ `keeper` ِ JS
+      val into = HashMap<String, String>()
+      raw.list("debtors").forEach { d -> l.debtors[d.s("id")] = d.s("name"); if (d.s("mergedInto").isNotBlank()) into[d.s("id")] = d.s("mergedInto") }
+      //  S89: جفتِ «اصل + سندِ معکوس» (`core/debt/DebtReversal`، هم‌زادِ `reversalNeutral` ِ JS) بیرون — سنِ بدهی همان حذفِ امروز
+      val txs = raw.list("transactions")
+      val neutral = ir.vil3ntec.tohid.core.debt.DebtReversal.neutral(
+        txs.map { t -> ir.vil3ntec.tohid.core.debt.DebtReversal.Row(t.s("id"), t.s("type"), money(t, "amount"), t.s("kind").ifEmpty { null }, t.s("refId").ifEmpty { null }) },
+      )
+      txs.forEach { t ->
+        if (t.s("id") in neutral) return@forEach
+        val who = if (into.isEmpty()) t.s("debtorId") else keeper(into, l.debtors, t.s("debtorId"))
+        l.transactions += Tx(t.s("id"), who, t.s("type") == "give", money(t, "amount"), t.s("date"), ms(t, "createdAt"))
       }
       raw.list("suppliers").forEach { s -> l.suppliers[s.s("id")] = s.s("name") }
       raw.list("purchases").forEach { p ->

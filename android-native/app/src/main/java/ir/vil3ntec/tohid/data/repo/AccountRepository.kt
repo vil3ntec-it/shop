@@ -26,38 +26,37 @@ class AccountRepository(private val api: ApiClient) {
     result { ApiJson.decode<MeDto>(api.get(ApiEndpoints.Me.ROOT)) }
 
   /**
-   *  ویرایشِ پروفایل.
+   *  ویرایشِ پروفایل («فقط ایمیل»، ۱۴۰۵/۰۸/۲۳).
    *
-   *  نام هر وقت عوض می‌شود. شماره فقط **یک بار** ثبت می‌شود و از آن به
-   *  بعد سرور خودش ردش می‌کند — همان‌طور که ایمیل از اول قابلِ عوض کردن
-   *  نبوده. اینجا هم فرستادنِ شماره برای کسی که از قبل شماره دارد،
-   *  خطای `phone_locked` می‌گیرد؛ برنامه آن را نشان می‌دهد و بس.
+   *  نام هر وقت عوض می‌شود. شماره فقط **فیلدِ تماس** است (راهِ ورود نیست): بی کد افزوده، عوض یا پاک (`""`) می‌شود.
+   *  ایمیل راهِ ورود است و فقط حسابِ بی‌ایمیل آن را یک بار با کدِ همان ایمیل می‌افزاید (AUTH-08 ⇐ ایمیل)؛ ایمیلِ ثبت‌شده
+   *  از برنامه عوض نمی‌شود (`email_locked`).
    *
-   *  @param phone خالی یعنی «دست نزن»، نه «پاک کن».
-   *  @param phoneCode AUTH-08: کدِ همان شماره (`requestPhoneCode`)؛ خالی ⇒ فرستاده نمی‌شود، یعنی همان
-   *    درخواستِ پیشین. با پرچمِ سروریِ روشن، شمارهٔ بی کد ۴۰۰ `phone_code_required` می‌گیرد (`PhoneClaim`).
+   *  @param phone null ⇒ «دست نزن»؛ `""` ⇒ پاک؛ وگرنه شمارهٔ تماسِ تازه.
+   *  @param email خالی ⇒ فرستاده نمی‌شود؛ وگرنه ایمیلی که افزوده می‌شود (بی کد ⇒ ۴۰۰ `email_code_required`، `EmailClaim`).
+   *  @param emailCode کدِ همان ایمیل (`requestEmailCode`)؛ خالی ⇒ فرستاده نمی‌شود.
    */
-  suspend fun updateProfile(name: String, phone: String = "", phoneCode: String = ""): ApiResult<UserWrapDto> = result {
+  suspend fun updateProfile(name: String, phone: String? = null, email: String = "", emailCode: String = ""): ApiResult<UserWrapDto> = result {
     ApiJson.decode<UserWrapDto>(
       api.put(
         ApiEndpoints.Me.ROOT,
         buildJsonObject {
           put("name", JsonPrimitive(name.trim()))
-          if (phone.isNotBlank()) put("phone", JsonPrimitive(phone.trim()))
-          if (phone.isNotBlank() && phoneCode.isNotBlank()) put("phoneCode", JsonPrimitive(phoneCode))
+          if (phone != null) put("phone", JsonPrimitive(phone.trim()))
+          if (email.isNotBlank()) put("email", JsonPrimitive(email.trim()))
+          if (email.isNotBlank() && emailCode.isNotBlank()) put("emailCode", JsonPrimitive(emailCode))
         },
       )
     )
   }
 
   /**
-   *  AUTH-08: کدِ یک‌بارمصرف به همان شماره‌ای که افزوده می‌شود. پرچمِ سروری خاموش ⇒ ۴۰۴
-   *  `phone_code_disabled` (برنامه همان ذخیرهٔ بی کد را می‌کند). «این شماره حسابِ دیگری دارد» این‌جا گفته نمی‌شود.
-   *  خروجی: مهلتِ «ارسالِ دوباره» به ثانیه از پاسخِ خودِ سرور (`PhoneClaim.resendSeconds`؛ نبود ⇒ ۰).
+   *  AUTH-08 ⇐ «فقط ایمیل»: کدِ یک‌بارمصرف به همان ایمیلی که به حسابِ بی‌ایمیل افزوده می‌شود. «این ایمیل حسابِ دیگری دارد»
+   *  این‌جا گفته نمی‌شود. خروجی: مهلتِ «ارسالِ دوباره» به ثانیه از پاسخِ خودِ سرور (`EmailClaim.resendSeconds`؛ نبود ⇒ ۰).
    */
-  suspend fun requestPhoneCode(phone: String): ApiResult<Int> = result {
-    ir.vil3ntec.tohid.core.account.PhoneClaim.resendSeconds(
-      api.post(ApiEndpoints.Me.PHONE_CODE, buildJsonObject { put("phone", JsonPrimitive(phone.trim())) }),
+  suspend fun requestEmailCode(email: String): ApiResult<Int> = result {
+    ir.vil3ntec.tohid.core.account.EmailClaim.resendSeconds(
+      api.post(ApiEndpoints.Me.EMAIL_CODE, buildJsonObject { put("email", JsonPrimitive(email.trim())) }),
     )
   }
 

@@ -32,6 +32,8 @@ async function createApp({ runMigrations = true } = {}) {
     await require('./lib/sync-epoch').rotate('boot')
       .catch(err => console.error('[sync-epoch] دورانِ تازه ساخته نشد:', err.message));
   }
+  //  SEC-10 (#۱۵): پس از جایگزینیِ دیتابیس از پشتیبانِ کهنه، مشتری‌های پاک‌شده دوباره پاک می‌شوند (`customer-erasure.replay`)
+  await require('./lib/customer-erasure').replay({ log: (m) => console.error(m) }).catch(err => console.error('[customer-erasure]', err.message));
   //  سرور فقط رلهٔ پیام است: پیام و رسانهٔ کهنه‌تر از CHAT_RELAY_DAYS می‌رود
   await require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
   //  شناسهٔ پایدارِ این سرور — در نخستین راه‌اندازی ساخته می‌شود (`lib/server-identity.js`)
@@ -400,6 +402,7 @@ async function createApp({ runMigrations = true } = {}) {
     //  پروندهٔ مدرکِ اختلاف (RSK-08) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.dispute_file`
     api.use('/shop/orders/evidence', require('./routes/order-evidence'));
     api.use('/shop/order-feedback', require('./routes/order-feedback'));   // NTF-07/09: گزارشِ مشکل و نظرِ مشتری، پشتِ دو پرچمِ خاموش
+    api.use('/shop/order-returns', require('./routes/shop-return-requests'));   // RET-11: درخواست‌های برگشتِ ویترین، پشتِ پرچمِ خاموش
     //  پوزش و کوپنِ خودکارِ تأخیر (NTF-10) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.late_apology`
     api.use('/shop/orders/late-apology', require('./routes/order-late-apology'));
     //  سفارش‌های باز/لغوشدهٔ یک مشتری برای پروندهٔ او (CRM-07) — پیش از `/shop/orders`؛ پشتِ همان پرچمِ `shop.orders`
@@ -410,11 +413,11 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/orders', require('./routes/orders'));
     //  ویترین (فاز ۴): تنظیمِ دکان زیرِ `/shop` (پیش از آن)، و درِ عمومی
     //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
-    //  پیوندِ کمپین و QR (MKT-10/11) پیش از `/shop/storefront`؛ پیش‌فرض خاموش
-    api.use('/shop/storefront/campaigns', require('./routes/storefront-campaigns'));
+    api.use('/shop/storefront/campaigns', require('./routes/storefront-campaigns'));   // پیوندِ کمپین و QR (MKT-10/11)، پیش از `/shop/storefront`؛ پیش‌فرض خاموش
     //  تخفیفِ اولین خرید و سدِ سوءاستفاده از تخفیف (MKT-02، RSK-09)؛ پیش‌فرض خاموش
     api.use('/shop/storefront/promo-guard', require('./routes/storefront-promo-guard'));
     api.use('/shop/storefront/eta', require('./routes/storefront-eta'));   // WEB-04: تنظیمِ زمانِ تقریبیِ تحویل، پشتِ پرچمِ خاموش
+    api.use('/shop/storefront/hosts', require('./routes/storefront-hosts'));   // نشانیِ دیگرِ ویترین (SERVERS §۳)، پشتِ پرچمِ خاموش
     api.use('/shop/storefront', require('./routes/storefront-admin'));
     //  تأییدِ جایگزینِ جمع‌آوری توسطِ مشتری (PCK-05) — با توکنِ پیگیری؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`
     api.use('/store', require('./routes/pick-substitutes-store'));
@@ -428,6 +431,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/store', require('./routes/store-push'));   // CHK-20/NTF-01: پوشِ وب ِ مشتری برای همین سفارش، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront-finder-store'));   // WEB-07/10: فیلتر و «خبرم کن»، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/order-feedback-store'));   // NTF-07/09: گزارشِ مشکل با عکس و نظرِ سفارش، پشتِ دو پرچمِ خاموش
+    api.use('/store', require('./routes/store-return-requests'));   // RET-11: درخواستِ برگشت از ویترین، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront-eta-store'));   // WEB-04: زمانِ تقریبیِ تحویل، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront-funnel-store'));   // RPT-14: تپشِ بالای قیفِ ویترینِ وب، پشتِ پرچمِ خاموشِ گزارش
     api.use('/store', require('./routes/store-account-history'));   // CRM-13: «حسابِ من» (خرید و مانده)، پشتِ پرچمِ خاموش
@@ -710,8 +714,8 @@ async function createApp({ runMigrations = true } = {}) {
     }));
   }).catch((err) => (err.status === 404 ? res.status(404).json({ error: { code: 'store_not_found', message: 'این ویترین پیدا نشد' } }) : next(err))));
   app.get('/', (req, res, next) => {
-    const slug = storefront.slugFromHost(req.hostname);
-    if (!slug) return next();
+    const slug = storefront.slugFromHost(req.hostname);   //  نبود ⇒ نشانیِ دیگرِ ویترین (`lib/storefront-hosts.js`)؛ سرورِ بی دامنه ⇒ همان next()
+    if (!slug) return require('./lib/storefront-hosts').root(req, res, next);
     storeHeaders(req, res, () => storePage(slug, res, req.query.lang, true).catch(next));
   });
   // ---- بازارچه (WEB، §۲۳؛ پرچمِ `market.directory`) و کیتِ مشترکِ وبِ خریدار ----

@@ -29,6 +29,7 @@ const { toMinor, toMilli } = require('./sync-v3-convert');
 const { badRequest, notFound, conflict, forbidden } = require('../middleware/errors');
 //  O-06 = ب (ORD-20/CHK-18): نگه‌داشتنِ نرم — آزاد = دفتر − نگه‌داشتهٔ فعال (پرچمِ خاموشِ `shop.stock_reserve`)
 const reserve = () => require('./stock-reserve');
+const cb = require('./catalog-branch');   //  شعبه (فازِ ۳): کلیدِ موجودی = دکان یا `<دکان>#<شعبه>` — اصلی همان امروز
 
 const TABLES = Object.freeze({ v1: 'sync_rows', v3: 'sync_v3_rows' });
 //  `stockMovements` فقط برای INV-10 (`count-absorb-ledger.collect`): موجودی همچنان از ورود و فروش است
@@ -122,18 +123,18 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
   //  کنار گذاشتنِ موجودیِ سفارش‌محورِ پیشین — فقط دکانی که ردیفِ آن را دارد؛ پس از COMMIT در
   //  `refresh` در دفترِ ممیزی نوشته و «انجام‌شده» علامت می‌خورد
   let retiredNow = null;
-  if (!retired.has(shopId)) {
+  if (!cb.isBranch(shopId) && !retired.has(shopId)) {
     retiredNow = await retireOrderStock(c, shopId, at);
     if (retiredNow.touched.length) await stock.checkProducts(c, shopId, retiredNow.touched.sort(), settings, at);
   }
-  const fmt = settings.syncSource === 'v3' ? 'v3' : 'v1';
+  const fmt = cb.fmtOf(shopId, settings);
   const T = TABLES[fmt];
   const rd = reader(fmt);
-  const st = (await c.query('SELECT source, watermark FROM catalog_sync_state WHERE shop_id=$1', [shopId])).rows[0];
+  const st = await cb.stateOf(c, shopId);
   //  منبع عوض شد ⇒ از اول خوانده می‌شود؛ سهم‌ها کلیدِ مستقل از قالب دارند، پس دوباره کم نمی‌شود
   let wm = !st || st.source !== fmt || full ? 0 : num(st.watermark);
   const ACC = "app='shop' AND account_kind='shop' AND account_id=$1";
-  const track = await require('./market-changes').enabled(shopId, c);   //  S6: پرچمِ `market.changes` یک بار برای کلِ همین خواندن
+  const track = !cb.isBranch(shopId) && await require('./market-changes').enabled(shopId, c);   //  S6: پرچمِ `market.changes` یک بار برای کلِ همین خواندن
   const repackRef = require('./catalog-repack').deviceRefs(shopId, c);   //  INV-21: ردیفِ تولیدِ برنامه ⇒ `production` ِ پیوسته
   let products = 0;
   let moves = 0;
@@ -145,7 +146,7 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
       `SELECT table_name, row_id, data, deleted_at, updated_seq, created_at FROM ${T}
         WHERE ${ACC} AND table_name = ANY($2::text[]) AND ${DEVICE_ROWS} AND updated_seq > $3
         ORDER BY updated_seq, table_name, row_id LIMIT $4`,
-      [shopId, DEVICE_TABLES, wm, PAGE]
+      [shopId, cb.tablesOf(shopId, DEVICE_TABLES), wm, PAGE]
     )).rows;
     if (!page.length) break;
     let rows = page;
@@ -211,13 +212,13 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
       const posted = new Map();
       for (const p of (await c.query(
         'SELECT source_key, product_id, posted_milli, rev FROM stock_sources WHERE shop_id=$1 AND source_key = ANY($2::text[])',
-        [shopId, [...contrib.keys()]]
+        [cb.shopOf(shopId), [...contrib.keys()].map((k) => stock.keyIn(shopId, k))]
       )).rows) {
         if (!posted.has(p.source_key)) posted.set(p.source_key, new Map());
         posted.get(p.source_key).set(p.product_id, { milli: num(p.posted_milli), rev: num(p.rev) });
       }
       for (const [key, k] of contrib) {
-        const have = posted.get(key) || new Map();
+        const have = posted.get(stock.keyIn(shopId, key)) || new Map();
         for (const pid of new Set([...k.want.keys(), ...have.keys()])) {
           const want = k.want.get(pid) || 0;
           const prev = have.get(pid) || { milli: 0, rev: 0 };
@@ -245,16 +246,16 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
              VALUES ($1,$2,$3,$4,$5,$6)
              ON CONFLICT (shop_id, source_key, product_id) DO UPDATE
                SET posted_milli=excluded.posted_milli, rev=excluded.rev, updated_at=excluded.updated_at`,
-            [shopId, key, pid, want, rev, at]
+            [cb.shopOf(shopId), stock.keyIn(shopId, key), pid, want, rev, at]
           );
           touched.add(pid);
           moves += 1;
         }
       }
     }
-    for (const pid of await absorbLedger.collect(c, shopId, rows, rd, at)) counted.add(pid);
+    if (!cb.isBranch(shopId)) for (const pid of await absorbLedger.collect(c, shopId, rows, rd, at)) counted.add(pid);   //  INV-10: فقط اصلی
     //  INV-11: گام‌های انتقالِ بی‌اینترنت پس از ورود و فروشِ همین صفحه، به ترتیبِ رسیدن (یک بار برای هر ردیف)
-    if (steps.length) {
+    if (steps.length && !cb.isBranch(shopId)) {   //  انتقالِ شعبه: فازِ ۴ (`docs/BRANCHES-fa.md`)
       const x = await require('./stock-transfers').ingestDevice(c, shopId, steps, settings, at);
       transfers.applied += x.applied;
       transfers.refused += x.refused;
@@ -263,13 +264,9 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
     if (page.length < PAGE) break;
   }
 
-  await c.query(
-    `INSERT INTO catalog_sync_state (shop_id, source, watermark, last_run_at) VALUES ($1,$2,$3,$4)
-     ON CONFLICT (shop_id) DO UPDATE SET source=excluded.source, watermark=excluded.watermark, last_run_at=excluded.last_run_at`,
-    [shopId, fmt, wm, at]
-  );
+  await cb.saveState(c, shopId, fmt, wm, at);
   //  INV-10: فروشِ پیش از شمارش که پس از ثبتِ شمارش رسید دوباره کم نمی‌شود (پرچمِ `shop.count_absorb`)
-  for (const pid of await absorbLedger.settle(c, shopId, settings, at, counted)) { touched.add(pid); moves += 1; }
+  if (!cb.isBranch(shopId)) for (const pid of await absorbLedger.settle(c, shopId, settings, at, counted)) { touched.add(pid); moves += 1; }
   if (touched.size) await stock.checkProducts(c, shopId, [...touched].sort(), settings, at);
   return { products, moves, source: fmt, retired: retiredNow, ...(transfers.applied || transfers.refused ? { transfers } : {}) };
 }
@@ -290,14 +287,14 @@ async function prepare(shopId, { at = now() } = {}) {
  * عوض‌شده یا هرگز‌نخوانده ⇒ «بله».)
  */
 async function hasNewer(shopId) {
-  const st = await one('SELECT source, watermark FROM catalog_sync_state WHERE shop_id=$1', [shopId]);
+  const st = await cb.stateOf(null, shopId);
   if (!st) return true;
-  const fmt = (await stock.settingsOf(shopId)).syncSource === 'v3' ? 'v3' : 'v1';
+  const fmt = cb.fmtOf(shopId, await stock.settingsOf(shopId));
   if (st.source !== fmt) return true;
   const r = await one(
     `SELECT 1 AS x FROM ${TABLES[fmt]} WHERE app='shop' AND account_kind='shop' AND account_id=$1
         AND table_name = ANY($2::text[]) AND ${DEVICE_ROWS} AND updated_seq > $3 LIMIT 1`,
-    [shopId, DEVICE_TABLES, num(st.watermark)]
+    [shopId, cb.tablesOf(shopId, DEVICE_TABLES), num(st.watermark)]
   );
   return !!r;
 }
@@ -347,6 +344,7 @@ async function refresh(shopId, { full = false, maxAgeMs = 0, at = now(), throttl
 }
 
 async function ingest(shopId, at, full) {
+  if (cb.isBranch(shopId)) await refresh(cb.shopOf(shopId), { maxAgeMs: 1, at, throttle: false });   //  کاتالوگِ مشترک: تعریفِ کالا از اصلی
   const out = await tx(async (c) => ingestTx(c, shopId, at, await stock.settingsOf(shopId, c), { full }));
   await afterIngest(shopId, out);
   return out;
@@ -520,7 +518,7 @@ async function freshness(shopId, settings, at, c = null) {
             COALESCE(MAX(CASE WHEN last_seen_at >= $2 THEN queued ELSE 0 END),0)::int AS queued
        FROM sync_v3_devices WHERE app='shop' AND account_kind='shop' AND account_id=$1`, [shopId, since]
   );
-  const st = await row('SELECT last_run_at FROM catalog_sync_state WHERE shop_id=$1', [shopId]);
+  const st = await cb.stateOf(c, shopId);
   const seen = Math.max(num(v1 && v1.seen), num(v3 && v3.seen));
   const queued = Math.max(num(v1 && v1.queued), num(v3 && v3.queued));
   let reason = '';
@@ -552,7 +550,7 @@ async function productsOf(shopId, ids) {
   const rows = (await query(
     `SELECT cp.*, EXISTS (SELECT 1 FROM product_photos ph WHERE ph.app='shop' AND ph.account_id=cp.shop_id
                             AND ph.product_id=cp.product_id AND (ph.data IS NOT NULL OR ph.store_key <> '')) AS has_photo
-       FROM catalog_products cp WHERE cp.shop_id=$1 AND cp.product_id = ANY($2::text[])`, [shopId, ids]
+       FROM catalog_products cp WHERE cp.shop_id=$1 AND cp.product_id = ANY($2::text[])`, [cb.shopOf(shopId), ids]
   )).rows;
   return new Map(rows.map((r) => [r.product_id, r]));
 }
@@ -611,7 +609,7 @@ function decodeCursor(raw) {
 async function list(shopId, { q, cursor, limit } = {}) {
   await refresh(shopId);
   const lim = Math.min(Math.max(Number(limit) || 50, 1), MAX_LIST);
-  const params = [shopId];
+  const params = [cb.shopOf(shopId)];
   const where = ['cp.shop_id=$1', 'NOT cp.deleted'];
   const term = text(q, 80).toLowerCase();
   if (term) {
@@ -631,7 +629,7 @@ async function list(shopId, { q, cursor, limit } = {}) {
   const page = rows.slice(0, lim).map((r) => r.product_id);
   const settings = await stock.settingsOf(shopId);
   const fr = await freshness(shopId, settings, now());
-  const [ps, lvs, held] = await Promise.all([productsOf(shopId, page), stock.levelsOf(null, shopId, page), reserve().heldOf(null, shopId, page)]);
+  const [ps, lvs, held] = await Promise.all([productsOf(shopId, page), stock.levelsOf(null, shopId, page), cb.heldOf(shopId, page)]);
   const items = page.map((id) => productView(ps.get(id), lvs.get(id), held.get(id) || 0, settings, fr));
   const last = items[items.length - 1];
   return {
@@ -651,7 +649,7 @@ async function detail(shopId, productId) {
   const lv = (await stock.levelsOf(null, shopId, [id])).get(id);
   const lows = {};
   for (const loc of stock.LOCATIONS) if (lv && lv[loc] && lv[loc].low !== null) lows[loc] = lv[loc].low;
-  const held = (await reserve().heldOf(null, shopId, [id])).get(id) || 0;
+  const held = (await cb.heldOf(shopId, [id])).get(id) || 0;
   return { product: productView(p, lv, held, settings, fr), lowByLocation: lows, freshness: fr };
 }
 
@@ -668,8 +666,8 @@ function moveView(r) {
 /** دفترِ گردش (INV-16) — تازه‌ترین اول، صفحه‌بندیِ کلیدی. */
 async function moves(shopId, { productId, cursor, limit, places = null } = {}) {
   const lim = Math.min(Math.max(Number(limit) || 50, 1), MAX_LIST);
-  const params = [shopId];
-  const where = places ? ['shop_id=$1', `location = ANY($${params.push(places)}::text[])`] : ['shop_id=$1'];   //  STF-06: فقط مکان‌های محدوده
+  const params = [cb.shopOf(shopId), cb.branchOf(shopId)];
+  const where = places ? ['shop_id=$1 AND branch_id=$2', `location = ANY($${params.push(places)}::text[])`] : ['shop_id=$1 AND branch_id=$2'];   //  STF-06: فقط مکان‌های محدوده
   if (productId) { params.push(String(productId)); where.push(`product_id=$${params.length}`); }
   const cur = decodeCursor(cursor);
   if (cur) {
@@ -693,8 +691,8 @@ async function tasks(shopId, { status = 'open', limit, places = null } = {}) {  
   if (!['open', 'resolved', 'dismissed'].includes(status)) throw badRequest('وضعیتِ وظیفه معتبر نیست', 'bad_status');
   const lim = Math.min(Math.max(Number(limit) || 50, 1), MAX_LIST);
   return (await query(
-    `SELECT * FROM stock_tasks WHERE shop_id=$1 AND status=$2${places ? " AND (location = ANY($4::text[]) OR (kind = 'transfer_short' AND detail->>'to' = ANY($4::text[])))" : ''} ORDER BY created_at DESC, id DESC LIMIT $3`,
-    places ? [shopId, status, lim, places] : [shopId, status, lim]
+    `SELECT * FROM stock_tasks WHERE shop_id=$1 AND branch_id=${places ? '$5' : '$4'} AND status=$2${places ? " AND (location = ANY($4::text[]) OR (kind = 'transfer_short' AND detail->>'to' = ANY($4::text[])))" : ''} ORDER BY created_at DESC, id DESC LIMIT $3`,
+    places ? [cb.shopOf(shopId), status, lim, places, cb.branchOf(shopId)] : [cb.shopOf(shopId), status, lim, cb.branchOf(shopId)]
   )).rows.map((r) => ({
     id: r.id, kind: r.kind, productId: r.product_id, location: r.location, status: r.status,
     detail: decode(r.detail) || {}, hits: num(r.hits), createdAt: num(r.created_at), updatedAt: num(r.updated_at),
@@ -710,7 +708,7 @@ async function resolveTask(shopId, id, body, userId) {
   const at = now();
   const r = await query(
     `UPDATE stock_tasks SET status=$3, resolved_by=$4, resolved_at=$5, note=$6, updated_at=$5
-      WHERE shop_id=$1 AND id=$2 AND status='open' RETURNING id`, [shopId, String(id || ''), action, userId, at, note]
+      WHERE shop_id=$1 AND branch_id=$7 AND id=$2 AND status='open' RETURNING id`, [cb.shopOf(shopId), String(id || ''), action, userId, at, note, cb.branchOf(shopId)]
   );
   if (!r.rows.length) throw notFound('وظیفهٔ باز پیدا نشد', 'task_not_found');
   return { id: r.rows[0].id, status: action };

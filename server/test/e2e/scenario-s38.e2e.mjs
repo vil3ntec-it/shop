@@ -10,6 +10,7 @@
  * اجرا:  node test/e2e/run.mjs scenario-s38
  */
 import { boot, assert } from './lib/harness.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const E = await boot({ name: 'scenario-s38' });
 const { db } = E;
@@ -36,8 +37,8 @@ await E.step('S38.0', 'سفارشِ ویترین ⇒ دکان با «آماده 
   await A.drain();
   E.ok(await A.api('PUT', '/shop/storefront', { slug: SLUG, enabled: true, title: 'ویترینِ S38', contactPhone: '0700000038', deliveryFeeMinor: 0, minOrderMinor: 0 }), 'ویترین');
   for (const id of [rice, oil]) E.ok(await A.api('PUT', `/shop/storefront/products/${id}`, { published: true }), 'انتشار');
-  const st = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { phone: PHONE }), 'کدِ تأیید');
-  ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { phone: PHONE, code: st.devCode }), 'تأییدِ شماره').ticket;
+  const st = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { email: mailOf(PHONE) }), 'کدِ تأیید');
+  ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { email: mailOf(PHONE), code: st.devCode }), 'تأییدِ شماره').ticket;
   const r = E.ok(await E.post(`/api/store/${SLUG}/checkout`, {
     fulfillment: 'pickup', customer: { name: 'مشتریِ S38', phone: PHONE }, lines: [{ productId: rice, qtyMilli: 1000 }],
   }, '', { ...H(), 'Idempotency-Key': E.key('ck') }), 'ثبت', 201);

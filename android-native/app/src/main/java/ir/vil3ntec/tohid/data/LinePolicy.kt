@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.data
 import ir.vil3ntec.tohid.core.i18n.StrLine
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.pos.LinePricing
+import ir.vil3ntec.tohid.core.product.UnitSale
 import ir.vil3ntec.tohid.numberInvalid
 import ir.vil3ntec.tohid.parseNumber
 import kotlin.math.roundToLong
@@ -52,6 +53,7 @@ object LinePolicy {
    *
    *  @param price قیمتِ واحدِ دستیِ نوشته‌شده؛ `null` ⇒ قیمتِ خودِ کالا
    *  @param discountText نوشتهٔ کادرِ تخفیفِ ردیف (درصد اگر [percent]، وگرنه افغانی)
+   *  @param pack S45 — واحدِ انتخاب‌شدهٔ ردیف (بسته/کارتن)؛ با قیمتِ جدا قاعده‌ها با قیمتِ همان بسته ([listMinor])
    */
   fun edit(
     p: LinePricing.Policy,
@@ -62,6 +64,7 @@ object LinePolicy {
     quantity: Double?,
     percent: Boolean,
     discountText: String,
+    pack: UnitSale.Unit? = null,
   ): Dialog {
     val canDiscount = p.on && (p.exempt || p.mayReduce)
     if (canDiscount && numberInvalid(discountText)) return Dialog(true, StrSale.badNumber(StrLine.lineDiscount), null, null)
@@ -69,13 +72,19 @@ object LinePolicy {
     val qtyMilli = quantity?.takeIf { it > 0 && it.isFinite() }?.let { (it * 1000).roundToLong() } ?: 0L
     val e = runCatching {
       LinePricing.edit(
-        p, free, DiscountGate.minor(basePrice), DiscountGate.minor(unitPrice), price?.let(DiscountGate::minor), qtyMilli,
+        p, free, listMinor(basePrice, pack.takeUnless { free }), DiscountGate.minor(unitPrice), price?.let(DiscountGate::minor), qtyMilli,
         percent, DiscountGate.minor(typed),
       )
     }.getOrNull() ?: return Dialog(canDiscount, if (p.on) StrLine.tooLarge else null, null, null)
     val net = if (e.discountMinor > 0) (e.grossMinor - e.discountMinor) / 100.0 else null
     return Dialog(canDiscount, message(e.problem, p), net, e.netUnit, e.problem)
   }
+
+  /**
+   *  S45 (تصمیمِ ۱۴۰۵/۰۸/۲۳ #۲۱) — قیمتِ فهرستِ قاعده (Minor برای هر واحدِ پایه): قیمتِ بستهٔ انتخاب‌شده اگر قیمتِ جدا دارد،
+   *  وگرنه قیمتِ کالا — همان `LinePricing.ruleListMinor` ِ هسته؛ برای سنجش، ردیفِ سابقهٔ تأیید و متنِ برگهٔ تأیید.
+   */
+  fun listMinor(basePrice: Double, pack: UnitSale.Unit?): Long = LinePricing.ruleListMinor(DiscountGate.minor(basePrice), pack)
 
   /**
    *  S45 — کادرِ ردیف با «درخواستِ تأیید» (هر دو صندوق: `CartLineDialog` و برگهٔ ردیفِ گوشیِ نسخهٔ ۳، `LineModel.check`).
@@ -91,16 +100,18 @@ object LinePolicy {
   /**
    *  [edit] با تأییدِ [grant] — @param price قیمتِ دستیِ نوشته‌شده (`null` ⇒ قیمتِ کالا؛ تأیید فقط به قیمتِ دستی می‌خورد)
    *  @param canAsk این کادر «درخواستِ تأیید» دارد (`PriceAsk` داده شده)
+   *  @param pack S45 — بسته/کارتنِ انتخاب‌شدهٔ ردیف ([listMinor])؛ `null` ⇒ قیمتِ کالا
    */
   fun checked(
     p: LinePricing.Policy, free: Boolean, basePrice: Double, unitPrice: Double, price: Double?, quantity: Double?,
     percent: Boolean, discountText: String, grant: ir.vil3ntec.tohid.core.pos.PriceApproval.Grant?, canAsk: Boolean,
+    pack: UnitSale.Unit? = null,
   ): Checked {
-    val first = edit(p, free, basePrice, unitPrice, price, quantity, percent, discountText)
+    val first = edit(p, free, basePrice, unitPrice, price, quantity, percent, discountText, pack)
     val typedMinor = price?.let(DiscountGate::minor)
     val granted = grant?.takeIf { ir.vil3ntec.tohid.core.pos.PriceApproval.covers(it, typedMinor) }
     val lifted = if (granted == null) first
-      else edit(ir.vil3ntec.tohid.core.pos.PriceApproval.lifted(p, granted.code), free, basePrice, unitPrice, price, quantity, percent, discountText)
+      else edit(ir.vil3ntec.tohid.core.pos.PriceApproval.lifted(p, granted.code), free, basePrice, unitPrice, price, quantity, percent, discountText, pack)
     val ask = first.code?.takeIf { canAsk && granted == null && typedMinor != null && ir.vil3ntec.tohid.core.pos.PriceApproval.askable(p, it) }
     return Checked(first, lifted, granted, ask)
   }

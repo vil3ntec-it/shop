@@ -3,7 +3,7 @@ package ir.vil3ntec.tohid.customer
 import ir.vil3ntec.tohid.core.shopper.ChatDeleteScope
 import ir.vil3ntec.tohid.core.shopper.ChatPhoto
 import ir.vil3ntec.tohid.core.shopper.ChatThread
-import ir.vil3ntec.tohid.core.shopper.PhoneTicket
+import ir.vil3ntec.tohid.core.shopper.CustomerTicket
 import ir.vil3ntec.tohid.core.shopper.ShopperApi
 import ir.vil3ntec.tohid.core.shopper.ShopperError
 import ir.vil3ntec.tohid.core.shopper.ShopperHttp
@@ -133,7 +133,7 @@ class CustomerChatActsTest {
   }
 
   private var lost = 0
-  private val ticket = PhoneTicket("+93700000002", "v2.ticket", Long.MAX_VALUE)
+  private val ticket = CustomerTicket("c700000002@test.local", "v2.ticket", Long.MAX_VALUE)
 
   private fun model(io: CoroutineDispatcher = Dispatchers.Unconfined) = ChatModel(
     ShopperApi(http), object : ShopperKeyValue {

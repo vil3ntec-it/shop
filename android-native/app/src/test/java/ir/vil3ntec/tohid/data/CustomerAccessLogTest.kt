@@ -102,10 +102,14 @@ class CustomerAccessLogTest {
     assertEquals(Kind.DETAIL, CustomerAccessLog.openKind(true, null))
   }
 
-  @Test fun `هر دو پرونده بخش را دارند و دیدن را ثبت می‌کنند؛ فقط audit_view؛ حسابدار و حالتِ آموزشی نمی‌نویسند`() {
-    assertTrue(src("ui/v3/money/DebtorFileExtras.kt").contains("CustomerAccessPanel(d, debtorId,"))
+  /**
+   *  تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۳: بخشِ «چه کسی دید» در پروندهٔ قرض‌دار (گوشیِ نسخهٔ ۳ و کامپیوتر) کشیده نمی‌شود — پرونده فقط
+   *  تراکنش‌ها؛ ثبتِ دیدن همان می‌ماند (فقط به «سابقهٔ عملیات» ِ صاحب). جزءِ بخش خودش هنوز هست (`CustomerAccessPanel`).
+   */
+  @Test fun `هر دو پرونده بخش را نشان نمی‌دهند ولی دیدن را ثبت می‌کنند؛ فقط audit_view؛ حسابدار و حالتِ آموزشی نمی‌نویسند`() {
+    assertFalse(src("ui/v3/money/DebtorFileExtras.kt").contains("CustomerAccessPanel("))
     val desk = src("ui/screens/DeskCustomers.kt")
-    assertTrue(desk.contains("CustomerAccessPanel(d, id,"))
+    assertFalse(desk.contains("CustomerAccessPanel("))
     assertTrue(desk.contains("LaunchedEffect(id) { viewed(id, ir.vil3ntec.tohid.data.CustomerAccessLog.openKind(contacts, debtor)) }"))
     val screen = src("ui/v3/money/DebtorLedgerScreen.kt")
     assertTrue(screen.contains("LaunchedEffect(id) { actions.onViewed(ir.vil3ntec.tohid.data.CustomerAccessLog.openKind(contacts, account.debtor)) }"))
@@ -128,11 +132,18 @@ class CustomerAccessLogTest {
     val branch = panel.indexOf("if (!PermCore.canWrite(role, \"auditLog\")) {")
     val body = panel.indexOf("val body = CustomerAccess.noteBody(customerId, kind) ?: return@runCatching false")
     val ready = panel.indexOf("if (!Backend.isReady(context)) return@runCatching false")
+    //  CRM-15 (د۱۸): همان شاخه با بازگشتِ `try` — رسید ⇒ true؛ ردِ همیشگی ⇒ پرتاب؛ بی‌اینترنت ⇒ صفِ دستگاه، و هرگز دفتر
+    val back = panel.indexOf("return@runCatching try {", ready)
     val post = panel.indexOf("Backend.api(context).post(CustomerAccess.PATH, body)")
-    val done = panel.indexOf("return@runCatching true", post)
+    val done = panel.indexOf("true", post)
+    val rethrow = panel.indexOf("if (!e.retryable) throw e", post)
+    val queued = panel.indexOf("CustomerAccessOutboxAndroid.add(context, customerId, kind, System.currentTimeMillis())", post)
     val ledger = panel.indexOf("store.update { d -> CustomerAccessLog.record(")
     assertTrue("حالتِ آموزشی پیش از هر راهی", training in 0 until branch)
-    assertTrue("شاخهٔ حسابدار پیش از دفتر و با بازگشت", branch < body && body < ready && ready < post && post < done && done < ledger)
+    assertTrue(
+      "شاخهٔ حسابدار پیش از دفتر و با بازگشت",
+      branch in 0 until body && body < ready && ready < back && back < post && post < done && done < rethrow && rethrow < queued && queued < ledger,
+    )
     //  بدنه فقط شناسه و نوع است؛ برگهٔ همه فقط با خروجی (core: CustomerAccessTest)
     assertEquals(setOf("customerId", "kind"), CustomerAccess.noteBody("d1", Kind.DETAIL)?.keys)
     assertNull(CustomerAccess.noteBody(CustomerAccess.ALL, Kind.DETAIL))

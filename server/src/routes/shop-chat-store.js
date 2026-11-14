@@ -2,23 +2,23 @@
 /**
  * چتِ مشتری ↔ دکان، سمتِ مشتری — `/api/store/:slug/chat/…` (v3 §۳۳).
  *
- * هویتِ مشتری = شمارهٔ تأییدشده با بلیتِ ویترین (سرآیندِ `X-Store-Ticket`)،
+ * هویتِ مشتری = ایمیلِ تأییدشده با بلیتِ ویترین (سرآیندِ `X-Store-Ticket`؛ «فقط ایمیل»، ۱۴۰۵/۰۸/۲۳)،
  * همان که ویترین (PR #244، `lib/storefront.js`) پس از کدِ یک‌بارمصرف می‌دهد.
  * با پرچمِ سراسریِ `market.account` (پیش‌فرض خاموش) نشستِ حساب (`X-Store-Session`)
  * هم پذیرفته است و گفت‌وگو به شناسهٔ حساب گره می‌خورد (S9).
  * قراردادی که این‌جا از ویترین لازم است، فقط دو تابع:
  *
  *   open(slug)            ⇒ ردیفِ ویترینِ روشن با `shop_id` — یا خطای ۴۰۴
- *   verifiedPhoneOfTicket(ticket) ⇒ (ناهم‌گام) شمارهٔ ‎+93…‎ ِ تأییدشده — یا null
+ *   verifiedEmailOfTicket(ticket) ⇒ (ناهم‌گام) ایمیلِ تأییدشده — یا null
  *                                   (منقضی، دست‌خورده یا لغوشده با «خروج از همه‌جا»)
  *
  * تا ویترین روی سرور نیست، این درها همان ۴۰۴ ِ «ویترین نیست» را می‌دهند.
  *
  * ⛔ پیش‌فرض خاموش: ویترینِ روشن (پرچم‌های خودش) + پرچمِ `shop.chat` ِ همان
  * دکان؛ هر کدام نباشد ⇒ ۴۰۴ و هیچ ردیفی ساخته نمی‌شود.
- * ⛔ shop_id فقط از `slug` ِ ویترینِ روشن، شماره فقط از بلیتِ امضاشده.
+ * ⛔ shop_id فقط از `slug` ِ ویترینِ روشن، کلیدِ مشتری فقط از بلیتِ امضاشده یا نشستِ حساب.
  * ⛔ سقفِ درخواست: خواندن با سطلِ `generalMax` به‌ازای IP؛ نوشتن و بارگذاری
- * به‌ازای (دکان، شماره) — تا پشتِ یک IP ِ مشترک، مشتری‌ها جای هم را نگیرند.
+ * به‌ازای (دکان، کلیدِ مشتری) — تا پشتِ یک IP ِ مشترک، مشتری‌ها جای هم را نگیرند.
  */
 const express = require('express');
 const config = require('../config');
@@ -49,7 +49,7 @@ function storefront() {
 const customer = async (req, res, next) => {
   res.set('Cache-Control', 'no-store');
   const sf = storefront();
-  if (!sf || typeof sf.open !== 'function' || typeof sf.verifiedPhoneOfTicket !== 'function') {
+  if (!sf || typeof sf.open !== 'function' || typeof sf.verifiedEmailOfTicket !== 'function') {
     throw notFound('این ویترین پیدا نشد', 'store_not_found');
   }
   const store = await sf.open(req.params.slug);
@@ -59,12 +59,14 @@ const customer = async (req, res, next) => {
   if (session && (await require('../lib/market').accountOn())) {
     const a = await require('../lib/store-customers').auth(session);
     if (!a) throw new ApiError(401, 'session_required', 'برای این کار وارد حسابِ خود شوید');
-    req.chatViewer = { side: 'customer', shopId: store.shop_id, phone: a.customer.phone, customerId: a.customer.id };
+    //  حسابِ کهنهٔ فقط‌شماره تا ایمیلش را وصل نکرده تأییدشده نیست
+    if (!a.customer.email) throw new ApiError(401, 'verification_required', 'برای چت با دکان، ایمیلِ حسابِ خود را وصل کنید');
+    req.chatViewer = { side: 'customer', shopId: store.shop_id, phone: a.customer.email, customerId: a.customer.id };
     return next();
   }
-  const phone = await sf.verifiedPhoneOfTicket(req.get('x-store-ticket') || '');
-  if (!phone) throw new ApiError(401, 'verification_required', 'برای چت با دکان، شمارهٔ خود را تأیید کنید');
-  req.chatViewer = { side: 'customer', shopId: store.shop_id, phone };
+  const email = await sf.verifiedEmailOfTicket(req.get('x-store-ticket') || '');
+  if (!email) throw new ApiError(401, 'verification_required', 'برای چت با دکان، ایمیلِ خود را تأیید کنید');
+  req.chatViewer = { side: 'customer', shopId: store.shop_id, phone: email };
   next();
 };
 

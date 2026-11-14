@@ -57,9 +57,29 @@ sealed interface HeldClaim {
   data class Held(val series: String, val reason: String, val fresh: Boolean) : HeldClaim
 }
 
-/** «یک فاکتور در دو دستگاه» — تا کاربر ببیند می‌ماند ([HeldSyncState.conflicts]، [HeldSyncEngine.ack]) */
+/**
+ *  «یک فاکتور در دو دستگاه» — تا کاربر ببیند می‌ماند ([HeldSyncState.conflicts]، [HeldSyncEngine.ack]).
+ *  S09 (پرچمِ خاموشِ `shop.held_twice_cancel`، `HeldTwice`): [sale] فروشِ همین دستگاه از همان نگه‌داشته (کلیدِ تازهٔ بازگرداندنِ
+ *  بی شبکه)، [base] نسخه‌ای که این دستگاه دیده بود، [kept] فروشِ نخستِ یافته در دفتر، [cancelled] فروشِ دوم خودکار لغو شد،
+ *  [reported] گزارش به صندوقِ صاحب رسید، [seen] کاربر دید ولی گزارش هنوز نرسیده. همه خالی ⇒ نوشته نمی‌شوند (وضعِ پیشین همان).
+ */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
-data class HeldConflict(val title: String = "", val series: String = "", val reason: String = "", val at: Long = 0)
+data class HeldConflict(
+  val title: String = "",
+  val series: String = "",
+  val reason: String = "",
+  val at: Long = 0,
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val sale: String = "",
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val base: Long = 0,
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val kept: String = "",
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val cancelled: Boolean = false,
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val reported: Boolean = false,
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val seen: Boolean = false,
+) {
+  /** داوری شد (فروشِ نخست پیدا شد) ولی صندوقِ صاحب هنوز نمی‌داند */
+  val unreported: Boolean get() = kept.isNotBlank() && !reported
+}
 
 /** وضعِ همگام‌سازیِ نگه‌داشته‌های یک دکان روی این دستگاه — فقط وقتی پرچم روشن است نوشته می‌شود */
 @OptIn(ExperimentalSerializationApi::class)
@@ -80,6 +100,9 @@ data class HeldSyncState(
   /** «یک فاکتور در دو دستگاه»ِ دیده‌نشده (شناسهٔ نگه‌داشته ⇒ شرح)؛ نبود ⇒ نوشته نمی‌شود (وضعِ پیشین بایت‌به‌بایت همان) */
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val conflicts: Map<String, HeldConflict> = emptyMap(),
+  /** S09: پرچمِ `shop.held_twice_cancel` به گفتهٔ سرور (`auto_cancel` ِ `GET`)؛ خاموش ⇒ نوشته نمی‌شود */
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val autoCancel: Boolean = false,
 ) {
   /** [base] و [title] فقط برای بازگرداندن (نسخه‌ای که دیده بود؛ نامِ برگه برای پیامِ «دوتایی»)؛ ۰/خالی نوشته نمی‌شوند */
   @OptIn(ExperimentalSerializationApi::class)
@@ -90,6 +113,8 @@ data class HeldSyncState(
     val why: String = "",
     @EncodeDefault(EncodeDefault.Mode.NEVER) val base: Long = 0,
     @EncodeDefault(EncodeDefault.Mode.NEVER) val title: String = "",
+    /** S09: کلیدِ تازهٔ فروش که همین بازگرداندنِ بی شبکه با آن باز شد ([HeldClaim.Rekey]) */
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val sale: String = "",
   )
 }
 
@@ -246,6 +271,8 @@ class HeldSyncEngine(
     suspend fun delete(id: String, version: Long, reason: String, base: Long): Reply = delete(id, version, reason)
     /** «در دستِ دستگاهِ X» پیش از بازگرداندن ([force] = تأییدِ صریحِ گرفتن)؛ نرسید ⇒ `Reply(0)` */
     suspend fun claim(id: String, version: Long, base: Long, force: Boolean): Reply = Reply(0)
+    /** S09: «یک فاکتور در دو دستگاه» ⇒ صندوقِ صاحب (`POST …/:id/twice`)؛ نرسید ⇒ `Reply(0)` */
+    suspend fun twice(id: String, body: JsonObject): Reply = Reply(0)
   }
 
   /** `status` ۰ ⇒ نرسید (شبکه)؛ [error] = شیءِ `error` ِ پاسخِ ناموفق */
@@ -272,10 +299,44 @@ class HeldSyncEngine(
   fun othersHeld(id: String): Boolean = state.read().let { it.on && id in it.others }
 
   /** «یک فاکتور در دو دستگاه» ِ دیده‌نشده */
-  fun conflicts(): Map<String, HeldConflict> = state.read().conflicts
+  fun conflicts(): Map<String, HeldConflict> = state.read().conflicts.filterValues { !it.seen }
 
-  /** کاربر دید ⇒ کنار */
-  fun ack(id: String) { update { s -> if (id !in s.conflicts) s else s.copy(conflicts = s.conflicts - id) } }
+  /** کاربر دید ⇒ کنار؛ S09: گزارشِ نرسیده به صندوقِ صاحب ⇒ فقط «دیده» تا گزارش برسد */
+  fun ack(id: String) {
+    update { s ->
+      val c = s.conflicts[id] ?: return@update s
+      if (c.unreported) s.copy(conflicts = s.conflicts + (id to c.copy(seen = true))) else s.copy(conflicts = s.conflicts - id)
+    }
+  }
+
+  /** S09: لغوِ خودکارِ فروشِ دوم روشن است (پرچمِ سرور و همگام‌سازیِ نگه‌داشته‌ها) */
+  val autoCancel: Boolean get() = state.read().let { it.on && it.autoCancel }
+
+  /** S09: «دوتایی»هایی که فروشِ همین دستگاه را دارند و هنوز داوری یا گزارش نشده‌اند */
+  fun twiceOpen(): Map<String, HeldConflict> = state.read().conflicts.filterValues { it.sale.isNotBlank() && (it.kept.isBlank() || it.unreported) }
+
+  /** S09: داوری ([HeldTwice]): فروشِ نخستِ [kept] پیدا شد و فروشِ دوم [cancelled] شد یا نه */
+  fun settle(id: String, kept: String, cancelled: Boolean) = update { s ->
+    val c = s.conflicts[id] ?: return@update s
+    s.copy(conflicts = s.conflicts + (id to c.copy(kept = kept, cancelled = cancelled)))
+  }
+
+  /** S09: داوری‌ای که دیگر چیزی برای کردن ندارد (فروشِ دوم نیست، ناهمسان، یا کاربر خودش لغو کرد) ⇒ همان «دوتایی» ِ پیشین */
+  fun giveUp(id: String) = update { s ->
+    val c = s.conflicts[id] ?: return@update s
+    if (c.seen) s.copy(conflicts = s.conflicts - id) else s.copy(conflicts = s.conflicts + (id to c.copy(sale = "")))
+  }
+
+  /** S09: گزارش به صندوقِ صاحب؛ رسید ⇒ `reported` (و اگر کاربر پیش‌تر دیده بود، کنار) */
+  suspend fun report(id: String, body: JsonObject): Boolean {
+    val reply = port.twice(id, body)
+    val ok = reply.status in 200..299 || reply.code == "bad_held_twice"
+    if (ok) update { s ->
+      val c = s.conflicts[id] ?: return@update s
+      if (c.seen) s.copy(conflicts = s.conflicts - id) else s.copy(conflicts = s.conflicts + (id to c.copy(reported = true)))
+    }
+    return ok
+  }
 
   private fun conflict(id: String, c: HeldConflict) = update { s -> s.copy(conflicts = s.conflicts + (id to c)) }
 
@@ -335,7 +396,10 @@ class HeldSyncEngine(
       val base = known[h.id] ?: 0L
       val v = HeldSyncPlan.nextVersion(known, h.id, clock())
       out.remove(h.id)
-      out[h.id] = HeldSyncState.Op(del = true, v = v, why = HeldChange.RESUME.reason, base = base, title = HeldSyncPlan.titleOf(h))
+      //  S09: کلیدِ تازهٔ فروش فقط با پرچمِ `shop.held_twice_cancel` (خاموش ⇒ همان op ِ پیشین)
+      out[h.id] = HeldSyncState.Op(
+        del = true, v = v, why = HeldChange.RESUME.reason, base = base, title = HeldSyncPlan.titleOf(h), sale = if (st.autoCancel) next else "",
+      )
       known[h.id] = v
       st.copy(out = out, known = known)
     }
@@ -357,6 +421,7 @@ class HeldSyncEngine(
     store.load()
     val pulled = pull(state.read().cursor) ?: return@withLock Report(enabled = state.read().on)
     if (!pulled.enabled) return@withLock Report(false)
+    if (state.read().autoCancel != pulled.auto) update { it.copy(autoCancel = pulled.auto) }
     var absorbed = absorb(pulled.rows, pulled.rev, pulled.cancel)
     if (state.read().refill) {
       val all = pull(0)
@@ -372,12 +437,16 @@ class HeldSyncEngine(
     Report(true, absorbed, sent)
   }
 
-  private class Pulled(val enabled: Boolean, val rows: List<HeldSyncPlan.Remote> = emptyList(), val rev: Long = 0, val cancel: Boolean = false)
+  private class Pulled(
+    val enabled: Boolean, val rows: List<HeldSyncPlan.Remote> = emptyList(), val rev: Long = 0, val cancel: Boolean = false,
+    val auto: Boolean = false,
+  )
 
   private suspend fun pull(from: Long): Pulled? {
     var since = from
     val rows = ArrayList<HeldSyncPlan.Remote>()
     var cancel = false
+    var auto = false
     var pages = 0
     while (pages++ < 5) {
       val body = port.pull(since) ?: return null
@@ -386,13 +455,14 @@ class HeldSyncEngine(
         if (state.read() != HeldSyncState()) update { HeldSyncState() }
         return Pulled(false)
       }
+      auto = (body["auto_cancel"] as? JsonPrimitive)?.booleanOrNull == true
       cancel = ((body["permissions"] as? JsonObject)?.get("cancel") as? JsonPrimitive)?.booleanOrNull == true
       (body["items"] as? JsonArray)?.forEach { e -> remoteOf(e as? JsonObject, gone = false)?.let(rows::add) }
       (body["gone"] as? JsonArray)?.forEach { e -> remoteOf(e as? JsonObject, gone = true)?.let(rows::add) }
       since = maxOf(since, (body["rev"] as? JsonPrimitive)?.longOrNull ?: since)
       if ((body["more"] as? JsonPrimitive)?.booleanOrNull != true) break
     }
-    return Pulled(true, rows, since, cancel)
+    return Pulled(true, rows, since, cancel, auto)
   }
 
   /**
@@ -458,7 +528,8 @@ class HeldSyncEngine(
         //  همین نگه‌داشته را دستگاهِ دیگری پیش‌تر برگرداند، فروخت یا عوض کرد ⇒ کاربر ببیند؛ سرور دست نخورد
         reply.code == "held_conflict" -> {
           done(id, op)
-          conflict(id, holderOf(reply.error?.get("holder") as? JsonObject, op.title))
+          val holder = holderOf(reply.error?.get("holder") as? JsonObject, op.title)
+          conflict(id, if (op.sale.isBlank()) holder else holder.copy(sale = op.sale, base = op.base))
         }
         //  ردِ همیشگی (شکل، اندازه، نگه‌داشتهٔ کسِ دیگر): نسخهٔ دستگاه سرِ جایش، کار کنار
         else -> done(id, op)

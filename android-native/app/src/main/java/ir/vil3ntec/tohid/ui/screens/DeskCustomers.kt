@@ -463,7 +463,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
     ir.vil3ntec.tohid.ui.components.pos.LoyaltyHistory(d, id, Modifier.padding(top = 8.dp).heightIn(max = 220.dp).verticalScroll(rememberScrollState()), store, ::toast)
     ir.vil3ntec.tohid.ui.components.pos.LayawayCustomerPanel(d, store, id, ::toast) // POS-27: امانی‌های همین مشتری (`LayawayPref`)
     CustomerOnlineOrdersPanel(d, id, Modifier.padding(top = 8.dp), onOpen = onOpenOrder) // CRM-07: سفارش‌های اینترنتیِ باز/لغوشده (بخشِ سفارش و اجازهٔ «تماس»)
-    CustomerAccessPanel(d, id, Modifier.padding(top = 8.dp).heightIn(max = 180.dp).verticalScroll(rememberScrollState())) // CRM-15: فقط صاحب و `audit.view`
+    //  CRM-15: بخشِ «چه کسی دید» در پرونده نیست (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۳)؛ ثبتِ دیدنِ بالا همان (فقط «سابقهٔ عملیات»)
     Spacer(Modifier.height(10.dp))
 
     //  زبانه‌ها
@@ -788,11 +788,11 @@ internal fun HeadRow(cols: List<Pair<String, Dp>>) {
 
 @Composable
 private fun NewCustomerRow(store: ShopStore, d: ShopData, toast: (String) -> Unit, onAdded: (String) -> Unit) {
-  val scope = rememberCoroutineScope()
+  val scope = rememberCoroutineScope(); val limitRules = ir.vil3ntec.tohid.ui.components.rememberCreditLimitRules() // CRM-03 #۲۵
   var name by remember { mutableStateOf("") }
   var phone by remember { mutableStateOf("") }
   fun save() {
-    when (val r = DebtorEngine.add(d, DebtorEngine.DebtorDraft(name = name, phone = phone), System.currentTimeMillis(), ::newId)) {
+    when (val r = DebtorEngine.add(d, ir.vil3ntec.tohid.data.CreditLimitGate.quickDraft(limitRules, DebtorEngine.DebtorDraft(name = name, phone = phone)), System.currentTimeMillis(), ::newId)) {
       is DebtorEngine.Result.Failed -> toast(r.message)
       is DebtorEngine.Result.Ok -> { scope.launch { store.save(d, r.data) }; onAdded(r.id); name = ""; phone = "" }
     }

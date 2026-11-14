@@ -330,6 +330,10 @@ class DataSafetyGuardTest {
       "tohid-synonyms",
       //  POS-05/INV-03: آخرین نمای رزروِ سفارش‌های اینترنتی (`OnlineHoldsStore`، هر دقیقه از سرور)؛ تنظیمِ دکان نیست
       "tohid-online-holds",
+      //  PAY-07 (د۱۸): آینهٔ وضعیتِ حساب‌پیِ سرور روی فاکتورِ دستگاه (`PayMirrorAndroid`)؛ منبعش سرور است
+      "tohid-pay-mirror",
+      //  CRM-15 (د۱۸): صفِ «دیدنِ پرونده» ِ حسابدارِ بی‌اینترنت تا رسیدن به سرور (`CustomerAccessOutboxAndroid`)
+      "tohid-customer-access",
     ).forEach { put(it, Kind.SERVER) }
     //  عمداً مالِ همین دستگاه: نشست و همگام‌سازی، سرور، قفل، زبان و ظاهر، چاپگر/دستگاه‌ها، پیش‌نویس‌ها
     listOf(
@@ -347,6 +351,9 @@ class DataSafetyGuardTest {
       "tohid-conflict-fix",
       //  OPS-02: پرچمِ «پشتیبانِ دستی و پوشه هم رمزدار» و شکستِ پشتیبانِ پوشه (`BackupDevice`)؛ کلیدِ عبارت مالِ همین دستگاه است
       "tohid-backup-device",
+      //  S29/SYN-09: cursor ِ هاب، `epoch` و حلقهٔ «دیده از سرور» (`HubLinkV1Android`)، و کلیدِ جفت‌شدن اگر Keystore ِ گوشی خراب است
+      //  (`HubKeyStore`) — مالِ همین دستگاه؛ پس از بازگردانی گوشی دوباره جفت می‌شود
+      "tohid-hub-link", "tohid-hub-secure-plain",
     ).forEach { put(it, Kind.DEVICE) }
     //  مانده (DATA-SAFETY §۶): رمزِ کارمندان عمداً از پشتیبان بیرون است — دوباره گذاشته می‌شود
     put("tohid-staff-pins", Kind.GAP)

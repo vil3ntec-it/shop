@@ -21,6 +21,7 @@ import { missingTool, PLAYWRIGHT_INSTALL, SKIP, closeSafeRoute } from './browser
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -329,6 +330,7 @@ ok((await page.locator('button', { hasText: /پرداختِ آنلاین|پرد�
 await page.fill('#a-text', 'کارتهٔ سه، سرکِ دوم');
 await page.fill('#c-name', 'مشتریِ آزمایشی');
 await page.fill('#c-phone', '0791112233');
+await page.fill('#c-email', mailOf('0791112233'));
 await page.click('#verify-send');
 await page.waitForSelector('#verify-code-row:not([hidden])', { timeout: 10000 });
 const code = ((await page.textContent('#verify-msg')).match(/(\d{4,8})/) || [])[1];
@@ -424,6 +426,7 @@ await dark.close();
   await p2.goto(`${base}/store/${ga.slug}#/checkout`);
   await p2.waitForSelector('#view-checkout:not([hidden])');
   await p2.fill('#c-phone', '0790000000');
+  await p2.fill('#c-email', mailOf('0790000000'));
   const t = await p2.textContent('#verify-msg');
   ok(/راه‌اندازی نشده/.test(t) && (await p2.isHidden('#verify-send')) && (await p2.isDisabled('#submit-order')),
     'بی سرویسِ پیامک: پیامِ روشن، بی دکمهٔ «فرستادن» و بی ثبت', t);
@@ -464,6 +467,7 @@ for (const [lang, dir, cur, title] of [['en', 'ltr', 'AFN', 'Checkout'], ['ps', 
     if (scheme === 'light') {
       //  خطای سرور با واژه‌نامه، نه متنِ خامِ فارسیِ سرور
       await p.fill('#c-phone', '0793334455');
+      await p.fill('#c-email', mailOf('0793334455'));
       await p.click('#verify-send');
       await p.waitForSelector('#verify-code-row:not([hidden])', { timeout: 10000 });
       await p.fill('#v-code', '000000');

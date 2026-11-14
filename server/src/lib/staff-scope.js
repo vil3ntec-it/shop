@@ -86,8 +86,9 @@ function taskPlaces(t) {
   return t.kind === 'transfer_short' ? [t.location, d.to] : [t.location];
 }
 
-async function taskOf(shopId, id) {
-  return one('SELECT kind, location, detail FROM stock_tasks WHERE shop_id=$1 AND id=$2', [shopId, String(id || '')]);
+/** وظیفهٔ همین دکان و همین شعبه (`branchId` ِ فازِ ۳؛ '' = اصلی، همان امروز) — شعبهٔ دیگر ⇒ undefined، پس «نیست» ِ همان در */
+async function taskOf(shopId, id, branchId = '') {
+  return one('SELECT kind, location, detail FROM stock_tasks WHERE shop_id=$1 AND id=$2 AND branch_id=$3', [shopId, String(id || ''), String(branchId || '')]);
 }
 
 async function transferTo(shopId, id) {

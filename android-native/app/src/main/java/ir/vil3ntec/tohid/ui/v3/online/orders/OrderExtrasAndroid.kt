@@ -56,7 +56,7 @@ import kotlinx.coroutines.launch
 
 private fun buzz(context: android.content.Context): (Boolean) -> Unit = { ok -> if (ok) Haptics.success(context) else Haptics.confirm(context) }
 
-/** سرِ صفِ سفارش‌ها: قفسه و دستهٔ جمع‌آوری (PCK-10/12)، گزارش‌ها و نظرها (NTF-07/09) و هشدارهای بازپرداخت (RET-11) */
+/** سرِ صفِ سفارش‌ها: قفسه و دستهٔ جمع‌آوری (PCK-10/12)، گزارش‌ها و نظرها (NTF-07/09)، درخواست‌های برگشت و هشدارهای بازپرداخت (RET-11) */
 @Composable
 internal fun RouteScope.OrderQueueExtras(cfg: OrdersConfigDto?, onChanged: () -> Unit, onOpen: (String) -> Unit) {
   val c = cfg ?: return
@@ -67,6 +67,7 @@ internal fun RouteScope.OrderQueueExtras(cfg: OrdersConfigDto?, onChanged: () ->
   Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
     PickDeskEntry(c, api, buzz(context), onChanged)
     OrderFeedbackEntry(api, c.permissions.manage, OrdersLive.rev.value)
+    ReturnRequestsEntry(api, c.permissions.manage, OrdersLive.rev.value)   // RET-11: درخواست‌های برگشتِ ویترین
   }
   RefundListNotices(ledger, c, onOpen = onOpen, onRetry = { scope.launch { OrdersLive.reconcile(context, store, force = true) } })
 }

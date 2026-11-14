@@ -59,6 +59,12 @@ object StrSaleCaps {
     "Changing the credit limit is closed for your role; ask the shop owner.",
     "ستاسو رول ته د پور د حد بدلول تړلي دي؛ د دوکان له خاوند څخه وغواړئ.",
   )
+  //  CRM-03 #۲۵ (۱۴۰۵/۰۸/۲۳): مشتریِ تازهٔ کارمندِ «ممنوع» با سقفِ پیش‌فرضِ دکان (صفر)
+  val limitNewDefault: String get() = t(
+    "مشتریِ تازه با سقفِ پیش‌فرضِ دکان (صفر) ساخته می‌شود؛ سقفِ دیگر را مدیر یا صاحبِ دکان می‌گذارد.",
+    "A new customer gets the shop's default limit (zero); a manager or the shop owner sets any other limit.",
+    "نوی پېرودونکی د دوکان له اصلي حد (صفر) سره جوړېږي؛ بل حد مدیر یا د دوکان خاوند ږدي.",
+  )
   fun limitUpTo(cap: String): String = t(
     "سقف را تا ${asIs(cap)} افغانی می‌توانید بگذارید؛ بیشتر یا «بی سقف» را صاحبِ دکان می‌گذارد.",
     "You can set a limit up to $cap afghani; a higher limit or no limit is for the shop owner.",

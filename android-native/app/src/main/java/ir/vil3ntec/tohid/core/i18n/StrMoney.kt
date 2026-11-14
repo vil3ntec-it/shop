@@ -95,6 +95,11 @@ object StrMoney {
   val newTx: String get() = t("ثبتِ تراکنش", "New transaction", "نوې راکړه ورکړه")
   val newTxHint: String get() = t("مبلغ را بنویسید و برد یا رسید را انتخاب کنید", "Enter an amount, then pick give or receive", "مبلغ ولیکئ او ورکړه یا رسید وټاکئ")
   val txDeleted: String get() = t("تراکنش حذف شد", "Transaction deleted", "راکړه ورکړه ړنګه شوه")
+  // S89 — با کلیدِ `shop.doc_chain` «حذف» سندِ معکوس است (اصل می‌ماند)
+  val reverse: String get() = t("سندِ معکوس", "Reverse", "معکوس سند")
+  val txReversed: String get() = t("سندِ معکوس ثبت شد", "Reversal recorded", "معکوس سند ثبت شو")
+  val reversalTag: String get() = t("معکوس", "Reversal", "معکوس")
+  val reversedTag: String get() = t("معکوس‌شده", "Reversed", "معکوس شوی")
   fun debtorDeleted(name: Any): String = t("«${asIs(name)}» حذف شد", "“$name” deleted", "«$name» ړنګ شو")
   val deleteDebtorTitle: String get() = t("حذفِ قرض‌دار؟", "Delete this debtor?", "پوروړی ړنګ شي؟")
   val deleteTxTitle: String get() = t("حذفِ تراکنش؟", "Delete this transaction?", "راکړه ورکړه ړنګه شي؟")
@@ -178,6 +183,9 @@ object StrMoney {
   val receiveKind: String get() = t("رسید — پول رساند", "Receive — paid back", "رسید — پیسې یې راکړې")
   val recordGive: String get() = t("ثبت برد", "Record give", "ورکړه ثبت کړئ")
   val recordReceive: String get() = t("ثبت رسید", "Record receipt", "رسید ثبت کړئ")
+  /** برگهٔ کوچکِ ثبت (صاحب‌کار ۱۴۰۵/۰۸/۲۳): زدنِ قوطیِ «برد/رسید» کنارِ مبلغ و تاریخِ سربرگ */
+  val txSwitchKind: String get() = t("عوض کردنِ برد و رسید", "Switch give / receive", "ورکړه او رسید بدل کړئ")
+  val txChangeDate: String get() = t("عوض کردنِ تاریخ", "Change date", "نېټه بدله کړئ")
   fun balanceAfterSave(state: Any): String = t("مانده پس از ثبت: ${asIs(state)}", "Balance after saving: $state", "له ثبت وروسته پاتې: $state")
   val overLimitTitle: String get() = t("بیش از سقفِ اعتبار", "Over the credit limit", "له پور حد زیات")
   val overLimitNote: String get() = t(

@@ -137,6 +137,7 @@ val MoneyModule = AppModule(
       val id = CustomerCrm.resolve(data, args["id"].orEmpty())
       val remindScope = rememberCoroutineScope()
       val viewed = ir.vil3ntec.tohid.ui.screens.rememberCustomerAccessNote(store) // CRM-15
+      val chainOn = rememberDocChainOn() // S89: «حذف» با کلیدِ `shop.doc_chain` سندِ معکوس است
       VipGate(Str.debtors) {
         DebtorLedgerScreen(
           id = id,
@@ -148,7 +149,7 @@ val MoneyModule = AppModule(
             onEdit = { nav.open(MoneyPaths.editDebtor(id)) },
             onDelete = { nav.open(MoneyPaths.deleteDebtor(id)) },
             onOpenTx = { nav.open(MoneyPaths.txDetail(id, it)) },
-            onDeleteTx = { MoneyUndo.deleteLater(store, snackbar, PendingDelete.Transaction(it), StrMoney.txDeleted) },
+            onDeleteTx = { MoneyUndo.removeTxLater(store, snackbar, it, chainOn) },
             onOpenSale = { nav.open(SalesPaths.invoice(it)) },
             onOlderSales = { nav.open(SalesPaths.history(q = data.debtors.find { d -> d.id == id }?.name)) },
             //  CRM-06: یک ردِ `debt_reminder` در روز برای هر راه (زمان‌بندیِ «یادآوریِ امروز»)
@@ -322,7 +323,8 @@ internal fun moneyId(): String = ir.vil3ntec.tohid.ui.screens.newId()
 private fun RouteScope.DebtorTxRoute() {
   val id = args["id"].orEmpty()
   val txId = args["txId"].orEmpty()
-  val tx = data.transactions.find { it.id == txId && it.debtorId == id }
+  val own = ir.vil3ntec.tohid.data.CustomerAlias.of(data, id)  // CRM-10: ردیفِ ادغام‌شدهٔ پیوندی هم در همین پرونده
+  val tx = data.transactions.find { it.id == txId && it.debtorId in own }
   if (tx == null || txId in MoneyUndo.hiddenTx) {
     LandOn(MoneyPaths.debtor(id))
     return
@@ -330,15 +332,20 @@ private fun RouteScope.DebtorTxRoute() {
   val context = LocalContext.current
   val book = remember(data, id) { ir.vil3ntec.tohid.data.DebtBook.book(data, id, todayIso()) }
   val receipt = remember(data, id, txId) { receiptOf(context, data, id, txId) }
+  //  S89: کلیدِ `shop.doc_chain` روشن ⇒ دکمه «سندِ معکوس» است و ردیفی که معکوس نمی‌شود دکمه ندارد
+  val chainOn = rememberDocChainOn()
+  val removable = remember(data, txId, chainOn) { !chainOn || ir.vil3ntec.tohid.data.DebtReverse.refusalOf(data, txId) == null }
+  val removeLabel = if (!removable) null else if (chainOn) StrMoney.reverse else StrMoney.delete
   VipGate(Str.debtors) {
     DebtorTxSheet(
       tx = tx,
       book = book,
       receipt = receipt,
       desk = desk,
+      removeLabel = removeLabel,
       actions = DebtorTxSheetActions(
         onClose = { back() },
-        onDelete = { MoneyUndo.deleteLater(store, snackbar, PendingDelete.Transaction(txId), StrMoney.txDeleted) },
+        onDelete = { MoneyUndo.removeTxLater(store, snackbar, txId, chainOn) },
         onSaveDue = { due -> MoneyWriter.debtor(store, toasts, context, data, DebtorEngine.setDueDate(data, txId, due), StrMoney.dueSaved) },
       ),
     )
@@ -354,7 +361,22 @@ private fun RouteScope.DeleteDebtorRoute() {
     LandOn(MoneyPaths.DEBTORS)
     return
   }
+  //  S89: با کلیدِ `shop.doc_chain` قرض‌دارِ دارای ردیف پاک نمی‌شود (پاک شدنش یعنی حذفِ اسنادِ ثبت‌شده) ⇒ فقط دلیل و «بستن»
+  val rows = ir.vil3ntec.tohid.data.CustomerAlias.of(data, id).let { own -> data.transactions.count { it.debtorId in own } }
+  val deletable = ir.vil3ntec.tohid.core.debt.DebtReversal.canDeleteDebtor(rememberDocChainOn(), rows)
   VipGate(Str.debtors) {
+    if (!deletable) {
+      V3ConfirmSheet(
+        title = StrMoney.deleteDebtorTitle,
+        message = ir.vil3ntec.tohid.core.i18n.StrLedger.debtorHasDocs(debtor.name, rows),
+        confirm = ir.vil3ntec.tohid.core.i18n.StrKit.close,
+        icon = Icons.Outlined.DeleteOutline,
+        danger = false,
+        onConfirm = { back() },
+        onDismiss = { back() },
+      )
+      return@VipGate
+    }
     V3ConfirmSheet(
       title = StrMoney.deleteDebtorTitle,
       message = DebtorEngine.deleteWarning(data, id),
@@ -431,7 +453,7 @@ private fun RouteScope.DebtorFormRoute(id: String?) {
       debtor = debtor,
       onClose = { back() },
       onSave = { f ->
-        saved[0] = MoneyWriter.debtor(store, toasts, context, data, DebtorFormsModel.save(data, id, f, System.currentTimeMillis(), limitRules, ::moneyId), if (id == null) StrMoney.saved else StrMoney.edited)
+        saved[0] = MoneyWriter.debtor(store, toasts, context, data, DebtorFormsModel.saveBasic(data, id, f, System.currentTimeMillis(), limitRules, ::moneyId), if (id == null) StrMoney.saved else StrMoney.edited)
         saved[0] != null
       },
       onSaved = { if (id == null) nav.finish(saved[0]) else back() },

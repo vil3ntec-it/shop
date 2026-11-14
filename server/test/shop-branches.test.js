@@ -243,11 +243,19 @@ test('v3: هر شعبه بخشِ جدای خودش را دارد؛ شناسهٔ 
   const none = await pushV3(w.onlyA, [product3('p-none')]);
   assert.equal(none.status, 403); assert.equal(none.body.error.code, 'branch_required');
   //  الف
-  const pa = await pushV3(w.onlyA, [product3('p-a'), sale3('s-a', 30000), expense3('e-a', 1000)], A);
+  //  فازِ ۳: کالا مالِ کلِ دکان است ⇒ در بخشِ شعبه فقط سندهای خودش (این‌جا مصرف به‌جای کالای فازِ ۱)
+  const pa = await pushV3(w.onlyA, [expense3('p-a', 100), sale3('s-a', 30000), expense3('e-a', 1000)], A);
   assert.equal(pa.status, 200, JSON.stringify(pa.body));
   for (const x of pa.body.results) assert.notEqual(x.status, 'rejected', JSON.stringify(x));
+  //  کاتالوگ فقط از شعبهٔ اصلی: کالای تازه در بخشِ شعبه (کارمند و صاحب هم) ⇒ رد با `catalog_main_only` و بی ردیف
+  for (const who of [w.onlyA, s]) {
+    const pc = await pushV3(who, [product3(`p-cat-${who.device.slice(-6)}`)], A);
+    assert.equal(pc.status, 200, JSON.stringify(pc.body));
+    assert.equal(pc.body.results[0].status, 'rejected');
+    assert.equal(pc.body.results[0].reason, 'catalog_main_only');
+  }
   //  دستکاریِ بدنه: branch_id ِ ب در بدنه با سرآیندِ الف ⇒ همچنان الف
-  const tb = await v3(w.onlyA, 'POST', 'push', { branch: A, body: { device_id: w.onlyA.device, protocol: 3, branch_id: Bid, branchId: Bid, ops: [product3('p-a2')] } });
+  const tb = await v3(w.onlyA, 'POST', 'push', { branch: A, body: { device_id: w.onlyA.device, protocol: 3, branch_id: Bid, branchId: Bid, ops: [expense3('p-a2', 100)] } });
   assert.equal(tb.status, 200);
   //  ب از سرآیند ⇒ ۴۰۳ بی هیچ ردیف
   const pb = await pushV3(w.onlyA, [product3('p-steal')], Bid);
@@ -264,16 +272,21 @@ test('v3: هر شعبه بخشِ جدای خودش را دارد؛ شناسهٔ 
   //  کارمندِ اصلی روی الف ⇒ ۴۰۳
   assert.equal((await pushV3(w.main, [product3('p-m-steal')], A)).status, 403);
 
-  //  ردیف‌ها کجا نشستند: اصلی = همان حسابِ امروز، الف = بخشِ جدا
+  //  ردیف‌ها کجا نشستند: اصلی = همان حسابِ امروز، الف = بخشِ جدا (کالای الف هیچ؛ کاتالوگ فقط آینهٔ اصلی پس از pull)
   assert.deepEqual((await rowsOf(s.shopId, 'products')).map((r) => r.row_id), ['p-m']);
-  assert.deepEqual((await rowsOf(`${s.shopId}#${A}`, 'products')).map((r) => r.row_id), ['p-a', 'p-a2']);
-  assert.deepEqual((await rowsOf(`${s.shopId}#${Bid}`, 'products')).map((r) => r.row_id), []);
+  assert.deepEqual((await rowsOf(`${s.shopId}#${A}`, 'expenses')).map((r) => r.row_id), ['e-a', 'p-a', 'p-a2']);
+  assert.deepEqual((await rowsOf(`${s.shopId}#${A}`, 'products')).map((r) => r.row_id), []);
+  assert.deepEqual((await rowsOf(`${s.shopId}#${Bid}`, 'expenses')).map((r) => r.row_id), []);
+  assert.deepEqual((await rowsOf(s.shopId, 'expenses')).map((r) => r.row_id), []);
 
   //  خواندن: Snapshot و pull ِ هر شعبه فقط خودش
   const snapA = await v3(w.onlyA, 'GET', 'snapshot', { branch: A });
   assert.equal(snapA.status, 200);
   const idsOf = (t) => (Array.isArray(t) ? t.map((r) => r.row_id || r.id) : Object.keys(t || {})).sort();
-  assert.deepEqual(idsOf(snapA.body.tables.products), ['p-a', 'p-a2']);
+  assert.deepEqual(idsOf(snapA.body.tables.expenses), ['e-a', 'p-a', 'p-a2']);
+  //  کالای اصلی (کاتالوگِ مشترک) در Snapshot ِ الف — همان آینه؛ فروشِ اصلی نه
+  assert.deepEqual(idsOf(snapA.body.tables.products), ['p-m']);
+  assert.ok(!JSON.stringify(snapA.body.tables).includes('s-m'), 'فروشِ اصلی در الف نیست');
   const snapM = await v3(w.main, 'GET', 'snapshot');
   const idsM = JSON.stringify(snapM.body.tables);
   assert.ok(!idsM.includes('p-a') && !idsM.includes('s-a') && !idsM.includes('e-a'), 'دادهٔ الف در اصلی نیست');
@@ -281,19 +294,20 @@ test('v3: هر شعبه بخشِ جدای خودش را دارد؛ شناسهٔ 
   assert.equal(pullM.status, 200);
   assert.ok(!JSON.stringify(pullM.body).includes('p-a'));
   const pullA = await v3(w.onlyA, 'GET', 'pull', { branch: A, query: `?device_id=${w.onlyA.device}y&since=0` });
-  assert.ok(!JSON.stringify(pullA.body).includes('p-m') && !JSON.stringify(pullA.body).includes('s-m'));
+  assert.ok(!JSON.stringify(pullA.body).includes('s-m'), 'فروشِ اصلی در pull ِ الف نیست');
+  assert.ok(pullA.body.ops.every((o) => o.table === 'products' ? o.origin === 'server' : true), 'کالا در الف فقط از آینهٔ سرور');
   //  وضعیت و تعارض‌ها هم بخشِ خودش
   assert.equal((await v3(w.onlyA, 'GET', 'status', { branch: Bid })).status, 403);
   assert.equal((await v3(w.onlyA, 'GET', 'conflicts', { branch: Bid })).status, 403);
   assert.equal((await v3(w.onlyA, 'GET', 'conflicts', { branch: A })).status, 200);
 
   //  مدیرِ الف‌وب: هر دو، نه اصلی؛ صاحب: هر سه
-  assert.equal((await pushV3(w.aAndB, [product3('p-b')], Bid)).status, 200);
+  assert.equal((await pushV3(w.aAndB, [expense3('p-b', 100)], Bid)).status, 200);
   assert.equal((await pushV3(w.aAndB, [product3('p-ab-main')], '')).status, 403);
   const ownA = await v3(s, 'GET', 'snapshot', { branch: A });
   assert.equal(ownA.status, 200);
   assert.ok(JSON.stringify(ownA.body.tables).includes('p-a'));
-  assert.deepEqual((await rowsOf(`${s.shopId}#${Bid}`, 'products')).map((r) => r.row_id), ['p-b']);
+  assert.deepEqual((await rowsOf(`${s.shopId}#${Bid}`, 'expenses')).map((r) => r.row_id), ['p-b']);
 
   //  تغییرِ صاحب از درخواستِ بعد: الف از کارمند گرفته شد
   await h.put(`/api/shop/branches/members/${w.onlyA.memberId}`, { branches: [Bid] }, { token: s.token });
@@ -415,9 +429,9 @@ test('کوچ: دکانِ امروز بی هیچ ردیفِ تازه «شعبهٔ
   assert.ok(JSON.stringify(snap.body.tables).includes('k-1'), 'دادهٔ پیشین همان شعبهٔ اصلی است');
 
   const b = await h.post('/api/shop/branches', { name: 'شعبهٔ تازه' }, { token: s.token });
-  assert.equal((await pushV3(s, [product3('k-b')], b.body.branch.id)).status, 200);
+  assert.equal((await pushV3(s, [expense3('k-b', 100)], b.body.branch.id)).status, 200);
   const key = `${s.shopId}#${b.body.branch.id}`;
-  assert.equal((await rowsOf(key, 'products')).length, 1);
+  assert.equal((await rowsOf(key, 'expenses')).length, 1);
   await query('DELETE FROM shops WHERE id=$1', [s.shopId]);
   for (const t of ['sync_v3_rows', 'sync_v3_ops', 'sync_v3_devices']) {
     assert.equal((await one(`SELECT COUNT(*)::int AS n FROM ${t} WHERE account_id=$1`, [key])).n, 0, t);
@@ -427,7 +441,7 @@ test('کوچ: دکانِ امروز بی هیچ ردیفِ تازه «شعبهٔ
 test('پرچم دوباره خاموش ⇒ همان امروز، حتی با ردیف‌های شعبه و انتساب (کارمند به شعبهٔ اصلی برمی‌گردد)', async () => {
   const w = await world('خاموش‌دوباره');
   const { s, A } = w;
-  assert.equal((await pushV3(w.onlyA, [product3('d-a')], A)).status, 200);
+  assert.equal((await pushV3(w.onlyA, [expense3('d-a', 100)], A)).status, 200);
   await flag(s, 'shop.branches', false);
   //  همگام‌سازی و درهای امروز برای کارمندِ «فقط الف»: همان امروز (شعبهٔ اصلی)
   assert.equal((await h.get('/api/shop', { token: w.onlyA.token })).status, 200);
@@ -437,7 +451,7 @@ test('پرچم دوباره خاموش ⇒ همان امروز، حتی با ر�
   const p = await pushV3(w.onlyA, [product3('d-main')], A);
   assert.equal(p.status, 200, JSON.stringify(p.body));
   assert.deepEqual((await rowsOf(s.shopId, 'products')).map((r) => r.row_id), ['d-main']);
-  assert.deepEqual((await rowsOf(`${s.shopId}#${A}`, 'products')).map((r) => r.row_id), ['d-a']);
+  assert.deepEqual((await rowsOf(`${s.shopId}#${A}`, 'expenses')).map((r) => r.row_id), ['d-a']);
   //  درهای شعبه همان مسیرِ ناشناخته
   assert.equal((await h.get('/api/shop/branches', { token: s.token })).status, 404);
   assert.equal((await h.get('/api/shop/branches/report', { token: s.token })).status, 404);

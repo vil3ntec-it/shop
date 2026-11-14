@@ -148,8 +148,8 @@ async function wrap(price, sf, { key, body, input, phone = '', ip = '' }) {
     }
     let discountMinor = g ? (await guard.settle(run, g, { e, subtotalMinor: out.subtotalMinor, code, key, at })).discountMinor : e.discountMinor;
     let totalMinor = out.subtotalMinor - discountMinor + out.deliveryFeeMinor;
-    //  NTF-10: کوپنِ پوزش پس از قاعده‌ها و اولین خرید، یک‌بار و فقط برای همان شماره (lib/order-late-apology)
-    if (apology) ({ discountMinor, totalMinor } = await apology.apply(run, { ...out, discountMinor, totalMinor }, { at, phone: input.customerPhone, sale }));
+    //  NTF-10: کوپنِ پوزش پس از قاعده‌ها و اولین خرید، یک‌بار و فقط برای همان مشتری (ایمیلِ تأییدشده؛ lib/order-late-apology)
+    if (apology) ({ discountMinor, totalMinor } = await apology.apply(run, { ...out, discountMinor, totalMinor }, { at, email: phone, sale }));
     if (expected !== null && expected !== totalMinor) {
       throw Object.assign(conflict('قیمت‌ها عوض شده است؛ سبد را دوباره ببینید', 'price_changed'), {
         data: { quote: { subtotalMinor: out.subtotalMinor, discountMinor, deliveryFeeMinor: out.deliveryFeeMinor, totalMinor }, changes: [] },

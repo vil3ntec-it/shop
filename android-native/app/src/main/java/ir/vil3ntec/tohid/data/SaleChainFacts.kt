@@ -30,6 +30,15 @@ object SaleChainFacts {
     return own.mapNotNull { s -> runCatching { facts(s, items[s.id].orEmpty()) }.getOrNull() }
   }
 
+  /** فاکتورهای شماره‌دارِ **هر** سری — «بررسیِ یکپارچگی» (حلقهٔ لغو فاکتورِ هر سری‌ای را می‌تواند داشته باشد) */
+  fun ofAll(d: ShopData): List<SaleFacts> {
+    val own = d.sales.filter { !it.series.isNullOrBlank() && (it.invoiceNumber ?: 0) > 0 }
+    if (own.isEmpty()) return emptyList()
+    val ids = own.mapTo(HashSet()) { it.id }
+    val items = d.saleItems.filter { it.saleId in ids }.groupBy { it.saleId }
+    return own.mapNotNull { s -> runCatching { facts(s, items[s.id].orEmpty()) }.getOrNull() }
+  }
+
   fun facts(s: Sale, items: List<SaleItem>): SaleFacts = SaleFacts(
     id = s.id,
     series = s.series.orEmpty(),

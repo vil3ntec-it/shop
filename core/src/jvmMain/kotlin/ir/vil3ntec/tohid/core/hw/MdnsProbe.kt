@@ -27,7 +27,17 @@ object MdnsProbe {
     group: String = Mdns.GROUP,
     port: Int = Mdns.PORT,
     sourceOk: (String) -> Boolean = Subnet::isPrivate,
-  ): List<FoundPrinter> {
+  ): List<FoundPrinter> = Mdns.printers(messages(lanIp, timeoutMs, service, group, port, sourceOk), service)
+
+  /** همان پرسشِ یک‌باره، پیام‌های خام (SYN-09: `HubMdns.hubs` ِ هابِ کامپیوتر) */
+  fun messages(
+    lanIp: String,
+    timeoutMs: Int = Mdns.WAIT_MS,
+    service: String = Mdns.PDL,
+    group: String = Mdns.GROUP,
+    port: Int = Mdns.PORT,
+    sourceOk: (String) -> Boolean = Subnet::isPrivate,
+  ): List<Mdns.Message> {
     val ip = lanIp.trim()
     if (LocalNetwork.ipv4(ip) == null || LocalNetwork.ipv4(group.trim()) == null) return emptyList()
     val local = InetAddress.getByName(ip)
@@ -55,6 +65,6 @@ object MdnsProbe {
         if (m.response && (m.id == id || m.id == 0)) got += m
       }
     }
-    return Mdns.printers(got, service)
+    return got
   }
 }

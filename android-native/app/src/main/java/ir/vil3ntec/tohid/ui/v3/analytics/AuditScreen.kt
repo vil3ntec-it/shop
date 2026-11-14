@@ -104,6 +104,8 @@ fun AuditScreen(
   val names = chain.names
   val report = chain.report
   val brokenId = AuditModel.brokenId(report, chain.server)
+  //  SEC-02: درِ «بررسیِ یکپارچگیِ اسناد» فقط با پرچمِ `shop.doc_chain` (خاموش ⇒ همان صفحهٔ پیشین)
+  val docChain = rememberDocChainOn()
   val chips: (@Composable () -> Unit)? = if (log.isEmpty()) null else ({
     V3ChipRow {
       V3Chip(Str.all, kind == null, { kind = null })
@@ -132,6 +134,7 @@ fun AuditScreen(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding()),
       ) {
+        if (docChain) item(key = "doc-chain") { DocChainCheckEntry { onOpen(AnalyticsPaths.DOC_CHAIN) } }
         report?.let { r ->
           item(key = "chain") {
             val line = AuditModel.chainLine(r, thisDevice, chain.server)

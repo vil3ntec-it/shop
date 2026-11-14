@@ -32,6 +32,13 @@ object StrKit {
   val notANumber: String get() = t("عدد درست بنویسید", "Enter a valid number", "سم شمېر ولیکئ")
   fun selectedCount(n: Any): String = t("${asIs(n)} انتخاب‌شده", "$n selected", "$n ټاکل شوي")
 
+  // OPS-06: دکمهٔ «راهنما» (`V3GuideSheet`) — متنِ خودِ راهنما در `core/guide/ScreenGuides` است
+  val guide: String get() = t("راهنما", "Help", "لارښود")
+  fun guideTitle(screen: Any): String = t("راهنمای «${asIs(screen)}»", "“$screen” help", "د «$screen» لارښود")
+  fun guideStep(n: Any): String = t(asIs(n), "$n", "$n")
+  fun guideVideo(seconds: Any): String = t("ویدیوی آموزشی (${asIs(seconds)} ثانیه، با اینترنت)", "Tutorial video ($seconds s, needs internet)", "زده‌کړیز ویډیو ($seconds ثانیې، له انټرنېټ سره)")
+  val guideOffline: String get() = t("این راهنما در خودِ برنامه است و بی اینترنت هم باز می‌شود.", "This help is built into the app and opens without internet.", "دا لارښود په اپ کې دی او بې انټرنېټه هم پرانیستل کېږي.")
+
   // فرم: دور انداختنِ تغییرها
   val discardTitle: String get() = t("تغییرها دور ریخته شوند؟", "Discard changes?", "بدلونونه لرې شي؟")
   val discardBody: String get() = t("آنچه نوشته‌اید ذخیره نشده است.", "What you entered hasn't been saved.", "څه چې مو لیکلي خوندي شوي ندي.")

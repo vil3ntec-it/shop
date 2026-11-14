@@ -287,11 +287,11 @@ object PayFlow {
    */
   val KIND_LABELS: Map<String, String> = linkedMapOf(
     //  «به حساب» همان نسیه است (واژهٔ دکان)؛ «به حسابِ مشتری» فقط متنِ ردیفِ رسید/جزئیات ([receiptLines])
-    CASH to "نقد", "credit" to "نسیه", ACCOUNT to "نسیه", "card" to "کارت", "transfer" to "حواله",  // داده: برچسبِ روشِ پرداخت — هم‌شکلِ `ReportTables`/`report-core.js` و ستونِ خروجی (منتظرِ تصمیمِ صاحب‌کار)
-    "wallet" to "کیف پول", "store_credit" to "اعتبار فروشگاه", "gift_card" to "کارت هدیه", "other" to "سایر", MIXED to "ترکیبی",  // داده: برچسبِ روشِ پرداخت — هم‌شکلِ `ReportTables`/`report-core.js` و ستونِ خروجی (منتظرِ تصمیمِ صاحب‌کار)
+    CASH to "نقد", "credit" to "نسیه", ACCOUNT to "نسیه", "card" to "کارت", "transfer" to "حواله",  // داده: کلیدِ برچسبِ روش — هم‌شکلِ `ReportTables`/`report-core.js`؛ صفحه، رسید و اکسل با `Receipts.payName` به زبانِ برنامه
+    "wallet" to "کیف پول", "store_credit" to "اعتبار فروشگاه", "gift_card" to "کارت هدیه", "other" to "سایر", MIXED to "ترکیبی",  // داده: کلیدِ برچسبِ روش — همان؛ ترجمه در `Receipts.payName` (LOC-06 #۲۴)
     Pay.FX to "ارز",  // داده: PAY-10 — ردیفِ ارزِ نقد (ریزِ ارز و نرخ کنارش، `FxTillFlow.detail`)
     //  فاکتورِ W ِ سفارشِ اینترنتی (#321): روشِ سفارش، نه نوعِ ردیف
-    ONLINE to "پرداختِ آنلاین", COD to "نقد هنگامِ تحویل",  // داده: برچسبِ روشِ پرداخت — هم‌شکلِ `ReportTables`/`report-core.js` و ستونِ خروجی (منتظرِ تصمیمِ صاحب‌کار)
+    ONLINE to "پرداختِ آنلاین", COD to "نقد هنگامِ تحویل",  // داده: کلیدِ برچسبِ روش — همان؛ ترجمه در `Receipts.payName` (LOC-06 #۲۴)
   )
 
   /** `paymentMethod`ِ فاکتورِ W: پرداختِ آنلاین و نقد هنگامِ تحویل (دستِ پیک) — هیچ‌کدام نقدِ دخل نیست */
@@ -447,6 +447,11 @@ object PayFlow {
       //  رسیدِ ساختهٔ لغو (فقط بستنِ بدهی) پولِ دخل نیست — همان `CashShift.isCashReceipt`
       if (t.type != "receive" || !CashShift.isCashReceipt(t) || !counts(t.shiftId, t.createdAt) || minor(t.amount) <= 0) return@forEach
       ev += 0 to ShiftEventInput(id = "rcv:${t.id}", type = "receipt", at = t.createdAt, method = CASH, amount = minor(t.amount))
+    }
+    //  S89: رسیدِ نقدیِ معکوس‌شده در لحظهٔ ردیفِ معکوس از همین دخل بیرون می‌رود — همان `CashShift.totals` (هسته رسیدِ منفی ندارد ⇒ «پولِ پس»)
+    DebtReverse.cashBack(d.transactions).forEach { t ->
+      if (!counts(t.shiftId, t.createdAt) || minor(t.amount) <= 0) return@forEach
+      ev += 2 to ShiftEventInput(id = "rvs:${t.id}", type = "refund", at = t.createdAt, rows = listOf(ShiftRow(CASH, minor(t.amount))))
     }
     //  PAY-24/PRM-14: فروش و شارژِ کارتِ هدیه نقد به دخل می‌آورند — همان `CashShift.totals`
     if (own == null) GiftCards.cashRows(d, from, to).forEach { a ->

@@ -12,6 +12,8 @@
  *   بریده می‌شود (`request`) یا پس از اعمال، بی پاسخ (`response` — بدترین حالت: سرور گرفت، دستگاه نفهمید).
  * • درِ کنترل (`ctl`، فقط 127.0.0.1، جدا از پراکسی): ساعت، شبکه، ساختنِ دکان/صاحب/شاگرد و ورودِ دو دستگاه، پرچم،
  *   نگاه به `oplog` (شمارِ op ِ هر دستگاه و تکراری‌ها)، ورودِ دوباره، باطل کردنِ توکنِ تازه‌سازی و کدِ آفلاین.
+ * • **خطِ 2G ِ هر دستگاه** (S26/SYN-04، `link-2g.mjs`): `POST /link` یک پراکسیِ TCP ِ جدا جلوی همان پراکسیِ دکان
+ *   می‌سازد (پهنای باند، RTT، گم شدنِ بسته، بریدن در میانه، مهلتِ خواندن) و نشانی‌اش را می‌دهد؛ `GET /links` شمارِ هر خط.
  * • نشانی‌ها در `<خروجی.json>`؛ با `POST /stop` یا بسته شدنِ stdin خاموش می‌شود.
  *
  * ⛔ فقط برای آزمون: ساعتِ دست‌گردان و پراکسی هرگز در کدِ سرور نیستند؛ این پرونده جزوِ `src/` نیست.
@@ -37,6 +39,7 @@ if (!out) { console.error('کاربرد: node offline30-backend.mjs <خروجی.
 
 const { boot } = await import('./harness.mjs');
 const { NativeDevice } = await import('./native.mjs');
+const { createLink } = await import('./link-2g.mjs');
 const E = await boot({ name: 'offline30' });
 
 /* ── شبکهٔ دکان: پراکسی ── */
@@ -81,7 +84,7 @@ const api = `http://127.0.0.1:${proxy.address().port}`;
 /* ── دکان و دو دستگاه ── */
 let shop = null;
 
-async function setup({ subscriptionDays = 120 } = {}) {
+async function setup({ subscriptionDays = 120, extraStaff = 0 } = {}) {
   const owner = await E.owner('off30-owner@example.com', 'صاحبِ دکان', 'دکانِ سی‌روزه');
   const admin = await E.adminToken();
   E.ok(await E.post('/api/admin/subscriptions', { shopId: owner.shopId, plan: 'pro', days: subscriptionDays, reason: 'آزمونِ ۳۰ روز' },
@@ -95,9 +98,19 @@ async function setup({ subscriptionDays = 120 } = {}) {
   const dev = (d, extra = {}) => ({
     deviceId: d.deviceId, userId: String(d.user?.id || ''), access: d.token, refresh: d.refreshToken, ...extra,
   });
+  //  S26: گوشی‌های دیگرِ شاگرد (هر کدام کد و حسابِ خودش)
+  const more = [];
+  for (let i = 0; i < extraStaff; i++) {
+    const c = E.ok(await E.post('/api/shop/staff-code', { role: 'staff', maxUses: 1 }, owner.token), 'کدِ شاگرد');
+    const d = new NativeDevice(E, `off30-staff-phone-${i + 2}`, { seller: `شاگرد ${i + 2}` });
+    await d.loginStaff(c.code, `شاگرد ${i + 2}`);
+    more.push(dev(d, { deviceKey: d.staffKey, staffCode: c.code }));
+  }
   return {
     api, shopId: owner.shopId, ownerEmail: owner.email, staffCode: inv.code, publicKey: pk.publicKey,
-    owner: dev(A), staff: dev(B, { deviceKey: B.staffKey }),
+    owner: dev(A), staff: dev(B, { deviceKey: B.staffKey }), more,
+    //  S76 (د۱۸): سوکتِ زندهٔ واقعی مستقیم به سرور — پراکسیِ «شبکهٔ دکان» فقط HTTP است (upgrade ندارد)
+    direct: E.apiBase,
   };
 }
 
@@ -115,8 +128,33 @@ async function oplog() {
   return { total: rows.length, distinct: seen.size, duplicates, byDevice, ids: [...seen.keys()] };
 }
 
+/* ── خطِ 2G ِ هر دستگاه (S26) — جلوی همان پراکسیِ دکان، تا `down` و بریدن‌های بالا هم بمانند ── */
+const links = new Map();
+
+/** همان برای `sync_v3_ops` (S26/v3، `SYNC_V3_ENABLED`) */
+async function oplog3() {
+  const rows = await E.db.many(
+    `SELECT device_id, op_id FROM sync_v3_ops WHERE app='shop' AND account_kind='shop' AND account_id=$1`, [String(shop.owner.shopId)]);
+  const byDevice = {};
+  const seen = new Map();
+  for (const r of rows) {
+    byDevice[r.device_id] = (byDevice[r.device_id] || 0) + 1;
+    seen.set(r.op_id, (seen.get(r.op_id) || 0) + 1);
+  }
+  return { total: rows.length, distinct: seen.size, duplicates: [...seen].filter(([, n]) => n > 1).map(([id]) => id), byDevice, ids: [...seen.keys()] };
+}
+
 /* ── درِ کنترل ── */
 const routes = {
+  'POST /link': async (b) => {
+    const id = String(b.id || `link${links.size + 1}`);
+    if (links.has(id)) await links.get(id).close();
+    const l = await createLink({ port: proxy.address().port }, b.cfg || {});
+    links.set(id, l);
+    return { id, url: l.url };
+  },
+  'POST /link-set': async (b) => { links.get(String(b.id))?.set(b.cfg || {}); return { ok: links.has(String(b.id)) }; },
+  'GET /links': async () => Object.fromEntries([...links].map(([id, l]) => [id, l.stats()])),
   'POST /clock': async (b) => { offsetMs = Math.round(Number(b.days || 0) * DAY); return { now: Date.now(), offsetMs }; },
   'POST /net': async (b) => {
     mode = b.mode === 'down' ? 'down' : 'up';
@@ -128,6 +166,7 @@ const routes = {
   'POST /setup': async (b) => setup(b),
   'POST /flag': async (b) => { await E.flag(shop.owner.shopId, String(b.key), b.value); return { ok: true }; },
   'GET /oplog': async () => oplog(),
+  'GET /oplog3': async () => oplog3(),
   /** صاحب دوباره با کدِ ایمیلی، روی **همان** دستگاه (همان شناسه) — مثلِ کسی که پس از از دست رفتنِ نشست وارد می‌شود */
   'POST /relogin-owner': async () => {
     const d = new NativeDevice(E, 'off30-owner-pc', { deviceId: shop.A.deviceId, seller: 'صاحب' });
@@ -199,6 +238,7 @@ let stopping = false;
 async function stop() {
   if (stopping) return;
   stopping = true;
+  for (const l of links.values()) await l.close().catch(() => {});
   proxy.closeAllConnections?.();
   proxy.close();
   ctl.closeAllConnections?.();

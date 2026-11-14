@@ -217,6 +217,9 @@ class HttpEngine(
       connection.connectTimeout = ApiConfig.CONNECT_TIMEOUT_MS
       connection.readTimeout = ApiConfig.READ_TIMEOUT_MS
       connection.setRequestProperty("Accept", "application/json")
+      //  SYN-04: JDK ِ کامپیوتر این را خودش نمی‌فرستد (OkHttp ِ اندروید می‌فرستد) ⇒ pull/Snapshot ِ بزرگ روی 2G ساده
+      //  می‌آمد؛ با سرآیندِ صریح باز کردن با خودِ ماست ([readBody]) — روی هر دو یکسان
+      connection.setRequestProperty("Accept-Encoding", "gzip")
       stamp(connection, token, headers, anonymous)
 
       /*
@@ -257,8 +260,7 @@ class HttpEngine(
 
       val status = connection.responseCode
       val ok = status in 200..299
-      val text = (if (ok) connection.inputStream else connection.errorStream)
-        ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+      val text = readBody(connection, if (ok) connection.inputStream else connection.errorStream)
 
       if (!ok) throw ApiFailure.fromHttp(status, text, authenticated = token != null).withRetryAfter(connection.getHeaderField("Retry-After"))
 
@@ -277,6 +279,13 @@ class HttpEngine(
     } finally {
       runCatching { connection.disconnect() }
     }
+  }
+
+  /** متنِ پاسخ؛ `Content-Encoding: gzip` (پاسخِ همان `Accept-Encoding` ِ [attempt]) ⇒ باز شده. بدنهٔ خالی ⇒ "" */
+  private fun readBody(connection: HttpURLConnection, stream: java.io.InputStream?): String {
+    val bytes = stream?.use { it.readBytes() } ?: return ""
+    val gzip = connection.getHeaderField("Content-Encoding")?.contains("gzip", ignoreCase = true) == true
+    return (if (gzip && bytes.isNotEmpty()) java.util.zip.GZIPInputStream(bytes.inputStream()).use { it.readBytes() } else bytes).toString(Charsets.UTF_8)
   }
 
   /**

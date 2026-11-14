@@ -54,6 +54,10 @@ const KNOWN = Object.freeze([
   { key: 'shop.settings_sync', scope: 'shop', default: false, what: 'همگام‌سازیِ زندهٔ تنظیماتِ دکان (قاعده‌های پول، برگشت، مالیات) بینِ دستگاه‌ها' },
   { key: 'shop.held_sync', scope: 'shop', default: false, what: 'پشتیبانِ سرورِ فاکتورهای نگه‌داشته: با پاک کردنِ برنامه گم نمی‌شوند و روی دستگاهِ دیگرِ دکان برمی‌گردند (POS-12، S09)' },
   { key: 'shop.customer_erasure', scope: 'shop', default: false, what: 'حذفِ دادهٔ شخصیِ مشتری با نگه‌داشتنِ سندِ مالیِ ناشناس (SEC-10)' },
+  { key: 'shop.held_twice_cancel', scope: 'shop', default: false, what: 'لغوِ خودکارِ فروشِ دومِ «یک فاکتور در دو دستگاه» از راهِ لغوِ عادی، با ردیف در صندوقِ تعارضِ صاحب (S09)' },
+  { key: 'shop.lost_device_replay', scope: 'shop', default: false, what: 'بازیابیِ کارهای همگام‌نشدهٔ دستگاهِ گم‌شدهٔ غیرفعال از پشتیبانش به دفترِ دکان (S44)' },
+  { key: 'shop.customer_erasure_ledger', scope: 'shop', default: false, what: 'پس از حذفِ دادهٔ مشتری، نام/شماره/نشانیِ همان پرونده در دفترِ دستگاه‌ها هم پاک شود (فرمانِ سرور ⇐ برنامهٔ صاحب/مدیر؛ CRM-15، SEC-10)؛ با `shop.customer_erasure`' },
+  { key: 'shop.customer_access_offline', scope: 'shop', default: false, what: 'ثبتِ دیدنِ پروندهٔ مشتری به دستِ حسابدارِ بی‌اینترنت پس از وصل، با زمانِ خودِ دیدن (CRM-15)' },
   { key: 'shop.orders.dispute_file', scope: 'shop', default: false, what: 'پروندهٔ مدرکِ اختلافِ سفارش (RSK-08)' },
   { key: 'shop.storefront.filters', scope: 'shop', default: true, what: 'فیلترِ کاتالوگِ ویترین (برند، قیمت، موجود، مشخصه)' },
   { key: 'shop.storefront.alerts', scope: 'shop', default: false, what: '«خبرم کن وقتی موجود/ارزان شد» ِ ویترین' },
@@ -107,6 +111,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.orders.refund_tracking', scope: 'shop', default: true, what: 'پیگیریِ بازپرداخت برای مشتری در صفحهٔ سفارش (NTF-08)' },
   { key: 'shop.orders.refund_receipt', scope: 'shop', default: true, what: 'رسیدِ اصلاحیِ هر بازپرداختِ دفتر برای کارمند و مشتری (E2E-RET-11)' },
   { key: 'shop.orders.issue_reports', scope: 'shop', default: false, what: '«گزارشِ مشکل» با عکس در پیگیریِ سفارش (NTF-07)' },
+  { key: 'shop.storefront.return_requests', scope: 'shop', default: false, what: '«درخواستِ برگشت» ِ مشتری از ویترین و صندوقِ برگشتِ دکان (RET-11)' },
   { key: 'shop.orders.reviews', scope: 'shop', default: false, what: 'امتیاز و نظرِ مشتری با بازبینیِ دکان (NTF-09)' },
   { key: 'shop.orders.late_apology', scope: 'shop', default: false, what: 'عذرخواهی و کوپنِ خودکار برای تأخیرِ زیاد (NTF-10)' },
   { key: 'shop.orders.delay', scope: 'shop', default: false, what: '«عقب انداختنِ» زمانِ آماده‌شدنِ سفارشِ قبول‌شده (ORD-07)' },
@@ -190,6 +195,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.image_studio', scope: 'shop', default: false, what: 'استودیوی عکس روی سرورِ خودمان: صفِ پردازشِ گروهی، خروجی فقط پس از تأییدِ دکان (AI-02/05)؛ با `shop.image_bank`' },
   { key: 'image_bank.resume', scope: 'all', default: false, what: 'ادامهٔ بارگذاریِ دسته‌ایِ بانکِ تصاویر بی فرستادنِ دوبارهٔ همان فایل (IMG-14)' },
   { key: 'pay.hesabpay', scope: 'shop', default: false, what: 'حساب‌پی ِ خودکار با کلیدهای خودِ دکان؛ پول مستقیم به حسابِ دکان، تأیید فقط با webhook' },
+  { key: 'shop.pay_status_mirror', scope: 'shop', default: false, what: 'آینهٔ وضعیتِ بعدیِ حساب‌پیِ خودکار («نیازمند بررسی»/«بازپرداخت» ِ سرور) روی ردیفِ درگاهِ فاکتورِ دستگاه (PAY-07)؛ با `pay.hesabpay`' },
   //  ── همگام‌سازیِ دکان (پمپ هیچ‌کدام را نمی‌خواند)
   { key: 'shop.sync.doc_roles', scope: 'shop', default: false, what: 'داوریِ نقشِ سندهای سابقه‌سوار (کارتِ هدیه، امتیاز، امانی…) در Sync v3' },
   { key: 'shop.sync_v3_to_v1', scope: 'shop', default: false, what: 'پلِ v3 ⇒ v1 برای دکانی که دستگاهِ کهنه و تازه با هم دارد' },
@@ -222,7 +228,6 @@ const KNOWN = Object.freeze([
   { key: 'ops.sync_lag', scope: 'ops', default: false, what: 'بخشِ «تأخیرِ همگام‌سازی» در سلامتِ سامانه (OPS-04)' },
   { key: 'backup.require_encryption', scope: 'security', default: false, what: 'پشتیبانِ سرور فقط رمزدار و پس از بازگشاییِ همان فایل (SEC-07)' },
   { key: 'admin.support_grant', scope: 'security', default: false, what: 'دانلودِ پشتیبانِ دکان در پنل فقط با اجازهٔ زندهٔ «خروجی» ِ همان مدیر روی همان دکان (رضایتِ صاحب یا شکستنِ شیشه؛ TEN-04)' },
-  { key: 'auth.phone_add_code', scope: 'security', default: false, what: 'افزودنِ شمارهٔ ورود فقط با کدِ همان شماره (AUTH-08)؛ پیش از روشن کردن برنامه‌ها `phoneCode` بفرستند' },
 ]);
 
 router.get('/', async (req, res) => {

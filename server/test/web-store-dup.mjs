@@ -13,6 +13,7 @@
 import { createRequire } from 'node:module';
 import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -79,8 +80,8 @@ await call('PUT', '/api/shop/storefront/products/rice', { published: true }, T);
 
 //  مشتری: تأییدِ شماره و نخستین سفارشِ «دریافت» با API ِ واقعی؛ همان بلیت در مرورگر
 const phone = '0791114141';
-const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
-const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
 ok(vc.status === 200 && vc.body.ticket, 'شماره تأیید شد');
 const ck = await call('POST', `/api/store/${slug}/checkout`, {
   fulfillment: 'pickup', customer: { name: 'مشتری', phone }, lines: [{ productId: 'rice', qtyMilli: 1000 }],
@@ -100,7 +101,7 @@ await ctx.addInitScript(([s, t]) => {
   localStorage.setItem(`store-cart:${s}`, JSON.stringify({
     rice: { qtyMilli: 1000, name: 'برنج', unit: 'دانه', priceMinor: 30000, maxQtyMilli: null, photo: false, unavailable: false },
   }));
-}, [slug, { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt }]);
+}, [slug, { email: vc.body.email, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt }]);
 const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });
@@ -110,6 +111,7 @@ const submitSame = async () => {
   await page.goto(`${base}/store/${slug}?r=${++loads}#/checkout`);
   await page.waitForSelector('#view-checkout:not([hidden]) #submit-order', { timeout: 15000 });
   await page.fill('#c-name', 'مشتری');
+  await page.fill('#c-phone', '0791230002');   //  «فقط ایمیل»: شمارهٔ تماسِ پیک جدا و بی کد
   await page.check('input[name="fulfillment"][value="pickup"]');
   await page.click('#submit-order');
   await page.waitForSelector('dialog.confirm .btn-danger', { timeout: 10000 });

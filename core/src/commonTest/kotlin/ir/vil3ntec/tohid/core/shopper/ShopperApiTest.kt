@@ -181,14 +181,20 @@ class ShopperApiTest {
     assertEquals("/api/store/golestan/products/rice/photo", a.photoPath("golestan", "rice", null, thumb = false))
   }
 
-  @Test fun verificationRoundTripKeepsServerPhone() {
+  @Test fun verificationRoundTripKeepsServerEmail() {
     val (a, http) = api {
-      if (it.path.endsWith("/start")) ok("""{"sent":true,"expiresAt":99,"resendSeconds":60,"devCode":"123456"}""")
-      else ok("""{"phone":"+93700000002","ticket":"v2.x.y","expiresAt":555}""")
+      if (it.path.endsWith("/start")) ok("""{"email":"a@b.co","sent":true,"expiresAt":99,"resendSeconds":60,"devCode":"123456"}""")
+      else ok("""{"email":"a@b.co","ticket":"v3.x.y","expiresAt":555}""")
     }
-    assertEquals("123456", a.verifyStart("golestan", "+93700000002").valueOrNull()?.devCode)
-    val t = a.verifyCheck("golestan", "+93700000002", "123456").valueOrNull()
-    assertEquals(PhoneTicket("+93700000002", "v2.x.y", 555), t)
+    assertEquals("123456", a.verifyStart("golestan", "a@b.co").valueOrNull()?.devCode)
+    val t = a.verifyCheck("golestan", "a@b.co", "123456").valueOrNull()
+    assertEquals(CustomerTicket("a@b.co", "v3.x.y", 555), t)
+    //  «فقط ایمیل»: بدنه فقط `email` دارد، هرگز `phone`
+    for (seen in http.seen.take(2)) {
+      val b = Json.parseToJsonElement(seen.body!!) as JsonObject
+      assertEquals("a@b.co", b["email"]!!.jsonPrimitive.content)
+      assertEquals(null, b["phone"])
+    }
     val body = Json.parseToJsonElement(http.seen[1].body!!) as JsonObject
     assertEquals("123456", body["code"]!!.jsonPrimitive.content)
   }

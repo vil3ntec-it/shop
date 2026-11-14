@@ -100,8 +100,9 @@ async function catalog(page) {
   await page.waitForFunction((name) => !document.documentElement.hasAttribute('data-i18n')
     && [...document.querySelectorAll('#products .p-name')].some((e) => e.textContent === name), PRODUCT, { timeout: 15000 });
 }
-/** برگهٔ ثبت با یک قلم؛ صبر تا برچسبِ شماره همان متنِ خواسته شود */
-async function checkout(page, phoneLabel) {
+/** برگهٔ ثبت با یک قلم؛ صبر تا برچسبِ هزینهٔ ارسال همان متنِ خواسته شود («فقط ایمیل»: برچسبِ شماره حالا «شمارهٔ تماس برای
+ *  پیک» است که واژهٔ دری‌شدنی ندارد، پس نشانهٔ دری همان «کرایهٔ ارسال» است) */
+async function checkout(page, feeLabel) {
   if (!(await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem(`store-cart:${location.pathname.split('/').pop()}`) || '{}')).length))) {
     await page.locator('#products li[data-id="phone"] .p-add').click();
     await page.waitForFunction(() => /store-cart/.test(Object.keys(localStorage).join(' ')), null, { timeout: 5000 });
@@ -109,9 +110,9 @@ async function checkout(page, phoneLabel) {
   await page.evaluate(() => { location.hash = '#/checkout'; });
   await page.waitForFunction((want) => {
     const v = document.getElementById('view-checkout');
-    const l = document.querySelector('#view-checkout [data-t="phone.l"]');
+    const l = document.getElementById('t-fee-label');
     return v && !v.hidden && l && l.textContent === want;
-  }, phoneLabel, { timeout: 15000 });
+  }, feeLabel, { timeout: 15000 });
 }
 
 //  ── ۱) فارسی دست‌نخورده ──
@@ -119,8 +120,8 @@ const fa = await context();
 await fa.page.goto(`${base}/store/${slug}`);
 await catalog(fa.page);
 ok(JSON.stringify(await html(fa.page)) === JSON.stringify({ lang: 'fa', dir: 'rtl' }), 'فارسی: lang="fa" و dir="rtl"');
-await checkout(fa.page, 'شمارهٔ موبایل');
-ok((await fa.page.textContent('#t-fee-label')) === 'هزینهٔ ارسال', 'فارسی: «شمارهٔ موبایل» و «هزینهٔ ارسال» همان فارسی');
+await checkout(fa.page, 'هزینهٔ ارسال');
+ok((await fa.page.textContent('#t-fee-label')) === 'هزینهٔ ارسال', 'فارسی: «هزینهٔ ارسال» همان فارسی');
 ok(!fa.seen.some((u) => u.endsWith('/dari.js')), 'فارسی: dari.js هرگز خواسته نشد', fa.seen.join(' '));
 
 //  ── ۲) گزینش‌گر: «دری» ⇒ بارِ دوباره با prs ──
@@ -142,8 +143,8 @@ ok((await prs.textContent('#store-title')) === SHOP, 'دری: نامِ دکان 
 ok((await prs.textContent('#products li[data-id="phone"] .p-name')) === PRODUCT, 'دری: نامِ کالا همان «گوشی سامسونگ»');
 const cats = await prs.evaluate(() => document.body.innerText);
 ok(cats.includes(CATEGORY) && !cats.includes('مبایل سامسونگ') && !cats.includes('دکان کریم'), 'دری: دستهٔ «موبایل» و هیچ دادهٔ فروشنده دری نشد');
-await checkout(prs, 'شمارهٔ مبایل');
-ok((await prs.textContent('#t-fee-label')) === 'کرایهٔ ارسال', 'دری: «شمارهٔ مبایل» و «کرایهٔ ارسال»', await prs.textContent('#t-fee-label'));
+await checkout(prs, 'کرایهٔ ارسال');
+ok((await prs.textContent('#t-fee-label')) === 'کرایهٔ ارسال', 'دری: «کرایهٔ ارسال»', await prs.textContent('#t-fee-label'));
 //  واژه‌نامهٔ هر بخش (K.part): همان fa.json ِ بخش + لایه، هرگز `.prs.json`
 const part = await prs.evaluate(() => window.K.part('method').then((r) => [r, window.K.t('dm.to.pickup'), window.K.t('dm.send')]));
 ok(part[0] === true && part[1] === 'دریافت از دکان (بدون کرایهٔ ارسال)' && part[2] === 'دیدنِ هزینهٔ تازه',
@@ -161,7 +162,7 @@ ok(aria === 'زبان', 'دری: برچسبِ دکمهٔ زبان (data-ta) از
 await prs.goto(`${base}/store/${slug}#/`);
 await catalog(prs);
 await prs.waitForFunction(() => document.documentElement.lang === 'prs', null, { timeout: 10000 });
-await checkout(prs, 'شمارهٔ مبایل');
+await checkout(prs, 'کرایهٔ ارسال');
 ok(await prs.evaluate(() => localStorage.getItem('vill3n-lang')) === 'prs', 'بارِ دوباره: دری در حافظهٔ همین مرورگر ماند و صفحه دری است');
 await prs.evaluate(() => { location.hash = '#/'; });
 await catalog(prs);
@@ -175,7 +176,7 @@ const down = await context((r) => r.abort('failed'));
 await down.page.goto(`${base}/store/${slug}?lang=prs`);
 await catalog(down.page);
 await down.page.waitForFunction(() => document.documentElement.lang === 'fa', null, { timeout: 10000 });
-await checkout(down.page, 'شمارهٔ موبایل');
+await checkout(down.page, 'هزینهٔ ارسال');
 const dl = await html(down.page);
 ok(dl.lang === 'fa' && dl.dir === 'rtl' && (await down.page.textContent('#t-fee-label')) === 'هزینهٔ ارسال',
   'لایه نیامد: همان فارسی و lang="fa" (نه ادعای دری)', JSON.stringify(dl));

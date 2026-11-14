@@ -36,6 +36,8 @@ object AnalyticsPaths {
   fun reports(tab: String? = null, range: String? = null) = RoutePaths.withQuery(REPORTS, "tab" to tab, "range" to range)
   fun stats(period: String? = null) = RoutePaths.withQuery("stats", "period" to period)
   fun audit(kind: String? = null) = RoutePaths.withQuery("audit", "kind" to kind)
+  /** SEC-02: «بررسیِ یکپارچگیِ اسناد» — درش فقط با پرچمِ `shop.doc_chain` (`rememberDocChainOn`) */
+  const val DOC_CHAIN = "audit/doc-chain"
   const val ADMIN = "admin"
   /** STF-07/08: ساعتِ کار و پورسانت — فقط با پرچمِ `shop.staff_time` (`StaffTimeHub`) */
   const val STAFF_TIME = "admin/staff-time"
@@ -92,6 +94,10 @@ val AnalyticsModule = AppModule(
     },
     V3Route("audit", RouteKind.PAGE, { StrReports.auditTitle }, needs = setOf(Need.AUDIT), chrome = Chrome.OWN, deniedBody = { StrReports.auditDenied }) {
       AuditScreen(data, args.query("kind"), onBack = backOrNull, onOpen = { nav.open(it) })
+    },
+    V3Route(AnalyticsPaths.DOC_CHAIN, RouteKind.PAGE, { ir.vil3ntec.tohid.core.i18n.StrDocChain.title }, parent = "audit", needs = setOf(Need.AUDIT), chrome = Chrome.OWN, deniedBody = { StrReports.auditDenied }) {
+      val run = rememberDocChainCheck(data)
+      DocChainCheckScreen(run.state, { ir.vil3ntec.tohid.ui.v3.account.AccountFormat.date(it) }, run.again, onBack = backOrNull)
     },
     V3Route(AnalyticsPaths.ADMIN, RouteKind.PAGE, { Str.adminCenter }, chrome = Chrome.OWN) {
       AdminScreen(

@@ -184,6 +184,8 @@ class BranchDeskDesktopTest {
     }
     val backend = listOf("../android-native/app/src/main/java", "android-native/app/src/main/java").map { File(it, "ir/vil3ntec/tohid/data/repo/Backend.kt") }.first { it.isFile }.readText()
     assertTrue("همهٔ درخواست‌ها از همان `identity`", backend.contains(") + ir.vil3ntec.tohid.data.BranchDesk.headers(app)"))
+    val hub = listOf("../android-native/app/src/main/java", "android-native/app/src/main/java").map { File(it, "ir/vil3ntec/tohid/platform/HubLinkV1Android.kt") }.first { it.isFile }.readText()
+    assertTrue("هابِ شبکهٔ دکان همان سرآیند را می‌گیرد و به سرور می‌برد", hub.contains(") + ir.vil3ntec.tohid.data.BranchDesk.headers(app)"))
   }
 
   @Test

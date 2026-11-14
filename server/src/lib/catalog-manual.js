@@ -8,6 +8,8 @@ const crypto = require('crypto');
 const { query, one, now, tx } = require('../db');
 const stock = require('./stock');
 const repack = require('./catalog-repack');
+//  شعبه (فازِ ۳): `shopId` ِ این پرونده «کلیدِ موجودی» است (دکان یا `<دکان>#<شعبه>`)؛ کالا از کاتالوگِ مشترکِ دکان
+const bk = require('./branch-key');
 const { stable } = require('./idempotency');
 const { badRequest, notFound, conflict } = require('../middleware/errors');
 
@@ -105,10 +107,15 @@ function countedAtOf(t, at) {
 async function movedAfter(c, shopId, productId, location, countedAt) {
   const r = (await c.query(
     `SELECT COALESCE(SUM(delta_on_hand_milli), 0) AS s FROM stock_moves
-      WHERE shop_id=$1 AND product_id=$2 AND branch_id='' AND location=$3 AND at > $4`,
-    [shopId, productId, location, countedAt]
+      WHERE shop_id=$1 AND product_id=$2 AND branch_id=$5 AND location=$3 AND at > $4`,
+    [bk.shopOf(shopId), productId, location, countedAt, bk.branchOf(shopId)]
   )).rows[0];
   return Number(r.s);
+}
+
+/** شعبه: تعریفِ کالا از کاتالوگِ مشترکِ دکان ⇒ پیش از سنجیدنِ «کالا هست؟» دفترِ اصلی خوانده می‌شود (بی تازه ⇒ یک پرسش) */
+async function sharedCatalog(sk, at) {
+  if (bk.isBranch(sk)) await require('./catalog').refresh(bk.shopOf(sk), { maxAgeMs: 1, at, throttle: false });
 }
 
 function hashOf(body) {
@@ -117,7 +124,7 @@ function hashOf(body) {
 
 //  هر درخواستِ دستی حداکثر دو حرکت دارد (انتقال = خروج + ورود)، و ساختِ بسته یکی برای هر جزء + خروجی ⇒ کلیدهای دقیق، نه LIKE
 const MAX_PLAN = 1 + repack.MAX_PARTS;
-const staffKeys = (k) => Array.from({ length: MAX_PLAN }, (_, i) => `staff:${k}:${i + 1}`);
+const staffKeys = (k, sk = '') => Array.from({ length: MAX_PLAN }, (_, i) => stock.keyIn(sk, `staff:${k}:${i + 1}`));
 //  به ترتیبِ ردیفِ سند (`staff:k:10` پس از `staff:k:9`، نه پیش از `:2`)
 const seqOf = (r) => Number(r.source_key.slice(r.source_key.lastIndexOf(':') + 1));
 const bySeq = (rows) => rows.sort((a, b) => seqOf(a) - seqOf(b));
@@ -140,24 +147,25 @@ async function manualMove(shopId, { key, body, actor }) {
   const hash = hashOf(body);
   const at = now();
   const countedAt = m.kind === 'count' ? countedAtOf(m.countedAt, at) : null;
+  await sharedCatalog(shopId, at);
   let ingested = null;
   const out = await tx(async (c) => {
     await stock.lock(c, shopId);
     const prev = (await c.query(
-      `SELECT * FROM stock_moves WHERE shop_id=$1 AND source_key = ANY($2::text[]) ORDER BY source_key`, [shopId, staffKeys(k)]
+      `SELECT * FROM stock_moves WHERE shop_id=$1 AND source_key = ANY($2::text[]) ORDER BY source_key`, [bk.shopOf(shopId), staffKeys(k, shopId)]
     )).rows;
     bySeq(prev);
     if (prev.length) {
       if (prev[0].ref_id !== hash) throw conflict('این کلیدِ یکتایی پیش‌تر برای حرکتِ دیگری به کار رفته است', 'idempotency_key_reused');
       return { moves: prev.map(moveView), replayed: true, unchanged: false };
     }
-    if (m.repack && !(await repack.enabled(shopId, c))) throw badRequest('نوعِ حرکت معتبر نیست', 'bad_kind');
+    if (m.repack && !(await repack.enabled(bk.shopOf(shopId), c))) throw badRequest('نوعِ حرکت معتبر نیست', 'bad_kind');
     const settings = await stock.settingsOf(shopId, c);
     //  دفترِ دستگاه پیش از اصلاح: شمارش و انتقال روی موجودیِ امروز حساب شوند
     ingested = await ingestTx(c, shopId, at, settings);
-    const p = (await c.query('SELECT product_id FROM catalog_products WHERE shop_id=$1 AND product_id=$2', [shopId, m.productId])).rows[0];
+    const p = (await c.query('SELECT product_id FROM catalog_products WHERE shop_id=$1 AND product_id=$2', [bk.shopOf(shopId), m.productId])).rows[0];
     if (!p) throw notFound('کالا پیدا نشد', 'product_not_found');
-    if (m.repack) await repack.requireProducts(c, shopId, m);
+    if (m.repack) await repack.requireProducts(c, bk.shopOf(shopId), m);
 
     const base = {
       productId: m.productId, mode: 'local', source: 'staff', refType: 'staff', refId: hash,
@@ -190,7 +198,7 @@ async function manualMove(shopId, { key, body, actor }) {
     }
     await stock.checkProducts(c, shopId, m.repack ? repack.ids(m) : [m.productId], settings, at);
     const rows = bySeq((await c.query(
-      `SELECT * FROM stock_moves WHERE shop_id=$1 AND source_key = ANY($2::text[]) ORDER BY source_key`, [shopId, staffKeys(k)]
+      `SELECT * FROM stock_moves WHERE shop_id=$1 AND source_key = ANY($2::text[]) ORDER BY source_key`, [bk.shopOf(shopId), staffKeys(k, shopId)]
     )).rows);
     return { moves: rows.map(moveView), replayed: false, unchanged: false };
   });
@@ -211,13 +219,14 @@ async function setLow(shopId, productId, body) {
     low = b.lowMilli;
   }
   const id = String(productId || '');
-  const p = await one('SELECT 1 FROM catalog_products WHERE shop_id=$1 AND product_id=$2', [shopId, id]);
+  await sharedCatalog(shopId, now());
+  const p = await one('SELECT 1 FROM catalog_products WHERE shop_id=$1 AND product_id=$2', [bk.shopOf(shopId), id]);
   if (!p) throw notFound('کالا پیدا نشد', 'product_not_found');
   await query(
     `INSERT INTO stock_levels (shop_id, product_id, branch_id, location, on_hand_milli, low_milli, updated_at)
-     VALUES ($1,$2,'',$3,0,$4,$5)
+     VALUES ($1,$2,$6,$3,0,$4,$5)
      ON CONFLICT (shop_id, product_id, branch_id, location) DO UPDATE SET low_milli=excluded.low_milli`,
-    [shopId, id, location, low, now()]
+    [bk.shopOf(shopId), id, location, low, now(), bk.branchOf(shopId)]
   );
   return { productId: id, location, lowMilli: low };
 }

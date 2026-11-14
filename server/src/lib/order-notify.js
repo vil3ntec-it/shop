@@ -23,9 +23,9 @@
  *     هنگامِ «گرفتن» بالا می‌روند، پس حتی کارگری که وسطِ کار بمیرد هم
  *     نمی‌تواند حلقهٔ بی‌پایان بسازد.
  *   • کانالِ پشتیبان (§۳۰.۴) حداکثر یک بار برای هر اعلان (`fallback_at`
- *     اتمی گرفته می‌شود). امروز هیچ سرویس‌دهندهٔ پیامکی وصل نیست ⇒ حالِ
- *     صادقانهٔ `not_configured`؛ **هیچ پیامِ واقعی‌ای نمی‌رود**. پیامکِ
- *     OTP جداست و این‌جا به کار نمی‌رود (گیرنده، قالب و هزینهٔ دیگری دارد).
+ *     اتمی گرفته می‌شود). «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): پیامک دیگر کانالِ
+ *     پشتیبان نیست؛ کانالِ پیش‌فرض `email` است و امروز هیچ سرویس‌دهنده‌ای
+ *     نشانده نشده ⇒ حالِ صادقانهٔ `not_configured`؛ **هیچ پیامِ واقعی‌ای نمی‌رود**.
  *   • متنِ اعلان هیچ دادهٔ مشتری ندارد (§۳۰.۱ بندِ ۴): فقط شمارهٔ سفارش.
  *     لمسِ اعلان باید `/api/shop/orders/:id` را بخواند (دسترسی دوباره
  *     سنجیده می‌شود)؛ payload منبعِ داده نیست (بندِ ۵).
@@ -155,9 +155,9 @@ async function reviewOpen(row, at) {
 // ════════════════════════════════════════════════════════════════════
 
 /**
- * `{ channel: 'sms', send: async ({shopId, orderId, orderNo, notifId, reason}) => ({ok, error}) }`
+ * `{ channel: 'email', send: async ({shopId, orderId, orderNo, notifId, reason}) => ({ok, error}) }`
  *
- * ⛔ در کارِ عادی هیچ‌وقت مقدار نمی‌گیرد: سرویس‌دهندهٔ پیامکِ هشدار به مالک
+ * ⛔ در کارِ عادی هیچ‌وقت مقدار نمی‌گیرد: سرویس‌دهندهٔ کانالِ پشتیبانِ هشدار به مالک (پیامک با «فقط ایمیل» رفت)
  * (با قالب، رضایت و سقفِ هزینهٔ خودش) بیرونی است و هنوز تصویب نشده
  * (BLOCKED-EXTERNAL). فقط `test/*.test.js` آن را می‌نشاند تا «حداکثر یک
  * بار» سنجیده شود — همان الگوی `push.setDeliver`.
@@ -173,8 +173,8 @@ async function escalate(row, lock, at, reason) {
     [row.id, at, lock]
   );
   if (!won.rows[0]) return {};
-  if (!fallback) return { fallback_channel: 'sms', fallback_state: 'not_configured' };
-  const channel = String(fallback.channel || 'sms').slice(0, 20);
+  if (!fallback) return { fallback_channel: 'email', fallback_state: 'not_configured' };
+  const channel = String(fallback.channel || 'email').slice(0, 20);
   try {
     const out = await fallback.send({
       shopId: row.shop_id, orderId: row.order_id, orderNo: Number(row.order_no), notifId: row.id, reason,
@@ -472,7 +472,7 @@ async function config(shopId, { userId = '', deviceUid = '' } = {}) {
       shopDevices: devices.n,
       thisDeviceRegistered: mine.n > 0,
     },
-    fallback: { sms: fallback ? 'configured' : 'not_configured' },
+    fallback: { email: fallback ? 'configured' : 'not_configured' },
     policy: { maxAttempts: MAX_ATTEMPTS, backoffMs: BACKOFF_MS, ackWindowMs: ACK_WINDOW_MS, maxReminders: MAX_REMINDERS },
   };
 }

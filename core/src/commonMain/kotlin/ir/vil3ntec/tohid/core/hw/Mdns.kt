@@ -137,6 +137,30 @@ object Mdns {
     return Discovery.merge(emptyList(), found)
   }
 
+  /** پرسشِ رسیده (SYN-09، پاسخ‌دهندهٔ هاب): شناسه و (نام، نوع)ِ هر پرسش */
+  data class Query(val id: Int, val questions: List<Pair<List<String>, Int>>)
+
+  /** فقط بستهٔ پرسش (نه پاسخ، opcode ِ صفر)؛ بدشکل ⇒ `null` — همان نام‌خوانِ امنِ [parse] */
+  fun questions(p: ByteArray): Query? {
+    if (p.size < 12) return null
+    val flags = u16(p, 2)
+    if ((flags and 0x8000) != 0 || (flags and 0x7800) != 0) return null
+    val n = u16(p, 4)
+    if (n !in 1..16) return null
+    val out = ArrayList<Pair<List<String>, Int>>()
+    var at = 12
+    repeat(n) {
+      val nm = name(p, at) ?: return null
+      if (nm.end + 4 > p.size) return null
+      out += nm.labels to u16(p, nm.end)
+      at = nm.end + 4
+    }
+    return Query(u16(p, 0), out)
+  }
+
+  /** همان سنجشِ نامِ [parse] (بی بزرگ/کوچکِ ASCII) */
+  fun sameName(a: List<String>, b: List<String>): Boolean = same(a, b)
+
   /** نامِ نمایشی: نویسهٔ کنترلی و جهت‌دهندهٔ پنهان (LRM/RLM، U+202A..E، U+2066..9) ⇒ فاصله */
   fun clean(s: String): String = buildString {
     for (c in s) {
