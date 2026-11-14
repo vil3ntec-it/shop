@@ -452,7 +452,7 @@ private fun RouteScope.DebtorFormRoute(id: String?) {
       debtor = debtor,
       onClose = { back() },
       onSave = { f ->
-        saved[0] = MoneyWriter.debtor(store, toasts, context, data, DebtorFormsModel.save(data, id, f, System.currentTimeMillis(), limitRules, ::moneyId), if (id == null) StrMoney.saved else StrMoney.edited)
+        saved[0] = MoneyWriter.debtor(store, toasts, context, data, DebtorFormsModel.saveBasic(data, id, f, System.currentTimeMillis(), limitRules, ::moneyId), if (id == null) StrMoney.saved else StrMoney.edited)
         saved[0] != null
       },
       onSaved = { if (id == null) nav.finish(saved[0]) else back() },
