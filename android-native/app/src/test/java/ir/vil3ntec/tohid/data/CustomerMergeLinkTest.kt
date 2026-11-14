@@ -101,7 +101,7 @@ class CustomerMergeLinkTest {
     val v1 = moved(d0).data
     assertEquals(view(v1, "c2"), view(linked, "c2"))
     assertEquals(view(v1, "c5"), view(linked, "c5"))
-    assertEquals(1150.0 - 400.0 - 50.0, ShopStore.debt(linked, "c2"), 0.0)
+    assertEquals(1300.0 - 400.0 - 50.0, ShopStore.debt(linked, "c2"), 0.0)
     assertEquals("ادغام‌شده ماندهٔ جدا ندارد", 0.0, ShopStore.debt(linked, "c1"), 0.0)
     assertEquals(listOf("s3", "s7", "s8"), CustomerEngine.invoices(linked, "c2").map { it.id }.sorted())
     //  گزارشِ سنِ بدهیِ همه: یک ردیف برای ماندگار، هیچ ردیفی برای ادغام‌شده

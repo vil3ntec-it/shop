@@ -80,7 +80,7 @@ object StrSheets {
   val balance: String get() = t("مانده", "Balance", "پاتې")
   val productNameShort: String get() = t("نام کالا", "Product name", "د توکي نوم")
   val appStock: String get() = t("موجودی برنامه", "Stock in app", "په پروګرام کې موجودي")
-  val counted: String get() = t("شمرده‌شده", "Counted", "ګڼل شوي")
+  val counted: String get() = t("شمرده‌شده", "On shelf", "ګڼل شوي")
   val difference: String get() = t("اختلاف", "Difference", "توپیر")
   val differenceValue: String get() = t("ارزش اختلاف", "Difference value", "د توپیر ارزښت")
   val debtorName: String get() = t("نام قرض‌دار", "Debtor name", "د پوروړي نوم")

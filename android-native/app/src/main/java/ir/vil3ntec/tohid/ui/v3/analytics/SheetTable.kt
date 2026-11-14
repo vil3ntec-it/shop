@@ -47,7 +47,7 @@ object SheetModel {
    *  انگلیسی و پشتوی `StrSheets` هم؛ `SheetLangTest` جمع‌پذیریِ هر برگه را در چهار زبان یکی می‌سنجد. فارسی همان فهرستِ پیشین.
    */
   private val NO_SUM = listOf("شماره", "تعداد", "روز", "موجودی", "حداقل", "ردیف", "مقدار", "فی", "قیمت") +
-    listOf("No.", " count", "Day", "day", "Stock", "stock", "Row", "Quantity", "quantity", "price", "Discount") +
+    listOf("No.", "no.", "Phone", "phone", "Count", " count", "Day", "day", "Stock", "stock", "Row", "Quantity", "quantity", "price", "Discount") +
     listOf("شمېر", "ورځ", "موجودي", "قطار", "بیه")
 
   fun columns(sheet: ReportCsv.Sheet): SheetColumns {
