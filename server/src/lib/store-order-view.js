@@ -34,6 +34,9 @@ async function customerOrder(store, token) {
   if (issueReports !== undefined) order.issueReports = issueReports;
   const review = await require('./order-reviews').customerView(store.shop_id, orderId, order.status);
   if (review !== undefined) order.review = review;
+  //  RET-11: «درخواستِ برگشت» ِ سفارشِ تحویل‌شده — فقط با پرچمِ `shop.storefront.return_requests` (خاموش ⇒ کلید نیست)
+  const returnRequest = await require('./order-return-requests').customerView(store, orderId);
+  if (returnRequest !== undefined) order.returnRequest = returnRequest;
   //  WEB-04: زمانِ تقریبیِ همین سفارش، از نو با هر مرحله — فقط با پرچمِ `shop.storefront.eta` (خاموش ⇒ کلید نیست)
   const live = await eta.orderEta(store, orderId);
   if (live !== undefined) order.eta = live;

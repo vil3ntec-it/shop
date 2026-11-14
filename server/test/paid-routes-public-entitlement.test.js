@@ -45,6 +45,7 @@ const CATEGORY = {
   'order-address-media-store.js': 'STORE_PAID',   //  CHK-08: عکسِ دروازه و یادداشتِ صوتیِ نشانی — همان ویترینِ پولی (sf.open)
   'storefront-finder-store.js': 'STORE_PAID',  //  WEB-07/10: فیلتر و «خبرم کن» — همان ویترینِ پولی (sf.open)
   'order-feedback-store.js': 'STORE_PAID',     //  NTF-07/09: گزارشِ مشکل و نظرِ سفارش — همان ویترینِ پولی (sf.open)
+  'store-return-requests.js': 'STORE_PAID',    //  RET-11: درخواستِ برگشت از ویترین — همان ویترینِ پولی (sf.open پیش از پرچم)
   'storefront-eta-store.js': 'STORE_PAID',    //  WEB-04: زمانِ تقریبیِ تحویل — همان ویترینِ پولی (sf.open)
   'store-account-history.js': 'STORE_PAID',    //  CRM-13: «حسابِ من» — همان ویترینِ پولی (sf.open پیش از پرچم)
   'order-add-store.js': 'STORE_PAID',          //  CHK-21: افزودنِ قلم پیش از جمع‌آوری — همان ویترینِ پولی (sf.open)
@@ -63,7 +64,9 @@ const FLAGS = ['shop.orders', 'shop.storefront', 'shop.chat', 'shop.delivery', '
   //  AI-11: `POST /store/:slug/visual-search` پشتِ پرچمِ ویترین و پرچمِ نمایه (خاموش ⇒ همان درِ ناشناخته)
   'shop.visual_search', 'shop.storefront.visual_search',
   //  RPT-14: `POST /store/:slug/funnel/:step` پشتِ پرچمِ گزارش (خاموش ⇒ همان درِ ناشناخته)
-  'shop.orders.online_report'];
+  'shop.orders.online_report',
+  //  RET-11: درهای `…/return-requests` پشتِ پرچمِ خودشان (خاموش ⇒ همان درِ ناشناخته)
+  'shop.storefront.return_requests'];
 
 /** `${base}` ِ روترهای چت و شکایت همان ثابتِ `const base = '…'` ِ پرونده است. */
 const baseOf = (file) => (fs.readFileSync(nodePath.join(ROUTES, file), 'utf8').match(/const base = '([^']+)'/) || [])[1] || '';

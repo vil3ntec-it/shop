@@ -107,6 +107,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.orders.refund_tracking', scope: 'shop', default: true, what: 'پیگیریِ بازپرداخت برای مشتری در صفحهٔ سفارش (NTF-08)' },
   { key: 'shop.orders.refund_receipt', scope: 'shop', default: true, what: 'رسیدِ اصلاحیِ هر بازپرداختِ دفتر برای کارمند و مشتری (E2E-RET-11)' },
   { key: 'shop.orders.issue_reports', scope: 'shop', default: false, what: '«گزارشِ مشکل» با عکس در پیگیریِ سفارش (NTF-07)' },
+  { key: 'shop.storefront.return_requests', scope: 'shop', default: false, what: '«درخواستِ برگشت» ِ مشتری از ویترین و صندوقِ برگشتِ دکان (RET-11)' },
   { key: 'shop.orders.reviews', scope: 'shop', default: false, what: 'امتیاز و نظرِ مشتری با بازبینیِ دکان (NTF-09)' },
   { key: 'shop.orders.late_apology', scope: 'shop', default: false, what: 'عذرخواهی و کوپنِ خودکار برای تأخیرِ زیاد (NTF-10)' },
   { key: 'shop.orders.delay', scope: 'shop', default: false, what: '«عقب انداختنِ» زمانِ آماده‌شدنِ سفارشِ قبول‌شده (ORD-07)' },

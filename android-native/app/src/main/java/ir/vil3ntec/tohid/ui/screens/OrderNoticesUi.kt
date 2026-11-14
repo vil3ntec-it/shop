@@ -51,6 +51,9 @@ private fun noticeEventText(e: String): String = when (e) {
   "order_cancelled" -> StrOrderOps.noticeEventCancelled
   "order_late_apology" -> StrOrderOps.noticeEventLateApology
   "order_refund" -> StrOrderOps.noticeEventRefund
+  "order_return_accepted" -> StrOrderOps.noticeEventReturnAccepted
+  "order_return_rejected" -> StrOrderOps.noticeEventReturnRejected
+  "order_return_completed" -> StrOrderOps.noticeEventReturnCompleted
   else -> e
 }
 

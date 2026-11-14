@@ -33,6 +33,8 @@
  *   store_alert_push           اشتراکِ پوشِ مرورگر برای «خبرم کن» ِ همین شماره در همین دکان پاک (مهاجرتِ ۴۷۵).
  *   order_issues               متنِ گزارشِ مشکل و پاسخِ دکان پاک؛ نوع و وضعیت می‌مانند. order_issue_photos پاک.
  *   order_reviews              متنِ نظر پاک؛ ستاره و وضعیت (میانگینِ امتیاز) همان.
+ *   order_return_requests      متنِ درخواستِ برگشت و دلیلِ ردِ دکان پاک؛ قلم‌ها، وضعیت و شناسهٔ سندِ برگشت می‌مانند (RET-11،
+ *                              مهاجرتِ ۸۶۶ — اگر جدولش هست). order_return_request_photos پاک.
  *   customer_access_log        «سابقهٔ دسترسی» (CRM-15): پروندهٔ همین شماره (`ph:` ِ شماره و قرض‌دارانِ دفترِ سرور با
  *                              همین شماره) ⇐ `erased:<شناسهٔ حذف>`؛ بیننده، نقش، زمان و شمار می‌مانند (`lib/customer-access.js`).
  *
@@ -78,6 +80,7 @@ const COUNT_KEYS = Object.freeze([
   'orders', 'orderLines', 'orderEvents', 'deliveryEvents', 'deliveryPhotos', 'pickPhotos', 'deliveryLocations',
   'notifyOutbox', 'conversations', 'messages', 'chatMedia', 'chatPins', 'chatReports', 'carts', 'favorites', 'lists', 'areaRequests',
   'alerts', 'issues', 'issuePhotos', 'reviews', 'pushSubs', 'alertPushSubs', 'orderDevices', 'addressMedia', 'addressMediaLinks',
+  'returnRequests', 'returnPhotos',
 ]);
 
 const flagOn = (shopId) => flagOf(shopId, FLAG);
@@ -266,6 +269,14 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '',
         if (await has(c, 'order_reviews')) {
           counts.reviews = await q(
             `UPDATE order_reviews SET comment='' WHERE shop_id=$1 AND order_id = ANY($2::text[]) AND comment <> '' RETURNING id`, [shopId, orderIds]);
+        }
+        if (await has(c, 'order_return_requests')) {
+          counts.returnPhotos = await qk(
+            `DELETE FROM order_return_request_photos WHERE shop_id=$1 AND request_id IN (
+               SELECT id FROM order_return_requests WHERE shop_id=$1 AND order_id = ANY($2::text[])) RETURNING store_key`, [shopId, orderIds]);
+          counts.returnRequests = await q(
+            `UPDATE order_return_requests SET body='', decision_note='' WHERE shop_id=$1 AND order_id = ANY($2::text[])
+                AND (body <> '' OR decision_note <> '') RETURNING id`, [shopId, orderIds]);
         }
       }
 

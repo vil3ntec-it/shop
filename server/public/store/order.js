@@ -92,6 +92,7 @@
       renderRate(o, token);
       renderPrefs(o, token);
       renderFeedback(o, token);
+      renderReturns(o, token);
       renderChanges(o, token);
       renderChat(o);
       renderAdd(o, token);
@@ -225,6 +226,17 @@
         document.head.appendChild(el('script', { attrs: { src: '/store/order-feedback.js' }, on: { load: ok, error: no } }));
       }).then(function () { return window.StoreFeedback({ api: api }); }).catch(function () { feedback = null; return null; });
       feedback.then(function (f) { if (f) f.render(o, token); });
+    }
+
+    //  RET-11: «درخواستِ برگشت» ِ سفارشِ تحویل‌شده — store/return-request.js فقط وقتی سرور کلیدِ `returnRequest` را داد
+    //  (پرچمِ خاموش یا سفارشِ ناتحویلِ بی درخواست ⇒ نه اسکریپت، نه واژه‌نامه، نه گره‌ای در صفحه)
+    var returns = null;
+    function renderReturns(o, token) {
+      if (!o.returnRequest) { if ($('o-rr')) $('o-rr').hidden = true; return; }
+      returns = returns || K.js('/store/return-request.js').then(function () { return window.StoreReturns({ api: api }); }).catch(function () { returns = null; return null; });
+      returns.then(function (f) {
+        if (f) f.order(o, token, function () { api('/orders/' + encodeURIComponent(token)).then(function (r) { renderOrder(r.order, token); }); });
+      });
     }
 
     //  ORD-14/NTF-08: پیشنهادِ ویرایشِ دکان (پذیرفتن/رد) و پیگیریِ بازپرداخت — store/order-changes.js فقط وقتی سرور

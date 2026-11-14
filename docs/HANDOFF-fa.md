@@ -57,6 +57,27 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-49r (د۱۲) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-49r` (از `origin/main`، 94eb92d90)
+
+- **RET-11 (تصمیمِ ۱۳ «ب»: مشتری از ویترین درخواستِ برگشت می‌دهد):** ساخته پشتِ پرچمِ خاموشِ `shop.storefront.return_requests` (مهاجرتِ ۸۶۶).
+  ویترین: در جزئیاتِ سفارشِ **تحویل‌شده** «درخواستِ برگشت» (`store/return-request.js` ِ دیربار، واژه‌نامهٔ `returns` ِ سه‌زبانه، عکس از راهِ
+  `chat-photo.js`، بی innerHTML، بودجهٔ بارِ نخست بی‌تغییر ۷۲٬۶۳۴ ≤ ۷۲٬۷۰۴)، وضعیت در همان صفحه و «سفارش‌های من». سرور: `lib/order-return-requests.js`
+  (مشتری) و `-shop.js` (دکان)، درهای `/api/store/:slug/orders/:token/return-requests*`، `/api/store/:slug/account/return-requests` و
+  `/api/shop/order-returns*`؛ اعلانِ دکان (پوشِ اعلانِ سفارش) و مشتری (`customer-notify` ⇐ `onReturnIn`، ستونِ `return_request_id`). برنامهٔ دکان
+  (اندروید و کامپیوتر، یک کد): صندوقِ «درخواست‌های برگشت» سرِ صفِ سفارش‌ها؛ «پذیرفتن» ⇒ همان `ReturnFlowSheet` با `preset`
+  (`data/ReturnRequestPrefill.kt`) و سندِ ثابتِ `o-<سفارش>-rq-<درخواست>` ⇒ «ثبت شد» به سرور؛ پول/موجودی فقط از راهِ برگشتِ موجود.
+- ⚠️ **برای عاملِ ایمیل (هماهنگی):** هویت = حسابِ ویترین (`customer_id`)؛ «صاحبِ سفارش» یک تابع است: `ownsOrder` در
+  `lib/order-return-requests.js` (امروز شمارهٔ حساب = `customer_phone` ِ سفارش، همان قاعدهٔ `ordersOfPhone` ِ «سفارش‌های من»). وقتی «سفارش‌های من» به
+  ایمیل/شناسهٔ حساب رفت، همین تابع هم؛ آزمونِ «مالکیت = سفارش‌های من» در `order-return-requests.test.js` این دو را به هم می‌بندد. اعلانِ مشتری از همان
+  صفِ `customer-notify` (`phone_key`) است. به `lib/otp`/ورود دست نخورد.
+- **آزمون‌ها (سرخ پیش/سبز پس):** `order-return-requests.test.js` ۰/۷ روی main ⇒ ۷/۷؛ `web-store-returns.mjs` (کرومیوم) روی main سرخ (TimeoutError) ⇒
+  ۰ ❌؛ core `OrderReturnRequestsTest` پیش از کد کامپایل‌نشدنی ⇒ ۶/۶؛ DESKTOP_EVIDENCE. فهرست‌های در/اشتراک/مجوز (`shop-route-inventory`،
+  `paid-routes*`، `route-authz-inventory`، `dead-doors`، `role-route-isolation`) و `customer-erasure`، `customer-notify`، `image-store-migrate`،
+  `admin-flags`، `web-i18n`، `market-web` سبز. اجرای کاملِ سرور در دو تکه (PGlite): الف ۲۳۳۶ آزمون، ۲۳۰۵ قبول، ۱۱ شکست = ۷ شکستِ محیطیِ همان main (`backup.test.js` ×۶ و `pump-isolation` «سرور را به کامپیوترِ دیگر ببر» — pg_dump/سوکتِ PostgreSQL در این کانتینر نیست؛ روی main هم همین ۷) + ۴ که در همین شاخه درست و دوباره سبز شدند (`dari-text` ×۳: «مهلت» ⇐ «وقت»، «دوباره بزنید» ⇐ «دوباره کوشش کنید»؛ `customer-notify-refund`: نامِ رویدادهای برگشت از `StrOrderOps`)؛ ب ۱۹۵۶ آزمون، ۱۹۳۳ قبول، ۰ شکست. web-store*.mjs: هر ۳۶ پرونده ۰ ❌ (account، web و vitals در دورِ نخست زیرِ بارِ سنگین «Page crashed»/مهلت گرفتند و جدا دوباره سبز شدند).
+- **STATUS/اسناد:** RET-11 همان PARTIAL، از «تصمیم» به «بیرونی» (فقط بازپرداختِ آنلاین با حساب‌پی، D-08)؛ PARTIAL-MAP (تصمیم ۵۲، بیرونی ۴۰)،
+  FLAGS-ON §۳۳، OWNER-DECISIONS (۱۴۰۵/۰۸/۲۳)، OWNER-NEXT، WHATS-NEW، RULES (نقشهٔ پرچم و قاعدهٔ «درخواستِ برگشت»)، `docs/api/routes.json`.
+- **نیمه‌کاره/قدمِ بعد:** صاحب‌کار: پرچم را برای یک دکان روشن و یک برگشت را از ویترین تا «برگشت ثبت شد» در برنامه بزند (FLAGS-ON §۳۳)؛ بازپرداختِ
+  آنلاین پس از حساب‌پی (D-08). پیکِ برگشت فقط «روشِ رساندن» است (مأموریتِ خودکارِ پیک ساخته نشد).
 ### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-50d (د۱۳) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-50d` (از main ‏94eb92d90)
 
 پنج تصمیمِ کوچکِ صاحب‌کار (`decisions-1405-08-23`، شماره‌های ۶، ۱۵، ۲۱، ۲۴، ۲۵)، هر کدام کامیتِ جدا با آزمونِ سرخ‌پیش/سبزپس:
