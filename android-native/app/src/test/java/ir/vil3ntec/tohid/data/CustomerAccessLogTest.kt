@@ -102,10 +102,14 @@ class CustomerAccessLogTest {
     assertEquals(Kind.DETAIL, CustomerAccessLog.openKind(true, null))
   }
 
-  @Test fun `هر دو پرونده بخش را دارند و دیدن را ثبت می‌کنند؛ فقط audit_view؛ حسابدار و حالتِ آموزشی نمی‌نویسند`() {
-    assertTrue(src("ui/v3/money/DebtorFileExtras.kt").contains("CustomerAccessPanel(d, debtorId,"))
+  /**
+   *  تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۳: بخشِ «چه کسی دید» در پروندهٔ قرض‌دار (گوشیِ نسخهٔ ۳ و کامپیوتر) کشیده نمی‌شود — پرونده فقط
+   *  تراکنش‌ها؛ ثبتِ دیدن همان می‌ماند (فقط به «سابقهٔ عملیات» ِ صاحب). جزءِ بخش خودش هنوز هست (`CustomerAccessPanel`).
+   */
+  @Test fun `هر دو پرونده بخش را نشان نمی‌دهند ولی دیدن را ثبت می‌کنند؛ فقط audit_view؛ حسابدار و حالتِ آموزشی نمی‌نویسند`() {
+    assertFalse(src("ui/v3/money/DebtorFileExtras.kt").contains("CustomerAccessPanel("))
     val desk = src("ui/screens/DeskCustomers.kt")
-    assertTrue(desk.contains("CustomerAccessPanel(d, id,"))
+    assertFalse(desk.contains("CustomerAccessPanel("))
     assertTrue(desk.contains("LaunchedEffect(id) { viewed(id, ir.vil3ntec.tohid.data.CustomerAccessLog.openKind(contacts, debtor)) }"))
     val screen = src("ui/v3/money/DebtorLedgerScreen.kt")
     assertTrue(screen.contains("LaunchedEffect(id) { actions.onViewed(ir.vil3ntec.tohid.data.CustomerAccessLog.openKind(contacts, account.debtor)) }"))
