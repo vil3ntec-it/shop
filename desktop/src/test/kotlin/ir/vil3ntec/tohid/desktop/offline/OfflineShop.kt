@@ -119,12 +119,14 @@ internal class OfflineBackend private constructor(private val proc: Process, val
       else -> null
     }
 
-    fun start(root: File, log: File): OfflineBackend {
+    /** [extraEnv]: متغیرِ محیطِ همان سرور (مثلاً `SYNC_V3_ENABLED` برای S26/v3) */
+    fun start(root: File, log: File, extraEnv: Map<String, String> = emptyMap()): OfflineBackend {
       val out = File(log.parentFile, "offline30-backend-${System.nanoTime()}.json")
       val pb = ProcessBuilder("node", File(root, "server/test/e2e/lib/offline30-backend.mjs").path, out.path)
         .directory(File(root, "server")).redirectErrorStream(true).redirectOutput(log)
       //  PostgreSQL ِ محلی (پایگاهِ جدا؛ schema ِ public از نو) — بی آن PGlite ِ در حافظه
       env("OFFLINE30_DATABASE_URL")?.let { pb.environment()["E2E_DATABASE_URL"] = it }
+      pb.environment().putAll(extraEnv)
       val p = pb.start()
       val until = System.currentTimeMillis() + 180_000
       while (!out.isFile || out.length() == 0L) {

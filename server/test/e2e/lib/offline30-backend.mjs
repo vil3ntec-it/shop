@@ -131,6 +131,19 @@ async function oplog() {
 /* ── خطِ 2G ِ هر دستگاه (S26) — جلوی همان پراکسیِ دکان، تا `down` و بریدن‌های بالا هم بمانند ── */
 const links = new Map();
 
+/** همان برای `sync_v3_ops` (S26/v3، `SYNC_V3_ENABLED`) */
+async function oplog3() {
+  const rows = await E.db.many(
+    `SELECT device_id, op_id FROM sync_v3_ops WHERE app='shop' AND account_kind='shop' AND account_id=$1`, [String(shop.owner.shopId)]);
+  const byDevice = {};
+  const seen = new Map();
+  for (const r of rows) {
+    byDevice[r.device_id] = (byDevice[r.device_id] || 0) + 1;
+    seen.set(r.op_id, (seen.get(r.op_id) || 0) + 1);
+  }
+  return { total: rows.length, distinct: seen.size, duplicates: [...seen].filter(([, n]) => n > 1).map(([id]) => id), byDevice, ids: [...seen.keys()] };
+}
+
 /* ── درِ کنترل ── */
 const routes = {
   'POST /link': async (b) => {
@@ -153,6 +166,7 @@ const routes = {
   'POST /setup': async (b) => setup(b),
   'POST /flag': async (b) => { await E.flag(shop.owner.shopId, String(b.key), b.value); return { ok: true }; },
   'GET /oplog': async () => oplog(),
+  'GET /oplog3': async () => oplog3(),
   /** صاحب دوباره با کدِ ایمیلی، روی **همان** دستگاه (همان شناسه) — مثلِ کسی که پس از از دست رفتنِ نشست وارد می‌شود */
   'POST /relogin-owner': async () => {
     const d = new NativeDevice(E, 'off30-owner-pc', { deviceId: shop.A.deviceId, seller: 'صاحب' });

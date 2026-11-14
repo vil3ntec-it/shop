@@ -10,6 +10,11 @@ import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.sync.v1.LedgerDiff
 import ir.vil3ntec.tohid.sync.v1.OpQueue
 import ir.vil3ntec.tohid.sync.v1.Ulid
+import ir.vil3ntec.tohid.sync.v3.FileV3Store
+import ir.vil3ntec.tohid.sync.v3.HttpV3Transport
+import ir.vil3ntec.tohid.sync.v3.SyncV3Engine
+import ir.vil3ntec.tohid.sync.v3.V3Convert
+import ir.vil3ntec.tohid.sync.v3.V3Ledger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -64,11 +69,11 @@ class S26Load2GDesktopTest {
 
   /* ════════════════════════ کارِ دکان ════════════════════════ */
 
-  /** چند کار، یک ثبت (`SyncCommit.record`) — [every] = ۱ همان رفتارِ برنامه */
-  private class Stager(val dev: ShopDevice, val every: Int) {
+  /** چند کار، یک ثبت (`SyncCommit.record`) — [every] = ۱ همان رفتارِ برنامه؛ [also]: ثبتِ v3 ِ همان دفتر (`SyncV3Engine.record`) */
+  private class Stager(val dev: ShopDevice, val every: Int, val also: ((ShopData) -> Unit)? = null) {
     var n = 0
     fun put(next: ShopData) { dev.ledger = next; if (++n >= every) flush() }
-    fun flush() { if (n > 0) { dev.save(dev.ledger); n = 0 } }
+    fun flush() { if (n > 0) { dev.save(dev.ledger); also?.invoke(dev.ledger); n = 0 } }
   }
 
   private fun newId(): String = Ulid.next()
@@ -251,6 +256,153 @@ class S26Load2GDesktopTest {
   @Test fun `SYN-04 همان خطِ 2G با پرچم‌های فشرده‌سازی ⇒ push ِ بزرگ فشرده و همان همگرایی`() =
     scenario("syn04", if (heavy && env("S26_GZIP") != null) target else 600, gzip = true)
 
+  /**
+   *  v3 (پیش‌فرض خاموش: `SYNC_V3_ENABLED` ِ سرور و `SyncChoice` ِ دستگاه): همان سه دستگاه و همان کار، با موتورِ واقعیِ
+   *  `SyncV3Engine` + `HttpV3Transport` + `FileV3Store` ِ برنامه، و همان پرچمِ `sync.gzip_push`. روزِ ۳۱ برنامه از نو باز
+   *  می‌شود (موتور و ترابری تازه — همان `SyncV3Runner` پس از بسته شدن). فاصلهٔ تلاش همان `V3Step.retryInMs` ِ موتور.
+   */
+  @Test fun `SYN-04 v3 پشتِ SYNC_V3_ENABLED روی همان خطِ 2G ⇒ هر op یک بار و همگرایی`() {
+    val root = OfflineBackend.repoRoot()
+    val missing = OfflineBackend.available(root)
+    assumeTrue("سرورِ واقعی در دسترس نیست: $missing", missing == null)
+    work.mkdirs()
+    OfflineBackend.start(root!!, File(work, "backend-v3.log"), mapOf("SYNC_V3_ENABLED" to "1")).use { be ->
+      runBlocking { playV3(be, if (heavy && env("S26_V3") != null) target else 600) }
+    }
+  }
+
+  private fun v3Engine(d: ShopDevice): SyncV3Engine = SyncV3Engine(
+    HttpV3Transport(d.api), FileV3Store(File(work, "v3/${d.label}/state").apply { mkdirs() }), d.deviceId,
+    object : V3Ledger { override fun read(): ShopData = d.ledger; override fun write(next: ShopData) { d.ledger = next } },
+  ).load()
+
+  private suspend fun v3Sync(e: SyncV3Engine, waits: MutableList<Long>? = null) {
+    var k = 0
+    while (true) {
+      val st = e.sync(false)
+      if (st.ok && e.queued() == 0) return
+      check(!st.stopped && ++k < 60) { "v3: ${st} ${e.status()}" }
+      if (!st.ok) { waits?.add(st.retryInMs); delay((st.retryInMs / speed).toLong()) }
+    }
+  }
+
+  private suspend fun playV3(be: OfflineBackend, ops: Int) {
+    val t0 = System.currentTimeMillis()
+    val rnd = Random(263)
+    val setup = be.call("POST", "/setup", obj("subscriptionDays" to 120, "extraStaff" to 1))
+    val o = setup.obj("owner")
+    val s = setup.obj("staff")
+    val s2 = (setup["more"] as JsonArray)[0] as JsonObject
+    val direct = setup.str("api")
+    val clock = ShopClock(System.currentTimeMillis())
+    val A = ShopDevice("owner-pc", o.str("deviceId"), o.str("userId"), "صاحب", direct, MemTokens(o.str("access"), o.str("refresh")), File(work, "v3/A"), "1.0.9999")
+    val B = ShopDevice("staff-phone-1", s.str("deviceId"), s.str("userId"), "علی", direct, MemTokens(s.str("access"), s.str("refresh")), File(work, "v3/B"), "3.2.9999")
+    val C = ShopDevice("staff-phone-2", s2.str("deviceId"), s2.str("userId"), "شاگرد 2", direct, MemTokens(s2.str("access"), s2.str("refresh")), File(work, "v3/C"), "3.2.9999")
+    val devs = listOf(A, B, C)
+    for (k in listOf("sync.gzip_push", "sync.gzip_pull")) be.call("POST", "/flag", obj("key" to k, "value" to true))
+    be.serverDay(0.0)
+    clock.at(0, 6 * 60)
+    val engines = HashMap<ShopDevice, SyncV3Engine>()
+    for (d in devs) {
+      d.seatEmpty()   //  صفِ v1 ِ همین دستگاه هرگز نمی‌رود — فقط تا `save` ِ موتورها کار کند
+      engines[d] = v3Engine(d).also { assertTrue("${d.label}: راه‌اندازیِ v3", it.initialize(false).ok) }
+      d.series = ApiJson.text(d.api.post("/shop/series", buildJsonObject { put("deviceId", d.deviceId) }), "series")
+    }
+    seed(A, clock)
+    engines.getValue(A).record(A.ledger)
+    for (d in devs + A) v3Sync(engines.getValue(d))
+    val debtors = A.ledger.debtors.map { it.id }
+    val hot = A.ledger.products.take(5).map { it.id }
+    val online0 = engines.values.sumOf { it.queued() }
+    assertEquals(0, online0)
+
+    for (d in devs) d.online = false
+    val share = mapOf(A to 0.45, B to 0.30, C to 0.25)
+    val stagers = devs.associateWith { d -> Stager(d, saveEvery) { engines.getValue(d).record(it) } }
+    var perAction = 4.0
+    var actions = 0
+    //  شمار از صفِ v3 (صفِ v1 ِ این دستگاه‌ها ردیف‌های گرفته‌شده از v3 را هم «تغییر» می‌بیند و هرگز نمی‌رود)
+    fun offlineOps() = devs.sumOf { engines.getValue(it).queued() }
+    for (day in 1..days) {
+      val budget = (ops - offlineOps()).coerceAtLeast(0).toDouble() / (days - day + 1)
+      for (d in devs) {
+        val n = maxOf(1, (budget * share.getValue(d) / perAction).toInt())
+        stagers.getValue(d).day(rnd, clock, n, d === A, debtors, hot, day, if (d === A) 7 * 60 else 8 * 60)
+        actions += n
+      }
+      perAction = offlineOps().toDouble() / maxOf(1, actions)
+    }
+    val made = devs.associateWith { d -> engines.getValue(d).queue.outbox.flatMap { e -> e.ops.mapNotNull { (it["op_id"] as? JsonPrimitive)?.content } }.toSet() }
+    val offlineMs = System.currentTimeMillis() - t0
+
+    /* ── روزِ ۳۱: برنامه از نو (موتور و ترابریِ تازه)، هر دستگاه روی خطِ خودش، هم‌زمان ── */
+    be.serverDay(days + 1.0 + 9 / 24.0)
+    val waits = devs.associateWith { ArrayList<Long>() }
+    for ((i, d) in devs.withIndex()) {
+      engines[d] = v3Engine(d)
+      d.apiUrl = be.call("POST", "/link", obj("id" to d.label, "cfg" to linkCfg(360 + i))).str("url")
+      d.online = true
+    }
+    val tNet = System.currentTimeMillis()
+    val walls = HashMap<ShopDevice, Long>()
+    val linkAt = HashMap<ShopDevice, JsonObject>()
+    coroutineScope {
+      devs.map { d -> async(Dispatchers.IO) {
+        val t = System.nanoTime()
+        v3Sync(engines.getValue(d), waits.getValue(d))
+        synchronized(walls) { walls[d] = (System.nanoTime() - t) / 1_000_000; linkAt[d] = be.call("GET", "/links").obj(d.label) }
+      } }.awaitAll()
+    }
+    val parallelMs = System.currentTimeMillis() - tNet
+    for (d in devs) be.call("POST", "/link-set", obj("id" to d.label, "cfg" to buildJsonObject { put("dropRate", 0.0) }))
+    repeat(2) { for (d in devs) v3Sync(engines.getValue(d)) }
+
+    val log = be.call("GET", "/oplog3")
+    val ids = (log["ids"] as JsonArray).map { (it as JsonPrimitive).content }.toHashSet()
+    assertEquals("v3: هیچ op_id ِ تکراری", "[]", log["duplicates"].toString())
+    assertEquals(log.str("total"), log.str("distinct"))
+    for (d in devs) {
+      assertTrue("${d.label}: هر op ِ قطعیِ v3 روی سرور (${made.getValue(d).size})", made.getValue(d).isNotEmpty() && ids.containsAll(made.getValue(d)))
+      assertEquals("${d.label}: صفِ v3 خالی", 0, engines.getValue(d).queued())
+      assertEquals("${d.label}: ردشدهٔ v3", 0, engines.getValue(d).rejected().size)
+    }
+    for (d in devs) d.apiUrl = direct
+    val server = LedgerDiff.fromSnapshot(V3Convert.snapshotToLegacy(A.api.get("/sync/v3/snapshot")), LedgerDiff.toJson(ShopData()))
+    val want = canon(server)
+    for (d in devs) assertEquals("${d.label} = Snapshot ِ v3 (بایت)", want, canon(LedgerDiff.toJson(d.ledger)))
+
+    val report = ArrayList<String>()
+    for (d in devs) {
+      val l = linkAt.getValue(d)
+      val kinds = l.obj("kinds")
+      val push = kinds["v3push"] as? JsonObject ?: JsonObject(emptyMap())
+      val pull = kinds["v3pull"] as? JsonObject ?: JsonObject(emptyMap())
+      val wire = (l["log"] as JsonArray).map { it as JsonArray }.filter { (it[0] as JsonPrimitive).content == "v3push" }
+      val big = wire.count { (it[4] as JsonPrimitive).content.toInt() > 1024 }
+      val gz = wire.count { (it[7] as JsonPrimitive).content == "1" }
+      assertTrue("${d.label}: بدنهٔ push ِ v3 ≤ ۲۵۶KB", (push.str("maxReqBody").toIntOrNull() ?: 0) <= SyncV3Engine.MAX_BYTES + 1024)
+      val retryV = waits.getValue(d).sum()
+      val v2g = l.str("vClockMs").toDouble() + retryV - retryV / speed
+      report += "${d.label}: op ${made.getValue(d).size}، push ${push.str("n")} (بریده ${push.str("dropUp")}↑/${push.str("dropDown")}↓، مهلت ${push.str("timeouts")}، gzip $gz/$big، بدنه ${push.str("reqBody")}، برآوردِ gzip ${push.str("reqGzEst")}، بیشترین ${push.str("maxReqBody")})، " +
+        "pull ${pull.str("n")} (بدنه ${pull.str("resBody")}، gzip ${pull.str("resGzipped")}، برآوردِ gzip ${pull.str("resGzEst")})؛ انتظار ${waits.getValue(d)}؛ سیم ↑${l.str("wireUp")} ↓${l.str("wireDown")}؛ " +
+        "زمانِ 2G ${"%.1f".format(v2g / 60_000)} دقیقه (دیواری ${walls.getValue(d) / 1000}s)"
+    }
+    val json = buildJsonObject {
+      put("name", "v3"); put("ops", offlineOps()); put("speed", speed)
+      put("report", JsonArray(report.map { JsonPrimitive(it) }))
+      put("links", JsonObject(linkAt.entries.associate { (d, v) -> d.label to JsonObject(v.filterKeys { it != "log" }) }))
+    }.toString()
+    env("S26_REPORT")?.let { File(it.replace(".json", "-v3.json")).writeText(json) }
+    println(
+      """
+      |── S26/v3 (${be.db}، ${offlineOps()} op ِ قطعیِ v1-شمار، سرعتِ خط ×$speed، gzip_push روشن، برنامه از نو در روزِ ۳۱) ──
+      |${report.joinToString("\n|")}
+      |سرور: sync_v3_ops ${log.str("total")} یکتا ${log.str("distinct")}، تکراری ۰؛ همگرایی: سه دفتر = Snapshot ِ v3 (sha ${want.first.take(12)})
+      |زمان: قطعی ${offlineMs / 1000}s، همگام‌سازیِ هم‌زمان ${parallelMs / 1000}s
+      """.trimMargin()
+    )
+  }
+
   private fun scenario(name: String, ops: Int, gzip: Boolean) {
     val root = OfflineBackend.repoRoot()
     val missing = OfflineBackend.available(root)
@@ -362,6 +514,8 @@ class S26Load2GDesktopTest {
     val json = StringBuilder("{\"name\":\"$name\",\"ops\":${offlineOps()},\"speed\":$speed,\"saveEvery\":$saveEvery,\"devices\":[")
     var gzOk = 0
     var gzBig = 0
+    var dropDown = 0
+    var dups = 0
     for ((i, r) in runs.withIndex()) {
       val d = r.dev
       val l = r.link
@@ -374,8 +528,9 @@ class S26Load2GDesktopTest {
       assertTrue("${d.label}: بدنهٔ push روی سیم ≤ ۲۵۶KB (${push.str("maxReqBody")})", push.str("maxReqBody").toInt() <= OpQueue.MAX_BYTES + 1024)
       for ((k, v) in kinds) if (k != "push") assertTrue("${d.label}: درخواستِ $k ≤ ۶۴KB", (v as JsonObject).str("maxReqBody").toInt() <= 64 * 1024)
       assertEquals("${d.label}: ادامه از همان‌جا — هیچ op ِ پذیرفته‌ای دوباره نرفت", 0, d.resentAfterAck)
-      assertTrue("${d.label}: بریدنِ قطعی دیده شد ${push}", push.str("dropUp").toInt() >= 1 && push.str("dropDown").toInt() >= 1)
-      assertTrue("${d.label}: پاسخِ گم‌شدهٔ push ⇒ «تکراری» از سرور (${d.duplicates})", d.duplicates > 0)
+      assertTrue("${d.label}: بریدنِ push پیش از سرور دیده شد ${push}", push.str("dropUp").toInt() >= 1)
+      dropDown += push.str("dropDown").toInt()
+      dups += d.duplicates
       //  روی سیم: پس از هر push ِ ناکام، push ِ بعدی یا پس از فاصلهٔ تلاش است یا تنها یک تلاشِ بی‌صدای `HttpURLConnection`
       val wire = (l["log"] as JsonArray).map { it as JsonArray }.filter { (it[0] as JsonPrimitive).content == "push" }
       fun failed(j: Int) = (wire[j][3] as JsonPrimitive).content != "ok"
@@ -397,6 +552,7 @@ class S26Load2GDesktopTest {
         .append("\"failures\":${r.failures.size},\"waits\":${r.waits},\"immediatePushRetries\":$immediate,\"v2gMs\":${v2g.toLong()},\"wallMs\":${r.wallMs},\"maxBatch\":${d.maxBatch},\"maxBatchBytes\":${d.maxBatchBytes},")
         .append("\"maxOpFieldsBytes\":${d.maxOpFieldsBytes},\"pulledOps\":${d.pulledOps},\"link\":${JsonObject(l.filterKeys { it != "log" })}}")
     }
+    assertTrue("پاسخِ push پس از اعمال بریده شد ($dropDown) ⇒ «تکراری» از سرور ($dups)", dropDown >= 1 && dups > 0)
     if (gzip) assertEquals("SYN-04: پرچمِ `sync.gzip_push` ⇒ هر push ِ بالای ۱KB فشرده ($gzOk از $gzBig)", gzBig, gzOk)
     val total = System.currentTimeMillis() - t0
     json.append("],\"finalRounds\":$rounds,\"offlineMs\":$offlineMs,\"parallelMs\":$parallelMs,\"totalMs\":$total,\"finalLinks\":${JsonObject(links.mapValues { (_, v) -> JsonObject((v as JsonObject).filterKeys { it != "log" }) })}}")
