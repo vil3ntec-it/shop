@@ -510,4 +510,5 @@ module.exports = {
   PROTOCOL, MAX_OPS, MAX_BATCH_BYTES, PULL_MIN_BYTES, PULL_MAX_BYTES, SERVER_DEVICE,
   validate, merge, normPhone, push, pull, snapshot, status, report, bridge,
   listConflicts, resolveConflict, describe, clock, _resetClockForTests,
+  catchUp, lockedTx,   //  آینهٔ کاتالوگِ شعبه (`lib/branch-catalog.js`): همان پل و همان قفلِ حساب
 };

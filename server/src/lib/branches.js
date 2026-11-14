@@ -223,6 +223,16 @@ function resolve(access, claim) {
   return id;
 }
 
+/**
+ * فازِ ۳ — شعبهٔ یک درِ REST ِ شعبه‌شناس (`/shop/catalog`): از سرآیندِ سنجیدهٔ `X-Branch-Id` با دسترسیِ همین عضو (همان
+ * `resolve` ِ Sync v3)، هرگز از بدنه یا پارامتر. پرچمِ خاموش ⇒ همیشه اصلی و سرآیند خوانده هم نمی‌شود (همان امروز).
+ * ⇒ شناسهٔ شعبه ('' = اصلی)؛ نامجاز ⇒ ۴۰۳ `branch_forbidden`/`branch_required`.
+ */
+async function restOf(req) {
+  if (!(await enabled(req.shopId))) return MAIN;
+  return resolve(await accessOf(req.shopId, req.member), claimOf(req));
+}
+
 /** آیا هیچ عضوی در هیچ دکانی شعبه گرفته؟ (راهِ تندِ نگهبان: نه ⇒ همه شعبهٔ اصلی را دارند) */
 async function anyAssignments() {
   return !!(await one('SELECT 1 AS x FROM shop_member_branches LIMIT 1'));
@@ -236,6 +246,6 @@ function ctxFor(sync, branchId) {
 
 module.exports = {
   FLAG, MAIN, MAIN_NAME, MAX_BRANCHES, HEADER, enabled, idOf, claimOf, list, create, update, members, setMember,
-  accessOf, allows, reaches, resolve, anyAssignments, ctxFor,
+  accessOf, allows, reaches, resolve, restOf, anyAssignments, ctxFor,
   partitionOf: key.partitionOf, shopOf: key.shopOf,
 };

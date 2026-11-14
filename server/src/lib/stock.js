@@ -23,9 +23,15 @@
  *
  * ⛔ پرچمِ `shop.catalog` (تنظیماتِ زنده) پیش‌فرض خاموش است؛ خاموش ⇒ هیچ
  * ردیفی نوشته نمی‌شود.
+ *
+ * شعبه (فازِ ۳ ِ `docs/BRANCHES-fa.md`؛ INV-01 «به تفکیکِ شعبه»): هر `shopId` ِ این پرونده «کلیدِ موجودی» است — شناسهٔ
+ * دکان (شعبهٔ اصلی، همان امروز) یا `<دکان>#<شعبه>` (`branch-key`). SQL همیشه `shop_id = shopOf` و `branch_id = branchOf`؛
+ * پرچم و تنظیمات سطحِ دکان. کلیدِ یکتای دفتر/وظیفهٔ شعبهٔ غیرِ اصلی پیشوندِ `<شعبه>|` دارد (`keyIn`). روی شناسهٔ امروز
+ * `shopOf` همانی و `branchOf` همان '' است ⇒ دادهٔ امروز بایت‌به‌بایت همان.
  */
 const core = require('./stock-core');
 const { query } = require('../db');
+const bk = require('./branch-key');
 const { ulid } = require('./ulid');
 const { ApiError, badRequest, conflict } = require('../middleware/errors');
 
@@ -47,6 +53,8 @@ const DEFAULTS = Object.freeze({
 const AGG = '*sellable';
 
 const runOf = (c) => (c ? (t, p) => c.query(t, p) : query);
+/** کلیدِ یکتای دفتر (`source_key`) و وظیفه (`dedupe`) در یک شعبه: اصلی همان کلید؛ شعبهٔ دیگر `<شعبه>|<کلید>` */
+const keyIn = (sk, k) => (bk.isBranch(sk) ? `${bk.branchOf(sk)}|${k}` : k);
 const num = (v) => (v === null || v === undefined ? 0 : Number(v));
 
 function decode(v) {
@@ -61,12 +69,12 @@ function decode(v) {
 /** پرچمِ دکان: مقدارِ خودِ دکان بر `all` جلو می‌افتد؛ فقط `true` روشن است. */
 async function flagOf(shopId, c) {
   //  بیرون از تراکنش: حافظهٔ کوتاهِ `HOT_CACHE_MS` (پیش‌فرض خاموش؛ `lib/hot-cache.js`، باطل با نوشتنِ پرچم)
-  if (!c) return require('./hot-cache').get('flag', `${String(shopId)}\u0000${FLAG_KEY}\u0000p`, () => readFlag(shopId, null));
+  if (!c) return require('./hot-cache').get('flag', `${bk.shopOf(shopId)}\u0000${FLAG_KEY}\u0000p`, () => readFlag(shopId, null));
   return readFlag(shopId, c);
 }
 async function readFlag(shopId, c, key = FLAG_KEY) {
   const rows = (await runOf(c)(
-    'SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)', [key, 'all', String(shopId)]
+    'SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)', [key, 'all', bk.shopOf(shopId)]
   )).rows;
   let v;
   for (const r of rows) if (r.scope === 'all') v = decode(r.value);
@@ -75,7 +83,7 @@ async function readFlag(shopId, c, key = FLAG_KEY) {
 }
 /** پرچمِ نگه‌داشتنِ موجودی (`shop.stock_reserve`) با همان قاعده؛ درونِ تراکنش ⇒ همان اتصال، بی حافظه. */
 async function reserveFlagOf(shopId, c) {
-  if (!c) return require('./hot-cache').get('flag', `${String(shopId)}\u0000${RESERVE_FLAG_KEY}\u0000p`, () => readFlag(shopId, null, RESERVE_FLAG_KEY));
+  if (!c) return require('./hot-cache').get('flag', `${bk.shopOf(shopId)}\u0000${RESERVE_FLAG_KEY}\u0000p`, () => readFlag(shopId, null, RESERVE_FLAG_KEY));
   return readFlag(shopId, c, RESERVE_FLAG_KEY);
 }
 
@@ -86,7 +94,7 @@ function normSellable(v) {
 }
 
 async function settingsOf(shopId, c) {
-  const r = (await runOf(c)('SELECT * FROM catalog_settings WHERE shop_id=$1', [shopId])).rows[0];
+  const r = (await runOf(c)('SELECT * FROM catalog_settings WHERE shop_id=$1', [bk.shopOf(shopId)])).rows[0];
   if (!r) return { ...DEFAULTS, sellableLocations: [...DEFAULTS.sellableLocations] };
   return {
     sellableLocations: normSellable(r.sellable_locations),
@@ -204,13 +212,13 @@ function refusal(result) {
 //  مانده‌ها
 // ════════════════════════════════════════════════════════════════════
 
-/** pid ⇒ { location: {onHand, low} } — فقط شعبهٔ اصلی (چند شعبه: §۳۸.۳، هنوز API ندارد). */
+/** pid ⇒ { location: {onHand, low} } — فقط شعبهٔ همین کلید (اصلی: `branch_id = ''`، همان امروز). */
 async function levelsOf(c, shopId, ids) {
   const map = new Map();
   if (!ids.length) return map;
   const rows = (await runOf(c)(
     `SELECT product_id, location, on_hand_milli, low_milli FROM stock_levels
-      WHERE shop_id=$1 AND branch_id='' AND product_id = ANY($2::text[])`, [shopId, ids]
+      WHERE shop_id=$1 AND branch_id=$3 AND product_id = ANY($2::text[])`, [bk.shopOf(shopId), ids, bk.branchOf(shopId)]
   )).rows;
   for (const r of rows) {
     if (!map.has(r.product_id)) map.set(r.product_id, {});
@@ -244,10 +252,10 @@ function freeOf(lv, held, settings) {
 async function bump(c, shopId, productId, location, delta, at) {
   await c.query(
     `INSERT INTO stock_levels (shop_id, product_id, branch_id, location, on_hand_milli, updated_at)
-     VALUES ($1,$2,'',$3,$4,$5)
+     VALUES ($1,$2,$6,$3,$4,$5)
      ON CONFLICT (shop_id, product_id, branch_id, location) DO UPDATE
        SET on_hand_milli = stock_levels.on_hand_milli + excluded.on_hand_milli, updated_at = excluded.updated_at`,
-    [shopId, productId, location, delta, at]
+    [bk.shopOf(shopId), productId, location, delta, at, bk.branchOf(shopId)]
   );
 }
 
@@ -261,11 +269,11 @@ async function insertMove(c, shopId, m, at) {
     `INSERT INTO stock_moves (id, shop_id, product_id, branch_id, location, type, qty_milli,
        delta_on_hand_milli, delta_reserved_milli, mode, source, source_key, ref_type, ref_id,
        actor_type, actor_id, reason, note, at, created_at)
-     VALUES ($1,$2,$3,'',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+     VALUES ($1,$2,$3,$20,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
      ON CONFLICT (shop_id, source_key) DO NOTHING RETURNING id`,
-    [ulid(at), shopId, m.productId, m.location, m.type, m.qtyMilli, m.deltaOnHand || 0, m.deltaReserved || 0,
-      m.mode, m.source, m.sourceKey, m.refType || '', m.refId || '', m.actorType, m.actorId || '',
-      m.reason || '', m.note || '', m.at || at, at]
+    [ulid(at), bk.shopOf(shopId), m.productId, m.location, m.type, m.qtyMilli, m.deltaOnHand || 0, m.deltaReserved || 0,
+      m.mode, m.source, keyIn(shopId, m.sourceKey), m.refType || '', m.refId || '', m.actorType, m.actorId || '',
+      m.reason || '', m.note || '', m.at || at, at, bk.branchOf(shopId)]
   );
   return r.rows.length > 0;
 }
@@ -273,10 +281,10 @@ async function insertMove(c, shopId, m, at) {
 async function openTask(c, shopId, { kind, productId, location = '', dedupe, detail = {} }, at) {
   await c.query(
     `INSERT INTO stock_tasks (id, shop_id, kind, product_id, branch_id, location, dedupe, detail, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,'',$5,$6,$7::jsonb,$8,$8)
+     VALUES ($1,$2,$3,$4,$9,$5,$6,$7::jsonb,$8,$8)
      ON CONFLICT (shop_id, dedupe) WHERE status = 'open'
      DO UPDATE SET hits = stock_tasks.hits + 1, detail = excluded.detail, updated_at = excluded.updated_at`,
-    [ulid(at), shopId, kind, productId, location, dedupe, JSON.stringify(detail), at]
+    [ulid(at), bk.shopOf(shopId), kind, productId, location, keyIn(shopId, dedupe), JSON.stringify(detail), at, bk.branchOf(shopId)]
   );
 }
 
@@ -326,7 +334,7 @@ async function checkProducts(c, shopId, ids, settings, at) {
   const lvs = await levelsOf(c, shopId, ids);
   const mins = new Map((await c.query(
     'SELECT product_id, min_stock_milli FROM catalog_products WHERE shop_id=$1 AND product_id = ANY($2::text[])',
-    [shopId, ids]
+    [bk.shopOf(shopId), ids]
   )).rows.map((r) => [r.product_id, num(r.min_stock_milli)]));
   for (const pid of ids) {
     const lv = lvs.get(pid) || {};
@@ -346,7 +354,8 @@ async function checkProducts(c, shopId, ids, settings, at) {
       }
     }
   }
-  await require('./stock-reserve').afterMovesIn(c, shopId, ids, settings, at);
+  //  نگه‌داشتهٔ سفارشِ آنلاین فقط شعبهٔ اصلی (تصمیمِ ۱۱: «محل در فروش همیشه محلِ اصلی»)
+  if (!bk.isBranch(shopId)) await require('./stock-reserve').afterMovesIn(c, shopId, ids, settings, at);
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -416,19 +425,20 @@ async function check(c, shopId, { lines, settings, names = new Map(), held = nul
  * بازپخش و با مانده‌ها سنجیده می‌شود.
  */
 async function reconcile(shopId, { productId = '' } = {}) {
-  const p = productId ? [shopId, productId] : [shopId];
-  const pf = productId ? 'AND product_id=$2' : '';
+  //  همان شعبهٔ کلید (اصلی: '' — همهٔ ردیف‌های امروز)
+  const p = productId ? [bk.shopOf(shopId), bk.branchOf(shopId), productId] : [bk.shopOf(shopId), bk.branchOf(shopId)];
+  const pf = productId ? 'AND product_id=$3' : '';
   const ledger = (await query(
     `SELECT product_id, location, COALESCE(SUM(delta_on_hand_milli),0)::bigint AS on_hand,
             COALESCE(SUM(delta_reserved_milli),0)::bigint AS reserved, COUNT(*)::int AS moves
-       FROM stock_moves WHERE shop_id=$1 ${pf} GROUP BY product_id, location`, p
+       FROM stock_moves WHERE shop_id=$1 AND branch_id=$2 ${pf} GROUP BY product_id, location`, p
   )).rows;
   const levels = (await query(
-    `SELECT product_id, location, on_hand_milli FROM stock_levels WHERE shop_id=$1 AND branch_id='' ${pf}`, p
+    `SELECT product_id, location, on_hand_milli FROM stock_levels WHERE shop_id=$1 AND branch_id=$2 ${pf}`, p
   )).rows;
   const holds = (await query(
     `SELECT product_id, COALESCE(SUM(qty_milli),0)::bigint AS q FROM stock_reservations
-      WHERE shop_id=$1 AND status='held' ${pf} GROUP BY product_id`, p
+      WHERE shop_id=$1 AND branch_id=$2 AND status='held' ${pf} GROUP BY product_id`, p
   )).rows;
 
   const key = (a, b) => `${a}\u0000${b}`;
@@ -461,7 +471,7 @@ async function reconcile(shopId, { productId = '' } = {}) {
   if (productId) {
     const docs = (await query(
       `SELECT source_key, type, qty_milli, location, actor_type, actor_id, reason, at FROM stock_moves
-        WHERE shop_id=$1 AND product_id=$2 ORDER BY created_at, id`, [shopId, productId]
+        WHERE shop_id=$1 AND branch_id=$3 AND product_id=$2 ORDER BY created_at, id`, [bk.shopOf(shopId), productId, bk.branchOf(shopId)]
     )).rows;
     let book = core.emptyBook();
     for (const m of docs) {
@@ -512,10 +522,10 @@ async function rebuild(shopId, { apply = false, by = '' } = {}) {
     await lock(c, shopId);
     const ledger = (await c.query(
       `SELECT product_id, location, COALESCE(SUM(delta_on_hand_milli),0)::bigint AS on_hand, COUNT(*)::int AS n
-         FROM stock_moves WHERE shop_id=$1 AND location <> '' GROUP BY product_id, location`, [shopId]
+         FROM stock_moves WHERE shop_id=$1 AND branch_id=$2 AND location <> '' GROUP BY product_id, location`, [bk.shopOf(shopId), bk.branchOf(shopId)]
     )).rows;
     const levels = (await c.query(
-      `SELECT product_id, location, on_hand_milli FROM stock_levels WHERE shop_id=$1 AND branch_id=''`, [shopId]
+      `SELECT product_id, location, on_hand_milli FROM stock_levels WHERE shop_id=$1 AND branch_id=$2`, [bk.shopOf(shopId), bk.branchOf(shopId)]
     )).rows;
     const key = (a, b) => `${a}\u0000${b}`;
     const led = new Map(ledger.map((r) => [key(r.product_id, r.location), num(r.on_hand)]));
@@ -534,10 +544,10 @@ async function rebuild(shopId, { apply = false, by = '' } = {}) {
     for (const f of fixed) {
       await c.query(
         `INSERT INTO stock_levels (shop_id, product_id, branch_id, location, on_hand_milli, updated_at)
-         VALUES ($1,$2,'',$3,$4,$5)
+         VALUES ($1,$2,$6,$3,$4,$5)
          ON CONFLICT (shop_id, product_id, branch_id, location) DO UPDATE
            SET on_hand_milli = excluded.on_hand_milli, updated_at = excluded.updated_at`,
-        [shopId, f.productId, f.location, f.ledgerMilli, at]
+        [bk.shopOf(shopId), f.productId, f.location, f.ledgerMilli, at, bk.branchOf(shopId)]
       );
     }
     await require('./audit').logIn(c, {
@@ -552,7 +562,7 @@ module.exports = {
   FLAG_KEY, RESERVE_FLAG_KEY, LOCATIONS, SELLABLE_CHOICES, DEFAULTS,
   flagOf, reserveFlagOf, settingsOf, saveSettings, lock, decide,
   levelsOf, freeOf, sellableOnHand, onHandAt, fmtMilli,
-  insertMove, postMove, openTask, checkProducts,
+  insertMove, postMove, openTask, checkProducts, keyIn,
   check, outOfStock,
   reconcile, rebuild,
 };

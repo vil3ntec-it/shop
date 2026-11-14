@@ -88,7 +88,8 @@ async function applyOne(s, ctx, op, { deviceId, origin, cursor = 0, t, groups = 
   if (dup) return retried(s, ctx, op, origin, { op_id: op.op_id, status: 'duplicate', server_seq: Number(dup.server_seq) }, hideContact);
 
   const row = await s.load(ctx, op.table, op.row_id);
-  const denied = await require('./sync-v3-roles').denied(c, ctx, op, origin, plan) || await authorize(c, ctx, op, row, deviceId, origin, groups, plan);
+  //  شعبه (فازِ ۳): کاتالوگِ دکان فقط از شعبهٔ اصلی — پیش از هر داوریِ دیگر تا دلیل همیشه همین باشد (`lib/branch-catalog.js`)
+  const denied = require('./branch-catalog').judge(ctx, op, origin) || await require('./sync-v3-roles').denied(c, ctx, op, origin, plan) || await authorize(c, ctx, op, row, deviceId, origin, groups, plan);
   if (denied) {
     const out = { op_id: op.op_id, status: 'rejected', reason: typeof denied === 'string' ? denied : denied.reason };
     //  ردیفِ صندوق بعد از برگشتِ savepoint نوشته می‌شود (`push`)؛ در پاسخ نمی‌آید
@@ -171,6 +172,7 @@ async function applyServerOp(s, ctx, raw, t) {
 }
 
 async function after(s, ctx, op, res, { eff, origin, t }) {
+  if (origin === 'server' && require('./branch-catalog').isMirrorOp(op)) return;   //  آینهٔ کاتالوگِ شعبه: پیامدها در بخشِ اصلی سنجیده شد
   const data = res.row.data;
   const set = (res.effect && res.effect.set) || {};
 

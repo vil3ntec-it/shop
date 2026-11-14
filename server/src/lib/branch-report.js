@@ -8,6 +8,9 @@
  *   عدد    ⇐ برای هر شعبه همان خلاصهٔ گزارشِ خودکارِ صاحب (`owner-report.ledgerOf` + `summarize`، هستهٔ مشترکِ
  *            `report-core`)، فقط از دفترِ همگام‌شدهٔ **همان** شعبه: اصلی = حسابِ دکان با قالبِ امروزش (v1/v3)، شعبهٔ
  *            دیگر = بخشِ `<دکان>#<شعبه>` (همیشه v3). روزِ محلیِ دکان. نه ادغامِ کالا/مشتری میانِ شعبه‌ها.
+ *   کالا   ⇐ فازِ ۳: تعریفِ کالا مالِ کلِ دکان ⇒ نامِ کالاهای شعبهٔ دیگر از دفترِ اصلی (`owner-report.productsOf`)؛
+ *            `lowStock` ِ هر شعبه از موجودیِ سرورِ همان شعبه (`shop.catalog` خاموش ⇒ null) — در `totals` نمی‌آید (شمارِ
+ *            کالا جمع‌شدنی نیست؛ یک کالا در دو شعبه دو بار شمرده می‌شد).
  *   سقف    ⇐ بازه ≤ ۳۱ روز (همان `branches-report.rangeOf`)؛ شمارِ شعبه ≤ `branches.MAX_BRANCHES` + اصلی. فقط خواندنی.
  */
 const rep = require('./owner-report');
@@ -18,11 +21,16 @@ const SUM_KEYS = Object.freeze(['invoices', 'sales', 'discount', 'returnCount', 
 
 async function summaryOf(shopId, branchId, w, zone) {
   const isMain = branchId === branches.MAIN;
-  const L = await rep.ledgerOf(branches.partitionOf(shopId, branchId), w, isMain ? null : 'v3');
-  const s = rep.summarize(L.raw, w, zone, { partial: L.partial, lowStock: null });
+  const sk = branches.partitionOf(shopId, branchId);
+  const L = await rep.ledgerOf(sk, w, isMain ? null : 'v3');
+  if (!isMain) {
+    const pids = [...new Set([...L.raw.saleItems, ...L.raw.returns].map((x) => String(x.productId || '')).filter(Boolean))];
+    L.raw.products = await rep.productsOf(shopId, pids);
+  }
+  const s = rep.summarize(L.raw, w, zone, { partial: L.partial, lowStock: await rep.lowStockOf(sk) });
   return {
     ...Object.fromEntries(SUM_KEYS.map((k) => [k, Number(s[k] || 0)])),
-    payments: s.payments, topProducts: s.topProducts, partial: !!s.partial,
+    payments: s.payments, topProducts: s.topProducts, lowStock: s.lowStock, partial: !!s.partial,
   };
 }
 
