@@ -31,8 +31,8 @@ class BranchesStateTest {
 
   private fun json(s: String) = Json.parseToJsonElement(s).jsonObject
 
-  private fun book(owner: Boolean, mine: String, branches: String): BranchBook.Answer =
-    BranchBook.of(json("""{"enabled":true,"all":$owner,"mine":$mine,"branches":$branches}"""))
+  private fun book(owner: Boolean, mine: String, branches: String): ApiResult<BranchBook.Answer> =
+    ApiResult.Success(BranchBook.of(json("""{"enabled":true,"all":$owner,"mine":$mine,"branches":$branches}""")))
 
   private val three = """[{"id":"","name":"","status":"active"},{"id":"$A","name":"الف","status":"active"},{"id":"$B","name":"ب","status":"archived"}]"""
 
