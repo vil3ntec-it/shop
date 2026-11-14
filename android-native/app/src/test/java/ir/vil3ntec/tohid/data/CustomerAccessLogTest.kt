@@ -131,8 +131,9 @@ class CustomerAccessLogTest {
     //  CRM-15 (د۱۸): همان شاخه با بازگشتِ `try` — رسید ⇒ true؛ ردِ همیشگی ⇒ پرتاب؛ بی‌اینترنت ⇒ صفِ دستگاه، و هرگز دفتر
     val back = panel.indexOf("return@runCatching try {", ready)
     val post = panel.indexOf("Backend.api(context).post(CustomerAccess.PATH, body)")
-    //  CRM-15 (د۱۸): پس از post، شکستِ دوباره‌پذیر ⇒ صفِ دستگاه (`CustomerAccessOutboxAndroid`)؛ هنوز پیش از دفتر
-    val done = panel.indexOf("CustomerAccessOutboxAndroid.add(", post)
+    val done = panel.indexOf("true", post)
+    val rethrow = panel.indexOf("if (!e.retryable) throw e", post)
+    val queued = panel.indexOf("CustomerAccessOutboxAndroid.add(context, customerId, kind, System.currentTimeMillis())", post)
     val ledger = panel.indexOf("store.update { d -> CustomerAccessLog.record(")
     assertTrue("حالتِ آموزشی پیش از هر راهی", training in 0 until branch)
     assertTrue(
