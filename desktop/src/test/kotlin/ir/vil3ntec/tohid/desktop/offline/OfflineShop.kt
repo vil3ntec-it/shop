@@ -163,7 +163,8 @@ internal class ShopDevice(
   val deviceId: String,
   val userId: String,
   val seller: String,
-  apiUrl: String,
+  /** نشانیِ سرور — S26 پس از قطعی همان دستگاه را به خطِ 2G ِ خودش می‌برد (`OfflineBackend` ⇐ `/link`) */
+  @Volatile var apiUrl: String,
   val tokens: MemTokens,
   root: File,
   appVersion: String,
@@ -185,6 +186,15 @@ internal class ShopDevice(
   var maxBatchBytes = 0
   var duplicates = 0
   var refused = 0
+  /** S26: بزرگ‌ترین `fields` ِ یک op (سقفِ سرور ۶۴KB، `MAX_FIELDS_BYTES`) */
+  var maxOpFieldsBytes = 0
+  /** S26: opی که سرور پیش‌تر پذیرفته بود و دوباره در دسته رفت — «ادامه از همان‌جا» یعنی صفر */
+  var resentAfterAck = 0
+  /** S26: opهای پذیرفته (applied/duplicate) تا این‌جا */
+  val acked = HashSet<String>()
+  /** S26: opهای گرفته‌شده از دیگران و این‌که آخرین pull گفت «باز هست» */
+  var pulledOps = 0
+  var lastHasMore = false
   var saveMs = 0L
   var saves = 0
   var slowestSaveMs = 0L
@@ -257,6 +267,8 @@ internal class ShopDevice(
     while (rounds < 50) {
       rounds++
       val got = client.pull(deviceId, state.cursor)
+      pulledOps += got.ops.size
+      lastHasMore = got.hasMore
       if (got.ops.isNotEmpty()) commit.absorb(got.ops, ledger, got.cursor) { ledger = it }
       state.cursor = got.cursor
       if (got.serverSchema > 0) state.serverSchema = got.serverSchema
@@ -273,6 +285,8 @@ internal class ShopDevice(
       if (batch.isEmpty()) break
       maxBatch = maxOf(maxBatch, batch.size)
       maxBatchBytes = maxOf(maxBatchBytes, batch.sumOf { it.toJson().toString().toByteArray().size + 1 })
+      maxOpFieldsBytes = maxOf(maxOpFieldsBytes, batch.maxOf { (it.toJson()["fields"] ?: JsonObject(emptyMap())).toString().toByteArray().size })
+      resentAfterAck += batch.count { it.opId in acked }
       pushes++
       val out = client.push(deviceId, batch, queue.size(), caps = true, schema = LedgerDiff.wireSchema(state.serverSchema))
       state.serverSchema = out.serverSchema
@@ -280,6 +294,7 @@ internal class ShopDevice(
       duplicates += out.results.count { it.status == "duplicate" }
       val rejected = out.results.filter { !it.accepted }
       if (accepted.isNotEmpty()) queue.ack(accepted)
+      acked += accepted
       if (rejected.isNotEmpty()) {
         refused += rejected.size
         rejected.groupBy { it.reason.ifBlank { "rejected" } }.forEach { (why, rs) ->
