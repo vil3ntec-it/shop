@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,7 +40,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrA11y
@@ -53,7 +53,6 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
-import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Chip
 import ir.vil3ntec.tohid.ui.v3.V3ChipRow
@@ -65,7 +64,8 @@ import ir.vil3ntec.tohid.ui.v3.V3IconTile
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Segmented
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
-import ir.vil3ntec.tohid.ui.v3.V3StatusPill
+import ir.vil3ntec.tohid.ui.v3.V3AmountStatus
+import ir.vil3ntec.tohid.ui.v3.V3PillAction
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
@@ -242,18 +242,26 @@ internal fun PeriodCard(
   }
 }
 
-/** ردیفِ یک فاکتور — «#۱۲۴۵ · نام»، ساعت · اقلام، قرصِ پرداخت و مبلغ؛ لغوشده خط‌خورده. کشیدن ⇐ برگشت/لغو؛ نگه داشتن ⇐ همهٔ کارها */
+/**
+ *  ردیفِ یک فاکتور (سادهٔ e-rows-63d): عنوانِ معنادار (مشتری، وگرنه نامِ کالاها)، «ساعت · اقلام · #شماره»، و در پایان
+ *  «مبلغ • وضعیت» به متنِ آرام — نقدیِ عادی بی وضعیت، نسیه کهربایی، لغوشده خط‌خورده. زدن ⇐ فاکتور؛ کشیدن ⇐ برگشت/لغو؛
+ *  نگه داشتن ⇐ همهٔ کارها (`SaleActionsSheet`).
+ */
 @Composable
 internal fun InvoiceRow(s: Sale, ctx: RowCtx, first: Boolean, last: Boolean, withDate: Boolean) {
   val c = PhoneV3.colors
-  val row = remember(s, ctx.look, ctx.returnsV2, withDate, ir.vil3ntec.tohid.core.i18n.I18n.lang) { HistoryModel.row(ctx.d, s, ctx.returnsV2, look = ctx.look, withDate = withDate) }
+  val row = remember(s, ctx.look, ctx.returnsV2, withDate, ctx.today, ir.vil3ntec.tohid.core.i18n.I18n.lang) {
+    HistoryModel.row(ctx.d, s, ctx.returnsV2, look = ctx.look, withDate = withDate, today = ctx.today)
+  }
+  val amount = remember(row.amount, ir.vil3ntec.tohid.core.i18n.I18n.lang) { PhoneSaleText.amount(row.amount) }
   val cancelled = row.state == SaleState.CANCELLED
   val a = ctx.actions
   Column(Modifier.clip(groupShape(first, last)).background(c.card)) {
     if (!first) V3Divider(start = 64.dp)
     V3ListRow(
-      title = "${row.number} · ${row.name}",
+      title = row.title,
       subtitle = row.subtitle,
+      subtitleLines = 1,
       leading = {
         V3IconTile(
           if (cancelled) Icons.Outlined.Block else Icons.AutoMirrored.Outlined.ReceiptLong,
@@ -266,19 +274,8 @@ internal fun InvoiceRow(s: Sale, ctx: RowCtx, first: Boolean, last: Boolean, wit
           danger = cancelled,
         )
       },
-      trailing = {
-        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-          Text(
-            PhoneSaleText.amount(row.amount),
-            style = V3Type.headline,
-            color = if (cancelled) c.inkMuted else c.ink,
-            textDecoration = if (cancelled) TextDecoration.LineThrough else null,
-          )
-          V3StatusPill(payStatus(row), row.payLabel)
-          //  PAY-07: وضعیتِ پرداختِ غیرنقد، فقط وقتی «تأییدشده» نیست
-          row.payState?.let { V3StatusPill(PayStatusText.pill(it), PayStatusText.name(it)) }
-        }
-      },
+      //  «۳۰۰ ؋ • لغوشده» — بی قرص؛ PAY-07 «در انتظار/ناموفق» در همان متن با رنگِ توجه
+      trailing = { V3AmountStatus(amount, row.status, Modifier.widthIn(max = 168.dp), struck = cancelled) },
       chevron = false,
       endActions = buildList {
         if (row.canReturn) add(V3SwipeAction(Icons.AutoMirrored.Outlined.AssignmentReturn, if (ctx.returnsV2) StrSale.returnOrExchange else StrSale.returnWord) { a.ret(row.id) })
@@ -296,7 +293,7 @@ internal fun InvoiceRow(s: Sale, ctx: RowCtx, first: Boolean, last: Boolean, wit
 @Composable
 internal fun SaleActionsSheet(row: HistoryRow, canCancel: Boolean, returnsV2: Boolean, actions: HistoryActions, askCancel: Boolean = false, onClose: () -> Unit) {
   val chosen = remember { booleanArrayOf(false) }
-  V3Sheet(onDismiss = { if (!chosen[0]) onClose() }, title = "${row.number} · ${row.name}", detents = false) { closer ->
+  V3Sheet(onDismiss = { if (!chosen[0]) onClose() }, title = "${row.title} · ${row.number}", detents = false) { closer ->
     fun pick(go: () -> Unit) { chosen[0] = true; closer.close { onClose(); go() } }
     V3ListRow(StrSale.viewInvoice, icon = Icons.AutoMirrored.Outlined.ReceiptLong, hue = V3Hue.BLUE, onClick = { pick { actions.open(row.id) } })
     if (row.canReturn) V3ListRow(
@@ -369,12 +366,19 @@ internal fun PrintBannerCard(b: PrintBanner) {
   }
 }
 
+/**
+ *  دورهٔ بی فاکتور: نوشتهٔ آرام بی کادر، و گامِ بعدیِ روشن زیرش («فروشِ تازه» یا «پاک کردنِ فیلترها») — نه فقط
+ *  «هنوز فاکتوری نیست».
+ */
 @Composable
-internal fun EmptyLine(text: String) {
+internal fun EmptyLine(text: String, action: String? = null, onAction: (() -> Unit)? = null) {
   val c = PhoneV3.colors
-  val shape = RoundedCornerShape(PhoneV3.groupRadius)
-  Box(Modifier.fillMaxWidth().clip(shape).background(c.card).border(1.dp, c.hairline, shape).padding(18.dp), contentAlignment = Alignment.Center) {
+  Column(Modifier.fillMaxWidth().padding(vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
     Text(text, style = V3Type.callout, color = c.inkMuted)
+    if (action != null && onAction != null) {
+      Spacer(Modifier.height(8.dp))
+      V3PillAction(action, onAction)
+    }
   }
 }
 
@@ -383,13 +387,6 @@ internal fun MoreButton(text: String, onClick: () -> Unit) {
   Box(Modifier.fillMaxWidth().padding(top = 8.dp)) {
     V3Button(text, onClick, kind = V3ButtonKind.NEUTRAL, height = 40.dp)
   }
-}
-
-private fun payStatus(row: HistoryRow): V3Status = when {
-  row.state == SaleState.CANCELLED -> V3Status.CANCELLED
-  row.state == SaleState.ONLINE -> V3Status.IN_DELIVERY
-  row.credit -> V3Status.WARNING
-  else -> V3Status.DELIVERED
 }
 
 private fun groupShape(first: Boolean, last: Boolean) = RoundedCornerShape(

@@ -35,6 +35,8 @@ import ir.vil3ntec.tohid.JALALI_MONTHS
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrReports
+import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.data.CustomerCrm
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.plain
@@ -129,9 +131,13 @@ internal fun ReceiptsScreen(
         if (shown.isEmpty()) {
           item(key = "empty") {
             V3Card {
+              //  گامِ بعدیِ روشن (e-rows-63d): با سال/ماه/قرض‌دارِ برگزیده ⇐ «نمایشِ همه»
+              val narrowed = year != null || month != null || who != null
               V3EmptyState(
                 Icons.AutoMirrored.Outlined.ReceiptLong,
                 if (tab == ReceiptsModel.Tab.DEBTORS) StrMoney.noReceipts else StrMoney.noExpensesFiltered,
+                action = if (narrowed) StrReports.showAll else null,
+                onAction = if (narrowed) ({ year = null; month = null; who = null }) else null,
               )
             }
           }
@@ -188,7 +194,8 @@ private fun ReceiptRow(row: ReceiptsModel.Row, first: Boolean, last: Boolean, ta
     androidx.compose.foundation.layout.Column {
       V3ListRow(
         title = row.title,
-        subtitle = listOf(MoneyText.date(row.date), row.note).filter { it.isNotBlank() }.joinToString(" — "),
+        //  سادهٔ e-rows-63d: تاریخِ کوتاه («دیروز»، «۲۸ میزان»)
+        subtitle = remember(row.date, row.note, I18n.lang) { listOf(MoneyText.short(row.date, todayIso()), row.note).filter { it.isNotBlank() }.joinToString(" · ") },
         icon = if (receipt) Icons.Outlined.SouthWest else Icons.Outlined.Payments,
         hue = if (receipt) V3Modules.hueOf("receipts") else V3Modules.hueOf("expenses"),
         trailing = {
