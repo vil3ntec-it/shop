@@ -250,6 +250,17 @@ async function salesLedgerOf(shopId, w, only = null) {
   return L;
 }
 
+/**
+ * تعریفِ کالاها از دفترِ **شعبهٔ اصلی** با قالبِ امروزِ دکان (کاتالوگِ مشترک — فازِ ۳ ِ شعبه، `lib/branch-report.js`):
+ * نامِ کالای گزارشِ شعبه همان نامِ دکان است، حتی پیش از رسیدنِ آینه به بخشِ شعبه. فقط خواندنی.
+ */
+async function productsOf(shopId, pids) {
+  if (!pids.length) return [];
+  const fmt = (await require('./stock').settingsOf(shopId)).syncSource === 'v3' ? 'v3' : 'v1';
+  const rows = (await rowsById(STORES[fmt], 'products', shopId, pids)).slice(0, MAX_ROWS);
+  return rows.map((r) => legacyRow(fmt, 'products', r)).filter(Boolean);
+}
+
 /** دفترِ بازه: فاکتورها و برگشتی‌های بازه، فاکتورِ هر برگشت، قلم‌ها و نامِ کالاها. */
 async function ledgerOf(shopId, w, only = null) {
   const L = await salesLedgerOf(shopId, w, only);
@@ -320,17 +331,21 @@ function profitOf(raw, w, zone, { partial = false, netSales = null } = {}) {
   };
 }
 
-/** کالای کم‌موجود از موجودیِ سرور (همان قاعدهٔ `stock.checkProducts`)؛ بی `shop.catalog` ⇒ null. */
+/**
+ * کالای کم‌موجود از موجودیِ سرور (همان قاعدهٔ `stock.checkProducts`)؛ بی `shop.catalog` ⇒ null. شعبه (فازِ ۳): کلیدِ
+ * `<دکان>#<شعبه>` ⇒ همان کاتالوگِ مشترک با موجودیِ همان شعبه؛ شناسهٔ دکان ⇒ شعبهٔ اصلی (همان امروز).
+ */
 async function lowStockOf(shopId) {
   const stock = require('./stock');
+  const bk = require('./branch-key');
   if (!(await stock.flagOf(shopId))) return null;
   const st = await stock.settingsOf(shopId);
   const r = await one(
     `SELECT COUNT(*)::int AS n FROM catalog_products p
       WHERE p.shop_id=$1 AND p.deleted=false AND p.active=true AND p.min_stock_milli > 0
-        AND COALESCE((SELECT SUM(l.on_hand_milli) FROM stock_levels l WHERE l.shop_id=p.shop_id AND l.branch_id=''
+        AND COALESCE((SELECT SUM(l.on_hand_milli) FROM stock_levels l WHERE l.shop_id=p.shop_id AND l.branch_id=$3
                        AND l.product_id=p.product_id AND l.location = ANY($2::text[])), 0) <= p.min_stock_milli`,
-    [shopId, st.sellableLocations]
+    [bk.shopOf(shopId), st.sellableLocations, bk.branchOf(shopId)]
   );
   return r ? Number(r.n) : 0;
 }
@@ -537,6 +552,6 @@ function stop() {
 module.exports = {
   FLAG_KEY, PROFIT_FLAG, COST_DECIDED, FREQUENCIES, CHANNELS, CATCHUP_MS, MORNING_BEFORE, MAX_ROWS, DEFAULTS,
   flagOf, profitFlagOf, settingsOf, saveSettings, parseSettings, dueOf, clockFor, summarize, profitOf, buildSummary, render, timezoneOf,
-  salesLedgerOf, ledgerOf, CREATED,
+  salesLedgerOf, ledgerOf, CREATED, productsOf, lowStockOf,
   runShop, sweep, viewOf, start, stop,
 };

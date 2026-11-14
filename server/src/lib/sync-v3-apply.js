@@ -42,6 +42,7 @@ function openTask(s, ctx, { kind, table, rowId, dedupe, detail, t }) {
  */
 async function authorize(c, ctx, op, row, deviceId, origin, groups = null, plan = null) {
   if (origin === 'v1' || origin === 'server') return null;      //  v1 خودش سنجیده بود (و `v1Guard`)
+  { const bc = require('./branch-catalog').judge(ctx, op, origin); if (bc) return bc; }   //  شعبه (فازِ ۳): کاتالوگ فقط از شعبهٔ اصلی
   { const pu = await require('./product-unit-rules').judgeV3(c, ctx, op, row); if (pu) return pu; }   //  PRD-07: واحدِ گردش‌دار و ضریبِ ناجور (صاحب هم)
   const role = ctx.role;
   const own = !!row && row.created_by === deviceId;
@@ -171,6 +172,7 @@ async function applyServerOp(s, ctx, raw, t) {
 }
 
 async function after(s, ctx, op, res, { eff, origin, t }) {
+  if (origin === 'server' && require('./branch-catalog').isMirrorOp(op)) return;   //  آینهٔ کاتالوگِ شعبه: پیامدها در بخشِ اصلی سنجیده شد
   const data = res.row.data;
   const set = (res.effect && res.effect.set) || {};
 

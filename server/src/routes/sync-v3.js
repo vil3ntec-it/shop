@@ -42,6 +42,7 @@ const contact = require('../lib/customer-contact');
 const creditReview = require('../lib/credit-limit-review');
 const tillOpUser = require('../lib/till-op-user');
 const branches = require('../lib/branches');
+const branchCatalog = require('../lib/branch-catalog');
 
 const gzip = promisify(zlib.gzip);
 const router = express.Router();
@@ -145,6 +146,8 @@ router.post('/push', requireSyncWrite, async (req, res, next) => {
 
 router.get('/pull', async (req, res, next) => {
   try {
+    //  شعبه (فازِ ۳): کاتالوگِ دکان پیش از خواندنِ بخش در بخشِ همین شعبه (`lib/branch-catalog.js`)؛ بیشتر ⇒ `has_more`
+    const cm = req.syncBranch ? await branchCatalog.mirrorSoft(req.syncBranch) : null;
     const out = await sync.pull(ctxOf(req), {
       deviceId: deviceOf(req.query),
       since: Number(req.query?.since || 0),
@@ -154,6 +157,7 @@ router.get('/pull', async (req, res, next) => {
     //  §۹.۵: «دورانِ» سرور کنارِ هر pull — عوض شده ⇒ برنامه opهای گم‌شده را دوباره می‌فرستد
     //  (`lib/sync-epoch.js`، `SyncV3Engine.pullOnce`). خاموش ⇒ همان پاسخِ پیشین.
     if (config.syncEpoch.enabled) out.epoch = await syncEpoch.forAccount(ctxOf(req), 'v3');
+    if (cm && cm.more) out.has_more = true;
     //  SYN-04: «push ات را فشرده بفرست» فقط با پرچمِ دکانِ `sync.gzip_push` (همان پرچمِ v1؛ سرور بدنهٔ فشرده را همیشه باز می‌کند)
     if ((await require('../lib/sync-v1-keep').flags(req.sync)).gzipPush) out.gzip_push = true;
     if (contact.touches(out.ops) && await contact.hiddenForReq(req)) out.ops = contact.omitV3Ops(out.ops);
@@ -163,6 +167,7 @@ router.get('/pull', async (req, res, next) => {
 
 router.get('/snapshot', async (req, res, next) => {
   try {
+    if (req.syncBranch) await branchCatalog.mirrorSoft(req.syncBranch, { rounds: 40 });   //  شعبه: همهٔ کاتالوگِ دکان (تا ۲۰ هزار ردیف)
     const snap = await sync.snapshot(ctxOf(req));
     if (await contact.hiddenForReq(req)) snap.tables = contact.omitTables(snap.tables);
     await send(req, res, { ok: true, ...snap });
