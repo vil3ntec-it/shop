@@ -2161,6 +2161,62 @@ web/           اپ وب فعلی (index.html و license/*.js)، با انتقا
   - STF-09: `AuditChainTest`، `AuditChainVectorsTest`، `AuditSealTest`.
   - STF-11: `server/test/staff-code.test.js`، `server/test/staff-key-life.test.js`، `StaffCodeTest`.
 
+- **S154 — گزارش و تحلیل (RPT):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - RPT-01: `ReportCoreVectorsTest`، `ReportFreshModelTest`، `server/test/report-core.test.js`.
+  - RPT-05: `ReportEngineTest`، `DashboardEngineTest`.
+  - RPT-06: `server/test/report-core.test.js`، `ReportCoreVectorsTest`، `ReportFreshModelTest`.
+  - RPT-07: `ReportEngineTest`.
+  - RPT-08: `SalesHeatmapTest`، `SalesHeatmapVectorsTest`، `HeatmapModelTest`.
+  - RPT-11 (بخشی: Excel و PDF؛ چاپ روی چاپگرِ واقعی سنجیده نشده): `ImagePdfTest`، `ImagePdfVectorsTest`، `XlsxTest`.
+  - RPT-12: `server/test/owner-report.test.js`، `OwnerReportPlanTest`.
+  - RPT-13: `ReportRowDrillTest`، `ReportDrillTest`، `ReportDrillVectorsTest`.
+  - RPT-14 (بخشی: ساخته؛ دیدن روی گوشیِ واقعی مانده): `server/test/storefront-funnel.test.js`، `server/test/web-store-p1.mjs`، `OnlineReportPageTest`.
+  - RPT-16 (بخشی: پرسش‌های آماده؛ پرسشِ آزاد با عاملِ هوش مصنوعی جداست): `SimpleAskTest`، `SimpleAskEngineTest`.
+  - RPT-17: `DocGapsTest`، `DocGapsSheetTest`، `DocGapsV3WiringTest`.
+  - RPT-18 (بخشی: سرور و هسته؛ صفحهٔ برنامه مانده): `server/test/branches-report.test.js`، `server/test/shop-branches-stock.test.js`، `BranchesReportTest`.
+
+- **S155 — آفلاین و همگام‌سازی (SYN):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - SYN-03: `server/test/sync-v3.test.js`، `SyncV1CoreTest`.
+  - SYN-08: `SyncGuardTest`، `server/test/sync-v3-client.test.js`.
+  - SYN-10: `SyncGuardTest`، `server/test/e2e/sync.e2e.mjs`، `server/test/e2e/security.e2e.mjs`.
+  - SYN-11: `server/test/sync-v3-convert.test.js`.
+  - SYN-13: `server/test/sync-v3.test.js`، `server/test/sync-v3-convert.test.js`.
+  - SYN-14 (بخشی: ادامه از جای قطع و اولویتِ پایین‌تر؛ قطعِ رادیویی روی گوشیِ واقعی سنجیده نشده): `PhotoSyncPlanTest`.
+
+- **S156 — امنیت (SEC):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - SEC-02 (بخشی: زنجیرهٔ فاکتورهای فروش و ابزارِ سنجش؛ سندهای دیگر مانده): `DocChainTest`، `DocChainVectorsTest`، `DocChainCycleTest`.
+  - SEC-03 (بخشی: ساخته، پشتِ پرچمِ خاموش): `server/test/doc-chain.test.js`، `server/test/finalized-sales.test.js`، `VoidFlowTest`.
+  - SEC-04: `server/test/admin-totp.test.js`.
+  - SEC-05: `server/test/sync-live-ticket.test.js`.
+  - SEC-06: `server/test/otp-cost-cap.test.js`، `server/test/otp-cost.test.js`، `server/test/otp-phone-forms.test.js`.
+  - SEC-07: `server/test/backup-strict.test.js`، `server/test/backup.test.js`.
+  - SEC-09: `server/test/storefront.test.js`.
+  - SEC-10: `server/test/customer-erasure.test.js`، `server/test/customer-erasure-restore.test.js`، `server/test/customer-erasure-ledger.test.js`.
+
+- **S157 — ویترین اینترنتی (WEB):** آزمون‌های خودکارِ موجود؛ هر قابلیت با آزمون‌های نام‌برده‌اش پذیرفته می‌شود.
+  - WEB-01 (بخشی: نشانی، نام، لوگو و رنگ؛ نگه‌داشتنِ نشانی پشتِ پرچمِ خاموش): `server/test/storefront.test.js`، `server/test/storefront-audit.test.js`، `server/test/web-store-audit.mjs`.
+  - WEB-02: `server/test/storefront-deals.test.js`، `server/test/storefront-v2.test.js`، `server/test/web-store.mjs`.
+  - WEB-03: `server/test/storefront.test.js`، `server/test/web-store.mjs`.
+  - WEB-04: `server/test/storefront-eta.test.js`، `StorefrontEtaApiTest`، `server/test/web-store-web.mjs`.
+  - WEB-05 (بخشی: پیش‌بینی و غلطِ تایپی؛ بار کردنِ فهرستِ مترادف مانده): `server/test/storefront-search-smart.test.js`، `server/test/storefront-trgm.test.js`، `server/test/search-synonyms-draft.test.js`.
+  - WEB-06: `server/test/storefront-search-smart.test.js`، `server/test/web-store.mjs`.
+  - WEB-07: `server/test/storefront-filters.test.js`، `server/test/storefront-hide-sold-out.test.js`، `server/test/web-store-finder.mjs`.
+  - WEB-08: `server/test/storefront-v2.test.js`، `server/test/web-store.mjs`.
+  - WEB-09: `server/test/storefront-hide-sold-out.test.js`، `server/test/web-store-stock.mjs`.
+  - WEB-10 (بخشی: ساخته؛ پوشِ مرورگر روی گوشیِ واقعی سنجیده نشده): `server/test/storefront-alerts.test.js`، `server/test/store-alert-push.test.js`، `server/test/web-store-finder.mjs`.
+  - WEB-11: `server/test/storefront-extras.test.js`، `server/test/storefront-shopping-list.test.js`، `server/test/web-store-web.mjs`.
+  - WEB-12: `server/test/storefront-v2.test.js`.
+  - WEB-13: `server/test/storefront-recent.test.js`، `RecentlyViewedTest`، `server/test/web-store-web.mjs`.
+  - WEB-14: `server/test/web-store-web.mjs`، `server/test/storefront-web-account.test.js`، `server/test/web-store-acct.mjs`.
+  - WEB-15: `server/test/web-store-vitals.mjs`، `server/test/storefront-seo.test.js`.
+  - WEB-16: `server/test/store-webp.test.js`، `server/test/storefront-v2.test.js`، `server/test/web-store.mjs`.
+  - WEB-17 (بخشی: داده‌ٔ ساختاریافته، نقشهٔ سایت و hreflang؛ ثبت در موتورِ جست‌وجو بیرونی است): `server/test/storefront-seo.test.js`.
+  - WEB-18: `server/test/web-store.mjs`، `server/test/web-market.mjs`.
+  - WEB-19: `server/test/web-i18n.test.js`، `server/test/web-store.mjs`، `server/test/web-market.mjs`.
+  - WEB-20 (بخشی: برچسب‌های پیش‌نمایش؛ پیش‌نمایشِ واقعیِ برنامه‌های بیرونی سنجیده نشده): `server/test/storefront-seo.test.js`، `server/test/storefront-seo-media.test.js`، `server/test/web-store-web.mjs`.
+  - WEB-23: `server/test/storefront-privacy.test.js`.
+  - WEB-24: `server/test/storefront-extras.test.js`، `StorefrontBannersTest`، `StorefrontBannersUiTest`.
+
 
 ## ۸. فازبندی و ترتیب اجرا
 
