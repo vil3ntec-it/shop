@@ -77,7 +77,7 @@ object GiftCards {
   // ── اعتبارِ فروشگاه ─────────────────────────────────────────────
   /** ماندهٔ دفترِ قرض‌دار به پول (مثبت = بدهکار، منفی = طلب) — همان حسابِ `DebtBook.creditCheck` */
   fun balanceMinor(d: ShopData, debtorId: String): Long =
-    d.transactions.filter { it.debtorId == debtorId }.sumOf { if (it.type == "give") PayFlow.minor(it.amount) else -PayFlow.minor(it.amount) }
+    CustomerAlias.of(d, debtorId).let { own -> d.transactions.filter { it.debtorId in own } }.sumOf { if (it.type == "give") PayFlow.minor(it.amount) else -PayFlow.minor(it.amount) }
 
   /** طلبِ خرج‌شدنیِ مشتری (۰ اگر طلبی ندارد) */
   fun creditOf(d: ShopData, debtorId: String?): Long = debtorId?.let { StoreCredit.available(balanceMinor(d, it)) } ?: 0L

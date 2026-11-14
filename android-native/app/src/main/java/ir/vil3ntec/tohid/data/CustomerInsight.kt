@@ -66,7 +66,7 @@ object CustomerInsight {
 
   /** سنِ بدهیِ یک مشتری — `null` اگر مانده‌ای ندارد */
   fun agingOf(d: ShopData, debtorId: String, asOf: String): AgeLine? =
-    aging(d.copy(transactions = d.transactions.filter { it.debtorId == debtorId }), asOf).lines.firstOrNull()
+    CustomerAlias.of(d, debtorId).let { own -> aging(d.copy(transactions = d.transactions.filter { it.debtorId in own }), asOf).lines.firstOrNull() }
 
   fun agingSheet(d: ShopData, today: String): ReportCsv.Sheet {
     val a = aging(d, today)

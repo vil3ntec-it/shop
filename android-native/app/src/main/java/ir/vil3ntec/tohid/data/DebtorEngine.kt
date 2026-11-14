@@ -126,7 +126,9 @@ object DebtorEngine {
     newId: () -> String = ::auditId,
   ): Result {
     val debtor = d.debtors.find { it.id == id } ?: return Result.Failed(StrLedger.debtorNotFound)
-    val rows = d.transactions.count { it.debtorId == id }
+    //  CRM-10: سندهای ادغام‌شده‌های پیوندی هم زیرِ همین پرونده‌اند (`CustomerAlias`) و همراهش می‌روند — مثلِ دفترِ v1 پس از ادغام
+    val own = CustomerAlias.of(d, id)
+    val rows = d.transactions.count { it.debtorId in own }
     //  ردپا: پیش‌تر قرض‌دار و همهٔ تراکنش‌هایش بی هیچ سابقه‌ای می‌رفتند
     val trace = AuditEntry(
       id = newId(), type = "debtor_delete", date = today, refId = id, createdAt = now,
@@ -135,7 +137,7 @@ object DebtorEngine {
     return Result.Ok(
       d.copy(
         debtors = d.debtors.filter { it.id != id },
-        transactions = d.transactions.filter { it.debtorId != id },
+        transactions = d.transactions.filter { it.debtorId !in own },
         auditLog = d.auditLog + trace,
       ),
       id = id,
@@ -146,7 +148,8 @@ object DebtorEngine {
   fun deleteWarning(d: ShopData, id: String): String {
     val debtor = d.debtors.find { it.id == id } ?: return ""
     val balance = ShopStore.debt(d, id)
-    val count = d.transactions.count { it.debtorId == id }
+    val own = CustomerAlias.of(d, id)
+    val count = d.transactions.count { it.debtorId in own }
     return if (balance > 0) {
       StrLedger.deleteWarnDebt(debtor.name, money(balance), money(count.toDouble()))
     } else {
@@ -325,7 +328,8 @@ object DebtorEngine {
 
   fun account(d: ShopData, id: String): Account? {
     val debtor = d.debtors.find { it.id == id } ?: return null
-    val mine = d.transactions.filter { it.debtorId == id }.sortedByDescending { it.createdAt }
+    val own = CustomerAlias.of(d, id)  // CRM-10: با سندهای ادغام‌شده‌های پیوندی
+    val mine = d.transactions.filter { it.debtorId in own }.sortedByDescending { it.createdAt }
     //  S89: «داده/گرفته» بی جفتِ «اصل + معکوس» (همان حذفِ امروز)؛ فهرست هر دو ردیف را دارد (سابقه روشن)
     val live = DebtReverse.effective(mine)
     return Account(
@@ -335,7 +339,7 @@ object DebtorEngine {
       balance = ShopStore.debt(d, id),
       transactions = mine,
       since = debtSince(d, id),
-      sales = d.sales.filter { it.debtorId == id }.sortedByDescending { it.createdAt },
+      sales = d.sales.filter { it.debtorId in own }.sortedByDescending { it.createdAt },
     )
   }
 
@@ -360,7 +364,8 @@ object DebtorEngine {
    */
   fun debtSince(d: ShopData, debtorId: String): Long? {
     //  S89: جفتِ «اصل + معکوس» بیرون — کهنگی همان حذفِ امروز (رسیدِ معکوس‌شده قدیمی‌ترین برد را نمی‌بندد)
-    val mine = DebtReverse.effective(d.transactions.filter { it.debtorId == debtorId })
+    val own = CustomerAlias.of(d, debtorId)
+    val mine = DebtReverse.effective(d.transactions.filter { it.debtorId in own })
       .sortedWith(compareBy<DebtTransaction>({ it.date }, { it.createdAt }))
     if (mine.isEmpty()) return null
 

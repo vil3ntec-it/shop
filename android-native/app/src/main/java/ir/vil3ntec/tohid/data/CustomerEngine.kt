@@ -58,9 +58,10 @@ object CustomerEngine {
   )
 
   fun summary(d: ShopData, debtor: Debtor, now: Long = System.currentTimeMillis()): Summary {
-    val sales = d.sales.filter { it.debtorId == debtor.id && it.status != "cancelled" }
+    val own = CustomerAlias.of(d, debtor.id)  // CRM-10: با سندهای ادغام‌شده‌های پیوندی
+    val sales = d.sales.filter { it.debtorId in own && it.status != "cancelled" }
     //  S89: «آخرین پرداخت» بی رسیدِ معکوس‌شده و بی سندِ معکوس
-    val receives = DebtReverse.effective(d.transactions.filter { it.debtorId == debtor.id }).filter { it.type != "give" && !DebtReverse.isReversal(it) }
+    val receives = DebtReverse.effective(d.transactions.filter { it.debtorId in own }).filter { it.type != "give" && !DebtReverse.isReversal(it) }
     return Summary(
       id = debtor.id,
       name = debtor.name,
@@ -100,10 +101,11 @@ object CustomerEngine {
   /** صورت‌حساب: ردیف به ردیف به ترتیبِ تاریخ، با ماندهٔ پس از هر ردیف و فاکتورِ پشتش */
   fun ledger(d: ShopData, debtorId: String): List<LedgerLine> {
     //  کلید همان شمارهٔ نمایشی است: `A1-5` و `B1-5` دو فاکتورِ جدااند (F0-03)
-    val byLabel = d.sales.filter { it.debtorId == debtorId && it.invoiceNumber != null }
+    val own = CustomerAlias.of(d, debtorId)
+    val byLabel = d.sales.filter { it.debtorId in own && it.invoiceNumber != null }
       .associateBy { it.invoiceLabel()!! }
     var run = 0.0
-    return d.transactions.filter { it.debtorId == debtorId }
+    return d.transactions.filter { it.debtorId in own }
       .sortedWith(compareBy<DebtTransaction> { it.date }.thenBy { it.createdAt })
       .mapIndexed { i, tx ->
         val give = tx.type == "give"
@@ -124,7 +126,7 @@ object CustomerEngine {
 
   /** فاکتورهای مشتری، تازه‌ترین بالا — لغوشده هم، با همان وضعیت */
   fun invoices(d: ShopData, debtorId: String): List<Sale> =
-    d.sales.filter { it.debtorId == debtorId }
+    CustomerAlias.of(d, debtorId).let { own -> d.sales.filter { it.debtorId in own } }
       .sortedWith(compareByDescending<Sale> { it.date }.thenByDescending { it.createdAt })
 
   /** هر قلمی که برداشته — از همهٔ فاکتورهای ثبت‌شده، تازه‌ترین بالا */

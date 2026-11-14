@@ -12,7 +12,8 @@ object CustomerStatement {
 
   fun lines(d: ShopData, debtorId: String): List<StatementLine> {
     var balance = 0L
-    return d.transactions.filter { it.debtorId == debtorId }
+    val own = CustomerAlias.of(d, debtorId)  // CRM-10: با سندهای ادغام‌شده‌های پیوندی
+    return d.transactions.filter { it.debtorId in own }
       .sortedWith(compareBy<DebtTransaction> { it.date }.thenBy { it.createdAt })
       .map { tx ->
         val m = DebtBook.minor(tx.amount).minor

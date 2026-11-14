@@ -213,10 +213,9 @@ class ShopStore(
    *  - ⛔ هرگز `record` ِ کلِ دفتر: فقط opهای هدفمندِ خودِ sweep (`CustomerMerge.sweepOps`:
    *    UPDATE ِ `debtorId`/`mergedInto` و INSERT ِ ردِ دفترچه) با `SyncV1Engine.recordOps`
    *    (سایه = سایه + همین opها). پس هیچ DELETEی ساخته نمی‌شود.
-   *  - ⛔ روی همگام‌سازیِ v3 نمی‌نشیند: آن‌جا عوض کردنِ `debtorId` ِ سندِ مالی (قرض، فاکتور)
-   *    «ویرایشِ سند» است، با قالبِ v2 می‌رود و سرور آن را به صندوقِ تعارض می‌برد
-   *    (`SyncV3Engine`، آزمونِ `docEditIsNotLostGoesAsV2`). خودِ ادغام هم همین‌طور؛ راهِ v3 باید
-   *    سمتِ سرور (یا با سندِ معکوس) ساخته شود.
+   *  - ⛔ روی همگام‌سازیِ v3 هیچ سندی جابه‌جا نمی‌شود (`docs = false`): عوض کردنِ `debtorId` ِ قرض و فاکتور
+   *    آن‌جا «ویرایشِ سند» است و به صندوقِ تعارض می‌رود (`docEditIsNotLostGoesAsV2`)؛ فقط حلقهٔ دو ادغامِ وارونه
+   *    (پروندهٔ مشتری) ترمیم می‌شود و سندها را `CustomerAlias` زیرِ ماندگار می‌خواند.
    *  - نوشتنِ بسته ⇒ هیچ، بی پیام: دفترِ بارنشده، دفترِ خوانده‌نشده (SEC-01 / #331) یا
    *    قفلِ نرم. خطای دیسکِ همین sweep هم پیامِ «ذخیره نشد» ِ صفحه نمی‌شود؛ دورِ بعد دوباره.
    *  - خودتوان: کاری نبود ⇒ `null`، نه نوشتن نه op. هر دستگاه از همان دفتر همان نتیجه را
@@ -230,14 +229,13 @@ class ShopStore(
   private suspend fun sweepNow(requireLoaded: Boolean): Boolean? = withContext(Dispatchers.IO) {
     if (!syncs) return@withContext null
     if (!ShopPolicy.crmReports(context)) return@withContext null
-    if (SyncChoice.isV3(context)) return@withContext null
     val engine = SyncV1Engine.of(context)
     synchronized(engine) {
       if ((requireLoaded && !_loaded.value) || _unreadable.value != null || engine.rebuilding) return@synchronized null
       //  نمونه‌ای که پیش از عوضِ حساب بار شده روی دفترِ حسابِ تازه نمی‌نویسد (`LedgerFollow.movedLocked`)
       if (!follow.sameAccount()) return@synchronized null
       val disk = readDiskLocked() ?: return@synchronized null
-      val next = CustomerMerge.sweep(disk) ?: return@synchronized null
+      val next = CustomerMerge.sweep(disk, docs = !SyncChoice.isV3(context)) ?: return@synchronized null
       val ops = CustomerMerge.sweepOps(disk, next) ?: return@synchronized null
       if (SoftLock.isLocked(context)) return@synchronized null
       //  همان قاعدهٔ `writeLocked`: دفتری که به دیسک نرسید op نمی‌سازد (F0-01)
@@ -616,14 +614,13 @@ class ShopStore(
   }
 
   /**
-   *  CRM-10: آیا «ادغامِ مشتری» روی این دستگاه باز است؟ `null` ⇒ باز؛ وگرنه همان یک خطِ دلیل
-   *  برای کنارِ دکمهٔ بسته.
-   *
-   *  ⛔ روی همگام‌سازیِ v3 بسته است: آن‌جا جابه‌جاییِ `debtorId` ِ قرض و فاکتور «ویرایشِ سندِ
-   *  مالی» است، با قالبِ v2 می‌رود و سرور آن را به صندوقِ تعارض می‌برد (`SyncV3Engine`، آزمونِ
-   *  `docEditIsNotLostGoesAsV2`). راهِ سرور بعداً ساخته می‌شود (STATUS: CRM-10 ⇒ PARTIAL).
+   *  CRM-10: آیا «ادغامِ مشتری» روی این دستگاه باز است؟ `null` ⇒ باز؛ وگرنه یک خطِ دلیل برای کنارِ دکمهٔ بسته.
+   *  حالا روی هر دو همگام‌سازی باز است: روی v3 ادغام **بی ویرایشِ سند** است (`CustomerMerge.merge(docs = false)`: فقط
+   *  پروندهٔ مشتری‌ها و ردِ دفترچه؛ سندها با `CustomerAlias` زیرِ ماندگار خوانده می‌شوند)، چون جابه‌جاییِ `debtorId` ِ
+   *  قرض و فاکتور آن‌جا به صندوقِ تعارض می‌رفت (`docEditIsNotLostGoesAsV2`). v1 همان جابه‌جاییِ پیشین.
+   *  (`StrShell.mergeNotOnV3` برای دستگاهی می‌ماند که روزی دلیلِ بستن داشت.)
    */
-  fun mergeBlockedReason(): String? = if (SyncChoice.isV3(context)) StrShell.mergeNotOnV3 else null
+  fun mergeBlockedReason(): String? = null
 
   /**
    *  CRM-10: تنها درِ ادغامِ دو مشتری — `CustomerMerge.merge` (با `limitRules` ِ CRM-03؛ پیش‌فرض خاموش) روی دفترِ همین لحظه، از همان
@@ -634,7 +631,7 @@ class ShopStore(
     mergeBlockedReason()?.let { return CustomerMerge.Result.Failed(it) }
     var out: CustomerMerge.Result = CustomerMerge.Result.Failed(StrShell.mergeNotSaved)
     val wrote = update { d ->
-      when (val r = CustomerMerge.merge(d, keepId, dropId, limitRules)) {
+      when (val r = CustomerMerge.merge(d, keepId, dropId, limitRules, docs = !SyncChoice.isV3(context))) {
         is CustomerMerge.Result.Ok -> { out = r; r.data }
         is CustomerMerge.Result.Failed -> { out = r; null }
       }

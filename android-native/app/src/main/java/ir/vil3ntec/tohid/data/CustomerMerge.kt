@@ -25,6 +25,11 @@ import ir.vil3ntec.tohid.sync.v1.SyncOp
  *  ۴) یک ردِ `customer_merge` در دفترچهٔ ثبت: `refId` = «تکراری»، شمارِ ردیف‌ها و ماندهٔ
  *     منتقل‌شده در شرح، و شناسهٔ تک‌تکِ ردیف‌های منتقل‌شده در `refIds` (برای برگرداندن).
  *
+ *  ── بی ویرایشِ سند (`docs = false`، همگام‌سازیِ v3) ─────────────────────
+ *  آن‌جا سندِ مالی فقط افزودنی است و جابه‌جاییِ `debtorId` به صندوقِ تعارض می‌رود؛ پس فقط گامِ ۲ تا ۴ (پروندهٔ مشتری
+ *  و ردِ دفترچه): هیچ قرض و فاکتوری دست نمی‌خورد و همه از راهِ `CustomerAlias` زیرِ ماندگار خوانده می‌شوند (مانده،
+ *  صورت‌حساب، سنِ بدهی، گزارش‌ها). سندِ تکراری با همان مشتری می‌ماند ⇒ هیچ پول و سابقه‌ای روی هیچ دستگاهی گم نمی‌شود.
+ *
  *  ── دستگاهِ آفلاین ────────────────────────────────────────────────────
  *  دستگاهی که پیش از رسیدنِ ادغام روی «تکراری» فروخت، ردیفش با شناسهٔ کهنه می‌رسد.
  *  `sweep` آن‌ها را به ماندگار می‌برد (بی‌خطر و تکرارپذیر). دو ادغامِ وارونه روی دو
@@ -65,7 +70,7 @@ object CustomerMerge {
   }
 
   private fun activity(d: ShopData, id: String): Int =
-    d.transactions.count { it.debtorId == id } + d.sales.count { it.debtorId == id }
+    CustomerAlias.of(d, id).let { own -> d.transactions.count { it.debtorId in own } + d.sales.count { it.debtorId in own } }
 
   /**
    *  گروه‌های تکراری میانِ مشتریانِ فعال: شمارهٔ یکسان (هر کدام از دو شماره، با
@@ -185,12 +190,13 @@ object CustomerMerge {
       is Check.Good -> c.keep to c.drop
     }
     val dropBalance = ShopStore.debt(d, drop.id)
+    val own = CustomerAlias.of(d, drop.id)
     return Result.Ok(
       d,
       Preview(
         keep = keep, drop = drop,
-        transactions = d.transactions.count { it.debtorId == drop.id },
-        sales = d.sales.count { it.debtorId == drop.id },
+        transactions = d.transactions.count { it.debtorId in own },
+        sales = d.sales.count { it.debtorId in own },
         dropBalance = dropBalance,
         balanceAfter = ShopStore.debt(d, keep.id) + dropBalance,
         result = fold(keep, drop),
@@ -209,6 +215,11 @@ object CustomerMerge {
   ): Result = merge(d, keepId, dropId, CreditLimitPerm.Rules.OFF, today, now, newId)
 
   /**
+   *  @param docs `true` (v1): قرض و فاکتورهای تکراری به ماندگار می‌روند. `false` (v3): **هیچ سندی** ویرایش نمی‌شود؛ فقط
+   *    پروندهٔ مشتری‌ها و ردِ دفترچه، و خواندن از راهِ `CustomerAlias` (شرح سرِ همین فایل).
+   */
+
+  /**
    *  همان ادغام با قاعدهٔ «تغییرِ سقفِ اعتبار» ِ همین کاربر (CRM-03 / §۱۰.۱، `rememberCreditLimitRules`): ماندگارِ بی سقف سقفِ
    *  تکراری را می‌گیرد ([fold]) و این همان تغییری است که سرور با `shop.credit_limit_perm` رد می‌کند ⇒ پیش از نوشتن، با همان
    *  `CreditLimitGate.error` ِ برگهٔ مشتری. خاموش/صاحب/سقفِ بی‌تغییر ⇒ همان امروز.
@@ -221,20 +232,22 @@ object CustomerMerge {
     today: String = ir.vil3ntec.tohid.todayIso(),
     now: Long = ReportBridge.nowMs(),
     newId: () -> String = ::auditId,
+    docs: Boolean = true,
   ): Result {
     val p = when (val r = preview(d, keepId, dropId)) {
       is Result.Failed -> return r
       is Result.Ok -> r.preview
     }
     CreditLimitGate.error(limitRules, p.keep, p.result.creditLimit)?.let { return Result.Failed(StrLedger.mergeChangesLimit(p.keep.name, it)) }
-    val rows = d.transactions.filter { it.debtorId == dropId }.map { "transactions/${it.id}" } +
+    val rows = if (!docs) emptyList() else d.transactions.filter { it.debtorId == dropId }.map { "transactions/${it.id}" } +
       d.sales.filter { it.debtorId == dropId }.map { "sales/${it.id}" }
     //  ادغامی که رضایتِ ماندگار را عوض کرد (فقط سخت‌گیرانه‌تر) همین‌جا سند دارد
     val consent = if (p.result.marketingConsent == p.keep.marketingConsent) "" else
       " — رضایتِ تبلیغ: ${CustomerCrm.consentText(p.keep.marketingConsent)} ⇐ ${CustomerCrm.consentText(p.result.marketingConsent)}"  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+    val moved = if (docs) "منتقل شد" else "بی ویرایش زیرِ ماندگار خوانده می‌شود"  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     val trace = trail(
       dropId,
-      "ادغامِ «${p.drop.name}» (${p.drop.id}) در «${p.keep.name}» (${p.keep.id}): ${p.transactions} تراکنش و ${p.sales} فاکتور منتقل شد" +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+      "ادغامِ «${p.drop.name}» (${p.drop.id}) در «${p.keep.name}» (${p.keep.id}): ${p.transactions} تراکنش و ${p.sales} فاکتور $moved" +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         " — ماندهٔ منتقل‌شده ${money(p.dropBalance)} افغانی" + consent,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       rows, today, now, newId,
     )
@@ -248,8 +261,8 @@ object CustomerMerge {
           else -> it
         }
       },
-      transactions = d.transactions.map { if (it.debtorId == dropId) it.copy(debtorId = keepId) else it },
-      sales = d.sales.map { if (it.debtorId == dropId) it.copy(debtorId = keepId) else it },
+      transactions = if (!docs) d.transactions else d.transactions.map { if (it.debtorId == dropId) it.copy(debtorId = keepId) else it },
+      sales = if (!docs) d.sales else d.sales.map { if (it.debtorId == dropId) it.copy(debtorId = keepId) else it },
       auditLog = d.auditLog + trace,
     )
     return Result.Ok(data, p)
@@ -263,12 +276,14 @@ object CustomerMerge {
    *  حلقه (`CustomerCrm.resolve`) دوباره فعال و بقیه مستقیم به آن؛ همهٔ دستگاه‌ها همین را
    *  می‌سازند. مقصدِ ناپیدا (ردیفِ ماندگار هنوز نرسیده) دست نمی‌خورد.
    *  برای هر ماندگار یک ردِ `customer_merge` با `refId` = همان ماندگار و ردیف‌ها در `refIds`.
+   *  [docs] = `false` (v3): فقط ترمیمِ حلقه (پروندهٔ مشتری)؛ هیچ سندی جابه‌جا نمی‌شود — `CustomerAlias` آن‌ها را می‌خواند.
    */
   fun sweep(
     d: ShopData,
     today: String = ir.vil3ntec.tohid.todayIso(),
     now: Long = System.currentTimeMillis(),
     newId: () -> String = ::auditId,
+    docs: Boolean = true,
   ): ShopData? {
     val merged = d.debtors.filter { !CustomerCrm.isActive(it) }
     if (merged.isEmpty()) return null
@@ -286,7 +301,7 @@ object CustomerMerge {
         else -> c
       }
     }
-    val moves = target.filter { (a, b) -> a != b }
+    val moves = if (docs) target.filter { (a, b) -> a != b } else emptyMap()
     val moved = sortedMapOf<String, MutableList<String>>()
     val transactions = d.transactions.map { t ->
       moves[t.debtorId]?.let { to -> moved.getOrPut(to) { mutableListOf() } += "transactions/${t.id}"; t.copy(debtorId = to) } ?: t
@@ -299,7 +314,8 @@ object CustomerMerge {
       val rows = moved[to].orEmpty()
       val tx = rows.count { it.startsWith("transactions/") }
       val head = if (to in revive) "حلقهٔ ادغام ترمیم شد: «${byId.getValue(to).name}» ($to) دوباره فعال است — " else ""  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
-      trail(to, head + "انتقالِ ردیف‌های دیررسیده به مشتریِ ماندگار: $tx تراکنش و ${rows.size - tx} فاکتور", rows, today, now, newId)  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+      val body = if (docs) "انتقالِ ردیف‌های دیررسیده به مشتریِ ماندگار: $tx تراکنش و ${rows.size - tx} فاکتور" else "سندهای حلقه بی ویرایش زیرِ همین مشتری خوانده می‌شوند"  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+      trail(to, head + body, rows, today, now, newId)
     }
     return d.copy(debtors = debtors, transactions = transactions, sales = salesOut, auditLog = d.auditLog + trace)
   }

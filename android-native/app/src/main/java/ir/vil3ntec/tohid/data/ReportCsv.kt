@@ -270,7 +270,8 @@ object ReportCsv {
     val debtor = d.debtors.find { it.id == debtorId }
     val rows = mutableListOf(listOf("تاریخ", "شرح", "برد", "رسید", "مانده"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
     var balance = 0.0
-    d.transactions.filter { it.debtorId == debtorId }
+    val own = CustomerAlias.of(d, debtorId)  // CRM-10: با سندهای ادغام‌شده‌های پیوندی
+    d.transactions.filter { it.debtorId in own }
       .sortedWith(compareBy<DebtTransaction> { it.date }.thenBy { it.createdAt })
       .forEach { tx ->
         val give = tx.type == "give"
@@ -301,7 +302,7 @@ object ReportCsv {
       listOf("نام قرض‌دار", "شماره تماس", "بدهی", "تاریخ آخرین تراکنش", "یادداشت")  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
     )
     d.debtors.forEach { debtor ->
-      val last = d.transactions.filter { it.debtorId == debtor.id }.maxByOrNull { it.createdAt }
+      val last = DebtRows.of(d)[debtor.id]?.maxByOrNull { it.createdAt }
       rows += listOf(
         debtor.name, debtor.phone,
         round(ShopStore.debt(d, debtor.id)),
