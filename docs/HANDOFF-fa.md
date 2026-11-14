@@ -66,7 +66,13 @@
   `recheck` و سنجشِ گاه‌گاهِ سرورِ پیش‌فرضِ تک‌نشانی (`app.multi_server`)؛ خریدِ مشتری اندروید/آیفون: `tohid.multiServer` (زمانِ ساخت)؛
   سرور: `PUBLIC_BASE_URLS` ⇒ `publicUrls`، و نشانیِ دیگرِ ویترین (`STOREFRONT_ALIAS_DOMAINS` + `shop.storefront.host_alias`،
   `PUT /api/shop/storefront/hosts` فقط صاحب، مهاجرتِ ۹۱۲). پمپ و `sync-v1*` دست نخوردند.
-- **آزمون:** TESTS_58M
+- **آزمون:** core ⇒ `ServerRouterTest` ۱۵/۱۵، `ShopperServersTest` ۷/۷، `ServerProfilesTest` ۱۶/۱۶؛ کامپیوتر ⇒ `ServerFailoverDesktopTest` ۳/۳
+  (HTTP ِ واقعیِ محلی) و `ServerSwitchGateTest` ۲/۲؛ اجرای کاملِ desktop: ۴۱۷۰ آزمون، ۵ شکست — همه از پیش و بیرون از این کار
+  (`DariCoverageTest`/`CustomerErasureLedger`، `I18nCoverageTest`/`StrReturnRequests`، `CustomerAccessLogTest`، `DataSafetyGuardTest`
+  ِ `tohid-pay-mirror`/`tohid-customer-access`، `ScenarioS76ServerDesktopTest` ِ float — همه از ادغامِ e-rows-55s). سرور (PGlite):
+  `storefront-hosts` ۶/۶ (Host ِ دشمنی)، `server-info` ۷/۷، `paid-routes-entitlement` ۶/۶، `paid-routes-public-entitlement` ۶/۶،
+  `shop-route-inventory` ۲/۲، `route-authz-inventory` ۴/۴، `api-contract` ۲/۲، `upgrade-rehearsal` ۹/۹، `storefront` ۲۰/۲۰،
+  `storefront-seo` ۶/۶. precheck ⇒ fail=0.
 - **نیمه‌کاره / قدمِ بعد:** صفحهٔ «نشانی‌های ویترین» در برنامهٔ دکان (امروز فقط درِ سرور)؛ ساختِ اندروید/آیفونِ خریدِ مشتری در CI
   (این‌جا SDK نبود)؛ VPS ِ واقعی، تونلِ Cloudflare و DNS ِ دامنهٔ دوم آزموده نشد.
 ### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-55s (د۱۸) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-55s` (از `origin/claude/batch-62` 1a77fe22f) — همگام‌سازی، گروهِ الف
