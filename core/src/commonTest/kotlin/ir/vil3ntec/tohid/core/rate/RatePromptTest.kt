@@ -147,11 +147,11 @@ class RatePromptTest {
 
   @Test fun storeLinksFollowTheOfficialIntents() {
     val b = RateLinks.bazaar("ir.vil3ntec.tohid")
-    assertEquals(RateLink("android.intent.action.EDIT", "bazaar://details?id=ir.vil3ntec.tohid", "com.farsitel.bazaar"), b.first())
+    assertEquals(RateLink(RateAction.EDIT, "bazaar://details?id=ir.vil3ntec.tohid", "com.farsitel.bazaar"), b.first())
     assertEquals("https://cafebazaar.ir/app/ir.vil3ntec.tohid", b.last().uri)
     val p = RateLinks.playListing("ir.vil3ntec.tohid")
-    assertEquals(RateLink("android.intent.action.VIEW", "market://details?id=ir.vil3ntec.tohid", "com.android.vending"), p.first())
-    assertEquals(RateLink("android.intent.action.VIEW", "https://play.google.com/store/apps/details?id=ir.vil3ntec.tohid"), p.last())
+    assertEquals(RateLink(RateAction.VIEW, "market://details?id=ir.vil3ntec.tohid", "com.android.vending"), p.first())
+    assertEquals(RateLink(RateAction.VIEW, "https://play.google.com/store/apps/details?id=ir.vil3ntec.tohid"), p.last())
   }
 
   @Test fun noRuleAsksForAStarCountOrGatesOnHappiness() {

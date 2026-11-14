@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.rate
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import ir.vil3ntec.tohid.core.rate.RateAction
 import ir.vil3ntec.tohid.core.rate.RateLink
 import ir.vil3ntec.tohid.core.rate.RateLinks
 import ir.vil3ntec.tohid.core.rate.RateTarget
@@ -54,10 +55,13 @@ object RateStoreAndroid {
   /** نخستین درِ بازشدنی؛ هیچ فروشگاه و مرورگری ⇒ هیچ (هرگز از کار افتادن) */
   fun openFirst(context: Context, links: List<RateLink>): Boolean {
     for (l in links) {
-      val intent = Intent(l.action, Uri.parse(l.uri)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      val intent = Intent(intentAction(l.action), Uri.parse(l.uri)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
       if (l.pkg != null) intent.setPackage(l.pkg)
       if (runCatching { context.startActivity(intent) }.isSuccess) return true
     }
     return false
   }
+
+  /** `Intent.ACTION_EDIT` ِ کافه‌بازار — رشته، چون shim ِ کامپیوتر و آیفون آن ثابت را ندارند */
+  fun intentAction(a: RateAction): String = if (a == RateAction.EDIT) "android.intent.action.EDIT" else Intent.ACTION_VIEW
 }

@@ -159,26 +159,27 @@ object RatePrompt {
   }
 }
 
+/** کارِ یک «در»: [VIEW] دیدنِ صفحه، [EDIT] «نظر و امتیاز» ِ بازار (`Intent.ACTION_VIEW`/`ACTION_EDIT` در مرزِ اندروید) */
+enum class RateAction { VIEW, EDIT }
+
 /** یک «در» برای باز کردنِ فروشگاه (همان Intent ِ اندروید، به‌شکلِ داده تا آزموده شود) */
-data class RateLink(val action: String, val uri: String, val pkg: String? = null)
+data class RateLink(val action: RateAction, val uri: String, val pkg: String? = null)
 
 /** درهای فروشگاه به ترتیب؛ نخستینِ بازشدنی برنده است */
 object RateLinks {
-  const val ACTION_VIEW = "android.intent.action.VIEW"
-  const val ACTION_EDIT = "android.intent.action.EDIT"
   const val BAZAAR_PACKAGE = "com.farsitel.bazaar"
   const val PLAY_PACKAGE = "com.android.vending"
 
   /** کافه‌بازار: درِ رسمیِ «نظر و امتیاز» (`ACTION_EDIT` روی `bazaar://details`)، صفحهٔ برنامه، و وبِ بازار */
   fun bazaar(appId: String): List<RateLink> = listOf(
-    RateLink(ACTION_EDIT, "bazaar://details?id=$appId", BAZAAR_PACKAGE),
-    RateLink(ACTION_VIEW, "bazaar://details?id=$appId", BAZAAR_PACKAGE),
-    RateLink(ACTION_VIEW, "https://cafebazaar.ir/app/$appId"),
+    RateLink(RateAction.EDIT, "bazaar://details?id=$appId", BAZAAR_PACKAGE),
+    RateLink(RateAction.VIEW, "bazaar://details?id=$appId", BAZAAR_PACKAGE),
+    RateLink(RateAction.VIEW, "https://cafebazaar.ir/app/$appId"),
   )
 
   /** صفحهٔ برنامه در Play — وقتی نظرِ درون‌برنامه نشد: برنامهٔ Play، و بی آن وبِ Play */
   fun playListing(appId: String): List<RateLink> = listOf(
-    RateLink(ACTION_VIEW, "market://details?id=$appId", PLAY_PACKAGE),
-    RateLink(ACTION_VIEW, "https://play.google.com/store/apps/details?id=$appId"),
+    RateLink(RateAction.VIEW, "market://details?id=$appId", PLAY_PACKAGE),
+    RateLink(RateAction.VIEW, "https://play.google.com/store/apps/details?id=$appId"),
   )
 }

@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.customer
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import ir.vil3ntec.tohid.core.rate.RateAction
 import ir.vil3ntec.tohid.core.rate.RateLinks
 import ir.vil3ntec.tohid.core.rate.RateTarget
 import ir.vil3ntec.tohid.customer.ui.RateHook
@@ -22,7 +23,7 @@ object RateAndroid {
 
   private fun listing(activity: Activity) {
     for (l in RateLinks.playListing(activity.packageName)) {
-      val intent = Intent(l.action, Uri.parse(l.uri))
+      val intent = Intent(if (l.action == RateAction.EDIT) Intent.ACTION_EDIT else Intent.ACTION_VIEW, Uri.parse(l.uri))
       if (l.pkg != null) intent.setPackage(l.pkg)
       if (runCatching { activity.startActivity(intent) }.isSuccess) return
     }

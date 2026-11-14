@@ -13,6 +13,7 @@ import androidx.compose.ui.test.performClick
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.StrRate
+import ir.vil3ntec.tohid.core.rate.RateAction
 import ir.vil3ntec.tohid.core.rate.RateChoice
 import ir.vil3ntec.tohid.core.rate.RateTarget
 import ir.vil3ntec.tohid.rate.RateStoreAndroid
@@ -105,5 +106,8 @@ class RateSheetUiTest {
     assertEquals("میزبانِ آیفونِ دکان هنوز نمی‌نشاند", RateTarget.NONE, RateStoreAndroid.target("appstore", preview = false, desktop = false))
     assertEquals(RateTarget.PLAY, RateStoreAndroid.target("play", preview = false, desktop = false))
     assertEquals(RateTarget.BAZAAR, RateStoreAndroid.target("bazaar", preview = false, desktop = false))
+    //  درِ رسمیِ «نظر و امتیاز» ِ کافه‌بازار
+    assertEquals("android.intent.action.EDIT", RateStoreAndroid.intentAction(RateAction.EDIT))
+    assertEquals("android.intent.action.VIEW", RateStoreAndroid.intentAction(RateAction.VIEW))
   }
 }
