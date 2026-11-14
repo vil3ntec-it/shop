@@ -405,6 +405,39 @@ test('RPT-18: گزارشِ هر شعبه با نامِ کالای دکان و ک
   assert.equal(ob.body.totals, undefined);
 });
 
+// ── هم‌زمانی ────────────────────────────────────────────────────────────
+
+test('هم‌زمانی: pull ِ هم‌زمانِ چند دستگاهِ شعبه یک آینه؛ حرکتِ دستیِ هم‌زمان با یک کلید یک حرکت؛ اصلی و شعبه با هم بی قاطی', async () => {
+  const w = await world('هم‌زمانی');
+  const { s, A } = w;
+  await pushV3(s, [product3('pc1'), product3('pc2')]);
+  const KA = `${s.shopId}#${A}`;
+  const pulls = await Promise.all([1, 2, 3, 4, 5].map((i) => v3(w.onlyA, `pull?device_id=${w.onlyA.device.slice(0, 50)}-${i}&since=0`, A)));
+  for (const p of pulls) assert.equal(p.status, 200, JSON.stringify(p.body));
+  const dup = await many(
+    "SELECT row_id, COUNT(*)::int AS n FROM sync_v3_ops WHERE account_id=$1 AND op_id LIKE 'srv.cm.%' GROUP BY row_id HAVING COUNT(*) > 1", [KA]);
+  assert.deepEqual(dup, [], 'هر ردیفِ کاتالوگ یک بار آینه شد');
+  const ids = (await many("SELECT row_id FROM sync_v3_rows WHERE account_id=$1 AND table_name='products'", [KA])).map((r) => r.row_id).sort();
+  assert.deepEqual(ids, ['p1', 'pc1', 'pc2']);
+  //  یک کلید، چهار درخواستِ هم‌زمان در الف ⇒ یک حرکت، بقیه همان پاسخ
+  const key = fresh();
+  const body = { kind: 'adjust', productId: 'p1', location: 'shop_floor', qtyMilli: 200, reason: 'شمارش' };
+  const rs = await Promise.all([1, 2, 3, 4].map(() => cat(w.mgrA, '/moves', A, { method: 'POST', key, body })));
+  assert.deepEqual(rs.map((r) => r.status).sort(), [200, 200, 200, 201], JSON.stringify(rs.map((r) => r.body)));
+  //  اصلی و الف هم‌زمان با کلیدهای جدا ⇒ هر کدام فقط در خودش
+  const both = await Promise.all([
+    cat(s, '/moves', undefined, { method: 'POST', key: fresh(), body: { ...body, qtyMilli: 300 } }),
+    cat(w.mgrA, '/moves', A, { method: 'POST', key: fresh(), body: { ...body, qtyMilli: 400 } }),
+    cat(s, '/moves', A, { method: 'POST', key: fresh(), body: { ...body, qtyMilli: 50 } }),
+    cat(s, '/moves', undefined, { method: 'POST', key: fresh(), body: { ...body, qtyMilli: 7 } }),
+  ]);
+  for (const r of both) assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.equal(await levelOf(s, 'p1'), 10307);
+  assert.equal(await levelOf(w.mgrA, 'p1', A), 650);
+  assert.equal((await cat(s, '/report')).body.ok, true);
+  assert.equal((await cat(w.mgrA, '/report', A)).body.ok, true);
+});
+
 // ── مهاجرتِ ۹۰۰: برگشت و دوباره ─────────────────────────────────────────
 
 test('مهاجرتِ ۹۰۰: برگشت فقط موجودیِ شعبه‌ها و ردیفِ خودش را برمی‌دارد؛ دوباره بالا می‌آید و خواندنِ دوباره همان عددها', async () => {
