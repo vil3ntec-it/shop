@@ -498,6 +498,18 @@
   شعبهٔ اصلی‌اند: `lib/branch-gate.js` عضوِ بی اصلی را ۴۰۳ `branch_main_only` و ادعای شعبهٔ دیگر را ۴۰۳ `branch_unsupported`
   می‌دهد؛ درِ تازه‌ای که شعبه را می‌شناسد فقط با `branch_id`/بخش و دسترسیِ `branches.accessOf` از این نگهبان بیرون می‌رود.
   پلِ v3⇒v1 برای بخشِ شعبه هرگز. پرچم خاموش ⇒ همه بی اثر (سنجه: `server/test/shop-branches.test.js`).
+- ⛔ **شعبه، فازِ ۳ — کاتالوگِ مشترک و موجودیِ هر شعبه** (`claude/e-rows-59b`، مهاجرتِ ۹۰۰): (۱) `products`/`productCategories`/
+  `productUnits` مالِ کلِ دکان‌اند: op ِ دستگاه روی آن‌ها در بخشِ شعبهٔ غیرِ اصلی ⇒ رد با `catalog_main_only` **پیش از هر داوریِ
+  دیگر** (صاحب هم؛ از اصلی می‌نویسد) و سرور همان ردیف‌ها را با op ِ سرور `srv.cm.<updated_seq ِ اصلی>` پیش از pull/Snapshot ِ شعبه
+  در بخشِ شعبه می‌نشاند (`lib/branch-catalog.js`؛ قفلِ اصلی و قفلِ شعبه پشتِ هم، هرگز تودرتو؛ پیامدهای op ِ دستگاه برای آینه نه؛
+  `stock` ِ derived نه). جدولِ تازه‌ای که «مالِ کلِ دکان» باشد همین فهرست را می‌گیرد، نه نوشتنِ آزاد در شعبه. (۲) هر تابعِ
+  `lib/stock.js`/`catalog.js`/`catalog-manual.js` «کلیدِ موجودی» می‌گیرد (دکان یا `<دکان>#<شعبه>`): SQL با `shop_id = shopOf` و
+  `branch_id = branchOf` — هرگز `branch_id = ''` ِ ثابت؛ کلیدِ یکتای دفتر/وظیفه/سهمِ شعبهٔ غیرِ اصلی `stock.keyIn` (`<شعبه>|…`)؛
+  نشانهٔ خواندن `catalog_branch_state` (اصلی همان `catalog_sync_state`)؛ کالا همیشه از `catalog_products` ِ اصلی (خواندنِ شعبه اول
+  اصلی را تازه می‌کند). نگه‌داشتهٔ سفارشِ آنلاین، INV-10 (`count_absorb`)، گام‌های انتقالِ دستگاه و `market.changes` فقط اصلی.
+  (۳) درِ REST ِ شعبه‌شناس شعبه را فقط از `branches.restOf(req)` می‌گیرد (سرآیندِ سنجیده؛ بدنه/پارامتر هرگز؛ پرچم خاموش ⇒ اصلی
+  بی خواندنِ سرآیند) و درهای سطحِ دکان/فقط‌اصلیِ خودش را در شعبهٔ دیگر ۴۰۳ `branch_unsupported` می‌دهد؛ هر درِ تازه‌ای که از
+  `branch-gate` بیرون برود در `tenant-matrix-branches.test.js` سنجیده می‌شود. سنجه: `shop-branches-stock.test.js`.
 
 - ⛔ **گروهِ الفِ همگام‌سازی (د۱۸، `claude/e-rows-55s`)** — هر کدام پشتِ پرچمِ خاموش، پرچم پیش از بدنه، و هیچ‌کدام `sync-v1.js`/`routes/sync-v1.js`/`sync-v1-auth.js` (مشترک با پمپ) را نمی‌خوانند:
   PRD-07 راهِ قدیم فقط `product-unit-rules.legacyGuard` پیش از `sync.pushChanges` (ردشده ⇐ تعارضِ همان ردیف با دادهٔ سرور؛ `lib/sync.js` دست نمی‌خورد)؛
