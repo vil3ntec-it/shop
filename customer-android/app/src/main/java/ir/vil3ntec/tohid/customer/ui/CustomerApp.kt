@@ -33,6 +33,8 @@ class Platform(
   val server: () -> String,
   val setServer: (String) -> Unit,
   val version: String,
+  /** کادرِ «نشانیِ سرور (برای آزمون)» — فقط ساختِ آزمونِ دستی (`tohid.serverField`)؛ پیش‌فرض نیست */
+  val serverField: Boolean = false,
   val openMap: (geoUri: String) -> Unit = {},
   val canPickPhoto: Boolean = false,
   val pickPhoto: (done: (ChatPhoto?) -> Unit) -> Unit = { it(null) },

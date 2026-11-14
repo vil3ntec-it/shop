@@ -43,6 +43,7 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Tone
+import ir.vil3ntec.tohid.ui.v3.settings.sections.SyncModel
 import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3PageSwitch
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
@@ -239,7 +240,8 @@ internal fun RouteScope.SignOutRoute(everywhere: Boolean = false) {
 
   val shown = if (reason == SignOutSafety.Reason.NONE) live else maxOf(held, live)
   SignOutContent(
-    ui = SignOutUi(stage, shown, remember(v1) { Backend.isOnline(context) }, v1.lastError, backupPath, busy, reason, everywhere, serverError),
+    //  ⛔ خطای خامِ همگام‌سازی روی برگه نمی‌آید — فقط شکلِ ساده (`SyncModel.reason`، «هیچ جزئیاتِ فنی/زیرساخت در صفحه»)
+    ui = SignOutUi(stage, shown, remember(v1) { Backend.isOnline(context) }, SyncModel.reason(v1.lastError), backupPath, busy, reason, everywhere, serverError),
     actions = SignOutActions(
       signOut = { checkThenLeave() },
       syncNow = { checkThenLeave() },

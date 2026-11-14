@@ -174,12 +174,12 @@ object StrAppData {
     "په دې وسیله د ګوګل حساب نشته، یا ګوګل د دې پروګرام لپاره حساب پیدا نه کړ — د وسیلې په امستنو کې د ګوګل حساب ور ګډ کړئ او بیا یې ووهئ",
   )
   val googleHint: String get() = t(
-    "اگر تکرار شد: شناسهٔ کلاینتِ سرور باید از نوعِ Web باشد و امضای SHA-1 این برنامه در Google Cloud ثبت شده باشد.",
-    "If it happens again: the server's client id must be of type Web and this app's SHA-1 signature must be registered in Google Cloud.",
-    "که بیا پېښ شو: د سرور د کلاینټ پېژندنه باید د Web ډول وي او د دې پروګرام SHA-1 لاسلیک باید په Google Cloud کې ثبت وي.",
+    "اگر تکرار شد، با ایمیل یا شماره وارد شوید و به پشتیبانی خبر بدهید.",
+    "If it happens again, sign in with email or phone number and let support know.",
+    "که بیا پېښ شو، په ایمیل یا شمېره ننوځئ او ملاتړ ته خبر ورکړئ.",
   )
   val googleBadAnswer: String get() = t("پاسخِ گوگل شناخته نشد", "Google's answer wasn't recognised", "د ګوګل ځواب ونه پېژندل شو")
-  val googleBadToken: String get() = t("توکنِ گوگل خوانده نشد", "The Google token couldn't be read", "د ګوګل ټوکن ونه لوستل شو")
+  val googleBadToken: String get() = t("ورود با گوگل کامل نشد؛ دوباره بزنید", "Google sign-in didn't finish; tap again", "د ګوګل ننوتل بشپړ نه شول؛ بیا یې ووهئ")
   val fpTitle: String get() = t("باز کردن فروشگاه من", "Open My Shop", "زما دوکان خلاصول")
   val fpSubtitle: String get() = t("انگشتتان را روی حسگر بگذارید", "Put your finger on the sensor", "خپله ګوته پر سېنسر کېږدئ")
   val fpUsePin: String get() = t("با رمز وارد می‌شوم", "I'll sign in with the PIN", "په رمز ننوځم")
@@ -282,18 +282,20 @@ object StrAppData {
     "دا صادرول د $v بڼې سره جوړ شوی او د پروګرام دا نسخه یې نه پېژني",
   )
   val serverEmpty: String get() = t("پاسخِ سرور خالی بود", "The server's answer was empty", "د سرور ځواب تش و")
+  /** [keys] (کلیدهای پاسخِ سرور) فقط برای سازگاریِ امضا؛ ⛔ دیگر نشان داده نمی‌شود — جزئیاتِ ورود فنی است */
+  @Suppress("UNUSED_PARAMETER")
   fun noTokenSent(keys: Any?): String = t(
-    "توکن در پاسخ نبود — سرور فرستاد: ${asIs(keys)}",
-    "There was no token in the answer — the server sent: $keys",
-    "په ځواب کې ټوکن نه و — سرور ولېږل: $keys",
+    "ورود کامل نشد؛ کمی بعد دوباره امتحان کنید",
+    "Sign-in didn't finish; try again a little later",
+    "ننوتل بشپړ نه شول؛ لږ وروسته بیا هڅه وکړئ",
   )
   val serverShapeBad: String get() = t(
     "پاسخِ سرور شکلِ درستی نداشت",
     "The server's answer wasn't in the right shape",
     "د سرور ځواب سمه بڼه نه درلوده",
   )
-  val noToken: String get() = t("توکن نیامد", "The token didn't arrive", "ټوکن رانغی")
-  val noPublicKey: String get() = t("کلید عمومی نیامد", "The public key didn't arrive", "عامه کیلي رانغله")
+  val noToken: String get() = t("ورود کامل نشد؛ دوباره امتحان کنید", "Sign-in didn't finish; try again", "ننوتل بشپړ نه شول؛ بیا هڅه وکړئ")
+  val noPublicKey: String get() = t("پاسخِ سرور کامل نبود؛ دوباره امتحان کنید", "The server's answer was incomplete; try again", "د سرور ځواب بشپړ نه و؛ بیا هڅه وکړئ")
   val sqBadData: String get() = t(
     "دادهٔ این تغییر روی دستگاه خراب بود؛ دوباره ذخیره کنید.",
     "This change's data on the device was damaged; save it again.",
@@ -348,9 +350,9 @@ object StrAppData {
   val versionUpdates: String get() = t("نسخه و به‌روزرسانی", "Version and updates", "نسخه او تازه کول")
   fun profitBy(dim: Any?): String = t("سود و حاشیه به تفکیک ${asIs(dim)}", "Profit and margin by $dim", "ګټه او حاشیه د $dim له مخې")
   val serverNoDb: String get() = t(
-    "سرور بالاست ولی دیتابیسش وصل نیست",
-    "The server is up but its database isn't connected",
-    "سرور چالان دی خو ډېټابېس یې وصل نه دی",
+    "سرور جواب داد ولی هنوز آماده نیست؛ کمی بعد دوباره بسنجید",
+    "The server answered but isn't ready yet; check again a little later",
+    "سرور ځواب ورکړ خو لا چمتو نه دی؛ لږ وروسته بیا وګورئ",
   )
   val voicePrompt: String get() = t("بگویید دنبالِ چه می‌گردید", "Say what you are looking for", "ووایاست څه لټوئ")
 
