@@ -20,10 +20,14 @@
  *                                    ⇒ ۲۰۱ (همان کلید و بدنه ⇒ ۲۰۰ و `replayed`)؛ فقط `stock.adjust` (بدهیِ تأمین‌کننده)
  *   POST /:id/bills/:billId/void     `{reason}` ⇒ ۲۰۰؛ تکرار بی اثر
  * ⛔ سقفِ نرخ برای هر IP **پیش از** احراز (همان سقفِ عمومی؛ سطلِ جدا).
+ * ⛔ شعبه (فازِ ۳ب ِ `docs/BRANCHES-fa.md`، پرچمِ خاموشِ `shop.branches`): سفارشِ خرید، رسید و فاکتور مالِ شعبه‌اند — شعبه
+ *   فقط از سرآیندِ سنجیدهٔ `X-Branch-Id` (`branch-rest.scope`)، هرگز از بدنه/پارامتر؛ پرچمِ `shop.purchase_orders` سطحِ دکان؛
+ *   سابقهٔ شعبهٔ دیگر `detail.branch` دارد.
  */
 const express = require('express');
 const po = require('../lib/purchase-orders');
 const audit = require('../lib/audit');
+const branchRest = require('../lib/branch-rest');
 const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
@@ -31,12 +35,13 @@ const config = require('../config');
 
 const router = express.Router();
 router.use(rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'purchase-orders-ip' }));
-router.use(requireUser, requireShop, requirePermission('stock.view'));
+router.use(requireUser, requireShop, requirePermission('stock.view'), branchRest.scope);
 
 const needFlag = async (req, res, next) => { await po.requireEnabled(req.shopId); next(); };
 
 const log = (req, action, targetId, detail) => audit.log({
-  shopId: req.shopId, userId: req.user.id, action, targetType: 'purchase_order', targetId, detail, ip: clientIp(req),
+  shopId: req.shopId, userId: req.user.id, action, targetType: 'purchase_order', targetId,
+  detail: branchRest.detailOf(req, detail), ip: clientIp(req),
 });
 
 router.get('/config', async (req, res) => {
@@ -49,44 +54,44 @@ router.get('/config', async (req, res) => {
 
 router.get('/', needFlag, async (req, res) => {
   //  `status` (PUR-02/03): وضعیتِ نمایشی — بخشی/کامل/«باز» از رسیدها روی سرور (lib/purchase-orders.js ‹list›)
-  res.json(await po.list(req.shopId, {
+  res.json(await po.list(req.branchKey, {
     state: req.query.state, status: req.query.status, supplierId: req.query.supplierId, cursor: req.query.cursor, limit: req.query.limit,
   }));
 });
 
 router.get('/:id', needFlag, async (req, res) => {
-  res.json({ order: await po.get(req.shopId, req.params.id) });
+  res.json({ order: await po.get(req.branchKey, req.params.id) });
 });
 
 router.post('/', needFlag, requirePermission('stock.adjust'), async (req, res) => {
   const key = po.clientKeyOf(req);
-  const { order, replayed } = await po.create(req.shopId, { key, body: req.body, userId: req.user.id });
+  const { order, replayed } = await po.create(req.branchKey, { key, body: req.body, userId: req.user.id });
   if (!replayed) await log(req, 'purchase_order.create', order.id, { no: order.no, lines: order.lines.length });
   if (replayed) res.set('Idempotent-Replayed', 'true');
   res.status(replayed ? 200 : 201).json({ order, replayed });
 });
 
 router.put('/:id', needFlag, requirePermission('stock.adjust'), async (req, res) => {
-  const order = await po.update(req.shopId, req.params.id, { body: req.body });
+  const order = await po.update(req.branchKey, req.params.id, { body: req.body });
   await log(req, 'purchase_order.update', order.id, { version: order.version, lines: order.lines.length });
   res.json({ order });
 });
 
 router.post('/:id/send', needFlag, requirePermission('stock.adjust'), async (req, res) => {
-  const { order, changed } = await po.transition(req.shopId, req.params.id, 'send');
+  const { order, changed } = await po.transition(req.branchKey, req.params.id, 'send');
   if (changed) await log(req, 'purchase_order.send', order.id, { no: order.no });
   res.json({ order, changed });
 });
 
 router.post('/:id/cancel', needFlag, requirePermission('stock.adjust'), async (req, res) => {
-  const { order, changed } = await po.transition(req.shopId, req.params.id, 'cancel', { reason: req.body?.reason });
+  const { order, changed } = await po.transition(req.branchKey, req.params.id, 'cancel', { reason: req.body?.reason });
   if (changed) await log(req, 'purchase_order.cancel', order.id, { no: order.no, reason: order.cancelReason || '' });
   res.json({ order, changed });
 });
 
 router.post('/:id/receipts', needFlag, requirePermission('stock.move'), async (req, res) => {
   const headerKey = typeof req.get === 'function' ? req.get('idempotency-key') : undefined;
-  const out = await po.receive(req.shopId, req.params.id, {
+  const out = await po.receive(req.branchKey, req.params.id, {
     body: req.body, headerKey, userId: req.user.id, role: req.role,
   });
   if (!out.replayed) {
@@ -99,7 +104,7 @@ router.post('/:id/receipts', needFlag, requirePermission('stock.move'), async (r
 
 router.post('/:id/bills', needFlag, requirePermission('stock.adjust'), async (req, res) => {
   const headerKey = typeof req.get === 'function' ? req.get('idempotency-key') : undefined;
-  const out = await po.bill(req.shopId, req.params.id, { body: req.body, headerKey, userId: req.user.id });
+  const out = await po.bill(req.branchKey, req.params.id, { body: req.body, headerKey, userId: req.user.id });
   if (!out.replayed) {
     await log(req, 'purchase_order.bill', out.order.id, { bill: out.bill.id, billNo: out.bill.billNo, totalMinor: out.bill.totalMinor });
   } else res.set('Idempotent-Replayed', 'true');
@@ -107,7 +112,7 @@ router.post('/:id/bills', needFlag, requirePermission('stock.adjust'), async (re
 });
 
 router.post('/:id/bills/:billId/void', needFlag, requirePermission('stock.adjust'), async (req, res) => {
-  const out = await po.voidBill(req.shopId, req.params.id, req.params.billId, { reason: req.body?.reason, userId: req.user.id });
+  const out = await po.voidBill(req.branchKey, req.params.id, req.params.billId, { reason: req.body?.reason, userId: req.user.id });
   if (out.changed) await log(req, 'purchase_order.bill_void', out.order.id, { bill: out.bill.id, reason: out.bill.voidReason });
   res.json(out);
 });

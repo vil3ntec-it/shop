@@ -9,14 +9,23 @@
  * چرا خواندن پشتِ اشتراک نیست: صاحب دکان باید بتواند ببیند در نبودش چه
  * گذشت، حتی اگر اشتراکش تمام شده باشد. نوشتن هم آزاد است — خبر داده‌ی
  * دکان نیست، یک پیام است، و بستنش فقط صاحب دکان را کور می‌کند.
+ *
+ * ⛔ شعبه (فازِ ۳ب ِ `docs/BRANCHES-fa.md`، پرچمِ خاموشِ `shop.branches`): خبرهای هر شعبه جدا — شعبه فقط از سرآیندِ سنجیدهٔ
+ * `X-Branch-Id` (`branch-rest.scope`)؛ شعبهٔ اصلی همان دفترِ امروز (`lib/events.js`)، شعبهٔ دیگر `lib/branch-events.js`
+ * (همان منطق، جدولِ جدا، زنگ فقط به اعضای همان شعبه).
  */
 const express = require('express');
 const v = require('../lib/validate');
 const events = require('../lib/events');
+const branchEvents = require('../lib/branch-events');
+const branchRest = require('../lib/branch-rest');
 const { requireUser, requireShop } = require('../middleware/auth');
 
 const router = express.Router();
-router.use(requireUser, requireShop);
+router.use(requireUser, requireShop, branchRest.scope);
+
+/** دفترِ خبرِ همین درخواست: اصلی ⇒ همان امروز (کلید = دکان)؛ شعبهٔ دیگر ⇒ دفترِ جدای همان شعبه (کلید = بخش) */
+const bookOf = (req) => (req.branchId ? branchEvents : events);
 
 /*
  *  ⛔ ممیزیِ ۳۵ (B6): زمانِ خبر از دستگاه می‌آید (صفِ بی‌اینترنت زمانِ خودش را دارد)، ولی **آینده** نه. خبرِ ۲۰۵۸ ِ
@@ -32,10 +41,10 @@ router.post('/', async (req, res, next) => {
     const t = require('../db').now();
     const items = (Array.isArray(req.body?.events) ? req.body.events
       : (req.body?.kind ? [req.body] : [])).map((it) => (it && typeof it === 'object' ? { ...it, at: atOf(it.at, t) } : it));
-    const out = await events.record(
-      { shopId: req.shopId, userId: req.user.id, userName: req.user.name || '' },
-      items
-    );
+    const who = { userId: req.user.id, userName: req.user.name || '' };
+    const out = req.branchId
+      ? await branchEvents.record(req.branchKey, who, items)
+      : await events.record({ shopId: req.shopId, ...who }, items);
     res.status(201).json({ ...out, serverTime: require('../db').now() });
   } catch (err) { next(err); }
 });
@@ -44,11 +53,12 @@ router.get('/', async (req, res, next) => {
   try {
     const since = v.integer(req.query?.since, { field: 'since', min: 0, max: Number.MAX_SAFE_INTEGER, def: 0 });
     const limit = v.integer(req.query?.limit, { field: 'limit', min: 1, max: 200, def: 50 });
-    const list = await events.list(req.shopId, { since, limit });
+    const book = bookOf(req);
+    const list = await book.list(req.branchKey, { since, limit });
     res.json({
       events: list,
-      seenAt: await events.seenAt(req.shopId, req.user.id),
-      unread: await events.unreadCount(req.shopId, req.user.id),
+      seenAt: await book.seenAt(req.branchKey, req.user.id),
+      unread: await book.unreadCount(req.branchKey, req.user.id),
       serverTime: require('../db').now(),
     });
   } catch (err) { next(err); }
@@ -61,7 +71,7 @@ router.post('/seen', async (req, res, next) => {
     const at = Math.min(v.integer(req.body?.at, {
       field: 'at', min: 0, max: Number.MAX_SAFE_INTEGER, def: t,
     }), t + SKEW_MS);
-    await events.markSeen(req.shopId, req.user.id, at);
+    await bookOf(req).markSeen(req.branchKey, req.user.id, at);
     res.json({ ok: true, seenAt: at });
   } catch (err) { next(err); }
 });

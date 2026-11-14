@@ -14,12 +14,16 @@
  * ⛔ پیش‌فرض خاموش: بی پرچمِ `shop.held_sync` ⇒ `GET` فقط `{enabled:false}` و `PUT`/`DELETE` ۴۰۳ `held_sync_disabled`.
  * ⛔ shop_id فقط از عضویتِ توکن. سقف: سطلِ IP پیش از احراز، سپس سطلِ هر کاربر. فقط برنامهٔ دکان، نه sync-v1.
  * ⛔ کلیدِ اشتراک ندارد (SUB-10: FREE): نگه‌داشتنِ فاکتور بخشی از صندوقِ پایه است؛ دادهٔ دکان گروگان نمی‌شود.
+ * ⛔ شعبه (فازِ ۳ب ِ `docs/BRANCHES-fa.md`، پرچمِ خاموشِ `shop.branches`): نگه‌داشته مالِ شعبه است — شعبه فقط از سرآیندِ
+ *   سنجیدهٔ `X-Branch-Id` (`branch-rest.scope`)، هر خواندن/نوشتن فقط در همان شعبه (`req.branchKey`). خبرِ سوکت فقط برای
+ *   شعبهٔ اصلی (سوکتِ دکان مالِ دستگاه‌های اصلی است؛ دستگاهِ شعبه با دورِ بعدی می‌گیرد)؛ سابقهٔ شعبه `detail.branch` دارد.
  */
 const express = require('express');
 const config = require('../config');
 const held = require('../lib/shop-held-sync');
 const audit = require('../lib/audit');
 const perms = require('../lib/staff-perms');
+const branchRest = require('../lib/branch-rest');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { forbidden } = require('../middleware/errors');
@@ -27,7 +31,7 @@ const { forbidden } = require('../middleware/errors');
 const router = express.Router();
 router.use(rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-held-ip' }));
 const limit = rateLimit({ max: 240, windowMs: 60 * 1000, keyPrefix: 'shop-held', key: (req) => req.user && req.user.id });
-router.use(requireUser, requireShop, limit, requirePermission('data.write'));
+router.use(requireUser, requireShop, limit, requirePermission('data.write'), branchRest.scope);
 
 const needFlag = async (req, res, next) => {
   if (!(await held.flagOn(req.shopId))) return next(forbidden('پشتیبانِ فاکتورهای نگه‌داشته برای این دکان روشن نیست', 'held_sync_disabled'));
@@ -36,6 +40,7 @@ const needFlag = async (req, res, next) => {
 
 /** خبر به دستگاه‌های دیگرِ همان دکان — خودِ داده از این در نمی‌رود (همان `settings`) */
 function relay(req, rev) {
+  if (req.branchId) return;   //  شعبهٔ دیگر: rev ِ آن به سوکتِ دستگاه‌های اصلی نمی‌رود
   try {
     require('../lib/sync-v1-live').relay({ app: 'shop', accountKind: 'shop', accountId: String(req.shopId) }, { event: 'held', rev });
   } catch { /* سوکت نبود: دستگاه‌ها با دورِ بعدی می‌گیرند */ }
@@ -44,12 +49,12 @@ function relay(req, rev) {
 router.get('/', async (req, res) => {
   if (!(await held.flagOn(req.shopId))) return res.json({ enabled: false });
   const since = Number.parseInt(typeof req.query.since === 'string' ? req.query.since : '0', 10);
-  const out = await held.read(req.shopId, Number.isSafeInteger(since) ? since : 0, req.user.id);
+  const out = await held.read(req.branchKey, Number.isSafeInteger(since) ? since : 0, req.user.id);
   res.json({ enabled: true, ...out, permissions: { cancel: await perms.memberAllows(req, 'sales.cancel') } });
 });
 
 router.put('/:id', needFlag, async (req, res) => {
-  const out = await held.put(req.shopId, { userId: req.user.id }, req.params.id, req.body);
+  const out = await held.put(req.branchKey, { userId: req.user.id }, req.params.id, req.body);
   if (out.applied) relay(req, out.item.rev);
   res.json({ enabled: true, ...out });
 });
@@ -57,20 +62,21 @@ router.put('/:id', needFlag, async (req, res) => {
 router.delete('/:id', needFlag, async (req, res) => {
   const q = (k) => (typeof req.query[k] === 'string' ? req.query[k] : undefined);
   const canCancel = await perms.memberAllows(req, 'sales.cancel');
-  const out = await held.remove(req.shopId, { userId: req.user.id, deviceId: q('device_id') }, req.params.id,
+  const out = await held.remove(req.branchKey, { userId: req.user.id, deviceId: q('device_id') }, req.params.id,
     { version: q('version'), reason: q('reason'), base: q('base'), claim: q('claim'), force: q('force') }, canCancel);
   if (out.claim && out.claim.takeover) {
     const t = out.claim.takeover;
     await audit.log({
       shopId: req.shopId, userId: req.user.id, action: 'held.takeover', targetType: 'held_invoice', targetId: req.params.id,
-      detail: { from_series: t.series, from_reason: t.reason, fresh: t.fresh, version: out.version }, ip: clientIp(req),
+      detail: branchRest.detailOf(req, { from_series: t.series, from_reason: t.reason, fresh: t.fresh, version: out.version }),
+      ip: clientIp(req),
     });
   }
   if (out.deleted) {
     if (q('reason') === 'deleted') {
       await audit.log({
         shopId: req.shopId, userId: req.user.id, action: 'held.discard', targetType: 'held_invoice', targetId: req.params.id,
-        detail: { others: out.others, version: out.version }, ip: clientIp(req),
+        detail: branchRest.detailOf(req, { others: out.others, version: out.version }), ip: clientIp(req),
       });
     }
     relay(req, out.rev);
