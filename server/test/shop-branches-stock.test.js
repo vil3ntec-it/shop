@@ -324,6 +324,10 @@ test('آینهٔ کاتالوگ: کالا، دسته و واحدِ اصلی با
     [key, table])).map((r) => [r.row_id, r.deleted_at === null ? r.data.name : null]).sort((x, y) => (x[0] < y[0] ? -1 : 1));
   const KA = `${s.shopId}#${A}`;
   assert.deepEqual(await rowsIn(KA, 'products'), [], 'پیش از نخستین pull ِ الف هیچ');
+  //  hello ِ شعبه می‌گوید کاتالوگ این‌جا فقط‌خواندنی است؛ hello ِ اصلی همان پیشین (بی `branch`)
+  const hi = await v3(w.onlyA, 'hello', A);
+  assert.deepEqual(hi.body.branch, { id: A, catalog_read_only: ['products', 'productCategories', 'productUnits'] });
+  assert.equal((await v3(s, 'hello')).body.branch, undefined);
   const p1 = await v3(w.onlyA, `pull?device_id=${w.onlyA.device}&since=0`, A);
   assert.equal(p1.status, 200, JSON.stringify(p1.body));
   const cat1 = p1.body.ops.filter((o) => ['products', 'productCategories', 'productUnits'].includes(o.table));

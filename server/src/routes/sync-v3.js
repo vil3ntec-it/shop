@@ -92,7 +92,9 @@ async function send(req, res, payload) {
 }
 
 router.get('/hello', (req, res) => {
-  res.json({ ok: true, enabled: true, ...sync.describe(req.sync) });
+  //  شعبهٔ غیرِ اصلی (فازِ ۳): شعبه و جدول‌های فقط‌خواندنیِ کاتالوگِ دکان، تا برنامه ویرایشِ کالا را در همین شعبه نشان ندهد
+  const branch = req.syncBranch ? { branch: { id: req.syncBranch.branchId, catalog_read_only: branchCatalog.TABLES } } : {};
+  res.json({ ok: true, enabled: true, ...sync.describe(req.sync), ...branch });
 });
 
 router.post('/push', requireSyncWrite, async (req, res, next) => {
