@@ -44,7 +44,7 @@ object PlainError {
     Regex("""(?m)^\s*at\s+[\w$.<>]+\("""),
     Regex("""(?i)\bstack\s?trace\b|\bcaused by\b"""),
     //  کدِ فنی: HTTP 500، status=404، (503)، E_TIMEOUT، ECONNREFUSED، errno
-    Regex("""(?i)\b(?:status|code|errno|http|err|error)\s*[:=#]?\s*\d{3,}\b"""),
+    Regex("""(?i)(?:\b(?:status|code|errno|http|err|error)|خطای|خطا|کد|وضعیت)\s*[:=#]?\s*\d{3,}\b"""),
     Regex("""\(\s*\d{3}\s*\)"""),
     Regex("""\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b"""),
     Regex("""\bE(?:CONN[A-Z]+|NOTFOUND|TIMEDOUT|ACCES|PIPE|HOSTUNREACH|NETUNREACH|ADDRINUSE)\b"""),
