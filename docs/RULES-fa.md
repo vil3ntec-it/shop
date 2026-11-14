@@ -508,6 +508,17 @@
   زنجیرهٔ زندهٔ push ِ v1 (`conflict-inbox.pushV1`) با همان `op_id`. کارهای پس از دورِ `SyncV1Worker` همه در `sweepAfterPull`، هر کدام در `runCatching`.
   سنجه: `product-unit-rules`، `pay-status-mirror`، `customer-access-offline`، `customer-erasure-ledger`، `scenario-s44.e2e.mjs`، `ScenarioS76ServerDesktopTest`.
 
+- ⛔ **گروهِ الف، ماندهٔ کدِ د۱۸ (`claude/e-rows-56c`)** — هر کدام پشتِ پرچمِ خاموشِ خودش؛ خاموش ⇒ همان پاسخ و همان رفتار، بایت‌به‌بایت:
+  S44 دکمهٔ «بازیابی از پشتیبان» فقط وقتی `GET /shop/devices` کلیدِ `replay` دارد (پرچمِ `shop.lost_device_replay`؛ خاموش ⇒ پاسخ بی کلیدِ تازه)، فقط
+  برای دستگاهِ **غیرفعال** و فقط برای صاحب (`LostDeviceRestore.canReplay`)، در صفحهٔ عضو و بخشِ «دستگاه‌ها»؛ از فایلِ پشتیبان فقط قلمِ
+  `pending-ops.json` خوانده می‌شود (`LostDevicePendingAndroid.read`، رمزدار با عبارت ⇐ پرسیدنِ عبارت؛ هیچ پوشهٔ موقتِ بازیابی ساخته نمی‌شود).
+  S09 لغوِ خودکارِ فروشِ دوم (پرچمِ `shop.held_twice_cancel`، `auto_cancel` ِ `GET /shop/held-invoices`): فقط دستگاهی که `held_conflict` گرفت و فقط
+  فروشِ **خودش** (کلیدِ تازهٔ بازگرداندنِ بی شبکه، `HeldSyncState.Op.sale`)، فقط وقتی **دقیقاً یک** فروشِ دیگر از سریِ دیگر پس از نسخهٔ دیده‌شده
+  قلم‌به‌قلم، مبلغ و قرض‌دار با آن یکی است (`HeldTwice.decide`)؛ بی اجازهٔ `sales.cancel` لغو نمی‌شود. لغو فقط از راهِ عادی (`SalesVoid.run` ⇐
+  `ShopStore.save` ⇐ `DocChainSync.recordVoid`) و همیشه گزارش به صندوقِ تعارضِ صاحب (`POST /shop/held-invoices/:id/twice`، گونهٔ `held_twice`،
+  `held_twice`/`held_twice_open`؛ فقط «کنار بگذار» یا «اصلاح و ثبت»، هرگز «دوباره ثبت»). سرور با گزارش هیچ ردیفِ دفتری نمی‌سازد.
+  سنجه: `held-twice.test.js`، `lost-device-replay-button.test.js`، `HeldTwiceTest`، `LostDeviceRestoreDesktopTest`.
+
 ### v3 · دفترِ محلی و مهاجرتِ داده
 
 - دفترِ وب در IndexedDB فقط با نشانهٔ `tohid-ledger-store-v1 = idb` (پیش‌فرض خاموش)؛ دفتر و سایه/صف/cursorِ همگام‌سازی در یک تراکنش نوشته می‌شوند (#228).
@@ -652,6 +663,12 @@
 - سندِ `posted` ویرایش نمی‌شود؛ اصلاح فقط با سندِ معکوس (`reverses`، `reason`، `by` اجباری؛ معکوسِ معکوس رد) (SEC-03، #242).
 - بررسی با `npm run verify-chain` (خروجِ ۰ سالم، ۲ شکسته، ۱ خطا) (#242).
 - هر خروجیِ کاملِ مالک یک ردیفِ سابقهٔ `data_export` می‌سازد (§۲۱.۲، #247).
+- ⛔ SEC-02، اسنادِ بی‌شماره (`claude/e-rows-56c`): برگشت، قرض/رسید، خرید و پرداخت به تأمین‌کننده هر ردیف یک سند (`core/audit/DocChainDocs`،
+  بردارِ `core/test-vectors/doc-chain-docs-v1.json` با سازندهٔ `server/scripts/doc-chain-docs-vectors.js`)، فقط بخش‌های تغییرناپذیر و بی دادهٔ شخصی
+  (نه یادداشت، دلیل، سررسید، شمارهٔ فاکتورِ خرید، هزینهٔ جانبی یا شیفت — این‌ها ویرایش‌پذیرند). «تا کجا» نشانِ `DocChainState` است: `docFrom` (آغاز؛
+  گذشته دوباره ساخته نمی‌شود)، `docAt` (هرگز جلوتر از ساعتِ دستگاه) و کلیدهای پنجرهٔ سه‌روزهٔ `DocChainDocs.SETTLE_MS` — سندِ دیررسیده در پنجره یک بار،
+  پیش از آن «بی لنگر» در صفحهٔ «بررسیِ یکپارچگی». ⛔ بی اسنادِ بی‌شماره (`docFrom = -1`) وضعیت بایت‌به‌بایت همان پیشین است. صفحهٔ «بررسیِ یکپارچگیِ
+  اسناد» (`audit/doc-chain`، درش فقط با پرچم) هر حلقه را از دفترِ امروز **از نو می‌سازد** و با بدنهٔ لنگرخورده می‌سنجد (`DocChainAudit`)؛ فقط می‌خواند.
 - ⛔ SEC-02 (زنجیرهٔ اسنادِ دستگاه، پرچمِ `shop.doc_chain`): منطق فقط در `core/src/commonMain/.../core/audit` (`Sha256` ِ خالص با بردارِ NIST، `HashChain`، `PostedDocument`، `DocChain`، `DocChainCycle`)؛ برنامه فقط مرزِ `sync/platform/DocChainSync.kt` (دیسک، شبکه، ساعت). سند بی دادهٔ شخصی و فقط بخش‌های تغییرناپذیرِ فاکتور (مبلغ پول، مقدار هزارم)، با `chain` و `seq` ِ خودش؛ شکلِ سند با `core/test-vectors/doc-chain-v1.json` (سازنده: `server/scripts/doc-chain-vectors.js`) قفل است — شکلِ تازه ⇐ `"v": 2`.
 - ⛔ گزارشِ زنجیره جدا از push است (`GET`/`POST /api/sync/v1/chain`): هرگز op یا فروشی را رد نمی‌کند؛ هر ناهمخوانی (`fork`، `rollback`، `prev_mismatch`، `hash_mismatch`، `not_canonical`، `body_mismatch`، `series_owner`، `local_broken`/`truncated`، `restarted`) یک رویدادِ `security.doc_chain` در سابقه است، نه هر دور؛ جهشِ دوره بیش از ۱۶ (`bad_epoch`) بی ردیف و بی رویداد رد می‌شود و دستگاه دورهٔ درست را از نو می‌گیرد. حلقه‌های سالم در `hash_chain` (`doc/<دکان>/<سری>/<دوره>`) می‌نشینند و ابزارِ «بررسیِ زنجیره» ِ پنل همان‌ها را می‌سنجد.
 - ⛔ SEC-03: هر صفحه‌ای که لغو یا «اصلاح در سبد» دارد کنترل را فقط از `InvoiceVoid.check` (core) می‌گیرد (فاکتور هست، لغوشده/اینترنتی نیست، اجازه، دلیلِ ۱ تا ۱۲۰ نویسه؛ اصلاح دلیلِ ثابتِ «ویرایش در سبد») و **پس از** `store.save` ِ موفق `DocChainSync.recordVoid` را صدا می‌زند (سندِ معکوس با `reverses`، قرینهٔ مقدار و مبلغ؛ حلقهٔ «ثبت» دست نمی‌خورد). تاریخچهٔ امروز وصل است؛ `CancelSheet` ِ نسخهٔ ۳ (#391) هنگامِ ادغام همین دو را بگیرد.
