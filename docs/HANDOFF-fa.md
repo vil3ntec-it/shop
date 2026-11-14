@@ -57,6 +57,47 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-63p زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-63p` (از `origin/claude/batch-63` baff32f2e) — حریمِ خصوصی و شرایط درونِ برنامه‌ها، بی GitHub؛ نسخهٔ فروشگاهی بی کدِ به‌روزرسانی
+
+- **خواستهٔ صاحب‌کار:** صفحهٔ حریمِ خصوصی از `vil3ntec-it.github.io/shop/privacy.html` باز می‌شد و GitHub ِ او را به کاربر و مهاجم
+  نشان می‌داد ⇒ حریمِ خصوصی و شرایط **درونِ خودِ برنامه‌ها**، هیچ پیوندِ GitHub در برنامه‌ها، و نشانیِ عمومیِ فهرستِ فروشگاه‌ها روی
+  دامنهٔ خودِ سرور. سپس (پیامِ هماهنگ‌کننده، تصمیمِ صاحب‌کار) نسخهٔ Play/بازار اصلاً کدِ به‌روزرسانی و نشانیِ GitHub نداشته باشد.
+- **منبعِ یکتا:** `core/legal/legal-texts.json` (حریمِ خصوصی ۷ بخش و شرایطِ ۹ بند؛ fa همان `privacy.html` و `lib/terms.js` ِ پیشین،
+  بایت‌به‌بایت؛ en و ps تازه — ⚠️ ترجمهٔ ماشینیِ Claude، بازبینیِ گویندهٔ پشتو/انگلیسی مانده؛ دری از `DariText`). `node tools/legal/generate.mjs`
+  رونوشتِ سرور (`server/src/lib/legal-texts.json`) و کاتلین (`core/.../legal/LegalTexts{Fa,En,Ps}.kt`) را می‌سازد؛ API: `core/.../legal/Legal.kt`
+  (`doc(kind, lang)`، `spans` برای `**پررنگ**` و `[نوشته](/مسیرِ-نسبی)`، `TERMS_VERSION`).
+- **صفحه‌ها:** برنامهٔ دکان `LegalPage.kt` (مسیرِ تازهٔ `legal/privacy`؛ `auth/terms` با نامِ دیگرِ `legal/terms`؛ `TermsPage` همان صفحه)
+  ⇐ «درباره برنامه» (حریمِ خصوصی + ردیفِ تازهٔ شرایط)، «ویرایش حساب»، حالتِ پیک (`CourierLegal.kt`: کارتِ برگهٔ «حساب» و زیرصفحهٔ
+  `legal:*` در همان `page` ِ «نقدِ من» — `CourierHome.kt` بی رشد، ۸۱۸)؛ کامپیوتر و آیفونِ دکان همان پرونده‌ها. `data/Terms.kt` حالا از
+  core و به زبانِ برنامه. برنامهٔ خرید `LegalScreen.kt` (`LegalRoute` زیرکلاسِ `Route` در پروندهٔ جدا چون `CustomerModel.kt` ۸۰۰ خط است؛
+  دو دکمه در «تنظیمات»)؛ آیفونِ خرید همان. وبِ خریدار: پیوندِ `/legal/privacy|terms?lang=` در پنجرهٔ تنظیمات (`kit/settings.js`، کلیدهای
+  `set.privacy`/`set.terms`).
+- **سرور:** `routes/legal-pages.js` سوار در `app.js` با همان یک خطِ سرخطِ «پورتال و SDK» (۸۰۵ خط، بی رشد): `GET /legal/privacy`،
+  `/legal/terms`، `/legal/` ⇐ ۳۰۲؛ عمومی، بی نشست و کوکی، HTML با `Cache-Control: public, max-age=3600`، ETag ِ محتوا و ۳۰۴، CSP ِ بی اسکریپت
+  (style با hash)، فقط پیوندِ نسبی، `?lang=fa|prs|en|ps`. `lib/terms.js` از همان منبع؛ پاسخِ `GET /api/auth/terms` و `terms.version`=«1» ِ
+  ثبت‌نام بایت‌به‌بایت همان (سنجیده با پروندهٔ پیشین). ⚠️ اگر سرور پشتِ پنلِ خانگی است و فقط پیشوندهای شناخته را می‌فرستد، `/legal` باید
+  آن‌جا هم برود (ریپوی `server` دست نخورد؛ دستور در `OWNER-NEXT-fa.md` بخشِ ۳).
+- **GitHub در نوشته‌ها:** `AccountDeletion.PRIVACY_URL` رفت؛ پیامِ خطای به‌روزرسانی (`StrUpdate.github*`، نام‌ها همان) «سرورِ انتشارها»
+  می‌گوید (+ `DariText.PHRASES`، `dari.js`، `DARI-REVIEW-fa.md`)؛ توضیحِ `PlusCode.kt`.
+- **نسخهٔ فروشگاهی:** `update/Updater.kt` با `git mv` به `android-native/app/src/direct/java` (بی هیچ تغییرِ متن)؛ `app/build.gradle.kts`:
+  `sourceSets["main"].java.srcDir(if (storeManaged) "src/store/java" else "src/direct/java")`؛ `src/store/.../UpdaterStoreAndroid.kt` همان API
+  بی شبکه و بی نشانی. سقفِ `platformDeps` ِ همان پرونده به مسیرِ تازه رفت (۱۷، بی تغییر)؛ سطرِ `update/Updater.kt` ِ `desktop/build.gradle.kts`
+  (`replaced`) و `ios/shared/ios-exclude.txt` توضیح شد چون پرونده دیگر در `src/main` نیست. `GOOGLE-PLAY-fa.md` §۲.۱ و §۴/§۶ (نشانیِ تازه).
+- **آزمون‌های تازه:** core `LegalTest` (۷)؛ کامپیوتر `LegalPagesUiTest` (۵: هر دو سند در fa/prs/en/ps، دکمهٔ «می‌پذیرم»، «درباره» ⇐ صفحهٔ
+  درونِ برنامه، `legal/terms`، برگهٔ «حساب» ِ پیک)؛ برنامهٔ خرید `CustomerLegalTest` (۲، فقط CI)؛ سرور `legal-pages` (۶)، `legal-texts` (۵:
+  `--check`، قاعده‌های منبع، قراردادِ شرایط، برابریِ `privacy.html` با منبع، نامِ پیوندهای وب)، `no-github-in-apps` (۲)، `store-build-updater` (۴).
+- **تغییرِ عمدیِ آزمون/نگهبان:** (۱) `self-delete`، `privacy-erasure-text` و `backup-passphrase-warning` هنوز `privacy.html` را می‌خوانند؛
+  `legal-texts.test.js` برابریِ بند‌به‌بندِ آن با فارسیِ منبع را قفل می‌کند، پس آن سه منبع را هم می‌پوشانند — با پاک شدنِ `privacy.html`
+  باید به `server/src/lib/legal-texts.json` برگردانده شوند. (۲) `no-github-in-apps` عمداً بیرون می‌گذارد: آزمون‌ها، پوشه‌های `update/`
+  (`Updater*`، `ReleaseFeed.kt`: کانالِ به‌روزرسانیِ نسخهٔ مستقیم)، پوستهٔ بازنشستهٔ `android/`، پنلِ مدیر (`public/admin`، پیوندِ
+  انتشارهای آزمایشی) و صفحه‌های GitHub Pages ِ ریشه. (۳) سه سطرِ «گیت‌هاب» ِ `DARI-REVIEW-fa.md` به متنِ تازه.
+- **اجرا:** __RUNS__
+- **نیمه‌کاره/قدمِ بعدی:** (۱) صاحب‌کار نشانیِ Play Console (و بازار/App Store) را به `https://<دامنه>/legal/privacy` برگرداند ⇒ `privacy.html`
+  (و پیوندش در `index.html` ِ ریشه) پاک و سه آزمونِ بالا به منبع برگردانده شود. (۲) بازبینیِ ترجمهٔ en/ps ِ متنِ حقوقی. (۳) هنوز در کد:
+  پیشفرضِ `update_repo` = «vil3ntec-it/shop» در `UpdateBanner`/`ShellNotices`/`More.kt` (نامِ مخزن، نه نشانی؛ در نسخهٔ فروشگاهی بی‌اثر)،
+  پیوندهای انتشارِ آزمایشیِ پنلِ مدیر، و `index.html`/`download.html` ِ GitHub Pages — تصمیمِ کانالِ به‌روزرسانی. (۴) ساختِ اندرویدِ
+  `-Pstore=play|bazaar` و `customer-android` فقط در CI سنجیده می‌شود (این‌جا Android SDK نیست).
+
 ### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-59b زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-59b` (از `origin/claude/batch-62` 21e7499a8) — شعبه درونِ یک دکان، فازِ ۳ ِ سرور
 
 - **ساخته شد (فقط سرور، پشتِ پرچمِ خاموشِ `shop.branches`؛ طراحی و جدولِ درها: [`BRANCHES-fa.md`](BRANCHES-fa.md) §۹؛ مهاجرتِ ۹۰۰ + rollback):**

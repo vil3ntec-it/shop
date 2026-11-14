@@ -78,12 +78,12 @@ internal fun AboutScreen(data: ShopData, onBack: (() -> Unit)?) {
       V3Section(StrAccount.privacyPolicy) {
         V3ListRow(
           StrAccount.privacyPolicy, subtitle = StrAccount.privacyLine, icon = Icons.Outlined.PrivacyTip, hue = V3Hue.BRAND,
-          onClick = { nav.open(OnboardingPaths.PRIVACY) },
+          onClick = { nav?.open(OnboardingPaths.PRIVACY) },
         )
         V3Divider(start = 64.dp)
         V3ListRow(
           StrAuth.termsShort, subtitle = StrAuth.termsTap(Terms.SECTIONS.size), icon = Icons.Outlined.Description, hue = V3Hue.VIOLET,
-          onClick = { nav.open(OnboardingPaths.TERMS) },
+          onClick = { nav?.open(OnboardingPaths.TERMS) },
         )
       }
     }
