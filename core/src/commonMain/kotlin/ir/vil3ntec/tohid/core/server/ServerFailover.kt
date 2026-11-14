@@ -63,6 +63,72 @@ object ServerFailover {
     }
     return Pick.None(mismatched)
   }
+
+  /**
+   *  سنجشِ نشانی‌ها یکی‌یکی به ترتیبِ [order]، تا نخستین که پذیرفته شد — همان حلقهٔ `recheck` ِ برنامهٔ دکان، حالا
+   *  مشترکِ همهٔ برنامه‌ها (دکان و پیک، خریدِ مشتری). [ask] پاسخِ `config/server` (یا `/api/health`) ِ یک نشانی؛
+   *  `null` یعنی نرسید.
+   *
+   *  سرورِ پیش‌فرض: نشانیِ اصلی‌اش در خودِ نسخه است و سنجاقش اجباری نیست (صاحب محصول سرورش را جابه‌جا می‌کند)؛
+   *  هر نشانیِ دیگر فقط با همان `serverId` ِ سنجاق‌شده ([judge]).
+   */
+  fun choose(profile: ServerProfile, lastGood: String?, ask: (String) -> ServerInfo?): Pick {
+    val probes = ArrayList<Probe>()
+    for (u in order(profile.urls, lastGood)) {
+      val probe = Probe(u, ask(u))
+      probes += probe
+      val info = probe.info ?: continue
+      val primaryOfDefault = profile.isDefault && ServerAddress.normalize(u) == profile.primary
+      if (primaryOfDefault || judge(profile, probe) == Judgement.ACCEPT) return Pick.Chosen(ServerAddress.normalize(u), info)
+    }
+    return pick(profile, probes)
+  }
+}
+
+/**
+ *  نشانی‌های تازهٔ **همان** سرور، از زبانِ خودِ سرور (`publicUrls` ِ `config/server`) — بی نسخهٔ تازه و بی کیو‌آر.
+ *
+ *  ⛔ فقط سرورِ سنجاق‌شده (همان `serverId` ِ پروفایل، پاسخ از نشانیِ خودِ پروفایل) می‌گوید؛ و هر نشانیِ گفته‌شده تا خودش
+ *  همان `serverId` را ندهد ([adopt]) به پروفایل نمی‌رود. ⛔ نشانیِ شبکهٔ محلی هرگز آموخته نمی‌شود: گواهیِ خودامضا
+ *  سنجاق می‌خواهد و سنجاق فقط با دستِ صاحبِ دکان (کیو‌آر یا «بررسی») — همان قاعدهٔ امروز.
+ */
+object ServerLearn {
+
+  /** هر چند وقت سرورِ مورد اعتماد دوباره پرسیده شود، فقط برای نشانیِ تازه (جابه‌جایی جدا و زودتر است) */
+  const val LEARN_MS: Long = 6 * 60 * 60_000L
+
+  /** نشانی‌های اعلام‌شده‌ای که هنوز در پروفایل نیستند و قاعدهٔ نشانی را دارند — هنوز سنجیده نشده‌اند */
+  fun candidates(profile: ServerProfile, from: String, info: ServerInfo, devBuild: Boolean = false): List<String> {
+    val pinned = profile.serverId ?: return emptyList()
+    if (info.serverId != pinned || ServerAddress.normalize(from) !in profile.urls) return emptyList()
+    val room = ServerProfiles.MAX_URLS - profile.urls.size
+    if (room <= 0) return emptyList()
+    return (listOf(info.publicUrl) + info.publicUrls).asSequence()
+      .filter { it.isNotEmpty() }
+      .mapNotNull { (ServerAddress.check(it, lanAllowed = false, devBuild = devBuild) as? ServerAddress.Verdict.Ok)?.parts }
+      .filter { it.kind == ServerAddress.HostKind.PUBLIC_NAME || it.kind == ServerAddress.HostKind.PUBLIC_IP }
+      .map { it.url }
+      .filter { it !in profile.urls }
+      .distinct().take(room).toList()
+  }
+
+  /** نشانیِ آموخته فقط وقتی به پروفایل می‌رود که خودش همان `serverId` را داده باشد؛ وگرنه `null` */
+  fun adopt(profile: ServerProfile, url: String, answer: ServerInfo?): ServerProfile? {
+    val pinned = profile.serverId ?: return null
+    if (answer == null || answer.serverId != pinned) return null
+    val u = ServerAddress.normalize(url)
+    if (u.isEmpty() || u in profile.urls || profile.urls.size >= ServerProfiles.MAX_URLS) return null
+    return profile.copy(urls = profile.urls + u)
+  }
+
+  /** هر نشانیِ اعلام‌شده را جدا می‌پرسد ([ask]) و فقط آن‌ها را که همان سرورند می‌افزاید؛ بی تغییر ⇒ همان [profile] */
+  fun learn(profile: ServerProfile, from: String, info: ServerInfo, devBuild: Boolean = false, ask: (String) -> ServerInfo?): ServerProfile {
+    var p = profile
+    for (c in candidates(profile, from, info, devBuild)) {
+      p = adopt(p, c, runCatching { ask(c) }.getOrNull()) ?: p
+    }
+    return p
+  }
 }
 
 /**

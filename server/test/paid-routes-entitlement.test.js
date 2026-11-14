@@ -149,6 +149,8 @@ FLAGS.push('shop.customer_erasure');
 FLAGS.push('shop.storefront.promo_guard');
 //  WEB-04: تنظیمِ زمانِ تقریبیِ تحویل (`PUT /shop/storefront/eta`) با پرچمِ خودش
 FLAGS.push('shop.storefront.eta');
+//  SERVERS §۳: نشانی‌های دیگرِ ویترین (`PUT /shop/storefront/hosts`) با پرچمِ خودش
+FLAGS.push('shop.storefront.host_alias');
 //  RSK-08: پروندهٔ مدرکِ اختلافِ سفارش (`POST /shop/orders/evidence/:id/disputes…`، PAID با needWrite) با پرچمِ خودش
 FLAGS.push('shop.orders.dispute_file');
 //  NTF-10: سیاستِ پوزش و کوپنِ تأخیر (`PUT /shop/orders/late-apology`) با پرچمِ خودش

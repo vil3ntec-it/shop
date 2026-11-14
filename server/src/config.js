@@ -54,6 +54,12 @@ const config = {
    *  `GET /api/v1/config/server`. `PUBLIC_URL` نامِ دومِ همین است (docs/SERVERS-fa.md).
    */
   serverUrl: process.env.SERVER_URL || process.env.PUBLIC_URL || '',
+  /**
+   *  نشانی‌های عمومیِ دیگرِ **همین** سرور، با کاما (`PUBLIC_BASE_URLS=https://a.example,https://b.example`) ⇒
+   *  `publicUrls` ِ `GET /api/v1/config/server`. برنامه‌ای که همین سرور را می‌شناسد (همان `serverId`) هر کدام را جدا
+   *  می‌پرسد و فقط اگر همان شناسه را بدهد نشانیِ جایگزین می‌کند (docs/SERVERS-fa.md §۳). خالی (پیش‌فرض) ⇒ پاسخ همان امروز.
+   */
+  publicBaseUrls: String(process.env.PUBLIC_BASE_URLS || ''),
 
   /**
    *  HTTPS ِ مستقیم، بی Caddy و بی تونل — برای سرورِ شبکهٔ دکان (برنامه‌ها `http` ِ شبکه را
@@ -468,6 +474,9 @@ const config = {
     //  CHK-08 / ۴-۳: الگوی تکه‌های نقشهٔ پینِ ثبت (`lib/store-map.js`)، مثلاً https://tile.openstreetmap.org/{z}/{x}/{y}.png؛ خالی ⇒ بی نقشه
     mapTiles: String(process.env.STORE_MAP_TILES || '').trim(),
     domain: String(process.env.STOREFRONT_DOMAIN ?? 'vill3n.top').trim().toLowerCase().replace(/^\.+|\.+$/g, ''),
+    //  نشانیِ دیگرِ ویترینِ دکان (`lib/storefront-hosts.js`، پرچمِ `shop.storefront.host_alias`): دامنه‌هایی که گرداننده
+    //  به همین سرور رسانده، با کاما (مثلاً `shop.example.af,example.com`). خالی (پیش‌فرض) ⇒ هیچ نشانیِ دیگری، بیت‌به‌بیت همان امروز
+    aliasDomains: String(process.env.STOREFRONT_ALIAS_DOMAINS || ''),
     /*
      *  ۳۱.۲ بندِ ۴ — «اتصالِ تأییدشده» از آخرین تماسِ دستگاه‌های دکان:
      *  کهنه‌تر از `staleMs` ⇒ «اتصال تأیید نشده»؛ کهنه‌تر از `offlineMs` ⇒

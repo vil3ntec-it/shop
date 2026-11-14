@@ -425,6 +425,7 @@ private fun AddServerDialog(controller: ServersController, onDismiss: () -> Unit
 private fun actionText(action: String): String = when (action) {
   "add" -> StrSetupPages.histAdded
   "add_url" -> StrSetupPages.histAddUrl
+  "learn_url" -> StrSetupPages.histLearnUrl
   "remove" -> StrSettings.whatsNewKindRemoved
   "schedule" -> StrSetupPages.histSchedule
   "switch" -> StrSetupPages.histSwitch
