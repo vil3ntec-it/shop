@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -19,6 +20,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.I18n
@@ -100,6 +102,12 @@ class PlansCardsUiTest {
   private fun details(code: String) = rule.onNodeWithTag(PlansTags.details(code))
   private fun state(s: String) = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, s)
 
+  /**
+   *  زدنِ سرِ کارتِ [code] با کارِ کلیکِ خودِ گره (همان `onClick` ِ لمس): پنجرهٔ آزمون ۷۶۸px است و کارتِ پایینی زیرِ کشوی
+   *  باز و نوارِ چسبان، بیرون از قاب می‌افتد. لمسِ واقعی روی «ماهانه» ِ بالای فهرست جدا آزموده می‌شود.
+   */
+  private fun tap(code: String) { card(code).performSemanticsAction(SemanticsActions.OnClick) }
+
   @Test fun everyCardShowsItsPriceCurrencyPerDayAndComputedSaving() {
     val options = PlansModel.options(null)
     show(options)
@@ -129,23 +137,30 @@ class PlansCardsUiTest {
     details("m1").assertDoesNotExist(); details("y1").assertDoesNotExist()
     card("m6").assertIsSelected().assert(state(StrA11y.expanded))
 
-    card("y1").performClick(); rule.waitForIdle()
-    details("y1").assertIsDisplayed()
+    tap("y1"); rule.waitForIdle()
+    details("y1").assertExists()
     details("m6").assertDoesNotExist(); details("m1").assertDoesNotExist()
     card("y1").assertIsSelected().assert(state(StrA11y.expanded))
     card("m6").assert(state(StrA11y.collapsed))
     //  کشو همان قابلیت‌های واقعی و قاعدهٔ تمدید را دارد
-    rule.onNodeWithText(StrAccount.featSale).assertIsDisplayed()
-    rule.onNodeWithText(StrAccount.featStock).assertIsDisplayed()
-    rule.onNodeWithText(StrAccount.renewEarly).assertIsDisplayed()
+    rule.onNodeWithText(StrAccount.featSale).assertExists()
+    rule.onNodeWithText(StrAccount.featStock).assertExists()
+    rule.onNodeWithText(StrAccount.renewEarly).assertExists()
 
-    card("y1").performClick(); rule.waitForIdle()
+    tap("y1"); rule.waitForIdle()
     details("y1").assertDoesNotExist()
     card("y1").assertIsSelected().assert(state(StrA11y.collapsed))
 
+    //  لمسِ واقعی روی کارتِ بالای فهرست
     card("m1").performClick(); rule.waitForIdle()
     details("m1").assertIsDisplayed()
     details("y1").assertDoesNotExist(); details("m6").assertDoesNotExist()
+
+    //  صفحه‌خوان: «بستن» و «باز کردن» ِ خودِ کشو
+    card("m1").performSemanticsAction(SemanticsActions.Collapse); rule.waitForIdle()
+    details("m1").assertDoesNotExist()
+    card("m1").performSemanticsAction(SemanticsActions.Expand); rule.waitForIdle()
+    details("m1").assertIsDisplayed()
   }
 
   @Test fun buttonLabelAndPriceFollowTheSelectionAndBuyThatPlan() {
@@ -153,7 +168,7 @@ class PlansCardsUiTest {
     show(options)
     val buy = rule.onNodeWithTag(PlansTags.BUY)
     buy.assert(hasText(PlansModel.cta(options[1], cur)))
-    card("y1").performClick(); rule.waitForIdle()
+    tap("y1"); rule.waitForIdle()
     buy.assert(hasText(PlansModel.cta(options[2], cur))).assert(!hasText(PlansModel.cta(options[1], cur)))
     buy.performClick()
     card("m1").performClick(); rule.waitForIdle()
@@ -164,15 +179,16 @@ class PlansCardsUiTest {
 
   @Test fun theCodeEntryStillOpensTheCodeSheet() {
     show()
-    rule.onNodeWithText(StrAccount.haveCode).performScrollTo().performClick()
-    rule.onNodeWithText(StrAccount.noOnlinePay).performScrollTo().assertIsDisplayed()
+    //  ردیف زیرِ نوارِ چسبانِ پنجرهٔ آزمون می‌افتد ⇒ همان کارِ کلیکِ ردیف
+    rule.onNodeWithText(StrAccount.haveCode).performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+    rule.onNodeWithText(StrAccount.noOnlinePay).assertExists()
     assertEquals(listOf(AccountPaths.REDEEM), opened)
   }
 
   /** زدنِ «۱ ساله» و [frames] قاب؛ ساعتِ آزمون دستی */
   private fun tapYearlyThen(frames: Int) {
     rule.mainClock.autoAdvance = false
-    card("y1").performClick()
+    tap("y1")
     repeat(frames) { rule.mainClock.advanceTimeByFrame() }
   }
 
@@ -183,7 +199,7 @@ class PlansCardsUiTest {
     val options = PlansModel.options(null)
     show(options)
     tapYearlyThen(2)
-    details("y1").assertIsDisplayed()
+    details("y1").assertExists()
     details("m6").assertDoesNotExist()
     rule.onNodeWithTag(PlansTags.BUY).assert(hasText(PlansModel.cta(options[2], cur))).assert(!hasText(PlansModel.cta(options[1], cur)))
     card("y1").assertIsSelected().assert(state(StrA11y.expanded))
@@ -197,7 +213,7 @@ class PlansCardsUiTest {
     rule.mainClock.autoAdvance = true
     rule.waitForIdle()
     details("m6").assertDoesNotExist()
-    details("y1").assertIsDisplayed()
+    details("y1").assertExists()
   }
 
   @Test fun headersAreBigEnoughToTouchAndLaidOutRightToLeft() {
