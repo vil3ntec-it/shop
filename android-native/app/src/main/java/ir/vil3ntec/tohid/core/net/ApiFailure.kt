@@ -213,7 +213,7 @@ sealed class ApiFailure(
     private fun known(code: String): String? = knownFa(code)?.let(::localText)
 
     private fun branchText(code: String): String? =
-      ir.vil3ntec.tohid.core.branch.BranchBook.refusalOf(code)?.let(ir.vil3ntec.tohid.core.i18n.StrBranchDesk::refusal)
+      ir.vil3ntec.tohid.core.branch.BranchBook.refusalOf(code)?.let(ir.vil3ntec.tohid.core.i18n::branchRefusalText)
 
     private fun knownFa(code: String): String? = when (code) {
       "not_found" -> "سرورِ شما قدیمی است و این بخش را ندارد. نسخهٔ تازهٔ سرور را بالا بیاورید."

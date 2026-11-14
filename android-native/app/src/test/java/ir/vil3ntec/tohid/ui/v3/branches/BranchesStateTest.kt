@@ -95,7 +95,7 @@ class BranchesStateTest {
     f.next = book(false, "[]", "[]")
     assertEquals(BranchBook.Pick.None, BranchLive.probe(f, A, afterSignIn = false))
     assertEquals(BranchBook.Pick.None, BranchLive.pick)
-    assertEquals(StrBranchDesk.mainName, StrBranchDesk.nameOf("", main = true))
+    assertEquals(StrBranchDesk.mainName, ir.vil3ntec.tohid.core.i18n.branchName("", main = true))
   }
 
   @Test
@@ -104,7 +104,7 @@ class BranchesStateTest {
       val t = BranchLive.outcomeText(o, "الف")
       if (o == ir.vil3ntec.tohid.data.BranchDesk.Outcome.SAME) assertNull(t) else assertTrue(o.name, !t.isNullOrBlank())
     }
-    BranchBook.Refusal.values().forEach { assertTrue(it.name, StrBranchDesk.refusal(it).isNotBlank()) }
+    BranchBook.Refusal.values().forEach { assertTrue(it.name, ir.vil3ntec.tohid.core.i18n.branchRefusalText(it).isNotBlank()) }
   }
 
   @Test
@@ -166,7 +166,7 @@ class BranchesStateTest {
     s.load("2026-11-14")
     assertTrue(s.failed)
     assertNotNull("آخرین گزارش می‌ماند", s.view)
-    assertEquals(listOf(7, 7, 7), f.reports)
+    assertEquals("پیش‌فرض امروز، سپس ۷ روز", listOf(1, 7, 7, 7), f.reports)
   }
 
   private fun src(rel: String): String =

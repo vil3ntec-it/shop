@@ -12,7 +12,6 @@ object StrBranchDesk {
 
   val title: String get() = t("شعبه‌ها", "Branches", "څانګې")
   val mainName: String get() = t("شعبهٔ اصلی", "Main branch", "اصلي څانګه")
-  fun nameOf(name: String, main: Boolean): String = name.ifBlank { if (main) mainName else "—" }
   fun current(name: String): String = t("شعبهٔ این دستگاه: ${asIs(name)}", "This device's branch: $name", "د دې وسیلې څانګه: $name")
   val currentLabel: String get() = t("شعبهٔ این دستگاه", "This device's branch", "د دې وسیلې څانګه")
   val switch: String get() = t("تعویضِ شعبه", "Change branch", "څانګه بدلول")
@@ -50,29 +49,27 @@ object StrBranchDesk {
   val retry: String get() = t("دوباره", "Retry", "بیا")
   val off: String get() = t("شعبه‌ها برای این دکان روشن نیست.", "Branches are not turned on for this shop.", "څانګې د دې دوکان لپاره فعالې نه دي.")
 
-  /** پیامِ ردِ شعبهٔ سرور — به‌جای متنِ فنیِ پاسخ (`ApiFailure.fromHttp`) */
-  fun refusal(r: BranchBook.Refusal): String = when (r) {
-    BranchBook.Refusal.REQUIRED -> t(
-      "این دستگاه هنوز شعبه‌ای انتخاب نکرده است. از «حسابِ من ⇐ شعبه‌ها» شعبهٔ خود را انتخاب کنید.",
-      "This device has not chosen a branch yet. Choose your branch in “My account ⇐ Branches”.",
-      "دې وسیلې لا څانګه نه ده ټاکلې. په «زما حساب ⇐ څانګې» کې خپله څانګه وټاکئ.",
-    )
-    BranchBook.Refusal.MAIN_ONLY -> t(
-      "این بخش فقط دادهٔ شعبهٔ اصلی را دارد و شما به شعبهٔ اصلی دسترسی ندارید.",
-      "This part only holds the main branch's data, and you do not have access to the main branch.",
-      "دا برخه یوازې د اصلي څانګې معلومات لري او تاسو اصلي څانګې ته لاسرسی نه لرئ.",
-    )
-    BranchBook.Refusal.UNSUPPORTED -> t(
-      "این بخش هنوز فقط در شعبهٔ اصلی کار می‌کند. برای آن به شعبهٔ اصلی بروید.",
-      "This part still works only in the main branch. Switch to the main branch to use it.",
-      "دا برخه لا یوازې په اصلي څانګه کې کار کوي. د هغې لپاره اصلي څانګې ته لاړ شئ.",
-    )
-    BranchBook.Refusal.FORBIDDEN -> t(
-      "این شعبه در دسترسیِ شما نیست یا بایگانی شده است. شعبهٔ دیگری انتخاب کنید.",
-      "This branch is not open to you or has been archived. Choose another branch.",
-      "دا څانګه تاسو ته خلاصه نه ده یا آرشیف شوې ده. بله څانګه وټاکئ.",
-    )
-  }
+  //  پیامِ ردهای شعبهٔ سرور ([branchRefusalText]) — ویژگیِ جدا، چون جدول فقط عدد/متن/بله‌نه می‌گیرد (`DariWordsTest.argsFor`)
+  val refusalRequired: String get() = t(
+    "این دستگاه هنوز شعبه‌ای انتخاب نکرده است. از «حسابِ من ⇐ شعبه‌ها» شعبهٔ خود را انتخاب کنید.",
+    "This device has not chosen a branch yet. Choose your branch in “My account ⇐ Branches”.",
+    "دې وسیلې لا څانګه نه ده ټاکلې. په «زما حساب ⇐ څانګې» کې خپله څانګه وټاکئ.",
+  )
+  val refusalMainOnly: String get() = t(
+    "این بخش فقط دادهٔ شعبهٔ اصلی را دارد و شما به شعبهٔ اصلی دسترسی ندارید.",
+    "This part only holds the main branch's data, and you do not have access to the main branch.",
+    "دا برخه یوازې د اصلي څانګې معلومات لري او تاسو اصلي څانګې ته لاسرسی نه لرئ.",
+  )
+  val refusalUnsupported: String get() = t(
+    "این بخش هنوز فقط در شعبهٔ اصلی کار می‌کند. برای آن به شعبهٔ اصلی بروید.",
+    "This part still works only in the main branch. Switch to the main branch to use it.",
+    "دا برخه لا یوازې په اصلي څانګه کې کار کوي. د هغې لپاره اصلي څانګې ته لاړ شئ.",
+  )
+  val refusalForbidden: String get() = t(
+    "این شعبه در دسترسیِ شما نیست یا بایگانی شده است. شعبهٔ دیگری انتخاب کنید.",
+    "This branch is not open to you or has been archived. Choose another branch.",
+    "دا څانګه تاسو ته خلاصه نه ده یا آرشیف شوې ده. بله څانګه وټاکئ.",
+  )
 
   //  صفحهٔ صاحب
   val ownerOnly: String get() = t("شعبه‌ها را فقط صاحبِ دکان می‌سازد و می‌دهد.", "Only the shop owner creates and assigns branches.", "څانګې یوازې د دوکان خاوند جوړوي او ټاکي.")
@@ -106,3 +103,14 @@ object StrBranchDesk {
   )
   val allTogether: String get() = t("جمعِ همهٔ شعبه‌ها", "All branches together", "د ټولو څانګو ټولګه")
 }
+
+/** پیامِ ردِ شعبهٔ سرور — به‌جای متنِ فنیِ پاسخ (`ApiFailure.fromHttp`) */
+fun branchRefusalText(r: BranchBook.Refusal): String = when (r) {
+  BranchBook.Refusal.REQUIRED -> StrBranchDesk.refusalRequired
+  BranchBook.Refusal.MAIN_ONLY -> StrBranchDesk.refusalMainOnly
+  BranchBook.Refusal.UNSUPPORTED -> StrBranchDesk.refusalUnsupported
+  BranchBook.Refusal.FORBIDDEN -> StrBranchDesk.refusalForbidden
+}
+
+/** نامِ نمایشیِ شعبه: نامِ سرور، یا برای اصلیِ بی‌نام «شعبهٔ اصلی» (بیرون از جدول: نامِ داده از t نمی‌گذرد) */
+fun branchName(name: String, main: Boolean): String = name.ifBlank { if (main) StrBranchDesk.mainName else "—" }

@@ -119,7 +119,7 @@
   جای دفترِ اصلی می‌نشست — `BranchDeskDesktopTest`).
 - **همگام‌سازی:** حال و صفِ Sync v3 ِ هر شعبه جدا (`BranchKey.syncKey`/`syncFileKey`)؛ سرآیندِ `X-Branch-Id` روی **هر** درخواستِ
   حساب‌دار از همان `identity` ِ `Backend` (درخواستِ بی‌نامِ خریدار نه) ⇒ v3 در بخشِ شعبه، و هر درِ «فقط اصلی» (v1، پشتیبانِ کامل،
-  `/shop/*` ِ شعبه‌نشناس) ۴۰۳ `branch_unsupported` با پیامِ روشن (`ApiFailure` ⇐ `StrBranchDesk.refusal`). شعبهٔ دیگر فقط با v3:
+  `/shop/*` ِ شعبه‌نشناس) ۴۰۳ `branch_unsupported` با پیامِ روشن (`ApiFailure` ⇐ `branchRefusalText`). شعبهٔ دیگر فقط با v3:
   دستگاهِ v1 فقط با صفِ خالی و سرورِ دارای v3 (`/sync/v3/hello`) به v3 می‌رود و تا میز روی شعبه است `SyncChoice` به v1 برنمی‌گردد.
   ⛔ پرچمِ خاموش ⇒ سرور سرآیند را نادیده می‌گیرد (فازِ ۱) ⇒ هر دورِ v3 ِ شعبهٔ دیگر اول `GET /shop/branches` را می‌پرسد
   (`BranchDesk.confirm`، یک دقیقه بس) و بی پاسخِ روشن نمی‌رود؛ صفحه میز را به اصلی برمی‌گرداند.

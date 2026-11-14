@@ -176,7 +176,7 @@ internal fun RouteScope.BranchesPage() {
         else -> {
           val current = BranchLive.current
           V3Section(StrBranchDesk.currentLabel, footer = StrBranchDesk.pickNote) {
-            V3ListRow(StrBranchDesk.nameOf(book.nameOf(current).orEmpty(), BranchKey.isMain(current)), icon = Icons.Outlined.Store, chevron = false)
+            V3ListRow(ir.vil3ntec.tohid.core.i18n.branchName(book.nameOf(current).orEmpty(), BranchKey.isMain(current)), icon = Icons.Outlined.Store, chevron = false)
             if (book.choices.size > 1) {
               V3Divider()
               V3ListRow(StrBranchDesk.switch, onClick = { BranchLive.pick = BranchBook.Pick.Ask(book.choices) })
@@ -277,7 +277,7 @@ internal fun RouteScope.BranchReportPage() {
         else -> {
           if (state.failed) Text(StrBranchDesk.failed, style = V3Type.footnote, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(top = 8.dp))
           v.totals?.let { SummarySection(StrBranchDesk.allTogether, it, StrBranches.totalsNote) }
-          v.rows.forEach { r -> SummarySection(StrBranchDesk.nameOf(r.name, r.main) + if (r.archived) " · " + StrBranchDesk.archived else "", r.summary, null) }
+          v.rows.forEach { r -> SummarySection(ir.vil3ntec.tohid.core.i18n.branchName(r.name, r.main) + if (r.archived) " · " + StrBranchDesk.archived else "", r.summary, null) }
         }
       }
     }

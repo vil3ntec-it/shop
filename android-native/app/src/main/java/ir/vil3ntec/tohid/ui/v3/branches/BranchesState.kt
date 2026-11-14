@@ -38,10 +38,10 @@ object BranchLive {
   /** نامِ شعبهٔ جاری برای نمایش */
   fun nameOf(id: String): String {
     val b = book?.branches?.firstOrNull { it.id == id }
-    return StrBranchDesk.nameOf(b?.name.orEmpty(), BranchKey.isMain(id))
+    return ir.vil3ntec.tohid.core.i18n.branchName(b?.name.orEmpty(), BranchKey.isMain(id))
   }
 
-  fun label(b: BranchBook.Branch): String = StrBranchDesk.nameOf(b.name, b.main)
+  fun label(b: BranchBook.Branch): String = ir.vil3ntec.tohid.core.i18n.branchName(b.name, b.main)
 
   /** صفحهٔ «شعبه‌ها» و ردیفِ «حسابِ من» فقط وقتی سرور روشن گفت و این عضو بیش از یک شعبه دارد یا صاحب است */
   val visible: Boolean get() = book?.let { it.owner || it.choices.size > 1 } == true

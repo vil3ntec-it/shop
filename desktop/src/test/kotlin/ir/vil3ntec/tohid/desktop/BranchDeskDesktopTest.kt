@@ -170,7 +170,7 @@ class BranchDeskDesktopTest {
   fun `پیامِ روشنِ ردهای شعبه به‌جای متنِ فنیِ سرور`() {
     val f = ApiFailure.fromHttp(403, """{"error":{"code":"branch_unsupported","message":"این در فقط شعبهٔ اصلی را دارد؛ شعبهٔ دیگر از همگام‌سازیِ v3"}}""", authenticated = true)
     assertEquals("branch_unsupported", f.code)
-    assertEquals(ir.vil3ntec.tohid.core.i18n.StrBranchDesk.refusal(BranchBook.Refusal.UNSUPPORTED), f.userMessage)
+    assertEquals(ir.vil3ntec.tohid.core.i18n.StrBranchDesk.refusalUnsupported, f.userMessage)
     assertNull(BranchBook.refusalOf("not_found"))
   }
 }
