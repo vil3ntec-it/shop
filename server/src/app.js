@@ -32,6 +32,8 @@ async function createApp({ runMigrations = true } = {}) {
     await require('./lib/sync-epoch').rotate('boot')
       .catch(err => console.error('[sync-epoch] دورانِ تازه ساخته نشد:', err.message));
   }
+  //  SEC-10 (#۱۵): پس از جایگزینیِ دیتابیس از پشتیبانِ کهنه، مشتری‌های پاک‌شده دوباره پاک می‌شوند (`customer-erasure.replay`)
+  await require('./lib/customer-erasure').replay({ log: (m) => console.error(m) }).catch(err => console.error('[customer-erasure]', err.message));
   //  سرور فقط رلهٔ پیام است: پیام و رسانهٔ کهنه‌تر از CHAT_RELAY_DAYS می‌رود
   await require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
   //  شناسهٔ پایدارِ این سرور — در نخستین راه‌اندازی ساخته می‌شود (`lib/server-identity.js`)
@@ -351,6 +353,9 @@ async function createApp({ runMigrations = true } = {}) {
      */
     api.use('/auth', require('./routes/auth'));
     api.use('/auth/:app', require('./routes/app-auth'));
+    //  شعبه (فازِ ۱، `docs/BRANCHES-fa.md`): درهای شعبه‌نشناس (v1، راهِ قدیم، `/shop/*`، `/events`، `/me/backups`) فقط
+    //  شعبهٔ اصلی‌اند ⇒ با پرچمِ روشنِ `shop.branches` کارمندِ بی شعبهٔ اصلی و ادعای شعبهٔ دیگر ۴۰۳؛ خاموش ⇒ بی اثر
+    api.use(require('./lib/branch-gate').gate);
     //  WEB-15: کارتِ ویترین (`PUT /sync/v1/photos/:productId/thumb`) — فقط دکان، جدا از `routes/sync-v1.js` ِ مشترک با
     //  پمپ؛ پیش از آن و فقط همان یک در (زنجیره روی خودِ در، نه `router.use`) ⇒ هیچ درخواستِ دیگری از آن نمی‌گذرد
     api.use('/sync/v1', require('./routes/sync-photo-thumbs'));
@@ -389,12 +394,15 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/owner-report', require('./routes/owner-report'));
     //  RPT-18: گزارشِ همهٔ شعبه‌ها (دکان‌های همین صاحب) در یک جا — پیش از `/shop`؛ پشتِ پرچمِ خاموشِ `shop.branches_report`
     api.use('/shop/branches-report', require('./routes/branches-report'));
+    //  شعبه درونِ یک دکان (فازِ ۱): ساختن/نام/بایگانی، کارمند ⇐ شعبه، گزارشِ هر شعبه و جمع — پشتِ پرچمِ خاموشِ `shop.branches`
+    api.use('/shop/branches', require('./routes/shop-branches'));
     //  سفارشِ آنلاین (فاز ۴) — پیش از `/shop` تا `requireUser`ِ آن دو بار نرود؛ زیرِ همان پیشوند، پس ACCOUNT_PREFIXESِ پنلِ خانگی دست نمی‌خورد
     api.use('/shop/orders/desk', require('./routes/order-desk'));   // میزِ سفارش (ORD-04/08/09) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.desk`
     api.use('/shop/orders/bulk', require('./routes/order-bulk'));   // کارِ گروهی روی سفارش‌ها (ORD-19) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.bulk`
     //  پروندهٔ مدرکِ اختلاف (RSK-08) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.dispute_file`
     api.use('/shop/orders/evidence', require('./routes/order-evidence'));
     api.use('/shop/order-feedback', require('./routes/order-feedback'));   // NTF-07/09: گزارشِ مشکل و نظرِ مشتری، پشتِ دو پرچمِ خاموش
+    api.use('/shop/order-returns', require('./routes/shop-return-requests'));   // RET-11: درخواست‌های برگشتِ ویترین، پشتِ پرچمِ خاموش
     //  پوزش و کوپنِ خودکارِ تأخیر (NTF-10) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.late_apology`
     api.use('/shop/orders/late-apology', require('./routes/order-late-apology'));
     //  سفارش‌های باز/لغوشدهٔ یک مشتری برای پروندهٔ او (CRM-07) — پیش از `/shop/orders`؛ پشتِ همان پرچمِ `shop.orders`
@@ -423,6 +431,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/store', require('./routes/store-push'));   // CHK-20/NTF-01: پوشِ وب ِ مشتری برای همین سفارش، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront-finder-store'));   // WEB-07/10: فیلتر و «خبرم کن»، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/order-feedback-store'));   // NTF-07/09: گزارشِ مشکل با عکس و نظرِ سفارش، پشتِ دو پرچمِ خاموش
+    api.use('/store', require('./routes/store-return-requests'));   // RET-11: درخواستِ برگشت از ویترین، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront-eta-store'));   // WEB-04: زمانِ تقریبیِ تحویل، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront-funnel-store'));   // RPT-14: تپشِ بالای قیفِ ویترینِ وب، پشتِ پرچمِ خاموشِ گزارش
     api.use('/store', require('./routes/store-account-history'));   // CRM-13: «حسابِ من» (خرید و مانده)، پشتِ پرچمِ خاموش

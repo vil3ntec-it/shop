@@ -201,6 +201,7 @@ object StrReports {
     "delete_product" -> t("حذف محصول", "Item deleted", "توکی ړنګ شو")
     "debtor_delete" -> t("حذف قرض‌دار", "Debtor deleted", "پوروړی ړنګ شو")
     "debt_tx_delete" -> t("حذف تراکنش بدهی", "Debt entry deleted", "د پور راکړه ورکړه ړنګه شوه")
+    "debt_tx_reverse" -> t("سندِ معکوسِ قرض", "Debt entry reversed", "د پور معکوس سند")
     "expense_delete" -> t("حذف مصرف", "Expense deleted", "لګښت ړنګ شو")
     "delete_entry" -> t("حذفِ ورودِ کالا", "Stock entry deleted", "د توکو راوړنه ړنګه شوه")
     "data_export" -> t("خروجی کامل داده", "Full data export", "د ټولو معلوماتو وېستل")

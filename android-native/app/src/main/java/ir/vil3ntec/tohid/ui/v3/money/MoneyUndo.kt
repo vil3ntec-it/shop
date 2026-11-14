@@ -5,6 +5,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.mutableStateListOf
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.ui.theme.V3Tone
@@ -41,10 +42,22 @@ internal object MoneyUndo {
     }
   }
 
+  /**
+   *  S89: «حذف» ِ ردیفِ قرض از فهرست یا برگه — با کلیدِ `shop.doc_chain` ([chainOn]) سندِ معکوس با همان «برگرداندن»؛
+   *  ردیفی که معکوس نمی‌شود (معکوسِ معکوس، اصلِ معکوس‌شده، ساختهٔ سندِ دیگر) همان دم پیامِ دلیل می‌گیرد، نه پیامِ «ثبت شد».
+   */
+  fun removeTxLater(store: ShopStore, host: SnackbarHostState, txId: String, chainOn: Boolean) {
+    if (chainOn) ir.vil3ntec.tohid.data.DebtReverse.refusalOf(store.data.value, txId)?.let { why ->
+      scope.launch { host.currentSnackbarData?.dismiss(); host.showSnackbar(V3SnackVisuals(why, V3Tone.ERROR)) }
+      return
+    }
+    deleteLater(store, host, PendingDelete.Transaction(txId, reverse = chainOn), if (chainOn) StrMoney.txReversed else StrMoney.txDeleted)
+  }
+
   private suspend fun commit(store: ShopStore, host: SnackbarHostState, p: PendingDelete) {
     val data = store.data.value
     val result = when (p) {
-      is PendingDelete.Transaction -> DebtorEngine.deleteTransaction(data, p.txId)
+      is PendingDelete.Transaction -> removeDebtTx(data, p.txId, p.reverse)
       is PendingDelete.Debtor -> DebtorEngine.delete(data, p.debtorId)
     }
     when (result) {

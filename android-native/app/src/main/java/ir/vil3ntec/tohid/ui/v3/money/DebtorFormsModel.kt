@@ -52,8 +52,9 @@ internal data class TxForm(
  */
 internal object DebtorFormsModel {
 
-  fun of(debtor: Debtor?): DebtorForm {
-    if (debtor == null) return DebtorForm()
+  /** [rules] (CRM-03 #۲۵): مشتریِ تازهٔ کارمندی که «بی سقف» برایش مجاز نیست با سقفِ پیش‌فرضِ دکان باز می‌شود (`CreditLimitPerm.newLimit`) */
+  fun of(debtor: Debtor?, rules: CreditLimitPerm.Rules = CreditLimitPerm.Rules.OFF): DebtorForm {
+    if (debtor == null) return DebtorForm(creditLimit = limitText(CreditLimitPerm.newLimit(rules)))
     val p = CustomerCrm.profileOf(debtor)
     return DebtorForm(
       name = debtor.name,
@@ -85,7 +86,8 @@ internal object DebtorFormsModel {
 
   /**
    *  CRM-03 — سقفِ تازه‌ای که این کاربر نمی‌گذارد (`customers.credit_limit` با پرچمِ `shop.credit_limit_perm`) ⇒ خطای درجا؛
-   *  نوشتهٔ نادرست را [limitError] می‌گوید. مشتریِ تازه، سقفِ عوض‌نشده یا قاعدهٔ خاموش ⇒ null.
+   *  نوشتهٔ نادرست را [limitError] می‌گوید. سقفِ عوض‌نشده یا قاعدهٔ خاموش ⇒ null؛ مشتریِ تازه ([debtor] = null) از سقفِ پیش‌فرضِ
+   *  دکان سنجیده می‌شود (#۲۵).
    */
   fun limitPermError(rules: CreditLimitPerm.Rules, debtor: Debtor?, f: DebtorForm): String? {
     if (limitError(f) != null) return null
@@ -115,9 +117,9 @@ internal object DebtorFormsModel {
     limitRules: CreditLimitPerm.Rules,
     newId: () -> String,
   ): DebtorEngine.Result {
-    if (editingId != null) {
-      limitPermError(limitRules, d.debtors.find { it.id == editingId }, f)?.let { return DebtorEngine.Result.Failed(it) }
-    }
+    //  #۲۵: مشتریِ تازه هم (از سقفِ پیش‌فرضِ دکان)؛ ویرایشِ مشتریِ ناپیدا را خودِ موتور رد می‌کند
+    val editing = editingId?.let { id -> d.debtors.find { it.id == id } }
+    if (editingId == null || editing != null) limitPermError(limitRules, editing, f)?.let { return DebtorEngine.Result.Failed(it) }
     val base = if (editingId == null) DebtorEngine.add(d, draft(f), now, newId) else DebtorEngine.editWithLimit(d, editingId, draft(f))
     val saved = base as? DebtorEngine.Result.Ok ?: return base
     val id = saved.id

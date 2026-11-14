@@ -116,6 +116,9 @@ fun SaleScreen(
   var open by rememberSaveable { mutableStateOf(start.open) }
   var expanded by remember { mutableStateOf(start.expanded) }
   var menu by remember { mutableStateOf(start.menu) }
+  //  OPS-06: راهنمای صندوق از «…» (`LocalV3Guide`؛ بی راهنما ⇒ بی ردیف)
+  val guide = ir.vil3ntec.tohid.ui.v3.LocalV3Guide.current
+  var guideOpen by remember { mutableStateOf(false) }
   val category = CatalogModel.keepCategory(picked, d.productCategories)
   LaunchedEffect(cart.isEmpty()) { if (cart.isEmpty()) open = false }
 
@@ -246,8 +249,10 @@ fun SaleScreen(
         onHeldList = onHeldList,
         onPriceCheck = actions.priceCheck,
         onVisualSearch = visual?.let { v -> { v.start() } },
+        onGuide = guide?.let { { guideOpen = true } },
       )
     }
+    if (guideOpen && guide != null) ir.vil3ntec.tohid.ui.v3.V3GuideSheet(guide) { guideOpen = false }
     //  «مشابه» فقط کالا را در کادرِ جست‌وجو می‌نشاند (دستهٔ «همه» تا زیرِ دستهٔ دیگر گم نشود)؛ هرگز سبد
     visual?.let { VisualSearchHost(it) { t -> if (t is VisualSearch.Tap.Search) { picked = null; search = t.query } } }
   }

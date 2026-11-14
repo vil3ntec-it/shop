@@ -980,8 +980,8 @@ fun CartLineDialog(
   //  POS-08/10/20: قاعدهٔ جهت، سقفِ قلمِ آزاد و تخفیفِ ردیف؛ خاموش ⇒ بی رد و بی تخفیف. S45: تأییدِ گرفته‌شده فقط همان قاعده را
   //  برای همان قیمت برمی‌دارد — `LinePolicy.checked`، همان برگهٔ ردیفِ گوشیِ نسخهٔ ۳ (⛔ پیش‌تر کدِ رد جای متنِ رد بود ⇒ دکمه هرگز)
   val gate = ir.vil3ntec.tohid.data.LinePolicy.checked(
-    policy, free, basePrice, unitPrice, if (manual) parsedPrice else null, parsedQty, discountPercent, discountText, grant, canAsk = priceAsk != null,
-  )
+    policy, free, basePrice, unitPrice, if (manual) parsedPrice else null, parsedQty, discountPercent, discountText, grant, canAsk = priceAsk != null, pack = unitNow,
+  ) // S45 (#۲۱): با بستهٔ قیمت‌دارِ انتخاب‌شده قاعده با قیمتِ همان بسته (`LinePricing.ruleListMinor`)
   val firstEdit = gate.first; val edit = gate.edit; val granted = gate.granted; val askCode = gate.askCode
   val typedMinor = if (manual) parsedPrice?.let(DiscountGate::minor) else null
   val ok = parsedQty != null && parsedQty > 0 && (!manual || (parsedPrice != null && parsedPrice >= 0)) && edit.ok
@@ -1119,10 +1119,10 @@ fun CartLineDialog(
   if (asking && ask != null && askCode != null && typedMinor != null) {
     ir.vil3ntec.tohid.ui.components.staff.PinApprovalDialog(
       title = ir.vil3ntec.tohid.core.i18n.StrTill.priceTitle,
-      summary = ir.vil3ntec.tohid.core.i18n.StrTill.priceSummary(name, money(basePrice), money(typedMinor / 100.0)),
+      summary = ir.vil3ntec.tohid.core.i18n.StrTill.priceSummary(name, money(ir.vil3ntec.tohid.data.LinePolicy.listMinor(basePrice, unitNow) / 100.0), money(typedMinor / 100.0)),
       selfRole = ask.selfRole, selfName = ask.selfName, requesterUserId = ask.requesterUserId,
       onApproved = { by, role, reason ->
-        grant = ir.vil3ntec.tohid.core.pos.PriceApproval.Grant(askCode, by, role, reason, ask.selfName, DiscountGate.minor(basePrice), typedMinor)
+        grant = ir.vil3ntec.tohid.core.pos.PriceApproval.Grant(askCode, by, role, reason, ask.selfName, ir.vil3ntec.tohid.data.LinePolicy.listMinor(basePrice, unitNow), typedMinor)
         asking = false
       },
       onDismiss = { asking = false },

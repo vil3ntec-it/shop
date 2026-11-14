@@ -228,4 +228,39 @@ class PayStatusFlowTest {
     assertEquals("sales/{saleId}/pay/{i}", t.resolve(SalesPaths.payStatus("s1", 1))!!.route.pattern)
     assertEquals("sales/{saleId}", t.resolve(SalesPaths.invoice("s1"))!!.route.pattern)
   }
+
+  @Test fun `PAY-07 آینهٔ حساب‌پیِ خودکار - فقط ردیفِ درگاه، فقط نمایش؛ بی آینه همان امروز و X و Z دست نمی‌خورد`() {
+    val gw = Sale(
+      id = "s2", invoiceNumber = 13, finalTotal = 1450.0, createdAt = 1150, date = day, paymentMethod = "mixed",
+      payments = listOf(
+        SalePayment("cash", "cash", 5_000, "confirmed"),
+        SalePayment("hesabpay", "wallet", 145_000, "confirmed", "HP-1", "gateway"),
+      ),
+    )
+    val d = base.copy(sales = listOf(sale, gw))
+    try {
+      PayStatusFlow.mirror = emptyMap()
+      val before = PayStatusFlow.view(d, gw)
+      assertEquals(listOf(PayStatus.CONFIRMED), before.map { it.status })
+      assertNull(PayStatusFlow.chip(d, gw))
+      assertTrue(PayStatusFlow.review(d).isEmpty())
+      val xz = received(d)
+
+      PayStatusFlow.mirror = mapOf("s2" to mapOf("hesabpay" to PayStatus.NEEDS_REVIEW), "s1" to mapOf("afpay_card" to PayStatus.FAILED))
+      val after = PayStatusFlow.view(d, gw)
+      assertEquals(listOf(PayStatus.NEEDS_REVIEW), after.map { it.status })
+      assertEquals(listOf(false), after.map { it.manual })
+      assertEquals(PayStatus.NEEDS_REVIEW, PayStatusFlow.chip(d, gw))
+      assertEquals(listOf("s2"), PayStatusFlow.review(d).map { it.sale.id })
+      //  ردیفِ ثبتِ دستیِ کارت سرورِ مرجع ندارد ⇒ آینه رویش نمی‌نشیند
+      assertEquals(listOf(PayStatus.CONFIRMED), PayStatusFlow.view(d, sale).map { it.status })
+      //  پولِ دریافتیِ X/Z همان
+      assertEquals(xz, received(d))
+
+      PayStatusFlow.mirror = mapOf("s2" to mapOf("hesabpay" to PayStatus.REFUNDED))
+      assertEquals(PayStatus.REFUNDED, PayStatusFlow.view(d, gw).single().status)
+    } finally {
+      PayStatusFlow.mirror = emptyMap()
+    }
+  }
 }

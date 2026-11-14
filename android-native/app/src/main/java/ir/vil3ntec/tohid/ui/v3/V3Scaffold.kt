@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -178,7 +179,16 @@ fun V3Scaffold(
   var menuOpen by remember { mutableStateOf(false) }
   val navInset = LocalV3SystemBottom.current ?: WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
   val bottomBarHeight = with(density) { barHeight.toDp() }
-  val headerActions = actions.take(2) + if (overflow.isEmpty()) emptyList() else listOf(V3Action(Icons.Outlined.MoreHoriz, StrKit.more) { menuOpen = true })
+  //  OPS-06: «راهنما» ِ صفحهٔ ریشه (`LocalV3Guide`، فقط وقتی راهنمای آماده هست) — آیکنِ سربرگ اگر جا هست (تا سه آیکن)،
+  //  وگرنه نخستین ردیفِ «…»
+  val guide = LocalV3Guide.current
+  var guideOpen by remember { mutableStateOf(false) }
+  val shown = actions.take(2)
+  val guideIcon = guide != null && shown.size + (if (overflow.isEmpty()) 0 else 1) < 3
+  val menu = if (guide != null && !guideIcon) listOf(V3MenuItem(Icons.AutoMirrored.Outlined.HelpOutline, StrKit.guide) { guideOpen = true }) + overflow else overflow
+  val headerActions = shown +
+    (if (guideIcon) listOf(V3Action(Icons.AutoMirrored.Outlined.HelpOutline, StrKit.guide) { guideOpen = true }) else emptyList()) +
+    (if (menu.isEmpty()) emptyList() else listOf(V3Action(Icons.Outlined.MoreHoriz, StrKit.more) { menuOpen = true }))
 
   Box(if (backdrop != null) modifier.fillMaxSize().then(backdrop) else modifier.fillMaxSize().background(c.bg)) {
     Column(Modifier.fillMaxSize().nestedScroll(connection)) {
@@ -212,10 +222,11 @@ fun V3Scaffold(
       ) { fab(!state.scrolledDown) }
     }
   }
+  if (guideOpen && guide != null) V3GuideSheet(guide) { guideOpen = false }
   if (menuOpen) {
     V3Sheet(onDismiss = { menuOpen = false }, detents = false) { closer ->
       V3Card(padding = PaddingValues(vertical = 4.dp)) {
-        overflow.forEachIndexed { i, item ->
+        menu.forEachIndexed { i, item ->
           if (i > 0) V3Divider(start = 64.dp)
           V3ListRow(item.label, icon = item.icon, danger = item.danger, chevron = false, onClick = { closer.close(item.onClick) })
         }

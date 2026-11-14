@@ -155,7 +155,8 @@ object DebtorListModel {
   fun summary(d: ShopData): Summary = Summary(
     people = CustomerCrm.active(d).size,
     owed = CustomerCrm.active(d).sumOf { ShopStore.debt(d, it.id).coerceAtLeast(0.0) },
-    received = d.transactions.filter { it.type == "receive" }.sumOf { it.amount },
+    //  S89: رسیدِ معکوس‌شده و خودِ سندِ معکوس رسید نیستند
+    received = ir.vil3ntec.tohid.data.DebtReverse.effective(d.transactions).filter { it.type == "receive" && !ir.vil3ntec.tohid.data.DebtReverse.isReversal(it) }.sumOf { it.amount },
   )
 
   /* ------------------------------ متنِ کارت ------------------------------ */

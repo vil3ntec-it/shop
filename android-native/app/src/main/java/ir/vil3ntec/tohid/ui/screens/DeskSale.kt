@@ -952,10 +952,10 @@ fun DeskSaleScreen(
   receiptOf?.let { (data, debtorId, txId) ->
     DebtReceiptDialog(data, debtorId, txId, onDismiss = { receiptOf = null; refocus() })
   }
-  if (pickDebtor) {
+  if (pickDebtor) { val limitRules = ir.vil3ntec.tohid.ui.components.rememberCreditLimitRules() // CRM-03 #۲۵: مشتریِ تازهٔ صندوق
     DebtorPicker(d = d, selected = cartDebtorId, touch = touchExtras, onClose = { pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true } }, onPick = { id ->
       cartStore.setDebtor(id); pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true }
-    }, onAdd = if (!touchExtras) null else { name -> tillNewCustomer(d, name, store) { id -> cartStore.setDebtor(id); pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true } } }) // POS-31/S18 گامِ ۴
+    }, onAdd = if (!touchExtras) null else { name -> tillNewCustomer(d, name, store, limitRules) { id -> cartStore.setDebtor(id); pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true } } }) // POS-31/S18 گامِ ۴
   }
   if (lineSellerOpen && lineSellerOn) ir.vil3ntec.tohid.ui.components.pos.LineSellerSheet(d, cart, seller, lineSellerFor, onClose = { lineSellerOpen = false; refocus() }) { next ->
     cartStore.set(next).also { if (!it) toast(StrPos.cartChangedRetry) } } // POS-23 — همان برگهٔ صندوقِ گوشی

@@ -64,6 +64,8 @@ function isPlainObject(v) { return v !== null && typeof v === 'object' && !Array
 /** پرچمِ دکان: مقدارِ خودِ دکان بر `all` جلو می‌افتد؛ فقط `true` روشن است. */
 async function enabled(ctx) {
   if (!ctx || ctx.app !== 'shop' || ctx.accountKind !== 'shop') return false;
+  //  شعبهٔ غیرِ اصلی (`docs/BRANCHES-fa.md`): v1 فقط شعبهٔ اصلی را دارد ⇒ پل هرگز
+  if (require('./branch-key').isBranch(ctx)) return false;
   const rows = await many(
     'SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)',
     [FLAG_KEY, 'all', String(ctx.accountId || '')]

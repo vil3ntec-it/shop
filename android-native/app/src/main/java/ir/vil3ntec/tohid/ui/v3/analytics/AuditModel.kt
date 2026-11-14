@@ -21,7 +21,7 @@ object AuditModel {
     "sale", "cancel_sale", "return", "purchase", "customer_payment", "supplier_payment", "stock_adjustment",
     "supplier_return", "price_change", "product_edit", "shift_open", "shift_close", "delete_product",
     "debtor_delete", "debt_tx_delete", "expense_delete", "delete_entry", "data_export", "debt_due_set",
-    "credit_over_limit", "credit_limit_set",
+    "credit_over_limit", "credit_limit_set", "debt_tx_reverse",
   )
 
   /** پاک‌کردن‌ها — قرصِ قرمزِ «حذف» */
@@ -72,7 +72,7 @@ object AuditModel {
       "sale", "cancel_sale", "return" -> sale()
       "price_change", "product_edit" -> product()
       //  CRM-15: «دیدنِ پروندهٔ مشتری» ⇐ همان پرونده (خروجیِ همهٔ مشتریان `*` ⇐ هیچ)
-      "customer_payment", "credit_over_limit", "credit_limit_set", "debt_tx_delete", "customer_view" -> debtor()
+      "customer_payment", "credit_over_limit", "credit_limit_set", "debt_tx_delete", "debt_tx_reverse", "customer_view" -> debtor()
       "debt_due_set" -> d.transactions.firstOrNull { it.id == ref }?.let { debtor(it.debtorId) }
       "purchase" -> d.purchases.firstOrNull { it.id == ref }?.let { supplier(it.supplierId) }
       "supplier_payment" -> d.supplierPayments.firstOrNull { it.id == ref }?.let { supplier(it.supplierId) }

@@ -23,7 +23,7 @@ const { query, newId, now } = require('../src/db');
 const { PAID_KEYS } = require('../src/lib/features');
 
 const DAY = 24 * 60 * 60 * 1000;
-const PAID = /^(POST|PUT|PATCH|DELETE) \/shop\/(orders|order-feedback|storefront|market|delivery)(\/|$)|^POST \/shop\/(staff-code|invite|staff-code\/rotate)$/;
+const PAID = /^(POST|PUT|PATCH|DELETE) \/shop\/(orders|order-feedback|order-returns|storefront|market|delivery)(\/|$)|^POST \/shop\/(staff-code|invite|staff-code\/rotate)$/;
 const JOIN = ['POST /shop/staff/join', 'POST /shop/join'];
 const STAFF = ['POST /shop/sync', 'POST /shop/sync/push'];
 /** نوشتنی‌های بی کلیدِ پولی — هر کدام با دلیل؛ فهرست باید با سورس یکی بماند. */
@@ -34,6 +34,8 @@ const FREE = [
     'POST /shop/staff-code/disable', 'DELETE /shop/staff-codes/:id',
     'PUT /shop/permissions/members/:id',
     'POST /shop/devices/:id/disable', 'POST /shop/devices/:id/enable',
+    //  S44 (د۱۸): کارهای همگام‌نشدهٔ دستگاهِ گم‌شدهٔ غیرفعال — بخشی از همان «دستگاهِ گم‌شده»، فقط پرچمِ shop.lost_device_replay
+    'POST /shop/devices/:id/replay',
     'POST /shop/approver-keys', 'DELETE /shop/approver-keys/:id']],
   ['چت و شکایت کلیدِ کاتالوگ ندارند؛ فقط پرچم', [
     'POST /shop/chat/conversations', 'PUT /shop/chat/conversations/:id/status', 'POST /shop/chat/conversations/:id/messages',
@@ -89,10 +91,15 @@ const FREE = [
     'POST /shop/staff-time/punches', 'PUT /shop/staff-time/commission-plan']],
   ['حذفِ دادهٔ شخصیِ مشتری (SEC-10) کلیدِ کاتالوگ ندارد، فقط پرچمِ shop.customer_erasure: حقِ حذف به اشتراک بسته نیست '
     + 'و پس از پایانِ اشتراک هم باید شدنی بماند', [
-    'POST /shop/customer-erasure']],
+    'POST /shop/customer-erasure',
+    //  CRM-15/SEC-10 (د۱۸): «انجام شد» ِ فرمانِ پاک کردنِ پرونده در دفترِ دستگاه — دنبالهٔ همان حذف، فقط پرچمِ shop.customer_erasure_ledger
+    'POST /shop/customer-erasure/ledger/applied']],
   ['محدودهٔ مکانِ کارمندان (STF-06) بخشی از مجوزهای هستهٔ دکان است و کلیدِ کاتالوگ ندارد، فقط پرچمِ shop.staff_scope؛ '
     + 'صاحب باید پس از پایانِ اشتراک هم بتواند دسترسیِ کارمند را ببندد', [
     'PUT /shop/staff-scope/members/:id']],
+  ['شعبه درونِ دکان (فازِ ۱) بخشی از مجوزهای هستهٔ دکان است (کدام کارمند کدام دفتر را می‌بیند) و کلیدِ کاتالوگ ندارد، فقط '
+    + 'پرچمِ shop.branches؛ صاحب باید پس از پایانِ اشتراک هم بتواند دسترسیِ کارمند را به شعبه ببندد یا شعبه را بایگانی کند', [
+    'POST /shop/branches', 'PATCH /shop/branches/:id', 'PUT /shop/branches/members/:id']],
   ['PIN ِ شخصیِ صندوق و نوبت‌های سنجیدهٔ صندوق (STF-04، S46، مهاجرتِ ۶۴۰) هویتِ کاربرِ صندوق‌اند، بخشی از مجوزهای هستهٔ دکان، '
     + 'و کلیدِ کاتالوگ ندارند، فقط پرچمِ shop.till_pin؛ صاحب باید پس از پایانِ اشتراک هم PIN را بگذارد/بردارد و قفلش را باز کند', [
     'PUT /shop/till-pin/me', 'PUT /shop/till-pin/members/:id', 'DELETE /shop/till-pin/members/:id', 'POST /shop/till-pin/members/:id/unlock',
@@ -117,7 +124,9 @@ const FREE = [
     'POST /shop/push/devices', 'DELETE /shop/push/devices']],
   ['«سابقهٔ دسترسی» (CRM-15، درِ app ِ مهاجرتِ ۶۱۰): دیدنِ پرونده از دفترِ خودِ برنامه (وب، حسابدار) سپرِ حریمِ خصوصی است، '
     + 'نه قابلیتِ پولی؛ کلید و پرچم ندارد و پس از پایانِ اشتراک هم باید ثبت شود (customer-access-app.test.js)', [
-    'POST /shop/customer-access']],
+    'POST /shop/customer-access',
+    //  د۱۸: همان دیدن‌ها از صفِ آفلاینِ حسابدار — فقط پرچمِ shop.customer_access_offline
+    'POST /shop/customer-access/offline']],
 ];
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.orders.delay', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',

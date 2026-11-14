@@ -29,6 +29,10 @@
  *   • درخواستِ تازه (نه تکرار) پس از commit یک پوش به صاحبان/مدیرانِ فعال (جز خودش) می‌فرستد ([notifyApprovers])؛
  *     بی‌انتظار، و شکستش کار را برنمی‌گرداند.
  *
+ * ⛔ STF-06 ِ شعبه (پرچمِ `shop.branches`، `docs/BRANCHES-fa.md`): هر درخواست مالِ شعبهٔ سندِ خودش است (`branch_id`؛ از سرآیندِ
+ *    سنجیدهٔ `X-Branch-Id` ِ درِ ساختن، هر ردیفِ پیشین ⇐ اصلی). صاحب همه را می‌بیند و تأیید می‌کند؛ مدیر فقط درخواست‌های شعبه‌های
+ *    خودش (فهرست، دیدن، تأیید/رد، خبرِ پوش)؛ بیرون از آن همان ۴۰۴ ِ «پیدا نشد». مصرف فقط در بخشِ همان شعبه و فقط اگر تأییدکننده
+ *    هنوز به آن شعبه می‌رسد. پرچمِ خاموش ⇒ همه همان امروز.
  * ⛔ پیش‌فرض خاموش: بی پرچمِ `shop.approval_requests` همهٔ درها جز `/config` ۴۰۳ و opِ با `request` همان
  *    `approval_invalid` ِ امروز (برگهٔ بدشکل) را می‌گیرد — رفتارِ امروز بایت‌به‌بایت همان.
  */
@@ -38,6 +42,9 @@ const slipCore = require('./approval-core');
 const staffPerms = require('./staff-perms');
 const audit = require('./audit');
 const { flagOf } = require('./orders');
+const branchKey = require('./branch-key');
+/** STF-06: شعبه‌های در دسترسِ این عضو (`branches.accessOf`) یا null = بی سنجشِ شعبه (پرچمِ `shop.branches` خاموش) */
+const seesBranch = (access, branchId) => !access || access.all || access.ids.includes(String(branchId || ''));
 const { many, one, query, tx, newId, now } = require('../db');
 const { badRequest, conflict, forbidden, notFound, tooMany } = require('../middleware/errors');
 const maskCards = (t) => require('./ops-errors').maskCards(t);   //  S117: شمارهٔ کاملِ کارت ⇒ «[کارت]» پیش از دیتابیس و هشِ تکرار
@@ -138,7 +145,7 @@ const same = (r, p) => r.perm === p.perm && r.doc === p.doc && optInt(r.pct_bp) 
 /**
  * شاگرد می‌پرسد. `actor` = { userId, role }. ⇒ { request, duplicate }
  */
-async function create(shopId, actor, body, { deviceId = '' } = {}) {
+async function create(shopId, actor, body, { deviceId = '', branchId = '' } = {}) {
   const p = parseBody(body);
   const layers = await staffPerms.layersFor(shopId, actor.role, actor.userId);
   const d = core.evaluate(actor.role, layers, p.perm, evalReq({ pct_bp: p.pctBp, amount: p.amount }));
@@ -173,10 +180,10 @@ async function create(shopId, actor, body, { deviceId = '' } = {}) {
     );
     const row = (await c.query(
       `INSERT INTO shop_approval_requests (id, shop_id, request_key, requester_id, requester_device, perm, doc, pct_bp, amount,
-                                           reason, status, created_at, expires_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending',$11,$12) RETURNING *`,
+                                           reason, status, created_at, expires_at, branch_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending',$11,$12,$13) RETURNING *`,
       [newId('apr'), shopId, p.key, actor.userId, String(deviceId || '').slice(0, 64), p.perm, p.doc, p.pctBp, p.amount,
-        p.reason, t, t + p.ttl]
+        p.reason, t, t + p.ttl, String(branchId || '')]
     )).rows[0];
     await log({
       shopId, userId: actor.userId, action: 'approval_request.create', targetType: 'approval_request', targetId: row.id,
@@ -184,7 +191,7 @@ async function create(shopId, actor, body, { deviceId = '' } = {}) {
     });
     return { request: shape(row, t), duplicate: false };
   });
-  if (!out.duplicate) notifyApprovers(shopId, actor.userId, out.request);
+  if (!out.duplicate) notifyApprovers(shopId, actor.userId, out.request, String(branchId || ''));
   return out;
 }
 
@@ -199,14 +206,15 @@ const PERM_LABEL = Object.freeze({
  * ⛔ بی‌انتظار و بی‌اثر بر کار: شکستِ پوش (یا خاموش بودنش) درخواست را برنمی‌گرداند؛ صندوقِ تأییدِ برنامه هم می‌پرسد.
  * ⛔ فقط آگاهی است: تأیید هنوز با `POST /:id/approve` ِ دستگاهِ خودِ مدیر و سنجشِ اختیارش در سرور است.
  */
-function notifyApprovers(shopId, requesterId, request) {
+function notifyApprovers(shopId, requesterId, request, branchId = '') {
   const T = require('./text-core');
   const fa = (n) => T.displayDigits(String(n), 'fa');
   return (async () => {
-    const ids = (await query(
-      `SELECT user_id FROM shop_members WHERE shop_id=$1 AND status='active' AND role = ANY($2::text[]) AND user_id <> $3`,
+    const ids = [];
+    for (const r of (await query(
+      `SELECT user_id, role FROM shop_members WHERE shop_id=$1 AND status='active' AND role = ANY($2::text[]) AND user_id <> $3`,
       [shopId, APPROVER_ROLES, String(requesterId || '')]
-    )).rows.map((r) => r.user_id);
+    )).rows) if (await require('./branches').reaches(shopId, r, branchId)) ids.push(r.user_id);   //  STF-06: فقط مدیرِ همان شعبه
     if (!ids.length) return { sent: 0 };
     const who = (await one('SELECT name FROM users WHERE id=$1', [requesterId]))?.name || 'کارمند';
     const money = request.amount === null ? '' : `${fa((request.amount / 100).toLocaleString('en-US')).split(',').join('٬')} افغانی`;
@@ -221,7 +229,7 @@ function notifyApprovers(shopId, requesterId, request) {
 }
 
 /** صاحب و مدیر همه را می‌بینند؛ بقیه فقط درخواست‌های خودشان. `status=open` (پیش‌فرض) = در انتظار و نگذشته. */
-async function list(shopId, actor, { status = 'open', limit = 100 } = {}) {
+async function list(shopId, actor, { status = 'open', limit = 100, access = null } = {}) {
   const want = STATUSES.includes(status) ? status : 'open';
   const cap = Math.min(Math.max(1, Number(limit) || 100), 200);
   const all = isApprover(actor.role);
@@ -234,18 +242,19 @@ async function list(shopId, actor, { status = 'open', limit = 100 } = {}) {
       ORDER BY r.created_at DESC LIMIT $6`,
     [shopId, all, String(actor.userId || ''), want, t, want === 'open' || want === 'all' ? cap : 500]
   );
-  const out = rows.map((r) => shape(r, t));
+  //  STF-06: تأییدکننده فقط شعبه‌های خودش؛ درخواست‌کننده همیشه درخواست‌های خودش
+  const out = rows.filter((r) => r.requester_id === String(actor.userId || '') || seesBranch(access, r.branch_id)).map((r) => shape(r, t));
   return { requests: (want === 'open' || want === 'all' ? out : out.filter((r) => r.status === want)).slice(0, cap) };
 }
 
 /** فقط درخواست‌کننده یا صاحب/مدیرِ همان دکان؛ بقیه همان ۴۰۴ (بودنِ درخواست هم نشت نمی‌کند) */
-async function get(shopId, actor, id) {
+async function get(shopId, actor, id, { access = null } = {}) {
   const r = ID_RE.test(String(id || '')) ? await one(
     `SELECT r.*, u.name AS requester_name, ${DECIDER_COLS} FROM shop_approval_requests r LEFT JOIN users u ON u.id = r.requester_id
       ${DECIDER_JOIN}
       WHERE r.id=$1 AND r.shop_id=$2`, [id, shopId]
   ) : null;
-  if (!r || (r.requester_id !== actor.userId && !isApprover(actor.role))) throw notFound('درخواست پیدا نشد', 'request_not_found');
+  if (!r || (r.requester_id !== actor.userId && !(isApprover(actor.role) && seesBranch(access, r.branch_id)))) throw notFound('درخواست پیدا نشد', 'request_not_found');
   return { request: shape(r) };
 }
 
@@ -258,14 +267,15 @@ async function lockRow(c, shopId, id) {
  * صاحب یا مدیر روی دستگاهِ خودش تأیید/رد می‌کند. ⇒ { request, duplicate }
  * @param decision 'approve' | 'deny'
  */
-async function decide(shopId, actor, id, decision, { note = '' } = {}) {
+async function decide(shopId, actor, id, decision, { note = '', access = null } = {}) {
   if (!isApprover(actor.role)) throw forbidden('فقط صاحب دکان یا مدیر تأیید می‌کند', 'not_approver');
   const text = maskCards(typeof note === 'string' ? note.trim() : '');
   if (text.length > NOTE_MAX || LINE_BREAK.test(text)) throw badRequest('یادداشت نادرست است', 'bad_reason');
   const target = decision === 'approve' ? 'approved' : 'denied';
   return inTx(async (c, log) => {
     const r = await lockRow(c, shopId, id);
-    if (!r) throw notFound('درخواست پیدا نشد', 'request_not_found');
+    //  STF-06: درخواستِ شعبه‌ای که این مدیر ندارد همان «پیدا نشد» است
+    if (!r || !seesBranch(access, r.branch_id)) throw notFound('درخواست پیدا نشد', 'request_not_found');
     if (r.requester_id === actor.userId) throw forbidden('کسی کارِ خودش را تأیید نمی‌کند', 'approval_self');
     const t = now();
     if (r.status !== 'pending') {
@@ -328,11 +338,14 @@ const dbq = { query: (s, p) => query(s, p) };
  */
 async function accept(q, ctx, need, ref, { opId, at, deviceId, path }) {
   const c = q || dbq;
-  if (!(await enabled(ctx.accountId))) return 'approval_invalid';
+  const shopId = branchKey.shopOf(ctx);   //  شعبه: درخواست سطحِ دکان نشسته، شعبه‌اش ستونِ خودش (`branch_id`)
+  if (!(await enabled(shopId))) return 'approval_invalid';
   if (ref.v !== 1 || !ID_RE.test(ref.request)) return 'approval_invalid';
-  const r = (await c.query('SELECT * FROM shop_approval_requests WHERE id=$1 AND shop_id=$2', [ref.request, ctx.accountId])).rows[0];
+  const r = (await c.query('SELECT * FROM shop_approval_requests WHERE id=$1 AND shop_id=$2', [ref.request, shopId])).rows[0];
   if (!r) return 'approval_invalid';
   if (r.requester_id !== String(ctx.userId || '')) return 'approval_mismatch';
+  //  STF-06: تأییدِ شعبهٔ دیگر برای سندِ این شعبه هرگز (پرچمِ `shop.branches` خاموش ⇒ همه '' ⇒ همان امروز)
+  if (String(r.branch_id || '') !== branchKey.branchOf(ctx)) return 'approval_mismatch';
   const op = String(opId || '');
   if (r.status === 'used') return r.used_op_id === op ? null : 'approval_replayed';
   if (r.status === 'pending') return 'approval_pending';
@@ -344,13 +357,14 @@ async function accept(q, ctx, need, ref, { opId, at, deviceId, path }) {
   );
   if (cover) return cover;
   //  تأییدکننده هنوز عضوِ فعالِ صاحب/مدیر است و همین مقدار را مجاز دارد
-  const approver = await policyOf(c, ctx.accountId, r.decided_by);
+  const approver = await policyOf(c, shopId, r.decided_by);
   if (!approver || !isApprover(approver.role)
-    || core.evaluate(approver.role, approver.layers, r.perm, evalReq(r)).decision !== 'allow') return 'approver_not_allowed';
+    || core.evaluate(approver.role, approver.layers, r.perm, evalReq(r)).decision !== 'allow'
+    || !(await require('./branches').reaches(shopId, { role: approver.role, userId: r.decided_by }, r.branch_id))) return 'approver_not_allowed';
   const t = now();
   const won = (await c.query(
     `UPDATE shop_approval_requests SET status='used', used_op_id=$3, used_at=$4
-      WHERE id=$1 AND shop_id=$2 AND status='approved' RETURNING id`, [r.id, ctx.accountId, op, t]
+      WHERE id=$1 AND shop_id=$2 AND status='approved' RETURNING id`, [r.id, shopId, op, t]
   )).rows[0];
   if (!won) {
     const now2 = (await c.query('SELECT status, used_op_id FROM shop_approval_requests WHERE id=$1', [r.id])).rows[0];
@@ -360,7 +374,7 @@ async function accept(q, ctx, need, ref, { opId, at, deviceId, path }) {
     `INSERT INTO shop_approvals (shop_id, nonce, op_id, doc, perm, pct_bp, amount, approver_id, requester_id,
                                  key_id, device_id, path, reason, issued_at, used_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'remote',$10,$11,$12,$13,$14) ON CONFLICT (shop_id, nonce) DO NOTHING`,
-    [ctx.accountId, `req_${r.id}`, op, need.doc, need.perm, optInt(r.pct_bp),
+    [shopId, `req_${r.id}`, op, need.doc, need.perm, optInt(r.pct_bp),
       optInt(r.amount) ?? (need.record ? need.record.amount : null), r.decided_by, r.requester_id,
       String(deviceId || '').slice(0, 64), ['v1', 'v2', 'v3'].includes(path) ? path : 'v3', r.reason, Number(r.decided_at), t]
   );

@@ -1,0 +1,315 @@
+name: انتشارِ مرحله‌ای
+
+# OPS-01 + OPS-03@29 + S64 (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۳، OA §۹د): «اول چند دکان، بعد همه؛ ایست و برگشت اگر خطا بالا رفت»
+# و «آزمونِ انتشار روی کپیِ موقت پیش از انتشار». راهنمای صاحب‌کار: docs/RELEASE-STABLE-fa.md بخشِ «انتشارِ مرحله‌ای».
+#
+#   ۱) verify   همان نصبیِ **آزمایشیِ آزموده** (`<برچسب>-beta`) — بی ساختِ دوباره و بی هیچ کلیدِ امضا: نسخهٔ version.txt
+#               همان ورودی، کامیتش روی main، هشِ هر نصبی در SHA256SUMS.txt و امضای فهرست با کلیدِ عمومیِ برنامه، بالاتر
+#               از پایدارِ امروز، و برچسبِ نسخه‌دار هنوز نیست (هرگز بازنویسی نمی‌شود).
+#   ۲) rehearse کپیِ موقت (Postgres ِ یک‌بارمصرف، بی دادهٔ واقعی): آزمون‌های انتشارِ سرورِ همان کامیت، «تمرینِ ارتقا»
+#               از نسخهٔ امروزِ سرور (`server_base`) روی دادهٔ واقعی‌نما با مهاجرت و برگشت، سپس آزمونِ انتشارِ همین فایل‌ها
+#               روی سرورِ تازه (`server/scripts/release-rehearsal.js`: یک دکان ⇐ همه ⇐ ایستِ خودکار ⇐ پایان).
+#   ۳) publish  فقط از main و فقط Run workflow: همان بایت‌های سنجیده زیرِ برچسبِ ثابتِ `<برچسب>-v<نسخه>` (پیش‌نویس ⇐
+#               فایل‌ها یکی‌یکی، version.txt آخر ⇐ عمومی). برچسبِ روان (`tohid-native`/`tohid-desktop`) **جابه‌جا نمی‌شود**؛
+#               تا مدیر در پنل مرحله را نگذارد (`PUT /api/admin/release/stage`) هیچ دستگاهی آن را نمی‌گیرد.
+# PR ِ همین سازوکار: آزمونِ خشک — همان ۱ و ۲ روی آزمایشیِ امروز با سرورِ همان PR، بی انتشار.
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'برنامه: android («توحید بومی») یا desktop («فروشگاه من — کامپیوتر»)'
+        type: choice
+        options: [android, desktop]
+        default: android
+      version:
+        description: 'نسخهٔ آزمایشیِ آزموده — همان version.txt ِ انتشارِ آزمایشی (مثلاً 3.2.2100). آزمایشی جلو رفته باشد ⇒ ایست'
+        type: string
+        required: true
+      server_base:
+        description: 'نسخهٔ سرورِ امروز (شاخه، برچسب یا کامیت) — تمرینِ ارتقا از همین'
+        type: string
+        default: 'main'
+  pull_request:
+    paths:
+      - '.github/workflows/release-stage.yml'
+      - 'server/scripts/release-rehearsal.js'
+      - 'server/scripts/upgrade-rehearsal.*'
+      - 'server/src/lib/release-stage.js'
+      - 'server/src/lib/release-stage-guard.js'
+      - 'server/src/routes/releases.js'
+      - 'server/src/routes/admin-release.js'
+
+concurrency:
+  group: release-stage-${{ github.event.pull_request.number || github.ref }}-${{ inputs.app || 'pr' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+#  ⛔ §۱۴ (docs/security/supply-fa.md): پیش‌فرض خواندنی؛ نوشتن فقط در کارِ «publish»، فقط از main، و بی اجرای کدِ مخزن.
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: سنجشِ نسخهٔ آزمایشی
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      tag: ${{ steps.pick.outputs.tag }}
+      versioned: ${{ steps.pick.outputs.versioned }}
+      version: ${{ steps.pick.outputs.version }}
+      sha: ${{ steps.pick.outputs.sha }}
+      head: ${{ steps.pick.outputs.head }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: آزمایشیِ آزموده و فایل‌هایش
+        id: pick
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          INPUT_APP: ${{ inputs.app }}
+          INPUT_VERSION: ${{ inputs.version }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          case "${INPUT_APP:-android}" in
+            android) tag=tohid-native ;;
+            desktop) tag=tohid-desktop ;;
+            *) echo "::error::برنامه فقط android یا desktop"; exit 1 ;;
+          esac
+          beta="$tag-beta"
+          ref() { gh api "repos/$REPO/git/ref/tags/$beta" --jq '.object.type + " " + .object.sha'; }
+          read -r kind sha < <(ref)
+          [ "$kind" = commit ] || { echo "::error::برچسبِ $beta به کامیت اشاره نمی‌کند ($kind)"; exit 1; }
+          #  فقط REST (همان راهِ سرور): «<شناسه> <نام>» ِ هر فایل
+          assets=$(gh api "repos/$REPO/releases/tags/$beta" --jq '.assets[] | "\(.id) \(.name)"')
+          names=$(printf '%s\n' "$assets" | cut -d' ' -f2-)
+          get() { # <نام> <پوشه>
+            local id; id=$(printf '%s\n' "$assets" | awk -v n="$1" '$2 == n { print $1; exit }')
+            gh api -H 'Accept: application/octet-stream' "repos/$REPO/releases/assets/$id" > "$2/$1"
+          }
+          if [ "$tag" = tohid-native ]; then
+            want=$(printf '%s\n' "$names" | grep -E '^Tohid-Native-[0-9.]+\.apk\.beta$' || true)
+          else
+            want="Tohid-Windows-Offline.exe Tohid-Mac-AppleSilicon.dmg Tohid-Mac-Intel.dmg Tohid-Linux.deb"
+          fi
+          want="$want SHA256SUMS.txt version.txt"
+          if printf '%s\n' "$names" | grep -qx 'SHA256SUMS.txt.sig'; then want="$want SHA256SUMS.txt.sig"; fi
+          mkdir -p staged
+          for f in $want; do
+            printf '%s\n' "$names" | grep -qxF "$f" || { echo "::error::$f روی انتشارِ $beta نیست"; exit 1; }
+            get "$f" staged
+          done
+          #  مرجِ تازه میانِ دریافت آزمایشی را جابه‌جا نکرده باشد
+          read -r _ again < <(ref)
+          [ "$again" = "$sha" ] || { echo "::error::$beta میانِ دریافت جابه‌جا شد ($sha ⇐ $again) — دوباره بزنید"; exit 1; }
+          version=$(head -n1 staged/version.txt | tr -d '[:space:]')
+          [[ "$version" =~ ^[0-9]+(\.[0-9]+){1,3}$ ]] || { echo "::error::version.txt ِ آزمایشی ناجور: «$version»"; exit 1; }
+          if [ -n "$INPUT_VERSION" ] && [ "$INPUT_VERSION" != "$version" ]; then
+            echo "::error::نسخهٔ خواسته‌شده ($INPUT_VERSION) آزمایشیِ امروز ($version) نیست — آزمایشی پس از آزمودن جلو رفته؛ نسخهٔ تازه را بیازمایید"
+            exit 1
+          fi
+          git merge-base --is-ancestor "$sha" origin/main || { echo "::error::کامیتِ آزمایشی ($sha) روی main نیست"; exit 1; }
+          vt="$tag-v$version"
+          if gh api "repos/$REPO/releases/tags/$vt" >/dev/null 2>&1 || gh api "repos/$REPO/git/ref/tags/$vt" >/dev/null 2>&1; then
+            echo "::error::$vt پیش‌تر هست — برچسبِ نسخه‌دار هرگز بازنویسی نمی‌شود"; exit 1
+          fi
+          stable=''
+          sid=$(gh api "repos/$REPO/releases/tags/$tag" --jq '.assets[] | select(.name == "version.txt") | .id' 2>/dev/null || true)
+          if [ -n "$sid" ]; then
+            stable=$(gh api -H 'Accept: application/octet-stream' "repos/$REPO/releases/assets/$sid" | head -n1 | tr -d '[:space:]')
+          fi
+          if [ -n "$stable" ]; then
+            top=$(printf '%s\n%s\n' "$stable" "$version" | sort -V | tail -n1)
+            if [ "$stable" = "$version" ] || [ "$top" != "$version" ]; then
+              echo "::error::نسخهٔ $version از پایدارِ امروز ($stable) بالاتر نیست — مرحله بی‌اثر می‌ماند"; exit 1
+            fi
+          fi
+          #  سرورِ زیرِ آزمون: در PR همین PR (آزمونِ خشک)؛ وگرنه همان کامیتِ آزمایشی، که باید ابزارِ آزمونِ انتشار را داشته باشد
+          if [ "$EVENT" = pull_request ]; then
+            head="$GITHUB_SHA"
+          else
+            git cat-file -e "$sha:server/scripts/release-rehearsal.js" 2>/dev/null \
+              || { echo "::error::کامیتِ آزمایشی ($sha) ابزارِ آزمونِ انتشار را ندارد — یک آزمایشیِ تازه پس از این تغییر بسازید"; exit 1; }
+            head="$sha"
+          fi
+          {
+            echo "tag=$tag"; echo "versioned=$vt"; echo "version=$version"; echo "sha=$sha"; echo "head=$head"
+          } >> "$GITHUB_OUTPUT"
+          echo "آزمایشیِ $beta: نسخهٔ $version از $sha (پایدارِ امروز: ${stable:-نامعلوم})"
+          ls -la staged
+
+      #  همان سنجشِ برنامه: هشِ هر نصبی در فهرست، و امضای فهرست با کلیدِ عمومیِ سنجاق‌شده (vars؛ خالی ⇒ فقط هش)
+      - name: هش و امضای فایل‌ها
+        env:
+          TAG: ${{ steps.pick.outputs.tag }}
+          VERSION: ${{ steps.pick.outputs.version }}
+          TOHID_UPDATE_PUBLIC_KEY: ${{ vars.TOHID_UPDATE_PUBLIC_KEY }}
+        run: >-
+          node -e "const a = require('./server/scripts/release-rehearsal').loadArtifacts('staged',
+          { tag: process.env.TAG, version: process.env.VERSION, pubkey: process.env.TOHID_UPDATE_PUBLIC_KEY || '' });
+          console.log('✔ نصبی:', a.updaters.join('، '), a.sig ? '· امضا هست' : '· بی امضا')"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: staged-files
+          path: staged/
+          if-no-files-found: error
+          retention-days: 7
+
+  rehearse:
+    name: آزمون روی کپیِ موقت (سرور و انتشار)
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: shop
+          POSTGRES_PASSWORD: shoppass
+          POSTGRES_DB: shop_staging
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://shop:shoppass@127.0.0.1:5432/shop_staging
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          path: head
+          ref: ${{ needs.verify.outputs.head }}
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          path: base
+          ref: ${{ github.event.pull_request.base.sha || inputs.server_base || 'main' }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: نصبِ وابستگی‌ها (هر دو نسخهٔ سرور)
+        run: |
+          (cd base/server && npm ci)
+          (cd head/server && npm ci)
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: staged-files
+          path: files
+
+      #  S64: «آزمونِ سرخ هرگز منتشر نمی‌شود» — آزمون‌های انتشار و مرحله‌ای ِ همان سرور، پیش از هر چیز
+      - name: آزمون‌های انتشارِ سرور (همان کامیت)
+        working-directory: head/server
+        env:
+          TEST_DATABASE_URL: pglite:memory
+        run: >-
+          node --test --test-concurrency=1 test/release-stage.test.js test/release-stage-guard.test.js
+          test/releases.test.js test/admin-release.test.js test/release-rehearsal.test.js
+
+      - name: تمرینِ ارتقا (سرورِ امروز ⇐ همان کامیت، روی دادهٔ واقعی‌نما)
+        env:
+          SALES: '100'
+        run: bash head/server/scripts/upgrade-rehearsal.sh base head rehearsal-out
+
+      - name: آزمونِ انتشار روی کپیِ موقت
+        env:
+          TAG: ${{ needs.verify.outputs.tag }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          TOHID_UPDATE_PUBLIC_KEY: ${{ vars.TOHID_UPDATE_PUBLIC_KEY }}
+        run: |
+          set -o pipefail
+          node head/server/scripts/release-rehearsal.js --artifacts files --tag "$TAG" --version "$VERSION" --out rehearsal-out \
+            | tee rehearsal-out/release.log
+
+      - name: خلاصه
+        if: always()
+        env:
+          VT: ${{ needs.verify.outputs.versioned }}
+        run: |
+          {
+            echo "### آزمون روی کپیِ موقت: \`$(git -C base rev-parse --short HEAD)\` ⇐ \`$(git -C head rev-parse --short HEAD)\` · $VT"
+            [ -f rehearsal-out/migrate-ms.txt ] && echo "- زمانِ مهاجرت روی دادهٔ seed: $(cat rehearsal-out/migrate-ms.txt)ms"
+            echo '```'
+            cat rehearsal-out/check.log rehearsal-out/rollback.log rehearsal-out/release.log 2>/dev/null || echo 'تمرین پیش از پایان ایستاد — لاگِ گام را ببینید'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: release-rehearsal
+          path: rehearsal-out/
+          if-no-files-found: ignore
+
+  #  ⛔ فقط این کار توکنِ نوشتنی دارد؛ هیچ کدِ مخزن (npm، Gradle، اسکریپت) در آن اجرا نمی‌شود و هیچ کلیدِ امضایی نمی‌بیند —
+  #  فقط همان بایت‌های سنجیده و آزموده (artifact ِ «staged-files») را زیرِ برچسبِ تازهٔ نسخه‌دار می‌گذارد.
+  publish:
+    name: انتشارِ برچسبِ نسخه‌دار
+    needs: [verify, rehearse]
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      TAG: ${{ needs.verify.outputs.tag }}
+      VT: ${{ needs.verify.outputs.versioned }}
+      VERSION: ${{ needs.verify.outputs.version }}
+      SHA: ${{ needs.verify.outputs.sha }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: staged-files
+          path: files
+
+      - name: همان بایت‌های سنجیده
+        working-directory: files
+        run: |
+          set -euo pipefail
+          [ "$(head -n1 version.txt | tr -d '[:space:]')" = "$VERSION" ] || { echo "::error::version.txt عوض شده"; exit 1; }
+          sha256sum -c --ignore-missing SHA256SUMS.txt
+
+      #  پیش‌نویس ⇐ فایل‌ها یکی‌یکی و version.txt آخر ⇐ عمومی: هیچ لحظه‌ای شماره‌ای اعلام نمی‌شود که فایلش نیامده
+      #  (همان درسِ «Error saving asset» ِ «توحید بومی»). نصبیِ اندروید `.apk.beta` می‌ماند تا برنامه‌های کهنه‌ای که
+      #  بی سرور از api.github.com «اولین .apk» را برمی‌دارند مرحله را دور نزنند.
+      - name: انتشارِ نسخه‌دار
+        working-directory: files
+        run: |
+          set -euo pipefail
+          [[ "$VT" =~ ^tohid-(native|desktop)-v[0-9]+(\.[0-9]+){1,3}$ ]] || { echo "::error::برچسبِ ناجور: $VT"; exit 1; }
+          if gh api "repos/$REPO/releases/tags/$VT" >/dev/null 2>&1 || gh api "repos/$REPO/git/ref/tags/$VT" >/dev/null 2>&1; then
+            echo "::error::$VT پیش‌تر هست — برچسبِ نسخه‌دار هرگز بازنویسی نمی‌شود"; exit 1
+          fi
+          #  پیش‌نویسِ نیمه‌کارهٔ اجرای شکست‌خوردهٔ پیشین (عمومی نشده، برچسب نساخته) پاک می‌شود
+          for id in $(gh api "repos/$REPO/releases" --paginate --jq ".[] | select(.draft and .tag_name == \"$VT\") | .id"); do
+            gh api -X DELETE "repos/$REPO/releases/$id"
+          done
+          notes="## انتشارِ مرحله‌ای — نسخهٔ $VERSION
+
+          همان نصبیِ آزمایشیِ آزموده (\`$TAG-beta\`، کامیتِ \`$SHA\`)، بی ساختِ دوباره. **هیچ دستگاهی خودکار این را نمی‌گیرد**
+          تا مدیر در پنل مرحله را بگذارد (\`PUT /api/admin/release/stage\` با \`version: $VERSION\` و درصد یا فهرستِ دکان‌ها).
+          برچسبِ روانِ \`$TAG\` (پایدار) دست نخورده است. راهنما: docs/RELEASE-STABLE-fa.md."
+          gh release create "$VT" -R "$REPO" --draft --prerelease --target "$SHA" --title "$TAG — مرحله‌ای $VERSION" --notes "$notes"
+          up() {
+            for i in 1 2 3; do
+              if gh release upload "$VT" "$1" -R "$REPO"; then return 0; fi
+              echo "::warning::فرستادنِ $1 نشد (تلاش $i)"; sleep $((i * 5))
+            done
+            echo "::error::فرستادنِ $1 بعد از سه تلاش نشد"; return 1
+          }
+          for f in *; do [ "$f" = version.txt ] || up "$f"; done
+          up version.txt
+          names=$(gh release view "$VT" -R "$REPO" --json assets -q '.assets[].name')
+          for f in *; do printf '%s\n' "$names" | grep -qxF "$f" || { echo "::error::$f روی $VT نیست"; exit 1; }; done
+          gh release edit "$VT" -R "$REPO" --draft=false --prerelease
+          {
+            echo "### ✔ $VT منتشر شد (هنوز به هیچ دستگاهی نمی‌رسد)"
+            echo "گامِ بعد در پنل (مدیرِ ارشد): \`PUT /api/admin/release/stage\` با"
+            echo "\`{\"tag\":\"$TAG\",\"version\":\"$VERSION\",\"percent\":0,\"shops\":[\"<شناسهٔ دکان>\"]}\` ⇐ سپس ۲۵ ⇐ ۱۰۰."
+          } >> "$GITHUB_STEP_SUMMARY"
