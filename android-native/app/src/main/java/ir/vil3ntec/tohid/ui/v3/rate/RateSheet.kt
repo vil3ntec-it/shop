@@ -86,9 +86,5 @@ fun RateSheet(target: RateTarget, onChoice: (RateChoice) -> Unit) {
   }
 }
 
-/** نامِ فروشگاهِ همین ساخت در جمله */
-internal fun rateBody(target: RateTarget): String = when (target) {
-  RateTarget.BAZAAR -> StrRate.bodyBazaar
-  RateTarget.APP_STORE -> StrRate.bodyAppStore
-  else -> StrRate.bodyPlay
-}
+/** نامِ فروشگاهِ همین ساخت در جمله (برگه فقط Play و بازار است: `RateTarget.ownSheet`) */
+internal fun rateBody(target: RateTarget): String = if (target == RateTarget.BAZAAR) StrRate.bodyBazaar else StrRate.bodyPlay

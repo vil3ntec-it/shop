@@ -1,6 +1,5 @@
 package ir.vil3ntec.tohid.core.shopper
 
-import ir.vil3ntec.tohid.core.rate.RateTarget
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -18,7 +17,7 @@ class RateTextCoverageTest {
     ShopperText.audit = null
   }
 
-  private fun all(): List<String> = listOf(RateText.title, RateText.bodyPlay, RateText.bodyAppStore, RateText.rate, RateText.later, RateText.never)
+  private fun all(): List<String> = listOf(RateText.title, RateText.body, RateText.rate, RateText.later, RateText.never)
 
   @Test fun everyRateTextHasFaEnPsAndNoStarCountQuestionOrReward() {
     for (l in ShopperLang.entries) {
@@ -27,7 +26,7 @@ class RateTextCoverageTest {
       ShopperText.audit = { fa, en, ps -> seen += Triple(fa, en, ps) }
       val out = all()
       ShopperText.audit = null
-      assertEquals(6, seen.size)
+      assertEquals(5, seen.size)
       for ((fa, en, ps) in seen) {
         assertTrue(fa.isNotBlank() && en.isNotBlank() && ps.isNotBlank(), "جای خالی: $fa")
         assertFalse(en.any { it in '؀'..'ۿ' }, "انگلیسیِ نیمه‌فارسی: $en")
@@ -41,9 +40,8 @@ class RateTextCoverageTest {
     }
   }
 
-  @Test fun bodyNamesTheStoreOfThisBuild() {
+  @Test fun bodyNamesGooglePlay() {
     ShopperText.lang = ShopperLang.FA
-    assertTrue("گوگل‌پلی" in RateText.body(RateTarget.PLAY))
-    assertTrue("اپ‌استور" in RateText.body(RateTarget.APP_STORE))
+    assertTrue("گوگل‌پلی" in RateText.body)
   }
 }

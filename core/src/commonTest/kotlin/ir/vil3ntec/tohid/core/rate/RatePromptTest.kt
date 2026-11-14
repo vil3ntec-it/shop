@@ -113,6 +113,13 @@ class RatePromptTest {
     assertNull(RatePrompt.block(tappedLater, moment(at = after)))
   }
 
+  @Test fun appStoreUsesOnlyTheSystemCard() {
+    assertTrue(RateTarget.PLAY.ownSheet)
+    assertTrue(RateTarget.BAZAAR.ownSheet)
+    assertEquals(false, RateTarget.APP_STORE.ownSheet, "اپل ۵.۶.۱: درخواستِ نظرِ سفارشی نه")
+    assertEquals(false, RateTarget.NONE.ownSheet)
+  }
+
   @Test fun neverAgainStopsForGood() {
     val s = RatePrompt.chose(RatePrompt.shown(ready, now), RateChoice.NEVER, now)
     assertEquals(RateStop.NEVER, s.stop)

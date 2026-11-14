@@ -24,6 +24,12 @@ enum class RateTarget {
   /** App Store: `SKStoreReviewController` ِ میزبانِ آیفون */
   APP_STORE;
 
+  /**
+   *  برگهٔ خودِ برنامه با سه دکمه (Play، بازار). App Store نه: قاعدهٔ ۵.۶.۱ ِ اپل «درخواستِ نظرِ سفارشی» را نمی‌پذیرد ⇒ همان
+   *  لحظه فقط کارتِ خودِ سیستم (`SKStoreReviewController`) خواسته می‌شود؛ سیستم خودش سالی سه بار و کلیدِ خاموشِ «تنظیمات» دارد.
+   */
+  val ownSheet: Boolean get() = this == PLAY || this == BAZAAR
+
   companion object {
     /** همان مقدارِ `BuildConfig.STORE` ِ ساختِ آیفون (`ios/shared/build.gradle.kts`) */
     const val APP_STORE_CHANNEL = "appstore"

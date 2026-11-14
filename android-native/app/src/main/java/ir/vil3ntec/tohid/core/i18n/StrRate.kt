@@ -17,11 +17,6 @@ object StrRate {
     "If the app has been useful to you, rating it on Cafe Bazaar helps make it better 🙏",
     "که اپ مو په کار درغلی، په کافه بازار کې په ستوري ورکولو مرسته وکړئ چې ښه شي 🙏",
   )
-  val bodyAppStore: String get() = t(
-    "اگر برنامه به کارتان آمده، با ستاره دادن در اپ‌استور کمک کنید بهتر شود 🙏",
-    "If the app has been useful to you, rating it on the App Store helps make it better 🙏",
-    "که اپ مو په کار درغلی، په اپ سټور کې په ستوري ورکولو مرسته وکړئ چې ښه شي 🙏",
-  )
   val rate: String get() = t("ستاره می‌دهم", "Rate the app", "ستوري ورکوم")
   val later: String get() = t("بعداً", "Later", "وروسته")
   val never: String get() = t("دیگر نپرس", "Don't ask again", "بیا مه پوښتئ")

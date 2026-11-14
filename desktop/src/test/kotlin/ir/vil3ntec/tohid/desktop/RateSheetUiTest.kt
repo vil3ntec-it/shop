@@ -85,13 +85,12 @@ class RateSheetUiTest {
     assertTrue(count(StrRate.title) > 0)
     assertTrue(StrRate.bodyPlay.contains("گوگل‌پلی"))
     assertTrue(StrRate.bodyBazaar.contains("کافه‌بازار"))
-    assertTrue(StrRate.bodyAppStore.contains("اپ‌استور"))
   }
 
   @Test fun noStarCountNoQuestionNoRewardInAnyLanguage() {
     for (lang in Lang.entries) {
       I18n.source = { lang }
-      for (s in listOf(StrRate.title, StrRate.bodyPlay, StrRate.bodyBazaar, StrRate.bodyAppStore, StrRate.rate, StrRate.later, StrRate.never)) {
+      for (s in listOf(StrRate.title, StrRate.bodyPlay, StrRate.bodyBazaar, StrRate.rate, StrRate.later, StrRate.never)) {
         assertFalse("$lang: «$s» شمارِ ستاره دارد", Regex("[0-9۰-۹٠-٩]|پنج|five|5 star", RegexOption.IGNORE_CASE).containsMatchIn(s))
         assertFalse("$lang: «$s» پرسش است (دروازه‌گذاری)", s.contains('?') || s.contains('؟'))
         assertFalse("$lang: «$s» جایزه می‌دهد", Regex("جایزه|هدیه|تخفیف|reward|gift|discount|bonus", RegexOption.IGNORE_CASE).containsMatchIn(s))

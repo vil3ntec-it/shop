@@ -84,7 +84,8 @@ fun RatePromptHost(store: ShopStore, data: ShopData, loaded: Boolean, cart: Cart
     )
     if (RatePrompt.shouldAsk(state, m)) {
       save(RatePrompt.shown(state, at))
-      open = true
+      //  App Store: فقط کارتِ خودِ سیستم، بی برگهٔ ما (قاعدهٔ ۵.۶.۱ ِ اپل)؛ میزبانِ آیفونِ دکان هنوز نمی‌نشاند (`target` = NONE)
+      if (target.ownSheet) open = true else RateStoreAndroid.open(context, target)
     }
   }
   if (open) {

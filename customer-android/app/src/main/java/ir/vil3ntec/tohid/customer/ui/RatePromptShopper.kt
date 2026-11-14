@@ -101,11 +101,12 @@ internal fun RatePromptShopper(model: CustomerModel, hook: RateHook?) {
     )
     if (RatePrompt.shouldAsk(state, m)) {
       save(RatePrompt.shown(state, at))
-      open = true
+      //  App Store: فقط کارتِ خودِ سیستم، بی برگهٔ ما (قاعدهٔ ۵.۶.۱ ِ اپل) — شمرده می‌شود، ولی «ستاره داد» دانسته نمی‌شود
+      if (hook.target.ownSheet) open = true else hook.open()
     }
   }
   if (open) {
-    ShopperRateSheet(hook.target) { choice ->
+    ShopperRateSheet { choice ->
       open = false
       save(RatePrompt.chose(state, choice, model.clock()))
       if (choice == RateChoice.RATE) hook.open()
@@ -119,7 +120,7 @@ internal fun RatePromptShopper(model: CustomerModel, hook: RateHook?) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ShopperRateSheet(target: RateTarget, onChoice: (RateChoice) -> Unit) {
+internal fun ShopperRateSheet(onChoice: (RateChoice) -> Unit) {
   val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
   val scope = rememberCoroutineScope()
   var chosen by remember { mutableStateOf<RateChoice?>(null) }
@@ -148,7 +149,7 @@ internal fun ShopperRateSheet(target: RateTarget, onChoice: (RateChoice) -> Unit
       Text(RateText.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
       Spacer(Modifier.height(6.dp))
       Text(
-        RateText.body(target),
+        RateText.body,
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
