@@ -157,6 +157,12 @@ object StrMoney {
   )
   //  پروندهٔ CRM (#330)
   val phone2Optional: String get() = t("شمارهٔ دوم (اختیاری)", "Second phone (optional)", "دویمه شمېره (اختیاري)")
+  val emailOptional: String get() = t("ایمیل (اختیاری)", "Email (optional)", "برېښنالیک (اختیاري)")
+  val emailHelper: String get() = t(
+    "همان ایمیلی که مشتری با آن در فروشگاهِ اینترنتی وارد می‌شود؛ حساب و تخفیفِ گروهش فقط با همین ایمیلِ تأییدشده به او می‌رسد",
+    "The email the customer signs in with at your online store; their account and group discount reach them only through this verified email",
+    "هغه برېښنالیک چې پېرودونکی پرې په آنلاین پلورنځي کې ننوځي؛ حساب او د ډلې تخفیف یې یوازې د همدې تایید شوي برېښنالیک له لارې ورته رسېږي",
+  )
   val tagsField: String get() = t("برچسب‌ها (اختیاری)", "Tags (optional)", "نښانونه (اختیاري)")
   val tagsHelper: String get() = t("با «،» جدا کنید — مثلاً عمده، همسایه", "Separate with commas — e.g. wholesale, neighbour", "په «،» جلا کړئ — لکه عمده، ګاونډی")
   /* CRM-09 — نشانیِ تحویلِ مشتری (§۴.۴) */
