@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3
 
 import ir.vil3ntec.tohid.core.i18n.StrA11y
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
@@ -8,6 +9,7 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -56,6 +58,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -68,6 +71,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
+import ir.vil3ntec.tohid.ui.screens.MotionTokens
 import ir.vil3ntec.tohid.ui.screens.iconTile
 import ir.vil3ntec.tohid.ui.screens.pressed
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -90,7 +94,7 @@ data class V3SwipeAction(
 
 /** کاشیِ آیکنِ ردیف: سطحِ درونی (surfaceElevated) با نشانهٔ رنگی یا خاکستری */
 @Composable
-fun V3IconTile(icon: ImageVector, hue: V3Hue? = null, danger: Boolean = false, size: Dp = 40.dp) {
+fun V3IconTile(icon: ImageVector, hue: V3Hue? = null, danger: Boolean = false, size: Dp = 40.dp, modifier: Modifier = Modifier) {
   val c = PhoneV3.colors
   val tint = when {
     danger -> c.negative
@@ -99,9 +103,110 @@ fun V3IconTile(icon: ImageVector, hue: V3Hue? = null, danger: Boolean = false, s
   }
   //  THEME-V2: آیکنِ رنگی روی پس‌زمینهٔ نرمِ همان رنگ
   val bg = if (hue != null && !danger) PhoneV3Palette.soft(c, hue) else c.iconTile
-  Box(Modifier.size(size).clip(RoundedCornerShape(12.dp)).background(bg), contentAlignment = Alignment.Center) {
+  Box(modifier.size(size).clip(RoundedCornerShape(12.dp)).background(bg), contentAlignment = Alignment.Center) {
     Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size * 0.53f))
   }
+}
+
+/**
+ *  نمای ردیف: `LIST` ردیفِ داده (کالا، فاکتور، قرض‌دار — همان پیشین)؛ `NAV` ردیفِ ناوبری و تنظیمات (`V3NavRow`) —
+ *  همان «بیشتر» که صاحب‌کار پسندید (۶۵r).
+ */
+enum class V3RowLook { LIST, NAV }
+
+/**
+ *  نمای پیش‌فرضِ ردیف‌های یک صفحه: قابِ تنظیمات (`SettingsPageFrame`) `NAV` می‌گذارد تا **هر** ردیفِ درونِ صفحه‌های
+ *  تنظیمات — ردیفِ بخش، کلید (`V3ToggleRow`)، ردیفِ کار و فهرستِ انتخاب — همان ردیفِ «بیشتر» باشد (۶۵r).
+ */
+val LocalV3RowLook = androidx.compose.runtime.compositionLocalOf { V3RowLook.LIST }
+
+/** رنگِ کاشیِ ردیفِ `NAV` ای که رنگِ خودش را نگفته — قابِ تنظیمات رنگِ همان بخش را می‌دهد (`SettingsHues`) */
+val LocalV3RowHue = androidx.compose.runtime.compositionLocalOf<V3Hue?> { null }
+
+/**
+ *  هر `V3ListRow`/`V3ToggleRow` ِ درونِ [content] همان ردیفِ «بیشتر» (`NAV`) با کاشیِ [hue] (وقتی رنگِ خودش را نگفته)
+ *  — برای صفحه‌های ناوبری و تنظیمات‌مانند (تنظیمات، «حساب من» و برگه‌هایش، اشتراک، مرکزِ مدیریت)، نه فهرستِ داده.
+ */
+@Composable
+fun V3NavRows(hue: V3Hue?, content: @Composable () -> Unit) {
+  androidx.compose.runtime.CompositionLocalProvider(LocalV3RowLook provides V3RowLook.NAV, LocalV3RowHue provides hue, content = content)
+}
+
+/**
+ *  اندازه‌های **یک** سبکِ ردیفِ ناوبری و تنظیمات (۶۵r، خواستِ صاحب‌کار: «دقیق همه چی منظم باشه شبیهِ اون عکسِ اول»)،
+ *  از روی خودِ «بیشتر» اندازه گرفته: کاشیِ ۴۰ با گوشهٔ ۱۲ و نشانهٔ ۲۱، عنوانِ یک‌خطیِ ۱۶ (`V3Type.rowTitle`)، خطِ
+ *  راهنمای یک‌خطیِ کم‌رنگِ ۱۳ (`V3Type.rowHelp`)، فاصلهٔ آغاز ۱۲ / پایان ۱۶ / بالا و پایین ۸، کاشی تا متن ۱۲،
+ *  بلندیِ کمِ ۵۶ (ردیفِ یک‌خطی درست ۵۶؛ ردیفِ با خطِ راهنما بلندیِ طبیعیِ دو خطِ وزیرمتن، همه یک‌اندازه) و خطِ جداکننده از زیرِ
+ *  متن (۶۴). کناره‌های صفحه ۲۰.
+ *  عدد را در صفحه ننویس؛ همین‌ها (`V3NavRowGuardTest`).
+ */
+object V3NavRowSpec {
+  val TILE: Dp = 40.dp
+  val MIN_HEIGHT: Dp = 56.dp
+  val PAD_START: Dp = 12.dp
+  val PAD_END: Dp = 16.dp
+  val PAD_V: Dp = 8.dp
+  val GAP: Dp = 12.dp
+  /** ردیفِ بی آیکن (فهرستِ وضعیت): متن از ۱۶ */
+  val PAD_START_PLAIN: Dp = 16.dp
+  /** خطِ مویی از زیرِ متن: آغاز + کاشی + فاصله */
+  val DIVIDER_START: Dp = PAD_START + TILE + GAP
+  /** کناره‌های فهرست در صفحه (همان «بیشتر») */
+  val GUTTER: Dp = 20.dp
+  /** پهنای بیشینهٔ مقدارِ پایانِ ردیف */
+  val VALUE_MAX: Dp = 160.dp
+  const val TITLE_SP = 16
+  const val HELP_SP = 13
+  /** نشانِ آزمون روی کاشی و بدنهٔ ردیف (فقط `testTag`؛ صفحه‌خوان آن را نمی‌خواند) */
+  const val TILE_TAG = "v3-nav-tile"
+  const val ROW_TAG = "v3-nav-row"
+}
+
+/**
+ *  **ردیفِ ناوبری و تنظیماتِ همهٔ برنامه** (۶۵r) — «بیشتر»، صفحهٔ اول و دسته‌های تنظیمات، صفحه‌های بخش، دستگاه‌ها،
+ *  «حساب من»، مرکزِ مدیریت و پشتیبانی همین را می‌کشند: کاشیِ رنگیِ آیکن (`V3IconTile`، رنگ از نقشهٔ همان بخش)،
+ *  عنوانِ یک‌خطی، خطِ راهنمای یک‌خطیِ کم‌رنگ (`help`، هرگز دو خط)، و در پایان یا مقدارِ کم‌رنگ کنارِ پیکان
+ *  (`value`، با نقطهٔ وضعیتِ اختیاریِ `valueDot`)، یا کلید (`toggle`/`onToggle`)، یا `trailing` ِ دلخواه (برچسبِ «آزمایشی»).
+ *  آیکنِ بی‌کاشی در این ردیف نیست؛ ردیفِ بی آیکن (فهرستِ وضعیت) فقط متن دارد.
+ */
+@Composable
+fun V3NavRow(
+  title: String,
+  icon: ImageVector?,
+  hue: V3Hue?,
+  modifier: Modifier = Modifier,
+  help: String? = null,
+  value: String? = null,
+  valueColor: Color? = null,
+  valueDot: Color? = null,
+  toggle: Boolean? = null,
+  onToggle: ((Boolean) -> Unit)? = null,
+  trailing: (@Composable () -> Unit)? = null,
+  danger: Boolean = false,
+  chevron: Boolean = true,
+  selected: Boolean? = null,
+  onClick: (() -> Unit)? = null,
+) {
+  V3ListRow(
+    title = title,
+    modifier = modifier,
+    subtitle = help,
+    icon = icon,
+    hue = hue,
+    value = value,
+    valueColor = valueColor,
+    valueDot = valueDot,
+    trailing = when {
+      toggle != null -> ({ V3Toggle(toggle, title, onToggle) })
+      else -> trailing
+    },
+    danger = danger,
+    chevron = chevron,
+    minHeight = V3NavRowSpec.MIN_HEIGHT,
+    selected = selected,
+    look = V3RowLook.NAV,
+    onClick = onClick,
+  )
 }
 
 /**
@@ -143,22 +248,37 @@ fun V3ListRow(
   onLongClick: (() -> Unit)? = null,
   role: Role = Role.Button,
   below: (@Composable () -> Unit)? = null,
+  /** `NAV` ⇒ همان ردیفِ «بیشتر» (`V3NavRow`): کاشیِ همیشگی، عنوانِ ۱۶، راهنمای یک‌خطیِ ۱۳؛ null ⇒ نمای صفحه (`LocalV3RowLook`) */
+  look: V3RowLook? = null,
+  /** نقطهٔ وضعیتِ کوچکِ پیش از مقدار (همگام‌سازی: رنگ + نوشته، نه رنگِ تنها) */
+  valueDot: Color? = null,
   onClick: (() -> Unit)? = null,
 ) {
   val c = PhoneV3.colors
   val haptic = LocalHapticFeedback.current
+  val nav = (look ?: LocalV3RowLook.current) == V3RowLook.NAV
+  //  ردیفِ ناوبری آیکنِ بی‌کاشی ندارد (۶۵r)؛ رنگِ نگفته ⇐ رنگِ بخشِ صفحه
+  val tiled = icon != null && (tile || nav)
+  val tileHue = hue ?: if (nav) LocalV3RowHue.current else null
+  val minH = if (nav) maxOf(minHeight, V3NavRowSpec.MIN_HEIGHT) else minHeight
+  val startPad = when {
+    tile && !nav || leading != null || selected != null || tiled -> V3NavRowSpec.PAD_START
+    nav -> V3NavRowSpec.PAD_START_PLAIN
+    else -> 22.dp
+  }
   val body: @Composable (Modifier) -> Unit = { m ->
     Row(
       m
         .fillMaxWidth()
-        .heightIn(min = minHeight)
+        .heightIn(min = minH)
         .background(if (selected == true) PhoneV3Palette.selected(c) else c.card)
         .then(
           if (onClick != null || onLongClick != null) Modifier.rowClick(c.pressed, title, role, onClick ?: {}, onLongClick?.let { l -> { haptic.performHapticFeedback(HapticFeedbackType.LongPress); l() } })
           else Modifier,
         )
         .semantics { if (selected != null) this.selected = selected }
-        .padding(start = if (tile || leading != null || selected != null) 12.dp else 22.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+        .then(if (nav) Modifier.testTag(V3NavRowSpec.ROW_TAG) else Modifier)
+        .padding(start = startPad, end = V3NavRowSpec.PAD_END, top = V3NavRowSpec.PAD_V, bottom = V3NavRowSpec.PAD_V),
       verticalAlignment = Alignment.CenterVertically,
     ) {
       AnimatedVisibility(selected != null, enter = expandHorizontally() + fadeIn(), exit = shrinkHorizontally() + fadeOut()) {
@@ -166,32 +286,57 @@ fun V3ListRow(
       }
       when {
         leading != null -> { leading(); Spacer(Modifier.width(12.dp)) }
-        icon != null && tile -> { V3IconTile(icon, hue, danger); Spacer(Modifier.width(12.dp)) }
+        icon != null && tiled -> {
+          V3IconTile(icon, tileHue, danger, V3NavRowSpec.TILE, if (nav) Modifier.testTag(V3NavRowSpec.TILE_TAG) else Modifier)
+          Spacer(Modifier.width(V3NavRowSpec.GAP))
+        }
         icon != null -> {
           Icon(icon, contentDescription = null, tint = if (danger) c.negative else c.icon, modifier = Modifier.size(24.dp))
           Spacer(Modifier.width(14.dp))
         }
       }
       Column(Modifier.weight(1f)) {
-        Text(title, style = V3Type.body, color = if (danger) c.negative else c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(title, style = if (nav) V3Type.rowTitle else V3Type.body, color = if (danger) c.negative else c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (subtitle != null) {
-          Text(subtitle, style = V3Type.footnote, color = c.inkMuted, maxLines = subtitleLines, overflow = TextOverflow.Ellipsis)
+          //  ناوبری: راهنما همیشه یک خط (۶۵r — «هرگز دو و سه خط»)
+          Text(
+            subtitle,
+            style = if (nav) V3Type.rowHelp else V3Type.footnote,
+            color = c.inkMuted,
+            maxLines = if (nav) 1 else subtitleLines,
+            overflow = TextOverflow.Ellipsis,
+          )
         }
         below?.invoke()
       }
       if (value != null) {
         Spacer(Modifier.width(8.dp))
-        Text(value, style = V3Type.subhead, color = valueColor ?: c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 160.dp))
+        if (nav) NavValue(value, valueColor ?: c.inkMuted, valueDot)
+        else Text(value, style = V3Type.subhead, color = valueColor ?: c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = V3NavRowSpec.VALUE_MAX))
       }
       if (trailing != null) { Spacer(Modifier.width(8.dp)); trailing() }
       if (onClick != null && chevron && trailing == null && selected == null) {
         Spacer(Modifier.width(4.dp))
-        V3Chevron(if (tile) c.chevron else c.icon)
+        V3Chevron(if (tile || nav) c.chevron else c.icon)
       }
     }
   }
   if (startActions.isEmpty() && endActions.isEmpty()) body(modifier)
   else V3Swipeable(startActions, endActions, modifier) { body(Modifier) }
+}
+
+/** مقدارِ کم‌رنگِ ردیفِ ناوبری، درست پیش از پیکان: مقدارِ تازه با محوِ نرم جای قبلی می‌نشیند */
+@Composable
+private fun NavValue(value: String, color: Color, dot: Color?) {
+  Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.widthIn(max = V3NavRowSpec.VALUE_MAX)) {
+    if (dot != null) {
+      Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
+      Spacer(Modifier.width(6.dp))
+    }
+    AnimatedContent(value, transitionSpec = { fadeIn(MotionSpec.tweenOf(MotionTokens.MEDIUM)) togetherWith fadeOut(MotionSpec.tweenOf(MotionTokens.SHORT)) }, label = "navValue") {
+      Text(it, style = V3Type.rowHelp, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+  }
 }
 
 /** پُرشدنِ نرمِ هنگامِ فشار (بی موجِ رنگی) با زدن و نگه‌داشتن */

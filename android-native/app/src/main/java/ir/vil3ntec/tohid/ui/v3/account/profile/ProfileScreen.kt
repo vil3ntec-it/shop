@@ -48,7 +48,10 @@ import ir.vil3ntec.tohid.ui.screens.rememberAlerts
 import ir.vil3ntec.tohid.ui.v3.V3Action
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Divider
-import ir.vil3ntec.tohid.ui.v3.V3ListRow
+import ir.vil3ntec.tohid.ui.v3.V3Hue
+import ir.vil3ntec.tohid.ui.v3.V3NavRow
+import ir.vil3ntec.tohid.ui.v3.V3NavRowSpec
+import ir.vil3ntec.tohid.ui.v3.nav.V3Modules
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.account.AccountFormat
 import ir.vil3ntec.tohid.ui.v3.account.AccountLinks
@@ -97,7 +100,7 @@ internal fun ProfileContent(
       Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
       horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-      Column(Modifier.widthIn(max = 520.dp).fillMaxWidth().padding(horizontal = 16.dp)) {
+      Column(Modifier.widthIn(max = 520.dp).fillMaxWidth().padding(horizontal = V3NavRowSpec.GUTTER)) {
         Spacer(Modifier.height(4.dp))
         val avatar = 120.dp
         val overlap = 26.dp
@@ -127,14 +130,14 @@ internal fun ProfileContent(
           )
         }
         Spacer(Modifier.height(16.dp))
-        V3Card(radius = 24.dp, padding = PaddingValues(vertical = 4.dp)) {
+        //  ۶۵r: همان کارت و ردیفِ «بیشتر» (`V3NavRow`) — کاشیِ رنگیِ هر بخش، عنوانِ یک‌خطی، پیکان
+        V3Card(padding = PaddingValues(vertical = 4.dp)) {
           ui.menu.forEachIndexed { i, item ->
-            if (i > 0) V3Divider(start = 58.dp)
-            V3ListRow(
+            if (i > 0) V3Divider(start = V3NavRowSpec.DIVIDER_START)
+            V3NavRow(
               title = item.label,
               icon = menuIcon(item.item),
-              tile = false,
-              minHeight = 60.dp,
+              hue = menuHue(item.item),
               danger = item.danger,
               chevron = !item.danger,
               modifier = Modifier.v3Stagger(stagger, item.item, i + 1),
@@ -149,6 +152,17 @@ internal fun ProfileContent(
       }
     }
   }
+}
+
+/** رنگِ کاشیِ هر ردیف — همان رنگِ بخشِ مقصد در «بیشتر» (`V3Modules.hueOf`)؛ «تنظیمات» `SettingsHues.ROOT`؛ خروج سرخِ خطر */
+private fun menuHue(item: ProfileHomeModel.Item): V3Hue? = when (item) {
+  ProfileHomeModel.Item.EDIT -> V3Hue.BRAND
+  ProfileHomeModel.Item.DEVICES -> V3Modules.hueOf("devices")
+  ProfileHomeModel.Item.PLAN -> V3Modules.hueOf("myplan")
+  ProfileHomeModel.Item.STATS -> V3Modules.hueOf("reports")
+  ProfileHomeModel.Item.SETTINGS -> ir.vil3ntec.tohid.ui.v3.settings.SettingsHues.ROOT
+  ProfileHomeModel.Item.SUPPORT -> V3Modules.hueOf("support")
+  ProfileHomeModel.Item.SIGN_OUT, ProfileHomeModel.Item.SIGN_OUT_ALL -> null
 }
 
 private fun menuIcon(item: ProfileHomeModel.Item) = when (item) {

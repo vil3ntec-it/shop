@@ -19,11 +19,7 @@ object StrLineSeller {
       "«د هر کارن پلور» او «د دې میاشتې کمیشن» هره کرښه د خپل پلورونکي په نوم شمېري او بېرته ورکړه له همغه پلورونکي کمېږي. " +
       "یوازې خاوند او مدیر د بل چا نوم ټاکي؛ هر څوک کرښه په خپل نوم کولی شي. بند: پلورونکی د فاکتور کارن دی، لکه تل.",
   )
-  val helpLine: String get() = t(
-    "هر ردیف به نامِ کارمندی که فروخت؛ پایهٔ پورسانت",
-    "Put each line on the staff member who sold it; the basis for commission",
-    "هره کرښه د هغه کارکوونکي په نوم چې پلورلې یې ده؛ د کمیشن بنسټ",
-  )
+  val helpLine: String get() = t("فروشندهٔ هر ردیف، پایهٔ پورسانت", "Seller per line, for commission", "د هرې کرښې پلورونکی، د کمیشن لپاره")
   val helpExample: String get() = t(
     "مثال: احمد فاکتور را می‌زند ولی روغن را زهرا فروخت؛ ردیفِ روغن و پورسانتش به نامِ زهرا می‌رود.",
     "Example: Ahmad rings up the invoice but Zahra sold the oil; the oil line and its commission go on Zahra.",

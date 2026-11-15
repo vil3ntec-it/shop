@@ -32,6 +32,8 @@ object StrSettings {
 
   // هشدارها
   fun debtFrom(a: Any): String = t("قرض از ${asIs(a)} ؋ به بالا", "Debts of $a ؋ or more", "له $a ؋ او زیات پور")
+  /** مقدارِ کوتاهِ ردیفِ «هشدارها» (۶۵r: کنارِ پیکان، تا خطِ راهنما در ۳۶۰dp یک خط بماند) */
+  fun debtAtLeast(a: Any): String = t("${asIs(a)} ؋ به بالا", "$a ؋ and up", "$a ؋ او پورته")
   val alertsNote: String get() = t("وقتی کالایی تمام شود، قرضِ کسی از این مبلغ بگذرد، یا اشتراک رو به پایان باشد، برنامه خبر می‌دهد — حتی وقتی بسته است.", "The app notifies you when an item runs out, someone's debt passes this amount, or the subscription is about to end — even when the app is closed.", "کله چې یو توکی خلاص شي، د چا پور له دې مبلغ واوړي، یا ګډون پای ته نږدې وي، اپ خبر درکوي — حتی کله چې بند وي.")
   val debtAlertLabel: String get() = t("هشدار قرض از این مبلغ به بالا (افغانی)", "Debt alert from this amount (AFN)", "له دې مبلغ څخه د پور خبرتیا (افغانۍ)")
   val zeroOff: String get() = t("صفر یعنی هشدارِ قرض خاموش. کالای تمام‌شده و اشتراک سرِ جایشان می‌مانند.", "Zero turns debt alerts off. Sold-out and subscription alerts stay on.", "صفر یعني د پور خبرتیا بنده ده. د خلاصو توکو او ګډون خبرتیاوې پاتې کېږي.")
@@ -286,7 +288,7 @@ object StrSettings {
   val calNote: String get() = t("خودکار یعنی فارسی و پشتو خورشیدی، انگلیسی میلادی. فقط نمایش است؛ تاریخِ ذخیره‌شده عوض نمی‌شود.", "Automatic means solar for Persian and Pashto, Gregorian for English. Display only; saved dates don't change.", "اتومات یعني فارسي او پښتو لمریز، انګلیسي میلادي. یوازې ښودنه ده؛ خوندي شوې نېټې نه بدلېږي.")
 
   // POS-39: دریافت از مشتری در صندوق (F7)
-  val tillReceiveTitle: String get() = t("دریافت از مشتری در صندوق (F7)", "Take customer payments at the till (F7)", "په صندوق کې له پیرودونکي پیسې اخیستل (F7)")
+  val tillReceiveTitle: String get() = t("دریافت از مشتری (F7)", "Customer payments (F7)", "له پېرودونکي پیسې (F7)")
   val tillReceiveNote: String get() = t(
     "قسط یا بدهیِ مشتری بی رفتن به «قرض‌داران»، با رسید. همان ردیفِ دفترِ قرض است و در دخلِ شیفت شمرده می‌شود. فقط روی همین دستگاه.",
     "Take an instalment or debt payment without leaving the register, with a receipt. It is the same debt-book entry and counts in the shift's cash. On this device only.",

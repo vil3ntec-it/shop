@@ -1,9 +1,9 @@
-# سرورِ آزمونیِ CI برای دانلودِ ادامه‌دار (tohid-desktop.yml، آزمون‌های ۳ب و ۵).
+# سرورِ آزمونیِ CI برای دانلودِ ادامه‌دار (tohid-desktop.yml، آزمونِ ۲: install.ps1 با نصابِ کامل).
 #
 # مثلِ سرورِ ما (res.download) و GitHub: Range/206/416 و ETag. هر فایلِ بزرگ‌تر از
 # ۱ مگابایت در CUTS پاسخِ اولش وسطِ راه بریده می‌شود (نصفِ باقی‌مانده و بستنِ
-# اتصال، کمتر از Content-Length) تا معلوم شود نصاب و install.ps1 از همان بایت
-# ادامه می‌دهند، نه از صفر. هر درخواست در LOG: «نام Range» (بی Range ⇐ «-»).
+# اتصال، کمتر از Content-Length) تا معلوم شود install.ps1 از همان بایت
+# ادامه می‌دهد، نه از صفر. هر درخواست در LOG: «نام Range» (بی Range ⇐ «-»).
 #
 #   python test-range-server.py ROOT PORT CUTS LOG
 import http.server

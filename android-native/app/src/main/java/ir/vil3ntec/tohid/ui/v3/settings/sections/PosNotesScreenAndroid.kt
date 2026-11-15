@@ -56,7 +56,7 @@ internal fun RouteScope.PosNotesScreen(onBack: (() -> Unit)?) {
         if (list.isNotEmpty()) {
           V3Section(null) {
             list.forEachIndexed { i, t ->
-              if (i > 0) V3Divider(start = 16.dp)
+              if (i > 0) V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.PAD_START_PLAIN)
               V3ListRow(
                 t,
                 chevron = false,

@@ -43,6 +43,14 @@ class SectionColorsTest {
     }
   }
 
+  /** همان منبع در تنظیمات (۶۵r ⇐ ۶۵s): بخش‌های هم‌پوشانِ `SettingsHues` همان خانوادهٔ بخشِ برنامه‌اند */
+  @Test fun `نقشهٔ رنگِ تنظیمات با رنگِ بخش‌ها هم‌خوان است`() {
+    val parts = mapOf("invoice" to V3Section.SALES, "reports" to V3Section.REPORTS, "goods" to V3Section.STOCK, "online" to V3Section.ORDERS)
+    parts.forEach { (part, s) ->
+      assertEquals("بخشِ «$part» ِ تنظیمات", SectionColors.family(s.hue), SectionColors.family(ir.vil3ntec.tohid.ui.v3.settings.SettingsHues.part(part)!!))
+    }
+  }
+
   @Test fun `نوشته روی تهِ‌رنگ AA است`() {
     for (dark in listOf(false, true)) for (h in SectionColors.DAY.keys) {
       val t = SectionColors.ofHue(h, dark)

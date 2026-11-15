@@ -1,5 +1,9 @@
 package ir.vil3ntec.tohid.ui.v3.account.profile
 
+import ir.vil3ntec.tohid.ui.v3.V3Divider
+import ir.vil3ntec.tohid.ui.v3.V3Hue
+import ir.vil3ntec.tohid.ui.v3.V3NavRowSpec
+import ir.vil3ntec.tohid.ui.v3.V3NavRow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -58,7 +62,6 @@ import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3FieldKind
 import ir.vil3ntec.tohid.ui.v3.V3Form
-import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3TextButton
 import ir.vil3ntec.tohid.ui.v3.V3TextField
@@ -178,19 +181,22 @@ internal fun ProfileEditContent(
     }
 
     V3Section(StrAccount.groupMembership, Modifier.v3Stagger(stagger, "member", 3)) {
-      V3ListRow(
+      //  ۶۵r: همان ردیفِ «بیشتر» (`V3NavRow`) — کاشیِ رنگی، عنوان، یک خطِ کم‌رنگ، مقدار در پایان
+      V3NavRow(
         StrAccount.memberFor,
         icon = Icons.Outlined.Schedule,
+        hue = V3Hue.BRAND,
         value = AccountFormat.span(ui.createdAt),
-        subtitle = if (ui.createdAt > 0) StrAccount.memberSince(AccountFormat.date(ui.createdAt)) else StrAccount.createdUnknown,
+        help = if (ui.createdAt > 0) StrAccount.memberSince(AccountFormat.date(ui.createdAt)) else StrAccount.createdUnknown,
         chevron = false,
       )
     }
 
     //  قاعدهٔ Google Play: حریمِ خصوصی و «حذفِ حساب» در خودِ برنامه، پیدا و یک لمس دورتر
     V3Section(StrAccount.privacyPolicy, Modifier.v3Stagger(stagger, "privacy", 4)) {
-      V3ListRow(StrAccount.privacyPolicy, subtitle = StrAccount.privacyLine, icon = Icons.Outlined.PrivacyTip, onClick = onPrivacy)
-      V3ListRow(StrAccount.deleteAccount, subtitle = StrAccount.deleteAccountLine, icon = Icons.Outlined.DeleteForever, danger = true, onClick = onDelete)
+      V3NavRow(StrAccount.privacyPolicy, icon = Icons.Outlined.PrivacyTip, hue = V3Hue.BRAND, help = StrAccount.privacyLine, onClick = onPrivacy)
+      V3Divider(start = V3NavRowSpec.DIVIDER_START)
+      V3NavRow(StrAccount.deleteAccount, icon = Icons.Outlined.DeleteForever, hue = null, help = StrAccount.deleteAccountLine, danger = true, onClick = onDelete)
     }
     Spacer(Modifier.height(24.dp))
   }

@@ -145,13 +145,13 @@ fun BranchHost(store: ShopStore) {
 fun BranchProfileCard(onOpen: (String) -> Unit) {
   if (!BranchLive.visible) return
   Spacer(Modifier.height(16.dp))
-  V3Card(radius = 24.dp, padding = PaddingValues(vertical = 4.dp)) {
-    V3ListRow(
+  //  ۶۵r: همان کارت و ردیفِ «بیشتر» که منوی «حساب من» دارد؛ رنگ همان ردیفِ «شعبه‌ها» در تنظیمات
+  V3Card(padding = PaddingValues(vertical = 4.dp)) {
+    ir.vil3ntec.tohid.ui.v3.V3NavRow(
       title = StrBranchDesk.title,
-      subtitle = StrBranchDesk.current(BranchLive.nameOf(BranchLive.current)),
       icon = Icons.Outlined.Store,
-      tile = false,
-      minHeight = 60.dp,
+      hue = ir.vil3ntec.tohid.ui.v3.settings.SettingsHues.extra(ir.vil3ntec.tohid.ui.screens.SettingsLayout.SHOP, null),
+      help = StrBranchDesk.current(BranchLive.nameOf(BranchLive.current)),
       onClick = { onOpen(BranchPaths.ROOT) },
     )
   }

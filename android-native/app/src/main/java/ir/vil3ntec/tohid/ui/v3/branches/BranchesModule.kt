@@ -27,7 +27,7 @@ val BranchesModule = AppModule(
   icon = Icons.Outlined.Store,
   //  ردیفِ «دکان و امنیت» فقط با پاسخِ روشن (صاحب، یا عضوِ چندشعبه‌ای)
   settings = listOf(
-    SettingsEntry({ StrBranchDesk.title }, BranchPaths.ROOT, Icons.Outlined.Store, SettingsLayout.SHOP, shown = { BranchLive.visible }, subtitle = { StrBranchDesk.pickNote }),
+    SettingsEntry({ StrBranchDesk.title }, BranchPaths.ROOT, Icons.Outlined.Store, SettingsLayout.SHOP, shown = { BranchLive.visible }, subtitle = { StrBranchDesk.settingsLine }),
   ),
   routes = listOf(
     V3Route(BranchPaths.ROOT, RouteKind.PAGE, { StrBranchDesk.title }, chrome = Chrome.OWN) { BranchesPage() },

@@ -62,7 +62,7 @@
 
   <h3>نصب</h3>
   <div class="note">
-    <b>ویندوز:</b> فایلِ ‎MyShop-Windows-Setup.exe‎ را باز کنید (چند مگابایت است؛ برنامه را خودش دانلود می‌کند و اگر دانلود خراب شود خودش دوباره می‌گیرد). اگر پنجرهٔ آبیِ «Windows protected your PC» آمد، «More info» و بعد «Run anyway» را بزنید (نصاب هنوز امضای تجاری ندارد).<br>
+    <b>ویندوز:</b> فایلِ ‎MyShop-Windows-Setup.exe‎ را باز کنید — همهٔ برنامه داخلِ خودش است و هنگامِ نصب اینترنت نمی‌خواهد. اگر پنجرهٔ آبیِ «Windows protected your PC» آمد، «More info» و بعد «Run anyway» را بزنید (نصاب هنوز امضای تجاری ندارد). اگر نصاب گفت فایل خراب است (corrupted)، فایل در راهِ دانلود خراب شده: دوباره بگیرید، یا همان یک خطِ PowerShell ِ بالا را بزنید که درستیِ فایل را می‌سنجد و پس از قطعِ اینترنت از همان‌جا ادامه می‌دهد.<br>
     <b>مک:</b> فایلِ ‎.dmg‎ را باز کنید و فروشگاه من را به پوشهٔ Applications بکشید. بارِ اول روی برنامه کلیکِ راست ⇐ Open.<br>
     <b>لینوکس:</b> <code dir="ltr">sudo apt install ./MyShop-Linux.deb</code> (دبیان، اوبونتو، مینت).<br>
     <b>اندروید:</b> فایلِ ‎.apk‎ را باز کنید و «نصب از منبعِ ناشناس» را برای همین بار اجازه دهید.
@@ -83,8 +83,7 @@
   var BASE = 'https://github.com/vil3ntec-it/shop/releases/download/';
   var ITEMS = [
     {id:'all', os:'همهٔ کامپیوترها در یک نصاب', sub:'ویندوز، مک (اپل و اینتل) و لینوکس در یک بسته — بازش کنید و نصب‌کنندهٔ سیستمِ خودتان را بزنید', url: BASE + 'tohid-desktop/MyShop-Setup-All.zip'},
-    {id:'win',   os:'ویندوز ۱۰ و ۱۱', sub:'۶۴ بیت · نصابِ کوچک؛ برنامه را خودش دانلود و درستی‌اش را بررسی می‌کند', url: BASE + 'tohid-desktop/MyShop-Windows-Setup.exe'},
-    {id:'win-off', os:'ویندوز — بی‌اینترنت', sub:'۶۴ بیت · نصابِ کامل (حدودِ ۹۰ مگابایت)', url: BASE + 'tohid-desktop/MyShop-Windows-Offline.exe'},
+    {id:'win',   os:'ویندوز ۱۰ و ۱۱', sub:'۶۴ بیت · یک نصابِ کامل (حدودِ ۱۳۰ مگابایت)؛ هنگامِ نصب اینترنت نمی‌خواهد', url: BASE + 'tohid-desktop/MyShop-Windows-Setup.exe'},
     {id:'mac-arm', os:'مک — تراشهٔ اپل (M1 تا M4)', sub:'مک‌های ۲۰۲۰ به بعد · فایلِ ‎.dmg‎', url: BASE + 'tohid-desktop/MyShop-Mac-AppleSilicon.dmg'},
     {id:'mac-intel', os:'مک — اینتل', sub:'مک‌های پیش از ۲۰۲۱ · فایلِ ‎.dmg‎', url: BASE + 'tohid-desktop/MyShop-Mac-Intel.dmg'},
     {id:'linux', os:'لینوکس', sub:'دبیان، اوبونتو، مینت (۶۴ بیت) · فایلِ ‎.deb‎', url: BASE + 'tohid-desktop/MyShop-Linux.deb'},

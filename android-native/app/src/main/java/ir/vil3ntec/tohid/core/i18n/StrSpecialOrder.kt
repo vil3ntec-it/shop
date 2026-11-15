@@ -8,7 +8,7 @@ package ir.vil3ntec.tohid.core.i18n
  */
 @Suppress("unused")
 object StrSpecialOrder {
-  val settingsTitle: String get() = t("سفارشِ ویژه با پیش‌پرداخت", "Special orders with deposit", "ځانګړی فرمایش له مخکېنۍ ورکړې سره")
+  val settingsTitle: String get() = t("سفارشِ ویژه با پیش‌پرداخت", "Special orders with deposit", "ځانګړی فرمایش او مخکې ورکړه")
   val settingsNote: String get() = t(
     "در صندوق، کالایی که موجود نیست برای مشتری سفارش می‌شود و پیش‌پرداختش به حسابِ او و دخل می‌رود. تحویل فروشِ عادیِ صندوق است که پیش‌پرداخت از آن کم می‌شود؛ لغو پیش‌پرداخت را با دلیل پس می‌دهد.",
     "At the register, an out-of-stock item is ordered for a customer and the deposit goes to their account and the drawer. Delivery is a normal register sale with the deposit deducted; cancelling returns the deposit with a reason.",

@@ -146,7 +146,6 @@ private fun Inbox(data: ShopData) {
       V3ListRow(
         StrSettings.photoAt(displayMillis(item.at)),
         icon = Icons.Outlined.Image,
-        tile = false,
         chevron = false,
         trailing = {
           Row {

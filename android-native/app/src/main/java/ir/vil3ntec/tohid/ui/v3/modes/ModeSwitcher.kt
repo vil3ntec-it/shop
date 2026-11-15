@@ -32,10 +32,12 @@ fun ModeSwitcher(modifier: Modifier = Modifier) {
   val modes = remember(ModeState.chosen.value) { ModeState.available(context) }
   V3Section(title = StrKit.switchMode, modifier = modifier) {
     modes.forEachIndexed { i, mode ->
-      if (i > 0) V3Divider(start = 64.dp)
+      if (i > 0) V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.DIVIDER_START)
       val look = lookOf(mode)
+      //  ۶۵r: روی «حساب من» همان ردیفِ «بیشتر» (`NAV`) که منوی کنارش دارد
       V3ListRow(
         title = look.title(),
+        look = ir.vil3ntec.tohid.ui.v3.V3RowLook.NAV,
         subtitle = look.body(),
         icon = look.icon,
         hue = look.hue,
@@ -47,9 +49,10 @@ fun ModeSwitcher(modifier: Modifier = Modifier) {
       )
     }
     if (AppMode.SHOP !in modes) {
-      V3Divider(start = 64.dp)
+      V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.DIVIDER_START)
       V3ListRow(
         title = StrKit.openShopMode,
+        look = ir.vil3ntec.tohid.ui.v3.V3RowLook.NAV,
         icon = Icons.Outlined.Storefront,
         hue = lookOf(AppMode.SHOP).hue,
         onClick = { ModeState.startShop(context) },
