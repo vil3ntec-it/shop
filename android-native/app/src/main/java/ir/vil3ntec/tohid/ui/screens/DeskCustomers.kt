@@ -153,10 +153,11 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
     d.sales.filter { it.debtorId != null && it.status != "cancelled" && it.date.startsWith(month) }.sumOf { it.finalTotal }
   }
 
+  val contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts() // CRM-15: شمارهٔ مشتری در خروجی
   fun excel() {
     val rows = mutableListOf(listOf("نام", "تلفن", "مانده", "روزِ بدهی", "تعدادِ فاکتور", "جمعِ خرید", "آخرین خرید", "آخرین پرداخت")) // داده: برگهٔ اکسل/چاپ (خروجی) زبانِ صفحه را نمی‌گیرد
     list.forEach { s ->
-      rows += listOf(s.name, s.phone, Math.round(s.balance).toString(), s.debtDays?.toString().orEmpty(), s.invoices.toString(),
+      rows += listOf(s.name, ir.vil3ntec.tohid.ui.components.customerPhoneExport(s.phone, contacts), Math.round(s.balance).toString(), s.debtDays?.toString().orEmpty(), s.invoices.toString(),
         Math.round(s.bought).toString(), s.lastPurchase.orEmpty(), s.lastPaid.orEmpty())
     }
     val sheet = ReportCsv.Sheet("مشتری‌ها-${ir.vil3ntec.tohid.todayIso()}", rows) // داده: برگهٔ اکسل/چاپ (خروجی) زبانِ صفحه را نمی‌گیرد

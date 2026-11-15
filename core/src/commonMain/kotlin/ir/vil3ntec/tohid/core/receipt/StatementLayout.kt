@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.core.receipt
 
+import ir.vil3ntec.tohid.core.crm.CustomerMask
+
 /**
  *  صورت‌حسابِ مشتری به شکلِ تصویر — CRM-05 («چاپ، تصویر یا PDF»).
  *
@@ -30,6 +32,10 @@ data class StatementInput(
   /** روزِ صدور، `YYYY-MM-DD` */
   val todayIso: String,
   val lines: List<StatementLine>,
+  /** CRM-15 — پرچمِ نقش‌محورِ `shop.customer_role_mask`؛ خاموش (پیش‌فرض) ⇒ شماره همان امروز */
+  val roleMask: Boolean = false,
+  /** CRM-15 — «چاپِ شمارهٔ کامل» ِ صاحب (پیش‌فرض خاموش) */
+  val printFullPhone: Boolean = false,
 )
 
 data class StatementLabels(
@@ -87,7 +93,8 @@ object StatementLayout {
     b += ReceiptBlock.Rule()
     text(labels.title, TextStyle.TOTAL)
     row(labels.customer, input.customer.trim())
-    if (input.phone.isNotBlank()) row(labels.phone, fmt.phone(input.phone))
+    //  CRM-15: برای هر نقش پوشیده («•••• ۰۰۸») مگر «چاپِ شمارهٔ کامل» (`CustomerMask.printPhone`)
+    if (input.phone.isNotBlank()) row(labels.phone, fmt.phone(CustomerMask.printPhone(input.phone, input.roleMask, input.printFullPhone)))
     row(labels.date, fmt.date(input.todayIso))
     b += ReceiptBlock.Rule()
 

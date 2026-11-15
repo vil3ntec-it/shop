@@ -122,6 +122,7 @@ import androidx.compose.material.icons.outlined.ShoppingBag
 import ir.vil3ntec.tohid.ui.v3.settings.sections.CountToolsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.DeliverLaterScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.GiftReceiptScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.PrintPhoneScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.LabelToolsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.PriceWhyScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.ProductInfoScreen
@@ -201,6 +202,7 @@ internal object SettingsPages {
     Page(SettingsLayout.SPECIAL_ORDER, Icons.Outlined.ShoppingBag) { SpecialOrderScreen(it) },
     Page(SettingsLayout.DELIVER_LATER, Icons.Outlined.PendingActions) { DeliverLaterScreen(it) },
     Page(SettingsLayout.GIFT_RECEIPT, Icons.Outlined.Celebration) { GiftReceiptScreen(it) },
+    Page(SettingsLayout.PRINT_PHONE, Icons.Outlined.Print) { PrintPhoneScreen(it) },
     Page(SettingsLayout.TILL_RECEIVE, Icons.Outlined.PointOfSale) { TillReceiveScreen(it) },
     Page(SettingsLayout.LINE_SELLER, Icons.Outlined.Badge) { LineSellerScreen(it) },
     Page(SettingsLayout.MULTI_DRAWER, Icons.Outlined.PointOfSale) { MultiDrawerScreen(it) },

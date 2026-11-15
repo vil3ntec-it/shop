@@ -194,7 +194,9 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState, onOpen: (String) -> Un
   }
   val (from, to) = if (keys && shift != 0) ReportKeys.range(span.name, baseFrom, baseTo, shift, today) else baseFrom to baseTo
   val lineSeller = remember { ir.vil3ntec.tohid.data.LineSellerPref.on(context) } // POS-23: فروشندهٔ هر ردیف
-  val base = remember(d, rep, from, to) { ReportCsv.of(rep.key, d, from, to, today, reminderTemplate).let { ReportCsv.lineSellers(it, rep.key, d, from, to, lineSeller) } }
+  val contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts() // CRM-15: شمارهٔ مشتری در برگه
+  val phoneOf: (String) -> String = { ir.vil3ntec.tohid.ui.components.customerPhoneExport(it, contacts) }
+  val base = remember(d, rep, from, to, contacts) { ReportCsv.of(rep.key, d, from, to, today, reminderTemplate, phone = phoneOf).let { ReportCsv.lineSellers(it, rep.key, d, from, to, lineSeller) } }
   //  RPT-13: «مقایسه» ⇒ ستونِ «دورهٔ قبل» و «تغییر» در خودِ جدول (چاپ و اکسل همان جدول): برگهٔ کلیددار ردیف‌به‌ردیف، برگهٔ
   //  فهرستیِ سند (فاکتور، خرید، مصرف) گروه‌شده با روشِ پرداخت/تأمین‌کننده/دسته (`ReportCsv.compareGroup`)
   val sheet = remember(base, keys, compare, span, from, to) {
@@ -203,7 +205,7 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState, onOpen: (String) -> Un
       ir.vil3ntec.tohid.core.report.ReportPeriod.shift(ReportKeys.unitOf(span.name), from, to, -1, today) else null
     if (prev == null) base
     else {
-      val past = ReportCsv.of(rep.key, d, prev.from, prev.to, today, reminderTemplate).let { ReportCsv.lineSellers(it, rep.key, d, prev.from, prev.to, lineSeller) }
+      val past = ReportCsv.of(rep.key, d, prev.from, prev.to, today, reminderTemplate, phone = phoneOf).let { ReportCsv.lineSellers(it, rep.key, d, prev.from, prev.to, lineSeller) }
       if (keyed) ReportCsv.compared(rep.key, base, past, StrReach.prevColumn, StrReach.changeColumn)
       else ReportCsv.comparedList(rep.key, base, past, StrReports.colCount, StrReach.prevColumn, StrReach.changeColumn)
     }

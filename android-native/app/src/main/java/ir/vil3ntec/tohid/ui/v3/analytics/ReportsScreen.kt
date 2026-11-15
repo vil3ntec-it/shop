@@ -140,7 +140,8 @@ fun ReportsScreen(
   val (from, to) = ReportsModel.bounds(period, today)
 
   val lineSeller = remember { ir.vil3ntec.tohid.data.LineSellerPref.on(context) } // POS-23
-  fun sheet() = ReportCsv.of(tab.csv, d, from, to, today).let { ReportCsv.lineSellers(it, tab.csv, d, from, to, lineSeller) }
+  val contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts() // CRM-15: شمارهٔ مشتری در برگه
+  fun sheet() = ReportCsv.of(tab.csv, d, from, to, today, phone = { ir.vil3ntec.tohid.ui.components.customerPhoneExport(it, contacts) }).let { ReportCsv.lineSellers(it, tab.csv, d, from, to, lineSeller) }
   var pending by remember { mutableStateOf<ReportCsv.Sheet?>(null) }
   //  نوشتن با انتخابگرِ خودِ اندروید — بی اجازهٔ ذخیره‌سازی (همان راهِ امروز)
   val saveCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->

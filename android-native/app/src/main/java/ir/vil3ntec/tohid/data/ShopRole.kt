@@ -84,12 +84,14 @@ object ShopRole {
     val e = prefs(context).edit()
     if (policyJson.isNullOrBlank()) e.remove(POLICY) else e.putString(POLICY, policyJson)
     e.apply()
+    customerMask.value = PermPolicy.customerMask(policyJson)
     policyVersion.value++
   }
 
   fun forget(context: Context) {
     prefs(context).edit().remove(KEY).remove(POLICY).remove(SHOP_ID).apply()
     courierMode.value = false
+    customerMask.value = false
     policyVersion.value++
   }
 
@@ -97,8 +99,18 @@ object ShopRole {
    *  تصمیم با هستهٔ مشترک (`core/perm/PermCore`) — همان که سرور و وب دارند.
    *  بی لایه دقیقاً همان `!isStaff`ِ پیشین است (آزمونِ مرجع: `PermCoreTest`).
    */
-  fun allows(context: Context, key: String): Boolean =
-    PermPolicy.allows(current(context), prefs(context).getString(POLICY, null), key)
+  fun allows(context: Context, key: String): Boolean {
+    val policy = prefs(context).getString(POLICY, null)
+    //  CRM-15: هر پرسشِ «دیدنِ شمارهٔ مشتریان» پرچمِ نقش‌محورِ ذخیره‌شده را هم تازه می‌کند ([customerMask])
+    if (key == ir.vil3ntec.tohid.core.crm.CustomerMask.KEY) customerMask.value = PermPolicy.customerMask(policy)
+    return PermPolicy.allows(current(context), policy, key)
+  }
+
+  /**
+   *  CRM-15 — `policy.customerMask` (پرچمِ `shop.customer_role_mask`): قالبِ شمارهٔ پوشیده «•••• ۰۰۸» و چاپِ پوشیده
+   *  (`core/crm/CustomerMask`). با [rememberPolicy] و هر `allows("customers.contact")` تازه می‌شود.
+   */
+  val customerMask = kotlinx.coroutines.flow.MutableStateFlow(false)
 
   /** حالتِ پیک: نقشِ ذخیره‌شده «پیک» است */
   fun isCourier(context: Context): Boolean =
