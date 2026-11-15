@@ -10,7 +10,9 @@
  * راهِ کاملِ برنامه سنجیده می‌شود:
  *
  *   ۱) فایل‌ها: `version.txt` = نسخه؛ هر نصبیِ به‌روزرسانی در `SHA256SUMS.txt` با همان هش؛ امضای فهرست با کلیدِ
- *      عمومیِ سنجاق‌شدهٔ برنامه (اگر داده شد؛ همان `SHA256withECDSA` ِ `ReleaseSignature.kt`).
+ *      عمومیِ سنجاق‌شدهٔ برنامه (اگر داده شد؛ همان `SHA256withECDSA` ِ `ReleaseSignature.kt`). کامپیوتر: یک نصابِ ویندوز
+ *      (2.14.5) — `MyShop-Windows-Setup.exe` ِ فهرست همان هشِ نصابِ کامل (`Tohid-Windows-Offline.exe`) را دارد و
+ *      `MyShop-Windows-Offline.exe` دیگر در فهرست نیست.
  *   ۲) پنل (درِ واقعیِ مدیرِ ارشد): مرحله با «فقط یک دکان» ⇒ همان دکان نسخهٔ تازه را از برچسبِ نسخه‌دار می‌گیرد،
  *      دکانِ دیگر و برنامهٔ قدیمی برچسبِ روان؛ دانلودِ هر نصبی از سرور = همان بایت‌ها و همان هشِ فهرست؛ فهرست و
  *      امضای سروشده = همان فایل‌ها.
@@ -38,6 +40,13 @@ const REPO = 'rehearsal/shop';
 const SHOP = 'rehearsal-shop-1';
 const OTHER_SHOP = 'rehearsal-shop-2';
 const DESKTOP_UPDATERS = Object.freeze(['Tohid-Windows-Offline.exe', 'Tohid-Mac-AppleSilicon.dmg', 'Tohid-Mac-Intel.dmg', 'Tohid-Linux.deb']);
+/**
+ * یک نصابِ ویندوز (2.14.5، خواستِ صاحب‌کار): نصابِ رو به کاربر (صفحهٔ دانلود، `install.ps1`، `MyShop-Setup-All.zip`)
+ * همان بایت‌های نصابِ کاملِ به‌روزرسانی است، نه نصابِ آنلاینِ کوچک؛ نامِ بازنشسته منتشر نمی‌شود. فقط از فهرست سنجیده
+ * می‌شود (`release-stage.yml` خودِ فایلِ رو به کاربر را نمی‌گیرد).
+ */
+const PUBLIC_WINDOWS = Object.freeze({ name: 'MyShop-Windows-Setup.exe', sameAs: 'Tohid-Windows-Offline.exe' });
+const RETIRED_PUBLIC = Object.freeze(['MyShop-Windows-Offline.exe']);
 const TAGS = Object.freeze(['tohid-native', 'tohid-desktop']);
 const VERSION = /^\d{1,6}(\.\d{1,6}){1,3}$/;
 //  برچسبِ روانِ ساختگی: همیشه پایین‌تر از هر نسخهٔ واقعی
@@ -74,7 +83,7 @@ function verifySignature(sumsBuf, sigText, pubkey) {
 
 /**
  * پوشهٔ فایل‌های انتشار ⇒ { version, files: [{name, path, size, sha}], sums, sig, updaters }. هر ناسازگاری ⇒ خطای تمرین.
- * `requireAll`: برای کامپیوتر هر چهار نصبی لازم است (ورک‌فلو)؛ آزمون می‌تواند یکی بدهد.
+ * `requireAll`: برای کامپیوتر هر چهار نصبی و نصابِ یگانهٔ ویندوز در فهرست لازم است (ورک‌فلو)؛ آزمون می‌تواند یکی بدهد.
  */
 function loadArtifacts(dir, { tag, version, pubkey = '', requireAll = true }) {
   if (!TAGS.includes(tag)) fail(`برچسب یکی از ${TAGS.join('، ')}`);
@@ -104,6 +113,12 @@ function loadArtifacts(dir, { tag, version, pubkey = '', requireAll = true }) {
     const f = files.find((x) => x.name === n);
     if (!sums.has(n)) fail(`${n} در SHA256SUMS.txt نیست`);
     if (sums.get(n) !== f.sha) fail(`هشِ ${n} با SHA256SUMS.txt نمی‌خواند`);
+  }
+  if (tag === 'tohid-desktop' && requireAll) {
+    const pub = sums.get(PUBLIC_WINDOWS.name);
+    if (!pub) fail(`${PUBLIC_WINDOWS.name} در SHA256SUMS.txt نیست — install.ps1 بی آن نصب نمی‌کند`);
+    if (pub !== sums.get(PUBLIC_WINDOWS.sameAs)) fail(`${PUBLIC_WINDOWS.name} همان نصابِ کامل (${PUBLIC_WINDOWS.sameAs}) نیست — نصابِ ویندوز یکی است و هنگامِ نصب دانلود نمی‌کند`);
+    for (const n of RETIRED_PUBLIC) if (sums.has(n)) fail(`${n} دیگر منتشر نمی‌شود — یک نصابِ ویندوز`);
   }
   const sigBuf = read('SHA256SUMS.txt.sig');
   if (pubkey) {

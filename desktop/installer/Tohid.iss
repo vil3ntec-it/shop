@@ -1,9 +1,19 @@
 ﻿; نصابِ ویندوزِ «فروشگاه من» — Inno Setup 6.5+، دو گونه از یک فایل:
 ;
-;   Tohid-Windows-Setup.exe    (پیش‌فرض، ~۳ مگابایت) — «نصابِ آنلاین»
-;   Tohid-Windows-Offline.exe  (/DOffline، ~۹۰ مگابایت) — همه‌چیز داخلِ خودش
+;   Tohid-Windows-Offline.exe  (/DOffline، ~۱۳۰ مگابایت) — همه‌چیز داخلِ خودش؛ تنها گونه‌ای که ساخته می‌شود
+;   Tohid-Windows-Setup.exe    (پیش‌فرض، ~۳ مگابایت) — «نصابِ آنلاین»؛ از 2.14.5 دیگر ساخته نمی‌شود
 ;
-; ── چرا آنلاین؟ (سناریوهای خطا، از گزارشِ صاحب مخزن) ─────────────────
+; ── یک نصاب (2.14.5) ──────────────────────────────────────────────────
+; صاحب‌کار: «آفلاین وسط‌اش چیه، این آنلاین و آفلاین است، مسخره» — یک نصابِ ویندوز. گامِ دانلودِ
+; نصابِ آنلاین روی اینترنتِ ضعیف همان جایی بود که می‌شکست؛ پس CI فقط ‎/DOffline‎ را می‌سازد و همان
+; بایت‌ها دو نام دارند: ‎Tohid-Windows-Offline.exe‎ (به‌روزرسانیِ درون‌برنامه، ‎/SILENT‎) و
+; ‎MyShop-Windows-Setup.exe‎ (صفحهٔ دانلود، ‎install.ps1‎، ‎MyShop-Setup-All.zip‎) — هنگامِ نصب هیچ دانلودی
+; نیست. فایلِ خرابِ دانلود را Inno با پیامِ «corrupted» رد می‌کند؛ راهِ مطمئن ‎install.ps1‎ است (SHA-256 و ادامه‌دار).
+; گونهٔ آنلاین (پایین، بی ‎/DOffline‎) فقط مانده تا روشن باشد نصابِ آنلاینی که کاربری از 2.11.42 تا 2.14.5
+; گرفته و نگه داشته چه می‌کند: ‎Tohid-Windows-App-<نسخهٔ خودش>.7z‎ را از ‎/api/releases/<برچسب>/file/‎ ِ سرورِ
+; خودمان و بعد GitHub می‌گیرد. ⛔ آن بسته‌ها و ‎Tohid-Windows-Setup.exe‎ ِ مانده روی انتشار پاک نشوند و آن نشانی‌ها عوض نشوند.
+;
+; ── چرا آنلاین بود؟ (2.11.42 تا 2.14.5؛ سناریوهای خطا، از گزارشِ صاحب مخزن) ──
 ; دو نصابِ کاملاً متفاوت (MSIِ WiX و Inno) روی کامپیوترِ او هر دو گفتند
 ; «فایل خراب است» («Data.cab is corrupt» و «The source file is corrupted»)،
 ; در حالی که فایلِ منتشرشده سالم بود و اندازهٔ فایلِ دانلودشده هم درست بود.
@@ -21,7 +31,8 @@
 ; به‌روزرسانیِ درون‌برنامه نسخهٔ Offline را می‌گیرد (خودش SHA256SUMSِ
 ; امضاشده را می‌سنجد) و با ‎/SILENT‎ اجرا می‌کند.
 ;
-; ساخت: tohid-desktop.yml — ‎iscc /DAppVersion=… /DPayloadSha=… /DPayloadSize=… /DPayloadBytes=… /DReleaseTag=… [/DOffline]‎
+; ساخت: tohid-desktop.yml — ‎iscc /DAppVersion=… /DOffline‎. گونهٔ آنلاین (دیگر ساخته نمی‌شود):
+; ‎iscc /DAppVersion=… /DPayloadSha=… /DPayloadSize=… /DPayloadBytes=… /DReleaseTag=…‎
 ;
 ; ── دانلودِ ادامه‌دار (۱۴۰۵/۰۷/۲۶) ─────────────────────────────────────
 ; DownloadPageِ Inno نمی‌تواند ادامه دهد: هر قطع ⇐ ۹۰ مگابایت از صفر. حالا
@@ -525,7 +536,7 @@ begin
       'فروشگاه من could not be downloaded.' + #13#10#13#10 +
       'Reason: ' + Err + #13#10#13#10 +
       'Please check your internet connection (or turn your VPN/proxy off or on) and click Install again.' + #13#10#13#10 +
-      'Without internet: download MyShop-Windows-Offline.exe from' + #13#10 +
+      'Without internet: download the full installer MyShop-Windows-Setup.exe from' + #13#10 +
       'https://vil3ntec-it.github.io/shop/download.html',
       mbCriticalError, MB_OK, IDOK);
     Result := False;

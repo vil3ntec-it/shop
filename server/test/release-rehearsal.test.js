@@ -5,7 +5,8 @@
  *
  * آن‌چه این پرونده قفل می‌کند:
  *   ۱) فایل‌های انتشار پیش از هر چیز: نسخهٔ `version.txt`، هشِ هر نصبی در `SHA256SUMS.txt`، امضای فهرست با کلیدِ
- *      عمومیِ برنامه (همان SHA256withECDSA ِ `ReleaseSignature.kt`)، یک نصبیِ اندروید با همان نسخه، چهار نصبیِ کامپیوتر.
+ *      عمومیِ برنامه (همان SHA256withECDSA ِ `ReleaseSignature.kt`)، یک نصبیِ اندروید با همان نسخه، چهار نصبیِ کامپیوتر،
+ *      و یک نصابِ ویندوز: `MyShop-Windows-Setup.exe` ِ فهرست = هشِ نصابِ کامل، بی `MyShop-Windows-Offline.exe` (2.14.5).
  *      هر ناسازگاری ⇒ خطای تمرین (کدِ ۲)، نه انتشار.
  *   ۲) دودآزماییِ کامل روی سرورِ واقعی (درهای مدیر، `/api/releases`، `/api/errors`) با GitHub ِ ساختگیِ همان فایل‌ها:
  *      فقط یک دکان ⇒ ۱۰۰٪ ⇒ ایستِ خودکار ⇒ ادامه ⇒ پایان؛ بایت‌ها، فهرست و امضای سروشده همان فایل‌ها.
@@ -24,8 +25,12 @@ const keys = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
 const PUB = keys.publicKey.export({ format: 'der', type: 'spki' }).toString('base64');
 const other = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
 
-/** پوشهٔ انتشارِ ساختگی، مثلِ خروجیِ کارِ «انتشار» ِ «توحید بومی» (آزمایشی) */
-function makeDir({ tag = 'tohid-native', version = VERSION, files = null, sign = keys.privateKey, sumsFor = null } = {}) {
+/**
+ * پوشهٔ انتشارِ ساختگی، مثلِ خروجیِ کارِ «انتشار» ِ «توحید بومی» (آزمایشی). کامپیوتر: مثلِ `release-stage.yml` فقط
+ * نصبی‌های به‌روزرسانی در پوشه‌اند، ولی فهرست (`SHA256SUMS.txt` ِ `tohid-desktop.yml`) نامِ رو به کاربر را هم دارد:
+ * `MyShop-Windows-Setup.exe` با همان بایت‌های `Tohid-Windows-Offline.exe` (`publicSums` جایش را می‌گیرد).
+ */
+function makeDir({ tag = 'tohid-native', version = VERSION, files = null, sign = keys.privateKey, sumsFor = null, publicSums = null } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rel-reh-'));
   const list = files || (tag === 'tohid-native'
     ? { [`Tohid-Native-${version}.apk.beta`]: Buffer.from(`apk-${version}-${'x'.repeat(2000)}`) }
@@ -33,7 +38,9 @@ function makeDir({ tag = 'tohid-native', version = VERSION, files = null, sign =
       .map((n) => [n, Buffer.from(`${n}-${version}`)])));
   for (const [n, b] of Object.entries(list)) fs.writeFileSync(path.join(dir, n), b);
   fs.writeFileSync(path.join(dir, 'version.txt'), `${version}\n`);
-  const sums = Object.entries(sumsFor || list).map(([n, b]) => `${crypto.createHash('sha256').update(b).digest('hex')}  ${n}`).join('\n') + '\n';
+  const pub = publicSums || (tag === 'tohid-desktop' && list['Tohid-Windows-Offline.exe']
+    ? { 'MyShop-Windows-Setup.exe': list['Tohid-Windows-Offline.exe'] } : {});
+  const sums = Object.entries(sumsFor || { ...list, ...pub }).map(([n, b]) => `${crypto.createHash('sha256').update(b).digest('hex')}  ${n}`).join('\n') + '\n';
   fs.writeFileSync(path.join(dir, 'SHA256SUMS.txt'), sums);
   if (sign) fs.writeFileSync(path.join(dir, 'SHA256SUMS.txt.sig'), crypto.sign('sha256', Buffer.from(sums), sign).toString('base64'));
   return dir;
@@ -74,6 +81,15 @@ test('⛔ فایل‌های ناسازگار ⇒ خطای تمرین، نه ان
   //  کامپیوترِ ناقص
   rejects(() => R.loadArtifacts(makeDir({ tag: 'tohid-desktop', version: '1.0.500', files: { 'Tohid-Linux.deb': Buffer.from('d') } }),
     { tag: 'tohid-desktop', version: '1.0.500' }), /ناقص/);
+  //  یک نصابِ ویندوز (2.14.5): نامِ رو به کاربر نیست، نصابِ آنلاینِ کوچک است، یا نامِ بازنشسته برگشته
+  const desk = (publicSums) => () => R.loadArtifacts(makeDir({ tag: 'tohid-desktop', version: '1.0.500', publicSums }),
+    { tag: 'tohid-desktop', version: '1.0.500' });
+  rejects(desk({ 'MyShop-Mac-Intel.dmg': Buffer.from('m') }), /MyShop-Windows-Setup\.exe در SHA256SUMS/);
+  rejects(desk({ 'MyShop-Windows-Setup.exe': Buffer.from('online-stub-2.5MB') }), /همان نصابِ کامل/);
+  rejects(desk({ 'MyShop-Windows-Setup.exe': Buffer.from('Tohid-Windows-Offline.exe-1.0.500'), 'MyShop-Windows-Offline.exe': Buffer.from('Tohid-Windows-Offline.exe-1.0.500') }),
+    /MyShop-Windows-Offline\.exe دیگر منتشر نمی‌شود/);
+  //  همان قاعده فقط با «همه» (ورک‌فلو)؛ آزمونی که یکی می‌دهد بی آن
+  assert.ok(R.loadArtifacts(makeDir({ tag: 'tohid-desktop', version: '1.0.500', publicSums: {} }), { tag: 'tohid-desktop', version: '1.0.500', requireAll: false }));
   //  برچسب یا نسخهٔ ناجور
   rejects(() => R.loadArtifacts(makeDir(), { tag: 'tohid-admin', version: VERSION }), /برچسب/);
   rejects(() => R.loadArtifacts(makeDir(), { tag: 'tohid-native', version: 'v3.2.900' }), /نسخهٔ نادرست/);

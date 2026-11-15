@@ -8,7 +8,7 @@
   لینوکس (دبیان، اوبونتو، مینت) ⇐  «Install-Linux.sh» را اجرا کنید (رمزِ کاربر را می‌پرسد)
 
 یا مستقیم از پوشه‌ها:
-  Windows/MyShop-Windows-Setup.exe  (بستهٔ کنارش را خودش برمی‌دارد)
+  Windows/MyShop-Windows-Setup.exe  (نصابِ کامل؛ بی اینترنت نصب می‌شود)
   Mac-Apple-Silicon/MyShop-Mac-AppleSilicon.dmg
   Mac-Intel/MyShop-Mac-Intel.dmg
   Linux/MyShop-Linux.deb
