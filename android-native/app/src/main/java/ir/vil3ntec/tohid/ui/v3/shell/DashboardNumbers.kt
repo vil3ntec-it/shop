@@ -46,6 +46,8 @@ data class DashboardNumbers(
       val stock = ShopStore.index(d)
 
       val todaySales = d.sales.filter { it.date == today && it.status != "cancelled" }
+      //  PERF-SCREEN: وضعیتِ هر کالا یک بار (کم و تمام‌شده از همان فهرست، همان ترتیب)
+      val status = d.products.map { stock.status(it) }
 
       //  یک گذر روی تراکنش‌ها، نه یک پیمایش به ازای هر قرض‌دار
       val byDebtor = ir.vil3ntec.tohid.data.DebtRows.of(d)  // CRM-10: کلیدِ ماندگار
@@ -113,8 +115,8 @@ data class DashboardNumbers(
         totalDebt = owing.sumOf { it.second },
         expenseMonth = d.expenses.filter { it.date.startsWith(monthPrefix) }.sumOf { it.amount },
         supplierDebt = d.suppliers.sumOf { ShopStore.supplierDebt(d, it.id) }.coerceAtLeast(0.0),
-        lowStock = d.products.filter { stock.status(it) == "low" },
-        outOfStock = d.products.filter { stock.status(it) == "out" },
+        lowStock = d.products.filterIndexed { i, _ -> status[i] == "low" },
+        outOfStock = d.products.filterIndexed { i, _ -> status[i] == "out" },
         expiring = ir.vil3ntec.tohid.data.ExpiryEngine.alerts(d, today),
         warehouse = WarehouseEngine.summary(d),
         monthSalesTotal = monthByDay.values.sum(),

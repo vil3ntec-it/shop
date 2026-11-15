@@ -116,8 +116,9 @@ object Transactions {
     //  ترتیب همان است: مرتب‌سازیِ پایدار پس از صافی = صافی پس از مرتب‌سازیِ پایدار.
     val names = d.debtors.associate { it.id to it.name }
     val mine = d.sales.filter { it.date == today }
-    val ids = mine.mapTo(HashSet()) { it.id }
-    val counts = if (ids.isEmpty()) emptyMap() else d.saleItems.filter { it.saleId in ids }.groupingBy { it.saleId }.eachCount()
+    //  شمارِ اقلام از جدولِ یک‌خانه‌ایِ فروش (`ShopStore.salesIndex`: همان `groupBy { saleId }` ِ همهٔ اقلام)
+    val bySale = if (mine.isEmpty()) emptyMap() else ir.vil3ntec.tohid.data.ShopStore.salesIndex(d).itemsBySale
+    val counts = mine.associate { it.id to (bySale[it.id]?.size ?: 0) }
     val sales = mine.map { ofSale(d, it, names, counts) }
     val bought = if (purchases) {
       val suppliers = d.suppliers.associate { it.id to it.name }
