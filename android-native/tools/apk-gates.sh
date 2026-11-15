@@ -4,7 +4,8 @@
 #
 #  APKِ تازه با آخرین نسخهٔ منتشرشده (انتشارِ آزمایشی، وگرنه پایدار) سنجیده می‌شود — و اگر مرجع آزمایشی بود،
 #  گواهی و versionCode با پایدار هم (گوشی‌های پایدار همان را دارند):
-#    • applicationId همان `ir.vil3ntec.tohid`               — همیشه سخت
+#    • applicationId همان `com.vill3n.dailyshop` (تصمیمِ ۱۴۰۵/۰۸/۲۴؛ پلِ گذار با `TOHID_LEGACY_APP_ID=true`:
+#      `ir.vil3ntec.tohid`) — همیشه سخت؛ منتشرشده فقط یکی از همین دو (گذار: شناسهٔ قدیمی ⇐ تازه فقط هشدار)
 #    • versionCode همان «۱۰۰ + شمارهٔ ساخت» — همیشه سخت؛ کمتر از منتشرشده نیست — سخت بیرون از PR
 #      (در PR فقط هشدار: شمارهٔ ساختِ PR ِ مانده در صف از آخرین انتشار عقب می‌افتد)
 #    • اثر انگشتِ گواهیِ امضا (SHA-256) همان منتشرشده         — همیشه سخت
@@ -17,14 +18,19 @@
 #  شمارِ آزمون‌ها هم (اگر پوشهٔ نتیجه داده شود) در خلاصهٔ اجرا می‌آید.
 #
 #  usage: apk-gates.sh <apk> <expected-versionCode> [test-results-dir]
-#  env:   ANDROID_HOME, GH_TOKEN, GITHUB_REPOSITORY, PR_NUMBER (خالی بیرون از PR)
+#  env:   ANDROID_HOME, GH_TOKEN, GITHUB_REPOSITORY, PR_NUMBER (خالی بیرون از PR)، TOHID_LEGACY_APP_ID (فقط پلِ گذار)
 #
 set -euo pipefail
 
 apk=$1
 want_code=$2
 results=${3:-}
-want_id=ir.vil3ntec.tohid
+#  شناسهٔ نصب (`update/AppMove.kt`): تازه، و قدیمی فقط برای پلِ گذار. نسخهٔ منتشرشده می‌تواند هنوز قدیمی باشد —
+#  گوشیِ قدیمی نصبیِ تازه را کنارِ خودش نصب می‌کند و به‌روزرسانِ داخلی آن را «برنامه با نامِ تازه» نشان می‌دهد.
+new_id=com.vill3n.dailyshop
+legacy_id=ir.vil3ntec.tohid
+want_id=$new_id
+[ "${TOHID_LEGACY_APP_ID:-}" = true ] && want_id=$legacy_id
 summary=${GITHUB_STEP_SUMMARY:-/dev/stdout}
 
 bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n1)
@@ -91,7 +97,12 @@ if [ -n "$ref" ]; then
   ref_code=$(field versionCode "$rb")
   ref_fp=$(cert "$ref")
   ref_size=$(stat -c %s "$ref")
-  [ "$ref_id" = "$id" ] || err "applicationId با نسخهٔ منتشرشده ($ref_id) یکی نیست"
+  if [ "$ref_id" != "$id" ]; then
+    case "$ref_id" in
+      "$new_id"|"$legacy_id") echo "::warning::گذارِ شناسهٔ نصب: منتشرشده «$ref_id»، این ساخت «$id» — گوشی‌های شناسهٔ دیگر برگهٔ «برنامه با نامِ تازه» را می‌بینند، نه به‌روزرسانی" ;;
+      *) err "applicationId با نسخهٔ منتشرشده ($ref_id) یکی نیست" ;;
+    esac
+  fi
   [ "$ref_fp" = "$fp" ] || err "اثر انگشتِ امضا با نسخهٔ منتشرشده یکی نیست — به‌روزرسانی روی گوشی‌ها نصب نمی‌شود"
   #  versionCode = ۱۰۰ + `run_number`. اجرای PR شماره‌اش را هنگامِ push می‌گیرد؛ اگر در صفِ CI بماند و
   #  main پیش از آن یک نسخهٔ آزمایشیِ تازه منتشر کند، PR بی هیچ ایرادی «کمتر» می‌شود (#608، ۱۵۱۳ در

@@ -77,15 +77,17 @@ fun AuthGate(store: ShopStore, mode: String? = null, onClose: (() -> Unit)? = nu
     secondsLeft = controller.cooldown::secondsLeft,
     apple = controller.appleReady,
   )
-  AuthFlow(controller.ui, env, controller, onClose)
-  controller.externalLink?.let { ask ->
-    ExternalLinkSheet(
-      ask = ask,
-      busy = controller.ui.busy,
-      onDismiss = { controller.externalLink = null },
-      onSendCode = { controller.linkSendCode(ask) },
-      onProve = { controller.linkProve(ask, it) },
-    )
+  ProvideWelcomeForeground {
+    AuthFlow(controller.ui, env, controller, onClose)
+    controller.externalLink?.let { ask ->
+      ExternalLinkSheet(
+        ask = ask,
+        busy = controller.ui.busy,
+        onDismiss = { controller.externalLink = null },
+        onSendCode = { controller.linkSendCode(ask) },
+        onProve = { controller.linkProve(ask, it) },
+      )
+    }
   }
 }
 
@@ -103,24 +105,27 @@ internal fun AuthFlow(ui: AuthUi, env: AuthEnv, act: AuthActions, onClose: (() -
   }
   //  متنِ کاملِ شرایط درونِ گامِ ۳ جابه‌جا می‌شود (لوکیشنِ پیداشده نگه داشته می‌شود)
   val page = if (ui.step == AuthStep.TERMS_TEXT) AuthStep.TERMS else ui.step
-  V3PageSwitch(target = page, depth = { it.depth }) { step ->
-    when (step) {
-      AuthStep.FORM -> FormStep(ui, env, act, stepBack)
-      AuthStep.FORGOT -> ForgotStep(ui, env, act, stepBack)
-      AuthStep.JOIN -> JoinStep(ui, env, act, stepBack)
-      AuthStep.CODE -> CodeStep(ui, env, act, stepBack)
-      AuthStep.TERMS, AuthStep.TERMS_TEXT -> TermsStep(ui, env, act, stepBack)
-      //  «ورودِ پیک» (گروهِ آنلاین): همان کدِ شاگرد و همان پیوستن؛ نقشِ پیک را سرور می‌دهد
-      AuthStep.COURIER -> CourierJoinScreen(
-        name = ui.name,
-        onName = { v -> act.edit { it.copy(name = v, error = null) } },
-        code = ui.staffCode,
-        onCode = { v -> act.edit { it.copy(staffCode = v.uppercase(), error = null) } },
-        busy = ui.busy,
-        error = ui.error,
-        onJoin = act::joinWithStaffCode,
-        onBack = { act.edit { it.backFromCourier() } },
-      )
+  //  پس‌زمینهٔ ورودِ قدیمی (سه خط، موج‌ها، حباب‌ها) یک بار پشتِ همهٔ گام‌ها؛ گام‌ها رویش جابه‌جا می‌شوند
+  WelcomeBackdrop {
+    V3PageSwitch(target = page, depth = { it.depth }) { step ->
+      when (step) {
+        AuthStep.FORM -> FormStep(ui, env, act, stepBack)
+        AuthStep.FORGOT -> ForgotStep(ui, env, act, stepBack)
+        AuthStep.JOIN -> JoinStep(ui, env, act, stepBack)
+        AuthStep.CODE -> CodeStep(ui, env, act, stepBack)
+        AuthStep.TERMS, AuthStep.TERMS_TEXT -> TermsStep(ui, env, act, stepBack)
+        //  «ورودِ پیک» (گروهِ آنلاین): همان کدِ شاگرد و همان پیوستن؛ نقشِ پیک را سرور می‌دهد
+        AuthStep.COURIER -> CourierJoinScreen(
+          name = ui.name,
+          onName = { v -> act.edit { it.copy(name = v, error = null) } },
+          code = ui.staffCode,
+          onCode = { v -> act.edit { it.copy(staffCode = v.uppercase(), error = null) } },
+          busy = ui.busy,
+          error = ui.error,
+          onJoin = act::joinWithStaffCode,
+          onBack = { act.edit { it.backFromCourier() } },
+        )
+      }
     }
   }
 }

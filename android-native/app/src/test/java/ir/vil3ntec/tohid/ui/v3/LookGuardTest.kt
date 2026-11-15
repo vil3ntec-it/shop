@@ -78,18 +78,18 @@ class LookGuardTest {
     "ui/v3/shell/HomeAccents.kt" to "661f1bb3f069b39a",
     "ui/v3/shell/HomeDrawerCard.kt" to "b2abe9468bb6cfd6",
     "ui/v3/shell/HomeHero.kt" to "7d387b698015fed9",
-    "ui/v3/shell/HomeHeroAndroid.kt" to "7848c0af51b14200",
+    "ui/v3/shell/HomeHeroAndroid.kt" to "e4a463554ab28c6c", // ۶۳f: فقط سرعت؛ ظاهر همان
     "ui/v3/shell/HomeHeroCard.kt" to "dfe6ef9b70b42ed0",
     "ui/v3/shell/HomeSalesCard.kt" to "4ba6b745c8b4805b",
     "ui/v3/shell/HomeScreen.kt" to "2053f8948f58e2d0",
-    "ui/v3/shell/HomeShortcuts.kt" to "1c6a39676f781dc4",
+    "ui/v3/shell/HomeShortcuts.kt" to "8df1e96ad45f5aa6", // ۶۳f: فقط سرعت؛ ظاهر همان
     "ui/v3/shell/HomeTiles.kt" to "8b1a8dd019fea541",
     "ui/v3/shell/HomeToday.kt" to "56d3f8fc29e5085a",
     "ui/v3/shell/HomeTrend.kt" to "57d139695c46830d",
     //  ۶۳k (خواستهٔ صاحب‌کار «هشدارِ انقضا»): فقط ورودیِ کاشیِ هشدار — «منقضی‌شده» جدا از «نزدیکِ انقضا» با نامِ کالا؛ ظاهرِ خانه همان
     "ui/v3/shell/HomeView.kt" to "070fca810e6224ce",
     "ui/v3/shell/DeskHome.kt" to "4b21911118a57c2c",
-    "ui/v3/shell/DashboardNumbers.kt" to "132f992d7d26c645",
+    "ui/v3/shell/DashboardNumbers.kt" to "6c026a3633404708", // ۶۳f: فقط سرعت؛ ظاهر همان
     "ui/v3/shell/HeroMoney.kt" to "b543739c866c10d4",
     "ui/v3/shell/HeroMoneySheet.kt" to "74e98770e7221dce",
     "ui/v3/V3HeroCard.kt" to "95171b224dfd0333",
@@ -98,6 +98,30 @@ class LookGuardTest {
   @Test
   fun `داشبوردِ خانه دست نخورد`() {
     dashboard.forEach { (path, hash) -> assertEquals("داشبورد: $path", hash, sha(text(path))) }
+  }
+
+  /**
+   *  صاحب‌کار ۱۴۰۵/۰۸/۲۴: صفحهٔ ورودِ قدیمی (سه خط و دایرهٔ چرخان) — بی اجازهٔ صاحب‌کار دست نخورد.
+   *  همان `WelcomeDecor.kt` ِ پیش از #1041 (موج‌ها، سه خطِ سفید، حباب‌ها، شبِ کم‌رنگ، قرص و حلقهٔ چرخان، زمان‌های ۳۰/۹/۱۴/۳ ثانیه)؛
+   *  ساعتِ «فقط روی همین صفحه» جداست (`WelcomeClock.kt`) و این‌جا قفل نیست.
+   */
+  private val welcomeLook = mapOf(
+    //  دستهٔ ۶۸: فقط `Color(0xFFFFFFFF)` ⇐ `Color.White` (همان رنگ، برای HardcodedColorsTest)؛ ظاهر همان
+    "ui/v3/onboarding/WelcomeDecor.kt" to "19f2b85fce3e9a75",
+  )
+
+  @Test
+  fun `صفحهٔ ورودِ قدیمی دست نخورد — سه خط، موج‌ها، حباب‌ها و دایرهٔ چرخان`() {
+    welcomeLook.forEach { (path, hash) -> assertEquals("صفحهٔ ورود: $path", hash, sha(text(path))) }
+    val decor = text("ui/v3/onboarding/WelcomeDecor.kt")
+    assertTrue("سه خط", decor.contains("listOf(0f, 0.06f, 0.12f).forEachIndexed"))
+    assertTrue("حلقهٔ چرخان", decor.contains("rotate(spin)"))
+    //  یک نسخه، نه دو؛ و به کار رفته: پس‌زمینه پشتِ گام‌های ورود، نشان بالای قابِ دروازه، قفلِ رمز همان نشانِ پیشین
+    assertFalse(File(main, "ui/screens/WelcomeDecor.kt").exists())
+    assertEquals(listOf("ui/v3/onboarding/WelcomeDecor.kt"), sources().filter { Regex("""\bfun WelcomeBackground\(""").containsMatchIn(it.readText()) }.map(::rel).toList())
+    assertTrue(text("ui/v3/onboarding/AuthFlow.kt").contains("WelcomeBackdrop {"))
+    assertTrue(text("ui/v3/onboarding/GateFrame.kt").contains("WelcomeMark()"))
+    assertTrue(text("ui/v3/onboarding/LockGate.kt").let { it.contains("GateBackdrop(welcome = false)") && it.contains("BrandMark()") })
   }
 
   /** آیکنِ هر بخش (همهٔ `ModuleEntry`ها) — «سابقهٔ عملیات» از ۶۳w نیست، بقیه همان */

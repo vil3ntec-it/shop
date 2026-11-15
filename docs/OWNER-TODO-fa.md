@@ -90,7 +90,7 @@
 - **چرا:** بی آن، سفارشِ شبانه وقتی برنامه بسته است دیده نمی‌شود. کد آماده و خاموش است.
 - **گام‌ها** (راهنمای تصویری: [`FIREBASE-SETUP-fa.md`](FIREBASE-SETUP-fa.md)):
   1. `console.firebase.google.com` ⇐ پروژهٔ رایگانِ تازه.
-  2. دو برنامهٔ اندروید `ir.vil3ntec.tohid` و `ir.vil3ntec.tohid.preview` را بیفزایید و `google-services.json` را بگیرید.
+  2. دو برنامهٔ اندروید `com.vill3n.dailyshop` و `com.vill3n.dailyshop.preview` را بیفزایید (شناسهٔ نصبِ تازه، ۱۴۰۵/۰۸/۲۴) و `google-services.json` را بگیرید.
   3. گیت‌هاب ⇐ Settings ⇐ Secrets and variables ⇐ Actions ⇐ New secret: نام `GOOGLE_SERVICES_JSON`، مقدار = متنِ همان فایل.
   4. در Firebase «کلیدِ حسابِ سرویس» (JSON) بسازید، روی سرور در `server/secrets/` بگذارید و در `.env`:
      `FCM_SERVICE_ACCOUNT_FILE=/app/secrets/fcm-service-account.json`.
@@ -146,7 +146,7 @@
 - **گام‌ها** (`IOS-PLAN-fa.md` §۰.۶):
   1. Apple Developer Program (۹۹ دلار در سال؛ حسابِ سازمانی D-U-N-S می‌خواهد). پیش از پرداخت ببینید اپل کشورتان را می‌پذیرد.
   2. **Team ID** را بفرستید (رمز نیست) ⇐ در `ios/iosApp/Configuration/Config.xcconfig` می‌نشیند.
-  3. شناسهٔ برنامه `ir.vil3ntec.tohid` را ثبت کنید، با قابلیت‌های Push Notifications و Sign in with Apple.
+  3. شناسهٔ برنامه `com.vill3n.dailyshop` را ثبت کنید (تصمیمِ ۱۴۰۵/۰۸/۲۴)، با قابلیت‌های Push Notifications و Sign in with Apple.
   4. کلیدِ اعلانِ اپل (فایلِ **p8**) با Key ID بسازید و **فقط روی سرور** بگذارید: `APNS_KEY_ID`، `APNS_TEAM_ID`، `APNS_KEY_P8`،
      `APNS_BUNDLE_ID`، `APNS_ENV`؛ برای ورود با اپل `APPLE_CLIENT_IDS` = همان bundle id.
   5. گواهیِ Apple Distribution، profile و رکوردِ App Store Connect (نام، نماد، عکس، فرم‌های حریمِ خصوصی) با حسابِ شما.

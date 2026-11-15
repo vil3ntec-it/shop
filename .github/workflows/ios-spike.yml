@@ -146,12 +146,12 @@ jobs:
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" ios/iosApp/build/Debug-iphonesimulator/iosApp.app
-          xcrun simctl launch "$UDID" ir.vil3ntec.tohid
+          xcrun simctl launch "$UDID" com.vill3n.dailyshop
           sleep 20
           mkdir -p ios-shots
           xcrun simctl io "$UDID" screenshot ios-shots/ios-app.png
           xcrun simctl spawn "$UDID" log show --last 3m --predicate 'process == "iosApp"' > ios-shots/ios-app.log 2>&1 || true
-          if xcrun simctl spawn "$UDID" launchctl list | grep -q 'ir.vil3ntec.tohid'; then echo "برنامه پس از ۲۰ ثانیه زنده است"; else echo "::warning::برنامه پس از ۲۰ ثانیه زنده نیست (ios-shots/ios-app.log)"; exit 1; fi
+          if xcrun simctl spawn "$UDID" launchctl list | grep -q 'com.vill3n.dailyshop'; then echo "برنامه پس از ۲۰ ثانیه زنده است"; else echo "::warning::برنامه پس از ۲۰ ثانیه زنده نیست (ios-shots/ios-app.log)"; exit 1; fi
       #  ۴) سرورِ آزمونِ سرتاسری (گامِ ۸): همان سرورِ مخزن روی PGlite ِ در حافظه، فقط 127.0.0.1، با صاحبِ دکان (ایمیل و رمز)
       #  و یک کالای موجود از دستگاهِ دیگرِ همان دکان؛ شبیه‌ساز شبکهٔ همین مک را دارد
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0

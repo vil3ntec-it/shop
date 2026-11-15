@@ -8,7 +8,8 @@
 #  ⛔ محتوای secret هرگز چاپ نمی‌شود.
 #
 #  usage: GOOGLE_SERVICES_JSON=… google-services.sh <بستهٔ لازم>...
-#         مثلاً `google-services.sh ir.vil3ntec.tohid` (انتشار) یا `google-services.sh ir.vil3ntec.tohid.preview`
+#         مثلاً `google-services.sh com.vill3n.dailyshop` (انتشار) یا `google-services.sh com.vill3n.dailyshop.preview`
+#         (شناسهٔ نصبِ تازه از ۱۴۰۵/۰۸/۲۴؛ پروژهٔ Firebase همین دو را دارد — پلِ گذار با شناسهٔ قدیمی بی پوش ساخته می‌شود)
 #
 set -euo pipefail
 dest="$(cd "$(dirname "$0")/.." && pwd)/app/google-services.json"

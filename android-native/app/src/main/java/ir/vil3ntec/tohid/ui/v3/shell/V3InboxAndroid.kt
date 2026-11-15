@@ -51,7 +51,7 @@ object V3InboxLive {
 fun V3InboxNotice() {
   val context = LocalContext.current
   val nav = LocalV3Nav.current
-  LaunchedEffect(Unit) {
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(Unit) {
     while (true) {
       runCatching { V3InboxLive.ensure(context)?.refresh() }
       delay(V3InboxLive.LIST_MS)

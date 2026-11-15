@@ -21,7 +21,8 @@ const ENV = Object.freeze({
   APNS_KEY_ID: 'ABC123DEFG',
   APNS_TEAM_ID: 'TEAM123456',
   APNS_KEY_P8: P8,
-  APNS_BUNDLE_ID: 'ir.vil3ntec.tohid',
+  //  شناسهٔ برنامهٔ آیفون از ۱۴۰۵/۰۸/۲۴ (`ios/iosApp/Configuration/Config.xcconfig`)
+  APNS_BUNDLE_ID: 'com.vill3n.dailyshop',
   APNS_ENV: 'sandbox',
 });
 const TOKEN = 'a1'.repeat(32);
@@ -120,6 +121,15 @@ test('تنظیم: محیطِ پیش‌فرض production؛ sandbox/development؛ 
 
 /* ------------------------------- JWT ------------------------------ */
 
+test('شناسهٔ برنامه: شناسهٔ تازه و پیشین هر دو پذیرفته‌اند و apns-topic همان شناسهٔ محیط است', () => {
+  for (const id of ['com.vill3n.dailyshop', 'ir.vil3ntec.tohid']) {
+    const c = apns.readConfig({ ...ENV, APNS_BUNDLE_ID: id });
+    assert.equal(c.ok, true, id);
+    assert.equal(c.cfg.bundleId, id);
+  }
+  assert.equal(apns.readConfig({ ...ENV, APNS_BUNDLE_ID: 'com.vill3n/dailyshop' }).reason, 'bad_bundle_id');
+});
+
 test('JWT ِ ES256: kid و iss درست، امضای خامِ ۶۴ بایتی با کلیدِ عمومی درست، ۴۰ دقیقه یکی', () => {
   const { s, tick } = senderFor('http://127.0.0.1:1');
   const first = s.providerToken();
@@ -153,7 +163,7 @@ test('فرستادن: مسیر، سرآیندها و بدنهٔ اعلان هم�
     const [req] = apple.seen;
     assert.equal(req.headers[':method'], 'POST');
     assert.equal(req.headers[':path'], `/3/device/${TOKEN}`);
-    assert.equal(req.headers['apns-topic'], 'ir.vil3ntec.tohid');
+    assert.equal(req.headers['apns-topic'], 'com.vill3n.dailyshop');
     assert.equal(req.headers['apns-push-type'], 'alert');
     assert.equal(req.headers['apns-priority'], '10');
     assert.equal(req.headers['apns-expiration'], String(T0 / 1000 + 24 * 3600));

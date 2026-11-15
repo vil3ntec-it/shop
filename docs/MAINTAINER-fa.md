@@ -26,7 +26,7 @@
 
 | بخش | پوشه | چیست | وضع |
 |---|---|---|---|
-| برنامهٔ اندروید (گوشی و تبلت) | `android-native/` | Kotlin + Jetpack Compose؛ رابطِ نسخهٔ ۳ در `ui/v3`، صفحه‌های بزرگ در `ui/screens` | فعال؛ بستهٔ `ir.vil3ntec.tohid` |
+| برنامهٔ اندروید (گوشی و تبلت) | `android-native/` | Kotlin + Jetpack Compose؛ رابطِ نسخهٔ ۳ در `ui/v3`، صفحه‌های بزرگ در `ui/screens` | فعال؛ شناسهٔ نصب `com.vill3n.dailyshop` (از ۱۴۰۵/۰۸/۲۴؛ بسته‌های کد `ir.vil3ntec.tohid`) |
 | برنامهٔ کامپیوتر (ویندوز؛ مک و لینوکس هم ساخته می‌شود) | `desktop/` | **همان** سورسِ `android-native/app/src/main/java` روی Compose Desktop؛ نام‌های `android.*` با shim در `desktop/src/shim` | فعال؛ نصاب در CI روی `windows-latest` |
 | برنامهٔ آیفون | `ios/` | همان سورسِ اندروید، کپی‌شده هنگامِ ساخت (`ios/shared`، Kotlin/Native + Compose Multiplatform) + پوستهٔ SwiftUI (`ios/iosApp`) | فقط شبیه‌ساز؛ بی امضا (§۶، `docs/IOS-PLAN-fa.md`) |
 | منطقِ مشترک | `core/` | Kotlin Multiplatform (`commonMain`، `jvmMain` فقط برای JDK)؛ includeBuild در هر سه برنامه | منطقِ تازه **فقط** این‌جا |
@@ -240,7 +240,7 @@ desktop/gradlew -p ios/shared -Pios=true compileKotlinIosSimulatorArm64   # پی
 | `quality.yml` «کیفیتِ کد» | هر PR و push به main | سقف‌ها، ESLint، «تازه‌ها»، پوشش ⇐ گزارش؛ **شمارهٔ مهاجرت** و **قاعده‌های دسترسیِ عامل‌ها** (`tools/ai-access`) | دو گامِ سد، بقیه گزارش |
 | `spec.yml` «مشخصاتِ جامع» | تغییرِ `docs/spec/**` | `spec.mjs check` | **سد** |
 | `tohid-native.yml` «توحید بومی» | تغییرِ `android-native/**`، `core/**`، `docs/WHATS-NEW-fa.md` (PR)؛ `customer-android/**` فقط در PR | آزمون‌های واحد + `:core:jvmTest`، APK، دروازه‌های APK و `artifact-gate`، AAB ِ Play (`tools/play-check.py`)؛ روی main انتشارِ beta. کارِ جدای «برنامهٔ خریدِ مشتری (گزارش)»: `testDebugUnitTest assembleDebug` ِ `customer-android` و `server/test/shopper-live.mjs` | **سد** (ساخت)؛ کارِ مشتری **گزارش** (`continue-on-error`) |
-| `tohid-native-preview.yml` | push به main + PR | APK ِ بستهٔ `ir.vil3ntec.tohid.preview` ⇐ برچسبِ `tohid-native-preview` | **سد** |
+| `tohid-native-preview.yml` | push به main + PR | APK ِ بستهٔ `com.vill3n.dailyshop.preview` ⇐ برچسبِ `tohid-native-preview` | **سد** |
 | `tohid-desktop.yml` «فروشگاه من — کامپیوتر» | `desktop/**`، `android-native/app/src/**`، `core/**`، `install.ps1` | کامپایل و آزمون، دیسکِ ویندوز، نصاب‌ها، انتشارِ beta | **سد** |
 | `tohid-admin.yml` «توحید مدیریت» | `admin-android` | ساخت و انتشار ⇐ برچسبِ `tohid-admin` | سد |
 | `customer-ios.yml` | `customer-android/**`، `customer-ios/**`، `core/.../core/shopper/**` (فقط PR) | «برنامهٔ خرید روی آیفون — klib» (لینوکس) و «— چارچوب، Xcode و شبیه‌ساز» (مک، با پیوندِ عمیقِ `tohidshop://` و عکس) | هر دو **گزارش** (`continue-on-error`) |
@@ -280,7 +280,7 @@ desktop/gradlew -p ios/shared -Pios=true compileKotlinIosSimulatorArm64   # پی
 |---|---|---|---|
 | اندروید، آزمایشی | `MyShop-Android.apk.beta` و نسخهٔ بازار | `tohid-native-beta` | خودکار با هر push به main که اندروید/core را عوض کند |
 | اندروید، **پایدار** | همان، برای همهٔ دکان‌ها | `tohid-native` | **فقط صاحب‌کار:** Actions ⇐ «توحید بومی» ⇐ Run workflow ⇐ `main` ⇐ `channel = stable` |
-| پیش‌نمایشِ گوشیِ صاحب‌کار | بستهٔ جدای `ir.vil3ntec.tohid.preview` (`tohid-preview.zip`) | `tohid-native-preview` | خودکار با هر push به main؛ اگر صاحب‌کار گفت «نسخه تازه نشد» اول همین ورک‌فلو |
+| پیش‌نمایشِ گوشیِ صاحب‌کار | بستهٔ جدای `com.vill3n.dailyshop.preview` (`tohid-preview.zip`) | `tohid-native-preview` | خودکار با هر push به main؛ اگر صاحب‌کار گفت «نسخه تازه نشد» اول همین ورک‌فلو |
 | کامپیوتر، آزمایشی / پایدار | یک نصابِ کاملِ ویندوز `MyShop-Windows-Setup.exe` (بی دانلود هنگامِ نصب) و مک/لینوکس | `tohid-desktop-beta` / `tohid-desktop` | همان قاعده: پایدار با «فروشگاه من — کامپیوتر» ⇐ `channel = stable` |
 | وب | `/shop/beta/` و ریشهٔ سایت | `tohid-web` | فقط پس از تنظیمِ Pages = GitHub Actions (O-17)؛ پایدار با «وب — GitHub Pages» ⇐ `channel = stable` |
 | برنامهٔ مدیر | APK ِ `admin-android` | `tohid-admin` | با push به main |

@@ -131,7 +131,8 @@ internal fun LockBody(
 ) {
   val c = PhoneV3.colors
   val stagger = rememberV3Stagger()
-  GateBackdrop {
+  //  قفل (رمزِ چهاررقمیِ هر روز) جزوِ صفحهٔ ورود نیست: همان زمینهٔ مه‌گرفته و `BrandMark`، بی پس‌زمینهٔ ورودِ قدیمی
+  GateBackdrop(welcome = false) {
     Box(
       Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).verticalScroll(rememberScrollState()),
       contentAlignment = Alignment.Center,

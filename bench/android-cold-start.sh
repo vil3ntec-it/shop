@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # bench — شروعِ سردِ برنامهٔ اندروید روی گوشیِ مرجع (F0-26، بخشِ ۹.۱ و ۹.۲).
 #
-#   bash bench/android-cold-start.sh [دفعه‌ها=10] [بسته=ir.vil3ntec.tohid]
+#   bash bench/android-cold-start.sh [دفعه‌ها=10] [بسته=com.vill3n.dailyshop]   (گوشیِ نصبِ پیش از ۱۴۰۵/۰۸/۲۴: ir.vil3ntec.tohid)
 #
 # نیاز: adb روی کامپیوتر، گوشی با «USB debugging» وصل، و برنامه نصب.
 # هر دور: برنامه کاملاً بسته می‌شود (force-stop) و با `am start -W` باز
@@ -11,7 +11,7 @@
 # هیچ دادهٔ دکانی خوانده یا فرستاده نمی‌شود؛ فقط عدد چاپ می‌شود.
 set -euo pipefail
 RUNS="${1:-10}"
-PKG="${2:-ir.vil3ntec.tohid}"
+PKG="${2:-com.vill3n.dailyshop}"
 
 command -v adb >/dev/null || { echo "adb پیدا نشد (Android platform-tools)"; exit 2; }
 ACT="$(adb shell cmd package resolve-activity --brief "$PKG" | tr -d '\r' | tail -n 1)"

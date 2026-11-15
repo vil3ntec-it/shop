@@ -24,7 +24,8 @@ import platform.Foundation.NSUserDomainMask
  */
 abstract class Context {
   open val applicationContext: Context get() = this
-  open val packageName: String get() = "ir.vil3ntec.tohid"
+  //  شناسهٔ برنامهٔ آیفون (bundle id ِ `ios/iosApp/Configuration/Config.xcconfig`) — تصمیمِ ۱۴۰۵/۰۸/۲۴
+  open val packageName: String get() = "com.vill3n.dailyshop"
   open val filesDir: File get() = appDir(NSApplicationSupportDirectory, "tohid").also { ir.vil3ntec.tohid.ios.backup.IosNoBackupDirs.firstUse(it) }
   open val cacheDir: File get() = appDir(NSCachesDirectory, "tohid")
   open val noBackupFilesDir: File get() = appDir(NSCachesDirectory, "tohid-no-backup")

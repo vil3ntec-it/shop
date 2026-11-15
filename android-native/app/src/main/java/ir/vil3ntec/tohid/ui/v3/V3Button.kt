@@ -85,7 +85,7 @@ fun V3Button(
     AnimatedContent(loading, transitionSpec = { fadeIn(MotionSpec.tweenOf(MotionTokens.SHORT)) togetherWith fadeOut(MotionSpec.tweenOf(90)) }, label = "btnLoading") { busy ->
       when {
         busy -> Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
-          CircularProgressIndicator(color = fg, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+          V3LiveSpinner(Modifier.size(18.dp), color = fg, strokeWidth = 2.dp)
         }
         icon != null -> Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(20.dp))
         else -> Spacer(Modifier.height(0.dp))

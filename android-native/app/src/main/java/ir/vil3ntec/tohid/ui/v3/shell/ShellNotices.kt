@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.BuildConfig
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrHome
+import ir.vil3ntec.tohid.core.i18n.StrUpdate
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.platform.StoreChannel
 import ir.vil3ntec.tohid.sync.v1.SoftLock
@@ -131,21 +132,24 @@ fun UpdateNotice() {
   val progress = UpdateManager.progress
   val ready = UpdateManager.ready
   val busy = UpdateManager.busy
+  //  AppMove: نسخهٔ تازه برنامهٔ دیگری است (شناسهٔ نصبِ تازه) ⇒ «به‌روزرسانی» نیست؛ نوار برگهٔ راهنما را باز می‌کند
+  val moved = found.movedTo.isNotEmpty()
   DraftNoticeBar(
-    tone = if (required) V3Tone.ERROR else V3Tone.INFO,
+    tone = if (required) V3Tone.ERROR else if (moved) V3Tone.WARNING else V3Tone.INFO,
     icon = Icons.Outlined.SystemUpdate,
     text = when {
       progress >= 0 -> StrHome.updateGetting(found.version, progress) + (UpdateManager.note?.let { " · $it" } ?: "")
+      moved -> StrUpdate.movedBar
       ready != null -> StrHome.updateReady(found.version)
       required -> StrHome.updateRequired(found.version)
       else -> StrHome.updateNew(found.version)
     },
-    detail = UpdateManager.message?.takeIf { progress < 0 && ready == null && !busy },
+    detail = UpdateManager.message?.takeIf { progress < 0 && (ready == null || moved) && !busy },
     progress = progress.takeIf { it >= 0 }?.let { it / 100f },
-    action = if (progress >= 0 || busy) null else if (ready != null && !Platform.DESKTOP) StrHome.install else StrHome.update,
-    onAction = { if (ready != null) UpdateManager.install(context) else UpdateManager.download(context) },
+    action = if (progress >= 0 || busy) null else if (moved) StrUpdate.movedAction else if (ready != null && !Platform.DESKTOP) StrHome.install else StrHome.update,
+    onAction = { if (moved) UpdateManager.openMove() else if (ready != null) UpdateManager.install(context) else UpdateManager.download(context) },
     onClose = if (required || progress >= 0) null else ({ hidden = true }),
-    onClick = { openRoute(nav, ShellTargets.ABOUT) },
+    onClick = { if (moved) UpdateManager.openMove() else openRoute(nav, ShellTargets.ABOUT) },
   )
 }
 

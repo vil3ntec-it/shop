@@ -340,7 +340,8 @@ fun main() {
           ir.vil3ntec.tohid.ui.AppNav.theme.value = null
         }
 
-        TohidTheme(theme) {
+        //  PERF-SCREEN: چیزهای زنده (`V3Live`) فقط با پنجرهٔ RESUMED
+        ir.vil3ntec.tohid.ui.v3.ProvideV3Foreground { TohidTheme(theme) {
           //  زبان و جهت: فارسی و پشتو راست‌به‌چپ، انگلیسی چپ‌به‌راست
           ir.vil3ntec.tohid.ui.ProvideLang {
             if (!welcomed) {
@@ -362,7 +363,7 @@ fun main() {
             }
             SessionLostNotice(context)
           }
-        }
+        } }
       }
     }
   }
