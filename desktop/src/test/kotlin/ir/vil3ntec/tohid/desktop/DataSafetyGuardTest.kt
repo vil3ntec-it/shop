@@ -351,6 +351,8 @@ class DataSafetyGuardTest {
       "tohid-conflict-fix",
       //  OPS-02: پرچمِ «پشتیبانِ دستی و پوشه هم رمزدار» و شکستِ پشتیبانِ پوشه (`BackupDevice`)؛ کلیدِ عبارت مالِ همین دستگاه است
       "tohid-backup-device",
+      //  «هیچ جزئیاتِ فنی در صفحه»: اثر، زمان و شناسهٔ آخرین گزارشِ پشتیبانیِ همگام‌سازی (`SupportDiagAndroid`) — فقط یادِ «فرستاده شد؟»
+      "tohid-support-diag",
     ).forEach { put(it, Kind.DEVICE) }
     //  مانده (DATA-SAFETY §۶): رمزِ کارمندان عمداً از پشتیبان بیرون است — دوباره گذاشته می‌شود
     put("tohid-staff-pins", Kind.GAP)
