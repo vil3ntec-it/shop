@@ -70,7 +70,10 @@
   مجوزِ POS-16 بیرون از `perm-core` (لایه‌های آن فقط می‌بندند و کلیدِ تازه کاتالوگِ همهٔ دکان‌ها را با پرچمِ خاموش هم عوض می‌کرد).
 - **آزمون‌ها:** `branch-transfers.test.js` ۹/۹ (PGlite و PostgreSQL ۱۶ ِ محلی)، `branch-stock-peek.test.js` ۳/۳، `tenant-matrix-branches` ۱/۱ (درهای
   تازه با شناسهٔ واقعیِ «ب»)، `shop-route-inventory` ۲/۲، `paid-routes-entitlement` ۶/۶، `route-authz-inventory` ۴/۴، `upgrade-rehearsal` ۹/۹،
-  `shop-branches` ۱۰/۱۰، `shop-branches-stock` ۷/۷، `catalog-transfers` ۹/۹، `catalog-transfer-steps` ۷/۷؛ اجرای کاملِ سرور و Kotlin: پایینِ همین بند.
+  `shop-branches` ۱۰/۱۰، `shop-branches-stock` ۷/۷، `catalog-transfers` ۹/۹، `catalog-transfer-steps` ۷/۷. **اجرای کاملِ سرور (PGlite، دو تکه
+  پشتِ هم، پس از ادغامِ `batch-63` ‏13ee0312e):** ۴۳۴۳ آزمون، ۴۲۹۸ سبز، ۴۰ SKIP، ۲ TODO ِ شناخته، ۳ شکست که از `batch-63` آمده‌اند و به
+  این شاخه ربط ندارند (همان پرونده‌ها در این شاخه دست نخورده): `loc-no-postal` (سطرِ کهنهٔ `REVIEWED_OPTIONAL` ِ `DebtorFormSheets.kt`) و دو
+  آزمونِ `console-shell` (کلیدِ `shop.storefront.host_alias` ِ `storefront-hosts.js` بیرون از کاتالوگِ پرچم‌ها).
 - **مانده / قدمِ بعد:** صفحهٔ «انتقال میانِ شعبه‌ها» و کلیدِ مجوز در «شعبه‌ها» ِ برنامه و سرآیندِ `X-Branch-Id` در REST ِ برنامه (فازِ ۲، کنارِ
   «انتخابِ شعبه» ِ عاملِ دیگر)؛ دفترِ دستگاه برای انتقالِ میانِ شعبه (پیشنهاد در §۱۰)؛ دستگاهِ واقعی (فازِ ۵).
 
