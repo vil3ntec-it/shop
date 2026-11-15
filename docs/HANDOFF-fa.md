@@ -57,6 +57,30 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-64x زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-64x` (از `origin/claude/batch-64` 00e98a802) — سه تصمیمِ سپرده‌شده (CRM-15، PUR-03، OPS-01)
+
+- **تصمیم‌ها** (صاحب‌کار: «ببین کدام درست است و برنامه‌های حرفه‌ای چه می‌کنند»؛ ثبت در `OWNER-DECISIONS-fa.md` «گرفته‌شده — ۱۴۰۵/۰۸/۲۴»):
+  CRM-15 کمترین دسترسی بر پایهٔ نقش؛ PUR-03 فصل فقط با ۱۲ ماه فروش؛ OPS-01 دلتا «نه» (ردیف بسته، IMPLEMENTED-VERIFIED).
+- **CRM-15 ساخته شد** پشتِ پرچمِ خاموشِ `shop.customer_role_mask` (FLAGS-ON §۴۴، ثبت در `routes/admin-flags.js`): هستهٔ یکتا
+  `core/crm/CustomerMask.kt` (ماتریس، «•••• ۰۰۸»، چاپ) و سرور `lib/customer-role-mask.js` (همان قالب و ماتریس). پیش‌فرضِ تازه = یک لایهٔ `deny`
+  پیش از لایه‌های صاحب ⇒ همهٔ درهای امروزِ CRM-15 (`customer-contact.allowed`/`hiddenForReq`: همگام‌سازی، صندوقِ تعارض، `maskerOf`، «خبرم کن»،
+  سدِ تخفیف، گفت‌وگو) خودبه‌خود پیروی می‌کنند؛ جزئیاتِ سفارش با `forDetail` (نشانی `{}`، «در دست داشتن» = سفارشِ باز با رویدادِ خودِ کارمند).
+  `policy.customerMask` ⇒ برنامه (`PermPolicy.allows`، `ShopRole.customerMask`)؛ نمایش فقط `customerPhone`/`customerAddress`/`customerPhoneExport`؛
+  کادرِ شمارهٔ مشتریِ موجود بی مجوز نیست؛ برگهٔ قرض‌داران ِ گزارش و اکسلِ «مشتری‌ها» همان؛ صورت‌حسابِ چاپی `CustomerMask.printPhone` با
+  «چاپِ شمارهٔ کامل» (`CustomerPrintPref`، تنظیمِ دکانِ `print_full_phone`، صفحهٔ تازهٔ `settings/sales/print-phone` فقط صاحب). پیک دست نخورد
+  (`courierView` همان «فقط مأموریتِ خودش تا تحویل»). ⛔ پمپ، `sync-v1.js`/`routes/sync-v1.js` و `app.js` دست نخوردند؛ `orders.js` همان ۷۹۸ خط.
+- **PUR-03 ساخته شد** (بی پرچم: فقط عدد و نشان): `core/purchase/PoSeasonality.kt` روی `DemandForecast` (`Input.seasonOverride`، `null` ⇒ INV-13
+  بیت‌به‌بیت) — تاریخچه از نخستین **فروش**؛ < ۱۲ ماه ⇒ حسابِ امروز و «اطمینانِ کم»؛ ≥ ۱۲ ماه ⇒ «همین ماهِ پارسال» ÷ میانگینِ اخیر (پنجرهٔ پارسال اگر
+  هست، وگرنه امسال)؛ اطمینان از درازا (۱۲/۲۴ ماه) و نوسان. `PurchaseSuggest.Row.season`/`Plan.season` برای هر دو صفحه؛ نشان در `PurchaseSuggestView`
+  (`StrPoSeason`). **برای 63b:** زیرِ ردیفِ فرمِ سفارشِ گوشی (`PurchaseOrderPages.kt` ~خطِ ۶۳۰) هنوز `DemandForecast.confidenceText` است — اگر آن
+  صفحه را دست می‌زنید `StrPoSeason.label(plan.season!!.confidence)` بگذارید (منطق در core است؛ این‌جا دست نخورد تا تداخل نکند).
+- **آزمون‌ها:** سرور `customer-role-mask.test.js` ۵/۵ (تازه)، ۱۱ پروندهٔ همراه ۷۵/۷۵ (`customer-contact`، `order-phone-mask`، `customer-contact-lists`،
+  `staff-perms`، `perm-core`، `admin-flags`، `online-orders`، `order-customer`، `customer-access`، `delivery`، `courier-call`) و OPS-01 ۳۲/۳۲ روی PGlite؛
+  کاتلین: CORE_PLACEHOLDER؛ DESK_PLACEHOLDER.
+- **مانده/نکته:** روشن کردنِ §۴۴ (و §۳۶، §۳۷) برای دکانِ آزمایشی؛ شمارهٔ ازپیش‌همگام‌شده روی دستگاهِ کارمند تا بازسازیِ دفتر می‌ماند (نمایش پوشیده)؛
+  صفحهٔ کهنهٔ `ui/screens/Debtors.kt` فقط در `PhonePreview` (دمو) است و دست نخورد. پیوندِ `server/node_modules` به `wt62` شکسته بود ⇒ `wt-64e`
+  (همان lockfile). شمارهٔ بخشِ FLAGS-ON (§۴۴) را پس از ادغام با شاخه‌های موازی بشمارید.
+
 ### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-63c زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-63c` (از `origin/claude/batch-63` baff32f2e) — صندوقِ تعارضِ v3 در برنامه (SYN-07، S28، S28b)
 
 - **ساخته شد (پشتِ پرچمِ خاموشِ دکانِ `shop.sync_v3_inbox`، FLAGS-ON §۴۳؛ «بله» ِ پرسشِ ۳۲؛ موتورِ v3 همان پیش‌فرض‌خاموش):** صفحه و نوارِ

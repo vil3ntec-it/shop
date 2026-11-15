@@ -73,7 +73,7 @@ object CustomerMask {
 
   /** شمارهٔ کامل و نشانی را بیرون از سفارش می‌بیند؟ (`customers.contact` با پیش‌فرضِ تازه زیرِ پرچم) */
   fun contactAllowed(role: String, layers: List<Any?>?, on: Boolean): Boolean =
-    PermCore.allows(role.trim().lowercase(), layers(role, layers, on), KEY)
+    PermCore.allows(role.trim().lowercase(), this.layers(role, layers, on), KEY)
 
   /**
    *  چه چیزی دیده شود. [contactAllowed] همان [contactAllowed] ِ بالا (یا `rememberCanSeeContacts()` ِ برنامه)؛
