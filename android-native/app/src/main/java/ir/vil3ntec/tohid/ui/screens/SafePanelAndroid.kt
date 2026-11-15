@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -35,14 +36,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrSafe
+import ir.vil3ntec.tohid.core.i18n.StrSafeCur
 import ir.vil3ntec.tohid.core.i18n.StrShell
-import ir.vil3ntec.tohid.core.pay.CashKeys
 import ir.vil3ntec.tohid.core.pay.Pay
 import ir.vil3ntec.tohid.core.safe.SafeCore
+import ir.vil3ntec.tohid.core.safe.SafeCurrency
 import ir.vil3ntec.tohid.data.CashShift
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.SafeBook
 import ir.vil3ntec.tohid.data.SafeBookPref
+import ir.vil3ntec.tohid.data.SafeCurrencies
+import ir.vil3ntec.tohid.data.SafeCurrencyPref
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.ShopStore
@@ -53,6 +57,7 @@ import ir.vil3ntec.tohid.sync.v1.Ulid
 import ir.vil3ntec.tohid.ui.components.common.PillTone
 import ir.vil3ntec.tohid.ui.components.common.StatusPill
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.v3.shell.SafeCurrencyChoice
 import kotlinx.coroutines.launch
 
 /*
@@ -61,6 +66,9 @@ import kotlinx.coroutines.launch
  *  هر ثبت فقط از `SafeBookPref.record` (دفترِ همین لحظهٔ دیسک، یک بار برای شناسه‌ای که پنجره هنگامِ باز شدن می‌سازد).
  *  مجوز همان سرور (`safe-ledger.js`): شمارش، ورود، خروج، به بانک و به دخل `safe.move` می‌خواهند؛ «از دخل به گاوصندوق»
  *  فقط نوشتنِ `safeEntries`. بی `safe.move` مانده و تاریخچه هم دیده نمی‌شوند.
+ *  ارز (خواستهٔ صاحب‌کار ۱۴۰۵/۰۸/۲۴): هر ارز دفترِ جدای خودش است (`SafeBook.views`)؛ بیش از یک ارز ⇒ ماندهٔ هر ارز در
+ *  فهرستِ فشرده (`SafeBalanceList`)، کادرِ «ارز» کنارِ مبلغِ شمارش/ورود/خروج/بانک (`SafeCurrencyButton`؛ پیش‌فرض آخرین
+ *  ارزِ همین دستگاه). انتقال با دخل همیشه افغانی است. هیچ تبدیل و هیچ جمعی میانِ دو ارز.
  */
 
 private fun safeAfn(m: Long): String = "${money(PayFlow.major(m))} ؋"
@@ -95,8 +103,11 @@ private fun dialogTitle(kind: String): String = when (kind) {
 /** پیامِ سه‌زبانهٔ کدِ رد؛ کدِ ناشناخته ⇒ همان پیامِ `SafeBook`/`PayFlow` (برگهٔ «+» ِ خانه هم همین را می‌گیرد) */
 internal fun safeErrorText(f: SafeBook.Result.Failed): String = when (f.code) {
   SafeCore.Code.REASON_REQUIRED -> f.varianceMinor?.let {
-    StrSafe.varianceNeedsReason(it > 0, safeAfn(kotlin.math.abs(it)), safeAfn(Pay.DEFAULT_VARIANCE_THRESHOLD))
+    //  آستانه فقط افغانی است؛ در ارزِ دیگر هر اختلافی دلیل می‌خواهد (`SafeCore.thresholdFor`)
+    if (f.currency != SafeCurrency.AFN) StrSafeCur.varianceNeedsReason(it > 0, SafeCurrencies.format(kotlin.math.abs(it), f.currency))
+    else StrSafe.varianceNeedsReason(it > 0, safeAfn(kotlin.math.abs(it)), safeAfn(Pay.DEFAULT_VARIANCE_THRESHOLD))
   } ?: StrSafe.reasonRequired
+  SafeCore.Code.BAD_CURRENCY -> StrSafeCur.badCurrency
   SafeCore.Code.INSUFFICIENT_FUNDS -> StrSafe.insufficientFunds
   "INSUFFICIENT_CASH" -> StrSafe.insufficientCash
   SafeCore.Code.INVALID_AMOUNT -> StrSafe.invalidAmount
@@ -116,14 +127,21 @@ fun SafePanel(d: ShopData, store: ShopStore, me: String, toast: (String) -> Unit
   val canMove = remember { ShopRole.allows(context, "safe.move") }
   val canWrite = remember { ShopRole.canWrite(context, "safeEntries") }
   if (!canWrite) return
-  val view = remember(d) { SafeBook.view(d) }
+  val views = remember(d) { SafeBook.views(d) }
+  val view = views.getValue(SafeCurrency.AFN)
+  val names = remember(views) { SafeCurrencyPref.custom(context).let { c -> views.keys.associateWith { SafeCurrencies.name(it, c) } } }
   val shift = remember(d) { CashShift.current(d) }
   var mode by remember { mutableStateOf<String?>(null) }
   var history by remember { mutableStateOf(false) }
 
   Panel {
     Text(StrSafe.title, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
-    if (canMove) {
+    if (canMove && views.size > 1) {
+      //  چند ارز: ماندهٔ هر ارز جدا، افغانی اول؛ شمارِ ردیف‌های کنارگذاشته (ردیف، نه پول) یک‌جا
+      SafeBalanceList(views) { names[it] ?: it }
+      val bad = views.values.sumOf { it.invalid.size }
+      if (bad > 0) StatusPill(StrSafe.invalid(bad), PillTone.WARNING)
+    } else if (canMove) {
       Text(StrSafe.balance(safeAfn(view.balanceMinor)), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
       Text(
         view.lastCount?.let { StrSafe.lastCount(formatMillis(it.entry.at)) } ?: StrSafe.notCounted,
@@ -155,14 +173,24 @@ fun SafePanel(d: ShopData, store: ShopStore, me: String, toast: (String) -> Unit
   }
   Spacer(Modifier.height(12.dp))
 
-  mode?.let { k -> SafeMoveDialog(k, view.balanceMinor, store, me, toast) { mode = null } }
-  if (history) SafeHistoryDialog(view) { history = false }
+  mode?.let { k -> SafeMoveDialog(k, views, store, me, toast) { mode = null } }
+  if (history) SafeHistoryDialog(views) { history = false }
 }
 
-/** یک پنجره برای هر شش نوع؛ شناسهٔ ردیف (و ردیفِ جفتِ صندوق) هنگامِ باز شدن ساخته می‌شود ⇒ دو ضربه یک ثبت */
+/**
+ *  یک پنجره برای هر شش نوع؛ شناسهٔ ردیف (و ردیفِ جفتِ صندوق) هنگامِ باز شدن ساخته می‌شود ⇒ دو ضربه یک ثبت.
+ *  ارز: کادرِ «ارز» کنارِ مبلغ (جز انتقال با دخل که افغانی است)؛ ماندهٔ شمارش همان ارز.
+ */
 @Composable
-private fun SafeMoveDialog(kind: String, balanceMinor: Long, store: ShopStore, me: String, toast: (String) -> Unit, onDismiss: () -> Unit) {
+private fun SafeMoveDialog(kind: String, views: Map<String, SafeCore.View>, store: ShopStore, me: String, toast: (String) -> Unit, onDismiss: () -> Unit) {
+  val context = LocalContext.current
   val scope = rememberCoroutineScope()
+  val linked = kind == SafeCore.FROM_DRAWER || kind == SafeCore.TO_DRAWER
+  var custom by remember { mutableStateOf(SafeCurrencyPref.custom(context)) }
+  val choices = SafeCurrencies.all(custom, views.keys.toList())
+  var code by remember { mutableStateOf(if (linked) SafeCurrency.AFN else SafeCurrencies.pick(SafeCurrencyPref.last(context), choices)) }
+  val canAdd = remember { !ShopRole.isStaff(context) }
+  val balanceMinor = views[code]?.balanceMinor ?: 0L
   val key = remember { Ulid.next() }
   val auditKey = remember { Ulid.next() }
   val reasons = SafeCore.REASONS[kind].orEmpty()
@@ -173,7 +201,16 @@ private fun SafeMoveDialog(kind: String, balanceMinor: Long, store: ShopStore, m
   var error by remember { mutableStateOf<String?>(null) }
   var busy by remember { mutableStateOf(false) }
   val isCount = kind == SafeCore.COUNT
-  val minor = CashKeys.cashMinor(amount)
+  val minor = SafeCurrencies.parse(amount, code)
+  val choice = SafeCurrencyChoice(
+    code = code, choices = choices, name = { SafeCurrencies.name(it, custom) }, onPick = { code = it; error = null },
+    onAdd = if (!canAdd) null else { c, n ->
+      when (val r = SafeCurrencies.add(custom, c, n)) {
+        is SafeCurrencies.Added.Bad -> r.message
+        is SafeCurrencies.Added.Ok -> { SafeCurrencyPref.saveCustom(context, r.list); custom = r.list; code = r.code; null }
+      }
+    },
+  )
 
   fun submit() {
     if (busy) return
@@ -186,16 +223,19 @@ private fun SafeMoveDialog(kind: String, balanceMinor: Long, store: ShopStore, m
     scope.launch {
       val r = SafeBookPref.record(store, key) { cur, k ->
         when (kind) {
-          SafeCore.COUNT -> SafeBook.count(cur, m, text, me, now) { k }
-          SafeCore.IN -> SafeBook.deposit(cur, m, reason.orEmpty(), text, me, now) { k }
-          SafeCore.OUT -> SafeBook.withdraw(cur, m, reason.orEmpty(), text, me, now) { k }
-          SafeCore.TO_BANK -> SafeBook.toBank(cur, m, bag, text, me, now) { k }
+          SafeCore.COUNT -> SafeBook.count(cur, m, code, text, me, now) { k }
+          SafeCore.IN -> SafeBook.deposit(cur, m, code, reason.orEmpty(), text, me, now) { k }
+          SafeCore.OUT -> SafeBook.withdraw(cur, m, code, reason.orEmpty(), text, me, now) { k }
+          SafeCore.TO_BANK -> SafeBook.toBank(cur, m, code, bag, text, me, now) { k }
           else -> SafeBook.transfer(cur, kind, m, me, today, now, k, auditKey)
         }
       }
       busy = false
       when (r) {
-        is SafeBookPref.Saved.Ok -> { toast(if (r.again) StrSafe.already else StrSafe.saved); onDismiss() }
+        is SafeBookPref.Saved.Ok -> {
+          if (!linked) SafeCurrencyPref.setLast(context, code)
+          toast(if (r.again) StrSafe.already else StrSafe.saved); onDismiss()
+        }
         is SafeBookPref.Saved.Bad -> error = safeErrorText(r.failed)
         SafeBookPref.Saved.NotSaved -> error = StrSafe.notSaved
       }
@@ -217,17 +257,34 @@ private fun SafeMoveDialog(kind: String, balanceMinor: Long, store: ShopStore, m
             }
           }
         }
-        OutlinedTextField(
-          value = amount, onValueChange = { amount = numericInput(it); error = null },
-          label = { Text(if (isCount) StrSafe.counted else StrSafe.amount) }, singleLine = true,
-          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth(),
-        )
+        val afn = code == SafeCurrency.AFN
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          OutlinedTextField(
+            value = amount, onValueChange = { amount = numericInput(it); error = null },
+            label = {
+              Text(
+                when {
+                  isCount && afn -> StrSafe.counted
+                  isCount -> StrSafeCur.countedIn(code)
+                  afn -> StrSafe.amount
+                  else -> StrSafeCur.amountIn(code)
+                },
+              )
+            },
+            singleLine = true, suffix = { Text(SafeCurrencies.symbol(code)) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f),
+          )
+          if (!linked) {
+            Spacer(Modifier.width(6.dp))
+            SafeCurrencyButton(choice, enabled = !busy)
+          }
+        }
         if (isCount) {
-          Text(StrSafe.bookBalance(safeAfn(balanceMinor)), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+          Text(StrSafe.bookBalance(SafeCurrencies.format(balanceMinor, code)), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
           val v = minor?.takeIf { amount.isNotBlank() }?.let { it - balanceMinor }
           if (v != null && v != 0L) {
             Text(
-              if (v > 0) StrSafe.over(safeAfn(v)) else StrSafe.short(safeAfn(-v)),
+              if (v > 0) StrSafe.over(SafeCurrencies.format(v, code)) else StrSafe.short(SafeCurrencies.format(-v, code)),
               style = MaterialTheme.typography.labelSmall, color = Shop.colors.warning,
             )
           }
@@ -244,7 +301,7 @@ private fun SafeMoveDialog(kind: String, balanceMinor: Long, store: ShopStore, m
             label = {
               Text(
                 when (kind) {
-                  SafeCore.COUNT -> StrSafe.varianceReason
+                  SafeCore.COUNT -> if (afn) StrSafe.varianceReason else StrSafeCur.varianceAnyReason
                   SafeCore.TO_BANK -> StrSafe.bankNote
                   else -> StrSafe.noteForOther
                 },
@@ -264,22 +321,25 @@ private fun SafeMoveDialog(kind: String, balanceMinor: Long, store: ShopStore, m
   )
 }
 
-/** تاریخچه، تازه‌ترین اول — تا [HISTORY_MAX] ردیف */
+/** تاریخچهٔ همهٔ ارزها، تازه‌ترین اول — تا [HISTORY_MAX] ردیف؛ هر ردیف مبلغ و مانده را به ارزِ خودش */
 @Composable
-private fun SafeHistoryDialog(view: SafeCore.View, onDismiss: () -> Unit) {
+private fun SafeHistoryDialog(views: Map<String, SafeCore.View>, onDismiss: () -> Unit) {
+  val lines = remember(views) {
+    views.values.flatMap { it.history }.sortedWith(compareByDescending<SafeCore.Line> { it.entry.at }.thenByDescending { it.entry.id })
+  }
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = Shop.colors.surfaceSolid,
     title = { Text(StrSafe.historyTitle, color = Shop.colors.text) },
     text = {
       Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
-        if (view.history.isEmpty()) Text(StrSafe.empty, color = Shop.colors.muted)
-        view.history.take(HISTORY_MAX).forEachIndexed { i, line ->
+        if (lines.isEmpty()) Text(StrSafe.empty, color = Shop.colors.muted)
+        lines.take(HISTORY_MAX).forEachIndexed { i, line ->
           if (i > 0) HorizontalDivider(Modifier.padding(vertical = 6.dp), color = Shop.colors.border)
           SafeHistoryLine(line)
         }
-        if (view.history.size > HISTORY_MAX) {
-          Text(StrSafe.more(view.history.size - HISTORY_MAX), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+        if (lines.size > HISTORY_MAX) {
+          Text(StrSafe.more(lines.size - HISTORY_MAX), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
         }
       }
     },
@@ -292,9 +352,11 @@ private const val HISTORY_MAX = 200
 @Composable
 private fun SafeHistoryLine(line: SafeCore.Line) {
   val e = line.entry
+  val code = SafeCore.currencyOf(e)
+  fun fmt(m: Long) = SafeCurrencies.format(m, code)
   Row(verticalAlignment = Alignment.CenterVertically) {
     Text(kindLabel(e.kind), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = Shop.colors.text, modifier = Modifier.weight(1f))
-    val amount = if (e.kind == SafeCore.COUNT) safeAfn(e.amountMinor) else (if (line.deltaMinor > 0) "+" else "−") + safeAfn(e.amountMinor)
+    val amount = if (e.kind == SafeCore.COUNT) fmt(e.amountMinor) else (if (line.deltaMinor > 0) "+" else "−") + fmt(e.amountMinor)
     Text(amount, style = MaterialTheme.typography.bodyMedium, color = if (line.deltaMinor < 0 && e.kind != SafeCore.COUNT) Shop.colors.danger else Shop.colors.text)
   }
   val details = listOfNotNull(
@@ -303,10 +365,10 @@ private fun SafeHistoryLine(line: SafeCore.Line) {
     e.reason?.let { if (e.kind == SafeCore.COUNT) it else reasonLabel(it) },
     e.note,
     e.bagNo?.let { StrSafe.bag(it) },
-    if (e.kind == SafeCore.COUNT) line.varianceMinor?.let { v -> if (v > 0) StrSafe.over(safeAfn(v)) else if (v < 0) StrSafe.short(safeAfn(-v)) else null } ?: StrSafe.startCount else null,
+    if (e.kind == SafeCore.COUNT) line.varianceMinor?.let { v -> if (v > 0) StrSafe.over(fmt(v)) else if (v < 0) StrSafe.short(fmt(-v)) else null } ?: StrSafe.startCount else null,
   )
   Text(details.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-  Text(StrSafe.after(safeAfn(line.balanceMinor)), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
+  Text(StrSafe.after(fmt(line.balanceMinor)), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
   if (line.late) StatusPill(StrSafe.late, PillTone.WARNING)
 }
 

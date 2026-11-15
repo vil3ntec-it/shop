@@ -3,9 +3,11 @@ package ir.vil3ntec.tohid.data
 import ir.vil3ntec.tohid.core.i18n.StrGiftCard
 import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.i18n.StrSafe
+import ir.vil3ntec.tohid.core.i18n.StrSafeCur
 import ir.vil3ntec.tohid.core.money.MoneyInput
 import ir.vil3ntec.tohid.core.pay.Pay
 import ir.vil3ntec.tohid.core.safe.SafeCore
+import ir.vil3ntec.tohid.core.safe.SafeCurrency
 import ir.vil3ntec.tohid.money
 
 /**
@@ -21,37 +23,59 @@ object SafeBook {
   sealed interface Result {
     /** [duplicate]: همان عملیات پیش‌تر ثبت شده بود و دفتر عوض نشد */
     data class Ok(val data: ShopData, val entry: SafeEntry, val duplicate: Boolean = false) : Result
-    data class Failed(val code: String, val message: String, val varianceMinor: Long? = null) : Result
+    /** [currency]: ارزِ همان عملیات — پیامِ اختلاف به همان ارز است */
+    data class Failed(val code: String, val message: String, val varianceMinor: Long? = null, val currency: String = SafeCurrency.AFN) : Result
   }
 
   fun toCore(e: SafeEntry): SafeCore.Entry = SafeCore.Entry(
     id = e.id, kind = e.kind, amountMinor = e.amountMinor, at = e.createdAt, by = e.by, reason = e.reason,
     note = e.note, bagNo = e.bagNo, expectedMinor = e.expectedMinor, shiftId = e.shiftId, auditId = e.auditId,
+    currency = e.currency,
   )
 
   private fun toRow(e: SafeCore.Entry): SafeEntry = SafeEntry(
     id = e.id, kind = e.kind, amountMinor = e.amountMinor, createdAt = e.at, by = e.by, reason = e.reason,
     note = e.note, bagNo = e.bagNo, expectedMinor = e.expectedMinor, shiftId = e.shiftId, auditId = e.auditId,
+    currency = e.currency,
   )
 
-  /** مانده، آخرین شمارش و تاریخچه (تازه‌ترین اول) */
-  fun view(d: ShopData): SafeCore.View = SafeCore.view(d.safeEntries.map(::toCore))
+  /** مانده، آخرین شمارش و تاریخچه (تازه‌ترین اول) ِ یک ارز — پیش‌فرض افغانی؛ ارزِ دیگر هرگز در آن جمع نمی‌شود */
+  fun view(d: ShopData, currency: String = SafeCurrency.AFN): SafeCore.View = SafeCore.view(d.safeEntries.map(::toCore), currency)
+
+  /** دفترِ هر ارز، افغانی اول — هر کدام جدا (`SafeCore.views`) */
+  fun views(d: ShopData): Map<String, SafeCore.View> = SafeCore.views(d.safeEntries.map(::toCore))
 
   /** شمارش: مبلغِ شمرده؛ اختلاف با مانده کنارش ثبت می‌شود، هرگز بی‌صدا یکی نمی‌شود */
   fun count(d: ShopData, countedMinor: Long, reason: String?, by: String, now: Long, newId: () -> String): Result =
-    record(d, SafeCore.Input(newId(), SafeCore.COUNT, countedMinor, now, by = by, reason = reason))
+    count(d, countedMinor, null, reason, by, now, newId)
+
+  /** شمارشِ ارزِ [currency] (null ⇒ افغانی) در برابرِ ماندهٔ همان ارز */
+  fun count(d: ShopData, countedMinor: Long, currency: String?, reason: String?, by: String, now: Long, newId: () -> String): Result =
+    record(d, SafeCore.Input(newId(), SafeCore.COUNT, countedMinor, now, by = by, reason = reason, currency = currency))
 
   /** ورودِ پول به گاوصندوق — `reason` از `SafeCore.REASONS[IN]`؛ `other` یادداشت می‌خواهد */
   fun deposit(d: ShopData, amountMinor: Long, reason: String, note: String?, by: String, now: Long, newId: () -> String): Result =
-    record(d, SafeCore.Input(newId(), SafeCore.IN, amountMinor, now, by = by, reason = reason, note = note))
+    deposit(d, amountMinor, null, reason, note, by, now, newId)
+
+  /** ورود به ارزِ [currency] (null ⇒ افغانی)، به واحدِ کوچکِ همان ارز */
+  fun deposit(d: ShopData, amountMinor: Long, currency: String?, reason: String, note: String?, by: String, now: Long, newId: () -> String): Result =
+    record(d, SafeCore.Input(newId(), SafeCore.IN, amountMinor, now, by = by, reason = reason, note = note, currency = currency))
 
   /** خروجِ پول — `reason` از `SafeCore.REASONS[OUT]`؛ بیش از مانده رد می‌شود */
   fun withdraw(d: ShopData, amountMinor: Long, reason: String, note: String?, by: String, now: Long, newId: () -> String): Result =
-    record(d, SafeCore.Input(newId(), SafeCore.OUT, amountMinor, now, by = by, reason = reason, note = note))
+    withdraw(d, amountMinor, null, reason, note, by, now, newId)
+
+  /** خروج از ارزِ [currency]؛ بیش از ماندهٔ **همان ارز** رد می‌شود، ماندهٔ ارزِ دیگر به کار نمی‌آید */
+  fun withdraw(d: ShopData, amountMinor: Long, currency: String?, reason: String, note: String?, by: String, now: Long, newId: () -> String): Result =
+    record(d, SafeCore.Input(newId(), SafeCore.OUT, amountMinor, now, by = by, reason = reason, note = note, currency = currency))
 
   /** تحویل به بانک با شمارهٔ کیسه (PAY-18) */
   fun toBank(d: ShopData, amountMinor: Long, bagNo: String, note: String?, by: String, now: Long, newId: () -> String): Result =
-    record(d, SafeCore.Input(newId(), SafeCore.TO_BANK, amountMinor, now, by = by, note = note, bagNo = bagNo))
+    toBank(d, amountMinor, null, bagNo, note, by, now, newId)
+
+  /** تحویلِ ارزِ [currency] به بانک */
+  fun toBank(d: ShopData, amountMinor: Long, currency: String?, bagNo: String, note: String?, by: String, now: Long, newId: () -> String): Result =
+    record(d, SafeCore.Input(newId(), SafeCore.TO_BANK, amountMinor, now, by = by, note = note, bagNo = bagNo, currency = currency))
 
   /** کدِ «صندوق باز نیست» برای [transfer] — همان کدِ `ShiftCore` */
   const val SHIFT_CLOSED = "SHIFT_CLOSED"
@@ -99,7 +123,10 @@ object SafeBook {
 
   private fun record(d: ShopData, input: SafeCore.Input): Result =
     when (val r = SafeCore.build(d.safeEntries.map(::toCore), input, Pay.DEFAULT_VARIANCE_THRESHOLD)) {
-      is SafeCore.Result.Err -> Result.Failed(r.code, message(r.code, r.varianceMinor), r.varianceMinor)
+      is SafeCore.Result.Err -> {
+        val cur = input.currency?.trim()?.ifEmpty { null } ?: SafeCurrency.AFN
+        Result.Failed(r.code, message(r.code, r.varianceMinor, cur), r.varianceMinor, cur)
+      }
       is SafeCore.Result.Ok -> {
         val row = toRow(r.value)
         if (r.duplicate) Result.Ok(d, row, duplicate = true)
@@ -107,8 +134,9 @@ object SafeBook {
       }
     }
 
-  fun message(code: String, varianceMinor: Long? = null): String = when (code) {
+  fun message(code: String, varianceMinor: Long? = null, currency: String = SafeCurrency.AFN): String = when (code) {
     SafeCore.Code.REASON_REQUIRED -> varianceMinor?.let {
+      if (currency != SafeCurrency.AFN) return@let StrSafeCur.varianceNeedsReason(it > 0, SafeCurrencies.format(kotlin.math.abs(it), currency))
       val amount = money(kotlin.math.abs(it) / 100.0)
       val limit = money(Pay.DEFAULT_VARIANCE_THRESHOLD / 100.0)
       if (it > 0) StrLedger.varianceOver(amount, limit) else StrLedger.varianceShort(amount, limit)
@@ -121,6 +149,7 @@ object SafeBook {
     SafeCore.Code.TEXT_TOO_LONG -> StrGiftCard.errTooLong
     SafeCore.Code.ID_CONFLICT -> StrSafe.idConflict
     SafeCore.Code.INVALID_TIME -> StrSafe.badTime
+    SafeCore.Code.BAD_CURRENCY -> StrSafeCur.badCurrency
     SHIFT_CLOSED -> StrSafe.shiftClosed
     else -> StrLedger.notSavedCode(code)
   }

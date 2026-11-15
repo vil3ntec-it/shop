@@ -292,6 +292,7 @@ object OwnerExport {
     "expectedMinor" to "ماندهٔ دفتر هنگامِ شمارش (پول)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "shiftId" to "شناسهٔ صندوق",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "auditId" to "شناسهٔ ردیفِ صندوق",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "currency" to "ارز",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)، ارزِ ردیفِ گاوصندوق
     //  چند کشو (PAY-17): نامِ کشوی نام‌دار روی بازکردنِ صندوق (`shiftId` ِ فروش، برگشت و قرض همان «شناسهٔ صندوق» است)
     "drawer" to "کشو",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  انتقالِ موجودیِ سرور (INV-11): گامِ ارسال/دریافت/رد روی ردیفِ `stock_transfer`
@@ -383,7 +384,11 @@ object OwnerExport {
     val tables = ArrayList<Pair<String, List<List<Xlsx.Cell?>>>>()
     val keys = SHEETS.keys.filter { tree[it] is JsonArray } +
       tree.keys.filter { it !in SHEETS && it !in HEAD && tree[it] is JsonArray }
-    for (k in keys) tables += split(SHEETS[k] ?: k, table(tree[k] as JsonArray))
+    for (k in keys) {
+      val arr = tree[k] as JsonArray
+      tables += split(SHEETS[k] ?: k, table(if (k == "safeEntries") OwnerExportSafe.rows(arr) else arr))
+      if (k == "safeEntries") OwnerExportSafe.totals(arr)?.let { tables += OwnerExportSafe.SHEET to it }
+    }
     (tree["archive"] as? JsonObject)?.forEach { (k, v) ->
       if (v is JsonArray) tables += split(ARCHIVE_PREFIX + (SHEETS[k] ?: k), table(v))
     }

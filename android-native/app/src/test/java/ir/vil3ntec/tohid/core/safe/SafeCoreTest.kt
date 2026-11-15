@@ -57,7 +57,7 @@ class SafeCoreTest {
     for (c in cases("view")) {
       val name = c.s("name")
       val o = c.getValue("out").jsonObject
-      val got = SafeCore.view(c.entries())
+      val got = SafeCore.view(c.entries(), c.s("currency") ?: SafeCurrency.AFN)
       assertEquals(name, o.l("balanceMinor"), got.balanceMinor)
       assertEquals(name, o.s("lastCountId"), got.lastCount?.entry?.id)
       assertEquals(name, o.l("inSinceCountMinor"), got.inSinceCountMinor)
@@ -83,7 +83,7 @@ class SafeCoreTest {
       val input = SafeCore.Input(
         id = i.s("id"), kind = i.s("kind")!!, amountMinor = i.l("amountMinor")!!, at = i.l("at")!!,
         by = i.s("by"), reason = i.s("reason"), note = i.s("note"), bagNo = i.s("bagNo"),
-        shiftId = i.s("shiftId"), auditId = i.s("auditId"),
+        shiftId = i.s("shiftId"), auditId = i.s("auditId"), currency = i.s("currency"),
       )
       when (val r = SafeCore.build(c.entries(), input, threshold)) {
         is SafeCore.Result.Err -> {
@@ -95,6 +95,7 @@ class SafeCoreTest {
           assertEquals(name, o.l("at"), r.value.at)
           assertEquals(name, o.l("expectedMinor"), r.value.expectedMinor)
           assertEquals(name, o.getValue("duplicate").jsonPrimitive.booleanOrNull, r.duplicate)
+          assertEquals(name, o.s("currency"), r.value.currency)
           assertEquals("$name: ردیفِ ساخته‌شده خودش درست است", null, SafeCore.check(r.value))
         }
       }

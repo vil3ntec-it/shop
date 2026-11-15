@@ -4,10 +4,12 @@ import ir.vil3ntec.tohid.core.money.MoneyInput
 import ir.vil3ntec.tohid.core.pay.CashKeys
 import ir.vil3ntec.tohid.core.pay.ShiftCore
 import ir.vil3ntec.tohid.core.safe.SafeCore
+import ir.vil3ntec.tohid.core.safe.SafeCurrency
 import ir.vil3ntec.tohid.data.AuditEntry
 import ir.vil3ntec.tohid.data.CashShift
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.SafeBook
+import ir.vil3ntec.tohid.data.SafeCurrencies
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerNotes
 
@@ -60,6 +62,17 @@ object HeroMoney {
   }
 
   /**
+   *  مبلغِ گاوصندوق به ارزِ [currency] (واحدِ کوچکِ همان ارز، `SafeCurrencies.parse`)؛ افغانی همان [amount]. اعشاری که آن
+   *  ارز ندارد (ریالِ ۱۲٫۵) نامعتبر است، نه گرد — هیچ تبدیلی به افغانی نیست.
+   */
+  fun amount(text: String, currency: String): Amount {
+    if (currency == SafeCurrency.AFN) return amount(text)
+    if (ir.vil3ntec.tohid.latinDigits(text).replace(",", "").replace("٬", "").isBlank()) return Amount.Bad(AMOUNT_REQUIRED)
+    val m = SafeCurrencies.parse(text, currency) ?: return Amount.Bad(INVALID_AMOUNT)
+    return if (m <= 0L) Amount.Bad(INVALID_AMOUNT) else Amount.Ok(m)
+  }
+
+  /**
    *  ردیفِ سابقهٔ صندوق، درست همان که برگهٔ «ورود/خروجِ نقد» (`DrawerMoveRoute`) می‌سازد: `PayFlow.moveRow` روی
    *  صندوقِ بازِ همین دفتر، سپس `date` = امروز و `notes` = `DrawerNotes.move`. ثبت با `ShopStore.appendAudits`.
    */
@@ -90,10 +103,13 @@ object HeroMoney {
     }
   }
 
-  /** ردیفِ گاوصندوق با همان `SafeBook.deposit`/`withdraw` ِ پنجرهٔ گاوصندوق (یادداشتِ خالی ⇒ بی یادداشت) */
-  fun safeEntry(d: ShopData, dir: Dir, minor: Long, reason: String, note: String, me: String, now: Long, id: String): SafeBook.Result {
+  /**
+   *  ردیفِ گاوصندوق با همان `SafeBook.deposit`/`withdraw` ِ پنجرهٔ گاوصندوق (یادداشتِ خالی ⇒ بی یادداشت)؛ [currency] ارزِ
+   *  همان ردیف (null یا افغانی ⇒ ردیفِ افغانیِ امروز) و برداشت فقط از ماندهٔ همان ارز.
+   */
+  fun safeEntry(d: ShopData, dir: Dir, minor: Long, reason: String, note: String, me: String, now: Long, id: String, currency: String? = null): SafeBook.Result {
     val text = note.trim().ifEmpty { null }
-    return if (dir == Dir.ADD) SafeBook.deposit(d, minor, reason, text, me, now) { id }
-    else SafeBook.withdraw(d, minor, reason, text, me, now) { id }
+    return if (dir == Dir.ADD) SafeBook.deposit(d, minor, currency, reason, text, me, now) { id }
+    else SafeBook.withdraw(d, minor, currency, reason, text, me, now) { id }
   }
 }
