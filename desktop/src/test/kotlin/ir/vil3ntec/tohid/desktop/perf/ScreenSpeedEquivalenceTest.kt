@@ -168,4 +168,19 @@ class ScreenSpeedEquivalenceTest {
     assertTrue("کالای خریده‌شده نیست", named > 300)
     assertTrue(PurchaseSuggest.rows(d, emptyList(), today).isNotEmpty())
   }
+
+  /* ------------------------------ تأمین‌کننده: بدهی ------------------------------ */
+
+  @Test fun `بدهیِ هر تأمین‌کننده بیت‌به‌بیت همان جمعِ پیشین`() {
+    val extra = ir.vil3ntec.tohid.data.SupplierPayment(id = "pay-only", supplierId = "pay-only-supplier", amount = 12.5, date = today)
+    val dd = d.copy(supplierPayments = d.supplierPayments + extra)
+    val ids = dd.suppliers.map { it.id } + listOf("pay-only-supplier", "no-such-supplier", "")
+    for (id in ids) {
+      val mine = dd.purchases.filter { it.supplierId == id }
+      val want = mine.sumOf { it.totalAmount } - (mine.sumOf { it.paidAmount } + dd.supplierPayments.filter { it.supplierId == id }.sumOf { it.amount })
+      assertEquals(id, want, ShopStore.supplierDebt(dd, id), 0.0)
+      assertEquals(id, java.lang.Double.doubleToLongBits(want), java.lang.Double.doubleToLongBits(ShopStore.supplierDebt(dd, id)))
+    }
+    assertTrue(dd.suppliers.count { ShopStore.supplierDebt(dd, it.id) > 0 } > 10)
+  }
 }

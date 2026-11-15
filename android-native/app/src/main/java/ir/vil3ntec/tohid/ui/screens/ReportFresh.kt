@@ -665,7 +665,7 @@ fun PhoneFreshReports(d: ShopData) {
   val weekStart = ShopDayChoice.weekStart
   val dayStart = ShopDay.dayStartMinutes(ShopDayChoice.hours)
   val heat = rememberOffMain(d, heatSpan, today, money, weekStart) {
-    if (money) HeatmapModel.build(d, ReportBoard.range(heatSpan, today), offset, dayStart, weekStart) else null
+    if (money) HeatmapModel.build(d, ReportBoard.range(heatSpan, today), offset, dayStart, ShopDayChoice.weekStart) else null
   }
   //  کلیکِ کارتِ خانه روی گوشی همین صفحه را باز می‌کند؛ مقصد این‌جا یکی است
   LaunchedEffect(ReportFresh.preset.value) { ReportFresh.preset.value = null }

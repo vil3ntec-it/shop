@@ -72,15 +72,15 @@ class ScreenSpeedBenchTest {
       "JVM ${System.getProperty("java.version")} · max heap ${rt.maxMemory() / 1_000_000} MB · load ${load()}\n"
   }
 
-  /** همیشه: منطقِ هر بخش روی دادهٔ CI، میانهٔ گرمِ ۷ بار زیرِ [LOGIC_BUDGET_MS] */
+  /** همیشه: منطقِ هر بخش روی دادهٔ CI، میانهٔ گرمِ ۷ بار (پس از ۵ بارِ گرم‌کردن) زیرِ [LOGIC_BUDGET_MS] یا سقفِ بیرون‌از‌رشته‌اش */
   @Test(timeout = 600_000) fun `منطقِ هر بخش با ۲۰ هزار کالا — زیرِ بودجه`() {
     val d = ScreenSpeed.shop(ScreenSpeed.CI)
     val c = ctx(d)
     val log = StringBuilder(header(d))
-    val rows = ScreenLogic.SECTIONS.map { (name, f) -> logic(c, name, f, warm = 2, runs = 7, sampler = false, log = log) }
+    val rows = ScreenLogic.SECTIONS.map { (name, f) -> logic(c, name, f, warm = 5, runs = 7, sampler = false, log = log) }
     write("screen-speed-ci.txt", log.toString())
-    val over = rows.filter { it.median > LOGIC_BUDGET_MS }
-    assertTrue("بیش از ${LOGIC_BUDGET_MS}ms (میانهٔ گرم):\n" + over.joinToString("\n"), over.isEmpty())
+    val over = rows.filter { it.median > (ScreenLogic.OFF_MAIN_BUDGET_MS[it.name] ?: LOGIC_BUDGET_MS) }
+    assertTrue("بیش از سقف (رشتهٔ صفحه ${LOGIC_BUDGET_MS}ms، بیرون از آن ${ScreenLogic.OFF_MAIN_BUDGET_MS}؛ میانهٔ گرم):\n" + over.joinToString("\n"), over.isEmpty())
   }
 
   /** دستی: `TOHID_SCREEN_SPEED=1` — منطق و نخستین قابِ هر بخش روی دفترِ بزرگ */

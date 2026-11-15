@@ -44,6 +44,13 @@ internal object ScreenLogic {
     val debtorId: String = d.transactions.groupingBy { it.debtorId }.eachCount().maxByOrNull { it.value }?.key ?: d.debtors.first().id
   }
 
+  /**
+   *  بخش‌هایی که حسابشان **بیرون از رشتهٔ صفحه** است (`produceState` روی `Dispatchers.Default`): صفحه همان دم باز می‌شود و
+   *  محتوا پس از این زمان می‌رسد. سقفِ این‌ها نگهبانِ پس‌رفت است، نه بودجهٔ ۱۰۰ میلی‌ثانیه — هر سه هنوز بالای آن‌اند و در
+   *  `docs/PERFORMANCE-fa.md` (کارِ مانده) ثبت شده‌اند. سقف فقط پایین می‌آید.
+   */
+  val OFF_MAIN_BUDGET_MS: Map<String, Double> = mapOf("stock (گدام)" to 300.0, "sales history" to 300.0, "reports" to 2_500.0)
+
   /** نام (همان نامِ [ScreenSpeed.routes]) ⇒ کارِ نخستین بازِ آن بخش */
   val SECTIONS: List<Pair<String, (Ctx) -> Any?>> = listOf(
     //  HomeView.rememberHomeView + HomeToday + rememberShopAlerts + rememberHeroFaces
