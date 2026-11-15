@@ -60,7 +60,8 @@ class SafeCurrencyTest {
   }
 
   @Test fun `ماندهٔ هر ارز جدا، افغانی اول`() {
-    val v = SafeBook.views(mixed())
+    val d = mixed()
+    val v = SafeBook.views(d)
     assertEquals(listOf("AFN", "EUR", "USD"), v.keys.toList())
     assertEquals(80_000L, v.getValue("AFN").balanceMinor)
     assertEquals(2_500L, v.getValue("USD").balanceMinor)
@@ -68,7 +69,7 @@ class SafeCurrencyTest {
     assertEquals(listOf(SafeCore.OUT, SafeCore.COUNT), v.getValue("AFN").history.map { it.entry.kind })
     assertEquals(listOf(SafeCore.IN), v.getValue("USD").history.map { it.entry.kind })
     assertNull("ارزِ تازه شمارشی ندارد", v.getValue("USD").lastCount)
-    assertEquals(v.getValue("AFN"), SafeBook.view(mixed()))
+    assertEquals(v.getValue("AFN"), SafeBook.view(d))
   }
 
   @Test fun `ردیفِ کهنهٔ بی ارز افغانی است و ردیفِ افغانیِ تازه ارز نمی‌نویسد`() {
@@ -103,7 +104,7 @@ class SafeCurrencyTest {
     assertEquals(HomeHero.Flow(0, 20_000), HomeHero.safeToday(SafeBook.view(d).history, 0L))
   }
 
-  @Test fun `شمارشِ ارزِ دیگر: ماندهٔ همان ارز، هر اختلاف دلیل می‌خواهد با پیامِ همان ارز`() {
+  @Test fun `شمارشِ ارزِ دیگر — ماندهٔ همان ارز، هر اختلاف دلیل می‌خواهد با پیامِ همان ارز`() {
     I18n.source = { Lang.EN }
     val d = mixed()
     val c = ok(SafeBook.count(d, 2_500, "USD", null, "", 5_000, ids))

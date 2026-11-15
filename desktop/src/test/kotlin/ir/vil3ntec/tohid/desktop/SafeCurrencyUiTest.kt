@@ -7,7 +7,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.filter
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.onLast
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -107,7 +112,8 @@ class SafeCurrencyUiTest {
     assertEquals("USD", p.code)
     rule.onAllNodesWithText(StrSafeCur.amountIn("USD")).assertCountEquals(1)
     rule.onNodeWithContentDescription("${StrSafeCur.currency}: ${StrFx.usd}").assertExists()
-    rule.onNodeWithText(StrHero.add).performClick()
+    //  دکمهٔ «اضافه» ِ پایینِ برگه (همان نوشته در «اضافه / برداشت» ِ بالا هم هست) — پایینِ قابِ آزمون، پس با کارِ معنایی
+    rule.onAllNodesWithText(StrHero.add).filter(hasClickAction()).onLast().performSemanticsAction(SemanticsActions.OnClick)
     rule.waitForIdle()
     assertEquals(listOf("25.5" to "USD"), submitted)
     assertEquals(HeroMoney.Amount.Ok(2_550), HeroMoney.amount("25.5", p.code))

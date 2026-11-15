@@ -78,10 +78,15 @@ class SafeCurrencyRenderTest {
   @Test fun safeScreensFaLightAndDark() {
     RenderReport.skipReason()?.let { why -> println("RENDER کنار رفت: $why"); Assume.assumeTrue(why, false) }
     val d = ledger()
+    val afnOnly = d.copy(safeEntries = d.safeEntries.filter { it.currency == null })
     try {
       SafeBookPref.set(DesktopContext, true)
       for (dark in listOf(false, true)) {
         val t = if (dark) "dark" else "light"
+        //  پایه: دفترِ فقط‌افغانی ⇒ همان کادرِ امروز، بی تراشه (برای سنجیدنِ زمانِ نخستین قاب در کنارِ حالتِ چندارزی)
+        shot("safe-home-afn-only-$t", dark) {
+          Bg { HomeScreen(afnOnly, {}, PhoneNav.RESERVE, HomeShot(reveal = 1f, drawerPage = 1)) }
+        }
         shot("safe-home-afn-$t", dark, { SafeCurrencyPref.setViewed(DesktopContext, SafeCurrency.AFN) }) {
           Bg { HomeScreen(d, {}, PhoneNav.RESERVE, HomeShot(reveal = 1f, drawerPage = 1)) }
         }
