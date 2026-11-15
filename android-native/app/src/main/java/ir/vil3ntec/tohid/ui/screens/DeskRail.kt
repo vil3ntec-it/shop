@@ -13,6 +13,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -21,12 +27,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrDeskOff
 import ir.vil3ntec.tohid.core.i18n.StrShell
 
 /** پهنای منوی کناری — محتوا به همین اندازه از کنار فاصله می‌گیرد */
@@ -48,8 +56,9 @@ object RailMode {
  *  بخش‌ها یک‌جا در ستونِ راست دیده می‌شوند — همان چیدمانِ برنامه‌های میزکار.
  *
  *  از ۱۴۰۵/۰۷/۲۵ گروه‌بندی‌شده است (`DeskMenu`، v3 §۲۰.۳ و VISUAL-DIRECTION
- *  §۳): «اصلی»، «کانال‌های فروش» و «مدیریت و سامانه»؛ بخشِ ساخته‌نشده با
- *  برچسبِ «در دست ساخت» و بی‌کلیک. میان‌برهای Ctrl+۱…۹ عوض نشده‌اند (همان
+ *  §۳): «اصلی»، «کانال‌های فروش» و «مدیریت و سامانه»؛ بخشِ ساخته‌شده‌ای که برای
+ *  این دکان خاموش است با نشانِ «خاموش» و برگهٔ «چطور روشن می‌شود» (`DeskOff`)، و
+ *  فقط بخشِ ساخته‌نشده «در دست ساخت» و بی‌کلیک. میان‌برهای Ctrl+۱…۹ عوض نشده‌اند (همان
  *  `AppNav.SHORTCUTS`)؛ فهرستشان در راهنمای F1 است.
  */
 @Composable
@@ -64,6 +73,8 @@ fun DeskRail(
 ) {
   val context = LocalContext.current
   val canAdmin = ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)
+  //  نامِ پرچم و «پیام به پشتیبانی» ِ برگهٔ بخشِ خاموش فقط برای صاحبِ دکان
+  val owner = ir.vil3ntec.tohid.data.ShopRole.current(context) == ir.vil3ntec.tohid.data.ShopRole.OWNER
   //  سفارش‌ها و ویترین فقط وقتی سرور روشنشان کرده (و برای ویترین، کاربر اجازهٔ مدیریت دارد)
   val groups = DeskMenu.groups(
     canAdmin,
@@ -71,6 +82,12 @@ fun DeskRail(
     storefrontLive = StorefrontGate.visible,
     deliveryLive = DeliveryGate.visible,
   )
+  //  «آماده‌سازی و تحویل» و «سفارش‌های آنلاین» هر دو صفِ سفارش‌اند ⇒ ردیفِ زده‌شده تا صفحه عوض نشده روشن می‌ماند
+  val items = groups.flatMap { it.items }
+  var picked by rememberSaveable { mutableStateOf<String?>(null) }
+  val selected = DeskMenu.selectedId(items, current, picked)
+  LaunchedEffect(current) { if (picked != null && selected != picked) picked = null }
+  var offSheet by remember { mutableStateOf<String?>(null) }
   Column(
     Modifier
       .width(if (compact) DESK_RAIL_COMPACT else DESK_RAIL_WIDTH)
@@ -118,10 +135,13 @@ fun DeskRail(
       if (!compact) Text(group.title, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.muted, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
       else if (gi > 0) androidx.compose.material3.HorizontalDivider(Modifier.padding(horizontal = 10.dp, vertical = 4.dp), color = Shop.colors.border)
       group.items.forEach { item ->
-        if (item.state == DeskMenu.State.SOON) {
+        when (item.state) {
           //  «در دست ساخت»: دیده می‌شود ولی کلیک ندارد؛ در حالتِ فقط‌آیکن نمی‌آید
-          if (!compact) RailSoonItem(item.label, iconOf(item.id))
-        } else RailItem(item.id, item.label, item.key, iconOf(item.id), current == item.id, onPick, compact, badges[item.id] ?: 0)
+          DeskMenu.State.SOON -> if (!compact) RailSoonItem(item.label, iconOf(item.id))
+          //  «خاموش»: ساخته شده ولی برای این دکان روشن نیست ⇒ برگهٔ توضیح؛ در حالتِ فقط‌آیکن مثلِ پیش نمی‌آید
+          DeskMenu.State.OFF -> if (!compact) RailOffItem(item.label, iconOf(item.id)) { offSheet = item.id }
+          DeskMenu.State.LIVE -> RailItem(item.id, item.label, item.key, iconOf(item.id), selected == item.id, { _ -> picked = item.id; onPick(item.target) }, compact, badges[item.id] ?: 0)
+        }
       }
     }
     //  حالتِ منو — سه آیکنِ کوچک پایینِ منو
@@ -136,6 +156,28 @@ fun DeskRail(
         ) { Icon(ic, null, tint = if (mode == m) Shop.colors.iconActive else Shop.colors.icon, modifier = Modifier.size(17.dp)) }
         Spacer(Modifier.width(4.dp))
       }
+    }
+  }
+  offSheet?.let { id -> DeskOff.info(id, owner, canAdmin)?.let { DeskOffSheet(it, onPick, onDismiss = { offSheet = null }) } }
+}
+
+/** بخشِ ساخته‌شده‌ای که برای این دکان خاموش است — کم‌رنگ با نشانِ «خاموش»؛ زدن ⇒ برگهٔ «چطور روشن می‌شود» */
+@Composable
+private fun RailOffItem(label: String, icon: ImageVector, onOpen: () -> Unit) {
+  Row(
+    Modifier
+      .fillMaxWidth()
+      .clip(Shape.chip)
+      .clickable(onClickLabel = StrDeskOff.whyOff, onClick = onOpen)
+      .semantics { stateDescription = StrDeskOff.badge }
+      .padding(horizontal = 12.dp, vertical = 8.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Icon(icon, contentDescription = null, tint = Shop.colors.muted, modifier = Modifier.size(19.dp))
+    Spacer(Modifier.width(12.dp))
+    Column(Modifier.weight(1f)) {
+      Text(label, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.muted, maxLines = 2)
+      DeskOffBadge(Modifier.padding(top = 2.dp))
     }
   }
 }
@@ -238,10 +280,12 @@ private fun iconOf(id: String): ImageVector = when (id) {
   "devices" -> Icons.Filled.Devices
   "storefront" -> Icons.Filled.Storefront
   "delivery" -> Icons.Filled.DeliveryDining
-  "soon:orders" -> Icons.Filled.ShoppingCart
-  "soon:fulfil" -> Icons.Filled.Inventory
-  "soon:storefront" -> Icons.Filled.Storefront
-  "soon:delivery" -> Icons.Filled.DeliveryDining
+  "fulfil" -> Icons.Filled.Inventory
+  //  همان آیکن‌های ردیفِ «در دست ساخت» ِ پیشین
+  "off:orders" -> Icons.Filled.ShoppingCart
+  "off:fulfil" -> Icons.Filled.Inventory
+  "off:storefront" -> Icons.Filled.Storefront
+  "off:delivery" -> Icons.Filled.DeliveryDining
   else -> Icons.Filled.MoreHoriz
 }
 

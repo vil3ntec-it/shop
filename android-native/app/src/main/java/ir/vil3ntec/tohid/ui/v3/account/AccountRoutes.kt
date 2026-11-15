@@ -62,6 +62,8 @@ object AccountPaths {
   const val PLANS = "subscription/plans"
   const val REDEEM = "subscription/redeem"
   const val SUPPORT = "support"
+  /** گفت‌وگوی پشتیبانی با پیش‌نویسِ آماده (`?text=`) — فرستادن همچنان با زدنِ خودِ کاربر است */
+  fun support(draft: String?) = RoutePaths.withQuery(SUPPORT, "text" to draft)
 }
 
 /**
