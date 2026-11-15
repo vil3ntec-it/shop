@@ -145,7 +145,7 @@ fun DeskDashboard(d: ShopData, onOpen: (String) -> Unit) {
       }
 
       //  ── ۲: نمودار و پرفروش‌ها ──
-      if (wide) Row(Modifier.fillMaxWidth().height(368.dp), horizontalArrangement = Arrangement.spacedBy(DeskSpace.gap)) {
+      if (wide) Row(Modifier.fillMaxWidth().height(344.dp), horizontalArrangement = Arrangement.spacedBy(DeskSpace.gap)) {
         SalesChartCard(d, today, onOpen, view.canSeeMoney, Modifier.weight(2f).fillMaxHeight())
         TopProductsCard(d, today, Modifier.weight(1f).fillMaxHeight())
       } else {
