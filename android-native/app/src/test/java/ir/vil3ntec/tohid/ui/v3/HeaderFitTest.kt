@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -26,9 +28,9 @@ class HeaderFitTest {
   }
 
   @Test fun `کارهای رفته اولِ «…» می‌آیند و نقطه‌شان روی «…»`() {
-    val a = V3Action(androidx.compose.material.icons.Icons.Default.Add, "الف") {}
-    val b = V3Action(androidx.compose.material.icons.Icons.Default.Add, "ب", dot = true) {}
-    val split = V3HeaderActions.split(listOf(a, b), listOf(V3MenuItem(androidx.compose.material.icons.Icons.Default.Add, "منو") {}), visible = 1)
+    val a = V3Action(Icons.Default.Add, "الف") {}
+    val b = V3Action(Icons.Default.Add, "ب", dot = true) {}
+    val split = V3HeaderActions.split(listOf(a, b), listOf(V3MenuItem(Icons.Default.Add, "منو") {}), visible = 1)
     assertEquals(listOf("الف"), split.shown.map { it.label })
     assertEquals(listOf("ب", "منو"), split.menu.map { it.label })
     assertEquals(true, split.menuDot)
