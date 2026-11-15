@@ -127,8 +127,15 @@ fun OrderCard(
     )
     Spacer(Modifier.height(4.dp))
     Text(OrdersHubModel.items(o), style = V3Type.callout, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
-    Spacer(Modifier.height(10.dp))
-    OrderTags(o, now)
+    //  سادهٔ e-rows-63d: روش، زمان و پرداخت یک خطِ آرام (نه پنج تراشه)؛ فقط آن‌چه توجه می‌خواهد تراشه می‌ماند
+    Spacer(Modifier.height(4.dp))
+    Text(OrderCardText.line(o, now), style = V3Type.footnote, color = c.inkMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    OrderCardText.alerts(o).takeIf { it.isNotEmpty() }?.let { tags ->
+      Spacer(Modifier.height(8.dp))
+      FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        tags.forEach { (label, review) -> DraftTag(label, if (review) Icons.Outlined.Inventory2 else Icons.Outlined.Science, tone = V3Tone.WARNING) }
+      }
+    }
     if (risk != null) {
       Spacer(Modifier.height(6.dp))
       DraftTag(risk, Icons.Outlined.WarningAmber, tone = V3Tone.WARNING)
@@ -153,7 +160,26 @@ fun OrderCard(
   }
 }
 
-/** برچسب‌های کارت و سرِ جزئیات — یک جا تا هر دو یکی باشند */
+/**
+ *  متن‌های کارتِ صف (سادهٔ e-rows-63d): «با پیک · برای ۱۸:۰۰ · ۳ قلم · پرداخت‌شده» در یک خطِ آرام، و فقط دو نشانِ توجه
+ *  (بازبینیِ موجودی O-06، «آزمایشی») به رنگِ هشدار. سرِ جزئیات همان [OrderTags] ِ کامل را دارد.
+ */
+internal object OrderCardText {
+  fun line(o: OrderDto, now: Long): String = listOfNotNull(
+    OrdersHubModel.method(o),
+    o.scheduledFor?.let { StrOnline.forTime(OrdersModel.scheduleLabel(it, now)) },
+    StrOnline.items(o.itemsCount),
+    OnlineFmt.pay(o.paymentStatus, o.paymentMethod),
+  ).joinToString(" · ")
+
+  /** نشان‌های توجه: (برچسب، بازبینیِ موجودی؟) */
+  fun alerts(o: OrderDto): List<Pair<String, Boolean>> = listOfNotNull(
+    (StrOrdersHub.stockReview to true).takeIf { OrderStockHold.review(o) },
+    (StrOnline.test to false).takeIf { o.isTest },
+  )
+}
+
+/** برچسب‌های سرِ جزئیات (همهٔ نشان‌ها) */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun OrderTags(o: OrderDto, now: Long) {

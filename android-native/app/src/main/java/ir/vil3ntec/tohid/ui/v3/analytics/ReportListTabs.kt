@@ -32,7 +32,6 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
-import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
@@ -40,7 +39,9 @@ import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Stat
-import ir.vil3ntec.tohid.ui.v3.V3StatusPill
+import ir.vil3ntec.tohid.ui.v3.V3QuietStatus
+import ir.vil3ntec.tohid.ui.v3.V3RowStatus
+import ir.vil3ntec.tohid.ui.v3.V3RowTone
 import ir.vil3ntec.tohid.ui.v3.V3StaggerState
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.rememberV3Grow
@@ -190,12 +191,15 @@ internal fun ExpiryTab(d: ShopData, today: String, spec: ReportListSpec, places:
                 at[l.entry.id]?.let { StrPlaces.inPlaces(it.joinToString("، ")) },
               ).joinToString(" · "),
               icon = Icons.Outlined.EventBusy, hue = if (l.expired) null else V3Hue.ORANGE, danger = l.expired,
+              //  سادهٔ e-rows-63d: متنِ آرام به‌جای قرص — منقضی قرمز، نزدیک کهربایی، دور خاکستری
               trailing = {
-                when {
-                  l.expired -> V3StatusPill(V3Status.CANCELLED, StrReports.expired)
-                  l.daysLeft <= near -> V3StatusPill(V3Status.WARNING, StrReports.daysLeft(l.daysLeft))
-                  else -> V3StatusPill(V3Status.INACTIVE, StrReports.daysLeft(l.daysLeft))
-                }
+                V3QuietStatus(
+                  when {
+                    l.expired -> V3RowStatus(StrReports.expired, V3RowTone.DANGER)
+                    l.daysLeft <= near -> V3RowStatus(StrReports.daysLeft(l.daysLeft), V3RowTone.ATTENTION)
+                    else -> V3RowStatus(StrReports.daysLeft(l.daysLeft))
+                  },
+                )
               },
               onClick = { spec.onOpen(StockPaths.item(l.product.id)) },
             )
