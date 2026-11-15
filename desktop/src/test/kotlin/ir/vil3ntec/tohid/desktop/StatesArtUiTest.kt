@@ -88,6 +88,8 @@ class StatesArtUiTest {
     val nodes = art()
     assertEquals(1, nodes.size)
     assertEquals(V3ArtKind.PRODUCTS, nodes[0].config[V3ArtKindKey])
+    //  حالتِ خالی صحنهٔ آدمک‌دار دارد (فروشنده و جعبهٔ خالی)
+    assertEquals(true, nodes[0].config[ir.vil3ntec.tohid.ui.v3.art.V3ArtCharacterKey])
     //  تزئینی: صفحه‌خوان چیزی از تصویر نمی‌خواند
     assertEquals(null, nodes[0].config.getOrNull(SemanticsProperties.ContentDescription))
   }
@@ -140,6 +142,9 @@ class StatesArtUiTest {
         assertFalse("«$leak» در «$t»", t.contains(leak, ignoreCase = true))
       }
     }
+    //  خطای تمام‌صفحه آدمک دارد؛ کادرِ خطای درونِ صفحه نشانِ کوچکِ بی آدمک
+    val chars = art().map { it.config[ir.vil3ntec.tohid.ui.v3.art.V3ArtCharacterKey] }
+    assertEquals(listOf(true, true, false, true), chars)
     //  پیش‌فرضِ ساده جای متنِ فنی: سرِ تکهٔ ساده، یا عنوان و «چه کنید» ِ همان گونه
     assertTrue(shown.toString(), "Sync failed" in shown)
     assertTrue(shown.toString(), StrStates.offlineHint in shown)

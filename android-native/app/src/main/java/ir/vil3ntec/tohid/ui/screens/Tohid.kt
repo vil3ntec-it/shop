@@ -386,7 +386,7 @@ fun TohidEmptyState(
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {
     //  تصویرِ متحرکِ همان زمینه (از روی آیکن؛ بی آیکن ⇒ درختِ پیش‌فرض) — همان `V3Illustration` ِ نسخهٔ ۳
-    ir.vil3ntec.tohid.ui.v3.art.V3Illustration(ir.vil3ntec.tohid.ui.v3.art.V3ArtKind.forIcon(icon), size = 96.dp)
+    ir.vil3ntec.tohid.ui.v3.art.V3Illustration(ir.vil3ntec.tohid.ui.v3.art.V3ArtKind.forIcon(icon), size = 140.dp)
     Spacer(Modifier.height(Space.sm))
     Text(title, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text, textAlign = TextAlign.Center)
     Spacer(Modifier.height(Space.xxs))
@@ -421,7 +421,7 @@ fun TohidErrorState(
     modifier.fillMaxWidth().padding(vertical = Space.xl, horizontal = Space.md),
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {
-    ir.vil3ntec.tohid.ui.v3.art.V3Illustration(ir.vil3ntec.tohid.ui.v3.art.V3ArtKind.forError(kind), size = 88.dp)
+    ir.vil3ntec.tohid.ui.v3.art.V3Illustration(ir.vil3ntec.tohid.ui.v3.art.V3ArtKind.forError(kind), size = 132.dp)
     Spacer(Modifier.height(Space.xs))
     Text(shownTitle, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text, textAlign = TextAlign.Center)
     Spacer(Modifier.height(Space.xxs))

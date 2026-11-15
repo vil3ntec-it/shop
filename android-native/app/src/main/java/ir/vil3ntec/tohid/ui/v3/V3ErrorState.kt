@@ -77,7 +77,7 @@ internal fun V3StateLayout(
   body: String?,
   action: String?,
   onAction: (() -> Unit)?,
-  artSize: Dp = 112.dp,
+  artSize: Dp = 164.dp,
   actionKind: V3ButtonKind = V3ButtonKind.PRIMARY,
 ) {
   val c = PhoneV3.colors

@@ -102,6 +102,10 @@ internal class ArtShapes(private val u: Float, private val p: V3ArtPalette) {
     bottomRightCornerRadius = CornerRadius(bottom * u), bottomLeftCornerRadius = CornerRadius(bottom * u),
   )
 
+  /** بازیگرانِ صحنه‌های آدمک‌دار و ژستِ هر فریم (یک شیء، دوباره پر می‌شود) */
+  val cast: Cast by lazy(LazyThreadSafetyMode.NONE) { Cast(p) }
+  val pose = Pose()
+
   /** مسیرهای خمیدهٔ هر فریم (ساقه، سیم): همان چند شیء از نو پر می‌شوند، بی ساختنِ تازه */
   val stem = Path()
   val cableA = Path()

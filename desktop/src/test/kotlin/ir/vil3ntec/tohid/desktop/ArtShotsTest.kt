@@ -140,6 +140,40 @@ class ArtShotsTest {
     }
   }
 
+  @Test fun everyCharacterLoopIsSeamlessAndTheSmallBadgeStillDraws() {
+    motion(on = true)
+    for (kind in V3ArtKind.entries) {
+      //  چرخهٔ ۲۴ ثانیه‌ای: قابِ ۱ ثانیه و ۲۵ ثانیه یکی‌اند (پایانِ چرخه بی پرش به آغازش می‌چسبد)
+      val (a, b) = frames(200, 200, false, listOf(1_000L, 25_000L)) { V3Illustration(kind, size = 180.dp) }
+      assertTrue("$kind: چرخه درز دارد", a.contentEquals(b))
+      //  نشانِ کوچک (کمتر از CHARACTER_MIN) همان صحنهٔ چیزها را می‌کشد و می‌جنبد
+      val (c, d) = frames(60, 60, false, listOf(1_000L, 2_300L)) { V3Illustration(kind, size = 48.dp) }
+      assertTrue("$kind: نشانِ کوچک چیزی نکشید", colors(c) > 6)
+      assertFalse("$kind: نشانِ کوچک ایستاده ماند", c.contentEquals(d))
+    }
+  }
+
+  /** چرخهٔ هر صحنهٔ آدمک‌دار (ثانیه) — قاب‌های GIF ِ نمایشی */
+  private fun loopOf(kind: V3ArtKind): Long = when (kind) {
+    V3ArtKind.TREE -> 6_000L
+    V3ArtKind.ORDERS -> 3_000L
+    else -> 4_000L
+  }
+
+  @Test fun characterFrameSequencesForTheOwner() {
+    val dir = out ?: return
+    motion(on = true)
+    for (kind in V3ArtKind.entries) for (dark in listOf(false, true)) {
+      val loop = loopOf(kind)
+      //  ۱۲ قاب در ثانیه، از ۱۰ ثانیه به بعد (پس از گرم شدن) تا یک چرخهٔ کامل
+      val times = (0 until (loop / 1000L * 12L).toInt()).map { 10_000L + it * 1000L / 12L }
+      val pngs = frames(220, 220, dark, times) { V3Illustration(kind, size = 210.dp) }
+      val sub = File(dir, "frames/${kind.name.lowercase()}-${if (dark) "dark" else "light"}").apply { mkdirs() }
+      pngs.forEachIndexed { i, png -> File(sub, "f%03d.png".format(i)).writeBytes(png) }
+      assertTrue("$kind: قاب‌های چرخه همه یکی‌اند", pngs.distinctBy { it.contentHashCode() }.size > pngs.size / 3)
+    }
+  }
+
   @Test fun reducedMotionDrawsTheSameStillFrame() {
     motion(on = false)
     assertFalse(Motion.enabled)
