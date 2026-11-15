@@ -7,6 +7,8 @@ import androidx.compose.runtime.remember
 import ir.vil3ntec.tohid.data.DashboardEngine
 import ir.vil3ntec.tohid.data.ShopData
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -26,10 +28,13 @@ internal object DeskAlerts {
   /** همان دفتر (همان نمونه) و همان روز ⇒ نتیجهٔ آماده */
   fun cached(d: ShopData, today: String): DashboardEngine.Alerts? = last?.takeIf { it.data === d && it.today == today }?.alerts
 
-  /** یک بار برای هر دفتر: صدازنندهٔ دوم پشتِ قفل می‌ماند و همان نتیجه را می‌گیرد */
-  fun of(d: ShopData, today: String): DashboardEngine.Alerts = cached(d, today) ?: synchronized(this) {
-    cached(d, today) ?: DashboardEngine.alerts(d, today, DAYS, System.currentTimeMillis()).also { last = Entry(d, today, it) }
-  }
+  /** یک بار برای هر دفتر؛ دو صدازنندهٔ هم‌زمان پشتِ [gate] (`rememberDeskAlerts`) می‌مانند و دومی همان نتیجه را می‌گیرد */
+  @OptIn(kotlin.time.ExperimentalTime::class)
+  fun of(d: ShopData, today: String): DashboardEngine.Alerts = cached(d, today)
+    ?: DashboardEngine.alerts(d, today, DAYS, kotlin.time.Clock.System.now().toEpochMilliseconds()).also { last = Entry(d, today, it) }
+
+  /** قفلِ هم‌روالی (چندسکویی، نه `synchronized` ِ JVM) برای سربرگ و منو که با هم می‌پرسند */
+  val gate = Mutex()
 
   /** بازهٔ تخته‌ای که سربرگ و منو پیش‌تر می‌ساختند (`board(d, today, 7)`) */
   const val DAYS = 7
@@ -41,7 +46,7 @@ internal fun rememberDeskAlerts(d: ShopData): DashboardEngine.Alerts {
   val today = ir.vil3ntec.tohid.todayIso()
   val state = remember { mutableStateOf(DeskAlerts.cached(d, today) ?: DashboardEngine.Alerts.NONE) }
   LaunchedEffect(d, today) {
-    state.value = DeskAlerts.cached(d, today) ?: withContext(Dispatchers.Default) { DeskAlerts.of(d, today) }
+    state.value = DeskAlerts.cached(d, today) ?: withContext(Dispatchers.Default) { DeskAlerts.gate.withLock { DeskAlerts.of(d, today) } }
   }
   return state.value
 }
