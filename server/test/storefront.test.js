@@ -114,8 +114,11 @@ const count = async (shopId) => (await one('SELECT COUNT(*)::int AS n FROM onlin
    ۱) پیش‌فرض خاموش
    ══════════════════════════════════════════════════════════════════ */
 
-test('بی پرچم: تنظیم ۴۰۳، نشانیِ عمومی ۴۰۴، و هیچ ردیفی', async () => {
+test('پرچمِ خاموشِ صریح: تنظیم ۴۰۳، نشانیِ عمومی ۴۰۴، و هیچ ردیفی', async () => {
   const o = await shopOwner('خاموش');
+  //  از ۱۴۰۵/۰۸/۲۴ هر دو پیش‌فرض روشن‌اند (FLAGS-ON §۴۸) ⇒ «خاموش» صریح
+  await setFlag(o.shopId, 'shop.orders', false);
+  await setFlag(o.shopId, 'shop.storefront', false);
   const cfg = await h.get('/api/shop/storefront/config', { token: o.token });
   assert.equal(cfg.status, 200);
   assert.equal(cfg.body.enabled, false);

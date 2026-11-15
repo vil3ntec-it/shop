@@ -5,7 +5,10 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AssignmentReturn
 import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.RateReview
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -78,8 +81,11 @@ private fun RouteScope.OrdersRouteBody(wide: Boolean) {
   }
   var selected by rememberSaveable { mutableStateOf<String?>(null) }
   val perms = cfg?.permissions ?: OrderPermsDto()
+  //  ۱۴۰۵/۰۸/۲۴: یادآوریِ «همهٔ دستگاه‌ها را به‌روز کنید» از صف رفت — به برنامه هیچ خبری از نسخهٔ دستگاه‌های دیگرِ دکان
+  //  نمی‌رسد (سرور نمی‌گوید کدام دستگاه کهنه است)، پس هشدار برای همه بود؛ همان یادآوری در راهنمای «سفارش‌ها» است و
+  //  سفارشِ پیش از کف همچنان به «بررسیِ صاحب» می‌رود (`review`).
   val notes = OrderFulfillNotes.queue(
-    rollout = OrdersLive.rolloutNotice(), review = OrdersLive.review.value, unposted = OrdersLive.unposted.value,
+    rollout = false, review = OrdersLive.review.value, unposted = OrdersLive.unposted.value,
     waiting = OrdersLive.waiting.value, shortfalls = OrdersLive.shortfalls.value, canRefund = perms.refund,
   )
   val state = ctl.state.copy(perms = perms, counts = OrdersLive.counts.value, notes = notes)
@@ -99,17 +105,30 @@ private fun RouteScope.OrdersRouteBody(wide: Boolean) {
   LaunchedEffect(slipMsg) { slipMsg?.let { toasts.show(it); OrdersLive.slipMessage.value = null } }
   val header: @Composable () -> Unit = {
     OrderDeskStrip(deskCtl)
-    //  «چرا سفارش نمی‌رسد؟» — ویترینِ خاموش، بی کالا، دورهٔ آزمایشی، اعلانِ خاموش… (lib/order-arrival)
-    OrdersLive.arrival.value?.let { a -> OrderArrivalCardV3(a, onFix = { openFix(it) }) }
+    //  «چرا سفارش نمی‌رسد؟» (lib/order-arrival) دیگر دیوارِ پیام نیست: تنها ردیفِ `setup` زیرِ برگه‌ها (پایین) و برگهٔ فهرست؛
+    //  شرحِ کاملِ هر دروازه در «تنظیمات ← سفارشِ آنلاین» (`OrderArrivalCardV3`، `showOk`)
     cfg?.let { c -> OrderAlertNotes(c, ::openOrder) }
     OrderRiskQueueCardV3(riskQ, riskOn, ::openOrder)
-    //  قفسه و دستهٔ جمع‌آوری (PCK-10/12)، گزارش‌ها و نظرها (NTF-07/09) و «کالا به انبار برگشت؟» ِ بازپرداخت‌ها (RET-11)
-    OrderQueueExtras(cfg, onChanged = { ctl.reload() }, onOpen = ::openOrder)
+    //  «کالا به انبار برگشت؟» ِ بازپرداخت‌ها (RET-11)؛ قفسه، گزارش‌ها و نظرها و درخواست‌های برگشت در «…» (`queueMenu`)
+    OrderQueueExtras(cfg, onOpen = ::openOrder)
     if (cfg?.bulk == true) Row { OrderBulkToggleV3(bulk, cfg) }
     OrderBulkBarV3(bulk, cfg, state.items, OrdersHub.repo(context), printer, { toasts.show(it) }) {
       ctl.reload()
       scope.launch { OrdersLive.pollSummary(context) }
     }
+  }
+  //  ۱۴۰۵/۰۸/۲۴: درهای سرِ صف (جمع‌آوری، گزارش‌ها و نظرها، درخواست‌های برگشت) در «…» ِ سربرگ
+  val queueMenu = orderQueueMenu(cfg) { ctl.reload() }
+  val menu = riskMenu + queueMenu.mapNotNull { e ->
+    e.label?.let { label -> V3MenuItem(queueIcon(e, queueMenu), label, onClick = e.open) }
+  }
+  //  تنها ردیفِ وضعیت: کارهای راه‌اندازیِ خودِ دکان یا «خاموش است ⇐ پشتیبانی» (`OrderSetupModel`)
+  val setup = OrderSetupModel.of(OrdersLive.arrival.value)
+  var setupOpen by rememberSaveable { mutableStateOf(false) }
+  val hosts: @Composable () -> Unit = {
+    queueMenu.forEach { it.host() }
+    val todo = setup as? OrderSetupModel.Status.Todo
+    if (setupOpen && todo != null) OrderSetupSheet(todo.tasks, onFix = { openFix(it) }, onDismiss = { setupOpen = false })
   }
   val picked = if (bulk.on) bulk.ids else null
   val actions = QueueActions(
@@ -134,12 +153,24 @@ private fun RouteScope.OrdersRouteBody(wide: Boolean) {
     AppNav.addAction.value = action
     onDispose { if (AppNav.addAction.value === action) AppNav.addAction.value = null }
   }
+  val onSetup = { setupOpen = true }
+  val onSupport = { openFix(ir.vil3ntec.tohid.core.orders.OrderFlow.Fix.SUPPORT) }
   if (!wide) {
-    OrdersScreen(state, actions, backOrNull, header = header, picked = picked, riskFlags = riskFlags, menu = riskMenu)
+    OrdersScreen(
+      state, actions, backOrNull, header = header, picked = picked, riskFlags = riskFlags, menu = menu,
+      setup = setup, onSetup = onSetup, onSupport = onSupport,
+    )
+    hosts()
     return
   }
+  hosts()
   V3TwoPane(
-    list = { OrdersScreen(state, actions, backOrNull, selectedId = selected, header = header, picked = picked, riskFlags = riskFlags, menu = riskMenu) },
+    list = {
+      OrdersScreen(
+        state, actions, backOrNull, selectedId = selected, header = header, picked = picked, riskFlags = riskFlags, menu = menu,
+        setup = setup, onSetup = onSetup, onSupport = onSupport,
+      )
+    },
     detail = {
       val id = selected
       if (id == null) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -341,6 +372,9 @@ internal fun RouteScope.NewOrderRoute() {
     failure = failure,
     onBack = { back() },
     extras = { form, onForm -> NewOrderExtras(OrdersLive.config.value, form, onForm) },
+    //  ۱۴۰۵/۰۸/۲۴: «مثلِ سبد» — کالاها، دسته‌ها، موجودی و مشتری‌ها از دفترِ همین دکان؛ اسکن همان برگهٔ اسکنِ برنامه
+    d = data,
+    onScan = { onCode -> nav.openForResult(ir.vil3ntec.tohid.ui.v3.sales.SalesPaths.scan("order")) { code -> code?.let(onCode) } },
     onSubmit = { form ->
       when (val r = ir.vil3ntec.tohid.core.orders.OrderDraft.build(form)) {
         is ir.vil3ntec.tohid.core.orders.OrderDraft.Result.Error -> failure = r.message
@@ -361,4 +395,11 @@ internal fun RouteScope.NewOrderRoute() {
       }
     },
   )
+}
+
+/** آیکنِ هر درِ «…» ِ صف — به ترتیبِ `orderQueueMenu`: جمع‌آوری، گزارش‌ها و نظرها، درخواست‌های برگشت */
+private fun queueIcon(e: ir.vil3ntec.tohid.ui.screens.QueueEntry, all: List<ir.vil3ntec.tohid.ui.screens.QueueEntry>) = when (all.indexOf(e)) {
+  0 -> Icons.Outlined.Inventory2
+  1 -> Icons.Outlined.RateReview
+  else -> Icons.Outlined.AssignmentReturn
 }

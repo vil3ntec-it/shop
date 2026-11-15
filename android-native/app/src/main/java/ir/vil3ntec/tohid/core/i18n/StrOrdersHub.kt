@@ -29,6 +29,38 @@ object StrOrdersHub {
     else -> StrOnline.orderTab(id)
   }
 
+  /**
+   *  نامِ کوتاهِ همان برگه‌ها برای ردیفِ برگه‌های گوشی (۱۴۰۵/۰۸/۲۴: «تمام‌شده» در ۳۶۰dp بریده بود) — همهٔ برگه‌ها در یک نگاه؛
+   *  نامِ کاملِ [tab] در خالیِ هر برگه، راهنما و کامپیوتر می‌ماند.
+   */
+  fun tabShort(id: String): String = when (id) {
+    "new" -> t("جدید", "New", "نوي")
+    "preparing" -> t("آماده‌سازی", "Preparing", "چمتو کول")
+    "ready" -> t("آماده", "Ready", "چمتو")
+    "on_the_way" -> t("در راه", "On the way", "په لاره")
+    "scheduled" -> t("زمان‌دار", "Scheduled", "مهال‌ویش")
+    "done" -> t("تمام‌شده", "Done", "بشپړ")
+    else -> tab(id)
+  }
+
+  // ── «سفارشِ دستی» مثلِ سبد (صاحب‌کار ۱۴۰۵/۰۸/۲۴: «محصولات رو انتخاب کنم — مثلِ سبد») ──
+  val pickNext: String get() = t("ادامه", "Continue", "ادامه")
+  val freeLine: String get() = t("قلمِ دستی (بیرون از فهرست)", "Custom item (not in the list)", "لاسي توکی (له لړلیک بهر)")
+  val addProducts: String get() = t("افزودنِ کالا", "Add products", "توکي ورزیاتول")
+  val addFreeLine: String get() = t("قلمِ دستی", "Custom item", "لاسي توکی")
+  val pickCustomer: String get() = t("از مشتری‌ها", "From customers", "له پېرودونکو")
+  val more: String get() = t("بیشتر", "More", "نور")
+  val moreHint: String get() = t("از کجا، یادداشت و سفارشِ آزمایشی", "Source, note and test order", "له کومه، یادښت او ازمېښتي فرمایش")
+  val noProducts: String get() = t("هنوز کالایی ثبت نشده", "No products yet", "لا هېڅ توکی نه دی ثبت شوی")
+  val noProductsBody: String get() = t(
+    "قلم را دستی بنویسید؛ کالا را بعداً در «کالاها» ثبت کنید.",
+    "Type the item by hand; add products later in Products.",
+    "توکی په لاس ولیکئ؛ توکي وروسته په «توکو» کې ثبت کړئ.",
+  )
+  fun unknownCode(code: String): String = t("کالایی با کدِ ${asIs(code)} نیست", "No product with code $code", "د $code کوډ سره توکی نشته")
+  fun lineOf(qty: String, unit: String, price: String): String =
+    t("${asIs(qty)} ${asIs(unit)} × ${asIs(price)}", "$qty $unit × $price", "$qty $unit × $price").replace("  ", " ")
+
   // ── کارتِ صف ──
   val onlineBadge: String get() = t("سفارشِ آنلاین", "Online order", "آنلاین فرمایش")
   /** خطِ دومِ کوتاهِ کارتِ صف (۶۸c): «آنلاین · ۶ دقیقه پیش · ۳ قلم» */

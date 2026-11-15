@@ -71,7 +71,7 @@ import kotlinx.coroutines.launch
  */
 
 @Composable
-internal fun RouteScope.ReturnRequestsEntry(api: ApiClient, canManage: Boolean, rev: Long) {
+internal fun RouteScope.ReturnRequestsEntry(api: ApiClient, canManage: Boolean, rev: Long): ir.vil3ntec.tohid.ui.screens.QueueEntry {
   val scope = rememberCoroutineScope()
   val ctl = remember(api) { ReturnRequestsController(ReturnRequestsRepository(api), scope) }
   var open by remember { mutableStateOf(false) }
@@ -86,14 +86,12 @@ internal fun RouteScope.ReturnRequestsEntry(api: ApiClient, canManage: Boolean, 
   LaunchedEffect(ctl.note) { ctl.note?.let { (ok, text) -> toasts.show(text, if (ok) V3Tone.SUCCESS else V3Tone.ERROR) } }
   val b = ctl.board
   LaunchedEffect(b.visible) { if (!b.visible) open = false }
-  if (b.visible) {
-    V3Button(
-      if (b.waiting > 0) StrReturnRequests.entry(b.waiting) else StrReturnRequests.title, { open = true },
-      kind = V3ButtonKind.SECONDARY, height = 40.dp,
-    )
+  //  ۱۴۰۵/۰۸/۲۴: دکمهٔ سرِ صف به «…» ِ سربرگ رفت — همان برچسب با شمارِ منتظر
+  val label = if (!b.visible) null else if (b.waiting > 0) StrReturnRequests.entry(b.waiting) else StrReturnRequests.title
+  return ir.vil3ntec.tohid.ui.screens.QueueEntry(label, { open = true }) {
+    if (open) ReturnRequestsSheet(ctl, canManage, onClose = { open = false }, onPost = { r -> open = false; posting = r })
+    posting?.let { r -> ReturnRequestPost(ctl, r) { posting = null } }
   }
-  if (open) ReturnRequestsSheet(ctl, canManage, onClose = { open = false }, onPost = { r -> open = false; posting = r })
-  posting?.let { r -> ReturnRequestPost(ctl, r) { posting = null } }
 }
 
 /** برگهٔ برگشتِ موجود برای یک درخواستِ پذیرفته — بی فروشِ همان سفارش در دفترِ این دستگاه ⇒ پیام و هیچ */

@@ -26,18 +26,19 @@ test.after(async () => { await h.stop(); });
 test.beforeEach(() => hot.clear());
 
 test('خواندنِ دوم از حافظه؛ نوشتنِ پرچم همان دم باطل می‌کند', async () => {
-  assert.equal(await orders.flagOf(shopId, 'shop.orders'), false);
-  await db.query("INSERT INTO live_config (scope, key, value, updated_at, updated_by) VALUES ($1, 'shop.orders', 'true', 0, 't')", [shopId]);
-  assert.equal(await orders.flagOf(shopId, 'shop.orders'), false, 'نوشتنِ مستقیم (بی درِ live-config) تا ttl دیده نمی‌شود');
-  assert.equal(await orders.flagOf(shopId, 'shop.orders', (t, p) => db.query(t, p)), true, 'درونِ تراکنش هرگز از حافظه نیست');
-  await liveConfig.remove(shopId, 'shop.orders', 't');
-  await liveConfig.set(shopId, 'shop.orders', true, 't');
-  assert.equal(await orders.flagOf(shopId, 'shop.orders'), true, 'نوشتن از درِ live-config ⇒ تازه');
-  await liveConfig.set('all', 'shop.orders', false, 't');
-  await liveConfig.remove(shopId, 'shop.orders', 't');
-  assert.equal(await orders.flagOf(shopId, 'shop.orders'), false, 'پاک کردن و `all` هم باطل می‌کنند');
-  await liveConfig.set('all', 'shop.orders', true, 't');
-  assert.equal(await orders.flagOf(shopId, 'shop.orders'), true, 'نوشتنِ `all` پرچمِ هر دکان را باطل می‌کند');
+  //  کلیدِ پیش‌فرض‌خاموش (از ۱۴۰۵/۰۸/۲۴ `shop.orders` پیش‌فرض روشن است، FLAGS-ON §۴۸)
+  assert.equal(await orders.flagOf(shopId, 'shop.delivery'), false);
+  await db.query("INSERT INTO live_config (scope, key, value, updated_at, updated_by) VALUES ($1, 'shop.delivery', 'true', 0, 't')", [shopId]);
+  assert.equal(await orders.flagOf(shopId, 'shop.delivery'), false, 'نوشتنِ مستقیم (بی درِ live-config) تا ttl دیده نمی‌شود');
+  assert.equal(await orders.flagOf(shopId, 'shop.delivery', (t, p) => db.query(t, p)), true, 'درونِ تراکنش هرگز از حافظه نیست');
+  await liveConfig.remove(shopId, 'shop.delivery', 't');
+  await liveConfig.set(shopId, 'shop.delivery', true, 't');
+  assert.equal(await orders.flagOf(shopId, 'shop.delivery'), true, 'نوشتن از درِ live-config ⇒ تازه');
+  await liveConfig.set('all', 'shop.delivery', false, 't');
+  await liveConfig.remove(shopId, 'shop.delivery', 't');
+  assert.equal(await orders.flagOf(shopId, 'shop.delivery'), false, 'پاک کردن و `all` هم باطل می‌کنند');
+  await liveConfig.set('all', 'shop.delivery', true, 't');
+  assert.equal(await orders.flagOf(shopId, 'shop.delivery'), true, 'نوشتنِ `all` پرچمِ هر دکان را باطل می‌کند');
 });
 
 test('«غیرفعال کردنِ سرویس» (shop-holds) پرچمِ همان دکان را باطل می‌کند', async () => {

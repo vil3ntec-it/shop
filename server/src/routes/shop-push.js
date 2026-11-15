@@ -7,8 +7,9 @@
  *   POST   /devices   `{token, provider?: fcm|apns, platform?: android|ios}` ⇒ ثبتِ توکنِ **همین** عضو و **همین** دستگاه
  *   DELETE /devices   `{token?}` ⇒ توکن(های) همین عضو روی همین دستگاه کهنه می‌شوند (خروج، خاموش کردنِ پرچم)
  *
- * ⛔ پیش‌فرض خاموش: بی پرچمِ `shop.device_push` (live_config، دکان یا `all`) ثبت ۴۰۳ `device_push_disabled` است و هیچ
- *    توکنی جمع نمی‌شود؛ پاک کردن همیشه باز است.
+ * ⛔ پیش‌فرض روشن از ۱۴۰۵/۰۸/۲۴ (تصمیمِ صاحب‌کار، `lib/flag-defaults.js`): فقط `false` ِ صریحِ `shop.device_push` (دکان یا
+ *    `all`) ثبت را ۴۰۳ `device_push_disabled` می‌کند و هیچ توکنی جمع نمی‌شود؛ پاک کردن همیشه باز است. بی حسابِ Firebase ِ
+ *    سرور توکن ثبت می‌شود ولی هیچ پوشی نمی‌رود (`push.sendTo` ⇒ `skipped`).
  * ⛔ کاربر، دکان و دستگاه فقط از توکنِ ورود (`requireUser`، `requireShop`، `req.device`)؛ `userId`/`shopId` ِ بدنه
  *    نادیده (SEC-AUTH-11). عضوِ برداشته‌شده یا دستگاهِ خارج‌شده ⇒ توکن کهنه (`lib/push.js`).
  * ⛔ خبر و اعلان پشتِ اشتراک نیست (SUB-10: FREE)؛ هر عضوِ فعال (پیک نه — درِ `/api/shop` به او بسته است).
@@ -23,6 +24,7 @@ const { query } = require('../db');
 const { requireUser, requireShop } = require('../middleware/auth');
 const { rateLimit } = require('../middleware/ratelimit');
 const { forbidden, badRequest } = require('../middleware/errors');
+const { DEFAULT_ON } = require('../lib/flag-defaults');
 
 const FLAG_KEY = 'shop.device_push';
 /** FCM: نویسه‌های امنِ base64url و «:» (حدودِ ۱۵۰ تا ۲۰۰)؛ APNs: هگزِ ۶۴ نویسه‌ای (یا بلندتر در آینده) */
@@ -34,7 +36,7 @@ router.use(requireUser, requireShop);
 
 function decode(text) { try { return JSON.parse(text); } catch { return null; } }
 
-/** همان قاعدهٔ پرچم‌های دکان: مقدارِ دکان بر `all` جلو می‌افتد؛ فقط `true` روشن است */
+/** همان قاعدهٔ پرچم‌های دکان: مقدارِ دکان بر `all` جلو می‌افتد؛ کلیدِ پیش‌فرض‌روشن ⇒ فقط `false` ِ صریح خاموش */
 async function flagOf(shopId) {
   const rows = (await query(
     'SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)', [FLAG_KEY, 'all', String(shopId)]
@@ -42,7 +44,7 @@ async function flagOf(shopId) {
   let v;
   for (const r of rows) if (r.scope === 'all') v = decode(r.value);
   for (const r of rows) if (r.scope !== 'all') v = decode(r.value);
-  return v === true;
+  return DEFAULT_ON.has(FLAG_KEY) ? v !== false : v === true;
 }
 
 const deviceOf = (req) => (req.device ? String(req.device.device_uid || req.device.id || '') : '');

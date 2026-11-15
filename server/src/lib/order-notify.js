@@ -84,10 +84,13 @@ const ACK_KINDS = ['received', 'opened'];
 // ════════════════════════════════════════════════════════════════════
 
 function decode(text) { try { return JSON.parse(text); } catch { return null; } }
+const { DEFAULT_ON } = require('./flag-defaults');
 
 /**
  * همان قاعدهٔ `orders.flagOf` (مقدارِ دکان بر `all` جلو می‌افتد؛ فقط `true`
  * روشن است) — ولی با `run` تا درونِ تراکنشِ ساختِ سفارش هم خوانده شود.
+ * کلیدِ پیش‌فرض‌روشنِ `lib/flag-defaults.js` (`shop.order_notify` از ۱۴۰۵/۰۸/۲۴): بی ردیف روشن، فقط `false` ِ صریح خاموش؛
+ * `shop.stock_reserve` بیرون از آن فهرست است و همان «فقط `true`» می‌ماند.
  */
 async function flagIn(run, shopId, key = FLAG_KEY) {
   const rows = (await run(
@@ -97,6 +100,7 @@ async function flagIn(run, shopId, key = FLAG_KEY) {
   let v;
   for (const r of rows) if (r.scope === 'all') v = decode(r.value);
   for (const r of rows) if (r.scope !== 'all') v = decode(r.value);
+  if (DEFAULT_ON.has(key)) return v !== false;
   return v === true;
 }
 const flagOf = (shopId) => flagIn((t, p) => query(t, p), shopId);
@@ -530,5 +534,5 @@ async function ack(shopId, notifId, { kind, userId = '', deviceUid = '' } = {}) 
 
 module.exports = {
   FLAG_KEY, EVENT, REVIEW_EVENT, EVENTS, ONCE_EVENTS, CHANNEL, TTL_SECONDS, MAX_ATTEMPTS, MAX_REMINDERS, BACKOFF_MS, ACK_WINDOW_MS, STALE_MS,
-  flagOf, enqueueIn, enqueueReviewIn, messageFor, tick, start, stop, setFallback, config, pending, ack, shape, recipientIds,
+  flagOf, flagIn, enqueueIn, enqueueReviewIn, messageFor, tick, start, stop, setFallback, config, pending, ack, shape, recipientIds,
 };

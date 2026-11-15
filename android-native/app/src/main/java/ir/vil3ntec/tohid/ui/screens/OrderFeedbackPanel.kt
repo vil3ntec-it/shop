@@ -51,7 +51,7 @@ import kotlinx.coroutines.delay
  */
 
 @Composable
-internal fun OrderFeedbackEntry(api: ApiClient, canManage: Boolean, rev: Long) {
+internal fun OrderFeedbackEntry(api: ApiClient, canManage: Boolean, rev: Long): QueueEntry {
   val ctl = rememberOrderFeedback(api)
   var open by remember { mutableStateOf(false) }
   ir.vil3ntec.tohid.ui.v3.V3LiveEffect(ctl, rev) {
@@ -61,12 +61,13 @@ internal fun OrderFeedbackEntry(api: ApiClient, canManage: Boolean, rev: Long) {
     }
   }
   val b = ctl.board
-  //  پرچم میانِ کار خاموش شد ⇒ برگه بسته و دکمه نیست
+  //  پرچم میانِ کار خاموش شد ⇒ برگه بسته و ردیفِ «…» نیست
   LaunchedEffect(b.visible) { if (!b.visible) open = false }
-  if (!b.visible) return
-  Spacer(Modifier.width(8.dp))
-  TohidSecondaryButton(if (b.waiting > 0) StrOrderFeedback.entry(b.waiting) else StrOrderFeedback.title, onClick = { open = true })
-  if (open) OrderFeedbackSheet(ctl, canManage, onClose = { open = false })
+  if (!b.visible) return QueueEntry.NONE
+  //  ۱۴۰۵/۰۸/۲۴: دکمهٔ سرِ صف به «…» ِ سربرگ رفت (صاحب‌کار: «صد تا هشدار») — همان برچسب با شمارِ منتظر
+  return QueueEntry(if (b.waiting > 0) StrOrderFeedback.entry(b.waiting) else StrOrderFeedback.title, { open = true }) {
+    if (open) OrderFeedbackSheet(ctl, canManage, onClose = { open = false })
+  }
 }
 
 @Composable

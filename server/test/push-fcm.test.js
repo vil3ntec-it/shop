@@ -196,10 +196,13 @@ test('FCM v1: JWT ِ امضاشده، یک توکنِ دسترسی، پیام ب
 
 /* ══ ۳) ثبتِ توکن از برنامه ═══════════════════════════════════════════ */
 
-test('/api/shop/push: پیش‌فرض خاموش؛ فقط همین عضو و دستگاه؛ یک توکنِ زنده برای هر دستگاه؛ پاک کردن فقط مالِ خودش', async () => {
+test('/api/shop/push: خاموشِ صریح ⇒ ۴۰۳؛ فقط همین عضو و دستگاه؛ یک توکنِ زنده برای هر دستگاه؛ پاک کردن فقط مالِ خودش', async () => {
   const a = await owner('ثبت');
   const b = await owner('دیگری');
   credentials(false);
+  //  از ۱۴۰۵/۰۸/۲۴ `shop.device_push` و `shop.order_notify` پیش‌فرض روشن‌اند (FLAGS-ON §۴۸) ⇒ «خاموش» صریح
+  await flag(a.shopId, 'shop.device_push', false);
+  await flag(a.shopId, 'shop.order_notify', false);
   let cfg = await h.get('/api/shop/push/config', { token: a.token });
   assert.equal(cfg.status, 200, JSON.stringify(cfg.body));
   assert.deepEqual(cfg.body, { enabled: false, server: { ready: false, fcm: false, apns: false }, device: { registered: false }, orderAlerts: false });

@@ -2,7 +2,8 @@
 /**
  * پرچم‌های پیش‌فرض‌روشنِ `orders.flagOf` (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲، خواستِ صاحب‌کار «کلیدهای کم‌خطر را روشن کن»).
  *
- *   - هر ۱۷ کلید بی ردیف ⇒ روشن (بیرون و درونِ تراکنش)؛ کاتالوگِ پنل (`KNOWN`) همان پیش‌فرض را نشان می‌دهد.
+ *   - هر ۲۱ کلید بی ردیف ⇒ روشن (بیرون و درونِ تراکنش)؛ کاتالوگِ پنل (`KNOWN`) همان پیش‌فرض را نشان می‌دهد — ۱۷ کلیدِ
+ *     نمایشیِ ۱۴۰۵/۰۸/۲۲ و چهار کلیدِ پایهٔ سفارش با تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۴ (FLAGS-ON §۴۸؛ آزمونِ کامل: `order-defaults-on.test.js`).
  *   - `false` ِ صریحِ دکان یا `all` ⇒ خاموش؛ `true` ِ دکان بر `false` ِ `all` جلو؛ مقدارِ نادرست ⇒ همان پیش‌فرضِ روشن.
  *   - «غیرفعال کردنِ سرویس» ِ `shop_holds` ⇒ خاموش (فقط همان دکان).
  *   - کلیدِ بیرون از فهرست همان قاعدهٔ پیشین: بی ردیف خاموش، فقط `true` روشن.
@@ -19,9 +20,11 @@ const LIST = [
   'shop.storefront.gallery', 'shop.storefront.stock_list', 'shop.storefront.address_extra', 'shop.storefront.map_pin',
   'shop.orders.refund_tracking', 'shop.orders.refund_receipt', 'shop.orders.presence', 'shop.orders.online_report',
   'shop.branches_report', 'shop.delivery_route', 'shop.delivery_map', 'shop.orders.start_alert', 'shop.orders.stuck_alert',
+  //  تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۴: همهٔ قابلیت‌های سفارش پیش‌فرض روشن
+  'shop.orders', 'shop.storefront', 'shop.order_notify', 'shop.device_push',
 ];
-//  بیرون از فهرست: پول، داده یا هزینه — همان پیش‌فرضِ خاموش
-const OFF = ['shop.orders', 'shop.storefront', 'shop.orders.refunds', 'shop.storefront.alerts', 'shop.customer_notify'];
+//  بیرون از فهرست: پول، داده یا هزینه — همان پیش‌فرضِ خاموش (`shop.orders`/`shop.storefront` از ۱۴۰۵/۰۸/۲۴ در فهرست‌اند)
+const OFF = ['shop.delivery', 'shop.stock_reserve', 'shop.orders.refunds', 'shop.storefront.alerts', 'shop.customer_notify', 'shop.orders.subscribers_only'];
 
 test.before(async () => { await h.start(); });
 test.after(async () => { await h.stop(); });
@@ -44,15 +47,15 @@ const hold = (shopId, key) => query(
 //  درونِ تراکنش (`run` ِ اتصالِ جاری) همان پاسخ
 const inTx = (shopId, key) => tx((c) => orders.flagOf(shopId, key, (sql, p) => c.query(sql, p)));
 
-test('فهرست: همان ۱۷ کلید، فقط‌خواندنی، و کاتالوگِ پنل همان پیش‌فرض را دارد', () => {
+test('فهرست: همان ۲۱ کلید، فقط‌خواندنی، و کاتالوگِ پنل همان پیش‌فرض را دارد', () => {
   assert.deepEqual([...DEFAULT_ON].sort(), [...LIST].sort());
-  assert.equal(DEFAULT_ON.size, 17);
+  assert.equal(DEFAULT_ON.size, 21);
   assert.deepEqual([...KEYS].sort(), [...LIST].sort());
   assert.ok(Object.isFrozen(KEYS) && Object.isFrozen(DEFAULT_ON));
-  assert.throws(() => DEFAULT_ON.add('shop.orders'), TypeError);
+  assert.throws(() => DEFAULT_ON.add('shop.delivery'), TypeError);
   assert.throws(() => DEFAULT_ON.delete('shop.storefront.filters'), TypeError);
   assert.throws(() => DEFAULT_ON.clear(), TypeError);
-  assert.ok(!DEFAULT_ON.has('shop.orders') && DEFAULT_ON.has('shop.orders.stuck_alert'));
+  assert.ok(!DEFAULT_ON.has('shop.delivery') && DEFAULT_ON.has('shop.orders.stuck_alert') && DEFAULT_ON.has('shop.orders'));
   const { KNOWN } = require('../src/routes/admin-flags');
   for (const key of LIST) {
     const k = KNOWN.find((x) => x.key === key);

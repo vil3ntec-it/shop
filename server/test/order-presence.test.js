@@ -47,6 +47,8 @@ async function shop(label, { presence = true, storefront = true } = {}) {
   //  پیش‌فرض‌روشن‌ها (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) `false` ِ صریح ⇒ شکلِ پاسخِ پیشین؛ نشانگر فقط با `presence`
   await h.defaultOnOff(o.shopId);
   await setFlag(o.shopId, 'shop.orders.presence', presence);
+  //  صریح در هر دو حال: از ۱۴۰۵/۰۸/۲۴ `shop.storefront` پیش‌فرض روشن است (FLAGS-ON §۴۸)
+  if (!storefront) await setFlag(o.shopId, 'shop.storefront', false);
   if (storefront) {
     await setFlag(o.shopId, 'shop.storefront', true);
     o.slug = `pr-${uniq()}`;
