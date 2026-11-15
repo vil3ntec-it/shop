@@ -4,10 +4,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -27,7 +25,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.heading
@@ -147,6 +144,7 @@ fun HistoryScreen(
   val ctx = RowCtx(
     d, book?.look, returnsV2, canCancel, actions, askCancel, today = book?.today.orEmpty(),
     onReturns = { returnSheet = true },
+    period = { PeriodDropdown(book, query) },
   ) { menuFor = it }
 
   V3Scaffold(
@@ -161,7 +159,8 @@ fun HistoryScreen(
     ),
     bottomReserve = bottomReserve,
     search = V3Search(query.search, { query.search = ir.vil3ntec.tohid.latinDigits(it) }, StrSale.historySearch, onScan = actions.scanReceipt),
-    chips = { PeriodBar(book, query) { filterSheet = true } },
+    //  ۶۵s: دوره در گوشهٔ کارتِ خلاصه (`ctx.period`)؛ زیرِ عنوان فقط تراشه‌های فیلترِ روشن
+    chips = if (query.filtered) ({ FilterChipsBar(query) { filterSheet = true } }) else null,
   ) { pad ->
     val padding = PaddingValues(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding() + 16.dp)
     when {
@@ -196,12 +195,16 @@ internal class RowCtx(
   val today: String = "",
   /** «برگشتِ کالا» ⇐ برگهٔ راه‌های برگشت (`ReturnStartSheet`) */
   val onReturns: () -> Unit = {},
+  /** ۶۵s: کادرِ کشوییِ دوره برای گوشهٔ کارتِ خلاصه */
+  val period: (@Composable () -> Unit)? = null,
   val onMenu: (String) -> Unit,
 )
 
 /**
  *  خلاصهٔ بالا: دورهٔ برگزیده (پیش‌فرض دورهٔ جاری) — مبلغ، شمار، و کارهای کوچکِ چاپ و بررسی زیرش (`V3Summary`، جای کادرِ
  *  گرادیانی). ۶۵h: «صندوق بسته است» وضعیت است، نه کار ⇒ از این‌جا به ردیفِ صندوقِ [PeriodResult] رفت (`HistoryResult.kt`).
+ *  ۶۵s: کادرِ کشوییِ دوره در گوشهٔ همین کارت و «نقد · نسیه · کارت» نمودارِ رنگیِ درونش (نه کارتِ جدای زیرش)؛ [PeriodResult]
+ *  (برگشت، خالص، قرضِ وصول‌شده، صندوق) جدا زیرش می‌ماند.
  */
 @Composable
 private fun Top(p: SalesPeriods.Period, title: String, ctx: RowCtx, reviews: Int, money: Boolean) {
@@ -211,11 +214,7 @@ private fun Top(p: SalesPeriods.Period, title: String, ctx: RowCtx, reviews: Int
     a.payReview?.takeIf { reviews > 0 }?.let { V3SummaryAction(StrPayStatus.reviewCount(plain(reviews)), Icons.Outlined.FactCheck, onClick = it) },
   )
   Column(Modifier.padding(top = 4.dp, bottom = 8.dp)) {
-    PeriodSummary(p, title, money, chips)
-    if (money) {
-      Spacer(Modifier.height(10.dp))
-      MoneySplit(p.totals)
-    }
+    PeriodSummary(p, title, money, chips, ctx.period)
   }
 }
 

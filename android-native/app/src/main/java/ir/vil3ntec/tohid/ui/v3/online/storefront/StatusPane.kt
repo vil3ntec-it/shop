@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.online.storefront
 
+import ir.vil3ntec.tohid.ui.theme.V3Section
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -76,6 +77,8 @@ fun StatusPane(
       value = PresenceModel.headline(st),
       caption = PresenceModel.sentence(st),
       note = PresenceModel.caption(st).takeIf { it.isNotBlank() },
+      collapseKey = "storefront/status",
+      section = V3Section.ORDERS,
     )
     V3Section(null) {
       if (st != null) {

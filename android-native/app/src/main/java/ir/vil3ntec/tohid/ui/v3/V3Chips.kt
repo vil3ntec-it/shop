@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,7 +32,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -118,18 +131,51 @@ fun V3AddChip(label: String, onClick: () -> Unit) {
   }
 }
 
-/** ردیفِ افقیِ تراشه‌ها با پیمایش (دسته‌ها، فیلترها) */
+/**
+ *  ردیفِ افقیِ تراشه‌ها با پیمایش (دسته‌ها، فیلترها). ۶۸c (صاحب‌کار: کادرِ «رسیدن:» نیمه‌بریده دیده می‌شد): هر لبه‌ای که پشتش
+ *  تراشهٔ دیگری هست نرم محو می‌شود ([v3EdgeFade]) — تراشهٔ نیمه‌پیدا دیگر «بریده» نیست، نشانِ «بیشتر هست» است.
+ */
 @Composable
 fun V3ChipRow(
   modifier: Modifier = Modifier,
   contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp),
   content: @Composable () -> Unit,
 ) {
+  val scroll = rememberScrollState()
   Row(
-    modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(contentPadding),
+    modifier.fillMaxWidth().v3EdgeFade(scroll).horizontalScroll(scroll).padding(contentPadding),
     horizontalArrangement = Arrangement.spacedBy(8.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) { content() }
+}
+
+/** پهنای محوِ لبهٔ ردیفِ پیمایشی */
+val V3_EDGE_FADE = 28.dp
+
+/**
+ *  محوِ نرمِ لبه‌هایی از ردیفِ پیمایشیِ افقی که پشتشان چیزی هست (آغاز وقتی پیمایش شده، پایان وقتی هنوز مانده) — در راست‌به‌چپ
+ *  آینه. فقط آلفا را کم می‌کند (لایهٔ جدا، `DstIn`)؛ رنگِ تازه‌ای نمی‌کشد.
+ */
+fun Modifier.v3EdgeFade(scroll: ScrollState, width: Dp = V3_EDGE_FADE): Modifier = composed {
+  val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+  this
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+      drawContent()
+      val w = width.toPx().coerceAtMost(size.width / 3f)
+      val startHidden = scroll.value > 0
+      val endHidden = scroll.value < scroll.maxValue
+      val leftHidden = if (rtl) endHidden else startHidden
+      val rightHidden = if (rtl) startHidden else endHidden
+      if (leftHidden) drawRect(
+        Brush.horizontalGradient(listOf(Color.Transparent, Color.Black), startX = 0f, endX = w),
+        size = Size(w, size.height), blendMode = BlendMode.DstIn,
+      )
+      if (rightHidden) drawRect(
+        Brush.horizontalGradient(listOf(Color.Black, Color.Transparent), startX = size.width - w, endX = size.width),
+        topLeft = Offset(size.width - w, 0f), size = Size(w, size.height), blendMode = BlendMode.DstIn,
+      )
+    }
 }
 
 /**

@@ -35,9 +35,9 @@ import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.ui.theme.Corner
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Colors
-import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
+import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
+import ir.vil3ntec.tohid.ui.theme.SectionColors
 import ir.vil3ntec.tohid.ui.theme.V3Pair
-import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.v3.V3Type
 
 /*
@@ -45,12 +45,12 @@ import ir.vil3ntec.tohid.ui.v3.V3Type
  *  همه‌جای صفحه همان است — ردیفِ فاکتور، خطِ «برگشت / خالص / قرضِ وصول‌شده» و سرخطِ روز. رنگ هرگز تنها نیست: کنارش
  *  همیشه واژه («نقد») یا آیکن (اسکناس) هست.
  *
- *    نقد            سبز        ⇐ پولِ دخل
- *    نسیه           کهربایی    ⇐ به حسابِ مشتری رفت (بدهی)
- *    کارت/حواله…    آبی        ⇐ غیرنقد (کارت، حواله، کیف پول، ترکیبی)
- *    برگشت و لغو    سرخ        ⇐ پولی که پس رفت یا فاکتوری که نیست
+ *    نقد            زمردی      ⇐ پولِ دخل
+ *    نسیه           زر         ⇐ به حسابِ مشتری رفت (بدهی)
+ *    کارت/حواله…    لاجوردی    ⇐ غیرنقد (کارت، حواله، کیف پول، ترکیبی)
+ *    برگشت و لغو    عقیقِ سرخ  ⇐ پولی که پس رفت یا فاکتوری که نیست
  *    خالص           خنثیِ پررنگ ⇐ فروش منهای برگشت
- *    قرضِ وصول‌شده  فیروزه‌ای  ⇐ پولِ قرض‌های پیشین — فروش نیست
+ *    قرضِ وصول‌شده  نفتی       ⇐ پولِ قرض‌های پیشین — فروش نیست
  *    اینترنتی       آرام        ⇐ پولِ دخل نیست
  */
 
@@ -67,18 +67,24 @@ fun moneyKindOf(state: SaleState, payGroup: String): MoneyKind = when {
 }
 
 /**
- *  رنگِ هر معنا — **تنها** جای رنگِ پولِ تاریخچه، از جفت‌های وضعیتِ تم (`ShopColors.status`، روشن و تیره، متن‌خوان روی کارت).
- *  ⚠️ نقطهٔ اتصال به توکن‌های رنگِ بخشِ `claude/e-rows-65s`: پس از ادغام فقط بدنهٔ همین تابع به آن پرونده اشاره می‌کند؛
- *  ردیف، خطِ نتیجه و سرخطِ روز چیزی جز این نمی‌خوانند.
+ *  رنگِ هر معنا — **تنها** جای رنگِ پولِ تاریخچه. ۶۵s: از همان منبعِ رنگِ بخش‌ها (`ui/theme/SectionColors.kt`، خانواده‌های پالت،
+ *  روز و شب، عدد روی تهِ‌رنگ ≥ ۴٫۵:۱). ۶۸c (پالتِ لوکس، بی صورتی): نقد = زمردی (همان «رسیدها»)، نسیه = زر، کارت/غیرنقد =
+ *  لاجوردی، برگشت و لغو = عقیقِ سرخِ قرض، قرضِ وصول‌شده = نفتی (جدا از نیلیِ کارتِ فروش — «فروش نیست»)؛ `fg` عددِ پررنگ و
+ *  `bg` تهِ‌رنگِ همان.
+ *  جفت‌های کنارِ هم در کوررنگی جدا (`SectionColors.MONEY_PAIRS`). ردیف، خطِ نتیجه، سرخطِ روز و نمودارِ کارتِ خلاصه چیزی جز این
+ *  نمی‌خوانند.
  */
-fun historyTone(c: PhoneV3Colors, kind: MoneyKind): V3Pair = when (kind) {
-  MoneyKind.CASH -> PhoneV3Roles.status(c, V3Status.DELIVERED)
-  MoneyKind.CREDIT -> PhoneV3Roles.status(c, V3Status.WARNING)
-  MoneyKind.CARD -> PhoneV3Roles.status(c, V3Status.IN_DELIVERY)
-  MoneyKind.RETURN, MoneyKind.CANCELLED -> PhoneV3Roles.status(c, V3Status.CANCELLED)
-  MoneyKind.DEBT_IN -> PhoneV3Roles.status(c, V3Status.PREPARING)
-  MoneyKind.NET -> V3Pair(fg = c.ink, bg = c.tile)
-  MoneyKind.ONLINE -> V3Pair(fg = c.inkMuted, bg = c.tile)
+fun historyTone(c: PhoneV3Colors, kind: MoneyKind): V3Pair {
+  fun of(h: PhoneV3Palette.Hue) = SectionColors.ofHue(h, c.source.isDark).let { V3Pair(fg = it.strong, bg = it.tint) }
+  return when (kind) {
+    MoneyKind.CASH -> of(PhoneV3Palette.Hue.MINT)
+    MoneyKind.CREDIT -> of(PhoneV3Palette.Hue.AMBER)
+    MoneyKind.CARD -> of(PhoneV3Palette.Hue.SKY)
+    MoneyKind.RETURN, MoneyKind.CANCELLED -> of(PhoneV3Palette.Hue.CORAL)
+    MoneyKind.DEBT_IN -> of(PhoneV3Palette.Hue.TEAL)
+    MoneyKind.NET -> V3Pair(fg = c.ink, bg = c.tile)
+    MoneyKind.ONLINE -> V3Pair(fg = c.inkMuted, bg = c.tile)
+  }
 }
 
 /** آیکنِ همراهِ هر رنگ — رنگ‌کورها و چاپِ سیاه‌وسفید هم بفهمند */

@@ -109,10 +109,11 @@ fun V3IconTile(icon: ImageVector, hue: V3Hue? = null, danger: Boolean = false, s
 }
 
 /**
- *  نمای ردیف: `LIST` ردیفِ داده (کالا، فاکتور، قرض‌دار — همان پیشین)؛ `NAV` ردیفِ ناوبری و تنظیمات (`V3NavRow`) —
- *  همان «بیشتر» که صاحب‌کار پسندید (۶۵r).
+ *  نمای ردیف: `LIST` ردیفِ آزادِ برگه‌ها و کارها (همان پیشین)؛ `NAV` ردیفِ ناوبری و تنظیمات (`V3NavRow`) —
+ *  همان «بیشتر» که صاحب‌کار پسندید (۶۵r)؛ `DATA` ردیفِ فهرستِ داده (`V3DataRow`، ۶۸c): کاشیِ همیشگی، عنوانِ یک‌خطیِ ۱۶،
+ *  خطِ دومِ یک‌خطیِ ۱۳ و خطِ مبلغ، با فاصلهٔ آرامِ ۱۲.
  */
-enum class V3RowLook { LIST, NAV }
+enum class V3RowLook { LIST, NAV, DATA }
 
 /**
  *  نمای پیش‌فرضِ ردیف‌های یک صفحه: قابِ تنظیمات (`SettingsPageFrame`) `NAV` می‌گذارد تا **هر** ردیفِ درونِ صفحه‌های
@@ -256,11 +257,19 @@ fun V3ListRow(
 ) {
   val c = PhoneV3.colors
   val haptic = LocalHapticFeedback.current
-  val nav = (look ?: LocalV3RowLook.current) == V3RowLook.NAV
-  //  ردیفِ ناوبری آیکنِ بی‌کاشی ندارد (۶۵r)؛ رنگِ نگفته ⇐ رنگِ بخشِ صفحه
-  val tiled = icon != null && (tile || nav)
+  val shownLook = look ?: LocalV3RowLook.current
+  val nav = shownLook == V3RowLook.NAV
+  //  ردیفِ داده (۶۸c): همان اندازه‌های «بیشتر» با سه خطِ کالبد — `V3DataRow`
+  val data = shownLook == V3RowLook.DATA
+  //  ردیفِ ناوبری و داده آیکنِ بی‌کاشی ندارد (۶۵r)؛ رنگِ نگفته ⇐ رنگِ بخشِ صفحه
+  val tiled = icon != null && (tile || nav || data)
   val tileHue = hue ?: if (nav) LocalV3RowHue.current else null
-  val minH = if (nav) maxOf(minHeight, V3NavRowSpec.MIN_HEIGHT) else minHeight
+  val minH = when {
+    nav -> maxOf(minHeight, V3NavRowSpec.MIN_HEIGHT)
+    data -> maxOf(minHeight, V3DataRowSpec.MIN_HEIGHT)
+    else -> minHeight
+  }
+  val padV = if (data) V3DataRowSpec.PAD_V else V3NavRowSpec.PAD_V
   val startPad = when {
     tile && !nav || leading != null || selected != null || tiled -> V3NavRowSpec.PAD_START
     nav -> V3NavRowSpec.PAD_START_PLAIN
@@ -277,8 +286,8 @@ fun V3ListRow(
           else Modifier,
         )
         .semantics { if (selected != null) this.selected = selected }
-        .then(if (nav) Modifier.testTag(V3NavRowSpec.ROW_TAG) else Modifier)
-        .padding(start = startPad, end = V3NavRowSpec.PAD_END, top = V3NavRowSpec.PAD_V, bottom = V3NavRowSpec.PAD_V),
+        .then(if (nav) Modifier.testTag(V3NavRowSpec.ROW_TAG) else if (data) Modifier.testTag(V3DataRowSpec.ROW_TAG) else Modifier)
+        .padding(start = startPad, end = V3NavRowSpec.PAD_END, top = padV, bottom = padV),
       verticalAlignment = Alignment.CenterVertically,
     ) {
       AnimatedVisibility(selected != null, enter = expandHorizontally() + fadeIn(), exit = shrinkHorizontally() + fadeOut()) {
@@ -296,14 +305,14 @@ fun V3ListRow(
         }
       }
       Column(Modifier.weight(1f)) {
-        Text(title, style = if (nav) V3Type.rowTitle else V3Type.body, color = if (danger) c.negative else c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(title, style = if (nav || data) V3Type.rowTitle else V3Type.body, color = if (danger) c.negative else c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (subtitle != null) {
-          //  ناوبری: راهنما همیشه یک خط (۶۵r — «هرگز دو و سه خط»)
+          //  ناوبری و داده: راهنما/خطِ دوم همیشه یک خط (۶۵r، ۶۸c — «هرگز دو و سه خط»)
           Text(
             subtitle,
-            style = if (nav) V3Type.rowHelp else V3Type.footnote,
+            style = if (nav || data) V3Type.rowHelp else V3Type.footnote,
             color = c.inkMuted,
-            maxLines = if (nav) 1 else subtitleLines,
+            maxLines = if (nav || data) 1 else subtitleLines,
             overflow = TextOverflow.Ellipsis,
           )
         }
@@ -317,7 +326,7 @@ fun V3ListRow(
       if (trailing != null) { Spacer(Modifier.width(8.dp)); trailing() }
       if (onClick != null && chevron && trailing == null && selected == null) {
         Spacer(Modifier.width(4.dp))
-        V3Chevron(if (tile || nav) c.chevron else c.icon)
+        V3Chevron(if (tile || nav || data) c.chevron else c.icon)
       }
     }
   }

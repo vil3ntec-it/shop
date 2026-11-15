@@ -16,16 +16,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.LocalOffer
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -48,6 +47,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -55,7 +55,6 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrFields
 import ir.vil3ntec.tohid.core.i18n.StrGrid
-import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.core.i18n.StrInvoices
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrLine
@@ -78,13 +77,7 @@ import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.PromoLive
 import ir.vil3ntec.tohid.ui.components.common.BulkAction
 import ir.vil3ntec.tohid.ui.components.common.BulkActionBar
-import ir.vil3ntec.tohid.ui.components.common.PillTone
 import ir.vil3ntec.tohid.ui.components.common.ScreenKind
-import ir.vil3ntec.tohid.ui.components.common.SegmentTab
-import ir.vil3ntec.tohid.ui.components.common.SegmentedTabs
-import ir.vil3ntec.tohid.ui.components.common.Metric
-import ir.vil3ntec.tohid.ui.components.common.MetricRows
-import ir.vil3ntec.tohid.ui.components.common.StatusPill
 import ir.vil3ntec.tohid.ui.components.common.TableToolbar
 import ir.vil3ntec.tohid.ui.components.common.ViewMode
 import ir.vil3ntec.tohid.ui.components.common.rememberViewMode
@@ -199,16 +192,27 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
         }
         Spacer(Modifier.height(Space.sm))
       }
-      //  ۶۳w (صاحب‌کار: «چهار کادرِ بزرگ نه»): یک فهرستِ فشرده؛ «فعال» و «همه» همان پالایه را می‌زنند
+      //  ۶۵s (صاحب‌کار: سربرگ وسط، تاشو و به رنگِ بخش؛ کادرِ کشویی درونِ کارت): خلاصهٔ بنفشِ تخفیف‌ها — شمارِ فعال درشت،
+      //  «با کد · زمان‌دار · همه» زیرش و پالایهٔ «همه / فعال / …» (`V3Dropdown`) در گوشهٔ همان کارت (جای چهار عددِ ۶۳w)
       item(key = "stats") {
         val active = snap.rules.count { PromoText.status(it, today) == PromoText.Status.ACTIVE }
-        MetricRows(
-          listOf(
-            Metric(StrSettings.active, active.toString(), StrHome.justNow, selected = tab == PromoText.Tab.ACTIVE, icon = Icons.Filled.CheckCircle, onClick = { tab = PromoText.Tab.ACTIVE }),
-            Metric(StrPromoPages.withCode, snap.rules.count { it.code.isNotEmpty() }.toString(), StrSale.promoCode, icon = Icons.Filled.Sell),
-            Metric(StrPromoPages.timed, snap.rules.count { PromoText.windowText(it) != ir.vil3ntec.tohid.core.i18n.StrMarketPages.always }.toString(), StrPromoPages.hourOrDay, icon = Icons.Filled.Schedule),
-            Metric(Str.all, snap.rules.size.toString(), StrPromoPages.ruleWord, selected = tab == PromoText.Tab.ALL, icon = Icons.Filled.LocalOffer, onClick = { tab = PromoText.Tab.ALL }),
-          ),
+        val coded = snap.rules.count { it.code.isNotEmpty() }
+        val timed = snap.rules.count { PromoText.windowText(it) != ir.vil3ntec.tohid.core.i18n.StrMarketPages.always }
+        ir.vil3ntec.tohid.ui.v3.V3Summary(
+          label = StrKit.promos + " · " + StrSettings.active,
+          value = active.toString(),
+          caption = "$coded ${StrPromoPages.withCode} · $timed ${StrPromoPages.timed} · ${snap.rules.size} ${StrPromoPages.ruleWord}",
+          collapseKey = "promos",
+          section = ir.vil3ntec.tohid.ui.theme.V3Section.PROMOS,
+          corner = {
+            ir.vil3ntec.tohid.ui.v3.V3Dropdown(
+              value = tab.label,
+              choices = PromoText.Tab.entries.map { ir.vil3ntec.tohid.ui.v3.V3Choice(it.name, it.label) },
+              selected = tab.name,
+              onSelect = { k -> PromoText.Tab.entries.firstOrNull { it.name == k }?.let { tab = it } },
+              label = ir.vil3ntec.tohid.core.i18n.StrLook.show,
+            )
+          },
         )
         Spacer(Modifier.height(Space.sm))
       }
@@ -218,16 +222,6 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
           onQuery = { query = it },
           placeholder = StrPromoPages.searchNameCode,
           viewMode = view,
-          //  پالایهٔ «همه / فعال / …» یک کادرِ کشویی (`V3Dropdown`)، نه کلیدِ پهن
-          tabs = {
-            ir.vil3ntec.tohid.ui.v3.V3Dropdown(
-              value = tab.label,
-              choices = PromoText.Tab.entries.map { ir.vil3ntec.tohid.ui.v3.V3Choice(it.name, it.label) },
-              selected = tab.name,
-              onSelect = { k -> PromoText.Tab.entries.firstOrNull { it.name == k }?.let { tab = it } },
-              label = ir.vil3ntec.tohid.core.i18n.StrLook.show,
-            )
-          },
         )
         Spacer(Modifier.height(Space.sm))
       }
@@ -251,13 +245,15 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
           onOpen = { if (snap.manage) editing = it },
           onMenu = { if (snap.manage) editing = it },
         )
-        else -> items(shown, key = { it.id }) { r ->
+        //  ۶۸c: یک فهرستِ پیوسته با خطِ مویی (کالبدِ `V3DataRow`)، نه کارت‌های جدا با دو دکمه
+        else -> itemsIndexed(shown, key = { _, r -> r.id }) { i, r ->
           PromoCard(
             r, d, today, snap.manage,
             onEdit = { editing = r },
             onDelete = { deleting = listOf(r) },
+            first = i == 0,
+            last = i == shown.lastIndex,
           )
-          Spacer(Modifier.height(Space.xs))
         }
       }
       item(key = "foot") { Spacer(Modifier.height(96.dp)) }
@@ -321,6 +317,11 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
 /** شناسهٔ قاعدهٔ تازه — ULID، همان `newId()`ِ صفحه‌ها */
 private fun newPromoId(): String = "prm_" + ir.vil3ntec.tohid.sync.v1.Ulid.next().lowercase()
 
+/**
+ *  ردیفِ یک قاعدهٔ تخفیف (کالبدِ `V3DataRow`، ۶۸c): کاشیِ برچسب، نام، «نوع · کالاها · زمان · روی هم»، و خطِ مقدارِ «۱۰٪ • فعال •
+ *  کد SALE» — وضعیت واژهٔ آرام، نه قرصِ رنگی. زدن ⇐ ویرایش (همهٔ تنظیم‌ها)؛ «حذف» با کشیدن (و کارِ صفحه‌خوان)، هر دو فقط برای
+ *  مدیر — همان کارهای پیشین.
+ */
 @Composable
 private fun PromoCard(
   r: PromoCore.Rule,
@@ -329,38 +330,33 @@ private fun PromoCard(
   canEdit: Boolean,
   onEdit: () -> Unit,
   onDelete: () -> Unit,
+  first: Boolean = true,
+  last: Boolean = true,
 ) {
-  val c = Shop.colors
+  val c = ir.vil3ntec.tohid.ui.theme.PhoneV3.colors
   val st = PromoText.status(r, today)
-  Column(
-    Modifier
-      .fillMaxWidth()
-      .background(c.surfaceSolid, Shape.card)
-      .then(if (canEdit) Modifier.clickable(onClickLabel = StrPromoPages.editRule, onClick = onEdit) else Modifier)
-      .padding(Space.md),
-  ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      Text(r.name, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
-        color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-      StatusPill(st.label, if (st == PromoText.Status.ACTIVE) PillTone.SUCCESS else if (st == PromoText.Status.SCHEDULED) PillTone.WARNING else PillTone.NEUTRAL)
-      if (r.code.isNotEmpty()) {
-        Spacer(Modifier.width(Space.xxs))
-        StatusPill(r.code, PillTone.NEUTRAL)
-      }
-    }
-    Spacer(Modifier.height(Space.xxs))
-    Text(PromoText.valueText(r), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = c.primary)
-    Spacer(Modifier.height(Space.xxs))
-    Text(
-      listOf(PromoText.kindLabel(r.kind), PromoText.scopeText(r, d), PromoText.windowText(r), PromoText.stackLabel(r.stack)).joinToString(" · "),
-      style = MaterialTheme.typography.bodySmall, color = c.muted,
+  val radius = ir.vil3ntec.tohid.ui.theme.PhoneV3.groupRadius
+  val shape = androidx.compose.foundation.shape.RoundedCornerShape(
+    topStart = if (first) radius else 0.dp, topEnd = if (first) radius else 0.dp,
+    bottomStart = if (last) radius else 0.dp, bottomEnd = if (last) radius else 0.dp,
+  )
+  Column(Modifier.fillMaxWidth().clip(shape).background(c.card)) {
+    ir.vil3ntec.tohid.ui.v3.V3DataRow(
+      title = r.name,
+      secondary = listOf(PromoText.kindLabel(r.kind), PromoText.scopeText(r, d), PromoText.windowText(r), PromoText.stackLabel(r.stack)).joinToString(" · "),
+      meta = ir.vil3ntec.tohid.ui.v3.V3RowMeta(
+        PromoText.valueText(r),
+        ir.vil3ntec.tohid.ui.v3.V3RowStatus(st.label),
+        r.code.takeIf { it.isNotEmpty() }?.let { ir.vil3ntec.tohid.ui.v3.V3RowStatus(it) },
+      ),
+      icon = androidx.compose.material.icons.Icons.Outlined.LocalOffer,
+      hue = ir.vil3ntec.tohid.ui.theme.V3Section.PROMOS.hue,
+      endActions = if (canEdit) listOf(
+        ir.vil3ntec.tohid.ui.v3.V3SwipeAction(androidx.compose.material.icons.Icons.Outlined.DeleteOutline, StrMoney.delete, ir.vil3ntec.tohid.ui.theme.V3ButtonKind.DANGER, onDelete),
+      ) else emptyList(),
+      onClick = if (canEdit) onEdit else null,
     )
-    if (canEdit) {
-      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-        TextButton(onClick = onEdit) { Text(StrMoney.edit) }
-        TextButton(onClick = onDelete) { Text(StrMoney.delete, color = c.danger) }
-      }
-    }
+    if (!last) ir.vil3ntec.tohid.ui.v3.V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3DataRowSpec.DIVIDER_START)
   }
 }
 

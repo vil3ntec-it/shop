@@ -1,11 +1,11 @@
 package ir.vil3ntec.tohid.ui.v3.stock
 
+import ir.vil3ntec.tohid.ui.theme.V3Section
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,56 +37,51 @@ import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
-import ir.vil3ntec.tohid.ui.theme.V3Space
 import ir.vil3ntec.tohid.ui.theme.V3Tone
-import ir.vil3ntec.tohid.ui.v3.V3Card
-import ir.vil3ntec.tohid.ui.v3.V3ListRow
+import ir.vil3ntec.tohid.ui.v3.V3DataRow
+import ir.vil3ntec.tohid.ui.v3.V3DataRowSpec
+import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3ProductThumb
-import ir.vil3ntec.tohid.ui.v3.V3QuietStatus
+import ir.vil3ntec.tohid.ui.v3.V3RowMeta
 import ir.vil3ntec.tohid.ui.v3.V3RowStatus
 import ir.vil3ntec.tohid.ui.v3.V3RowTone
+import ir.vil3ntec.tohid.ui.v3.V3Summary
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.rememberCountUp
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 
 /**
- *  کارتِ آمارِ انبار (یک کارتِ برجستهٔ r16): سه خانهٔ کوچک — قلم، کارتن، واحد — و
- *  ارزشِ تقریبی درشت زیرشان، همه با شمارنده؛ و دو تراشهٔ هشدار (تمام‌شده/کم) که
- *  فهرست را روی همان فیلتر می‌برند. عددها همه از `WarehouseEngine.summary`.
+ *  خلاصهٔ انبار (۶۵s، همان `V3Summary` ِ هر بخش — وسط‌چین و تاشو، کلیدِ `stock`): ارزشِ تقریبی درشت، زیرش سه خانهٔ
+ *  کوچک — قلم، کارتن، واحد — با شمارنده؛ و دو تراشهٔ هشدار (تمام‌شده/کم) که فهرست را روی همان فیلتر می‌برند.
+ *  عددها همه از `WarehouseEngine.summary`؛ بسته ⇒ یک خطِ «ارزشِ تقریبی · …».
  */
 @Composable
 internal fun StockStatsCard(summary: WarehouseEngine.Summary, onFilter: (StockFilter) -> Unit, modifier: Modifier = Modifier) {
-  val c = PhoneV3.colors
-  V3Card(modifier, radius = V3Space.featuredRadius, padding = PaddingValues(16.dp)) {
-    Row(Modifier.fillMaxWidth()) {
-      StatCell(StrStock.statItems, summary.products.toDouble(), { money(it) }, Modifier.weight(1f))
-      CellDivider()
-      StatCell(StrStock.statCartons, summary.cartons, { qty(it) }, Modifier.weight(1f))
-      CellDivider()
-      StatCell(StrStock.statUnits, summary.units, { qty(it) }, Modifier.weight(1f))
-    }
-    Spacer(Modifier.height(14.dp))
-    Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))
-    Spacer(Modifier.height(12.dp))
-    val value = rememberCountUp(summary.value)
-    Text(StrStock.statValue, style = V3Type.footnote, color = c.inkMuted)
-    Text(
-      "${money(value)} ؋",
-      style = V3Type.largeTitle,
-      color = c.ink,
-      maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
-      modifier = Modifier.semantics { contentDescription = "${StrStock.statValue}: ${money(summary.value)} ؋" },
-    )
-    if (summary.out > 0 || summary.low > 0) {
+  V3Summary(
+    label = StrStock.statValue,
+    value = "${money(summary.value)} ؋",
+    modifier = modifier,
+    collapseKey = "stock",
+    section = V3Section.STOCK,
+    extra = {
       Spacer(Modifier.height(12.dp))
-      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (summary.out > 0) DraftToneChip(V3Tone.ERROR, Icons.Outlined.RemoveShoppingCart, StrStock.alertOut(money(summary.out.toDouble()))) { onFilter(StockFilter.OUT) }
-        if (summary.low > 0) DraftToneChip(V3Tone.WARNING, Icons.AutoMirrored.Outlined.TrendingDown, StrStock.alertLow(money(summary.low.toDouble()))) { onFilter(StockFilter.LOW) }
+      Row(Modifier.fillMaxWidth()) {
+        StatCell(StrStock.statItems, summary.products.toDouble(), { money(it) }, Modifier.weight(1f))
+        CellDivider()
+        StatCell(StrStock.statCartons, summary.cartons, { qty(it) }, Modifier.weight(1f))
+        CellDivider()
+        StatCell(StrStock.statUnits, summary.units, { qty(it) }, Modifier.weight(1f))
       }
-    }
-  }
+      if (summary.out > 0 || summary.low > 0) {
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          if (summary.out > 0) DraftToneChip(V3Tone.ERROR, Icons.Outlined.RemoveShoppingCart, StrStock.alertOut(money(summary.out.toDouble()))) { onFilter(StockFilter.OUT) }
+          if (summary.low > 0) DraftToneChip(V3Tone.WARNING, Icons.AutoMirrored.Outlined.TrendingDown, StrStock.alertLow(money(summary.low.toDouble()))) { onFilter(StockFilter.LOW) }
+        }
+      }
+    },
+  )
 }
 
 @Composable
@@ -154,8 +149,9 @@ internal fun stockPill(row: StockRowUi): V3RowStatus? = when {
 }
 
 /**
- *  ردیفِ ۶۸dpِ انبار: عکس یا کاشیِ حرف، نام، زیرعنوان، و در پایان موجودیِ درشت با
- *  واحد و قرصِ وضعیت. کشیدن به پایان «ورود» (برند)، به آغاز «اصلاح» (خنثی).
+ *  ردیفِ انبار (کالبدِ `V3DataRow`، ۶۸c): عکس یا کاشیِ حرف، نام، خطِ دومِ یک‌خطی (کارتن، قیمت، «چند روز کافی است»، انقضا)
+ *  و خطِ مبلغِ «۱۲ کیلو • کم» — موجودی به رنگِ نوشته، وضعیت واژهٔ آرام (فقط منقضی/تمام‌شده رنگِ خطر). ردیف‌ها یک فهرستِ پیوسته
+ *  با خطِ مویی‌اند ([first]/[last] گوشه‌ها). کشیدن به پایان «ورود» (برند)، به آغاز «اصلاح» (خنثی).
  */
 @Composable
 internal fun StockRowItem(
@@ -165,34 +161,26 @@ internal fun StockRowItem(
   onEntry: () -> Unit,
   onAdjust: () -> Unit,
   modifier: Modifier = Modifier,
+  first: Boolean = true,
+  last: Boolean = true,
 ) {
   val p = row.product
+  val c = PhoneV3.colors
+  val r = PhoneV3.groupRadius
+  val shape = RoundedCornerShape(topStart = if (first) r else 0.dp, topEnd = if (first) r else 0.dp, bottomStart = if (last) r else 0.dp, bottomEnd = if (last) r else 0.dp)
   //  کامپیوتر (دو ستون): ردیفِ بازِ کنار با مرزِ برند — رنگ تنها نیست، مرز هم هست
-  val ring = if (selected) Modifier.border(2.dp, PhoneV3Roles.focus(PhoneV3.colors), RoundedCornerShape(V3Space.cardRadius)) else Modifier
-  V3Card(modifier.then(ring), radius = V3Space.cardRadius, padding = PaddingValues(0.dp)) {
-    V3ListRow(
+  val ring = if (selected) Modifier.border(2.dp, PhoneV3Roles.focus(c), shape) else Modifier
+  Column(modifier.clip(shape).background(c.card).then(ring)) {
+    V3DataRow(
       title = p.name,
-      subtitle = stockRowSubtitle(row),
+      secondary = stockRowSubtitle(row),
+      meta = V3RowMeta(listOf(qty(row.stock), p.unit).filter { it.isNotBlank() }.joinToString(" "), stockPill(row)),
       leading = { V3ProductThumb(p.id, p.name, size = 44.dp) },
-      trailing = { StockQty(row) },
-      minHeight = 68.dp,
       startActions = listOf(V3SwipeAction(Icons.Outlined.MoveToInbox, StrStock.swipeEntry, V3ButtonKind.PRIMARY, onEntry)),
       endActions = listOf(V3SwipeAction(Icons.Outlined.Tune, StrStock.swipeAdjust, V3ButtonKind.NEUTRAL, onAdjust)),
       onClick = onOpen,
     )
+    if (!last) V3Divider(start = V3DataRowSpec.PAD_START + 44.dp + V3DataRowSpec.GAP)
   }
 }
 
-@Composable
-private fun StockQty(row: StockRowUi) {
-  val c = PhoneV3.colors
-  Column(horizontalAlignment = Alignment.End) {
-    Text(
-      listOf(qty(row.stock), row.product.unit).filter { it.isNotBlank() }.joinToString(" "),
-      style = V3Type.headline,
-      color = c.ink,
-      maxLines = 1,
-    )
-    stockPill(row)?.let { V3QuietStatus(it) }
-  }
-}

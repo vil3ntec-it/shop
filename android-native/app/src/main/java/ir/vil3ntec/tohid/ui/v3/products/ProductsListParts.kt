@@ -1,12 +1,12 @@
 package ir.vil3ntec.tohid.ui.v3.products
 
+import ir.vil3ntec.tohid.ui.theme.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Collapse
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,7 +23,6 @@ import androidx.compose.material.icons.outlined.MoveToInbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -35,10 +34,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -52,18 +49,17 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Space
 import ir.vil3ntec.tohid.ui.v3.V3Divider
-import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3ProductThumb
 import ir.vil3ntec.tohid.ui.v3.V3QuietStatus
+import ir.vil3ntec.tohid.ui.v3.V3Summary
 import ir.vil3ntec.tohid.ui.v3.V3RowStatus
 import ir.vil3ntec.tohid.ui.v3.V3RowTone
 import ir.vil3ntec.tohid.ui.v3.V3_ROW_DOT
+import ir.vil3ntec.tohid.ui.v3.V3DataRow
+import ir.vil3ntec.tohid.ui.v3.V3RowMeta
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
 import ir.vil3ntec.tohid.ui.v3.V3Type
-import ir.vil3ntec.tohid.ui.v3.rememberCountUp
 import ir.vil3ntec.tohid.ui.v3.V3Card
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.fillMaxHeight
 
 /**
  *  وضعیتِ آرامِ ردیف (سادهٔ e-rows-63d، به‌جای قرص): «کم» کهربایی، «تمام‌شده» قرمز، «غیرفعال» خاکستری؛ عادی ⇒ هیچ.
@@ -92,9 +88,9 @@ internal class RowSwipes(val onEntry: () -> Unit, val onEdit: () -> Unit, val on
 }
 
 /**
- *  ردیفِ فهرست (۶۴dp): عکسِ ۴۸ یا کاشیِ حرف، نام، «دسته · موجودی»، قیمتِ فروشِ
- *  پررنگ و نشانِ وضعیت فقط وقتی «کم»، «تمام‌شده» یا «غیرفعال» است. در حالتِ انتخاب
- *  دایرهٔ تیک می‌آید و کشیدن خاموش است. `flash` = کالای تازه‌ثبت (۱٫۲ ثانیه درخشش).
+ *  ردیفِ فهرست (کالبدِ `V3DataRow`، ۶۸c): عکسِ ۴۸ یا کاشیِ حرف، نام، «دسته · موجودی»، و خطِ مبلغِ «۱۲۰ ؋ • کم» — وضعیت
+ *  فقط وقتی «کم»، «تمام‌شده» یا «غیرفعال» است و به واژهٔ آرام (فقط «تمام‌شده» رنگِ خطر). در حالتِ انتخاب دایرهٔ تیک می‌آید و
+ *  کشیدن خاموش است. `flash` = کالای تازه‌ثبت (۱٫۲ ثانیه درخشش).
  */
 @Composable
 internal fun ProductRow(
@@ -107,25 +103,16 @@ internal fun ProductRow(
   onClick: () -> Unit,
   onLongClick: (() -> Unit)?,
 ) {
-  val c = PhoneV3.colors
   Box(Modifier.draftFlash(flash)) {
-    V3ListRow(
+    V3DataRow(
       title = p.name,
-      subtitle = stockLine(p, stock),
-      subtitleLines = 1,
-      minHeight = 64.dp,
+      secondary = stockLine(p, stock),
+      meta = V3RowMeta("${money(p.salePrice)} ؋", badgeStatus(badge), struck = false),
       leading = {
         Box(Modifier.graphicsLayer { alpha = if (p.active) 1f else 0.55f }) {
           V3ProductThumb(p.id, p.name, size = 48.dp, version = ProductPhotos.version.intValue)
         }
       },
-      trailing = {
-        Column(horizontalAlignment = Alignment.End) {
-          Text("${money(p.salePrice)} ؋", style = V3Type.callout.copy(fontWeight = FontWeight.Bold), color = if (p.active) c.ink else c.inkMuted, maxLines = 1)
-          badgeStatus(badge)?.let { V3QuietStatus(it) }
-        }
-      },
-      chevron = false,
       startActions = swipes?.start.orEmpty(),
       endActions = swipes?.end.orEmpty(),
       selected = selected,
@@ -189,34 +176,21 @@ private fun CheckDot(on: Boolean) {
   ) { if (on) Icon(Icons.Outlined.Check, contentDescription = null, tint = pair.fg, modifier = Modifier.size(16.dp)) }
 }
 
-/** کارتِ آمارِ بالای فهرست: دو خانه با شمارنده — «قلم کالا» و «سود بالقوه» */
+/**
+ *  خلاصهٔ بالای فهرستِ کالاها (۶۵s، همان `V3Summary` ِ هر بخش — وسط‌چین و تاشو، کلیدِ `products`): «سود بالقوه» درشت و
+ *  زیرش «اگر همه فروخته شود · ۲۴۰ قلم کالا»؛ بسته ⇒ یک خطِ «سود بالقوه · …».
+ */
 @Composable
 internal fun ProductsStatsCard(stats: ProductsListModel.Stats, modifier: Modifier = Modifier) {
-  val c = PhoneV3.colors
-  val items = rememberCountUp(stats.items.toDouble())
-  val profit = rememberCountUp(stats.potentialProfit)
-  V3Card(modifier, radius = V3Space.featuredRadius, padding = androidx.compose.foundation.layout.PaddingValues(vertical = 14.dp)) {
-    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
-      StatCell(StrProducts.statItems, items.toLong().toString(), null, Modifier.weight(0.8f))
-      Box(Modifier.width(1.dp).fillMaxHeight().background(c.hairline))
-      //  عددِ میلیاردی در خانه جا شود: اندازهٔ نوشته از عددِ پایانی (نه از شمارنده) تا وسطِ شمارش نپرد
-      val long = money(stats.potentialProfit).length > LONG_FIGURE
-      StatCell(StrProducts.statPotential, "${money(profit)} ؋", StrProducts.statPotentialCaption, Modifier.weight(1.2f), small = long)
-    }
-  }
+  V3Summary(
+    label = StrProducts.statPotential,
+    value = "${money(stats.potentialProfit)} ؋",
+    modifier = modifier,
+    caption = StrProducts.statPotentialCaption + " · " + money(stats.items.toDouble()) + " " + StrProducts.statItems,
+    collapseKey = "products",
+    section = V3Section.STOCK,
+  )
 }
-
-@Composable
-private fun StatCell(label: String, value: String, caption: String?, modifier: Modifier, small: Boolean = false) {
-  val c = PhoneV3.colors
-  Column(modifier.padding(horizontal = 16.dp)) {
-    Text(label, style = V3Type.footnote, color = c.inkMuted, maxLines = 1)
-    Spacer(Modifier.height(4.dp))
-    Text(value, style = if (small) V3Type.title else V3Type.figure, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    if (caption != null) Text(caption, style = V3Type.caption, color = c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-  }
-}
-
 
 /**
  *  یک تکه از کارتِ گروهیِ فهرستِ تنبل: ردیفِ اول گوشه‌های بالا و ردیفِ آخر گوشه‌های
@@ -247,5 +221,3 @@ internal fun Modifier.draftGroupItem(first: Boolean, last: Boolean, radius: Dp =
 @Composable
 internal fun RowDivider() = V3Divider(start = 72.dp)
 
-/** بیش از این نویسه، عددِ آمار با نوشتهٔ کوچک‌تر */
-private const val LONG_FIGURE = 9

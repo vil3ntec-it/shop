@@ -26,15 +26,19 @@ import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.Stable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
@@ -146,8 +150,11 @@ fun V3Scaffold(
   chips: (@Composable () -> Unit)? = null,
   notice: (@Composable () -> Unit)? = LocalV3Notice.current,
   bottomReserve: Dp = 0.dp,
-  /** false ⇒ فقط عنوانِ کوچکِ وسط (فرم‌ها و صفحه‌های کوتاه) */
-  largeTitle: Boolean = true,
+  /**
+   *  true ⇒ عنوانِ درشتِ زیرِ نوار که با پیمایش جمع می‌شود. پیش‌فرض از ۶۵s `false` (صاحب‌کار: عنوان بالا در نوار، وسطِ
+   *  برگشت و راهنما — مثلِ «قرض‌داران»)؛ بخشی که عنوانِ درشت می‌خواهد آن را با دلیل روشن می‌کند.
+   */
+  largeTitle: Boolean = false,
   state: V3HeaderState = rememberV3HeaderState(),
   fab: (@Composable BoxScope.(expanded: Boolean) -> Unit)? = null,
   bottomBar: (@Composable () -> Unit)? = null,
@@ -196,23 +203,37 @@ fun V3Scaffold(
   val guide = LocalV3Guide.current
   var guideOpen by remember { mutableStateOf(false) }
   val find = if (thumb && search != null && !navSearch) listOf(V3Action(Icons.Outlined.Search, StrKit.search, onClick = finder.open)) else emptyList()
-  val split = V3HeaderActions.split(find + actions, overflow)
+  //  ۶۵s: عنوانِ وسطِ نوار هرگز زیرِ آیکن نمی‌رود — از پهنای پنجره و پهنای خودِ عنوان، دست‌بالا دو کار (راهنما هم یک کار است،
+  //  واپسین) پیدا و بقیه در «…» (`V3HeaderActions.visibleFor`)؛ راهنمای رفته به «…» نخستین ردیفِ آن است
+  val guideAction = guide?.let { listOf(V3Action(Icons.AutoMirrored.Outlined.HelpOutline, StrKit.guide) { guideOpen = true }) }.orEmpty()
+  val candidates = find + actions + guideAction
+  val measurer = rememberTextMeasurer()
+  val titleStyle = V3Type.headline
+  val titlePx = remember(title, titleStyle, measurer) { measurer.measure(title, titleStyle, maxLines = 1).size.width.toFloat() }
+  val barPx = with(density) { (LocalConfiguration.current.screenWidthDp.dp - 32.dp).toPx() }
+  val iconPx = with(density) { 44.dp.toPx() }
+  val gapPx = with(density) { 8.dp.toPx() }
+  val visible = V3HeaderActions.visibleFor(candidates.size, overflow.isNotEmpty()) { icons ->
+    val row = if (icons == 0) 0f else icons * iconPx + (icons - 1) * gapPx
+    titlePx + 2 * (maxOf(if (onBack != null) iconPx else 0f, row) + gapPx) <= barPx
+  }
+  val split = V3HeaderActions.split(candidates, overflow, visible)
   val shown = split.shown
-  val guideIcon = guide != null && shown.size + (if (split.menu.isEmpty()) 0 else 1) < 3
-  val menu = if (guide != null && !guideIcon) listOf(V3MenuItem(Icons.AutoMirrored.Outlined.HelpOutline, StrKit.guide) { guideOpen = true }) + split.menu else split.menu
+  val menu = split.menu.partition { it.label == StrKit.guide && guide != null }.let { (g, rest) -> g + rest }
   val headerActions = shown +
-    (if (guideIcon) listOf(V3Action(Icons.AutoMirrored.Outlined.HelpOutline, StrKit.guide) { guideOpen = true }) else emptyList()) +
     (if (menu.isEmpty()) emptyList() else listOf(V3Action(Icons.Outlined.MoreHoriz, StrKit.more, dot = split.menuDot) { menuOpen = true }))
 
   //  زدنِ بیرون از کادرِ نوشتن ⇒ صفحه‌کلید بسته (`v3ClearFocusOnTap`، یک جا برای همهٔ صفحه‌های کیت)
   Box((if (backdrop != null) modifier.fillMaxSize().then(backdrop) else modifier.fillMaxSize().background(c.bg)).v3ClearFocusOnTap()) {
     Column(Modifier.fillMaxSize().nestedScroll(connection)) {
       if (searching && search != null) V3SearchBar(search, finder.close, transparent = backdrop != null)
-      else V3HeaderBar(title, onBack, headerActions, showTitle = showTitle, divider = { if (large) state.fraction else 1f }, transparent = backdrop != null)
+      else V3HeaderBar(title, onBack, headerActions, showTitle = showTitle, divider = { if (large) state.fraction else 1f }, transparent = backdrop != null, heading = !large)
       //  عنوانِ درشت، پیام‌ها، جست‌وجو (کامپیوتر) و تراشه‌ها با هم جمع می‌شوند تا فهرست جا بگیرد (S3);
       //  بلندی با درشتیِ نوشته اندازه گرفته می‌شود، نه عددِ ثابت (S4)
       V3Collapsing(state, transparent = backdrop != null) {
         if (large) V3LargeTitle(title, subtitle, state)
+        //  بی عنوانِ درشت، زیرنویس (حالِ صفحه) یک خطِ کوچکِ وسط زیرِ نوار است — گم نمی‌شود
+        else if (subtitle != null && !searching) V3BarSubtitle(subtitle)
         if (notice != null) V3NoticeSlot(notice)
         if (!thumb && search != null) V3InlineSearch(search)
         if (chips != null) Box(Modifier.fillMaxWidth().padding(top = if (large) 0.dp else 8.dp, bottom = 8.dp)) { chips() }
@@ -286,6 +307,10 @@ private fun V3NoticeSlot(notice: @Composable () -> Unit) {
   }
 }
 
+private const val BAR_BACK = "bar-back"
+private const val BAR_TITLE = "bar-title"
+private const val BAR_ACTIONS = "bar-actions"
+
 private val LARGE = 52.dp
 private val LARGE_WITH_SUB = 74.dp
 
@@ -300,29 +325,53 @@ internal fun V3HeaderBar(
   divider: () -> Float,
   /** روی `backdrop` ِ صفحه: بی زمینه */
   transparent: Boolean = false,
+  /** عنوانِ نوار تنها عنوانِ صفحه است (بی عنوانِ درشت) ⇒ سرخطِ صفحه‌خوان */
+  heading: Boolean = false,
 ) {
   val c = PhoneV3.colors
   val alpha by animateFloatAsState(if (showTitle) 1f else 0f, MotionSpec.tweenOf(150), label = "barTitle")
   Column(Modifier.fillMaxWidth().background(if (transparent) Color.Transparent else c.bg).windowInsetsPadding(WindowInsets.statusBars)) {
-    Box(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
-      if (onBack != null) Box(Modifier.align(Alignment.CenterStart)) { V3BackButton(onBack) }
-      Text(
-        title,
-        style = V3Type.headline,
-        color = c.ink,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        textAlign = TextAlign.Center,
-        modifier = Modifier.padding(horizontal = 104.dp).graphicsLayer { this.alpha = alpha },
-      )
-      if (actions.isNotEmpty()) {
-        Row(Modifier.align(Alignment.CenterEnd)) {
+    //  ۶۵s: عنوان وسطِ نوار میانِ برگشت و کارها؛ اگر کارهای یک سو پهن‌اند و وسط جا نیست، وسطِ جای خالیِ میانشان — هرگز زیرِ آیکن.
+    //  چیدمانِ نوار در **هر زبان همان** است (صاحب‌کار: «لی‌اوتش به دیگه جهت نره حتی با عوض کردن زبان»): برگشت در راست، کارها در
+    //  چپ، عنوان وسط — جهتِ چیدمان ثابتِ راست‌به‌چپ؛ جهتِ خودِ نوشته از محتوایش (انگلیسی همان چپ‌به‌راست خوانده می‌شود)
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+    androidx.compose.ui.layout.Layout(
+      modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp),
+      content = {
+        Box(Modifier.layoutId(BAR_BACK)) { if (onBack != null) V3BackButton(onBack) }
+        Text(
+          title,
+          style = V3Type.headline,
+          color = c.ink,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+          textAlign = TextAlign.Center,
+          modifier = Modifier.layoutId(BAR_TITLE).graphicsLayer { this.alpha = alpha }.then(if (heading) Modifier.semantics { heading() } else Modifier),
+        )
+        Row(Modifier.layoutId(BAR_ACTIONS)) {
           actions.forEachIndexed { i, a ->
             if (i > 0) Spacer(Modifier.width(8.dp))
             V3IconButton(a.icon, a.label, dot = a.dot, onClick = a.onClick)
           }
         }
+      },
+    ) { measurables, constraints ->
+      val loose = constraints.copy(minWidth = 0, minHeight = 0)
+      val back = measurables.first { it.layoutId == BAR_BACK }.measure(loose)
+      val acts = measurables.first { it.layoutId == BAR_ACTIONS }.measure(loose)
+      val gap = 8.dp.roundToPx()
+      val w = constraints.maxWidth
+      val free = (w - back.width - acts.width - 2 * gap).coerceAtLeast(0)
+      val title = measurables.first { it.layoutId == BAR_TITLE }.measure(loose.copy(maxWidth = free))
+      val h = maxOf(constraints.minHeight, back.height, acts.height, title.height)
+      val centred = (w - title.width) / 2
+      val x = if (centred >= back.width + gap && centred + title.width <= w - acts.width - gap) centred else back.width + gap + (free - title.width) / 2
+      layout(w, h) {
+        back.placeRelative(0, (h - back.height) / 2)
+        title.placeRelative(x, (h - title.height) / 2)
+        acts.placeRelative(w - acts.width, (h - acts.height) / 2)
       }
+    }
     }
     Box(Modifier.fillMaxWidth().height(1.dp).graphicsLayer { this.alpha = divider() }.background(c.hairline))
   }
@@ -369,6 +418,20 @@ private fun V3LargeTitle(title: String, subtitle: String?, state: V3HeaderState)
     Text(title, style = V3Type.largeTitle, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
     if (subtitle != null) Text(subtitle, style = V3Type.subhead, color = c.inkMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
   }
+}
+
+/** زیرنویسِ صفحه وقتی عنوان در نوار است: یک خطِ کم‌رنگِ وسط */
+@Composable
+private fun V3BarSubtitle(subtitle: String) {
+  Text(
+    subtitle,
+    style = V3Type.footnote,
+    color = PhoneV3.colors.inkMuted,
+    maxLines = 2,
+    overflow = TextOverflow.Ellipsis,
+    textAlign = TextAlign.Center,
+    modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 6.dp),
+  )
 }
 
 /** زیرِ این بلندیِ پنجره (dp) عنوانِ درشت نیست */

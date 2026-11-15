@@ -61,7 +61,7 @@ internal fun ProfitTab(d: ShopData, from: String, to: String, spec: ReportListSp
     item(key = "hero") {
       Box(spec.appear("hero", 0).padding(top = 12.dp)) {
         //  ضرر به نامِ خودش، نه «سودِ منفی» — کلمهٔ درست خودش هشدار است
-        HeroFigure(if (loss) StrReports.netLoss else StrReports.netProfit, kotlin.math.abs(r.netProfit), Str.invoicesCount(r.count), negative = loss)
+        HeroFigure(if (loss) StrReports.netLoss else StrReports.netProfit, kotlin.math.abs(r.netProfit), Str.invoicesCount(r.count), negative = loss, collapseKey = "reports/profit", corner = spec.range, note = spec.rangeNote)
       }
     }
     if (empty) {

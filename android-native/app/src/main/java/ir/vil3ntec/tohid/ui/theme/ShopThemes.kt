@@ -30,16 +30,33 @@ import androidx.compose.ui.graphics.Color
  *  کنتراست‌ها همان قاعدهٔ `Vill3nPaletteTest` (عددها با `scratchpad/hero/tools/palette.py` سنجیده شد).
  */
 
-/** هفت رنگِ همراه — به همین ترتیب: آسمانی، بنفش، مرجانی، کهربایی، نعنایی، صورتی، لیمویی */
+/**
+ *  هفت رنگِ همراهِ تم (`ShopColors.accents`) به ترتیبِ `SectionColors.ORDER` — همان جاهایی که پرونده‌های قفل‌شدهٔ خانه می‌خوانند
+ *  (۶۸c، پالتِ لوکسِ برند؛ صورتی و لیمویی دیگر نیستند):
+ *   • جاهای ۱ تا ۴ و ۶ نشانهٔ همان خانواده‌اند (`SectionTone.glyph`، روز روی سفید ≥ ۳:۱، شب روی کارتِ شب ≥ ۶:۱): میان‌برهای خانه
+ *     (`HomeAccents`: تاریخچه نیلی، سفارش‌ها نفتی، ورودِ کالا زر، دریافت زمردی) همان رنگِ بخش‌ها؛
+ *   • جاهای ۰ و ۵ فقط دو درخششِ نرمِ کادرِ گرادیانیِ خانه‌اند (`V3HeroCard`، ۱۸٪) و از جدولِ بخش‌ها **جدا**: بالا همان آسمانیِ پیشین
+ *     ([HERO_GLOW_TOP])، پایین بنفشِ نرمِ برند ([HERO_GLOW_BOTTOM]) به‌جای صورتیِ پیشین — گرادیان و ظاهرِ کادر همان.
+ *  نشانهٔ کاشی‌ها (`PhoneV3Palette.glyph`) مستقیم از `SectionColors` می‌خواند، نه از این فهرست. سری‌های نمودار: [chart].
+ */
 object ThemeAccents {
-  val SKY = Color(0xFF0EA5E9)
-  val VIOLET = Color(0xFF8B5CF6)
-  val CORAL = Color(0xFFF97362)
-  val AMBER = Color(0xFFF59E0B)
-  val MINT = Color(0xFF14B8A6)
-  val PINK = Color(0xFFEC4899)
-  val LIME = Color(0xFF84CC16)
-  val ALL: List<Color> = listOf(SKY, VIOLET, CORAL, AMBER, MINT, PINK, LIME)
+  /** درخششِ بالای کادرِ گرادیانیِ خانه — همان آسمانیِ پیش از ۶۸c */
+  val HERO_GLOW_TOP = Color(0xFF0EA5E9)
+  /** درخششِ پایینِ همان کادر — بنفشِ نرمِ برند، جای صورتیِ پیشین (#EC4899) */
+  val HERO_GLOW_BOTTOM = Color(0xFF8B5CF6)
+
+  private fun of(dark: Boolean): List<Color> =
+    SectionColors.ORDER.map { SectionColors.glyph(it, dark) }.toMutableList().also { it[0] = HERO_GLOW_TOP; it[5] = HERO_GLOW_BOTTOM }
+
+  val DAY: List<Color> = of(dark = false)
+  val NIGHT: List<Color> = of(dark = true)
+  /** پیش‌فرضِ `ShopColors.accents` (روز) */
+  val ALL: List<Color> get() = DAY
+
+  /** سری‌های نمودار (§۱۰): همان رنگ‌های همراه به ترتیبِ معنا — هزینه عقیق (`SectionColors.CHART`) */
+  fun chart(dark: Boolean, grid: Color): ChartColors = SectionColors.CHART.map { SectionColors.glyph(it, dark) }.let { a ->
+    ChartColors(sales = a[0], comparison = a[1], costs = a[2], discount = a[3], drop = a[4], stock = a[5], neutral = a[6], grid = grid)
+  }
 }
 
 /** تمِ رنگیِ برنامه — جدا از روز/شب (`ThemeChoice`) */
@@ -131,7 +148,7 @@ internal val SkyLight = ShopColors(
     error = MessageTone(text = Color(0xFFB91C1C), bg = Color(0xFFFEF2F2), icon = Color(0xFFDC2626), border = Color(0xFFFECACA)),
   ),
   //  سری‌های نمودار به ترتیبِ رنگ‌های همراه (THEME-V2)
-  chart = ChartColors(sales = Color(0xFF0EA5E9), comparison = Color(0xFF8B5CF6), costs = Color(0xFFF97362), discount = Color(0xFFF59E0B), drop = Color(0xFF14B8A6), stock = Color(0xFFEC4899), neutral = Color(0xFF84CC16), grid = Color(0xFFE2E8F0)),
+  chart = ThemeAccents.chart(dark = false, grid = Color(0xFFE2E8F0)),
   shadow = Color(0x520F172A),
   scrim = Color(0x990B1220),
   glow = Color(0x1F2563EB),
@@ -140,7 +157,7 @@ internal val SkyLight = ShopColors(
   auroraTwo = Color(0x3D4F46E5),
   auroraThree = Color(0x337C3AED),
   heroGradient = listOf(Color(0xFF2563EB), Color(0xFF4F46E5), Color(0xFF7C3AED)),
-  accents = ThemeAccents.ALL,
+  accents = ThemeAccents.DAY,
   brandOnInverse = Color(0xFF60A5FA),
   heroScrim = 0.04f,
   heroChipShade = 0.15f,
@@ -193,7 +210,7 @@ internal val SkyDark = ShopColors(
     error = MessageTone(text = Color(0xFFFCA5A5), bg = Color(0xFF2D1215), icon = Color(0xFFF87171), border = Color(0xFF7F1D1D)),
   ),
   //  سری‌های نمودار به ترتیبِ رنگ‌های همراه (THEME-V2)
-  chart = ChartColors(sales = Color(0xFF0EA5E9), comparison = Color(0xFF8B5CF6), costs = Color(0xFFF97362), discount = Color(0xFFF59E0B), drop = Color(0xFF14B8A6), stock = Color(0xFFEC4899), neutral = Color(0xFF84CC16), grid = Color(0xFF1E222D)),
+  chart = ThemeAccents.chart(dark = true, grid = Color(0xFF1E222D)),
   shadow = Color(0x80000000),
   scrim = Color(0xCC020509),
   glow = Color(0x3360A5FA),
@@ -202,7 +219,7 @@ internal val SkyDark = ShopColors(
   auroraTwo = Color(0x61312E81),
   auroraThree = Color(0x574C1D95),
   heroGradient = listOf(Color(0xFF1E3A8A), Color(0xFF312E81), Color(0xFF4C1D95)),
-  accents = ThemeAccents.ALL,
+  accents = ThemeAccents.NIGHT,
   brandOnInverse = Color(0xFF1D4ED8),
   heroScrim = 0.0f,
   heroChipShade = 0.0f,
@@ -255,7 +272,7 @@ internal val OceanLight = ShopColors(
     error = MessageTone(text = Color(0xFFB91C1C), bg = Color(0xFFFEF2F2), icon = Color(0xFFDC2626), border = Color(0xFFFECACA)),
   ),
   //  سری‌های نمودار به ترتیبِ رنگ‌های همراه (THEME-V2)
-  chart = ChartColors(sales = Color(0xFF0EA5E9), comparison = Color(0xFF8B5CF6), costs = Color(0xFFF97362), discount = Color(0xFFF59E0B), drop = Color(0xFF14B8A6), stock = Color(0xFFEC4899), neutral = Color(0xFF84CC16), grid = Color(0xFFE2E8F0)),
+  chart = ThemeAccents.chart(dark = false, grid = Color(0xFFE2E8F0)),
   shadow = Color(0x520F172A),
   scrim = Color(0x990B1220),
   glow = Color(0x1F0284C7),
@@ -264,7 +281,7 @@ internal val OceanLight = ShopColors(
   auroraTwo = Color(0x3D0EA5E9),
   auroraThree = Color(0x3322D3EE),
   heroGradient = listOf(Color(0xFF0369A1), Color(0xFF0EA5E9), Color(0xFF22D3EE)),
-  accents = ThemeAccents.ALL,
+  accents = ThemeAccents.DAY,
   brandOnInverse = Color(0xFF38BDF8),
   heroScrim = 0.3f,
   heroChipShade = 0.3f,
@@ -317,7 +334,7 @@ internal val OceanDark = ShopColors(
     error = MessageTone(text = Color(0xFFFCA5A5), bg = Color(0xFF2D1215), icon = Color(0xFFF87171), border = Color(0xFF7F1D1D)),
   ),
   //  سری‌های نمودار به ترتیبِ رنگ‌های همراه (THEME-V2)
-  chart = ChartColors(sales = Color(0xFF0EA5E9), comparison = Color(0xFF8B5CF6), costs = Color(0xFFF97362), discount = Color(0xFFF59E0B), drop = Color(0xFF14B8A6), stock = Color(0xFFEC4899), neutral = Color(0xFF84CC16), grid = Color(0xFF19242A)),
+  chart = ThemeAccents.chart(dark = true, grid = Color(0xFF19242A)),
   shadow = Color(0x80000000),
   scrim = Color(0xCC020509),
   glow = Color(0x3338BDF8),
@@ -326,7 +343,7 @@ internal val OceanDark = ShopColors(
   auroraTwo = Color(0x61075985),
   auroraThree = Color(0x57155E75),
   heroGradient = listOf(Color(0xFF0C4A6E), Color(0xFF075985), Color(0xFF155E75)),
-  accents = ThemeAccents.ALL,
+  accents = ThemeAccents.NIGHT,
   brandOnInverse = Color(0xFF0369A1),
   heroScrim = 0.0f,
   heroChipShade = 0.0f,
@@ -379,7 +396,7 @@ internal val DuskLight = ShopColors(
     error = MessageTone(text = Color(0xFFB91C1C), bg = Color(0xFFFEF2F2), icon = Color(0xFFDC2626), border = Color(0xFFFECACA)),
   ),
   //  سری‌های نمودار به ترتیبِ رنگ‌های همراه (THEME-V2)
-  chart = ChartColors(sales = Color(0xFF0EA5E9), comparison = Color(0xFF8B5CF6), costs = Color(0xFFF97362), discount = Color(0xFFF59E0B), drop = Color(0xFF14B8A6), stock = Color(0xFFEC4899), neutral = Color(0xFF84CC16), grid = Color(0xFFE2E8F0)),
+  chart = ThemeAccents.chart(dark = false, grid = Color(0xFFE2E8F0)),
   shadow = Color(0x520F172A),
   scrim = Color(0x990B1220),
   glow = Color(0x1F4F46E5),
@@ -388,7 +405,7 @@ internal val DuskLight = ShopColors(
   auroraTwo = Color(0x3DDB2777),
   auroraThree = Color(0x33F97316),
   heroGradient = listOf(Color(0xFF4F46E5), Color(0xFFDB2777), Color(0xFFF97316)),
-  accents = ThemeAccents.ALL,
+  accents = ThemeAccents.DAY,
   brandOnInverse = Color(0xFF818CF8),
   heroScrim = 0.3f,
   heroChipShade = 0.15f,
@@ -441,7 +458,7 @@ internal val DuskDark = ShopColors(
     error = MessageTone(text = Color(0xFFFCA5A5), bg = Color(0xFF2D1215), icon = Color(0xFFF87171), border = Color(0xFF7F1D1D)),
   ),
   //  سری‌های نمودار به ترتیبِ رنگ‌های همراه (THEME-V2)
-  chart = ChartColors(sales = Color(0xFF0EA5E9), comparison = Color(0xFF8B5CF6), costs = Color(0xFFF97362), discount = Color(0xFFF59E0B), drop = Color(0xFF14B8A6), stock = Color(0xFFEC4899), neutral = Color(0xFF84CC16), grid = Color(0xFF221F2C)),
+  chart = ThemeAccents.chart(dark = true, grid = Color(0xFF221F2C)),
   shadow = Color(0x80000000),
   scrim = Color(0xCC020509),
   glow = Color(0x33818CF8),
@@ -450,7 +467,7 @@ internal val DuskDark = ShopColors(
   auroraTwo = Color(0x61831843),
   auroraThree = Color(0x579A3412),
   heroGradient = listOf(Color(0xFF312E81), Color(0xFF831843), Color(0xFF9A3412)),
-  accents = ThemeAccents.ALL,
+  accents = ThemeAccents.NIGHT,
   brandOnInverse = Color(0xFF4338CA),
   heroScrim = 0.0f,
   heroChipShade = 0.0f,
