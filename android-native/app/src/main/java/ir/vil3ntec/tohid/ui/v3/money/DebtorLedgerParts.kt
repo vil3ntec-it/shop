@@ -178,6 +178,7 @@ private fun actionLook(action: DebtorLedgerModel.Action): Pair<ImageVector, Stri
   DebtorLedgerModel.Action.SMS -> Icons.Outlined.Sms to StrMoney.sms
   DebtorLedgerModel.Action.WHATSAPP -> Icons.AutoMirrored.Outlined.Chat to StrMoney.whatsapp
   DebtorLedgerModel.Action.EDIT -> Icons.Outlined.Edit to StrMoney.edit
+  DebtorLedgerModel.Action.INVOICES -> Icons.AutoMirrored.Outlined.ReceiptLong to StrMoney.invoicesAction
   DebtorLedgerModel.Action.STATEMENT_CSV -> Icons.Outlined.FileDownload to StrMoney.statementCsv
   DebtorLedgerModel.Action.PRINT -> Icons.Outlined.Print to StrMoney.print
   DebtorLedgerModel.Action.STATEMENT_IMAGE -> Icons.Outlined.Image to StrMoney.statementImage
@@ -266,6 +267,7 @@ internal fun rememberDebtorTasks(d: ShopData, account: DebtorEngine.Account, act
         DebtorLedgerModel.Action.WHATSAPP ->
           if (open("https://wa.me/${DebtorLedgerModel.whatsappNumber(debtor.phone)}?text=" + android.net.Uri.encode(message()))) acts.onReminded("whatsapp")
         DebtorLedgerModel.Action.EDIT -> acts.onEdit()
+        DebtorLedgerModel.Action.INVOICES -> acts.onOlderSales()
         DebtorLedgerModel.Action.STATEMENT_CSV -> {
           val sheet = ReportCsv.statement(data, debtor.id, todayIso())
           pendingCsv = sheet
@@ -275,41 +277,6 @@ internal fun rememberDebtorTasks(d: ShopData, account: DebtorEngine.Account, act
         DebtorLedgerModel.Action.STATEMENT_IMAGE -> scope.launch { toasts?.show(StatementImage.share(context, data, debtor.id, todayIso())) }
         DebtorLedgerModel.Action.DELETE -> acts.onDelete()
       }
-    }
-  }
-}
-
-/* ------------------------------ فاکتورها ------------------------------ */
-
-/** چند فاکتورِ آخرِ مشتری — بقیه در «فروش‌ها» */
-private const val SALES_SHOWN = 20
-
-/** فاکتورهای همین مشتری (خودِ خرید، نه فقط ردیفِ بدهی) — هر ردیف ⇐ همان فاکتور در «فروش‌ها» */
-@Composable
-internal fun DebtorInvoices(account: DebtorEngine.Account, onOpen: (String) -> Unit, onOlder: () -> Unit) {
-  val older = account.sales.size - SALES_SHOWN
-  V3Section(
-    title = StrMoney.invoices(account.sales.size),
-    action = if (older > 0) StrMoney.olderInvoices(older) else null,
-    onAction = if (older > 0) onOlder else null,
-  ) {
-    account.sales.take(SALES_SHOWN).forEachIndexed { i, sale ->
-      if (i > 0) V3Divider(start = 64.dp)
-      val cancelled = sale.status == "cancelled"
-      V3ListRow(
-        title = StrMoney.invoiceNo(sale.invoiceLabel() ?: "—") + if (cancelled) " (${StrMoney.cancelled})" else "",
-        subtitle = MoneyText.date(sale.date),
-        icon = Icons.AutoMirrored.Outlined.ReceiptLong,
-        trailing = {
-          Column(horizontalAlignment = Alignment.End) {
-            Text(money(sale.finalTotal), style = v3Text(14, FontWeight.SemiBold, 20), color = if (cancelled) PhoneV3.colors.inkMuted else PhoneV3.colors.ink)
-            if (sale.remaining > 0 && !cancelled) {
-              Text(StrMoney.remaining(money(sale.remaining)), style = v3Text(12, FontWeight.Medium, 17), color = LedgerTone.OWE.ink())
-            }
-          }
-        },
-        onClick = { onOpen(sale.id) },
-      )
     }
   }
 }

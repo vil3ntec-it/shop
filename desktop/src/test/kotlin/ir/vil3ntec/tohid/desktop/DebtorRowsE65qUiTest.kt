@@ -272,18 +272,19 @@ class DebtorRowsE65qUiTest {
     val ids = ArrayList<String>()
     val rows = ArrayList<String>()
     val sales = ArrayList<String>()
+    var olderSales = 0
   }
 
-  private fun showLedger(opened: Opened, links: Boolean = true) = show {
+  private fun showLedger(opened: Opened, links: Boolean = true, drawerOpen: Boolean = false) = show {
     val actions = DebtorLedgerActions(
       onBack = null, onCompose = {}, onEdit = {}, onDelete = {}, onOpenTx = { opened.rows += it }, onDeleteTx = {},
-      onOpenSale = { opened.sales += it }, onOlderSales = {},
+      onOpenSale = { opened.sales += it }, onOlderSales = { opened.olderSales++ },
     )
     if (links) {
       CompositionLocalProvider(LocalInvoiceLinks provides InvoiceLinks.of(file) { opened.ids += it }) {
-        DebtorLedgerScreen("q-d", file, wide = false, actions = actions, drawerOpen = false)
+        DebtorLedgerScreen("q-d", file, wide = false, actions = actions, drawerOpen = drawerOpen)
       }
-    } else DebtorLedgerScreen("q-d", file, wide = false, actions = actions, drawerOpen = false)
+    } else DebtorLedgerScreen("q-d", file, wide = false, actions = actions, drawerOpen = drawerOpen)
   }
 
   /** ردیف‌های حساب با نامِ نوعشان (پیکانِ ↗ برد / ↙ رسید برای صفحه‌خوان) */
@@ -340,15 +341,20 @@ class DebtorRowsE65qUiTest {
     assertTrue(opened.rows.isEmpty())
   }
 
-  @Test fun theInvoicesOfThisCustomerAreTheEarlierRows() {
+  /**
+   *  صاحب‌کار ۱۴۰۵/۰۸/۲۴: «فاکتورها توی همون بردگی یا رسید باشه، این‌جا نباید باشه» — فهرستِ جدای «فاکتورهای این مشتری» زیرِ
+   *  تراکنش‌ها نیست؛ فاکتورِ نسیه در ردیفِ «برد» ِ خودش زدنی است و همهٔ فاکتورها (نقد هم) از دکمهٔ «فاکتورها» ِ «کارها و اطلاعات»
+   *  ⇐ تاریخچهٔ فروشِ همین مشتری (`onOlderSales`). (جای آزمونِ «فاکتورهای این مشتری ردیف‌های پیشین‌اند» ِ ۶۵q.)
+   */
+  @Test fun invoicesAreInTheirRowsAndAllOfThemBehindTheDrawerButtonNotAListBelow() {
     val opened = Opened()
-    showLedger(opened)
-    rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(StrMoney.invoices(1)))
-    rule.waitForIdle()
-    //  «فاکتور #۱۲» عنوانِ ردیف، «مانده ۴۰۰» به رنگِ بدهی زیرِ مبلغ؛ زدن ⇐ همان فاکتور در «فروش‌ها»
-    rule.waitUntil(10_000) { count(StrMoney.remaining(money(400.0))) > 0 }
-    assertEquals(1, count(StrMoney.invoices(1)))
-    assertEquals(0, count(rice.name, substring = true))
+    showLedger(opened, drawerOpen = true)
+    rule.waitUntil(10_000) { rule.onAllNodes(hasText("فاکتور #12") and hasClickAction()).fetchSemanticsNodes().isNotEmpty() }
+    assertEquals(0, count(StrMoney.invoices(1), substring = true))
+    rule.waitUntil(10_000) { count(StrMoney.invoicesAction) > 0 }
+    click(StrMoney.invoicesAction)
+    assertEquals(1, opened.olderSales)
+    assertTrue(opened.sales.isEmpty() && opened.rows.isEmpty())
   }
 
   private fun showSheet(txId: String, opened: Opened) {
