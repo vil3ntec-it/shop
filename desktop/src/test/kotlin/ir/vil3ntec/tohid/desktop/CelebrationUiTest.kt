@@ -21,7 +21,6 @@ import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.SalePost
 import ir.vil3ntec.tohid.data.SalesEngine
-import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
@@ -62,7 +61,10 @@ class CelebrationUiTest {
     val before = V3Celebrate.fired
     val cart = CartStore(DesktopContext)
     assertTrue(cart.set(listOf(SalesEngine.CartLine("p1", 1.0))))
-    val out = runBlocking { cart.post(ShopStore(DesktopContext), ShopData()) { key -> SalesEngine.Result.Ok(ShopData(), 1, key) } }
+    //  دفترِ بارشدهٔ همین دستگاه؛ فاکتور همان دفتر را برمی‌گرداند ⇒ نوشتنِ همان محتوا (بی ردیفِ تازه روی پوشهٔ آزمون)
+    val store = ShopStore(DesktopContext).also { runBlocking { it.load() } }
+    val d = store.data.value
+    val out = runBlocking { cart.post(store, d) { key -> SalesEngine.Result.Ok(d, 1, key) } }
     assertTrue("$out", out is SalePost.Outcome.Done)
     assertEquals(before + 1, V3Celebrate.fired)
 
