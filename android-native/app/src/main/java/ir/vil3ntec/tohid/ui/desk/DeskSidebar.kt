@@ -44,7 +44,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -94,9 +93,9 @@ fun DeskSidebar(
   path: String = "",
 ) {
   val c = Desk.colors
-  val context = LocalContext.current
-  val canAdmin = ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)
-  val owner = ir.vil3ntec.tohid.data.ShopRole.current(context) == ir.vil3ntec.tohid.data.ShopRole.OWNER
+  val role = rememberDeskRole()
+  val canAdmin = role.canAdmin
+  val owner = role.owner
   val ordersLive = ir.vil3ntec.tohid.ui.OrdersLive.enabled
   val chatLive = ir.vil3ntec.tohid.data.ShopChatSync.config.value?.enabled == true
   val flags = ModuleFlags.on.value

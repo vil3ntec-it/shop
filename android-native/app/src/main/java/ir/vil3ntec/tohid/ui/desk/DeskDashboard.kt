@@ -112,7 +112,7 @@ fun DeskDashboard(d: ShopData, onOpen: (String) -> Unit) {
   val view = rememberHomeView(d)
   val today = ir.vil3ntec.tohid.todayIso()
   val nums = remember(d, today) { DashboardNumbers.of(d, today) }
-  val trend = remember(d, today) { HomeTrend.of(d.sales, today, System.currentTimeMillis()) }
+  val trend = remember(d, today) { HomeTrend.of(d.sales, today, nowMs()) }
   val profitSeries = remember(d, today, view.canSeeMoney) { if (view.canSeeMoney) DeskDashModel.profitSeries(d, today, HomeTrend.DAYS) else emptyList() }
   val pressing = HomeAlerts.pressing(view.alerts)
 
@@ -650,3 +650,7 @@ internal object DeskDashModel {
     return day?.toString()
   }
 }
+
+/** اکنون (میلی‌ثانیه) بی وابستگیِ پلتفرمی — همان ساعتِ `kotlin.time` که آیفون هم دارد */
+@OptIn(kotlin.time.ExperimentalTime::class)
+private fun nowMs(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds()

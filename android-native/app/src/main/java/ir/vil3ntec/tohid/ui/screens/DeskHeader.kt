@@ -93,7 +93,7 @@ fun DeskHeader(
     verticalAlignment = Alignment.CenterVertically,
   ) {
     //  ── آغاز: ☰ (فقط منوی پنهان)، برگشت، مسیر و عنوان ──
-    if (!menuVisible) HeaderIcon(Icons.Filled.Menu, StrDeskHeader.showMenu, onClick = onMenu)
+    if (!menuVisible) HeaderIcon(Icons.Filled.Menu, ir.vil3ntec.tohid.core.i18n.StrDesk.showMenu, onClick = onMenu)
     if (onBack != null) HeaderIcon(Icons.AutoMirrored.Filled.ArrowBack, Str.back, tint = c.ink, onClick = onBack)
     Spacer(Modifier.width(DeskSpace.x1))
     Row(Modifier.widthIn(max = 460.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -143,11 +143,6 @@ fun DeskHeader(
     Spacer(Modifier.width(DeskSpace.x3))
     UserChip(onOpen)
   }
-}
-
-/** نوشته‌های تازهٔ سربرگ — از `StrDesk` */
-private object StrDeskHeader {
-  val showMenu: String get() = ir.vil3ntec.tohid.core.i18n.StrDesk.showMenu
 }
 
 /** کادرِ نمایشیِ جست‌وجو که پنجرهٔ جست‌وجوی سریع (Ctrl+K) را باز می‌کند */

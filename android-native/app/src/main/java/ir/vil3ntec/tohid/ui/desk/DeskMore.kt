@@ -29,7 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,12 +63,9 @@ import ir.vil3ntec.tohid.ui.v3.nav.V3Modules
 @Composable
 fun DeskMoreScreen(d: ShopData, onOpen: (String) -> Unit) {
   val c = Desk.colors
-  val context = LocalContext.current
-  val canManage = remember { ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context) }
-  LaunchedEffect(Unit) {
-    ir.vil3ntec.tohid.data.ShopChatSync.refreshConfig(context)
-    ModuleFlags.load(context)
-  }
+  val role = rememberDeskRole()
+  val canManage = role.canAdmin
+  DeskMoreRefresh()
   val ordersLive = ir.vil3ntec.tohid.ui.OrdersLive.enabled
   val newOrders = ir.vil3ntec.tohid.ui.OrdersLive.newCount
   val chatLive = ir.vil3ntec.tohid.data.ShopChatSync.config.value?.enabled == true
@@ -80,7 +76,7 @@ fun DeskMoreScreen(d: ShopData, onOpen: (String) -> Unit) {
     DeskMoreModel.sections(canManage, ordersLive, newOrders, chatLive, storefront, delivery, flags)
   }
   var offSheet by remember { mutableStateOf<String?>(null) }
-  val owner = remember { ir.vil3ntec.tohid.data.ShopRole.current(context) == ir.vil3ntec.tohid.data.ShopRole.OWNER }
+  val owner = role.owner
 
   BoxWithConstraints(Modifier.fillMaxSize().background(c.app), contentAlignment = Alignment.TopCenter) {
     val usable = (maxWidth.coerceAtMost(DeskSize.contentMax) - DeskSpace.page * 2)
