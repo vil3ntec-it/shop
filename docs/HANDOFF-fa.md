@@ -82,7 +82,10 @@
   شاگرد بی `shop.` و ⇒ `support`؛ سفارشِ روشن ⇒ `orders?tab=preparing`)، و `InfraLeakGuardTest` ۸، `I18nCoverageTest` ۸،
   `DariCoverageTest` ۲۳، `DariWordsTest` ۱۷، `ScreenTextTest` ۳، `ShellTargetsTest` ۵، `MoreLayoutTest` ۵، `AccountRoutesTest` ۲،
   `ProfileHomeModelTest` ۶، `ModuleRegistryTest` ۱۱ — همه سبز. `DariWordsTest` نخست سرخ شد («فروشگاه» با `asIs` در دری ماند) ⇒ در دری
-  «دکان» می‌شود (استثنا تصمیمِ صاحب‌کار است). FULLRUN
+  «دکان» می‌شود (استثنا تصمیمِ صاحب‌کار است).
+  **اجرای کامل** (`-p desktop test`، لاینِ B): ۴۳۰۲ آزمون، ۴ رد شده، **۱ شکست** — `SheetLangTest` («فارسی بایت‌به‌بایت همان …»، اثرِ
+  `518f4acd…` به‌جای `ea86b342…`)؛ **از پیش**: همان شکست با همان اثر در اجرای کاملِ دو عاملِ دیگرِ batch-63 بی این تغییر (۰۳:۱۲ و ۰۴:۳۳)؛
+  این کار به برگه‌های اکسل/CSV دست نمی‌زند. precheck `fail=0`، quality بی ردیفِ «همین تغییر»، spec «سالم»، whatsnew و secret-scan سبز.
 - **قدمِ بعد:** دیدنِ روی تبلتِ واقعی (سنجیده نشد)؛ اگر صاحب‌کار نامِ پرچم را هم نخواست، همان یک خط.
 ### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-63p زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-63p` (از `origin/claude/batch-63` baff32f2e) — حریمِ خصوصی و شرایط درونِ برنامه‌ها، بی GitHub؛ نسخهٔ فروشگاهی بی کدِ به‌روزرسانی
 
