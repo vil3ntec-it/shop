@@ -334,6 +334,8 @@ class DataSafetyGuardTest {
       "tohid-pay-mirror",
       //  CRM-15 (د۱۸): صفِ «دیدنِ پرونده» ِ حسابدارِ بی‌اینترنت تا رسیدن به سرور (`CustomerAccessOutboxAndroid`)
       "tohid-customer-access",
+      //  SYN-07/S28: صفِ تصمیم‌های صندوقِ تعارضِ v3 تا رسیدن به سرور (`V3InboxOutboxAndroid`، پرچمِ `shop.sync_v3_inbox`)
+      "tohid-v3-inbox",
     ).forEach { put(it, Kind.SERVER) }
     //  عمداً مالِ همین دستگاه: نشست و همگام‌سازی، سرور، قفل، زبان و ظاهر، چاپگر/دستگاه‌ها، پیش‌نویس‌ها
     listOf(

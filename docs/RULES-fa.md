@@ -457,6 +457,13 @@
   اندروید در `SyncV1Engine` (`parts.push`، `pushClient`)، وب در `recordChange`/`pushBaseline`/`pushOnce`. sync-core ِ کهنه ⇒ بی `since`، بی خطا.
 - opِ قدیمی مهلت ندارد (D-05، #233).
 - بستنِ تعارض با `data.delete.any` (مالک و مدیر)؛ لغوِ فاکتور با `sales.cancel` (#233).
+- ⛔ **صندوقِ تعارضِ v3 در برنامه** (SYN-07/S28، `claude/e-rows-63c`، پرچمِ دکانِ `shop.sync_v3_inbox`، پیش‌فرض خاموش): فقط همان دو درِ
+  `/api/sync/v3/conflicts` (درِ موازی نه). خاموش ⇒ پاسخ‌ها بایت‌به‌بایت همان (بی `inbox`، `merge` ⇒ ۴۰۰ ِ `bad_action`، بستنِ دوباره ۴۰۹)؛ روشن ⇒
+  `inbox` در فهرست، `merge` + `fields` فقط روی ردیفِ چندفیلدیِ دوسو‌دار (`sync-v3-inbox.mergeable`؛ همان opِ `srv.rv.<شناسه>` با فیلدهای کم‌تر،
+  حال `reverted` و `detail.merged`) و تکرارِ همان تصمیمِ همان کاربر ⇒ ۲۰۰ ِ `duplicate` بی op ِ دوم. برنامه: منطق فقط `core/sync/V3Inbox`،
+  `V3InboxOutbox` و `V3InboxClient` (commonMain)؛ تصمیم **اول** روی دیسک (`V3InboxOutboxAndroid`، یک `lock`) و بعد فرستاده، پس از هر دورِ
+  `SyncV1Worker` و از صفحه؛ فقط دستگاهِ Sync v3 و صاحب/مدیر می‌پرسند (v1 ⇒ هیچ درخواستی)؛ گونه‌های صندوقِ سند (`perm_denied`، `approval_*`)
+  این‌جا نمی‌آیند. سنجه: `server/test/sync-v3-inbox.test.js`، `V3InboxTest`، `V3InboxOutboxTest`، `V3InboxDesktopUiTest`، `V3InboxWiringTest`.
 - صندوقِ سندهای ردشده (`/api/shop/conflict-inbox`، `lib/conflict-inbox.js`، مهاجرتِ ۳۱۵؛ پیش‌فرض روشن، بی پرچم): فقط گونه‌های
   صندوقِ سند (`perm_denied`، `approval_*`) و فقط صاحب/مدیر (`data.delete.any`)؛ عضوِ دیگر فقط `/mine` ِ خودش. ⛔ «دوباره ثبت»
   همان زنجیرهٔ زندهٔ `POST /api/sync/v1/push` (از `router.stack`، نه کپی) یا `sync-v3.push` است با **نقشِ تأییدکننده** و

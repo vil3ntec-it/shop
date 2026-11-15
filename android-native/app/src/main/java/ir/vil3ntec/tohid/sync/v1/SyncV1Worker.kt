@@ -165,6 +165,8 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
     runCatching { ir.vil3ntec.tohid.data.CustomerAccessOutboxAndroid.flush(applicationContext) }
     //  CRM-15/SEC-10 (د۱۸): فرمانِ ناشناس کردنِ پرونده پس از حذفِ دادهٔ مشتری (پرچمِ خاموشِ سرور ⇒ ۴۰۴ ⇒ هیچ)
     runCatching { ir.vil3ntec.tohid.data.CustomerErasureLedgerAndroid.afterSync(applicationContext, store) }
+    //  SYN-07/S28: تصمیم‌های صفِ صندوقِ تعارضِ v3 (فقط Sync v3 ِ دستگاه و صاحب/مدیر؛ صفِ خالی ⇒ هیچ درخواستی)
+    runCatching { ir.vil3ntec.tohid.data.V3InboxOutboxAndroid.flush(applicationContext) }
   }
 
   companion object {
