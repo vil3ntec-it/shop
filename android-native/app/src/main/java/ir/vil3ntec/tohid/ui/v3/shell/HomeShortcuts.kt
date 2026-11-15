@@ -175,8 +175,7 @@ private fun PulseDot(color: Color, modifier: Modifier = Modifier) {
   val ring = PhoneV3.colors.bg
   Box(modifier.size(14.dp), contentAlignment = Alignment.Center) {
     if (Motion.enabled) {
-      val wave = rememberInfiniteTransition(label = "ordersPulse")
-      val f by wave.animateFloat(0f, 1f, infiniteRepeatable(tween(1400, easing = LinearOutSlowInEasing), RepeatMode.Restart), label = "ordersPulseF")
+      val f by ir.vil3ntec.tohid.ui.v3.v3LiveFloat(0f, 1f, infiniteRepeatable(tween(1400, easing = LinearOutSlowInEasing), RepeatMode.Restart), "ordersPulseF")
       Box(Modifier.size(10.dp).graphicsLayer { scaleX = 1f + 1.3f * f; scaleY = 1f + 1.3f * f; alpha = 1f - f }.clip(CircleShape).background(color))
     }
     Box(Modifier.size(10.dp).clip(CircleShape).background(color).border(1.5.dp, ring, CircleShape))

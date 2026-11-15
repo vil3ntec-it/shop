@@ -269,10 +269,7 @@ private fun TrackRowView(r: TrackRow, last: Boolean, modifier: Modifier) {
         r.current -> {
           //  پلهٔ جاری: حلقهٔ سبزآبی که آرام می‌تپد (بخشِ G)
           val pulse = if (Motion.enabled) {
-            rememberInfiniteTransition(label = "pulse").animateFloat(
-              initialValue = 0.85f, targetValue = 1.15f,
-              animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "pulseScale",
-            ).value
+            ir.vil3ntec.tohid.ui.v3.v3LiveFloat(0.85f, 1.15f, infiniteRepeatable(tween(900), RepeatMode.Reverse), "pulseScale").value
           } else 1f
           Box(
             Modifier.size(20.dp).graphicsLayer { scaleX = pulse; scaleY = pulse }

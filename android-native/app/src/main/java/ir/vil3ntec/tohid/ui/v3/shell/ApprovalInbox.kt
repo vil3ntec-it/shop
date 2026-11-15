@@ -124,7 +124,7 @@ object ApprovalInboxLive {
 fun ApprovalInboxNotice() {
   val context = LocalContext.current
   val nav = LocalV3Nav.current
-  LaunchedEffect(Unit) {
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(Unit) {
     while (true) {
       runCatching { ApprovalInboxLive.refresh(context) }
       delay(ApprovalInboxLive.LIST_MS)
@@ -177,15 +177,14 @@ fun RouteScope.ApprovalInboxRoute() {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val c = PhoneV3.colors
-  LaunchedEffect(Unit) {
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(Unit) {
     while (true) {
       runCatching { ApprovalInboxLive.refresh(context, force = true) }
       delay(ApprovalInboxLive.LIST_MS)
     }
   }
   val all by ApprovalInboxLive.rows
-  var tick by remember { mutableStateOf(System.currentTimeMillis()) }
-  LaunchedEffect(Unit) { while (true) { delay(1_000L); tick = System.currentTimeMillis() } }
+  val tick = ir.vil3ntec.tohid.ui.v3.rememberV3LiveClock(1_000L) { System.currentTimeMillis() } // PERF-SCREEN
   val mine = remember(all, tick / 15_000L) { ApprovalInboxLive.visible(context, all, tick) }
   var confirm by remember { mutableStateOf<Pair<RemoteApproval.Request, Boolean>?>(null) }
   var busy by remember { mutableStateOf<String?>(null) }

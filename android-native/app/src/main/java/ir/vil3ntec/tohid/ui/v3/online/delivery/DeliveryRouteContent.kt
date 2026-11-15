@@ -41,7 +41,7 @@ internal fun RouteScope.DeliveryRoute() {
   val rev = OrdersLive.rev.value
   LaunchedEffect(reload, rev) { if (!DeskStore.load(context)) back() }
   //  تا صفحه باز است، هر نیم دقیقه تازه می‌شود (پیک‌ها وضعیت را از گوشیِ خودشان می‌فرستند)
-  LaunchedEffect(Unit) { while (isActive) { delay(REFRESH_MS); DeskStore.refresh() } }
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(Unit) { while (isActive) { delay(REFRESH_MS); DeskStore.refresh() } }
   var tab by rememberSaveable { mutableStateOf(DeliveryModel.initialTab(args.query("tab"), cfg)) }
   LaunchedEffect(cfg.perms.assign) { if (tab !in DeliveryModel.tabs(cfg)) tab = DeliveryModel.ASSIGN }
   var busyId by remember { mutableStateOf<String?>(null) }

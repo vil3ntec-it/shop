@@ -1875,6 +1875,21 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
   تمام می‌شود» در پیامِ پشتیبانی می‌ماند (`entitle.e2e.mjs` «S47» آن را می‌جوید). سنجه: `subscription-end-day.test.js` (۴/۴؛ پیش از رفع ۴ سرخ).
 
 ### سنجشِ کارایی
+- ⛔ **PERF-SCREEN — بودجهٔ ۱۰۰ میلی‌ثانیه برای هر صفحه و بخش (خواستِ صاحب‌کار، ۱۴۰۵/۰۸/۲۳؛ `docs/PERFORMANCE-fa.md`):** هر بخش با
+  دفترِ بزرگ (۲۰ هزار کالا، ۵ هزار مشتری، ده‌ها هزار فاکتور) زیرِ ۱۰۰ms باز می‌شود و پاسخ می‌دهد، با حرکت. در منطقِ صفحه هیچ گذرِ کلِ
+  دفتر **برای هر ردیف** نیست (`find`/`filter` درونِ `map` روی مشتری، کالا، رسید یا فاکتور): یک `groupBy`/نقشهٔ یک‌باره یا جدولِ
+  یک‌خانه‌ای (`DebtRows`، `ShopStore.index`، `CustomerAlias`). حسابِ سنگین (JSON ِ دفتر، بازپخشِ هستهٔ گزارش) هرگز در ترکیبِ صفحه:
+  `rememberOffMain`/`produceState` روی `Dispatchers.Default`. شمارنده با `rememberCountUpState` و `.value` فقط در برگی که عدد را
+  می‌کشد، نه در ریشهٔ صفحه. سنجه: `desktop/…/perf/ScreenSpeedBenchTest` (CI: منطقِ رشتهٔ صفحه ≤ ۵۰ms میانهٔ گرم روی ۲۰ هزار کالا؛
+  دستی با `TOHID_SCREEN_SPEED=1` منطق و نخستین قاب) و هم‌ارزی `ScreenSpeedEquivalenceTest`. بخشِ تازه ⇒ ردیف در
+  `ScreenLogic.SECTIONS` و مسیر در `ScreenSpeed.routes`؛ بودجه بالا نمی‌رود.
+- ⛔ **PERF-SCREEN — هیچ چیزِ زنده تا کسی در آن بخش نیست (خواستِ صاحب‌کار، ۱۴۰۵/۰۸/۲۴):** هر انیمیشنِ بی‌پایان، چشمک، شیمر،
+  اسپینر، شمارنده، تیکِ ساعت و «… پیش» و نظرسنجیِ صفحه فقط از `ui/v3/V3Live.kt`: `v3LiveFloat` (جای `rememberInfiniteTransition`)،
+  `V3LiveEffect` (جای `LaunchedEffect { while (true) … }`)، `rememberV3LiveClock`، `V3LiveSpinner`، و برای چیزِ دیگر
+  `rememberV3Live().active` (+ `.area` روی خودِ تکه برای «در قاب»). «دیده می‌شود» = بالاترین لایه (`V3Sheet` ⇒ `LocalV3Layer`،
+  دروازه ⇒ `LocalV3Covered`) و برنامهٔ RESUMED (`ProvideV3Foreground` در `MainActivity` و پنجرهٔ کامپیوتر) و در قاب؛ وگرنه قابِ
+  ایستا و صفر قاب. کارِ داده‌ایِ سراسری (همگام‌سازی، زنگِ سفارش، کارگرها) از آن نمی‌گذرد. نگهبان: `V3LiveGuardTest` (فهرستِ
+  کارِ سراسری و اسپینرهای مانده فقط کوچک می‌شود)، رفتار: `V3LiveGateTest`. صحنه‌های هنرِ `ui/v3/art/` هم همین را صدا می‌زنند.
 - ⛔ **PERF-02 — بار در مقیاسِ §۹.۳ و درستی زیرِ بار (`claude/perf-load`):** `load-test.mjs --profile scale,scale-burst --check`
   (آمیزه و دفترِ بارساز `scripts/load-scale.mjs`، سنجه `scripts/load-check.js`). هر تغییرِ push/pull ِ v3، وظیفه/تعارض، نگه‌داشته،
   ویترین یا جدایی دکان ⇒ `test/load-correctness.test.js` روی PGlite و PostgreSQL (بی سنجهٔ زمانی، ~۱ دقیقه). جست‌وجوی ردیفِ «باز» با

@@ -121,7 +121,7 @@ private fun HesabTillSheet(ask: HesabTillModel.Ask, env: HesabPayEnv, onPaid: (i
     }
   }
   //  ساعت: پایانِ «در انتظار»
-  LaunchedEffect(Unit) { while (true) { delay(1_000); on(HesabTill.Event.Tick(env.now())) } }
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(Unit) { while (true) { delay(1_000); on(HesabTill.Event.Tick(env.now())) } }
 
   fun cancel() {
     val live = (state as? HesabTill.State.Pending)?.intent
@@ -217,7 +217,7 @@ private fun QrBox(payload: String?) {
 @Composable
 private fun NfcLine(env: HesabPayEnv) {
   var nfc by remember { mutableStateOf(env.nfc()) }
-  LaunchedEffect(Unit) { while (true) { delay(2_000); nfc = env.nfc() } }
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(Unit) { while (true) { delay(2_000); nfc = env.nfc() } }
   when (nfc) {
     PayDevice.Nfc.READY -> V3Message(V3Tone.INFO, StrTillPay.tapNow)
     PayDevice.Nfc.OFF -> V3Message(V3Tone.WARNING, StrPay.nfcOff, action = StrPay.nfcSettings, onAction = { env.openNfcSettings() })

@@ -111,7 +111,17 @@ object ExpiryEngine {
   }
 
   /** ماندهٔ هر محمولهٔ انقضادار، برای همهٔ کالاها */
+  /**
+   *  PERF-SCREEN: آخرین [lots] برای همان دفتر (همان شیء، مثلِ `ShopStore.index`)، همان روز و همان پرچمِ جذبِ شمارش (موجودی) —
+   *  خانه روی رشتهٔ صفحه و گدام هر دو همین را می‌خوانند و بازگشت به خانه با همان دفتر دوباره نمی‌سازدش. فهرست فقط‌خواندنی است.
+   */
+  private class Last(val d: ShopData, val today: String, val absorb: Boolean, val lots: List<Lot>)
+
+  @Volatile private var last: Last? = null
+
   fun lots(d: ShopData, today: String): List<Lot> {
+    val absorb = CountAbsorbWiring.serverFlag
+    last?.let { if (it.d === d && it.today == today && it.absorb == absorb) return it.lots }
     val out = ArrayList<Lot>()
     val byProduct = d.warehouseEntries
       .filter(::isLot)
@@ -136,7 +146,7 @@ object ExpiryEngine {
         }
       }
     }
-    return out.sortedBy { it.daysLeft }
+    return out.sortedBy { it.daysLeft }.also { last = Last(d, today, absorb, it) }
   }
 
   /** یک تکه از برداشت: سری و انقضای محموله (خالی ⇒ بی انقضا یا بی محموله) و مقدار به هزارم */

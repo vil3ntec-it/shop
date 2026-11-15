@@ -364,8 +364,10 @@ object DebtorEngine {
    */
   fun debtSince(d: ShopData, debtorId: String): Long? {
     //  S89: جفتِ «اصل + معکوس» بیرون — کهنگی همان حذفِ امروز (رسیدِ معکوس‌شده قدیمی‌ترین برد را نمی‌بندد)
-    val own = CustomerAlias.of(d, debtorId)
-    val mine = DebtReverse.effective(d.transactions.filter { it.debtorId in own })
+    //  PERF-SCREEN: ردیف‌های همین پرونده از جدولِ یک‌خانه‌ایِ `DebtRows` (کلیدِ ماندگارِ `CustomerAlias`؛ همان ردیف‌ها به همان
+    //  ترتیبِ `filter { it.debtorId in CustomerAlias.of(d, id) }`) — فهرستِ «قرض‌داران» این را برای هر مشتری می‌خواند و پیش‌تر
+    //  هر بار کلِ دفترِ قرض را می‌گشت (۵ هزار مشتری × ۳۰ هزار ردیف)
+    val mine = DebtReverse.effective(DebtRows.of(d)[debtorId].orEmpty())
       .sortedWith(compareBy<DebtTransaction>({ it.date }, { it.createdAt }))
     if (mine.isEmpty()) return null
 
