@@ -157,8 +157,8 @@ fun V3SummaryFrame(
   //  چیدمانِ کارت در **هر زبان همان** (صاحب‌کار: «لی‌اوتش به دیگه جهت نره حتی با عوض کردن زبان»): پیکان در راست، کادرِ کشویی در چپ،
   //  نمودار نام در راست و مبلغ در چپ — جهتِ چیدمان ثابتِ راست‌به‌چپ؛ جهتِ خودِ نوشته از محتوا. درونِ کادرِ کشویی جهتِ زبان ([corner])
   val language = LocalLayoutDirection.current
-  val inLanguage: (@Composable () -> Unit)? =
-    if (corner == null) null else @Composable { CompositionLocalProvider(LocalLayoutDirection provides language) { corner() } }
+  val wrapped: @Composable () -> Unit = { if (corner != null) CompositionLocalProvider(LocalLayoutDirection provides language) { corner() } }
+  val inLanguage: (@Composable () -> Unit)? = if (corner == null) null else wrapped
   CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
   Column(
     modifier
