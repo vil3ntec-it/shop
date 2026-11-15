@@ -102,7 +102,8 @@ fun V3SummaryBars(
         Box(Modifier.weight(0.4f).height(8.dp).clip(RoundedCornerShape(50)).background(track)) {
           Box(
             Modifier
-              .fillMaxWidth((b.value / max).toFloat().coerceIn(0.02f, 1f))
+              //  صفر ⇒ بی نوار (نه نقطهٔ گمراه‌کننده)؛ مقدارِ بسیار کوچک دست‌کم یک تکهٔ دیدنی
+              .fillMaxWidth(if (b.value <= 0.0) 0f else (b.value / max).toFloat().coerceIn(0.03f, 1f))
               .fillMaxHeight()
               .graphicsLayer { scaleX = grow; transformOrigin = TransformOrigin(if (rtl) 1f else 0f, 0.5f) }
               .clip(RoundedCornerShape(50))

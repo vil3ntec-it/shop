@@ -90,6 +90,10 @@ class E65sShotsTest {
   fun shots() {
     Assume.assumeTrue("E65S_SHOTS نیست", out != null)
     ShopRole.remember(DesktopContext, ShopRole.OWNER)
+    //  گزارش: زبانه‌های نسخهٔ ۳ (نه «گزارشِ تازه» ِ آزمایشی) تا کارتِ خلاصهٔ گزارش دیده شود — پس از عکس پاک
+    val ui = DesktopContext.getSharedPreferences("tohid-ui", 0)
+    ui.edit().putBoolean("report_fresh", false).commit()
+    ir.vil3ntec.tohid.ui.screens.ReportFresh.on.value = false
     val buying = PurchaseDemo.full()
     val money = MoneyDemo.full()
     val stock = StockDemo.full()
@@ -103,5 +107,6 @@ class E65sShotsTest {
     all("promos", "promos", "promos", stock)
     all("products", "products", "products", stock)
     all("stock", "stock", "stock", stock)
+    ui.edit().remove("report_fresh").commit()
   }
 }

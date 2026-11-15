@@ -306,6 +306,10 @@ class SummaryCardUiTest {
     rule.onNode(dropdown).performClick()
     rule.waitForIdle()
     assertEquals(StrA11y.expanded, state())
+    //  گزینه‌ای از فهرست ⇒ فهرست بسته می‌شود و کارت همان باز می‌ماند
+    rule.onNode(hasText("میزان 1405")).performClick()
+    rule.waitForIdle()
+    assertEquals(StrA11y.expanded, state())
     //  بسته ⇒ یک خط، بی کادرِ کشویی
     rule.onNode(header).performClick()
     rule.waitForIdle()
