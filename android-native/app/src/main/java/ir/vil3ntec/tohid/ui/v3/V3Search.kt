@@ -1,6 +1,5 @@
 package ir.vil3ntec.tohid.ui.v3
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -111,7 +110,7 @@ fun rememberV3SearchToggle(search: V3Search?, enabled: Boolean = true): V3Search
     if (live) V3ScopedSearch.register(handler)
     onDispose { V3ScopedSearch.unregister(handler) }
   }
-  BackHandler(enabled = live && toggle.shown, onBack = toggle.close)
+  V3SearchBack(enabled = live && toggle.shown, onBack = toggle.close)
   return toggle
 }
 

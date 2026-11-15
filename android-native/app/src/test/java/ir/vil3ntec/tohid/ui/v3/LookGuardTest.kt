@@ -60,7 +60,7 @@ class LookGuardTest {
   }
 
   @Test
-  fun `دوره و ماه با کادرِ کشویی — نه ‹ ماه › و نه «روز / ماه / سال»`() {
+  fun `دوره و ماه با کادرِ کشویی — نه ‹ ماه › و نه «روز، ماه، سال»`() {
     val expenses = text("ui/v3/money/ExpensesScreen.kt")
     assertFalse(expenses.contains("MonthSwitcher"))
     assertTrue(expenses.contains("V3Dropdown("))
