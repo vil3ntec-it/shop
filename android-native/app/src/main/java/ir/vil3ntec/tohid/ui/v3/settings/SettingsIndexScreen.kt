@@ -51,8 +51,8 @@ internal fun RouteScope.SettingsIndexScreen(onBack: (() -> Unit)?) {
   val facts = rememberSettingsFacts(theme)
   val docs = rememberSearchDocs(facts)
   var query by rememberSaveable { mutableStateOf(SettingsShotState.query) }
-  SettingsPageFrame(title = Str.settings, onBack = onBack, largeTitle = false) {
-    item(key = "search") { SettingsSearchBox(query) { query = it } }
+  //  کارِ یک‌دستی: کادرِ جست‌وجو پایینِ صفحه (`V3Dock`)
+  SettingsPageFrame(title = Str.settings, onBack = onBack, largeTitle = false, search = { SettingsSearchBox(query) { query = it } }) {
     if (query.isBlank()) {
       item(key = "home") { SettingsHomeCard(selected = null) { nav.open(SettingsPaths.home(it)) } }
       item(key = "features") { FeaturesLink { nav.open(SettingsPaths.FEATURES) } }
@@ -138,7 +138,8 @@ internal fun FeaturesLink(onOpen: () -> Unit) {
 internal fun RouteScope.rememberSearchDocs(facts: SettingsFacts): List<SettingsSearchIndex.Doc> {
   val entries = remember(access) { V3Modules.settingsEntries(access) }
   val extras = entries.filter { it.shown() }.map { SettingsSearchIndex.Extra(it.route, it.label(), it.subtitle(), it.group) }
-  return SettingsSearchIndex.docs(Platform.DESKTOP, facts.serverOn, extras)
+  //  ردیفِ فقط‌صاحب («سرورها») در جست‌وجوی دیگران هم نیست
+  return SettingsSearchIndex.docs(Platform.DESKTOP, facts.serverOn, extras).filter { facts.owner || it.key !in SettingsLayout.OWNER_ONLY }
 }
 
 /** نتیجه‌های جست‌وجو: هر ردیف نام، جایش در تنظیمات («فروش و پرداخت · پرداخت») و برچسبِ «آزمایشی» اگر باشد */

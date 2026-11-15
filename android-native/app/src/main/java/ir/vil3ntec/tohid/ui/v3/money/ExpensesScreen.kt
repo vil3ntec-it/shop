@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.data.Expense
 import ir.vil3ntec.tohid.data.ShopData
@@ -158,8 +159,11 @@ internal fun ExpensesScreen(d: ShopData, monthArg: String?, categoryArg: String?
             val shape = RoundedCornerShape(topStart = if (first) r else 0.dp, topEnd = if (first) r else 0.dp, bottomStart = if (last) r else 0.dp, bottomEnd = if (last) r else 0.dp)
             Column(Modifier.v3AnimateItem(this).v3Stagger(stagger, e.id, i).clip(shape).background(PhoneV3.colors.card)) {
               V3ListRow(
+                //  سادهٔ e-rows-63d: دسته فقط وقتی خودش عنوان نیست، و تاریخِ کوتاه («دیروز»، «۲۸ میزان»)
                 title = e.title.ifBlank { e.category },
-                subtitle = listOf(e.category, MoneyText.date(e.date)).filter { it.isNotBlank() }.joinToString(" — "),
+                subtitle = remember(e.title, e.category, e.date, today, I18n.lang) {
+                  listOf(e.category.takeIf { e.title.isNotBlank() }.orEmpty(), MoneyText.short(e.date, today)).filter { it.isNotBlank() }.joinToString(" · ")
+                },
                 icon = Icons.Outlined.Payments,
                 hue = hue,
                 trailing = { Text(MoneyText.afn(e.amount), style = v3Text(14, FontWeight.SemiBold, 20), color = PhoneV3.colors.ink) },

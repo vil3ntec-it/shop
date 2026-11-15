@@ -3,7 +3,6 @@ package ir.vil3ntec.tohid.ui.v3.shell
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,9 +34,9 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
+import ir.vil3ntec.tohid.ui.v3.V3PillAction
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3StaggerState
-import ir.vil3ntec.tohid.ui.v3.v3Pressable
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
 
 /** بلندیِ ردیفِ مرکزِ هشدارها (shell.md: ۶۴dp) */
@@ -73,7 +72,6 @@ private fun ToneTile(item: ShopAlerts.Item) {
 @Composable
 internal fun AlertGroup(title: String, items: List<ShopAlerts.Item>, stagger: V3StaggerState, offset: Int, onOpen: (String) -> Unit) {
   if (items.isEmpty()) return
-  val c = PhoneV3.colors
   V3Section(title, padding = PaddingValues(vertical = 4.dp)) {
     items.forEachIndexed { i, item ->
       if (i > 0) V3Divider(start = 64.dp)
@@ -84,16 +82,8 @@ internal fun AlertGroup(title: String, items: List<ShopAlerts.Item>, stagger: V3
         minHeight = ROW,
         subtitleLines = 1,
         modifier = Modifier.v3Stagger(stagger, item.key, offset + i),
-        //  «دیدن» همان زدنِ ردیف است ⇐ فقط چِورون؛ کارِ دیگر (تمدید، بررسی، پیگیری) نوشته می‌ماند
-        trailing = if (item.plainSee) null else ({
-          Text(
-            item.action,
-            style = v3Text(14, FontWeight.SemiBold, 20),
-            color = PhoneV3Roles.brandText(c),
-            modifier = Modifier.clip(RoundedCornerShape(8.dp)).v3Pressable(label = item.action) { onOpen(item.actionRoute) }
-              .padding(horizontal = 8.dp, vertical = 6.dp),
-          )
-        }),
+        //  «دیدن» همان زدنِ ردیف است ⇐ فقط چِورون؛ کارِ دیگر (تمدید، بررسی، پیگیری) تنها قرصِ نرمِ ردیف (e-rows-63d)
+        trailing = if (item.plainSee) null else ({ V3PillAction(item.action, { onOpen(item.actionRoute) }) }),
         chevron = item.plainSee,
         onClick = { onOpen(item.route) },
       )

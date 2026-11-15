@@ -92,7 +92,8 @@ fun V3SearchField(
       Row(
         Modifier
           .fillMaxWidth()
-          .heightIn(min = 46.dp)
+          //  جای لمسِ ۴۸dp (کارِ یک‌دستی؛ کادرِ جست‌وجو حالا پایینِ صفحه زیرِ شست است)
+          .heightIn(min = V3DockTarget)
           .clip(shape)
           .background(c.card)
           .border(if (focused) 2.dp else 1.dp, ring, shape)

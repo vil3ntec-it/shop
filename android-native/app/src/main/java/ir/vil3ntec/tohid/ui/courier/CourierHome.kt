@@ -560,7 +560,7 @@ private fun RouteTab(
     itemsIndexed(queue.rejected, key = { _, r -> "rej-" + r.event.eventId }) { _, r ->
       RejectedNote(
         title = StrCourierApp.actionNotSaved(actionLabel("", r.event.type)),
-        message = r.message.ifBlank { r.code },
+        message = r.message.ifBlank { StrCourierApp.notSaved },   //  ⛔ کدِ ماشینِ خطا روی صفحه نه
         onDismiss = { onDismissRejected(r.event.eventId) },
         modifier = Modifier.animateItem(),
       )

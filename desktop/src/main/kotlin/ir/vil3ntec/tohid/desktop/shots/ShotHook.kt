@@ -103,11 +103,16 @@ fun V3RoutePreview(path: String, store: ShopStore, dark: Boolean) {
     access = Access.all(mode, setOf(EXAMPLE_FLAG, KIT_GALLERY_FLAG)),
     navAllowed = NavCatalog.allowed(canManage = true, ordersLive = true),
   )
-  //  همان قراردادِ پوسته (`ShellFrame`): نوار فقط روی ریشهٔ تب‌ها و پایینِ هر صفحه نگه‌داشته —
-  //  عکس همان چیزی را نشان می‌دهد که گوشی (AUDIT-NAV S1/N11)
+  //  همان قراردادِ پوسته (`ShellFrame`): نوار روی هر بخشِ اصلی (نه زیرِ برگه) و پایینِ هر صفحه نگه‌داشته —
+  //  عکس همان چیزی را نشان می‌دهد که گوشی (AUDIT-NAV S1/N11، کارِ یک‌دستی)
   val page = RoutePaths.normalize(nav.page.substringBefore('?'))
-  val navVisible = mode == AppMode.SHOP && ShellFrame.navVisible(phone = true, page = page, barTabs = navRoutes, gate = nav.gate != null, cartOpen = false)
-  val pageBottom = if (mode == AppMode.SHOP) ShellFrame.pageBottom(true, navVisible, page, PhoneNav.RESERVE, 0.dp) else 0.dp
+  val cartOpen by ir.vil3ntec.tohid.ui.components.pos.PhoneCartUi.sheetOpen
+  val bar = if (mode != AppMode.SHOP) ShellFrame.Bar.NONE else ShellFrame.bar(
+    phone = true, page = page, barTabs = navRoutes, sections = V3Modules.sections, gate = nav.gate != null,
+    cartOpen = cartOpen, sheetOnTop = nav.current != nav.page, keyboard = false,
+  )
+  val navVisible = ShellFrame.navVisible(bar)
+  val pageBottom = if (mode == AppMode.SHOP) ShellFrame.pageBottom(true, bar, page, PhoneNav.RESERVE, 0.dp) else 0.dp
   CompositionLocalProvider(LocalV3Toasts provides toasts, LocalV3SystemBottom provides 0.dp, ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout provides false) {
     Box(Modifier.fillMaxSize().background(PhoneV3.colors.bg)) {
       V3RouteHost(nav, shell, Modifier.fillMaxSize().padding(bottom = pageBottom))

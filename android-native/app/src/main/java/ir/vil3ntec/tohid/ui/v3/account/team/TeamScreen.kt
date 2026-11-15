@@ -42,7 +42,6 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
-import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Collapse
@@ -56,7 +55,8 @@ import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Skeleton
-import ir.vil3ntec.tohid.ui.v3.V3StatusPill
+import ir.vil3ntec.tohid.ui.v3.V3QuietStatus
+import ir.vil3ntec.tohid.ui.v3.V3RowStatus
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.account.AccountFormat
@@ -148,24 +148,24 @@ internal fun TeamContent(
   }
 }
 
+/**
+ *  ردیفِ کارمند (سادهٔ e-rows-63d): نام، «نقش · تماس» به متنِ آرام؛ وضعیت فقط وقتی «بسته» است (فعال = عادی ⇒ هیچ).
+ *  زدن ⇐ صفحهٔ همان کارمند (نقش، اجازه‌ها، دستگاه‌ها، برداشتن)؛ کشیدن ⇐ «برداشتن».
+ */
 @Composable
 private fun MemberRowView(m: TeamModel.MemberRow, modifier: Modifier, actions: TeamActions) {
   val c = PhoneV3.colors
   V3ListRow(
     title = m.name,
-    subtitle = m.contact.ifBlank { null },
+    subtitle = TeamModel.memberLine(m),
+    subtitleLines = 1,
     modifier = modifier,
     leading = {
       Box(Modifier.size(40.dp).clip(CircleShape).background(if (m.roleKind == AccountFormat.Role.OWNER) PhoneV3Palette.selected(c) else c.tile), contentAlignment = Alignment.Center) {
         Text(m.initial, style = V3Type.headline, color = if (m.active) PhoneV3Roles.brandText(c) else c.inkMuted)
       }
     },
-    trailing = {
-      Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        RolePill(m.role)
-        V3StatusPill(if (m.active) V3Status.DELIVERED else V3Status.INACTIVE, if (m.active) StrAccount.stateActive else StrAccount.stateClosed)
-      }
-    },
+    trailing = if (m.active) null else ({ V3QuietStatus(V3RowStatus(StrAccount.stateClosed)) }),
     endActions = if (m.removable) listOf(V3SwipeAction(Icons.Outlined.PersonRemove, StrAccount.remove, V3ButtonKind.DANGER) { actions.remove(m.id) }) else emptyList(),
     onClick = { actions.member(m.id) },
   )

@@ -61,8 +61,8 @@ fun DeskStatusBar(d: ShopData) {
       sync.dot == SyncDot.RED -> colors.danger to StrNav.syncError
       else -> colors.muted2 to StrNav.offlineHeld
     }
-    //  SYN-08: شمارِ منتظر، آخرین همگام‌سازیِ موفق و خطای آخر همیشه پیداست
-    val text = if (!signedIn) head else SyncBadge.line(head, sync.queued, sync.lastOkAt, sync.lastError, now)
+    //  SYN-08: شمارِ منتظر، آخرین همگام‌سازیِ موفق و خطای آخر همیشه پیداست — خطا فقط به شکلِ ساده (`SyncModel.reason`)
+    val text = if (!signedIn) head else SyncBadge.line(head, sync.queued, sync.lastOkAt, SyncModel.reason(sync.lastError), now)
     Cell(onClick = { AppNav.go("devices") }) {
       Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
       Spacer(Modifier.width(6.dp))

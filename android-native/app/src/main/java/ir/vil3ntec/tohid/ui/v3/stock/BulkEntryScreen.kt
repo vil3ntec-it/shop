@@ -110,7 +110,8 @@ fun BulkEntryScreen(
       if (failure != null) shake++
     },
     onBack = onBack,
-    actions = listOf(V3Action(Icons.Outlined.QrCodeScanner, StrKit.scanBarcode) { onScan { code -> change(state.scanned(data, code, unit)) } }),
+    //  کارِ یک‌دستی: اسکنِ پیاپی پایین، درست بالای «ثبتِ همه»
+    dock = listOf(V3Action(Icons.Outlined.QrCodeScanner, StrKit.scanBarcode) { onScan { code -> change(state.scanned(data, code, unit)) } }),
     primaryEnabled = ready.isNotEmpty(),
     summary = StrStock.bulkSummary(money(ready.size.toDouble()), qty(ready.sumOf { it.amount }), money(ready.sumOf { it.value })),
     dirty = state.dirty,

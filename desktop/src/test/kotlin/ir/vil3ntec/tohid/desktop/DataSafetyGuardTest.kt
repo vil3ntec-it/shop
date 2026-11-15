@@ -354,6 +354,8 @@ class DataSafetyGuardTest {
       //  S29/SYN-09: cursor ِ هاب، `epoch` و حلقهٔ «دیده از سرور» (`HubLinkV1Android`)، و کلیدِ جفت‌شدن اگر Keystore ِ گوشی خراب است
       //  (`HubKeyStore`) — مالِ همین دستگاه؛ پس از بازگردانی گوشی دوباره جفت می‌شود
       "tohid-hub-link", "tohid-hub-secure-plain",
+      //  «هیچ جزئیاتِ فنی در صفحه»: اثر، زمان و شناسهٔ آخرین گزارشِ پشتیبانیِ همگام‌سازی (`SupportDiagAndroid`) — فقط یادِ «فرستاده شد؟»
+      "tohid-support-diag",
     ).forEach { put(it, Kind.DEVICE) }
     //  مانده (DATA-SAFETY §۶): رمزِ کارمندان عمداً از پشتیبان بیرون است — دوباره گذاشته می‌شود
     put("tohid-staff-pins", Kind.GAP)

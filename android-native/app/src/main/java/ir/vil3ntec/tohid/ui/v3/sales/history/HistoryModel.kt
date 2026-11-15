@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.sales.history
 
+import ir.vil3ntec.tohid.core.i18n.StrRows
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.receipt.ReceiptToken
 import ir.vil3ntec.tohid.data.PayFlow
@@ -12,6 +13,9 @@ import ir.vil3ntec.tohid.data.isOnlineOrder
 import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.formatMonth
 import ir.vil3ntec.tohid.plain
+import ir.vil3ntec.tohid.ui.v3.RowWhen
+import ir.vil3ntec.tohid.ui.v3.V3RowStatus
+import ir.vil3ntec.tohid.ui.v3.V3RowTone
 
 /** فیلترهای تاریخچه — همان پنج تراشهٔ امروز (منطقِ فیلتر دست نخورده) */
 enum class HistoryFilter(val id: String) {
@@ -42,6 +46,10 @@ data class HistoryRow(
   val returnDocs: List<String>,
   /** PAY-07 — وضعیتِ پرداختِ غیرنقد برای تراشه؛ null ⇒ نقد، یا همه تأییدشده */
   val payState: String? = null,
+  /** عنوانِ معنادار: نامِ مشتری، وگرنه نامِ کالاها («برنج، روغن و ۲ قلمِ دیگر»)؛ شماره کوچک در پایانِ [subtitle] */
+  val title: String = name,
+  /** وضعیتِ آرامِ کنارِ مبلغ («• نسیه»، «• لغوشده»)؛ فروشِ نقدیِ عادی ⇒ null (هیچ) */
+  val status: V3RowStatus? = null,
 )
 
 /** کارتِ آمارِ بالای تاریخچه */
@@ -123,54 +131,96 @@ object HistoryModel {
   /**
    *  @param fixed POS-40: روشِ پرداختِ این فاکتور اصلاح شد (`PayFixFlow.fixedSales`) ⇒ نشان کنارِ نوع
    *  @param look نمایه‌های یک‌بارهٔ تاریخچه (`RowLookup`) — همان معنا، بی گشتنِ همهٔ دفتر برای هر ردیف
-   *  @param withDate بخشِ ماه و سال: روزِ فاکتور پیش از ساعت
+   *  @param withDate بخشِ ماه و سال و جستجو: روزِ کوتاهِ فاکتور («دیروز ۱۴:۰۵»، «۲۸ میزان ۱۴:۰۵») به‌جای ساعتِ تنها
+   *  @param today امروزِ دکان برای «امروز/دیروز» و سالِ جاری ([RowWhen])
    */
-  fun row(d: ShopData, s: Sale, returnsV2: Boolean, fixed: Boolean = false, look: RowLookup? = null, withDate: Boolean = false): HistoryRow {
-    if (look != null) return fast(d, s, returnsV2, look, withDate)
+  fun row(d: ShopData, s: Sale, returnsV2: Boolean, fixed: Boolean = false, look: RowLookup? = null, withDate: Boolean = false, today: String = ""): HistoryRow {
+    if (look != null) return fast(d, s, returnsV2, look, withDate, today)
     val state = ReceiptModel.state(s)
-    val items = d.saleItems.count { it.saleId == s.id }
+    val items = d.saleItems.filter { it.saleId == s.id }
+    val debtor = ReceiptModel.debtorName(d, s)
+    val payLabel = payLabel(state, s, fixed)
+    val payState = ir.vil3ntec.tohid.data.PayStatusFlow.chip(d, s)
     return HistoryRow(
       id = s.id,
       number = "#" + ReceiptModel.number(s),
-      name = ReceiptModel.debtorName(d, s) ?: StrSale.cashPay,
-      subtitle = listOf(SaleTime.clock(s.createdAt), StrSale.itemsCount(plain(items))).filter { it.isNotBlank() }.joinToString(" · "),
+      name = debtor ?: StrSale.cashPay,
+      subtitle = subtitle(s, withDate, today, if (debtor != null) items.size else null),
       amount = s.finalTotal,
       state = state,
-      payLabel = when (state) {
-        SaleState.CANCELLED -> StrSale.cancelled
-        SaleState.ONLINE -> StrSale.online
-        SaleState.DONE -> ir.vil3ntec.tohid.data.PayFixFlow.kindLabel(ReceiptModel.payLabel(s), fixed)
-      },
+      payLabel = payLabel,
       credit = PayFlow.payGroup(s) == "credit",
       canReturn = canReturn(d, s),
       canCancel = s.status != "cancelled" && !s.isOnlineOrder(),
       returnDocs = if (returnsV2) returnDocs(d, s) else emptyList(),
-      payState = ir.vil3ntec.tohid.data.PayStatusFlow.chip(d, s),
+      payState = payState,
+      title = debtor ?: itemsTitle(items.map { ir.vil3ntec.tohid.data.SalesEngine.itemName(d, it) }),
+      status = status(state, PayFlow.payGroup(s) == "credit", payLabel, payState),
     )
   }
 
-  private fun fast(d: ShopData, s: Sale, returnsV2: Boolean, look: RowLookup, withDate: Boolean): HistoryRow {
+  private fun fast(d: ShopData, s: Sale, returnsV2: Boolean, look: RowLookup, withDate: Boolean, today: String): HistoryRow {
     val state = ReceiptModel.state(s)
-    val day = if (withDate && s.date.isNotBlank()) displayDate(s.date) else ""
+    val items = look.items[s.id].orEmpty()
+    val debtor = s.debtorId?.let(look.debtors::get)
+    val payLabel = payLabel(state, s, s.id in look.fixed)
+    val payState = ir.vil3ntec.tohid.data.PayStatusFlow.chip(d, s, look.payChanges[s.id].orEmpty())
     return HistoryRow(
       id = s.id,
       number = "#" + ReceiptModel.number(s),
-      name = s.debtorId?.let(look.debtors::get) ?: StrSale.cashPay,
-      subtitle = listOf(day, SaleTime.clock(s.createdAt), StrSale.itemsCount(plain(look.items[s.id]?.size ?: 0)))
-        .filter { it.isNotBlank() }.joinToString(" · "),
+      name = debtor ?: StrSale.cashPay,
+      subtitle = subtitle(s, withDate, today, if (debtor != null) items.size else null),
       amount = s.finalTotal,
       state = state,
-      payLabel = when (state) {
-        SaleState.CANCELLED -> StrSale.cancelled
-        SaleState.ONLINE -> StrSale.online
-        SaleState.DONE -> ir.vil3ntec.tohid.data.PayFixFlow.kindLabel(ReceiptModel.payLabel(s), s.id in look.fixed)
-      },
+      payLabel = payLabel,
       credit = PayFlow.payGroup(s) == "credit",
       canReturn = look.canReturn(s),
       canCancel = s.status != "cancelled" && !s.isOnlineOrder(),
       returnDocs = if (returnsV2) look.returnDocs[s.id].orEmpty() else emptyList(),
-      payState = ir.vil3ntec.tohid.data.PayStatusFlow.chip(d, s, look.payChanges[s.id].orEmpty()),
+      payState = payState,
+      title = debtor ?: itemsTitle(items.map(look::itemName)),
+      status = status(state, PayFlow.payGroup(s) == "credit", payLabel, payState),
     )
+  }
+
+  private fun payLabel(state: SaleState, s: Sale, fixed: Boolean): String = when (state) {
+    SaleState.CANCELLED -> StrSale.cancelled
+    SaleState.ONLINE -> StrSale.online
+    SaleState.DONE -> ir.vil3ntec.tohid.data.PayFixFlow.kindLabel(ReceiptModel.payLabel(s), fixed)
+  }
+
+  /**
+   *  «۱۴:۰۵ · ۳ قلم · #۱۲۴۵» — ساعت (یا روزِ کوتاه با [withDate])، شمارِ قلم فقط وقتی عنوان نامِ مشتری است (عنوانِ نقدی
+   *  خودش نامِ کالاهاست)، و شمارهٔ فاکتور کوچک در پایان (برای جستجو و برگشت با شماره).
+   */
+  private fun subtitle(s: Sale, withDate: Boolean, today: String, items: Int?): String {
+    val clock = SaleTime.clock(s.createdAt)
+    val whenText = if (withDate && s.date.isNotBlank()) RowWhen.of(s.date, today, clock) else clock
+    return listOfNotNull(whenText, items?.let { StrSale.itemsCount(plain(it)) }, "#" + ReceiptModel.number(s))
+      .filter { it.isNotBlank() }.joinToString(" · ")
+  }
+
+  /** «برنج»، «برنج، روغن»، «برنج، روغن و ۲ قلمِ دیگر»؛ بی قلم ⇒ «نقدی» */
+  fun itemsTitle(names: List<String>): String {
+    val shown = names.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+    return when {
+      shown.isEmpty() -> StrSale.cashPay
+      shown.size <= 2 -> shown.joinToString(StrRows.namesSep)
+      else -> StrRows.andMore(shown.take(2).joinToString(StrRows.namesSep), plain(shown.size - 2))
+    }
+  }
+
+  /**
+   *  وضعیتِ آرامِ ردیف: لغوشده و اینترنتی خاکستری؛ نسیه کهربایی (بدهی)؛ پرداختِ غیرنقدِ تأییدنشده (PAY-07) با شدّتِ همان
+   *  قرصِ پیشین («ناموفق» قرمز)؛ غیرنقدِ عادی (کارت، کیف پول) آرام؛ نقدیِ عادی ⇒ null.
+   */
+  internal fun status(state: SaleState, credit: Boolean, payLabel: String, payState: String?): V3RowStatus? = when {
+    state == SaleState.CANCELLED -> V3RowStatus(StrSale.cancelled)
+    state == SaleState.ONLINE -> V3RowStatus(StrSale.online)
+    payState != null -> V3RowStatus.of(payLabel + " · " + PayStatusText.name(payState), PayStatusText.pill(payState))
+    credit -> V3RowStatus(payLabel, V3RowTone.ATTENTION)
+    payLabel == StrSale.cashPay -> null
+    else -> V3RowStatus(payLabel)
   }
 
   /**
