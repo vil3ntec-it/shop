@@ -200,9 +200,10 @@ class DeskMenuTest {
   }
 
   @Test
-  fun `نامِ برگه‌های پنل در دری و پشتو همان نوشتهٔ پنل است`() {
+  fun `نامِ برگه‌های پنل در دری و پشتو همان نوشتهٔ پنل است — جز فروشگاه که در دری دکان است`() {
     I18n.source = { Lang.PRS }
-    assertTrue(StrDeskOff.stepPanel, "«فروشگاه»" in StrDeskOff.stepPanel)
+    //  «فروشگاه» واژهٔ ایرانی است و در دری «دکان» می‌شود (`DariWordsTest`)؛ نامِ برگه‌ها همان نوشتهٔ پنل
+    assertTrue(StrDeskOff.stepPanel, "«دکان»" in StrDeskOff.stepPanel && "فروشگاه" !in StrDeskOff.stepPanel)
     assertTrue("«همهٔ دکان‌ها»" in StrDeskOff.stepScope)
     I18n.source = { Lang.PS }
     assertTrue("«تنظیمات و پرچم‌ها»" in StrDeskOff.stepTab && "«پرچم‌ها»" in StrDeskOff.stepTab)
