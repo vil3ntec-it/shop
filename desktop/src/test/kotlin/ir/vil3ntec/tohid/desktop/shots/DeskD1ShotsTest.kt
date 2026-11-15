@@ -120,6 +120,11 @@ class DeskD1ShotsTest {
   fun shots() {
     Assume.assumeTrue("D1_SHOTS نیست", out != null)
     ShopRole.remember(DesktopContext, ShopRole.OWNER)
+    //  برگهٔ یک‌بارهٔ «تازه‌های این نسخه» روی عکس نیفتد: همهٔ بخش‌های بسته‌شده «دیده‌شده»
+    ir.vil3ntec.tohid.data.WhatsNewPref.setKeys(
+      DesktopContext,
+      ir.vil3ntec.tohid.core.guide.WhatsNew.ack(ir.vil3ntec.tohid.core.guide.WhatsNew.bundled.sections, ir.vil3ntec.tohid.data.WhatsNewPref.keys(DesktopContext)),
+    )
     val d = DeskDemo.full()
     val pages = listOf("home" to "home", "more" to "more", "settings" to "settings", "products" to "products")
     for ((name, route) in pages) {
