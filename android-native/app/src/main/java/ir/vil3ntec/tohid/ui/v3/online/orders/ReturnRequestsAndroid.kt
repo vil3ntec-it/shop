@@ -76,7 +76,7 @@ internal fun RouteScope.ReturnRequestsEntry(api: ApiClient, canManage: Boolean, 
   val ctl = remember(api) { ReturnRequestsController(ReturnRequestsRepository(api), scope) }
   var open by remember { mutableStateOf(false) }
   var posting by remember { mutableStateOf<OrderReturnRequests.Request?>(null) }
-  LaunchedEffect(ctl, rev) {
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(ctl, rev) {
     while (true) {
       ctl.refresh()
       delay(ReturnRequestsController.POLL_MS)

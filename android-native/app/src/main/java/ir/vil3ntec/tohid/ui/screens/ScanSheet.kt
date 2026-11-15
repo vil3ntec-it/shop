@@ -248,16 +248,7 @@ fun ScanLine(modifier: Modifier = Modifier) {
     return
   }
 
-  val glide = rememberInfiniteTransition(label = "scan")
-  val y by glide.animateFloat(
-    initialValue = 0f,
-    targetValue = 1f,
-    animationSpec = infiniteRepeatable(
-      tween(SCAN_SWEEP_MS, easing = FastOutSlowInEasing),
-      RepeatMode.Reverse,
-    ),
-    label = "scanline",
-  )
+  val y by ir.vil3ntec.tohid.ui.v3.v3LiveFloat(0f, 1f, infiniteRepeatable(tween(SCAN_SWEEP_MS, easing = FastOutSlowInEasing), RepeatMode.Reverse), "scanline")
   Box(modifier.drawBehind { scanLine(y, tint) })
 }
 

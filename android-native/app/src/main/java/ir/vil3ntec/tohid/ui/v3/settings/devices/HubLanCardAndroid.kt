@@ -73,7 +73,7 @@ private fun HubHostCard(port: HubPanel.Port) {
   val scope = rememberCoroutineScope()
   var state by remember { mutableStateOf(HubPanel.State.OFF) }
   var tick by remember { mutableStateOf(0) }
-  LaunchedEffect(tick) {
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(tick) {
     while (true) {
       state = withContext(Dispatchers.IO) { runCatching { port.state() }.getOrDefault(HubPanel.State.OFF) }
       delay(1_000)

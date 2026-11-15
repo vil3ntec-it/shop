@@ -44,12 +44,7 @@ fun ScanViewfinder(read: Boolean, modifier: Modifier = Modifier) {
   val scrim = c.black.copy(alpha = SCRIM_ALPHA)
   val fill by animateFloatAsState(if (read) 1f else 0f, MotionSpec.tweenOf(MotionTokens.SHORT), label = "scanRead")
   val sweep: State<Float>? = if (Motion.enabled && !read) {
-    rememberInfiniteTransition(label = "scanLine").animateFloat(
-      initialValue = 0f,
-      targetValue = 1f,
-      animationSpec = infiniteRepeatable(tween(SWEEP_MS, easing = MotionTokens.Standard), RepeatMode.Reverse),
-      label = "scanSweep",
-    )
+    ir.vil3ntec.tohid.ui.v3.v3LiveFloat(0f, 1f, infiniteRepeatable(tween(SWEEP_MS, easing = MotionTokens.Standard), RepeatMode.Reverse), "scanSweep")
   } else null
 
   Box(

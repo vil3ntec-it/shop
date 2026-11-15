@@ -234,7 +234,7 @@ internal fun RouteScope.SupportRoute() {
     load(0)
     Backend.support(context).markRead(state.deviceUid)
   }
-  LaunchedEffect(lastAt) {
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(lastAt) {
     while (true) { delay(8_000); load(lastAt) }
   }
 

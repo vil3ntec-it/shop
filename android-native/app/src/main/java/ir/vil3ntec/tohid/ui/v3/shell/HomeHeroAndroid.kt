@@ -59,13 +59,7 @@ fun rememberHeroInput(d: ShopData): HeroInput {
   val safeOn = remember { safeAllowed(context) }
   val blind = remember { ShopPolicy.payV2(context) && ShopPolicy.blindHere(context) }
   //  هر دقیقه یک تیک؛ ورودی فقط با عوض شدنِ ساعت (یا دفتر) از نو ساخته می‌شود
-  var tick by remember { mutableLongStateOf(System.currentTimeMillis()) }
-  LaunchedEffect(Unit) {
-    while (true) {
-      delay(60_000)
-      tick = System.currentTimeMillis()
-    }
-  }
+  val tick = ir.vil3ntec.tohid.ui.v3.rememberV3LiveClock(60_000) { System.currentTimeMillis() } // PERF-SCREEN: فقط وقتی دیده می‌شود
   val start = remember(today) { isoMillis(today).let { if (it > 0L) it - 12 * HomeHero.HOUR_MS else tick } }
   val hour = HomeHero.hourOf(tick, start)
   val safe = remember(d, safeOn) { if (safeOn) SafeBook.view(d) else null }

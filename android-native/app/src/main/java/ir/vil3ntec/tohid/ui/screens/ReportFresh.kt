@@ -687,7 +687,7 @@ fun PhoneFreshReports(d: ShopData) {
         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
       ) { Text(StrMoney.printPdf) }
     }
-    if (fresh == null) { item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }; return@LazyColumn }
+    if (fresh == null) { item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { ir.vil3ntec.tohid.ui.v3.V3LiveSpinner() } }; return@LazyColumn }
     item { HomeKpis(d, {}, money, columns = 2, ready = fresh.home) }
     fresh.dayEnd?.let { b -> item { DayEndPhone(b) } }
     heat?.let { h -> item { HeatmapPhone(h, heatSpan) { heatSpan = it } } }

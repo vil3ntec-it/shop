@@ -92,13 +92,8 @@ fun AuroraBackground(
   val rich = richGlass()
   val moving = animated && rich
 
-  val transition = rememberInfiniteTransition(label = "aurora")
-  val t by transition.animateFloat(
-    initialValue = 0f,
-    targetValue = 1f,
-    animationSpec = infiniteRepeatable(tween(18_000, easing = LinearEasing), RepeatMode.Reverse),
-    label = "drift",
-  )
+  //  PERF-SCREEN: فقط وقتی دیده می‌شود (`v3LiveFloat`)
+  val t by ir.vil3ntec.tohid.ui.v3.v3LiveFloat(0f, 1f, infiniteRepeatable(tween(18_000, easing = LinearEasing), RepeatMode.Reverse), "drift")
   val phase = if (moving) t else 0.5f
   //  هر لکه ۲۰dp جابه‌جا می‌شود، با فازِ متفاوت تا با هم نروند و بیایند
   fun shift(seed: Float) = (sin((phase + seed) * 2f * Math.PI.toFloat()) * 20f).dp

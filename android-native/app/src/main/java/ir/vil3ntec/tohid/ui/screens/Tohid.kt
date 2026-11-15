@@ -452,13 +452,7 @@ fun TohidErrorState(
 @Composable
 fun TohidLoadingState(rows: Int = 4, modifier: Modifier = Modifier) {
   val colors = Shop.colors
-  val shimmer = rememberInfiniteTransition(label = "shimmer")
-  val slide by shimmer.animateFloat(
-    initialValue = -1f,
-    targetValue = 2f,
-    animationSpec = infiniteRepeatable(tween(1400, easing = LinearEasing), RepeatMode.Restart),
-    label = "slide",
-  )
+  val slide by ir.vil3ntec.tohid.ui.v3.v3LiveFloat(-1f, 2f, infiniteRepeatable(tween(1400, easing = LinearEasing), RepeatMode.Restart), "slide")
   val x = if (Motion.enabled) slide else 0.5f
 
   Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Space.sm)) {

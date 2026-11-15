@@ -94,9 +94,10 @@ fun V3RouteHost(nav: V3Nav, shell: ShellContext, modifier: Modifier = Modifier) 
       transitionSpec = { V3Transitions.page(if (nav.wide) Move.NONE else nav.move, dir, nav.tabForward) },
       label = "route",
     ) { path ->
-      saved.SaveableStateProvider(path) { RouteContent(path, nav, shell) }
+      //  PERF-SCREEN: صفحهٔ زیرِ دروازه (قفل) پوشیده است — چیزِ زنده‌اش (`V3Live`) می‌ایستد
+      saved.SaveableStateProvider(path) { CompositionLocalProvider(ir.vil3ntec.tohid.ui.v3.LocalV3Covered provides (nav.gate != null)) { RouteContent(path, nav, shell) } }
     }
-    if (topIsSheet) RouteContent(top, nav, shell)
+    if (topIsSheet) CompositionLocalProvider(ir.vil3ntec.tohid.ui.v3.LocalV3Covered provides (nav.gate != null)) { RouteContent(top, nav, shell) }
     nav.gate?.let { RouteContent(it, nav, shell) }
   }
 }

@@ -186,8 +186,11 @@ fun rememberCountUp(target: Double): Double = rememberCountUpState(target).value
 fun rememberCountUpState(target: Double): State<Double> {
   val from = remember { doubleArrayOf(if (Motion.enabled) 0.0 else target) }
   val progress = remember { Animatable(if (Motion.enabled) 0f else 1f) }
-  LaunchedEffect(target) {
-    if (!Motion.enabled) { progress.snapTo(1f); from[0] = target; return@LaunchedEffect }
+  //  PERF-SCREEN: دیده نمی‌شود (زیرِ برگه، پس‌زمینه) ⇒ همان عددِ پایانی، بی قاب (`V3Live`)
+  val live = rememberV3Live().active
+  LaunchedEffect(target, live) {
+    if (!Motion.enabled || !live) { progress.snapTo(1f); from[0] = target; return@LaunchedEffect }
+    if (from[0] == target && progress.value >= 1f) return@LaunchedEffect
     progress.snapTo(0f)
     progress.animateTo(1f, tween(MotionTokens.COUNT_UP, easing = MotionTokens.EmphasizedDecelerate))
     from[0] = target
