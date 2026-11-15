@@ -389,6 +389,9 @@ dependencies {
   implementation("androidx.compose.material:material-icons-extended")
   implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
   implementation("androidx.webkit:webkit:1.12.1")
+  //  PERF-SCREEN: نصبِ Baseline Profile (`src/main/baseline-prof.txt`) روی APK ِ بیرون از Play (انتشارِ گیت‌هاب و بازار) —
+  //  Compose همین را از پیش با 1.4.0 در زمانِ اجرا می‌آورد؛ این‌جا فقط آشکار و هم‌نسخه با AndroidX ِ امروز
+  implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 
   // دوربین و خواندنِ بارکد — مدلِ خواندن داخلِ خودِ برنامه است، پس در
   // دکانی که اینترنت ندارد هم کار می‌کند
