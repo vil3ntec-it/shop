@@ -133,7 +133,7 @@ private fun OptionalGroup(row: ProductRowDraft, errors: Map<Field, Problem>, hoo
 
 /** تاریخِ جمع‌وجور: فقط رقم (صفحه‌کلیدِ عددی)، «۱۴۰۵/۰۸/۲۴» با جداکنندهٔ خودکار؛ نمونهٔ کادر تاریخِ امروز است */
 @Composable
-private fun DateBox(
+internal fun DateBox(
   value: String,
   onValue: (String) -> Unit,
   label: String,
@@ -152,7 +152,7 @@ private fun DateBox(
 }
 
 /** زیرِ «تاریخِ انقضا»: چند روز مانده، «نزدیکِ انقضا» (همان مرزِ هشدار) یا «گذشته» */
-private fun expiryNote(row: ProductRowDraft, today: String): String? {
+internal fun expiryNote(row: ProductRowDraft, today: String): String? {
   val days = NewProductStock.expiryDays(row, today) ?: return null
   return when {
     days < 0 -> StrNewProduct.alreadyExpired

@@ -17,15 +17,22 @@ import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.core.i18n.StrShell
 
+/** نسخه با نشانِ «نسخهٔ پیش‌نمایش» (فقط buildTypeِ `preview`) — «درباره» و ردیفِ نسخهٔ تنظیمات */
+fun previewVersionLabel(version: String): String = if (BuildConfig.PREVIEW) "$version · ${StrShell.previewBuild}" else version
+
 /**
  *  نوارِ «نسخهٔ پیش‌نمایش» — فقط در buildTypeِ `preview` (`BuildConfig.PREVIEW`).
  *
  *  پیش‌نمایش بی حساب و فقط روی همین دستگاه هم کار می‌کند. اگر کسی با آن وارد
  *  حسابِ واقعی شد (سرور تنظیم و نشست باز)، **یک بار** هشدار می‌دهد که این
  *  نسخه برای دیدن است، نه کارِ روزانه. «یک بار» در `tohid_preview` می‌ماند.
+ *
+ *  [strip] = نوارِ زردِ بالای صفحه. گوشی (۱۴۰۵/۰۸/۲۴، صاحب‌کار: صفحه‌ها «خیلی شلوغ») نوار را روی هیچ صفحه‌ای نمی‌کشد —
+ *  `PreviewBanner(strip = false)` یک بار در پوسته فقط هشدار را نگه می‌دارد و نشانِ پیش‌نمایش کنارِ شمارهٔ نسخه در «درباره» و
+ *  ردیفِ نسخهٔ تنظیمات است ([previewVersionLabel]). کامپیوتر همان نوارِ زیرِ سربرگ.
  */
 @Composable
-fun PreviewBanner() {
+fun PreviewBanner(strip: Boolean = true) {
   if (!BuildConfig.PREVIEW) return
   val context = LocalContext.current
   var warn by remember { mutableStateOf(false) }
@@ -41,7 +48,7 @@ fun PreviewBanner() {
       kotlinx.coroutines.delay(4_000)
     }
   }
-  Text(
+  if (strip) Text(
     StrShell.previewBuild,
     modifier = Modifier
       .fillMaxWidth()

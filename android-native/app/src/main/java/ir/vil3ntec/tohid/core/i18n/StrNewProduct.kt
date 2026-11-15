@@ -38,6 +38,19 @@ object StrNewProduct {
   val expiresToday: String get() = t("امروز منقضی می‌شود", "Expires today", "نن ختمېږي")
   val alreadyExpired: String get() = t("این تاریخ گذشته — کالا منقضی است", "This date has passed — already expired", "دا نېټه تېره ده — توکی ختم شوی")
 
+  // فرمِ سادهٔ یک‌کالایی (۱۴۰۵/۰۸/۲۴، دکمهٔ «کالای تازه»): نام و قیمتِ فروش، بقیه زیرِ «بیشتر»
+  val moreHint: String get() = t(
+    "قیمتِ خرید، دسته، واحد، بارکد، موجودی و تاریخ",
+    "Purchase price, category, unit, barcode, stock and dates",
+    "د پېرود بیه، ډله، واحد، بارکوډ، موجودي او نېټې",
+  )
+  fun savedOne(name: Any): String = t("«${asIs(name)}» ثبت شد", "“$name” saved", "«$name» ثبت شو")
+  fun savedOneWithStock(name: Any): String = t(
+    "«${asIs(name)}» ثبت شد · موجودی به انبار رفت",
+    "“$name” saved · stock recorded",
+    "«$name» ثبت شو · موجودي ګدام ته ولاړه",
+  )
+
   fun savedWithStock(n: Int, stocked: Int): String = t(
     "${asIs(n)} کالا ثبت شد · موجودیِ ${asIs(stocked)} کالا به انبار رفت",
     "$n ${pl(n, "product", "products")} saved · stock recorded for $stocked",
