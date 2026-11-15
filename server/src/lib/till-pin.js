@@ -36,10 +36,17 @@
  *
  * ⛔ پشتِ پرچمِ خاموشِ `shop.till_pin` (live_config): خاموش ⇒ جز `config` هیچ خواندن/نوشتنی از دو جدول؛ تنها استثنا
  *    [memberGone] (تعلیق/برداشتنِ عضو) که فقط PIN و نوبتِ همان عضو را پاک می‌کند و می‌بندد (SR45-3).
+ *
+ * ⛔ شعبه (فازِ ۳ب ِ `docs/BRANCHES-fa.md`، مهاجرتِ ۹۳۰): PIN هویتِ عضو است و سطحِ دکان می‌ماند؛ **نوبت** مالِ شعبه‌ای است که
+ *    دستگاه در آن صندوق باز کرد. [verify]/[current]/[endCurrent]/[sessions]/[sessionAt] «کلید» می‌گیرند (شناسهٔ دکان = اصلی،
+ *    یا `<دکان>#<شعبه>`) و فقط نوبت‌های همان شعبه را می‌خوانند/می‌نویسند؛ یک نوبتِ باز برای هر (دستگاه، شعبه). پرچمِ
+ *    `shop.branches` روشن ⇒ PIN ِ عضوی که به همان شعبه نمی‌رسد نوبت باز نمی‌کند (همان ۴۰۴ ِ «عضو نیست»). برداشتنِ PIN و
+ *    رفتنِ عضو نوبت‌های بازِ او را در همهٔ شعبه‌ها می‌بندند (سطحِ دکان).
  */
 const crypto = require('crypto');
 const { promisify } = require('util');
 const { one, many, query, tx, now, newId } = require('../db');
+const bk = require('./branch-key');
 const audit = require('./audit');
 const orders = require('./orders');
 const { badRequest, forbidden, notFound, conflict, ApiError } = require('../middleware/errors');
@@ -199,8 +206,13 @@ async function closeOpen(c, shopId, where, params, reason, t) {
   return r.rowCount || 0;
 }
 
-/** دو سنجش/بستنِ هم‌زمان روی یک دستگاه پشتِ هم (نوبتِ باز یکتاست: `ux_shop_till_sessions_open`) */
-const lockDevice = (c, shopId, deviceId) => c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`till-device:${shopId}:${deviceId}`]);
+/** دو سنجش/بستنِ هم‌زمان روی یک دستگاه (در یک شعبه؛ [key] = کلید) پشتِ هم (نوبتِ باز یکتاست: `ux_shop_till_sessions_open`) */
+const lockDevice = (c, key, deviceId) => c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`till-device:${key}:${deviceId}`]);
+/** بستنِ نوبتِ بازِ همین دستگاه در همین شعبه */
+const closeDevice = (c, key, deviceId, reason, t) => closeOpen(c, bk.shopOf(key), 'device_id=$4 AND branch_id=$5',
+  [deviceId, bk.branchOf(key)], reason, t);
+/** سابقهٔ شعبهٔ غیرِ اصلی شعبه‌اش را دارد */
+const withBranch = (key, detail) => (bk.isBranch(key) ? { ...detail, branch: bk.branchOf(key) } : detail);
 
 const deviceOf = (device) => {
   if (!device || !device.id) throw conflict('این نشست به دستگاهِ شناخته‌ای بسته نیست؛ یک بار خارج و دوباره وارد شوید.', 'till_device_unknown');
@@ -333,13 +345,16 @@ async function unlock(shopId, actor, target, { ip = '' } = {}) {
  * خطا (PIN ِ غلط، قفل) پس از commit ِ شمارِ خطا پرتاب می‌شود.
  * [seesAll]: درخواست‌کننده `members.view` دارد (صاحب/مدیر) — فقط او و خودِ عضو «ندارد/باطل» را می‌بینند (R15).
  */
-async function verify(shopId, actor, device, target, pin, { ip = '', seesAll = false } = {}) {
+async function verify(key, actor, device, target, pin, { ip = '', seesAll = false } = {}) {
   const dev = deviceOf(device);
   if (typeof pin !== 'string' || !pin.trim()) throw badRequest('PIN را بزنید.', 'till_pin_required');
+  const shopId = bk.shopOf(key);
   const t = now();
   let log;
   const out = await tx(async (c) => {
     const tm = await memberOf(c, shopId, target);
+    //  شعبه: عضوی که به همین شعبه نمی‌رسد اینجا «عضو نیست» (پیش از هر شمار یا سنجشِ PIN؛ پرچمِ خاموش ⇒ همیشه می‌رسد)
+    if (!(await require('./branches').reaches(shopId, tm, bk.branchOf(key)))) throw notFound('این عضو در دکان نیست', 'member_not_found');
     const reveal = seesAll || tm.id === actor.id;
     //  ⛔ R15: برای دیگران عضوِ بی PIN یک ردیفِ جانشین دارد تا شمار و قفل و پاسخ همان PIN ِ غلط باشد (همان گام‌ها برای هر دو)
     if (!reveal) {
@@ -367,26 +382,26 @@ async function verify(shopId, actor, device, target, pin, { ip = '', seesAll = f
       );
       log = await audit.logIn(c, {
         shopId, userId: actor.userId, action: voidNow ? 'till_pin.invalidated' : lockNow ? 'till_pin.locked' : 'till_pin.wrong',
-        targetType: 'member', targetId: tm.id, detail: { failures, device: dev.id }, ip,
+        targetType: 'member', targetId: tm.id, detail: withBranch(key, { failures, device: dev.id }), ip,
       });
       return { error: lockNow ? lockedError(until, t) : wrongError(MAX_FAILURES - (failures % MAX_FAILURES)) };
     }
     if (Number(row.failures)) await c.query('UPDATE shop_till_pins SET failures=0 WHERE shop_id=$1 AND member_id=$2', [shopId, tm.id]);
     const self = tm.id === actor.id;
-    await lockDevice(c, shopId, dev.id);
-    const ended = await closeOpen(c, shopId, 'device_id=$4', [dev.id], self ? 'self' : 'switch', t);
+    await lockDevice(c, key, dev.id);
+    const ended = await closeDevice(c, key, dev.id, self ? 'self' : 'switch', t);
     let session = null;
     if (!self) {
       const r = (await c.query(
-        `INSERT INTO shop_till_sessions (shop_id, id, till_member_id, device_member_id, device_id, device_uid, started_at, expires_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-        [shopId, newId('till'), tm.id, actor.id, dev.id, String(dev.device_uid || '').slice(0, 120), t, t + SESSION_MS],
+        `INSERT INTO shop_till_sessions (shop_id, branch_id, id, till_member_id, device_member_id, device_id, device_uid, started_at, expires_at)
+         VALUES ($1,$9,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        [shopId, newId('till'), tm.id, actor.id, dev.id, String(dev.device_uid || '').slice(0, 120), t, t + SESSION_MS, bk.branchOf(key)],
       )).rows[0];
       session = shapeSession({ ...r, name: tm.name, role: tm.role }, t);
     }
     log = await audit.logIn(c, {
       shopId, userId: actor.userId, action: self ? 'till_session.self' : 'till_session.open', targetType: 'member', targetId: tm.id,
-      detail: { device: dev.id, session: session ? session.id : '', ended }, ip,
+      detail: withBranch(key, { device: dev.id, session: session ? session.id : '', ended }), ip,
     });
     return { member: shapeMember(tm), session };
   });
@@ -396,36 +411,41 @@ async function verify(shopId, actor, device, target, pin, { ip = '', seesAll = f
 }
 
 /** نوبتِ بازِ (و زندهٔ) دستگاهِ توکن، با نام و نقشِ کاربرِ صندوق؛ عضوِ رفته ⇒ null */
-async function current(shopId, device) {
+async function current(key, device) {
   if (!device || !device.id) return { session: null };
   const t = now();
   const r = await one(
     `SELECT s.*, ${NAME_SQL} AS name, m.role FROM shop_till_sessions s
        JOIN shop_members m ON m.id = s.till_member_id AND m.shop_id = s.shop_id AND m.status='active'
        LEFT JOIN users u ON u.id = m.user_id
-      WHERE s.shop_id=$1 AND s.device_id=$2 AND s.ended_at IS NULL AND s.expires_at > $3`,
-    [shopId, device.id, t],
+      WHERE ${bk.sqlOwn(1, 's.')} AND s.device_id=$2 AND s.ended_at IS NULL AND s.expires_at > $3`,
+    [key, device.id, t],
   );
   return { session: r ? shapeSession(r, t) : null };
 }
 
-/** بستنِ نوبتِ بازِ دستگاهِ توکن (قفلِ صندوق) — فقط کم می‌کند */
-async function endCurrent(shopId, actor, device, reason = 'lock', { ip = '' } = {}) {
+/** بستنِ نوبتِ بازِ دستگاهِ توکن در همین شعبه (قفلِ صندوق) — فقط کم می‌کند */
+async function endCurrent(key, actor, device, reason = 'lock', { ip = '' } = {}) {
   if (!END_REASONS.includes(reason)) throw badRequest('دلیلِ بستن نادرست است', 'till_end_reason');
   if (!device || !device.id) return { ended: 0 };
   let log;
   const ended = await tx(async (c) => {
-    await lockDevice(c, shopId, device.id);
-    const n = await closeOpen(c, shopId, 'device_id=$4', [device.id], reason, now());
-    if (n) log = await audit.logIn(c, { shopId, userId: actor.userId, action: 'till_session.end', targetType: 'device', targetId: device.id, detail: { reason }, ip });
+    await lockDevice(c, key, device.id);
+    const n = await closeDevice(c, key, device.id, reason, now());
+    if (n) {
+      log = await audit.logIn(c, {
+        shopId: bk.shopOf(key), userId: actor.userId, action: 'till_session.end', targetType: 'device', targetId: device.id,
+        detail: withBranch(key, { reason }), ip,
+      });
+    }
     return n;
   });
   if (log) await log.afterCommit();
   return { ended };
 }
 
-/** نوبت‌های یک بازه (حداکثر ۶۲ روز). صاحب و مدیر همه را (یا یک عضو)؛ بقیه فقط نوبت‌های خودشان */
-async function sessions(shopId, actor, { from, to, memberId } = {}) {
+/** نوبت‌های یک بازه (حداکثر ۶۲ روز) در همین شعبه ([key]). صاحب و مدیر همه را (یا یک عضو)؛ بقیه فقط نوبت‌های خودشان */
+async function sessions(key, actor, { from, to, memberId } = {}) {
   const t = now();
   const end = to === undefined || to === '' ? t : Number(to);
   const start = from === undefined || from === '' ? end - 7 * 24 * 60 * 60 * 1000 : Number(from);
@@ -437,10 +457,10 @@ async function sessions(shopId, actor, { from, to, memberId } = {}) {
        LEFT JOIN shop_members m ON m.id = s.till_member_id AND m.shop_id = s.shop_id
        LEFT JOIN users u ON u.id = m.user_id
        LEFT JOIN devices d ON d.id = s.device_id
-      WHERE s.shop_id=$1 AND s.started_at <= $3 AND COALESCE(s.ended_at, s.expires_at) >= $2
+      WHERE ${bk.sqlOwn(1, 's.')} AND s.started_at <= $3 AND COALESCE(s.ended_at, s.expires_at) >= $2
         AND ($4::text IS NULL OR s.till_member_id=$4)
       ORDER BY s.started_at, s.id LIMIT 2000`,
-    [shopId, start, end, who],
+    [key, start, end, who],
   );
   return { from: start, to: end, serverTime: t, sessions: rows.map((r) => shapeSession(r, t)) };
 }
@@ -449,22 +469,23 @@ async function sessions(shopId, actor, { from, to, memberId } = {}) {
  * چه کسی (به سنجشِ سرور) در لحظهٔ [at] پشتِ دستگاهِ [deviceId] بود ⇒ شناسهٔ عضو، یا null (خودِ حسابِ دستگاه).
  * برای نسبت دادنِ کارِ آن دستگاه در آن لحظه؛ پرچمِ خاموش ⇒ null بی هیچ خواندنی.
  */
-async function whoAt(shopId, deviceId, at) {
-  const s = await sessionAt(shopId, deviceId, at);
+async function whoAt(key, deviceId, at) {
+  const s = await sessionAt(key, deviceId, at);
   return s ? s.till_member_id : null;
 }
 
 /**
  * همان [whoAt] با خودِ نوبت (`id`، `till_member_id`، `started_at`) — برای «کاربرِ سنجیدهٔ صندوق» روی op (S46،
  * `lib/till-op-user.js`) که آغازِ نوبت را هم می‌سنجد. پرچمِ خاموش ⇒ null بی هیچ خواندنی.
+ * [key]: شناسهٔ دکان (اصلی) یا `<دکان>#<شعبه>` — فقط نوبتِ همان شعبه (op ِ بخشِ شعبه هرگز به نوبتِ شعبهٔ دیگر نمی‌افتد).
  */
-async function sessionAt(shopId, deviceId, at) {
-  if (!deviceId || !Number.isSafeInteger(Number(at)) || !(await flagOf(shopId))) return null;
+async function sessionAt(key, deviceId, at) {
+  if (!deviceId || !Number.isSafeInteger(Number(at)) || !(await flagOf(key))) return null;
   const r = await one(
     `SELECT id, till_member_id, started_at FROM shop_till_sessions
-      WHERE shop_id=$1 AND device_id=$2 AND started_at <= $3 AND $3 < COALESCE(ended_at, expires_at)
+      WHERE ${bk.sqlOwn(1)} AND device_id=$2 AND started_at <= $3 AND $3 < COALESCE(ended_at, expires_at)
       ORDER BY started_at DESC LIMIT 1`,
-    [shopId, String(deviceId), Number(at)],
+    [key, String(deviceId), Number(at)],
   );
   return r ? { id: r.id, till_member_id: r.till_member_id, started_at: Number(r.started_at) } : null;
 }

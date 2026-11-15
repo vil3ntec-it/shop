@@ -79,6 +79,77 @@
 - **مانده / قدمِ بعد:** صفحهٔ «انتقال میانِ شعبه‌ها» و کلیدِ مجوز در «شعبه‌ها» ِ برنامه و سرآیندِ `X-Branch-Id` در REST ِ برنامه (فازِ ۲، کنارِ
   «انتخابِ شعبه» ِ عاملِ دیگر)؛ دفترِ دستگاه برای انتقالِ میانِ شعبه (پیشنهاد در §۱۰)؛ دستگاهِ واقعی (فازِ ۵).
 
+### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-63p زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-63p` (از `origin/claude/batch-63` baff32f2e) — حریمِ خصوصی و شرایط درونِ برنامه‌ها، بی GitHub؛ نسخهٔ فروشگاهی بی کدِ به‌روزرسانی
+
+- **خواستهٔ صاحب‌کار:** صفحهٔ حریمِ خصوصی از `vil3ntec-it.github.io/shop/privacy.html` باز می‌شد و GitHub ِ او را به کاربر و مهاجم
+  نشان می‌داد ⇒ حریمِ خصوصی و شرایط **درونِ خودِ برنامه‌ها**، هیچ پیوندِ GitHub در برنامه‌ها، و نشانیِ عمومیِ فهرستِ فروشگاه‌ها روی
+  دامنهٔ خودِ سرور. سپس (پیامِ هماهنگ‌کننده، تصمیمِ صاحب‌کار) نسخهٔ Play/بازار اصلاً کدِ به‌روزرسانی و نشانیِ GitHub نداشته باشد.
+- **منبعِ یکتا:** `core/legal/legal-texts.json` (حریمِ خصوصی ۷ بخش و شرایطِ ۹ بند؛ fa همان `privacy.html` و `lib/terms.js` ِ پیشین،
+  بایت‌به‌بایت؛ en و ps تازه — ⚠️ ترجمهٔ ماشینیِ Claude، بازبینیِ گویندهٔ پشتو/انگلیسی مانده؛ دری از `DariText`). `node tools/legal/generate.mjs`
+  رونوشتِ سرور (`server/src/lib/legal-texts.json`) و کاتلین (`core/.../legal/LegalTexts{Fa,En,Ps}.kt`) را می‌سازد؛ API: `core/.../legal/Legal.kt`
+  (`doc(kind, lang)`، `spans` برای `**پررنگ**` و `[نوشته](/مسیرِ-نسبی)`، `TERMS_VERSION`).
+- **صفحه‌ها:** برنامهٔ دکان `LegalPage.kt` (مسیرِ تازهٔ `legal/privacy`؛ `auth/terms` با نامِ دیگرِ `legal/terms`؛ `TermsPage` همان صفحه)
+  ⇐ «درباره برنامه» (حریمِ خصوصی + ردیفِ تازهٔ شرایط)، «ویرایش حساب»، حالتِ پیک (`CourierLegal.kt`: کارتِ برگهٔ «حساب» و زیرصفحهٔ
+  `legal:*` در همان `page` ِ «نقدِ من» — `CourierHome.kt` بی رشد، ۸۱۸)؛ کامپیوتر و آیفونِ دکان همان پرونده‌ها. `data/Terms.kt` حالا از
+  core و به زبانِ برنامه. برنامهٔ خرید `LegalScreen.kt` (`LegalRoute` زیرکلاسِ `Route` در پروندهٔ جدا چون `CustomerModel.kt` ۸۰۰ خط است؛
+  دو دکمه در «تنظیمات»)؛ آیفونِ خرید همان. وبِ خریدار: پیوندِ `/legal/privacy|terms?lang=` در پنجرهٔ تنظیمات (`kit/settings.js`، کلیدهای
+  `set.privacy`/`set.terms`).
+- **سرور:** `routes/legal-pages.js` سوار در `app.js` با همان یک خطِ سرخطِ «پورتال و SDK» (۸۰۵ خط، بی رشد): `GET /legal/privacy`،
+  `/legal/terms`، `/legal/` ⇐ ۳۰۲؛ عمومی، بی نشست و کوکی، HTML با `Cache-Control: public, max-age=3600`، ETag ِ محتوا و ۳۰۴، CSP ِ بی اسکریپت
+  (style با hash)، فقط پیوندِ نسبی، `?lang=fa|prs|en|ps`. `lib/terms.js` از همان منبع؛ پاسخِ `GET /api/auth/terms` و `terms.version`=«1» ِ
+  ثبت‌نام بایت‌به‌بایت همان (سنجیده با پروندهٔ پیشین). ⚠️ اگر سرور پشتِ پنلِ خانگی است و فقط پیشوندهای شناخته را می‌فرستد، `/legal` باید
+  آن‌جا هم برود (ریپوی `server` دست نخورد؛ دستور در `OWNER-NEXT-fa.md` بخشِ ۳).
+- **GitHub در نوشته‌ها:** `AccountDeletion.PRIVACY_URL` رفت؛ توضیحِ `PlusCode.kt`. پیام‌های `StrUpdate` پس از ادغامِ `origin/claude/batch-63`
+  همان متنِ 63h («سرورِ به‌روزرسانی»)؛ دو پیامِ کددار (کارِ ماندهٔ 63h) بی کدِ HTTP شدند: `githubError(code)` ⇐ `updateServerError` و
+  `updateServerNoAnswer(code)` ⇐ `updateServerNoAnswer` (صدازننده‌ها `Updater.kt` و `UpdaterDesk.kt`؛ + `DariText.PHRASES`، `dari.js`، `DARI-REVIEW-fa.md`).
+- **نسخهٔ فروشگاهی:** `update/Updater.kt` با `git mv` به `android-native/app/src/direct/java` (بی هیچ تغییرِ متن)؛ `app/build.gradle.kts`:
+  `sourceSets["main"].java.srcDir(if (storeManaged) "src/store/java" else "src/direct/java")`؛ `src/store/.../UpdaterStoreAndroid.kt` همان API
+  بی شبکه و بی نشانی. سقفِ `platformDeps` ِ همان پرونده به مسیرِ تازه رفت (۱۷، بی تغییر)؛ سطرِ `update/Updater.kt` ِ `desktop/build.gradle.kts`
+  (`replaced`) و `ios/shared/ios-exclude.txt` توضیح شد چون پرونده دیگر در `src/main` نیست. `GOOGLE-PLAY-fa.md` §۲.۱ و §۴/§۶ (نشانیِ تازه).
+- **آزمون‌های تازه:** core `LegalTest` (۷)؛ کامپیوتر `LegalPagesUiTest` (۵: هر دو سند در fa/prs/en/ps، دکمهٔ «می‌پذیرم»، «درباره» ⇐ صفحهٔ
+  درونِ برنامه، `legal/terms`، برگهٔ «حساب» ِ پیک)؛ برنامهٔ خرید `CustomerLegalTest` (۲، فقط CI)؛ سرور `legal-pages` (۶)، `legal-texts` (۵:
+  `--check`، قاعده‌های منبع، قراردادِ شرایط، برابریِ `privacy.html` با منبع، نامِ پیوندهای وب)، `no-github-in-apps` (۲)، `store-build-updater` (۴).
+- **تغییرِ عمدیِ آزمون/نگهبان:** (۱) `self-delete`، `privacy-erasure-text` و `backup-passphrase-warning` هنوز `privacy.html` را می‌خوانند؛
+  `legal-texts.test.js` برابریِ بند‌به‌بندِ آن با فارسیِ منبع را قفل می‌کند، پس آن سه منبع را هم می‌پوشانند — با پاک شدنِ `privacy.html`
+  باید به `server/src/lib/legal-texts.json` برگردانده شوند. (۲) `no-github-in-apps` عمداً بیرون می‌گذارد: آزمون‌ها، پوشه‌های `update/`
+  (`Updater*`، `ReleaseFeed.kt`: کانالِ به‌روزرسانیِ نسخهٔ مستقیم)، پوستهٔ بازنشستهٔ `android/`، پنلِ مدیر (`public/admin`، پیوندِ
+  انتشارهای آزمایشی) و صفحه‌های GitHub Pages ِ ریشه. (۳) سه سطرِ «گیت‌هاب» ِ `DARI-REVIEW-fa.md` به متنِ تازه.
+- **اجرا:** سرور (PGlite) ۱۴ پرونده ۱۱۱/۱۱۱ (`legal-pages`، `legal-texts`، `no-github-in-apps`، `store-build-updater`، `signup-location`، `self-delete`،
+  `privacy-erasure-text`، `backup-passphrase-warning`، `web-i18n`، `dari-text`، `dead-doors`، `tenant-matrix`، `api-contract`، `kotlin-test-names-windows`)؛
+  core `jvmTest` ‹legal/text/account› ۷۴/۷۴؛ کامپیوتر هدف‌دار پس از ادغامِ batch-63 (`LegalPagesUiTest` ۵، `core.i18n.*` با `InfraLeakGuardTest` ۸ و
+  `DariCoverageTest` ۲۳، `update.*`، `NoLegacyUiTest`، `*Courier*`، `*Onboarding*`، `*Settings*`، `*Profile*`، `*WhatsNew*`) ۳۳۰/۳۳۰؛ جایگزینِ فروشگاهیِ `Updater` + `ReleaseVersion` + صدازنندهٔ نمونه روی JVM کامپایل شد
+  (shim ِ `Context`؛ پروژهٔ موقت). نخستین کامپایلِ کامپیوتر دو باگِ واقعیِ همین کار را گرفت: `/legal/*` در KDoc توضیحِ تودرتو باز می‌کرد
+  و `LocalV3Nav.current` تهی‌پذیر است. spec «سالم»، api-contract تازه (+۲ درِ `/legal`)، secret-scan ۰ سد، dari-words و kt-names سبز.
+  ⚠️ precheck پس از ادغام `fail=1` فقط از `quality.mjs` و **ارثِ `origin/claude/batch-63`** است (نه این شاخه؛ diff ِ این شاخه با batch-63 روی
+  آن پرونده‌ها صفر): `sync/v1/SyncV1Engine.kt` ۹۶۴ خط > سقفِ ۹۶۱ و `core/net/HttpEngine.kt` ۵ وابستگیِ پلتفرمی > ۳ — کدِ همگام‌سازی دست
+  نخورد. اجرای **کاملِ** کامپیوتر دو بار با ری‌استارتِ کانتینر (فشارِ حافظه) کشته شد و دوباره زده نشد؛ فقط هدف‌دار.
+- **نیمه‌کاره/قدمِ بعدی:** (۱) صاحب‌کار نشانیِ Play Console (و بازار/App Store) را به `https://<دامنه>/legal/privacy` برگرداند ⇒ `privacy.html`
+  (و پیوندش در `index.html` ِ ریشه) پاک و سه آزمونِ بالا به منبع برگردانده شود. (۲) بازبینیِ ترجمهٔ en/ps ِ متنِ حقوقی. (۳) هنوز در کد:
+  پیشفرضِ `update_repo` = «vil3ntec-it/shop» در `UpdateBanner`/`ShellNotices`/`More.kt` (نامِ مخزن، نه نشانی؛ در نسخهٔ فروشگاهی بی‌اثر)،
+  پیوندهای انتشارِ آزمایشیِ پنلِ مدیر، و `index.html`/`download.html` ِ GitHub Pages — تصمیمِ کانالِ به‌روزرسانی. (۴) ساختِ اندرویدِ
+  `-Pstore=play|bazaar` و `customer-android` فقط در CI سنجیده می‌شود (این‌جا Android SDK نیست).
+### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-62b زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-62b` (از `origin/claude/batch-63` baff32f2e، سپس ادغامِ 1502120a8) — شعبه درونِ یک دکان، فازِ ۳ب ِ سرور
+
+- **ساخته شد (فقط سرور، پشتِ پرچمِ خاموشِ `shop.branches`؛ تصمیمِ هر گروه: [`BRANCHES-fa.md`](BRANCHES-fa.md) §۹؛ مهاجرتِ ۹۳۰ + rollback):**
+  شعبه‌شناس با سرآیندِ سنجیدهٔ `X-Branch-Id` (`lib/branch-rest.js`، SQL با `branch-key.sqlOwn`) و بیرون از `branch-gate`: نگه‌داشته (و درِ
+  تازهٔ `/:id/twice` ِ S09 به صندوقِ تعارضِ همان شعبه)، سفارشِ خرید/رسید/فاکتور (شمارهٔ هر شعبه از ۱)، نوبت‌های صندوق و S46 (یک نوبتِ باز برای
+  هر دستگاه و شعبه؛ PIN سطحِ دکان؛ `/till-pin/members…` فقط اصلی)، صندوقِ تعارض («دوباره ثبت» ِ شعبه فقط v3 در همان بخش) و `/api/events`
+  (`lib/branch-events.js` = همان `events.build` روی جدولِ جدا؛ زنگ فقط به اعضای همان شعبه). CRM-03/STF-03 در بخشِ شعبه با `detail.branch` و
+  هدفِ `<شعبه>|<فاکتور>`. کلیدهای یکتا با شعبه ⇒ شناسهٔ یکسان در دو شعبه نه «تعارض» و نه نوشتن روی دیگری. پرچمِ خاموش و شعبهٔ اصلی
+  بایت‌به‌بایت همان (پاسخ و ردیف‌ها)؛ تنها فرقِ اصلی با پرچمِ روشن: PIN ِ عضوِ بی شعبهٔ اصلی در اصلی نوبت باز نمی‌کند (۴۰۴).
+  `lib/events.js`، `account-backups`، کدِ پمپ و `sync-v1*` دست نخوردند.
+- **فقط اصلی ماند (تصمیمِ صاحب‌کار):** پشتیبانِ کامل `/api/me/backups` — سهم/نگه‌داریِ اشتراک برای شعبه‌ها؛ پرسشِ ۴-۴ در `OWNER-PENDING-fa.md`.
+- **تغییرِ آگاهانهٔ آزمون:** `shop-branches.test.js`: `/api/events` برای کارمندِ فقط الف بی سرآیند حالا ۴۰۳ `branch_required` (نه
+  `branch_main_only`) و با سرآیندِ الف دفترِ خودِ الف — هنوز ۴۰۳، سخت‌تر نه سست‌تر؛ `till-pin.test.js` (مهاجرتِ ۶۴۰): پیش از برگشتِ ۶۴۰
+  برگشتِ ۹۳۰ (دُمِ مهاجرت‌ها، همان روشِ `upgrade-rehearsal`) و انتظارِ `['640…', '930…']`.
+- **آزمون:** `shop-branches-doors.test.js` **۷/۷** (روی کدِ پیشین ۰/۷ سرخ)؛ `tenant-matrix-branches.test.js` **۱/۱** (۳۵۲ در شاملِ
+  `/api/events*` و `/api/me/backups*`، ~۴۹۰۰ درخواست، شناسهٔ واقعیِ سفارش/تعارضِ «ب» و سرآیندِ ساختگی روی ۳۳ درِ ۳ب)؛ پس از ادغامِ batch-63
+  ۱۵ پروندهٔ مربوط ۱۱۶/۱۱۶. **اجرای کاملِ سرور روی PGlite** (دو تکه): ۴۳۳۸ آزمون، ۴۲۹۳ سبز، ۳ شکست، ۴۰ SKIP، ۲ TODO ِ پیشین — هر سه
+  شکست روی خودِ `origin/claude/batch-63` هم سرخ‌اند (بیرون از این کار): `console-shell` ×۲ (`shop.storefront.host_alias` در KNOWN نیست)
+  و `loc-no-postal` (`DebtorFormSheets.kt` ِ کدِ پستی). precheck `fail=0`، quality بی «همین تغییر»، spec «سالم»، whatsnew، api-contract و
+  secret-scan (۰ سد) سبز. Kotlin عوض نشد ⇒ desktop/core اجرا نشد.
+- **مانده:** پرسشِ ۴-۴؛ بازبینیِ `doc-chain` و سریِ سندِ هر شعبه (`shop_doc_series` سطحِ دکان ماند)؛ ابزارهای پنل برای بخش‌ها؛ فازِ ۲
+  (برنامه‌ها) و فازِ ۴ (انتقال، کارِ 63t). PostgreSQL ِ محلی نبود ⇒ فقط PGlite. ⛔ تا پایانِ فازِ ۲ کلید را روی دکانِ واقعی روشن نکنید.
 ### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-63r زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-63r` (از `origin/claude/batch-63` cad65eb96) — کارِ یک‌دستی در همهٔ نسخهٔ ۳
 
 خواستِ صاحب‌کار: «با یک دست کار می‌کنم؛ دکمه‌ای که می‌زنم بالا نباشد؛ از همه‌جا درست کن؛ چیزی حذف نشود». صفحه‌ای که نشان داد («نام، بارکد یا کدِ کالا»

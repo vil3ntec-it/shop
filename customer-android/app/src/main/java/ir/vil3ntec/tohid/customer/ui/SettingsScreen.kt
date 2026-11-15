@@ -29,7 +29,7 @@ import ir.vil3ntec.tohid.core.shopper.ShopperLang
 import ir.vil3ntec.tohid.core.shopper.ShopperText
 
 /**
- *  تنظیمات: زبان، ظاهر و حساب. ⛔ نشانیِ سرور به خریدار نشان داده نمی‌شود («هیچ جزئیاتِ فنی/زیرساخت در صفحه»،
+ *  تنظیمات: زبان، ظاهر، حساب، حریمِ خصوصی و شرایط (`LegalScreen.kt`). ⛔ نشانیِ سرور به خریدار نشان داده نمی‌شود («هیچ جزئیاتِ فنی/زیرساخت در صفحه»،
  *  `docs/RULES-fa.md`): کادرِ آزمونِ «نشانیِ سرور» فقط در ساختِ آزمونِ دستی (`Platform.serverField`) و **خالی** باز می‌شود —
  *  نه نشانیِ ساخت و نه نشانیِ آموخته در آن نیست؛ فقط همان که آزماینده خودش می‌نویسد (خالی ⇒ برگشت به نشانیِ ساخت).
  */
@@ -47,6 +47,7 @@ fun SettingsScreen(model: CustomerModel) {
         Option(label, model.saved.theme == k) { model.setTheme(k) }
       }
       AccountSettings(model)
+      LegalLinks(model)   //  حریمِ خصوصی و شرایط درونِ برنامه (`LegalScreen.kt`)
       if (platform.serverField) {
         SectionTitle(ShopperText.server)
         OutlinedTextField(

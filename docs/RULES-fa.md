@@ -542,6 +542,12 @@
   (۳) درِ REST ِ شعبه‌شناس شعبه را فقط از `branches.restOf(req)` می‌گیرد (سرآیندِ سنجیده؛ بدنه/پارامتر هرگز؛ پرچم خاموش ⇒ اصلی
   بی خواندنِ سرآیند) و درهای سطحِ دکان/فقط‌اصلیِ خودش را در شعبهٔ دیگر ۴۰۳ `branch_unsupported` می‌دهد؛ هر درِ تازه‌ای که از
   `branch-gate` بیرون برود در `tenant-matrix-branches.test.js` سنجیده می‌شود. سنجه: `shop-branches-stock.test.js`.
+- ⛔ **شعبه، فازِ ۳ب — درهای REST ِ شعبه‌دار** (`claude/e-rows-62b`، مهاجرتِ ۹۳۰): درِ تازهٔ شعبه‌شناس `branch-rest.scope` را پس از
+  احراز می‌گذارد و به کتابخانه `req.branchKey` می‌دهد (نه `req.shopId`)؛ جدولِ سرورِ شعبه‌دار ستونِ `branch_id` (پیش‌فرض `''`) و
+  **کلیدهای یکتای با شعبه** دارد و SQL فقط با `branch-key.sqlOwn(n)` (یک پارامتر = کلید؛ هرگز `shop_id=$1` ِ تنها روی جدولِ
+  شعبه‌دار)؛ پرچم/تعریف/عضو/سابقه با `shopOf` و سابقهٔ شعبه با `detail.branch`؛ کتابخانهٔ مشترک با پمپ (`lib/events.js`،
+  `account-backups`) دست نمی‌خورد — جدولِ جدا یا «فقط اصلی». سابقهٔ `once` ِ شعبه هدفِ `<شعبه>|…` می‌گیرد. هر درِ تازه در
+  `tenant-matrix-branches.test.js` (`PHASE3B`) و `shop-branches-doors.test.js`.
 
 - ⛔ **گروهِ الفِ همگام‌سازی (د۱۸، `claude/e-rows-55s`)** — هر کدام پشتِ پرچمِ خاموش، پرچم پیش از بدنه، و هیچ‌کدام `sync-v1.js`/`routes/sync-v1.js`/`sync-v1-auth.js` (مشترک با پمپ) را نمی‌خوانند:
   PRD-07 راهِ قدیم فقط `product-unit-rules.legacyGuard` پیش از `sync.pushChanges` (ردشده ⇐ تعارضِ همان ردیف با دادهٔ سرور؛ `lib/sync.js` دست نمی‌خورد)؛
@@ -1602,7 +1608,8 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
   `consented()` کاری نمی‌کنند و پیش‌فرض «بی رضایت» است (`DEFAULT_CONSENT = false`) تا تصمیمِ D-04. اجازهٔ اندروید
   رضایت به فرستادنِ دوره‌ای نیست. لوکیشنِ یک‌بارهٔ ثبت‌نام (`Welcome.kt`) جداست.
 - ⛔ هر تغییری در داده‌ای که از دستگاه بیرون می‌رود (موقعیت، تپشِ بازدید، شناسهٔ دستگاه) در همان PR در
-  `privacy.html` هم نوشته می‌شود.
+  منبعِ یکتای متنِ حقوقی `core/legal/legal-texts.json` (fa/en/ps) هم نوشته می‌شود، سپس `node tools/legal/generate.mjs`؛
+  تا پاک شدنِ رونوشتِ موقتِ GitHub Pages، `privacy.html` هم بند‌به‌بند همان فارسی (`server/test/legal-texts.test.js`).
 - ⛔ **F0-18:** در کدِ صفحه‌ها (بیرون از `ui/theme/`) رنگِ ثابت نیست: نه `Color(0x…)` و نه
   `background(Color.White/Black)`؛ رنگ از `Shop.colors.*` یا `MaterialTheme.colorScheme`. رنگِ تازه اول یک توکن
   با دو مقدارِ روز و شب در `ShopColors`. هر پنجرهٔ جدا در کامپیوتر داخلِ `TohidTheme`. نگهبان:
@@ -3915,13 +3922,28 @@ SCALE=2000 SCALE_PAR=40 node --test test/pump-scale.test.js
 - CI: کارِ جدای «نسخهٔ Google Play (AAB)» در `tohid-native.yml` — `bundleRelease -Pstore=play` و `tools/play-check.py`
   (targetSdk ≥ ۳۶، بی اجازهٔ نصب، LOAD ِ ۱۶KB برای `.so` ِ ۶۴بیتی)؛ AAB فقط artifact است (`MyShop-Play`)، نه انتشار.
 - ⛔ **حذفِ حساب** (قاعدهٔ Play): برنامه «حساب من ← ویرایش ← حذفِ حساب» (`profile/delete`، `DeleteAccountSheet`)، وب
-  `/portal/#delete-account`، و `privacy.html#delete-account` (نشانیِ Play Console؛ `server/test/self-delete.test.js` می‌سنجد).
+  `/portal/#delete-account`، و `/legal/privacy#delete-account` ِ خودِ سرور (نشانیِ Play Console از این پس؛ تا عوض شدنِ نشانیِ
+  کنسول همان `privacy.html#delete-account` ِ GitHub Pages هم می‌ماند — `server/test/self-delete.test.js` و `legal-pages.test.js`).
   سرور `routes/account-deletion.js` + `lib/self-delete.js` روی همان `lib/user-delete.js`؛ پرچمِ `account.self_delete` پیش‌فرض
   خاموش ⇒ «درخواست از پشتیبانی». پیوندِ «حریمِ خصوصی» در «درباره برنامه» و «ویرایش حساب».
   ⛔ نشستِ بسته به دکانی که آدم صاحبش نیست (شاگرد/مدیرِ دکانِ دیگر، `/api/shop/active`) ⇒ هر دو در (`GET` و `POST`) ۴۰۳
   `owner_session_required` — نه نامِ دکان‌های خودش، نه حذف (TEN-01؛ `tenant-matrix.test.js`، `self-delete.test.js`).
 - ⚠️ کلیدِ `android-native/app/tohid-release.jks` در مخزنِ عمومی است؛ برای Play کلیدِ بارگذاریِ تازه (Play App Signing)،
   نه این کلید. تصمیمِ صاحب‌کار در `docs/GOOGLE-PLAY-fa.md`.
+- ⛔ **حریمِ خصوصی و شرایط درونِ برنامه، نه GitHub** (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۳، `claude/e-rows-63p`): هیچ برنامه‌ای به
+  `github.io`/`github.com` پیوند نمی‌دهد و نامِ GitHub را نشان نمی‌دهد. منبعِ یکتا `core/legal/legal-texts.json` (fa/en/ps؛ دری از
+  `DariText`)؛ `node tools/legal/generate.mjs` رونوشتِ سرور (`server/src/lib/legal-texts.json`) و کاتلین (`core/.../legal/LegalTexts*.kt`)
+  را می‌سازد و `--check` ِ آن در `server/test/legal-texts.test.js` است — رونوشت دستی ویرایش نمی‌شود. صفحه‌ها: برنامهٔ دکان
+  `legal/privacy` و `auth/terms` (= `legal/terms`، `LegalPage.kt`؛ «درباره»، «ویرایش حساب»، حالتِ پیک ‹`CourierLegal.kt`›)، برنامهٔ
+  خرید `LegalRoute` (`LegalScreen.kt`، «تنظیمات»)، وبِ خریدار پیوندِ `/legal/*` در پنجرهٔ تنظیمات. نشانیِ عمومیِ فهرستِ Play و App
+  Store: `GET /legal/privacy` و `/legal/terms` ِ خودِ سرور (`routes/legal-pages.js`؛ عمومی، بی نشست، HTML ِ کش‌پذیر با ETag، CSP ِ بی
+  اسکریپت، بی نامِ میزبان؛ `?lang=fa|prs|en|ps`). قراردادِ `GET /api/auth/terms` و `terms.version` ِ ثبت‌نام همان «1» و همان فارسی
+  است (`lib/terms.js` از همان منبع). متنِ شرایط که عوض شد ⇒ `terms.version` جلو. نگهبان: `server/test/no-github-in-apps.test.js`
+  (بیرون: آزمون‌ها، پوشه‌های `update/`، پوستهٔ بازنشستهٔ `android/`، پنلِ مدیر و صفحه‌های GitHub Pages ِ ریشه).
+- ⛔ **نسخهٔ فروشگاهی بی کدِ به‌روزرسانی** (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۳): `update/Updater.kt` ِ واقعی فقط در
+  `android-native/app/src/direct/java` (نسخهٔ مستقیم و پیش‌نمایش، رفتار بایت‌به‌بایت همان)؛ `-Pstore=play|bazaar` جایش
+  `src/store/java/.../UpdaterStoreAndroid.kt` (همان API، بی شبکه و بی نشانی) را کامپایل می‌کند (`app/build.gradle.kts` ‹srcDir›).
+  `Updater.kt` به `src/main` برنمی‌گردد و `src/store` هیچ «github» ندارد؛ API ِ دو نسخه یکی می‌ماند (`server/test/store-build-updater.test.js`).
 
 ## 🔑 کدِ اشتراکِ آفلاینِ «فروشگاه من» — بسته به یک کامپیوتر، یک بار (از ۱۴۰۵/۰۷/۲۰، نسخه 2.12.1)
 

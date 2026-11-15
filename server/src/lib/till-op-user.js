@@ -10,7 +10,7 @@
  * ── قاعده ──────────────────────────────────────────────────────────
  *   • هنگامِ **رسیدنِ** push ([begin]): دستگاه = ردیفِ **توکن** (`tokens.device_id`، نه `device_id` ِ بدنه) و نوبتِ بازِ
  *     همان دستگاه در همان لحظه (`till-pin.sessionAt`). پس از پاسخِ موتور، برای هر op که «نشست» یک ردیف در
- *     `shop_till_op_users` ([record]) — op ِ ردشده و تکراری نه؛ کلیدِ (shop_id, op_id) و `ON CONFLICT DO NOTHING` ⇒ op ِ
+ *     `shop_till_op_users` ([record]) — op ِ ردشده و تکراری نه؛ کلیدِ (shop_id, branch_id, op_id) و `ON CONFLICT DO NOTHING` ⇒ op ِ
  *     دوباره‌فرستاده ردیفِ دوم نمی‌سازد.
  *   • عضو فقط وقتی نوشته می‌شود که سرور خودش دیده باشد ([judge])؛ وگرنه NULL (ناشناخته) با دلیل:
  *       pin_off         `shop.till_pin` خاموش
@@ -30,6 +30,7 @@
  *    خواندن/نوشتنی؛ پمپ و حسابِ غیرِدکان اصلاً نمی‌رسند.
  */
 const { many, query, now } = require('../db');
+const bk = require('./branch-key');
 const orders = require('./orders');
 const tp = require('./till-pin');
 const { badRequest } = require('../middleware/errors');
@@ -56,9 +57,12 @@ async function tokenDevice(req, ctx) {
   return String(row.device_id);
 }
 
-/** هنگامِ رسیدنِ push: پرچمِ خاموش ⇒ null. وگرنه همهٔ آنچه سرور خودش می‌داند (هرگز چیزی از بدنه) */
-async function begin(req) {
-  const ctx = req.sync;
+/**
+ * هنگامِ رسیدنِ push: پرچمِ خاموش ⇒ null. وگرنه همهٔ آنچه سرور خودش می‌داند (هرگز چیزی از بدنه).
+ * [ctx]: بافتِ دفتر — `req.sync` (اصلی) یا بافتِ بخشِ شعبه (`branches.ctxFor`، فازِ ۳ب): نوبت فقط از همان شعبه و ردیف با
+ * همان شعبه (`accountId` = `<دکان>#<شعبه>`؛ پرچم‌ها سطحِ دکان با `shopOf`).
+ */
+async function begin(req, ctx = req.sync) {
   if (!isShop(ctx) || !(await flagOf(ctx.accountId))) return null;
   const at = now();
   const deviceId = await tokenDevice(req, ctx);
@@ -90,12 +94,13 @@ async function record(b, path, items) {
     cols.ts.push(Number.isSafeInteger(Number(x.ts)) && Number(x.ts) > 0 ? Number(x.ts) : null);
   }
   const r = await query(
-    `INSERT INTO shop_till_op_users (shop_id, op_id, path, table_name, row_id, op_type, device_id, device_user_id,
+    `INSERT INTO shop_till_op_users (shop_id, branch_id, op_id, path, table_name, row_id, op_type, device_id, device_user_id,
                                      till_member_id, till_session_id, basis, op_ts, at)
-     SELECT $1, x.op_id, $2, x.table_name, x.row_id, x.op_type, $3, $4, x.member, x.session, x.basis, x.op_ts, $5
+     SELECT ${bk.sqlShop(1)}, ${bk.sqlBranch(1)}, x.op_id, $2, x.table_name, x.row_id, x.op_type, $3, $4, x.member, x.session,
+            x.basis, x.op_ts, $5
        FROM unnest($6::text[], $7::text[], $8::text[], $9::text[], $10::text[], $11::text[], $12::text[], $13::bigint[])
             AS x(op_id, table_name, row_id, op_type, member, session, basis, op_ts)
-     ON CONFLICT (shop_id, op_id) DO NOTHING`,
+     ON CONFLICT (shop_id, branch_id, op_id) DO NOTHING`,
     [b.shopId, path, b.deviceId, b.userId, b.at,
       cols.op, cols.table, cols.row, cols.type, cols.member, cols.session, cols.basis, cols.ts],
   );
@@ -190,7 +195,10 @@ function shape(r) {
 /** صاحب و مدیر: همه (یا یک عضو)؛ بقیه فقط خودشان — همان مرزِ `till-pin.sessions` */
 const whoOf = (actor, memberId) => (MANAGERS.includes(actor.role) ? (memberId ? String(memberId).slice(0, 64) : null) : actor.id);
 
-/** opهای یک بازه (حداکثر ۶۲ روز، تازه‌ترین بالا، تا [MAX_LIST]) با جمعِ هر کاربرِ صندوق در همان بازه */
+/**
+ * opهای یک بازه (حداکثر ۶۲ روز، تازه‌ترین بالا، تا [MAX_LIST]) با جمعِ هر کاربرِ صندوق در همان بازه.
+ * [shopId]: کلید — شناسهٔ دکان (اصلی) یا `<دکان>#<شعبه>` (فقط opهای همان شعبه؛ همین برای [forRow]).
+ */
 async function list(shopId, actor, { from, to, memberId, table } = {}) {
   const t = now();
   const end = to === undefined || to === '' ? t : Number(to);
@@ -200,14 +208,14 @@ async function list(shopId, actor, { from, to, memberId, table } = {}) {
   if (table !== undefined && table !== '' && !text(table, 64)) throw badRequest('جدول نادرست است', 'table_invalid');
   const who = whoOf(actor, memberId);
   const params = [shopId, start, end, who, table ? String(table) : null];
-  const where = `o.shop_id=$1 AND o.at >= $2 AND o.at <= $3 AND ($4::text IS NULL OR o.till_member_id=$4)
+  const where = `${bk.sqlOwn(1, 'o.')} AND o.at >= $2 AND o.at <= $3 AND ($4::text IS NULL OR o.till_member_id=$4)
      AND ($5::text IS NULL OR o.table_name=$5)`;
   const rows = await many(`${SELECT} WHERE ${where} ORDER BY o.at DESC, o.op_id LIMIT ${MAX_LIST + 1}`, params);
   const sums = await many(
     `SELECT s.till_member_id, s.ops, s.sales, m.role, ${NAME('u')} AS name
        FROM (SELECT o.till_member_id, COUNT(*)::int AS ops, COUNT(*) FILTER (WHERE o.table_name='sales')::int AS sales
                FROM shop_till_op_users o WHERE ${where} GROUP BY o.till_member_id) s
-       LEFT JOIN shop_members m ON m.id = s.till_member_id AND m.shop_id = $1
+       LEFT JOIN shop_members m ON m.id = s.till_member_id AND m.shop_id = ${bk.sqlShop(1)}
        LEFT JOIN users u ON u.id = m.user_id
       ORDER BY s.ops DESC, s.till_member_id LIMIT 500`,
     params,
@@ -230,7 +238,7 @@ async function forRow(shopId, actor, table, rowId) {
   if (!tb || !id) throw badRequest('جدول و شناسهٔ ردیف لازم است', 'row_invalid');
   const who = whoOf(actor, null);
   const rows = await many(
-    `${SELECT} WHERE o.shop_id=$1 AND o.table_name=$2 AND o.row_id=$3 AND ($4::text IS NULL OR o.till_member_id=$4)
+    `${SELECT} WHERE ${bk.sqlOwn(1, 'o.')} AND o.table_name=$2 AND o.row_id=$3 AND ($4::text IS NULL OR o.till_member_id=$4)
       ORDER BY o.at, o.op_id LIMIT ${MAX_ROW}`,
     [shopId, tb, id, who],
   );

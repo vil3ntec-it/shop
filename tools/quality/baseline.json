@@ -459,6 +459,6 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/update/ReleaseSignature.kt": 3,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/update/ResumableDownload.kt": 6,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/update/UpdateManager.kt": 8,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/update/Updater.kt": 17
+    "android-native/app/src/direct/java/ir/vil3ntec/tohid/update/Updater.kt": 17
   }
 }

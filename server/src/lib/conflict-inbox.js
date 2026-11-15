@@ -29,9 +29,15 @@
  *
  * ⛔ فقط ردیف‌های همین دکان (`account_id` از عضویتِ توکن) و فقط گونه‌های صندوقِ سند ([BOX]).
  * ⛔ `lib/sync-v1.js` ِ مشترک با پمپ دست نمی‌خورد: زنجیرهٔ push از روترِ زندهٔ `routes/sync-v1.js` خوانده می‌شود.
+ * ⛔ شعبه (فازِ ۳ب ِ `docs/BRANCHES-fa.md`): هر تابع «کلید» می‌گیرد — شناسهٔ دکان (اصلی، همان امروز) یا `<دکان>#<شعبه>`
+ *    (`branch-rest.scope`)؛ ردیف‌ها همان بخشِ همگام‌سازی (`account_id`). «دوباره ثبت» ِ شعبه فقط از v3 و با بافتِ همان بخش
+ *    (`branches.ctxFor`؛ v1 هرگز شعبه ندارد)؛ سابقه و برگهٔ تأیید (`shop_approvals`) در خودِ دکان با `detail.branch`.
  */
 const { EventEmitter } = require('events');
 const { one, many, query, tx, now } = require('../db');
+const bk = require('./branch-key');
+/** سابقهٔ کارِ شعبهٔ غیرِ اصلی شعبه‌اش را دارد (اصلی ⇒ همان امروز) */
+const withBranch = (key, detail) => (bk.isBranch(key) ? { ...detail, branch: bk.branchOf(key) } : detail);
 const { badRequest, notFound, conflict: conflictError, forbidden } = require('../middleware/errors');
 const { can } = require('./permissions');
 const audit = require('./audit');
@@ -405,13 +411,16 @@ function v1Chain() {
   return [require('./safe-flag').within, ...layer.route.stack.map((s) => s.handle)];
 }
 
-async function syncCtx(shopId, actor) {
+async function syncCtx(key, actor) {
+  const shopId = bk.shopOf(key);
   const shop = await one('SELECT name FROM shops WHERE id=$1', [shopId]);
-  return {
+  const ctx = {
     app: 'shop', accountKind: 'shop', accountId: shopId, accountName: shop ? shop.name || '' : '',
     userId: actor.userId, role: actor.role, via: 'user', deviceUid: '', expiresAt: 0,
     safeEntries: await require('./safe-flag').enabledFor(shopId),
   };
+  //  شعبه: همان بافتِ بخشِ `routes/sync-v3.js` (ردیف‌ها در `<دکان>#<شعبه>`، سنجش‌های دکان با `shopId`)
+  return require('./branches').ctxFor(ctx, bk.branchOf(key));
 }
 
 async function pushV1(ctx, deviceId, ops, ip) {
@@ -463,7 +472,10 @@ async function resubmit(shopId, actor, id, { note: raw, ip = '' } = {}) {
   if (cur.status !== 'open') throw conflictError('این مورد پیش‌تر بسته شده است', 'already_resolved');
   const p = payloadOf(cur);
   const reason = reasonOf(cur);
-  if (p.path !== 'v1' && p.path !== 'v3') throw conflictError('این سند از راهِ همگام‌سازی نیامده؛ «اصلاح و ثبت» کنید', 'not_resubmittable');
+  //  شعبهٔ غیرِ اصلی فقط v3 دارد (v1 مشترک با پمپ و فقط شعبهٔ اصلی) ⇒ هر بستهٔ دیگری همان «دوباره‌ثبت‌نشدنی»
+  if ((p.path !== 'v1' && p.path !== 'v3') || (bk.isBranch(shopId) && p.path !== 'v3')) {
+    throw conflictError('این سند از راهِ همگام‌سازی نیامده؛ «اصلاح و ثبت» کنید', 'not_resubmittable');
+  }
   if (!p.ops.length || p.truncated) throw conflictError('بستهٔ این سند کامل نیست؛ «اصلاح و ثبت» کنید', 'payload_incomplete');
   if (NO_APPROVAL.has(reason)) throw conflictError('این رد با تأیید درست نمی‌شود؛ «اصلاح و ثبت» یا «کنار بگذار»', 'not_resubmittable');
 
@@ -509,8 +521,8 @@ async function resubmit(shopId, actor, id, { note: raw, ip = '' } = {}) {
       [shopId, cur.id, JSON.stringify(claim.loser_value), String(code).slice(0, 80), t, actor.userId]);
     const partial = results.some((x) => x && (x.status === 'applied' || x.status === 'partial'));
     await audit.log({
-      shopId, userId: actor.userId, action: 'conflict_inbox.resubmit_rejected', targetType: 'sync_conflict', targetId: cur.id, ip,
-      detail: { reason: code, original: reason, ops: ids.length, partial },
+      shopId: bk.shopOf(shopId), userId: actor.userId, action: 'conflict_inbox.resubmit_rejected', targetType: 'sync_conflict',
+      targetId: cur.id, ip, detail: withBranch(shopId, { reason: code, original: reason, ops: ids.length, partial }),
     });
     throw Object.assign(conflictError('سرور این سند را دوباره هم نپذیرفت', 'resubmit_rejected'), { data: { reason: code, partial } });
   }
@@ -530,12 +542,14 @@ async function resubmit(shopId, actor, id, { note: raw, ip = '' } = {}) {
       `INSERT INTO shop_approvals (shop_id, nonce, op_id, doc, perm, pct_bp, amount, approver_id, requester_id,
                                    key_id, device_id, path, reason, issued_at, used_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'inbox',$10,$11,$12,$13,$13) ON CONFLICT (shop_id, nonce) DO NOTHING`,
-      [shopId, `cf:${cur.id}`.slice(0, 120), ids[0], `${cur.table_name}/${cur.row_id}`, str(d.perm) || cur.kind,
+      [bk.shopOf(shopId), `cf:${cur.id}`.slice(0, 120), ids[0], `${cur.table_name}/${cur.row_id}`, str(d.perm) || cur.kind,
         intOrNull(d.pct_bp), intOrNull(d.amount), actor.userId, str(d.requester), deviceId.slice(0, 64), p.path,
         why || 'دوباره ثبت از صندوقِ سندهای ردشده', t]);
     await log({
-      shopId, userId: actor.userId, action: 'conflict_inbox.resubmit', targetType: 'sync_conflict', targetId: cur.id, ip,
-      detail: { reason, perm: str(d.perm), doc: `${cur.table_name}/${cur.row_id}`, requester: str(d.requester), ops: ids.length, applied, path: p.path },
+      shopId: bk.shopOf(shopId), userId: actor.userId, action: 'conflict_inbox.resubmit', targetType: 'sync_conflict', targetId: cur.id, ip,
+      detail: withBranch(shopId, {
+        reason, perm: str(d.perm), doc: `${cur.table_name}/${cur.row_id}`, requester: str(d.requester), ops: ids.length, applied, path: p.path,
+      }),
     });
     return true;
   });
@@ -564,8 +578,11 @@ async function dismiss(shopId, actor, id, { reason, fixedDoc, ip = '' } = {}) {
       [shopId, cur.id, status, t, actor.userId, why, JSON.stringify(doc ? { fixed_doc: doc.slice(6) } : {})]);
     const d = isObj(cur.detail) ? cur.detail : {};
     await log({
-      shopId, userId: actor.userId, action: doc ? 'conflict_inbox.fix' : 'conflict_inbox.dismiss', targetType: 'sync_conflict', targetId: cur.id, ip,
-      detail: { reason: reasonOf(cur), note: why, doc: `${cur.table_name}/${cur.row_id}`, requester: str(d.requester), ...(doc ? { fixedDoc: doc } : {}) },
+      shopId: bk.shopOf(shopId), userId: actor.userId, action: doc ? 'conflict_inbox.fix' : 'conflict_inbox.dismiss',
+      targetType: 'sync_conflict', targetId: cur.id, ip,
+      detail: withBranch(shopId, {
+        reason: reasonOf(cur), note: why, doc: `${cur.table_name}/${cur.row_id}`, requester: str(d.requester), ...(doc ? { fixedDoc: doc } : {}),
+      }),
     });
     return { id: cur.id, duplicate: false };
   });

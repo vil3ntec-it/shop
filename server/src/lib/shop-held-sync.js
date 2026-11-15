@@ -22,6 +22,9 @@
  *    `sales.cancel` می‌خواهد (همان «لغوِ فاکتور» ِ پاک کردنِ کهنه‌ها)؛ بازگرداندن و فروش برای هر فروشنده.
  * ⛔ shop_id فقط از عضویتِ توکن. سقف‌ها: ۶۰ نگه‌داشتهٔ زنده در هر دکان، ۳۲ کیلوبایت و ۲۰۰ ردیف در هر فاکتور.
  * ⛔ سرور بدنه را نمی‌خواند و با آن هیچ پولی نمی‌سازد؛ فقط شکل و اندازه را می‌سنجد.
+ * ⛔ شعبه (فازِ ۳ب ِ `docs/BRANCHES-fa.md`، مهاجرتِ ۹۳۰): هر تابع «کلید» می‌گیرد — شناسهٔ دکان (اصلی، همان امروز) یا
+ *    `<دکان>#<شعبه>` (`branch-rest.scope`). هر پرسش فقط همان شعبه (`branch-key.sqlOwn`)؛ `rev`، قفل، سقفِ ۶۰ و سنگِ قبر هم
+ *    جدا برای هر شعبه. سریِ سندِ دستگاه سطحِ دکان (`shop_doc_series`).
  *
  * ── «در دستِ دستگاهِ X» (ادعای نرم، همان پرچم؛ بی ستون و بی مهاجرتِ تازه) ──────────────────────────────────
  * سنگِ قبرِ `resumed` همان ادعاست: دستگاهی که برش گرداند (`device_id`) و کی (`updated_at`)؛ تا [CLAIM_MS] «تازه».
@@ -34,7 +37,11 @@
  */
 const { one, many, tx, now } = require('../db');
 const { flagOf } = require('./orders');
+const bk = require('./branch-key');
 const { badRequest, forbidden, conflict } = require('../middleware/errors');
+
+/** «مالِ همین کلید» (دکان + شعبه) با پارامترِ $1 */
+const OWN = bk.sqlOwn(1);
 
 const FLAG = 'shop.held_sync';
 const ID_RE = /^[0-9A-Za-z_-]{1,64}$/;
@@ -131,13 +138,13 @@ async function read(shopId, since, me) {
   const rows = await many(
     `SELECT ${HCOLS}, s.series FROM shop_held_invoices h
        LEFT JOIN shop_doc_series s ON s.shop_id = h.shop_id AND s.device_id = h.device_id AND h.device_id <> ''
-      WHERE h.shop_id=$1 AND h.rev > $2::bigint AND (NOT h.deleted OR $2::bigint > 0)
+      WHERE ${bk.sqlOwn(1, 'h.')} AND h.rev > $2::bigint AND (NOT h.deleted OR $2::bigint > 0)
       ORDER BY h.rev ASC LIMIT $3`,
     [shop, from, PAGE + 1],
   );
   const more = rows.length > PAGE;
   const page = rows.slice(0, PAGE);
-  const head = await one('SELECT COALESCE(MAX(rev), 0) AS rev FROM shop_held_invoices WHERE shop_id=$1', [shop]);
+  const head = await one(`SELECT COALESCE(MAX(rev), 0) AS rev FROM shop_held_invoices WHERE ${OWN}`, [shop]);
   const rev = more ? Number(page[page.length - 1].rev) : Number(head ? head.rev : 0);
   const views = page.map((r) => view(r, me));
   return {
@@ -150,12 +157,12 @@ async function read(shopId, since, me) {
 
 async function locked(c, shop) {
   await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`shop-held:${shop}`]);
-  //  سنگِ قبرِ کهنه — همان دکان، با نوشتنِ بعدی
-  await c.query('DELETE FROM shop_held_invoices WHERE shop_id=$1 AND deleted AND updated_at < $2', [shop, now() - TOMB_MS]);
+  //  سنگِ قبرِ کهنه — همان دکان (و همان شعبه)، با نوشتنِ بعدی
+  await c.query(`DELETE FROM shop_held_invoices WHERE ${OWN} AND deleted AND updated_at < $2`, [shop, now() - TOMB_MS]);
 }
 
 async function nextRev(c, shop) {
-  const r = (await c.query('SELECT COALESCE(MAX(rev), 0) AS rev FROM shop_held_invoices WHERE shop_id=$1', [shop])).rows[0];
+  const r = (await c.query(`SELECT COALESCE(MAX(rev), 0) AS rev FROM shop_held_invoices WHERE ${OWN}`, [shop])).rows[0];
   return Number(r.rev) + 1;
 }
 
@@ -178,7 +185,7 @@ async function put(shopId, actor, rawId, raw) {
   const shop = String(shopId);
   return tx(async (c) => {
     await locked(c, shop);
-    const cur = (await c.query(`SELECT ${COLS} FROM shop_held_invoices WHERE shop_id=$1 AND id=$2`, [shop, id])).rows[0];
+    const cur = (await c.query(`SELECT ${COLS} FROM shop_held_invoices WHERE ${OWN} AND id=$2`, [shop, id])).rows[0];
     if (cur && Number(cur.version) >= version) {
       if (!cur.deleted && Number(cur.version) === version && canon(cur.body) === canon(body)) {
         return { applied: false, item: view(cur, actor.userId) };
@@ -186,7 +193,7 @@ async function put(shopId, actor, rawId, raw) {
       throw stale(cur, actor.userId);
     }
     if (!cur || cur.deleted) {
-      const live = (await c.query('SELECT COUNT(*)::int AS n FROM shop_held_invoices WHERE shop_id=$1 AND NOT deleted', [shop])).rows[0].n;
+      const live = (await c.query(`SELECT COUNT(*)::int AS n FROM shop_held_invoices WHERE ${OWN} AND NOT deleted`, [shop])).rows[0].n;
       if (live >= MAX_LIVE) throw conflict(`بیش از ${MAX_LIVE} فاکتورِ نگه‌داشته برای یک دکان`, 'too_many_held');
     }
     const rev = await nextRev(c, shop);
@@ -194,9 +201,9 @@ async function put(shopId, actor, rawId, raw) {
     const heldBy = cur && !cur.deleted ? cur.held_by : actor.userId;
     const row = (await c.query(
       `INSERT INTO shop_held_invoices
-         (shop_id, id, body, bytes, version, deleted, reason, rev, created_by, held_by, updated_by, device_id, created_at, updated_at)
-       VALUES ($1,$2,$3::jsonb,$4,$5,false,'',$6,$7,$8,$7,$9,$10,$10)
-       ON CONFLICT (shop_id, id) DO UPDATE SET
+         (shop_id, branch_id, id, body, bytes, version, deleted, reason, rev, created_by, held_by, updated_by, device_id, created_at, updated_at)
+       VALUES (${bk.sqlShop(1)},${bk.sqlBranch(1)},$2,$3::jsonb,$4,$5,false,'',$6,$7,$8,$7,$9,$10,$10)
+       ON CONFLICT (shop_id, branch_id, id) DO UPDATE SET
          body=EXCLUDED.body, bytes=EXCLUDED.bytes, version=EXCLUDED.version, deleted=false, reason='', rev=EXCLUDED.rev,
          held_by=EXCLUDED.held_by, updated_by=EXCLUDED.updated_by, device_id=EXCLUDED.device_id, updated_at=EXCLUDED.updated_at
        RETURNING ${COLS}`,
@@ -208,7 +215,8 @@ async function put(shopId, actor, rawId, raw) {
 
 async function seriesOf(c, shop, deviceId) {
   if (!deviceId) return '';
-  const r = (await c.query('SELECT series FROM shop_doc_series WHERE shop_id=$1 AND device_id=$2', [shop, deviceId])).rows[0];
+  //  سریِ سندِ دستگاه سطحِ دکان است (شعبه نه) ⇒ همان شناسهٔ دکانِ کلید
+  const r = (await c.query('SELECT series FROM shop_doc_series WHERE shop_id=$1 AND device_id=$2', [bk.shopOf(shop), deviceId])).rows[0];
   return r ? String(r.series) : '';
 }
 
@@ -251,7 +259,7 @@ async function remove(shopId, actor, rawId, {
   const shop = String(shopId);
   return tx(async (c) => {
     await locked(c, shop);
-    const cur = (await c.query(`SELECT ${COLS} FROM shop_held_invoices WHERE shop_id=$1 AND id=$2`, [shop, id])).rows[0];
+    const cur = (await c.query(`SELECT ${COLS} FROM shop_held_invoices WHERE ${OWN} AND id=$2`, [shop, id])).rows[0];
     const at = now();
     const granted = (extra = {}) => ({ granted: true, until: at + CLAIM_MS, ...extra });
     if (!cur) return { deleted: false, others: false, version: 0, ...(claiming ? { claim: granted() } : {}) };
@@ -265,7 +273,7 @@ async function remove(shopId, actor, rawId, {
       }
       if (mine) {
         //  ادعای خودِ همین دستگاه ⇒ تازه می‌شود (بی rev: دستگاه‌های دیگر فقط هنگامِ پرسیدن می‌خوانندش)
-        if (cur.reason === 'resumed') await c.query('UPDATE shop_held_invoices SET updated_at=$3 WHERE shop_id=$1 AND id=$2', [shop, id, at]);
+        if (cur.reason === 'resumed') await c.query(`UPDATE shop_held_invoices SET updated_at=$3 WHERE ${OWN} AND id=$2`, [shop, id, at]);
         return { deleted: false, others: false, version: Number(cur.version), claim: granted() };
       }
       if (taken && !forcing) throw claimed(await holderOf(c, shop, cur, at));
@@ -275,7 +283,7 @@ async function remove(shopId, actor, rawId, {
       const rev = await nextRev(c, shop);
       await c.query(
         `UPDATE shop_held_invoices SET reason='resumed', version=$3, rev=$4, updated_by=$5, device_id=$6, updated_at=$7
-          WHERE shop_id=$1 AND id=$2`,
+          WHERE ${OWN} AND id=$2`,
         [shop, id, v, rev, actor.userId, deviceId, at],
       );
       return { deleted: true, others: cur.held_by !== actor.userId, version: v, rev, claim: granted(takeover ? { takeover } : {}) };
@@ -293,7 +301,7 @@ async function remove(shopId, actor, rawId, {
     const rev = await nextRev(c, shop);
     await c.query(
       `UPDATE shop_held_invoices SET deleted=true, body=NULL, bytes=0, reason=$3, version=$4, rev=$5,
-         updated_by=$6, device_id=$7, updated_at=$8 WHERE shop_id=$1 AND id=$2`,
+         updated_by=$6, device_id=$7, updated_at=$8 WHERE ${OWN} AND id=$2`,
       [shop, id, reason, version, rev, actor.userId, deviceId, at],
     );
     return { deleted: true, others, version, rev, ...(claiming ? { claim: granted() } : {}) };

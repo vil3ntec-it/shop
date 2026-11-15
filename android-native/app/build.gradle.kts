@@ -74,6 +74,14 @@ android {
     )
     sourceSets["main"].manifest.srcFile(stripped)
   }
+  /*
+   *  کانالِ به‌روزرسانی (تصمیمِ صاحب‌کار، ۱۴۰۵/۰۸/۲۳): نسخهٔ فروشگاهی (Play، بازار) فقط از فروشگاه به‌روز می‌شود، پس کدِ
+   *  به‌روزرسانیِ درونِ برنامه و نشانی‌های مخزن **اصلاً درونِ بسته نیست**، نه فقط در اجرا خاموش: `update/Updater.kt` ِ واقعی
+   *  در `src/direct/java` است و فقط نسخهٔ مستقیم و پیش‌نمایش (همان رفتارِ پیشین، بایت‌به‌بایت) آن را می‌گیرند؛ نسخهٔ
+   *  فروشگاهی جایش `src/store/java` (همان API، بی شبکه) را دارد تا صدازننده‌ها دست نخورند. نگهبان:
+   *  `server/test/store-build-updater.test.js`؛ شرح: `docs/GOOGLE-PLAY-fa.md`.
+   */
+  sourceSets["main"].java.srcDir(if (storeManaged) "src/store/java" else "src/direct/java")
 
   //  متغیرِ تنظیم‌نشده در GitHub Actions **رشتهٔ خالی** می‌شود، نه
   //  ناموجود. پس `?:` تنها کافی نیست و خالی هم باید «نبود» حساب شود —

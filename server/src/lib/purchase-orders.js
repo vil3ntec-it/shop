@@ -15,6 +15,11 @@
  * هم‌زمانی: ساختن زیرِ قفلِ دکان (`pg_advisory_xact_lock`، شماره و کلیدِ یکتایی)؛ هر تغییرِ سفارش
  * و هر رسید زیرِ `SELECT … FOR UPDATE` ِ همان سفارش، پس دو رسیدِ هم‌زمان باقی‌مانده را دو بار
  * نمی‌خورند و رسیدِ تکراری همان پاسخِ اول را می‌گیرد.
+ *
+ * ⛔ شعبه (فازِ ۳ب ِ `docs/BRANCHES-fa.md`، مهاجرتِ ۹۳۰): «خرید» مالِ شعبه است — هر تابع «کلید» می‌گیرد: شناسهٔ دکان (اصلی،
+ *    همان امروز) یا `<دکان>#<شعبه>` (`branch-rest.scope`). هر پرسش فقط همان شعبه (`branch-key.sqlOwn`)؛ شمارهٔ سفارش، قفل و
+ *    کلیدهای یکتا (سفارش، رسید، فاکتور) جدا برای هر شعبه ⇒ کلیدِ شعبهٔ دیگر هرگز «تعارض» یا «تکراری» نمی‌گیرد. کالا همان
+ *    کاتالوگِ مشترکِ دکان؛ تأمین‌کننده شناسه‌ای از دفترِ همان شعبه.
  */
 const crypto = require('crypto');
 const { query, many, now, tx } = require('../db');
@@ -23,7 +28,12 @@ const { stable } = require('./idempotency');
 const { flagOf } = require('./orders');
 const { can } = require('./permissions');
 const core = require('./purchase-order-core');
+const bk = require('./branch-key');
 const { badRequest, forbidden, notFound, conflict } = require('../middleware/errors');
+
+/** «مالِ همین کلید» (دکان + شعبه) با پارامترِ $1 */
+const OWN = bk.sqlOwn(1);
+const KEYCOLS = `${bk.sqlShop(1)},${bk.sqlBranch(1)}`;
 
 const FLAG_KEY = 'shop.purchase_orders';
 const KEY_RE = /^[A-Za-z0-9_.:-]{8,128}$/;
@@ -235,19 +245,19 @@ function view(order, receipts, { withReceipts = true, bills = [] } = {}) {
 
 async function billsOf(run, shopId, poId) {
   return (await run(
-    'SELECT * FROM purchase_bills WHERE shop_id=$1 AND po_id=$2 ORDER BY created_at, id', [shopId, poId]
+    `SELECT * FROM purchase_bills WHERE ${OWN} AND po_id=$2 ORDER BY created_at, id`, [shopId, poId]
   )).rows.map(billOf);
 }
 
 async function receiptsOf(run, shopId, poId) {
   return (await run(
-    'SELECT * FROM purchase_receipts WHERE shop_id=$1 AND po_id=$2 ORDER BY created_at, id', [shopId, poId]
+    `SELECT * FROM purchase_receipts WHERE ${OWN} AND po_id=$2 ORDER BY created_at, id`, [shopId, poId]
   )).rows.map(receiptOf);
 }
 
 async function lockOrder(c, shopId, id) {
   const row = (await c.query(
-    'SELECT * FROM purchase_orders WHERE shop_id=$1 AND id=$2 FOR UPDATE', [shopId, String(id || '')]
+    `SELECT * FROM purchase_orders WHERE ${OWN} AND id=$2 FOR UPDATE`, [shopId, String(id || '')]
   )).rows[0];
   if (!row) throw notFound('سفارشِ خرید پیدا نشد', 'purchase_order_not_found');
   return orderOf(row);
@@ -263,7 +273,7 @@ async function create(shopId, { key, body, userId }) {
     const run = (t, p) => c.query(t, p);
     await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`purchase_orders:${shopId}`]);
     const prev = (await c.query(
-      'SELECT * FROM purchase_orders WHERE shop_id=$1 AND client_key=$2', [shopId, key]
+      `SELECT * FROM purchase_orders WHERE ${OWN} AND client_key=$2`, [shopId, key]
     )).rows[0];
     if (prev) {
       if (prev.request_hash !== hash) {
@@ -273,14 +283,14 @@ async function create(shopId, { key, body, userId }) {
       return { order: view(o, await receiptsOf(run, shopId, o.id), { bills: await billsOf(run, shopId, o.id) }), replayed: true };
     }
     const no = Number((await c.query(
-      'SELECT COALESCE(MAX(po_no), 0) + 1 AS n FROM purchase_orders WHERE shop_id=$1', [shopId]
+      `SELECT COALESCE(MAX(po_no), 0) + 1 AS n FROM purchase_orders WHERE ${OWN}`, [shopId]
     )).rows[0].n);
     const at = now();
     const id = ulid(at);
     const row = (await c.query(
-      `INSERT INTO purchase_orders (shop_id, id, po_no, client_key, request_hash, supplier_id, supplier_name, state,
+      `INSERT INTO purchase_orders (shop_id, branch_id, id, po_no, client_key, request_hash, supplier_id, supplier_name, state,
          lines, expected_date, note, version, created_by, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'draft',$8::jsonb,$9,$10,1,$11,$12,$12) RETURNING *`,
+       VALUES (${KEYCOLS},$2,$3,$4,$5,$6,$7,'draft',$8::jsonb,$9,$10,1,$11,$12,$12) RETURNING *`,
       [shopId, id, no, key, hash, draft.supplierId, draft.supplierName, JSON.stringify(draft.lines),
         draft.expectedDate, draft.note, userId || '', at]
     )).rows[0];
@@ -305,7 +315,7 @@ async function update(shopId, id, { body }) {
     const row = (await c.query(
       `UPDATE purchase_orders SET supplier_id=$3, supplier_name=$4, lines=$5::jsonb, expected_date=$6, note=$7,
          version=version+1, updated_at=$8
-       WHERE shop_id=$1 AND id=$2 RETURNING *`,
+       WHERE ${OWN} AND id=$2 RETURNING *`,
       [shopId, current.id, draft.supplierId, draft.supplierName, JSON.stringify(draft.lines), draft.expectedDate,
         draft.note, now()]
     )).rows[0];
@@ -328,9 +338,9 @@ async function transition(shopId, id, action, { reason } = {}) {
     const row = (await c.query(
       action === 'send'
         ? `UPDATE purchase_orders SET state='sent', sent_at=$3, version=version+1, updated_at=$3
-           WHERE shop_id=$1 AND id=$2 RETURNING *`
+           WHERE ${OWN} AND id=$2 RETURNING *`
         : `UPDATE purchase_orders SET state='cancelled', cancelled_at=$3, cancel_reason=$4, version=version+1, updated_at=$3
-           WHERE shop_id=$1 AND id=$2 RETURNING *`,
+           WHERE ${OWN} AND id=$2 RETURNING *`,
       action === 'send' ? [shopId, current.id, at] : [shopId, current.id, at, why || null]
     )).rows[0];
     return { order: view(orderOf(row), receipts, { bills }), changed: true };
@@ -369,7 +379,7 @@ async function receive(shopId, id, { body, headerKey, userId, role }) {
     //  همین کلید روی سفارشِ دیگری؟ ⇒ تعارض (کلیدِ رسید در کلِ دکان یکتاست)
     if (typeof rid === 'string' && rid) {
       const elsewhere = (await c.query(
-        'SELECT po_id FROM purchase_receipts WHERE shop_id=$1 AND id=$2', [shopId, rid]
+        `SELECT po_id FROM purchase_receipts WHERE ${OWN} AND id=$2`, [shopId, rid]
       )).rows[0];
       if (elsewhere && elsewhere.po_id !== current.id) throw refuse({ code: 'id_conflict', lineId: null, index: -1 });
     }
@@ -398,8 +408,8 @@ async function receive(shopId, id, { body, headerKey, userId, role }) {
     let row;
     try {
       row = (await c.query(
-        `INSERT INTO purchase_receipts (shop_id, id, po_id, lines, posted, total_minor, freight_minor, note, created_by, created_at)
-         VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,$6,$7,$8,$9,$10) RETURNING *`,
+        `INSERT INTO purchase_receipts (shop_id, branch_id, id, po_id, lines, posted, total_minor, freight_minor, note, created_by, created_at)
+         VALUES (${KEYCOLS},$2,$3,$4::jsonb,$5::jsonb,$6,$7,$8,$9,$10) RETURNING *`,
         [shopId, rid, current.id, JSON.stringify(r.ok.receipt.lines), JSON.stringify(r.ok.lines), r.ok.totalMinor,
           freight, note, userId || '', at]
       )).rows[0];
@@ -410,7 +420,7 @@ async function receive(shopId, id, { body, headerKey, userId, role }) {
     }
     //  رسید وضعیتِ نمایشی را عوض می‌کند ⇒ نسخه و زمان بالا می‌روند (فهرست و ویرایشِ هم‌زمان)
     const updated = (await c.query(
-      'UPDATE purchase_orders SET version=version+1, updated_at=$3 WHERE shop_id=$1 AND id=$2 RETURNING *',
+      `UPDATE purchase_orders SET version=version+1, updated_at=$3 WHERE ${OWN} AND id=$2 RETURNING *`,
       [shopId, current.id, at]
     )).rows[0];
     const receipt = receiptOf(row);
@@ -485,7 +495,7 @@ async function bill(shopId, id, { body, headerKey, userId }) {
     if (current.state === core.STATE.DRAFT) throw refuse({ code: 'not_sent' });
     const parsed = parseBill(current, b);
     const hash = hashOf(parsed);
-    const prev = (await c.query('SELECT * FROM purchase_bills WHERE shop_id=$1 AND id=$2', [shopId, bid])).rows[0];
+    const prev = (await c.query(`SELECT * FROM purchase_bills WHERE ${OWN} AND id=$2`, [shopId, bid])).rows[0];
     if (prev) {
       if (prev.po_id !== current.id) throw refuse({ code: 'id_conflict' });
       if (prev.request_hash !== hash) {
@@ -497,15 +507,15 @@ async function bill(shopId, id, { body, headerKey, userId }) {
       };
     }
     const taken = (await c.query(
-      'SELECT 1 FROM purchase_bills WHERE shop_id=$1 AND po_id=$2 AND bill_no=$3 AND voided_at IS NULL', [shopId, current.id, parsed.billNo]
+      `SELECT 1 FROM purchase_bills WHERE ${OWN} AND po_id=$2 AND bill_no=$3 AND voided_at IS NULL`, [shopId, current.id, parsed.billNo]
     )).rows[0];
     if (taken) throw refuse({ code: 'bill_no_taken' });
     const at = now();
     let row;
     try {
       row = (await c.query(
-        `INSERT INTO purchase_bills (shop_id, id, po_id, bill_no, bill_date, lines, total_minor, request_hash, note, created_by, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11) RETURNING *`,
+        `INSERT INTO purchase_bills (shop_id, branch_id, id, po_id, bill_no, bill_date, lines, total_minor, request_hash, note, created_by, created_at)
+         VALUES (${KEYCOLS},$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11) RETURNING *`,
         [shopId, bid, current.id, parsed.billNo, parsed.billDate, JSON.stringify(parsed.lines), parsed.totalMinor, hash,
           parsed.note, userId || '', at]
       )).rows[0];
@@ -515,7 +525,7 @@ async function bill(shopId, id, { body, headerKey, userId }) {
       throw e;
     }
     const updated = (await c.query(
-      'UPDATE purchase_orders SET version=version+1, updated_at=$3 WHERE shop_id=$1 AND id=$2 RETURNING *', [shopId, current.id, at]
+      `UPDATE purchase_orders SET version=version+1, updated_at=$3 WHERE ${OWN} AND id=$2 RETURNING *`, [shopId, current.id, at]
     )).rows[0];
     return {
       order: view(orderOf(updated), await receiptsOf(run, shopId, current.id), { bills: await billsOf(run, shopId, current.id) }),
@@ -532,7 +542,7 @@ async function voidBill(shopId, id, billId, { reason, userId }) {
     const run = (t, p) => c.query(t, p);
     const current = await lockOrder(c, shopId, id);
     const row = (await c.query(
-      'SELECT * FROM purchase_bills WHERE shop_id=$1 AND po_id=$2 AND id=$3', [shopId, current.id, String(billId || '')]
+      `SELECT * FROM purchase_bills WHERE ${OWN} AND po_id=$2 AND id=$3`, [shopId, current.id, String(billId || '')]
     )).rows[0];
     if (!row) throw notFound(MESSAGES.bill_not_found, 'bill_not_found');
     if (row.voided_at !== null) {
@@ -543,11 +553,11 @@ async function voidBill(shopId, id, billId, { reason, userId }) {
     }
     const at = now();
     const done = (await c.query(
-      `UPDATE purchase_bills SET voided_at=$4, voided_by=$5, void_reason=$6 WHERE shop_id=$1 AND po_id=$2 AND id=$3 RETURNING *`,
+      `UPDATE purchase_bills SET voided_at=$4, voided_by=$5, void_reason=$6 WHERE ${OWN} AND po_id=$2 AND id=$3 RETURNING *`,
       [shopId, current.id, row.id, at, userId || '', why]
     )).rows[0];
     const updated = (await c.query(
-      'UPDATE purchase_orders SET version=version+1, updated_at=$3 WHERE shop_id=$1 AND id=$2 RETURNING *', [shopId, current.id, at]
+      `UPDATE purchase_orders SET version=version+1, updated_at=$3 WHERE ${OWN} AND id=$2 RETURNING *`, [shopId, current.id, at]
     )).rows[0];
     return {
       order: view(orderOf(updated), await receiptsOf(run, shopId, current.id), { bills: await billsOf(run, shopId, current.id) }),
@@ -557,7 +567,7 @@ async function voidBill(shopId, id, billId, { reason, userId }) {
 }
 
 async function get(shopId, id) {
-  const rows = await many('SELECT * FROM purchase_orders WHERE shop_id=$1 AND id=$2', [shopId, String(id || '')]);
+  const rows = await many(`SELECT * FROM purchase_orders WHERE ${OWN} AND id=$2`, [shopId, String(id || '')]);
   if (!rows.length) throw notFound('سفارشِ خرید پیدا نشد', 'purchase_order_not_found');
   const o = orderOf(rows[0]);
   return view(o, await receiptsOf(query, shopId, o.id), { bills: await billsOf(query, shopId, o.id) });
@@ -582,7 +592,7 @@ async function receiptsByPo(shopId, ids) {
   const byPo = new Map(ids.map((x) => [x, []]));
   if (ids.length) {
     const rs = await many(
-      'SELECT * FROM purchase_receipts WHERE shop_id=$1 AND po_id = ANY($2::text[]) ORDER BY created_at, id', [shopId, ids]
+      `SELECT * FROM purchase_receipts WHERE ${OWN} AND po_id = ANY($2::text[]) ORDER BY created_at, id`, [shopId, ids]
     );
     for (const r of rs) byPo.get(r.po_id).push(receiptOf(r));
   }
@@ -607,7 +617,7 @@ async function list(shopId, { state, status, supplierId, cursor, limit } = {}) {
   if (want !== null && state !== undefined && state !== '' && state !== stored) {
     throw badRequest('وضعیتِ ذخیره‌شده با وضعیتِ نمایشی نمی‌خواند', 'bad_status');
   }
-  const where = ['shop_id=$1'];
+  const where = [`${OWN}`];
   const args = [shopId];
   if (stored) { args.push(stored); where.push(`state=$${args.length}`); }
   if (typeof supplierId === 'string' && supplierId) { args.push(supplierId); where.push(`supplier_id=$${args.length}`); }
@@ -663,7 +673,7 @@ async function list(shopId, { state, status, supplierId, cursor, limit } = {}) {
   const billsBy = new Map(ids.map((x) => [x, []]));
   if (ids.length) {
     const bs = await many(
-      'SELECT * FROM purchase_bills WHERE shop_id=$1 AND po_id = ANY($2::text[]) ORDER BY created_at, id', [shopId, ids]
+      `SELECT * FROM purchase_bills WHERE ${OWN} AND po_id = ANY($2::text[]) ORDER BY created_at, id`, [shopId, ids]
     );
     for (const x of bs) billsBy.get(x.po_id).push(billOf(x));
   }

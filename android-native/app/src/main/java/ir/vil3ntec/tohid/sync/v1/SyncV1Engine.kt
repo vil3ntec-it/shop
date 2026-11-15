@@ -171,7 +171,7 @@ class SyncV1Engine private constructor(context: Context) {
         synchronized(this) { commit.queueRecorded() }
         val before = queue.droppedCount()
         try {
-          pushQueue(pushClient(), deviceId())
+          pushQueue(pushClients.client(), deviceId())
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
           throw cancelled
         } catch (e: Throwable) {
@@ -211,7 +211,7 @@ class SyncV1Engine private constructor(context: Context) {
     busy = true
     publish()
     try {
-      val client = pushClient()
+      val client = pushClients.client()
       val device = store.deviceUid
       recoverWith(object : RecoverIo {
         override suspend fun push() = pushQueue(client, device)
@@ -422,11 +422,7 @@ class SyncV1Engine private constructor(context: Context) {
    *  `core/…/core/sync/PushSince.kt`. سرور فقط با پرچمِ دکانِ `sync.cursor_from_since` آن را می‌خواند؛
    *  بی پرچم (و برای پمپ) همان رفتارِ امروز.
    */
-  /** SYN-04: «فشرده بفرست» ِ سرور، ماندگار روی همین حساب؛ ردِ فشرده تا پایانِ همین اجرا (`SyncV1Client.PushGzip`) */
-  private val pushGzip = SyncV1Client.PushGzip({ state.gzipPush }, { state.gzipPush = it })
-
-  private fun pushClient(): SyncV1Client =
-    SyncV1Client(Backend.api(app), { ir.vil3ntec.tohid.core.sync.PushSince.since(state.pushSince, state.cursor) }, pushGzip)
+  private val pushClients = SyncV1PushClientAndroid(app) { state }
 
   /* ==========================================================
      ۲) یک دورِ کامل: Push تا ته، بعد Pull
@@ -447,7 +443,7 @@ class SyncV1Engine private constructor(context: Context) {
       try {
         //  ژورنالِ نیمه‌مانده پیش از هر Push/Pull (F0-05)
         if (commit.pending()) synchronized(this) { commit.recover(read()) }
-        val client = pushClient()
+        val client = pushClients.client()
         val device = deviceId()
 
         //  §۹.۵: سرور از پشتیبان برگشته؟ (هر دور) opهای گم‌شده — خودِ دستگاه و گرفته‌شده‌ها — به ترتیبِ سرور جلوی صف
@@ -603,7 +599,7 @@ class SyncV1Engine private constructor(context: Context) {
     try {
       //  opهای ژورنالِ «ثبت» که هنوز به صف نرسیده بودند (همان `op_id`)
       synchronized(this) { commit.queueRecorded() }
-      pushQueue(pushClient(), deviceId())
+      pushQueue(pushClients.client(), deviceId())
       Result.success(queue.size())
     } catch (cancelled: kotlinx.coroutines.CancellationException) {
       throw cancelled
@@ -630,7 +626,7 @@ class SyncV1Engine private constructor(context: Context) {
     publish()
     try {
       synchronized(this) { commit.queueRecorded() }
-      val client = pushClient()
+      val client = pushClients.client()
       val device = deviceId()
       //  §۹.۵: سرور از پشتیبان برگشته؟ opهای گم‌شده (خودی و گرفته‌شده، دفترچه رمزدار نیست) پیش از
       //  Snapshot جلوی صف ⇒ دفترِ بازسازی‌شده آن‌ها را هم دارد

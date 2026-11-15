@@ -13,7 +13,7 @@
 #  ── الف) فقط اندروید، برای همیشه (iOS همتا نمی‌خواهد؛ همتای کوچکش فقط همان API را بی‌اثر نگه می‌دارد) ──
 MainActivity.kt  # نقطهٔ ورودِ اندروید (Activity، مانیفست، نامِ مستعارِ پیوند، سرویسِ اسکنِ پس‌زمینه). ورودِ آیفون: ios/IosRoot.kt ⇐ همان AppShell/AppStart ِ مشترک
 data/push/FcmPushAndroid.kt  # پوشِ Firebase (FCM) و سرویسِ پیامِ اندروید (O-01). آیفون APNs است: توکن از ios/IosPush.kt، فرستنده server/src/lib/apns.js؛ روزی که حسابِ اپل آمد (O-02) یک `PushPlatform` با provider = "apns" در data/push/DevicePushAndroid.kt می‌نشیند
-update/Updater.kt  # دانلود، سنجشِ امضا و نصبِ APK. iOS فقط App Store (قاعدهٔ ۲.۵.۲ ِ اپل) ⇐ update/UpdaterIos.kt؛ قاعدهٔ شماره‌ها مشترک (update/ReleaseVersion.kt)
+#  update/Updater.kt ِ اندروید دیگر در src/main نیست (فقط src/direct، نسخهٔ مستقیمِ گوشی) ⇐ سطرش رفت؛ iOS فقط App Store (قاعدهٔ ۲.۵.۲ ِ اپل) ⇐ update/UpdaterIos.kt
 
 #  ── ب) همتای iOS (همان API، در ios/shared/src/iosMain؛ مثلِ «replaced» ِ desktop): سرویسِ سکو که shim ِ هم‌نام دروغ می‌گفت یا ضعیف‌تر بود ──
 data/AtRestKeys.kt  # KEK ِ Android Keystore (سخت‌افزاری، چرخشِ نام) و متنِ صفحهٔ امنیت؛ iOS: data/AtRestKeysIos.kt (Keychain، «فقط همین دستگاه»، HARDWARE_BACKED=false)
@@ -26,4 +26,5 @@ scan/GuidedCapture.kt  # دوربینِ راهنمای CameraX؛ iOS: scan/Guide
 ui/SecureWindowAndroid.kt  # OPS-02: `FLAG_SECURE` ِ برگهٔ عبارت (android.view) — آیفون پنجرهٔ امن ندارد؛ ui/PlatformIos.kt: `SecureWindow` ِ بی‌اثر
 ui/Platform.kt  # «کدام سکو» (شناسهٔ دستگاه، پوشهٔ پشتیبان) — برای هر سکو جدا، مثلِ ui/PlatformDesk.kt؛ iOS: ui/PlatformIos.kt (identifierForVendor)
 ui/screens/Haptics.kt  # الگوی خامِ VibrationEffect.createWaveform؛ iOS: ui/screens/HapticsIos.kt ⇐ ios/IosHaptics.kt (مولدهای UIKit با همان معنا: موفق/خطا/تأیید/انتخاب/آستانه، گامِ ۱۰ §۰.۱۵)
+core/net/HttpBodyAndroid.kt  # java.util.zip ِ JVM برای پاسخِ gzip ِ `HttpEngine`؛ iOS: core/net/HttpBodyIos.kt (NSURLSession خودش باز می‌کند)
 sync/v3/V3GzipAndroid.kt  # java.util.zip ِ JVM؛ iOS: sync/v3/V3GzipIos.kt (push ِ v3 همیشه ساده — MIN_CHARS هرگز نمی‌رسد؛ سرور هر دو را می‌پذیرد)

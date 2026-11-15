@@ -740,7 +740,7 @@ async function createApp({ runMigrations = true } = {}) {
 
   app.get('/', (req, res) => res.redirect('/admin/'));
 
-  // ---- پورتالِ مشتری و SDK ----
+  app.use('/legal', require('./routes/legal-pages'));   // ---- حریمِ خصوصی و شرایط (عمومی، نشانیِ فروشگاه‌ها)؛ پورتالِ مشتری و SDK ----
   app.use('/portal', express.static(path.join(__dirname, '..', 'public', 'portal'), {
     index: 'index.html', maxAge: 0, etag: true,
   }));

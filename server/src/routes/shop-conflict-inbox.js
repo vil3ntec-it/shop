@@ -11,43 +11,46 @@
  * ⛔ shop_id و کاربر فقط از عضویتِ توکن. سقف: سطلِ IP پیش از احراز، سپس سطلِ هر کاربر؛ نوشتن سطلِ تنگ‌ترِ خودش.
  * ⛔ کلیدِ اشتراک ندارد (SUB-10: FREE): دادهٔ فروشنده گروگانِ اشتراک نمی‌شود (D-05)؛ همان «دوباره ثبت» ِ همگام‌سازی است.
  * ⛔ پیش‌فرض روشن و بی پرچم: صندوق فقط وقتی چیزی نشان می‌دهد که سندی رد شده باشد.
+ * ⛔ شعبه (فازِ ۳ب ِ `docs/BRANCHES-fa.md`، پرچمِ خاموشِ `shop.branches`): صندوقِ هر شعبه همان سندهای ردشدهٔ بخشِ خودش —
+ *   شعبه فقط از سرآیندِ سنجیدهٔ `X-Branch-Id` (`branch-rest.scope`)؛ مدیر فقط شعبه‌های خودش، صاحب هر شعبه.
  */
 const express = require('express');
 const config = require('../config');
 const inbox = require('../lib/conflict-inbox');
+const branchRest = require('../lib/branch-rest');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 
 const router = express.Router();
 router.use(rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'conflict-inbox-ip' }));
 const limit = rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'conflict-inbox', key: (req) => req.user && req.user.id });
-router.use(requireUser, requireShop, limit, requirePermission('data.read'));
+router.use(requireUser, requireShop, limit, requirePermission('data.read'), branchRest.scope);
 //  هر «دوباره ثبت» یک push ِ کامل است
 const writeLimit = rateLimit({ max: 30, windowMs: 60 * 1000, keyPrefix: 'conflict-inbox-write', key: (req) => req.user && req.user.id });
 
 const actorOf = (req) => ({ userId: req.user.id, role: req.role });
 
 router.get('/', requirePermission(inbox.RESOLVE_PERMISSION), async (req, res) => {
-  res.json(await inbox.list(req.shopId, actorOf(req), { status: String(req.query.status || 'open'), limit: req.query.limit }));
+  res.json(await inbox.list(req.branchKey, actorOf(req), { status: String(req.query.status || 'open'), limit: req.query.limit }));
 });
 
 router.get('/mine', async (req, res) => {
   //  ⛔ CRM-15: `settle.base` مقدارِ امروزِ سرورِ ردیف‌هایی است که opهای خودِ او زدند — بی `customers.contact` بی شماره و نشانی
   const hideContact = await require('../lib/customer-contact').hiddenForReq(req);
-  res.json(await inbox.mine(req.shopId, actorOf(req), { limit: req.query.limit, hideContact }));
+  res.json(await inbox.mine(req.branchKey, actorOf(req), { limit: req.query.limit, hideContact }));
 });
 
 router.get('/:id', requirePermission(inbox.RESOLVE_PERMISSION), async (req, res) => {
   const hideContact = await require('../lib/customer-contact').hiddenForReq(req);
-  res.json(await inbox.get(req.shopId, actorOf(req), req.params.id, { hideContact }));
+  res.json(await inbox.get(req.branchKey, actorOf(req), req.params.id, { hideContact }));
 });
 
 router.post('/:id/resubmit', requirePermission(inbox.RESOLVE_PERMISSION), writeLimit, async (req, res) => {
-  res.json(await inbox.resubmit(req.shopId, actorOf(req), req.params.id, { note: req.body?.note, ip: clientIp(req) }));
+  res.json(await inbox.resubmit(req.branchKey, actorOf(req), req.params.id, { note: req.body?.note, ip: clientIp(req) }));
 });
 
 router.post('/:id/dismiss', requirePermission(inbox.RESOLVE_PERMISSION), writeLimit, async (req, res) => {
-  res.json(await inbox.dismiss(req.shopId, actorOf(req), req.params.id, {
+  res.json(await inbox.dismiss(req.branchKey, actorOf(req), req.params.id, {
     reason: req.body?.reason, fixedDoc: req.body?.fixedDoc, ip: clientIp(req),
   }));
 });

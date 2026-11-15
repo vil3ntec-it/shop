@@ -63,6 +63,8 @@ function convertFields(spec, fields) {
   const dropped = [];
   for (const [k, v] of Object.entries(fields || {})) {
     if (k === 'id') continue;
+    //  نامِ ویژهٔ شیء هرگز فیلد نیست (CodeQL «تزریقِ نامِ ویژگی»: `__proto__` روی `set`/`inc` نمونه‌پایه را عوض می‌کرد)
+    if (k === '__proto__' || k === 'constructor' || k === 'prototype') { dropped.push(k); continue; }
     if (spec.derived.includes(k) || spec.localOnly.includes(k)) { dropped.push(k); continue; }
     const unit = spec.money.includes(k) ? ['Minor', toMinor] : spec.qty.includes(k) ? ['Milli', toMilli] : null;
     if (isInc(v)) {
