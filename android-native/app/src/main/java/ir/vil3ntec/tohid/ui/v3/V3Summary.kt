@@ -30,6 +30,9 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
@@ -151,6 +154,12 @@ fun V3SummaryFrame(
   val fold = collapseKey?.let { rememberSummaryFold(it) }
   val open = fold?.folded != true
   val shape = RoundedCornerShape(PhoneV3.groupRadius)
+  //  چیدمانِ کارت در **هر زبان همان** (صاحب‌کار: «لی‌اوتش به دیگه جهت نره حتی با عوض کردن زبان»): پیکان در راست، کادرِ کشویی در چپ،
+  //  نمودار نام در راست و مبلغ در چپ — جهتِ چیدمان ثابتِ راست‌به‌چپ؛ جهتِ خودِ نوشته از محتوا. درونِ کادرِ کشویی جهتِ زبان ([corner])
+  val language = LocalLayoutDirection.current
+  val inLanguage: (@Composable () -> Unit)? =
+    if (corner == null) null else @Composable { CompositionLocalProvider(LocalLayoutDirection provides language) { corner() } }
+  CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
   Column(
     modifier
       .fillMaxWidth()
@@ -162,7 +171,7 @@ fun V3SummaryFrame(
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {
     if (fold == null) {
-      if (corner != null) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { corner() }
+      if (inLanguage != null) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { inLanguage() }
       Text(
         label,
         style = V3Type.subhead,
@@ -174,9 +183,10 @@ fun V3SummaryFrame(
       )
       Spacer(Modifier.height(4.dp))
     } else {
-      SummaryHeader(label, value, open, labelColor ?: sc.label, valueColor ?: sc.strong, sc.chevron, corner, fold::toggle)
+      SummaryHeader(label, value, open, labelColor ?: sc.label, valueColor ?: sc.strong, sc.chevron, inLanguage, fold::toggle)
     }
     if (open) body()
+  }
   }
 }
 

@@ -91,6 +91,9 @@
 - **ادغامِ `origin/claude/batch-67` (۶۵r)**: `SettingsHues` برای بخش‌های هم‌پوشان (فاکتور/گزارش/کالا/آنلاین و دستهٔ کالا) از `V3Section.hue`
   می‌خواند (همان مقدارها؛ هم‌خوانی در `SectionColorsTest`)؛ **عنوانِ تکراریِ تنظیمات برداشته شد** — `rememberBarTitleFits` (جای ثابتِ ۱۰۴ از
   هر سو) و نامِ دومِ زیرِ سربرگ نیست؛ سربرگ جای عنوان را از دکمه‌های واقعی می‌سنجد (`V3HeaderBar`) و کارِ اضافه به «…» (`visibleFor`).
+- **چیدمانِ سربرگ در هر زبان همان** (خواستِ تازهٔ صاحب‌کار): `V3HeaderBar` و `V3SummaryFrame` درونِ `LocalLayoutDirection = Rtl` ِ ثابت
+  (نوشته جهتِ محتوای خودش را دارد؛ درونِ کادرِ کشوییِ گوشه جهتِ زبان). شاهد: `SectionHeaderUiTest.barAndSummaryKeepTheirArrangementInEveryLanguage`
+  (فارسی و انگلیسی: برگشت، کار، وسطِ عنوان، کادرِ کشویی و وسطِ برچسب همان جا).
 - **آزمون‌ها**: تازه `SummaryCardUiTest`، `SectionHeaderUiTest`، `SummaryFoldTest`، `SectionColorsTest`؛ عکس `E65sShotsTest`
   (`E65S_SHOTS=<پوشه>`). آزمونِ کهنه فقط `HistoryMeaningTest` (رنگِ پول ⇐ `SectionColors`) آگاهانه عوض شد؛ `HistoryPrintWiringTest` با همان `FlowRow(Modifier.fillMaxWidth()` سبز ماند.
 - **دست نخورد**: داشبورد و آیکن‌ها (`LookGuardTest`)، `DebtorsStatsCard` (۶۵q)، ردیف‌ها و راهنمای برگشتِ تاریخچه (۶۵h)، تنظیمات (۶۵r).

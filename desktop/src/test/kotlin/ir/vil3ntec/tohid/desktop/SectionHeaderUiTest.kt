@@ -181,6 +181,68 @@ class SectionHeaderUiTest {
     }
   }
 
+  /**
+   *  صاحب‌کار: «همه سربرگ‌هایی که … نوشته‌هاشو وسط می‌زاری … لی‌اوتش به دیگه جهت نره حتی با عوض کردن زبان» — نوار و کارتِ خلاصه
+   *  در فارسی و انگلیسی (چپ‌به‌راست) همان چیدمان: برگشت، کار، عنوانِ وسط، کادرِ کشوییِ گوشهٔ کارت و برچسبِ وسطِ آن سرِ جای خود.
+   */
+  @Test fun barAndSummaryKeepTheirArrangementInEveryLanguage() {
+    I18n.source = { Lang.FA }
+    val backFa = StrKit.back
+    I18n.source = { Lang.EN }
+    val backEn = StrKit.back
+    I18n.source = { Lang.FA }
+    ctx.getSharedPreferences(ViewModePref.PREFS, 0).edit().remove(SummaryFold.key("test65s/lang")).commit()
+    val en = androidx.compose.runtime.mutableStateOf(false)
+    rule.setContent {
+      CompositionLocalProvider(LocalContext provides ctx) {
+        TohidTheme(ThemeChoice.LIGHT) {
+          CompositionLocalProvider(LocalLayoutDirection provides if (en.value) LayoutDirection.Ltr else LayoutDirection.Rtl) {
+            Box(Modifier.width(360.dp)) {
+              V3Scaffold(
+                title = if (en.value) "Expenses" else "مصارف",
+                onBack = {},
+                actions = listOf(V3Action(Icons.Outlined.Tune, "کار") {}),
+              ) {
+                ir.vil3ntec.tohid.ui.v3.V3Summary(
+                  label = if (en.value) "Month total" else "جمع ماه",
+                  value = "16,450 ؋",
+                  collapseKey = "test65s/lang",
+                  section = ir.vil3ntec.tohid.ui.theme.V3Section.EXPENSES,
+                  corner = {
+                    ir.vil3ntec.tohid.ui.v3.V3Dropdown(if (en.value) "Nov 2026" else "عقرب 1405", emptyList(), null, {}, label = "ماه")
+                  },
+                )
+              }
+            }
+          }
+        }
+      }
+    }
+    rule.waitForIdle()
+    val backM = hasClickAction() and (hasContentDescription(backFa) or hasContentDescription(backEn))
+    fun snap(title: String, label: String): List<Float> {
+      val back = nodes(backM).single().boundsInRoot
+      val act = nodes(hasContentDescription("کار") and hasClickAction()).single().boundsInRoot
+      val t = titleNode(title).boundsInRoot
+      val drop = nodes(dropdown).single().boundsInRoot
+      val l = nodes(hasText(label) and !hasClickAction(), unmerged = true).single().boundsInRoot
+      return listOf(back.left, back.right, act.left, act.right, t.center.x, drop.left, drop.right, l.center.x)
+    }
+    try {
+      val fa = snap("مصارف", "جمع ماه")
+      I18n.source = { Lang.EN }
+      en.value = true
+      rule.waitForIdle()
+      val enPos = snap("Expenses", "Month total")
+      val names = listOf("برگشت (چپ)", "برگشت (راست)", "کار (چپ)", "کار (راست)", "وسطِ عنوان", "کشویی (چپ)", "کشویی (راست)", "وسطِ برچسب")
+      names.forEachIndexed { i, n -> assertEquals("$n همان جا در انگلیسی", fa[i], enPos[i], px(1.5f)) }
+      assertTrue("برگشت در راست (همان فارسی)", fa[0] > px(180f))
+    } finally {
+      I18n.source = { Lang.FA }
+      ctx.getSharedPreferences(ViewModePref.PREFS, 0).edit().remove(SummaryFold.key("test65s/lang")).commit()
+    }
+  }
+
   @Test fun expensesMonthDropdownAndCategoryChartAreInsideTheSummaryCard() {
     val d = MoneyDemo.full()
     h.show("expenses", d)

@@ -34,6 +34,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.graphics.Color
@@ -328,7 +331,10 @@ internal fun V3HeaderBar(
   val c = PhoneV3.colors
   val alpha by animateFloatAsState(if (showTitle) 1f else 0f, MotionSpec.tweenOf(150), label = "barTitle")
   Column(Modifier.fillMaxWidth().background(if (transparent) Color.Transparent else c.bg).windowInsetsPadding(WindowInsets.statusBars)) {
-    //  ۶۵s: عنوان وسطِ نوار میانِ برگشت و کارها؛ اگر کارهای یک سو پهن‌اند و وسط جا نیست، وسطِ جای خالیِ میانشان — هرگز زیرِ آیکن
+    //  ۶۵s: عنوان وسطِ نوار میانِ برگشت و کارها؛ اگر کارهای یک سو پهن‌اند و وسط جا نیست، وسطِ جای خالیِ میانشان — هرگز زیرِ آیکن.
+    //  چیدمانِ نوار در **هر زبان همان** است (صاحب‌کار: «لی‌اوتش به دیگه جهت نره حتی با عوض کردن زبان»): برگشت در راست، کارها در
+    //  چپ، عنوان وسط — جهتِ چیدمان ثابتِ راست‌به‌چپ؛ جهتِ خودِ نوشته از محتوایش (انگلیسی همان چپ‌به‌راست خوانده می‌شود)
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
     androidx.compose.ui.layout.Layout(
       modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp),
       content = {
@@ -365,6 +371,7 @@ internal fun V3HeaderBar(
         title.placeRelative(x, (h - title.height) / 2)
         acts.placeRelative(w - acts.width, (h - acts.height) / 2)
       }
+    }
     }
     Box(Modifier.fillMaxWidth().height(1.dp).graphicsLayer { this.alpha = divider() }.background(c.hairline))
   }
