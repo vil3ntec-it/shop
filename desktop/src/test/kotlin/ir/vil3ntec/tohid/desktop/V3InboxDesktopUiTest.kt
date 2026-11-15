@@ -82,8 +82,8 @@ class V3InboxDesktopUiTest {
 
   private fun skew(status: String = "open") = """{"id":"cf_skew1","kind":"clock_skew","task":false,"revertible":${status == "open"},
     "table":"products","row_id":"p-tea","field":"*","winner_value":{"name":"چای سبز","salePriceMinor":10000},
-    "loser_value":{"name":"چای سبزِ تازه","salePriceMinor":12500},"winner_hlc":"000001799999990000:000000:desk-a",
-    "loser_hlc":"000001800000600000:000000:desk-c","winner_device":"desk-a","loser_device":"desk-c","detail":{},
+    "loser_value":{"name":"چای سبزِ تازه","salePriceMinor":12500},"winner_hlc":"001799999990000:000000:desk-a",
+    "loser_hlc":"001800000600000:000000:desk-c","winner_device":"desk-a","loser_device":"desk-c","detail":{},
     "status":"$status","at":1799999999000,"resolved_at":null,"resolved_by":"","resolution_op_id":""}"""
 
   private fun show(m: V3InboxModel) {

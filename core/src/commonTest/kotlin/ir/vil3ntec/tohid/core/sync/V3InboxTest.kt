@@ -19,13 +19,13 @@ class V3InboxTest {
 
   private val skew = """{"id":"cf_skew1","kind":"clock_skew","task":false,"revertible":true,"table":"products","row_id":"p1",
     "field":"*","winner_value":{"name":"چای","salePriceMinor":10000},"loser_value":{"name":"چای تازه","salePriceMinor":12500},
-    "winner_hlc":"000001700000000000:000000:dev-a","loser_hlc":"000001700000600000:000000:dev-c","winner_op_id":"o1",
+    "winner_hlc":"001700000000000:000000:dev-a","loser_hlc":"001700000600000:000000:dev-c","winner_op_id":"o1",
     "loser_op_id":"o2","winner_device":"dev-a","loser_device":"dev-c","detail":{},"status":"open","at":1700000000000,
     "resolved_at":null,"resolved_by":"","resolution_op_id":""}"""
 
   private val lww = """{"id":"cf_lww1","kind":"lww","task":false,"revertible":true,"table":"products","row_id":"p2",
-    "field":"salePriceMinor","winner_value":2000,"loser_value":1500,"winner_hlc":"000001700000000020:000000:dev-a",
-    "loser_hlc":"000001700000000010:000000:dev-b","winner_device":"dev-a","loser_device":"dev-b","status":"open","at":5}"""
+    "field":"salePriceMinor","winner_value":2000,"loser_value":1500,"winner_hlc":"001700000000020:000000:dev-a",
+    "loser_hlc":"001700000000010:000000:dev-b","winner_device":"dev-a","loser_device":"dev-b","status":"open","at":5}"""
 
   private fun page(vararg rows: String, inbox: String? = """{"v":1,"merge":true}""") =
     V3Inbox.parsePage(obj("""{"ok":true,"conflicts":[${rows.joinToString(",")}]${inbox?.let { ",\"inbox\":$it" } ?: ""}}"""))
