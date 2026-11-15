@@ -177,11 +177,12 @@ class RowsE63dUiTest {
     var seq = 0
     val data = (SalesEngine.record(
       ShopData(products = listOf(tea), warehouseEntries = listOf(WarehouseEntry(id = "r63-w", productId = tea.id, units = 5.0))),
-      listOf(SalesEngine.CartLine(tea.id, 1.0)), SalesEngine.Checkout(seller = "صندوقدار"), todayIso(), 1L, { "r63-${seq++}" },
+      listOf(SalesEngine.CartLine(tea.id, 1.0)), SalesEngine.Checkout(seller = "صندوقدار"), todayIso(), System.currentTimeMillis(), { "r63-${seq++}" },
     ) as SalesEngine.Result.Ok).data
     ShopRole.remember(DesktopContext, ShopRole.OWNER)
     RouteUiHarness(rule).use { h ->
       h.show(SalesPaths.HISTORY, data)
+      //  دفترِ تاریخچه در پس‌زمینه ساخته می‌شود؛ فاکتورِ امروز (ساعتِ همین لحظه) زیرِ «امروز» است
       h.await(tea.name)
       h.click(tea.name)
       h.await(StrSale.print)
