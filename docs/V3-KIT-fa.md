@@ -10,7 +10,7 @@
 
 | جزء | کی | نکته |
 |---|---|---|
-| `V3Scaffold(title, subtitle?, onBack?, actions≤2, overflow, search, chips, notice, bottomReserve, largeTitle, fab, bottomBar, backdrop?) { pad -> }` | قابِ **هر** صفحه | عنوانِ درشتِ ۳۰sp که با پیمایش جمع می‌شود؛ `pad.calculateBottomPadding()` را به فهرست بدهید. `notice` را پوسته خودش می‌گذارد (`ui/v3/shell/ShellNotice()`، مالِ G10: اشتراک/نسخهٔ تازه). `backdrop` (مثلاً `Modifier.frosted(PhoneV3.colors)`) به‌جای `bg`؛ سربرگ و عنوانِ درشت آن‌وقت شفاف‌اند. |
+| `V3Scaffold(title, subtitle?, onBack?, actions≤2, overflow, search, chips, dock, notice, bottomReserve, largeTitle, fab, bottomBar, backdrop?) { pad -> }` | قابِ **هر** صفحه | عنوانِ درشتِ ۳۰sp که با پیمایش جمع می‌شود؛ `pad.calculateBottomPadding()` را به فهرست بدهید. کارِ یک‌دستی: روی گوشی و تبلت `search`، `chips` و `dock` (کارهای شست: اسکن، مرتب‌سازی، نما) در `V3Dock` ِ پایینِ صفحه‌اند، بالای `bottomBar`؛ `actions` ِ سربرگ فقط کارهای کم‌کاربرد؛ کامپیوتر همان بالا. `notice` را پوسته خودش می‌گذارد (`ui/v3/shell/ShellNotice()`، مالِ G10: اشتراک/نسخهٔ تازه). `backdrop` (مثلاً `Modifier.frosted(PhoneV3.colors)`) به‌جای `bg`؛ سربرگ و عنوانِ درشت آن‌وقت شفاف‌اند. |
 | `V3Section(title?, footer?, action?)` + `V3Card` + `V3Divider(start)` | گروهِ محتوا | سرخط بیرونِ کارت؛ کارت همیشه مرزدار. |
 | `V3ListRow(title, subtitle?, icon?, hue?, leading?, value?, trailing?, startActions, endActions, selected?, onLongClick?, onClick?)` | **هر** ردیفِ فهرست | کاشیِ رنگیِ `V3Hue`؛ کشیدن ⇐ کارها (آینه در RTL، لرزش در آستانه، کشیدنِ کامل = کارِ اول). |
 | `V3IconTile`، `V3Chevron`، `V3ProductThumb(productId, name)` | آیکن/عکس | عکسِ کالا یا کاشیِ حرفِ اول. |
@@ -28,6 +28,7 @@
 | `V3Message(V3Tone, title, body?, action?)` | پیام (§۹) | |
 | `V3EmptyState(icon, title, body?, action?)`، `V3Skeleton(rows)` | خالی / در حالِ بار | به‌جای چرخنده، اسکلت. |
 | `V3Fab(icon, label, expanded, onClick)` | کارِ اصلیِ فهرست | با پیمایش جمع می‌شود؛ Ctrl+N کامپیوتر همین. |
+| `V3Dock(search?, chips?, actions, below)` | نوارِ کارهای پایین (کارِ یک‌دستی) | فقط `V3Scaffold` می‌کشدش؛ دکمه‌ها ۴۸dp (`V3DockTarget`)؛ جست‌وجو خودش فوکوس نمی‌گیرد و با صفحه‌کلید بالا می‌رود. |
 | `V3ActionBar(count, actions, onClear)` | انتخابِ گروهی | |
 | `LocalV3Toasts.current?.show(text)` / `.undo(text) { }`، `V3SnackbarHost` | پیام کوتاه | «برگرداندن» فقط جایی که موتور کارِ وارونه دارد. |
 | `V3TabBar(tabs, current, onPick)`، `V3TwoPane(list, detail)` | پوسته‌های دیگر، کامپیوتر | |
@@ -106,8 +107,9 @@
      `nav.openFromRail` (منوی کناری، فهرستِ فرمان، میان‌برها).
    - برگشتِ سربرگ: `backOrNull` (ریشهٔ تب بی برگشت). چیدمانِ کامپیوتری در مسیر: `if (desk)`، نه `Platform.DESKTOP`
      (پیش‌نمایشِ گوشی `LocalDeskLayout = false` می‌دهد تا عکس نسخهٔ گوشی باشد).
-   - پایینِ صفحه را پوسته نگه می‌دارد (`ShellFrame`): نوارِ شناور فقط روی ریشهٔ تب‌ها؛ صفحه `bottomReserve`
-     نمی‌خواهد و نوارِ سیستم را دوباره نمی‌شمارد (`LocalV3SystemBottom.current ?: navigationBars`).
+   - پایینِ صفحه را پوسته نگه می‌دارد (`ShellFrame`): نوارِ شناور روی هر بخشِ اصلی (ورودی‌های ماژول، صندوق؛
+     نه صفحهٔ درونی، نه زیرِ برگه، نه با صفحه‌کلیدِ باز)؛ صفحه `bottomReserve` نمی‌خواهد (مسیر `0.dp` می‌دهد، جز خانه)
+     و نوارِ سیستم را دوباره نمی‌شمارد (`LocalV3SystemBottom.current ?: navigationBars`).
 5. پیوندِ بیرونی: `vill3n://app/<مسیر>` (اعلان‌ها) — `DeepLinks.appLink(path)`. پیوندِ سرد پشته را از زنجیرهٔ `parent` می‌سازد.
 6. دسترسی: `needs = setOf(Need.MANAGE)` و/یا پرچمِ ماژول؛ بی‌دسترسی خودکار صفحهٔ «دسترسی ندارید» با برگشت. متنِ ویژهٔ
    همان صفحه: `V3Route(..., deniedBody = { StrX.why })` (پیش‌فرض `StrKit.noAccessBody`).

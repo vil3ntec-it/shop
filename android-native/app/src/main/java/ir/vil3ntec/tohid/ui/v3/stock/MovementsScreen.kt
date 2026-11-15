@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.ShopData
@@ -118,7 +119,8 @@ fun MovementsScreen(
     }),
   ) { pad ->
     if (days.isEmpty()) {
-      V3EmptyState(Icons.Outlined.SwapVert, StrStock.noMovements)
+      //  گامِ بعدیِ روشن (e-rows-63d): نخستین ورودِ همین کالا
+      V3EmptyState(Icons.Outlined.SwapVert, StrStock.noMovements, action = StrReports.stockEntry, onAction = { onOpen(StockPaths.entry(productId)) })
       return@V3Scaffold
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding())) {

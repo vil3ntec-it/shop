@@ -297,6 +297,12 @@ object SettingsLayout {
     GIFT_CARD, LAYAWAY, LOYALTY, SAFE_BOOK, SPECIAL_ORDER, QUOTE, PRICE_LIST, AUTO_FEES, DELIVER_LATER, TAX_QUARTER, HESAB_SHOP,
   )
 
+  /**
+   *  ردیف‌هایی که فقط صاحبِ دکان می‌بیند (نه مدیر، نه کارمند، نه پیک): «سرورها» با نشانی و هویتِ سرور سروکار دارد
+   *  («هیچ جزئیاتِ فنی/زیرساخت در صفحه»، `docs/RULES-fa.md`). خودِ کارها را `ServersController.canManage` هم می‌بندد.
+   */
+  val OWNER_ONLY: Set<String> = setOf(SERVERS)
+
   /** قابلیت‌هایی که ردیفشان فقط با «روشن» دیده می‌شود */
   val FEATURE_GATED: Set<String> get() = FEATURES.toSet() - HESAB_SHOP
 

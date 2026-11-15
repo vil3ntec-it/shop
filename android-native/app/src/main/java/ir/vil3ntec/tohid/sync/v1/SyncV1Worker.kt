@@ -75,6 +75,9 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
     //  Sync v3 پشتِ تنظیمِ هر دستگاه (پیش‌فرض v1): همین کارگر، موتورِ دیگر
     if (ir.vil3ntec.tohid.sync.v3.SyncChoice.isV3(app)) {
       val done = ir.vil3ntec.tohid.sync.v3.SyncV3Runner.of(app).work(store)
+      //  SEC-02: زنجیرهٔ اسنادِ همین سری روی Sync v3 هم — همان دورِ v1 (پرچمِ خاموشِ shop.doc_chain ⇒ فقط پرسشِ روزانهٔ پرچم؛ شکستش
+      //  بی‌صدا). ⛔ «سریِ سند» این‌جا گرفته نمی‌شود (شماره‌گذاریِ فاکتورِ v3 همان می‌ماند): دستگاهِ بی سری هیچ درخواستی نمی‌فرستد
+      runCatching { ir.vil3ntec.tohid.sync.platform.DocChainSync.cycle(app, store.data.value) }
       sweepAfterPull(store)
       noteOffline()
       return if (done) Result.success() else Result.retry()
@@ -125,6 +128,8 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
       read = { store.ledgerNow() },
       write = { next -> store.applyFromServerNow(next) },
     )
+    //  S29/SYN-09: سرور نرسید ⇒ هابِ جفت‌شدهٔ شبکهٔ دکان (پرچم یا `hub.peer` خاموش ⇒ هیچ؛ شکستش دور را نمی‌گیرد) — `SyncV1HubAndroid.kt`
+    runCatching { engine.hubExchange(app, outcome.exceptionOrNull(), read = { store.ledgerNow() }, write = { next -> store.applyFromServerNow(next) }) }
     sweepAfterPull(store)
     //  STF-09: سرِ زنجیرهٔ سابقهٔ همین دستگاه پس از هر دور، فقط وقتی عوض شده — ردیف‌های هنوز نرفته هم (بریدنشان روی
     //  سرور دیده می‌شود). پرچمِ خاموشِ shop.doc_chain ⇒ هیچ؛ شکستش بی‌صدا و دورِ بعد دوباره (`AuditAnchorSync`)

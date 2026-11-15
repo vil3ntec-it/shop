@@ -20,6 +20,7 @@ const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
 const sf = require('../src/lib/storefront');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -85,11 +86,11 @@ async function liveStore(label, settings = {}) {
 const tickets = new Map();
 async function ticketFor(slug, phone) {
   if (tickets.has(phone)) return tickets.get(phone);
-  const s = await h.post(`/api/store/${slug}/verify/start`, { phone });
+  const s = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
   assert.equal(s.status, 200, JSON.stringify(s.body));
   assert.equal(s.body.sent, true);
   assert.match(String(s.body.devCode), /^\d+$/, 'بیرون از تولید و با راهِ log، کدِ آزمایشی برمی‌گردد');
-  const c = await h.post(`/api/store/${slug}/verify/check`, { phone, code: s.body.devCode });
+  const c = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: s.body.devCode });
   assert.equal(c.status, 200, JSON.stringify(c.body));
   tickets.set(phone, c.body.ticket);
   return c.body.ticket;
@@ -132,7 +133,7 @@ test('بی پرچم: تنظیم ۴۰۳، نشانیِ عمومی ۴۰۴، و ه�
     await h.get('/api/store/khamosh-shop'),
     await h.get('/api/store/khamosh-shop/products'),
     await checkout('khamosh-shop', cart()),
-    await h.post('/api/store/khamosh-shop/verify/start', { phone: PHONE }),
+    await h.post('/api/store/khamosh-shop/verify/start', { email: mailOf(PHONE) }),
   ]) {
     assert.equal(r.status, 404, JSON.stringify(r.body));
     assert.equal(r.body.error.code, 'store_not_found');
@@ -253,22 +254,24 @@ test('کاتالوگ: فقط منتشرشده، زنده و قیمت‌دار؛ 
    ۳) تأییدِ شماره و ثبت
    ══════════════════════════════════════════════════════════════════ */
 
-test('بی شمارهٔ تأییدشده سفارشی ثبت نمی‌شود (S133)؛ بلیتِ دست‌خورده یا شمارهٔ دیگر هم نه', async () => {
+test('بی ایمیلِ تأییدشده سفارشی ثبت نمی‌شود (S133)؛ بلیتِ دست‌خورده نه؛ شمارهٔ تماسِ دیگر فقط تماس است («فقط ایمیل»)', async () => {
   const s = await liveStore('تأیید');
   const none = await checkout(s.slug, cart());
   assert.equal(none.status, 401);
   assert.equal(none.body.error.code, 'verification_required');
 
-  const bad = await h.post(`/api/store/${s.slug}/verify/check`, { phone: '0790000009', code: '000000' });
+  const bad = await h.post(`/api/store/${s.slug}/verify/check`, { email: mailOf('0790000009'), code: '000000' });
   assert.ok(bad.status >= 400 && bad.status < 500);
 
   const t = await ticketFor(s.slug, PHONE);
   const forged = t.slice(0, -2) + (t.endsWith('AA') ? 'BB' : 'AA');
   assert.equal((await checkout(s.slug, cart(), { ticket: forged })).status, 401);
-  const other = await checkout(s.slug, cart({ customer: { name: 'دیگری', phone: '0790000008' } }), { ticket: t });
-  assert.equal(other.status, 403);
-  assert.equal(other.body.error.code, 'phone_not_verified');
   assert.equal(await count(s.shopId), 0);
+  //  شمارهٔ تماسِ دیگر با همان بلیت ⇒ ثبت با همان ایمیلِ تأییدشده (شماره هویت نیست، فقط تماسِ پیک)
+  const other = await checkout(s.slug, cart({ customer: { name: 'دیگری', phone: '0790000008' } }), { ticket: t });
+  assert.equal(other.status, 201, JSON.stringify(other.body));
+  const row = await one('SELECT customer_phone, customer_email FROM online_orders WHERE shop_id=$1', [s.shopId]);
+  assert.deepEqual([row.customer_phone, row.customer_email], ['+93790000008', mailOf(PHONE)]);
 });
 
 test('ثبت: قیمت از سرور، عددِ مشتری بی‌اثر، رویدادِ «مشتری»، و همان در صفِ کارمند', async () => {

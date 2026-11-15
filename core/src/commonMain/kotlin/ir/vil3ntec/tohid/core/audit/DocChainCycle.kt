@@ -30,7 +30,8 @@ object DocChainCycle {
 
   /**
    *  یک دور. [sales] فاکتورهای همین دفتر (هر سری؛ فقط [series] برداشته می‌شود)، [by] شناسهٔ کاربرِ
-   *  واردشده (در سند، STF-09). ⇐ پرچمِ تازه و نتیجه.
+   *  واردشده (در سند، STF-09). [docs] اسنادِ بی‌شمارهٔ همین دفتر (برگشت، قرض، خرید — [DocChainDocs]؛ پیش‌فرض هیچ).
+   *  ⇐ پرچمِ تازه و نتیجه.
    */
   suspend fun tick(
     gate: Gate,
@@ -41,6 +42,7 @@ object DocChainCycle {
     series: String,
     by: String,
     sales: List<SaleFacts>,
+    docs: List<PlainFacts> = emptyList(),
   ): Pair<Gate, Outcome> {
     if (!DocChain.validSeries(series) || DocChain.chainId(shopId, series, 1) == null) return gate to Outcome.Skipped
     var status: DocChainStatus? = null
@@ -51,7 +53,7 @@ object DocChainCycle {
       if (!status.enabled) return Gate(false, now) to Outcome.Disabled
     }
     val on = Gate(true, now)
-    val outcome = run(book, server, shopId, series, by, sales, status)
+    val outcome = run(book, server, shopId, series, by, sales, docs, now, status)
     return when (outcome) {
       Outcome.Disabled -> Gate(false, now) to outcome
       else -> on to outcome
@@ -91,17 +93,19 @@ object DocChainCycle {
     series: String,
     by: String,
     sales: List<SaleFacts>,
+    docs: List<PlainFacts>,
+    now: Long,
     known: DocChainStatus?,
   ): Outcome {
     var st = book.state()?.takeIf { it.series == series && DocChain.chainId(it.chain)?.first == shopId }
     //  حلقهٔ تازه بی شبکه هم ساخته می‌شود (فاصلهٔ ثبت تا زنجیره کوتاه بماند)
-    if (st != null && st.halted.isEmpty()) st = book.catchUp(st, by, sales)
+    if (st != null && st.halted.isEmpty()) st = book.catchUpDocs(book.catchUp(st, by, sales), by, docs, now)
     if (st == null || st.halted in DocChain.RESTART) {
       val s = known ?: server.status() ?: return Outcome.Offline
       if (!s.enabled) return Outcome.Disabled
       //  از همین لحظه: فاکتورهای پیشین لنگر نخورده‌اند و زنجیره‌شان چیزی را ثابت نمی‌کند
       val startNo = (sales.filter { it.series == series }.maxOfOrNull { it.no } ?: 0L) + 1
-      st = book.start(shopId, series, maxOf(s.lastEpoch, st?.epoch ?: 0L) + 1, startNo) ?: return Outcome.Skipped
+      st = book.start(shopId, series, maxOf(s.lastEpoch, st?.epoch ?: 0L) + 1, startNo, docFrom = now) ?: return Outcome.Skipped
     }
     val reply = server.report(book.report(st)) ?: return Outcome.Offline
     if (!reply.enabled) return Outcome.Disabled

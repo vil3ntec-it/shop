@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrSheets
 import ir.vil3ntec.tohid.core.money.Currency
 import ir.vil3ntec.tohid.core.money.Money
 import ir.vil3ntec.tohid.core.money.Qty
@@ -37,14 +38,14 @@ object ShrinkLoss {
     return ShrinkReport.build(moves(d), from, to, { cost[it] }, salesMinor = sales)
   }
 
-  /** نامِ هر نوع در برگه — داده است و با زبانِ صفحه عوض نمی‌شود */
+  /** نامِ هر نوع در برگه — به زبانِ برنامه (LOC-06، تصمیمِ ۱۴۰۵/۰۸/۲۳ #۲۴) */
   fun kindName(k: ShrinkReport.Kind): String = when (k) {
-    ShrinkReport.Kind.WASTE -> "ضایعات"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    ShrinkReport.Kind.EXPIRED -> "منقضی"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    ShrinkReport.Kind.LOST -> "گم‌شده"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    ShrinkReport.Kind.SHORTAGE -> "کسریِ شمارش"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    ShrinkReport.Kind.SURPLUS -> "اضافهٔ شمارش"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    ShrinkReport.Kind.OTHER -> "اصلاحِ دستی"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    ShrinkReport.Kind.WASTE -> StrSheets.waste
+    ShrinkReport.Kind.EXPIRED -> StrSheets.expired
+    ShrinkReport.Kind.LOST -> StrSheets.lost
+    ShrinkReport.Kind.SHORTAGE -> StrSheets.countShortage
+    ShrinkReport.Kind.SURPLUS -> StrSheets.countSurplus
+    ShrinkReport.Kind.OTHER -> StrSheets.manualFix
   }
 
   /** مبلغ به افغانی برای برگه: رقمِ لاتین، بی جداکننده، اعشار فقط اگر هست (۳۳٫۳ ⇒ 33.30) */
@@ -69,12 +70,12 @@ object ShrinkLoss {
   fun sheet(d: ShopData, from: String, to: String): ReportCsv.Sheet {
     val r = report(d, from, to)
     val products = d.products.associateBy { it.id }
-    val rows = mutableListOf(listOf("تاریخ", "نام کالا", "نوع", "مقدار", "واحد", "زیان", "دلیل"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    val rows = mutableListOf(listOf(StrSheets.date, StrSheets.productNameShort, StrSheets.type, StrSheets.quantity, StrSheets.unit, StrSheets.loss, StrSheets.reason))
     for (l in r.lines) {
       val p = products[l.move.productId]
       rows += listOf(
         l.move.date,
-        p?.name ?: "کالای حذف‌شده",  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+        p?.name ?: StrSheets.deletedProduct,
         kindName(l.move.kind),
         qtyText(l.move.qtyMilli),
         p?.unit.orEmpty(),

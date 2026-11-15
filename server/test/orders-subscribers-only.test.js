@@ -24,6 +24,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const DAY = 24 * 60 * 60 * 1000;
 const GATE = 'shop.orders.subscribers_only';
@@ -108,9 +109,9 @@ const CLOSED = {
 let phoneSeq = 0;
 const nextPhone = () => `07955${String(++phoneSeq).padStart(5, '0')}`;
 async function ticketFor(slug, phone) {
-  const s = await h.post(`/api/store/${slug}/verify/start`, { phone });
+  const s = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
   assert.equal(s.status, 200, JSON.stringify(s.body));
-  const c = await h.post(`/api/store/${slug}/verify/check`, { phone, code: s.body.devCode });
+  const c = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: s.body.devCode });
   assert.equal(c.status, 200, JSON.stringify(c.body));
   return c.body.ticket;
 }
@@ -219,7 +220,7 @@ for (const [name, apply] of Object.entries(CLOSED)) {
     const phone = nextPhone();
     for (const r of [
       await h.get(`/api/store/${s.slug}`), await h.get(`/api/store/${s.slug}/products`),
-      await h.post(`/api/store/${s.slug}/verify/start`, { phone }),
+      await h.post(`/api/store/${s.slug}/verify/start`, { email: mailOf(phone) }),
       await h.post(`/api/store/${s.slug}/checkout`, cart(phone), { headers: { 'Idempotency-Key': `ck-${uniq()}-key` } }),
     ]) {
       assert.equal(r.status, 404, JSON.stringify(r.body));

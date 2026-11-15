@@ -36,6 +36,8 @@ fun V3FormSheet(
   dirty: Boolean,
   onClose: () -> Unit,
   scroll: Boolean = true,
+  /** جای کوچکِ روبه‌روی عنوان (`V3Sheet.headerEnd`) */
+  headerEnd: (@Composable () -> Unit)? = null,
   content: @Composable ColumnScope.(V3FormSheetScope) -> Unit,
 ) {
   var open by remember { mutableStateOf(true) }
@@ -54,6 +56,7 @@ fun V3FormSheet(
       },
       title = title,
       scroll = scroll,
+      headerEnd = headerEnd,
     ) { closer ->
       val scope = remember(closer) { V3FormSheetScope(closer) { done = true } }
       content(scope)

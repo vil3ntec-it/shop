@@ -166,14 +166,15 @@ const PHONE_MIN_MILLI = 1000;
 
 /**
  * ۲-۲۱ (R5 الف) — شمارهٔ سفارشِ مشتریِ [orderId] با [lines] از سقفِ خودش می‌گذرد؟ ⇐ true (نگه دار) | false (کلِ سفارش بی
- * نگه‌داشتن). سفارشِ کارمند (`orders.STAFF_SOURCES`) یا بی شماره ⇐ true. درونِ همان تراکنش و زیرِ قفلِ موجودیِ [planIn]؛
- * شکل‌های همان شماره با `validate.phoneForms`؛ فقط نگه‌داشتهٔ فعال (نگذشته) می‌شمارد.
+ * نگه‌داشتن). سفارشِ کارمند (`orders.STAFF_SOURCES`) یا بی شماره و بی ایمیل ⇐ true. درونِ همان تراکنش و زیرِ قفلِ موجودیِ
+ * [planIn]؛ «همان مشتری» = همان ایمیلِ تأییدشده **یا** یکی از شکل‌های همان شمارهٔ تماس («فقط ایمیل» ۱۴۰۵/۰۸/۲۳: شمارهٔ
+ * تأییدنشده با عوض کردن از سقف نمی‌رهاند، ایمیل هم نه)؛ فقط نگه‌داشتهٔ فعال (نگذشته) می‌شمارد.
  */
 async function phoneCapOk(c, shopId, orderId, lines, at) {
-  const o = (await c.query('SELECT source, customer_phone FROM online_orders WHERE shop_id=$1 AND id=$2', [shopId, orderId])).rows[0];
-  if (!o || !o.customer_phone || require('./orders').STAFF_SOURCES.includes(o.source)) return true;
-  const forms = [...require('./validate').phoneForms(o.customer_phone)];
-  if (!forms.length) return true;
+  const o = (await c.query('SELECT source, customer_phone, customer_email FROM online_orders WHERE shop_id=$1 AND id=$2', [shopId, orderId])).rows[0];
+  if (!o || !(o.customer_phone || o.customer_email) || require('./orders').STAFF_SOURCES.includes(o.source)) return true;
+  const forms = o.customer_phone ? [...require('./validate').phoneForms(o.customer_phone)] : [];
+  if (!forms.length && !o.customer_email) return true;
   const ids = [...new Set(lines.map((l) => l.productId))].sort();
   const want = new Map();
   for (const l of lines) want.set(l.productId, (want.get(l.productId) || 0) + num(l.qtyMilli));
@@ -181,8 +182,9 @@ async function phoneCapOk(c, shopId, orderId, lines, at) {
     `SELECT r.product_id, COALESCE(SUM(r.qty_milli),0)::bigint AS q
        FROM stock_reservations r JOIN online_orders o ON o.id = r.order_id AND o.shop_id = r.shop_id
       WHERE r.shop_id=$1 AND r.kind='soft' AND r.status='held' AND r.product_id = ANY($2::text[])
-        AND (r.expires_at IS NULL OR r.expires_at > $3) AND r.order_id <> $4 AND o.customer_phone = ANY($5::text[])
-      GROUP BY r.product_id`, [shopId, ids, at, orderId, forms]
+        AND (r.expires_at IS NULL OR r.expires_at > $3) AND r.order_id <> $4
+        AND (o.customer_phone = ANY($5::text[]) OR ($6 <> '' AND o.customer_email = $6))
+      GROUP BY r.product_id`, [shopId, ids, at, orderId, forms, o.customer_email || '']
   )).rows.map((r) => [r.product_id, num(r.q)]));
   const all = await sumHeld(c, shopId, ids, at, orderId);
   const settings = await stock.settingsOf(shopId, c);

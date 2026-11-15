@@ -7,6 +7,8 @@ import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.sync.License
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.account.AccountFormat
+import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 /**
  *  «اشتراک و قیمت‌ها» (آزمون: `PlansModelTest`) — جای `VipScreen` بی طلا و بی نشانِ VIP.
@@ -24,6 +26,8 @@ object PlansModel {
     val badge: String = "",
     val days: Int,
     val discountLabel: String = "",
+    /** مدت به ماهِ تقویمی (`amount`/`unit` ِ سرور)؛ ۰ = ناپیدا ⇒ مقایسه با روزها */
+    val months: Int = 0,
   ) {
     val discounted: Boolean get() = fullPrice > price
     val offPercent: Int get() = if (!discounted || fullPrice <= 0) 0 else ((fullPrice - price) * 100 / fullPrice).toInt()
@@ -33,9 +37,9 @@ object PlansModel {
 
   val fallback: List<Option>
     get() = listOf(
-      Option("m1", StrAccount.planMonthly, 500, days = 30),
-      Option("m6", StrAccount.planSixMonths, 2500, badge = StrAccount.badgeRecommended, days = 180),
-      Option("y1", StrAccount.planYearly, 4000, badge = StrAccount.badgeBestValue, days = 365),
+      Option("m1", StrAccount.planMonthly, 500, days = 30, months = 1),
+      Option("m6", StrAccount.planSixMonths, 2500, badge = StrAccount.badgeRecommended, days = 180, months = 6),
+      Option("y1", StrAccount.planYearly, 4000, badge = StrAccount.badgeBestValue, days = 365, months = 12),
     )
 
   /** پلن‌های فعالِ سرور، وگرنه پیش‌فرض‌ها */
@@ -49,6 +53,7 @@ object PlansModel {
         badge = p.badge,
         days = p.days,
         discountLabel = p.discount?.label.orEmpty(),
+        months = monthsOf(p.amount, p.unit),
       )
     }
     return fresh.ifEmpty { fallback }
@@ -63,6 +68,44 @@ object PlansModel {
   fun discountText(o: Option): String? = if (!o.discounted) null else o.discountLabel.ifBlank { StrAccount.percentOff(o.offPercent) }
 
   fun cta(o: Option, currency: String): String = StrAccount.buyCta(o.title, price(o.price, currency))
+
+  /** ماهِ تقویمیِ «مقدار + واحد» ِ سرور (همان `endOfPeriod`: ماه و سال)؛ روز و هفته ⇒ ۰ */
+  fun monthsOf(amount: Int, unit: String): Int = when (unit) {
+    "month" -> amount.coerceAtLeast(0)
+    "year" -> (amount * 12).coerceAtLeast(0)
+    else -> 0
+  }
+
+  /** صرفه‌جویی در برابرِ خریدِ پیاپیِ [base] (کوتاه‌ترین پلن) برای همان مدت */
+  data class Saving(val amount: Long, val percent: Int, val base: Option)
+
+  /**
+   *  صرفه‌جوییِ [o] از **همین قیمت‌ها** (سرور یا پیش‌فرض)، نه عددِ نوشته: بهای همان مدت با کوتاه‌ترین پلن منهای
+   *  قیمتِ [o]. ماهِ تقویمی اگر هر دو دارند (۱۲ × ماهانه برای یک سال)، وگرنه روزها. خودِ پایه، پلنِ کوتاه‌تر یا
+   *  بی‌صرفه ⇒ null.
+   */
+  fun saving(o: Option, options: List<Option>): Saving? {
+    val base = options.filter { it.days > 0 && it.price > 0 }.minByOrNull { it.days } ?: return null
+    if (base.code == o.code || o.days <= base.days) return null
+    val same = if (o.months > 0 && base.months > 0) base.price.toDouble() * o.months / base.months
+      else base.price.toDouble() * o.days / base.days
+    val amount = (same - o.price).roundToLong()
+    if (amount <= 0) return null
+    return Saving(amount, (amount * 100.0 / same).roundToInt().coerceIn(1, 99), base)
+  }
+
+  /** نشانِ «هنوز کسی کارتی را باز و بسته نکرده» ⇒ کارتِ انتخاب‌شده باز است */
+  const val UNTOUCHED = ""
+
+  /** کارتِ باز: [state] تا وقتی در فهرست است؛ دست‌نخورده یا کدِ رفته ⇒ انتخاب‌شده؛ null ⇒ همه بسته */
+  fun openCard(options: List<Option>, picked: Option, state: String?): String? = when {
+    state == null -> null
+    options.any { it.code == state } -> state
+    else -> picked.code
+  }
+
+  /** زدنِ کارتِ [code]: همان کارتِ باز ⇒ بسته؛ هر کارتِ دیگر ⇒ فقط همان باز (یکی در هر لحظه) */
+  fun toggle(code: String, open: String?): String? = if (open == code) null else code
 
   /** کارتِ حالتِ بالای صفحه */
   data class StateCard(val tone: V3Tone, val title: String, val body: String)

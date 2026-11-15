@@ -150,14 +150,22 @@ test('۲ب) ورود با کدِ ایمیل خودش احراز است: کارِ
     { body: { newPassword: 'Taze!pass12' }, headers: HEAD, token: ok.body.access_token });
   assert.equal(set.status, 200, JSON.stringify(set.body));
 
-  //  تازه‌سازی احراز نیست — همان قاعدهٔ `lib/reauth`
+  //  تازه‌سازی احراز نیست — همان قاعدهٔ `lib/reauth`. («فقط ایمیل»: شماره دیگر روشِ ورود نیست و بی تأییدِ دوباره عوض می‌شود،
+  //  پس کارِ حساس این‌جا گذاشتنِ رمز روی حسابِ بی‌رمزِ دیگری است با نشستِ تازه‌شده.)
+  const other = freshEmail();
+  const r2 = await post(`/api/auth/${APP}/request-code`, { email: other });
+  const ok2 = await post(`/api/auth/${APP}/verify`, { request_id: r2.body.request_id, code: await codeOf(r2.body.request_id) });
+  assert.equal(ok2.status, 200, JSON.stringify(ok2.body));
   const refreshed = await h.api('POST', '/api/auth/refresh',
-    { body: { refreshToken: ok.body.refresh_token }, headers: HEAD });
+    { body: { refreshToken: ok2.body.refresh_token }, headers: HEAD });
   assert.equal(refreshed.status, 200, JSON.stringify(refreshed.body));
-  const stale = await h.api('PUT', '/api/me',
-    { body: { phone: '09121234567' }, headers: HEAD, token: refreshed.body.accessToken });
+  const stale = await h.api('POST', '/api/auth/password',
+    { body: { newPassword: 'Taze!pass34' }, headers: HEAD, token: refreshed.body.accessToken });
   assert.equal(stale.status, 403, JSON.stringify(stale.body));
   assert.equal(stale.body.error.code, 'reauth_required');
+  //  شمارهٔ تماس (داده، نه روشِ ورود) با همان نشست بی تأییدِ دوباره ذخیره می‌شود
+  const phone = await h.api('PUT', '/api/me', { body: { phone: '0791234567' }, headers: HEAD, token: refreshed.body.accessToken });
+  assert.equal(phone.status, 200, JSON.stringify(phone.body));
 });
 
 /* ------------------------------------------------------------------ ۳ */

@@ -112,9 +112,12 @@ sealed class ApiFailure(
   class ServerFault(message: String, code: String) :
     ApiFailure(message, code, retryable = true)
 
-  /** پاسخ رسید ولی آن چیزی نبود که قرار بود باشد */
+  /**
+   *  پاسخ رسید ولی آن چیزی نبود که قرار بود باشد. ⛔ [detail] ِ فنی (نامِ فیلد مثلِ «dispute»، «وضعیت 302») روی صفحه
+   *  نمی‌آید — فقط جملهٔ سادهٔ بی حرف/رقمِ لاتین ([plainDetail])، مثلِ «ورود کامل نشد».
+   */
   class InvalidResponse(detail: String = "") :
-    ApiFailure(localText(if (detail.isEmpty()) "پاسخ سرور خوانده نشد" else "پاسخ سرور خوانده نشد (${asIs(detail)})"), "invalid_response")
+    ApiFailure(localText(if (!plainDetail(detail)) "پاسخ سرور خوانده نشد" else "پاسخ سرور خوانده نشد (${asIs(detail)})"), "invalid_response")
 
   companion object {
 
@@ -204,15 +207,14 @@ sealed class ApiFailure(
     /**
      *  کدهایی که پیامِ فارسیِ خودشان را دارند.
      *
-     *  `not_found` روی مسیرِ API معنایش برای دکان‌دار این است که سرورش
-     *  آن قابلیت را ندارد — و تقریباً همیشه یعنی ظرفِ سرور با کدِ کهنه
-     *  بالا آمده. `docker compose up -d` بدونِ `--build` ایمیج را از نو
-     *  نمی‌سازد و همین یک نکته، ساعت‌ها گشتن می‌سازد.
+     *  `not_found` روی مسیرِ API معنایش این است که سرور آن قابلیت را ندارد — تقریباً همیشه ظرفِ سرور با کدِ کهنه
+     *  بالا آمده. ⛔ این را صاحبِ سرور از گزارشِ پشتیبانی می‌فهمد، نه کاربر از صفحه: پیام بی نامِ نسخه و بی دستورِ
+     *  سرور است («هیچ جزئیاتِ فنی/زیرساخت در صفحه»، `docs/RULES-fa.md`).
      */
     private fun known(code: String): String? = knownFa(code)?.let(::localText)
 
     private fun knownFa(code: String): String? = when (code) {
-      "not_found" -> "سرورِ شما قدیمی است و این بخش را ندارد. نسخهٔ تازهٔ سرور را بالا بیاورید."
+      "not_found" -> "این بخش هنوز روی سرور فعال نیست؛ به پشتیبانی خبر بدهید."
       "no_shop" -> "برای این حساب دکانی ثبت نشده است"
       "shop_not_found" -> "دکان پیدا نشد"
       "code_not_found" -> "این کد پیدا نشد یا از قبل باطل شده است"
@@ -237,11 +239,12 @@ sealed class ApiFailure(
       400 -> "درخواست درست نبود"
       401 -> "ایمیل/شماره یا رمز درست نیست"
       403 -> "این حساب اجازهٔ این کار را ندارد"
-      404 -> "این مسیر روی سرور پیدا نشد"
+      404 -> "این بخش روی سرور پیدا نشد"
       409 -> "این مورد از قبل ثبت شده است"
       429 -> "درخواست‌ها زیاد بود؛ کمی بعد دوباره امتحان کنید"
       in 500..599 -> "سرور خطا داد؛ کمی بعد دوباره امتحان کنید"
-      else -> "پاسخ سرور درست نبود (${asIs(status)})"
+      //  ⛔ کدِ HTTP روی صفحه نمی‌آید (همان «هیچ جزئیاتِ فنی/زیرساخت»)؛ `status` خودش روی خطا هست
+      else -> "پاسخ سرور درست نبود"
     }
 
     /**
@@ -277,6 +280,9 @@ sealed class ApiFailure(
  *  می‌گذرد. مقدارِ درونِ متن با `asIs`. پیامِ سرور داده است و دست نمی‌خورد.
  */
 internal fun localText(fa: String): String = I18n.pick(I18n.lang, fa, null, null)
+
+/** جزئیاتِ «پاسخ خوانده نشد» فقط وقتی دیدنی است که جملهٔ ساده باشد: نه حرف/رقمِ لاتین، نه نشانی */
+internal fun plainDetail(detail: String): Boolean = detail.isNotBlank() && !Regex("[A-Za-z0-9]").containsMatchIn(detail)
 
 fun Throwable.userText(fallback: String): String =
   (this as? ApiFailure)?.userMessage ?: fallback

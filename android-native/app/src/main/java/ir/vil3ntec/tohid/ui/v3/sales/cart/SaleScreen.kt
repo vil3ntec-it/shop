@@ -173,6 +173,8 @@ fun SaleScreen(
           onHold = actions.hold,
           onMinus = actions.minus,
           onMenu = { menu = true },
+          //  کارِ یک‌دستی: جستجو، اسکن، نما، «…» و دسته‌ها پایین، درست بالای نوارِ سبد و نوارِ شناور
+          thumbDock = true,
         )
       },
       cart = { revealed, dragHandle ->

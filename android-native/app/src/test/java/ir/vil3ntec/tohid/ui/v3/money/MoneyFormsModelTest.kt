@@ -1,7 +1,9 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
 import ir.vil3ntec.tohid.LocaleText
+import ir.vil3ntec.tohid.core.perm.CreditLimitPerm
 import ir.vil3ntec.tohid.data.DebtTransaction
+import ir.vil3ntec.tohid.data.DeliveryAddress
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.Expense
@@ -140,6 +142,38 @@ class MoneyFormsModelTest {
     assertTrue(bad is DebtorEngine.Result.Failed)
     val noSource = DebtorFormsModel.save(ledger, "d", DebtorFormsModel.of(ledger.debtors[0]).copy(consent = true), 1L) { "x" }
     assertTrue(noSource is DebtorEngine.Result.Failed)
+  }
+
+  /** صاحب‌کار ۱۴۰۵/۰۸/۲۳ («اسم و شماره بسه»): برگهٔ کوچکِ قرض‌دار فقط نام و تلفن می‌نویسد؛ پروندهٔ CRM ِ مشتریِ کهنه دست‌نخورده */
+  @Test
+  fun `برگهٔ کوچکِ قرض‌دار — فقط نام و تلفن؛ شمارهٔ دوم، برچسب، نشانی، رضایت، یادداشت و سقفِ کهنه دست نمی‌خورند`() {
+    val old = Debtor(
+      id = "c", name = "زرغونه", phone = "+93791112233", notes = "عمده", creditLimit = 2000.0,
+      phone2 = "+93702223344", tags = listOf("عمده"), marketingConsent = true,
+      deliveryAddress = DeliveryAddress(landmark = "مسجدِ جامع", floor = "۲"),
+    )
+    val d = ledger.copy(debtors = ledger.debtors + old)
+    //  «بله» ِ کهنه بی منبع: ذخیرهٔ کامل رد می‌کرد؛ برگهٔ کوچک به رضایت دست نمی‌زند
+    val f = DebtorFormsModel.of(old).copy(name = "زرغونه جان", phone = "0799998877")
+    assertTrue(DebtorFormsModel.save(d, "c", f, 1L) { "x" } is DebtorEngine.Result.Failed)
+    val ok = DebtorFormsModel.saveBasic(d, "c", f, 1L, CreditLimitPerm.Rules.OFF) { "x" } as DebtorEngine.Result.Ok
+    val c = ok.data.debtors.first { it.id == "c" }
+    assertEquals("زرغونه جان", c.name)
+    assertEquals(LocaleText.phoneForSave("0799998877"), c.phone)
+    assertEquals("جز نام و تلفن هیچ چیز عوض نشد", old.copy(name = c.name, phone = c.phone), c)
+    assertEquals("سقفِ عوض‌نشده ردِ سابقه نمی‌سازد", d.auditLog, ok.data.auditLog)
+    //  تازه: فقط نام (و تلفنِ خالی)؛ بی پروندهٔ CRM
+    val added = DebtorFormsModel.saveBasic(ledger, null, DebtorFormsModel.of(null).copy(name = "پروین"), 1L, CreditLimitPerm.Rules.OFF) { "n" }
+    val n = (added as DebtorEngine.Result.Ok).data.debtors.first { it.id == "n" }
+    assertEquals("پروین", n.name)
+    assertNull(n.creditLimit)
+    assertNull(n.phone2)
+    assertNull(n.tags)
+    assertNull(n.deliveryAddress)
+    assertNull(n.marketingConsent)
+    //  همان سنجش‌ها: نامِ خالی و قرض‌دارِ ناپیدا
+    assertTrue(DebtorFormsModel.saveBasic(ledger, null, DebtorForm(name = " "), 1L, CreditLimitPerm.Rules.OFF) { "n" } is DebtorEngine.Result.Failed)
+    assertTrue(DebtorFormsModel.saveBasic(ledger, "gone", DebtorForm(name = "x"), 1L, CreditLimitPerm.Rules.OFF) { "n" } is DebtorEngine.Result.Failed)
   }
 
   @Test

@@ -36,6 +36,8 @@ internal data class SettingsFacts(
   val version: String = "",
   /** بخش‌های پشتِ پرچمِ سرور که سرور همین لحظه «روشن» گفته (`SettingsLayout.SERVER_GATED`)؛ تا پاسخ، هیچ */
   val serverOn: Set<String> = emptySet(),
+  /** صاحبِ دکان؟ — ردیفِ «سرورها» فقط برای او (`SettingsLayout.OWNER_ONLY`)؛ مدیر، کارمند و پیک آن را نمی‌بینند */
+  val owner: Boolean = false,
 )
 
 /** ردیف‌های صفحهٔ تنظیمات: مقدارِ خاکستریِ پایانِ هر ردیف — خالص، آزمون‌پذیر */

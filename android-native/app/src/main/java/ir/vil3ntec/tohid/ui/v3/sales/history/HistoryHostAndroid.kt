@@ -134,7 +134,8 @@ internal fun RouteScope.HistoryHost() {
       print = { printing = it },
       table = if (onDesk) ({ nav.open(SalesPaths.TABLE) }) else null,
     ),
-    bottomReserve = bottomReserve,
+    //  پوسته جای نوارِ پایین را خودش نگه می‌دارد (`ShellFrame`)؛ پیش‌تر این‌جا دوباره شمرده می‌شد (۸۰dp خالی)
+    bottomReserve = 0.dp,
     shopTag = shopTag,
     reviews = reviewCount(d),
     money = !blind,

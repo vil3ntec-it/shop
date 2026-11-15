@@ -145,8 +145,13 @@ internal fun heldTakeTitle(h: HeldClaim.Held): String = when {
   else -> StrPos.heldOpenedElsewhere
 }
 
-internal fun heldTwiceText(c: HeldConflict): String =
-  if (c.series.isNotBlank()) StrPos.heldTwice(c.title, c.series) else StrPos.heldTwiceElsewhere(c.title)
+internal fun heldTwiceText(c: HeldConflict): String = when {
+  //  S09: فروشِ دومِ همین دستگاه خودکار لغو شد، یا یکی‌اند و صاحب خبر شد (`HeldTwice`)
+  c.kept.isNotBlank() && c.cancelled -> ir.vil3ntec.tohid.core.i18n.StrHeldTwice.cancelled(c.title, c.series)
+  c.kept.isNotBlank() -> ir.vil3ntec.tohid.core.i18n.StrHeldTwice.reported(c.title, c.series)
+  c.series.isNotBlank() -> StrPos.heldTwice(c.title, c.series)
+  else -> StrPos.heldTwiceElsewhere(c.title)
+}
 
 /** وضعیت و کارهای برگه‌ها برای یک صفحهٔ صندوق */
 @Stable

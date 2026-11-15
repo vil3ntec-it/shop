@@ -51,6 +51,9 @@ import ir.vil3ntec.tohid.ui.v3.V3SearchField
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Segmented
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
+import ir.vil3ntec.tohid.ui.v3.V3QuietStatus
+import ir.vil3ntec.tohid.ui.v3.V3RowStatus
+import ir.vil3ntec.tohid.ui.v3.V3RowTone
 import ir.vil3ntec.tohid.ui.v3.V3StatusPill
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
@@ -81,6 +84,12 @@ private fun statusPill(s: Status): V3Status = when (s) {
   Status.RECEIVED -> V3Status.DELIVERED
   Status.REJECTED -> V3Status.CANCELLED
   Status.REFUSED -> V3Status.WARNING
+}
+
+/** وضعیتِ آرامِ ردیفِ فهرست: «رسید» (پایانِ عادی) ⇒ null؛ رد/نپذیرفتن قرمز، نیمه‌رسیده کهربایی، در مسیر آرام */
+private fun rowStatus(s: Status): V3RowStatus? = when (s) {
+  Status.RECEIVED -> null
+  else -> V3RowStatus.of(statusLabel(s), statusPill(s)).let { if (s == Status.IN_TRANSIT) it.copy(tone = V3RowTone.QUIET) else it }
 }
 
 /** مقدار با واحدِ کالا (هزارم ⇒ متن) */
@@ -129,10 +138,9 @@ internal fun TransferListScreen(
     title = StrTransfer.title,
     subtitle = StrTransfer.subtitle,
     onBack = onBack,
-    actions = listOf(
-      V3Action(Icons.Outlined.Refresh, StrTransfer.refresh, onClick = onRefresh),
-      V3Action(Icons.Outlined.Add, StrTransfer.newTransfer, dot = hasDraft, onClick = onNew),
-    ),
+    actions = listOf(V3Action(Icons.Outlined.Refresh, StrTransfer.refresh, onClick = onRefresh)),
+    //  کارِ یک‌دستی: «انتقالِ تازه» (کارِ اصلی) پایینِ صفحه؛ «تازه‌کردن» کم‌کاربرد در سربرگ می‌ماند
+    dock = listOf(V3Action(Icons.Outlined.Add, StrTransfer.newTransfer, dot = hasDraft, onClick = onNew)),
   ) { pad ->
     LazyColumn(
       Modifier.fillMaxSize(),
@@ -168,12 +176,8 @@ private fun TransferGroup(title: String, ts: List<StockTransfer.Transfer>, names
           ).joinToString("\n"),
           subtitleLines = 3,
           tile = false,
-          trailing = {
-            Column(horizontalAlignment = Alignment.End) {
-              V3StatusPill(statusPill(t.status), statusLabel(t.status))
-              if (t.queued) { Spacer(Modifier.height(4.dp)); V3StatusPill(V3Status.REVIEW, StrTransfer.queuedPill) }
-            }
-          },
+          //  سادهٔ e-rows-63d: وضعیت به متنِ آرام (رسیده = پایانِ عادی ⇒ هیچ)؛ «در صف» همان خطِ زیرعنوان است، نه قرصِ دوم
+          trailing = rowStatus(t.status)?.let { st -> { V3QuietStatus(st) } },
           onClick = { onOpen(t.sendKey) },
         )
       }

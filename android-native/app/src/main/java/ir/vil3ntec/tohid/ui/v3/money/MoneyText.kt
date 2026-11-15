@@ -21,6 +21,9 @@ internal object MoneyText {
   /** تاریخِ خورشیدی، یا «—» برای ردیفِ بی‌تاریخ (پشتیبانِ خیلی قدیمی) */
   fun date(iso: String): String = if (iso.isBlank()) DebtorLedgerModel.UNDATED else displayDate(iso)
 
+  /** تاریخِ کوتاهِ ردیفِ فهرست («امروز»، «دیروز»، «۲۸ میزان»؛ سالِ دیگر با سال) — `RowWhen`؛ بی‌تاریخ ⇒ «—» */
+  fun short(iso: String, today: String): String = if (iso.isBlank()) DebtorLedgerModel.UNDATED else ir.vil3ntec.tohid.ui.v3.RowWhen.of(iso, today)
+
   /** `2026-10` ⇐ «میزان ۱۴۰۵» */
   fun month(month: String): String = formatMonth(month)
 

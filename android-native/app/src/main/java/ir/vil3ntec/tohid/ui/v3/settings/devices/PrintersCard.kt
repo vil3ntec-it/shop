@@ -1,9 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.settings.devices
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
@@ -16,7 +13,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -26,14 +22,13 @@ import ir.vil3ntec.tohid.print.OrderSlipPrint
 import ir.vil3ntec.tohid.print.PrinterRegistry
 import ir.vil3ntec.tohid.print.ThermalPrinter
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
-import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.v3.LocalV3Toasts
 import ir.vil3ntec.tohid.ui.v3.V3Collapse
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
-import ir.vil3ntec.tohid.ui.v3.V3StatusPill
+import ir.vil3ntec.tohid.ui.v3.V3PillAction
+import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
-import ir.vil3ntec.tohid.ui.v3.V3TextButton
 import ir.vil3ntec.tohid.ui.v3.V3ToggleRow
 import kotlinx.coroutines.launch
 
@@ -97,24 +92,34 @@ internal fun PrintersCard(highlight: Boolean) {
   }
 }
 
+/**
+ *  ردیفِ چاپگر (سادهٔ e-rows-63d): «پیش‌فرض» در زیرعنوان به نوشتهٔ آرام (نه قرصِ سبز) و «آزمایش» تنها قرصِ نرمِ ردیف؛
+ *  «پیش‌فرض کن» و «برداشتن» با کشیدن یا نگه‌داشتن (برگهٔ کارها) — هیچ کاری برداشته نشد.
+ */
 @Composable
 private fun PrinterRow(p: PrinterRegistry.Saved, isDefault: Boolean, divider: Boolean, onTest: () -> Unit, onRemove: () -> Unit, onDefault: () -> Unit) {
+  var menu by remember { mutableStateOf(false) }
+  val name = p.name.ifBlank { PrinterRegistry.label(p.link) }
   Column {
     if (divider) V3Divider(start = 64.dp)
     V3ListRow(
-      p.name.ifBlank { PrinterRegistry.label(p.link) },
-      subtitle = "${PrinterRegistry.kind(p.link)} · ${PrinterRegistry.label(p.link)} · " +
+      name,
+      subtitle = listOfNotNull(
+        StrSettings.defaultPrinter.takeIf { isDefault }, PrinterRegistry.kind(p.link), PrinterRegistry.label(p.link),
         StrSettings.paperMm(if (p.width >= ThermalPrinter.WIDTH_80MM) 80 else 58),
+      ).joinToString(" · "),
       icon = Icons.Outlined.Print,
       chevron = false,
-      trailing = {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-          if (isDefault) { V3StatusPill(V3Status.DELIVERED, StrSettings.defaultPrinter); Spacer(Modifier.width(4.dp)) }
-          V3TextButton(StrSettings.test, onTest)
-        }
-      },
+      trailing = { V3PillAction(StrSettings.test, onTest) },
       endActions = listOf(V3SwipeAction(Icons.Outlined.Delete, StrSettings.remove, V3ButtonKind.DANGER, onRemove)),
       startActions = if (isDefault) emptyList() else listOf(V3SwipeAction(Icons.Outlined.Star, StrSettings.makeDefault, V3ButtonKind.PRIMARY, onDefault)),
+      onLongClick = { menu = true },
     )
+  }
+  if (menu) {
+    V3Sheet(onDismiss = { menu = false }, title = name, detents = false) { closer ->
+      if (!isDefault) V3ListRow(StrSettings.makeDefault, icon = Icons.Outlined.Star, chevron = false, onClick = { closer.close { menu = false; onDefault() } })
+      V3ListRow(StrSettings.remove, icon = Icons.Outlined.Delete, danger = true, chevron = false, onClick = { closer.close { menu = false; onRemove() } })
+    }
   }
 }

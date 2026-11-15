@@ -49,7 +49,6 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
-import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Chip
@@ -62,14 +61,13 @@ import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
-import ir.vil3ntec.tohid.ui.v3.V3StatusPill
+import ir.vil3ntec.tohid.ui.v3.V3QuietStatus
+import ir.vil3ntec.tohid.ui.v3.V3RowStatus
+import ir.vil3ntec.tohid.ui.v3.V3RowTone
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3AnimateItem
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  *  «سابقهٔ عملیات» (`audit?kind=`): «همه» + پنج نوعِ پرتکرار و «نوعِ رویداد» ⇐ برگهٔ همهٔ نوع‌ها؛
@@ -104,6 +102,8 @@ fun AuditScreen(
   val names = chain.names
   val report = chain.report
   val brokenId = AuditModel.brokenId(report, chain.server)
+  //  SEC-02: درِ «بررسیِ یکپارچگیِ اسناد» فقط با پرچمِ `shop.doc_chain` (خاموش ⇒ همان صفحهٔ پیشین)
+  val docChain = rememberDocChainOn()
   val chips: (@Composable () -> Unit)? = if (log.isEmpty()) null else ({
     V3ChipRow {
       V3Chip(Str.all, kind == null, { kind = null })
@@ -132,6 +132,7 @@ fun AuditScreen(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding()),
       ) {
+        if (docChain) item(key = "doc-chain") { DocChainCheckEntry { onOpen(AnalyticsPaths.DOC_CHAIN) } }
         report?.let { r ->
           item(key = "chain") {
             val line = AuditModel.chainLine(r, thisDevice, chain.server)
@@ -170,8 +171,9 @@ private fun AuditRow(e: AuditEntry, who: String, broken: Boolean, onClick: () ->
       Column(horizontalAlignment = Alignment.End) {
         timeOf(e.createdAt)?.let { Text(it, style = V3Type.footnote, color = c.inkMuted) }
         if (e.amount != 0.0) Text(afn(e.amount), style = V3Type.subhead, color = c.ink)
-        if (deletion) { Spacer(Modifier.height(4.dp)); V3StatusPill(V3Status.CANCELLED, StrReports.deletion) }
-        if (broken) { Spacer(Modifier.height(4.dp)); V3StatusPill(V3Status.CANCELLED, StrReports.chainBreakHere) }
+        //  سادهٔ e-rows-63d: «حذف» و «زنجیره از این‌جا شکست» متنِ قرمزِ آرام، نه قرص (عنوان و کاشی هم قرمزند)
+        if (deletion) V3QuietStatus(V3RowStatus(StrReports.deletion, V3RowTone.DANGER))
+        if (broken) V3QuietStatus(V3RowStatus(StrReports.chainBreakHere, V3RowTone.DANGER))
       }
     },
     onClick = onClick,
@@ -225,8 +227,9 @@ private fun dayTitle(date: String, today: String): String = when (date) {
   else -> uiDateLong(date)
 }
 
+/** «۱۴:۰۵» با همان ساعتِ فهرستِ فروش (`SaleTime`، بی `java.text`) */
 private fun timeOf(createdAt: Long): String? =
-  if (createdAt <= 0) null else runCatching { SimpleDateFormat("HH:mm", Locale.US).format(Date(createdAt)) }.getOrNull()
+  if (createdAt <= 0) null else ir.vil3ntec.tohid.ui.v3.sales.history.SaleTime.clock(createdAt).ifBlank { null }
 
 private fun kindIcon(type: String): ImageVector = when (type) {
   "sale", "shift_open", "shift_close" -> Icons.Outlined.PointOfSale

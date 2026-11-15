@@ -71,10 +71,12 @@ test('rawBody: فقط Buffer؛ رشته، آرایه، شیء، null و بی ب�
   }
 });
 
-test('verifiedPhone: بی بلیت و با نشستِ تهی/بی‌شکل ⇒ null (همان پیشین)', async () => {
+//  «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): `verifiedPhone` ⇐ به‌جایش `verifiedEmail` (همان سنجش، هویتِ ایمیل)
+test('verifiedEmail: بی بلیت و با نشستِ تهی/بی‌شکل ⇒ null (همان پیشین)', async () => {
   const sf = require('../src/lib/storefront');
   for (const session of ['', undefined, null, 'not-a-session', ['sc1.x']]) {
-    assert.equal(await sf.verifiedPhone('', session), null);
+    assert.equal(await sf.verifiedEmail('', session), null);
+    assert.equal(await sf.verification('', session), null);
   }
 });
 

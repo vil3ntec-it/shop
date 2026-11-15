@@ -55,13 +55,15 @@ internal fun SettingsPageFrame(
   actions: List<V3Action> = emptyList(),
   state: LazyListState = rememberLazyListState(),
   bottomBar: (@Composable () -> Unit)? = null,
+  /** کادرِ جست‌وجوی صفحه — گوشی: پایینِ صفحه (`V3Dock`، کارِ یک‌دستی)؛ کامپیوتر: زیرِ عنوان */
+  search: (@Composable () -> Unit)? = null,
   content: LazyListScope.() -> Unit,
 ) {
   val stagger = rememberV3Stagger(title)
   //  صفحهٔ یک بخش (`LocalSettingsKey`) ⇒ کارتِ «این چه می‌کند؟» با یک مثال بالای صفحه؛ قابِ تودرتو دوباره نمی‌کشد
   val whatKey = LocalSettingsKey.current
   CompositionLocalProvider(LocalSettingsKey provides null) {
-    V3Scaffold(title = title, subtitle = subtitle, onBack = onBack, actions = actions, largeTitle = largeTitle, bottomBar = bottomBar) { pad ->
+    V3Scaffold(title = title, subtitle = subtitle, onBack = onBack, actions = actions, largeTitle = largeTitle, bottomBar = bottomBar, search = search) { pad ->
       Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         LazyColumn(
           Modifier.widthIn(max = 720.dp).fillMaxSize(),

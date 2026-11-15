@@ -323,7 +323,8 @@ internal fun moneyId(): String = ir.vil3ntec.tohid.ui.screens.newId()
 private fun RouteScope.DebtorTxRoute() {
   val id = args["id"].orEmpty()
   val txId = args["txId"].orEmpty()
-  val tx = data.transactions.find { it.id == txId && it.debtorId == id }
+  val own = ir.vil3ntec.tohid.data.CustomerAlias.of(data, id)  // CRM-10: ردیفِ ادغام‌شدهٔ پیوندی هم در همین پرونده
+  val tx = data.transactions.find { it.id == txId && it.debtorId in own }
   if (tx == null || txId in MoneyUndo.hiddenTx) {
     LandOn(MoneyPaths.debtor(id))
     return
@@ -361,7 +362,7 @@ private fun RouteScope.DeleteDebtorRoute() {
     return
   }
   //  S89: با کلیدِ `shop.doc_chain` قرض‌دارِ دارای ردیف پاک نمی‌شود (پاک شدنش یعنی حذفِ اسنادِ ثبت‌شده) ⇒ فقط دلیل و «بستن»
-  val rows = data.transactions.count { it.debtorId == id }
+  val rows = ir.vil3ntec.tohid.data.CustomerAlias.of(data, id).let { own -> data.transactions.count { it.debtorId in own } }
   val deletable = ir.vil3ntec.tohid.core.debt.DebtReversal.canDeleteDebtor(rememberDocChainOn(), rows)
   VipGate(Str.debtors) {
     if (!deletable) {
@@ -452,7 +453,7 @@ private fun RouteScope.DebtorFormRoute(id: String?) {
       debtor = debtor,
       onClose = { back() },
       onSave = { f ->
-        saved[0] = MoneyWriter.debtor(store, toasts, context, data, DebtorFormsModel.save(data, id, f, System.currentTimeMillis(), limitRules, ::moneyId), if (id == null) StrMoney.saved else StrMoney.edited)
+        saved[0] = MoneyWriter.debtor(store, toasts, context, data, DebtorFormsModel.saveBasic(data, id, f, System.currentTimeMillis(), limitRules, ::moneyId), if (id == null) StrMoney.saved else StrMoney.edited)
         saved[0] != null
       },
       onSaved = { if (id == null) nav.finish(saved[0]) else back() },

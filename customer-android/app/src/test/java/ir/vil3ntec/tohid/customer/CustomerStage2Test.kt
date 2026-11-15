@@ -79,7 +79,7 @@ class CustomerStage2Test {
         else ShopperResponse(200, """{"subtotalMinor":36000,"discountMinor":0,"totalMinor":36000}""")
       }
       p.endsWith("/verify/start") -> ShopperResponse(200, """{"sent":true,"expiresAt":999}""")
-      p.endsWith("/verify/check") -> ShopperResponse(200, """{"phone":"+93700000002","ticket":"v2.ticket","expiresAt":99999999999}""")
+      p.endsWith("/verify/check") -> ShopperResponse(200, """{"email":"c700000002@test.local","ticket":"v2.ticket","expiresAt":99999999999}""")
       p.endsWith("/checkout") -> ShopperResponse(201, order)
       p.endsWith("/review") -> ShopperResponse(201, """{"review":{"stars":5,"comment":"خوب","status":"pending"},"replayed":false}""")
       p.endsWith("/rating") -> ShopperResponse(200, """{"canRate":true,"rating":null,"tags":["on_time","late"]}""")
@@ -116,7 +116,7 @@ class CustomerStage2Test {
     m.go(Route.Shop("golestan"))
     repeat(3) { m.add("golestan", m.items.single()) }
     m.go(Route.Checkout("golestan"))
-    m.updateForm(m.form.copy(name = "احمد", phone = "0700000002"))
+    m.updateForm(m.form.copy(name = "احمد", phone = "0700000002", email = "c700000002@test.local"))
     m.sendCode()
     m.code = "123456"
     m.checkCode()

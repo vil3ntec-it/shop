@@ -108,7 +108,8 @@ fun QuickSaleScreen(
     title = StrSale.quickSale,
     subtitle = StrSale.quickHint,
     onBack = onBack,
-    actions = listOfNotNull(visual?.let { v -> V3Action(Icons.Outlined.PhotoCamera, StrVisualSearch.button) { v.start() } }),
+    //  کارِ یک‌دستی: جست‌وجو (با اسکن)، دسته‌ها و «جست‌وجو با عکس» پایین، درست بالای نوارِ سبد
+    dock = listOfNotNull(visual?.let { v -> V3Action(Icons.Outlined.PhotoCamera, StrVisualSearch.button) { v.start() } }),
     search = {
       V3SearchField(query, { query = it }, StrSale.catalogHint, onScan = actions.scan)
     },

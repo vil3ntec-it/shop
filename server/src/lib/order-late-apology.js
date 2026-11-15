@@ -19,7 +19,8 @@
  *           یکتاییِ (order_id, event)، فقط کانال‌های رایگان، سقفِ هر مشتری و سقفِ هزینهٔ روزانهٔ هر دکان و هر کانال
  *           (NTF-02، `notify-cost`). متن بی دادهٔ حساس (فقط نامِ ویترین و شمارهٔ سفارش)؛ کد در صفحهٔ پیگیری است.
  *   کوپن ── اختیاری (صاحب): مبلغ (`amountMinor`) یا درصد (`bp`، تا ۵۰٪)، مهلت به روز. کد `AP` + ۸ نویسهٔ تصادفی،
- *           **یک‌بارمصرف** و **فقط برای همان شماره** (`phone_key` = HMAC ِ شماره) در همان دکان. مصرف در ثبتِ ویترین با
+ *           **یک‌بارمصرف** و **فقط برای همان مشتری** (`phone_key` = HMAC ِ کلیدِ مشتریِ سفارش: ایمیلِ تأییدشده — «فقط ایمیل»
+ *           ۱۴۰۵/۰۸/۲۳؛ شمارهٔ تماس هرگز، چون تأیید نمی‌شود) در همان دکان. مصرف در ثبتِ ویترین با
  *           همان کلیدِ `promoCode` (`storefront-promos.wrap`)، درونِ تراکنشِ ثبت، زیرِ قفلِ ردیفِ کوپن و فقط اگر هنوز
  *           مصرف نشده (`redeemed_at IS NULL`) ⇒ دو ثبتِ هم‌زمان یکی را می‌برند؛ تکرارِ همان ثبت همان سفارش است.
  *           سفارشِ مبدأ لغو/رد شده ⇒ کوپن بی‌اعتبار. تخفیف فقط از جمعِ اقلام (نه هزینهٔ ارسال)، پلهٔ ۱۰۰.
@@ -133,7 +134,7 @@ function candidates(at) {
     `SELECT o.id, o.shop_id, o.order_no
        FROM online_orders o
        JOIN order_late_apology_policy p ON p.shop_id = o.shop_id AND p.enabled
-      WHERE o.status = ANY($1::text[]) AND o.is_test = false AND o.source = 'storefront' AND o.customer_phone <> ''
+      WHERE o.status = ANY($1::text[]) AND o.is_test = false AND o.source = 'storefront' AND (o.customer_email <> '' OR o.customer_phone <> '')
         AND COALESCE(o.ready_at, o.scheduled_for, o.created_at) + p.late_minutes * ${MIN} <= $2
         AND COALESCE(o.ready_at, o.scheduled_for, o.created_at) > $3
         AND NOT EXISTS (SELECT 1 FROM order_late_apologies a WHERE a.order_id = o.id)
@@ -169,7 +170,7 @@ function newCode() {
 async function record(o, at) {
   return tx(async (c) => {
     const row = (await c.query('SELECT * FROM online_orders WHERE shop_id=$1 AND id=$2 FOR UPDATE', [o.shop_id, o.id])).rows[0];
-    if (!row || !LATE_STATUSES.includes(row.status) || row.is_test === true || row.source !== 'storefront' || !row.customer_phone) return null;
+    if (!row || !LATE_STATUSES.includes(row.status) || row.is_test === true || row.source !== 'storefront' || !(row.customer_email || row.customer_phone)) return null;
     const pol = (await c.query('SELECT * FROM order_late_apology_policy WHERE shop_id=$1', [row.shop_id])).rows[0];
     if (!pol || !pol.enabled) return null;
     const due = dueOf(row);
@@ -188,7 +189,7 @@ async function record(o, at) {
          coupon_amount_minor, coupon_bp, coupon_expires_at, created_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT (order_id) DO NOTHING RETURNING order_id`,
       [row.id, row.shop_id, byCustomer ? 'skipped_customer' : 'apology', Number(pol.late_minutes), due,
-        coupon ? cn.phoneKey(row.customer_phone) : '', coupon ? coupon.code : '', kind,
+        coupon ? cn.phoneKey(row.customer_email || row.customer_phone) : '', coupon ? coupon.code : '', kind,
         coupon ? coupon.amountMinor : 0, coupon ? coupon.bp : 0, coupon ? coupon.expiresAt : null, at]
     );
     if (!ins.rows[0]) return null;
@@ -293,11 +294,11 @@ async function couponOf(shopId, code) {
   if (!(await one('SELECT 1 AS x FROM order_late_apologies WHERE shop_id=$1 AND coupon_code=$2', [String(shopId), code]))) return null;
   return {
     code,
-    /** درونِ تراکنشِ ثبت: قفلِ ردیفِ کوپن، شماره، مهلت، یک‌بار ⇒ تخفیف روی `out` و ثبتِ مصرف */
-    async apply(run, out, { at, phone, sale }) {
+    /** درونِ تراکنشِ ثبت: قفلِ ردیفِ کوپن، ایمیلِ تأییدشدهٔ ثبت (`email`)، مهلت، یک‌بار ⇒ تخفیف روی `out` و ثبتِ مصرف */
+    async apply(run, out, { at, email, sale }) {
       const r = (await run(`${SELECT_COUPON} FOR UPDATE OF a`, [String(shopId), code])).rows[0];
       let st = stateOf(r, at);
-      if (st === 'applied' && r.phone_key !== require('./customer-notify').phoneKey(phone)) st = 'unknown';
+      if (st === 'applied' && (!email || r.phone_key !== require('./customer-notify').phoneKey(email))) st = 'unknown';
       const d = st === 'applied' ? discountOf(r, out.subtotalMinor - out.discountMinor) : 0;
       if (st === 'applied' && d <= 0) st = 'no_effect';
       if (st !== 'applied') throw reject(code, st);
@@ -309,7 +310,7 @@ async function couponOf(shopId, code) {
       if (!u.rows[0]) throw reject(code, 'used_up');
       return { ...out, discountMinor: out.discountMinor + d, totalMinor: out.totalMinor - d };
     },
-    /** پیش‌نمایش (`/promos/quote`): بی قفل، بی مصرف و بی شماره — شماره در ثبت سنجیده می‌شود */
+    /** پیش‌نمایش (`/promos/quote`): بی قفل، بی مصرف و بی هویت — ایمیلِ تأییدشده در ثبت سنجیده می‌شود */
     async preview(baseMinor, at = now()) {
       const r = await one(SELECT_COUPON, [String(shopId), code]);
       let status = stateOf(r, at);
@@ -327,7 +328,7 @@ function wrapPrice(price, coupon, { key, input }) {
     input.expectedTotalMinor = null;
     let out;
     try { out = await price(run, at); } finally { input.expectedTotalMinor = expected; }
-    const res = await coupon.apply(run, out, { at, phone: input.customerPhone, sale: `sf:${key}` });
+    const res = await coupon.apply(run, out, { at, email: out.customerEmail, sale: `sf:${key}` });   //  ایمیلِ تأییدشدهٔ `withWho`
     if (expected !== null && expected !== res.totalMinor) {
       throw Object.assign(conflict('قیمت‌ها عوض شده است؛ سبد را دوباره ببینید', 'price_changed'), {
         data: { quote: { subtotalMinor: res.subtotalMinor, discountMinor: res.discountMinor, deliveryFeeMinor: res.deliveryFeeMinor, totalMinor: res.totalMinor }, changes: [] },
