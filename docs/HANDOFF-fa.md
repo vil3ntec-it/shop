@@ -57,6 +57,51 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-63k زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-63k` (از `origin/claude/batch-63` 9271f92cb) — فرمِ جمع‌وجورِ «کالای جدید» با موجودیِ آغاز و هشدارِ انقضا
+
+- **خواستهٔ صاحب‌کار (تصویرِ فرم):** دسته و واحد (و هر فهرستِ انتخابی) **کادرِ کشویی** با «+ تازه» تهِ همان فهرست؛ همهٔ کادرها «خیلی
+  جمع‌وجورتر»؛ «حداقلِ موجودی» و «قیمتِ عمده» از این فرم بروند (نه از مدل)؛ تاریخِ تولید/انقضا و «موجودی در انبار» ِ اختیاری؛ «دو کارتن
+  آوردم ⇒ از همین‌جا برای انبار هم ثبت شود»؛ «هر کدام که تاریخشان کم مانده بود هشدار بیاید»؛ و «سناریونویسی کن».
+- **سناریو** (کامل در `docs/SHOP-SCENARIO-fa.md` › «۵. کالاها» › «فرمِ «کالای جدید» ِ گوشی»): کارتِ هر کالا — نام؛ دسته‌بندی ▾ | واحد ▾؛
+  خرید | فروش (+ سودِ هر واحد)؛ کد/بارکد با اسکن؛ قابِ کم‌رنگِ «اختیاری»: موجودی در انبار (پسوندِ واحد، «با ذخیره، ۲ کارتن به انبار…
+  · ۴٬۸۰۰ ؋») و تاریخِ تولید | انقضا (هشت رقم ⇒ «۱۴۰۵/۰۸/۲۴»، زیرِ انقضا «n روز مانده» / «نزدیکِ انقضا» / «گذشته»)؛ «ذخیرهٔ همه» کالا و
+  ورودِ انبار را یک‌جا؛ هشدارِ «منقضی‌شده» (سرخ، فوری) جدا از «نزدیکِ انقضا»، و یادآوریِ صبح. حالت‌های مرزی همان‌جا (تاریخ بی موجودی،
+  تاریخِ ناقص، تولید پس از انقضا، انقضای گذشته، کارتن/دانه، ردیفِ نیمه‌پر، یا همه یا هیچ، دو بار زدن، آفلاین).
+- **کد:** `ui/v3/products/NewProductFields.kt` (چیدمانِ تازهٔ فرمِ تازه)، `ChoiceDropdown.kt` (کادرِ کشویی؛ ⏳ `claude/e-rows-63w` روی origin
+  نبود ⇒ همین بسته، با آمدنِ کادرِ کیت جایگزین شود)، `NewProductStock.kt` (قاعده‌های «اختیاری» و `DateMask`)؛ `ProductFormModel`: سه فیلدِ
+  `stock/made/expiry`، `Field` با ترتیبِ تازه (`UNIT` پس از `CATEGORY`؛ `STOCK/MADE/EXPIRY`)، `Problem` +۳، `draftNew` همیشه `minStock = 0` و
+  `wholesalePrice = null`، `Check.Ok(rows)` با `drafts` ِ مشتق. `ProductFields` (فقط ویرایش): دسته، واحد و تأمین‌کننده کشویی، «+ تازه»
+  با `NewValueSheet`؛ `FieldHooks.onNewCategory` و `ProductFormNav.pickCategory` رفتند (برگهٔ دسته‌ها با `pick` هنوز هست). `V3TextField`
+  یک پارامترِ پیش‌فرض‌تهیِ `mask` گرفت (بی اثر برای بقیه). `ProductRowCard`: خلاصهٔ کارتِ بسته موجودی را هم می‌گوید؛ `CardSection` ِ بی‌کار رفت.
+- **موجودیِ آغاز:** `data/OpeningStock.save` = هر ردیف همان `addProduct` ⇒ (اگر موجودی > ۰) `addEntry` ِ «ورودِ کالا» (مقدار به واحدِ خودِ
+  کالا — فرمِ تازه `purchaseUnits`/`unitFactor` ندارد —، فی = قیمتِ خرید، تاریخِ امروز، تولید/انقضا، یادداشتِ `OpeningStock.NOTE`)؛ یا همه یا
+  هیچ؛ صفحه با یک `ShopStore.save` (همان opهای همیشگی؛ آزمونِ برابریِ خروجی با زنجیرهٔ دستی). صفحه: `if (saving || done) return`.
+- **هشدار:** `data/ExpiryAlerts` روی `ExpiryEngine.alerts` (FEFO، مرزِ `ExpiryPref`): یکی برای هر (کالا، انقضا، سری)؛ `HomeAlerts.Input` +
+  `expired`، `expiringNames`، `expiredNames` ⇒ «n محموله منقضی شده» (فوری ⇐ `ShellTargets.EXPIRED` = `stock?filter=expired`) و «n محموله
+  نزدیکِ انقضا» (⇐ `EXPIRING`)، زیرنویس نامِ کالاها؛ `HomeView` از همان `nums.expiring`. یادآوریِ روزانه: `LedgerSummary.expiry`
+  (محموله‌های تا ۳۶۵ روز، با تاریخ) ⇐ `Reminders.summary(s, today, nearDays)`؛ عنوان: تمام‌شده > منقضی > کم > نزدیک > طلب.
+- **رشته‌ها:** `StrNewProduct`، `StrExpiryAlert` (fa/en/ps، در `I18nTables`).
+- **تغییرِ عمدیِ آزمون:** (۱) `WholesalePriceTest`: `newForm_writesWholesale…` ⇒ `newForm_hasNoWholesale_alwaysZero_deskRowStillWrites`
+  (فرمِ تازه دیگر عمده نمی‌نویسد؛ ویرایش و ردیفِ کامپیوتر همان)، و آزمونِ سیم‌کشی ⇒ «فرمِ تازه هیچ `PriceListPrefs`/`wholesale` ندارد، ویرایش
+  دارد». (۲) `ProductFormModelTest`: نخستین خطا میانِ `UNIT` و `SALE` حالا `UNIT` است (واحد کنارِ دسته و بالای قیمت‌ها). (۳)
+  `WholesaleFieldUiTest`: `FieldHooks` بی `onNewCategory`. (۴) `ShellTargetsTest`: `EXPIRED` و `expired = 1` هم سنجیده می‌شوند.
+- **آزمون‌های تازه (۲۱):** `OpeningStockTest` (۶: یک کالا + یک ورود با مقدار/واحد/فی/دو تاریخ و یک `purchase_in`؛ بی موجودی فقط کالا؛
+  برابریِ عینِ خروجی با زنجیرهٔ دستیِ `addProduct`⇒`addEntry`؛ دوباره زدن ⇒ «نامِ تکراری» و هیچ چیزِ دوم؛ یا همه یا هیچ با تولیدِ پس از
+  انقضا، بارکدِ تکراریِ درونِ دسته و تاریخِ ناخوانا؛ از فرم تا دفتر با تاریخِ خورشیدی)، `ExpiryAlertsTest` (۵: نزدیک با مرزِ قابلِ تنظیم؛
+  منقضی جدا و فوری در `HomeAlerts`؛ فروش/اصلاح ⇒ هشدار می‌رود؛ یکی برای هر محموله؛ یادآوریِ روزانه از `LedgerSummary`)، `NewProductStockTest`
+  (۴)، کامپیوتر `NewProductFormUiTest` (۵: نه حداقل نه عمده حتی با لیستِ قیمت؛ کشوییِ دسته/واحد و «+ تازه» از درونِ فهرست؛ تاریخ‌ها و
+  موجودی ⇒ یک کالا و یک ورود، دو زدنِ هم‌قاب ⇒ یک ثبت؛ تولید پس از انقضا و تاریخ بی موجودی درجا؛ ردیف‌ها و «افزودن از متن»)، و
+  `shots/NewProductFormRenderTest` (۱، فقط با `TOHID_RENDER_OUT`: خالی/پر/خطا × روشن/تیره، فارسی).
+- **اجرا:** هدف‌دار زیرِ `flock` (‹`OpeningStockTest`، `ExpiryAlertsTest`، `ExpiryEngineTest`، `WholesalePriceTest`، `DebtSettledTest`، `ui.v3.products.*`،
+  `ui.v3.shell.*`، `PhoneHomeModelTest`، `StockListModelTest`، `ScenarioS22Test`، `ScenarioS96Test`، `core.i18n.*` با `InfraLeakGuardTest` ۸،
+  `I18nCoverageTest` ۸، `DariWordsTest` ۱۷ و `DariCoverageTest` ۲۳، `NewProductFormUiTest`، `WholesaleFieldUiTest`، `NewProductFormRenderTest`›)
+  ۲۶۸/۲۶۸ در نخستین اجرا؛ FULL_PLACEHOLDER. precheck `fail=0`، quality بی ردیفِ «همین تغییر»، spec «سالم»، whatsnew و secret-scan سبز.
+  عکس‌ها: `/tmp/claude-0/-home-user/f1a91bac-436d-52ce-8105-79a315de1198/scratchpad/e63k/new-product-{empty,filled,errors}-{light,dark}-fa.png`
+  (یافتهٔ «clipped» ِ `render-report.json` برای همهٔ نوشته‌ها، حتی عنوانِ صفحه، است و در عکس هیچ بریدگی‌ای نیست ⇒ نویزِ قلمِ محلی؛ offscreen
+  و raw-key صفر). قابِ نخست: محاسبهٔ تازه‌ای ندارد (فهرستِ کشویی تا باز نشود ساخته نمی‌شود، «امروز» یک بار)؛ زمانش جدا سنجیده نشد.
+- **نیمه‌کاره / بعدی:** کادرِ کشوییِ کیت (63w) که آمد جای `ChoiceDropdown` بنشیند؛ ترجمهٔ en/ps ِ رشته‌های تازه ماشینی است (بازبینیِ گوینده)؛
+  ردیفِ «کالای تازه» ِ کامپیوتر (`DeskProducts`) عمداً دست نخورد (هنوز عمده و موجودیِ اول دارد، بی تاریخ). روی گوشیِ واقعی سنجیده نشد.
+
 ### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-63p زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-63p` (از `origin/claude/batch-63` baff32f2e) — حریمِ خصوصی و شرایط درونِ برنامه‌ها، بی GitHub؛ نسخهٔ فروشگاهی بی کدِ به‌روزرسانی
 
 - **خواستهٔ صاحب‌کار:** صفحهٔ حریمِ خصوصی از `vil3ntec-it.github.io/shop/privacy.html` باز می‌شد و GitHub ِ او را به کاربر و مهاجم
