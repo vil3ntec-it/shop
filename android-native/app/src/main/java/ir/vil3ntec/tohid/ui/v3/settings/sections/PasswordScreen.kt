@@ -49,7 +49,7 @@ internal fun RouteScope.PasswordScreen(onBack: (() -> Unit)?) {
   val title = SettingsLayout.labelOf("تغییر رمز حساب")
   val signedIn = remember { SyncStore(context).accessToken != null }
   if (!signedIn) {
-    V3Scaffold(title = title, onBack = onBack) { pad ->
+    V3Scaffold(title = title, onBack = onBack, largeTitle = false) { pad ->
       Box(Modifier.fillMaxSize().padding(bottom = pad.calculateBottomPadding())) {
         V3EmptyState(Icons.Outlined.Password, StrSettings.passwordSignedOut, body = StrSettings.serverPassword)
       }

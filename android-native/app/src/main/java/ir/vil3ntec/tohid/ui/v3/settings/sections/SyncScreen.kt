@@ -132,7 +132,7 @@ internal fun RouteScope.SyncScreen(onBack: (() -> Unit)?) {
       val pulse = SyncModel.server(ServerPulse.state)
       V3Section(StrNav.server) {
         V3ListRow(StrSettings.serverStatus, chevron = false, trailing = { StatusLine(pulse, small = true) })
-        if (ServerPulse.at > 0) { V3Divider(start = 22.dp); V3ListRow(StrNav.lastCheck(SettingsIndexModel.since(ServerPulse.at, now)), chevron = false) }
+        if (ServerPulse.at > 0) { V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.PAD_START_PLAIN); V3ListRow(StrNav.lastCheck(SettingsIndexModel.since(ServerPulse.at, now)), chevron = false) }
       }
       SyncModel.pulseNote(ServerPulse.state, ServerPulse.note)?.let { ErrorText(it) }
       V3TextButton(
@@ -146,10 +146,10 @@ internal fun RouteScope.SyncScreen(onBack: (() -> Unit)?) {
         val q = SyncModel.queue(v1.queued)
         V3Section(StrNav.changeLog) {
           V3ListRow(q.text, chevron = false, trailing = { Dot(q.tone) })
-          V3Divider(start = 22.dp)
+          V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.PAD_START_PLAIN)
           V3ListRow(if (v1.lastOkAt > 0) StrNav.lastSyncOk(displayMillis(v1.lastOkAt)) else StrNav.noSyncYet, chevron = false)
           if (v1.dropped > 0) {
-            V3Divider(start = 22.dp)
+            V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.PAD_START_PLAIN)
             val told = if (notified) StrSyncPlain.supportNotified else StrSyncPlain.supportPending
             V3ListRow(StrSyncPlain.rejectedTitle(v1.dropped) + " — " + told, chevron = false, trailing = { Dot(V3Tone.WARNING) })
           }

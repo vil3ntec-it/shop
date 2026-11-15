@@ -57,6 +57,10 @@ object V3Type {
   val subhead: TextStyle @Composable get() = v3Text(13, FontWeight.Medium, 18)
   val footnote: TextStyle @Composable get() = v3Text(12, FontWeight.Medium, 17)
   val caption: TextStyle @Composable get() = v3Text(11, FontWeight.SemiBold, 15)
+  /** عنوانِ ردیفِ ناوبری و تنظیمات (`V3NavRow`، ۶۵r): یک خط، ۱۶ — «بیشتر»، تنظیمات، حساب و مرکزِ مدیریت همین */
+  val rowTitle: TextStyle @Composable get() = v3Text(V3NavRowSpec.TITLE_SP, FontWeight.Medium, 22)
+  /** خطِ راهنما و مقدارِ کم‌رنگِ همان ردیف: یک خط، ۱۳ */
+  val rowHelp: TextStyle @Composable get() = v3Text(V3NavRowSpec.HELP_SP, FontWeight.Medium, 18)
   /** عددِ درشتِ آمار و پول */
   val figure: TextStyle @Composable get() = v3Text(24, FontWeight.Bold, 30)
 }

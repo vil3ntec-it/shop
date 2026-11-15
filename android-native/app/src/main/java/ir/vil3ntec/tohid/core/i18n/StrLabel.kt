@@ -79,7 +79,7 @@ object StrLabel {
   fun perUnit(unit: Any): String = t("هر ${asIs(unit)}", "per $unit", "هر $unit")
 
   // تنظیمات
-  val settingsTitle: String get() = t("برچسب و بارکدِ داخلی", "Labels and in-store barcodes", "لیبلونه او دننني بارکوډونه")
+  val settingsTitle: String get() = t("برچسب و بارکدِ داخلی", "Labels and store barcodes", "لیبلونه او دننني بارکوډونه")
   val settingsOn: String get() = t("در «انبار» دیده می‌شود", "Shown under “Warehouse”", "په «ګودام» کې ښکاري")
   val settingsNote: String get() = t(
     "دکمهٔ تازه در «انبار»: برچسبِ بارکد (۴۰×۳۰: نام، قیمت، بارکد) یا برچسبِ قفسه (قیمتِ درشت) برای چند کالا با تعدادِ هر کدام، روی چاپگرِ برچسب (TSPL یا ESC/POS) یا برگهٔ A4 ِ ۳×۸؛ و ساختِ بارکدِ داخلی (۲۰/۲۹) برای کالای بی‌بارکد. روی چاپگر و بارکدخوانِ واقعی آزموده نشده است؛ اولین برچسب را اسکن کنید. پس از تغییر، «انبار» را دوباره باز کنید.",

@@ -59,7 +59,7 @@ object StrPayFix {
   val errOther: String get() = t("اصلاح ثبت نشد", "The correction was not recorded", "سمون ثبت نه شو")
 
   // تنظیمات (همین دستگاه)
-  val settingsTitle: String get() = t("اصلاحِ روشِ پرداخت پس از فروش", "Correct payment method after a sale", "له پلور وروسته د ورکړې لاره سمول")
+  val settingsTitle: String get() = t("اصلاحِ روشِ پرداخت", "Fix payment method", "د ورکړې لارې سمول")
   val settingsNote: String get() = t(
     "در «فاکتورها» روشِ پرداختِ فاکتورِ ثبت‌شده با سندی جدا (نام، تأیید و دلیل) اصلاح می‌شود؛ فاکتور دست نمی‌خورد و روزِ بسته (Z) اصلاح نمی‌شود. شاگرد با تأییدِ مدیر. فقط روی همین دستگاه؛ نسخه‌های قدیمیِ برنامه اصلاح را در صندوقِ خودشان نمی‌شمارند.",
     "In “Invoices” the payment method of a recorded invoice is corrected with a separate record (name, approval and reason); the invoice is not edited and a closed day (Z) cannot be corrected. Staff need a manager's approval. Only on this device; older app versions do not count the correction in their own register.",

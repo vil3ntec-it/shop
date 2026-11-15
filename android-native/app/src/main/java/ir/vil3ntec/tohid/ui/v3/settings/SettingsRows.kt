@@ -1,19 +1,10 @@
 package ir.vil3ntec.tohid.ui.v3.settings
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -21,7 +12,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
@@ -36,20 +26,16 @@ import ir.vil3ntec.tohid.sync.AutoSync
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.v1.SyncDot
 import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
-import ir.vil3ntec.tohid.ui.screens.MotionSpec
-import ir.vil3ntec.tohid.ui.screens.MotionTokens
 import ir.vil3ntec.tohid.ui.screens.SettingsHelp
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.V3Tone
-import ir.vil3ntec.tohid.ui.v3.V3Chevron
 import ir.vil3ntec.tohid.ui.v3.V3Divider
-import ir.vil3ntec.tohid.ui.v3.V3ListRow
+import ir.vil3ntec.tohid.ui.v3.V3NavRow
+import ir.vil3ntec.tohid.ui.v3.V3NavRowSpec
 import ir.vil3ntec.tohid.ui.v3.V3Section
-import ir.vil3ntec.tohid.ui.v3.V3Toggle
-import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.nav.SettingsEntry
 import ir.vil3ntec.tohid.ui.v3.nav.V3Modules
@@ -57,8 +43,8 @@ import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.v3.settings.sections.rememberLockOn
 import ir.vil3ntec.tohid.ui.v3.settings.sections.rememberServerSections
 
-/** خطِ مویی میانِ ردیف‌ها، از زیرِ متن (آیکنِ ۲۴ + فاصله‌ها) */
-internal val ROW_DIVIDER_START = 60.dp
+/** خطِ مویی میانِ ردیف‌ها، از زیرِ متن — همان «بیشتر» (کاشیِ ۴۰ + فاصله‌ها، `V3NavRowSpec`) */
+internal val ROW_DIVIDER_START = V3NavRowSpec.DIVIDER_START
 
 /** هر آنچه ردیف‌ها نشان می‌دهند — از موتورهای امروز، بی منطقِ تازه */
 @Composable
@@ -127,8 +113,9 @@ internal fun RouteScope.rememberCategoryParts(group: String, facts: SettingsFact
 }
 
 /**
- *  کارتِ یک بخشِ کوتاه (r5): سرخط بیرونِ کارت، ردیف‌ها با آیکنِ خطی، یک خطِ ساده («این چه می‌کند»، `SettingsHelp`)
- *  و مقدارِ خاکستری / کلید / فلش. `onRow` صفحهٔ همان بخش (یا پیوندش) را باز می‌کند و `onExtra` مسیرِ ردیفِ ماژول را.
+ *  کارتِ یک بخشِ کوتاه: سرخط بیرونِ کارت و ردیف‌ها همان ردیفِ «بیشتر» (`V3NavRow`، ۶۵r) — کاشیِ رنگیِ بخش
+ *  (`SettingsHues`)، عنوانِ یک‌خطی، یک خطِ ساده («این چه می‌کند»، `SettingsHelp`) و مقدارِ کم‌رنگ کنارِ پیکان یا کلید.
+ *  `onRow` صفحهٔ همان بخش (یا پیوندش) را باز می‌کند و `onExtra` مسیرِ ردیفِ ماژول را.
  */
 @Composable
 internal fun PartCard(
@@ -147,7 +134,7 @@ internal fun PartCard(
     }
     part.extra.forEachIndexed { i, e ->
       if (part.rows.isNotEmpty() || i > 0) V3Divider(start = ROW_DIVIDER_START)
-      V3ListRow(e.label(), subtitle = e.subtitle(), icon = e.icon, tile = false, onClick = { onExtra(e.route) })
+      V3NavRow(e.label(), icon = e.icon, hue = SettingsHues.extra(e.group, e.part ?: part.id), help = e.subtitle(), onClick = { onExtra(e.route) })
     }
   }
 }
@@ -158,56 +145,38 @@ internal fun SelectedMark(modifier: Modifier) {
   Box(modifier.width(4.dp).height(28.dp).clip(RoundedCornerShape(2.dp)).background(PhoneV3Roles.focus(PhoneV3.colors)))
 }
 
-/** یک ردیف: مقدارِ تازه با محوِ نرم جای قبلی می‌نشیند */
+/**
+ *  یک ردیفِ تنظیمات — همان ردیفِ «بیشتر» (`V3NavRow`): کاشیِ رنگیِ بخش، عنوان، یک خطِ ساده (`SettingsHelp.line`)
+ *  و در پایان مقدارِ کم‌رنگ پیش از پیکان (مقدارِ تازه با محوِ نرم جای قبلی می‌نشیند)، یا کلیدِ خودِ ردیف.
+ */
 @Composable
 internal fun SettingsRow(key: String, facts: SettingsFacts, onClick: () -> Unit, onLockToggle: (Boolean) -> Unit, selected: Boolean? = null) {
   val label = SettingsLayout.labelOf(key)
   val toggle = SettingsIndexModel.toggle(key, facts)
   val value = SettingsIndexModel.value(key, facts)
-  V3ListRow(
+  V3NavRow(
     title = label,
-    //  تنظیماتِ کم: هر ردیفِ دیده‌شده یک خطِ ساده دارد
-    subtitle = SettingsHelp.line(key),
     icon = SettingsPages.icon(key),
-    tile = false,
+    hue = SettingsHues.of(key),
+    //  تنظیماتِ کم: هر ردیفِ دیده‌شده یک خطِ ساده دارد
+    help = SettingsHelp.line(key),
+    value = value.takeIf { toggle == null },
+    valueDot = if (key == "همگام‌سازی" && value != null) syncDot(facts.sync) else null, // داده: کلیدِ بخشِ تنظیمات
+    toggle = toggle,
+    onToggle = onLockToggle,
     selected = selected,
-    trailing = when {
-      toggle != null -> ({ V3Toggle(toggle, label, onLockToggle) })
-      key == "همگام‌سازی" && value != null -> ({ SyncValue(facts.sync, value) })
-      value != null -> ({ RowValue(value) })
-      else -> null
-    },
     onClick = onClick,
   )
 }
 
+/** همگام‌سازی: نقطهٔ وضعیت (رنگ + نوشته، نه رنگِ تنها) پیش از «۲ دقیقه پیش» */
 @Composable
-private fun RowValue(value: String) {
-  val c = PhoneV3.colors
-  Row(verticalAlignment = Alignment.CenterVertically) {
-    AnimatedContent(value, transitionSpec = { fadeIn(MotionSpec.tweenOf(MotionTokens.MEDIUM)) togetherWith fadeOut(MotionSpec.tweenOf(MotionTokens.SHORT)) }, label = "rowValue") {
-      Text(it, style = V3Type.subhead, color = c.inkMuted, maxLines = 1)
-    }
-    Spacer(Modifier.width(4.dp))
-    V3Chevron()
-  }
-}
-
-/** همگام‌سازی: نقطهٔ وضعیت (رنگ + نوشته، نه رنگِ تنها) و «۲ دقیقه پیش» */
-@Composable
-private fun SyncValue(state: SyncState, value: String) {
-  val c = PhoneV3.colors
+private fun syncDot(state: SyncState): androidx.compose.ui.graphics.Color? {
   val tone = when (state) {
     SyncState.OK -> V3Tone.SUCCESS
     SyncState.WAITING -> V3Tone.WARNING
     SyncState.FAILED -> V3Tone.ERROR
     SyncState.OFF -> null
-  }
-  Row(verticalAlignment = Alignment.CenterVertically) {
-    if (tone != null) {
-      Box(Modifier.size(8.dp).clip(CircleShape).background(PhoneV3Roles.toneIcon(c, tone)))
-      Spacer(Modifier.width(6.dp))
-    }
-    RowValue(value)
-  }
+  } ?: return null
+  return PhoneV3Roles.toneIcon(PhoneV3.colors, tone)
 }

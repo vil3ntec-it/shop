@@ -140,20 +140,10 @@ internal fun settingsIcon(key: String): ImageVector? = when (key) {
 
 /**
  *  رنگِ نشانهٔ ردیف‌های تنظیمات (VILL3N r7) به گروهِ هر بخش — همان رنگِ گروه در
- *  «بیشتر»، تا یک بخش همه‌جا یک رنگ داشته باشد.
+ *  «بیشتر»، تا یک بخش همه‌جا یک رنگ داشته باشد. جدول یک جاست: `SettingsHues.GROUP` (۶۵r).
  */
-internal fun settingsHue(key: String): ir.vil3ntec.tohid.ui.v3.V3Hue? = when (SettingsLayout.groupOf(key) ?: key) {
-  SettingsLayout.SHOP -> ir.vil3ntec.tohid.ui.v3.V3Hue.BRAND
-  SettingsLayout.GOODS -> ir.vil3ntec.tohid.ui.v3.V3Hue.AMBER
-  SettingsLayout.LOOK -> ir.vil3ntec.tohid.ui.v3.V3Hue.BLUE
-  SettingsLayout.GENERAL -> ir.vil3ntec.tohid.ui.v3.V3Hue.BLUE
-  SettingsLayout.SECURITY -> ir.vil3ntec.tohid.ui.v3.V3Hue.BRAND
-  SettingsLayout.SALES -> ir.vil3ntec.tohid.ui.v3.V3Hue.ORANGE
-  SettingsLayout.DEVICES -> ir.vil3ntec.tohid.ui.v3.V3Hue.TEAL
-  SettingsLayout.DATA -> ir.vil3ntec.tohid.ui.v3.V3Hue.PURPLE
-  SettingsLayout.ABOUT -> ir.vil3ntec.tohid.ui.v3.V3Hue.BLUE
-  else -> null
-}
+internal fun settingsHue(key: String): ir.vil3ntec.tohid.ui.v3.V3Hue? =
+  ir.vil3ntec.tohid.ui.v3.settings.SettingsHues.group(SettingsLayout.groupOf(key) ?: key)
 
 /**
  *  یک بخشِ تنظیمات.

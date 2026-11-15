@@ -25,12 +25,11 @@ import ir.vil3ntec.tohid.core.i18n.StrSettingsHome
 import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
 import ir.vil3ntec.tohid.ui.screens.SettingsSearchIndex
-import ir.vil3ntec.tohid.ui.screens.settingsHue
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
-import ir.vil3ntec.tohid.ui.v3.V3ListRow
+import ir.vil3ntec.tohid.ui.v3.V3NavRow
 import ir.vil3ntec.tohid.ui.v3.V3SearchField
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3StatusPill
@@ -103,18 +102,18 @@ internal fun SettingsSearchBox(query: String, onChange: (String) -> Unit) {
   V3SearchField(query, onChange, StrSettingsHome.searchHint, Modifier.fillMaxWidth().padding(top = 8.dp))
 }
 
-/** شش دستهٔ صفحهٔ اول: کاشیِ رنگی، نام و یک خطِ ساده؛ `selected` (کامپیوتر) دستهٔ بازِ ستونِ کناری */
+/** شش دستهٔ صفحهٔ اول: همان ردیفِ «بیشتر» (`V3NavRow`) — کاشیِ رنگیِ دسته، نام و یک خطِ ساده؛ `selected` (کامپیوتر) دستهٔ بازِ ستونِ کناری */
 @Composable
 internal fun SettingsHomeCard(selected: String?, onOpen: (String) -> Unit) {
   V3Section(null) {
     SettingsLayout.GROUPS.forEachIndexed { i, g ->
-      if (i > 0) V3Divider(start = ROW_DIVIDER_START + 12.dp)
+      if (i > 0) V3Divider(start = ROW_DIVIDER_START)
       Box {
-        V3ListRow(
+        V3NavRow(
           SettingsLayout.groupLabel(g.title),
-          subtitle = SettingsLayout.groupLine(g.title),
           icon = SettingsPages.icon(g.title),
-          hue = settingsHue(g.title),
+          hue = SettingsHues.of(g.title),
+          help = SettingsLayout.groupLine(g.title),
           onClick = { onOpen(g.title) },
         )
         if (g.title == selected) SelectedMark(Modifier.align(Alignment.CenterStart))
@@ -131,7 +130,7 @@ internal fun FeaturesLink(onOpen: () -> Unit) {
     horizontalArrangement = Arrangement.spacedBy(4.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    Text(StrSettingsHome.featuresLine, style = V3Type.footnote, color = PhoneV3.colors.inkMuted, modifier = Modifier.weight(1f))
+    Text(StrSettingsHome.featuresLine, style = V3Type.rowHelp, color = PhoneV3.colors.inkMuted, modifier = Modifier.weight(1f))
     V3TextButton(StrSettingsHome.features, onOpen)
   }
 }
@@ -155,20 +154,28 @@ internal fun LazyListScope.searchResults(hits: List<SettingsSearchIndex.Doc>, qu
     V3Section(null) {
       hits.forEachIndexed { i, d ->
         if (i > 0) V3Divider(start = ROW_DIVIDER_START)
-        V3ListRow(
+        V3NavRow(
           d.title,
-          subtitle = d.place.ifBlank { d.subtitle ?: StrSettingsHome.categoryHit },
           icon = when (d.kind) {
             SettingsSearchIndex.Kind.FEATURES -> Icons.Outlined.Extension
             else -> SettingsPages.icon(d.key)
           },
-          tile = false,
+          hue = searchHue(d),
+          help = d.place.ifBlank { d.subtitle ?: StrSettingsHome.categoryHit },
           trailing = if (d.experimental) ({ V3StatusPill(V3Status.WARNING, StrSettingsHome.experimental) }) else null,
           onClick = { onOpen(d) },
         )
       }
     }
   }
+}
+
+/** رنگِ کاشیِ نتیجهٔ جست‌وجو — همان رنگی که ردیف در جای خودش دارد (`SettingsHues`) */
+private fun searchHue(d: SettingsSearchIndex.Doc): ir.vil3ntec.tohid.ui.v3.V3Hue = when (d.kind) {
+  SettingsSearchIndex.Kind.FEATURES -> SettingsHues.FEATURES
+  SettingsSearchIndex.Kind.EXTRA ->
+    V3Modules.ALL.asSequence().flatMap { it.settings.asSequence() }.firstOrNull { it.route == d.key }?.let { SettingsHues.extra(it.group, it.part) } ?: SettingsHues.FEATURES
+  else -> SettingsHues.of(d.key)
 }
 
 /**

@@ -67,7 +67,6 @@ internal fun RouteScope.AlertsScreen(onBack: (() -> Unit)?) {
             StrSettings.phoneNotifications,
             subtitle = StrSettings.phoneNotificationsNote,
             icon = Icons.Outlined.NotificationsActive,
-            tile = false,
             onClick = {
               runCatching {
                 context.startActivity(

@@ -39,10 +39,9 @@ internal fun RouteScope.LanguageScreen(onBack: (() -> Unit)?) {
     item(key = "lang") {
       V3Section(StrSettings.appLanguage, footer = StrSettings.languageNote) {
         Lang.entries.forEachIndexed { i, l ->
-          if (i > 0) V3Divider(start = 22.dp)
+          if (i > 0) V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.PAD_START_PLAIN)
           V3ListRow(
             l.native,
-            tile = false,
             chevron = false,
             trailing = if (l == lang) ({ Check() }) else null,
             onClick = { if (l != lang) { Haptics.confirm(context); LocaleChoice.setLang(context, l) } },
@@ -53,10 +52,9 @@ internal fun RouteScope.LanguageScreen(onBack: (() -> Unit)?) {
     item(key = "months") {
       V3Section(StrSettings.monthNames) {
         listOf(LocaleText.MONTHS_DARI to StrSettings.monthsDari, LocaleText.MONTHS_PASHTO to StrSettings.monthsPashto).forEachIndexed { i, (id, label) ->
-          if (i > 0) V3Divider(start = 22.dp)
+          if (i > 0) V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.PAD_START_PLAIN)
           V3ListRow(
             label,
-            tile = false,
             chevron = false,
             trailing = if (id == months) ({ Check() }) else null,
             onClick = { LocaleChoice.setMonths(context, id) },

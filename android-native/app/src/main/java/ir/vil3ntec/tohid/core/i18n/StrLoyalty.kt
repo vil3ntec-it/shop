@@ -6,7 +6,7 @@ package ir.vil3ntec.tohid.core.i18n
  */
 @Suppress("unused")
 object StrLoyalty {
-  val settingsTitle: String get() = t("امتیازِ وفاداری و سطحِ مشتری", "Loyalty points and customer tiers", "د وفادارۍ امتیاز او د پېرودونکي کچه")
+  val settingsTitle: String get() = t("امتیازِ وفاداری و سطحِ مشتری", "Loyalty points and tiers", "د وفادارۍ امتیاز او کچه")
   val settingsNote: String get() = t(
     "مشتریِ انتخاب‌شده با هر خریدِ پرداخت‌شده امتیاز می‌گیرد (به نسبتِ سطحش در ۱۲ ماهِ گذشته) و در صندوق می‌تواند امتیاز را به‌جای بخشی از پول بدهد. برگشت و لغوِ فاکتور امتیازِ همان فاکتور را به همان نسبت برمی‌گرداند.",
     "The selected customer earns points on every paid purchase (scaled by their tier over the last 12 months) and can use points for part of an invoice at the register. Returns and voids reverse that invoice's points in the same proportion.",

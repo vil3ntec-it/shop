@@ -13,12 +13,12 @@ object StrSettingsHome {
   val data: String get() = t("داده و پشتیبان", "Data & backup", "معلومات او بیک اپ")
   val look: String get() = t("ظاهر و زبان", "Look & language", "بڼه او ژبه")
 
-  val shopLine: String get() = t("حساب، قفل، کدِ شاگرد و هشدارها", "Account, lock, staff code and alerts", "حساب، قلف، د شاګرد کوډ او خبرتیاوې")
-  val salesLine: String get() = t("پرداخت، فاکتور، رسید و برگشت", "Payment, invoices, receipts and returns", "تادیه، بلونه، رسید او بېرته ورکړه")
-  val goodsLine: String get() = t("ثبتِ کالا، برچسب و جای کالا در انبار", "Adding items, labels and where stock is kept", "د توکو ثبت، لیبل او په ګدام کې د توکو ځای")
+  val shopLine: String get() = t("حساب، قفل، کدِ شاگرد و هشدارها", "Account, lock, staff code, alerts", "حساب، قلف، د شاګرد کوډ او خبرتیاوې")
+  val salesLine: String get() = t("پرداخت، فاکتور، رسید و برگشت", "Payments, invoices, returns", "تادیه، بلونه، رسید او بېرته ورکړه")
+  val goodsLine: String get() = t("ثبتِ کالا، برچسب و جای کالا", "Items, labels and locations", "توکي، لیبل او ځای")
   val devicesLine: String get() = t("چاپگر، بارکدخوان، ترازو و نمایشگر", "Printer, scanner, scale and display", "چاپګر، بارکوډ لوستونکی، تله او ښودونکی")
   val dataLine: String get() = t("همگام‌سازی، پشتیبان و نسخهٔ برنامه", "Sync, backup and app version", "همغږي، بیک اپ او د اپ نسخه")
-  val lookLine: String get() = t("رنگ، زبان، تاریخ و رقم", "Colours, language, dates and digits", "رنګ، ژبه، نېټه او شمېرې")
+  val lookLine: String get() = t("رنگ، زبان، تاریخ و رقم", "Colours, language, dates", "رنګ، ژبه، نېټه او شمېرې")
 
   //  ── سرخطِ بخش‌های کوتاهِ هر دسته ───────────────────────────────────
   val partShop: String get() = t("دکان", "Shop", "دوکان")

@@ -118,7 +118,7 @@ object StrOrderFlow {
 
   // ── تنظیمات: «سفارشِ آنلاین» ──
   val settingsTitle: String get() = t("سفارشِ آنلاین", "Online orders", "آنلاین فرمایشونه")
-  val settingsLine: String get() = t("چرا سفارش نمی‌رسد، و پرداخت پس از پذیرش", "Why orders aren't arriving, and payment after accepting", "ولې فرمایش نه راځي، او له منلو وروسته تادیه")
+  val settingsLine: String get() = t("رسیدنِ سفارش و پرداختِ آن", "Order arrival and payment", "د فرمایش رارسېدل او تادیه")
   val settingsExample: String get() = t(
     "مثلاً اگر ویترین خاموش است یا کالایی منتشر نشده، همین‌جا گفته می‌شود و با یک دکمه درستش می‌کنید.",
     "For example, if the storefront is off or no product is published, it says so here and one button takes you to fix it.",

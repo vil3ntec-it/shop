@@ -65,7 +65,7 @@ internal fun PhotosCard(highlight: Boolean) {
   var auto by remember { mutableStateOf(PhotoBot.autoEnabled(context)) }
   DeviceCard(StrSettings.productPhotos, StrSettings.photosNote, highlight) {
     V3ToggleRow(StrSettings.showPhotos, checked = PhotoPrefs.show.value, onCheckedChange = { PhotoPrefs.set(context, it) }, icon = Icons.Outlined.Image)
-    V3Divider(start = 64.dp)
+    V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.DIVIDER_START)
     V3ToggleRow(StrSettings.photoBotAuto, checked = auto, onCheckedChange = { auto = it; PhotoBot.setAuto(context, it) }, subtitle = StrSettings.photoBotNote, icon = Icons.Outlined.AutoFixHigh)
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
       val prog = PhotoBot.progress.value

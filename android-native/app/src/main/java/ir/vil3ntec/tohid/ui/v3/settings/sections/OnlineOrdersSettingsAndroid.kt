@@ -107,7 +107,6 @@ internal fun RouteScope.OnlineOrdersScreen(onBack: (() -> Unit)?) {
             StrPush.allowNotifications,
             subtitle = StrPush.allowNotificationsHelp,
             icon = Icons.Outlined.NotificationsActive,
-            tile = false,
             onClick = {
               if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
                 runCatching { askNotify.launch(android.Manifest.permission.POST_NOTIFICATIONS) }
