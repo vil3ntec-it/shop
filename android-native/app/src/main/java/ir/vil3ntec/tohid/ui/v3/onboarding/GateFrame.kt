@@ -30,8 +30,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -54,14 +56,22 @@ internal val GATE_WIDTH = 440.dp
 /** گوشهٔ کارتِ دروازه و کارت‌های گزینه — همان خانوادهٔ کارت‌های برنامه (THEME-V2: ۲۰) */
 internal val GATE_CARD_RADIUS = PhoneV3.groupRadius
 
-/** زمینهٔ مه‌گرفتهٔ همهٔ دروازه‌ها (زبانِ r4، رنگِ تمِ جاری) — ثابت می‌ماند و فقط محتوا جابه‌جا می‌شود */
+/**
+ *  زمینهٔ دروازه‌ها. [welcome] (ورود، ساختِ حساب، کد، فراموشی، شرایط، پیوستن، ساختِ دکان): پس‌زمینهٔ ورودِ قدیمی
+ *  (`WelcomeBackground`، صاحب‌کار ۱۴۰۵/۰۸/۲۴) — درونِ `AuthFlow` یک بار پشتِ همهٔ گام‌ها کشیده شده و گام فقط شفاف است؛
+ *  تنها (عکس‌ها، «ساختِ دکان») خودش می‌کشد. بی [welcome] (دروازهٔ قفل): همان زمینهٔ مه‌گرفته (زبانِ r4، رنگِ تمِ جاری).
+ */
 @Composable
-internal fun GateBackdrop(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
-  Box(modifier.fillMaxSize().frosted(PhoneV3.colors), content = content)
+internal fun GateBackdrop(modifier: Modifier = Modifier, welcome: Boolean = true, content: @Composable BoxScope.() -> Unit) {
+  when {
+    welcome && LocalWelcomeBackdrop.current -> Box(modifier.fillMaxSize(), content = content)
+    welcome -> WelcomeBackdrop(modifier, content)
+    else -> Box(modifier.fillMaxSize().frosted(PhoneV3.colors), content = content)
+  }
 }
 
 /**
- *  قابِ یک دروازه (ورود، ساختِ دکان، قفل): نشانِ برنامه، عنوانِ درشتِ ۳۰ و زیرعنوانِ ۱۵ از
+ *  قابِ یک دروازه (ورود، ساختِ دکان): نشانِ قدیمیِ ورود (`WelcomeMark`)، عنوانِ درشتِ ۳۰ و زیرعنوانِ ۱۵ از
  *  آغاز، و محتوا در **یک** کارتِ ۱۶ با پهنای حداکثرِ ۴۴۰ که روی تبلت و کامپیوتر وسط می‌نشیند.
  *  صفحه با صفحه‌کلید بالا می‌رود (کادرِ فعال و دکمه بالای آن می‌مانند). بخش‌ها بارِ اول پلکانی می‌آیند.
  */
@@ -80,26 +90,31 @@ internal fun GateFrame(
   card: @Composable ColumnScope.() -> Unit,
 ) {
   val c = PhoneV3.colors
+  //  زیرعنوان روی موجِ آبیِ پس‌زمینهٔ ورود (در چپ‌به‌راست درست رویش می‌افتد): خاکستریِ کمی سیرتر تا ≥ ۴٫۵:۱ بماند
+  val muted = lerp(c.inkMuted, c.ink, 0.5f)
   val stagger = rememberV3Stagger(title)
   Box(
     modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding().verticalScroll(rememberScrollState()),
     contentAlignment = Alignment.TopCenter,
   ) {
     Column(Modifier.widthIn(max = GATE_WIDTH).fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
-      Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (onBack != null) V3BackButton(onBack)
-      }
-      Column(Modifier.v3Stagger(stagger, "head", 0)) {
-        BrandMark()
-        Spacer(Modifier.height(18.dp))
-        Text(title, style = V3Type.largeTitle, color = c.ink)
-        if (subtitle != null) {
-          Spacer(Modifier.height(6.dp))
-          Text(subtitle, style = V3Type.body, color = c.inkMuted)
+      //  نشانِ قدیمیِ ورود (دایرهٔ چرخان) وسطِ بالا؛ «برگشت» در همان ردیف سمتِ آغاز — جایی کنارِ نشان، نه رویش
+      Box(Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxWidth().v3Stagger(stagger, "head", 0)) {
+          Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) { WelcomeMark() }
+          Spacer(Modifier.height(10.dp))
+          Text(title, style = V3Type.largeTitle, color = c.ink)
+          if (subtitle != null) {
+            Spacer(Modifier.height(6.dp))
+            Text(subtitle, style = V3Type.body, color = muted)
+          }
+          if (stage != null) {
+            Spacer(Modifier.height(16.dp))
+            SignupProgress(stage, muted)
+          }
         }
-        if (stage != null) {
-          Spacer(Modifier.height(16.dp))
-          SignupProgress(stage)
+        Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
+          if (onBack != null) V3BackButton(onBack)
         }
       }
       if (above != null) {
@@ -131,7 +146,7 @@ internal fun GateFrame(
  *  بی‌حرکت ⇐ بی‌درنگ). رنگ: primaryِ تم روی خطِ مرز.
  */
 @Composable
-internal fun SignupProgress(stage: Int) {
+internal fun SignupProgress(stage: Int, muted: Color = PhoneV3.colors.inkMuted) {
   val c = PhoneV3.colors
   val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
   val total = AuthRules.SIGNUP_STAGES
@@ -145,8 +160,8 @@ internal fun SignupProgress(stage: Int) {
   Column(Modifier.fillMaxWidth()) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
       Text(StrAuth.stepOf(stage, total), style = V3Type.subhead, color = PhoneV3Palette.glyph(c, PhoneV3Palette.Hue.BRAND))
-      Text("·", style = V3Type.subhead, color = c.inkMuted)
-      Text(label, style = V3Type.subhead, color = c.inkMuted)
+      Text("·", style = V3Type.subhead, color = muted)
+      Text(label, style = V3Type.subhead, color = muted)
     }
     Spacer(Modifier.height(8.dp))
     Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(c.hairline)) {

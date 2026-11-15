@@ -89,41 +89,44 @@ fun ShopSetupGate(store: ShopStore, onDone: () -> Unit) {
   }
   fun fail(text: String) { error = text; failures++ }
 
-  ShopSetupBody(
-    choice = choice, name = name, code = code, busy = busy, error = error, failures = failures,
-    onChoice = { choice = it; error = null },
-    onName = { name = it; error = null },
-    onCode = { code = it.uppercase(); error = null },
-    onCreate = {
-      busy = true; error = null
-      scope.launch {
-        shops.create(ShopSetupRules.nameToCreate(name))
-          .onSuccess { settle(it.shop?.id.orEmpty()) }
-          .onFailure { fail(it.userText(StrAuth.shopNotCreated)) }
-        busy = false
-      }
-    },
-    onJoin = {
-      val entered = StaffCode.clean(code)
-      //  قالبِ کد کارِ سرور است؛ گوشی فقط می‌بیند خالی نباشد
-      if (!StaffCode.usable(entered)) {
-        fail(Str.codeIncomplete)
-      } else {
+  //  پایانِ همان راهِ نخستِ ساختِ حساب ⇒ همان پس‌زمینهٔ ورودِ قدیمی؛ ساعتش فقط وقتی برنامه پیش‌روست
+  ProvideWelcomeForeground {
+    ShopSetupBody(
+      choice = choice, name = name, code = code, busy = busy, error = error, failures = failures,
+      onChoice = { choice = it; error = null },
+      onName = { name = it; error = null },
+      onCode = { code = it.uppercase(); error = null },
+      onCreate = {
         busy = true; error = null
         scope.launch {
-          //  کاربر از قبل وارد است (این دروازه بعد از ورود می‌آید) ⇒ همان حساب می‌پیوندد
-          shops.join(entered)
-            .onSuccess {
-              it.role?.let { role -> ShopRole.remember(context, role) }
-              settle(it.shop?.id.orEmpty())
-            }
-            .onFailure { fail(StaffJoinErrors.message(it)) }
+          shops.create(ShopSetupRules.nameToCreate(name))
+            .onSuccess { settle(it.shop?.id.orEmpty()) }
+            .onFailure { fail(it.userText(StrAuth.shopNotCreated)) }
           busy = false
         }
-      }
-    },
-    onLater = onDone,
-  )
+      },
+      onJoin = {
+        val entered = StaffCode.clean(code)
+        //  قالبِ کد کارِ سرور است؛ گوشی فقط می‌بیند خالی نباشد
+        if (!StaffCode.usable(entered)) {
+          fail(Str.codeIncomplete)
+        } else {
+          busy = true; error = null
+          scope.launch {
+            //  کاربر از قبل وارد است (این دروازه بعد از ورود می‌آید) ⇒ همان حساب می‌پیوندد
+            shops.join(entered)
+              .onSuccess {
+                it.role?.let { role -> ShopRole.remember(context, role) }
+                settle(it.shop?.id.orEmpty())
+              }
+              .onFailure { fail(StaffJoinErrors.message(it)) }
+            busy = false
+          }
+        }
+      },
+      onLater = onDone,
+    )
+  }
 }
 
 /** نمایشِ «ساختِ دکان»، بی حالتِ خودش (عکس‌ها همین را با هر گزینه و خطا می‌کشند) */
