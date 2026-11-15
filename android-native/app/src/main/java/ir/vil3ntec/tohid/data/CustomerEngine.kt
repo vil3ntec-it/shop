@@ -100,6 +100,16 @@ object CustomerEngine {
     if (series.isEmpty()) n.toString() else "$series-$n"
   }
 
+  /**
+   *  همهٔ «فاکتور #…» های یک شرح با جایشان — برای پیوندِ «فقط همان بخش» (`InvoiceRefs.split`، `claude/e-rows-63q`)؛
+   *  همان یک الگو، پس هر شرحی که دفتر فاکتورش را می‌شناسد پیوند هم می‌شود.
+   */
+  fun invoiceRefsOf(notes: String): List<Pair<IntRange, String>> = INVOICE.findAll(notes).mapNotNull { m ->
+    val n = m.groupValues[2].toIntOrNull() ?: return@mapNotNull null
+    val series = m.groupValues[1]
+    m.range to (if (series.isEmpty()) n.toString() else "$series-$n")
+  }.toList()
+
   /** صورت‌حساب: ردیف به ردیف به ترتیبِ تاریخ، با ماندهٔ پس از هر ردیف و فاکتورِ پشتش */
   fun ledger(d: ShopData, debtorId: String): List<LedgerLine> {
     //  کلید همان شمارهٔ نمایشی است: `A1-5` و `B1-5` دو فاکتورِ جدااند (F0-03)

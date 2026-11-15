@@ -589,10 +589,10 @@ internal fun FreshTable(t: ReportTables.Table, modifier: Modifier, onRow: ((List
           Row(Modifier.height(IntrinsicSize.Min).background(if (r % 2 == 1) Shop.colors.surface2.copy(alpha = 0.4f) else Shop.colors.surface).then(drill)) {
             rows[r].forEachIndexed { i, v ->
               cell(i, null) {
-                Text(
-                  ReportFreshModel.display(v, t.columns[i].kind, ::formatDate), maxLines = 1, overflow = TextOverflow.Ellipsis,
-                  style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text,
-                )
+                val shown = ReportFreshModel.display(v, t.columns[i].kind, ::formatDate)
+                //  «فاکتور #۱۲» ِ ستونِ سند («پایانِ روز»، فاکتورهای روز) زدنی ⇒ همان فاکتور (`InvoiceRef`، `claude/e-rows-63q`)
+                if (t.columns[i].kind == "text") ir.vil3ntec.tohid.ui.v3.InvoiceRefText(ir.vil3ntec.tohid.ui.v3.InvoiceRefs.split(shown), style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text, maxLines = 1)
+                else Text(shown, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
               }
             }
           }

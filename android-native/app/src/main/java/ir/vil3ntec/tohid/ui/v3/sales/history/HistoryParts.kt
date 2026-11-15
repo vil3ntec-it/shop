@@ -60,6 +60,8 @@ import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3Summary
 import ir.vil3ntec.tohid.ui.v3.V3SummaryAction
 import ir.vil3ntec.tohid.ui.v3.V3Hue
+import ir.vil3ntec.tohid.ui.v3.InvoiceRefText
+import ir.vil3ntec.tohid.ui.v3.InvoiceRefs
 import ir.vil3ntec.tohid.ui.v3.V3IconTile
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Segmented
@@ -231,14 +233,15 @@ internal fun InvoiceRow(s: Sale, ctx: RowCtx, first: Boolean, last: Boolean, wit
     HistoryModel.row(ctx.d, s, ctx.returnsV2, look = ctx.look, withDate = withDate, today = ctx.today)
   }
   val amount = remember(row.amount, ir.vil3ntec.tohid.core.i18n.I18n.lang) { PhoneSaleText.amount(row.amount) }
+  //  «۱۴:۰۵ · ۳ قلم · #۱۲۴۵»: شمارهٔ پایان زدنی (`InvoiceRef`، همان فاکتور) — هر «فاکتور #n» ِ برنامه یک جزء است (`claude/e-rows-63q`)
+  val subtitle = remember(row.subtitle, row.number, row.id) { InvoiceRefs.linkify(row.subtitle, row.number.removePrefix("#"), row.id) }
   val cancelled = row.state == SaleState.CANCELLED
   val a = ctx.actions
   Column(Modifier.clip(groupShape(first, last)).background(c.card)) {
     if (!first) V3Divider(start = 64.dp)
     V3ListRow(
       title = row.title,
-      subtitle = row.subtitle,
-      subtitleLines = 1,
+      below = { InvoiceRefText(subtitle, maxLines = 1, debtorId = s.debtorId) },
       leading = {
         V3IconTile(
           if (cancelled) Icons.Outlined.Block else Icons.AutoMirrored.Outlined.ReceiptLong,
