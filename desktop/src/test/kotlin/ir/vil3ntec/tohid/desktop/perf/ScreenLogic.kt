@@ -25,7 +25,6 @@ import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryBook
 import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryFilter
 import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryQuery
 import ir.vil3ntec.tohid.ui.v3.sales.history.filteredOf
-import ir.vil3ntec.tohid.ui.v3.sales.history.reviewCount
 import ir.vil3ntec.tohid.ui.v3.shell.DashboardNumbers
 import ir.vil3ntec.tohid.ui.v3.shell.HomeHero
 import ir.vil3ntec.tohid.ui.v3.shell.SearchIndex
@@ -110,12 +109,12 @@ internal object ScreenLogic {
       DebtBook.book(d, c.debtorId, c.today)
       DebtorLedgerModel.rows(account?.transactions.orEmpty(), emptySet())
     },
-    //  HistoryHostAndroid (produceState ⇐ HistoryBook.build، DrawerModel.line، reviewCount) + HistoryScreen
+    //  HistoryHostAndroid (produceState ⇐ HistoryBook.build، DrawerModel.line، reviewCount ⇐ PayStatusFlow.review) + HistoryScreen
     "sales history" to { c: Ctx ->
       val d = c.d
       val book = HistoryBook.build(d, ReportBridge.deviceClock(c.now), c.now, false)
       DrawerModel.line(d, c.now, false)
-      reviewCount(d)
+      ir.vil3ntec.tohid.data.PayStatusFlow.review(d).size // reviewCount (صاحب)
       val q = HistoryQuery(HistoryFilter.ALL, "")
       val unit = SalesPeriods.Unit.DAY
       filteredOf(book.current(unit), q)
