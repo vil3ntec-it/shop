@@ -121,12 +121,12 @@ internal class ArtGroup(
 }
 
 /** مسیرِ ثابت (پر یا خط) */
-internal class ArtShape(val role: ArtRole, width: Float, val path: Path) : ArtNode() {
+internal class ArtShape(val role: ArtRole, val width: Float, val path: Path) : ArtNode() {
   val style: DrawStyle = artStyle(width)
 }
 
 /** مسیرِ دگرگون‌شونده: همهٔ گونه‌ها یک فهرستِ دستورِ یکسان (M/C/Z) دارند؛ [track] ⇒ ۰ … n−۱ */
-internal class ArtMorph(val role: ArtRole, width: Float, val track: ArtTrack, val ops: CharArray, val variants: Array<FloatArray>) : ArtNode() {
+internal class ArtMorph(val role: ArtRole, val width: Float, val track: ArtTrack, val ops: CharArray, val variants: Array<FloatArray>) : ArtNode() {
   val style: DrawStyle = artStyle(width)
   val path = Path()
 }
@@ -182,25 +182,7 @@ internal class ArtScene(val loop: Float, val rest: Float, val badge: FloatArray,
         }
       }
       is ArtShape -> drawPath(n.path, pal[n.role], alpha = alpha, style = n.style)
-      is ArtMorph -> {
-        val v = n.track.at(t, loop, 0f).coerceIn(0f, (n.variants.size - 1).toFloat())
-        val i = min(n.variants.size - 2, floor(v).toInt())
-        val u = v - i
-        val p0 = n.variants[i]
-        val p1 = n.variants[i + 1]
-        val path = n.path
-        path.rewind()
-        var k = 0
-        fun c(j: Int) = p0[j] + (p1[j] - p0[j]) * u
-        for (op in n.ops) {
-          when (op) {
-            'M' -> { path.moveTo(c(k), c(k + 1)); k += 2 }
-            'C' -> { path.cubicTo(c(k), c(k + 1), c(k + 2), c(k + 3), c(k + 4), c(k + 5)); k += 6 }
-            else -> path.close()
-          }
-        }
-        drawPath(path, pal[n.role], alpha = alpha, style = n.style)
-      }
+      is ArtMorph -> drawPath(morphAt(n, t), pal[n.role], alpha = alpha, style = n.style)
       is ArtRope -> {
         world(n.a, n.pa[0], n.pa[1], t)
         val ax = scratch[0]
@@ -215,6 +197,26 @@ internal class ArtScene(val loop: Float, val rest: Float, val badge: FloatArray,
         drawPath(path, pal[n.role], alpha = alpha, style = n.style)
       }
     }
+  }
+
+  /** شکلِ دگرگون‌شونده در زمانِ [t] (در همان `Path` ِ از پیش ساختهٔ خودش) */
+  internal fun morphAt(n: ArtMorph, t: Float, path: Path = n.path): Path {
+    val v = n.track.at(t, loop, 0f).coerceIn(0f, (n.variants.size - 1).toFloat())
+    val i = min(n.variants.size - 2, floor(v).toInt())
+    val u = v - i
+    val p0 = n.variants[i]
+    val p1 = n.variants[i + 1]
+    path.rewind()
+    var k = 0
+    fun c(j: Int) = p0[j] + (p1[j] - p0[j]) * u
+    for (op in n.ops) {
+      when (op) {
+        'M' -> { path.moveTo(c(k), c(k + 1)); k += 2 }
+        'C' -> { path.cubicTo(c(k), c(k + 1), c(k + 2), c(k + 3), c(k + 4), c(k + 5)); k += 6 }
+        else -> path.close()
+      }
+    }
+    return path
   }
 
   /** نقطهٔ ([x], [y]) ِ گروهِ [g] در مختصاتِ صحنه در زمانِ [t] ⇒ `scratch` */

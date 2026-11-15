@@ -54,7 +54,7 @@ import kotlinx.coroutines.delay
 internal fun OrderFeedbackEntry(api: ApiClient, canManage: Boolean, rev: Long) {
   val ctl = rememberOrderFeedback(api)
   var open by remember { mutableStateOf(false) }
-  LaunchedEffect(ctl, rev) {
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(ctl, rev) {
     while (true) {
       ctl.refresh()
       delay(OrderFeedbackController.POLL_MS)

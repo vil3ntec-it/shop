@@ -53,7 +53,7 @@ internal fun V3InboxPage(model: V3InboxModel, data: ShopData, onBack: (() -> Uni
   val c = PhoneV3.colors
   var tab by remember { mutableStateOf(0) }
   var picked by remember { mutableStateOf<V3Inbox.Conflict?>(null) }
-  LaunchedEffect(model) {
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(model) {
     var first = true
     while (true) {
       //  نخستین بار همان دم (حتی در پنجرهٔ «خاموش»)؛ بعد با فاصلهٔ خودِ مدل

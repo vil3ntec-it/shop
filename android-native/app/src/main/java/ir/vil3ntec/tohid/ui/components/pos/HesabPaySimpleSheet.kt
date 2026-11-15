@@ -135,7 +135,7 @@ private fun HesabPaySimpleSheet(
   val ref = remember(saleKey) { HesabPayShop.invoiceRef(saleKey) }
   val openedAt = remember { now() }
   var clock by remember { mutableLongStateOf(openedAt) }
-  LaunchedEffect(Unit) { while (true) { delay(5_000); clock = now() } }
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(Unit) { while (true) { delay(5_000); clock = now() } }
   val hint by HesabPayHints.hint.collectAsState()
   val suggestion = HesabPayHint.suggest(hint, amountMinor, ref, openedAt, maxOf(clock, hint?.at ?: 0L))
   var error by remember { mutableStateOf<String?>(null) }

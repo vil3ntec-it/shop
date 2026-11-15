@@ -41,7 +41,7 @@ internal fun CodeStep(ui: AuthUi, env: AuthEnv, act: AuthActions, onBack: (() ->
   val keyboard = LocalSoftwareKeyboardController.current
   var wait by remember { mutableIntStateOf(env.secondsLeft(destination)) }
   //  هر ثانیه از روی مهلتِ گوشی؛ «ارسالِ دوباره» مهلتِ تازه را پس از پاسخِ سرور می‌نویسد
-  LaunchedEffect(destination) {
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(destination) {
     while (true) {
       wait = env.secondsLeft(destination)
       delay(1000)

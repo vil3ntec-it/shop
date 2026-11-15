@@ -310,52 +310,85 @@ function headNode(o, id, A, headY, neckY, skin, shade) {
     parts.push(fill(shade, ellipse(11.4, c + 1.2, 3.1, 3.9)));
     parts.push(fill('blush', ellipse(11.6, c + 1.3, 1.4, 2.1)));
   }
-  // face skin
-  const faceD = smooth([[-1, c - 13.2], [-9.4, c - 10.6], [-12.4, c - 2.4], [-11.6, c + 6.4], [-7.8, c + 11.6], [-1.4, c + 13.6], [5.6, c + 12], [10.8, c + 6.4], [12.2, c - 2.6], [10, c - 10.4], [4.6, c - 13.2]]);
-  parts.push(fill(skin, faceD));
+  const S0 = o.turn ?? 2.0;
+  const X0 = (x) => x - S0;
+  // face skin — a bearded head has a fuller jaw: the beard is drawn inside this silhouette, never past it
+  const chin = o.beard ? [[5.8, c + 13.4], [-1.4, c + 18.6], [-8.4, c + 15.2]] : [[5.6, c + 12], [-1.4, c + 13.6], [-7.8, c + 11.6]];
+  const faceD = smooth([[-1, c - 13.2], [-9.4, c - 10.6], [-12.4, c - 2.4], [-11.6, c + 6.4], ...chin.reverse(), [10.8, c + 6.4], [12.2, c - 2.6], [10, c - 10.4], [4.6, c - 13.2]]);
+  //  bearded: the beard is the lower part of the head itself — skin above a soft wave under the nose, beard below, both
+  //  inside the same silhouette (the skin stops 1.4 under the wave so no light rim shows at the beard's edge)
+  const wave = [[X0(-7.6), c + 5.2], [X0(-3.6), c + 4.8], [X0(-0.8), c + 6.6], [X0(2.6), c + 4.8], [X0(7.4), c + 3]];
+  if (o.beard) {
+    const above = smooth([[-20, c - 30, 1], [20, c - 30, 1], [20, c + 2, 1], ...wave.slice().reverse().map(([x, y]) => [x, y + 1.4]), [-20, c + 2.6, 1]], { t: 0.9 });
+    parts.push(g({ name: id('skin') }, g({ clip: above }, fill(skin, faceD))));
+    parts.push(g({ name: id('beard'), clip: faceD },
+      fill(o.beardCol || hairCol, smooth([[-16, c + 1.2], ...wave, [16, c + 0.6], [16, c + 24, 1], [-16, c + 24, 1]], { t: 0.9 })),
+    ));
+  } else parts.push(g({ name: id('skin') }, fill(skin, faceD)));
 
+  /*
+   *  Three-quarter face (owner 1405/08/25: the nose and mouth must never stick out of the face). Features are laid out
+   *  frontally around x = 0, then the whole face slides toward the side the head faces (−x) by the turn S: S0 at rest,
+   *  0 … TURN_MAX while acting (`face.turn` 0 … 1 in a scene). TURN_MAX is chosen so that, at full turn and with the
+   *  eyes looking aside, every feature's outer edge stays ≥ 6% of the head width inside the skin — tools/art/check.mjs
+   *  proves it for every frame, and gen.mjs refuses to write data that fails.
+   */
+  const X = X0;
   const face = [];
-  // blush & nose
-  face.push(fill('blush', ellipse(-1.6, c + 4.6, 3.4, 2.3)));
-  face.push(fill('nose', ellipse(-11.2, c + 1.6, 3.3, 3.1)));
+  // cheek (the nose comes after the facial hair, so it sits on the mustache)
+  face.push(g({ name: id('blush') }, fill('blush', ellipse(X(4.6), c + 4.8, 2.8, 1.9))));
   // eyes (blink + look)
-  const eye = (x, r) => fill('ink', ellipse(x, c - 0.6, r, r * 1.08));
+  const eye = (x, r) => fill('ink', ellipse(X(x), c - 0.6, r, r * 1.08));
   face.push(g({ name: id('look'), px: 0, py: c, ...A('look') },
-    g({ name: id('eyes'), px: 0, py: c - 0.6, ...A('eyes') }, eye(-6.6, 1.35), eye(2.2, 1.45)),
+    g({ name: id('eyes'), px: 0, py: c - 0.6, ...A('eyes') }, eye(-4.4, 1.35), eye(4.2, 1.45)),
   ));
   // brows: thick rounded bars, each with its own pivot
-  const brow = (key, x, y, base) => g({ name: id(key), px: x, py: y, r: { k: [[0, base, 's']] }, ...A(key) },
-    fill(o.browCol || 'brow', smooth([[x - 3.6, y + 0.4], [x - 2.6, y - 1.4], [x + 2.8, y - 1.2], [x + 3.7, y + 0.5], [x + 2.4, y + 1.5], [x - 2.5, y + 1.4]], { t: 0.9 })),
-  );
-  face.push(brow('browL', -6.8, c - 6.2, 8));
-  face.push(brow('browR', 2.6, c - 6.6, -8));
-  // glasses
+  const brow = (key, fx, y, base) => {
+    const x = X(fx);
+    return g({ name: id(key), px: x, py: y, r: { k: [[0, base, 's']] }, ...A(key) },
+      fill(o.browCol || 'brow', smooth([[x - 2.7, y + 0.4], [x - 1.9, y - 1.3], [x + 2.1, y - 1.1], [x + 2.8, y + 0.5], [x + 1.8, y + 1.4], [x - 1.9, y + 1.3]], { t: 0.9 })),
+    );
+  };
+  face.push(brow('browL', -3.9, c - 5.4, 8));
+  face.push(brow('browR', 4.4, c - 6.2, -8));
+  // glasses: lenses round the eyes, the arm runs back toward the ear but stops inside the face
   if (o.glasses) {
-    face.push(stroke('ink', 0.9, ellipse(-6.4, c - 0.4, 3.6, 3.2)));
-    face.push(stroke('ink', 0.9, ellipse(2.6, c - 0.4, 3.8, 3.3)));
-    face.push(stroke('ink', 0.9, line([[-2.8, c - 0.8], [-1.2, c - 0.9]])));
-    face.push(stroke('ink', 0.9, line([[6.4, c - 0.9], [11, c - 1.6]])));
+    face.push(g({ name: id('glasses') },
+      stroke('ink', 0.9, ellipse(X(-4.4), c - 0.4, 3.0, 2.8)),
+      stroke('ink', 0.9, ellipse(X(4.2), c - 0.4, 3.1, 2.9)),
+      stroke('ink', 0.9, line([[X(-1.4), c - 0.8], [X(1.1), c - 0.8]])),
+      stroke('ink', 0.9, line([[X(7.3), c - 0.8], [X(10.2), c - 1.4]]))));
   }
-  // mouth
-  const my = o.mustache ? c + 10.2 : c + 7.6;
-
-
-  // facial hair
-  if (o.mustache) face.push(fill(o.beardCol || hairCol, smooth([[-15, c + 7.2], [-13, c + 4.4], [-9.6, c + 3.9], [-6.8, c + 4.6], [-3.6, c + 4.0], [-0.8, c + 5.4], [0.4, c + 7.6], [-1.8, c + 7.4], [-4.6, c + 8.4], [-8.4, c + 8.2], [-11.4, c + 8.8]], { t: 0.9 })));
-  if (o.beard) {
-    face.push(fill(o.beardCol || hairCol, smooth([
-      [-12, c + 1.6], [-9, c + 5.6], [-4.6, c + 5.2], [-1, c + 7.2], [4.2, c + 5.6], [9, c + 3], [11.6, c + 1.4],
-      [11.2, c + 9], [7, c + 15.4], [2, c + 16.6], [-1.6, c + 19], [-4.6, c + 16.8], [-9.6, c + 15.8], [-12.4, c + 9.4],
-    ], { t: 0.9 })));
+  // mustache under the nose, tips turned up, well inside the cheeks
+  const my = o.mustache ? c + 8.6 : c + 7.4;
+  if (o.mustache) {
+    face.push(g({ name: id('mustache') }, fill(o.beardCol || hairCol, smooth([
+      [X(-6.0), c + 5.4], [X(-4.8), c + 3.6], [X(-2.6), c + 3.1], [X(-0.8), c + 3.8], [X(1.0), c + 3.1], [X(3.2), c + 3.6], [X(4.4), c + 5.4],
+      [X(2.8), c + 6.2], [X(0.6), c + 7.2], [X(-0.8), c + 6.6], [X(-2.2), c + 7.2], [X(-4.4), c + 6.2],
+    ], { t: 0.9 }))));
   }
+  // nose between the eyes, a touch toward the turned side
+  face.push(g({ name: id('nose') }, fill('nose', ellipse(X(-0.8), c + 2.2, 2.5, 2.3))));
   //  every variant = M + two cubics (smile, flat, worried, "o") so they morph point to point
-  const mo = (x0, y0, c1, c2, xm, ym, c3, c4, x1, y1) => `M${x0} ${y0}C${c1} ${c2} ${xm} ${ym}C${c3} ${c4} ${x1} ${y1}`;
-  face.push(morphStroke(o.beard ? 'nose' : 'ink', o.beard ? 1.5 : 1.15, A('mouth').m || { k: [[0, 0, 's']] },
-    mo(-6.2, my - 0.4, `${-5.6} ${my + 0.8}`, `${-4.6} ${my + 1.3}`, -3.6, my + 1.3, `${-2.4} ${my + 1.3}`, `${-1.5} ${my + 0.6}`, -1.0, my - 0.3),
-    mo(-6.0, my + 0.5, `${-5.2} ${my + 0.4}`, `${-4.4} ${my + 0.3}`, -3.6, my + 0.3, `${-2.8} ${my + 0.3}`, `${-2.0} ${my + 0.4}`, -1.2, my + 0.5),
-    mo(-5.6, my + 1.4, `${-5.1} ${my + 0.3}`, `${-4.5} ${my - 0.2}`, -3.7, my - 0.2, `${-2.8} ${my - 0.2}`, `${-2.2} ${my + 0.3}`, -1.8, my + 1.3),
-    mo(-3.6, my - 1.1, `${-5.4} ${my - 1.1}`, `${-5.4} ${my + 2.1}`, -3.6, my + 2.1, `${-1.8} ${my + 2.1}`, `${-1.8} ${my - 1.1}`, -3.5, my - 1.1),
-  ));  parts.push(g({ name: id('face'), px: 0, py: c, ...A('face') }, ...face));
+  const mo = (x0, y0, c1x, c1y, c2x, c2y, xm, ym, c3x, c3y, c4x, c4y, x1, y1) =>
+    `M${X(x0)} ${y0}C${X(c1x)} ${c1y} ${X(c2x)} ${c2y} ${X(xm)} ${ym}C${X(c3x)} ${c3y} ${X(c4x)} ${c4y} ${X(x1)} ${y1}`;
+  face.push(g({ name: id('mouth') }, morphStroke(o.beard ? 'nose' : 'ink', o.beard ? 1.5 : 1.15, A('mouth').m || { k: [[0, 0, 's']] },
+    mo(-3.2, my - 0.4, -2.6, my + 0.8, -1.6, my + 1.3, -0.6, my + 1.3, 0.6, my + 1.3, 1.5, my + 0.6, 2.0, my - 0.3),
+    mo(-3.0, my + 0.5, -2.2, my + 0.4, -1.4, my + 0.3, -0.6, my + 0.3, 0.2, my + 0.3, 1.0, my + 0.4, 1.8, my + 0.5),
+    mo(-2.6, my + 1.4, -2.1, my + 0.3, -1.5, my - 0.2, -0.7, my - 0.2, 0.2, my - 0.2, 0.8, my + 0.3, 1.2, my + 1.3),
+    mo(0, my - 0.9, -1.6, my - 0.9, -1.6, my + 1.8, 0, my + 1.8, 1.6, my + 1.8, 1.6, my - 0.9, 0.1, my - 0.9),
+  )));
+  // the face turns: `face.turn` 0 … 1 slides every feature (TURN_MAX at full turn), from the rest turn S0
+  //  no explicit turn ⇒ the head follows the eyes: looking toward the prop turns the face, looking at you opens it
+  const lookX = A('look').x;
+  const turnTrack = A('face').turn || (lookX && lookX.k ? { k: lookX.k.map(([t, v, e]) => [t, Math.max(0, Math.min(1, 0.62 - 0.35 * v)), e]) } : null);
+  const faceX = turnTrack ? {
+    x: {
+      k: (turnTrack.k || []).map(([t, v, e]) => [t, S0 - v * TURN_MAX, e]),
+      ...(turnTrack.w ? { w: [-turnTrack.w[0] * TURN_MAX, turnTrack.w[1], turnTrack.w[2]] } : {}),
+    },
+  } : {};
+  parts.push(g({ name: id('face'), px: 0, py: c, ...faceX }, ...face));
 
   // front hair / scarf / cap
   if (o.scarf) {
@@ -397,6 +430,9 @@ function headNode(o, id, A, headY, neckY, skin, shade) {
   if (o.pencil) parts.push(g({}, fill('mustard', capsule(6.4, c - 2.6, 16.4, c - 7.6, 1.1)), fill('cream2', capsule(5.6, c - 2.2, 7.2, c - 3, 1.1)), fill('ink', capsule(16.2, c - 7.5, 17.8, c - 8.3, 0.55, 0.2))));
   return g({ name: id('head'), px: 0, py: neckY, ...A('head') }, ...parts);
 }
+
+/** how far (scene units) the features may slide toward the turned side — see `headNode` and tools/art/check.mjs */
+export const TURN_MAX = 3.0;
 
 /* ---------------------------------------------------------------- posing helpers */
 
