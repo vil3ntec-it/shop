@@ -186,8 +186,10 @@ class BranchesStateTest {
     assertTrue(src("ui/v3/branches/BranchesModule.kt").contains("shown = { BranchLive.visible }"))
     //  فازِ ۳: ساختن/ویرایشِ کالا و مدیریتِ دسته پشتِ قفلِ کاتالوگِ شعبه
     val products = src("ui/v3/products/ProductsRoutes.kt")
-    listOf("BranchCatalogGate {\n        NewProductsScreen(", "BranchCatalogGate { EditProductScreen(", "if (use is CategoryUse.Manage) BranchCatalogGate {", "BranchCatalogGate { CategorySheet(store, data, toasts, CategoryUse.Bulk(ids)")
+    listOf("BranchCatalogGate {\n        if (many || desk) NewProductsScreen(", "BranchCatalogGate { EditProductScreen(", "if (use is CategoryUse.Manage) BranchCatalogGate {", "BranchCatalogGate { CategorySheet(store, data, toasts, CategoryUse.Bulk(ids)")
       .forEach { assertTrue(it, products.contains(it)) }
+    //  e-phone-p2: فرمِ سادهٔ یک‌کالایی (`QuickProductScreen`) شاخهٔ دیگرِ همان قفل است، نه بیرونِ آن
+    assertTrue(products.substringAfter("BranchCatalogGate {\n        if (many || desk) NewProductsScreen(").substringBefore("BranchCatalogGate { EditProductScreen(").contains("else QuickProductScreen("))
     assertTrue(src("data/ShopStore.kt").contains("?: return BranchDesk.catalogRefused(context, base, next) { _notice.tryEmit(it) }"))
   }
 }

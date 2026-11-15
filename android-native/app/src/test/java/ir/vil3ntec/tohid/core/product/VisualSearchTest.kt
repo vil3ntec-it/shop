@@ -214,7 +214,9 @@ class VisualSearchTest {
     //  (نه در حالتِ انتخاب)؛ «مشابه» همان بازکردنِ کالا
     val list = code("ui/v3/products/ProductsListScreen.kt")
     assertTrue(list.contains("val visual = rememberVisualSearch(rememberVisualSearchApi(), data.products, VisualSearch.Place.LIST)"))
-    assertTrue(list.contains("overflow = if (selecting) emptyList() else listOfNotNull(visual?.let { v -> V3MenuItem(Icons.Outlined.PhotoCamera, StrVisualSearch.button) { v.start() } })"))
+    //  e-phone-p2: «ثبتِ چند کالا با هم» هم در همین «…» است، پس «…» چندخطی شد — «جست‌وجو با عکس» هنوز درونِ آن و بی حالتِ انتخاب
+    val overflow = list.substringAfter("overflow = if (selecting) emptyList() else listOfNotNull(", "").substringBefore("\n    ),")
+    assertTrue(overflow.contains("visual?.let { v -> V3MenuItem(Icons.Outlined.PhotoCamera, StrVisualSearch.button) { v.start() } }"))
     assertTrue(list.contains("visual?.let { VisualSearchHost(it) { t -> if (t is VisualSearch.Tap.Open) nav.open(t.productId) } }"))
 
     //  هیچ‌کدام «مشابه» را به سبد نمی‌برد
