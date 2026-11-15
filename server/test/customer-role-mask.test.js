@@ -74,7 +74,7 @@ test('قالب همان CustomerMask ِ برنامه: «•••• ۰۰۸»، 
   assert.equal(roleMask.maskPhone('+93791200008'), '•••• 008');
   assert.equal(roleMask.maskPhone('۰۷۹۱۲۰۰۰۰۸'), '•••• ۰۰۸');
   assert.equal(roleMask.maskPhone('+93 79 120 0008'), roleMask.maskPhone('0791200008'));
-  assert.equal(roleMask.maskPhone('⁦0791200008⁩'), '⁦•••• 008⁩');
+  assert.equal(roleMask.maskPhone('\u20660791200008\u2069'), '\u2066•••• 008\u2069');
   assert.equal(roleMask.maskPhone('123'), '••••');
   assert.equal(roleMask.maskPhone(''), '');
   assert.equal(roleMask.maskPhone('ali@mail.af'), 'a•••@mail.af');

@@ -75,7 +75,8 @@
   (`StrPoSeason`). **برای 63b:** زیرِ ردیفِ فرمِ سفارشِ گوشی (`PurchaseOrderPages.kt` ~خطِ ۶۳۰) هنوز `DemandForecast.confidenceText` است — اگر آن
   صفحه را دست می‌زنید `StrPoSeason.label(plan.season!!.confidence)` بگذارید (منطق در core است؛ این‌جا دست نخورد تا تداخل نکند).
 - **آزمون‌ها:** سرور `customer-role-mask.test.js` ۵/۵ (تازه)، ۱۱ پروندهٔ همراه ۷۵/۷۵ (`customer-contact`، `order-phone-mask`، `customer-contact-lists`،
-  `staff-perms`، `perm-core`، `admin-flags`، `online-orders`، `order-customer`، `customer-access`، `delivery`، `courier-call`) و OPS-01 ۳۲/۳۲ روی PGlite؛
+  `staff-perms`، `perm-core`، `admin-flags`، `online-orders`، `order-customer`، `customer-access`، `delivery`، `courier-call`)، همهٔ ۷۱ پروندهٔ
+  `order-*`/`orders-*`/`online-orders`/`delivery-*`/`courier-*`/`conflict-inbox`/`shop-chat*`/`storefront-promo*` ۴۹۲/۴۹۲ و `storefront-area-requests` + `storefront-promo*` ۲۳/۲۳ و OPS-01 ۳۲/۳۲ روی PGlite؛
   کاتلین: CORE_PLACEHOLDER؛ DESK_PLACEHOLDER.
 - **مانده/نکته:** روشن کردنِ §۴۴ (و §۳۶، §۳۷) برای دکانِ آزمایشی؛ شمارهٔ ازپیش‌همگام‌شده روی دستگاهِ کارمند تا بازسازیِ دفتر می‌ماند (نمایش پوشیده)؛
   صفحهٔ کهنهٔ `ui/screens/Debtors.kt` فقط در `PhonePreview` (دمو) است و دست نخورد. پیوندِ `server/node_modules` به `wt62` شکسته بود ⇒ `wt-64e`

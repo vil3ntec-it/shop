@@ -23,8 +23,8 @@ const MASK = '••••';
 const DENY_LAYER = Object.freeze({ [KEY]: Object.freeze({ mode: 'deny' }) });
 const FULL_ROLES = new Set(['owner', 'manager']);
 const ND = /^\p{Nd}$/u;
-const OPEN = new Set(['⁦', '⁧', '⁨', '‪', '‫', '‎', '‏']);
-const CLOSE = new Set(['⁩', '‬', '‎', '‏']);
+const OPEN = new Set(['\u2066', '\u2067', '\u2068', '\u202A', '\u202B', '\u200E', '\u200F']);
+const CLOSE = new Set(['\u2069', '\u202C', '\u200E', '\u200F']);
 
 /** «•••• ۰۰۸» — همان `CustomerMask.masked` ِ برنامه: چهار نقطه و سه رقمِ آخر؛ ≤ ۳ رقم ⇒ فقط نقطه؛ ایمیل ⇒ نویسهٔ نخست و دامنه */
 function maskPhone(text) {

@@ -23,7 +23,7 @@ class CustomerMaskTest {
     //  درازای شماره پیدا نیست
     assertEquals(CustomerMask.masked("0791200008"), CustomerMask.masked("+93 79 120 0008"))
     //  جهت‌نماهای متنِ نمایشی می‌مانند
-    assertEquals("⁦•••• 008⁩", CustomerMask.masked("⁦0791200008⁩"))
+    assertEquals("\u2066•••• 008\u2069", CustomerMask.masked("\u20660791200008\u2069"))
     assertEquals("••••", CustomerMask.masked("123"))
     assertEquals("", CustomerMask.masked(""))
     assertEquals("a•••@mail.af", CustomerMask.masked("ali@mail.af"))

@@ -89,8 +89,8 @@ object CustomerMask {
     }
   }
 
-  private val ISOLATE_OPEN = setOf('⁦', '⁧', '⁨', '‪', '‫', '‎', '‏')
-  private val ISOLATE_CLOSE = setOf('⁩', '‬', '‎', '‏')
+  private val ISOLATE_OPEN = setOf('\u2066', '\u2067', '\u2068', '\u202A', '\u202B', '\u200E', '\u200F')
+  private val ISOLATE_CLOSE = setOf('\u2069', '\u202C', '\u200E', '\u200F')
 
   /**
    *  «•••• ۰۰۸»: چهار نقطه و سه رقمِ آخر (رقمِ فارسی همان فارسی)؛ کمتر از چهار رقم ⇒ فقط نقطه‌ها؛ ایمیل ⇒ نویسهٔ نخست و
