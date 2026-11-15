@@ -201,9 +201,7 @@ fun DeskIconButton(
   if (shortcut != null) DeskTooltip(label, shortcut) { body() } else body()
 }
 
-/** یک گزینهٔ فهرستِ کشویی: مقدار و نوشته */
-@Immutable
-data class DeskOption<T>(val value: T, val label: String)
+//  `DeskOption` (مقدار، نوشته، [divider]) یک بار، در `DeskData.kt` — هر دو کادرِ کشوییِ کامپیوتر همان را می‌گیرند
 
 /**
  *  فهرستِ کشوییِ فیلتر (دسته، محل): دکمهٔ ۳۶dp با «برچسب: مقدار» و پیکان؛ گزینهٔ «همه» (`null`) اول. انتخاب‌شده تیک دارد.
