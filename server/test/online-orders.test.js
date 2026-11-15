@@ -83,8 +83,10 @@ const move = (token, id, body) => h.post(`/api/shop/orders/${id}/transition`, bo
    ۱) پیش‌فرض خاموش
    ══════════════════════════════════════════════════════════════════ */
 
-test('بی پرچم: بخشِ «سفارش‌ها» خاموش است و هیچ ردیفی ساخته نمی‌شود', async () => {
+test('پرچمِ خاموشِ صریح: بخشِ «سفارش‌ها» خاموش است و هیچ ردیفی ساخته نمی‌شود', async () => {
   const a = await shopOwner('خاموش');
+  //  از ۱۴۰۵/۰۸/۲۴ `shop.orders` پیش‌فرض روشن است (FLAGS-ON §۴۸) ⇒ «خاموش» صریح
+  await setFlag(a.shopId, false);
   const cfg = await h.get('/api/shop/orders/config', { token: a.token });
   assert.equal(cfg.status, 200);
   assert.equal(cfg.body.enabled, false);
@@ -109,9 +111,11 @@ test('پرچم: `all` همه را روشن می‌کند، `false` ِ خودِ �
     assert.equal((await h.get('/api/shop/orders/config', { token: a.token })).body.enabled, true);
     await setFlag(a.shopId, false);
     assert.equal((await h.get('/api/shop/orders/config', { token: a.token })).body.enabled, false);
-    //  مقدارِ خودِ دکان جلو می‌افتد، و فقط `true` روشن است (رشتهٔ "true" نه)
+    //  مقدارِ خودِ دکان جلو می‌افتد؛ کلیدِ پیش‌فرض‌روشن: فقط `false` ِ صریح خاموش، مقدارِ نادرست (رشتهٔ "true") ⇒ همان پیش‌فرضِ روشن
     await setFlag(a.shopId, 'true');
-    assert.equal((await h.get('/api/shop/orders/config', { token: a.token })).body.flag, false);
+    assert.equal((await h.get('/api/shop/orders/config', { token: a.token })).body.flag, true);
+    await setFlag(a.shopId, 'false');
+    assert.equal((await h.get('/api/shop/orders/config', { token: a.token })).body.flag, true, 'رشتهٔ "false" هم false ِ صریح نیست');
     await setFlag(a.shopId, true);
     assert.equal((await h.get('/api/shop/orders/config', { token: a.token })).body.flag, true);
     await setFlag(a.shopId, false);

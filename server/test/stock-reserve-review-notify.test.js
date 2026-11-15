@@ -70,7 +70,8 @@ async function enable(s, { reserve = true, notify = true } = {}) {
   await live(s.shopId, 'shop.orders', true);
   await live(s.shopId, 'shop.catalog', true);
   if (reserve) await live(s.shopId, 'shop.stock_reserve', true);
-  if (notify) await live(s.shopId, 'shop.order_notify', true);
+  //  صریح در هر دو حال: از ۱۴۰۵/۰۸/۲۴ `shop.order_notify` پیش‌فرض روشن است (FLAGS-ON §۴۸)
+  await live(s.shopId, 'shop.order_notify', notify);
 }
 
 let opN = 0;

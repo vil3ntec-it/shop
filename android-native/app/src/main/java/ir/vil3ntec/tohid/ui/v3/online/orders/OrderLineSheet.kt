@@ -36,6 +36,8 @@ fun OrderLineSheet(
   onSave: (OrderDraft.LineInput) -> Unit,
   onDismiss: () -> Unit,
   onDelete: (() -> Unit)? = null,
+  /** کالای برگزیده از فهرست (۱۴۰۵/۰۸/۲۴): نام از خودِ کالا و عنوانِ برگه، فقط مقدار و فی */
+  product: Boolean = false,
 ) {
   var line by remember { mutableStateOf(start) }
   var tried by remember { mutableIntStateOf(0) }
@@ -43,12 +45,14 @@ fun OrderLineSheet(
   else NewOrderModel.lineErrors(line).ifEmpty {
     if (NewOrderModel.isBlank(line)) mapOf(NewOrderModel.LineField.NAME to StrOnline.errLineName) else emptyMap()
   }
-  V3Sheet(onDismiss = onDismiss, title = StrOnline.lineN(index + 1), detents = false) { closer ->
-    V3TextField(
-      line.name, { line = line.copy(name = it.take(NewOrderModel.LINE_NAME_MAX)) }, StrOnline.lineName,
-      required = true, error = errors[NewOrderModel.LineField.NAME], modifier = Modifier.fillMaxWidth(),
-    )
-    Spacer(Modifier.height(12.dp))
+  V3Sheet(onDismiss = onDismiss, title = if (product) start.name else StrOnline.lineN(index + 1), detents = false) { closer ->
+    if (!product) {
+      V3TextField(
+        line.name, { line = line.copy(name = it.take(NewOrderModel.LINE_NAME_MAX)) }, StrOnline.lineName,
+        required = true, error = errors[NewOrderModel.LineField.NAME], modifier = Modifier.fillMaxWidth(),
+      )
+      Spacer(Modifier.height(12.dp))
+    }
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
       V3TextField(
         line.qty, { line = line.copy(qty = it.take(NewOrderModel.NUMBER_MAX)) }, StrOnline.qty,

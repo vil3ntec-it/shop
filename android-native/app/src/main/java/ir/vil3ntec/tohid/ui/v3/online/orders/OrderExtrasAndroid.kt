@@ -38,6 +38,7 @@ import ir.vil3ntec.tohid.ui.screens.OrderPickHost
 import ir.vil3ntec.tohid.ui.screens.OrderSubstitutionNote
 import ir.vil3ntec.tohid.ui.screens.OrderSubstitutionPicker
 import ir.vil3ntec.tohid.ui.screens.PickDeskEntry
+import ir.vil3ntec.tohid.ui.screens.QueueEntry
 import ir.vil3ntec.tohid.ui.screens.RefundDetailNotices
 import ir.vil3ntec.tohid.ui.screens.RefundListNotices
 import ir.vil3ntec.tohid.ui.screens.RestockDialog
@@ -56,19 +57,29 @@ import kotlinx.coroutines.launch
 
 private fun buzz(context: android.content.Context): (Boolean) -> Unit = { ok -> if (ok) Haptics.success(context) else Haptics.confirm(context) }
 
-/** سرِ صفِ سفارش‌ها: قفسه و دستهٔ جمع‌آوری (PCK-10/12)، گزارش‌ها و نظرها (NTF-07/09)، درخواست‌های برگشت و هشدارهای بازپرداخت (RET-11) */
+/**
+ *  درهای صفِ سفارش‌ها در «…» ِ سربرگ (۱۴۰۵/۰۸/۲۴؛ پیش‌تر ردیفِ دکمه‌های سرِ صف): قفسه و دستهٔ جمع‌آوری (PCK-10/12)، گزارش‌ها و
+ *  نظرها (NTF-07/09) و درخواست‌های برگشت (RET-11) — هر کدام فقط با پرچم و اجازهٔ خودش ردیف دارد؛ برگه‌ها با `host`.
+ */
 @Composable
-internal fun RouteScope.OrderQueueExtras(cfg: OrdersConfigDto?, onChanged: () -> Unit, onOpen: (String) -> Unit) {
+internal fun RouteScope.orderQueueMenu(cfg: OrdersConfigDto?, onChanged: () -> Unit): List<QueueEntry> {
+  val c = cfg ?: return emptyList()
+  val context = LocalContext.current
+  val api = remember(context) { Backend.api(context) }
+  return listOf(
+    PickDeskEntry(c, api, buzz(context), onChanged),
+    OrderFeedbackEntry(api, c.permissions.manage, OrdersLive.rev.value),
+    ReturnRequestsEntry(api, c.permissions.manage, OrdersLive.rev.value),   // RET-11: درخواست‌های برگشتِ ویترین
+  )
+}
+
+/** سرِ صف: هشدارهای بازپرداخت (RET-11) — فقط وقتی سندِ برگشتی ننشست */
+@Composable
+internal fun RouteScope.OrderQueueExtras(cfg: OrdersConfigDto?, onOpen: (String) -> Unit) {
   val c = cfg ?: return
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
-  val api = remember(context) { Backend.api(context) }
   val ledger by store.data.collectAsState()
-  Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-    PickDeskEntry(c, api, buzz(context), onChanged)
-    OrderFeedbackEntry(api, c.permissions.manage, OrdersLive.rev.value)
-    ReturnRequestsEntry(api, c.permissions.manage, OrdersLive.rev.value)   // RET-11: درخواست‌های برگشتِ ویترین
-  }
   RefundListNotices(ledger, c, onOpen = onOpen, onRetry = { scope.launch { OrdersLive.reconcile(context, store, force = true) } })
 }
 

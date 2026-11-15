@@ -355,6 +355,11 @@ object ScreenGuides {
         "سفارشِ تلفنی را خودتان با «سفارشِ دستی» (Ctrl+N) ثبت کنید.",
         "Record a phone order yourself with “Manual order” (Ctrl+N).",
       ),
+      //  ۱۴۰۵/۰۸/۲۴: دو یادداشتِ سرِ صف (تازه شدنِ خودکار، به‌روز بودنِ دستگاه‌ها) از صفحه به راهنما آمد
+      GuideText(
+        "تا برنامه باز است صف خودش تازه می‌شود؛ همهٔ دستگاه‌های دکان را به‌روز نگه دارید تا فروشِ سفارش دو بار ثبت نشود.",
+        "While the app is open the queue refreshes itself; keep every shop device updated so an order's sale isn't recorded twice.",
+      ),
     ),
     ready(
       "storefront", GuideText("ویترین", "Storefront", "ویترین"),

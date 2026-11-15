@@ -236,7 +236,8 @@ test('سفارشِ خطادار صف را نمی‌گیرد؛ پس از چند �
 test('TEN-02: دو دکان — ردِ خودکارِ «الف» به سفارش، سابقه و اعلانِ «ب» نمی‌رسد؛ پرچمِ اعلانِ هر دکان جدا', async () => {
   const a = await liveStore('الفِ مهلت');
   const b = await liveStore('بِ مهلت');
-  await setFlag(a.shopId, 'shop.order_notify', true);   //  «ب» بی پرچمِ اعلان
+  await setFlag(a.shopId, 'shop.order_notify', true);
+  await setFlag(b.shopId, 'shop.order_notify', false);  //  «ب» بی اعلان (از ۱۴۰۵/۰۸/۲۴ پیش‌فرض روشن ⇒ خاموشِ صریح)
   const oa = await order(a, '0791113011');
   const ob = await order(b, '0791113011');               //  همان مشتری در هر دو دکان
   const da = Number(oa.accept_deadline_at);
