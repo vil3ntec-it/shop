@@ -38,7 +38,9 @@ internal const val ART_${key.toUpperCase()} = """
 ${text}
 """
 `;
-  const old = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+  //  یک بار خواندن، بی «اول ببین هست، بعد بخوان» (CodeQL: js/file-system-race)
+  let old = null;
+  try { old = fs.readFileSync(file, 'utf8'); } catch (e) { if (e.code !== 'ENOENT') throw e; }
   if (old === src) continue;
   if (check) { console.error(`stale: ${path.relative(process.cwd(), file)}`); stale++; continue; }
   fs.writeFileSync(file, src);
