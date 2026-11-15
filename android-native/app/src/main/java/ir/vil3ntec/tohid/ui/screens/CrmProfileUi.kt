@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -30,10 +31,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.i18n.StrMarketPages
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.data.CustomerCrm
@@ -57,9 +60,15 @@ import kotlinx.coroutines.launch
  *  درِ `ShopStore.mergeCustomers` (روی همگام‌سازیِ v3 بسته، با همان دلیل). همان رفتارِ برگه‌های نسخهٔ ۳ (#393).
  */
 
-/** دو کادرِ پرونده در فرمِ مشتری: شمارهٔ دوم و برچسب‌ها */
+/**
+ *  کادرهای پرونده در فرمِ مشتری: شمارهٔ دوم، برچسب‌ها و ایمیل (PRM-11/CRM-13).
+ *  [email] = null ⇒ بی کادرِ ایمیل (CRM-15: کاربرِ بی «شمارهٔ مشتریان» ایمیل را نه می‌بیند نه عوض می‌کند).
+ */
 @Composable
-internal fun CrmProfileFields(phone2: String, onPhone2: (String) -> Unit, tags: String, onTags: (String) -> Unit) {
+internal fun CrmProfileFields(
+  phone2: String, onPhone2: (String) -> Unit, tags: String, onTags: (String) -> Unit,
+  email: String? = null, onEmail: (String) -> Unit = {},
+) {
   OutlinedTextField(
     phone2, onPhone2, label = { Text(StrMoney.phone2Optional) },
     singleLine = true, modifier = Modifier.fillMaxWidth(),
@@ -67,6 +76,17 @@ internal fun CrmProfileFields(phone2: String, onPhone2: (String) -> Unit, tags: 
   Spacer(Modifier.height(10.dp))
   OutlinedTextField(
     tags, onTags, label = { Text(StrMarketPages.tagsField) },
+    singleLine = true, modifier = Modifier.fillMaxWidth(),
+  )
+  if (email == null) return
+  Spacer(Modifier.height(10.dp))
+  //  ایمیلِ نادرست درجا گفته می‌شود (همان شرطِ `CustomerCrm.setProfile`)؛ «ذخیره» همان پیام را می‌دهد
+  val bad = CustomerCrm.emailOf(email)?.let { !CustomerCrm.emailOk(it) } == true
+  OutlinedTextField(
+    email, onEmail, label = { Text(StrMoney.emailOptional) },
+    supportingText = { Text(if (bad) StrLedger.emailBad else StrMoney.emailHelper) },
+    isError = bad,
+    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
     singleLine = true, modifier = Modifier.fillMaxWidth(),
   )
 }
@@ -110,22 +130,25 @@ internal fun CrmExtraLine(debtor: Debtor) {
   Text(line, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
 }
 
-/** پنجرهٔ پروندهٔ کامپیوتر: شمارهٔ دوم و برچسب‌های یک مشتری */
+/** پنجرهٔ پروندهٔ کامپیوتر: شمارهٔ دوم، برچسب‌ها و ایمیلِ یک مشتری */
 @Composable
-internal fun CrmProfileDialog(debtor: Debtor, onDismiss: () -> Unit, onSave: (phone2: String, tags: String) -> Unit) {
+internal fun CrmProfileDialog(debtor: Debtor, onDismiss: () -> Unit, onSave: (phone2: String, tags: String, email: String?) -> Unit) {
+  //  CRM-15: ایمیل راهِ تماس است ⇒ فقط برای کسی که شمارهٔ مشتری را می‌بیند؛ بقیه ⇒ null = ایمیلِ ذخیره‌شده دست نمی‌خورد
+  val contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()
   var phone2 by remember(debtor.id) { mutableStateOf(debtor.phone2.orEmpty()) }
   var tags by remember(debtor.id) { mutableStateOf(CustomerProfileForm.tagsText(debtor)) }
+  var email by remember(debtor.id) { mutableStateOf(debtor.email.orEmpty()) }
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
       Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
           Text(StrMarketPages.profileOf(debtor.name), style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
           Spacer(Modifier.height(14.dp))
-          CrmProfileFields(phone2, { phone2 = it }, tags, { tags = it })
+          CrmProfileFields(phone2, { phone2 = it }, tags, { tags = it }, email.takeIf { contacts }, { email = it })
           Spacer(Modifier.height(18.dp))
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(Str.cancel) }
-            Button(onClick = { onSave(phone2, tags) }, modifier = Modifier.weight(1f)) { Text(StrKit.save) }
+            Button(onClick = { onSave(phone2, tags, email.takeIf { contacts }) }, modifier = Modifier.weight(1f)) { Text(StrKit.save) }
           }
         }
       }

@@ -29,6 +29,9 @@ object CustomerCrm {
   const val MAX_TAGS = 12
   const val MAX_TAG_LENGTH = 30
   const val MAX_GROUP_LENGTH = 40
+  /** PRM-11/CRM-13: همان سقف و شکلِ `validate.email` ِ سرور — ایمیلی که سرور نمی‌پذیرد هرگز پیوندی نمی‌سازد */
+  const val MAX_EMAIL_LENGTH = 190
+  private val EMAIL = Regex("^[^\\s@]+@[^\\s@.]+(\\.[^\\s@.]+)+$")
 
   /* ------------------------------ فعال و ادغام ------------------------------ */
 
@@ -165,6 +168,8 @@ object CustomerCrm {
     val group: String = "",
     /** `retail` (یا خالی) | `wholesale` */
     val priceList: String = PRICE_RETAIL,
+    /** ایمیلِ مشتری (PRM-11/CRM-13)؛ خالی ⇒ بی ایمیل */
+    val email: String = "",
   )
 
   fun profileOf(debtor: Debtor): Profile = Profile(
@@ -172,10 +177,22 @@ object CustomerCrm {
     tags = debtor.tags.orEmpty(),
     group = debtor.group.orEmpty(),
     priceList = priceListOf(debtor),
+    email = debtor.email.orEmpty(),
   )
 
   /**
-   *  شمارهٔ دوم، برچسب، گروه و لیستِ قیمت — همه یا هیچ. تغییرِ لیستِ قیمت (پول) در
+   *  ایمیلِ پرونده (`Debtor.email`، PRM-11/CRM-13) ⇐ متنِ کادر: خالی ⇒ null؛ کوچک‌حرف و بی فاصلهٔ دو سر (همان کلیدِ سرور).
+   *  نوشتن فقط از [setProfile]. «حسابِ من» و گروهِ تخفیفِ ویترین (`Debtor.group`) فقط وقتی به این پرونده می‌رسند که مشتری
+   *  **همین** ایمیل را در ویترین با کد تأیید کند (سرور: `store-account-history.debtorRowsOf`، تطبیقِ دقیق) — ایمیلِ نوشتهٔ
+   *  کارمند به‌تنهایی هیچ دری باز نمی‌کند. `null` = بی ایمیل، همان رفتارِ همیشه.
+   */
+  fun emailOf(text: String): String? = text.trim().lowercase().ifEmpty { null }
+
+  /** همان شکلِ پذیرفتهٔ سرور (`validate.email`): یک «@»، دامنهٔ نقطه‌دار، بی فاصله، حداکثر [MAX_EMAIL_LENGTH] */
+  fun emailOk(email: String): Boolean = email.length <= MAX_EMAIL_LENGTH && EMAIL.matches(email)
+
+  /**
+   *  شمارهٔ دوم، برچسب، گروه، لیستِ قیمت و ایمیل — همه یا هیچ. تغییرِ لیستِ قیمت (پول) در
    *  دفترچهٔ ثبت ردی می‌گذارد؛ بقیه مثلِ یادداشت بی رد.
    */
   fun setProfile(
@@ -204,8 +221,10 @@ object CustomerCrm {
       PRICE_WHOLESALE -> PRICE_WHOLESALE
       else -> return DebtorEngine.Result.Failed(StrLedger.unknownPriceList)
     }
+    val email = emailOf(p.email)
+    if (email != null && !emailOk(email)) return DebtorEngine.Result.Failed(StrLedger.emailBad)
 
-    val next = c.copy(phone2 = phone2, tags = tags.ifEmpty { null }, group = group, priceList = priceList)
+    val next = c.copy(phone2 = phone2, tags = tags.ifEmpty { null }, group = group, priceList = priceList, email = email)
     if (next == c) return DebtorEngine.Result.Ok(d, id)
     fun label(v: String?) = if (v == PRICE_WHOLESALE) "عمده" else "خرده"  // داده: برچسبِ درونِ یادداشتِ سابقه
     val trace = if (priceList != c.priceList) AuditEntry(
