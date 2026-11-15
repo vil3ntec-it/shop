@@ -77,7 +77,10 @@ class E63wShotsTest {
         LocalView provides remember { android.view.View(DesktopContext) },
         LocalConfiguration provides Configuration(360, 760),
       ) {
-        TohidTheme(if (dark) ThemeChoice.DARK else ThemeChoice.LIGHT) { content() }
+        TohidTheme(if (dark) ThemeChoice.DARK else ThemeChoice.LIGHT) {
+          //  فارسی راست‌به‌چپ — همان جهتِ پنجرهٔ برنامه (`ScreenRender` هم همین را می‌گذارد)
+          CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Rtl) { content() }
+        }
       }
     }
     repeat(24) {
@@ -95,8 +98,14 @@ class E63wShotsTest {
   }
 
   private fun route(name: String, path: String, data: ShopData) = both(name) { dark ->
-    val store = remember { RouteUiHarness.memoryStore(data) }
+    val store = remember { loadedStore(data) }
     V3RoutePreview(path, store, dark)
+  }
+
+  /** دفترِ حافظه‌ایِ «خوانده‌شده» — بی آن کالاها و انبار اسکلت می‌کشند */
+  private fun loadedStore(d: ShopData): ir.vil3ntec.tohid.data.ShopStore = RouteUiHarness.memoryStore(d).also { s ->
+    @Suppress("UNCHECKED_CAST")
+    (ir.vil3ntec.tohid.data.ShopStore::class.java.getDeclaredField("_loaded").apply { isAccessible = true }.get(s) as kotlinx.coroutines.flow.MutableStateFlow<Boolean>).value = true
   }
 
   @Test

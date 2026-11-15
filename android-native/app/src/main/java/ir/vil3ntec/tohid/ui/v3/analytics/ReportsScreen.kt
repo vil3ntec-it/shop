@@ -285,8 +285,8 @@ private fun RangeRow(period: ReportPeriod, from: String, to: String, year: Int, 
   }
   val keys = remember(year, month) { ReportsModel.choiceKeys(year, month) }
   val selected = ReportsModel.choiceKey(period)
-  val choices = (keys + listOf(selected).filter { it !in keys }).map { k ->
-    V3Choice(k, label(k), divider = k == keys[3] || k == "jyear:$year" || k == "all")
+  val choices = remember(keys, selected, I18n.lang) {
+    (keys + listOf(selected).filter { it !in keys }).map { k -> V3Choice(k, label(k), divider = k == keys[3] || k == "jyear:$year" || k == "all") }
   }
   Column(Modifier.padding(top = 4.dp)) {
     V3Dropdown(label(selected), choices, selected, { k -> onPick(ReportsModel.parseChoice(k, period)) }, label = StrLook.period)

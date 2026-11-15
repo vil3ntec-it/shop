@@ -311,10 +311,12 @@ private fun TillCatalog(
   }
 }
 
-/** آیکنِ گردِ ۴۴dp ِ سربرگِ صندوق (همان آیکن‌های پیشین، بی زمینه) */
+/** آیکنِ گردِ ۴۴dp ِ سربرگِ صندوق — همان آیکن و همان دایرهٔ کارتیِ مرزدارِ ردیفِ پیشین (آیکن‌ها عوض نمی‌شوند) */
 @Composable
 private fun TillIcon(label: String, icon: ImageVector, onClick: () -> Unit) {
-  RoundButton(label, onClick, 44.dp, null) { Icon(icon, null, tint = PhoneV3.colors.icon, modifier = Modifier.size(22.dp)) }
+  val v = PhoneV3.colors
+  Spacer(Modifier.width(6.dp))
+  RoundButton(label, onClick, 44.dp, v.card) { Icon(icon, null, tint = v.icon, modifier = Modifier.size(22.dp)) }
 }
 
 /** کاشیِ سه‌ستونه یا فهرست — پرفروش‌ترین اول */
