@@ -129,12 +129,15 @@ class D3bShotsTest {
     val current = nav.current
     val title = nav.resolve(current)?.route?.title?.invoke().orEmpty()
     CompositionLocalProvider(LocalV3Toasts provides toasts, LocalV3SystemBottom provides 0.dp) {
+      //  همان چیدمانِ `AppRoot` ِ کامپیوتر: منوی کناری تمام‌قد در آغاز، ستونِ سربرگ و صفحه کنارش، نوارِ وضعیت در پایین
       Column(Modifier.fillMaxSize().background(PhoneV3.colors.bg)) {
-        DeskHeader(title = title, d = data, onBack = null, onMenu = {}, onSearch = {}, onOpen = {}, page = V3Modules.legacyId(current))
         Row(Modifier.weight(1f)) {
           DeskRail(current = V3Modules.railId(current), onPick = {})
-          //  [body]: صفحه‌ای که پشتِ دروازهٔ اشتراک است (`VipGate`، قرض‌داران) همان‌جا کشیده می‌شود — پوسته همان
-          Box(Modifier.weight(1f)) { PageWidth { if (body != null) body(store) else V3RouteHost(nav, shell, Modifier.fillMaxSize()) } }
+          Column(Modifier.weight(1f)) {
+            DeskHeader(title = title, d = data, onBack = null, onMenu = {}, onSearch = {}, onOpen = {}, page = V3Modules.legacyId(current))
+            //  [body]: صفحه‌ای که پشتِ دروازهٔ اشتراک است (`VipGate`، قرض‌داران) همان‌جا کشیده می‌شود — پوسته همان
+            Box(Modifier.weight(1f)) { PageWidth { if (body != null) body(store) else V3RouteHost(nav, shell, Modifier.fillMaxSize()) } }
+          }
         }
         DeskStatusBar(data)
       }

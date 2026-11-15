@@ -449,7 +449,6 @@ private fun InvoicePane(
       DeskButton(StrHistory.print, onShow, kind = DeskButtonKind.PRIMARY, icon = Icons.Outlined.Print)
       if (row.canReturn) DeskButton(if (returnsV2) StrSale.returnOrExchange else StrSale.returnWord, { actions.ret(sale.id) }, icon = Icons.AutoMirrored.Outlined.AssignmentReturn)
       if (row.canCancel && (canCancel || askCancel)) DeskButton(StrSale.cancelSale, { actions.cancel(sale.id) }, icon = Icons.Outlined.Block)
-      Spacer(Modifier.weight(1f))
       DeskOverflow(
         buildList {
           add(DeskMenuItem(StrSale.viewInvoice, Icons.AutoMirrored.Outlined.ReceiptLong) { actions.open(sale.id) })

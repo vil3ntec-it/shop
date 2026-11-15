@@ -136,10 +136,13 @@ fun DeskCustomersScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostSta
   val open = openId?.let { id -> d.debtors.find { it.id == id } }
   //  سه جعبهٔ رنگیِ قرض‌داران — همان هویتِ گوشی که صاحب‌کار پسندید (`DebtorsStatsCard`): آبی، سرخ، سبز
   val summary = rememberDeskLoad(d) { DebtorListModel.summary(d) }
+  //  «خریدِ مشتری‌ها در این ماه» — همان عددِ کارتِ پیشین
+  val month = ir.vil3ntec.tohid.todayIso().take(7)
+  val monthBought = rememberDeskLoad(d, month) { d.sales.filter { it.debtorId != null && it.status != "cancelled" && it.date.startsWith(month) }.sumOf { it.finalTotal } }
   //  همهٔ ردیف‌های فهرست یک بار و بیرون از رشتهٔ صفحه (۵ هزار مشتری هم)
   val all = rememberDeskLoad(d) { CustomerCrm.active(d).map { it.id }.toSet().let { on -> CustomerEngine.summaries(d).filter { it.id in on } } }
   DeskPage {
-    CustomerStats(summary, all)
+    CustomerStats(summary, all, monthBought)
     BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
       val listW = (maxWidth * 0.34f).coerceIn(340.dp, 440.dp)
       Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(DeskSpace.gap)) {
@@ -174,7 +177,7 @@ private fun debtTone(balance: Double): DebtTone = deskDebtTone(balance, PhoneV3D
  *  ۶۰ روز، خریدِ این ماه) — هیچ عددی گم نشد.
  */
 @Composable
-private fun CustomerStats(summary: DebtorListModel.Summary?, all: List<CustomerEngine.Summary>?) {
+private fun CustomerStats(summary: DebtorListModel.Summary?, all: List<CustomerEngine.Summary>?, monthBought: Double?) {
   val c = PhoneV3Debt.colors
   val late = all?.count { (it.debtDays ?: 0) > 60 }
   val debtors = all?.count { it.balance > 0.5 }
@@ -184,7 +187,7 @@ private fun CustomerStats(summary: DebtorListModel.Summary?, all: List<CustomerE
     DeskStatBox(ir.vil3ntec.tohid.core.i18n.StrMoney.statOwed, summary?.let { "${money(it.owed)} ؋" } ?: "—", c.owe, c.oweTint, Modifier.weight(1f),
       caption = late?.let { ir.vil3ntec.tohid.core.i18n.StrCustomerPages.lateKpi + ": " + ir.vil3ntec.tohid.core.i18n.StrHome.people(it) }, icon = Icons.Outlined.NorthEast)
     DeskStatBox(ir.vil3ntec.tohid.core.i18n.StrMoney.statReceived, summary?.let { "${money(it.received)} ؋" } ?: "—", c.settled, c.settledTint, Modifier.weight(1f),
-      caption = ir.vil3ntec.tohid.core.i18n.StrCustomerPages.monthKpi, icon = Icons.Outlined.SouthWest)
+      caption = monthBought?.let { ir.vil3ntec.tohid.core.i18n.StrCustomerPages.monthKpi + ": " + money(it) + " ؋" }, icon = Icons.Outlined.SouthWest)
   }
 }
 
@@ -286,6 +289,7 @@ private fun CustomerCards(
       DeskNote(
         ir.vil3ntec.tohid.core.i18n.StrCustomerPages.listHint(list.size, all?.size ?: 0, if (view.mode == ViewMode.TABLE) ir.vil3ntec.tohid.core.i18n.StrCustomerPages.rowWord else ir.vil3ntec.tohid.core.i18n.StrCustomerPages.cardWord),
         Modifier.weight(1f),
+        maxLines = 2,
       )
       if (!adding) DeskLink(ir.vil3ntec.tohid.core.i18n.StrMoney.newDebtor, { adding = true })
       DeskIconButton(Icons.Outlined.TableChart, ir.vil3ntec.tohid.core.i18n.StrInvoices.excelKey, ::excel)

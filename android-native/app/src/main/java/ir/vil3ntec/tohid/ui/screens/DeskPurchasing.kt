@@ -741,8 +741,8 @@ private fun SupplierFile(store: ShopStore, d: ShopData, open: PurchaseBook.Suppl
         }
       }
       val cols = listOf(
-        DeskColumn(StrCustomerPages.colRow, width = 44.dp), DeskColumn(StrInvoices.colDate, width = 100.dp), DeskColumn(StrReports.note, weight = 1f),
-        DeskColumn(Str.purchases, width = 120.dp, end = true), DeskColumn(StrHistory.payment, width = 120.dp, end = true), DeskColumn(StrSimpleAsk.vDebtRemaining, width = 120.dp, end = true),
+        DeskColumn(StrCustomerPages.colRow, width = 36.dp), DeskColumn(StrInvoices.colDate, width = 96.dp), DeskColumn(StrReports.note, weight = 1f),
+        DeskColumn(Str.purchases, width = 100.dp, end = true), DeskColumn(StrHistory.payment, width = 100.dp, end = true), DeskColumn(StrSimpleAsk.vDebtRemaining, width = 104.dp, end = true),
       )
       DeskGrid(
         cols, ledger.size, Modifier.fillMaxWidth().weight(1f),

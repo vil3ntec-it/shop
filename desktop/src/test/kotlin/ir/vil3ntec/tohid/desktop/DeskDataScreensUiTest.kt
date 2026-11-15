@@ -196,14 +196,14 @@ class DeskDataScreensUiTest {
     tap("جلیل احمدی")
     await(StrCustomerPages.tabStatement, substring = true)
     assertTrue(has(StrMoney.giveTag))
+    //  «فاکتورها» فقط زبانه و پیوندِ ردیفِ «برد» (کهنه‌ترین ردیف، بالای دفتر) — فهرستِ جدای فاکتور نیست
+    assertTrue(has("#12"))
     //  ردیفِ «رسید» پایین‌ترِ دفتر است (جدولِ تنبل) — تا آن پیمایش
     onAllNodes(androidx.compose.ui.test.hasScrollToNodeAction()).fetchSemanticsNodes().indices.forEach { i ->
       runCatching { onAllNodes(androidx.compose.ui.test.hasScrollToNodeAction())[i].performScrollToNode(hasText(StrMoney.receiveTag)) }
     }
     waitForIdle()
     assertTrue(has(StrMoney.receiveTag))
-    //  «فاکتورها» فقط زبانه و پیوندِ ردیفِ «برد» — فهرستِ جدای فاکتور نیست
-    assertTrue(has("#12"))
     assertTrue(has(StrCustomerPages.receivePayment) && has(StrCustomerPages.manualCredit))
     tap(Str.invoices, substring = true)
     await(StrCustomerPages.payable)

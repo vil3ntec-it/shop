@@ -87,6 +87,8 @@ internal fun DeskReportToolbar(
   dims: List<Pair<String, String>>?, dim: String, onDim: (String) -> Unit,
   view: ViewModeState,
   onPrint: () -> Unit, onPdf: () -> Unit, onExcel: () -> Unit,
+  /** کلیدِ «گزارشِ تازه» این‌جا (وقتی ردیفِ دوره‌ای نیست که جایش باشد) */
+  freshSwitch: Boolean = false,
 ) {
   DeskToolbar(
     end = {
@@ -100,6 +102,7 @@ internal fun DeskReportToolbar(
     if (days != null) DeskDropdown(day, days.map { DeskOption(it.first, it.second) }, onDay, label = StrDeskData.dayLabel)
     if (spans != null) DeskDropdown(span, spans.map { DeskOption(it.first, it.second) }, onSpan, label = StrLook.period)
     if (dims != null) DeskDropdown(dim, dims.map { DeskOption(it.first, it.second) }, onDim, label = StrDeskData.breakdown)
+    if (freshSwitch) ReportFreshSwitch()
   }
 }
 

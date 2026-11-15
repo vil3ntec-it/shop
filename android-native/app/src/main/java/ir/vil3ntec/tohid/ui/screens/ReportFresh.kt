@@ -343,10 +343,11 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
       spans = if (def.ranged) ReportBoard.SPANS.map { it to ReportBoard.SPAN_LABELS.getValue(it) } else null, span = span, onSpan = { span = it },
       dims = if (def.id == "sales" || def.id == "profit") ReportBoard.DIMS.map { it to ReportBoard.DIM_LABELS.getValue(it) } else null, dim = dim, onDim = { dim = it },
       view = viewMode, onPrint = ::print, onPdf = ::pdf, onExcel = ::excel,
+      freshSwitch = !(shifting || comparing),
     )
     //  RPT-13: دورهٔ قبل/بعد با برچسبِ کلید، «از … تا …» ِ بازهٔ جابه‌جاشده، «مقایسه» و خطِ «نسبت به دورهٔ قبل» (`ReportKeys.kt`)؛
     //  کلیدِ «گزارشِ تازه» در پایانِ همین ردیف تا نوارِ ابزار در ۱۳۶۶ یک خط بماند
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    if (shifting || comparing) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
       Box(Modifier.weight(1f)) { FreshPeriodBar(shifting, comparing, compare, rng, onStep = ::step, onCompare = { compare = !compare }) }
       ReportFreshSwitch()
     }

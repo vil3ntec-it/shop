@@ -131,7 +131,8 @@ internal fun DeskExpensesScreen(d: ShopData, monthArg: String?, categoryArg: Str
       val pct = if (prev > 0.0) (((total - prev) * 100.0) / prev).toInt() else null
       DeskKpiCard(DeskKpi(StrMoney.monthTotal(label), MoneyText.afn(total), Icons.Outlined.Payments, tone, pct = pct, versus = StrDeskData.versusPrevMonth,
         fallback = StrDeskData.noPrevExpenses, higherIsBetter = false, spark = spark), m)
-      DeskKpiCard(DeskKpi(StrDeskData.rowsLabel, plain(count), Icons.AutoMirrored.Outlined.ReceiptLong, DeskHues.tone(ir.vil3ntec.tohid.ui.v3.V3Hue.SKY), fallback = StrMoney.rows(shown.size)), m)
+      DeskKpiCard(DeskKpi(StrDeskData.rowsLabel, plain(count), Icons.AutoMirrored.Outlined.ReceiptLong, DeskHues.tone(ir.vil3ntec.tohid.ui.v3.V3Hue.SKY),
+        fallback = StrMoney.rows(shown.size).takeIf { shown.size != count }), m)
       val top = byCategory.maxByOrNull { it.second }
       DeskKpiCard(DeskKpi(StrReports.topCategory, top?.let { MoneyText.afn(it.second) } ?: "—", Icons.Outlined.Category, DeskHues.tone(ir.vil3ntec.tohid.ui.v3.V3Hue.AMBER),
         fallback = top?.first?.ifBlank { StrReports.noCategory } ?: "—"), m)
