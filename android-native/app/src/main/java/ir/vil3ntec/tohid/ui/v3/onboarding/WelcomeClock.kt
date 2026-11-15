@@ -17,9 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.compose.currentStateAsState
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.v3.V3Depth
 
@@ -27,7 +24,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Depth
  *  ساعتِ صفحهٔ ورودِ قدیمی (`WelcomeDecor.kt`) — خواستِ صاحب‌کار: «هیچ انیمیشنی اجرا نشود مگر کاربر روی همان صفحه باشد».
  *  `V3Live` (همین قاعده برای همهٔ برنامه) هنوز روی این پایه نیست؛ تا برسد، همین چهار شرط با هم ⇒ «زنده»:
  *   ۱. حرکت روشن است (`Motion.enabled`: کلیدِ تنظیمات یا «کاهشِ حرکت» ِ سیستم) — خاموش ⇒ هیچ ساعتی ساخته نمی‌شود؛
- *   ۲. برنامه پیش‌رو و دست‌کم RESUMED است ([LocalWelcomeForeground] از [ProvideWelcomeForeground] ِ `AuthGate`/`ShopSetupGate`)؛
+ *   ۲. برنامه پیش‌رو و دست‌کم RESUMED است ([LocalWelcomeForeground] از `ProvideWelcomeForeground` ِ `AuthGate`/`ShopSetupGate`)؛
  *   ۳. هیچ برگه‌ای (`V3Sheet`) رویش باز نیست (`V3Depth.sheets`)؛
  *   ۴. برای نشان: خودش در قاب است ([WelcomeClock.area]؛ با پیمایش بیرون رفت ⇒ می‌ایستد).
  *  زنده نیست ⇒ هیچ قابی خواسته نمی‌شود و همان قابِ ایستا می‌ماند؛ دوباره زنده شد ⇒ از همان لحظه ادامه، بی پرش به آغاز.
@@ -43,13 +40,6 @@ internal val LocalWelcomeBackdrop = compositionLocalOf { false }
 /** شمارِ قاب‌هایی که ساعت‌های صفحهٔ ورود خواسته‌اند — فقط برای آزمون (`WelcomeLookUiTest`)؛ روی رشتهٔ صفحه */
 internal object WelcomeProbe {
   @Volatile var frames: Long = 0
-}
-
-/** ریشهٔ دروازه‌ها (`LocalLifecycleOwner` آن‌جا همیشه هست: فعالیتِ اندروید، پنجرهٔ کامپیوتر، نمای آیفون) */
-@Composable
-internal fun ProvideWelcomeForeground(content: @Composable () -> Unit) {
-  val state by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
-  CompositionLocalProvider(LocalWelcomeForeground provides state.isAtLeast(Lifecycle.State.RESUMED), content = content)
 }
 
 /** پس‌زمینهٔ ورود یک بار پشتِ همهٔ گام‌ها: گام‌ها جابه‌جا می‌شوند و موج‌ها و خط‌ها سرِ جایشان می‌مانند */
