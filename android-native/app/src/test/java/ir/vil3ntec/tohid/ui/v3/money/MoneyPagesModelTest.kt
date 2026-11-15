@@ -200,7 +200,9 @@ class MoneyPagesModelTest {
     //  PUR-05 (دورِ ۳۱): همان فراخوانی با کلیدِ همین فرم — دو لمسِ «ثبت» یک فاکتور است؛ تک‌ردیفه هم با شناسه‌های همان کلید
     //  (PUR-05، هزینهٔ جانبی و سررسید: همان فراخوانی، با `extras` ِ فرم پیش از کلید)
     assertTrue(routes.contains("ir.vil3ntec.tohid.data.PurchaseBook.record(data, supplierId, lines, paid, date, notes, todayIso(), System.currentTimeMillis(), ::moneyId, landedTotal = extras.landedTotal, dueDate = extras.dueDate, key = saveKey)"))
-    assertTrue(routes.contains("LedgerEngine.addPurchase(data, draft, todayIso(), System.currentTimeMillis(), ir.vil3ntec.tohid.data.PurchaseBook.keyedIds(saveKey))"))
+    //  e-rows-63b (تغییرِ عمدی): راهِ تک‌ردیفهٔ `addPurchase` ِ مسیر رفت — همان کلید فقط به `PurchaseBook.record` و سفارشِ نرسیده می‌رود
+    assertFalse(routes.contains("LedgerEngine.addPurchase(data, draft"))
+    assertTrue(routes.contains("onSaveLater = rememberSaveLater(saveKey),"))
     assertTrue(routes.contains("val saveKey = remember { moneyId() }"))
   }
 
