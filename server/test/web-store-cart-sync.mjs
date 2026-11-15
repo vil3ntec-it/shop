@@ -312,11 +312,15 @@ await page.waitForTimeout(1200);
 ok(puts(t) === 1 && (await local(page)).salt === 5000, '۵۰۳ ⇒ یک تلاش، سبد روی دستگاه (نمک ×۵)');
 mode = 429;
 await until(async () => puts(t) === 2, 6000);
-const t429 = Date.now();
+//  مرزِ «پس از لمس» با جای ثبت در `reqs` نه با ساعت: درخواستِ ۴۲۹ ای که `until` همین حالا دید گاهی در همان میلی‌ثانیهٔ
+//  `Date.now()` ثبت شده بود و `>=` آن را «پس از لمس» می‌شمرد (CI ِ #1057) — سنجه همان: هیچ PUT ِ تازه پس از لمس
+const at429 = reqs.length;
+const putsFrom = (i) => reqs.slice(i).filter((r) => r.method === 'PUT').length;
 await add(page, 'salt');   //  لمس در میانهٔ درنگ ⇒ درخواستِ تازه نه
 await page.waitForTimeout(3500);
-ok(puts(t) === 2 && puts(t429) === 0 && (await local(page)).salt === 6000,
-  '۴۲۹ ⇒ درنگِ بلند؛ لمسِ کاربر درنگ را نمی‌شکند (سطلِ سرور دور زده نمی‌شود) و سبد کار می‌کند', `puts=${puts(t)}`);
+const salt429 = (await local(page)).salt;
+ok(puts(t) === 2 && putsFrom(at429) === 0 && salt429 === 6000,
+  '۴۲۹ ⇒ درنگِ بلند؛ لمسِ کاربر درنگ را نمی‌شکند (سطلِ سرور دور زده نمی‌شود) و سبد کار می‌کند', `puts=${puts(t)} after=${putsFrom(at429)} salt=${salt429}`);
 ok((await scary(page)).length === 0 && (await dbCart(P)).items.salt === 4000, '۵۰۳/۴۲۹ ⇒ هیچ پیامِ ترسناک؛ سرور هنوز همان', JSON.stringify(await scary(page)));
 await page.unroute('**/account/cart', flaky);
 await page.evaluate(() => window.dispatchEvent(new Event('online')));   //  برگشتِ شبکه درنگ را می‌شکند (نه لمسِ کاربر)
