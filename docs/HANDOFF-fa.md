@@ -72,7 +72,8 @@
 - حال فقط روی دستگاه (`tohid-ui`/`rate_prompt`، خریدار `shopper.rate.v1`) — DATA-SAFETY §۵. کامپایلِ اندروید/آیفون این‌جا
   سنجیده نشد (بی Android SDK و Xcode) — CI. قدمِ بعدی: آزمونِ داخلیِ Play برای دیدنِ کارت، و سیم‌کشیِ آیفون.
 - آزمون‌ها (همه زیرِ `flock`): core ۲۳ سبز (`RatePromptTest` ۱۷ + `RateTextCoverageTest` ۲ تازه)؛ desktop ۱۳۲ سبز (`RateSheetUiTest` ۷،
-  `PlayReviewSplitTest` ۳، `InfraLeakGuardTest`، i18n/دری، DATA-SAFETY، a11y و دسترسی). اجرای کاملِ desktop نشد (صفِ قفل).
+  `InfraLeakGuardTest`، i18n/دری، DATA-SAFETY، a11y و دسترسی)؛ پس از «فقط صفحهٔ Play»: core ۱۹ و desktop ۵۰ سبز (`PlayReviewSplitTest` ۴:
+  هیچ ساختی کدِ نظرِ Play ندارد، دکمه صفحهٔ Play). اجرای کاملِ desktop نشد (صفِ قفل).
 
 ### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-63d زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-63d` (از `origin/claude/batch-63` cad65eb96) — سادگیِ ردیف‌ها و کارت‌های نسخهٔ ۳
 
