@@ -191,8 +191,10 @@ class MoneyPagesModelTest {
     assertTrue(src.contains("more = v.drop(8).chunked(4).filter { it.size == 4 }.map { r -> PurchaseRow(r[0].ifEmpty { null }, r[1], r[2], r[3]) })"))
     assertTrue(src.contains("it.paid, it.date, it.notes, it.expiry) +"))
     assertTrue(src.contains("PurchaseForm(v[0].ifEmpty { null }, v[1].ifEmpty { null }, v[2], v[3], v[4], v[5], v[6], expiry = v[7],"))
-    //  تک‌ردیفه همان `onSave` (موتورِ امروز)، چندردیفه `onSaveMany` ⇒ `PurchaseBook.record`
-    assertTrue(src.contains("else if (!PurchaseFormModel.multi(form)) { if (onSave(PurchaseFormModel.draft(form, product?.unit.orEmpty()))) onBack() }"))
+    //  e-rows-63b (تغییرِ عمدی): هر خرید، تک‌ردیفه هم، `onSaveMany` ⇒ `PurchaseBook.record` (فاکتورِ شماره‌دار، «پرداخت» ِ همان
+    //  خرید)؛ راهِ تک‌ردیفهٔ `onSave` دیگر نیست — اثرها همان `addPurchase` ِ هر ردیف
+    assertFalse(src.contains("onSave("))
+    assertTrue(src.contains("PurchaseFormModel.paid(form), form.date, form.notes.trim(), PurchaseFormModel.extras(form, extrasOn),\n        ) -> onBack()"))
     val routes = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
       .map { java.io.File(it, "ir/vil3ntec/tohid/ui/v3/money/MoneyRoutes.kt") }.first { it.isFile }.readText()
     //  PUR-05 (دورِ ۳۱): همان فراخوانی با کلیدِ همین فرم — دو لمسِ «ثبت» یک فاکتور است؛ تک‌ردیفه هم با شناسه‌های همان کلید
@@ -253,7 +255,9 @@ class MoneyPagesModelTest {
     val screen = src("ir/vil3ntec/tohid/ui/v3/money/PurchaseFormScreen.kt")
     assertTrue(screen.contains("+ listOf(it.landed, it.due) }"))
     assertTrue(screen.contains(".let { f -> if ((v.size - 8) % 4 == 2) f.copy(landed = v[v.size - 2], due = v[v.size - 1]) else f }"))
-    assertTrue(screen.indexOf("if (extrasOn) {") in 0 until screen.indexOf("label = StrPurchasePages.landedAfn"))
+    //  e-rows-63b: هزینهٔ جانبی همچنان فقط با موتورِ تازه، و نه برای کالای نرسیده (بها با «دریافتِ کالا»)؛ سررسید با «بخشی/بعداً»
+    //  همه‌جا (`PurchaseFormModel.dueShown`، `PurchasesModelTest`)
+    assertTrue(screen.indexOf("if (extrasOn && !form.later) {") in 0 until screen.indexOf("label = StrPurchasePages.landedAfn"))
     assertTrue(screen.contains("PurchaseFormModel.paid(form), form.date, form.notes.trim(), PurchaseFormModel.extras(form, extrasOn),"))
     val routes = src("ir/vil3ntec/tohid/ui/v3/money/MoneyRoutes.kt")
     assertTrue(routes.contains("extrasOn = remember(data.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(data) },"))

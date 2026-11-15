@@ -24,6 +24,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import kotlinx.coroutines.runBlocking
 
 /**
  *  «خریدها» (e-rows-63b) با `ShellContext` ِ واقعی ([RouteUiHarness]) روی [PurchaseDemo]:
@@ -43,9 +44,19 @@ class PurchasesRoutesUiTest {
   private val today = todayIso()
   private val views = PurchaseViews.all(data, today).associateBy { it.no }
 
-  @Before fun up() { h = RouteUiHarness(rule) }
+  private val ctx = DesktopContext
 
-  @After fun down() = h.close()
+  /** دفترِ روی دیسک (همان راهِ `ExchangeGuardsPhoneUiTest`) — برای آزمونی که صفحه در دفتر می‌نویسد */
+  private fun disk(): ShopStore = ShopStore(ctx).also { s -> runBlocking { s.load(); assertTrue(s.replaceAll(data)) } }
+
+  private fun clean() {
+    ctx.filesDir.listFiles().orEmpty().filter { it.name.startsWith("shop-data.json") }.forEach { it.deleteRecursively() }
+    ir.vil3ntec.tohid.data.ShopRole.remember(ctx, ir.vil3ntec.tohid.data.ShopRole.OWNER)
+  }
+
+  @Before fun up() { clean(); h = RouteUiHarness(rule) }
+
+  @After fun down() { h.close(); clean() }
 
   @Test fun listRowsShowSupplierItemsPaymentAndReceipt() {
     h.show(MoneyPaths.PURCHASING, data)
@@ -77,13 +88,13 @@ class PurchasesRoutesUiTest {
 
   @Test fun payFromDetailIsPrefilledAndClearsThatPurchaseNotTheOlderOne() {
     val big = views.getValue(PurchaseDemo.BIG_NO)
-    h.show(MoneyPaths.purchase(big.key), data)
+    val store = disk()
+    h.show(MoneyPaths.purchase(big.key), store)
     h.await(StrPurchases.barcode(PurchaseDemo.FLOUR_CODE), substring = true)
     h.click(StrMoney.pay)
     h.await(StrMoney.recordPayment)
     assertTrue(h.has(PurchaseBook.payNote(PurchaseDemo.BIG_NO), substring = true))
     h.click(StrMoney.recordPayment)
-    val store = h.store!!
     h.awaitThat { store.data.value.supplierPayments.isNotEmpty() }
     val pay = store.data.value.supplierPayments.single()
     assertEquals(3320.0, pay.amount, 0.0)
@@ -133,7 +144,8 @@ class PurchasesRoutesUiTest {
    */
   @Test fun notReceivedNowSendsOnePurchaseOrderWithOnePrepaymentAndNoStock() {
     val fake = FakePurchaseOrders(h.server)
-    h.show(MoneyPaths.newPurchase(PurchaseDemo.PAMIR), data)
+    val store = disk()
+    h.show(MoneyPaths.newPurchase(PurchaseDemo.PAMIR), store)
     h.await(StrPurchases.receivedNow)
     h.click(StrMoney.pickItem)
     h.await("نمک")
@@ -144,7 +156,6 @@ class PurchasesRoutesUiTest {
     val save = rule.onAllNodes(hasText(StrMoney.newPurchase) and hasClickAction())[0]
     save.performSemanticsAction(SemanticsActions.OnClick)
     runCatching { save.performSemanticsAction(SemanticsActions.OnClick) }
-    val store = h.store!!
     h.awaitThat { store.data.value.supplierPayments.isNotEmpty() }
     val root = FakePurchaseOrders.ROOT
     val creates = fake.writes().filter { it.path == root && it.method == "POST" }
