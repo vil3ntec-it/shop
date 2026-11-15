@@ -150,7 +150,12 @@ fun V3Sheet(
         .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
     ) {
       if (title != null) SheetTitle(title, headerEnd)
-      androidx.compose.runtime.CompositionLocalProvider(LocalV3Layer provides layer) { content(closer) }
+      //  تصویرِ صفحهٔ زیرِ برگه می‌ایستد؛ تصویرِ درونِ همین برگه می‌جنبد (`LocalArtLayer`، قاعدهٔ «فقط وقتی دیده می‌شود»)؛
+      //  PERF-SCREEN: همان لایه برای چیزهای زندهٔ `V3Live` (`LocalV3Layer`)
+      androidx.compose.runtime.CompositionLocalProvider(
+        LocalV3Layer provides layer,
+        ir.vil3ntec.tohid.ui.v3.art.LocalArtLayer provides ir.vil3ntec.tohid.ui.v3.art.LocalArtLayer.current + 1,
+      ) { content(closer) }
     }
   }
 }

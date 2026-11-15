@@ -381,13 +381,13 @@ fun TohidEmptyState(
   onAction: (() -> Unit)? = null,
   modifier: Modifier = Modifier,
 ) {
-  Column(
-    modifier.fillMaxWidth().padding(vertical = Space.xxl, horizontal = Space.md),
+  //  همان الگوی نسخهٔ ۳ (دستهٔ ۶۵): بلوک در میانهٔ جای خالی، صحنهٔ پهنِ همان زمینه (از روی آیکن؛ بی آیکن ⇒ درخت)
+  Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Column(
+    Modifier.fillMaxWidth().padding(vertical = Space.lg, horizontal = Space.md),
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {
-    //  تصویرِ متحرکِ همان زمینه (از روی آیکن؛ بی آیکن ⇒ درختِ پیش‌فرض) — همان `V3Illustration` ِ نسخهٔ ۳
-    ir.vil3ntec.tohid.ui.v3.art.V3Illustration(ir.vil3ntec.tohid.ui.v3.art.V3ArtKind.forIcon(icon), size = 140.dp)
-    Spacer(Modifier.height(Space.sm))
+    ir.vil3ntec.tohid.ui.v3.art.V3SceneArt(ir.vil3ntec.tohid.ui.v3.art.V3ArtKind.forIcon(icon), Modifier.widthIn(max = 360.dp).fillMaxWidth().aspectRatio(2f))
+    Spacer(Modifier.height(Space.md))
     Text(title, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text, textAlign = TextAlign.Center)
     Spacer(Modifier.height(Space.xxs))
     Text(
@@ -400,7 +400,7 @@ fun TohidEmptyState(
       Spacer(Modifier.height(Space.md))
       TohidButton(text = actionText, onClick = onAction)
     }
-  }
+  } }
 }
 
 /**
@@ -417,12 +417,12 @@ fun TohidErrorState(
   val kind = ir.vil3ntec.tohid.core.text.PlainError.kindOf(title, description)
   val shownTitle = ir.vil3ntec.tohid.core.text.PlainError.text(title) ?: ir.vil3ntec.tohid.ui.v3.V3ErrorText.title(kind)
   val shownBody = ir.vil3ntec.tohid.core.text.PlainError.text(description) ?: ir.vil3ntec.tohid.ui.v3.V3ErrorText.hint(kind)
-  Column(
-    modifier.fillMaxWidth().padding(vertical = Space.xl, horizontal = Space.md),
+  Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Column(
+    Modifier.fillMaxWidth().padding(vertical = Space.lg, horizontal = Space.md),
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {
-    ir.vil3ntec.tohid.ui.v3.art.V3Illustration(ir.vil3ntec.tohid.ui.v3.art.V3ArtKind.forError(kind), size = 132.dp)
-    Spacer(Modifier.height(Space.xs))
+    ir.vil3ntec.tohid.ui.v3.art.V3SceneArt(ir.vil3ntec.tohid.ui.v3.art.V3ArtKind.forError(kind), Modifier.widthIn(max = 360.dp).fillMaxWidth().aspectRatio(2f))
+    Spacer(Modifier.height(Space.md))
     Text(shownTitle, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text, textAlign = TextAlign.Center)
     Spacer(Modifier.height(Space.xxs))
     Text(
@@ -435,7 +435,7 @@ fun TohidErrorState(
       Spacer(Modifier.height(Space.md))
       TohidSecondaryButton(text = StrShellPages.tryAgain, onClick = onRetry)
     }
-  }
+  } }
 }
 
 /**
