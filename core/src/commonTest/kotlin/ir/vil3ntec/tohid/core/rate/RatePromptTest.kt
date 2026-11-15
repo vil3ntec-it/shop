@@ -94,7 +94,9 @@ class RatePromptTest {
       assertNull(RatePrompt.block(s, moment(at = at)), "پرسشِ ${i + 1}")
       s = RatePrompt.chose(RatePrompt.shown(s, at), RateChoice.LATER, at)
       val soon = at + 29 * day
-      assertEquals(RateBlock.SPACING, RatePrompt.block(s, moment(at = soon)))
+      //  پس از سومین بار سقف پیش از فاصله می‌بندد
+      val want = if (i < RatePrompt.MAX_ASKS - 1) RateBlock.SPACING else RateBlock.MAX_ASKS
+      assertEquals(want, RatePrompt.block(s, moment(at = soon)))
       at += RatePrompt.SPACING_DAYS * day
     }
     assertEquals(RatePrompt.MAX_ASKS, s.asks)
