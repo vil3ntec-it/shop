@@ -155,13 +155,11 @@ class DeskMenuTest {
   }
 
   @Test
-  fun `سفارش‌های خاموش ⇒ برگهٔ چه می‌کند و چطور روشن می‌شود — صاحب با نامِ پرچم و پیام به پشتیبانی`() {
+  fun `سفارش‌های خاموش ⇒ برگهٔ چه می‌کند — صاحب با پیام به پشتیبانی، بی گامِ پنل و نامِ پرچم`() {
     val i = DeskOff.info("off:orders", owner = true, canAdmin = true)!!
     assertEquals(StrNav.onlineOrders, i.title)
     assertEquals(StrNav.ordersSub, i.what)
     assertEquals(StrDeskOff.built, i.status)
-    assertEquals(listOf(StrDeskOff.stepPanel, StrDeskOff.stepTab, StrDeskOff.stepScope, StrDeskOff.stepTurnOn(StrNav.onlineOrders)), i.steps)
-    assertEquals("نامِ پرچم در پنل: shop.orders", i.flagKey)
     assertNull(i.contact)
     assertEquals(StrDeskOff.askSupport, i.actions[0].label)
     assertTrue(i.actions[0].primary)
@@ -171,45 +169,43 @@ class DeskMenuTest {
     //  همان «چرا سفارشِ آنلاین نمی‌رسد» ِ کاشیِ خاموشِ خانه
     assertEquals(ShellTargets.ORDERS_SETUP, i.actions[1].target)
     assertTrue(routed(i.actions[1].target))
-    //  گام‌ها همان راهِ پنلِ سرور است
-    assertEquals("پنلِ سرور را باز کنید و به بخشِ «فروشگاه» بروید.", StrDeskOff.stepPanel)
-    assertEquals("دامنه را روی همین دکان بگذارید، نه «همهٔ دکان‌ها».", StrDeskOff.stepScope)
   }
 
   @Test
   fun `شاگرد نامِ پرچم را نمی‌بیند و به تماس با پشتیبانی راه داده می‌شود`() {
     for (id in DeskOff.ids) {
       val i = DeskOff.info(id, owner = false, canAdmin = false)!!
-      assertNull(id, i.flagKey)
       assertEquals(StrDeskOff.callSupport, i.contact)
       assertEquals(StrDeskOff.builtStaff, i.status)
       assertEquals(listOf(AccountPaths.SUPPORT), i.actions.map { it.target })
       assertEquals(Str.support, i.actions.single().label)
-      assertTrue(i.steps.none { "shop." in it })
     }
     //  مدیرِ نه‌صاحب: «چرا نمی‌رسد» دارد، نامِ پرچم نه
     val m = DeskOff.info("off:fulfil", owner = false, canAdmin = true)!!
-    assertNull(m.flagKey)
     assertEquals(listOf(AccountPaths.SUPPORT, ShellTargets.ORDERS_SETUP), m.actions.map { it.target })
     assertEquals(StrDeskOff.partOf(StrNav.onlineOrders), m.note)
-    //  ویترین و میزِ تحویل نامِ پرچمِ خودشان را دارند
-    assertEquals("نامِ پرچم در پنل: shop.storefront", DeskOff.info("off:storefront", true, true)!!.flagKey)
-    assertEquals("نامِ پرچم در پنل: shop.delivery", DeskOff.info("off:delivery", true, true)!!.flagKey)
     assertEquals(listOf(true), DeskOff.info("off:delivery", true, true)!!.actions.map { it.primary })
     assertNull(DeskOff.info("off:unknown", true, true))
   }
 
+  /**
+   *  تصمیمِ هماهنگ‌کننده (۱۴۰۵/۰۸/۲۴): برگه را صاحبِ **هر** دکانی می‌بیند و او به پنلِ سکو راه ندارد؛ پس «هیچ جزئیاتِ فنی/زیرساخت
+   *  در صفحه» برای همهٔ نقش‌ها — نه نامِ پرچم، نه گامِ پنل، نه «سرور» — در هر چهار زبان. (جای آزمونِ «نامِ برگه‌های پنل در دری و پشتو» ِ 63n.)
+   */
   @Test
-  fun `نامِ برگه‌های پنل در دری و پشتو همان نوشتهٔ پنل است — جز فروشگاه که در دری دکان است`() {
-    I18n.source = { Lang.PRS }
-    //  «فروشگاه» واژهٔ ایرانی است و در دری «دکان» می‌شود (`DariWordsTest`)؛ نامِ برگه‌ها همان نوشتهٔ پنل
-    assertTrue(StrDeskOff.stepPanel, "«دکان»" in StrDeskOff.stepPanel && "فروشگاه" !in StrDeskOff.stepPanel)
-    assertTrue("«همهٔ دکان‌ها»" in StrDeskOff.stepScope)
-    I18n.source = { Lang.PS }
-    assertTrue("«تنظیمات و پرچم‌ها»" in StrDeskOff.stepTab && "«پرچم‌ها»" in StrDeskOff.stepTab)
+  fun `برگهٔ خاموش برای هیچ نقش و هیچ زبانی نامِ پرچم یا گامِ پنل ندارد`() {
+    for (lang in listOf(Lang.FA, Lang.PRS, Lang.PS, Lang.EN)) {
+      I18n.source = { lang }
+      for (id in DeskOff.ids) for (owner in listOf(true, false)) for (admin in listOf(true, false)) {
+        val i = DeskOff.info(id, owner = owner, canAdmin = admin)!!
+        val shown = listOfNotNull(i.title, i.what, i.status, i.note, i.contact) + i.actions.map { it.label }
+        for (t in shown) {
+          assertTrue("$lang $id: $t", "shop." !in t && "پنل" !in t && "پینل" !in t && "panel" !in t.lowercase() && "سرور" !in t && "server" !in t.lowercase())
+        }
+      }
+    }
     I18n.source = { Lang.EN }
     assertEquals("Off", StrDeskOff.badge)
-    assertEquals("Set the scope to this shop, not \"All shops\".", StrDeskOff.stepScope)
   }
 
   @Test

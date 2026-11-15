@@ -74,7 +74,7 @@ class DeskRailOffUiTest {
     rule.waitForIdle()
   }
 
-  @Test fun ordersOffShowOffAndTheOwnerSheetExplainsHowToSwitchItOn() {
+  @Test fun ordersOffShowOffAndTheOwnerSheetOffersSupportWithoutPanelDetails() {
     ShopRole.remember(ctx, ShopRole.OWNER)
     show()
     rule.waitUntil(5_000) { count(StrNav.onlineOrders) > 0 }
@@ -82,16 +82,17 @@ class DeskRailOffUiTest {
     assertEquals(4, count(StrDeskOff.badge))
     assertEquals(0, count(StrNav.soon, substring = true))
     click(StrNav.onlineOrders)
-    rule.waitUntil(5_000) { count(StrDeskOff.howTitle) > 0 }
+    rule.waitUntil(5_000) { count(StrDeskOff.whatTitle) > 0 }
     assertEquals(1, count(StrDeskOff.built))
     assertEquals(1, count(StrNav.ordersSub))
-    assertEquals(1, count(StrDeskOff.stepScope))
-    assertEquals(1, count(StrDeskOff.flagKey("shop.orders")))
+    //  نه نامِ پرچم، نه گامِ پنل — صاحبِ هر دکانی این برگه را می‌بیند (تصمیمِ ۱۴۰۵/۰۸/۲۴)
+    assertEquals(0, count("shop.", substring = true))
+    assertEquals(0, count("پنل", substring = true))
     click(StrDeskOff.askSupport)
     rule.waitUntil(5_000) { picks.isNotEmpty() }
     assertEquals(listOf(AccountPaths.support(StrDeskOff.supportDraft(StrNav.onlineOrders))), picks)
     //  برگه با رفتن بسته می‌شود
-    rule.waitUntil(5_000) { count(StrDeskOff.howTitle) == 0 }
+    rule.waitUntil(5_000) { count(StrDeskOff.whatTitle) == 0 }
   }
 
   @Test fun staffSeeNoFlagNameAndAreSentToSupport() {
@@ -99,7 +100,7 @@ class DeskRailOffUiTest {
     show()
     rule.waitUntil(5_000) { count(StrNav.fulfilment) > 0 }
     click(StrNav.fulfilment)
-    rule.waitUntil(5_000) { count(StrDeskOff.howTitle) > 0 }
+    rule.waitUntil(5_000) { count(StrDeskOff.whatTitle) > 0 }
     assertEquals(1, count(StrDeskOff.builtStaff))
     assertEquals(1, count(StrDeskOff.callSupport))
     assertEquals(1, count(StrDeskOff.partOf(StrNav.onlineOrders)))
@@ -121,7 +122,7 @@ class DeskRailOffUiTest {
     click(StrNav.fulfilment)
     rule.waitUntil(5_000) { picks.isNotEmpty() }
     assertEquals(listOf("orders?tab=preparing"), picks)
-    assertEquals(0, count(StrDeskOff.howTitle))
+    assertEquals(0, count(StrDeskOff.whatTitle))
     click(StrNav.onlineOrders)
     assertEquals(listOf("orders?tab=preparing", "orders"), picks)
   }

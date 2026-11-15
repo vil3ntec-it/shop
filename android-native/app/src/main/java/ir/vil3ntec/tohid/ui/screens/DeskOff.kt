@@ -1,11 +1,8 @@
 package ir.vil3ntec.tohid.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,8 +23,8 @@ import ir.vil3ntec.tohid.ui.v3.shell.ShellTargets
  *  بخشِ **ساخته‌شده** که برای این دکان خاموش است (ردیفِ `DeskMenu.State.OFF`، شناسهٔ `off:…`) — برگهٔ کوتاهِ «این
  *  بخش چه می‌کند، خاموش است، چطور روشن می‌شود» به‌جای «در دست ساخت» ِ پیشین (صاحب‌کار ۱۴۰۵/۰۸/۲۳).
  *
- *  - روشن کردن کارِ پنلِ سرور است (برنامه کلیدی برای آن ندارد): «فروشگاه» ⇐ «تنظیمات و پرچم‌ها» ⇐ «پرچم‌ها» ⇐ دامنهٔ
- *    همین دکان ⇐ روشن کردنِ همان بخش. نامِ درونیِ پرچم فقط برای صاحبِ دکان، نوشتهٔ کوچک؛ هیچ نشانی و نامِ میزبانی نه.
+ *  - روشن کردن کارِ پنلِ سکوست، نه کاربرِ دکان؛ پس برگه **نه** گامِ پنل دارد **نه** نامِ درونیِ پرچم (قاعدهٔ «هیچ جزئیاتِ
+ *    فنی/زیرساخت در صفحه» برای همهٔ نقش‌ها، تصمیمِ هماهنگ‌کننده ۱۴۰۵/۰۸/۲۴ — صاحبِ هر دکانی این برگه را می‌بیند و به پنل راه ندارد).
  *  - صاحبِ دکان: «پیام به پشتیبانی برای روشن کردن» (گفت‌وگوی پشتیبانی با پیش‌نویسِ آماده)؛ دیگران: «برای روشن کردن با
  *    پشتیبانی تماس بگیرید» و دکمهٔ همان «پشتیبانی». سفارش‌ها برای صاحب/مدیر «چرا سفارشِ آنلاین نمی‌رسد» را هم دارد
  *    (`ShellTargets.ORDERS_SETUP`، همان کاشیِ خاموشِ خانه).
@@ -38,7 +35,7 @@ object DeskOff {
   private class Section(
     val title: () -> String,
     val what: () -> String,
-    /** نامِ درونیِ پرچم در پنل — فقط صاحبِ دکان می‌بیند */
+    /** پرچمِ سرورِ همین بخش — فقط برای منطق (کدام بخش‌ها «سفارش» اند)، هرگز روی صفحه */
     val flag: String,
     /** نامِ چیزی که در پنل روشن می‌شود (آماده‌سازی و تحویل ⇐ خودِ «سفارش‌های آنلاین») */
     val switchName: () -> String,
@@ -62,16 +59,13 @@ object DeskOff {
     val what: String,
     val status: String,
     val note: String?,
-    val steps: List<String>,
-    /** فقط صاحبِ دکان */
-    val flagKey: String?,
     /** کسی که پیامِ آماده ندارد: «برای روشن کردن با پشتیبانی تماس بگیرید» */
     val contact: String?,
     val actions: List<Action>,
   )
 
   /**
-   *  @param owner صاحبِ دکان (`ShopRole.OWNER`) — نامِ پرچم و پیامِ آماده به پشتیبانی
+   *  @param owner صاحبِ دکان (`ShopRole.OWNER`) — پیامِ آماده به پشتیبانی
    *  @param canAdmin صاحب/مدیر — «چرا سفارشِ آنلاین نمی‌رسد» ِ تنظیمات
    */
   fun info(id: String, owner: Boolean, canAdmin: Boolean): Info? {
@@ -83,8 +77,6 @@ object DeskOff {
       what = s.what(),
       status = if (owner || canAdmin) StrDeskOff.built else StrDeskOff.builtStaff,
       note = if (s.partOfOrders) StrDeskOff.partOf(name) else null,
-      steps = listOf(StrDeskOff.stepPanel, StrDeskOff.stepTab, StrDeskOff.stepScope, StrDeskOff.stepTurnOn(name)),
-      flagKey = if (owner) StrDeskOff.flagKey(s.flag) else null,
       contact = if (owner) null else StrDeskOff.callSupport,
       actions = buildList {
         if (owner) add(Action(StrDeskOff.askSupport, AccountPaths.support(StrDeskOff.supportDraft(name)), primary = true))
@@ -117,15 +109,6 @@ internal fun DeskOffSheet(info: DeskOff.Info, onOpen: (String) -> Unit, onDismis
       Text(StrDeskOff.whatTitle, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text, modifier = Modifier.padding(top = 4.dp))
       Text(info.what, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.muted)
       info.note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted) }
-      Text(StrDeskOff.howTitle, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text, modifier = Modifier.padding(top = 4.dp))
-      info.steps.forEach { step ->
-        Row(Modifier.fillMaxWidth()) {
-          Text("•", style = MaterialTheme.typography.bodyMedium, color = Shop.colors.muted)
-          Spacer(Modifier.width(8.dp))
-          Text(step, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text, modifier = Modifier.weight(1f))
-        }
-      }
-      info.flagKey?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted) }
       info.contact?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text, modifier = Modifier.padding(top = 4.dp)) }
       info.actions.forEach { a ->
         val go = { onDismiss(); onOpen(a.target) }
