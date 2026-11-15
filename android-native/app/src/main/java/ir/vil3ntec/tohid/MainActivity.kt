@@ -80,7 +80,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     ir.vil3ntec.tohid.data.ShopRole.courierMode.value = ir.vil3ntec.tohid.data.ShopRole.isCourier(applicationContext)
     live = AppStart.startSync(applicationContext)
 
-    setContent { AppShell(applicationContext, store) }
+    setContent { ir.vil3ntec.tohid.ui.v3.ProvideV3Foreground { AppShell(applicationContext, store) } }
     handleLink(intent)
   }
 

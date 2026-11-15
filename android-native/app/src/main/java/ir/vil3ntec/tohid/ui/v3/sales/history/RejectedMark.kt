@@ -119,7 +119,7 @@ internal fun RejectedWatch(force: Boolean = false, data: ShopData? = null) {
   val context = LocalContext.current
   val settled = remember(data?.setAside) { data?.let(SetAside::settledOps).orEmpty() }
   val now by rememberUpdatedState(settled)
-  LaunchedEffect(Unit) {
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(Unit) {
     var first = true
     while (true) {
       runCatching { RejectedLive.refresh(context, force = force && first, settled = now) }

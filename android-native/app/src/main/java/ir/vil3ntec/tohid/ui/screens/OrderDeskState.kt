@@ -70,7 +70,7 @@ internal class OrderDeskController(val repo: OrderDeskRepository, private val sc
 internal fun rememberOrderDesk(api: ApiClient): OrderDeskController {
   val scope = rememberCoroutineScope()
   val c = remember(api) { OrderDeskController(OrderDeskRepository(api), scope) }
-  LaunchedEffect(c) { c.poll() }
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(c) { c.poll() }
   return c
 }
 

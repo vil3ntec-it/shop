@@ -1189,13 +1189,7 @@ class ShopStore(
      *  فایل را درست می‌خواند. این فرمول از خودِ دو عددِ اصلی حساب می‌کند،
      *  پس فایلِ ناقص هم درست خوانده می‌شود.
      */
-    fun supplierDebt(d: ShopData, supplierId: String): Double {
-      val mine = d.purchases.filter { it.supplierId == supplierId }
-      val billed = mine.sumOf { it.totalAmount }
-      val paid = mine.sumOf { it.paidAmount } +
-        d.supplierPayments.filter { it.supplierId == supplierId }.sumOf { it.amount }
-      return billed - paid
-    }
+    fun supplierDebt(d: ShopData, supplierId: String): Double = SupplierDebts.of(d)[supplierId] ?: 0.0 // PERF-SCREEN: یک گذر برای همه
 
     fun barcodeIndex(d: ShopData): Map<String, String> = ProductIndexes.barcodes(d.products) // S125: یک بار برای همان فهرست
     fun productsById(products: List<Product>): Map<String, Product> = ProductIndexes.byId(products)

@@ -101,7 +101,7 @@ fun BranchHost(store: ShopStore) {
   }
 
   //  ورود/خروج و دکانِ تازه بی بازسازیِ این جزء هم دیده شود؛ پرچمِ دکان هر ۱۰ دقیقه دوباره (خاموش ⇒ میز به اصلی)
-  LaunchedEffect(tick) {
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(tick) {
     var seen: String? = null
     var at = 0L
     while (true) {

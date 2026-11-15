@@ -119,8 +119,7 @@ fun V3Skeleton(rows: Int = 5, modifier: Modifier = Modifier) {
   val base = c.tile
   val shine = if (c.isDark) c.hairline else c.card
   val shimmer = if (Motion.enabled) {
-    rememberInfiniteTransition(label = "shimmer")
-      .animateFloat(-1f, 2f, infiniteRepeatable(tween(1200, easing = LinearEasing), RepeatMode.Restart), label = "shimmerX")
+    v3LiveFloat(-1f, 2f, infiniteRepeatable(tween(1200, easing = LinearEasing), RepeatMode.Restart), "shimmerX")
   } else null
   val brush = remember(base, shine) { Brush.linearGradient(listOf(base, shine, base), start = Offset(-300f, 0f), end = Offset(0f, 0f)) }
   val bone = Modifier.drawBehind {

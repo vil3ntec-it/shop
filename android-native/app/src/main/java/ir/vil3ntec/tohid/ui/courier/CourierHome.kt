@@ -221,7 +221,7 @@ fun CourierHome(onSignedOut: () -> Unit) {
   }
 
   //  باز شدن و هر نیم دقیقه تا صفحه باز است (همگام‌سازی بی سرویسِ پس‌زمینه — §۳.۱۱)
-  LaunchedEffect(Unit) { while (true) { sync(); delay(30_000) } }
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(Unit) { while (true) { sync(); delay(30_000) } }
   //  DLV-16: تنها سرویسِ پیش‌زمینهٔ پیک — موقعیت فقط برای مأموریتِ «در راه» که سرور خواست (`CourierLiveTrackAndroid.kt`)
   //  S94: رضایتِ پیک عوض شد ⇒ از نو (روشن/خاموش کردنِ سرویس با همان قاعده)
   key(consent.mayShare) { CourierLiveTrack(active, queue) }
