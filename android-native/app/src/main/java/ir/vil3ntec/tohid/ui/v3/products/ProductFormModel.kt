@@ -66,7 +66,11 @@ object ProductFormModel {
   /** خطای درجای یک کادر — سه تای آخر فقط بخشِ «اختیاری» ِ کالای تازه */
   enum class Problem { REQUIRED, NOT_A_NUMBER, BAD_DATE, MADE_AFTER_EXPIRY, NEEDS_STOCK }
 
-  enum class Mode { NEW, EDIT }
+  /**
+   *  `NEW` = فرمِ چندردیفیِ «ثبتِ چند کالا با هم» (قاعدهٔ `bpReadyRows`: نام، دسته، واحد و هر دو قیمت)؛ `QUICK` = فرمِ سادهٔ یک‌کالاییِ
+   *  دکمهٔ «کالای تازه» (۱۴۰۵/۰۸/۲۴، [quickReady]: فقط نام و قیمتِ فروش لازم)؛ `EDIT` = «ویرایش کالا».
+   */
+  enum class Mode { NEW, QUICK, EDIT }
 
   /** ردیفی که هیچ چیزش پر نشده — نادیده گرفته می‌شود، خطا نیست */
   fun untouched(r: ProductRowDraft): Boolean =
@@ -88,6 +92,11 @@ object ProductFormModel {
         if (r.category.isBlank()) put(Field.CATEGORY, Problem.REQUIRED)
         if (r.unit.isBlank()) put(Field.UNIT, Problem.REQUIRED)
         number(r.purchase, required = true)?.let { put(Field.PURCHASE, it) }
+        putAll(NewProductStock.errors(r))
+      }
+      //  فرمِ ساده: دسته و واحد اختیاری (واحدِ خالی ⇐ واحدِ پیش‌فرضِ دکان در [draftQuick])، قیمتِ خرید اختیاری ولی اگر نوشته شد عدد
+      Mode.QUICK -> {
+        number(r.purchase, required = false)?.let { put(Field.PURCHASE, it) }
         putAll(NewProductStock.errors(r))
       }
       Mode.EDIT -> {
@@ -152,6 +161,32 @@ object ProductFormModel {
     barcode = r.barcode,
     wholesalePrice = null,
   )
+
+  /** فرمِ سادهٔ «کالای تازه» آمادهٔ ثبت است؟ — فقط نام و قیمتِ فروش لازم، و هر کادرِ اختیاریِ نوشته‌شده درست ([errors] با `QUICK`) */
+  fun quickReady(r: ProductRowDraft): Boolean = errors(r, Mode.QUICK).isEmpty()
+
+  /**
+   *  پیش‌نویسِ فرمِ ساده — همان [draftNew] با دو پیش‌فرض برای کادرهای اختیاری: قیمتِ خریدِ خالی ⇐ ۰ (همان «ویرایش») و واحدِ خالی ⇐
+   *  [defaultUnit] (نخستین واحدِ دکان؛ همان پیش‌فرضِ برگهٔ چندردیفیِ پیشین). دستهٔ خالی خالی می‌ماند.
+   */
+  fun draftQuick(r: ProductRowDraft, defaultUnit: String) = draftNew(r).copy(unit = r.unit.ifBlank { defaultUnit })
+
+  /** ردیفِ موتور برای فرمِ ساده: کالا و (اگر نوشته شده) موجودیِ آغاز — همان `OpeningStock.Row` ِ «ذخیرهٔ همه» */
+  fun quickRow(r: ProductRowDraft, defaultUnit: String): OpeningStock.Row =
+    OpeningStock.Row(draftQuick(r, defaultUnit), NewProductStock.stockOf(r))
+
+  /** کادرِ اختیاری‌ای («بیشتر») پر شده؟ — فرمِ ساده با بارکدِ اسکن‌شده یا پیش‌نویسِ پر، «بیشتر» را باز نشان می‌دهد */
+  fun quickHasMore(r: ProductRowDraft): Boolean =
+    r.purchase.isNotBlank() || r.barcode.isNotBlank() || r.category.isNotBlank() || r.stock.isNotBlank() || r.made.isNotBlank() || r.expiry.isNotBlank()
+
+  /** کادرهای «بیشتر» ِ فرمِ ساده — خطای یکی از این‌ها ⇒ «بیشتر» باز می‌شود تا کادر دیده شود */
+  val QUICK_MORE: Set<Field> = setOf(Field.CATEGORY, Field.UNIT, Field.PURCHASE, Field.STOCK, Field.MADE, Field.EXPIRY)
+
+  /** ترتیبِ کادرهای فرمِ ساده از بالا: دو کادرِ لازم، سپس «بیشتر» */
+  private val QUICK_ORDER = listOf(Field.NAME, Field.SALE, Field.PURCHASE, Field.CATEGORY, Field.UNIT, Field.STOCK, Field.MADE, Field.EXPIRY)
+
+  /** نخستین کادرِ خرابِ فرمِ ساده به ترتیبِ دیده شدن (نام و فروش پیش از «بیشتر») */
+  fun quickFirst(errors: Map<Field, Problem>): Field? = QUICK_ORDER.firstOrNull { it in errors } ?: firstField(errors)
 
   /** پیش‌نویسِ ویرایش — همان دکمهٔ «ذخیره تغییرات» ِ `ProductDialog` */
   fun draftEdit(r: ProductRowDraft) = WarehouseEngine.ProductDraft(

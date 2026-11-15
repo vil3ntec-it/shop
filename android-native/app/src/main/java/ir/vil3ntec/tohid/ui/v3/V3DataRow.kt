@@ -45,6 +45,12 @@ object V3DataRowSpec {
   val PAD_V: Dp = 12.dp
   /** بلندیِ کم: سه خطِ کالبد */
   val MIN_HEIGHT: Dp = 72.dp
+  /**
+   *  ردیفِ فشردهٔ دوخطی (`V3DataRow(dense = true)`: عنوان + خطِ مبلغ، بی خطِ دوم) — «کالاها» ِ گوشی (۱۴۰۵/۰۸/۲۴: دست‌کم ۸ ردیفِ کامل
+   *  در ۳۶۰×۷۶۰ زیرِ سربرگ، تراشه‌ها و نوارِ پایین). ۱۰ + ۲۲ + ۲ + ۲۰ + ۱۰ = ۶۴.
+   */
+  val DENSE_PAD_V: Dp = 10.dp
+  val DENSE_MIN_HEIGHT: Dp = 64.dp
   /** خطِ مویی از زیرِ متن: آغاز + کاشی + فاصله (۶۴) */
   val DIVIDER_START: Dp = PAD_START + TILE + GAP
   /** فاصلهٔ خطِ مبلغ از خطِ دوم */
@@ -125,6 +131,8 @@ fun V3DataRow(
   endActions: List<V3SwipeAction> = emptyList(),
   selected: Boolean? = null,
   onLongClick: (() -> Unit)? = null,
+  /** ردیفِ فشردهٔ دوخطی ([V3DataRowSpec.DENSE_MIN_HEIGHT]) — فقط برای فهرستِ بی خطِ دوم */
+  dense: Boolean = false,
   onClick: (() -> Unit)? = null,
 ) {
   val hasBelow = secondaryContent != null || meta != null || metaContent != null
@@ -142,7 +150,7 @@ fun V3DataRow(
     trailing = pill,
     danger = danger,
     chevron = action == null,
-    minHeight = V3DataRowSpec.MIN_HEIGHT,
+    minHeight = if (dense) V3DataRowSpec.DENSE_MIN_HEIGHT else V3DataRowSpec.MIN_HEIGHT,
     subtitleLines = 1,
     startActions = startActions,
     endActions = endActions,
@@ -158,6 +166,7 @@ fun V3DataRow(
       }
     }),
     look = V3RowLook.DATA,
+    dense = dense,
     onClick = onClick,
   )
 }

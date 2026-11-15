@@ -637,7 +637,8 @@ private fun AppRootActive(
         LocalV3Toasts provides toasts,
         //  نوارِ سیستم را پوسته همین‌جا حساب کرده است
         LocalV3SystemBottom provides 0.dp,
-        LocalV3Notice provides { Column { PreviewBanner(); ir.vil3ntec.tohid.ui.v3.shell.ShellNotice() } },
+        //  نوارِ «نسخهٔ پیش‌نمایش» دیگر روی هر صفحه نیست (۱۴۰۵/۰۸/۲۴) — فقط هشدارِ یک‌باره، یک بار در پوسته؛ نشانش در «درباره»
+        LocalV3Notice provides { ir.vil3ntec.tohid.ui.v3.shell.ShellNotice() },
         ir.vil3ntec.tohid.ui.v3.LocalV3NavSearch provides navSearch,
       ) {
         if (Platform.DESKTOP) Column(Modifier.padding(start = railPad).fillMaxSize()) {
@@ -665,8 +666,12 @@ private fun AppRootActive(
               V3RouteHost(nav, shell, Modifier.fillMaxSize())
             }
           }
-        } else PageWidth(Modifier.padding(start = railPad, bottom = pageBottom)) {
-          V3RouteHost(nav, shell, Modifier.fillMaxSize())
+        } else {
+          //  گوشی (e-phone-p2): نوارِ «نسخهٔ پیش‌نمایش» روی هیچ صفحه‌ای نیست؛ فقط هشدارِ یک‌باره، یک بار در پوسته
+          PreviewBanner(strip = false)
+          PageWidth(Modifier.padding(start = railPad, bottom = pageBottom)) {
+            V3RouteHost(nav, shell, Modifier.fillMaxSize())
+          }
         }
       }
       //  نوارِ شناورِ r10 — دایرهٔ شروع، قرص، دایرهٔ پایان؛ نگه‌داشتن = ویرایشگر

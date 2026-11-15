@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.Close
@@ -32,8 +33,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.i18n.StrProducts
 import ir.vil3ntec.tohid.core.i18n.StrVisualSearch
 import ir.vil3ntec.tohid.core.product.VisualSearch
@@ -72,12 +75,24 @@ internal class ProductsListNav(
   val scan: () -> Unit,
   /** برگهٔ دستهٔ گروهی؛ پس از تغییر `onDone` (انتخاب پاک می‌شود) */
   val bulkCategory: (ids: Set<String>, onDone: () -> Unit) -> Unit,
+  /** «ثبتِ چند کالا با هم» (فرمِ چندردیفی، «…» ِ سربرگ) — `new` فرمِ سادهٔ یک‌کالایی است */
+  val newMany: () -> Unit = {},
 )
 
+/** اندازه‌ها و نشانِ آزمونِ فهرستِ کالاها (۱۴۰۵/۰۸/۲۴) */
+object ProductsListSpec {
+  /** شبکه: سه ستون روی گوشی — هرگز کارتِ نیم‌صفحه‌ای برای یک کالا */
+  const val GRID_COLUMNS = 3
+  const val LIST_TAG = "products-list"
+  const val CELL_TAG = "products-cell"
+  const val FOOTER_TAG = "products-footer"
+}
+
 /**
- *  «کالاها» (`products`، تبِ نوار): جست‌وجو، کارتِ آمار، فیلترِ دسته و وضعیت،
- *  مرتب‌سازی، فهرست یا شبکه، کشیدنِ ردیف (ورود / ویرایش / حذف)، انتخابِ گروهی با
- *  نگه‌داشتن و دکمهٔ شناورِ «کالای تازه».
+ *  «کالاها» (`products`، تبِ نوار): جست‌وجو، فیلترِ دسته و وضعیت، مرتب‌سازی، فهرستِ فشرده (ردیفِ دوخطیِ ≤ ۷۲dp) یا شبکهٔ
+ *  سه‌ستونه، کشیدنِ ردیف (ورود / ویرایش / حذف)، انتخابِ گروهی با نگه‌داشتن و دکمهٔ شناورِ «کالای تازه» (فرمِ ساده). ۱۴۰۵/۰۸/۲۴
+ *  (صاحب‌کار: «سربرگ‌ها به درد نمی‌خورند»، «یک کالا نباید نصفِ صفحه را بگیرد»): کارتِ آمارِ بالا رفت — همان دو عدد (شمارِ قلم و
+ *  سودِ بالقوه) یک خطِ کم‌رنگ در پایانِ فهرست است ([ProductsListFooter]). «ثبتِ چند کالا با هم» در «…».
  */
 @Composable
 internal fun ProductsListScreen(
@@ -125,7 +140,10 @@ internal fun ProductsListScreen(
       if (layout == Layout.LIST) V3Action(Icons.Outlined.GridView, StrProducts.viewGrid) { layout = Layout.GRID; saveLayout(context, Layout.GRID) }
       else V3Action(Icons.Outlined.ViewAgenda, StrProducts.viewList) { layout = Layout.LIST; saveLayout(context, Layout.LIST) },
     ),
-    overflow = if (selecting) emptyList() else listOfNotNull(visual?.let { v -> V3MenuItem(Icons.Outlined.PhotoCamera, StrVisualSearch.button) { v.start() } }),
+    overflow = if (selecting) emptyList() else listOfNotNull(
+      V3MenuItem(Icons.AutoMirrored.Outlined.PlaylistAdd, StrReach.bulkProducts, onClick = nav.newMany),
+      visual?.let { v -> V3MenuItem(Icons.Outlined.PhotoCamera, StrVisualSearch.button) { v.start() } },
+    ),
     //  جست‌وجو (اسکن و صدا درونِ کادر) از دکمهٔ نوار؛ فیلتر و مرتب‌سازی زیرِ عنوان؛ نما در سربرگ؛ «کالای تازه» تنها دکمهٔ شناور
     search = if (selecting) null else V3Search(query.text, { query = query.copy(text = it) }, StrProducts.searchHint, onScan = nav.scan, onVoice = voice),
     chips = if (!loaded || data.products.isEmpty()) null else ({
@@ -147,21 +165,18 @@ internal fun ProductsListScreen(
       )
     }),
   ) { pad ->
-    val cols = if (layout == Layout.GRID) 2 else 1
+    val cols = if (layout == Layout.GRID) ProductsListSpec.GRID_COLUMNS else 1
     val full: (androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan) = { GridItemSpan(maxLineSpan) }
     LazyVerticalGrid(
       columns = GridCells.Fixed(cols),
-      modifier = Modifier.fillMaxSize(),
+      modifier = Modifier.fillMaxSize().testTag(ProductsListSpec.LIST_TAG),
       contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding() + FAB_SPACE),
-      horizontalArrangement = Arrangement.spacedBy(10.dp),
-      verticalArrangement = Arrangement.spacedBy(if (layout == Layout.GRID) 10.dp else 0.dp),
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+      verticalArrangement = Arrangement.spacedBy(if (layout == Layout.GRID) 8.dp else 0.dp),
     ) {
       if (!loaded) {
         item(key = "skeleton", span = full) { V3Skeleton(rows = 6) }
         return@LazyVerticalGrid
-      }
-      if (data.products.isNotEmpty()) {
-        item(key = "stats", span = full) { ProductsStatsCard(stats, Modifier.padding(bottom = 12.dp)) }
       }
       when (empty) {
         ProductsListModel.Empty.NO_PRODUCTS -> item(key = "empty", span = full) {
@@ -198,6 +213,8 @@ internal fun ProductsListScreen(
           }
         }
       }
+      //  جای کارتِ آمارِ پیشین: همان دو عدد، یک خطِ کم‌رنگ پس از آخرین ردیف (فهرستِ تنگ‌شده هم همهٔ کالاها را می‌شمارد)
+      if (empty == ProductsListModel.Empty.NONE) item(key = "footer", span = full) { ProductsListFooter(stats) }
     }
   }
 

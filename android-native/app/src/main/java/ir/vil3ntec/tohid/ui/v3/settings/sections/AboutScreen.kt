@@ -55,7 +55,7 @@ internal fun AboutScreen(data: ShopData, onBack: (() -> Unit)?) {
         V3IconTile(Icons.Outlined.Storefront, hue = V3Hue.BRAND, size = 72.dp)
         Spacer(Modifier.height(10.dp))
         Text(Str.appName, style = V3Type.title, color = c.ink)
-        Text(Str.version(BuildConfig.VERSION_NAME), style = V3Type.subhead, color = c.inkMuted)
+        Text(Str.version(ir.vil3ntec.tohid.ui.previewVersionLabel(BuildConfig.VERSION_NAME)), style = V3Type.subhead, color = c.inkMuted)
         Spacer(Modifier.height(8.dp))
         Text(StrSettings.aboutText, style = V3Type.footnote, color = c.inkMuted, textAlign = TextAlign.Center)
       }
@@ -89,7 +89,7 @@ internal fun AboutScreen(data: ShopData, onBack: (() -> Unit)?) {
     }
     item(key = "status") {
       V3Section(StrNav.status) {
-        V3ListRow(StrNav.versionLabel, value = BuildConfig.VERSION_NAME, chevron = false)
+        V3ListRow(StrNav.versionLabel, value = ir.vil3ntec.tohid.ui.previewVersionLabel(BuildConfig.VERSION_NAME), chevron = false)
         listOf(
           StrNav.goods to data.products.size,
           Str.invoices to data.sales.size,

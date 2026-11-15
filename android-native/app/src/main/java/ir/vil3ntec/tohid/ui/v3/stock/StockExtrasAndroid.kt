@@ -62,6 +62,8 @@ import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3MenuItem
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
+import ir.vil3ntec.tohid.ui.v3.nav.LandOn
+import ir.vil3ntec.tohid.ui.v3.products.ProductsPaths
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsPaths
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
 import kotlinx.coroutines.Dispatchers
@@ -101,12 +103,14 @@ internal fun RouteScope.rememberStockExtras(): List<V3MenuItem> {
   LaunchedEffect(Unit) { StockTransferFlag.refresh(context) }
   val stored = remember { StockTransferFlag.on(context) }
   val transfers = StockTransferFlag.visible.value ?: stored
+  //  ۱۴۰۵/۰۸/۲۴: «ثبتِ چند کالا با هم» ِ گوشی همان فرمِ چندردیفیِ کالاها (کادرِ کشویی، نه دیوارِ تراشه)؛ کامپیوتر برگهٔ پیشین
+  val bulkProducts = if (desk) StockPaths.BULK_PRODUCTS else ProductsPaths.newMany()
   return StockExtras.of(flags.copy(imageChanges = imageChanges, transfers = transfers)).map { x ->
     when (x) {
       StockExtra.PLACES -> V3MenuItem(Icons.Outlined.SwapHoriz, StrReach.places) { nav.open(x.route) }
       StockExtra.LABELS -> V3MenuItem(Icons.Outlined.Print, StrLabel.openButton) { nav.open(x.route) }
       StockExtra.BOOK -> V3MenuItem(Icons.Outlined.MenuBook, StrReach.stockBook) { nav.open(x.route) }
-      StockExtra.BULK_PRODUCTS -> V3MenuItem(Icons.AutoMirrored.Outlined.PlaylistAdd, StrReach.bulkProducts) { nav.open(x.route) }
+      StockExtra.BULK_PRODUCTS -> V3MenuItem(Icons.AutoMirrored.Outlined.PlaylistAdd, StrReach.bulkProducts) { nav.open(bulkProducts) }
       StockExtra.IMAGES -> V3MenuItem(Icons.Outlined.AddPhotoAlternate, StrReach.imageImport) { nav.open(x.route) }
       StockExtra.IMAGE_CHANGES -> V3MenuItem(Icons.Outlined.Collections, StrImageChanges.title) { nav.open(x.route) }
       StockExtra.IMAGE_STUDIO -> V3MenuItem(Icons.Outlined.AutoFixHigh, StrImageStudio.title) { nav.open(x.route) }
@@ -179,9 +183,13 @@ internal fun RouteScope.StockBookRoute() {
   StockBookScreen(store, data, snackbar) { nav.open(SettingsPaths.section(SettingsLayout.STOCK_MODE)) }
 }
 
-/** ثبتِ چند کالا با هم */
+/** ثبتِ چند کالا با هم — گوشی (۱۴۰۵/۰۸/۲۴) ⇐ فرمِ چندردیفیِ کالاها (`products/new?many=1`)؛ کامپیوتر همان برگهٔ پیشین */
 @Composable
 internal fun RouteScope.BulkProductsRoute() {
+  if (!desk) {
+    LandOn(ProductsPaths.newMany())
+    return
+  }
   val writer = rememberStockWriter()
   BulkProductSheet(data, onDismiss = { back() }) { drafts ->
     val failed = writer.commit(data, WarehouseEngine.addProducts(data, drafts, writer.now, writer.newId), StrStock.imported(money(drafts.size.toDouble())))

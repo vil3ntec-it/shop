@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrKit
@@ -74,8 +75,8 @@ class StockListActions(
 
 /**
  *  «انبار» (`stock`): عنوانِ درشتِ جمع‌شونده، اسکن و «…» در سربرگ، جست‌وجو و تراشه‌های
- *  فیلتر که با پیمایش می‌مانند، کارتِ آمار با شمارنده، ردیف‌های کشیدنی و دکمهٔ شناورِ
- *  «ورود کالا». حساب‌ها روی رشتهٔ پس‌زمینه (`StockListModel.overview`) و تا آماده شود
+ *  فیلتر که با پیمایش می‌مانند، ردیف‌های کشیدنی، خطِ کم‌رنگِ جمع در پایان (گوشی؛ کامپیوتر کارتِ
+ *  آمار با شمارنده) و دکمهٔ شناورِ «ورود کالا». حساب‌ها روی رشتهٔ پس‌زمینه (`StockListModel.overview`) و تا آماده شود
  *  اسکلت؛ دفترِ تازه که برسد عددِ پیشین می‌ماند و شمارنده تا عددِ تازه می‌رود.
  *
  *  `wide` (کامپیوتر): کارهای «…» دکمه‌های زیرِ جست‌وجو می‌شوند و ردیفِ بازِ کنار
@@ -172,6 +173,12 @@ fun StockListScreen(
 
 private const val FAB_KEY = "stock-entry-fab"
 
+/** نشانِ آزمونِ فهرستِ انبار (فقط `testTag`) */
+object StockListSpec {
+  const val LIST_TAG = "stock-list"
+  const val FOOTER_TAG = "stock-footer"
+}
+
 /**
  *  جای دکمهٔ شناور زیرِ آخرین ردیف (۵۶ + ۱۶) تا ردیفِ آخر زیرِ «ورود کالا» نماند — نه جای
  *  نوارِ پایین: آن را پوسته خودش نگه می‌دارد (AUDIT-NAV S1/S6) و `pad` ِ `V3Scaffold` نوارِ سیستم را.
@@ -235,8 +242,10 @@ private fun StockList(
 ) {
   val rows = remember(overview, filter, query, category, place) { StockListModel.visible(StockListModel.atPlace(overview, place), filter, query, category) }
   //  ۶۸c: ردیف‌ها یک فهرستِ پیوسته با خطِ مویی (کالبدِ `V3DataRow`)، نه کارتِ جدا با فاصله؛ فاصلهٔ ۸ فقط میانِ کارت‌های بالا
-  LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = contentPadding) {
-    item(key = "stats") {
+  LazyColumn(Modifier.fillMaxSize().testTag(StockListSpec.LIST_TAG), state = listState, contentPadding = contentPadding) {
+    //  ۱۴۰۵/۰۸/۲۴ (صاحب‌کار: «سربرگِ گدام رو می‌خوام چی کار آخه؟»): گوشی بی کارتِ خلاصهٔ بالا — همان عددها یک خطِ کم‌رنگ در پایانِ
+    //  فهرست ([StockListFooter]) و هشدارهای «تمام‌شده/کم» همان تراشه‌های شمارداری فیلتر. کامپیوتر (دو ستون) کارت را نگه می‌دارد.
+    if (wide) item(key = "stats") {
       StockStatsCard(overview.summary, onFilter, Modifier.padding(bottom = 12.dp).v3Stagger(stagger, "stats", 0))
     }
     if (wide) item(key = "desk-actions") {
@@ -265,6 +274,7 @@ private fun StockList(
         last = index == rows.lastIndex,
       )
     }
+    if (!wide && rows.isNotEmpty()) item(key = "footer") { StockListFooter(overview.summary) }
     item(key = "end") { Spacer(Modifier.height(8.dp)) }
   }
 }
