@@ -57,6 +57,41 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-68c زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-68c` (از `origin/claude/e-rows-65s` 6d697791f + ادغامِ `origin/claude/batch-68` 337caa416) — پالتِ لوکسِ برند و ردیف‌های آرامِ فهرست
+
+- **خواست** (صاحب‌کار): «رنگ صورتی کار نگیر، توی برنامه خیلی مسخره میشه. رنگ‌های برند بزار، لوکس.» و با عکسِ «خریدها» (شب) و عکسِ
+  پیش/پسِ یک فهرست: «این شلوغی‌هات رو، من قبلن هم این عکس رو دادم گفتم به وجود نیاد … درست کن دقیق و منظم.»
+- **ساخته شد — پالت**: `ui/theme/SectionColors.kt` هفت خانوادهٔ برند (نیلی `VIOLET`، زرِ گرم `AMBER`، نفتی `TEAL` ِ جدا از زمردی،
+  زمردی `MINT`، لاجوردیِ سرمه‌ای `SKY`، عقیقِ سرخ `CORAL` فقط برای قرض و برگشت، گرافیت `SLATE` ِ تازه)؛ `PINK` و `LIME` از
+  `PhoneV3Palette.Hue` برداشته شدند. هر خانه نشانهٔ کاشی (`glyph`) هم دارد و `ThemeAccents.DAY/NIGHT` و سری‌های نمودارِ هر شش پالت
+  (`ThemeAccents.chart`) از همین جدول‌اند (ترتیب `SectionColors.ORDER` = جاهای پیشینِ `HomeAccents`؛ خانه دست نخورد). بخش‌ها: فروش
+  نیلی، مصارف و تخفیف زر، خرید و سفارش نفتی، قرض عقیق، رسید و گاوصندوق زمردی، گزارش لاجوردی، انبار گرافیت؛ `V3Modules.HUE_BY_ID`،
+  `SettingsHues` (صندوق زمردی، انبار زر) و `historyTone` (قرضِ وصول‌شده نفتی) همان. جدول در `RULES-fa.md`.
+- **ساخته شد — ردیف**: `ui/v3/V3DataRow.kt` (`V3DataRow`، `V3DataRowSpec`، `V3RowMeta`/`v3MetaText`، `V3RowAction`) و نمای `DATA` ِ
+  `V3ListRow`: کاشی · عنوانِ یک‌خطیِ ۱۶ · خطِ دومِ یک‌خطیِ ۱۳ · خطِ مبلغِ یک‌خطی (مبلغ به رنگِ نوشته، وضعیت کم‌رنگ، دست‌بالا یک واژهٔ
+  خطر) و یک قرصِ خنثی **یا** پیکان. `V3RowTone.ATTENTION` دیگر زرد نیست (`v3RowToneColor`). صفحه‌ها: خریدها (`PurchaseRowText.meta`:
+  «۸٬۳۲۰ ؋ • ۳٬۳۲۰ ؋ مانده»، «سررسید ۴ قوس»، «سررسید گذشته»؛ «رسیده» ِ عادی فقط در جزئیات)، سفارشِ خرید، تأمین‌کننده‌ها و صفحهٔ هر کدام
+  (پرداخت‌ها هم)، مصارف، رسیدها، تاریخچهٔ فروش (واژهٔ رنگیِ پرداخت تنها نشان؛ PAY-07 و برگشت آرام)، کالاها، انبار (یک فهرستِ پیوسته با
+  خطِ مویی، نه کارت‌های جدا)، صفِ سفارش‌ها (`OrderCard`: «#۱۰۴۲ · مشتری»، «آنلاین · زمان · اقلام»، «مبلغ • وضعیت»، قرصِ خنثیِ گام؛
+  امضای تابع همان)، تخفیف‌ها (`Promos.kt`: بی دو دکمه — زدن ⇐ ویرایش، کشیدن ⇐ حذف) و کارمندان.
+- **پالایه‌ها**: خریدها یک ردیفِ ثابت (کادرِ دوره + «فیلتر» با شمار) و برگهٔ `PurchaseFilterSheet` (تأمین‌کننده/پرداخت/رسیدن)؛ `V3ChipRow` و
+  تب‌های صفِ سفارش (`DraftCountTabs`) لبهٔ محو (`v3EdgeFade`).
+- **دست نخورد**: داشبوردِ خانه (هش‌ها همان)، آیکن‌ها، قرض‌داران و پروندهٔ قرض‌دار، صفحهٔ ورود، `V3NavRow` (۶۵r)، رنگ‌های وضعیت.
+- **آزمون‌های عمداً عوض‌شده**: `SectionColorsTest` (TEAL خانوادهٔ خودش، هفت خانه، نشانهٔ کاشی ≥۳:۱/≥۴٫۵:۱)، `ThemeV2PaletteTest` و
+  `Vill3nPaletteTest` (رنگ‌های همراه و نمودارِ روز/شب، فهرستِ «زیرِ ۳:۱» تهی شد)، `HistoryMeaningTest` (قرضِ وصول‌شده نفتی)،
+  `V3NavRowGuardTest` (سه رشتهٔ متنیِ `V3ListRow` با `data`)، `PurchasesRoutesUiTest` (خطِ مبلغِ کوتاه و «فیلتر» ⇐ برگه). تازه:
+  `LuxPaletteGuardTest`، `V3DataRowGuardTest`، `PurchaseRowMetaTest`، `DataRowsE68cUiTest`، عکس‌ها `E68cShotsTest` (`E68C_SHOTS`، `E68C_ONLY`).
+- **نتیجه**: اجرای کاملِ هدف‌دار روی شاخهٔ ادغام‌شده با batch-68 (۲۵۸ آزمون): همه سبز جز ۴ آزمونِ تازهٔ خودم که پنجرهٔ پهنِ آزمون را
+  می‌سنجیدند (قابِ ۳۶۰dp ⇐ درست شد)؛ سپس `DataRowsE68cUiTest` ۱۱/۱۱، `PurchasesRoutesUiTest` ۷/۷، `RowsE63dUiTest` ۱۰/۱۰، `PurchaseRowMetaTest`
+  ۴/۴، `LuxPaletteGuardTest` ۵/۵، `V3DataRowGuardTest` ۵/۵، `LookGuardTest` ۷/۷، `SectionColorsTest` ۷/۷، `HardcodedColorsTest`، I18n/Dari سبز.
+  همچنین سبز: `SummaryCardUiTest` ۱۰، `SectionHeaderUiTest` ۷، `HistoryE65hUiTest` ۶، `HistoryMeaningTest` ۶، `NavRowUiTest` ۳، `V3NavRowGuardTest` ۶،
+  `ThemeV2PaletteTest` ۹، `Vill3nPaletteTest` ۶، `PurchaseViewsTest` ۱۰، `PurchaseOrderRoutesUiTest` ۷، `SupplierBillRoutesUiTest` ۶،
+  `DebtorRowsE65qUiTest` ۱۴، `OneHandShellUiTest` ۸، `InfraLeakGuardTest` ۸. `precheck.sh` fail=0؛ `whatsnew/check.mjs` سبز.
+- **عکس‌ها**: `scratchpad/e68c/{before,after}/<صفحه>-<light|dark>.png` و `compare-lists.png`، `compare-palette.png` (پیش = همین آزمون روی ۶۵s).
+- **قدمِ بعدی / نیمه‌کاره**: تمِ «شامگاه» گرادیانِ خودش را (`#DB2777` صورتی) هنوز دارد — جدولِ THEME-V2 ِ صاحب‌کار است؛ اگر «هیچ صورتی»
+  آن را هم می‌گیرد، با پرسش عوض شود. در «شامگاه» برند همان نیلیِ فروش است. ردیف‌های داده‌ای که هنوز `V3ListRow` ِ آزادند (گزارش‌ها، حرکاتِ
+  انبار، شاخه‌ها) در دستهٔ بعد به `V3DataRow` بروند.
+
 ### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-65s زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-65s` (از `origin/claude/batch-65` 66dd6f6fc) — سربرگِ بخش‌ها: وسط، تاشو، رنگِ بخش
 
 - **خواست** (صاحب‌کار با عکس): «همه سربرگ‌های توی برنامه همه‌شون وسط باشن و کشویی یعنی جمع بشن و بیان بیرون هر وقت که خواست» و سپس
