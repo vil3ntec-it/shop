@@ -94,12 +94,16 @@ class ScreenSpeedBenchTest {
     for ((name, f) in ScreenLogic.SECTIONS) if (only == null || name in only) logic(c, name, f, warm = 2, runs = 5, sampler = true, log = log)
     write("screen-speed.txt", log.toString())
     val store = ScreenFrame.storeOf(d)
+    ScreenFrame.signedIn { frames(d, store, only, log) }
+  }
+
+  private fun frames(d: ShopData, store: ShopStore, only: Set<String>?, log: StringBuilder) {
     for ((name, path) in ScreenSpeed.routes(d)) {
       if (only != null && name !in only) continue
       System.gc()
       val l0 = load()
       val cold = ScreenFrame.route(path, store)
-      val s = StackSampler(Thread.currentThread())
+      val s = StackSampler(ScreenFrame.worker)
       val warm = List(3) { ScreenFrame.route(path, store) }
       s.close()
       val firsts = warm.map { it.first }.sorted()

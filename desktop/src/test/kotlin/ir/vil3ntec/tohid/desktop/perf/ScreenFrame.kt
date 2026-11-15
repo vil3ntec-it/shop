@@ -29,15 +29,21 @@ import ir.vil3ntec.tohid.desktop.shots.V3RoutePreview
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.runBlocking
 import org.jetbrains.skia.Surface
+import java.util.concurrent.Executors
 
 /**
  *  PERF-SCREEN — «نخستین قاب» ِ یک مسیرِ v3 با دفترِ بزرگ، بی پنجره (رَسترِ Skia ِ همان Compose ِ کامپیوتر؛ همان پوشش‌های
  *  `ScreenRender`: `LocalContext`، `LocalConfiguration`، تم، راست‌به‌چپ و زبانِ `I18n`) و همان پوسته‌ای که برنامه می‌سازد
  *  ([V3RoutePreview] ⇐ `V3RouteHost`). زمان = `setContent` (ترکیبِ نخست) + نخستین `render` (چیدمان و کشیدن)؛ سپس چند قابِ
  *  ۱۶ میلی‌ثانیه‌ای تا کارهای پس از نخستین قاب (`LaunchedEffect`، `produceState`) هم دیده شوند.
+ *
+ *  صحنه روی **یک رشتهٔ جدا** ([worker]) با dispatcher ِ همان رشته ساخته و کشیده می‌شود: با `Dispatchers.Unconfined`
+ *  (`ScreenRender`) ادامهٔ `delay` ِ پلکانِ v3 روی `DefaultExecutor` می‌دوید و با `render` بن‌بست می‌شد.
+ *  پروندهٔ «نیازمندِ اشتراک» (`VipGate`) با نشستِ ساختگی ([signedIn]) باز است، همان پروندهٔ برنامه، نه برگهٔ قفل.
  *
  *  عددِ این‌جا JVM ِ کامپیوتر است، نه گوشی؛ گوشی و ART جدا سنجیده نشده‌اند (`docs/PERFORMANCE-fa.md`).
  */
@@ -50,6 +56,20 @@ internal object ScreenFrame {
     val total: Long get() = first + next.sum()
   }
 
+  /** رشتهٔ صحنه — برای نمونه‌برداری ([StackSampler]) */
+  @Volatile lateinit var worker: Thread
+    private set
+
+  private val dispatcher = Executors.newSingleThreadExecutor { r -> Thread(r, "screen-frame").apply { isDaemon = true; worker = this } }.asCoroutineDispatcher()
+
+  /** [block] با نشستِ ساختگی (`TokenStore.signedIn`) تا `VipGate` همان صفحه را نشان دهد؛ نشستِ پیشین پس از آن برمی‌گردد */
+  fun <T> signedIn(block: () -> T): T {
+    val tokens = ir.vil3ntec.tohid.data.repo.Backend.tokens(DesktopContext)
+    val before = tokens.accessToken
+    tokens.accessToken = "screen-speed"
+    try { return block() } finally { tokens.accessToken = before }
+  }
+
   /** دفترِ نمایشی فقط در حافظه — هیچ نوشتنی روی پوشهٔ دادهٔ آزمون (همان راهِ `NewScreensRenderTest`) */
   fun storeOf(d: ShopData): ShopStore = ShopStore(DesktopContext).also { s ->
     @Suppress("UNCHECKED_CAST")
@@ -60,7 +80,10 @@ internal object ScreenFrame {
   fun route(path: String, store: ShopStore, widthDp: Int = 360, heightDp: Int = 760, frames: Int = 4): Times =
     measure(widthDp, heightDp, frames) { V3RoutePreview(path, store, dark = false) }
 
-  fun measure(widthDp: Int, heightDp: Int, frames: Int, density: Float = 2f, content: @Composable () -> Unit): Times {
+  fun measure(widthDp: Int, heightDp: Int, frames: Int, density: Float = 2f, content: @Composable () -> Unit): Times =
+    runBlocking(dispatcher) { measureHere(widthDp, heightDp, frames, density, content) }
+
+  private fun measureHere(widthDp: Int, heightDp: Int, frames: Int, density: Float, content: @Composable () -> Unit): Times {
     val w = (widthDp * density).toInt()
     val h = (heightDp * density).toInt()
     val info = object : WindowInfo {
@@ -73,7 +96,7 @@ internal object ScreenFrame {
     val before = I18n.source
     I18n.source = { Lang.FA }
     val surface = Surface.makeRasterN32Premul(w, h)
-    val scene = CanvasLayersComposeScene(Density(density), LayoutDirection.Rtl, IntSize(w, h), Dispatchers.Unconfined, platform)
+    val scene = CanvasLayersComposeScene(Density(density), LayoutDirection.Rtl, IntSize(w, h), dispatcher, platform)
     try {
       val t0 = System.nanoTime()
       scene.setContent {
