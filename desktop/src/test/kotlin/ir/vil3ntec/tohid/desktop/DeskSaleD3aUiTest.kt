@@ -112,9 +112,14 @@ class DeskSaleD3aUiTest {
 
   private class Till(val store: ShopStore, val cart: CartStore, val snackbar: SnackbarHostState)
 
-  private fun open(d: ShopData): Till {
-    val store = ShopStore(ctx).also { runBlocking { it.load() } }
-    assertTrue(runBlocking { store.save(d) })
+  /**
+   *  [memory]: دفترِ حافظه‌ای (`RouteUiHarness.loadedStore`)، بی ذخیره روی دیسک — برای کاتالوگِ ۲۰ هزار کالا که فقط کشیدن را
+   *  می‌سنجد. ذخیرهٔ آن روی `ShopStore` ِ مشترکِ آزمون‌ها ~۱۲۳ هزار INSERT (و با ذخیرهٔ بعدی همان‌قدر DELETE) در صفِ همگام‌سازیِ
+   *  مشترک می‌گذاشت (فایلِ ۸۰ مگابایتی) و `push` ِ آزمون‌های بعدی (`TillReceiveStaleTest`) دیگر روی حافظه نمی‌نشست.
+   */
+  private fun open(d: ShopData, memory: Boolean = false): Till {
+    val store = if (memory) RouteUiHarness.loadedStore(d)
+    else ShopStore(ctx).also { runBlocking { it.load() } }.also { assertTrue(runBlocking { it.save(d) }) }
     val t = Till(store, CartStore(ctx), SnackbarHostState())
     rule.setContent {
       CompositionLocalProvider(
@@ -227,7 +232,7 @@ class DeskSaleD3aUiTest {
 
   @Test fun `کاتالوگِ ۲۰ هزار کالا تنبل کشیده می‌شود`() {
     val s = PosSpeed.shop(products = 20_000, sales = 10)
-    open(s.d)
+    open(s.d, memory = true)
     scanBox()
     rule.waitForIdle()
     val rows = count(clickLabel(StrSale.addToCart))

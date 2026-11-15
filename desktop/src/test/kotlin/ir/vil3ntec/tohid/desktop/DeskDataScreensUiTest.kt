@@ -16,8 +16,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
@@ -279,7 +281,11 @@ class DeskDataScreensUiTest {
     set { DeskFreshReports(d, remember { SnackbarHostState() }) }
     await(StrReports.reportType + ":")
     tap(StrReports.reportType + ":", substring = true)
-    tap(ReportFreshModelLabel.sales())
+    //  گزینهٔ کادرِ کشویی (`DeskMenuRow` حالتِ «انتخاب» دارد) — نه سرستونِ زدنیِ «فروش» ِ جدولِ «امروز» با همان نوشته، که
+    //  اگر بارِ «امروز» پیش از این ضربه رسیده باشد نخستین گره است و فقط جدول را مرتب می‌کند
+    onAllNodes(hasText(ReportFreshModelLabel.sales()) and hasClickAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected))[0]
+      .performSemanticsAction(SemanticsActions.OnClick)
+    waitForIdle()
     await(StrReports.netSales)
     waitUntil(timeoutMillis = 20_000) { has(ir.vil3ntec.tohid.core.i18n.StrDesk.salesChart) || has(StrDeskData.salesByHour) || has(StrDeskData.salesByMonth) }
     assertTrue(has(ir.vil3ntec.tohid.core.report.ReportBoard.DIM_LABELS.getValue("payment")))
