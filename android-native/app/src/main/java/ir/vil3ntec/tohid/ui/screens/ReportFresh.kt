@@ -226,7 +226,8 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   }
   val today = ir.vil3ntec.tohid.todayIso()
   val clock = remember { ReportBridge.deviceClock() }
-  val ledger = remember(d) { ReportBridge.ledgerOf(d) }
+  //  PERF-DESK: JSON ِ کلِ دفتر بیرون از رشتهٔ صفحه (دفترِ تازه ⇒ تا آماده شدن همان درختِ پیشین)
+  val ledger = rememberOffMain(d) { _ -> ReportBridge.ledgerOf(d) }
 
   var tab by remember { mutableStateOf(tabs.first().id) }
   var day by remember { mutableStateOf(today) }
@@ -254,9 +255,18 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   val rng = remember(span, today, shift, shifting) { ReportFreshModel.rangeOf(span, today, if (shifting) shift else 0) }
   val comparing = keys && def.id in ReportFreshModel.COMPARABLE
   fun step(by: Int) { if (ReportFreshModel.canShift(span, today, shift + by)) shift += by }
-  val view = remember(ledger, def.id, span, dim, today, cost, lineSeller, rng) {
-    ReportFreshModel.view(ledger, def.id, span, dim, today, clock, ReportFreshModel.costingOf(cost), lineSeller, rng)
+  //  PERF-DESK: نما و زبانه‌های دفتری بیرون از رشتهٔ صفحه، فقط برای همین زبانه/بازه/تفکیک (`rememberOffMainFor`)
+  val fresh = rememberOffMainFor(listOf(def.id, span, dim, today, cost, lineSeller, rng), ledger) { step ->
+    val l = ledger ?: return@rememberOffMainFor null
+    val view = ReportFreshModel.view(l, def.id, span, dim, today, clock, ReportFreshModel.costingOf(cost), lineSeller, rng)
+    step()
+    DeskFresh(
+      view = view,
+      promo = if (def.id == PromoFresh.TAB_ID) PromoFresh.view(d, l, span, today, clock, cost) else null,
+      stockCost = if (def.id == StockCostFresh.TAB_ID) ir.vil3ntec.tohid.core.report.ReportCore.stockCost(l) else null,
+    )
   }
+  val view = fresh?.view
   //  RPT-04: «پایانِ روز» از شیفت‌ها و دفتر (نه فقط `ReportLedger`)
   val dayEnd = remember(d, def.id, day) {
     if (def.id == DayEndModel.TAB_ID) DayEndModel.build(d, day, clock, ReportBridge.nowMs(), ReportBridge.offsetMinutes()) else null
@@ -279,25 +289,25 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
       ?: d.purchases.find { it.id == id }?.let { p -> StrReportPages.docPurchase + p.notes.trim().let { if (it.isEmpty()) "" else " — $it" } }
       ?: ""
   val gaps = remember(d, def.id, today) { if (def.id == DocGapsFresh.TAB_ID) DocGapsFresh.tables(d, today) else null }
-  //  PRM-16: اثرِ هر تخفیف با همان روشِ بهای «سود و حاشیه» (`ReportFresh.cost`)
-  val promo = remember(d, ledger, def.id, span, today, cost) {
-    if (def.id == PromoFresh.TAB_ID) PromoFresh.view(d, ledger, span, today, clock, cost) else null
-  }
-  //  PRD-15: بهای میانگینِ هر کالا و ارزشِ موجودی از همان بازپخشِ میانگینِ موزون؛ فقط خواندنی
-  val stockCost = remember(ledger, def.id) {
-    if (def.id == StockCostFresh.TAB_ID) ir.vil3ntec.tohid.core.report.ReportCore.stockCost(ledger) else null
-  }
+  //  PRM-16: اثرِ هر تخفیف با همان روشِ بهای «سود و حاشیه» (`ReportFresh.cost`) — در `fresh` (بیرون از رشتهٔ صفحه)
+  val promo = fresh?.promo
+  //  PRD-15: بهای میانگینِ هر کالا و ارزشِ موجودی از همان بازپخشِ میانگینِ موزون؛ فقط خواندنی — در `fresh`
+  val stockCost = fresh?.stockCost
+  //  PERF-DESK: تا آماده شدنِ نمای همین زبانه، جای عددها و جدول‌ها همان اسکلتِ «در حالِ خواندن» است، نه «گزارشی نیست»
+  val loading = view == null && dayEnd == null && heat == null && gaps == null
   val tables = dayEnd?.tables ?: heat?.let { HeatmapModel.tables(it) } ?: gaps ?: promo?.let { PromoFresh.tables(it) }
-    ?: stockCost?.let { StockCostFresh.tables(it) } ?: view.tables
+    ?: stockCost?.let { StockCostFresh.tables(it) } ?: view?.tables.orEmpty()
   val viewMode = rememberViewMode("report-fresh", ScreenKind.MANAGEMENT)
   val name = "گزارش-${def.label}-${if (dayEnd != null) day else today}".replace(' ', '-') // داده: نامِ پروندهٔ خروجی
 
   fun sheet() = ReportCsv.Sheet(name, ReportFreshModel.exportRows(tables))
-  fun print() = ir.vil3ntec.tohid.print.ReportPrint.print(context, sheet(), name)
-  fun excel() { Platform.saveFile("$name.xlsx", Xlsx.of(sheet()))?.let { scope.launch { snackbar.showSnackbar(StrSale.savedTo(it)) } } }
+  //  تا نمای همین زبانه آماده نشده، چاپ و خروجی کاری نمی‌کنند (برگهٔ خالی چاپ نمی‌شود)
+  fun print() { if (!loading) ir.vil3ntec.tohid.print.ReportPrint.print(context, sheet(), name) }
+  fun excel() { if (!loading) Platform.saveFile("$name.xlsx", Xlsx.of(sheet()))?.let { scope.launch { snackbar.showSnackbar(StrSale.savedTo(it)) } } }
   //  RPT-11: PDF ِ مستقیم — همان جدول‌های چاپ، بی پنجرهٔ چاپ (فقط در «گزارشِ تازه»، پشتِ `report_fresh`)
   //  کامپیوتر: پنجرهٔ ذخیره؛ گوشی: «فرستادن» (همان راهِ PDF ِ فاکتور). ساختنِ صفحه‌ها بیرون از نخِ صفحه.
   fun pdf() {
+    if (loading) return
     val s = sheet()
     scope.launch {
       val msg = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { ir.vil3ntec.tohid.print.ReportPrint.savePdf(context, s, name) }
@@ -364,31 +374,34 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
       gaps != null -> Unit   // RPT-17: شمارها در خودِ جدول‌اند
       promo != null -> PromoSummary(promo)
       stockCost != null -> StockCostSummary(stockCost)
-      else -> Summary(view, def.id, d, money)
+      view != null -> Summary(view, def.id, d, money)
+      else -> TohidLoadingState(rows = 5)   // PERF-DESK: نمای همین زبانه هنوز بیرون از رشتهٔ صفحه ساخته می‌شود
     }
 
     /* ۴ ─ جدول‌ها */
-    if (tables.isEmpty()) Text(StrReportPages.noReport, color = Shop.colors.muted)
+    if (tables.isEmpty() && !loading) Text(StrReportPages.noReport, color = Shop.colors.muted)
     tables.forEach { t ->
       if (tables.size > 1) Text(t.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
-      val sales = view.sales
+      val sales = view?.sales
+      val l = ledger
       val onRow: ((List<JsonPrimitive>) -> Unit)? = when {
         dayEnd != null && t.id == DayEndModel.METHODS_ID -> { row -> DayEndModel.methodOf(dayEnd.report, row.first().content)?.let { drill = it } }
+        l == null -> null
         sales != null && (t.id.startsWith("sales.") || t.id == "profit") -> { row ->
           val dimNow = if (dim in ReportBoard.DIMS) dim else "product"
           //  POS-23: «فروشندهٔ هر ردیف» ⇒ ریزِ «کاربر» به فروشندهٔ ردیف؛ خاموش ⇒ همان فراخوانِ امروز
-          salesDrill = if (lineSeller) ReportFreshModel.drill(ledger, sales, dimNow, t.rows.indexOf(row), row.first().content, clock, lineSeller = true, doc = ::saleDoc)
-          else ReportFreshModel.drill(ledger, sales, dimNow, t.rows.indexOf(row), row.first().content, clock, ::saleDoc)
+          salesDrill = if (lineSeller) ReportFreshModel.drill(l, sales, dimNow, t.rows.indexOf(row), row.first().content, clock, lineSeller = true, doc = ::saleDoc)
+          else ReportFreshModel.drill(l, sales, dimNow, t.rows.indexOf(row), row.first().content, clock, ::saleDoc)
         }
         t.id == "today" -> { row ->
-          ReportFreshModel.dayDrill(ledger, row, clock, ::saleDoc)?.let { rowDrill = it to StrReportPages.dayDrillNote }
+          ReportFreshModel.dayDrill(l, row, clock, ::saleDoc)?.let { rowDrill = it to StrReportPages.dayDrillNote }
         }
-        view.debts != null && t.id.startsWith("debts.") -> { row ->
-          ReportFreshModel.debtDrill(ledger, view.debts, t.id == "debts.suppliers", t.rows.indexOf(row), row.first().content, clock, ::debtDoc)
+        view?.debts != null && t.id.startsWith("debts.") -> { row ->
+          ReportFreshModel.debtDrill(l, view.debts, t.id == "debts.suppliers", t.rows.indexOf(row), row.first().content, clock, ::debtDoc)
             ?.let { rowDrill = it to StrReportPages.debtDrillNote }
         }
-        view.fraud != null && t.id == "fraud" -> { row ->
-          ReportFreshModel.fraudDrill(ledger, view.fraud, t.rows.indexOf(row), clock, ::saleDoc)
+        view?.fraud != null && t.id == "fraud" -> { row ->
+          ReportFreshModel.fraudDrill(l, view.fraud, t.rows.indexOf(row), clock, ::saleDoc)
             ?.let { rowDrill = it to StrReportPages.fraudDrillNote }
         }
         else -> null

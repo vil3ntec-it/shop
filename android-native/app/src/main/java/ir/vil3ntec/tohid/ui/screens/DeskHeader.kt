@@ -50,8 +50,8 @@ fun DeskHeader(
   /** صفحهٔ باز — صندوق جست‌وجو و «فروشِ تازه»ِ سربرگ را نمی‌گیرد */
   page: String = "",
 ) {
-  val today = ir.vil3ntec.tohid.todayIso()
-  val board = remember(d, today) { DashboardEngine.board(d, today, 7) }
+  //  PERF-DESK: فقط چهار هشدار، یک بار برای هر دفتر و بیرون از رشتهٔ صفحه (`DeskAlerts`؛ پیش‌تر کلِ تخته روی رشتهٔ صفحه)
+  val board = rememberDeskAlerts(d)
   var bell by remember { mutableStateOf(false) }
   val c = Shop.colors
   val onSale = page == "sale"

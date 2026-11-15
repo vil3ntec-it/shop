@@ -109,16 +109,61 @@ object SearchIndex {
   fun scanTarget(d: ShopData, code: String): String =
     ShopStore.barcodeIndex(d)[code]?.let(ShellTargets::product) ?: ShellTargets.newProduct(code)
 
+  /*
+   *  PERF-DESK: نوشته‌های یکسان‌شدهٔ دفتر — نامِ هر کالا، نام و تلفنِ هر مشتری، شماره و نامِ مشتریِ هر فاکتور و مبلغِ هر
+   *  فاکتور — یک بار برای هر فهرست، نه با هر کلید. پیش‌تر هر حرفِ کادرِ جست‌وجو (Ctrl+K ِ کامپیوتر، جست‌وجوی گوشی)
+   *  برای ۲۰ هزار کالا و همهٔ فاکتورها `norm` (با `latinDigits` ِ نویسه‌به‌نویسه)، `invoiceLabel` و `money` را از نو
+   *  می‌ساخت. همان تابع‌ها روی همان ردیف‌ها، همان مقایسه و همان ترتیب؛ فهرستِ تازه (دفترِ عوض‌شده) ⇒ جدولِ تازه.
+   *  آزمونِ هم‌ارزی: `DeskSpeedEquivalenceTest`.
+   */
+  /** جدولِ یک‌خانه‌ای: کلیدِ همانی ([a]، [b]) ⇒ همان [value]؛ رشتهٔ پس‌زمینه و رشتهٔ صفحه هر دو می‌خوانند (`@Volatile`) */
+  private class Memo<T>(val a: Any?, val b: Any?, val value: T) {
+    fun of(a: Any?, b: Any?): T? = if (this.a === a && this.b === b) value else null
+  }
+
+  private class DebtorKeys(val names: Array<String>, val phones: Array<String>, val byId: Map<String, String>)
+  private class InvoiceKeys(val labels: Array<String?>, val customers: Array<String?>)
+
+  @Volatile private var productMemo: Memo<Array<String>>? = null
+  @Volatile private var debtorMemo: Memo<DebtorKeys>? = null
+  @Volatile private var invoiceMemo: Memo<InvoiceKeys>? = null
+  @Volatile private var amountMemo: Memo<Array<String>>? = null
+
+  private fun productNames(d: ShopData): Array<String> = productMemo?.of(d.products, null)
+    ?: Array(d.products.size) { norm(d.products[it].name) }.also { productMemo = Memo(d.products, null, it) }
+
+  private fun debtorKeys(d: ShopData): DebtorKeys = debtorMemo?.of(d.debtors, null)
+    ?: DebtorKeys(Array(d.debtors.size) { norm(d.debtors[it].name) }, Array(d.debtors.size) { norm(d.debtors[it].phone) }, d.debtors.associate { it.id to it.name })
+      .also { debtorMemo = Memo(d.debtors, null, it) }
+
+  private fun invoiceKeys(d: ShopData): InvoiceKeys = invoiceMemo?.of(d.sales, d.debtors) ?: run {
+    val names = debtorKeys(d).byId
+    InvoiceKeys(
+      Array(d.sales.size) { d.sales[it].invoiceLabel()?.lowercase() },
+      Array(d.sales.size) { i -> d.sales[i].debtorId?.let { names[it] }?.let(::norm) },
+    ).also { invoiceMemo = Memo(d.sales, d.debtors, it) }
+  }
+
+  private fun invoiceAmounts(d: ShopData): Array<String> = amountMemo?.of(d.sales, null)
+    ?: Array(d.sales.size) { money(d.sales[it].finalTotal).replace(",", "") }.also { amountMemo = Memo(d.sales, null, it) }
+
+  /** جدول‌های همین دفتر را از پیش می‌سازد (بیرون از رشتهٔ صفحه، با باز شدنِ جست‌وجو) تا نخستین کلید هم تند باشد */
+  fun warm(d: ShopData) {
+    productNames(d); invoiceKeys(d)
+  }
+
   private fun products(d: ShopData, q: String): Group {
     val stock = ShopStore.index(d)
-    val found = d.products.filter { norm(it.name).contains(q) || it.barcodes.any { b -> b.contains(q) } }
+    val names = productNames(d)
+    val found = d.products.filterIndexed { i, it -> names[i].contains(q) || it.barcodes.any { b -> b.contains(q) } }
     return Group(Kind.PRODUCT, found.take(CAP).map { p ->
       Hit(Kind.PRODUCT, p.id, p.name, StrSearch.productHint(money(stock.stock(p.id)), money(p.salePrice)), ShellTargets.product(p.id), matchIn(p.name, q))
     }, found.size)
   }
 
   private fun debtors(d: ShopData, q: String): Group {
-    val found = d.debtors.filter { norm(it.name).contains(q) || norm(it.phone).contains(q) || LocaleText.phoneMatches(it.phone, q) }
+    val keys = debtorKeys(d)
+    val found = d.debtors.filterIndexed { i, it -> keys.names[i].contains(q) || keys.phones[i].contains(q) || LocaleText.phoneMatches(it.phone, q) }
     return Group(Kind.DEBTOR, found.take(CAP).map { b ->
       Hit(Kind.DEBTOR, b.id, b.name, StrSearch.debtorHint(money(ShopStore.debt(d, b.id))), ShellTargets.debtor(b.id), matchIn(b.name, q))
     }, found.size)
@@ -126,12 +171,15 @@ object SearchIndex {
 
   /** فاکتورها: شماره (`B1-154` یا `154`)، نامِ مشتری، یا مبلغِ نهایی — تازه‌ترین اول */
   private fun invoices(d: ShopData, q: String): Group {
-    val names = d.debtors.associate { it.id to it.name }
+    val names = debtorKeys(d).byId
     val digits = q.all { it.isDigit() || it == ',' }
-    val found = d.sales.filter { s ->
-      s.invoiceLabel()?.lowercase()?.contains(q) == true ||
-        (s.debtorId?.let { names[it] }?.let { norm(it).contains(q) } == true) ||
-        (digits && money(s.finalTotal).replace(",", "") == q.replace(",", ""))
+    val keys = invoiceKeys(d)
+    val amounts = if (digits) invoiceAmounts(d) else null
+    val plain = q.replace(",", "")
+    val found = d.sales.filterIndexed { i, _ ->
+      keys.labels[i]?.contains(q) == true ||
+        (keys.customers[i]?.contains(q) == true) ||
+        (amounts != null && amounts[i] == plain)
     }.sortedByDescending { it.createdAt }
     return Group(Kind.INVOICE, found.take(CAP).map { s -> invoiceHit(s, names[s.debtorId], q) }, found.size)
   }

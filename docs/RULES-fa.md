@@ -1890,6 +1890,17 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
   دروازه ⇒ `LocalV3Covered`) و برنامهٔ RESUMED (`ProvideV3Foreground` در `MainActivity` و پنجرهٔ کامپیوتر) و در قاب؛ وگرنه قابِ
   ایستا و صفر قاب. کارِ داده‌ایِ سراسری (همگام‌سازی، زنگِ سفارش، کارگرها) از آن نمی‌گذرد. نگهبان: `V3LiveGuardTest` (فهرستِ
   کارِ سراسری و اسپینرهای مانده فقط کوچک می‌شود)، رفتار: `V3LiveGateTest`. صحنه‌های هنرِ `ui/v3/art/` هم همین را صدا می‌زنند.
+- ⛔ **PERF-DESK — پنجرهٔ کامپیوتر (خواستِ صاحب‌کار ۱۴۰۵/۰۸/۲۴: «برنامهٔ کامپیوتری کند و لگ است»؛ `docs/PERFORMANCE-fa.md`):**
+  پوسته (سربرگ، منوی کناری، نوارِ وضعیت) با هر عوض شدنِ دفتر هیچ گذرِ کلِ دفتر روی رشتهٔ صفحه نمی‌کند: هشدارهای زنگ و نشانِ
+  منو فقط از `rememberDeskAlerts` (`DashboardEngine.alerts`، یک بار برای هر دفتر، `Dispatchers.Default`)، نه `board` ِ کامل. هر
+  JSON ِ کلِ دفتر یا بازپخشِ هستهٔ گزارش (`ReportBridge.ledgerOf`، `ReportEngine.stockValue`، `ReportFreshModel.view`) فقط با
+  `rememberOffMain`/`rememberOffMainFor` (زبانهٔ دیگر ⇒ نتیجهٔ زبانهٔ پیشین هرگز دیده نمی‌شود). جست‌وجو با هر حرف فقط روی جدول‌های
+  یک‌بارهٔ `SearchIndex` (نوشتهٔ یکسان‌شده برای هر فهرست، نه `norm` برای هر ردیف در هر کلید). تصویرِ متحرک (`V3Illustration`) هم از
+  `rememberV3Live` می‌گذرد (پنجرهٔ بی فوکوس ⇒ صفر قاب). کارِ پیش از پنجره در `main` فقط آنچه پنجره لازم دارد (سوکت و کارگرِ همگام‌سازی
+  روی `Dispatchers.IO`). نصاب: `cdsArchive` (نقشهٔ CDS ِ JDK پس از `createDistributable`) و `-XX:+UseStringDeduplication` برداشته
+  نمی‌شوند؛ `files/startup.txt` (`StartupTrace`) زمانِ باز شدن و موتورِ کشیدن را نشان می‌دهد و CI ِ ویندوز چاپش می‌کند. سنجه:
+  `desktop/…/perf/DeskSpeedBenchTest` (دستی، `TOHID_DESK_SPEED=1`؛ پنجرهٔ بی پنجره `DeskShell`)؛ نگهبانِ همیشگی `DeskIdleGuardTest`
+  (خانهٔ بی‌کار صفر قاب و صفر ترکیب، صندوقِ پنجرهٔ بی فوکوس صفر قاب)؛ هم‌ارزی `DeskSpeedEquivalenceTest`.
 - ⛔ **PERF-02 — بار در مقیاسِ §۹.۳ و درستی زیرِ بار (`claude/perf-load`):** `load-test.mjs --profile scale,scale-burst --check`
   (آمیزه و دفترِ بارساز `scripts/load-scale.mjs`، سنجه `scripts/load-check.js`). هر تغییرِ push/pull ِ v3، وظیفه/تعارض، نگه‌داشته،
   ویترین یا جدایی دکان ⇒ `test/load-correctness.test.js` روی PGlite و PostgreSQL (بی سنجهٔ زمانی، ~۱ دقیقه). جست‌وجوی ردیفِ «باز» با

@@ -376,6 +376,8 @@ jobs:
           if ($mem -lt 150) { throw "JVMِ برنامه بالا نیامد (حافظه $mem مگابایت)" }
           if ($title -notmatch 'فروشگاه من') { Write-Host "::warning::عنوانِ پنجره «$title» است (روی CI ممکن است پنجره ساخته نشود)" }
           Write-Host "✓ برنامه باز شد و ماند"
+          #  PERF-DESK: زمانِ باز شدن، موتورِ کشیدنِ Skiko و heap روی همین ویندوز (‎desktop/…/StartupTrace.kt‎) — فقط چاپ
+          Get-Content (Join-Path $env:LOCALAPPDATA 'Tohid\files\startup.txt') -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "   startup: $_" }
           Check "$t\a" "Offline"
 
           #  ۲) ‎install.ps1‎ (راهِ بی SmartScreen) با Windows PowerShell 5.1 — همان که روی ویندوزِ کاربر است — و

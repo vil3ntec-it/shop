@@ -37,7 +37,8 @@ private var SemanticsPropertyReceiver.artCharacter by V3ArtCharacterKey
  *    خلاف، چیزِ نزدیک هم‌سو)، سایه‌های نرمِ لایه‌لایه و شناوریِ آرام با سایهٔ زمینی که کوچک و بزرگ می‌شود؛
  *  - کارایی: ساعت فقط در `graphicsLayer {}` و رسم خوانده می‌شود (بی بازترکیب در هر فریم)، مسیرهای ثابت یک بار در
  *    `drawWithCache` ساخته می‌شوند، بی bitmap، بی Lottie؛ نخستین فریم فقط چند مسیرِ کوچک است؛
- *  - ایستادن: «کاهشِ حرکت» (`Motion.enabled`)، بیرون رفتن از دید (`boundsInWindow` تهی) یا رفتنِ صفحه ⇒ هیچ ساعتی نیست
+ *  - ایستادن: «کاهشِ حرکت» (`Motion.enabled`)، بیرون رفتن از دید (`boundsInWindow` تهی)، برگه/دروازهٔ رویِ صفحه یا برنامهٔ
+ *    نه-RESUMED (`rememberV3Live`؛ کامپیوتر: پنجرهٔ بی فوکوس) یا رفتنِ صفحه ⇒ هیچ ساعتی نیست
  *    و تصویر در ژستِ آرام ثابت است؛ پس‌زمینه ⇒ ساعتِ قاب‌های Compose خودش می‌ایستد؛
  *  - دسترس‌پذیری: تزئینی ([clearAndSetSemantics] بی نام)؛ معنا در عنوانِ زیرِ آن است.
  *
@@ -47,7 +48,10 @@ private var SemanticsPropertyReceiver.artCharacter by V3ArtCharacterKey
 fun V3Illustration(kind: V3ArtKind, modifier: Modifier = Modifier, size: Dp = 112.dp, depth: Boolean = true) {
   val palette = rememberV3ArtPalette()
   var onScreen by remember { mutableStateOf(true) }
-  val animated = Motion.enabled && onScreen
+  //  PERF-DESK: همان دروازهٔ «زنده» ِ `V3Live` (برگه/دروازه رویش نیست و برنامه RESUMED است — روی کامپیوتر یعنی پنجره
+  //  فوکوس دارد): پیش‌تر تصویر زیرِ برگه و در پنجرهٔ پشتِ برنامهٔ دیگر هم هر قاب کشیده می‌شد
+  val live = ir.vil3ntec.tohid.ui.v3.rememberV3Live()
+  val animated = Motion.enabled && onScreen && live.active
   val clock = rememberV3ArtClock(animated)
   //  آدمک‌ها از ۷۲dp به بالا خوانا هستند؛ نشانِ کوچک (کادرِ خطای درونِ فرم) همان صحنهٔ چیزهاست
   val character = size >= CHARACTER_MIN
