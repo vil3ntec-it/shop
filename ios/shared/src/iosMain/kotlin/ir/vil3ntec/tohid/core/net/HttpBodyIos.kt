@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.core.net
 
+import ir.vil3ntec.tohid.ios.jvm.Charsets
 import java.io.InputStream
 import java.net.HttpURLConnection
 
