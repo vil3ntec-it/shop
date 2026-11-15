@@ -46,6 +46,8 @@ class BranchDeskDesktopTest {
 
   private fun clean() {
     BranchDesk.reset(ctx)
+    //  قفلِ کاتالوگِ شعبهٔ «الف» از آزمونِ پیشین روی دیسک می‌ماند (همان شناسه) ⇒ هر آزمون از صفر
+    BranchDesk.rememberCatalog(ctx, "", emptySet())
     BranchDesk.forgetCache()
     SyncChoice.set(ctx, SyncChoice.V1, 0)
     SyncStore(ctx).signOut()
