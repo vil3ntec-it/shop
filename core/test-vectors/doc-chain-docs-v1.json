@@ -1,0 +1,272 @@
+{
+  "format": "tohid-hashchain-v1",
+  "version": 1,
+  "about": "بردارِ مرجعِ اسنادِ بی‌شمارهٔ زنجیرهٔ دستگاه (SEC-02): برگشت، قرض/رسید، خرید و پرداخت به تأمین‌کننده پسِ فاکتورهای همان سری. ساخته‌شده با server/scripts/doc-chain-docs-vectors.js — دستی ویرایش نشود. Kotlin (core/audit/DocChainDocs، DocChainDocsVectorsTest) همین خط‌ها را می‌سازد و سرور (lib/doc-chain.js، doc-chain-docs.test.js) همین حلقه‌ها را می‌پذیرد. مبلغ به پول، مقدار به هزارم؛ سند بی دادهٔ شخصی.",
+  "rules": {
+    "doc": "canonicalJson of { chain, seq, kind:\"doc\", type, v:1, id, status:\"posted\", postedAt, by? (when non-empty), currency, ...type fields } — return: qtyScale, saleId, saleItemId, productId, qty, amount, docId?, disposition?, refund?, toAccount?, toCredit?, creditTo?, unitPrice?; debt: customerId, direction, amount, refId?, debtKind?; purchase: qtyScale, supplierId, productId, qty, unitPrice, total, paid, debt; supplier_pay: supplierId, amount",
+    "pick": "after the sales of the series: plain docs with postedAt >= docFrom (and inside the 3-day window before the marker), id without , TAB CR LF, not chained before; ascending by postedAt, then type, then id; one per type:id",
+    "marker": "docAt = max(docAt, min(newest chained postedAt, now)); docIds = chained keys still inside the window",
+    "line": "L1 TAB seq TAB prevHash TAB hash TAB type TAB ref TAB 0 TAB body (one line per link, LF-terminated)"
+  },
+  "shopId": "shp_vec01",
+  "series": "B1",
+  "epoch": 1,
+  "chain": "doc/shp_vec01/B1/1",
+  "by": "usr_vec01",
+  "startNo": 7,
+  "docFrom": 1761800000000,
+  "now": 1761800900000,
+  "sales": [
+    {
+      "id": "sal_01",
+      "series": "B1",
+      "no": 7,
+      "postedAt": 1761800100000,
+      "customerId": "deb_07",
+      "currency": "AFN",
+      "lines": [
+        {
+          "productId": "p_rice",
+          "qty": 2000,
+          "unitPrice": 5000,
+          "amount": 10000
+        }
+      ],
+      "subtotal": 10000,
+      "discount": 0,
+      "total": 10000,
+      "paid": 4000,
+      "method": "credit"
+    }
+  ],
+  "docs": [
+    {
+      "type": "debt",
+      "id": "dtx_old",
+      "postedAt": 1761799999999,
+      "currency": "AFN",
+      "customerId": "deb_07",
+      "direction": "give",
+      "amount": 100
+    },
+    {
+      "type": "return",
+      "id": "ret_01a",
+      "postedAt": 1761800200000,
+      "currency": "AFN",
+      "saleId": "sal_01",
+      "saleItemId": "si_01",
+      "productId": "p_rice",
+      "qty": 500,
+      "amount": 2500,
+      "docId": "rdoc_01",
+      "disposition": "restock",
+      "refund": "cash",
+      "toAccount": 1000
+    },
+    {
+      "type": "return",
+      "id": "ret_01b",
+      "postedAt": 1761800200000,
+      "currency": "AFN",
+      "saleId": "sal_01",
+      "saleItemId": "si_01",
+      "productId": "p_rice",
+      "qty": 250,
+      "amount": 1250,
+      "docId": "rdoc_01",
+      "disposition": "damaged",
+      "refund": "store_credit",
+      "toCredit": 1250,
+      "creditTo": "deb_07"
+    },
+    {
+      "type": "return",
+      "id": "ret_02",
+      "postedAt": 1761800250000,
+      "currency": "AFN",
+      "saleId": "",
+      "saleItemId": "",
+      "productId": "p_oil",
+      "qty": 1000,
+      "amount": 12550,
+      "unitPrice": 12550
+    },
+    {
+      "type": "debt",
+      "id": "dtx_01",
+      "postedAt": 1761800300000,
+      "currency": "AFN",
+      "customerId": "deb_07",
+      "direction": "give",
+      "amount": 75000
+    },
+    {
+      "type": "debt",
+      "id": "dtx_02",
+      "postedAt": 1761800300000,
+      "currency": "AFN",
+      "customerId": "deb_07",
+      "direction": "receive",
+      "amount": 6000,
+      "refId": "sal_01",
+      "kind": "sale_cancel"
+    },
+    {
+      "type": "purchase",
+      "id": "pur_01",
+      "postedAt": 1761800400000,
+      "currency": "AFN",
+      "supplierId": "sup_01",
+      "productId": "p_gold",
+      "qty": 1500,
+      "unitPrice": 658436214008,
+      "total": 987654321012,
+      "paid": 900000000000,
+      "debt": 87654321012
+    },
+    {
+      "type": "purchase",
+      "id": "pur_02",
+      "postedAt": 1761800450000,
+      "currency": "AFN",
+      "supplierId": "sup_01",
+      "productId": "p_rice",
+      "qty": -2000,
+      "unitPrice": 4000,
+      "total": -8000,
+      "paid": 0,
+      "debt": -8000
+    },
+    {
+      "type": "supplier_pay",
+      "id": "spay_01",
+      "postedAt": 1761800500000,
+      "currency": "AFN",
+      "supplierId": "sup_01",
+      "amount": 50000
+    },
+    {
+      "type": "debt",
+      "id": "dtx,bad",
+      "postedAt": 1761800600000,
+      "currency": "AFN",
+      "customerId": "deb_07",
+      "direction": "give",
+      "amount": 1
+    },
+    {
+      "type": "supplier_pay",
+      "id": "spay_01",
+      "postedAt": 1761800500000,
+      "currency": "AFN",
+      "supplierId": "sup_01",
+      "amount": 50000
+    }
+  ],
+  "links": [
+    {
+      "seq": 1,
+      "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "hash": "9d347b7a2b643d25a97b55cdef346a49062fac417a22b0306eddf018f3a4e0cb",
+      "type": "sale",
+      "ref": "sal_01",
+      "no": 7,
+      "body": "{\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"customerId\":\"deb_07\",\"discount\":0,\"id\":\"sal_01\",\"kind\":\"doc\",\"lines\":[{\"amount\":10000,\"productId\":\"p_rice\",\"qty\":2000,\"unitPrice\":5000}],\"method\":\"credit\",\"no\":7,\"paid\":4000,\"postedAt\":1761800100000,\"qtyScale\":1000,\"seq\":1,\"series\":\"B1\",\"status\":\"posted\",\"subtotal\":10000,\"total\":10000,\"type\":\"sale\",\"v\":1}",
+      "line": "L1\t1\t0000000000000000000000000000000000000000000000000000000000000000\t9d347b7a2b643d25a97b55cdef346a49062fac417a22b0306eddf018f3a4e0cb\tsale\tsal_01\t7\t{\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"customerId\":\"deb_07\",\"discount\":0,\"id\":\"sal_01\",\"kind\":\"doc\",\"lines\":[{\"amount\":10000,\"productId\":\"p_rice\",\"qty\":2000,\"unitPrice\":5000}],\"method\":\"credit\",\"no\":7,\"paid\":4000,\"postedAt\":1761800100000,\"qtyScale\":1000,\"seq\":1,\"series\":\"B1\",\"status\":\"posted\",\"subtotal\":10000,\"total\":10000,\"type\":\"sale\",\"v\":1}"
+    },
+    {
+      "seq": 2,
+      "prevHash": "9d347b7a2b643d25a97b55cdef346a49062fac417a22b0306eddf018f3a4e0cb",
+      "hash": "c69b9a69f0b061e341a04088d29f5d39b3ea9aa8e001f262ea48e85467d43800",
+      "type": "return",
+      "ref": "ret_01a",
+      "no": 0,
+      "body": "{\"amount\":2500,\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"disposition\":\"restock\",\"docId\":\"rdoc_01\",\"id\":\"ret_01a\",\"kind\":\"doc\",\"postedAt\":1761800200000,\"productId\":\"p_rice\",\"qty\":500,\"qtyScale\":1000,\"refund\":\"cash\",\"saleId\":\"sal_01\",\"saleItemId\":\"si_01\",\"seq\":2,\"status\":\"posted\",\"toAccount\":1000,\"type\":\"return\",\"v\":1}",
+      "line": "L1\t2\t9d347b7a2b643d25a97b55cdef346a49062fac417a22b0306eddf018f3a4e0cb\tc69b9a69f0b061e341a04088d29f5d39b3ea9aa8e001f262ea48e85467d43800\treturn\tret_01a\t0\t{\"amount\":2500,\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"disposition\":\"restock\",\"docId\":\"rdoc_01\",\"id\":\"ret_01a\",\"kind\":\"doc\",\"postedAt\":1761800200000,\"productId\":\"p_rice\",\"qty\":500,\"qtyScale\":1000,\"refund\":\"cash\",\"saleId\":\"sal_01\",\"saleItemId\":\"si_01\",\"seq\":2,\"status\":\"posted\",\"toAccount\":1000,\"type\":\"return\",\"v\":1}"
+    },
+    {
+      "seq": 3,
+      "prevHash": "c69b9a69f0b061e341a04088d29f5d39b3ea9aa8e001f262ea48e85467d43800",
+      "hash": "e480b8ab6ac9b3e0644824ecf0ecd39272a93117ac00e7957e6d56abeffd5f57",
+      "type": "return",
+      "ref": "ret_01b",
+      "no": 0,
+      "body": "{\"amount\":1250,\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"creditTo\":\"deb_07\",\"currency\":\"AFN\",\"disposition\":\"damaged\",\"docId\":\"rdoc_01\",\"id\":\"ret_01b\",\"kind\":\"doc\",\"postedAt\":1761800200000,\"productId\":\"p_rice\",\"qty\":250,\"qtyScale\":1000,\"refund\":\"store_credit\",\"saleId\":\"sal_01\",\"saleItemId\":\"si_01\",\"seq\":3,\"status\":\"posted\",\"toCredit\":1250,\"type\":\"return\",\"v\":1}",
+      "line": "L1\t3\tc69b9a69f0b061e341a04088d29f5d39b3ea9aa8e001f262ea48e85467d43800\te480b8ab6ac9b3e0644824ecf0ecd39272a93117ac00e7957e6d56abeffd5f57\treturn\tret_01b\t0\t{\"amount\":1250,\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"creditTo\":\"deb_07\",\"currency\":\"AFN\",\"disposition\":\"damaged\",\"docId\":\"rdoc_01\",\"id\":\"ret_01b\",\"kind\":\"doc\",\"postedAt\":1761800200000,\"productId\":\"p_rice\",\"qty\":250,\"qtyScale\":1000,\"refund\":\"store_credit\",\"saleId\":\"sal_01\",\"saleItemId\":\"si_01\",\"seq\":3,\"status\":\"posted\",\"toCredit\":1250,\"type\":\"return\",\"v\":1}"
+    },
+    {
+      "seq": 4,
+      "prevHash": "e480b8ab6ac9b3e0644824ecf0ecd39272a93117ac00e7957e6d56abeffd5f57",
+      "hash": "4e5b4ee1b92f24d97c65f8296cb5cde95117964c32e184d7da471b57ab343432",
+      "type": "return",
+      "ref": "ret_02",
+      "no": 0,
+      "body": "{\"amount\":12550,\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"id\":\"ret_02\",\"kind\":\"doc\",\"postedAt\":1761800250000,\"productId\":\"p_oil\",\"qty\":1000,\"qtyScale\":1000,\"saleId\":\"\",\"saleItemId\":\"\",\"seq\":4,\"status\":\"posted\",\"type\":\"return\",\"unitPrice\":12550,\"v\":1}",
+      "line": "L1\t4\te480b8ab6ac9b3e0644824ecf0ecd39272a93117ac00e7957e6d56abeffd5f57\t4e5b4ee1b92f24d97c65f8296cb5cde95117964c32e184d7da471b57ab343432\treturn\tret_02\t0\t{\"amount\":12550,\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"id\":\"ret_02\",\"kind\":\"doc\",\"postedAt\":1761800250000,\"productId\":\"p_oil\",\"qty\":1000,\"qtyScale\":1000,\"saleId\":\"\",\"saleItemId\":\"\",\"seq\":4,\"status\":\"posted\",\"type\":\"return\",\"unitPrice\":12550,\"v\":1}"
+    },
+    {
+      "seq": 5,
+      "prevHash": "4e5b4ee1b92f24d97c65f8296cb5cde95117964c32e184d7da471b57ab343432",
+      "hash": "a6095cc740e0b688d3ef3cdd70273b48629cf9229205633977fb4ce842efc096",
+      "type": "debt",
+      "ref": "dtx_01",
+      "no": 0,
+      "body": "{\"amount\":75000,\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"customerId\":\"deb_07\",\"direction\":\"give\",\"id\":\"dtx_01\",\"kind\":\"doc\",\"postedAt\":1761800300000,\"seq\":5,\"status\":\"posted\",\"type\":\"debt\",\"v\":1}",
+      "line": "L1\t5\t4e5b4ee1b92f24d97c65f8296cb5cde95117964c32e184d7da471b57ab343432\ta6095cc740e0b688d3ef3cdd70273b48629cf9229205633977fb4ce842efc096\tdebt\tdtx_01\t0\t{\"amount\":75000,\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"customerId\":\"deb_07\",\"direction\":\"give\",\"id\":\"dtx_01\",\"kind\":\"doc\",\"postedAt\":1761800300000,\"seq\":5,\"status\":\"posted\",\"type\":\"debt\",\"v\":1}"
+    },
+    {
+      "seq": 6,
+      "prevHash": "a6095cc740e0b688d3ef3cdd70273b48629cf9229205633977fb4ce842efc096",
+      "hash": "02d15ba89edfcb63e9f1d2e0a2636fee033efffbcead4239c60c26ed21735f49",
+      "type": "debt",
+      "ref": "dtx_02",
+      "no": 0,
+      "body": "{\"amount\":6000,\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"customerId\":\"deb_07\",\"debtKind\":\"sale_cancel\",\"direction\":\"receive\",\"id\":\"dtx_02\",\"kind\":\"doc\",\"postedAt\":1761800300000,\"refId\":\"sal_01\",\"seq\":6,\"status\":\"posted\",\"type\":\"debt\",\"v\":1}",
+      "line": "L1\t6\ta6095cc740e0b688d3ef3cdd70273b48629cf9229205633977fb4ce842efc096\t02d15ba89edfcb63e9f1d2e0a2636fee033efffbcead4239c60c26ed21735f49\tdebt\tdtx_02\t0\t{\"amount\":6000,\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"customerId\":\"deb_07\",\"debtKind\":\"sale_cancel\",\"direction\":\"receive\",\"id\":\"dtx_02\",\"kind\":\"doc\",\"postedAt\":1761800300000,\"refId\":\"sal_01\",\"seq\":6,\"status\":\"posted\",\"type\":\"debt\",\"v\":1}"
+    },
+    {
+      "seq": 7,
+      "prevHash": "02d15ba89edfcb63e9f1d2e0a2636fee033efffbcead4239c60c26ed21735f49",
+      "hash": "9b3e6404ef44fe99c5d10315e5a1a1fbc6bdab9cf52a4e0813d43c608716728b",
+      "type": "purchase",
+      "ref": "pur_01",
+      "no": 0,
+      "body": "{\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"debt\":87654321012,\"id\":\"pur_01\",\"kind\":\"doc\",\"paid\":900000000000,\"postedAt\":1761800400000,\"productId\":\"p_gold\",\"qty\":1500,\"qtyScale\":1000,\"seq\":7,\"status\":\"posted\",\"supplierId\":\"sup_01\",\"total\":987654321012,\"type\":\"purchase\",\"unitPrice\":658436214008,\"v\":1}",
+      "line": "L1\t7\t02d15ba89edfcb63e9f1d2e0a2636fee033efffbcead4239c60c26ed21735f49\t9b3e6404ef44fe99c5d10315e5a1a1fbc6bdab9cf52a4e0813d43c608716728b\tpurchase\tpur_01\t0\t{\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"debt\":87654321012,\"id\":\"pur_01\",\"kind\":\"doc\",\"paid\":900000000000,\"postedAt\":1761800400000,\"productId\":\"p_gold\",\"qty\":1500,\"qtyScale\":1000,\"seq\":7,\"status\":\"posted\",\"supplierId\":\"sup_01\",\"total\":987654321012,\"type\":\"purchase\",\"unitPrice\":658436214008,\"v\":1}"
+    },
+    {
+      "seq": 8,
+      "prevHash": "9b3e6404ef44fe99c5d10315e5a1a1fbc6bdab9cf52a4e0813d43c608716728b",
+      "hash": "73a0a306a8bfd74396cc1615b0149a856d32544daca037fca3554356f868c9a2",
+      "type": "purchase",
+      "ref": "pur_02",
+      "no": 0,
+      "body": "{\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"debt\":-8000,\"id\":\"pur_02\",\"kind\":\"doc\",\"paid\":0,\"postedAt\":1761800450000,\"productId\":\"p_rice\",\"qty\":-2000,\"qtyScale\":1000,\"seq\":8,\"status\":\"posted\",\"supplierId\":\"sup_01\",\"total\":-8000,\"type\":\"purchase\",\"unitPrice\":4000,\"v\":1}",
+      "line": "L1\t8\t9b3e6404ef44fe99c5d10315e5a1a1fbc6bdab9cf52a4e0813d43c608716728b\t73a0a306a8bfd74396cc1615b0149a856d32544daca037fca3554356f868c9a2\tpurchase\tpur_02\t0\t{\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"debt\":-8000,\"id\":\"pur_02\",\"kind\":\"doc\",\"paid\":0,\"postedAt\":1761800450000,\"productId\":\"p_rice\",\"qty\":-2000,\"qtyScale\":1000,\"seq\":8,\"status\":\"posted\",\"supplierId\":\"sup_01\",\"total\":-8000,\"type\":\"purchase\",\"unitPrice\":4000,\"v\":1}"
+    },
+    {
+      "seq": 9,
+      "prevHash": "73a0a306a8bfd74396cc1615b0149a856d32544daca037fca3554356f868c9a2",
+      "hash": "400b34abe132c91bbc726f957683560c83aec0f7af1457f1928b80afd13a59e5",
+      "type": "supplier_pay",
+      "ref": "spay_01",
+      "no": 0,
+      "body": "{\"amount\":50000,\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"id\":\"spay_01\",\"kind\":\"doc\",\"postedAt\":1761800500000,\"seq\":9,\"status\":\"posted\",\"supplierId\":\"sup_01\",\"type\":\"supplier_pay\",\"v\":1}",
+      "line": "L1\t9\t73a0a306a8bfd74396cc1615b0149a856d32544daca037fca3554356f868c9a2\t400b34abe132c91bbc726f957683560c83aec0f7af1457f1928b80afd13a59e5\tsupplier_pay\tspay_01\t0\t{\"amount\":50000,\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"id\":\"spay_01\",\"kind\":\"doc\",\"postedAt\":1761800500000,\"seq\":9,\"status\":\"posted\",\"supplierId\":\"sup_01\",\"type\":\"supplier_pay\",\"v\":1}"
+    }
+  ],
+  "head": "400b34abe132c91bbc726f957683560c83aec0f7af1457f1928b80afd13a59e5",
+  "bytes": 4024,
+  "docAt": 1761800500000,
+  "docIds": [
+    "debt:dtx_01",
+    "debt:dtx_02",
+    "purchase:pur_01",
+    "purchase:pur_02",
+    "return:ret_01a",
+    "return:ret_01b",
+    "return:ret_02",
+    "supplier_pay:spay_01"
+  ]
+}

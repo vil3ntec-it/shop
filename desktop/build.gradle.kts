@@ -79,6 +79,8 @@ val updateKey = env("TOHID_UPDATE_PUBLIC_KEY") ?: prop("tohid.updateKey")
 val replaced = listOf(
   "MainActivity.kt",
   "core/net/TokenStore.kt",
+  //  S29: کلیدِ جفت‌شدن با هاب — اندروید Keystore، این‌جا `SecretBox` (‎platform/HubKeyStoreDesk.kt‎)
+  "platform/HubKeyStore.kt",
   "data/Fingerprint.kt",
   //  SEC-01: کلیدِ اصلیِ رمزِ دفتر — اندروید Keystore، این‌جا فایلِ فقط-صاحب (‎data/AtRestKeysDesk.kt‎)
   "data/AtRestKeys.kt",

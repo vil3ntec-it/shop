@@ -23,6 +23,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -101,7 +102,7 @@ test('بی پرچمِ market.directory: همهٔ درهای بازارچه ۴۰�
     await h.get('/api/market/shops'),
     await h.get('/api/market/search?q=برنج'),
     await h.get('/api/market/orders'),
-    await h.post('/api/market/verify/start', { phone: '0791112233' }),
+    await h.post('/api/market/verify/start', { email: mailOf('0791112233') }),
   ]) {
     assert.equal(r.status, 404, JSON.stringify(r.body));
     assert.equal(r.body.error.code, 'market_not_found');
@@ -314,9 +315,9 @@ test('سفارش‌های من: فقط با بلیت، فقط همان شمار�
   const a = await liveStore('سفارشِ الف');
   const b = await liveStore('سفارشِ ب', { listing: { listed: false } });
   const ticketOf = async (phone) => {
-    const s = await h.post('/api/market/verify/start', { phone });
+    const s = await h.post('/api/market/verify/start', { email: mailOf(phone) });
     assert.equal(s.status, 200, JSON.stringify(s.body));
-    const c = await h.post('/api/market/verify/check', { phone, code: s.body.devCode });
+    const c = await h.post('/api/market/verify/check', { email: mailOf(phone), code: s.body.devCode });
     assert.equal(c.status, 200, JSON.stringify(c.body));
     return c.body.ticket;
   };

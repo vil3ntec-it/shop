@@ -1090,6 +1090,46 @@ class SyncV3EngineTest {
     assertEquals(0, b.engine.record(b.ledger.data))
   }
 
+  /**
+   *  CRM-10 روی v3 — ادغامِ بی ویرایشِ سند (`CustomerMerge.merge(docs = false)`): op‌ها فقط پروندهٔ مشتری (جدولِ پایه،
+   *  «آخرین نوشتن» ِ فیلد) و درجِ سابقه‌اند؛ هیچ کدام قالبِ v2 (ویرایشِ سند) نیست، سرور تعارضی نمی‌سازد، سندها روی
+   *  سرور و دستگاهِ دیگر همان می‌مانند و دستگاهِ دیگر همان مانده را زیرِ ماندگار می‌خواند.
+   */
+  @Test fun crmLinkMergeSendsNoDocEditAndOtherDeviceReadsKeeper() {
+    val server = FakeServer()
+    val crm = ShopData(
+      debtors = listOf(Debtor(id = "c1", name = "احمد", phone = "+93700123456"), Debtor(id = "c2", name = "احمد کابلی", phone = "+93799555444")),
+      transactions = listOf(
+        DebtTransaction(id = "t1", debtorId = "c1", type = "give", amount = 300.0, date = "2026-09-01"),
+        DebtTransaction(id = "t2", debtorId = "c2", type = "give", amount = 1000.0, date = "2026-06-01"),
+      ),
+      sales = listOf(Sale(id = "s1", total = 300.0, finalTotal = 300.0, paymentMethod = "credit", debtorId = "c1")),
+    )
+    val a = Device("dev-a", server, crm).also { assertTrue(it.sync().ok) }
+    val b = Device("dev-b", server, ShopData()).also { assertTrue(it.sync().ok) }
+    val txRow = server.row("transactions", "t1")!!.toMap()
+    val saleRow = server.row("sales", "s1")!!.toMap()
+
+    a.edit { d -> (CustomerMerge.merge(d, "c2", "c1", ir.vil3ntec.tohid.core.perm.CreditLimitPerm.Rules.OFF, false, "2026-10-19", 9) { "m1" } as CustomerMerge.Result.Ok).data }
+    val before = a.engine.queue.outbox.size
+    assertTrue(a.engine.record(a.ledger.data) > 0)
+    val added = a.engine.queue.outbox.drop(before)
+    assertTrue("هیچ ویرایشِ سندی (v2) نیست", added.none { it.fmt == V3Entry.V2 })
+    assertTrue(runBlocking { a.engine.pushOnce() }.ok)
+    assertFalse("بی صندوقِ تعارض", a.engine.meta.conflictsDirty)
+    assertTrue(server.conflicts.isEmpty())
+    assertEquals("سندِ سرور دست نخورد", txRow, server.row("transactions", "t1")!!.toMap())
+    assertEquals(saleRow, server.row("sales", "s1")!!.toMap())
+
+    assertTrue(b.sync().ok)
+    val got = b.ledger.data
+    assertEquals("c2", got.debtors.single { it.id == "c1" }.mergedInto)
+    assertEquals("c1", got.transactions.single { it.id == "t1" }.debtorId)
+    assertEquals("c1", got.sales.single { it.id == "s1" }.debtorId)
+    assertEquals(1300.0, ir.vil3ntec.tohid.data.ShopStore.debt(got, "c2"), 0.0)
+    assertEquals(0.0, ir.vil3ntec.tohid.data.ShopStore.debt(got, "c1"), 0.0)
+  }
+
   /* ------------------------------------------------ DATA-06: پشتیبانِ دستگاهِ دیگر (`V3State.kt`) */
 
   /** پشتیبانِ خودکارِ اندروید از یک دستگاه: دفتر، صف (`sync-v3-<کلید>/queue.json`)، و فقط در ساخت‌های پیشین حال (`state.json`) */

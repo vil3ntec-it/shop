@@ -14,6 +14,7 @@
  */
 import { createRequire } from 'node:module';
 import { boot, assert } from './lib/harness.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const E = await boot({ name: 'scenario-s36' });
 const require = createRequire(import.meta.url);
@@ -62,8 +63,8 @@ await E.step('S36.0', 'دکان: کالا، ویترین، گوشیِ صاحب �
   E.ok(await A.api('PUT', '/shop/storefront', { slug: SLUG, enabled: true, title: 'ویترینِ S36', contactPhone: '0700000036', deliveryFeeMinor: 0, minOrderMinor: 0 }), 'ویترین');
   E.ok(await A.api('PUT', `/shop/storefront/products/${rice}`, { published: true }), 'انتشار');
   E.ok(await A.api('POST', '/me/push', { token: 's36-push-phone' }), 'پوشِ گوشی', 201);
-  const st = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { phone: PHONE }), 'کدِ تأیید');
-  ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { phone: PHONE, code: st.devCode }), 'تأییدِ شماره').ticket;
+  const st = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { email: mailOf(PHONE) }), 'کدِ تأیید');
+  ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { email: mailOf(PHONE), code: st.devCode }), 'تأییدِ شماره').ticket;
 });
 
 await E.step('S36.repeat', 'پوشِ تکراری تا «دیدم»: یک پوش و حداکثر دو یادآوری؛ «دیدم» زنجیره را می‌بندد', async () => {

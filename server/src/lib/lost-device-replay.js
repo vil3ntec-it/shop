@@ -28,8 +28,11 @@ const FLAG = 'shop.lost_device_replay';
 const MAX_OPS = 500;
 const ID_RE = /^[A-Za-z0-9_.:-]{1,80}$/;
 
+/** پرچم برای همین دکان روشن است؟ (`GET /api/shop/devices` ⇒ `replay: true` تا برنامه دکمه را نشان دهد) */
+const isOn = async (shopId) => Boolean(await flagOf(shopId, FLAG));
+
 async function requireOn(shopId) {
-  if (!(await flagOf(shopId, FLAG))) throw notFound('بازیابیِ دستگاهِ گم‌شده روشن نیست', 'lost_device_replay_off');
+  if (!(await isOn(shopId))) throw notFound('بازیابیِ دستگاهِ گم‌شده روشن نیست', 'lost_device_replay_off');
 }
 
 /** شکلِ درخواست ⇒ `{ device, deviceId, ops }`؛ بدشکل ⇒ ۴۰۰ */
@@ -67,4 +70,4 @@ async function replay(shopId, actor, { device, deviceId, ops }, ip = '') {
   return { results, counts };
 }
 
-module.exports = { FLAG, MAX_OPS, requireOn, parse, replay };
+module.exports = { FLAG, MAX_OPS, isOn, requireOn, parse, replay };

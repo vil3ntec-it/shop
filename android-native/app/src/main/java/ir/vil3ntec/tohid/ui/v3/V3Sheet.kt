@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -38,6 +39,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -89,6 +92,11 @@ fun V3Sheet(
    *  جا می‌افتد. برگهٔ کوتاه همان بلندیِ خودش است. تأیید و منو `false` (همیشه کامل).
    */
   detents: Boolean = true,
+  /**
+   *  جای کوچکِ پایانِ سطرِ عنوان (در راست‌به‌چپ: چپ)، روبه‌روی عنوانِ وسط — مثلاً تاریخِ زدنیِ «ثبتِ تراکنش».
+   *  null ⇒ همان عنوانِ تنهای همیشه.
+   */
+  headerEnd: (@Composable () -> Unit)? = null,
   content: @Composable ColumnScope.(V3SheetCloser) -> Unit,
 ) {
   val c = PhoneV3.colors
@@ -139,17 +147,29 @@ fun V3Sheet(
         .then(if (scroll) Modifier.verticalScroll(rememberScrollState()) else Modifier)
         .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
     ) {
-      if (title != null) {
-        Text(
-          title,
-          style = v3Text(17, FontWeight.SemiBold, 24),
-          color = c.ink,
-          textAlign = TextAlign.Center,
-          modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp).semantics { heading() },
-        )
-      }
+      if (title != null) SheetTitle(title, headerEnd)
       content(closer)
     }
+  }
+}
+
+/**
+ *  عنوانِ وسطِ برگه؛ با [end] همان عنوان هنوز دقیقاً وسط است و دو سویش به پهنای [end] خالی می‌ماند تا روی هم نیفتند.
+ */
+@Composable
+private fun SheetTitle(title: String, end: (@Composable () -> Unit)?) {
+  val c = PhoneV3.colors
+  var endWidth by remember { mutableIntStateOf(0) }
+  val inset = with(LocalDensity.current) { endWidth.toDp() }
+  Box(Modifier.fillMaxWidth().padding(bottom = 14.dp)) {
+    Text(
+      title,
+      style = v3Text(17, FontWeight.SemiBold, 24),
+      color = c.ink,
+      textAlign = TextAlign.Center,
+      modifier = Modifier.fillMaxWidth().padding(horizontal = inset).align(Alignment.Center).semantics { heading() },
+    )
+    if (end != null) Box(Modifier.align(Alignment.CenterEnd).onSizeChanged { endWidth = it.width }) { end() }
   }
 }
 

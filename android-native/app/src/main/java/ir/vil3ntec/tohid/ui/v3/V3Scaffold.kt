@@ -190,7 +190,8 @@ fun V3Scaffold(
     (if (guideIcon) listOf(V3Action(Icons.AutoMirrored.Outlined.HelpOutline, StrKit.guide) { guideOpen = true }) else emptyList()) +
     (if (menu.isEmpty()) emptyList() else listOf(V3Action(Icons.Outlined.MoreHoriz, StrKit.more) { menuOpen = true }))
 
-  Box(if (backdrop != null) modifier.fillMaxSize().then(backdrop) else modifier.fillMaxSize().background(c.bg)) {
+  //  زدنِ بیرون از کادرِ نوشتن ⇒ صفحه‌کلید بسته (`v3ClearFocusOnTap`، یک جا برای همهٔ صفحه‌های کیت)
+  Box((if (backdrop != null) modifier.fillMaxSize().then(backdrop) else modifier.fillMaxSize().background(c.bg)).v3ClearFocusOnTap()) {
     Column(Modifier.fillMaxSize().nestedScroll(connection)) {
       V3HeaderBar(title, onBack, headerActions, showTitle = showTitle, divider = { if (large) state.fraction else 1f }, transparent = backdrop != null)
       //  عنوانِ درشت، پیام‌ها، جست‌وجو و تراشه‌ها با هم جمع می‌شوند تا فهرست جا بگیرد (S3)؛

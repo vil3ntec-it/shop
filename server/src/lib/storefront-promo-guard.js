@@ -126,14 +126,19 @@ function deviceKeyOf(raw) {
 
 /**
  * پیش از تراکنش (فقط استخر، نه اتصالِ قفل‌دار): پرچم و تنظیم. خاموش ⇒ null.
- * `phone` رشته یا تابعی که فقط با پرچمِ روشن صدا زده می‌شود (پیش‌نمایش: بلیتِ نادرست ⇒ «نامعلوم»، نه خطا).
- * ⇒ `{ shopId, settings, phone, phoneKey, deviceKey, ip }`
+ * `phone` = **کلیدِ مشتریِ تأییدشده** («فقط ایمیل»، ۱۴۰۵/۰۸/۲۳: ایمیلِ تأییدشده؛ نامِ پارامتر برای سازگاری) — رشته یا
+ * تابعی که فقط با پرچمِ روشن صدا زده می‌شود (پیش‌نمایش: بلیتِ نادرست ⇒ «نامعلوم»، نه خطا). `phoneKey` ِ ستونِ
+ * `storefront_promo_claims` همان کلید است. شمارهٔ تماسِ فرم (`contact`) فقط برای «اولین خرید» هم سنجیده می‌شود تا
+ * ایمیلِ تازه با همان شماره اولین خریدِ دوباره نگیرد.
+ * ⇒ `{ shopId, settings, phone, phoneKey, contact, deviceKey, ip }`
  */
 async function prepare(shopId, { body, phone = '', ip = '' } = {}) {
   if (!(await flagOn(shopId))) return null;
   if (typeof phone === 'function') phone = await Promise.resolve().then(phone).catch(() => '');
+  let contact = '';
+  try { contact = require('./validate').phone(obj(obj(body).customer).phone) || ''; } catch { contact = ''; }
   return {
-    shopId, settings: await settingsOf(shopId), phone: phone || '', phoneKey: phone ? phoneKey(phone) : '',
+    shopId, settings: await settingsOf(shopId), phone: phone || '', phoneKey: phone ? phoneKey(phone) : '', contact,
     deviceKey: deviceKeyOf(obj(body).deviceId), ip: String(ip || ''),
   };
 }
@@ -189,11 +194,13 @@ async function overLimit(run, g, ruleIds, exceptKey = '') {
   return (await count('phone_key', g.phoneKey, codePerPhone)) || (await count('device_key', g.deviceKey, codePerDevice));
 }
 
-/** اولین خرید هنوز باز است؟ بی شمارهٔ تأییدشده ⇒ null (نامعلوم) */
+/** اولین خرید هنوز باز است؟ بی مشتریِ تأییدشده ⇒ null (نامعلوم). سفارشِ پیشینِ همان ایمیل یا همان شمارهٔ تماس ⇒ نه */
 async function firstOrderOpen(run, g) {
   if (!g.phoneKey) return null;
   const prior = (await run(
-    'SELECT 1 FROM online_orders WHERE shop_id=$1 AND customer_phone = ANY($2::text[]) LIMIT 1', [g.shopId, phoneForms(g.phone)]
+    `SELECT 1 FROM online_orders WHERE shop_id=$1
+        AND (customer_email = $2 OR customer_phone = ANY($3::text[])) LIMIT 1`,
+    [g.shopId, g.phone, g.contact ? phoneForms(g.contact) : []]
   )).rows.length;
   if (prior) return false;
   const used = (await run(

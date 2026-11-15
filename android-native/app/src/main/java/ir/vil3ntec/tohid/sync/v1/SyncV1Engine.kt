@@ -48,7 +48,7 @@ class SyncV1Engine private constructor(context: Context) {
 
   /** کلیدِ حساب — نشستِ نبوده هم کلیدِ خودش را دارد. */
   private var accountKey: String = keyOf()
-  private var state = SyncStateV1(app, accountKey)
+  internal var state = SyncStateV1(app, accountKey)
   private var queue = OpQueue(app, accountKey)
 
   /**
@@ -75,7 +75,7 @@ class SyncV1Engine private constructor(context: Context) {
     SyncCommit(SyncCommit.Journal(java.io.File(app.filesDir, "sync-journal-${OpQueue.fileKey(key)}.json")), parts)
 
   /** §۹.۵: سرور از پشتیبان برگشت — شرح سرِ `V1Restore` و `core/sync/RestoreReplay.kt` */
-  private var restore = restoreFor(accountKey)
+  internal var restore = restoreFor(accountKey)
 
   private fun restoreFor(key: String) =
     V1Restore(state, queue, FileReplayStore.inDir(app.filesDir, "sync-replay-${OpQueue.fileKey(key)}"), commit, ::clock) {
@@ -422,8 +422,11 @@ class SyncV1Engine private constructor(context: Context) {
    *  `core/…/core/sync/PushSince.kt`. سرور فقط با پرچمِ دکانِ `sync.cursor_from_since` آن را می‌خواند؛
    *  بی پرچم (و برای پمپ) همان رفتارِ امروز.
    */
+  /** SYN-04: «فشرده بفرست» ِ سرور، ماندگار روی همین حساب؛ ردِ فشرده تا پایانِ همین اجرا (`SyncV1Client.PushGzip`) */
+  private val pushGzip = SyncV1Client.PushGzip({ state.gzipPush }, { state.gzipPush = it })
+
   private fun pushClient(): SyncV1Client =
-    SyncV1Client(Backend.api(app)) { ir.vil3ntec.tohid.core.sync.PushSince.since(state.pushSince, state.cursor) }
+    SyncV1Client(Backend.api(app), { ir.vil3ntec.tohid.core.sync.PushSince.since(state.pushSince, state.cursor) }, pushGzip)
 
   /* ==========================================================
      ۲) یک دورِ کامل: Push تا ته، بعد Pull
@@ -492,7 +495,7 @@ class SyncV1Engine private constructor(context: Context) {
         var rounds = 0
         while (!state.restorePending && !state.restoredRebuild && rounds < 50) {
           rounds++
-          val got = client.pull(device, state.cursor)
+          val got = client.pull(device, state.cursor).also { ir.vil3ntec.tohid.platform.HubLinkV1Android.saw(app, it.ops.map { o -> o.opId }) }  // S29: «دیده از سرور» ِ هاب (خاموش ⇒ هیچ)
           //  §۹.۵: opهای دیگران با شماره‌شان — **پیش از** نشاندن — برای دوباره فرستادن پس از بازیابی
           if (got.seen.isNotEmpty()) restore.seen(got.seen)
           //  §۹.۵: دوران کنارِ pull ⇔ پرچمِ سرور روشن ⇒ دورِ بعد درِ دوران پرسیده می‌شود، وگرنه هرگز

@@ -10,6 +10,8 @@
  *          &device_id=&base=     «در دستِ دستگاهِ X»: `claim=1` پیش از بازگرداندن ⇒ `{…, claim}` یا ۴۰۹ `held_claimed`
  *          &claim=1&force=1      (`force=1` = گرفتن با تأییدِ صریح، سابقهٔ `held.takeover`)؛ در صف بی `claim` ⇒ ۴۰۹
  *                                 `held_conflict`. شرح: `lib/shop-held-sync.js`
+ *   POST   /:id/twice            S09: «یک فاکتور در دو دستگاه» ⇒ صندوقِ تعارضِ صاحب (`lib/held-twice.js`؛ پرچمِ خاموشِ
+ *                                 `shop.held_twice_cancel` ⇒ ۴۰۴ `held_twice_off` پیش از بدنه؛ روشن ⇒ `GET` هم `auto_cancel: true`)
  *
  * ⛔ پیش‌فرض خاموش: بی پرچمِ `shop.held_sync` ⇒ `GET` فقط `{enabled:false}` و `PUT`/`DELETE` ۴۰۳ `held_sync_disabled`.
  * ⛔ shop_id فقط از عضویتِ توکن. سقف: سطلِ IP پیش از احراز، سپس سطلِ هر کاربر. فقط برنامهٔ دکان، نه sync-v1.
@@ -18,6 +20,7 @@
 const express = require('express');
 const config = require('../config');
 const held = require('../lib/shop-held-sync');
+const twice = require('../lib/held-twice');
 const audit = require('../lib/audit');
 const perms = require('../lib/staff-perms');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
@@ -45,7 +48,21 @@ router.get('/', async (req, res) => {
   if (!(await held.flagOn(req.shopId))) return res.json({ enabled: false });
   const since = Number.parseInt(typeof req.query.since === 'string' ? req.query.since : '0', 10);
   const out = await held.read(req.shopId, Number.isSafeInteger(since) ? since : 0, req.user.id);
-  res.json({ enabled: true, ...out, permissions: { cancel: await perms.memberAllows(req, 'sales.cancel') } });
+  //  S09: لغوِ خودکارِ فروشِ دوم فقط با پرچمِ خودش (خاموش ⇒ پاسخ بایت‌به‌بایت همان پیشین)
+  const auto = (await twice.flagOn(req.shopId)) ? { auto_cancel: true } : {};
+  res.json({ enabled: true, ...out, permissions: { cancel: await perms.memberAllows(req, 'sales.cancel') }, ...auto });
+});
+
+const twiceLimit = rateLimit({ max: 30, windowMs: 60 * 1000, keyPrefix: 'shop-held-twice', key: (req) => req.user && req.user.id });
+router.post('/:id/twice', needFlag, twiceLimit, async (req, res) => {
+  await twice.requireOn(req.shopId);
+  const r = twice.parse(req.params.id, req.body);
+  const out = await twice.report(req.shopId, { userId: req.user.id, role: req.role }, r);
+  await audit.log({
+    shopId: req.shopId, userId: req.user.id, action: r.cancelled ? 'held.twice_cancelled' : 'held.twice_found',
+    targetType: 'sale', targetId: r.sale, detail: { held: r.held, kept: r.kept, total_minor: r.total, inbox: out.id }, ip: clientIp(req),
+  });
+  res.status(out.created ? 201 : 200).json({ ok: true, ...out });
 });
 
 router.put('/:id', needFlag, async (req, res) => {

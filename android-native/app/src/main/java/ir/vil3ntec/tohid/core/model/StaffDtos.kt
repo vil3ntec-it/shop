@@ -92,7 +92,11 @@ data class ShopDeviceDto(
 )
 
 @Serializable
-data class ShopDevicesDto(val devices: List<ShopDeviceDto> = emptyList())
+data class ShopDevicesDto(
+  val devices: List<ShopDeviceDto> = emptyList(),
+  /** S44: پرچمِ `shop.lost_device_replay` روشن ⇒ «بازیابی از پشتیبان» ِ دستگاهِ غیرفعال (سرورِ کهنه یا خاموش ⇒ نیست) */
+  val replay: Boolean = false,
+)
 
 /*
  *  دستگاه‌های شناختهٔ کارمندان — رازِ دستگاهِ ورود با کد (`GET /api/shop/staff-keys`، مهاجرتِ ۳۴۵). سرور شناسهٔ کاملِ

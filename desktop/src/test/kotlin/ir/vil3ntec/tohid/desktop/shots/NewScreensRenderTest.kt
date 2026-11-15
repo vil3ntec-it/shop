@@ -194,6 +194,19 @@ class NewScreensRenderTest {
       }
     }
   }
+
+  /** «اشتراک و قیمت‌ها» ِ کارت‌های بازشونده: «پیشنهادِ ما» باز و «۱ ساله» باز؛ و تمامِ بلندیِ گوشی، روشن و تیره */
+  @Test fun plansCardsReport() {
+    both("plans-cards") { PlansDemo.Screen(null) }
+    both("plans-cards-yearly") { PlansDemo.Screen("y1") }
+    for (dark in listOf(false, true)) for (en in listOf(false, true)) {
+      val id = "plans-cards-full-${if (dark) "dark" else "light"}-${if (en) "en" else "fa"}"
+      val r = runCatching { ScreenRender.render(id, PHONE, 1560, en, dark = dark) { PlansDemo.Screen(null) } }
+        .getOrElse { e -> ScreenRender.Result(id, PHONE, en, listOf(ScreenRender.Finding("error", e.toString().take(400), "")), emptyList()) }
+      r.findings.forEach { println("RENDER $id: $it") }
+      synchronized(all) { all += r }
+    }
+  }
 }
 
 /** دفترِ نمایشی: همان `MoneyDemo` با واحدِ خرید، قیمتِ خاص، دیدنِ پرونده و تخفیفِ خودکار */

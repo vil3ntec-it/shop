@@ -110,9 +110,10 @@ object DebtBook {
     val debtor = d.debtors.find { it.id == debtorId } ?: return null
     //  S89: جفتِ «اصل + سندِ معکوس» بیرون (`DebtReverse.effective`، هم‌زادِ `reversalNeutral` ِ JS) — سررسید و تخصیص همان حذفِ امروز
     //  S89: جفتِ «اصل + سندِ معکوس» بیرون (`DebtReverse.effective`، هم‌زادِ `reversalNeutral` ِ JS) — سررسید و تخصیص همان حذفِ امروز
-    val mine = DebtReverse.effective(d.transactions.filter { it.debtorId == debtorId }).sortedWith(ORDER)
+    val own = CustomerAlias.of(d, debtorId)  // CRM-10: با سندهای ادغام‌شده‌های پیوندی
+    val mine = DebtReverse.effective(d.transactions.filter { it.debtorId in own }).sortedWith(ORDER)
     //  کلید همان شمارهٔ نمایشی است: `A1-5` و `B1-5` دو فاکتورِ جدااند (F0-03)
-    val byLabel = d.sales.filter { it.debtorId == debtorId && it.invoiceNumber != null }
+    val byLabel = d.sales.filter { it.debtorId in own && it.invoiceNumber != null }
       .associateBy { it.invoiceLabel()!! }
     val itemsBySale = d.saleItems.groupBy { it.saleId }
     val units = d.products.associate { it.id to it.unit }
@@ -235,7 +236,8 @@ object DebtBook {
    */
   fun creditCheck(d: ShopData, debtorId: String, extra: Money): Credit? {
     val debtor = d.debtors.find { it.id == debtorId } ?: return null
-    val balance = d.transactions.filter { it.debtorId == debtorId }
+    val own = CustomerAlias.of(d, debtorId)
+    val balance = d.transactions.filter { it.debtorId in own }
       .fold(ZERO) { acc, t -> if (t.type == "give") acc + minor(t.amount) else acc - minor(t.amount) }
     return creditOf(debtor, balance, extra)
   }
