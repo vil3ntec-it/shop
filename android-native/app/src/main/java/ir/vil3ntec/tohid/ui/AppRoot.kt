@@ -564,7 +564,7 @@ private fun AppRootActive(
           onOpen = { nav.open(it) },
           page = V3Modules.legacyId(current),
         )
-        CompositionLocalProvider(ir.vil3ntec.tohid.ui.v3.nav.LocalV3Nav provides nav) { PreviewBanner(); ir.vil3ntec.tohid.ui.v3.shell.ShellNotice() }
+        CompositionLocalProvider(ir.vil3ntec.tohid.ui.v3.nav.LocalV3Nav provides nav) { ir.vil3ntec.tohid.ui.v3.shell.ShellNotice() }
       }
     },
     //  پیام‌ها بالای صفحه می‌آیند، سرِ راهِ هیچ‌چیز نیستند
@@ -598,6 +598,8 @@ private fun AppRootActive(
       PhoneLinkHost(store, data, snackbar)
       //  OPS-05: «چه چیزی تازه است» یک بار پس از به‌روزرسانی (نخستین اجرا هیچ) — پشتِ قفل‌ها و دروازه‌ها نه
       ir.vil3ntec.tohid.ui.screens.WhatsNewOnUpdate()
+      //  هشدارِ یک‌بارهٔ «پیش‌نمایش است» پس از ورود به حسابِ واقعی — یک بار در پوسته، نه نواری روی هر صفحه
+      PreviewAccountWarning()
       //  جست‌وجوی سریع (Ctrl+K)
       if (AppNav.palette.value) {
         CommandPalette(data, onDismiss = { AppNav.palette.value = false }) { hit ->
@@ -634,7 +636,8 @@ private fun AppRootActive(
         LocalV3Toasts provides toasts,
         //  نوارِ سیستم را پوسته همین‌جا حساب کرده است
         LocalV3SystemBottom provides 0.dp,
-        LocalV3Notice provides { Column { PreviewBanner(); ir.vil3ntec.tohid.ui.v3.shell.ShellNotice() } },
+        //  p0: نوارِ «نسخهٔ پیش‌نمایش» دیگر روی صفحه نیست (نشانش کنارِ نسخه در «بیشتر»/«درباره»، `previewVersion`)
+        LocalV3Notice provides { ir.vil3ntec.tohid.ui.v3.shell.ShellNotice() },
         ir.vil3ntec.tohid.ui.v3.LocalV3NavSearch provides navSearch,
       ) {
         PageWidth(Modifier.padding(start = railPad, bottom = pageBottom)) {

@@ -31,6 +31,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.draw.clip
@@ -163,6 +164,7 @@ fun V3SummaryFrame(
   Column(
     modifier
       .fillMaxWidth()
+      .testTag(V3Anatomy.SUMMARY)
       .clip(shape)
       .background(sc.surface)
       .then(if (sc.edge != null) Modifier.border(1.dp, sc.edge, shape) else Modifier)

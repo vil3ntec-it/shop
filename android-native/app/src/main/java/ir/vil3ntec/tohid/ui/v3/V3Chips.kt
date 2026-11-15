@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -143,7 +144,7 @@ fun V3ChipRow(
 ) {
   val scroll = rememberScrollState()
   Row(
-    modifier.fillMaxWidth().v3EdgeFade(scroll).horizontalScroll(scroll).padding(contentPadding),
+    modifier.fillMaxWidth().testTag(V3Anatomy.CHIPS).v3EdgeFade(scroll).horizontalScroll(scroll).padding(contentPadding),
     horizontalArrangement = Arrangement.spacedBy(8.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) { content() }

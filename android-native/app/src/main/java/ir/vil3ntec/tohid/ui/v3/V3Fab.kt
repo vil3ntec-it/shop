@@ -26,6 +26,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -65,6 +66,7 @@ fun V3Fab(
   val shape = RoundedCornerShape(18.dp)
   Row(
     modifier
+      .testTag(V3Anatomy.FAB)
       .v3Pressable(label = label, scale = 0.94f, haptic = true, role = Role.Button, onClick = onClick)
       .height(56.dp)
       .shadow(10.dp, shape, ambientColor = pair.bg.copy(alpha = 0.5f), spotColor = pair.bg.copy(alpha = 0.5f))
