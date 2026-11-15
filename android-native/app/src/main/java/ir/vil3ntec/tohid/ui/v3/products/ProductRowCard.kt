@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrProducts
 import ir.vil3ntec.tohid.money
+import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3Space
@@ -106,20 +107,13 @@ internal fun ProductRowCard(
   }
 }
 
-/** «۱ · بیسکویت شکلاتی · ۲۰ ؋» (کارتِ باز فقط شماره و نام) */
+/** «۱ · بیسکویت شکلاتی · ۲۰ ؋ · ۲ کارتن» (کارتِ باز فقط شماره و نام؛ موجودیِ آغاز اگر نوشته شده) */
 private fun summary(number: Int, row: ProductRowDraft, expanded: Boolean): String = buildString {
   append(number)
   append(" · ")
   append(row.name.trim().ifBlank { StrProducts.untitled })
   val sale = row.sale.toDoubleOrNull()
   if (!expanded && sale != null) append(" · ${money(sale)} ؋")
-}
-
-/** سرِ هر گروهِ کادرها درونِ کارتِ ردیف («اصلی»، «قیمت»، «انبار») */
-internal val CardSection: FieldSection = { title, content ->
-  val c = PhoneV3.colors
-  Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
-    Text(title, style = V3Type.caption, color = c.inkMuted, modifier = Modifier.padding(start = 2.dp, bottom = 8.dp))
-    content()
-  }
+  val stock = NewProductStock.qty(row)?.takeIf { it > 0 }
+  if (!expanded && stock != null) append(" · ${qty(stock)} ${row.unit.ifBlank { StrProducts.unitWord }}")
 }

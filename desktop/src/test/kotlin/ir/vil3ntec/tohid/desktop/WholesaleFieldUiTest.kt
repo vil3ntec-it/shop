@@ -37,7 +37,7 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- *  PRD-12 — کادرِ «قیمتِ عمده» ِ فرمِ کالا (`ProductFieldGroups`، مشترکِ «کالای تازه» و «ویرایش کالا» ِ گوشی و کامپیوتر) با آزمونِ
+ *  PRD-12 — کادرِ «قیمتِ عمده» ِ فرمِ «ویرایش کالا» (`ProductFieldGroups` ِ گوشی و کامپیوتر؛ فرمِ «کالای جدید» از ۱۴۰۵/۰۸/۲۴ آن را ندارد ⇐ `NewProductFormUiTest`) با آزمونِ
  *  خودکارِ صفحه: فقط با «لیستِ قیمت در صندوق» دیده می‌شود؛ عددِ نوشته‌شده همان `wholesalePrice` ِ پیش‌نویس است؛ منفی خطای کادر
  *  و ردِ قاعده (`StrGoods.wholesaleBad`) را دارد؛ قیمتِ عمدهٔ پیشین در ویرایش در کادر می‌آید.
  */
@@ -57,7 +57,7 @@ class WholesaleFieldUiTest {
           Column {
             ProductFieldGroups(
               row, ProductFormModel.errors(row, ProductFormModel.Mode.EDIT), emptyList(), listOf("عدد"),
-              FieldHooks(onChange = { f -> row = f(row) }, onBlur = {}, onScan = {}, onNewCategory = {}, focus = { focus.getValue(it) }),
+              FieldHooks(onChange = { f -> row = f(row) }, onBlur = {}, onScan = {}, focus = { focus.getValue(it) }),
               { title, content -> Column { Text(title); content() } },
               ProductFormModel.Mode.EDIT,
               wholesale = wholesale,

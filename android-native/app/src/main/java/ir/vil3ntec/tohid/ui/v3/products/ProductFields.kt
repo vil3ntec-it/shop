@@ -5,19 +5,14 @@ import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import androidx.compose.animation.core.animateFloatAsState
 import ir.vil3ntec.tohid.ui.v3.V3Collapse
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -34,7 +29,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrGoods
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrNewProduct
 import ir.vil3ntec.tohid.core.i18n.StrPriceCheck
 import ir.vil3ntec.tohid.core.i18n.StrProducts
 import ir.vil3ntec.tohid.core.product.ProductSuggest
@@ -43,9 +40,7 @@ import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3Status
-import ir.vil3ntec.tohid.ui.v3.V3AddChip
 import ir.vil3ntec.tohid.ui.v3.V3Button
-import ir.vil3ntec.tohid.ui.v3.V3Chip
 import ir.vil3ntec.tohid.ui.v3.V3FieldKind
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3StatusPill
@@ -60,9 +55,12 @@ import ir.vil3ntec.tohid.ui.v3.products.ProductFormModel.Problem
 internal fun problemText(p: Problem): String = when (p) {
   Problem.REQUIRED -> StrKit.required
   Problem.NOT_A_NUMBER -> StrKit.notANumber
+  Problem.BAD_DATE -> StrNewProduct.badDate
+  Problem.MADE_AFTER_EXPIRY -> StrGoods.madeAfterExpiry
+  Problem.NEEDS_STOCK -> StrNewProduct.stockForDates
 }
 
-/** جای فرم برای هر گروهِ کادرها: کارتِ ردیف (کالای تازه) یا بخشِ صفحه (ویرایش) */
+/** جای فرم برای هر گروهِ کادرهای «ویرایش کالا» (بخشِ صفحه) */
 internal typealias FieldSection = @Composable (title: String, content: @Composable ColumnScope.() -> Unit) -> Unit
 
 /** هرچه کادرهای کالا از صفحه می‌خواهند */
@@ -71,16 +69,15 @@ internal class FieldHooks(
   /** کادری که تمرکز را از دست داد ⇐ از این پس خطایش دیده شود */
   val onBlur: (Field) -> Unit,
   val onScan: () -> Unit,
-  val onNewCategory: () -> Unit,
   val focus: (Field) -> FocusRequester,
 )
 
 /**
- *  کادرهای یک کالا در سه گروه — «اصلی» (نام، دسته)، «قیمت» (خرید | فروش و سودِ
- *  هر واحد)، «انبار» (واحد، حداقل موجودی، بارکد با اسکن). مشترکِ فرمِ چندردیفیِ
- *  «کالای تازه» و «ویرایش کالا»؛ «بیشتر» فقط در ویرایش (`MoreFields`).
+ *  کادرهای «ویرایش کالا» در سه گروه — «اصلی» (نام، دسته)، «قیمت» (خرید | فروش و سودِ
+ *  هر واحد، عمده)، «انبار» (واحد، حداقل موجودی، بارکد با اسکن)؛ «بیشتر» جدا (`MoreFields`).
+ *  دسته و واحد کادرِ کشویی‌اند (`ChoiceDropdown`، «+ تازه» تهِ فهرست). فرمِ «کالای جدید» از
+ *  ۱۴۰۵/۰۸/۲۴ چیدمانِ جمع‌وجورِ خودش را دارد (`NewProductFields`).
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ProductFieldGroups(
   row: ProductRowDraft,
@@ -93,11 +90,11 @@ internal fun ProductFieldGroups(
   nameHelper: String? = null,
   /** AI-06: دستهٔ پیشنهادی از نام (`rememberCategorySuggest`)؛ null ⇒ هیچ */
   suggest: ((String) -> List<ProductSuggest.Pick>)? = null,
-  /** PRD-12: کادرِ «قیمتِ عمده» — فرمِ تازه و ویرایش، فقط با «لیستِ قیمت در صندوق» روشن */
+  /** PRD-12: کادرِ «قیمتِ عمده» — فقط ویرایش (فرمِ «کالای جدید» از ۱۴۰۵/۰۸/۲۴ ندارد)، فقط با «لیستِ قیمت در صندوق» روشن */
   wholesale: Boolean = false,
 ) {
   val strict = mode == ProductFormModel.Mode.NEW
-  var newUnit by remember { mutableStateOf(false) }
+  var adding by remember { mutableStateOf<Field?>(null) }
   //  فقط تا دسته خالی است؛ زدنِ تراشه همان انتخابِ دسته است
   val picks = remember(row.name, row.category, suggest) {
     if (suggest == null || row.category.isNotBlank()) emptyList() else suggest(row.name)
@@ -112,12 +109,11 @@ internal fun ProductFieldGroups(
       CategorySuggestions(picks) { cat -> hooks.onChange { it.copy(category = cat) } }
     }
     Spacer(Modifier.height(14.dp))
-    ChipGroup(StrProducts.category, errors[Field.CATEGORY], required = strict) {
-      (categories + listOfNotNull(row.category.takeIf { it.isNotBlank() && it !in categories })).forEach { cat ->
-        V3Chip(cat, row.category == cat, { hooks.onChange { it.copy(category = ProductFormModel.toggle(it.category, cat)) } })
-      }
-      V3AddChip(StrProducts.newCategory, hooks.onNewCategory)
-    }
+    ChoiceDropdown(
+      StrProducts.category, row.category, categories, { v -> hooks.onChange { it.copy(category = v) } },
+      Modifier.fillMaxWidth(), required = strict, error = errors[Field.CATEGORY]?.let(::problemText),
+      addLabel = StrProducts.newCategory, onAdd = { adding = Field.CATEGORY }, onClosed = { hooks.onBlur(Field.CATEGORY) },
+    )
   }
   section(StrProducts.groupPrice) {
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -141,12 +137,11 @@ internal fun ProductFieldGroups(
     }
   }
   section(StrProducts.groupStock) {
-    ChipGroup(StrProducts.unit, errors[Field.UNIT], required = strict) {
-      (units + listOfNotNull(row.unit.takeIf { it.isNotBlank() && it !in units })).forEach { u ->
-        V3Chip(u, row.unit == u, { hooks.onChange { it.copy(unit = ProductFormModel.toggle(it.unit, u)) } })
-      }
-      V3AddChip(StrProducts.newUnit) { newUnit = true }
-    }
+    ChoiceDropdown(
+      StrProducts.unit, row.unit, units, { v -> hooks.onChange { it.copy(unit = v) } },
+      Modifier.fillMaxWidth(), required = strict, error = errors[Field.UNIT]?.let(::problemText),
+      addLabel = StrProducts.newUnit, onAdd = { adding = Field.UNIT }, onClosed = { hooks.onBlur(Field.UNIT) },
+    )
     Spacer(Modifier.height(14.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
       V3TextField(row.minStock, { v -> hooks.onChange { it.copy(minStock = v) } }, StrProducts.minStock, Modifier.weight(1f), kind = V3FieldKind.NUMBER)
@@ -156,14 +151,17 @@ internal fun ProductFieldGroups(
       )
     }
   }
-  if (newUnit) NewValueSheet(StrProducts.newUnit, StrProducts.unit, onDismiss = { newUnit = false }) { v -> hooks.onChange { it.copy(unit = v) } }
+  when (adding) {
+    Field.CATEGORY -> NewValueSheet(StrProducts.newCategory, StrProducts.category, onDismiss = { adding = null }) { v -> hooks.onChange { it.copy(category = v) } }
+    Field.UNIT -> NewValueSheet(StrProducts.newUnit, StrProducts.unit, onDismiss = { adding = null }) { v -> hooks.onChange { it.copy(unit = v) } }
+    else -> Unit
+  }
 }
 
 /**
- *  «بیشتر» (فقط ویرایش، جمع‌شده): زیردسته، واحدِ فروشِ دوم و ضریبش، تأمین‌کننده،
+ *  «بیشتر» (فقط ویرایش، جمع‌شده): زیردسته، واحدِ فروشِ دوم و ضریبش، تأمین‌کننده (کادرِ کشویی)،
  *  و کلیدِ «فعال در فروش».
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ColumnScope.MoreFields(
   row: ProductRowDraft,
@@ -194,10 +192,11 @@ internal fun ColumnScope.MoreFields(
   )
   if (suppliers.isNotEmpty()) {
     Spacer(Modifier.height(14.dp))
-    ChipGroup(StrProducts.supplier, null, required = false) {
-      V3Chip(StrProducts.noSupplier, row.supplierId.isBlank(), { hooks.onChange { it.copy(supplierId = "") } })
-      suppliers.forEach { s -> V3Chip(s.name, row.supplierId == s.id, { hooks.onChange { it.copy(supplierId = s.id) } }) }
-    }
+    val names = suppliers.associate { it.id to it.name }
+    ChoiceDropdown(
+      StrProducts.supplier, row.supplierId, suppliers.map { it.id }, { v -> hooks.onChange { it.copy(supplierId = v) } },
+      Modifier.fillMaxWidth(), noneLabel = StrProducts.noSupplier, display = { id -> names[id] ?: id },
+    )
   }
   Spacer(Modifier.height(10.dp))
   V3ToggleRow(StrProducts.activeInSale, row.active, { on -> hooks.onChange { it.copy(active = on) } }, subtitle = StrProducts.activeHint)
@@ -217,30 +216,9 @@ internal fun CollapsibleHeader(title: String, open: Boolean, onToggle: () -> Uni
   }
 }
 
-/** گروهِ تراشه با برچسب (مثلِ برچسبِ کادر) و خطای درجا */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ChipGroup(label: String, error: Problem?, required: Boolean = true, chips: @Composable () -> Unit) {
-  val c = PhoneV3.colors
-  Column {
-    Row(Modifier.padding(start = 2.dp, bottom = 8.dp)) {
-      Text(label, style = V3Type.subhead.copy(fontWeight = FontWeight.SemiBold), color = c.inkMuted)
-      if (required) Text(" *", style = V3Type.subhead.copy(fontWeight = FontWeight.SemiBold), color = PhoneV3Roles.errorText(c))
-    }
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { chips() }
-    V3Collapse(error != null) {
-      Row(Modifier.padding(start = 2.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Outlined.ErrorOutline, contentDescription = null, tint = PhoneV3Roles.errorText(c), modifier = Modifier.size(15.dp))
-        Spacer(Modifier.width(4.dp))
-        Text(error?.let(::problemText).orEmpty(), style = V3Type.footnote, color = PhoneV3Roles.errorText(c))
-      }
-    }
-  }
-}
-
 /** «سودِ هر عدد: ۲۰ ؋» — زیان با برچسبِ «زیان» و رنگِ خطا (رنگ تنها نیست) */
 @Composable
-private fun ProfitLine(row: ProductRowDraft) {
+internal fun ProfitLine(row: ProductRowDraft) {
   val profit = ProductFormModel.unitProfit(row)
   V3Collapse(profit != null) { ProfitText(row, profit ?: 0.0) }
 }
@@ -271,7 +249,7 @@ internal fun NewValueSheet(title: String, label: String, onDismiss: () -> Unit, 
 }
 
 /** تمرکزِ کادر (برای پرش به نخستین خطا) و «از دست دادنِ تمرکز» (نشان دادنِ خطایش) */
-private fun Modifier.field(f: Field, hooks: FieldHooks): Modifier = composed {
+internal fun Modifier.field(f: Field, hooks: FieldHooks): Modifier = composed {
   var had by remember { mutableStateOf(false) }
   this
     .focusRequester(hooks.focus(f))

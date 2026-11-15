@@ -40,7 +40,7 @@ class ShellTargetsTest {
   fun `همهٔ مقصدهای پوسته ثبت‌اند`() {
     listOf(
       ShellTargets.BACKUP, ShellTargets.ABOUT, ShellTargets.NEW_ORDERS, ShellTargets.SUBSCRIPTION, ShellTargets.PLANS,
-      ShellTargets.stock(true), ShellTargets.stock(false), ShellTargets.OVERDUE_DEBTS, ShellTargets.MOST_DEBT, ShellTargets.EXPIRING,
+      ShellTargets.stock(true), ShellTargets.stock(false), ShellTargets.OVERDUE_DEBTS, ShellTargets.MOST_DEBT, ShellTargets.EXPIRING, ShellTargets.EXPIRED,
       ShellTargets.PURCHASING, ShellTargets.product("p1"), ShellTargets.newProduct("123"), ShellTargets.debtor("d1"),
       ShellTargets.supplier("s1"), ShellTargets.invoice("sale-1"), ShellTargets.SCAN, ShellTargets.notifications("news"),
       ShellTargets.search("x"), TransactionPaths.LIST, ShellTargets.ORDERS, ShellTargets.ORDERS_SETUP,
@@ -48,7 +48,7 @@ class ShellTargetsTest {
     //  درهای نوار و «بیشتر» ِ نسخهٔ ۳ (کاشی‌های `HomeSections` ِ r7 بی‌راه بودند و برداشته شدند، `claude/e-rows-39m`)
     NavCatalog.BUILT_IN.forEach { resolves(it.route) }
     HomeAlerts.build(
-      HomeAlerts.Input(ordersLive = true, newOrders = 1, subscriptionLocked = true, sync = HomeAlerts.Sync.ERROR, outOfStock = 1, overdueDebtors = 1, expiring = 1),
+      HomeAlerts.Input(ordersLive = true, newOrders = 1, subscriptionLocked = true, sync = HomeAlerts.Sync.ERROR, outOfStock = 1, overdueDebtors = 1, expiring = 1, expired = 1),
     ).forEach { resolves(it.route); resolves(it.actionRoute) }
     SearchIndex.sections().forEach { resolves(it.route) }
   }

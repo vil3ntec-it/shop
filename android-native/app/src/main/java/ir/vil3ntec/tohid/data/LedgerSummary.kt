@@ -34,6 +34,8 @@ data class LedgerSummary(
   val savedAt: Long = 0,
   val stock: List<StockLine> = emptyList(),
   val debts: List<DebtLine> = emptyList(),
+  /** محموله‌هایی که تا یک سالِ دیگر منقضی می‌شوند یا شده‌اند (`ExpiryAlerts.lines`)؛ خلاصهٔ کهنه ⇒ خالی */
+  val expiry: List<ExpiryLine> = emptyList(),
 ) {
 
   @Serializable
@@ -42,6 +44,16 @@ data class LedgerSummary(
     val name: String = "",
     /** out | low | ok — همان سه حالتِ `ShopStore.stockStatus` */
     val status: String = "ok",
+    val left: Double = 0.0,
+  )
+
+  /** یک محمولهٔ انقضادار: کالا، تاریخِ انقضا (`yyyy-MM-dd`)، سری و مانده — «امروز» هنگامِ یادآوری سنجیده می‌شود */
+  @Serializable
+  data class ExpiryLine(
+    val id: String = "",
+    val name: String = "",
+    val expiry: String = "",
+    val batch: String = "",
     val left: Double = 0.0,
   )
 
@@ -67,7 +79,7 @@ data class LedgerSummary(
     private fun file(context: Context) = File(context.filesDir, NAME)
 
     /** ساختنِ خلاصه از روی دفتر — یک گذر روی کالاها و یک گذر روی قرض‌ها */
-    fun of(d: ShopData, now: Long = System.currentTimeMillis()): LedgerSummary {
+    fun of(d: ShopData, now: Long = System.currentTimeMillis(), today: String = ir.vil3ntec.tohid.todayIso()): LedgerSummary {
       val index = ShopStore.index(d)
       //  یک گذر روی تراکنش‌ها، نه یک پیمایش به ازای هر قرض‌دار
       val byDebtor = DebtRows.of(d)  // CRM-10: کلیدِ ماندگار
@@ -86,6 +98,8 @@ data class LedgerSummary(
           val amount = DebtMinorFlag.balance(byDebtor[debtor.id].orEmpty())
           DebtLine(id = debtor.id, name = debtor.name, amount = amount)
         },
+        //  یادآوریِ روزانهٔ انقضا (`Reminders`): ماندهٔ FEFO ِ همان `ExpiryEngine`؛ شکستش خلاصه را نمی‌شکند
+        expiry = runCatching { ExpiryAlerts.lines(d, today) }.getOrDefault(emptyList()),
       )
     }
 
