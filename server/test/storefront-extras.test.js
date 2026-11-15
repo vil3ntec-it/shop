@@ -14,6 +14,7 @@ const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
 const X = require('../src/lib/storefront-extras');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -63,8 +64,8 @@ async function liveStore(label) {
 }
 
 async function customer(slug, phone) {
-  const s = await h.post(`/api/store/${slug}/verify/start`, { phone });
-  const c = await h.post(`/api/store/${slug}/verify/check`, { phone, code: s.body.devCode });
+  const s = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+  const c = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: s.body.devCode });
   const a = await h.post(`/api/store/${slug}/account`, {}, { headers: { 'X-Store-Ticket': c.body.ticket } });
   assert.ok(a.status < 300, JSON.stringify(a.body));
   return { headers: { 'X-Store-Session': a.body.session } };
@@ -119,7 +120,7 @@ test('WEB-11 علاقه‌مندی: خاموش ۴۰۴، روشن فقط فروخ
   assert.deepEqual((await h.get(base, k)).body.items.map((p) => p.id), ['oil']);
 
   //  سقف
-  const cust = await one("SELECT id FROM store_customers WHERE phone = '+93791240001'");
+  const cust = await one('SELECT id FROM store_customers WHERE email = $1', [mailOf('0791240001')]);
   for (let i = 0; i < X.MAX_FAVORITES - 1; i++) {
     await query('INSERT INTO store_customer_favorites (customer_id, shop_id, product_id, created_at) VALUES ($1,$2,$3,$4)', [cust.id, s.shopId, `fill-${i}`, 1]);
   }

@@ -219,7 +219,9 @@ class DariWordsTest {
     assertEquals("موتورِ تازه روشن (آزمایشی)", StrSettingsPages.stockModeOn)
     assertEquals("چند کادر درست نیست؛ پیامِ زیرِ هر کادر را ببینید", StrSettingsPages.fixFields)
     assertEquals("اینترنت وصل نیست", ir.vil3ntec.tohid.core.net.ApiFailure.Offline().userMessage)
-    assertEquals("پاسخ سرور خوانده نشد (x)", ir.vil3ntec.tohid.core.net.ApiFailure.InvalidResponse("x").userMessage)
+    //  «هیچ جزئیاتِ فنی/زیرساخت در صفحه»: جزئیاتِ لاتین (نامِ فیلد) دیگر در پیام نیست؛ جملهٔ سادهٔ فارسی هنوز هست
+    assertEquals("پاسخ سرور خوانده نشد", ir.vil3ntec.tohid.core.net.ApiFailure.InvalidResponse("x").userMessage)
+    assertEquals("پاسخ سرور خوانده نشد (گوشی)", ir.vil3ntec.tohid.core.net.ApiFailure.InvalidResponse("گوشی").userMessage)
     I18n.source = { Lang.PRS }
     assertEquals("مصروف هستم", StrCourierApp.rsBusy)
     assertEquals("روان شدم", StrCourierApp.acMoving)

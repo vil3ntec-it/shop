@@ -35,6 +35,7 @@ import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -106,8 +107,8 @@ ok(pushed.status === 200, 'کالا از راهِ همگام‌سازیِ واق
 await call('PUT', '/api/shop/storefront/products/rice', { published: true }, T);
 
 const phone = '0791112244';
-const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
-const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
 ok(vc.status === 200 && vc.body.ticket, 'شماره تأیید شد');
 let seqKey = 0;
 const checkout = async () => {
@@ -153,7 +154,7 @@ await ctx.addInitScript((t) => {
     sessionStorage.setItem('seeded', '1');
     localStorage.setItem('store-ticket', JSON.stringify(t));
   } catch { /* about:blank */ }
-}, { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
+}, { email: vc.body.email, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
 const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });
@@ -228,9 +229,9 @@ ok(await countFrom(conv1.id, 'پیامِ بی‌اینترنت') === 0 && (await
 ok(await page.$('#ct-out .ct-q [data-q="retry"]') !== null && await page.$('#ct-out .ct-q [data-q="cancel"]') !== null,
   'حبابِ «در صف»: «دوباره» و «لغو»');
 const disk1 = await stored();
-ok(disk1 && disk1.phone === vc.body.phone && disk1.items.length === 1 && disk1.items[0].body === 'پیامِ بی‌اینترنت' &&
+ok(disk1 && disk1.phone === vc.body.email && disk1.items.length === 1 && disk1.items[0].body === 'پیامِ بی‌اینترنت' &&
   !Object.keys(disk1.items[0]).some((k) => /media|kind|bytes|photo/i.test(k)),
-'صف روی localStorage ِ store-chat-out: فقط متن، با برچسبِ همان شماره', JSON.stringify(disk1 && Object.keys(disk1.items[0] || {})));
+'صف روی localStorage ِ store-chat-out: فقط متن، با برچسبِ همان ایمیلِ تأییدشده', JSON.stringify(disk1 && Object.keys(disk1.items[0] || {})));
 await ctx.setOffline(false);
 ok(await until(async () => (await countFrom(conv1.id, 'پیامِ بی‌اینترنت')) === 1, 20000), 'وصل شد ⇒ خودش رفت، بی زدنِ دوباره');
 await page.waitForFunction(() => /بی‌اینترنت/.test(document.getElementById('ct-list').textContent), null, { timeout: 15000 });
@@ -268,7 +269,7 @@ await page.unroute(postUrl);
 const qc = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
 await qc.addInitScript((t) => {
   try { if (!localStorage.getItem('qc-seeded')) { localStorage.setItem('qc-seeded', '1'); localStorage.setItem('store-ticket', JSON.stringify(t)); } } catch { /* about:blank */ }
-}, { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
+}, { email: vc.body.email, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
 const qOpen = async () => {
   const p = await qc.newPage();
   p.on('pageerror', (e) => errors.push(String(e)));
@@ -325,7 +326,7 @@ ok(await countFrom(conv1.id, 'پس از تأیید') === 0 && (await stored(qp))
 //  دست را برباید: پیش‌تر تایمرِ ۸۰ms ِ verify() میانِ fill ِ کد نشست، کد در کادرِ شماره رفت و verify/check ۴۰۰ داد (CI ِ #1022).
 const reverify = async (p, num, { refocus = false } = {}) => {
   await query('UPDATE otp_codes SET created_at = created_at - $1', [10 * 60 * 1000]);   //  فاصلهٔ «کدِ تازه» (۱۲۰ ثانیه) گذشته
-  await p.fill('#ct-phone', num);
+  await p.fill('#ct-email', mailOf(num));
   await p.click('#ct-vsend');
   await p.waitForFunction(() => /\d{4,}/.test(document.getElementById('ct-vmsg').textContent), null, { timeout: 10000 });
   const code = (await p.textContent('#ct-vmsg')).match(/(\d{4,})/)[1];
@@ -707,7 +708,7 @@ await page.waitForFunction(() => /آرد/.test(document.getElementById('ct-list'
 //  ⛔ رشتهٔ همین شماره با کلیدِ یکتا (دکان، شماره، ''): گامِ «شمارهٔ دیگر» (۰۷۹۱۱۱۲۲۵۵) هم در همین دکان گفت‌وگوی عمومی دارد و
 //  SELECT ِ بی شماره و بی ORDER BY هر کدام را شاید بدهد — پس از autoanalyze ِ PostgreSQL ِ CI ⇒ Seq Scan به ترتیبِ heap ⇒ رشتهٔ
 //  دیگر کهنه می‌شد، این یکی باز می‌ماند و `#ct-old` هرگز نمی‌آمد (CI ِ #1024). بازتولید: ANALYZE پیش از همین SELECT.
-const gen = await one("SELECT id FROM shop_chat_conversations WHERE shop_id=$1 AND customer_phone=$2 AND order_id=''", [shopId, vc.body.phone]);
+const gen = await one("SELECT id FROM shop_chat_conversations WHERE shop_id=$1 AND customer_phone=$2 AND order_id=''", [shopId, vc.body.email]);
 ok(gen && ((await lastFrom(gen.id, 'customer')) || {}).body === 'آرد دارید؟', 'سرور: گفت‌وگوی عمومیِ همین شماره همان پیامِ تازه را دارد');
 await query('UPDATE shop_chat_conversations SET created_at = created_at - $2, last_message_at = last_message_at - $2 WHERE id=$1', [gen.id, 8 * DAY]);
 await query('UPDATE shop_chat_messages SET created_at = created_at - $2 WHERE conversation_id=$1', [gen.id, 8 * DAY]);
@@ -724,7 +725,7 @@ await page.keyboard.press('Escape');
 if (axeSrc) {
   const ac = await browser.newContext({ viewport: { width: 360, height: 760 }, bypassCSP: true });
   await ac.addInitScript((t) => { try { localStorage.setItem('store-ticket', JSON.stringify(t)); } catch { /* about:blank */ } },
-    { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
+    { email: vc.body.email, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
   const ap = await ac.newPage();
   await ap.goto(`${base}/store/${slug}#/o/${encodeURIComponent(o1.token)}`);
   await ap.waitForSelector('#o-chat-open', { timeout: 15000 });
@@ -871,7 +872,7 @@ page.off('request', onMedia);
 if (axeSrc) {
   const ac = await browser.newContext({ viewport: { width: 360, height: 760 }, bypassCSP: true });
   await ac.addInitScript((t) => { try { localStorage.setItem('store-ticket', JSON.stringify(t)); } catch { /* about:blank */ } },
-    { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
+    { email: vc.body.email, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
   const ap = await ac.newPage();
   await ap.goto(`${base}/store/${slug}#/o/${encodeURIComponent(o3.token)}`);
   await ap.waitForSelector('#o-chat-open', { timeout: 15000 });
@@ -1117,7 +1118,7 @@ if (axeSrc) {
   //  گوشی (لمسی) ⇒ دکمهٔ دوربین هم؛ axe در دو حالت: «آماده» و «در صف» (نوار و «تلاشِ دوباره»)
   const ac = await browser.newContext({ viewport: { width: 360, height: 760 }, bypassCSP: true, hasTouch: true, isMobile: true });
   await ac.addInitScript((t) => { try { localStorage.setItem('store-ticket', JSON.stringify(t)); } catch { /* about:blank */ } },
-    { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
+    { email: vc.body.email, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
   const ap = await ac.newPage();
   await ap.goto(`${base}/store/${slug}#/o/${encodeURIComponent(o4.token)}`);
   await ap.waitForSelector('#o-chat-open', { timeout: 15000 });
@@ -1150,7 +1151,7 @@ if (axeSrc) {
   const voices = async () => Number((await one(
     "SELECT COUNT(*)::int AS n FROM shop_chat_messages WHERE conversation_id=$1 AND sender='customer' AND kind='audio' AND deleted_at IS NULL", [conv5.id])).n);
   const audioRows = async () => Number((await one("SELECT COUNT(*)::int AS n FROM shop_chat_media WHERE conversation_id=$1 AND kind='audio'", [conv5.id])).n);
-  const seed = { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt };
+  const seed = { email: vc.body.email, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt };
   const openChat = async (p) => {
     await p.goto(`${base}/store/${slug}#/o/${encodeURIComponent(o5.token)}`);
     await p.waitForSelector('#o-chat-open', { timeout: 15000 });

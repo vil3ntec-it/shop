@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -87,8 +88,8 @@ await call('POST', '/api/sync/v1/push', { device_id: 'dev-owner', schema_version
 await call('PUT', '/api/shop/storefront/products/rice', { published: true }, T);
 
 const phone = '0791112277';
-const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
-const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
 ok(vc.status === 200 && vc.body.ticket, 'شماره تأیید شد');
 let seq = 0;
 async function placed(fulfillment) {

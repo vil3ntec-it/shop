@@ -3,8 +3,10 @@ package ir.vil3ntec.tohid.ui.v3.settings.sections
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.i18n.StrSyncPlain
 import ir.vil3ntec.tohid.core.sync.SyncOutage
 import ir.vil3ntec.tohid.sync.AutoSync
+import ir.vil3ntec.tohid.sync.v1.SyncStatus
 import ir.vil3ntec.tohid.ui.screens.ServerPulse
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.settings.SyncState
@@ -64,6 +66,53 @@ internal object SyncModel {
     }
   }
 
+  /**
+   *  خطای خامِ موتور ⇒ یک جملهٔ کوتاهِ بی جزئیاتِ فنی برای خانه، نوارِ وضعیت و برگهٔ خروج (قاعدهٔ «هیچ جزئیاتِ فنی/زیرساخت
+   *  در صفحه»). اینترنت/نشست/سرور/دفترِ دستگاه ⇒ همان سرخطِ «گره»؛ پیامِ ناشناختهٔ ساده (فارسیِ بی نشانی، بی کدِ لاتین و
+   *  بی عدد، مثلاً «اشتراک تمام شده») همان می‌ماند، وگرنه «همگام‌سازی کامل نشد». خالی ⇒ خالی. متنِ خام فقط برای پشتیبانی می‌رود.
+   */
+  fun reason(raw: String): String {
+    val e = raw.trim()
+    return when (if (e.isEmpty()) Problem.NONE else classify(e)) {
+      Problem.NONE -> ""
+      Problem.OFFLINE -> StrSettings.diagOfflineTitle
+      Problem.SIGN_IN -> StrSettings.diagSignInTitle
+      Problem.SERVER -> StrSettings.diagServerTitle
+      Problem.LOCAL -> StrSettings.diagLocalTitle
+      else -> e.takeIf { plain(it) } ?: StrSettings.diagUnknownTitle
+    }
+  }
+
+  /** متنِ بی هیچ نشانهٔ فنی: نه حرف/رقمِ لاتین، نه رقمِ دیگر، نه نشانی، و کوتاه */
+  fun plain(text: String): Boolean = text.length <= PLAIN_MAX && !TECHNICAL.containsMatchIn(text)
+
+  private const val PLAIN_MAX = 120
+  private val TECHNICAL = Regex("[A-Za-z0-9۰-۹٠-٩]|://|[{}<>\\/_=]")
+
+  /**
+   *  جزئیاتِ فنیِ کنارِ گره — **فقط برای پشتیبانی** (`SupportDiagAndroid`)، هرگز در صفحه: نسخهٔ Schema ِ دستگاه و سرور،
+   *  نسخه و راهِ API ِ سرور، صف، ردشده‌ها، حکمِ موتور. نشانیِ سرور نیست (گزارش به همان سرور می‌رود).
+   */
+  fun facts(v1: SyncStatus, serverVersion: String, apiPrefix: String): Map<String, String> = linkedMapOf(
+    "schema" to v1.schemaVersion.toString(),
+    "serverSchema" to v1.serverSchema.toString(),
+    "serverVersion" to serverVersion,
+    "apiPrefix" to apiPrefix,
+    "queued" to v1.queued.toString(),
+    "dropped" to v1.dropped.toString(),
+    "holding" to v1.holding.toString(),
+    "outage" to v1.outage.name,
+    "lastOkAt" to v1.lastOkAt.toString(),
+  )
+
+  /** یادداشتِ زیرِ «وضعیتِ سرور»: سرورِ بالا ولی ناآماده ⇒ همان جملهٔ ساده؛ جواب نداد ⇒ [reason]؛ بقیه هیچ */
+  fun pulseNote(state: ServerPulse.State, note: String?): String? = when {
+    note.isNullOrBlank() -> null
+    state == ServerPulse.State.UP -> note.takeIf { plain(it) }
+    state == ServerPulse.State.DOWN -> reason(note).ifBlank { null }
+    else -> null
+  }
+
   /** SYN-12: حکمِ موتور (`SyncStatus.outage`، از کدِ HTTP و مدتِ شکست) جای نشانه‌های متنی؛ «خطا»/«همگام» ⇒ همان نشانه‌ها */
   fun fromOutage(outage: SyncOutage.Kind?): Problem? = when (outage) {
     SyncOutage.Kind.OFFLINE -> Problem.OFFLINE
@@ -87,8 +136,8 @@ internal object SyncModel {
 
   /**
    *  ترتیب: سرورِ عقب‌مانده (چیزی نمی‌رود تا به‌روز شود) ⇐ نبودنِ دکان ⇐ حکمِ موتور (SYN-12) ⇐ نتِ دستگاه ⇐
-   *  خطای آخرین دور ⇐ تغییرهای ردشده. `detail` همان متنِ خام برای پشتیبانی است. سرورِ گرفتار (حکمِ
-   *  موتور) زرد است، نه سرخ: تقصیرِ این دستگاه نیست و خودش دوباره می‌رود.
+   *  خطای آخرین دور ⇐ تغییرهای ردشده. `detail` همان متنِ خام **فقط برای پشتیبانی** است (`SupportDiagAndroid`) و
+   *  هرگز در صفحه نشان داده نمی‌شود. سرورِ گرفتار (حکمِ موتور) زرد است، نه سرخ: تقصیرِ این دستگاه نیست و خودش دوباره می‌رود.
    */
   fun diagnose(error: String, holding: Boolean, dropped: Int, needsShop: Boolean, server: ServerPulse.State, outage: SyncOutage.Kind? = null): Diagnosis {
     val raw = error.trim()
@@ -113,7 +162,7 @@ internal object SyncModel {
       Problem.SERVER_BEHIND -> Diagnosis(problem, StrSettings.diagBehindTitle, StrNav.serverBehind, StrSettings.diagBehindDo, V3Tone.WARNING, null)
       Problem.NO_SHOP -> Diagnosis(problem, StrSettings.diagNoShopTitle, StrSettings.diagNoShopBody, StrSettings.diagNoShopDo, V3Tone.WARNING, detail)
       Problem.LOCAL -> Diagnosis(problem, StrSettings.diagLocalTitle, StrSettings.diagLocalBody, StrSettings.diagLocalDo, V3Tone.ERROR, detail)
-      Problem.REJECTED -> Diagnosis(problem, StrSettings.diagRejectedTitle(dropped), StrNav.droppedChanges(dropped), StrSettings.diagRejectedDo, V3Tone.WARNING, null)
+      Problem.REJECTED -> Diagnosis(problem, StrSyncPlain.rejectedTitle(dropped), StrNav.droppedChanges(dropped), StrSettings.diagRejectedDo, V3Tone.WARNING, null)
       Problem.UNKNOWN -> Diagnosis(problem, StrSettings.diagUnknownTitle, StrSettings.diagUnknownBody, StrSettings.diagUnknownDo, V3Tone.ERROR, detail)
     }
   }

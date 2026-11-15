@@ -15,6 +15,7 @@ const { query, one, many, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
 const delivery = require('../src/lib/delivery');
 const N = require('../src/lib/customer-notify');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -56,8 +57,8 @@ async function liveShop(label) {
 
 async function checkout(s, fulfillment) {
   const phone = '0791112244';
-  const st = await h.post(`/api/store/${s.slug}/verify/start`, { phone });
-  const ck = await h.post(`/api/store/${s.slug}/verify/check`, { phone, code: st.body.devCode });
+  const st = await h.post(`/api/store/${s.slug}/verify/start`, { email: mailOf(phone) });
+  const ck = await h.post(`/api/store/${s.slug}/verify/check`, { email: mailOf(phone), code: st.body.devCode });
   const r = await h.post(`/api/store/${s.slug}/checkout`, {
     fulfillment, customer: { name: 'مشتری', phone }, lines: [{ productId: 'rice', qtyMilli: 1000 }],
     ...(fulfillment === 'delivery' ? { address: { lat: 34.523456, lng: 69.181234, landmark: 'نزدیکِ مسجد' } } : {}),

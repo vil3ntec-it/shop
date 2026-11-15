@@ -346,6 +346,7 @@ fun SettingsScreen(
   val v1 by ir.vil3ntec.tohid.sync.v1.SyncV1Engine.of(context).status.collectAsState()
   val lastSyncOk = maxOf(state.lastSyncAt, v1.lastOkAt)
   val syncNow = System.currentTimeMillis()
+  val plainSync = ir.vil3ntec.tohid.ui.v3.settings.sections.SyncModel.reason(v1.lastError)   //  ⛔ خطای خام نه (`docs/RULES-fa.md`)
 
   /*
    *  بدنهٔ تنظیمات — یک بار نوشته شده و سه جا کشیده می‌شود: فهرستِ گوشی،
@@ -762,7 +763,7 @@ fun SettingsScreen(
           icon = Icons.Filled.Sync,
           title = StrSettings.syncRow,
           subtitle = if (!signedIn) ir.vil3ntec.tohid.core.i18n.StrShellPages.syncSignInFirst
-          else ir.vil3ntec.tohid.core.sync.SyncBadge.line(StrSettings.syncRow, v1.queued, lastSyncOk, v1.lastError, syncNow),
+          else ir.vil3ntec.tohid.core.sync.SyncBadge.line(StrSettings.syncRow, v1.queued, lastSyncOk, plainSync, syncNow),
           tint = Shop.colors.accent,
           value = if (!signedIn) StrSettings.notSignedIn else ir.vil3ntec.tohid.core.sync.SyncBadge.since(lastSyncOk, syncNow),
         ) {
@@ -772,10 +773,7 @@ fun SettingsScreen(
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.muted2,
           )
-          if (v1.lastError.isNotBlank()) {
-            Spacer(Modifier.height(6.dp))
-            Text(v1.lastError, style = MaterialTheme.typography.labelSmall, color = Shop.colors.danger)
-          }
+          if (plainSync.isNotBlank()) Text(plainSync, Modifier.padding(top = 6.dp), style = MaterialTheme.typography.labelSmall, color = Shop.colors.danger)
           Spacer(Modifier.height(12.dp))
           TohidButton(
             text = StrSettings.syncNow,

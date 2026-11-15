@@ -138,7 +138,8 @@ internal fun FeaturesLink(onOpen: () -> Unit) {
 internal fun RouteScope.rememberSearchDocs(facts: SettingsFacts): List<SettingsSearchIndex.Doc> {
   val entries = remember(access) { V3Modules.settingsEntries(access) }
   val extras = entries.filter { it.shown() }.map { SettingsSearchIndex.Extra(it.route, it.label(), it.subtitle(), it.group) }
-  return SettingsSearchIndex.docs(Platform.DESKTOP, facts.serverOn, extras)
+  //  ردیفِ فقط‌صاحب («سرورها») در جست‌وجوی دیگران هم نیست
+  return SettingsSearchIndex.docs(Platform.DESKTOP, facts.serverOn, extras).filter { facts.owner || it.key !in SettingsLayout.OWNER_ONLY }
 }
 
 /** نتیجه‌های جست‌وجو: هر ردیف نام، جایش در تنظیمات («فروش و پرداخت · پرداخت») و برچسبِ «آزمایشی» اگر باشد */

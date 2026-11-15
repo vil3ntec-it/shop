@@ -17,6 +17,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -71,8 +72,8 @@ async function storeShop(label) {
 async function pickingOrder(o) {
   const phone = `079${String(1000000 + ((seq * 7919) % 8999999)).slice(-7)}`;
   uniq();
-  const v = await h.post(`/api/store/${o.slug}/verify/start`, { phone });
-  const t = await h.post(`/api/store/${o.slug}/verify/check`, { phone, code: v.body.devCode });
+  const v = await h.post(`/api/store/${o.slug}/verify/start`, { email: mailOf(phone) });
+  const t = await h.post(`/api/store/${o.slug}/verify/check`, { email: mailOf(phone), code: v.body.devCode });
   assert.equal(t.status, 200, JSON.stringify(t.body));
   const ck = await h.post(`/api/store/${o.slug}/checkout`, {
     fulfillment: 'pickup', customer: { name: 'مشتری', phone }, lines: [{ productId: 'meat', qtyMilli: 1000 }, { productId: 'oil', qtyMilli: 1000 }],

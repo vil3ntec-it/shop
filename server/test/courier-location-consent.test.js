@@ -18,6 +18,7 @@ const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
 const delivery = require('../src/lib/delivery');
 const consent = require('../src/lib/courier-location-consent');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -76,8 +77,8 @@ async function addCourier(s, name) {
 /** سفارشِ ارسالی، سپرده به پیک و «در راه». */
 async function onTheWay(s, courier) {
   const phone = '0791112233';
-  const st = await h.post(`/api/store/${s.slug}/verify/start`, { phone });
-  const ck = await h.post(`/api/store/${s.slug}/verify/check`, { phone, code: st.body.devCode });
+  const st = await h.post(`/api/store/${s.slug}/verify/start`, { email: mailOf(phone) });
+  const ck = await h.post(`/api/store/${s.slug}/verify/check`, { email: mailOf(phone), code: st.body.devCode });
   assert.equal(ck.status, 200, JSON.stringify(ck.body));
   const r = await h.post(`/api/store/${s.slug}/checkout`, {
     fulfillment: 'delivery', customer: { name: 'مشتری', phone },

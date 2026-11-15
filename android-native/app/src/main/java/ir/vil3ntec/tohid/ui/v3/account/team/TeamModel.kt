@@ -25,6 +25,9 @@ object TeamModel {
     val removable: Boolean,
   )
 
+  /** «فروشنده · ۰۷۹۹…» — نقش و تماس در یک خطِ آرام (به‌جای دو قرص) */
+  fun memberLine(m: MemberRow): String = listOf(m.role, m.contact).filter { it.isNotBlank() }.joinToString(" · ")
+
   fun memberRow(m: MemberDto): MemberRow {
     val kind = AccountFormat.roleOf(m.role)
     return MemberRow(

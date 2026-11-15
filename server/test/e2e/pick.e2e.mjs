@@ -13,6 +13,7 @@
  */
 import { createRequire } from 'node:module';
 import { boot, assert, sameOrderLink } from './lib/harness.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const E = await boot({ name: 'pick' });
 //  ⚠️ پس از boot: کدِ سرور پیکربندی را همان لحظهٔ نخستین require می‌خواند
@@ -61,8 +62,8 @@ await E.step('E2E-PCK-06.0', 'A کالا با دسته و بارکد می‌سا
   await A.drain();
   E.ok(await A.api('PUT', '/shop/storefront', { slug: SLUG, enabled: true, title: 'ویترینِ جمع‌آوری', contactPhone: '0700000003', deliveryFeeMinor: 0, minOrderMinor: 0 }), 'ویترین');
   for (const id of Object.values(P)) E.ok(await A.api('PUT', `/shop/storefront/products/${id}`, { published: true }), `انتشارِ ${id}`);
-  const s = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { phone: PHONE }), 'کدِ تأیید');
-  ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { phone: PHONE, code: s.devCode }), 'تأییدِ شماره').ticket;
+  const s = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { email: mailOf(PHONE) }), 'کدِ تأیید');
+  ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { email: mailOf(PHONE), code: s.devCode }), 'تأییدِ شماره').ticket;
   assert.ok(ticket);
 });
 

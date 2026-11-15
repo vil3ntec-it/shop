@@ -38,12 +38,13 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Space
-import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3ProductThumb
-import ir.vil3ntec.tohid.ui.v3.V3StatusPill
+import ir.vil3ntec.tohid.ui.v3.V3QuietStatus
+import ir.vil3ntec.tohid.ui.v3.V3RowStatus
+import ir.vil3ntec.tohid.ui.v3.V3RowTone
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.rememberCountUp
@@ -140,12 +141,15 @@ internal fun stockRowSubtitle(row: StockRowUi): String = listOfNotNull(
   row.expiresInDays?.let { if (it <= 0) StrStock.expiresToday else StrStock.expiresIn(money(it.toDouble())) },
 ).joinToString(" · ")
 
-/** قرصِ وضعیتِ ردیف: منقضی، تمام‌شده، کم، نزدیکِ انقضا (به همین ترتیبِ اهمیت) */
-internal fun stockPill(row: StockRowUi): Pair<V3Status, String>? = when {
-  row.expired -> V3Status.CANCELLED to StrStock.pillExpired
-  row.level == StockLevel.OUT -> V3Status.CANCELLED to StrStock.pillOut
-  row.level == StockLevel.LOW -> V3Status.WARNING to StrStock.pillLow
-  row.expiresInDays != null -> V3Status.WARNING to StrStock.pillExpiring
+/**
+ *  وضعیتِ آرامِ ردیف (سادهٔ e-rows-63d، به‌جای قرص): منقضی و تمام‌شده قرمز، کم و نزدیکِ انقضا کهربایی (به همین ترتیبِ
+ *  اهمیت)؛ عادی ⇒ هیچ.
+ */
+internal fun stockPill(row: StockRowUi): V3RowStatus? = when {
+  row.expired -> V3RowStatus(StrStock.pillExpired, V3RowTone.DANGER)
+  row.level == StockLevel.OUT -> V3RowStatus(StrStock.pillOut, V3RowTone.DANGER)
+  row.level == StockLevel.LOW -> V3RowStatus(StrStock.pillLow, V3RowTone.ATTENTION)
+  row.expiresInDays != null -> V3RowStatus(StrStock.pillExpiring, V3RowTone.ATTENTION)
   else -> null
 }
 
@@ -189,9 +193,6 @@ private fun StockQty(row: StockRowUi) {
       color = c.ink,
       maxLines = 1,
     )
-    stockPill(row)?.let { (status, label) ->
-      Spacer(Modifier.height(4.dp))
-      V3StatusPill(status, label)
-    }
+    stockPill(row)?.let { V3QuietStatus(it) }
   }
 }

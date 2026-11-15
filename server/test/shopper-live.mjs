@@ -19,6 +19,7 @@
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = 'test';
@@ -123,8 +124,8 @@ const rule = await call('PUT', '/api/shop/promos/rules/vip', { rule: {
 } }, T);
 ok(rule.status === 200, 'کدِ تخفیفِ VIP10 ساخته شد', JSON.stringify(rule.body).slice(0, 120));
 const dPhone = '0700999888';
-const dStart = await call('POST', `/api/store/${slug}/verify/start`, { phone: dPhone });
-const dCheck = await call('POST', `/api/store/${slug}/verify/check`, { phone: dPhone, code: dStart.body.devCode });
+const dStart = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(dPhone) });
+const dCheck = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(dPhone), code: dStart.body.devCode });
 const dOrder = await call('POST', `/api/store/${slug}/checkout`, {
   fulfillment: 'pickup', customer: { name: 'مشتریِ تحویل', phone: dPhone }, lines: [{ productId: 'rice', qtyMilli: 1000 }], lang: 'fa',
 }, null, { 'Idempotency-Key': 'live-delivered-1', 'X-Store-Ticket': dCheck.body.ticket });

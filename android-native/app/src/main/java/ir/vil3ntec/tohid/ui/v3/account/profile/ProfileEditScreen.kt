@@ -46,7 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.account.AccountDeletion
-import ir.vil3ntec.tohid.core.account.PhoneClaimForm
+import ir.vil3ntec.tohid.core.account.EmailClaimForm
 import ir.vil3ntec.tohid.core.i18n.StrAccount
 import ir.vil3ntec.tohid.core.i18n.StrShellPages
 import ir.vil3ntec.tohid.core.net.ApiFailure
@@ -82,14 +82,17 @@ internal data class ProfileEditUi(
   val name: String,
   val nameError: String? = null,
   val email: String,
-  val phone: String,
+  /** «فقط ایمیل»: ایمیلی که حسابِ بی‌ایمیل می‌افزاید (کادر فقط وقتی `email` خالی است) */
+  val newEmail: String = "",
+  val emailError: String? = null,
+  /** شمارهٔ تماس (راهِ ورود نیست؛ بی کد عوض/پاک) */
   val newPhone: String,
   val phoneError: String? = null,
   val shopName: String,
   val createdAt: Long,
   val busy: Boolean = false,
   val dirty: Boolean = false,
-  /** AUTH-08: کادرِ «کدِ همان شماره» — فقط وقتی سرور کد خواست (پرچمِ `auth.phone_add_code`) */
+  /** AUTH-08 ⇐ ایمیل: کادرِ «کدِ همان ایمیل» — فقط وقتی سرور کد خواست (`email_code_required`) */
   val codeShown: Boolean = false,
   val code: String = "",
   val codeError: String? = null,
@@ -103,6 +106,7 @@ internal fun ProfileEditContent(
   ui: ProfileEditUi,
   onName: (String) -> Unit,
   onNewPhone: (String) -> Unit,
+  onNewEmail: (String) -> Unit = {},
   onShopName: (String) -> Unit,
   onPhoto: () -> Unit,
   onSave: () -> Unit,
@@ -139,17 +143,14 @@ internal fun ProfileEditContent(
     V3Section(StrAccount.groupAccount, Modifier.v3Stagger(stagger, "account", 1), padding = PaddingValues(16.dp)) {
       V3TextField(ui.name, onName, StrAccount.fullName, Modifier.v3Shake(ui.nameError), error = ui.nameError, required = true)
       Spacer(Modifier.height(14.dp))
-      LockedField(Icons.Outlined.AlternateEmail, StrAccount.email, ui.email.ifBlank { StrAccount.emailNone }, ProfileEditModel.emailNote(ui.email), ltr = ui.email.isNotBlank())
-      Spacer(Modifier.height(14.dp))
-      if (ProfileEditModel.phoneLocked(ui.phone)) {
-        LockedField(Icons.Outlined.Lock, StrAccount.phone, ui.phone, StrAccount.phoneLocked, ltr = true)
-      } else {
+      if (ProfileEditModel.emailClaimable(ui.email)) {
+        //  «فقط ایمیل»: حسابِ کهنهٔ بی‌ایمیل ایمیل را با کدِ همان ایمیل می‌افزاید (AUTH-08 ⇐ ایمیل)
         V3TextField(
-          ui.newPhone, onNewPhone, StrAccount.phone, Modifier.v3Shake(ui.phoneError),
-          kind = V3FieldKind.PHONE, placeholder = "07XXXXXXXX",
-          helper = StrAccount.phoneOnceHelper, error = ui.phoneError,
+          ui.newEmail, onNewEmail, StrAccount.email, Modifier.v3Shake(ui.emailError),
+          kind = V3FieldKind.EMAIL, placeholder = "name@example.com",
+          helper = ProfileEditModel.emailNote(ui.email), error = ui.emailError,
         )
-        //  AUTH-08: کدی که سرور به همین شماره فرستاد؛ شماره عوض شود ⇒ کادر بسته
+        //  کدی که سرور به همین ایمیل فرستاد؛ ایمیل عوض شود ⇒ کادر بسته
         if (ui.codeShown) {
           Spacer(Modifier.height(14.dp))
           V3TextField(
@@ -161,7 +162,16 @@ internal fun ProfileEditContent(
             enabled = !ui.busy && ui.resendWait == 0,
           )
         }
+      } else {
+        LockedField(Icons.Outlined.AlternateEmail, StrAccount.email, ui.email, ProfileEditModel.emailNote(ui.email), ltr = true)
       }
+      Spacer(Modifier.height(14.dp))
+      //  شمارهٔ تماس: راهِ ورود نیست ⇒ همیشه آزاد، بی کد
+      V3TextField(
+        ui.newPhone, onNewPhone, StrAccount.phone, Modifier.v3Shake(ui.phoneError),
+        kind = V3FieldKind.PHONE, placeholder = "07XXXXXXXX",
+        helper = StrAccount.phoneOnceHelper, error = ui.phoneError,
+      )
     }
 
     V3Section(StrAccount.groupShop, Modifier.v3Stagger(stagger, "shop", 2), padding = PaddingValues(16.dp)) {
@@ -213,9 +223,9 @@ private fun LockedField(icon: ImageVector, label: String, value: String, note: S
  *  مسیرِ `profile/edit`: نام و نامِ دکان همان لحظه روی گوشی (`SyncStore`،
  *  `store_name`)، و اگر آنتن بود `updateProfile` روی سرور؛ عکس فقط روی گوشی.
  *
- *  AUTH-08 — شمارهٔ تازه با کدِ همان شماره (پرچمِ سروریِ `auth.phone_add_code`): `PUT /api/me` ⇐ `phone_code_required`
- *  ⇐ `POST /api/me/phone/code` ⇐ کادرِ کد ⇐ `PUT` با `phoneCode`. گامِ بعد فقط از `core/account/PhoneClaimForm`؛ سقفِ
- *  تلاش، فاصلهٔ ارسالِ دوباره و سقفِ روزانه همان سرور است. پرچمِ خاموش ⇒ کادرِ کد هرگز باز نمی‌شود — همان درخواستِ پیشین.
+ *  «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): شمارهٔ تماس بی کد با همان ذخیره می‌رود. AUTH-08 ⇐ ایمیل — حسابِ بی‌ایمیل ایمیل را با کدِ همان
+ *  ایمیل می‌افزاید: `PUT /api/me` ⇐ `email_code_required` ⇐ `POST /api/me/email/code` ⇐ کادرِ کد ⇐ `PUT` با `emailCode`.
+ *  گامِ بعد فقط از `core/account/EmailClaimForm`؛ سقفِ تلاش، فاصلهٔ ارسالِ دوباره و سقفِ روزانه همان سرور است.
  */
 @Composable
 internal fun RouteScope.ProfileEditRoute() {
@@ -229,11 +239,13 @@ internal fun RouteScope.ProfileEditRoute() {
   var shop by rememberSaveable { mutableStateOf(savedShop) }
   var claim by rememberSaveable { mutableStateOf("") }
   var phone by remember { mutableStateOf(state.accountPhone) }
+  var typedPhone by rememberSaveable { mutableStateOf(state.accountPhone) }
   var email by remember { mutableStateOf(state.accountEmail) }
   var nameError by remember { mutableStateOf<String?>(null) }
   var phoneError by remember { mutableStateOf<String?>(null) }
+  var emailError by remember { mutableStateOf<String?>(null) }
   var busy by remember { mutableStateOf(false) }
-  var form by rememberSaveable(stateSaver = PhoneFormSaver) { mutableStateOf(PhoneClaimForm()) }
+  var form by rememberSaveable(stateSaver = EmailFormSaver) { mutableStateOf(EmailClaimForm()) }
   var resendWait by remember { mutableIntStateOf(0) }
   //  شمارشِ «ارسالِ دوباره» از مهلتِ پاسخِ سرور، با هر کدِ تازه از نو
   LaunchedEffect(form.sent) {
@@ -251,24 +263,23 @@ internal fun RouteScope.ProfileEditRoute() {
       .onFailure { toasts.show(StrAccount.photoFailed, V3Tone.ERROR) }
   }
 
-  /** پاسخِ ناموفقی که پیامش را خودِ سرور داده یا کد دیگر لازم نیست */
-  fun tell(what: PhoneClaimForm.Next, f: ApiFailure, tone: V3Tone) {
+  /** پاسخِ ناموفقی که پیامش را خودِ سرور داده */
+  fun tell(what: EmailClaimForm.Next, f: ApiFailure, tone: V3Tone) {
     when (what) {
-      PhoneClaimForm.Next.SERVER_MESSAGE -> toasts.show(f.userMessage, tone)
-      PhoneClaimForm.Next.SAVE_AGAIN -> toasts.show(StrAccount.codeNotNeeded, V3Tone.INFO)
-      PhoneClaimForm.Next.REQUEST_CODE, PhoneClaimForm.Next.NONE -> Unit
+      EmailClaimForm.Next.SERVER_MESSAGE -> toasts.show(f.userMessage, tone)
+      EmailClaimForm.Next.REQUEST_CODE, EmailClaimForm.Next.NONE -> Unit
     }
   }
 
-  /** کدِ همان شماره (`POST /api/me/phone/code`)؛ کادرِ کد باز می‌شود یا پیامِ سرور */
-  fun requestCode(phone: String) {
+  /** کدِ همان ایمیل (`POST /api/me/email/code`)؛ کادرِ کد باز می‌شود یا پیامِ سرور */
+  fun requestCode(address: String) {
     busy = true
     scope.launch {
       val account = Backend.account(context)
-      account.requestPhoneCode(phone)
-        .onSuccess { seconds -> form = form.sent(phone, seconds); toasts.show(StrShellPages.smsCodeSent, V3Tone.INFO) }
+      account.requestEmailCode(address)
+        .onSuccess { seconds -> form = form.sent(address, seconds); toasts.show(StrShellPages.smsCodeSent, V3Tone.INFO) }
         .onFailure { f ->
-          val (next, what) = form.sendFailed(f.code, phone)
+          val (next, what) = form.sendFailed(f.code, address)
           form = next
           tell(what, f, V3Tone.WARNING)
         }
@@ -278,7 +289,9 @@ internal fun RouteScope.ProfileEditRoute() {
 
   fun save() {
     val clean = name.trim()
-    val step = ProfileEditModel.step(clean, claim.trim(), Backend.isReady(context), Backend.isOnline(context))
+    val wanted = claim.trim()
+    val phoneOut = if (ProfileEditModel.phoneChanged(typedPhone, phone)) typedPhone.trim() else null
+    val step = ProfileEditModel.step(clean, wanted + (phoneOut?.let { "#$it" } ?: ""), Backend.isReady(context), Backend.isOnline(context))
     if (step == ProfileEditModel.Step.NAME_MISSING) { nameError = StrAccount.nameRequired; return }
     //  نام و نامِ دکان همان لحظه روی گوشی — سربرگِ فاکتور و رسیدها همین را دارند
     prefs.edit().putString("store_name", shop.trim()).apply()
@@ -286,21 +299,21 @@ internal fun RouteScope.ProfileEditRoute() {
     savedName = clean; savedShop = shop.trim(); name = clean
     when (step) {
       ProfileEditModel.Step.LOCAL_ONLY -> { toasts.show(StrAccount.nameSavedOffline, V3Tone.INFO); back() }
-      ProfileEditModel.Step.PHONE_NEEDS_INTERNET -> phoneError = StrAccount.phoneNeedsInternet
+      ProfileEditModel.Step.NEEDS_INTERNET -> if (wanted.isNotBlank()) emailError = StrAccount.phoneNeedsInternet else phoneError = StrAccount.phoneNeedsInternet
       ProfileEditModel.Step.SERVER -> {
-        val wanted = claim.trim()
         //  کادرِ کد باز و کدِ نادرست ⇒ هیچ درخواستی، فقط خطای درجا
-        val phoneCode = form.codeToSend() ?: run { form = form.badCode(); return }
+        val emailCode = form.codeToSend() ?: run { form = form.badCode(); return }
         busy = true
         scope.launch {
           val account = Backend.account(context)
-          account.updateProfile(clean, wanted, phoneCode)
+          account.updateProfile(clean, phoneOut, wanted, emailCode)
             .onSuccess { done ->
               state.accountName = done.user.name
               state.accountEmail = done.user.email.orEmpty()
               state.accountPhone = done.user.phone.orEmpty()
               name = done.user.name; savedName = done.user.name
-              email = done.user.email.orEmpty(); phone = done.user.phone.orEmpty(); claim = ""; form = PhoneClaimForm()
+              email = done.user.email.orEmpty(); phone = done.user.phone.orEmpty(); typedPhone = phone
+              claim = ""; form = EmailClaimForm()
               Haptics.success(context)
               toasts.show(ProfileEditModel.savedMessage(wanted), V3Tone.SUCCESS)
               busy = false
@@ -311,7 +324,7 @@ internal fun RouteScope.ProfileEditRoute() {
               val (next, what) = form.afterSave(f.code, wanted)
               form = next
               when (what) {
-                PhoneClaimForm.Next.REQUEST_CODE -> requestCode(wanted)
+                EmailClaimForm.Next.REQUEST_CODE -> requestCode(wanted)
                 else -> tell(what, f, V3Tone.ERROR)
               }
             }
@@ -324,13 +337,16 @@ internal fun RouteScope.ProfileEditRoute() {
   ProfileEditContent(
     ui = ProfileEditUi(
       accountId = accountId, avatarVersion = version,
-      name = name, nameError = nameError, email = email, phone = phone,
-      newPhone = claim, phoneError = phoneError, shopName = shop, createdAt = state.accountCreatedAt,
-      busy = busy, dirty = ProfileEditModel.dirty(name, savedName, shop, savedShop, claim),
+      name = name, nameError = nameError, email = email,
+      newEmail = claim, emailError = emailError,
+      newPhone = typedPhone, phoneError = phoneError, shopName = shop, createdAt = state.accountCreatedAt,
+      busy = busy,
+      dirty = ProfileEditModel.dirty(name, savedName, shop, savedShop, claim + if (ProfileEditModel.phoneChanged(typedPhone, phone)) "#" else ""),
       codeShown = form.shown, code = form.code, codeError = ProfileEditModel.codeError(form.problem), resendWait = resendWait,
     ),
     onName = { name = it; nameError = null },
-    onNewPhone = { claim = it; phoneError = null; form = form.phone(it) },
+    onNewPhone = { typedPhone = it; phoneError = null },
+    onNewEmail = { claim = it; emailError = null; form = form.email(it) },
     onShopName = { shop = it },
     onPhoto = { sheet = true },
     onSave = ::save,
@@ -343,8 +359,8 @@ internal fun RouteScope.ProfileEditRoute() {
   if (sheet) AvatarSourceSheet(picker) { sheet = false }
 }
 
-/** حالِ کادرِ کد پس از چرخاندن: شماره و کدِ تایپ‌شده (مهلتِ ارسالِ دوباره از نو؛ سرور خودش می‌سنجد) */
-private val PhoneFormSaver = listSaver<PhoneClaimForm, String>(
+/** حالِ کادرِ کد پس از چرخاندن: ایمیل و کدِ تایپ‌شده (مهلتِ ارسالِ دوباره از نو؛ سرور خودش می‌سنجد) */
+private val EmailFormSaver = listSaver<EmailClaimForm, String>(
   save = { listOf(it.codeFor, it.code) },
-  restore = { PhoneClaimForm(codeFor = it[0], code = it[1]) },
+  restore = { EmailClaimForm(codeFor = it[0], code = it[1]) },
 )

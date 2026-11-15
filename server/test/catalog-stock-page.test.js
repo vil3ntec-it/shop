@@ -27,6 +27,7 @@ const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const syncV1 = require('../src/lib/sync-v1');
 const { resetAll } = require('../src/middleware/ratelimit');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const VECTORS = path.join(__dirname, '..', '..', 'core', 'test-vectors', 'product-page-inv-v1.json');
 let admin = '';
@@ -121,9 +122,9 @@ const tickets = new Map();
 async function ticket(s, phone) {
   const k = `${s.slug}:${phone}`;
   if (!tickets.has(k)) {
-    const a = await h.post(`/api/store/${s.slug}/verify/start`, { phone });
+    const a = await h.post(`/api/store/${s.slug}/verify/start`, { email: mailOf(phone) });
     assert.equal(a.status, 200, JSON.stringify(a.body));
-    const c = await h.post(`/api/store/${s.slug}/verify/check`, { phone, code: a.body.devCode });
+    const c = await h.post(`/api/store/${s.slug}/verify/check`, { email: mailOf(phone), code: a.body.devCode });
     assert.equal(c.status, 200, JSON.stringify(c.body));
     tickets.set(k, c.body.ticket);
   }

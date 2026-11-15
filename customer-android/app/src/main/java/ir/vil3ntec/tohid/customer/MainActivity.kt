@@ -107,6 +107,7 @@ class MainActivity : ComponentActivity() {
       server = server,
       setServer = { kv.put(SERVER_KEY, it.trim().takeIf { s -> s.isNotEmpty() }) },
       version = BuildConfig.VERSION_NAME,
+      serverField = BuildConfig.SERVER_FIELD,
       openMap = { openMap(it) },
       canPickPhoto = true,
       pickPhoto = { done ->

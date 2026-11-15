@@ -19,6 +19,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const chat = require('../src/lib/shop-chat');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const DAY = 24 * 3600 * 1000;
 const base = '/api/shop/chat';
@@ -55,13 +56,16 @@ async function shop(name) {
 }
 
 /** سفارشِ دریافت از دکان (نقد) تا [to] با گذارهای واقعیِ سرور (رویدادها هم) */
-async function order(s, phone, { upTo = 'picked_up', fulfillment = 'pickup' } = {}) {
+/** «فقط ایمیل»: سفارشِ مشتری با ایمیلِ تأییدشده‌اش به او بسته است (`customer_email`، همان که ویترین می‌نشاند)؛ `email: false` ⇒
+ *  سفارشِ دستیِ فقط‌شماره که هیچ مشتری‌ای با شماره به آن نمی‌رسد. */
+async function order(s, phone, { upTo = 'picked_up', fulfillment = 'pickup', email = true } = {}) {
   const r = await h.post('/api/shop/orders', {
     source: 'phone', fulfillment, paymentMethod: 'cod', customer: { name: 'کریم', phone },
     ...(fulfillment === 'delivery' ? { address: { landmark: 'نزدیکِ مسجد', text: 'کارتهٔ چهار', lat: 34.5, lng: 69.1 } } : {}),
     lines: [{ name: 'برنج', qtyMilli: 1000, unitPriceMinor: 12_000 }],
   }, { token: s.token, headers: { 'Idempotency-Key': `ord-${uniq()}` } });
   assert.equal(r.status, 201, JSON.stringify(r.body));
+  if (email) await query('UPDATE online_orders SET customer_email=$1 WHERE id=$2', [mailOf(phone), r.body.order.id]);
   const path = fulfillment === 'pickup'
     ? ['accepted', 'picking', 'packed', 'ready_for_pickup', 'picked_up']
     : ['accepted', 'picking', 'packed', 'out_for_delivery', 'delivered'];
@@ -72,7 +76,7 @@ async function order(s, phone, { upTo = 'picked_up', fulfillment = 'pickup' } = 
   return r.body.order;
 }
 
-const customer = (shopId, phone) => ({ side: 'customer', shopId, phone });
+const customer = (shopId, phone) => ({ side: 'customer', shopId, phone: mailOf(phone) });   //  کلیدِ مشتری = ایمیلِ تأییدشده
 const shopConv = async (s, orderId) => {
   const r = await h.post(`${base}/conversations`, { orderId }, { token: s.token });
   assert.ok(r.status === 200 || r.status === 201, JSON.stringify(r.body));
@@ -201,6 +205,9 @@ test('سفارشِ تازه ⇒ رشتهٔ تازه؛ تاریخچهٔ دکان 
   //  مشتری با شمارهٔ سفارش به همان رشتهٔ هر سفارش می‌رسد
   assert.equal((await chat.open(me, { orderNo: second.orderNo })).conversation.id, c2.id);
   assert.equal((await chat.open(me, { orderNo: first.orderNo })).conversation.id, c1.id);
+  //  سفارشِ دستیِ فقط‌شماره با همان شماره: مشتری با شماره به آن نمی‌رسد (شماره هویت نیست)
+  const phoneOnly = await order(s, '0791110021', { upTo: 'accepted', email: false });
+  await assert.rejects(chat.open(me, { orderNo: phoneOnly.orderNo }), (e) => e.code === 'order_not_found');
   //  مشتریِ دیگرِ همین دکان
   const other = await order(s, '0791110022', { upTo: 'accepted' });
   const c3 = await shopConv(s, other.id);
@@ -309,9 +316,9 @@ test('درِ مشتری: POST /api/store/:slug/chat/conversations/:id/issue با
   const put = await h.put('/api/shop/storefront', { slug, enabled: true, title: 'ویترینِ چت', contactPhone: '0700000001' }, { token: s.token });
   assert.equal(put.status, 200, JSON.stringify(put.body));
   const phone = '0791110061';
-  const start = await h.post(`/api/store/${slug}/verify/start`, { phone });
+  const start = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
   assert.equal(start.status, 200, JSON.stringify(start.body));
-  const check = await h.post(`/api/store/${slug}/verify/check`, { phone, code: start.body.devCode });
+  const check = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: start.body.devCode });
   const ticket = check.body.ticket;
   assert.ok(ticket, JSON.stringify(check.body));
   const o = await order(s, phone);

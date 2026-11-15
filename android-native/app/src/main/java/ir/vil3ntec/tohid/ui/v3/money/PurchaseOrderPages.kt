@@ -46,6 +46,7 @@ import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseOrders
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
+import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseUnits
 import ir.vil3ntec.tohid.core.i18n.StrReturnPages
 import ir.vil3ntec.tohid.core.i18n.StrSafe
@@ -246,19 +247,18 @@ internal fun RouteScope.PurchaseOrdersRoute() {
         action = if (perms.manage) StrPurchasePages.newPoTitle else null,
         onAction = if (perms.manage) ({ nav.openForResult(MoneyPaths.NEW_PURCHASE_ORDER) { tick++ } }) else null,
       )
-      list.isEmpty() && next == null -> V3EmptyState(Icons.Outlined.LocalShipping, StrPurchaseOrders.noneFiltered)
+      list.isEmpty() && next == null -> V3EmptyState(
+        Icons.Outlined.LocalShipping, StrPurchaseOrders.noneFiltered, action = StrReports.showAll, onAction = { filter = PoForms.Filter.ALL },
+      )
       list.isNotEmpty() -> V3Section(null) {
+        //  سادهٔ e-rows-63d: نامِ تأمین‌کننده، «مبلغ • وضعیت» به متنِ آرام و «دریافتِ کالا» تنها قرصِ ردیف (`PurchaseOrderRow.kt`)
+        val today = remember { todayIso() }
         list.forEachIndexed { i, o ->
           if (i > 0) V3Divider()
-          val s = PurchaseOrderBook.status(o)
-          V3ListRow(
-            StrSupplierBills.orderTitle(o.no, o.supplierName.ifBlank { StrMoney.supplierLabel }),
-            subtitle = StrPurchasePages.poLine(o.lines.size, poAfn(o.totals.orderedMinor), poAfn(o.totals.remainingMinor)) +
-              (o.expectedDate?.let { StrPurchasePages.arrivesSuffix(formatDate(it)) } ?: ""),
-            icon = Icons.AutoMirrored.Outlined.ReceiptLong,
-            trailing = { V3StatusPill(pill(s), PurchaseOrderBook.label(s)) },
-            chevron = false,
-            onClick = { nav.openForResult(MoneyPaths.purchaseOrder(o.id)) { tick++ } },
+          PoListRow(
+            o, perms, today,
+            onOpen = { nav.openForResult(MoneyPaths.purchaseOrder(o.id)) { tick++ } },
+            onReceive = { nav.openForResult(MoneyPaths.receivePurchaseOrder(o.id)) { tick++ } },
           )
         }
       }

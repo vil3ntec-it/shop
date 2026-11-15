@@ -105,9 +105,9 @@ class CustomerAddressSyncTest {
       p == "/api/store/golestan" -> ShopperResponse(200, store)
       p.startsWith("/api/store/golestan/products") -> ShopperResponse(200, """{"items":[],"nextCursor":null}""")
       p.endsWith("/verify/start") -> ShopperResponse(200, """{"sent":true,"expiresAt":999}""")
-      p.endsWith("/verify/check") -> ShopperResponse(200, """{"phone":"+93700000002","ticket":"v2.ticket","expiresAt":99999999999}""")
+      p.endsWith("/verify/check") -> ShopperResponse(200, """{"email":"c700000002@test.local","ticket":"v2.ticket","expiresAt":99999999999}""")
       p == "/api/store/golestan/account" && r.method == "POST" ->
-        ShopperResponse(201, """{"session":"sc1.s","expiresAt":99999999999,"customer":{"id":"c1","phone":"+93700000002","name":""}}""")
+        ShopperResponse(201, """{"session":"sc1.s","expiresAt":99999999999,"customer":{"id":"c1","email":"c700000002@test.local","phone":null,"name":""}}""")
       p.startsWith(book) && r.headers["X-Store-Session"] != "sc1.s" -> ShopperResponse(401, """{"error":{"code":"session_required"}}""")
       p == book && r.method == "GET" ->
         ShopperResponse(200, """{"addresses":[${rows.entries.joinToString(",") { view(it.key, it.value) }}],"mediaLimits":{"photoMax":1048576,"voiceMax":786432}}""")
@@ -158,7 +158,7 @@ class CustomerAddressSyncTest {
     assertTrue("بی نشست هیچ درِ نشانیِ حساب زده نمی‌شود", calls().isEmpty())
     assertEquals(AddressMediaGate.SIGN_IN, m.mediaGate(local.id))
 
-    m.account.phone = "0700000002"
+    m.account.email = "c700000002@test.local"
     m.accountSendCode("golestan")
     m.account.code = "123456"
     m.accountSignIn("golestan")

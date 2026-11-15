@@ -6,7 +6,8 @@
  *   پرچم ── `shop.chat` در «تنظیماتِ زنده» (scope = شناسهٔ دکان، یا `all`).
  *           ⛔ پیش‌فرض خاموش ⇒ همهٔ درها ۴۰۴ و هیچ ردیفی ساخته نمی‌شود.
  *   بیننده ─ `{ side: 'shop', shopId, userId, role }` (کارمند؛ shop_id فقط از
- *           عضویتِ توکن) یا `{ side: 'customer', shopId, phone, customerId? }` (مشتری؛ بلیتِ
+ *           عضویتِ توکن) یا `{ side: 'customer', shopId, phone, customerId? }` (مشتری؛ `phone` = کلیدِ مشتری:
+ *           ایمیلِ تأییدشده از «فقط ایمیل» ِ ۱۴۰۵/۰۸/۲۳ — نامِ فیلد برای سازگاری؛ بلیتِ
  *           ویترین، یا نشستِ حسابِ بازار — `shop-chat-account.js`). هر پرسش با همین دو قفل می‌شود:
  *           شناسهٔ گفت‌وگو/پیام/رسانهٔ دیگری ⇒ همان ۴۰۴ ِ «نیست» (CHAT-09).
  *   ارسال ─ با `clientId` ِ خودِ دستگاه، زیرِ قفلِ ردیفِ گفت‌وگو: تکرار ⇒ همان
@@ -86,6 +87,8 @@ function maskPhone(p) {
 
 const viewerKey = (v) => (v.side === 'customer' ? 'customer' : `user:${v.userId}`);
 const peerOf = (side) => (side === 'customer' ? 'shop' : 'customer');
+/** طرفِ دکان (کارمند)؟ — `side` فقط `shop` یا `customer` است؛ برای `shop-chat-safety.js` هم */
+const shopSide = (side) => side === 'shop';
 const gone = () => notFound('این گفت‌وگو پیدا نشد', 'conversation_not_found');
 const isAuthor = (v, m) => m.sender === v.side && (v.side === 'customer' || m.sender_user_id === v.userId);
 //  سنجاقِ پیام (CHAT-14) — `lib/shop-chat-pins.js`؛ تابع‌های این پرونده hoist می‌شوند
@@ -189,7 +192,12 @@ function conversationView(viewer, r) {
   return {
     ...base,
     orderId: r.order_id || null,
-    customer: {
+    //  «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): کلیدِ گفت‌وگوی تازه ایمیلِ تأییدشده است ⇒ `email`/`emailMasked` (نه در جای شماره،
+    //  تا «تماس» به ایمیل زنگ نزند)؛ گفت‌وگوی کهنهٔ شماره‌ای همان `phone`/`phoneMasked`
+    customer: String(r.customer_phone || '').includes('@') ? {
+      name: r.customer_name || '', phoneMasked: '', emailMasked: maskPhone(r.customer_phone),
+      ...(contact ? { email: r.customer_phone } : {}),
+    } : {
       name: r.customer_name || '',
       phoneMasked: maskPhone(r.customer_phone),
       ...(contact ? { phone: r.customer_phone } : {}),
@@ -286,13 +294,14 @@ async function open(viewer, body) {
   let orderId = '';
   let name = '';
   if (viewer.side === 'customer') {
-    phone = viewer.phone;
+    phone = viewer.phone;   //  کلیدِ مشتری: ایمیلِ تأییدشده («فقط ایمیل»)
     name = shortText(b.name, 60);
     if (b.orderNo !== undefined && b.orderNo !== null && b.orderNo !== '') {
       const no = intIn(b.orderNo, { min: 1 });
       const o = await one(
-        'SELECT id FROM online_orders WHERE shop_id=$1 AND order_no=$2 AND customer_phone=$3',
-        [viewer.shopId, no, phone]
+        `SELECT id FROM online_orders WHERE shop_id=$1 AND order_no=$2
+            AND ${require('./storefront').OWNED_SQL('', '$3', '$4')}`,
+        [viewer.shopId, no, phone, viewer.customerId || '']
       );
       if (!o) throw notFound('این سفارش پیدا نشد', 'order_not_found');
       orderId = o.id;
@@ -300,10 +309,11 @@ async function open(viewer, body) {
   } else {
     const oid = str(b.orderId);
     if (!oid) throw badRequest('گفت‌وگوی دکان فقط از روی یک سفارش باز می‌شود', 'order_required');
-    const o = await one('SELECT id, customer_phone, customer_name FROM online_orders WHERE shop_id=$1 AND id=$2', [viewer.shopId, oid]);
+    const o = await one('SELECT id, customer_phone, customer_email, customer_name FROM online_orders WHERE shop_id=$1 AND id=$2', [viewer.shopId, oid]);
     if (!o) throw notFound('این سفارش پیدا نشد', 'order_not_found');
-    if (!o.customer_phone) throw badRequest('این سفارش شمارهٔ مشتری ندارد', 'no_customer_phone');
-    phone = o.customer_phone;
+    //  کلیدِ گفت‌وگو = هویتِ مشتری: ایمیلِ تأییدشدهٔ سفارشِ ویترین («فقط ایمیل»)، وگرنه شمارهٔ سفارشِ کهنه/دستی
+    if (!o.customer_email && !o.customer_phone) throw badRequest('این سفارش راهِ تماسی با مشتری ندارد', 'no_customer_phone');
+    phone = o.customer_email || o.customer_phone;
     orderId = o.id;
     name = shortText(o.customer_name, 60);
   }
@@ -734,88 +744,8 @@ function rawMedia(req, res, next) {
 //  بلاک، گزارش، جست‌وجو
 // ════════════════════════════════════════════════════════════════════
 
-/** بلاک به‌ازای (دکان، شماره): دکان ⇒ مشتری؛ مشتری ⇒ دکان. خواندنِ گذشته آزاد می‌ماند. */
-async function setBlock(viewer, id, on) {
-  const conv = await rowOf(viewer, id);
-  const blocker = viewer.side;
-  if (on) {
-    await query(
-      `INSERT INTO shop_chat_blocks (shop_id, customer_phone, blocker, by_user_id, created_at)
-       VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
-      [conv.shop_id, conv.customer_phone, blocker, viewer.side === 'shop' ? viewer.userId : '', now()]
-    );
-  } else {
-    await query('DELETE FROM shop_chat_blocks WHERE shop_id=$1 AND customer_phone=$2 AND blocker=$3',
-      [conv.shop_id, conv.customer_phone, blocker]);
-  }
-  if (viewer.side === 'shop') {
-    await require('./audit').log({
-      shopId: conv.shop_id, userId: viewer.userId, action: on ? 'chat.customer_blocked' : 'chat.customer_unblocked',
-      targetType: 'chat_conversation', targetId: conv.id,
-    });
-  }
-  notify(conv.id);
-  return viewOf(viewer, conv.id);
-}
-
-/** گزارشِ سوءاستفاده به مدیرِ سامانه — با رونوشتِ همان پیام در همان لحظه. یک گزارش برای هر (پیام، طرف): تکرار ردیفِ دوم نمی‌سازد. */
-async function report(viewer, id, body) {
-  const b = obj(body);
-  const reason = str(b.reason);
-  if (!REASONS.includes(reason)) throw badRequest('دلیلِ گزارش نامعتبر است', 'bad_reason');
-  const note = require('./ops-errors').maskCards(shortText(b.note, 500));   //  S117
-  const conv = await rowOf(viewer, id);
-  let messageId = '';
-  let snapshot = {};
-  if (b.messageId) {
-    messageId = str(b.messageId);
-    const m = ID_RE.test(messageId) && await one(
-      'SELECT * FROM shop_chat_messages WHERE id=$1 AND conversation_id=$2', [messageId, conv.id]
-    );
-    if (!m) throw notFound('این پیام پیدا نشد', 'message_not_found');
-    if (m.sender === viewer.side) throw badRequest('پیامِ خودتان را گزارش نمی‌کنید', 'bad_report');
-    snapshot = {
-      sender: m.sender, senderUserId: m.sender_user_id || '', kind: m.kind, body: m.body,
-      mediaId: m.media_id || '', createdAt: n(m.created_at), editedAt: m.edited_at == null ? null : n(m.edited_at),
-      deleted: !!m.deleted_at,
-    };
-  }
-  const ins = await one(
-    `INSERT INTO shop_chat_reports (id, shop_id, conversation_id, message_id, reporter, reporter_user_id, reason, note, snapshot, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-     ON CONFLICT (conversation_id, message_id, reporter) DO NOTHING RETURNING id`,
-    [newId('scr'), conv.shop_id, conv.id, messageId, viewer.side, viewer.side === 'shop' ? viewer.userId : '',
-      reason, note, JSON.stringify(snapshot), now()]
-  );
-  return { reported: true, duplicate: !ins };
-}
-
-/** جست‌وجو در پیام‌های مجاز — پاک‌شده و «حذف برای من» نمی‌آیند (CHAT-14). */
-async function search(viewer, q, { limit } = {}) {
-  const term = shortText(q, 100);
-  if (term.length < 2) throw badRequest('دست‌کم دو نویسه بنویسید', 'query_too_short');
-  const lim = intIn(limit, { min: 1, max: 50, def: 30 });
-  const args = [viewer.shopId, `%${term.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`, viewerKey(viewer)];
-  let scope = '';
-  if (viewer.side === 'customer') scope = ` AND ${acct.mineSql(viewer, args)}`;
-  args.push(lim);
-  const rows = await many(
-    `SELECT m.id, m.conversation_id, m.seq, m.sender, m.sender_user_id, m.kind, m.body, m.created_at
-       FROM shop_chat_messages m JOIN shop_chat_conversations c ON c.id = m.conversation_id
-      WHERE m.shop_id = $1 AND c.shop_id = $1${scope} AND m.deleted_at IS NULL
-        AND m.body ILIKE $2 ESCAPE '\\'
-        AND NOT EXISTS (SELECT 1 FROM shop_chat_hidden h WHERE h.message_id = m.id AND h.viewer = $3)
-      ORDER BY m.created_at DESC, m.id DESC LIMIT $${args.length}`,
-    args
-  );
-  return {
-    results: rows.map((r) => ({
-      conversationId: r.conversation_id, id: r.id, seq: n(r.seq), sender: r.sender, kind: r.kind,
-      body: String(r.body).slice(0, 200), createdAt: n(r.created_at),
-      ...(viewer.side === 'shop' && r.sender === 'shop' ? { senderUserId: r.sender_user_id } : {}),
-    })),
-  };
-}
+//  بلاک، گزارشِ سوءاستفاده و جست‌وجو — `lib/shop-chat-safety.js` (شرح همان‌جا)
+const { setBlock, report, search } = require('./shop-chat-safety')({ rowOf, viewOf, viewerKey, shopSide, shortText, intIn, obj, str, n, REASONS, ID_RE });
 
 // ════════════════════════════════════════════════════════════════════
 //  پاک‌سازی

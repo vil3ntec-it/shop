@@ -71,7 +71,7 @@ async function makeCode({ path, prefix, reload }) {
       plan: $(`${prefix}-plan`).value,
       days: days ? Number(days) : null,
       email: $(`${prefix}-email`).value.trim(),
-      phone: $(`${prefix}-phone`).value.trim(),
+      phone: $(`${prefix}-phone`) ? $(`${prefix}-phone`).value.trim() : '',   //  فقط پمپ («فقط ایمیل»: VIP ِ دکان بی پیامک)
       note: $(`${prefix}-note`).value.trim(),
     });
     //  کدِ خام فقط همین یک بار دیده می‌شود
@@ -84,7 +84,7 @@ async function makeCode({ path, prefix, reload }) {
     msg(node, `کد: ${out.code} — همین حالا برش دارید، دیگر نشان داده نمی‌شود${sent}`,
       out.emailStatus === 'failed' || out.smsStatus === 'failed' ? 'warn' : 'ok');
     $(`${prefix}-email`).value = '';
-    $(`${prefix}-phone`).value = '';
+    if ($(`${prefix}-phone`)) $(`${prefix}-phone`).value = '';
     $(`${prefix}-note`).value = '';
     await reload();
   } catch (err) {

@@ -27,6 +27,7 @@ const { query, one, many, newId, now } = db;
 const N = require('../src/lib/customer-notify');
 const P = require('../src/lib/store-push');
 const { resetAll } = require('../src/middleware/ratelimit');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -82,8 +83,8 @@ async function shop(label, { notify = true, tracking = true, push = false } = {}
 
 const NAME = 'مشتریِ بازپرداخت';
 async function storeOrder(s, lang = 'fa') {
-  const st = await h.post(`/api/store/${s.slug}/verify/start`, { phone: s.phone });
-  const c = await h.post(`/api/store/${s.slug}/verify/check`, { phone: s.phone, code: st.body.devCode });
+  const st = await h.post(`/api/store/${s.slug}/verify/start`, { email: mailOf(s.phone) });
+  const c = await h.post(`/api/store/${s.slug}/verify/check`, { email: mailOf(s.phone), code: st.body.devCode });
   const r = await h.post(`/api/store/${s.slug}/checkout`, {
     fulfillment: 'pickup', customer: { name: NAME, phone: s.phone }, lines: [{ productId: 'rice', qtyMilli: 5000 }], lang,
   }, { headers: { 'Idempotency-Key': `ck-${uniq()}-key`, 'X-Store-Ticket': c.body.ticket } });
@@ -140,7 +141,7 @@ test('⛔ پرچم: بی اعلانِ مشتری یا بی پیگیریِ باز
 test('NTF-08: قالبِ order_refund به fa، ps و en با {amount}، {no} و {shop}؛ رقم و واحدِ هر زبان', () => {
   const tpl = N.EXTRA.order_refund;
   assert.ok(tpl, 'رویدادِ سیستمیِ order_refund');
-  assert.deepEqual(tpl.channels, ['push', 'whatsapp', 'telegram'], 'فقط کانال‌های رایگان (پیامکِ پولی نه)');
+  assert.deepEqual(tpl.channels, ['push', 'email', 'whatsapp', 'telegram'], 'فقط کانال‌های رایگان (پوش ⇒ ایمیل ⇒ …؛ پیامک دیگر در هیچ زنجیره‌ای نیست)');
   for (const lang of N.LANGS) {
     assert.deepEqual(tpl.text[lang].match(/\{[^}]*\}/g).sort(), ['{amount}', '{no}', '{shop}'], `${lang}: فقط مبلغ، شمارهٔ سفارش و نامِ ویترین`);
     assert.equal(/[؀-ۿ]/.test(tpl.text[lang]), lang !== 'en', `${lang}: خطِ همان زبان`);

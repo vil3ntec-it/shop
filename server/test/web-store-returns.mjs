@@ -87,9 +87,12 @@ const pushed = await call('POST', '/api/sync/v1/push', { device_id: 'dev-owner',
 ok(pushed.status === 200, 'کالا از راهِ همگام‌سازیِ واقعی رسید');
 await call('PUT', '/api/shop/storefront/products/rice', { published: true, onlinePriceMinor: null, maxQtyMilli: null }, T);
 
+//  «فقط ایمیل» (ادغامِ e-rows-47e): کدِ مشتری به ایمیل؛ شماره فقط شمارهٔ تماسِ فرمِ ثبت
 const phone = '0791114455';
-const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
-const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+const customerEmail = 'returns.customer@test.local';
+const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: customerEmail });
+const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: customerEmail, code: vs.body.devCode });
+ok(vc.status === 200, 'ایمیلِ مشتری با کد تأیید شد', JSON.stringify(vc.body).slice(0, 120));
 const acc = await call('POST', `/api/store/${slug}/account`, { name: 'مشتری' }, null, { 'X-Store-Ticket': vc.body.ticket });
 ok(acc.status === 201, 'حسابِ وبِ مشتری ساخته شد', JSON.stringify(acc.body).slice(0, 120));
 const placed = await call('POST', `/api/store/${slug}/checkout`, { fulfillment: 'pickup', customer: { name: 'مشتری', phone }, lines: [{ productId: 'rice', qtyMilli: 5000 }] },
@@ -104,7 +107,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 const errors = [];
 const violations = [];
 const loads = [];
-const session = { token: acc.body.session, expiresAt: acc.body.expiresAt, phone: acc.body.customer.phone, name: 'مشتری' };
+const session = { token: acc.body.session, expiresAt: acc.body.expiresAt, email: acc.body.customer.email || '', phone: acc.body.customer.phone || '', name: 'مشتری' };
 const seed = (c, withSession) => c.addInitScript(([s, sess, order]) => {
   if (localStorage.getItem('seeded')) return;
   localStorage.setItem('seeded', '1');
