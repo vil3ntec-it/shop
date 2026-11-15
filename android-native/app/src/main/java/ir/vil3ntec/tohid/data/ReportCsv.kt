@@ -25,17 +25,18 @@ object ReportCsv {
    *  @param reminderTemplate متنِ یادآوریِ همین دستگاه (`DebtReminderPref`، CRM-06)؛ پیش‌فرض همان جملهٔ امروز
    *  @param lineSeller POS-23 — «فروشندهٔ هر ردیف» (`LineSellerPref`): برگهٔ `sellers` به فروشندهٔ ردیف و با ستونِ برگشتی؛
    *    `false` (پیش‌فرض) ⇒ همان برگهٔ امروز
+   *  @param phone CRM-15 — شمارهٔ مشتری در برگهٔ قرض‌داران (`customerPhoneExport`)؛ پیش‌فرض همان کامل
    */
   fun of(
     section: String, d: ShopData, from: String, to: String, today: String, reminderTemplate: String = DebtReminder.DEFAULT_TEMPLATE,
-    lineSeller: Boolean = false,
+    lineSeller: Boolean = false, phone: (String) -> String = { it },
     //  لحظهٔ «اکنون» ِ برگه‌هایی که روزِ بدهی را از زمانِ ثبت می‌شمارند («یادآوری»)؛ آزمون آن را ثابت می‌کند
     now: Long = System.currentTimeMillis(),
   ): Sheet =
     when (section) {
       "sales" -> sales(d, from, to)
       "products" -> products(d, today)
-      "debtors" -> debtors(d, today)
+      "debtors" -> debtors(d, today, phone)
       "purchases" -> purchases(d, from, to)
       "expiry" -> expiry(d, today)
       "profit" -> profit(d, from, to)
@@ -301,14 +302,14 @@ object ReportCsv {
     return Sheet(StrSheets.nameStockCount(today), rows)
   }
 
-  private fun debtors(d: ShopData, today: String): Sheet {
+  private fun debtors(d: ShopData, today: String, phone: (String) -> String = { it }): Sheet {
     val rows = mutableListOf(
       listOf(StrSheets.debtorName, StrSheets.phone, StrSheets.debt, StrSheets.lastTxDate, StrSheets.note)
     )
     d.debtors.forEach { debtor ->
       val last = DebtRows.of(d)[debtor.id]?.maxByOrNull { it.createdAt }
       rows += listOf(
-        debtor.name, debtor.phone,
+        debtor.name, phone(debtor.phone),
         round(ShopStore.debt(d, debtor.id)),
         last?.date ?: "",
         debtor.notes,

@@ -82,6 +82,11 @@ object DemandForecast {
     val smart: Boolean = false,
     /** AI-07: چند روزِ آینده تک‌تک پیش‌بینی شود ([SmartDemand.Smart.perDayMilli]) */
     val smartDays: Int = SmartDemand.FORECAST_DAYS,
+    /**
+     *  PUR-03 ([PoSeasonality]): ضریبِ فصلِ بیرونی به هزارم به‌جای «همین روزهای پارسال» ِ پایین؛ [NEUTRAL] = بی فصل،
+     *  `null` (پیش‌فرض) ⇒ همان حسابِ INV-13 بیت‌به‌بیت
+     */
+    val seasonOverride: Int? = null,
   )
 
   data class Forecast(
@@ -191,7 +196,8 @@ object DemandForecast {
 
     val leadUsed = i.leadDays ?: ReorderCore.DEFAULT_LEAD_DAYS
     val horizon = maxOf(1, leadUsed + i.coverDays)
-    val season = seasonOf(i, today, eff, horizon, ::sumRange)
+    require(i.seasonOverride == null || i.seasonOverride in SEASON_MIN..SEASON_MAX) { "demand-forecast: seasonOverride in $SEASON_MIN..$SEASON_MAX" }
+    val season = if (i.seasonOverride != null) i.seasonOverride.takeIf { it != NEUTRAL } else seasonOf(i, today, eff, horizon, ::sumRange)
 
     val base = Model(total, eff, if (weekly) sums else null, if (weekly) counts else null, season ?: NEUTRAL, today)
     //  AI-07: فقط با `smart`؛ خاموش ⇒ همان `base` و همان حسابِ پیشین

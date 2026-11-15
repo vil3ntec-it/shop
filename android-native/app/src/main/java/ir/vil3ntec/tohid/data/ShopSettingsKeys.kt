@@ -72,6 +72,7 @@ object ShopSettingsKeys {
     shop("safe_currencies", "s"),               // PAY-18: ارزهایی که دکان به گاوصندوق افزود (`SafeCurrencyPref`، JSON)
     shop("fx_tender", "b"),                     // PAY-10: پرداخت با ارزِ نقد (`FxTillPref`)
     shop("fx_rates", "s"),                      // PAY-10: جدولِ نرخِ خودِ دکان (JSON)
+    shop("print_full_phone", "b"),              // CRM-15: «چاپِ شمارهٔ کامل» ِ مشتری (`CustomerPrintPref`، فقط صاحب)
     shop("pay_methods_off", "set"),             // PAY-06: روش‌هایی که دکان از پنلِ پرداخت برداشته (`PayMethodsPref`)
     //  برگشت
     shop("returns_v2", "b"),                    // ReturnSettings

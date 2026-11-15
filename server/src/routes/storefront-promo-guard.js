@@ -51,7 +51,7 @@ router.get('/', limit, requirePermission('settings.write'), needFlag, async (req
   res.set('Cache-Control', 'no-store');
   const view = await guard.ownerView(req.shopId);
   //  ⛔ CRM-15: مدیری که صاحب «شمارهٔ مشتریان» را برایش بسته، شمارهٔ کامل نمی‌گیرد (فقط پوشیده)
-  res.json(await contact.hiddenForReq(req) ? guard.maskView(view, contact.maskPhone) : view);
+  res.json(await contact.hiddenForReq(req) ? guard.maskView(view, await contact.maskerForReq(req)) : view);
 });
 
 router.put('/', limit, requirePermission('settings.write'), needFlag, needWrite, async (req, res) => {

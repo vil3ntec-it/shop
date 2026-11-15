@@ -17,6 +17,8 @@ object I18nTables {
     StrSimpleAsk,
     StrEvidence, StrLateApology, StrErasure, // RSK-08، NTF-10، SEC-10: صفحه‌های برنامه برای سه درِ سرور
     StrCustomerAccess, // CRM-15: «چه کسی این پرونده را دید» (سابقهٔ دسترسی)
+    StrCustomerMask, // CRM-15: «چاپِ شمارهٔ کامل» (پوشاندن بر پایهٔ نقش)
+    StrPoSeason, // PUR-03: اطمینانِ کم/متوسط/زیاد ِ پیشنهادِ سفارش
     StrTrust, // ABUSE-01: شکایت و گزارشِ خریداران در برنامهٔ دکان
     StrSupportAccess, // TEN-04: نوارِ «پشتیبانی در حالِ مشاهده» و پذیرفتن/رد/بستن
     StrRate, // RATE-01: برگهٔ «ستاره بدهید» (Play/بازار)

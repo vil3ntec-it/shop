@@ -57,6 +57,35 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-64x زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-64x` (از `origin/claude/batch-64` 00e98a802) — سه تصمیمِ سپرده‌شده (CRM-15، PUR-03، OPS-01)
+
+- **تصمیم‌ها** (صاحب‌کار: «ببین کدام درست است و برنامه‌های حرفه‌ای چه می‌کنند»؛ ثبت در `OWNER-DECISIONS-fa.md` «گرفته‌شده — ۱۴۰۵/۰۸/۲۴»):
+  CRM-15 کمترین دسترسی بر پایهٔ نقش؛ PUR-03 فصل فقط با ۱۲ ماه فروش؛ OPS-01 دلتا «نه» (ردیف بسته، IMPLEMENTED-VERIFIED).
+- **CRM-15 ساخته شد** پشتِ پرچمِ خاموشِ `shop.customer_role_mask` (FLAGS-ON §۴۷، ثبت در `routes/admin-flags.js`): هستهٔ یکتا
+  `core/crm/CustomerMask.kt` (ماتریس، «•••• ۰۰۸»، چاپ) و سرور `lib/customer-role-mask.js` (همان قالب و ماتریس). پیش‌فرضِ تازه = یک لایهٔ `deny`
+  پیش از لایه‌های صاحب ⇒ همهٔ درهای امروزِ CRM-15 (`customer-contact.allowed`/`hiddenForReq`: همگام‌سازی، صندوقِ تعارض، `maskerOf`، «خبرم کن»،
+  سدِ تخفیف، گفت‌وگو) خودبه‌خود پیروی می‌کنند؛ جزئیاتِ سفارش با `forDetail` (نشانی `{}`، «در دست داشتن» = سفارشِ باز با رویدادِ خودِ کارمند).
+  `policy.customerMask` ⇒ برنامه (`PermPolicy.allows`، `ShopRole.customerMask`)؛ نمایش فقط `customerPhone`/`customerAddress`/`customerPhoneExport`؛
+  کادرِ شمارهٔ مشتریِ موجود بی مجوز نیست؛ برگهٔ قرض‌داران ِ گزارش و اکسلِ «مشتری‌ها» همان؛ صورت‌حسابِ چاپی `CustomerMask.printPhone` با
+  «چاپِ شمارهٔ کامل» (`CustomerPrintPref`، تنظیمِ دکانِ `print_full_phone`، صفحهٔ تازهٔ `settings/sales/print-phone` فقط صاحب). پیک دست نخورد
+  (`courierView` همان «فقط مأموریتِ خودش تا تحویل»). ⛔ پمپ، `sync-v1.js`/`routes/sync-v1.js` و `app.js` دست نخوردند؛ `orders.js` همان ۷۹۸ خط.
+- **PUR-03 ساخته شد** (بی پرچم: فقط عدد و نشان): `core/purchase/PoSeasonality.kt` روی `DemandForecast` (`Input.seasonOverride`، `null` ⇒ INV-13
+  بیت‌به‌بیت) — تاریخچه از نخستین **فروش**؛ < ۱۲ ماه ⇒ حسابِ امروز و «اطمینانِ کم»؛ ≥ ۱۲ ماه ⇒ «همین ماهِ پارسال» ÷ میانگینِ اخیر (پنجرهٔ پارسال اگر
+  هست، وگرنه امسال)؛ اطمینان از درازا (۱۲/۲۴ ماه) و نوسان. `PurchaseSuggest.Row.season`/`Plan.season` برای هر دو صفحه؛ نشان در `PurchaseSuggestView`
+  (`StrPoSeason`). **برای 63b:** زیرِ ردیفِ فرمِ سفارشِ گوشی (`PurchaseOrderPages.kt` ~خطِ ۶۳۰) هنوز `DemandForecast.confidenceText` است — اگر آن
+  صفحه را دست می‌زنید `seasonLabel(plan.season!!.confidence)` (`ui/screens/PurchaseSuggestView.kt`) بگذارید (منطق در core است؛ این‌جا دست نخورد تا تداخل نکند).
+- **آزمون‌ها:** سرور `customer-role-mask.test.js` ۵/۵ (تازه؛ روی کدِ پایه با همان lib ولی بی وصل کردن ۳ از ۵ سرخ)، ۱۱ پروندهٔ همراه ۷۵/۷۵ (`customer-contact`، `order-phone-mask`، `customer-contact-lists`،
+  `staff-perms`، `perm-core`، `admin-flags`، `online-orders`، `order-customer`، `customer-access`، `delivery`، `courier-call`)، همهٔ ۷۱ پروندهٔ
+  `order-*`/`orders-*`/`online-orders`/`delivery-*`/`courier-*`/`conflict-inbox`/`shop-chat*`/`storefront-promo*` ۴۹۲/۴۹۲ و `storefront-area-requests` + `storefront-promo*` ۲۳/۲۳ و OPS-01 ۳۲/۳۲ روی PGlite؛
+  کاتلین (flock، `-Xmx3g`؛ اجرای کاملِ `:core:jvmTest test`): هسته ۲۰۲۶/۰ (۲ SKIP ِ پیشین) با `CustomerMaskTest` ۹، `PoSeasonalityTest` ۵،
+  `StatementLayoutTest` ۶، `DemandForecastTest` ۱۳؛ کامپیوتر/اندروید ۴۳۱۹ با `CustomerMaskCashierUiTest` ۳ (Compose)، `ContactPrivacyTest` ۴،
+  `PurchaseSuggestTest` ۶، `PoSuggestUiTest` ۲، `InfraLeakGuardTest` ۸، `I18nCoverageTest`/`DariCoverageTest`/`DariWordsTest` سبز — ۲ شکست:
+  ⚠️ `SheetLangTest` (اثرِ SHA ِ برگه‌های فارسی) **پیشین است**: همان اثرِ `518f4acd…` روی wt-63f/63g/57x ِ بی این کار ⇒ صاحبِ LOC-06 اثر را تازه کند؛
+  و `DocGapsV3WiringTest` (متنِ فراخوانِ برگه را من عوض کردم ⇒ به متنِ تازه رسید و سخت‌تر شد: اجرای هدف‌دارِ پس از آن `--tests '*DocGapsV3WiringTest' --tests '*PoSuggestUiTest' --tests '*InfraLeakGuardTest'` ⇒ ۲/۲، ۲/۲، ۸/۸).
+- **مانده/نکته:** روشن کردنِ §۴۴ (و §۳۶، §۳۷) برای دکانِ آزمایشی؛ شمارهٔ ازپیش‌همگام‌شده روی دستگاهِ کارمند تا بازسازیِ دفتر می‌ماند (نمایش پوشیده)؛
+  صفحهٔ کهنهٔ `ui/screens/Debtors.kt` فقط در `PhonePreview` (دمو) است و دست نخورد. پیوندِ `server/node_modules` به `wt62` شکسته بود ⇒ `wt-64e`
+  (همان lockfile). شمارهٔ بخشِ FLAGS-ON (§۴۴) را پس از ادغام با شاخه‌های موازی بشمارید.
+
 ### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-63i (دنباله)، شاخهٔ `claude/e-rows-63i` (روی `batch-64` 4af0e0b2a) — آدمک‌های زنده در صفحه‌های خالی و خطا
 
 - **خواستِ صاحب‌کار** (با نمونهٔ گیف): «همه‌شان گیف باشند، زنده باشند… جذاب باشند». هر صحنهٔ بزرگ (≥ `CHARACTER_MIN` = ۷۲dp) حالا یک

@@ -161,10 +161,14 @@ function policyPayload(role, layers, editable = SERVER_EDITABLE.filter((k) => !F
 async function policyOf(shopId, member) {
   if (!member) return { permissions: [], policy: null };
   const layers = await layersFor(shopId, member.role, member.user_id);
-  return {
-    permissions: legacyPermissions(member.role, layers),
-    policy: policyPayload(member.role, layers, await editableFor(shopId)),
-  };
+  const policy = policyPayload(member.role, layers, await editableFor(shopId));
+  //  CRM-15 (`customer-role-mask.js`): پرچمِ نقش‌محور ⇒ برنامه پیش‌فرضِ تازه را خودش زیرِ همین لایه‌ها می‌گذارد (`CustomerMask.layers`)
+  const roleMask = require('./customer-role-mask');
+  if (await roleMask.onFor(shopId)) {
+    policy.customerMask = true;
+    policy.effective[roleMask.KEY] = core.resolve(member.role, roleMask.layersWith(member.role, layers, true), roleMask.KEY);
+  }
+  return { permissions: legacyPermissions(member.role, layers), policy };
 }
 
 /**

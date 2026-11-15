@@ -53,6 +53,40 @@ class PurchaseSuggestTest {
     assertNull(rows[2].supplierId)
   }
 
+  @Test fun `PUR-03 — با ۱۲ ماه فروش، همین ماهِ پارسال در صفحه و فرم یکسان؛ تاریخچه از نخستین فروش است نه خرید`() {
+    val ly = t - 365
+    val n = 400
+    val sold = (0 until n).map { k -> Sale(id = "y$k", date = CivilDays.isoOf(t - k), status = "completed") }
+    //  روزی ۱، «همین ماهِ پارسال» روزی ۲ ⇒ ضریبِ ۲
+    val lines = (0 until n).map { k -> SaleItem(id = "yi$k", saleId = "y$k", productId = "pS", quantity = if (t - k in ly + 1..ly + 30) 2.0 else 1.0) }
+    val total = lines.sumOf { it.quantity }
+    val season = ShopData(
+      products = listOf(Product(id = "pS", name = "بخاری", unit = "عدد", purchasePrice = 10.0, supplierId = "s1")),
+      suppliers = listOf(Supplier(id = "s1", name = "یک")),
+      sales = sold,
+      saleItems = lines,
+      //  خریدِ دو سال پیش: تاریخچهٔ فروش را دراز نمی‌کند
+      purchases = listOf(Purchase(id = "old", productId = "pS", supplierId = "s1", quantity = 1.0, purchasePrice = 10.0, date = CivilDays.isoOf(t - 800))),
+      warehouseEntries = listOf(WarehouseEntry(id = "w", productId = "pS", units = total)),
+    )
+    val row = PurchaseSuggest.rows(season, emptyList(), today).single()
+    val s = row.season!!
+    assertEquals(2000, s.permille)
+    assertEquals(n, s.historyDays)
+    assertFalse(s.baseLastYear)
+    assertEquals(ir.vil3ntec.tohid.core.purchase.PoSeasonality.Confidence.MEDIUM, s.confidence)
+    //  روزانه ۱ × ۲؛ زمانِ تأمینِ ۷ + پوششِ ۱۴ ⇒ ۴۲ (بی فصل ۲۱)
+    assertEquals(42_000L, row.forecast.qtyMilli)
+    val plan = PurchaseSuggest.forSupplier(season, "s1", emptyList(), today).single()
+    assertEquals(row.forecast, plan.forecast)
+    assertEquals(s, plan.season)
+    //  همان کالا با ۱۰۰ روز فروش ⇒ حسابِ امروز و «کم»
+    val young = season.copy(sales = sold.take(100), saleItems = lines.take(100), warehouseEntries = listOf(WarehouseEntry(id = "w", productId = "pS", units = lines.take(100).sumOf { it.quantity })))
+    val y = PurchaseSuggest.rows(young, emptyList(), today).single()
+    assertNull(y.season!!.permille)
+    assertEquals(ir.vil3ntec.tohid.core.purchase.PoSeasonality.Confidence.LOW, y.season!!.confidence)
+  }
+
   @Test fun `۳-۱۷ — «پیشنهاد با فروش و زمانِ تأمین» ِ فرمِ سفارش همان پیشنهادِ صفحهٔ «پیشنهادِ سفارش» است`() {
     //  کالاهای فرم = آنچه از همان تأمین‌کننده خریده شده (`supplierPicks`) ⇒ pA یک بار از s1
     val bought = d.copy(purchases = d.purchases + Purchase(id = "u2", productId = "pA", supplierId = "s1", quantity = 1.0, purchasePrice = 100.0, date = "2026-01-02"))
