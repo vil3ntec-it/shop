@@ -88,7 +88,9 @@ class LookGuardTest {
     "ui/v3/shell/HomeTrend.kt" to "57d139695c46830d",
     //  ۶۳k (خواستهٔ صاحب‌کار «هشدارِ انقضا»): فقط ورودیِ کاشیِ هشدار — «منقضی‌شده» جدا از «نزدیکِ انقضا» با نامِ کالا؛ ظاهرِ خانه همان
     "ui/v3/shell/HomeView.kt" to "070fca810e6224ce",
-    "ui/v3/shell/DeskHome.kt" to "4b21911118a57c2c",
+    //  e-desk-d1 (خواستِ صاحب‌کار ۱۴۰۵/۰۸/۲۴ برای **کامپیوتر**: «طراحیِ موبایل رو نمی‌تونی روی کامپیوتر بیاری»): خانهٔ کامپیوتر
+    //  داشبوردِ `ui/desk/DeskDashboard.kt` شد و این پرونده فقط به آن می‌رساند؛ هیچ پروندهٔ خانهٔ گوشی عوض نشد
+    "ui/v3/shell/DeskHome.kt" to "9acb58dcdd66909f",
     "ui/v3/shell/DashboardNumbers.kt" to "132f992d7d26c645",
     "ui/v3/shell/HeroMoney.kt" to "b543739c866c10d4",
     "ui/v3/shell/HeroMoneySheet.kt" to "74e98770e7221dce",

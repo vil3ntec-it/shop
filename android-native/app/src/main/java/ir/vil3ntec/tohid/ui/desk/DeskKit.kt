@@ -424,10 +424,10 @@ fun DeskKpiCard(kpi: DeskKpi, modifier: Modifier = Modifier, onClick: (() -> Uni
     Spacer(Modifier.height(DeskSpace.x3))
     Row(verticalAlignment = Alignment.Bottom) {
       Row(Modifier.weight(1f), verticalAlignment = Alignment.Bottom) {
-        Text(kpi.value, style = DeskType.kpi, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        Text(kpi.value, style = DeskType.kpi, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false).alignByBaseline())
         if (kpi.unit != null) {
           Spacer(Modifier.width(DeskSpace.x1))
-          Text(kpi.unit, style = DeskType.secondary, color = c.inkSecondary, maxLines = 1, modifier = Modifier.padding(bottom = 5.dp))
+          Text(kpi.unit, style = DeskType.bodyStrong, color = c.inkSecondary, maxLines = 1, modifier = Modifier.alignByBaseline())
         }
       }
       if (kpi.spark.size >= 2) {

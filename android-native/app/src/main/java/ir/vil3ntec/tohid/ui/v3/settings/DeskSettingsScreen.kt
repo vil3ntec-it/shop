@@ -11,6 +11,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.screens.MotionTokens
@@ -50,16 +52,27 @@ internal fun RouteScope.DeskSettingsScreen(group: String? = null, section: Strin
       SettingsSearchIndex.Kind.EXTRA -> nav.open(d.key)
     }
   }
+  //  e-desk-d1: ستونِ دسته‌ها (`DeskSize.settingsList`) روی سطحِ پوستهٔ کامپیوتر، صفحهٔ بخش روی زمینهٔ پنجره با پهنای خوانا
   V3TwoPane(
-    listWidth = 320.dp,
+    listWidth = ir.vil3ntec.tohid.ui.desk.DeskSize.settingsList,
     list = {
-      SettingsPageFrame(title = Str.settings, onBack = null, largeTitle = false) {
-        item(key = "search") { SettingsSearchBox(query) { query = it } }
-        if (query.isBlank()) {
-          item(key = "home") { SettingsHomeCard(selected = cat) { cat = it; pick = null } }
-          item(key = "features") { FeaturesLink { cat = SettingsPaths.FEATURES; pick = null } }
-        } else {
-          searchResults(SettingsSearchIndex.search(docs, query), query, ::open)
+      //  ستونِ دسته‌ها روی سطحِ پوسته، بی سربرگِ دوم: عنوانِ «تنظیمات» را سربرگِ کامپیوتر (`DeskHeader`) دارد و سربرگِ ستونِ
+      //  باریک فقط «تنظ…» جا می‌داد. همان جست‌وجو، همان شش دسته (ردیفِ `NAV` ِ ۶۵r) و همان «قابلیت‌ها»
+      androidx.compose.runtime.CompositionLocalProvider(ir.vil3ntec.tohid.ui.v3.LocalV3RowLook provides ir.vil3ntec.tohid.ui.v3.V3RowLook.NAV) {
+        androidx.compose.foundation.lazy.LazyColumn(
+          androidx.compose.ui.Modifier.fillMaxSize().background(ir.vil3ntec.tohid.ui.desk.Desk.colors.chrome),
+          contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            horizontal = ir.vil3ntec.tohid.ui.desk.DeskSpace.x3,
+            vertical = ir.vil3ntec.tohid.ui.desk.DeskSpace.x4,
+          ),
+        ) {
+          item(key = "search") { SettingsSearchBox(query) { query = it } }
+          if (query.isBlank()) {
+            item(key = "home") { SettingsHomeCard(selected = cat) { cat = it; pick = null } }
+            item(key = "features") { FeaturesLink { cat = SettingsPaths.FEATURES; pick = null } }
+          } else {
+            searchResults(SettingsSearchIndex.search(docs, query), query, ::open)
+          }
         }
       }
     },

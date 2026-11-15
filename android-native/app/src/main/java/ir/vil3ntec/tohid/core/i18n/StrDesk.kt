@@ -58,7 +58,6 @@ object StrDesk {
   val colAmount: String get() = t("مبلغ", "Amount", "مبلغ")
   val colPayment: String get() = t("پرداخت", "Payment", "تادیه")
   val colStatus: String get() = t("وضعیت", "Status", "حالت")
-  val statusDone: String get() = t("ثبت شد", "Recorded", "ثبت شو")
   val payCard: String get() = t("کارت", "Card", "کارت")
   val payMixed: String get() = t("چندگانه", "Split", "ګډ")
   val purchase: String get() = t("خرید", "Purchase", "پېرود")
