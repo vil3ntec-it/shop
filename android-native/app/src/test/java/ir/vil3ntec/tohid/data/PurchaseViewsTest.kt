@@ -225,4 +225,28 @@ class PurchaseViewsTest {
     assertEquals("", PurchaseViews.userNote(PurchaseOrderBook.postedNote(9)))
     assertEquals("نقد", PurchaseViews.userNote("نقد"))
   }
+
+  /** بودجهٔ نخستین قاب (۱۰۰ms): ساختنِ همهٔ نماها برای دفترِ بزرگ (۲٬۰۰۰ فاکتور × ۳ قلم، ۱٬۰۰۰ پرداخت) کم‌هزینه است */
+  @Test fun `دفترِ بزرگ — نمای همهٔ خریدها زیرِ بودجهٔ نخستین قاب`() {
+    val products = (0 until 500).map { Product(id = "p$it", name = "کالای $it", unit = "عدد", barcodes = listOf("626${it.toString().padStart(10, '0')}")) }
+    val purchases = (0 until 2000).flatMap { inv ->
+      (0 until 3).map { k ->
+        val day = ir.vil3ntec.tohid.core.calendar.CivilDays.addDays(today, -(inv % 400))!!
+        Purchase(id = "u$inv-$k", productId = "p${(inv * 3 + k) % 500}", supplierId = if (inv % 2 == 0) "s1" else "s2", quantity = 2.0, unit = "عدد",
+          purchasePrice = 50.0, totalAmount = 100.0, paidAmount = if (inv % 3 == 0) 100.0 else 0.0, debt = if (inv % 3 == 0) 0.0 else 100.0,
+          date = day, createdAt = inv * 10L + k, invoiceNo = inv + 1, dueDate = if (inv % 5 == 0) day else null)
+      }
+    }
+    val pays = (0 until 1000).map { SupplierPayment("y$it", if (it % 2 == 0) "s1" else "s2", 50.0, today, if (it % 7 == 0) PurchaseBook.payNote(it + 1) else "", it.toLong()) }
+    val d = d0.copy(products = products, purchases = purchases, supplierPayments = pays)
+    repeat(3) { PurchaseViews.all(d, today) }
+    val t0 = System.nanoTime()
+    val all = PurchaseViews.all(d, today)
+    val found = PurchaseViews.search(d, all, "6260000000007")
+    val ms = (System.nanoTime() - t0) / 1_000_000
+    println("PurchaseViews.all + search: ${all.size} خرید در $ms ms")
+    assertEquals(2000, all.size)
+    assertTrue(found.isNotEmpty())
+    assertTrue("$ms ms", ms < 400)
+  }
 }

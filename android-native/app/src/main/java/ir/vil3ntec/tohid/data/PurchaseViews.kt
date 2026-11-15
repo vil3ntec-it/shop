@@ -132,6 +132,8 @@ object PurchaseViews {
     val invoices = PurchaseBook.invoices(d)
     val remaining = PurchaseBook.open(d).associate { it.invoice.key to it.remaining }
     val entries = d.warehouseEntries.filter { it.purchaseId != null }.associateBy { it.purchaseId!! }
+    /** خریدِ قدیمیِ بی `purchaseId` روی ورود ⇒ با `warehouseEntryId` (یک نقشه، نه جست‌وجوی خطی برای هر ردیف) */
+    val entryById by lazy { d.warehouseEntries.associateBy { it.id } }
 
     fun name(supplierId: String, fallback: String = "") = suppliers[supplierId]?.name ?: fallback
 
@@ -161,7 +163,7 @@ object PurchaseViews {
 
     fun line(p: Purchase): Line {
       val product = products[p.productId]
-      val e = entries[p.id] ?: p.warehouseEntryId?.let { id -> d.warehouseEntries.firstOrNull { it.id == id } }
+      val e = entries[p.id] ?: p.warehouseEntryId?.let(entryById::get)
       val inUnit = p.unitName?.takeIf { it.isNotBlank() && (p.unitQtyMilli ?: 0) > 0 }
       val qty = if (inUnit != null) p.unitQtyMilli!! / 1000.0 else kotlin.math.abs(p.quantity)
       val sign = if (p.totalAmount < 0) -1.0 else 1.0
