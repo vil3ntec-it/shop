@@ -70,7 +70,8 @@ class SummaryCardUiTest {
   @get:Rule val rule = createComposeRule()
 
   private val ctx = DesktopContext
-  private val keys = listOf("test65s/a", "test65s/b", "test65s/c", "test65s/d", "test65s/e", "test65s/f")
+  //  هر کلیدی که آزمون‌ها می‌نویسند — پیش و پس از هر آزمون پاک (حالتِ «بسته» روی دیسکِ آزمون می‌ماند)
+  private val keys = ('a'..'i').map { "test65s/$it" }
 
   private val label = "قرضِ ما به تأمین‌کننده‌ها"
   private val value = "0 ؋"

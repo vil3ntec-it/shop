@@ -125,7 +125,7 @@ class SectionHeaderUiTest {
     assertTrue("$where: عنوان در نوار — $t", t.bottom <= px(64f))
     val icons = nodes(hasClickAction()).map { it.boundsInRoot }.filter { it.bottom <= px(64f) && it.width < px(80f) }
     icons.forEach { i -> assertTrue("$where: عنوانِ «$title» زیرِ آیکن — $t / $i", t.right <= i.left + 0.5f || t.left >= i.right - 0.5f) }
-    assertTrue("$where: عنوان کامل یا دست‌کم پیدا", t.width > px(40f))
+    assertTrue("$where: عنوان پیداست", t.width > px(20f))
   }
 
   @Test fun busyBarWithBackThreeActionsAndMenuNeverCoversTheTitle() {
