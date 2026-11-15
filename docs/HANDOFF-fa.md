@@ -96,6 +96,11 @@
   (فارسی و انگلیسی: برگشت، کار، وسطِ عنوان، کادرِ کشویی و وسطِ برچسب همان جا).
 - **آزمون‌ها**: تازه `SummaryCardUiTest`، `SectionHeaderUiTest`، `SummaryFoldTest`، `SectionColorsTest`؛ عکس `E65sShotsTest`
   (`E65S_SHOTS=<پوشه>`). آزمونِ کهنه فقط `HistoryMeaningTest` (رنگِ پول ⇐ `SectionColors`) آگاهانه عوض شد؛ `HistoryPrintWiringTest` با همان `FlowRow(Modifier.fillMaxWidth()` سبز ماند.
+- **اجرا** (لاینِ A، `-Xmx3g`، روی شاخهٔ ادغام‌شده با batch-67): ۷۱۷ آزمون (`*UiTest*`، `*GuardTest*`، `*WiringTest*`، `*CoverageTest*`، `*History*Test*`،
+  `*Settings*Test*`، `*Promo*Test*`، `SummaryFoldTest`، `SectionColorsTest`، `HeaderFitTest`، `LookModelsTest`، `ReportsModelTest`) — ۷۱۶ سبز و یک
+  آزمونِ تازهٔ زبان که لبهٔ دومِ کادرِ کشویی را می‌سنجید (پهنایش به نوشته است؛ اصلاحِ آزمون)؛ بازاجرا: `SectionHeaderUiTest`، `SummaryCardUiTest`،
+  `LookGuardTest`، `NavRowUiTest`، `V3NavRowGuardTest` ۳۲/۳۲ سبز. `precheck.sh` ⇒ `fail=0`؛ `quality.mjs` بی سطرِ «همین تغییر» (در برابرِ batch-67).
+  عکس‌ها: `E65sShotsTest` (پس، باز/بسته، روز/شب) و «پیش» از درختِ `66dd6f6fc` با همان مهار (پوشهٔ موقتِ scratchpad).
 - **دست نخورد**: داشبورد و آیکن‌ها (`LookGuardTest`)، `DebtorsStatsCard` (۶۵q)، ردیف‌ها و راهنمای برگشتِ تاریخچه (۶۵h)، تنظیمات (۶۵r).
 - **استثناها** (عمدی): ردیفِ کادرهای کشوییِ پالایهٔ «خریدها» (تأمین‌کننده/پرداخت/رسیدن/دوره) و تراشه‌های سال/ماه/قرض‌دارِ «دریافت‌ها»
   پالایهٔ فهرست‌اند و بالای کارت ماندند؛ `MetricRows` (مرکزِ مدیریت) و شبکهٔ `V3Stat` ِ «پیک» سربرگ نیستند؛ زبانه‌های گزارش بی کارتِ خلاصه
