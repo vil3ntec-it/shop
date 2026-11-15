@@ -385,7 +385,7 @@ tasks.register("printVersionName") {
  *  (AWT، Swing، شبکه…) از نو خوانده، بررسی و ساخته می‌شوند.
  *
  *  JDK ِ کامل این نقشه را دارد (`lib/server/classes.jsa`) ولی runtime ای که jlink ِ پلاگینِ Compose می‌سازد ندارد
- *  (`--generate-cds-archive` را نمی‌دهد)، پس برنامهٔ نصب‌شده تا امروز بی CDS بالا می‌آمد. این‌جا پس از
+ *  (`--generate-cds-archive` را نمی‌دهد)، پس برنامهٔ نصب‌شده تا امروز بی CDS بالا می‌آمد. این‌جا در پایانِ
  *  `createDistributable` همان لانچرِ برنامه یک بار با `-Xshare:dump` اجرا می‌شود: JVM ِ **همان runtime** نقشه را از
  *  فهرستِ کلاس‌های خودش (`lib/classlist`) می‌سازد و پیش از `main` بیرون می‌رود (برنامه اجرا نمی‌شود). نصابِ Inno
  *  (`installer/Tohid.iss`) همین پوشه را برمی‌دارد.
@@ -394,14 +394,15 @@ tasks.register("printVersionName") {
  *  (نسخهٔ دیگر) را JVM خودش کنار می‌گذارد (`-Xshare:auto` ِ پیش‌فرض). فقط ویندوز و لینوکس: بستهٔ مک امضا/notarize
  *  می‌شود و فایلِ افزوده پس از ساختنِ بسته امضا را می‌شکند. سنجه: `docs/PERFORMANCE-fa.md` (PERF-DESK).
  */
-val cdsArchive = tasks.register("cdsArchive") {
-  description = "نقشهٔ CDS ِ JDK برای runtime ِ پوشهٔ createDistributable"
+//  گامِ آخرِ خودِ `createDistributable` (نه کارِ جدا): هر کاری که پوشهٔ برنامه را برمی‌دارد (نصابِ Inno، dmg، deb) نقشه را هم می‌بیند
+tasks.matching { it.name == "createDistributable" }.configureEach {
   val os = System.getProperty("os.name").orEmpty().lowercase()
   val windows = os.startsWith("windows")
+  val wanted = windows || os.startsWith("linux")
   val appDir = layout.buildDirectory.dir("compose/binaries/main/app/Tohid")
   val logFile = layout.buildDirectory.file("cds-dump.log")
-  onlyIf { windows || os.startsWith("linux") }
   doLast {
+    if (!wanted) return@doLast
     val root = appDir.get().asFile
     val launcher = if (windows) root.resolve("Tohid.exe") else root.resolve("bin/Tohid")
     //  جای نقشه کنارِ کتابخانهٔ JVM است (ویندوز `runtime/bin/server`، لینوکس `lib/runtime/lib/server`) — پیدا می‌شود، فرض نمی‌شود
@@ -423,7 +424,6 @@ val cdsArchive = tasks.register("cdsArchive") {
     }
   }
 }
-tasks.matching { it.name == "createDistributable" }.configureEach { finalizedBy(cdsArchive) }
 
 /**
  *  همهٔ وابستگی‌ها را پایین می‌آورد — CI پیش از ساخت صدایش می‌زند تا

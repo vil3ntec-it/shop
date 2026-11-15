@@ -1897,8 +1897,8 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
   `rememberOffMain`/`rememberOffMainFor` (زبانهٔ دیگر ⇒ نتیجهٔ زبانهٔ پیشین هرگز دیده نمی‌شود). جست‌وجو با هر حرف فقط روی جدول‌های
   یک‌بارهٔ `SearchIndex` (نوشتهٔ یکسان‌شده برای هر فهرست، نه `norm` برای هر ردیف در هر کلید). تصویرِ متحرک (`V3Illustration`) هم از
   `rememberV3Live` می‌گذرد (پنجرهٔ بی فوکوس ⇒ صفر قاب). کارِ پیش از پنجره در `main` فقط آنچه پنجره لازم دارد (سوکت و کارگرِ همگام‌سازی
-  روی `Dispatchers.IO`). نصاب: `cdsArchive` (نقشهٔ CDS ِ JDK پس از `createDistributable`) و `-XX:+UseStringDeduplication` برداشته
-  نمی‌شوند؛ `files/startup.txt` (`StartupTrace`) زمانِ باز شدن و موتورِ کشیدن را نشان می‌دهد و CI ِ ویندوز چاپش می‌کند. سنجه:
+  روی `Dispatchers.IO`). نصاب: گامِ پایانیِ `createDistributable` (نقشهٔ CDS ِ JDK، `cdsArchive:` در گزارشِ Gradle) و `-XX:+UseStringDeduplication`
+  برداشته نمی‌شوند؛ `files/startup.txt` (`StartupTrace`) زمانِ باز شدن و موتورِ کشیدن را نشان می‌دهد و CI ِ ویندوز چاپش می‌کند. سنجه:
   `desktop/…/perf/DeskSpeedBenchTest` (دستی، `TOHID_DESK_SPEED=1`؛ پنجرهٔ بی پنجره `DeskShell`)؛ نگهبانِ همیشگی `DeskIdleGuardTest`
   (خانهٔ بی‌کار صفر قاب و صفر ترکیب، صندوقِ پنجرهٔ بی فوکوس صفر قاب)؛ هم‌ارزی `DeskSpeedEquivalenceTest`.
 - ⛔ **PERF-02 — بار در مقیاسِ §۹.۳ و درستی زیرِ بار (`claude/perf-load`):** `load-test.mjs --profile scale,scale-burst --check`

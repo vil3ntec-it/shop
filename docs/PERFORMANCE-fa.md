@@ -157,8 +157,8 @@
 - **تصویرهای متحرک** (`V3Illustration`، صندوق، قرض‌داران، گدام، شاگردان، تخفیف‌ها) از دروازهٔ `V3Live` نمی‌گذشتند: پنجرهٔ پشتِ برنامهٔ
   دیگر (روی کامپیوتر RESUMED یعنی فوکوس) یا زیرِ برگه هم ~۴۵ قاب در ثانیه کلِ پنجره را می‌کشید ⇒ `rememberV3Live`.
 - **آغاز:** ساختنِ کلاینتِ OkHttp ِ سوکتِ زنده (بارِ گواهی‌های TLS ِ JDK) نیمی از کارِ پیش از پنجره بود (JFR) ⇒ همراهِ کارگرِ همگام‌سازی
-  روی `Dispatchers.IO`. runtime ِ jlink ِ Compose نقشهٔ CDS ِ JDK را نداشت ⇒ `cdsArchive` (لانچر با `-Xshare:dump` پس از
-  `createDistributable`؛ هر شکست ⇒ همان پوشهٔ دیروز). `-XX:+UseStringDeduplication` (G1، رشتهٔ پس‌زمینه).
+  روی `Dispatchers.IO`. runtime ِ jlink ِ Compose نقشهٔ CDS ِ JDK را نداشت ⇒ گامِ پایانیِ `createDistributable` (لانچر با `-Xshare:dump`؛
+  هر شکست ⇒ همان پوشهٔ دیروز). `-XX:+UseStringDeduplication` (G1، رشتهٔ پس‌زمینه).
 - **دیدنِ ویندوز:** `files/startup.txt` (زمان‌ها، `renderApi` ِ Skiko — `DIRECT3D`/`OPENGL`/`SOFTWARE_*` — heap، GC) و CI ِ ویندوز
   پس از بازشدنِ برنامهٔ نصب‌شده آن را چاپ می‌کند.
 

@@ -69,8 +69,8 @@
   ۲ × ۶۰۰ms) ⇒ `DashboardEngine.alerts` + `DeskAlerts` (پس‌زمینه، یک بار). (۲) «گزارش‌ها» ی کامپیوتر ۲٫۸ ثانیه پنجره را می‌ایستاند ⇒
   `rememberOffMainFor` (+ `DeskFresh`). (۳) «مرکزِ مدیریت» ۱٫۴ ثانیه ⇒ ارزشِ موجودی پس‌زمینه. (۴) Ctrl+K: `norm` ِ همه‌چیز با هر حرف ⇒
   جدول‌های یک‌بارهٔ `SearchIndex`. (۵) تصویرهای متحرک بی دروازهٔ `V3Live` (پنجرهٔ بی فوکوس ۴۸ قاب در ثانیه ⇒ ۰). (۶) OkHttp/TLS ِ
-  سوکتِ زنده پیش از پنجره ⇒ `Dispatchers.IO` (کارِ پیش از پنجره ~۹۰۰ ⇒ ~۴۰۰ms). (۷) runtime بی CDS ⇒ `cdsArchive` در
-  `desktop/build.gradle.kts`؛ `-XX:+UseStringDeduplication` (دفترِ ۵۰ هزاری ۱۸۲ ⇒ ۱۲۶ MB). (۸) `StartupTrace` + چاپ در CI ِ ویندوز.
+  سوکتِ زنده پیش از پنجره ⇒ `Dispatchers.IO` (کارِ پیش از پنجره ~۹۰۰ ⇒ ~۴۰۰ms). (۷) runtime بی CDS ⇒ گامِ پایانیِ `createDistributable`
+  (`desktop/build.gradle.kts`، `cdsArchive:` در گزارش)؛ `-XX:+UseStringDeduplication` (دفترِ ۵۰ هزاری ۱۸۲ ⇒ ۱۲۶ MB). (۸) `StartupTrace` + چاپ در CI ِ ویندوز.
 - **پیش ⇐ پس (بارِ ماشین ۳–۶٫۵):** نخستین قابِ پنجره با دفترِ بزرگ ۱۷۶۲ ⇒ ۶۷۵ms؛ بلندترین قابِ «گزارش‌ها» ۲۷۶۳ ⇒ ۳۰۴ms؛ «مدیریت»
   ۱۴۳۰ ⇒ ۶۵ms؛ منطقِ Ctrl+K ۲۴–۵۷ ⇒ ۷–۱۳ms؛ صندوقِ پنجرهٔ بی فوکوس ۴۸ ⇒ ۰ قاب در ثانیه؛ خانهٔ بی‌کار پیش و پس ۰.
 - **آزمون:** `DeskSpeedEquivalenceTest`، `DeskIdleGuardTest`، `release-rehearsal` (۴/۴)، `artifact-gate --profile desktop` روی پوشهٔ
