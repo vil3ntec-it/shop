@@ -93,10 +93,14 @@ class Vill3nPaletteTest {
     assertSame(shopColors(ShopTheme.SKY, false), LightColors)
     assertSame(shopColors(ShopTheme.SKY, true), DarkColors)
     for ((name, c) in palettes) for ((k, v) in tokens(c)) if (v.alpha != 1f) bad += "$name:$k شفاف است"
-    //  سری‌های نمودار به ترتیبِ رنگ‌های همراه، در هر شش پالت یکی
-    val accents = listOf("#0EA5E9", "#8B5CF6", "#F97362", "#F59E0B", "#14B8A6", "#EC4899", "#84CC16")
+    //  سری‌های نمودار به ترتیبِ رنگ‌های همراه، در هر سه پالتِ روز یکی و در هر سه پالتِ شب یکی (۶۸c عمدی: پالتِ لوکسِ
+    //  `SectionColors` — روز و شب جدا، بی صورتی و لیمویی)
     for ((name, c) in palettes) {
-      if (c.chart.series.map(::hex) != accents) bad += "$name: سری‌های نمودار ≠ رنگ‌های همراه"
+      val accents = (if (c.isDark) ThemeAccents.NIGHT else ThemeAccents.DAY).map(::hex)
+      //  نمودار همان هفت رنگ به ترتیبِ معنا (هزینه عقیق)؛ رنگ‌های همراه به ترتیبِ جاهای خانه
+      val series = SectionColors.CHART.map { hex(SectionColors.glyph(it, c.isDark)) }
+      if (c.chart.series.map(::hex) != series) bad += "$name: سری‌های نمودار ≠ رنگ‌های همراه"
+      if (c.chart.series.map(::hex).toSet() != SectionColors.ORDER.map { hex(SectionColors.glyph(it, c.isDark)) }.toSet()) bad += "$name: سری‌های نمودار بیرون از هفت خانواده"
       if (c.accents.map(::hex) != accents) bad += "$name: رنگ‌های همراه"
     }
     assertEquals("#E2E8F0", hex(LightColors.chart.grid))
@@ -185,10 +189,10 @@ class Vill3nPaletteTest {
 
   @Test
   fun `سریِ نمودارِ زیرِ ۳ به ۱ روی کارتِ روز همیشه برچسب دارد — فهرست فقط کوتاه شود`() {
-    //  «همیشه نامِ سری/راهنما/برچسب». پنج رنگِ همراه روی سفید زیرِ ۳:۱اند؛ رنگ می‌ماند
-    //  ولی تنها حاملِ معنا نیست (برچسبِ عدد کنارِ ستون).
+    //  «همیشه نامِ سری/راهنما/برچسب». ۶۸c: فهرست کوتاه شد — هیچ رنگِ همراهِ پالتِ لوکس روی سفید زیرِ ۳:۱ نیست (پیش‌تر پنج تا)؛
+    //  برچسبِ عدد کنارِ ستون همچنان هست.
     val low = LightColors.chart.series.filter { contrast(it, LightColors.surface) < 3f }.map(::hex).toSet()
-    assertEquals(setOf("#0EA5E9", "#F97362", "#F59E0B", "#14B8A6", "#84CC16"), low)
+    assertEquals(emptySet<String>(), low)
     for ((name, c) in palettes.filter { it.second.isDark }) {
       assertEquals(name, emptyList<Color>(), c.chart.series.filter { contrast(it, c.surface) < 3f })
     }

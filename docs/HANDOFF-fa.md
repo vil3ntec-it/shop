@@ -57,6 +57,132 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۴ — هماهنگ‌کننده (سیزنِ 01GcPTAL…)، دستهٔ ۶۹ (`claude/batch-69`، PR #1056)
+
+- **CI ِ #1056**: (۱) `ساخت نسخهٔ بومی`: `compileReleaseKotlin` «Not enough memory» ⇐ `kotlin.daemon.jvmargs=-Xmx4g` در `android-native/gradle.properties`.
+  (۲) `ScreenSpeedBenchTest`: «خانه» با همان کد روی یک ماشینِ GitHub ۳۷ و روی دیگری ۷۲ ms ⇐ **تغییرِ آگاهانهٔ آزمون**: سنجشِ سرعتِ
+  ماشین (`calibrationMs`، مرتب‌سازیِ ثابتِ ۳۰۰ هزار عدد، مرجع ۲۰ ms) و ضربِ سقف در کندیِ ماشین، کفِ ۱ و سقفِ ۲٫۵ — روی ماشینِ
+  تندتر سقف همان ۵۰ ms است (سست نشد) و کندیِ بیش از ۲٫۵ برابر هنوز می‌شکند.
+- **در راه**: گوشی p1 (فروش و سبد)، p2 (کالا، گدام، فرمِ ساده)، p3 (تیره، دکمه، تم)، p4 (سفارش‌ها، سفارشِ دستی، پیش‌فرضِ روشن)؛
+  کامپیوتر d1 + d3a + d3b آماده برای یک دستهٔ کامپیوتری (عنوانِ دوباره زیرِ `DeskHeader` باید درست شود)؛ p0 (کالبدِ یکسان) متوقف،
+  کارِ ناآزموده روی `claude/e-phone-p0`. صاحب‌کار خواست آهسته‌تر (سقفِ مصرف).
+
+### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-68c زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-68c` (از `origin/claude/e-rows-65s` 6d697791f + ادغامِ `origin/claude/batch-68` 337caa416) — پالتِ لوکسِ برند و ردیف‌های آرامِ فهرست
+
+- **خواست** (صاحب‌کار): «رنگ صورتی کار نگیر، توی برنامه خیلی مسخره میشه. رنگ‌های برند بزار، لوکس.» و با عکسِ «خریدها» (شب) و عکسِ
+  پیش/پسِ یک فهرست: «این شلوغی‌هات رو، من قبلن هم این عکس رو دادم گفتم به وجود نیاد … درست کن دقیق و منظم.»
+- **ساخته شد — پالت**: `ui/theme/SectionColors.kt` هفت خانوادهٔ برند (نیلی `VIOLET`، زرِ گرم `AMBER`، نفتی `TEAL` ِ جدا از زمردی،
+  زمردی `MINT`، لاجوردیِ سرمه‌ای `SKY`، عقیقِ سرخ `CORAL` فقط برای قرض و برگشت، گرافیت `SLATE` ِ تازه)؛ `PINK` و `LIME` از
+  `PhoneV3Palette.Hue` برداشته شدند. هر خانه نشانهٔ کاشی (`glyph`) هم دارد و `ThemeAccents.DAY/NIGHT` و سری‌های نمودارِ هر شش پالت
+  (`ThemeAccents.chart`) از همین جدول‌اند (ترتیب `SectionColors.ORDER` = جاهای پیشینِ `HomeAccents`؛ خانه دست نخورد). بخش‌ها: فروش
+  نیلی، مصارف و تخفیف زر، خرید و سفارش نفتی، قرض عقیق، رسید و گاوصندوق زمردی، گزارش لاجوردی، انبار گرافیت؛ `V3Modules.HUE_BY_ID`،
+  `SettingsHues` (صندوق زمردی، انبار زر) و `historyTone` (قرضِ وصول‌شده نفتی) همان. جدول در `RULES-fa.md`.
+- **ساخته شد — ردیف**: `ui/v3/V3DataRow.kt` (`V3DataRow`، `V3DataRowSpec`، `V3RowMeta`/`v3MetaText`، `V3RowAction`) و نمای `DATA` ِ
+  `V3ListRow`: کاشی · عنوانِ یک‌خطیِ ۱۶ · خطِ دومِ یک‌خطیِ ۱۳ · خطِ مبلغِ یک‌خطی (مبلغ به رنگِ نوشته، وضعیت کم‌رنگ، دست‌بالا یک واژهٔ
+  خطر) و یک قرصِ خنثی **یا** پیکان. `V3RowTone.ATTENTION` دیگر زرد نیست (`v3RowToneColor`). صفحه‌ها: خریدها (`PurchaseRowText.meta`:
+  «۸٬۳۲۰ ؋ • ۳٬۳۲۰ ؋ مانده»، «سررسید ۴ قوس»، «سررسید گذشته»؛ «رسیده» ِ عادی فقط در جزئیات)، سفارشِ خرید، تأمین‌کننده‌ها و صفحهٔ هر کدام
+  (پرداخت‌ها هم)، مصارف، رسیدها، تاریخچهٔ فروش (واژهٔ رنگیِ پرداخت تنها نشان؛ PAY-07 و برگشت آرام)، کالاها، انبار (یک فهرستِ پیوسته با
+  خطِ مویی، نه کارت‌های جدا)، صفِ سفارش‌ها (`OrderCard`: «#۱۰۴۲ · مشتری»، «آنلاین · زمان · اقلام»، «مبلغ • وضعیت»، قرصِ خنثیِ گام؛
+  امضای تابع همان)، تخفیف‌ها (`Promos.kt`: بی دو دکمه — زدن ⇐ ویرایش، کشیدن ⇐ حذف) و کارمندان.
+- **پالایه‌ها**: خریدها یک ردیفِ ثابت (کادرِ دوره + «فیلتر» با شمار) و برگهٔ `PurchaseFilterSheet` (تأمین‌کننده/پرداخت/رسیدن)؛ `V3ChipRow` و
+  تب‌های صفِ سفارش (`DraftCountTabs`) لبهٔ محو (`v3EdgeFade`).
+- **دست نخورد**: داشبوردِ خانه (هش‌ها همان)، آیکن‌ها، قرض‌داران و پروندهٔ قرض‌دار، صفحهٔ ورود، `V3NavRow` (۶۵r)، رنگ‌های وضعیت.
+- **آزمون‌های عمداً عوض‌شده**: `SectionColorsTest` (TEAL خانوادهٔ خودش، هفت خانه، نشانهٔ کاشی ≥۳:۱/≥۴٫۵:۱)، `ThemeV2PaletteTest` و
+  `Vill3nPaletteTest` (رنگ‌های همراه و نمودارِ روز/شب، فهرستِ «زیرِ ۳:۱» تهی شد)، `HistoryMeaningTest` (قرضِ وصول‌شده نفتی)،
+  `V3NavRowGuardTest` (سه رشتهٔ متنیِ `V3ListRow` با `data`)، `PurchasesRoutesUiTest` (خطِ مبلغِ کوتاه و «فیلتر» ⇐ برگه). تازه:
+  `LuxPaletteGuardTest`، `V3DataRowGuardTest`، `PurchaseRowMetaTest`، `DataRowsE68cUiTest`، عکس‌ها `E68cShotsTest` (`E68C_SHOTS`، `E68C_ONLY`).
+- **نتیجه**: اجرای کاملِ هدف‌دار روی شاخهٔ ادغام‌شده با batch-68 (۲۵۸ آزمون): همه سبز جز ۴ آزمونِ تازهٔ خودم که پنجرهٔ پهنِ آزمون را
+  می‌سنجیدند (قابِ ۳۶۰dp ⇐ درست شد)؛ سپس `DataRowsE68cUiTest` ۱۱/۱۱، `PurchasesRoutesUiTest` ۷/۷، `RowsE63dUiTest` ۱۰/۱۰، `PurchaseRowMetaTest`
+  ۴/۴، `LuxPaletteGuardTest` ۵/۵، `V3DataRowGuardTest` ۵/۵، `LookGuardTest` ۷/۷، `SectionColorsTest` ۷/۷، `HardcodedColorsTest`، I18n/Dari سبز.
+  همچنین سبز: `SummaryCardUiTest` ۱۰، `SectionHeaderUiTest` ۷، `HistoryE65hUiTest` ۶، `HistoryMeaningTest` ۶، `NavRowUiTest` ۳، `V3NavRowGuardTest` ۶،
+  `ThemeV2PaletteTest` ۹، `Vill3nPaletteTest` ۶، `PurchaseViewsTest` ۱۰، `PurchaseOrderRoutesUiTest` ۷، `SupplierBillRoutesUiTest` ۶،
+  `DebtorRowsE65qUiTest` ۱۴، `OneHandShellUiTest` ۸، `InfraLeakGuardTest` ۸. `precheck.sh` fail=0؛ `whatsnew/check.mjs` سبز.
+- **عکس‌ها**: `scratchpad/e68c/{before,after}/<صفحه>-<light|dark>.png` و `compare-lists.png`، `compare-palette.png` (پیش = همین آزمون روی ۶۵s).
+- **خانه (دروازهٔ هماهنگ‌کننده)**: `E68cHomeShotsTest` (`E68C_HOME`) — گوشی «آسمان»/«شامگاه» روز و شب و کامپیوتر ۱۳۶۶×۷۶۸، پیش =
+  `origin/claude/batch-68` 988fd543f با همان دفتر؛ `scratchpad/e68c/home/compare-home.png`. فقط رنگِ چهار میان‌برِ خانه عوض شد
+  (دریافت زمردی، ورودِ کالا زر، تاریخچه نیلی، «سفارش‌های آنلاین» نفتی به‌جای مرجانی — جای ۲ ِ `SectionColors.ORDER` نفتی شد چون عقیقِ
+  کم‌رنگِ کاشیِ «خاموش» صورتی‌نما بود)؛ گرادیانِ کادرهای بزرگ (`heroGradient`) و چیدمان همان؛ دو درخششِ کادر (جاهای ۰ و ۵ ِ
+  `ShopColors.accents`) از جدولِ بخش‌ها جدا شدند: بالا همان آسمانی، پایین بنفشِ نرم به‌جای صورتی. نشانهٔ کاشی‌ها
+  (`PhoneV3Palette.glyph`) مستقیم از `SectionColors`. نمودارِ تم به ترتیبِ معنا (`SectionColors.CHART`، هزینه عقیق).
+- **قدمِ بعدی / نیمه‌کاره**: تمِ «شامگاه» گرادیانِ خودش را (`#DB2777` صورتی) هنوز دارد — جدولِ THEME-V2 ِ صاحب‌کار است؛ اگر «هیچ صورتی»
+  آن را هم می‌گیرد، با پرسش عوض شود. در «شامگاه» برند همان نیلیِ فروش است. ردیف‌های داده‌ای که هنوز `V3ListRow` ِ آزادند (گزارش‌ها، حرکاتِ
+  انبار، شاخه‌ها) در دستهٔ بعد به `V3DataRow` بروند.
+
+### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-65s زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-65s` (از `origin/claude/batch-65` 66dd6f6fc) — سربرگِ بخش‌ها: وسط، تاشو، رنگِ بخش
+
+- **خواست** (صاحب‌کار با عکس): «همه سربرگ‌های توی برنامه همه‌شون وسط باشن و کشویی یعنی جمع بشن و بیان بیرون هر وقت که خواست» و سپس
+  «تمام سربرگ‌ها باید وسط باشن و رنگِ خودشون داشته باشن؛ تمام رنگ‌ها باید با دقت باشن» (+ عنوان در نوار، کادرِ کشویی و تفکیک درونِ کارت).
+- **ساخته شد**:
+  - `V3Summary`/`V3SummaryFrame` (`ui/v3/V3Summary.kt`): همه‌چیز وسط در کارتِ تمام‌پهنا؛ `collapseKey` ⇒ سرخطِ تاشوی ۴۸dp (پیکان در
+    گوشهٔ آغاز، نقشِ دکمه، `stateDescription` ِ «باز/بسته»، نامِ کار `StrLook.foldSummary`/`unfoldSummary`)، بسته یک خطِ «برچسب · عدد»،
+    `animateContentSize` فقط با `Motion.enabled`؛ `section` ⇒ تهِ‌رنگ/مرز/عددِ بخش؛ `corner` ⇒ کادرِ کشوییِ دوره در گوشهٔ مقابلِ پیکان؛
+    `extra` ⇒ چیزِ زیرِ عدد (نمودار). همهٔ پارامترها پیش‌فرض دارند (سازگار با پیش).
+  - حالتِ باز/بسته: `SummaryFold` (`summary_folded:<صفحه>` در `tohid-ui`، کنارِ `view_mode`؛ همگام نمی‌شود)، `rememberSummaryFold` و
+    `summaryFoldStore` در `V3SummaryFoldAndroid.kt` (مرزِ پلتفرم؛ سنجهٔ کیفیت).
+  - رنگِ بخش‌ها — **یک منبع**: `ui/theme/SectionColors.kt` (`V3Section(hue)` = خانوادهٔ کاشیِ همان بخش در «بیشتر»، `V3Modules.HUE_BY_ID`؛
+    جدولِ خانواده‌ها روز/شب، `ofHue`، `contrast`)؛ جدول در `RULES-fa.md`. **برای ۶۵r:** نگاشتِ
+    رنگِ کاشی‌های تنظیمات/ناوبری را می‌توان به همین فایل برد.
+  - نمودارِ افقیِ درونِ کارت: `V3SummaryBars` (`ui/v3/V3SummaryBars.kt`): ۵ ردیف + «… N مورد دیگر»، زدن = پالایه.
+  - `V3Scaffold`: پیش‌فرضِ `largeTitle` شد `false` — عنوان وسطِ نوار (چیدمانِ تازهٔ `V3HeaderBar`: اگر کارهای یک سو پهن‌اند، وسطِ جای
+    خالی، هرگز زیرِ آیکن؛ سرخطِ صفحه‌خوان)؛ زیرنویسِ صفحه یک خطِ کوچکِ وسط زیرِ نوار. تنظیمات (`SettingsPageFrame` خودش `largeTitle`
+    می‌دهد) دست نخورد — کارِ ۶۵r.
+  - صفحه‌ها (کلید · رنگ): خریدها `purchasing` · PURCHASES؛ تأمین‌کنندگان `purchasing/suppliers` · PURCHASES؛ صفحهٔ تأمین‌کننده
+    `purchasing/supplier` · PURCHASES؛ مصارف `expenses` · EXPENSES (کادرِ ماه در گوشه، نمودارِ دسته‌ها درونِ کارت؛ کارتِ جدای نوار و
+    تراشه‌ها برداشته)؛ تاریخچهٔ فروش `sales` · SALES (کادرِ دوره در گوشه و «نقد · نسیه · دیگر» نمودارِ درونِ کارت؛ `PeriodResult` ِ ۶۵h —
+    برگشت/خالص/قرضِ وصول‌شده/صندوق — جدا زیرِ کارت ماند؛ بالای صفحه فقط تراشه‌های فیلترِ روشن)؛ دریافت‌ها `receipts` · RECEIPTS/EXPENSES (جای `V3Stat`)؛ کالاها `products` · STOCK (سودِ بالقوه
+    درشت)؛ انبار `stock` · STOCK (ارزش درشت، سه خانه و تراشه‌های هشدار در `extra`)؛ گزارش: سود `reports/profit`، خرید
+    `reports/purchases` (جای دو `V3Stat`)، قرض‌داران `reports/debtors` · REPORTS (بازه در گوشهٔ کارتِ سود و خرید)؛ تخفیف‌ها `promos` ·
+    PROMOS (جای `MetricRows`، پالایهٔ «نمایش» در گوشه)؛ وضعیتِ ویترین `storefront/status` · ORDERS.
+- **ادغامِ `origin/claude/batch-66` (۶۵h)** در همین شاخه: تعارضِ `HistoryScreen.kt`/`HistoryParts.kt` حل شد (`RowCtx` هم `onReturns` و هم
+  `period`؛ `MoneySplit` ِ سه‌خانه فقط برای دوره‌های پیشینِ باز)؛ **`historyTone` (`HistoryTones.kt`) حالا از `SectionColors.ofHue` می‌خواند** (نقد =
+  نعنایی، نسیه = کهربایی، کارت = آسمانی، برگشت/لغو = مرجانیِ سرخ، قرضِ وصول‌شده = صورتی — جدا از بنفشِ کارتِ فروش) و `HistoryMeaningTest` آگاهانه به همین جدول عوض شد.
+- **نوار**: عنوانِ وسط هرگز زیرِ آیکن نمی‌رود — `V3HeaderActions.visibleFor` از پهنای عنوان (`TextMeasurer`) و پنجره دست‌بالا دو کار
+  (راهنما هم یک کار، واپسین) پیدا می‌گذارد و بقیه به «…» (راهنمای رفته نخستین ردیفِ آن)؛ چیدمانِ `V3HeaderBar` اگر باز هم جا نشد عنوان را کوتاه
+  می‌کند. شاهد: `SectionHeaderUiTest` (مرزِ گرهِ عنوان با هیچ آیکنی برخورد ندارد، ۳۶۰dp، تاریخچه و هر صفحهٔ پرکار).
+- **ادغامِ `origin/claude/batch-67` (۶۵r)**: `SettingsHues` برای بخش‌های هم‌پوشان (فاکتور/گزارش/کالا/آنلاین و دستهٔ کالا) از `V3Section.hue`
+  می‌خواند (همان مقدارها؛ هم‌خوانی در `SectionColorsTest`)؛ **عنوانِ تکراریِ تنظیمات برداشته شد** — `rememberBarTitleFits` (جای ثابتِ ۱۰۴ از
+  هر سو) و نامِ دومِ زیرِ سربرگ نیست؛ سربرگ جای عنوان را از دکمه‌های واقعی می‌سنجد (`V3HeaderBar`) و کارِ اضافه به «…» (`visibleFor`).
+- **چیدمانِ سربرگ در هر زبان همان** (خواستِ تازهٔ صاحب‌کار): `V3HeaderBar` و `V3SummaryFrame` درونِ `LocalLayoutDirection = Rtl` ِ ثابت
+  (نوشته جهتِ محتوای خودش را دارد؛ درونِ کادرِ کشوییِ گوشه جهتِ زبان). شاهد: `SectionHeaderUiTest.barAndSummaryKeepTheirArrangementInEveryLanguage`
+  (فارسی و انگلیسی: برگشت، کار، وسطِ عنوان، کادرِ کشویی و وسطِ برچسب همان جا).
+- **آزمون‌ها**: تازه `SummaryCardUiTest`، `SectionHeaderUiTest`، `SummaryFoldTest`، `SectionColorsTest`؛ عکس `E65sShotsTest`
+  (`E65S_SHOTS=<پوشه>`). آزمونِ کهنه فقط `HistoryMeaningTest` (رنگِ پول ⇐ `SectionColors`) آگاهانه عوض شد؛ `HistoryPrintWiringTest` با همان `FlowRow(Modifier.fillMaxWidth()` سبز ماند.
+- **اجرا** (لاینِ A، `-Xmx3g`، روی شاخهٔ ادغام‌شده با batch-67): ۷۱۷ آزمون (`*UiTest*`، `*GuardTest*`، `*WiringTest*`، `*CoverageTest*`، `*History*Test*`،
+  `*Settings*Test*`، `*Promo*Test*`، `SummaryFoldTest`، `SectionColorsTest`، `HeaderFitTest`، `LookModelsTest`، `ReportsModelTest`) — ۷۱۶ سبز و یک
+  آزمونِ تازهٔ زبان که لبهٔ دومِ کادرِ کشویی را می‌سنجید (پهنایش به نوشته است؛ اصلاحِ آزمون)؛ بازاجرا: `SectionHeaderUiTest`، `SummaryCardUiTest`،
+  `LookGuardTest`، `NavRowUiTest`، `V3NavRowGuardTest` ۳۲/۳۲ سبز. `precheck.sh` ⇒ `fail=0`؛ `quality.mjs` بی سطرِ «همین تغییر» (در برابرِ batch-67).
+  عکس‌ها: `E65sShotsTest` (پس، باز/بسته، روز/شب) و «پیش» از درختِ `66dd6f6fc` با همان مهار (پوشهٔ موقتِ scratchpad).
+- **دست نخورد**: داشبورد و آیکن‌ها (`LookGuardTest`)، `DebtorsStatsCard` (۶۵q)، ردیف‌ها و راهنمای برگشتِ تاریخچه (۶۵h)، تنظیمات (۶۵r).
+- **استثناها** (عمدی): ردیفِ کادرهای کشوییِ پالایهٔ «خریدها» (تأمین‌کننده/پرداخت/رسیدن/دوره) و تراشه‌های سال/ماه/قرض‌دارِ «دریافت‌ها»
+  پالایهٔ فهرست‌اند و بالای کارت ماندند؛ `MetricRows` (مرکزِ مدیریت) و شبکهٔ `V3Stat` ِ «پیک» سربرگ نیستند؛ زبانه‌های گزارش بی کارتِ خلاصه
+  (کالا، انقضا، انبار، ضایعات…) همان ردیفِ بازه را بالای فهرست دارند.
+### ۱۴۰۵/۰۸/۲۴ — عاملِ e-desk-perf زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-desk-perf` (از `origin/claude/batch-67` 58170c1e8 + `origin/claude/e-rows-63f`) — سرعتِ برنامهٔ کامپیوتر (PERF-DESK)
+
+- **خواست** (صاحب‌کار، بتای کامپیوتر 1.0.1998، لپ‌تاپِ ویندوزیِ معمولی): «برنامهٔ کامپیوتری چقدر کند است… هم لگ هم کند… تمامِ
+  برنامه‌ها». فقط کارایی؛ ظاهر دست نخورد (عاملِ طراحی `claude/e-desk-d1` روی پوسته کار می‌کند — ویرایش‌ها یک‌خطی در `DeskHeader`/`AppRoot`).
+- **سنجه:** `desktop/…/perf/DeskShell.kt` (همان درختِ `Main.kt` بی پنجره، ۱۳۶۶ نقطه، ردیابِ ترکیبِ Compose، کلید/چرخِ AWT) و
+  `DeskSpeedBenchTest` (دستی `TOHID_DESK_SPEED=1`: نخستین قاب، بی‌کاریِ خانه، هر بخشِ منو سرد و گرم، پنجرهٔ بی فوکوس، Ctrl+K، تایپِ
+  صندوق، چرخِ ماوس، GC و heap)؛ برنامهٔ واقعی زیرِ Xvfb با `StartupTrace` (`files/startup.txt`) و JFR. عدد و روش: `PERFORMANCE-fa.md`
+  ← «کامپیوتر». نگهبانِ همیشگی `DeskIdleGuardTest`، هم‌ارزی `DeskSpeedEquivalenceTest` (۳ آزمون).
+- **ریشه‌ها و درمان:** (۱) سربرگ و منوی کناری با هر فروش دو بار کلِ `DashboardEngine.board` روی رشتهٔ صفحه (۲ × ۱۲۰–۱۷۰ms، سرد
+  ۲ × ۶۰۰ms) ⇒ `DashboardEngine.alerts` + `DeskAlerts` (پس‌زمینه، یک بار). (۲) «گزارش‌ها» ی کامپیوتر ۲٫۸ ثانیه پنجره را می‌ایستاند ⇒
+  `rememberOffMainFor` (+ `DeskFresh`). (۳) «مرکزِ مدیریت» ۱٫۴ ثانیه ⇒ ارزشِ موجودی پس‌زمینه. (۴) Ctrl+K: `norm` ِ همه‌چیز با هر حرف ⇒
+  جدول‌های یک‌بارهٔ `SearchIndex`. (۵) تصویرهای متحرک بی دروازهٔ «زنده» (پنجرهٔ بی فوکوس ۴۸ قاب در ثانیه ⇒ ۰؛ پس از ادغامِ `batch-67` همان
+  دروازه از صحنه‌های ۶۵a: `rememberResumed` + `LocalArtLayer`، و `V3Sheet` هر دو لایه را می‌دهد). (۶) OkHttp/TLS ِ
+  سوکتِ زنده پیش از پنجره ⇒ `Dispatchers.IO` (کارِ پیش از پنجره ~۹۰۰ ⇒ ~۴۰۰ms). (۷) runtime بی CDS ⇒ گامِ پایانیِ `createDistributable`
+  (`desktop/build.gradle.kts`، `cdsArchive:` در گزارش)؛ `-XX:+UseStringDeduplication` (دفترِ ۵۰ هزاری ۱۸۲ ⇒ ۱۲۶ MB). (۸) `StartupTrace` + چاپ در CI ِ ویندوز.
+- **پیش ⇐ پس (بارِ ماشین ۳–۶٫۵):** نخستین قابِ پنجره با دفترِ بزرگ ۱۷۶۲ ⇒ ۶۷۵ms؛ بلندترین قابِ «گزارش‌ها» ۲۷۶۳ ⇒ ۳۰۴ms؛ «مدیریت»
+  ۱۴۳۰ ⇒ ۶۵ms؛ منطقِ Ctrl+K ۲۴–۵۷ ⇒ ۷–۱۳ms؛ صندوقِ پنجرهٔ بی فوکوس ۴۸ ⇒ ۰ قاب در ثانیه؛ خانهٔ بی‌کار پیش و پس ۰.
+- **آزمون:** `DeskSpeedEquivalenceTest`، `DeskIdleGuardTest`، `release-rehearsal` (۴/۴)، `artifact-gate --profile desktop` روی پوشهٔ
+  `createDistributable` با نقشهٔ CDS (۰ یافته)، کلِ `test` ِ کامپیوتر روی درختِ ادغام‌شده (با `batch-67` ِ تازه): ۴۵۱۰ آزمون، ۴۴۹۶
+  گذشت، ۱۴ کنار (سنجه‌های دستی/ویندوز)، ۰ شکست. اجرای کاملِ پیشین دو آزمونِ متنیِ RPT-13 (`ReportDrillTest`/`ReportRowDrillTest`:
+  نامِ `ledger` در `ReportFresh.kt`) را سرخ کرد ⇒ نام برگشت (آزمون دست نخورد)؛ `TrustCasesUiTest.appealOnlyForUpheldAndNeedsTenChars`
+  یک بار سرخ (کلیکِ بیرون از قاب پس از `performScrollTo`) و در دو اجرای بعد سبز — ناپایدار، بی ربط به این تغییر. هیچ آزمونی سست نشد.
+- **مانده / قدمِ بعدی:** (الف) آغاز با دفترِ بزرگ هنوز ~۸–۱۵ ثانیه تا دفتر: `recoverSync` ⇐ `LedgerDiff.toJson` ِ کلِ دفتر پیش از
+  `loaded` (کارِ موتورِ همگام‌سازی). (ب) تصویرهای متحرک وقتی پنجره فوکوس دارد ~۴۵ قاب در ثانیه (~۱۸٪ یک هسته) — تصمیمِ ظاهر با
+  صاحب‌کار. (ج) `DashboardNumbers` در ترکیبِ خانه (~۳۵ms). (د) روی ویندوز سنجیده نشد: پس از نخستین CI، سطرِ `startup:` ِ گامِ
+  «نصابِ Inno Setup و آزمونِ نصب» را بخوانید (`renderApi`، زمان‌ها)، و از صاحب‌کار `%LOCALAPPDATA%\Tohid\files\startup.txt` را بخواهید.
+
 ### ۱۴۰۵/۰۸/۲۵ — عاملِ e-appid زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-appid` (روی `origin/claude/batch-67`) — شناسهٔ نصبِ تازه `com.vill3n.dailyshop`
 
 - **چرا**: تصمیمِ صریحِ صاحب‌کار (۱۴۰۵/۰۸/۲۴): شناسهٔ نصبِ برنامهٔ دکان `com.vill3n.dailyshop` (پیش‌نمایش `….preview`) — همان دو نامی که در
@@ -252,6 +378,25 @@
   هر پرداخت، جمعِ سرخطِ روز، یک «برگشتِ کالا» ⇐ QR/بی رسید/جست‌وجو، صندوق، زدنِ ردیف ⇐ فاکتور، روزِ خالی).
 - **عکس‌ها** (`E65hShotsTest`، `E65H_SHOTS`/`E65H_TAG`؛ دفترِ نمایشیِ `shots/HistoryDemo.kt`): پیش از درختِ پایه و پس — روزِ خالی و روزِ پر، روشن و تیره.
 - **قدمِ بعدی**: ادغام با ۶۵s و اشاره دادنِ `historyTone` به توکن‌های او؛ دیدنِ عکس روی گوشیِ صاحب‌کار (دری).
+### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-63f زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-63f` (از `origin/claude/batch-63`) — سرعتِ صفحه‌ها (PERF-SCREEN)
+
+- **ساخته شد:** سنجهٔ منطق و نخستینِ قابِ هر بخش با دفترِ بزرگ (`desktop/…/perf/ScreenSpeed*`، `ScreenLogic`، `ScreenFrame`؛ عدد و روش:
+  [`PERFORMANCE-fa.md`](PERFORMANCE-fa.md))، بودجهٔ CI (رشتهٔ صفحه ≤ ۵۰ms روی ۲۰ هزار کالا) و آزمونِ هم‌ارزی. درمانِ ریشه‌ها: مدتِ قرض
+  از `DebtRows` (قرض‌داران ۱٫۹ ثانیه ⇐ ۵ms)، «گزارشِ تازه» ِ گوشی و `HomeKpis` بیرون از رشتهٔ صفحه (قابِ ۵٫۵ ثانیه ⇐ ~۱۳۰ms)،
+  پیشنهادِ خرید با خریدهای هر کالا (گدام ۱٫۱ ثانیه ⇐ ~۱۳۵ms پس‌زمینه)، رسیدها با نقشهٔ مشتری، «امروز» ِ خانه، تاریخِ یک‌باره،
+  `SupplierDebts`، شمارندهٔ عدد در برگ. Baseline Profile و `profileinstaller` برای اندروید (روی گوشی سنجیده نشد؛ R8 از پیش روشن).
+- **یافته:** سنجهٔ بی پنجره با `Dispatchers.Unconfined` (`ScreenRender`) با پلکانِ v3 بن‌بست می‌شود ⇒ `ScreenFrame` رشتهٔ جدا دارد؛
+  مسیرهای `VipGate` بی نشست برگهٔ قفل را نشان می‌دهند (سنجه با نشستِ ساختگی).
+- **خواستهٔ تازهٔ صاحب‌کار («هیچ انیمیشن یا چیزِ زنده‌ای تا کسی در آن بخش نرفته اجرا نشود»):** کمکِ یکتای `ui/v3/V3Live.kt`
+  (`rememberV3Live`، `v3LiveFloat`، `V3LiveEffect`، `rememberV3LiveClock`، `V3LiveSpinner`؛ ریشه‌ها `ProvideV3Foreground`)؛ ۷ انیمیشنِ
+  بی‌پایان، ۲۲ تیک/نظرسنجیِ صفحه، شمارنده و اسپینرِ کیت از همان راه؛ کارِ داده‌ایِ سراسری (`AppRoot`، `OrdersLive`، `PromoLive`،
+  `HeldSync`، ردگیریِ پیک، …) دست نخورد. آزمون: `V3LiveGateTest` (زیرِ برگه، زیرِ دروازه، پس‌زمینه، بیرون از قاب ⇒ صفر قاب)،
+  نگهبان: `V3LiveGuardTest`. مانده: ۱۲ اسپینرِ قدیمی (فهرستِ نگهبان) و `ui/v3/art/` (عاملِ ۶۵a همین کمک را صدا بزند).
+- **ادغامِ `batch-65` (072e2605b):** `PurchaseSuggest` (فصلِ PUR-03 ِ ۶۴x + خریدهای هر کالا)، `ExpensesScreen`/`SuppliersScreen`
+  (`V3Summary` ِ ۶۳w/۶۳b + شمارنده با `.value` درونِ همان ردیف)؛ سه نظرسنجیِ تازهٔ صفحه (`V3InboxAndroid`، `V3InboxPage`، شعبه‌ها) از
+  `V3LiveEffect`؛ اثرِ سه پروندهٔ داشبورد در `LookGuardTest` با «۶۳f: فقط سرعت؛ ظاهر همان» و عکسِ خانه پیش/پس بایت‌به‌بایت یکی.
+- **مانده:** گزارش‌ها هنوز ~۲٫۶ ثانیه پس‌زمینه (JSON ِ کلِ دفتر و بازپخشِ هسته)، گدام و تاریخچه ~۱۳۵ms پس‌زمینه، خانه ~۹۴ms روی JVM ِ
+  پربار — هر چهار در «مانده» ِ `PERFORMANCE-fa.md`. پروندهٔ قرض‌دار و برگه‌هایش (۶۳u) فقط از لایهٔ داده تند شدند.
 ### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-65q زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-65q` (از `origin/claude/batch-65` 66dd6f6fc) — قرض‌داران به مدلِ پیشین برگشتند
 
 - **خواستِ صاحب‌کار** (عکسِ ظاهرِ ۶۳q را رد کرد: «همون مربع‌ها بهتر بود و اون برد یا رسید که سبز و سرخ بود هم خوب بود؛ مدلِ قرض‌دارانِ قدیم رو بده»):

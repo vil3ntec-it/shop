@@ -33,6 +33,10 @@ object StrPurchases {
   val credit: String get() = t("نسیه", "On credit", "پور")
   fun creditDue(day: Any): String = t("نسیه — سررسید ${asIs(day)}", "On credit — due $day", "پور — نېټه $day")
   fun overdue(amount: Any): String = t("سررسید گذشته — ${asIs(amount)} ؋ مانده", "Overdue — $amount ؋ left", "نېټه تېره — $amount ؋ پاتې")
+  /** خطِ مبلغِ ردیف (۶۸c، کوتاه و یک‌خطی): «سررسید گذشته» — مانده کنارش جدا می‌آید */
+  val overdueRow: String get() = t("سررسید گذشته", "Overdue", "نېټه تېره")
+  /** خطِ مبلغِ ردیف (۶۸c، کوتاه و یک‌خطی): «سررسید ۴ قوس» — نسیه خودش از سررسید پیداست */
+  fun dueOn(day: Any): String = t("سررسید ${asIs(day)}", "Due $day", "نېټه $day")
   val returned: String get() = t("برگشت", "Returned", "بېرته")
 
   /* ── حالِ رسیدن ── */

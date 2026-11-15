@@ -222,11 +222,13 @@ internal fun ReturnStartSheet(actions: HistoryActions, onClose: () -> Unit) {
 
 /** «↩ برگشت شد: ۱۰۰ ؋» زیرِ ردیفِ فاکتورِ برگشت‌خورده — سرخ با آیکن، نه رنگِ تنها */
 @Composable
-internal fun RefundLine(text: String) {
-  val tone = historyTone(PhoneV3.colors, MoneyKind.RETURN)
+internal fun RefundLine(text: String, quiet: Boolean = false) {
+  //  [quiet] (ردیفِ فاکتور، ۶۸c): واژه و آیکنِ آرامِ کم‌رنگ — تنها نشانِ رنگیِ ردیف واژهٔ پرداخت است؛ معنا (`moneyKind`) همان
+  val c = PhoneV3.colors
+  val ink = if (quiet) c.inkMuted else historyTone(c, MoneyKind.RETURN).fg
   Row(Modifier.padding(top = 2.dp).semantics(mergeDescendants = true) { moneyKind = MoneyKind.RETURN }, verticalAlignment = Alignment.CenterVertically) {
-    Icon(Icons.AutoMirrored.Outlined.AssignmentReturn, contentDescription = null, tint = tone.fg, modifier = Modifier.size(14.dp))
+    Icon(Icons.AutoMirrored.Outlined.AssignmentReturn, contentDescription = null, tint = ink, modifier = Modifier.size(14.dp))
     Spacer(Modifier.width(4.dp))
-    Text(text, style = V3Type.footnote, color = tone.fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Text(text, style = V3Type.footnote, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
   }
 }

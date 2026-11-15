@@ -1,5 +1,6 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import java.util.Properties
+import java.util.concurrent.TimeUnit
 import org.gradle.api.tasks.testing.TestDescriptor
 import org.gradle.api.tasks.testing.TestListener
 import org.gradle.api.tasks.testing.TestResult
@@ -327,6 +328,10 @@ compose.desktop {
   application {
     mainClass = "ir.vil3ntec.tohid.desktop.MainKt"
     jvmArgs += listOf("-Dfile.encoding=UTF-8", "-Dsun.jnu.encoding=UTF-8")
+    //  PERF-DESK: رشته‌های تکراریِ دفتر (تاریخ، نامِ کالا در هر قلم، وضعیت، واحد…) یک نسخه در حافظه — دفترِ ۵۰ هزار فاکتوری
+    //  ۱۸۲ ⇒ ۱۲۶ مگ heap (سنجیده، `docs/PERFORMANCE-fa.md`)؛ کارِ G1 (GC ِ پیش‌فرض) در رشتهٔ پس‌زمینهٔ خودش، نه در مکثِ GC.
+    //  heap و GC همان پیش‌فرضِ JVM (G1، یک‌چهارمِ حافظهٔ کامپیوتر).
+    jvmArgs += listOf("-XX:+UseStringDeduplication")
     nativeDistributions {
       //  نصابِ ویندوز Inno Setup است (‎installer/Tohid.iss‎ روی `createDistributable`)؛
       //  Msi فقط برای نسخه‌های قدیمی که خودشان را از MSI به‌روز می‌کنند
@@ -376,6 +381,51 @@ tasks.register("printVersionName") {
 }
 
 /**
+ *  PERF-DESK: نقشهٔ CDS ِ کلاس‌های JDK برای JVM ِ همراهِ برنامه — بی آن هر بار که برنامه باز می‌شود هزاران کلاسِ JDK
+ *  (AWT، Swing، شبکه…) از نو خوانده، بررسی و ساخته می‌شوند.
+ *
+ *  JDK ِ کامل این نقشه را دارد (`lib/server/classes.jsa`) ولی runtime ای که jlink ِ پلاگینِ Compose می‌سازد ندارد
+ *  (`--generate-cds-archive` را نمی‌دهد)، پس برنامهٔ نصب‌شده تا امروز بی CDS بالا می‌آمد. این‌جا در پایانِ
+ *  `createDistributable` همان لانچرِ برنامه یک بار با `-Xshare:dump` اجرا می‌شود: JVM ِ **همان runtime** نقشه را از
+ *  فهرستِ کلاس‌های خودش (`lib/classlist`) می‌سازد و پیش از `main` بیرون می‌رود (برنامه اجرا نمی‌شود). نصابِ Inno
+ *  (`installer/Tohid.iss`) همین پوشه را برمی‌دارد.
+ *
+ *  ایمن در هر شکست: نقشه ساخته نشد ⇒ هشدار و همان پوشهٔ دیروز (برنامه مثلِ پیش بی CDS باز می‌شود)؛ نقشهٔ ناجور با JVM
+ *  (نسخهٔ دیگر) را JVM خودش کنار می‌گذارد (`-Xshare:auto` ِ پیش‌فرض). فقط ویندوز و لینوکس: بستهٔ مک امضا/notarize
+ *  می‌شود و فایلِ افزوده پس از ساختنِ بسته امضا را می‌شکند. سنجه: `docs/PERFORMANCE-fa.md` (PERF-DESK).
+ */
+//  گامِ آخرِ خودِ `createDistributable` (نه کارِ جدا): هر کاری که پوشهٔ برنامه را برمی‌دارد (نصابِ Inno، dmg، deb) نقشه را هم می‌بیند
+tasks.matching { it.name == "createDistributable" }.configureEach {
+  val os = System.getProperty("os.name").orEmpty().lowercase()
+  val windows = os.startsWith("windows")
+  val wanted = windows || os.startsWith("linux")
+  val appDir = layout.buildDirectory.dir("compose/binaries/main/app/Tohid")
+  val logFile = layout.buildDirectory.file("cds-dump.log")
+  doLast {
+    if (!wanted) return@doLast
+    val root = appDir.get().asFile
+    val launcher = if (windows) root.resolve("Tohid.exe") else root.resolve("bin/Tohid")
+    //  جای نقشه کنارِ کتابخانهٔ JVM است (ویندوز `runtime/bin/server`، لینوکس `lib/runtime/lib/server`) — پیدا می‌شود، فرض نمی‌شود
+    fun archives() = root.walkTopDown().filter { it.isFile && it.name == "classes.jsa" }.toList()
+    if (!launcher.isFile) { logger.warn("cdsArchive: لانچر نیست ($launcher) — بی CDS"); return@doLast }
+    archives().forEach { it.setWritable(true); it.delete() }
+    val pb = ProcessBuilder(launcher.absolutePath).redirectErrorStream(true).redirectOutput(logFile.get().asFile)
+    //  فقط همین گزینه (JVM ِ برنامه آن را مثلِ هر JAVA_TOOL_OPTIONS می‌خواند)؛ گزینه‌های پروکسیِ ماشینِ ساخت نه
+    pb.environment()["JAVA_TOOL_OPTIONS"] = "-Xshare:dump"
+    val p = pb.start()
+    val done = p.waitFor(180, TimeUnit.SECONDS)
+    if (!done) p.destroyForcibly()
+    val made = archives()
+    if (made.isNotEmpty()) {
+      //  JVM نقشه را فقط‌خواندنی می‌نویسد؛ نصاب و به‌روزرسانیِ بعدی باید بتوانند رویش بنویسند
+      made.forEach { it.setWritable(true); logger.lifecycle("cdsArchive: ${it.length() / 1_048_576} MB ⇒ $it") }
+    } else {
+      logger.warn("cdsArchive: نقشه ساخته نشد (${if (done) "exit ${p.exitValue()}" else "۱۸۰ ثانیه گذشت"}؛ ${logFile.get().asFile}) — برنامه مثلِ پیش بی CDS باز می‌شود")
+    }
+  }
+}
+
+/**
  *  همهٔ وابستگی‌ها را پایین می‌آورد — CI پیش از ساخت صدایش می‌زند تا
  *  بستهٔ «ساختِ آفلاین» (`androidx.*` از مخزنِ گوگل) کامل باشد، حتی اگر
  *  کامپایل جایی بشکند.
@@ -397,6 +447,10 @@ tasks.test {
   //  پوشهٔ دادهٔ جدا — آزمون هرگز به دادهٔ واقعیِ کامپیوتر دست نمی‌زند
   environment("TOHID_DATA_DIR", layout.buildDirectory.dir("test-data").get().asFile.absolutePath)
   jvmArgs("-Djava.awt.headless=true", "-Dfile.encoding=UTF-8", "-Dsun.jnu.encoding=UTF-8")
+  //  heap ِ آزمون: پیش‌فرضِ Gradle ۵۱۲ مگ است و جدول‌های یک‌خانه‌ایِ سرعت (DebtRows، ProductIndexes، SearchIndex،
+  //  DeskAlerts، …) هر کدام آخرین دفترِ بزرگِ آزمونی را نگه می‌دارند؛ در اجرای کاملِ CI، `ScreenSpeedBenchTest` در جمع‌آوریِ
+  //  زباله گیر کرد («خانه» ۷۲–۸۱ ms، تنها ۳۸ ms) — #1056. ۱٫۵ گیگ؛ سنجه‌های دستیِ دفترِ بزرگ همان متغیرِ خودشان.
+  maxHeapSize = "1536m"
   //  PERF-LEDGER: سنجهٔ دستیِ دفترِ بزرگ (`BigLedgerBenchTest`، `docs/PERF-LEDGER-fa.md`) — فقط وقتی خواسته شود
   System.getenv("TOHID_BIG_LEDGER_HEAP")?.takeIf { it.isNotBlank() }?.let { maxHeapSize = it }
   System.getenv("TOHID_BIG_LEDGER")?.takeIf { it.isNotBlank() }?.let { environment("TOHID_BIG_LEDGER", it); outputs.upToDateWhen { false } }

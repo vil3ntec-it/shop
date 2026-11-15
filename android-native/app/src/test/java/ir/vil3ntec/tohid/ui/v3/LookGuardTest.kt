@@ -89,7 +89,7 @@ class LookGuardTest {
     //  ۶۳k (خواستهٔ صاحب‌کار «هشدارِ انقضا»): فقط ورودیِ کاشیِ هشدار — «منقضی‌شده» جدا از «نزدیکِ انقضا» با نامِ کالا؛ ظاهرِ خانه همان
     "ui/v3/shell/HomeView.kt" to "070fca810e6224ce",
     "ui/v3/shell/DeskHome.kt" to "4b21911118a57c2c",
-    "ui/v3/shell/DashboardNumbers.kt" to "6c026a3633404708", // ۶۳f: فقط سرعت؛ ظاهر همان
+    "ui/v3/shell/DashboardNumbers.kt" to "188a6e3f6c31869c", // ۶۳f و #1056: فقط سرعت (یک‌خانه‌ایِ همان دفتر و روز)؛ ظاهر همان
     "ui/v3/shell/HeroMoney.kt" to "b543739c866c10d4",
     "ui/v3/shell/HeroMoneySheet.kt" to "74e98770e7221dce",
     "ui/v3/V3HeroCard.kt" to "95171b224dfd0333",

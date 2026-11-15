@@ -55,6 +55,58 @@ object DashboardEngine {
     val alertCount: Int get() = outOfStock.size + lowStock.size + expiring.size + debtOverdue.size
   }
 
+  /**
+   *  PERF-DESK: فقط چهار هشدارِ [Board] — سربرگ و منوی کناریِ کامپیوتر جز همین‌ها چیزی از تخته نمی‌خوانند و پیش‌تر هر دو با
+   *  هر عوض شدنِ دفتر کلِ تخته (فروشِ بازه، سود، نمودار، پرفروش‌ها، دسته‌ها…) را روی رشتهٔ صفحه از نو می‌ساختند.
+   *  همان فرمول‌ها، همان ترتیب و همان ردیف‌ها ([board] هم همین تابع‌ها را صدا می‌زند؛ آزمونِ هم‌ارزی `DeskShellEquivalenceTest`).
+   */
+  data class Alerts(
+    val outOfStock: List<StockAlert>,
+    val lowStock: List<StockAlert>,
+    val expiring: List<ExpiryEngine.Lot>,
+    val debtOverdue: List<DebtLine>,
+  ) {
+    val alertCount: Int get() = outOfStock.size + lowStock.size + expiring.size + debtOverdue.size
+
+    companion object {
+      val NONE = Alerts(emptyList(), emptyList(), emptyList(), emptyList())
+    }
+  }
+
+  fun alerts(d: ShopData, today: String, days: Int, now: Long): Alerts {
+    val t = day(today) ?: 0L
+    val from = t - days + 1
+    val index = ShopStore.index(d)
+    val stockOf = d.products.associate { it.id to index.stock(it.id) }
+    val active = d.products.filter { it.active }
+    val txByDebtor = DebtRows.of(d)
+    //  همان `debtLines` ِ [board]، فقط برای کسی که بدهی دارد (بقیه هرگز در «دیرکرده» نیستند): همان مانده، همان روزها، همان تغییر
+    val overdue = d.debtors.mapNotNull { db ->
+      val txs = txByDebtor[db.id].orEmpty()
+      val balance = DebtMinorFlag.balance(txs)
+      if (balance <= 0.5) return@mapNotNull null
+      val days = DebtorEngine.debtDays(d, db.id, now)
+      if ((days ?: 0) <= 60) return@mapNotNull null
+      DebtLine(db, balance, changeIn(txs, from, t), days)
+    }.sortedByDescending { it.days ?: 0 }
+    return Alerts(outOf(active, stockOf), lowOf(active, stockOf), expiringOf(d, today), overdue)
+  }
+
+  //  PRD-09: کالای خدماتی هرگز «ناموجود» نیست
+  private fun outOf(active: List<Product>, stockOf: Map<String, Double>): List<StockAlert> =
+    active.filter { it.stockless != true && (stockOf[it.id] ?: 0.0) <= 0.0 }.map { StockAlert(it, stockOf[it.id] ?: 0.0) }
+
+  private fun lowOf(active: List<Product>, stockOf: Map<String, Double>): List<StockAlert> =
+    active.filter { val s = stockOf[it.id] ?: 0.0; s > 0.0 && it.minStock > 0 && s <= it.minStock }
+      .map { StockAlert(it, stockOf[it.id] ?: 0.0) }.sortedBy { it.stock / max(1.0, it.product.minStock) }
+
+  private fun expiringOf(d: ShopData, today: String): List<ExpiryEngine.Lot> =
+    runCatching { ExpiryEngine.alerts(d, today) }.getOrDefault(emptyList())
+
+  /** همان جمعِ `ShopStore.debt` روی ردیف‌های همین بازه (`DebtMinorFlag`) */
+  private fun changeIn(txs: List<DebtTransaction>, from: Long, t: Long): Double =
+    DebtMinorFlag.balance(txs.filter { day(it.date)?.let { x -> x in from..t } == true })
+
   private fun day(iso: String): Long? = runCatching { ExpiryEngine.epochDay(iso) }.getOrNull()
 
   fun board(d: ShopData, today: String, days: Int, now: Long = System.currentTimeMillis()): Board {
@@ -96,15 +148,13 @@ object DashboardEngine {
     val index = ShopStore.index(d)
     val stockOf = d.products.associate { it.id to index.stock(it.id) }
     val active = d.products.filter { it.active }
-    //  PRD-09: کالای خدماتی هرگز «ناموجود» نیست
-    val out = active.filter { it.stockless != true && (stockOf[it.id] ?: 0.0) <= 0.0 }.map { StockAlert(it, stockOf[it.id] ?: 0.0) }
-    val low = active.filter { val s = stockOf[it.id] ?: 0.0; s > 0.0 && it.minStock > 0 && s <= it.minStock }
-      .map { StockAlert(it, stockOf[it.id] ?: 0.0) }.sortedBy { it.stock / max(1.0, it.product.minStock) }
+    val out = outOf(active, stockOf)
+    val low = lowOf(active, stockOf)
     val unsold = active.filter { (stockOf[it.id] ?: 0.0) > 0.0 && it.id !in sold.keys }
       .map { StockAlert(it, stockOf[it.id] ?: 0.0) }
       .sortedByDescending { it.stock * it.product.purchasePrice }
 
-    val expiring = runCatching { ExpiryEngine.alerts(d, today) }.getOrDefault(emptyList())
+    val expiring = expiringOf(d, today)
 
     //  قرض‌داران — تغییرِ بدهی در همین بازه
     val txByDebtor = DebtRows.of(d)  // CRM-10: کلیدِ ماندگار
@@ -112,7 +162,7 @@ object DashboardEngine {
       val txs = txByDebtor[db.id].orEmpty()
       //  همان جمعِ `ShopStore.debt` (`DebtMinorFlag`: با `shop.debt_minor` به پول، خاموش همان Double)
       val balance = DebtMinorFlag.balance(txs)
-      val change = DebtMinorFlag.balance(txs.filter { day(it.date)?.let { x -> x in from..t } == true })
+      val change = changeIn(txs, from, t)
       DebtLine(db, balance, change, DebtorEngine.debtDays(d, db.id, now))
     }
     val receivables = debtLines.sumOf { it.balance.coerceAtLeast(0.0) }

@@ -62,6 +62,9 @@ object ReportsModel {
     ReportEngine.Range.JMONTH, ReportEngine.Range.JYEAR, ReportEngine.Range.ALL,
   )
 
+  /** ۶۵s: زبانه‌هایی که کارتِ خلاصهٔ خودشان کادرِ کشوییِ بازه را در گوشه دارند (ردیفِ بازهٔ بالای فهرست ندارند) */
+  val OWN_SUMMARY: Set<ReportPage> = setOf(ReportTab.PROFIT, ReportTab.PURCHASES)
+
   fun tabs(canSeeMoney: Boolean): List<ReportTab> = ReportTab.entries.filter { canSeeMoney || !it.money }
 
   /** زبانه‌های پایه و سپس اختیاری‌های روشن (پولی فقط با `canSeeMoney`) */

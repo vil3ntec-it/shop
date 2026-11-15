@@ -138,7 +138,7 @@ internal fun PurchaseDetailScreen(v: PurchaseViews.View?, today: String, actions
             text.title,
             subtitle = listOfNotNull(formatDate(v.date), v.orderNo?.takeIf { !v.isOrder }?.let(StrPurchases::fromOrder)).joinToString(" · "),
             leading = { LetterAvatar(v.supplierName, V3Modules.hueOf("purchasing")) },
-            below = { V3AmountStatus(text.amount, text.pay, align = TextAlign.Start, second = text.receipt) },
+            below = { V3AmountStatus(text.amount, text.pay, align = TextAlign.Start, second = text.receipt, maxLines = 2) },
             onClick = { actions.onSupplier(v.supplierId) },
           )
         }

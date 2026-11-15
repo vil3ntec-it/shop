@@ -67,23 +67,26 @@ object V3Modules {
   }
 
   /**
-   *  رنگِ همراهِ ثابتِ هر بخش (THEME-V2) — یک جا، تا میان‌برهای خانه، «بیشتر» و هر فهرستِ دیگری
-   *  همان رنگ را نشان دهند: فروش آبی، دریافت نعنایی، ورودِ کالا کهربایی، تاریخچه بنفش، مشتری‌ها مرجانی،
-   *  مصارف صورتی، گزارش آسمانی. بخشی که این‌جا نیست رنگِ ثبت‌شدهٔ خودش (`ModuleEntry.hue`) را دارد.
+   *  رنگِ همراهِ ثابتِ هر بخش (THEME-V2 ⇐ پالتِ لوکسِ ۶۸c) — یک جا، تا میان‌برهای خانه، «بیشتر» و هر فهرستِ دیگری
+   *  همان رنگ را نشان دهند و کارتِ خلاصهٔ هر بخش (`V3Section`) هم همین خانواده باشد: فروش برند، دریافت زمردی، ورودِ کالا زر،
+   *  انبار گرافیت، تاریخچه نیلی، قرض‌داران عقیقِ سرخ، مشتری‌ها لاجوردی، مصارف زر، گزارش لاجوردی، خرید و سفارشِ آنلاین نفتی،
+   *  تخفیف زر. بخشی که این‌جا نیست رنگِ ثبت‌شدهٔ خودش (`ModuleEntry.hue`) را دارد.
    */
   val HUE_BY_ID: Map<String, ir.vil3ntec.tohid.ui.v3.V3Hue> = mapOf(
     "sale" to ir.vil3ntec.tohid.ui.v3.V3Hue.BRAND,
     "scan" to ir.vil3ntec.tohid.ui.v3.V3Hue.BRAND,
     "receipts" to ir.vil3ntec.tohid.ui.v3.V3Hue.MINT,
-    "warehouse" to ir.vil3ntec.tohid.ui.v3.V3Hue.AMBER,
+    "warehouse" to ir.vil3ntec.tohid.ui.v3.V3Hue.SLATE,
     "stock-entry" to ir.vil3ntec.tohid.ui.v3.V3Hue.AMBER,
     "sales" to ir.vil3ntec.tohid.ui.v3.V3Hue.VIOLET,
     "history" to ir.vil3ntec.tohid.ui.v3.V3Hue.VIOLET,
     "debtors" to ir.vil3ntec.tohid.ui.v3.V3Hue.CORAL,
-    "customers" to ir.vil3ntec.tohid.ui.v3.V3Hue.CORAL,
-    "expenses" to ir.vil3ntec.tohid.ui.v3.V3Hue.PINK,
+    "customers" to ir.vil3ntec.tohid.ui.v3.V3Hue.SKY,
+    "expenses" to ir.vil3ntec.tohid.ui.v3.V3Hue.AMBER,
     "reports" to ir.vil3ntec.tohid.ui.v3.V3Hue.SKY,
-    "purchasing" to ir.vil3ntec.tohid.ui.v3.V3Hue.LIME,
+    "purchasing" to ir.vil3ntec.tohid.ui.v3.V3Hue.TEAL,
+    "orders" to ir.vil3ntec.tohid.ui.v3.V3Hue.TEAL,
+    "promos" to ir.vil3ntec.tohid.ui.v3.V3Hue.AMBER,
   )
 
   fun hueOf(e: ModuleEntry): ir.vil3ntec.tohid.ui.v3.V3Hue? = HUE_BY_ID[e.id] ?: e.hue

@@ -7,7 +7,6 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,8 +21,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.AbsoluteAlignment
@@ -42,6 +41,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -52,9 +52,11 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Colors
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
-import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.V3Springs
+import ir.vil3ntec.tohid.ui.v3.V3SummaryFrame
+import ir.vil3ntec.tohid.ui.v3.summaryColors
+import ir.vil3ntec.tohid.ui.theme.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.rememberCountUp
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
@@ -123,17 +125,37 @@ internal fun Legend(items: List<Pair<Color, String>>, modifier: Modifier = Modif
 
 /**
  *  کارتِ عددِ اصلی (hero): برچسب، عددِ درشتِ شمارنده و زیرنویس. `negative` ⇒ رنگِ ضرر —
- *  برچسب هم خودش «ضرر» است، رنگ تنها نیست.
+ *  برچسب هم خودش «ضرر» است، رنگ تنها نیست. ۶۵s: همان قابِ خلاصه (`V3SummaryFrame`) — وسط‌چین و با [collapseKey] تاشو.
  */
 @Composable
-internal fun HeroFigure(label: String, value: Double, caption: String?, negative: Boolean = false, format: (Double) -> String = ::afn) {
+internal fun HeroFigure(
+  label: String,
+  value: Double,
+  caption: String?,
+  negative: Boolean = false,
+  format: (Double) -> String = ::afn,
+  collapseKey: String? = null,
+  /** ۶۵s: رنگِ بخش (گزارش ⇒ نیلی)، کادرِ کشوییِ بازه در گوشه و «از … تا …» زیرِ زیرنویس */
+  section: V3Section? = V3Section.REPORTS,
+  corner: (@Composable () -> Unit)? = null,
+  note: String? = null,
+) {
   val c = PhoneV3.colors
+  val sc = summaryColors(section)
   val shown = rememberCountUp(value)
-  V3Card(padding = PaddingValues(horizontal = 18.dp, vertical = 16.dp)) {
-    Text(label, style = V3Type.subhead, color = if (negative) PhoneV3Roles.errorText(c) else c.inkMuted)
-    Spacer(Modifier.height(4.dp))
-    Text(format(shown), style = V3Type.largeTitle, color = if (negative) c.negative else c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    if (caption != null) Text(caption, style = V3Type.footnote, color = c.inkMuted)
+  val labelColor = if (negative) PhoneV3Roles.errorText(c) else null
+  val valueColor = if (negative) c.negative else null
+  V3SummaryFrame(label, format(value), collapseKey = collapseKey, labelColor = labelColor, valueColor = valueColor, section = section, corner = corner) {
+    Text(
+      format(shown),
+      style = V3Type.largeTitle,
+      color = valueColor ?: sc.strong,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+      textAlign = TextAlign.Center,
+    )
+    if (caption != null) Text(caption, style = V3Type.footnote, color = sc.label, textAlign = TextAlign.Center)
+    if (note != null) Text(note, style = V3Type.footnote, color = sc.label, textAlign = TextAlign.Center)
   }
 }
 

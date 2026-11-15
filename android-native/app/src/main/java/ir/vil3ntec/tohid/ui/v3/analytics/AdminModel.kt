@@ -45,7 +45,16 @@ sealed interface AdminMembers {
 
 /** حالتِ خالصِ مرکزِ مدیریت، با آزمون (`AdminModelTest`) */
 object AdminModel {
-  fun numbers(d: ShopData, today: String, now: Long): AdminNumbers {
+  fun numbers(d: ShopData, today: String, now: Long): AdminNumbers = numbers(d, today, now, stockValueOf(d))
+
+  /**
+   *  PERF-DESK: «ارزش موجودی» (بازپخشِ میانگینِ موزونِ هستهٔ گزارش روی کلِ دفتر — با ۵۰ هزار فاکتور ~۱٫۵ ثانیه) جدا، تا
+   *  صفحه آن را بیرون از رشتهٔ صفحه بسازد؛ همان عدد.
+   */
+  fun stockValueOf(d: ShopData): Double = ReportEngine.stockValue(d).valuation.costMinor / 100.0
+
+  /** همان [numbers] با ارزشِ موجودیِ از پیش ساخته ([stockValueOf]) */
+  fun numbers(d: ShopData, today: String, now: Long, stockValue: Double): AdminNumbers {
     val monthFrom = today.take(7) + "-01"
     val todayR = ReportEngine.sales(d, today, today)
     val monthR = ReportEngine.sales(d, monthFrom, today)
@@ -58,7 +67,7 @@ object AdminModel {
       monthCount = monthR.count,
       monthProfit = monthR.netProfit,
       //  ۳-۱۶ (۲): همان «ارزش موجودی» ِ گزارش‌ها (میانگینِ موزونِ D-23)، نه جمعِ ورودی‌های انبار
-      stockValue = ReportEngine.stockValue(d).valuation.costMinor / 100.0,
+      stockValue = stockValue,
       stockProducts = stock.products,
       owed = d.debtors.sumOf { ShopStore.debt(d, it.id).coerceAtLeast(0.0) },
       owingPeople = d.debtors.count { ShopStore.debt(d, it.id) > 0 },

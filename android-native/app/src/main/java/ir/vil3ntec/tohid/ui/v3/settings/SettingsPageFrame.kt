@@ -19,7 +19,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -71,9 +70,8 @@ internal fun SettingsPageFrame(
     LocalV3RowLook provides V3RowLook.NAV,
     LocalV3RowHue provides pageHue,
   ) {
-    //  سربرگِ `V3Scaffold` کنارِ عنوان دو جای دکمه نگه می‌دارد (۱۰۴ از هر سو): عنوانی که آن‌جا جا نشود یک بار کامل زیرِ سربرگ
-    //  هم می‌آید (هم‌اندازهٔ عنوانِ ردیف، وسط، تا دو خط) — نه عنوانِ درشت در بدنه، نه نامِ بریده‌ای که صاحب‌کار نتواند بخواند
-    val fits = !largeTitle && rememberBarTitleFits(title)
+    //  ۶۵s: عنوان **فقط** در سربرگ است (یک منبع، هرگز دوبار): سربرگِ `V3Scaffold` جای عنوان را از شمارِ واقعیِ دکمه‌ها می‌سنجد و
+    //  کارِ اضافه را به «…» می‌برد تا عنوان کامل وسط جا شود (`V3HeaderActions.visibleFor`، `V3HeaderBar`)
     V3Scaffold(title = title, subtitle = subtitle.takeIf { largeTitle }, onBack = onBack, actions = actions, largeTitle = largeTitle, bottomBar = bottomBar, search = search) { pad ->
       Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         LazyColumn(
@@ -83,7 +81,7 @@ internal fun SettingsPageFrame(
         ) {
           val list = StaggeredList(this, stagger)
           //  عنوان در سربرگ است (نه درشت در بدنه)؛ زیرعنوانِ صفحه («روشن»، «آخرین پشتیبان …») یک خطِ کم‌رنگِ وسط زیرِ آن
-          if (!largeTitle && (!fits || subtitle != null)) list.item(key = "settings-subtitle") { SettingsSubtitle(title.takeIf { !fits }, subtitle) }
+          if (!largeTitle && subtitle != null) list.item(key = "settings-subtitle") { SettingsSubtitle(subtitle) }
           if (whatKey != null && SettingsHelp.example(whatKey) != null) list.item(key = "settings-what") { SettingsWhatCard(whatKey) }
           list.content()
         }
@@ -125,37 +123,14 @@ internal fun SettingsWhatCard(key: String, modifier: Modifier = Modifier) {
 @Composable
 internal fun SettingsRowLook(key: String, content: @Composable () -> Unit) = V3NavRows(SettingsHues.of(key), content)
 
-/** زیرِ سربرگ، وسط: نامِ کاملِ صفحه وقتی در سربرگ جا نشد ([title]، همان اندازهٔ عنوانِ ردیف) و زیرعنوانِ کم‌رنگ («روشن»، «آخرین پشتیبان…») */
+/** زیرِ سربرگ، وسط: زیرعنوانِ کم‌رنگ («روشن»، «آخرین پشتیبان…»)؛ نامِ صفحه فقط در سربرگ است (۶۵s، بی تکرار) */
 @Composable
-private fun SettingsSubtitle(title: String?, subtitle: String?) {
-  val c = PhoneV3.colors
-  Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-    if (title != null) {
-      Text(
-        title, style = V3Type.rowTitle, color = c.ink, textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 2,
-        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-      )
-    }
-    if (subtitle != null) {
-      Text(
-        subtitle, style = V3Type.rowHelp, color = c.inkMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 2,
-        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-      )
-    }
-  }
-}
-
-/** جای عنوانِ سربرگِ `V3Scaffold`: پهنای قاب − دو کناره (۱۶) − دو جای دکمه (۱۰۴)؛ همان نوشتهٔ `V3Type.headline` */
-@Composable
-private fun rememberBarTitleFits(title: String): Boolean {
-  val measurer = androidx.compose.ui.text.rememberTextMeasurer()
-  val style = V3Type.headline
-  val density = androidx.compose.ui.platform.LocalDensity.current
-  val width = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp
-  return remember(title, style, width, density) {
-    val room = with(density) { (minOf(width, 720.dp) - 32.dp - 208.dp).toPx() }
-    room > 0 && measurer.measure(title, style, maxLines = 1).size.width <= room
-  }
+private fun SettingsSubtitle(subtitle: String) {
+  Text(
+    subtitle, style = V3Type.rowHelp, color = PhoneV3.colors.inkMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 2,
+    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp),
+  )
 }
 
 /** بندِ توضیح زیر یا میانِ کارت‌ها — خاکستری و کوتاه، همان اندازهٔ خطِ راهنمای ردیف (۱۳، ۶۵r) */

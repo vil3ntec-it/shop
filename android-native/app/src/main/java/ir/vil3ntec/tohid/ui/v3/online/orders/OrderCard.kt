@@ -9,34 +9,26 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Payments
-import androidx.compose.material.icons.outlined.RadioButtonUnchecked
-import androidx.compose.material3.Icon
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.TwoWheeler
-import androidx.compose.material.icons.outlined.WarningAmber
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
@@ -47,21 +39,24 @@ import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.screens.MotionTokens
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
-import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
+import ir.vil3ntec.tohid.ui.theme.V3Section
 import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.theme.V3Tone
-import ir.vil3ntec.tohid.ui.v3.V3Button
-import ir.vil3ntec.tohid.ui.v3.V3Type
+import ir.vil3ntec.tohid.ui.v3.V3DataRow
+import ir.vil3ntec.tohid.ui.v3.V3RowAction
+import ir.vil3ntec.tohid.ui.v3.V3RowMeta
+import ir.vil3ntec.tohid.ui.v3.V3RowStatus
+import ir.vil3ntec.tohid.ui.v3.V3RowTone
 import ir.vil3ntec.tohid.ui.v3.online.DraftTag
-import ir.vil3ntec.tohid.ui.v3.online.status.OrderStatusPill
-import ir.vil3ntec.tohid.ui.v3.v3Pressable
+import ir.vil3ntec.tohid.ui.v3.online.status.OnlineStatus
 
 /**
- *  کارتِ سفارش در صف (online.md): «#۱۰۴۲» و قرصِ وضعیت، مشتری با شمارهٔ پوشیده و
- *  منبع، برچسب‌های ارسال/حضوری، زمان‌دار، شمارِ اقلام، پرداخت و «آزمایشی»، و پایینِ
- *  کارت جمعِ کل با دکمهٔ گامِ بعدی. سفارشِ تازه‌رسیده (`flash`) یک بار به رنگِ «در انتظارِ تأیید» می‌درخشد.
+ *  کارتِ سفارش در صف (online.md) — ۶۸c: همان کالبدِ آرامِ ردیفِ داده (`V3DataRow`، صاحب‌کار: «این شلوغی‌ها … دقیق و منظم»):
+ *  کاشیِ کره و واژهٔ «آنلاین» (سفارشِ آنلاین، جدا از فروشِ صندوق)، «#۱۰۴۲ · مریم احمدی»، خطِ دومِ آرامِ «آنلاین · ۶ دقیقه پیش
+ *  · ۳ قلم»، و خطِ مبلغِ «۱٬۴۵۰ افغانی • جدید» — وضعیت واژهٔ آرام، نه قرصِ رنگی؛ تنها نشانِ رنگی هشدارِ کارخواه (سابقهٔ مشتری
+ *  RSK-03، بازبینیِ موجودی O-06). یک قرصِ خنثیِ گامِ بعدی؛ روش، پرداخت، اقلام، شمارهٔ پوشیده و همهٔ نشان‌ها در سرِ جزئیات
+ *  ([OrderTags]). سفارشِ تازه‌رسیده (`flash`) یک بار به رنگِ «در انتظارِ تأیید» می‌درخشد.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun OrderCard(
   o: OrderDto,
@@ -72,7 +67,7 @@ fun OrderCard(
   modifier: Modifier = Modifier,
   selected: Boolean = false,
   flash: Boolean = false,
-  /** حالتِ انتخابِ چندتایی (ORD-19): null ⇒ نیست؛ وگرنه نشانِ تیک کنارِ شماره، نه فقط رنگِ مرز */
+  /** حالتِ انتخابِ چندتایی (ORD-19): null ⇒ نیست؛ وگرنه نشانِ تیک در آغازِ ردیف، نه فقط رنگِ مرز */
   checked: Boolean? = null,
   /** RSK-03 «کارت در صف»: نخستین هشدارِ سابقهٔ این مشتری (`OrderRisk.cardFlags`)؛ null ⇒ بی نشان */
   risk: String? = null,
@@ -86,91 +81,74 @@ fun OrderCard(
     else glow.snapTo(edge)
   }
   val shape = RoundedCornerShape(PhoneV3.groupRadius)
-  val picked = checked
   val open = selected
+  val lang = ir.vil3ntec.tohid.core.i18n.I18n.lang
+  val secondary = remember(o, now, lang) { OrderCardText.secondary(o, now) }
+  val meta = remember(o, risk, lang) { OrderCardText.meta(o, risk) }
   Column(
     modifier
       .fillMaxWidth()
-      .v3Pressable(label = StrOnline.orderTitle(o.orderNo), onClick = onOpen)
-      //  تیک و مرزِ رنگی برای صفحه‌خوان هم: «انتخاب‌شده» (در حالتِ چندتایی هر کارت، وگرنه فقط کارتِ بازِ کنار)
-      .semantics {
-        if (picked != null) this.selected = picked
-        else if (open) this.selected = true
-      }
+      //  کارتِ بازِ کنار (کامپیوتر) برای صفحه‌خوان هم «انتخاب‌شده»؛ در حالتِ چندتایی تیکِ خودِ ردیف
+      .semantics { if (checked == null && open) this.selected = true }
       .clip(shape)
       .background(c.card)
-      .border(if (selected || flash) 2.dp else 1.dp, glow.value, shape)
-      .padding(16.dp),
+      .border(if (selected || flash) 2.dp else 1.dp, glow.value, shape),
   ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      if (checked != null) {
-        Icon(
-          if (checked) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked, contentDescription = null,
-          tint = if (checked) PhoneV3Roles.focus(c) else c.inkMuted,
-        )
-        Spacer(Modifier.width(8.dp))
-      }
-      Text(OnlineFmt.orderNo(o.orderNo), style = V3Type.headline, color = c.ink)
-      Spacer(Modifier.width(8.dp))
-      //  «سفارشِ آنلاین» — جدا از فروشِ صندوق، روی هر کارتِ صف (خواستِ صاحب‌کار)
-      DraftTag(StrOrdersHub.onlineBadge, Icons.Outlined.Language, tone = V3Tone.INFO)
-      Spacer(Modifier.weight(1f))
-      OrderStatusPill(o.status)
-    }
-    Spacer(Modifier.height(6.dp))
-    Text(
-      listOfNotNull(o.customer.name.ifBlank { null }, o.customer.phoneMasked.ifBlank { null }?.let(OnlineFmt::ltr), StrOnline.orderSource(o.source)).joinToString(" · "),
-      style = V3Type.subhead,
-      color = c.inkMuted,
-      maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
+    V3DataRow(
+      title = OrderCardText.title(o),
+      secondary = secondary,
+      meta = meta,
+      icon = Icons.Outlined.Language,
+      hue = V3Section.ORDERS.hue,
+      action = step?.let { to -> V3RowAction(StrOnline.orderAction(to), OrderCardText.stepIcon(to)) { onStep(to) } },
+      selected = checked,
+      onClick = onOpen,
     )
-    Spacer(Modifier.height(4.dp))
-    Text(OrdersHubModel.items(o), style = V3Type.callout, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
-    //  سادهٔ e-rows-63d: روش، زمان و پرداخت یک خطِ آرام (نه پنج تراشه)؛ فقط آن‌چه توجه می‌خواهد تراشه می‌ماند
-    Spacer(Modifier.height(4.dp))
-    Text(OrderCardText.line(o, now), style = V3Type.footnote, color = c.inkMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
-    OrderCardText.alerts(o).takeIf { it.isNotEmpty() }?.let { tags ->
-      Spacer(Modifier.height(8.dp))
-      FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        tags.forEach { (label, review) -> DraftTag(label, if (review) Icons.Outlined.Inventory2 else Icons.Outlined.Science, tone = V3Tone.WARNING) }
-      }
-    }
-    if (risk != null) {
-      Spacer(Modifier.height(6.dp))
-      DraftTag(risk, Icons.Outlined.WarningAmber, tone = V3Tone.WARNING)
-    }
-    Spacer(Modifier.height(12.dp))
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      Column(Modifier.weight(1f)) {
-        Text(OnlineFmt.afn(o.totalMinor), style = V3Type.headline, color = c.ink, maxLines = 1)
-        Text(OnlineFmt.ago(o.createdAt, now), style = V3Type.caption, color = c.inkMuted)
-      }
-      if (step != null) {
-        Spacer(Modifier.width(8.dp))
-        V3Button(
-          StrOnline.orderAction(step),
-          { onStep(step) },
-          kind = if (OrdersModel.danger(step)) V3ButtonKind.DANGER else V3ButtonKind.PRIMARY,
-          height = 40.dp,
-          haptic = true,
-        )
-      }
-    }
   }
 }
 
 /**
- *  متن‌های کارتِ صف (سادهٔ e-rows-63d): «با پیک · برای ۱۸:۰۰ · ۳ قلم · پرداخت‌شده» در یک خطِ آرام، و فقط دو نشانِ توجه
- *  (بازبینیِ موجودی O-06، «آزمایشی») به رنگِ هشدار. سرِ جزئیات همان [OrderTags] ِ کامل را دارد.
+ *  متن‌های کارتِ صف (کالبدِ ۶۸c): عنوانِ «#۱۰۴۲ · مریم احمدی»، خطِ دومِ «آنلاین · ۶ دقیقه پیش · ۳ قلم» و خطِ مبلغِ «۱٬۴۵۰
+ *  افغانی • جدید»؛ هشدارِ کارخواه (سابقهٔ مشتری، بازبینیِ موجودی) تنها واژهٔ رنگیِ ردیف است، «آزمایشی» واژهٔ آرام. روش و پرداخت
+ *  ([line]) و سرِ جزئیات ([OrderTags]) کامل‌اند.
  */
 internal object OrderCardText {
+  /** خطِ روش، زمان، شمار و پرداخت (صفحه‌های دیگر و جزئیات) */
   fun line(o: OrderDto, now: Long): String = listOfNotNull(
     OrdersHubModel.method(o),
     o.scheduledFor?.let { StrOnline.forTime(OrdersModel.scheduleLabel(it, now)) },
     StrOnline.items(o.itemsCount),
     OnlineFmt.pay(o.paymentStatus, o.paymentMethod),
   ).joinToString(" · ")
+
+  /** عنوان: «#۱۰۴۲ · مریم احمدی» — شمارهٔ سفارش و مشتری در یک خط */
+  fun title(o: OrderDto): String = listOfNotNull(OnlineFmt.orderNo(o.orderNo), o.customer.name.ifBlank { null }).joinToString(" · ")
+
+  /** خطِ دومِ کوتاه: «آنلاین · ۶ دقیقه پیش · ۳ قلم» (زمان‌دار ⇒ «برای ۱۸:۰۰» به‌جای شمارِ اقلام) */
+  fun secondary(o: OrderDto, now: Long): String = listOfNotNull(
+    StrOrdersHub.onlineShort,
+    OnlineFmt.ago(o.createdAt, now).ifBlank { null },
+    o.scheduledFor?.let { StrOnline.forTime(OrdersModel.scheduleLabel(it, now)) } ?: StrOnline.items(o.itemsCount),
+  ).joinToString(" · ")
+
+  /** خطِ مبلغ: «۱٬۴۵۰ افغانی • جدید» و فقط هشدارِ کارخواه (سابقهٔ مشتری، بازبینیِ موجودی) یا «آزمایشی» */
+  fun meta(o: OrderDto, risk: String?): V3RowMeta {
+    val status = V3RowStatus.of(StrOnline.orderStatus(o.status), OnlineStatus.order(o.status))
+    val alert = when {
+      risk != null -> V3RowStatus(risk, V3RowTone.DANGER)
+      OrderStockHold.review(o) -> V3RowStatus(StrOrdersHub.stockReview, V3RowTone.DANGER)
+      o.isTest -> V3RowStatus(StrOnline.test)
+      else -> null
+    }
+    return V3RowMeta(OnlineFmt.afn(o.totalMinor), status, alert)
+  }
+
+  /** نشانهٔ قرصِ گامِ بعدی */
+  fun stepIcon(to: String): ImageVector = when {
+    OrdersModel.danger(to) -> Icons.Outlined.Block
+    to == "accepted" -> Icons.Outlined.CheckCircle
+    else -> Icons.AutoMirrored.Outlined.ArrowForward
+  }
 
   /** نشان‌های توجه: (برچسب، بازبینیِ موجودی؟) */
   fun alerts(o: OrderDto): List<Pair<String, Boolean>> = listOfNotNull(

@@ -55,7 +55,8 @@ import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Skeleton
-import ir.vil3ntec.tohid.ui.v3.V3QuietStatus
+import ir.vil3ntec.tohid.ui.v3.V3DataRow
+import ir.vil3ntec.tohid.ui.v3.V3RowMeta
 import ir.vil3ntec.tohid.ui.v3.V3RowStatus
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
 import ir.vil3ntec.tohid.ui.v3.V3Type
@@ -149,23 +150,22 @@ internal fun TeamContent(
 }
 
 /**
- *  ردیفِ کارمند (سادهٔ e-rows-63d): نام، «نقش · تماس» به متنِ آرام؛ وضعیت فقط وقتی «بسته» است (فعال = عادی ⇒ هیچ).
- *  زدن ⇐ صفحهٔ همان کارمند (نقش، اجازه‌ها، دستگاه‌ها، برداشتن)؛ کشیدن ⇐ «برداشتن».
+ *  ردیفِ کارمند (کالبدِ `V3DataRow`، ۶۸c؛ سادهٔ e-rows-63d): نام، «نقش · تماس» به متنِ آرام؛ وضعیت فقط وقتی «بسته» است
+ *  (فعال = عادی ⇒ هیچ). زدن ⇐ صفحهٔ همان کارمند (نقش، اجازه‌ها، دستگاه‌ها، برداشتن)؛ کشیدن ⇐ «برداشتن».
  */
 @Composable
 private fun MemberRowView(m: TeamModel.MemberRow, modifier: Modifier, actions: TeamActions) {
   val c = PhoneV3.colors
-  V3ListRow(
+  V3DataRow(
     title = m.name,
-    subtitle = TeamModel.memberLine(m),
-    subtitleLines = 1,
+    secondary = TeamModel.memberLine(m),
+    meta = if (m.active) null else V3RowMeta(status = V3RowStatus(StrAccount.stateClosed)),
     modifier = modifier,
     leading = {
       Box(Modifier.size(40.dp).clip(CircleShape).background(if (m.roleKind == AccountFormat.Role.OWNER) PhoneV3Palette.selected(c) else c.tile), contentAlignment = Alignment.Center) {
         Text(m.initial, style = V3Type.headline, color = if (m.active) PhoneV3Roles.brandText(c) else c.inkMuted)
       }
     },
-    trailing = if (m.active) null else ({ V3QuietStatus(V3RowStatus(StrAccount.stateClosed)) }),
     endActions = if (m.removable) listOf(V3SwipeAction(Icons.Outlined.PersonRemove, StrAccount.remove, V3ButtonKind.DANGER) { actions.remove(m.id) }) else emptyList(),
     onClick = { actions.member(m.id) },
   )

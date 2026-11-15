@@ -1,6 +1,5 @@
 package ir.vil3ntec.tohid.ui.v3.stock
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -235,20 +234,21 @@ private fun StockList(
   onClear: () -> Unit,
 ) {
   val rows = remember(overview, filter, query, category, place) { StockListModel.visible(StockListModel.atPlace(overview, place), filter, query, category) }
-  LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+  //  ۶۸c: ردیف‌ها یک فهرستِ پیوسته با خطِ مویی (کالبدِ `V3DataRow`)، نه کارتِ جدا با فاصله؛ فاصلهٔ ۸ فقط میانِ کارت‌های بالا
+  LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = contentPadding) {
     item(key = "stats") {
-      StockStatsCard(overview.summary, onFilter, Modifier.padding(bottom = 4.dp).v3Stagger(stagger, "stats", 0))
+      StockStatsCard(overview.summary, onFilter, Modifier.padding(bottom = 12.dp).v3Stagger(stagger, "stats", 0))
     }
     if (wide) item(key = "desk-actions") {
       //  کامپیوتر: کارهای «…» همین‌جا دیده می‌شوند — تراشهٔ کار با آیکن، با پیمایشِ افقی اگر جا نشد
-      V3ChipRow(contentPadding = PaddingValues(0.dp)) {
+      V3ChipRow(Modifier.padding(bottom = 8.dp), contentPadding = PaddingValues(0.dp)) {
         V3Chip(StrStock.menuCount, selected = false, icon = Icons.AutoMirrored.Outlined.FactCheck, onClick = actions.count)
         V3Chip(StrStock.menuBulk, selected = false, icon = Icons.AutoMirrored.Outlined.PlaylistAdd, onClick = actions.bulk)
         V3Chip(StrStock.menuImport, selected = false, icon = Icons.Outlined.UploadFile, onClick = actions.import)
         actions.extras.forEach { x -> V3Chip(x.label, selected = false, icon = x.icon, onClick = x.onClick) }
       }
     }
-    item(key = "header") { actions.header() }
+    item(key = "header") { Box(Modifier.padding(bottom = 8.dp)) { actions.header() } }
     if (rows.isEmpty()) item(key = "no-match") {
       V3EmptyState(Icons.Outlined.SearchOff, StrKit.nothingFound, body = StrStock.noMatchBody, action = StrStock.clearFilters, onAction = onClear)
     }
@@ -261,6 +261,8 @@ private fun StockList(
         onEntry = { actions.entry(id) },
         onAdjust = { actions.adjust(id) },
         modifier = Modifier.v3AnimateItem(this).v3Stagger(stagger, id, index),
+        first = index == 0,
+        last = index == rows.lastIndex,
       )
     }
     item(key = "end") { Spacer(Modifier.height(8.dp)) }

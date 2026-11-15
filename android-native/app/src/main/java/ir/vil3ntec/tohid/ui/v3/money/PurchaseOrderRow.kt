@@ -5,7 +5,6 @@ import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.MoveToInbox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.text.style.TextAlign
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
@@ -16,9 +15,9 @@ import ir.vil3ntec.tohid.data.PurchaseOrderBook
 import ir.vil3ntec.tohid.data.PoPermsDto
 import ir.vil3ntec.tohid.data.PurchaseOrderDto
 import ir.vil3ntec.tohid.ui.v3.RowWhen
-import ir.vil3ntec.tohid.ui.v3.V3AmountStatus
-import ir.vil3ntec.tohid.ui.v3.V3ListRow
-import ir.vil3ntec.tohid.ui.v3.V3PillAction
+import ir.vil3ntec.tohid.ui.v3.V3DataRow
+import ir.vil3ntec.tohid.ui.v3.V3RowAction
+import ir.vil3ntec.tohid.ui.v3.V3RowMeta
 import ir.vil3ntec.tohid.ui.v3.V3RowStatus
 import ir.vil3ntec.tohid.ui.v3.V3RowTone
 
@@ -54,21 +53,20 @@ internal class PoRowText(val title: String, val subtitle: String, val amount: St
 }
 
 /**
- *  ردیفِ فهرستِ «سفارش‌های خرید»: زدن ⇐ جزئیات (همهٔ کارها: فرستادن، ویرایش، تطبیق، فاکتورِ تأمین‌کننده، لغو)؛ تنها کارِ
- *  اصلی، «دریافتِ کالا»، قرصِ نرمِ پایانِ ردیف است و فقط وقتی نقش × وضعیت اجازه می‌دهد (`PoForms.actions`).
+ *  ردیفِ فهرستِ «سفارش‌های خرید» (کالبدِ `V3DataRow`، ۶۸c): زدن ⇐ جزئیات (همهٔ کارها: فرستادن، ویرایش، تطبیق، فاکتورِ
+ *  تأمین‌کننده، لغو)؛ تنها کارِ اصلی، «دریافتِ کالا»، قرصِ خنثیِ پایانِ ردیف است و فقط وقتی نقش × وضعیت اجازه می‌دهد
+ *  (`PoForms.actions`).
  */
 @Composable
 internal fun PoListRow(o: PurchaseOrderDto, perms: PoPermsDto, today: String, onOpen: () -> Unit, onReceive: () -> Unit) {
   val text = remember(o, today, I18n.lang) { PoRowText.of(o, today) }
   val receive = remember(o, perms) { PoForms.actions(o, perms).receive }
-  V3ListRow(
+  V3DataRow(
     text.title,
-    subtitle = text.subtitle,
-    subtitleLines = 1,
+    secondary = text.subtitle,
+    meta = V3RowMeta(text.amount, text.status, struck = text.struck),
     icon = Icons.AutoMirrored.Outlined.ReceiptLong,
-    below = { V3AmountStatus(text.amount, text.status, struck = text.struck, align = TextAlign.Start) },
-    trailing = if (receive) ({ V3PillAction(StrPurchasePages.receiveGoods, onReceive, icon = Icons.Outlined.MoveToInbox) }) else null,
-    chevron = false,
+    action = if (receive) V3RowAction(StrPurchasePages.receiveGoods, Icons.Outlined.MoveToInbox, onClick = onReceive) else null,
     onClick = onOpen,
   )
 }

@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,11 +23,14 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.PointOfSale
 import androidx.compose.material.icons.outlined.Print
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import ir.vil3ntec.tohid.ui.v3.summaryColors
+import ir.vil3ntec.tohid.ui.v3.V3SummaryBars
+import ir.vil3ntec.tohid.ui.v3.V3Bar
+import ir.vil3ntec.tohid.ui.theme.V3Section
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -40,6 +42,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -63,10 +66,10 @@ import ir.vil3ntec.tohid.ui.v3.V3SummaryAction
 import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.InvoiceRefText
 import ir.vil3ntec.tohid.ui.v3.InvoiceRefs
+import ir.vil3ntec.tohid.ui.v3.V3DataRow
+import ir.vil3ntec.tohid.ui.v3.V3DataRowSpec
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
-import ir.vil3ntec.tohid.ui.v3.V3Segmented
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
-import ir.vil3ntec.tohid.ui.v3.V3QuietStatus
 import ir.vil3ntec.tohid.ui.v3.V3_ROW_DOT
 import ir.vil3ntec.tohid.ui.v3.V3PillAction
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
@@ -92,9 +95,12 @@ internal fun channelName(c: HistoryChannel): String = when (c) {
   HistoryChannel.ONLINE -> StrSale.online
 }
 
-/** خلاصهٔ دوره (`V3Summary`، بی گرادیان): «جمع فروش · دوره»، مبلغ و شمارها؛ شمارشِ کور ⇒ فقط شمار */
+/**
+ *  خلاصهٔ دوره (`V3Summary`، بخشِ فروش — آبی، بی گرادیان): «جمع فروش · دوره»، مبلغ و شمارها؛ شمارشِ کور ⇒ فقط شمار.
+ *  ۶۵s: [period] (کادرِ کشوییِ دوره) در گوشهٔ کارت و «نقد · نسیه · دیگر» ([PaySplit]) درونِ همین کارت.
+ */
 @Composable
-internal fun PeriodSummary(p: SalesPeriods.Period, title: String, money: Boolean, actions: List<V3SummaryAction>) {
+internal fun PeriodSummary(p: SalesPeriods.Period, title: String, money: Boolean, actions: List<V3SummaryAction>, period: (@Composable () -> Unit)? = null) {
   val t = p.totals
   val returns = if (money && t.refunds != 0L) " · " + StrHistory.returnsAmount(PeriodLabel.amount(t.refunds)) else ""
   val value = if (money) PeriodLabel.amount(t.sales) else StrHistory.invoices(plain(t.invoices))
@@ -103,12 +109,33 @@ internal fun PeriodSummary(p: SalesPeriods.Period, title: String, money: Boolean
     value = value,
     caption = if (money) PeriodLabel.counts(t) + returns else StrHistory.countsOnly,
     actions = actions,
+    collapseKey = "sales",
+    section = V3Section.SALES,
+    corner = period,
+    extra = if (money) ({ PaySplit(t) }) else null,
   )
 }
 
 /**
- *  «نقد · نسیه · دیگر» — همان جمع‌های X/Z (کارتِ تفکیکِ پرداخت؛ `claude/e-rows-65s` آن را به درونِ خلاصه می‌برد).
- *  ۶۵h: «برگشت / خالص / قرضِ وصول‌شده» و «بیرون از جمع» از این کارت به [PeriodResult] (`HistoryResult.kt`) رفتند.
+ *  «نقد · نسیه · دیگر» درونِ کارتِ خلاصه (۶۵s، جای کارتِ جدای [MoneySplit] زیرش): نمودارِ افقیِ رنگی به همان رنگِ معنای
+ *  هر پول در تاریخچه (`historyTone`: نقد سبز، نسیه کهربایی، کارت/دیگر آبی) — رنگ هرگز تنها نیست، نام کنارش است.
+ *  «برگشت / خالص / قرضِ وصول‌شده» جدا زیرِ کارت در [PeriodResult] (۶۵h) می‌ماند.
+ */
+@Composable
+private fun PaySplit(t: SalesPeriods.Totals) {
+  val c = PhoneV3.colors
+  val bars = listOf(
+    V3Bar("cash", StrHistory.cash, PeriodLabel.amount(t.cash), t.cash.toDouble(), historyTone(c, MoneyKind.CASH).fg),
+    V3Bar("credit", StrHistory.credit, PeriodLabel.amount(t.credit), t.credit.toDouble(), historyTone(c, MoneyKind.CREDIT).fg),
+    V3Bar("other", StrHistory.other, PeriodLabel.amount(t.other), t.other.toDouble(), historyTone(c, MoneyKind.CARD).fg),
+  )
+  Spacer(Modifier.height(10.dp))
+  V3SummaryBars(bars, track = summaryColors(V3Section.SALES).track)
+}
+
+/**
+ *  «نقد · نسیه · دیگر» — همان جمع‌های X/Z (کارتِ تفکیکِ پرداختِ دوره‌های پیشینِ باز؛ کارتِ دورهٔ برگزیده آن را درونِ خلاصه دارد:
+ *  [PaySplit]، ۶۵s). ۶۵h: «برگشت / خالص / قرضِ وصول‌شده» و «بیرون از جمع» از این کارت به [PeriodResult] (`HistoryResult.kt`) رفتند.
  */
 @Composable
 internal fun MoneySplit(t: SalesPeriods.Totals, modifier: Modifier = Modifier) {
@@ -204,10 +231,10 @@ internal fun PeriodCard(
 }
 
 /**
- *  ردیفِ یک فاکتور (۶۵h، روی سادهٔ e-rows-63d): کاشیِ آیکنِ رنگِ پرداخت، عنوانِ معنادار (مشتری، وگرنه نامِ کالاها)، زیرش
- *  «● نسیه · ۱۴:۰۵ · ۳ قلم · #۱۲۴۵» (نقطه و واژه به رنگِ همان پرداخت — [historyTone])، و مبلغِ پررنگ در پایان. لغوشده: آیکن و
- *  واژهٔ سرخ و مبلغِ خط‌خورده؛ برگشت‌خورده: خطِ سرخِ «↩ برگشت شد: …». زدن ⇐ فاکتور («#n» هم زدنی، ۶۳q)؛ کشیدن ⇐ برگشت/لغو؛
- *  نگه داشتن ⇐ همهٔ کارها (`SaleActionsSheet`).
+ *  ردیفِ یک فاکتور (کالبدِ `V3DataRow`، ۶۸c، روی ۶۵h): کاشیِ آیکنِ رنگِ پرداخت، عنوانِ معنادار (مشتری، وگرنه نامِ کالاها)،
+ *  خطِ دومِ آرامِ «۱۴:۰۵ · ۳ قلم · #۱۲۴۵» («#n» زدنی، ۶۳q)، و خطِ مبلغِ «۱٬۴۵۰ ؋ • ● نسیه» — مبلغ به رنگِ نوشته و تنها نشانِ
+ *  رنگیِ ردیف نقطه و واژهٔ پرداخت ([historyTone]، خواستِ ۶۵h «رنگ بده»). لغوشده: آیکن و واژهٔ سرخ و مبلغِ خط‌خورده؛
+ *  برگشت‌خورده: خطِ آرامِ «↩ برگشت شد: …». زدن ⇐ فاکتور؛ کشیدن ⇐ برگشت/لغو؛ نگه داشتن ⇐ همهٔ کارها (`SaleActionsSheet`).
  */
 @Composable
 internal fun InvoiceRow(s: Sale, ctx: RowCtx, first: Boolean, last: Boolean, withDate: Boolean) {
@@ -226,34 +253,30 @@ internal fun InvoiceRow(s: Sale, ctx: RowCtx, first: Boolean, last: Boolean, wit
   val cancelled = row.kind == MoneyKind.CANCELLED
   val a = ctx.actions
   Column(Modifier.clip(groupShape(first, last)).background(c.card)) {
-    if (!first) V3Divider(start = 64.dp)
-    V3ListRow(
+    if (!first) V3Divider(start = V3DataRowSpec.DIVIDER_START)
+    V3DataRow(
       title = row.title,
-      below = {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-          MoneyWord(row.kind, row.payWord)
-          //  PAY-07 «در انتظار/ناموفق» کنارِ همان واژه، با شدّتِ خودش
+      secondaryContent = { InvoiceRefText(subtitle, style = V3Type.rowHelp, maxLines = 1, debtorId = s.debtorId) },
+      metaContent = {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.testTag(V3DataRowSpec.META_TAG)) {
+          Text(
+            amount,
+            style = V3Type.callout.copy(fontFeatureSettings = "tnum"),
+            color = if (cancelled) c.inkMuted else c.ink,
+            textDecoration = if (cancelled) TextDecoration.LineThrough else null,
+            maxLines = 1,
+          )
+          Text(V3_ROW_DOT, style = V3Type.callout, color = c.inkMuted)
+          MoneyWord(row.kind, row.payWord, style = V3Type.callout)
+          //  PAY-07 «در انتظار/ناموفق» کنارِ همان واژه، به واژهٔ آرامِ کم‌رنگ — تنها نشانِ رنگیِ ردیف واژهٔ پرداخت است (۶۸c)
           row.status?.let { st ->
-            Text(V3_ROW_DOT, style = V3Type.footnote, color = c.inkMuted)
-            V3QuietStatus(st)
+            Text(V3_ROW_DOT, style = V3Type.callout, color = c.inkMuted)
+            Text(st.text, style = V3Type.callout, color = c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
           }
-          Text(" · ", style = V3Type.footnote, color = c.inkMuted)
-          InvoiceRefText(subtitle, Modifier.weight(1f, fill = false), maxLines = 1, debtorId = s.debtorId)
         }
-        refund?.let { RefundLine(it) }
+        refund?.let { RefundLine(it, quiet = true) }
       },
       leading = { MoneyTile(row.kind) },
-      trailing = {
-        Text(
-          amount,
-          style = V3Type.headline,
-          color = if (cancelled) c.inkMuted else c.ink,
-          textDecoration = if (cancelled) TextDecoration.LineThrough else null,
-          maxLines = 1,
-          modifier = Modifier.widthIn(max = 150.dp),
-        )
-      },
-      chevron = false,
       endActions = buildList {
         if (row.canReturn) add(V3SwipeAction(Icons.AutoMirrored.Outlined.AssignmentReturn, if (ctx.returnsV2) StrSale.returnOrExchange else StrSale.returnWord) { a.ret(row.id) })
         if (row.canCancel && (ctx.canCancel || ctx.askCancel)) add(V3SwipeAction(Icons.Outlined.Block, StrSale.cancelSale, V3ButtonKind.DANGER) { a.cancel(row.id) })

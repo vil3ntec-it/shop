@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import ir.vil3ntec.tohid.ui.v3.v3EdgeFade
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -68,10 +69,13 @@ fun DraftCountTabs(tabs: List<CountTab>, selected: String, onSelect: (String) ->
   val target = bounds[selected]
   val x by animateDpAsState(target?.first ?: 0.dp, MotionSpec.indicator(), label = "tabX")
   val w by animateDpAsState(target?.second ?: 0.dp, MotionSpec.indicator(), label = "tabW")
+  //  ۶۸c: لبه‌ای که پشتش تبِ دیگری هست نرم محو می‌شود — تبِ نیمه‌پیدا «بریده» دیده نمی‌شود (`v3EdgeFade`)
+  val scroll = rememberScrollState()
   Box(
     modifier
       .fillMaxWidth()
-      .horizontalScroll(rememberScrollState())
+      .v3EdgeFade(scroll)
+      .horizontalScroll(scroll)
       .padding(horizontal = 16.dp),
   ) {
     Box(

@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
+import ir.vil3ntec.tohid.ui.theme.V3Section
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,7 +54,10 @@ import ir.vil3ntec.tohid.ui.v3.V3Fab
 import ir.vil3ntec.tohid.ui.v3.V3Summary
 import ir.vil3ntec.tohid.ui.v3.V3SummaryAction
 import ir.vil3ntec.tohid.ui.v3.V3Hue
-import ir.vil3ntec.tohid.ui.v3.V3ListRow
+import ir.vil3ntec.tohid.ui.v3.V3DataRow
+import ir.vil3ntec.tohid.ui.v3.V3DataRowSpec
+import ir.vil3ntec.tohid.ui.v3.V3RowMeta
+import ir.vil3ntec.tohid.ui.v3.V3RowStatus
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
 import ir.vil3ntec.tohid.ui.v3.rememberCountUpState
@@ -160,6 +164,8 @@ internal fun SuppliersScreen(
             value = MoneyText.afn(owed.value),
             caption = StrMoney.suppliersCaption(d.suppliers.size, d.purchases.size),
             actions = listOf(V3SummaryAction(StrMoney.newSupplier, Icons.Outlined.PersonAddAlt, onClick = actions.onNewSupplier)) + doors,
+            collapseKey = "purchasing/suppliers",
+            section = V3Section.PURCHASES,
           )
           Spacer(Modifier.height(16.dp))
         }
@@ -212,11 +218,12 @@ private fun SupplierRow(
   val shape = RoundedCornerShape(topStart = if (first) r else 0.dp, topEnd = if (first) r else 0.dp, bottomStart = if (last) r else 0.dp, bottomEnd = if (last) r else 0.dp)
   val s = row.supplier
   Column(modifier.clip(shape).background(c.card)) {
-    V3ListRow(
+    //  کالبدِ ردیفِ داده (۶۸c): نام · شماره · «۱۲٬۴۰۰ ؋ • بدهکاریم» به واژهٔ آرام — بی مبلغِ رنگی در پایان
+    V3DataRow(
       title = s.name,
-      subtitle = s.phone.takeIf { it.isNotBlank() }?.let { ir.vil3ntec.tohid.LocaleText.phoneDisplay(it) },
+      secondary = s.phone.takeIf { it.isNotBlank() }?.let { ir.vil3ntec.tohid.LocaleText.phoneDisplay(it) },
+      meta = V3RowMeta("${money(kotlin.math.abs(row.debt))} ؋", V3RowStatus(supplierStateWord(row.state))),
       leading = { LetterAvatar(s.name, V3Modules.hueOf("purchasing")) },
-      trailing = { DebtLabel(row.debt, row.state) },
       startActions = listOf(V3SwipeAction(Icons.Outlined.Payments, StrMoney.pay, V3ButtonKind.PRIMARY) { actions.onPay(s.id) }),
       endActions = listOf(
         V3SwipeAction(Icons.Outlined.Edit, StrMoney.edit) { actions.onEdit(s.id) },
@@ -224,26 +231,15 @@ private fun SupplierRow(
       ),
       onClick = { actions.onOpen(s.id) },
     )
-    if (!last) V3Divider(start = 64.dp)
+    if (!last) V3Divider(start = V3DataRowSpec.DIVIDER_START)
   }
 }
 
-/** مبلغ و برچسبِ وضعیتِ حسابِ تأمین‌کننده — رنگ هرگز تنها نیست */
-@Composable
-internal fun DebtLabel(debt: Double, state: SuppliersModel.State) {
-  val tint = supplierTint(state)
-  Column(horizontalAlignment = Alignment.End) {
-    Text("${money(kotlin.math.abs(debt))} ؋", style = v3Text(15, FontWeight.Bold, 20), color = tint)
-    Text(
-      when (state) {
-        SuppliersModel.State.OWE -> StrMoney.weOwe
-        SuppliersModel.State.PREPAID -> StrMoney.prepaidToSupplier
-        SuppliersModel.State.SETTLED -> StrMoney.accountSettled
-      },
-      style = v3Text(11, FontWeight.Medium, 15),
-      color = PhoneV3.colors.inkMuted,
-    )
-  }
+/** واژهٔ حالِ حسابِ تأمین‌کننده: «بدهکاریم»، «پیش‌پرداخت»، «تسویه» */
+internal fun supplierStateWord(state: SuppliersModel.State): String = when (state) {
+  SuppliersModel.State.OWE -> StrMoney.weOwe
+  SuppliersModel.State.PREPAID -> StrMoney.prepaidToSupplier
+  SuppliersModel.State.SETTLED -> StrMoney.accountSettled
 }
 
 @Composable

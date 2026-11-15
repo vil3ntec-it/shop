@@ -200,27 +200,20 @@ val PhoneV3UiDark: PhoneV3Ui = PhoneV3Ui.from(DarkColors)
 
 object PhoneV3Palette {
   /**
-   *  رنگِ همراهِ آیکن و کاشی (THEME-V2). نام‌های پیشین هم‌معنیِ تازه‌اند:
-   *  TEAL = MINT، BLUE = SKY، ORANGE = AMBER، PURPLE = VIOLET؛ BRAND = primaryِ تم.
+   *  رنگِ همراهِ آیکن و کاشی (THEME-V2 ⇐ پالتِ لوکسِ ۶۸c). نام‌های پیشین هم‌معنیِ تازه‌اند: BLUE = SKY، ORANGE = AMBER،
+   *  PURPLE = VIOLET؛ BRAND = primaryِ تم. هر نام یک خانوادهٔ `SectionColors` است: SKY لاجوردیِ سرمه‌ای، VIOLET نیلی، TEAL نفتی،
+   *  MINT زمردی، AMBER زر، CORAL عقیقِ سرخ (خطر و بدهی)، SLATE گرافیت. صورتی و لیمویی دیگر نیستند (۶۸c، صاحب‌کار: «رنگ صورتی
+   *  کار نگیر») — `LuxPaletteGuardTest`.
    */
-  enum class Hue { BRAND, TEAL, BLUE, ORANGE, PURPLE, SKY, VIOLET, CORAL, AMBER, MINT, PINK, LIME }
+  enum class Hue { BRAND, TEAL, BLUE, ORANGE, PURPLE, SKY, VIOLET, CORAL, AMBER, MINT, SLATE }
 
   private fun shop(c: PhoneV3Colors): ShopColors = c.source
 
-  /** شمارهٔ رنگِ همراه (`ShopColors.accent(i)`) برای هر نام؛ BRAND ⇒ null */
-  fun accentIndex(hue: Hue): Int? = when (hue) {
-    Hue.BRAND -> null
-    Hue.SKY, Hue.BLUE -> 0
-    Hue.VIOLET, Hue.PURPLE -> 1
-    Hue.CORAL -> 2
-    Hue.AMBER, Hue.ORANGE -> 3
-    Hue.MINT, Hue.TEAL -> 4
-    Hue.PINK -> 5
-    Hue.LIME -> 6
-  }
+  /** شمارهٔ رنگِ همراه (`ShopColors.accent(i)`) برای هر نام — جایش در `SectionColors.ORDER`؛ BRAND ⇒ null */
+  fun accentIndex(hue: Hue): Int? = if (hue == Hue.BRAND) null else SectionColors.ORDER.indexOf(SectionColors.family(hue))
 
-  /** آیکنِ رنگی */
-  fun glyph(c: PhoneV3Colors, hue: Hue): Color = accentIndex(hue)?.let { shop(c).accent(it) } ?: shop(c).brandPrimary
+  /** آیکنِ رنگی — نشانهٔ همان خانواده از `SectionColors` (روز/شب)؛ BRAND ⇒ primaryِ تم */
+  fun glyph(c: PhoneV3Colors, hue: Hue): Color = if (hue == Hue.BRAND) shop(c).brandPrimary else SectionColors.glyph(hue, shop(c).isDark)
 
   /** پس‌زمینهٔ نرمِ همان رنگ (۱۲٪ روز، ۲۰٪ شب) */
   fun soft(c: PhoneV3Colors, hue: Hue): Color = glyph(c, hue).copy(alpha = if (c.source.isDark) 0.20f else 0.12f)
