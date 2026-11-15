@@ -14,7 +14,8 @@ const router = express.Router();
 router.get('/', async (req, res, next) => {
   try {
     res.set('Cache-Control', 'no-cache');
-    res.json(await identity.info());
+    //  بیرون از شبکهٔ درونی بی نسخهٔ سرور (`lib/public-detail.js`)؛ `publicUrls`/`serverId`/`wire` همان
+    res.json(require('../lib/public-detail').identity(req, await identity.info()));
   } catch (err) { next(err); }
 });
 

@@ -117,6 +117,7 @@ fun V3IconTile(icon: ImageVector, hue: V3Hue? = null, danger: Boolean = false, s
  *  • `selected`: حالتِ انتخابِ گروهی — دایرهٔ تیک در آغاز (null = بی انتخاب).
  *  • `onLongClick`: نگه‌داشتن (معمولاً شروعِ انتخاب یا برگهٔ کارها)؛ صفحه‌خوان آن را «کارهای بیشتر» می‌نامد.
  *  • `role`: نقشِ ردیف برای صفحه‌خوان (`V3ToggleRow` ⇒ کلید).
+ *  • `below`: خطِ سومِ دلخواه زیرِ زیرعنوان («۲٬۵۰۰ ؋ • نیمه‌رسیده» با `V3AmountStatus`) وقتی پایانِ ردیف کارِ اصلی است.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -141,6 +142,7 @@ fun V3ListRow(
   selected: Boolean? = null,
   onLongClick: (() -> Unit)? = null,
   role: Role = Role.Button,
+  below: (@Composable () -> Unit)? = null,
   onClick: (() -> Unit)? = null,
 ) {
   val c = PhoneV3.colors
@@ -175,6 +177,7 @@ fun V3ListRow(
         if (subtitle != null) {
           Text(subtitle, style = V3Type.footnote, color = c.inkMuted, maxLines = subtitleLines, overflow = TextOverflow.Ellipsis)
         }
+        below?.invoke()
       }
       if (value != null) {
         Spacer(Modifier.width(8.dp))

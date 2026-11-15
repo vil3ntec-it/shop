@@ -51,8 +51,12 @@ import kotlinx.coroutines.launch
  *  بخشِ «سرورها» در تنظیمات (پرچمِ دستگاهیِ `app.multi_server`، پیش‌فرض خاموش) — `docs/SERVERS-fa.md`.
  *
  *  خاموش: فقط کلیدِ روشن کردن، و برنامه همان است که بود. روشن: فهرستِ سرورها، افزودن با نشانی یا کیو‌آر،
- *  بررسیِ واقعی (نام، نسخه، اثرِ انگشتِ هویت)، تأیید، رفتن به سرورِ دیگر و برداشتن. هر تغییر فقط کارِ صاحبِ
+ *  بررسیِ واقعی (نام و اثرِ انگشتِ هویت)، تأیید، رفتن به سرورِ دیگر و برداشتن. هر تغییر فقط کارِ صاحبِ
  *  دکان است (`ServersController.canManage`)، با رمزِ برنامه اگر روشن است، و در سابقه می‌ماند.
+ *
+ *  ⛔ «هیچ جزئیاتِ فنی/زیرساخت در صفحه» (`docs/RULES-fa.md`): هیچ نشانیِ سرور (دستی، آموخته از خودِ سرور یا اعلام‌شده
+ *  با `publicUrls`) و هیچ نسخهٔ سروری فهرست نمی‌شود؛ نشانیِ دستیِ صاحب فقط در کادرِ ویرایشِ خودش هنگامِ نوشتن دیده می‌شود.
+ *  اثرِ انگشت می‌ماند: سنجشِ هویتِ سرور با چشمِ صاحب است (ضدِ جعل)، نه نشانی و نه راز.
  *
  *  ⛔ رفتن به سرورِ دیگر برنامه را **می‌بندد**: عوض شدن فقط در شروعِ بعدیِ برنامه، پیش از هر دفتر و
  *  درخواستی، انجام می‌شود (`ServerSwitchAndroid.applyPending`) تا دفترِ این سرور هرگز به آن سرور نرود.
@@ -236,8 +240,10 @@ private fun ServerList(
       Spacer(Modifier.height(12.dp))
       Text(StrInvoices.history, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
       log.forEach { e ->
+        //  ⛔ یادداشتِ «افزودن/نشانیِ تازه» خودِ نشانی است ⇒ فقط یادداشتِ «رفتن» (نامِ سرورِ پیشین) دیده می‌شود
+        val note = e.note.takeIf { e.action == "schedule" && it.isNotBlank() }
         Text(
-          "${actionText(e.action)} — ${e.name}" + (if (e.note.isNotBlank()) " (${e.note})" else ""),
+          "${actionText(e.action)} — ${e.name}" + (if (note != null) " ($note)" else ""),
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted2,
         )
@@ -267,13 +273,9 @@ private fun ServerRow(
       if (active) Text(StrSettings.active, style = MaterialTheme.typography.labelSmall, color = Shop.colors.success)
       if (p.lan) Text(StrSetupPages.localNetwork, style = MaterialTheme.typography.labelSmall, color = Shop.colors.info)
     }
-    p.urls.forEach { u -> Text(u, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted) }
-    p.lastInfo?.let { i ->
-      Text(
-        Str.version(i.version) + if (i.legacy) StrSetupPages.legacyServer else "",
-        style = MaterialTheme.typography.labelSmall,
-        color = Shop.colors.muted2,
-      )
+    //  ⛔ نشانی‌ها (دستی، آموخته یا اعلام‌شده) و نسخهٔ سرور فهرست نمی‌شوند — فقط نام، اثرِ انگشت و «قدیمی»
+    if (p.lastInfo?.legacy == true) {
+      Text(StrSetupPages.legacyServer.trimStart(' ', '—'), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
     }
     if (fingerprint.isNotEmpty()) {
       Text(StrSetupPages.fingerprint(fingerprint), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
@@ -346,9 +348,8 @@ private fun AddServerDialog(controller: ServersController, onDismiss: () -> Unit
             color = Shop.colors.muted2,
           )
         } else {
+          //  ⛔ نشانی‌ها و نسخهٔ سرور این‌جا نیستند؛ نشانیِ دستی فقط در همان کادرِ ویرایشِ صاحب دیده می‌شد
           Text(c.name, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
-          c.urls.forEach { u -> Text(u, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted) }
-          Text(Str.version(c.info.version), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
           if (c.info.legacy) {
             Text(
               StrSetupPages.legacyWarn,

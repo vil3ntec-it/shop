@@ -98,6 +98,7 @@ internal fun rememberSettingsFacts(theme: ThemeChoice): SettingsFacts {
     now = System.currentTimeMillis(),
     version = BuildConfig.VERSION_NAME,
     serverOn = rememberServerSections(),
+    owner = remember { ir.vil3ntec.tohid.data.ShopRole.current(context) == ir.vil3ntec.tohid.data.ShopRole.OWNER },
   )
 }
 
@@ -120,7 +121,8 @@ internal fun RouteScope.rememberCategoryParts(group: String, facts: SettingsFact
   val all = SettingsLayout.GROUPS.firstOrNull { it.title == group }?.parts.orEmpty()
   val visible = SettingsLayout.visibleParts(group, Platform.DESKTOP, facts.serverOn, featuresOn).associateBy { it.id }
   return all.map { p ->
-    CategoryPart(p.id, visible[p.id]?.rows.orEmpty(), shown.filter { (it.part ?: all.last().id) == p.id })
+    val rows = visible[p.id]?.rows.orEmpty().filter { facts.owner || it !in SettingsLayout.OWNER_ONLY }
+    CategoryPart(p.id, rows, shown.filter { (it.part ?: all.last().id) == p.id })
   }.filter { it.rows.isNotEmpty() || it.extra.isNotEmpty() }
 }
 

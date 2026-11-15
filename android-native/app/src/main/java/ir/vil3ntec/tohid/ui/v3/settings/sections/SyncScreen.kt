@@ -15,22 +15,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.i18n.StrSyncPlain
 import ir.vil3ntec.tohid.core.net.userText
+import ir.vil3ntec.tohid.data.platform.SupportDiagAndroid
 import ir.vil3ntec.tohid.displayMillis
 import ir.vil3ntec.tohid.sync.AutoSync
 import ir.vil3ntec.tohid.sync.SyncStore
@@ -63,6 +64,10 @@ import kotlinx.coroutines.launch
  *  سربرگِ قدیم، حالا صفحهٔ خودش. هشدارهای همگام‌سازیِ خانه همین‌جا را باز می‌کنند و
  *  گره را به زبانِ آدم می‌گوید (`SyncModel.diagnose`: چه شده، چه نگه داشته شده، چه
  *  کنید). صفحه فقط‌خواندنی است و کارمند هم بازش می‌کند؛ کارِ پاک‌کننده‌ای در آن نیست.
+ *
+ *  ⛔ هیچ جزئیاتِ فنی/زیرساخت (`docs/RULES-fa.md`): نه نشانیِ سرور، نه نسخهٔ سرور/Schema، نه راهِ API، نه متنِ خامِ
+ *  خطا — برای هیچ نقشی. همان جزئیات برای پشتیبانی **فرستاده** می‌شود (`SupportDiagAndroid`) و صفحه فقط می‌گوید
+ *  «پشتیبانی خبردار شد». نگهبان: `InfraLeakGuardTest`.
  */
 @Composable
 internal fun RouteScope.SyncScreen(onBack: (() -> Unit)?) {
@@ -74,6 +79,9 @@ internal fun RouteScope.SyncScreen(onBack: (() -> Unit)?) {
   LaunchedEffect(Unit) { ServerPulse.probe(context) }
   val now = System.currentTimeMillis()
   val lastOk = maxOf(lastSync, AutoSync.lastOk, v1.lastOkAt)
+  //  جزئیاتِ فنیِ گره ⇒ فقط پشتیبانی؛ صفحه «خبردار شد» را پس از رسیدنِ گزارش به سرور می‌گوید (عکسِ صفحه چیزی نمی‌فرستد)
+  var notified by remember { mutableStateOf(false) }
+  val shot = SettingsShotState.signedIn != null || SettingsShotState.syncError != null
 
   SettingsPageFrame(title = SettingsLayout.labelOf("همگام‌سازی"), onBack = onBack) {
     item(key = "hero") {
@@ -110,20 +118,23 @@ internal fun RouteScope.SyncScreen(onBack: (() -> Unit)?) {
         //  SYN-12: حکمِ موتور فقط برای خطای خودِ موتور (`v1.lastError`)؛ خطای عکسِ صفحه یا `AutoSync` ⇒ همان نشانه‌ها
         val engineError = SettingsShotState.syncError == null && v1.lastError.isNotBlank()
         val d = SyncModel.diagnose(SettingsShotState.syncError ?: v1.lastError.ifBlank { AutoSync.lastError.orEmpty() }, v1.holding, v1.dropped, AutoSync.needsShop, ServerPulse.state, if (engineError) v1.outage else null)
-        if (d.problem != SyncModel.Problem.NONE) DiagnosisCard(d)
+        val support = d.detail ?: if (v1.dropped > 0) "dropped=${v1.dropped}" else null
+        LaunchedEffect(d.problem, support) {
+          notified = false
+          if (support != null && !shot) {
+            notified = SupportDiagAndroid.report(context, d.problem.name, support, SyncModel.facts(v1, ServerPulse.version, ServerPulse.prefix))
+          }
+        }
+        if (d.problem != SyncModel.Problem.NONE) DiagnosisCard(d, if (support == null) null else notified)
       }
     }
     item(key = "server") {
       val pulse = SyncModel.server(ServerPulse.state)
       V3Section(StrNav.server) {
         V3ListRow(StrSettings.serverStatus, chevron = false, trailing = { StatusLine(pulse, small = true) })
-        val address = remember { ServerPulse.address(context) }
-        if (address.isNotBlank()) { V3Divider(start = 22.dp); LtrRow(StrSettings.serverAddress, address) }
-        if (ServerPulse.version.isNotBlank()) { V3Divider(start = 22.dp); LtrRow(StrNav.serverVersion.trimEnd(':'), ServerPulse.version) }
-        if (ServerPulse.prefix.isNotBlank()) { V3Divider(start = 22.dp); LtrRow(StrNav.apiPath.trimEnd(':'), ServerPulse.prefix) }
         if (ServerPulse.at > 0) { V3Divider(start = 22.dp); V3ListRow(StrNav.lastCheck(SettingsIndexModel.since(ServerPulse.at, now)), chevron = false) }
       }
-      ServerPulse.note?.let { ErrorText(it) }
+      SyncModel.pulseNote(ServerPulse.state, ServerPulse.note)?.let { ErrorText(it) }
       V3TextButton(
         if (ServerPulse.state == ServerPulse.State.CHECKING) StrNav.checking else StrNav.checkAgain,
         { if (ServerPulse.state != ServerPulse.State.CHECKING) scope.launch { ServerPulse.probe(context, force = true) } },
@@ -137,11 +148,10 @@ internal fun RouteScope.SyncScreen(onBack: (() -> Unit)?) {
           V3ListRow(q.text, chevron = false, trailing = { Dot(q.tone) })
           V3Divider(start = 22.dp)
           V3ListRow(if (v1.lastOkAt > 0) StrNav.lastSyncOk(displayMillis(v1.lastOkAt)) else StrNav.noSyncYet, chevron = false)
-          V3Divider(start = 22.dp)
-          V3ListRow(StrNav.schemaVersion(v1.schemaVersion) + if (v1.serverSchema > 0) " · " + StrNav.serverN(v1.serverSchema) else "", chevron = false)
           if (v1.dropped > 0) {
             V3Divider(start = 22.dp)
-            V3ListRow(StrSettings.diagRejectedTitle(v1.dropped), chevron = false, trailing = { Dot(V3Tone.WARNING) })
+            val told = if (notified) StrSyncPlain.supportNotified else StrSyncPlain.supportPending
+            V3ListRow(StrSyncPlain.rejectedTitle(v1.dropped) + " — " + told, chevron = false, trailing = { Dot(V3Tone.WARNING) })
           }
         }
       }
@@ -149,12 +159,15 @@ internal fun RouteScope.SyncScreen(onBack: (() -> Unit)?) {
   }
 }
 
-/** گره به زبانِ آدم: چه شده، چه نگه داشته شده، و «چه کنید»؛ متنِ خام برای پشتیبانی زیرش */
+/**
+ *  گره به زبانِ آدم: چه شده، چه نگه داشته شده، و «چه کنید». ⛔ متنِ خام (`d.detail`) این‌جا نیست — فقط برای پشتیبانی
+ *  فرستاده می‌شود؛ [notified]: `null` ⇒ چیزی برای پشتیبانی نیست، `true` ⇒ «پشتیبانی خبردار شد»، `false` ⇒ «فرستاده می‌شود».
+ */
 @Composable
-private fun DiagnosisCard(d: SyncModel.Diagnosis) {
+private fun DiagnosisCard(d: SyncModel.Diagnosis, notified: Boolean?) {
   Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
     V3Message(d.tone, d.title, body = d.body + "\n\n" + StrSettings.whatToDo + ": " + d.action)
-    d.detail?.let { Text(StrSettings.details(it), style = V3Type.caption, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = 6.dp)) }
+    notified?.let { Text(if (it) StrSyncPlain.supportNotified else StrSyncPlain.supportPending, style = V3Type.caption, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = 6.dp)) }
   }
 }
 
@@ -173,16 +186,6 @@ private fun StatusLine(line: SyncModel.Line, small: Boolean = false) {
 private fun Dot(tone: V3Tone?, size: Int = 8) {
   val c = PhoneV3.colors
   Box(Modifier.size(size.dp).clip(CircleShape).background(if (tone == null) c.chevron else PhoneV3Roles.toneIcon(c, tone)))
-}
-
-/** نشانی و نسخه لاتین‌اند و در صفحهٔ راست‌به‌چپ وارونه دیده می‌شدند */
-@Composable
-private fun LtrRow(label: String, value: String) {
-  V3ListRow(label, chevron = false, trailing = {
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-      Text(value, style = V3Type.subhead, color = PhoneV3.colors.inkMuted, maxLines = 1)
-    }
-  })
 }
 
 @Composable

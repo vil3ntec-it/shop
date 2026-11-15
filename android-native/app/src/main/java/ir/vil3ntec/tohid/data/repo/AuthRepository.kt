@@ -564,14 +564,14 @@ class AuthRepository(
    *
    *  اگر توکن نبود، پیامِ خطا **می‌گوید سرور چه فرستاده**. پیامِ قبلی
    *  فقط «توکن نیامد» بود و آدم را سرِ حدس می‌گذاشت: پاسخ خالی بود؟
-   *  سرورِ قدیمی؟ چیزی وسط راه جوابِ دیگری داد؟ حالا کلیدهای پاسخ در
-   *  همان پیام هست و یک نگاه، تکلیف را روشن می‌کند.
+   *  سرورِ قدیمی؟ چیزی وسط راه جوابِ دیگری داد؟ ⛔ کلیدهای پاسخ دیگر در
+   *  پیامِ صفحه نیستند («هیچ جزئیاتِ فنی/زیرساخت در صفحه»، `docs/RULES-fa.md`).
    */
   private fun keep(body: JsonObject): SessionDto {
     val session = ApiJson.decode<SessionDto>(body)
     if (!session.isValid) throw ApiFailure.InvalidResponse(
       if (body.isEmpty()) StrAppData.serverEmpty
-      else StrAppData.noTokenSent(body.keys.joinToString(", ").take(90))
+      else StrAppData.noTokenSent
     )
     tokens.save(session.accessToken, session.refreshToken, session.accessExpiresAt)
     runCatching { onSignedIn(session) }

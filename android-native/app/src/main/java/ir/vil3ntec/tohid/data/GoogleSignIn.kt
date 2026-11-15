@@ -54,24 +54,11 @@ object GoogleSignIn {
       )
     } catch (e: Exception) {
       /*
-       *  پیامِ خامِ گوگل نگه داشته می‌شود، نه اینکه با یک جملهٔ کلی
-       *  پاک شود.
-       *
-       *  گزارش شد «ورود با گوگل کار نمی‌کند» و همین جمله‌ی کلی روی صفحه
-       *  بود؛ از رویش معلوم نمی‌شد اشکال از گوشی است یا از تنظیماتِ
-       *  سرور. تقریباً همیشه یکی از این دو است:
-       *   • شناسهٔ کلاینت با امضای این نسخهٔ برنامه (SHA-1) جور نیست
-       *   • شناسه‌ای که سرور می‌دهد از نوعِ «Web» نیست
-       *  هر دو را از متنِ خودِ گوگل می‌شود فهمید.
+       *  ⛔ پیامِ خامِ گوگل (کدِ خطا، شناسهٔ کلاینت، SHA-1) دیگر روی صفحه نمی‌آید — جزئیاتِ ورود فنی است و به هر کاربری
+       *  نشان داده می‌شد (`docs/RULES-fa.md`: «هیچ جزئیاتِ فنی/زیرساخت در صفحه»). تقریباً همیشه یکی از این دو است و
+       *  کارِ صاحبِ سرور است، نه کاربر: شناسهٔ کلاینت با امضای این نسخه (SHA-1) جور نیست، یا شناسهٔ سرور از نوعِ «Web» نیست.
        */
-      val raw = e.message.orEmpty().take(160)
-      throw IllegalStateException(
-        buildString {
-          append(StrAuth.googleFailed)
-          if (raw.isNotBlank()) append(" — ").append(raw)
-          append("\n").append(StrAppData.googleHint)
-        }
-      )
+      throw IllegalStateException(StrAuth.googleFailed + "\n" + StrAppData.googleHint, e)
     }
 
     val credential = response.credential
