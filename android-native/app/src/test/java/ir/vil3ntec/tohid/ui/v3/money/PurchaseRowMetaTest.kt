@@ -34,7 +34,7 @@ class PurchaseRowMetaTest {
   )
 
   private fun view(paid: Double, due: String? = null, qty: Double = 10.0): PurchaseViews.View {
-    val d = (PurchaseBook.record(d0, "s1", listOf(PurchaseBook.Line("p0", qty, 145.0)), paid, "2026-11-14", "", today, 1, { "m${n++}" }, dueDate = due) as PurchaseBook.Result.Ok).data
+    val d = (PurchaseBook.record(d0, "s1", listOf(PurchaseBook.Line("p0", qty, 145.0)), paid, "2026-11-01", "", today, 1, { "m${n++}" }, dueDate = due) as PurchaseBook.Result.Ok).data
     return PurchaseViews.all(d, today).single()
   }
 
