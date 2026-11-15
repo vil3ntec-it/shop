@@ -72,9 +72,9 @@ class ContactPrivacyTest {
     val pages = listOf(
       "ui/v3/sales/checkout/CustomerPickerSheet.kt", "ui/v3/money/ReceivePickerSheet.kt", "ui/v3/money/DebtorMergeSheet.kt",
       "ui/screens/DeskCustomers.kt", "ui/screens/CrmProfileUi.kt", "ui/screens/PhoneDebtors.kt",
+      //  فهرستِ قرض‌داران (`DebtorsListScreen.kt`) شماره را فقط از کارتِ `DebtorTile` ِ `PhoneDebtors.kt` نشان می‌دهد
+      //  (`claude/e-rows-65q`: کارت‌های پیشین برگشتند، ردیفِ سادهٔ ۶۳q رفت)
       "ui/v3/money/DebtorLedgerParts.kt", "ui/v3/money/DebtorLedgerScreen.kt",
-      //  ردیفِ سادهٔ قرض‌داران (`claude/e-rows-63q`): شماره از `DebtorRowModel` با همان مجوز
-      "ui/v3/money/DebtorsListScreen.kt",
     )
     for (p in pages) {
       val s = src(p)
