@@ -66,7 +66,7 @@
   بسته‌های کد `ir.vil3ntec.tohid.*` (پس `R`، `BuildConfig`، `-keep` ِ proguard، `ComponentName("…AppLinkAlias")`، کنش‌های USB و extraها)
   دست نخوردند. کامپیوتر (AppId ِ Inno، `upgradeUuid`، `bundleID` ِ مک، `APPLICATION_ID` ِ BuildConfig ِ کامپیوتر)، مدیریت، خرید و پمپ دست نخوردند.
 - **گذار**: انتشار `app-id.txt` دارد (ورک‌فلو از خودِ APK با aapt؛ پایدار، آزمایشی، نسخه‌دار و پیش‌نمایش)؛ سرور ⇐ `appId` ِ `/latest` و برای
-  برنامهٔ پیشین (بی `?app=`) هشدارِ گذار سرِ `notes`. برنامه (`update/AppMove.kt`، `UpdateManager`، برگهٔ `ui/v3/shell/AppMoveSheet.kt`) نصبیِ
+  برنامهٔ پیشین (بی `?app=`) هشدارِ گذار سرِ `notes`. برنامه (`update/AppMove.kt`، `UpdateManager`، برگهٔ `ui/v3/shell/AppMoveSheetAndroid.kt`) نصبیِ
   شناسهٔ دیگر را هرگز «به‌روزرسانی» نشان نمی‌دهد، نمی‌گیرد و نصب نمی‌کند جز از دکمهٔ برگه؛ حتی بی `app-id.txt` بستهٔ فایلِ گرفته‌شده سنجیده
   می‌شود (`Updater.foreignPackage`). پیشنهادِ پاک کردن فقط با «وارد + صفِ خالی + یک همگام‌سازیِ موفق». «پلِ گذار»: ورودیِ `legacy_id` ِ
   «توحید بومی» ⇐ `TOHID_LEGACY_APP_ID=true` ⇐ همین کد با شناسهٔ قدیمی (یک بار، پیش از نخستین پایدارِ شناسهٔ تازه). `apk-gates.sh` شناسهٔ
