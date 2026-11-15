@@ -36,7 +36,6 @@ const CHANNEL = 'email';
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** ردیفِ رفته فقط برای سقف‌های ۲۴ ساعت نگه داشته می‌شود */
 const KEEP_SENT_MS = 2 * DAY_MS;
-const BATCH = 500;
 const tickMs = () => {
   const v = Number(process.env.STORE_AREA_EMAIL_TICK_MS);
   return Number.isSafeInteger(v) && v >= 10_000 ? v : 5 * 60_000;
@@ -118,7 +117,8 @@ async function checkShop(shopId, at = now()) {
   const rows = await many(
     `SELECT id, phone, cell_lat, cell_lng, lang, created_at FROM storefront_area_requests
       WHERE shop_id = $1 AND notice = '' AND updated_at >= $2 ORDER BY created_at, id LIMIT $3`,
-    [shopId, at - areas.RETAIN_MS, BATCH]
+    //  همهٔ منتظرها (حداکثر همان سقفِ هر دکان): پوشش در JS سنجیده می‌شود، پس دسته‌ای از نپوشیده‌ها جلوی پوشیده‌ها را نمی‌گیرد
+    [shopId, at - areas.RETAIN_MS, areas.MAX_PER_SHOP]
   );
   const covered = rows.filter((r) => r.phone.includes('@') && sfd.zoneAt(zones, Number(r.cell_lat), Number(r.cell_lng)));
   out.covered = covered.length;
