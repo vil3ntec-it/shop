@@ -11,15 +11,31 @@ import ir.vil3ntec.tohid.core.report.ReportTables
 import ir.vil3ntec.tohid.data.ReportBridge
 import ir.vil3ntec.tohid.data.ShopData
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+
+/** یک حسابِ سنگین در هر لحظه: هر کدام کلِ دفتر را در حافظه بازمی‌سازد؛ چند تا با هم (رفت‌وبرگشتِ تند، فروش پشتِ فروش) حافظهٔ گوشی را پر می‌کرد */
+private val heavy = Mutex()
 
 /**
  *  PERF-SCREEN — حسابِ سنگین بیرون از رشتهٔ صفحه: [compute] روی `Dispatchers.Default` با همان کلیدها، و تا آماده شدن
  *  `null` (بارِ نخست) یا همان نتیجهٔ پیشین (کلیدِ تازه، مثلاً دفتر پس از یک فروش) — صفحه هرگز منتظرِ حساب نمی‌ماند.
+ *  یکی‌یکی ([heavy])؛ حسابی که دیگر خواسته نیست (صفحه رفت، کلید عوض شد) سرِ گامِ بعدی (`step`) می‌ایستد.
  */
 @Composable
-internal fun <T : Any> rememberOffMain(vararg keys: Any?, compute: () -> T?): T? =
-  produceState<T?>(null, *keys) { value = withContext(Dispatchers.Default) { compute() } }.value
+internal fun <T : Any> rememberOffMain(vararg keys: Any?, compute: (step: () -> Unit) -> T?): T? =
+  produceState<T?>(null, *keys) {
+    value = withContext(Dispatchers.Default) {
+      heavy.withLock {
+        val ctx = currentCoroutineContext()
+        ctx.ensureActive()
+        compute { ctx.ensureActive() }
+      }
+    }
+  }.value
 
 /**
  *  هرچه «گزارشِ تازه» ِ گوشی (`PhoneFreshReports`) از دفتر می‌سازد، همان فراخوانی‌ها با همان ورودی‌ها، یک‌جا بیرون از رشتهٔ
@@ -35,18 +51,24 @@ internal class PhoneFresh(
   val promo: PromoFresh.View?,
 ) {
   companion object {
-    fun build(d: ShopData, today: String, clock: ReportClock, money: Boolean, cost: CostMethod, now: Long, offsetMinutes: Int): PhoneFresh {
+    /** [step] میانِ گام‌ها: حسابی که دیگر خواسته نیست همان‌جا می‌ایستد (`rememberOffMain`) */
+    fun build(d: ShopData, today: String, clock: ReportClock, money: Boolean, cost: CostMethod, now: Long, offsetMinutes: Int, step: () -> Unit = {}): PhoneFresh {
       val ledger = ReportBridge.ledgerOf(d)
-      return PhoneFresh(
-        home = ReportBoard.build(ledger, today, ReportBridge.deviceClock(), ReportFreshModel.costingOf(cost), CostPolicy.approved(cost), money = money),
-        debts = ReportFreshModel.view(ledger, "debts", "all", "", today, clock),
-        todayTables = if (money) ReportFreshModel.view(ledger, "today", "today", "", today, clock, ReportFreshModel.costingOf(cost)).tables else emptyList(),
-        //  RPT-04: پایانِ امروز فقط برای کسی که پول را می‌بیند
-        dayEnd = if (money) DayEndModel.build(d, today, clock, now, offsetMinutes) else null,
-        //  PRD-15 / PRM-16: فقط برای کسی که پول را می‌بیند
-        stockCost = if (money) ReportCore.stockCost(ledger) else null,
-        promo = if (money && ir.vil3ntec.tohid.data.PromoEffectBook.has(d)) PromoFresh.view(d, ledger, "month", today, clock, cost) else null,
-      )
+      step()
+      val home = ReportBoard.build(ledger, today, ReportBridge.deviceClock(), ReportFreshModel.costingOf(cost), CostPolicy.approved(cost), money = money)
+      step()
+      val debts = ReportFreshModel.view(ledger, "debts", "all", "", today, clock)
+      step()
+      val todayTables = if (money) ReportFreshModel.view(ledger, "today", "today", "", today, clock, ReportFreshModel.costingOf(cost)).tables else emptyList()
+      step()
+      //  RPT-04: پایانِ امروز فقط برای کسی که پول را می‌بیند
+      val dayEnd = if (money) DayEndModel.build(d, today, clock, now, offsetMinutes) else null
+      step()
+      //  PRD-15 / PRM-16: فقط برای کسی که پول را می‌بیند
+      val stockCost = if (money) ReportCore.stockCost(ledger) else null
+      step()
+      val promo = if (money && ir.vil3ntec.tohid.data.PromoEffectBook.has(d)) PromoFresh.view(d, ledger, "month", today, clock, cost) else null
+      return PhoneFresh(home, debts, todayTables, dayEnd, stockCost, promo)
     }
   }
 }

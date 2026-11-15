@@ -167,7 +167,7 @@ private fun rememberHome(d: ShopData, showMoney: Boolean): ReportBoard.Home {
   val today = ir.vil3ntec.tohid.todayIso()
   val cost = ReportFresh.cost.value
   //  PERF-SCREEN: تابلو بیرون از رشتهٔ صفحه؛ تا آماده شدن کارتی نیست (همان «دفترِ خالی»)
-  return rememberOffMain(d, today, showMoney, cost) {
+  return rememberOffMain(d, today, showMoney, cost) { _ ->
     ReportBoard.build(ReportBridge.ledgerOf(d), today, ReportBridge.deviceClock(), ReportFreshModel.costingOf(cost), CostPolicy.approved(cost), money = showMoney)
   } ?: ReportBoard.Home(today, emptyList(), emptyList())
 }
@@ -659,12 +659,12 @@ fun PhoneFreshReports(d: ShopData) {
   //  PERF-SCREEN: بدهی، امروز، پایانِ روز (RPT-04)، بهای میانگین (PRD-15) و اثرِ تخفیف (PRM-16) بیرون از رشتهٔ صفحه (`PhoneFresh`)
   val now = ReportBridge.nowMs()
   val offset = ReportBridge.offsetMinutes()
-  val fresh = rememberOffMain(d, today, money, cost) { PhoneFresh.build(d, today, clock, money, cost, now, offset) }
+  val fresh = rememberOffMain(d, today, money, cost) { step -> PhoneFresh.build(d, today, clock, money, cost, now, offset, step) }
   //  RPT-08: «ساعت و روز» روی گوشی هم — همان نقشهٔ کامپیوتر، فقط برای کسی که پول را می‌بیند
   var heatSpan by remember { mutableStateOf(HeatmapModel.PHONE_SPANS.first()) }
   val weekStart = ShopDayChoice.weekStart
   val dayStart = ShopDay.dayStartMinutes(ShopDayChoice.hours)
-  val heat = rememberOffMain(d, heatSpan, today, money, weekStart) {
+  val heat = rememberOffMain(d, heatSpan, today, money, weekStart) { _ ->
     if (money) HeatmapModel.build(d, ReportBoard.range(heatSpan, today), offset, dayStart, ShopDayChoice.weekStart) else null
   }
   //  کلیکِ کارتِ خانه روی گوشی همین صفحه را باز می‌کند؛ مقصد این‌جا یکی است
