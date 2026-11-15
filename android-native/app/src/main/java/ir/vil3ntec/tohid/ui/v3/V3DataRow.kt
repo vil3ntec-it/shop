@@ -128,6 +128,9 @@ fun V3DataRow(
   onClick: (() -> Unit)? = null,
 ) {
   val hasBelow = secondaryContent != null || meta != null || metaContent != null
+  val pill: (@Composable () -> Unit)? = action?.let { a ->
+    @Composable { V3PillAction(a.label, a.onClick, Modifier.testTag(V3DataRowSpec.ACTION_TAG), icon = a.icon, enabled = a.enabled, neutral = true) }
+  }
   V3ListRow(
     title = title,
     modifier = modifier,
@@ -136,9 +139,7 @@ fun V3DataRow(
     hue = hue,
     tile = true,
     leading = leading,
-    trailing = action?.let { a ->
-      { V3PillAction(a.label, a.onClick, Modifier.testTag(V3DataRowSpec.ACTION_TAG), icon = a.icon, enabled = a.enabled, neutral = true) }
-    },
+    trailing = pill,
     danger = danger,
     chevron = action == null,
     minHeight = V3DataRowSpec.MIN_HEIGHT,
