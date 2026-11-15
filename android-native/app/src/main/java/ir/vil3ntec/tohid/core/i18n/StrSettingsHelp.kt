@@ -141,7 +141,7 @@ object StrSettingsHelp {
     "For example, an invoice over 10,000 afghani can't close without a customer name.",
     "د بېلګې په توګه، له ۱۰۰۰۰ افغانیو پورته فاکتور بې د پېرودونکي نوم نه تړل کېږي.",
   )
-  val heldLine: String get() = t("چند فاکتورِ باز با هم", "Several open invoices", "څو پرانیستي فاکتورونه")
+  val heldLine: String get() = t("یکی را نگه دارید، دیگری را بفروشید", "Hold one, serve the next", "یو وساتئ، بل وپلورئ")
   val heldExample: String get() = t(
     "مثلاً مشتری رفت پول بیاورد؛ فاکتورش را نگه دارید و به نفرِ بعدی بفروشید.",
     "For example, a customer goes to fetch money: hold their invoice and serve the next person.",
@@ -153,7 +153,7 @@ object StrSettingsHelp {
     "For example, only within 7 days of purchase, for \"faulty\" or \"wrong size\".",
     "د بېلګې په توګه، یوازې د پېر تر ۷ ورځو پورې، د «خراب» یا «اندازه» دلیل سره.",
   )
-  val payFixLine: String get() = t("اصلاحِ روشِ پرداخت با دلیل", "Fix a payment method", "د تادیې لار په دلیل سمول")
+  val payFixLine: String get() = t("برای فاکتورِ ثبت‌شده، با دلیل", "On saved invoices", "د ثبت شوي فاکتور لپاره")
   val payFixExample: String get() = t(
     "مثلاً فاکتوری که اشتباهی «نقد» ثبت شد «کارت» شود؛ خودِ فاکتور دست نمی‌خورد.",
     "For example, an invoice wrongly saved as cash becomes card; the invoice itself stays the same.",
@@ -244,7 +244,7 @@ object StrSettingsHelp {
     "For example, staff can't give more than 5% off without your approval.",
     "د بېلګې په توګه، شاګرد ستاسو له تایید پرته له ۵٪ ډېر تخفیف نه شي ورکولی.",
   )
-  val tillGoodsLine: String get() = t("ثبتِ سریع و فروش به کارتن", "Quick add, sell by carton", "چټک ثبت، په کارتن پلور")
+  val tillGoodsLine: String get() = t("فروش به کارتن و بسته", "Sell by carton or pack", "په کارتن او بسته پلور")
   val tillGoodsExample: String get() = t(
     "مثلاً بارکدِ ناشناس را اسکن کنید و همان‌جا نام و قیمت بدهید؛ یا یک کارتن = ۲۴ دانه بفروشید.",
     "For example, scan an unknown barcode and add its name and price on the spot; or sell a carton of 24.",
@@ -304,7 +304,7 @@ object StrSettingsHelp {
     "For example, raise all soft drinks by 10% at once and preview before saving.",
     "د بېلګې په توګه، د ټولو یخو څښاکونو بیه یوځای ۱۰٪ لوړه کړئ او له ثبت مخکې یې وګورئ.",
   )
-  val productInfoLine: String get() = t("کد، نامِ دیگر و جای قفسه", "Code, other names, shelf spot", "کوډ، نور نومونه، د المارۍ ځای")
+  val productInfoLine: String get() = t("نام‌های پشتو و انگلیسیِ کالا", "Pashto and English names", "پښتو او انګلیسي نومونه")
   val productInfoExample: String get() = t(
     "مثلاً بنویسید «راهرو ۲، قفسه ۳» تا شاگرد زود پیدایش کند.",
     "For example, write \"aisle 2, shelf 3\" so staff find it fast.",
