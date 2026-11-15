@@ -200,7 +200,8 @@ class DeskMenuTest {
         val i = DeskOff.info(id, owner = owner, canAdmin = admin)!!
         val shown = listOfNotNull(i.title, i.what, i.status, i.note, i.contact) + i.actions.map { it.label }
         for (t in shown) {
-          assertTrue("$lang $id: $t", "shop." !in t && "پنل" !in t && "پینل" !in t && "panel" !in t.lowercase() && "سرور" !in t && "server" !in t.lowercase())
+          //  نامِ پرچم = `shop.<چیزی>` (پایانِ جملهٔ انگلیسیِ «… for this shop.» نامِ پرچم نیست)
+          assertTrue("$lang $id: $t", !Regex("""shop\.[a-z]""").containsMatchIn(t) && "پنل" !in t && "پینل" !in t && "panel" !in t.lowercase() && "سرور" !in t && "server" !in t.lowercase())
         }
       }
     }
