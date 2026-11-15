@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
@@ -106,7 +107,10 @@ fun InvoiceNoteButton(note: String?, show: Boolean, onNote: (String?) -> Boolean
   PosNotesPrefs.load(LocalContext.current)
   if (!PosNotesPrefs.on.value || !show) return
   var open by remember { mutableStateOf(false) }
-  TextButton(onClick = { open = true }) {
+  if (LocalTillMenu.current != null) {
+    //  «…» ِ سبدِ گوشی: یادداشتِ نوشته‌شده خودش عنوانِ ردیف است
+    TillOffer("note", TillAction(20, note?.let { StrSalePages.noteLine(it) } ?: StrSalePages.invoiceNote, StrSalePages.printedOnReceipt, Icons.Outlined.EditNote, ir.vil3ntec.tohid.ui.v3.V3Hue.SLATE) { open = true })
+  } else TextButton(onClick = { open = true }) {
     androidx.compose.material3.Icon(Icons.Filled.Edit, contentDescription = null)
     Text(
       note?.let { StrSalePages.noteLine(it) } ?: StrSalePages.invoiceNote,

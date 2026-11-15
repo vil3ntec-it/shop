@@ -157,11 +157,14 @@ class OneHandShellUiTest {
     assertTrue("کالاها", barShown())
     listOf(
       StockPaths.LIST, MoneyPaths.DEBTORS, SalesPaths.HISTORY, MoneyPaths.RECEIPTS, MoneyPaths.EXPENSES,
-      MoneyPaths.PURCHASING, AnalyticsPaths.REPORTS, SettingsPaths.ROOT, "more", SalesPaths.SALE,
+      MoneyPaths.PURCHASING, AnalyticsPaths.REPORTS, SettingsPaths.ROOT, "more",
     ).forEach { p ->
       go(p)
       assertTrue("نوارِ پایین روی $p", barShown())
     }
+    //  تغییرِ عمدی (صاحب‌کار ۱۴۰۵/۰۸/۲۴، حالتِ تمرکزِ فروش): صندوق نوارِ شناور ندارد؛ نوارِ سبدِ خودش تنها چیزِ پایین است (`SaleFocusUiTest`)
+    go(SalesPaths.SALE)
+    assertFalse("صندوق (حالتِ تمرکز) نوار ندارد", barShown())
     go(ProductsPaths.item("p-rice"))
     assertFalse("صفحهٔ درونی (جزئیاتِ کالا) نوار ندارد", barShown())
   }
@@ -208,7 +211,7 @@ class OneHandShellUiTest {
 
   /** صندوقِ گوشی (`SaleScreen` — مسیرِ `sale` در آزمون پشتِ سدِ اشتراک است) بی دکمهٔ جست‌وجوی نوار ⇒ ذره‌بینِ سربرگ */
   @Test
-  fun `صندوق — دسته‌ها و آیکن‌ها بالا، اسکن تنها دکمهٔ شناور، جستجو با ذره‌بین`() {
+  fun `صندوق — دسته‌ها و آیکن‌ها بالا، اسکن تنها دکمهٔ پایین، جستجو با ذره‌بین`() {
     I18n.source = { Lang.FA }
     val noop: (PhoneCatalogItem) -> Unit = {}
     val actions = SaleActions(
@@ -234,12 +237,12 @@ class OneHandShellUiTest {
     assertTrue("«همه» بالا", topPx(hasText(StrSale.allChip) and hasClickAction()) < half)
     assertTrue("«+» ِ دسته بالا", topPx(hasContentDescription(StrSale.newCategory) and hasClickAction()) < half)
     assertTrue("بی کادرِ جستجو تا زدنِ ذره‌بین", nodes(hasSetTextAction()).isEmpty())
-    //  اسکن: تنها دکمهٔ پایین
+    //  اسکن: تنها دکمهٔ پایین (حالتِ تمرکزِ ۱۴۰۵/۰۸/۲۴: درونِ نوارِ سبد، نه دکمهٔ شناورِ جدا؛ سبدِ خالی ⇒ نوار فقط اسکن دارد)
     val scan = nodes(hasContentDescription(StrKit.scanBarcode) and hasClickAction())
     assertEquals(1, scan.size)
-    assertTrue("اسکن دکمهٔ شناورِ پایین", scan[0].boundsInRoot.top > half)
+    assertTrue("اسکن پایین", scan[0].boundsInRoot.top > half)
     val low = nodes(hasClickAction() and !inList).filter { it.boundsInRoot.top > half }
-    assertEquals("پایین فقط دکمهٔ شناورِ اسکن", 1, low.size)
+    assertEquals("پایین فقط دکمهٔ اسکن", 1, low.size)
     //  ذره‌بین ⇒ نوارِ جستجو جای سربرگ، اسکن درونِ کادر؛ نوشتن فهرست را کوتاه می‌کند
     click(find)
     val field = hasSetTextAction() and hasContentDescription(StrSale.catalogHint)
@@ -299,8 +302,11 @@ class OneHandShellUiTest {
   fun `دوربینِ اسکن و تسویه نوارِ پایین ندارند`() {
     val rice = data.products.first { it.id == "p-rice" }
     LineSheetHarness.seed(listOf(SalesEngine.CartLine(rice.id, 1.0)))
-    show(SalesPaths.SALE)
+    //  کالاها نوار دارند؛ صندوق (حالتِ تمرکز)، تسویه و دوربین نه
+    show(ProductsPaths.LIST)
     assertTrue(barShown())
+    go(SalesPaths.SALE)
+    assertFalse("صندوق", barShown())
     go(SalesPaths.CHECKOUT)
     assertFalse("تسویه", barShown())
     go(SalesPaths.scan("product"))

@@ -120,7 +120,7 @@ fun RouteScope.SaleRoute() {
     }
   }
 
-  //  صندوق نوارِ پایین ندارد (نوارِ سبد جایش است) ⇒ برگشت همیشه هست؛ در ریشه ⇒ خانه
+  //  حالتِ تمرکز: صندوق نوارِ شناور ندارد (`ShellFrame.FOCUS`؛ نوارِ سبد جایش است) ⇒ برگشت همیشه هست؛ در ریشه ⇒ خانه
   val back: () -> Unit = backOrNull ?: { nav.back(); Unit }
   val mode = remember(context) { CatalogMode(context) }
   //  POS-15: همان تنظیمِ «قیمت‌پرسی در صندوق» ِ کامپیوتر (ردهٔ A)
@@ -134,7 +134,9 @@ fun RouteScope.SaleRoute() {
     debtorId = debtorId,
     listMode = listMode,
     promo = promo?.applied.orEmpty(),
-    heldStrip = if (held.visible) ({ HeldStrip(held, data) }) else null,
+    //  نمایشِ تدریجی (۱۴۰۵/۰۸/۲۴): نوارِ فاکتورها فقط وقتی بیش از یک فاکتور باز است؛ وگرنه «فاکتورِ تازه» در «…» ِ سبد
+    heldStrip = if (held.visible && heldBook.items.isNotEmpty()) ({ HeldStrip(held, data) }) else null,
+    onNewInvoice = if (held.visible && heldBook.items.isEmpty()) ({ held.newInvoice() }) else null,
     onHold = if (held.visible) ({ held.askHold() }) else null,
     onHeldList = if (held.visible) ({ held.dialog = HeldDialog.List }) else null,
     tools = { PhoneTillTools(lines, PromoEngine.priced(lines, promo), debtorId) },
