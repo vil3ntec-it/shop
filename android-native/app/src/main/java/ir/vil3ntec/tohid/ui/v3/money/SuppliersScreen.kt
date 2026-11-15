@@ -61,6 +61,14 @@ import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3AnimateItem
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import ir.vil3ntec.tohid.ui.v3.nav.V3Modules
+import ir.vil3ntec.tohid.ui.v3.V3Search
+import ir.vil3ntec.tohid.ui.v3.V3Segmented
+import ir.vil3ntec.tohid.core.i18n.StrPurchases
+import ir.vil3ntec.tohid.data.PurchaseOrderDto
+import ir.vil3ntec.tohid.data.PurchaseViews
+import ir.vil3ntec.tohid.todayIso
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.saveable.rememberSaveable
 
 /** کارهای فهرستِ تأمین‌کننده‌ها — هر کدام یک مسیر، جز حذف که موتور همین‌جا رد یا قبول می‌کند */
 internal class SuppliersActions(
@@ -76,40 +84,82 @@ internal class SuppliersActions(
   val onSupplierBills: (() -> Unit)? = null,
   /** PUR-02/03/04: «سفارش‌های خرید» — `null` ⇒ پرچمِ `shop.purchase_orders` خاموش یا بی اینترنت (تراشه پنهان) */
   val onPurchaseOrders: (() -> Unit)? = null,
+  /** e-rows-63b: زبانهٔ «خریدها» — `null` ⇒ فقط فهرستِ تأمین‌کنندگان (آزمون‌های پیشین) */
+  val purchases: PurchasesActions? = null,
+  /** اسکنِ بارکد درونِ کادرِ جست‌وجوی خریدها ⇒ نوشتهٔ جست‌وجو */
+  val onScan: (((String) -> Unit) -> Unit)? = null,
 )
 
+/** زبانهٔ آغازینِ «خرید و تأمین‌کننده»: `?tab=suppliers` ⇒ تأمین‌کنندگان، وگرنه خریدها */
+internal const val SUPPLIERS_TAB = "suppliers"
+
 /**
- *  خرید و تأمین‌کننده (`purchasing`): کادرِ بزرگِ «بدهیِ ما به تأمین‌کننده‌ها» (شمارنده)، و هر
- *  تأمین‌کننده یک ردیف — آواتارِ حرفِ اول، نام، شماره، و بدهی با برچسبِ وضعیت (بدهکاریم سرخ،
- *  پیش‌پرداخت آبی، صاف سبز). کشیدن: «پرداخت» از آغاز، «ویرایش/حذف» از پایان. «ثبت خرید» شناور.
+ *  خرید و تأمین‌کننده (`purchasing`) — دو زبانه زیرِ عنوان (e-rows-63b، خواستهٔ صاحب‌کار: «نمی‌شود خریدهایی که کردم را ببینم»):
+ *   • **خریدها** (پیش‌فرض): همهٔ خریدها تازه‌ترین بالا ([purchasesContent])، یک ردیفِ کادرهای کشوییِ پالایه (تأمین‌کننده، پرداخت،
+ *     رسیدن، دوره) و جست‌وجوی بخش (نامِ کالا، بارکد، تأمین‌کننده، «#شماره»)؛ [orders] = سفارش‌های بازِ سرور (خالی ⇒ فقط دفتر).
+ *   • **تأمین‌کنندگان**: خلاصهٔ آرامِ «بدهیِ ما به تأمین‌کننده‌ها» و هر تأمین‌کننده یک ردیف — نام، شماره، و بدهی با برچسبِ
+ *     وضعیت. کشیدن: «پرداخت» از آغاز، «ویرایش/حذف» از پایان.
+ *  تنها دکمهٔ شناور «خریدِ تازه» است.
  */
 @Composable
-internal fun SuppliersScreen(d: ShopData, actions: SuppliersActions) {
+internal fun SuppliersScreen(
+  d: ShopData,
+  actions: SuppliersActions,
+  orders: List<PurchaseOrderDto> = emptyList(),
+  tabArg: String? = null,
+  payArg: String? = null,
+) {
+  val buying = actions.purchases
+  var tab by rememberSaveable { mutableStateOf(if (buying == null || tabArg == SUPPLIERS_TAB) 1 else 0) }
+  var filter by remember { mutableStateOf(PurchaseViews.Filter(pay = PurchaseViews.PayFilter.entries.firstOrNull { it.name == payArg?.uppercase() } ?: PurchaseViews.PayFilter.ALL)) }
+  var query by rememberSaveable { mutableStateOf("") }
+  val today = remember { todayIso() }
+  val views = remember(d, orders, today) { PurchaseViews.all(d, today, orders) }
+  val greg = PurchaseRowText.gregorian()
+  val shown = remember(views, filter, query, greg) {
+    PurchaseViews.search(d, views.filter { PurchaseViews.matches(it, filter, greg, today) }, query)
+  }
   val rows = remember(d) { SuppliersModel.rows(d) }
   val owed = rememberCountUp(remember(d) { SuppliersModel.owedTotal(d) })
   val stagger = rememberV3Stagger()
   var confirmDelete by remember { mutableStateOf<String?>(null) }
+  val doors = listOfNotNull(
+    actions.onPurchaseOrders?.let { V3SummaryAction(StrPurchasePages.purchaseOrders, Icons.Outlined.LocalShipping, onClick = it) },
+    actions.onSupplierBills?.let { V3SummaryAction(StrSupplierBills.title, Icons.AutoMirrored.Outlined.ReceiptLong, onClick = it) },
+  )
 
   V3Scaffold(
     title = Str.purchasing,
     onBack = actions.onBack,
-    fab = { expanded -> V3Fab(Icons.Outlined.AddShoppingCart, StrMoney.newPurchase, expanded, actions.onNewPurchase) },
+    search = if (buying != null && tab == 0) V3Search(query, { query = ir.vil3ntec.tohid.latinDigits(it) }, StrPurchases.searchHint, onScan = actions.onScan?.let { scan -> { scan { code -> query = code } } }) else null,
+    chips = if (buying == null) null else ({
+      Column {
+        Box(Modifier.padding(horizontal = 16.dp)) {
+          V3Segmented(listOf(StrPurchases.tabPurchases, StrPurchasePages.suppliers), tab, { tab = it })
+        }
+        if (tab == 0) {
+          Spacer(Modifier.height(8.dp))
+          PurchaseFilterRow(d, views, today, filter) { filter = it }
+        }
+      }
+    }),
+    fab = { expanded -> V3Fab(Icons.Outlined.AddShoppingCart, StrPurchases.newPurchase, expanded, actions.onNewPurchase) },
   ) { pad ->
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
       LazyColumn(
         Modifier.widthIn(max = 720.dp).fillMaxWidth(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding() + 72.dp),
       ) {
+        if (buying != null && tab == 0) {
+          purchasesContent(shown, views.isNotEmpty(), today, buying, doors) { filter = PurchaseViews.Filter(); query = "" }
+          return@LazyColumn
+        }
         item(key = "summary") {
           V3Summary(
             label = StrMoney.supplierDebtTotal,
             value = MoneyText.afn(owed),
             caption = StrMoney.suppliersCaption(d.suppliers.size, d.purchases.size),
-            actions = listOfNotNull(
-              V3SummaryAction(StrMoney.newSupplier, Icons.Outlined.PersonAddAlt, onClick = actions.onNewSupplier),
-              actions.onPurchaseOrders?.let { V3SummaryAction(StrPurchasePages.purchaseOrders, Icons.Outlined.LocalShipping, onClick = it) },
-              actions.onSupplierBills?.let { V3SummaryAction(StrSupplierBills.title, Icons.AutoMirrored.Outlined.ReceiptLong, onClick = it) },
-            ),
+            actions = listOf(V3SummaryAction(StrMoney.newSupplier, Icons.Outlined.PersonAddAlt, onClick = actions.onNewSupplier)) + doors,
           )
           Spacer(Modifier.height(16.dp))
         }

@@ -252,11 +252,24 @@ object PurchaseBook {
     val out = ArrayList<Due>()
     invoices(d, supplierId).groupBy { it.supplierId }.forEach { (sid, list) ->
       val bills = list.filter { !it.isReturn }
-      var credit = d.supplierPayments.filter { it.supplierId == sid }.sumOf { it.amount } +
-        list.filter { it.isReturn }.sumOf { -it.total } +
-        bills.sumOf { (-it.debt).coerceAtLeast(0.0) }
+      //  e-rows-63b: پرداختی که فاکتورش را نام می‌برد ([payNote]، «پرداخت» ِ جزئیاتِ خرید) اول همان فاکتور را صاف می‌کند؛
+      //  بیشِ آن و بقیهٔ پرداخت‌ها همان FIFO. جمعِ مانده‌ها همچنان `max(0, supplierDebt)` است.
+      val left = HashMap<String, Double>(bills.size * 2)
+      bills.forEach { left[it.key] = it.debt.coerceAtLeast(0.0) }
+      val byNo = bills.filter { it.no > 0 }.associateBy { it.no }
+      var credit = list.filter { it.isReturn }.sumOf { -it.total } + bills.sumOf { (-it.debt).coerceAtLeast(0.0) }
+      d.supplierPayments.filter { it.supplierId == sid }.forEach { p ->
+        var amount = p.amount
+        val target = if (amount > 0) paidInvoiceNo(p.notes)?.let(byNo::get) else null
+        if (target != null) {
+          val take = minOf(amount, left[target.key] ?: 0.0)
+          left[target.key] = (left[target.key] ?: 0.0) - take
+          amount -= take
+        }
+        credit += amount
+      }
       bills.sortedWith(compareBy<Invoice> { it.date }.thenBy { it.createdAt }.thenBy { it.key }).forEach { inv ->
-        val debt = inv.debt.coerceAtLeast(0.0)
+        val debt = left[inv.key] ?: 0.0
         val take = minOf(debt, credit.coerceAtLeast(0.0))
         credit -= take
         out += Due(inv, debt - take)
@@ -264,6 +277,18 @@ object PurchaseBook {
     }
     return out
   }
+
+  /**
+   *  یادداشتِ پرداختی که یک فاکتورِ خرید را صاف می‌کند («فاکتورِ خرید #۱۲ — …»، همان تکهٔ یادداشتِ ردیف‌های همان فاکتور
+   *  در [record]) — [open] آن را اول به همان فاکتور می‌دهد. بی تغییرِ سیم: یادداشت همان فیلدِ امروزِ `SupplierPayment` است.
+   */
+  fun payNote(no: Int, extra: String = ""): String =
+    listOf("فاکتورِ خرید #$no", extra.trim()).filter { it.isNotBlank() }.joinToString(" — ")  // داده: تکهٔ یادداشتِ پرداخت (منطقِ [open])
+
+  /** شمارهٔ فاکتوری که یادداشتِ یک پرداخت نام می‌برد ([payNote])؛ نبود ⇒ null */
+  fun paidInvoiceNo(notes: String): Int? = PAY_TAG.find(notes)?.groupValues?.get(1)?.toIntOrNull()?.takeIf { it > 0 }
+
+  private val PAY_TAG = Regex("^فاکتورِ خرید #(\\d+)")  // داده: همان تکهٔ [payNote]
 
   /** فاکتورهای خریدِ دارای ماندهٔ واقعی که سررسیدشان پیش از امروز است، زودترین سررسید بالا */
   fun overdue(d: ShopData, today: String, supplierId: String? = null): List<Due> =
@@ -467,7 +492,8 @@ object PurchaseBook {
   /** عنوانِ برگهٔ چاپیِ برگشت به تأمین‌کننده (S25، PUR-08) */
   const val CREDIT_NOTE_TITLE = "سندِ کسر"  // داده: نامِ پروندهٔ خروجی
 
-  fun invoiceSheet(d: ShopData, inv: Invoice): ReportCsv.Sheet {
+  /** [remaining] = ماندهٔ واقعی ([open]، چاپِ جزئیاتِ خرید ۶۳b)؛ null ⇒ همان ماندهٔ هنگامِ خرید، مثلِ پیشین */
+  fun invoiceSheet(d: ShopData, inv: Invoice, remaining: Double? = null): ReportCsv.Sheet {
     val names = d.products.associate { it.id to it.name }
     val supplier = d.suppliers.find { it.id == inv.supplierId }?.name.orEmpty()
     val rows = mutableListOf(listOf(StrSheets.row, StrSheets.product, StrSheets.quantity, StrSheets.unit, StrSheets.unitPrice, StrSheets.total))
@@ -485,8 +511,9 @@ object PurchaseBook {
       rows += listOf((i + 1).toString(), names[p.productId].orEmpty(), q(p.quantity), p.unit, r(p.purchasePrice), r(p.totalAmount))
     }
     rows += listOf("", StrSheets.total, "", "", "", r(inv.total))
-    rows += listOf("", StrSheets.paidDone, "", "", "", r(inv.paid))
-    rows += listOf("", StrSheets.balance, "", "", "", r(inv.debt))
+    val left = remaining?.coerceAtLeast(0.0) ?: inv.debt
+    rows += listOf("", StrSheets.paidDone, "", "", "", r(if (remaining == null) inv.paid else inv.total - left))
+    rows += listOf("", StrSheets.balance, "", "", "", r(left))
     val title = if (inv.no > 0) "فاکتور-خرید-${inv.no}" else "خرید"  // داده: نامِ پروندهٔ خروجی
     return ReportCsv.Sheet("$title-${safe(supplier)}-${inv.date}", rows)
   }

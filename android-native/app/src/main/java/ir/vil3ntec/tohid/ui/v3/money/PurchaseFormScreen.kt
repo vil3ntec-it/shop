@@ -1,5 +1,10 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
+import ir.vil3ntec.tohid.core.i18n.StrPurchases
+import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.ui.v3.V3Segmented
+import ir.vil3ntec.tohid.money
+import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -70,6 +75,23 @@ private val PurchaseFormSaver = listSaver<PurchaseForm, String>(
 )
 
 /**
+ *  e-rows-63b: «پرداخت» و «الان رسیده؟» کنارِ قالبِ [PurchaseFormUnitsSaver] (که دست نمی‌خورد):
+ *  `[قالبِ پیشین…] + [نامِ گزینهٔ پرداخت یا خالی، «1»/«0» ِ نرسیده] + [اندازهٔ قالبِ پیشین]`.
+ */
+private val PurchaseFormFlowSaver = listSaver<PurchaseForm, String>(
+  save = { f ->
+    @Suppress("UNCHECKED_CAST")
+    val base = with(PurchaseFormUnitsSaver) { save(f) } as List<String>
+    base + listOf(f.pay?.name.orEmpty(), if (f.later) "1" else "0", base.size.toString())
+  },
+  restore = { v ->
+    val n = v.lastOrNull()?.toIntOrNull()?.takeIf { it + 3 == v.size }
+    if (n == null) PurchaseFormUnitsSaver.restore(v)
+    else PurchaseFormUnitsSaver.restore(v.take(n))?.copy(pay = PurchasePay.entries.firstOrNull { it.name == v[n] }, later = v[n + 1] == "1")
+  },
+)
+
+/**
  *  PRD-07: واحدِ خریدِ ردیفِ نخست و هر ردیفِ افزوده کنارِ همان قالبِ [PurchaseFormSaver] (که دست نمی‌خورد):
  *  `[قالبِ پیشین…] + [واحدِ ردیفِ نخست، واحدِ هر ردیف…] + [اندازهٔ قالبِ پیشین]`؛ خالی = واحدِ پایه.
  */
@@ -119,9 +141,12 @@ private fun ExpiryField(value: String, onValue: (String) -> Unit, error: String?
  *  «ثبت خرید» (`purchasing/new?supplier=`، صفحه): گروه‌های «تأمین‌کننده» (پیش‌پُر از حسابِ همان
  *  تأمین‌کننده)، «کالا» (انبارِ خالی ⇒ راهنما و پیوندِ «کالای تازه»)، «مقدار و قیمت» با «جمع خرید»
  *  ِ زنده، «پرداخت» (خالی یعنی نسیه) با «باقی‌مانده» ِ زنده، تاریخ و توضیحات. دکمهٔ چسبانِ «ثبت خرید»؛
- *  نوشتهٔ ذخیره‌نشده ⇒ «دور ریخته شود؟». ثبت = `LedgerEngine.addPurchase` (اثرِ انبار همان امروز).
- *  PUR-05: «افزودنِ ردیفِ کالا» ⇒ فاکتورِ چندردیفه (کالا، مقدار و قیمتِ هر ردیف، یک پرداخت برای کل) و ثبت با همان
- *  `PurchaseBook.record` ِ فاکتورِ چندردیفهٔ کامپیوتر ([onSaveMany])؛ بی ردیفِ افزوده همان راهِ تک‌ردیفهٔ امروز.
+ *  نوشتهٔ ذخیره‌نشده ⇒ «دور ریخته شود؟».
+ *  PUR-05: «افزودنِ ردیفِ کالا» ⇒ فاکتورِ چندردیفه (کالا، مقدار و قیمتِ هر ردیف، یک پرداخت برای کل).
+ *  e-rows-63b (سادهٔ صاحب‌کار): تأمین‌کننده یا کالای تازه از همان برگهٔ انتخاب، افزودن با اسکن (دوربین و بارکدخوان)، «پرداخت»
+ *  با سه گزینه (کامل / بخشی / بعداً با سررسید) و «الان رسیده؟». رسیده ⇒ **همیشه** یک فاکتورِ شماره‌دار با `PurchaseBook.record`
+ *  ([onSaveMany]، اثرِ هر ردیف همان `addPurchase`: انبار، حرکت، بدهی، بهای خرید)، با یک کلید برای همین فرم (دو لمس یک خرید)؛
+ *  نرسیده ⇒ سفارشِ خرید ([onSaveLater]) و کالا با «دریافتِ کالا» می‌آید.
  */
 @Composable
 internal fun PurchaseFormScreen(
@@ -129,8 +154,6 @@ internal fun PurchaseFormScreen(
   supplierArg: String?,
   onBack: () -> Unit,
   onNewProduct: () -> Unit,
-  /** `true` ⇐ موتور پذیرفت (صفحه بسته می‌شود)؛ ردِ موتور پیامِ خودش را دارد */
-  onSave: (LedgerEngine.PurchaseDraft) -> Boolean,
   /**
    *  PUR-05: فاکتورِ دفترِ خرید (تأمین‌کننده، ردیف‌ها، پرداخت، تاریخ، توضیح، هزینهٔ جانبی و سررسید) ⇒ `PurchaseBook.record`؛
    *  `true` ⇐ پذیرفته
@@ -143,13 +166,26 @@ internal fun PurchaseFormScreen(
   extrasOn: Boolean = false,
   /** پیامِ بارکدخوان (بارکدِ ناشناخته، واحدِ خریدِ خوانده‌شده، فاکتورِ پر) — صفحه آن را در نوارِ پایین نشان می‌دهد */
   notify: (V3Tone, String) -> Unit = { _, _ -> },
+  /** e-rows-63b: «+ تأمین‌کنندهٔ تازه» در برگهٔ انتخاب ⇒ فرمِ تأمین‌کننده؛ شناسهٔ ساخته‌شده (یا null) برمی‌گردد */
+  onNewSupplier: ((String?) -> Unit) -> Unit = {},
+  /** e-rows-63b: دکمهٔ «اسکنِ بارکد» (دوربین) ⇒ همان افزودنِ ردیفِ بارکدخوان؛ null ⇒ نیست */
+  onScan: (((String) -> Unit) -> Unit)? = null,
+  /** e-rows-63b: «الان رسیده؟ نه» شدنی است؟ (پرچمِ سفارشِ خرید روشن، اینترنت، نقشِ مدیر) */
+  laterOn: Boolean = false,
+  /** e-rows-63b: کالای نرسیده ⇒ سفارشِ خرید (و پیش‌پرداخت)؛ پاسخ با `true` ⇐ فرستاده شد */
+  onSaveLater: (PurchaseForm, (Boolean) -> Unit) -> Unit = { _, done -> done(false) },
 ) {
   val initial = remember(supplierArg) { PurchaseFormModel.initial(supplierArg?.takeIf { id -> d.suppliers.any { it.id == id } }, todayIso()) }
   //  نوشته‌ها با چرخشِ گوشی و برگشت از «کالای تازه» نمی‌روند
-  var form by rememberSaveable(supplierArg, stateSaver = PurchaseFormUnitsSaver) { mutableStateOf(initial) }
+  var form by rememberSaveable(supplierArg, stateSaver = PurchaseFormFlowSaver) { mutableStateOf(initial) }
+  var busy by remember { mutableStateOf(false) }
   var tried by rememberSaveable { mutableStateOf(false) }
   //  کادرهای پنهان (موتورِ تازه خاموش) هیچ اثری ندارند — نوشتهٔ برگشته از چرخشِ صفحه هم پاک می‌شود
-  LaunchedEffect(extrasOn) { if (!extrasOn && (form.landed.isNotEmpty() || form.due.isNotEmpty())) form = form.copy(landed = "", due = "") }
+  LaunchedEffect(extrasOn) {
+    if (!extrasOn && form.landed.isNotEmpty()) form = form.copy(landed = "")
+    //  سررسید با «بخشی/بعداً» همه‌جا پیداست (e-rows-63b)؛ فقط کادرِ پنهان پاک می‌شود
+    if (!PurchaseFormModel.dueShown(form, extrasOn) && form.due.isNotEmpty()) form = form.copy(due = "")
+  }
   //  PRD-07: واحدِ خریدِ ردیف فقط با `ShopPolicy.productTools` (همان فاکتور و سفارشِ خریدِ کامپیوتر)؛ خاموش ⇒ همه به واحدِ پایه،
   //  پس ردیف‌ها و بدنهٔ فاکتور همان پیشین‌اند
   val unitsOn = purchaseUnitsOn()
@@ -158,7 +194,7 @@ internal fun PurchaseFormScreen(
   //  پرچم (خاموش ⇒ همان صفحهٔ پیشین، بی بارکدخوان)
   val barcodes = remember(d) { ShopStore.barcodeIndex(d) }
   val unitIndex = remember(d, unitsOn) { if (unitsOn) ShopStore.purchaseUnitIndex(d) else null }
-  val onScan by rememberUpdatedState<(String) -> Unit> { code ->
+  val onScanCode by rememberUpdatedState<(String) -> Unit> { code ->
     when (val r = PurchaseFormModel.scan(form, d, code, barcodes, unitIndex)) {
       is PurchaseFormModel.Scan.Added -> { form = r.form; r.unit?.let { notify(V3Tone.SUCCESS, StrPurchaseUnits.scanned(r.name, it)) } }
       is PurchaseFormModel.Scan.Unknown -> notify(V3Tone.ERROR, StrPurchasePages.barcodeUnknown(r.code))
@@ -166,9 +202,22 @@ internal fun PurchaseFormScreen(
     }
   }
   val scanOwner = remember { Any() }
-  DisposableEffect(unitsOn) {
-    if (unitsOn) ScanRouter.register(scanOwner) { code -> onScan(code); true }
-    onDispose { if (unitsOn) ScanRouter.unregister(scanOwner) }
+  //  e-rows-63b: «افزودن با اسکن» همیشه (پیش‌تر فقط با پرچمِ واحدِ خرید): بارکدخوانِ وصل تا این صفحه باز است همین‌جا
+  DisposableEffect(Unit) {
+    ScanRouter.register(scanOwner) { code -> onScanCode(code); true }
+    onDispose { ScanRouter.unregister(scanOwner) }
+  }
+  //  کالای تازه از همین فرم (فرمِ «کالای جدید» دست نمی‌خورد): کالایی که پس از رفتن به آن فرم پیدا شد، ردیفِ همان‌جا می‌شود
+  var waitingProduct by remember { mutableStateOf<Set<String>?>(null) }
+  var pickRowAtAdd by remember { mutableStateOf(-1) }
+  LaunchedEffect(d.products) {
+    val before = waitingProduct ?: return@LaunchedEffect
+    val added = d.products.filter { it.id !in before }
+    if (added.size == 1) {
+      val p = added.single()
+      form = if (pickRowAtAdd < 0) PurchaseFormModel.pickProduct(form, p, unitsOn) else PurchaseFormModel.pickRowProduct(form, pickRowAtAdd, p, unitsOn)
+    }
+    if (added.isNotEmpty()) waitingProduct = null
   }
   var shake by remember { mutableStateOf(0) }
   var picker by remember { mutableStateOf<PurchasePicker?>(null) }
@@ -194,13 +243,20 @@ internal fun PurchaseFormScreen(
     primary = StrMoney.newPurchase,
     onPrimary = {
       tried = true
-      if (errors.any) shake++
-      else if (!PurchaseFormModel.multi(form)) { if (onSave(PurchaseFormModel.draft(form, product?.unit.orEmpty()))) onBack() }
-      else if (onSaveMany(
+      when {
+        busy -> Unit
+        errors.any -> shake++
+        //  e-rows-63b: نرسیده ⇒ سفارشِ خرید (سرور)؛ بی آن پیامِ «روشن نیست» و هیچ ثبت
+        form.later && !laterOn -> { shake++; notify(V3Tone.ERROR, StrPurchases.laterOff) }
+        form.later -> { busy = true; onSaveLater(form) { ok -> busy = false; if (ok) onBack() } }
+        //  e-rows-63b: هر خرید یک فاکتورِ شماره‌دار (`PurchaseBook.record`) — تک‌ردیفه هم، تا «خریدِ #n» و «پرداخت» ِ همان خرید
+        //  (یادداشتِ `PurchaseBook.payNote`) کار کنند؛ اثرها همان `addPurchase` ِ هر ردیف است
+        onSaveMany(
           form.supplierId.orEmpty(),
           PurchaseFormModel.lines(form) { id -> d.products.find { it.id == id }?.unit.orEmpty() },
           PurchaseFormModel.paid(form), form.date, form.notes.trim(), PurchaseFormModel.extras(form, extrasOn),
-        )) onBack()
+        ) -> onBack()
+      }
     },
     onBack = onBack,
     dirty = PurchaseFormModel.dirty(form, initial),
@@ -257,7 +313,8 @@ internal fun PurchaseFormScreen(
         if (unitsOn) RowUnit(d, form.productId, form.unitName, form.quantity, form.price, shownErrors.unit) { u ->
           form = PurchaseFormModel.pickUnit(form, d, -1, u)
         }
-        ExpiryField(form.expiry, { form = form.copy(expiry = it) }, shownErrors.expiry)
+        //  کالای نرسیده انقضایش هنگامِ «دریافتِ کالا» ثبت می‌شود
+        if (!form.later) ExpiryField(form.expiry, { form = form.copy(expiry = it) }, shownErrors.expiry)
         LiveLine(StrMoney.purchaseTotal, MoneyText.afn(total))
       }
       //  PUR-05: ردیف‌های افزوده — هر کدام کالا، مقدار و قیمتِ خودش
@@ -296,7 +353,7 @@ internal fun PurchaseFormScreen(
           if (unitsOn) RowUnit(d, row.productId, row.unitName, row.quantity, row.price, rowErrors.unit) { u ->
             form = PurchaseFormModel.pickUnit(form, d, i, u)
           }
-          ExpiryField(row.expiry, { form = PurchaseFormModel.setRow(form, i, row.copy(expiry = it)) }, rowErrors.expiry)
+          if (!form.later) ExpiryField(row.expiry, { form = PurchaseFormModel.setRow(form, i, row.copy(expiry = it)) }, rowErrors.expiry)
           Spacer(Modifier.height(12.dp))
           V3Button(StrMoney.removePurchaseRow, { form = PurchaseFormModel.removeRow(form, i) }, Modifier.fillMaxWidth(), kind = V3ButtonKind.NEUTRAL)
         }
@@ -307,21 +364,51 @@ internal fun PurchaseFormScreen(
           Modifier.fillMaxWidth().padding(vertical = 8.dp), kind = V3ButtonKind.SECONDARY,
         )
       }
-      V3Section(StrMoney.paidSection, padding = PaddingValues(16.dp)) {
-        V3TextField(
-          value = form.paid,
-          onValueChange = { form = form.copy(paid = it) },
-          label = StrMoney.paidField,
-          kind = V3FieldKind.MONEY,
-          helper = StrMoney.paidHelper,
-          error = shownErrors.paid,
+      //  e-rows-63b: افزودنِ ردیف با دوربین — همان راهِ بارکدخوان (`PurchaseFormModel.scan`)
+      if (onScan != null && d.products.isNotEmpty()) {
+        V3Button(
+          StrKit.scanBarcode, { onScan { code -> onScanCode(code) } },
+          Modifier.fillMaxWidth().padding(bottom = 8.dp), kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.QrCodeScanner,
         )
+      }
+      //  e-rows-63b: «الان رسیده؟» — بله ⇒ فاکتورِ دفتر (کالا همین حالا به انبار)؛ نه ⇒ سفارشِ خرید و «دریافتِ کالا» ِ بعدی
+      V3Section(StrPurchases.receivedNow, padding = PaddingValues(16.dp)) {
+        V3Segmented(
+          listOf(StrPurchases.yesReceived, StrPurchases.laterReceived), if (form.later) 1 else 0,
+          { i -> form = PurchaseFormModel.setLater(form, i == 1) },
+        )
+        if (form.later) {
+          Spacer(Modifier.height(10.dp))
+          V3Message(if (laterOn) V3Tone.INFO else V3Tone.WARNING, if (laterOn) StrPurchases.laterHow else StrPurchases.laterOff)
+        }
+      }
+      V3Section(if (form.later) StrPurchases.prepay else StrMoney.paidSection, padding = PaddingValues(16.dp)) {
+        //  e-rows-63b: سه گزینهٔ روشن به‌جای «خالی یعنی نسیه»
+        val modes = PurchasePay.entries
+        V3Segmented(
+          listOf(StrPurchases.payFull, StrPurchases.payPart, StrPurchases.payLater),
+          modes.indexOf(form.pay ?: PurchasePay.PART),
+          { i -> form = PurchaseFormModel.setPay(form, modes[i]) },
+        )
+        Spacer(Modifier.height(12.dp))
+        when {
+          PurchaseFormModel.typesPaid(form) -> V3TextField(
+            value = form.paid,
+            onValueChange = { form = form.copy(paid = it) },
+            label = StrMoney.paidField,
+            kind = V3FieldKind.MONEY,
+            helper = if (form.pay == null) StrMoney.paidHelper else null,
+            error = shownErrors.paid,
+          )
+          form.pay == PurchasePay.FULL -> Text(StrPurchases.paidAll(money(total)), style = V3Type.subhead, color = PhoneV3.colors.inkMuted)
+          else -> Text(StrPurchases.laterNote, style = V3Type.subhead, color = PhoneV3.colors.inkMuted)
+        }
         val left = PurchaseFormModel.remaining(form)
         LiveLine(StrMoney.remainingLabel, MoneyText.afn(left), if (left > 0) LedgerTone.OWE else LedgerTone.SETTLED)
         Spacer(Modifier.height(12.dp))
         V3DateField(form.date, { form = form.copy(date = it) }, StrMoney.date)
-        if (extrasOn) {
-          //  PUR-06: کرایه/گمرک روی بهای ردیف‌ها (نه بدهیِ تأمین‌کننده)؛ PUR-07: سررسیدِ کلِ فاکتور برای یادآورِ بدهی
+        if (extrasOn && !form.later) {
+          //  PUR-06: کرایه/گمرک روی بهای ردیف‌ها (نه بدهیِ تأمین‌کننده)
           Spacer(Modifier.height(12.dp))
           V3TextField(
             value = form.landed,
@@ -331,6 +418,9 @@ internal fun PurchaseFormScreen(
             helper = StrPurchasePages.landedNote,
             error = shownErrors.landed,
           )
+        }
+        if (PurchaseFormModel.dueShown(form, extrasOn)) {
+          //  PUR-07: سررسیدِ کلِ فاکتور برای یادآورِ بدهی — با «بخشی/بعداً» همه‌جا (e-rows-63b)
           Spacer(Modifier.height(12.dp))
           V3TextField(
             form.due, { form = form.copy(due = it) }, StrPurchasePages.payDue, Modifier.fillMaxWidth(),
@@ -355,6 +445,8 @@ internal fun PurchaseFormScreen(
       selected = form.supplierId,
       onPick = { id -> form = form.copy(supplierId = id) },
       onDismiss = { picker = null },
+      addLabel = StrMoney.newSupplier,
+      onAdd = { onNewSupplier { id -> if (id != null) form = form.copy(supplierId = id) } },
     )
     PurchasePicker.PRODUCT -> {
       val current = if (pickRow < 0) form.productId else form.more.getOrNull(pickRow)?.productId
@@ -368,6 +460,9 @@ internal fun PurchaseFormScreen(
           }
         },
         onDismiss = { picker = null },
+        //  کالای تازه: همان فرمِ «کالای جدید» (۶۳k) — پس از ذخیره، همان ردیف همان کالا را می‌گیرد
+        addLabel = StrMoney.addProduct,
+        onAdd = { waitingProduct = d.products.mapTo(HashSet()) { it.id }; pickRowAtAdd = pickRow; onNewProduct() },
       )
     }
     null -> Unit

@@ -48,18 +48,26 @@ fun v3RowToneColor(c: PhoneV3Colors, tone: V3RowTone): Color = when (tone) {
 
 /**
  *  «۳۰۰ ؋ • لغوشده» در یک نوشته (اگر جا نشد، وضعیت به خطِ دوم می‌رود). [status] null ⇒ فقط مبلغ.
- *  [struck] ⇒ مبلغِ خط‌خورده و کم‌رنگ (فاکتورِ لغوشده).
+ *  [struck] ⇒ مبلغِ خط‌خورده و کم‌رنگ (فاکتورِ لغوشده). [second]: وضعیتِ دومِ آرام با رنگِ خودش («… • نیمه‌پرداخت • رسیده»،
+ *  خریدها ۶۳b) — null ⇒ همان یک وضعیت.
  */
 @Composable
-fun V3AmountStatus(amount: String?, status: V3RowStatus?, modifier: Modifier = Modifier, struck: Boolean = false, align: TextAlign = TextAlign.End) {
+fun V3AmountStatus(
+  amount: String?,
+  status: V3RowStatus?,
+  modifier: Modifier = Modifier,
+  struck: Boolean = false,
+  align: TextAlign = TextAlign.End,
+  second: V3RowStatus? = null,
+) {
   val c = PhoneV3.colors
   val text = buildAnnotatedString {
     if (amount != null) {
       withStyle(SpanStyle(color = if (struck) c.inkMuted else c.ink, textDecoration = if (struck) TextDecoration.LineThrough else null)) { append(amount) }
     }
-    if (status != null) {
-      if (amount != null) withStyle(SpanStyle(color = c.inkMuted)) { append(V3_ROW_DOT) }
-      withStyle(SpanStyle(color = v3RowToneColor(c, status.tone))) { append(status.text) }
+    listOfNotNull(status, second).forEachIndexed { i, st ->
+      if (amount != null || i > 0) withStyle(SpanStyle(color = c.inkMuted)) { append(V3_ROW_DOT) }
+      withStyle(SpanStyle(color = v3RowToneColor(c, st.tone))) { append(st.text) }
     }
   }
   Text(

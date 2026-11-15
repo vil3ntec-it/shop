@@ -4,6 +4,8 @@ import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.i18n.StrSupplierBills
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseOrders
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
+import ir.vil3ntec.tohid.core.i18n.StrPurchases
+import ir.vil3ntec.tohid.data.PoForms
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -11,7 +13,10 @@ import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.PeopleOutline
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.Str
@@ -64,6 +69,13 @@ object MoneyPaths {
   fun supplier(id: String) = "purchasing/suppliers/" + RoutePaths.encode(id)
   fun editSupplier(id: String) = supplier(id) + "/edit"
   fun paySupplier(id: String) = supplier(id) + "/pay"
+  /** e-rows-63b: «پرداخت» ِ یک خرید — برگهٔ همان تأمین‌کننده با ماندهٔ خرید و شمارهٔ فاکتور (یادداشتِ `PurchaseBook.payNote`) */
+  fun payPurchase(id: String, amount: Double, invoiceNo: Int?) =
+    RoutePaths.withQuery(paySupplier(id), "amount" to PoForms.num(Math.round(amount * 100.0) / 100.0), "invoice" to invoiceNo?.toString())
+  /** e-rows-63b: جزئیاتِ یک خرید با کلیدِ `PurchaseViews.View.key` */
+  fun purchase(key: String) = "purchasing/purchases/" + RoutePaths.encode(key)
+  /** زبانهٔ خرید با زبانهٔ آغازین (`suppliers`) یا پالایهٔ پرداخت (`unpaid`، `overdue`) */
+  fun purchasing(tab: String? = null, pay: String? = null) = RoutePaths.withQuery(PURCHASING, "tab" to tab, "pay" to pay)
   fun returnSupplier(id: String) = supplier(id) + "/return"
   fun newPurchase(supplier: String? = null) = RoutePaths.withQuery("purchasing/new", "supplier" to supplier)
   /** PUR-14: فاکتورهای تأمین‌کننده در گوشی — درش فقط با پرچمِ `shop.purchase_orders` و برای مدیر/صاحب (`rememberSupplierBillsDoor`) */
@@ -201,8 +213,13 @@ val MoneyModule = AppModule(
         val billsDoor = rememberSupplierBillsDoor()
         //  PUR-02/03/04: «سفارش‌های خرید» روی گوشی هم (پیش‌تر فقط پنجرهٔ کامپیوتر) — همان پرچم
         val ordersDoor = rememberPurchaseOrdersDoor()
+        //  e-rows-63b: سفارش‌های بازِ سرور در فهرستِ «خریدها» (نرسیده/نیمه‌رسیده) — فقط با همان پرچم
+        val open = rememberOpenOrders(ordersDoor)
         SuppliersScreen(
           d = data,
+          orders = open.orders,
+          tabArg = args.query("tab"),
+          payArg = args.query("pay"),
           actions = SuppliersActions(
             onBack = backOrNull,
             onOpen = { nav.open(MoneyPaths.supplier(it)) },
@@ -213,9 +230,14 @@ val MoneyModule = AppModule(
             onNewPurchase = { nav.open(MoneyPaths.newPurchase()) },
             onSupplierBills = if (billsDoor) ({ nav.open(MoneyPaths.SUPPLIER_BILLS) }) else null,
             onPurchaseOrders = if (ordersDoor) ({ nav.open(MoneyPaths.PURCHASE_ORDERS) }) else null,
+            purchases = purchasesActions(open),
+            onScan = purchaseScan(),
           ),
         )
       }
+    },
+    V3Route("purchasing/purchases/{key}", RouteKind.PAGE, { StrPurchases.purchase }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) {
+      PurchaseDetailRoute(args["key"].orEmpty())
     },
     V3Route(MoneyPaths.SUPPLIER_BILLS, RouteKind.PAGE, { StrSupplierBills.title }, parent = MoneyPaths.PURCHASING) { SupplierBillsRoute() },
     V3Route("purchasing/bills/{id}", RouteKind.PAGE, { StrSupplierBills.order }, parent = MoneyPaths.SUPPLIER_BILLS) { SupplierBillRoute(args["id"].orEmpty()) },
@@ -230,9 +252,12 @@ val MoneyModule = AppModule(
     V3Route(MoneyPaths.NEW_SUPPLIER, RouteKind.SHEET, { StrMoney.newSupplier }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) { SupplierFormRoute(null) },
     V3Route("purchasing/suppliers/{id}", RouteKind.PAGE, { Str.purchasing }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) {
       val id = args["id"].orEmpty()
+      //  e-rows-63b: سفارش‌های بازِ همین تأمین‌کننده هم در «خریدها» ِ صفحه‌اش (همان پرچم)
+      val open = rememberOpenOrders(rememberPurchaseOrdersDoor())
       SupplierLedgerScreen(
         id = id,
         d = data,
+        orders = open.orders,
         actions = SupplierLedgerActions(
           onBack = backOrNull,
           onPay = { nav.open(MoneyPaths.paySupplier(id)) },
@@ -240,6 +265,7 @@ val MoneyModule = AppModule(
           onEdit = { nav.open(MoneyPaths.editSupplier(id)) },
           onDelete = { if (MoneyWriter.ledger(store, toasts, null, data, LedgerEngine.deleteSupplier(data, id), StrMoney.deleted) != null) back() },
           onReturn = { nav.open(MoneyPaths.returnSupplier(id)) },
+          purchases = purchasesActions(open),
         ),
       )
     },
@@ -257,9 +283,6 @@ val MoneyModule = AppModule(
         supplierArg = args.query("supplier"),
         onBack = { back() },
         onNewProduct = { nav.open(ProductsPaths.new()) },
-        onSave = { draft ->
-          MoneyWriter.ledger(store, toasts, context, data, LedgerEngine.addPurchase(data, draft, todayIso(), System.currentTimeMillis(), ir.vil3ntec.tohid.data.PurchaseBook.keyedIds(saveKey)), StrMoney.purchaseSaved) != null
-        },
         //  PUR-05: همان فاکتورِ چندردیفهٔ کامپیوتر (`DeskPurchasing`)، با هزینهٔ جانبی (PUR-06) و سررسید (PUR-07)
         onSaveMany = { supplierId, lines, paid, date, notes, extras ->
           MoneyWriter.purchase(
@@ -272,6 +295,11 @@ val MoneyModule = AppModule(
         //  همان شرطِ کامپیوتر (`DeskPurchasing.stockOn`)
         extrasOn = remember(data.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(data) },
         notify = { tone, text -> toasts.show(text, tone) },
+        //  e-rows-63b: تأمین‌کنندهٔ تازه از همان برگهٔ انتخاب، اسکن با دوربین، و «الان رسیده؟ نه» ⇒ سفارشِ خرید (همان کلیدِ فرم)
+        onNewSupplier = { picked -> nav.openForResult(MoneyPaths.NEW_SUPPLIER) { picked(it) } },
+        onScan = purchaseScan(),
+        laterOn = rememberPoManage(rememberPurchaseOrdersDoor()),
+        onSaveLater = rememberSaveLater(saveKey),
       )
     },
 
@@ -490,14 +518,16 @@ private fun RouteScope.SupplierFormRoute(id: String?) {
   val context = LocalContext.current
   val supplier = id?.let { k -> data.suppliers.find { it.id == k } }
   if (id != null && supplier == null) { LandOn(MoneyPaths.PURCHASING); return }
+  //  e-rows-63b: شناسهٔ تأمین‌کنندهٔ تازه نتیجهٔ همین برگه است (فرمِ «خریدِ تازه» آن را برمی‌گزیند)؛ بی منتظر همان «برگشت»
+  var made by remember { mutableStateOf<String?>(null) }
   SupplierFormSheet(
     supplier = supplier,
     onClose = { back() },
     onSave = { draft ->
       val result = if (id == null) LedgerEngine.addSupplier(data, draft, System.currentTimeMillis(), ::moneyId) else LedgerEngine.editSupplier(data, id, draft)
-      MoneyWriter.ledger(store, toasts, context, data, result, if (id == null) StrMoney.saved else StrMoney.edited) != null
+      MoneyWriter.ledger(store, toasts, context, data, result, if (id == null) StrMoney.saved else StrMoney.edited)?.also { made = it } != null
     },
-    onSaved = { back() },
+    onSaved = { nav.finish(made) },
   )
 }
 
@@ -510,9 +540,15 @@ private fun RouteScope.PayRoute() {
   if (supplier == null) { LandOn(MoneyPaths.PURCHASING); return }
   //  PUR-07: یک کلید برای همین برگه — دو لمسِ «ثبتِ پرداخت» پیش از بسته شدن یک پرداخت است
   val payKey = remember(id) { moneyId() }
+  //  e-rows-63b: «پرداخت» ِ یک خرید ⇒ ماندهٔ همان خرید و یادداشتی که فاکتور را نام می‌برد (`PurchaseBook.open` اول همان را صاف می‌کند)
+  val invoiceNo = args.query("invoice")?.toIntOrNull()?.takeIf { it > 0 }
+  val prefill = remember(id, invoiceNo) {
+    args.query("amount")?.takeIf { it.isNotBlank() }?.let { a -> PayForm(amount = a, date = todayIso(), notes = invoiceNo?.let { ir.vil3ntec.tohid.data.PurchaseBook.payNote(it) }.orEmpty()) }
+  }
   SupplierPaySheet(
     supplier = supplier,
     debt = ir.vil3ntec.tohid.data.ShopStore.supplierDebt(data, id),
+    prefill = prefill,
     onClose = { back() },
     onSave = { f ->
       val result = LedgerEngine.paySupplier(data, id, LedgerFormsModel.payAmount(f), f.date, f.notes, todayIso(), System.currentTimeMillis(), ::moneyId, key = payKey)
