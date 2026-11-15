@@ -40,7 +40,8 @@ import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.desktop.DesktopContext
 import ir.vil3ntec.tohid.desktop.RouteUiHarness
 import ir.vil3ntec.tohid.ui.components.common.NavCatalog
-import ir.vil3ntec.tohid.ui.screens.DESK_RAIL_WIDTH
+import ir.vil3ntec.tohid.ui.desk.DeskSize
+import ir.vil3ntec.tohid.ui.screens.RailMode
 import ir.vil3ntec.tohid.ui.screens.DeskHeader
 import ir.vil3ntec.tohid.ui.screens.DeskRail
 import ir.vil3ntec.tohid.ui.screens.DeskStatusBar
@@ -117,15 +118,20 @@ class D3aShotsTest {
       access = Access.all(AppMode.SHOP, setOf(EXAMPLE_FLAG, KIT_GALLERY_FLAG)),
       navAllowed = NavCatalog.allowed(canManage = true, ordersLive = true),
     )
+    //  صندوق منوی «فقط آیکن» دارد (`desk_rail_pos`، پیش‌فرض)، بقیه منوی کامل — همان `AppRoot`
+    val compact = rail == "sale"
     CompositionLocalProvider(LocalV3Toasts provides toasts, LocalV3SystemBottom provides 0.dp, LocalDeskLayout provides true) {
       Column(Modifier.fillMaxSize().background(PhoneV3.colors.bg)) {
-        DeskHeader(title = title, d = data, onBack = null, onMenu = {}, onSearch = {}, onOpen = {}, page = rail)
         Box(Modifier.weight(1f).fillMaxWidth()) {
-          DeskRail(current = rail, onPick = {})
-          Box(Modifier.fillMaxSize().padding(start = DESK_RAIL_WIDTH)) {
-            //  صندوق بی سدِ اشتراکِ آزمون (`VipGate` بی حساب قفل است) — همان صفحه‌ای که مسیرِ `sale` برای حسابِ فعال می‌کشد
-            if (path == "sale") ir.vil3ntec.tohid.ui.screens.DeskSaleScreen(store = store, cartStore = cart, d = data, snackbar = snackbar) {}
-            else V3RouteHost(nav, shell, Modifier.fillMaxSize())
+          DeskRail(current = rail, onPick = {}, compact = compact, mode = if (compact) RailMode.COMPACT else RailMode.FULL, path = path)
+          //  e-desk-d1: سربرگ درونِ ستونِ محتوا، کنارِ منوی تمام‌قد
+          Column(Modifier.fillMaxSize().padding(start = if (compact) DeskSize.sidebarCompact else DeskSize.sidebar)) {
+            DeskHeader(title = title, d = data, onBack = null, onMenu = {}, onSearch = {}, onOpen = {}, page = rail, menuVisible = true)
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+              //  صندوق بی سدِ اشتراکِ آزمون (`VipGate` بی حساب قفل است) — همان صفحه‌ای که مسیرِ `sale` برای حسابِ فعال می‌کشد
+              if (path == "sale") ir.vil3ntec.tohid.ui.screens.DeskSaleScreen(store = store, cartStore = cart, d = data, snackbar = snackbar) {}
+              else V3RouteHost(nav, shell, Modifier.fillMaxSize())
+            }
           }
         }
         DeskStatusBar(data)
@@ -176,7 +182,7 @@ class D3aShotsTest {
     val pos = ir.vil3ntec.tohid.ui.components.pos.PosShot.view
     screen("sale", "sale", ir.vil3ntec.tohid.core.i18n.Str.sale, "sale", withCart = true) { pos.value = ir.vil3ntec.tohid.ui.components.common.ViewMode.CARD }
     screen("sale-table", "sale", ir.vil3ntec.tohid.core.i18n.Str.sale, "sale", withCart = true) { pos.value = ir.vil3ntec.tohid.ui.components.common.ViewMode.TABLE }
-    screen("products", "products", ir.vil3ntec.tohid.core.i18n.StrProducts.listTitle, "products")
+    screen("products", "products", ir.vil3ntec.tohid.core.i18n.StrProducts.listTitle, "products") { ir.vil3ntec.tohid.ui.screens.DeskProductsShot.view.value = "table" }
     screen("stock", "stock", ir.vil3ntec.tohid.core.i18n.Str.warehouse, "warehouse")
     screen("stock-item", "stock/" + StockDemo.RICE, ir.vil3ntec.tohid.core.i18n.Str.warehouse, "warehouse")
     screen("stock-moves", "stock/" + StockDemo.RICE + "/movements", ir.vil3ntec.tohid.core.i18n.StrStock.movementsRow, "warehouse")

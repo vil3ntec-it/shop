@@ -156,16 +156,25 @@ internal fun DeskCatalogTable(
   modifier: Modifier = Modifier,
 ) {
   LaunchedEffect(highlight, items) {
-    runCatching { if (highlight in items.indices) state.animateScrollToItem(highlight) else state.scrollToItem(0) }
+    //  برجسته دیده می‌ماند؛ فهرستِ تازه فقط اگر از سر رفته بود به سر برمی‌گردد (بارِ نخست منتظرِ چیدمان نمی‌ماند)
+    runCatching {
+      if (highlight in items.indices) state.animateScrollToItem(highlight)
+      else if (state.firstVisibleItemIndex + state.firstVisibleItemScrollOffset > 0) state.scrollToItem(0)
+    }
   }
   val c = Desk.colors
+  androidx.compose.foundation.layout.BoxWithConstraints(modifier) {
+  //  کاتالوگِ پهن (مانیتورِ بزرگ): سهمِ وزنی تا موجودی و قیمت کنارِ نام بمانند، نه ته جدول
+  val xw = maxWidth.value >= 1000f
+  fun col(title: String, w: Dp, weight: Float, end: Boolean = false) = if (xw) DeskColumn(title, weight = weight, end = end) else DeskColumn(title, width = w, end = end)
+  fun RowScope.cell(w: Dp, weight: Float): Modifier = if (xw) Modifier.weight(weight) else Modifier.width(w)
   val cols = listOf(
-    DeskColumn(Str.product, weight = 1f),
-    DeskColumn(StrSale.stock, width = COL_STOCK),
-    DeskColumn(StrSale.price, width = COL_PRICE, end = true),
-    DeskColumn(StrPos.inCart, width = COL_IN_CART, end = true),
+    DeskColumn(Str.product, weight = if (xw) 3f else 1f),
+    col(StrSale.stock, COL_STOCK, 1.2f),
+    col(StrSale.price, COL_PRICE, 0.9f, end = true),
+    col(StrPos.inCart, COL_IN_CART, 0.5f, end = true),
   )
-  Column(modifier) {
+  Column(Modifier.fillMaxSize()) {
     DeskTableHead(cols)
     LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = state, contentPadding = PaddingValues(bottom = DeskSpace.x2)) {
       itemsIndexed(items, key = { _, p -> p.id }) { i, p ->
@@ -183,20 +192,26 @@ internal fun DeskCatalogTable(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DeskSpace.x3),
           ) {
-            if (showPhotos) ProductThumb(p.id, p.name, 30.dp, true, tintKey = p.category)
-            Column(Modifier.weight(1f)) {
-              Text(p.name, style = DeskType.bodyStrong, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-              val meta = listOf(p.category, p.barcodes.firstOrNull().orEmpty()).filter { it.isNotBlank() }.joinToString(" • ")
-              if (meta.isNotEmpty()) Text(meta, style = DeskType.caption.copy(fontWeight = DeskType.secondary.fontWeight), color = c.inkSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(Modifier.weight(if (xw) 3f else 1f), verticalAlignment = Alignment.CenterVertically) {
+              if (showPhotos) {
+                ProductThumb(p.id, p.name, 30.dp, true, tintKey = p.category)
+                Spacer(Modifier.width(DeskSpace.x3))
+              }
+              Column(Modifier.weight(1f)) {
+                Text(p.name, style = DeskType.bodyStrong, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val meta = listOf(p.category, p.barcodes.firstOrNull().orEmpty()).filter { it.isNotBlank() }.joinToString(" • ")
+                if (meta.isNotEmpty()) Text(meta, style = DeskType.caption.copy(fontWeight = DeskType.secondary.fontWeight), color = c.inkSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+              }
             }
-            Text(deskStockText(p, stock), Modifier.width(COL_STOCK), style = DeskType.secondary, color = if (stock <= 0 && p.stockless != true) c.inkMuted else c.inkSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${money(ir.vil3ntec.tohid.data.ProductPlansMap.price(p))} ؋", Modifier.width(COL_PRICE), style = DeskType.number, color = c.ink, textAlign = TextAlign.End, maxLines = 1)
-            Text(if (inCart > 0) "×${qty(inCart)}" else "", Modifier.width(COL_IN_CART), style = DeskType.number, color = c.brandInk, textAlign = TextAlign.End, maxLines = 1)
+            Text(deskStockText(p, stock), cell(COL_STOCK, 1.2f), style = DeskType.secondary, color = if (stock <= 0 && p.stockless != true) c.inkMuted else c.inkSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("${money(ir.vil3ntec.tohid.data.ProductPlansMap.price(p))} ؋", cell(COL_PRICE, 0.9f), style = DeskType.number, color = c.ink, textAlign = TextAlign.End, maxLines = 1)
+            Text(if (inCart > 0) "×${qty(inCart)}" else "", cell(COL_IN_CART, 0.5f), style = DeskType.number, color = c.brandInk, textAlign = TextAlign.End, maxLines = 1)
           }
           DeskDivider(Modifier.padding(horizontal = DeskSpace.x3))
         }
       }
     }
+  }
   }
 }
 
@@ -215,7 +230,11 @@ internal fun DeskCatalogGrid(
   modifier: Modifier = Modifier,
 ) {
   LaunchedEffect(highlight, items) {
-    runCatching { if (highlight in items.indices) state.animateScrollToItem(highlight) else state.scrollToItem(0) }
+    //  برجسته دیده می‌ماند؛ فهرستِ تازه فقط اگر از سر رفته بود به سر برمی‌گردد (بارِ نخست منتظرِ چیدمان نمی‌ماند)
+    runCatching {
+      if (highlight in items.indices) state.animateScrollToItem(highlight)
+      else if (state.firstVisibleItemIndex + state.firstVisibleItemScrollOffset > 0) state.scrollToItem(0)
+    }
   }
   val c = Desk.colors
   LazyVerticalGrid(
@@ -500,14 +519,14 @@ internal fun DeskTotals(rows: List<PosSummaryRow>, payable: Double, extra: @Comp
 @Composable
 internal fun DeskPayMethods(methods: List<PosPayMethod>, selected: SalesEngine.Payment, tone: DeskHue, onSelect: (PosPayMethod) -> Unit) {
   val c = Desk.colors
-  Row(Modifier.fillMaxWidth().padding(top = DeskSpace.x3).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(DeskSpace.x2)) {
+  Row(Modifier.fillMaxWidth().padding(top = DeskSpace.x2).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(DeskSpace.x2)) {
     methods.forEach { m ->
       val on = m.payment == selected
       val icon = if (m.payment == SalesEngine.Payment.CASH) Icons.Outlined.Payments else Icons.Outlined.AccountBalanceWallet
       Row(
         Modifier
           .weight(1f)
-          .height(44.dp)
+          .height(42.dp)
           .clip(DeskRadius.controlShape)
           .background(if (on) tone.tile else c.surface)
           .border(if (on) 1.5.dp else DeskSize.hairline, if (on) tone.solid else c.hairline, DeskRadius.controlShape)
