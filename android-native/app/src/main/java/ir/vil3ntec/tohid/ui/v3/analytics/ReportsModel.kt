@@ -94,6 +94,32 @@ object ReportsModel {
     else -> p
   }
 
+  /** ۶۳w: کلیدِ کادرِ کشوییِ بازه — «today»، «week»، «month»، «jmonth:1405-8»، «jyear:1405»، «all» */
+  fun choiceKey(p: ReportPeriod): String = when (p.range) {
+    ReportEngine.Range.JMONTH -> "jmonth:${p.year}-${p.month}"
+    ReportEngine.Range.JYEAR -> "jyear:${p.year}"
+    else -> rangeId(p.range)
+  }
+
+  /** گزینه‌های کادر (جای ردیفِ تراشه‌ها و ‹ ماه › ِ برگه): امروز، ۷ روز، این ماه، دوازده ماهِ خورشیدی، سه سال، از آغاز */
+  fun choiceKeys(year: Int, month: Int): List<String> =
+    listOf("today", "week", "month") +
+      (0 downTo -11).map { stepMonth(year, month, it).let { (y, m) -> "jmonth:$y-$m" } } +
+      (0 downTo -2).map { "jyear:${year + it}" } + "all"
+
+  /** کلیدِ کادر ⇒ بازه؛ ناشناخته ⇒ [fallback] */
+  fun parseChoice(key: String, fallback: ReportPeriod): ReportPeriod {
+    val head = key.substringBefore(':')
+    val tail = key.substringAfter(':', "")
+    val range = ReportEngine.Range.entries.firstOrNull { it.name.equals(head, ignoreCase = true) } ?: return fallback
+    return when (range) {
+      ReportEngine.Range.JMONTH -> tail.split('-').mapNotNull { it.toIntOrNull() }.takeIf { it.size == 2 && it[1] in 1..12 }
+        ?.let { ReportPeriod(range, it[0], it[1]) } ?: fallback
+      ReportEngine.Range.JYEAR -> tail.toIntOrNull()?.let { ReportPeriod(range, it, fallback.month) } ?: fallback
+      else -> fallback.copy(range = range)
+    }
+  }
+
   fun bounds(p: ReportPeriod, today: String): Pair<String, String> = ReportEngine.rangeOf(p.range, today, p.year, p.month)
 
   fun isAllTime(from: String): Boolean = from == "0000-01-01"

@@ -88,5 +88,11 @@ internal class RouteUiHarness(private val rule: ComposeContentTestRule) : AutoCl
       @Suppress("UNCHECKED_CAST")
       (ShopStore::class.java.getDeclaredField("_data").apply { isAccessible = true }.get(s) as MutableStateFlow<ShopData>).value = d
     }
+
+    /** همان دفترِ حافظه‌ای، «خوانده‌شده از دیسک» (`loaded`) — صفحه‌هایی که تا آن لحظه اسکلت نشان می‌دهند (کالاها) فهرستِ واقعی می‌کشند */
+    fun loadedStore(d: ShopData): ShopStore = memoryStore(d).also { s ->
+      @Suppress("UNCHECKED_CAST")
+      (ShopStore::class.java.getDeclaredField("_loaded").apply { isAccessible = true }.get(s) as MutableStateFlow<Boolean>).value = true
+    }
   }
 }

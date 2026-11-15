@@ -61,7 +61,7 @@ private fun <T> ShopperResult<T>.load(): Load<T> = when (this) {
  */
 class CustomerModel(
   internal val api: ShopperApi,
-  private val kv: ShopperKeyValue,
+  internal val kv: ShopperKeyValue,
   private val scope: CoroutineScope,
   private val io: CoroutineDispatcher,
   internal val clock: () -> Long,

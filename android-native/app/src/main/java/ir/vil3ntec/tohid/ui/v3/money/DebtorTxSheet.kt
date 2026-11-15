@@ -47,6 +47,7 @@ import ir.vil3ntec.tohid.ui.v3.v3Shake
 import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Divider
+import ir.vil3ntec.tohid.ui.v3.InvoiceRefText
 import ir.vil3ntec.tohid.ui.v3.V3InvoiceItems
 import ir.vil3ntec.tohid.ui.v3.V3PageSwitch
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
@@ -118,26 +119,34 @@ private fun TxDetails(tx: DebtTransaction, entry: DebtBook.Entry?, book: DebtBoo
     V3Card(padding = PaddingValues(vertical = 4.dp)) {
       lines.forEachIndexed { i, line ->
         if (i > 0) V3Divider(start = 14.dp)
-        DetailLine(line)
+        DetailLine(line, tx.debtorId)
       }
     }
     val items = remember(entry) { DebtorTxModel.items(entry) }
     if (entry != null && items.isNotEmpty()) {
       Spacer(Modifier.height(14.dp))
-      V3InvoiceItems(items, title = DebtorTxModel.itemsTitle(entry), footer = DebtorTxModel.itemsFooter(entry))
+      //  سرِ اقلام: «فاکتور #۱۲» زدنی (همان فاکتور)؛ بقیه همان نوشتهٔ پررنگِ سرِ `V3InvoiceItems`
+      val head = remember(entry) { DebtorTxModel.itemsTitlePieces(entry) }
+      InvoiceRefText(head, Modifier.padding(horizontal = 4.dp), style = v3Text(15, FontWeight.Bold, 21), color = PhoneV3.colors.ink, debtorId = tx.debtorId)
+      Spacer(Modifier.height(6.dp))
+      V3InvoiceItems(items, footer = DebtorTxModel.itemsFooter(entry))
     }
   }
 }
 
 @Composable
-private fun DetailLine(line: DebtorTxModel.Line) {
+private fun DetailLine(line: DebtorTxModel.Line, debtorId: String) {
   val c = PhoneV3.colors
   Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
     Text(line.label, style = v3Text(13, FontWeight.Normal, 18), color = c.inkMuted)
     Spacer(Modifier.width(12.dp))
     Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
       val pill = line.pill
-      if (pill == null) Text(line.value, style = v3Text(14, FontWeight.Medium, 20), color = c.ink, textAlign = TextAlign.End)
+      val pieces = line.pieces
+      //  «فروش نسیه — فاکتور #12»: فقط «فاکتور #12» زدنی ⇒ همان فاکتور (`InvoiceRef`)
+      if (pill == null && pieces != null) {
+        InvoiceRefText(pieces, style = v3Text(14, FontWeight.Medium, 20), color = c.ink, debtorId = debtorId, arrangement = Arrangement.End, textAlign = TextAlign.End)
+      } else if (pill == null) Text(line.value, style = v3Text(14, FontWeight.Medium, 20), color = c.ink, textAlign = TextAlign.End)
       else V3StatusPill(
         when (pill) {
           DebtorTxModel.Pill.SETTLED -> V3Status.DELIVERED
@@ -201,11 +210,7 @@ private fun DueStep(entry: DebtBook.Entry?, onCancel: () -> Unit, onSave: (Strin
   Column {
     Text(StrMoney.dueTitle, style = v3Text(19, FontWeight.Bold, 26), color = PhoneV3.colors.ink)
     if (entry != null) {
-      Text(
-        listOfNotNull(MoneyText.date(entry.tx.date), "${DebtBook.show(entry.amount)} ؋", entry.invoiceLabel?.let { StrMoney.invoiceNo(it) }).joinToString(" — "),
-        style = v3Text(13, FontWeight.Normal, 19),
-        color = PhoneV3.colors.inkMuted,
-      )
+      InvoiceRefText(DebtorTxModel.dueSubtitle(entry), style = v3Text(13, FontWeight.Normal, 19), color = PhoneV3.colors.inkMuted, debtorId = entry.tx.debtorId)
     }
     Spacer(Modifier.height(14.dp))
     var dueText by remember { mutableStateOf("") }

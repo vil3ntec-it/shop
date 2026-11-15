@@ -47,6 +47,8 @@ function backgroundJobs() {
     mod('hesabpay-guard'),
     //  WEB-10: «خبرم کن وقتی موجود/ارزان شد» (بی پرچمِ `shop.storefront.alerts` ⇒ جدولِ خالی، یک پرسشِ کوچک)
     mod('storefront-alerts'),
+    //  CHK-10: «رسیدیم» ِ خودکار به ایمیلِ تأییدشدهٔ «خبرم کن» ِ بیرونِ محدوده (بی پرچمِ `shop.storefront.area_email` ⇒ هیچ نامه)
+    mod('storefront-area-email'),
     //  NTF-10: پوزش و کوپنِ خودکارِ تأخیر (فقط دکانِ با پرچمِ `shop.orders.late_apology` و سیاستِ روشنِ صاحب)
     mod('order-late-apology'),
     //  AI-11: نمایهٔ هشِ عکسِ کالاها برای «جست‌وجو با عکس» — فقط دکان‌های پرچمِ `shop.visual_search`، دسته‌ای و بی‌تکرار

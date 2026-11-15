@@ -33,6 +33,8 @@ object ShellPaths {
   const val APPROVALS = "approvals"
   /** صندوقِ سندهای ردشده ِ صاحب/مدیر (`ConflictInbox.kt`) — راهش نوارِ پوسته؛ بی سندِ باز هیچ‌جا دیده نمی‌شود */
   const val CONFLICTS = "conflicts"
+  /** SYN-07/S28: تعارض‌های همگام‌سازیِ v3 ِ صاحب/مدیر (`V3InboxAndroid.kt`) — راهش نوارِ پوسته؛ پرچمِ خاموشِ `shop.sync_v3_inbox` ⇒ هیچ‌جا */
+  const val SYNC_CONFLICTS = "sync-conflicts"
 }
 
 /** بخش‌های جست‌وجو که همین کاربر حق دارد باز کند (نقش، پرچمِ سرور، پرچمِ ماژول) */
@@ -87,6 +89,9 @@ val ShellModule = AppModule(
     },
     V3Route(ShellPaths.CONFLICTS, RouteKind.PAGE, { ir.vil3ntec.tohid.core.i18n.StrConflictInbox.title }, parent = ShellPaths.HOME, chrome = Chrome.OWN) {
       ConflictInboxRoute()
+    },
+    V3Route(ShellPaths.SYNC_CONFLICTS, RouteKind.PAGE, { ir.vil3ntec.tohid.core.i18n.StrV3Inbox.title }, parent = ShellPaths.HOME, chrome = Chrome.OWN) {
+      V3InboxRoute()
     },
     V3Route(TransactionPaths.LIST, RouteKind.PAGE, { StrHome.transactions }, parent = ShellPaths.HOME, chrome = Chrome.OWN) {
       TransactionsScreen(

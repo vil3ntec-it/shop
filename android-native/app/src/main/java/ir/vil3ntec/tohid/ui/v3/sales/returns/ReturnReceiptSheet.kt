@@ -27,6 +27,8 @@ import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.v3.V3Button
+import ir.vil3ntec.tohid.ui.v3.InvoiceRefText
+import ir.vil3ntec.tohid.ui.v3.InvoiceRefs
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3InvoiceItems
 import ir.vil3ntec.tohid.ui.v3.V3InvoiceLine
@@ -49,20 +51,30 @@ fun ReturnReceiptSheet(
   val c = PhoneV3.colors
   val doc = remember(d, docId) { ReturnFlow.doc(d, docId) } ?: return
   V3Sheet(onDismiss = onClose, title = StrSale.returnReceiptOf(doc.label), detents = false) {
-    Text(
-      (doc.sale?.let { StrSale.fromInvoice(it.invoiceLabel() ?: "0") } ?: StrSale.withoutReceipt) + " · " + displayDate(doc.date),
-      style = V3Type.footnote,
-      color = c.inkMuted,
-    )
+    //  «از فاکتور #۱۲ · …»: «فاکتور #۱۲» زدنی ⇒ همان فاکتور (`InvoiceRef`، `claude/e-rows-63q`)
+    val from = remember(doc) {
+      val head = (doc.sale?.let { StrSale.fromInvoice(it.invoiceLabel() ?: "0") } ?: StrSale.withoutReceipt) + " · " + displayDate(doc.date)
+      doc.sale?.let { s -> s.invoiceLabel()?.let { InvoiceRefs.linkify(head, it, s.id) } } ?: listOf(InvoiceRefs.plain(head))
+    }
+    InvoiceRefText(from, style = V3Type.footnote, color = c.inkMuted, debtorId = doc.sale?.debtorId)
     Spacer(Modifier.height(12.dp))
     V3InvoiceItems(doc.rows.map { r ->
       V3InvoiceLine(ReturnFlow.rowName(d, r), "${qty(r.quantity)} · ${ReturnFlow.dispositionName(r.disposition)}", PhoneSaleText.amount(r.amount))
     })
     doc.exchange?.let { ex ->
       Spacer(Modifier.height(12.dp))
+      //  «خریدِ تازه — فاکتور #۱۳»: همان سرِ پررنگِ `V3InvoiceItems`، با «فاکتور #۱۳» زدنی
+      val label = ex.invoiceLabel() ?: "0"
+      InvoiceRefText(
+        InvoiceRefs.linkify(StrSale.newPurchaseOf(label), label, ex.id),
+        Modifier.padding(horizontal = 4.dp),
+        style = ir.vil3ntec.tohid.ui.screens.v3Text(15, androidx.compose.ui.text.font.FontWeight.Bold, 21),
+        color = c.ink,
+        debtorId = ex.debtorId,
+      )
+      Spacer(Modifier.height(6.dp))
       V3InvoiceItems(
         d.saleItems.filter { it.saleId == ex.id }.map { si -> V3InvoiceLine(SalesEngine.itemName(d, si), "× ${qty(si.quantity)}", PhoneSaleText.amount(si.totalPrice)) },
-        title = StrSale.newPurchaseOf(ex.invoiceLabel() ?: "0"),
       )
     }
     Spacer(Modifier.height(12.dp))

@@ -188,6 +188,7 @@ object LedgerOwner {
         runCatching { PhotoStore.openFrom(context, to) }
         state.accountId = user
         remember(context, user, shop)
+        BranchDesk.reset(context)
         return Result.SWITCHED
       }
     }
@@ -202,8 +203,13 @@ object LedgerOwner {
     val from = key(scope, previousUser, previousShop)
     val to = key(scope, user, shop)
 
-    //  بایگانی ننشست (حافظهٔ پر…) ⇒ هیچ جابه‌جایی: دفترِ روی میز هرگز با دفترِ دیگری رونویسی نمی‌شود
-    if (!store.stashTo(from)) throw NotArchived()
+    //  بایگانی ننشست (حافظهٔ پر…) ⇒ هیچ جابه‌جایی: دفترِ روی میز هرگز با دفترِ دیگری رونویسی نمی‌شود.
+    //  شعبه (فازِ ۲): دفترِ روی میز زیرِ نامِ **شعبهٔ خودش** (`BranchDesk.vaultOf`؛ اصلی ⇒ همان [from]) — وگرنه دفترِ
+    //  شعبهٔ دیگر جای دفترِ اصلیِ همان حساب@دکان می‌نشست. نام و عکس‌ها سطحِ دکان‌اند و همان [from].
+    if (!store.stashTo(BranchDesk.vaultOf(context, from))) throw NotArchived()
+    //  صاحبِ تازهٔ میز از شعبهٔ اصلیِ خودش شروع می‌کند («انتخابِ شعبه» پس از ورود) — پیش از بازکردنِ دفترش، تا هر چه هنگامِ
+    //  بازکردن از موتور خوانده می‌شود همان رفتارِ امروز باشد
+    BranchDesk.reset(context)
     state.forgetAccountState()
     //  همان حساب، دکانِ دیگر ⇒ صف/سایه/cursor ِ دکانِ پیشین هم کنارِ دفترش (کلیدِ v1 شناسهٔ حساب است، نه دکان)
     if (previousUser == user) runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Keys.switchShop(context, user, previousShop, shop) }

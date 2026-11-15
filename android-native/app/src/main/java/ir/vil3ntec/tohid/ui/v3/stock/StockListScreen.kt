@@ -44,7 +44,7 @@ import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3Fab
 import ir.vil3ntec.tohid.ui.v3.V3MenuItem
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
-import ir.vil3ntec.tohid.ui.v3.V3SearchField
+import ir.vil3ntec.tohid.ui.v3.V3Search
 import ir.vil3ntec.tohid.ui.v3.V3Skeleton
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
@@ -116,14 +116,14 @@ fun StockListScreen(
   V3Scaffold(
     title = Str.warehouse,
     onBack = onBack,
-    //  کارِ یک‌دستی: اسکن، جست‌وجو و فیلترها پایینِ صفحه (`V3Dock`)؛ «ورودِ کالا» دکمهٔ شناورِ بالای آن
-    dock = listOf(V3Action(Icons.Outlined.QrCodeScanner, StrKit.scanBarcode, onClick = actions.scan)),
+    //  اسکن آیکنِ سربرگ (و درونِ کادرِ جست‌وجو)؛ جست‌وجو از دکمهٔ نوار؛ فیلترها زیرِ عنوان؛ «ورودِ کالا» تنها دکمهٔ شناور
+    actions = listOf(V3Action(Icons.Outlined.QrCodeScanner, StrKit.scanBarcode, onClick = actions.scan)),
     overflow = if (wide) emptyList() else listOf(
       V3MenuItem(Icons.AutoMirrored.Outlined.FactCheck, StrStock.menuCount, onClick = actions.count),
       V3MenuItem(Icons.Outlined.UploadFile, StrStock.menuImport, onClick = actions.import),
       V3MenuItem(Icons.AutoMirrored.Outlined.PlaylistAdd, StrStock.menuBulk, onClick = actions.bulk),
     ) + actions.extras,
-    search = if (empty) null else ({ V3SearchField(query, { query = it }, StrStock.searchHint) }),
+    search = if (empty) null else V3Search(query, { query = it }, StrStock.searchHint, onScan = actions.scan),
     chips = if (empty) null else ({
       FilterChips(overview, filter, categories, category, onFilter = { filterKey = it.key }, onCategory = { category = it }, place = place, onPlace = { place = it })
     }),

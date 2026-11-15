@@ -70,6 +70,7 @@
     dueDate: 'سررسید',
     creditLimit: 'سقف اعتبار',
     phone2: 'تلفن دوم',
+    email: 'ایمیل',   //  PRM-11/CRM-13: `Debtor.email`
     tags: 'برچسب‌ها',
     group: 'گروه مشتری',
     priceList: 'لیست قیمت',

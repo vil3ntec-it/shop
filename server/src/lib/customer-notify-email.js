@@ -44,4 +44,15 @@ async function builtin() {
   return cfg && cfg.provider && cfg.provider !== 'log' ? provider : null;
 }
 
-module.exports = { provider, builtin, esc };
+/**
+ * سرویسِ ایمیلِ سرور «پیکربندی‌شده» است؟ — راهِ `log` نه، و `smtp`/`api` با همهٔ فیلدهای لازم (`mailer.readiness`).
+ * برای کانال‌های تازهٔ NOTIF-11 (`order-notify-email`) و CHK-10 (`storefront-area-email`): پیکربندی‌نشده ⇒ هیچ نامه و حالِ
+ * صادقانهٔ «پیکربندی نشده» — نه تلاشی که با خطای «تنظیمات کامل نیست» بسوزد. `builtin` ِ زنجیرهٔ مشتری همان پیشین می‌ماند.
+ */
+async function ready() {
+  const mailer = require('./mailer');
+  const cfg = await mailer.current();
+  return Boolean(cfg && cfg.provider && cfg.provider !== 'log' && mailer.readiness(cfg).ok);
+}
+
+module.exports = { provider, builtin, ready, esc };

@@ -40,6 +40,8 @@ class Platform(
   val pickPhoto: (done: (ChatPhoto?) -> Unit) -> Unit = { it(null) },
   val picture: @Composable (bytes: ByteArray, modifier: Modifier) -> Unit = { _, m -> Box(m) },
   val tile: (@Composable (url: String, modifier: Modifier, loaded: (Boolean) -> Unit) -> Unit)? = null,
+  /** RATE-01: «ستاره بدهید» ِ فروشگاهِ همین ساخت (`RatePromptShopper.kt`)؛ null ⇒ هرگز (ساختِ بی فروشگاه، آیفون تا میزبان بنشاند) */
+  val rate: RateHook? = null,
 )
 
 val LocalPlatform = staticCompositionLocalOf<Platform> { error("Platform داده نشده") }
@@ -85,6 +87,7 @@ fun CustomerApp(model: CustomerModel, platform: Platform) {
               is Route.AddressEdit -> AddressEditScreen(model, r.id)
               is Route.Chat -> ChatScreen(model, r.slug, r.orderNo)
             }
+            RatePromptShopper(model, platform.rate)
           }
         }
       }

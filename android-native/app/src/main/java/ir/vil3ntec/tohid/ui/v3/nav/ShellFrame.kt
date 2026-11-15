@@ -57,6 +57,14 @@ object ShellFrame {
     else -> Bar.SHOWN
   }
 
+  /**
+   *  دکمهٔ جست‌وجوی نوار روی این صفحه هست؟ (صفحه‌کلید، برگه و سبدِ باز فقط موقت می‌پوشانند و حساب نمی‌شوند) — ۶۳w:
+   *  دکمهٔ نوار جست‌وجوی همان بخش را باز می‌کند (`V3ScopedSearch`)؛ نه ⇒ سربرگ ذره‌بینِ خودش را می‌گذارد تا جست‌وجو بی‌راه نماند.
+   *  @param hasSearch چیدمانِ نوارِ همین کاربر دکمهٔ جست‌وجو دارد
+   */
+  fun navSearch(phone: Boolean, page: String, barTabs: Set<String>, sections: Set<String>, gate: Boolean, hasSearch: Boolean): Boolean =
+    hasSearch && bar(phone, page, barTabs, sections, gate, cartOpen = false, sheetOnTop = false, keyboard = false) != Bar.NONE
+
   /** نوار کشیده می‌شود؟ */
   fun navVisible(bar: Bar): Boolean = bar == Bar.SHOWN
 

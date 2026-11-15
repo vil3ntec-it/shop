@@ -62,8 +62,6 @@ fun V3Form(
   summary: String? = null,
   /** نوشته‌ای ذخیره‌نشده هست ⇒ «برگشت» (دکمه یا کلیدِ گوشی) اول برگهٔ «دور ریخته شود؟» */
   dirty: Boolean = false,
-  /** کارِ پرکاربرد برای شست (مثلاً اسکنِ پیاپی) — `V3Dock` درست بالای دکمهٔ اصلی؛ کامپیوتر: سربرگ */
-  dock: List<V3Action> = emptyList(),
   content: @Composable ColumnScope.() -> Unit,
 ) {
   val c = PhoneV3.colors
@@ -83,7 +81,6 @@ fun V3Form(
     modifier = modifier,
     onBack = onBack?.let { back -> { if (dirty) askDiscard = true else back() } },
     actions = actions,
-    dock = dock,
     largeTitle = false,
     notice = null,
     bottomBar = {

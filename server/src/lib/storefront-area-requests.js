@@ -17,7 +17,9 @@
  *    «درون/بیرون» ِ ویترین با آن سنجیده می‌شود، پس پاسخ هم دقیق‌تر از یک خانه نیست.
  * ⛔ پرچمِ پیش‌فرض خاموشِ `shop.storefront.notify_area`، روی `shop.storefront.zones`: خاموش ⇒
  *    درِ مشتری همان پاسخِ درِ ناشناختهٔ main و درِ دکان ۴۰۳ `notify_area_disabled`.
- * ⛔ سرور پیامی نمی‌فرستد (پیامک/واتس‌اپ ِ خودکار: D-09)؛ دکان خودش خبر می‌دهد.
+ * ⛔ پیامِ خودکارِ «رسیدیم» فقط با پرچمِ خاموشِ `shop.storefront.area_email` (`lib/storefront-area-email.js`، مهاجرتِ ۹۴۵):
+ *    یک ایمیل به کلیدِ تأییدشدهٔ همان درخواست وقتی ناحیهٔ فعالی خانه‌اش را پوشاند؛ پس از آن `notice = 'sent'` = «انجام شد»
+ *    (مثلِ «خبر دادم»: دیگر در فهرستِ دکان نیست). بی آن پرچم سرور پیامی نمی‌فرستد و دکان خودش خبر می‌دهد.
  */
 const db = require('../db');
 const { tx, now, many } = db;
@@ -31,6 +33,9 @@ const MAX_PER_SHOP = 5000;
 const MAX_CONTACTS = 500;
 const RETAIN_MS = 365 * 24 * 60 * 60 * 1000;
 const KEY_RE = /^(\+[1-9]\d{7,14}|[^\s@A-Z]+@[^\s@A-Z]+)$/;   //  کلیدِ مشتری: ایمیلِ تأییدشده یا شمارهٔ کهنه
+const LANGS = Object.freeze(['fa', 'ps', 'en']);
+/** زبانِ ویترین برای نامهٔ «رسیدیم» (CHK-10)؛ نبود یا ناشناس ⇒ fa */
+const langOf = (b) => (b && LANGS.includes(b.lang) ? b.lang : 'fa');
 
 /** هر دو پرچم: بی ناحیه «بیرون از محدوده» معنا ندارد. */
 async function flagOn(shopId) {
@@ -76,14 +81,15 @@ async function request(store, phone, body) {
         [store.shop_id])).rows[0].n);
       if (n >= MAX_PER_SHOP) throw conflict('این دکان فعلاً درخواستِ تازه نمی‌پذیرد', 'too_many_area_requests');
     }
-    //  همان شماره دو بار (یا هم‌زمان) ⇒ همان ردیف، با پینِ تازه
+    //  همان شماره دو بار (یا هم‌زمان) ⇒ همان ردیف، با پینِ تازه — و درخواستِ تازه یعنی «دوباره خبرم کن» (CHK-10: حالِ نامه از نو)
     const r = (await c.query(
-      `INSERT INTO storefront_area_requests (id, shop_id, phone, cell_lat, cell_lng, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$6)
+      `INSERT INTO storefront_area_requests (id, shop_id, phone, cell_lat, cell_lng, created_at, updated_at, lang)
+       VALUES ($1,$2,$3,$4,$5,$6,$6,$7)
        ON CONFLICT (shop_id, phone) DO UPDATE
-         SET cell_lat = EXCLUDED.cell_lat, cell_lng = EXCLUDED.cell_lng, updated_at = EXCLUDED.updated_at
+         SET cell_lat = EXCLUDED.cell_lat, cell_lng = EXCLUDED.cell_lng, updated_at = EXCLUDED.updated_at,
+             lang = EXCLUDED.lang, notice = '', tried = '[]'::jsonb, sent_at = NULL
        RETURNING id, created_at, updated_at`,
-      [ulid(at), store.shop_id, phone, cell.lat, cell.lng, at]
+      [ulid(at), store.shop_id, phone, cell.lat, cell.lng, at, langOf(body)]
     )).rows[0];
     return { created: !old, request: { createdAt: Number(r.created_at), updatedAt: Number(r.updated_at) } };
   });
@@ -106,7 +112,7 @@ async function forShop(shopId, at = now()) {
     many(
       `SELECT r.id, r.phone, r.cell_lat, r.cell_lng, r.created_at, r.updated_at, sc.phone AS contact_phone
          FROM storefront_area_requests r LEFT JOIN store_customers sc ON sc.email = r.phone
-        WHERE r.shop_id = $1 AND r.updated_at >= $2 ORDER BY r.created_at, r.id LIMIT $3`,
+        WHERE r.shop_id = $1 AND r.updated_at >= $2 AND r.notice <> 'sent' ORDER BY r.created_at, r.id LIMIT $3`,
       [shopId, at - RETAIN_MS, MAX_PER_SHOP]
     ),
   ]);
@@ -150,4 +156,4 @@ async function markNotified(shopId, id) {
   });
 }
 
-module.exports = { FLAG_KEY, MAX_PER_SHOP, RETAIN_MS, flagOn, request, withdraw, forShop, markNotified };
+module.exports = { FLAG_KEY, MAX_PER_SHOP, RETAIN_MS, LANGS, flagOn, activeZones, request, withdraw, forShop, markNotified };

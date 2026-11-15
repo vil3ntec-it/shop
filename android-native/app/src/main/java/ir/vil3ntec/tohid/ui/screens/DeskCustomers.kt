@@ -641,8 +641,8 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
     scope.launch { store.save(d, next) }; limitOpen = false; toast(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.creditLimitSaved)
   }
   if (profileOpen && crm) {
-    CrmProfileDialog(debtor, onDismiss = { profileOpen = false }) { phone2, tags ->
-      when (val r = CustomerProfileForm.setProfile(d, id, phone2, tags)) {
+    CrmProfileDialog(debtor, onDismiss = { profileOpen = false }) { phone2, tags, email ->
+      when (val r = CustomerProfileForm.setProfile(d, id, phone2, tags, email)) {
         is DebtorEngine.Result.Failed -> toast(r.message)
         is DebtorEngine.Result.Ok -> { scope.launch { store.save(d, r.data) }; profileOpen = false; toast(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.profileSaved) }
       }

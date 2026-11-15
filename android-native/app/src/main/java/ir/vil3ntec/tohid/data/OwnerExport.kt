@@ -111,6 +111,7 @@ object OwnerExport {
     "dueDate" to "سررسید",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "creditLimit" to "سقف اعتبار",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "phone2" to "تلفن دوم",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "email" to "ایمیل",  // داده: PRM-11/CRM-13، ستونِ خروجیِ کاملِ صاحب
     "tags" to "برچسب‌ها",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "group" to "گروه مشتری",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "priceList" to "لیست قیمت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)

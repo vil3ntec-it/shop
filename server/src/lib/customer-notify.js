@@ -507,8 +507,9 @@ async function spentToday(shopId, channel, at) {
     `SELECT tried FROM customer_notify_outbox WHERE shop_id=$1 AND channel=$2 AND status='sent' AND sent_at > $3`,
     [shopId, channel, at - cost.DAY_MS]
   );
-  //  سقفِ هر دکان و کانال مشترک است: خبرِ «موجود/ارزان شد» (WEB-10) هم شمرده می‌شود (بی آن ردیف ⇒ همان صفر)
-  return cost.spentOf(rows.map((r) => asJson(r.tried)), channel) + await require('./storefront-alerts').spentToday(shopId, channel, at);
+  //  سقفِ هر دکان و کانال مشترک است: خبرِ «موجود/ارزان شد» (WEB-10) و «رسیدیم» (CHK-10) هم شمرده می‌شوند (بی آن ردیف‌ها ⇒ همان صفر)
+  return cost.spentOf(rows.map((r) => asJson(r.tried)), channel) + await require('./storefront-alerts').spentToday(shopId, channel, at)
+    + await require('./storefront-area-email').spentToday(shopId, channel, at);
 }
 
 async function overCap(row, at) {

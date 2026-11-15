@@ -314,6 +314,9 @@ test('IMG-PRO-14: هزار عکس با چند کارگر — همزمانیِ م
   await query(`UPDATE image_studio_jobs SET lease_until=0 WHERE id = ANY($1::text[])`, [seen]);
   let active = 0, peak = 0, calls = 0;
   const flaky = new Set(ids.filter((_, i) => i % 10 === 0));
+  //  لحظهٔ هر شکستِ گذرا: backoff از همان لحظه سنجیده می‌شود، نه از پایانِ drain (هزار کار روی CI ِ کند بیش از ۱۵ ثانیه می‌کشد
+  //  و «next_at > اکنون» ِ پیشین گاهی سرخ می‌شد بی آن‌که backoff غلط باشد)
+  const failedAt = new Map();
   jobs._setIsolate(async (task) => {
     calls++;
     active++; peak = Math.max(peak, active);
@@ -321,6 +324,7 @@ test('IMG-PRO-14: هزار عکس با چند کارگر — همزمانیِ م
     active--;
     if (flaky.delete(task.image_id)) {
       //  یکی از هر ده عکس بارِ اول شکستِ گذرا دارد
+      failedAt.set(task.image_id, now());
       throw Object.assign(new Error('timeout'), { code: 'timeout' });
     }
     return { buf: one0.buf, width: one0.width, height: one0.height, derivatives: one0.derivatives, report: one0.report };
@@ -330,8 +334,12 @@ test('IMG-PRO-14: هزار عکس با چند کارگر — همزمانیِ م
     const mid = (await S('GET', `/batches/${r.body.id}`, B)).body.progress;
     assert.equal(mid.done + mid.queued + mid.running + mid.failed + mid.cancelled, 1000, 'پیشرفتِ دقیق از خودِ ردیف‌ها');
     assert.ok(mid.queued > 0, 'شکستِ گذرا ⇒ دوباره در صف با backoff');
-    const retried = await many(`SELECT error, next_at FROM image_studio_jobs WHERE batch_id=$1 AND status='queued'`, [r.body.id]);
-    for (const x of retried) assert.ok(x.error === 'timeout' && Number(x.next_at) > now(), JSON.stringify(x));
+    const retried = await many(`SELECT image_id, error, next_at FROM image_studio_jobs WHERE batch_id=$1 AND status='queued'`, [r.body.id]);
+    for (const x of retried) {
+      assert.ok(failedAt.has(x.image_id), `در صف ماند بی شکستِ گذرا: ${x.image_id}`);
+      //  بارِ اول ⇒ دست‌کم یک BACKOFF_MS پس از همان شکست (نه زودتر)
+      assert.ok(x.error === 'timeout' && Number(x.next_at) >= failedAt.get(x.image_id) + jobs.LIMITS.BACKOFF_MS, JSON.stringify(x));
+    }
     await query(`UPDATE image_studio_jobs SET next_at=0 WHERE batch_id=$1 AND status='queued'`, [r.body.id]);
     await jobs.drain({ timeoutMs: 600000 });
   } finally { jobs._setIsolate(null); }

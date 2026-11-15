@@ -34,6 +34,9 @@ const BRANCH_FREE = {
   'GET /api/shop/approver-keys': 'کلیدِ تأییدکنندهٔ خودِ همین عضو — سطحِ دکان، بی دادهٔ شعبه (`branch-gate`)',
   'GET /api/shop/approval-requests': 'درخواست‌های شعبه‌های خودِ همین مدیر (STF-06؛ «ب» در آن نیست)',
   'GET /api/shop/approval-requests/config': 'پرچم و نقشِ خودِ عضو و توانِ سرور — بی دادهٔ هیچ شعبه‌ای',
+  //  فازِ ۲ (`claude/e-rows-54p`): «دکانِ من» سطحِ دکان است و از `branch-gate` بیرون آمد تا برنامهٔ کارمندِ فقط شعبهٔ دیگر نقشش را بگیرد
+  'GET /api/shop': 'دکان، نقش، مجوز و اشتراکِ خودِ همین عضو — سطحِ دکان، بی دادهٔ هیچ شعبه‌ای (نشانِ «ب» همچنان سنجیده می‌شود)',
+  'GET /api/shop/me': 'همان «دکانِ من» — سطحِ دکان، بی دادهٔ هیچ شعبه‌ای',
 };
 
 let admin = '';
@@ -87,6 +90,9 @@ async function printOf(shopId, branchId) {
     await q('SELECT * FROM shop_branch_events WHERE branch_key=$1 ORDER BY id', [k]),
     await q('SELECT * FROM shop_branch_event_reads WHERE branch_key=$1 ORDER BY user_id', [k]),
     await q('SELECT id, status, detail FROM sync_v3_conflicts WHERE account_id=$1 ORDER BY id', [k]),
+    //  فازِ ۴: انتقال‌هایی که یک سرشان «ب» است و گام‌های «ب»
+    await q('SELECT * FROM branch_transfers WHERE shop_id=$1 AND (from_branch=$2 OR to_branch=$2) ORDER BY id', [shopId, branchId]),
+    await q('SELECT * FROM branch_transfer_steps WHERE shop_id=$1 AND branch_id=$2 ORDER BY step_key', [shopId, branchId]),
   ];
 }
 
@@ -170,6 +176,22 @@ test('ماتریسِ شعبه: هیچ درِ /api/shop/* و /api/sync/v3/* دا�
   assert.ok(JSON.stringify(ownB.body).includes('bsec-e1'), JSON.stringify(ownB.body));
   const ownPull = await h.api('GET', `/api/sync/v3/pull?device_id=dev-own-x&since=0`, { token: s.token, headers: { 'X-Branch-Id': Bid } });
   assert.ok(JSON.stringify(ownPull.body).includes('bsec-x1'));
+  //  فازِ ۴ (INV-11 میانِ شعبه‌ها): «ب» ⇒ اصلی با یادداشتِ نشان‌دار، و «الف» ⇒ «ب» (هر دو هنوز در مسیر)
+  const xf = (who, branch, body) => h.api('POST', '/api/shop/catalog/branch-transfers', {
+    token: who.token, body, headers: { 'X-Branch-Id': branch, 'Idempotency-Key': `brm-${newId('k')}` },
+  });
+  r = await xf(mgrB, Bid, { toBranch: 'main', from: 'shop_floor', to: 'shop_floor', lines: [{ productId: 'p1', qtyMilli: 1000 }], note: 'bsec-xfer-note' });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const bXfer = r.body.transfer.id;
+  r = await xf(mgrA, A, { toBranch: Bid, from: 'shop_floor', to: 'warehouse', lines: [{ productId: 'p1', qtyMilli: 1000 }], note: 'asec-xfer' });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const abXfer = r.body.transfer.id;
+  //  بی‌اثر نیست: «ب» هر دو را می‌بیند
+  const ownX = await h.api('GET', '/api/shop/catalog/branch-transfers', { token: mgrB.token, headers: { 'X-Branch-Id': Bid } });
+  assert.deepEqual(ownX.body.transfers.map((t) => t.id).sort(), [bXfer, abXfer].sort());
+  assert.ok(JSON.stringify(ownX.body).includes('bsec-xfer-note'));
+  const ownPeek = await h.api('GET', '/api/shop/catalog/products/p1/other-branches', { token: s.token, headers: { 'X-Branch-Id': A } });
+  assert.deepEqual(ownPeek.body.branches.find((b) => b.branchId === Bid), { branchId: Bid, branchName: 'ب', qty: 6000 }, JSON.stringify(ownPeek.body));
   const before = await printOf(s.shopId, Bid);
 
   const ids = [bTask, bReq, 'bsec-s1', Bid];
@@ -215,6 +237,33 @@ test('ماتریسِ شعبه: هیچ درِ /api/shop/* و /api/sync/v3/* دا�
             assert.ok(['branch_forbidden', 'branch_unsupported'].includes(res.body.error.code), `${d.key} ${text}`);
           }
         }
+      }
+    }
+  }
+  //  درهای انتقالِ میانِ شعبه‌ها با شناسهٔ واقعیِ انتقال‌های «ب» (و «الف» ⇒ «ب»): هیچ نشان، و «الف» در «ب» دریافت/رد نمی‌کند
+  const X = '/api/shop/catalog/branch-transfers';
+  const xdoors = [['GET', X], ['GET', `${X}?direction=in`], ['GET', `${X}?direction=out&status=open`], ['GET', `${X}/destinations`],
+    ['GET', `${X}/${bXfer}`], ['POST', `${X}/${bXfer}/receive`, {}], ['POST', `${X}/${bXfer}/reject`, { reason: 'x' }],
+    ['GET', `${X}/${abXfer}`], ['POST', `${X}/${abXfer}/receive`, { lines: [{ productId: 'p1', receivedMilli: 1000 }] }],
+    ['POST', `${X}/${abXfer}/reject`, { reason: 'x' }],
+    ['POST', X, { toBranch: 'main', from: 'shop_floor', to: 'shop_floor', lines: [{ productId: 'p1', qtyMilli: 1 }] }],
+    //  POS-16/S17: عددِ موجودیِ «ب» فقط با دسترسی به «ب» یا مجوزِ صاحب — «الف» هیچ (حتی نامِ «ب»)
+    ['GET', `/api/shop/catalog/products/p1/other-branches?branch=${Bid}&branchId=${Bid}`]];
+  for (const who of [mgrA, staffA]) {
+    for (const [method, url, body] of xdoors) {
+      for (const claim of [Bid, undefined, A, 'brn_000000000000000000000000', `${Bid},${A}`]) {
+        //  ارسالِ «الف» با سرآیندِ «الف» کارِ درستِ خودش است (به «ب» نمی‌رسد مگر مقصد باشد) — این‌جا فقط ب ⇐ نه
+        if (method === 'POST' && url === X && claim === A) continue;
+        resetAll();
+        const res = await h.api(method, url, { token: who.token, body: body || null,
+          headers: { ...(claim === undefined ? {} : { 'X-Branch-Id': claim }), 'Idempotency-Key': `brm-${newId('k')}` } });
+        calls += 1;
+        const text = JSON.stringify(res.body || '');
+        if (text.includes('bsec') || text.includes(bXfer)) leaks.push(`${method} ${url} [${claim === undefined ? 'بی سرآیند' : claim}] ${res.status}`);
+        if (claim !== A) assert.equal(res.status, 403, `${method} ${url} ${claim} ${text}`);
+        else if (url.includes(bXfer)) assert.equal(res.status, 404, `${method} ${url} ${text}`);
+        else if (method === 'POST' && url.includes(abXfer)) assert.equal(res.body.error.code, 'transfer_wrong_branch', `${url} ${text}`);
+        else if (url.includes('/other-branches')) assert.deepEqual(res.body, { branches: [] }, `${url} ${text}`);
       }
     }
   }

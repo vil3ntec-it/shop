@@ -92,7 +92,7 @@ class ModuleRegistryTest {
       "stock", "stock/1", "stock/entry", "stock/entry/bulk", "stock/1/adjust", "stock/1/movements", "stock/count", "stock/import",
       "debtors", "debtors/1", "debtors/new", "debtors/receive", "debtors/1/tx", "receipts", "purchasing", "purchasing/new",
       "expenses", "expenses/new", "sale", "sale/quick", "sale/checkout", "scan", "sales", "sales/1", "sales/drawer",
-      "reports", "stats", "audit", "admin", "profile", "team", "subscription", "subscription/plans", "support",
+      "reports", "stats", "admin", "profile", "team", "subscription", "subscription/plans", "support",
       "orders", "orders/1", "orders/new", "storefront", "chat", "delivery", "courier",
       "settings", "settings/shop", "settings/sales", "settings/goods", "settings/devices", "settings/data", "settings/look",
       "settings/shop/app-lock", "settings/look/navbar", "settings/features",
@@ -100,6 +100,8 @@ class ModuleRegistryTest {
       //  نشانیِ پیش از نسخهٔ دوم
       "settings/general", "settings/security", "settings/security/app-lock", "settings/general/navbar",
     ).forEach { assertNotNull("ثبت نیست: $it", table.resolve(it)) }
+    //  ۶۳w: «سابقهٔ عملیات» و درِ یکپارچگیِ اسناد ِ درونش از برنامه برداشته شدند (صاحب‌کار) — ثبتِ دفتر همان
+    listOf("audit", "audit/doc-chain").forEach { assertNull("سابقهٔ عملیات راهی ندارد: $it", table.resolve(it)) }
   }
 
   @Test
@@ -147,7 +149,7 @@ class ModuleRegistryTest {
     assertFalse(table.resolve("settings/security")!!.allowed(clerk))
     assertTrue(table.resolve("settings/general/navbar")!!.allowed(clerk))
     assertTrue(table.resolve("devices")!!.allowed(clerk))
-    assertFalse(table.resolve("audit")!!.allowed(Access(granted = setOf(Need.MANAGE))))
+    assertNull("سابقهٔ عملیات (۶۳w) برای هیچ نقشی مسیر ندارد", table.resolve("audit"))
   }
 
   @Test

@@ -163,6 +163,8 @@ router.put('/delivery', requirePermission('settings.write'), needFlag, needZones
     detail: { zones: out.zones.length, slotRules: out.slotRules.length, allowAsap: out.allowAsap, slotDays: out.slotDays },
     ip: clientIp(req),
   });
+  //  CHK-10: ناحیهٔ تازه شاید خانهٔ «خبرم کن» ِ کسی را پوشاند ⇒ دورِ زودترِ «رسیدیم» (بی پرچم هیچ نامه؛ کارگرِ خاموش ⇒ هیچ)
+  require('../lib/storefront-area-email').soon();
   res.json(out);
 });
 

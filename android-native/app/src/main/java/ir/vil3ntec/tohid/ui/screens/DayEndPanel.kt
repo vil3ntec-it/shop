@@ -22,7 +22,9 @@ import ir.vil3ntec.tohid.core.i18n.StrSalePages
 import ir.vil3ntec.tohid.core.report.ReportTables
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.components.common.PillTone
-import ir.vil3ntec.tohid.ui.components.common.StatCard
+import ir.vil3ntec.tohid.core.pay.DayClose
+import ir.vil3ntec.tohid.ui.components.common.Metric
+import ir.vil3ntec.tohid.ui.components.common.MetricRows
 import ir.vil3ntec.tohid.ui.components.common.StatusPill
 import ir.vil3ntec.tohid.ui.theme.Shop
 
@@ -54,22 +56,20 @@ private fun StatusLine(b: DayEndModel.Built) {
   }
 }
 
-/** کامپیوتر: چهار کارت و وضعیتِ روز */
+/** چهار عددِ پایانِ روز — یک فهرستِ فشرده (۶۳w: جای چهار کارتِ بزرگ) */
+private fun dayEndMetrics(r: DayClose.Report, shiftsNote: String): List<Metric> = listOf(
+  Metric(StrSalePages.shiftsNet, af(r.total.shifts.net), shiftsNote),
+  Metric(StrSalePages.tillVariance, r.total.variance?.let(::af) ?: "—", StrSalePages.varianceHow),
+  Metric(StrSalePages.outsideShifts, af(r.total.outside), StrSalePages.outsideHow),
+  Metric(StrSalePages.shifts, r.shifts.size.toString(), if (r.openShifts > 0) StrSalePages.openCount(r.openShifts) else StrSalePages.allClosed),
+)
+
+/** کامپیوتر: چهار عدد و وضعیتِ روز */
 @Composable
 internal fun DayEndSummary(b: DayEndModel.Built) {
   val r = b.report
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-    if (r != null) {
-      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        StatCard(StrSalePages.shiftsNet, af(r.total.shifts.net), StrSalePages.shiftsNetHow, Modifier.weight(1f))
-        StatCard(StrSalePages.tillVariance, r.total.variance?.let(::af) ?: "—", StrSalePages.varianceHow, Modifier.weight(1f))
-        StatCard(StrSalePages.outsideShifts, af(r.total.outside), StrSalePages.outsideHow, Modifier.weight(1f))
-        StatCard(
-          StrSalePages.shifts, r.shifts.size.toString(),
-          if (r.openShifts > 0) StrSalePages.openCount(r.openShifts) else StrSalePages.allClosed, Modifier.weight(1f),
-        )
-      }
-    }
+    if (r != null) MetricRows(dayEndMetrics(r, StrSalePages.shiftsNetHow))
     Row(verticalAlignment = Alignment.CenterVertically) {
       StatusLine(b)
       Spacer(Modifier.width(8.dp))
@@ -78,26 +78,14 @@ internal fun DayEndSummary(b: DayEndModel.Built) {
   }
 }
 
-/** گوشی: پایانِ امروز، دو ردیفِ کارت و وضعیت */
+/** گوشی: پایانِ امروز، فهرستِ فشردهٔ چهار عدد و وضعیت */
 @Composable
 internal fun DayEndPhone(b: DayEndModel.Built) {
   val r = b.report
   Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
     Text(StrSalePages.endOfToday, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
     StatusLine(b)
-    if (r != null) {
-      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        StatCard(StrSalePages.shiftsNet, af(r.total.shifts.net), Str.today, Modifier.weight(1f))
-        StatCard(StrSalePages.tillVariance, r.total.variance?.let(::af) ?: "—", StrSalePages.varianceHow, Modifier.weight(1f))
-      }
-      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        StatCard(StrSalePages.outsideShifts, af(r.total.outside), StrSalePages.outsideHow, Modifier.weight(1f))
-        StatCard(
-          StrSalePages.shifts, r.shifts.size.toString(),
-          if (r.openShifts > 0) StrSalePages.openCount(r.openShifts) else StrSalePages.allClosed, Modifier.weight(1f),
-        )
-      }
-    }
+    if (r != null) MetricRows(dayEndMetrics(r, Str.today))
     Text(NOTE, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
   }
 }

@@ -74,4 +74,25 @@ class ShellFrameTest {
     assertEquals("صفحه‌کلیدِ باز: فقط نوارِ سیستم", system, ShellFrame.pageBottom(true, bar("products", keyboard = true), "products", reserve, system))
     assertEquals("پهن: نوارِ سیستم", system, ShellFrame.pageBottom(false, Bar.NONE, "stock", reserve, system))
   }
+
+  /** ۶۳w: دکمهٔ جست‌وجوی نوار روی بخش ⇒ جست‌وجوی همان بخش؛ وگرنه سربرگ ذره‌بینِ خودش را می‌گذارد */
+  private fun navSearch(page: String, phone: Boolean = true, gate: Boolean = false, hasSearch: Boolean = true) =
+    ShellFrame.navSearch(phone, page, tabs, sections, gate, hasSearch)
+
+  @Test
+  fun `دکمهٔ جست‌وجوی نوار روی هر بخشِ اصلی هست — صفحه‌کلید و برگه حسابش نمی‌کنند`() {
+    listOf("products", "stock", "debtors", "sales", "expenses", "receipts", "sale", "settings").forEach { assertTrue(it, navSearch(it)) }
+    //  صفحه‌کلیدِ باز و برگهٔ روی صفحه نوار را موقت می‌پوشانند، ولی ذره‌بینِ سربرگ نباید بپرد
+    assertEquals(Bar.NONE, bar("products", keyboard = true))
+    assertTrue(navSearch("products"))
+  }
+
+  @Test
+  fun `بی دکمهٔ جست‌وجو در نوار، صفحهٔ درونی، کامپیوتر یا دروازه ⇒ سربرگ ذره‌بین دارد`() {
+    assertFalse("نوارِ ویرایش‌شده بی جست‌وجو", navSearch("products", hasSearch = false))
+    assertFalse("جزئیاتِ کالا نوار ندارد", navSearch("products/{id}"))
+    assertFalse("فروشِ سریع", navSearch("sale/quick"))
+    assertFalse("کامپیوتر", navSearch("products", phone = false))
+    assertFalse("دروازه", navSearch("products", gate = true))
+  }
 }

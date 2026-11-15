@@ -153,6 +153,7 @@ object StrConflictInbox {
     "held_twice" -> t("یک فاکتور در دو دستگاه فروخته شد؛ فروشِ دوم خودکار لغو شد", "One invoice was sold on two devices; the second sale was cancelled automatically", "یو بل په دوو وسیلو پلورل شوی؛ دویم پلور پخپله لغوه شو")
     "held_twice_open" -> t("یک فاکتور در دو دستگاه فروخته شد؛ یکی را لغو کنید", "One invoice was sold on two devices; cancel one of them", "یو بل په دوو وسیلو پلورل شوی؛ یو یې لغوه کړئ")
     "tx_rejected" -> t("سندِ همراهش رد شد", "Its document was rejected", "د هغه سند رد شو")
+    "catalog_main_only" -> t("کالا، دسته و واحد فقط از شعبهٔ اصلی ثبت می‌شوند", "Items, categories and units are recorded only from the main branch", "توکي، ډلې او واحدونه یوازې له اصلي څانګې ثبتېږي") // شعبه، فازِ ۳
     //  کدِ ناشناخته (سرورِ تازه‌تر) ⇒ خودِ کد کنارِ جمله، برای پشتیبانی
     else -> t("سرور این سند را نپذیرفت (${asIs(code)})", "The server did not accept this document ($code)", "سرور دا سند ونه منه ($code)")
   }

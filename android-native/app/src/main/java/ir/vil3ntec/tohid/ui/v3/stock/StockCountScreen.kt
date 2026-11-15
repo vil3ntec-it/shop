@@ -71,7 +71,7 @@ import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.V3ProductThumb
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
-import ir.vil3ntec.tohid.ui.v3.V3SearchField
+import ir.vil3ntec.tohid.ui.v3.V3Search
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3StatusPill
 import ir.vil3ntec.tohid.ui.v3.V3TextField
@@ -158,7 +158,7 @@ fun StockCountScreen(
     largeTitle = false,
     notice = null,
     actions = listOf(V3Action(Icons.Outlined.FileDownload, StrStock.exportCsv) { onExport(ReportCsv.stockCount(lines, today)) }),
-    search = { V3SearchField(query, { query = it }, StrStock.searchHint) },
+    search = V3Search(query, { query = it }, StrStock.searchHint),
     bottomBar = {
       V3FormBar(
         primary = StrStock.saveDiffs,

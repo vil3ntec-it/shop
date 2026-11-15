@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.products
 
+import ir.vil3ntec.tohid.ui.v3.InvoiceRefs
+import ir.vil3ntec.tohid.ui.v3.InvoiceRefText
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.outlined.SyncAlt
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -196,10 +199,14 @@ internal fun MovesSection(p: Product, moves: List<StockMovement>, total: Int, on
       val kind = ProductDetailModel.kindOf(m.type)
       val (icon, hue) = moveIcon(kind)
       val sign = if (m.qty > 0) "+" else if (m.qty < 0) "−" else ""
+      //  سادهٔ e-rows-63q: روزِ کوتاه («دیروز»، «۲۸ میزان»)؛ «فاکتور #n» ِ یادداشت زدنی ⇒ همان فاکتور (`InvoiceRef`)
+      val line = remember(m.date, m.notes, ir.vil3ntec.tohid.core.i18n.I18n.lang) {
+        val day = ir.vil3ntec.tohid.ui.v3.RowWhen.of(m.date, ir.vil3ntec.tohid.todayIso())
+        if (m.notes.isBlank()) listOf(InvoiceRefs.plain(day)) else listOf(InvoiceRefs.plain("$day — ")) + InvoiceRefs.split(m.notes)
+      }
       V3ListRow(
         title = moveLabel(kind, m.type),
-        subtitle = displayDate(m.date) + if (m.notes.isNotBlank()) " — ${m.notes}" else "",
-        subtitleLines = 1,
+        below = { InvoiceRefText(line, maxLines = 1) },
         icon = icon,
         hue = hue,
         chevron = false,
@@ -222,7 +229,8 @@ internal fun HistorySection(history: List<AuditEntry>) {
   V3Section(StrProducts.history) {
     history.forEachIndexed { i, a ->
       if (i > 0) V3Divider(start = 16.dp)
-      V3ListRow(title = displayDate(a.date), subtitle = a.notes, subtitleLines = 3, tile = false, chevron = false)
+      //  سادهٔ e-rows-63q: روزِ کوتاه (`RowWhen`)، نه تاریخِ کامل با سالِ جاری
+      V3ListRow(title = ir.vil3ntec.tohid.ui.v3.RowWhen.of(a.date, ir.vil3ntec.tohid.todayIso()), subtitle = a.notes, subtitleLines = 3, tile = false, chevron = false)
     }
   }
 }

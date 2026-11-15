@@ -131,9 +131,12 @@ fun SectionTitle(text: String) {
   )
 }
 
+/** «چیزی نیست» ِ کوتاهِ صفحه‌های قدیم: درختِ کوچکِ تاب‌خور (`V3Illustration`) بالای همان یک خط */
 @Composable
 fun EmptyNote(text: String) {
-  Box(Modifier.fillMaxWidth().padding(vertical = 28.dp), contentAlignment = Alignment.Center) {
+  Column(Modifier.fillMaxWidth().padding(vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    ir.vil3ntec.tohid.ui.v3.art.V3Illustration(ir.vil3ntec.tohid.ui.v3.art.V3ArtKind.TREE, size = 64.dp)
+    Spacer(Modifier.height(6.dp))
     Text(
       text,
       style = MaterialTheme.typography.bodyMedium,

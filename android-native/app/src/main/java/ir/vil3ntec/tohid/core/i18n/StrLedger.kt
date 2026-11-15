@@ -50,6 +50,7 @@ object StrLedger {
     "د ډلې نوم تر ټولو ډېر $n توري",
   )
   val unknownPriceList: String get() = t("لیستِ قیمتِ ناشناخته", "Unknown price list", "نامعلوم د بیو لېست")
+  val emailBad: String get() = t("ایمیل درست نیست — مثلاً name@example.com", "The email isn't valid — e.g. name@example.com", "برېښنالیک سم نه دی — لکه name@example.com")
   fun addressPartTooLong(n: Any?): String = t(
     "هر بخشِ نشانی حداکثر ${asIs(n)} حرف",
     "Each part of the address can have at most $n characters",

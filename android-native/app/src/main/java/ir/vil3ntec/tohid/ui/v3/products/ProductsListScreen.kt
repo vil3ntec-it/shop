@@ -18,7 +18,6 @@ import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.PhotoCamera
-import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material.icons.outlined.ToggleOff
 import androidx.compose.material.icons.outlined.ToggleOn
@@ -55,7 +54,7 @@ import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3Fab
 import ir.vil3ntec.tohid.ui.v3.V3MenuItem
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
-import ir.vil3ntec.tohid.ui.v3.V3SearchField
+import ir.vil3ntec.tohid.ui.v3.V3Search
 import ir.vil3ntec.tohid.ui.v3.V3Skeleton
 import ir.vil3ntec.tohid.ui.v3.V3Toasts
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
@@ -121,18 +120,17 @@ internal fun ProductsListScreen(
 
   V3Scaffold(
     title = if (selecting) StrProducts.selectedTitle(picked.size) else StrProducts.listTitle,
-    actions = if (selecting) listOf(V3Action(Icons.Outlined.Close, StrProducts.cancelSelection) { selection = emptySet() }) else emptyList(),
-    overflow = if (selecting) emptyList() else listOfNotNull(visual?.let { v -> V3MenuItem(Icons.Outlined.PhotoCamera, StrVisualSearch.button) { v.start() } }),
-    //  کارِ یک‌دستی: جست‌وجو، فیلتر و مرتب‌سازی، اسکن و نما پایینِ صفحه (`V3Dock`)؛ «کالای تازه» دکمهٔ شناورِ بالای آن
-    search = { V3SearchField(query.text, { query = query.copy(text = it) }, StrProducts.searchHint, onVoice = voice) },
-    chips = if (!loaded || data.products.isEmpty()) null else ({
-      ProductsFilterRow(query, data.productCategories, counts, onQuery = { query = it }, onSort = { sortOpen = true }, modifier = Modifier.padding(start = 16.dp, end = 12.dp))
-    }),
-    dock = if (selecting) emptyList() else listOf(
-      V3Action(Icons.Outlined.QrCodeScanner, StrKit.scanBarcode, onClick = nav.scan),
+    actions = if (selecting) listOf(V3Action(Icons.Outlined.Close, StrProducts.cancelSelection) { selection = emptySet() })
+    else listOf(
       if (layout == Layout.LIST) V3Action(Icons.Outlined.GridView, StrProducts.viewGrid) { layout = Layout.GRID; saveLayout(context, Layout.GRID) }
       else V3Action(Icons.Outlined.ViewAgenda, StrProducts.viewList) { layout = Layout.LIST; saveLayout(context, Layout.LIST) },
     ),
+    overflow = if (selecting) emptyList() else listOfNotNull(visual?.let { v -> V3MenuItem(Icons.Outlined.PhotoCamera, StrVisualSearch.button) { v.start() } }),
+    //  جست‌وجو (اسکن و صدا درونِ کادر) از دکمهٔ نوار؛ فیلتر و مرتب‌سازی زیرِ عنوان؛ نما در سربرگ؛ «کالای تازه» تنها دکمهٔ شناور
+    search = if (selecting) null else V3Search(query.text, { query = query.copy(text = it) }, StrProducts.searchHint, onScan = nav.scan, onVoice = voice),
+    chips = if (!loaded || data.products.isEmpty()) null else ({
+      ProductsFilterRow(query, data.productCategories, counts, onQuery = { query = it }, onSort = { sortOpen = true }, modifier = Modifier.padding(start = 16.dp, end = 12.dp))
+    }),
     fab = if (selecting) null else ({ expanded ->
       V3Fab(Icons.Outlined.Add, StrProducts.newProduct, expanded, onClick = nav.new)
     }),
