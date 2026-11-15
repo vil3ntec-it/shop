@@ -114,7 +114,8 @@ class PoSuggestUiTest {
     //  PUR-03: نشانِ اطمینان از درازای تاریخچه و نوسان (کمتر از ۱۲ ماه ⇒ «کم» و یادداشتِ «فصل حساب نشد»)، نه نشانِ کهنهٔ INV-13
     val season = row.season!!
     assertEquals(ir.vil3ntec.tohid.core.purchase.PoSeasonality.Confidence.LOW, season.confidence)
-    val label = ir.vil3ntec.tohid.core.i18n.StrPoSeason.label(season.confidence)
+    val label = ir.vil3ntec.tohid.ui.screens.seasonLabel(season.confidence)
+    assertEquals(ir.vil3ntec.tohid.core.i18n.StrPoSeason.low, label)
     rule.onNodeWithText(label).assertExists()
     rule.onAllNodesWithText(ir.vil3ntec.tohid.core.i18n.StrPoSeason.shortHistory).onFirst().assertExists()
     val old = DemandForecast.confidenceText(row.forecast.confidence)

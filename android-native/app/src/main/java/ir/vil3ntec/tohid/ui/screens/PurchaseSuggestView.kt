@@ -123,7 +123,7 @@ private fun SuggestRow(r: PurchaseSuggest.Row) {
       Text(r.product.name, color = c.text, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
       //  PUR-03: اطمینان از درازای تاریخچهٔ فروش و نوسان (`PoSeasonality`)
       val season = r.season
-      if (season != null) StatusPill(StrPoSeason.label(season.confidence), seasonTone(season.confidence))
+      if (season != null) StatusPill(seasonLabel(season.confidence), seasonTone(season.confidence))
       else StatusPill(DemandForecast.confidenceText(f.confidence), confidenceTone(f.confidence))
     }
     Text(
@@ -141,6 +141,13 @@ private fun SuggestRow(r: PurchaseSuggest.Row) {
       }
     }
   }
+}
+
+/** PUR-03 — نشانِ اطمینان (`StrPoSeason`)؛ صفحهٔ دیگری که همان `PurchaseSuggest.Row.season`/`Plan.season` را نشان می‌دهد همین را صدا بزند */
+internal fun seasonLabel(x: PoSeasonality.Confidence): String = when (x) {
+  PoSeasonality.Confidence.LOW -> StrPoSeason.low
+  PoSeasonality.Confidence.MEDIUM -> StrPoSeason.medium
+  PoSeasonality.Confidence.HIGH -> StrPoSeason.high
 }
 
 private fun seasonTone(x: PoSeasonality.Confidence): PillTone = when (x) {

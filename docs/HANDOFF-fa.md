@@ -73,8 +73,8 @@
   بیت‌به‌بیت) — تاریخچه از نخستین **فروش**؛ < ۱۲ ماه ⇒ حسابِ امروز و «اطمینانِ کم»؛ ≥ ۱۲ ماه ⇒ «همین ماهِ پارسال» ÷ میانگینِ اخیر (پنجرهٔ پارسال اگر
   هست، وگرنه امسال)؛ اطمینان از درازا (۱۲/۲۴ ماه) و نوسان. `PurchaseSuggest.Row.season`/`Plan.season` برای هر دو صفحه؛ نشان در `PurchaseSuggestView`
   (`StrPoSeason`). **برای 63b:** زیرِ ردیفِ فرمِ سفارشِ گوشی (`PurchaseOrderPages.kt` ~خطِ ۶۳۰) هنوز `DemandForecast.confidenceText` است — اگر آن
-  صفحه را دست می‌زنید `StrPoSeason.label(plan.season!!.confidence)` بگذارید (منطق در core است؛ این‌جا دست نخورد تا تداخل نکند).
-- **آزمون‌ها:** سرور `customer-role-mask.test.js` ۵/۵ (تازه)، ۱۱ پروندهٔ همراه ۷۵/۷۵ (`customer-contact`، `order-phone-mask`، `customer-contact-lists`،
+  صفحه را دست می‌زنید `seasonLabel(plan.season!!.confidence)` (`ui/screens/PurchaseSuggestView.kt`) بگذارید (منطق در core است؛ این‌جا دست نخورد تا تداخل نکند).
+- **آزمون‌ها:** سرور `customer-role-mask.test.js` ۵/۵ (تازه؛ روی کدِ پایه با همان lib ولی بی وصل کردن ۳ از ۵ سرخ)، ۱۱ پروندهٔ همراه ۷۵/۷۵ (`customer-contact`، `order-phone-mask`، `customer-contact-lists`،
   `staff-perms`، `perm-core`، `admin-flags`، `online-orders`، `order-customer`، `customer-access`، `delivery`، `courier-call`)، همهٔ ۷۱ پروندهٔ
   `order-*`/`orders-*`/`online-orders`/`delivery-*`/`courier-*`/`conflict-inbox`/`shop-chat*`/`storefront-promo*` ۴۹۲/۴۹۲ و `storefront-area-requests` + `storefront-promo*` ۲۳/۲۳ و OPS-01 ۳۲/۳۲ روی PGlite؛
   کاتلین: CORE_PLACEHOLDER؛ DESK_PLACEHOLDER.
