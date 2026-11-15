@@ -101,15 +101,7 @@ internal fun RouteScope.HistoryHost() {
   val onDesk = desk
 
   RejectedWatch(data = d)
-  HistoryScreen(
-    d = d,
-    book = book,
-    returnsV2 = v2,
-    canCancel = canCancel,
-    askCancel = askCancel,
-    drawer = DrawerModel.line(d, ReportBridge.nowMs(), blind),
-    query = query,
-    actions = HistoryActions(
+  val historyActions = HistoryActions(
       open = { nav.open(SalesPaths.invoice(it)) },
       ret = { nav.open(SalesPaths.returnOf(it)) },
       cancel = { nav.open(SalesPaths.cancelOf(it)) },
@@ -133,7 +125,22 @@ internal fun RouteScope.HistoryHost() {
       payReview = { nav.open(SalesPaths.PAY_REVIEW) },
       print = { printing = it },
       table = if (onDesk) ({ nav.open(SalesPaths.TABLE) }) else null,
-    ),
+    )
+  val drawerLine = DrawerModel.line(d, ReportBridge.nowMs(), blind)
+  //  کامپیوتر (`claude/e-desk-d3b`): جدول + کارتِ KPI + پنلِ فاکتور (`DeskHistoryPage`) با همین دفتر، پرسش و کارها
+  if (onDesk) ir.vil3ntec.tohid.ui.screens.DeskHistoryPage(
+    store = store, d = d, snackbar = snackbar, book = book, query = query, actions = historyActions,
+    returnsV2 = v2, canCancel = canCancel, askCancel = askCancel, drawer = drawerLine, reviews = reviewCount(d),
+    showMoney = !blind, banner = printBanner(), shopTag = shopTag,
+  ) else HistoryScreen(
+    d = d,
+    book = book,
+    returnsV2 = v2,
+    canCancel = canCancel,
+    askCancel = askCancel,
+    drawer = drawerLine,
+    query = query,
+    actions = historyActions,
     //  پوسته جای نوارِ پایین را خودش نگه می‌دارد (`ShellFrame`)؛ پیش‌تر این‌جا دوباره شمرده می‌شد (۸۰dp خالی)
     bottomReserve = 0.dp,
     shopTag = shopTag,

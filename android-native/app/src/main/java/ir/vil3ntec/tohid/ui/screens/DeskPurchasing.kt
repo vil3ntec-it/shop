@@ -55,6 +55,46 @@ import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.LocalShipping
+import androidx.compose.material.icons.outlined.Print
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Storefront
+import androidx.compose.material.icons.outlined.TableChart
+import ir.vil3ntec.tohid.core.i18n.StrDeskData
+import ir.vil3ntec.tohid.ui.desk.Desk
+import ir.vil3ntec.tohid.ui.desk.DeskButton
+import ir.vil3ntec.tohid.ui.desk.DeskButtonKind
+import ir.vil3ntec.tohid.ui.desk.DeskCalmRow
+import ir.vil3ntec.tohid.ui.desk.DeskCell
+import ir.vil3ntec.tohid.ui.desk.DeskColumn
+import ir.vil3ntec.tohid.ui.desk.DeskDataShot
+import ir.vil3ntec.tohid.ui.desk.DeskDivider
+import ir.vil3ntec.tohid.ui.desk.DeskDropdown
+import ir.vil3ntec.tohid.ui.desk.DeskGrid
+import ir.vil3ntec.tohid.ui.desk.DeskHues
+import ir.vil3ntec.tohid.ui.desk.DeskIconButton
+import ir.vil3ntec.tohid.ui.desk.DeskInfoRow
+import ir.vil3ntec.tohid.ui.desk.DeskKpiCard
+import ir.vil3ntec.tohid.ui.desk.DeskKpiRow
+import ir.vil3ntec.tohid.ui.desk.DeskLetterTile
+import ir.vil3ntec.tohid.ui.desk.DeskNote
+import ir.vil3ntec.tohid.ui.desk.DeskOption
+import ir.vil3ntec.tohid.ui.desk.DeskPage
+import ir.vil3ntec.tohid.ui.desk.DeskPane
+import ir.vil3ntec.tohid.ui.desk.DeskPaneHint
+import ir.vil3ntec.tohid.ui.desk.DeskRadius
+import ir.vil3ntec.tohid.ui.desk.DeskSegmented
+import ir.vil3ntec.tohid.ui.desk.DeskSize
+import ir.vil3ntec.tohid.ui.desk.DeskSpace
+import ir.vil3ntec.tohid.ui.desk.DeskSubhead
+import ir.vil3ntec.tohid.ui.desk.DeskTextField
+import ir.vil3ntec.tohid.ui.desk.DeskToolbar
+import ir.vil3ntec.tohid.ui.desk.DeskType
+import ir.vil3ntec.tohid.ui.desk.deskCard
+import ir.vil3ntec.tohid.ui.desk.rememberDeskLoad
 
 /**
  *  خرید و تأمین‌کنندگان — کامپیوتر.
@@ -80,6 +120,9 @@ fun DeskPurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
   var editing by remember { mutableStateOf(false) }
   val unitsOn = purchaseUnitsOn()
   val pending = remember { mutableStateListOf<Scan>() }
+  //  عکسِ CI (`D3bShotsTest`): زبانهٔ «تأمین‌کنندگان»
+  val shotTab = DeskDataShot.tab.value
+  LaunchedEffect(shotTab) { if (shotTab == "suppliers") tab = 1 }
 
   //  بارکدخوان: کالا به فاکتورِ باز؛ اگر بسته است، فاکتورِ تازه باز می‌شود
   val latest by rememberUpdatedState(d)
@@ -107,26 +150,43 @@ fun DeskPurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
     return
   }
 
-  Column(
-    Modifier
-      .fillMaxSize()
-      .onPreviewKeyEvent { e ->
-        if (e.type == KeyEventType.KeyDown && e.isPrimaryModifier && e.key == Key.N) { editing = true; true } else false
-      }
-      .padding(16.dp),
+  DeskPage(
+    Modifier.onPreviewKeyEvent { e ->
+      if (e.type == KeyEventType.KeyDown && e.isPrimaryModifier && e.key == Key.N) { editing = true; true } else false
+    },
   ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      TabRow(selectedTabIndex = tab, containerColor = Shop.colors.surface, modifier = Modifier.weight(1f)) {
-        Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(StrPurchasePages.purchaseInvoices) })
-        Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(StrPurchasePages.suppliers) })
-      }
-      Spacer(Modifier.width(12.dp))
-      //  PUR-02/04: فقط با پرچمِ سرورِ `shop.purchase_orders` دیده می‌شود
-      PurchaseOrdersEntry(store, d, ::toast, Modifier.padding(end = 8.dp))
-      Button(onClick = { editing = true }) { Text(StrPurchasePages.newPurchaseKey) }
+    PurchaseKpis(d)
+    DeskToolbar(
+      end = {
+        //  PUR-02/04: فقط با پرچمِ سرورِ `shop.purchase_orders` دیده می‌شود
+        PurchaseOrdersEntry(store, d, ::toast)
+        DeskButton(StrPurchasePages.newPurchaseKey, { editing = true }, kind = DeskButtonKind.PRIMARY)
+      },
+    ) {
+      DeskSegmented(listOf(0 to StrPurchasePages.purchaseInvoices, 1 to StrPurchasePages.suppliers), tab, { tab = it })
     }
-    Spacer(Modifier.height(12.dp))
     if (tab == 0) PurchaseInvoices(d, ::toast) else Suppliers(store, d, ::toast)
+  }
+}
+
+/** چهار عددِ کل: خریدِ این ماه، بدهیِ ما، شمارِ فاکتورها و تأمین‌کنندگان — کارتِ KPI ِ کامپیوتر، بیرون از رشتهٔ صفحه */
+@Composable
+private fun PurchaseKpis(d: ShopData) {
+  val month = ir.vil3ntec.tohid.todayIso().take(7)
+  val k = rememberDeskLoad(d, month) {
+    listOf(
+      d.purchases.filter { it.date.startsWith(month) }.sumOf { it.totalAmount },
+      d.suppliers.sumOf { ShopStore.supplierDebt(d, it.id).coerceAtLeast(0.0) },
+      PurchaseBook.invoices(d, null).size.toDouble(),
+    )
+  }
+  fun amountOrDash(v: Double?) = v?.let { "${money(it)} ؋" } ?: "—"
+  DeskKpiRow {
+    val m = Modifier.weight(1f).fillMaxHeight()
+    DeskKpiCard(ir.vil3ntec.tohid.ui.desk.DeskKpi(StrPurchasePages.thisMonthPurchases, amountOrDash(k?.get(0)), Icons.Outlined.LocalShipping, DeskHues.tone("purchasing")), m)
+    DeskKpiCard(ir.vil3ntec.tohid.ui.desk.DeskKpi(StrPurchasePages.weOweSuppliers, amountOrDash(k?.get(1)), Icons.Outlined.AccountBalanceWallet, DeskHues.tone(ir.vil3ntec.tohid.ui.v3.V3Hue.AMBER)), m)
+    DeskKpiCard(ir.vil3ntec.tohid.ui.desk.DeskKpi(StrPurchasePages.purchaseInvoices, k?.get(2)?.let { ir.vil3ntec.tohid.plain(it.toInt()) } ?: "—", Icons.AutoMirrored.Outlined.ReceiptLong, DeskHues.tone(ir.vil3ntec.tohid.ui.v3.V3Hue.BRAND)), m)
+    DeskKpiCard(ir.vil3ntec.tohid.ui.desk.DeskKpi(StrPurchasePages.suppliers, ir.vil3ntec.tohid.plain(d.suppliers.size), Icons.Outlined.Storefront, DeskHues.tone(ir.vil3ntec.tohid.ui.v3.V3Hue.SKY)), m)
   }
 }
 
@@ -134,106 +194,109 @@ fun DeskPurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
 
 @Composable
 private fun ColumnScope.PurchaseInvoices(d: ShopData, toast: (String) -> Unit) {
-  val context = LocalContext.current
   var supplier by remember { mutableStateOf<String?>(null) }
-  var menu by remember { mutableStateOf(false) }
   var picked by remember { mutableStateOf<String?>(null) }
-  val list = remember(d, supplier) { PurchaseBook.invoices(d, supplier) }
+  val list = rememberDeskLoad(d, supplier) { PurchaseBook.invoices(d, supplier) }.orEmpty()
   //  ماندهٔ واقعیِ هر فاکتور (پرداخت‌های بعدی و سندِ کسر FIFO) — برای رنگِ سررسید
   val remaining = remember(d) { PurchaseBook.open(d).associate { it.invoice.key to it.remaining } }
   val names = remember(d) { d.suppliers.associate { it.id to it.name } }
   val today = ir.vil3ntec.tohid.todayIso()
-  val month = today.take(7)
+  val shotPick = DeskDataShot.pick.value
+  LaunchedEffect(shotPick, list.isNotEmpty()) { if (shotPick == "first") list.firstOrNull()?.let { picked = it.key } }
+  val c = Desk.colors
 
-  Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-    DeskKpi(StrPurchasePages.thisMonthPurchases, "${money(d.purchases.filter { it.date.startsWith(month) }.sumOf { it.totalAmount })} ؋", Shop.colors.primary, Modifier.weight(1f))
-    DeskKpi(StrPurchasePages.weOweSuppliers, "${money(d.suppliers.sumOf { ShopStore.supplierDebt(d, it.id).coerceAtLeast(0.0) })} ؋", Shop.colors.danger, Modifier.weight(1f))
-    DeskKpi(StrPurchasePages.purchaseInvoices, "${list.size}", Shop.colors.text, Modifier.weight(1f))
-    DeskKpi(StrPurchasePages.suppliers, "${d.suppliers.size}", Shop.colors.text, Modifier.weight(1f))
-  }
-  Spacer(Modifier.height(10.dp))
   //  یادآورِ سررسید (PUR-07) — فقط وقتی فاکتوری سررسید دارد
   SupplierDueReminder(d, today) { supplier = it }
-  Spacer(Modifier.height(6.dp))
-  Row(verticalAlignment = Alignment.CenterVertically) {
-    Box {
-      OutlinedButton(onClick = { menu = true }) { Text(StrPurchasePages.supplierFilter(supplier?.let { names[it] } ?: Str.all)) }
-      DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-        DropdownMenuItem(text = { Text(Str.all) }, onClick = { supplier = null; menu = false })
-        d.suppliers.forEach { s -> DropdownMenuItem(text = { Text(s.name) }, onClick = { supplier = s.id; menu = false }) }
-      }
-    }
-    Spacer(Modifier.weight(1f))
-    OutlinedButton(onClick = {
-      val sh = PurchaseBook.invoicesSheet(d, list, today)
-      Platform.saveFile("${sh.name}.xlsx", Xlsx.of(sh))?.let { toast(StrSale.savedTo(it)) }
-    }) { Text(StrPurchasePages.listExcel) }
-  }
-  Spacer(Modifier.height(8.dp))
-  Row(Modifier.weight(1f)) {
-    val cols = listOf(TCol(StrInvoices.colInvoice, 80.dp), TCol(StrInvoices.colDate, 110.dp), TCol(StrMoney.supplierLabel), TCol(StrPurchasePages.rows, 70.dp, true), TCol(StrInvoices.total, 130.dp, true), TCol(StrInvoices.colPaid, 130.dp, true), TCol(StrSimpleAsk.vDebtRemaining, 130.dp, true))
-    DeskTable(
-      cols, list.size, Modifier.weight(1f),
-      empty = StrPurchasePages.noPurchasesYet,
-      selected = list.indexOfFirst { it.key == picked }.takeIf { it >= 0 },
-      cell = { i, c ->
-        val v = list[i]
-        when (c) {
-          0 -> if (v.isReturn) TCell(StrHistory.returns, Shop.colors.success, bold = true) else TCell(if (v.no > 0) "#${v.no}" else "—", Shop.colors.primary, bold = true)
-          1 -> TCell(formatDate(v.date))
-          2 -> TCell(names[v.supplierId] ?: "—")
-          3 -> TCell(v.lines.size.toString())
-          4 -> TCell(money(v.total), bold = true)
-          5 -> TCell(money(v.paid), Shop.colors.success)
-          else -> TCell(if (v.debt > 0.5) money(v.debt) else "", Shop.colors.danger)
-        }
-      },
-      onClick = { picked = list[it].key },
-      footer = listOf(StrInvoices.total, "", "", "", money(list.sumOf { it.total }), money(list.sumOf { it.paid }), money(list.sumOf { it.debt })),
+  DeskToolbar(
+    end = {
+      DeskButton(StrPurchasePages.listExcel, {
+        val sh = PurchaseBook.invoicesSheet(d, list, today)
+        Platform.saveFile("${sh.name}.xlsx", Xlsx.of(sh))?.let { toast(StrSale.savedTo(it)) }
+      }, icon = Icons.Outlined.TableChart)
+    },
+  ) {
+    DeskDropdown(
+      supplier,
+      listOf(DeskOption<String?>(null, Str.all)) + d.suppliers.map { DeskOption<String?>(it.id, it.name) },
+      { supplier = it; picked = null },
+      label = StrMoney.supplierLabel,
     )
-    list.find { it.key == picked }?.let { inv ->
-      Spacer(Modifier.width(12.dp))
-      Column(
-        Modifier.width(380.dp).fillMaxHeight().clip(RoundedCornerShape(12.dp)).background(Shop.colors.surface)
-          .border(1.dp, Shop.colors.border, RoundedCornerShape(12.dp)).padding(14.dp),
-      ) {
-        Text(if (inv.isReturn) StrPurchasePages.returnToSupplier else if (inv.no > 0) StrPurchasePages.purchaseInvoiceNo(inv.no) else Str.purchases, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
-        inv.dueDate?.takeIf { !inv.isReturn }?.let { due ->
-          Text(StrPurchasePages.dueOn(formatDate(due)), style = MaterialTheme.typography.labelSmall, color = if (due < today && (remaining[inv.key] ?: 0.0) > 0.5) Shop.colors.danger else Shop.colors.muted)
-        }
-        Text("${names[inv.supplierId] ?: "—"} · ${formatDate(inv.date)}", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-        Spacer(Modifier.height(8.dp))
-        HeadRow(listOf(StrMoney.item to 0.dp, StrPlaces.amount to 60.dp, StrInvoices.total to 100.dp))
-        LazyColumn(Modifier.weight(1f).fillMaxWidth().border(1.dp, Shop.colors.border)) {
-          itemsIndexed(inv.lines, key = { _, p -> p.id }) { i, p ->
-            Row(
-              Modifier.fillMaxWidth().background(if (i % 2 == 1) Shop.colors.surface2.copy(alpha = 0.45f) else Shop.colors.surface).padding(horizontal = 8.dp, vertical = 6.dp),
-              verticalAlignment = Alignment.CenterVertically,
-            ) {
-              Column(Modifier.weight(1f)) {
-                Text(d.products.find { it.id == p.productId }?.name ?: StrHome.txDeletedItem, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Shop.colors.text)
-                Text(StrPurchasePages.unitPriceUnit(money(p.purchasePrice), p.unit), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-              }
-              Text(qtyText(p.quantity), Modifier.width(60.dp), textAlign = TextAlign.End)
-              Text(money(p.totalAmount), Modifier.width(100.dp), textAlign = TextAlign.End, fontWeight = FontWeight.SemiBold)
-            }
-          }
-        }
-        Spacer(Modifier.height(8.dp))
-        Row { Text(StrInvoices.total, Modifier.weight(1f), color = Shop.colors.muted); Text("${money(inv.total)} ؋", fontWeight = FontWeight.Bold) }
-        Row { Text(StrInvoices.colPaid, Modifier.weight(1f), color = Shop.colors.muted); Text(money(inv.paid), color = Shop.colors.success) }
-        Row { Text(StrPurchasePages.onSupplierAccount, Modifier.weight(1f), color = Shop.colors.muted); Text(money(inv.debt), color = Shop.colors.danger, fontWeight = FontWeight.Bold) }
-        Spacer(Modifier.height(10.dp))
-        Row {
-          Button(onClick = { PurchaseBook.invoiceSheet(d, inv).let { ir.vil3ntec.tohid.print.ReportPrint.print(context, it, it.name) } }, modifier = Modifier.weight(1f)) { Text(StrHistory.print) }
-          Spacer(Modifier.width(6.dp))
-          OutlinedButton(onClick = {
-            val sh = PurchaseBook.invoiceSheet(d, inv)
-            Platform.saveFile("${sh.name}.xlsx", Xlsx.of(sh))?.let { toast(StrSale.savedTo(it)) }
-          }, modifier = Modifier.weight(1f)) { Text(StrReports.excel) }
-        }
+    DeskNote(StrDeskData.rowsShown(ir.vil3ntec.tohid.plain(list.size)))
+  }
+  val inv = list.find { it.key == picked }
+  BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+   val paneW = ir.vil3ntec.tohid.ui.desk.deskPaneWidth(maxWidth)
+   Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(DeskSpace.gap)) {
+   Box(Modifier.weight(1f).fillMaxHeight()) {
+    val cols = listOf(
+      DeskColumn(StrInvoices.colInvoice, width = 88.dp), DeskColumn(StrInvoices.colDate, width = 104.dp), DeskColumn(StrMoney.supplierLabel, weight = 1f),
+      DeskColumn(StrPurchasePages.rows, width = 60.dp, end = true), DeskColumn(StrInvoices.total, width = 120.dp, end = true),
+      DeskColumn(StrInvoices.colPaid, width = 120.dp, end = true), DeskColumn(StrSimpleAsk.vDebtRemaining, width = 120.dp, end = true),
+    )
+    DeskGrid(
+      cols, list.size, Modifier.fillMaxSize(),
+      key = { list[it].key },
+      selected = list.indexOfFirst { it.key == picked }.takeIf { it >= 0 },
+      onPick = { picked = list[it].key },
+      rowLabel = { list[it].let { v -> if (v.no > 0) "#${v.no}" else Str.purchases } },
+      footer = listOf(StrInvoices.total, "", "", "", money(list.sumOf { it.total }), money(list.sumOf { it.paid }), money(list.sumOf { it.debt })),
+      empty = { ir.vil3ntec.tohid.ui.v3.V3EmptyState(Icons.Outlined.LocalShipping, StrPurchasePages.noPurchasesYet) },
+    ) { i, col ->
+      val v = list[i]
+      when (col) {
+        0 -> DeskCell(if (v.isReturn) StrHistory.returns else if (v.no > 0) "#${v.no}" else "—", muted = v.isReturn)
+        1 -> DeskCell(formatDate(v.date), muted = true)
+        2 -> DeskCell(names[v.supplierId] ?: "—")
+        3 -> DeskCell(ir.vil3ntec.tohid.plain(v.lines.size), muted = true)
+        4 -> DeskCell(money(v.total), strong = true)
+        5 -> DeskCell(money(v.paid), muted = true)
+        else -> DeskCell(if (v.debt > 0.5) money(v.debt) else "", strong = true)
       }
     }
+   }
+   if (inv != null) Box(Modifier.width(paneW).fillMaxHeight()) { PurchasePane(d, inv, names, remaining, today, toast, onClose = { picked = null }) }
+   }
+  }
+}
+
+/** پنلِ فاکتورِ خریدِ برگزیده: ردیف‌ها، جمع‌ها، سررسید و چاپ/اکسل */
+@Composable
+private fun PurchasePane(d: ShopData, inv: PurchaseBook.Invoice, names: Map<String, String>, remaining: Map<String, Double>, today: String, toast: (String) -> Unit, onClose: () -> Unit) {
+  val context = LocalContext.current
+  val c = Desk.colors
+  val late = inv.dueDate?.let { due -> !inv.isReturn && due < today && (remaining[inv.key] ?: 0.0) > 0.5 } == true
+  DeskPane(
+    title = if (inv.isReturn) StrPurchasePages.returnToSupplier else if (inv.no > 0) StrPurchasePages.purchaseInvoiceNo(inv.no) else Str.purchases,
+    subtitle = "${names[inv.supplierId] ?: "—"} • ${formatDate(inv.date)}",
+    onClose = onClose,
+    actions = {
+      DeskButton(StrHistory.print, { PurchaseBook.invoiceSheet(d, inv).let { ir.vil3ntec.tohid.print.ReportPrint.print(context, it, it.name) } }, Modifier.weight(1f), kind = DeskButtonKind.PRIMARY, icon = Icons.Outlined.Print)
+      DeskButton(StrReports.excel, {
+        val sh = PurchaseBook.invoiceSheet(d, inv)
+        Platform.saveFile("${sh.name}.xlsx", Xlsx.of(sh))?.let { toast(StrSale.savedTo(it)) }
+      }, Modifier.weight(1f), icon = Icons.Outlined.TableChart)
+    },
+  ) {
+    inv.dueDate?.takeIf { !inv.isReturn }?.let { due ->
+      DeskNote(StrPurchasePages.dueOn(formatDate(due)))
+      if (late) Text(StrPurchasePages.overdue, style = DeskType.label, color = c.negative)
+    }
+    DeskSubhead(StrPurchasePages.rows + " · " + ir.vil3ntec.tohid.plain(inv.lines.size))
+    Column(Modifier.fillMaxWidth()) {
+      inv.lines.forEach { p ->
+        Row(Modifier.fillMaxWidth().padding(vertical = DeskSpace.x2), verticalAlignment = Alignment.CenterVertically) {
+          Column(Modifier.weight(1f)) {
+            Text(d.products.find { it.id == p.productId }?.name ?: StrHome.txDeletedItem, maxLines = 1, overflow = TextOverflow.Ellipsis, style = DeskType.body, color = c.ink)
+            Text("${qtyText(p.quantity)} × " + StrPurchasePages.unitPriceUnit(money(p.purchasePrice), p.unit), style = DeskType.secondary, color = c.inkSecondary, maxLines = 1)
+          }
+          Text(money(p.totalAmount), style = DeskType.table, color = c.ink)
+        }
+        DeskDivider()
+      }
+    }
+    DeskInfoRow(StrInvoices.total, "${money(inv.total)} ؋", strong = true)
+    DeskInfoRow(StrInvoices.colPaid, money(inv.paid))
+    DeskInfoRow(StrPurchasePages.onSupplierAccount, money(inv.debt), strong = inv.debt > 0.5, valueColor = if (inv.debt > 0.5) c.negative else null)
   }
 }
 
@@ -527,163 +590,176 @@ private fun LineRow(i: Int, l: Draft, d: ShopData, hint: String?, unitsOn: Boole
 
 /* ══════════════════════════ تأمین‌کنندگان ══════════════════════════ */
 
+/**
+ *  تأمین‌کنندگان — فهرستِ آرام در آغاز (نام، شماره • آخرین خرید، بدهیِ ما) با ردیفِ «تأمین‌کنندهٔ تازه»، و صورت‌حسابِ
+ *  تأمین‌کنندهٔ برگزیده در کنار: بدهیِ ما، چهار عددِ آرام، F7 پرداخت (و «برگشت» با دفترِ موجودی)، چاپ و اکسل.
+ */
 @Composable
 private fun ColumnScope.Suppliers(store: ShopStore, d: ShopData, toast: (String) -> Unit) {
-  val context = LocalContext.current
   val scope = rememberCoroutineScope()
   var openId by remember { mutableStateOf<String?>(null) }
   val today = ir.vil3ntec.tohid.todayIso()
-  val all = remember(d, today) { PurchaseBook.suppliers(d, today) }
+  val all = rememberDeskLoad(d, today) { PurchaseBook.suppliers(d, today) }.orEmpty()
+  val shotPick = DeskDataShot.pick.value
+  LaunchedEffect(shotPick, all.isNotEmpty()) { if (shotPick == "first" && openId == null) openId = all.maxByOrNull { it.balance }?.supplier?.id }
   val open = all.find { it.supplier.id == openId }
+  val c = Desk.colors
 
-  if (open == null) {
-    var name by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    fun add() {
-      when (val r = LedgerEngine.addSupplier(d, LedgerEngine.SupplierDraft(name = name, phone = phone), System.currentTimeMillis(), ::newId)) {
-        is LedgerEngine.Result.Failed -> toast(r.message)
-        is LedgerEngine.Result.Ok -> { scope.launch { store.save(d, r.data) }; name = ""; phone = "" }
-      }
-    }
-    val enter = Modifier.onPreviewKeyEvent { e -> if (e.type == KeyEventType.KeyDown && (e.key == Key.Enter || e.key == Key.NumPadEnter)) { add(); true } else false }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      OutlinedTextField(name, { name = it }, singleLine = true, label = { Text(StrPurchasePages.newSupplierName) }, modifier = Modifier.width(280.dp).then(enter))
-      Spacer(Modifier.width(6.dp))
-      OutlinedTextField(phone, { phone = it }, singleLine = true, label = { Text(StrCustomerPages.phone) }, modifier = Modifier.width(170.dp).then(enter))
-      Spacer(Modifier.width(6.dp))
-      Button(onClick = ::add, enabled = name.isNotBlank()) { Text(StrCustomerPages.addKey) }
-    }
-    Spacer(Modifier.height(10.dp))
-    LazyVerticalGrid(
-      columns = GridCells.Adaptive(210.dp),
-      horizontalArrangement = Arrangement.spacedBy(12.dp),
-      verticalArrangement = Arrangement.spacedBy(12.dp),
-      modifier = Modifier.weight(1f),
-    ) {
-      items(all, key = { it.supplier.id }) { s ->
-        val tint = if (s.balance > 0.5) Shop.colors.danger else Shop.colors.success
-        Column(
-          Modifier.aspectRatio(1.15f).clip(RoundedCornerShape(14.dp)).background(Shop.colors.surface)
-            .border(1.dp, Shop.colors.border, RoundedCornerShape(14.dp)).clickable { openId = s.supplier.id }.padding(14.dp),
-        ) {
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(40.dp).clip(CircleShape).background(Shop.colors.primary.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
-              Text(s.supplier.name.take(1), fontWeight = FontWeight.Bold, color = Shop.colors.primary)
-            }
-            Spacer(Modifier.width(10.dp))
-            Column {
-              Text(s.supplier.name, fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-              Text(ir.vil3ntec.tohid.LocaleText.phoneDisplay(s.supplier.phone).ifBlank { StrCustomerPages.noPhone }, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-            }
+  BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+    val listW = (maxWidth * 0.34f).coerceIn(320.dp, 420.dp)
+    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(DeskSpace.gap)) {
+      Column(Modifier.width(listW).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(DeskSpace.x2)) {
+        var name by remember { mutableStateOf("") }
+        var phone by remember { mutableStateOf("") }
+        fun add() {
+          if (name.isBlank()) return
+          when (val r = LedgerEngine.addSupplier(d, LedgerEngine.SupplierDraft(name = name, phone = phone), System.currentTimeMillis(), ::newId)) {
+            is LedgerEngine.Result.Failed -> toast(r.message)
+            is LedgerEngine.Result.Ok -> { scope.launch { store.save(d, r.data) }; name = ""; phone = "" }
           }
-          Spacer(Modifier.weight(1f))
-          Text(if (s.balance > 0.5) StrMoney.ourDebt else StrCustomerPages.noBalance, style = MaterialTheme.typography.labelMedium, color = tint)
-          Text("${money(s.balance.coerceAtLeast(0.0))} ؋", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = tint)
-          Spacer(Modifier.weight(1f))
-          Text(StrCustomerPages.cardStats(s.invoices, money(s.bought)) + (s.lastPurchase?.let { " · ${formatDate(it)}" } ?: ""), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted, maxLines = 1)
+        }
+        DeskTextField(name, { name = it }, StrPurchasePages.newSupplierName, Modifier.fillMaxWidth(), onEnter = ::add)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DeskSpace.x2)) {
+          DeskTextField(phone, { phone = it }, StrCustomerPages.phone, Modifier.weight(1f), onEnter = ::add)
+          DeskButton(StrCustomerPages.addKey, ::add, kind = DeskButtonKind.PRIMARY, enabled = name.isNotBlank())
+        }
+        if (all.isEmpty()) Box(Modifier.fillMaxWidth().weight(1f).deskCard(c), contentAlignment = Alignment.Center) {
+          ir.vil3ntec.tohid.ui.v3.V3EmptyState(Icons.Outlined.Storefront, StrPurchasePages.noBuyOrPay)
+        } else LazyColumn(Modifier.fillMaxWidth().weight(1f).deskCard(c).padding(vertical = DeskSpace.x1)) {
+          items(all, key = { it.supplier.id }) { s ->
+            DeskCalmRow(
+              title = s.supplier.name,
+              sub = listOf(ir.vil3ntec.tohid.LocaleText.phoneDisplay(s.supplier.phone), s.lastPurchase?.let { ir.vil3ntec.tohid.ui.v3.RowWhen.of(it, today) }.orEmpty())
+                .filter { it.isNotBlank() }.joinToString(" • ").ifBlank { StrCustomerPages.noPhone },
+              amount = if (s.balance > 0.5) "${money(s.balance)} ؋" else StrCustomerPages.settled,
+              status = if (s.balance > 0.5) StrMoney.ourDebt else StrCustomerPages.cardStats(s.invoices, money(s.bought)),
+              amountColor = if (s.balance > 0.5) c.negative else null,
+              selected = s.supplier.id == openId,
+              //  کاشیِ حرفِ خنثی — سبز/سرخ این‌جا معنای حسابِ مشتری را می‌گرفت
+              leading = { DeskLetterTile(s.supplier.name, c.inkSecondary, c.surfaceAlt) },
+              onClick = { openId = s.supplier.id },
+            )
+          }
         }
       }
+      Box(Modifier.weight(1f).fillMaxHeight()) {
+        if (open == null) DeskPaneHint(Icons.Outlined.Storefront, StrDeskData.pickSupplier, Modifier.fillMaxSize())
+        else key(open.supplier.id) { SupplierFile(store, d, open, today, toast) { openId = null } }
+      }
     }
-    return
   }
+}
 
-  var paying by remember(openId) { mutableStateOf(false) }
-  var returning by remember(openId) { mutableStateOf(false) }
-  var amount by remember(openId) { mutableStateOf("") }
+/** صورت‌حسابِ یک تأمین‌کننده — پنلِ کنارِ فهرست */
+@Composable
+private fun SupplierFile(store: ShopStore, d: ShopData, open: PurchaseBook.SupplierSummary, today: String, toast: (String) -> Unit, onClose: () -> Unit) {
+  val context = LocalContext.current
+  val scope = rememberCoroutineScope()
+  val c = Desk.colors
+  var paying by remember { mutableStateOf(false) }
+  var returning by remember { mutableStateOf(false) }
+  var amount by remember { mutableStateOf("") }
   val stockOn = remember(d.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
-  val ledger = remember(d, openId) { PurchaseBook.ledger(d, open.supplier.id) }
+  val ledger = remember(d, open.supplier.id) { PurchaseBook.ledger(d, open.supplier.id) }
   fun sheet() = PurchaseBook.ledgerSheet(d, open.supplier, today)
   Column(
-    Modifier.weight(1f).onPreviewKeyEvent { e ->
+    Modifier.fillMaxSize().deskCard(c).onPreviewKeyEvent { e ->
       if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
       when {
         e.key == Key.F7 -> { paying = true; true }
-        e.key == Key.Escape && !paying -> { openId = null; true }
+        e.key == Key.Escape && !paying && !returning -> { onClose(); true }
         else -> false
       }
     },
   ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      IconButton(onClick = { openId = null }) { Icon(Icons.Filled.ArrowForward, Str.back, tint = Shop.colors.text) }
-      Text(open.supplier.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Shop.colors.text)
-      Spacer(Modifier.width(12.dp))
-      Text(ir.vil3ntec.tohid.LocaleText.phoneDisplay(open.supplier.phone), color = Shop.colors.muted)
-      Spacer(Modifier.weight(1f))
-      Button(onClick = { paying = true }) { Text(StrPurchasePages.paySupplierKey) }
-      if (stockOn) {
-        Spacer(Modifier.width(6.dp))
-        OutlinedButton(onClick = { returning = true }) { Text(StrPurchasePages.returnCredit) }
+    Row(Modifier.fillMaxWidth().padding(start = DeskSpace.card, end = DeskSpace.x3, top = DeskSpace.x4, bottom = DeskSpace.x3), verticalAlignment = Alignment.CenterVertically) {
+      DeskLetterTile(open.supplier.name, c.inkSecondary, c.surfaceAlt, size = DeskSize.tileLarge)
+      Spacer(Modifier.width(DeskSpace.x3))
+      Column(Modifier.weight(1f)) {
+        Text(open.supplier.name, style = DeskType.sectionTitle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(listOf(ir.vil3ntec.tohid.LocaleText.phoneDisplay(open.supplier.phone), open.supplier.address).filter { it.isNotBlank() }.joinToString(" • ").ifBlank { StrCustomerPages.noPhone },
+          style = DeskType.secondary, color = c.inkSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
       }
-      Spacer(Modifier.width(6.dp))
-      OutlinedButton(onClick = { sheet().let { ir.vil3ntec.tohid.print.ReportPrint.print(context, it, it.name) } }) { Text(StrHistory.print) }
-      Spacer(Modifier.width(6.dp))
-      OutlinedButton(onClick = { val sh = sheet(); Platform.saveFile("${sh.name}.xlsx", Xlsx.of(sh))?.let { toast(StrSale.savedTo(it)) } }) { Text(StrReports.excel) }
+      Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(horizontal = DeskSpace.x3)) {
+        Text(StrMoney.ourDebt, style = DeskType.label, color = c.inkSecondary, maxLines = 1)
+        Text("${money(open.balance)} ؋", style = DeskType.kpiSmall, color = if (open.balance > 0.5) c.negative else c.positive, maxLines = 1)
+      }
+      DeskIconButton(Icons.Outlined.Close, Str.close, onClose)
     }
-    Spacer(Modifier.height(8.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-      DeskKpi(StrMoney.ourDebt, "${money(open.balance)} ؋", if (open.balance > 0.5) Shop.colors.danger else Shop.colors.success, Modifier.weight(1f))
-      DeskKpi(StrSimpleAsk.vPurchaseTotal, "${money(open.bought)} ؋", Shop.colors.primary, Modifier.weight(1f))
-      DeskKpi(Str.invoices, "${open.invoices}", Shop.colors.text, Modifier.weight(1f))
-      DeskKpi(StrPriceCheck.lastPurchase, open.lastPurchase?.let { formatDate(it) } ?: "—", Shop.colors.text, Modifier.weight(1f))
-      if (stockOn && open.overdue > 0.5) DeskKpi(StrPurchasePages.overdue, "${money(open.overdue)} ؋", Shop.colors.danger, Modifier.weight(1f))
-      if (open.returned > 0.5) DeskKpi(StrPurchasePages.creditNoteReturn, "${money(open.returned)} ؋", Shop.colors.success, Modifier.weight(1f))
-    }
-    if (returning) {
-      SupplierReturnDialog(d, open.supplier.id, onDismiss = { returning = false }) { productId, q, price, reason, date, key ->
-        when (val r = PurchaseBook.supplierReturn(
-          d, open.supplier.id, productId, q, price, reason, date, today, System.currentTimeMillis(), ::newId,
-          userId = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull(), key = key,
-        )) {
-          is PurchaseBook.Result.Failed -> toast(r.message)
-          is PurchaseBook.Result.Ok -> { scope.launch { store.save(d, r.data) }; returning = false; toast(StrReach.returnSaved) }
+    DeskDivider()
+    Column(Modifier.fillMaxWidth().weight(1f).padding(horizontal = DeskSpace.card, vertical = DeskSpace.x4), verticalArrangement = Arrangement.spacedBy(DeskSpace.x3)) {
+      DeskNote(
+        listOfNotNull(
+          StrSimpleAsk.vPurchaseTotal + ": " + money(open.bought) + " ؋",
+          Str.invoices + ": " + ir.vil3ntec.tohid.plain(open.invoices),
+          StrPriceCheck.lastPurchase + ": " + (open.lastPurchase?.let { formatDate(it) } ?: "—"),
+          if (stockOn && open.overdue > 0.5) StrPurchasePages.overdue + ": " + money(open.overdue) + " ؋" else null,
+          if (open.returned > 0.5) StrPurchasePages.creditNoteReturn + ": " + money(open.returned) + " ؋" else null,
+        ).joinToString(" • "),
+      )
+      DeskToolbar(
+        end = {
+          DeskButton(StrHistory.print, { sheet().let { ir.vil3ntec.tohid.print.ReportPrint.print(context, it, it.name) } }, icon = Icons.Outlined.Print)
+          DeskButton(StrReports.excel, { val sh = sheet(); Platform.saveFile("${sh.name}.xlsx", Xlsx.of(sh))?.let { toast(StrSale.savedTo(it)) } }, icon = Icons.Outlined.TableChart)
+        },
+      ) {
+        DeskButton(StrPurchasePages.paySupplierKey, { paying = true }, kind = DeskButtonKind.PRIMARY)
+        if (stockOn) DeskButton(StrPurchasePages.returnCredit, { returning = true })
+      }
+      if (returning) {
+        SupplierReturnDialog(d, open.supplier.id, onDismiss = { returning = false }) { productId, q, price, reason, date, key ->
+          when (val r = PurchaseBook.supplierReturn(
+            d, open.supplier.id, productId, q, price, reason, date, today, System.currentTimeMillis(), ::newId,
+            userId = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull(), key = key,
+          )) {
+            is PurchaseBook.Result.Failed -> toast(r.message)
+            is PurchaseBook.Result.Ok -> { scope.launch { store.save(d, r.data) }; returning = false; toast(StrReach.returnSaved) }
+          }
         }
       }
-    }
-    if (paying) {
-      Spacer(Modifier.height(8.dp))
-      val focus = remember { FocusRequester() }
-      LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-      //  PUR-07: یک کلید برای همین ردیفِ پرداخت — Enter ِ پشتِ‌سرِهم یک پرداخت است
-      val payKey = remember { newId() }
-      fun pay() {
-        val a = amount.toDoubleOrNull() ?: return
-        when (val r = LedgerEngine.paySupplier(d, open.supplier.id, a, today, StrHistory.payment, today, System.currentTimeMillis(), ::newId, key = payKey)) { // داده: یادداشتِ ردیفِ دفترِ تأمین‌کننده (داده)
-          is LedgerEngine.Result.Failed -> toast(r.message)
-          is LedgerEngine.Result.Ok -> { scope.launch { store.save(d, r.data) }; paying = false; amount = ""; toast(StrPurchasePages.paymentSaved(money(a))) }
+      if (paying) {
+        val focus = remember { FocusRequester() }
+        LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+        //  PUR-07: یک کلید برای همین ردیفِ پرداخت — Enter ِ پشتِ‌سرِهم یک پرداخت است
+        val payKey = remember { newId() }
+        fun pay() {
+          val a = amount.toDoubleOrNull() ?: return
+          when (val r = LedgerEngine.paySupplier(d, open.supplier.id, a, today, StrHistory.payment, today, System.currentTimeMillis(), ::newId, key = payKey)) { // داده: یادداشتِ ردیفِ دفترِ تأمین‌کننده (داده)
+            is LedgerEngine.Result.Failed -> toast(r.message)
+            is LedgerEngine.Result.Ok -> { scope.launch { store.save(d, r.data) }; paying = false; amount = ""; toast(StrPurchasePages.paymentSaved(money(a))) }
+          }
+        }
+        Row(
+          Modifier.fillMaxWidth().clip(DeskRadius.controlShape).background(c.positiveSoft).border(DeskSize.hairline, c.positive, DeskRadius.controlShape).padding(DeskSpace.x2),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(DeskSpace.x2),
+        ) {
+          Text(StrPurchasePages.payTo(open.supplier.name), Modifier.weight(1f), style = DeskType.bodyStrong, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+          DeskTextField(amount, { amount = ir.vil3ntec.tohid.numericInput(it) }, StrCustomerPages.amountAfn, Modifier.width(180.dp), focus, onEnter = ::pay, onEscape = { paying = false })
+          DeskButton(StrCustomerPages.saveKey, ::pay, kind = DeskButtonKind.PRIMARY, enabled = (amount.toDoubleOrNull() ?: 0.0) > 0)
+          DeskButton(Str.cancel, { paying = false }, kind = DeskButtonKind.GHOST, shortcut = "Esc")
         }
       }
-      Surface(color = Shop.colors.success.copy(alpha = 0.08f), shape = RoundedCornerShape(8.dp)) {
-        Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-          Text(StrPurchasePages.payTo(open.supplier.name), color = Shop.colors.text)
-          Spacer(Modifier.width(8.dp))
-          OutlinedTextField(amount, { amount = ir.vil3ntec.tohid.numericInput(it) }, singleLine = true, label = { Text(StrCustomerPages.amountAfn) },
-            modifier = Modifier.width(180.dp).focusRequester(focus).onPreviewKeyEvent { e ->
-              if (e.type != KeyEventType.KeyDown) false
-              else when (e.key) { Key.Enter, Key.NumPadEnter -> { pay(); true }; Key.Escape -> { paying = false; true }; else -> false }
-            })
-          Spacer(Modifier.width(6.dp))
-          Button(onClick = ::pay, enabled = (amount.toDoubleOrNull() ?: 0.0) > 0) { Text(StrCustomerPages.saveKey) }
-          TextButton(onClick = { paying = false }) { Text("Esc") }
-        }
-      }
-    }
-    Spacer(Modifier.height(8.dp))
-    val cols = listOf(TCol(StrCustomerPages.colRow, 56.dp), TCol(StrInvoices.colDate, 110.dp), TCol(StrReports.note), TCol(Str.purchases, 140.dp, true), TCol(StrHistory.payment, 140.dp, true), TCol(StrSimpleAsk.vDebtRemaining, 140.dp, true))
-    DeskTable(
-      cols, ledger.size, Modifier.weight(1f),
-      empty = StrPurchasePages.noBuyOrPay,
-      cell = { i, c ->
+      val cols = listOf(
+        DeskColumn(StrCustomerPages.colRow, width = 44.dp), DeskColumn(StrInvoices.colDate, width = 100.dp), DeskColumn(StrReports.note, weight = 1f),
+        DeskColumn(Str.purchases, width = 120.dp, end = true), DeskColumn(StrHistory.payment, width = 120.dp, end = true), DeskColumn(StrSimpleAsk.vDebtRemaining, width = 120.dp, end = true),
+      )
+      DeskGrid(
+        cols, ledger.size, Modifier.fillMaxWidth().weight(1f),
+        rowLabel = { ledger[it].text },
+        footer = listOf("", "", StrInvoices.total, money(ledger.sumOf { it.bill }), money(ledger.sumOf { it.pay }), money(open.balance)),
+        empty = { ir.vil3ntec.tohid.ui.v3.V3EmptyState(Icons.AutoMirrored.Outlined.ReceiptLong, StrPurchasePages.noBuyOrPay) },
+      ) { i, col ->
         val l = ledger[i]
-        when (c) {
-          0 -> TCell(l.row.toString(), Shop.colors.muted)
-          1 -> TCell(formatDate(l.date))
-          2 -> TCell(l.text)
-          3 -> TCell(if (l.bill > 0) money(l.bill) else "", Shop.colors.danger)
-          4 -> TCell(if (l.pay > 0) money(l.pay) else "", Shop.colors.success)
-          else -> TCell(money(l.balance), bold = true)
+        when (col) {
+          0 -> DeskCell(ir.vil3ntec.tohid.plain(l.row), muted = true)
+          1 -> DeskCell(formatDate(l.date), muted = true)
+          2 -> DeskCell(l.text)
+          3 -> DeskCell(if (l.bill > 0) money(l.bill) else "")
+          4 -> DeskCell(if (l.pay > 0) money(l.pay) else "", color = c.positive)
+          else -> DeskCell(money(l.balance), strong = true)
         }
-      },
-      footer = listOf("", "", StrInvoices.total, money(ledger.sumOf { it.bill }), money(ledger.sumOf { it.pay }), money(open.balance)),
-    )
+      }
+    }
   }
 }

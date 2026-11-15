@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import androidx.compose.material.icons.automirrored.outlined.ListAlt
+import androidx.compose.material.icons.outlined.Close
+import ir.vil3ntec.tohid.ui.desk.deskCard
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -88,7 +91,7 @@ fun PurchaseOrdersEntry(store: ShopStore, d: ShopData, toast: (String) -> Unit, 
   LaunchedEffect(Unit) { config = repo.config().valueOrNull() }
   val cfg = config
   if (cfg == null || !cfg.enabled) return
-  OutlinedButton(onClick = { open = true }, modifier = modifier) { Text(StrPurchasePages.purchaseOrders) }
+  ir.vil3ntec.tohid.ui.desk.DeskButton(StrPurchasePages.purchaseOrders, { open = true }, modifier, icon = androidx.compose.material.icons.Icons.AutoMirrored.Outlined.ListAlt)
   if (open) PurchaseOrdersDialog(store, d, host, cfg.permissions, toast) { open = false }
 }
 
@@ -118,18 +121,19 @@ private fun PurchaseOrdersDialog(
   val repo = host.repo
   Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
     DialogEntry {
-      Surface(
-        color = c.surfaceSolid,
-        shape = Shape.dialog,
-        modifier = Modifier.padding(12.dp).widthIn(max = 920.dp).fillMaxWidth().fillMaxHeight(0.94f),
-      ) {
-        Column(Modifier.padding(16.dp)) {
+      //  کامپیوتر (`claude/e-desk-d3b`): پنجرهٔ کارتِ کامپیوتر — سرخط با «فهرست» و «بستن»، بی سطحِ رنگی
+      val dc = ir.vil3ntec.tohid.ui.desk.Desk.colors
+      Box(Modifier.padding(12.dp).widthIn(max = 920.dp).fillMaxWidth().fillMaxHeight(0.94f).deskCard(dc)) {
+        Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
           Row(verticalAlignment = Alignment.CenterVertically) {
-            if (mode != PoMode.Index) TextButton(onClick = { mode = PoMode.Index }) { Text(StrPurchasePages.list) }
-            Text(StrPurchasePages.purchaseOrders, style = MaterialTheme.typography.titleMedium, color = c.text, modifier = Modifier.weight(1f))
-            TextButton(onClick = onDismiss) { Text(Str.close) }
+            if (mode != PoMode.Index) {
+              ir.vil3ntec.tohid.ui.desk.DeskButton(StrPurchasePages.list, { mode = PoMode.Index }, kind = ir.vil3ntec.tohid.ui.desk.DeskButtonKind.GHOST)
+              Spacer(Modifier.width(8.dp))
+            }
+            ir.vil3ntec.tohid.ui.desk.DeskSectionTitle(StrPurchasePages.purchaseOrders, Modifier.weight(1f))
+            ir.vil3ntec.tohid.ui.desk.DeskIconButton(androidx.compose.material.icons.Icons.Outlined.Close, Str.close, onDismiss)
           }
-          Spacer(Modifier.height(8.dp))
+          Spacer(Modifier.height(12.dp))
           when (val m = mode) {
             PoMode.Index -> PoList(repo, perms, onOpen = { mode = PoMode.Detail(it) }, onNew = { mode = PoMode.Edit(null) }, onSuggest = { mode = PoMode.Suggest })
             PoMode.Suggest -> PoSuggest(d, repo, perms, toast, onCreated = { mode = PoMode.Detail(it.id) })
@@ -160,13 +164,19 @@ private fun PoList(repo: PurchaseOrderRepository, perms: PoPermsDto, onOpen: (St
     orders = r.valueOrNull()?.orders?.let { list -> if (state == PurchaseOrderCore.State.SENT) PoForms.openOnly(list) else list }
     error = r.errorMessage()
   }
-  Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-    listOf(null to Str.all, "draft" to StrPurchasePages.draft, "sent" to StrPurchasePages.sentOpen, "cancelled" to StrPay.cancel).forEach { (k, label) ->
-      FilterChip(selected = state == k, onClick = { state = k }, label = { Text(label) }, shape = Shape.chip)
-    }
-    Spacer(Modifier.width(12.dp))
-    if (perms.manage) Button(onClick = onNew) { Text(StrPurchasePages.newPo) }
-    OutlinedButton(onClick = onSuggest) { Text(StrPurchasePages.reorderSuggest) }
+  //  کامپیوتر (`claude/e-desk-d3b`): وضعیت یک کادرِ کشویی، کارها کنارش — یک نوار که می‌پیچد، بریده نمی‌شود
+  ir.vil3ntec.tohid.ui.desk.DeskToolbar(
+    end = {
+      ir.vil3ntec.tohid.ui.desk.DeskButton(StrPurchasePages.reorderSuggest, onSuggest)
+      if (perms.manage) ir.vil3ntec.tohid.ui.desk.DeskButton(StrPurchasePages.newPo, onNew, kind = ir.vil3ntec.tohid.ui.desk.DeskButtonKind.PRIMARY)
+    },
+  ) {
+    ir.vil3ntec.tohid.ui.desk.DeskDropdown(
+      state,
+      listOf(null to Str.all, "draft" to StrPurchasePages.draft, "sent" to StrPurchasePages.sentOpen, "cancelled" to StrPay.cancel).map { (k, label) -> ir.vil3ntec.tohid.ui.desk.DeskOption(k, label) },
+      { state = it },
+      label = ir.vil3ntec.tohid.core.i18n.StrDesk.colStatus,
+    )
   }
   Spacer(Modifier.height(10.dp))
   Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
@@ -174,28 +184,24 @@ private fun PoList(repo: PurchaseOrderRepository, perms: PoPermsDto, onOpen: (St
       error != null -> Text(error!!, color = c.danger, style = MaterialTheme.typography.bodySmall)
       orders == null -> Text(StrReports.loading, color = c.muted, style = MaterialTheme.typography.bodySmall)
       orders!!.isEmpty() -> EmptyNote(StrPurchasePages.noPoYet)
+      //  ردیفِ آرام (خواستِ صاحب‌کار): عنوان، یک خطِ کم‌رنگ، مبلغ و وضعیت به واژه — بی قرصِ رنگی
       else -> orders!!.forEach { o ->
         val st = PurchaseOrderBook.status(o)
-        Row(
-          Modifier.fillMaxWidth().clip(Shape.button).clickable { onOpen(o.id) }.padding(horizontal = 8.dp, vertical = 10.dp),
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Column(Modifier.weight(1f)) {
-            Text(StrSupplierBills.orderTitle(o.no, o.supplierName.ifBlank { StrMoney.supplierLabel }), color = c.text, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-              StrPurchasePages.poLine(o.lines.size, money(PurchaseOrderBook.asAfn(o.totals.orderedMinor)), money(PurchaseOrderBook.asAfn(o.totals.remainingMinor))) +
-                (o.expectedDate?.let { StrPurchasePages.arrivesSuffix(ir.vil3ntec.tohid.formatDate(it)) } ?: ""),
-              style = MaterialTheme.typography.labelSmall, color = c.muted,
-            )
-          }
-          StatusPill(PurchaseOrderBook.label(st), poTone(st))
-        }
-        HorizontalDivider(color = c.border)
+        ir.vil3ntec.tohid.ui.desk.DeskCalmRow(
+          title = StrSupplierBills.orderTitle(o.no, o.supplierName.ifBlank { StrMoney.supplierLabel }),
+          sub = StrPurchasePages.poLine(o.lines.size, money(PurchaseOrderBook.asAfn(o.totals.orderedMinor)), money(PurchaseOrderBook.asAfn(o.totals.remainingMinor))) +
+            (o.expectedDate?.let { StrPurchasePages.arrivesSuffix(ir.vil3ntec.tohid.formatDate(it)) } ?: ""),
+          amount = "${money(PurchaseOrderBook.asAfn(o.totals.orderedMinor))} ؋",
+          status = PurchaseOrderBook.label(st),
+          selected = false,
+          onClick = { onOpen(o.id) },
+        )
       }
     }
   }
 }
 
+@Suppress("unused")
 private fun poTone(s: PurchaseOrderCore.Status): PillTone = when (s) {
   PurchaseOrderCore.Status.DRAFT -> PillTone.NEUTRAL
   PurchaseOrderCore.Status.SENT -> PillTone.INFO

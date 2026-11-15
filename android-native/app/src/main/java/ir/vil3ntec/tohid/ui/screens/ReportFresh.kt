@@ -76,6 +76,9 @@ import ir.vil3ntec.tohid.ui.components.common.rememberViewMode
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.InsertChart
+import ir.vil3ntec.tohid.ui.desk.rememberDeskLoad
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -203,10 +206,26 @@ fun HomeKpis(d: ShopData, onOpen: (String) -> Unit, showMoney: Boolean, columns:
 
 /* ══════════════════════════ کامپیوتر ══════════════════════════ */
 
+/** نتیجهٔ یک بارِ «گزارشِ تازه» ِ کامپیوتر — همه بیرون از رشتهٔ صفحه ساخته می‌شوند (`claude/e-desk-d3b`) */
+private class FreshLoad(
+  val tab: String,
+  val ledger: ir.vil3ntec.tohid.core.report.ReportLedger,
+  val view: ReportFreshModel.View,
+  val dayEnd: DayEndModel.Built?,
+  val heat: ir.vil3ntec.tohid.core.report.SalesHeatmap?,
+  val gaps: List<ReportTables.Table>?,
+  val promo: PromoFresh.View?,
+  val stockCost: ReportCore.StockCost?,
+  /** روندِ فروشِ خالصِ بازه (برچسب، افغانی) — نمودارِ کنارِ جدول */
+  val trend: List<Pair<String, Double>>,
+)
+
 /**
- *  صفحهٔ گزارشِ تازه — کامپیوتر. زبانه‌ها: امروز، فروش (شش تفکیک)، سود و حاشیه (تقریبی)،
- *  سنِ بدهی، ضدتقلب. جدول (مرتب‌شدنی با کلیک روی سرستون) یا کارت، اکسل و چاپ با همان
- *  کلیدهای مرکزی (Ctrl+E / Ctrl+P).
+ *  صفحهٔ گزارشِ تازه — کامپیوتر. زبانه‌ها: امروز، فروش (شش تفکیک)، سود و حاشیه (تقریبی)، سنِ بدهی، ضدتقلب، …؛ جدول
+ *  (مرتب‌شدنی با کلیک روی سرستون) یا کارت، اکسل و چاپ با همان کلیدهای مرکزی (Ctrl+E / Ctrl+P).
+ *  «گزارش‌ها» ِ کامپیوتر (گزارشِ تازه، پیش‌فرض روشن) — صفحهٔ داشبوردی (`claude/e-desk-d3b`): یک نوارِ ابزار (گزارش، دوره،
+ *  تفکیک و روزِ «پایانِ روز» همه کادرِ کشویی؛ نما، چاپ، PDF و اکسل)، ردیفِ کارت‌های KPI ِ همان زبانه، و جدول با نمودارِ
+ *  روند و سهمِ روش‌های پرداخت در کنار (فروش و سود). دفتر، جدول‌ها و همهٔ زبانه‌های سنگین بیرون از رشتهٔ صفحه.
  */
 @Composable
 fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
@@ -225,7 +244,6 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   }
   val today = ir.vil3ntec.tohid.todayIso()
   val clock = remember { ReportBridge.deviceClock() }
-  val ledger = remember(d) { ReportBridge.ledgerOf(d) }
 
   var tab by remember { mutableStateOf(tabs.first().id) }
   var day by remember { mutableStateOf(today) }
@@ -253,19 +271,30 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   val rng = remember(span, today, shift, shifting) { ReportFreshModel.rangeOf(span, today, if (shifting) shift else 0) }
   val comparing = keys && def.id in ReportFreshModel.COMPARABLE
   fun step(by: Int) { if (ReportFreshModel.canShift(span, today, shift + by)) shift += by }
-  val view = remember(ledger, def.id, span, dim, today, cost, lineSeller, rng) {
-    ReportFreshModel.view(ledger, def.id, span, dim, today, clock, ReportFreshModel.costingOf(cost), lineSeller, rng)
-  }
-  //  RPT-04: «پایانِ روز» از شیفت‌ها و دفتر (نه فقط `ReportLedger`)
-  val dayEnd = remember(d, def.id, day) {
-    if (def.id == DayEndModel.TAB_ID) DayEndModel.build(d, day, clock, ReportBridge.nowMs(), ReportBridge.offsetMinutes()) else null
-  }
-  //  RPT-08: «ساعت و روز» از فروش‌ها و برگشت‌های دفتر در همان بازه
-  val heat = remember(d, def.id, span, today, ShopDayChoice.weekStart, rng) {
-    if (def.id == HeatmapModel.TAB_ID) {
-      HeatmapModel.build(d, rng, ReportBridge.offsetMinutes(), ShopDay.dayStartMinutes(ShopDayChoice.hours), ShopDayChoice.weekStart)
-    } else null
-  }
+  //  PERF (e-desk-d3b): دفتر و هر زبانه بیرون از رشتهٔ صفحه — ۱۵۰ هزار قلمِ فروش صفحه را نمی‌خواباند
+  val ledgerNow = rememberDeskLoad(d) { ReportBridge.ledgerOf(d) }
+  val weekStart = ShopDayChoice.weekStart
+  val load = rememberDeskLoad(ledgerNow, def.id, span, dim, today, cost, lineSeller, rng, day, weekStart) {
+    val ledger = ledgerNow ?: return@rememberDeskLoad null
+    val view = ReportFreshModel.view(ledger, def.id, span, dim, today, clock, ReportFreshModel.costingOf(cost), lineSeller, rng)
+    FreshLoad(
+      tab = def.id,
+      ledger = ledger,
+      view = view,
+      //  RPT-04: «پایانِ روز» از شیفت‌ها و دفتر (نه فقط `ReportLedger`)
+      dayEnd = if (def.id == DayEndModel.TAB_ID) DayEndModel.build(d, day, clock, ReportBridge.nowMs(), ReportBridge.offsetMinutes()) else null,
+      //  RPT-08: «ساعت و روز» از فروش‌ها و برگشت‌های دفتر در همان بازه
+      heat = if (def.id == HeatmapModel.TAB_ID) {
+        HeatmapModel.build(d, rng, ReportBridge.offsetMinutes(), ShopDay.dayStartMinutes(ShopDayChoice.hours), ShopDayChoice.weekStart)
+      } else null,
+      gaps = if (def.id == DocGapsFresh.TAB_ID) DocGapsFresh.tables(d, today) else null,
+      //  PRM-16: اثرِ هر تخفیف با همان روشِ بهای «سود و حاشیه» (`ReportFresh.cost`)
+      promo = if (def.id == PromoFresh.TAB_ID) PromoFresh.view(d, ledger, span, today, clock, cost) else null,
+      //  PRD-15: بهای میانگینِ هر کالا و ارزشِ موجودی از همان بازپخشِ میانگینِ موزون؛ فقط خواندنی
+      stockCost = if (def.id == StockCostFresh.TAB_ID) ir.vil3ntec.tohid.core.report.ReportCore.stockCost(ledger) else null,
+      trend = if (view.sales != null) DeskReportTrend.of(d, view.sales, rng.from, rng.to, today) else emptyList(),
+    )
+  }?.takeIf { it.tab == def.id }
   //  RPT-04 / S48: ریزِ تراکنش‌های یک روش (کلیک یا Enter روی ردیفِ «نقد» ِ «پایانِ روز»)
   var drill by remember(day) { mutableStateOf<String?>(null) }
   //  RPT-13: ریزِ ردیفِ تفکیکِ فروش («فروش» و «سود و حاشیه»؛ کلیک یا Enter) ⇐ فاکتورهای همان ردیف
@@ -277,19 +306,9 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
     d.transactions.find { it.id == id }?.let { t -> t.refId?.let { r -> d.sales.find { it.id == r } }?.let { saleDoc(it.id) } ?: t.notes.trim().ifEmpty { StrReportPages.docDebt } }
       ?: d.purchases.find { it.id == id }?.let { p -> StrReportPages.docPurchase + p.notes.trim().let { if (it.isEmpty()) "" else " — $it" } }
       ?: ""
-  val gaps = remember(d, def.id, today) { if (def.id == DocGapsFresh.TAB_ID) DocGapsFresh.tables(d, today) else null }
-  //  PRM-16: اثرِ هر تخفیف با همان روشِ بهای «سود و حاشیه» (`ReportFresh.cost`)
-  val promo = remember(d, ledger, def.id, span, today, cost) {
-    if (def.id == PromoFresh.TAB_ID) PromoFresh.view(d, ledger, span, today, clock, cost) else null
-  }
-  //  PRD-15: بهای میانگینِ هر کالا و ارزشِ موجودی از همان بازپخشِ میانگینِ موزون؛ فقط خواندنی
-  val stockCost = remember(ledger, def.id) {
-    if (def.id == StockCostFresh.TAB_ID) ir.vil3ntec.tohid.core.report.ReportCore.stockCost(ledger) else null
-  }
-  val tables = dayEnd?.tables ?: heat?.let { HeatmapModel.tables(it) } ?: gaps ?: promo?.let { PromoFresh.tables(it) }
-    ?: stockCost?.let { StockCostFresh.tables(it) } ?: view.tables
+  val tables = load?.let { l -> l.dayEnd?.tables ?: l.heat?.let { HeatmapModel.tables(it) } ?: l.gaps ?: l.promo?.let { PromoFresh.tables(it) } ?: l.stockCost?.let { StockCostFresh.tables(it) } ?: l.view.tables }.orEmpty()
   val viewMode = rememberViewMode("report-fresh", ScreenKind.MANAGEMENT)
-  val name = "گزارش-${def.label}-${if (dayEnd != null) day else today}".replace(' ', '-') // داده: نامِ پروندهٔ خروجی
+  val name = "گزارش-${def.label}-${if (def.id == DayEndModel.TAB_ID) day else today}".replace(' ', '-') // داده: نامِ پروندهٔ خروجی
 
   fun sheet() = ReportCsv.Sheet(name, ReportFreshModel.exportRows(tables))
   fun print() = ir.vil3ntec.tohid.print.ReportPrint.print(context, sheet(), name)
@@ -304,9 +323,8 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
     }
   }
 
-  Column(
+  ir.vil3ntec.tohid.ui.desk.DeskPage(
     Modifier
-      .fillMaxSize()
       .onPreviewKeyEvent { e ->
         when {
           e.matches(KeyMap.GLOBAL_PRINT) -> { print(); true }
@@ -316,84 +334,77 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
           comparing && e.matches(KeyMap.REPORTS_COMPARE) -> { compare = !compare; true }
           else -> false
         }
-      }
-      .padding(16.dp),
-    verticalArrangement = Arrangement.spacedBy(12.dp),
+      },
   ) {
-    /* ۱ ─ عنوان، توضیح، خروجی و عملِ اصلی */
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      Column(Modifier.weight(1f)) {
-        Text(Str.reports, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Shop.colors.text)
-        Text(
-          StrReportPages.sourceNote,
-          style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
-        )
-      }
+    /* ۱ ─ نوارِ ابزار: گزارش، روز، دوره، تفکیک | گزارشِ تازه، نما، چاپ، PDF، اکسل — همه کادرِ کشویی، می‌پیچد */
+    DeskReportToolbar(
+      tabs = tabs.map { it.id to it.label }, tab = def.id, onTab = { tab = it },
+      days = if (def.id == DayEndModel.TAB_ID) DayEndModel.days(today).map { it to DayEndModel.dayLabel(it, today, ::formatDate) } else null, day = day, onDay = { day = it },
+      spans = if (def.ranged) ReportBoard.SPANS.map { it to ReportBoard.SPAN_LABELS.getValue(it) } else null, span = span, onSpan = { span = it },
+      dims = if (def.id == "sales" || def.id == "profit") ReportBoard.DIMS.map { it to ReportBoard.DIM_LABELS.getValue(it) } else null, dim = dim, onDim = { dim = it },
+      view = viewMode, onPrint = ::print, onPdf = ::pdf, onExcel = ::excel,
+    )
+    //  RPT-13: دورهٔ قبل/بعد با برچسبِ کلید، «از … تا …» ِ بازهٔ جابه‌جاشده، «مقایسه» و خطِ «نسبت به دورهٔ قبل» (`ReportKeys.kt`)؛
+    //  کلیدِ «گزارشِ تازه» در پایانِ همین ردیف تا نوارِ ابزار در ۱۳۶۶ یک خط بماند
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+      Box(Modifier.weight(1f)) { FreshPeriodBar(shifting, comparing, compare, rng, onStep = ::step, onCompare = { compare = !compare }) }
       ReportFreshSwitch()
-      Spacer(Modifier.width(12.dp))
-      OutlinedButton(onClick = ::print) { Text(StrReportPages.printKey(KeyMap.GLOBAL_PRINT.hint)) }
-      Spacer(Modifier.width(6.dp))
-      OutlinedButton(onClick = ::pdf) { Text("PDF") }
-      Spacer(Modifier.width(6.dp))
-      Button(onClick = ::excel) { Text(StrReportPages.excelKey(KeyMap.GLOBAL_EXPORT.hint)) }
     }
-
-    /* ۲ ─ نوارِ ابزار: زبانه، بازه، تفکیک، نما */
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-      SegmentedTabs(tabs.map { SegmentTab(it.id, it.label) }, def.id, { tab = it })
-      if (def.id == DayEndModel.TAB_ID) {
-        SegmentedTabs(DayEndModel.days(today).map { SegmentTab(it, DayEndModel.dayLabel(it, today, ::formatDate)) }, day, { day = it })
-      }
-      Spacer(Modifier.weight(1f))
-      ViewModeToggle(viewMode)
-    }
-    //  بازه در ردیفِ خودش: با دو سه‌ماههٔ مالی (LOC-02) شش گزینه است و کنارِ پنج زبانه در ۱۲۸۰ جا نمی‌شد
-    if (def.ranged) SegmentedTabs(ReportBoard.SPANS.map { SegmentTab(it, ReportBoard.SPAN_LABELS.getValue(it)) }, span, { span = it })
-    //  RPT-13: دورهٔ قبل/بعد با برچسبِ کلید، «از … تا …» ِ بازهٔ جابه‌جاشده، «مقایسه» و خطِ «نسبت به دورهٔ قبل» (`ReportKeys.kt`)
-    FreshPeriodBar(shifting, comparing, compare, rng, onStep = ::step, onCompare = { compare = !compare })
     if (comparing && compare) ReportCompareLine(d, def.id, ReportFreshModel.keysSpan(span), rng.from, rng.to, today)
-    if (def.id == "sales" || def.id == "profit") {
-      SegmentedTabs(ReportBoard.DIMS.map { SegmentTab(it, ReportBoard.DIM_LABELS.getValue(it)) }, dim, { dim = it })
-    }
 
-    /* ۳ ─ کارت‌های آماریِ همین زبانه */
-    when {
-      dayEnd != null -> DayEndSummary(dayEnd)
-      heat != null -> HeatmapSummary(heat)
-      gaps != null -> Unit   // RPT-17: شمارها در خودِ جدول‌اند
-      promo != null -> PromoSummary(promo)
-      stockCost != null -> StockCostSummary(stockCost)
-      else -> Summary(view, def.id, d, money)
-    }
-
-    /* ۴ ─ جدول‌ها */
-    if (tables.isEmpty()) Text(StrReportPages.noReport, color = Shop.colors.muted)
-    tables.forEach { t ->
-      if (tables.size > 1) Text(t.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
-      val sales = view.sales
-      val onRow: ((List<JsonPrimitive>) -> Unit)? = when {
-        dayEnd != null && t.id == DayEndModel.METHODS_ID -> { row -> DayEndModel.methodOf(dayEnd.report, row.first().content)?.let { drill = it } }
-        sales != null && (t.id.startsWith("sales.") || t.id == "profit") -> { row ->
-          val dimNow = if (dim in ReportBoard.DIMS) dim else "product"
-          //  POS-23: «فروشندهٔ هر ردیف» ⇒ ریزِ «کاربر» به فروشندهٔ ردیف؛ خاموش ⇒ همان فراخوانِ امروز
-          salesDrill = if (lineSeller) ReportFreshModel.drill(ledger, sales, dimNow, t.rows.indexOf(row), row.first().content, clock, lineSeller = true, doc = ::saleDoc)
-          else ReportFreshModel.drill(ledger, sales, dimNow, t.rows.indexOf(row), row.first().content, clock, ::saleDoc)
-        }
-        t.id == "today" -> { row ->
-          ReportFreshModel.dayDrill(ledger, row, clock, ::saleDoc)?.let { rowDrill = it to StrReportPages.dayDrillNote }
-        }
-        view.debts != null && t.id.startsWith("debts.") -> { row ->
-          ReportFreshModel.debtDrill(ledger, view.debts, t.id == "debts.suppliers", t.rows.indexOf(row), row.first().content, clock, ::debtDoc)
-            ?.let { rowDrill = it to StrReportPages.debtDrillNote }
-        }
-        view.fraud != null && t.id == "fraud" -> { row ->
-          ReportFreshModel.fraudDrill(ledger, view.fraud, t.rows.indexOf(row), clock, ::saleDoc)
-            ?.let { rowDrill = it to StrReportPages.fraudDrillNote }
-        }
-        else -> null
+    val l = load
+    if (l == null) {
+      ir.vil3ntec.tohid.ui.desk.DeskSkeleton(Modifier.fillMaxWidth().weight(1f))
+    } else {
+      val ledger = l.ledger
+      val view = l.view
+      val dayEnd = l.dayEnd
+      /* ۲ ─ کارت‌های KPI ِ همین زبانه */
+      when {
+        dayEnd != null -> DayEndSummary(dayEnd)
+        l.heat != null -> HeatmapSummary(l.heat)
+        l.gaps != null -> Unit   // RPT-17: شمارها در خودِ جدول‌اند
+        l.promo != null -> PromoSummary(l.promo)
+        l.stockCost != null -> StockCostSummary(l.stockCost)
+        else -> Summary(view, def.id, d, money)
       }
-      if (viewMode.mode == ViewMode.TABLE) FreshTable(t, Modifier.weight(1f).fillMaxWidth(), onRow)
-      else FreshCards(t, Modifier.weight(1f).fillMaxWidth())
+
+      /* ۳ ─ جدول‌ها؛ فروش و سود: نمودارِ روند و سهمِ روش‌ها در کنار */
+      val charts = view.sales != null && (def.id == "sales" || def.id == "profit") && money
+      Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(ir.vil3ntec.tohid.ui.desk.DeskSpace.gap)) {
+        Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(ir.vil3ntec.tohid.ui.desk.DeskSpace.x3)) {
+          if (tables.isEmpty()) ir.vil3ntec.tohid.ui.desk.DeskNote(StrReportPages.noReport)
+          tables.forEach { t ->
+            if (tables.size > 1) ir.vil3ntec.tohid.ui.desk.DeskSubhead(t.title)
+            val sales = view.sales
+            val onRow: ((List<JsonPrimitive>) -> Unit)? = when {
+              dayEnd != null && t.id == DayEndModel.METHODS_ID -> { row -> DayEndModel.methodOf(dayEnd.report, row.first().content)?.let { drill = it } }
+              sales != null && (t.id.startsWith("sales.") || t.id == "profit") -> { row ->
+                val dimNow = if (dim in ReportBoard.DIMS) dim else "product"
+                //  POS-23: «فروشندهٔ هر ردیف» ⇒ ریزِ «کاربر» به فروشندهٔ ردیف؛ خاموش ⇒ همان فراخوانِ امروز
+                salesDrill = if (lineSeller) ReportFreshModel.drill(ledger, sales, dimNow, t.rows.indexOf(row), row.first().content, clock, lineSeller = true, doc = ::saleDoc)
+                else ReportFreshModel.drill(ledger, sales, dimNow, t.rows.indexOf(row), row.first().content, clock, ::saleDoc)
+              }
+              t.id == "today" -> { row ->
+                ReportFreshModel.dayDrill(ledger, row, clock, ::saleDoc)?.let { rowDrill = it to StrReportPages.dayDrillNote }
+              }
+              view.debts != null && t.id.startsWith("debts.") -> { row ->
+                ReportFreshModel.debtDrill(ledger, view.debts, t.id == "debts.suppliers", t.rows.indexOf(row), row.first().content, clock, ::debtDoc)
+                  ?.let { rowDrill = it to StrReportPages.debtDrillNote }
+              }
+              view.fraud != null && t.id == "fraud" -> { row ->
+                ReportFreshModel.fraudDrill(ledger, view.fraud, t.rows.indexOf(row), clock, ::saleDoc)
+                  ?.let { rowDrill = it to StrReportPages.fraudDrillNote }
+              }
+              else -> null
+            }
+            if (viewMode.mode == ViewMode.TABLE) FreshTable(t, Modifier.weight(1f).fillMaxWidth(), onRow)
+            else FreshCards(t, Modifier.weight(1f).fillMaxWidth())
+          }
+          ir.vil3ntec.tohid.ui.desk.DeskNote(StrReportPages.sourceNote)
+        }
+        if (charts) DeskReportCharts(l.trend, view.sales!!, Modifier.width(380.dp).fillMaxHeight())
+      }
     }
   }
   drill?.let { m ->
@@ -408,13 +419,22 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
 
 @Composable
 private fun Summary(view: ReportFreshModel.View, tab: String, d: ShopData, showMoney: Boolean) {
-  @Composable fun card(title: String, value: String, period: String, m: Modifier) = StatCard(title, value, period, m)
+  //  کامپیوتر (`claude/e-desk-d3b`): کارتِ KPI ِ کامپیوتر با رنگ‌های آرامِ همان نقشه (بی صورتی)، به ترتیبِ ثابت
+  val hues = listOf(ir.vil3ntec.tohid.ui.v3.V3Hue.BRAND, ir.vil3ntec.tohid.ui.v3.V3Hue.SKY, ir.vil3ntec.tohid.ui.v3.V3Hue.MINT, ir.vil3ntec.tohid.ui.v3.V3Hue.AMBER, ir.vil3ntec.tohid.ui.v3.V3Hue.VIOLET)
+  val order = intArrayOf(0)
+  @Composable fun card(title: String, value: String, period: String, m: Modifier) =
+    ir.vil3ntec.tohid.ui.desk.DeskKpiCard(
+      //  بازه یک بار در ردیفِ دوره نوشته شده؛ زیرِ هر کارت تکرار نمی‌شود — جز وقتی معنای دیگری دارد («تا امروز»، «مشتری»)
+      ir.vil3ntec.tohid.ui.desk.DeskKpi(title, value, Icons.Outlined.InsertChart, ir.vil3ntec.tohid.ui.desk.DeskHues.tone(hues[order[0]++ % hues.size]), fallback = period.takeIf { it.isNotBlank() && it.none { ch -> ch.isDigit() } }),
+      m.fillMaxHeight(),
+    )
   fun af(v: Long) = "${money(v / 100.0)} ؋"
   when (tab) {
-    "today" -> HomeKpis(d, {}, showMoney, columns = 5)
+    //  کامپیوتر (`claude/e-desk-d3b`): همان تابلوی «امروز» با کارتِ KPI ِ کامپیوتر، بیرون از رشتهٔ صفحه
+    "today" -> DeskTodayKpis(d, showMoney)
     "sales" -> view.sales?.let { s ->
       val p = if (s.from == s.to) formatDate(s.from) else if (s.from == "0000-01-01") StrReports.allDates else StrSimpleAsk.range(formatDate(s.from), formatDate(s.to))
-      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+      ir.vil3ntec.tohid.ui.desk.DeskKpiRow {
         card(StrReports.netSales, af(s.totals.netSales), p, Modifier.weight(1f))
         card(StrInvoices.colInvoice, s.totals.invoices.toString(), p, Modifier.weight(1f))
         card(Str.discount, af(s.totals.discount), p, Modifier.weight(1f))
@@ -427,7 +447,7 @@ private fun Summary(view: ReportFreshModel.View, tab: String, d: ShopData, showM
       //  RPT-03: روشِ بها همان که هسته با آن حساب کرد (`s.costing`)، نه حدسِ صفحه
       val m = CostPolicy.parse(s.costing)
       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        ir.vil3ntec.tohid.ui.desk.DeskKpiRow {
           card(StrReports.netSales, af(s.totals.netSales), p, Modifier.weight(1f))
           card(CostPolicy.label(StrReportPages.cogs, m), af(s.totals.cogs), p, Modifier.weight(1f))
           card(CostPolicy.label(StrReports.grossProfit, m), af(s.totals.grossProfit), p, Modifier.weight(1f))
@@ -450,7 +470,7 @@ private fun Summary(view: ReportFreshModel.View, tab: String, d: ShopData, showM
     }
     "debts" -> view.debts?.let { x ->
       val late = x.customers.rows.count { (it.buckets.lastOrNull() ?: 0L) > 0 }
-      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+      ir.vil3ntec.tohid.ui.desk.DeskKpiRow {
         card(StrHome.receivablesCustomers, af(x.customers.totals.balance), StrReportPages.untilToday, Modifier.weight(1f))
         card(StrReportPages.owingCustomers, x.customers.rows.count { it.balance > 0 }.toString(), StrReportPages.untilToday, Modifier.weight(1f))
         card(StrReportPages.creditOver(x.buckets.lastOrNull() ?: 0), late.toString(), StrOnline.customer, Modifier.weight(1f))
@@ -466,7 +486,7 @@ private fun Summary(view: ReportFreshModel.View, tab: String, d: ShopData, showM
         AnomalyBook.view(anomalyOn, d, f.from, f.to, alerts, ReportBridge.offsetMinutes(), ir.vil3ntec.tohid.todayIso())
       }
       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        ir.vil3ntec.tohid.ui.desk.DeskKpiRow {
           card(StrReportPages.invoiceVoids, f.totals.voidCount.toString(), p, Modifier.weight(1f))
           card(StrBranches.returns, f.totals.returnCount.toString(), p, Modifier.weight(1f))
           card(StrStock.removeRow, f.totals.lineDeleteCount.toString(), p, Modifier.weight(1f))
@@ -553,6 +573,8 @@ private fun colWidth(kind: String): Dp = when (kind) {
  */
 @Composable
 internal fun FreshTable(t: ReportTables.Table, modifier: Modifier, onRow: ((List<JsonPrimitive>) -> Unit)? = null) {
+  //  کامپیوتر (`claude/e-desk-d3b`): جدولِ آرامِ کامپیوتر — بی خطِ دورِ هر خانه؛ همان مرتب‌سازی، «ریز» و ردیفِ جمع
+  if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) { DeskFreshTable(t, modifier, onRow); return }
   var sort by remember(t.id) { mutableStateOf<Pair<Int, Boolean>?>(null) }
   val rows = remember(t, sort) { sort?.let { (c, desc) -> ReportBoard.sortRows(t.rows, c, desc) } ?: t.rows }
   val line = Shop.colors.border

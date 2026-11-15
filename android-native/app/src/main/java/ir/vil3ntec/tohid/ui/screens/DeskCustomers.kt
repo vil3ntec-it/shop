@@ -60,28 +60,72 @@ import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.softCard
 import ir.vil3ntec.tohid.ui.theme.tabular
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.NorthEast
+import androidx.compose.material.icons.outlined.PeopleOutline
+import androidx.compose.material.icons.outlined.Print
+import androidx.compose.material.icons.outlined.SouthWest
+import androidx.compose.material.icons.outlined.TableChart
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+import ir.vil3ntec.tohid.core.i18n.StrDeskData
+import ir.vil3ntec.tohid.plain
+import ir.vil3ntec.tohid.ui.desk.Desk
+import ir.vil3ntec.tohid.ui.desk.DeskButton
+import ir.vil3ntec.tohid.ui.desk.DeskButtonKind
+import ir.vil3ntec.tohid.ui.desk.DeskCalmRow
+import ir.vil3ntec.tohid.ui.desk.DeskCell
+import ir.vil3ntec.tohid.ui.desk.DeskColumn
+import ir.vil3ntec.tohid.ui.desk.DeskDivider
+import ir.vil3ntec.tohid.ui.desk.DeskDropdown
+import ir.vil3ntec.tohid.ui.desk.DeskGrid
+import ir.vil3ntec.tohid.ui.desk.DeskIconButton
+import ir.vil3ntec.tohid.ui.desk.DeskInfoRow
+import ir.vil3ntec.tohid.ui.desk.DeskKpiRow
+import ir.vil3ntec.tohid.ui.desk.DeskLetterTile
+import ir.vil3ntec.tohid.ui.desk.DeskLink
+import ir.vil3ntec.tohid.ui.desk.DeskNote
+import ir.vil3ntec.tohid.ui.desk.DeskOption
+import ir.vil3ntec.tohid.ui.desk.DeskPage
+import ir.vil3ntec.tohid.ui.desk.DeskPane
+import ir.vil3ntec.tohid.ui.desk.DeskPaneHint
+import ir.vil3ntec.tohid.ui.desk.DeskRadius
+import ir.vil3ntec.tohid.ui.desk.DeskSearchField
+import ir.vil3ntec.tohid.ui.desk.DeskSegmented
+import ir.vil3ntec.tohid.ui.desk.DeskSize
+import ir.vil3ntec.tohid.ui.desk.DeskSkeleton
+import ir.vil3ntec.tohid.ui.desk.DeskSpace
+import ir.vil3ntec.tohid.ui.desk.DeskStatBox
+import ir.vil3ntec.tohid.ui.desk.DeskTextField
+import ir.vil3ntec.tohid.ui.desk.DeskToolbar
+import ir.vil3ntec.tohid.ui.desk.DeskType
+import ir.vil3ntec.tohid.ui.desk.deskCard
+import ir.vil3ntec.tohid.ui.desk.deskClickable
+import ir.vil3ntec.tohid.ui.desk.rememberDeskLoad
+import ir.vil3ntec.tohid.ui.theme.PhoneV3Debt
+import ir.vil3ntec.tohid.ui.v3.RowWhen
+import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 
 /**
- *  مشتری‌ها و قرض‌داران — کامپیوتر.
+ *  مشتری‌ها و قرض‌داران — کامپیوتر (`claude/e-desk-d3b`).
  *
- *  خواستهٔ صاحب مخزن: «بیرون حساب‌هاشون مربعی باشه مثل موبایل و داخلش کادری
- *  یا شبیه اکسل ستونی و بردگی تاریخ… و فاکتور یارو هم باشه… هر چیزی که
- *  برمی‌داره دیده بشه… فاکتور هم جدا دیده بشه… کسایی که خرید می‌کنن هم باید
- *  ثبت بشه و فاکتورشونو نشون داده بشه.»
- *
- *  • **بیرون**: کارتِ مربعیِ هر مشتری — مانده (رنگی)، «چند روز است»، تعدادِ
- *    فاکتور، آخرین خرید. بالایش چهار عددِ کل، جست‌وجو، صافی (بدهکار، دیرکرد،
- *    خریدارِ نقدی، بی‌حساب) و مرتب‌سازی. ردیفِ «مشتریِ تازه» همان‌جا.
- *  • **داخل** (کلیک روی کارت): سه زبانه، هر سه جدولِ خط‌دارِ اکسلی:
- *    «صورت‌حساب» (ردیف، تاریخ، شرح، فاکتور، برد، رسید، مانده)،
- *    «فاکتورها» (کلیک ⇐ اقلامِ همان فاکتور کنارش، «نمایش و چاپ» ⇐ فاکتورِ جدا)،
- *    «اقلامِ برداشته» (هر کالایی که برده، با تاریخ و فاکتور).
- *  • F7 دریافت، F6 قرضِ دستی، Ctrl+P چاپ و Ctrl+E اکسلِ **همان زبانه**، Esc برگشت.
+ *  خواستهٔ صاحب مخزن: «بیرون حساب‌هاشون مربعی باشه مثل موبایل و داخلش کادری یا شبیه اکسل ستونی و بردگی تاریخ… و فاکتور
+ *  یارو هم باشه…»؛ و ۱۴۰۵/۰۸/۲۴: ظاهرِ قرض‌دارانِ گوشی (کارتِ مربعیِ سرخ/سبز، ردیفِ «برد» سرخ و «رسید» سبز، سه جعبهٔ رنگی)
+ *  همان بماند. روی کامپیوتر همان هویت، چیده برای میز:
+ *  • **بالا**: سه جعبهٔ رنگی (تعداد آبی، جمعِ قرض سرخ، رسیدها سبز) — همان `DebtorsStatsCard`.
+ *  • **فهرست در آغاز**: جست‌وجو (Ctrl+F)، صافی و ترتیب (کادرِ کشویی)، «قرض‌دار تازه» (Ctrl+N)، اکسل؛ نمای ردیف (ردیفِ
+ *    آرام با کاشیِ حرفِ سرخ/سبز و مانده) یا کارت (مربعِ سرخ/سبز). فهرست تنبل است (۵ هزار مشتری هم) و حسابش بیرون از رشتهٔ صفحه.
+ *  • **پرونده در کنار**: نام و مانده به رنگِ حساب، کارها (F7 دریافت، F6 قرضِ دستی، سقف، …؛ Ctrl+P چاپ و Ctrl+E اکسلِ
+ *    **همان زبانه**، Esc بستن) و سه زبانه: «صورت‌حساب» (ردیفِ «برد» سرخ، «رسید» سبز؛ فاکتور فقط درونِ ردیفِ «برد» و
+ *    زبانهٔ «فاکتورها» — فهرستِ جدایی نیست)، «فاکتورها» و «اقلامِ برداشته».
  *
  *  همهٔ عددها از `CustomerEngine` — از خودِ دفتر، هیچ عددی جدا ذخیره نمی‌شود.
  */
 @Composable
 fun DeskCustomersScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState, onOpenOrder: ((String) -> Unit)? = null) { // CRM-07: سفارشِ پرونده ⇐ `orders/{id}`
+  val scope = rememberCoroutineScope()
+  fun toast(t: String) { scope.launch { snackbar.showSnackbar(t) } }
   var openId by remember { mutableStateOf<String?>(null) }
   //  عکس‌های خودکار (`DevShot`، فرمانِ cust:first) ⇐ پروندهٔ بدهکارترین مشتری
   val shotOpen = DeskCustomersShot.open.value
@@ -90,8 +134,23 @@ fun DeskCustomersScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostSta
     else if (shotOpen == "close") openId = null
   }
   val open = openId?.let { id -> d.debtors.find { it.id == id } }
-  if (open == null) CustomerCards(store, d, snackbar) { openId = it }
-  else CustomerFile(store, d, snackbar, open.id, onOpenOrder) { openId = null }
+  //  سه جعبهٔ رنگیِ قرض‌داران — همان هویتِ گوشی که صاحب‌کار پسندید (`DebtorsStatsCard`): آبی، سرخ، سبز
+  val summary = rememberDeskLoad(d) { DebtorListModel.summary(d) }
+  //  همهٔ ردیف‌های فهرست یک بار و بیرون از رشتهٔ صفحه (۵ هزار مشتری هم)
+  val all = rememberDeskLoad(d) { CustomerCrm.active(d).map { it.id }.toSet().let { on -> CustomerEngine.summaries(d).filter { it.id in on } } }
+  DeskPage {
+    CustomerStats(summary, all)
+    BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+      val listW = (maxWidth * 0.34f).coerceIn(340.dp, 440.dp)
+      Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(DeskSpace.gap)) {
+        CustomerCards(store, d, all, openId, ::toast, Modifier.width(listW).fillMaxHeight()) { openId = it }
+        Box(Modifier.weight(1f).fillMaxHeight()) {
+          if (open == null) DeskPaneHint(Icons.Outlined.PeopleOutline, StrDeskData.pickCustomer, Modifier.fillMaxSize())
+          else key(open.id) { CustomerFile(store, d, snackbar, open.id, onOpenOrder) { openId = null } }
+        }
+      }
+    }
+  }
 }
 
 /** فقط برای عکس‌های خودکارِ CI (`desktop/.../DevShot.kt`) — در کارِ عادی دست نمی‌خورد */
@@ -100,33 +159,71 @@ object DeskCustomersShot {
   val tab = mutableStateOf(-1)
 }
 
-/* ══════════════════════════ بیرون: کارت‌ها ══════════════════════════ */
+/** رنگ‌های معنای حساب — همان `PhoneV3Debt` ِ کارت‌های سرخ/سبز (روشن و تیره)، نه رنگِ تازه */
+private data class DebtTone(val ink: Color, val fill: Color)
+
+/** بدهکار ⇒ سرخ (`owe`)، صاف یا پیش‌پرداخت ⇒ سبز (`settled`) — رنگِ نوشته و زمینهٔ کم‌رنگِ همان (خالص، آزمون‌شده) */
+internal fun deskDebtTone(balance: Double, c: ir.vil3ntec.tohid.ui.theme.PhoneV3DebtColors): Pair<Color, Color> =
+  if (balance > 0.5) c.owe to c.oweTint else c.settled to c.settledTint
+
+@Composable
+private fun debtTone(balance: Double): DebtTone = deskDebtTone(balance, PhoneV3Debt.colors).let { (ink, fill) -> DebtTone(ink, fill) }
+
+/**
+ *  سرِ صفحه: سه جعبهٔ رنگیِ قرض‌داران (تعداد آبی، جمعِ قرض سرخ، رسیدها سبز) و کنارشان دو عددِ آرامِ پیشین (دیرکردِ بیش از
+ *  ۶۰ روز، خریدِ این ماه) — هیچ عددی گم نشد.
+ */
+@Composable
+private fun CustomerStats(summary: DebtorListModel.Summary?, all: List<CustomerEngine.Summary>?) {
+  val c = PhoneV3Debt.colors
+  val late = all?.count { (it.debtDays ?: 0) > 60 }
+  val debtors = all?.count { it.balance > 0.5 }
+  DeskKpiRow {
+    DeskStatBox(ir.vil3ntec.tohid.core.i18n.StrMoney.statPeople, summary?.let { plain(it.people) } ?: "—", c.info, c.infoTint, Modifier.weight(1f),
+      caption = debtors?.let { ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.vDebtors + ": " + ir.vil3ntec.tohid.core.i18n.StrHome.people(it) }, icon = Icons.Outlined.PeopleOutline)
+    DeskStatBox(ir.vil3ntec.tohid.core.i18n.StrMoney.statOwed, summary?.let { "${money(it.owed)} ؋" } ?: "—", c.owe, c.oweTint, Modifier.weight(1f),
+      caption = late?.let { ir.vil3ntec.tohid.core.i18n.StrCustomerPages.lateKpi + ": " + ir.vil3ntec.tohid.core.i18n.StrHome.people(it) }, icon = Icons.Outlined.NorthEast)
+    DeskStatBox(ir.vil3ntec.tohid.core.i18n.StrMoney.statReceived, summary?.let { "${money(it.received)} ؋" } ?: "—", c.settled, c.settledTint, Modifier.weight(1f),
+      caption = ir.vil3ntec.tohid.core.i18n.StrCustomerPages.monthKpi, icon = Icons.Outlined.SouthWest)
+  }
+}
+
+/* ══════════════════════════ فهرست: کارت‌ها یا ردیف‌ها ══════════════════════════ */
 
 private enum class Filter(private val text: () -> String) { ALL({ ir.vil3ntec.tohid.core.i18n.Str.all }), DEBT({ ir.vil3ntec.tohid.core.i18n.StrCustomerPages.owing }), LATE({ ir.vil3ntec.tohid.core.i18n.StrCustomerPages.lateFilter }), BUYERS({ ir.vil3ntec.tohid.core.i18n.StrCustomerPages.buyers }), CLEAR({ ir.vil3ntec.tohid.core.i18n.StrCustomerPages.noBalance }); val label: String get() = text() }
 private enum class Sort(private val text: () -> String) { DEBT({ ir.vil3ntec.tohid.core.i18n.StrCustomerPages.sortMostOwed }), RECENT({ ir.vil3ntec.tohid.core.i18n.StrCustomerPages.sortLatest }), BOUGHT({ ir.vil3ntec.tohid.core.i18n.StrCustomerPages.sortMostBought }), NAME({ ir.vil3ntec.tohid.core.i18n.StrGrid.name }); val label: String get() = text() }
 
+/**
+ *  فهرستِ مشتری‌ها در آغازِ صفحه: جست‌وجو، صافی و ترتیب (کادرِ کشویی)، «مشتریِ تازه»، اکسل و نمای «ردیف/کارت». ردیف همان
+ *  ردیفِ آرام است (نام، شماره • آخرین خرید، مانده و واژهٔ حالش) با کاشیِ حرفِ سرخ/سبز؛ کارت همان مربعِ سرخ/سبزِ گوشی.
+ */
 @Composable
-private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostState, onOpen: (String) -> Unit) {
+private fun CustomerCards(
+  store: ShopStore,
+  d: ShopData,
+  all: List<CustomerEngine.Summary>?,
+  selectedId: String?,
+  toast: (String) -> Unit,
+  modifier: Modifier,
+  onOpen: (String) -> Unit,
+) {
   val context = LocalContext.current
-  val scope = rememberCoroutineScope()
-  fun toast(t: String) { scope.launch { snackbar.showSnackbar(t) } }
   var search by remember { mutableStateOf("") }
   var filter by remember { mutableStateOf(Filter.ALL) }
   var sort by remember { mutableStateOf(Sort.DEBT) }
-  var sortMenu by remember { mutableStateOf(false) }
-  //  نمای کارتی/جدولی (VISUAL-DIRECTION §۱٫۵) — پیش‌فرضِ مدیریت جدول؛ جست‌وجو،
-  //  صافی و ترتیب با عوض‌شدنِ نما دست نمی‌خورند
+  var adding by remember { mutableStateOf(false) }
+  //  نمای کارتی/جدولی (VISUAL-DIRECTION §۱٫۵) — پیش‌فرضِ مدیریت جدول؛ جست‌وجو، صافی و ترتیب با عوض‌شدنِ نما دست نمی‌خورند
   val view = rememberViewMode("customers", ScreenKind.MANAGEMENT)
   //  پروندهٔ CRM (CRM-02/10/11) — فقط با «گزارش‌های مشتری» روشن (`ShopPolicy.crmReports`، پیش‌فرض خاموش)
   val crm = ShopPolicy.crmReports(context)
   var tagFilter by remember { mutableStateOf<String?>(null) }
   var mergeOpen by remember { mutableStateOf(false) }
+  val searchFocus = remember { FocusRequester() }
 
   //  ادغام‌شده‌ها بیرون (CRM-10)؛ با CRM روشن جست‌وجو روی هر دو شماره و برچسب و صافیِ برچسب
-  val all = remember(d) { CustomerCrm.active(d).map { it.id }.toSet().let { on -> CustomerEngine.summaries(d).filter { it.id in on } } }
-  val list = remember(all, search, filter, sort, tagFilter, crm) {
+  val list = rememberDeskLoad(all, search, filter, sort, tagFilter, crm) {
     val shown = CustomerProfileForm.visible(d, search, tagFilter, crm).map { it.id }.toSet()
-    all.filter { it.id in shown }
+    all.orEmpty().filter { it.id in shown }
       .filter {
         when (filter) {
           Filter.ALL -> true
@@ -144,14 +241,7 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
           Sort.NAME -> compareBy { it.name }
         },
       )
-  }
-  val month = ir.vil3ntec.tohid.todayIso().take(7)
-  val totalDebt = all.sumOf { it.balance.coerceAtLeast(0.0) }
-  val debtors = all.count { it.balance > 0.5 }
-  val late = all.count { (it.debtDays ?: 0) > 60 }
-  val monthBought = remember(d, month) {
-    d.sales.filter { it.debtorId != null && it.status != "cancelled" && it.date.startsWith(month) }.sumOf { it.finalTotal }
-  }
+  }.orEmpty()
   val contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts() // CRM-15: شمارهٔ مشتری در خروجی
   fun excel() {
     val rows = mutableListOf(listOf("نام", "تلفن", "مانده", "روزِ بدهی", "تعدادِ فاکتور", "جمعِ خرید", "آخرین خرید", "آخرین پرداخت")) // داده: برگهٔ اکسل/چاپ (خروجی) زبانِ صفحه را نمی‌گیرد
@@ -162,173 +252,128 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
     val sheet = ReportCsv.Sheet("مشتری‌ها-${ir.vil3ntec.tohid.todayIso()}", rows) // داده: برگهٔ اکسل/چاپ (خروجی) زبانِ صفحه را نمی‌گیرد
     Platform.saveFile("${sheet.name}.xlsx", Xlsx.of(sheet))?.let { toast(ir.vil3ntec.tohid.core.i18n.StrSale.savedTo(it)) }
   }
-
-  Column(
-    Modifier
-      .fillMaxSize()
-      .onPreviewKeyEvent { e ->
-        if (e.type == KeyEventType.KeyDown && e.isPrimaryModifier && e.key == Key.E) { excel(); true } else false
-      }
-      .padding(16.dp),
-  ) {
-    //  چهار عددِ کل
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-      DeskKpi(ir.vil3ntec.tohid.core.i18n.StrReports.totalReceivable, "${money(totalDebt)} ؋", Shop.colors.danger, Modifier.weight(1f))
-      DeskKpi(ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.vDebtors, ir.vil3ntec.tohid.core.i18n.StrHome.people(debtors), Shop.colors.warning, Modifier.weight(1f))
-      DeskKpi(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.lateKpi, ir.vil3ntec.tohid.core.i18n.StrHome.people(late), if (late > 0) Shop.colors.danger else Shop.colors.success, Modifier.weight(1f))
-      DeskKpi(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.monthKpi, "${money(monthBought)} ؋", Shop.colors.primary, Modifier.weight(1f))
-    }
-    Spacer(Modifier.height(12.dp))
-
-    //  نوارِ ابزار
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      //  نسخهٔ ۲: همان کادرِ جست‌وجوی مشترکِ فهرست‌ها (`SearchBox`) — گرد، نرم، با ×
-      ir.vil3ntec.tohid.ui.components.common.SearchBox(search, { search = it }, ir.vil3ntec.tohid.core.i18n.StrCustomerPages.searchHint, Modifier.width(280.dp))
-      Spacer(Modifier.width(8.dp))
-      Row(Modifier.weight(1f).horizontalScroll(rememberScrollState())) {
-        Filter.values().forEach { f ->
-          FilterChip(selected = filter == f, onClick = { filter = f }, label = { Text(f.label) })
-          Spacer(Modifier.width(6.dp))
-        }
-      }
-      Box {
-        OutlinedButton(onClick = { sortMenu = true }) { Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.sortBy(sort.label)) }
-        DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
-          Sort.values().forEach { s -> DropdownMenuItem(text = { Text(s.label) }, onClick = { sort = s; sortMenu = false }) }
-        }
-      }
-      Spacer(Modifier.width(6.dp))
-      ViewModeToggle(view)
-      Spacer(Modifier.width(6.dp))
-      OutlinedButton(onClick = ::excel) { Text(ir.vil3ntec.tohid.core.i18n.StrInvoices.excelKey) }
-    }
-    Spacer(Modifier.height(8.dp))
-    if (crm) CrmListTools(d, tagFilter, { tagFilter = it }, onMerge = { mergeOpen = true })
-    NewCustomerRow(store, d, ::toast) { onOpen(it) }
-    Spacer(Modifier.height(4.dp))
-    Text(
-      ir.vil3ntec.tohid.core.i18n.StrCustomerPages.listHint(list.size, all.size, if (view.mode == ViewMode.TABLE) ir.vil3ntec.tohid.core.i18n.StrCustomerPages.rowWord else ir.vil3ntec.tohid.core.i18n.StrCustomerPages.cardWord),
-      style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
-    )
-    Spacer(Modifier.height(8.dp))
-
-    if (list.isEmpty()) {
-      Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(if (all.isEmpty()) ir.vil3ntec.tohid.core.i18n.StrCustomerPages.noneYet else ir.vil3ntec.tohid.core.i18n.StrCustomerPages.noneMatch, color = Shop.colors.muted)
-      }
-    } else if (view.mode == ViewMode.TABLE) {
-      //  همان فهرست، همان صافی و ترتیب — جدولِ خط‌دار مثلِ داخلِ پرونده
-      val cols = listOf(
-        //  ستونِ نام اولویت دارد: ستون‌های ثابت به‌اندازهٔ محتوا (بازبینیِ ۱۴۰۵/۰۷/۲۷)
-        TCol(ir.vil3ntec.tohid.core.i18n.StrGrid.name), TCol(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.phone, 118.dp), TCol(ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.vDebtRemaining, 104.dp, true), TCol(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.debtDays, 76.dp, true),
-        TCol(ir.vil3ntec.tohid.core.i18n.Str.invoices, 70.dp, true), TCol(ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.vPurchaseTotal, 104.dp, true), TCol(ir.vil3ntec.tohid.core.i18n.StrPriceCheck.lastPurchase, 98.dp), TCol(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.lastPaid, 98.dp),
-      )
-      DeskTable(
-        cols, list.size, Modifier.weight(1f),
-        empty = "",
-        cell = { i, c ->
-          val r = list[i]
-          when (c) {
-            0 -> TCell(r.name, bold = true)
-            1 -> TCell(ir.vil3ntec.tohid.ui.components.customerPhone(r.phone, ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()), Shop.colors.muted)
-            2 -> TCell(if (kotlin.math.abs(r.balance) < 0.5) ir.vil3ntec.tohid.core.i18n.StrCustomerPages.settled else money(r.balance), stateColor(r.balance), bold = true)
-            3 -> TCell(r.debtDays?.toString().orEmpty(), if ((r.debtDays ?: 0) > 60) Shop.colors.danger else Shop.colors.muted)
-            4 -> TCell(r.invoices.toString())
-            5 -> TCell(money(r.bought))
-            6 -> TCell(r.lastPurchase?.let { formatDate(it) } ?: "—", Shop.colors.muted)
-            else -> TCell(r.lastPaid?.let { formatDate(it) } ?: "—", Shop.colors.success)
-          }
-        },
-        onClick = { i -> onOpen(list[i].id) },
-        footer = listOf(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.totalOf(list.size), "", money(list.sumOf { it.balance }), "", list.sumOf { it.invoices }.toString(), money(list.sumOf { it.bought }), "", ""),
-      )
-    } else {
-      LazyVerticalGrid(
-        columns = GridCells.Adaptive(210.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier.fillMaxSize(),
-      ) {
-        items(list, key = { it.id }) { s -> CustomerCard(s) { onOpen(s.id) } }
-      }
-    }
+  //  Ctrl+N (پنجره) ⇐ «مشتریِ تازه»
+  val add = remember { { adding = true } }
+  DisposableEffect(Unit) {
+    ir.vil3ntec.tohid.ui.AppNav.addAction.value = add
+    onDispose { if (ir.vil3ntec.tohid.ui.AppNav.addAction.value === add) ir.vil3ntec.tohid.ui.AppNav.addAction.value = null }
   }
-  if (mergeOpen && crm) CustomerMergeDialog(d, store, onDismiss = { mergeOpen = false }, toast = ::toast)
-}
 
-@Composable
-internal fun DeskKpi(label: String, value: String, tint: Color, modifier: Modifier = Modifier) {
-  //  نسخهٔ ۲: کارتِ نرم (سایه، گوشهٔ ۱۶)، نقطهٔ رنگیِ معنا کنارِ عنوان و عددِ درشتِ هم‌پهنا
   Column(
     modifier
-      .softCard(Shop.colors, Shape.card)
-      .padding(16.dp),
+      .onPreviewKeyEvent { e ->
+        if (e.type != KeyEventType.KeyDown || !e.isPrimaryModifier) return@onPreviewKeyEvent false
+        when (e.key) {
+          Key.E -> { excel(); true }
+          Key.F -> { runCatching { searchFocus.requestFocus() }; true }
+          else -> false
+        }
+      },
+    verticalArrangement = Arrangement.spacedBy(DeskSpace.x2),
   ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      Box(Modifier.size(8.dp).clip(CircleShape).background(tint))
-      Spacer(Modifier.width(8.dp))
-      Text(label, style = MaterialTheme.typography.labelLarge, color = Shop.colors.muted, maxLines = 1)
+    DeskSearchField(search, { search = it }, ir.vil3ntec.tohid.core.i18n.StrCustomerPages.searchHint, Modifier.fillMaxWidth(), searchFocus)
+    DeskToolbar(
+      end = {
+        if (view.toggleVisible) DeskSegmented(listOf(ViewMode.TABLE to ir.vil3ntec.tohid.core.i18n.Str.tableView, ViewMode.CARD to ir.vil3ntec.tohid.core.i18n.Str.cardView), view.mode, { view.set(it) })
+      },
+    ) {
+      DeskDropdown(filter, Filter.entries.map { DeskOption(it, it.label) }, { filter = it }, label = StrDeskData.show)
+      DeskDropdown(sort, Sort.entries.map { DeskOption(it, it.label) }, { sort = it }, label = StrDeskData.sortLabel)
     }
-    Spacer(Modifier.height(8.dp))
-    Text(value, style = MaterialTheme.typography.headlineSmall.tabular(), fontWeight = FontWeight.Bold, color = tint, maxLines = 1)
+    if (crm) CrmListTools(d, tagFilter, { tagFilter = it }, onMerge = { mergeOpen = true })
+    if (adding) NewCustomerRow(store, d, toast, onCancel = { adding = false }) { onOpen(it); adding = false }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      DeskNote(
+        ir.vil3ntec.tohid.core.i18n.StrCustomerPages.listHint(list.size, all?.size ?: 0, if (view.mode == ViewMode.TABLE) ir.vil3ntec.tohid.core.i18n.StrCustomerPages.rowWord else ir.vil3ntec.tohid.core.i18n.StrCustomerPages.cardWord),
+        Modifier.weight(1f),
+      )
+      if (!adding) DeskLink(ir.vil3ntec.tohid.core.i18n.StrMoney.newDebtor, { adding = true })
+      DeskIconButton(Icons.Outlined.TableChart, ir.vil3ntec.tohid.core.i18n.StrInvoices.excelKey, ::excel)
+    }
+
+    val c = Desk.colors
+    when {
+      all == null -> DeskSkeleton(Modifier.fillMaxWidth().weight(1f))
+      list.isEmpty() -> Box(Modifier.fillMaxWidth().weight(1f).deskCard(c), contentAlignment = Alignment.Center) {
+        if (all.isEmpty()) V3EmptyState(Icons.Outlined.PeopleOutline, ir.vil3ntec.tohid.core.i18n.StrCustomerPages.noneYet, action = ir.vil3ntec.tohid.core.i18n.StrMoney.newDebtor, onAction = { adding = true })
+        else V3EmptyState(Icons.Outlined.PeopleOutline, ir.vil3ntec.tohid.core.i18n.StrCustomerPages.noneMatch, action = ir.vil3ntec.tohid.core.i18n.StrReports.showAll, onAction = { search = ""; filter = Filter.ALL; tagFilter = null })
+      }
+      view.mode == ViewMode.TABLE -> {
+        val state = rememberLazyListState()
+        val today = ir.vil3ntec.tohid.todayIso()
+        val sel = list.indexOfFirst { it.id == selectedId }
+        LaunchedEffect(selectedId) { if (sel >= 0) { val seen = state.layoutInfo.visibleItemsInfo; if (seen.isEmpty() || sel < seen.first().index || sel > seen.last().index) state.scrollToItem(sel) } }
+        LazyColumn(
+          Modifier.fillMaxWidth().weight(1f).deskCard(c).padding(vertical = DeskSpace.x1)
+            .onPreviewKeyEvent { e ->
+              if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+              when (e.key) {
+                Key.DirectionDown -> { list.getOrNull((sel + 1).coerceAtMost(list.lastIndex))?.let { onOpen(it.id) }; true }
+                Key.DirectionUp -> { list.getOrNull((sel - 1).coerceAtLeast(0))?.let { onOpen(it.id) }; true }
+                else -> false
+              }
+            },
+          state = state,
+        ) {
+          items(list, key = { it.id }) { r ->
+            val tone = debtTone(r.balance)
+            DeskCalmRow(
+              title = r.name,
+              sub = listOf(
+                ir.vil3ntec.tohid.ui.components.customerPhone(r.phone, ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()),
+                r.lastPurchase?.let { RowWhen.of(it, today) }.orEmpty(),
+              ).filter { it.isNotBlank() }.joinToString(" • "),
+              amount = if (kotlin.math.abs(r.balance) < 0.5) ir.vil3ntec.tohid.core.i18n.StrCustomerPages.settled else "${money(kotlin.math.abs(r.balance))} ؋",
+              status = when { r.balance > 0.5 -> r.debtDays?.let { ir.vil3ntec.tohid.core.i18n.Str.days(it) } ?: ir.vil3ntec.tohid.core.i18n.StrCustomerPages.owing; r.balance < -0.5 -> ir.vil3ntec.tohid.core.i18n.StrCustomerPages.inCredit; else -> "" },
+              amountColor = if (r.balance > 0.5) tone.ink else if (r.balance < -0.5) tone.ink else null,
+              selected = r.id == selectedId,
+              leading = { DeskLetterTile(r.name, tone.ink, tone.fill) },
+              onClick = { onOpen(r.id) },
+            )
+          }
+        }
+      }
+      else -> LazyVerticalGrid(
+        columns = GridCells.Adaptive(176.dp),
+        horizontalArrangement = Arrangement.spacedBy(DeskSpace.x3),
+        verticalArrangement = Arrangement.spacedBy(DeskSpace.x3),
+        modifier = Modifier.fillMaxWidth().weight(1f),
+      ) {
+        items(list, key = { it.id }) { s -> CustomerCard(s, s.id == selectedId) { onOpen(s.id) } }
+      }
+    }
   }
+  if (mergeOpen && crm) CustomerMergeDialog(d, store, onDismiss = { mergeOpen = false }, toast = toast)
 }
 
+/** کارتِ مربعیِ هر مشتری — همان کارتِ سرخ/سبزِ گوشی (زمینهٔ کم‌رنگ و مرزِ رنگِ حساب)، به اندازهٔ میز */
 @Composable
-internal fun stateColor(balance: Double) = when {
-  balance > 0.5 -> Shop.colors.danger
-  balance < -0.5 -> Shop.colors.success
-  else -> Shop.colors.muted
-}
-
-/** کارتِ مربعیِ هر مشتری */
-@Composable
-private fun CustomerCard(s: CustomerEngine.Summary, onClick: () -> Unit) {
-  val tint = stateColor(s.balance)
+private fun CustomerCard(s: CustomerEngine.Summary, selected: Boolean, onClick: () -> Unit) {
+  val c = Desk.colors
+  val tone = debtTone(s.balance)
+  val shape = DeskRadius.cardShape
   Column(
     Modifier
       .aspectRatio(1f)
-      //  نسخهٔ ۲: کارتِ نرم؛ بدهکار را نقطه و رنگِ مانده نشان می‌دهد نه خطِ دورِ رنگی
-      .softCard(Shop.colors, Shape.card)
-      .clickable(onClick = onClick)
-      .padding(14.dp),
+      .clip(shape)
+      .background(tone.fill)
+      .border(if (selected) DeskSize.focusRing else DeskSize.hairline, if (selected) c.brand else tone.ink, shape)
+      .deskClickable(label = s.name, shape = shape, selected = false, onClick = onClick)
+      .padding(DeskSpace.x4),
   ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      Box(
-        Modifier.size(42.dp).clip(CircleShape).background(tint.copy(alpha = 0.14f)),
-        contentAlignment = Alignment.Center,
-      ) {
-        Text(s.name.trim().take(1).ifBlank { "؟" }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = tint)
-      }
-      Spacer(Modifier.width(10.dp))
-      Column(Modifier.weight(1f)) {
-        Text(s.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
-        Text(ir.vil3ntec.tohid.ui.components.customerPhone(s.phone, ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()).ifBlank { ir.vil3ntec.tohid.core.i18n.StrCustomerPages.noPhone }, maxLines = 1, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-      }
-    }
+    Text(s.name, maxLines = 2, overflow = TextOverflow.Ellipsis, style = DeskType.bodyStrong, color = c.ink)
+    Text(ir.vil3ntec.tohid.ui.components.customerPhone(s.phone, ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()).ifBlank { ir.vil3ntec.tohid.core.i18n.StrCustomerPages.noPhone }, maxLines = 1, style = DeskType.secondary, color = c.inkSecondary)
     Spacer(Modifier.weight(1f))
     Text(
       when { s.balance > 0.5 -> ir.vil3ntec.tohid.core.i18n.StrCustomerPages.owing; s.balance < -0.5 -> ir.vil3ntec.tohid.core.i18n.StrCustomerPages.inCredit; else -> ir.vil3ntec.tohid.core.i18n.StrCustomerPages.noBalance },
-      style = MaterialTheme.typography.labelMedium, color = tint,
+      style = DeskType.label, color = tone.ink,
     )
-    Text("${money(kotlin.math.abs(s.balance))} ؋", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = tint, maxLines = 1)
+    Text("${money(kotlin.math.abs(s.balance))} ؋", style = DeskType.kpiSmall, color = tone.ink, maxLines = 1)
     Spacer(Modifier.weight(1f))
-    HorizontalDivider(color = Shop.colors.border)
-    Spacer(Modifier.height(6.dp))
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      Column(Modifier.weight(1f)) {
-        Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.cardStats(s.invoices, money(s.bought)), style = MaterialTheme.typography.labelSmall, color = Shop.colors.text, maxLines = 1)
-        Text(s.lastPurchase?.let { ir.vil3ntec.tohid.core.i18n.StrCustomerPages.lastBoughtOn(formatDate(it)) } ?: ir.vil3ntec.tohid.core.i18n.StrCustomerPages.noPurchases, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted, maxLines = 1)
-      }
-      s.debtDays?.let { days ->
-        val c = when { days > 60 -> Shop.colors.danger; days > 30 -> Shop.colors.warning; else -> Shop.colors.muted }
-        Text(
-          ir.vil3ntec.tohid.core.i18n.Str.days(days),
-          Modifier.clip(RoundedCornerShape(6.dp)).background(c.copy(alpha = 0.14f)).padding(horizontal = 6.dp, vertical = 2.dp),
-          style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = c,
-        )
-      }
-    }
+    Text(
+      s.lastPurchase?.let { ir.vil3ntec.tohid.core.i18n.StrCustomerPages.lastBoughtOn(formatDate(it)) } ?: ir.vil3ntec.tohid.core.i18n.StrCustomerPages.noPurchases,
+      style = DeskType.secondary, color = c.inkSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+    )
   }
 }
 
@@ -336,6 +381,12 @@ private fun CustomerCard(s: CustomerEngine.Summary, onClick: () -> Unit) {
 
 private enum class FileTab(private val text: () -> String) { LEDGER({ ir.vil3ntec.tohid.core.i18n.StrCustomerPages.tabStatement }), INVOICES({ ir.vil3ntec.tohid.core.i18n.Str.invoices }), ITEMS({ ir.vil3ntec.tohid.core.i18n.StrCustomerPages.tabItems }); val label: String get() = text() }
 
+/**
+ *  پروندهٔ مشتری — پنلِ پهنِ کنارِ فهرست: سرِ پرونده (کاشیِ سرخ/سبز، نام، شماره و حال)، پنج عدد (مانده به رنگِ حساب)، کارها
+ *  (دریافت F7، قرضِ دستی F6، سقفِ اعتبار، …؛ چاپ و اکسلِ همان زبانه)، و سه زبانه: «صورت‌حساب» با ردیف‌های **«برد» سرخ /
+ *  «رسید» سبز** (همان هویتِ گوشی)، «فاکتورها» (فاکتورها فقط درونِ ردیف‌های «برد» و همین زبانه — فهرستِ جدایی نیست) و
+ *  «اقلامِ برداشته». جزئیاتِ ردیفِ برگزیدهٔ صورت‌حساب زیرِ جدول (رسید، سررسید، فاکتور).
+ */
 @Composable
 private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostState, id: String, onOpenOrder: ((String) -> Unit)?, onBack: () -> Unit) {
   val context = LocalContext.current
@@ -344,6 +395,8 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
   val debtor = d.debtors.first { it.id == id }
   val s = remember(d, id) { CustomerEngine.summary(d, debtor) }
   val today = ir.vil3ntec.tohid.todayIso()
+  val c = Desk.colors
+  val debt = PhoneV3Debt.colors
 
   var tab by remember { mutableStateOf(FileTab.LEDGER) }
   var entry by remember { mutableStateOf<DebtorEngine.Kind?>(null) }
@@ -385,9 +438,11 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
     Platform.saveFile("${sh.name}.xlsx", Xlsx.of(sh))?.let { viewed(id, ir.vil3ntec.tohid.core.crm.CustomerAccess.Kind.EXPORT); toast(ir.vil3ntec.tohid.core.i18n.StrSale.savedTo(it)) }
   }
 
+  val tone = debtTone(s.balance)
   Column(
     Modifier
       .fillMaxSize()
+      .deskCard(c)
       .onPreviewKeyEvent { e ->
         if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
         when {
@@ -398,206 +453,258 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
           e.key == Key.Escape && entry == null && showInvoice == null && receiptFor == null && dueFor == null && !limitOpen && !profileOpen && overLimit == null -> { onBack(); true }
           else -> false
         }
-      }
-      .padding(16.dp),
+      },
   ) {
     //  سرِ پرونده
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowForward, ir.vil3ntec.tohid.core.i18n.StrCustomerPages.backToCards, tint = Shop.colors.text) }
-      val tint = stateColor(s.balance)
-      Box(Modifier.size(48.dp).clip(CircleShape).background(tint.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-        Text(debtor.name.trim().take(1).ifBlank { "؟" }, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = tint)
-      }
-      Spacer(Modifier.width(12.dp))
+    Row(Modifier.fillMaxWidth().padding(start = DeskSpace.card, end = DeskSpace.x3, top = DeskSpace.x4, bottom = DeskSpace.x3), verticalAlignment = Alignment.CenterVertically) {
+      DeskLetterTile(debtor.name, tone.ink, tone.fill, size = DeskSize.tileLarge)
+      Spacer(Modifier.width(DeskSpace.x3))
       Column(Modifier.weight(1f)) {
-        Text(debtor.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Shop.colors.text)
-        Text(listOf(ir.vil3ntec.tohid.ui.components.customerPhone(debtor.phone, ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()), DebtorEngine.stateText(s.balance), debtor.notes).filter { it.isNotBlank() }.joinToString(" · "),
-          style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        Text(debtor.name, style = DeskType.sectionTitle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(listOf(ir.vil3ntec.tohid.ui.components.customerPhone(debtor.phone, ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()), DebtorEngine.stateText(s.balance), debtor.notes).filter { it.isNotBlank() }.joinToString(" • "),
+          style = DeskType.secondary, color = c.inkSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         CrmExtraLine(debtor)
       }
-      Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.escBack, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+      //  مانده — به رنگِ حساب (سرخ بدهکار، سبز صاف)، همان معنای کارتِ گوشی
+      Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(horizontal = DeskSpace.x3)) {
+        Text(ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.vDebtRemaining, style = DeskType.label, color = c.inkSecondary, maxLines = 1)
+        Text("${money(s.balance)} ؋", style = DeskType.kpiSmall, color = tone.ink, maxLines = 1)
+      }
+      DeskIconButton(Icons.Outlined.Close, ir.vil3ntec.tohid.core.i18n.StrCustomerPages.escBack, onBack)
     }
-    Spacer(Modifier.height(10.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-      DeskKpi(ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.vDebtRemaining, "${money(s.balance)} ؋", stateColor(s.balance), Modifier.weight(1f))
-      DeskKpi(ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.vPurchaseTotal, "${money(s.bought)} ؋", Shop.colors.primary, Modifier.weight(1f))
-      DeskKpi(ir.vil3ntec.tohid.core.i18n.Str.invoices, "${s.invoices}", Shop.colors.text, Modifier.weight(1f))
-      DeskKpi(ir.vil3ntec.tohid.core.i18n.StrPriceCheck.lastPurchase, s.lastPurchase?.let { formatDate(it) } ?: "—", Shop.colors.text, Modifier.weight(1f))
-      DeskKpi(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.lastPaid, s.lastPaid?.let { formatDate(it) } ?: "—", Shop.colors.success, Modifier.weight(1f))
-    }
-    book?.let {
-      Spacer(Modifier.height(8.dp))
-      DebtBookBanner(it)
-    }
-    Spacer(Modifier.height(10.dp))
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      Button(onClick = { entry = DebtorEngine.Kind.RECEIVE }) { Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.receiveKey) }
-      Spacer(Modifier.width(6.dp))
-      OutlinedButton(onClick = { entry = DebtorEngine.Kind.GIVE }) { Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.creditKey) }
-      Spacer(Modifier.width(6.dp))
-      OutlinedButton(onClick = { limitOpen = true }) { Text(ir.vil3ntec.tohid.core.i18n.StrExpenses.auditCreditLimitSet) }
-      if (crm) { Spacer(Modifier.width(6.dp)); OutlinedButton(onClick = { profileOpen = true }) { Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.secondNumber) } }
-      Spacer(Modifier.weight(1f))
-      OutlinedButton(onClick = ::print) { Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.printTab(tab.label)) }
-      Spacer(Modifier.width(6.dp))
-      OutlinedButton(onClick = ::excel) { Text(ir.vil3ntec.tohid.core.i18n.StrInvoices.excelKey) }
-      StatementImageButton(d, id, ::toast, Modifier.padding(start = 6.dp))
-      CrmPricingButton(store, d, id, ::toast, Modifier.padding(start = 6.dp))
-      CustomerPricesButton(store, d, id, ::toast, Modifier.padding(start = 6.dp)) // POS-18: همان دکمهٔ پروندهٔ گوشی، پیش‌فرض خاموش
-      CustomerCardButton(store, d, id, ::toast, Modifier.padding(start = 6.dp)) // CRM-16، پیش‌فرض خاموش
-      StoreCreditGrantButton(store, d, id, ::toast, Modifier.padding(start = 6.dp)) // PRM-15: همان دکمهٔ پروندهٔ گوشی (`GiftCardPref`)
-      CustomerErasureButton(d.debtors.find { it.id == id }?.phone, Modifier.padding(start = 6.dp)) // SEC-10، فقط صاحب و پرچمِ روشن
-    }
-    entry?.let { kind ->
-      Spacer(Modifier.height(8.dp))
-      key(id, kind) {
-        EntryRow(kind, onCancel = { entry = null }) { amount, notes, due ->
-          //  CRM-03: بردِ بیش از سقف فقط با تأییدِ صریح؛ مشتریِ بی سقف همان رفتارِ همیشه
-          val credit = if (kind == DebtorEngine.Kind.GIVE) DebtBook.creditCheck(d, id, DebtBook.minor(amount)) else null
-          if (credit != null && credit.over) overLimit = Triple(amount, notes, due)
-          else record(kind, amount, notes, due, over = false)
+    DeskDivider()
+    BoxWithConstraints(Modifier.fillMaxWidth().weight(1f).padding(horizontal = DeskSpace.card, vertical = DeskSpace.x4)) {
+    //  پنجرهٔ کوتاه (۷۶۸) ⇒ چهار عددِ آرام یک خطِ کم‌رنگ می‌شوند تا جدول جا داشته باشد
+    val tall = maxHeight >= 560.dp
+    val wide = maxWidth >= 900.dp
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(DeskSpace.x3)) {
+      if (tall) DeskKpiRow {
+        MiniStat(ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.vPurchaseTotal, "${money(s.bought)} ؋", Modifier.weight(1f))
+        MiniStat(ir.vil3ntec.tohid.core.i18n.Str.invoices, plain(s.invoices), Modifier.weight(0.8f))
+        MiniStat(ir.vil3ntec.tohid.core.i18n.StrPriceCheck.lastPurchase, s.lastPurchase?.let { formatDate(it) } ?: "—", Modifier.weight(1f))
+        MiniStat(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.lastPaid, s.lastPaid?.let { formatDate(it) } ?: "—", Modifier.weight(1f))
+      } else DeskNote(
+        listOf(
+          ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.vPurchaseTotal + ": " + money(s.bought) + " ؋",
+          ir.vil3ntec.tohid.core.i18n.Str.invoices + ": " + plain(s.invoices),
+          ir.vil3ntec.tohid.core.i18n.StrPriceCheck.lastPurchase + ": " + (s.lastPurchase?.let { formatDate(it) } ?: "—"),
+          ir.vil3ntec.tohid.core.i18n.StrCustomerPages.lastPaid + ": " + (s.lastPaid?.let { formatDate(it) } ?: "—"),
+        ).joinToString(" • "),
+      )
+      book?.let { DebtBookBanner(it) }
+      DeskToolbar {
+        DeskButton(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.receivePayment, { entry = DebtorEngine.Kind.RECEIVE }, kind = DeskButtonKind.PRIMARY, icon = Icons.Outlined.SouthWest, shortcut = "F7")
+        DeskButton(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.manualCredit, { entry = DebtorEngine.Kind.GIVE }, icon = Icons.Outlined.NorthEast, shortcut = "F6")
+        DeskButton(ir.vil3ntec.tohid.core.i18n.StrExpenses.auditCreditLimitSet, { limitOpen = true })
+        if (crm) DeskButton(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.secondNumber, { profileOpen = true })
+        StatementImageButton(d, id, ::toast)
+        CrmPricingButton(store, d, id, ::toast)
+        CustomerPricesButton(store, d, id, ::toast, Modifier) // POS-18: همان دکمهٔ پروندهٔ گوشی، پیش‌فرض خاموش
+        CustomerCardButton(store, d, id, ::toast, Modifier) // CRM-16، پیش‌فرض خاموش
+        StoreCreditGrantButton(store, d, id, ::toast, Modifier) // PRM-15: همان دکمهٔ پروندهٔ گوشی (`GiftCardPref`)
+        CustomerErasureButton(d.debtors.find { it.id == id }?.phone) // SEC-10، فقط صاحب و پرچمِ روشن
+      }
+      entry?.let { kind ->
+        key(id, kind) {
+          EntryRow(kind, onCancel = { entry = null }) { amount, notes, due ->
+            //  CRM-03: بردِ بیش از سقف فقط با تأییدِ صریح؛ مشتریِ بی سقف همان رفتارِ همیشه
+            val credit = if (kind == DebtorEngine.Kind.GIVE) DebtBook.creditCheck(d, id, DebtBook.minor(amount)) else null
+            if (credit != null && credit.over) overLimit = Triple(amount, notes, due)
+            else record(kind, amount, notes, due, over = false)
+          }
         }
       }
-    }
-    //  PRM-13: مانده و سابقهٔ امتیازِ وفاداری (`LoyaltyPref` خاموش و بی ردیف ⇒ هیچ)
-    ir.vil3ntec.tohid.ui.components.pos.LoyaltyHistory(d, id, Modifier.padding(top = 8.dp).heightIn(max = 220.dp).verticalScroll(rememberScrollState()), store, ::toast)
-    ir.vil3ntec.tohid.ui.components.pos.LayawayCustomerPanel(d, store, id, ::toast) // POS-27: امانی‌های همین مشتری (`LayawayPref`)
-    CustomerOnlineOrdersPanel(d, id, Modifier.padding(top = 8.dp), onOpen = onOpenOrder) // CRM-07: سفارش‌های اینترنتیِ باز/لغوشده (بخشِ سفارش و اجازهٔ «تماس»)
-    //  CRM-15: بخشِ «چه کسی دید» در پرونده نیست (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۳)؛ ثبتِ دیدنِ بالا همان (فقط «سابقهٔ عملیات»)
-    Spacer(Modifier.height(10.dp))
+      //  PRM-13: مانده و سابقهٔ امتیازِ وفاداری (`LoyaltyPref` خاموش و بی ردیف ⇒ هیچ)
+      ir.vil3ntec.tohid.ui.components.pos.LoyaltyHistory(d, id, Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState()), store, ::toast)
+      ir.vil3ntec.tohid.ui.components.pos.LayawayCustomerPanel(d, store, id, ::toast) // POS-27: امانی‌های همین مشتری (`LayawayPref`)
+      CustomerOnlineOrdersPanel(d, id, Modifier.padding(top = 8.dp), onOpen = onOpenOrder) // CRM-07: سفارش‌های اینترنتیِ باز/لغوشده (بخشِ سفارش و اجازهٔ «تماس»)
+      //  CRM-15: بخشِ «چه کسی دید» در پرونده نیست (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۳)؛ ثبتِ دیدنِ بالا همان (فقط «سابقهٔ عملیات»)
 
-    //  زبانه‌ها
-    val invoices = remember(d, id) { CustomerEngine.invoices(d, id) }
-    val ledger = remember(d, id) { CustomerEngine.ledger(d, id) }
-    val items = remember(d, id) { CustomerEngine.items(d, id) }
-    TabRow(selectedTabIndex = tab.ordinal, containerColor = Shop.colors.surface) {
-      FileTab.values().forEach { t ->
-        val n = when (t) { FileTab.LEDGER -> ledger.size; FileTab.INVOICES -> invoices.size; FileTab.ITEMS -> items.size }
-        Tab(selected = tab == t, onClick = { tab = t }, text = { Text("${t.label} ($n)") })
+      //  زبانه‌ها
+      val invoices = remember(d, id) { CustomerEngine.invoices(d, id) }
+      val ledger = remember(d, id) { CustomerEngine.ledger(d, id) }
+      val items = remember(d, id) { CustomerEngine.items(d, id) }
+      DeskToolbar(
+        end = {
+          DeskButton(ir.vil3ntec.tohid.core.i18n.StrHistory.print, ::print, icon = Icons.Outlined.Print, shortcut = "Ctrl+P")
+          DeskButton(ir.vil3ntec.tohid.core.i18n.StrReports.excel, ::excel, icon = Icons.Outlined.TableChart, shortcut = "Ctrl+E")
+        },
+      ) {
+        DeskSegmented(
+          FileTab.values().map { t ->
+            val n = when (t) { FileTab.LEDGER -> ledger.size; FileTab.INVOICES -> invoices.size; FileTab.ITEMS -> items.size }
+            t to "${t.label} (${plain(n)})"
+          },
+          tab, { tab = it },
+        )
       }
-    }
-    Spacer(Modifier.height(8.dp))
 
-    when (tab) {
-      FileTab.LEDGER -> Row(Modifier.weight(1f)) {
-        val cols = listOf(TCol(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.colRow, 56.dp), TCol(ir.vil3ntec.tohid.core.i18n.StrInvoices.colDate, 110.dp), TCol(ir.vil3ntec.tohid.core.i18n.StrReports.note), TCol(ir.vil3ntec.tohid.core.i18n.StrInvoices.colInvoice, 90.dp), TCol(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.colGive, 130.dp, true), TCol(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.colReceive, 130.dp, true), TCol(ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.vDebtRemaining, 140.dp, true), TCol(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.colDue, 170.dp))
-        Column(Modifier.weight(1f).fillMaxHeight()) {
-          DeskTable(
-            cols, ledger.size, Modifier.weight(1f),
-            empty = ir.vil3ntec.tohid.core.i18n.StrCustomerPages.ledgerEmpty,
-            selected = ledger.indexOfFirst { it.tx.id == pickedTx }.takeIf { it >= 0 },
-            cell = { i, c ->
+      BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+        when (tab) {
+          FileTab.LEDGER -> Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(DeskSpace.x2)) {
+            val cols = buildList {
+              if (wide) add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.colRow, width = 44.dp))
+              add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrInvoices.colDate, width = 96.dp))
+              add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrInvoices.colKind, width = 64.dp))
+              add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrReports.note, weight = 1f))
+              add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrInvoices.colInvoice, width = 72.dp))
+              add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrDesk.colAmount, width = 112.dp, end = true))
+              add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.vDebtRemaining, width = 112.dp, end = true))
+              if (wide) add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.colDue, width = 150.dp))
+            }
+            val sel = ledger.indexOfFirst { it.tx.id == pickedTx }.takeIf { it >= 0 }
+            DeskGrid(
+              cols, ledger.size, Modifier.fillMaxWidth().weight(1f),
+              key = { ledger[it].tx.id },
+              selected = sel,
+              onPick = { pickedTx = ledger[it].tx.id },
+              rowLabel = { i -> ledger[i].let { l -> (if (l.give > 0) ir.vil3ntec.tohid.core.i18n.StrMoney.giveTag else ir.vil3ntec.tohid.core.i18n.StrMoney.receiveTag) + " " + money(if (l.give > 0) l.give else l.receive) } },
+              //  هویتِ دفترِ قرضِ گوشی: ردیفِ «برد» سرخِ کم‌رنگ، «رسید» سبزِ کم‌رنگ
+              wash = { i -> if (ledger[i].give > 0) debt.oweTint else debt.settledTint },
+              footer = buildList {
+                if (wide) add("")
+                add(""); add(""); add(ir.vil3ntec.tohid.core.i18n.StrInvoices.total); add("")
+                add(money(ledger.sumOf { it.give } - ledger.sumOf { it.receive })); add(money(s.balance))
+                if (wide) add(book?.overdueAmount?.takeIf { it.minor > 0 }?.let { ir.vil3ntec.tohid.core.i18n.StrCustomerPages.overdueAmount(DebtBook.show(it)) }.orEmpty())
+              },
+              empty = { V3EmptyState(Icons.AutoMirrored.Outlined.ReceiptLong, ir.vil3ntec.tohid.core.i18n.StrCustomerPages.ledgerEmpty) },
+            ) { i, col ->
               val l = ledger[i]
-              when (c) {
-                0 -> TCell(l.row.toString(), Shop.colors.muted)
-                1 -> TCell(formatDate(l.tx.date))
-                2 -> TCell(l.tx.notes.ifBlank { if (l.give > 0) ir.vil3ntec.tohid.core.i18n.StrMoney.giveTag else ir.vil3ntec.tohid.core.i18n.StrMoney.receiveTag })
-                3 -> TCell(l.invoiceLabel?.let { "#$it" }.orEmpty(), Shop.colors.primary, link = l.saleId != null)
-                4 -> TCell(if (l.give > 0) money(l.give) else "", Shop.colors.danger)
-                5 -> TCell(if (l.receive > 0) money(l.receive) else "", Shop.colors.success)
-                6 -> TCell(money(l.balance), bold = true)
+              val give = l.give > 0
+              val ink = if (give) debt.owe else debt.settled
+              when (cols[col].title) {
+                ir.vil3ntec.tohid.core.i18n.StrCustomerPages.colRow -> DeskCell(plain(l.row), muted = true)
+                ir.vil3ntec.tohid.core.i18n.StrInvoices.colDate -> DeskCell(formatDate(l.tx.date))
+                ir.vil3ntec.tohid.core.i18n.StrInvoices.colKind -> Row(verticalAlignment = Alignment.CenterVertically) {
+                  Icon(if (give) Icons.Outlined.NorthEast else Icons.Outlined.SouthWest, contentDescription = null, tint = ink, modifier = Modifier.size(14.dp))
+                  Spacer(Modifier.width(DeskSpace.x1))
+                  DeskCell(if (give) ir.vil3ntec.tohid.core.i18n.StrMoney.giveTag else ir.vil3ntec.tohid.core.i18n.StrMoney.receiveTag, color = ink, strong = true)
+                }
+                //  نوع در ستونِ خودش است؛ شرحِ خالی «—» ِ کم‌رنگ، نه تکرارِ «برد»/«رسید»
+                ir.vil3ntec.tohid.core.i18n.StrReports.note -> DeskCell(l.tx.notes.ifBlank { "—" }, muted = l.tx.notes.isBlank())
+                ir.vil3ntec.tohid.core.i18n.StrInvoices.colInvoice -> {
+                  val sale = l.saleId?.let { sid -> invoices.find { it.id == sid } }
+                  if (l.invoiceLabel != null && sale != null) DeskLink("#${l.invoiceLabel}", { picked = sale.id; showInvoice = sale })
+                  else DeskCell(l.invoiceLabel?.let { "#$it" }.orEmpty(), muted = true)
+                }
+                ir.vil3ntec.tohid.core.i18n.StrDesk.colAmount -> DeskCell((if (give) "+" else "−") + money(if (give) l.give else l.receive), color = ink, strong = true)
+                ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.vDebtRemaining -> DeskCell(money(l.balance), strong = true)
                 else -> book?.entry(l.tx.id)?.takeIf { it.give && it.amount.minor > 0 }?.let { e ->
                   val due = e.dueDate?.let { formatDate(it) + " · " }.orEmpty()
-                  TCell(
+                  DeskCell(
                     due + if (e.paid) ir.vil3ntec.tohid.core.i18n.StrMoney.settled else ir.vil3ntec.tohid.core.i18n.StrDebtPages.openAmount(DebtBook.show(e.open)),
-                    when { e.overdue -> Shop.colors.danger; e.paid -> Shop.colors.success; else -> Shop.colors.warning },
+                    color = when { e.overdue -> debt.owe; e.paid -> debt.settled; else -> c.inkSecondary },
                   )
-                } ?: TCell("")
+                } ?: DeskCell("")
               }
-            },
-            onClick = { i -> pickedTx = ledger[i].tx.id },
-            footer = listOf("", "", ir.vil3ntec.tohid.core.i18n.StrInvoices.total, "", money(ledger.sumOf { it.give }), money(ledger.sumOf { it.receive }), money(s.balance), book?.overdueAmount?.takeIf { it.minor > 0 }?.let { ir.vil3ntec.tohid.core.i18n.StrCustomerPages.overdueAmount(DebtBook.show(it)) }.orEmpty()),
-          )
-          Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.ledgerNote,
-            style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-        }
-        //  جزئیاتِ ردیفِ انتخاب‌شده — کنارِ جدول، مثلِ اقلامِ فاکتور در زبانهٔ «فاکتورها»
-        val e = pickedTx?.let { book?.entry(it) }
-        if (book != null && e != null) {
-          Spacer(Modifier.width(12.dp))
-          Surface(color = Shop.colors.surface, shape = RoundedCornerShape(8.dp), modifier = Modifier.width(380.dp).fillMaxHeight()) {
-            Column(Modifier.padding(12.dp).verticalScroll(rememberScrollState())) {
-              Text(
-                ir.vil3ntec.tohid.core.i18n.StrCustomerPages.rowDetail(e.row, if (e.give) ir.vil3ntec.tohid.core.i18n.StrMoney.giveTag else ir.vil3ntec.tohid.core.i18n.StrMoney.receiveTag, DebtBook.show(e.amount)),
-                style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text,
-              )
-              Text(formatDate(e.tx.date) + (e.invoiceLabel?.let { ir.vil3ntec.tohid.core.i18n.StrDebtPages.invoiceTail(it) } ?: ""), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-              Spacer(Modifier.height(8.dp))
-              DebtEntryDetail(book, e, maxLines = 40)
-              Spacer(Modifier.height(10.dp))
-              Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Button(onClick = { receiptFor = e.tx.id }) { Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.receiptBtn) }
-                if (e.give) OutlinedButton(onClick = { dueFor = e.tx.id }) { Text(ir.vil3ntec.tohid.core.i18n.StrMoney.due) }
-                e.sale?.let { sale -> OutlinedButton(onClick = { picked = sale.id; tab = FileTab.INVOICES }) { Text(ir.vil3ntec.tohid.core.i18n.StrInvoices.colInvoice) } }
+            }
+            DeskNote(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.ledgerNote, maxLines = 2)
+            //  جزئیاتِ ردیفِ برگزیده — زیرِ جدول (پهنای پنل برای جدول می‌ماند)
+            val e = pickedTx?.let { book?.entry(it) }
+            if (book != null && e != null) {
+              Column(Modifier.fillMaxWidth().heightIn(max = 240.dp).clip(DeskRadius.controlShape).background(c.surfaceAlt).verticalScroll(rememberScrollState()).padding(DeskSpace.x4), verticalArrangement = Arrangement.spacedBy(DeskSpace.x2)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                  Column(Modifier.weight(1f)) {
+                    Text(
+                      ir.vil3ntec.tohid.core.i18n.StrCustomerPages.rowDetail(e.row, if (e.give) ir.vil3ntec.tohid.core.i18n.StrMoney.giveTag else ir.vil3ntec.tohid.core.i18n.StrMoney.receiveTag, DebtBook.show(e.amount)),
+                      style = DeskType.bodyStrong, color = if (e.give) debt.owe else debt.settled,
+                    )
+                    Text(formatDate(e.tx.date) + (e.invoiceLabel?.let { ir.vil3ntec.tohid.core.i18n.StrDebtPages.invoiceTail(it) } ?: ""), style = DeskType.secondary, color = c.inkSecondary)
+                  }
+                  DeskButton(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.receiptBtn, { receiptFor = e.tx.id }, kind = DeskButtonKind.PRIMARY)
+                  if (e.give) { Spacer(Modifier.width(DeskSpace.x2)); DeskButton(ir.vil3ntec.tohid.core.i18n.StrMoney.due, { dueFor = e.tx.id }) }
+                  e.sale?.let { sale -> Spacer(Modifier.width(DeskSpace.x2)); DeskButton(ir.vil3ntec.tohid.core.i18n.StrInvoices.colInvoice, { picked = sale.id; tab = FileTab.INVOICES }) }
+                  Spacer(Modifier.width(DeskSpace.x1))
+                  DeskIconButton(Icons.Outlined.Close, ir.vil3ntec.tohid.core.i18n.Str.close, { pickedTx = null })
+                }
+                DebtEntryDetail(book, e, maxLines = 40)
+              }
+            }
+          }
+
+          FileTab.INVOICES -> { val side = maxWidth >= 1000.dp; Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(DeskSpace.gap)) {
+            //  زبانه باز شد و فاکتوری انتخاب نشده ⇐ تازه‌ترین، تا اقلامش همان‌جا دیده شود
+            LaunchedEffect(invoices) { if (picked == null || invoices.none { it.id == picked }) picked = invoices.firstOrNull()?.id }
+            val counts = remember(d) { d.saleItems.groupingBy { it.saleId }.eachCount() }
+            val cols = buildList {
+              add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrInvoices.colInvoice, width = 80.dp))
+              add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrInvoices.colDate, weight = 1f))
+              if (wide) add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrInvoices.colItems, width = 52.dp, end = true))
+              add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.payable, width = 112.dp, end = true))
+              if (wide) add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrInvoices.colPaid, width = 104.dp, end = true))
+              add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrInvoices.colBalance, width = 104.dp, end = true))
+              add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrInvoices.colKind, width = 72.dp))
+              add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrMoney.status, width = 84.dp))
+            }
+            val live = invoices.filter { it.status != "cancelled" }
+            DeskGrid(
+              cols, invoices.size, Modifier.weight(1f).fillMaxHeight(),
+              key = { invoices[it].id },
+              selected = invoices.indexOfFirst { it.id == picked }.takeIf { it >= 0 },
+              onPick = { picked = invoices[it].id; if (!side) showInvoice = invoices[it] },
+              onOpen = { showInvoice = invoices[it] },
+              rowLabel = { "#${invoices[it].invoiceLabel() ?: "—"}" },
+              footer = buildList {
+                add(ir.vil3ntec.tohid.core.i18n.StrInvoices.total); add("")
+                if (wide) add("")
+                add(money(s.bought))
+                if (wide) add(money(live.sumOf { it.paidAmount }))
+                add(money(live.sumOf { it.remaining })); add(""); add("")
+              },
+              empty = { V3EmptyState(Icons.AutoMirrored.Outlined.ReceiptLong, ir.vil3ntec.tohid.core.i18n.StrCustomerPages.invoicesEmpty) },
+            ) { i, col ->
+              val v = invoices[i]
+              val off = v.status == "cancelled"
+              when (cols[col].title) {
+                ir.vil3ntec.tohid.core.i18n.StrInvoices.colInvoice -> DeskCell("#${v.invoiceLabel() ?: "—"}", muted = off)
+                ir.vil3ntec.tohid.core.i18n.StrInvoices.colDate -> DeskCell(formatDate(v.date), muted = true)
+                ir.vil3ntec.tohid.core.i18n.StrInvoices.colItems -> DeskCell(plain(counts[v.id] ?: 0), muted = true)
+                ir.vil3ntec.tohid.core.i18n.StrCustomerPages.payable -> DeskCell(money(v.finalTotal), strong = !off, muted = off)
+                ir.vil3ntec.tohid.core.i18n.StrInvoices.colPaid -> DeskCell(money(v.paidAmount), muted = true)
+                ir.vil3ntec.tohid.core.i18n.StrInvoices.colBalance -> DeskCell(if (v.remaining > 0.5) money(v.remaining) else "", color = debt.owe)
+                ir.vil3ntec.tohid.core.i18n.StrInvoices.colKind -> DeskCell(ir.vil3ntec.tohid.data.PayFlow.payLabel(v), muted = true)
+                //  CRM-07: فاکتورِ سفارشِ اینترنتیِ تحویل‌شده نشانِ «اینترنتی» دارد
+                else -> DeskCell(when { off -> ir.vil3ntec.tohid.core.i18n.StrSale.cancelled; v.isOnlineOrder() -> StrDebtor.online; else -> ir.vil3ntec.tohid.core.i18n.StrInvoices.recorded }, muted = true)
+              }
+            }
+            //  اقلامِ فاکتورِ انتخاب‌شده — کنارِ جدول وقتی جا هست؛ وگرنه زدنِ ردیف خودِ فاکتور را باز می‌کند
+            if (side) invoices.find { it.id == picked }?.let { sale ->
+              InvoicePeek(d, sale, Modifier.width(360.dp).fillMaxHeight()) { showInvoice = sale }
+            }
+          } }
+
+          FileTab.ITEMS -> {
+            val cols = buildList {
+              add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrInvoices.colDate, width = 96.dp))
+              add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrInvoices.colInvoice, width = 72.dp))
+              add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrMoney.item, weight = 1f))
+              add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrSale.qty, width = 60.dp, end = true))
+              if (wide) add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrOnline.unitPrice, width = 104.dp, end = true))
+              add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrInvoices.total, width = 112.dp, end = true))
+              add(DeskColumn(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.colReturned, width = 68.dp, end = true))
+            }
+            DeskGrid(
+              cols, items.size, Modifier.fillMaxSize(),
+              onPick = { i -> picked = items[i].saleId; tab = FileTab.INVOICES },
+              rowLabel = { items[it].name },
+              footer = buildList { add(""); add(""); add(ir.vil3ntec.tohid.core.i18n.StrInvoices.total); add(""); if (wide) add(""); add(money(items.sumOf { it.total })); add("") },
+              empty = { V3EmptyState(Icons.AutoMirrored.Outlined.ReceiptLong, ir.vil3ntec.tohid.core.i18n.StrCustomerPages.itemsEmpty) },
+            ) { i, col ->
+              val l = items[i]
+              when (cols[col].title) {
+                ir.vil3ntec.tohid.core.i18n.StrInvoices.colDate -> DeskCell(formatDate(l.date), muted = true)
+                ir.vil3ntec.tohid.core.i18n.StrInvoices.colInvoice -> DeskCell("#${l.invoiceLabel ?: "—"}", muted = true)
+                ir.vil3ntec.tohid.core.i18n.StrMoney.item -> DeskCell(l.name)
+                ir.vil3ntec.tohid.core.i18n.StrSale.qty -> DeskCell(qty(l.quantity))
+                ir.vil3ntec.tohid.core.i18n.StrOnline.unitPrice -> DeskCell(money(l.unitPrice), muted = true)
+                ir.vil3ntec.tohid.core.i18n.StrInvoices.total -> DeskCell(money(l.total), strong = true)
+                else -> DeskCell(if (l.returned > 0) qty(l.returned) else "", color = debt.owe)
               }
             }
           }
         }
       }
-
-      FileTab.INVOICES -> Row(Modifier.weight(1f)) {
-        //  زبانه باز شد و فاکتوری انتخاب نشده ⇐ تازه‌ترین، تا اقلامش همان‌جا دیده شود
-        LaunchedEffect(invoices) { if (picked == null || invoices.none { it.id == picked }) picked = invoices.firstOrNull()?.id }
-        val counts = remember(d) { d.saleItems.groupingBy { it.saleId }.eachCount() }
-        val cols = listOf(TCol(ir.vil3ntec.tohid.core.i18n.StrInvoices.colInvoice, 80.dp), TCol(ir.vil3ntec.tohid.core.i18n.StrInvoices.colDate, 110.dp), TCol(ir.vil3ntec.tohid.core.i18n.StrInvoices.colItems, 60.dp, true), TCol(ir.vil3ntec.tohid.core.i18n.StrInvoices.total, 0.dp, true), TCol(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.payable, 0.dp, true), TCol(ir.vil3ntec.tohid.core.i18n.StrInvoices.colPaid, 0.dp, true), TCol(ir.vil3ntec.tohid.core.i18n.StrInvoices.colBalance, 0.dp, true), TCol(ir.vil3ntec.tohid.core.i18n.StrInvoices.colKind, 70.dp), TCol(ir.vil3ntec.tohid.core.i18n.StrMoney.status, 80.dp))
-        Column(Modifier.weight(1f).fillMaxHeight()) {
-          DeskTable(
-            cols, invoices.size, Modifier.weight(1f),
-            empty = ir.vil3ntec.tohid.core.i18n.StrCustomerPages.invoicesEmpty,
-            selected = invoices.indexOfFirst { it.id == picked }.takeIf { it >= 0 },
-            cell = { i, c ->
-              val v = invoices[i]
-              val off = v.status == "cancelled"
-              when (c) {
-                0 -> TCell("#${v.invoiceLabel() ?: "—"}", Shop.colors.primary, bold = true)
-                1 -> TCell(formatDate(v.date))
-                2 -> TCell((counts[v.id] ?: 0).toString())
-                3 -> TCell(money(v.total), if (off) Shop.colors.muted else Shop.colors.text)
-                4 -> TCell(money(v.finalTotal), if (off) Shop.colors.muted else Shop.colors.text, bold = true)
-                5 -> TCell(money(v.paidAmount), Shop.colors.success)
-                6 -> TCell(if (v.remaining > 0.5) money(v.remaining) else "", Shop.colors.danger)
-                7 -> TCell(ir.vil3ntec.tohid.data.PayFlow.payLabel(v))
-                //  CRM-07: فاکتورِ سفارشِ اینترنتیِ تحویل‌شده نشانِ «اینترنتی» دارد
-                else -> TCell(
-                  when { off -> ir.vil3ntec.tohid.core.i18n.StrSale.cancelled; v.isOnlineOrder() -> StrDebtor.online; else -> ir.vil3ntec.tohid.core.i18n.StrInvoices.recorded },
-                  when { off -> Shop.colors.danger; v.isOnlineOrder() -> Shop.colors.primary; else -> Shop.colors.success },
-                )
-              }
-            },
-            onClick = { i -> picked = invoices[i].id },
-            footer = listOf(ir.vil3ntec.tohid.core.i18n.StrInvoices.total, "", "", money(invoices.filter { it.status != "cancelled" }.sumOf { it.total }),
-              money(s.bought), money(invoices.filter { it.status != "cancelled" }.sumOf { it.paidAmount }),
-              money(invoices.filter { it.status != "cancelled" }.sumOf { it.remaining }), "", ""),
-          )
-        }
-        //  اقلامِ فاکتورِ انتخاب‌شده — کنارِ جدول
-        invoices.find { it.id == picked }?.let { sale ->
-          Spacer(Modifier.width(12.dp))
-          InvoicePeek(d, sale, Modifier.width(380.dp).fillMaxHeight()) { showInvoice = sale }
-        }
-      }
-
-      FileTab.ITEMS -> {
-        val cols = listOf(TCol(ir.vil3ntec.tohid.core.i18n.StrInvoices.colDate, 110.dp), TCol(ir.vil3ntec.tohid.core.i18n.StrInvoices.colInvoice, 80.dp), TCol(ir.vil3ntec.tohid.core.i18n.StrMoney.item), TCol(ir.vil3ntec.tohid.core.i18n.StrSale.qty, 80.dp, true), TCol(ir.vil3ntec.tohid.core.i18n.StrOnline.unitPrice, 120.dp, true), TCol(ir.vil3ntec.tohid.core.i18n.StrInvoices.total, 130.dp, true), TCol(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.colReturned, 80.dp, true))
-        DeskTable(
-          cols, items.size, Modifier.weight(1f),
-          empty = ir.vil3ntec.tohid.core.i18n.StrCustomerPages.itemsEmpty,
-          cell = { i, c ->
-            val l = items[i]
-            when (c) {
-              0 -> TCell(formatDate(l.date))
-              1 -> TCell("#${l.invoiceLabel ?: "—"}", Shop.colors.primary, link = true)
-              2 -> TCell(l.name)
-              3 -> TCell(qty(l.quantity))
-              4 -> TCell(money(l.unitPrice))
-              5 -> TCell(money(l.total), bold = true)
-              else -> TCell(if (l.returned > 0) qty(l.returned) else "", Shop.colors.danger)
-            }
-          },
-          onClick = { i -> picked = items[i].saleId; tab = FileTab.INVOICES },
-          footer = listOf("", "", ir.vil3ntec.tohid.core.i18n.StrInvoices.total, "", "", money(items.sumOf { it.total }), ""),
-        )
-      }
+    }
     }
   }
 
@@ -650,166 +757,45 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
   }
 }
 
+/** عددِ آرامِ پرونده: برچسب و مقدار روی سطحِ دوم */
+@Composable
+private fun MiniStat(label: String, value: String, modifier: Modifier) {
+  val c = Desk.colors
+  Column(modifier.fillMaxHeight().clip(DeskRadius.cardShape).background(c.surfaceAlt).padding(horizontal = DeskSpace.x4, vertical = DeskSpace.x4)) {
+    Text(label, style = DeskType.label, color = c.inkSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Spacer(Modifier.height(DeskSpace.x2))
+    Text(value, style = DeskType.kpiSmall.copy(fontSize = DeskType.sectionTitle.fontSize), color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+  }
+}
+
 private fun qty(v: Double) = if (v == Math.floor(v)) v.toLong().toString() else v.toString()
 
-/** اقلامِ یک فاکتور کنارِ جدول، با دکمهٔ «نمایش و چاپ» که فاکتور را جدا باز می‌کند */
 @Composable
-internal fun InvoicePeek(d: ShopData, sale: Sale, modifier: Modifier, onShow: () -> Unit) {
-  val lines = remember(d, sale.id) { d.saleItems.filter { it.saleId == sale.id } }
-  Column(
-    modifier
-      .softCard(Shop.colors, Shape.card)
-      .padding(14.dp),
-  ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      Icon(Icons.Filled.ReceiptLong, null, tint = Shop.colors.primary)
-      Spacer(Modifier.width(8.dp))
-      Column(Modifier.weight(1f)) {
-        Text(ir.vil3ntec.tohid.core.i18n.StrDebtPages.invoiceNo(sale.invoiceLabel() ?: "—"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
-        Text(listOf(formatDate(sale.date), sale.seller.takeIf { it.isNotBlank() }?.let { ir.vil3ntec.tohid.core.i18n.StrCustomerPages.sellerIs(it) }).filterNotNull().joinToString(" · "),
-          style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-      }
-    }
-    Spacer(Modifier.height(10.dp))
-    HeadRow(listOf(ir.vil3ntec.tohid.core.i18n.StrMoney.item to 0.dp, ir.vil3ntec.tohid.core.i18n.StrSale.qty to 56.dp, ir.vil3ntec.tohid.core.i18n.StrInvoices.total to 100.dp))
-    LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-      itemsIndexed(lines, key = { _, l -> l.id }) { i, l ->
-        Row(
-          Modifier.fillMaxWidth().background(if (i % 2 == 1) Shop.colors.surface2 else Shop.colors.surface).padding(horizontal = 8.dp, vertical = 6.dp),
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Column(Modifier.weight(1f)) {
-            Text(SalesEngine.itemName(d, l), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
-            Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.unitPriceIs(money(l.unitPrice)) + if (l.returnedQty > 0) ir.vil3ntec.tohid.core.i18n.StrCustomerPages.returnedQty(qty(l.returnedQty)) else "", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-          }
-          Text(qty(l.quantity), Modifier.width(56.dp), textAlign = TextAlign.End, style = MaterialTheme.typography.bodyMedium)
-          Text(money(l.totalPrice), Modifier.width(100.dp), textAlign = TextAlign.End, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-        }
-      }
-    }
-    Spacer(Modifier.height(8.dp))
-    @Composable fun line(k: String, v: String, c: Color = Shop.colors.text, b: Boolean = false) =
-      Row { Text(k, Modifier.weight(1f), color = Shop.colors.muted, style = MaterialTheme.typography.bodySmall); Text(v, color = c, fontWeight = if (b) FontWeight.Bold else null) }
-    line(ir.vil3ntec.tohid.core.i18n.StrInvoices.total, money(sale.total))
-    if (sale.discount > 0) line(ir.vil3ntec.tohid.core.i18n.Str.discount, money(sale.discount), Shop.colors.success)
-    line(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.payable, "${money(sale.finalTotal)} ؋", b = true)
-    line(ir.vil3ntec.tohid.core.i18n.StrInvoices.colPaid, money(sale.paidAmount), Shop.colors.success)
-    if (sale.remaining > 0.5) line(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.remainingOnAccount, money(sale.remaining), Shop.colors.danger, true)
-    if (sale.status == "cancelled") Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.cancelledWhy(sale.cancelReason.ifBlank { ir.vil3ntec.tohid.core.i18n.StrShrink.noReason }), color = Shop.colors.danger, style = MaterialTheme.typography.labelMedium)
-    Spacer(Modifier.height(10.dp))
-    Button(onClick = onShow, modifier = Modifier.fillMaxWidth()) { Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.showPrint) }
-  }
-}
-
-/* ══════════════════════════ جدولِ اکسلی ══════════════════════════ */
-
-/** ستون — پهنای ۰ یعنی «باقی‌مانده»؛ `end` ⇒ عدد، راست‌چینِ انتها */
-internal data class TCol(val title: String, val width: Dp = 0.dp, val end: Boolean = false)
-internal data class TCell(val text: String, val color: Color? = null, val bold: Boolean = false, val link: Boolean = false)
-
-/**
- *  جدولِ مدیریت: سرستون، ردیف‌های یکی‌درمیان، ردیفِ جمع در پایین. کلیک روی ردیف ⇐ `onClick`.
- *
- *  نسخهٔ ۲ (نقدِ ۱۴۰۵/۰۷/۲۷: «همه‌جا خطِ تیره»): خطِ عمودی و افقیِ خانه‌ها برداشته
- *  شد؛ ردیف‌ها را زمینهٔ یکی‌درمیان و ارتفاعِ راحت جدا می‌کند و کلِ جدول یک کارتِ نرم است.
- */
-@Composable
-internal fun DeskTable(
-  cols: List<TCol>,
-  count: Int,
-  modifier: Modifier,
-  empty: String,
-  cell: @Composable (Int, Int) -> TCell,
-  onClick: (Int) -> Unit = {},
-  footer: List<String>? = null,
-  selected: Int? = null,
-) {
-  @Composable fun RowScope.box(c: TCol, content: @Composable () -> Unit) {
-    Box(
-      (if (c.width == 0.dp) Modifier.weight(1f) else Modifier.width(c.width))
-        .fillMaxHeight()
-        .padding(horizontal = 12.dp, vertical = 9.dp),
-      contentAlignment = if (c.end) Alignment.CenterEnd else Alignment.CenterStart,
-    ) { content() }
-  }
-  Column(modifier.fillMaxWidth().softCard(Shop.colors, Shape.card)) {
-    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(Shop.colors.surface2)) {
-      cols.forEach { c -> box(c) { Text(c.title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = Shop.colors.muted, maxLines = 1) } }
-    }
-    LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-      if (count == 0) item {
-        Text(empty, Modifier.fillMaxWidth().padding(28.dp), color = Shop.colors.muted, textAlign = TextAlign.Center)
-      }
-      items(count) { i ->
-        val bg = when {
-          i == selected -> Shop.colors.primaryTint
-          i % 2 == 1 -> Shop.colors.surface2
-          else -> Shop.colors.surface
-        }
-        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(bg).clickable { onClick(i) }) {
-          cols.forEachIndexed { ci, c ->
-            val v = cell(i, ci)
-            box(c) {
-              //  ستونِ اصلی (پهنای ۰ = باقیِ جا، معمولاً نام) تا دو خط می‌شکند، بریده نمی‌شود
-              Text(
-                v.text, maxLines = if (c.width == 0.dp) 2 else 1, overflow = TextOverflow.Ellipsis,
-                style = if (c.end) MaterialTheme.typography.bodyMedium.tabular() else MaterialTheme.typography.bodyMedium,
-                fontWeight = if (v.bold) FontWeight.SemiBold else null,
-                color = v.color ?: Shop.colors.text,
-                textDecoration = if (v.link) androidx.compose.ui.text.style.TextDecoration.Underline else null,
-              )
-            }
-          }
-        }
-      }
-    }
-    footer?.let { f ->
-      Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(Shop.colors.surface2)) {
-        cols.forEachIndexed { ci, c -> box(c) { Text(f.getOrElse(ci) { "" }, style = MaterialTheme.typography.bodyMedium.tabular(), fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1) } }
-      }
-    }
-  }
-}
-
-@Composable
-internal fun HeadRow(cols: List<Pair<String, Dp>>) {
-  Row(
-    Modifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)).background(Shop.colors.surface2).padding(horizontal = 8.dp, vertical = 7.dp),
-  ) {
-    cols.forEachIndexed { i, (t, w) ->
-      Text(
-        t, if (w == 0.dp) Modifier.weight(1f) else Modifier.width(w),
-        style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted,
-        textAlign = if (i > 0 && w != 0.dp) TextAlign.End else TextAlign.Start,
-      )
-    }
-  }
-}
-
-@Composable
-private fun NewCustomerRow(store: ShopStore, d: ShopData, toast: (String) -> Unit, onAdded: (String) -> Unit) {
+private fun NewCustomerRow(store: ShopStore, d: ShopData, toast: (String) -> Unit, onCancel: () -> Unit, onAdded: (String) -> Unit) {
   val scope = rememberCoroutineScope(); val limitRules = ir.vil3ntec.tohid.ui.components.rememberCreditLimitRules() // CRM-03 #۲۵
   var name by remember { mutableStateOf("") }
   var phone by remember { mutableStateOf("") }
+  val focus = remember { FocusRequester() }
+  LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
   fun save() {
+    if (name.isBlank()) return
     when (val r = DebtorEngine.add(d, ir.vil3ntec.tohid.data.CreditLimitGate.quickDraft(limitRules, DebtorEngine.DebtorDraft(name = name, phone = phone)), System.currentTimeMillis(), ::newId)) {
       is DebtorEngine.Result.Failed -> toast(r.message)
       is DebtorEngine.Result.Ok -> { scope.launch { store.save(d, r.data) }; onAdded(r.id); name = ""; phone = "" }
     }
   }
-  val enter = Modifier.onPreviewKeyEvent { e ->
-    if (e.type == KeyEventType.KeyDown && (e.key == Key.Enter || e.key == Key.NumPadEnter)) { save(); true } else false
-  }
-  Row(verticalAlignment = Alignment.CenterVertically) {
-    OutlinedTextField(name, { name = it }, label = { Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.newCustomerName) }, singleLine = true, modifier = Modifier.width(280.dp).then(enter))
-    Spacer(Modifier.width(6.dp))
-    OutlinedTextField(phone, { phone = it }, label = { Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.phone) }, singleLine = true, modifier = Modifier.width(170.dp).then(enter))
-    Spacer(Modifier.width(6.dp))
-    Button(onClick = ::save, enabled = name.isNotBlank()) { Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.addKey) }
+  val c = Desk.colors
+  Column(Modifier.fillMaxWidth().clip(DeskRadius.cardShape).background(c.surface).border(DeskSize.hairline, c.hairline, DeskRadius.cardShape).padding(DeskSpace.x3), verticalArrangement = Arrangement.spacedBy(DeskSpace.x2)) {
+    DeskTextField(name, { name = it }, ir.vil3ntec.tohid.core.i18n.StrCustomerPages.newCustomerName, Modifier.fillMaxWidth(), focus, onEnter = ::save, onEscape = onCancel)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DeskSpace.x2)) {
+      DeskTextField(phone, { phone = it }, ir.vil3ntec.tohid.core.i18n.StrCustomerPages.phone, Modifier.weight(1f), onEnter = ::save, onEscape = onCancel)
+      DeskButton(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.addKey, ::save, kind = DeskButtonKind.PRIMARY, enabled = name.isNotBlank())
+      DeskButton(ir.vil3ntec.tohid.core.i18n.Str.cancel, onCancel, kind = DeskButtonKind.GHOST, shortcut = "Esc")
+    }
   }
 }
 
-/** ردیفِ ثبتِ دریافت/قرض — مبلغ، شرح، Enter */
+/** ردیفِ ثبتِ دریافت/قرض — مبلغ، شرح، Enter؛ سبزِ «رسید» یا سرخِ «برد» (همان معنای دفتر) */
 @Composable
 private fun EntryRow(kind: DebtorEngine.Kind, onCancel: () -> Unit, onSave: (Double, String, String?) -> Unit) {
   var amount by remember { mutableStateOf("") }
@@ -821,36 +807,27 @@ private fun EntryRow(kind: DebtorEngine.Kind, onCancel: () -> Unit, onSave: (Dou
   val focus = remember { FocusRequester() }
   LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
   fun go() { if (!dueBroken) amount.toDoubleOrNull()?.let { onSave(it, notes.trim(), due) } }
-  val keys = Modifier.onPreviewKeyEvent { e ->
-    if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-    when (e.key) {
-      Key.Enter, Key.NumPadEnter -> { go(); true }
-      Key.Escape -> { onCancel(); true }
-      else -> false
-    }
-  }
   val receive = kind == DebtorEngine.Kind.RECEIVE
-  Surface(
-    color = (if (receive) Shop.colors.success else Shop.colors.danger).copy(alpha = 0.08f),
-    shape = RoundedCornerShape(8.dp),
+  val debt = PhoneV3Debt.colors
+  val ink = if (receive) debt.settled else debt.owe
+  val c = Desk.colors
+  Row(
+    Modifier.fillMaxWidth().clip(DeskRadius.controlShape).background(if (receive) debt.settledTint else debt.oweTint)
+      .border(DeskSize.hairline, ink, DeskRadius.controlShape).padding(DeskSpace.x2),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(DeskSpace.x2),
   ) {
-    Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-      Text(if (receive) ir.vil3ntec.tohid.core.i18n.StrCustomerPages.receivePayment else ir.vil3ntec.tohid.core.i18n.StrCustomerPages.manualCredit, style = MaterialTheme.typography.labelLarge, color = Shop.colors.text)
-      Spacer(Modifier.width(8.dp))
-      OutlinedTextField(amount, { amount = ir.vil3ntec.tohid.numericInput(it) }, label = { Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.amountAfn) }, singleLine = true, modifier = Modifier.width(160.dp).focusRequester(focus).then(keys))
-      Spacer(Modifier.width(6.dp))
-      OutlinedTextField(notes, { notes = it }, label = { Text(ir.vil3ntec.tohid.core.i18n.StrReports.note) }, singleLine = true, modifier = Modifier.weight(1f).then(keys))
-      if (!receive) {
-        Spacer(Modifier.width(6.dp))
-        OutlinedTextField(
-          dueText, { dueText = ir.vil3ntec.tohid.latinDigits(it).filter { c -> c.isDigit() || c == '/' || c == '-' } },
-          label = { Text(ir.vil3ntec.tohid.core.i18n.StrMoney.dueField) }, placeholder = { Text("۱۴۰۵/۰۸/۰۱") },
-          singleLine = true, isError = dueBroken, modifier = Modifier.width(170.dp).then(keys),
-        )
-      }
-      Spacer(Modifier.width(6.dp))
-      Button(onClick = ::go, enabled = (amount.toDoubleOrNull() ?: 0.0) > 0 && !dueBroken) { Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.saveKey) }
-      TextButton(onClick = onCancel) { Text("Esc") }
+    Icon(if (receive) Icons.Outlined.SouthWest else Icons.Outlined.NorthEast, contentDescription = null, tint = ink, modifier = Modifier.size(18.dp))
+    Text(if (receive) ir.vil3ntec.tohid.core.i18n.StrCustomerPages.receivePayment else ir.vil3ntec.tohid.core.i18n.StrCustomerPages.manualCredit, style = DeskType.bodyStrong, color = c.ink, maxLines = 1)
+    DeskTextField(amount, { amount = ir.vil3ntec.tohid.numericInput(it) }, ir.vil3ntec.tohid.core.i18n.StrCustomerPages.amountAfn, Modifier.width(150.dp), focus, onEnter = ::go, onEscape = onCancel)
+    DeskTextField(notes, { notes = it }, ir.vil3ntec.tohid.core.i18n.StrReports.note, Modifier.weight(1f), onEnter = ::go, onEscape = onCancel)
+    if (!receive) {
+      DeskTextField(
+        dueText, { dueText = ir.vil3ntec.tohid.latinDigits(it).filter { ch -> ch.isDigit() || ch == '/' || ch == '-' } },
+        ir.vil3ntec.tohid.core.i18n.StrMoney.dueField + " ۱۴۰۵/۰۸/۰۱", Modifier.width(170.dp), isError = dueBroken, onEnter = ::go, onEscape = onCancel,
+      )
     }
+    DeskButton(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.saveKey, ::go, kind = DeskButtonKind.PRIMARY, enabled = (amount.toDoubleOrNull() ?: 0.0) > 0 && !dueBroken)
+    DeskButton(ir.vil3ntec.tohid.core.i18n.Str.cancel, onCancel, kind = DeskButtonKind.GHOST, shortcut = "Esc")
   }
 }
