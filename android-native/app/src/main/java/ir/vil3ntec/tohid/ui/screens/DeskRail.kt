@@ -70,7 +70,14 @@ fun DeskRail(
   onMode: (String) -> Unit = {},
   /** شمارِ کنارِ هر بخش (کم‌موجودی کنارِ کالاها، قرضِ دیرکرده کنارِ قرض‌داران) */
   badges: Map<String, Int> = emptyMap(),
+  /** مسیرِ کاملِ صفحهٔ باز — فقط منوی کامپیوتر (`DeskSidebar`) */
+  path: String = "",
 ) {
+  //  کامپیوتر (ویندوز/مک/لینوکس): منوی گروه‌بندی‌شدهٔ تازه با رنگِ هر بخش (`ui/desk`، e-desk-d1). تبلتِ اندروید همین ستونِ پیشین
+  if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
+    ir.vil3ntec.tohid.ui.desk.DeskSidebar(current, onPick, compact, mode, onMode, badges, path)
+    return
+  }
   val context = LocalContext.current
   val canAdmin = ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)
   //  نامِ پرچم و «پیام به پشتیبانی» ِ برگهٔ بخشِ خاموش فقط برای صاحبِ دکان

@@ -97,7 +97,7 @@ object DeskSize {
   /** پهنای بیشترِ محتوای داشبورد روی مانیتورِ خیلی پهن */
   val contentMax = 1600.dp
   /** ستونِ دسته‌های تنظیمات و پهنای بیشترِ صفحهٔ بخش */
-  val settingsList = 280.dp
+  val settingsList = 300.dp
   val settingsContentMax = 760.dp
   val hairline = 1.dp
   val focusRing = 2.dp
@@ -200,6 +200,8 @@ data class DeskColors(
   val grid: Color,
   val isDark: Boolean,
   val source: ShopColors,
+  /** نشانِ کوچکِ «کاری مانده» (نقطهٔ نسیه، قرضِ دیرکرده) — غیرِ متنی، ≥ ۳:۱ روی کارت */
+  val attention: Color = source.message.warning.icon,
 ) {
   companion object {
     fun from(s: ShopColors): DeskColors = DeskColors(
@@ -286,14 +288,13 @@ object DeskHues {
   private val ALIAS = mapOf(
     "dashboard" to "home",
     "fulfil" to "orders",
-    "app" to "whats-new",
   )
 
   /** رنگِ یک بخش (شناسهٔ ماژول/منو) یا یک دسته/بخشِ تنظیمات */
   fun of(section: String): V3Hue {
     val id = section.removePrefix("off:").removePrefix("settings:")
     if (id == "settings") return SettingsHues.ROOT
-    if (id == "app") return V3Hue.BLUE // همان ردیفِ «نسخه و به‌روزرسانی» ِ «بیشتر» (`MoreLayout.appItem`)
+    if (id == "app") return ir.vil3ntec.tohid.ui.screens.MoreLayout.APP_HUE // همان ردیفِ «نسخه و به‌روزرسانی» ِ «بیشتر»
     V3Modules.hueOf(ALIAS[id] ?: id)?.let { return it }
     if (SettingsLayout.groupOf(id) != null || SettingsHues.GROUP.containsKey(id) || SettingsHues.PART.containsKey(id)) return SettingsHues.of(id)
     return V3Hue.BRAND
