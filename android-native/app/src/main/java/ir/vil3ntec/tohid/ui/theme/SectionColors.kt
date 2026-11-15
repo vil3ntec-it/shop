@@ -92,11 +92,17 @@ object SectionColors {
   }
 
   /**
-   *  ترتیبِ رنگ‌های همراهِ تم (`ShopColors.accents`، `ThemeAccents`) و سری‌های نمودار: ۰ لاجوردی، ۱ نیلی، ۲ عقیق، ۳ زر،
-   *  ۴ زمرد، ۵ گرافیت، ۶ نفتی — همان جاهای پیشینِ «آسمانی، بنفش، مرجانی، کهربایی، نعنایی، صورتی، لیمویی» تا میان‌برهای خانه
-   *  (`HomeAccents`) بی دست خوردن رنگِ تازه بگیرند.
+   *  ترتیبِ رنگ‌های همراهِ تم (`ShopColors.accents`، `ThemeAccents`): ۰ لاجوردی، ۱ نیلی، ۲ نفتی، ۳ زر، ۴ زمرد، ۵ گرافیت،
+   *  ۶ عقیق — همان جاهای پیشینِ «آسمانی، بنفش، مرجانی، کهربایی، نعنایی، صورتی، لیمویی» تا میان‌برهای خانه (`HomeAccents`) بی دست
+   *  خوردن رنگِ تازه بگیرند: «دریافت» زمردی، «ورودِ کالا» زر، «تاریخچه» نیلی و «سفارش‌های آنلاین» (جای ۲) نفتی — همان رنگِ بخشِ
+   *  سفارش؛ نه عقیق، که کاشیِ کم‌رنگِ «خاموش» را صورتی‌نما می‌کرد. عقیقِ خطر جای ۶ (لیموییِ پیشین، بی کاربرد در خانه). جاهای ۰ و ۵
+   *  ِ `ShopColors.accents` دو درخششِ کادرِ گرادیانیِ خانه‌اند و از این جدول جدا (`ThemeAccents.HERO_GLOW_*`).
+   *  سری‌های نمودار ترتیبِ معناییِ خودشان را دارند (`ThemeAccents.chart`).
    */
-  val ORDER: List<Hue> = listOf(Hue.SKY, Hue.VIOLET, Hue.CORAL, Hue.AMBER, Hue.MINT, Hue.SLATE, Hue.TEAL)
+  val ORDER: List<Hue> = listOf(Hue.SKY, Hue.VIOLET, Hue.TEAL, Hue.AMBER, Hue.MINT, Hue.SLATE, Hue.CORAL)
+
+  /** سری‌های نمودار (§۱۰) به ترتیبِ معنا: فروش، مقایسه، هزینه (عقیق)، تخفیف، افت، موجودی، خنثی */
+  val CHART: List<Hue> = listOf(Hue.SKY, Hue.VIOLET, Hue.CORAL, Hue.AMBER, Hue.MINT, Hue.SLATE, Hue.TEAL)
 
   /** روز: تهِ‌رنگِ بسیار روشن، مرزِ نرم، عددِ پررنگِ همان خانواده و نشانهٔ کاشی (روی سفید ≥ ۳:۱) */
   val DAY: Map<Hue, SectionTone> = mapOf(

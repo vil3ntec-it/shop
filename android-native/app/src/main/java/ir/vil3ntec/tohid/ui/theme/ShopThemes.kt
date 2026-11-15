@@ -31,18 +31,30 @@ import androidx.compose.ui.graphics.Color
  */
 
 /**
- *  هفت رنگِ همراه — نشانهٔ کاشی‌ها و سری‌های نمودار، به ترتیبِ `SectionColors.ORDER`: لاجوردی، نیلی، عقیق، زر، زمرد،
- *  گرافیت، نفتی (۶۸c — پالتِ لوکسِ برند؛ صورتی و لیمویی دیگر نیستند). هیچ HEX ِ خودش ندارد: همان `SectionTone.glyph` ِ هر
- *  خانواده، روز ([DAY]، روی سفید ≥ ۳:۱) و شب ([NIGHT]، روی کارتِ شب ≥ ۶:۱).
+ *  هفت رنگِ همراهِ تم (`ShopColors.accents`) به ترتیبِ `SectionColors.ORDER` — همان جاهایی که پرونده‌های قفل‌شدهٔ خانه می‌خوانند
+ *  (۶۸c، پالتِ لوکسِ برند؛ صورتی و لیمویی دیگر نیستند):
+ *   • جاهای ۱ تا ۴ و ۶ نشانهٔ همان خانواده‌اند (`SectionTone.glyph`، روز روی سفید ≥ ۳:۱، شب روی کارتِ شب ≥ ۶:۱): میان‌برهای خانه
+ *     (`HomeAccents`: تاریخچه نیلی، سفارش‌ها نفتی، ورودِ کالا زر، دریافت زمردی) همان رنگِ بخش‌ها؛
+ *   • جاهای ۰ و ۵ فقط دو درخششِ نرمِ کادرِ گرادیانیِ خانه‌اند (`V3HeroCard`، ۱۸٪) و از جدولِ بخش‌ها **جدا**: بالا همان آسمانیِ پیشین
+ *     ([HERO_GLOW_TOP])، پایین بنفشِ نرمِ برند ([HERO_GLOW_BOTTOM]) به‌جای صورتیِ پیشین — گرادیان و ظاهرِ کادر همان.
+ *  نشانهٔ کاشی‌ها (`PhoneV3Palette.glyph`) مستقیم از `SectionColors` می‌خواند، نه از این فهرست. سری‌های نمودار: [chart].
  */
 object ThemeAccents {
-  val DAY: List<Color> = SectionColors.ORDER.map { SectionColors.glyph(it, dark = false) }
-  val NIGHT: List<Color> = SectionColors.ORDER.map { SectionColors.glyph(it, dark = true) }
+  /** درخششِ بالای کادرِ گرادیانیِ خانه — همان آسمانیِ پیش از ۶۸c */
+  val HERO_GLOW_TOP = Color(0xFF0EA5E9)
+  /** درخششِ پایینِ همان کادر — بنفشِ نرمِ برند، جای صورتیِ پیشین (#EC4899) */
+  val HERO_GLOW_BOTTOM = Color(0xFF8B5CF6)
+
+  private fun of(dark: Boolean): List<Color> =
+    SectionColors.ORDER.map { SectionColors.glyph(it, dark) }.toMutableList().also { it[0] = HERO_GLOW_TOP; it[5] = HERO_GLOW_BOTTOM }
+
+  val DAY: List<Color> = of(dark = false)
+  val NIGHT: List<Color> = of(dark = true)
   /** پیش‌فرضِ `ShopColors.accents` (روز) */
   val ALL: List<Color> get() = DAY
 
-  /** سری‌های نمودار (§۱۰) همان رنگ‌های همراه به همان ترتیب */
-  fun chart(dark: Boolean, grid: Color): ChartColors = (if (dark) NIGHT else DAY).let { a ->
+  /** سری‌های نمودار (§۱۰): همان رنگ‌های همراه به ترتیبِ معنا — هزینه عقیق (`SectionColors.CHART`) */
+  fun chart(dark: Boolean, grid: Color): ChartColors = SectionColors.CHART.map { SectionColors.glyph(it, dark) }.let { a ->
     ChartColors(sales = a[0], comparison = a[1], costs = a[2], discount = a[3], drop = a[4], stock = a[5], neutral = a[6], grid = grid)
   }
 }

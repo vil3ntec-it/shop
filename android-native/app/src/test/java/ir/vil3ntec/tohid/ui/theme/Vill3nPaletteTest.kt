@@ -97,7 +97,10 @@ class Vill3nPaletteTest {
     //  `SectionColors` — روز و شب جدا، بی صورتی و لیمویی)
     for ((name, c) in palettes) {
       val accents = (if (c.isDark) ThemeAccents.NIGHT else ThemeAccents.DAY).map(::hex)
-      if (c.chart.series.map(::hex) != accents) bad += "$name: سری‌های نمودار ≠ رنگ‌های همراه"
+      //  نمودار همان هفت رنگ به ترتیبِ معنا (هزینه عقیق)؛ رنگ‌های همراه به ترتیبِ جاهای خانه
+      val series = SectionColors.CHART.map { hex(SectionColors.glyph(it, c.isDark)) }
+      if (c.chart.series.map(::hex) != series) bad += "$name: سری‌های نمودار ≠ رنگ‌های همراه"
+      if (c.chart.series.map(::hex).toSet() != SectionColors.ORDER.map { hex(SectionColors.glyph(it, c.isDark)) }.toSet()) bad += "$name: سری‌های نمودار بیرون از هفت خانواده"
       if (c.accents.map(::hex) != accents) bad += "$name: رنگ‌های همراه"
     }
     assertEquals("#E2E8F0", hex(LightColors.chart.grid))

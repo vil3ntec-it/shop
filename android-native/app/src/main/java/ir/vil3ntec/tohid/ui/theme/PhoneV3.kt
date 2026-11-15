@@ -212,8 +212,8 @@ object PhoneV3Palette {
   /** شمارهٔ رنگِ همراه (`ShopColors.accent(i)`) برای هر نام — جایش در `SectionColors.ORDER`؛ BRAND ⇒ null */
   fun accentIndex(hue: Hue): Int? = if (hue == Hue.BRAND) null else SectionColors.ORDER.indexOf(SectionColors.family(hue))
 
-  /** آیکنِ رنگی */
-  fun glyph(c: PhoneV3Colors, hue: Hue): Color = accentIndex(hue)?.let { shop(c).accent(it) } ?: shop(c).brandPrimary
+  /** آیکنِ رنگی — نشانهٔ همان خانواده از `SectionColors` (روز/شب)؛ BRAND ⇒ primaryِ تم */
+  fun glyph(c: PhoneV3Colors, hue: Hue): Color = if (hue == Hue.BRAND) shop(c).brandPrimary else SectionColors.glyph(hue, shop(c).isDark)
 
   /** پس‌زمینهٔ نرمِ همان رنگ (۱۲٪ روز، ۲۰٪ شب) */
   fun soft(c: PhoneV3Colors, hue: Hue): Color = glyph(c, hue).copy(alpha = if (c.source.isDark) 0.20f else 0.12f)

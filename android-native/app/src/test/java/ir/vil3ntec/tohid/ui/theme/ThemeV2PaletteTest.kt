@@ -97,8 +97,10 @@ class ThemeV2PaletteTest {
    */
   @Test
   fun `هفت رنگِ همراه و پس‌زمینهٔ نرمشان`() {
-    val day = listOf("#1E40AF", "#4F46E5", "#B4232F", "#A87A12", "#05875F", "#526177", "#0E7490")
-    val night = listOf("#86A6E8", "#9696F0", "#E57B76", "#D9B260", "#4DC79A", "#9AA8BB", "#4FB6CC")
+    //  جای ۲ (میان‌برِ «سفارش‌های آنلاین» ِ خانه) نفتی — همان رنگِ بخشِ سفارش؛ عقیقِ خطر جای ۶؛ جاهای ۰ و ۵ دو درخششِ کادرِ
+    //  گرادیانیِ خانه: آسمانیِ پیشین و بنفشِ نرم به‌جای صورتی (جدا از جدولِ بخش‌ها، روز و شب یکی)
+    val day = listOf("#0EA5E9", "#4F46E5", "#0E7490", "#A87A12", "#05875F", "#8B5CF6", "#B4232F")
+    val night = listOf("#0EA5E9", "#9696F0", "#4FB6CC", "#D9B260", "#4DC79A", "#8B5CF6", "#E57B76")
     assertEquals(day, ThemeAccents.ALL.map { hex(it) })
     assertEquals(day, ThemeAccents.DAY.map { hex(it) })
     assertEquals(night, ThemeAccents.NIGHT.map { hex(it) })
