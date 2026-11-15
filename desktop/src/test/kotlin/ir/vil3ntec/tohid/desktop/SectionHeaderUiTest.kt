@@ -226,7 +226,8 @@ class SectionHeaderUiTest {
       val t = titleNode(title).boundsInRoot
       val drop = nodes(dropdown).single().boundsInRoot
       val l = nodes(hasText(label) and !hasClickAction(), unmerged = true).single().boundsInRoot
-      return listOf(back.left, back.right, act.left, act.right, t.center.x, drop.left, drop.right, l.center.x)
+      //  کادرِ کشویی به اندازهٔ نوشته‌اش است: لبهٔ بیرونیِ گوشه (چپ) همان جا می‌ماند
+      return listOf(back.left, back.right, act.left, act.right, t.center.x, drop.left, l.center.x)
     }
     try {
       val fa = snap("مصارف", "جمع ماه")
@@ -234,7 +235,7 @@ class SectionHeaderUiTest {
       en.value = true
       rule.waitForIdle()
       val enPos = snap("Expenses", "Month total")
-      val names = listOf("برگشت (چپ)", "برگشت (راست)", "کار (چپ)", "کار (راست)", "وسطِ عنوان", "کشویی (چپ)", "کشویی (راست)", "وسطِ برچسب")
+      val names = listOf("برگشت (چپ)", "برگشت (راست)", "کار (چپ)", "کار (راست)", "وسطِ عنوان", "کشویی (لبهٔ گوشه)", "وسطِ برچسب")
       names.forEachIndexed { i, n -> assertEquals("$n همان جا در انگلیسی", fa[i], enPos[i], px(1.5f)) }
       assertTrue("برگشت در راست (همان فارسی)", fa[0] > px(180f))
     } finally {
