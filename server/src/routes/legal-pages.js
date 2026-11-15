@@ -113,7 +113,7 @@ router.get('/:doc', (req, res, next) => {
   const p = page(doc, lang, req.baseUrl);
   res.set('ETag', p.etag);
   //  `If-None-Match` می‌تواند چند ETag (با ویرگول) یا `*` باشد
-  const tags = String(req.get('if-none-match') || '').split(/\s*,\s*/);
+  const tags = String(req.get('if-none-match') || '').split(',').map((t) => t.trim());   //  بی regex: سرآیندِ بیرونی (CodeQL ReDoS)
   if (tags.includes(p.etag) || tags.includes('*')) return res.status(304).end();
   res.type('html').send(p.html);
 });
