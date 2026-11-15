@@ -83,7 +83,8 @@ class LookGuardTest {
     "ui/v3/shell/HomeTiles.kt" to "8b1a8dd019fea541",
     "ui/v3/shell/HomeToday.kt" to "56d3f8fc29e5085a",
     "ui/v3/shell/HomeTrend.kt" to "57d139695c46830d",
-    "ui/v3/shell/HomeView.kt" to "dac36eff6a95d954",
+    //  ۶۳k (خواستهٔ صاحب‌کار «هشدارِ انقضا»): فقط ورودیِ کاشیِ هشدار — «منقضی‌شده» جدا از «نزدیکِ انقضا» با نامِ کالا؛ ظاهرِ خانه همان
+    "ui/v3/shell/HomeView.kt" to "070fca810e6224ce",
     "ui/v3/shell/DeskHome.kt" to "4b21911118a57c2c",
     "ui/v3/shell/DashboardNumbers.kt" to "132f992d7d26c645",
     "ui/v3/shell/HeroMoney.kt" to "e2ab7de317fd8349",
