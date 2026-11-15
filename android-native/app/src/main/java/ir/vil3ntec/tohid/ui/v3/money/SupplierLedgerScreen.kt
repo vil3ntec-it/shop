@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
+import ir.vil3ntec.tohid.ui.theme.V3Section
 import androidx.compose.material.icons.automirrored.outlined.AssignmentReturn
 import ir.vil3ntec.tohid.core.i18n.StrReach
 import android.content.Intent
@@ -130,6 +131,9 @@ internal fun SupplierLedgerScreen(id: String, d: ShopData, actions: SupplierLedg
           caption = "${StrMoney.totalBought} ${MoneyText.afn(totals.bought)} · ${StrMoney.totalPaid} ${MoneyText.afn(totals.paid)}",
           note = overdue.takeIf { it > 0 }?.let(StrPurchases::overdueCount),
           actions = listOf(V3SummaryAction(StrMoney.pay, Icons.Outlined.Payments, onClick = actions.onPay)),
+          //  یک حالت برای همهٔ تأمین‌کننده‌ها (صفحه، نه هر نفر)
+          collapseKey = "purchasing/supplier",
+          section = V3Section.PURCHASES,
         )
         if (supplier.phone.isNotBlank() || supplier.address.isNotBlank()) {
           V3ChipRow(contentPadding = PaddingValues(0.dp)) {

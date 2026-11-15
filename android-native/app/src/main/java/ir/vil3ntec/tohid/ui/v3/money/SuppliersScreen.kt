@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
+import ir.vil3ntec.tohid.ui.theme.V3Section
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -160,6 +161,8 @@ internal fun SuppliersScreen(
             value = MoneyText.afn(owed),
             caption = StrMoney.suppliersCaption(d.suppliers.size, d.purchases.size),
             actions = listOf(V3SummaryAction(StrMoney.newSupplier, Icons.Outlined.PersonAddAlt, onClick = actions.onNewSupplier)) + doors,
+            collapseKey = "purchasing/suppliers",
+            section = V3Section.PURCHASES,
           )
           Spacer(Modifier.height(16.dp))
         }

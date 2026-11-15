@@ -19,6 +19,9 @@ import androidx.compose.material.icons.outlined.PeopleOutline
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import ir.vil3ntec.tohid.ui.theme.V3Section
+import ir.vil3ntec.tohid.ui.v3.V3SummaryAction
+import ir.vil3ntec.tohid.ui.v3.V3Summary
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -67,7 +70,7 @@ internal fun DebtorsTab(d: ShopData, spec: ReportListSpec) {
   ReportList(spec) {
     item(key = "hero") {
       Box(spec.appear("hero", 0).padding(top = 12.dp, bottom = 4.dp)) {
-        HeroFigure(StrReports.receivable, rows.sumOf { it.remaining.coerceAtLeast(0.0) }, StrReports.people(rows.count { it.remaining > 0 }))
+        HeroFigure(StrReports.receivable, rows.sumOf { it.remaining.coerceAtLeast(0.0) }, StrReports.people(rows.count { it.remaining > 0 }), collapseKey = "reports/debtors")
       }
     }
     if (rows.isEmpty()) {
@@ -106,10 +109,19 @@ internal fun PurchasesTab(d: ShopData, from: String, to: String, spec: ReportLis
   val invoiceOf = remember(d) { ir.vil3ntec.tohid.data.PurchaseBook.invoices(d).flatMap { inv -> inv.lines.map { it.id to inv.key } }.toMap() }
   val stagger = rememberV3Stagger(from, to)
   ReportList(spec) {
+    //  ۶۵s: یک کارتِ خلاصهٔ رنگیِ گزارش (جای دو کاشیِ جدا) با بازه در گوشه؛ «قرضِ تأمین‌کننده‌ها» کارِ کوچکِ همان کارت ⇐ خریدها
     item(key = "kpi") {
-      Row(spec.appear("kpi", 0).padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        V3Stat(StrReports.purchasesTotal, r.total, ::afn, Modifier.weight(1f), hue = V3Hue.PURPLE, caption = Str.invoicesCount(r.count))
-        V3Stat(StrReports.supplierDebt, r.debt, ::afn, Modifier.weight(1f), hue = V3Hue.ORANGE, onClick = { spec.onOpen(MoneyPaths.PURCHASING) })
+      Box(spec.appear("kpi", 0).padding(top = 12.dp)) {
+        V3Summary(
+          label = StrReports.purchasesTotal,
+          value = afn(r.total),
+          caption = Str.invoicesCount(r.count),
+          note = spec.rangeNote,
+          actions = listOf(V3SummaryAction(StrReports.supplierDebt + ": " + afn(r.debt), Icons.Outlined.LocalShipping) { spec.onOpen(MoneyPaths.PURCHASING) }),
+          collapseKey = "reports/purchases",
+          section = V3Section.REPORTS,
+          corner = spec.range,
+        )
       }
     }
     if (r.rows.isEmpty()) {

@@ -1,17 +1,10 @@
 package ir.vil3ntec.tohid.ui.v3.sales.history
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrHistory
@@ -69,27 +62,25 @@ internal object HistoryPeriods {
   }
 }
 
-/** زیرِ عنوان: کادرِ کشوییِ دوره؛ با فیلترِ روشن، تراشه‌های همان فیلتر و «پاک کردن» زیرش */
+/** کادرِ کشوییِ دوره — ۶۵s: در گوشهٔ کارتِ خلاصهٔ تاریخچه (`PeriodSummary`، مقابلِ پیکان)، نه بالای آن */
 @Composable
-internal fun PeriodBar(book: HistoryBook?, query: HistoryQuery, onFilter: () -> Unit) {
+internal fun PeriodDropdown(book: HistoryBook?, query: HistoryQuery) {
   val choices = remember(book, I18n.lang) { book?.let(HistoryPeriods::choices).orEmpty() }
-  Column {
-    Box(Modifier.padding(horizontal = 16.dp)) {
-      V3Dropdown(
-        value = HistoryPeriods.label(book, query),
-        choices = choices,
-        selected = HistoryPeriods.selected(query),
-        onSelect = { HistoryPeriods.apply(query, it) },
-        label = StrLook.period,
-      )
-    }
-    if (query.filtered) {
-      Spacer(Modifier.height(8.dp))
-      V3ChipRow {
-        if (query.filter != HistoryFilter.ALL) V3Chip(filterName(query.filter), true, onFilter, icon = Icons.Outlined.Tune)
-        if (query.channel != HistoryChannel.ALL) V3Chip(channelName(query.channel), true, onFilter, icon = Icons.Outlined.Tune)
-        V3Chip(StrHistory.clearFilters, false, { query.filter = HistoryFilter.ALL; query.channel = HistoryChannel.ALL }, icon = Icons.Outlined.Close)
-      }
-    }
+  V3Dropdown(
+    value = HistoryPeriods.label(book, query),
+    choices = choices,
+    selected = HistoryPeriods.selected(query),
+    onSelect = { HistoryPeriods.apply(query, it) },
+    label = StrLook.period,
+  )
+}
+
+/** زیرِ عنوان فقط با فیلترِ روشن: تراشه‌های همان فیلتر و «پاک کردن» */
+@Composable
+internal fun FilterChipsBar(query: HistoryQuery, onFilter: () -> Unit) {
+  V3ChipRow {
+    if (query.filter != HistoryFilter.ALL) V3Chip(filterName(query.filter), true, onFilter, icon = Icons.Outlined.Tune)
+    if (query.channel != HistoryChannel.ALL) V3Chip(channelName(query.channel), true, onFilter, icon = Icons.Outlined.Tune)
+    V3Chip(StrHistory.clearFilters, false, { query.filter = HistoryFilter.ALL; query.channel = HistoryChannel.ALL }, icon = Icons.Outlined.Close)
   }
 }

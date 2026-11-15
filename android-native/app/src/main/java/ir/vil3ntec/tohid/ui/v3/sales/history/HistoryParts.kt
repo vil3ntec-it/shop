@@ -29,6 +29,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.font.FontWeight
+import ir.vil3ntec.tohid.ui.v3.summaryColors
+import ir.vil3ntec.tohid.ui.v3.V3SummaryBars
+import ir.vil3ntec.tohid.ui.v3.V3Bar
+import ir.vil3ntec.tohid.ui.theme.V3Section
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -91,9 +100,12 @@ internal fun channelName(c: HistoryChannel): String = when (c) {
   HistoryChannel.ONLINE -> StrSale.online
 }
 
-/** خلاصهٔ دوره (`V3Summary`، بی گرادیان): «جمع فروش · دوره»، مبلغ و شمارها؛ شمارشِ کور ⇒ فقط شمار */
+/**
+ *  خلاصهٔ دوره (`V3Summary`، بخشِ فروش — آبی، بی گرادیان): «جمع فروش · دوره»، مبلغ و شمارها؛ شمارشِ کور ⇒ فقط شمار.
+ *  ۶۵s: [period] (کادرِ کشوییِ دوره) در گوشهٔ کارت و «نقد · نسیه · دیگر» ([PaySplit]) درونِ همین کارت.
+ */
 @Composable
-internal fun PeriodSummary(p: SalesPeriods.Period, title: String, money: Boolean, actions: List<V3SummaryAction>) {
+internal fun PeriodSummary(p: SalesPeriods.Period, title: String, money: Boolean, actions: List<V3SummaryAction>, period: (@Composable () -> Unit)? = null) {
   val t = p.totals
   val returns = if (money && t.refunds != 0L) " · " + StrHistory.returnsAmount(PeriodLabel.amount(t.refunds)) else ""
   val value = if (money) PeriodLabel.amount(t.sales) else StrHistory.invoices(plain(t.invoices))
@@ -102,7 +114,43 @@ internal fun PeriodSummary(p: SalesPeriods.Period, title: String, money: Boolean
     value = value,
     caption = if (money) PeriodLabel.counts(t) + returns else StrHistory.countsOnly,
     actions = actions,
+    collapseKey = "sales",
+    section = V3Section.SALES,
+    corner = period,
+    extra = if (money) ({ PaySplit(t) }) else null,
   )
+}
+
+/**
+ *  «نقد · نسیه · دیگر» درونِ کارتِ خلاصه (۶۵s، جای کارتِ جدای [MoneySplit] زیرش): نمودارِ افقیِ رنگی — همان سه رنگِ پیشین،
+ *  رنگ هرگز تنها نیست — و زیرش «برگشت» و «خالص»، «دریافتِ قرض» و یادداشتِ بیرون از جمع، همه وسط.
+ */
+@Composable
+private fun PaySplit(t: SalesPeriods.Totals) {
+  val c = PhoneV3.colors
+  val sc = summaryColors(V3Section.SALES)
+  val bars = listOf(
+    V3Bar("cash", StrHistory.cash, PeriodLabel.amount(t.cash), t.cash.toDouble(), PhoneV3Palette.glyph(c, V3Hue.MINT)),
+    V3Bar("credit", StrHistory.credit, PeriodLabel.amount(t.credit), t.credit.toDouble(), PhoneV3Palette.glyph(c, V3Hue.AMBER)),
+    V3Bar("other", StrHistory.other, PeriodLabel.amount(t.other), t.other.toDouble(), PhoneV3Palette.glyph(c, V3Hue.SKY)),
+  )
+  Spacer(Modifier.height(10.dp))
+  V3SummaryBars(bars, track = sc.track)
+  Spacer(Modifier.height(6.dp))
+  val refunds = if (t.refunds == 0L) PeriodLabel.amount(0) else "−" + PeriodLabel.amount(t.refunds)
+  Text(
+    buildAnnotatedString {
+      append(StrHistory.returns + " (" + plain(t.returns) + ") ")
+      withStyle(SpanStyle(color = if (t.refunds == 0L) sc.ink else c.negative, fontWeight = FontWeight.SemiBold)) { append(refunds) }
+      append("  ·  " + StrHistory.net + " ")
+      withStyle(SpanStyle(color = sc.strong, fontWeight = FontWeight.SemiBold)) { append(PeriodLabel.amount(t.net)) }
+    },
+    style = V3Type.footnote,
+    color = sc.label,
+    textAlign = TextAlign.Center,
+  )
+  if (t.receipts != 0L) Text(StrHistory.receipts + ": " + PeriodLabel.amount(t.receipts), style = V3Type.footnote, color = sc.label, textAlign = TextAlign.Center)
+  if (t.cancelled > 0 || t.online > 0) Text(StrHistory.notInTotals, style = V3Type.caption, color = sc.label, textAlign = TextAlign.Center)
 }
 
 /** «نقد · نسیه · دیگر» و زیرش «برگشت» و «خالص» — همان جمع‌های X/Z؛ لغوشده و اینترنتی با یادداشت بیرون از جمع */

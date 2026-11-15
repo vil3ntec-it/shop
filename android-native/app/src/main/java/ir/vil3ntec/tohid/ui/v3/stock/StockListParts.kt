@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.stock
 
+import ir.vil3ntec.tohid.ui.theme.V3Section
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -45,48 +46,43 @@ import ir.vil3ntec.tohid.ui.v3.V3ProductThumb
 import ir.vil3ntec.tohid.ui.v3.V3QuietStatus
 import ir.vil3ntec.tohid.ui.v3.V3RowStatus
 import ir.vil3ntec.tohid.ui.v3.V3RowTone
+import ir.vil3ntec.tohid.ui.v3.V3Summary
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.rememberCountUp
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 
 /**
- *  کارتِ آمارِ انبار (یک کارتِ برجستهٔ r16): سه خانهٔ کوچک — قلم، کارتن، واحد — و
- *  ارزشِ تقریبی درشت زیرشان، همه با شمارنده؛ و دو تراشهٔ هشدار (تمام‌شده/کم) که
- *  فهرست را روی همان فیلتر می‌برند. عددها همه از `WarehouseEngine.summary`.
+ *  خلاصهٔ انبار (۶۵s، همان `V3Summary` ِ هر بخش — وسط‌چین و تاشو، کلیدِ `stock`): ارزشِ تقریبی درشت، زیرش سه خانهٔ
+ *  کوچک — قلم، کارتن، واحد — با شمارنده؛ و دو تراشهٔ هشدار (تمام‌شده/کم) که فهرست را روی همان فیلتر می‌برند.
+ *  عددها همه از `WarehouseEngine.summary`؛ بسته ⇒ یک خطِ «ارزشِ تقریبی · …».
  */
 @Composable
 internal fun StockStatsCard(summary: WarehouseEngine.Summary, onFilter: (StockFilter) -> Unit, modifier: Modifier = Modifier) {
-  val c = PhoneV3.colors
-  V3Card(modifier, radius = V3Space.featuredRadius, padding = PaddingValues(16.dp)) {
-    Row(Modifier.fillMaxWidth()) {
-      StatCell(StrStock.statItems, summary.products.toDouble(), { money(it) }, Modifier.weight(1f))
-      CellDivider()
-      StatCell(StrStock.statCartons, summary.cartons, { qty(it) }, Modifier.weight(1f))
-      CellDivider()
-      StatCell(StrStock.statUnits, summary.units, { qty(it) }, Modifier.weight(1f))
-    }
-    Spacer(Modifier.height(14.dp))
-    Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))
-    Spacer(Modifier.height(12.dp))
-    val value = rememberCountUp(summary.value)
-    Text(StrStock.statValue, style = V3Type.footnote, color = c.inkMuted)
-    Text(
-      "${money(value)} ؋",
-      style = V3Type.largeTitle,
-      color = c.ink,
-      maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
-      modifier = Modifier.semantics { contentDescription = "${StrStock.statValue}: ${money(summary.value)} ؋" },
-    )
-    if (summary.out > 0 || summary.low > 0) {
+  V3Summary(
+    label = StrStock.statValue,
+    value = "${money(summary.value)} ؋",
+    modifier = modifier,
+    collapseKey = "stock",
+    section = V3Section.STOCK,
+    extra = {
       Spacer(Modifier.height(12.dp))
-      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (summary.out > 0) DraftToneChip(V3Tone.ERROR, Icons.Outlined.RemoveShoppingCart, StrStock.alertOut(money(summary.out.toDouble()))) { onFilter(StockFilter.OUT) }
-        if (summary.low > 0) DraftToneChip(V3Tone.WARNING, Icons.AutoMirrored.Outlined.TrendingDown, StrStock.alertLow(money(summary.low.toDouble()))) { onFilter(StockFilter.LOW) }
+      Row(Modifier.fillMaxWidth()) {
+        StatCell(StrStock.statItems, summary.products.toDouble(), { money(it) }, Modifier.weight(1f))
+        CellDivider()
+        StatCell(StrStock.statCartons, summary.cartons, { qty(it) }, Modifier.weight(1f))
+        CellDivider()
+        StatCell(StrStock.statUnits, summary.units, { qty(it) }, Modifier.weight(1f))
       }
-    }
-  }
+      if (summary.out > 0 || summary.low > 0) {
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          if (summary.out > 0) DraftToneChip(V3Tone.ERROR, Icons.Outlined.RemoveShoppingCart, StrStock.alertOut(money(summary.out.toDouble()))) { onFilter(StockFilter.OUT) }
+          if (summary.low > 0) DraftToneChip(V3Tone.WARNING, Icons.AutoMirrored.Outlined.TrendingDown, StrStock.alertLow(money(summary.low.toDouble()))) { onFilter(StockFilter.LOW) }
+        }
+      }
+    },
+  )
 }
 
 @Composable

@@ -28,7 +28,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.heading
@@ -146,7 +145,7 @@ fun HistoryScreen(
 ) {
   var filterSheet by remember { mutableStateOf(false) }
   var menuFor by remember { mutableStateOf<String?>(null) }
-  val ctx = RowCtx(d, book?.look, returnsV2, canCancel, actions, askCancel, today = book?.today.orEmpty()) { menuFor = it }
+  val ctx = RowCtx(d, book?.look, returnsV2, canCancel, actions, askCancel, today = book?.today.orEmpty(), period = { PeriodDropdown(book, query) }) { menuFor = it }
 
   V3Scaffold(
     title = Str.salesHistory,
@@ -160,7 +159,8 @@ fun HistoryScreen(
     ),
     bottomReserve = bottomReserve,
     search = V3Search(query.search, { query.search = ir.vil3ntec.tohid.latinDigits(it) }, StrSale.historySearch, onScan = actions.scanReceipt),
-    chips = { PeriodBar(book, query) { filterSheet = true } },
+    //  ۶۵s: دوره در گوشهٔ کارتِ خلاصه (`ctx.period`)؛ زیرِ عنوان فقط تراشه‌های فیلترِ روشن
+    chips = if (query.filtered) ({ FilterChipsBar(query) { filterSheet = true } }) else null,
   ) { pad ->
     val padding = PaddingValues(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding() + 16.dp)
     when {
@@ -192,12 +192,15 @@ internal class RowCtx(
   val askCancel: Boolean,
   /** امروزِ دکان (`HistoryBook.today`) — «امروز/دیروز» و سالِ جاریِ تاریخِ کوتاهِ ردیف */
   val today: String = "",
+  /** ۶۵s: کادرِ کشوییِ دوره برای گوشهٔ کارتِ خلاصه */
+  val period: (@Composable () -> Unit)? = null,
   val onMenu: (String) -> Unit,
 )
 
 /**
  *  خلاصهٔ بالا: دورهٔ برگزیده (پیش‌فرض دورهٔ جاری) — مبلغ، شمار، و کارهای کوچکِ چاپ، بررسی و صندوق زیرش (`V3Summary`،
- *  جای کادرِ گرادیانی). صندوقِ بلند واپسین است تا «چاپ» و «بررسی» با هم در ردیفِ نخست بمانند.
+ *  جای کادرِ گرادیانی). صندوقِ بلند واپسین است تا «چاپ» و «بررسی» با هم در ردیفِ نخست بمانند. ۶۵s: کادرِ کشوییِ دوره در
+ *  گوشهٔ همین کارت و «نقد · نسیه · دیگر» نمودارِ رنگیِ درونش (نه کارتِ جدای زیرش).
  */
 @Composable
 private fun Top(p: SalesPeriods.Period, title: String, ctx: RowCtx, drawer: DrawerLine?, reviews: Int, money: Boolean) {
@@ -208,11 +211,7 @@ private fun Top(p: SalesPeriods.Period, title: String, ctx: RowCtx, drawer: Draw
     drawer?.let { V3SummaryAction(it.text, Icons.Outlined.PointOfSale, onClick = a.drawer) },
   )
   Column(Modifier.padding(top = 4.dp, bottom = 8.dp)) {
-    PeriodSummary(p, title, money, chips)
-    if (money) {
-      Spacer(Modifier.height(10.dp))
-      MoneySplit(p.totals)
-    }
+    PeriodSummary(p, title, money, chips, ctx.period)
   }
 }
 

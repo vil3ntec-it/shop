@@ -23,9 +23,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.LocalOffer
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -55,7 +52,6 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrFields
 import ir.vil3ntec.tohid.core.i18n.StrGrid
-import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.core.i18n.StrInvoices
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrLine
@@ -80,10 +76,6 @@ import ir.vil3ntec.tohid.ui.components.common.BulkAction
 import ir.vil3ntec.tohid.ui.components.common.BulkActionBar
 import ir.vil3ntec.tohid.ui.components.common.PillTone
 import ir.vil3ntec.tohid.ui.components.common.ScreenKind
-import ir.vil3ntec.tohid.ui.components.common.SegmentTab
-import ir.vil3ntec.tohid.ui.components.common.SegmentedTabs
-import ir.vil3ntec.tohid.ui.components.common.Metric
-import ir.vil3ntec.tohid.ui.components.common.MetricRows
 import ir.vil3ntec.tohid.ui.components.common.StatusPill
 import ir.vil3ntec.tohid.ui.components.common.TableToolbar
 import ir.vil3ntec.tohid.ui.components.common.ViewMode
@@ -199,16 +191,27 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
         }
         Spacer(Modifier.height(Space.sm))
       }
-      //  ۶۳w (صاحب‌کار: «چهار کادرِ بزرگ نه»): یک فهرستِ فشرده؛ «فعال» و «همه» همان پالایه را می‌زنند
+      //  ۶۵s (صاحب‌کار: سربرگ وسط، تاشو و به رنگِ بخش؛ کادرِ کشویی درونِ کارت): خلاصهٔ بنفشِ تخفیف‌ها — شمارِ فعال درشت،
+      //  «با کد · زمان‌دار · همه» زیرش و پالایهٔ «همه / فعال / …» (`V3Dropdown`) در گوشهٔ همان کارت (جای چهار عددِ ۶۳w)
       item(key = "stats") {
         val active = snap.rules.count { PromoText.status(it, today) == PromoText.Status.ACTIVE }
-        MetricRows(
-          listOf(
-            Metric(StrSettings.active, active.toString(), StrHome.justNow, selected = tab == PromoText.Tab.ACTIVE, icon = Icons.Filled.CheckCircle, onClick = { tab = PromoText.Tab.ACTIVE }),
-            Metric(StrPromoPages.withCode, snap.rules.count { it.code.isNotEmpty() }.toString(), StrSale.promoCode, icon = Icons.Filled.Sell),
-            Metric(StrPromoPages.timed, snap.rules.count { PromoText.windowText(it) != ir.vil3ntec.tohid.core.i18n.StrMarketPages.always }.toString(), StrPromoPages.hourOrDay, icon = Icons.Filled.Schedule),
-            Metric(Str.all, snap.rules.size.toString(), StrPromoPages.ruleWord, selected = tab == PromoText.Tab.ALL, icon = Icons.Filled.LocalOffer, onClick = { tab = PromoText.Tab.ALL }),
-          ),
+        val coded = snap.rules.count { it.code.isNotEmpty() }
+        val timed = snap.rules.count { PromoText.windowText(it) != ir.vil3ntec.tohid.core.i18n.StrMarketPages.always }
+        ir.vil3ntec.tohid.ui.v3.V3Summary(
+          label = StrKit.promos + " · " + StrSettings.active,
+          value = active.toString(),
+          caption = "$coded ${StrPromoPages.withCode} · $timed ${StrPromoPages.timed} · ${snap.rules.size} ${StrPromoPages.ruleWord}",
+          collapseKey = "promos",
+          section = ir.vil3ntec.tohid.ui.theme.V3Section.PROMOS,
+          corner = {
+            ir.vil3ntec.tohid.ui.v3.V3Dropdown(
+              value = tab.label,
+              choices = PromoText.Tab.entries.map { ir.vil3ntec.tohid.ui.v3.V3Choice(it.name, it.label) },
+              selected = tab.name,
+              onSelect = { k -> PromoText.Tab.entries.firstOrNull { it.name == k }?.let { tab = it } },
+              label = ir.vil3ntec.tohid.core.i18n.StrLook.show,
+            )
+          },
         )
         Spacer(Modifier.height(Space.sm))
       }
@@ -218,16 +221,6 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
           onQuery = { query = it },
           placeholder = StrPromoPages.searchNameCode,
           viewMode = view,
-          //  پالایهٔ «همه / فعال / …» یک کادرِ کشویی (`V3Dropdown`)، نه کلیدِ پهن
-          tabs = {
-            ir.vil3ntec.tohid.ui.v3.V3Dropdown(
-              value = tab.label,
-              choices = PromoText.Tab.entries.map { ir.vil3ntec.tohid.ui.v3.V3Choice(it.name, it.label) },
-              selected = tab.name,
-              onSelect = { k -> PromoText.Tab.entries.firstOrNull { it.name == k }?.let { tab = it } },
-              label = ir.vil3ntec.tohid.core.i18n.StrLook.show,
-            )
-          },
         )
         Spacer(Modifier.height(Space.sm))
       }

@@ -15,25 +15,21 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ChevronLeft
-import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.PieChart
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.I18n
@@ -46,6 +42,7 @@ import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
+import ir.vil3ntec.tohid.ui.theme.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
 import ir.vil3ntec.tohid.ui.v3.V3Divider
@@ -53,9 +50,10 @@ import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3Fab
 import ir.vil3ntec.tohid.ui.v3.V3Summary
 import ir.vil3ntec.tohid.ui.v3.V3SummaryAction
+import ir.vil3ntec.tohid.ui.v3.V3SummaryBars
+import ir.vil3ntec.tohid.ui.v3.summaryColors
 import ir.vil3ntec.tohid.ui.v3.V3Choice
 import ir.vil3ntec.tohid.ui.v3.V3Dropdown
-import ir.vil3ntec.tohid.ui.v3.V3IconButton
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
@@ -63,7 +61,6 @@ import ir.vil3ntec.tohid.ui.v3.V3TextButton
 import ir.vil3ntec.tohid.ui.v3.rememberCountUp
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3AnimateItem
-import ir.vil3ntec.tohid.ui.v3.v3Pressable
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import ir.vil3ntec.tohid.ui.v3.nav.V3Modules
 
@@ -81,8 +78,8 @@ internal class ExpensesActions(
 )
 
 /**
- *  مصارف (`expenses?month=&category=`): زیرِ عنوان کادرِ کشوییِ ماه («ماه…» ⇐ برگهٔ ماه)، خلاصهٔ آرامِ
- *  «جمع مصارف ماه» با شمارنده (`V3Summary`)، نوارِ رنگیِ دسته‌ها با تراشهٔ هر دسته (زدن = فیلتر)، و ردیف‌ها با
+ *  مصارف (`expenses?month=&category=`): عنوان در نوار؛ خلاصهٔ رُزیِ «جمع مصارف ماه» (`V3Summary`، بخشِ مصارف) با کادرِ
+ *  کشوییِ ماه در گوشه («ماه…» ⇐ برگهٔ ماه) و نمودارِ افقیِ دسته‌ها درونش (زدن = فیلتر)، و ردیف‌ها با
  *  آیکنِ رنگِ همراهِ بخش و مبلغ؛ کشیدن ⇐ «حذف» با پرسش (متنِ امروز). «مصرف تازه» شناور.
  *  مبلغ‌ها دیگر سرخ نیستند: سرخ فقط برای خطر است (THEME-V2) — رنگِ مصارف رنگِ همراهِ خودش است.
  */
@@ -105,25 +102,6 @@ internal fun ExpensesScreen(d: ShopData, monthArg: String?, categoryArg: String?
   V3Scaffold(
     title = Str.expenses,
     onBack = actions.onBack,
-    //  ماه یک کادرِ کشویی زیرِ عنوان (صاحب‌کار ۱۴۰۵/۰۸/۲۴: «یک کادرِ کشویی بس بود») — جای ‹ ماه › ِ پایین
-    chips = {
-      val months = remember(d, today, month, I18n.lang) {
-        ExpensesModel.choices(d, today, month).map { V3Choice(it, MoneyText.month(it)) } +
-          V3Choice(ExpensesModel.OTHER_MONTH, StrReports.rangePickMonth, divider = true)
-      }
-      Box(Modifier.padding(horizontal = 16.dp)) {
-        V3Dropdown(
-          value = label,
-          choices = months,
-          selected = month,
-          onSelect = { m ->
-            if (m == ExpensesModel.OTHER_MONTH) actions.onPickMonth(month) { picked -> month = picked; category = null }
-            else { month = m; category = null }
-          },
-          label = StrMoney.month,
-        )
-      }
-    },
     fab = { expanded -> V3Fab(Icons.Outlined.Payments, StrMoney.newExpense, expanded, actions.onNew) },
   ) { pad ->
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
@@ -131,7 +109,14 @@ internal fun ExpensesScreen(d: ShopData, monthArg: String?, categoryArg: String?
         Modifier.widthIn(max = 720.dp).fillMaxWidth(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding() + 72.dp),
       ) {
+        //  ۶۵s (صاحب‌کار): کادرِ کشوییِ ماه در گوشهٔ کارت (نه بالای آن) و تفکیکِ دسته‌ها نمودارِ افقیِ درونِ همان کارت (نه کارتِ
+        //  جدای زیرش)؛ زدنِ ردیفِ دسته = پالایهٔ همان دسته، دوباره = همه — همان کارِ تراشه‌های پیشین
         item(key = "summary") {
+          val months = remember(d, today, month, I18n.lang) {
+            ExpensesModel.choices(d, today, month).map { V3Choice(it, MoneyText.month(it)) } +
+              V3Choice(ExpensesModel.OTHER_MONTH, StrReports.rangePickMonth, divider = true)
+          }
+          val bars = categoryBars(byCategory)
           V3Summary(
             label = StrMoney.monthTotal(label),
             value = MoneyText.afn(total),
@@ -139,14 +124,26 @@ internal fun ExpensesScreen(d: ShopData, monthArg: String?, categoryArg: String?
             actions = if (byCategory.isEmpty()) emptyList() else listOf(
               V3SummaryAction(StrMoney.byCategory, Icons.Outlined.PieChart) { actions.onBreakdown(month, category) { c -> category = c?.takeIf { it.isNotBlank() } } },
             ),
+            collapseKey = "expenses",
+            section = V3Section.EXPENSES,
+            corner = {
+              V3Dropdown(
+                value = label,
+                choices = months,
+                selected = month,
+                onSelect = { m ->
+                  if (m == ExpensesModel.OTHER_MONTH) actions.onPickMonth(month) { picked -> month = picked; category = null }
+                  else { month = m; category = null }
+                },
+                label = StrMoney.month,
+              )
+            },
+            extra = if (bars.isEmpty()) null else ({
+              Spacer(Modifier.height(10.dp))
+              V3SummaryBars(bars, selected = category, onPick = { c -> category = if (category == c) null else c }, track = summaryColors(V3Section.EXPENSES).track)
+            }),
           )
           Spacer(Modifier.height(12.dp))
-        }
-        if (byCategory.isNotEmpty()) {
-          item(key = "categories") {
-            CategoryBreakdown(byCategory, category, onPick = { c -> category = if (category == c) null else c })
-            Spacer(Modifier.height(12.dp))
-          }
         }
         item(key = "list-title") {
           Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {

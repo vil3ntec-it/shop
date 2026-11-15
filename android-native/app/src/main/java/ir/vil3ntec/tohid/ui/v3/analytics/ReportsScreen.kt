@@ -185,11 +185,15 @@ fun ReportsScreen(
     },
     bottomReserve = bottomReserve,
   ) { pad ->
+    val pickRange: (ReportPeriod) -> Unit = { p -> year = p.year; month = p.month; rangeId = ReportsModel.rangeId(p.range) }
+    //  ۶۵s: زبانه‌ای که کارتِ خلاصه دارد (سود، خرید) کادرِ کشوییِ بازه را در گوشهٔ همان کارت می‌گیرد، نه بالای آن
+    val rangeDrop: @Composable () -> Unit = { RangeDropdown(period, now?.year ?: year, now?.month ?: month, pickRange) }
+    val rangeNote = if (ReportsModel.isAllTime(from)) StrReports.allDates else StrReports.rangeSpan(uiDateLong(from), uiDateLong(to))
     fun header(t: ReportPage): LazyListScope.() -> Unit = {
       item(key = "range") {
-        if (t.ranged) RangeRow(period, from, to, now?.year ?: year, now?.month ?: month) { p ->
-          year = p.year; month = p.month; rangeId = ReportsModel.rangeId(p.range)
-        } else Text(
+        if (t.ranged && t in ReportsModel.OWN_SUMMARY) Unit
+        else if (t.ranged) RangeRow(period, from, to, now?.year ?: year, now?.month ?: month, pickRange)
+        else Text(
           if (t == ReportTab.STOCK) StrReports.allMovements else StrReports.rightNow,
           style = V3Type.footnote, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(top = 4.dp),
         )
@@ -199,7 +203,7 @@ fun ReportsScreen(
       }
     }
     V3PageSwitch(tab, { tabs.indexOf(it) }, Modifier.fillMaxSize()) { t ->
-      val list = ReportListSpec(pad, header(t), onOpen, rememberV3Stagger(t))
+      val list = ReportListSpec(pad, header(t), onOpen, rememberV3Stagger(t), range = rangeDrop, rangeNote = rangeNote)
       when (t) {
         ReportTab.PROFIT -> ProfitTab(d, from, to, list)
         ReportTab.PRODUCTS -> ProductsTab(d, canSeeMoney, list)
@@ -235,6 +239,10 @@ internal class ReportListSpec(
   val header: LazyListScope.() -> Unit,
   val onOpen: (String) -> Unit,
   private val stagger: V3StaggerState,
+  /** ۶۵s: کادرِ کشوییِ بازه برای گوشهٔ کارتِ خلاصهٔ زبانه ([ReportsModel.OWN_SUMMARY]) */
+  val range: (@Composable () -> Unit)? = null,
+  /** «از … تا …» ِ همان بازه — خطِ کم‌رنگِ کارتِ خلاصه */
+  val rangeNote: String? = null,
 ) {
   /** آمدنِ پلکانیِ بخش‌های زبانه (محو + بالا آمدن، فقط بارِ اول) */
   fun appear(key: String, index: Int): Modifier = Modifier.v3Stagger(stagger, key, index)
@@ -272,6 +280,20 @@ internal fun tabLabel(t: ReportPage): String = when (t) {
 @Composable
 private fun RangeRow(period: ReportPeriod, from: String, to: String, year: Int, month: Int, onPick: (ReportPeriod) -> Unit) {
   val c = PhoneV3.colors
+  Column(Modifier.padding(top = 4.dp)) {
+    RangeDropdown(period, year, month, onPick)
+    Text(
+      if (ReportsModel.isAllTime(from)) StrReports.allDates else StrReports.rangeSpan(uiDateLong(from), uiDateLong(to)),
+      style = V3Type.footnote,
+      color = c.inkMuted,
+      modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp),
+    )
+  }
+}
+
+/** خودِ کادرِ کشوییِ بازه (امروز، ۷ روز، این ماه، دوازده ماهِ خورشیدی، سه سال، از آغاز) */
+@Composable
+internal fun RangeDropdown(period: ReportPeriod, year: Int, month: Int, onPick: (ReportPeriod) -> Unit) {
   val months = I18n.solarMonths(I18n.lang, LocaleChoice.months)
   fun label(key: String): String {
     val p = ReportsModel.parseChoice(key, period)
@@ -289,13 +311,5 @@ private fun RangeRow(period: ReportPeriod, from: String, to: String, year: Int, 
   val choices = remember(keys, selected, I18n.lang) {
     (keys + listOf(selected).filter { it !in keys }).map { k -> V3Choice(k, label(k), divider = k == keys[3] || k == "jyear:$year" || k == "all") }
   }
-  Column(Modifier.padding(top = 4.dp)) {
-    V3Dropdown(label(selected), choices, selected, { k -> onPick(ReportsModel.parseChoice(k, period)) }, label = StrLook.period)
-    Text(
-      if (ReportsModel.isAllTime(from)) StrReports.allDates else StrReports.rangeSpan(uiDateLong(from), uiDateLong(to)),
-      style = V3Type.footnote,
-      color = c.inkMuted,
-      modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp),
-    )
-  }
+  V3Dropdown(label(selected), choices, selected, { k -> onPick(ReportsModel.parseChoice(k, period)) }, label = StrLook.period)
 }
