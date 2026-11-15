@@ -359,6 +359,8 @@ class SettingsPortTest {
     /** نوشتنی که جای نسخهٔ ۳ ِ آن صفحه‌ای غیر از تنظیمات است ⇐ همان صفحه */
     val OUTSIDE_SETTINGS: Map<String, String> = mapOf(
       "ScaleAtPos.set" to "«دستگاه‌ها ⇐ ترازو» (`DevicesScreen` ⇐ `ScalePanel` ⇐ `ScaleAtPosSettings`)",
+      //  ارزِ گاوصندوق: آخرین ارزِ کادرِ همین دستگاه پس از هر ثبت (یادِ دستگاه، نه تنظیمی که کاربر می‌گذارد)
+      "SafeCurrencyPref.setLast" to "برگهٔ «+» ِ گاوصندوقِ خانه (`HeroMoneyRoute` ⇐ `rememberSafeCurrency`)",
     )
 
     /** همهٔ نوشتن‌های تنظیماتِ رابطِ قدیم (`SettingsLegacy` و جزءهایش) در روزِ پاک شدن — ۱۴۰۵/۰۸/۱۱ */
