@@ -80,10 +80,10 @@ internal object ScreenFrame {
   fun route(path: String, store: ShopStore, widthDp: Int = 360, heightDp: Int = 760, frames: Int = 4): Times =
     measure(widthDp, heightDp, frames) { V3RoutePreview(path, store, dark = false) }
 
-  fun measure(widthDp: Int, heightDp: Int, frames: Int, density: Float = 2f, content: @Composable () -> Unit): Times =
-    runBlocking(dispatcher) { measureHere(widthDp, heightDp, frames, density, content) }
+  fun measure(widthDp: Int, heightDp: Int, frames: Int, density: Float = 2f, png: java.io.File? = null, content: @Composable () -> Unit): Times =
+    runBlocking(dispatcher) { measureHere(widthDp, heightDp, frames, density, png, content) }
 
-  private fun measureHere(widthDp: Int, heightDp: Int, frames: Int, density: Float, content: @Composable () -> Unit): Times {
+  private fun measureHere(widthDp: Int, heightDp: Int, frames: Int, density: Float, png: java.io.File?, content: @Composable () -> Unit): Times {
     val w = (widthDp * density).toInt()
     val h = (heightDp * density).toInt()
     val info = object : WindowInfo {
@@ -123,6 +123,7 @@ internal object ScreenFrame {
         scene.render(surface.canvas.asComposeCanvas(), t)
         next += System.nanoTime() - s
       }
+      png?.let { f -> surface.makeImageSnapshot().encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG)?.bytes?.let { f.parentFile?.mkdirs(); f.writeBytes(it) } }
       return Times(first, next)
     } finally {
       scene.close()
