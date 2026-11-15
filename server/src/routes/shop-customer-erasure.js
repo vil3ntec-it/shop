@@ -2,7 +2,8 @@
 /**
  * SEC-10 — درِ صاحبِ دکان برای حذفِ دادهٔ شخصیِ یک مشتری (`lib/customer-erasure.js`).
  *
- *   POST /api/shop/customer-erasure   بدنه: `{ phone }` یا `{ orderId }`، و `dryRun: true` برای پیش‌نمایش
+ *   POST /api/shop/customer-erasure   بدنه: `{ phone }`، `{ email }` (ایمیلِ مشتریِ ویترین — «فقط ایمیل»: کلیدِ گفت‌وگو و
+ *     «خبرم کن» ایمیل است) یا `{ orderId }`، و `dryRun: true` برای پیش‌نمایش
  *     ⇒ `{ dryRun, mode, openOrders, counts, total, kept, erasureId? }`
  *
  * ⛔ پرچمِ `shop.customer_erasure` (`live_config`، پیش‌فرض خاموش): خاموش ⇒ `next('router')` — درخواست
@@ -39,7 +40,7 @@ router.post('/', requireShop, shopLimit, async (req, res) => {
   const b = req.body && typeof req.body === 'object' ? req.body : {};
   const dryRun = b.dryRun === true;
   if (!dryRun) await reauth.assertFresh(req);
-  const out = await erasure.erase(req.shopId, { phone: b.phone, orderId: b.orderId }, {
+  const out = await erasure.erase(req.shopId, { phone: b.phone, email: b.email, orderId: b.orderId }, {
     dryRun, by: 'owner', userId: req.user.id, ip: clientIp(req),
   });
   res.set('Cache-Control', 'no-store').json(out);

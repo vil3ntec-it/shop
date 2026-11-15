@@ -54,11 +54,13 @@ const hash = (x) => crypto.createHash('sha256').update(JSON.stringify(x)).digest
 const docIdOf = (orderId, requestId) => `o-${orderId}-rq-${requestId}`;
 
 /**
- * «صاحبِ سفارش» = همان قاعدهٔ «سفارش‌های من» ِ حساب (`sf.ordersOfPhone` ِ `GET /:slug/account/orders`). امروز پیوندِ
- * حساب ⇄ سفارش شمارهٔ حساب است؛ آزمونِ «مالکیت = سفارش‌های من» این دو را به هم می‌بندد تا با هم عوض شوند.
+ * «صاحبِ سفارش» = همان قاعدهٔ «سفارش‌های من» ِ حساب (`sf.ownsOrder`/`sf.OWNED_SQL` ِ `GET /:slug/account/orders`). از «فقط
+ * ایمیل» (۱۴۰۵/۰۸/۲۳) پیوندِ حساب ⇄ سفارش **ایمیلِ تأییدشده و شناسهٔ حساب** است، نه شماره: شمارهٔ تماسِ حساب بی کد عوض
+ * می‌شود و هرگز مالکیت نمی‌دهد. آزمونِ «مالکیت = سفارش‌های من» این دو را به هم می‌بندد تا با هم عوض شوند.
  */
 function ownsOrder(customer, order) {
-  return Boolean(customer && order && order.source === 'storefront' && customer.phone && order.customer_phone === customer.phone);
+  return Boolean(customer && order && order.source === 'storefront'
+    && require('./storefront').ownsOrder(order, { email: customer.email || '', customerId: customer.id || '' }));
 }
 
 // ════════════════════════════════════════════════════════════════════

@@ -155,8 +155,8 @@ async function change(sf, token, { key, body, ticket = '', session = '' }) {
   const input = parse(body, sf);
   const hash = orders.hashOf(body);
   const orderId = await store.orderIdOfLink(sf, token);   // توکنِ نادرست/باطل ⇒ ۴۰۴
-  const phone = await store.verifiedPhone(ticket, session);
-  if (!phone) throw new ApiError(401, 'verification_required', 'برای تغییرِ روشِ تحویل، شمارهٔ خود را تأیید کنید');
+  const who = await store.verification(ticket, session);
+  if (!who) throw new ApiError(401, 'verification_required', 'برای تغییرِ روشِ تحویل، ایمیلِ خود را تأیید کنید');
   const zonesOn = await sfd.flagOn(shopId);   // پرچم پیش از تراکنش (درونِ قفل فقط اتصالِ همان تراکنش)
   const pinOn = await require('./plus-code').flagOn(shopId);   // S33: نشانیِ تازه ⇒ Plus Code ِ همان پین
 
@@ -166,7 +166,7 @@ async function change(sf, token, { key, body, ticket = '', session = '' }) {
       const run = (t, p) => c.query(t, p);
       const { row, events } = await amend.lockOrder(c, shopId, orderId);
       if (row.source !== 'storefront' || row.is_test === true) throw notFound('سفارش پیدا نشد', 'order_not_found');
-      if (row.customer_phone !== phone) throw forbidden('این سفارش با شمارهٔ تأییدشدهٔ شما ثبت نشده است', 'not_your_order');
+      if (!store.ownsOrder(row, who)) throw forbidden('این سفارش با ایمیلِ تأییدشدهٔ شما ثبت نشده است', 'not_your_order');
       for (const e of events) {
         const d = e.kind === 'note' ? asJson(e.detail) : {};
         if (d.type === EVENT_TYPE && d.key === key) {

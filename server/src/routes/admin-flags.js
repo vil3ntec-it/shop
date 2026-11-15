@@ -54,6 +54,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.settings_sync', scope: 'shop', default: false, what: 'همگام‌سازیِ زندهٔ تنظیماتِ دکان (قاعده‌های پول، برگشت، مالیات) بینِ دستگاه‌ها' },
   { key: 'shop.held_sync', scope: 'shop', default: false, what: 'پشتیبانِ سرورِ فاکتورهای نگه‌داشته: با پاک کردنِ برنامه گم نمی‌شوند و روی دستگاهِ دیگرِ دکان برمی‌گردند (POS-12، S09)' },
   { key: 'shop.customer_erasure', scope: 'shop', default: false, what: 'حذفِ دادهٔ شخصیِ مشتری با نگه‌داشتنِ سندِ مالیِ ناشناس (SEC-10)' },
+  { key: 'shop.held_twice_cancel', scope: 'shop', default: false, what: 'لغوِ خودکارِ فروشِ دومِ «یک فاکتور در دو دستگاه» از راهِ لغوِ عادی، با ردیف در صندوقِ تعارضِ صاحب (S09)' },
   { key: 'shop.lost_device_replay', scope: 'shop', default: false, what: 'بازیابیِ کارهای همگام‌نشدهٔ دستگاهِ گم‌شدهٔ غیرفعال از پشتیبانش به دفترِ دکان (S44)' },
   { key: 'shop.customer_erasure_ledger', scope: 'shop', default: false, what: 'پس از حذفِ دادهٔ مشتری، نام/شماره/نشانیِ همان پرونده در دفترِ دستگاه‌ها هم پاک شود (فرمانِ سرور ⇐ برنامهٔ صاحب/مدیر؛ CRM-15، SEC-10)؛ با `shop.customer_erasure`' },
   { key: 'shop.customer_access_offline', scope: 'shop', default: false, what: 'ثبتِ دیدنِ پروندهٔ مشتری به دستِ حسابدارِ بی‌اینترنت پس از وصل، با زمانِ خودِ دیدن (CRM-15)' },
@@ -227,7 +228,6 @@ const KNOWN = Object.freeze([
   { key: 'ops.sync_lag', scope: 'ops', default: false, what: 'بخشِ «تأخیرِ همگام‌سازی» در سلامتِ سامانه (OPS-04)' },
   { key: 'backup.require_encryption', scope: 'security', default: false, what: 'پشتیبانِ سرور فقط رمزدار و پس از بازگشاییِ همان فایل (SEC-07)' },
   { key: 'admin.support_grant', scope: 'security', default: false, what: 'دانلودِ پشتیبانِ دکان در پنل فقط با اجازهٔ زندهٔ «خروجی» ِ همان مدیر روی همان دکان (رضایتِ صاحب یا شکستنِ شیشه؛ TEN-04)' },
-  { key: 'auth.phone_add_code', scope: 'security', default: false, what: 'افزودنِ شمارهٔ ورود فقط با کدِ همان شماره (AUTH-08)؛ پیش از روشن کردن برنامه‌ها `phoneCode` بفرستند' },
 ]);
 
 router.get('/', async (req, res) => {

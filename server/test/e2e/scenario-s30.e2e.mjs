@@ -15,6 +15,7 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { boot, assert } from './lib/harness.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const E = await boot({ name: 'scenario-s30' });
 const require = createRequire(import.meta.url);
@@ -55,8 +56,8 @@ await E.step('S30.0', 'دکان روشن: کالا از برنامه، ویتر�
   E.ok(await A.api('POST', '/me/push', { token: 's30-push-phone' }), 'پوشِ گوشی', 201);
   E.ok(await D.api('POST', '/me/push', { token: 's30-push-desk' }), 'پوشِ کامپیوتر', 201);
   assert.equal((await status()).orderAcceptance, 'accepting');
-  const st = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { phone: PHONE }), 'کدِ تأیید');
-  ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { phone: PHONE, code: st.devCode }), 'تأییدِ شماره').ticket;
+  const st = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { email: mailOf(PHONE) }), 'کدِ تأیید');
+  ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { email: mailOf(PHONE), code: st.devCode }), 'تأییدِ شماره').ticket;
 });
 
 await E.step('S30.outage', '۲۰ دقیقه همهٔ دستگاه‌ها آفلاین ⇒ ویترین پیامِ تأخیر نشان می‌دهد؛ سفارش‌ها ثبت و در صف می‌مانند', async () => {

@@ -13,6 +13,7 @@
  */
 import { createRequire } from 'node:module';
 import { boot, assert } from './lib/harness.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 //  کشِ ۳۰ ثانیه‌ایِ پاسخِ عمومیِ «زمانِ تحویل» خاموش: هر خواندن همان لحظه را نشان دهد (بی خواب)
 const E = await boot({ name: 'scenario-s42', env: { STORE_ETA_CACHE_MS: '0' } });
@@ -64,8 +65,8 @@ await E.step('S42.0', 'دکان روشن: کالا، ویترین، صاحب و 
   E.ok(await A.api('PUT', `/shop/storefront/products/${rice}`, { published: true }), 'انتشار');
   E.ok(await A.api('POST', '/me/push', { token: 's42-push-owner' }), 'پوشِ صاحب', 201);
   E.ok(await M.api('POST', '/me/push', { token: 's42-push-manager' }), 'پوشِ مدیر', 201);
-  const st = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { phone: PHONE }), 'کدِ تأیید');
-  ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { phone: PHONE, code: st.devCode }), 'تأییدِ شماره').ticket;
+  const st = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { email: mailOf(PHONE) }), 'کدِ تأیید');
+  ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { email: mailOf(PHONE), code: st.devCode }), 'تأییدِ شماره').ticket;
   assert.deepEqual(await pickupEta(), span(eta.range(15)), 'بی سابقه: پیش‌فرضِ ۱۵ دقیقه');
 });
 

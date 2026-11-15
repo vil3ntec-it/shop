@@ -5,6 +5,7 @@ import ir.vil3ntec.tohid.core.i18n.StrSaleCaps
 import ir.vil3ntec.tohid.core.perm.CreditLimitPerm
 import ir.vil3ntec.tohid.money
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -52,7 +53,9 @@ class CustomerMergeLimitTest {
   @Test fun everyMergeDoorPassesTheShopRules() {
     fun src(rel: String) = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
       .map { java.io.File(it, "ir/vil3ntec/tohid/$rel") }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد")
-    assertTrue(src("data/ShopStore.kt").contains("CustomerMerge.merge(d, keepId, dropId, limitRules)"))
+    //  CRM-10 (`claude/e-rows-57x`): همان قاعده روی هر دو همگام‌سازی — v3 ادغامِ بی ویرایشِ سند (`docs = false`)، نه دری بی قاعده
+    assertTrue(src("data/ShopStore.kt").contains("CustomerMerge.merge(d, keepId, dropId, limitRules, docs = !SyncChoice.isV3(context))"))
+    assertFalse(Regex("""CustomerMerge\.merge\(d, keepId, dropId\)""").containsMatchIn(src("data/ShopStore.kt")))
     assertTrue(src("ui/screens/CrmProfileUi.kt").contains("store.mergeCustomers(p.keep.id, p.drop.id, limitRules)"))
     assertTrue(src("ui/v3/money/MoneyRoutes.kt").contains("MoneyWriter.merge(store, toasts, context, keepId, dropId, limitRules)"))
   }

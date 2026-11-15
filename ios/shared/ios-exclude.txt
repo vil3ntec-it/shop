@@ -20,9 +20,11 @@ data/AtRestKeys.kt  # KEK ِ Android Keystore (سخت‌افزاری، چرخش�
 data/DiskWrite.kt  # شاخهٔ java.nio با سطحِ API (SDK_INT ِ shim = 0 ⇐ بی fsync ِ پوشه)؛ iOS: data/DiskWriteIos.kt (همان تضمین با fsync + rename ِ POSIX)
 data/GoogleSignIn.kt  # Credential Manager ِ اندروید (ورود با گوگل در همهٔ سکوها خاموش است)؛ iOS: data/GoogleSignInIos.kt — ورودِ آیفون اپل است (ios/AppleSignInIos.kt پشتِ data/ExternalSignIn.kt)
 hw/PrinterFinderAndroid.kt  # کارتِ شبکه (ConnectivityManager) و جست‌وجوی بلوتوثِ کلاسیک؛ iOS: hw/PrinterFinderIos.kt (getifaddrs؛ بی بلوتوث، §۵.۱)
+platform/HubFindAndroid.kt  # پرسشِ mDNS ِ هاب (`MdnsProbe`، هدفِ jvm) و کارتِ شبکه؛ iOS: platform/HubFindIos.kt (بی کشف، QR)
 scan/BarcodeScanner.kt  # CameraX + ML Kit + MediaPlayer؛ iOS: scan/BarcodeScannerIos.kt (AVFoundation). سدها مشترک‌اند: BarcodeGuard و ScanGate (core)
 scan/GuidedCapture.kt  # دوربینِ راهنمای CameraX؛ iOS: scan/GuidedCaptureIos.kt (دکمه پنهان، عکسِ کالا با دوربینِ خودِ iOS از راهِ TakePicture)
 ui/SecureWindowAndroid.kt  # OPS-02: `FLAG_SECURE` ِ برگهٔ عبارت (android.view) — آیفون پنجرهٔ امن ندارد؛ ui/PlatformIos.kt: `SecureWindow` ِ بی‌اثر
 ui/Platform.kt  # «کدام سکو» (شناسهٔ دستگاه، پوشهٔ پشتیبان) — برای هر سکو جدا، مثلِ ui/PlatformDesk.kt؛ iOS: ui/PlatformIos.kt (identifierForVendor)
 ui/screens/Haptics.kt  # الگوی خامِ VibrationEffect.createWaveform؛ iOS: ui/screens/HapticsIos.kt ⇐ ios/IosHaptics.kt (مولدهای UIKit با همان معنا: موفق/خطا/تأیید/انتخاب/آستانه، گامِ ۱۰ §۰.۱۵)
+core/net/HttpBodyAndroid.kt  # java.util.zip ِ JVM برای پاسخِ gzip ِ `HttpEngine`؛ iOS: core/net/HttpBodyIos.kt (NSURLSession خودش باز می‌کند)
 sync/v3/V3GzipAndroid.kt  # java.util.zip ِ JVM؛ iOS: sync/v3/V3GzipIos.kt (push ِ v3 همیشه ساده — MIN_CHARS هرگز نمی‌رسد؛ سرور هر دو را می‌پذیرد)

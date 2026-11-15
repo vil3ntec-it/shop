@@ -8,11 +8,16 @@
  * (`BACKUP_PATH`، یا `ERASURE_LEDGER_PATH`) می‌ماند، هر جا پشتیبان‌ها رونوشت می‌شوند همراهشان می‌رود، و پشتیبانِ کهنه آن را
  * کهنه نمی‌کند (پشتیبان فقط دیتابیس است).
  *
- * هر خط یک حذف (JSON): `{v, id, shop, at, key, orders, customer}`
+ * هر خط یک حذف (JSON): `{v, id, shop, at, key, ekey, orders, customer}`
  *   id        شناسهٔ همان حذف (`era…`) — همان `target_id` ِ سابقهٔ `customer_erasure` در دیتابیس
- *   key       HMAC ِ شماره (رازِ سرور، کلیدِ جدای همین کار؛ شکلِ یکتای `validate.phoneKey`) یا '' (سفارشِ بی شماره)
- *   orders    فقط شناسهٔ سفارش‌های بی شماره (حالتِ «همین سفارش»)؛ customer: شناسهٔ حسابِ ویترین (حالتِ «خودِ مشتری»)
- * ⛔ هیچ شماره، نام، نشانی یا متنی. کلید بی رازِ سرور به شماره برنمی‌گردد.
+ *   key       HMAC ِ شماره (رازِ سرور، کلیدِ جدای همین کار؛ شکلِ یکتای `validate.phoneKey`) یا '' (هدفِ بی شماره)
+ *   ekey      (از v2، «فقط ایمیل» ۱۴۰۵/۰۸/۲۳) HMAC ِ ایمیلِ یکدست‌شده (کوچک‌حرف، بی فاصلهٔ دو سر) با کلیدِ جدای دیگر، یا ''
+ *   orders    فقط شناسهٔ سفارش‌های بی شماره و بی ایمیل (حالتِ «همین سفارش»)؛ customer: شناسهٔ حسابِ ویترین (حالتِ «خودِ مشتری»)
+ * ⛔ هیچ شماره، ایمیل، نام، نشانی یا متنی. کلید بی رازِ سرور به شماره/ایمیل برنمی‌گردد.
+ *
+ * نسخه‌ها (پرونده از نسخهٔ کد بیشتر می‌ماند ⇒ خطِ کهنه همیشه خوانده می‌شود):
+ *   v1  (`claude/e-rows-50d`) `key` یا `orders` لازم؛ `ekey` ندارد (اگر هم باشد نادیده) ⇒ همان بازپخشِ پیشین با شماره.
+ *   v2  (امروز، تنها نسخهٔ نوشتنی) `key`، `ekey` یا `orders` — دست‌کم یکی؛ حذفِ ایمیلی فقط `ekey` دارد.
  *
  * نوشتن **پیش از commit ِ همان حذف** است (`append`، با fsync): نوشته نشد ⇒ استثنا ⇒ تراکنشِ حذف برمی‌گردد. پس حذفی نیست که
  * این‌جا نباشد؛ خطِ حذفی که commit نشد (نادر: افتادنِ اتصال میانِ نوشتن و commit) فقط یعنی درخواستِ همان مشتری بعداً اجرا شود.
@@ -25,7 +30,8 @@ const config = require('../config');
 const { serverSecret } = require('./server-secret');
 const { phoneKey } = require('./validate');
 
-const VERSION = 1;
+const VERSION = 2;
+const VERSIONS = Object.freeze([1, 2]);
 const MAX_LINE = 8192;
 const ID = /^[A-Za-z0-9_-]{1,80}$/;
 
@@ -40,6 +46,17 @@ function keyOf(phone) {
   return crypto.createHmac('sha256', k).update(phoneKey(phone)).digest('hex');
 }
 
+/** ایمیلِ یکدست‌شده (همان `validate.email`: کوچک‌حرف) — یک آدم یک کلید */
+const emailNorm = (email) => String(email || '').trim().toLowerCase();
+
+/** HMAC ِ ایمیل با کلیدِ جدای خودش (دامنهٔ جدا از شماره: ایمیل و شماره هرگز هم‌کلید نمی‌شوند) */
+function emailKeyOf(email) {
+  const k = crypto.createHash('sha256').update(`customer-erasure-email\n${serverSecret(['api', 'jwt'], 'customer-erasure')}`).digest();
+  return crypto.createHmac('sha256', k).update(emailNorm(email)).digest('hex');
+}
+
+const HEX = /^[0-9a-f]{64}$/;
+
 const ids = (a) => (Array.isArray(a) ? a.filter((x) => typeof x === 'string' && ID.test(x)).slice(0, 50) : []);
 
 /** خطِ سالم ⇒ ورودی؛ خطِ بدشکل ⇒ null (نادیده؛ شمارش در `read`) */
@@ -47,19 +64,24 @@ function parse(line) {
   if (!line || line.length > MAX_LINE) return null;
   let e;
   try { e = JSON.parse(line); } catch { return null; }
-  if (!e || e.v !== VERSION || !ID.test(String(e.id)) || !ID.test(String(e.shop))) return null;
-  const key = typeof e.key === 'string' && /^[0-9a-f]{64}$/.test(e.key) ? e.key : '';
+  if (!e || !VERSIONS.includes(e.v) || !ID.test(String(e.id)) || !ID.test(String(e.shop))) return null;
+  const key = typeof e.key === 'string' && HEX.test(e.key) ? e.key : '';
+  //  v1 کلیدِ ایمیل نداشت: همان قاعدهٔ پیشین (کلیدِ شماره یا سفارش)، تا خطِ کهنه دقیقاً همان‌طور بازپخش شود
+  const ekey = e.v >= 2 && typeof e.ekey === 'string' && HEX.test(e.ekey) ? e.ekey : '';
   const orders = ids(e.orders);
-  if (!key && !orders.length) return null;
+  if (!key && !ekey && !orders.length) return null;
   return {
-    id: e.id, shop: e.shop, at: Number(e.at) || 0, key, orders,
+    id: e.id, shop: e.shop, at: Number(e.at) || 0, key, ekey, orders,
     customer: typeof e.customer === 'string' && ID.test(e.customer) ? e.customer : '',
   };
 }
 
 /** یک خط، پیش از commit ِ حذف؛ شکست ⇒ throw (تراکنشِ حذف برمی‌گردد) */
-function append({ id, shop, at, phone = null, orders = [], customer = '' }) {
-  const entry = { v: VERSION, id, shop, at, key: phone ? keyOf(phone) : '', orders: ids(orders), customer: customer || '' };
+function append({ id, shop, at, phone = null, email = null, orders = [], customer = '' }) {
+  const entry = {
+    v: VERSION, id, shop, at, key: phone ? keyOf(phone) : '', ekey: emailNorm(email) ? emailKeyOf(email) : '',
+    orders: ids(orders), customer: customer || '',
+  };
   if (!parse(JSON.stringify(entry))) throw new Error('erasure ledger: bad entry');
   const f = file();
   fs.mkdirSync(path.dirname(f), { recursive: true, mode: 0o700 });
@@ -94,4 +116,4 @@ async function read() {
   return { entries, bad };
 }
 
-module.exports = { VERSION, file, keyOf, parse, append, read };
+module.exports = { VERSION, VERSIONS, file, keyOf, emailKeyOf, parse, append, read };

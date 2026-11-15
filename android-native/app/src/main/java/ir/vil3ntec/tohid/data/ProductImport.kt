@@ -42,12 +42,12 @@ object ProductImport {
   )
 
   private val ALIASES: Map<String, String> = mapOf(
-    "نام محصول" to "name", "نام کالا" to "name", "نام" to "name", "کالا" to "name", "name" to "name", "product" to "name",  // داده: نامِ ستونِ فایلِ ورودی برای شناختن (منطق)
-    "دسته" to "category", "دسته‌بندی" to "category", "دسته بندی" to "category", "category" to "category",  // داده: نامِ ستونِ فایلِ ورودی برای شناختن (منطق)
+    "نام محصول" to "name", "نام کالا" to "name", "نام" to "name", "کالا" to "name", "name" to "name", "product" to "name", "product name" to "name", "د توکي نوم" to "name",  // داده: نامِ ستونِ فایلِ ورودی برای شناختن (منطق)
+    "دسته" to "category", "دسته‌بندی" to "category", "دسته بندی" to "category", "category" to "category", "ډله" to "category",  // داده: نامِ ستونِ فایلِ ورودی برای شناختن (منطق)
     "واحد" to "unit", "unit" to "unit",  // داده: نامِ ستونِ فایلِ ورودی برای شناختن (منطق)
-    "قیمت خرید" to "purchase", "purchase price" to "purchase", "purchaseprice" to "purchase", "cost" to "purchase",  // داده: نامِ ستونِ فایلِ ورودی برای شناختن (منطق)
-    "قیمت فروش" to "sale", "sale price" to "sale", "saleprice" to "sale", "price" to "sale",  // داده: نامِ ستونِ فایلِ ورودی برای شناختن (منطق)
-    "حداقل موجودی" to "min", "min stock" to "min", "minstock" to "min",  // داده: نامِ ستونِ فایلِ ورودی برای شناختن (منطق)
+    "قیمت خرید" to "purchase", "purchase price" to "purchase", "purchaseprice" to "purchase", "cost" to "purchase", "د پېر بیه" to "purchase",  // داده: نامِ ستونِ فایلِ ورودی برای شناختن (منطق)
+    "قیمت فروش" to "sale", "sale price" to "sale", "saleprice" to "sale", "price" to "sale", "د پلور بیه" to "sale",  // داده: نامِ ستونِ فایلِ ورودی برای شناختن (منطق)
+    "حداقل موجودی" to "min", "min stock" to "min", "minstock" to "min", "minimum stock" to "min", "لږترلږه موجودي" to "min",  // داده: نامِ ستونِ فایلِ ورودی برای شناختن (منطق)
     "بارکد" to "barcode", "barcode" to "barcode",  // داده: نامِ ستونِ فایلِ ورودی برای شناختن (منطق)
   )
 

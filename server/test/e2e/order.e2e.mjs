@@ -75,6 +75,7 @@ await E.step('E2E-MKT-02', 'S32: قیمت بینِ سبد و ثبت در برن�
   const { page } = C;
   await page.fill('#c-name', 'مشتریِ آزمون');
   await page.fill('#c-phone', '0791112233');
+  await page.fill('#c-email', 'c791112233@e2e.local');   //  «فقط ایمیل»: کد به ایمیل؛ شماره فقط تماسِ پیک
   await page.click('#verify-send');
   await page.waitForSelector('#verify-code-row:not([hidden])', { timeout: 10_000 });
   const code = ((await page.textContent('#verify-msg')).match(/(\d{4,8})/) || [])[1];

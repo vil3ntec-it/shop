@@ -14,7 +14,7 @@
   var DICT = {};
   var own = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
   //  بی واژه‌نامه: واژه‌های پایه (= fa.json، web-i18n)، بقیه خالی؛ کلیدِ خام هرگز
-  K.FB = { 'money': '{n} افغانی', 'cur': 'افغانی', 'sep': '، ', 'err.generic': 'خطا؛ دوباره بزنید.', 'err.rate': 'درخواست‌ها زیاد شد؛ کمی بعد دوباره بزنید.', 'close': 'بستن', 'yes': 'بله', 'no': 'نه', 'add.one': 'افزودنِ {name} به سبد', 'stock.unk': 'موجودی در حال بررسی است', 'stock.out': 'ناموجود', 'st.open': 'باز است', 'st.closed': 'بسته است', 'unit': 'عدد', 'all': 'همه', 'ck.title': 'ثبتِ سفارش', 'ck.sending': 'در حالِ ثبت…', 'cod': 'نقد هنگامِ تحویل', 'free': 'رایگان', 'ship.fee': 'ارسال {fee}', 'ship.free': 'ارسالِ رایگان', 'pickup': 'دریافت از دکان', 'min.order': 'حداقلِ سفارش {m}', 'qty.less': 'یکی کمتر {name}', 'qty.more': 'یکی بیشتر {name}', 'ps.add': 'افزودن به سبد — {p}', 'bar.label': '، {n} قلم، جمع {sum} — باز کردنِ سبد', 'line.label': '{name}، {q}، {sum} — تغییرِ تعداد', 'od.title': 'سفارش', 'od.placed': 'سفارش ثبت شد. دکان آن را بررسی می‌کند؛ همین صفحه وضعیت را نشان می‌دهد.', 'od.no': 'سفارشِ شمارهٔ {n}', 'my.orders': 'سفارش‌های من', 'v.sent': 'کد فرستاده شد.', 'v.ok': 'شماره تأیید شده است.', 'err.bad_phone': 'شمارهٔ موبایل درست نیست.', 'cart.min': 'برای ادامه، سبد به حداقلِ سفارش برسد.', 'order.new': 'ثبت شد — منتظرِ تأییدِ دکان', 'order.accepted': 'دکان قبول کرد', 'order.rejected': 'دکان نپذیرفت', 'order.ready_for_pickup': 'آمادهٔ دریافت از دکان', 'order.out_for_delivery': 'در راه', 'order.delivered': 'تحویل شد', 'order.cancelled': 'لغو شد', 'order.cancelled_by_customer': 'شما لغو کردید', 'ck.submit': 'ثبتِ سفارش — {sum}', 'ck.fee': 'هزینهٔ ارسال', 'ship': 'ارسال', 'p.per': 'هر {unit}', 'acc.orders': 'سفارش‌های من', 'od.sub': 'جمعِ کالاها', 'od.total': 'مبلغِ نهایی', 'od.due': 'مانده (نقد هنگامِ تحویل)' };
+  K.FB = { 'money': '{n} افغانی', 'cur': 'افغانی', 'sep': '، ', 'err.generic': 'خطا؛ دوباره بزنید.', 'err.rate': 'درخواست‌ها زیاد شد؛ کمی بعد دوباره بزنید.', 'close': 'بستن', 'yes': 'بله', 'no': 'نه', 'add.one': 'افزودنِ {name} به سبد', 'stock.unk': 'موجودی در حال بررسی است', 'stock.out': 'ناموجود', 'st.open': 'باز است', 'st.closed': 'بسته است', 'unit': 'عدد', 'all': 'همه', 'ck.title': 'ثبتِ سفارش', 'ck.sending': 'در حالِ ثبت…', 'cod': 'نقد هنگامِ تحویل', 'free': 'رایگان', 'ship.fee': 'ارسال {fee}', 'ship.free': 'ارسالِ رایگان', 'pickup': 'دریافت از دکان', 'min.order': 'حداقلِ سفارش {m}', 'qty.less': 'یکی کمتر {name}', 'qty.more': 'یکی بیشتر {name}', 'ps.add': 'افزودن به سبد — {p}', 'bar.label': '، {n} قلم، جمع {sum} — باز کردنِ سبد', 'line.label': '{name}، {q}، {sum} — تغییرِ تعداد', 'od.title': 'سفارش', 'od.placed': 'سفارش ثبت شد. دکان آن را بررسی می‌کند؛ همین صفحه وضعیت را نشان می‌دهد.', 'od.no': 'سفارشِ شمارهٔ {n}', 'my.orders': 'سفارش‌های من', 'v.sent': 'کد فرستاده شد.', 'v.ok': 'ایمیل تأیید شده است.', 'err.bad_phone': 'شمارهٔ موبایل درست نیست.', 'cart.min': 'برای ادامه، سبد به حداقلِ سفارش برسد.', 'order.new': 'ثبت شد — منتظرِ تأییدِ دکان', 'order.accepted': 'دکان قبول کرد', 'order.rejected': 'دکان نپذیرفت', 'order.ready_for_pickup': 'آمادهٔ دریافت از دکان', 'order.out_for_delivery': 'در راه', 'order.delivered': 'تحویل شد', 'order.cancelled': 'لغو شد', 'order.cancelled_by_customer': 'شما لغو کردید', 'ck.submit': 'ثبتِ سفارش — {sum}', 'ck.fee': 'هزینهٔ ارسال', 'ship': 'ارسال', 'p.per': 'هر {unit}', 'acc.orders': 'سفارش‌های من', 'od.sub': 'جمعِ کالاها', 'od.total': 'مبلغِ نهایی', 'od.due': 'مانده (نقد هنگامِ تحویل)' };
   //  رقمِ فارسی برای fa و ps (پشتوی افغانستان همان ۰–۹ و ماهِ خورشیدی)، لاتین برای en
   var LOC = LANG === 'en' ? 'en-GB' : 'fa-AF';
 
@@ -142,13 +142,14 @@
   K.loadS = function (key) { try { return JSON.parse(sessionStorage.getItem(key)); } catch (e) { return null; } };
   K.saveS = function (key, v) { try { sessionStorage.setItem(key, JSON.stringify(v)); } catch (e) { /* بی حافظه */ } };
 
-  // ── بلیتِ شمارهٔ تأییدشده (۲۳.۲) — بینِ بازارچه و همهٔ ویترین‌ها مشترک ──
+  // ── بلیتِ ایمیلِ تأییدشده (۲۳.۲) — مشترکِ بازارچه و ویترین‌ها ──
   var KEY_TICKET = 'store-ticket';
   K.ticket = function () {
     var t = K.load(KEY_TICKET, null);
-    return t && t.ticket && t.expiresAt > Date.now() ? t : null;
+    return t && t.ticket && t.email && t.expiresAt > Date.now() ? t : null;
   };
-  K.setTicket = function (t) { K.save(KEY_TICKET, t ? { phone: t.phone, ticket: t.ticket, expiresAt: t.expiresAt } : null); };
+  K.setTicket = function (t) { K.save(KEY_TICKET, t ? { email: t.email, ticket: t.ticket, expiresAt: t.expiresAt } : null); };
+  K.normEmail = function (e) { return String(e || '').trim().toLowerCase(); };
   // CHK-01: نشستِ حساب (acct.js)
   K.sess = function () { var s = K.load('store-session', null); return s && s.token && s.expiresAt > Date.now() ? s : null; };
   K.localPhone = function (p) { return String(p || '').replace(/^\+93/, '0'); };
@@ -332,7 +333,7 @@
     if (!a) return;
     var t = K.ticket();
     K.clear(a).append(K.el('span', { class: 'who' }, K.icon('user')),
-      K.el('span', { class: 'lbl' }, t ? K.t('acc.mine') : K.t('acc.orders'), K.el('small', { class: t ? 'ltr' : '', text: t ? K.localPhone(t.phone) : K.t('acc.verified') })));
+      K.el('span', { class: 'lbl' }, t ? K.t('acc.mine') : K.t('acc.orders'), K.el('small', { class: t ? 'ltr' : '', text: t ? t.email : K.t('acc.verified') })));
   };
   /** متنِ ثابتِ HTML به زبانِ صفحه: data-t (متن)، data-ta (aria-label)، data-tp (placeholder). */
   function translate(root) {

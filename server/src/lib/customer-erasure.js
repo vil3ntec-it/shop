@@ -52,10 +52,11 @@
  * سابقه (`audit_logs`): فقط شناسهٔ حذف، روش و شمارش‌ها — نه شماره، نه نام، نه شناسهٔ سفارش.
  *
  * ── پس از بازگردانیِ کلِ سرور (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۳ #۱۵: «بله، خودکار») ──────────────────────────────
- * هر حذف پیش از commit یک خط در دفترِ بیرون از دیتابیس می‌نویسد (`lib/erasure-ledger.js`: فقط شناسه، دکان، زمان و HMAC ِ
- * شماره). [replay] — پس از `backup.restore` (`afterRestore`) و در هر بالا آمدنِ سرور (`app.js`، برای پوشهٔ PGlite ِ
- * جایگزین‌شده) — هر خطی را که سابقه‌اش (`audit_logs`، `target_type = customer_erasure`، همان شناسه) در **این** دیتابیس
- * نیست دوباره اجرا می‌کند: شمارهٔ هم‌کلید در جدول‌های همان دکان پیدا و با همان `erase` (بی سنجشِ «سفارشِ باز»، که در
+ * هر حذف پیش از commit یک خط در دفترِ بیرون از دیتابیس می‌نویسد (`lib/erasure-ledger.js`: فقط شناسه، دکان، زمان، HMAC ِ
+ * شماره و/یا HMAC ِ ایمیل — «فقط ایمیل»: حذفِ ایمیلی فقط کلیدِ ایمیل دارد). [replay] — پس از `backup.restore`
+ * (`afterRestore`) و در هر بالا آمدنِ سرور (`app.js`، برای پوشهٔ PGlite ِ جایگزین‌شده) — هر خطی را که سابقه‌اش
+ * (`audit_logs`، `target_type = customer_erasure`، همان شناسه) در **این** دیتابیس نیست دوباره اجرا می‌کند: شماره یا ایمیلِ
+ * هم‌کلید در جدول‌های همان دکان (یا حسابِ همان شناسه) پیدا و با همان `erase` (بی سنجشِ «سفارشِ باز»، که در
  * پشتیبانِ کهنه کهنه است) پاک می‌شود، و سابقه با **همان** شناسه نوشته می‌شود. چرا امن: سابقه و حذف در یک تراکنش‌اند، پس
  * «سابقه هست» یعنی حذف در همین داده نشسته است؛ و بازپخش همیشه سابقه را می‌نویسد (حتی وقتی چیزی برای پاک کردن نیافت)، پس
  * سفارشِ تازهٔ همان مشتری پس از حذف (یا پس از بازگردانی) هرگز دوباره پاک نمی‌شود.
@@ -141,32 +142,63 @@ async function scrubEvents(c, table, shopId, orderIds) {
 }
 
 /**
- * هدف: `{ phone }` (هر شکلی که validate.phone بپذیرد)، `{ orderId }` (مشتریِ همان سفارش؛ سفارشِ
- * بی شماره ⇒ فقط همان سفارش) یا — فقط برای مشتری — `{ phone, customerId }` ِ حسابِ خودش.
+ * هدف: `{ phone }` (هر شکلی که validate.phone بپذیرد)، `{ email }` (ایمیلِ تأییدشدهٔ مشتریِ ویترین)، `{ orderId }`
+ * (مشتریِ همان سفارش: ایمیل و شماره‌اش؛ سفارشِ بی هیچ‌کدام ⇒ فقط همان سفارش) یا — فقط برای مشتری —
+ * `targetOfCustomer(حسابِ خودش)`. «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): `forms` همهٔ **کلیدهای مشتری** است (شکل‌های شماره و
+ * ایمیل) — همان کلیدِ چت، «خبرم کن»، پوش و درخواستِ محدوده؛ سفارش‌ها با شماره، ایمیل یا حساب.
  */
 async function resolveTarget(c, shopId, input) {
   const b = input && typeof input === 'object' ? input : {};
   let phone = null;
+  let email = null;
   let mode = 'phone';
   const orderOnly = [];
-  if (b.orderId !== undefined && b.orderId !== null && b.orderId !== '') {
+  const given = (x) => x !== undefined && x !== null && x !== '';
+  if (given(b.orderId)) {
     mode = 'order';
-    const o = (await c.query('SELECT id, customer_phone FROM online_orders WHERE shop_id=$1 AND id=$2',
+    const o = (await c.query('SELECT id, customer_phone, customer_email FROM online_orders WHERE shop_id=$1 AND id=$2',
       [shopId, String(b.orderId).slice(0, 80)])).rows[0];
     if (!o) throw notFound('این سفارش در این دکان نیست', 'order_not_found');
     if (o.customer_phone && !o.customer_phone.startsWith(ERASED_PREFIX)) phone = o.customer_phone;
-    else orderOnly.push(o.id);
-  } else if (b.phone !== undefined && b.phone !== null && b.phone !== '') {
-    phone = v.phone(b.phone, { required: true });
+    if (o.customer_email) email = o.customer_email;
+    if (!phone && !email) orderOnly.push(o.id);
+  } else if (given(b.phone) || given(b.email)) {
+    if (given(b.phone)) phone = v.phone(b.phone, { required: true });
+    if (given(b.email)) { email = v.email(b.email, { required: true }); if (!given(b.phone)) mode = 'email'; }
   } else {
-    throw badRequest('شمارهٔ مشتری یا شناسهٔ سفارش لازم است', 'bad_target');
+    throw badRequest('شمارهٔ مشتری، ایمیل یا شناسهٔ سفارش لازم است', 'bad_target');
   }
-  const forms = phone ? v.phoneForms(phone) : [];
+  const phones = phone ? v.phoneForms(phone) : [];
+  const emails = email ? [email] : [];
   let customerIds = b.customerId ? [String(b.customerId)] : [];
-  if (forms.length && !b.customerId) {
-    customerIds = ids((await c.query('SELECT id FROM store_customers WHERE phone = ANY($1::text[])', [forms])).rows);
+  if (!b.customerId && (phones.length || emails.length)) {
+    //  درخواستِ دکان با شماره: مشتری‌ای که در **همین دکان** با این شماره سفارش داده (ایمیلِ تأییدشده و حسابش) هم همان آدم است
+    const fromOrders = [];
+    if (phones.length) {
+      for (const r of (await c.query(
+        `SELECT DISTINCT customer_email, store_customer_id FROM online_orders
+          WHERE shop_id=$1 AND customer_phone = ANY($2::text[]) AND (customer_email <> '' OR store_customer_id IS NOT NULL)`,
+        [shopId, phones]
+      )).rows) {
+        if (r.customer_email && !emails.includes(r.customer_email)) emails.push(r.customer_email);
+        if (r.store_customer_id) fromOrders.push(r.store_customer_id);
+      }
+    }
+    customerIds = [...new Set([...ids((await c.query('SELECT id FROM store_customers WHERE phone = ANY($1::text[]) OR email = ANY($2::text[])',
+      [phones, emails])).rows), ...fromOrders])];
   }
-  return { phone, forms, orderOnly, customerIds, mode: b.customerId ? 'account' : mode };
+  //  `phone`/`email`: هویتِ نخستِ همین هدف (دادهٔ کاربر یا سفارش) — همان کلیدهای دفترِ بازپخش (`lib/erasure-ledger.js`)
+  return { phone, email, forms: [...phones, ...emails], phones, emails, orderOnly, customerIds, mode: b.customerId ? 'account' : mode };
+}
+
+/**
+ * هدفِ «پاک کردنِ دادهٔ من» ِ خودِ مشتری: ایمیل و حسابش؛ شماره فقط برای حسابِ کهنهٔ فقط‌شماره (که هویتِ تأییدشده‌اش
+ * بود). ⛔ شمارهٔ تماسِ حسابِ ایمیل‌دار هدف نیست: تأییدنشده است و ممکن است مالِ کسِ دیگری باشد.
+ */
+function targetOfCustomer(customer) {
+  return customer.email
+    ? { email: customer.email, customerId: customer.id }
+    : { phone: customer.phone, customerId: customer.id };
 }
 
 class DryRun extends Error {
@@ -193,9 +225,10 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '',
       const t = await resolveTarget(c, shopId, target);
       const orders = (await c.query(
         `SELECT id, status FROM online_orders
-          WHERE shop_id=$1 AND (customer_phone = ANY($2::text[]) OR id = ANY($3::text[]))
+          WHERE shop_id=$1 AND (customer_phone = ANY($2::text[]) OR id = ANY($3::text[])
+                OR customer_email = ANY($4::text[]) OR store_customer_id = ANY($5::text[]))
           ORDER BY id FOR UPDATE`,
-        [shopId, t.forms, t.orderOnly]
+        [shopId, t.phones, t.orderOnly, t.emails, t.customerIds]
       )).rows;
       const open = orders.filter((o) => !settled(o.status)).length;
       //  بازپخش: «باز» ِ پشتیبانِ کهنه کهنه است — حذفِ اصلی فقط پس از پایانِ همهٔ سفارش‌ها پذیرفته شده بود
@@ -216,12 +249,12 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '',
 
       if (orderIds.length) {
         counts.orders = await q(
-          `UPDATE online_orders SET customer_name='',
+          `UPDATE online_orders SET customer_name='', customer_email='',
                   customer_phone = CASE WHEN customer_phone = '' OR customer_phone LIKE 'erased:%' THEN customer_phone ELSE $3 END,
                   address = CASE WHEN address->'zone' IS NOT NULL THEN jsonb_build_object('zone', address->'zone') ELSE '{}'::jsonb END,
                   delivery = delivery - 'leaveWith', note='', track_gen = track_gen + 1, version = version + 1
             WHERE shop_id=$1 AND id = ANY($2::text[])
-              AND (customer_name <> '' OR (customer_phone <> '' AND customer_phone NOT LIKE 'erased:%') OR note <> ''
+              AND (customer_name <> '' OR customer_email <> '' OR (customer_phone <> '' AND customer_phone NOT LIKE 'erased:%') OR note <> ''
                    OR (address - 'zone') <> '{}'::jsonb OR (delivery->'leaveWith') IS NOT NULL)
             RETURNING id`,
           [shopId, orderIds, placeholder]
@@ -342,9 +375,11 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '',
       const total = COUNT_KEYS.reduce((s, k) => s + counts[k], 0);
       const out = { dryRun: Boolean(dryRun), mode: t.mode, openOrders: open, counts, total, kept: KEPT };
       if (dryRun) throw new DryRun(out);
-      //  دفترِ بیرون از دیتابیس پیش از commit (شکست ⇒ throw ⇒ هیچ حذفی بی خطِ دفتر) — بازپخش خطِ خودش را دارد
+      //  دفترِ بیرون از دیتابیس پیش از commit (شکست ⇒ throw ⇒ هیچ حذفی بی خطِ دفتر) — بازپخش خطِ خودش را دارد.
+      //  هر حالت دست‌کم یک کلید دارد: شماره و/یا ایمیل (حالت‌های شماره، ایمیل، حساب و سفارشِ دارای یکی از این دو)،
+      //  وگرنه همان سفارش‌های بی شماره و بی ایمیل (`orderOnly` فقط همان‌جا پر است).
       if (!replaying) {
-        ledger.append({ id: erasureId, shop: shopId, at, phone: t.phone, orders: t.phone ? [] : t.orderOnly,
+        ledger.append({ id: erasureId, shop: shopId, at, phone: t.phone, email: t.email, orders: t.orderOnly,
           customer: t.mode === 'account' ? t.customerIds[0] || '' : '' });
       }
       //  CRM-15 (د۱۸، پرچمِ خاموشِ `shop.customer_erasure_ledger`): فرمانِ ناشناس کردنِ پرونده‌های همین شماره در دفترِ دستگاه
@@ -370,25 +405,51 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '',
 
 /* ───────────── بازپخش پس از بازگردانی (تصمیمِ ۱۴۰۵/۰۸/۲۳ #۱۵) ───────────── */
 
-/** شماره‌های زندهٔ (پاک‌نشدهٔ) دکان در این دیتابیس — هر جا `erase` با شماره پیدا می‌کند */
-async function phonesOf(c, shopId, customer) {
-  const out = new Set();
-  const add = (rows, k) => rows.forEach((r) => { const p = r[k]; if (p && !String(p).startsWith(ERASED_PREFIX)) out.add(String(p)); });
+/**
+ * کلیدهای زندهٔ (پاک‌نشدهٔ) مشتری در جدول‌های دکان در این دیتابیس — هر جا `erase` با شماره یا ایمیل پیدا می‌کند:
+ * سفارش (شمارهٔ تماس و ایمیل)، چت، «خبرم کن»، پوشِ آن و درخواستِ محدوده (ستونِ «کلیدِ مشتری» از ۸۸۱: ایمیل یا شمارهٔ کهنه)،
+ * و خودِ حساب. ⇒ `{ phones, emails }`
+ */
+async function keysOf(c, shopId, customer) {
+  const phones = new Set();
+  const emails = new Set();
+  const add = (rows, k) => rows.forEach((r) => {
+    const x = r[k] ? String(r[k]) : '';
+    if (!x || x.startsWith(ERASED_PREFIX)) return;
+    (x.includes('@') ? emails : phones).add(x);
+  });
   add((await c.query("SELECT DISTINCT customer_phone FROM online_orders WHERE shop_id=$1 AND customer_phone <> ''", [shopId])).rows, 'customer_phone');
+  add((await c.query("SELECT DISTINCT customer_email FROM online_orders WHERE shop_id=$1 AND customer_email <> ''", [shopId])).rows, 'customer_email');
   add((await c.query("SELECT DISTINCT customer_phone FROM shop_chat_conversations WHERE shop_id=$1 AND customer_phone <> ''", [shopId])).rows, 'customer_phone');
   add((await c.query('SELECT DISTINCT phone FROM storefront_area_requests WHERE shop_id=$1', [shopId])).rows, 'phone');
   for (const t of ['storefront_alerts', 'store_alert_push']) {
     if (await has(c, t)) add((await c.query(`SELECT DISTINCT phone FROM ${t} WHERE shop_id=$1`, [shopId])).rows, 'phone');
   }
-  if (customer) add((await c.query('SELECT phone FROM store_customers WHERE id=$1', [customer])).rows, 'phone');
-  return [...out];
+  if (customer) {
+    const sc = (await c.query('SELECT phone, email FROM store_customers WHERE id=$1', [customer])).rows;
+    add(sc, 'phone');
+    add(sc, 'email');
+  }
+  return { phones: [...phones], emails: [...emails] };
 }
 
-/** هدفِ یک خطِ دفتر در این دیتابیس: شمارهٔ هم‌کلید، وگرنه سفارش‌های بی شماره؛ هیچ ⇒ null */
+/**
+ * هدفِ یک خطِ دفتر در این دیتابیس: شماره و/یا ایمیلِ هم‌کلید (با حسابِ همان خط)؛ وگرنه — برای «خودِ مشتری» — حسابِ همان
+ * شناسه با کلیدی که **در همین پشتیبان** دارد (ایمیلش پس از پشتیبان عوض شده بود: همان حساب، همان آدم؛ `targetOfCustomer`)؛
+ * وگرنه سفارش‌های بی شماره و بی ایمیل؛ هیچ ⇒ null
+ */
 async function targetOf(c, e) {
-  if (e.key) {
-    const phone = (await phonesOf(c, e.shop, e.customer)).find((p) => ledger.keyOf(p) === e.key);
-    if (phone) return e.customer ? { phone, customerId: e.customer } : { phone };
+  if (e.key || e.ekey) {
+    const { phones, emails } = await keysOf(c, e.shop, e.customer);
+    const phone = e.key ? phones.find((p) => ledger.keyOf(p) === e.key) : undefined;
+    const email = e.ekey ? emails.find((m) => ledger.emailKeyOf(m) === e.ekey) : undefined;
+    if (phone || email) {
+      return { ...(phone ? { phone } : {}), ...(email ? { email } : {}), ...(e.customer ? { customerId: e.customer } : {}) };
+    }
+  }
+  if (e.customer) {
+    const sc = (await c.query('SELECT id, phone, email FROM store_customers WHERE id=$1', [e.customer])).rows[0];
+    if (sc && (sc.email || sc.phone)) return targetOfCustomer(sc);
   }
   for (const id of e.orders) {
     if ((await c.query('SELECT 1 FROM online_orders WHERE shop_id=$1 AND id=$2', [e.shop, id])).rows.length) return { orderId: id };
@@ -437,4 +498,5 @@ async function replay({ run = tx, log = () => {} } = {}) {
   return out;
 }
 
-module.exports = { FLAG, KEPT, COUNT_KEYS, ERASED_PREFIX, flagOn, flagOnSlug, erase, replay, scrub, settled };
+module.exports = {
+  targetOfCustomer, FLAG, KEPT, COUNT_KEYS, ERASED_PREFIX, flagOn, flagOnSlug, erase, replay, scrub, settled };

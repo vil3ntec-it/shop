@@ -33,7 +33,8 @@ router.get('/:slug/promos', readLimit, store, async (req, res) => {
 
 router.post('/:slug/promos/quote', quoteLimit, store, async (req, res) => {
   //  MKT-02: شمارهٔ تأییدشده (بلیت/نشست) فقط با پرچمِ روشنِ `shop.storefront.promo_guard` خوانده می‌شود
-  const phone = () => sf.verifiedPhone(req.get('x-store-ticket') || '', req.get('x-store-session') || '');
+  //  کلیدِ مشتری = ایمیلِ تأییدشده («فقط ایمیل»)؛ نامِ `phone` همان پارامترِ `quote`
+  const phone = () => sf.verifiedEmail(req.get('x-store-ticket') || '', req.get('x-store-session') || '');
   try {
     res.json(await promos.quote(req.store, req.body, undefined, { phone, ip: clientIp(req) }));
   } catch (err) {

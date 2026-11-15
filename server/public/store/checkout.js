@@ -176,7 +176,7 @@
     }
     //  MKT-02/RSK-09 (`promos.guard`، پرچمِ `shop.storefront.promo_guard`): اولین خرید به شمارهٔ تأییدشده بسته است ⇒ کلیدِ پیش‌نمایش
     //  با همان شماره عوض می‌شود؛ شناسهٔ تصادفیِ همین مرورگر (`deviceId`، نه شناسهٔ سخت‌افزار) در پیش‌نمایش فقط با همین پرچم، در ثبت همیشه
-    function guardPhone() { var tk = promos && promos.guard ? K.ticket() : null; return tk ? tk.phone : ''; }
+    function guardPhone() { var tk = promos && promos.guard ? K.ticket() : null; return tk ? tk.email : ''; }
     function deviceId() {
       var v = K.load('store-device', '');
       if (!/^[A-Za-z0-9_-]{8,128}$/.test(v)) {
@@ -240,10 +240,10 @@
       var r = document.querySelector('input[name="fulfillment"]:checked');
       return r ? r.value : '';
     }
-    //  بلیت، یا نشستِ حسابِ همان شماره (CHK-01، acct.js) — سرور هر دو را می‌پذیرد
-    function verifiedFor(phone) {
-      var tk = K.ticket(); var s = K.sess(); var n = phone && K.normPhone(phone);
-      return Boolean(n && ((tk && tk.phone === n) || (s && s.phone === n)));
+    //  بلیت، یا نشستِ حسابِ همان ایمیل (CHK-01، acct.js) — سرور هر دو را می‌پذیرد. «فقط ایمیل»: شمارهٔ فرم فقط تماسِ پیک است
+    function verifiedFor(email) {
+      var tk = K.ticket(); var s = K.sess(); var n = K.normEmail(email);
+      return Boolean(n && ((tk && tk.email === n) || (s && s.email === n)));
     }
 
     function renderCheckout() {
@@ -289,7 +289,7 @@
       renderEta(f);
       renderMethod(f);
       renderVerify();
-      var ok = verifiedFor($('c-phone').value);
+      var ok = verifiedFor($('c-email').value);
       var btn = $('submit-order');
       btn.disabled = closed() || !ids().length || !f || below || unknown || hasBad() || hasShort() || !ok || pending() || needSlot(f);
       btn.textContent = t(quoteNote ? 'ck.accept' : 'ck.submit', { sum: K.money(sub - disc + fee) });
@@ -297,7 +297,7 @@
     }
 
     function renderVerify() {
-      var ok = verifiedFor($('c-phone').value);
+      var ok = verifiedFor($('c-email').value);
       $('verify-send').hidden = ok || !verifyAvailable;
       if (ok) { K.note($('verify-msg'), 'ok', t('v.ok')); $('verify-code-row').hidden = true; $('verify-text').hidden = true; }
       else {
@@ -309,22 +309,22 @@
     }
 
     function sendCode() {
-      var phone = $('c-phone').value;
-      if (!phone.trim()) { K.note($('verify-msg'), 'err', t('v.need')); $('c-phone').focus(); return; }
+      var email = $('c-email').value;
+      if (!email.trim()) { K.note($('verify-msg'), 'err', t('v.need')); $('c-email').focus(); return; }
       var b = $('verify-send'); b.disabled = true;
-      api('/verify/start', { method: 'POST', body: { phone: phone } }).then(function (r) {
+      api('/verify/start', { method: 'POST', body: { email: email } }).then(function (r) {
         $('verify-code-row').hidden = false;
         K.note($('verify-msg'), 'info', t('v.sent') + (r.devCode ? ' ' + t('v.dev', { code: r.devCode }) : ''));
         $('v-code').focus();
       }).catch(function (e) {
         if (e.code === 'verification_unavailable') verifyAvailable = false;
-        K.note($('verify-msg'), e.code === 'verification_unavailable' ? 'warn' : 'err', e.code === 'bad_request' ? t('err.bad_phone') : e.message);
+        K.note($('verify-msg'), e.code === 'verification_unavailable' ? 'warn' : 'err', e.code === 'bad_request' ? t('err.bad_email') : e.message);
       }).then(function () { b.disabled = false; renderCheckout(); });
     }
 
     function checkCode() {
       var b = $('verify-check'); b.disabled = true;
-      api('/verify/check', { method: 'POST', body: { phone: $('c-phone').value, code: $('v-code').value } }).then(function (r) {
+      api('/verify/check', { method: 'POST', body: { email: $('c-email').value, code: $('v-code').value } }).then(function (r) {
         K.setTicket(r);
         K.account();
         $('v-code').value = '';
@@ -364,7 +364,7 @@
     }
     function notifyMe() {
       if (!area) return;
-      if (!verifiedFor($('c-phone').value)) { K.note($('zone-msg'), 'warn', t('err.verification_required')); $('c-phone').focus(); return; }
+      if (!verifiedFor($('c-email').value)) { K.note($('zone-msg'), 'warn', t('err.verification_required')); $('c-email').focus(); return; }
       api('/area-request', { method: 'POST', body: { lat: area.lat, lng: area.lng } }).then(function () {
         area.done = true; renderCheckout();
       }).catch(function (e) { K.note($('zone-msg'), 'err', e.message); });
@@ -494,7 +494,7 @@
         }
         K.saveS('placed:' + r.order.token, true);
         //  فقط روی همین دستگاه، برای سفارشِ بعدی (نام و آخرین نشانی)
-        K.save('store-customer', { name: body.customer.name, addressText: body.address ? body.address.text : '', landmark: body.address ? body.address.landmark : '' });
+        K.save('store-customer', { name: body.customer.name, phone: body.customer.phone, addressText: body.address ? body.address.text : '', landmark: body.address ? body.address.landmark : '' });
         if (ac) ac.placed(body);   //  CHK-09: «این نشانی را با نام نگه دار»
         quoteNote = ''; secondOrder = false; c.empty();
         msg.hidden = true;
@@ -575,12 +575,15 @@
         if (r) r.checked = true;
       }
       var tk = K.ticket() || K.sess();
-      if (tk && !$('c-phone').value) $('c-phone').value = K.localPhone(tk.phone);
+      if (tk && !$('c-email').value) $('c-email').value = tk.email || '';
+      var ss = K.sess();   //  شمارهٔ تماسِ حساب (بی کد) فقط پیش‌پر می‌شود
+      if (ss && ss.phone && !$('c-phone').value) $('c-phone').value = K.localPhone(ss.phone);
       var me = K.load('store-customer', null) || (K.sess() && { name: K.sess().name });
       //  CHK-09: نشانی‌های نام‌دارِ حساب (acct.js، فقط با `features.webAccount` و نشست)
       if (c.acct) c.acct().then(function (a) { ac = a.checkout({ pin: setPin }); }, function () { ac = null; });
       if (me) {
         if (!$('c-name').value && me.name) $('c-name').value = me.name;
+        if (!$('c-phone').value && me.phone) $('c-phone').value = me.phone;   //  شمارهٔ تماسِ ثبتِ پیشینِ همین دستگاه (بی کد)
         if (!$('a-text').value && me.addressText) $('a-text').value = me.addressText;
         if (!$('a-landmark').value && me.landmark) $('a-landmark').value = me.landmark;
       }
@@ -593,6 +596,9 @@
 
     Array.prototype.forEach.call(document.querySelectorAll('input[name="fulfillment"]'), function (r) { r.addEventListener('change', renderCheckout); });
     $('c-phone').addEventListener('input', renderCheckout);
+    //  شمارهٔ تماس (بی کد) مثلِ نام روی همین دستگاه یاد می‌ماند تا بارِ دوباره/قطعِ شبکه دوباره نوشتنش را نخواهد
+    $('c-phone').addEventListener('change', function () { var me = K.load('store-customer', null) || {}; me.phone = $('c-phone').value.trim(); K.save('store-customer', me); });
+    $('c-email').addEventListener('input', renderCheckout);
     $('verify-send').addEventListener('click', sendCode);
     $('verify-check').addEventListener('click', checkCode);
     $('v-code').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); checkCode(); } });

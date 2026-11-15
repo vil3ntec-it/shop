@@ -155,8 +155,8 @@ object PullCard {
  *
  *  هر هشدار مستقیم سرِ کادرِ خودش می‌رود (`ShellTargets`): همگام‌سازی ⇐ صفحهٔ
  *  همگام‌سازی (نه دستگاه‌های جانبی)، کالا ⇐ فهرستِ همان فیلتر، اشتراک ⇐ اشتراک و
- *  دکمهٔ «تمدید» ⇐ پلن‌ها (`actionRoute`). خطای همگام‌سازی دلیلِ واقعیِ موتور را
- *  (`syncError`) همان‌جا می‌گوید.
+ *  دکمهٔ «تمدید» ⇐ پلن‌ها (`actionRoute`). خطای همگام‌سازی دستهٔ سادهٔ دلیلِ موتور را
+ *  (`syncError` ⇒ `SyncModel.reason`) همان‌جا می‌گوید، بی جزئیاتِ فنی.
  */
 object HomeAlerts {
   enum class Kind { ORDERS, SUBSCRIPTION, SYNC, STOCK, DEBTS, EXPIRY, TAX }
@@ -192,7 +192,7 @@ object HomeAlerts {
     val subscriptionDaysLeft: Int? = null,
     val sync: Sync = Sync.OK,
     val queued: Int = 0,
-    /** آخرین خطای موتورِ همگام‌سازی (`SyncStatus.lastError`) — دلیلِ واقعی */
+    /** آخرین خطای موتورِ همگام‌سازی (`SyncStatus.lastError`) — فقط شکلِ سادهٔ آن دیده می‌شود ([syncReason]) */
     val syncError: String = "",
     val outOfStock: Int = 0,
     val lowStock: Int = 0,
@@ -213,7 +213,8 @@ object HomeAlerts {
 
   /** دلیلِ واقعیِ خطا در یک خط، یا متنِ همیشگی وقتی موتور چیزی نگفته */
   fun syncReason(error: String): String {
-    val e = error.trim().replace('\n', ' ')
+    //  ⛔ متنِ خامِ موتور (کدِ HTTP، نشانی، پیامِ لاتین) روی خانه نمی‌آید — فقط جملهٔ سادهٔ همان دسته (`SyncModel.reason`)
+    val e = ir.vil3ntec.tohid.ui.v3.settings.sections.SyncModel.reason(error.replace('\n', ' '))
     return when {
       e.isEmpty() -> StrHome.alertSyncErrorBody
       e.length <= MAX_ERROR -> e

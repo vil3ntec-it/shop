@@ -184,3 +184,151 @@ test('دفتر نوشته نشد ⇒ حذف هم نمی‌نشیند (همه ی�
   }
   assert.equal((await one('SELECT count(*)::int AS n FROM online_orders WHERE shop_id=$1 AND customer_phone=$2', [shopId, P4])).n, 1);
 });
+
+/* ── «فقط ایمیل» × بازپخش (ادغامِ e-rows-47e و e-rows-50d) ──────────────────────────────────────────────────────────── */
+
+const E1 = 'karim.erase@example.com';
+const E2 = 'stays@example.com';
+
+async function orderE(email, { phone = '', name = 'مشتریِ ایمیلی', customerId = null, status = 'delivered' } = {}) {
+  const id = await order(phone, name, status);
+  await query('UPDATE online_orders SET customer_email=$2, store_customer_id=$3 WHERE id=$1', [id, email, customerId]);
+  return id;
+}
+async function chatOf(key, name) {
+  const id = newId('cv');
+  await query(`INSERT INTO shop_chat_conversations (id, shop_id, customer_phone, customer_name, created_at, updated_at)
+               VALUES ($1,$2,$3,$4,$5,$5)`, [id, shopId, key, name, now()]);
+  return id;
+}
+async function areaOf(key) {
+  await query(`INSERT INTO storefront_area_requests (id, shop_id, phone, cell_lat, cell_lng, created_at, updated_at)
+               VALUES ($1,$2,$3,34.5,69.2,$4,$4)`, [newId('ar'), shopId, key, now()]);
+}
+const auditsOf = (q, id) => q("SELECT actor_type FROM audit_logs WHERE target_type='customer_erasure' AND target_id=$1", [id]);
+
+test('«فقط ایمیل»: حذف با ایمیل (بی شماره) ⇒ خطِ دفتر با کلیدِ ایمیل ⇒ پس از بازگردانی همان آدم با ایمیل پیدا و دوباره پاک می‌شود؛ همان شناسه، یک سابقه', async () => {
+  const contact = '+93700555666';   //  شمارهٔ تماسِ پیک روی یکی از سفارش‌ها (تأییدنشده)
+  const o1 = await orderE(E1, { name: NAME1 });
+  const o2 = await orderE(E1, { name: NAME1, phone: contact });
+  const keep = await orderE(E2, { name: 'ایمیلیِ ماندنی' });
+  const cv = await chatOf(E1, NAME1);
+  const cvKeep = await chatOf(E2, 'ایمیلیِ ماندنی');
+  await areaOf(E1);
+  await areaOf(E2);
+  const before = await backup.run({ kind: 'manual' });
+
+  const lines0 = (await fs.readFile(process.env.ERASURE_LEDGER_PATH, 'utf8').catch(() => '')).trim().split('\n').filter(Boolean).length;
+  const done = await erasure.erase(shopId, { email: E1 }, { by: 'owner', userId: 'u1' });
+  assert.equal(done.mode, 'email');
+  assert.equal(done.counts.orders, 2);
+  assert.equal(done.counts.conversations, 1);
+  assert.equal(done.counts.areaRequests, 1);
+  const text = await fs.readFile(process.env.ERASURE_LEDGER_PATH, 'utf8');
+  const lines = text.trim().split('\n');
+  assert.equal(lines.length, lines0 + 1, 'یک خطِ تازه');
+  for (const secret of [E1, 'karim.erase', NAME1, contact, '700555666']) assert.ok(!text.includes(secret), `دفتر «${secret}» دارد`);
+  const entry = JSON.parse(lines[lines.length - 1]);
+  assert.equal(entry.id, done.erasureId);
+  assert.equal(entry.ekey, ledger.emailKeyOf(E1));
+  assert.equal(ledger.emailKeyOf(' Karim.Erase@Example.COM '), entry.ekey, 'ایمیل پیش از HMAC یکدست می‌شود');
+  assert.notEqual(ledger.emailKeyOf(E1), ledger.keyOf(E1), 'کلیدِ ایمیل و کلیدِ شماره دو دامنهٔ جدا');
+  assert.equal(entry.key, '', 'حذفِ ایمیلی کلیدِ شماره ندارد');
+
+  const copy = await drill.restoreIsolated(before.file);
+  try {
+    const q = (t, p) => copy.q(t, p).then((r) => r.rows);
+    assert.equal((await q('SELECT 1 FROM online_orders WHERE shop_id=$1 AND customer_email=$2', [shopId, E1])).length, 2, 'پشتیبانِ کهنه برگرداند');
+    assert.equal((await auditsOf(q, done.erasureId)).length, 0);
+    const run = txOf(copy.pool);
+    const r1 = await erasure.replay({ run });
+    assert.deepEqual([r1.replayed, r1.empty, r1.failed], [1, 0, 0], JSON.stringify(r1));
+    const gone = await q('SELECT id, customer_name, customer_email, customer_phone, note, total_minor FROM online_orders WHERE id = ANY($1::text[]) ORDER BY id', [[o1, o2]]);
+    assert.equal(gone.length, 2);
+    for (const o of gone) {
+      assert.deepEqual([o.customer_name, o.customer_email, o.note, Number(o.total_minor)], ['', '', '', 25000]);
+      assert.ok(o.customer_phone === '' || o.customer_phone === `erased:${done.erasureId}`, o.customer_phone);
+    }
+    assert.equal((await q('SELECT 1 FROM online_orders WHERE customer_phone=$1', [contact])).length, 0, 'شمارهٔ تماسِ همان سفارش هم رفت');
+    assert.deepEqual((await q('SELECT customer_phone, customer_name FROM shop_chat_conversations WHERE id=$1', [cv]))[0],
+      { customer_phone: `erased:${cv}`, customer_name: '' });
+    assert.equal((await q('SELECT 1 FROM storefront_area_requests WHERE shop_id=$1 AND phone=$2', [shopId, E1])).length, 0);
+    //  دیگری دست نخورد
+    assert.deepEqual((await q('SELECT customer_email, customer_name FROM online_orders WHERE id=$1', [keep]))[0], { customer_email: E2, customer_name: 'ایمیلیِ ماندنی' });
+    assert.equal((await q('SELECT customer_phone FROM shop_chat_conversations WHERE id=$1', [cvKeep]))[0].customer_phone, E2);
+    assert.equal((await q('SELECT 1 FROM storefront_area_requests WHERE shop_id=$1 AND phone=$2', [shopId, E2])).length, 1);
+    const mark = await auditsOf(q, done.erasureId);
+    assert.deepEqual(mark.map((m) => m.actor_type), ['system'], 'همان شناسه، یک سابقه');
+
+    //  بارِ دوم ⇒ هیچ؛ سفارشِ تازهٔ همان ایمیل پس از بازگردانی دست نمی‌خورد؛ سابقه تکرار نمی‌شود
+    await copy.q(
+      `INSERT INTO online_orders (id, shop_id, order_no, client_key, request_hash, source, status, fulfillment, customer_name, customer_phone,
+         customer_email, address, delivery, note, items_count, subtotal_minor, delivery_fee_minor, total_minor, created_at, updated_at)
+       VALUES ('ord-e-after', $1, 9997, 'ck-e-after', 'h', 'storefront', 'new', 'pickup', 'کریمِ تازه', '', $2, '{}'::jsonb, '{}'::jsonb, '', 1, 1, 0, 1, 1, 1)`,
+      [shopId, E1]);
+    const r2 = await erasure.replay({ run });
+    assert.deepEqual([r2.replayed, r2.empty, r2.failed], [0, 0, 0]);
+    assert.deepEqual((await q('SELECT id FROM online_orders WHERE customer_email=$1', [E1])).map((o) => o.id), ['ord-e-after']);
+    assert.equal((await auditsOf(q, done.erasureId)).length, 1, 'بی سابقهٔ تکراری');
+  } finally {
+    await copy.close();
+  }
+});
+
+test('«فقط ایمیل»: «پاک کردنِ دادهٔ من» ِ خودِ مشتری (حساب با ایمیل) ⇒ بازپخش با ایمیل و حساب؛ حسابی که پس از پشتیبان ایمیلش عوض شد هم با شناسهٔ حساب پیدا می‌شود', async () => {
+  const at = now();
+  const cid = newId('sc');
+  const OLD = 'old.mail@example.com';
+  const NEW = 'new.mail@example.com';
+  await query('INSERT INTO store_customers (id, email, phone, name, created_at, updated_at) VALUES ($1,$2,NULL,$3,$4,$4)', [cid, OLD, 'حسابِ ایمیلی', at]);
+  const oOld = await orderE(OLD, { customerId: cid, name: 'حسابِ ایمیلی' });
+  const cvOld = await chatOf(OLD, 'حسابِ ایمیلی');
+  const before = await backup.run({ kind: 'manual' });
+  //  پس از پشتیبان: ایمیلِ حساب عوض شد و سفارشِ تازه با ایمیلِ تازه
+  await query('UPDATE store_customers SET email=$2 WHERE id=$1', [cid, NEW]);
+  const oNew = await orderE(NEW, { customerId: cid, name: 'حسابِ ایمیلی' });
+  const cust = await one('SELECT id, email, phone FROM store_customers WHERE id=$1', [cid]);
+  const done = await erasure.erase(shopId, erasure.targetOfCustomer(cust), { by: 'customer' });
+  assert.equal(done.mode, 'account');
+  assert.equal(done.counts.orders, 2, 'سفارشِ ایمیلِ پیشین هم با حساب');
+  const entry = (await ledger.read()).entries.find((e) => e.id === done.erasureId);
+  assert.deepEqual([entry.ekey, entry.key, entry.customer], [ledger.emailKeyOf(NEW), '', cid]);
+
+  const copy = await drill.restoreIsolated(before.file);
+  try {
+    const q = (t, p) => copy.q(t, p).then((r) => r.rows);
+    assert.equal((await q('SELECT email FROM store_customers WHERE id=$1', [cid]))[0].email, OLD, 'پشتیبان ایمیلِ پیشین را دارد');
+    const r = await erasure.replay({ run: txOf(copy.pool) });
+    assert.deepEqual([r.replayed, r.empty, r.failed], [1, 0, 0], JSON.stringify(r));
+    assert.deepEqual((await q('SELECT customer_email, customer_name FROM online_orders WHERE id=$1', [oOld]))[0], { customer_email: '', customer_name: '' });
+    assert.equal((await q('SELECT customer_phone FROM shop_chat_conversations WHERE id=$1', [cvOld]))[0].customer_phone, `erased:${cvOld}`);
+    assert.equal((await q('SELECT 1 FROM online_orders WHERE id=$1', [oNew])).length, 0, 'سفارشِ پس از پشتیبان در پشتیبان نیست');
+    assert.equal((await q('SELECT 1 FROM store_customers WHERE id=$1', [cid])).length, 1, 'حسابِ سراسری می‌ماند (فقط با حذفِ حساب)');
+    assert.deepEqual((await auditsOf(q, done.erasureId)).map((m) => m.actor_type), ['system']);
+  } finally {
+    await copy.close();
+  }
+});
+
+test('دفترِ کهنه: خطِ v1 (فقط کلیدِ شماره، پیش از «فقط ایمیل») همان‌طور خوانده و بازپخش می‌شود', async () => {
+  const P6 = '+93700555777';
+  const o = await order(P6, 'مشتریِ دفترِ کهنه');
+  const before = await backup.run({ kind: 'manual' });
+  //  خطی که کدِ پیشین (v1) نوشته بود — بی `ekey`
+  const id = newId('era');
+  const v1 = { v: 1, id, shop: shopId, at: now(), key: ledger.keyOf(P6), orders: [], customer: '' };
+  assert.deepEqual(ledger.parse(JSON.stringify(v1)), { id, shop: shopId, at: v1.at, key: v1.key, ekey: '', orders: [], customer: '' });
+  assert.equal(ledger.parse(JSON.stringify({ ...v1, key: '' })), null, 'v1 بی کلید و بی سفارش همان «بدشکل»');
+  assert.equal(ledger.parse(JSON.stringify({ ...v1, key: '', ekey: ledger.emailKeyOf(E1) })), null, 'v1 کلیدِ ایمیل را نمی‌شناسد');
+  await fs.appendFile(process.env.ERASURE_LEDGER_PATH, `${JSON.stringify(v1)}\n`);
+  const copy = await drill.restoreIsolated(before.file);
+  try {
+    const q = (t, p) => copy.q(t, p).then((r) => r.rows);
+    const r = await erasure.replay({ run: txOf(copy.pool) });
+    assert.deepEqual([r.replayed, r.failed], [1, 0], JSON.stringify(r));
+    assert.deepEqual((await q('SELECT customer_phone, customer_name FROM online_orders WHERE id=$1', [o]))[0], { customer_phone: `erased:${id}`, customer_name: '' });
+    assert.deepEqual((await auditsOf(q, id)).map((m) => m.actor_type), ['system']);
+  } finally {
+    await copy.close();
+  }
+});

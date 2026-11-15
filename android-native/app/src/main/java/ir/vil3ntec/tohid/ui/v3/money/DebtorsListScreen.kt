@@ -93,7 +93,19 @@ internal fun DebtorsListScreen(d: ShopData, sortArg: String?, queryArg: String?,
   val summary = remember(d) { DebtorListModel.summary(d) }
   val motion = Motion.enabled
 
-  V3Scaffold(title = Str.debtors, onBack = actions.onBack, largeTitle = false) { pad ->
+  //  کارِ یک‌دستی: جست‌وجو و تراشه‌های برچسب پایینِ صفحه (`V3Dock`)، دکمهٔ «+» هم پایین — بقیهٔ r9 همان
+  V3Scaffold(
+    title = Str.debtors,
+    onBack = actions.onBack,
+    largeTitle = false,
+    search = { PhoneDebtorsTheme { DebtorsSearchField(value = search, onValueChange = { search = it }) } },
+    chips = if (tags.isEmpty()) null else ({
+      Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        V3Chip(StrMoney.allTags, tag == null, { tagPick = null })
+        tags.forEach { (t, n) -> V3Chip("#$t", tag == t, { tagPick = if (tag == t) null else t }, count = n) }
+      }
+    }),
+  ) { pad ->
     PhoneDebtorsTheme {
       DebtorsBackdrop {
         LazyVerticalGrid(
@@ -109,15 +121,6 @@ internal fun DebtorsListScreen(d: ShopData, sortArg: String?, queryArg: String?,
             Column {
               DebtorsStatsCard(summary)
               Spacer(Modifier.height(12.dp))
-              DebtorsSearchField(value = search, onValueChange = { search = it })
-              Spacer(Modifier.height(10.dp))
-              if (tags.isNotEmpty()) {
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                  V3Chip(StrMoney.allTags, tag == null, { tagPick = null })
-                  tags.forEach { (t, n) -> V3Chip("#$t", tag == t, { tagPick = if (tag == t) null else t }, count = n) }
-                }
-                Spacer(Modifier.height(10.dp))
-              }
               val onMerge = actions.onMerge
               if (onMerge != null && duplicates > 0) {
                 V3ListRow(

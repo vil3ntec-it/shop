@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrSheets
 import ir.vil3ntec.tohid.core.i18n.StrGoods
 import ir.vil3ntec.tohid.ui.screens.DayEndModel
 
@@ -53,7 +54,7 @@ object ReportDrillSheet {
   private fun saleLines(d: ShopData, from: String, to: String, row: Int): ReportCsv.Sheet? {
     val sale = d.sales.filter { it.date >= from && it.date <= to }.sortedBy { it.createdAt }.getOrNull(row) ?: return null
     val names = d.products.associate { it.id to it.name }
-    val rows = mutableListOf(listOf("کالا", "مقدار", "فی", "جمع"))  // داده: سرستونِ ریزِ ردیف، همان زبانِ برگه‌های «گزارش‌ها»
+    val rows = mutableListOf(listOf(StrSheets.product, StrSheets.quantity, StrSheets.unitPrice, StrSheets.total))
     d.saleItems.filter { it.saleId == sale.id }.forEach { l ->
       rows += listOf(l.name.ifBlank { names[l.productId].orEmpty() }, ir.vil3ntec.tohid.qty(l.quantity), whole(l.unitPrice), whole(l.totalPrice))
     }
@@ -63,7 +64,7 @@ object ReportDrillSheet {
   /** همان گروهِ `ReportEngine.bySeller` (بی «فروشندهٔ هر ردیف»): فروشنده ⇐ فاکتورهایش */
   private fun sellerInvoices(d: ShopData, from: String, to: String, row: Int): ReportCsv.Sheet? {
     val who = ReportEngine.bySeller(d, from, to).getOrNull(row)?.seller ?: return null
-    val rows = mutableListOf(listOf("روز", "فاکتور", "فروش"))  // داده: سرستونِ ریزِ ردیف، همان زبانِ برگه‌های «گزارش‌ها»
+    val rows = mutableListOf(listOf(StrSheets.day, StrSheets.invoice, StrSheets.moveSale))
     d.sales.filter { it.status != "cancelled" && it.date >= from && it.date <= to && it.seller.trim().ifEmpty { StrGoods.unknownSeller } == who }
       .sortedBy { it.createdAt }
       .forEach { s -> rows += listOf(s.date, DayEndModel.docLabel(d, "sale:${s.id}"), whole(s.finalTotal)) }
@@ -77,7 +78,7 @@ object ReportDrillSheet {
   private fun profit(d: ShopData, from: String, to: String, row: Int): ReportCsv.Sheet? = when (row) {
     0, 1, 2, 3, 5 -> {
       val index = ShopStore.salesIndex(d)
-      val rows = mutableListOf(listOf("روز", "فاکتور", "فروشِ ناخالص", "تخفیف", "فروشِ خالص", "بهای تمام‌شدهٔ کالا"))  // داده: سرستونِ ریزِ ردیف، همان زبانِ برگه‌های «گزارش‌ها»
+      val rows = mutableListOf(listOf(StrSheets.day, StrSheets.invoice, StrSheets.grossSales, StrSheets.discount, StrSheets.netSales, StrSheets.cogs))
       d.sales.filter { it.date in from..to && it.status != "cancelled" }.sortedBy { it.createdAt }.forEach { s ->
         val cogs = index.itemsBySale[s.id].orEmpty().sumOf { it.quantity * it.purchasePrice }
         rows += listOf(s.date, DayEndModel.docLabel(d, "sale:${s.id}"), whole(s.total), whole(s.discount), whole(s.finalTotal), whole(cogs))
@@ -87,7 +88,7 @@ object ReportDrillSheet {
     4 -> {
       val index = ShopStore.salesIndex(d)
       val names = d.products.associate { it.id to it.name }
-      val rows = mutableListOf(listOf("روز", "فاکتور", "کالا", "مقدار", "مبلغ"))  // داده: سرستونِ ریزِ ردیف، همان زبانِ برگه‌های «گزارش‌ها»
+      val rows = mutableListOf(listOf(StrSheets.day, StrSheets.invoice, StrSheets.product, StrSheets.quantity, StrSheets.amount))
       d.saleReturns.filter { it.date in from..to && index.saleById[it.saleId]?.status != "cancelled" }.sortedBy { it.createdAt }.forEach { r ->
         val item = index.itemById[r.saleItemId]
         rows += listOf(
@@ -111,7 +112,7 @@ object ReportDrillSheet {
   private fun rfmPurchases(d: ShopData, x: CustomerInsight.Rfm, today: String): ReportCsv.Sheet {
     val names = d.debtors.associateBy { it.id }
     val returned = d.saleReturns.groupBy { it.saleId }.mapValues { (_, l) -> l.sumOf { it.amount } }
-    val rows = mutableListOf(listOf("روز", "فاکتور", "مبلغِ خرید"))  // داده: سرستونِ ریزِ ردیف، همان زبانِ برگه‌های «گزارش‌ها»
+    val rows = mutableListOf(listOf(StrSheets.day, StrSheets.invoice, StrSheets.purchaseAmount))
     d.sales.filter { s ->
       s.status != "cancelled" && s.date >= x.firstPurchase && s.date <= today &&
         s.debtorId?.takeIf { it.isNotBlank() }?.let { CustomerCrm.resolve(names, it) } == x.id

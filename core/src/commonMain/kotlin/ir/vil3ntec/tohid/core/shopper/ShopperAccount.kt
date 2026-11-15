@@ -16,11 +16,12 @@ import kotlinx.serialization.json.JsonElement
  *    فهرست ─ ادغام، سپس هر تغییر یک کار («همه» یا «برداشتنِ یکی») روی نسخهٔ دیده‌شده؛ ۴۰۹ ⇒ همان کار روی فهرستِ تازه؛
  *           صف خالی ⇒ حساب حرفِ آخر؛ پر ⇒ فهرستِ دستگاه جای حساب؛ `too_many_lists` ⇒ فقط روی دستگاه.
  *  ⛔ قیمت، نام و موجودی همیشه از پاسخِ امروزِ سرور؛ فهرست فقط شناسه و مقدار. بی نشست ⇒ همه فقط روی دستگاه.
- *  ⛔ ورود فقط با بلیتِ تازهٔ کدِ واقعیِ سرور (`POST /:slug/account`)؛ سرورِ بی راهِ پیامک ⇒ ۵۰۳ (D-09)، هرگز کدِ ساختگی.
+ *  ⛔ ورود فقط با بلیتِ تازهٔ کدِ واقعیِ سرور به **ایمیل** (`POST /:slug/account`؛ «فقط ایمیل»)؛ سرورِ بی راهِ ایمیل ⇒ ۵۰۳،
+ *     هرگز کدِ ساختگی. شمارهٔ حساب فقط تماسِ پیک است.
  */
 
 @Serializable
-data class AccountCustomer(val id: String = "", val phone: String = "", val name: String = "")
+data class AccountCustomer(val id: String = "", val email: String? = null, val phone: String? = null, val name: String = "")
 
 /** نشستِ حساب (`sc1.…`) — پاسخِ `POST /:slug/account`. ⛔ فقط در نگه‌دارِ رمزشدهٔ سکو، هرگز در [ShopperState]. */
 @Serializable
@@ -159,6 +160,12 @@ object AccountRules {
   fun maskPhone(e164: String): String {
     val local = if (e164.startsWith("+93")) "0" + e164.removePrefix("+93") else e164
     return if (local.length <= 7) local else local.take(4) + "•••" + local.takeLast(3)
+  }
+
+  /** ایمیلِ خودِ مشتری، پوشیده (CRM-15): `ali.r@x.af` ⇒ `a••••@x.af` (همان `customer-contact.maskPhone` ِ سرور برای ایمیل) */
+  fun maskEmail(email: String): String {
+    val at = email.indexOf('@')
+    return if (at <= 0) email else email.take(1) + "•".repeat(maxOf(1, at - 1)) + email.substring(at)
   }
 
   fun cleanFavs(ids: List<String>): List<String> = ids.filter { ID.matches(it) }.distinct().take(MAX_FAVS)

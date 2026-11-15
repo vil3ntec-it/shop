@@ -126,6 +126,11 @@ fun rememberV3HeaderState(): V3HeaderState = remember { V3HeaderState() }
  *  پایین: `bottomReserve` جای نوارِ شناورِ پایین است (صفحه‌های نوار)، و
  *  `bottomBar` نوارِ چسبان (فرم‌ها، `V3ActionBar`)؛ هر دو در `PaddingValues`ِ
  *  محتوا حساب شده‌اند تا آخرین ردیف زیرِ چیزی نماند. `fab` با پیمایش جمع می‌شود.
+ *
+ *  کارِ یک‌دستی (گوشی و تبلت، نه کامپیوتر): `search`، `chips` و کارهای `dock` (اسکن، مرتب‌سازی، نما، …)
+ *  در `V3Dock` ِ پایینِ صفحه می‌نشینند — بالای `bottomBar` و نوارِ شناور؛ بالا فقط عنوان، برگشت و کارهای
+ *  کم‌کاربردِ سربرگ و «…». روی کامپیوتر (`LocalDeskLayout`) همان چیدمانِ پیشین: جست‌وجو و تراشه زیرِ عنوان و
+ *  `dock` جلوی کارهای سربرگ.
  */
 @Composable
 fun V3Scaffold(
@@ -146,8 +151,14 @@ fun V3Scaffold(
   bottomBar: (@Composable () -> Unit)? = null,
   /** زمینهٔ ویژه به‌جای `bg` (مثلاً `Modifier.frosted(PhoneV3.colors)` در «حساب من»)؛ سربرگ و عنوانِ درشت شفاف می‌شوند */
   backdrop: Modifier? = null,
+  /** کارهای پرکاربرد برای شست (اسکن، مرتب‌سازی/فیلتر، نما) — دکمه‌های `V3Dock` ِ پایین؛ کامپیوتر: سربرگ */
+  dock: List<V3Action> = emptyList(),
   content: @Composable (PaddingValues) -> Unit,
 ) {
+  //  گوشی و تبلت: جست‌وجو، تراشه‌ها و کارهای شست پایینِ صفحه (`V3Dock`)
+  val thumb = !ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout.current
+  val docked = thumb && (search != null || chips != null || dock.isNotEmpty())
+  val headerTop = if (thumb) actions else dock + actions
   val c = PhoneV3.colors
   val density = LocalDensity.current
   //  پنجرهٔ کوتاه (افقی، دوپاره): عنوانِ درشت نه — همه‌جا برای فهرست (AUDIT-NAV S3)
@@ -183,14 +194,15 @@ fun V3Scaffold(
   //  وگرنه نخستین ردیفِ «…»
   val guide = LocalV3Guide.current
   var guideOpen by remember { mutableStateOf(false) }
-  val shown = actions.take(2)
+  val shown = headerTop.take(2)
   val guideIcon = guide != null && shown.size + (if (overflow.isEmpty()) 0 else 1) < 3
   val menu = if (guide != null && !guideIcon) listOf(V3MenuItem(Icons.AutoMirrored.Outlined.HelpOutline, StrKit.guide) { guideOpen = true }) + overflow else overflow
   val headerActions = shown +
     (if (guideIcon) listOf(V3Action(Icons.AutoMirrored.Outlined.HelpOutline, StrKit.guide) { guideOpen = true }) else emptyList()) +
     (if (menu.isEmpty()) emptyList() else listOf(V3Action(Icons.Outlined.MoreHoriz, StrKit.more) { menuOpen = true }))
 
-  Box(if (backdrop != null) modifier.fillMaxSize().then(backdrop) else modifier.fillMaxSize().background(c.bg)) {
+  //  زدنِ بیرون از کادرِ نوشتن ⇒ صفحه‌کلید بسته (`v3ClearFocusOnTap`، یک جا برای همهٔ صفحه‌های کیت)
+  Box((if (backdrop != null) modifier.fillMaxSize().then(backdrop) else modifier.fillMaxSize().background(c.bg)).v3ClearFocusOnTap()) {
     Column(Modifier.fillMaxSize().nestedScroll(connection)) {
       V3HeaderBar(title, onBack, headerActions, showTitle = showTitle, divider = { if (large) state.fraction else 1f }, transparent = backdrop != null)
       //  عنوانِ درشت، پیام‌ها، جست‌وجو و تراشه‌ها با هم جمع می‌شوند تا فهرست جا بگیرد (S3)؛
@@ -198,12 +210,23 @@ fun V3Scaffold(
       V3Collapsing(state, transparent = backdrop != null) {
         if (large) V3LargeTitle(title, subtitle, state)
         if (notice != null) V3NoticeSlot(notice)
-        if (search != null) Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp)) { search() }
-        if (chips != null) Box(Modifier.fillMaxWidth().padding(bottom = 8.dp)) { chips() }
+        if (!thumb && search != null) Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp)) { search() }
+        if (!thumb && chips != null) Box(Modifier.fillMaxWidth().padding(bottom = 8.dp)) { chips() }
       }
+      //  زیرِ محتوا: نوارِ کارها (اگر هست)، نوارِ چسبان و جای نوارِ شناور/سیستم
+      val under = bottomReserve + bottomBarHeight + (if (bottomBar == null) navInset else 0.dp)
       Box(Modifier.weight(1f).fillMaxWidth()) {
-        content(PaddingValues(bottom = bottomReserve + bottomBarHeight + (if (bottomBar == null) navInset else 0.dp) + 16.dp))
+        //  با نوارِ کارها محتوا همان‌جا تمام می‌شود که نوار شروع می‌شود؛ دکمهٔ شناور هم درست بالای آن
+        content(PaddingValues(bottom = (if (docked) 0.dp else under) + 16.dp))
+        if (fab != null) {
+          Box(
+            Modifier
+              .align(Alignment.BottomEnd)
+              .padding(end = 16.dp, bottom = if (docked) 12.dp else bottomReserve + bottomBarHeight + (if (bottomReserve == 0.dp && bottomBar == null) navInset else 0.dp) + 16.dp),
+          ) { fab(!state.scrolledDown) }
+        }
       }
+      if (docked) V3Dock(Modifier.padding(bottom = under), search = search, chips = chips, actions = dock, below = bottomReserve + bottomBarHeight)
     }
     if (bottomBar != null) {
       Box(
@@ -213,13 +236,6 @@ fun V3Scaffold(
           .padding(bottom = bottomReserve)
           .onSizeChanged { barHeight = it.height.toFloat() },
       ) { bottomBar() }
-    }
-    if (fab != null) {
-      Box(
-        Modifier
-          .align(Alignment.BottomEnd)
-          .padding(end = 16.dp, bottom = bottomReserve + bottomBarHeight + (if (bottomReserve == 0.dp && bottomBar == null) navInset else 0.dp) + 16.dp),
-      ) { fab(!state.scrolledDown) }
     }
   }
   if (guideOpen && guide != null) V3GuideSheet(guide) { guideOpen = false }

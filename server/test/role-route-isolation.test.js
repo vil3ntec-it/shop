@@ -26,6 +26,7 @@ inv.tapMounts();
 const h = require('./helpers');
 const { query, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 /** همهٔ درهای زیرِ `/api` با نامِ میان‌افزارهای زنجیره‌شان (`route-inventory.live`). */
 const live = () => inv.live(h.server().listeners('request')[0]);
@@ -80,9 +81,9 @@ async function courier(owner, name) {
 }
 
 async function customer(slug, phone) {
-  const s = await h.post(`/api/store/${slug}/verify/start`, { phone });
+  const s = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
   assert.equal(s.status, 200, JSON.stringify(s.body));
-  const c = await h.post(`/api/store/${slug}/verify/check`, { phone, code: s.body.devCode });
+  const c = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: s.body.devCode });
   const a = await h.post(`/api/store/${slug}/account`, {}, { headers: { 'X-Store-Ticket': c.body.ticket } });
   assert.ok(a.status < 300, JSON.stringify(a.body));
   return { session: a.body.session, ticket: c.body.ticket, phone };

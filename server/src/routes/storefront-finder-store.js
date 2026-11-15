@@ -41,9 +41,10 @@ const filtersOn = gate(filters.flagOn);
 const alertsOn = gate(alerts.flagOn);
 
 const verified = async (req, res, next) => {
-  const phone = await sf.verifiedPhone(req.get('x-store-ticket') || '', req.get('x-store-session') || '');
-  if (!phone) throw new ApiError(401, 'verification_required', 'برای «خبرم کن»، شمارهٔ خود را با کد تأیید کنید');
-  req.verifiedPhone = phone;
+  //  کلیدِ مشتری = ایمیلِ تأییدشده («فقط ایمیل»، ۱۴۰۵/۰۸/۲۳؛ ستونِ `storefront_alerts.phone` از مهاجرتِ ۸۸۱)
+  const email = await sf.verifiedEmail(req.get('x-store-ticket') || '', req.get('x-store-session') || '');
+  if (!email) throw new ApiError(401, 'verification_required', 'برای «خبرم کن»، ایمیلِ خود را با کد تأیید کنید');
+  req.verifiedPhone = email;
   next();
 };
 

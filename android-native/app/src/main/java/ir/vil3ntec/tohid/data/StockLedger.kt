@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrSheets
 import ir.vil3ntec.tohid.core.stock.CountDuringSales
 import ir.vil3ntec.tohid.core.stock.Lot
 import ir.vil3ntec.tohid.core.stock.LotRef
@@ -613,7 +614,7 @@ object StockLedger {
       (f.to == null || r.at <= f.to)
   }
 
-  val EXPORT_HEADER = listOf("شناسه", "زمان", "روز", "نوع", "کالا", "محل", "مقدار", "بهای موقت (افغانی)", "کاربر", "دلیل", "سری", "سند")  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+  val EXPORT_HEADER: List<String> get() = listOf(StrSheets.id, StrSheets.time, StrSheets.day, StrSheets.type, StrSheets.product, StrSheets.location, StrSheets.quantity, StrSheets.provisionalCost, StrSheets.user, StrSheets.reason, StrSheets.lot, StrSheets.document)
 
   fun exportRows(rows: List<Row>, nameOf: (String) -> String): List<List<String>> = rows.map { r ->
     listOf(

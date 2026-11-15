@@ -40,8 +40,10 @@ internal object ReceiptsModel {
     //  S89: رسیدِ معکوس‌شده و خودِ سندِ معکوس در فهرستِ رسیدها نیستند (سابقه در حسابِ قرض‌دار)
     Tab.DEBTORS -> ir.vil3ntec.tohid.data.DebtReverse.effective(d.transactions).filter { it.type == "receive" && !ir.vil3ntec.tohid.data.DebtReverse.isReversal(it) }.mapNotNull { t ->
       val j = Jalali.ofIso(t.date) ?: return@mapNotNull null
-      val debtor = d.debtors.find { it.id == t.debtorId }
-      Row(t.id, debtor?.name ?: StrMoney.deletedDebtor, t.notes, t.amount, t.date, t.debtorId, debtor != null, j.year, j.month)
+      //  CRM-10: رسیدِ مشتریِ ادغام‌شده زیرِ ماندگار (نام و فیلترِ «قرض‌دار»)
+      val who = ir.vil3ntec.tohid.data.CustomerAlias.keeperOf(d, t.debtorId)
+      val debtor = d.debtors.find { it.id == who }
+      Row(t.id, debtor?.name ?: StrMoney.deletedDebtor, t.notes, t.amount, t.date, who, debtor != null, j.year, j.month)
     }
     Tab.EXPENSES -> d.expenses.mapNotNull { x ->
       val j = Jalali.ofIso(x.date) ?: return@mapNotNull null

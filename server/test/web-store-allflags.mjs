@@ -22,6 +22,7 @@ import { missingTool, PLAYWRIGHT_INSTALL, SKIP } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -345,8 +346,8 @@ async function clickCard(P, id, sel) {
   await b.evaluate((e) => { e.scrollIntoView({ block: 'center' }); e.click(); });
 }
 const cartLocal = (P) => P.page.evaluate((k) => { try { return Object.fromEntries(Object.entries(JSON.parse(localStorage.getItem(k)) || {}).map(([i, l]) => [i, l.qtyMilli])); } catch { return {}; } }, `store-cart:${slug}`);
-const dbCart = async (phone) => {
-  const r = await one(`SELECT c.items FROM store_customer_carts c JOIN store_customers s ON s.id = c.customer_id WHERE c.shop_id = $1 AND s.phone = $2`, [shopId, phone]);
+const dbCart = async (phone) => {   //  «فقط ایمیل»: حساب با ایمیلِ تأییدشده (همان mailOf ِ شماره)
+  const r = await one(`SELECT c.items FROM store_customer_carts c JOIN store_customers s ON s.id = c.customer_id WHERE c.shop_id = $1 AND s.email = $2`, [shopId, mailOf(phone)]);
   if (!r) return null;
   const items = typeof r.items === 'string' ? JSON.parse(r.items) : r.items;
   return Object.fromEntries(items.map((i) => [i.productId, i.qtyMilli]));
@@ -442,7 +443,7 @@ async function journey(width, lang, phone) {
   await page.waitForSelector('#ac-mine > button.btn-sm:not(.btn-ghost)', { timeout: 15000 });
   await check(P, 'سفارش‌های من (بی حساب)');
   await page.click('#ac-mine > button.btn-sm:not(.btn-ghost)');
-  await page.fill('#ac-mine input[type="tel"]', phone);
+  await page.fill('#ac-mine input[type="email"]', mailOf(phone));
   await page.click('#ac-mine button.btn-soft');
   await page.waitForSelector('#ac-mine .code-row:not([hidden])', { timeout: 10000 });
   const code = devCodeOf(await page.textContent('#ac-mine .note'));
@@ -498,6 +499,7 @@ async function journey(width, lang, phone) {
   await page.click('#cart-next');
   await page.waitForSelector('#view-checkout:not([hidden])', { timeout: 10000 });
   await page.fill('#c-name', 'مشتریِ همه‌روشن');
+  await page.fill('#c-phone', phone);   //  «فقط ایمیل»: شمارهٔ تماسِ پیک جدا و بی کد
   await page.check('input[name="fulfillment"][value="delivery"]');
   await page.waitForSelector('#zone-box:not([hidden])', { timeout: 10000 });
   await page.click('#pin-btn');
@@ -648,9 +650,9 @@ async function journey(width, lang, phone) {
 
 /** همان صفحه‌ها در یک ترکیبِ دیگرِ عرض و زبان (سفارش و رشتهٔ یک سفرِ کامل؛ بی ثبتِ تازه) */
 async function sweep(width, lang, o) {
-  const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone: o.phone });
-  const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone: o.phone, code: vs.body.devCode });
-  const P = await device(width, lang, { ticket: { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt } });
+  const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(o.phone) });
+  const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(o.phone), code: vs.body.devCode });
+  const P = await device(width, lang, { ticket: { email: vc.body.email, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt } });
   const { page } = P;
   await goStore(P);
   await check(P, 'ویترین');

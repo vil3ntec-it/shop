@@ -1,6 +1,15 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.Str
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.isTraversalGroup
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
@@ -59,6 +68,7 @@ import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.ViewList
 import androidx.compose.material3.Icon
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -112,6 +122,8 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
  *    ۲) چیپ‌های کوچکِ دسته                                       ← می‌ماند
  *    ۳) «پرفروش‌ها»: قرص‌های یک‌ضربه‌ای (نام + قیمت) — هنگامِ جستجو پنهان
  *    ۴) کاشیِ سه‌ستونه (~۱۰۰dp) یا فهرستِ ۵۲dp، پرفروش‌ترین اول
+ *  صندوقِ نسخهٔ ۳ (`thumbDock`، کارِ یک‌دستی ۱۴۰۵/۰۸/۲۳) همین چهار تکه را وارونه می‌چیند: بالا فقط برگشت و
+ *  نامِ صفحه، سپس کاشی/فهرست، و پایین (جای شست) پرفروش‌ها، دسته‌ها و ردیفِ ۱ — درست بالای نوارِ سبد.
  *  زدن ⇐ +۱ (لرزش و پرشِ کوچک)؛ کالای وزنی ⇐ صفحه‌کلید؛ نگه داشتن ⇐ صفحه‌کلید.
  *  در سبد ⇐ دایرهٔ رنگیِ مقدار و «−». رنگ‌ها فقط از `PhoneV3`.
  */
@@ -160,6 +172,11 @@ fun PhoneCatalog(
   onMinus: (PhoneCatalogItem) -> Unit,
   /** «…» سربرگ (نسخهٔ ۳: قلمِ آزاد، فروشِ سریع، تاریخچه)؛ null ⇒ بی دکمه */
   onMenu: (() -> Unit)? = null,
+  /**
+   *  کارِ یک‌دستی (صندوقِ نسخهٔ ۳، صاحب‌کار ۱۴۰۵/۰۸/۲۳): جستجو، اسکن، کاشی/فهرست، «…»، دسته‌ها (با «+») و
+   *  پرفروش‌ها پایین، درست بالای نوارِ سبد و نوارِ شناور؛ بالا فقط برگشت و نامِ صفحه. false ⇒ چیدمانِ پیشین.
+   */
+  thumbDock: Boolean = false,
 ) {
   val v = PhoneV3.colors
   //  زیرِ نوارِ وضعیت؛ کمینهٔ ۲۴ (بلندیِ نوارِ وضعیتِ گوشی) تا در پنجرهٔ بی‌نوار هم همان‌جا بنشیند
@@ -168,6 +185,40 @@ fun PhoneCatalog(
   val list = rememberLazyListState()
   LaunchedEffect(scanning) {
     if (scanning) runCatching { if (listMode) list.scrollToItem(0) else grid.scrollToItem(0) }
+  }
+  val tools: @Composable RowScope.(Dp) -> Unit = { size ->
+    CatalogTools(search, onSearch, onScan, scanning, listMode, onToggleMode, onMenu, size)
+  }
+
+  if (thumbDock) {
+    Column(Modifier.fillMaxSize()) {
+      /* ---------- بالا: فقط برگشت و نامِ صفحه ---------- */
+      Row(
+        Modifier.fillMaxWidth().padding(top = top + 6.dp, start = 4.dp, end = 12.dp).height(44.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        if (onBack != null) {
+          RoundButton(StrKit.back, onBack, 44.dp, null) { BackChevron(v.icon) }
+          Spacer(Modifier.width(4.dp))
+        } else Spacer(Modifier.width(12.dp))
+        Text(Str.sale, color = v.ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.semantics { heading() })
+      }
+      CatalogItems(items, listMode, scanning, scanPanel, emptyText, PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp), list, grid, onTap, onHold, onMinus, Modifier.weight(1f))
+      /* ---------- پایین (جای شست): پرفروش‌ها، دسته‌ها، جستجو + اسکن + نما + «…» ---------- */
+      Column(
+        Modifier
+          .fillMaxWidth()
+          .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets.navigationBars.add(WindowInsets(bottom = LocalCatalogBelow.current))))
+          .semantics { isTraversalGroup = true },
+      ) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(v.hairline))
+        if (search.isBlank() && bestsellers.isNotEmpty()) BestsellerRow(bestsellers, onTap)
+        CategoryChips(categories, category, onCategory, onCategoryHold, onAddCategory)
+        Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) { tools(48.dp) }
+        Spacer(Modifier.height((bottomGap - 12.dp).coerceAtLeast(8.dp)))
+      }
+    }
+    return
   }
 
   Column(Modifier.fillMaxSize()) {
@@ -180,21 +231,7 @@ fun PhoneCatalog(
         RoundButton(StrKit.back, onBack, 40.dp, null) { BackChevron(v.icon) }
         Spacer(Modifier.width(2.dp))
       } else Spacer(Modifier.width(8.dp))
-      SearchField(search, onSearch, Modifier.weight(1f))
-      Spacer(Modifier.width(8.dp))
-      RoundButton(if (scanning) StrSale.closeScan else StrKit.scanBarcode, onScan, 44.dp, v.card) {
-        Icon(if (scanning) Icons.Outlined.Close else Icons.Outlined.QrCodeScanner, null, tint = v.icon, modifier = Modifier.size(22.dp))
-      }
-      Spacer(Modifier.width(6.dp))
-      RoundButton(if (listMode) StrSale.gridView else StrSale.listView, onToggleMode, 44.dp, v.card) {
-        Icon(if (listMode) Icons.Outlined.GridView else Icons.Outlined.ViewList, null, tint = v.icon, modifier = Modifier.size(22.dp))
-      }
-      if (onMenu != null) {
-        Spacer(Modifier.width(6.dp))
-        RoundButton(StrKit.more, onMenu, 44.dp, v.card) {
-          Icon(Icons.Outlined.MoreHoriz, null, tint = v.icon, modifier = Modifier.size(22.dp))
-        }
-      }
+      tools(44.dp)
     }
 
     /* ---------- ۲) چیپ‌های دسته ---------- */
@@ -204,29 +241,80 @@ fun PhoneCatalog(
     if (search.isBlank() && bestsellers.isNotEmpty()) BestsellerRow(bestsellers, onTap)
 
     /* ---------- ۴) کاشی یا فهرست ---------- */
-    Box(Modifier.weight(1f).fillMaxWidth()) {
-      val pad = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = bottomGap)
-      if (listMode) {
-        LazyColumn(state = list, modifier = Modifier.fillMaxSize(), contentPadding = pad) {
-          if (scanning) item(key = "scan") { Box(Modifier.padding(bottom = 8.dp)) { scanPanel() } }
-          if (items.isEmpty()) item(key = "empty") { EmptyText(emptyText) }
-          itemsIndexed(items, key = { _, it -> it.id }) { i, it ->
-            PhoneListRow(it, first = i == 0, last = i == items.lastIndex, onTap = onTap, onHold = onHold, onMinus = onMinus)
-          }
+    CatalogItems(items, listMode, scanning, scanPanel, emptyText, PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = bottomGap), list, grid, onTap, onHold, onMinus, Modifier.weight(1f))
+  }
+}
+
+/** پایینِ صفحهٔ صندوق تا لبهٔ این سطح (نوارِ سبد) — صفحه‌کلید اول همین را می‌پوشاند (`PhoneSaleFrame` می‌گذارد) */
+internal val LocalCatalogBelow = androidx.compose.runtime.compositionLocalOf { 0.dp }
+
+/** جستجو (پهنای باقی‌مانده)، اسکن، کاشی/فهرست و «…» — بالا (چیدمانِ پیشین) یا پایین (`thumbDock`) */
+@Composable
+private fun RowScope.CatalogTools(
+  search: String,
+  onSearch: (String) -> Unit,
+  onScan: () -> Unit,
+  scanning: Boolean,
+  listMode: Boolean,
+  onToggleMode: () -> Unit,
+  onMenu: (() -> Unit)?,
+  size: Dp,
+) {
+  val v = PhoneV3.colors
+  SearchField(search, onSearch, Modifier.weight(1f).height(size))
+  Spacer(Modifier.width(8.dp))
+  RoundButton(if (scanning) StrSale.closeScan else StrKit.scanBarcode, onScan, size, v.card) {
+    Icon(if (scanning) Icons.Outlined.Close else Icons.Outlined.QrCodeScanner, null, tint = v.icon, modifier = Modifier.size(22.dp))
+  }
+  Spacer(Modifier.width(6.dp))
+  RoundButton(if (listMode) StrSale.gridView else StrSale.listView, onToggleMode, size, v.card) {
+    Icon(if (listMode) Icons.Outlined.GridView else Icons.Outlined.ViewList, null, tint = v.icon, modifier = Modifier.size(22.dp))
+  }
+  if (onMenu != null) {
+    Spacer(Modifier.width(6.dp))
+    RoundButton(StrKit.more, onMenu, size, v.card) {
+      Icon(Icons.Outlined.MoreHoriz, null, tint = v.icon, modifier = Modifier.size(22.dp))
+    }
+  }
+}
+
+/** کاشیِ سه‌ستونه یا فهرست — پرفروش‌ترین اول */
+@Composable
+private fun CatalogItems(
+  items: List<PhoneCatalogItem>,
+  listMode: Boolean,
+  scanning: Boolean,
+  scanPanel: @Composable () -> Unit,
+  emptyText: String,
+  pad: PaddingValues,
+  list: androidx.compose.foundation.lazy.LazyListState,
+  grid: androidx.compose.foundation.lazy.grid.LazyGridState,
+  onTap: (PhoneCatalogItem) -> Unit,
+  onHold: (PhoneCatalogItem) -> Unit,
+  onMinus: (PhoneCatalogItem) -> Unit,
+  modifier: Modifier,
+) {
+  Box(modifier.fillMaxWidth()) {
+    if (listMode) {
+      LazyColumn(state = list, modifier = Modifier.fillMaxSize(), contentPadding = pad) {
+        if (scanning) item(key = "scan") { Box(Modifier.padding(bottom = 8.dp)) { scanPanel() } }
+        if (items.isEmpty()) item(key = "empty") { EmptyText(emptyText) }
+        itemsIndexed(items, key = { _, it -> it.id }) { i, it ->
+          PhoneListRow(it, first = i == 0, last = i == items.lastIndex, onTap = onTap, onHold = onHold, onMinus = onMinus)
         }
-      } else {
-        LazyVerticalGrid(
-          columns = GridCells.Fixed(3),
-          state = grid,
-          modifier = Modifier.fillMaxSize(),
-          contentPadding = pad,
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
-          verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-          if (scanning) item(key = "scan", span = { GridItemSpan(maxLineSpan) }) { scanPanel() }
-          if (items.isEmpty()) item(key = "empty", span = { GridItemSpan(maxLineSpan) }) { EmptyText(emptyText) }
-          items(items, key = { it.id }) { PhoneTile(it, onTap, onHold, onMinus) }
-        }
+      }
+    } else {
+      LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        state = grid,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = pad,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+      ) {
+        if (scanning) item(key = "scan", span = { GridItemSpan(maxLineSpan) }) { scanPanel() }
+        if (items.isEmpty()) item(key = "empty", span = { GridItemSpan(maxLineSpan) }) { EmptyText(emptyText) }
+        items(items, key = { it.id }) { PhoneTile(it, onTap, onHold, onMinus) }
       }
     }
   }
@@ -326,7 +414,7 @@ private fun CategoryChips(
     Modifier
       .fillMaxWidth()
       .horizontalScroll(rememberScrollState())
-      .padding(start = 12.dp, end = 12.dp, top = 8.dp),
+      .padding(start = 12.dp, end = 12.dp),
     horizontalArrangement = Arrangement.spacedBy(6.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
@@ -334,8 +422,11 @@ private fun CategoryChips(
     categories.forEach { c ->
       Chip(c, selected = category == c, onClick = { onCategory(if (category == c) null else c) }, onHold = { onHold(c) })
     }
-    RoundButton(StrSale.newCategory, onAdd, 32.dp, PhoneV3.colors.card) {
-      Icon(Icons.Outlined.Add, contentDescription = null, tint = PhoneV3.colors.icon, modifier = Modifier.size(16.dp))
+    //  جای لمسِ ۴۸dp (کارِ یک‌دستی)؛ نمای ۳۲dp همان
+    Box(Modifier.minimumInteractiveComponentSize(), contentAlignment = Alignment.Center) {
+      RoundButton(StrSale.newCategory, onAdd, 32.dp, PhoneV3.colors.card) {
+        Icon(Icons.Outlined.Add, contentDescription = null, tint = PhoneV3.colors.icon, modifier = Modifier.size(16.dp))
+      }
     }
   }
 }
@@ -346,6 +437,8 @@ private fun Chip(text: String, selected: Boolean, onClick: () -> Unit, onHold: (
   val v = PhoneV3.colors
   Box(
     Modifier
+      //  جای لمسِ ۴۸dp (کارِ یک‌دستی)؛ نمای ۳۲dp همان
+      .minimumInteractiveComponentSize()
       .height(32.dp)
       .clip(RoundedCornerShape(percent = 50))
       //  انتخاب ⇐ رنگِ برند (نشانِ روشنِ فعال)؛ بقیه کارت با مرز
@@ -379,7 +472,7 @@ private fun BestsellerRow(items: List<PhoneCatalogItem>, onTap: (PhoneCatalogIte
     Modifier
       .fillMaxWidth()
       .horizontalScroll(rememberScrollState())
-      .padding(start = 12.dp, end = 12.dp, top = 8.dp),
+      .padding(start = 12.dp, end = 12.dp),
     horizontalArrangement = Arrangement.spacedBy(6.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
@@ -388,6 +481,7 @@ private fun BestsellerRow(items: List<PhoneCatalogItem>, onTap: (PhoneCatalogIte
       val pop = rememberAddPop(b.inCart)
       Row(
         Modifier
+          .minimumInteractiveComponentSize()
           .height(32.dp)
           .graphicsLayer { scaleX = pop.value; scaleY = pop.value }
           .alpha(if (b.soldOut) SOLD_OUT_ALPHA else 1f)

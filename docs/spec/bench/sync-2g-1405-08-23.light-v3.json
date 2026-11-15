@@ -1,0 +1,292 @@
+{
+ "name": "v3",
+ "ops": 585,
+ "speed": 1.0,
+ "openConflicts": 7,
+ "diverged": {
+  "staff-phone-1": 0,
+  "staff-phone-2": 1,
+  "owner-pc": 1
+ },
+ "rows": 710,
+ "report": [
+  "owner-pc: op 234، push 3 (بریده 1↑/0↓، مهلت 0، gzip 0/3، بدنه 120267، برآوردِ gzip 15343، بیشترین 84429)، pull 1 (بدنه 19505، gzip 1، برآوردِ gzip 19505)؛ انتظار []؛ سیم ↑114076 ↓30413؛ زمانِ 2G 0.5 دقیقه (دیواری 32s)",
+  "staff-phone-1: op 162، push 3 (بریده 1↑/0↓، مهلت 0، gzip 0/3، بدنه 73336، برآوردِ gzip 10948، بیشترین 64898)، pull 1 (بدنه 8635، gzip 1، برآوردِ gzip 8635)؛ انتظار []؛ سیم ↑73559 ↓17948؛ زمانِ 2G 0.4 دقیقه (دیواری 21s)",
+  "staff-phone-2: op 189، push 3 (بریده 1↑/0↓، مهلت 0، gzip 0/3، بدنه 100923، برآوردِ gzip 14029، بیشترین 65627)، pull 1 (بدنه 19423، gzip 1، برآوردِ gzip 19423)؛ انتظار []؛ سیم ↑95028 ↓28986؛ زمانِ 2G 0.4 دقیقه (دیواری 25s)"
+ ],
+ "links": {
+  "staff-phone-2": {
+   "cfg": {
+    "rttMs": 600,
+    "upBps": 50000,
+    "downBps": 50000,
+    "loss": 0.02,
+    "rtoMs": 1200,
+    "dropRate": 0.02,
+    "readTimeoutMs": 30000,
+    "sendBufBytes": 65536,
+    "mss": 1460,
+    "speed": 1,
+    "seed": 362
+   },
+   "conns": 2,
+   "exchanges": 5,
+   "wireUp": 95028,
+   "wireDown": 28986,
+   "lostUp": 0,
+   "lostDown": 0,
+   "drops": 1,
+   "timeouts": 0,
+   "kinds": {
+    "v3push": {
+     "n": 3,
+     "ok": 2,
+     "reqWire": 94289,
+     "resWire": 4863,
+     "reqBody": 100923,
+     "resBody": 4061,
+     "reqGzipped": 0,
+     "resGzipped": 2,
+     "reqGzEst": 14029,
+     "resGzEst": 4061,
+     "maxReqBody": 65627,
+     "maxResBody": 3044,
+     "dropUp": 1,
+     "dropDown": 0,
+     "timeouts": 0,
+     "closed": 0,
+     "status": {
+      "200": 2
+     }
+    },
+    "v3pull": {
+     "n": 1,
+     "ok": 1,
+     "reqWire": 396,
+     "resWire": 19825,
+     "reqBody": 0,
+     "resBody": 19423,
+     "reqGzipped": 0,
+     "resGzipped": 1,
+     "reqGzEst": 0,
+     "resGzEst": 19423,
+     "maxReqBody": 0,
+     "maxResBody": 19423,
+     "dropUp": 0,
+     "dropDown": 0,
+     "timeouts": 0,
+     "closed": 0,
+     "status": {
+      "200": 1
+     }
+    },
+    "other": {
+     "n": 1,
+     "ok": 1,
+     "reqWire": 343,
+     "resWire": 4298,
+     "reqBody": 0,
+     "resBody": 3847,
+     "reqGzipped": 0,
+     "resGzipped": 0,
+     "reqGzEst": 0,
+     "resGzEst": 764,
+     "maxReqBody": 0,
+     "maxResBody": 3847,
+     "dropUp": 0,
+     "dropDown": 0,
+     "timeouts": 0,
+     "closed": 0,
+     "status": {
+      "200": 1
+     }
+    }
+   },
+   "serverMs": 1115.603731999996,
+   "vClockMs": 25414.971230999974,
+   "realMs": 25422.996595999997
+  },
+  "staff-phone-1": {
+   "cfg": {
+    "rttMs": 600,
+    "upBps": 50000,
+    "downBps": 50000,
+    "loss": 0.02,
+    "rtoMs": 1200,
+    "dropRate": 0.02,
+    "readTimeoutMs": 30000,
+    "sendBufBytes": 65536,
+    "mss": 1460,
+    "speed": 1,
+    "seed": 361
+   },
+   "conns": 2,
+   "exchanges": 5,
+   "wireUp": 73559,
+   "wireDown": 17948,
+   "lostUp": 1,
+   "lostDown": 0,
+   "drops": 1,
+   "timeouts": 0,
+   "kinds": {
+    "v3push": {
+     "n": 3,
+     "ok": 2,
+     "reqWire": 72826,
+     "resWire": 4614,
+     "reqBody": 73336,
+     "resBody": 3813,
+     "reqGzipped": 0,
+     "resGzipped": 2,
+     "reqGzEst": 10948,
+     "resGzEst": 3813,
+     "maxReqBody": 64898,
+     "maxResBody": 3401,
+     "dropUp": 1,
+     "dropDown": 0,
+     "timeouts": 0,
+     "closed": 0,
+     "status": {
+      "200": 2
+     }
+    },
+    "v3pull": {
+     "n": 1,
+     "ok": 1,
+     "reqWire": 392,
+     "resWire": 9036,
+     "reqBody": 0,
+     "resBody": 8635,
+     "reqGzipped": 0,
+     "resGzipped": 1,
+     "reqGzEst": 0,
+     "resGzEst": 8635,
+     "maxReqBody": 0,
+     "maxResBody": 8635,
+     "dropUp": 0,
+     "dropDown": 0,
+     "timeouts": 0,
+     "closed": 0,
+     "status": {
+      "200": 1
+     }
+    },
+    "other": {
+     "n": 1,
+     "ok": 1,
+     "reqWire": 341,
+     "resWire": 4298,
+     "reqBody": 0,
+     "resBody": 3847,
+     "reqGzipped": 0,
+     "resGzipped": 0,
+     "reqGzEst": 0,
+     "resGzEst": 764,
+     "maxReqBody": 0,
+     "maxResBody": 3847,
+     "dropUp": 0,
+     "dropDown": 0,
+     "timeouts": 0,
+     "closed": 0,
+     "status": {
+      "200": 1
+     }
+    }
+   },
+   "serverMs": 998.5278730000064,
+   "vClockMs": 21052.868875999997,
+   "realMs": 21094.562884999996
+  },
+  "owner-pc": {
+   "cfg": {
+    "rttMs": 600,
+    "upBps": 50000,
+    "downBps": 50000,
+    "loss": 0.02,
+    "rtoMs": 1200,
+    "dropRate": 0.02,
+    "readTimeoutMs": 30000,
+    "sendBufBytes": 65536,
+    "mss": 1460,
+    "speed": 1,
+    "seed": 360
+   },
+   "conns": 2,
+   "exchanges": 5,
+   "wireUp": 114076,
+   "wireDown": 30413,
+   "lostUp": 3,
+   "lostDown": 0,
+   "drops": 1,
+   "timeouts": 0,
+   "kinds": {
+    "v3push": {
+     "n": 3,
+     "ok": 2,
+     "reqWire": 113352,
+     "resWire": 5583,
+     "reqBody": 120267,
+     "resBody": 4782,
+     "reqGzipped": 0,
+     "resGzipped": 2,
+     "reqGzEst": 15343,
+     "resGzEst": 4782,
+     "maxReqBody": 84429,
+     "maxResBody": 3887,
+     "dropUp": 1,
+     "dropDown": 0,
+     "timeouts": 0,
+     "closed": 0,
+     "status": {
+      "200": 2
+     }
+    },
+    "v3pull": {
+     "n": 1,
+     "ok": 1,
+     "reqWire": 386,
+     "resWire": 19907,
+     "reqBody": 0,
+     "resBody": 19505,
+     "reqGzipped": 0,
+     "resGzipped": 1,
+     "reqGzEst": 0,
+     "resGzEst": 19505,
+     "maxReqBody": 0,
+     "maxResBody": 19505,
+     "dropUp": 0,
+     "dropDown": 0,
+     "timeouts": 0,
+     "closed": 0,
+     "status": {
+      "200": 1
+     }
+    },
+    "other": {
+     "n": 1,
+     "ok": 1,
+     "reqWire": 338,
+     "resWire": 4923,
+     "reqBody": 0,
+     "resBody": 4471,
+     "reqGzipped": 0,
+     "resGzipped": 0,
+     "reqGzEst": 0,
+     "resGzEst": 840,
+     "maxReqBody": 0,
+     "maxResBody": 4471,
+     "dropUp": 0,
+     "dropDown": 0,
+     "timeouts": 0,
+     "closed": 0,
+     "status": {
+      "200": 1
+     }
+    }
+   },
+   "serverMs": 1443.8836449999872,
+   "vClockMs": 32430.71782399994,
+   "realMs": 32492.279241999997
+  }
+ }
+}
