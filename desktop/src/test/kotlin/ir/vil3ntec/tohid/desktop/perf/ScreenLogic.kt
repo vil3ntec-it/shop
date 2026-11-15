@@ -5,14 +5,11 @@ import ir.vil3ntec.tohid.data.CustomerCrm
 import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ReportBridge
-import ir.vil3ntec.tohid.data.ReportEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.ui.components.common.Selection
 import ir.vil3ntec.tohid.ui.components.pos.CartSummary
 import ir.vil3ntec.tohid.ui.screens.DebtorListModel
-import ir.vil3ntec.tohid.ui.v3.analytics.ReportPeriod
-import ir.vil3ntec.tohid.ui.v3.analytics.ReportsModel
 import ir.vil3ntec.tohid.ui.v3.money.DebtorLedgerModel
 import ir.vil3ntec.tohid.ui.v3.money.ExpensesModel
 import ir.vil3ntec.tohid.ui.v3.money.ReceiptsModel
@@ -127,12 +124,15 @@ internal object ScreenLogic {
       ReceiptsModel.years(all)
       CustomerCrm.active(d)
     },
-    //  ReportsScreen ⇐ ProfitTab (زبانهٔ نخست، بازهٔ پیش‌فرض)
+    //  ReportsScreen ⇐ «گزارشِ تازه» (پیش‌فرض روشن، `ReportFresh.on`) ⇐ PhoneFreshReports: کارت‌ها، بدهی، امروز، پایانِ روز،
+    //  بهای میانگین، اثرِ تخفیف (`PhoneFresh.build`) و «ساعت و روز» (`HeatmapModel`) — پس از PERF-SCREEN بیرون از رشتهٔ صفحه
     "reports" to { c: Ctx ->
       val d = c.d
-      val (from, to) = ReportsModel.bounds(ReportPeriod(ReportsModel.rangeOf(null), 1405, 8), c.today)
-      ReportEngine.sales(d, from, to)
-      ReportEngine.bySeller(d, from, to, false)
+      ir.vil3ntec.tohid.ui.screens.PhoneFresh.build(d, c.today, ReportBridge.deviceClock(c.now), true, ir.vil3ntec.tohid.core.cost.CostPolicy.DEFAULT, c.now, ReportBridge.offsetMinutes())
+      ir.vil3ntec.tohid.ui.screens.HeatmapModel.build(
+        d, ir.vil3ntec.tohid.core.report.ReportBoard.range(ir.vil3ntec.tohid.ui.screens.HeatmapModel.PHONE_SPANS.first(), c.today), ReportBridge.offsetMinutes(),
+        ir.vil3ntec.tohid.core.calendar.ShopDay.dayStartMinutes(ir.vil3ntec.tohid.ShopDayChoice.hours), ir.vil3ntec.tohid.ShopDayChoice.weekStart,
+      )
     },
     //  ExpensesScreen
     "expenses" to { c: Ctx ->

@@ -6,6 +6,9 @@ import ir.vil3ntec.tohid.data.DebtReverse
 import ir.vil3ntec.tohid.data.DebtTransaction
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
+import ir.vil3ntec.tohid.data.PurchaseOrderBook
+import ir.vil3ntec.tohid.data.PurchaseSuggest
+import ir.vil3ntec.tohid.core.purchase.SupplierPricing
 import ir.vil3ntec.tohid.data.Purchase
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
@@ -144,5 +147,25 @@ class ScreenSpeedEquivalenceTest {
     assertEquals(overdue, got.overdue)
     assertEquals(overdue.maxOfOrNull { (debtor, _) -> ((nowMs - (last[debtor.id] ?: nowMs)) / dayMs).coerceAtLeast(0) } ?: 0L, got.overdueOldestDays)
     assertTrue(got.overdue.isNotEmpty() && week > 0)
+  }
+
+  /* ------------------------------ انبار: پیشنهادِ خرید ------------------------------ */
+
+  /** `PurchaseSuggest.rows` حالا به هر کالا فقط خریدهای همان کالا را می‌دهد؛ هر دو تابع با همه‌ی خریدها همان جواب را بدهند */
+  @Test fun `پیشنهادِ خرید با خریدهای هر کالا همان جوابِ همهٔ خریدها`() {
+    val all = PurchaseOrderBook.buys(d)
+    val byProduct = all.groupBy { it.productId }
+    var named = 0
+    for (p in d.products) {
+      val mine = byProduct[p.id].orEmpty()
+      val latest = SupplierPricing.latestSupplier(all, p.id)
+      assertEquals(p.id, latest, SupplierPricing.latestSupplier(mine, p.id))
+      if (latest != null) named++
+      for (sid in d.suppliers.take(4).map { it.id } + listOfNotNull(latest)) {
+        assertEquals("${p.id} $sid", PurchaseOrderBook.lastPriceMinor(d, sid, p, all), PurchaseOrderBook.lastPriceMinor(d, sid, p, mine))
+      }
+    }
+    assertTrue("کالای خریده‌شده نیست", named > 300)
+    assertTrue(PurchaseSuggest.rows(d, emptyList(), today).isNotEmpty())
   }
 }

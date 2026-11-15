@@ -85,15 +85,18 @@ object PurchaseSuggest {
   fun rows(d: ShopData, orders: List<PurchaseOrderDto>, today: String, smart: Boolean = false): List<Row> {
     val t = CivilDays.jdnOfIso(today) ?: return emptyList()
     val h = history(d, t)
-    val buys = PurchaseOrderBook.buys(d)
+    //  PERF-SCREEN: خریدهای هر کالا یک بار (همان ترتیب) — `latestSupplier` و `lastPriceMinor` هر دو اول به همان کالا صاف
+    //  می‌کنند، پس فهرستِ همان کالا همان جواب را می‌دهد؛ پیش‌تر برای هر کالا کلِ خریدها گشته می‌شد (۲۰ هزار × ۵ هزار)
+    val buys = PurchaseOrderBook.buys(d).groupBy { it.productId }
     val known = d.suppliers.mapTo(HashSet()) { it.id }
     val onOrder = PurchaseOrderBook.onOrderMilli(orders)
     val leads = HashMap<String, ReorderCore.Lead>()
     return d.products.filter { it.active }.mapNotNull { p ->
-      val sid = p.supplierId.takeIf { it in known } ?: SupplierPricing.latestSupplier(buys, p.id)?.takeIf { it in known }
+      val mine = buys[p.id].orEmpty()
+      val sid = p.supplierId.takeIf { it in known } ?: SupplierPricing.latestSupplier(mine, p.id)?.takeIf { it in known }
       val lead = sid?.let { s -> leads.getOrPut(s) { PurchaseOrderBook.leadTime(orders, s, PurchaseOrderBook.manualLead(d, s)) } }
       val f = forecastOf(d, p, t, h, onOrder, lead?.days, smart) ?: return@mapNotNull null
-      val price = sid?.let { PurchaseOrderBook.lastPriceMinor(d, it, p, buys) } ?: PurchaseOrderBook.minor(p.purchasePrice)
+      val price = sid?.let { PurchaseOrderBook.lastPriceMinor(d, it, p, mine) } ?: PurchaseOrderBook.minor(p.purchasePrice)
       Row(p, sid, f, price)
     }.sortedWith(compareBy<Row>({ !it.due }, { it.forecast.daysLeft ?: Int.MAX_VALUE }, { it.product.name }))
   }

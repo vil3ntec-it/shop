@@ -166,9 +166,10 @@ private fun kpiDelta(k: ReportBoard.Kpi): StatDelta? {
 private fun rememberHome(d: ShopData, showMoney: Boolean): ReportBoard.Home {
   val today = ir.vil3ntec.tohid.todayIso()
   val cost = ReportFresh.cost.value
-  return remember(d, today, showMoney, cost) {
+  //  PERF-SCREEN: تابلو بیرون از رشتهٔ صفحه؛ تا آماده شدن کارتی نیست (همان «دفترِ خالی»)
+  return rememberOffMain(d, today, showMoney, cost) {
     ReportBoard.build(ReportBridge.ledgerOf(d), today, ReportBridge.deviceClock(), ReportFreshModel.costingOf(cost), CostPolicy.approved(cost), money = showMoney)
-  }
+  } ?: ReportBoard.Home(today, emptyList(), emptyList())
 }
 
 /**
@@ -177,8 +178,8 @@ private fun rememberHome(d: ShopData, showMoney: Boolean): ReportBoard.Home {
  *  دفترِ خالی ⇒ صفر، نه عددِ نمونه.
  */
 @Composable
-fun HomeKpis(d: ShopData, onOpen: (String) -> Unit, showMoney: Boolean, columns: Int, modifier: Modifier = Modifier) {
-  val home = rememberHome(d, showMoney)
+fun HomeKpis(d: ShopData, onOpen: (String) -> Unit, showMoney: Boolean, columns: Int, modifier: Modifier = Modifier, ready: ReportBoard.Home? = null) {
+  val home = ready ?: rememberHome(d, showMoney)
   Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
     home.kpis.chunked(columns).forEach { line ->
       Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -654,26 +655,17 @@ fun PhoneFreshReports(d: ShopData) {
   val money = remember { ir.vil3ntec.tohid.data.ShopRole.canSeeMoney(context) }
   val today = ir.vil3ntec.tohid.todayIso()
   val clock = remember { ReportBridge.deviceClock() }
-  val ledger = remember(d) { ReportBridge.ledgerOf(d) }
-  val debts = remember(ledger, today) { ReportFreshModel.view(ledger, "debts", "all", "", today, clock) }
   val cost = ReportFresh.cost.value
-  val todayTables = remember(ledger, today, money, cost) {
-    if (money) ReportFreshModel.view(ledger, "today", "today", "", today, clock, ReportFreshModel.costingOf(cost)).tables else emptyList()
-  }
-  //  RPT-04: پایانِ امروز فقط برای کسی که پول را می‌بیند
-  val dayEnd = remember(d, today, money) {
-    if (money) DayEndModel.build(d, today, clock, ReportBridge.nowMs(), ReportBridge.offsetMinutes()) else null
-  }
+  //  PERF-SCREEN: بدهی، امروز، پایانِ روز (RPT-04)، بهای میانگین (PRD-15) و اثرِ تخفیف (PRM-16) بیرون از رشتهٔ صفحه (`PhoneFresh`)
+  val now = ReportBridge.nowMs()
+  val offset = ReportBridge.offsetMinutes()
+  val fresh = rememberOffMain(d, today, money, cost) { PhoneFresh.build(d, today, clock, money, cost, now, offset) }
   //  RPT-08: «ساعت و روز» روی گوشی هم — همان نقشهٔ کامپیوتر، فقط برای کسی که پول را می‌بیند
   var heatSpan by remember { mutableStateOf(HeatmapModel.PHONE_SPANS.first()) }
-  val heat = remember(d, heatSpan, today, money, ShopDayChoice.weekStart) {
-    if (money) HeatmapModel.build(d, ReportBoard.range(heatSpan, today), ReportBridge.offsetMinutes(), ShopDay.dayStartMinutes(ShopDayChoice.hours), ShopDayChoice.weekStart) else null
-  }
-  //  PRD-15: ارزشِ موجودی به بهای میانگینِ موزون (فقط خواندنی)؛ PRM-16: اثرِ تخفیف‌های این ماه با همان روشِ بها —
-  //  هر دو فقط برای کسی که پول را می‌بیند (همان کامپیوتر: «بهای میانگین» و «اثرِ تخفیف»)
-  val stockCost = remember(ledger, money) { if (money) ReportCore.stockCost(ledger) else null }
-  val promo = remember(d, ledger, today, money, cost) {
-    if (money && ir.vil3ntec.tohid.data.PromoEffectBook.has(d)) PromoFresh.view(d, ledger, "month", today, clock, cost) else null
+  val weekStart = ShopDayChoice.weekStart
+  val dayStart = ShopDay.dayStartMinutes(ShopDayChoice.hours)
+  val heat = rememberOffMain(d, heatSpan, today, money, weekStart) {
+    if (money) HeatmapModel.build(d, ReportBoard.range(heatSpan, today), offset, dayStart, weekStart) else null
   }
   //  کلیکِ کارتِ خانه روی گوشی همین صفحه را باز می‌کند؛ مقصد این‌جا یکی است
   LaunchedEffect(ReportFresh.preset.value) { ReportFresh.preset.value = null }
@@ -688,17 +680,20 @@ fun PhoneFreshReports(d: ShopData) {
       OutlinedButton(
         onClick = {
           val name = "گزارش-امروز-و-بدهی-$today" // داده: نامِ پروندهٔ خروجی
-          ir.vil3ntec.tohid.print.ReportPrint.print(context, ReportCsv.Sheet(name, ReportFreshModel.exportRows(todayTables + debts.tables + dayEnd?.tables.orEmpty())), name)
+          val f = fresh ?: return@OutlinedButton
+          ir.vil3ntec.tohid.print.ReportPrint.print(context, ReportCsv.Sheet(name, ReportFreshModel.exportRows(f.todayTables + f.debts.tables + f.dayEnd?.tables.orEmpty())), name)
         },
+        enabled = fresh != null,
         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
       ) { Text(StrMoney.printPdf) }
     }
-    item { HomeKpis(d, {}, money, columns = 2) }
-    dayEnd?.let { b -> item { DayEndPhone(b) } }
+    if (fresh == null) { item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }; return@LazyColumn }
+    item { HomeKpis(d, {}, money, columns = 2, ready = fresh.home) }
+    fresh.dayEnd?.let { b -> item { DayEndPhone(b) } }
     heat?.let { h -> item { HeatmapPhone(h, heatSpan) { heatSpan = it } } }
-    stockCost?.let { c -> item { StockCostPhone(c) } }
-    promo?.let { v -> item { PromoPhone(v) } }
-    phoneDebts(this, debts)
+    fresh.stockCost?.let { c -> item { StockCostPhone(c) } }
+    fresh.promo?.let { v -> item { PromoPhone(v) } }
+    phoneDebts(this, fresh.debts)
   }
 }
 
