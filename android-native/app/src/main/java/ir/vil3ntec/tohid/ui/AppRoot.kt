@@ -661,7 +661,9 @@ private fun AppRootActive(
           )
           CompositionLocalProvider(ir.vil3ntec.tohid.ui.v3.nav.LocalV3Nav provides nav) { PreviewBanner(); ir.vil3ntec.tohid.ui.v3.shell.ShellNotice() }
           PageWidth(Modifier.weight(1f).padding(bottom = pageBottom)) {
-            V3RouteHost(nav, shell, Modifier.fillMaxSize())
+            CompositionLocalProvider(ir.vil3ntec.tohid.ui.v3.LocalDeskPageTitle provides title) {
+              V3RouteHost(nav, shell, Modifier.fillMaxSize())
+            }
           }
         } else PageWidth(Modifier.padding(start = railPad, bottom = pageBottom)) {
           V3RouteHost(nav, shell, Modifier.fillMaxSize())
