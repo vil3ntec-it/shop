@@ -16,7 +16,16 @@ class HomeLookShotTest {
     assumeTrue("فقط با TOHID_HOME_SHOT", tag.isNotBlank())
     val store = ScreenFrame.storeOf(BigLedger.make(BigLedger.SMOKE))
     val out = File(System.getProperty("user.dir"), "build/home-look-$tag.png")
-    ScreenFrame.signedIn { ScreenFrame.measure(360, 760, 150, png = out) { V3RoutePreview("home", store, dark = false) } }
+    //  «کاهشِ حرکت» (همان راهِ `ReducedMotionTillUiTest`): پلکان و شمارنده همان دم سرِ جا — عکسِ حالتِ نشسته، نه قابِ میانِ حرکت
+    val before = ir.vil3ntec.tohid.ui.screens.Motion.reducedForTest
+    ir.vil3ntec.tohid.ui.screens.Motion.reducedForTest = true
+    ir.vil3ntec.tohid.ui.screens.Motion.load(ir.vil3ntec.tohid.desktop.DesktopContext)
+    try {
+      ScreenFrame.signedIn { ScreenFrame.measure(360, 760, 150, png = out) { V3RoutePreview("home", store, dark = false) } }
+    } finally {
+      ir.vil3ntec.tohid.ui.screens.Motion.reducedForTest = before
+      ir.vil3ntec.tohid.ui.screens.Motion.load(ir.vil3ntec.tohid.desktop.DesktopContext)
+    }
     println("[home-shot] $out ${out.length()} bytes")
   }
 }
