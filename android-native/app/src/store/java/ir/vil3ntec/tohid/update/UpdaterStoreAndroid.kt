@@ -31,6 +31,7 @@ object Updater {
     val size: Long,
     val sumsUrl: String = "",
     val minVersion: String = "",
+    val movedTo: String = "",
   )
 
   /** همیشه «نسخهٔ تازه‌ای نیست»: به‌روزرسانی کارِ خودِ فروشگاه است */
@@ -54,6 +55,9 @@ object Updater {
     onStatus: (String?) -> Unit = {},
     onProgress: (Int) -> Unit,
   ): Result<File> = Result.failure(UnsupportedOperationException())
+
+  @Suppress("UNUSED_PARAMETER")
+  fun foreignPackage(context: Context, apk: File): String? = null
 
   @Suppress("UNUSED_PARAMETER")
   fun readyFile(context: Context, release: Release): File? = null

@@ -15,7 +15,9 @@ const config = require('../src/config');
 const apple = require('../src/lib/apple');
 const { many } = require('../src/db');
 
-const BUNDLE = 'ir.vil3ntec.tohid';
+//  شناسهٔ برنامهٔ آیفون از ۱۴۰۵/۰۸/۲۴ (`ios/iosApp/Configuration/Config.xcconfig`)؛ شناسهٔ پیشین فقط در فهرستِ گذار
+const BUNDLE = 'com.vill3n.dailyshop';
+const LEGACY_BUNDLE = 'ir.vil3ntec.tohid';
 const KID = 'apple-kid-1';
 const keys = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const stranger = generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -195,4 +197,24 @@ test('کلیدِ تازهٔ اپل (kid ِ ناشناخته) کشِ JWKS را ی
   assert.equal(r.status, 403);
   assert.equal(r.body.error.code, 'bad_apple_token');
   assert.equal(jwksHits, before + 1, 'یک بار تازه شد، نه بیشتر');
+});
+
+test('گذارِ شناسهٔ برنامه: APPLE_CLIENT_IDS با هر دو شناسه هر دو را می‌پذیرد؛ شناسهٔ بیرونِ فهرست نه', async () => {
+  config.apple.clientIds = [BUNDLE, LEGACY_BUNDLE];
+  for (const [aud, sub, email] of [[BUNDLE, 'mv-new', 'mv-new@test.local'], [LEGACY_BUNDLE, 'mv-old', 'mv-old@test.local']]) {
+    const nonce = await freshNonce();
+    const r = await h.post('/api/auth/apple', { idToken: appleToken({ sub, email, nonce, aud }), nonce });
+    assert.equal(r.status, 201, `${aud}: ${JSON.stringify(r.body)}`);
+    assert.ok(r.body.accessToken);
+  }
+  const nonce = await freshNonce();
+  const bad = await h.post('/api/auth/apple', { idToken: appleToken({ sub: 'mv-x', email: 'mv-x@test.local', nonce, aud: 'ir.vil3ntec.tohid.customer' }), nonce });
+  assert.equal(bad.status, 403);
+  assert.equal(bad.body.error.code, 'bad_audience');
+  //  فقط شناسهٔ تازه ⇒ شناسهٔ پیشین دیگر پذیرفته نیست (فهرست تصمیمِ صاحب‌کار است، نه کد)
+  config.apple.clientIds = [BUNDLE];
+  const n2 = await freshNonce();
+  const old = await h.post('/api/auth/apple', { idToken: appleToken({ sub: 'mv-old2', email: 'mv-old2@test.local', nonce: n2, aud: LEGACY_BUNDLE }), nonce: n2 });
+  assert.equal(old.status, 403);
+  assert.equal(old.body.error.code, 'bad_audience');
 });

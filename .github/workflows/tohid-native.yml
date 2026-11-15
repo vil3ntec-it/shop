@@ -41,6 +41,18 @@ on:
         type: string
         required: false
         default: ''
+      #  شناسهٔ نصب (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۴): همیشه `com.vill3n.dailyshop`. فقط برای «پلِ گذار» — یک بار، پیش از
+      #  نخستین پایدارِ شناسهٔ تازه — همین کد با شناسهٔ قدیمی ساخته می‌شود تا گوشی‌های `ir.vil3ntec.tohid` اول برگهٔ
+      #  «برنامه با نامِ تازه آمده» را مثلِ یک به‌روزرسانیِ عادی بگیرند (docs/spec/OWNER-ACTIONS-fa.md).
+      legacy_id:
+        description: 'پلِ گذار: ساخت با شناسهٔ قدیمی ir.vil3ntec.tohid (فقط یک بار، پیش از نخستین پایدارِ com.vill3n.dailyshop). خاموش ⇒ شناسهٔ تازه'
+        type: boolean
+        required: false
+        default: false
+
+#  `TOHID_LEGACY_APP_ID` را `app/build.gradle.kts` (applicationId)، `apk-gates.sh` و گامِ Firebase می‌خوانند؛ push و PR همیشه «»
+env:
+  TOHID_LEGACY_APP_ID: ${{ inputs.legacy_id && 'true' || '' }}
 
 concurrency:
   #  انتشارِ پایدار با pushِ بعدی لغو نشود. PR: pushِ تازه اجرای قبلیِ همان PR را لغو می‌کند؛
@@ -88,6 +100,13 @@ jobs:
               *) echo "::error::سرِ main ($GITHUB_SHA) همان کامیتِ آزموده‌شده ($want) نیست — main پس از آزمایشی جلو رفته؛ نسخهٔ آزمایشیِ تازه را بیازمایید یا sha ِ تازه را بدهید"; exit 1 ;;
             esac
           fi
+          #  شناسهٔ نصبِ این ساخت (`app-id.txt` ِ انتشار و سنجشِ دروازه‌ها از همین)
+          if [ "$TOHID_LEGACY_APP_ID" = true ]; then
+            echo "::notice::پلِ گذار: این ساخت شناسهٔ قدیمیِ ir.vil3ntec.tohid را دارد"
+            echo "APP_ID=ir.vil3ntec.tohid" >> "$GITHUB_ENV"
+          else
+            echo "APP_ID=com.vill3n.dailyshop" >> "$GITHUB_ENV"
+          fi
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then
             echo "PUBLISH=false" >> "$GITHUB_ENV"
           elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$INPUT_CHANNEL" = "stable" ]; then
@@ -125,7 +144,7 @@ jobs:
       - name: تنظیمِ Firebase (اختیاری)
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: bash android-native/tools/google-services.sh ir.vil3ntec.tohid
+        run: bash android-native/tools/google-services.sh "$APP_ID"
 
       #  `:core:jvmTest` = همهٔ آزمون‌های core (`core/src/commonTest` و `core/src/jvmTest`: «تسویهٔ کامل»
       #  بی گردِ افغانی، کشو، وضعیتِ چاپگر، برگهٔ دوروشی، هم‌خوانیِ CoreVectorsCommonTest با JSON…)؛
@@ -188,6 +207,11 @@ jobs:
           mkdir -p out
           version=$(gradle --no-daemon -q printVersionName -PbuildNumber=${{ github.run_number }} | tail -n1)
           apk=app/build/outputs/apk/release/app-release.apk
+          #  شناسهٔ نصبِ همین نصبی، از خودِ APK (`update/AppMove.kt`): برنامهٔ شناسهٔ دیگر آن را «به‌روزرسانی» نمی‌بیند
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n1)
+          pkg=$("$bt/aapt" dump badging "$apk" | sed -n "1s/^package: name='\([^']*\)'.*/\1/p")
+          [ "$pkg" = "$APP_ID" ] || { echo "::error::شناسهٔ نصبِ APK «$pkg» است، نه $APP_ID"; exit 1; }
+          printf '%s\n' "$pkg" > out/app-id.txt
           if [ "$CHANNEL" = beta ]; then
             cp "$apk" "out/Tohid-Native-$version.apk.beta"
             printf '%s\n' "$version" > out/version.txt
@@ -335,7 +359,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  #  برنامهٔ خریدِ مشتری (O-04 «ب»، مرحلهٔ ۱؛ `customer-android/`، بستهٔ `ir.vil3ntec.tohid.customer`): کارِ جدا و
+  #  برنامهٔ خریدِ مشتری (O-04 «ب»، مرحلهٔ ۱؛ `customer-android/`، بستهٔ `ir.vil3ntec.tohid.customer` — جدا، دست‌نخورده): کارِ جدا و
   #  **گزارشی** (`continue-on-error`) — نه `needs` ِ کارِ دیگری است و نه انتشار دارد، پس هرگز ساخت یا انتشارِ برنامهٔ
   #  دکان را نمی‌شکند. فقط آزمون‌های واحد، APK ِ debug (بی امضای انتشار، بی انتشار) و کارخواهِ core روی سرورِ واقعی
   #  (PGlite، `server/test/shopper-live.mjs` ⇐ `ShopperLiveTest`، و فاز ۲ ⇐ `ShopperStage2LiveTest`: نشانی، گفت‌وگو، نظر و
@@ -405,7 +429,7 @@ jobs:
           UPDATE_SIGNING_KEY: ${{ secrets.TOHID_UPDATE_SIGNING_KEY }}
           TOHID_UPDATE_PUBLIC_KEY: ${{ vars.TOHID_UPDATE_PUBLIC_KEY }}
         run: |
-          test -s SHA256SUMS.txt && test -s "$APK_NAME" && test -s version.txt
+          test -s SHA256SUMS.txt && test -s "$APK_NAME" && test -s version.txt && test -s app-id.txt
           if [ -n "$UPDATE_SIGNING_KEY" ]; then
             printf '%s\n' "$UPDATE_SIGNING_KEY" > "$RUNNER_TEMP/update.pem"
             openssl dgst -sha256 -sign "$RUNNER_TEMP/update.pem" SHA256SUMS.txt | base64 -w0 > SHA256SUMS.txt.sig
@@ -508,13 +532,15 @@ jobs:
             #  آزمایشی: فقط نصبیِ نسخه‌دار، فهرست، امضا و شماره — هیچ `.apk`ی
             up SHA256SUMS.txt
             if [ -f SHA256SUMS.txt.sig ]; then up SHA256SUMS.txt.sig; fi
+            #  شناسهٔ نصب پیش از شماره: هیچ لحظه‌ای شمارهٔ تازه با شناسهٔ کهنه اعلام نمی‌شود
+            up app-id.txt
             up version.txt
             names=$(gh api "repos/${{ github.repository }}/releases/tags/$TAG" | jq -r '.assets[].name')
-            for f in "${{ env.APK_NAME }}" SHA256SUMS.txt version.txt; do
+            for f in "${{ env.APK_NAME }}" SHA256SUMS.txt app-id.txt version.txt; do
               echo "$names" | grep -qx "$f" || { echo "::error::$f روی انتشار نیست"; exit 1; }
             done
             echo "$names" | grep -qi '\.apk$' && { echo "::error::انتشارِ آزمایشی نباید فایلِ .apk داشته باشد"; exit 1; }
-            echo "هر سه فایل روی انتشارِ آزمایشی است"
+            echo "هر چهار فایل روی انتشارِ آزمایشی است"
             exit 0
           fi
           up Tohid-Native.apk
@@ -525,13 +551,14 @@ jobs:
           up MyShop-Bazaar.apk
           up SHA256SUMS.txt
           if [ -f SHA256SUMS.txt.sig ]; then up SHA256SUMS.txt.sig; fi
+          up app-id.txt
           up version.txt
-          #  و از خودِ گیت‌هاب بپرس که هر سه واقعاً روی انتشار نشسته‌اند
+          #  و از خودِ گیت‌هاب بپرس که همه واقعاً روی انتشار نشسته‌اند
           names=$(gh api "repos/${{ github.repository }}/releases/tags/$TAG" | jq -r '.assets[].name')
-          for f in "${{ env.APK_NAME }}" Tohid-Native.apk SHA256SUMS.txt version.txt; do
+          for f in "${{ env.APK_NAME }}" Tohid-Native.apk SHA256SUMS.txt app-id.txt version.txt; do
             echo "$names" | grep -qx "$f" || { echo "::error::$f روی انتشار نیست"; exit 1; }
           done
-          echo "هر چهار فایل روی انتشار است"
+          echo "هر پنج فایل روی انتشار است"
 
       - name: پاک کردن نسخه‌های قبلی
         if: ${{ env.PUBLISH == 'true' }}
@@ -544,7 +571,7 @@ jobs:
           gh api "repos/${{ github.repository }}/releases/tags/$TAG" \
             | jq -r '.assets[] | "\(.id) \(.name)"' | while read -r id name; do
               case "$name" in
-                "${{ env.APK_NAME }}"|Tohid-Native.apk|MyShop-Android.apk|MyShop-Bazaar.apk|SHA256SUMS.txt|SHA256SUMS.txt.sig|version.txt) ;;
+                "${{ env.APK_NAME }}"|Tohid-Native.apk|MyShop-Android.apk|MyShop-Bazaar.apk|SHA256SUMS.txt|SHA256SUMS.txt.sig|app-id.txt|version.txt) ;;
                 *) gh api -X DELETE "repos/${{ github.repository }}/releases/assets/$id" ;;
               esac
             done

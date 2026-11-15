@@ -5,7 +5,7 @@
 نیمه‌کاره مانده. اگر می‌خواهید کسی روی این برنامه کار کند، **همین فایل و
 `docs/DESIGN-PROMPT-fa.md` را به او بدهید.**
 
-> پوشه: `android-native/` · شناسه: `ir.vil3ntec.tohid` · minSdk 24 · targetSdk 35
+> پوشه: `android-native/` · شناسهٔ نصب: `com.vill3n.dailyshop` (از ۱۴۰۵/۰۸/۲۴؛ بسته‌های کد `ir.vil3ntec.tohid`) · minSdk 24 · targetSdk 35
 
 ---
 
