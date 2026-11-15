@@ -79,7 +79,7 @@ class ReturnSettingsGateTest {
   @Test fun `صندوقِ کامپیوتر و QR ِ رسید فقط با کلیدِ روشن`() {
     val desk = src("ir/vil3ntec/tohid/ui/screens/DeskSale.kt")
     assertTrue(desk.contains("val returnsV2 = remember { ir.vil3ntec.tohid.data.ReturnSettings.enabled(context) }"))
-    assertTrue(desk.contains("if (returnsV2) CartHeaderAction(StrInvoices.returnItems"))
+    assertTrue(desk.contains("if (returnsV2) DeskCartAction(StrInvoices.returnItems")) //  e-desk-d3a: سربرگِ سبدِ کامپیوتر روی `ui/desk` (همان دروازه)
     val print = src("ir/vil3ntec/tohid/print/PrintJob.kt")
     assertTrue(print.contains("if (ir.vil3ntec.tohid.data.ReturnSettings.enabled(context) && sale.status != \"cancelled\") {"))
   }

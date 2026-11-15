@@ -98,6 +98,8 @@ fun StockItemScreen(
   actions: StockItemActions,
   onBack: (() -> Unit)?,
   modifier: Modifier = Modifier,
+  /** پنلِ کنارِ جدولِ انبارِ کامپیوتر (`DeskStockScreen`) ⇒ عنوانِ کوچکِ سربرگ؛ گوشی همان عنوانِ درشت */
+  largeTitle: Boolean = true,
 ) {
   val item = remember(data, productId, today) { StockItemModel.of(data, productId, today) }
   if (item == null) {
@@ -115,6 +117,7 @@ fun StockItemScreen(
     title = p.name,
     modifier = modifier,
     onBack = onBack,
+    largeTitle = largeTitle,
     actions = listOf(V3Action(Icons.Outlined.Edit, StrStock.edit) { actions.edit(p.id) }),
     overflow = listOf(
       V3MenuItem(Icons.Outlined.Visibility, StrStock.viewProduct) { actions.view(p.id) },

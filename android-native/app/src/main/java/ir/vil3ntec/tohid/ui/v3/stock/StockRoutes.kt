@@ -20,9 +20,7 @@ import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.screens.StockStrip
 import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
-import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3Hue
-import ir.vil3ntec.tohid.ui.v3.V3TwoPane
 import ir.vil3ntec.tohid.ui.v3.nav.AppModule
 import ir.vil3ntec.tohid.ui.v3.nav.Chrome
 import ir.vil3ntec.tohid.ui.v3.nav.ModuleEntry
@@ -135,7 +133,9 @@ val StockModule = AppModule(
     V3Route("stock/{id}/movements", RouteKind.PAGE, { StrStock.movementsRow }, parent = "stock/{id}", chrome = Chrome.OWN) {
       val writer = rememberStockWriter()
       val export = rememberCsvExport { ok -> if (ok) writer.info(StrStock.fileSaved) else writer.fail(StrStock.fileFailed) }
-      MovementsScreen(data, args["id"].orEmpty(), writer.today, onOpen = { nav.open(it) }, onBack = { back() }, onExport = export)
+      //  کامپیوتر: جدولِ آرامِ `ui/desk` (`DeskMovementsScreen`)؛ گوشی همان صفحه
+      if (desk) DeskMovementsScreen(data, args["id"].orEmpty(), writer.today, onOpen = { nav.open(it) }, onBack = { back() }, onExport = export)
+      else MovementsScreen(data, args["id"].orEmpty(), writer.today, onOpen = { nav.open(it) }, onBack = { back() }, onExport = export)
     },
     V3Route("stock/{id}/entries/{entryId}/delete", RouteKind.SHEET, { StrStock.deleteEntryTitle }, parent = "stock/{id}", chrome = Chrome.OWN) {
       val writer = rememberStockWriter()
@@ -257,10 +257,12 @@ private fun RouteScope.StockHome(selected: String?) {
     )
   }
   when {
-    twoPane -> V3TwoPane(list = list, detail = {
-      if (selected != null) StockItemScreen(data, today, selected, itemActions, onBack = null)
-      else V3EmptyState(Icons.Outlined.Inventory2, StrStock.pickOne)
-    })
+    //  کامپیوتر: جدول و کارت‌های عددِ `ui/desk` (`DeskStockScreen`)؛ کالای باز در پنلِ کنار (همان `StockItemScreen`)
+    twoPane -> DeskStockScreen(
+      data, today, listActions, itemActions, selected, placesOn,
+      initialFilter = StockFilter.of(args.query("filter")), initialQuery = args.query("q").orEmpty(),
+      onClose = { nav.replace(StockPaths.LIST) },
+    )
     selected == null -> list()
     else -> StockItemScreen(data, today, selected, itemActions, onBack = backOrNull)
   }
