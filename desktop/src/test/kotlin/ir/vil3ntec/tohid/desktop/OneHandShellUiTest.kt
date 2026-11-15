@@ -94,7 +94,7 @@ class OneHandShellUiTest {
   private fun show(first: String) {
     path.value = first
     I18n.source = { Lang.FA }
-    val store = RouteUiHarness.memoryStore(data)
+    val store = RouteUiHarness.loadedStore(data)
     rule.setContent {
       CompositionLocalProvider(
         LocalContext provides DesktopContext,
