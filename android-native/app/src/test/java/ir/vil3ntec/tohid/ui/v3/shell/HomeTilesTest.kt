@@ -104,7 +104,13 @@ class HomeTilesTest {
     val home = File(shell, "HomeScreen.kt").readText()
     assertTrue("خانهٔ گوشی/تبلت کاشی را با همان شمار می‌گیرد", "HomeShortcuts(onOpen, Modifier.v3Stagger(stagger, \"shortcuts\", 2), orders)" in home)
     assertTrue("خانهٔ گوشی/تبلت دکمهٔ شناورِ صندوق دارد", "HomeSaleFab(" in home && "HomeTiles.saleFab(" in home)
-    assertTrue("خانهٔ کامپیوتر همان ردیفِ میان‌برها", "HomeShortcuts(" in File(shell, "DeskHome.kt").readText())
+    //  e-desk-d1: خانهٔ کامپیوتر داشبوردِ ویژهٔ خودش است (`ui/desk/DeskDashboard.kt`، «طراحیِ موبایل رو نمی‌تونی روی کامپیوتر
+    //  بیاری») — کاشیِ گوشی نه، ولی همان چهار میان‌بر (سفارش‌ها/راه‌اندازیِ سفارش، دریافت، ورودِ کالا، تاریخچه) در «کارهای سریع»
+    assertTrue("خانهٔ کامپیوتر ⇐ داشبوردِ کامپیوتر", "DeskDashboard(" in File(shell, "DeskHome.kt").readText())
+    val desk = File(repo, "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/desk/DeskDashboard.kt").readText()
+    for (t in listOf("ORDERS", "ORDERS_SETUP", "RECEIVE", "STOCK_ENTRY", "HISTORY")) {
+      assertTrue("خانهٔ کامپیوتر همان میان‌برِ $t", Regex("""ShellTargets\.$t\b""").containsMatchIn(desk))
+    }
     //  سفارش‌ها در «خانه» ِ ماژول‌ها هم هست
     assertTrue(V3Modules.ALL.flatMap { it.entries }.any { it.id == "orders" && Place.HOME in it.places })
   }

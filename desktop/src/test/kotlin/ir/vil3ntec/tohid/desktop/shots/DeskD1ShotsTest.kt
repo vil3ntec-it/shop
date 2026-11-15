@@ -126,5 +126,7 @@ class DeskD1ShotsTest {
       if (only != null && name !in only) continue
       for ((w, h) in listOf(1366 to 768, 1920 to 1080)) for (dark in listOf(false, true)) shot(name, route, w, h, dark, d)
     }
+    //  پنجرهٔ کوچک (منو خودبه‌خود فقط‌آیکن، کارت‌ها دوتادوتا): فقط خانه و «همهٔ بخش‌ها»، روز
+    for (name in listOf("home", "more")) if (only == null || name in only) shot(name, name, 960, 640, false, d)
   }
 }
