@@ -353,7 +353,7 @@ test('v1، راهِ قدیم و درهای امروز فقط شعبهٔ اصلی
   const rows = await many(`SELECT row_id FROM sync_rows WHERE app='shop' AND account_id=$1 AND table_name='expenses' ORDER BY row_id`, [s.shopId]);
   assert.deepEqual(rows.map((r) => r.row_id), ['e-v1']);
   //  درهای امروز و راهِ قدیم برای کارمندِ فقط الف
-  for (const p of ['/api/shop/members', '/api/shop/sync/pull', '/api/sync/pull', '/api/events', '/api/me/backups']) {
+  for (const p of ['/api/shop/members', '/api/shop/sync/pull', '/api/sync/pull', '/api/me/backups']) {
     const r = await h.get(p, { token: w.onlyA.token });
     assert.equal(r.status, 403, `${p} ${JSON.stringify(r.body)}`);
     assert.equal(r.body.error.code, 'branch_main_only', p);
@@ -366,6 +366,14 @@ test('v1، راهِ قدیم و درهای امروز فقط شعبهٔ اصلی
     assert.equal(r.body.shop.id, s.shopId);
     assert.equal(r.body.isOwner, false);
   }
+  //  فازِ ۳ب: خبرها شعبه‌شناس‌اند ⇒ کارمندِ فقط الف بی سرآیند هرگز به دفترِ اصلی نمی‌رسد (۴۰۳ `branch_required`)؛ با
+  //  سرآیندِ الف فقط دفترِ خودِ الف (`shop-branches-doors.test.js`)
+  const ev = await h.get('/api/events', { token: w.onlyA.token });
+  assert.equal(ev.status, 403, JSON.stringify(ev.body));
+  assert.equal(ev.body.error.code, 'branch_required');
+  const evA = await h.api('GET', '/api/events', { token: w.onlyA.token, headers: B(A) });
+  assert.equal(evA.status, 200, JSON.stringify(evA.body));
+  assert.deepEqual(evA.body.events, []);
   //  کارمندِ اصلی همان امروز
   assert.equal((await h.get('/api/shop', { token: w.main.token })).status, 200);
   //  ادعای الف روی درِ امروز ⇒ ۴۰۳ (حتی صاحب)

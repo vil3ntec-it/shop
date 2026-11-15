@@ -40,4 +40,13 @@ function branchOf(x) {
 /** آیا این کلید/بافت بخشِ یک شعبهٔ غیرِ اصلی است */
 const isBranch = (x) => branchOf(x) !== MAIN;
 
-module.exports = { SEP, MAIN, partitionOf, shopOf, branchOf, isBranch };
+/**
+ * فازِ ۳ب — SQL ِ «مالِ همین کلید» برای جدول‌های سرورِ شعبه‌دار (`shop_id` + `branch_id`) با **یک** پارامتر: شناسهٔ دکان
+ * (اصلی ⇒ `branch_id = ''`، همان ردیف‌های امروز) یا `<دکان>#<شعبه>`. پس کتابخانه همان یک پارامترِ امروز را می‌گیرد و هر
+ * پرسش فقط همان شعبه را می‌بیند/می‌نویسد. ⛔ کلید فقط از `branches.partitionOf` پس از سنجشِ دسترسی، هرگز از درخواست.
+ */
+const sqlShop = (n) => `split_part($${n}::text, '${SEP}', 1)`;
+const sqlBranch = (n) => `split_part($${n}::text, '${SEP}', 2)`;
+const sqlOwn = (n, alias = '') => `${alias}shop_id = ${sqlShop(n)} AND ${alias}branch_id = ${sqlBranch(n)}`;
+
+module.exports = { SEP, MAIN, partitionOf, shopOf, branchOf, isBranch, sqlShop, sqlBranch, sqlOwn };

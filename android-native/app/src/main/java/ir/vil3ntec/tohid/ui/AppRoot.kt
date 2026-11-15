@@ -418,12 +418,14 @@ private fun AppRootActive(
   }
   val current = nav.current
   val base = RoutePaths.normalize(current.substringBefore('?'))
-  //  نوار فقط روی ریشهٔ تب‌های خودش (`ShellFrame`)؛ صندوق و ویرایشگرِ نوار هرگز
+  //  کارِ یک‌دستی: نوار روی هر بخشِ اصلی (`ShellFrame`)؛ برگه، صفحه‌کلید، سبدِ باز و دروازه نه
   val page = RoutePaths.normalize(nav.page.substringBefore('?'))
-  val navVisible = ShellFrame.navVisible(
-    phone = phoneNav, page = page, barTabs = navRoutes, gate = nav.gate != null,
+  val bar = ShellFrame.bar(
+    phone = phoneNav, page = page, barTabs = navRoutes, sections = V3Modules.sections, gate = nav.gate != null,
     cartOpen = ir.vil3ntec.tohid.ui.components.pos.PhoneCartUi.sheetOpen.value,
+    sheetOnTop = nav.current != nav.page, keyboard = ir.vil3ntec.tohid.ui.v3.nav.rememberKeyboardOpen(),
   )
+  val navVisible = ShellFrame.navVisible(bar)
   val navReserve = PhoneNav.RESERVE + (if (renewDays != null) PhoneNav.RENEW_RESERVE else 0.dp)
 
   //  ویترین و میزِ تحویل: فقط وقتی سرور می‌گوید روشن است، بخششان دیده می‌شود
@@ -619,7 +621,7 @@ private fun AppRootActive(
       }
       //  جای نوارِ شناور: خانه خودش زیرِ نوار می‌کشد؛ صفحهٔ بی‌نوار (صندوق) فقط نوارِ سیستم
       val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-      val pageBottom = ShellFrame.pageBottom(phoneNav, navVisible, page, navReserve, navInset)
+      val pageBottom = ShellFrame.pageBottom(phoneNav, bar, page, navReserve, navInset)
       CompositionLocalProvider(
         LocalV3Toasts provides toasts,
         //  نوارِ سیستم را پوسته همین‌جا حساب کرده است

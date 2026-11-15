@@ -28,6 +28,10 @@
  *   `GET /ops/row` (پرچمِ `shop.till_op_user`) — با پرچمِ خاموش دقیقاً همان پاسخِ درِ ناشناخته (۴۰۴، `next('router')`).
  *   (قاعدهٔ «درِ بی صدازننده نگه داشته نمی‌شود»، B15 ِ `docs/SECURITY-AUDIT-fa.md`؛ آزمون: `till-pin.test.js`.)
  * ⛔ SUB-10: FREE — هویتِ کاربرِ صندوق بخشی از مجوزهای هستهٔ دکان است و پس از پایانِ اشتراک هم باید کار کند.
+ * ⛔ شعبه (فازِ ۳ب ِ `docs/BRANCHES-fa.md`، پرچمِ خاموشِ `shop.branches`): نوبت‌ها و opها مالِ شعبه‌اند — `/verify`، `/current`،
+ *   `/current/end`، `/sessions`، `/ops`، `/ops/row` فقط در شعبهٔ سرآیندِ سنجیدهٔ `X-Branch-Id` (`branch-rest.scope`). PIN هویتِ
+ *   عضو و سطحِ دکان است: `/config` و `PUT /me` (PIN ِ خودم) از هر شعبه‌ای که عضو دارد؛ مدیریتِ PIN ِ دیگران (`/members…`) مثلِ
+ *   بقیهٔ مدیریتِ اعضا فقط شعبهٔ اصلی (`branch-gate`).
  */
 const express = require('express');
 const config = require('../config');
@@ -35,6 +39,7 @@ const v = require('../lib/validate');
 const tp = require('../lib/till-pin');
 const tou = require('../lib/till-op-user');
 const perms = require('../lib/staff-perms');
+const branchRest = require('../lib/branch-rest');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { requireRecentAuth } = require('../lib/reauth');
@@ -43,7 +48,7 @@ const { forbidden } = require('../middleware/errors');
 const router = express.Router();
 router.use(rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'till-pin-ip' }));
 const limit = rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'till-pin', key: (req) => req.user && req.user.id });
-router.use(requireUser, requireShop, limit, requirePermission('data.read'));
+router.use(requireUser, requireShop, limit, requirePermission('data.read'), branchRest.scope);
 //  حدسِ PIN: سطلِ جدای هر حسابِ دستگاه، جدا از قفلِ هر PIN در پایگاه
 const verifyLimit = rateLimit({
   max: Number(process.env.RATE_TILL_PIN_VERIFY_MAX) || 20, windowMs: 60 * 1000, keyPrefix: 'till-pin-verify',
@@ -76,11 +81,11 @@ const needPinFlag = prebuilt((shopId) => tp.flagOf(shopId));
 
 router.get('/ops', needOpsFlag, async (req, res) => {
   const q = req.query || {};
-  res.json(await tou.list(req.shopId, actorOf(req), { from: q.from, to: q.to, memberId: q.member, table: q.table }));
+  res.json(await tou.list(req.branchKey, actorOf(req), { from: q.from, to: q.to, memberId: q.member, table: q.table }));
 });
 
 router.get('/ops/row', needOpsFlag, async (req, res) => {
-  res.json(await tou.forRow(req.shopId, actorOf(req), req.query?.table, req.query?.row_id));
+  res.json(await tou.forRow(req.branchKey, actorOf(req), req.query?.table, req.query?.row_id));
 });
 
 router.get('/members', needFlag, requirePermission('members.view'), async (req, res) => {
@@ -108,19 +113,19 @@ router.post('/verify', needFlag, verifyLimit, async (req, res) => {
   const target = b.memberId ? { memberId: v.id(b.memberId, { field: 'شناسه عضو' }) } : { userId: v.id(b.userId, { field: 'شناسه کاربر' }) };
   //  ⛔ R15: «PIN ندارد/باطل است» فقط برای کسی که `/members` را هم می‌بیند (و خودِ عضو، در lib)؛ بقیه همان «غلط»
   const seesAll = await perms.memberAllows(req, 'members.view');
-  res.json(await tp.verify(req.shopId, actorOf(req), req.device, target, b.pin, { ...opts(req), seesAll }));
+  res.json(await tp.verify(req.branchKey, actorOf(req), req.device, target, b.pin, { ...opts(req), seesAll }));
 });
 
 router.get('/current', needPinFlag, async (req, res) => {
-  res.json(await tp.current(req.shopId, req.device));
+  res.json(await tp.current(req.branchKey, req.device));
 });
 
 router.post('/current/end', needFlag, async (req, res) => {
-  res.json(await tp.endCurrent(req.shopId, actorOf(req), req.device, req.body?.reason || 'lock', opts(req)));
+  res.json(await tp.endCurrent(req.branchKey, actorOf(req), req.device, req.body?.reason || 'lock', opts(req)));
 });
 
 router.get('/sessions', needPinFlag, async (req, res) => {
-  res.json(await tp.sessions(req.shopId, actorOf(req), { from: req.query.from, to: req.query.to, memberId: req.query.member }));
+  res.json(await tp.sessions(req.branchKey, actorOf(req), { from: req.query.from, to: req.query.to, memberId: req.query.member }));
 });
 
 module.exports = router;

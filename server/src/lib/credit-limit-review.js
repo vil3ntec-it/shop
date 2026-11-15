@@ -26,9 +26,12 @@
  *   - عددِ بیرون از ±(2^53−1) یا سقفِ منفی «بیش از سقف» است، نه «آزاد» (همان بسته‌به‌خطای `CreditGate`).
  *   - پرچمِ خاموش (پیش‌فرض)، صاحب یا دسته‌ای بی فاکتورِ قرض‌دار ⇒ هیچ پرسشی. شکستِ بررسی هرگز push را نمی‌خواباند.
  * ⛔ فقط ردیف‌های همین دکان (`account_id`/`shop_id` ِ عضویت). بی دادهٔ شخصی در سابقه (فقط شناسهٔ مشتری، نه نام و شماره).
+ * ⛔ شعبه (فازِ ۳ب ِ `docs/BRANCHES-fa.md`): v3 در بخشِ شعبهٔ غیرِ اصلی فاکتور و قرضِ همان بخش را می‌خواند (`ctx.accountId`)،
+ *    پرچم سطحِ دکان؛ سابقه در دکان با `detail.branch` و هدفِ `<شعبه>|<فاکتور>` (`once` ِ دو شعبه هرگز یکی نمی‌شود).
  */
 const { many } = require('../db');
 const audit = require('./audit');
+const bk = require('./branch-key');
 
 const FLAG = 'shop.credit_limit_review';
 const ACTION = 'sale.credit_over_limit';
@@ -251,7 +254,7 @@ async function review(who, sales, shape, load, { asOf = null, triggers = [], lat
     const o = x.over;
     const r = await audit.log({
       shopId: who.shopId, actorType: 'user', userId: who.userId || '', ip: who.ip || '', once: true,
-      action: ACTION, targetType: 'sale', targetId: x.id.slice(0, 128),
+      action: ACTION, targetType: 'sale', targetId: (who.branch ? `${who.branch}|${x.id}` : x.id).slice(0, 128),
       detail: {
         problem: 'credit_over_limit', review: true, path: who.path, deviceId: str(who.deviceId).slice(0, 64), role: str(who.role).slice(0, 24),
         invoice: x.data.invoiceNumber ?? null, debtorId: str(x.debtorId).slice(0, 128),
@@ -259,6 +262,7 @@ async function review(who, sales, shape, load, { asOf = null, triggers = [], lat
         //  تراکنشِ دیررسیده یا دلتا/ویرایشِ قرض این فاکتور را از سقف گذراند (فاکتور خودش پیش‌تر نشسته بود)
         ...(late.has(x.id) ? { late: true } : {}), ...(asOf && asOf.has(x.id) ? { raised: true } : {}),
         text: 'فروشِ نسیه بیش از سقفِ اعتبارِ مشتری، بی تأییدِ مدیر روی دستگاه — فروش ثبت شد؛ بررسی کنید',
+        ...(who.branch ? { branch: who.branch } : {}),
       },
     });
     if (r) n++;
@@ -368,8 +372,10 @@ function v3(ctx, deviceId, ops, results, { ip = '' } = {}) {
         WHERE app=$1 AND account_kind=$2 AND account_id=$3 AND table_name='sales' AND row_id = ANY($4::text[]) AND deleted_at IS NULL`,
       [ctx.app, ctx.accountKind, ctx.accountId, [...ids]]
     )) : [];
-    return review({ shopId: ctx.accountId, role: ctx.role, userId: ctx.userId, deviceId, ip, path: 'v3' }, sales, 'v3',
-      (debtorIds, saleIds) => loadRows('sync_v3_rows', ctx, debtorIds, saleIds),
+    //  دفتر از همین بخش (`ctx.accountId`)؛ سابقه در خودِ دکان با شعبه (اصلی ⇒ همان امروز)
+    const branch = bk.branchOf(ctx);
+    return review({ shopId: bk.shopOf(ctx), ...(branch ? { branch } : {}), role: ctx.role, userId: ctx.userId, deviceId, ip, path: 'v3' },
+      sales, 'v3', (debtorIds, saleIds) => loadRows('sync_v3_rows', ctx, debtorIds, saleIds),
       { asOf, triggers, lateOf: lateRows('sync_v3_rows', ctx) });
   });
 }

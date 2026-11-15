@@ -160,9 +160,9 @@ async function customerCausedIn(c, row, events, at) {
 }
 
 function newCode() {
-  const bytes = crypto.randomBytes(8);
+  //  `randomInt` بی سوگیریِ باقی‌مانده (۲۵۶ بر ۳۰ بخش‌پذیر نیست؛ CodeQL «عددِ تصادفیِ سوگیر»)
   let s = 'AP';
-  for (const b of bytes) s += CODE_ALPHABET[b % CODE_ALPHABET.length];
+  for (let i = 0; i < 8; i++) s += CODE_ALPHABET[crypto.randomInt(CODE_ALPHABET.length)];
   return s;
 }
 

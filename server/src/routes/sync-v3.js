@@ -110,10 +110,9 @@ router.post('/push', requireSyncWrite, async (req, res, next) => {
       version: appVersion, shape: b.format === 'v2' ? 'v1' : 'v3', caps: b.caps, client: b.client,
     });
     //  S46: نوبتِ سنجیدهٔ صندوقِ دستگاهِ توکن در لحظهٔ رسیدن (پرچمِ خاموشِ `shop.till_op_user` ⇒ null؛ ‎lib/till-op-user.js‎)
-    //  شعبهٔ غیرِ اصلی (فازِ ۱): سابقه‌های بهترین‌کوششِ سطحِ دکان (کاربرِ صندوق، بررسیِ قرض/تخفیف) نوشته نمی‌شوند تا ردیفِ
-    //  شعبه در دفترِ سطحِ دکانِ اصلی نیاید — فازِ ۳ (`docs/BRANCHES-fa.md`)
-    const branchCtx = req.syncBranch || null;
-    const till = !branchCtx && Array.isArray(fl.ops) && fl.ops.length ? await tillOpUser.begin(req).catch((err) => {
+    //  شعبهٔ غیرِ اصلی (فازِ ۳ب ِ `docs/BRANCHES-fa.md`): سابقه‌های بهترین‌کوشش (کاربرِ صندوق، بررسیِ قرض/تخفیف) با بافتِ
+    //  همان بخش — نوبتِ همان شعبه، دفترِ همان بخش، تعریف‌ها و پرچم‌ها سطحِ دکان؛ ردیف/سابقه با شعبه، هرگز در اصلی
+    const till = Array.isArray(fl.ops) && fl.ops.length ? await tillOpUser.begin(req, ctxOf(req)).catch((err) => {
       console.error('[till-op-user] نوبتِ صندوق خوانده نشد (v3):', err.message);
       return null;
     }) : null;
@@ -130,9 +129,9 @@ router.post('/push', requireSyncWrite, async (req, res, next) => {
       hideContact: await contact.hiddenForReq(req),
     });
     //  CRM-03: فروشِ نسیهٔ تازه بیش از سقفِ اعتبار ⇒ فقط سابقهٔ بررسی (پرچمِ خاموش؛ ‎lib/credit-limit-review.js‎)
-    if (!branchCtx) await creditReview.v3(req.sync, deviceOf(b), fl.ops, out.results, { ip: clientIp(req) });
+    await creditReview.v3(ctxOf(req), deviceOf(b), fl.ops, out.results, { ip: clientIp(req) });
     //  STF-03: تخفیفِ خودکار و مصرفِ امتیاز با تعریف‌های دکان ⇒ فقط سابقهٔ بررسی (پرچمِ خاموش؛ ‎lib/promo-loyalty-review.js‎)
-    if (!branchCtx) await require('../lib/promo-loyalty-review').v3(req.sync, deviceOf(b), fl.ops, out.results, { ip: clientIp(req) });
+    await require('../lib/promo-loyalty-review').v3(ctxOf(req), deviceOf(b), fl.ops, out.results, { ip: clientIp(req) });
     //  S46: کاربرِ سنجیدهٔ صندوق برای هر op ِ نشسته (بهترین‌کوشش؛ پاسخ دست نمی‌خورد)
     await tillOpUser.v3(till, fl.ops, out.results, { format: b.format === 'v2' ? 'v2' : 'v3' });
     out.results = newerFields.mergeResults(fl, out.results);
