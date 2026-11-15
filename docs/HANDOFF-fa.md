@@ -81,7 +81,7 @@
   `StatementLayoutTest` ۶، `DemandForecastTest` ۱۳؛ کامپیوتر/اندروید ۴۳۱۹ با `CustomerMaskCashierUiTest` ۳ (Compose)، `ContactPrivacyTest` ۴،
   `PurchaseSuggestTest` ۶، `PoSuggestUiTest` ۲، `InfraLeakGuardTest` ۸، `I18nCoverageTest`/`DariCoverageTest`/`DariWordsTest` سبز — ۲ شکست:
   ⚠️ `SheetLangTest` (اثرِ SHA ِ برگه‌های فارسی) **پیشین است**: همان اثرِ `518f4acd…` روی wt-63f/63g/57x ِ بی این کار ⇒ صاحبِ LOC-06 اثر را تازه کند؛
-  و `DocGapsV3WiringTest` (متنِ فراخوانِ برگه را من عوض کردم ⇒ به متنِ تازه رسید و سخت‌تر شد: DOCGAPS_X).
+  و `DocGapsV3WiringTest` (متنِ فراخوانِ برگه را من عوض کردم ⇒ به متنِ تازه رسید و سخت‌تر شد: اجرای هدف‌دارِ پس از آن `--tests '*DocGapsV3WiringTest' --tests '*PoSuggestUiTest' --tests '*InfraLeakGuardTest'` ⇒ ۲/۲، ۲/۲، ۸/۸).
 - **مانده/نکته:** روشن کردنِ §۴۴ (و §۳۶، §۳۷) برای دکانِ آزمایشی؛ شمارهٔ ازپیش‌همگام‌شده روی دستگاهِ کارمند تا بازسازیِ دفتر می‌ماند (نمایش پوشیده)؛
   صفحهٔ کهنهٔ `ui/screens/Debtors.kt` فقط در `PhonePreview` (دمو) است و دست نخورد. پیوندِ `server/node_modules` به `wt62` شکسته بود ⇒ `wt-64e`
   (همان lockfile). شمارهٔ بخشِ FLAGS-ON (§۴۴) را پس از ادغام با شاخه‌های موازی بشمارید.
