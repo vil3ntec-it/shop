@@ -57,6 +57,33 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-65q زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-65q` (از `origin/claude/batch-65` 66dd6f6fc) — قرض‌داران به مدلِ پیشین برگشتند
+
+- **خواستِ صاحب‌کار** (عکسِ ظاهرِ ۶۳q را رد کرد: «همون مربع‌ها بهتر بود و اون برد یا رسید که سبز و سرخ بود هم خوب بود؛ مدلِ قرض‌دارانِ قدیم رو بده»):
+  مبنا = همان پرونده‌ها در `9ca50a2c3` (batch-64 درست پیش از ادغامِ ۶۳q، `597f2eba2`). `DebtorsListScreen.kt`، `LedgerRow.kt`، `DebtorLedgerParts.kt`
+  و `DebtorLedgerScreen.kt` از همان کامیت برگشتند (پس از ۶۳q کسی آن‌ها را دست نزده بود)؛ `DebtorListRow.kt` (`DebtorRowModel`، `DebtorRowMenu`،
+  `moneyGroupShape`) و `DebtorInvoices.kt` (`DebtorInvoiceModel`) حذف شدند (جز خودشان کسی به کارشان نمی‌برد). مردهٔ پس از آن هم برگشت: سه متنِ
+  `StrRows.owes/overdue/inCredit` و رنگ‌های `V3RowTone.DEBT/RECEIPT` (`V3RowStatus.kt` از مبنا، `V3RowBits.kt` فقط همان سه خط). `RowWhen.dayAt` ماند
+  (کمکیِ عمومیِ کیت، زیرِ `InvoiceRefsTest`؛ اکنون جایی در برنامه آن را نمی‌خواند).
+- **ماند:** `ui/v3/InvoiceRef.kt` و همهٔ کاربردهای بیرون از قرض‌داران؛ برگهٔ تراکنشِ ۶۳u (`DebtorTxSheet`/`DebtorTxModel` با «فاکتور #n» ِ زدنی) دست نخورد؛
+  «فاکتور #n» ِ یادداشتِ ردیفِ حساب کوچک **زیرِ تاریخ** همان ردیفِ قدیم (`LedgerRow(invoice=…, debtorId=…)`، `InvoiceRefs.split`؛ ردیفِ بی فاکتور
+  بیت‌به‌بیت همان، ردیفِ فاکتوردار هم ۴۶dp — `height` ⇒ `heightIn(min)` فقط برای نوشتهٔ درشت). شمارهٔ کارت از `DebtorListModel.subtitle` ⇒ `customerPhone`
+  (CRM-15 ِ ۶۴x). «نمایشِ همه» ِ جستجوی بی نتیجه روی همان `DebtorsEmptyCard` (پارامترِ تازهٔ `actionIcon`، null ⇒ بی «+»)؛ «قرض‌دار تازه» ِ دفترِ خالی از پیش بود.
+- **خواستِ تازهٔ صاحب‌کار:** کارتِ سه‌عددیِ بالای «قرض‌داران» (`DebtorsStatsCard`، `PhoneDebtors.kt`) سه جعبهٔ جدای کنارِ هم شد: تعداد آبی (`info/infoTint`)،
+  جمعِ قرض سرخ (`owe/oweTint`، عدد همیشه سرخ)، رسیدها سبز (`settled/settledTint`)؛ مرزِ `cardBorder` مثلِ کارت‌ها، بی گرادیان، هم‌بلند (`IntrinsicSize.Min`)،
+  برچسب تا دو خط. `PhoneDebtors.kt` از 6b9eb2716 (پیش از ۶۳w؛ ۶۳w آن را دست نزد) همان یک کارتِ سه‌ستونه بود ⇒ سه جعبه تازه ساخته شد. `ui/screens/Debtors.kt` (دمو) هم همین را می‌کشد.
+- **آزمون‌ها (تغییرِ عمدی):** `DebtorRowsE63qUiTest` ⇒ `DebtorRowsE65qUiTest` (۱۴) — ظاهرِ برگشته را با پیکسل می‌سنجد (کارتِ بدهکار سرخ و صاف سبز، دو کارت
+  در یک ردیفِ شبکه، × و مداد و نگه‌داشتن، سه جعبهٔ آبی/سرخ/سبزِ هم‌بلند درونِ ۳۶۰dp، ردیفِ برد سرخ و رسید سبزِ ۴۶dp، «فاکتور #12» ِ ردیف ⇒ همان فاکتور
+  و نه برگهٔ ردیف، «پیدا نشد»، شمارهٔ پوشیدهٔ صندوق‌دار روی کارت، خالی‌ها) و رفتارهای ماندهٔ ۶۳q (برگهٔ تراکنش، تاریخچهٔ فروش) را همان‌طور.
+  `DebtorRowModelTest` با خودِ `DebtorRowModel` رفت. `ContactPrivacyTest`: سطرِ افزودهٔ ۶۳q (`DebtorsListScreen.kt` در فهرستِ صفحه‌ها) برداشته شد،
+  چون فهرست دیگر شماره نمی‌کشد — شماره فقط از `PhoneDebtors.kt` که در فهرست هست. `E65qShotsTest` (فقط با `E65Q_SHOTS`، `E65Q_PREFIX`) عکس‌ها را می‌کشد.
+- **نتیجه:** هدف‌دار (flock، لاینِ B): `DebtorRowsE65qUiTest` ۱۴/۱۴؛ با `*Debtor*`، `ContactPrivacyTest`، `InvoiceRefsTest`، `LookGuardTest`، `OneHandShellUiTest`،
+  `I18nCoverageTest`، `DariCoverageTest`، `InfraLeakGuardTest` ۱۵۰ آزمون سبز (جز همان یک ادعای خودِ آزمونِ تازه که «مانده ۴۰۰» ِ فاکتورها را هم می‌شمرد ⇒
+  به همان ردیف بسته شد). دورِ گسترده (همان‌ها + `V3PortedFeaturesTest`، `ServerFeatureScreensTest`، `CustomerAccessLogTest`، `V3A11yGuardTest`، `V3ScanGuardTest`، `RowsSimpleTest`، `PurchasesModelTest`، `CustomerMaskCashierUiTest`، `*Ledger*`) ۳۷۶ آزمون، ۰ شکست (۱ SKIP ِ پیشینِ `BigLedgerBenchTest`)؛ `precheck.sh` ⇒ `fail=0`؛ `quality.mjs` بی سطرِ «همین تغییر».
+- **عکس‌ها** (۳۶۰×۷۶۰dp، چگالیِ ۲، فارسی راست‌به‌چپ): مبنا از درختِ جدای `9ca50a2c3` با همان آزمون و همان داده. پروندهٔ قرض‌دار با مبنا بیت‌به‌بیت یکی است جز
+  خانهٔ تاریخِ ردیفِ «فاکتور #12»؛ «قرض‌داران» جز سه جعبه بیت‌به‌بیت همان است، فقط ۸dp بالاتر (جعبه‌ها ۸dp کوتاه‌ترند از کارتِ پیشین).
+- **قدمِ بعدی:** صاحب‌کار عکس‌ها را ببیند؛ اگر جعبه‌ها باید همان بلندیِ کارتِ پیشین باشند، `padding(vertical)` ِ `StatBox` را ۱۸dp کنید.
+
 ### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-64x زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-64x` (از `origin/claude/batch-64` 00e98a802) — سه تصمیمِ سپرده‌شده (CRM-15، PUR-03، OPS-01)
 
 - **تصمیم‌ها** (صاحب‌کار: «ببین کدام درست است و برنامه‌های حرفه‌ای چه می‌کنند»؛ ثبت در `OWNER-DECISIONS-fa.md` «گرفته‌شده — ۱۴۰۵/۰۸/۲۴»):

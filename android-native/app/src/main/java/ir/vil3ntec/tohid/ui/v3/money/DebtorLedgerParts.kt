@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
@@ -57,6 +58,8 @@ import ir.vil3ntec.tohid.data.DebtReminderSend
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.invoiceLabel
+import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.print.ReportPrint
 import ir.vil3ntec.tohid.print.StatementImage
 import ir.vil3ntec.tohid.ui.v3.LocalV3Toasts
@@ -68,6 +71,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Collapse
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
+import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Springs
 import ir.vil3ntec.tohid.ui.v3.V3StatusPill
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
@@ -275,4 +279,37 @@ internal fun rememberDebtorTasks(d: ShopData, account: DebtorEngine.Account, act
   }
 }
 
-/* فاکتورهای مشتری: `DebtorInvoices.kt` (سادهٔ `claude/e-rows-63q`) */
+/* ------------------------------ فاکتورها ------------------------------ */
+
+/** چند فاکتورِ آخرِ مشتری — بقیه در «فروش‌ها» */
+private const val SALES_SHOWN = 20
+
+/** فاکتورهای همین مشتری (خودِ خرید، نه فقط ردیفِ بدهی) — هر ردیف ⇐ همان فاکتور در «فروش‌ها» */
+@Composable
+internal fun DebtorInvoices(account: DebtorEngine.Account, onOpen: (String) -> Unit, onOlder: () -> Unit) {
+  val older = account.sales.size - SALES_SHOWN
+  V3Section(
+    title = StrMoney.invoices(account.sales.size),
+    action = if (older > 0) StrMoney.olderInvoices(older) else null,
+    onAction = if (older > 0) onOlder else null,
+  ) {
+    account.sales.take(SALES_SHOWN).forEachIndexed { i, sale ->
+      if (i > 0) V3Divider(start = 64.dp)
+      val cancelled = sale.status == "cancelled"
+      V3ListRow(
+        title = StrMoney.invoiceNo(sale.invoiceLabel() ?: "—") + if (cancelled) " (${StrMoney.cancelled})" else "",
+        subtitle = MoneyText.date(sale.date),
+        icon = Icons.AutoMirrored.Outlined.ReceiptLong,
+        trailing = {
+          Column(horizontalAlignment = Alignment.End) {
+            Text(money(sale.finalTotal), style = v3Text(14, FontWeight.SemiBold, 20), color = if (cancelled) PhoneV3.colors.inkMuted else PhoneV3.colors.ink)
+            if (sale.remaining > 0 && !cancelled) {
+              Text(StrMoney.remaining(money(sale.remaining)), style = v3Text(12, FontWeight.Medium, 17), color = LedgerTone.OWE.ink())
+            }
+          }
+        },
+        onClick = { onOpen(sale.id) },
+      )
+    }
+  }
+}

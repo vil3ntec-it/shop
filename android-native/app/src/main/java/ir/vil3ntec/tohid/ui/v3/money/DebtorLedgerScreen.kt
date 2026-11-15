@@ -5,11 +5,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -45,10 +43,6 @@ import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.v3.InvoiceRefs
 import ir.vil3ntec.tohid.ui.v3.LocalV3SystemBottom
-import ir.vil3ntec.tohid.ui.v3.RowWhen
-import ir.vil3ntec.tohid.ui.v3.V3RowStatus
-import ir.vil3ntec.tohid.ui.v3.V3RowTone
-import ir.vil3ntec.tohid.ui.v3.sales.history.SaleTime
 import ir.vil3ntec.tohid.ui.v3.V3Action
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Divider
@@ -113,7 +107,6 @@ internal fun DebtorLedgerScreen(
   val book = remember(d, id) { DebtBook.book(d, id, todayIso()) }
   val rows = remember(account.transactions, hidden) { DebtorLedgerModel.rows(account.transactions, hidden) }
   val totals = DebtorLedgerModel.totals(account)
-  val invoices = remember(d, account) { DebtorInvoiceModel.rows(d, account, todayIso()) }
   val drawer = rememberDrawerState(context, drawerOpen)
   val stagger = rememberV3Stagger(id)
   var menuFor by rememberSaveable { mutableStateOf<String?>(null) }
@@ -165,20 +158,20 @@ internal fun DebtorLedgerScreen(
             }
           },
           detail = {
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = listPad.copyTop(10.dp)) {
-              ledgerItems(rows, book, account, actions, stagger, extras, onMenu = { menuFor = it }, invoices = invoices)
+            LazyColumn(Modifier.fillMaxSize(), contentPadding = listPad.copyTop(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+              ledgerItems(rows, book, account, actions, stagger, extras, onMenu = { menuFor = it })
             }
           },
         )
       } else {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = listPad) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = listPad, verticalArrangement = Arrangement.spacedBy(4.dp)) {
           item(key = "drawer") {
             Box(Modifier.padding(bottom = 4.dp)) {
               DebtorDrawer(account, book, available, open = drawer.open, onToggle = drawer::toggle, onAction = tasks::run)
             }
           }
-          item(key = "totals") { Box(Modifier.padding(top = 4.dp)) { LedgerTotals(totalCells) } }
-          ledgerItems(rows, book, account, actions, stagger, extras, onMenu = { menuFor = it }, invoices = invoices)
+          item(key = "totals") { LedgerTotals(totalCells) }
+          ledgerItems(rows, book, account, actions, stagger, extras, onMenu = { menuFor = it })
         }
       }
     }
@@ -226,8 +219,6 @@ private fun LazyListScope.ledgerItems(
   stagger: V3StaggerState,
   extras: (@Composable () -> Unit)?,
   onMenu: (String) -> Unit,
-  /** «فاکتورهای این مشتری» ِ آماده (`DebtorInvoiceModel.rows`) */
-  invoices: List<DebtorInvoiceRow>,
 ) {
   val reversed = ir.vil3ntec.tohid.data.DebtReverse.reversed(account.transactions) // S89: اصل‌های معکوس‌شده
   item(key = "tx-title") {
@@ -235,7 +226,7 @@ private fun LazyListScope.ledgerItems(
       "${StrMoney.transactions} · ${plain(rows.size)}",
       style = v3Text(15, FontWeight.Bold, 20),
       color = PhoneV3.colors.ink,
-      modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 12.dp, bottom = 6.dp).semantics { heading() },
+      modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 2.dp).semantics { heading() },
     )
   }
   if (rows.isEmpty()) {
@@ -251,24 +242,17 @@ private fun LazyListScope.ledgerItems(
       }
     }
   }
-  val today = todayIso()
   itemsIndexed(rows, key = { _, tx -> tx.id }) { i, tx ->
     val give = tx.type == "give"
     val entry = book?.entry(tx.id)
-    //  تاریخِ کوتاه و یادداشتِ تکه‌تکه («فاکتور #۱۲» زدنی؛ فاکتورِ شناختهٔ دفتر با شناسه‌اش) — یک بار برای هر ردیف
-    val date = remember(tx.date, tx.createdAt, today, ir.vil3ntec.tohid.core.i18n.I18n.lang) {
-      if (tx.date.isBlank()) DebtorLedgerModel.UNDATED
-      else RowWhen.dayAt(tx.date, tx.createdAt, today, SaleTime.zoneOffset(tx.createdAt))
-    }
-    val note = remember(tx.notes, entry?.sale?.id) {
-      InvoiceRefs.split(tx.notes.trim(), entry?.let { e -> e.invoiceLabel?.let { l -> e.sale?.id?.let { mapOf(l to it) } } }.orEmpty())
+    //  «فاکتور #۱۲» ِ یادداشت (فقط همان بخش، `InvoiceRefs.split`؛ فاکتورِ شناختهٔ دفتر با شناسه‌اش) — یک بار برای هر ردیف
+    val invoice = remember(tx.notes, entry?.sale?.id) {
+      val known = entry?.let { e -> e.invoiceLabel?.let { l -> e.sale?.id?.let { mapOf(l to it) } } }.orEmpty()
+      InvoiceRefs.split(tx.notes.trim(), known).firstOrNull { it.isRef }
     }
     LedgerRow(
-      amount = MoneyText.afn(tx.amount),
-      direction = if (give) V3RowStatus(StrMoney.giveTag, V3RowTone.DEBT) else V3RowStatus(StrMoney.receiveTag, V3RowTone.RECEIPT),
-      up = give,
-      date = date,
-      note = note,
+      date = MoneyText.date(tx.date),
+      amount = MoneyText.signed(tx.amount, give),
       //  S89: جفتِ «اصل + سندِ معکوس» در دفترِ مؤثر نیست (بی «مانده»)؛ جایش برچسبِ «معکوس»/«معکوس‌شده» تا سابقه روشن باشد
       after = entry?.let { StrMoney.balanceAfterShort(DebtBook.show(it.balanceAfter)) }
         ?: when {
@@ -276,9 +260,11 @@ private fun LazyListScope.ledgerItems(
           tx.id in reversed -> StrMoney.reversedTag
           else -> null
         },
+      tone = if (give) LedgerTone.OWE else LedgerTone.SETTLED,
+      up = give,
+      kindLabel = if (give) StrMoney.giveTag else StrMoney.receiveTag,
+      invoice = invoice,
       debtorId = account.debtor.id,
-      first = i == 0,
-      last = i == rows.lastIndex,
       onClick = { actions.onOpenTx(tx.id) },
       onLongClick = { onMenu(tx.id) },
       onDelete = { actions.onDeleteTx(tx.id) },
@@ -286,10 +272,9 @@ private fun LazyListScope.ledgerItems(
     )
   }
   if (account.sales.isNotEmpty()) {
-    item(key = "sales") { Box(Modifier.padding(top = 12.dp)) { DebtorInvoices(account, invoices, actions.onOpenSale, actions.onOlderSales) } }
+    item(key = "sales") { DebtorInvoices(account, actions.onOpenSale, actions.onOlderSales) }
   }
   //  POS-27، PRM-13، CRM-08/12: بخش‌های پرونده که هر کدام با تنظیمِ خودش دیده می‌شوند
-  if (extras != null) item(key = "extras-gap") { Spacer(Modifier.height(8.dp)) }
   if (extras != null) item(key = "extras") { extras() }
   //  SEC-10: «حذفِ دادهٔ این مشتری» — فقط صاحب و پرچمِ روشنِ `shop.customer_erasure` (خاموش ⇒ هیچ)
   item(key = "erase") { CustomerErasureV3(account.debtor.phone) }

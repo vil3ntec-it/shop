@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -168,33 +170,44 @@ fun DebtorsHeader(onBack: (() -> Unit)?, modifier: Modifier = Modifier) {
 
 /* ------------------------------ کارتِ سه‌عددی ------------------------------ */
 
-/** «تعداد قرض‌داران» · «جمع تمام قرض‌ها» (قرمز) · «رسیدهای همه» (سبز) — هم‌وزن، بی خطِ جداکننده */
+/**
+ *  «تعداد قرض‌داران» (آبی) · «جمع تمام قرض‌ها» (سرخ) · «رسیدهای همه» (سبز) — سه جعبهٔ جدا کنارِ هم، هر کدام با زمینهٔ
+ *  کم‌رنگ و مرزِ رنگِ خودش، مثلِ کارت‌های سرخ/سبزِ قرض‌داران (خواستِ صاحب‌کار ۱۴۰۵/۰۸/۲۴، `claude/e-rows-65q`). رنگ‌ها
+ *  فقط از `PhoneV3Debt` (روشن و تیره)؛ بی گرادیان. سه جعبه هم‌بلندند و روی گوشیِ ۳۶۰dp در یک ردیف جا می‌شوند.
+ */
 @Composable
 fun DebtorsStatsCard(summary: DebtorListModel.Summary, modifier: Modifier = Modifier) {
   val c = PhoneV3Debt.colors
-  val shape = RoundedCornerShape(PhoneV3Debt.cardRadius)
   Row(
-    modifier
-      .fillMaxWidth()
-      .clip(shape)
-      .background(c.surface)
-      .border(1.dp, c.edge, shape)
-      .padding(18.dp),
-    verticalAlignment = Alignment.CenterVertically,
+    modifier.fillMaxWidth().height(IntrinsicSize.Min),
+    horizontalArrangement = Arrangement.spacedBy(PhoneV3Debt.gap),
   ) {
-    StatCell(ir.vil3ntec.tohid.core.i18n.StrMoney.statPeople, plain(summary.people), c.ink, c)
-    StatCell(ir.vil3ntec.tohid.core.i18n.StrMoney.statOwed, money(summary.owed), if (summary.owed > 0) c.owe else c.settled, c)
-    StatCell(ir.vil3ntec.tohid.core.i18n.StrMoney.statReceived, money(summary.received), c.settled, c)
+    StatBox(ir.vil3ntec.tohid.core.i18n.StrMoney.statPeople, plain(summary.people), ink = c.info, fill = c.infoTint, c = c)
+    StatBox(ir.vil3ntec.tohid.core.i18n.StrMoney.statOwed, money(summary.owed), ink = c.owe, fill = c.oweTint, c = c)
+    StatBox(ir.vil3ntec.tohid.core.i18n.StrMoney.statReceived, money(summary.received), ink = c.settled, fill = c.settledTint, c = c)
   }
 }
 
+/** یک جعبهٔ عدد: زمینهٔ کم‌رنگ و مرزِ همان رنگ، عددِ پررنگ و برچسبِ آرامِ زیرش (تا دو خط، وسط‌چین) */
 @Composable
-private fun RowScope.StatCell(label: String, value: String, tint: Color, c: PhoneV3DebtColors) {
-  Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+private fun RowScope.StatBox(label: String, value: String, ink: Color, fill: Color, c: PhoneV3DebtColors) {
+  val shape = RoundedCornerShape(PhoneV3Debt.cardRadius)
+  Column(
+    Modifier
+      .weight(1f)
+      .fillMaxHeight()
+      .clip(shape)
+      .background(fill)
+      .border(PhoneV3Debt.cardBorder, ink, shape)
+      .semantics(mergeDescendants = true) {}
+      .padding(horizontal = 6.dp, vertical = 14.dp),
+    horizontalAlignment = Alignment.CenterHorizontally,
+    verticalArrangement = Arrangement.Center,
+  ) {
     Text(
       value,
       style = MaterialTheme.typography.titleSmall,
-      color = tint,
+      color = ink,
       fontWeight = FontWeight.Bold,
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
@@ -204,7 +217,7 @@ private fun RowScope.StatCell(label: String, value: String, tint: Color, c: Phon
       label,
       style = MaterialTheme.typography.labelSmall,
       color = c.muted,
-      maxLines = 1,
+      maxLines = 2,
       overflow = TextOverflow.Ellipsis,
       textAlign = TextAlign.Center,
     )
@@ -548,6 +561,8 @@ fun DebtorsEmptyCard(
   description: String,
   actionText: String? = null,
   onAction: (() -> Unit)? = null,
+  /** آیکنِ دکمه: «+» برای «قرض‌دار تازه»؛ null برای کاری که چیزی نمی‌افزاید («نمایشِ همه») */
+  actionIcon: ImageVector? = Icons.Filled.Add,
 ) {
   val c = PhoneV3Debt.colors
   val shape = RoundedCornerShape(PhoneV3Debt.cardRadius)
@@ -580,8 +595,10 @@ fun DebtorsEmptyCard(
           .padding(horizontal = 18.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
       ) {
-        Icon(Icons.Filled.Add, contentDescription = null, tint = c.onAccent, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(6.dp))
+        if (actionIcon != null) {
+          Icon(actionIcon, contentDescription = null, tint = c.onAccent, modifier = Modifier.size(18.dp))
+          Spacer(Modifier.width(6.dp))
+        }
         Text(actionText, style = MaterialTheme.typography.labelLarge, color = c.onAccent, fontWeight = FontWeight.Bold)
       }
     }
