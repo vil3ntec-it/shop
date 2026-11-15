@@ -209,10 +209,9 @@ async function createApp({ runMigrations = true } = {}) {
       server: 'online',
       //  حالِ دیتابیس از آخرین سنجشِ پس‌زمینه می‌آید، نه از یک پرس‌وجوی تازه
       database: lastDbState ? 'connected' : 'unavailable',
-      email_worker: worker,
-      version: require('../package.json').version,
       time: now(),
-      uptimeSeconds: Math.round(process.uptime()),
+      //  نسخه، مدتِ روشن بودن و حالِ کارگر فقط برای میزبان/شبکهٔ درونیِ بی پیش‌کش (`lib/public-detail.js`)
+      ...require('./lib/public-detail').inside(req, { email_worker: worker, version: require('../package.json').version, uptimeSeconds: Math.round(process.uptime()) }),
     });
   };
 
@@ -229,8 +228,8 @@ async function createApp({ runMigrations = true } = {}) {
   const ready = async (req, res) => {
     const db = await healthy();
     res.status(db ? 200 : 503).json({
-      ok: db, database: db ? 'connected' : 'unavailable',
-      version: require('../package.json').version, time: now(),
+      ok: db, database: db ? 'connected' : 'unavailable', time: now(),
+      ...require('./lib/public-detail').inside(req, { version: require('../package.json').version }),
     });
   };
   app.get('/health', health);
@@ -413,11 +412,11 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/orders', require('./routes/orders'));
     //  ویترین (فاز ۴): تنظیمِ دکان زیرِ `/shop` (پیش از آن)، و درِ عمومی
     //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
-    //  پیوندِ کمپین و QR (MKT-10/11) پیش از `/shop/storefront`؛ پیش‌فرض خاموش
-    api.use('/shop/storefront/campaigns', require('./routes/storefront-campaigns'));
+    api.use('/shop/storefront/campaigns', require('./routes/storefront-campaigns'));   // پیوندِ کمپین و QR (MKT-10/11)، پیش از `/shop/storefront`؛ پیش‌فرض خاموش
     //  تخفیفِ اولین خرید و سدِ سوءاستفاده از تخفیف (MKT-02، RSK-09)؛ پیش‌فرض خاموش
     api.use('/shop/storefront/promo-guard', require('./routes/storefront-promo-guard'));
     api.use('/shop/storefront/eta', require('./routes/storefront-eta'));   // WEB-04: تنظیمِ زمانِ تقریبیِ تحویل، پشتِ پرچمِ خاموش
+    api.use('/shop/storefront/hosts', require('./routes/storefront-hosts'));   // نشانیِ دیگرِ ویترین (SERVERS §۳)، پشتِ پرچمِ خاموش
     api.use('/shop/storefront', require('./routes/storefront-admin'));
     //  تأییدِ جایگزینِ جمع‌آوری توسطِ مشتری (PCK-05) — با توکنِ پیگیری؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`
     api.use('/store', require('./routes/pick-substitutes-store'));
@@ -714,8 +713,8 @@ async function createApp({ runMigrations = true } = {}) {
     }));
   }).catch((err) => (err.status === 404 ? res.status(404).json({ error: { code: 'store_not_found', message: 'این ویترین پیدا نشد' } }) : next(err))));
   app.get('/', (req, res, next) => {
-    const slug = storefront.slugFromHost(req.hostname);
-    if (!slug) return next();
+    const slug = storefront.slugFromHost(req.hostname);   //  نبود ⇒ نشانیِ دیگرِ ویترین (`lib/storefront-hosts.js`)؛ سرورِ بی دامنه ⇒ همان next()
+    if (!slug) return require('./lib/storefront-hosts').root(req, res, next);
     storeHeaders(req, res, () => storePage(slug, res, req.query.lang, true).catch(next));
   });
   // ---- بازارچه (WEB، §۲۳؛ پرچمِ `market.directory`) و کیتِ مشترکِ وبِ خریدار ----
@@ -741,7 +740,7 @@ async function createApp({ runMigrations = true } = {}) {
 
   app.get('/', (req, res) => res.redirect('/admin/'));
 
-  // ---- پورتالِ مشتری و SDK ----
+  app.use('/legal', require('./routes/legal-pages'));   // ---- حریمِ خصوصی و شرایط (عمومی، نشانیِ فروشگاه‌ها)؛ پورتالِ مشتری و SDK ----
   app.use('/portal', express.static(path.join(__dirname, '..', 'public', 'portal'), {
     index: 'index.html', maxAge: 0, etag: true,
   }));

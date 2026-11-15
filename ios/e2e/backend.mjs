@@ -22,6 +22,7 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import { boot } from '../../server/test/e2e/lib/harness.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const out = process.argv[2];
 if (!out) { console.error('کاربرد: node ios/e2e/backend.mjs <خروجی.json> [درگاه]'); process.exit(2); }
@@ -61,8 +62,8 @@ async function placeOrder() {
   await other.drain();
   E.ok(await other.api('PUT', `/shop/storefront/products/${productId}`, { published: true }), 'انتشارِ کالا');
   const phone = `07966${String(n).padStart(5, '0')}`;
-  const v = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { phone }), 'تأییدِ شماره ۱');
-  const c = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { phone, code: v.devCode }), 'تأییدِ شماره ۲');
+  const v = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { email: mailOf(phone) }), 'تأییدِ شماره ۱');
+  const c = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { email: mailOf(phone), code: v.devCode }), 'تأییدِ شماره ۲');
   const ck = E.ok(await E.post(`/api/store/${SLUG}/checkout`, {
     fulfillment: 'delivery',
     customer: { name: 'مشتریِ آیفون', phone },

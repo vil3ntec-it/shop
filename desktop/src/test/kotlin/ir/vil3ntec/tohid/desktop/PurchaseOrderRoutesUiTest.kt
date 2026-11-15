@@ -11,7 +11,6 @@ import ir.vil3ntec.tohid.core.i18n.StrLayaway
 import ir.vil3ntec.tohid.core.i18n.StrLoyalty
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseOrders
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
-import ir.vil3ntec.tohid.core.i18n.StrSupplierBills
 import ir.vil3ntec.tohid.data.PoForms
 import ir.vil3ntec.tohid.data.PoPermsDto
 import ir.vil3ntec.tohid.desktop.shots.MoneyDemo
@@ -53,12 +52,15 @@ class PurchaseOrderRoutesUiTest {
 
   @After fun down() = h.close()
 
-  private fun title(o: ir.vil3ntec.tohid.data.PurchaseOrderDto) = StrSupplierBills.orderTitle(o.no, o.supplierName)
+  //  e-rows-63d (خواستهٔ صاحب‌کار، سادگیِ ردیف): عنوانِ ردیف نامِ تأمین‌کننده است و شماره کوچک در زیرعنوان («#1044 · …»)؛
+  //  هر ردیف با شماره‌اش شناخته می‌شود (یکتا) و نامِ تأمین‌کننده جدا سنجیده می‌شود
+  private fun title(o: ir.vil3ntec.tohid.data.PurchaseOrderDto) = "#${o.no}"
 
   @Test fun listShowsEveryStatusFiltersDraftsAndManagerCanStartANewOrder() {
     h.show("purchasing/orders", data)
     h.await(title(PoDemoOrders.partial), substring = true)
     for (o in PoDemoOrders.all) assertTrue(title(o), h.has(title(o), substring = true))
+    for (o in PoDemoOrders.all) assertTrue(o.supplierName, h.has(o.supplierName))
     for (s in listOf(StrGoods.poDraft, StrGoods.poSent, StrGoods.poPartial)) assertTrue(s, h.has(s, substring = true))
     assertTrue(h.has(StrPurchasePages.newPoTitle))
 

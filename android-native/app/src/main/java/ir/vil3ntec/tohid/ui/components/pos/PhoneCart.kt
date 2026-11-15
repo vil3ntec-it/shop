@@ -390,7 +390,10 @@ fun PhoneSaleFrame(
         //  لبهٔ سطح روی زمینهٔ تیره همیشه دیده شود (به‌ویژه در شب: #0B1220 روی #050A14)
         .border(1.dp, v.hairline, surfaceShape),
     ) {
-      catalog(if (stripShown) 24.dp else 24.dp + navBottom)
+      //  کارِ یک‌دستی: نوارِ کارهای پایینِ کاتالوگ با صفحه‌کلیدِ باز بالای آن می‌رود؛ نوارِ سبد زیرش را اول می‌پوشاند
+      androidx.compose.runtime.CompositionLocalProvider(LocalCatalogBelow provides if (stripShown) stripSpace else 0.dp) {
+        catalog(if (stripShown) 24.dp else 24.dp + navBottom)
+      }
       if (p > 0.001f) {
         //  تکهٔ روشنِ پیدا: زدن یا کشیدن به پایین ⇐ بستن؛ کارت‌های زیرش زده نمی‌شوند
         Box(

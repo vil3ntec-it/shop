@@ -15,6 +15,7 @@
 import { createRequire } from 'node:module';
 import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -161,10 +162,10 @@ ok(/"oil"/.test(await page.evaluate((k) => localStorage.getItem(k) || '', `store
 {
   const phone = '0791114888';
   const sessionOf = async () => {
-    const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
-    const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+    const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+    const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
     const a = await call('POST', `/api/store/${slug}/account`, {}, null, { 'X-Store-Ticket': vc.body.ticket });
-    return { token: a.body.session, expiresAt: a.body.expiresAt, phone: a.body.customer.phone, name: '' };
+    return { token: a.body.session, expiresAt: a.body.expiresAt, email: a.body.customer.email, phone: a.body.customer.phone, name: "" };
   };
   const S1 = await sessionOf();
   const favsOf = async (S) => ((await call('GET', `/api/store/${slug}/account/favorites`, null, null, { 'X-Store-Session': S.token })).body.items || []).map((p) => p.id);
@@ -217,10 +218,10 @@ ok(/"oil"/.test(await page.evaluate((k) => localStorage.getItem(k) || '', `store
   const phone = '0791114999';
   const listUrl = `/api/store/${slug}/account/shopping-list`;
   const sessionOf = async () => {
-    const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
-    const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+    const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+    const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
     const a = await call('POST', `/api/store/${slug}/account`, {}, null, { 'X-Store-Ticket': vc.body.ticket });
-    return { token: a.body.session, expiresAt: a.body.expiresAt, phone: a.body.customer.phone, name: '' };
+    return { token: a.body.session, expiresAt: a.body.expiresAt, email: a.body.customer.email, phone: a.body.customer.phone, name: "" };
   };
   const L1 = await sessionOf();
   const listOf = async (S) => (await call('GET', listUrl, null, null, { 'X-Store-Session': S.token })).body.list;
@@ -337,8 +338,8 @@ await page.waitForFunction(() => { const e = document.getElementById('ck-eta'); 
 ok(true, 'WEB-04: دریافت از دکان ⇒ «آماده برای دریافت، تقریبی: ۱۰ تا ۲۰ دقیقه»');
 {
   const phone = '0791113777';
-  const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
-  const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+  const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+  const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
   const placed = await call('POST', `/api/store/${slug}/checkout`, { fulfillment: 'pickup', customer: { name: 'مشتری', phone },
     lines: [{ productId: 'rice', qtyMilli: 1000 }] }, null, { 'Idempotency-Key': `eta-${Date.now()}-key`, 'X-Store-Ticket': vc.body.ticket });
   ok(placed.status === 201, 'سفارشِ آزمایشیِ پیگیری ثبت شد', JSON.stringify(placed.body).slice(0, 120));

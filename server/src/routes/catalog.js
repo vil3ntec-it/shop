@@ -13,6 +13,13 @@
  *
  * زیرِ پیشوندِ موجودِ `/shop` است، پس `ACCOUNT_PREFIXES`ِ پنلِ خانگی
  * چیزِ تازه‌ای نمی‌خواهد.
+ *
+ * ⛔ شعبه (فازِ ۳ ِ `docs/BRANCHES-fa.md`، پرچمِ خاموشِ `shop.branches`؛ INV-01 «به تفکیکِ شعبه»): شعبه فقط از سرآیندِ
+ * سنجیدهٔ `X-Branch-Id` با دسترسیِ همین عضو (`branches.restOf`) — کارمند فقط شعبه‌های خودش، صاحب هر شعبه؛ نامجاز ⇒ ۴۰۳
+ * `branch_forbidden`، بی سرآیند و بی شعبهٔ اصلی ⇒ ۴۰۳ `branch_required`. شناسهٔ شعبه در بدنه/پارامتر هرگز خوانده نمی‌شود.
+ * کالاها همان کاتالوگِ مشترکِ دکان؛ موجودی، حرکت، وظیفه و تطبیق فقط از همان شعبه (کلیدِ `req.stockKey`). درهای سطحِ دکان
+ * یا فقط‌اصلی (تنظیمات، نگه‌داشتهٔ سفارشِ آنلاین، انتقال — فازِ ۴) در شعبهٔ دیگر ⇒ ۴۰۳ `branch_unsupported`.
+ * پرچمِ خاموش ⇒ سرآیند خوانده نمی‌شود و `req.stockKey` همان شناسهٔ دکان (بایت‌به‌بایت همان امروز).
  */
 const express = require('express');
 const catalog = require('../lib/catalog');
@@ -25,9 +32,18 @@ const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { clientIp, rateLimit } = require('../middleware/ratelimit');
 const { badRequest, forbidden } = require('../middleware/errors');
+const branches = require('../lib/branches');
 
 const router = express.Router();
 router.use(requireUser, requireShop, requirePermission('stock.view'));
+router.use(async (req, res, next) => {
+  req.stockBranch = await branches.restOf(req);
+  req.stockKey = branches.partitionOf(req.shopId, req.stockBranch);
+  next();
+});
+//  سطحِ دکان یا فقط شعبهٔ اصلی
+const mainOnly = (req, res, next) => (req.stockBranch
+  ? next(forbidden('این کار فقط در شعبهٔ اصلی است', 'branch_unsupported')) : next());
 
 const reserve = require('../lib/stock-reserve');
 const repack = require('../lib/catalog-repack');
@@ -39,9 +55,12 @@ const needFlag = async (req, res, next) => { await catalog.requireEnabled(req.sh
  * درِ ناشناخته‌اند (`next('router')`، ۴۰۴) — قاعدهٔ «درِ بی صدازننده نگه داشته نمی‌شود» (B15 ِ SECURITY-AUDIT).
  */
 const prebuilt = async (req, res, next) => ((await stock.flagOf(req.shopId)) ? next() : next('router'));
+//  سابقهٔ کارِ شعبهٔ غیرِ اصلی شعبه‌اش را دارد (اصلی ⇒ همان سابقهٔ امروز)
+const branchOf = (req) => (req.stockBranch ? { branch: req.stockBranch } : {});
 
 router.get('/config', async (req, res) => {
   const sc = await scope.scopeOfReq(req);
+  const branch = req.stockBranch ? { branch: req.stockBranch } : {};   //  فقط شعبهٔ غیرِ اصلی (خاموش ⇒ همان پاسخ)
   //  INV-21: شکستنِ کارتن و ساختِ بسته فقط با `shop.catalog_repack` (خاموش ⇒ همان فهرستِ پیشین)
   const repackKinds = (await repack.enabled(req.shopId)) ? repack.KINDS : [];
   res.json({
@@ -59,10 +78,11 @@ router.get('/config', async (req, res) => {
       settings: can(req.role, 'settings.write'),
     },
     ...(sc ? { scope: sc } : {}),
+    ...branch,
   });
 });
 
-router.put('/settings', prebuilt, requirePermission('settings.write'), async (req, res) => {
+router.put('/settings', prebuilt, mainOnly, requirePermission('settings.write'), async (req, res) => {
   scope.requireAll(await scope.scopeOfReq(req));
   const settings = await stock.saveSettings(req.shopId, req.body, req.user.id, now());
   await audit.log({
@@ -83,28 +103,28 @@ router.post('/refresh', prebuilt, requirePermission('stock.move'), async (req, r
   if (full && !FULL_REFRESH_ROLES.has(req.role)) {
     throw forbidden('خواندنِ کاملِ دفتر فقط برای مالک و مدیر است', 'full_refresh_forbidden');
   }
-  res.json(await catalog.refresh(req.shopId, { full }));
+  res.json(await catalog.refresh(req.stockKey, { full }));
 });
 
 router.get('/products', prebuilt, async (req, res) => {
   const sc = await scope.scopeOfReq(req);
-  const out = await catalog.list(req.shopId, { q: req.query.q, cursor: req.query.cursor, limit: req.query.limit });
+  const out = await catalog.list(req.stockKey, { q: req.query.q, cursor: req.query.cursor, limit: req.query.limit });
   res.json(sc ? { ...out, items: out.items.map((p) => scope.trimProduct(p, sc)) } : out);
 });
 
 router.get('/products/:id', prebuilt, async (req, res) => {
   const sc = await scope.scopeOfReq(req);
-  const out = await catalog.detail(req.shopId, req.params.id);
+  const out = await catalog.detail(req.stockKey, req.params.id);
   res.json(sc ? { ...out, product: scope.trimProduct(out.product, sc), lowByLocation: scope.trimLows(out.lowByLocation, sc) } : out);
 });
 
 router.put('/products/:id/low', prebuilt, requirePermission('settings.write'), async (req, res) => {
   scope.checkLocation(await scope.scopeOfReq(req), req.body?.location);
-  res.json(await catalog.setLow(req.shopId, req.params.id, req.body));
+  res.json(await catalog.setLow(req.stockKey, req.params.id, req.body));
 });
 
 router.get('/moves', prebuilt, async (req, res) => {
-  res.json(await catalog.moves(req.shopId, {
+  res.json(await catalog.moves(req.stockKey, {
     productId: req.query.productId, cursor: req.query.cursor, limit: req.query.limit, places: await scope.scopeOfReq(req),
   }));
 });
@@ -114,7 +134,7 @@ router.get('/report', prebuilt, requirePermission('reports.view'), async (req, r
   const productId = String(req.query.productId || '');
   //  ممیزیِ ۳۵ (B4): NUL ⇒ ۵۰۰ ِ پایگاه‌داده
   if (productId.includes('\u0000')) throw badRequest('شناسهٔ کالا معتبر نیست', 'bad_product_id');
-  res.json(await stock.reconcile(req.shopId, { productId }));
+  res.json(await stock.reconcile(req.stockKey, { productId }));
 });
 
 /**
@@ -124,24 +144,24 @@ router.get('/report', prebuilt, requirePermission('reports.view'), async (req, r
 const reservedLimit = rateLimit({
   max: 30, windowMs: 60 * 1000, keyPrefix: 'catalog-reserved', key: (req) => `${req.shopId || 'x'}:${req.user?.id || ''}`,
 });
-router.get('/reserved', reservedLimit, needFlag, requirePermission('orders.view'), async (req, res) => {
+router.get('/reserved', reservedLimit, needFlag, mainOnly, requirePermission('orders.view'), async (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json(await reserve.posView(req.shopId));
 });
 
 router.get('/tasks', prebuilt, async (req, res) => {
   const places = await scope.scopeOfReq(req);
-  res.json({ tasks: await catalog.tasks(req.shopId, { status: String(req.query.status || 'open'), limit: req.query.limit, places }) });
+  res.json({ tasks: await catalog.tasks(req.stockKey, { status: String(req.query.status || 'open'), limit: req.query.limit, places }) });
 });
 
 router.post('/tasks/:id/resolve', prebuilt, requirePermission('stock.adjust'), async (req, res) => {
   const sc = await scope.scopeOfReq(req);
-  const task = sc ? await scope.taskOf(req.shopId, req.params.id) : null;
+  const task = sc ? await scope.taskOf(req.shopId, req.params.id, req.stockBranch) : null;
   if (task) scope.check(sc, scope.taskPlaces(task));
-  const out = await catalog.resolveTask(req.shopId, req.params.id, req.body, req.user.id);
+  const out = await catalog.resolveTask(req.stockKey, req.params.id, req.body, req.user.id);
   await audit.log({
     shopId: req.shopId, userId: req.user.id, action: 'stock.task', targetType: 'stock_task',
-    targetId: out.id, detail: { status: out.status }, ip: clientIp(req),
+    targetId: out.id, detail: { status: out.status, ...branchOf(req) }, ip: clientIp(req),
   });
   res.json(out);
 });
@@ -158,7 +178,7 @@ router.post('/moves', prebuilt, async (req, res) => {
   if (!can(req.role, spec.permission)) throw forbidden('این کار در حد دسترسی شما نیست', 'permission_denied');
   const sc = await scope.scopeOfReq(req);
   if (sc) scope.check(sc, scope.manualPlaces(catalog.parseManual(req.body)));
-  const out = await catalog.manualMove(req.shopId, {
+  const out = await catalog.manualMove(req.stockKey, {
     key: req.get('idempotency-key') || req.body?.clientKey, body: req.body,
     actor: { type: 'user', id: req.user.id, role: req.role },
   });
@@ -170,7 +190,7 @@ router.post('/moves', prebuilt, async (req, res) => {
     await audit.log({
       shopId: req.shopId, userId: req.user.id, action: 'stock.move', targetType: 'product',
       targetId: String(req.body.productId || ''),
-      detail: { kind: req.body.kind, reason: req.body.reason || '', moves: out.moves.map((m) => [m.type, m.location, m.qtyMilli]) },
+      detail: { kind: req.body.kind, reason: req.body.reason || '', moves: out.moves.map((m) => [m.type, m.location, m.qtyMilli]), ...branchOf(req) },
       ip: clientIp(req),
     });
   }
@@ -184,7 +204,7 @@ router.post('/moves', prebuilt, async (req, res) => {
  * خواندن اول دفترِ دستگاه را می‌خواند (گام‌های بی‌اینترنتِ برنامه همان‌جا می‌نشینند)؛ `?keys=a,b` نتیجهٔ همان گام‌ها
  * (ثبت/رد با کد) را هم می‌دهد — بی `keys` پاسخ همان شکلِ پیشین است.
  */
-router.get('/transfers', needFlag, async (req, res) => {
+router.get('/transfers', needFlag, mainOnly, async (req, res) => {
   const places = await scope.scopeOfReq(req);
   await catalog.refresh(req.shopId);
   const list = await transfers.list(req.shopId, { status: req.query.status, limit: req.query.limit, places });
@@ -214,7 +234,7 @@ async function checkClose(req) {
   if (to) scope.check(sc, [to]);
 }
 
-router.post('/transfers', prebuilt, requirePermission('stock.move'), async (req, res) => {
+router.post('/transfers', prebuilt, mainOnly, requirePermission('stock.move'), async (req, res) => {
   const sc = await scope.scopeOfReq(req);
   if (sc) scope.check(sc, [transfers.parseSend(req.body).from]);
   const out = await transfers.send(req.shopId, {
@@ -223,7 +243,7 @@ router.post('/transfers', prebuilt, requirePermission('stock.move'), async (req,
   await transferDone(req, res, 'stock.transfer_send', out);
 });
 
-router.post('/transfers/:id/receive', prebuilt, requirePermission('stock.move'), async (req, res) => {
+router.post('/transfers/:id/receive', prebuilt, mainOnly, requirePermission('stock.move'), async (req, res) => {
   await checkClose(req);
   const out = await transfers.receive(req.shopId, req.params.id, {
     key: req.get('idempotency-key') || req.body?.clientKey, body: req.body, actor: { id: req.user.id, role: req.role },
@@ -231,7 +251,7 @@ router.post('/transfers/:id/receive', prebuilt, requirePermission('stock.move'),
   await transferDone(req, res, 'stock.transfer_receive', out);
 });
 
-router.post('/transfers/:id/reject', prebuilt, requirePermission('stock.move'), async (req, res) => {
+router.post('/transfers/:id/reject', prebuilt, mainOnly, requirePermission('stock.move'), async (req, res) => {
   await checkClose(req);
   const out = await transfers.reject(req.shopId, req.params.id, {
     key: req.get('idempotency-key') || req.body?.clientKey, body: req.body, actor: { id: req.user.id, role: req.role },

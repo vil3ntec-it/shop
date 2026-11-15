@@ -102,12 +102,13 @@ object ProductImportPlan {
   private fun key(text: String) = SimilarNames.exactKey(text)
 
   private val ALIASES: Map<String, Col> = listOf(
-    Col.NAME to listOf("نام محصول", "نام کالا", "نام", "کالا", "name", "product"),
-    Col.CATEGORY to listOf("دسته", "دسته‌بندی", "دسته بندی", "category"),
+    //  LOC-06 (#۲۴): برگهٔ «محصولات» ِ همین برنامه به انگلیسی/پشتو (`StrSheets`) هم دوباره خوانده می‌شود
+    Col.NAME to listOf("نام محصول", "نام کالا", "نام", "کالا", "name", "product", "product name", "د توکي نوم"),
+    Col.CATEGORY to listOf("دسته", "دسته‌بندی", "دسته بندی", "category", "ډله"),
     Col.UNIT to listOf("واحد", "unit"),
-    Col.PURCHASE to listOf("قیمت خرید", "purchase price", "purchaseprice", "cost"),
-    Col.SALE to listOf("قیمت فروش", "sale price", "saleprice", "price"),
-    Col.MIN to listOf("حداقل موجودی", "min stock", "minstock"),
+    Col.PURCHASE to listOf("قیمت خرید", "purchase price", "purchaseprice", "cost", "د پېر بیه"),
+    Col.SALE to listOf("قیمت فروش", "sale price", "saleprice", "price", "د پلور بیه"),
+    Col.MIN to listOf("حداقل موجودی", "min stock", "minstock", "minimum stock", "لږترلږه موجودي"),
     Col.BARCODE to listOf("بارکد", "بارکدها", "barcode", "barcodes"),
   ).flatMap { (col, names) -> names.map { key(it) to col } }.toMap()
 

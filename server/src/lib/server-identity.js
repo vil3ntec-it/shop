@@ -69,6 +69,43 @@ function publicUrl() {
   } catch { return ''; }
 }
 
+/**
+ * نشانی‌های عمومیِ دیگرِ همین سرور (`PUBLIC_BASE_URLS`) — فقط نشانیِ ریشهٔ درست: https (http فقط روی همین کامپیوتر)،
+ * بی نامِ کاربری و رمز، بی `?` و `#`، بی فاصله و نویسهٔ کنترلی؛ حداکثر ۸، هر کدام حداکثر ۲۰۰ نویسه، بی تکرار.
+ * نادرست ⇒ کنار گذاشته می‌شود (یک بار هشدار در لاگ). ⛔ این فهرست به برنامه **اعتماد** نمی‌دهد: برنامه هر نشانی را
+ * جدا می‌پرسد و فقط با همان `serverId` می‌پذیرد (`core/server/ServerFailover.kt`، `ServerLearn`).
+ */
+const MAX_PUBLIC_URLS = 8;
+const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
+let warnedUrls = '';
+function publicUrls(raw = config.publicBaseUrls) {
+  const out = [];
+  const bad = [];
+  for (const part of String(raw || '').split(',')) {
+    const t = part.trim().replace(/\/+$/, '');
+    if (!t) continue;
+    let ok = false;
+    if (t.length <= 200 && !/[\s\u0000-\u001f\u007f\\@]/.test(t)) {
+      try {
+        const u = new URL(t);
+        const host = u.hostname.toLowerCase();
+        ok = (u.protocol === 'https:' || (u.protocol === 'http:' && LOOPBACK.has(host)))
+          && !u.username && !u.password && !u.search && !u.hash && !t.includes('?') && !t.includes('#')
+          && /^[a-z0-9.\-[\]:]+$/.test(host) && !t.includes('..');
+      } catch { ok = false; }
+    }
+    if (!ok) { bad.push(t.slice(0, 60)); continue; }
+    const norm = t.replace(/^([a-z]+:\/\/[^/]+)/i, (m) => m.toLowerCase());
+    if (!out.includes(norm) && out.length < MAX_PUBLIC_URLS) out.push(norm);
+  }
+  const key = bad.join(',');
+  if (bad.length && warnedUrls !== key) {
+    warnedUrls = key;
+    console.warn(`[server-id] PUBLIC_BASE_URLS: این نشانی‌ها پذیرفته نشدند: ${bad.join(' ، ')}`);
+  }
+  return out;
+}
+
 /** آنچه این سرور دارد — فهرستِ سفید، از پیکربندی؛ هیچ‌کدام راز نیست */
 function features() {
   const out = ['health', 'config.server', 'auth.password', 'shop', 'pump', 'sync.v1', 'live', 'plans.public'];
@@ -88,6 +125,7 @@ async function displayName() {
 }
 
 async function info() {
+  const urls = publicUrls();
   return {
     ok: true,
     kind: KIND,
@@ -98,8 +136,10 @@ async function info() {
     api: ['v1'],
     features: features(),
     publicUrl: publicUrl(),
+    //  فقط وقتی `PUBLIC_BASE_URLS` چیزی دارد — خالی ⇒ پاسخ بیت‌به‌بیت همان امروز
+    ...(urls.length ? { publicUrls: urls } : {}),
     time: now(),
   };
 }
 
-module.exports = { serverId, info, features, publicUrl, forgetCache, WIRE, KIND, ID };
+module.exports = { serverId, info, features, publicUrl, publicUrls, forgetCache, WIRE, KIND, ID, MAX_PUBLIC_URLS };

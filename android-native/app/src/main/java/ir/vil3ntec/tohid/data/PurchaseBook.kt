@@ -1,6 +1,6 @@
 package ir.vil3ntec.tohid.data
 
-
+import ir.vil3ntec.tohid.core.i18n.StrSheets
 import ir.vil3ntec.tohid.core.i18n.StrGoods
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
 import ir.vil3ntec.tohid.core.i18n.StrStock
@@ -440,15 +440,15 @@ object PurchaseBook {
     invoices(d, supplierId).forEach { inv ->
       //  سندِ کسر (برگشت به تأمین‌کننده) در ستونِ «پرداخت» می‌نشیند — همان اثر روی مانده
       if (inv.isReturn) {
-        evs += Ev(inv.date, inv.createdAt, 0, "برگشت به تأمین‌کننده (سندِ کسر)", 0.0, -inv.total, inv.key)  // داده: شرحِ ردیفِ حسابِ تأمین‌کننده — ستونِ برگهٔ خروجی هم هست (منتظرِ تصمیمِ صاحب‌کار)
+        evs += Ev(inv.date, inv.createdAt, 0, StrSheets.supplierReturnNote, 0.0, -inv.total, inv.key)
         return@forEach
       }
-      val title = if (inv.no > 0) "فاکتورِ خرید #${inv.no} (${inv.lines.size} ردیف)" else "خرید"  // داده: شرحِ ردیفِ حسابِ تأمین‌کننده — ستونِ برگهٔ خروجی هم هست (منتظرِ تصمیمِ صاحب‌کار)
+      val title = if (inv.no > 0) StrSheets.purchaseInvoiceTitle(inv.no, inv.lines.size) else StrSheets.purchase
       evs += Ev(inv.date, inv.createdAt, 0, title, inv.total, 0.0, inv.key)
-      if (inv.paid > 0) evs += Ev(inv.date, inv.createdAt, 1, "پرداخت هنگامِ خرید", 0.0, inv.paid, inv.key)  // داده: شرحِ ردیفِ حسابِ تأمین‌کننده — ستونِ برگهٔ خروجی هم هست (منتظرِ تصمیمِ صاحب‌کار)
+      if (inv.paid > 0) evs += Ev(inv.date, inv.createdAt, 1, StrSheets.paidAtPurchase, 0.0, inv.paid, inv.key)
     }
     d.supplierPayments.filter { it.supplierId == supplierId }.forEach { p ->
-      evs += Ev(p.date, p.createdAt, 2, p.notes.ifBlank { "پرداخت" }, 0.0, p.amount, null)  // داده: شرحِ ردیفِ حسابِ تأمین‌کننده — ستونِ برگهٔ خروجی هم هست (منتظرِ تصمیمِ صاحب‌کار)
+      evs += Ev(p.date, p.createdAt, 2, p.notes.ifBlank { StrSheets.payment }, 0.0, p.amount, null)
     }
     var run = 0.0
     return evs.sortedWith(compareBy<Ev> { it.date }.thenBy { it.at }.thenBy { it.order })
@@ -470,30 +470,30 @@ object PurchaseBook {
   fun invoiceSheet(d: ShopData, inv: Invoice): ReportCsv.Sheet {
     val names = d.products.associate { it.id to it.name }
     val supplier = d.suppliers.find { it.id == inv.supplierId }?.name.orEmpty()
-    val rows = mutableListOf(listOf("ردیف", "کالا", "مقدار", "واحد", "فی", "جمع"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    val rows = mutableListOf(listOf(StrSheets.row, StrSheets.product, StrSheets.quantity, StrSheets.unit, StrSheets.unitPrice, StrSheets.total))
     //  S25: سندِ کسر برگهٔ خودش را دارد — عنوانِ «سندِ کسر»، مقدار و مبلغِ برگشتی مثبت، دلیل و کسر از بدهی (نه پرداخت/مانده)
     if (inv.isReturn) {
       inv.lines.forEachIndexed { i, p ->
         rows += listOf((i + 1).toString(), names[p.productId].orEmpty(), q(-p.quantity), p.unit, r(p.purchasePrice), r(-p.totalAmount))
       }
-      rows += listOf("", "کسر از بدهی به «$supplier»", "", "", "", r(-inv.total))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-      inv.lines.map { it.notes.substringAfter("برگشت به تأمین‌کننده: ", "").trim() }.filter { it.isNotEmpty() }.distinct()  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-        .forEach { rows += listOf("", "دلیل: $it", "", "", "", "") }  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+      rows += listOf("", StrSheets.deductedFrom(supplier), "", "", "", r(-inv.total))
+      inv.lines.map { it.notes.substringAfter("برگشت به تأمین‌کننده: ", "").trim() }.filter { it.isNotEmpty() }.distinct()  // داده: پیشوندِ یادداشتِ ذخیره‌شدهٔ ردیفِ برگشت (منطق، نه متنِ برگه)
+        .forEach { rows += listOf("", StrSheets.reasonLine(it), "", "", "", "") }
       return ReportCsv.Sheet("$CREDIT_NOTE_TITLE-${safe(supplier)}-${inv.date}", rows)
     }
     inv.lines.forEachIndexed { i, p ->
       rows += listOf((i + 1).toString(), names[p.productId].orEmpty(), q(p.quantity), p.unit, r(p.purchasePrice), r(p.totalAmount))
     }
-    rows += listOf("", "جمع", "", "", "", r(inv.total))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    rows += listOf("", "پرداخت‌شده", "", "", "", r(inv.paid))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    rows += listOf("", "مانده", "", "", "", r(inv.debt))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    rows += listOf("", StrSheets.total, "", "", "", r(inv.total))
+    rows += listOf("", StrSheets.paidDone, "", "", "", r(inv.paid))
+    rows += listOf("", StrSheets.balance, "", "", "", r(inv.debt))
     val title = if (inv.no > 0) "فاکتور-خرید-${inv.no}" else "خرید"  // داده: نامِ پروندهٔ خروجی
     return ReportCsv.Sheet("$title-${safe(supplier)}-${inv.date}", rows)
   }
 
   fun invoicesSheet(d: ShopData, list: List<Invoice>, today: String): ReportCsv.Sheet {
     val names = d.suppliers.associate { it.id to it.name }
-    val rows = mutableListOf(listOf("فاکتور", "تاریخ", "تأمین‌کننده", "ردیف‌ها", "جمع", "پرداخت‌شده", "مانده"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    val rows = mutableListOf(listOf(StrSheets.invoice, StrSheets.date, StrSheets.supplier, StrSheets.rows, StrSheets.total, StrSheets.paidDone, StrSheets.balance))
     list.forEach { v ->
       rows += listOf(if (v.no > 0) v.no.toString() else "", v.date, names[v.supplierId].orEmpty(), v.lines.size.toString(), r(v.total), r(v.paid), r(v.debt))
     }
@@ -501,7 +501,7 @@ object PurchaseBook {
   }
 
   fun ledgerSheet(d: ShopData, supplier: Supplier, today: String): ReportCsv.Sheet {
-    val rows = mutableListOf(listOf("ردیف", "تاریخ", "شرح", "خرید", "پرداخت", "مانده"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    val rows = mutableListOf(listOf(StrSheets.row, StrSheets.date, StrSheets.description, StrSheets.purchase, StrSheets.payment, StrSheets.balance))
     ledger(d, supplier.id).forEach { l ->
       rows += listOf(l.row.toString(), l.date, l.text, if (l.bill > 0) r(l.bill) else "", if (l.pay > 0) r(l.pay) else "", r(l.balance))
     }

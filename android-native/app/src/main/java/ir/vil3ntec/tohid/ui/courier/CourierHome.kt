@@ -380,7 +380,7 @@ internal fun CourierBoard(
 
   val screen = when {
     find(openId) != null -> "d:$openId"
-    page == "cash" -> "cash"
+    page == "cash" || CourierLegal.isKey(page) -> page.orEmpty()
     else -> "t:$tab"
   }
 
@@ -428,7 +428,7 @@ internal fun CourierBoard(
                 )
               }
             }
-            key == "cash" -> CourierCashPage(summary, staleError, syncing, onBack = { page = null }, onRefresh = onRefresh)
+            key == "cash" || CourierLegal.isKey(key) -> CourierSubPage(key, summary, staleError, syncing, onBack = { page = null }, onRefresh = onRefresh)
             key == "t:route" -> RouteTab(
               live = live, finished = finished, queue = queue, routeTab = routeTab, onRouteTab = { routeTab = it },
               syncing = syncing, waitingTotal = waitingTotal, lastError = lastError, view = view.mode,
@@ -454,7 +454,7 @@ internal fun CourierBoard(
             key == "t:account" -> CourierAccountTab(
               name = name, summary = summary, syncing = syncing, waiting = waitingTotal, lastError = lastError,
               lastSyncAt = lastSyncAt, onRefresh = onRefresh, onCallShop = { callShop() }, onCash = { page = "cash" },
-              onSignOut = { askSignOut = true }, consent = consent, consentBusy = consentBusy, onConsent = onConsent,
+              onSignOut = { askSignOut = true }, consent = consent, consentBusy = consentBusy, onConsent = onConsent, onLegal = { page = it },
             )
             else -> CourierHomeTab(
               name = name, summary = summary, live = live, finished = finished, queue = queue,
@@ -560,7 +560,7 @@ private fun RouteTab(
     itemsIndexed(queue.rejected, key = { _, r -> "rej-" + r.event.eventId }) { _, r ->
       RejectedNote(
         title = StrCourierApp.actionNotSaved(actionLabel("", r.event.type)),
-        message = r.message.ifBlank { r.code },
+        message = r.message.ifBlank { StrCourierApp.notSaved },   //  ⛔ کدِ ماشینِ خطا روی صفحه نه
         onDismiss = { onDismissRejected(r.event.eventId) },
         modifier = Modifier.animateItem(),
       )

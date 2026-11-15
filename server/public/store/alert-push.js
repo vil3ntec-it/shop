@@ -27,10 +27,10 @@
   function make(ctx) {
     var P = window.StorePush;
     var page = P.page(ctx.slug);
-    var KEY = 'store-alert-push:' + ctx.slug;   //  { p: شماره، e: نشانیِ اشتراک } — این مرورگر برای همین شماره روشن است
+    var KEY = 'store-alert-push:' + ctx.slug;   //  { p: کلیدِ مشتری (ایمیلِ تأییدشده)، e: نشانیِ اشتراک } — این مرورگر برای همین مشتری روشن است
     var busy = false; var fresh = null; var key = ''; var row = null;
 
-    function phone() { var tk = K.ticket(); return tk ? tk.phone : ''; }
+    function phone() { var tk = K.ticket(); return tk ? tk.email : ''; }   //  کلیدِ مشتری («فقط ایمیل»)
     function mine() { var m = K.load(KEY, null); return m && m.p && m.e && m.p === phone() ? m.e : ''; }
     function state() {
       if (Notification.permission === 'denied') return 'denied';

@@ -28,11 +28,15 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.shopper.ShopperLang
 import ir.vil3ntec.tohid.core.shopper.ShopperText
 
-/** تنظیمات: فقط زبان و ظاهر؛ نشانیِ سرور برای آزمون پایینِ صفحه (ساختِ debug ِ مرحلهٔ ۱). */
+/**
+ *  تنظیمات: زبان، ظاهر، حساب، حریمِ خصوصی و شرایط (`LegalScreen.kt`). ⛔ نشانیِ سرور به خریدار نشان داده نمی‌شود («هیچ جزئیاتِ فنی/زیرساخت در صفحه»،
+ *  `docs/RULES-fa.md`): کادرِ آزمونِ «نشانیِ سرور» فقط در ساختِ آزمونِ دستی (`Platform.serverField`) و **خالی** باز می‌شود —
+ *  نه نشانیِ ساخت و نه نشانیِ آموخته در آن نیست؛ فقط همان که آزماینده خودش می‌نویسد (خالی ⇒ برگشت به نشانیِ ساخت).
+ */
 @Composable
 fun SettingsScreen(model: CustomerModel) {
   val platform = LocalPlatform.current
-  var server by remember { mutableStateOf(platform.server()) }
+  var server by remember { mutableStateOf("") }
   Column(Modifier.fillMaxSize()) {
     TopBar(ShopperText.settings, onBack = { model.back() })
     Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -43,12 +47,15 @@ fun SettingsScreen(model: CustomerModel) {
         Option(label, model.saved.theme == k) { model.setTheme(k) }
       }
       AccountSettings(model)
-      SectionTitle(ShopperText.server)
-      OutlinedTextField(
-        value = server, onValueChange = { server = it.trim() }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-      )
-      OutlinedButton(onClick = { platform.setServer(server); model.serverChanged() }, modifier = Modifier.fillMaxWidth()) { Text(ShopperText.save) }
+      LegalLinks(model)   //  حریمِ خصوصی و شرایط درونِ برنامه (`LegalScreen.kt`)
+      if (platform.serverField) {
+        SectionTitle(ShopperText.server)
+        OutlinedTextField(
+          value = server, onValueChange = { server = it.trim() }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+        )
+        OutlinedButton(onClick = { platform.setServer(server); model.serverChanged() }, modifier = Modifier.fillMaxWidth()) { Text(ShopperText.save) }
+      }
       Text(platform.version, style = MaterialTheme.typography.bodySmall)
     }
   }

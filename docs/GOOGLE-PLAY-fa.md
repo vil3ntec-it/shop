@@ -13,6 +13,8 @@
    داخلی و بی خرید با واتساپ ساخته می‌شود و CI هر بار آن را می‌سازد و می‌سنجد.
 2. «حذفِ حساب» حالا هم در برنامه هست، هم در وب (پورتال)، هم در صفحهٔ حریمِ خصوصی. حذفِ خودکار **پیش‌فرض خاموش** است؛ تا
    روشنش نکنید، همان دکمه درخواست را به پشتیبانی می‌فرستد.
+   **۱۴۰۵/۰۸/۲۳:** حریمِ خصوصی و شرایط **درونِ خودِ برنامه**اند (بی پیوندِ GitHub) و نشانیِ عمومیِ فهرستِ Play از این پس
+   `https://api.vill3n.top/legal/privacy` ِ سرورِ خودتان است (بخشِ ۲.۱ و ۴)؛ نسخهٔ Play کدِ به‌روزرسانیِ داخلی را **اصلاً** ندارد.
 3. ⚠️ سه تصمیمِ بزرگ با شماست (بخشِ ۱): حسابِ توسعه‌دهنده از کدام کشور، کلیدِ امضا، و فروشِ اشتراک داخلِ برنامهٔ Play.
 4. 🟡 در Play Console حدودِ ده فرم پر می‌شود (بخشِ ۴)؛ جوابِ پیشنهادیِ فرمِ «ایمنیِ داده» در بخشِ ۵ است.
 5. 🟡 برای حسابِ شخصیِ تازه، پیش از انتشارِ همگانی ۱۴ روز آزمونِ بسته با دست‌کم ۱۲ نفر لازم است.
@@ -74,6 +76,16 @@
 | صفحهٔ حریمِ خصوصی: بخشِ `#delete-account` (راهِ برنامه، راهِ وب، چه می‌ماند) و اجازه‌ها و داده‌های جاافتاده (میکروفون، NFC، دسترسی به اعلان، گزارشِ خطا، گفت‌وگو، ML Kit) | `privacy.html` |
 | پیوندِ «حریمِ خصوصی» داخلِ برنامه (قاعدهٔ Play): «درباره برنامه» و «ویرایش حساب»؛ جست‌وجوی تنظیمات «حذف حساب» و «حریم خصوصی» را پیدا می‌کند | `AboutScreen.kt`، `ProfileEditScreen.kt`، `SettingsSearchIndex.kt` |
 
+### ۲.۱ حریمِ خصوصی درونِ برنامه و نسخهٔ Play بی کدِ به‌روزرسانی (۱۴۰۵/۰۸/۲۳) ✅
+
+| کار | کجا |
+|---|---|
+| متنِ حریمِ خصوصی و شرایط یک منبع دارد (فارسی، انگلیسی، پشتو؛ دری از لایهٔ واژه) و درونِ برنامه بی اینترنت باز می‌شود: «درباره برنامه»، «ویرایش حساب»، حالتِ پیک، برنامهٔ خرید؛ هیچ پیوندی به GitHub نمانده | `core/legal/legal-texts.json` ⇐ `node tools/legal/generate.mjs` |
+| نشانیِ عمومی برای فهرستِ Play/App Store روی دامنهٔ خودتان: `GET /legal/privacy` و `/legal/terms` (‎`?lang=en`، `ps`، `prs`‎) — عمومی، بی ورود، بی نامِ میزبان یا جزئیاتِ سرور | `server/src/routes/legal-pages.js` |
+| ⛔ نسخهٔ Play و کافه‌بازار **کدِ به‌روزرسانیِ داخلی و هیچ نشانیِ GitHub ندارند**، نه فقط در اجرا خاموش: `Updater.kt` ِ واقعی در `src/direct/java` است و فقط نسخهٔ مستقیم (APK ِ سایت) و پیش‌نمایش آن را می‌گیرند — رفتارشان بایت‌به‌بایت همان؛ `-Pstore=play|bazaar` جایش `src/store/java/…/UpdaterStoreAndroid.kt` را دارد (همان API، بی شبکه: «نسخهٔ تازه‌ای نیست») | `android-native/app/build.gradle.kts` ‹srcDir› |
+| نگهبان‌ها: `src/store` هیچ «github» ندارد، `Updater.kt` به `src/main` برنمی‌گردد، رشته‌های `src/main` نشانیِ GitHub ندارند و API ِ دو نسخه یکی است | `server/test/store-build-updater.test.js`، `no-github-in-apps.test.js` |
+| ⚠️ ساختِ اندروید فقط در CI است (این‌جا Android SDK نیست): کارهای «نسخهٔ کافه‌بازار» و «نسخهٔ Google Play (AAB)» ِ `tohid-native.yml` همین جایگزین را کامپایل می‌کنند | CI |
+
 ### آنچه سنجیده شد و درست بود (بی تغییر)
 
 | موضوع | نتیجه |
@@ -117,7 +129,8 @@
    می‌فروشید «رایگان با خریدِ درون‌برنامه»؛ فعلاً خرید ندارد.
 3. **Play App Signing:** «Let Google create and manage my app signing key» و بارگذاریِ کلیدِ بارگذاری (بخشِ ۱.۲).
 4. **App content** (Policy and programs ← App content):
-   - **Privacy policy:** `https://vil3ntec-it.github.io/shop/privacy.html`
+   - **Privacy policy:** `https://api.vill3n.top/legal/privacy` (دامنهٔ سرورِ خودتان؛ ⚠️ اول در مرورگر ببینید باز می‌شود).
+     نشانیِ پیشینِ GitHub Pages فقط تا همین عوض شدن می‌ماند و پس از آن پاک می‌شود (`OWNER-NEXT-fa.md` بخشِ ۳).
    - **App access:** «All or some functionality is restricted» ⇐ یک حسابِ آزمایشی (ایمیل و رمز) با دکانِ نمونه برای بازبین
      بسازید و همین‌جا بنویسید؛ بگویید ورود با «ایمیل و رمز» است و اشتراکِ آزمایشیِ هفت‌روزه همه‌چیز را باز می‌کند.
    - **Ads:** No.
@@ -133,7 +146,7 @@
      lend money.» اگر نبود: «My app doesn't provide any financial features». ⚠️ این تفسیرِ من است؛ اگر Google سند خواست، همین شرح را بدهید.
    - **Data safety:** بخشِ ۵.
    - **Account deletion** (درونِ Data safety): «Yes, users can delete their account» و نشانی:
-     `https://vil3ntec-it.github.io/shop/privacy.html#delete-account`. «امکانِ حذفِ بخشی از داده بی حذفِ حساب» ⇐ ⚠️ Yes
+     `https://api.vill3n.top/legal/privacy#delete-account`. «امکانِ حذفِ بخشی از داده بی حذفِ حساب» ⇐ ⚠️ Yes
      (کالا، مشتری و پشتیبان‌های ابری را خودِ کاربر در برنامه پاک می‌کند؛ فروشِ ثبت‌شده فقط لغو می‌شود — اگر مطمئن نیستید No بزنید).
    - **Foreground service permissions:** نوعِ `connectedDevice` ⇐ کاربردِ «Connect to a Bluetooth barcode scanner the user
      paired, while the app is closed». ویدیوی کوتاه (مثلاً در یوتیوبِ unlisted): «دستگاه‌ها» ⇐ افزودنِ بارکدخوانِ بلوتوثی ⇐
@@ -204,10 +217,10 @@ Financial ← Credit score / User payment info (شمارهٔ کارت خواند
   > بفرستید، قرضِ هر مشتری و دریافت‌ها را نگه دارید، موجودیِ انبار و تاریخِ انقضا را ببینید و گزارشِ روز و ماه بگیرید.
   > بی اینترنت هم کار می‌کند؛ با حساب، دفتر میانِ گوشی‌ها و کامپیوترهای دکان همگام می‌شود و پشتیبان می‌گیرد.
   > چاپگرِ حرارتی و بارکدخوانِ بلوتوثی، کارمند با نقش و اجازهٔ جدا، و پرداختِ حساب‌پی با QR یا NFC.
-  > تبلیغ ندارد و داده‌های دکانِ شما فروخته نمی‌شود. حریمِ خصوصی: https://vil3ntec-it.github.io/shop/privacy.html
-- **نشانی‌ها:** حریمِ خصوصی `https://vil3ntec-it.github.io/shop/privacy.html` · حذفِ حساب
-  `https://vil3ntec-it.github.io/shop/privacy.html#delete-account` · حذف از وب `https://api.vill3n.top/portal/#delete-account`
-  · وب‌سایت `https://vil3ntec-it.github.io/shop/`
+  > تبلیغ ندارد و داده‌های دکانِ شما فروخته نمی‌شود. حریمِ خصوصی: https://api.vill3n.top/legal/privacy
+- **نشانی‌ها:** حریمِ خصوصی `https://api.vill3n.top/legal/privacy` (انگلیسی: `…/legal/privacy?lang=en`) · شرایط
+  `https://api.vill3n.top/legal/terms` · حذفِ حساب `https://api.vill3n.top/legal/privacy#delete-account` · حذف از وب
+  `https://api.vill3n.top/portal/#delete-account` · وب‌سایت: اختیاری — ⛔ نشانیِ GitHub Pages را نگذارید.
 - **ایمیلِ تماس:** ⚠️ یک ایمیلِ واقعی که می‌خوانید (در Play عمومی دیده می‌شود).
 - **شرحِ حسابِ آزمایشی برای بازبین** (App access): «Sign in with email and password on the first screen. The account has a
   sample shop with products and sales; the 7-day trial unlocks all features.»

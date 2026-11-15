@@ -69,6 +69,8 @@ object HeldSync {
       return withTimeoutOrNull(CLAIM_WAIT_MS) { call.await() } ?: HeldSyncEngine.Reply(0)
     }
 
+    override suspend fun twice(id: String, body: JsonObject): HeldSyncEngine.Reply = reply { Backend.api(app).post("$PATH/$id/twice", body) }
+
     private inline fun reply(call: () -> JsonObject): HeldSyncEngine.Reply = try {
       HeldSyncEngine.Reply(200, call())
     } catch (c: kotlinx.coroutines.CancellationException) {
@@ -128,7 +130,8 @@ object HeldSync {
     if (!force && now - lastAt < MIN_MS) return
     lastAt = now
     val e = engine(app) ?: return
-    scope.launch { runCatching { e.cycle() }; publish(e) }
+    //  S09: پس از دور، لغوِ خودکارِ فروشِ دومِ «یک فاکتور در دو دستگاه» (پرچمِ خاموشِ `shop.held_twice_cancel` ⇒ هیچ)
+    scope.launch { runCatching { e.cycle() }; runCatching { HeldTwiceAndroid.sweep(app, e) }; publish(e) }
   }
 
   private fun publish(e: HeldSyncEngine) { _conflicts.value = runCatching { e.conflicts() }.getOrDefault(emptyMap()) }

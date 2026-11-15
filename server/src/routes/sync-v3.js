@@ -19,6 +19,8 @@
  *    همان عضو؛ شعبهٔ غیرِ اصلی ⇐ `req.syncBranch` (ردیف‌ها در بخشِ `<دکان>#<شعبه>`) و **همهٔ** خواندن/نوشتنِ دفتر
  *    با آن (`ctxOf`). `req.sync` دست نمی‌خورد ⇒ `requireSyncWrite`، پنهان کردنِ تماس و پرچم‌ها همان دکان. پرچم خاموش ⇒
  *    سرآیند خوانده هم نمی‌شود. شناسهٔ شعبه در بدنه هرگز خوانده نمی‌شود.
+ * ⛔ شعبه (فازِ ۳، `lib/branch-catalog.js`): کاتالوگِ دکان (کالا/دسته/واحد) فقط از شعبهٔ اصلی — op ِ دستگاه رویش در بخشِ شعبه ⇒
+ *    `catalog_main_only`؛ پیش از pull/Snapshot ِ بخشِ شعبه آینهٔ کاتالوگِ اصلی با op ِ سرور (بهترین‌کوشش، `has_more` اگر ماند).
  * ⚠️ هر پاسخ `server_time` دارد (و سرآیندِ `X-Server-Time`) تا دستگاه
  *    اختلافِ ساعتش را نگه دارد (بخشِ ۳.۸.۱ بندِ ۸).
  */
@@ -42,6 +44,7 @@ const contact = require('../lib/customer-contact');
 const creditReview = require('../lib/credit-limit-review');
 const tillOpUser = require('../lib/till-op-user');
 const branches = require('../lib/branches');
+const branchCatalog = require('../lib/branch-catalog');
 
 const gzip = promisify(zlib.gzip);
 const router = express.Router();
@@ -89,7 +92,9 @@ async function send(req, res, payload) {
 }
 
 router.get('/hello', (req, res) => {
-  res.json({ ok: true, enabled: true, ...sync.describe(req.sync) });
+  //  شعبهٔ غیرِ اصلی (فازِ ۳): شعبه و جدول‌های فقط‌خواندنیِ کاتالوگِ دکان، تا برنامه ویرایشِ کالا را در همین شعبه نشان ندهد
+  const branch = req.syncBranch ? { branch: { id: req.syncBranch.branchId, catalog_read_only: branchCatalog.TABLES } } : {};
+  res.json({ ok: true, enabled: true, ...sync.describe(req.sync), ...branch });
 });
 
 router.post('/push', requireSyncWrite, async (req, res, next) => {
@@ -105,10 +110,9 @@ router.post('/push', requireSyncWrite, async (req, res, next) => {
       version: appVersion, shape: b.format === 'v2' ? 'v1' : 'v3', caps: b.caps, client: b.client,
     });
     //  S46: نوبتِ سنجیدهٔ صندوقِ دستگاهِ توکن در لحظهٔ رسیدن (پرچمِ خاموشِ `shop.till_op_user` ⇒ null؛ ‎lib/till-op-user.js‎)
-    //  شعبهٔ غیرِ اصلی (فازِ ۱): سابقه‌های بهترین‌کوششِ سطحِ دکان (کاربرِ صندوق، بررسیِ قرض/تخفیف) نوشته نمی‌شوند تا ردیفِ
-    //  شعبه در دفترِ سطحِ دکانِ اصلی نیاید — فازِ ۳ (`docs/BRANCHES-fa.md`)
-    const branchCtx = req.syncBranch || null;
-    const till = !branchCtx && Array.isArray(fl.ops) && fl.ops.length ? await tillOpUser.begin(req).catch((err) => {
+    //  شعبهٔ غیرِ اصلی (فازِ ۳ب ِ `docs/BRANCHES-fa.md`): سابقه‌های بهترین‌کوشش (کاربرِ صندوق، بررسیِ قرض/تخفیف) با بافتِ
+    //  همان بخش — نوبتِ همان شعبه، دفترِ همان بخش، تعریف‌ها و پرچم‌ها سطحِ دکان؛ ردیف/سابقه با شعبه، هرگز در اصلی
+    const till = Array.isArray(fl.ops) && fl.ops.length ? await tillOpUser.begin(req, ctxOf(req)).catch((err) => {
       console.error('[till-op-user] نوبتِ صندوق خوانده نشد (v3):', err.message);
       return null;
     }) : null;
@@ -125,9 +129,9 @@ router.post('/push', requireSyncWrite, async (req, res, next) => {
       hideContact: await contact.hiddenForReq(req),
     });
     //  CRM-03: فروشِ نسیهٔ تازه بیش از سقفِ اعتبار ⇒ فقط سابقهٔ بررسی (پرچمِ خاموش؛ ‎lib/credit-limit-review.js‎)
-    if (!branchCtx) await creditReview.v3(req.sync, deviceOf(b), fl.ops, out.results, { ip: clientIp(req) });
+    await creditReview.v3(ctxOf(req), deviceOf(b), fl.ops, out.results, { ip: clientIp(req) });
     //  STF-03: تخفیفِ خودکار و مصرفِ امتیاز با تعریف‌های دکان ⇒ فقط سابقهٔ بررسی (پرچمِ خاموش؛ ‎lib/promo-loyalty-review.js‎)
-    if (!branchCtx) await require('../lib/promo-loyalty-review').v3(req.sync, deviceOf(b), fl.ops, out.results, { ip: clientIp(req) });
+    await require('../lib/promo-loyalty-review').v3(ctxOf(req), deviceOf(b), fl.ops, out.results, { ip: clientIp(req) });
     //  S46: کاربرِ سنجیدهٔ صندوق برای هر op ِ نشسته (بهترین‌کوشش؛ پاسخ دست نمی‌خورد)
     await tillOpUser.v3(till, fl.ops, out.results, { format: b.format === 'v2' ? 'v2' : 'v3' });
     out.results = newerFields.mergeResults(fl, out.results);
@@ -145,6 +149,8 @@ router.post('/push', requireSyncWrite, async (req, res, next) => {
 
 router.get('/pull', async (req, res, next) => {
   try {
+    //  شعبه (فازِ ۳): کاتالوگِ دکان پیش از خواندنِ بخش در بخشِ همین شعبه (`lib/branch-catalog.js`)؛ بیشتر ⇒ `has_more`
+    const cm = req.syncBranch ? await branchCatalog.mirrorSoft(req.syncBranch) : null;
     const out = await sync.pull(ctxOf(req), {
       deviceId: deviceOf(req.query),
       since: Number(req.query?.since || 0),
@@ -154,6 +160,7 @@ router.get('/pull', async (req, res, next) => {
     //  §۹.۵: «دورانِ» سرور کنارِ هر pull — عوض شده ⇒ برنامه opهای گم‌شده را دوباره می‌فرستد
     //  (`lib/sync-epoch.js`، `SyncV3Engine.pullOnce`). خاموش ⇒ همان پاسخِ پیشین.
     if (config.syncEpoch.enabled) out.epoch = await syncEpoch.forAccount(ctxOf(req), 'v3');
+    if (cm && cm.more) out.has_more = true;
     //  SYN-04: «push ات را فشرده بفرست» فقط با پرچمِ دکانِ `sync.gzip_push` (همان پرچمِ v1؛ سرور بدنهٔ فشرده را همیشه باز می‌کند)
     if ((await require('../lib/sync-v1-keep').flags(req.sync)).gzipPush) out.gzip_push = true;
     if (contact.touches(out.ops) && await contact.hiddenForReq(req)) out.ops = contact.omitV3Ops(out.ops);
@@ -163,6 +170,7 @@ router.get('/pull', async (req, res, next) => {
 
 router.get('/snapshot', async (req, res, next) => {
   try {
+    if (req.syncBranch) await branchCatalog.mirrorSoft(req.syncBranch, { rounds: 40 });   //  شعبه: همهٔ کاتالوگِ دکان (تا ۲۰ هزار ردیف)
     const snap = await sync.snapshot(ctxOf(req));
     if (await contact.hiddenForReq(req)) snap.tables = contact.omitTables(snap.tables);
     await send(req, res, { ok: true, ...snap });

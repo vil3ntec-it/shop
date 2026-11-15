@@ -10,7 +10,11 @@
  *      گذشتهٔ کانالِ پولی ≥ ۸۰٪ سقف).
  *   ۴) بازه ۱ تا ۳۱ روز (نادرست ⇒ ۷)؛ پیامِ بیرونِ بازه شمرده نمی‌شود؛ پرهزینه‌ترین دکان اول.
  *   ۵) ⛔ هیچ شماره، `phone_key`، شناسهٔ سفارش یا متنی در پاسخ نیست.
+ * «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): پیامک از زنجیره رفت و هیچ کانالی قیمتِ پیش‌فرض ندارد ⇒ «کانالِ پولیِ» این آزمون همان ایمیل
+ * است با قیمت و سقفِ env (همان عددهای پیامکِ پیشین تا حسابِ هزینه و «نزدیکِ سقف» همان بماند).
  */
+process.env.CUSTOMER_NOTIFY_COST_MICROS_EMAIL = '446000';
+process.env.CUSTOMER_NOTIFY_DAILY_CAP_MICROS_EMAIL = '2230000';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
@@ -83,17 +87,17 @@ test.before(async () => {
   B = await shop('کم‌پیام');
   C = await shop('بی‌پیام');
   const t = now();
-  //  «الف»: دو پیامک (یکی ۳ بخش با هزینهٔ ثبت‌شده، یکی پیش از NTF-02 بی هزینه ⇒ قیمتِ یک بخش)، یک تلگرامِ رایگان،
+  //  «الف»: دو ایمیلِ پولی (یکی با هزینهٔ ثبت‌شده، یکی پیش از NTF-02 بی هزینه ⇒ قیمتِ یک پیام)، یک تلگرامِ رایگان،
   //  یک خبرِ پوش؛ یکی با سقفِ مشتری نگه داشته شد و یکی پیامکش با سقفِ هزینه رد و هیچ کانالی نماند؛ یکی هنوز در صف
-  await outbox(A, { channel: 'sms', tried: [{ channel: 'push', result: 'not_configured' }, ok('sms', 1_338_000)], sentAt: t - 60_000 });
-  await outbox(A, { channel: 'sms', tried: [ok('sms')], sentAt: t - 2 * 60 * 60_000 });
+  await outbox(A, { channel: 'email', tried: [{ channel: 'push', result: 'not_configured' }, ok('email', 1_338_000)], sentAt: t - 60_000 });
+  await outbox(A, { channel: 'email', tried: [ok('email')], sentAt: t - 2 * 60 * 60_000 });
   await outbox(A, { channel: 'telegram', tried: [ok('telegram', 0)], sentAt: t - 3 * DAY });
   await outbox(A, { status: 'rate_limited', at: t - DAY });
-  await outbox(A, { status: 'no_channel', tried: [{ channel: 'sms', result: 'cost_cap' }], at: t - 2 * 60_000 });
+  await outbox(A, { status: 'no_channel', tried: [{ channel: 'email', result: 'cost_cap' }], at: t - 2 * 60_000 });
   await outbox(A, { status: 'pending', at: t });
   await alert(A, { channel: 'push', tried: [ok('push', 0)], sentAt: t - 5 * 60_000 });
   //  «الف»، ۱۰ روز پیش: بیرون از ۷ روز، درونِ ۳۱ روز
-  await outbox(A, { channel: 'sms', tried: [ok('sms', 446_000)], sentAt: t - 10 * DAY, at: t - 10 * DAY });
+  await outbox(A, { channel: 'email', tried: [ok('email', 446_000)], sentAt: t - 10 * DAY, at: t - 10 * DAY });
   //  «ب»: یک واتس‌اپ با هزینهٔ دلخواه؛ یک خبر با سقفِ هزینه
   await outbox(B, { channel: 'whatsapp', tried: [ok('whatsapp', 5_000)], sentAt: t - DAY / 2 });
   await alert(B, { notice: 'cost_cap', tried: [{ channel: 'push', result: 'not_configured' }], at: t - 60_000 });
@@ -124,19 +128,20 @@ test('هر دکان و هر کانال: شمار و هزینه با همان ق�
   assert.equal(a.name, A.name);
   assert.equal(a.sent, 4);
   assert.equal(a.costMicros, 1_338_000 + 446_000, 'ردیفِ بی هزینه ⇒ قیمتِ یک بخش؛ تلگرام و پوش رایگان');
-  assert.deepEqual(a.byChannel.sms, { sent: 2, costMicros: 1_784_000, last24hMicros: 1_784_000 });
+  assert.deepEqual(a.byChannel.email, { sent: 2, costMicros: 1_784_000, last24hMicros: 1_784_000 });
   assert.deepEqual(a.byChannel.telegram, { sent: 1, costMicros: 0, last24hMicros: 0 });
   assert.deepEqual(a.byChannel.push, { sent: 1, costMicros: 0, last24hMicros: 0 });
   assert.equal(a.costCap, 1);
   assert.equal(a.rateLimited, 1);
-  assert.deepEqual(a.nearCap, ['sms'], '۱٫۷۸۴ از ۲٫۲۳ دلار = ۸۰٪');
+  assert.deepEqual(a.nearCap, ['email'], '۱٫۷۸۴ از ۲٫۲۳ دلار = ۸۰٪');
   assert.equal(bb.sent, 1);
   assert.equal(bb.costMicros, 5_000);
   assert.equal(bb.costCap, 1, 'خبرِ ردشده با سقف');
   assert.deepEqual(bb.nearCap, [], 'واتس‌اپ امروز قیمتی ندارد ⇒ هرگز «نزدیکِ سقف»');
   assert.deepEqual(b.totals, { sent: 5, costMicros: 1_789_000, costCap: 2, rateLimited: 1, shops: 2 });
-  const sms = b.channels.find((c) => c.channel === 'sms');
-  assert.deepEqual(sms, { channel: 'sms', unitMicros: 446_000, capMicros: 2_230_000 });
+  const mail = b.channels.find((c) => c.channel === 'email');
+  assert.deepEqual(mail, { channel: 'email', unitMicros: 446_000, capMicros: 2_230_000 });
+  assert.equal(b.channels.find((c) => c.channel === 'sms'), undefined, 'پیامک دیگر کانال نیست');
   assert.equal(b.truncated, false);
   assert.equal(b.shopsTruncated, false);
   //  ⛔ حریم
@@ -150,8 +155,8 @@ test('هر دکان و هر کانال: شمار و هزینه با همان ق�
 test('بازه: ۳۱ روز پیامِ کهنه را هم می‌شمارد، ۱ روز فقط ۲۴ ساعت؛ مقدارِ نادرست ⇒ ۷', async () => {
   const month = (await get('?days=31', { token: admin })).body;
   assert.equal(month.days, 31);
-  assert.equal(month.shops[0].byChannel.sms.sent, 3);
-  assert.equal(month.shops[0].byChannel.sms.last24hMicros, 1_784_000, '۲۴ ساعت همان');
+  assert.equal(month.shops[0].byChannel.email.sent, 3);
+  assert.equal(month.shops[0].byChannel.email.last24hMicros, 1_784_000, '۲۴ ساعت همان');
   const day = (await get('?days=1', { token: admin })).body;
   assert.equal(day.shops[0].sent, 3, 'تلگرامِ سه روز پیش بیرون');
   assert.equal(day.shops[0].rateLimited, 0, 'سقفِ مشتریِ ۲۴ ساعت و یک دقیقه پیش بیرون');
@@ -165,9 +170,9 @@ test('بازه: ۳۱ روز پیامِ کهنه را هم می‌شمارد، ۱
 
 test('هزینهٔ تازه با قیمتِ همین env؛ هیچ دکانی ⇒ فهرستِ خالی', async () => {
   const at = now();
-  const r = await usage.report({ days: 7, at, env: { CUSTOMER_NOTIFY_COST_MICROS_SMS: '100' } });
+  const r = await usage.report({ days: 7, at, env: { CUSTOMER_NOTIFY_COST_MICROS_EMAIL: '100' } });
   assert.equal(r.shops[0].shopId, A.shopId);
-  assert.equal(r.shops[0].byChannel.sms.costMicros, 1_338_000 + 100, 'ردیفِ بی هزینه با قیمتِ امروز؛ ثبت‌شده همان');
+  assert.equal(r.shops[0].byChannel.email.costMicros, 1_338_000 + 100, 'ردیفِ بی هزینه با قیمتِ امروز؛ ثبت‌شده همان');
   const empty = await usage.report({ days: 1, at: at - 30 * DAY });
   assert.deepEqual(empty.shops, []);
   assert.deepEqual(empty.totals, { sent: 0, costMicros: 0, costCap: 0, rateLimited: 0, shops: 0 });

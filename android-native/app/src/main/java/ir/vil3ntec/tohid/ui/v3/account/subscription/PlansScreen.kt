@@ -2,33 +2,26 @@ package ir.vil3ntec.tohid.ui.v3.account.subscription
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
-import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CreditCardOff
-import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.Redeem
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -38,8 +31,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.BuildConfig
@@ -49,17 +43,14 @@ import ir.vil3ntec.tohid.core.i18n.StrAccount
 import ir.vil3ntec.tohid.core.model.PlansDto
 import ir.vil3ntec.tohid.core.platform.StoreChannel
 import ir.vil3ntec.tohid.data.repo.Backend
-import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.sync.LicenseGuard
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.screens.SUBSCRIPTION_WARN_DAYS
 import ir.vil3ntec.tohid.ui.screens.SalesContact
 import ir.vil3ntec.tohid.ui.screens.SubscriptionPulse
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
-import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Divider
-import ir.vil3ntec.tohid.ui.v3.V3FormBar
 import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Message
@@ -68,7 +59,6 @@ import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.account.AccountLinks
 import ir.vil3ntec.tohid.ui.v3.account.AccountPaths
-import ir.vil3ntec.tohid.ui.v3.account.DraftSelectCard
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
@@ -95,20 +85,25 @@ internal class PlansActions(
 )
 
 /**
- *  «اشتراک و قیمت‌ها» — کارت‌های ساده، بی طلا و بی نشانِ VIP: کارتِ حالت، سه کارتِ
- *  انتخابیِ مدت (قیمت از سرور، تخفیف خط‌خورده، قیمتِ روزانه)، فهرستِ واقعیِ
- *  قابلیت‌ها، «کد اشتراک دارم» ⇐ برگهٔ کد، و دکمهٔ چسبانِ «گرفتن اشتراک …».
+ *  «اشتراک و قیمت‌ها»: کارتِ حالت، ستونِ کارت‌های بازشوندهٔ پلن (`PlanCard`: قیمتِ درشت از سرور، روزی چند، صرفه‌جویی
+ *  از همان قیمت‌ها؛ زدن = انتخاب و باز شدنِ کشوی جزئیات، هر بار یکی)، «کد اشتراک دارم» ⇐ برگهٔ کد، نبودِ پرداختِ
+ *  آنلاین، واتساپ، و نوارِ چسبانِ «گرفتن اشتراک …» که نوشته‌اش با انتخاب نرم عوض می‌شود (`PlansBuyBar`).
+ *  فهرستِ «همیشه رایگان» و «با اشتراک باز می‌شود» درونِ کشوی هر پلن به تراشه رفت، نه دو فهرستِ بلندِ صفحه.
  */
 @Composable
 internal fun PlansContent(ui: PlansUi, actions: PlansActions) {
   val c = PhoneV3.colors
   val stagger = rememberV3Stagger()
+  //  کارتِ باز (UI، نه داده): دست‌نخورده ⇒ همان پلنِ انتخاب‌شده؛ null ⇒ همه بسته
+  var openState by rememberSaveable { mutableStateOf<String?>(PlansModel.UNTOUCHED) }
+  val open = PlansModel.openCard(ui.options, ui.picked, openState)
+  val savings = remember(ui.options) { ui.options.associate { it.code to PlansModel.saving(it, ui.options) } }
   V3Scaffold(
     title = Str.plans,
     onBack = actions.back,
     notice = null,
     bottomBar = if (ui.storeBuild) null else ({
-      V3FormBar(primary = PlansModel.cta(ui.picked, ui.currency), onPrimary = actions.buy, summary = StrAccount.buyFootnote)
+      PlansBuyBar(PlansModel.cta(ui.picked, ui.currency), ui.picked.price, onBuy = actions.buy, summary = StrAccount.buyFootnote)
     }),
   ) { pad ->
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
@@ -116,38 +111,45 @@ internal fun PlansContent(ui: PlansUi, actions: PlansActions) {
         Spacer(Modifier.height(8.dp))
         V3Message(ui.state.tone, ui.state.title, body = ui.state.body)
 
-        Text(StrAccount.chooseDuration, style = V3Type.headline, color = c.ink, modifier = Modifier.padding(top = 20.dp, bottom = 10.dp, start = 4.dp))
-        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          ui.options.forEachIndexed { i, o ->
-            DraftSelectCard(
+        Text(
+          StrAccount.chooseDuration,
+          style = V3Type.headline,
+          color = c.ink,
+          modifier = Modifier.padding(top = 20.dp, bottom = 10.dp, start = 4.dp).semantics { heading() },
+        )
+        ui.options.forEachIndexed { i, o ->
+          key(o.code) {
+            PlanCard(
+              option = o,
+              saving = savings[o.code],
+              currency = ui.currency,
               selected = o.code == ui.picked.code,
-              label = o.title,
-              onClick = { actions.pick(o.code) },
-              badge = o.badge.ifBlank { null },
-              modifier = Modifier.weight(1f).fillMaxHeight().v3Stagger(stagger, o.code, i),
-            ) { OptionBody(o, ui.currency) }
+              open = o.code == open,
+              onTap = {
+                actions.pick(o.code)
+                openState = PlansModel.toggle(o.code, open)
+              },
+              modifier = Modifier.padding(bottom = 12.dp).v3Stagger(stagger, o.code, i),
+            )
           }
         }
 
         if (!ui.signedIn) {
-          Spacer(Modifier.height(14.dp))
+          Spacer(Modifier.height(2.dp))
           V3Message(V3Tone.WARNING, StrAccount.buySignInTitle, body = StrAccount.buySignInBody, action = Str.signIn, onAction = { actions.open(AccountLinks.SIGN_IN) })
         }
         if (ui.storeBuild) {
-          Spacer(Modifier.height(14.dp))
+          Spacer(Modifier.height(2.dp))
           Text(StrAccount.bazaarNote, style = V3Type.footnote, color = c.inkMuted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
         }
 
-        Features(StrAccount.freeAlways, PlansModel.freeFeatures, Icons.Outlined.Check, Modifier.v3Stagger(stagger, "free", 3))
-        Features(StrAccount.withSubscription, PlansModel.paidFeatures, Icons.Outlined.LockOpen, Modifier.v3Stagger(stagger, "paid", 4))
-
-        V3Section(null) {
+        V3Section(null, Modifier.v3Stagger(stagger, "redeem", ui.options.size)) {
           V3ListRow(StrAccount.haveCode, subtitle = StrAccount.sixDigitHint, icon = Icons.Outlined.Redeem, hue = V3Hue.BRAND, onClick = { actions.open(AccountPaths.REDEEM) })
           V3Divider(start = 64.dp)
           V3ListRow(StrAccount.noOnlinePay, icon = Icons.Outlined.CreditCardOff, chevron = false)
         }
         if (!ui.storeBuild) {
-          V3Section(StrAccount.contactWays) {
+          V3Section(StrAccount.contactWays, Modifier.v3Stagger(stagger, "contact", ui.options.size + 1)) {
             V3ListRow(
               StrAccount.whatsapp,
               icon = Icons.AutoMirrored.Outlined.Chat,
@@ -163,37 +165,6 @@ internal fun PlansContent(ui: PlansUi, actions: PlansActions) {
         }
         Spacer(Modifier.height(24.dp))
       }
-    }
-  }
-}
-
-@Composable
-private fun OptionBody(o: PlansModel.Option, currency: String) {
-  val c = PhoneV3.colors
-  Text(o.title, style = V3Type.headline, color = c.ink)
-  Spacer(Modifier.height(6.dp))
-  if (o.discounted) {
-    Text(money(o.fullPrice.toDouble()), style = V3Type.footnote.copy(textDecoration = TextDecoration.LineThrough), color = c.inkMuted)
-  }
-  Text(money(o.price.toDouble()), style = V3Type.figure, color = c.ink)
-  Text(currency, style = V3Type.caption, color = c.inkMuted)
-  PlansModel.discountText(o)?.let { Text(it, style = V3Type.caption, color = PhoneV3Roles.brandText(c)) }
-  Spacer(Modifier.height(4.dp))
-  Text(StrAccount.perDay(money(o.perDay)), style = V3Type.caption, color = c.inkMuted)
-}
-
-@Composable
-private fun Features(title: String, items: List<String>, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier) {
-  val c = PhoneV3.colors
-  V3Section(title, modifier) {
-    items.forEachIndexed { i, f ->
-      if (i > 0) V3Divider(start = 52.dp)
-      V3ListRow(
-        f,
-        minHeight = 46.dp,
-        chevron = false,
-        leading = { Icon(icon, contentDescription = null, tint = PhoneV3Roles.brandText(c), modifier = Modifier.size(20.dp)) },
-      )
     }
   }
 }

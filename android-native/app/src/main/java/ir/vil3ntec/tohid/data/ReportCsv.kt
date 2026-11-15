@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrSheets
+
 /**
  *  خروجی CSV گزارش‌ها — ستون‌به‌ستون همان چیزی که نسخهٔ وب می‌سازد.
  *
@@ -27,6 +29,8 @@ object ReportCsv {
   fun of(
     section: String, d: ShopData, from: String, to: String, today: String, reminderTemplate: String = DebtReminder.DEFAULT_TEMPLATE,
     lineSeller: Boolean = false,
+    //  لحظهٔ «اکنون» ِ برگه‌هایی که روزِ بدهی را از زمانِ ثبت می‌شمارند («یادآوری»)؛ آزمون آن را ثابت می‌کند
+    now: Long = System.currentTimeMillis(),
   ): Sheet =
     when (section) {
       "sales" -> sales(d, from, to)
@@ -41,7 +45,7 @@ object ReportCsv {
       "aging" -> CustomerInsight.agingSheet(d, today)
       "rfm" -> CustomerInsight.rfmSheet(d, today)
       "duplicates" -> CustomerMerge.duplicatesSheet(d, today)
-      "reminders" -> DebtReminder.dueSheet(d, today, template = reminderTemplate)
+      "reminders" -> DebtReminder.dueSheet(d, today, template = reminderTemplate, now = now)
       //  شماره‌های جاافتادهٔ اسناد (RPT-17) — فقط وقتی `DocGapsPref` روشن است دیده می‌شود
       "gaps" -> DocGapsSheet.sheet(d, today)
       //  INV-17 — فقط وقتی `ShrinkReportPref` روشن است دیده می‌شود
@@ -101,46 +105,46 @@ object ReportCsv {
 
   /** ستونِ «وضعیت» ِ برگهٔ فروش و خانهٔ فاکتورِ لغوشده‌اش (همان [sales]) */
   private const val SALE_STATUS = 8
-  private const val CANCELLED = "لغو‌شده"  // داده: خانهٔ «وضعیت» ِ برگهٔ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+  private val CANCELLED: String get() = StrSheets.cancelledZ
 
   /** سود و زیانِ بازه — همان عددهای `ReportEngine.sales`، سطر به سطر */
   private fun profit(d: ShopData, from: String, to: String): Sheet {
     val r = ReportEngine.sales(d, from, to)
-    val rows = mutableListOf(listOf("شرح", "مبلغ"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    rows += listOf("تعدادِ فاکتور", r.count.toString())  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    rows += listOf("فروشِ ناخالص", round(r.gross))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    rows += listOf("تخفیف", round(r.discount))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    rows += listOf("فروشِ خالص", round(r.net))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    rows += listOf("مرجوعی", round(r.returnAmount))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    rows += listOf("بهای تمام‌شدهٔ کالا", round(r.cogs))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    rows += listOf("سودِ ناخالص", round(r.grossProfit))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    rows += listOf("مصارف", round(r.expenses))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    rows += listOf("سودِ خالص", round(r.netProfit))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    return Sheet("سود-و-زیان-$from-تا-$to", rows)  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    val rows = mutableListOf(listOf(StrSheets.description, StrSheets.amount))
+    rows += listOf(StrSheets.invoiceCount, r.count.toString())
+    rows += listOf(StrSheets.grossSales, round(r.gross))
+    rows += listOf(StrSheets.discount, round(r.discount))
+    rows += listOf(StrSheets.netSales, round(r.net))
+    rows += listOf(StrSheets.returns, round(r.returnAmount))
+    rows += listOf(StrSheets.cogs, round(r.cogs))
+    rows += listOf(StrSheets.grossProfit, round(r.grossProfit))
+    rows += listOf(StrSheets.expenses, round(r.expenses))
+    rows += listOf(StrSheets.netProfit, round(r.netProfit))
+    return Sheet(StrSheets.nameProfit(from, to), rows)
   }
 
   private fun expenses(d: ShopData, from: String, to: String): Sheet {
-    val rows = mutableListOf(listOf("تاریخ", "عنوان", "دسته", "مبلغ", "یادداشت"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    val rows = mutableListOf(listOf(StrSheets.date, StrSheets.title, StrSheets.category, StrSheets.amount, StrSheets.note))
     d.expenses.filter { it.date in from..to }.sortedBy { it.date }.forEach { e ->
       rows += listOf(e.date, e.title, e.category, round(e.amount), e.notes)
     }
-    return Sheet("مصارف-$from-تا-$to", rows)  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    return Sheet(StrSheets.nameExpenses(from, to), rows)
   }
 
   private fun sellers(d: ShopData, from: String, to: String, lineSeller: Boolean = false): Sheet {
-    val rows = mutableListOf(listOf("فروشنده", "تعدادِ فاکتور", "فروشِ خالص", "تخفیف"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    val rows = mutableListOf(listOf(StrSheets.seller, StrSheets.invoiceCount, StrSheets.netSales, StrSheets.discount))
     //  POS-23: فروشندهٔ هر ردیف ⇒ همان برگه به فروشندهٔ ردیف، با ستونِ برگشتیِ ردیف‌های همان فروشنده (پایهٔ پورسانت)
-    if (lineSeller) rows[0] = rows[0] + "برگشتی"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    if (lineSeller) rows[0] = rows[0] + StrSheets.returned
     ReportEngine.bySeller(d, from, to, lineSeller).forEach { s ->
       rows += listOf(s.seller, s.count.toString(), round(s.net), round(s.discount)) + (if (lineSeller) listOf(round(s.returns)) else emptyList())
     }
-    return Sheet("فروشِ-هر-کاربر-$from-تا-$to", rows)  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    return Sheet(StrSheets.nameSellers(from, to), rows)
   }
 
   private fun purchases(d: ShopData, from: String, to: String): Sheet {
     val names = d.suppliers.associate { it.id to it.name }
     val products = d.products.associate { it.id to it.name }
-    val rows = mutableListOf(listOf("تاریخ", "تأمین‌کننده", "کالا", "مقدار", "واحد", "قیمت خرید", "جمع", "پرداختی", "بدهی"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    val rows = mutableListOf(listOf(StrSheets.date, StrSheets.supplier, StrSheets.product, StrSheets.quantity, StrSheets.unit, StrSheets.purchasePrice, StrSheets.total, StrSheets.paid, StrSheets.debt))
     ReportEngine.purchases(d, from, to).rows.forEach { p ->
       rows += listOf(
         p.date, names[p.supplierId].orEmpty(), products[p.productId].orEmpty(),
@@ -148,26 +152,26 @@ object ReportCsv {
         round(p.totalAmount), round(p.paidAmount), round(p.debt),
       )
     }
-    return Sheet("گزارش-خرید-$from-تا-$to", rows)  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    return Sheet(StrSheets.namePurchases(from, to), rows)
   }
 
   private fun expiry(d: ShopData, today: String): Sheet {
-    val rows = mutableListOf(listOf("کالا", "سری ساخت", "تاریخ تولید", "تاریخ انقضا", "روز مانده", "مقدارِ مانده", "واحد", "وضعیت"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    val rows = mutableListOf(listOf(StrSheets.product, StrSheets.batch, StrSheets.productionDate, StrSheets.expiryDate, StrSheets.daysLeft, StrSheets.quantityLeft, StrSheets.unit, StrSheets.status))
     ExpiryEngine.lots(d, today).forEach { l ->
       rows += listOf(
         l.product.name, l.entry.batch, l.entry.productionDate, l.entry.expiryDate, l.daysLeft.toString(),
         ir.vil3ntec.tohid.qty(l.remaining), l.product.unit,
-        when { l.expired -> "منقضی"; l.daysLeft <= ExpiryEngine.nearDays -> "نزدیک به انقضا"; else -> "سالم" },  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+        when { l.expired -> StrSheets.expired; l.daysLeft <= ExpiryEngine.nearDays -> StrSheets.nearExpiry; else -> StrSheets.healthy },
       )
     }
-    return Sheet("گزارش-انقضا-$today", rows)  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    return Sheet(StrSheets.nameExpiry(today), rows)
   }
 
   private fun sales(d: ShopData, from: String, to: String): Sheet {
     val rows = mutableListOf(
       listOf(
-        "شماره فاکتور", "تاریخ", "مبلغ کل", "تخفیف", "مبلغ نهایی",  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-        "پرداختی", "باقی‌مانده", "روش پرداخت", "وضعیت", "دلیلِ لغو", "فروشنده",  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+        StrSheets.invoiceNo, StrSheets.date, StrSheets.grossTotal, StrSheets.discount, StrSheets.finalTotal,
+        StrSheets.paid, StrSheets.remaining, StrSheets.payMethod, StrSheets.status, StrSheets.cancelReason, StrSheets.seller,
       )
     )
     d.sales
@@ -179,13 +183,13 @@ object ReportCsv {
           s.date,
           round(s.total), round(s.discount), round(s.finalTotal),
           round(s.paidAmount), round(s.remaining),
-          PayFlow.payLabel(s, cash = "نقدی"),  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-          if (s.status == "cancelled") CANCELLED else "ثبت‌شده",  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+          ir.vil3ntec.tohid.print.Receipts.payName(PayFlow.payLabel(s, cash = StrSheets.cashPay)),  // نامِ روش به زبانِ برنامه (فارسی ⇒ همان)
+          if (s.status == "cancelled") CANCELLED else StrSheets.recorded,
           s.cancelReason,
           s.seller,
         )
       }
-    return Sheet("گزارش-فروش-$from-تا-$to", rows)  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    return Sheet(StrSheets.nameSales(from, to), rows)
   }
 
   /**
@@ -198,8 +202,8 @@ object ReportCsv {
     val values = s.valuation.lines.associateBy { it.id }
     val rows = mutableListOf(
       listOf(
-        "ردیف", "نام محصول", "دسته", "ردهٔ ABC", "فروشِ خالصِ بازه", "سهم از فروش", "سهمِ انباشته",  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-        "موجودی", "ارزشِ خرید", "ارزشِ فروش",  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+        StrSheets.row, StrSheets.productName, StrSheets.category, StrSheets.abcClass, StrSheets.rangeNetSales, StrSheets.salesShare, StrSheets.cumulativeShare,
+        StrSheets.stock, StrSheets.costValue, StrSheets.retailValue,
       )
     )
     s.rows.forEachIndexed { i, r ->
@@ -210,13 +214,13 @@ object ReportCsv {
         v?.let { round(it.costMinor / 100.0) }.orEmpty(), v?.let { round(it.retailMinor / 100.0) }.orEmpty(),
       )
     }
-    return Sheet("تحلیل-موجودی-$from-تا-$to", rows)  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    return Sheet(StrSheets.nameInsight(from, to), rows)
   }
 
   /** کالاهایی که به نقطهٔ سفارش، حد کم بودن یا صفر رسیده‌اند، با پیشنهادِ «تا بیشینه» — `WarehouseEngine.reorderList` */
   private fun reorder(d: ShopData, today: String): Sheet {
     val rows = mutableListOf(
-      listOf("نام محصول", "دسته", "واحد", "موجودی", "حد کم بودن", "نقطهٔ سفارش", "بیشینه", "وضعیت", "مقدارِ پیشنهادی")  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+      listOf(StrSheets.productName, StrSheets.category, StrSheets.unit, StrSheets.stock, StrSheets.lowLimit, StrSheets.reorderPoint, StrSheets.maximum, StrSheets.status, StrSheets.suggestedQuantity)
     )
     WarehouseEngine.reorderList(d).forEach { r ->
       val p = r.product
@@ -224,14 +228,14 @@ object ReportCsv {
         p.name, p.category, p.unit, trim(r.onHand),
         if (p.minStock > 0) trim(p.minStock) else "", p.reorderPoint?.let { trim(it) }.orEmpty(), p.maxStock?.let { trim(it) }.orEmpty(),
         when (r.state) {
-          ir.vil3ntec.tohid.core.stock.StockLevelRules.State.OUT -> "تمام‌شده"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-          ir.vil3ntec.tohid.core.stock.StockLevelRules.State.BELOW_MIN -> "زیرِ حد کم بودن"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-          else -> "وقتِ سفارش"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+          ir.vil3ntec.tohid.core.stock.StockLevelRules.State.OUT -> StrSheets.outOfStock
+          ir.vil3ntec.tohid.core.stock.StockLevelRules.State.BELOW_MIN -> StrSheets.belowLow
+          else -> StrSheets.timeToOrder
         },
-        r.suggest?.let { trim(it) } ?: "بیشینه تعریف نشده",  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+        r.suggest?.let { trim(it) } ?: StrSheets.noMaximum,
       )
     }
-    return Sheet("نیاز-به-سفارش-$today", rows)  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    return Sheet(StrSheets.nameReorder(today), rows)
   }
 
   /** بیسیس‌پوینت ⇒ «۲۶.۸٪» */
@@ -240,8 +244,8 @@ object ReportCsv {
   private fun products(d: ShopData, today: String): Sheet {
     val rows = mutableListOf(
       listOf(
-        "نام محصول", "دسته", "واحد", "قیمت خرید", "قیمت فروش",  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-        "موجودی", "حداقل موجودی", "وضعیت", "تعداد فروخته‌شده", "سود",  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+        StrSheets.productName, StrSheets.category, StrSheets.unit, StrSheets.purchasePrice, StrSheets.salePrice,
+        StrSheets.stock, StrSheets.minStock, StrSheets.status, StrSheets.quantitySold, StrSheets.profit,
       )
     )
     d.products.forEach { p ->
@@ -251,14 +255,14 @@ object ReportCsv {
         round(p.purchasePrice), round(p.salePrice),
         trim(ShopStore.stock(d, p.id)), trim(p.minStock),
         when (ShopStore.stockStatus(d, p)) {
-          "out" -> "تمام‌شده"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-          "low" -> "موجودی کم"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-          else -> "موجودی کافی"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+          "out" -> StrSheets.outOfStock
+          "low" -> StrSheets.lowStock
+          else -> StrSheets.enoughStock
         },
         trim(sold), round(profit),
       )
     }
-    return Sheet("گزارش-محصولات-$today", rows)  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    return Sheet(StrSheets.nameProducts(today), rows)
   }
 
   /**
@@ -268,40 +272,41 @@ object ReportCsv {
    */
   fun statement(d: ShopData, debtorId: String, today: String): Sheet {
     val debtor = d.debtors.find { it.id == debtorId }
-    val rows = mutableListOf(listOf("تاریخ", "شرح", "برد", "رسید", "مانده"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    val rows = mutableListOf(listOf(StrSheets.date, StrSheets.description, StrSheets.given, StrSheets.receivedCol, StrSheets.balance))
     var balance = 0.0
-    d.transactions.filter { it.debtorId == debtorId }
+    val own = CustomerAlias.of(d, debtorId)  // CRM-10: با سندهای ادغام‌شده‌های پیوندی
+    d.transactions.filter { it.debtorId in own }
       .sortedWith(compareBy<DebtTransaction> { it.date }.thenBy { it.createdAt })
       .forEach { tx ->
         val give = tx.type == "give"
         balance += if (give) tx.amount else -tx.amount
         rows += listOf(
           tx.date,
-          tx.notes.ifBlank { if (give) "برد" else "رسید" },  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+          tx.notes.ifBlank { if (give) StrSheets.given else StrSheets.receivedCol },
           if (give) round(tx.amount) else "",
           if (give) "" else round(tx.amount),
           round(balance),
         )
       }
     val name = debtor?.name?.replace(Regex("[\\\\/:*?\"<>|]"), " ")?.trim().orEmpty()
-    return Sheet("صورت‌حساب-${name.ifBlank { "مشتری" }}-$today", rows)  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    return Sheet(StrSheets.nameStatement(name.ifBlank { StrSheets.customerFallback }, today), rows)
   }
 
   /** گزارشِ اختلافِ انبارگردانی — پیش از ثبت، برای بایگانی یا بازبینی */
   fun stockCount(lines: List<WarehouseEngine.CountLine>, today: String): Sheet {
-    val rows = mutableListOf(listOf("نام کالا", "واحد", "موجودی برنامه", "شمرده‌شده", "اختلاف", "ارزش اختلاف"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    val rows = mutableListOf(listOf(StrSheets.productNameShort, StrSheets.unit, StrSheets.appStock, StrSheets.counted, StrSheets.difference, StrSheets.differenceValue))
     lines.forEach { l ->
       rows += listOf(l.product.name, l.product.unit, trim(l.system), trim(l.counted), trim(l.diff), round(l.value))
     }
-    return Sheet("انبارگردانی-$today", rows)  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    return Sheet(StrSheets.nameStockCount(today), rows)
   }
 
   private fun debtors(d: ShopData, today: String): Sheet {
     val rows = mutableListOf(
-      listOf("نام قرض‌دار", "شماره تماس", "بدهی", "تاریخ آخرین تراکنش", "یادداشت")  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+      listOf(StrSheets.debtorName, StrSheets.phone, StrSheets.debt, StrSheets.lastTxDate, StrSheets.note)
     )
     d.debtors.forEach { debtor ->
-      val last = d.transactions.filter { it.debtorId == debtor.id }.maxByOrNull { it.createdAt }
+      val last = DebtRows.of(d)[debtor.id]?.maxByOrNull { it.createdAt }
       rows += listOf(
         debtor.name, debtor.phone,
         round(ShopStore.debt(d, debtor.id)),
@@ -309,22 +314,22 @@ object ReportCsv {
         debtor.notes,
       )
     }
-    return Sheet("گزارش-قرض‌داران-$today", rows)  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    return Sheet(StrSheets.nameDebtors(today), rows)
   }
 
-  private fun stock(d: ShopData, today: String): Sheet = moves(d, d.stockMovements, "گردش-موجودی-$today")  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+  private fun stock(d: ShopData, today: String): Sheet = moves(d, d.stockMovements, StrSheets.nameStockMoves(today))
 
   /**
    *  INV-02 — گردشِ موجودی با کاربر و دلیلِ هر حرکت (`StockMovement.userId/reason`؛ نداشته ⇒ خالی).
    *  صفحهٔ «حرکاتِ انبار» ِ یک کالا همین را با حرکت‌های صافی‌شدهٔ همان صفحه می‌سازد.
    */
   fun moves(d: ShopData, moves: List<StockMovement>, name: String): Sheet {
-    val rows = mutableListOf(listOf("تاریخ", "محصول", "نوع حرکت", "تعداد", "توضیحات", "کاربر", "دلیل"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    val rows = mutableListOf(listOf(StrSheets.date, StrSheets.productCol, StrSheets.moveType, StrSheets.count, StrSheets.details, StrSheets.user, StrSheets.reason))
     val names = d.products.associate { it.id to it.name }
     moves.sortedBy { it.createdAt }.forEach { m ->
       rows += listOf(
         m.date,
-        names[m.productId] ?: "(حذف‌شده)",  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+        names[m.productId] ?: StrSheets.deletedMark,
         movementLabel(m.type),
         trim(m.qty),
         m.notes,
@@ -352,17 +357,17 @@ object ReportCsv {
 
   /** همان برچسب‌هایی که صفحهٔ انبار نشان می‌دهد */
   private fun movementLabel(type: String): String = when (type) {
-    "purchase_in" -> "ورود خرید"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    "sale" -> "فروش"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    "customer_return" -> "مرجوعی مشتری"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    "supplier_return" -> "برگشت به تأمین‌کننده"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    "adjustment" -> "اصلاح موجودی"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    "count_adjust" -> "اصلاحِ شمارش"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    "damage" -> "ضایعات"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    "purchase_in" -> StrSheets.movePurchaseIn
+    "sale" -> StrSheets.moveSale
+    "customer_return" -> StrSheets.moveCustomerReturn
+    "supplier_return" -> StrSheets.moveSupplierReturn
+    "adjustment" -> StrSheets.moveAdjustment
+    "count_adjust" -> StrSheets.moveCountAdjust
+    "damage" -> StrSheets.waste
     //  انتقال بین محل‌ها (موتورِ تازهٔ موجودی): دو ردیف، خروجیِ منفی و ورودیِ مثبت
-    "transfer_out" -> "انتقالِ خروجی"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    "transfer_in" -> "انتقالِ ورودی"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    "transfer" -> "انتقال"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    "transfer_out" -> StrSheets.moveTransferOut
+    "transfer_in" -> StrSheets.moveTransferIn
+    "transfer" -> StrSheets.moveTransfer
     else -> type
   }
 }

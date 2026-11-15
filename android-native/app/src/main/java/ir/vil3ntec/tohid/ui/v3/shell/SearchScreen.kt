@@ -36,8 +36,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -63,6 +61,7 @@ import ir.vil3ntec.tohid.ui.v3.V3SearchField
 import ir.vil3ntec.tohid.ui.v3.nav.V3Modules
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3AnimateItem
+import ir.vil3ntec.tohid.ui.v3.v3ClearFocusOnTap
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import kotlinx.coroutines.Dispatchers
@@ -95,21 +94,20 @@ fun SearchScreen(
   var query by rememberSaveable { mutableStateOf(initialQuery) }
   var results by remember { mutableStateOf(SearchIndex.search(d, initialQuery, sections)) }
   var expanded by remember(query) { mutableStateOf(emptySet<SearchIndex.Kind>()) }
-  val focus = remember { FocusRequester() }
-  LaunchedEffect(Unit) { if (initialQuery.isEmpty()) runCatching { focus.requestFocus() } }
+  //  صفحه‌کلید فقط با زدنِ خودِ کادر باز می‌شود، نه با باز شدنِ صفحه (صاحب‌کار ۱۴۰۵/۰۸/۲۳)؛ زدنِ بیرون آن را می‌بندد
   LaunchedEffect(query, d, sections) {
     if (query != results.query) delay(DEBOUNCE_MS)
     results = withContext(Dispatchers.Default) { SearchIndex.search(d, query, sections) }
   }
 
-  Column(Modifier.fillMaxSize().background(p.bg).windowInsetsPadding(WindowInsets.statusBars)) {
+  Column(Modifier.fillMaxSize().background(p.bg).v3ClearFocusOnTap().windowInsetsPadding(WindowInsets.statusBars)) {
     Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
       if (onBack != null) { V3BackButton(onBack); Spacer(Modifier.width(10.dp)) }
       V3SearchField(
         value = query,
         onValueChange = { query = it },
         placeholder = StrSearch.placeholder,
-        modifier = Modifier.weight(1f).focusRequester(focus),
+        modifier = Modifier.weight(1f),
         onScan = onScan,
         onSubmit = { results.first?.let { onOpen(it.route) } },
       )

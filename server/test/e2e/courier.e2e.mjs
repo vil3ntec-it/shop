@@ -26,6 +26,7 @@
 import { createRequire } from 'node:module';
 import { boot, assert } from './lib/harness.mjs';
 import { CourierApp, KT, LT, Pacer, canSend, enqueue } from './lib/courier.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const D = require('../../src/lib/delivery-states');
@@ -95,8 +96,8 @@ await E.step('E2E-DLV.app.0', 'صفِ برنامهٔ پیک همان دلیل‌
   c2 = E.ok(await A.api('POST', '/shop/delivery/couriers', { userId: k2Acct.user.id, cashCapMinor: 5_000_000 }), 'پیکِ دوم', 201).courier.id;
   K1 = new CourierApp(await E.device('K1-courier-phone', k1Acct.email));
   K2 = new CourierApp(await E.device('K2-courier-phone', k2Acct.email));
-  const s = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { phone: PHONE }), 'کدِ تأیید');
-  ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { phone: PHONE, code: s.devCode }), 'تأییدِ شماره').ticket;
+  const s = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { email: mailOf(PHONE) }), 'کدِ تأیید');
+  ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { email: mailOf(PHONE), code: s.devCode }), 'تأییدِ شماره').ticket;
 });
 
 await E.step('DEL-01', 'پیکِ اول از برنامه با دلیل رد می‌کند ⇐ سفارش «بسته‌بندی‌شده» و معتبر؛ کارت از گوشیِ او می‌رود؛ دکان به پیکِ دوم می‌سپارد', async () => {

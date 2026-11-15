@@ -1,14 +1,14 @@
 {
   "tr.shop": "Report a problem with this shop",
   "tr.product": "Report this product",
-  "tr.p": "Market support reviews reports; your name and number are not given to the shop.",
+  "tr.p": "Market support reviews reports; your name and email are not given to the shop.",
   "tr.mine": "My reports",
   "tr.pick": "Choose a topic",
   "tr.cat": "Topic",
   "tr.order": "Order number (if it is about an order)",
   "tr.text": "Details",
   "tr.send": "Send report",
-  "tr.verify": "To send, confirm your mobile number with a code.",
+  "tr.verify": "To submit, verify your email with a code.",
   "tr.done": "Report sent; its status shows here.",
   "tr.dup": "This report was already sent and is still open.",
   "tr.reply": "Shop's reply: {text}",
@@ -57,5 +57,6 @@
   "err.text_too_long": "The details are too long.",
   "err.product_not_found": "This product is no longer in the shop.",
   "err.case_not_found": "This report was not found.",
-  "err.trust_unavailable": "Reporting is not ready on this server yet."
+  "err.trust_unavailable": "Reporting is not ready on this server yet.",
+  "tr.email": "Email"
 }

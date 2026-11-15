@@ -381,7 +381,6 @@ object StrSettings {
   val syncStarted: String get() = t("همگام‌سازی شروع شد؛ چند ثانیه بعد «آخرین همگام‌سازی» تازه می‌شود", "Sync started; “Last sync” updates in a few seconds", "همغږي پیل شوه؛ څو ثانیې وروسته «وروستۍ همغږي» تازه کېږي")
   val syncFailed: String get() = t("همگام‌سازی ناموفق بود", "Sync failed", "همغږي ناکامه شوه")
   val serverStatus: String get() = t("وضعیت", "Status", "حالت")
-  val serverAddress: String get() = t("نشانی", "Address", "پته")
 
   // پشتیبان
   val manualBackup: String get() = t("پشتیبانِ دستی", "Manual backup", "لاسي بیک‌اپ")
@@ -482,7 +481,6 @@ object StrSettings {
   val diagLocalTitle: String get() = t("دفترِ تغییراتِ این دستگاه ناجور است", "This device's change log doesn't match", "د دې وسیلې د بدلونونو دفتر سمون نه خوري")
   val diagLocalBody: String get() = t("فهرستِ تغییرهای این دستگاه با دفتر نمی‌خواند و همگام‌سازی برای ایمنی ایستاد؛ هیچ داده‌ای پاک نشده.", "The list of changes doesn't match the ledger, so sync stopped for safety; no data was deleted.", "د بدلونونو لړ له دفتر سره سمون نه خوري، نو همغږي د خوندیتوب لپاره ودرېده؛ هېڅ معلومات نه دي پاک شوي.")
   val diagLocalDo: String get() = t("از «پشتیبان و بازگردانی» پشتیبانِ کامل بگیرید و به پشتیبانی خبر دهید.", "Take a full backup in “Backup & restore” and tell support.", "په «بیک‌اپ او بېرته راوستل» کې بشپړ بیک‌اپ واخلئ او ملاتړ ته ووایاست.")
-  fun diagRejectedTitle(n: Any): String = t("سرور ${asIs(n)} تغییر را نپذیرفت", "The server rejected $n ${pl(n, "change", "changes")}", "سرور $n ${pl(n, "بدلون", "بدلونونه")} ونه منل")
   val diagRejectedDo: String get() = t("همان رکوردها را دوباره ببینید و اگر لازم است دوباره ثبت کنید.", "Check those records and enter them again if needed.", "هماغه ریکارډونه بیا وګورئ او که اړتیا وي بیا یې ثبت کړئ.")
   val diagUnknownTitle: String get() = t("همگام‌سازی کامل نشد", "Sync didn't finish", "همغږي بشپړه نه شوه")
   val diagUnknownBody: String get() = t("تغییرها روی همین دستگاه نگه داشته می‌شوند و گم نمی‌شوند.", "Changes are kept on this device and aren't lost.", "بدلونونه په همدې وسیله ساتل کېږي او نه ورکېږي.")
@@ -495,7 +493,6 @@ object StrSettings {
   val diagRetryingBody: String get() = t("تلاشِ آخر به سرور نرسید؛ برنامه خودش چند لحظهٔ دیگر دوباره می‌فرستد. تغییرها روی همین دستگاه‌اند؛ چیزی گم نمی‌شود.", "The last try didn't reach the server; the app sends again by itself in a moment. Changes are on this device; nothing is lost.", "وروستۍ هڅه سرور ته ونه رسېده؛ اپ پخپله یوه شېبه وروسته بیا لېږي. بدلونونه په همدې وسیله دي؛ هېڅ نه ورکېږي.")
   val diagRetryingDo: String get() = t("کاری لازم نیست.", "Nothing to do.", "هېڅ کار ته اړتیا نشته.")
   val whatToDo: String get() = t("چه کنید", "What to do", "څه وکړئ")
-  fun details(x: Any): String = t("جزئیات: ${asIs(x)}", "Details: $x", "جزئیات: $x")
   fun queueSize(n: Any): String = t("در صف: ${asIs(n)} تغییر", "Queued: $n ${pl(n, "change", "changes")}", "په کتار کې: $n ${pl(n, "بدلون", "بدلونونه")}")
 
   // تمِ رنگ (THEME-V2: سه تم، فقط روی همین دستگاه)

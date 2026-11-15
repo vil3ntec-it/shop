@@ -16,6 +16,8 @@ import androidx.lifecycle.lifecycleScope
 import ir.vil3ntec.tohid.core.shopper.ChatPhoto
 import ir.vil3ntec.tohid.core.shopper.GeoPin
 import ir.vil3ntec.tohid.core.shopper.ShopperApi
+import ir.vil3ntec.tohid.core.shopper.ShopperRoutedHttp
+import ir.vil3ntec.tohid.core.shopper.ShopperServers
 import ir.vil3ntec.tohid.core.shopper.ShopperText
 import ir.vil3ntec.tohid.customer.ui.CustomerApp
 import ir.vil3ntec.tohid.customer.ui.CustomerModel
@@ -40,6 +42,8 @@ class MainActivity : ComponentActivity() {
   private var photoDone: ((ChatPhoto?) -> Unit)? = null
   //  پیامِ صوتی (CHAT-07): پیش از onCreate ساخته می‌شود (پرسشِ اجازهٔ میکروفون با registerForActivityResult)
   private val voice = VoiceAndroid(this)
+  //  چند نشانیِ یک سرور (پرچمِ خاموشِ `tohid.multiServer`، `docs/SERVERS-fa.md` §۳) — خاموش ⇒ همیشه null
+  private var routed: ShopperRoutedHttp? = null
 
   private val askLocation = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
     val done = locationDone ?: return@registerForActivityResult
@@ -81,7 +85,14 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     val kv = StoreAndroid(this)
     val server = { kv.get(SERVER_KEY)?.takeIf { it.isNotBlank() } ?: BuildConfig.API_BASE }
-    val api = ShopperApi(HttpAndroid(server)) { ShopperText.lang.code }
+    val http = HttpAndroid(server)
+    //  پرچمِ خاموش ⇒ `routed` تهی، `base` همان `server` و فرستنده همان `http` ِ امروز؛ نشانیِ دستیِ «تنظیمات» هم همان، بی جابه‌جایی
+    val routed = if (BuildConfig.MULTI_SERVER) {
+      ShopperServers.routed(BuildConfig.API_BASE, kv, { kv.get(SERVER_KEY) }, http, System::currentTimeMillis) { e -> HttpAndroid.notSent(e) }
+    } else null
+    this.routed = routed
+    val base: () -> String = if (routed != null) ({ routed.base() }) else server
+    val api = ShopperApi(routed ?: http) { ShopperText.lang.code }
     val random = SecureRandom()
     model = CustomerModel(
       api, kv, lifecycleScope, Dispatchers.IO, System::currentTimeMillis,
@@ -91,11 +102,12 @@ class MainActivity : ComponentActivity() {
       voice = voice,
     )
     val platform = Platform(
-      photo = { path, modifier -> ImagesAndroid.Photo(server().trimEnd('/') + path, modifier) },
+      photo = { path, modifier -> ImagesAndroid.Photo(base().trimEnd('/') + path, modifier) },
       call = { phone -> startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))) },
       server = server,
       setServer = { kv.put(SERVER_KEY, it.trim().takeIf { s -> s.isNotEmpty() }) },
       version = BuildConfig.VERSION_NAME,
+      serverField = BuildConfig.SERVER_FIELD,
       openMap = { openMap(it) },
       canPickPhoto = true,
       pickPhoto = { done ->
@@ -103,7 +115,7 @@ class MainActivity : ComponentActivity() {
         pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
       },
       picture = { bytes, modifier -> PhotoAndroid.Picture(bytes, modifier) },
-      tile = { url, modifier, loaded -> MapTilesAndroid.Tile(server(), url, "TohidShop/${BuildConfig.VERSION_NAME} (Android)", modifier, loaded) },
+      tile = { url, modifier, loaded -> MapTilesAndroid.Tile(base(), url, "TohidShop/${BuildConfig.VERSION_NAME} (Android)", modifier, loaded) },
     )
     if (savedInstanceState == null) intent?.dataString?.let { model.openLink(it) }
     setContent {
@@ -120,6 +132,8 @@ class MainActivity : ComponentActivity() {
   override fun onResume() {
     super.onResume()
     if (::model.isInitialized) model.resumed()
+    //  سنجشِ پس‌زمینهٔ نشانی‌های همان سرور — فقط با پرچمِ روشن و وقتی وقتش رسیده
+    routed?.let { r -> lifecycleScope.launch(Dispatchers.IO) { runCatching { r.refreshIfDue() } } }
   }
 
   //  بیرون از RESUMED (پس‌زمینه، پنجرهٔ دیگر جلو) پیامِ گفت‌وگو «دیده» حساب نمی‌شود — فقط «رسید» (CHAT-04)

@@ -17,6 +17,13 @@ plugins {
  */
 val apiBase: String = (System.getenv("TOHID_API_BASE")?.takeIf { it.isNotBlank() }
   ?: providers.gradleProperty("tohid.apiBase").orNull ?: "https://api.vill3n.top").trimEnd('/')
+//  چند نشانیِ یک سرور (`docs/SERVERS-fa.md` §۳) — پیش‌فرض خاموش؛ خاموش ⇒ همان یک نشانیِ زمانِ ساخت
+val multiServer: Boolean = (System.getenv("TOHID_MULTI_SERVER")?.takeIf { it.isNotBlank() }
+  ?: providers.gradleProperty("tohid.multiServer").orNull)?.trim() == "true"
+//  کادرِ «نشانیِ سرور (برای آزمون)» در تنظیمات — پیش‌فرض خاموش: نشانیِ سرور به خریدار نشان داده نمی‌شود
+//  («هیچ جزئیاتِ فنی/زیرساخت در صفحه»، docs/RULES-fa.md). فقط ساختِ آزمونِ دستی با `-Ptohid.serverField=true`.
+val serverField: Boolean = (System.getenv("TOHID_SERVER_FIELD")?.takeIf { it.isNotBlank() }
+  ?: providers.gradleProperty("tohid.serverField").orNull)?.trim() == "true"
 
 android {
   namespace = "ir.vil3ntec.tohid.customer"
@@ -29,6 +36,8 @@ android {
     versionCode = 1
     versionName = "0.1.0"
     buildConfigField("String", "API_BASE", "\"$apiBase\"")
+    buildConfigField("boolean", "MULTI_SERVER", "$multiServer")
+    buildConfigField("boolean", "SERVER_FIELD", "$serverField")
   }
 
   compileOptions {

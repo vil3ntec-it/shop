@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.customer.ios
 import ir.vil3ntec.tohid.core.shopper.ShopperHttp
 import ir.vil3ntec.tohid.core.shopper.ShopperRequest
 import ir.vil3ntec.tohid.core.shopper.ShopperResponse
+import ir.vil3ntec.tohid.core.shopper.ShopperSender
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
 import platform.Foundation.NSData
@@ -36,7 +37,7 @@ import platform.posix.memcpy
  *  کارخواه می‌خواند). بایت‌های خام (عکسِ گفت‌وگو) با `Content-Type` ِ خودشان؛ [ShopperRequest.binary] ⇒ بایت‌های پاسخ.
  *  نرسیدن به سرور ⇒ استثنا ⇒ خطای `network` ِ کارخواه.
  */
-class HttpIos(private val base: () -> String) : ShopperHttp {
+class HttpIos(private val base: () -> String) : ShopperHttp, ShopperSender {
   private class NoRedirect : NSObject(), NSURLSessionTaskDelegateProtocol {
     override fun URLSession(
       session: NSURLSession,
@@ -58,8 +59,11 @@ class HttpIos(private val base: () -> String) : ShopperHttp {
     NSURLSession.sessionWithConfiguration(config, delegate = delegate, delegateQueue = null)
   }
 
-  override fun send(request: ShopperRequest): ShopperResponse {
-    val url = NSURL.URLWithString(base().trimEnd('/') + request.path) ?: throw IllegalArgumentException("نشانیِ نادرست")
+  override fun send(request: ShopperRequest): ShopperResponse = send(base(), request)
+
+  /** همان، با نشانیِ پایهٔ داده‌شده (`ShopperRoutedHttp`، پرچمِ خاموشِ `tohid.multiServer`) */
+  override fun send(base: String, request: ShopperRequest): ShopperResponse {
+    val url = NSURL.URLWithString(base.trimEnd('/') + request.path) ?: throw IllegalArgumentException("نشانیِ نادرست")
     val req = NSMutableURLRequest.requestWithURL(url)
     req.setHTTPMethod(request.method)
     req.setHTTPShouldHandleCookies(false)

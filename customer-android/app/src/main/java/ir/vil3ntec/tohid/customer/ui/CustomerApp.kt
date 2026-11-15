@@ -33,6 +33,8 @@ class Platform(
   val server: () -> String,
   val setServer: (String) -> Unit,
   val version: String,
+  /** کادرِ «نشانیِ سرور (برای آزمون)» — فقط ساختِ آزمونِ دستی (`tohid.serverField`)؛ پیش‌فرض نیست */
+  val serverField: Boolean = false,
   val openMap: (geoUri: String) -> Unit = {},
   val canPickPhoto: Boolean = false,
   val pickPhoto: (done: (ChatPhoto?) -> Unit) -> Unit = { it(null) },
@@ -78,6 +80,7 @@ fun CustomerApp(model: CustomerModel, platform: Platform) {
               is Route.Placed -> PlacedScreen(model, r.slug, r.token)
               is Route.Track -> TrackScreen(model, r.slug, r.token)
               Route.Settings -> SettingsScreen(model)
+              is LegalRoute -> LegalScreen(model, r.kind)
               Route.Addresses -> AddressesScreen(model)
               is Route.AddressEdit -> AddressEditScreen(model, r.id)
               is Route.Chat -> ChatScreen(model, r.slug, r.orderNo)

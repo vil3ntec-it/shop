@@ -64,7 +64,7 @@ class CustomerRecentTenderTest {
       p == "/api/store/golestan/products/rice" -> ShopperResponse(200, """{"product":$rice}""")
       p.startsWith("/api/store/golestan/products") -> ShopperResponse(200, """{"items":[$rice],"nextCursor":null}""")
       p.endsWith("/verify/start") -> ShopperResponse(200, """{"sent":true,"expiresAt":999}""")
-      p.endsWith("/verify/check") -> ShopperResponse(200, """{"phone":"+93700000002","ticket":"v2.ticket","expiresAt":9999999}""")
+      p.endsWith("/verify/check") -> ShopperResponse(200, """{"email":"c700000002@test.local","ticket":"v2.ticket","expiresAt":9999999}""")
       p.endsWith("/checkout") -> ShopperResponse(201, order)
       else -> ShopperResponse(404, """{"error":{"code":"not_found"}}""")
     }
@@ -124,7 +124,7 @@ class CustomerRecentTenderTest {
   private fun readyToPlace(m: CustomerModel) {
     m.go(Route.CartPage("golestan"))
     m.go(Route.Checkout("golestan"))
-    m.updateForm(m.form.copy(name = "احمد", phone = "0700000002", addressText = "کارتهٔ سه"))
+    m.updateForm(m.form.copy(name = "احمد", phone = "0700000002", email = "c700000002@test.local", addressText = "کارتهٔ سه"))
     m.sendCode()
     m.code = "123456"
     m.checkCode()

@@ -298,11 +298,14 @@ test('مهاجرتِ ۶۴۰: برگشت دو جدول را برمی‌دارد �
   const path = require('node:path');
   const members = (await one('SELECT count(*)::int AS n FROM shop_members WHERE shop_id=$1', [A.shopId])).n;
   const down = fs.readFileSync(path.join(__dirname, '..', 'migrations', 'rollback', '640_shop_till_pins.down.sql'), 'utf8');
+  //  ۹۳۰ (شعبه، فازِ ۳ب) روی `shop_till_sessions` ستونِ شعبه می‌گذارد ⇒ اول همان برمی‌گردد (دُمِ مهاجرت‌ها، مثلِ
+  //  `upgrade-rehearsal`)، سپس ۶۴۰؛ دوباره بالا آمدن هر دو را به ترتیب می‌نشاند
+  await query(fs.readFileSync(path.join(__dirname, '..', 'migrations', 'rollback', '930_branch_doors.down.sql'), 'utf8'));
   await query(down);
   const tables = (await many(`SELECT table_name FROM information_schema.tables WHERE table_name IN ('shop_till_pins','shop_till_sessions')`));
   assert.deepEqual(tables, []);
   assert.equal((await one('SELECT count(*)::int AS n FROM shop_members WHERE shop_id=$1', [A.shopId])).n, members);
-  assert.deepEqual(await require('../src/migrate').run(), ['640_shop_till_pins.sql']);
+  assert.deepEqual(await require('../src/migrate').run(), ['640_shop_till_pins.sql', '930_branch_doors.sql']);
   ok(await setPin(A, A.staff, PIN.staff));
   assert.equal(ok(await verify(A, A.staff, PIN.staff)).session.memberId, A.staff.memberId);
 });

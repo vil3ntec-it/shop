@@ -76,6 +76,10 @@ object MemberModel {
     else -> null
   }
 
+  /** S44: «بازیابی از پشتیبان» فقط برای دستگاهِ غیرفعال، صاحبِ ویرایش و پرچمِ روشن (`LostDeviceRestore.canReplay`) */
+  fun canReplay(d: ShopDeviceDto, canEdit: Boolean, replay: Boolean): Boolean =
+    ir.vil3ntec.tohid.data.LostDeviceRestore.canReplay(d.disabledAt != null, d.current, canEdit, replay)
+
   fun deviceName(d: ShopDeviceDto): String = d.name.ifBlank { d.platform.ifBlank { StrAccount.device } }
 
   /* ---------------- دستگاه‌های ورود با کد (رازِ دستگاه، `GET /api/shop/staff-keys`) ---------------- */

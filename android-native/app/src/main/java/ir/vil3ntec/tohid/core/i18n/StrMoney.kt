@@ -183,6 +183,9 @@ object StrMoney {
   val receiveKind: String get() = t("رسید — پول رساند", "Receive — paid back", "رسید — پیسې یې راکړې")
   val recordGive: String get() = t("ثبت برد", "Record give", "ورکړه ثبت کړئ")
   val recordReceive: String get() = t("ثبت رسید", "Record receipt", "رسید ثبت کړئ")
+  /** برگهٔ کوچکِ ثبت (صاحب‌کار ۱۴۰۵/۰۸/۲۳): زدنِ قوطیِ «برد/رسید» کنارِ مبلغ و تاریخِ سربرگ */
+  val txSwitchKind: String get() = t("عوض کردنِ برد و رسید", "Switch give / receive", "ورکړه او رسید بدل کړئ")
+  val txChangeDate: String get() = t("عوض کردنِ تاریخ", "Change date", "نېټه بدله کړئ")
   fun balanceAfterSave(state: Any): String = t("مانده پس از ثبت: ${asIs(state)}", "Balance after saving: $state", "له ثبت وروسته پاتې: $state")
   val overLimitTitle: String get() = t("بیش از سقفِ اعتبار", "Over the credit limit", "له پور حد زیات")
   val overLimitNote: String get() = t(

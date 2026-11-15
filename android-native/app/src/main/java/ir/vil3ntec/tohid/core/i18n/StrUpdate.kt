@@ -95,7 +95,7 @@ object StrUpdate {
     "The download stopped — tapping again continues from here.",
     "ډاونلوډ ودرېد — په بیا وهلو له همدې ځایه دوام کوي.",
   )
-  val badRepo: String get() = t("آدرس مخزن درست نیست", "The repository address isn't valid", "د زېرمې پته سمه نه ده")
+  val badRepo: String get() = t("نشانیِ به‌روزرسانی درست نیست", "The update address isn't valid", "د تازه کولو پته سمه نه ده")
   val noRelease: String get() = t("نسخه‌ای برای دانلود پیدا نشد", "No version was found to download", "د ډاونلوډ لپاره نسخه پیدا نه شوه")
   val notApk: String get() = t(
     "چیزی که گرفته شد فایلِ نصبی نیست — دوباره بزنید",
@@ -132,25 +132,27 @@ object StrUpdate {
     "The downloaded file isn't the same as the published version; it was deleted — tap again",
     "اخیستل شوی فایل له خپره شوې نسخې سره یو نه دی؛ پاک شو — بیا یې ووهئ",
   )
+  //  ⛔ نامِ میزبانِ فایل‌های نسخه و کدِ HTTP روی صفحه نمی‌آید («هیچ جزئیاتِ فنی/زیرساخت در صفحه»، `docs/RULES-fa.md`)
   val githubLimited: String get() = t(
-    "گیت‌هاب فعلاً جواب نمی‌دهد (سهمیهٔ ساعتی تمام شده) — کمی بعد دوباره بزنید",
-    "GitHub isn't answering right now (the hourly quota is used up) — tap again a little later",
-    "ګیټ‌هب اوس ځواب نه ورکوي (د ساعت برخه خلاصه شوې) — لږ وروسته بیا یې ووهئ",
+    "سرورِ به‌روزرسانی فعلاً جواب نمی‌دهد — کمی بعد دوباره بزنید",
+    "The update server isn't answering right now — tap again a little later",
+    "د تازه کولو سرور اوس ځواب نه ورکوي — لږ وروسته بیا یې ووهئ",
   )
   val githubNoFile: String get() = t(
-    "فایلِ نسخهٔ تازه روی گیت‌هاب پیدا نشد",
-    "The new version's file wasn't found on GitHub",
-    "د نوې نسخې فایل په ګیټ‌هب کې پیدا نه شو",
+    "فایلِ نسخهٔ تازه پیدا نشد",
+    "The new version's file wasn't found",
+    "د نوې نسخې فایل پیدا نه شو",
   )
-  fun githubError(code: Any?): String = t(
-    "گیت‌هاب خطا داد (${asIs(code)}) — کمی بعد دوباره بزنید",
-    "GitHub gave an error ($code) — tap again a little later",
-    "ګیټ‌هب تېروتنه ورکړه ($code) — لږ وروسته بیا یې ووهئ",
+  //  بی کدِ HTTP: کد فقط در لاگ/گزارشِ خطاست، نه روی صفحه (صدازننده‌ها `update/Updater.kt` و `UpdaterDesk.kt`)
+  val updateServerError: String get() = t(
+    "سرورِ به‌روزرسانی خطا داد — کمی بعد دوباره بزنید",
+    "The update server gave an error — tap again a little later",
+    "د تازه کولو سرور تېروتنه ورکړه — لږ وروسته بیا یې ووهئ",
   )
-  fun updateServerNoAnswer(code: Any?): String = t(
-    "سرورِ به‌روزرسانی جواب نداد (${asIs(code)})",
-    "The update server didn't answer ($code)",
-    "د تازه کولو سرور ځواب ورنه کړ ($code)",
+  val updateServerNoAnswer: String get() = t(
+    "سرورِ به‌روزرسانی جواب نداد",
+    "The update server didn't answer",
+    "د تازه کولو سرور ځواب ورنه کړ",
   )
 
   // ── کامپیوتر (`UpdaterDesk`) ──
@@ -161,8 +163,8 @@ object StrUpdate {
   )
   val installerFailedDesk: String get() = t("نصب‌کننده باز نشد", "The installer didn't open", "نصبوونکی خلاص نه شو")
   val githubBusy: String get() = t(
-    "گیت‌هاب فعلاً جواب نمی‌دهد — کمی بعد دوباره بزنید",
-    "GitHub isn't answering right now — tap again a little later",
-    "ګیټ‌هب اوس ځواب نه ورکوي — لږ وروسته بیا یې ووهئ",
+    "سرورِ به‌روزرسانی فعلاً جواب نمی‌دهد — کمی بعد دوباره بزنید",
+    "The update server isn't answering right now — tap again a little later",
+    "د تازه کولو سرور اوس ځواب نه ورکوي — لږ وروسته بیا یې ووهئ",
   )
 }

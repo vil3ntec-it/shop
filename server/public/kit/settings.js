@@ -1,5 +1,5 @@
 /*
- * کیتِ وبِ خریدار — پنجرهٔ تنظیمات: زبان، تم و شمارهٔ تأییدشدهٔ همین دستگاه. دیربار: فقط با زدنِ دکمهٔ تنظیمات/زبان
+ * کیتِ وبِ خریدار — پنجرهٔ تنظیمات: زبان، تم، پیوندِ حریمِ خصوصی و شرایط (`/legal/*` ِ همین سرور) و شمارهٔ تأییدشدهٔ همین دستگاه. دیربار: فقط با زدنِ دکمهٔ تنظیمات/زبان
  * (`K.settings` در kit.js) بار می‌شود، نه در بارِ نخستِ ویترین و بازارچه (بودجهٔ WEB-15، §۳.۱۰).
  * مانندِ kit.js: ES5، بی innerHTML و هر متن با textContent.
  */
@@ -34,12 +34,17 @@
     d.append(K.el('h2', { text: K.t('set.title'), attrs: { id: 'set-title' } }),
       K.el('p', { class: 'label', text: K.t('set.lang'), attrs: { id: 'set-lang' } }), lang,
       K.el('p', { class: 'label section', text: K.t('set.theme'), attrs: { id: 'set-theme' } }), theme);
+    //  حریمِ خصوصی و شرایط از خودِ همین سرور و همین دامنه (`/legal/*`، همان متنِ برنامه‌ها) — نه صفحهٔ بیرونی
+    var lq = K.lang && K.lang !== 'fa' ? '?lang=' + encodeURIComponent(K.lang) : '';
+    d.append(K.el('p', { class: 'small section' },
+      K.el('a', { text: K.t('set.privacy'), attrs: { href: '/legal/privacy' + lq } }), ' · ',
+      K.el('a', { text: K.t('set.terms'), attrs: { href: '/legal/terms' + lq } })));
     var t = K.ticket();
     if (t) {
       var out = K.el('button', { class: 'btn btn-ghost btn-sm', text: K.t('set.out'), attrs: { type: 'button' } });
       out.addEventListener('click', function () { K.setTicket(null); d.close(); location.reload(); });
       d.append(K.el('div', { class: 'inner section' }, K.el('p', { class: 'small muted', text: K.t('set.phone') }),
-        K.el('div', { class: 'spread' }, K.el('b', { class: 'ltr', text: K.localPhone(t.phone) }), out)));
+        K.el('div', { class: 'spread' }, K.el('b', { class: 'ltr', text: t.email }), out)));
     }
     d.append(K.el('div', { class: 'row' }, close));
     document.body.appendChild(d);

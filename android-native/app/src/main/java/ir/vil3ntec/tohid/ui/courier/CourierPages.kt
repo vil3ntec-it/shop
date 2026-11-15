@@ -500,6 +500,7 @@ internal fun CourierAccountTab(
   consent: LocationConsent = LocationConsent(),
   consentBusy: Boolean = false,
   onConsent: (Boolean) -> Unit = {},
+  onLegal: (String) -> Unit = {},
 ) {
   val p = PhoneV3.colors
   Column(
@@ -529,6 +530,7 @@ internal fun CourierAccountTab(
     }
     //  S94: فقط وقتی دکان رضایتِ پیک را می‌خواهد (`locationConsent.required` ِ `/courier/me`)؛ وگرنه کلیدی که اثری ندارد نیست
     if (consent.showToggle) ConsentCard(consent, consentBusy, onConsent)
+    CourierLegalCard(onLegal)   //  حریمِ خصوصی و شرایط درونِ برنامه (`CourierLegal.kt`)
     Text(lastSyncText(lastSyncAt), style = courierText(12.sp), color = p.inkMuted, modifier = Modifier.padding(horizontal = 4.dp))
     CourierSecondary(StrCourierApp.signOutTitle, onSignOut, Modifier.fillMaxWidth(), icon = Icons.AutoMirrored.Outlined.Logout, negative = true)
   }
@@ -561,7 +563,7 @@ private fun ConsentCard(consent: LocationConsent, busy: Boolean, onConsent: (Boo
 }
 
 @Composable
-private fun AccountRow(icon: ImageVector, label: String, value: String, ltr: Boolean = false, divider: Boolean = true, onClick: () -> Unit) {
+internal fun AccountRow(icon: ImageVector, label: String, value: String, ltr: Boolean = false, divider: Boolean = true, onClick: () -> Unit) {
   val p = PhoneV3.colors
   val ui = PhoneV3.ui
   Row(

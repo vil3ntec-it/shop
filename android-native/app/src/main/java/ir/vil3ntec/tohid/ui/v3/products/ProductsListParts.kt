@@ -51,11 +51,13 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Space
-import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3ProductThumb
-import ir.vil3ntec.tohid.ui.v3.V3StatusPill
+import ir.vil3ntec.tohid.ui.v3.V3QuietStatus
+import ir.vil3ntec.tohid.ui.v3.V3RowStatus
+import ir.vil3ntec.tohid.ui.v3.V3RowTone
+import ir.vil3ntec.tohid.ui.v3.V3_ROW_DOT
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.rememberCountUp
@@ -63,11 +65,14 @@ import ir.vil3ntec.tohid.ui.v3.V3Card
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxHeight
 
-/** برچسب و رنگِ §۸ ِ نشانِ ردیف — رنگ هرگز تنها نیست */
-internal fun badgeStatus(b: ProductsListModel.Badge): Pair<V3Status, String>? = when (b) {
-  ProductsListModel.Badge.LOW -> V3Status.WARNING to StrProducts.filterLow
-  ProductsListModel.Badge.OUT -> V3Status.CANCELLED to StrProducts.filterOut
-  ProductsListModel.Badge.INACTIVE -> V3Status.INACTIVE to StrProducts.filterInactive
+/**
+ *  وضعیتِ آرامِ ردیف (سادهٔ e-rows-63d، به‌جای قرص): «کم» کهربایی، «تمام‌شده» قرمز، «غیرفعال» خاکستری؛ عادی ⇒ هیچ.
+ *  رنگ هرگز تنها نیست — نوشته همیشه هست.
+ */
+internal fun badgeStatus(b: ProductsListModel.Badge): V3RowStatus? = when (b) {
+  ProductsListModel.Badge.LOW -> V3RowStatus(StrProducts.filterLow, V3RowTone.ATTENTION)
+  ProductsListModel.Badge.OUT -> V3RowStatus(StrProducts.filterOut, V3RowTone.DANGER)
+  ProductsListModel.Badge.INACTIVE -> V3RowStatus(StrProducts.filterInactive)
   ProductsListModel.Badge.NONE -> null
 }
 
@@ -117,7 +122,7 @@ internal fun ProductRow(
       trailing = {
         Column(horizontalAlignment = Alignment.End) {
           Text("${money(p.salePrice)} ؋", style = V3Type.callout.copy(fontWeight = FontWeight.Bold), color = if (p.active) c.ink else c.inkMuted, maxLines = 1)
-          badgeStatus(badge)?.let { (s, label) -> Spacer(Modifier.height(3.dp)); V3StatusPill(s, label) }
+          badgeStatus(badge)?.let { V3QuietStatus(it) }
         }
       },
       chevron = false,
@@ -161,12 +166,15 @@ internal fun ProductCell(
         radius = 0.dp,
       )
       Box(Modifier.align(Alignment.TopStart).padding(8.dp)) { V3Collapse(selected != null) { CheckDot(selected == true) } }
-      badgeStatus(badge)?.let { (s, label) -> Box(Modifier.align(Alignment.BottomStart).padding(8.dp)) { V3StatusPill(s, label) } }
     }
     Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
       Text("${money(p.salePrice)} ؋", style = V3Type.headline, color = c.ink, maxLines = 1)
       Text(p.name, style = V3Type.subhead, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.height(36.dp))
-      Text(stockLine(p, stock), style = V3Type.footnote, color = c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(stockLine(p, stock), style = V3Type.footnote, color = c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        //  «• کم» کنارِ موجودی، نه قرص روی عکس
+        badgeStatus(badge)?.let { st -> Text(V3_ROW_DOT, style = V3Type.footnote, color = c.inkMuted); V3QuietStatus(st) }
+      }
     }
   }
 }

@@ -148,17 +148,20 @@ fun HistoryScreen(
   var searching by rememberSaveable { mutableStateOf(query.search.isNotEmpty()) }
   var filterSheet by remember { mutableStateOf(false) }
   var menuFor by remember { mutableStateOf<String?>(null) }
-  val ctx = RowCtx(d, book?.look, returnsV2, canCancel, actions, askCancel) { menuFor = it }
+  val ctx = RowCtx(d, book?.look, returnsV2, canCancel, actions, askCancel, today = book?.today.orEmpty()) { menuFor = it }
 
   V3Scaffold(
     title = Str.salesHistory,
     onBack = actions.back,
-    actions = buildList {
-      add(V3Action(Icons.Outlined.PointOfSale, StrSale.drawerWord, dot = drawer.open, onClick = actions.drawer))
-      add(V3Action(Icons.Outlined.Search, StrSale.searchAlt) { searching = !searching })
-      add(V3Action(Icons.Outlined.Tune, StrHistory.filter, dot = query.filtered) { filterSheet = true })
-      actions.table?.let { add(V3Action(Icons.Outlined.TableChart, StrHistory.table, onClick = it)) }
-    },
+    //  جدولِ اکسلی فقط کامپیوتر
+    actions = listOfNotNull(actions.table?.let { V3Action(Icons.Outlined.TableChart, StrHistory.table, onClick = it) }),
+    //  کارِ یک‌دستی: جست‌وجو، فیلتر و صندوقِ نقد پایینِ صفحه (`V3Dock`)؛ پیش‌تر سربرگ فقط دوتای اول را نشان می‌داد
+    //  (ترتیب همان پیشین تا سربرگِ کامپیوتر — دو تای اول — عوض نشود)
+    dock = listOf(
+      V3Action(Icons.Outlined.PointOfSale, StrSale.drawerWord, dot = drawer.open, onClick = actions.drawer),
+      V3Action(Icons.Outlined.Search, StrSale.searchAlt) { searching = !searching },
+      V3Action(Icons.Outlined.Tune, StrHistory.filter, dot = query.filtered) { filterSheet = true },
+    ),
     bottomReserve = bottomReserve,
     search = if (searching || query.search.isNotEmpty()) ({
       V3SearchField(
@@ -184,7 +187,7 @@ fun HistoryScreen(
   if (filterSheet) FilterSheet(query) { filterSheet = false }
   menuFor?.let { id ->
     d.sales.find { it.id == id }?.let { s ->
-      SaleActionsSheet(HistoryModel.row(d, s, returnsV2, look = book?.look), canCancel, returnsV2, actions, askCancel = askCancel, onClose = { menuFor = null })
+      SaleActionsSheet(HistoryModel.row(d, s, returnsV2, look = book?.look, today = book?.today.orEmpty()), canCancel, returnsV2, actions, askCancel = askCancel, onClose = { menuFor = null })
     }
   }
 }
@@ -198,6 +201,8 @@ internal class RowCtx(
   val actions: HistoryActions,
   /** STF-02 — «لغو» با برگهٔ مدیر */
   val askCancel: Boolean,
+  /** امروزِ دکان (`HistoryBook.today`) — «امروز/دیروز» و سالِ جاریِ تاریخِ کوتاهِ ردیف */
+  val today: String = "",
   val onMenu: (String) -> Unit,
 )
 
@@ -240,7 +245,7 @@ private fun PhoneList(
     banner?.let { b -> item(key = "banner") { PrintBannerCard(b) } }
     item(key = "top-" + current.key) { Top(current, PeriodLabel.current(current, book.gregorian), ctx, drawer, reviews, money) }
     returnsHint(ctx)
-    invoices(current, currentList, ctx, query, empty = if (unit == SalesPeriods.Unit.DAY) StrHistory.emptyToday else StrHistory.emptyPeriod)
+    invoices(current, currentList, ctx, query, empty = if (unit == SalesPeriods.Unit.DAY) StrHistory.emptyToday else StrHistory.emptyPeriod, current = true)
     setAside(ctx)
     if (olderLists.isNotEmpty()) item(key = "earlier") { GroupTitle(StrHistory.earlier) }
     olderLists.forEach { (p, list) ->
@@ -288,7 +293,7 @@ private fun TwoPane(
         val title = if (picked.key == current.key) PeriodLabel.current(picked, book.gregorian) else PeriodLabel.full(picked, book.gregorian)
         item(key = "top-" + picked.key) { Top(picked, title, ctx, drawer.takeIf { picked.key == current.key }, reviews, money) }
         if (picked.key == current.key) returnsHint(ctx)
-        invoices(picked, list, ctx, query, empty = StrHistory.emptyPeriod)
+        invoices(picked, list, ctx, query, empty = StrHistory.emptyPeriod, current = picked.key == current.key)
         if (picked.key == current.key) setAside(ctx)
       }
     },
@@ -317,12 +322,15 @@ private fun LazyListScope.returnsHint(ctx: RowCtx) {
 }
 
 /** فاکتورهای یک دوره، [HISTORY_PAGE] تا [HISTORY_PAGE] */
-private fun LazyListScope.invoices(p: SalesPeriods.Period, list: List<Sale>, ctx: RowCtx, query: HistoryQuery, empty: String) {
+/** [current] = دورهٔ جاری (امروز، این ماه…) ⇒ خالیِ آن «فروشِ تازه» را پیشنهاد می‌کند */
+private fun LazyListScope.invoices(p: SalesPeriods.Period, list: List<Sale>, ctx: RowCtx, query: HistoryQuery, empty: String, current: Boolean = false) {
   if (list.isEmpty()) {
     item(key = "empty-" + p.key) {
       if (p.sales.isEmpty() && p.unit == SalesPeriods.Unit.DAY && ctx.d.sales.isEmpty()) {
         V3EmptyState(Icons.AutoMirrored.Outlined.ReceiptLong, StrSale.noSalesYet, action = StrSale.newSale, onAction = ctx.actions.newSale)
-      } else EmptyLine(if (query.filtered && p.sales.isNotEmpty()) StrSale.noInvoiceMatch else empty)
+      } else if (query.filtered && p.sales.isNotEmpty()) {
+        EmptyLine(StrSale.noInvoiceMatch, StrHistory.clearFilters) { query.filter = HistoryFilter.ALL; query.channel = HistoryChannel.ALL }
+      } else EmptyLine(empty, StrSale.newSale.takeIf { current }, ctx.actions.newSale)
     }
     return
   }
