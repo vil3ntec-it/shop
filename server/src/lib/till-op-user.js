@@ -10,7 +10,7 @@
  * ── قاعده ──────────────────────────────────────────────────────────
  *   • هنگامِ **رسیدنِ** push ([begin]): دستگاه = ردیفِ **توکن** (`tokens.device_id`، نه `device_id` ِ بدنه) و نوبتِ بازِ
  *     همان دستگاه در همان لحظه (`till-pin.sessionAt`). پس از پاسخِ موتور، برای هر op که «نشست» یک ردیف در
- *     `shop_till_op_users` ([record]) — op ِ ردشده و تکراری نه؛ کلیدِ (shop_id, op_id) و `ON CONFLICT DO NOTHING` ⇒ op ِ
+ *     `shop_till_op_users` ([record]) — op ِ ردشده و تکراری نه؛ کلیدِ (shop_id, branch_id, op_id) و `ON CONFLICT DO NOTHING` ⇒ op ِ
  *     دوباره‌فرستاده ردیفِ دوم نمی‌سازد.
  *   • عضو فقط وقتی نوشته می‌شود که سرور خودش دیده باشد ([judge])؛ وگرنه NULL (ناشناخته) با دلیل:
  *       pin_off         `shop.till_pin` خاموش
