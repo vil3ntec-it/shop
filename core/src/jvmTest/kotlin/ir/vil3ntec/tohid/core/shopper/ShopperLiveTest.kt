@@ -1,6 +1,5 @@
 package ir.vil3ntec.tohid.core.shopper
 
-import ir.vil3ntec.tohid.core.text.LocaleFormat
 import org.junit.Assume
 import java.net.HttpURLConnection
 import java.net.URI
@@ -83,20 +82,21 @@ class ShopperLiveTest {
       api.productsByIds(slug, cart.lines.map { it.productId } + "ghost").ok("تازه‌سازی").items, now())
     assertEquals(1, gone.gone, "کالای نبوده خط‌خورده")
 
-    // ── تأییدِ شماره با کدِ آزمایشیِ سرور ──
-    val phone = LocaleFormat.normalizePhone("۰۷۰۰ ۱۲۳ ۴۵۶")!!
-    assertEquals("otp_not_found", api.verifyCheck(slug, phone, "000000").errorOrNull()?.code)
-    val sent = api.verifyStart(slug, phone).ok("فرستادنِ کد")
+    // ── «فقط ایمیل»: تأییدِ ایمیل با کدِ آزمایشیِ سرور؛ شماره فقط تماسِ پیک ──
+    val email = "live.buyer@test.local"
+    assertEquals("otp_not_found", api.verifyCheck(slug, email, "000000").errorOrNull()?.code)
+    val sent = api.verifyStart(slug, email).ok("فرستادنِ کد")
     val code = assertNotNull(sent.devCode, "سرورِ آزمون کد را برمی‌گرداند")
-    val ticket = api.verifyCheck(slug, phone, code).ok("زدنِ کد")
-    assertEquals(phone, ticket.phone)
+    val ticket = api.verifyCheck(slug, email, code).ok("زدنِ کد")
+    assertEquals(email, ticket.email)
 
     // ── ثبتِ ارسال با ناحیه: مبلغِ برنامه همان مبلغِ سرور ──
-    val form = CheckoutForm(name = "مشتریِ آزمایشی", phone = "0700123456", addressText = "کارته‌سه، سرکِ اول", zoneId = zone.id)
+    val form = CheckoutForm(name = "مشتریِ آزمایشی", email = email, phone = "۰۷۰۰ ۱۲۳ ۴۵۶", addressText = "کارته‌سه، سرکِ اول", zoneId = zone.id)
+    val phone = assertNotNull(CheckoutRules.phoneOf(form), "شمارهٔ تماسِ پیک به قالبِ سرور")
     assertTrue(CheckoutRules.problems(page, cart, form, ticket, null, now()).isEmpty())
     val sum = CheckoutRules.summary(page, cart, form, null)
     assertEquals(54100 + 3000 + 1500, sum.totalMinor)
-    val req = CheckoutRules.request(page, cart, form, ticket.phone, "fa", null)
+    val req = CheckoutRules.request(page, cart, form, phone, "fa", null)
     val memo = CheckoutKeys.keyFor(null, req)
     val placed = api.checkout(slug, req, memo.key, ticket.ticket).ok("ثبت")
     assertFalse(placed.replayed)
@@ -121,13 +121,13 @@ class ShopperLiveTest {
 
     // ── قیمتِ کهنه در سبد ⇒ ۴۰۹ با برگهٔ امروز؛ پذیرفتن ⇒ ثبت ──
     val stale = cart.copy(lines = cart.lines.map { if (it.productId == "rice") it.copy(priceMinor = 11000) else it })
-    val staleReq = CheckoutRules.request(page, stale, form.copy(fulfillment = "pickup"), ticket.phone, "fa", null)
+    val staleReq = CheckoutRules.request(page, stale, form.copy(fulfillment = "pickup"), phone, "fa", null)
     val err = api.checkout(slug, staleReq, CheckoutKeys.keyFor(memo, staleReq).key, ticket.ticket).errorOrNull()
     assertEquals(ShopperError.PRICE_CHANGED, err?.code)
     val quote = assertNotNull(err!!.quote())
     val (fixed, changed) = CartRules.applyQuote(stale, quote, now())
     assertEquals(listOf(Triple("برنج", 11000L, 12050L)), changed)
-    val pickupReq = CheckoutRules.request(page, fixed, form.copy(fulfillment = "pickup"), ticket.phone, "fa", null)
+    val pickupReq = CheckoutRules.request(page, fixed, form.copy(fulfillment = "pickup"), phone, "fa", null)
     val pickup = api.checkout(slug, pickupReq, CheckoutKeys.keyFor(null, pickupReq).key, ticket.ticket).ok("ثبتِ دریافت از دکان")
     assertEquals(54100, pickup.order.totalMinor, "دریافت از دکان بی هزینهٔ ارسال")
     assertEquals("pickup", pickup.order.fulfillment)

@@ -27,6 +27,7 @@ import { createRequire } from 'node:module';
 import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { startVitalsStore, PRODUCTS } from './vitals-store.mjs';
 import { execSync } from 'node:child_process';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -206,6 +207,7 @@ const broken = (page) => page.evaluate(() => [...document.querySelectorAll('img'
   ok(total.includes('۳۴۰'), 'بی عکس: جمعِ سبد پیش از ثبت دیده می‌شود (۳۰۰ + ۴۰)', total);
   await page.fill('#c-name', 'مشتریِ بی‌عکس');
   await page.fill('#c-phone', '0791112244');
+  await page.fill('#c-email', mailOf('0791112244'));
   await page.click('#verify-send');
   await page.waitForSelector('#verify-code-row:not([hidden])', { timeout: 15000 });
   const code = ((await page.textContent('#verify-msg')).match(/(\d{4,8})/) || [])[1];

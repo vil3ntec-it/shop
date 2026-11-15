@@ -82,6 +82,39 @@ const amountOf = (t, shape) => (shape === 'v3' && t.amountMinor !== undefined ? 
 const debtOf = (s, shape) => (shape === 'v3' ? minorOf(s.debtGivenMinor, false) : minorOf(s.debtGiven, true));
 const time = (v) => (Number.isFinite(Number(v)) && v !== null && v !== '' ? Number(v) : null);
 
+/**
+ * CRM-10 — همان `CustomerCrm.resolve` ِ برنامه (و `keeper` ِ `report-core`): زنجیرهٔ `mergedInto`؛ مقصدِ ناپیدا ⇒ آخرین موجود؛
+ * حلقه ⇒ کوچک‌ترین شناسهٔ حلقه. ادغامِ v3 سند را ویرایش نمی‌کند، پس فاکتور و قرضِ مشتریِ ادغام‌شده زیرِ ماندگار سنجیده می‌شوند.
+ * @param into Map(شناسه ⇒ mergedInto)؛ known Map ِ ردیف‌های مشتری
+ */
+function keeperOf(into, known, id) {
+  const path = [];
+  for (let cur = id; ;) {
+    const nx = into.get(cur);
+    if (nx === undefined || !known.has(nx)) return cur;
+    path.push(cur);
+    const at = path.indexOf(nx);
+    if (at >= 0) return path.slice(at).sort()[0];
+    cur = nx;
+  }
+}
+
+/**
+ * دفترِ همان شناسه‌ها **با پیوندِ ادغام**: مشتری‌های ادغام‌شدهٔ حساب (معمولاً انگشت‌شمار) یک بار خوانده می‌شوند؛ ماندگارِ هر
+ * شناسه و همهٔ شناسه‌هایی که به آن می‌رسند در پرسشِ مشتری و تراکنش می‌آیند. بی هیچ ادغام ⇒ همان دو پرسشِ پیشین.
+ */
+async function aliased(debtorIds, merged, debtorsOf, txsOf) {
+  const into = new Map();
+  for (const r of merged) if (nonBlank(r.into)) into.set(r.id, r.into);
+  const ids = new Set(debtorIds);
+  if (into.size) for (const [a, b] of into) { ids.add(a); ids.add(b); }
+  const known = new Map((await debtorsOf([...ids])).map((r) => [r.id, r.data]));
+  if (!into.size) return { debtors: known, txs: (await txsOf(debtorIds)).map((r) => r.data), into };
+  const keep = new Set(debtorIds.map((id) => keeperOf(into, known, id)));
+  const txIds = [...new Set([...ids].filter((id) => keep.has(keeperOf(into, known, id))))];
+  return { debtors: known, txs: (await txsOf(txIds)).map((r) => r.data), into };
+}
+
 /** فاکتورِ قرض‌دارِ نامزد؟ (بی پرسش — برای «پرچم را بخوانیم؟») */
 function candidate(s, shape) {
   if (!isObj(s) || s.status === 'cancelled' || !nonBlank(s.debtorId)) return false;
@@ -101,9 +134,11 @@ function approvedOn(audits, saleId) {
  */
 function overLimit(sales, ledger, shape, asOf = null) {
   const out = [];
+  const into = ledger.into instanceof Map ? ledger.into : new Map();
+  const keep = (id) => (into.size ? keeperOf(into, ledger.debtors, id) : id);
   for (const { id, data: s } of sales) {
     if (!candidate(s, shape)) continue;
-    const debtorId = s.debtorId;
+    const debtorId = keep(s.debtorId);
     const limit = limitOf(ledger.debtors.get(debtorId), shape);
     if (limit === null) continue;
     //  دلتا/ویرایشِ بالابرندهٔ قرض: مانده تا لحظهٔ همان op (پس از فاکتور)، نه فقط تا خودِ فاکتور
@@ -113,7 +148,7 @@ function overLimit(sales, ledger, shape, asOf = null) {
     let balance = 0;
     let own = 0;
     for (const t of ledger.txs) {
-      if (!isObj(t) || t.debtorId !== debtorId) continue;
+      if (!isObj(t) || keep(t.debtorId) !== debtorId) continue;
       const a = amountOf(t, shape);
       if (str(t.refId) === id) { if (t.type === 'give') own += a; continue; }
       const tt = time(t.createdAt);
@@ -139,23 +174,27 @@ function overLimit(sales, ledger, shape, asOf = null) {
 async function loadRows(table, ctx, debtorIds, saleIds) {
   const base = `SELECT row_id, data FROM ${table} WHERE app=$1 AND account_kind=$2 AND account_id=$3 AND deleted_at IS NULL`;
   const acc = [ctx.app, ctx.accountKind, ctx.accountId];
-  const [debtors, txs, audits] = await Promise.all([
-    many(`${base} AND table_name='debtors' AND row_id = ANY($4::text[])`, [...acc, debtorIds]),
-    many(`${base} AND table_name='transactions' AND data->>'debtorId' = ANY($4::text[])`, [...acc, debtorIds]),
+  const [merged, audits] = await Promise.all([
+    many(`${base} AND table_name='debtors' AND coalesce(data->>'mergedInto', '') <> ''`, acc),
     many(`${base} AND table_name='auditLog' AND data->>'type' = $5 AND data->>'refId' = ANY($4::text[])`, [...acc, saleIds, APPROVAL_TYPE]),
   ]);
-  return { debtors: new Map(debtors.map((r) => [r.row_id, r.data])), txs: txs.map((r) => r.data), audits: audits.map((r) => r.data) };
+  const led = await aliased(debtorIds, merged.map((r) => ({ id: r.row_id, into: str(r.data.mergedInto) })),
+    async (ids) => (await many(`${base} AND table_name='debtors' AND row_id = ANY($4::text[])`, [...acc, ids])).map((r) => ({ id: r.row_id, data: r.data })),
+    (ids) => many(`${base} AND table_name='transactions' AND data->>'debtorId' = ANY($4::text[])`, [...acc, ids]));
+  return { ...led, audits: audits.map((r) => r.data) };
 }
 
 /** دفترِ راهِ قدیم (جدول‌های جدای `debtors`، `payments`، `shop_audit_log`) */
 async function loadLegacy(shopId, debtorIds, saleIds) {
-  const [debtors, txs, audits] = await Promise.all([
-    many(`SELECT id, data FROM debtors WHERE shop_id=$1 AND deleted=false AND id = ANY($2::text[])`, [shopId, debtorIds]),
-    many(`SELECT data FROM payments WHERE shop_id=$1 AND deleted=false AND data->>'debtorId' = ANY($2::text[])`, [shopId, debtorIds]),
+  const [merged, audits] = await Promise.all([
+    many(`SELECT id, data FROM debtors WHERE shop_id=$1 AND deleted=false AND coalesce(data->>'mergedInto', '') <> ''`, [shopId]),
     many(`SELECT data FROM shop_audit_log WHERE shop_id=$1 AND deleted=false AND data->>'type' = $3 AND data->>'refId' = ANY($2::text[])`,
       [shopId, saleIds, APPROVAL_TYPE]),
   ]);
-  return { debtors: new Map(debtors.map((r) => [r.id, r.data])), txs: txs.map((r) => r.data), audits: audits.map((r) => r.data) };
+  const led = await aliased(debtorIds, merged.map((r) => ({ id: r.id, into: str(r.data.mergedInto) })),
+    (ids) => many(`SELECT id, data FROM debtors WHERE shop_id=$1 AND deleted=false AND id = ANY($2::text[])`, [shopId, ids]),
+    (ids) => many(`SELECT data FROM payments WHERE shop_id=$1 AND deleted=false AND data->>'debtorId' = ANY($2::text[])`, [shopId, ids]));
+  return { ...led, audits: audits.map((r) => r.data) };
 }
 
 /* ---------------------------------------------------------------- اجرا */
@@ -335,4 +374,4 @@ function v3(ctx, deviceId, ops, results, { ip = '' } = {}) {
   });
 }
 
-module.exports = { FLAG, ACTION, check, minorOf, limitOf, overLimit, approvedOn, triggersOf, lateHit, v1, v3, legacy };
+module.exports = { FLAG, ACTION, check, minorOf, limitOf, overLimit, approvedOn, triggersOf, lateHit, keeperOf, v1, v3, legacy };

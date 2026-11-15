@@ -1,6 +1,5 @@
 package ir.vil3ntec.tohid.desktop
 
-import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.data.CustomerMerge
 import ir.vil3ntec.tohid.data.DebtTransaction
 import ir.vil3ntec.tohid.data.Debtor
@@ -20,9 +19,8 @@ import org.junit.Test
 import java.io.File
 
 /**
- *  CRM-10 — «ادغامِ مشتری» روی همگام‌سازیِ v3 بسته است (`ShopStore.mergeBlockedReason`،
- *  `mergeCustomers`): دکمه دلیلِ یک‌خطی می‌گیرد و هیچ نوشتن یا opی ساخته نمی‌شود. روی v1 همان
- *  درِ ادغام باز است.
+ *  CRM-10 — «ادغامِ مشتری» (`ShopStore.mergeBlockedReason`، `mergeCustomers`): روی v1 سندها را جابه‌جا می‌کند؛ روی
+ *  همگام‌سازیِ v3 بی ویرایشِ سند است (فقط پروندهٔ مشتری‌ها و ردِ دفترچه، خواندن با `CustomerAlias`).
  */
 class CrmMergeGateDiskTest {
 
@@ -51,22 +49,30 @@ class CrmMergeGateDiskTest {
     ),
   )
 
-  @Test fun `همگام‌سازیِ v3 — دکمه بسته با دلیلِ یک‌خطی، و درِ ادغام نه می‌نویسد نه op می‌سازد`() {
+  @Test fun `همگام‌سازیِ v3 — دکمه باز و ادغام بی ویرایشِ سند — قرض و فاکتور همان، مانده زیرِ ماندگار`() {
     val store = open()
     assertTrue(runBlocking { store.save(twins) })
-    val bytes = ledger.readBytes()
     val v1Queue = engine.queueSize()
     val v3Queue = SyncV3Runner.of(ctx).queueSize()
+    val docs = open().data.value.transactions
 
     assertEquals("", SyncChoice.set(ctx, SyncChoice.V3, 0))
-    assertEquals(StrShell.mergeNotOnV3, store.mergeBlockedReason())
-    val r = runBlocking { store.mergeCustomers("gate1-c2", "gate1-c1") }
-    assertEquals(StrShell.mergeNotOnV3, (r as CustomerMerge.Result.Failed).message)
-
-    assertArrayEquals("دفتر دست نخورد", bytes, ledger.readBytes())
-    assertEquals(v1Queue, engine.queueSize())
-    assertEquals(v3Queue, SyncV3Runner.of(ctx).queueSize())
-    assertNull(open().data.value.debtors.first { it.id == "gate1-c1" }.mergedInto)
+    try {
+      assertNull(store.mergeBlockedReason())
+      val r = runBlocking { store.mergeCustomers("gate1-c2", "gate1-c1") }
+      assertTrue(r is CustomerMerge.Result.Ok)
+      val disk = open().data.value
+      assertEquals("gate1-c2", disk.debtors.first { it.id == "gate1-c1" }.mergedInto)
+      assertEquals("هیچ سندی جابه‌جا نشد", docs, disk.transactions)
+      assertEquals(1300.0, ShopStore.debt(disk, "gate1-c2"), 0.0)
+      assertEquals(0.0, ShopStore.debt(disk, "gate1-c1"), 0.0)
+      assertEquals(v1Queue, engine.queueSize())
+      //  شکلِ opهای v3 (فقط `debtors`/`auditLog`، هیچ قالبِ v2) در `SyncV3EngineTest.crmLinkMergeSendsNoDocEditAndOtherDeviceReadsKeeper`؛
+      //  این‌جا موتورِ v3 ِ دیسک هنوز Snapshot ِ نخست ندارد، پس فقط این‌که هیچ op ِ v1 و هیچ سندی عوض نشد
+      assertTrue(SyncV3Runner.of(ctx).queueSize() >= v3Queue)
+    } finally {
+      SyncChoice.set(ctx, SyncChoice.V1, 0)
+    }
   }
 
   @Test fun `همگام‌سازیِ v1 — دکمه باز است و همان در ادغام را می‌نشاند`() {

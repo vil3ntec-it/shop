@@ -1,0 +1,631 @@
+{
+ "name": "syn04",
+ "ops": 616,
+ "speed": 1.0,
+ "saveEvery": 1,
+ "devices": [
+  {
+   "label": "owner-pc",
+   "ops": 340,
+   "queued": 205,
+   "pushes": 4,
+   "duplicates": 198,
+   "failures": 1,
+   "waits": [
+    10000
+   ],
+   "immediatePushRetries": 1,
+   "v2gMs": 45250,
+   "wallMs": 45506,
+   "maxBatch": 198,
+   "maxBatchBytes": 82669,
+   "maxOpFieldsBytes": 376,
+   "pulledOps": 424,
+   "failureKinds": [
+    "InvalidResponse: پاسخ سرور خوانده نشد"
+   ],
+   "link": {
+    "cfg": {
+     "rttMs": 600,
+     "upBps": 50000,
+     "downBps": 50000,
+     "loss": 0.02,
+     "rtoMs": 1200,
+     "dropRate": 0.02,
+     "readTimeoutMs": 30000,
+     "sendBufBytes": 65536,
+     "mss": 1460,
+     "speed": 1,
+     "seed": 260
+    },
+    "conns": 6,
+    "exchanges": 10,
+    "wireUp": 59929,
+    "wireDown": 72581,
+    "lostUp": 0,
+    "lostDown": 1,
+    "drops": 4,
+    "timeouts": 0,
+    "kinds": {
+     "push": {
+      "n": 6,
+      "ok": 4,
+      "reqWire": 58438,
+      "resWire": 29734,
+      "reqBody": 56197,
+      "resBody": 34045,
+      "reqGzipped": 4,
+      "resGzipped": 0,
+      "reqGzEst": 56197,
+      "resGzEst": 5429,
+      "maxReqBody": 18337,
+      "maxResBody": 17728,
+      "dropUp": 1,
+      "dropDown": 1,
+      "timeouts": 0,
+      "closed": 0,
+      "status": {
+       "200": 3,
+       "401": 2
+      }
+     },
+     "refresh": {
+      "n": 1,
+      "ok": 1,
+      "reqWire": 384,
+      "resWire": 715,
+      "reqBody": 62,
+      "resBody": 374,
+      "reqGzipped": 0,
+      "resGzipped": 0,
+      "reqGzEst": 82,
+      "resGzEst": 215,
+      "maxReqBody": 62,
+      "maxResBody": 374,
+      "dropUp": 0,
+      "dropDown": 0,
+      "timeouts": 0,
+      "closed": 0,
+      "status": {
+       "200": 1
+      }
+     },
+     "pull": {
+      "n": 3,
+      "ok": 1,
+      "reqWire": 1107,
+      "resWire": 42132,
+      "reqBody": 0,
+      "resBody": 58626,
+      "reqGzipped": 0,
+      "resGzipped": 3,
+      "reqGzEst": 0,
+      "resGzEst": 58626,
+      "maxReqBody": 0,
+      "maxResBody": 19807,
+      "dropUp": 0,
+      "dropDown": 2,
+      "timeouts": 0,
+      "closed": 0,
+      "status": {
+       "200": 3
+      }
+     }
+    },
+    "serverMs": 1029.099873999996,
+    "vClockMs": 45250.93843399992,
+    "realMs": 45405.08272599999
+   }
+  },
+  {
+   "label": "staff-phone-1",
+   "ops": 212,
+   "queued": 207,
+   "pushes": 5,
+   "duplicates": 207,
+   "failures": 2,
+   "waits": [
+    10000,
+    20000
+   ],
+   "immediatePushRetries": 1,
+   "v2gMs": 62106,
+   "wallMs": 62297,
+   "maxBatch": 196,
+   "maxBatchBytes": 81873,
+   "maxOpFieldsBytes": 374,
+   "pulledOps": 549,
+   "failureKinds": [
+    "InvalidResponse: پاسخ سرور خوانده نشد",
+    "Unreachable: سرور در دسترس نیست"
+   ],
+   "link": {
+    "cfg": {
+     "rttMs": 600,
+     "upBps": 50000,
+     "downBps": 50000,
+     "loss": 0.02,
+     "rtoMs": 1200,
+     "dropRate": 0.02,
+     "readTimeoutMs": 30000,
+     "sendBufBytes": 65536,
+     "mss": 1460,
+     "speed": 1,
+     "seed": 261
+    },
+    "conns": 5,
+    "exchanges": 9,
+    "wireUp": 60313,
+    "wireDown": 52756,
+    "lostUp": 3,
+    "lostDown": 1,
+    "drops": 3,
+    "timeouts": 0,
+    "kinds": {
+     "push": {
+      "n": 7,
+      "ok": 4,
+      "reqWire": 59551,
+      "resWire": 31264,
+      "reqBody": 56889,
+      "resBody": 35021,
+      "reqGzipped": 5,
+      "resGzipped": 0,
+      "reqGzEst": 56889,
+      "resGzEst": 5677,
+      "maxReqBody": 17859,
+      "maxResBody": 17550,
+      "dropUp": 1,
+      "dropDown": 2,
+      "timeouts": 0,
+      "closed": 0,
+      "status": {
+       "200": 4,
+       "401": 2
+      }
+     },
+     "refresh": {
+      "n": 1,
+      "ok": 1,
+      "reqWire": 387,
+      "resWire": 715,
+      "reqBody": 62,
+      "resBody": 374,
+      "reqGzipped": 0,
+      "resGzipped": 0,
+      "reqGzEst": 82,
+      "resGzEst": 214,
+      "maxReqBody": 62,
+      "maxResBody": 374,
+      "dropUp": 0,
+      "dropDown": 0,
+      "timeouts": 0,
+      "closed": 0,
+      "status": {
+       "200": 1
+      }
+     },
+     "pull": {
+      "n": 1,
+      "ok": 1,
+      "reqWire": 375,
+      "resWire": 20777,
+      "reqBody": 0,
+      "resBody": 20352,
+      "reqGzipped": 0,
+      "resGzipped": 1,
+      "reqGzEst": 0,
+      "resGzEst": 20352,
+      "maxReqBody": 0,
+      "maxResBody": 20352,
+      "dropUp": 0,
+      "dropDown": 0,
+      "timeouts": 0,
+      "closed": 0,
+      "status": {
+       "200": 1
+      }
+     }
+    },
+    "serverMs": 959.3519460000025,
+    "vClockMs": 62106.93868499992,
+    "realMs": 62112.360378
+   }
+  },
+  {
+   "label": "staff-phone-2",
+   "ops": 212,
+   "queued": 204,
+   "pushes": 4,
+   "duplicates": 199,
+   "failures": 1,
+   "waits": [
+    10000
+   ],
+   "immediatePushRetries": 1,
+   "v2gMs": 36608,
+   "wallMs": 37849,
+   "maxBatch": 199,
+   "maxBatchBytes": 83811,
+   "maxOpFieldsBytes": 379,
+   "pulledOps": 552,
+   "failureKinds": [
+    "InvalidResponse: پاسخ سرور خوانده نشد"
+   ],
+   "link": {
+    "cfg": {
+     "rttMs": 600,
+     "upBps": 50000,
+     "downBps": 50000,
+     "loss": 0.02,
+     "rtoMs": 1200,
+     "dropRate": 0.02,
+     "readTimeoutMs": 30000,
+     "sendBufBytes": 65536,
+     "mss": 1460,
+     "speed": 1,
+     "seed": 262
+    },
+    "conns": 4,
+    "exchanges": 8,
+    "wireUp": 59286,
+    "wireDown": 50221,
+    "lostUp": 0,
+    "lostDown": 1,
+    "drops": 2,
+    "timeouts": 0,
+    "kinds": {
+     "push": {
+      "n": 6,
+      "ok": 4,
+      "reqWire": 58518,
+      "resWire": 29633,
+      "reqBody": 56247,
+      "resBody": 34033,
+      "reqGzipped": 4,
+      "resGzipped": 0,
+      "reqGzEst": 56247,
+      "resGzEst": 5416,
+      "maxReqBody": 18396,
+      "maxResBody": 17817,
+      "dropUp": 1,
+      "dropDown": 1,
+      "timeouts": 0,
+      "closed": 0,
+      "status": {
+       "200": 3,
+       "401": 2
+      }
+     },
+     "refresh": {
+      "n": 1,
+      "ok": 1,
+      "reqWire": 389,
+      "resWire": 715,
+      "reqBody": 62,
+      "resBody": 374,
+      "reqGzipped": 0,
+      "resGzipped": 0,
+      "reqGzEst": 82,
+      "resGzEst": 213,
+      "maxReqBody": 62,
+      "maxResBody": 374,
+      "dropUp": 0,
+      "dropDown": 0,
+      "timeouts": 0,
+      "closed": 0,
+      "status": {
+       "200": 1
+      }
+     },
+     "pull": {
+      "n": 1,
+      "ok": 1,
+      "reqWire": 379,
+      "resWire": 19873,
+      "reqBody": 0,
+      "resBody": 19448,
+      "reqGzipped": 0,
+      "resGzipped": 1,
+      "reqGzEst": 0,
+      "resGzEst": 19448,
+      "maxReqBody": 0,
+      "maxResBody": 19448,
+      "dropUp": 0,
+      "dropDown": 0,
+      "timeouts": 0,
+      "closed": 0,
+      "status": {
+       "200": 1
+      }
+     }
+    },
+    "serverMs": 916.8882139999987,
+    "vClockMs": 36608.985769999956,
+    "realMs": 37781.535762
+   }
+  }
+ ],
+ "finalRounds": 2,
+ "offlineMs": 6975,
+ "parallelMs": 62306,
+ "totalMs": 80398,
+ "finalLinks": {
+  "owner-pc": {
+   "cfg": {
+    "rttMs": 600,
+    "upBps": 50000,
+    "downBps": 50000,
+    "loss": 0.02,
+    "rtoMs": 1200,
+    "dropRate": 0,
+    "readTimeoutMs": 30000,
+    "sendBufBytes": 65536,
+    "mss": 1460,
+    "speed": 1,
+    "seed": 260
+   },
+   "conns": 8,
+   "exchanges": 12,
+   "wireUp": 60667,
+   "wireDown": 73595,
+   "lostUp": 0,
+   "lostDown": 1,
+   "drops": 4,
+   "timeouts": 0,
+   "kinds": {
+    "push": {
+     "n": 6,
+     "ok": 4,
+     "reqWire": 58438,
+     "resWire": 29734,
+     "reqBody": 56197,
+     "resBody": 34045,
+     "reqGzipped": 4,
+     "resGzipped": 0,
+     "reqGzEst": 56197,
+     "resGzEst": 5429,
+     "maxReqBody": 18337,
+     "maxResBody": 17728,
+     "dropUp": 1,
+     "dropDown": 1,
+     "timeouts": 0,
+     "closed": 0,
+     "status": {
+      "200": 3,
+      "401": 2
+     }
+    },
+    "refresh": {
+     "n": 1,
+     "ok": 1,
+     "reqWire": 384,
+     "resWire": 715,
+     "reqBody": 62,
+     "resBody": 374,
+     "reqGzipped": 0,
+     "resGzipped": 0,
+     "reqGzEst": 82,
+     "resGzEst": 215,
+     "maxReqBody": 62,
+     "maxResBody": 374,
+     "dropUp": 0,
+     "dropDown": 0,
+     "timeouts": 0,
+     "closed": 0,
+     "status": {
+      "200": 1
+     }
+    },
+    "pull": {
+     "n": 5,
+     "ok": 3,
+     "reqWire": 1845,
+     "resWire": 43146,
+     "reqBody": 0,
+     "resBody": 58786,
+     "reqGzipped": 0,
+     "resGzipped": 3,
+     "reqGzEst": 0,
+     "resGzEst": 58810,
+     "maxReqBody": 0,
+     "maxResBody": 19807,
+     "dropUp": 0,
+     "dropDown": 2,
+     "timeouts": 0,
+     "closed": 0,
+     "status": {
+      "200": 5
+     }
+    }
+   },
+   "serverMs": 1056.742825000012,
+   "vClockMs": 70209.49852899993,
+   "realMs": 70408.892442
+  },
+  "staff-phone-1": {
+   "cfg": {
+    "rttMs": 600,
+    "upBps": 50000,
+    "downBps": 50000,
+    "loss": 0.02,
+    "rtoMs": 1200,
+    "dropRate": 0,
+    "readTimeoutMs": 30000,
+    "sendBufBytes": 65536,
+    "mss": 1460,
+    "speed": 1,
+    "seed": 261
+   },
+   "conns": 6,
+   "exchanges": 12,
+   "wireUp": 61438,
+   "wireDown": 54277,
+   "lostUp": 3,
+   "lostDown": 1,
+   "drops": 4,
+   "timeouts": 0,
+   "kinds": {
+    "push": {
+     "n": 7,
+     "ok": 4,
+     "reqWire": 59551,
+     "resWire": 31264,
+     "reqBody": 56889,
+     "resBody": 35021,
+     "reqGzipped": 5,
+     "resGzipped": 0,
+     "reqGzEst": 56889,
+     "resGzEst": 5677,
+     "maxReqBody": 17859,
+     "maxResBody": 17550,
+     "dropUp": 1,
+     "dropDown": 2,
+     "timeouts": 0,
+     "closed": 0,
+     "status": {
+      "200": 4,
+      "401": 2
+     }
+    },
+    "refresh": {
+     "n": 1,
+     "ok": 1,
+     "reqWire": 387,
+     "resWire": 715,
+     "reqBody": 62,
+     "resBody": 374,
+     "reqGzipped": 0,
+     "resGzipped": 0,
+     "reqGzEst": 82,
+     "resGzEst": 214,
+     "maxReqBody": 62,
+     "maxResBody": 374,
+     "dropUp": 0,
+     "dropDown": 0,
+     "timeouts": 0,
+     "closed": 0,
+     "status": {
+      "200": 1
+     }
+    },
+    "pull": {
+     "n": 4,
+     "ok": 3,
+     "reqWire": 1500,
+     "resWire": 22298,
+     "reqBody": 0,
+     "resBody": 20592,
+     "reqGzipped": 0,
+     "resGzipped": 1,
+     "reqGzEst": 0,
+     "resGzEst": 20628,
+     "maxReqBody": 0,
+     "maxResBody": 20352,
+     "dropUp": 0,
+     "dropDown": 1,
+     "timeouts": 0,
+     "closed": 0,
+     "status": {
+      "200": 4
+     }
+    }
+   },
+   "serverMs": 1012.8895919999995,
+   "vClockMs": 71159.1004799999,
+   "realMs": 71170.920074
+  },
+  "staff-phone-2": {
+   "cfg": {
+    "rttMs": 600,
+    "upBps": 50000,
+    "downBps": 50000,
+    "loss": 0.02,
+    "rtoMs": 1200,
+    "dropRate": 0,
+    "readTimeoutMs": 30000,
+    "sendBufBytes": 65536,
+    "mss": 1460,
+    "speed": 1,
+    "seed": 262
+   },
+   "conns": 6,
+   "exchanges": 11,
+   "wireUp": 60423,
+   "wireDown": 53859,
+   "lostUp": 0,
+   "lostDown": 2,
+   "drops": 3,
+   "timeouts": 0,
+   "kinds": {
+    "push": {
+     "n": 6,
+     "ok": 4,
+     "reqWire": 58518,
+     "resWire": 29633,
+     "reqBody": 56247,
+     "resBody": 34033,
+     "reqGzipped": 4,
+     "resGzipped": 0,
+     "reqGzEst": 56247,
+     "resGzEst": 5416,
+     "maxReqBody": 18396,
+     "maxResBody": 17817,
+     "dropUp": 1,
+     "dropDown": 1,
+     "timeouts": 0,
+     "closed": 0,
+     "status": {
+      "200": 3,
+      "401": 2
+     }
+    },
+    "refresh": {
+     "n": 1,
+     "ok": 1,
+     "reqWire": 389,
+     "resWire": 715,
+     "reqBody": 62,
+     "resBody": 374,
+     "reqGzipped": 0,
+     "resGzipped": 0,
+     "reqGzEst": 82,
+     "resGzEst": 213,
+     "maxReqBody": 62,
+     "maxResBody": 374,
+     "dropUp": 0,
+     "dropDown": 0,
+     "timeouts": 0,
+     "closed": 0,
+     "status": {
+      "200": 1
+     }
+    },
+    "pull": {
+     "n": 4,
+     "ok": 3,
+     "reqWire": 1516,
+     "resWire": 23511,
+     "reqBody": 0,
+     "resBody": 22024,
+     "reqGzipped": 0,
+     "resGzipped": 3,
+     "reqGzEst": 0,
+     "resGzEst": 22036,
+     "maxReqBody": 0,
+     "maxResBody": 19448,
+     "dropUp": 0,
+     "dropDown": 1,
+     "timeouts": 0,
+     "closed": 0,
+     "status": {
+      "200": 4
+     }
+    }
+   },
+   "serverMs": 1031.886086000006,
+   "vClockMs": 71919.42152399998,
+   "realMs": 73130.78765900001
+  }
+ }
+}

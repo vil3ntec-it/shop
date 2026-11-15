@@ -18,6 +18,7 @@
 import { createRequire } from 'node:module';
 import crypto from 'node:crypto';
 import { boot, assert } from './lib/harness.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const E = await boot({ name: 'lifecycle' });
 //  ⚠️ پس از boot: کدِ سرور پیکربندی را همان لحظهٔ نخستین require می‌خواند
@@ -53,8 +54,8 @@ async function walk(id, steps) {
 const tickets = new Map();
 async function verify(phone) {
   if (!tickets.has(phone)) {
-    const s = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { phone }), 'کدِ تأیید');
-    tickets.set(phone, E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { phone, code: s.devCode }), 'تأییدِ شماره').ticket);
+    const s = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { email: mailOf(phone) }), 'کدِ تأیید');
+    tickets.set(phone, E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { email: mailOf(phone), code: s.devCode }), 'تأییدِ شماره').ticket);
   }
   return tickets.get(phone);
 }
@@ -118,6 +119,7 @@ await E.step('S74', 'قیمت بینِ بازکردنِ صفحه و ثبت عو�
   await page.check('input[name="fulfillment"][value="pickup"]');
   await page.fill('#c-name', 'مشتریِ چرخه');
   await page.fill('#c-phone', PHONE);
+  await page.fill('#c-email', mailOf(PHONE));
   await page.click('#verify-send');
   await page.waitForSelector('#verify-code-row:not([hidden])', { timeout: 10_000 });
   const code = ((await page.textContent('#verify-msg')).match(/(\d{4,8})/) || [])[1];

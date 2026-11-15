@@ -66,14 +66,16 @@ class DebtReminderTest {
     assertEquals(listOf("late", "old"), due.map { it.debtor.id })
     assertEquals("2026-10-15", due[0].overdueSince)
     assertEquals(10L, due[0].debtDays)
-    assertEquals(45L, due[1].debtDays)
+    //  CRM-10: «ادغامی» خودش در فهرست نیست، ولی بردِ ماندهٔ رویش (۷۰، از ۲۰۲۶-۰۸-۰۱) زیرِ ماندگارش «کهنه» است (`CustomerAlias`)
+    assertEquals(79L, due[1].debtDays)
     assertEquals("", due[1].overdueSince)
-    assertEquals(DebtReminder.message(DebtReminder.Vars("کهنه", 1000.0)), due[1].message)
+    assertEquals(DebtReminder.message(DebtReminder.Vars("کهنه", 1070.0)), due[1].message)
 
     //  مرزِ روز و مبلغ قابلِ تنظیم است
     assertEquals(listOf("late", "fresh", "old"), DebtReminder.due(d0, today, DebtReminder.Rule(minDebtDays = 5), now = now).map { it.debtor.id })
-    assertEquals(emptyList<String>(), DebtReminder.due(d0, today, DebtReminder.Rule(minBalance = 1001.0), now = now).map { it.debtor.id })
-    assertEquals(listOf("fresh"), DebtReminder.due(d0, today, DebtReminder.Rule(minBalance = 1001.0, minDebtDays = 5), now = now).map { it.debtor.id })
+    assertEquals(listOf("old"), DebtReminder.due(d0, today, DebtReminder.Rule(minBalance = 1001.0), now = now).map { it.debtor.id })
+    assertEquals(emptyList<String>(), DebtReminder.due(d0, today, DebtReminder.Rule(minBalance = 1071.0), now = now).map { it.debtor.id })
+    assertEquals(listOf("fresh", "old"), DebtReminder.due(d0, today, DebtReminder.Rule(minBalance = 1001.0, minDebtDays = 5), now = now).map { it.debtor.id })
   }
 
   @Test fun `یادآوریِ ثبت‌شده تا «هر چند روز» دوباره در فهرست نمی‌آید`() {
@@ -81,7 +83,7 @@ class DebtReminderTest {
     val a = r.data.auditLog.single()
     assertEquals(DebtReminder.TYPE, a.type)
     assertEquals("old", a.refId)
-    assertEquals("یادآوریِ بدهی به «کهنه» با واتس‌اپ — مانده ${money(1000.0)} افغانی", a.notes)
+    assertEquals("یادآوریِ بدهی به «کهنه» با واتس‌اپ — مانده ${money(1070.0)} افغانی", a.notes)
     assertEquals("2026-10-16", DebtReminder.lastReminded(r.data, "old"))
 
     //  سه روز پیش ⇒ نه؛ با «هر ۳ روز» ⇒ بله
@@ -121,7 +123,7 @@ class DebtReminderTest {
     //  همان متنِ فهرستِ «یادآوریِ امروز» برای همان مشتری
     assertEquals(DebtReminder.due(d0, today, template = tpl, store = "دکانِ توحید", now = now).single { it.debtor.id == "late" }.message, late)
     //  بی قالب ⇒ همان جملهٔ امروزِ دکمه‌ها، بیت‌به‌بیت
-    assertEquals(DebtReminder.message(DebtReminder.Vars("کهنه", 1000.0)), DebtReminder.forDebtor(d0, "old", today, now = now))
+    assertEquals(DebtReminder.message(DebtReminder.Vars("کهنه", 1070.0)), DebtReminder.forDebtor(d0, "old", today, now = now))
     //  تسویه ⇒ فقط سلام؛ ناشناخته ⇒ خالی
     assertEquals("سلام تسویه عزیز،", DebtReminder.forDebtor(d0, "paid", today, tpl, now = now))
     assertEquals("", DebtReminder.forDebtor(d0, "x", today, tpl, now = now))

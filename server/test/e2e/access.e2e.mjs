@@ -19,6 +19,7 @@
 import { createRequire } from 'node:module';
 import crypto from 'node:crypto';
 import { boot, assert } from './lib/harness.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const E = await boot({ name: 'access' });
 //  ⚠️ پس از boot: کدِ سرور پیکربندی را همان لحظهٔ نخستین require می‌خواند
@@ -47,8 +48,8 @@ const a = {};          //  شناسه‌های واقعیِ «الف»
 const secretsOf = () => [ownerA.shopId, a.order, a.orderToken, a.product, a.assignment, a.courier, a.sale, a.qr, SECRET_NAME, DEBTOR_A, PHONE_A.slice(1)].filter(Boolean);
 
 async function ticketOf(slug, phone) {
-  const s = E.ok(await E.post(`/api/store/${slug}/verify/start`, { phone }), 'کدِ تأیید');
-  return E.ok(await E.post(`/api/store/${slug}/verify/check`, { phone, code: s.devCode }), 'تأییدِ شماره').ticket;
+  const s = E.ok(await E.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) }), 'کدِ تأیید');
+  return E.ok(await E.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: s.devCode }), 'تأییدِ شماره').ticket;
 }
 /** همهٔ ردیف‌های «الف» در هر جدولِ دارای shop_id و دفترِ همگام‌سازی — اثرِ انگشت */
 async function footprint(shopId) {
@@ -328,7 +329,7 @@ await E.step('S88', 'مرزِ API: بدنهٔ بزرگ و JSON ِ خراب، ص�
   //  سقفِ درخواستِ کد (ویترین): پس از سقف ۴۲۹ با Retry-After و پیامِ کوتاه
   let r429 = null;
   for (let i = 0; i < 40 && !r429; i++) {
-    const r = await fetch(`${E.apiBase}/api/store/${SLUG_B}/verify/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: `07912600${String(i).padStart(2, '0')}` }) });
+    const r = await fetch(`${E.apiBase}/api/store/${SLUG_B}/verify/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: mailOf(`07912600${String(i).padStart(2, '0')}`) }) });
     if (r.status === 429) r429 = { status: 429, retry: r.headers.get('retry-after'), body: await r.json() };
   }
   assert.ok(r429, 'سقفِ درخواستِ کد هرگز نرسید');

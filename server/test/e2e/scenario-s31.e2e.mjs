@@ -19,6 +19,7 @@
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { boot, assert } from './lib/harness.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const E = await boot({ name: 'scenario-s31' });
 //  ⚠️ پس از boot: کدِ سرور پیکربندی را همان لحظهٔ نخستین require می‌خواند
@@ -82,8 +83,8 @@ await E.step('S31.0', 'دکان: چهار کالا با بارکد از برنا
 });
 
 await E.step('S31.1', 'مهمان: ۴ قلم، نام، شماره، پین، نشانه و «پیش از رسیدن زنگ بزنید» ⇒ ثبت با پرداختِ نقد هنگامِ تحویل', async () => {
-  const st = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { phone: PHONE }), 'کدِ تأیید');
-  ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { phone: PHONE, code: st.devCode }), 'تأییدِ شماره').ticket;
+  const st = E.ok(await E.post(`/api/store/${SLUG}/verify/start`, { email: mailOf(PHONE) }), 'کدِ تأیید');
+  ticket = E.ok(await E.post(`/api/store/${SLUG}/verify/check`, { email: mailOf(PHONE), code: st.devCode }), 'تأییدِ شماره').ticket;
   const lines = P.map((productId) => ({ productId, qtyMilli: 1000 }));
   const r = E.ok(await E.post(`/api/store/${SLUG}/checkout`, {
     fulfillment: 'delivery', paymentMethod: 'cod', customer: { name: 'مهمانِ S31', phone: PHONE }, lines,

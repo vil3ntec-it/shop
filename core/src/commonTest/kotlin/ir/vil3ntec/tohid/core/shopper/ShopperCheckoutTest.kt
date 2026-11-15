@@ -6,6 +6,7 @@ import ir.vil3ntec.tohid.core.shopper.CheckoutProblem.BELOW_MIN
 import ir.vil3ntec.tohid.core.shopper.CheckoutProblem.CLOSED
 import ir.vil3ntec.tohid.core.shopper.CheckoutProblem.EMPTY
 import ir.vil3ntec.tohid.core.shopper.CheckoutProblem.NAME
+import ir.vil3ntec.tohid.core.shopper.CheckoutProblem.EMAIL
 import ir.vil3ntec.tohid.core.shopper.CheckoutProblem.PHONE
 import ir.vil3ntec.tohid.core.shopper.CheckoutProblem.SLOT
 import ir.vil3ntec.tohid.core.shopper.CheckoutProblem.UNAVAILABLE_LINES
@@ -26,8 +27,9 @@ import kotlin.test.assertTrue
 /** برگهٔ ثبت: همان حسابِ وب (`zoneFee`، `feeFor`، `minFor`) و سرور (`forCheckout`، `parseCheckout`). */
 class ShopperCheckoutTest {
 
-  private val ticket = PhoneTicket("+93700000002", "v2.t", expiresAt = 10_000)
-  private val ready = CheckoutForm(name = "احمد", phone = "۰۷۰۰ ۰۰۰ ۰۰۲", addressText = "کارتهٔ سه، سرکِ اول")
+  private val ticket = CustomerTicket("c700000002@test.local", "v2.t", expiresAt = 10_000)
+  //  «فقط ایمیل»: ایمیل هویت است (بلیت)، شماره فقط تماسِ پیک (فقط شکل)
+  private val ready = CheckoutForm(name = "احمد", phone = "۰۷۰۰ ۰۰۰ ۰۰۲", email = " C700000002@Test.Local ", addressText = "کارتهٔ سه، سرکِ اول")
 
   private fun cart(vararg l: CartLine) = Cart("golestan", l.toList())
 
@@ -78,19 +80,25 @@ class ShopperCheckoutTest {
   @Test fun everyMissingPieceIsNamedInFormOrder() {
     val p = page(shop(min = 0))
     val empty = CheckoutForm()
-    assertEquals(listOf(EMPTY, NAME, PHONE, ADDRESS), CheckoutRules.problems(p, null, empty, null, null, 1))
+    assertEquals(listOf(EMPTY, NAME, PHONE, EMAIL, ADDRESS), CheckoutRules.problems(p, null, empty, null, null, 1))
     val c = cart(line("a", 100, 1000).copy(unavailable = true))
     val closed = page(shop(min = 0).copy(ordering = StoreOrdering(accepting = false)))
     assertEquals(listOf(CLOSED, UNAVAILABLE_LINES), CheckoutRules.problems(closed, c, ready, ticket, null, 1))
   }
 
-  @Test fun phoneIsNormalisedAndTicketMustMatchAndBeFresh() {
+  @Test fun emailIsTheIdentityAndTicketMustMatchAndBeFresh_phoneIsContactOnly() {
     val p = page(shop(min = 0))
     val c = cart(line("a", 100, 1000))
     assertEquals("+93700000002", CheckoutRules.phoneOf(ready), "رقمِ فارسی، فاصله و ۰ ِ آغاز ⇒ ‎+93")
+    assertEquals("c700000002@test.local", CheckoutRules.emailOf(ready), "فاصله و بزرگیِ حرف ⇒ همان ایمیلِ بلیت")
     assertTrue(CheckoutRules.problems(p, c, ready, ticket, null, now = 9_999).isEmpty())
     assertEquals(listOf(VERIFY), CheckoutRules.problems(p, c, ready, ticket, null, now = 10_000), "بلیتِ منقضی")
-    assertEquals(listOf(VERIFY), CheckoutRules.problems(p, c, ready.copy(phone = "0700000003"), ticket, null, 1), "شمارهٔ دیگر")
+    assertEquals(listOf(VERIFY), CheckoutRules.problems(p, c, ready.copy(email = "other@test.local"), ticket, null, 1), "ایمیلِ دیگر")
+    //  شمارهٔ تماسِ دیگر (بی کد) ⇒ هیچ مانعی: شماره هویت نیست
+    assertTrue(CheckoutRules.problems(p, c, ready.copy(phone = "0700000003"), ticket, null, 1).isEmpty(), "شمارهٔ تماس آزاد")
+    assertEquals(listOf(EMAIL), CheckoutRules.problems(p, c, ready.copy(email = "نه-ایمیل"), ticket, null, 1))
+    //  بلیتِ کهنهٔ شماره‌ای (پیش از «فقط ایمیل»، بی ایمیل) هیچ‌وقت تأییدشده نیست
+    assertEquals(listOf(VERIFY), CheckoutRules.problems(p, c, ready, CustomerTicket("", "v2.t", 10_000), null, 1))
     assertEquals(listOf(PHONE), CheckoutRules.problems(p, c, ready.copy(phone = "12"), ticket, null, 1))
   }
 

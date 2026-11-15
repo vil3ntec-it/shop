@@ -70,7 +70,7 @@ data class LedgerSummary(
     fun of(d: ShopData, now: Long = System.currentTimeMillis()): LedgerSummary {
       val index = ShopStore.index(d)
       //  یک گذر روی تراکنش‌ها، نه یک پیمایش به ازای هر قرض‌دار
-      val byDebtor = d.transactions.groupBy { it.debtorId }
+      val byDebtor = DebtRows.of(d)  // CRM-10: کلیدِ ماندگار
       return LedgerSummary(
         savedAt = now,
         stock = d.products.map {

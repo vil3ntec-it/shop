@@ -20,6 +20,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -100,8 +101,8 @@ const S = await shop('ویترینِ پوش', 'push-store', [...BASE_FLAGS, 'sho
 
 const phone = '0791112266';
 const ticket = async (slug) => {
-  const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
-  const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+  const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+  const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
   return vc.body;
 };
 const tk = await ticket(S.slug);
@@ -157,7 +158,7 @@ await ctx.addInitScript((t) => {
   if (sessionStorage.getItem('seeded')) return;
   sessionStorage.setItem('seeded', '1');
   localStorage.setItem('store-ticket', JSON.stringify(t));
-}, { phone: tk.phone, ticket: tk.ticket, expiresAt: tk.expiresAt });
+}, { email: tk.email, ticket: tk.ticket, expiresAt: tk.expiresAt });
 await ctx.addInitScript(stubPush, fakeSub);
 const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push(String(e)));
@@ -277,7 +278,7 @@ const ctx2 = await browser.newContext({ viewport: { width: 360, height: 760 }, l
 await ctx2.addInitScript((t) => {
   localStorage.setItem('store-ticket', JSON.stringify(t));
   Object.defineProperty(Notification, 'permission', { get: () => 'denied' });
-}, { phone: tk.phone, ticket: tk.ticket, expiresAt: tk.expiresAt });
+}, { email: tk.email, ticket: tk.ticket, expiresAt: tk.expiresAt });
 const p2 = await ctx2.newPage();
 const errors2 = [];
 p2.on('pageerror', (e) => errors2.push(String(e)));
@@ -290,7 +291,7 @@ await ctx2.close();
 //  ── ۸) پرچمِ خاموش ⇒ همان صفحهٔ امروز ──
 ok((await call('PUT', '/api/admin/pump/live-config', { scope: S.shopId, key: 'shop.storefront.web_push', value: false }, A)).status === 200, 'پرچمِ پوش خاموش شد');
 const ctx3 = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
-await ctx3.addInitScript((t) => { localStorage.setItem('store-ticket', JSON.stringify(t)); }, { phone: tk.phone, ticket: tk.ticket, expiresAt: tk.expiresAt });
+await ctx3.addInitScript((t) => { localStorage.setItem('store-ticket', JSON.stringify(t)); }, { email: tk.email, ticket: tk.ticket, expiresAt: tk.expiresAt });
 const p3 = await ctx3.newPage();
 const o4 = await order(S, tk);
 await p3.goto(`${base}/store/${S.slug}#/o/${encodeURIComponent(o4.token)}`);

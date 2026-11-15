@@ -15,6 +15,7 @@ import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -93,11 +94,11 @@ const feat = (await call('GET', `/api/store/${slug}`)).body.features || {};
 ok(feat.addressExtra === true && feat.webAccount === true && !feat.funnel, 'پرچم‌ها: نشانیِ کامل و حساب روشن، تپشِ قیف خاموش', JSON.stringify(feat));
 //  نشستِ حسابِ مشتری از همان درهای واقعی (کد ⇐ بلیت ⇐ حساب)
 const phone = '0791117788';
-const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
-const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
 const acct = await call('POST', `/api/store/${slug}/account`, {}, null, { 'X-Store-Ticket': vc.body.ticket });
 ok(acct.status === 201 && acct.body.session, 'نشستِ حساب ساخته شد', String(acct.status));
-const session = { token: acct.body.session, phone: vc.body.phone, expiresAt: acct.body.expiresAt };
+const session = { token: acct.body.session, email: vc.body.email, expiresAt: acct.body.expiresAt };
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium/chrome-linux/chrome' }).catch(() => chromium.launch());
 const errors = [];
@@ -125,6 +126,7 @@ const toCheckout = async ({ more = false } = {}) => {
   await go('#/checkout');
   await page.waitForSelector('#view-checkout:not([hidden]) #submit-order', { timeout: 15000 });
   await page.fill('#c-name', 'مشتری');
+  if (!(await page.inputValue('#c-phone'))) await page.fill('#c-phone', phone);   //  «فقط ایمیل»: تماسِ پیک، بی کد
   await page.check('input[name="fulfillment"][value="delivery"]');
   await page.waitForFunction(() => { const x = document.getElementById('addr-extra'); return x && !x.hidden && document.getElementById('a-house'); }, null, { timeout: 10000 });
   //  کادرهای کمکی در «جزئیاتِ بیشتر (اختیاری)» ِ بسته‌اند؛ مشتری بازش می‌کند
@@ -157,7 +159,7 @@ await page.check('#ac-keep');
 await page.fill('#ac-label', 'خانه');
 await submit();
 await page.waitForFunction(() => /«خانه»/.test((document.getElementById('toast') || {}).textContent || ''), null, { timeout: 5000 });
-const saved = await one(`SELECT a.* FROM store_customer_addresses a JOIN store_customers c ON c.id = a.customer_id WHERE c.phone = '+93791117788'`);
+const saved = await one(`SELECT a.* FROM store_customer_addresses a JOIN store_customers c ON c.id = a.customer_id WHERE c.email = '${mailOf(phone)}'`);
 ok(saved && saved.area === 'کارتهٔ چهار' && saved.gate_color === 'سبز' && saved.province === 'کابل' && saved.street === 'کوچهٔ گل‌ها'
   && saved.house === 'منزلِ ۳، طبقهٔ دوم' && saved.phone2 === '+93792223344' && saved.plus_code === '8FVC9G8F+6W',
   '«خانه» با ناحیه، دروازه، ولایت، گذر، منزل/طبقه، شمارهٔ دوم و Plus Code در حساب نشست', JSON.stringify(saved).slice(0, 200));
