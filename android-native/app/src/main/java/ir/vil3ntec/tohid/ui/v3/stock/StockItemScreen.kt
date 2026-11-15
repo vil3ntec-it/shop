@@ -53,7 +53,7 @@ import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Space
 import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.v3.V3Action
-import ir.vil3ntec.tohid.ui.v3.V3Button
+import ir.vil3ntec.tohid.ui.v3.V3FormBar
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
 import ir.vil3ntec.tohid.ui.v3.V3Divider
@@ -120,18 +120,15 @@ fun StockItemScreen(
       V3MenuItem(Icons.Outlined.Visibility, StrStock.viewProduct) { actions.view(p.id) },
       V3MenuItem(Icons.Outlined.DeleteOutline, StrStock.deleteProduct, danger = true) { confirmDelete = true },
     ),
+    //  کارِ یک‌دستی: «ورودِ کالا» و «اصلاحِ موجودی» در نوارِ چسبانِ پایین (پیش‌تر زیرِ کارتِ عددها، بالای صفحه)
+    bottomBar = { V3FormBar(StrStock.entryAction, { actions.entry(p.id) }, secondary = StrStock.adjustAction, onSecondary = { actions.adjust(p.id) }) },
   ) { pad ->
     LazyColumn(
       Modifier.fillMaxSize(),
       contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding()),
     ) {
       item(key = "figures") { Box(Modifier.v3Stagger(stagger, "figures", 0)) { FiguresCard(item, actions.copied) } }
-      item(key = "actions") {
-        Row(Modifier.fillMaxWidth().padding(top = 12.dp).v3Stagger(stagger, "actions", 1), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-          V3Button(StrStock.entryAction, { actions.entry(p.id) }, Modifier.weight(1f), icon = Icons.Outlined.MoveToInbox, haptic = true)
-          V3Button(StrStock.adjustAction, { actions.adjust(p.id) }, Modifier.weight(1f), kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.Tune)
-        }
-      }
+      item(key = "actions") { Spacer(Modifier.height(4.dp)) }
       item(key = "entries") {
         V3Section(StrStock.entriesTitle, modifier = Modifier.v3Stagger(stagger, "entries", 2)) {
           if (item.entries.isEmpty()) {

@@ -121,14 +121,18 @@ internal fun ProductsListScreen(
 
   V3Scaffold(
     title = if (selecting) StrProducts.selectedTitle(picked.size) else StrProducts.listTitle,
-    actions = if (selecting) listOf(V3Action(Icons.Outlined.Close, StrProducts.cancelSelection) { selection = emptySet() })
-    else listOf(
+    actions = if (selecting) listOf(V3Action(Icons.Outlined.Close, StrProducts.cancelSelection) { selection = emptySet() }) else emptyList(),
+    overflow = if (selecting) emptyList() else listOfNotNull(visual?.let { v -> V3MenuItem(Icons.Outlined.PhotoCamera, StrVisualSearch.button) { v.start() } }),
+    //  کارِ یک‌دستی: جست‌وجو، فیلتر و مرتب‌سازی، اسکن و نما پایینِ صفحه (`V3Dock`)؛ «کالای تازه» دکمهٔ شناورِ بالای آن
+    search = { V3SearchField(query.text, { query = query.copy(text = it) }, StrProducts.searchHint, onVoice = voice) },
+    chips = if (!loaded || data.products.isEmpty()) null else ({
+      ProductsFilterRow(query, data.productCategories, counts, onQuery = { query = it }, onSort = { sortOpen = true }, modifier = Modifier.padding(start = 16.dp, end = 12.dp))
+    }),
+    dock = if (selecting) emptyList() else listOf(
       V3Action(Icons.Outlined.QrCodeScanner, StrKit.scanBarcode, onClick = nav.scan),
       if (layout == Layout.LIST) V3Action(Icons.Outlined.GridView, StrProducts.viewGrid) { layout = Layout.GRID; saveLayout(context, Layout.GRID) }
       else V3Action(Icons.Outlined.ViewAgenda, StrProducts.viewList) { layout = Layout.LIST; saveLayout(context, Layout.LIST) },
     ),
-    overflow = if (selecting) emptyList() else listOfNotNull(visual?.let { v -> V3MenuItem(Icons.Outlined.PhotoCamera, StrVisualSearch.button) { v.start() } }),
-    search = { V3SearchField(query.text, { query = query.copy(text = it) }, StrProducts.searchHint, onVoice = voice) },
     fab = if (selecting) null else ({ expanded ->
       V3Fab(Icons.Outlined.Add, StrProducts.newProduct, expanded, onClick = nav.new)
     }),
@@ -160,9 +164,6 @@ internal fun ProductsListScreen(
       }
       if (data.products.isNotEmpty()) {
         item(key = "stats", span = full) { ProductsStatsCard(stats, Modifier.padding(bottom = 12.dp)) }
-        item(key = "filters", span = full) {
-          ProductsFilterRow(query, data.productCategories, counts, onQuery = { query = it }, onSort = { sortOpen = true }, modifier = Modifier.padding(bottom = 12.dp))
-        }
       }
       when (empty) {
         ProductsListModel.Empty.NO_PRODUCTS -> item(key = "empty", span = full) {

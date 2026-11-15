@@ -153,12 +153,15 @@ fun HistoryScreen(
   V3Scaffold(
     title = Str.salesHistory,
     onBack = actions.back,
-    actions = buildList {
-      add(V3Action(Icons.Outlined.PointOfSale, StrSale.drawerWord, dot = drawer.open, onClick = actions.drawer))
-      add(V3Action(Icons.Outlined.Search, StrSale.searchAlt) { searching = !searching })
-      add(V3Action(Icons.Outlined.Tune, StrHistory.filter, dot = query.filtered) { filterSheet = true })
-      actions.table?.let { add(V3Action(Icons.Outlined.TableChart, StrHistory.table, onClick = it)) }
-    },
+    //  جدولِ اکسلی فقط کامپیوتر
+    actions = listOfNotNull(actions.table?.let { V3Action(Icons.Outlined.TableChart, StrHistory.table, onClick = it) }),
+    //  کارِ یک‌دستی: جست‌وجو، فیلتر و صندوقِ نقد پایینِ صفحه (`V3Dock`)؛ پیش‌تر سربرگ فقط دوتای اول را نشان می‌داد
+    //  (ترتیب همان پیشین تا سربرگِ کامپیوتر — دو تای اول — عوض نشود)
+    dock = listOf(
+      V3Action(Icons.Outlined.PointOfSale, StrSale.drawerWord, dot = drawer.open, onClick = actions.drawer),
+      V3Action(Icons.Outlined.Search, StrSale.searchAlt) { searching = !searching },
+      V3Action(Icons.Outlined.Tune, StrHistory.filter, dot = query.filtered) { filterSheet = true },
+    ),
     bottomReserve = bottomReserve,
     search = if (searching || query.search.isNotEmpty()) ({
       V3SearchField(

@@ -49,6 +49,14 @@ object V3Modules {
 
   val table: RouteTable by lazy { RouteTable(ALL) }
 
+  /**
+   *  مسیرِ (بی پرسشِ) **بخش‌های اصلی**: هر ورودیِ ماژول — نوار، «همهٔ بخش‌ها» و خانه — و خودِ «بیشتر».
+   *  نوارِ پایینِ گوشی روی همین‌ها می‌ماند (`ShellFrame.bar`)؛ صفحهٔ درونیِ آن‌ها نوار ندارد.
+   */
+  val sections: Set<String> by lazy {
+    ALL.flatMap { m -> m.entries.map { RoutePaths.normalize(table.canonical(it.route).substringBefore('?')) } }.toSet() + "more"
+  }
+
   init {
     //  ویرایشگرِ نوار موردهای ماژول‌های تازه را خودش پیدا می‌کند
     NavCatalog.extras = {

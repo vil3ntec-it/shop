@@ -35,6 +35,7 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.v3.V3Button
+import ir.vil3ntec.tohid.ui.v3.V3FormBar
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3Hue
@@ -93,7 +94,12 @@ data class DrawerView(
 fun DrawerScreen(v: DrawerView, actions: DrawerActions) {
   val c = PhoneV3.colors
   val open = v.shift != null
-  V3Scaffold(title = StrSale.drawerWord, onBack = actions.back) { pad ->
+  //  کارِ یک‌دستی: کارِ اصلی («باز کردن / بستنِ صندوق») در نوارِ چسبانِ پایین
+  V3Scaffold(
+    title = StrSale.drawerWord,
+    onBack = actions.back,
+    bottomBar = { V3FormBar(if (open) StrSale.closeDrawer else StrSale.openDrawer, if (open) actions.close else actions.open) },
+  ) { pad ->
     Column(
       Modifier.fillMaxSize().verticalScroll(rememberScrollState())
         .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding() + 16.dp),
@@ -130,10 +136,8 @@ fun DrawerScreen(v: DrawerView, actions: DrawerActions) {
       }
       if (v.shift?.open?.drawer != null) { Spacer(Modifier.height(8.dp)); Text(StrDrawers.namedNote, style = V3Type.footnote, color = c.inkMuted) }
       v.scanner?.takeIf { open }?.let { Spacer(Modifier.height(8.dp)); Text(it, style = V3Type.footnote, color = c.inkMuted) }
-      Spacer(Modifier.height(14.dp))
-      V3Button(if (open) StrSale.closeDrawer else StrSale.openDrawer, if (open) actions.close else actions.open, Modifier.fillMaxWidth(), haptic = true)
       if (open && v.payV2) {
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           V3Button(StrSale.cashMove, actions.move, Modifier.weight(1f), kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.SwapVert, height = 44.dp)
           V3Button(StrSale.noSaleOpen, actions.noSale, Modifier.weight(1f), kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.LockOpen, height = 44.dp)
