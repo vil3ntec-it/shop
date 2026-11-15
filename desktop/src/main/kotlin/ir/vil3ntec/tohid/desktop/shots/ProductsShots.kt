@@ -110,7 +110,7 @@ private fun Toasted(content: @Composable (ir.vil3ntec.tohid.ui.v3.V3Toasts) -> U
 }
 
 private val noListNav = ProductsListNav({}, {}, {}, {}, {}, { _, _ -> })
-private val noFormNav = ProductFormNav({}, {}, { _, _ -> })
+private val noFormNav = ProductFormNav({}, {})
 
 @Composable
 private fun ListShot(store: ShopStore, data: ShopData, selected: Set<String> = emptySet()) = Toasted { toasts ->
@@ -125,7 +125,8 @@ private fun DetailShot(store: ShopStore, data: ShopData, id: String) = Toasted {
 @Composable
 private fun NewShot(store: ShopStore) = Toasted { toasts ->
   val rows = listOf(
-    ProductRowDraft(key = 0, name = "بیسکویت شکلاتی", category = "خوراکی", unit = "بسته", purchase = "80", sale = "100", barcode = "6260011"),
+    ProductRowDraft(key = 0, name = "بیسکویت شکلاتی", category = "خوراکی", unit = "بسته", purchase = "80", sale = "100", barcode = "6260011",
+      stock = "12", made = "14050701", expiry = "14051101"),
     ProductRowDraft(key = 1, name = "چای سبز", sale = "260"),
     ProductRowDraft(key = 2, name = "صابون دست", category = "شوینده", unit = "عدد", purchase = "60", sale = "50"),
   )

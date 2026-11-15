@@ -65,24 +65,23 @@ class WholesalePriceTest {
     assertTrue(ProductFormModel.draftEdit(row.copy(wholesale = "x")).wholesalePrice!!.isNaN())
   }
 
-  /** فرمِ «کالای تازه» ِ نسخهٔ ۳ (و ردیفِ «کالای تازه» ِ کامپیوتر) هم کادرِ عمده دارد — پیش‌تر فقط ویرایش */
+  /**
+   *  ۱۴۰۵/۰۸/۲۴ (خواستهٔ صاحب‌کار): فرمِ «کالای جدید» ِ نسخهٔ ۳ دیگر کادرِ عمده ندارد ⇒ پیش‌نویسش همیشه `wholesalePrice = null`
+   *  ⇒ ۰ (همان کالای تازهٔ پیش از PRD-12)؛ قیمتِ عمده فقط در «ویرایش کالا» (بالا) و ردیفِ «کالای تازه» ِ کامپیوتر (پایین) نوشته
+   *  می‌شود. پیش‌تر این آزمون می‌سنجید که فرمِ تازه «۶۰» را می‌نویسد.
+   */
   @Test
-  fun newForm_writesWholesale_blankIsZero_badIsInline() {
+  fun newForm_hasNoWholesale_alwaysZero_deskRowStillWrites() {
     val row = ProductRowDraft(key = 1, name = "قند", category = "خوراکی", unit = "کیلو", purchase = "50", sale = "70")
-    val drafts = (ProductFormModel.check(listOf(row.copy(wholesale = "60"))) as ProductFormModel.Check.Ok).drafts
-    assertEquals(60.0, drafts.single().wholesalePrice!!, 0.0)
-    assertEquals(60.0, added(WarehouseEngine.addProducts(d, drafts, 0, ::newId)).wholesalePrice, 0.0)
-    //  خالی ⇒ null ⇒ ۰ (همان کالای تازهٔ امروز؛ تنظیمِ خاموش کادر را نشان نمی‌دهد ⇒ همیشه خالی)
-    val plain = (ProductFormModel.check(listOf(row)) as ProductFormModel.Check.Ok).drafts.single()
-    assertNull(plain.wholesalePrice)
-    assertEquals(ProductFormModel.draftNew(row), plain)
-    assertEquals(0.0, added(WarehouseEngine.addProducts(d, listOf(plain), 0, ::newId)).wholesalePrice, 0.0)
-    //  نادرست ⇒ خطای همان کادر، ردیف آماده نیست (نه پیامِ کلیِ موتور پس از «ذخیره»)
-    val bad = row.copy(wholesale = "x")
-    assertEquals(ProductFormModel.Problem.NOT_A_NUMBER, ProductFormModel.errors(bad, ProductFormModel.Mode.NEW)[ProductFormModel.Field.WHOLESALE])
-    assertFalse(ProductFormModel.ready(bad))
-    assertEquals(ProductFormModel.Check.Broken(0), ProductFormModel.check(listOf(bad)))
-    //  ردیفی که فقط عمده دارد دست‌نخورده نیست ⇒ بی‌صدا دور ریخته نمی‌شود
+    //  مقداری که فرمِ تازه هرگز نمی‌گذارد (کادرش نیست) هم به پیش‌نویس نمی‌رسد و ردیف را خراب نمی‌کند
+    for (w in listOf("", "60", "x")) {
+      val drafts = (ProductFormModel.check(listOf(row.copy(wholesale = w))) as ProductFormModel.Check.Ok).drafts
+      assertNull(w, drafts.single().wholesalePrice)
+      assertNull(w, ProductFormModel.errors(row.copy(wholesale = w), ProductFormModel.Mode.NEW)[ProductFormModel.Field.WHOLESALE])
+      assertEquals(0.0, added(WarehouseEngine.addProducts(d, drafts, 0, ::newId)).wholesalePrice, 0.0)
+    }
+    assertEquals(ProductFormModel.draftNew(row), ProductFormModel.draftNew(row.copy(wholesale = "60")))
+    //  ردیفی که فقط عمده دارد (دادهٔ کهنه) هنوز دست‌نخورده نیست ⇒ بی‌صدا دور ریخته نمی‌شود
     assertFalse(ProductFormModel.untouched(ProductRowDraft(key = 2, wholesale = "60")))
     //  کادرِ کامپیوتر: خالی ⇒ ۰، نادرست ⇒ NaN (موتور رد می‌کند)؛ ۰ ِ کالا ⇒ کادرِ خالی
     assertEquals(0.0, deskWholesale(" "), 0.0)
@@ -107,14 +106,18 @@ class WholesalePriceTest {
     for (same in listOf(null, 100.0)) assertFalse("$same", data(edit(same)).auditLog.any { it.notes.contains("قیمت عمده") })
   }
 
+  /** ویرایشِ گوشی و ردیف/پنلِ کامپیوتر فقط با «لیستِ قیمت در صندوق»؛ فرمِ «کالای جدید» از ۱۴۰۵/۰۸/۲۴ اصلاً کادرِ عمده ندارد */
   @Test
-  fun wiring_newFormAndDesktopFields_onlyWithThePriceListSetting() {
+  fun wiring_editAndDesktopFields_onlyWithThePriceListSetting_newFormNever() {
     fun src(rel: String) = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
       .map { File(it, rel) }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد")
     val form = src("ir/vil3ntec/tohid/ui/v3/products/NewProductsScreen.kt")
-    assertTrue(form.contains("val wholesaleOn = remember { ir.vil3ntec.tohid.ui.components.pos.PriceListPrefs.on(context) }"))
-    assertTrue(form.contains("wholesale = wholesaleOn,"))
-    assertTrue(form.contains("check.drafts.map { it.copy(wholesalePrice = it.wholesalePrice.takeIf { wholesaleOn }) }"))
+    assertFalse(form.contains("PriceListPrefs"))
+    assertFalse(form.contains("wholesale"))
+    assertFalse(src("ir/vil3ntec/tohid/ui/v3/products/NewProductFields.kt").contains("wholesale"))
+    val edit = src("ir/vil3ntec/tohid/ui/v3/products/EditProductScreen.kt")
+    assertTrue(edit.contains("PriceListPrefs.on(context)"))
+    assertTrue(edit.contains("wholesale = wholesaleOn"))
     val desk = src("ir/vil3ntec/tohid/ui/screens/DeskProducts.kt")
     assertEquals(2, Regex(Regex.escape("remember { ir.vil3ntec.tohid.ui.components.pos.PriceListPrefs.on(context) }")).findAll(desk).count())
     assertEquals(2, Regex(Regex.escape("wholesalePrice = if (wholesaleOn) deskWholesale(wholesale) else null,")).findAll(desk).count())

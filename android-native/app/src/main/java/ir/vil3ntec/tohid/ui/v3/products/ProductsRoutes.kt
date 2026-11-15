@@ -167,7 +167,4 @@ private fun RouteScope.listNav() = ProductsListNav(
 private fun RouteScope.formNav() = ProductFormNav(
   back = { back() },
   scan = { onCode -> nav.openForResult(SalesPaths.scan("product")) { code -> code?.let(onCode) } },
-  pickCategory = { current, onPicked ->
-    nav.openForResult(ProductsPaths.categories(pick = true, selected = current.takeIf { it.isNotBlank() })) { name -> name?.let(onPicked) }
-  },
 )

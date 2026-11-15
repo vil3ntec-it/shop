@@ -100,6 +100,8 @@ fun V3TextField(
   imeAction: ImeAction = ImeAction.Next,
   onImeAction: (() -> Unit)? = null,
   singleLine: Boolean = true,
+  /** نمایشِ دلخواه روی مقدارِ خام (مثلاً تاریخِ «۱۴۰۵/۰۸/۲۴» از هشت رقم)؛ null ⇒ همان نمایشِ گونهٔ کادر */
+  mask: VisualTransformation? = null,
 ) {
   val c = PhoneV3.colors
   val source = remember { MutableInteractionSource() }
@@ -134,7 +136,7 @@ fun V3TextField(
       textStyle = v3Text(16, FontWeight.Medium, 22).copy(color = ink),
       cursorBrush = SolidColor(PhoneV3Roles.focus(c)),
       interactionSource = source,
-      visualTransformation = when (kind) {
+      visualTransformation = mask ?: when (kind) {
         V3FieldKind.MONEY -> MoneyMask
         V3FieldKind.PASSWORD -> PasswordVisualTransformation()
         else -> VisualTransformation.None
