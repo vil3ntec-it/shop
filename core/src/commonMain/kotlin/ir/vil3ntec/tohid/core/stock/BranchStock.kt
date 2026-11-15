@@ -45,13 +45,16 @@ object BranchStock {
   ))
 
   /** پاسخ ⇒ ردیف‌ها؛ ردیفِ بدشکل کنار، عددِ منفی ⇒ صفر */
-  fun parse(body: JsonObject?): List<Qty> = ((body?.get("branches") as? JsonArray) ?: return emptyList()).mapNotNull { e ->
-    val o = e as? JsonObject ?: return@mapNotNull null
-    val id = (o["branchId"] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull ?: return@mapNotNull null
-    if (id != BranchTransfer.MAIN && !BRANCH_RE.matches(id)) return@mapNotNull null
-    val name = (o["branchName"] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull.orEmpty()
-    val qty = (o["qty"] as? JsonPrimitive)?.takeIf { !it.isString }?.longOrNull ?: return@mapNotNull null
-    Qty(id, name, qty.coerceAtLeast(0L))
+  fun parse(body: JsonObject?): List<Qty> {
+    val rows = body?.get("branches") as? JsonArray ?: return emptyList()
+    return rows.mapNotNull { e ->
+      val o = e as? JsonObject ?: return@mapNotNull null
+      val id = (o["branchId"] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull ?: return@mapNotNull null
+      if (id != BranchTransfer.MAIN && !BRANCH_RE.matches(id)) return@mapNotNull null
+      val name = (o["branchName"] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull.orEmpty()
+      val qty = (o["qty"] as? JsonPrimitive)?.takeIf { !it.isString }?.longOrNull ?: return@mapNotNull null
+      Qty(id, name, qty.coerceAtLeast(0L))
+    }
   }
 
   /** پاسخِ «درِ ناشناخته» = پرچمِ خاموش (نه خطای شبکه، نه ۴۰۳ ِ شعبه) */
