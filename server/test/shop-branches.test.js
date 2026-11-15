@@ -170,6 +170,12 @@ test('صاحب شعبه می‌سازد، نام می‌دهد، بایگانی 
   assert.equal((await h.get('/api/shop/branches', { token: s.token })).body.branches[0].name, 'مرکز');
   //  شعبهٔ اصلی بایگانی نمی‌شود
   assert.equal((await h.api('PATCH', '/api/shop/branches/main', { token: s.token, body: { status: 'archived' } })).body.error.code, 'main_branch_fixed');
+  //  فازِ ۲: همان در با POST (برنامهٔ اندروید/کامپیوتر PATCH نمی‌فرستد — `HttpURLConnection`)
+  const rp = await h.post(`/api/shop/branches/${A}`, { name: 'شعبهٔ الف ۲' }, { token: s.token });
+  assert.equal(rp.status, 200, JSON.stringify(rp.body));
+  assert.equal(rp.body.branch.name, 'شعبهٔ الف ۲');
+  assert.equal((await h.post(`/api/shop/branches/${A}`, { name: 'شعبهٔ الف' }, { token: s.token })).status, 200);
+  assert.equal((await h.post('/api/shop/branches/main', { status: 'archived' }, { token: s.token })).body.error.code, 'main_branch_fixed');
 
   //  کارمند: فقط شعبه‌های خودش، بی نامِ بقیه
   const mine = await h.get('/api/shop/branches', { token: w.onlyA.token });
@@ -214,11 +220,13 @@ test('نفوذ: کارمند و مدیر هیچ درِ نوشتنیِ شعبه �
   for (const who of [w.main, w.onlyA, w.aAndB]) {
     assert.equal((await h.post('/api/shop/branches', { name: 'دزد' }, { token: who.token })).status, 403);
     assert.equal((await h.api('PATCH', `/api/shop/branches/${w.A}`, { token: who.token, body: { name: 'دزد' } })).status, 403);
+    assert.equal((await h.post(`/api/shop/branches/${w.A}`, { name: 'دزد' }, { token: who.token })).status, 403);
     assert.equal((await h.put(`/api/shop/branches/members/${who.memberId}`, { branches: [w.A, w.Bid, ''] }, { token: who.token })).status, 403);
     assert.equal((await h.get('/api/shop/branches/members', { token: who.token })).status, 403);
   }
   //  صاحبِ دکانِ دیگر: شعبه‌های این دکان «نیست»
   assert.equal((await h.api('PATCH', `/api/shop/branches/${w.A}`, { token: other.s.token, body: { name: 'دزد' } })).body.error.code, 'branch_not_found');
+  assert.equal((await h.post(`/api/shop/branches/${w.A}`, { name: 'دزد' }, { token: other.s.token })).body.error.code, 'branch_not_found');
   assert.equal((await h.put(`/api/shop/branches/members/${other.onlyA.memberId}`, { branches: [w.A] }, { token: other.s.token })).body.error.code, 'branch_not_found');
   assert.equal((await h.put(`/api/shop/branches/members/${w.onlyA.memberId}`, { branches: [other.A] }, { token: other.s.token })).body.error.code, 'member_not_found');
   assert.equal((await pushV3(other.s, [product3('p-x')], w.A)).status, 403);
@@ -345,10 +353,18 @@ test('v1، راهِ قدیم و درهای امروز فقط شعبهٔ اصلی
   const rows = await many(`SELECT row_id FROM sync_rows WHERE app='shop' AND account_id=$1 AND table_name='expenses' ORDER BY row_id`, [s.shopId]);
   assert.deepEqual(rows.map((r) => r.row_id), ['e-v1']);
   //  درهای امروز و راهِ قدیم برای کارمندِ فقط الف
-  for (const p of ['/api/shop', '/api/shop/sync/pull', '/api/sync/pull', '/api/me/backups']) {
+  for (const p of ['/api/shop/members', '/api/shop/sync/pull', '/api/sync/pull', '/api/me/backups']) {
     const r = await h.get(p, { token: w.onlyA.token });
     assert.equal(r.status, 403, `${p} ${JSON.stringify(r.body)}`);
     assert.equal(r.body.error.code, 'branch_main_only', p);
+  }
+  //  فازِ ۲: «دکانِ من» (`GET /shop`، `/shop/me`) سطحِ دکان است (نقش، مجوز، اشتراک؛ هیچ دادهٔ شعبه‌ای) ⇒ کارمندِ فقط الف
+  //  هم نقش و دکانش را می‌گیرد (وگرنه برنامه نقش را نمی‌دانست و صاحب فرض می‌کرد)؛ نوشتن روی همین نشانی‌ها نگهبان دارد
+  for (const p of ['/api/shop', '/api/shop/me']) {
+    const r = await h.get(p, { token: w.onlyA.token });
+    assert.equal(r.status, 200, `${p} ${JSON.stringify(r.body)}`);
+    assert.equal(r.body.shop.id, s.shopId);
+    assert.equal(r.body.isOwner, false);
   }
   //  فازِ ۳ب: خبرها شعبه‌شناس‌اند ⇒ کارمندِ فقط الف بی سرآیند هرگز به دفترِ اصلی نمی‌رسد (۴۰۳ `branch_required`)؛ با
   //  سرآیندِ الف فقط دفترِ خودِ الف (`shop-branches-doors.test.js`)
@@ -361,7 +377,7 @@ test('v1، راهِ قدیم و درهای امروز فقط شعبهٔ اصلی
   //  کارمندِ اصلی همان امروز
   assert.equal((await h.get('/api/shop', { token: w.main.token })).status, 200);
   //  ادعای الف روی درِ امروز ⇒ ۴۰۳ (حتی صاحب)
-  const g = await h.api('GET', '/api/shop', { token: s.token, headers: B(A) });
+  const g = await h.api('GET', '/api/shop/members', { token: s.token, headers: B(A) });
   assert.equal(g.status, 403); assert.equal(g.body.error.code, 'branch_unsupported');
   //  بی توکن همان پاسخِ امروز (نگهبان چیزی نمی‌گوید)
   assert.equal((await h.api('GET', '/api/shop', { headers: B(A) })).status, 401);

@@ -17,6 +17,8 @@ object StrPriceCheck {
   val stock: String get() = t("موجودی", "In stock", "موجودي")
   /** S17 — موجودیِ یک محلِ نگه‌داری زیرِ موجودیِ کل */
   fun atPlace(place: String, qty: String): String = t("${asIs(place)}: ${asIs(qty)}", "$place: $qty", "$place: $qty")
+  /** POS-16/S17 — سطرِ موجودیِ همین کالا در شعبه‌های دیگرِ همین دکان (فقط عدد، از سرور) */
+  val otherBranches: String get() = t("در شعبه‌های دیگر", "At other branches", "په نورو څانګو کې")
   val lastPurchase: String get() = t("آخرین خرید", "Last purchase", "وروستی پېر")
   val noPurchase: String get() = t("خریدی ثبت نشده", "No purchase recorded", "هېڅ پېر نه دی ثبت")
   val expiry: String get() = t("نزدیک‌ترین انقضا", "Nearest expiry", "تر ټولو نږدې پای نېټه")

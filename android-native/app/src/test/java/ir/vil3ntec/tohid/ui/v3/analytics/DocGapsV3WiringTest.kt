@@ -56,12 +56,15 @@ class DocGapsV3WiringTest {
     val phone = src("ui/v3/analytics/ReportsScreen.kt")
     assertTrue(phone.contains("if (DocGapsPref.on(context)) add(ReportExtra.GAPS)"))
     assertTrue(phone.contains("ReportExtra.GAPS -> ReportList(list) { gapsSection(this, d, today) }"))
-    assertTrue(phone.contains("fun sheet() = ReportCsv.of(tab.csv, d, from, to, today)"))
+    //  CRM-15 (۱۴۰۵/۰۸/۲۴): شمارهٔ مشتریِ برگه از همان راهِ نقش‌محور
+    assertTrue(phone.contains("fun sheet() = ReportCsv.of(tab.csv, d, from, to, today, phone = { ir.vil3ntec.tohid.ui.components.customerPhoneExport(it, contacts) })"))
+    assertTrue(phone.contains("val contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()"))
     val desk = src("ui/v3/analytics/ReportsDesk.kt")
     assertTrue(desk.contains("if (DocGapsPref.on(context)) add(DeskRep.GAPS)"))
     assertTrue(desk.contains("GAPS(\"gaps\", false)"))
     assertTrue(desk.contains("val g = remember(d) { DocGapsSheet.report(d) }"))
-    assertTrue(desk.contains("ReportCsv.of(rep.key, d, from, to, today, reminderTemplate)"))
+    assertTrue(desk.contains("ReportCsv.of(rep.key, d, from, to, today, reminderTemplate, phone = phoneOf)"))
+    assertTrue(desk.contains("val phoneOf: (String) -> String = { ir.vil3ntec.tohid.ui.components.customerPhoneExport(it, contacts) }"))
     //  مسیرِ «گزارش‌ها» ِ نسخهٔ ۳: کامپیوتر ⇐ ReportsDesk، گوشی ⇐ ReportsScreen
     val routes = src("ui/v3/analytics/AnalyticsRoutes.kt")
     assertTrue(routes.contains("if (desk) ReportsDesk(data, snackbar) { nav.open(it) }"))

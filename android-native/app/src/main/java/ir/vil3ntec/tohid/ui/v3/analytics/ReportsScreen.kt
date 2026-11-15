@@ -61,6 +61,9 @@ import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.LocalV3Toasts
 import ir.vil3ntec.tohid.ui.v3.V3Action
 import ir.vil3ntec.tohid.ui.v3.V3Chip
+import ir.vil3ntec.tohid.ui.v3.V3Choice
+import ir.vil3ntec.tohid.ui.v3.V3Dropdown
+import ir.vil3ntec.tohid.core.i18n.StrLook
 import ir.vil3ntec.tohid.ui.v3.V3ChipRow
 import ir.vil3ntec.tohid.ui.v3.V3MenuItem
 import ir.vil3ntec.tohid.ui.v3.V3Message
@@ -140,7 +143,8 @@ fun ReportsScreen(
   val (from, to) = ReportsModel.bounds(period, today)
 
   val lineSeller = remember { ir.vil3ntec.tohid.data.LineSellerPref.on(context) } // POS-23
-  fun sheet() = ReportCsv.of(tab.csv, d, from, to, today).let { ReportCsv.lineSellers(it, tab.csv, d, from, to, lineSeller) }
+  val contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts() // CRM-15: شمارهٔ مشتری در برگه
+  fun sheet() = ReportCsv.of(tab.csv, d, from, to, today, phone = { ir.vil3ntec.tohid.ui.components.customerPhoneExport(it, contacts) }).let { ReportCsv.lineSellers(it, tab.csv, d, from, to, lineSeller) }
   var pending by remember { mutableStateOf<ReportCsv.Sheet?>(null) }
   //  نوشتن با انتخابگرِ خودِ اندروید — بی اجازهٔ ذخیره‌سازی (همان راهِ امروز)
   val saveCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
@@ -183,9 +187,8 @@ fun ReportsScreen(
   ) { pad ->
     fun header(t: ReportPage): LazyListScope.() -> Unit = {
       item(key = "range") {
-        if (t.ranged) RangeRow(period, from, to) { r ->
-          rangeId = ReportsModel.rangeId(r)
-          if (r == ReportEngine.Range.JMONTH || r == ReportEngine.Range.JYEAR) picker = r
+        if (t.ranged) RangeRow(period, from, to, now?.year ?: year, now?.month ?: month) { p ->
+          year = p.year; month = p.month; rangeId = ReportsModel.rangeId(p.range)
         } else Text(
           if (t == ReportTab.STOCK) StrReports.allMovements else StrReports.rightNow,
           style = V3Type.footnote, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(top = 4.dp),
@@ -206,6 +209,7 @@ fun ReportsScreen(
         ReportTab.STOCK -> StockTab(d, list)
         //  زبانه‌های اختیاری: همان بخش‌های گزارشِ گوشیِ پیشین (`ui/screens`)
         ReportExtra.SHRINK -> ReportList(list) {
+          //  ضایعات ردیفِ بازهٔ خودش را دارد (صفحهٔ قدیمی) — «ماه…/سال…» ِ آن همان برگهٔ انتخاب
           shrinkSection(this, d, period.range, from, to) { r ->
             rangeId = ReportsModel.rangeId(r)
             if (r == ReportEngine.Range.JMONTH || r == ReportEngine.Range.JYEAR) picker = r
@@ -264,26 +268,29 @@ internal fun tabLabel(t: ReportPage): String = when (t) {
   else -> t.id
 }
 
-/** ردیفِ بازه و زیرنویسِ «از … تا …» */
+/** بازهٔ گزارش — یک کادرِ کشویی (۶۳w، جای ردیفِ تراشه‌ها و ‹ ماه › ِ برگه)؛ زیرش زیرنویسِ «از … تا …» */
 @Composable
-private fun RangeRow(period: ReportPeriod, from: String, to: String, onPick: (ReportEngine.Range) -> Unit) {
+private fun RangeRow(period: ReportPeriod, from: String, to: String, year: Int, month: Int, onPick: (ReportPeriod) -> Unit) {
   val c = PhoneV3.colors
   val months = I18n.solarMonths(I18n.lang, LocaleChoice.months)
-  Column(Modifier.padding(top = 4.dp)) {
-    V3ChipRow(contentPadding = PaddingValues(0.dp)) {
-      ReportsModel.RANGES.forEach { r ->
-        val on = r == period.range
-        val label = when (r) {
-          ReportEngine.Range.TODAY -> StrReports.rangeToday
-          ReportEngine.Range.WEEK -> StrReports.rangeWeek
-          ReportEngine.Range.MONTH -> StrReports.rangeMonth
-          ReportEngine.Range.JMONTH -> if (on) "${months.getOrElse(period.month - 1) { "" }} ${period.year}" else StrReports.rangePickMonth
-          ReportEngine.Range.JYEAR -> if (on) StrReports.yearLabel(period.year) else StrReports.rangePickYear
-          ReportEngine.Range.ALL -> StrReports.rangeAll
-        }
-        V3Chip(label, on, { onPick(r) })
-      }
+  fun label(key: String): String {
+    val p = ReportsModel.parseChoice(key, period)
+    return when (p.range) {
+      ReportEngine.Range.TODAY -> StrReports.rangeToday
+      ReportEngine.Range.WEEK -> StrReports.rangeWeek
+      ReportEngine.Range.MONTH -> StrReports.rangeMonth
+      ReportEngine.Range.JMONTH -> "${months.getOrElse(p.month - 1) { "" }} ${p.year}"
+      ReportEngine.Range.JYEAR -> StrReports.yearLabel(p.year)
+      ReportEngine.Range.ALL -> StrReports.rangeAll
     }
+  }
+  val keys = remember(year, month) { ReportsModel.choiceKeys(year, month) }
+  val selected = ReportsModel.choiceKey(period)
+  val choices = remember(keys, selected, I18n.lang) {
+    (keys + listOf(selected).filter { it !in keys }).map { k -> V3Choice(k, label(k), divider = k == keys[3] || k == "jyear:$year" || k == "all") }
+  }
+  Column(Modifier.padding(top = 4.dp)) {
+    V3Dropdown(label(selected), choices, selected, { k -> onPick(ReportsModel.parseChoice(k, period)) }, label = StrLook.period)
     Text(
       if (ReportsModel.isAllTime(from)) StrReports.allDates else StrReports.rangeSpan(uiDateLong(from), uiDateLong(to)),
       style = V3Type.footnote,

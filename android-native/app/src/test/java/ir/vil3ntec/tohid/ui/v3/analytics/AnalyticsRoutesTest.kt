@@ -8,6 +8,7 @@ import ir.vil3ntec.tohid.ui.v3.nav.V3Nav
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -20,7 +21,6 @@ class AnalyticsRoutesTest {
     listOf(
       AnalyticsPaths.reports("purchases", "jmonth") to "reports",
       AnalyticsPaths.stats("week") to "stats",
-      AnalyticsPaths.audit("sale") to "audit",
       AnalyticsPaths.ADMIN to "admin",
       AdminModel.route(AdminKpi.MONTH_PROFIT) to "reports",
     ).forEach { (path, pattern) ->
@@ -33,7 +33,7 @@ class AnalyticsRoutesTest {
 
   @Test
   fun `پیوندِ سرد پشته را از خانه می‌سازد و برگشت به خانه است`() {
-    listOf(AnalyticsPaths.stats("month"), AnalyticsPaths.audit(), AnalyticsPaths.ADMIN).forEach { path ->
+    listOf(AnalyticsPaths.stats("month"), AnalyticsPaths.ADMIN).forEach { path ->
       val nav = V3Nav(table, "home", NavStack.of("home"))
       nav.openDeep(path)
       assertEquals(path.substringBefore('?'), nav.current.substringBefore('?'))
@@ -42,10 +42,12 @@ class AnalyticsRoutesTest {
     }
   }
 
+  /** ۶۳w (صاحب‌کار: «این بخشِ عملیات چیه، بردار از برنامه»): پیش‌تر فقط با دسترسیِ سابقه باز بود؛ حالا برای هیچ نقشی مسیر نیست */
   @Test
-  fun `سابقهٔ عملیات فقط با دسترسیِ سابقه باز است`() {
-    assertFalse(table.resolve("audit")!!.allowed(Access(granted = setOf(Need.MANAGE))))
-    assertTrue(table.resolve("audit")!!.allowed(Access(granted = setOf(Need.AUDIT))))
+  fun `سابقهٔ عملیات از برنامه برداشته شد و مرکزِ مدیریت همان است`() {
+    assertNull(table.resolve("audit"))
+    assertNull(table.resolve(AnalyticsPaths.DOC_CHAIN))
+    assertFalse(V3Modules.entries(ir.vil3ntec.tohid.core.nav.Place.MORE, Access(granted = setOf(Need.MANAGE, Need.AUDIT))).any { it.id == "audit" })
     assertTrue(table.resolve(AnalyticsPaths.ADMIN)!!.allowed(Access(granted = emptySet())))
   }
 }

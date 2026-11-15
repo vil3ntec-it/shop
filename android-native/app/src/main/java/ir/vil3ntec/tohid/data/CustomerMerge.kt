@@ -176,6 +176,8 @@ object CustomerMerge {
         .take(ir.vil3ntec.tohid.core.sale.CustomerPrice.MAX_ENTRIES).ifEmpty { null },
       creditLimit = keep.creditLimit ?: drop.creditLimit,
       marketingConsent = consent,
+      //  PRM-11/CRM-13: ایمیلِ ماندگار مقدم؛ بی آن ایمیلِ تکراری (ادغام‌شده دیگر پیوند نمی‌سازد: `mergedInto`)
+      email = keep.email ?: drop.email,
       //  CRM-09: نشانیِ ماندگار مقدم؛ بی آن نشانیِ تکراری — پین همراهِ همان نشانی (پینِ یکی کنارِ نشانیِ دیگری نه)
       deliveryAddress = if (hasAddress(keep)) keep.deliveryAddress else drop.deliveryAddress,
       deliveryPin = if (hasAddress(keep)) keep.deliveryPin else drop.deliveryPin,

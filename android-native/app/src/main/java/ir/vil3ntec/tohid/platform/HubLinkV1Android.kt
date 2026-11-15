@@ -78,7 +78,8 @@ class HubLinkV1Android private constructor(private val app: Context, private val
       "X-Device" to deviceId,
       "X-App" to AppConfig.appId,
       "X-App-Version" to AppConfig.appVersion,
-    )
+      //  شعبه درونِ یک دکان (فازِ ۲): شعبهٔ میز؛ اصلی ⇒ هیچ (همان امروز) — هاب همین را نگه می‌دارد و به سرور می‌فرستد
+    ) + ir.vil3ntec.tohid.data.BranchDesk.headers(app)
 
     /** op ِ رسیده از سرور ⇒ حلقهٔ «دیده از سرور» (فقط وقتی جفت شده؛ وگرنه هیچ) */
     fun saw(context: Context, ids: Collection<String>) {

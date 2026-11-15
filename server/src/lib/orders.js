@@ -387,8 +387,8 @@ async function loadDetail(run, shopId, id, viewer) {
   const lines = (await run('SELECT * FROM online_order_lines WHERE order_id=$1 ORDER BY line_no', [id])).rows;
   const events = (await run('SELECT * FROM online_order_events WHERE order_id=$1 ORDER BY seq', [id])).rows;
   //  CRM-15: صاحب می‌تواند `customers.contact` را برای همین مدیر ببندد (‎lib/customer-contact.js‎)
-  const contact = await require('./customer-contact').ordersContact({ shopId, role: viewer?.role, userId: viewer?.id }, run);
-  const out = detail(row, lines, events, viewer, now(), contact, await maskerOf(shopId, viewer, run));
+  const m = await require('./customer-role-mask').forDetail(shopId, viewer, row, events, run);   // CRM-15 (+ نقش‌محور)
+  const out = m.apply(detail(row, lines, events, viewer, now(), m.contact, m.mask));
   //  O-06 = ب: نگه‌داشتنِ موجودیِ همین سفارش (فقط اگر دارد ⇒ بی آن همان پاسخِ پیشین)
   const hold = await require('./stock-reserve').orderView(run, shopId, id);
   if (hold) out.stockHold = hold;

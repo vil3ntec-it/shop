@@ -37,10 +37,14 @@ object CustomerProfileForm {
     return setProfile(saved.data, saved.id, phone2, tagsText)
   }
 
-  /** فقط شمارهٔ دوم و برچسب‌ها (پروندهٔ کامپیوتر) — بقیهٔ پرونده همان */
-  fun setProfile(d: ShopData, id: String, phone2: String, tagsText: String): DebtorEngine.Result {
+  /**
+   *  فقط شمارهٔ دوم، برچسب‌ها و (اگر آمد) ایمیل (پروندهٔ کامپیوتر) — بقیهٔ پرونده همان.
+   *  @param email PRM-11/CRM-13: `null` ⇒ ایمیلِ ذخیره‌شده دست نمی‌خورد؛ "" ⇒ پاک
+   */
+  fun setProfile(d: ShopData, id: String, phone2: String, tagsText: String, email: String? = null): DebtorEngine.Result {
     val c = d.debtors.find { it.id == id } ?: return DebtorEngine.Result.Failed(StrLedger.customerNotFound)
-    val p = CustomerCrm.profileOf(c).copy(phone2 = phone2, tags = CustomerCrm.parseTags(tagsText))
+    val base = CustomerCrm.profileOf(c)
+    val p = base.copy(phone2 = phone2, tags = CustomerCrm.parseTags(tagsText), email = email ?: base.email)
     return when (val r = CustomerCrm.setProfile(d, id, p)) {
       is DebtorEngine.Result.Ok -> DebtorEngine.Result.Ok(r.data, id)
       is DebtorEngine.Result.Failed -> r
@@ -65,7 +69,7 @@ object CustomerProfileForm {
 
   /** نوشتهٔ کوتاهِ زیرِ نام: شمارهٔ دوم و برچسب‌ها («#عمده #همسایه») — خالی ⇒ ""؛ [contacts] CRM-15: بی مجوز شماره پوشیده */
   fun extraLine(debtor: Debtor, contacts: Boolean = true): String = listOfNotNull(
-    debtor.phone2?.takeIf { it.isNotBlank() }?.let { ir.vil3ntec.tohid.core.text.ContactMask.show(LocaleText.phoneDisplay(it), contacts) },
+    debtor.phone2?.takeIf { it.isNotBlank() }?.let { ir.vil3ntec.tohid.core.crm.CustomerMask.show(LocaleText.phoneDisplay(it), contacts, ShopRole.customerMask.value) },
     debtor.tags.orEmpty().takeIf { it.isNotEmpty() }?.joinToString(" ") { "#$it" },
   ).joinToString(" · ")
 }

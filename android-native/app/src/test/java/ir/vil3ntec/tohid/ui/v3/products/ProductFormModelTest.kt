@@ -90,7 +90,9 @@ class ProductFormModelTest {
     assertEquals(mapOf(Field.UNIT_FACTOR to Problem.NOT_A_NUMBER), ProductFormModel.errors(full.copy(saleUnit = "گرم", unitFactor = "0"), Mode.EDIT))
     assertTrue(ProductFormModel.errors(full, Mode.NEW).isEmpty())
     assertEquals(Field.NAME, ProductFormModel.firstField(ProductFormModel.errors(empty, Mode.NEW)))
-    assertEquals(Field.SALE, ProductFormModel.firstField(mapOf(Field.UNIT to Problem.REQUIRED, Field.SALE to Problem.REQUIRED)))
+    //  ۱۴۰۵/۰۸/۲۴: در فرمِ تازه «واحد» کنارِ «دسته» و بالای قیمت‌هاست ⇒ پیش از «قیمتِ فروش» (پیش‌تر زیرِ قیمت‌ها بود)
+    assertEquals(Field.UNIT, ProductFormModel.firstField(mapOf(Field.UNIT to Problem.REQUIRED, Field.SALE to Problem.REQUIRED)))
+    assertEquals(Field.SALE, ProductFormModel.firstField(mapOf(Field.STOCK to Problem.NOT_A_NUMBER, Field.SALE to Problem.REQUIRED)))
   }
 
   @Test

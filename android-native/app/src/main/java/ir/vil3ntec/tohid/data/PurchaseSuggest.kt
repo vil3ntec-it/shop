@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.calendar.CivilDays
 import ir.vil3ntec.tohid.core.purchase.DemandForecast
+import ir.vil3ntec.tohid.core.purchase.PoSeasonality
 import ir.vil3ntec.tohid.core.purchase.PurchaseOrderCore
 import ir.vil3ntec.tohid.core.purchase.ReorderCore
 import ir.vil3ntec.tohid.core.purchase.SupplierPricing
@@ -28,12 +29,17 @@ object PurchaseSuggest {
     val supplierId: String?,
     val forecast: DemandForecast.Forecast,
     val priceMinor: Long,
+    /** PUR-03: فصل (فقط با ۱۲ ماه فروش) و اطمینانِ کم/متوسط/زیاد از درازای تاریخچه و نوسان */
+    val season: PoSeasonality.Season? = null,
   ) {
     val due: Boolean get() = forecast.qtyMilli > 0
   }
 
-  /** فروشِ خالصِ هر روزِ هر کالا در [HISTORY_DAYS] تا امروز و نخستین روزِ هر کالا (فروش یا خرید) */
-  private class History(val days: Map<String, List<DemandForecast.Day>>, val first: Map<String, Int>)
+  /**
+   *  فروشِ خالصِ هر روزِ هر کالا در [HISTORY_DAYS] تا امروز، نخستین روزِ هر کالا (فروش یا خرید) و نخستین روزِ **فروشِ** آن
+   *  (PUR-03: «۱۲ ماه تاریخچهٔ فروش»)
+   */
+  private class History(val days: Map<String, List<DemandForecast.Day>>, val first: Map<String, Int>, val firstSale: Map<String, Int>)
 
   private fun history(d: ShopData, t: Int): History {
     val from = t - HISTORY_DAYS + 1
@@ -44,24 +50,26 @@ object PurchaseSuggest {
     }
     val days = HashMap<String, ArrayList<DemandForecast.Day>>()
     val first = HashMap<String, Int>()
-    fun seen(productId: String, jdn: Int) {
-      val old = first[productId]
-      if (old == null || jdn < old) first[productId] = jdn
+    val firstSale = HashMap<String, Int>()
+    fun seen(productId: String, jdn: Int, into: HashMap<String, Int> = first) {
+      val old = into[productId]
+      if (old == null || jdn < old) into[productId] = jdn
     }
     for (i in d.saleItems) {
       if (i.productId.isBlank()) continue
       val j = live[i.saleId] ?: continue
       seen(i.productId, j)
+      seen(i.productId, j, firstSale)
       if (j in from..t) days.getOrPut(i.productId) { ArrayList() } += DemandForecast.Day(j, PurchaseOrderBook.milli(i.quantity - i.returnedQty))
     }
     for (p in d.purchases) CivilDays.jdnOfIso(p.date)?.let { seen(p.productId, it) }
-    return History(days, first)
+    return History(days, first, firstSale)
   }
 
-  /** پیش‌بینیِ کالای [p] با زمانِ تأمینِ [leadDays]؛ سرریزِ حساب ⇒ `null` */
-  private fun forecastOf(d: ShopData, p: Product, t: Int, h: History, onOrder: Map<String, Long>, leadDays: Int?, smart: Boolean): DemandForecast.Forecast? =
+  /** پیش‌بینیِ کالای [p] با زمانِ تأمینِ [leadDays] و فصلِ PUR-03 (`PoSeasonality`)؛ سرریزِ حساب ⇒ `null` */
+  private fun forecastOf(d: ShopData, p: Product, t: Int, h: History, onOrder: Map<String, Long>, leadDays: Int?, smart: Boolean): PoSeasonality.Result? =
     try {
-      DemandForecast.forecast(
+      PoSeasonality.forecast(
         DemandForecast.Input(
           todayJdn = t,
           history = h.days[p.id].orEmpty(),
@@ -73,6 +81,7 @@ object PurchaseSuggest {
           wholeUnits = p.unit !in PurchaseOrderBook.WEIGHED_UNITS,
           smart = smart,
         ),
+        h.firstSale[p.id],
       )
     } catch (e: ArithmeticException) {
       null
@@ -95,14 +104,14 @@ object PurchaseSuggest {
       val mine = buys[p.id].orEmpty()
       val sid = p.supplierId.takeIf { it in known } ?: SupplierPricing.latestSupplier(mine, p.id)?.takeIf { it in known }
       val lead = sid?.let { s -> leads.getOrPut(s) { PurchaseOrderBook.leadTime(orders, s, PurchaseOrderBook.manualLead(d, s)) } }
-      val f = forecastOf(d, p, t, h, onOrder, lead?.days, smart) ?: return@mapNotNull null
+      val r = forecastOf(d, p, t, h, onOrder, lead?.days, smart) ?: return@mapNotNull null
       val price = sid?.let { PurchaseOrderBook.lastPriceMinor(d, it, p, mine) } ?: PurchaseOrderBook.minor(p.purchasePrice)
-      Row(p, sid, f, price)
+      Row(p, sid, r.forecast, price, r.season)
     }.sortedWith(compareBy<Row>({ !it.due }, { it.forecast.daysLeft ?: Int.MAX_VALUE }, { it.product.name }))
   }
 
   /** ۳-۱۷ — یک ردیفِ «پیشنهاد با فروش و زمانِ تأمین» ِ فرمِ سفارش، با همان پیش‌بینی (دلیل و اطمینان) */
-  data class Plan(val pick: PurchaseOrderBook.Pick, val forecast: DemandForecast.Forecast)
+  data class Plan(val pick: PurchaseOrderBook.Pick, val forecast: DemandForecast.Forecast, val season: PoSeasonality.Season? = null)
 
   /**
    *  ۳-۱۷ ِ صاحب‌کار (PUR-03 الف): «پیشنهاد با فروش و زمانِ تأمین» ِ فرمِ سفارشِ خرید = **همان** پیشنهادِ صفحهٔ «پیشنهادِ
@@ -119,8 +128,8 @@ object PurchaseSuggest {
     val onOrder = PurchaseOrderBook.onOrderMilli(orders)
     return picks.mapNotNull { pk ->
       val p = d.products.find { it.id == pk.productId } ?: return@mapNotNull null
-      val f = forecastOf(d, p, t, h, onOrder, lead.days, smart) ?: return@mapNotNull null
-      if (f.qtyMilli > 0) Plan(pk.copy(qtyMilli = f.qtyMilli), f) else null
+      val r = forecastOf(d, p, t, h, onOrder, lead.days, smart) ?: return@mapNotNull null
+      if (r.forecast.qtyMilli > 0) Plan(pk.copy(qtyMilli = r.forecast.qtyMilli), r.forecast, r.season) else null
     }
   }
 

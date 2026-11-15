@@ -65,6 +65,8 @@ import ir.vil3ntec.tohid.ui.components.common.ScreenKind
 import ir.vil3ntec.tohid.ui.components.common.SegmentTab
 import ir.vil3ntec.tohid.ui.components.common.SegmentedTabs
 import ir.vil3ntec.tohid.ui.components.common.StatCard
+import ir.vil3ntec.tohid.ui.components.common.Metric
+import ir.vil3ntec.tohid.ui.components.common.MetricRows
 import ir.vil3ntec.tohid.ui.components.common.StatDelta
 import ir.vil3ntec.tohid.ui.components.common.StatusPill
 import ir.vil3ntec.tohid.ui.components.common.Trend
@@ -161,6 +163,9 @@ private fun kpiDelta(k: ReportBoard.Kpi): StatDelta? {
   return StatDelta(text, trend, good = k.good == true)
 }
 
+/** گوشی: چند عددِ اصلیِ امروز پیدا (فروشِ خالص، فاکتورها، سود، میانگین)؛ بقیه با «بیشتر» */
+private const val PHONE_KPIS = 4
+
 /** تابلوی امروز از همان هسته — یک بار به ازای هر دفتر و روز */
 @Composable
 private fun rememberHome(d: ShopData, showMoney: Boolean): ReportBoard.Home {
@@ -181,17 +186,11 @@ private fun rememberHome(d: ShopData, showMoney: Boolean): ReportBoard.Home {
 fun HomeKpis(d: ShopData, onOpen: (String) -> Unit, showMoney: Boolean, columns: Int, modifier: Modifier = Modifier, ready: ReportBoard.Home? = null) {
   val home = ready ?: rememberHome(d, showMoney)
   Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-    home.kpis.chunked(columns).forEach { line ->
-      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        line.forEach { k ->
-          StatCard(
-            title = k.title, value = kpiText(k), period = k.period, delta = kpiDelta(k), modifier = Modifier.weight(1f),
-            onClick = { ReportFresh.open(k.target, onOpen) },
-          )
-        }
-        repeat(columns - line.size) { Spacer(Modifier.weight(1f)) }
-      }
-    }
+    //  ۶۳w (صاحب‌کار: «کادرهای بزرگ نه»): فهرستِ فشرده — گوشی چهار عددِ اصلی و بقیه زیرِ «… عددِ دیگر»؛ پهن همه
+    MetricRows(
+      home.kpis.map { k -> Metric(k.title, kpiText(k), k.period, kpiDelta(k), onClick = { ReportFresh.open(k.target, onOpen) }) },
+      top = if (columns <= 2) PHONE_KPIS else Int.MAX_VALUE,
+    )
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       home.pills.forEach { p ->
         StatusPill(
@@ -591,10 +590,10 @@ internal fun FreshTable(t: ReportTables.Table, modifier: Modifier, onRow: ((List
           Row(Modifier.height(IntrinsicSize.Min).background(if (r % 2 == 1) Shop.colors.surface2.copy(alpha = 0.4f) else Shop.colors.surface).then(drill)) {
             rows[r].forEachIndexed { i, v ->
               cell(i, null) {
-                Text(
-                  ReportFreshModel.display(v, t.columns[i].kind, ::formatDate), maxLines = 1, overflow = TextOverflow.Ellipsis,
-                  style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text,
-                )
+                val shown = ReportFreshModel.display(v, t.columns[i].kind, ::formatDate)
+                //  «فاکتور #۱۲» ِ ستونِ سند («پایانِ روز»، فاکتورهای روز) زدنی ⇒ همان فاکتور (`InvoiceRef`، `claude/e-rows-63q`)
+                if (t.columns[i].kind == "text") ir.vil3ntec.tohid.ui.v3.InvoiceRefText(ir.vil3ntec.tohid.ui.v3.InvoiceRefs.split(shown), style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text, maxLines = 1)
+                else Text(shown, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
               }
             }
           }
@@ -701,10 +700,7 @@ fun PhoneFreshReports(d: ShopData) {
 @Composable
 private fun StockCostPhone(c: ReportCore.StockCost) {
   Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-    StatCard(
-      StrStockPages.stockValueAvg, "${money(c.totals.valueMinor / 100.0)} ؋",
-      if (c.totals.approximate) StrReportPages.colApprox else StrReportPages.untilToday, Modifier.fillMaxWidth(),
-    )
+    MetricRows(listOf(Metric(StrStockPages.stockValueAvg, "${money(c.totals.valueMinor / 100.0)} ؋", if (c.totals.approximate) StrReportPages.colApprox else StrReportPages.untilToday)))
     Text(StockCostFresh.note(c), style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
   }
 }
@@ -741,13 +737,8 @@ private fun phoneDebts(scope: LazyListScope, v: ReportFreshModel.View) {
   scope.item {
     Text(StrReportPages.customerAging, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
     Spacer(Modifier.height(8.dp))
-    labels.indices.chunked(2).forEach { line ->
-      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        line.forEach { i -> StatCard(labels[i], "${money(x.customers.totals.buckets[i] / 100.0)} ؋", StrSimpleAsk.vDebtRemaining, Modifier.weight(1f)) }
-        if (line.size == 1) Spacer(Modifier.weight(1f))
-      }
-      Spacer(Modifier.height(10.dp))
-    }
+    MetricRows(labels.indices.map { i -> Metric(labels[i], "${money(x.customers.totals.buckets[i] / 100.0)} ؋", StrSimpleAsk.vDebtRemaining) }, top = Int.MAX_VALUE)
+    Spacer(Modifier.height(10.dp))
   }
   if (x.customers.rows.isEmpty()) scope.item { Text(StrReportPages.noCustomerOwes, color = Shop.colors.muted) }
   scope.items(x.customers.rows, key = { it.id }) { r ->

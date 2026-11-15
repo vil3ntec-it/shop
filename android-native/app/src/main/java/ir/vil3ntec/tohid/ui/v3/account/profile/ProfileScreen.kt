@@ -142,6 +142,8 @@ internal fun ProfileContent(
             )
           }
         }
+        //  شعبه درونِ یک دکان (فازِ ۲): شعبهٔ جاری و راهِ «شعبه‌ها» — فقط با شعبه‌های روشن
+        ir.vil3ntec.tohid.ui.v3.branches.BranchProfileCard(onOpen)
         modes?.invoke()
         Spacer(Modifier.height(24.dp + pad.calculateBottomPadding()))
       }

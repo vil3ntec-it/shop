@@ -298,7 +298,7 @@ class ShopStore(
   /** A16: نقشی که این بخش را نمی‌نویسد ⇐ پیش از دیسک و op (سرور هم رد می‌کرد) — تغییرِ خودِ صفحه، نه دفترِ همین حالا */
   private fun roleRefused(base: ShopData, next: ShopData): Boolean {
     val role = ShopRole.current(context)
-    val table = RoleGate.blocked(role, base, next) ?: return false
+    val table = RoleGate.blocked(role, base, next) ?: return BranchDesk.catalogRefused(context, base, next) { _notice.tryEmit(it) } // شعبه، فازِ ۳
     _roleBlocked.tryEmit(RoleGate.tableTitle(table) to ir.vil3ntec.tohid.core.perm.RoleInfo.title(role))
     return true
   }

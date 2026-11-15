@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrExpiryAlert
 import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.core.i18n.StrTaxQuarter
 import ir.vil3ntec.tohid.core.report.QuarterTax
@@ -198,7 +199,13 @@ object HomeAlerts {
     val lowStock: Int = 0,
     val overdueDebtors: Int = 0,
     val overdueTotal: String = "",
+    /** محموله‌های **نزدیکِ** انقضا (نه گذشته) — یکی برای هر محموله (`ExpiryAlerts`) */
     val expiring: Int = 0,
+    /** محموله‌هایی که انقضایشان **گذشته** و هنوز مانده دارند — فوری، جدا از «نزدیک» */
+    val expired: Int = 0,
+    /** نامِ کالاهای همان دو گروه برای زیرنویس («شیر، ماست و ۱ دیگر»)؛ خالی ⇒ جملهٔ همیشگی */
+    val expiringNames: String = "",
+    val expiredNames: String = "",
     /** S49/RPT-10: یادآورِ سررسیدِ مالیاتِ سه‌ماههٔ امروز ([taxDue])، یا `null` */
     val taxDue: QuarterTax.Due? = null,
   )
@@ -259,8 +266,12 @@ object HomeAlerts {
     if (i.overdueDebtors > 0) add(
       Alert(Kind.DEBTS, StrHome.alertOverdue(i.overdueDebtors), StrHome.alertOverdueBody(i.overdueTotal), StrHome.actionFollowUp, ShellTargets.OVERDUE_DEBTS),
     )
+    //  منقضی‌شده سرخ و فوری (فروخته نشود) ⇐ انبار با پالایهٔ «منقضی»؛ نزدیکِ انقضا زرد ⇐ پالایهٔ «نزدیکِ انقضا»
+    if (i.expired > 0) add(
+      Alert(Kind.EXPIRY, StrExpiryAlert.expired(i.expired), i.expiredNames.ifBlank { StrExpiryAlert.expiredBody }, StrHome.actionSee, ShellTargets.EXPIRED, urgent = true),
+    )
     if (i.expiring > 0) add(
-      Alert(Kind.EXPIRY, StrHome.alertExpiring(i.expiring), StrHome.alertExpiringBody, StrHome.actionSee, ShellTargets.EXPIRING),
+      Alert(Kind.EXPIRY, StrHome.alertExpiring(i.expiring), i.expiringNames.ifBlank { StrHome.alertExpiringBody }, StrHome.actionSee, ShellTargets.EXPIRING),
     )
     if (i.sync == Sync.QUEUED && i.queued > 0) add(
       Alert(Kind.SYNC, StrHome.alertQueued(i.queued), StrHome.alertQueuedBody, StrHome.actionCheck, ShellTargets.SYNC),

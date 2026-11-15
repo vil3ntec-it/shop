@@ -19,8 +19,10 @@ class MoreLayoutTest {
     //  نام‌های پیشین با مسیرِ امروزشان: انبار = `stock`، «اشتراکِ من» = `subscription`
     val before = setOf(
       "orders", "admin", "devices", "stock", "expenses", "receipts", "sales",
-      "purchasing", "reports", "audit", "team", "subscription", "chat", "support", "storefront",
+      "purchasing", "reports", "team", "subscription", "chat", "support", "storefront",
     )
+    //  ۶۳w: «سابقهٔ عملیات» عمداً دیگر نیست (صاحب‌کار: «بردار از برنامه»)
+    assertFalse("audit" in routes(all))
     assertTrue((before - routes(all)).toString(), routes(all).containsAll(before))
     assertTrue("debtors" in routes(all))
     assertTrue(MoreLayout.APP in routes(all))

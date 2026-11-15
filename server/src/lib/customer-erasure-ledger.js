@@ -7,7 +7,7 @@
  * دارند و با زنجیرهٔ STF-09 مُهر خورده‌اند — ویرایش‌نشدنی) هنوز به پروندهٔ نام‌دار اشاره می‌کردند.
  *
  * راه (پرچمِ `shop.customer_erasure_ledger`، `live_config`، پیش‌فرض خاموش ⇒ هیچ ⇒ همان امروز):
- *   ۱) [queueIn] درونِ تراکنشِ حذف: هر پروندهٔ قرض‌دارِ همان شماره در دفترِ سرور (راهِ قدیم، v1، v3) ⇐ ردیفِ
+ *   ۱) [queueIn] درونِ تراکنشِ حذف: هر پروندهٔ قرض‌دارِ همان شماره یا همان ایمیل (`Debtor.email`، PRM-11/CRM-13) در دفترِ سرور (راهِ قدیم، v1، v3) ⇐ ردیفِ
  *      `customer_erasure_ledger` (مهاجرتِ ۸۹۵؛ حذفِ دوباره همان پرونده را دوباره باز می‌کند).
  *   ۲) `GET /api/shop/customer-erasure/ledger` [pending]: برنامهٔ صاحب/مدیر (`data.delete.any`) پس از هر دورِ همگام‌سازی
  *      فهرست را می‌گیرد و نام/شماره/نشانی/یادداشتِ همان پرونده‌ها را در دفترِ خودش پاک می‌کند (`CustomerErasureLedger`) —
@@ -24,10 +24,27 @@ const FLAG = 'shop.customer_erasure_ledger';
 const MAX = 200;
 const ID_RE = /^[A-Za-z0-9_.:-]{1,80}$/;
 
-/** درونِ تراکنشِ حذف: پرونده‌های همین شماره ⇐ فرمان؛ پرچمِ خاموش ⇒ ۰ */
+/**
+ * پرونده‌های قرض‌دارِ همین ایمیل در دفترِ سرور (v1 و v3) — PRM-11/CRM-13: `Debtor.email` ِ برنامه (کوچک‌حرف، تطبیقِ دقیق؛
+ * همان کلیدِ `store-account-history.debtorRowsOf`). کلیدِ بی «@» (شماره) ⇒ هیچ.
+ */
+async function debtorIdsByEmail(c, shopId, forms) {
+  const emails = [...new Set((forms || []).filter((f) => typeof f === 'string' && f.includes('@')).map((f) => f.trim().toLowerCase()))];
+  if (!emails.length) return [];
+  const where = `table_name='debtors' AND deleted_at IS NULL AND lower(COALESCE(data->>'email','')) = ANY($2::text[])`;
+  return (await c.query(
+    `SELECT row_id FROM sync_rows WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND ${where}
+     UNION SELECT row_id FROM sync_v3_rows WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND ${where}`,
+    [shopId, emails]
+  )).rows.map((r) => r.row_id);
+}
+
+/** درونِ تراکنشِ حذف: پرونده‌های همین شماره یا همین ایمیل ⇐ فرمان؛ پرچمِ خاموش ⇒ ۰ */
 async function queueIn(c, shopId, forms, erasureId) {
   if (!forms || !forms.length || !(await flagOf(shopId, FLAG))) return 0;
-  const ids = [...new Set((await require('./customer-access')._debtorIdsByPhone(c, shopId, forms)).map((d) => d.row_id))]
+  const phones = forms.filter((f) => !String(f).includes('@'));
+  const byPhone = phones.length ? (await require('./customer-access')._debtorIdsByPhone(c, shopId, phones)).map((d) => d.row_id) : [];
+  const ids = [...new Set([...byPhone, ...(await debtorIdsByEmail(c, shopId, forms))])]
     .filter((id) => typeof id === 'string' && ID_RE.test(id));
   for (const id of ids) {
     await c.query(
@@ -51,7 +68,8 @@ async function pending(shopId) {
 /** پرونده‌ای که دفترِ سرور (v1 یا v3) هنوز شماره/نام برایش دارد */
 async function stillPersonal(shopId, ids) {
   const where = `row_id = ANY($2::text[]) AND deleted_at IS NULL AND (COALESCE(data->>'phone','') <> '' OR COALESCE(data->>'phone2','') <> ''
-    OR COALESCE(data->>'notes','') <> '' OR COALESCE(data->>'deliveryAddress','') <> '' OR COALESCE(data->>'deliveryPin','') <> '')`;
+    OR COALESCE(data->>'notes','') <> '' OR COALESCE(data->>'deliveryAddress','') <> '' OR COALESCE(data->>'deliveryPin','') <> ''
+    OR COALESCE(data->>'email','') <> '')`;
   const rows = await many(
     `SELECT row_id FROM sync_rows WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name='debtors' AND ${where}
      UNION SELECT row_id FROM sync_v3_rows WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name='debtors' AND ${where}`,

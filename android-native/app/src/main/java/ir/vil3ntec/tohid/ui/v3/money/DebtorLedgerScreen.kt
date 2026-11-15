@@ -41,6 +41,7 @@ import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
+import ir.vil3ntec.tohid.ui.v3.InvoiceRefs
 import ir.vil3ntec.tohid.ui.v3.LocalV3SystemBottom
 import ir.vil3ntec.tohid.ui.v3.V3Action
 import ir.vil3ntec.tohid.ui.v3.V3Card
@@ -243,11 +244,17 @@ private fun LazyListScope.ledgerItems(
   }
   itemsIndexed(rows, key = { _, tx -> tx.id }) { i, tx ->
     val give = tx.type == "give"
+    val entry = book?.entry(tx.id)
+    //  «فاکتور #۱۲» ِ یادداشت (فقط همان بخش، `InvoiceRefs.split`؛ فاکتورِ شناختهٔ دفتر با شناسه‌اش) — یک بار برای هر ردیف
+    val invoice = remember(tx.notes, entry?.sale?.id) {
+      val known = entry?.let { e -> e.invoiceLabel?.let { l -> e.sale?.id?.let { mapOf(l to it) } } }.orEmpty()
+      InvoiceRefs.split(tx.notes.trim(), known).firstOrNull { it.isRef }
+    }
     LedgerRow(
       date = MoneyText.date(tx.date),
       amount = MoneyText.signed(tx.amount, give),
       //  S89: جفتِ «اصل + سندِ معکوس» در دفترِ مؤثر نیست (بی «مانده»)؛ جایش برچسبِ «معکوس»/«معکوس‌شده» تا سابقه روشن باشد
-      after = book?.entry(tx.id)?.let { StrMoney.balanceAfterShort(DebtBook.show(it.balanceAfter)) }
+      after = entry?.let { StrMoney.balanceAfterShort(DebtBook.show(it.balanceAfter)) }
         ?: when {
           ir.vil3ntec.tohid.data.DebtReverse.isReversal(tx) -> StrMoney.reversalTag
           tx.id in reversed -> StrMoney.reversedTag
@@ -256,6 +263,8 @@ private fun LazyListScope.ledgerItems(
       tone = if (give) LedgerTone.OWE else LedgerTone.SETTLED,
       up = give,
       kindLabel = if (give) StrMoney.giveTag else StrMoney.receiveTag,
+      invoice = invoice,
+      debtorId = account.debtor.id,
       onClick = { actions.onOpenTx(tx.id) },
       onLongClick = { onMenu(tx.id) },
       onDelete = { actions.onDeleteTx(tx.id) },

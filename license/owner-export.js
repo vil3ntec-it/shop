@@ -70,6 +70,7 @@
     dueDate: 'سررسید',
     creditLimit: 'سقف اعتبار',
     phone2: 'تلفن دوم',
+    email: 'ایمیل',   //  PRM-11/CRM-13: `Debtor.email`
     tags: 'برچسب‌ها',
     group: 'گروه مشتری',
     priceList: 'لیست قیمت',
@@ -250,6 +251,7 @@
     expectedMinor: 'ماندهٔ دفتر هنگامِ شمارش (پول)',
     shiftId: 'شناسهٔ صندوق',
     auditId: 'شناسهٔ ردیفِ صندوق',
+    currency: 'ارز',
     //  چند کشو (PAY-17): نامِ کشوی نام‌دار روی بازکردنِ صندوق — همان `OwnerExport.HEADERS` ِ برنامه
     drawer: 'کشو',
     //  انتقالِ موجودیِ سرور (INV-11، #975): همان ستونِ `xfer` ِ `OwnerExport.HEADERS` ِ برنامه
@@ -384,13 +386,32 @@
     return out;
   }
 
+  /**
+   * گاوصندوق: هر ردیف ستونِ «ارز» پس از مبلغ دارد؛ بی `currency` همان «AFN» (نبودن = افغانی، `core/safe/SafeCurrency.kt`).
+   * فقط برگهٔ اکسل — JSON همان دفتر می‌ماند. همان `OwnerExportSafe.rows` ِ برنامهٔ نصبی.
+   */
+  function safeRows(arr) {
+    return arr.map(function (o) {
+      if (!o || typeof o !== 'object' || Array.isArray(o)) return o;
+      var cur = o.currency == null ? 'AFN' : o.currency;
+      var out = {};
+      Object.keys(o).forEach(function (k) {
+        if (k === 'currency') return;
+        out[k] = o[k];
+        if (k === 'amountMinor') out.currency = cur;
+      });
+      if (!own(out, 'currency')) out.currency = cur;
+      return out;
+    });
+  }
+
   function sheets(t) {
     var tables = [];
     var keys = SHEETS.map(function (s) { return s[0]; }).filter(function (k) { return Array.isArray(t[k]); });
     Object.keys(t).forEach(function (k) {
       if (keys.indexOf(k) < 0 && !own(HEAD, k) && Array.isArray(t[k])) keys.push(k);
     });
-    keys.forEach(function (k) { tables = tables.concat(split(sheetLabel(k), table(t[k]))); });
+    keys.forEach(function (k) { tables = tables.concat(split(sheetLabel(k), table(k === 'safeEntries' ? safeRows(t[k]) : t[k]))); });
     if (t.archive && typeof t.archive === 'object') {
       Object.keys(t.archive).forEach(function (k) {
         if (Array.isArray(t.archive[k])) tables = tables.concat(split(ARCHIVE_PREFIX + sheetLabel(k), table(t.archive[k])));

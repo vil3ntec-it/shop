@@ -94,19 +94,16 @@ fun AdminScreen(
         .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = pad.calculateBottomPadding()),
       verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-      kpis.chunked(columns).forEachIndexed { r, line ->
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-          line.forEachIndexed { i, k ->
-            KpiTile(k, n, Modifier.weight(1f).v3Stagger(stagger, k, r * columns + i)) { onOpen(AdminModel.route(k)) }
-          }
-          repeat(columns - line.size) { Spacer(Modifier.weight(1f)) }
-        }
-      }
+      //  ۶۳w (صاحب‌کار: «کادرهای بزرگ نه»): فهرستِ فشرده — گوشی چهار عددِ اصلی و بقیه زیرِ «… عددِ دیگر»؛ پهن همه
+      ir.vil3ntec.tohid.ui.components.common.MetricRows(
+        kpis.map { k -> kpiMetric(k, n) { onOpen(AdminModel.route(k)) } },
+        top = if (columns > 2) Int.MAX_VALUE else ADMIN_TOP,
+      )
       V3Section(null) {
         val rows = buildList {
           if (canManage) add(AdminLink(StrReports.staff, Icons.Outlined.Badge, V3Hue.BLUE, AccountPaths.TEAM, membersValue(members)))
           if (staffTime) add(AdminLink(StrReach.staffTime, Icons.Outlined.Schedule, V3Hue.TEAL, AnalyticsPaths.STAFF_TIME, null))
-          if (canAudit) add(AdminLink(StrReports.auditTitle, Icons.AutoMirrored.Outlined.ManageSearch, V3Hue.PURPLE, AnalyticsPaths.audit(), StrReports.auditCount(d.auditLog.size)))
+          //  «سابقهٔ عملیات» از ۶۳w در برنامه نیست (صاحب‌کار) — `canAudit` فقط برای سازگاریِ صدازننده‌ها می‌ماند
           add(AdminLink(StrReports.subscription, Icons.Outlined.WorkspacePremium, V3Hue.ORANGE, AccountPaths.SUBSCRIPTION, null))
           if (canManage) add(AdminLink(Str.settings, Icons.Outlined.Settings, null, SettingsPaths.ROOT, null))
         }
@@ -129,10 +126,11 @@ private fun membersValue(m: AdminMembers): String = when (m) {
   is AdminMembers.Count -> StrReports.people(m.n)
 }
 
-/** کارتِ عدد: برچسب، عددِ درشتِ شمارنده، زیرنویس و فلشِ «جلو» — همه یک درِ زدنی */
-@Composable
-private fun KpiTile(k: AdminKpi, n: AdminNumbers, modifier: Modifier, onClick: () -> Unit) {
-  val c = PhoneV3.colors
+/** گوشی: چند عددِ اصلیِ مرکزِ مدیریت پیدا؛ بقیه با «بیشتر» */
+private const val ADMIN_TOP = 4
+
+/** یک ردیفِ فهرستِ فشرده: برچسب، عدد و زیرنویس — همان عددها و همان مقصدِ کاشیِ پیشین */
+private fun kpiMetric(k: AdminKpi, n: AdminNumbers, onClick: () -> Unit): ir.vil3ntec.tohid.ui.components.common.Metric {
   val loss = k == AdminKpi.MONTH_PROFIT && n.monthProfit < 0
   val label = when (k) {
     AdminKpi.TODAY_SALES -> StrReports.todaySales
@@ -164,19 +162,10 @@ private fun KpiTile(k: AdminKpi, n: AdminNumbers, modifier: Modifier, onClick: (
     AdminKpi.CASH -> n.cashOpenedAt?.let { StrReports.openSince(displayMillis(it)) } ?: StrReports.openFromHistory
     AdminKpi.STOCK_ALERT -> StrReports.outAndLow(n.out, n.low)
   }
-  val shown = rememberCountUp(value ?: 0.0)
   val text = when {
     value == null -> StrReports.drawerClosed
-    k == AdminKpi.STOCK_ALERT -> shown.toLong().toString()
-    else -> afn(shown)
+    k == AdminKpi.STOCK_ALERT -> value.toLong().toString()
+    else -> afn(value)
   }
-  V3Card(modifier.v3Pressable(label = label, onClick = onClick).heightIn(min = 112.dp), radius = 16.dp, padding = PaddingValues(14.dp)) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      Text(label, style = V3Type.footnote, color = if (loss) PhoneV3Roles.errorText(c) else c.inkMuted, maxLines = 2, modifier = Modifier.weight(1f))
-      V3Chevron()
-    }
-    Spacer(Modifier.height(8.dp))
-    Text(text, style = V3Type.figure, color = if (loss) c.negative else c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    Text(caption, style = V3Type.caption, color = c.inkMuted, maxLines = 2)
-  }
+  return ir.vil3ntec.tohid.ui.components.common.Metric(label, text, caption, onClick = onClick)
 }

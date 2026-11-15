@@ -28,7 +28,10 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.nav.Need
 import ir.vil3ntec.tohid.core.guide.GuideHelp
+import ir.vil3ntec.tohid.ui.v3.InvoiceLinks
+import ir.vil3ntec.tohid.ui.v3.LocalInvoiceLinks
 import ir.vil3ntec.tohid.ui.v3.LocalV3Guide
+import ir.vil3ntec.tohid.ui.v3.sales.SalesPaths
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Transitions
@@ -78,7 +81,10 @@ fun V3RouteHost(nav: V3Nav, shell: ShellContext, modifier: Modifier = Modifier) 
   }
   val endSign = if (dir == LayoutDirection.Rtl) -1f else 1f
 
-  CompositionLocalProvider(LocalV3Nav provides nav) {
+  //  «روی فاکتور که بزنم همان فاکتور» (`claude/e-rows-63q`): هر «فاکتور #n» ِ صفحه‌ها (`InvoiceRef`) با همین دفتر پیدا و با
+  //  همین ناوبری باز می‌شود — همان صفحهٔ «نمایشِ فاکتور»
+  val invoiceLinks = remember(shell.data, nav) { InvoiceLinks.of(shell.data) { id -> nav.open(SalesPaths.invoice(id)) } }
+  CompositionLocalProvider(LocalV3Nav provides nav, LocalInvoiceLinks provides invoiceLinks) {
     AnimatedContent(
       targetState = base,
       //  صفحهٔ زیرِ برگه تا ۰٫۹۶ کوچک می‌شود (`V3Sheet` خودش را می‌شمارد)

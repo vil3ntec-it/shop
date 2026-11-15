@@ -11,10 +11,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrSafe
 import ir.vil3ntec.tohid.core.safe.SafeCore
+import ir.vil3ntec.tohid.core.safe.SafeCurrency
 import ir.vil3ntec.tohid.data.CashShift
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.SafeBook
 import ir.vil3ntec.tohid.data.SafeBookPref
+import ir.vil3ntec.tohid.data.SafeCurrencies
+import ir.vil3ntec.tohid.data.SafeCurrencyPref
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopRole
@@ -42,10 +45,18 @@ data class HeroInput(
   val nowMs: Long,
   /** ساعتِ همین حالا از آغازِ روز — کلیدِ تازه شدنِ نمودارِ «امروز» */
   val hour: Int,
-  /** صفحهٔ «گاوصندوق»: `null` یعنی نیست (تنظیمِ خاموش یا بی مجوز — همان سدِ `SafePanel`) */
+  /** صفحهٔ «گاوصندوق»: `null` یعنی نیست (تنظیمِ خاموش یا بی مجوز — همان سدِ `SafePanel`)؛ دفترِ ارزِ [safeCurrency] */
   val safe: SafeCore.View?,
   /** شاگردِ صندوقِ شیفت با شمارشِ کور (PAY-13، همان `DrawerRoute`): نقدِ موردِ انتظار دیده نمی‌شود */
   val blind: Boolean,
+  /** ارزِ نمودار و ماندهٔ گاوصندوق (آخرین ارزِ دیده‌شدهٔ همین دستگاه، `SafeCurrencyPref.viewed`؛ نبودش در دفتر ⇒ افغانی) */
+  val safeCurrency: String = SafeCurrency.AFN,
+  /** ارزهای دفترِ گاوصندوق، افغانی اول — بیش از یکی ⇒ تراشهٔ ارز در گوشهٔ نمودار */
+  val safeCurrencies: List<String> = listOf(SafeCurrency.AFN),
+  /** نامِ هر ارز («دالر (USD)»، ارزِ افزودهٔ دکان با نامِ خودش) */
+  val safeNames: Map<String, String> = emptyMap(),
+  /** برگزیدنِ ارزِ نمودار (و نگه‌داشتنش برای همین دستگاه) */
+  val pickSafe: (String) -> Unit = {},
 )
 
 /** گاوصندوق برای همین کاربر: تنظیمِ همین دستگاه (`SafeBookPref`) + `safe.move` + نوشتنِ `safeEntries` */
@@ -62,8 +73,38 @@ fun rememberHeroInput(d: ShopData): HeroInput {
   val tick = ir.vil3ntec.tohid.ui.v3.rememberV3LiveClock(60_000) { System.currentTimeMillis() } // PERF-SCREEN: فقط وقتی دیده می‌شود
   val start = remember(today) { isoMillis(today).let { if (it > 0L) it - 12 * HomeHero.HOUR_MS else tick } }
   val hour = HomeHero.hourOf(tick, start)
-  val safe = remember(d, safeOn) { if (safeOn) SafeBook.view(d) else null }
-  return remember(today, start, hour, safe, blind) { HeroInput(today, start, System.currentTimeMillis(), hour, safe, blind) }
+  //  ارز: هر ارز دفترِ جدای خودش است (`SafeCore.views`)؛ نمودار ارزِ برگزیدهٔ همین دستگاه را نشان می‌دهد
+  val book = remember(d, safeOn) { if (safeOn) SafeBook.views(d) else null }
+  var viewed by remember { mutableStateOf(SafeCurrencyPref.viewed(context)) }
+  val pick = remember { { c: String -> viewed = c; SafeCurrencyPref.setViewed(context, c) } }
+  val code = book?.let { if (viewed in it) viewed else SafeCurrency.AFN } ?: SafeCurrency.AFN
+  val safe = book?.get(code)
+  val codes = book?.keys?.toList() ?: listOf(SafeCurrency.AFN)
+  val names = remember(codes) { SafeCurrencyPref.custom(context).let { c -> codes.associateWith { SafeCurrencies.name(it, c) } } }
+  return remember(today, start, hour, safe, blind, code, codes, names) {
+    HeroInput(today, start, System.currentTimeMillis(), hour, safe, blind, code, codes, names, pick)
+  }
+}
+
+/** کادرِ «ارز» ِ برگهٔ «+» ِ گاوصندوق: آخرین ارزِ همین دستگاه (یا افغانی)، فهرستِ دکان و ارزهای دفتر، «+ ارزِ دیگر» برای صاحب/مدیر */
+@Composable
+private fun rememberSafeCurrency(context: android.content.Context, d: ShopData): Pair<SafeCurrencyChoice, () -> Unit> {
+  var custom by remember { mutableStateOf(SafeCurrencyPref.custom(context)) }
+  val inLedger = remember(d) { SafeBook.views(d).keys.toList() }
+  val choices = SafeCurrencies.all(custom, inLedger)
+  var code by remember { mutableStateOf(SafeCurrencies.pick(SafeCurrencyPref.last(context), choices)) }
+  //  فهرستِ ارزها تنظیمِ دکان است و فقط صاحب/مدیر آن را می‌فرستد (`ShopSettingsPlan`) ⇒ «+ ارزِ دیگر» فقط برای همان‌ها
+  val canAdd = remember { !ShopRole.isStaff(context) }
+  val choice = SafeCurrencyChoice(
+    code = code, choices = choices, name = { SafeCurrencies.name(it, custom) }, onPick = { code = it },
+    onAdd = if (!canAdd) null else { c, n ->
+      when (val r = SafeCurrencies.add(custom, c, n)) {
+        is SafeCurrencies.Added.Bad -> r.message
+        is SafeCurrencies.Added.Ok -> { SafeCurrencyPref.saveCustom(context, r.list); custom = r.list; code = r.code; null }
+      }
+    },
+  )
+  return choice to { SafeCurrencyPref.setLast(context, code) }
 }
 
 /** خطای سه‌زبانهٔ ثبتِ صندوق؛ کدِ دیگر ⇒ همان پیامِ `PayFlow` ِ برگهٔ صندوق */
@@ -97,6 +138,7 @@ fun RouteScope.HeroMoneyRoute() {
   val scope = rememberCoroutineScope()
   val shift = remember(data) { CashShift.current(data) }
   val closed = page == HomeHero.Page.TILL && shift == null
+  val (currency, used) = rememberSafeCurrency(context, data)
   var busy by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf<String?>(null) }
   HeroMoneySheet(
@@ -106,7 +148,8 @@ fun RouteScope.HeroMoneyRoute() {
     error = error,
     onSubmit = submit@{ dir, text, reason, note ->
       if (busy) return@submit
-      val minor = when (val a = HeroMoney.amount(text)) {
+      val cur = if (page == HomeHero.Page.SAFE) currency.code else SafeCurrency.AFN
+      val minor = when (val a = HeroMoney.amount(text, cur)) {
         is HeroMoney.Amount.Bad -> {
           error = if (a.code == HeroMoney.AMOUNT_REQUIRED) StrSafe.amountRequired else StrSafe.invalidAmount
           return@submit
@@ -127,8 +170,8 @@ fun RouteScope.HeroMoneyRoute() {
             else -> null to w!!.again
           }
         } else {
-          when (val r = SafeBookPref.record(store, key) { cur, k -> HeroMoney.safeEntry(cur, dir, minor, reason.orEmpty(), note, me, now, k) }) {
-            is SafeBookPref.Saved.Ok -> null to r.again
+          when (val r = SafeBookPref.record(store, key) { led, k -> HeroMoney.safeEntry(led, dir, minor, reason.orEmpty(), note, me, now, k, cur) }) {
+            is SafeBookPref.Saved.Ok -> { used(); null to r.again }
             is SafeBookPref.Saved.Bad -> safeErrorText(r.failed) to false
             SafeBookPref.Saved.NotSaved -> StrSafe.notSaved to false
           }
@@ -146,5 +189,6 @@ fun RouteScope.HeroMoneyRoute() {
       nav.open(SalesPaths.DRAWER_OPEN)
     },
     onClose = { back() },
+    currency = currency.takeIf { page == HomeHero.Page.SAFE },
   )
 }

@@ -24,4 +24,9 @@ object StrRows {
 
   /** «رسیدن ۲۸ میزان» — روزِ رسیدنِ سفارش، کوتاه */
   fun arrives(day: Any): String = t("رسیدن ${asIs(day)}", "arrives $day", "رسېدل $day")
+
+  /* ── ارجاعِ فاکتور (`claude/e-rows-63q`، `InvoiceRef`) ── */
+
+  /** «فاکتور #۱۲ · پیدا نشد» — ارجاعی که فاکتورش در این دکان نیست */
+  val invoiceMissing: String get() = t("پیدا نشد", "not found", "ونه موندل شو")
 }

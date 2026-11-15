@@ -310,8 +310,8 @@ class HttpEngine(
     /** نامِ کوچکِ سرآیندهایی که فقط خودِ این لایه می‌گذارد */
     val PROTECTED_HEADERS: Set<String> = setOf("authorization", "x-app", "x-app-id", "x-device", "x-app-version", "cookie")
 
-    /** هویتِ دستگاه — در درخواستِ `anonymous` نمی‌رود */
-    val DEVICE_HEADERS: Set<String> = setOf("x-device")
+    /** هویتِ دستگاه (و شعبهٔ میز، `data/BranchDesk`) — در درخواستِ `anonymous` نمی‌رود */
+    val DEVICE_HEADERS: Set<String> = setOf("x-device", "x-branch-id")
   }
 
   /**

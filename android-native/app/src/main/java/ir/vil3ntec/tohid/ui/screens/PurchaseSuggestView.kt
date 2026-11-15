@@ -11,11 +11,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrPoSeason
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
 import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.purchase.DemandForecast
+import ir.vil3ntec.tohid.core.purchase.PoSeasonality
 import ir.vil3ntec.tohid.core.purchase.ReorderCore
 import ir.vil3ntec.tohid.core.purchase.SmartDemand
 import ir.vil3ntec.tohid.core.text.LocaleFormat
@@ -119,7 +121,10 @@ private fun SuggestRow(r: PurchaseSuggest.Row) {
   Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text(r.product.name, color = c.text, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-      StatusPill(DemandForecast.confidenceText(f.confidence), confidenceTone(f.confidence))
+      //  PUR-03: اطمینان از درازای تاریخچهٔ فروش و نوسان (`PoSeasonality`)
+      val season = r.season
+      if (season != null) StatusPill(seasonLabel(season.confidence), seasonTone(season.confidence))
+      else StatusPill(DemandForecast.confidenceText(f.confidence), confidenceTone(f.confidence))
     }
     Text(
       StrPurchasePages.enoughFor(DemandForecast.coverText(f, LocaleFormat.DIGITS_LATN)) +
@@ -127,6 +132,7 @@ private fun SuggestRow(r: PurchaseSuggest.Row) {
       style = MaterialTheme.typography.bodySmall, color = if (r.due) c.text else c.muted,
     )
     Text(DemandForecast.why(f, LocaleFormat.DIGITS_LATN), style = MaterialTheme.typography.labelSmall, color = c.muted)
+    if (r.season?.seasonal == false && f.saleDays > 0) Text(StrPoSeason.shortHistory, style = MaterialTheme.typography.labelSmall, color = c.muted)
     f.smart?.let { s ->
       Row(verticalAlignment = Alignment.CenterVertically) {
         StatusPill(SmartDemand.methodText(s.method), PillTone.INFO)
@@ -135,6 +141,19 @@ private fun SuggestRow(r: PurchaseSuggest.Row) {
       }
     }
   }
+}
+
+/** PUR-03 — نشانِ اطمینان (`StrPoSeason`)؛ صفحهٔ دیگری که همان `PurchaseSuggest.Row.season`/`Plan.season` را نشان می‌دهد همین را صدا بزند */
+internal fun seasonLabel(x: PoSeasonality.Confidence): String = when (x) {
+  PoSeasonality.Confidence.LOW -> StrPoSeason.low
+  PoSeasonality.Confidence.MEDIUM -> StrPoSeason.medium
+  PoSeasonality.Confidence.HIGH -> StrPoSeason.high
+}
+
+private fun seasonTone(x: PoSeasonality.Confidence): PillTone = when (x) {
+  PoSeasonality.Confidence.HIGH -> PillTone.SUCCESS
+  PoSeasonality.Confidence.MEDIUM -> PillTone.INFO
+  PoSeasonality.Confidence.LOW -> PillTone.WARNING
 }
 
 private fun confidenceTone(x: ReorderCore.Confidence): PillTone = when (x) {

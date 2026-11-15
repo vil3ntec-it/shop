@@ -14,11 +14,12 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -48,6 +49,8 @@ import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
+import ir.vil3ntec.tohid.ui.v3.InvoicePiece
+import ir.vil3ntec.tohid.ui.v3.InvoiceRef
 
 /**
  *  ردیفِ یک‌خطیِ حساب (~۴۶dp، دستورِ صاحب محصول در #354): همهٔ ردیف به رنگِ نوعش — برد سرخ،
@@ -56,6 +59,9 @@ import ir.vil3ntec.tohid.ui.screens.MotionSpec
  *
  *  پیشنهادِ کیت (`Draft`): `V3ListRow` زمینهٔ رنگیِ ردیف را ندارد؛ کشیدن این‌جا `SwipeToDismissBox`
  *  ِ خودِ Compose است.
+ *
+ *  «فاکتور #۱۲» ِ یادداشتِ ردیف ([invoice]) زیرِ تاریخ، کوچک و زدنی (`InvoiceRef` ⇒ همان فاکتور؛ زدنش به زدنِ ردیف
+ *  نمی‌رسد). ردیفِ بی فاکتور همان ردیفِ یک‌خطیِ پیشین است (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۴، `claude/e-rows-65q`).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -71,6 +77,10 @@ internal fun LedgerRow(
   onLongClick: () -> Unit,
   onDelete: () -> Unit,
   modifier: Modifier = Modifier,
+  /** «فاکتور #۱۲» ِ یادداشت (`InvoiceRefs.split`)؛ null ⇒ فقط تاریخ */
+  invoice: InvoicePiece? = null,
+  /** مشتریِ همین حساب — برای شمارهٔ فاکتورِ دوپهلو */
+  debtorId: String? = null,
 ) {
   val c = PhoneV3.colors
   val ink = tone.ink()
@@ -104,7 +114,8 @@ internal fun LedgerRow(
     Row(
       Modifier
         .fillMaxWidth()
-        .height(46.dp)
+        //  کمینه همان ۴۶dp ِ یک‌خطی؛ نوشتهٔ درشتِ دستگاه ردیف را می‌بالاند، نمی‌بُرد
+        .heightIn(min = 46.dp)
         .graphicsLayer { scaleX = press; scaleY = press }
         .clip(shape)
         .background(tone.wash())
@@ -125,7 +136,14 @@ internal fun LedgerRow(
       Icon(if (up) Icons.Outlined.NorthEast else Icons.Outlined.SouthWest, contentDescription = kindLabel, tint = ink, modifier = Modifier.size(15.dp))
       Spacer(Modifier.width(8.dp))
       //  پهنای کمینه: ستونِ تاریخ هم‌تراز می‌ماند و با درشتیِ نوشته بریده نمی‌شود
-      Text(date, style = v3Text(12, FontWeight.Normal, 16), color = c.inkMuted, maxLines = 1, modifier = Modifier.widthIn(min = 74.dp))
+      if (invoice == null) {
+        Text(date, style = v3Text(12, FontWeight.Normal, 16), color = c.inkMuted, maxLines = 1, modifier = Modifier.widthIn(min = 74.dp))
+      } else {
+        Column(Modifier.widthIn(min = 74.dp)) {
+          Text(date, style = v3Text(12, FontWeight.Normal, 16), color = c.inkMuted, maxLines = 1)
+          InvoiceRef(invoice, style = v3Text(11, FontWeight.Medium, 14), debtorId = debtorId)
+        }
+      }
       Text(amount, style = v3Text(15, FontWeight.Bold, 20), color = ink, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
       if (after != null) Text(after, style = v3Text(12, FontWeight.Medium, 16), color = c.inkMuted, maxLines = 1)
     }

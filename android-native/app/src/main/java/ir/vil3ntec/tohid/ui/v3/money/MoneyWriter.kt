@@ -9,6 +9,7 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.ui.screens.Haptics
 import ir.vil3ntec.tohid.ui.theme.V3Tone
+import ir.vil3ntec.tohid.ui.v3.V3Celebrate
 import ir.vil3ntec.tohid.ui.v3.V3Toasts
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
@@ -26,6 +27,8 @@ internal object MoneyWriter {
 
   private fun ok(store: ShopStore, toasts: V3Toasts?, context: Context?, base: ShopData, data: ShopData, done: String) {
     scope.launch { store.save(base, data) }
+    //  پرداخت، رسید، قرض و خرید: جشنِ کوتاه روی همین پیام (`V3Celebrate`)؛ لرزشِ «ثبت شد» همان `Haptics.success`
+    V3Celebrate.fire(haptic = context == null)
     toasts?.show(done, V3Tone.SUCCESS)
     context?.let { Haptics.success(it) }
   }

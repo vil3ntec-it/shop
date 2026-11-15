@@ -6,6 +6,8 @@ import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.data.DebtTransaction
 import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.qty
+import ir.vil3ntec.tohid.ui.v3.InvoicePiece
+import ir.vil3ntec.tohid.ui.v3.InvoiceRefs
 import ir.vil3ntec.tohid.ui.v3.V3InvoiceLine
 
 /**
@@ -18,12 +20,21 @@ internal object DebtorTxModel {
   /** رنگِ قرصِ یک خط: تسویه سبز، باز در انتظار، سررسید آبی یا (گذشته) سرخ */
   enum class Pill { SETTLED, WAIT, INFO, OWE }
 
-  data class Line(val label: String, val value: String, val pill: Pill? = null)
+  /** [pieces]: همان [value] تکه‌تکه وقتی «فاکتور #n» دارد (زدنی، `InvoiceRef`)؛ null ⇒ نوشتهٔ ساده */
+  data class Line(val label: String, val value: String, val pill: Pill? = null, val pieces: List<InvoicePiece>? = null)
+
+  /** فاکتورِ شناختهٔ یک ردیف (بردِ فاکتوردار): شماره ⇒ شناسه — ارجاعِ یادداشت با شناسه باز می‌شود، نه با گشتنِ شماره */
+  private fun known(entry: DebtBook.Entry?): Map<String, String> =
+    entry?.let { e -> e.invoiceLabel?.let { l -> e.sale?.id?.let { mapOf(l to it) } } }.orEmpty()
+
+  /** یادداشتِ داده تکه‌تکه، فقط اگر «فاکتور #n» دارد */
+  private fun refPieces(text: String, known: Map<String, String>): List<InvoicePiece>? =
+    InvoiceRefs.split(text, known).takeIf { p -> p.any { it.isRef } }
 
   /** خط‌های کارتِ جزئیات به ترتیبِ نمایش */
   fun lines(tx: DebtTransaction, entry: DebtBook.Entry?, book: DebtBook.Book?): List<Line> = buildList {
     add(Line(StrMoney.date, MoneyText.date(tx.date)))
-    if (tx.notes.isNotBlank()) add(Line(StrMoney.notes, tx.notes))
+    if (tx.notes.isNotBlank()) add(Line(StrMoney.notes, tx.notes, pieces = refPieces(tx.notes, known(entry))))
     entry ?: return@buildList
     if (entry.give && entry.amount.minor > 0) {
       add(
@@ -40,11 +51,18 @@ internal object DebtorTxModel {
       )
     }
     if (!entry.give && entry.allocations.isNotEmpty() && book != null) {
-      add(Line(StrMoney.forWhat, entry.allocations.joinToString("، ") { a ->
-        val g = book.entry(a.txId)
-        val what = g?.invoiceLabel?.let { StrMoney.invoiceNo(it) } ?: "${StrMoney.giveTag} ${g?.tx?.date?.let(::displayDate).orEmpty()}"
-        "$what (${DebtBook.show(a.amount)})"
-      }))
+      //  «فاکتور #۱۲ (۲۰۰)، برد ۲۸ میزان (۵۰)» — هر «فاکتور #n» زدنی، با شناسهٔ فاکتورِ همان برد
+      val pieces = buildList {
+        entry.allocations.forEachIndexed { i, a ->
+          if (i > 0) add(InvoiceRefs.plain("، "))
+          val g = book.entry(a.txId)
+          val label = g?.invoiceLabel
+          if (label != null) add(InvoiceRefs.ref(label, g?.sale?.id))
+          else add(InvoiceRefs.plain("${StrMoney.giveTag} ${g?.tx?.date?.let(::displayDate).orEmpty()}"))
+          add(InvoiceRefs.plain(" (${DebtBook.show(a.amount)})"))
+        }
+      }
+      add(Line(StrMoney.forWhat, InvoiceRefs.text(pieces), pieces = pieces.takeIf { p -> p.any { it.isRef } }))
     }
     if (!entry.give && entry.open.minor > 0) add(Line(StrMoney.prepaid, DebtBook.show(entry.open)))
     add(Line(StrMoney.balanceAfter, MoneyText.state(entry.balanceAfter)))
@@ -63,8 +81,20 @@ internal object DebtorTxModel {
     }
 
   /** «اقلام · فاکتور #۱۲ · ۱۴۰۵/۰۷/۲۰» */
-  fun itemsTitle(entry: DebtBook.Entry): String =
-    (listOf(StrMoney.items) + listOfNotNull(entry.invoiceLabel?.let { StrMoney.invoiceNo(it) }, entry.sale?.date?.let(::displayDate))).joinToString(" · ")
+  fun itemsTitle(entry: DebtBook.Entry): String = InvoiceRefs.text(itemsTitlePieces(entry))
+
+  /** همان سرِ اقلام، تکه‌تکه: «فاکتور #۱۲» زدنی و با شناسهٔ همان فاکتور */
+  fun itemsTitlePieces(entry: DebtBook.Entry): List<InvoicePiece> = buildList {
+    add(InvoiceRefs.plain(StrMoney.items))
+    entry.invoiceLabel?.let { add(InvoiceRefs.plain(" · ")); add(InvoiceRefs.ref(it, entry.sale?.id)) }
+    entry.sale?.date?.let { add(InvoiceRefs.plain(" · " + displayDate(it))) }
+  }
+
+  /** زیرِ عنوانِ گامِ «سررسید»: «۱۴۰۵/۰۸/۲۰ — ۴۰۰ ؋ — فاکتور #۱۲» */
+  fun dueSubtitle(entry: DebtBook.Entry): List<InvoicePiece> = buildList {
+    add(InvoiceRefs.plain(MoneyText.date(entry.tx.date) + " — " + "${DebtBook.show(entry.amount)} ؋"))
+    entry.invoiceLabel?.let { add(InvoiceRefs.plain(" — ")); add(InvoiceRefs.ref(it, entry.sale?.id)) }
+  }
 
   /** تخفیف و پرداختِ همان لحظهٔ فاکتور، اگر بود */
   fun itemsFooter(entry: DebtBook.Entry): String? {

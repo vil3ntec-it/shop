@@ -72,6 +72,8 @@ class ContactPrivacyTest {
     val pages = listOf(
       "ui/v3/sales/checkout/CustomerPickerSheet.kt", "ui/v3/money/ReceivePickerSheet.kt", "ui/v3/money/DebtorMergeSheet.kt",
       "ui/screens/DeskCustomers.kt", "ui/screens/CrmProfileUi.kt", "ui/screens/PhoneDebtors.kt",
+      //  فهرستِ قرض‌داران (`DebtorsListScreen.kt`) شماره را فقط از کارتِ `DebtorTile` ِ `PhoneDebtors.kt` نشان می‌دهد
+      //  (`claude/e-rows-65q`: کارت‌های پیشین برگشتند، ردیفِ سادهٔ ۶۳q رفت)
       "ui/v3/money/DebtorLedgerParts.kt", "ui/v3/money/DebtorLedgerScreen.kt",
     )
     for (p in pages) {
@@ -83,5 +85,47 @@ class ContactPrivacyTest {
     assertTrue(src("ui/screens/DeskCustomers.kt").contains("customerPhone(r.phone, ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts())"))
     //  مرزِ سکو فقط در فایلِ `*Android.kt` (iPhone/کامپیوتر همان شیم‌ها)
     assertTrue(src("ui/components/ContactPrivacyAndroid.kt").contains("ShopRole.allows(context, \"customers.contact\")"))
+    //  CRM-15 نقش‌محور: خروجی‌ها و کادرِ ویرایشِ شماره هم از همان راه
+    assertTrue(src("ui/screens/DeskCustomers.kt").contains("customerPhoneExport(s.phone, contacts)"))
+    assertTrue(src("ui/v3/analytics/ReportsDesk.kt").contains("customerPhoneExport(it, contacts)"))
+    assertTrue(src("ui/v3/analytics/ReportsScreen.kt").contains("customerPhoneExport(it, contacts)"))
+    assertTrue(src("ui/v3/money/DebtorFormSheets.kt").contains("debtor == null || contacts || debtor.phone.isBlank()"))
+    assertTrue(src("print/StatementImage.kt").contains("CustomerPrintPref.roleMask(context)"))
+  }
+
+  @Test fun `CRM-15 پرچمِ نقش‌محور — فقط صاحب و مدیر کامل، قالبِ سه رقم، اجازهٔ صریحِ صاحب می‌چربد`() {
+    val on = """{"layers":[{},{}],"customerMask":true}"""
+    assertTrue(PermPolicy.customerMask(on))
+    assertFalse(PermPolicy.customerMask("""{"layers":[{},{}]}"""))
+    assertFalse(PermPolicy.customerMask("not json"))
+    val seen = mapOf(
+      "owner" to true, "manager" to true, "staff" to false, "cashier" to false,
+      "storekeeper" to false, "picker" to false, "accountant" to false,
+    )
+    for ((role, want) in seen) assertEquals(role, want, PermPolicy.allows(role, on, "customers.contact"))
+    //  کلیدهای دیگر دست نمی‌خورند
+    assertEquals(PermPolicy.allows("cashier", null, "sales.discount"), PermPolicy.allows("cashier", on, "sales.discount"))
+    val grant = """{"layers":[{},{"customers.contact":{"mode":"allow"}}],"customerMask":true}"""
+    assertTrue(PermPolicy.allows("cashier", grant, "customers.contact"))
+    val closedManager = """{"layers":[{},{"customers.contact":{"mode":"deny"}}],"customerMask":true}"""
+    assertFalse(PermPolicy.allows("manager", closedManager, "customers.contact"))
+
+    val before = ShopRole.customerMask.value
+    try {
+      ShopRole.customerMask.value = true
+      val masked = customerPhone(phone, false)
+      assertEquals(LocaleText.phoneDisplay(phone).let { ir.vil3ntec.tohid.core.crm.CustomerMask.masked(it) }, masked)
+      assertEquals(3, masked.count { it.isDigit() })
+      assertEquals(LocaleText.phoneDisplay(phone), customerPhone(phone, true))
+      assertEquals("•••• 456", ir.vil3ntec.tohid.ui.components.customerPhoneExport(phone, false))
+      assertEquals(phone, ir.vil3ntec.tohid.ui.components.customerPhoneExport(phone, true))
+      assertEquals(null, ir.vil3ntec.tohid.ui.components.customerAddress("کارتهٔ ۴", false))
+      ShopRole.customerMask.value = false
+      //  خاموش ⇒ همان امروز: خروجی کامل، صفحه دو رقمِ آخر
+      assertEquals(phone, ir.vil3ntec.tohid.ui.components.customerPhoneExport(phone, false))
+      assertEquals(2, customerPhone(phone, false).count { it.isDigit() })
+    } finally {
+      ShopRole.customerMask.value = before
+    }
   }
 }

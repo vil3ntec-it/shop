@@ -44,6 +44,8 @@ object V3Modules {
       SettingsModule,
       CourierModule,
       ExampleModule,
+      //  شعبه درونِ یک دکان، فازِ ۲ (راه فقط با پاسخِ روشنِ سرور: «حسابِ من» و پرسشِ پس از ورود)
+      ir.vil3ntec.tohid.ui.v3.branches.BranchesModule,
     )
   }
 

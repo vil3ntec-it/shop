@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.sales.history
 
+import ir.vil3ntec.tohid.ui.v3.V3RowStatus
+import ir.vil3ntec.tohid.ui.v3.V3QuietStatus
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -101,7 +103,8 @@ internal fun PayStatusSection(rows: List<PayStatusFlow.RowView>, onRow: ((Int) -
         icon = Icons.Outlined.Payments,
         hue = V3Hue.BLUE,
         subtitle = if (r.manual) null else StrPayStatus.serverOnly,
-        trailing = { V3StatusPill(PayStatusText.pill(r.status), PayStatusText.name(r.status)) },
+        //  سادهٔ e-rows-63q: وضعیتِ ردیف متنِ آرام با شدّتِ همان قرص («ناموفق» سرخ، «در انتظار» کهربایی)
+        trailing = { V3QuietStatus(V3RowStatus.of(PayStatusText.name(r.status), PayStatusText.pill(r.status))) },
         chevron = false,
         onClick = if (r.manual && onRow != null) ({ onRow(r.index) }) else null,
       )
@@ -196,7 +199,7 @@ fun RouteScope.PayReviewRoute() {
             subtitle = ReceiptModel.title(it.sale),
             icon = Icons.Outlined.FactCheck,
             hue = V3Hue.AMBER,
-            trailing = { V3StatusPill(V3Status.REVIEW, StrPayStatus.needsReview) },
+            trailing = { V3QuietStatus(V3RowStatus.of(StrPayStatus.needsReview, V3Status.REVIEW)) },
             onClick = { nav.open(SalesPaths.invoice(it.sale.id)) },
           )
         }

@@ -17,17 +17,22 @@ object I18nTables {
     StrSimpleAsk,
     StrEvidence, StrLateApology, StrErasure, // RSK-08، NTF-10، SEC-10: صفحه‌های برنامه برای سه درِ سرور
     StrCustomerAccess, // CRM-15: «چه کسی این پرونده را دید» (سابقهٔ دسترسی)
+    StrCustomerMask, // CRM-15: «چاپِ شمارهٔ کامل» (پوشاندن بر پایهٔ نقش)
+    StrPoSeason, // PUR-03: اطمینانِ کم/متوسط/زیاد ِ پیشنهادِ سفارش
     StrTrust, // ABUSE-01: شکایت و گزارشِ خریداران در برنامهٔ دکان
     StrSupportAccess, // TEN-04: نوارِ «پشتیبانی در حالِ مشاهده» و پذیرفتن/رد/بستن
+    StrRate, // RATE-01: برگهٔ «ستاره بدهید» (Play/بازار)
     StrOnline, StrSearch, StrTouch, StrPick, StrStaffTime, StrShiftReview, StrWhy, StrLocalNet, StrShrink,
     StrPriceCheck, StrChat, StrLabel, StrOrderSlip, StrCount, StrGift, StrRetPolicy, StrDeliver, StrProduct, StrGrid,
     StrRisk, StrPay, StrAdmin, StrShift, StrCourier, StrOrderOps, StrPayFix, StrSpecialOrder, StrSafe, StrGiftCard,
     StrTaxQuarter, StrCustomerCard, StrOrderFeedback, StrLayaway, StrVisualSearch,
     StrTill, // S28b، S45، S46، S50
+    StrStates, // دستهٔ ۶۳ (e-rows-63i): متنِ پیش‌فرضِ خطای ساده در حالت‌های مشترکِ خالی/خطا
     StrA11y, // صفحه‌خوان در نسخهٔ ۳: باز/بسته، کارِ نگه‌داشتن، QR ِ پرداخت، «نیاز به توجه»، ضبطِ صدا با زدن، جابه‌جاییِ نوار
     StrRounding, // PAY-09: گردکردنِ نقدی
     StrSaleTax, // POS-37: مالیاتِ فاکتور
     StrFx, // PAY-10: ارزِ نقد در صندوق
+    StrSafeCur, // PAY-18: ارزهای گاوصندوق
     StrSettingsHelp, // تنظیماتِ کم (۱۴۰۵/۰۸/۱۱): خطِ ساده و «این چه می‌کند؟»
     StrSettingsHome, // تنظیماتِ نسخهٔ دوم (۱۴۰۵/۰۸/۱۱): جست‌وجو، شش دسته و «قابلیت‌ها»
     StrDevices, // «دستگاه‌ها» و اسکن در پس‌زمینه (۱۴۰۵/۰۸/۱۱)
@@ -38,12 +43,14 @@ object I18nTables {
     StrMarketRegion, // S109: ولایت و ولسوالیِ دکان در «نمایش در بازارچه»
     StrCourierArea, // S83: محدودهٔ خدمتِ هر پیک (فرمِ پیک، کارت و سپردنِ دستی)
     StrProductSuggest, // AI-06: پیشنهادِ دسته و نام در فرمِ کالا
+    StrNewProduct, StrExpiryAlert, // فرمِ جمع‌وجورِ «کالای جدید» با موجودیِ آغاز، و هشدارِ «منقضی‌شده» جدا از «نزدیکِ انقضا»
     StrOnlineReport, // RPT-14: گزارشِ فروشِ اینترنتی در برنامهٔ مدیریت
     StrDocChain, // SEC-02: «بررسیِ یکپارچگیِ اسناد»
     StrLostDevice, // S44: «بازیابی از پشتیبان» ِ دستگاهِ غیرفعال
     StrHeldTwice, // S09: لغوِ خودکارِ فروشِ دومِ «یک فاکتور در دو دستگاه»
     StrAddressMedia, // CRM-09/CHK-08: عکسِ دروازه و یادداشتِ صوتیِ نشانیِ سفارش
     StrBranches, // RPT-18: گزارشِ همهٔ شعبه‌ها
+    StrBranchDesk, // شعبه درونِ یک دکان، فازِ ۲: انتخاب، صفحهٔ صاحب، گزارش، پیامِ ردها
     StrImageChanges, // IMG-PRO-17/16: تغییرِ دسته‌ایِ عکس‌ها و نسخه‌های عکس
     StrImageStudio, // ۴-۲۳ (۱): استودیوی عکسِ سرور — دسته‌ها و تأییدِ نسخه
     StrRefundSlip, // E2E-RET-11: رسیدِ اصلاحیِ بازپرداختِ سفارشِ اینترنتی (چاپ و صفحهٔ سفارش)
@@ -59,6 +66,7 @@ object I18nTables {
     StrSettingsPages, // صفحه‌های تنظیماتِ نسخهٔ ۳ با متنِ خام: گزارشِ صاحب، زمانِ تحویل، اولین خرید، موتورِ موجودی، یادداشتِ صندوق
     StrOrdersHub, // «سفارش‌های آنلاین» ِ خانه، صف و گفت‌وگوی هر سفارش
     StrOrderFlow, // «چرا سفارش نمی‌رسد؟»، «پرداخت پس از پذیرش» و «به سبد / فاکتور» ِ سفارشِ آنلاین
+    StrDeskOff, // بخشِ ساخته‌شدهٔ خاموش در منوی کناری: نشانِ «خاموش» و برگهٔ «چطور روشن می‌شود» (e-rows-63n)
     StrStorePlace, // نشانی و پینِ دکان برای مشتریِ «دریافت از دکان» (ممیزیِ ویترین، مهاجرتِ ۲۱۵)
     StrStoreStock, // WEB-09: «کالای ناموجود را در ویترین پنهان کن» (مهاجرتِ ۲۴۰)
     StrPush, // پوشِ گوشی (Firebase، O-01): حالِ «سفارشِ آنلاین»، «اجازهٔ اعلان» و نامِ کانال‌های اعلان
@@ -67,6 +75,7 @@ object I18nTables {
     StrRemoteApproval, // STF-02: «پرسیدن از مدیر» در صندوق و «درخواست‌های تأیید» ِ صاحب/مدیر
     StrBackupSafety, // OPS-02: بازیابیِ آزموده (پشتیبانِ ناقص/تازه‌تر/دکانِ دیگر)، رمزِ نسخه‌های خودکار و صفحهٔ «عبارتِ بازیابی»
     StrConflictInbox, // صندوقِ سندهای ردشده ِ صاحب/مدیر و نشانِ «سرور نپذیرفت» روی فاکتورِ دستگاهِ سازنده
+    StrV3Inbox, // SYN-07/S28: صندوقِ تعارضِ همگام‌سازیِ v3 ِ صاحب/مدیر (پرچمِ `shop.sync_v3_inbox`)
     StrSaleCaps, // STF-03: پیش‌سنجیِ سقفِ قرض، تغییرِ قیمتِ ردیف و «تخفیفِ پنهان» در صندوق (`SaleCapGate`)
     StrCustomerPrices, // POS-18: «قیمتِ خاصِ این مشتری» (پروندهٔ مشتری، صندوق، رسید و تنظیم)
     StrLineSeller, // POS-23/STF-08: فروشندهٔ هر ردیف (پایهٔ پورسانت)
@@ -83,5 +92,7 @@ object I18nTables {
     StrSheets, // LOC-06 #۲۴: سرستون و نامِ برگه‌های دیگرِ اکسل/CSV (`data/ReportCsv` و ۹ پروندهٔ دیگر) به زبانِ برنامه
     StrSyncPlain, // «هیچ جزئیاتِ فنی/زیرساخت در صفحه»: حالِ همگام‌سازی به زبانِ ساده و «پشتیبانی خبردار شد»
     StrRows, // سادگیِ ردیف‌ها (e-rows-63d): عنوانِ معنادار و جملهٔ کوتاهِ زیرِ آن
+    StrLook, // ظاهرِ آرام (e-rows-63w): کادرِ کشوییِ دوره و فهرستِ فشردهٔ عددها
+    StrPurchases, // «خریدها» (e-rows-63b): فهرست، جزئیات، تأمین‌کننده و فرمِ سادهٔ خرید
   )
 }

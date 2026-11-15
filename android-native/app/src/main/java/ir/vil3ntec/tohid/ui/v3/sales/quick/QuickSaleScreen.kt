@@ -49,7 +49,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Chip
 import ir.vil3ntec.tohid.ui.v3.V3ChipRow
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
-import ir.vil3ntec.tohid.ui.v3.V3SearchField
+import ir.vil3ntec.tohid.ui.v3.V3Search
 import ir.vil3ntec.tohid.ui.v3.V3Springs
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
@@ -108,11 +108,9 @@ fun QuickSaleScreen(
     title = StrSale.quickSale,
     subtitle = StrSale.quickHint,
     onBack = onBack,
-    //  کارِ یک‌دستی: جست‌وجو (با اسکن)، دسته‌ها و «جست‌وجو با عکس» پایین، درست بالای نوارِ سبد
-    dock = listOfNotNull(visual?.let { v -> V3Action(Icons.Outlined.PhotoCamera, StrVisualSearch.button) { v.start() } }),
-    search = {
-      V3SearchField(query, { query = it }, StrSale.catalogHint, onScan = actions.scan)
-    },
+    //  «جست‌وجو با عکس» آیکنِ سربرگ؛ جست‌وجو (با اسکن درونِ کادر) از دکمهٔ نوار یا ذره‌بینِ سربرگ؛ دسته‌ها زیرِ عنوان
+    actions = listOfNotNull(visual?.let { v -> V3Action(Icons.Outlined.PhotoCamera, StrVisualSearch.button) { v.start() } }),
+    search = V3Search(query, { query = it }, StrSale.catalogHint, onScan = actions.scan),
     chips = {
       V3ChipRow {
         V3Chip(StrSale.allChip, category == null, { picked = null })

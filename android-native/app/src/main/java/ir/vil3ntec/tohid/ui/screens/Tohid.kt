@@ -385,15 +385,9 @@ fun TohidEmptyState(
     modifier.fillMaxWidth().padding(vertical = Space.xxl, horizontal = Space.md),
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {
-    if (icon != null) {
-      Box(
-        Modifier.size(56.dp).clip(Shape.card).background(Shop.colors.surface2),
-        contentAlignment = Alignment.Center,
-      ) {
-        Icon(icon, contentDescription = null, tint = Shop.colors.muted, modifier = Modifier.size(26.dp))
-      }
-      Spacer(Modifier.height(Space.sm))
-    }
+    //  تصویرِ متحرکِ همان زمینه (از روی آیکن؛ بی آیکن ⇒ درختِ پیش‌فرض) — همان `V3Illustration` ِ نسخهٔ ۳
+    ir.vil3ntec.tohid.ui.v3.art.V3Illustration(ir.vil3ntec.tohid.ui.v3.art.V3ArtKind.forIcon(icon), size = 140.dp)
+    Spacer(Modifier.height(Space.sm))
     Text(title, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text, textAlign = TextAlign.Center)
     Spacer(Modifier.height(Space.xxs))
     Text(
@@ -409,7 +403,10 @@ fun TohidEmptyState(
   }
 }
 
-/** حالتِ خطا — چه شد، چرا، و دکمهٔ تلاش دوباره */
+/**
+ *  حالتِ خطا — چه شد، چه کنید، و دکمهٔ تلاش دوباره. تصویرِ دوستانهٔ همان گونه (سیمِ کشیده، ابر، «!») و متنی که از
+ *  `PlainError` گذشته: پیامِ خامِ سرور (نشانی، کد، نامِ استثنا) هرگز نشان داده نمی‌شود.
+ */
 @Composable
 fun TohidErrorState(
   title: String,
@@ -417,21 +414,19 @@ fun TohidErrorState(
   onRetry: (() -> Unit)? = null,
   modifier: Modifier = Modifier,
 ) {
+  val kind = ir.vil3ntec.tohid.core.text.PlainError.kindOf(title, description)
+  val shownTitle = ir.vil3ntec.tohid.core.text.PlainError.text(title) ?: ir.vil3ntec.tohid.ui.v3.V3ErrorText.title(kind)
+  val shownBody = ir.vil3ntec.tohid.core.text.PlainError.text(description) ?: ir.vil3ntec.tohid.ui.v3.V3ErrorText.hint(kind)
   Column(
     modifier.fillMaxWidth().padding(vertical = Space.xl, horizontal = Space.md),
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {
-    Icon(
-      Icons.Filled.ErrorOutline,
-      contentDescription = null,
-      tint = Shop.colors.danger,
-      modifier = Modifier.size(30.dp),
-    )
+    ir.vil3ntec.tohid.ui.v3.art.V3Illustration(ir.vil3ntec.tohid.ui.v3.art.V3ArtKind.forError(kind), size = 132.dp)
     Spacer(Modifier.height(Space.xs))
-    Text(title, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text, textAlign = TextAlign.Center)
+    Text(shownTitle, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text, textAlign = TextAlign.Center)
     Spacer(Modifier.height(Space.xxs))
     Text(
-      description,
+      shownBody,
       style = MaterialTheme.typography.bodySmall,
       color = Shop.colors.muted,
       textAlign = TextAlign.Center,

@@ -58,6 +58,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.lost_device_replay', scope: 'shop', default: false, what: 'بازیابیِ کارهای همگام‌نشدهٔ دستگاهِ گم‌شدهٔ غیرفعال از پشتیبانش به دفترِ دکان (S44)' },
   { key: 'shop.customer_erasure_ledger', scope: 'shop', default: false, what: 'پس از حذفِ دادهٔ مشتری، نام/شماره/نشانیِ همان پرونده در دفترِ دستگاه‌ها هم پاک شود (فرمانِ سرور ⇐ برنامهٔ صاحب/مدیر؛ CRM-15، SEC-10)؛ با `shop.customer_erasure`' },
   { key: 'shop.customer_access_offline', scope: 'shop', default: false, what: 'ثبتِ دیدنِ پروندهٔ مشتری به دستِ حسابدارِ بی‌اینترنت پس از وصل، با زمانِ خودِ دیدن (CRM-15)' },
+  { key: 'shop.customer_role_mask', scope: 'shop', default: false, what: 'شماره و نشانیِ مشتری بر پایهٔ نقش: کامل فقط صاحب و مدیر، کارمند «•••• ۰۰۸» جز سفارشِ خودش، چاپِ پوشیده (CRM-15، FLAGS-ON §۴۷)' },
   { key: 'shop.orders.dispute_file', scope: 'shop', default: false, what: 'پروندهٔ مدرکِ اختلافِ سفارش (RSK-08)' },
   { key: 'shop.storefront.filters', scope: 'shop', default: true, what: 'فیلترِ کاتالوگِ ویترین (برند، قیمت، موجود، مشخصه)' },
   { key: 'shop.storefront.alerts', scope: 'shop', default: false, what: '«خبرم کن وقتی موجود/ارزان شد» ِ ویترین' },
@@ -82,6 +83,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.storefront.seo', scope: 'shop', default: false, what: 'صفحهٔ کالای `/p/<id>` با Open Graph و JSON-LD، نقشهٔ سایت و «فرستادنِ نشانی» (WEB-17/20)' },
   { key: 'shop.storefront.zones', scope: 'shop', default: false, what: 'ناحیه‌های ارسال با هزینه، حداقل و «رایگان از…» در فرمِ سفارش (CHK-05/06/07/10)' },
   { key: 'shop.storefront.notify_area', scope: 'shop', default: false, what: '«وقتی به محلِ شما رسیدیم خبرم کن» برای نشانیِ بیرون از ناحیه (CHK-10)' },
+  { key: 'shop.storefront.area_email', scope: 'shop', default: false, what: 'CHK-10: پیامِ خودکارِ «رسیدیم» — یک ایمیلِ سرور به ایمیلِ تأییدشدهٔ «خبرم کن» وقتی ناحیهٔ فعال خانه‌اش را پوشاند؛ با `shop.storefront.notify_area`' },
   { key: 'shop.storefront.address_extra', scope: 'shop', default: true, what: 'شمارهٔ دوم، Plus Code و ولایت/گذر/منزل در نشانیِ سفارش (CHK-08)' },
   { key: 'shop.storefront.address_media', scope: 'shop', default: false, what: 'عکسِ دروازه و یادداشتِ صوتیِ اختیاری برای نشانیِ حسابِ مشتری و نشانیِ هر سفارش؛ دیدن فقط صاحب/مدیرِ دارای تماسِ مشتری و پیکِ همان مأموریت، تا سفارش باز است (CRM-09/CHK-08)' },
   { key: 'shop.storefront.map_pin', scope: 'shop', default: true, what: '«انتخاب روی نقشه» (OpenStreetMap) برای پینِ نشانی در ثبتِ ویترین؛ بی STORE_MAP_TILES ِ سرور هیچ (CHK-08، ۴-۳)' },
@@ -155,6 +157,8 @@ const KNOWN = Object.freeze([
   //  O-01 (docs/FIREBASE-SETUP-fa.md): هر دو برای «سفارش با برنامهٔ بسته» لازم‌اند
   { key: 'shop.order_notify', scope: 'shop', default: false, what: 'اعلانِ سفارشِ تازه، پرداخت و لغوِ مشتری به گوشی‌های دکان (صفِ پایدار و یادآوری)' },
   { key: 'shop.device_push', scope: 'shop', default: false, what: 'پوشِ گوشی با Firebase: ثبتِ توکنِ دستگاه‌های دکان (برنامهٔ بسته هم زنگ می‌زند)' },
+  { key: 'shop.order_notify_email', scope: 'shop', default: false, what: 'NOTIF-11: کانالِ پشتیبانِ اعلانِ سفارش = ایمیلِ سرور به ایمیلِ تأییدشدهٔ صاحب، وقتی پوش نرسید یا کسی باز نکرد؛ با `shop.order_notify`' },
+  { key: 'shop.order_notify_email.per_day', scope: 'shop', default: 3, what: 'سقفِ نامه‌های پشتیبانِ اعلانِ سفارشِ هر دکان در ۲۴ ساعت (۱ تا ۵۰؛ نامعتبر ⇒ ۳)؛ با `shop.order_notify_email`' },
   //  دستهٔ ۳۸: هر کلیدِ دیگری که کدِ غیرِ پمپ می‌خواند (سنجه: `console-shell.test.js` + `test/flag-scan.js`). پیش‌فرض همان پیش‌فرضِ کد است
   //  (`admin-flags.test.js`)؛ عدد/شیء = تنظیمِ زنده. بیرون: مشترک با پمپ (`sync.device_bind`، `sync.live_expiry_close`) و پویا (`stage.*`)
   //  ── پیک و تحویل (همه با `shop.delivery`)
@@ -200,6 +204,7 @@ const KNOWN = Object.freeze([
   //  ── همگام‌سازیِ دکان (پمپ هیچ‌کدام را نمی‌خواند)
   { key: 'shop.sync.doc_roles', scope: 'shop', default: false, what: 'داوریِ نقشِ سندهای سابقه‌سوار (کارتِ هدیه، امتیاز، امانی…) در Sync v3' },
   { key: 'shop.sync_v3_to_v1', scope: 'shop', default: false, what: 'پلِ v3 ⇒ v1 برای دکانی که دستگاهِ کهنه و تازه با هم دارد' },
+  { key: 'shop.sync_v3_inbox', scope: 'shop', default: false, what: 'صندوقِ تعارضِ v3 در برنامه (SYN-07، S28): دیدنِ دو سو، نگه داشتن/برگرداندن/ادغامِ فیلدبه‌فیلد و صفِ بی‌اینترنت؛ با `SYNC_V3_ENABLED` و Sync v3 ِ دستگاه' },
   { key: 'sync.cursor_from_since', scope: 'shop', default: false, what: 'cursor ِ دستگاهِ Sync v1 = آنچه دستگاه تأیید کرد، نه آنچه سرور فرستاد (#481)' },
   { key: 'sync.safe_entries', scope: 'shop', default: false, what: 'گاوصندوق (PAY-18): پلهٔ ۴ ِ schema و جدولِ `safeEntries` در Sync v1/v3' },
   { key: 'sync.keep_pending', scope: 'shop', default: false, what: 'pull ِ Sync v1 می‌گوید تغییرِ محلیِ در صف با opِ رسیده بازنویسی نشود (`KeepPending`)' },

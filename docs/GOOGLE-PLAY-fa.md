@@ -255,4 +255,36 @@ Financial ← Credit score / User payment info (شمارهٔ کارت خواند
 - پرداخت: https://support.google.com/googleplay/android-developer/answer/9858738 و https://play.google.com/about/monetization-ads/payments
 - آزمونِ بسته ۱۲ نفر/۱۴ روز: https://support.google.com/googleplay/android-developer/answer/14151465
 - دادهٔ ML Kit: https://developers.google.com/ml-kit/android-data-disclosure
+- نظرِ درون‌برنامه (In-App Review، بخشِ ۹؛ خوانده در ۱۴ نوامبر ۲۰۲۶): https://developer.android.com/guide/playcore/in-app-review
 - ⚠️ صفحه‌های `support.google.com` از این محیط مستقیم باز نشدند؛ متنشان از نتیجهٔ جست‌وجو خوانده شد. صفحه‌های `developer.android.com` کامل خوانده شدند.
+
+---
+
+## ۹. برگهٔ «ستاره بدهید» (نظرِ درون‌برنامه) — ۱۴۰۵/۰۸/۲۴
+
+خواستهٔ شما: «برنامه به کاربر بگوید از اپ‌استور یا گوگل‌پلی ستاره بدهد… چند بار، و اگر نخواست بگوید دیگر نیاید.»
+
+- ✅ **کجا:** فقط نسخهٔ Play و کافه‌بازارِ برنامهٔ دکان، فقط روی «خانه» با سبدِ خالی. APK ِ سایت/گیت‌هاب، پیش‌نمایش و کامپیوتر
+  هرگز. برنامهٔ خریدار فقط اگر با `-Pstore=play` ساخته شود (امروز فقط نسخهٔ آزمایشی دارد ⇒ هرگز).
+- ✅ **کِی:** دست‌کم ۷ روز روی همان گوشی و ۲۰ فروشِ کامل (خریدار: ۲ سفارش)؛ نه وسطِ فروش، نه تا نیم ساعت پس از خطا، نه
+  در سه دقیقهٔ نخستِ باز شدن و نه پیش از یک فروشِ تازه در همان بار، نه در حالتِ آموزشی. روی‌هم حداکثر **۳ بار**، هر بار
+  دست‌کم **۳۰ روز** فاصله. دکمه‌ها: «ستاره می‌دهم» (فروشگاه، و دیگر هرگز)، «بعداً» (۳۰ روزِ دیگر)، «دیگر نپرس» (هرگز).
+- ✅ **قاعدهٔ Play رعایت شد:** هیچ پرسشی پیش از برگه یا درونش نیست («دوست دارید؟»)، شمارِ ستاره خواسته نمی‌شود («۵ ستاره»)،
+  جایزه‌ای نیست، و **هر** کس «ستاره می‌دهم» بزند به Play می‌رود (جداکردنِ راضی و ناراضی ممنوع است). هیچ داده‌ای از
+  ستاره دادن ثبت یا فرستاده نمی‌شود ⇒ فرمِ «ایمنیِ داده» (بخشِ ۵) **عوض نمی‌شود**.
+- ✅ **Play:** «ستاره می‌دهم» صفحهٔ برنامه در Play را باز می‌کند (`market://details?id=…`، و بی برنامهٔ Play
+  `https://play.google.com/store/apps/details?id=…`). راهنمای Google می‌گوید دکمه API ِ نظرِ درون‌برنامه را صدا نزند (شاید
+  سهمیه پُر باشد و کارتی نیاید) و برای دکمه صفحهٔ Play را باز کند — تصمیمِ هماهنگ‌کننده به نمایندگیِ شما (۱۴۰۵/۰۸/۲۵) همین است.
+  پس کتابخانهٔ نظرِ Play (`com.google.android.play:review`) در **هیچ** نسخه‌ای نیست (آزمونِ نگهبان) و برای آزمودن هم نصب از
+  Play لازم نیست.
+- ✅ **کافه‌بازار:** همان درِ رسمیِ «نظر و امتیاز» ِ بازار (`bazaar://details?id=…` با `ACTION_EDIT`)، و اگر نشد صفحهٔ برنامه.
+  ⚠️ صفحهٔ راهنمای بازار از این محیط باز نشد؛ درِ نوشته‌شده همان شکلِ شناخته‌شدهٔ راهنمای بازار است.
+- 🟡 **آیفونِ خریدار** (`customer-ios`): قاعده و برگه در کدِ مشترک آماده است ولی میزبانِ آیفون هنوز نمی‌نشاند (این‌جا ساخته
+  نمی‌شود). اپل (قاعدهٔ ۵.۶.۱) برگهٔ نظرِ سفارشی را نمی‌پذیرد، پس روی آیفون برگهٔ ما **نمی‌آید** و همان لحظه فقط کارتِ سیستم خواسته
+  می‌شود. یک خط در `Platform(…)` ِ `customer-ios/shared/src/iosMain/kotlin/ir/vil3ntec/tohid/customer/ios/MainViewController.kt`:
+  ```kotlin
+  rate = RateHook(RateTarget.APP_STORE) { (UIApplication.sharedApplication.connectedScenes.firstOrNull { it is UIWindowScene } as? UIWindowScene)?.let { SKStoreReviewController.requestReviewInScene(it) } },
+  ```
+  (با `import platform.StoreKit.SKStoreReviewController`، `platform.UIKit.UIWindowScene`، `ir.vil3ntec.tohid.core.rate.RateTarget`
+  و `ir.vil3ntec.tohid.customer.ui.RateHook`؛ چارچوب ایستا است ⇒ `StoreKit.framework` در Xcode به `iosApp` پیوند شود).
+

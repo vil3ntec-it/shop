@@ -43,6 +43,21 @@ class StatementLayoutTest {
   }
 
   @Test
+  fun customerPhoneIsPrintedMaskedByDefaultUnderTheRoleMask() {
+    //  CRM-15: پرچمِ نقش‌محور روشن و «چاپِ شمارهٔ کامل» خاموش (پیش‌فرض) ⇒ برای هر نقش فقط سه رقمِ آخر
+    val masked = StatementLayout.build(input(lines).copy(roleMask = true), 576, fmt).blocks
+    assertTrue(ReceiptBlock.Row("تلفن", "P[•••• 222]") in masked)
+    assertTrue(masked.none { it.toString().contains("0799111") })
+    //  تلفنِ خودِ دکان دست نمی‌خورد
+    assertTrue(ReceiptBlock.Text("تلفن: P[0700123456]", TextStyle.SMALL) in masked)
+    //  صاحب «چاپِ شمارهٔ کامل» را روشن کرده
+    val full = StatementLayout.build(input(lines).copy(roleMask = true, printFullPhone = true), 576, fmt).blocks
+    assertTrue(ReceiptBlock.Row("تلفن", "P[0799111222]") in full)
+    //  پرچمِ خاموش ⇒ همان امروز
+    assertEquals(doc(lines).blocks, StatementLayout.build(input(lines).copy(printFullPhone = false), 576, fmt).blocks)
+  }
+
+  @Test
   fun everyLineKeepsItsOrderAmountAndBalanceInPul() {
     val items = doc(lines).blocks.filterIsInstance<ReceiptBlock.Item>()
     assertEquals(

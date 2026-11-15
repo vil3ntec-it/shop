@@ -637,9 +637,9 @@ data class Debtor(
   /**
    *  قیمت‌های خاصِ همین مشتری (POS-18) — هر کالا یک ردیف؛ نوشتن فقط از `CustomerPrices` (پشتِ `CustomerPricePrefs`).
    *  یک فیلدِ قرض‌دار است، پس همان راهِ همگام‌سازی و همان ادغامِ `Debtor.priceList` را دارد (v1 ردیف، v3 ‹master›
-   *  فیلدبه‌فیلد). `null` = بی قیمتِ خاص، همان رفتارِ همیشه، و ⛔ نوشته نمی‌شود (`EncodeDefault.NEVER`).
-   */
+   *  فیلدبه‌فیلد). `null` = بی قیمتِ خاص، همان رفتارِ همیشه، و ⛔ نوشته نمی‌شود (`EncodeDefault.NEVER`). */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val specialPrices: List<SpecialPrice>? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val email: String? = null,  // PRM-11/CRM-13: شرح سرِ `CustomerCrm.emailOf`
 )
 
 /**

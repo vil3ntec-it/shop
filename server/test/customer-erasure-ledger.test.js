@@ -101,6 +101,25 @@ test('روشن: پرونده‌های همان شماره (اول یا دوم) �
     { applied: [], pending: [] });
 });
 
+test('PRM-11/CRM-13: پروندهٔ همان ایمیلِ قرض‌دار (`Debtor.email`، بی شماره) هم صف می‌شود؛ «انجام شد» فقط پس از پاک شدنِ ایمیل', async () => {
+  await live.set(T.a.shopId, L.FLAG, true);
+  assert.equal((await push1(T.a, [
+    v1('debtors', 'cel-m1', { name: 'مشتریِ ایمیلی', email: 'karim.mail@shop.af' }),
+    v1('debtors', 'cel-m2', { name: 'ایمیلِ دیگر', email: 'other.mail@shop.af' }),
+  ])).status, 200);
+  const out = await erasure.erase(T.a.shopId, { email: 'Karim.Mail@Shop.AF' }, { by: 'owner', userId: T.a.userId });
+  assert.equal(out.ledgerDebtors, 1, 'فقط همان ایمیل (تطبیقِ دقیقِ کوچک‌حرف)، نه ایمیلِ دیگر');
+  const g = await h.get('/api/shop/customer-erasure/ledger', { token: T.a.token });
+  assert.ok(g.body.debtors.some((d) => d.debtorId === 'cel-m1') && !g.body.debtors.some((d) => d.debtorId === 'cel-m2'));
+  assert.ok(!JSON.stringify(g.body).includes('karim.mail'), 'بی ایمیل در پاسخ');
+  //  ایمیل هنوز در دفترِ سرور ⇒ می‌ماند
+  let a = await h.post('/api/shop/customer-erasure/ledger/applied', { debtorIds: ['cel-m1'] }, { token: T.a.token });
+  assert.deepEqual(a.body, { applied: [], pending: ['cel-m1'] });
+  assert.equal((await push1(T.a, [v1('debtors', 'cel-m1', { name: 'مشتریِ حذف‌شده', email: null }, 'update')])).status, 200);
+  a = await h.post('/api/shop/customer-erasure/ledger/applied', { debtorIds: ['cel-m1'] }, { token: T.a.token });
+  assert.deepEqual(a.body, { applied: ['cel-m1'], pending: [] });
+});
+
 test('۴۰۱ بی توکن؛ ۴۰۳ شاگرد؛ ۴۰۰ بدنهٔ بدشکل؛ ۴۲۹ سطلِ دکان', async () => {
   await live.set(T.a.shopId, L.FLAG, true);
   assert.equal((await h.get('/api/shop/customer-erasure/ledger')).status, 401);

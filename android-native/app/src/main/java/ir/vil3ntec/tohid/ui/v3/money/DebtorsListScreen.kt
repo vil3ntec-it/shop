@@ -41,7 +41,6 @@ import ir.vil3ntec.tohid.ui.screens.DebtorTile
 import ir.vil3ntec.tohid.ui.screens.DebtorsAddButton
 import ir.vil3ntec.tohid.ui.screens.DebtorsBackdrop
 import ir.vil3ntec.tohid.ui.screens.DebtorsEmptyCard
-import ir.vil3ntec.tohid.ui.screens.DebtorsSearchField
 import ir.vil3ntec.tohid.ui.screens.DebtorsSortRow
 import ir.vil3ntec.tohid.ui.screens.DebtorsStatsCard
 import ir.vil3ntec.tohid.ui.screens.Motion
@@ -70,6 +69,8 @@ internal class DebtorsListActions(
  *  کارتِ سه‌عددی، جستجو با میکروفون، تراشه‌های ترتیب و شبکهٔ کارت‌های سرخ/سبز با × و مداد.
  *  فقط سیم‌کشی عوض شد: کارت ⇐ `debtors/{id}`، مداد ⇐ `debtors/{id}/edit`، × ⇐ `debtors/{id}/delete`،
  *  «+» ⇐ `debtors/new`. ترتیب و جستجو از پرسشِ مسیر خوانده می‌شوند (`?sort=oldest` ِ هشدارها).
+ *  تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۴ (`claude/e-rows-65q`): همین شبکهٔ کارت‌ها می‌ماند (فهرستِ تختِ ۶۳q پس گرفته شد)؛ کارتِ
+ *  سه‌عددی سه جعبهٔ رنگیِ کنارِ هم است (`DebtorsStatsCard`).
  */
 @Composable
 internal fun DebtorsListScreen(d: ShopData, sortArg: String?, queryArg: String?, actions: DebtorsListActions, duplicates: Int = 0) {
@@ -93,12 +94,13 @@ internal fun DebtorsListScreen(d: ShopData, sortArg: String?, queryArg: String?,
   val summary = remember(d) { DebtorListModel.summary(d) }
   val motion = Motion.enabled
 
-  //  کارِ یک‌دستی: جست‌وجو و تراشه‌های برچسب پایینِ صفحه (`V3Dock`)، دکمهٔ «+» هم پایین — بقیهٔ r9 همان
+  //  جست‌وجو (با صدا) از دکمهٔ نوار؛ برچسب‌ها یک ردیفِ فشرده زیرِ عنوان؛ «+» تنها دکمهٔ پایین — بقیهٔ r9 همان
+  val voice = ir.vil3ntec.tohid.ui.screens.rememberVoiceSearch { search = it }
   V3Scaffold(
     title = Str.debtors,
     onBack = actions.onBack,
     largeTitle = false,
-    search = { PhoneDebtorsTheme { DebtorsSearchField(value = search, onValueChange = { search = it }) } },
+    search = ir.vil3ntec.tohid.ui.v3.V3Search(search, { search = it }, ir.vil3ntec.tohid.core.i18n.StrMoney.receivePickHint, onVoice = voice),
     chips = if (tags.isEmpty()) null else ({
       Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         V3Chip(StrMoney.allTags, tag == null, { tagPick = null })
@@ -140,10 +142,14 @@ internal fun DebtorsListScreen(d: ShopData, sortArg: String?, queryArg: String?,
           }
           if (rows.isEmpty()) {
             item(key = "debtors-empty", span = { GridItemSpan(maxLineSpan) }) {
+              //  خالیِ هر دو حالت گامِ بعدیِ خودش را دارد: دفترِ خالی «قرض‌دار تازه»، جستجوی بی نتیجه «نمایشِ همه»
               if (CustomerCrm.active(d).isEmpty()) {
                 DebtorsEmptyCard(Icons.Filled.Groups, StrMoney.emptyDebtorsTitle, StrMoney.emptyDebtorsBody, actionText = StrMoney.newDebtor, onAction = actions.onAdd)
               } else {
-                DebtorsEmptyCard(Icons.Filled.Search, StrMoney.noDebtorMatchTitle, StrMoney.noDebtorMatchBody)
+                DebtorsEmptyCard(
+                  Icons.Filled.Search, StrMoney.noDebtorMatchTitle, StrMoney.noDebtorMatchBody,
+                  actionText = StrMoney.showAll, onAction = { search = ""; tagPick = null }, actionIcon = null,
+                )
               }
             }
           } else {

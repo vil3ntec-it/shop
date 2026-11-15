@@ -69,7 +69,10 @@ internal fun DebtorFormSheet(
     Column(Modifier.v3Shake(shake)) {
       V3TextField(f.name, { f = f.copy(name = it) }, StrMoney.name, required = true, error = nameError.takeIf { tried })
       Spacer(Modifier.height(12.dp))
-      V3TextField(f.phone, { f = f.copy(phone = it) }, StrMoney.phoneOptional, kind = V3FieldKind.PHONE)
+      //  CRM-15: بی «دیدنِ شمارهٔ مشتریان» شمارهٔ مشتریِ موجود نه دیده و نه ویرایش می‌شود (سرور هم نمی‌پذیرد)؛ مشتریِ تازه شماره می‌گیرد
+      val contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()
+      if (debtor == null || contacts || debtor.phone.isBlank()) V3TextField(f.phone, { f = f.copy(phone = it) }, StrMoney.phoneOptional, kind = V3FieldKind.PHONE)
+      else Text(ir.vil3ntec.tohid.ui.components.customerPhone(debtor.phone, false), style = ir.vil3ntec.tohid.ui.v3.V3Type.footnote)
       Spacer(Modifier.height(18.dp))
       V3Button(
         StrKit.save,

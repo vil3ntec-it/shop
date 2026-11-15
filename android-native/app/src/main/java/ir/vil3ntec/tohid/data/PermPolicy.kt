@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.crm.CustomerMask
 import ir.vil3ntec.tohid.core.perm.PermCore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -53,6 +54,17 @@ object PermPolicy {
     }.getOrNull() ?: emptyList()
   }
 
+  /**
+   *  CRM-15 — پرچمِ نقش‌محورِ `shop.customer_role_mask` ِ همین دکان (`policy.customerMask` ِ سرور؛ فقط با پرچمِ روشن می‌آید).
+   *  نبودن یا خراب بودن ⇒ خاموش (همان امروز).
+   */
+  fun customerMask(policyJson: String?): Boolean {
+    if (policyJson.isNullOrBlank()) return false
+    return runCatching { tree(Json.parseToJsonElement(policyJson).jsonObject["customerMask"]) == true }.getOrDefault(false)
+  }
+
+  /** `customers.contact` زیرِ پرچمِ نقش‌محور: پیش‌فرضِ تازه («بسته» جز صاحب و مدیر) با همان لایه‌های صاحب (`CustomerMask`) */
   fun allows(role: String, policyJson: String?, key: String): Boolean =
-    PermCore.allows(role, layers(policyJson), key)
+    if (key == CustomerMask.KEY) CustomerMask.contactAllowed(role, layers(policyJson), customerMask(policyJson))
+    else PermCore.allows(role, layers(policyJson), key)
 }

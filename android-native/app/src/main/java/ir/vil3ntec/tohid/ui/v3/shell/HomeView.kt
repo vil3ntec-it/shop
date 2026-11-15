@@ -102,6 +102,8 @@ fun rememberHomeView(d: ShopData): HomeView {
   val warnDays = remember(locked) { runCatching { ir.vil3ntec.tohid.sync.v1.SoftLock.warnDays(context) }.getOrNull() }
   val ordersLive = OrdersLive.enabled
   val newOrders = OrdersLive.newCount
+  //  یک هشدار برای هر محموله، «منقضی‌شده» جدا از «نزدیکِ انقضا» — از همان محموله‌های `DashboardNumbers`
+  val expiry = remember(nums) { ir.vil3ntec.tohid.data.ExpiryAlerts.counts(ir.vil3ntec.tohid.data.ExpiryAlerts.of(nums.expiring)) }
   val alerts = HomeAlerts.build(
     HomeAlerts.Input(
       ordersLive = ordersLive, newOrders = newOrders,
@@ -109,7 +111,8 @@ fun rememberHomeView(d: ShopData): HomeView {
       sync = sync, queued = status?.queued ?: 0, syncError = status?.lastError.orEmpty(),
       outOfStock = nums.outOfStock.size, lowStock = nums.lowStock.size,
       overdueDebtors = nums.overdue.size, overdueTotal = "${money(nums.overdueTotal)} ؋",
-      expiring = nums.expiring.size,
+      expiring = expiry.near, expired = expiry.expired,
+      expiringNames = ShopAlerts.names(expiry.nearNames), expiredNames = ShopAlerts.names(expiry.expiredNames),
       taxDue = rememberTaxDue(canSeeMoney, today),
     ),
   )

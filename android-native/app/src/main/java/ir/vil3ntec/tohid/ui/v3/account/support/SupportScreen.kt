@@ -204,7 +204,8 @@ internal fun DraftComposer(value: String, onValueChange: (String) -> Unit, canSe
 
 /**
  *  مسیرِ `support`: گفت‌وگو به شناسهٔ همین دستگاه (بی‌حساب هم)، هر ۸ ثانیه فقط پیام‌های
- *  تازه، باز شدنِ صفحه یعنی «دیدم» (`markRead`) — همان فراخوان‌های صفحهٔ پیشین.
+ *  تازه، باز شدنِ صفحه یعنی «دیدم» (`markRead`) — همان فراخوان‌های صفحهٔ پیشین. `?text=` فقط کادرِ پیام را
+ *  از پیش پر می‌کند (`AccountPaths.support`، «پیام به پشتیبانی برای روشن کردن» ِ بخشِ خاموش)؛ فرستادن با کاربر است.
  */
 @Composable
 internal fun RouteScope.SupportRoute() {
@@ -213,7 +214,7 @@ internal fun RouteScope.SupportRoute() {
   val state = remember { SyncStore(context) }
   var messages by remember { mutableStateOf<List<SupportMessageDto>>(emptyList()) }
   var greeting by remember { mutableStateOf("") }
-  var draft by rememberSaveable { mutableStateOf("") }
+  var draft by rememberSaveable { mutableStateOf(args.query("text").orEmpty()) }
   var pending by remember { mutableStateOf<String?>(null) }
   var loading by remember { mutableStateOf(true) }
   var error by remember { mutableStateOf<String?>(null) }

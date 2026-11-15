@@ -61,6 +61,27 @@ object RowWhen {
     return of(day, today, clock, calendar, monthsPref)
   }
 
+  /**
+   *  روزِ سند ([day]، که کاربر می‌تواند پیش‌تر بگذارد) با ساعتِ ثبتِ [ms] **فقط** وقتی همان لحظه در همان روز است:
+   *  بردِ «دیروز» که امروز ۱۴:۰۵ ثبت شد ⇒ «دیروز»، نه «دیروز ۱۴:۰۵» ِ دروغ (`claude/e-rows-63q`، ردیفِ حسابِ قرض‌دار).
+   */
+  fun dayAt(
+    day: String,
+    ms: Long,
+    today: String,
+    offsetMs: Int,
+    calendar: String = LocaleChoice.calendar,
+    monthsPref: String = LocaleChoice.months,
+  ): String {
+    val iso = day.trim().take(10)
+    if (ms <= 0 || CivilDays.jdnOfIso(iso) == null) return of(day, today, "", calendar, monthsPref)
+    val local = ms + offsetMs
+    val sameDay = CivilDays.isoOf((local.floorDiv(DAY_MS) + EPOCH_JDN).toInt()) == iso
+    if (!sameDay) return of(iso, today, "", calendar, monthsPref)
+    val minutes = local.floorDiv(60_000L).mod(1_440L).toInt()
+    return of(iso, today, "${minutes / 60}:${(minutes % 60).toString().padStart(2, '0')}", calendar, monthsPref)
+  }
+
   private class Parts(val dayMonth: String, val year: Int)
 
   private fun parts(iso: String, lang: Lang, gregorian: Boolean, monthsPref: String): Parts? {

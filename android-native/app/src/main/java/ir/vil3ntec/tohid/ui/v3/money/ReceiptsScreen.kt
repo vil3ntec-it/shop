@@ -47,6 +47,8 @@ import ir.vil3ntec.tohid.ui.v3.V3Chip
 import ir.vil3ntec.tohid.ui.v3.V3ChipRow
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
+import ir.vil3ntec.tohid.ui.v3.InvoiceRefText
+import ir.vil3ntec.tohid.ui.v3.InvoiceRefs
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3PickerSheet
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
@@ -192,10 +194,14 @@ private fun ReceiptRow(row: ReceiptsModel.Row, first: Boolean, last: Boolean, ta
   val receipt = tab == ReceiptsModel.Tab.DEBTORS
   Box(modifier.clip(shape).background(c.card)) {
     androidx.compose.foundation.layout.Column {
+      //  سادهٔ e-rows-63d: تاریخِ کوتاه («دیروز»، «۲۸ میزان»)؛ «فاکتور #n» ِ یادداشت زدنی ⇒ همان فاکتور (`InvoiceRef`، 63q)
+      val line = remember(row.date, row.note, I18n.lang) {
+        val day = MoneyText.short(row.date, todayIso())
+        if (row.note.isBlank()) listOf(InvoiceRefs.plain(day)) else listOf(InvoiceRefs.plain("$day · ")) + InvoiceRefs.split(row.note)
+      }
       V3ListRow(
         title = row.title,
-        //  سادهٔ e-rows-63d: تاریخِ کوتاه («دیروز»، «۲۸ میزان»)
-        subtitle = remember(row.date, row.note, I18n.lang) { listOf(MoneyText.short(row.date, todayIso()), row.note).filter { it.isNotBlank() }.joinToString(" · ") },
+        below = { InvoiceRefText(line, maxLines = 2, debtorId = row.debtorId) },
         icon = if (receipt) Icons.Outlined.SouthWest else Icons.Outlined.Payments,
         hue = if (receipt) V3Modules.hueOf("receipts") else V3Modules.hueOf("expenses"),
         trailing = {

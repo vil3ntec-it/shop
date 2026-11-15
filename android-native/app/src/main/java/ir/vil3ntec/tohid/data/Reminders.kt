@@ -12,6 +12,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import ir.vil3ntec.tohid.core.i18n.StrAppData
+import ir.vil3ntec.tohid.core.i18n.StrExpiryAlert
+import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.core.nav.DeepLinks
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -91,24 +93,31 @@ object Reminders {
   /**
    *  خلاصهٔ آنچه امروز باید بداند — یا `null` اگر چیزی نیست.
    *
-   *  جدا نوشته شده تا بشود بدونِ اندروید هم سنجیدش.
+   *  جدا نوشته شده تا بشود بدونِ اندروید هم سنجیدش. انقضا (`ExpiryAlerts.ofLines`): محموله‌های منقضی‌شده و نزدیکِ انقضای
+   *  [today] با مرزِ [nearDays] ِ همین دستگاه، هر محموله یک بار؛ یک اعلان در روز (همان شناسه، جایگزین ⇒ تکرار نه).
    */
-  fun summary(s: LedgerSummary): Pair<String, String>? {
+  fun summary(s: LedgerSummary, today: String = ir.vil3ntec.tohid.todayIso(), nearDays: Int = ExpiryEngine.nearDays): Pair<String, String>? {
     val out = s.outOfStock
     val low = s.lowStock
     val owed = s.owing
+    val expiry = ExpiryAlerts.ofLines(s.expiry, today, nearDays)
+    val (expired, near) = expiry.partition { it.expired }
 
-    if (out.isEmpty() && low.isEmpty() && owed.isEmpty()) return null
+    if (out.isEmpty() && low.isEmpty() && owed.isEmpty() && expiry.isEmpty()) return null
 
     val title = when {
       out.isNotEmpty() -> StrAppData.remOut(out.size)
+      expired.isNotEmpty() -> StrExpiryAlert.expired(expired.size)
       low.isNotEmpty() -> StrAppData.remLow(low.size)
+      near.isNotEmpty() -> StrHome.alertExpiring(near.size)
       else -> StrAppData.remOwed
     }
 
     val lines = buildList {
       out.take(2).forEach { add(StrAppData.remItemOut(it.name)) }
+      expired.take(2).forEach { add(StrExpiryAlert.itemExpired(it.name)) }
       low.take(2).forEach { add(StrAppData.remItemLeft(it.name, qty(it.left))) }
+      near.take(2).forEach { add(StrExpiryAlert.itemNear(it.name, it.daysLeft)) }
       if (owed.isNotEmpty()) {
         add(StrAppData.remOwedSum(money(owed.sumOf { it.amount }), owed.size))
       }
@@ -118,8 +127,8 @@ object Reminders {
 
   suspend fun check(context: Context) {
     if (!allowed(context)) return
-    //  خلاصهٔ کوچک به‌جای کلِ دفتر — شرحش سرِ `LedgerSummary`
-    val (title, text) = summary(LedgerSummary.require(context)) ?: return
+    //  خلاصهٔ کوچک به‌جای کلِ دفتر — شرحش سرِ `LedgerSummary`؛ مرزِ «نزدیک به انقضا» همان تنظیمِ همین دستگاه
+    val (title, text) = summary(LedgerSummary.require(context), nearDays = ExpiryPref.nearDays(context)) ?: return
 
     ensureChannel(context)
 

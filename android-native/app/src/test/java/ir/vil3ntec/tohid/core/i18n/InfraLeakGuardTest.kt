@@ -150,7 +150,11 @@ class InfraLeakGuardTest {
   }
 
   @Test fun `«سرورها» فقط برای صاحبِ دکان در فهرست و جست‌وجو`() {
-    assertEquals(setOf(ir.vil3ntec.tohid.ui.screens.SettingsLayout.SERVERS), ir.vil3ntec.tohid.ui.screens.SettingsLayout.OWNER_ONLY)
+    //  CRM-15 (۱۴۰۵/۰۸/۲۴): «شمارهٔ مشتری روی چاپ» هم فقط صاحب (تصمیمِ «فقط صاحب چاپِ شمارهٔ کامل را روشن می‌کند»)؛ هر بخشِ دیگر سرخ
+    assertEquals(
+      setOf(ir.vil3ntec.tohid.ui.screens.SettingsLayout.SERVERS, ir.vil3ntec.tohid.ui.screens.SettingsLayout.PRINT_PHONE),
+      ir.vil3ntec.tohid.ui.screens.SettingsLayout.OWNER_ONLY,
+    )
     val rows = code(repo.resolve("android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/settings/SettingsRows.kt"))
     assertTrue(rows.contains("facts.owner || it !in SettingsLayout.OWNER_ONLY"))
     val index = code(repo.resolve("android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/settings/SettingsIndexScreen.kt"))

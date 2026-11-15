@@ -11,7 +11,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -24,7 +23,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -40,30 +38,30 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import ir.vil3ntec.tohid.core.text.PlainError
+import ir.vil3ntec.tohid.ui.v3.art.V3ArtKind
+import ir.vil3ntec.tohid.ui.v3.art.V3Burst
+import ir.vil3ntec.tohid.ui.v3.art.V3CheckBurst
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.screens.MotionTokens
 import ir.vil3ntec.tohid.ui.screens.isDark
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
-import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.theme.V3Tone
@@ -71,12 +69,13 @@ import ir.vil3ntec.tohid.ui.theme.V3Tone
 /**
  *  حالت‌های صفحه: خالی، در حالِ بار، پیام، وضعیت، و تیکِ موفقیت.
  *
- *  • `V3EmptyState`: آیکنِ خطی در دایرهٔ surfaceSelected، عنوان، یک خط توضیح و **یک**
- *    کارِ اصلی — بی تصویرسازی.
+ *  • `V3EmptyState`: تصویرِ متحرکِ همان زمینه (`V3Illustration`، از روی همان آیکن)، عنوان، یک خط
+ *    توضیح و **یک** کارِ اصلی؛ آیکنِ خطا (ابرِ قطع، بی وای‌فای…) ⇒ همان الگوی خطا با متنِ ساده‌شده.
  *  • `V3Skeleton`: ردیف‌های خاکستریِ لرزان به‌جای چرخنده (با «کاهشِ حرکت» ثابت).
  *  • `V3Message`: کادرِ پیامِ §۹ (موفق/اطلاع/هشدار/خطا) با آیکنِ معنادار — رنگ تنها نیست.
  *  • `V3StatusPill`: قرصِ §۸ — نقطه + برچسب، همان معنی در همه‌جا.
- *  • `V3SuccessCheck`: دایره و تیکی که در ۳۵۰ میلی‌ثانیه کشیده می‌شود.
+ *  • `V3Message`: خطا ⇒ `V3InlineError` (تصویرِ کوچک، متنِ ساده‌شده، کارِ ۴۸dp).
+ *  • `V3SuccessCheck`: جشنِ ۷۰۰ میلی‌ثانیه‌ای (`V3CheckBurst`): دایره، تیک، حلقه و چند ذره.
  */
 @Composable
 fun V3EmptyState(
@@ -86,26 +85,26 @@ fun V3EmptyState(
   body: String? = null,
   action: String? = null,
   onAction: (() -> Unit)? = null,
+  /** تصویرِ دیگری جز آنچه آیکن می‌گوید (null ⇒ از آیکن: `V3ArtKind.forIcon`) */
+  art: V3ArtKind? = null,
 ) {
-  val c = PhoneV3.colors
-  Column(
-    modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 40.dp),
-    horizontalAlignment = Alignment.CenterHorizontally,
-  ) {
-    Box(
-      Modifier.size(72.dp).clip(CircleShape).background(PhoneV3Palette.selected(c)),
-      contentAlignment = Alignment.Center,
-    ) { Icon(icon, contentDescription = null, tint = PhoneV3Palette.iconActive(c), modifier = Modifier.size(32.dp)) }
-    Spacer(Modifier.height(16.dp))
-    Text(title, style = V3Type.headline, color = c.ink, textAlign = TextAlign.Center)
-    if (body != null) {
-      Spacer(Modifier.height(6.dp))
-      Text(body, style = V3Type.callout, color = c.inkMuted, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 320.dp))
-    }
-    if (action != null && onAction != null) {
-      Spacer(Modifier.height(20.dp))
-      V3Button(action, onAction)
-    }
+  val kind = art ?: V3ArtKind.forIcon(icon)
+  if (kind.isError) {
+    //  حالتِ «بار نشد» با آیکنِ خطا: همان الگوی خطا — متنِ رسیده (گاهی پیامِ خامِ سرور) ساده می‌شود و خطِ «چه کنید» دارد؛
+    //  متنی که خودش می‌گوید چه شد (بی اینترنت، سرور) تصویرِ همان را می‌گیرد
+    val said = PlainError.kindOf(title, body)
+    val shown = if (art == null && said != PlainError.Kind.OTHER) V3ArtKind.forError(said) else kind
+    val hint = V3ErrorText.kind(shown, title, body)
+    V3StateLayout(
+      art = shown,
+      title = PlainError.text(title) ?: V3ErrorText.title(hint),
+      modifier = modifier,
+      body = PlainError.text(body) ?: V3ErrorText.hint(hint),
+      action = action,
+      onAction = onAction,
+    )
+  } else {
+    V3StateLayout(kind, title, modifier, body, action, onAction)
   }
 }
 
@@ -153,6 +152,11 @@ fun V3Message(
   action: String? = null,
   onAction: (() -> Unit)? = null,
 ) {
+  if (tone == V3Tone.ERROR) {
+    //  خطا: تصویرِ کوچکِ متحرک و متنِ ساده‌شده (`V3ErrorState.kt`)؛ همان کادر و همان ناحیهٔ زنده
+    V3InlineError(title, modifier, body, action, onAction)
+    return
+  }
   val c = PhoneV3.colors
   val pair = PhoneV3Roles.tone(c, tone)
   val icon = when (tone) {
@@ -197,46 +201,28 @@ fun V3StatusPill(status: V3Status, label: String, modifier: Modifier = Modifier)
 }
 
 /**
- *  تیکِ موفقیت: دایره با فنرِ شاد بزرگ می‌شود و تیک کشیده می‌شود (۳۵۰ms) + لرزشِ نرم.
- *  مسیرِ تیک یک بار ساخته می‌شود (`drawWithCache`)؛ هر فریم فقط تکه‌ای از آن رسم می‌شود.
+ *  تیکِ موفقیت: جشنِ کوتاهِ [V3Burst.MS] میلی‌ثانیه (`V3CheckBurst`): دایره با فنرِ کوچک باز می‌شود، تیک کشیده می‌شود
+ *  و چند ذرهٔ رنگی پخش و محو می‌شوند — یک بوم، یک عدد که فقط در رسم خوانده می‌شود، بی گرفتنِ لمس. با لرزشِ سبکِ
+ *  `HapticFeedbackType.Confirm` (اندروید). «کاهشِ حرکت» ⇒ همان دایره و تیکِ پایانی، بی ذره.
  *  @param haptic اگر صفحه خودش لرزشِ «ثبت شد» (`Haptics.success`) را می‌زند، false
  */
 @Composable
 fun V3SuccessCheck(visible: Boolean, modifier: Modifier = Modifier, size: Dp = 64.dp, haptic: Boolean = true) {
   val c = PhoneV3.colors
   val ok = PhoneV3Roles.tone(c, V3Tone.SUCCESS)
-  val context = androidx.compose.ui.platform.LocalContext.current
+  val sparks = listOf(ok.fg, c.source.brandPrimary, c.source.accent(3), c.source.accent(0))
+  val feedback = LocalHapticFeedback.current
   AnimatedVisibility(
     visible = visible,
     modifier = modifier,
-    enter = fadeIn(MotionSpec.tweenOf(MotionTokens.SHORT)) + scaleIn(V3Springs.playful(), initialScale = 0.6f),
+    enter = fadeIn(MotionSpec.tweenOf(MotionTokens.SHORT)),
     exit = fadeOut(MotionSpec.tweenOf(MotionTokens.SHORT)),
   ) {
     val draw = remember { Animatable(if (Motion.enabled) 0f else 1f) }
     LaunchedEffect(Unit) {
-      if (haptic) ir.vil3ntec.tohid.ui.screens.Haptics.confirm(context)
-      draw.animateTo(1f, MotionSpec.tweenOf(MotionTokens.EMPHASIZED, MotionTokens.EmphasizedDecelerate))
+      if (haptic) feedback.performHapticFeedback(HapticFeedbackType.Confirm)
+      draw.animateTo(1f, V3Burst.spec())
     }
-    Box(Modifier.size(size).clip(CircleShape).background(ok.bg), contentAlignment = Alignment.Center) {
-      Box(
-        Modifier.size(size * 0.5f).drawWithCache {
-          val w = this.size.width
-          val h = this.size.height
-          val path = Path().apply {
-            moveTo(w * 0.12f, h * 0.52f)
-            lineTo(w * 0.40f, h * 0.78f)
-            lineTo(w * 0.90f, h * 0.24f)
-          }
-          val measure = androidx.compose.ui.graphics.PathMeasure().apply { setPath(path, false) }
-          val part = Path()
-          val stroke = Stroke(width = w * 0.12f, cap = StrokeCap.Round)
-          onDrawBehind {
-            part.reset()
-            measure.getSegment(0f, measure.length * draw.value, part, true)
-            drawPath(part, ok.fg, style = stroke)
-          }
-        },
-      )
-    }
+    V3CheckBurst({ draw.value }, disc = ok.bg, tick = ok.fg, sparks = sparks, modifier = Modifier.size(size), burst = Motion.enabled)
   }
 }

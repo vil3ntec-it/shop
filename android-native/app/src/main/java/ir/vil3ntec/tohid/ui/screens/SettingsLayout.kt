@@ -143,6 +143,8 @@ object SettingsLayout {
   const val ONLINE_ORDERS = "سفارشِ آنلاین" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
   /** رسیدِ هدیهٔ بی قیمت (POS-34، `GiftReceiptPrefs`) */
   const val GIFT_RECEIPT = "رسیدِ هدیه" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
+  /** CRM-15: «چاپِ شمارهٔ کامل» ِ مشتری روی رسید و صورت‌حساب (`CustomerPrintPref`، فقط صاحب) */
+  const val PRINT_PHONE = "شمارهٔ مشتری روی چاپ" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
   /** فروش با تحویلِ بعدی (POS-38، `DeliverLaterPrefs`) */
   const val DELIVER_LATER = "فروش با تحویلِ بعدی" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
   /** سفارشِ ویژه با پیش‌پرداخت (POS-26، `SpecialOrderPref`) */
@@ -233,7 +235,7 @@ object SettingsLayout {
       listOf(
         Part("pay", listOf(PAY, HESAB_SHOP, TILL_RECEIVE, PAY_FIX, CREDIT_GATE, GIFT_CARD, LAYAWAY, SAFE_BOOK, CUSTOMER_CARD)),
         Part("invoice", listOf(CHECKOUT_RULES, HELD, "کالای منقضی", LINE_PRICING, AUTO_FEES, QUOTE, SPECIAL_ORDER, DELIVER_LATER, PRICE_WHY, POS_NOTES)), // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
-        Part("receipt", listOf(PRINTER, RETURNS, LOYALTY, PRICE_LIST, GIFT_RECEIPT)),
+        Part("receipt", listOf(PRINTER, RETURNS, LOYALTY, PRICE_LIST, GIFT_RECEIPT, PRINT_PHONE)),
         Part("till", listOf(LINE_SELLER, MULTI_DRAWER, POS_TOUCH, POS_MORE_KEYS, POS_SEARCH, POS_PRICE_CHECK, KEY_HELP)),
         Part("online", listOf(ONLINE_ORDERS, STORE_PLACE, STORE_STOCK, STOREFRONT_ETA, PROMO_GUARD)),
       ),
@@ -301,7 +303,7 @@ object SettingsLayout {
    *  ردیف‌هایی که فقط صاحبِ دکان می‌بیند (نه مدیر، نه کارمند، نه پیک): «سرورها» با نشانی و هویتِ سرور سروکار دارد
    *  («هیچ جزئیاتِ فنی/زیرساخت در صفحه»، `docs/RULES-fa.md`). خودِ کارها را `ServersController.canManage` هم می‌بندد.
    */
-  val OWNER_ONLY: Set<String> = setOf(SERVERS)
+  val OWNER_ONLY: Set<String> = setOf(SERVERS, PRINT_PHONE)
 
   /** قابلیت‌هایی که ردیفشان فقط با «روشن» دیده می‌شود */
   val FEATURE_GATED: Set<String> get() = FEATURES.toSet() - HESAB_SHOP
@@ -366,6 +368,7 @@ object SettingsLayout {
     PROMO_GUARD to "promo-guard",
     ONLINE_ORDERS to "online-orders",
     GIFT_RECEIPT to "gift-receipt",
+    PRINT_PHONE to "print-phone",
     DELIVER_LATER to "deliver-later",
     SPECIAL_ORDER to "special-orders",
     PRICE_WHY to "price-why",
@@ -454,6 +457,7 @@ object SettingsLayout {
     PROMO_GUARD -> StrSettingsPages.titlePromoGuard
     ONLINE_ORDERS -> ir.vil3ntec.tohid.core.i18n.StrOrderFlow.settingsTitle
     GIFT_RECEIPT -> ir.vil3ntec.tohid.core.i18n.StrGift.section
+    PRINT_PHONE -> ir.vil3ntec.tohid.core.i18n.StrCustomerMask.section
     DELIVER_LATER -> ir.vil3ntec.tohid.core.i18n.StrDeliver.section
     SPECIAL_ORDER -> ir.vil3ntec.tohid.core.i18n.StrSpecialOrder.settingsTitle
     PRICE_WHY -> ir.vil3ntec.tohid.core.i18n.StrWhy.section

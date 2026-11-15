@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.ui.v3.analytics
 
+import ir.vil3ntec.tohid.ui.v3.V3RowTone
+import ir.vil3ntec.tohid.ui.v3.V3RowStatus
+import ir.vil3ntec.tohid.ui.v3.V3QuietStatus
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -149,7 +152,8 @@ internal fun ProductsTab(d: ShopData, canSeeMoney: Boolean, spec: ReportListSpec
           if (i > 0) V3Divider(start = 64.dp)
           V3ListRow(
             p.name, icon = Icons.Outlined.Inventory2, hue = if (out) null else V3Hue.ORANGE, danger = false,
-            trailing = { V3StatusPill(if (out) V3Status.CANCELLED else V3Status.WARNING, if (out) StrReports.soldOut else StrReports.lowStock) },
+            //  سادهٔ e-rows-63q: وضعیت متنِ آرام (تمام‌شده سرخ، کم کهربایی)، نه قرص
+            trailing = { V3QuietStatus(V3RowStatus(if (out) StrReports.soldOut else StrReports.lowStock, if (out) V3RowTone.DANGER else V3RowTone.ATTENTION)) },
             onClick = { spec.onOpen(ProductsPaths.item(p.id)) },
           )
         }

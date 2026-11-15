@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.products
 
+import ir.vil3ntec.tohid.ui.v3.branches.BranchCatalogGate
 import android.net.Uri
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Sell
@@ -95,12 +96,15 @@ val ProductsModule = AppModule(
     //  بارکدِ ناشناس (صندوق، انبار، جست‌وجو) ⇐ همین فرم با بارکدِ پرشده؛ یک کالا ثبت شد ⇐ ورودِ انبارِ همان (مثلِ امروز)
     V3Route("products/new", RouteKind.PAGE, { StrProducts.newProduct }, parent = ProductsPaths.LIST, chrome = Chrome.OWN) {
       val barcode = args.query("barcode")?.takeIf { it.isNotBlank() }
-      NewProductsScreen(store, data, toasts, barcode, formNav()) { ids ->
-        if (barcode != null && ids.size == 1) nav.replace(StockPaths.entry(product = ids.first())) else back()
+      //  شعبه، فازِ ۳: کالا فقط از شعبهٔ اصلی (`BranchCatalogGate`)
+      BranchCatalogGate {
+        NewProductsScreen(store, data, toasts, barcode, formNav()) { ids ->
+          if (barcode != null && ids.size == 1) nav.replace(StockPaths.entry(product = ids.first())) else back()
+        }
       }
     },
     V3Route("products/{id}/edit", RouteKind.PAGE, { StrProducts.editTitle }, parent = "products/{id}", chrome = Chrome.OWN) {
-      EditProductScreen(store, data, toasts, args["id"].orEmpty(), formNav()) { back() }
+      BranchCatalogGate { EditProductScreen(store, data, toasts, args["id"].orEmpty(), formNav()) { back() } }
     },
     V3Route("products/{id}/photo", RouteKind.SHEET, { StrProducts.photoTitle }, parent = "products/{id}", chrome = Chrome.OWN) {
       val id = args["id"].orEmpty()
@@ -136,14 +140,16 @@ val ProductsModule = AppModule(
     V3Route("products/categories", RouteKind.SHEET, { StrProducts.categoriesTitle }, parent = ProductsPaths.LIST, chrome = Chrome.OWN) {
       var picked by remember { mutableStateOf<String?>(null) }
       val use = if (args.flag("pick")) CategoryUse.Pick(args.query("selected")) { picked = it } else CategoryUse.Manage
-      CategorySheet(store, data, toasts, use, onDismiss = { picked?.let { nav.finish(it) } ?: back() })
+      //  شعبه، فازِ ۳: «برگزیدن» آزاد، مدیریتِ دسته فقط از شعبهٔ اصلی
+      if (use is CategoryUse.Manage) BranchCatalogGate { CategorySheet(store, data, toasts, use, onDismiss = { back() }) }
+      else CategorySheet(store, data, toasts, use, onDismiss = { picked?.let { nav.finish(it) } ?: back() })
     },
     V3Route("products/bulk/category", RouteKind.SHEET, { StrProducts.bulkCategory }, parent = ProductsPaths.LIST, chrome = Chrome.OWN) {
       val ids = args.query("ids").orEmpty().split(',').filter { it.isNotBlank() }.toSet()
       if (ids.isEmpty()) LandOn(ProductsPaths.LIST)
       else {
         var done by remember { mutableStateOf(false) }
-        CategorySheet(store, data, toasts, CategoryUse.Bulk(ids) { done = true }, onDismiss = { if (done) nav.finish(BULK_DONE) else back() })
+        BranchCatalogGate { CategorySheet(store, data, toasts, CategoryUse.Bulk(ids) { done = true }, onDismiss = { if (done) nav.finish(BULK_DONE) else back() }) }
       }
     },
   ),
@@ -167,7 +173,4 @@ private fun RouteScope.listNav() = ProductsListNav(
 private fun RouteScope.formNav() = ProductFormNav(
   back = { back() },
   scan = { onCode -> nav.openForResult(SalesPaths.scan("product")) { code -> code?.let(onCode) } },
-  pickCategory = { current, onPicked ->
-    nav.openForResult(ProductsPaths.categories(pick = true, selected = current.takeIf { it.isNotBlank() })) { name -> name?.let(onPicked) }
-  },
 )

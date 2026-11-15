@@ -43,7 +43,10 @@ object ShellTargets {
   val OVERDUE_DEBTS: String = MoneyPaths.debtors(sort = "oldest")
   val MOST_DEBT: String = MoneyPaths.debtors(sort = "most")
   val EXPIRING: String = StockPaths.list(filter = "expiring")
+  val EXPIRED: String = StockPaths.list(filter = "expired")
   val PURCHASING: String = MoneyPaths.PURCHASING
+  /** e-rows-63b: خریدهایی که سررسیدِ پرداختشان گذشته */
+  val SUPPLIER_OVERDUE: String = MoneyPaths.purchasing(pay = "overdue")
 
   fun product(id: String): String = ProductsPaths.item(id)
   fun newProduct(barcode: String): String = ProductsPaths.new(barcode = barcode)
