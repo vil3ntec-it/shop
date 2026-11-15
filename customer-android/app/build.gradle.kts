@@ -94,3 +94,11 @@ tasks.withType<Test>().configureEach {
     }
   })
 }
+
+/*
+ *  RATE-01 — «ستاره بدهید» (`docs/GOOGLE-PLAY-fa.md` §۹). برنامهٔ خرید هنوز فروشگاه ندارد: پیش‌فرض `direct` ⇒ برگه هرگز
+ *  (`BuildConfig.STORE`، `RateAndroid.hook`)؛ `-Pstore=play` ⇒ «ستاره می‌دهم» صفحهٔ برنامه در Play را باز می‌کند (بی هیچ
+ *  کتابخانهٔ Play؛ `PlayReviewSplitTest`).
+ */
+val rateStore = (project.findProperty("store") as String?)?.trim()?.ifBlank { null } ?: "direct"
+android.defaultConfig.buildConfigField("String", "STORE", "\"$rateStore\"")
