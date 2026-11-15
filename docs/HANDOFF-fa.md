@@ -94,11 +94,13 @@
   انتشارهای آزمایشی) و صفحه‌های GitHub Pages ِ ریشه. (۳) سه سطرِ «گیت‌هاب» ِ `DARI-REVIEW-fa.md` به متنِ تازه.
 - **اجرا:** سرور (PGlite) ۱۴ پرونده ۱۱۱/۱۱۱ (`legal-pages`، `legal-texts`، `no-github-in-apps`، `store-build-updater`، `signup-location`، `self-delete`،
   `privacy-erasure-text`، `backup-passphrase-warning`، `web-i18n`، `dari-text`، `dead-doors`، `tenant-matrix`، `api-contract`، `kotlin-test-names-windows`)؛
-  core `jvmTest` ‹legal/text/account› ۷۴/۷۴؛ کامپیوتر هدف‌دار (`LegalPagesUiTest`، `core.i18n.*`، `update.*`، `NoLegacyUiTest`، `*Courier*`،
-  `*Onboarding*`، `*Settings*`، `*WhatsNew*`) ۲۹۳/۲۹۳؛ جایگزینِ فروشگاهیِ `Updater` + `ReleaseVersion` + صدازنندهٔ نمونه روی JVM کامپایل شد
+  core `jvmTest` ‹legal/text/account› ۷۴/۷۴؛ کامپیوتر هدف‌دار پس از ادغامِ batch-63 (`LegalPagesUiTest` ۵، `core.i18n.*` با `InfraLeakGuardTest` ۸ و
+  `DariCoverageTest` ۲۳، `update.*`، `NoLegacyUiTest`، `*Courier*`، `*Onboarding*`، `*Settings*`، `*Profile*`، `*WhatsNew*`) ۳۳۰/۳۳۰؛ جایگزینِ فروشگاهیِ `Updater` + `ReleaseVersion` + صدازنندهٔ نمونه روی JVM کامپایل شد
   (shim ِ `Context`؛ پروژهٔ موقت). نخستین کامپایلِ کامپیوتر دو باگِ واقعیِ همین کار را گرفت: `/legal/*` در KDoc توضیحِ تودرتو باز می‌کرد
-  و `LocalV3Nav.current` تهی‌پذیر است. precheck `fail=0`، `quality.mjs` بی سطرِ «همین تغییر»، spec «سالم»، api-contract تازه (+۲ درِ `/legal`).
-  __FULL__
+  و `LocalV3Nav.current` تهی‌پذیر است. spec «سالم»، api-contract تازه (+۲ درِ `/legal`)، secret-scan ۰ سد، dari-words و kt-names سبز.
+  ⚠️ precheck پس از ادغام `fail=1` فقط از `quality.mjs` و **ارثِ `origin/claude/batch-63`** است (نه این شاخه؛ diff ِ این شاخه با batch-63 روی
+  آن پرونده‌ها صفر): `sync/v1/SyncV1Engine.kt` ۹۶۴ خط > سقفِ ۹۶۱ و `core/net/HttpEngine.kt` ۵ وابستگیِ پلتفرمی > ۳ — کدِ همگام‌سازی دست
+  نخورد. اجرای **کاملِ** کامپیوتر دو بار با ری‌استارتِ کانتینر (فشارِ حافظه) کشته شد و دوباره زده نشد؛ فقط هدف‌دار.
 - **نیمه‌کاره/قدمِ بعدی:** (۱) صاحب‌کار نشانیِ Play Console (و بازار/App Store) را به `https://<دامنه>/legal/privacy` برگرداند ⇒ `privacy.html`
   (و پیوندش در `index.html` ِ ریشه) پاک و سه آزمونِ بالا به منبع برگردانده شود. (۲) بازبینیِ ترجمهٔ en/ps ِ متنِ حقوقی. (۳) هنوز در کد:
   پیشفرضِ `update_repo` = «vil3ntec-it/shop» در `UpdateBanner`/`ShellNotices`/`More.kt` (نامِ مخزن، نه نشانی؛ در نسخهٔ فروشگاهی بی‌اثر)،
