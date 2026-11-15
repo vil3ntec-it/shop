@@ -167,4 +167,46 @@ object StrUpdate {
     "The update server isn't answering right now — tap again a little later",
     "د تازه کولو سرور اوس ځواب نه ورکوي — لږ وروسته بیا یې ووهئ",
   )
+
+  // ── برنامه با نامِ تازه (`AppMove`، برگهٔ `AppMoveSheet`) — تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۴ ──
+  val movedBar: String get() = t(
+    "نسخهٔ تازهٔ برنامه با نامِ تازه آمده — این‌جا بزنید",
+    "The new version of the app comes under a new name — tap here",
+    "د اپ نوې نسخه په نوي نوم راغلې — دلته ووهئ",
+  )
+  val movedAction: String get() = t("راهنما", "What to do", "لارښود")
+  val movedTitle: String get() = t("برنامه با نامِ تازه آمده", "The app has a new name", "اپ نوی نوم لري")
+  val movedBody: String get() = t(
+    "نسخهٔ تازهٔ برنامه با نامِ تازه آمده: اول مطمئن شوید همه‌چیز همگام شده، برنامهٔ تازه را نصب و وارد شوید، بعد این برنامهٔ قدیمی را پاک کنید.",
+    "The new version of the app comes under a new name: first make sure everything is synced, install the new app and sign in, then remove this old app.",
+    "د اپ نوې نسخه په نوي نوم راغلې: لومړی ډاډ ترلاسه کړئ چې هر څه همغږي شوي، نوی اپ نصب کړئ او ننوځئ، بیا دا زوړ اپ لرې کړئ.",
+  )
+  val movedSide: String get() = t(
+    "برنامهٔ تازه کنارِ همین برنامه نصب می‌شود، نه رویش؛ این برنامه و دفترش سرِ جایش می‌ماند تا خودتان پاکش کنید.",
+    "The new app installs next to this one, not over it; this app and its ledger stay until you remove it yourself.",
+    "نوی اپ د دې اپ تر څنګ نصبېږي، نه پر هغه؛ دا اپ او دفتر یې تر هغه پاتې کېږي چې تاسو یې پخپله لرې کړئ.",
+  )
+  fun movedPending(n: Any): String = t(
+    "هنوز ${asIs(n)} تغییرِ این دستگاه به سرور نرسیده. تا همه نرسیده‌اند این برنامه را پاک نکنید؛ وگرنه آن کارها در برنامهٔ تازه نیستند.",
+    "$n ${pl(n, "change", "changes")} from this device ${pl(n, "hasn't", "haven't")} reached the server yet. Don't remove this app until they all have; otherwise that work won't be in the new app.",
+    "د دې وسیلې $n بدلونونه لا سرور ته نه دي رسېدلي. تر څو چې ټول ونه رسېږي دا اپ مه لرې کوئ؛ کنه هغه کارونه په نوي اپ کې نه وي.",
+  )
+  val movedNotSynced: String get() = t(
+    "دفترِ این دستگاه هنوز کامل به سرور نرسیده. «همین حالا همگام کن» را بزنید و تا آن وقت این برنامه را پاک نکنید.",
+    "This device's ledger hasn't fully reached the server yet. Tap “Sync now”, and don't remove this app until then.",
+    "د دې وسیلې دفتر لا بشپړ سرور ته نه دی رسېدلی. «همدا اوس همغږي کړئ» ووهئ او تر هغه دا اپ مه لرې کوئ.",
+  )
+  val movedNotSignedIn: String get() = t(
+    "این دستگاه به حسابی وصل نیست، پس دفترش فقط روی همین دستگاه است. اول در همین برنامه وارد شوید و بگذارید همه‌چیز همگام شود؛ تا آن وقت این برنامه را پاک نکنید.",
+    "This device isn't signed in to an account, so its ledger is only on this device. Sign in here first and let everything sync; don't remove this app until then.",
+    "دا وسیله په کوم حساب کې نه ده ننوتې، نو دفتر یې یوازې په همدې وسیله کې دی. لومړی په همدې اپ کې ننوځئ او پرېږدئ چې هر څه همغږي شي؛ تر هغه دا اپ مه لرې کوئ.",
+  )
+  val movedSafe: String get() = t(
+    "همه‌چیز به سرور رسیده. وقتی در برنامهٔ تازه وارد شدید و دفترتان را آن‌جا دیدید، می‌توانید این برنامه را پاک کنید.",
+    "Everything has reached the server. Once you've signed in to the new app and see your ledger there, you can remove this app.",
+    "ټول شیان سرور ته رسېدلي. کله چې په نوي اپ کې ننوتئ او خپل دفتر مو هلته ولید، دا اپ لرې کولی شئ.",
+  )
+  val movedInstall: String get() = t("گرفتن و نصبِ برنامهٔ تازه", "Get and install the new app", "نوی اپ ترلاسه او نصب کړئ")
+  val movedInstallReady: String get() = t("نصبِ برنامهٔ تازه", "Install the new app", "نوی اپ نصب کړئ")
+  val movedLater: String get() = t("بعداً", "Later", "وروسته")
 }

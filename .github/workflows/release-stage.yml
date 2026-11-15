@@ -97,6 +97,8 @@ jobs:
           fi
           want="$want SHA256SUMS.txt version.txt"
           if printf '%s\n' "$names" | grep -qx 'SHA256SUMS.txt.sig'; then want="$want SHA256SUMS.txt.sig"; fi
+          #  شناسهٔ نصبِ اندروید (`app-id.txt`، تصمیمِ ۱۴۰۵/۰۸/۲۴) — برچسبِ نسخه‌دار هم آن را دارد تا برنامهٔ شناسهٔ دیگر آن را «به‌روزرسانی» نبیند
+          if printf '%s\n' "$names" | grep -qx 'app-id.txt'; then want="$want app-id.txt"; fi
           mkdir -p staged
           for f in $want; do
             printf '%s\n' "$names" | grep -qxF "$f" || { echo "::error::$f روی انتشارِ $beta نیست"; exit 1; }

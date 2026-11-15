@@ -15,7 +15,7 @@
 | # | کار | کجا | نتیجه |
 |---|---|---|---|
 | ۱ | ساختنِ پروژهٔ رایگانِ Firebase | console.firebase.google.com | یک پروژه |
-| ۲ | افزودنِ دو برنامهٔ اندروید (`ir.vil3ntec.tohid` و `ir.vil3ntec.tohid.preview`) | همان کنسول | فایلِ `google-services.json` |
+| ۲ | افزودنِ دو برنامهٔ اندروید (`com.vill3n.dailyshop` و `com.vill3n.dailyshop.preview`) | همان کنسول | فایلِ `google-services.json` |
 | ۳ | گذاشتنِ آن فایل در GitHub به نامِ `GOOGLE_SERVICES_JSON` | تنظیماتِ مخزن ← Secrets | برنامهٔ بعدی با اعلانِ گوشی ساخته می‌شود |
 | ۴ | ساختنِ «کلیدِ حسابِ سرویس» و گذاشتنش روی سرور (`FCM_SERVICE_ACCOUNT_FILE`) | کنسول ← کامپیوترِ سرور | سرور می‌تواند اعلان بفرستد |
 | ۵ | روشن کردنِ کلیدها (پنل و پرچم‌ها) | پنلِ مدیر | برای یک دکانِ آزمایشی روشن |
@@ -38,14 +38,18 @@
 
 ## گامِ ۲ — افزودنِ برنامهٔ اندروید و گرفتنِ `google-services.json`
 
-نامِ بستهٔ برنامه (همان که در `android-native/app/build.gradle.kts` نوشته شده): **`ir.vil3ntec.tohid`**.
-نسخهٔ «پیش‌نمایش» بستهٔ جدای **`ir.vil3ntec.tohid.preview`** دارد. **هر دو** را بیفزایید:
+نامِ بستهٔ برنامه (همان که در `android-native/app/build.gradle.kts` نوشته شده): **`com.vill3n.dailyshop`**.
+نسخهٔ «پیش‌نمایش» بستهٔ جدای **`com.vill3n.dailyshop.preview`** دارد. **هر دو** را بیفزایید:
+
+> از ۱۴۰۵/۰۸/۲۴ (تصمیمِ صاحب‌کار، `docs/OWNER-DECISIONS-fa.md`) شناسهٔ نصب `com.vill3n.dailyshop` است. نامِ پیشین
+> `ir.vil3ntec.tohid` دیگر در Firebase لازم نیست؛ فقط «پلِ گذار» (یک ساختِ یک‌باره با شناسهٔ قدیمی) با آن ساخته
+> می‌شود و آن یکی عمداً بی اعلانِ گوشی است.
 
 1. در صفحهٔ اولِ پروژه، نشانِ اندروید (آدمکِ سبز) یا «**Add app**» ← «Android».
-2. «Android package name»: دقیقاً `ir.vil3ntec.tohid` (بی فاصله، با حروفِ کوچک). «App nickname»: `توحید`.
+2. «Android package name»: دقیقاً `com.vill3n.dailyshop` (بی فاصله، با حروفِ کوچک). «App nickname»: `فروشگاه من`.
    «Debug signing certificate SHA-1» را **خالی** بگذارید (برای اعلان لازم نیست). «Register app».
 3. دکمهٔ «Download google-services.json» را فعلاً نزنید؛ «Next»، «Next»، «Continue to console».
-4. دوباره «Add app» ← «Android»، این بار نامِ بسته `ir.vil3ntec.tohid.preview` و نام `توحید — پیش‌نمایش`. «Register app»، بعد تا آخر «Next».
+4. دوباره «Add app» ← «Android»، این بار نامِ بسته `com.vill3n.dailyshop.preview` و نام `فروشگاه من — پیش‌نمایش`. «Register app»، بعد تا آخر «Next».
 5. حالا از چرخ‌دندهٔ بالای چپ ← «**Project settings**» ← زبانهٔ «General»، پایینِ صفحه در «Your apps» یکی از دو برنامهٔ اندروید را
    بزنید و «**google-services.json**» را دانلود کنید. این فایل **هر دو** برنامه را دارد (چون پس از افزودنِ هر دو گرفته شد).
 

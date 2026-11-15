@@ -4,7 +4,7 @@ package android.content.pm
 class ApplicationInfo internal constructor() {
   val targetSdkVersion: Int get() = 0
   val flags: Int get() = 0
-  val packageName: String get() = "ir.vil3ntec.tohid"
+  val packageName: String get() = "com.vill3n.dailyshop"
   /** پوشهٔ دادهٔ برنامه (پدرِ `filesDir`) — اندروید: ‎/data/data/<بسته>‎ */
   val dataDir: String get() = android.content.IosContext.filesDir.absoluteFile.parentFile?.path.orEmpty()
 

@@ -59,7 +59,19 @@ object Updater {
     val sumsUrl: String = "",
     /** §۳۸.۹: حداقل نسخهٔ پشتیبانی‌شده (فقط از سرورِ خودمان)؛ خالی ⇒ حداقلی نیست */
     val minVersion: String = "",
+    /**
+     *  `AppMove`: شناسهٔ نصبِ برنامهٔ تازه، وقتی این انتشار برنامهٔ **دیگری** است (کنارِ این یکی نصب می‌شود، نه
+     *  رویش)؛ خالی ⇒ همین برنامه، به‌روزرسانیِ عادی.
+     */
+    val movedTo: String = "",
   )
+
+  /** شناسهٔ نصبِ همین برنامه (پیش‌نمایش با `.preview`) */
+  private val ownId: String get() = ir.vil3ntec.tohid.BuildConfig.APPLICATION_ID
+
+  /** `app-id.txt` ِ انتشار ⇐ `movedTo`؛ نبودِ فایل یا هر خطایی ⇒ «» (همان رفتارِ پیش از شناسهٔ تازه) */
+  private fun movedVia(url: String): String =
+    if (url.isBlank()) "" else AppMove.movedTo(AppMove.parseId(runCatching { get(url) }.getOrNull()), ownId)
 
   /**
    *  owner/repo — از تنظیمات می‌آید تا هر وقت خواستی عوضش کنی.
@@ -121,7 +133,7 @@ object Updater {
    *  نمی‌دهد ⇒ همان `tohid-native`، مثلِ پیش. خواندنِ پاسخ: `ReleaseFeed`.
    */
   private fun fromServer(server: String, shop: String, device: String): Release? {
-    val latest = ReleaseFeed.parseLatest(get(ReleaseFeed.latestUrl(server, TAG, shop, device)), TAG) ?: return null
+    val latest = ReleaseFeed.parseLatest(get(ReleaseFeed.latestUrl(server, TAG, shop, device, ownId)), TAG) ?: return null
     val chosen = ReleaseFeed.androidInstaller(latest.assets) ?: return null
     return Release(
       version = latest.version,
@@ -130,6 +142,7 @@ object Updater {
       size = chosen.size,
       sumsUrl = if (latest.hasSums) ReleaseFeed.fileUrl(server, latest.tag, ReleaseFeed.SUMS) else "",
       minVersion = latest.minVersion,
+      movedTo = AppMove.movedTo(latest.appId, ownId),
     )
   }
 
@@ -153,6 +166,7 @@ object Updater {
       apkUrl = pick.apk.url,
       size = pick.apk.size,
       sumsUrl = pick.sumsUrl,
+      movedTo = movedVia(pick.appIdUrl),
     )
   }
 
@@ -172,6 +186,7 @@ object Updater {
       apkUrl = apk.url,
       size = apk.size,
       sumsUrl = p.assets.first { it.name == ReleaseFeed.SUMS }.url,
+      movedTo = movedVia(p.assets.firstOrNull { it.name == AppMove.FILE }?.url.orEmpty()),
     )
   }
 
@@ -185,6 +200,7 @@ object Updater {
       apkUrl = stableApkUrl(slug),
       size = 0,
       sumsUrl = "https://github.com/$slug/releases/download/$TAG/SHA256SUMS.txt",
+      movedTo = movedVia("https://github.com/$slug/releases/download/$TAG/${AppMove.FILE}"),
     )
   }
 
@@ -341,6 +357,15 @@ object Updater {
     }
     return null
   }
+
+  /**
+   *  `AppMove`: بستهٔ فایلِ گرفته‌شده، وقتی **همین برنامه نیست** (شناسهٔ نصبِ دیگر)؛ همین برنامه یا ناخوانا ⇒ null.
+   *  `UpdateManager.install` چنین فایلی را بی برگهٔ «برنامه با نامِ تازه آمده» به نصب‌کننده نمی‌دهد.
+   */
+  fun foreignPackage(context: Context, apk: File): String? = runCatching {
+    @Suppress("DEPRECATION")
+    context.packageManager.getPackageArchiveInfo(apk.path, 0)?.packageName
+  }.getOrNull()?.takeIf { it.isNotBlank() && it != context.packageName }
 
   /** فایلِ آمادهٔ همین نسخه، اگر از قبل کامل گرفته شده باشد */
   fun readyFile(context: Context, release: Release): File? {

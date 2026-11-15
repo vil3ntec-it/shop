@@ -19,7 +19,8 @@ plugins {
  *  ⛔ افزونهٔ google-services **فقط** وقتی `app/google-services.json` کنارِ همین فایل است اعمال می‌شود. آن فایل هرگز
  *  در مخزن نیست (`.gitignore`): CI آن را از secret ِ `GOOGLE_SERVICES_JSON` می‌نویسد و بی آن secret، و هر ساختِ
  *  محلی، همان برنامهٔ بی‌پوش ساخته می‌شود (`BuildConfig.FCM_BUNDLED = false` ⇒ هیچ کدِ Firebase صدا زده نمی‌شود).
- *  فایل باید هر دو بسته را داشته باشد: `ir.vil3ntec.tohid` و `ir.vil3ntec.tohid.preview` (نسخهٔ پیش‌نمایش).
+ *  فایل باید هر دو بسته را داشته باشد: `com.vill3n.dailyshop` و `com.vill3n.dailyshop.preview` (نسخهٔ پیش‌نمایش؛
+ *  شناسهٔ نصبِ تازه از ۱۴۰۵/۰۸/۲۴ — پایین‌تر، کنارِ `applicationId`).
  */
 val googleServices = file("google-services.json").isFile
 if (googleServices) apply(plugin = "com.google.gms.google-services")
@@ -155,10 +156,21 @@ android {
       ?: (project.findProperty("tohid.updateKey") as String?)?.takeIf { it.isNotBlank() }
       ?: ""
 
+  /*
+   *  شناسهٔ نصب (applicationId) — تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۴: `com.vill3n.dailyshop` (پیش‌نمایش `….preview`).
+   *
+   *  ⛔ فقط شناسهٔ نصب عوض شد؛ `namespace` و بسته‌های کد (`ir.vil3ntec.tohid.*`، پس `R` و `BuildConfig`) همان‌اند.
+   *  گوشیِ دارای `ir.vil3ntec.tohid` این نسخه را **کنارِ** برنامهٔ قدیمی نصب می‌کند، نه رویش: به‌روزرسانِ داخلی آن را
+   *  «به‌روزرسانی» نشان نمی‌دهد و برگهٔ «برنامه با نامِ تازه آمده» را باز می‌کند (`update/AppMove.kt`، `app-id.txt` ِ انتشار).
+   *
+   *  پلِ گذار (فقط یک بار، پیش از نخستین پایدارِ شناسهٔ تازه): `TOHID_LEGACY_APP_ID=true` (ورودیِ `legacy_id` ِ
+   *  «توحید بومی») یا `-Ptohid.legacyAppId=true` همین کد را با شناسهٔ قدیمی می‌سازد تا گوشی‌های قدیمی اول همین
+   *  کد (و برگهٔ راهنما) را مثلِ یک به‌روزرسانیِ عادی بگیرند. جز «true» هیچ مقداری شناسه را عوض نمی‌کند.
+   */
+  val legacyAppId = (env("TOHID_LEGACY_APP_ID") ?: project.findProperty("tohid.legacyAppId") as String?)?.trim() == "true"
+
   defaultConfig {
-    // همان بستهٔ نسخهٔ قبلی: نصب می‌شود *روی* آن، و داده‌های قدیمی
-    // سرِ جایشان می‌مانند تا وارد شوند.
-    applicationId = "ir.vil3ntec.tohid"
+    applicationId = if (legacyAppId) "ir.vil3ntec.tohid" else "com.vill3n.dailyshop"
     minSdk = 24
     targetSdk = 35
     //  نسخهٔ Play یک پله بالاتر (`playTargetSdk` بالا)؛ `LocalNetworkManifestTest` هر دو را با مانیفست می‌سنجد
@@ -340,7 +352,7 @@ android {
      *  نسخهٔ پیش‌نمایش — `assemblePreview`، فقط از `tohid-native-preview.yml`.
      *
      *  همان release (کلید، سرور، R8، کلیدهای سنجاق‌شده)، ولی بستهٔ جدا
-     *  (`ir.vil3ntec.tohid.preview`): کنارِ برنامهٔ اصلی نصب می‌شود و به داده‌اش
+     *  (`com.vill3n.dailyshop.preview`): کنارِ برنامهٔ اصلی نصب می‌شود و به داده‌اش
      *  دست نمی‌زند. versionCode همان «۱۰۰ + buildNumber» است و buildNumber را
      *  ورک‌فلوِ پیش‌نمایش از شمارهٔ اجرای خودش می‌دهد؛ چون بسته جداست، با
      *  versionCodeِ انتشار هیچ ربطی ندارد. نام: `src/preview/res/values/strings.xml`.
