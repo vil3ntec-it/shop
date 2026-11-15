@@ -70,13 +70,16 @@ class LookGuardTest {
     assertTrue(text("ui/v3/analytics/ReportsScreen.kt").contains("V3Dropdown("))
   }
 
-  /** پرونده‌های داشبوردِ خانه (و خودِ کادرِ گرادیانی) — صاحب‌کار: «خانه را دست نزن» */
+  /**
+   *  پرونده‌های داشبوردِ خانه (و خودِ کادرِ گرادیانی) — صاحب‌کار: «خانه را دست نزن». اثرِ تازه فقط با خواستهٔ خودِ صاحب‌کار:
+   *  ۶۳g «ارز را یک کادرِ کوچک توی چارت بگذار» (HomeHero*، HeroMoney*: تراشهٔ ارزِ گاوصندوق؛ دکانِ فقط‌افغانی بیت‌به‌بیت همان کادر).
+   */
   private val dashboard = mapOf(
     "ui/v3/shell/HomeAccents.kt" to "661f1bb3f069b39a",
     "ui/v3/shell/HomeDrawerCard.kt" to "b2abe9468bb6cfd6",
-    "ui/v3/shell/HomeHero.kt" to "78c6f41099542af3",
-    "ui/v3/shell/HomeHeroAndroid.kt" to "caf8c17985b85db0",
-    "ui/v3/shell/HomeHeroCard.kt" to "6e31724916954312",
+    "ui/v3/shell/HomeHero.kt" to "7d387b698015fed9",
+    "ui/v3/shell/HomeHeroAndroid.kt" to "7848c0af51b14200",
+    "ui/v3/shell/HomeHeroCard.kt" to "dfe6ef9b70b42ed0",
     "ui/v3/shell/HomeSalesCard.kt" to "4ba6b745c8b4805b",
     "ui/v3/shell/HomeScreen.kt" to "2053f8948f58e2d0",
     "ui/v3/shell/HomeShortcuts.kt" to "1c6a39676f781dc4",
@@ -87,8 +90,8 @@ class LookGuardTest {
     "ui/v3/shell/HomeView.kt" to "070fca810e6224ce",
     "ui/v3/shell/DeskHome.kt" to "4b21911118a57c2c",
     "ui/v3/shell/DashboardNumbers.kt" to "132f992d7d26c645",
-    "ui/v3/shell/HeroMoney.kt" to "e2ab7de317fd8349",
-    "ui/v3/shell/HeroMoneySheet.kt" to "82d6b37547c66841",
+    "ui/v3/shell/HeroMoney.kt" to "b543739c866c10d4",
+    "ui/v3/shell/HeroMoneySheet.kt" to "74e98770e7221dce",
     "ui/v3/V3HeroCard.kt" to "95171b224dfd0333",
   )
 
