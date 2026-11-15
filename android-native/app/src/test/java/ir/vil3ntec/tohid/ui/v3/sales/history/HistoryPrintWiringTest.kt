@@ -36,7 +36,9 @@ class HistoryPrintWiringTest {
 
   /**
    *  ۶۳w: کادرِ گرادیانی (`wrapChips = true`) جایش را به خلاصهٔ آرام (`V3Summary`) داد که کارهایش را همیشه در `FlowRow`
-   *  به ردیفِ بعد می‌برد؛ قاعده همان: «چاپ» پیش از صندوقِ بلند، تا در ردیفِ نخست بماند.
+   *  به ردیفِ بعد می‌برد؛ «چاپ» نخستین کارِ خلاصه است.
+   *  ۶۵h (عمدی): «صندوق بسته است» وضعیت است، نه کار ⇒ دیگر قرصِ خلاصه نیست (پیش‌تر این آزمون «چاپ پیش از صندوقِ بلند» را
+   *  می‌سنجید)؛ حالِ صندوق ردیفِ زدنیِ کارتِ نتیجه است (`PeriodResult` ⇐ `DrawerRow`، همان `actions.drawer`).
    */
   @Test fun `خلاصهٔ بالای تاریخچه کارها را به ردیفِ بعد می‌برد، نمی‌بُرد`() {
     assertTrue(src("HistoryParts.kt").contains("V3Summary("))
@@ -44,6 +46,9 @@ class HistoryPrintWiringTest {
       .map { File(it, "ir/vil3ntec/tohid/ui/v3/V3Summary.kt") }.first { it.isFile }.readText()
     assertTrue(summary.contains("FlowRow(Modifier.fillMaxWidth()"))
     val top = src("HistoryScreen.kt")
-    assertTrue(top.indexOf("V3SummaryAction(StrHistory.print") in 1 until top.indexOf("V3SummaryAction(it.text, Icons.Outlined.PointOfSale"))
+    assertTrue(top.indexOf("V3SummaryAction(StrHistory.print") > 0)
+    assertFalse("حالِ صندوق قرصِ سربرگ نیست", top.contains("V3SummaryAction(it.text, Icons.Outlined.PointOfSale"))
+    assertTrue(top.contains("PeriodResult(p.totals, HistoryResult.netLabel(current, p.unit, title), money, drawer.takeIf { current }, ctx.actions.drawer)"))
+    assertTrue(src("HistoryResult.kt").contains("DrawerRow(drawer, onDrawer)"))
   }
 }

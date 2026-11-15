@@ -63,6 +63,17 @@ class DebtorLedgerModelTest {
     assertEquals(listOf(Action.EDIT, Action.DELETE), DebtorLedgerModel.actions("ندارد", hasTransactions = false))
   }
 
+  /** صاحب‌کار ۱۴۰۵/۰۸/۲۴: فهرستِ «فاکتورهای این مشتری» زیرِ تراکنش‌ها نیست؛ «فاکتورها» کنارِ «ویرایش» فقط وقتی فاکتوری هست */
+  @Test
+  fun invoicesActionOnlyWhenTheCustomerHasInvoices() {
+    assertEquals(listOf(Action.EDIT, Action.INVOICES, Action.DELETE), DebtorLedgerModel.actions("", hasTransactions = false, hasSales = true))
+    assertEquals(listOf(Action.EDIT, Action.DELETE), DebtorLedgerModel.actions("", hasTransactions = false, hasSales = false))
+    assertEquals(
+      listOf(Action.EDIT, Action.INVOICES, Action.STATEMENT_CSV, Action.PRINT, Action.DELETE),
+      DebtorLedgerModel.actions("", hasTransactions = true, hasSales = true),
+    )
+  }
+
   @Test
   fun statementImageOnlyWithCrmSwitchAndTransactions() {
     //  CRM-05: «تصویرِ صورت‌حساب» فقط با «گزارش‌های مشتری» روشن و فقط وقتی تراکنشی هست

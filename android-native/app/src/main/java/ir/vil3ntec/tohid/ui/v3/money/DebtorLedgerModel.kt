@@ -52,17 +52,22 @@ object DebtorLedgerModel {
   /* ------------------------------ کشو ------------------------------ */
 
   /** کارهای کشوی حساب، به همان ترتیبی که دیده می‌شوند */
-  enum class Action { CALL, SMS, WHATSAPP, EDIT, STATEMENT_CSV, PRINT, STATEMENT_IMAGE, DELETE }
+  enum class Action { CALL, SMS, WHATSAPP, EDIT, INVOICES, STATEMENT_CSV, PRINT, STATEMENT_IMAGE, DELETE }
 
   /**
    *  کدام کارها برای این حساب معنی دارد: تماس/پیامک/واتساپ فقط با شمارهٔ
    *  گرفتنی؛ صورت‌حساب و چاپ فقط وقتی تراکنشی هست. ویرایش و حذف همیشه.
    *  [image] (CRM-05، «گزارش‌های مشتری» روشن) ⇒ «تصویرِ صورت‌حساب» هم، کنارِ صورت‌حساب و چاپ.
    */
-  /** @param contacts CRM-15 — مجوزِ دیدنِ شمارهٔ مشتری (`customers.contact`)؛ بی آن تماس، پیامک و واتس‌اپ نیست */
-  fun actions(phone: String, hasTransactions: Boolean, image: Boolean = false, contacts: Boolean = true): List<Action> = buildList {
+  /**
+   *  @param contacts CRM-15 — مجوزِ دیدنِ شمارهٔ مشتری (`customers.contact`)؛ بی آن تماس، پیامک و واتس‌اپ نیست
+   *  @param hasSales فاکتورِ این مشتری (نقد یا نسیه) هست ⇒ «فاکتورها» (تاریخچهٔ فروشِ همین مشتری). صاحب‌کار ۱۴۰۵/۰۸/۲۴:
+   *    فهرستِ «فاکتورهای این مشتری» زیرِ تراکنش‌ها نیست — فاکتورِ نسیه در ردیفِ «برد» ِ خودش است و همه از همین دکمه
+   */
+  fun actions(phone: String, hasTransactions: Boolean, image: Boolean = false, contacts: Boolean = true, hasSales: Boolean = false): List<Action> = buildList {
     if (contacts && dialable(phone).isNotEmpty()) addAll(listOf(Action.CALL, Action.SMS, Action.WHATSAPP))
     add(Action.EDIT)
+    if (hasSales) add(Action.INVOICES)
     if (hasTransactions) addAll(listOf(Action.STATEMENT_CSV, Action.PRINT))
     if (hasTransactions && image) add(Action.STATEMENT_IMAGE)
     add(Action.DELETE)

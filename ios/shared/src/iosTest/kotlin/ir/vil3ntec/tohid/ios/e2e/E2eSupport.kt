@@ -127,6 +127,11 @@ internal object Find {
   /** کادرِ نوشتنیِ `V3TextField`/`DraftSecretField` (برچسبش `contentDescription` ِ کادر است) */
   fun field(label: String) = hasSetTextAction() and hasContentDescription(label)
 
+  /** کادرِ کشویی (`ChoiceDropdown` ِ ۶۳k: نقشِ DropdownList، توضیح = برچسب)؛ `value` ⇒ همان که الان برگزیده است (StateDescription) */
+  fun dropdown(label: String, value: String? = null) =
+    hasContentDescription(label) and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.DropdownList) and hasClickAction() and
+      (if (value == null) SemanticsMatcher("any") { true } else SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, value))
+
   /** زبانهٔ نوارِ پایینِ گوشی (`PhoneNavBar`: نقشِ Tab، توضیح = نامِ مورد) */
   fun tab(id: String) =
     hasContentDescription(NavCatalog.of(id)!!.label) and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Tab) and hasClickAction()

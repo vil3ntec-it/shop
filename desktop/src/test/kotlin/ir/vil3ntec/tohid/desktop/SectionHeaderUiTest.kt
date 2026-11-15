@@ -119,6 +119,68 @@ class SectionHeaderUiTest {
     assertTrue("در نوار", t.bottom <= px(56f) + 1f)
   }
 
+  /** گرهِ عنوانِ نوار هیچ آیکنِ زدنیِ نوار را نمی‌بُرد (مرزِ گره) */
+  private fun assertTitleClear(where: String, title: String) {
+    val t = titleNode(title).boundsInRoot
+    assertTrue("$where: عنوان در نوار — $t", t.bottom <= px(64f))
+    val icons = nodes(hasClickAction()).map { it.boundsInRoot }.filter { it.bottom <= px(64f) && it.width < px(80f) }
+    icons.forEach { i -> assertTrue("$where: عنوانِ «$title» زیرِ آیکن — $t / $i", t.right <= i.left + 0.5f || t.left >= i.right - 0.5f) }
+    assertTrue("$where: عنوان کامل یا دست‌کم پیدا", t.width > px(40f))
+  }
+
+  @Test fun busyBarWithBackThreeActionsAndMenuNeverCoversTheTitle() {
+    rule.setContent {
+      CompositionLocalProvider(LocalContext provides ctx) {
+        TohidTheme(ThemeChoice.LIGHT) {
+          CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+            Box(Modifier.width(360.dp)) {
+              V3Scaffold(
+                title = Str.salesHistory,
+                onBack = {},
+                actions = listOf(Icons.Outlined.Tune, Icons.Outlined.PointOfSale, Icons.Outlined.Print).mapIndexed { i, ic -> V3Action(ic, "کار $i") {} },
+                overflow = listOf(ir.vil3ntec.tohid.ui.v3.V3MenuItem(Icons.Outlined.Print, "منو") {}),
+              ) { }
+            }
+          }
+        }
+      }
+    }
+    rule.waitForIdle()
+    assertTitleClear("برگشت + سه کار + منو", Str.salesHistory)
+  }
+
+  @Test fun everyBusySectionKeepsItsBarTitleClear() {
+    val money = MoneyDemo.full()
+    val pages = listOf(
+      "sales" to Str.salesHistory, "expenses" to Str.expenses, "purchasing" to Str.purchasing, "reports" to Str.reports,
+      "receipts" to null, "stock" to null, "products" to null, "promos" to null,
+    )
+    val path = androidx.compose.runtime.mutableStateOf("sales")
+    I18n.source = { Lang.FA }
+    val store = RouteUiHarness.loadedStore(money)
+    rule.setContent {
+      CompositionLocalProvider(
+        LocalContext provides ctx,
+        androidx.compose.ui.platform.LocalView provides androidx.compose.runtime.remember { android.view.View(ctx) },
+        androidx.compose.ui.platform.LocalConfiguration provides androidx.compose.ui.platform.Configuration(360, 760),
+      ) {
+        TohidTheme(ThemeChoice.LIGHT) {
+          CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+            Box(Modifier.width(360.dp)) { ir.vil3ntec.tohid.desktop.shots.V3RoutePreview(path.value, store, dark = false) }
+          }
+        }
+      }
+    }
+    for ((p, title) in pages) {
+      path.value = p
+      rule.waitForIdle()
+      rule.waitUntil(15_000) { nodes(heading, unmerged = true).any { it.boundsInRoot.bottom <= px(64f) && it.config.contains(SemanticsProperties.Text) } }
+      val bar = nodes(heading, unmerged = true).first { it.boundsInRoot.bottom <= px(64f) && it.config.contains(SemanticsProperties.Text) }
+      val name = title ?: bar.config[SemanticsProperties.Text].joinToString("")
+      assertTitleClear(p, name)
+    }
+  }
+
   @Test fun expensesMonthDropdownAndCategoryChartAreInsideTheSummaryCard() {
     val d = MoneyDemo.full()
     h.show("expenses", d)

@@ -36,14 +36,11 @@ import ir.vil3ntec.tohid.ui.theme.V3Status
  *     جزئیات، نگه‌داشتن یا «…» می‌مانند.
  */
 
-/** رنگِ متنِ وضعیت: آرام خاکستری، توجه کهربایی، خطر قرمز؛ بدهی/رسیدِ دفتر همان سرخ/سبزِ حساب */
+/** رنگِ متنِ وضعیت: آرام خاکستری، توجه کهربایی، خطر قرمز */
 fun v3RowToneColor(c: PhoneV3Colors, tone: V3RowTone): Color = when (tone) {
   V3RowTone.QUIET -> c.inkMuted
   V3RowTone.ATTENTION -> PhoneV3Roles.status(c, V3Status.WARNING).fg
   V3RowTone.DANGER -> PhoneV3Roles.errorText(c)
-  //  همان `PhoneV3Debt.colors.owe/settled` (= `negative`/`positive`) ِ مبلغ‌های حساب
-  V3RowTone.DEBT -> c.negative
-  V3RowTone.RECEIPT -> c.positive
 }
 
 /**

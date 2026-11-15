@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
 import ir.vil3ntec.tohid.core.i18n.StrDebtor
+import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.ui.v3.money.DebtorLedgerModel
 
 import android.content.Context
@@ -48,6 +49,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ExpandMore
@@ -56,7 +58,6 @@ import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.NorthEast
 import androidx.compose.material.icons.outlined.Print
-import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Sms
 import androidx.compose.material.icons.outlined.SouthWest
 import androidx.compose.material.icons.outlined.Tune
@@ -215,6 +216,7 @@ internal fun DebtorDetailScreen(
       DebtorLedgerModel.Action.WHATSAPP ->
         open("https://wa.me/${DebtorLedgerModel.whatsappNumber(debtor.phone)}?text=" + android.net.Uri.encode(message))
       DebtorLedgerModel.Action.EDIT -> onEdit()
+      DebtorLedgerModel.Action.INVOICES -> Unit   //  فقط پروندهٔ نسخهٔ ۳ (`hasSales`)؛ این‌جا فهرستِ فاکتورها سرِ جایش است
       DebtorLedgerModel.Action.STATEMENT_CSV -> {
         val sheet = ReportCsv.statement(d, debtor.id, todayIso())
         pendingCsv = sheet
@@ -393,6 +395,7 @@ private fun ActionButton(action: DebtorLedgerModel.Action, modifier: Modifier, o
     DebtorLedgerModel.Action.WHATSAPP -> Icons.AutoMirrored.Outlined.Chat to StrDebtor.whatsapp
     DebtorLedgerModel.Action.EDIT -> Icons.Outlined.Edit to StrDebtor.edit
     DebtorLedgerModel.Action.STATEMENT_CSV -> Icons.Outlined.FileDownload to StrDebtor.statementCsv
+    DebtorLedgerModel.Action.INVOICES -> Icons.AutoMirrored.Outlined.ReceiptLong to StrMoney.invoicesAction
     DebtorLedgerModel.Action.PRINT -> Icons.Outlined.Print to StrDebtor.print
     DebtorLedgerModel.Action.STATEMENT_IMAGE -> Icons.Outlined.Image to StrDebtor.statementImage
     DebtorLedgerModel.Action.DELETE -> Icons.Outlined.DeleteOutline to StrDebtor.delete

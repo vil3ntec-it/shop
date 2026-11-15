@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
@@ -57,6 +58,8 @@ import ir.vil3ntec.tohid.data.DebtReminderSend
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.invoiceLabel
+import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.print.ReportPrint
 import ir.vil3ntec.tohid.print.StatementImage
 import ir.vil3ntec.tohid.ui.v3.LocalV3Toasts
@@ -68,6 +71,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Collapse
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
+import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Springs
 import ir.vil3ntec.tohid.ui.v3.V3StatusPill
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
@@ -174,6 +178,7 @@ private fun actionLook(action: DebtorLedgerModel.Action): Pair<ImageVector, Stri
   DebtorLedgerModel.Action.SMS -> Icons.Outlined.Sms to StrMoney.sms
   DebtorLedgerModel.Action.WHATSAPP -> Icons.AutoMirrored.Outlined.Chat to StrMoney.whatsapp
   DebtorLedgerModel.Action.EDIT -> Icons.Outlined.Edit to StrMoney.edit
+  DebtorLedgerModel.Action.INVOICES -> Icons.AutoMirrored.Outlined.ReceiptLong to StrMoney.invoicesAction
   DebtorLedgerModel.Action.STATEMENT_CSV -> Icons.Outlined.FileDownload to StrMoney.statementCsv
   DebtorLedgerModel.Action.PRINT -> Icons.Outlined.Print to StrMoney.print
   DebtorLedgerModel.Action.STATEMENT_IMAGE -> Icons.Outlined.Image to StrMoney.statementImage
@@ -262,6 +267,7 @@ internal fun rememberDebtorTasks(d: ShopData, account: DebtorEngine.Account, act
         DebtorLedgerModel.Action.WHATSAPP ->
           if (open("https://wa.me/${DebtorLedgerModel.whatsappNumber(debtor.phone)}?text=" + android.net.Uri.encode(message()))) acts.onReminded("whatsapp")
         DebtorLedgerModel.Action.EDIT -> acts.onEdit()
+        DebtorLedgerModel.Action.INVOICES -> acts.onOlderSales()
         DebtorLedgerModel.Action.STATEMENT_CSV -> {
           val sheet = ReportCsv.statement(data, debtor.id, todayIso())
           pendingCsv = sheet
@@ -274,5 +280,3 @@ internal fun rememberDebtorTasks(d: ShopData, account: DebtorEngine.Account, act
     }
   }
 }
-
-/* فاکتورهای مشتری: `DebtorInvoices.kt` (سادهٔ `claude/e-rows-63q`) */
