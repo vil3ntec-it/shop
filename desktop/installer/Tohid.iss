@@ -1,9 +1,19 @@
 ﻿; نصابِ ویندوزِ «فروشگاه من» — Inno Setup 6.5+، دو گونه از یک فایل:
 ;
-;   Tohid-Windows-Setup.exe    (پیش‌فرض، ~۳ مگابایت) — «نصابِ آنلاین»
-;   Tohid-Windows-Offline.exe  (/DOffline، ~۹۰ مگابایت) — همه‌چیز داخلِ خودش
+;   Tohid-Windows-Offline.exe  (/DOffline، ~۱۳۰ مگابایت) — همه‌چیز داخلِ خودش؛ تنها گونه‌ای که ساخته می‌شود
+;   Tohid-Windows-Setup.exe    (پیش‌فرض، ~۳ مگابایت) — «نصابِ آنلاین»؛ از 2.14.5 دیگر ساخته نمی‌شود
 ;
-; ── چرا آنلاین؟ (سناریوهای خطا، از گزارشِ صاحب مخزن) ─────────────────
+; ── یک نصاب (2.14.5) ──────────────────────────────────────────────────
+; صاحب‌کار: «آفلاین وسط‌اش چیه، این آنلاین و آفلاین است، مسخره» — یک نصابِ ویندوز. گامِ دانلودِ
+; نصابِ آنلاین روی اینترنتِ ضعیف همان جایی بود که می‌شکست؛ پس CI فقط ‎/DOffline‎ را می‌سازد و همان
+; بایت‌ها دو نام دارند: ‎Tohid-Windows-Offline.exe‎ (به‌روزرسانیِ درون‌برنامه، ‎/SILENT‎) و
+; ‎MyShop-Windows-Setup.exe‎ (صفحهٔ دانلود، ‎install.ps1‎، ‎MyShop-Setup-All.zip‎) — هنگامِ نصب هیچ دانلودی
+; نیست. فایلِ خرابِ دانلود را Inno با پیامِ «corrupted» رد می‌کند؛ راهِ مطمئن ‎install.ps1‎ است (SHA-256 و ادامه‌دار).
+; گونهٔ آنلاین (پایین، بی ‎/DOffline‎) فقط مانده تا روشن باشد نصابِ آنلاینی که کاربری از 2.11.42 تا 2.14.5
+; گرفته و نگه داشته چه می‌کند: ‎Tohid-Windows-App-<نسخهٔ خودش>.7z‎ را از ‎/api/releases/<برچسب>/file/‎ ِ سرورِ
+; خودمان و بعد GitHub می‌گیرد. ⛔ آن بسته‌ها و ‎Tohid-Windows-Setup.exe‎ ِ مانده روی انتشار پاک نشوند و آن نشانی‌ها عوض نشوند.
+;
+; ── چرا آنلاین بود؟ (2.11.42 تا 2.14.5؛ سناریوهای خطا، از گزارشِ صاحب مخزن) ──
 ; دو نصابِ کاملاً متفاوت (MSIِ WiX و Inno) روی کامپیوترِ او هر دو گفتند
 ; «فایل خراب است» («Data.cab is corrupt» و «The source file is corrupted»)،
 ; در حالی که فایلِ منتشرشده سالم بود و اندازهٔ فایلِ دانلودشده هم درست بود.
@@ -21,7 +31,8 @@
 ; به‌روزرسانیِ درون‌برنامه نسخهٔ Offline را می‌گیرد (خودش SHA256SUMSِ
 ; امضاشده را می‌سنجد) و با ‎/SILENT‎ اجرا می‌کند.
 ;
-; ساخت: tohid-desktop.yml — ‎iscc /DAppVersion=… /DPayloadSha=… /DPayloadSize=… /DPayloadBytes=… /DReleaseTag=… [/DOffline]‎
+; ساخت: tohid-desktop.yml — ‎iscc /DAppVersion=… /DOffline‎. گونهٔ آنلاین (دیگر ساخته نمی‌شود):
+; ‎iscc /DAppVersion=… /DPayloadSha=… /DPayloadSize=… /DPayloadBytes=… /DReleaseTag=…‎
 ;
 ; ── دانلودِ ادامه‌دار (۱۴۰۵/۰۷/۲۶) ─────────────────────────────────────
 ; DownloadPageِ Inno نمی‌تواند ادامه دهد: هر قطع ⇐ ۹۰ مگابایت از صفر. حالا
@@ -73,7 +84,11 @@ AppCopyright=(c) VIL3NTEC
 DefaultDirName={localappdata}\Tohid
 DefaultGroupName=فروشگاه من
 DisableProgramGroupPage=yes
-DisableDirPage=auto
+; صاحب‌کار (۱۴۰۵/۰۸/۲۴): «چرا نمی‌شه پوشهٔ موردِ نظر رو انتخاب کرد» — صفحهٔ پوشه همیشه دیده می‌شود (پیش‌تر ‎auto‎: با نصبِ پیشین
+; اصلاً نمی‌آمد). پیش‌فرض همان پوشهٔ پیشین (‎UsePreviousAppDir‎) یا ‎{localappdata}\Tohid‎. دادهٔ دکان جدا از پوشهٔ نصب در
+; ‎%LOCALAPPDATA%\Tohid‎ می‌ماند (`DesktopContext`)، پس هر پوشه‌ای امن است. پوشهٔ بی اجازهٔ نوشتن (مثلِ Program Files بی مدیر)
+; همان‌جا با پیامِ روشن رد می‌شود (`DirWritable`، پایین)، نه با خطای نیمه‌کارهٔ نصب. نصبِ خاموشِ به‌روزرسانی (/VERYSILENT) صفحه ندارد.
+DisableDirPage=no
 DisableWelcomePage=no
 UsePreviousAppDir=yes
 PrivilegesRequired=lowest
@@ -149,6 +164,33 @@ begin
   Result := True;
   for I := 1 to ParamCount do
     if CompareText(ParamStr(I), '/NOLAUNCH') = 0 then Result := False;
+end;
+
+// پوشهٔ نصب نوشتنی است؟ (نصب با اجازهٔ کاربرِ عادی است؛ ‎PrivilegesRequired=lowest‎) — پوشه را اگر نیست می‌سازد و یک پروندهٔ آزمون
+// می‌نویسد و پاک می‌کند؛ پوشه‌ای که خودش این‌جا ساخته شد و خالی ماند برداشته می‌شود
+function DirWritable(const Dir: String): Boolean;
+var
+  Probe: String;
+  Made: Boolean;
+begin
+  Made := not DirExists(Dir);
+  Result := ForceDirectories(Dir);
+  if not Result then Exit;
+  Probe := AddBackslash(Dir) + '.tohid-write-test';
+  Result := SaveStringToFile(Probe, 'ok', False);
+  if Result then DeleteFile(Probe);
+  if Made then RemoveDir(Dir);
+end;
+
+function DirPageOk: Boolean;
+begin
+  Result := DirWritable(WizardDirValue);
+  if not Result then
+    SuppressibleMsgBox(
+      'فروشگاه من cannot be installed in this folder:' + #13#10 + WizardDirValue + #13#10#13#10 +
+      'Windows does not allow writing there without administrator rights.' + #13#10 +
+      'Please choose another folder (for example on drive D:, or your Documents folder).',
+      mbError, MB_OK, IDOK);
 end;
 
 #ifndef Offline
@@ -486,6 +528,7 @@ var
   Err: String;
 begin
   Result := True;
+  if CurPageID = wpSelectDir then begin Result := DirPageOk; Exit; end;
   if CurPageID <> wpReady then Exit;
   if UseLocalPayload then Exit;
   if not DownloadPayload(Err) then begin
@@ -493,11 +536,17 @@ begin
       'فروشگاه من could not be downloaded.' + #13#10#13#10 +
       'Reason: ' + Err + #13#10#13#10 +
       'Please check your internet connection (or turn your VPN/proxy off or on) and click Install again.' + #13#10#13#10 +
-      'Without internet: download MyShop-Windows-Offline.exe from' + #13#10 +
+      'Without internet: download the full installer MyShop-Windows-Setup.exe from' + #13#10 +
       'https://vil3ntec-it.github.io/shop/download.html',
       mbCriticalError, MB_OK, IDOK);
     Result := False;
   end;
+end;
+#else
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if CurPageID = wpSelectDir then Result := DirPageOk;
 end;
 #endif
 

@@ -40,6 +40,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrA11y
@@ -62,11 +63,11 @@ import ir.vil3ntec.tohid.ui.v3.V3SummaryAction
 import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.InvoiceRefText
 import ir.vil3ntec.tohid.ui.v3.InvoiceRefs
-import ir.vil3ntec.tohid.ui.v3.V3IconTile
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Segmented
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
-import ir.vil3ntec.tohid.ui.v3.V3AmountStatus
+import ir.vil3ntec.tohid.ui.v3.V3QuietStatus
+import ir.vil3ntec.tohid.ui.v3.V3_ROW_DOT
 import ir.vil3ntec.tohid.ui.v3.V3PillAction
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
 import ir.vil3ntec.tohid.ui.v3.V3Type
@@ -105,7 +106,10 @@ internal fun PeriodSummary(p: SalesPeriods.Period, title: String, money: Boolean
   )
 }
 
-/** «نقد · نسیه · دیگر» و زیرش «برگشت» و «خالص» — همان جمع‌های X/Z؛ لغوشده و اینترنتی با یادداشت بیرون از جمع */
+/**
+ *  «نقد · نسیه · دیگر» — همان جمع‌های X/Z (کارتِ تفکیکِ پرداخت؛ `claude/e-rows-65s` آن را به درونِ خلاصه می‌برد).
+ *  ۶۵h: «برگشت / خالص / قرضِ وصول‌شده» و «بیرون از جمع» از این کارت به [PeriodResult] (`HistoryResult.kt`) رفتند.
+ */
 @Composable
 internal fun MoneySplit(t: SalesPeriods.Totals, modifier: Modifier = Modifier) {
   val c = PhoneV3.colors
@@ -115,29 +119,6 @@ internal fun MoneySplit(t: SalesPeriods.Totals, modifier: Modifier = Modifier) {
       Cell(StrHistory.cash, t.cash, V3Hue.MINT, Modifier.weight(1f))
       Cell(StrHistory.credit, t.credit, V3Hue.AMBER, Modifier.weight(1f))
       Cell(StrHistory.other, t.other, V3Hue.SKY, Modifier.weight(1f))
-    }
-    Spacer(Modifier.height(12.dp))
-    V3Divider()
-    Spacer(Modifier.height(10.dp))
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-      Text(
-        StrHistory.returns + " (" + plain(t.returns) + ")", style = V3Type.footnote, color = c.inkMuted,
-      )
-      Spacer(Modifier.width(6.dp))
-      Text(
-        if (t.refunds == 0L) PeriodLabel.amount(0) else "−" + PeriodLabel.amount(t.refunds),
-        style = V3Type.callout, color = if (t.refunds == 0L) c.ink else c.negative, modifier = Modifier.weight(1f),
-      )
-      Text(StrHistory.net + " ", style = V3Type.footnote, color = c.inkMuted)
-      Text(PeriodLabel.amount(t.net), style = V3Type.headline, color = c.ink)
-    }
-    if (t.receipts != 0L) {
-      Spacer(Modifier.height(4.dp))
-      Text(StrHistory.receipts + ": " + PeriodLabel.amount(t.receipts), style = V3Type.footnote, color = c.inkMuted)
-    }
-    if (t.cancelled > 0 || t.online > 0) {
-      Spacer(Modifier.height(4.dp))
-      Text(StrHistory.notInTotals, style = V3Type.caption, color = c.inkMuted)
     }
   }
 }
@@ -203,7 +184,7 @@ internal fun PeriodCard(
         Text(title, style = V3Type.headline, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(counts, style = V3Type.footnote, color = c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
       }
-      if (money) Text(PeriodLabel.amount(t.sales), style = V3Type.headline, color = c.ink, maxLines = 1)
+      if (money) Text(StrHistory.daySales(PeriodLabel.amount(t.sales)), style = V3Type.callout, color = c.ink, maxLines = 1)
       if (toggle) {
         Spacer(Modifier.width(6.dp))
         Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null, tint = c.chevron, modifier = Modifier.size(22.dp).rotate(turn))
@@ -212,6 +193,7 @@ internal fun PeriodCard(
     if (open) {
       Column(Modifier.padding(start = 10.dp, end = 10.dp, bottom = 10.dp)) {
         if (money) MoneySplit(t)
+        PeriodResult(t, HistoryResult.netLabel(current = false, p.unit, title), money, drawer = null, onDrawer = {})
         if (onPrint != null) {
           Spacer(Modifier.height(8.dp))
           V3Button(StrHistory.printTitle(title), onPrint, kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.Print, height = 40.dp)
@@ -222,40 +204,55 @@ internal fun PeriodCard(
 }
 
 /**
- *  ردیفِ یک فاکتور (سادهٔ e-rows-63d): عنوانِ معنادار (مشتری، وگرنه نامِ کالاها)، «ساعت · اقلام · #شماره»، و در پایان
- *  «مبلغ • وضعیت» به متنِ آرام — نقدیِ عادی بی وضعیت، نسیه کهربایی، لغوشده خط‌خورده. زدن ⇐ فاکتور؛ کشیدن ⇐ برگشت/لغو؛
+ *  ردیفِ یک فاکتور (۶۵h، روی سادهٔ e-rows-63d): کاشیِ آیکنِ رنگِ پرداخت، عنوانِ معنادار (مشتری، وگرنه نامِ کالاها)، زیرش
+ *  «● نسیه · ۱۴:۰۵ · ۳ قلم · #۱۲۴۵» (نقطه و واژه به رنگِ همان پرداخت — [historyTone])، و مبلغِ پررنگ در پایان. لغوشده: آیکن و
+ *  واژهٔ سرخ و مبلغِ خط‌خورده؛ برگشت‌خورده: خطِ سرخِ «↩ برگشت شد: …». زدن ⇐ فاکتور («#n» هم زدنی، ۶۳q)؛ کشیدن ⇐ برگشت/لغو؛
  *  نگه داشتن ⇐ همهٔ کارها (`SaleActionsSheet`).
  */
 @Composable
 internal fun InvoiceRow(s: Sale, ctx: RowCtx, first: Boolean, last: Boolean, withDate: Boolean) {
   val c = PhoneV3.colors
-  val row = remember(s, ctx.look, ctx.returnsV2, withDate, ctx.today, ir.vil3ntec.tohid.core.i18n.I18n.lang) {
+  val lang = ir.vil3ntec.tohid.core.i18n.I18n.lang
+  val row = remember(s, ctx.look, ctx.returnsV2, withDate, ctx.today, lang) {
     HistoryModel.row(ctx.d, s, ctx.returnsV2, look = ctx.look, withDate = withDate, today = ctx.today)
   }
-  val amount = remember(row.amount, ir.vil3ntec.tohid.core.i18n.I18n.lang) { PhoneSaleText.amount(row.amount) }
+  val amount = remember(row.amount, lang) { PhoneSaleText.amount(row.amount) }
   //  «۱۴:۰۵ · ۳ قلم · #۱۲۴۵»: شمارهٔ پایان زدنی (`InvoiceRef`، همان فاکتور) — هر «فاکتور #n» ِ برنامه یک جزء است (`claude/e-rows-63q`)
   val subtitle = remember(row.subtitle, row.number, row.id) { InvoiceRefs.linkify(row.subtitle, row.number.removePrefix("#"), row.id) }
-  val cancelled = row.state == SaleState.CANCELLED
+  val refund = remember(row.refunded, row.refundedAll, lang) {
+    if (row.refunded <= 0.0) null
+    else PhoneSaleText.amount(row.refunded).let { if (row.refundedAll) StrHistory.rowRefundedAll(it) else StrHistory.rowRefunded(it) }
+  }
+  val cancelled = row.kind == MoneyKind.CANCELLED
   val a = ctx.actions
   Column(Modifier.clip(groupShape(first, last)).background(c.card)) {
     if (!first) V3Divider(start = 64.dp)
     V3ListRow(
       title = row.title,
-      below = { InvoiceRefText(subtitle, maxLines = 1, debtorId = s.debtorId) },
-      leading = {
-        V3IconTile(
-          if (cancelled) Icons.Outlined.Block else Icons.AutoMirrored.Outlined.ReceiptLong,
-          hue = when {
-            cancelled -> null
-            row.state == SaleState.ONLINE -> V3Hue.SKY
-            row.credit -> V3Hue.AMBER
-            else -> V3Hue.MINT
-          },
-          danger = cancelled,
+      below = {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          MoneyWord(row.kind, row.payWord)
+          //  PAY-07 «در انتظار/ناموفق» کنارِ همان واژه، با شدّتِ خودش
+          row.status?.let { st ->
+            Text(V3_ROW_DOT, style = V3Type.footnote, color = c.inkMuted)
+            V3QuietStatus(st)
+          }
+          Text(" · ", style = V3Type.footnote, color = c.inkMuted)
+          InvoiceRefText(subtitle, Modifier.weight(1f, fill = false), maxLines = 1, debtorId = s.debtorId)
+        }
+        refund?.let { RefundLine(it) }
+      },
+      leading = { MoneyTile(row.kind) },
+      trailing = {
+        Text(
+          amount,
+          style = V3Type.headline,
+          color = if (cancelled) c.inkMuted else c.ink,
+          textDecoration = if (cancelled) TextDecoration.LineThrough else null,
+          maxLines = 1,
+          modifier = Modifier.widthIn(max = 150.dp),
         )
       },
-      //  «۳۰۰ ؋ • لغوشده» — بی قرص؛ PAY-07 «در انتظار/ناموفق» در همان متن با رنگِ توجه
-      trailing = { V3AmountStatus(amount, row.status, Modifier.widthIn(max = 168.dp), struck = cancelled) },
       chevron = false,
       endActions = buildList {
         if (row.canReturn) add(V3SwipeAction(Icons.AutoMirrored.Outlined.AssignmentReturn, if (ctx.returnsV2) StrSale.returnOrExchange else StrSale.returnWord) { a.ret(row.id) })

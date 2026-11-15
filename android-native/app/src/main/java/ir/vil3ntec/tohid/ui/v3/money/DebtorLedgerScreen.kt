@@ -117,6 +117,7 @@ internal fun DebtorLedgerScreen(
     //  CRM-05: «تصویرِ صورت‌حساب» فقط با «گزارش‌های مشتری» روشن (پیش‌فرض خاموش)
     image = ir.vil3ntec.tohid.data.ShopPolicy.crmReports(context),
     contacts = contacts,
+    hasSales = account.sales.isNotEmpty(),
   )
   //  CRM-15: یک ردیفِ «دیدنِ پرونده» برای هر باز شدن (شمارهٔ کامل پیداست ⇒ «شماره»)؛ تکرارِ ۱۰ دقیقه نوشته نمی‌شود
   androidx.compose.runtime.LaunchedEffect(id) { actions.onViewed(ir.vil3ntec.tohid.data.CustomerAccessLog.openKind(contacts, account.debtor)) }
@@ -271,9 +272,8 @@ private fun LazyListScope.ledgerItems(
       modifier = Modifier.v3AnimateItem(this).v3Stagger(stagger, tx.id, i),
     )
   }
-  if (account.sales.isNotEmpty()) {
-    item(key = "sales") { DebtorInvoices(account, actions.onOpenSale, actions.onOlderSales) }
-  }
+  //  فهرستِ جدای «فاکتورهای این مشتری» نیست (صاحب‌کار ۱۴۰۵/۰۸/۲۴): «فاکتور #n» در ردیفِ «برد» ِ خودش زدنی است و همهٔ فاکتورها
+  //  (نقد و نسیه) از دکمهٔ «فاکتورها» ِ «کارها و اطلاعات» (`DebtorLedgerModel.Action.INVOICES` ⇐ `onOlderSales`)
   //  POS-27، PRM-13، CRM-08/12: بخش‌های پرونده که هر کدام با تنظیمِ خودش دیده می‌شوند
   if (extras != null) item(key = "extras") { extras() }
   //  SEC-10: «حذفِ دادهٔ این مشتری» — فقط صاحب و پرچمِ روشنِ `shop.customer_erasure` (خاموش ⇒ هیچ)

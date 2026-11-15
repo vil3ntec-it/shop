@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -19,6 +20,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
+import ir.vil3ntec.tohid.core.i18n.StrHistory
 import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
 import ir.vil3ntec.tohid.core.i18n.StrReports
@@ -49,6 +51,8 @@ import ir.vil3ntec.tohid.ui.v3.sales.history.EmptyLine
 import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryActions
 import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryModel
 import ir.vil3ntec.tohid.ui.v3.sales.history.InvoiceRow
+import ir.vil3ntec.tohid.ui.v3.sales.history.MoneyKind
+import ir.vil3ntec.tohid.ui.v3.sales.history.MoneyKindKey
 import ir.vil3ntec.tohid.ui.v3.sales.history.RowCtx
 import ir.vil3ntec.tohid.ui.v3.sales.history.SaleActionsSheet
 import ir.vil3ntec.tohid.ui.v3.shell.AlertGroup
@@ -136,13 +140,20 @@ class RowsE63dUiTest {
     assertEquals(listOf("r63-cash"), calls.menu)
   }
 
-  @Test fun statusIsQuietInlineTextAndTheNormalCashSaleShowsNone() {
+  /**
+   *  ۶۵h (عمدی): وضعیت هنوز نوشته است، نه قرص — ولی صاحب‌کار «رنگ بده» خواست: هر ردیف، نقدیِ عادی هم، نقطهٔ رنگی و واژهٔ
+   *  پرداختش را دارد («● نقد» سبز، «● نسیه» کهربایی؛ `MoneyKindKey` نوعِ رنگ را برای آزمون می‌گوید). پیش‌تر «نقدیِ عادی
+   *  برچسبی ندارد» و «مبلغ • نسیه» یک نوشته بود.
+   */
+  @Test fun statusIsQuietInlineTextAndEverySaleShowsItsPaymentColourWord() {
     val calls = Calls()
     val ctx = RowCtx(book, null, false, true, calls.actions(), false, today = "2026-11-14") { calls.menu += it }
     show { book.sales.forEach { s -> InvoiceRow(s, ctx, first = true, last = true, withDate = false) } }
     val credit = HistoryModel.row(book, book.sales[1], false)
-    assertEquals("«مبلغ • نسیه» یک نوشته است، نه قرص", 1, count(" • " + credit.payLabel, substring = true))
-    assertEquals("نقدیِ عادی برچسبی ندارد", 0, count(StrSale.cashPay, substring = true))
+    fun kindOf(word: String) = rule.onAllNodes(hasText(word) and SemanticsMatcher.keyIsDefined(MoneyKindKey)).fetchSemanticsNodes().map { it.config[MoneyKindKey] }
+    assertEquals(listOf(MoneyKind.CREDIT), kindOf(credit.payWord))
+    assertEquals(listOf(MoneyKind.CASH), kindOf(StrHistory.cash))
+    assertEquals("قرصِ «نقدی» نیست — فقط واژهٔ کوتاهِ «نقد»", 0, count(StrSale.cashPay, substring = true))
     assertEquals("شماره کوچک در زیرعنوان مانده (جستجو و برگشت با شماره)", 1, count("#21", substring = true))
   }
 

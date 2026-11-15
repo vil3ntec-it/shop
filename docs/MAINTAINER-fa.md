@@ -281,7 +281,7 @@ desktop/gradlew -p ios/shared -Pios=true compileKotlinIosSimulatorArm64   # پی
 | اندروید، آزمایشی | `MyShop-Android.apk.beta` و نسخهٔ بازار | `tohid-native-beta` | خودکار با هر push به main که اندروید/core را عوض کند |
 | اندروید، **پایدار** | همان، برای همهٔ دکان‌ها | `tohid-native` | **فقط صاحب‌کار:** Actions ⇐ «توحید بومی» ⇐ Run workflow ⇐ `main` ⇐ `channel = stable` |
 | پیش‌نمایشِ گوشیِ صاحب‌کار | بستهٔ جدای `ir.vil3ntec.tohid.preview` (`tohid-preview.zip`) | `tohid-native-preview` | خودکار با هر push به main؛ اگر صاحب‌کار گفت «نسخه تازه نشد» اول همین ورک‌فلو |
-| کامپیوتر، آزمایشی / پایدار | `MyShop-Windows-Setup.exe`، `…-Offline.exe` و مک/لینوکس | `tohid-desktop-beta` / `tohid-desktop` | همان قاعده: پایدار با «فروشگاه من — کامپیوتر» ⇐ `channel = stable` |
+| کامپیوتر، آزمایشی / پایدار | یک نصابِ کاملِ ویندوز `MyShop-Windows-Setup.exe` (بی دانلود هنگامِ نصب) و مک/لینوکس | `tohid-desktop-beta` / `tohid-desktop` | همان قاعده: پایدار با «فروشگاه من — کامپیوتر» ⇐ `channel = stable` |
 | وب | `/shop/beta/` و ریشهٔ سایت | `tohid-web` | فقط پس از تنظیمِ Pages = GitHub Actions (O-17)؛ پایدار با «وب — GitHub Pages» ⇐ `channel = stable` |
 | برنامهٔ مدیر | APK ِ `admin-android` | `tohid-admin` | با push به main |
 | Google Play | `MyShop-Play.aab` (مصنوعِ هر اجرا) | — | دستی در Play Console؛ با کلیدِ بارگذاریِ تازه روی کامپیوترِ صاحب‌کار (`docs/GOOGLE-PLAY-fa.md` §۳) |

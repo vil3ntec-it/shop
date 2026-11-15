@@ -2,11 +2,13 @@
 #
 #   irm https://vil3ntec-it.github.io/shop/install.ps1 | iex
 #
-# Downloads MyShop-Windows-Setup.exe (our server first, then GitHub), checks its
-# SHA-256 against the published SHA256SUMS.txt and runs it. A file fetched this
-# way is not marked "downloaded from the internet", so Windows does not show the
-# blue SmartScreen "Windows protected your PC" box that browser downloads get
-# (the installer is not code-signed yet). Nothing here needs Administrator.
+# Downloads MyShop-Windows-Setup.exe - the one full Windows installer (about
+# 130 MB; it downloads nothing more while installing) - from our server first,
+# then GitHub, checks its SHA-256 against the published SHA256SUMS.txt and runs
+# it. A file fetched this way is not marked "downloaded from the internet", so
+# Windows does not show the blue SmartScreen "Windows protected your PC" box
+# that browser downloads get (the installer is not code-signed yet). Nothing
+# here needs Administrator.
 #
 # A dropped connection does not start the download over: Windows' own curl.exe
 # continues from the bytes already on disk (--continue-at -), retries after
@@ -55,7 +57,9 @@ function Save-Resumable([string]$url, [string]$file, [string]$want) {
     return
   }
   # curl's own --retry throws away the bytes of a failed attempt, so every
-  # attempt is a fresh curl that continues from the size on disk
+  # attempt is a fresh curl that continues from the size on disk. The installer
+  # is the full one (about 130 MB), so curl shows its progress bar (stderr,
+  # straight to the console; stdout carries only the HTTP code).
   $ErrorActionPreference = 'Continue'
   $pauses = @(2, 4, 8, 16, 30, 30, 30, 30)
   $fails = 0
@@ -63,7 +67,7 @@ function Save-Resumable([string]$url, [string]$file, [string]$want) {
   while ($true) {
     $before = Get-Size $file
     if ($before -gt 0) { Write-Host ('  continuing from {0:N1} MB' -f ($before / 1MB)) }
-    $code = & $curl --location --fail --silent --continue-at - --connect-timeout 20 --speed-limit 1024 --speed-time 60 `
+    $code = & $curl --location --fail --progress-bar --continue-at - --connect-timeout 20 --speed-limit 1024 --speed-time 60 `
       --user-agent tohid-install --write-out '%{http_code}' --output $file $url
     $rc = $LASTEXITCODE
     $done = ($rc -eq 0) -or ($rc -eq 22 -and "$code" -eq '416')
@@ -98,7 +102,7 @@ $exe = $null
 foreach ($src in $sources) {
   for ($try = 1; $try -le 2 -and -not $ok; $try++) {
     try {
-      Write-Host "Downloading My Shop from $src ..."
+      Write-Host "Downloading My Shop (one full installer, about 130 MB) from $src ..."
       $sums = (Invoke-WebRequest -UseBasicParsing "$src/SHA256SUMS.txt").Content
       if ($sums -is [byte[]]) { $sums = [Text.Encoding]::UTF8.GetString($sums) }
       $line = ($sums -split "`n") | Where-Object { $_ -match "\s\*?$([regex]::Escape($name))\s*$" } | Select-Object -First 1

@@ -58,6 +58,8 @@ object StrMoney {
 
   //  حسابِ یک قرض‌دار (#354)
   val actionsAndInfo: String get() = t("کارها و اطلاعات", "Actions & info", "کړنې او معلومات")
+  /** دکمهٔ «فاکتورها» ِ کارهای پرونده ⇐ تاریخچهٔ فروشِ همین مشتری (نقد و نسیه) */
+  val invoicesAction: String get() = t("فاکتورها", "Invoices", "بلونه")
   val statementCsv: String get() = t("صورت‌حساب CSV", "Statement CSV", "صورتحساب CSV")
   /** CRM-05 — صورت‌حساب به PNG (گوشی: فرستادن) */
   val statementImage: String get() = t("تصویرِ صورت‌حساب", "Statement image", "د صورتحساب انځور")

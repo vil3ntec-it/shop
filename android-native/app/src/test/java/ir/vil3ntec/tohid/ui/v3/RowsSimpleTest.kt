@@ -5,6 +5,7 @@ import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.StrAccount
 import ir.vil3ntec.tohid.core.i18n.StrGoods
+import ir.vil3ntec.tohid.core.i18n.StrHistory
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.PoLineDto
 import ir.vil3ntec.tohid.data.PoTotalsDto
@@ -15,6 +16,7 @@ import ir.vil3ntec.tohid.ui.v3.account.team.TeamModel
 import ir.vil3ntec.tohid.ui.v3.money.PoRowText
 import ir.vil3ntec.tohid.ui.v3.sales.SalesTestLedger.ledger
 import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryModel
+import ir.vil3ntec.tohid.ui.v3.sales.history.MoneyKind
 import ir.vil3ntec.tohid.ui.v3.sales.history.RowLookup
 import ir.vil3ntec.tohid.ui.v3.sales.history.SaleTime
 import ir.vil3ntec.tohid.ui.v3.account.AccountFormat
@@ -102,11 +104,15 @@ class RowsSimpleTest {
     ),
   )
 
-  @Test fun `فاکتورِ بی مشتری با نامِ کالاها و بی وضعیت، شماره کوچک در پایانِ زیرعنوان`() {
+  //  ۶۵h (عمدی): نقدیِ عادی دیگر «بی برچسب» نیست — صاحب‌کار «رنگ بده» خواست؛ هر ردیف نقطهٔ رنگی و واژهٔ پرداخت دارد
+  //  (`HistoryRow.kind`/`payWord`، سبزِ «نقد»). `status` فقط وضعیتِ افزودهٔ PAY-07 است و برای نقدیِ عادی همچنان هیچ.
+  @Test fun `فاکتورِ بی مشتری با نامِ کالاها و واژهٔ سبزِ «نقد»، شماره کوچک در پایانِ زیرعنوان`() {
     for (look in listOf(null, RowLookup(book))) {
       val cash = HistoryModel.row(book, book.sales[0], returnsV2 = false, look = look, today = "2026-11-14")
       assertEquals("صابون", cash.title)
-      assertNull("نقدیِ عادی هیچ وضعیتی ندارد", cash.status)
+      assertNull("نقدیِ عادی وضعیتِ افزوده ندارد", cash.status)
+      assertEquals(MoneyKind.CASH, cash.kind)
+      assertEquals(StrHistory.cash, cash.payWord)
       assertTrue(cash.subtitle.endsWith("#10"))
       assertFalse("شمارِ قلم در عنوانِ کالایی تکرار نمی‌شود", cash.subtitle.contains(StrSale.itemsCount("1")))
       val many = HistoryModel.row(book, book.sales[3], returnsV2 = false, look = look)
@@ -114,16 +120,20 @@ class RowsSimpleTest {
     }
   }
 
-  @Test fun `نسیه با نامِ مشتری و متنِ کهربایی، لغوشده آرام، و روزِ کوتاه در نمای ماه`() {
+  //  ۶۵h (عمدی): نوعِ پرداخت و لغو از `status` به `kind`/`payWord` رفتند؛ لغوشده دیگر «آرام» نیست، سرخ است (صاحب‌کار:
+  //  «لغوشده و برگشتی روشن نشان داده شود»)
+  @Test fun `نسیه با نامِ مشتری و واژهٔ کهربایی، لغوشده سرخ، و روزِ کوتاه در نمای ماه`() {
     for (look in listOf(null, RowLookup(book))) {
       val credit = HistoryModel.row(book, book.sales[1], returnsV2 = false, look = look, withDate = true, today = "2026-11-14")
       assertEquals("احمد کریمی", credit.title)
-      assertEquals(V3RowTone.ATTENTION, credit.status?.tone)
-      assertEquals(credit.payLabel, credit.status?.text)
+      assertEquals(MoneyKind.CREDIT, credit.kind)
+      assertEquals(credit.payLabel, credit.payWord)
+      assertNull(credit.status)
       assertTrue(credit.subtitle, credit.subtitle.startsWith("دیروز 0:00 · "))
       assertTrue(credit.subtitle.contains(StrSale.itemsCount("1")))
       val cancelled = HistoryModel.row(book, book.sales[2], returnsV2 = false, look = look, withDate = true, today = "2026-11-14")
-      assertEquals(V3RowStatus(StrSale.cancelled), cancelled.status)
+      assertEquals(MoneyKind.CANCELLED, cancelled.kind)
+      assertEquals(StrSale.cancelled, cancelled.payWord)
       assertTrue(cancelled.subtitle, cancelled.subtitle.startsWith("28 میزان"))
       //  میدان‌های پیشین (برگشت، لغو، برچسبِ پرداخت) دست نخورده‌اند
       assertFalse(cancelled.canCancel)

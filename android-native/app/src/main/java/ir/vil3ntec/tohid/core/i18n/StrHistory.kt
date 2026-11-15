@@ -117,4 +117,48 @@ object StrHistory {
   val onlineMark: String get() = t("سفارشِ اینترنتی — در جمعِ دخل نیست", "Online order — not in drawer totals", "آنلاین فرمایش — د دخل په ټولګه کې نه")
   val total: String get() = t("جمع", "Total", "ټول")
   val endOfList: String get() = t("پایانِ فهرست", "End of list", "د لېست پای")
+
+  // ── ۶۵h: هر عدد با نامش، هر رنگ با واژه‌اش (صاحب‌کار: «من حتی یک درصدش رو هم نفهمیدم») ──
+  val refunded: String get() = t("برگشت دادید", "Refunded", "بېرته مو ورکړل")
+  fun refundTimes(n: Any): String = t("${asIs(n)} بار", "$n ${pl(n, "time", "times")}", "$n ځله")
+  val netToday: String get() = t("خالصِ امروز", "Net today", "د نن خالص")
+  fun netOf(period: Any): String = t("خالصِ ${asIs(period)}", "Net for $period", "د $period خالص")
+  val netNote: String get() = t("فروش منهای برگشت", "Sales minus refunds", "پلور منفي بېرته ورکړه")
+  val debtCollected: String get() = t("قرضِ وصول‌شده", "Debt collected", "راټول شوی پور")
+  val debtCollectedNote: String get() = t("پولِ قرض‌های پیشین؛ فروش نیست", "From earlier debts — not a sale", "د پخوانیو پورونو پیسې؛ پلور نه دی")
+  fun notCounted(what: Any): String = t("${asIs(what)} در این جمع‌ها نیست", "$what not in these totals", "$what په دې ټولګو کې نه دي")
+  val and: String get() = t(" و ", " and ", " او ")
+  val drawerOpenWord: String get() = t("باز", "Open", "خلاص")
+  val drawerClosedWord: String get() = t("بسته", "Closed", "تړلی")
+  val drawerClosedHint: String get() = t(
+    "برای شمردنِ پولِ دخل، صندوق را باز کنید",
+    "Open the drawer to count the till money",
+    "د دخل د پیسو د شمېرلو لپاره صندوق خلاص کړئ",
+  )
+  val returnGoods: String get() = t("برگشتِ کالا", "Return items", "د توکو بېرته راګرځول")
+  val findInvoice: String get() = t("پیدا کردنِ فاکتور", "Find the invoice", "بل پیدا کړئ")
+  val findInvoiceHint: String get() = t(
+    "با شمارهٔ فاکتور یا نامِ مشتری؛ بعد روی فاکتور «برگشت» را بزنید",
+    "By invoice number or customer name, then choose Return on it",
+    "د بل په شمېره یا د پیرودونکي په نوم؛ بیا پر بل «بېرته» وټاکئ",
+  )
+  val scanReceiptHint: String get() = t(
+    "QR ِ پایینِ رسیدِ مشتری را با دوربین بخوانید",
+    "Read the QR at the bottom of the customer's receipt",
+    "د پیرودونکي د رسید لاندې QR په کمره ولولئ",
+  )
+  val noReceiptHint: String get() = t(
+    "مشتری رسید ندارد؛ کالا را خودتان برگزینید",
+    "The customer has no receipt; pick the items yourself",
+    "پیرودونکی رسید نه لري؛ توکي پخپله وټاکئ",
+  )
+  fun daySales(amount: Any): String = t("فروش ${asIs(amount)}", "Sales $amount", "پلور $amount")
+  fun rowRefunded(amount: Any): String = t("برگشت شد: ${asIs(amount)}", "Refunded: $amount", "بېرته ورکړل شول: $amount")
+  fun rowRefundedAll(amount: Any): String = t("همه برگشت شد: ${asIs(amount)}", "Fully refunded: $amount", "ټول بېرته ورکړل شول: $amount")
+  val emptyTodayTitle: String get() = t("امروز هنوز فروشی نیست", "No sales yet today", "نن لا پلور نشته")
+  val emptyTodayBody: String get() = t(
+    "هر فروش این‌جا با ساعت، مبلغ و رنگِ پرداخت می‌آید.",
+    "Each sale shows up here with its time, amount and payment colour.",
+    "هر پلور دلته له وخت، مبلغ او د ورکړې له رنګ سره راځي.",
+  )
 }
