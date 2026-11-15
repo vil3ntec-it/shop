@@ -497,11 +497,12 @@ object StrSettings {
   val whatToDo: String get() = t("چه کنید", "What to do", "څه وکړئ")
   fun queueSize(n: Any): String = t("در صف: ${asIs(n)} تغییر", "Queued: $n ${pl(n, "change", "changes")}", "په کتار کې: $n ${pl(n, "بدلون", "بدلونونه")}")
 
-  // تمِ رنگ (THEME-V2: سه تم، فقط روی همین دستگاه)
+  // تمِ رنگ (۶۹ p3: چهار تمِ گزیده از پالتِ برند، فقط روی همین دستگاه)
   val themeRow: String get() = t("تم", "Theme", "تیم")
   val themeSky: String get() = t("آسمان", "Sky", "آسمان")
-  val themeOcean: String get() = t("اقیانوس", "Ocean", "سمندر")
-  val themeSunset: String get() = t("غروب", "Sunset", "لمر لوېده")
+  val themeNavy: String get() = t("سرمه‌ای", "Navy", "تور شین")
+  val themeIvory: String get() = t("عاجی", "Ivory", "عاجي")
+  val themeGraphite: String get() = t("گرافیت", "Graphite", "ګرافیت")
   val themeOnDevice: String get() = t("تم فقط روی همین دستگاه عوض می‌شود.", "The theme changes on this device only.", "تیم یوازې په همدې وسیله بدلېږي.")
 
   // بخش‌های آمده از رابطِ امروز به نسخهٔ ۳ (SettingsLayout.ENCRYPTION، RETURNS)

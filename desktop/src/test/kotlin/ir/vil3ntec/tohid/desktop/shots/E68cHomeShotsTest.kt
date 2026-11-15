@@ -39,8 +39,8 @@ import kotlin.time.Duration.Companion.minutes
 
 /**
  *  ۶۸c — عکسِ خانه پیش و پس از پالتِ لوکس (هماهنگ‌کننده: «دقیقاً چه چیزی در خانه عوض شد»): خانهٔ گوشی ۳۶۰×۷۶۰dp (فارسی، تمِ
- *  «آسمان» و «شامگاه»، روز و شب) و خانهٔ کامپیوتر ۱۳۶۶×۷۶۸ (روز)، با همان دفترِ نمایشی (`MoneyDemo.full`) و «کاهشِ حرکت» (حالتِ
- *  نشسته). «پیش» همین آزمون روی شاخهٔ پایه است. فقط با `E68C_HOME=<پوشه>` (`home-<sky|dusk>-<light|dark>.png`، `home-desk-light.png`).
+ *  «آسمان» و «سرمه‌ای» (۶۹ p3؛ پیش‌تر «شامگاه»)، روز و شب) و خانهٔ کامپیوتر ۱۳۶۶×۷۶۸ (روز)، با همان دفترِ نمایشی (`MoneyDemo.full`) و «کاهشِ حرکت» (حالتِ
+ *  نشسته). «پیش» همین آزمون روی شاخهٔ پایه است. فقط با `E68C_HOME=<پوشه>` (`home-<sky|navy>-<light|dark>.png`، `home-desk-light.png`).
  */
 @OptIn(ExperimentalTestApi::class)
 class E68cHomeShotsTest {
@@ -82,7 +82,7 @@ class E68cHomeShotsTest {
     Motion.load(DesktopContext)
     val data = MoneyDemo.full()
     try {
-      for (theme in listOf(ShopTheme.SKY, ShopTheme.DUSK)) for (dark in listOf(false, true)) {
+      for (theme in listOf(ShopTheme.SKY, ShopTheme.NAVY)) for (dark in listOf(false, true)) {
         ThemeStore.preview(theme)
         frame("home-${theme.id}-${if (dark) "dark" else "light"}.png", 360, 760, 2f, dark, desk = false) {
           val store = remember { RouteUiHarness.loadedStore(data) }

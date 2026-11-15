@@ -242,7 +242,7 @@ private fun RefundReceiptsSection(o: OrderDto, actions: DetailActions) {
         icon = Icons.Outlined.Print,
         hue = V3Hue.SKY,
         chevron = false,
-        trailing = { Text(StrRefundSlip.print, style = V3Type.body, color = PhoneV3.colors.accent) },
+        trailing = { Text(StrRefundSlip.print, style = V3Type.body, color = ir.vil3ntec.tohid.ui.theme.PhoneV3Roles.brandText(PhoneV3.colors)) },
         onClick = { actions.onPrintRefund(r) },
       )
     }

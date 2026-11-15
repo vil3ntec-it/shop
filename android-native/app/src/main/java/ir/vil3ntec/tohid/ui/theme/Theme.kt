@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 /*
  *  رنگ‌ها — THEME-V2 (دستورِ صاحب‌کار، ۱۴۰۵/۰۸/۰۲؛ جای سبزِ VILL3N ِ ۱۴۰۵/۰۷/۲۸).
  *
- *  پایه آبی و سفید، سه تم («آسمان» پیش‌فرض، «اقیانوس»، «غروب») × روز و شب در `ShopThemes.kt`
+ *  چهار تم («آسمان» پیش‌فرض، «سرمه‌ای»، «عاجی»، «گرافیت» — ۶۹ p3) × روز و شب در `ShopThemes.kt`
  *  (`shopColors(theme, dark)`، `ThemeStore`). زمینه، کارت و سطحِ درونی سه رنگِ جدا با خطِ دورِ دیدنی در روز و
  *  شب دارند. هر رنگ یک **نامِ معنایی** دارد (`background`، `surface`، `textPrimary`،
  *  `brandPrimary`، `status.delivered`…) و صفحه‌ها فقط همین نام‌ها را می‌خوانند —
@@ -266,7 +266,7 @@ object Brand {
   val neutral = Color(0xFF94A3B8)
 }
 
-/** روزِ پیش‌فرض = «آسمان»ِ روشن (THEME-V2، ۱۴۰۵/۰۸/۰۲؛ جای سبزِ VILL3N). سه تم در `ShopThemes.kt`. */
+/** روزِ پیش‌فرض = «آسمان»ِ روشن (THEME-V2، ۱۴۰۵/۰۸/۰۲؛ جای سبزِ VILL3N). چهار تم در `ShopThemes.kt`. */
 val LightColors: ShopColors = SkyLight
 
 /** شبِ پیش‌فرض = «آسمان»ِ تیره */
@@ -323,19 +323,20 @@ enum class ThemeChoice { SYSTEM, LIGHT, DARK }
  *  طرحِ رنگِ متریال از توکن‌های VILL3N.
  *
  *  `primary`ِ متریال هم پُرِ `Button` است و هم متنِ `TextButton`/`OutlinedButton`
- *  و برچسبِ کادرِ متنِ فعال (بیش از ۲۰۰ جا). پس باید هم با متنِ رویش و هم به‌عنوانِ
- *  متن روی سطح ≥ ۴٫۵:۱ باشد ⇒ همان دکمهٔ اصلیِ تم (مثلاً «آسمان»: روز #1D4ED8، شب #60A5FA).
- *  کلید، نشانگر و حلقهٔ تمرکز از همین می‌خوانند.
+ *  و برچسبِ کادرِ متنِ فعال (بیش از ۲۰۰ جا، فقط صفحه‌های قدیمی و کامپیوتر — کیتِ v3 دکمهٔ متریال ندارد). پس باید هم با متنِ
+ *  رویش و هم به‌عنوانِ متن روی سطح ≥ ۴٫۵:۱ باشد ⇒ روز همان دکمهٔ اصلیِ تم (مثلاً «آسمان» #1D4ED8 با سفید)؛ شب (۶۹ p3) دکمهٔ
+ *  اصلیِ کیت پُرِ برند با نوشتهٔ سفید است که به‌عنوانِ متن روی کارتِ شب کم است ⇒ متریالِ شب `brandPrimary` ِ روشن با نوشتهٔ
+ *  زمینه (`ThemeSetContrastTest`). کلید، نشانگر و حلقهٔ تمرکز از همین می‌خوانند.
  */
 fun materialScheme(c: ShopColors) = if (c.isDark) {
   darkColorScheme(
-    primary = c.button.primary.bg,
-    onPrimary = c.button.primary.text,
+    primary = c.brandPrimary,
+    onPrimary = c.background,
     primaryContainer = c.surfaceSelected,
     onPrimaryContainer = c.brandText,
     inversePrimary = c.brandDeep,
     secondary = c.brandText,
-    onSecondary = c.button.primary.text,
+    onSecondary = c.background,
     secondaryContainer = c.surfaceSelected,
     onSecondaryContainer = c.brandText,
     tertiary = c.link,

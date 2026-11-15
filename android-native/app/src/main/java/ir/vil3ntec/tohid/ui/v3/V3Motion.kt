@@ -120,7 +120,8 @@ fun <T> V3PageSwitch(target: T, depth: (T) -> Int, modifier: Modifier = Modifier
 
 /**
  *  زدنی با کوچک‌شدنِ فنری (۰٫۹۷) و لرزشِ کوتاهِ اختیاری — همهٔ کاشی‌ها،
- *  ردیف‌ها، کارت‌ها و دکمه‌های کیت همین را دارند.
+ *  ردیف‌ها، کارت‌ها و دکمه‌های کیت همین را دارند. [interaction] (اختیاری): همان منبعِ لمس را دکمه‌ها برای
+ *  حالتِ فشرده و حلقهٔ تمرکز می‌خوانند (`V3Button`، `V3Fab`، ۶۹ p3).
  */
 fun Modifier.v3Pressable(
   enabled: Boolean = true,
@@ -128,9 +129,11 @@ fun Modifier.v3Pressable(
   role: Role = Role.Button,
   scale: Float = 0.97f,
   haptic: Boolean = false,
+  interaction: MutableInteractionSource? = null,
   onClick: () -> Unit,
 ): Modifier = composed {
-  val src = remember { MutableInteractionSource() }
+  val own = remember { MutableInteractionSource() }
+  val src = interaction ?: own
   val down by src.collectIsPressedAsState()
   val s by animateFloatAsState(if (down && enabled && Motion.enabled) scale else 1f, MotionSpec.press(), label = "v3press")
   val feedback = LocalHapticFeedback.current
