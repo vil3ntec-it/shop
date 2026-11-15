@@ -97,7 +97,7 @@ internal fun DrawScope.salesCast(a: Art) {
   val drum = keys(lt, S_DRUM)
   val pose = a.shapes.pose.apply {
     reset()
-    x = 52f; ground = 90f
+    x = 52f; ground = 90f; legs = false
     breathe = breath(lt, 4f) * (1f + 0.6f * drum)
     look = keys(lt, S_LOOK); tilt = keys(lt, S_TILT); lean = 2.5f * keys(lt, S_LOOK)
     smile = keys(lt, S_SMILE); brow = keys(lt, S_BROW)

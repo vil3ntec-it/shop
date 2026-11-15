@@ -113,6 +113,8 @@ internal class Pose {
   var bob = 0f
   var lean = 0f
   var sit = false
+  /** پاها پیدا؟ (پشتِ پیشخوان نه) */
+  var legs = true
   var tilt = 0f
   var look = 0f
   var lookY = 0f
@@ -140,7 +142,7 @@ internal class Pose {
   var headY = 0f
 
   fun reset() {
-    x = 50f; ground = 88f; bob = 0f; lean = 0f; sit = false; tilt = 0f; look = 0f; lookY = 0f; blink = 0f
+    x = 50f; ground = 88f; bob = 0f; lean = 0f; sit = false; legs = true; tilt = 0f; look = 0f; lookY = 0f; blink = 0f
     smile = 0.35f; happy = 0f; brow = 0f; open = 0f; breathe = 0f; shrug = 0f
     lArm = -12f; lFore = 0f; rArm = 12f; rFore = 0f; lLeg = -3f; lKnee = 0f; rLeg = 3f; rKnee = 0f
   }
@@ -171,8 +173,10 @@ private fun DrawScope.leg(a: Art, look: Look, jx: Float, jy: Float, h: Float, k:
 internal fun DrawScope.figure(a: Art, cast: Cast, look: Look, p: Pose) {
   val hipX = p.x
   val hipY = if (p.sit) p.ground - 3.2f + p.bob else p.ground - (THIGH + SHIN) + 0.8f + p.bob
-  leg(a, look, hipX - 3f, hipY, p.lLeg, p.lKnee, -1f, cast.shoe)
-  leg(a, look, hipX + 3f, hipY, p.rLeg, p.rKnee, 1f, cast.shoe)
+  if (p.legs) {
+    leg(a, look, hipX - 3f, hipY, p.lLeg, p.lKnee, -1f, cast.shoe)
+    leg(a, look, hipX + 3f, hipY, p.rLeg, p.rKnee, 1f, cast.shoe)
+  }
 
   val c = cosD(p.lean)
   val s = sinD(p.lean)

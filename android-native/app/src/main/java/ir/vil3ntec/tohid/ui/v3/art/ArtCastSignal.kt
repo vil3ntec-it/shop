@@ -103,10 +103,11 @@ internal fun DrawScope.searchCast(a: Art) {
     blink = max(blinkAt(lt, 0.25f), blinkAt(lt, 2.15f))
   }
   figure(a, a.shapes.cast, a.shapes.cast.seeker, pose)
-  //  ذره‌بین در دستِ راست
-  val lx = pose.rhX + 3.5f
-  val ly = pose.rhY - 7.5f
-  drawLine(p.line, a.o(pose.rhX, pose.rhY), a.o(lx, ly + 5.5f), strokeWidth = 2.4f * a.u, cap = StrokeCap.Round)
+  //  ذره‌بین در دستِ راست، در امتدادِ ساعد (عدسی هرگز جلوی چهره نمی‌افتد)
+  val fa = pose.rArm + pose.rFore - pose.lean
+  val lx = pose.rhX + 8.5f * sinD(fa)
+  val ly = pose.rhY + 8.5f * cosD(fa)
+  drawLine(p.line, a.o(pose.rhX, pose.rhY), a.o(pose.rhX + 2.6f * sinD(fa), pose.rhY + 2.6f * cosD(fa)), strokeWidth = 2.4f * a.u, cap = StrokeCap.Round)
   drawCircle(p.paper.copy(alpha = 0.88f), 6.6f * a.u, a.o(lx, ly))
   drawCircle(p.brand.copy(alpha = 0.10f), 6.6f * a.u, a.o(lx, ly))
   drawCircle(p.brand, 6.6f * a.u, a.o(lx, ly), style = Stroke(width = 2.2f * a.u))
@@ -183,14 +184,18 @@ internal fun DrawScope.serverCast(a: Art) {
   val lt = loop(a.t, 4f)
   stage(a, 0f, groundW = 60f)
   val flash = max(max(0f, 1f - abs(lt - 2f) / 0.12f), 0.6f * max(0f, 1f - abs(lt - 2.22f) / 0.08f))
-  //  باران زیرِ ابر
-  for (i in 0..5) {
-    val f = frac(a.t, 12, i / 6f)
-    val x = 18f + i * 6.5f - 3f * f
-    val y = 40f + 46f * f
+  //  باران از ابر تا زمین؛ زیرِ سایبانِ چتر خشک است
+  val tipX0 = 53f
+  val tipY0 = 28f
+  for (i in 0..9) {
+    val f = frac(a.t, 12, i / 10f)
+    val x = 14f + i * 7.6f - 3f * f
+    val y = 34f + 52f * f
+    if (x in (tipX0 - 17f)..(tipX0 + 17f) && y > tipY0 - 6f) continue
     drawLine(p.sky.copy(alpha = 0.55f * (1f - f * 0.6f)), a.o(x, y), a.o(x - 0.8f, y + 3.4f), strokeWidth = 1.2f * a.u, cap = StrokeCap.Round)
   }
-  drawOval(p.sky.copy(alpha = 0.18f), a.o(14f, 87f), a.s(30f, 3.4f))
+  drawOval(p.sky.copy(alpha = 0.18f), a.o(12f, 87f), a.s(26f, 3.4f))
+  drawOval(p.sky.copy(alpha = 0.14f), a.o(76f, 87.5f), a.s(14f, 2.6f))
   //  ابر و آذرخش (همان مسیرها، کوچک‌تر و بالا-چپ)
   withTransform({
     translate(-16f * a.u, -18f * a.u)
@@ -212,20 +217,21 @@ internal fun DrawScope.serverCast(a: Art) {
     look = keys(lt, U_LOOK); lookY = keys(lt, U_LOOKY)
     shrug = keys(lt, U_SHRUG); lean = keys(lt, U_LEAN); open = keys(lt, U_OPEN)
     blink = if (lt in 1.98f..2.4f) 1f else blinkAt(lt, 0.9f)
-    rArm = 165f; rFore = -15f
-    lArm = -20f; lFore = 30f
+    lArm = -60f; lFore = 230f
+    rArm = 14f; rFore = 0f
     smile = 0.1f
   }
   figure(a, a.shapes.cast, a.shapes.cast.rainy, pose)
-  //  چتر: دسته در دستِ راست، سایبان کمی به سمتِ ابر
-  val tipX = pose.rhX - 6f
-  val tipY = pose.rhY - 16f
-  drawLine(p.line, a.o(pose.rhX, pose.rhY), a.o(tipX, tipY), strokeWidth = 1.3f * a.u, cap = StrokeCap.Round)
-  drawArc(p.line, 0f, 180f, false, a.o(pose.rhX - 1.6f, pose.rhY - 0.4f), a.s(3.2f, 3.2f), style = Stroke(width = 1.2f * a.u, cap = StrokeCap.Round))
-  turn(a, -18f + 4f * wind(a.t, 0.4f), tipX, tipY) {
-    drawArc(p.coral, 180f, 180f, true, a.o(tipX - 16f, tipY - 9f), a.s(32f, 18f))
-    drawArc(lerp(p.coral, p.paper, 0.35f), 180f, 180f, true, a.o(tipX - 5f, tipY - 9f), a.s(10f, 18f))
-    for (k in 0..3) drawArc(p.coral, 0f, 180f, true, a.o(tipX - 16f + k * 8f, tipY - 2f), a.s(8f, 4f))
+  //  چتر: دسته در دستِ چپ، سایبان بالای سر و کمی رو به ابر
+  val tipX = tipX0 + 0.8f * wind(a.t, 0.4f)
+  val tipY = tipY0
+  drawLine(p.line, a.o(pose.lhX, pose.lhY + 2.6f), a.o(tipX, tipY), strokeWidth = 1.3f * a.u, cap = StrokeCap.Round)
+  drawArc(p.line, 0f, 180f, false, a.o(pose.lhX - 0.2f, pose.lhY + 1.6f), a.s(3.2f, 3.2f), style = Stroke(width = 1.2f * a.u, cap = StrokeCap.Round))
+  drawCircle(a.shapes.cast.rainy.skin, 2.2f * a.u, a.o(pose.lhX, pose.lhY))
+  turn(a, -10f + 4f * wind(a.t, 0.4f), tipX, tipY) {
+    drawArc(p.coral, 180f, 180f, true, a.o(tipX - 17f, tipY - 9f), a.s(34f, 18f))
+    drawArc(lerp(p.coral, p.paper, 0.35f), 180f, 180f, true, a.o(tipX - 5.5f, tipY - 9f), a.s(11f, 18f))
+    for (k in 0..3) drawArc(p.coral, 0f, 180f, true, a.o(tipX - 17f + k * 8.5f, tipY - 2.2f), a.s(8.5f, 4.4f))
     drawCircle(p.line, 0.9f * a.u, a.o(tipX, tipY - 9.4f))
   }
 }

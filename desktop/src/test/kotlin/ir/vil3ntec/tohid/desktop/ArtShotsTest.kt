@@ -128,6 +128,25 @@ class ArtShotsTest {
     return seen.size
   }
 
+  /**
+   *  سهمِ نقطه‌هایی که دست‌کم یک کانالشان بیش از [tol] فرق دارد. ساعتِ Compose زمانِ قاب را با `Float` می‌شمارد ⇒ قابِ
+   *  ۲۵ ثانیه چند صد نانوثانیه با قابِ ۱ ثانیه فرق دارد و لبهٔ نرمِ چند نقطه یکی دو پله عوض می‌شود؛ درز یعنی پرشِ دیدنی.
+   */
+  private fun diff(a: ByteArray, b: ByteArray, tol: Int = 24): Double {
+    val x = Bitmap.makeFromImage(Image.makeFromEncoded(a))
+    val y = Bitmap.makeFromImage(Image.makeFromEncoded(b))
+    var bad = 0
+    for (j in 0 until x.height) for (i in 0 until x.width) {
+      val p = x.getColor(i, j)
+      val q = y.getColor(i, j)
+      var worst = 0
+      var sh = 0
+      while (sh <= 24) { worst = maxOf(worst, kotlin.math.abs(((p ushr sh) and 0xFF) - ((q ushr sh) and 0xFF))); sh += 8 }
+      if (worst > tol) bad++
+    }
+    return bad.toDouble() / (x.width * x.height)
+  }
+
   private fun save(name: String, png: ByteArray) { out?.let { File(it, "$name.png").writeBytes(png) } }
 
   @Test fun everyIllustrationDrawsAndMovesWithMotion() {
@@ -135,7 +154,7 @@ class ArtShotsTest {
     for (kind in V3ArtKind.entries) for (dark in listOf(false, true)) {
       val (a, b) = frames(200, 200, dark, listOf(1_000L, 2_300L)) { V3Illustration(kind, size = 180.dp) }
       assertTrue("$kind چیزی نکشید", colors(a) > 12)
-      assertFalse("$kind با حرکتِ روشن ایستاده ماند", a.contentEquals(b))
+      assertTrue("$kind با حرکتِ روشن ایستاده ماند", diff(a, b) > 0.005)
       save("art-${kind.name.lowercase()}-${if (dark) "dark" else "light"}", a)
     }
   }
@@ -145,11 +164,11 @@ class ArtShotsTest {
     for (kind in V3ArtKind.entries) {
       //  چرخهٔ ۲۴ ثانیه‌ای: قابِ ۱ ثانیه و ۲۵ ثانیه یکی‌اند (پایانِ چرخه بی پرش به آغازش می‌چسبد)
       val (a, b) = frames(200, 200, false, listOf(1_000L, 25_000L)) { V3Illustration(kind, size = 180.dp) }
-      assertTrue("$kind: چرخه درز دارد", a.contentEquals(b))
+      assertTrue("$kind: چرخه درز دارد (${diff(a, b)})", diff(a, b) < 0.002)
       //  نشانِ کوچک (کمتر از CHARACTER_MIN) همان صحنهٔ چیزها را می‌کشد و می‌جنبد
       val (c, d) = frames(60, 60, false, listOf(1_000L, 2_300L)) { V3Illustration(kind, size = 48.dp) }
       assertTrue("$kind: نشانِ کوچک چیزی نکشید", colors(c) > 6)
-      assertFalse("$kind: نشانِ کوچک ایستاده ماند", c.contentEquals(d))
+      assertTrue("$kind: نشانِ کوچک ایستاده ماند", diff(c, d, tol = 8) > 0.002)
     }
   }
 
