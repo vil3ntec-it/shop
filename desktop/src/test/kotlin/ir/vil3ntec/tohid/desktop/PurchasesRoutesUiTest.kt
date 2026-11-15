@@ -1,7 +1,11 @@
 package ir.vil3ntec.tohid.desktop
 
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.performSemanticsAction
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseOrders
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
@@ -121,5 +125,40 @@ class PurchasesRoutesUiTest {
     assertTrue(h.has(StrPurchases.noPayments))
     assertFalse(h.has("عمده‌فروشی پامیر"))
     assertTrue(h.has(StrPurchases.newPurchase))
+  }
+
+  /**
+   *  «الان رسیده؟ نه» ⇐ همان سفارشِ خریدِ سرور: یک ساختن با کلیدِ فرم (دو لمس ⇒ یک درخواست)، یک فرستادن، و پیش‌پرداختِ کامل
+   *  یک بار پس از سرور؛ هیچ خرید، موجودی یا بدهیِ دفتر تا «دریافتِ کالا».
+   */
+  @Test fun notReceivedNowSendsOnePurchaseOrderWithOnePrepaymentAndNoStock() {
+    val fake = FakePurchaseOrders(h.server)
+    h.show(MoneyPaths.newPurchase(PurchaseDemo.PAMIR), data)
+    h.await(StrPurchases.receivedNow)
+    h.click(StrMoney.pickItem)
+    h.await("نمک")
+    h.click("نمک")
+    h.type(StrMoney.quantity, "10")
+    h.click(StrPurchases.laterReceived)
+    h.await(StrPurchases.laterHow)
+    val save = rule.onAllNodes(hasText(StrMoney.newPurchase) and hasClickAction())[0]
+    save.performSemanticsAction(SemanticsActions.OnClick)
+    runCatching { save.performSemanticsAction(SemanticsActions.OnClick) }
+    val store = h.store!!
+    h.awaitThat { store.data.value.supplierPayments.isNotEmpty() }
+    val root = FakePurchaseOrders.ROOT
+    val creates = fake.writes().filter { it.path == root && it.method == "POST" }
+    assertEquals(1, creates.size)
+    assertTrue(!creates.single().key.isNullOrBlank())
+    assertEquals(1, fake.writes("/po-new-1/send").size)
+    assertEquals("sent", fake.order("po-new-1")!!.state)
+    val pay = store.data.value.supplierPayments.single()
+    assertEquals(creates.single().key + "-pay", pay.id)
+    assertEquals(200.0, pay.amount, 0.0)
+    assertEquals(StrPurchases.prepaidNote(fake.order("po-new-1")!!.no), pay.notes)
+    //  کالا هنوز نیامده: نه خرید، نه موجودیِ تازه؛ پامیر پیش‌پرداخت دارد
+    assertEquals(data.purchases.size, store.data.value.purchases.size)
+    assertEquals(ShopStore.stock(data, "salt"), ShopStore.stock(store.data.value, "salt"), 0.0)
+    assertEquals(ShopStore.supplierDebt(data, PurchaseDemo.PAMIR) - 200.0, ShopStore.supplierDebt(store.data.value, PurchaseDemo.PAMIR), 0.0)
   }
 }
