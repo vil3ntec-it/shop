@@ -15,7 +15,6 @@ import ir.vil3ntec.tohid.formatMonth
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.ui.v3.RowWhen
 import ir.vil3ntec.tohid.ui.v3.V3RowStatus
-import ir.vil3ntec.tohid.ui.v3.V3RowTone
 
 /** فیلترهای تاریخچه — همان پنج تراشهٔ امروز (منطقِ فیلتر دست نخورده) */
 enum class HistoryFilter(val id: String) {
@@ -48,8 +47,19 @@ data class HistoryRow(
   val payState: String? = null,
   /** عنوانِ معنادار: نامِ مشتری، وگرنه نامِ کالاها («برنج، روغن و ۲ قلمِ دیگر»)؛ شماره کوچک در پایانِ [subtitle] */
   val title: String = name,
-  /** وضعیتِ آرامِ کنارِ مبلغ («• نسیه»، «• لغوشده»)؛ فروشِ نقدیِ عادی ⇒ null (هیچ) */
+  /**
+   *  ۶۵h: فقط وضعیتِ پرداختِ غیرنقدِ تأییدنشده (PAY-07: «در انتظار» کهربایی، «ناموفق» سرخ) کنارِ واژهٔ پرداخت؛ وگرنه null.
+   *  نوعِ پرداخت و لغو دیگر این‌جا نیستند — [kind] و [payWord].
+   */
   val status: V3RowStatus? = null,
+  /** رنگ و آیکنِ ردیف ([historyTone]): نقد، نسیه، کارت/حواله، اینترنتی یا لغوشده */
+  val kind: MoneyKind = MoneyKind.CASH,
+  /** واژهٔ کنارِ نقطهٔ رنگی: «نقد»، «نسیه»، «کارت»، «حواله»، «ترکیبی»، «اینترنتی»، «لغوشده» */
+  val payWord: String = "",
+  /** پولی که از این فاکتور برگشت داده شد (همهٔ برگشت‌ها، افغانی)؛ ۰ ⇒ هیچ */
+  val refunded: Double = 0.0,
+  /** همهٔ اقلام برگشت خورده‌اند (چیزی برای برگشت نمانده) */
+  val refundedAll: Boolean = false,
 )
 
 /** کارتِ آمارِ بالای تاریخچه */
@@ -102,10 +112,13 @@ object HistoryModel {
       .sortedByDescending { it.createdAt }
   }
 
-  /** روزبه‌روز، به همان ترتیبِ فهرست (تازه‌ترین روز اول) */
-  fun days(sales: List<Sale>): List<HistoryDay> {
+  /**
+   *  روزبه‌روز، به همان ترتیبِ فهرست (تازه‌ترین روز اول). [dayOf] روزِ هر فاکتور — پیش‌فرض `date` ِ ثبت‌شده؛ تاریخچه روزِ کاریِ
+   *  جمع‌ها را می‌دهد (`HistoryBook.dayOf`، با ساعتِ پایانِ روز) تا سرخط و جمعش یکی باشند.
+   */
+  fun days(sales: List<Sale>, dayOf: (Sale) -> String = { it.date }): List<HistoryDay> {
     val out = LinkedHashMap<String, MutableList<Sale>>()
-    sales.forEach { out.getOrPut(it.date) { mutableListOf() } += it }
+    sales.forEach { out.getOrPut(dayOf(it)) { mutableListOf() } += it }
     return out.map { (date, list) -> HistoryDay(date, list) }
   }
 
@@ -141,6 +154,9 @@ object HistoryModel {
     val debtor = ReceiptModel.debtorName(d, s)
     val payLabel = payLabel(state, s, fixed)
     val payState = ir.vil3ntec.tohid.data.PayStatusFlow.chip(d, s)
+    val kind = moneyKindOf(state, PayFlow.payGroup(s))
+    val canReturn = canReturn(d, s)
+    val refunded = refundedOf(d.saleReturns.filter { it.saleId == s.id })
     return HistoryRow(
       id = s.id,
       number = "#" + ReceiptModel.number(s),
@@ -150,12 +166,16 @@ object HistoryModel {
       state = state,
       payLabel = payLabel,
       credit = PayFlow.payGroup(s) == "credit",
-      canReturn = canReturn(d, s),
+      canReturn = canReturn,
       canCancel = s.status != "cancelled" && !s.isOnlineOrder(),
       returnDocs = if (returnsV2) returnDocs(d, s) else emptyList(),
       payState = payState,
       title = debtor ?: itemsTitle(items.map { ir.vil3ntec.tohid.data.SalesEngine.itemName(d, it) }),
-      status = status(state, PayFlow.payGroup(s) == "credit", payLabel, payState),
+      status = status(payState),
+      kind = kind,
+      payWord = payWord(kind, payLabel),
+      refunded = refunded,
+      refundedAll = refunded > 0 && kind != MoneyKind.CANCELLED && !canReturn,
     )
   }
 
@@ -165,6 +185,9 @@ object HistoryModel {
     val debtor = s.debtorId?.let(look.debtors::get)
     val payLabel = payLabel(state, s, s.id in look.fixed)
     val payState = ir.vil3ntec.tohid.data.PayStatusFlow.chip(d, s, look.payChanges[s.id].orEmpty())
+    val kind = moneyKindOf(state, PayFlow.payGroup(s))
+    val canReturn = look.canReturn(s)
+    val refunded = look.refunded[s.id] ?: 0.0
     return HistoryRow(
       id = s.id,
       number = "#" + ReceiptModel.number(s),
@@ -174,12 +197,16 @@ object HistoryModel {
       state = state,
       payLabel = payLabel,
       credit = PayFlow.payGroup(s) == "credit",
-      canReturn = look.canReturn(s),
+      canReturn = canReturn,
       canCancel = s.status != "cancelled" && !s.isOnlineOrder(),
       returnDocs = if (returnsV2) look.returnDocs[s.id].orEmpty() else emptyList(),
       payState = payState,
       title = debtor ?: itemsTitle(items.map(look::itemName)),
-      status = status(state, PayFlow.payGroup(s) == "credit", payLabel, payState),
+      status = status(payState),
+      kind = kind,
+      payWord = payWord(kind, payLabel),
+      refunded = refunded,
+      refundedAll = refunded > 0 && kind != MoneyKind.CANCELLED && !canReturn,
     )
   }
 
@@ -211,17 +238,25 @@ object HistoryModel {
   }
 
   /**
-   *  وضعیتِ آرامِ ردیف: لغوشده و اینترنتی خاکستری؛ نسیه کهربایی (بدهی)؛ پرداختِ غیرنقدِ تأییدنشده (PAY-07) با شدّتِ همان
-   *  قرصِ پیشین («ناموفق» قرمز)؛ غیرنقدِ عادی (کارت، کیف پول) آرام؛ نقدیِ عادی ⇒ null.
+   *  ۶۵h: وضعیتِ افزوده کنارِ واژهٔ پرداخت — فقط پرداختِ غیرنقدِ تأییدنشده (PAY-07) با شدّتِ همان قرصِ پیشین («در انتظار»
+   *  کهربایی، «ناموفق» سرخ)؛ بقیه null. نوعِ پرداخت با رنگ و واژهٔ خودش است ([moneyKindOf]، [payWord]).
    */
-  internal fun status(state: SaleState, credit: Boolean, payLabel: String, payState: String?): V3RowStatus? = when {
-    state == SaleState.CANCELLED -> V3RowStatus(StrSale.cancelled)
-    state == SaleState.ONLINE -> V3RowStatus(StrSale.online)
-    payState != null -> V3RowStatus.of(payLabel + " · " + PayStatusText.name(payState), PayStatusText.pill(payState))
-    credit -> V3RowStatus(payLabel, V3RowTone.ATTENTION)
-    payLabel == StrSale.cashPay -> null
-    else -> V3RowStatus(payLabel)
+  internal fun status(payState: String?): V3RowStatus? =
+    payState?.let { V3RowStatus.of(PayStatusText.name(it), PayStatusText.pill(it)) }
+
+  /**
+   *  واژهٔ کنارِ نقطهٔ رنگیِ ردیف: لغوشده و اینترنتی همان نامِ حالت؛ نقدِ ساده «نقد» (همان برچسبِ جمع‌ها)؛ بقیه برچسبِ
+   *  دقیقِ پرداخت («نسیه»، «کارت»، «حواله»، «کیف پول»، «ترکیبی»، «ارز»، با نشانِ «اصلاح‌شده» ِ POS-40).
+   */
+  internal fun payWord(kind: MoneyKind, payLabel: String): String = when (kind) {
+    MoneyKind.CANCELLED -> StrSale.cancelled
+    MoneyKind.ONLINE -> StrSale.online
+    MoneyKind.CASH -> if (payLabel == StrSale.cashPay) ir.vil3ntec.tohid.core.i18n.StrHistory.cash else payLabel
+    else -> payLabel
   }
+
+  /** پولِ برگشت‌دادهٔ یک فاکتور (افغانی) — جمعِ ردیف‌های برگشتِ همان فاکتور */
+  internal fun refundedOf(returns: List<ir.vil3ntec.tohid.data.SaleReturn>): Double = returns.sumOf { maxOf(0.0, it.amount) }
 
   /**
    *  «اصلاحِ فاکتور»: اقلامِ برنگشته با همان قیمت و نشان‌های ردیف به سبد؛ قلمِ آزاد شناسهٔ تازه می‌گیرد. همان راهِ کامپیوتر

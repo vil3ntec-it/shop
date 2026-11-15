@@ -135,6 +135,11 @@ class V3ReachabilityTest {
       "$HISTORY.HistoryScreen", "$HISTORY.PeriodCard", "$HISTORY.MoneySplit", "$HISTORY.FilterSheet",
       "$HISTORY.HistoryPrintSheet", "$HISTORY.PrintBannerCard", "ir.vil3ntec.tohid.print.PeriodPrint",
     ),
+    //  ۶۵h: نامِ ساده و رنگِ هر عدد زیرِ خلاصه، سرخطِ روز با جمع، و تنها کارِ «برگشتِ کالا» با همهٔ راه‌های برگشت
+    Feature(
+      "تاریخچه: «برگشت دادید/خالص/قرضِ وصول‌شده»، حالِ صندوق، سرخطِ روز و برگهٔ «برگشتِ کالا» (QR، جست‌وجو، بی رسید)", "sales",
+      "$HISTORY.PeriodResult", "$HISTORY.DayHeader", "$HISTORY.ReturnEntry", "$HISTORY.ReturnStartSheet",
+    ),
     Feature("جدولِ اکسلیِ فاکتورهای کامپیوتر از سربرگِ تاریخچه", "sales/table", s("DeskInvoicesScreen")),
     //  PAY-21: حساب‌پی (QR، NFC با HCE) فقط در `CheckoutDialog` ِ رابطِ قدیم بود؛ پس از دستهٔ ۱۳ صندوقِ گوشی راهی نداشت
     Feature(

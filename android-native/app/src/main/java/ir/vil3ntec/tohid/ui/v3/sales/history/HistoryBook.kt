@@ -35,6 +35,8 @@ class RowLookup(d: ShopData) {
   val items: Map<String, List<SaleItem>> = d.saleItems.groupBy { it.saleId }
   val returnDocs: Map<String, List<String>> =
     d.saleReturns.filter { it.docId != null }.groupBy { it.saleId }.mapValues { (_, r) -> r.mapNotNull { it.docId }.distinct() }
+  /** ۶۵h: پولِ برگشت‌دادهٔ هر فاکتور (همان `HistoryModel.refundedOf`) — نشانِ سرخِ «برگشت شد: …» ِ ردیف */
+  val refunded: Map<String, Double> = d.saleReturns.groupBy { it.saleId }.mapValues { (_, r) -> HistoryModel.refundedOf(r) }
   val payChanges: Map<String, List<PayStatus.Change>> = PayStatusFlow.bySale(d)
   val fixed: Set<String> = PayFixFlow.fixedSales(d)
   val debtors: Map<String, String> = d.debtors.associate { it.id to it.name }
@@ -63,6 +65,12 @@ class HistoryBook(
 ) {
   private val byUnit: Map<SalesPeriods.Unit, List<SalesPeriods.Period>> =
     SalesPeriods.Unit.entries.associateWith { SalesPeriods.periods(days, it, gregorian) }
+
+  /** ۶۵h: روزِ کاریِ هر فاکتور (همان روزِ جمع‌ها) — سرخطِ روز در فهرستِ ماه و سال، یک بار در پس‌زمینه */
+  private val dayOfSale: Map<String, SalesPeriods.Day> = HashMap<String, SalesPeriods.Day>().also { m -> days.forEach { day -> day.sales.forEach { m[it.id] = day } } }
+
+  /** روزِ کاریِ فاکتور؛ فاکتوری که در دفترِ روزها نیست ⇒ null */
+  fun dayOf(saleId: String): SalesPeriods.Day? = dayOfSale[saleId]
 
   fun periods(unit: SalesPeriods.Unit): List<SalesPeriods.Period> = byUnit.getValue(unit)
 
@@ -110,6 +118,10 @@ object PeriodLabel {
     }
     else -> full(p, gregorian)
   }
+
+  /** سرخطِ یک روزِ فهرست (۶۵h): «امروز»، «دیروز»، وگرنه تاریخِ کامل («۱۲ عقرب ۱۴۰۵») */
+  fun dayTitle(date: String, today: String, gregorian: Boolean): String =
+    title(SalesPeriods.Period(date, SalesPeriods.Unit.DAY, date, date, SalesPeriods.Totals(), emptyList()), today, gregorian)
 
   /** برچسبِ کامل (کاغذ و سرخطِ دورهٔ جاری) */
   fun full(p: SalesPeriods.Period, gregorian: Boolean, lang: Lang = I18n.lang, months: String = LocaleChoice.months): String {

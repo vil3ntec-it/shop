@@ -13,7 +13,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.AssignmentReturn
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.FactCheck
 import androidx.compose.material.icons.outlined.PointOfSale
@@ -44,9 +43,7 @@ import ir.vil3ntec.tohid.data.SalesPeriods
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
-import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.v3.V3Action
-import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3SummaryAction
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
@@ -146,7 +143,11 @@ fun HistoryScreen(
 ) {
   var filterSheet by remember { mutableStateOf(false) }
   var menuFor by remember { mutableStateOf<String?>(null) }
-  val ctx = RowCtx(d, book?.look, returnsV2, canCancel, actions, askCancel, today = book?.today.orEmpty()) { menuFor = it }
+  var returnSheet by remember { mutableStateOf(false) }
+  val ctx = RowCtx(
+    d, book?.look, returnsV2, canCancel, actions, askCancel, today = book?.today.orEmpty(),
+    onReturns = { returnSheet = true },
+  ) { menuFor = it }
 
   V3Scaffold(
     title = Str.salesHistory,
@@ -174,6 +175,7 @@ fun HistoryScreen(
   }
 
   if (filterSheet) FilterSheet(query) { filterSheet = false }
+  if (returnSheet) ReturnStartSheet(actions) { returnSheet = false }
   menuFor?.let { id ->
     d.sales.find { it.id == id }?.let { s ->
       SaleActionsSheet(HistoryModel.row(d, s, returnsV2, look = book?.look, today = book?.today.orEmpty()), canCancel, returnsV2, actions, askCancel = askCancel, onClose = { menuFor = null })
@@ -192,20 +194,21 @@ internal class RowCtx(
   val askCancel: Boolean,
   /** امروزِ دکان (`HistoryBook.today`) — «امروز/دیروز» و سالِ جاریِ تاریخِ کوتاهِ ردیف */
   val today: String = "",
+  /** «برگشتِ کالا» ⇐ برگهٔ راه‌های برگشت (`ReturnStartSheet`) */
+  val onReturns: () -> Unit = {},
   val onMenu: (String) -> Unit,
 )
 
 /**
- *  خلاصهٔ بالا: دورهٔ برگزیده (پیش‌فرض دورهٔ جاری) — مبلغ، شمار، و کارهای کوچکِ چاپ، بررسی و صندوق زیرش (`V3Summary`،
- *  جای کادرِ گرادیانی). صندوقِ بلند واپسین است تا «چاپ» و «بررسی» با هم در ردیفِ نخست بمانند.
+ *  خلاصهٔ بالا: دورهٔ برگزیده (پیش‌فرض دورهٔ جاری) — مبلغ، شمار، و کارهای کوچکِ چاپ و بررسی زیرش (`V3Summary`، جای کادرِ
+ *  گرادیانی). ۶۵h: «صندوق بسته است» وضعیت است، نه کار ⇒ از این‌جا به ردیفِ صندوقِ [PeriodResult] رفت (`HistoryResult.kt`).
  */
 @Composable
-private fun Top(p: SalesPeriods.Period, title: String, ctx: RowCtx, drawer: DrawerLine?, reviews: Int, money: Boolean) {
+private fun Top(p: SalesPeriods.Period, title: String, ctx: RowCtx, reviews: Int, money: Boolean) {
   val a = ctx.actions
   val chips = listOfNotNull(
     a.print?.let { print -> V3SummaryAction(StrHistory.print, Icons.Outlined.Print, onClick = { print(p) }) },
     a.payReview?.takeIf { reviews > 0 }?.let { V3SummaryAction(StrPayStatus.reviewCount(plain(reviews)), Icons.Outlined.FactCheck, onClick = it) },
-    drawer?.let { V3SummaryAction(it.text, Icons.Outlined.PointOfSale, onClick = a.drawer) },
   )
   Column(Modifier.padding(top = 4.dp, bottom = 8.dp)) {
     PeriodSummary(p, title, money, chips)
@@ -237,9 +240,13 @@ private fun PhoneList(
   LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
     banner?.let { b -> item(key = "banner") { PrintBannerCard(b) } }
     val title = if (isCurrent) PeriodLabel.current(focus, book.gregorian) else PeriodLabel.full(focus, book.gregorian)
-    item(key = "top-" + focus.key) { Top(focus, title, ctx, drawer.takeIf { isCurrent }, reviews, money) }
-    if (isCurrent) returnsHint(ctx)
-    invoices(focus, currentList, ctx, query, empty = if (unit == SalesPeriods.Unit.DAY && isCurrent) StrHistory.emptyToday else StrHistory.emptyPeriod, current = isCurrent)
+    item(key = "top-" + focus.key) { Top(focus, title, ctx, reviews, money) }
+    result(focus, PeriodLabel.title(focus, book.today, book.gregorian), isCurrent, ctx, drawer, money)
+    if (isCurrent) returnEntry(ctx)
+    invoices(
+      focus, currentList, ctx, query, money, book,
+      empty = if (unit == SalesPeriods.Unit.DAY && isCurrent) StrHistory.emptyTodayTitle else StrHistory.emptyPeriod, current = isCurrent,
+    )
     if (isCurrent) setAside(ctx)
     if (olderLists.isNotEmpty()) item(key = "earlier") { GroupTitle(StrHistory.earlier) }
     olderLists.forEach { (p, list) ->
@@ -252,7 +259,8 @@ private fun PhoneList(
           filteredCount = list.size.takeIf { query.filtered },
         )
       }
-      if (open) invoices(p, list, ctx, query, empty = StrHistory.emptyPeriod)
+      //  کارتِ روزِ پیشین خودش سرخطِ همان روز است؛ ماه و سالِ باز سرخطِ هر روزشان را دارند
+      if (open) invoices(p, list, ctx, query, money, book, empty = StrHistory.emptyPeriod, headers = unit != SalesPeriods.Unit.DAY)
     }
   }
 }
@@ -285,43 +293,59 @@ private fun TwoPane(
       LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
         banner?.let { b -> item(key = "banner") { PrintBannerCard(b) } }
         val title = if (picked.key == current.key) PeriodLabel.current(picked, book.gregorian) else PeriodLabel.full(picked, book.gregorian)
-        item(key = "top-" + picked.key) { Top(picked, title, ctx, drawer.takeIf { picked.key == current.key }, reviews, money) }
-        if (picked.key == current.key) returnsHint(ctx)
-        invoices(picked, list, ctx, query, empty = StrHistory.emptyPeriod, current = picked.key == current.key)
+        item(key = "top-" + picked.key) { Top(picked, title, ctx, reviews, money) }
+        result(picked, PeriodLabel.title(picked, book.today, book.gregorian), picked.key == current.key, ctx, drawer, money)
+        if (picked.key == current.key) returnEntry(ctx)
+        invoices(picked, list, ctx, query, money, book, empty = StrHistory.emptyPeriod, current = picked.key == current.key)
         if (picked.key == current.key) setAside(ctx)
       }
     },
   )
 }
 
-/** «برگشت و تعویض» روشن: راهنما و «برگشتِ بی رسید» — همان جای پیشین، زیرِ کادرِ امروز */
 /** سندهای ردشده‌ای که صاحب کنار گذاشت/اصلاح کرد — بیرون از جمعِ دوره (`RejectedMark.kt`) */
 private fun LazyListScope.setAside(ctx: RowCtx) {
   if (ctx.d.setAside.isEmpty()) return
   item(key = "set-aside") { SetAsideSection(ctx.d.setAside) }
 }
 
-private fun LazyListScope.returnsHint(ctx: RowCtx) {
-  if (!ctx.returnsV2) return
-  item(key = "returns") {
-    val c = PhoneV3.colors
-    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-      Text(StrSale.returnsHint, style = V3Type.footnote, color = c.inkMuted)
-      ctx.actions.noReceipt?.let {
-        Spacer(Modifier.height(6.dp))
-        V3Button(StrSale.noReceiptReturn, it, kind = V3ButtonKind.SECONDARY, icon = Icons.AutoMirrored.Outlined.AssignmentReturn, height = 40.dp)
-      }
-    }
+/**
+ *  ۶۵h: «برگشت دادید / خالص / قرضِ وصول‌شده» و حالِ صندوق (فقط دورهٔ جاری) زیرِ خلاصه — `PeriodResult`؛ هیچ ⇒ هیچ.
+ *  [title] برچسبِ کوتاهِ دوره برای «خالصِ …».
+ */
+private fun LazyListScope.result(p: SalesPeriods.Period, title: String, current: Boolean, ctx: RowCtx, drawer: DrawerLine, money: Boolean) {
+  item(key = "result-" + p.key) {
+    PeriodResult(p.totals, HistoryResult.netLabel(current, p.unit, title), money, drawer.takeIf { current }, ctx.actions.drawer)
   }
 }
 
-/** فاکتورهای یک دوره، [HISTORY_PAGE] تا [HISTORY_PAGE] */
-/** [current] = دورهٔ جاری (امروز، این ماه…) ⇒ خالیِ آن «فروشِ تازه» را پیشنهاد می‌کند */
-private fun LazyListScope.invoices(p: SalesPeriods.Period, list: List<Sale>, ctx: RowCtx, query: HistoryQuery, empty: String, current: Boolean = false) {
+/**
+ *  «برگشت و تعویض» روشن: یک کارِ «برگشتِ کالا» به‌جای راهنمای خاکستریِ بلند و دکمهٔ «برگشتِ بی رسید» ⇐ برگه‌ای با همهٔ
+ *  راه‌ها (`ReturnStartSheet`: QR ِ رسید، پیدا کردنِ فاکتور، بی رسید) — همان جای پیشین، زیرِ کادرِ امروز.
+ */
+private fun LazyListScope.returnEntry(ctx: RowCtx) {
+  if (!ctx.returnsV2) return
+  item(key = "returns") { ReturnEntry(ctx.onReturns) }
+}
+
+/**
+ *  فاکتورهای یک دوره، [HISTORY_PAGE] تا [HISTORY_PAGE]، **به روز** (۶۵h): سرخطِ هر روز با جمعِ فروشِ همان روز ([DayHeader]،
+ *  روزِ کاریِ جمع‌ها: `HistoryBook.dayOf`) و فاکتورهایش زیرش. [headers] = false ⇒ بی سرخط (کارتِ روزِ پیشین خودش سرخط است).
+ *  [current] = دورهٔ جاری (امروز، این ماه…) ⇒ خالیِ آن «فروشِ جدید» را پیشنهاد می‌کند.
+ */
+private fun LazyListScope.invoices(
+  p: SalesPeriods.Period, list: List<Sale>, ctx: RowCtx, query: HistoryQuery, money: Boolean, book: HistoryBook,
+  empty: String, current: Boolean = false, headers: Boolean = true,
+) {
   if (list.isEmpty()) {
     item(key = "empty-" + p.key) {
       if (p.sales.isEmpty() && p.unit == SalesPeriods.Unit.DAY && ctx.d.sales.isEmpty()) {
-        V3EmptyState(Icons.AutoMirrored.Outlined.ReceiptLong, StrSale.noSalesYet, action = StrSale.newSale, onAction = ctx.actions.newSale)
+        //  هنوز هیچ فروشی: کوتاه و دوستانه، با همان «فروشِ جدید»
+        V3EmptyState(
+          Icons.AutoMirrored.Outlined.ReceiptLong,
+          if (current) StrHistory.emptyTodayTitle else StrSale.noSalesYet,
+          body = StrHistory.emptyTodayBody, action = StrSale.newSale, onAction = ctx.actions.newSale,
+        )
       } else if (query.filtered && p.sales.isNotEmpty()) {
         EmptyLine(StrSale.noInvoiceMatch, StrHistory.clearFilters) { query.filter = HistoryFilter.ALL; query.channel = HistoryChannel.ALL }
       } else EmptyLine(empty, StrSale.newSale.takeIf { current }, ctx.actions.newSale)
@@ -330,9 +354,16 @@ private fun LazyListScope.invoices(p: SalesPeriods.Period, list: List<Sale>, ctx
   }
   val limit = query.limit(p.key)
   val shown = if (list.size > limit) list.subList(0, limit) else list
-  val withDate = p.unit != SalesPeriods.Unit.DAY
-  items(shown.size, key = { "s-" + shown[it].id }) { i ->
-    InvoiceRow(shown[i], ctx, first = i == 0, last = i == shown.lastIndex, withDate = withDate)
+  val groups = if (headers) HistoryModel.days(shown) { book.dayOf(it.id)?.date ?: it.date } else listOf(HistoryDay(p.key, shown))
+  groups.forEach { g ->
+    if (headers) item(key = "day-" + p.key + "-" + g.date) {
+      DayHeader(PeriodLabel.dayTitle(g.date, book.today, book.gregorian), book.dayOf(g.sales.first().id)?.totals, money)
+    }
+    //  درونِ سرخطِ روز ساعتِ تنها بس است؛ بی سرخط (ماهِ بسته‌کارت) روزِ کوتاه هم
+    val withDate = !headers && p.unit != SalesPeriods.Unit.DAY
+    items(g.sales.size, key = { "s-" + g.sales[it].id }) { i ->
+      InvoiceRow(g.sales[i], ctx, first = i == 0, last = i == g.sales.lastIndex, withDate = withDate)
+    }
   }
   if (list.size > limit) item(key = "more-" + p.key) {
     MoreButton(StrHistory.more(plain(minOf(HISTORY_PAGE, list.size - limit)))) { query.shown[p.key] = limit + HISTORY_PAGE }
