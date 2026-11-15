@@ -71,7 +71,7 @@ private val WAVE_DEEP = lerp(Color.White, Brand.primary, 0.38f)
 private val WAVE_EDGE = lerp(Color.White, Brand.primary, 0.52f)
 
 /** بازتابِ نورِ سفید روی موج */
-private val SHEEN = Color(0xFFFFFFFF)
+private val SHEEN = Color.White
 
 /** لهجهٔ گرم — فقط چند نقطه، به‌اندازه‌ای که چشم را گرم کند */
 private val ACCENT_AMBER = Brand.orange

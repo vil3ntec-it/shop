@@ -106,7 +106,8 @@ class LookGuardTest {
    *  ساعتِ «فقط روی همین صفحه» جداست (`WelcomeClock.kt`) و این‌جا قفل نیست.
    */
   private val welcomeLook = mapOf(
-    "ui/v3/onboarding/WelcomeDecor.kt" to "8fad5f8a6e83a7ad",
+    //  دستهٔ ۶۸: فقط `Color(0xFFFFFFFF)` ⇐ `Color.White` (همان رنگ، برای HardcodedColorsTest)؛ ظاهر همان
+    "ui/v3/onboarding/WelcomeDecor.kt" to "19f2b85fce3e9a75",
   )
 
   @Test
