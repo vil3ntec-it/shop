@@ -28,6 +28,7 @@ import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrHistory
+import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.desktop.shots.MoneyDemo
@@ -71,7 +72,7 @@ class SectionHeaderUiTest {
 
   private val heading = SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)
   private val dropdown = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.DropdownList)
-  private val header = SemanticsMatcher.keyIsDefined(SemanticsProperties.StateDescription) and hasClickAction()
+  private val header = SemanticsMatcher.keyIsDefined(SemanticsProperties.StateDescription) and hasClickAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)
 
   private fun nodes(m: SemanticsMatcher, unmerged: Boolean = false): List<SemanticsNode> =
     rule.onAllNodes(m, useUnmergedTree = unmerged).fetchSemanticsNodes()
@@ -112,7 +113,8 @@ class SectionHeaderUiTest {
   @Test fun wideActionsNeverCoverTheTitle() {
     bar(Str.salesHistory, back = false, actions = 3)
     val t = titleNode(Str.salesHistory).boundsInRoot
-    val icons = (0..2).map { i -> nodes(hasContentDescription("کار $i") and hasClickAction()).single().boundsInRoot }
+    //  دو کارِ نخست پیدا و بقیه زیرِ «…» (`V3HeaderActions.split`) — سه آیکن در یک سو
+    val icons = listOf("کار 0", "کار 1", StrKit.more).map { d -> nodes(hasContentDescription(d) and hasClickAction()).single().boundsInRoot }
     icons.forEach { i -> assertTrue("عنوان زیرِ آیکن نیست: $t / $i", t.right <= i.left || t.left >= i.right) }
     assertTrue("در نوار", t.bottom <= px(56f) + 1f)
   }
@@ -127,7 +129,9 @@ class SectionHeaderUiTest {
     val head = nodes(header).single().boundsInRoot
     val drop = nodes(dropdown).single().boundsInRoot
     assertTrue("کادرِ کشوییِ ماه درونِ سرخطِ کارت: $drop در $head", inside(drop, head))
-    assertTrue("گوشهٔ مقابلِ پیکان (چپ در فارسی)", drop.center.x < head.center.x)
+    //  گوشه، نه وسط (جهت را پوستهٔ برنامه می‌دهد؛ این‌جا فقط «در یک سو») — جهتِ راست‌به‌چپ در `SummaryCardUiTest`
+    assertTrue("در گوشه، نه وسط", abs(drop.center.x - head.center.x) > px(60f))
+    assertTrue("ردیفِ بالای کارت", drop.top - head.top <= px(12f))
     //  ستونِ «کرایه» درونِ کارت، زیرِ سرخط؛ زدن ⇒ پالایهٔ همان دسته
     val rent = nodes(hasContentDescription("کرایه: " + money(6000.0)) and hasClickAction()).single()
     assertTrue("نمودار زیرِ سرخطِ همان کارت", rent.boundsInRoot.top >= head.bottom - 1f)

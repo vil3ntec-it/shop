@@ -139,7 +139,7 @@ class SummaryCardUiTest {
 
   private fun textNode(text: String): SemanticsNode = textNodes(text).single()
 
-  private val header = SemanticsMatcher.keyIsDefined(SemanticsProperties.StateDescription) and hasClickAction()
+  private val header = SemanticsMatcher.keyIsDefined(SemanticsProperties.StateDescription) and hasClickAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)
 
   private fun headerNode(): SemanticsNode = rule.onAllNodes(header).fetchSemanticsNodes().single()
 

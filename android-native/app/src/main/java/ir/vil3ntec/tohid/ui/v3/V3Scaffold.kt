@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
@@ -199,12 +200,24 @@ fun V3Scaffold(
   val guide = LocalV3Guide.current
   var guideOpen by remember { mutableStateOf(false) }
   val find = if (thumb && search != null && !navSearch) listOf(V3Action(Icons.Outlined.Search, StrKit.search, onClick = finder.open)) else emptyList()
-  val split = V3HeaderActions.split(find + actions, overflow)
+  //  ۶۵s: عنوانِ وسطِ نوار هرگز زیرِ آیکن نمی‌رود — از پهنای پنجره و پهنای خودِ عنوان، دست‌بالا دو کار (راهنما هم یک کار است،
+  //  واپسین) پیدا و بقیه در «…» (`V3HeaderActions.visibleFor`)؛ راهنمای رفته به «…» نخستین ردیفِ آن است
+  val guideAction = guide?.let { listOf(V3Action(Icons.AutoMirrored.Outlined.HelpOutline, StrKit.guide) { guideOpen = true }) }.orEmpty()
+  val candidates = find + actions + guideAction
+  val measurer = rememberTextMeasurer()
+  val titleStyle = V3Type.headline
+  val titlePx = remember(title, titleStyle, measurer) { measurer.measure(title, titleStyle, maxLines = 1).size.width.toFloat() }
+  val barPx = with(density) { (LocalConfiguration.current.screenWidthDp.dp - 32.dp).toPx() }
+  val iconPx = with(density) { 44.dp.toPx() }
+  val gapPx = with(density) { 8.dp.toPx() }
+  val visible = V3HeaderActions.visibleFor(candidates.size, overflow.isNotEmpty()) { icons ->
+    val row = if (icons == 0) 0f else icons * iconPx + (icons - 1) * gapPx
+    titlePx + 2 * (maxOf(if (onBack != null) iconPx else 0f, row) + gapPx) <= barPx
+  }
+  val split = V3HeaderActions.split(candidates, overflow, visible)
   val shown = split.shown
-  val guideIcon = guide != null && shown.size + (if (split.menu.isEmpty()) 0 else 1) < 3
-  val menu = if (guide != null && !guideIcon) listOf(V3MenuItem(Icons.AutoMirrored.Outlined.HelpOutline, StrKit.guide) { guideOpen = true }) + split.menu else split.menu
+  val menu = split.menu.partition { it.label == StrKit.guide && guide != null }.let { (g, rest) -> g + rest }
   val headerActions = shown +
-    (if (guideIcon) listOf(V3Action(Icons.AutoMirrored.Outlined.HelpOutline, StrKit.guide) { guideOpen = true }) else emptyList()) +
     (if (menu.isEmpty()) emptyList() else listOf(V3Action(Icons.Outlined.MoreHoriz, StrKit.more, dot = split.menuDot) { menuOpen = true }))
 
   //  زدنِ بیرون از کادرِ نوشتن ⇒ صفحه‌کلید بسته (`v3ClearFocusOnTap`، یک جا برای همهٔ صفحه‌های کیت)
