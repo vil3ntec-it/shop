@@ -88,6 +88,12 @@
   `ThemeV2PaletteTest` ۹، `Vill3nPaletteTest` ۶، `PurchaseViewsTest` ۱۰، `PurchaseOrderRoutesUiTest` ۷، `SupplierBillRoutesUiTest` ۶،
   `DebtorRowsE65qUiTest` ۱۴، `OneHandShellUiTest` ۸، `InfraLeakGuardTest` ۸. `precheck.sh` fail=0؛ `whatsnew/check.mjs` سبز.
 - **عکس‌ها**: `scratchpad/e68c/{before,after}/<صفحه>-<light|dark>.png` و `compare-lists.png`، `compare-palette.png` (پیش = همین آزمون روی ۶۵s).
+- **خانه (دروازهٔ هماهنگ‌کننده)**: `E68cHomeShotsTest` (`E68C_HOME`) — گوشی «آسمان»/«شامگاه» روز و شب و کامپیوتر ۱۳۶۶×۷۶۸، پیش =
+  `origin/claude/batch-68` 988fd543f با همان دفتر؛ `scratchpad/e68c/home/compare-home.png`. فقط رنگِ چهار میان‌برِ خانه عوض شد
+  (دریافت زمردی، ورودِ کالا زر، تاریخچه نیلی، «سفارش‌های آنلاین» نفتی به‌جای مرجانی — جای ۲ ِ `SectionColors.ORDER` نفتی شد چون عقیقِ
+  کم‌رنگِ کاشیِ «خاموش» صورتی‌نما بود)؛ گرادیانِ کادرهای بزرگ (`heroGradient`) و چیدمان همان؛ دو درخششِ کادر (جاهای ۰ و ۵ ِ
+  `ShopColors.accents`) از جدولِ بخش‌ها جدا شدند: بالا همان آسمانی، پایین بنفشِ نرم به‌جای صورتی. نشانهٔ کاشی‌ها
+  (`PhoneV3Palette.glyph`) مستقیم از `SectionColors`. نمودارِ تم به ترتیبِ معنا (`SectionColors.CHART`، هزینه عقیق).
 - **قدمِ بعدی / نیمه‌کاره**: تمِ «شامگاه» گرادیانِ خودش را (`#DB2777` صورتی) هنوز دارد — جدولِ THEME-V2 ِ صاحب‌کار است؛ اگر «هیچ صورتی»
   آن را هم می‌گیرد، با پرسش عوض شود. در «شامگاه» برند همان نیلیِ فروش است. ردیف‌های داده‌ای که هنوز `V3ListRow` ِ آزادند (گزارش‌ها، حرکاتِ
   انبار، شاخه‌ها) در دستهٔ بعد به `V3DataRow` بروند.
