@@ -61,6 +61,7 @@ private val platform: Platform by lazy {
     server = server,
     setServer = { store.put(SERVER_KEY, it.trim().takeIf { s -> s.isNotEmpty() }) },
     version = CustomerIosConfig.VERSION_NAME,
+    serverField = CustomerIosConfig.SERVER_FIELD,
     openMap = { geo ->
       //  «نمایش روی نقشه» ⇐ Apple Maps با همان مختصات (iOS طرحِ `geo:` ندارد)
       val p = geo.substringAfter("geo:").substringBefore('?')

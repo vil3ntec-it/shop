@@ -39,7 +39,7 @@ object StrAuth {
   val signInWithCode: String get() = t("ورود با کد به‌جای رمز", "Sign in with a code instead", "د پټنوم پر ځای په کوډ ننوځئ")
   val previousCodeValid: String get() = t("کد قبلی هنوز معتبر است", "The previous code is still valid", "پخوانی کوډ لا هم د اعتبار وړ دی")
   val or: String get() = t("یا", "or", "یا")
-  val googleNotEnabled: String get() = t("ورود با گوگل روی این سرور باز نشده — در پروندهٔ .env مقدار GOOGLE_CLIENT_ID را بگذارید و سرور را دوباره بالا بیاورید", "Google sign-in isn't enabled on this server — set GOOGLE_CLIENT_ID in the .env file and restart the server", "په دې سرور کې د ګوګل ننوتل فعال نه دي — په .env دوتنه کې GOOGLE_CLIENT_ID ولیکئ او سرور بیا پیل کړئ")
+  val googleNotEnabled: String get() = t("ورود با گوگل فعلاً در دسترس نیست — با ایمیل یا شماره وارد شوید", "Google sign-in isn't available right now — sign in with email or phone number", "د ګوګل ننوتل اوس نشته — په ایمیل یا شمېره ننوځئ")
   val googleFailed: String get() = t("ورود با گوگل انجام نشد", "Google sign-in failed", "د ګوګل ننوتل ونه شو")
   val savedSignIns: String get() = t("ورودهای ذخیره شده", "Saved sign-ins", "خوندي شوې ننوتنې")
   val phoneAccount: String get() = t("این حساب با شماره ساخته شده بود — با ایمیلِ همان حساب وارد شوید", "This account was created with a phone number — sign in with that account's email", "دا حساب په شمېره جوړ شوی و — د همغه حساب په ایمیل ننوځئ")

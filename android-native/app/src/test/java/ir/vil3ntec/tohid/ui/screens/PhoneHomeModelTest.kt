@@ -181,11 +181,16 @@ class PhoneHomeModelTest {
   }
 
   @Test
-  fun `خطای همگام‌سازی دلیلِ واقعیِ موتور را می‌گوید`() {
+  fun `خطای همگام‌سازی دستهٔ دلیلِ موتور را به زبانِ ساده می‌گوید — بی کدِ HTTP و نشانی`() {
+    //  «هیچ جزئیاتِ فنی/زیرساخت در صفحه»: پیش‌تر همان متنِ خام («HTTP 503 — …») روی کارتِ خانه می‌آمد
     val a = HomeAlerts.build(HomeAlerts.Input(sync = HomeAlerts.Sync.ERROR, syncError = "HTTP 503 — سرور در دسترس نیست")).single()
-    assertEquals("HTTP 503 — سرور در دسترس نیست", a.body)
+    assertEquals("سرور الان جواب نمی‌دهد", a.body)
     assertEquals("settings/data/sync", a.route)
-    val long = HomeAlerts.syncReason("x".repeat(500))
+    assertEquals("دستگاه به سرور نرسید", HomeAlerts.syncReason("Unable to resolve host \"api.vill3n.top\": No address"))
+    assertEquals("همگام‌سازی کامل نشد", HomeAlerts.syncReason("boom at x.y.Z(Foo.kt:12)"))
+    //  پیامِ سادهٔ فارسیِ بی نشانهٔ فنی همان می‌ماند و بلندش بریده می‌شود
+    assertEquals("اشتراکِ این دکان تمام شده", HomeAlerts.syncReason("اشتراکِ این دکان تمام شده"))
+    val long = HomeAlerts.syncReason("ب".repeat(100))
     assertEquals(HomeAlerts.MAX_ERROR, long.length)
     assertTrue(long.endsWith("…"))
     assertEquals(HomeAlerts.build(HomeAlerts.Input(sync = HomeAlerts.Sync.ERROR)).single().body, HomeAlerts.syncReason(""))
