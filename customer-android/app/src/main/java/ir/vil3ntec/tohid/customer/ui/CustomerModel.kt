@@ -230,7 +230,7 @@ class CustomerModel(
       is Route.Checkout -> prepareCheckout(r.slug)
       is Route.Placed -> Unit
       is Route.Track -> loadOrder(r.slug, r.token, quiet = returning && order.valueOrNull()?.token == r.token)
-      Route.Settings, Route.Addresses -> Unit
+      Route.Settings, Route.Addresses, is LegalRoute -> Unit
       is Route.AddressEdit -> if (!returning) {
         if (r.fromCheckout) book.start(null, Triple(form.addressText, form.landmark, form.pin))
         else book.start(saved.addresses.firstOrNull { it.id == r.id })

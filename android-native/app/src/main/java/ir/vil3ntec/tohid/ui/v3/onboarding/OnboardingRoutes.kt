@@ -5,7 +5,9 @@ import androidx.compose.material.icons.outlined.Login
 import androidx.compose.runtime.LaunchedEffect
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.nav.RoutePaths
+import ir.vil3ntec.tohid.core.i18n.StrAccount
 import ir.vil3ntec.tohid.core.i18n.StrAuth
+import ir.vil3ntec.tohid.core.legal.LegalKind
 import ir.vil3ntec.tohid.ui.v3.nav.AppModule
 import ir.vil3ntec.tohid.ui.v3.nav.Chrome
 import ir.vil3ntec.tohid.ui.v3.nav.RouteKind
@@ -16,6 +18,8 @@ object OnboardingPaths {
   fun auth(mode: String? = null) = RoutePaths.withQuery("auth", "mode" to mode)
   const val CODE = "auth/code"
   const val TERMS = "auth/terms"
+  /** «حریمِ خصوصی» درونِ برنامه (پیش‌تر صفحهٔ بیرونیِ مرورگر) — برای همه، مهمان و کارمند و حالتِ پیک هم */
+  const val PRIVACY = "legal/privacy"
   const val SHOP_SETUP = "setup/shop"
   const val LOCK = "lock"
   const val LOCK_SETUP = "lock/setup"
@@ -35,8 +39,11 @@ val OnboardingModule = AppModule(
     V3Route("auth", RouteKind.GATE, { Str.signIn }, chrome = Chrome.OWN) {
       AuthGate(store, mode = args.query("mode"), onClose = { nav.back() }) { nav.passGate(); shell.afterSignIn() }
     },
-    V3Route(OnboardingPaths.TERMS, RouteKind.PAGE, { StrAuth.termsShort }, chrome = Chrome.OWN) {
+    V3Route(OnboardingPaths.TERMS, RouteKind.PAGE, { StrAuth.termsShort }, aliases = listOf("legal/terms"), chrome = Chrome.OWN) {
       TermsPage(accepting = false, onClose = { back() }, onAccept = { back() })
+    },
+    V3Route(OnboardingPaths.PRIVACY, RouteKind.PAGE, { StrAccount.privacyPolicy }, chrome = Chrome.OWN) {
+      LegalPage(LegalKind.PRIVACY, onClose = { back() })
     },
     V3Route(OnboardingPaths.CODE, RouteKind.SHEET, { StrAuth.emailSignIn }, chrome = Chrome.OWN) {
       EmailCodeSheet(onClose = { back() }, onSignedIn = { shell.afterSignIn() }, store = store)
