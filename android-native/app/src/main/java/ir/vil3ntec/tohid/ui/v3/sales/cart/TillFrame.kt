@@ -83,9 +83,9 @@ import kotlinx.coroutines.launch
  *    ┌ سربرگ: برگشت · «فروش» · جستجو · کاشی/فهرست · «…» ┐
  *    │  دسته‌ها، پرفروش‌ها، کالاها                          │
  *    │                                                      │
- *    │ ╭──────────────────────────────────────────────────╮ │
- *    │ │ (اسکن)   ۳ قلم / ۵۷۰ ؋   ˄          [ پرداخت ]   │ │  ← تنها چیزِ پایین: کارتِ روشن، مرزِ مویی، سایهٔ نرم
- *    │ ╰──────────────────────────────────────────────────╯ │
+ *    ├╭────────────────────────────────────────────────────╮┤
+ *    ││ (اسکن)   ۳ قلم / ۵۷۰ ؋   ˄            [ پرداخت ]   ││  ← تنها چیزِ پایین، چسبیده به لبهٔ پایین («سبد باید زیرِ صفحه باشه»):
+ *    └┴────────────────────────────────────────────────────┴┘     کارتِ روشن، گوشه‌های بالا گرد، مرزِ مویی، سایهٔ نرم
  *
  *  نوارِ شناورِ برنامه این‌جا نیست (`ShellFrame.FOCUS`). سبدِ باز برگهٔ همان رنگِ کارت روی پرده است — در روز روشن، در شب سطحِ
  *  برآمدهٔ تیره — نه تختهٔ سیاه؛ رنگِ برند فقط روی «پرداخت». برگه درونِ همین صفحه است (نه پنجرهٔ جدا) تا بارکدخوانِ سخت‌افزاری
@@ -94,11 +94,9 @@ import kotlinx.coroutines.launch
 
 /** اندازه‌ها و نشان‌های آزمونِ صندوقِ گوشی */
 object TillSpec {
-  val BAR_HEIGHT: Dp = 64.dp
-  /** فاصلهٔ کارتِ نوار از کناره‌ها و از پایین */
-  val BAR_INSET: Dp = 12.dp
-  /** جای لازم زیرِ آخرین کالا تا پشتِ نوار نماند */
-  val BAR_SPACE: Dp = BAR_HEIGHT + BAR_INSET * 2
+  val BAR_HEIGHT: Dp = 72.dp
+  /** جای لازم زیرِ آخرین کالا تا پشتِ نوار نماند (نوار به لبهٔ پایین چسبیده؛ نوارِ سیستم جدا افزوده می‌شود) */
+  val BAR_SPACE: Dp = BAR_HEIGHT + 8.dp
   /** بالای برگهٔ سبد همیشه کمی از کالاها دیده بماند */
   val SHEET_TOP_GAP: Dp = 56.dp
   const val BAR_TAG = "till-bar"
@@ -159,10 +157,7 @@ fun TillFrame(
   BoxWithConstraints(Modifier.fillMaxSize().background(c.bg)) {
     val fullPx = constraints.maxHeight.toFloat()
     catalog(TillSpec.BAR_SPACE + navBottom)
-    TillBar(
-      model, pulse, onOpen, onPay, onScan,
-      Modifier.align(Alignment.BottomCenter).padding(start = TillSpec.BAR_INSET, end = TillSpec.BAR_INSET, bottom = TillSpec.BAR_INSET + navBottom),
-    )
+    TillBar(model, pulse, onOpen, onPay, onScan, navBottom, Modifier.align(Alignment.BottomCenter))
 
     val p = progress.value
     if (p > 0.001f) {
@@ -222,9 +217,9 @@ fun TillFrame(
  *  جمع (زدن ⇐ سبد باز می‌شود) و «پرداخت» با رنگِ برند. سبدِ خالی ⇒ فقط اسکن و «سبد خالی است». `pulse` ⇒ پرشِ کوچکِ جمع.
  */
 @Composable
-private fun TillBar(model: CartSummary.Model, pulse: Int, onOpen: () -> Unit, onPay: () -> Unit, onScan: () -> Unit, modifier: Modifier) {
+private fun TillBar(model: CartSummary.Model, pulse: Int, onOpen: () -> Unit, onPay: () -> Unit, onScan: () -> Unit, navBottom: Dp, modifier: Modifier) {
   val c = PhoneV3.colors
-  val shape = RoundedCornerShape(PhoneV3.groupRadius)
+  val shape = RoundedCornerShape(topStart = PhoneV3.groupRadius, topEnd = PhoneV3.groupRadius)
   val bump = remember { Animatable(1f) }
   val first = remember { pulse }
   LaunchedEffect(pulse) {
@@ -235,13 +230,13 @@ private fun TillBar(model: CartSummary.Model, pulse: Int, onOpen: () -> Unit, on
   Row(
     modifier
       .fillMaxWidth()
-      .height(TillSpec.BAR_HEIGHT)
-      .shadow(8.dp, shape, clip = false, ambientColor = c.source.shadow, spotColor = c.source.shadow)
+      .shadow(12.dp, shape, clip = false, ambientColor = c.source.shadow, spotColor = c.source.shadow)
       .clip(shape)
       .background(c.card)
       .border(1.dp, c.hairline, shape)
       .testTag(TillSpec.BAR_TAG)
-      .padding(horizontal = 8.dp),
+      .padding(start = 12.dp, end = 12.dp, bottom = navBottom)
+      .height(TillSpec.BAR_HEIGHT),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     TillScanButton(onScan)

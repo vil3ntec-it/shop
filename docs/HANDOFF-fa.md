@@ -69,6 +69,8 @@
 - **فهرستِ کالا** (`components/pos/TillCatalog.kt`، `TillListRow`): کالبدِ ۶۸c؛ −/+ فقط برای کالای درونِ سبد. `PhoneCatalog.kt` زیرِ ۸۰۰ خط ماند.
 - آزمون‌ها: تازه `SaleFocusUiTest` (۹)، `ShellFrameTest` (+۱). **تغییرهای عمدی**: `ShellFrameTest` و `OneHandShellUiTest` دیگر نوار روی `sale` نمی‌خواهند
   (حالتِ تمرکز؛ به‌جایش «بی نوار» سنجیده می‌شود)؛ `V3A11yGuardTest` ردیفِ `TillFrame.kt` در ALTERNATIVES (دستگیره = دکمهٔ «بستنِ سبد»).
+- **کشیدن از لبهٔ راست ⇒ برگشت** (خواستِ تازهٔ صاحب‌کار ۱۴۰۵/۰۸/۲۵): `ui/v3/nav/EdgeSwipeBack.kt` در `V3RouteHost` (یک جا، فقط گوشی)؛ لبهٔ فیزیکیِ راست،
+  ۲۴dp، ۳۰٪ یا پرتاب ⇒ `nav.back()` (ریشهٔ تب ⇒ خانه، مثلِ دکمهٔ برگشتِ گوشی). آزمون `EdgeSwipeBackUiTest` (۳). نوارِ سبد هم به لبهٔ پایین چسبید.
 - عکس‌های پیش/پس (۳۶۰×۷۶۰، روز و شب): `P1_SHOTS=<پوشه>` با `--tests '*P1SaleShotsTest*'`.
 - قدمِ بعد: عکسِ دستگاهِ واقعی (سنجیده نشد)؛ ادغام با e-phone-p2/p3 (`PhoneCatalog.kt` را p2 هم شاید دست بزند — فقط `CatalogItems`/خصوصی‌ها `internal` شدند).
 
