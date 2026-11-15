@@ -266,6 +266,8 @@ class CartStore(context: Context) : HeldCart {
     val out = poster.run(cartKey, record, { store.save(base, it) }, gate, offMain = StockLedger.isOn(store.data.value)) { done -> if (key == done) wipe() }
     //  فروش ثبت شده و روی دیسک است؛ چاپ پس از آن و جدا از آن (S16: چاپگرِ خاموش فروش را نگه نمی‌دارد)
     if (out is SalePost.Outcome.Done) {
+      //  جشنِ «فروش ثبت شد» روی پیامِ همان ثبت، در همهٔ صندوق‌ها (`V3Celebrate`)؛ لرزشِ «ثبت شد» را خودِ صندوق می‌زند
+      ir.vil3ntec.tohid.ui.v3.V3Celebrate.fire(haptic = false)
       runCatching { ir.vil3ntec.tohid.print.PrintSpooler.afterSale(app, out.ok.data, out.ok.saleId, print = print) }
       //  «اصلاح و ثبت» ِ صندوقِ سندهای ردشده: همین سبد برای ردیفی باز شده بود ⇒ آن ردیف با همین فاکتور بسته می‌شود
       if (!training) runCatching { ConflictFix.posted(app, cartKey, out.ok.saleId) }

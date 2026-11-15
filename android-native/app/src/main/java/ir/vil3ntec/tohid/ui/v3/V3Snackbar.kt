@@ -1,6 +1,14 @@
 package ir.vil3ntec.tohid.ui.v3
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.semantics
+import ir.vil3ntec.tohid.ui.screens.Motion
+import ir.vil3ntec.tohid.ui.v3.art.V3Burst
+import ir.vil3ntec.tohid.ui.v3.art.V3CheckBurst
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -98,6 +106,9 @@ fun V3SnackbarHost(host: SnackbarHostState, modifier: Modifier = Modifier) {
   val c = PhoneV3.colors
   SnackbarHost(host, modifier) { data ->
     val tone = (data.visuals as? V3SnackVisuals)?.tone ?: V3Toasts.toneOf(data.visuals.message)
+    //  جشنِ ثبتِ تازه (`V3Celebrate`) فقط روی پیامِ «موفق»، یک بار؛ خطا هرگز خام نیست (`PlainError`)
+    val claim = remember(data) { if (tone == V3Tone.SUCCESS) V3Celebrate.claim() else null }
+    val message = if (tone == V3Tone.ERROR) V3ErrorText.toast(data.visuals.message) else data.visuals.message
     AnimatedVisibility(
       visible = true,
       enter = slideInVertically(MotionSpec.sheet()) { -it } + fadeIn(MotionSpec.tweenOf(MotionTokens.SHORT)),
@@ -114,9 +125,9 @@ fun V3SnackbarHost(host: SnackbarHostState, modifier: Modifier = Modifier) {
             .padding(start = 14.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
           verticalAlignment = Alignment.CenterVertically,
         ) {
-          Box(Modifier.size(8.dp).clip(CircleShape).background(dot(tone)))
+          if (claim != null) ToastBurst(claim, dot(tone), c.black) else Box(Modifier.size(8.dp).clip(CircleShape).background(dot(tone)))
           Spacer(Modifier.width(10.dp))
-          Text(data.visuals.message, style = V3Type.callout, color = c.onBlack, modifier = Modifier.weight(1f, fill = false))
+          Text(message, style = V3Type.callout, color = c.onBlack, modifier = Modifier.weight(1f, fill = false))
           val action = data.visuals.actionLabel
           if (action != null) {
             Spacer(Modifier.width(8.dp))
@@ -131,6 +142,27 @@ fun V3SnackbarHost(host: SnackbarHostState, modifier: Modifier = Modifier) {
       }
     }
   }
+}
+
+/**
+ *  جشنِ کوتاه به‌جای نقطهٔ پیام (۲۲dp، [V3Burst.MS] میلی‌ثانیه): تیکِ کشیده‌شونده با چند ذره روی همان قرصِ تیره؛ لرزشِ
+ *  سبک فقط اگر راهِ ثبت خودش نلرزانده بود. هیچ لمسی نمی‌گیرد و پیام را بلندتر نمی‌کند.
+ */
+@Composable
+private fun ToastBurst(claim: V3Celebrate.Claim, color: androidx.compose.ui.graphics.Color, onColor: androidx.compose.ui.graphics.Color) {
+  val feedback = LocalHapticFeedback.current
+  val dark = ir.vil3ntec.tohid.ui.theme.PhoneV3Dark.source
+  val sparks = remember(color) { listOf(color, dark.brandPrimary, dark.accent(3), dark.accent(0)) }
+  val p = remember { Animatable(if (Motion.enabled) 0f else 1f) }
+  LaunchedEffect(Unit) {
+    if (claim.haptic) feedback.performHapticFeedback(HapticFeedbackType.Confirm)
+    p.animateTo(1f, V3Burst.spec())
+  }
+  V3CheckBurst(
+    { p.value }, disc = color, tick = onColor, sparks = sparks,
+    modifier = Modifier.size(22.dp).semantics { this[V3CelebrationKey] = true },
+    burst = Motion.enabled,
+  )
 }
 
 /** نقطهٔ گونه روی سطحِ تیره — رنگ‌های روشنِ شب تا روی وارونه دیده شوند */
