@@ -66,10 +66,14 @@ data class DashboardNumbers(
        */
       val nowMs = isoMillis(today)
       val dayMs = 24L * 60 * 60 * 1000
+      //  PERF-SCREEN: هر رشتهٔ تاریخ یک بار در همین فراخوانی (همان `isoMillis`، همان منطقهٔ زمانی) — دفترِ چندساله
+      //  صدها هزار ردیف و فقط چند صد روزِ جدا دارد؛ پیش‌تر برای هر ردیف یک `Calendar` ِ تازه ساخته می‌شد
+      val dayMillis = HashMap<String, Long>()
+      fun millisOf(iso: String): Long = dayMillis.getOrPut(iso) { isoMillis(iso) }
       var weekTotal = 0.0
       var prevWeekTotal = 0.0
       d.sales.filter { it.status != "cancelled" }.forEach { sale ->
-        val age = (nowMs - isoMillis(sale.date)) / dayMs
+        val age = (nowMs - millisOf(sale.date)) / dayMs
         when {
           age in 0..6 -> weekTotal += sale.finalTotal
           age in 7..13 -> prevWeekTotal += sale.finalTotal
@@ -84,7 +88,7 @@ data class DashboardNumbers(
        *  روی آن نبوده. همان چیزی که دکاندار هم با آن حساب می‌کند.
        */
       val lastMove = byDebtor
-        .mapValues { (_, list) -> list.maxOf { isoMillis(it.date) } }
+        .mapValues { (_, list) -> list.maxOf { millisOf(it.date) } }
       val overdue = owing.filter { (debtor, _) ->
         val seen = lastMove[debtor.id] ?: 0L
         seen > 0L && (nowMs - seen) / dayMs > 30

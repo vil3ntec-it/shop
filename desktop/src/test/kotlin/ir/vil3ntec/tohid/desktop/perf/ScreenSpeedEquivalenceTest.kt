@@ -51,7 +51,8 @@ class ScreenSpeedEquivalenceTest {
 
   /** `DebtorEngine.debtSince` پیش از PERF-SCREEN، خط به خط */
   private fun oldDebtSince(d: ShopData, debtorId: String): Long? {
-    val mine = DebtReverse.effective(d.transactions.filter { it.debtorId == debtorId })
+    val own = ir.vil3ntec.tohid.data.CustomerAlias.of(d, debtorId)
+    val mine = DebtReverse.effective(d.transactions.filter { it.debtorId in own })
       .sortedWith(compareBy<DebtTransaction>({ it.date }, { it.createdAt }))
     if (mine.isEmpty()) return null
     val open = ArrayDeque<Pair<Long, Double>>()
@@ -112,8 +113,9 @@ class ScreenSpeedEquivalenceTest {
   private fun oldReceipts(d: ShopData): List<ReceiptsModel.Row> =
     DebtReverse.effective(d.transactions).filter { it.type == "receive" && !DebtReverse.isReversal(it) }.mapNotNull { t ->
       val j = Jalali.ofIso(t.date) ?: return@mapNotNull null
-      val debtor: Debtor? = d.debtors.find { it.id == t.debtorId }
-      ReceiptsModel.Row(t.id, debtor?.name ?: StrMoney.deletedDebtor, t.notes, t.amount, t.date, t.debtorId, debtor != null, j.year, j.month)
+      val who = ir.vil3ntec.tohid.data.CustomerAlias.keeperOf(d, t.debtorId)
+      val debtor: Debtor? = d.debtors.find { it.id == who }
+      ReceiptsModel.Row(t.id, debtor?.name ?: StrMoney.deletedDebtor, t.notes, t.amount, t.date, who, debtor != null, j.year, j.month)
     }.sortedByDescending { it.date }
 
   @Test fun `رسیدها همان ردیف‌ها، مشتریِ تکراری نخستین و حذف‌شده بی پیوند`() {
@@ -137,7 +139,7 @@ class ScreenSpeedEquivalenceTest {
     }
     assertEquals(week, got.weekTotal, 0.0)
     assertEquals(prev, got.prevWeekTotal, 0.0)
-    val last = d.transactions.groupBy { it.debtorId }.mapValues { (_, l) -> l.maxOf { isoMillis(it.date) } }
+    val last = ir.vil3ntec.tohid.data.DebtRows.of(d).mapValues { (_, l) -> l.maxOf { isoMillis(it.date) } }
     val overdue = got.owing.filter { (debtor, _) -> (last[debtor.id] ?: 0L).let { it > 0L && (nowMs - it) / dayMs > 30 } }
     assertEquals(overdue, got.overdue)
     assertEquals(overdue.maxOfOrNull { (debtor, _) -> ((nowMs - (last[debtor.id] ?: nowMs)) / dayMs).coerceAtLeast(0) } ?: 0L, got.overdueOldestDays)

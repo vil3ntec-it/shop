@@ -23,6 +23,8 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -174,18 +176,28 @@ fun Modifier.v3Stagger(state: V3StaggerState, key: Any, index: Int): Modifier = 
  *  `Double` است (پولِ میلیاردی دقیق می‌ماند) و در پایان دقیقاً خودِ `target`.
  */
 @Composable
-fun rememberCountUp(target: Double): Double {
+fun rememberCountUp(target: Double): Double = rememberCountUpState(target).value
+
+/**
+ *  PERF-SCREEN — همان [rememberCountUp] (همان عدد در هر قاب)، ولی به‌صورتِ `State`: هر قابِ شمارش فقط جایی را از نو
+ *  می‌سازد که `.value` را می‌خواند (کارتِ عدد)، نه کلِ صفحه‌ای که شمارنده را نگه داشته است.
+ */
+@Composable
+fun rememberCountUpState(target: Double): State<Double> {
   val from = remember { doubleArrayOf(if (Motion.enabled) 0.0 else target) }
   val progress = remember { Animatable(if (Motion.enabled) 0f else 1f) }
-  val start = from[0]
   LaunchedEffect(target) {
     if (!Motion.enabled) { progress.snapTo(1f); from[0] = target; return@LaunchedEffect }
     progress.snapTo(0f)
     progress.animateTo(1f, tween(MotionTokens.COUNT_UP, easing = MotionTokens.EmphasizedDecelerate))
     from[0] = target
   }
-  val p = progress.value
-  return if (p >= 1f) target else start + (target - start) * p
+  return remember(target) {
+    derivedStateOf {
+      val p = progress.value
+      if (p >= 1f) target else from[0] + (target - from[0]) * p
+    }
+  }
 }
 
 /**

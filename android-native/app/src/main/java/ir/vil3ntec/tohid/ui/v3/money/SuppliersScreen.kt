@@ -56,7 +56,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
-import ir.vil3ntec.tohid.ui.v3.rememberCountUp
+import ir.vil3ntec.tohid.ui.v3.rememberCountUpState
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3AnimateItem
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
@@ -86,7 +86,7 @@ internal class SuppliersActions(
 @Composable
 internal fun SuppliersScreen(d: ShopData, actions: SuppliersActions) {
   val rows = remember(d) { SuppliersModel.rows(d) }
-  val owed = rememberCountUp(remember(d) { SuppliersModel.owedTotal(d) })
+  val owed = rememberCountUpState(remember(d) { SuppliersModel.owedTotal(d) })
   val stagger = rememberV3Stagger()
   var confirmDelete by remember { mutableStateOf<String?>(null) }
 
@@ -103,7 +103,7 @@ internal fun SuppliersScreen(d: ShopData, actions: SuppliersActions) {
         item(key = "hero") {
           V3HeroCard(
             title = StrMoney.supplierDebtTotal,
-            value = MoneyText.afn(owed),
+            value = MoneyText.afn(owed.value),
             caption = StrMoney.suppliersCaption(d.suppliers.size, d.purchases.size),
             chips = listOfNotNull(
               V3HeroChip(StrMoney.newSupplier, Icons.Outlined.PersonAddAlt, onClick = actions.onNewSupplier),

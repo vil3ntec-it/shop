@@ -110,8 +110,22 @@ object Transactions {
   }
 
   /** «امروز» ِ خانه (HOME-V2 §۲٫۴): آخرین `n` تراکنشِ همین روز، تازه‌ترین بالا */
-  fun today(d: ShopData, today: String, n: Int = TODAY_ROWS, purchases: Boolean = true): List<Tx> =
-    list(d, purchases = purchases).asSequence().filter { it.date == today }.take(n).toList()
+  fun today(d: ShopData, today: String, n: Int = TODAY_ROWS, purchases: Boolean = true): List<Tx> {
+    //  PERF-SCREEN: همان `list(d).filter { date == today }.take(n)` ولی فقط ردیف‌های امروز ساخته می‌شوند — پیش‌تر خانه با
+    //  هر باز شدن برای همهٔ فاکتورها و خریدها ردیف می‌ساخت و کلِ آن را مرتب می‌کرد تا پنج ردیفِ امروز را بردارد.
+    //  ترتیب همان است: مرتب‌سازیِ پایدار پس از صافی = صافی پس از مرتب‌سازیِ پایدار.
+    val names = d.debtors.associate { it.id to it.name }
+    val mine = d.sales.filter { it.date == today }
+    val ids = mine.mapTo(HashSet()) { it.id }
+    val counts = if (ids.isEmpty()) emptyMap() else d.saleItems.filter { it.saleId in ids }.groupingBy { it.saleId }.eachCount()
+    val sales = mine.map { ofSale(d, it, names, counts) }
+    val bought = if (purchases) {
+      val suppliers = d.suppliers.associate { it.id to it.name }
+      val products = d.products.associate { it.id to it.name }
+      purchaseGroups(d).filter { it.first().date == today }.map { ofPurchase(d, it, suppliers, products) }
+    } else emptyList()
+    return (sales + bought).sortedByDescending { it.at }.take(n)
+  }
 
   /** چند ردیف در «امروز» ِ خانه */
   const val TODAY_ROWS = 5

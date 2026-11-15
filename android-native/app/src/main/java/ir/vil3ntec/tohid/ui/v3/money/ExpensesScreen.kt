@@ -57,7 +57,7 @@ import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
 import ir.vil3ntec.tohid.ui.v3.V3TextButton
-import ir.vil3ntec.tohid.ui.v3.rememberCountUp
+import ir.vil3ntec.tohid.ui.v3.rememberCountUpState
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3AnimateItem
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
@@ -94,7 +94,7 @@ internal fun ExpensesScreen(d: ShopData, monthArg: String?, categoryArg: String?
   val byCategory = remember(d, month) { ExpensesModel.byCategory(d, month) }
   //  جمع و شمارِ کادرِ بزرگ همهٔ ماه است، نه فقط دستهٔ انتخاب‌شده
   val monthCount = remember(d, month) { ExpensesModel.shown(d, month, null).size }
-  val total = rememberCountUp(remember(d, month) { ExpensesModel.total(d, month) })
+  val total = rememberCountUpState(remember(d, month) { ExpensesModel.total(d, month) })
   val label = MoneyText.month(month)
   val stagger = rememberV3Stagger(month, category)
   val hue = V3Modules.hueOf("expenses")
@@ -120,7 +120,7 @@ internal fun ExpensesScreen(d: ShopData, monthArg: String?, categoryArg: String?
         item(key = "hero") {
           V3HeroCard(
             title = StrMoney.monthTotal(label),
-            value = MoneyText.afn(total),
+            value = MoneyText.afn(total.value),
             caption = StrMoney.rows(monthCount),
             chips = if (byCategory.isEmpty()) emptyList() else listOf(
               V3HeroChip(StrMoney.byCategory, Icons.Outlined.PieChart) { actions.onBreakdown(month, category) { c -> category = c?.takeIf { it.isNotBlank() } } },
