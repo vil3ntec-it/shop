@@ -16,6 +16,7 @@ import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.v3.money.MoneyPaths
+import ir.vil3ntec.tohid.ui.v3.money.PurchaseLineText
 import ir.vil3ntec.tohid.ui.v3.money.PurchaseRowText
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -76,10 +77,10 @@ class PurchasesRoutesUiTest {
 
   @Test fun detailShowsEveryLineWithBarcodeBatchAndExpiry() {
     h.show(MoneyPaths.purchase(views.getValue(PurchaseDemo.BIG_NO).key), data)
-    h.await(StrPurchases.barcode(PurchaseDemo.FLOUR_CODE), substring = true)
+    h.await(StrPurchases.barcode(PurchaseLineText.ltr(PurchaseDemo.FLOUR_CODE)), substring = true)
     assertTrue(h.has(StrPurchases.lines(5)))
-    assertTrue(h.has(StrPurchases.batch("A-17"), substring = true))
-    assertTrue(h.has(StrPurchases.barcode("TEA-01"), substring = true))
+    assertTrue(h.has(StrPurchases.batch(PurchaseLineText.ltr("A-17")), substring = true))
+    assertTrue(h.has(StrPurchases.barcode(PurchaseLineText.ltr("TEA-01")), substring = true))
     assertTrue(h.has(StrPurchases.noCode, substring = true))
     assertTrue(h.has("آرد"))
     assertTrue(h.has("50 کیلو × 40 ؋", substring = true))
@@ -90,7 +91,7 @@ class PurchasesRoutesUiTest {
     val big = views.getValue(PurchaseDemo.BIG_NO)
     val store = disk()
     h.show(MoneyPaths.purchase(big.key), store)
-    h.await(StrPurchases.barcode(PurchaseDemo.FLOUR_CODE), substring = true)
+    h.await(StrPurchases.barcode(PurchaseLineText.ltr(PurchaseDemo.FLOUR_CODE)), substring = true)
     h.click(StrMoney.pay)
     h.await(StrMoney.recordPayment)
     assertTrue(h.has(PurchaseBook.payNote(PurchaseDemo.BIG_NO), substring = true))

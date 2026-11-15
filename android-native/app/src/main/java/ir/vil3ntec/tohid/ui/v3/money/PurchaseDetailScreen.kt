@@ -74,10 +74,16 @@ internal object PurchaseLineText {
     return l.baseQty?.let { "$main (${MoneyText.qtyUnit(it, l.baseUnit)})" } ?: main
   }
 
+  /**
+   *  بارکد، سری و تاریخ چپ‌به‌راستِ جدا (LRI…PDI): کنارِ «·» و واژهٔ فارسی، رقم و حرفِ لاتین بی آن جابه‌جا خوانده می‌شدند
+   *  («انقضا · A-17 بارکد 626… · سری»)
+   */
+  fun ltr(s: String): String = "\u2066$s\u2069"
+
   fun codes(l: PurchaseViews.Line): String = listOfNotNull(
-    l.code?.let(StrPurchases::barcode) ?: StrPurchases.noCode,
-    l.batch.takeIf { it.isNotBlank() }?.let(StrPurchases::batch),
-    l.expiry.takeIf { it.isNotBlank() }?.let { StrPurchases.expires(formatDate(it)) },
+    l.code?.let { StrPurchases.barcode(ltr(it)) } ?: StrPurchases.noCode,
+    l.batch.takeIf { it.isNotBlank() }?.let { StrPurchases.batch(ltr(it)) },
+    l.expiry.takeIf { it.isNotBlank() }?.let { StrPurchases.expires(ltr(formatDate(it))) },
   ).joinToString(" · ")
 
   /** رسیدنِ ردیف: خریدِ دفتر «رسیده»؛ سفارش «رسیده ۲ از ۵» (کمتر از سفارش ⇒ کهربایی) */

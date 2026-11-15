@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -56,7 +57,8 @@ internal fun PurchaseListRow(v: PurchaseViews.View, today: String, onOpen: () ->
   V3ListRow(
     text.title,
     subtitle = text.subtitle,
-    subtitleLines = 1,
+    //  روز و اقلام («۲۱ عقرب · آرد، روغن و ۳ قلمِ دیگر») کنارِ قرص در یک خط بریده می‌شد
+    subtitleLines = 2,
     icon = when (v.kind) {
       PurchaseViews.Kind.RETURN -> Icons.AutoMirrored.Outlined.AssignmentReturn
       PurchaseViews.Kind.ORDER -> Icons.Outlined.LocalShipping
@@ -83,6 +85,8 @@ internal class PurchasesActions(
 @Composable
 internal fun PurchaseFilterRow(d: ShopData, views: List<PurchaseViews.View>, today: String, filter: PurchaseViews.Filter, onFilter: (PurchaseViews.Filter) -> Unit) {
   val greg = PurchaseRowText.gregorian()
+  //  پهنای کران‌دار: درونِ ردیفِ پیمایشی پهنا بی‌کران است و نوشتهٔ کادرِ کشویی (`weight(fill = false)`) صفر می‌شد — فقط ▾ دیده می‌شد
+  val box = Modifier.widthIn(max = 200.dp)
   V3ChipRow {
     val suppliers = remember(d, I18n.lang) {
       listOf(V3Choice("", StrPurchases.allSuppliers)) + d.suppliers.sortedBy { it.name }.map { V3Choice(it.id, it.name) }
@@ -90,7 +94,7 @@ internal fun PurchaseFilterRow(d: ShopData, views: List<PurchaseViews.View>, tod
     V3Dropdown(
       value = filter.supplierId?.let { id -> d.suppliers.firstOrNull { it.id == id }?.name } ?: StrPurchases.allSuppliers,
       choices = suppliers, selected = filter.supplierId.orEmpty(),
-      onSelect = { onFilter(filter.copy(supplierId = it.ifEmpty { null })) }, label = StrMoney.supplierLabel,
+      onSelect = { onFilter(filter.copy(supplierId = it.ifEmpty { null })) }, label = StrMoney.supplierLabel, modifier = box,
     )
     val pays = remember(I18n.lang) {
       listOf(
@@ -102,7 +106,7 @@ internal fun PurchaseFilterRow(d: ShopData, views: List<PurchaseViews.View>, tod
     }
     V3Dropdown(
       value = pays.first { it.key == filter.pay.name }.label, choices = pays, selected = filter.pay.name,
-      onSelect = { k -> onFilter(filter.copy(pay = PurchaseViews.PayFilter.valueOf(k))) }, label = StrPurchases.payLabel,
+      onSelect = { k -> onFilter(filter.copy(pay = PurchaseViews.PayFilter.valueOf(k))) }, label = StrPurchases.payLabel, modifier = box,
     )
     val receipts = remember(I18n.lang) {
       listOf(
@@ -113,7 +117,7 @@ internal fun PurchaseFilterRow(d: ShopData, views: List<PurchaseViews.View>, tod
     }
     V3Dropdown(
       value = receipts.first { it.key == filter.receipt.name }.label, choices = receipts, selected = filter.receipt.name,
-      onSelect = { k -> onFilter(filter.copy(receipt = PurchaseViews.ReceiptFilter.valueOf(k))) }, label = StrPurchases.receiptLabel,
+      onSelect = { k -> onFilter(filter.copy(receipt = PurchaseViews.ReceiptFilter.valueOf(k))) }, label = StrPurchases.receiptLabel, modifier = box,
     )
     val periods = remember(views, today, greg, I18n.lang) {
       listOf(V3Choice("", StrPurchases.allTime)) + PurchasePeriods.keys(views.map { it.date }, today, greg).mapIndexed { i, k ->
@@ -122,7 +126,7 @@ internal fun PurchaseFilterRow(d: ShopData, views: List<PurchaseViews.View>, tod
     }
     V3Dropdown(
       value = PurchaseRowText.period(filter.period, today, greg), choices = periods, selected = filter.period.orEmpty(),
-      onSelect = { onFilter(filter.copy(period = it.ifEmpty { null })) }, label = ir.vil3ntec.tohid.core.i18n.StrLook.period,
+      onSelect = { onFilter(filter.copy(period = it.ifEmpty { null })) }, label = ir.vil3ntec.tohid.core.i18n.StrLook.period, modifier = box,
     )
   }
 }
