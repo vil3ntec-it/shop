@@ -26,6 +26,8 @@ object Updater {
     val size: Long,
     val sumsUrl: String = "",
     val minVersion: String = "",
+    /** `AppMove` (شناسهٔ نصبِ اندروید) — آیفون از App Store به‌روز می‌شود، پس همیشه خالی */
+    val movedTo: String = "",
   )
 
   @Suppress("UNUSED_PARAMETER")
@@ -49,6 +51,9 @@ object Updater {
     onStatus: (String?) -> Unit = {},
     onProgress: (Int) -> Unit,
   ): Result<File> = Result.failure(IllegalStateException(APP_STORE))
+
+  @Suppress("UNUSED_PARAMETER")
+  fun foreignPackage(context: Context, apk: File): String? = null
 
   @Suppress("UNUSED_PARAMETER")
   fun readyFile(context: Context, release: Release): File? = null

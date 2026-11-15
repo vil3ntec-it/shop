@@ -14,7 +14,7 @@
  *   APNS_KEY_ID     ده نویسه (Key ID ِ کلیدِ APNs)
  *   APNS_TEAM_ID    ده نویسه (Team ID)
  *   APNS_KEY_P8     متنِ فایلِ ‎.p8‎ (PEM؛ «\n» ِ نوشته‌شده هم پذیرفته است، یا base64 ِ همان فایل/بدنه)
- *   APNS_BUNDLE_ID  شناسهٔ برنامه، مثلاً ir.vil3ntec.tohid (همان `apns-topic`)
+ *   APNS_BUNDLE_ID  شناسهٔ برنامهٔ آیفون، com.vill3n.dailyshop از ۱۴۰۵/۰۸/۲۴ (همان `apns-topic`؛ یکی، چون توکن مالِ همان برنامه است)
  *   APNS_ENV        production (پیش‌فرض) یا sandbox (= development؛ ساختِ Xcode ِ Debug)
  * هیچ‌کدام نیست ⇒ خاموشِ بی‌صدا و همان رفتارِ گامِ ۴: توکن‌های apns نگه داشته می‌شوند، نه فرستاده، نه کهنه.
  * ناقص یا خراب ⇒ خاموش با یک هشدارِ کوتاه که فقط **نامِ** متغیر/دلیل را می‌گوید.

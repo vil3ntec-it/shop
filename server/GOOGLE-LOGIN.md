@@ -50,7 +50,7 @@ Web است، نه Android**. توکنی که گوشی می‌دهد روی نا�
 
 | فیلد | مقدار |
 |---|---|
-| Package name | `ir.vil3ntec.tohid` |
+| Package name | `com.vill3n.dailyshop` (از ۱۴۰۵/۰۸/۲۴؛ پیش‌نمایش جدا: `com.vill3n.dailyshop.preview`. کلاینتِ پیشینِ `ir.vil3ntec.tohid` را تا رفتنِ برنامه‌های قدیمی نگه دارید) |
 | SHA-1 certificate fingerprint | `29:36:A0:E2:69:4E:89:47:A4:AB:AA:D5:3F:73:74:55:EB:EC:BB:CA` |
 
 این SHA-1 مالِ همان کلیدی است که نسخه‌های منتشرشده با آن امضا می‌شوند

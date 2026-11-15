@@ -73,6 +73,27 @@ object UpdateManager {
     private set
 
   /**
+   *  `AppMove`: برگهٔ «برنامه با نامِ تازه آمده» باز است. نسخه‌ای که برنامهٔ دیگری است (`Release.movedTo`) هرگز
+   *  مثلِ به‌روزرسانی گرفته یا نصب نمی‌شود: «به‌روزرسانی»ِ هر نوار و کارتی همین برگه را باز می‌کند و فقط دکمهٔ خودِ
+   *  برگه (`download(…, moved = true)`) می‌گیرد و نصب می‌کند. برگه برای هر شناسهٔ تازه یک بار خودش باز می‌شود ([check]).
+   */
+  var moveAsk by mutableStateOf(false)
+    private set
+
+  /** کاربر در برگهٔ راهنما «نصبِ برنامهٔ تازه» را زد (فقط برای همان شناسه) */
+  private var moveGo = ""
+
+  /** بازکردنِ برگهٔ راهنما (نوار، کارت) — فقط وقتی نسخهٔ پیداشده برنامهٔ دیگری است */
+  fun openMove() {
+    if (release?.movedTo?.isNotEmpty() == true) moveAsk = true
+  }
+
+  /** «بعداً» یا بستنِ برگه — خودش دوباره باز نمی‌شود ([check] همان بارِ اول «دیده» نوشت)؛ از نوار و کارت باز می‌شود */
+  fun closeMove() {
+    moveAsk = false
+  }
+
+  /**
    *  بررسیِ خودکار — بارِ اول چند ثانیه پس از باز شدنِ برنامه و بعد هر ۶
    *  ساعت، بی پیام (نه «تازه‌ترین است»، نه خطای شبکه). نسخهٔ تازه که پیدا
    *  شد `UpdateBanner` بالای همهٔ صفحه‌ها می‌آید. روی کامپیوتر فایل همان
@@ -117,6 +138,13 @@ object UpdateManager {
         .onSuccess { found ->
           release = found
           checked = true
+          //  AppMove: برنامهٔ تازه ⇒ برگهٔ راهنما یک بار خودش باز می‌شود (برای هر شناسهٔ تازه)
+          val to = found?.movedTo.orEmpty()
+          if (to != moveGo) moveGo = ""
+          if (to.isNotEmpty() && !AppMoveSeen.seen(app, to)) {
+            moveAsk = true
+            AppMoveSeen.mark(app, to)
+          }
           // فایلِ همین نسخه شاید از قبل گرفته شده باشد — مثلاً کاربر
           // دانلود کرده و سرِ پرسشِ نصب «نه» زده
           ready = found?.let { Updater.readyFile(app, it) }
@@ -131,10 +159,23 @@ object UpdateManager {
     }
   }
 
-  fun download(context: Context, andInstall: Boolean = true) {
+  /**
+   *  @param moved دکمهٔ برگهٔ «برنامه با نامِ تازه آمده» (`AppMoveSheet`): فقط همین برنامهٔ دیگر را می‌گیرد (ادامه‌دار، با همان
+   *  سنجشِ جمعِ کنترلی و امضا) و به نصب‌کنندهٔ اندروید می‌دهد. جای دیگر هرگز `true` نمی‌دهد.
+   */
+  fun download(context: Context, andInstall: Boolean = true, moved: Boolean = false) {
     val target = release ?: return
     if (busy) return
     val app = context.applicationContext
+    if (moved && target.movedTo.isNotEmpty()) {
+      moveGo = target.movedTo
+      moveAsk = false
+    }
+    //  AppMove: برنامهٔ دیگر بی برگهٔ راهنما گرفته نمی‌شود (گرفتنِ پس‌زمینهٔ کامپیوتر هم نه)
+    if (!AppMove.mayGet(target.movedTo, moveGo)) {
+      if (andInstall) moveAsk = true
+      return
+    }
 
     // از قبل کامل گرفته شده؟ یک‌راست سراغِ نصب
     Updater.readyFile(app, target)?.let {
@@ -176,6 +217,16 @@ object UpdateManager {
       return
     }
 
+    //  AppMove: فایلی که بسته‌اش همین برنامه نیست (حتی بی `app-id.txt` در انتشار) فقط پس از برگهٔ راهنما
+    Updater.foreignPackage(app, file)?.let { foreign ->
+      val r = release ?: return
+      AppMove.installGate(foreign, r.movedTo, moveGo)?.let { pkg ->
+        if (r.movedTo != pkg) release = r.copy(movedTo = pkg)
+        moveAsk = true
+        return
+      }
+    }
+
     needsPermission = false
     Updater.install(app, file)
       .onFailure { message = StrUpdate.installerFailed }
@@ -189,6 +240,8 @@ object UpdateManager {
 
   /** راهِ آخر: گرفتنِ همان فایل با مرورگر */
   fun openInBrowser(context: Context, repo: String) {
+    //  AppMove: برنامهٔ دیگر از مرورگر هم بی برگهٔ راهنما نه
+    if (release?.movedTo?.isNotEmpty() == true) { moveAsk = true; return }
     val url = release?.apkUrl ?: Updater.stableApkUrl(repo)
     Updater.openInBrowser(context.applicationContext, url)
       .onFailure { message = StrUpdate.browserFailed }

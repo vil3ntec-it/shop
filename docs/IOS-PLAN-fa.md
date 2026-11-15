@@ -152,7 +152,7 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
 
 1. **حسابِ Apple Developer Program** (۹۹ دلار در سال؛ حسابِ سازمانی D-U-N-S می‌خواهد) و راهِ قانونیِ آن با وضعِ تحریم (بندِ ۵.۷).
 2. **Team ID** ⇐ `TEAM_ID` در `ios/iosApp/Configuration/Config.xcconfig` (اکنون خالی).
-3. **شناسهٔ برنامه (bundle id)**: پیشنهادِ `ir.vil3ntec.tohid` (همان `APPLICATION_ID` ِ اندروید) — باید در حسابِ اپل ثبت شود.
+3. **شناسهٔ برنامه (bundle id)**: `com.vill3n.dailyshop` (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۴، همان شناسهٔ نصبِ اندروید؛ `Config.xcconfig`) — باید در حسابِ اپل ثبت شود.
 4. **گواهیِ Apple Distribution و profile ِ ارائه**، و رکوردِ برنامه در App Store Connect (نام، نماد، عکس‌ها، ردهٔ سنی).
 5. **فرم‌های اپل**: Privacy Manifest و برچسب‌های حریمِ خصوصی، پاسخِ «رمزنگاری/صادرات»، و — اگر ورود با گوگل روشن شود — Sign in with Apple (قاعدهٔ ۴.۸؛
    امروز `GOOGLE_LOGIN = false` است و ورود فقط ایمیل/رمز/کدِ خودِ برنامه ⇐ ۴.۸ هنوز پیش نمی‌آید، ⇐ ۰.۱۰).

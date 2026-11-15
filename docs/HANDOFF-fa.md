@@ -57,6 +57,28 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۵ — عاملِ e-appid زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-appid` (روی `origin/claude/batch-67`) — شناسهٔ نصبِ تازه `com.vill3n.dailyshop`
+
+- **چرا**: تصمیمِ صریحِ صاحب‌کار (۱۴۰۵/۰۸/۲۴): شناسهٔ نصبِ برنامهٔ دکان `com.vill3n.dailyshop` (پیش‌نمایش `….preview`) — همان دو نامی که در
+  پروژهٔ تازهٔ Firebase ثبت می‌کند؛ آیفون هم همان. ثبت: `OWNER-DECISIONS-fa.md` («گرفته‌شده — ۱۴۰۵/۰۸/۲۴، تصمیمِ صریح»)، قاعده: `RULES-fa.md`
+  «v3 · به‌روزرسانی و انتشار»، کارهای صاحب‌کار: `spec/OWNER-ACTIONS-fa.md` بند ۱۰.
+- **فقط شناسهٔ نصب**: `applicationId` (و `BUNDLE_ID` ِ آیفون، shim ِ `packageName` و `BuildConfig.APPLICATION_ID` ِ آیفون)؛ `namespace` و
+  بسته‌های کد `ir.vil3ntec.tohid.*` (پس `R`، `BuildConfig`، `-keep` ِ proguard، `ComponentName("…AppLinkAlias")`، کنش‌های USB و extraها)
+  دست نخوردند. کامپیوتر (AppId ِ Inno، `upgradeUuid`، `bundleID` ِ مک، `APPLICATION_ID` ِ BuildConfig ِ کامپیوتر)، مدیریت، خرید و پمپ دست نخوردند.
+- **گذار**: انتشار `app-id.txt` دارد (ورک‌فلو از خودِ APK با aapt؛ پایدار، آزمایشی، نسخه‌دار و پیش‌نمایش)؛ سرور ⇐ `appId` ِ `/latest` و برای
+  برنامهٔ پیشین (بی `?app=`) هشدارِ گذار سرِ `notes`. برنامه (`update/AppMove.kt`، `UpdateManager`، برگهٔ `ui/v3/shell/AppMoveSheet.kt`) نصبیِ
+  شناسهٔ دیگر را هرگز «به‌روزرسانی» نشان نمی‌دهد، نمی‌گیرد و نصب نمی‌کند جز از دکمهٔ برگه؛ حتی بی `app-id.txt` بستهٔ فایلِ گرفته‌شده سنجیده
+  می‌شود (`Updater.foreignPackage`). پیشنهادِ پاک کردن فقط با «وارد + صفِ خالی + یک همگام‌سازیِ موفق». «پلِ گذار»: ورودیِ `legacy_id` ِ
+  «توحید بومی» ⇐ `TOHID_LEGACY_APP_ID=true` ⇐ همین کد با شناسهٔ قدیمی (یک بار، پیش از نخستین پایدارِ شناسهٔ تازه). `apk-gates.sh` شناسهٔ
+  منتشرشدهٔ قدیمی/تازه را در گذار فقط هشدار می‌دهد.
+- **آزمون**: سرور ⇐ `releases-app-id.test.js` (تازه، ۶) + apns/apple-signin/push-delivery/releases/store-build-updater/dari-text/… ⇐ ۱۲۱ گذشت.
+  تغییرِ عمدیِ آزمون: پیش‌فرضِ `APNS_BUNDLE_ID` و `BUNDLE` ِ اپل در آزمون‌ها شناسهٔ تازه شد (رفتار همان؛ آزمونِ تازه هر دو شناسه را می‌سنجد).
+  کاتلین (کامپیوتر) ⇐ `AppMoveTest` (تازه) + `ReleaseFeedTest` (۴ تازه) + LookGuard/I18nCoverage/Dari/DesktopPhrases/HardcodedColors/V3A11yGuard/
+  NoLegacyUi/ReleaseSignature/ResumableDownload/Updater ⇐ ۱۲۶ گذشت، ۰ شکست (کامپایلِ کاملِ کامپیوتر با برگهٔ تازه). `precheck.sh` ⇐ fail=0. شکستِ از پیشِ `tools/quality/quality.test.mjs` («baseline well formed»: سطرِ
+  `src/direct/…/Updater.kt` در baseline) مالِ این شاخه نیست.
+- **فقط CI و گوشیِ واقعی**: ساختِ APK (این‌جا Android SDK نیست) و `aapt` ِ شناسهٔ `com.vill3n.dailyshop[.preview]` (گامِ «نام‌گذاری» و
+  پیش‌نمایش سخت می‌سنجند)، نصبِ کنارِ هم، برگهٔ راهنما روی گوشیِ قدیمیِ پس از پلِ گذار، Firebase ِ تازه، ورود با گوگل (کلاینتِ Android ِ تازه).
+- **قدمِ بعد**: صاحب‌کار بند ۱۰ ِ OWNER-ACTIONS (Firebase، کلاینتِ گوگل، پلِ گذار پیش از پایدار، برنامهٔ تازه در Play/بازار).
 ### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-63f زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-63f` (از `origin/claude/batch-63`) — سرعتِ صفحه‌ها (PERF-SCREEN)
 
 - **ساخته شد:** سنجهٔ منطق و نخستینِ قابِ هر بخش با دفترِ بزرگ (`desktop/…/perf/ScreenSpeed*`، `ScreenLogic`، `ScreenFrame`؛ عدد و روش:

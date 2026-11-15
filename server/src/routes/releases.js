@@ -32,6 +32,12 @@
  * مرحله (`?shop=`) هر درصدی درون است؛ مرحلهٔ ایستاده (`halted`، دستی یا نگهبانِ خودکار) ⇒ هیچ‌کس.
  * برچسبِ نسخه‌دار را فقط ورک‌فلوی «انتشارِ مرحله‌ای» (`release-stage.yml`) از روی آزمایشیِ آزموده می‌سازد.
  *
+ * ── شناسهٔ نصبِ برنامهٔ دکان (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۴) ───────────────────────
+ * انتشارِ اندروید `app-id.txt` دارد (شناسهٔ نصبِ همان نصبی، از خودِ APK) ⇒ `appId` ِ پاسخ؛ نبود ⇒ «». برنامه‌ای که
+ * `?app=<شناسهٔ خودش>` می‌فرستد خودش «برنامه با نامِ تازه آمده» را نشان می‌دهد (`update/AppMove.kt`). برنامهٔ پیش از
+ * آن `app` نمی‌فرستد و همیشه `ir.vil3ntec.tohid` است: اگر نصبی شناسهٔ دیگری دارد، هشدارِ گذار سرِ `notes` می‌آید
+ * (تنها چیزی که آن برنامه از پاسخ نشان می‌دهد) — هر دو شناسه پذیرفته‌اند، هیچ‌کدام رد نمی‌شود.
+ *
  * ⛔ فقط برچسب‌ها و فایل‌هایی که در انتشار هست؛ نامِ فایل هرگز مسیر نمی‌شود.
  * ⛔ اصالت را سرور تضمین نمی‌کند — برنامه `SHA256SUMS.txt` و امضای ECDSAِ آن را
  *    با کلیدِ سنجاق‌شدهٔ خودش می‌سنجد؛ سرورِ دست‌کاری‌شده هم نمی‌تواند نصبیِ جعلی بدهد.
@@ -52,6 +58,16 @@ const BETA = (tag) => `${tag}-beta`;
 const TAGS = new Set([...STABLE, ...STABLE.map(BETA)]);
 const ID = /^[A-Za-z0-9_-]{1,80}$/;
 const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
+/** نامِ بستهٔ اندروید — همان قاعدهٔ `AppMove.valid` ِ برنامه */
+const PACKAGE = /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$/;
+const isPackage = (v) => typeof v === 'string' && v.length <= 150 && PACKAGE.test(v);
+/** شناسهٔ نصبِ همهٔ برنامه‌های دکانِ پیش از ۱۴۰۵/۰۸/۲۴ (برنامه‌ای که `app` نمی‌فرستد) */
+const LEGACY_APP_ID = 'ir.vil3ntec.tohid';
+const APP_ID_FILE = 'app-id.txt';
+/** هشدارِ گذار برای برنامهٔ پیشین — کوتاه، چون آن برنامه ۴۰۰ نویسهٔ اولِ یادداشت را نشان می‌دهد */
+const MOVED_NOTE = '⚠️ این نسخه برنامهٔ تازه‌ای با نامِ تازه است و کنارِ برنامهٔ فعلی نصب می‌شود، نه رویش. '
+  + 'اول مطمئن شوید همه‌چیز همگام شده، برنامهٔ تازه را نصب و وارد شوید، بعد این برنامهٔ قدیمی را پاک کنید. '
+  + 'تا همه‌چیز همگام نشده، برنامهٔ قدیمی را پاک نکنید.';
 
 /** انتشارِ هر برچسب، تا `ttlMs` در حافظه */
 const cache = new Map();
@@ -98,6 +114,20 @@ async function versionOf(data) {
     if (m && /\.(apk|msi|dmg|deb)$/i.test(a.name)) return m[1];
   }
   return '';
+}
+
+/** شناسهٔ نصبِ انتشار (`app-id.txt`)؛ نبود، ناخوانا یا ناجور ⇒ «» — هرگز خوراکِ انتشار را نمی‌خواباند */
+async function appIdOf(data) {
+  const a = data.assets.find(x => x.name === APP_ID_FILE);
+  if (!a) return '';
+  try {
+    const file = await cached(data.tag, a);
+    const text = fs.readFileSync(file, 'utf8').trim().split(/\r?\n/)[0].trim();
+    return isPackage(text) ? text : '';
+  } catch (err) {
+    console.warn(`[releases] ${data.tag} ${APP_ID_FILE}: ${err.message}`);
+    return '';
+  }
 }
 
 //  پنلِ مرکزی ۴.۸ (`lib/ops-overview.js`): همان خواننده و همان کش — نسخهٔ پایدار/آزمایشیِ هر سکو در پنل
@@ -227,13 +257,19 @@ router.get('/:tag/latest', async (req, res, next) => {
         console.warn(`[releases] ${BETA(tag)}: ${err.message}`);
       }
     }
+    //  شناسهٔ نصب: برنامه‌ای که `app` نمی‌فرستد پیشین است (همیشه شناسهٔ قدیمی) و برگهٔ راهنما ندارد
+    const appId = await appIdOf(data);
+    const legacyClient = !isPackage(req.query.app);
+    const notes = legacyClient && appId && appId !== LEGACY_APP_ID ? `${MOVED_NOTE}\n\n${data.notes}` : data.notes;
     //  پاسخ به شناسه بسته است ⇒ کشِ مشترک نباید پاسخِ یک دکان را به دیگری بدهد
     res.set('Cache-Control', req.query.shop || req.query.device ? 'private, max-age=60' : 'public, max-age=60');
     res.json({
       tag: use,
       channel,
       version,
-      notes: data.notes,
+      notes,
+      //  شناسهٔ نصبِ همان نصبی؛ «» یعنی نامعلوم (انتشارِ پیش از ۱۴۰۵/۰۸/۲۴)
+      appId,
       publishedAt: data.publishedAt,
       assets: data.assets.map(a => ({ name: a.name, size: a.size })),
       //  §۳۸.۹: حداقل نسخهٔ پشتیبانی‌شدهٔ دکان؛ خالی ⇒ حداقلی نیست. برنامهٔ زیرِ آن
@@ -266,4 +302,5 @@ router.get('/:tag/file/:name', async (req, res, next) => {
 module.exports = router;
 module.exports._cache = cache;
 module.exports.STABLE = STABLE;
+module.exports.LEGACY_APP_ID = LEGACY_APP_ID;
 module.exports._forgetBeta = () => { betaCache = EMPTY(); };

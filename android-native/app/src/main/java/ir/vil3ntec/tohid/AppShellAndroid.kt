@@ -154,6 +154,8 @@ fun AppShell(context: Context, store: ShopStore, onShopShown: (suspend () -> Uni
     // زبانِ صفحه و جهتش: فارسی و پشتو راست‌به‌چپ (پیش‌فرض، مثلِ پیش)، انگلیسی چپ‌به‌راست
     ir.vil3ntec.tohid.ui.ProvideLang {
       CrashNotice(context)
+      //  «برنامه با نامِ تازه آمده» (`update/AppMove.kt`) — یک برگه برای همهٔ صفحه‌ها
+      ir.vil3ntec.tohid.ui.v3.shell.AppMoveHost()
       //  عوض شدنِ حالت (سوییچرِ «حساب من»، پیوند) با محو و بزرگ‌شدنِ نرم
       AnimatedContent(
         targetState = screen,
