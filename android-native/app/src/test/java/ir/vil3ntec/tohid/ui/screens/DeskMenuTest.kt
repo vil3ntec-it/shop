@@ -97,6 +97,8 @@ class DeskMenuTest {
     val staff = DeskMenu.groups(false, shortcuts()).flatMap { it.items }.map { it.id }
     assertFalse("settings" in staff)
     assertFalse("audit" in staff)
+    //  ۶۳w: «سابقهٔ عملیات» برای صاحب هم در منو نیست (صاحب‌کار)
+    assertFalse(DeskMenu.groups(true, shortcuts()).flatMap { it.items }.any { it.id == "audit" })
     assertEquals("صاحب دکان", DeskMenu.roleLabel("owner"))
     assertEquals("شاگرد", DeskMenu.roleLabel("staff"))
   }

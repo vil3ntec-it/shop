@@ -54,7 +54,7 @@ private fun canSeeMoney(): Boolean {
   return remember { ShopRole.canSeeMoney(context) }
 }
 
-/** گروهِ گزارش‌ها (G6، `analytics.md`): گزارش‌ها، آمار، سابقهٔ عملیات و مرکزِ مدیریت؛ آمار را در ورقِ خانه هم می‌گذارد */
+/** گروهِ گزارش‌ها (G6، `analytics.md`): گزارش‌ها، آمار و مرکزِ مدیریت (سابقهٔ عملیات از ۶۳w نیست)؛ آمار را در ورقِ خانه هم می‌گذارد */
 val AnalyticsModule = AppModule(
   id = "analytics",
   title = { Str.reports },
@@ -62,7 +62,6 @@ val AnalyticsModule = AppModule(
   entries = listOf(
     ModuleEntry("reports", { Str.reports }, AnalyticsPaths.REPORTS, Icons.Outlined.InsertChart, setOf(Place.NAV, Place.MORE, Place.HOME), MoreGroup.MONEY, V3Hue.TEAL, order = 20),
     ModuleEntry("admin", { Str.adminCenter }, AnalyticsPaths.ADMIN, Icons.Outlined.AdminPanelSettings, setOf(Place.MORE), MoreGroup.SHOP, V3Hue.BRAND, order = 10),
-    ModuleEntry("audit", { Str.auditLog }, "audit", Icons.AutoMirrored.Outlined.ManageSearch, setOf(Place.MORE), MoreGroup.SHOP, V3Hue.PURPLE, needs = setOf(Need.MANAGE), order = 30),
   ),
   routes = listOf(
     V3Route(AnalyticsPaths.REPORTS, RouteKind.TAB, { Str.reports }, chrome = Chrome.OWN) {
@@ -93,13 +92,8 @@ val AnalyticsModule = AppModule(
         LandOn(ShellPaths.HOME)
       }
     },
-    V3Route("audit", RouteKind.PAGE, { StrReports.auditTitle }, needs = setOf(Need.AUDIT), chrome = Chrome.OWN, deniedBody = { StrReports.auditDenied }) {
-      AuditScreen(data, args.query("kind"), onBack = backOrNull, onOpen = { nav.open(it) })
-    },
-    V3Route(AnalyticsPaths.DOC_CHAIN, RouteKind.PAGE, { ir.vil3ntec.tohid.core.i18n.StrDocChain.title }, parent = "audit", needs = setOf(Need.AUDIT), chrome = Chrome.OWN, deniedBody = { StrReports.auditDenied }) {
-      val run = rememberDocChainCheck(data)
-      DocChainCheckScreen(run.state, { ir.vil3ntec.tohid.ui.v3.account.AccountFormat.date(it) }, run.again, onBack = backOrNull)
-    },
+    //  «سابقهٔ عملیات» (`audit`) و درِ «بررسیِ یکپارچگیِ اسناد» ِ درونش (`audit/doc-chain`، ۵۶c) از برنامه برداشته شدند
+    //  (صاحب‌کار ۱۴۰۵/۰۸/۲۴: «این بخشِ عملیات چیه، بردار از برنامه») — ثبتِ `auditLog` و سرور همان؛ فقط راهِ دیدن نیست.
     V3Route(AnalyticsPaths.ADMIN, RouteKind.PAGE, { Str.adminCenter }, chrome = Chrome.OWN) {
       AdminScreen(
         d = data, canSeeMoney = canSeeMoney(), canManage = Need.MANAGE in access.granted, canAudit = Need.AUDIT in access.granted,

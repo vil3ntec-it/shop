@@ -50,8 +50,8 @@ import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3Fab
-import ir.vil3ntec.tohid.ui.v3.V3HeroCard
-import ir.vil3ntec.tohid.ui.v3.V3HeroChip
+import ir.vil3ntec.tohid.ui.v3.V3Summary
+import ir.vil3ntec.tohid.ui.v3.V3SummaryAction
 import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
@@ -100,15 +100,15 @@ internal fun SuppliersScreen(d: ShopData, actions: SuppliersActions) {
         Modifier.widthIn(max = 720.dp).fillMaxWidth(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding() + 72.dp),
       ) {
-        item(key = "hero") {
-          V3HeroCard(
-            title = StrMoney.supplierDebtTotal,
+        item(key = "summary") {
+          V3Summary(
+            label = StrMoney.supplierDebtTotal,
             value = MoneyText.afn(owed),
             caption = StrMoney.suppliersCaption(d.suppliers.size, d.purchases.size),
-            chips = listOfNotNull(
-              V3HeroChip(StrMoney.newSupplier, Icons.Outlined.PersonAddAlt, onClick = actions.onNewSupplier),
-              actions.onPurchaseOrders?.let { V3HeroChip(StrPurchasePages.purchaseOrders, Icons.Outlined.LocalShipping, onClick = it) },
-              actions.onSupplierBills?.let { V3HeroChip(StrSupplierBills.title, Icons.AutoMirrored.Outlined.ReceiptLong, onClick = it) },
+            actions = listOfNotNull(
+              V3SummaryAction(StrMoney.newSupplier, Icons.Outlined.PersonAddAlt, onClick = actions.onNewSupplier),
+              actions.onPurchaseOrders?.let { V3SummaryAction(StrPurchasePages.purchaseOrders, Icons.Outlined.LocalShipping, onClick = it) },
+              actions.onSupplierBills?.let { V3SummaryAction(StrSupplierBills.title, Icons.AutoMirrored.Outlined.ReceiptLong, onClick = it) },
             ),
           )
           Spacer(Modifier.height(16.dp))

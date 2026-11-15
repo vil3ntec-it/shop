@@ -91,8 +91,8 @@ fun OrdersScreen(
     subtitle = StrOnline.ordersCaption,
     modifier = modifier,
     onBack = onBack,
-    //  کارِ یک‌دستی: «سفارشِ دستی» پایینِ صفحه کنارِ تب‌ها (`V3Dock`)
-    dock = if (state.perms.create) listOf(V3Action(Icons.Outlined.Add, StrOnline.manualOrder, onClick = actions.onNew)) else emptyList(),
+    //  «سفارشِ دستی» آیکنِ سربرگ؛ تب‌ها زیرِ عنوان — هیچ ردیفی بالای نوارِ پایین
+    actions = if (state.perms.create) listOf(V3Action(Icons.Outlined.Add, StrOnline.manualOrder, onClick = actions.onNew)) else emptyList(),
     overflow = listOf(V3MenuItem(Icons.Outlined.Refresh, StrOnline.reload, onClick = actions.onRetry)) + menu,
     chips = {
       DraftCountTabs(

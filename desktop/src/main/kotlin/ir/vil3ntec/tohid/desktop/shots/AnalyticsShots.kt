@@ -10,7 +10,6 @@ import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.v3.analytics.AdminMembers
 import ir.vil3ntec.tohid.ui.v3.analytics.AdminScreen
-import ir.vil3ntec.tohid.ui.v3.analytics.AuditScreen
 import ir.vil3ntec.tohid.ui.v3.analytics.ReportTab
 import ir.vil3ntec.tohid.ui.v3.analytics.ReportsScreen
 import ir.vil3ntec.tohid.ui.v3.analytics.StatsPage
@@ -44,9 +43,6 @@ object AnalyticsShots : GroupShots {
     add(Shot("stats", content = { store -> StatsPage(data(store), true, "day", {}, 0.dp, embedded = true) }))
     add(Shot("stats-month", content = { store -> StatsPage(data(store), true, "month", {}, 0.dp, embedded = true) }))
     add(Shot("stats-empty", content = { StatsPage(ShopData(), true, "day", {}, 0.dp, embedded = false, onBack = {}) }))
-    add(Shot("audit", route = "audit"))
-    add(Shot("audit-filtered", route = "audit?kind=sale"))
-    add(Shot("audit-empty", content = { AuditScreen(ShopData(), null, onBack = {}, onOpen = {}) }))
     add(Shot("admin", route = "admin"))
     add(Shot("admin-staff", content = { store ->
       AdminScreen(data(store), canSeeMoney = false, canManage = false, canAudit = false, members = AdminMembers.SignedOut, onBack = {}, onOpen = {})

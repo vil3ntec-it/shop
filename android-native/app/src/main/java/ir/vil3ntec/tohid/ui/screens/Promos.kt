@@ -82,7 +82,8 @@ import ir.vil3ntec.tohid.ui.components.common.PillTone
 import ir.vil3ntec.tohid.ui.components.common.ScreenKind
 import ir.vil3ntec.tohid.ui.components.common.SegmentTab
 import ir.vil3ntec.tohid.ui.components.common.SegmentedTabs
-import ir.vil3ntec.tohid.ui.components.common.StatCard
+import ir.vil3ntec.tohid.ui.components.common.Metric
+import ir.vil3ntec.tohid.ui.components.common.MetricRows
 import ir.vil3ntec.tohid.ui.components.common.StatusPill
 import ir.vil3ntec.tohid.ui.components.common.TableToolbar
 import ir.vil3ntec.tohid.ui.components.common.ViewMode
@@ -198,16 +199,17 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
         }
         Spacer(Modifier.height(Space.sm))
       }
+      //  ۶۳w (صاحب‌کار: «چهار کادرِ بزرگ نه»): یک فهرستِ فشرده؛ «فعال» و «همه» همان پالایه را می‌زنند
       item(key = "stats") {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-          val active = snap.rules.count { PromoText.status(it, today) == PromoText.Status.ACTIVE }
-          StatCard(StrSettings.active, active.toString(), StrHome.justNow, Modifier.weight(1f), icon = Icons.Filled.CheckCircle,
-            selected = tab == PromoText.Tab.ACTIVE, onClick = { tab = PromoText.Tab.ACTIVE })
-          StatCard(StrPromoPages.withCode, snap.rules.count { it.code.isNotEmpty() }.toString(), StrSale.promoCode, Modifier.weight(1f), icon = Icons.Filled.Sell)
-          StatCard(StrPromoPages.timed, snap.rules.count { PromoText.windowText(it) != ir.vil3ntec.tohid.core.i18n.StrMarketPages.always }.toString(), StrPromoPages.hourOrDay, Modifier.weight(1f), icon = Icons.Filled.Schedule)
-          StatCard(Str.all, snap.rules.size.toString(), StrPromoPages.ruleWord, Modifier.weight(1f), icon = Icons.Filled.LocalOffer,
-            selected = tab == PromoText.Tab.ALL, onClick = { tab = PromoText.Tab.ALL })
-        }
+        val active = snap.rules.count { PromoText.status(it, today) == PromoText.Status.ACTIVE }
+        MetricRows(
+          listOf(
+            Metric(StrSettings.active, active.toString(), StrHome.justNow, selected = tab == PromoText.Tab.ACTIVE, icon = Icons.Filled.CheckCircle, onClick = { tab = PromoText.Tab.ACTIVE }),
+            Metric(StrPromoPages.withCode, snap.rules.count { it.code.isNotEmpty() }.toString(), StrSale.promoCode, icon = Icons.Filled.Sell),
+            Metric(StrPromoPages.timed, snap.rules.count { PromoText.windowText(it) != ir.vil3ntec.tohid.core.i18n.StrMarketPages.always }.toString(), StrPromoPages.hourOrDay, icon = Icons.Filled.Schedule),
+            Metric(Str.all, snap.rules.size.toString(), StrPromoPages.ruleWord, selected = tab == PromoText.Tab.ALL, icon = Icons.Filled.LocalOffer, onClick = { tab = PromoText.Tab.ALL }),
+          ),
+        )
         Spacer(Modifier.height(Space.sm))
       }
       item(key = "toolbar") {
@@ -216,11 +218,14 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
           onQuery = { query = it },
           placeholder = StrPromoPages.searchNameCode,
           viewMode = view,
+          //  پالایهٔ «همه / فعال / …» یک کادرِ کشویی (`V3Dropdown`)، نه کلیدِ پهن
           tabs = {
-            SegmentedTabs(
-              tabs = PromoText.Tab.entries.map { SegmentTab(it, it.label) },
-              selected = tab,
-              onSelect = { tab = it },
+            ir.vil3ntec.tohid.ui.v3.V3Dropdown(
+              value = tab.label,
+              choices = PromoText.Tab.entries.map { ir.vil3ntec.tohid.ui.v3.V3Choice(it.name, it.label) },
+              selected = tab.name,
+              onSelect = { k -> PromoText.Tab.entries.firstOrNull { it.name == k }?.let { tab = it } },
+              label = ir.vil3ntec.tohid.core.i18n.StrLook.show,
             )
           },
         )

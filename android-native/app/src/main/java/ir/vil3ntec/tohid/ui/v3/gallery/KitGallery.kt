@@ -80,7 +80,7 @@ fun KitGallery(part: KitPart = KitPart.BASICS, onBack: (() -> Unit)? = null) {
     onBack = onBack,
     actions = listOf(V3Action(Icons.Outlined.Notifications, "هشدارها", dot = true) {}),
     overflow = listOf(V3MenuItem(Icons.Outlined.Share, "هم‌رسانی") {}, V3MenuItem(Icons.Outlined.DeleteOutline, "حذف", danger = true) {}),
-    search = if (part == KitPart.LISTS) ({ V3SearchField(search, { search = it }, "جست‌وجوی کالا یا بارکد…", onScan = {}) }) else null,
+    search = if (part == KitPart.LISTS) ir.vil3ntec.tohid.ui.v3.V3Search(search, { search = it }, "جست‌وجوی کالا یا بارکد…", onScan = {}) else null,
     chips = if (part == KitPart.LISTS) ({
       V3ChipRow {
         listOf("همه", "لبنیات", "نوشیدنی", "شوینده").forEach { V3Chip(it, chip == it, { chip = it }, count = if (it == "همه") 24 else null) }

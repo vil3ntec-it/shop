@@ -18,7 +18,6 @@ import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.FactCheck
 import androidx.compose.material.icons.outlined.PointOfSale
 import androidx.compose.material.icons.outlined.Print
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material.icons.outlined.TableChart
 import androidx.compose.material.icons.outlined.Tune
@@ -49,9 +48,9 @@ import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.v3.V3Action
 import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
-import ir.vil3ntec.tohid.ui.v3.V3HeroChip
+import ir.vil3ntec.tohid.ui.v3.V3SummaryAction
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
-import ir.vil3ntec.tohid.ui.v3.V3SearchField
+import ir.vil3ntec.tohid.ui.v3.V3Search
 import ir.vil3ntec.tohid.ui.v3.V3Skeleton
 import ir.vil3ntec.tohid.ui.v3.V3TwoPane
 import ir.vil3ntec.tohid.ui.v3.V3Type
@@ -145,7 +144,6 @@ fun HistoryScreen(
   /** STF-02 — «لغو» با برگهٔ تأییدِ مدیر (`CancelAsk.offered`)؛ «اصلاح» همان [canCancel] */
   askCancel: Boolean = false,
 ) {
-  var searching by rememberSaveable { mutableStateOf(query.search.isNotEmpty()) }
   var filterSheet by remember { mutableStateOf(false) }
   var menuFor by remember { mutableStateOf<String?>(null) }
   val ctx = RowCtx(d, book?.look, returnsV2, canCancel, actions, askCancel, today = book?.today.orEmpty()) { menuFor = it }
@@ -153,25 +151,16 @@ fun HistoryScreen(
   V3Scaffold(
     title = Str.salesHistory,
     onBack = actions.back,
-    //  جدولِ اکسلی فقط کامپیوتر
-    actions = listOfNotNull(actions.table?.let { V3Action(Icons.Outlined.TableChart, StrHistory.table, onClick = it) }),
-    //  کارِ یک‌دستی: جست‌وجو، فیلتر و صندوقِ نقد پایینِ صفحه (`V3Dock`)؛ پیش‌تر سربرگ فقط دوتای اول را نشان می‌داد
-    //  (ترتیب همان پیشین تا سربرگِ کامپیوتر — دو تای اول — عوض نشود)
-    dock = listOf(
-      V3Action(Icons.Outlined.PointOfSale, StrSale.drawerWord, dot = drawer.open, onClick = actions.drawer),
-      V3Action(Icons.Outlined.Search, StrSale.searchAlt) { searching = !searching },
+    //  سربرگ: فیلتر و صندوقِ نقد (دو آیکنِ پیدا)، جدولِ اکسلیِ کامپیوتر در «…»؛ جست‌وجو (با QRِ رسید درونِ کادر) از دکمهٔ
+    //  نوار؛ دوره یک کادرِ کشویی زیرِ عنوان — هیچ ردیفی بالای نوارِ پایین (صاحب‌کار ۱۴۰۵/۰۸/۲۴)
+    actions = listOfNotNull(
       V3Action(Icons.Outlined.Tune, StrHistory.filter, dot = query.filtered) { filterSheet = true },
+      V3Action(Icons.Outlined.PointOfSale, StrSale.drawerWord, dot = drawer.open, onClick = actions.drawer),
+      actions.table?.let { V3Action(Icons.Outlined.TableChart, StrHistory.table, onClick = it) },
     ),
     bottomReserve = bottomReserve,
-    search = if (searching || query.search.isNotEmpty()) ({
-      V3SearchField(
-        value = query.search,
-        onValueChange = { query.search = ir.vil3ntec.tohid.latinDigits(it) },
-        placeholder = StrSale.historySearch,
-        onScan = actions.scanReceipt,
-      )
-    }) else null,
-    chips = { UnitBar(query) { filterSheet = true } },
+    search = V3Search(query.search, { query.search = ir.vil3ntec.tohid.latinDigits(it) }, StrSale.historySearch, onScan = actions.scanReceipt),
+    chips = { PeriodBar(book, query) { filterSheet = true } },
   ) { pad ->
     val padding = PaddingValues(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding() + 16.dp)
     when {
@@ -207,19 +196,19 @@ internal class RowCtx(
 )
 
 /**
- *  کادرِ بالا: دورهٔ جاری (یا برگزیده در دوستونی) — مبلغ، شمار، و تراشه‌های چاپ، بررسی و صندوق. تراشه‌ها به ردیفِ بعد
- *  می‌روند (`wrapChips`)؛ صندوقِ بلند واپسین است تا «چاپ» و «بررسی» با هم در ردیفِ نخست بمانند.
+ *  خلاصهٔ بالا: دورهٔ برگزیده (پیش‌فرض دورهٔ جاری) — مبلغ، شمار، و کارهای کوچکِ چاپ، بررسی و صندوق زیرش (`V3Summary`،
+ *  جای کادرِ گرادیانی). صندوقِ بلند واپسین است تا «چاپ» و «بررسی» با هم در ردیفِ نخست بمانند.
  */
 @Composable
 private fun Top(p: SalesPeriods.Period, title: String, ctx: RowCtx, drawer: DrawerLine?, reviews: Int, money: Boolean) {
   val a = ctx.actions
   val chips = listOfNotNull(
-    a.print?.let { print -> V3HeroChip(StrHistory.print, Icons.Outlined.Print, onClick = { print(p) }) },
-    a.payReview?.takeIf { reviews > 0 }?.let { V3HeroChip(StrPayStatus.reviewCount(plain(reviews)), Icons.Outlined.FactCheck, onClick = it) },
-    drawer?.let { V3HeroChip(it.text, Icons.Outlined.PointOfSale, onClick = a.drawer) },
+    a.print?.let { print -> V3SummaryAction(StrHistory.print, Icons.Outlined.Print, onClick = { print(p) }) },
+    a.payReview?.takeIf { reviews > 0 }?.let { V3SummaryAction(StrPayStatus.reviewCount(plain(reviews)), Icons.Outlined.FactCheck, onClick = it) },
+    drawer?.let { V3SummaryAction(it.text, Icons.Outlined.PointOfSale, onClick = a.drawer) },
   )
   Column(Modifier.padding(top = 4.dp, bottom = 8.dp)) {
-    PeriodHero(p, title, money, chips)
+    PeriodSummary(p, title, money, chips)
     if (money) {
       Spacer(Modifier.height(10.dp))
       MoneySplit(p.totals)
@@ -235,18 +224,23 @@ private fun PhoneList(
   val unit = query.unit
   val filter = query.filter
   val channel = query.channel
-  val current = remember(book, unit) { book.current(unit) }
-  val currentList = remember(book, unit, filter, channel) { filteredOf(current, query) }
+  val picked = query.picked
+  //  دورهٔ کادرِ کشویی (پیش‌فرض دورهٔ جاری) بالا؛ زیرش دوره‌های پیش از آن
+  val focus = remember(book, unit, picked) { book.pick(unit, picked) }
+  val isCurrent = focus.key == book.currentKey(unit)
+  val currentList = remember(book, unit, picked, filter, channel) { filteredOf(focus, query) }
   //  با فیلتر فقط دوره‌هایی که فاکتورِ پیدا دارند؛ بی فیلتر همان فهرست‌ها (بی کپی)
-  val olderLists = remember(book, unit, filter, channel) {
-    book.older(unit).map { it to filteredOf(it, query) }.filter { (_, list) -> !query.filtered || list.isNotEmpty() }
+  val olderLists = remember(book, unit, picked, filter, channel) {
+    book.older(unit).filter { isCurrent || it.key < focus.key }
+      .map { it to filteredOf(it, query) }.filter { (_, list) -> !query.filtered || list.isNotEmpty() }
   }
   LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
     banner?.let { b -> item(key = "banner") { PrintBannerCard(b) } }
-    item(key = "top-" + current.key) { Top(current, PeriodLabel.current(current, book.gregorian), ctx, drawer, reviews, money) }
-    returnsHint(ctx)
-    invoices(current, currentList, ctx, query, empty = if (unit == SalesPeriods.Unit.DAY) StrHistory.emptyToday else StrHistory.emptyPeriod, current = true)
-    setAside(ctx)
+    val title = if (isCurrent) PeriodLabel.current(focus, book.gregorian) else PeriodLabel.full(focus, book.gregorian)
+    item(key = "top-" + focus.key) { Top(focus, title, ctx, drawer.takeIf { isCurrent }, reviews, money) }
+    if (isCurrent) returnsHint(ctx)
+    invoices(focus, currentList, ctx, query, empty = if (unit == SalesPeriods.Unit.DAY && isCurrent) StrHistory.emptyToday else StrHistory.emptyPeriod, current = isCurrent)
+    if (isCurrent) setAside(ctx)
     if (olderLists.isNotEmpty()) item(key = "earlier") { GroupTitle(StrHistory.earlier) }
     olderLists.forEach { (p, list) ->
       val open = query.open[p.key] == true || (query.filtered && list.isNotEmpty() && query.open[p.key] == null)

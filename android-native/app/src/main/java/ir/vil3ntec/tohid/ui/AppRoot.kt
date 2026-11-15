@@ -426,6 +426,8 @@ private fun AppRootActive(
     sheetOnTop = nav.current != nav.page, keyboard = ir.vil3ntec.tohid.ui.v3.nav.rememberKeyboardOpen(),
   )
   val navVisible = ShellFrame.navVisible(bar)
+  //  ۶۳w: دکمهٔ جست‌وجوی نوار روی این بخش ⇒ جست‌وجوی همین بخش؛ نه ⇒ ذره‌بینِ سربرگ (`LocalV3NavSearch`)
+  val navSearch = ShellFrame.navSearch(phoneNav, page, navRoutes, V3Modules.sections, nav.gate != null, NavCatalog.SEARCH in navLayout.ids)
   val navReserve = PhoneNav.RESERVE + (if (renewDays != null) PhoneNav.RENEW_RESERVE else 0.dp)
 
   //  ویترین و میزِ تحویل: فقط وقتی سرور می‌گوید روشن است، بخششان دیده می‌شود
@@ -632,6 +634,7 @@ private fun AppRootActive(
         //  نوارِ سیستم را پوسته همین‌جا حساب کرده است
         LocalV3SystemBottom provides 0.dp,
         LocalV3Notice provides { Column { PreviewBanner(); ir.vil3ntec.tohid.ui.v3.shell.ShellNotice() } },
+        ir.vil3ntec.tohid.ui.v3.LocalV3NavSearch provides navSearch,
       ) {
         PageWidth(Modifier.padding(start = railPad, bottom = pageBottom)) {
           V3RouteHost(nav, shell, Modifier.fillMaxSize())
@@ -642,7 +645,8 @@ private fun AppRootActive(
         layout = navLayout,
         //  فعال از ریشهٔ پشته (تبی که صفحه درونش است)، نه بالای پشته (AUDIT-NAV N1)
         current = NavCatalog.of(NavCatalog.activeForStack(navLayout, nav.stack.entries, V3Modules.table::canonical) ?: NavCatalog.MORE)?.route,
-        onPick = { item -> nav.open(item.route) },
+        //  ۶۳w: جست‌وجو روی بخشی که فهرست دارد ⇒ جست‌وجوی همان بخش؛ وگرنه صفحهٔ جست‌وجوی کل
+        onPick = { item -> if (item.id != NavCatalog.SEARCH || !ir.vil3ntec.tohid.ui.v3.V3ScopedSearch.openCurrent()) nav.open(item.route) },
         onEdit = { nav.open(ir.vil3ntec.tohid.ui.v3.settings.SettingsPaths.NAVBAR) },
         modifier = Modifier.align(Alignment.BottomCenter),
         renewDays = renewDays,

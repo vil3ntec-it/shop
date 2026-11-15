@@ -30,7 +30,7 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
 import ir.vil3ntec.tohid.ui.theme.V3Space
 
 /**
- *  کارتِ آمار: برچسبِ کوچک، عددِ درشت که با `rememberCountUp` می‌شمارد (عددِ
+ *  کاشیِ آمارِ فشرده (۶۳w، صاحب‌کار: «کادرهای بزرگ نه»): برچسبِ کوچک، عددِ ۱۷sp که با `rememberCountUp` می‌شمارد (عددِ
  *  پایانی همیشه دقیق است — قالب‌بندی با `format` ِ صدازننده، مثلِ `money`)، و
  *  نقطهٔ رنگیِ اختیاری از پالتِ پشتیبان. `onClick` ⇐ همان بخش (فیلترِ دقیق).
  */
@@ -51,11 +51,11 @@ fun V3Stat(
   Column(
     modifier
       .then(if (onClick != null) Modifier.v3Pressable(label = label, onClick = onClick) else Modifier)
-      .heightIn(min = 84.dp)
+      .heightIn(min = 64.dp)
       .clip(shape)
       .background(c.card)
       .border(1.dp, c.hairline, shape)
-      .padding(horizontal = 14.dp, vertical = 12.dp)
+      .padding(horizontal = 12.dp, vertical = 10.dp)
       .semantics(mergeDescendants = true) { contentDescription = "$label: ${format(value)}" },
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -65,8 +65,8 @@ fun V3Stat(
       }
       Text(label, style = V3Type.footnote, color = c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
-    Spacer(Modifier.height(6.dp))
-    Text(format(shown), style = V3Type.figure, color = valueColor ?: c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Spacer(Modifier.height(2.dp))
+    Text(format(shown), style = V3Type.headline, color = valueColor ?: c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
     if (caption != null) Text(caption, style = V3Type.caption, color = c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
   }
 }
@@ -78,9 +78,9 @@ fun V3StatGrid(
   columns: Int = 2,
   items: List<@Composable (Modifier) -> Unit>,
 ) {
-  Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+  Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     items.chunked(columns).forEach { row ->
-      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         row.forEach { cell -> cell(Modifier.weight(1f)) }
         repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
       }

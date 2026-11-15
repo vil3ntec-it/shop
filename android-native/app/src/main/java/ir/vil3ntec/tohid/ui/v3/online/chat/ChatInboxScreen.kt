@@ -85,7 +85,7 @@ fun ChatInboxScreen(
     subtitle = StrOnline.ctCaption,
     modifier = modifier,
     onBack = onBack,
-    search = { V3SearchField(state.query, onQuery, StrOnline.ctSearch) },
+    search = ir.vil3ntec.tohid.ui.v3.V3Search(state.query, onQuery, StrOnline.ctSearch),
     chips = {
       V3ChipRow { ChatModel.STATUSES.forEach { s -> V3Chip(ChatModel.statusLabel(s), state.status == s, { onStatus(s) }) } }
     },

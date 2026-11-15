@@ -34,10 +34,16 @@ class HistoryPrintWiringTest {
     assertFalse(s.contains("filteredOf("))
   }
 
-  @Test fun `کادرِ بالای تاریخچه تراشه‌ها را به ردیفِ بعد می‌برد، نمی‌بُرد`() {
-    assertTrue(src("HistoryParts.kt").contains("wrapChips = true,"))
+  /**
+   *  ۶۳w: کادرِ گرادیانی (`wrapChips = true`) جایش را به خلاصهٔ آرام (`V3Summary`) داد که کارهایش را همیشه در `FlowRow`
+   *  به ردیفِ بعد می‌برد؛ قاعده همان: «چاپ» پیش از صندوقِ بلند، تا در ردیفِ نخست بماند.
+   */
+  @Test fun `خلاصهٔ بالای تاریخچه کارها را به ردیفِ بعد می‌برد، نمی‌بُرد`() {
+    assertTrue(src("HistoryParts.kt").contains("V3Summary("))
+    val summary = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { File(it, "ir/vil3ntec/tohid/ui/v3/V3Summary.kt") }.first { it.isFile }.readText()
+    assertTrue(summary.contains("FlowRow(Modifier.fillMaxWidth()"))
     val top = src("HistoryScreen.kt")
-    //  صندوقِ بلند واپسین تراشه است تا «چاپ» در ردیفِ نخست بماند
-    assertTrue(top.indexOf("V3HeroChip(StrHistory.print") in 1 until top.indexOf("V3HeroChip(it.text, Icons.Outlined.PointOfSale"))
+    assertTrue(top.indexOf("V3SummaryAction(StrHistory.print") in 1 until top.indexOf("V3SummaryAction(it.text, Icons.Outlined.PointOfSale"))
   }
 }

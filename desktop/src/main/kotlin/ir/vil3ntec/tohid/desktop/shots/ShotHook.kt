@@ -112,12 +112,21 @@ fun V3RoutePreview(path: String, store: ShopStore, dark: Boolean) {
     cartOpen = cartOpen, sheetOnTop = nav.current != nav.page, keyboard = false,
   )
   val navVisible = ShellFrame.navVisible(bar)
+  val navSearch = mode == AppMode.SHOP && ShellFrame.navSearch(true, page, navRoutes, V3Modules.sections, nav.gate != null, NavCatalog.SEARCH in NavLayouts.DEFAULT.ids)
   val pageBottom = if (mode == AppMode.SHOP) ShellFrame.pageBottom(true, bar, page, PhoneNav.RESERVE, 0.dp) else 0.dp
-  CompositionLocalProvider(LocalV3Toasts provides toasts, LocalV3SystemBottom provides 0.dp, ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout provides false) {
+  CompositionLocalProvider(
+    LocalV3Toasts provides toasts, LocalV3SystemBottom provides 0.dp, ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout provides false,
+    ir.vil3ntec.tohid.ui.v3.LocalV3NavSearch provides navSearch,
+  ) {
     Box(Modifier.fillMaxSize().background(PhoneV3.colors.bg)) {
       V3RouteHost(nav, shell, Modifier.fillMaxSize().padding(bottom = pageBottom))
       if (navVisible) {
-        PhoneNavBar(NavLayouts.DEFAULT, page, onPick = { nav.open(it.route) }, onEdit = null, modifier = Modifier.align(Alignment.BottomCenter))
+        //  همان دکمهٔ جست‌وجوی آگاه از بخشِ برنامه (`V3ScopedSearch`)
+        PhoneNavBar(
+          NavLayouts.DEFAULT, page,
+          onPick = { if (it.id != NavCatalog.SEARCH || !ir.vil3ntec.tohid.ui.v3.V3ScopedSearch.openCurrent()) nav.open(it.route) },
+          onEdit = null, modifier = Modifier.align(Alignment.BottomCenter),
+        )
       }
       V3SnackbarHost(snackbar, Modifier.align(Alignment.TopCenter))
     }

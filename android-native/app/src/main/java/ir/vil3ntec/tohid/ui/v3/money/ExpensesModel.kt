@@ -21,6 +21,15 @@ internal object ExpensesModel {
   fun months(d: ShopData, today: String): List<String> =
     (d.expenses.map { it.date.take(7) }.filter { parseMonth(it) != null } + today.take(7)).distinct().sortedDescending()
 
+  /** گزینه‌ای در کادرِ کشوییِ ماه که برگهٔ ماهِ دلخواه را باز می‌کند */
+  const val OTHER_MONTH = "other"
+
+  /** ماه‌های کادرِ کشویی: ماهِ جاری و یازده ماهِ پیش، هر ماهِ دارای مصرف و ماهِ برگزیده — تازه‌ترین اول */
+  fun choices(d: ShopData, today: String, selected: String): List<String> {
+    val now = today.take(7)
+    return ((0 downTo -11).map { shift(now, it) } + months(d, today) + selected).filter { parseMonth(it) != null }.distinct().sortedDescending()
+  }
+
   /** ماهِ پیش/بعد (`delta` = −۱ / +۱) */
   fun shift(month: String, delta: Int): String {
     val y = month.take(4).toInt()

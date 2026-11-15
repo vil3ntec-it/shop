@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.I18n
+import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.data.Expense
 import ir.vil3ntec.tohid.data.ShopData
@@ -50,8 +51,10 @@ import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3Fab
-import ir.vil3ntec.tohid.ui.v3.V3HeroCard
-import ir.vil3ntec.tohid.ui.v3.V3HeroChip
+import ir.vil3ntec.tohid.ui.v3.V3Summary
+import ir.vil3ntec.tohid.ui.v3.V3SummaryAction
+import ir.vil3ntec.tohid.ui.v3.V3Choice
+import ir.vil3ntec.tohid.ui.v3.V3Dropdown
 import ir.vil3ntec.tohid.ui.v3.V3IconButton
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
@@ -78,8 +81,8 @@ internal class ExpensesActions(
 )
 
 /**
- *  مصارف (`expenses?month=&category=`): زیرِ عنوان ‹ ماه › (زدنِ نام ⇐ برگهٔ ماه)، کادرِ بزرگِ
- *  «جمع مصارف ماه» با شمارنده، نوارِ رنگیِ دسته‌ها با تراشهٔ هر دسته (زدن = فیلتر)، و ردیف‌ها با
+ *  مصارف (`expenses?month=&category=`): زیرِ عنوان کادرِ کشوییِ ماه («ماه…» ⇐ برگهٔ ماه)، خلاصهٔ آرامِ
+ *  «جمع مصارف ماه» با شمارنده (`V3Summary`)، نوارِ رنگیِ دسته‌ها با تراشهٔ هر دسته (زدن = فیلتر)، و ردیف‌ها با
  *  آیکنِ رنگِ همراهِ بخش و مبلغ؛ کشیدن ⇐ «حذف» با پرسش (متنِ امروز). «مصرف تازه» شناور.
  *  مبلغ‌ها دیگر سرخ نیستند: سرخ فقط برای خطر است (THEME-V2) — رنگِ مصارف رنگِ همراهِ خودش است.
  */
@@ -102,13 +105,24 @@ internal fun ExpensesScreen(d: ShopData, monthArg: String?, categoryArg: String?
   V3Scaffold(
     title = Str.expenses,
     onBack = actions.onBack,
+    //  ماه یک کادرِ کشویی زیرِ عنوان (صاحب‌کار ۱۴۰۵/۰۸/۲۴: «یک کادرِ کشویی بس بود») — جای ‹ ماه › ِ پایین
     chips = {
-      MonthSwitcher(
-        label = label,
-        onPrev = { month = ExpensesModel.shift(month, -1); category = null },
-        onNext = { month = ExpensesModel.shift(month, 1); category = null },
-        onPick = { actions.onPickMonth(month) { m -> month = m; category = null } },
-      )
+      val months = remember(d, today, month, I18n.lang) {
+        ExpensesModel.choices(d, today, month).map { V3Choice(it, MoneyText.month(it)) } +
+          V3Choice(ExpensesModel.OTHER_MONTH, StrReports.rangePickMonth, divider = true)
+      }
+      Box(Modifier.padding(horizontal = 16.dp)) {
+        V3Dropdown(
+          value = label,
+          choices = months,
+          selected = month,
+          onSelect = { m ->
+            if (m == ExpensesModel.OTHER_MONTH) actions.onPickMonth(month) { picked -> month = picked; category = null }
+            else { month = m; category = null }
+          },
+          label = StrMoney.month,
+        )
+      }
     },
     fab = { expanded -> V3Fab(Icons.Outlined.Payments, StrMoney.newExpense, expanded, actions.onNew) },
   ) { pad ->
@@ -117,13 +131,13 @@ internal fun ExpensesScreen(d: ShopData, monthArg: String?, categoryArg: String?
         Modifier.widthIn(max = 720.dp).fillMaxWidth(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding() + 72.dp),
       ) {
-        item(key = "hero") {
-          V3HeroCard(
-            title = StrMoney.monthTotal(label),
+        item(key = "summary") {
+          V3Summary(
+            label = StrMoney.monthTotal(label),
             value = MoneyText.afn(total),
             caption = StrMoney.rows(monthCount),
-            chips = if (byCategory.isEmpty()) emptyList() else listOf(
-              V3HeroChip(StrMoney.byCategory, Icons.Outlined.PieChart) { actions.onBreakdown(month, category) { c -> category = c?.takeIf { it.isNotBlank() } } },
+            actions = if (byCategory.isEmpty()) emptyList() else listOf(
+              V3SummaryAction(StrMoney.byCategory, Icons.Outlined.PieChart) { actions.onBreakdown(month, category) { c -> category = c?.takeIf { it.isNotBlank() } } },
             ),
           )
           Spacer(Modifier.height(12.dp))
@@ -187,23 +201,5 @@ internal fun ExpensesScreen(d: ShopData, monthArg: String?, categoryArg: String?
       onConfirm = { actions.onDelete(e.id) },
       onDismiss = { confirm = null },
     )
-  }
-}
-
-/** ‹ «میزان ۱۴۰۵» › — زدنِ نام ⇐ برگهٔ ماه؛ فلش‌ها آینه در راست‌به‌چپ (پیش = سمتِ آغاز) */
-@Composable
-private fun MonthSwitcher(label: String, onPrev: () -> Unit, onNext: () -> Unit, onPick: () -> Unit) {
-  val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-  Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-    V3IconButton(if (rtl) Icons.Outlined.ChevronRight else Icons.Outlined.ChevronLeft, StrMoney.prevMonth, size = 40.dp, onClick = onPrev)
-    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-      Text(
-        label,
-        style = v3Text(17, FontWeight.SemiBold, 24),
-        color = PhoneV3.colors.ink,
-        modifier = Modifier.clip(RoundedCornerShape(10.dp)).v3Pressable(label = StrMoney.pickMonth, onClick = onPick).padding(horizontal = 14.dp, vertical = 6.dp),
-      )
-    }
-    V3IconButton(if (rtl) Icons.Outlined.ChevronLeft else Icons.Outlined.ChevronRight, StrMoney.nextMonth, size = 40.dp, onClick = onNext)
   }
 }
