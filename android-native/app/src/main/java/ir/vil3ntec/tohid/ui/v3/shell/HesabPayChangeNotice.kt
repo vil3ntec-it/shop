@@ -53,7 +53,7 @@ fun HesabPayChangeNotice() {
   val pending by HesabPayChangeWatch.pending.collectAsState()
   var busy by remember { mutableStateOf(false) }
   var note by remember { mutableStateOf<String?>(null) }
-  LaunchedEffect(Unit) {
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(Unit) {
     while (true) {
       val due = deps.env.now() - HesabPayChangeWatch.checkedAt >= POLL_MS
       if (due && deps.ownerReady(signedIn = true) && deps.env.online()) {

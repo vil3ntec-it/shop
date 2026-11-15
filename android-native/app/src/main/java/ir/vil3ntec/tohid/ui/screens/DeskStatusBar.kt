@@ -45,8 +45,7 @@ fun DeskStatusBar(d: ShopData) {
   val signedIn = remember { ir.vil3ntec.tohid.data.repo.Backend.isReady(context) }
   //  PERF-LEDGER: موتور بیرون از رشتهٔ صفحه ساخته می‌شود (`rememberSyncV1Status`)
   val sync = ir.vil3ntec.tohid.sync.v1.rememberSyncV1Status(context) ?: ir.vil3ntec.tohid.sync.v1.SYNC_STARTING
-  var now by remember { mutableStateOf(System.currentTimeMillis()) }
-  LaunchedEffect(Unit) { while (true) { delay(30_000); now = System.currentTimeMillis() } }
+  val now = ir.vil3ntec.tohid.ui.v3.rememberV3LiveClock(30_000) { System.currentTimeMillis() } // PERF-SCREEN
   val today = ir.vil3ntec.tohid.todayIso()
   val todaySales = remember(d, today) { d.sales.filter { it.status != "cancelled" && it.date == today } }
   val shift = remember(d) { CashShift.current(d) }

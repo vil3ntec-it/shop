@@ -28,7 +28,6 @@ import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrPos
-import ir.vil3ntec.tohid.core.text.PlainError
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
@@ -42,6 +41,13 @@ import ir.vil3ntec.tohid.ui.v3.V3SnackbarHost
 import ir.vil3ntec.tohid.ui.v3.V3SuccessCheck
 import ir.vil3ntec.tohid.ui.v3.art.V3ArtKind
 import ir.vil3ntec.tohid.ui.v3.art.V3Illustration
+import ir.vil3ntec.tohid.ui.v3.art.LocalArtLayer
+import ir.vil3ntec.tohid.ui.v3.V3Depth
+import ir.vil3ntec.tohid.ui.v3.V3ErrorText
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Dispatchers
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
@@ -56,10 +62,13 @@ import org.junit.Test
 import java.io.File
 
 /**
- *  دستهٔ ۶۳ (e-rows-63i) — عکسِ هر تصویر و هر حالت با کشیدنِ بی پنجرهٔ Skia (همان رَسترِ `ScreenRender`)، با زمانِ صریحِ قاب:
- *   ۱) هر تصویر چیزی می‌کشد و با حرکتِ روشن دو قابِ دور از هم فرق دارند (باد، شناوری، چرخشِ سه‌بعدی)؛
- *   ۲) «کاهشِ حرکت» ⇒ همان دو قاب نقطه‌به‌نقطه یکی‌اند (هیچ ساعتی نمی‌دود)؛ جشنِ موفقیت هم بی‌درنگ همان حالتِ پایانی؛
- *   ۳) `TOHID_ART_OUT=<پوشه>` ⇒ عکس‌ها (روز و شب، حالت‌ها، قاب‌های جشن) در همان پوشه برای دیدن.
+ *  دستهٔ ۶۳ (e-rows-63i)، صحنه‌های تختِ دستهٔ ۶۵ (e-rows-65a) — عکسِ هر تصویر و هر حالت با کشیدنِ بی پنجرهٔ Skia
+ *  (همان رَسترِ `ScreenRender`)، با زمانِ صریحِ قاب:
+ *   ۱) هر صحنه (پهنِ ۲:۱) چیزی می‌کشد و با حرکتِ روشن دو قابِ دور از هم فرق دارند؛ نشانِ کوچک هم؛
+ *   ۲) چرخه بی درز (قابِ ۱ و ۲۵ ثانیه یکی‌اند)؛ «کاهشِ حرکت» ⇒ دو قاب نقطه‌به‌نقطه یکی؛ جشنِ موفقیت بی‌درنگ پایانی؛
+ *   ۳) قاعدهٔ «فقط وقتی دیده می‌شود»: زیرِ برگه یا با برنامهٔ نه‌RESUMED هیچ قابی خواسته نمی‌شود (`hasInvalidations`)،
+ *      و مرزِ مقابل — دیده و RESUMED ⇒ قاب خواسته می‌شود (سنجه کور نیست)؛
+ *   ۴) `TOHID_ART_OUT=<پوشه>` ⇒ عکس‌ها (صحنه‌ها روز و شب، صفحهٔ کاملِ خالی برای هر صحنه ۳۶۰×۷۶۰، قاب‌های چرخه برای GIF).
  *  کنار رفتن فقط وقتی ران‌تایم و ui ِ Compose دو نسخهٔ فرعیِ جدا دارند (همان دروازهٔ `RenderReport`؛ کشِ آفلاینِ ناجور).
  */
 @OptIn(InternalComposeUiApi::class)
@@ -91,7 +100,11 @@ class ArtShotsTest {
   }
 
   /** [content] در قابِ [wDp]×[hDp]؛ برای هر زمان (میلی‌ثانیه) یک PNG (پس از چند قابِ گرم شدن) */
-  private fun frames(wDp: Int, hDp: Int, dark: Boolean, timesMs: List<Long>, content: @Composable () -> Unit): List<ByteArray> {
+  private fun frames(wDp: Int, hDp: Int, dark: Boolean, timesMs: List<Long>, content: @Composable () -> Unit): List<ByteArray> =
+    render(wDp, hDp, dark, timesMs, content).first
+
+  /** همان، به‌علاوهٔ این‌که پس از قابِ آخر صحنه هنوز قابِ تازه می‌خواهد یا نه (`hasInvalidations`) */
+  private fun render(wDp: Int, hDp: Int, dark: Boolean, timesMs: List<Long>, content: @Composable () -> Unit): Pair<List<ByteArray>, Boolean> {
     val density = 2f
     val w = (wDp * density).toInt()
     val h = (hDp * density).toInt()
@@ -109,11 +122,12 @@ class ArtShotsTest {
       }
       fun draw(ns: Long) { surface.canvas.clear(0); scene.render(surface.canvas.asComposeCanvas(), ns) }
       for (i in 0..3) draw(i * 16_000_000L)
-      return timesMs.map { ms ->
+      val shots = timesMs.map { ms ->
         draw(ms * 1_000_000L)
         draw(ms * 1_000_000L)
         surface.makeImageSnapshot().encodeToData(EncodedImageFormat.PNG)!!.bytes
       }
+      return shots to scene.hasInvalidations()
     } finally {
       scene.close()
       surface.close()
@@ -152,7 +166,8 @@ class ArtShotsTest {
   @Test fun everyIllustrationDrawsAndMovesWithMotion() {
     motion(on = true)
     for (kind in V3ArtKind.entries) for (dark in listOf(false, true)) {
-      val (a, b) = frames(200, 200, dark, listOf(1_000L, 2_300L)) { V3Illustration(kind, size = 180.dp) }
+      //  بلندیِ ۱۸۰ ⇒ صحنهٔ پهنِ ۳۶۰×۱۸۰
+      val (a, b) = frames(380, 200, dark, listOf(1_000L, 2_300L)) { V3Illustration(kind, size = 180.dp) }
       assertTrue("$kind چیزی نکشید", colors(a) > 12)
       assertTrue("$kind با حرکتِ روشن ایستاده ماند", diff(a, b) > 0.005)
       save("art-${kind.name.lowercase()}-${if (dark) "dark" else "light"}", a)
@@ -162,21 +177,20 @@ class ArtShotsTest {
   @Test fun everyCharacterLoopIsSeamlessAndTheSmallBadgeStillDraws() {
     motion(on = true)
     for (kind in V3ArtKind.entries) {
-      //  چرخهٔ ۲۴ ثانیه‌ای: قابِ ۱ ثانیه و ۲۵ ثانیه یکی‌اند (پایانِ چرخه بی پرش به آغازش می‌چسبد)
-      val (a, b) = frames(200, 200, false, listOf(1_000L, 25_000L)) { V3Illustration(kind, size = 180.dp) }
+      //  ساعتِ ۲۴ ثانیه‌ای (چرخهٔ هر صحنه ۳/۴/۶ ثانیه): قابِ ۱ ثانیه و ۲۵ ثانیه یکی‌اند — پایانِ چرخه بی پرش به آغازش می‌چسبد
+      val (a, b) = frames(380, 200, false, listOf(1_000L, 25_000L)) { V3Illustration(kind, size = 180.dp) }
       assertTrue("$kind: چرخه درز دارد (${diff(a, b)})", diff(a, b) < 0.002)
-      //  نشانِ کوچک (کمتر از CHARACTER_MIN) همان صحنهٔ چیزها را می‌کشد و می‌جنبد
+      //  نشانِ کوچک (کمتر از CHARACTER_MIN): چهره و چیزِ داستانِ همان صحنه، می‌کشد و می‌جنبد
       val (c, d) = frames(60, 60, false, listOf(1_000L, 2_300L)) { V3Illustration(kind, size = 48.dp) }
       assertTrue("$kind: نشانِ کوچک چیزی نکشید", colors(c) > 6)
       assertTrue("$kind: نشانِ کوچک ایستاده ماند", diff(c, d, tol = 8) > 0.002)
     }
   }
 
-  /** چرخهٔ هر صحنهٔ آدمک‌دار (ثانیه) — قاب‌های GIF ِ نمایشی */
+  /** چرخهٔ هر صحنه (میلی‌ثانیه) — قاب‌های GIF ِ نمایشی (همان `loop` ِ tools/art/scenes) */
   private fun loopOf(kind: V3ArtKind): Long = when (kind) {
-    V3ArtKind.TREE -> 6_000L
-    V3ArtKind.ORDERS -> 3_000L
-    else -> 4_000L
+    V3ArtKind.SALES, V3ArtKind.ORDERS, V3ArtKind.ERROR_CLOUD, V3ArtKind.ERROR_MARK -> 4_000L
+    else -> 6_000L
   }
 
   @Test fun characterFrameSequencesForTheOwner() {
@@ -184,12 +198,51 @@ class ArtShotsTest {
     motion(on = true)
     for (kind in V3ArtKind.entries) for (dark in listOf(false, true)) {
       val loop = loopOf(kind)
-      //  ۱۲ قاب در ثانیه، از ۱۰ ثانیه به بعد (پس از گرم شدن) تا یک چرخهٔ کامل
-      val times = (0 until (loop / 1000L * 12L).toInt()).map { 10_000L + it * 1000L / 12L }
-      val pngs = frames(220, 220, dark, times) { V3Illustration(kind, size = 210.dp) }
+      //  ۱۵ قاب در ثانیه، از ۱۰ ثانیه به بعد (پس از گرم شدن) تا یک چرخهٔ کامل
+      val times = (0 until (loop / 1000L * 15L).toInt()).map { 10_000L + it * 1000L / 15L }
+      val pngs = frames(380, 200, dark, times) { V3Illustration(kind, size = 180.dp) }
       val sub = File(dir, "frames/${kind.name.lowercase()}-${if (dark) "dark" else "light"}").apply { mkdirs() }
       pngs.forEachIndexed { i, png -> File(sub, "f%03d.png".format(i)).writeBytes(png) }
       assertTrue("$kind: قاب‌های چرخه همه یکی‌اند", pngs.distinctBy { it.contentHashCode() }.size > pngs.size / 3)
+    }
+  }
+
+  /** صاحبِ چرخهٔ عمرِ ساختگی برای آزمون — RESUMED یا پس‌زمینه */
+  private fun owner(state: Lifecycle.State) = object : LifecycleOwner {
+    override val lifecycle: Lifecycle = LifecycleRegistry.createUnsafe(this).apply { currentState = state }
+  }
+
+  @Test fun aCoveredOrBackgroundedSceneRequestsZeroFrames() {
+    motion(on = true)
+    val empty: @Composable () -> Unit = { V3EmptyState(Icons.Outlined.Inventory2, "هنوز کالایی ثبت نشده") }
+    //  مرزِ مقابل: دیده، برنامه RESUMED ⇒ ساعت زنده است و قابِ بعدی را می‌خواهد
+    val (live, wantsMore) = render(360, 760, false, listOf(1_000L, 1_400L)) {
+      CompositionLocalProvider(LocalLifecycleOwner provides owner(Lifecycle.State.RESUMED)) { empty() }
+    }
+    assertTrue("با برنامهٔ RESUMED صحنه باید بجنبد", wantsMore)
+    assertFalse(live[0].contentEquals(live[1]))
+    //  برنامه در پس‌زمینه (STARTED/CREATED) ⇒ هیچ قابی خواسته نمی‌شود و تصویر می‌ایستد
+    for (state in listOf(Lifecycle.State.STARTED, Lifecycle.State.CREATED)) {
+      val (still, wants) = render(360, 760, false, listOf(1_000L, 1_400L)) {
+        CompositionLocalProvider(LocalLifecycleOwner provides owner(state)) { empty() }
+      }
+      assertFalse("برنامهٔ $state هنوز قاب می‌خواهد", wants)
+      assertTrue("برنامهٔ $state: تصویر جابه‌جا شد", still[0].contentEquals(still[1]))
+    }
+    //  زیرِ برگه (برگه‌ای روی صفحه باز است) ⇒ همان
+    V3Depth.sheets.intValue = 1
+    try {
+      val (covered, wants) = render(360, 760, false, listOf(1_000L, 1_400L)) { empty() }
+      assertFalse("صحنهٔ زیرِ برگه هنوز قاب می‌خواهد", wants)
+      assertTrue(covered[0].contentEquals(covered[1]))
+      //  تصویرِ درونِ همان برگه می‌جنبد
+      val (inSheet, sheetWants) = render(360, 760, false, listOf(1_000L, 1_400L)) {
+        CompositionLocalProvider(LocalArtLayer provides 1) { empty() }
+      }
+      assertTrue("تصویرِ درونِ برگه باید بجنبد", sheetWants)
+      assertFalse(inSheet[0].contentEquals(inSheet[1]))
+    } finally {
+      V3Depth.sheets.intValue = 0
     }
   }
 
@@ -215,14 +268,16 @@ class ArtShotsTest {
 
     for (dark in listOf(false, true)) {
       val suffix = if (dark) "dark" else "light"
-      save("state-empty-products-$suffix", frames(360, 420, dark, listOf(1_200L)) {
-        V3EmptyState(Icons.Outlined.Inventory2, "هنوز کالایی ثبت نشده", body = "نخستین کالا را بیفزایید تا فروش آغاز شود.", action = "افزودنِ کالا", onAction = {})
-      }.single())
-      save("state-error-offline-$suffix", frames(360, 420, dark, listOf(1_200L)) {
+      //  صفحهٔ کاملِ گوشی (۳۶۰×۷۶۰dp): بلوکِ صحنه + عنوان + خط + کار در میانه
+      for ((kind, text) in SCREENS) {
+        val (title, body, action) = text
+        save("screen-${kind.name.lowercase()}-$suffix", frames(360, 760, dark, listOf(1_200L)) {
+          if (kind.isError) V3ErrorState(title, body = body, onRetry = {}, kind = V3ErrorText.kind(kind))
+          else V3EmptyState(Icons.Outlined.Inventory2, title, body = body, action = action, onAction = {}, art = kind)
+        }.single())
+      }
+      save("state-error-offline-$suffix", frames(360, 760, dark, listOf(1_200L)) {
         V3ErrorState("java.net.UnknownHostException: api.vil3ntec.ir", onRetry = {})
-      }.single())
-      save("state-error-server-$suffix", frames(360, 420, dark, listOf(1_200L)) {
-        V3ErrorState("ارتباط با سرور برقرار نشد", body = "HTTP 503 Service Unavailable", onRetry = {}, kind = PlainError.Kind.SERVER)
       }.single())
       save("state-inline-error-$suffix", frames(360, 200, dark, listOf(1_200L)) {
         Column(Modifier.padding(16.dp)) { V3Message(V3Tone.ERROR, "موجودیِ این کالا کافی نیست", action = StrKit.retry, onAction = {}) }
@@ -234,4 +289,18 @@ class ArtShotsTest {
       }.single())
     }
   }
+
+  /** متنِ هر صفحهٔ نمونه (فارسی، همان لحنِ برنامه) */
+  private val SCREENS = listOf(
+    V3ArtKind.PRODUCTS to Triple("هنوز کالایی ثبت نشده", "نخستین کالا را بیفزایید تا فروش آغاز شود.", "افزودنِ کالا"),
+    V3ArtKind.SALES to Triple("امروز هنوز فروشی نیست", "نخستین فروشِ امروز همین‌جا دیده می‌شود.", "فروشِ تازه"),
+    V3ArtKind.PEOPLE to Triple("دفترِ قرض خالی است", "کسی از شما قرض‌دار نیست.", "قرض‌دارِ تازه"),
+    V3ArtKind.ORDERS to Triple("سفارشی نرسیده", "سفارش‌های تازهٔ فروشگاهِ اینترنتی این‌جا می‌آیند.", null),
+    V3ArtKind.STOCK to Triple("در این انبار چیزی نیست", "با «ورودِ کالا» موجودی را بیفزایید.", "ورودِ کالا"),
+    V3ArtKind.SEARCH to Triple("چیزی پیدا نشد", "واژهٔ دیگری بنویسید یا پالایه‌ها را بردارید.", "نمایشِ همه"),
+    V3ArtKind.TREE to Triple("این‌جا هنوز خالی است", "چیزی که بیفزایید همین‌جا دیده می‌شود.", null),
+    V3ArtKind.ERROR_CABLE to Triple("اینترنت وصل نیست", "اتصال را بررسی کنید و «دوباره» را بزنید.", null),
+    V3ArtKind.ERROR_CLOUD to Triple("ارتباط با سرور برقرار نشد", "چند لحظهٔ دیگر «دوباره» را بزنید.", null),
+    V3ArtKind.ERROR_MARK to Triple("کاری که خواستید انجام نشد", "دوباره امتحان کنید.", null),
+  )
 }

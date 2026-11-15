@@ -25,7 +25,7 @@ fun rememberSellableHeld(book: HeldBook, d: ShopData): Map<String, Double> {
   val context = LocalContext.current
   val shop = remember { LedgerOwner.currentShop(context) }
   var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-  LaunchedEffect(Unit) {
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(Unit) {
     OnlineHoldsStore.current(context)
     while (true) {
       OnlineHoldsStore.refresh(context)

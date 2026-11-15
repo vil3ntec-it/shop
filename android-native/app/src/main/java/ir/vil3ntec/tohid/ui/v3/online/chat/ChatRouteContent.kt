@@ -51,7 +51,7 @@ internal fun RouteScope.ChatRoute() {
   var list by remember { mutableStateOf<List<ChatConversation>>(emptyList()) }
   var loading by remember { mutableStateOf(true) }
   var error by remember { mutableStateOf<String?>(null) }
-  LaunchedEffect(status, query) {
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(status, query) {
     if (query.isNotEmpty()) delay(SEARCH_DEBOUNCE_MS)
     while (isActive) {
       Backend.shopChat(context).conversations(status, query)

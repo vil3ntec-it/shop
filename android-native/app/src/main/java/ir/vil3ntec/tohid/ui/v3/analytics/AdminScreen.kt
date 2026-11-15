@@ -84,7 +84,10 @@ fun AdminScreen(
   /** STF-07/08 روشن (پرچمِ سرور) ⇒ ردیفِ «ساعتِ کار و پورسانت» */
   staffTime: Boolean = false,
 ) {
-  val n = remember(d, today) { AdminModel.numbers(d, today, System.currentTimeMillis()) }
+  //  PERF-DESK: «ارزش موجودی» (بازپخشِ هستهٔ گزارش روی کلِ دفتر) بیرون از رشتهٔ صفحه؛ تا آماده شدن «در حالِ خواندن…»
+  val stock = ir.vil3ntec.tohid.ui.screens.rememberOffMain(d) { _ -> AdminModel.stockValueOf(d) }
+  val rest = remember(d, today) { AdminModel.numbers(d, today, System.currentTimeMillis(), 0.0) }
+  val n = remember(rest, stock) { rest.copy(stockValue = stock ?: 0.0) }
   val kpis = AdminModel.kpis(canSeeMoney)
   val columns = if (wide) 4 else 2
   val stagger = rememberV3Stagger()
@@ -96,7 +99,7 @@ fun AdminScreen(
     ) {
       //  ۶۳w (صاحب‌کار: «کادرهای بزرگ نه»): فهرستِ فشرده — گوشی چهار عددِ اصلی و بقیه زیرِ «… عددِ دیگر»؛ پهن همه
       ir.vil3ntec.tohid.ui.components.common.MetricRows(
-        kpis.map { k -> kpiMetric(k, n) { onOpen(AdminModel.route(k)) } },
+        kpis.map { k -> kpiMetric(k, n, stockReady = stock != null) { onOpen(AdminModel.route(k)) } },
         top = if (columns > 2) Int.MAX_VALUE else ADMIN_TOP,
       )
       V3Section(null) {
@@ -131,7 +134,7 @@ private fun membersValue(m: AdminMembers): String = when (m) {
 private const val ADMIN_TOP = 4
 
 /** یک ردیفِ فهرستِ فشرده: برچسب، عدد و زیرنویس — همان عددها و همان مقصدِ کاشیِ پیشین */
-private fun kpiMetric(k: AdminKpi, n: AdminNumbers, onClick: () -> Unit): ir.vil3ntec.tohid.ui.components.common.Metric {
+private fun kpiMetric(k: AdminKpi, n: AdminNumbers, stockReady: Boolean = true, onClick: () -> Unit): ir.vil3ntec.tohid.ui.components.common.Metric {
   val loss = k == AdminKpi.MONTH_PROFIT && n.monthProfit < 0
   val label = when (k) {
     AdminKpi.TODAY_SALES -> StrReports.todaySales
@@ -164,6 +167,7 @@ private fun kpiMetric(k: AdminKpi, n: AdminNumbers, onClick: () -> Unit): ir.vil
     AdminKpi.STOCK_ALERT -> StrReports.outAndLow(n.out, n.low)
   }
   val text = when {
+    k == AdminKpi.STOCK_VALUE && !stockReady -> StrReports.loading
     value == null -> StrReports.drawerClosed
     k == AdminKpi.STOCK_ALERT -> value.toLong().toString()
     else -> afn(value)

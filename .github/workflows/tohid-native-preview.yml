@@ -3,7 +3,7 @@ name: توحید بومی — پیش‌نمایش
 #  ⏳ موقت: پیش‌نمایشِ برنامهٔ در حالِ بازسازی روی گوشیِ صاحب‌کار.
 #  برای برداشتن: همین فایل، انتشار و برچسبِ `tohid-native-preview`.
 #
-#  بستهٔ جدا (`ir.vil3ntec.tohid.preview`، buildTypeِ `preview`) کنارِ برنامهٔ
+#  بستهٔ جدا (`com.vill3n.dailyshop.preview` از ۱۴۰۵/۰۸/۲۴، buildTypeِ `preview`) کنارِ برنامهٔ
 #  اصلی نصب می‌شود و به داده‌اش دست نمی‌زند. برنامهٔ پیش‌نمایش فقط از
 #  `releases/tags/tohid-native-preview` به‌روز می‌شود (`Updater.fromPreview`).
 #
@@ -74,7 +74,7 @@ jobs:
       - name: تنظیمِ Firebase (اختیاری)
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: bash android-native/tools/google-services.sh ir.vil3ntec.tohid.preview
+        run: bash android-native/tools/google-services.sh com.vill3n.dailyshop.preview
 
       - name: ساختِ نسخهٔ پیش‌نمایش
         working-directory: android-native
@@ -104,7 +104,7 @@ jobs:
           code=$(sed -n "s/.* versionCode='\([^']*\)'.*/\1/p" <<<"$badge")
           ver=$(sed -n "s/.* versionName='\([^']*\)'.*/\1/p" <<<"$badge")
           echo "بسته: $pkg · نسخه: $ver · versionCode: $code"
-          [ "$pkg" = ir.vil3ntec.tohid.preview ] || { echo "::error::بسته باید ir.vil3ntec.tohid.preview باشد، نه $pkg"; exit 1; }
+          [ "$pkg" = com.vill3n.dailyshop.preview ] || { echo "::error::بسته باید com.vill3n.dailyshop.preview باشد، نه $pkg"; exit 1; }
           [ "$code" = "$((100 + ${{ github.run_number }}))" ] || { echo "::error::versionCode نادرست: $code"; exit 1; }
           [[ "$ver" =~ \.[0-9]+-preview$ ]] || { echo "::error::نامِ نسخه باید با preview تمام شود: $ver"; exit 1; }
           echo "VERSION=$ver" >> "$GITHUB_ENV"
@@ -115,6 +115,8 @@ jobs:
           cp "../$apk" tohid-preview.apk
           zip -q -j tohid-preview.zip tohid-preview.apk
           rm tohid-preview.apk
+          #  شناسهٔ نصب (`update/AppMove.kt`): پیش‌نمایشِ شناسهٔ قدیمی این را «برنامه با نامِ تازه» می‌بیند، نه به‌روزرسانی
+          printf '%s\n' "$pkg" > app-id.txt
           sha256sum tohid-preview.apk.preview tohid-preview.zip > SHA256SUMS.txt
           cat SHA256SUMS.txt
           #  امضای فهرست، همان قاعدهٔ انتشار (`update/ReleaseSignature.kt`)
@@ -184,12 +186,13 @@ jobs:
           #  یک‌جا بالا می‌رود، پس هیچ لحظه‌ای شماره‌ای اعلام نمی‌شود که فایلش نیامده
           up SHA256SUMS.txt
           if [ -f SHA256SUMS.txt.sig ]; then up SHA256SUMS.txt.sig; fi
+          up app-id.txt
           up tohid-preview.zip
           up "tohid-preview.apk.preview#$VERSION"
 
           rel=$(gh api "repos/$REPO/releases/tags/$TAG")
           names=$(jq -r '.assets[].name' <<<"$rel")
-          for f in tohid-preview.apk.preview tohid-preview.zip SHA256SUMS.txt; do
+          for f in tohid-preview.apk.preview tohid-preview.zip SHA256SUMS.txt app-id.txt; do
             grep -qx "$f" <<<"$names" || { echo "::error::$f روی انتشار نیست"; exit 1; }
           done
           label=$(jq -r '.assets[] | select(.name == "tohid-preview.apk.preview") | .label' <<<"$rel")
@@ -199,7 +202,7 @@ jobs:
           #  هر چیزِ دیگری برداشته می‌شود
           jq -r '.assets[] | "\(.id) \(.name)"' <<<"$rel" | while read -r id name; do
             case "$name" in
-              tohid-preview.apk.preview|tohid-preview.zip|SHA256SUMS.txt|SHA256SUMS.txt.sig) ;;
+              tohid-preview.apk.preview|tohid-preview.zip|SHA256SUMS.txt|SHA256SUMS.txt.sig|app-id.txt) ;;
               *) gh api -X DELETE "repos/$REPO/releases/assets/$id" ;;
             esac
           done

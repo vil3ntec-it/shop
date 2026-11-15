@@ -72,6 +72,7 @@ import java.awt.event.MouseEvent
  *  - **Ctrl + / − / 0** بزرگ‌نمایی (روی مانیتورِ بزرگِ پشتِ دخل).
  */
 fun main() {
+  StartupTrace.mark("main") // PERF-DESK: زمانِ باز شدن و موتورِ کشیدن ⇐ files/startup.txt
   if (!SingleInstance.acquire()) return
   DevShot.start()
 
@@ -87,7 +88,7 @@ fun main() {
   ir.vil3ntec.tohid.sync.LicenseGuard.warm() // وضعِ سراسریِ Compose پیش از کارِ پس‌زمینه و نخستین ترکیب (#1028)
   val store = ShopStore(context)
   val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-  scope.launch { store.loadAndSummarize() }
+  scope.launch { store.loadAndSummarize(); StartupTrace.ledgerReady() }
   scope.launch(Dispatchers.IO) { runCatching { ir.vil3ntec.tohid.data.platform.CrashReporter.flush(context) } }
 
   runCatching { ir.vil3ntec.tohid.sync.SavedLogins.purgeTokens(context) }
@@ -103,14 +104,19 @@ fun main() {
   ir.vil3ntec.tohid.data.ExpiryPref.load(context) // S22: روزِ هشدارِ انقضا
   ir.vil3ntec.tohid.ui.theme.ThemeStore.load(context)
 
-  var live: LiveSocket? = null
-  runCatching {
-    SyncV1Worker.schedule(context)
-    live = LiveSocket(context) { SyncV1Worker.now(context) }
-    live?.connect()
+  //  PERF-DESK: سوکتِ زنده و کارگرِ همگام‌سازی بیرون از رشتهٔ آغاز — ساختنِ کلاینتِ OkHttp (بارِ گواهی‌های TLS ِ JDK)
+  //  پیش‌تر نیمی از کارِ پیش از پنجره بود و پنجره تا پایانش باز نمی‌شد؛ هیچ کدام به پنجره وابسته نیست
+  val live = java.util.concurrent.atomic.AtomicReference<LiveSocket?>(null)
+  scope.launch(Dispatchers.IO) {
+    runCatching {
+      SyncV1Worker.schedule(context)
+      live.set(LiveSocket(context) { SyncV1Worker.now(context) })
+      live.get()?.connect()
+    }
   }
   //  NOTIF-06: زنگِ سفارشِ تازه جدا از پنجره (پیدا، کوچک‌شده یا در سینی) — ‎OrderTrayAlarmDesktop.kt‎
   val orderAlarm = OrderTrayAlarm.start(context, scope)
+  StartupTrace.mark("boot")
 
   application(exitProcessOnExit = true) {
     var visible by remember { mutableStateOf(true) }
@@ -139,7 +145,7 @@ fun main() {
         .putInt("desktop_h", windowState.size.height.value.toInt())
         .putBoolean("desktop_max", windowState.placement == WindowPlacement.Maximized)
         .commit()
-      runCatching { live?.disconnect() }
+      runCatching { live.get()?.disconnect() }
       //  نسخهٔ محلیِ پایانِ روز (OPS-02) — فقط اگر دفتر از نسخهٔ نیم‌ساعتهٔ آخر
       //  عوض شده؛ یک مقایسه و یک رونوشت، چند ده میلی‌ثانیه
       runCatching { ir.vil3ntec.tohid.data.AutoBackup.take(context, ir.vil3ntec.tohid.todayIso()) }
@@ -291,6 +297,7 @@ fun main() {
       }
       //  پیش‌نمایشِ گوشی — فقط برای عکس‌های خودکار (`DevShot` ⇐ `phone:<صفحه>`)
       PhonePreviewWindow(store, context)
+      StartupMarks(store, context) { window.renderApi.name }
       LaunchedEffect(Unit) {
         //  منوی سیستم راست‌به‌چپ، مثلِ خودِ برنامه
         window.jMenuBar?.applyComponentOrientation(java.awt.ComponentOrientation.RIGHT_TO_LEFT)
@@ -340,7 +347,8 @@ fun main() {
           ir.vil3ntec.tohid.ui.AppNav.theme.value = null
         }
 
-        TohidTheme(theme) {
+        //  PERF-SCREEN: چیزهای زنده (`V3Live`) فقط با پنجرهٔ RESUMED
+        ir.vil3ntec.tohid.ui.v3.ProvideV3Foreground { TohidTheme(theme) {
           //  زبان و جهت: فارسی و پشتو راست‌به‌چپ، انگلیسی چپ‌به‌راست
           ir.vil3ntec.tohid.ui.ProvideLang {
             if (!welcomed) {
@@ -362,7 +370,7 @@ fun main() {
             }
             SessionLostNotice(context)
           }
-        }
+        } }
       }
     }
   }

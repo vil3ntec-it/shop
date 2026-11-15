@@ -393,7 +393,7 @@ test('آیفون: فرستندهٔ APNs (سرورِ HTTP/2 ِ ساختگی) — 
   const apns = require('../src/lib/apns');
   const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   const cfg = apns.readConfig({
-    APNS_KEY_ID: 'ABC123DEFG', APNS_TEAM_ID: 'TEAM123456', APNS_BUNDLE_ID: 'ir.vil3ntec.tohid',
+    APNS_KEY_ID: 'ABC123DEFG', APNS_TEAM_ID: 'TEAM123456', APNS_BUNDLE_ID: 'com.vill3n.dailyshop',
     APNS_KEY_P8: privateKey.export({ type: 'pkcs8', format: 'pem' }),
   }).cfg;
   const live = 'b2'.repeat(32);
@@ -437,7 +437,7 @@ test('آیفون: فرستندهٔ APNs (سرورِ HTTP/2 ِ ساختگی) — 
     assert.equal(out.sent, 1, JSON.stringify(out));
     assert.equal(out.total, 3);
     assert.deepEqual(seen.map((x) => x.token).sort(), [live, dead].sort(), 'فقط توکن‌های apns به اپل');
-    assert.equal(seen[0].topic, 'ir.vil3ntec.tohid');
+    assert.equal(seen[0].topic, 'com.vill3n.dailyshop');
     assert.equal(seen.find((x) => x.token === live).body.orderId, 'ord_x');
 
     const rows = await require('../src/db').many(

@@ -46,6 +46,8 @@ data class DashboardNumbers(
       val stock = ShopStore.index(d)
 
       val todaySales = d.sales.filter { it.date == today && it.status != "cancelled" }
+      //  PERF-SCREEN: وضعیتِ هر کالا یک بار (کم و تمام‌شده از همان فهرست، همان ترتیب)
+      val status = d.products.map { stock.status(it) }
 
       //  یک گذر روی تراکنش‌ها، نه یک پیمایش به ازای هر قرض‌دار
       val byDebtor = ir.vil3ntec.tohid.data.DebtRows.of(d)  // CRM-10: کلیدِ ماندگار
@@ -66,10 +68,14 @@ data class DashboardNumbers(
        */
       val nowMs = isoMillis(today)
       val dayMs = 24L * 60 * 60 * 1000
+      //  PERF-SCREEN: هر رشتهٔ تاریخ یک بار در همین فراخوانی (همان `isoMillis`، همان منطقهٔ زمانی) — دفترِ چندساله
+      //  صدها هزار ردیف و فقط چند صد روزِ جدا دارد؛ پیش‌تر برای هر ردیف یک `Calendar` ِ تازه ساخته می‌شد
+      val dayMillis = HashMap<String, Long>()
+      fun millisOf(iso: String): Long = dayMillis.getOrPut(iso) { isoMillis(iso) }
       var weekTotal = 0.0
       var prevWeekTotal = 0.0
       d.sales.filter { it.status != "cancelled" }.forEach { sale ->
-        val age = (nowMs - isoMillis(sale.date)) / dayMs
+        val age = (nowMs - millisOf(sale.date)) / dayMs
         when {
           age in 0..6 -> weekTotal += sale.finalTotal
           age in 7..13 -> prevWeekTotal += sale.finalTotal
@@ -84,7 +90,7 @@ data class DashboardNumbers(
        *  روی آن نبوده. همان چیزی که دکاندار هم با آن حساب می‌کند.
        */
       val lastMove = byDebtor
-        .mapValues { (_, list) -> list.maxOf { isoMillis(it.date) } }
+        .mapValues { (_, list) -> list.maxOf { millisOf(it.date) } }
       val overdue = owing.filter { (debtor, _) ->
         val seen = lastMove[debtor.id] ?: 0L
         seen > 0L && (nowMs - seen) / dayMs > 30
@@ -109,8 +115,8 @@ data class DashboardNumbers(
         totalDebt = owing.sumOf { it.second },
         expenseMonth = d.expenses.filter { it.date.startsWith(monthPrefix) }.sumOf { it.amount },
         supplierDebt = d.suppliers.sumOf { ShopStore.supplierDebt(d, it.id) }.coerceAtLeast(0.0),
-        lowStock = d.products.filter { stock.status(it) == "low" },
-        outOfStock = d.products.filter { stock.status(it) == "out" },
+        lowStock = d.products.filterIndexed { i, _ -> status[i] == "low" },
+        outOfStock = d.products.filterIndexed { i, _ -> status[i] == "out" },
         expiring = ir.vil3ntec.tohid.data.ExpiryEngine.alerts(d, today),
         warehouse = WarehouseEngine.summary(d),
         monthSalesTotal = monthByDay.values.sum(),

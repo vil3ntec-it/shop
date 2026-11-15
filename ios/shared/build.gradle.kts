@@ -262,7 +262,7 @@ val generateConfig by tasks.registering {
       |object BuildConfig {
       |  const val DEBUG: Boolean = false
       |  const val STORE: String = "appstore"
-      |  const val APPLICATION_ID: String = "ir.vil3ntec.tohid"
+      |  const val APPLICATION_ID: String = "com.vill3n.dailyshop"
       |  const val VERSION_NAME: String = "1.0"
       |  const val VERSION_CODE: Int = 100
       |  const val API_BASE: String = ${q(apiBase)}

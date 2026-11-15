@@ -110,7 +110,7 @@ object ConflictInboxLive {
 fun ConflictInboxNotice() {
   val context = LocalContext.current
   val nav = LocalV3Nav.current
-  LaunchedEffect(Unit) {
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(Unit) {
     while (true) {
       runCatching { ConflictInboxLive.refresh(context) }
       //  «اصلاح و ثبت» ِ مانده (بی شبکه بسته نشد) ⇒ همین‌جا دوباره
@@ -159,7 +159,7 @@ fun RouteScope.ConflictInboxRoute() {
   var closed by remember { mutableStateOf<List<ConflictInbox.Item>?>(null) }
   var picked by remember { mutableStateOf<ConflictInbox.Item?>(null) }
   val fixedNow by ConflictFix.closed.collectAsState()
-  LaunchedEffect(Unit) {
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(Unit) {
     while (true) {
       runCatching { ConflictInboxLive.refresh(context, force = true) }
       delay(ConflictInboxLive.LIST_MS / 2)

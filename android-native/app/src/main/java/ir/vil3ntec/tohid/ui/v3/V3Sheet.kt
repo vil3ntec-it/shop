@@ -108,6 +108,8 @@ fun V3Sheet(
     confirmValueChange = { it != SheetValue.Hidden || canHide || allowHide[0] },
   )
   val scope = rememberCoroutineScope()
+  //  PERF-SCREEN: لایهٔ این برگه (`LocalV3Layer`) — چیزِ زندهٔ زیرِ آن (صفحه، برگهٔ پایین‌تر) می‌ایستد
+  val layer = remember { V3Depth.sheets.intValue + 1 }
   //  صفحهٔ پشتِ برگه تا ۰٫۹۶ کوچک می‌شود (`v3BehindSheet` ِ پوسته)
   DisposableEffect(Unit) {
     V3Depth.sheets.intValue++
@@ -148,7 +150,12 @@ fun V3Sheet(
         .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
     ) {
       if (title != null) SheetTitle(title, headerEnd)
-      content(closer)
+      //  تصویرِ صفحهٔ زیرِ برگه می‌ایستد؛ تصویرِ درونِ همین برگه می‌جنبد (`LocalArtLayer`، قاعدهٔ «فقط وقتی دیده می‌شود»)؛
+      //  `LocalV3Layer` همان قاعده برای `V3Live` (۶۳f)
+      androidx.compose.runtime.CompositionLocalProvider(
+        ir.vil3ntec.tohid.ui.v3.art.LocalArtLayer provides ir.vil3ntec.tohid.ui.v3.art.LocalArtLayer.current + 1,
+        LocalV3Layer provides layer,
+      ) { content(closer) }
     }
   }
 }

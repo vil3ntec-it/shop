@@ -76,8 +76,8 @@ fun DeskHeader(
   crumbs: List<Pair<String, String>> = emptyList(),
   onCrumb: (String) -> Unit = {},
 ) {
-  val today = ir.vil3ntec.tohid.todayIso()
-  val board = remember(d, today) { DashboardEngine.board(d, today, 7) }
+  //  PERF-DESK: فقط چهار هشدار، یک بار برای هر دفتر و بیرون از رشتهٔ صفحه (`DeskAlerts`؛ پیش‌تر کلِ تخته روی رشتهٔ صفحه)
+  val board = rememberDeskAlerts(d)
   val c = Desk.colors
   val onSale = page == "sale"
   val ownSearch = onSale || page in PAGES_WITH_OWN_SEARCH
@@ -179,7 +179,7 @@ private fun HeaderIcon(icon: ImageVector, label: String, tint: Color? = null, sh
 
 /** زنگِ هشدارها — شمار روی زنگ و فهرستِ کوتاه با مقصدِ هر کدام */
 @Composable
-private fun Bell(board: DashboardEngine.Board, onOpen: (String) -> Unit) {
+private fun Bell(board: DashboardEngine.Alerts, onOpen: (String) -> Unit) {
   val c = Desk.colors
   val s = ir.vil3ntec.tohid.ui.theme.Shop.colors
   var bell by remember { mutableStateOf(false) }

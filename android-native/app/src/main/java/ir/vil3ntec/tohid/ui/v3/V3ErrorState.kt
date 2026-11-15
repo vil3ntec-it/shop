@@ -2,7 +2,10 @@ package ir.vil3ntec.tohid.ui.v3
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,11 +19,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrKit
@@ -32,6 +35,7 @@ import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.art.V3ArtKind
 import ir.vil3ntec.tohid.ui.v3.art.V3Illustration
+import ir.vil3ntec.tohid.ui.v3.art.V3SceneArt
 
 /*
  *  حالت‌های مشترکِ خالی و خطا (دستهٔ ۶۳، e-rows-63i). یک الگو برای همه: تصویرِ متحرکِ همان زمینه، عنوانِ ساده، یک خطِ
@@ -68,7 +72,11 @@ internal object V3ErrorText {
   fun toast(raw: String): String = PlainError.text(raw) ?: title(PlainError.kindOf(raw))
 }
 
-/** الگوی مشترکِ تمام‌صفحه: تصویر، عنوان، خطِ کوتاه و یک کار */
+/**
+ *  الگوی مشترکِ تمام‌صفحه (دستهٔ ۶۵): کلِ بلوک — صحنهٔ پهنِ ۲:۱، عنوان، خطِ کوتاه و یک کار — در **میانهٔ** جای خالی، هم
+ *  افقی هم عمودی (مثلِ صفحهٔ نمونهٔ صاحب‌کار). پهنای صحنه = کمینهٔ (جای خالی − ۳۲dp، ۳۶۰dp). درونِ فهرستِ پیمایشی (بلندیِ
+ *  بی‌مرز) همان بلوک بی کشیدگی در جای خودش می‌نشیند.
+ */
 @Composable
 internal fun V3StateLayout(
   art: V3ArtKind,
@@ -77,30 +85,34 @@ internal fun V3StateLayout(
   body: String?,
   action: String?,
   onAction: (() -> Unit)?,
-  artSize: Dp = 164.dp,
   actionKind: V3ButtonKind = V3ButtonKind.PRIMARY,
 ) {
   val c = PhoneV3.colors
-  Column(
-    modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 28.dp),
-    horizontalAlignment = Alignment.CenterHorizontally,
-  ) {
-    V3Illustration(art, size = artSize)
-    Spacer(Modifier.height(12.dp))
-    Text(title, style = V3Type.headline, color = c.ink, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 360.dp))
-    if (body != null) {
-      Spacer(Modifier.height(6.dp))
-      Text(body, style = V3Type.callout, color = c.inkMuted, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 320.dp))
-    }
-    if (action != null && onAction != null) {
-      Spacer(Modifier.height(20.dp))
-      V3Button(action, onAction, kind = actionKind)
+  Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Column(
+      Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 24.dp).testTag(V3_STATE_BLOCK),
+      horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+      V3SceneArt(art, Modifier.widthIn(max = 360.dp).fillMaxWidth().aspectRatio(2f))
+      Spacer(Modifier.height(18.dp))
+      Text(title, style = V3Type.headline, color = c.ink, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 360.dp).padding(horizontal = 16.dp))
+      if (body != null) {
+        Spacer(Modifier.height(6.dp))
+        Text(body, style = V3Type.callout, color = c.inkMuted, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 320.dp).padding(horizontal = 16.dp))
+      }
+      if (action != null && onAction != null) {
+        Spacer(Modifier.height(22.dp))
+        V3Button(action, onAction, kind = actionKind)
+      }
     }
   }
 }
 
+/** برچسبِ آزمون برای بلوکِ حالتِ خالی/خطا (صحنه + متن + کار) — آزمونِ «در میانه است» */
+const val V3_STATE_BLOCK = "v3StateBlock"
+
 /**
- *  خطای تمام‌صفحه: تصویرِ دوستانه (سیمِ کشیده، ابر با آذرخشِ کوچک یا «!»)، عنوانِ ساده، یک خطِ «چه کنید» و یک کار:
+ *  خطای تمام‌صفحه: صحنهٔ دوستانه (فروشندهٔ دوشاخه به‌دست، باران روی سرور یا «!» ِ سنگی)، عنوانِ ساده، یک خطِ «چه کنید» و یک کار:
  *  «دوباره» ([onRetry]) یا، اگر دوباره معنا ندارد، «پشتیبانی» ([onSupport]). متنِ دوستانهٔ صفحه‌های همگام‌سازی و
  *  سرور (e-rows-63h) همان‌طور که هست نشان داده می‌شود؛ متنِ فنی هرگز.
  *  @param kind گونهٔ خطا؛ null ⇒ از خودِ متن
@@ -154,7 +166,7 @@ internal fun V3InlineError(
       .padding(start = 8.dp, end = 14.dp, top = 8.dp, bottom = 8.dp),
     verticalAlignment = Alignment.Top,
   ) {
-    V3Illustration(V3ArtKind.forError(kind), size = 40.dp, depth = false)
+    V3Illustration(V3ArtKind.forError(kind), size = 40.dp)
     Spacer(Modifier.width(8.dp))
     Column(Modifier.weight(1f).padding(top = 6.dp, bottom = 4.dp)) {
       Text(plainTitle ?: V3ErrorText.title(kind), style = V3Type.body, color = pair.fg)

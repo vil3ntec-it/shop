@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.BuildConfig
 import ir.vil3ntec.tohid.core.i18n.StrNav
+import ir.vil3ntec.tohid.core.i18n.StrUpdate
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
@@ -51,7 +52,9 @@ internal fun UpdateCard(repo: String) {
     if (release == null) {
       V3Button(StrNav.checkUpdate, { UpdateManager.check(context, repo, BuildConfig.VERSION_NAME) }, Modifier.fillMaxWidth(), kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.SystemUpdate, loading = busy)
     } else {
-      Text(StrNav.versionReady(release.version), style = V3Type.headline, color = PhoneV3Roles.brandText(c))
+      //  AppMove: برنامهٔ دیگر (شناسهٔ نصبِ تازه) — دکمه برگهٔ راهنما را باز می‌کند (`UpdateManager.download`)
+      val moved = release.movedTo.isNotEmpty()
+      Text(if (moved) StrUpdate.movedTitle else StrNav.versionReady(release.version), style = V3Type.headline, color = PhoneV3Roles.brandText(c))
       if (release.notes.isNotBlank()) {
         Spacer(Modifier.height(6.dp))
         Text(release.notes.take(400), style = V3Type.footnote, color = c.inkMuted)
@@ -59,8 +62,8 @@ internal fun UpdateCard(repo: String) {
       Spacer(Modifier.height(12.dp))
       //  فایلی که کامل گرفته شده دوباره گرفته نمی‌شود؛ یک‌راست به نصب
       V3Button(
-        if (UpdateManager.ready != null) StrNav.installVersion(release.version) else StrNav.downloadInstall,
-        { UpdateManager.download(context) },
+        if (moved) StrUpdate.movedAction else if (UpdateManager.ready != null) StrNav.installVersion(release.version) else StrNav.downloadInstall,
+        { if (moved) UpdateManager.openMove() else UpdateManager.download(context) },
         Modifier.fillMaxWidth(),
         enabled = !busy,
         haptic = true,
@@ -71,7 +74,8 @@ internal fun UpdateCard(repo: String) {
         V3Button(StrNav.openInstallPermission, { UpdateManager.allowInstall(context) }, Modifier.fillMaxWidth(), kind = V3ButtonKind.SECONDARY)
       }
       Spacer(Modifier.height(4.dp))
-      V3TextButton(StrNav.viaBrowser, { UpdateManager.openInBrowser(context, repo) }, Modifier.align(Alignment.CenterHorizontally))
+      //  برنامهٔ دیگر از مرورگر هم بی برگهٔ راهنما گرفته نشود
+      if (!moved) V3TextButton(StrNav.viaBrowser, { UpdateManager.openInBrowser(context, repo) }, Modifier.align(Alignment.CenterHorizontally))
     }
     UpdateManager.message?.let {
       Spacer(Modifier.height(8.dp))

@@ -1,8 +1,8 @@
 {
   "note": "ساختهٔ spec.mjs split؛ دستی ویرایش نکن. 00-index.md و همین فایل بیرون از چسباندن‌اند.",
   "source": "MASTER-SPEC.md",
-  "bytes": 687456,
-  "sha256": "dfa093074218ec96067bd4385f4039f4c9b4ad0475d44e0cc9aa0491b7569af4",
+  "bytes": 687733,
+  "sha256": "cdaabb724ea5d2acc8b9bec4fa0be2a2df6029bf4564d61d13f7ff0e9371ccfd",
   "parts": [
     {
       "file": "00-intro.md",
@@ -34,8 +34,8 @@
         44,
         124
       ],
-      "bytes": 10925,
-      "sha256": "69c8e705addfc229901ba6ca6cfd529fa49628e094f246ef3b7c5e0396addfd5"
+      "bytes": 11116,
+      "sha256": "1bc45d8dad62c337eae99d2868e85deeaa957e75aaf382d63d5efcbcdfbb55df"
     },
     {
       "file": "02-current.md",
@@ -45,8 +45,8 @@
         125,
         239
       ],
-      "bytes": 22181,
-      "sha256": "a40009ee127d230bb0ac7117caf5b67f976d238a9a8fef24eb136797676c7fc6"
+      "bytes": 22267,
+      "sha256": "cf8c364eca2740b13569ae6f859bd53cf98cbc33d8986fa7c52b2d5fcb600826"
     },
     {
       "file": "03-architecture.md",

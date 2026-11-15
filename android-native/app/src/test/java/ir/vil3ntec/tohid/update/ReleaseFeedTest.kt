@@ -233,4 +233,48 @@ class ReleaseFeedTest {
     assertEquals(-1, ReleaseFeed.previewBuild("3.2.17"))
     assertEquals(-1, ReleaseFeed.previewBuild(""))
   }
+
+  // ── شناسهٔ نصب (`AppMove`، ۱۴۰۵/۰۸/۲۴) ───────────────────────────────
+
+  @Test
+  fun `سرور شناسهٔ نصبِ انتشار را می‌گوید؛ سرورِ قدیمی یا شناسهٔ ناجور یعنی نامعلوم`() {
+    val body = { id: String -> """{"tag":"tohid-native","version":"3.2.50",$id"assets":[{"name":"Tohid-Native-3.2.50.apk","size":5}]}""" }
+    assertEquals("com.vill3n.dailyshop", ReleaseFeed.parseLatest(body(""""appId":"com.vill3n.dailyshop","""), "tohid-native")!!.appId)
+    assertEquals("ir.vil3ntec.tohid", ReleaseFeed.parseLatest(body(""""appId":"ir.vil3ntec.tohid","""), "tohid-native")!!.appId)
+    assertEquals("", ReleaseFeed.parseLatest(body(""), "tohid-native")!!.appId)
+    assertEquals("", ReleaseFeed.parseLatest(body(""""appId":null,"""), "tohid-native")!!.appId)
+    assertEquals("", ReleaseFeed.parseLatest(body(""""appId":"<b>x</b>","""), "tohid-native")!!.appId)
+  }
+
+  @Test
+  fun `برنامه شناسهٔ نصبِ خودش را می‌فرستد؛ ناجور فرستاده نمی‌شود`() {
+    assertEquals(
+      "https://api.example/api/releases/tohid-native/latest?shop=s1&device=d1&app=com.vill3n.dailyshop&staged=1",
+      ReleaseFeed.latestUrl("https://api.example", "tohid-native", "s1", "d1", "com.vill3n.dailyshop"),
+    )
+    assertEquals(
+      "https://api.example/api/releases/tohid-native/latest?app=ir.vil3ntec.tohid.preview&staged=1",
+      ReleaseFeed.latestUrl("https://api.example", "tohid-native", "", "", "ir.vil3ntec.tohid.preview"),
+    )
+    assertEquals(
+      "https://api.example/api/releases/tohid-native/latest?staged=1",
+      ReleaseFeed.latestUrl("https://api.example", "tohid-native", "", "", "a&b=c"),
+    )
+  }
+
+  @Test
+  fun `راهِ GitHub نشانیِ app-id txt را برمی‌دارد؛ انتشارِ بی آن همان پیش`() {
+    val pick = ReleaseFeed.githubPick(release("tohid-native", "Tohid-Native-3.2.50.apk", "SHA256SUMS.txt", "app-id.txt"), "tohid-native")!!
+    assertEquals("https://dl.example/app-id.txt", pick.appIdUrl)
+    assertEquals("", ReleaseFeed.githubPick(release("tohid-native", "Tohid-Native-3.2.50.apk"), "tohid-native")!!.appIdUrl)
+  }
+
+  @Test
+  fun `پیش‌نمایش app-id txt را کنارِ نصبی و فهرست دارد`() {
+    val withId = preview().removeSuffix("]}") + "," + asset("app-id.txt") + "]}"
+    val p = ReleaseFeed.previewPick(withId)!!
+    assertEquals("https://dl.example/app-id.txt", p.assets.first { it.name == AppMove.FILE }.url)
+    assertEquals(3, p.assets.size)
+    assertEquals(2, ReleaseFeed.previewPick(preview())!!.assets.size)
+  }
 }

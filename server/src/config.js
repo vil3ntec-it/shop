@@ -240,7 +240,8 @@ const config = {
     legacyEmailLink: bool(process.env.GOOGLE_EMAIL_AUTOLINK, false),
   },
 
-  //  ورود با اپل (`lib/apple.js`) — شناسهٔ برنامهٔ آیفون (bundle id، مثلاً ir.vil3ntec.tohid) از
+  //  ورود با اپل (`lib/apple.js`) — شناسهٔ برنامهٔ آیفون (bundle id: com.vill3n.dailyshop از ۱۴۰۵/۰۸/۲۴؛ فهرست است، پس در
+  //  گذار شناسهٔ پیشین ir.vil3ntec.tohid هم می‌تواند کنارش بماند) از
   //  حسابِ اپلِ صاحب‌کار؛ خالی ⇒ خاموش (`/config` ⇐ appleLogin: false). هرگز وصلِ خودکار با ایمیل.
   apple: {
     clientIds: list(process.env.APPLE_CLIENT_IDS),

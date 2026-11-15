@@ -27,6 +27,7 @@ object ReleaseFeed {
    *  پاسخِ `/api/releases/<برچسب>/latest`.
    *  `minVersion` (§۳۸.۹): حداقل نسخهٔ پشتیبانی‌شده؛ خالی ⇒ حداقلی نیست
    *  (سرورِ قدیمی آن را نمی‌دهد ⇒ همان رفتارِ پیشین).
+   *  `appId` (`AppMove`): شناسهٔ نصبِ همان نصبی (`app-id.txt`)؛ خالی ⇒ نامعلوم (انتشار یا سرورِ پیشین).
    */
   data class Latest(
     val tag: String,
@@ -34,12 +35,13 @@ object ReleaseFeed {
     val notes: String,
     val assets: List<Asset>,
     val minVersion: String = "",
+    val appId: String = "",
   ) {
     val hasSums: Boolean get() = assets.any { it.name.equals(SUMS, true) }
   }
 
-  /** انتخاب از api.github.com */
-  data class GitHubPick(val notes: String, val apk: Asset, val sumsUrl: String)
+  /** انتخاب از api.github.com — `appIdUrl`: نشانیِ `app-id.txt` ِ همان انتشار، اگر هست */
+  data class GitHubPick(val notes: String, val apk: Asset, val sumsUrl: String, val appIdUrl: String = "")
 
   const val SUMS = "SHA256SUMS.txt"
   private val VERSION = Regex("^\\d+(\\.\\d+)+$")
@@ -53,11 +55,14 @@ object ReleaseFeed {
    *  `<سرور>/api/releases/<برچسب>/latest` — شناسهٔ خالی یا نادرست فرستاده نمی‌شود.
    *  OPS-01: `staged=1` یعنی «این برنامه برچسبِ نسخه‌دار (`<برچسب>-v<نسخه>`) را می‌شناسد»؛
    *  سرور فقط آن‌وقت دستگاهِ درونِ انتشارِ مرحله‌ای را به آن برچسب می‌فرستد.
+   *  `app` (`AppMove`): شناسهٔ نصبِ همین برنامه — یعنی «برگهٔ برنامهٔ تازه را خودم دارم»؛ برنامهٔ پیش از آن
+   *  نمی‌فرستد و سرور برایش هشدارِ گذار را سرِ یادداشتِ نسخه می‌گذارد.
    */
-  fun latestUrl(server: String, tag: String, shop: String, device: String): String {
+  fun latestUrl(server: String, tag: String, shop: String, device: String, app: String = ""): String {
     val q = listOfNotNull(
       shop.trim().takeIf { ID.matches(it) }?.let { "shop=$it" },
       device.trim().takeIf { ID.matches(it) }?.let { "device=$it" },
+      app.trim().takeIf(AppMove::valid)?.let { "app=$it" },
       "staged=1",
     )
     return "${server.trimEnd('/')}/api/releases/$tag/latest?" + q.joinToString("&")
@@ -79,7 +84,7 @@ object ReleaseFeed {
     val assets = (0 until list.length()).map { list.getJSONObject(it) }
       .map { Asset(it.getString("name"), it.optLong("size")) }
     val min = str(r, "minVersion").trim().takeIf { VERSION.matches(it) }.orEmpty()
-    return Latest(tag, version, str(r, "notes"), assets, min)
+    return Latest(tag, version, str(r, "notes"), assets, min, AppMove.parseId(str(r, "appId")))
   }
 
   /**
@@ -129,7 +134,8 @@ object ReleaseFeed {
       val apks = assets.filter { it.name.endsWith(".apk", true) }
       val apk = apks.firstOrNull { NUMBERED.containsMatchIn(it.name) } ?: apks.firstOrNull() ?: continue
       val sums = assets.firstOrNull { it.name.equals(SUMS, true) }?.url.orEmpty()
-      return GitHubPick(str(r, "body"), apk, sums)
+      val appId = assets.firstOrNull { it.name == AppMove.FILE }?.url.orEmpty()
+      return GitHubPick(str(r, "body"), apk, sums, appId)
     }
     return null
   }
@@ -156,11 +162,14 @@ object ReleaseFeed {
     val apk = assets.firstOrNull { str(it, "name") == PREVIEW_ASSET } ?: return null
     val version = str(apk, "label").trim().takeIf { previewBuild(it) >= 0 } ?: return null
     val sums = assets.firstOrNull { str(it, "name").equals(SUMS, true) } ?: return null
+    //  `app-id.txt` (`AppMove`) اگر هست، کنارِ همان دو؛ پیش‌نمایشِ پیش از ۱۴۰۵/۰۸/۲۴ ندارد
+    val appId = assets.firstOrNull { str(it, "name") == AppMove.FILE }
     return Latest(
       PREVIEW_TAG, version, str(r, "body"),
-      listOf(
+      listOfNotNull(
         Asset(PREVIEW_ASSET, apk.optLong("size"), str(apk, "browser_download_url")),
         Asset(SUMS, sums.optLong("size"), str(sums, "browser_download_url")),
+        appId?.let { Asset(AppMove.FILE, it.optLong("size"), str(it, "browser_download_url")) },
       ),
     )
   }

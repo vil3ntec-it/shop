@@ -91,7 +91,7 @@
    - در برنامه هیچ فیلدی برای «نشانی سرور» وجود ندارد.
    - شناسه‌های `tohid.apiBase` و `tohid.appId` ثابت‌اند.
    - `upgradeUuid` نصب‌کننده ویندوز هرگز عوض نمی‌شود.
-   - نام‌های داخلی `Tohid` و `ir.vil3ntec.tohid` ثابت‌اند.
+   - نام‌های داخلی `Tohid` و بسته‌های کدِ `ir.vil3ntec.tohid` ثابت‌اند؛ شناسهٔ نصبِ اندروید و آیفون از ۱۴۰۵/۰۸/۲۴ `com.vill3n.dailyshop` است (تصمیمِ صاحب‌کار، `OWNER-DECISIONS-fa.md`).
    - بخش دکان و بخش پمپ کاملاً جدا هستند (`/api/shop` و `/api/pump`، و `tokens.app`).
    - قیمت اشتراک فقط از سرور می‌آید.
    - اندروید و کامپیوتر صفر درصد WebView هستند.
@@ -130,7 +130,7 @@
 
 | بخش | محتوا |
 |---|---|
-| `android-native/` | اپ اصلی «فروشگاه من» با بسته `ir.vil3ntec.tohid`. Kotlin 2.0.21 و Compose، AGP 8.7.3، minSdk 24 و target 35. داده در یک فایل JSON است (`ShopData` → `shop-data.json`). |
+| `android-native/` | اپ اصلی «فروشگاه من» با بسته‌های کدِ `ir.vil3ntec.tohid` (شناسهٔ نصب از ۱۴۰۵/۰۸/۲۴: `com.vill3n.dailyshop`). Kotlin 2.0.21 و Compose، AGP 8.7.3، minSdk 24 و target 35. داده در یک فایل JSON است (`ShopData` → `shop-data.json`). |
 | `desktop/` | همان کدهای اندروید، که در یک build جداگانه با Compose Desktop ساخته می‌شوند. Kotlin 2.2.20 و CMP 1.9.3. ۴۱ فایل شبیه‌ساز (shim)، ۱۱ فایل `*Desk.kt` جایگزین، و جدول جایگزینی متنی `phrases`. نصب‌کننده MSI و Inno Setup، و به‌روزرسانی خودکار. |
 | `index.html` + `license/*.js` | اپ کامل وب (PWA) برای آیفون. داده در `localStorage` است. منطق تجاری جدا به JavaScript نوشته شده و برابری‌اش با Kotlin دستی حفظ می‌شود. وب از قبل برای هر عضو یک بازه شماره فاکتور جدا می‌گیرد (`assignInvoiceBlock`). |
 | `server/` | Node و Express 5، نسخه 2.14.0. بخش دکان و پمپ را جدا سرویس می‌دهد. حدود ۷۸۰ آزمون دارد. **سرور واقعی امروز PGlite است** و روی کامپیوتر ویندوزی خانگی صاحب سامانه اجرا می‌شود. پنل «کنترول سنتر» آن را بالا می‌آورد و Cloudflare Tunnel آن را در `api.vill3n.top` در دسترس می‌گذارد. PostgreSQL 16 فقط برای آزمون و Docker است. سرور امروز روی Node 22 اجرا می‌شود. |

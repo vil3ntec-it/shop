@@ -56,7 +56,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
-import ir.vil3ntec.tohid.ui.v3.rememberCountUp
+import ir.vil3ntec.tohid.ui.v3.rememberCountUpState
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3AnimateItem
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
@@ -120,7 +120,7 @@ internal fun SuppliersScreen(
     PurchaseViews.search(d, views.filter { PurchaseViews.matches(it, filter, greg, today) }, query)
   }
   val rows = remember(d) { SuppliersModel.rows(d) }
-  val owed = rememberCountUp(remember(d) { SuppliersModel.owedTotal(d) })
+  val owed = rememberCountUpState(remember(d) { SuppliersModel.owedTotal(d) })
   val stagger = rememberV3Stagger()
   var confirmDelete by remember { mutableStateOf<String?>(null) }
   val doors = listOfNotNull(
@@ -157,7 +157,7 @@ internal fun SuppliersScreen(
         item(key = "summary") {
           V3Summary(
             label = StrMoney.supplierDebtTotal,
-            value = MoneyText.afn(owed),
+            value = MoneyText.afn(owed.value),
             caption = StrMoney.suppliersCaption(d.suppliers.size, d.purchases.size),
             actions = listOf(V3SummaryAction(StrMoney.newSupplier, Icons.Outlined.PersonAddAlt, onClick = actions.onNewSupplier)) + doors,
           )

@@ -52,6 +52,8 @@ object Updater {
     val sumsUrl: String = "",
     /** §۳۸.۹: حداقل نسخهٔ پشتیبانی‌شده (فقط از سرورِ خودمان)؛ خالی ⇒ حداقلی نیست */
     val minVersion: String = "",
+    /** `AppMove` (شناسهٔ نصبِ اندروید) — کامپیوتر شناسهٔ نصبش را عوض نکرد، پس همیشه خالی */
+    val movedTo: String = "",
   )
 
   suspend fun check(
@@ -206,6 +208,10 @@ object Updater {
     return if (actual.equals(expected, ignoreCase = true)) null
     else StrUpdate.checksumMismatch
   }
+
+  /** `AppMove`: فقط اندروید شناسهٔ نصبِ دیگری دارد؛ نصبیِ کامپیوتر همیشه همین برنامه است */
+  @Suppress("UNUSED_PARAMETER")
+  fun foreignPackage(context: Context, apk: File): String? = null
 
   fun readyFile(context: Context, release: Release): File? =
     target(context, release).takeIf { it.isFile && release.size > 0 && it.length() == release.size }

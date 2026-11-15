@@ -421,7 +421,7 @@ private fun InfoPanel(
 @Composable
 private fun NfcHint(env: HesabPayEnv) {
   var nfc by remember { mutableStateOf(env.nfc()) }
-  LaunchedEffect(Unit) { while (true) { delay(2_000); nfc = env.nfc() } }
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(Unit) { while (true) { delay(2_000); nfc = env.nfc() } }
   when (nfc) {
     PayDevice.Nfc.READY -> {
       Spacer(Modifier.height(6.dp))
@@ -439,7 +439,7 @@ private fun NfcHint(env: HesabPayEnv) {
 private fun Countdown(env: HesabPayEnv, expiresAt: Long?, skewMs: Long) {
   if (expiresAt == null) return
   var now by remember { mutableLongStateOf(env.now()) }
-  LaunchedEffect(expiresAt) { while (true) { now = env.now(); delay(1_000) } }
+  ir.vil3ntec.tohid.ui.v3.V3LiveEffect(expiresAt) { while (true) { now = env.now(); delay(1_000) } }
   val left = ((expiresAt - (now - skewMs)) / 1000).coerceAtLeast(0)
   val text = "${left / 60}:${(left % 60).toString().padStart(2, '0')}"
   Text(StrPay.expiresIn(text), color = if (left < 60) Shop.colors.warning else Shop.colors.muted, style = MaterialTheme.typography.labelLarge)
