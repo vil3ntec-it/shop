@@ -77,7 +77,11 @@
 - **آزمون‌ها:** سرور `customer-role-mask.test.js` ۵/۵ (تازه؛ روی کدِ پایه با همان lib ولی بی وصل کردن ۳ از ۵ سرخ)، ۱۱ پروندهٔ همراه ۷۵/۷۵ (`customer-contact`، `order-phone-mask`، `customer-contact-lists`،
   `staff-perms`، `perm-core`، `admin-flags`، `online-orders`، `order-customer`، `customer-access`، `delivery`، `courier-call`)، همهٔ ۷۱ پروندهٔ
   `order-*`/`orders-*`/`online-orders`/`delivery-*`/`courier-*`/`conflict-inbox`/`shop-chat*`/`storefront-promo*` ۴۹۲/۴۹۲ و `storefront-area-requests` + `storefront-promo*` ۲۳/۲۳ و OPS-01 ۳۲/۳۲ روی PGlite؛
-  کاتلین: CORE_PLACEHOLDER؛ DESK_PLACEHOLDER.
+  کاتلین (flock، `-Xmx3g`؛ اجرای کاملِ `:core:jvmTest test`): هسته ۲۰۲۶/۰ (۲ SKIP ِ پیشین) با `CustomerMaskTest` ۹، `PoSeasonalityTest` ۵،
+  `StatementLayoutTest` ۶، `DemandForecastTest` ۱۳؛ کامپیوتر/اندروید ۴۳۱۹ با `CustomerMaskCashierUiTest` ۳ (Compose)، `ContactPrivacyTest` ۴،
+  `PurchaseSuggestTest` ۶، `PoSuggestUiTest` ۲، `InfraLeakGuardTest` ۸، `I18nCoverageTest`/`DariCoverageTest`/`DariWordsTest` سبز — ۲ شکست:
+  ⚠️ `SheetLangTest` (اثرِ SHA ِ برگه‌های فارسی) **پیشین است**: همان اثرِ `518f4acd…` روی wt-63f/63g/57x ِ بی این کار ⇒ صاحبِ LOC-06 اثر را تازه کند؛
+  و `DocGapsV3WiringTest` (متنِ فراخوانِ برگه را من عوض کردم ⇒ به متنِ تازه رسید و سخت‌تر شد: DOCGAPS_X).
 - **مانده/نکته:** روشن کردنِ §۴۴ (و §۳۶، §۳۷) برای دکانِ آزمایشی؛ شمارهٔ ازپیش‌همگام‌شده روی دستگاهِ کارمند تا بازسازیِ دفتر می‌ماند (نمایش پوشیده)؛
   صفحهٔ کهنهٔ `ui/screens/Debtors.kt` فقط در `PhonePreview` (دمو) است و دست نخورد. پیوندِ `server/node_modules` به `wt62` شکسته بود ⇒ `wt-64e`
   (همان lockfile). شمارهٔ بخشِ FLAGS-ON (§۴۴) را پس از ادغام با شاخه‌های موازی بشمارید.
