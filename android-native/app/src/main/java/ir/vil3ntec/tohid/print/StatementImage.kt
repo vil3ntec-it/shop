@@ -33,6 +33,8 @@ object StatementImage {
       phone = debtor.phone,
       todayIso = today,
       lines = CustomerStatement.lines(d, debtorId),
+      roleMask = ir.vil3ntec.tohid.data.CustomerPrintPref.roleMask(context), // CRM-15
+      printFullPhone = ir.vil3ntec.tohid.data.CustomerPrintPref.on(context),
     )
   }
 

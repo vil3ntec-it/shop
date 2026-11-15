@@ -90,7 +90,7 @@ class ModuleRegistryTest {
       "auth", "auth/code", "setup/shop", "lock", "lock/setup", "reauth",
       "products", "products/1", "products/new", "products/1/edit", "products/1/photo", "products/categories",
       "stock", "stock/1", "stock/entry", "stock/entry/bulk", "stock/1/adjust", "stock/1/movements", "stock/count", "stock/import",
-      "debtors", "debtors/1", "debtors/new", "debtors/receive", "debtors/1/tx", "receipts", "purchasing", "purchasing/new",
+      "debtors", "debtors/1", "debtors/new", "debtors/receive", "debtors/1/tx", "receipts", "purchasing", "purchasing/new", "purchasing/purchases/1",
       "expenses", "expenses/new", "sale", "sale/quick", "sale/checkout", "scan", "sales", "sales/1", "sales/drawer",
       "reports", "stats", "admin", "profile", "team", "subscription", "subscription/plans", "support",
       "orders", "orders/1", "orders/new", "storefront", "chat", "delivery", "courier",

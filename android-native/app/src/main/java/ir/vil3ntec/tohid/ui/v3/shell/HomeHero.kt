@@ -155,6 +155,13 @@ object HomeHero {
     return Series(v.toList(), now, ticks(range, size, weekLetters, rules), lines.isEmpty())
   }
 
+  /**
+   *  همان [Series] ِ [safe] (که واحدِ کوچک را ÷۱۰۰ می‌نویسد) برای ارزی با [minorPerMajor] واحدِ کوچک در هر واحد
+   *  (`SafeCurrency.minorPerMajor`: ریال ۱) — افغانی و دالر بی هیچ تغییر. فقط مقیاسِ نوشتن، نه تبدیلِ ارز.
+   */
+  fun perMajor(s: Series, minorPerMajor: Long): Series =
+    if (minorPerMajor == 100L || minorPerMajor <= 0L) s else s.copy(values = s.values.map { it * 100.0 / minorPerMajor })
+
   /** «واریزِ امروز» و «برداشتِ امروز» ِ گاوصندوق: اثرِ ردیف‌های امروز جز شمارش (ورود و از‌دخل + ؛ خروج، به‌دخل و به‌بانک −) */
   fun safeToday(history: List<SafeCore.Line>, dayStartMs: Long): Flow {
     var inn = 0L

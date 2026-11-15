@@ -7,6 +7,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import ir.vil3ntec.tohid.core.calendar.CivilDays
@@ -110,7 +111,15 @@ class PoSuggestUiTest {
     val row = PurchaseSuggest.rows(d, emptyList(), today).first { it.product.id == "pA" }
     assertTrue(row.due)
     rule.onNodeWithText(DemandForecast.why(row.forecast, LocaleFormat.DIGITS_LATN)).assertExists()
-    rule.onNodeWithText(DemandForecast.confidenceText(row.forecast.confidence)).assertExists()
+    //  PUR-03: نشانِ اطمینان از درازای تاریخچه و نوسان (کمتر از ۱۲ ماه ⇒ «کم» و یادداشتِ «فصل حساب نشد»)، نه نشانِ کهنهٔ INV-13
+    val season = row.season!!
+    assertEquals(ir.vil3ntec.tohid.core.purchase.PoSeasonality.Confidence.LOW, season.confidence)
+    val label = ir.vil3ntec.tohid.ui.screens.seasonLabel(season.confidence)
+    assertEquals(ir.vil3ntec.tohid.core.i18n.StrPoSeason.low, label)
+    rule.onNodeWithText(label).assertExists()
+    rule.onAllNodesWithText(ir.vil3ntec.tohid.core.i18n.StrPoSeason.shortHistory).onFirst().assertExists()
+    val old = DemandForecast.confidenceText(row.forecast.confidence)
+    if (old != label) assertTrue(rule.onAllNodesWithText(old).fetchSemanticsNodes().isEmpty())
     //  نمک بی‌نیاز است ⇒ در «نیازمندها» نیست
     assertTrue(rule.onAllNodesWithText("نمک").fetchSemanticsNodes().isEmpty())
     val button = rule.onNodeWithText(StrPurchasePages.createDraftN(1))

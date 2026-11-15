@@ -221,6 +221,7 @@ class SettingsTiersTest {
       SettingsLayout.PAY_FIX to listOf("data/PayFixAndroid.kt" to "KEY"),
       SettingsLayout.TILL_RECEIVE to listOf("data/TillReceiveAndroid.kt" to "KEY"),
       SettingsLayout.LINE_SELLER to listOf("data/LineSellerPrefAndroid.kt" to "KEY"),
+      SettingsLayout.PRINT_PHONE to listOf("data/CustomerPrintPrefAndroid.kt" to "KEY"),
       SettingsLayout.MULTI_DRAWER to listOf("data/TillDrawerAndroid.kt" to "KEY"),
       SettingsLayout.POS_TOUCH to listOf("ui/components/pos/PosTouchPrefsAndroid.kt" to "ON"),
       SettingsLayout.POS_MORE_KEYS to listOf("ui/components/pos/PosMoreKeysPrefsAndroid.kt" to "KEY"),

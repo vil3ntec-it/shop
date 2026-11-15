@@ -78,8 +78,16 @@ internal fun SupplierFormSheet(supplier: Supplier?, onClose: () -> Unit, onSave:
  *  «تسویهٔ کامل»، تاریخ و یادداشت ⇒ «ثبت پرداخت». ثبت = `LedgerEngine.paySupplier`.
  */
 @Composable
-internal fun SupplierPaySheet(supplier: Supplier, debt: Double, onClose: () -> Unit, onSave: (PayForm) -> Boolean, onSaved: () -> Unit) {
-  val initial = remember(supplier.id) { PayForm(date = todayIso()) }
+internal fun SupplierPaySheet(
+  supplier: Supplier,
+  debt: Double,
+  onClose: () -> Unit,
+  onSave: (PayForm) -> Boolean,
+  onSaved: () -> Unit,
+  /** e-rows-63b: «پرداخت» ِ یک خرید — مبلغ و یادداشتِ پیش‌پُر (ماندهٔ همان خرید)؛ null ⇒ برگهٔ خالیِ پیشین */
+  prefill: PayForm? = null,
+) {
+  val initial = remember(supplier.id, prefill) { prefill ?: PayForm(date = todayIso()) }
   var f by remember(supplier.id) { mutableStateOf(initial) }
   var tried by rememberSaveable { mutableStateOf(false) }
   var shake by remember { mutableStateOf(0) }

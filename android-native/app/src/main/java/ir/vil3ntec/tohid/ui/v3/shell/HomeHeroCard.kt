@@ -75,8 +75,11 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.ShopDayChoice
 import ir.vil3ntec.tohid.core.i18n.StrHero
 import ir.vil3ntec.tohid.core.i18n.StrHome
+import ir.vil3ntec.tohid.core.safe.SafeCurrency
+import ir.vil3ntec.tohid.data.SafeCurrencies
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.money
+import ir.vil3ntec.tohid.unitMoney
 import ir.vil3ntec.tohid.ui.screens.HomeAlerts
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
@@ -109,6 +112,11 @@ internal data class HeroFace(
   val empty: String,
   val first: HeroStat,
   val second: HeroStat,
+  /** نشانهٔ کنارِ عدد (`؋`؛ گاوصندوقِ ارزِ دیگر کدِ همان ارز) و اعشارِ واقعی برای ارزِ جز افغانی */
+  val unit: String = "؋",
+  val cents: Boolean = false,
+  /** گاوصندوقِ چندارزی: تراشهٔ ارزِ گوشهٔ نمودار (`HeroCurrencyChip`)؛ null ⇒ همان کادرِ امروز */
+  val currency: SafeCurrencyChoice? = null,
 )
 
 /** دو صفحهٔ «صندوق» و «گاوصندوق» از دادهٔ واقعی (`HomeView`، `HeroInput`) — عددِ تازه‌ای این‌جا ساخته نمی‌شود */
@@ -139,16 +147,23 @@ internal fun rememberHeroFaces(d: ShopData, view: HomeView, input: HeroInput, ra
     HomeHero.safe(safeView.history, range, input.today, input.dayStartMs, input.nowMs, letters, week)
   }
   val flow = remember(safeView, input.dayStartMs) { HomeHero.safeToday(safeView.history, input.dayStartMs) }
+  //  ارزِ نمودار (افغانی ⇒ بیت‌به‌بیت همان امروز): هر عدد از دفترِ همان ارز، هرگز جمعِ دو ارز
+  val cur = input.safeCurrency
   val safe = HeroFace(
     page = HomeHero.Page.SAFE,
     title = StrHome.safe,
     label = StrHero.safeBalance,
-    amount = safeView.balanceMinor / 100.0,
-    series = safeSeries,
+    amount = SafeCurrency.major(safeView.balanceMinor, cur),
+    series = HomeHero.perMajor(safeSeries, SafeCurrency.minorPerMajor(cur)),
     titles = listOf(StrHero.safeToday, StrHero.safeWeek, StrHero.safeMonth),
     empty = StrHero.emptySafe,
-    first = HeroStat(StrHero.safeIn, "${money(flow.inMinor / 100.0)} ؋", up = true),
-    second = HeroStat(StrHero.safeOut, "${money(flow.outMinor / 100.0)} ؋", up = false),
+    first = HeroStat(StrHero.safeIn, SafeCurrencies.format(flow.inMinor, cur), up = true),
+    second = HeroStat(StrHero.safeOut, SafeCurrencies.format(flow.outMinor, cur), up = false),
+    unit = SafeCurrencies.symbol(cur),
+    cents = cur != SafeCurrency.AFN,
+    currency = input.safeCurrencies.takeIf { it.size > 1 }?.let { codes ->
+      SafeCurrencyChoice(cur, codes, { input.safeNames[it] ?: SafeCurrencies.name(it) }, input.pickSafe)
+    },
   )
   return listOf(till, safe)
 }
@@ -239,7 +254,7 @@ private fun HeroCard(
       Spacer(Modifier.width(8.dp))
       SyncChip(sync, hc)
     }
-    HeroAmount(face.amount, hc)
+    HeroAmount(face.amount, hc, face.unit, face.cents)
     Spacer(Modifier.height(8.dp))
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
       Text(
@@ -250,8 +265,8 @@ private fun HeroCard(
       HeroRange(range, onRange, hc)
     }
     HeroChart(
-      face.series, hc, face.empty, face.titles[range.ordinal], key = face.page to range,
-      modifier = Modifier.fillMaxWidth().weight(1f),
+      face.series, hc, face.empty, face.titles[range.ordinal], key = Triple(face.page, range, face.unit),
+      modifier = Modifier.fillMaxWidth().weight(1f), unit = face.unit, cents = face.cents, currency = face.currency,
     )
     Spacer(Modifier.height(8.dp))
     HeroStats(face.first, face.second, hc, Modifier.height(62.dp * fs))
@@ -260,13 +275,13 @@ private fun HeroCard(
 
 /** عددِ درشت با شمارنده؛ عددِ دراز کوچک‌تر می‌شود تا در یک خط بماند. بلندی کمینه است تا با درشتیِ نوشته (×۱٫۳) بریده نشود */
 @Composable
-private fun HeroAmount(amount: Double?, hc: HeroColors) {
+private fun HeroAmount(amount: Double?, hc: HeroColors, unit: String = "؋", cents: Boolean = false) {
   Row(Modifier.fillMaxWidth().heightIn(min = 54.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
     if (amount == null) {
       Text(StrHero.blindHidden, color = hc.muted, style = v3Text(15, FontWeight.SemiBold, 22), maxLines = 1)
       return@Row
     }
-    val text = money(rememberCountUp(amount))
+    val text = rememberCountUp(amount).let { if (cents) unitMoney(it) else money(it) }
     val size = when {
       text.length > 13 -> 28
       text.length > 10 -> 34
@@ -274,7 +289,7 @@ private fun HeroAmount(amount: Double?, hc: HeroColors) {
     }
     Text(text, color = hc.ink, style = v3Text(size, FontWeight.ExtraBold, size + 8), maxLines = 1, softWrap = false)
     Spacer(Modifier.width(6.dp))
-    Text("؋", color = hc.muted, style = v3Text(size / 2 + 2, FontWeight.Bold, size), maxLines = 1)
+    Text(unit, color = hc.muted, style = v3Text(size / 2 + 2, FontWeight.Bold, size), maxLines = 1)
   }
 }
 
@@ -383,13 +398,24 @@ private fun StatCell(s: HeroStat, hc: HeroColors, modifier: Modifier) {
  *  صفحه که عوض شد خط از آغاز کشیده می‌شود (بی حرکت با «کاهشِ حرکت»). دادهٔ خالی ⇒ خطِ صافِ آرام و راهنما.
  */
 @Composable
-private fun HeroChart(series: HomeHero.Series, hc: HeroColors, emptyText: String, title: String, key: Any, modifier: Modifier) {
+private fun HeroChart(
+  series: HomeHero.Series,
+  hc: HeroColors,
+  emptyText: String,
+  title: String,
+  key: Any,
+  modifier: Modifier,
+  unit: String = "؋",
+  cents: Boolean = false,
+  /** گاوصندوقِ چندارزی: تراشهٔ ارز در گوشهٔ بالای نمودار (سمتِ آینده، دور از آغازِ خط) */
+  currency: SafeCurrencyChoice? = null,
+) {
   val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
   val measurer = rememberTextMeasurer()
   val tick = v3Text(11, FontWeight.Medium, 14).copy(color = hc.faint)
   val tickNow = tick.copy(color = hc.ink, fontWeight = FontWeight.Bold)
   val tipStyle = v3Text(12, FontWeight.Bold, 16).copy(color = hc.onPill)
-  val tip = "${money(series.current)} ؋"
+  val tip = "${if (cents) unitMoney(series.current) else money(series.current)} $unit"
   val reveal = remember { Animatable(if (Motion.enabled) 0f else 1f) }
   LaunchedEffect(key) {
     if (Motion.enabled) {
@@ -400,7 +426,7 @@ private fun HeroChart(series: HomeHero.Series, hc: HeroColors, emptyText: String
   Box(
     modifier
       .clipToBounds()
-      .semantics { contentDescription = StrHero.chart(title, money(series.current)) }
+      .semantics { contentDescription = StrHero.chart(title, if (cents) "${unitMoney(series.current)} $unit" else money(series.current)) }
       .drawWithCache {
         val n = series.values.size
         val now = series.now.coerceIn(0, (n - 1).coerceAtLeast(0))
@@ -489,5 +515,6 @@ private fun HeroChart(series: HomeHero.Series, hc: HeroColors, emptyText: String
         modifier = Modifier.fillMaxSize().padding(top = 8.dp).align(Alignment.TopCenter),
       )
     }
+    currency?.let { HeroCurrencyChip(it, hc, Modifier.align(Alignment.TopEnd)) }
   }
 }

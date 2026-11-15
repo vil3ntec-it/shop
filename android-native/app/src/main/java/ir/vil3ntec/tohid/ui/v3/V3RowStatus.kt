@@ -7,11 +7,8 @@ import ir.vil3ntec.tohid.ui.theme.V3Status
  *  ردیف فقط بکشد (`V3AmountStatus`، `V3QuietStatus` در `V3RowBits.kt`).
  */
 
-/**
- *  شدّتِ متنِ وضعیت — رنگ هرگز تنها نیست: نوشته همیشه هست. [DEBT]/[RECEIPT] رنگِ معناییِ دفترِ قرض است («• برد» و
- *  «• قرض‌دار» سرخِ بدهی، «• رسید» سبزِ رسید — همان `LedgerTone`)، نه هشدار (`claude/e-rows-63q`).
- */
-enum class V3RowTone { QUIET, ATTENTION, DANGER, DEBT, RECEIPT }
+/** شدّتِ متنِ وضعیت — رنگ هرگز تنها نیست: نوشته همیشه هست */
+enum class V3RowTone { QUIET, ATTENTION, DANGER }
 
 /** وضعیتِ آرامِ یک ردیف («لغوشده»، «نسیه») با شدّتش */
 data class V3RowStatus(val text: String, val tone: V3RowTone = V3RowTone.QUIET) {

@@ -1,19 +1,22 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Search
@@ -28,27 +31,26 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrMoney
-import ir.vil3ntec.tohid.data.CustomerCrm
 import ir.vil3ntec.tohid.data.ShopData
-import ir.vil3ntec.tohid.todayIso
+import ir.vil3ntec.tohid.ui.screens.gridMinSize
+import ir.vil3ntec.tohid.data.CustomerCrm
 import ir.vil3ntec.tohid.ui.screens.DebtorListModel
+import ir.vil3ntec.tohid.ui.screens.DebtorTile
 import ir.vil3ntec.tohid.ui.screens.DebtorsAddButton
 import ir.vil3ntec.tohid.ui.screens.DebtorsBackdrop
+import ir.vil3ntec.tohid.ui.screens.DebtorsEmptyCard
 import ir.vil3ntec.tohid.ui.screens.DebtorsSortRow
 import ir.vil3ntec.tohid.ui.screens.DebtorsStatsCard
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.screens.PhoneDebtorsTheme
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Debt
 import ir.vil3ntec.tohid.ui.v3.V3Chip
-import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
-import ir.vil3ntec.tohid.ui.v3.sales.history.SaleTime
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
 
 /** کارهای فهرستِ قرض‌داران — هر کدام یک مسیر */
@@ -63,10 +65,12 @@ internal class DebtorsListActions(
 )
 
 /**
- *  قرض‌داران (`debtors?sort=&q=`) — سربرگِ r9 همان (کارتِ سه‌عددی، جستجو با میکروفون، تراشه‌های ترتیب و برچسب)؛ ردیف‌ها
- *  سادهٔ `claude/e-rows-63q` (`DebtorListRow`): نام، «آخرین حرکت · شماره»، «۳۰۰ ؋ • قرض‌دار» به متنِ آرام، درونِ یک کارتِ
- *  پیوسته به‌جای شبکهٔ کارت‌های سرخ/سبزِ قاب‌دار. زدن ⇐ `debtors/{id}`؛ نگه‌داشتن ⇐ برگهٔ «باز کردن/ویرایش/حذف»
- *  (`debtors/{id}/edit`، `debtors/{id}/delete`)؛ «+» ⇐ `debtors/new`. ترتیب و جستجو از پرسشِ مسیر (`?sort=oldest` ِ هشدارها).
+ *  قرض‌داران (`debtors?sort=&q=`) — شکلِ r9 «همین مدلِ دقیق» بی هیچ تغییری (`PhoneDebtors.kt`):
+ *  کارتِ سه‌عددی، جستجو با میکروفون، تراشه‌های ترتیب و شبکهٔ کارت‌های سرخ/سبز با × و مداد.
+ *  فقط سیم‌کشی عوض شد: کارت ⇐ `debtors/{id}`، مداد ⇐ `debtors/{id}/edit`، × ⇐ `debtors/{id}/delete`،
+ *  «+» ⇐ `debtors/new`. ترتیب و جستجو از پرسشِ مسیر خوانده می‌شوند (`?sort=oldest` ِ هشدارها).
+ *  تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۴ (`claude/e-rows-65q`): همین شبکهٔ کارت‌ها می‌ماند (فهرستِ تختِ ۶۳q پس گرفته شد)؛ کارتِ
+ *  سه‌عددی سه جعبهٔ رنگیِ کنارِ هم است (`DebtorsStatsCard`).
  */
 @Composable
 internal fun DebtorsListScreen(d: ShopData, sortArg: String?, queryArg: String?, actions: DebtorsListActions, duplicates: Int = 0) {
@@ -76,7 +80,7 @@ internal fun DebtorsListScreen(d: ShopData, sortArg: String?, queryArg: String?,
   LaunchedEffect(sortArg) { if (sortArg != null) sortName = DebtorListModel.Sort.parse(sortArg.uppercase()).name }
   LaunchedEffect(queryArg) { if (queryArg != null) search = queryArg }
   val sort = DebtorListModel.Sort.parse(sortName)
-  val list = rememberLazyListState()
+  val grid = rememberLazyGridState()
   val stagger = rememberV3Stagger()
   val hidden = MoneyUndo.hiddenDebtors
   val term = search.trim()
@@ -89,13 +93,6 @@ internal fun DebtorsListScreen(d: ShopData, sortArg: String?, queryArg: String?,
   val rows = if (hidden.isEmpty()) allRows else allRows.filterNot { it.debtor.id in hidden }
   val summary = remember(d) { DebtorListModel.summary(d) }
   val motion = Motion.enabled
-  val contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts() // CRM-15
-  val today = remember(d) { todayIso() }
-  //  متنِ هر ردیف (مانده، وضعیت، آخرین حرکت) یک بار برای همین دفتر و زبان
-  val texts = remember(d, allRows, today, contacts, I18n.lang) {
-    allRows.associate { it.debtor.id to DebtorRowModel.of(d, it, today, SaleTime.zoneOffset, contacts) }
-  }
-  var menuFor by rememberSaveable { mutableStateOf<String?>(null) }
 
   //  جست‌وجو (با صدا) از دکمهٔ نوار؛ برچسب‌ها یک ردیفِ فشرده زیرِ عنوان؛ «+» تنها دکمهٔ پایین — بقیهٔ r9 همان
   val voice = ir.vil3ntec.tohid.ui.screens.rememberVoiceSearch { search = it }
@@ -113,13 +110,16 @@ internal fun DebtorsListScreen(d: ShopData, sortArg: String?, queryArg: String?,
   ) { pad ->
     PhoneDebtorsTheme {
       DebtorsBackdrop {
-        LazyColumn(
+        LazyVerticalGrid(
+          columns = GridCells.Adaptive(minSize = gridMinSize(phone = PhoneV3Debt.tileMin, tablet = PhoneV3Debt.tileMinTablet)),
           modifier = Modifier.fillMaxSize(),
-          state = list,
+          state = grid,
           //  پایین: جای دکمهٔ گردِ «+» (۱۶ + ۵۶ + ۱۶) بالای پایینِ صفحه
           contentPadding = PaddingValues(PhoneV3Debt.gutter, 8.dp, PhoneV3Debt.gutter, pad.calculateBottomPadding() + 72.dp),
+          horizontalArrangement = Arrangement.spacedBy(PhoneV3Debt.gap),
+          verticalArrangement = Arrangement.spacedBy(PhoneV3Debt.gap),
         ) {
-          item(key = "debtors-head") {
+          item(key = "debtors-head", span = { GridItemSpan(maxLineSpan) }) {
             Column {
               DebtorsStatsCard(summary)
               Spacer(Modifier.height(12.dp))
@@ -136,34 +136,33 @@ internal fun DebtorsListScreen(d: ShopData, sortArg: String?, queryArg: String?,
               }
               if (CustomerCrm.active(d).isNotEmpty()) {
                 DebtorsSortRow(current = sort, count = rows.size) { sortName = it.name }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(4.dp))
               }
             }
           }
           if (rows.isEmpty()) {
-            item(key = "debtors-empty") {
+            item(key = "debtors-empty", span = { GridItemSpan(maxLineSpan) }) {
               //  خالیِ هر دو حالت گامِ بعدیِ خودش را دارد: دفترِ خالی «قرض‌دار تازه»، جستجوی بی نتیجه «نمایشِ همه»
               if (CustomerCrm.active(d).isEmpty()) {
-                V3EmptyState(Icons.Filled.Groups, StrMoney.emptyDebtorsTitle, body = StrMoney.emptyDebtorsBody, action = StrMoney.newDebtor, onAction = actions.onAdd)
+                DebtorsEmptyCard(Icons.Filled.Groups, StrMoney.emptyDebtorsTitle, StrMoney.emptyDebtorsBody, actionText = StrMoney.newDebtor, onAction = actions.onAdd)
               } else {
-                V3EmptyState(
-                  Icons.Filled.Search, StrMoney.noDebtorMatchTitle, body = StrMoney.noDebtorMatchBody,
-                  action = StrMoney.showAll, onAction = { search = ""; tagPick = null },
+                DebtorsEmptyCard(
+                  Icons.Filled.Search, StrMoney.noDebtorMatchTitle, StrMoney.noDebtorMatchBody,
+                  actionText = StrMoney.showAll, onAction = { search = ""; tagPick = null }, actionIcon = null,
                 )
               }
             }
           } else {
             itemsIndexed(rows, key = { _, row -> row.debtor.id }) { index, row ->
-              val text = texts[row.debtor.id] ?: return@itemsIndexed
-              //  ورودِ پله‌پله در نخستین نمایش؛ با عوضِ ترتیب هر ردیف به جای تازه‌اش سُر می‌خورد
-              DebtorListRow(
-                text = text,
-                first = index == 0,
-                last = index == rows.lastIndex,
-                onOpen = { actions.onOpen(row.debtor.id) },
-                onMenu = { menuFor = row.debtor.id },
-                modifier = (if (motion) Modifier.animateItem() else Modifier).v3Stagger(stagger, row.debtor.id, index),
-              )
+              //  ورودِ پله‌پله در نخستین نمایش؛ با عوضِ ترتیب هر کارت به جای تازه‌اش سُر می‌خورد
+              Box((if (motion) Modifier.animateItem() else Modifier).v3Stagger(stagger, row.debtor.id, index)) {
+                DebtorTile(
+                  row = row,
+                  onOpen = { actions.onOpen(row.debtor.id) },
+                  onEdit = { actions.onEdit(row.debtor.id) },
+                  onDelete = { actions.onDelete(row.debtor.id) },
+                )
+              }
             }
           }
         }
@@ -175,18 +174,5 @@ internal fun DebtorsListScreen(d: ShopData, sortArg: String?, queryArg: String?,
         )
       }
     }
-  }
-
-  //  نگه‌داشتنِ ردیف ⇐ همان سه کارِ کارتِ پیشین (× و مداد دیگر روی ردیف نیستند)
-  val menuText = menuFor?.let(texts::get)
-  if (menuText != null) {
-    val id = menuText.id
-    DebtorRowMenu(
-      title = menuText.title,
-      onOpen = { actions.onOpen(id) },
-      onEdit = { actions.onEdit(id) },
-      onDelete = { actions.onDelete(id) },
-      onDismiss = { menuFor = null },
-    )
   }
 }

@@ -28,10 +28,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrNewProduct
 import ir.vil3ntec.tohid.core.i18n.StrProductSuggest
 import ir.vil3ntec.tohid.core.i18n.StrProducts
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.data.OpeningStock
 import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.ui.screens.Haptics
 import ir.vil3ntec.tohid.ui.screens.Motion
@@ -55,16 +57,14 @@ internal class ProductFormNav(
   val back: () -> Unit,
   /** اسکنِ بارکد برای نتیجه (`scan?for=product`) */
   val scan: (onCode: (String) -> Unit) -> Unit,
-  /** برگهٔ دسته‌ها برای انتخاب (`products/categories?pick=1`) */
-  val pickCategory: (current: String, onPicked: (String) -> Unit) -> Unit,
 )
 
 /**
- *  «کالای تازه» (`products/new?barcode=`): کارت‌های ردیف زیرِ هم، فقط یکی باز؛
- *  «+ افزودن ردیف» زیرِ آخرین کارت؛ نوارِ چسبانِ پایین «کالای آماده: ۲ از ۳» و
- *  «ذخیرهٔ همه» (تا یک ردیف آماده نشده خاموش). «ذخیره» یا همه را با هم ثبت می‌کند
- *  (`WarehouseEngine.addProducts`) یا به نخستین ردیفِ خراب می‌پرد. پس از ثبت
- *  `onSaved` با شناسهٔ کالاهای تازه.
+ *  «کالای تازه» (`products/new?barcode=`): کارت‌های ردیف زیرِ هم، فقط یکی باز (کادرهای جمع‌وجورِ
+ *  `NewProductFields`)؛ «+ افزودن ردیف» و «افزودن از متن» زیرِ آخرین کارت؛ نوارِ چسبانِ پایین «کالای آماده:
+ *  ۲ از ۳» و «ذخیرهٔ همه» (تا یک ردیف آماده نشده خاموش). «ذخیره» یا همه را با هم ثبت می‌کند — هر کالا و، اگر
+ *  «موجودی در انبار» دارد، ورودِ انبارش با همان تاریخ‌ها (`OpeningStock.save`، یک دفترِ تازه و یک `ShopStore.save`) —
+ *  یا به نخستین ردیفِ خراب می‌پرد. پس از نخستین ثبت، زدنِ دوباره هیچ نمی‌نویسد. پس از ثبت `onSaved` با شناسهٔ کالاهای تازه.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -101,8 +101,8 @@ internal fun NewProductsScreen(
   val suggest = rememberCategorySuggest(data)
   val pasteOn = rememberPasteOn()
   var pasting by remember { mutableStateOf(false) }
-  //  PRD-12: «قیمتِ عمده» فقط با «لیستِ قیمت در صندوق» (پیش‌فرض خاموش ⇒ همان فرم و `wholesalePrice = null` = ۰، همان ویرایش)
-  val wholesaleOn = remember { ir.vil3ntec.tohid.ui.components.pos.PriceListPrefs.on(context) }
+  //  «امروز» ِ دکان برای نمونهٔ تاریخ، «چند روز مانده» و تاریخِ ورودِ انبار
+  val today = remember { ir.vil3ntec.tohid.todayIso() }
 
   fun update(key: Int, change: (ProductRowDraft) -> ProductRowDraft) { rows = ProductFormModel.update(rows, key, change) }
 
@@ -118,6 +118,8 @@ internal fun NewProductsScreen(
   }
 
   fun save() {
+    //  دو بار زدن پیش از بسته شدنِ فرم: نخستین ثبت بس است (دفترِ ذخیره‌نشده پایهٔ دومی نمی‌شود)
+    if (saving || done) return
     when (val check = ProductFormModel.check(rows)) {
       is ProductFormModel.Check.Broken -> {
         touched = touched.copy(all = true)
@@ -131,8 +133,8 @@ internal fun NewProductsScreen(
       }
       is ProductFormModel.Check.Ok -> {
         val before = store.data.value
-        val drafts = check.drafts.map { it.copy(wholesalePrice = it.wholesalePrice.takeIf { wholesaleOn }) }
-        when (val r = WarehouseEngine.addProducts(before, drafts, System.currentTimeMillis(), ::newId)) {
+        //  «حداقلِ موجودی» و «قیمتِ عمده» این‌جا نیستند (ویرایش دارد) ⇒ ۰ و null، همان کالای تازهٔ پیشین
+        when (val r = OpeningStock.save(before, check.rows, today, System.currentTimeMillis(), ::newId)) {
           is WarehouseEngine.Result.Failed -> { banner = r.message; errorShake++ }
           is WarehouseEngine.Result.Ok -> {
             banner = null
@@ -141,7 +143,8 @@ internal fun NewProductsScreen(
             Haptics.success(context)
             val ids = ProductsListModel.added(before, r.data)
             RecentlyAdded.mark(ids)
-            toasts.show(StrProducts.savedMany(ids.size))
+            val stocked = check.rows.count { it.stock != null }
+            toasts.show(if (stocked > 0) StrNewProduct.savedWithStock(ids.size, stocked) else StrProducts.savedMany(ids.size))
             done = true
             scope.launch {
               if (Motion.enabled) delay(SUCCESS_MS)
@@ -174,7 +177,6 @@ internal fun NewProductsScreen(
             onChange = { change -> update(row.key, change) },
             onBlur = { f -> touched = touched.touch(row.key, f) },
             onScan = { nav.scan { code -> update(row.key) { it.copy(barcode = code) }; Haptics.confirm(context) } },
-            onNewCategory = { nav.pickCategory(row.category) { cat -> update(row.key) { it.copy(category = cat) } } },
             focus = { f -> focus.getOrPut("${row.key}:${f.name}") { FocusRequester() } },
           )
           Spacer(Modifier.height(12.dp))
@@ -203,17 +205,15 @@ internal fun NewProductsScreen(
             //  ورودِ پلکانیِ کارت‌های آغازین؛ کارتِ تازه (افزودن/تکثیر) همان لحظه بالا می‌آید
             modifier = Modifier.bringIntoViewRequester(req).v3Stagger(stagger, row.key, if (row.key in firstKeys) index else 0),
           ) {
-            ProductFieldGroups(
+            NewProductFields(
               row = row,
               errors = touched.visible(row.key, ProductFormModel.errors(row, Mode.NEW).takeUnless { ProductFormModel.untouched(row) && rows.size > 1 }.orEmpty()),
               categories = data.productCategories,
               units = data.productUnits,
               hooks = hooks,
-              section = CardSection,
-              mode = Mode.NEW,
+              today = today,
               nameHelper = if (index == 0 && rows.size == 1 && row.name.isBlank()) StrProducts.firstRowHint else null,
               suggest = suggest,
-              wholesale = wholesaleOn,
             )
           }
         } }

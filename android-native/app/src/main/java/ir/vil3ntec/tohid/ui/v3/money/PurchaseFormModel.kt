@@ -43,7 +43,17 @@ internal data class PurchaseForm(
    *  پایه، همان پیشین. فقط با `ShopPolicy.productTools` پُر می‌شود (صفحه با پرچمِ خاموش پاکش می‌کند).
    */
   val unitName: String? = null,
+  /**
+   *  e-rows-63b: «پرداخت» با سه گزینه — همه را دادم / بخشی را دادم ([paid] تایپ‌شده) / بعداً می‌دهم (با سررسید). `null` = کادرِ
+   *  تایپیِ پیشین (خالی = نسیه) — فرمِ تازه ([PurchaseFormModel.initial]) همیشه یکی را دارد.
+   */
+  val pay: PurchasePay? = null,
+  /** e-rows-63b: «الان رسیده؟ نه» ⇒ سفارشِ خرید (سرور، `shop.purchase_orders`)، نه فاکتورِ دفتر؛ کالا با «دریافتِ کالا» می‌آید */
+  val later: Boolean = false,
 )
+
+/** «پرداخت» ِ فرمِ خرید (e-rows-63b) */
+internal enum class PurchasePay { FULL, PART, LATER }
 
 /** یک ردیفِ افزوده‌شدهٔ فاکتورِ خرید (PUR-05) — همان متنِ خامِ کادرها؛ [expiry] مثلِ ردیفِ نخست */
 internal data class PurchaseRow(
@@ -59,7 +69,8 @@ internal data class PurchaseRow(
  */
 internal object PurchaseFormModel {
 
-  fun initial(supplierId: String?, today: String) = PurchaseForm(supplierId = supplierId?.takeIf { it.isNotBlank() }, date = today)
+  fun initial(supplierId: String?, today: String) =
+    PurchaseForm(supplierId = supplierId?.takeIf { it.isNotBlank() }, date = today, pay = PurchasePay.FULL)
 
   private fun num(text: String): Double? = text.trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()
 
@@ -105,7 +116,27 @@ internal object PurchaseFormModel {
   }
 
   /** باقی (نسیه) = جمع − پرداخت‌شده، نه کمتر از صفر */
-  fun remaining(f: PurchaseForm): Double = (total(f) - (num(f.paid) ?: 0.0)).coerceAtLeast(0.0)
+  fun remaining(f: PurchaseForm): Double = (total(f) - paid(f)).coerceAtLeast(0.0)
+
+  /** کادرِ مبلغِ پرداخت پیداست؟ (بخشی، یا کادرِ تایپیِ پیشین) */
+  fun typesPaid(f: PurchaseForm): Boolean = f.pay == null || f.pay == PurchasePay.PART
+
+  /**
+   *  کادرِ «سررسیدِ پرداخت» پیداست؟ نسیه یا بخشی (هر جا، e-rows-63b) یا موتورِ تازهٔ موجودی (PUR-07، همان شرطِ کامپیوتر)؛ نه برای
+   *  «همه را دادم» و نه کالای نرسیده (سفارش سررسیدِ پرداخت ندارد؛ بدهی با رسیدنِ کالا می‌آید).
+   */
+  fun dueShown(f: PurchaseForm, extrasOn: Boolean): Boolean =
+    !f.later && f.pay != PurchasePay.FULL && (extrasOn || f.pay == PurchasePay.PART || f.pay == PurchasePay.LATER)
+
+  /** گزینهٔ پرداخت ⇒ فرم: «همه» و «بعداً» مبلغِ تایپی را پاک می‌کنند؛ «همه» سررسید را هم */
+  fun setPay(f: PurchaseForm, pay: PurchasePay): PurchaseForm = when (pay) {
+    PurchasePay.FULL -> f.copy(pay = pay, paid = "", due = "")
+    PurchasePay.PART -> f.copy(pay = pay)
+    PurchasePay.LATER -> f.copy(pay = pay, paid = "")
+  }
+
+  /** «الان رسیده؟» ⇒ فرم: نرسیده سررسیدِ پرداخت و هزینهٔ جانبی ندارد (بها و بدهی با رسید می‌آیند) */
+  fun setLater(f: PurchaseForm, later: Boolean): PurchaseForm = if (later) f.copy(later = true, due = "", landed = "") else f.copy(later = false)
 
   /**
    *  کالا که انتخاب شد و قیمت خالی بود ⇒ قیمتِ خریدِ فعلیِ همان کالا (قابلِ عوض کردن).
@@ -303,7 +334,7 @@ internal object PurchaseFormModel {
     quantity = num(f.quantity) ?: 0.0,
     unit = unit,
     purchasePrice = num(f.price) ?: -1.0,
-    paidAmount = num(f.paid) ?: 0.0,
+    paidAmount = paid(f),
     date = f.date,
     notes = f.notes.trim(),
     //  PUR-05: انقضای محموله روی ورودِ انبار (FEFO و هشدارِ انقضا)؛ خالی ⇒ همان خریدِ امروز
@@ -319,7 +350,7 @@ internal object PurchaseFormModel {
   data class Extras(val landedTotal: Double = 0.0, val dueDate: String? = null)
 
   fun extras(f: PurchaseForm, on: Boolean): Extras =
-    if (!on) Extras() else Extras(landedTotal(f) ?: 0.0, dueOrNull(f))
+    Extras(if (on) landedTotal(f) ?: 0.0 else 0.0, if (dueShown(f, on)) dueOrNull(f) else null)
 
   /**
    *  PUR-05: ردیف‌های فاکتورِ چندردیفه برای `PurchaseBook.record` (همان فاکتورِ چندردیفهٔ کامپیوتر): ردیفِ نخست، سپس
@@ -335,6 +366,20 @@ internal object PurchaseFormModel {
       )
     }
 
-  /** پرداختِ کلِ فاکتور (خالی = نسیه) */
-  fun paid(f: PurchaseForm): Double = num(f.paid) ?: 0.0
+  /** پرداختِ کلِ فاکتور: «همه» ⇒ جمع؛ «بعداً» ⇒ ۰؛ بخشی یا کادرِ پیشین ⇒ مبلغِ تایپی (خالی = نسیه) */
+  fun paid(f: PurchaseForm): Double = when (f.pay) {
+    PurchasePay.FULL -> total(f)
+    PurchasePay.LATER -> 0.0
+    PurchasePay.PART, null -> num(f.paid) ?: 0.0
+  }
+
+  /**
+   *  e-rows-63b: «الان رسیده؟ نه» ⇒ ردیف‌های سفارشِ خرید (`PoForms.draft` ⇐ همان ساختنِ سفارشِ امروز). واحدِ خریدِ ردیف همان
+   *  واحد می‌ماند (`EditRow.unitName`)؛ انقضا در سفارش نیست (هنگامِ دریافت).
+   */
+  fun orderRows(f: PurchaseForm, d: ShopData): List<PoForms.EditRow> =
+    (listOf(first(f)) + f.more).mapIndexed { i, r ->
+      val p = d.products.find { it.id == r.productId }
+      PoForms.EditRow(i, r.productId.orEmpty(), p?.name.orEmpty(), p?.unit.orEmpty(), r.quantity.trim(), r.price.trim(), unitOrNull(r.unitName))
+    }
 }

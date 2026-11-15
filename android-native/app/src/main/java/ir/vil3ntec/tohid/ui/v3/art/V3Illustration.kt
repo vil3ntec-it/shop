@@ -24,8 +24,10 @@ import ir.vil3ntec.tohid.ui.screens.Motion
 /** فقط آزمون: گونهٔ تصویر و این‌که ساعتِ حرکتش زنده است — صفحه‌خوان هیچ‌کدام را نمی‌خواند (تصویر تزئینی است) */
 val V3ArtKindKey = SemanticsPropertyKey<V3ArtKind>("V3ArtKind")
 val V3ArtAnimatedKey = SemanticsPropertyKey<Boolean>("V3ArtAnimated")
+val V3ArtCharacterKey = SemanticsPropertyKey<Boolean>("V3ArtCharacter")
 private var SemanticsPropertyReceiver.artKind by V3ArtKindKey
 private var SemanticsPropertyReceiver.artAnimated by V3ArtAnimatedKey
+private var SemanticsPropertyReceiver.artCharacter by V3ArtCharacterKey
 
 /**
  *  تصویرِ متحرکِ یک زمینه ([V3ArtKind]) در **یک** بوم:
@@ -47,6 +49,8 @@ fun V3Illustration(kind: V3ArtKind, modifier: Modifier = Modifier, size: Dp = 11
   var onScreen by remember { mutableStateOf(true) }
   val animated = Motion.enabled && onScreen
   val clock = rememberV3ArtClock(animated)
+  //  آدمک‌ها از ۷۲dp به بالا خوانا هستند؛ نشانِ کوچک (کادرِ خطای درونِ فرم) همان صحنهٔ چیزهاست
+  val character = size >= CHARACTER_MIN
   Spacer(
     modifier
       .size(size)
@@ -58,12 +62,13 @@ fun V3Illustration(kind: V3ArtKind, modifier: Modifier = Modifier, size: Dp = 11
       .clearAndSetSemantics {
         artKind = kind
         artAnimated = animated
+        artCharacter = character
       }
       .graphicsLayer {
         if (depth && clock != null) {
           val t = clock.value
-          rotationY = 7f * wave(t, 3)
-          rotationX = 4f * wave(t, 2, 1.1f)
+          rotationY = (if (character) 4f else 7f) * wave(t, 3)
+          rotationX = (if (character) 2.5f else 4f) * wave(t, 2, 1.1f)
           cameraDistance = 14f * density
         }
       }
@@ -76,13 +81,33 @@ fun V3Illustration(kind: V3ArtKind, modifier: Modifier = Modifier, size: Dp = 11
         val art = Art(u, palette, shapes, ART_REST)
         onDrawBehind {
           art.t = clock?.value ?: ART_REST
-          translate(dx, dy) { drawArt(kind, art) }
+          translate(dx, dy) { if (character) drawCast(kind, art) else drawArt(kind, art) }
         }
       },
   )
 }
 
-/** یک صحنه در زمانِ `art.t` — برای تصویر و آزمونِ عکس */
+/** کمترین اندازه‌ای که صحنهٔ آدمک‌دار می‌گیرد */
+val CHARACTER_MIN = 72.dp
+
+/**
+ *  صحنهٔ آدمک‌دارِ هر زمینه (دستهٔ ۶۴): فروشنده و جعبهٔ خالی، صندوق‌دارِ منتظر، دفترِ خالی، پیکِ منتظر، گاریِ خالی،
+ *  جوینده با ذره‌بین، دوشاخهٔ کشیده، چترِ زیرِ ابر، بادکنکِ «!» و کتاب‌خوانِ زیرِ درخت.
+ */
+internal fun DrawScope.drawCast(kind: V3ArtKind, art: Art) = when (kind) {
+  V3ArtKind.TREE -> readerCast(art)
+  V3ArtKind.PRODUCTS -> productsCast(art)
+  V3ArtKind.SALES -> salesCast(art)
+  V3ArtKind.PEOPLE -> peopleCast(art)
+  V3ArtKind.ORDERS -> ordersCast(art)
+  V3ArtKind.STOCK -> stockCast(art)
+  V3ArtKind.SEARCH -> searchCast(art)
+  V3ArtKind.ERROR_CLOUD -> serverCast(art)
+  V3ArtKind.ERROR_CABLE -> offlineCast(art)
+  V3ArtKind.ERROR_MARK -> markCast(art)
+}
+
+/** صحنهٔ چیزها (بی آدمک) در زمانِ `art.t` — نشانِ کوچک */
 internal fun DrawScope.drawArt(kind: V3ArtKind, art: Art) = when (kind) {
   V3ArtKind.TREE -> treeScene(art)
   V3ArtKind.PRODUCTS -> productsScene(art)

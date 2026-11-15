@@ -201,6 +201,15 @@ object PurchaseOrderBook {
   fun ledgerId(receiptId: String, lineId: String, k: Int): String =
     "po-" + OpHash.sha256Hex("$receiptId|$lineId|$k").substring(0, 32)
 
+  /** یادداشتِ ردیفِ دفتری که رسیدِ سفارشِ [no] می‌سازد ([post]) — همان متنِ پیشین، بایت‌به‌بایت (ذخیره و همگام می‌شود) */
+  fun postedNote(no: Int): String = "سفارشِ خرید #$no — رسید"  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+
+  /** شمارهٔ سفارشی که یک ردیفِ خریدِ دفتر از رسیدِ آن آمده (شناسهٔ `po-…` و یادداشتِ [postedNote])؛ خریدِ دستی ⇒ null */
+  fun orderNoOf(p: Purchase): Int? =
+    if (!p.id.startsWith("po-")) null else POSTED.find(p.notes)?.groupValues?.get(1)?.toIntOrNull()
+
+  private val POSTED = Regex("^سفارشِ خرید #(\\d+) — رسید")  // داده: همان [postedNote]
+
   /** نخستین شناسهٔ `addPurchase` همان ردیفِ خرید است */
   fun purchaseIdOf(receiptId: String, lineId: String): String = ledgerId(receiptId, lineId, 0)
 
@@ -253,7 +262,7 @@ object PurchaseOrderBook {
         LedgerEngine.PurchaseDraft(
           supplierId = o.supplierId, productId = line.productId, quantity = units(p.acceptedMilli), unit = line.unit,
           purchasePrice = asAfn(p.priceMinor), paidAmount = 0.0, date = today,
-          notes = "سفارشِ خرید #${o.no} — رسید",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+          notes = postedNote(o.no),
           //  PRD-07: ردیفِ به واحدِ خرید ⇒ مقدار × ضریب به واحدِ پایه، با جمعِ دقیقِ پذیرفته به فیِ رسید
           inUnit = line.factorMilli?.takeIf { it > 0 }?.let { f ->
             LedgerEngine.InUnit(line.unit, p.acceptedMilli, f, ir.vil3ntec.tohid.core.product.PurchaseUnits.lineTotalMinor(p.acceptedMilli, p.priceMinor))

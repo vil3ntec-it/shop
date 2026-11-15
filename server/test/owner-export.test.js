@@ -194,6 +194,22 @@ test('POS-23: فروشندهٔ ردیف (`saleItems[].seller`) ستونِ «فر
   assert.equal(rows[2].find((c) => c.v === 'زهرا') !== undefined, true);
 });
 
+test('گاوصندوقِ چندارزی: هر ردیف ستونِ «ارز» پس از مبلغ دارد؛ بی ارز همان AFN، و JSON دست نمی‌خورد', async () => {
+  const src = ledger();
+  src.safeEntries = src.safeEntries.concat([
+    { id: 'sf2', kind: 'in', amountMinor: 12550, createdAt: 1700000000500, reason: 'deposit', currency: 'USD' },
+  ]);
+  const back = JSON.parse(X.json(src, META));
+  assert.deepEqual(back.safeEntries, src.safeEntries, 'JSON همان دفتر است — ردیفِ افغانی `currency` نمی‌گیرد');
+  const b = await book(src);
+  const rows = sheetRows(b.files.get(`xl/worksheets/sheet${b.names.indexOf('گاوصندوق') + 1}.xml`));
+  const head = rows[0].map((c) => c.v);
+  const col = head.indexOf('ارز');
+  assert.equal(col, head.indexOf('مبلغ (پول)') + 1, 'ستونِ «ارز» درست پس از مبلغ');
+  assert.deepEqual(rows.slice(1).map((r) => r[col].v), ['AFN', 'USD']);
+  assert.deepEqual(src.safeEntries.map((e) => e.currency), [undefined, 'USD'], 'دفترِ ورودی دست نخورد');
+});
+
 test('همان نام‌های فارسیِ برنامهٔ نصبی (OwnerExport.kt)', () => {
   const kt = fs.readFileSync(path.join(ROOT, 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/OwnerExport.kt'), 'utf8');
   const block = (name) => {

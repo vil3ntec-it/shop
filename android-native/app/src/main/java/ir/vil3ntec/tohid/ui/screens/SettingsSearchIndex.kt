@@ -141,6 +141,7 @@ object SettingsSearchIndex {
     L.LOYALTY to kw("امتیاز وفاداری مشتری", "loyalty points customer tier", "امتیاز وفاداري"), // داده: واژه‌های جست‌وجوی تنظیمات در سه زبان
     L.PRICE_LIST to kw("لیست قیمت عمده خرده قیمت خاص مشتری", "price list wholesale retail customer special price", "د بیو لېست عمده ځانګړې بیه"), // داده: واژه‌های جست‌وجوی تنظیمات در سه زبان
     L.GIFT_RECEIPT to kw("رسید هدیه", "gift receipt", "د ډالۍ رسید"), // داده: واژه‌های جست‌وجوی تنظیمات در سه زبان
+    L.PRINT_PHONE to kw("چاپ شماره کامل مشتری صورت‌حساب پوشیده", "print full customer number statement masked", "چاپ بشپړه شمېره پېرودونکی"), // داده: واژه‌های جست‌وجوی تنظیمات در سه زبان
     L.POS_TOUCH to kw("لمسی صفحه لمسی", "touch mode", "لمسي"), // داده: واژه‌های جست‌وجوی تنظیمات در سه زبان
     L.POS_MORE_KEYS to kw("کلید میانبر", "shortcut keys", "کیلي"), // داده: واژه‌های جست‌وجوی تنظیمات در سه زبان
     L.POS_SEARCH to kw("جست‌وجو صندوق", "till search", "لټون"), // داده: واژه‌های جست‌وجوی تنظیمات در سه زبان

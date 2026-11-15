@@ -9,7 +9,7 @@ import kotlinx.serialization.Serializable
 /**
  *  یک ردیفِ گاوصندوق (PAY-18، طرحِ SAFE-V1) — دفترِ فقط‌افزودنی؛ قاعده‌ها در هستهٔ
  *  `core/safe/SafeCore` و سنجشِ سرور در `server/src/lib/safe-ledger.js`.
- *  مبلغ عددِ صحیح به یک‌صدمِ افغانی (`amountMinor`)، نه `Double`ِ بقیهٔ دفتر.
+ *  مبلغ عددِ صحیح به واحدِ کوچکِ ارزِ ردیف (`amountMinor`؛ افغانی: یک‌صدم)، نه `Double`ِ بقیهٔ دفتر.
  *  `kind`: `count` | `in` | `out` | `from_drawer` | `to_drawer` | `to_bank`.
  *  پیش‌فرض‌ها فقط برای این‌اند که ردیفِ ناقص خواندنِ کلِ دفتر را نشکند؛ هسته آن را کنار می‌گذارد.
  *  فیلدهای اختیاری `null` نوشته نمی‌شوند — مثلِ `Sale.series`.
@@ -39,4 +39,10 @@ data class SafeEntry(
   val shiftId: String? = null,
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val auditId: String? = null,
+  /**
+   *  کدِ ارز (`core/safe/SafeCurrency`: `USD`، `EUR`…)؛ **نبودنش یعنی افغانی** — ردیفِ افغانی هرگز آن را نمی‌نویسد، پس
+   *  ردیف‌های پیشین و ساختِ کهنه همان می‌مانند. مبلغ‌ها (`amountMinor`، `expectedMinor`) به واحدِ کوچکِ همین ارزند.
+   */
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val currency: String? = null,
 )

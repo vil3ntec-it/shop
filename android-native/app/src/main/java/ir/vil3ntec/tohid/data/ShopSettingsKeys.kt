@@ -69,8 +69,10 @@ object ShopSettingsKeys {
     shop("quotes", "b"),                        // پیش‌فاکتور
     shop("special_orders", "b"),
     shop("safe_book", "b"),                     // PAY-18: گاوصندوق
+    shop("safe_currencies", "s"),               // PAY-18: ارزهایی که دکان به گاوصندوق افزود (`SafeCurrencyPref`، JSON)
     shop("fx_tender", "b"),                     // PAY-10: پرداخت با ارزِ نقد (`FxTillPref`)
     shop("fx_rates", "s"),                      // PAY-10: جدولِ نرخِ خودِ دکان (JSON)
+    shop("print_full_phone", "b"),              // CRM-15: «چاپِ شمارهٔ کامل» ِ مشتری (`CustomerPrintPref`، فقط صاحب)
     shop("pay_methods_off", "set"),             // PAY-06: روش‌هایی که دکان از پنلِ پرداخت برداشته (`PayMethodsPref`)
     //  برگشت
     shop("returns_v2", "b"),                    // ReturnSettings
@@ -112,6 +114,8 @@ object ShopSettingsKeys {
     //  ── مالِ همین دستگاه ──
     device("multi_drawer", "b"),                // PAY-17: کشو و شیفتِ برگزیدهٔ همین دستگاه
     device("multi_drawer_shift", "s"),
+    device("safe_last_currency", "s"),          // PAY-18: آخرین ارزِ کادرِ گاوصندوقِ همین دستگاه
+    device("safe_view_currency", "s"),          // PAY-18: ارزِ نمودار و ماندهٔ گاوصندوقِ همین دستگاه
     device("label_tools", "b"),                 // چاپِ برچسب (چاپگرِ همین دستگاه)
     device("customer_card", "b"),               // کارت/بارکدخوانِ صندوق
     device("count_tools", "b"),                 // پنجرهٔ اسکنِ انبارگردانی

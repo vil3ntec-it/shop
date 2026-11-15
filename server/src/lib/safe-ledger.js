@@ -21,6 +21,13 @@
  *   می‌سازد) — نگهبان همان opی را می‌بیند که v1 می‌نشاند. هر push ِ گاوصندوقی (v1 و v3) قفلِ
  *   حساب را تا پایانِ پاسخ نگه می‌دارد ([hold]، `account-lock.js`)، تا «ردیف هست؟» تا نشستن درست بماند.
  *
+ * ── ارز (خواستهٔ صاحب‌کار ۱۴۰۵/۰۸/۲۴، `core/safe/SafeCurrency.kt`) ───────
+ *   فیلدِ اختیاریِ `currency` روی همان ردیف: نبودنش افغانی است (همهٔ ردیف‌های پیشین و ساختی که فیلد را
+ *   نمی‌شناسد). کدِ نادرست، یا ارزِ جز افغانی روی انتقال از/به دخل ⇒ `safe_invalid` (`BAD_CURRENCY`).
+ *   سرور تبدیل و جمعِ ارزها نمی‌کند — مانده را برنامه هر ارز جدا حساب می‌کند. ساختِ کهنه‌ای که ردیف را بی
+ *   این فیلد دوباره بفرستد همان «بخشی از همان» است و ارزِ نشسته را پاک نمی‌کند ([within])؛ عوض کردنِ ارزِ
+ *   ردیفِ نشسته ویرایش است (`safe_append_only`).
+ *
  * ⛔ `sync-v1.js` (مشترک با پمپ)، `PUMP_TABLES` و `/api/pump/*` دست نمی‌خورند: v1 از درِ
  *    میان‌افزارِ فقط‌دکانِ `routes/sync-v1.js` ([v1SafeGuard]) و v3 در `authorize`ِ `sync-v3.js`.
  */
@@ -54,6 +61,9 @@ const MAX_AMOUNT = 100_000_000_000;
 const MAX_ID = 64;
 const MAX_TEXT = 200;
 const MAX_BAG = 40;
+/** همان `SafeCurrency.CODE`: سه حرفِ بزرگِ لاتین (مثلِ ISO 4217)؛ نبودن = افغانی */
+const CURRENCY_RE = /^[A-Z]{3}$/;
+const AFN = 'AFN';
 
 function isPlainObject(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
 const absent = (v) => v === undefined || v === null;
@@ -75,6 +85,8 @@ function check(row) {
   if (!absent(row.expectedMinor) && !Number.isSafeInteger(row.expectedMinor)) return 'BAD_FIELD';
   if (row.id.length > MAX_ID || longer(row.by, MAX_TEXT) || longer(row.reason, MAX_TEXT) || longer(row.note, MAX_TEXT)
     || longer(row.bagNo, MAX_BAG) || longer(row.shiftId, MAX_ID) || longer(row.auditId, MAX_ID)) return 'TEXT_TOO_LONG';
+  if (!absent(row.currency) && (typeof row.currency !== 'string' || !CURRENCY_RE.test(row.currency))) return 'BAD_CURRENCY';
+  if (LINKED.includes(row.kind) && !absent(row.currency) && row.currency !== AFN) return 'BAD_CURRENCY';
   const allowed = REASONS[row.kind];
   if (allowed) {
     if (absent(row.reason)) return 'REASON_REQUIRED';
@@ -276,6 +288,6 @@ async function judgeV3(ctx, op, existing, run = null) {
 }
 
 module.exports = {
-  TABLE, PERM, KINDS, REASONS, MAX_AHEAD_MS, MAX_AMOUNT,
+  TABLE, PERM, KINDS, REASONS, MAX_AHEAD_MS, MAX_AMOUNT, CURRENCY_RE,
   check, within, mayMove, isSafeOp, touches, hold, v1SafeGuard, judgeV3,
 };

@@ -102,7 +102,6 @@ internal fun EditProductScreen(
     onChange = { change -> row = change(row) },
     onBlur = { f -> touched = touched.touch(0, f) },
     onScan = { nav.scan { code -> row = row.copy(barcode = code); Haptics.confirm(context) } },
-    onNewCategory = { nav.pickCategory(row.category) { cat -> row = row.copy(category = cat) } },
     focus = { f -> focus.getOrPut(f.name) { FocusRequester() } },
   )
 

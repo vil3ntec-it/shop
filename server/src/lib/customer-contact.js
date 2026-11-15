@@ -73,7 +73,8 @@ async function allowed({ shopId, role, userId }, run = null) {
   if (role === 'owner') return true;
   if (!shopId || typeof role !== 'string' || core.defaultMode(role, KEY) === null) return false;
   const layers = await require('./staff-perms').layersFor(shopId, role, userId, run);
-  return core.allows(role, layers, KEY);
+  //  پرچمِ نقش‌محور (`customer-role-mask.js`): پیش‌فرضِ «بسته» جز صاحب و مدیر، زیرِ لایه‌های صاحب
+  return core.allows(role, await require('./customer-role-mask').layersFor(shopId, role, layers, run), KEY);
 }
 
 /** بافتِ همگام‌سازی (`req.sync`) ⇐ پنهان؟ فقط حسابِ دکان؛ پمپ همیشه false و بی پرسش */
@@ -91,7 +92,10 @@ async function hiddenForReq(req) {
     const role = req.member.role;
     if (role === 'owner') hidden = false;
     else if (core.defaultMode(role, KEY) === null) hidden = true;
-    else hidden = !core.allows(role, await require('./staff-perms').layersOfReq(req), KEY);
+    else {
+      const layers = await require('./staff-perms').layersOfReq(req);
+      hidden = !core.allows(role, await require('./customer-role-mask').layersFor(req.shopId, role, layers), KEY);
+    }
   } else hidden = true;
   req._contactHidden = hidden;
   return hidden;
@@ -105,6 +109,15 @@ async function hiddenForReq(req) {
 async function ordersContact(who, run = null) {
   if (!who || !can(who.role, 'orders.contact')) return false;
   return allowed(who, run);
+}
+
+/**
+ * پوشانندهٔ فهرستِ مشتری برای این درخواست: پرچمِ نقش‌محورِ `shop.customer_role_mask` روشن ⇒ «•••• ۰۰۸»
+ * (`customer-role-mask.maskPhone`، همان قالبِ برنامه)؛ خاموش ⇒ همان [maskPhone] ِ امروز.
+ */
+async function maskerForReq(req) {
+  const roleMask = require('./customer-role-mask');
+  return (await roleMask.onFor(req && req.shopId)) ? roleMask.maskPhone : maskPhone;
 }
 
 /** میان‌افزار: دری که شمارهٔ مشتری را می‌خواند یا با آن جست‌وجو می‌کند — پس از `requirePermission('orders.contact')` */
@@ -353,7 +366,7 @@ function v1Guard(req, res, next) {
 
 module.exports = {
   KEY, DOT, FIELDS, maskPhone, isMasked, fieldsOf,
-  allowed, hiddenForSync, hiddenForReq, ordersContact, requireOrdersContact,
+  allowed, hiddenForSync, hiddenForReq, ordersContact, requireOrdersContact, maskerForReq,
   omit, mask, maskValue, maskConflict, isSafeFieldName, safeFields, ignoredOf, keepServer,
   touches, omitV1Ops, omitV3Effect, omitV3Ops, omitTables, omitRows, mergeResults, v1Guard, guardV3,
 };

@@ -58,6 +58,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.lost_device_replay', scope: 'shop', default: false, what: 'بازیابیِ کارهای همگام‌نشدهٔ دستگاهِ گم‌شدهٔ غیرفعال از پشتیبانش به دفترِ دکان (S44)' },
   { key: 'shop.customer_erasure_ledger', scope: 'shop', default: false, what: 'پس از حذفِ دادهٔ مشتری، نام/شماره/نشانیِ همان پرونده در دفترِ دستگاه‌ها هم پاک شود (فرمانِ سرور ⇐ برنامهٔ صاحب/مدیر؛ CRM-15، SEC-10)؛ با `shop.customer_erasure`' },
   { key: 'shop.customer_access_offline', scope: 'shop', default: false, what: 'ثبتِ دیدنِ پروندهٔ مشتری به دستِ حسابدارِ بی‌اینترنت پس از وصل، با زمانِ خودِ دیدن (CRM-15)' },
+  { key: 'shop.customer_role_mask', scope: 'shop', default: false, what: 'شماره و نشانیِ مشتری بر پایهٔ نقش: کامل فقط صاحب و مدیر، کارمند «•••• ۰۰۸» جز سفارشِ خودش، چاپِ پوشیده (CRM-15، FLAGS-ON §۴۷)' },
   { key: 'shop.orders.dispute_file', scope: 'shop', default: false, what: 'پروندهٔ مدرکِ اختلافِ سفارش (RSK-08)' },
   { key: 'shop.storefront.filters', scope: 'shop', default: true, what: 'فیلترِ کاتالوگِ ویترین (برند، قیمت، موجود، مشخصه)' },
   { key: 'shop.storefront.alerts', scope: 'shop', default: false, what: '«خبرم کن وقتی موجود/ارزان شد» ِ ویترین' },

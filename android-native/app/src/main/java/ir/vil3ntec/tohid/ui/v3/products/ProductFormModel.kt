@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui.v3.products
 
 import ir.vil3ntec.tohid.core.product.PackBarcodes
 import ir.vil3ntec.tohid.core.product.UnitSale
+import ir.vil3ntec.tohid.data.OpeningStock
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ProductCycle
 import ir.vil3ntec.tohid.data.WarehouseEngine
@@ -28,8 +29,12 @@ data class ProductRowDraft(
   val unitFactor: String = "",
   /** MKT-06 «چرخهٔ مصرف» (روز، اختیاری) — فقط ویرایش؛ نوشتن با `ProductCycle.apply` پس از ویرایشِ موفق */
   val cycle: String = "",
-  /** PRD-12 قیمتِ عمده — فرمِ تازه و ویرایش، فقط با «لیستِ قیمت در صندوق» (صفحه وگرنه `wholesalePrice = null` می‌فرستد) */
+  /** PRD-12 قیمتِ عمده — فقط ویرایش، و فقط با «لیستِ قیمت در صندوق» (صفحه وگرنه `wholesalePrice = null` می‌فرستد) */
   val wholesale: String = "",
+  //  فقط کالای تازه، بخشِ «اختیاری» (`NewProductStock`): موجودیِ آغاز به واحدِ کالا، و دو تاریخ به هشت رقم (`14050824`)
+  val stock: String = "",
+  val made: String = "",
+  val expiry: String = "",
 )
 
 /**
@@ -37,7 +42,9 @@ data class ProductRowDraft(
  *  شده (زیرِ همان کادر، نه یک پیامِ کلی):
  *
  *   • کالای تازه = قاعدهٔ `BulkProductSheet` (`bpReadyRows` ِ وب): نام، دسته، واحد و
- *     هر دو قیمت (≥ ۰). ردیفِ دست‌نخورده نادیده گرفته می‌شود، ردیفِ نیمه‌پر خطاست.
+ *     هر دو قیمت (≥ ۰). ردیفِ دست‌نخورده نادیده گرفته می‌شود، ردیفِ نیمه‌پر خطاست. بخشِ «اختیاری»
+ *     (موجودی و دو تاریخ، `NewProductStock`) هم باید درست باشد؛ «حداقلِ موجودی» و «قیمتِ عمده» در فرمِ
+ *     تازه نیستند (۱۴۰۵/۰۸/۲۴) ⇒ ۰ و null، همان کالای تازهٔ پیشین؛ ویرایش هر دو را دارد.
  *   • ویرایش = قاعدهٔ `ProductDialog`: نام و قیمتِ فروش؛ قیمتِ خریدِ خالی ⇐ ۰؛ واحدِ
  *     فروشِ دوم ضریب می‌خواهد. باقیِ سنجش (نامِ تکراری، بارکدِ تکراری) کارِ
  *     `WarehouseEngine` است و پیامش بالای فرم می‌آید.
@@ -47,27 +54,31 @@ data class ProductRowDraft(
  */
 object ProductFormModel {
 
-  /** کادرهایی که خطا می‌گیرند — به ترتیبِ دیده شدن در فرم (نخستین خطا = کمترین) */
-  enum class Field { NAME, CATEGORY, PURCHASE, SALE, WHOLESALE, UNIT, UNIT_FACTOR, CYCLE }
+  /**
+   *  کادرهایی که خطا می‌گیرند — به ترتیبِ دیده شدن در فرم (نخستین خطا = کمترین). کالای تازه: نام، دسته | واحد، دو قیمت،
+   *  سپس «اختیاری»؛ ویرایش «واحد» را خطادار نمی‌کند، پس جایش در ترتیبِ ویرایش اثری ندارد.
+   */
+  enum class Field { NAME, CATEGORY, UNIT, PURCHASE, SALE, WHOLESALE, STOCK, MADE, EXPIRY, UNIT_FACTOR, CYCLE }
 
   /** نخستین کادرِ خراب به ترتیبِ فرم، یا null */
   fun firstField(errors: Map<Field, Problem>): Field? = errors.keys.minByOrNull { it.ordinal }
 
-  /** خطای درجای یک کادر */
-  enum class Problem { REQUIRED, NOT_A_NUMBER }
+  /** خطای درجای یک کادر — سه تای آخر فقط بخشِ «اختیاری» ِ کالای تازه */
+  enum class Problem { REQUIRED, NOT_A_NUMBER, BAD_DATE, MADE_AFTER_EXPIRY, NEEDS_STOCK }
 
   enum class Mode { NEW, EDIT }
 
   /** ردیفی که هیچ چیزش پر نشده — نادیده گرفته می‌شود، خطا نیست */
   fun untouched(r: ProductRowDraft): Boolean =
-    r.name.isBlank() && r.purchase.isBlank() && r.sale.isBlank() && r.barcode.isBlank() && r.minStock.isBlank() && r.wholesale.isBlank()
+    r.name.isBlank() && r.purchase.isBlank() && r.sale.isBlank() && r.barcode.isBlank() && r.minStock.isBlank() && r.wholesale.isBlank() &&
+      r.stock.isBlank() && r.made.isBlank() && r.expiry.isBlank()
 
   private fun nonNegative(s: String): Boolean = (s.toDoubleOrNull() ?: -1.0) >= 0
 
-  /** آمادهٔ ثبت؟ — همان شرطِ `ProductRow.ready` (کالای تازه)؛ قیمتِ عمدهٔ نوشته‌شده (PRD-12) هم باید خوانا و نامنفی باشد */
+  /** آمادهٔ ثبت؟ — همان شرطِ `ProductRow.ready` (کالای تازه)، و بخشِ «اختیاری» بی خطا */
   fun ready(r: ProductRowDraft): Boolean =
     r.name.isNotBlank() && nonNegative(r.purchase) && nonNegative(r.sale) && r.unit.isNotBlank() && r.category.isNotBlank() &&
-      (r.wholesale.isBlank() || nonNegative(r.wholesale))
+      NewProductStock.errors(r).isEmpty()
 
   /** خطای هر کادر — صفحه فقط خطای کادرهایی را نشان می‌دهد که لمس شده‌اند یا پس از «ذخیره» */
   fun errors(r: ProductRowDraft, mode: Mode): Map<Field, Problem> = buildMap {
@@ -77,6 +88,7 @@ object ProductFormModel {
         if (r.category.isBlank()) put(Field.CATEGORY, Problem.REQUIRED)
         if (r.unit.isBlank()) put(Field.UNIT, Problem.REQUIRED)
         number(r.purchase, required = true)?.let { put(Field.PURCHASE, it) }
+        putAll(NewProductStock.errors(r))
       }
       Mode.EDIT -> {
         number(r.purchase, required = false)?.let { put(Field.PURCHASE, it) }
@@ -88,12 +100,12 @@ object ProductFormModel {
           }
         }
         if (ProductCycle.bad(r.cycle)) put(Field.CYCLE, Problem.NOT_A_NUMBER)
+        //  PRD-12: خالی ⇒ عمده ندارد (کادر فقط با «لیستِ قیمت در صندوق» دیده می‌شود؛ خاموش ⇒ همیشه خالی)
+        number(r.wholesale, required = false)?.let { put(Field.WHOLESALE, it) }
       }
     }
     number(r.sale, required = true)?.let { put(Field.SALE, it) }
-    //  PRD-12: خالی ⇒ عمده ندارد (کادر فقط با «لیستِ قیمت در صندوق» دیده می‌شود؛ خاموش ⇒ همیشه خالی)
-    number(r.wholesale, required = false)?.let { put(Field.WHOLESALE, it) }
-    //  حداقلِ موجودیِ ناخوانا امروز هم بی‌صدا صفر است — خطا نیست
+    //  حداقلِ موجودیِ ناخوانا (فقط ویرایش) امروز هم بی‌صدا صفر است — خطا نیست
   }
 
   private fun number(s: String, required: Boolean): Problem? = when {
@@ -107,9 +119,12 @@ object ProductFormModel {
 
   fun readyCount(rows: List<ProductRowDraft>): Int = rows.count(::ready)
 
-  /** نتیجهٔ «ذخیرهٔ همه»: یا پیش‌نویس‌ها، یا ردیفِ خراب، یا «هیچ ردیفِ کاملی نیست» */
+  /** نتیجهٔ «ذخیرهٔ همه»: یا ردیف‌های آماده (کالا و موجودیِ آغاز)، یا ردیفِ خراب، یا «هیچ ردیفِ کاملی نیست» */
   sealed interface Check {
-    data class Ok(val drafts: List<WarehouseEngine.ProductDraft>) : Check
+    data class Ok(val rows: List<OpeningStock.Row>) : Check {
+      /** فقط پیش‌نویسِ کالاها */
+      val drafts: List<WarehouseEngine.ProductDraft> get() = rows.map { it.product }
+    }
     /** شمارهٔ ردیف از یک */
     data class Broken(val index: Int) : Check
     data object Empty : Check
@@ -120,20 +135,22 @@ object ProductFormModel {
     if (broken >= 0) return Check.Broken(broken)
     val ready = rows.filter(::ready)
     if (ready.isEmpty()) return Check.Empty
-    return Check.Ok(ready.map(::draftNew))
+    return Check.Ok(ready.map { OpeningStock.Row(draftNew(it), NewProductStock.stockOf(it)) })
   }
 
-  /** پیش‌نویسِ کالای تازه — همان `ProductRow.draft()` */
+  /**
+   *  پیش‌نویسِ کالای تازه — همان `ProductRow.draft()`. «حداقلِ موجودی» و «قیمتِ عمده» در فرمِ تازه نیستند ⇒ ۰ و null
+   *  (همان کالای تازهٔ پیشین با کادرِ خالی)؛ هر دو در «ویرایش کالا» سرِ جایشان‌اند.
+   */
   fun draftNew(r: ProductRowDraft) = WarehouseEngine.ProductDraft(
     name = r.name,
     category = r.category,
     unit = r.unit,
     purchasePrice = r.purchase.toDoubleOrNull() ?: 0.0,
     salePrice = r.sale.toDoubleOrNull() ?: -1.0,
-    minStock = r.minStock.toDoubleOrNull() ?: 0.0,
+    minStock = 0.0,
     barcode = r.barcode,
-    //  PRD-12: خالی ⇒ null ⇒ ۰ (همان کالای تازهٔ امروز)؛ نادرست ⇒ NaN تا موتور رد کند
-    wholesalePrice = r.wholesale.takeIf { it.isNotBlank() }?.let { it.toDoubleOrNull() ?: Double.NaN },
+    wholesalePrice = null,
   )
 
   /** پیش‌نویسِ ویرایش — همان دکمهٔ «ذخیره تغییرات» ِ `ProductDialog` */
