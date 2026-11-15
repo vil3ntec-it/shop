@@ -57,6 +57,29 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-65a زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-65a` (از `origin/claude/batch-65` 66dd6f6fc) — صحنه‌های تختِ خالی و خطا، در میانهٔ صفحه
+
+- **چرا**: صاحب‌کار آدمک‌های ۶۳i را «خیلی آشغال» خواند (سر دایره، تن مستطیل، درونِ هالهٔ گرد) و خواست همه به سبکِ نمونه‌اش (تصویرسازیِ تختِ
+  پهن روی خطِ زمین، سنگ و بوته، آدمکِ خوش‌ساخت با بازیِ داستانی) و **در وسطِ صفحه** باشند. قاعدهٔ تازه‌اش در میانهٔ کار: هیچ حرکتی جز وقتی
+  کاربر همان صفحه را می‌بیند.
+- **ساخته شد**: منبعِ طراحی و ابزار در `tools/art/` (`engine.mjs` موتورِ مشترکِ SVG/داده، `kit.mjs` زمین/سنگ/بوته/آدمکِ پارامتری با IK،
+  `scenes/*.mjs` ده صحنه، `preview.mjs` پیش‌نمایشِ Chromium، `gen.mjs` ⇒ `ui/v3/art/ArtData*.kt`، با `--check`). موتورِ برنامه `ArtScene.kt`
+  (گروهِ لولادار، مسیرِ ثابت، دگرگونی، سیمِ دوسر؛ هر مسیر یک بار)؛ `V3Illustration` (بلندی؛ ≥۷۲dp صحنهٔ ۲:۱، کمتر نشانِ مربعِ `badge`) و
+  `V3SceneArt` (پهنا از جا). `V3StateLayout`/`TohidEmptyState`/`TohidErrorState` بلوک را در میانه می‌نشانند (`V3_STATE_BLOCK`). رنگِ آدمک
+  `ui/theme/ArtInk.kt`، محیط از تم (`V3ArtPalette`). `ArtRig/ArtKit/ArtCast*/ArtScenes*` ِ ۶۳i پاک شدند.
+- **قاعدهٔ «فقط وقتی دیده می‌شود»**: ساعت (`rememberArtElapsed`، `withInfiniteAnimationFrameNanos`) فقط با «دید + RESUMED + نه زیرِ برگه» قاب می‌خواهد؛ RESUMED از
+  `ui/v3/art/platform/ArtLifecycle.kt` (بی صاحبِ چرخهٔ عمر ⇒ درست، برای رسمِ بی‌پنجره)، برگه با `LocalArtLayer` که `V3Sheet` یکی بالا می‌برد. وقتی
+  کمک‌کنندهٔ مشترکِ دید (63f) رسید، همین سه شرط را با آن عوض کنید.
+- **آزمون** (تغییرِ عمدی): `ArtShotsTest` قاب‌ها را ۳۸۰×۲۰۰ می‌کشد (صحنهٔ پهن)، GIF ۱۵ قاب/ثانیه، عکسِ صفحهٔ کامل برای هر صحنه، و آزمونِ تازهٔ
+  `aCoveredOrBackgroundedSceneRequestsZeroFrames` (STARTED/CREATED/زیرِ برگه ⇒ `hasInvalidations` نادرست؛ مرزِ مقابل RESUMED و درونِ برگه ⇒ درست).
+  `StatesArtUiTest.theEmptyStateBlockSitsInTheMiddleOfTheScreen` (۳۶۰ و ۸۰۰dp: مرکزِ بلوک < ۲dp از مرکز، صحنه ۳۲۸/۳۶۰dp و ۲:۱).
+  ساعت `withInfiniteAnimationFrameNanos` است (نه `withFrameNanos`): آزمونِ رابط با ساعتِ خودکار حرکتِ بی‌پایان را می‌ایستاند، وگرنه `waitForIdle` هرگز برنمی‌گردد.
+  اجرا (دستهٔ A): ArtShots ۶، StatesArt ۷، Celebration ۲، PlainError ۴، HardcodedColors ۲، LookGuard ۶، V3A11yGuard ۶، DariCoverage ۲۳، PhoneV3Tokens ۳،
+  NoLegacyUi ۵ و همهٔ `desktop.*UiTest`/`*RenderTest`/`*ShotsTest` ⇒ ۲۹۳ گذشت، ۰ شکست، ۵ کنار (عکس‌های بی متغیرِ محیط، از پیش)؛ I18nCoverage ۸ و
+  InfraLeakGuard ۸ در اجرای پیشین. `precheck.sh` ⇒ fail=0.
+- **نیمه‌کاره / قدمِ بعد**: درونِ `LazyColumn` (بیشترِ فهرست‌ها: قرض‌داران، تاریخچه، کالا) بلندی بی‌مرز است و بلوک فقط افقی در میانه است؛ برای
+  میانهٔ عمودی آن‌جا باید `item { … Modifier.fillParentMaxHeight() }` در همان صفحه‌ها داد (صدا زدن‌ها دست نخوردند). صحنهٔ تازه ⇒ یک پروندهٔ
+  `tools/art/scenes`، `node tools/art/gen.mjs`، و یک `V3ArtKind`.
 ### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-64x زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-64x` (از `origin/claude/batch-64` 00e98a802) — سه تصمیمِ سپرده‌شده (CRM-15، PUR-03، OPS-01)
 
 - **تصمیم‌ها** (صاحب‌کار: «ببین کدام درست است و برنامه‌های حرفه‌ای چه می‌کنند»؛ ثبت در `OWNER-DECISIONS-fa.md` «گرفته‌شده — ۱۴۰۵/۰۸/۲۴»):
