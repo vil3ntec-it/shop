@@ -75,6 +75,10 @@ fun rememberLineSellerStaff(othersAllowed: Boolean): List<String> {
 @Composable
 fun LineSellerButton(show: Boolean, onClick: () -> Unit) {
   if (!show || !LineSellerTill.on()) return
+  if (LocalTillMenu.current != null) {
+    TillOffer("seller", TillAction(40, StrLineSeller.button, ir.vil3ntec.tohid.core.i18n.StrSale.hintLineSeller, Icons.Outlined.Badge, ir.vil3ntec.tohid.ui.v3.V3Hue.SKY, onClick = onClick))
+    return
+  }
   TextButton(onClick = onClick) {
     Icon(Icons.Outlined.Badge, contentDescription = null)
     Text(StrLineSeller.button, maxLines = 1, overflow = TextOverflow.Ellipsis)

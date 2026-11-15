@@ -10,6 +10,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Schedule
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.ui.v3.V3Hue
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -79,7 +82,14 @@ fun LayawayBar(d: ShopData, store: ShopStore, cart: CartStore, toast: (String) -
   var making by remember { mutableStateOf(false) }
   var listing by remember { mutableStateOf(false) }
 
-  Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+  if (LocalTillMenu.current != null) {
+    //  «…» ِ سبدِ گوشی: همان شرط‌ها و پیام‌ها؛ فهرست فقط وقتی امانی‌ای هست
+    val open = views.count { it.active }
+    TillOffer("layaway.new", if (lines.isEmpty()) null else TillAction(55, StrLayaway.newLayaway, StrSale.hintLayawayNew, Icons.Outlined.Schedule, V3Hue.TEAL) {
+      if (debtorId == null) toast(StrLayaway.pickCustomerFirst) else making = true
+    })
+    TillOffer("layaway.list", if (views.isEmpty()) null else TillAction(40, if (open > 0) StrLayaway.list(open, views.count { it.late }) else StrSale.layaways, StrSale.hintLayawayList, Icons.Outlined.Schedule, V3Hue.TEAL, 1) { listing = true })
+  } else Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
     OutlinedButton(onClick = {
       when {
         lines.isEmpty() -> toast(StrLayaway.emptyCart)

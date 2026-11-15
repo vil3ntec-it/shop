@@ -22,6 +22,7 @@ import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -80,6 +81,10 @@ fun V3RouteHost(nav: V3Nav, shell: ShellContext, modifier: Modifier = Modifier) 
     }
   }
   val endSign = if (dir == LayoutDirection.Rtl) -1f else 1f
+  //  کشیدن از لبهٔ راست ⇒ برگشت (۱۴۰۵/۰۸/۲۵، `EdgeSwipe`): فقط گوشی، فقط وقتی برگشت هست، نه زیرِ برگه، دروازه یا سبدِ بازِ صندوق
+  var edgeProgress by remember { mutableFloatStateOf(0f) }
+  val edgeScope = rememberCoroutineScope()
+  val edgeOn = !nav.wide && nav.canBack && nav.gate == null && !topIsSheet && !ir.vil3ntec.tohid.ui.components.pos.PhoneCartUi.sheetOpen.value
 
   //  «روی فاکتور که بزنم همان فاکتور» (`claude/e-rows-63q`): هر «فاکتور #n» ِ صفحه‌ها (`InvoiceRef`) با همین دفتر پیدا و با
   //  همین ناوبری باز می‌شود — همان صفحهٔ «نمایشِ فاکتور»
@@ -88,14 +93,18 @@ fun V3RouteHost(nav: V3Nav, shell: ShellContext, modifier: Modifier = Modifier) 
     AnimatedContent(
       targetState = base,
       //  صفحهٔ زیرِ برگه تا ۰٫۹۶ کوچک می‌شود (`V3Sheet` خودش را می‌شمارد)
-      modifier = modifier.v3BehindSheet().graphicsLayer {
-        val p = backProgress
-        if (p > 0f) {
-          translationX = endSign * size.width * 0.12f * p
-          scaleX = 1f - 0.08f * p
-          scaleY = scaleX
-        }
-      },
+      modifier = modifier.v3BehindSheet()
+        .edgeSwipeBack(edgeOn, edgeScope, onProgress = { if (Motion.enabled) edgeProgress = it }) { nav.back() }
+        .graphicsLayer {
+          val p = backProgress
+          if (p > 0f) {
+            translationX = endSign * size.width * 0.12f * p
+            scaleX = 1f - 0.08f * p
+            scaleY = scaleX
+          }
+          //  کشیدنِ لبه: صفحه پا‌به‌پای انگشت کمی به چپ (لبهٔ فیزیکیِ راست در هر زبان)
+          if (edgeProgress > 0f) translationX = -size.width * 0.25f * edgeProgress
+        },
       //  کامپیوتر/پهن: صفحه‌ها هم‌سطح‌اند ⇐ محو، نه لغزشِ تمام‌عرض
       transitionSpec = { V3Transitions.page(if (nav.wide) Move.NONE else nav.move, dir, nav.tabForward) },
       label = "route",

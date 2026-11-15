@@ -1,9 +1,7 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
 import ir.vil3ntec.tohid.core.i18n.StrKit
-import ir.vil3ntec.tohid.core.i18n.Str
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.ui.semantics.heading
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
@@ -85,7 +83,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -106,11 +103,6 @@ import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
-import ir.vil3ntec.tohid.ui.v3.LocalV3NavSearch
-import ir.vil3ntec.tohid.ui.v3.V3Fab
-import ir.vil3ntec.tohid.ui.v3.V3Search
-import ir.vil3ntec.tohid.ui.v3.V3SearchBar
-import ir.vil3ntec.tohid.ui.v3.rememberV3SearchToggle
 
 /*
  *  کاتالوگِ صندوقِ گوشی (نسخهٔ ۳) — درونِ سطحِ روشنِ قابِ سبد (`PhoneSaleFrame`).
@@ -121,9 +113,8 @@ import ir.vil3ntec.tohid.ui.v3.rememberV3SearchToggle
  *    ۲) چیپ‌های کوچکِ دسته                                       ← می‌ماند
  *    ۳) «پرفروش‌ها»: قرص‌های یک‌ضربه‌ای (نام + قیمت) — هنگامِ جستجو پنهان
  *    ۴) کاشیِ سه‌ستونه (~۱۰۰dp) یا فهرستِ ۵۲dp، پرفروش‌ترین اول
- *  صندوقِ نسخهٔ ۳ (`till`، ۶۳w — صاحب‌کار ۱۴۰۵/۰۸/۲۴: «چرا جستجو و کادرها را بینِ نوارها آوردی»): هیچ ردیفی پایین نیست.
- *  بالا برگشت، «فروش»، کاشی/فهرست و «…»؛ زیرش دسته‌ها و پرفروش‌ها؛ جستجو با دکمهٔ جست‌وجوی نوارِ پایین (`V3ScopedSearch`)
- *  یا ذره‌بینِ سربرگ ⇒ نوارِ جستجو جای سربرگ با اسکن درونِ کادر؛ اسکن (کارِ اصلیِ صندوق) تنها دکمهٔ شناور است.
+ *  صندوقِ نسخهٔ ۳ (`till`، `TillCatalog.kt`): هیچ ردیفی پایین نیست. بالا برگشت، «فروش»، ذره‌بین، کاشی/فهرست و «…»؛ زیرش
+ *  دسته‌ها و پرفروش‌ها. حالتِ تمرکز (۱۴۰۵/۰۸/۲۴): نوارِ شناورِ برنامه نیست و اسکن درونِ نوارِ سبد است (`TillFrame`).
  *  زدن ⇐ +۱ (لرزش و پرشِ کوچک)؛ کالای وزنی ⇐ صفحه‌کلید؛ نگه داشتن ⇐ صفحه‌کلید.
  *  در سبد ⇐ دایرهٔ رنگیِ مقدار و «−». رنگ‌ها فقط از `PhoneV3`.
  */
@@ -246,82 +237,9 @@ private fun RowScope.CatalogTools(
   }
 }
 
-/**
- *  صندوقِ نسخهٔ ۳ (۶۳w): سربرگ (برگشت، «فروش»، ذره‌بین اگر نوار جست‌وجو ندارد، کاشی/فهرست، «…») یا — وقتی جستجو باز است —
- *  نوارِ جستجو با اسکن درونِ کادر؛ زیرش دسته‌ها و پرفروش‌ها، سپس کالاها و دکمهٔ شناورِ اسکن. صفحه‌کلید فقط با زدنِ کادر.
- */
-@Composable
-private fun TillCatalog(
-  items: List<PhoneCatalogItem>,
-  bestsellers: List<PhoneCatalogItem>,
-  categories: List<String>,
-  category: String?,
-  onCategory: (String?) -> Unit,
-  onCategoryHold: (String) -> Unit,
-  onAddCategory: () -> Unit,
-  search: String,
-  onSearch: (String) -> Unit,
-  listMode: Boolean,
-  onToggleMode: () -> Unit,
-  onBack: (() -> Unit)?,
-  onScan: () -> Unit,
-  emptyText: String,
-  bottomGap: Dp,
-  onTap: (PhoneCatalogItem) -> Unit,
-  onHold: (PhoneCatalogItem) -> Unit,
-  onMinus: (PhoneCatalogItem) -> Unit,
-  onMenu: (() -> Unit)?,
-  top: Dp,
-  list: androidx.compose.foundation.lazy.LazyListState,
-  grid: androidx.compose.foundation.lazy.grid.LazyGridState,
-) {
-  val v = PhoneV3.colors
-  val spec = V3Search(search, onSearch, StrSale.catalogHint, onScan = onScan)
-  val finder = rememberV3SearchToggle(spec)
-  val navSearch = LocalV3NavSearch.current
-  Column(Modifier.fillMaxSize()) {
-    if (finder.shown) {
-      //  `V3SearchBar` خودش زیرِ نوارِ وضعیت می‌نشیند؛ فقط کمینهٔ ۲۴ ِ همین قاب افزوده می‌شود
-      val inset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-      Box(Modifier.padding(top = (top - inset).coerceAtLeast(0.dp))) { V3SearchBar(spec, finder.close) }
-    } else {
-      Row(
-        Modifier.fillMaxWidth().padding(top = top + 6.dp, start = 4.dp, end = 12.dp).height(48.dp),
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        if (onBack != null) {
-          RoundButton(StrKit.back, onBack, 44.dp, null) { BackChevron(v.icon) }
-          Spacer(Modifier.width(4.dp))
-        } else Spacer(Modifier.width(12.dp))
-        Text(Str.sale, color = v.ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f).semantics { heading() })
-        if (!navSearch) TillIcon(StrKit.search, Icons.Outlined.Search, finder.open)
-        TillIcon(if (listMode) StrSale.gridView else StrSale.listView, if (listMode) Icons.Outlined.GridView else Icons.Outlined.ViewList, onToggleMode)
-        if (onMenu != null) TillIcon(StrKit.more, Icons.Outlined.MoreHoriz, onMenu)
-      }
-    }
-    CategoryChips(categories, category, onCategory, onCategoryHold, onAddCategory)
-    if (search.isBlank() && bestsellers.isNotEmpty()) BestsellerRow(bestsellers, onTap)
-    Box(Modifier.weight(1f).fillMaxWidth()) {
-      //  پایین: جای دکمهٔ شناور (۱۶ + ۵۶ + ۸) تا آخرین ردیف زیرش نماند
-      CatalogItems(items, listMode, false, {}, emptyText, PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = bottomGap + 80.dp), list, grid, onTap, onHold, onMinus, Modifier.fillMaxSize())
-      Box(Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 16.dp)) {
-        V3Fab(Icons.Outlined.QrCodeScanner, StrKit.scanBarcode, expanded = false, onClick = onScan)
-      }
-    }
-  }
-}
-
-/** آیکنِ گردِ ۴۴dp ِ سربرگِ صندوق — همان آیکن و همان دایرهٔ کارتیِ مرزدارِ ردیفِ پیشین (آیکن‌ها عوض نمی‌شوند) */
-@Composable
-private fun TillIcon(label: String, icon: ImageVector, onClick: () -> Unit) {
-  val v = PhoneV3.colors
-  Spacer(Modifier.width(6.dp))
-  RoundButton(label, onClick, 44.dp, v.card) { Icon(icon, null, tint = v.icon, modifier = Modifier.size(22.dp)) }
-}
-
 /** کاشیِ سه‌ستونه یا فهرست — پرفروش‌ترین اول */
 @Composable
-private fun CatalogItems(
+internal fun CatalogItems(
   items: List<PhoneCatalogItem>,
   listMode: Boolean,
   scanning: Boolean,
@@ -334,6 +252,8 @@ private fun CatalogItems(
   onHold: (PhoneCatalogItem) -> Unit,
   onMinus: (PhoneCatalogItem) -> Unit,
   modifier: Modifier,
+  /** صندوقِ نسخهٔ ۳: ردیفِ آرامِ فهرست (`TillListRow`، −/+ فقط برای کالای درونِ سبد) */
+  till: Boolean = false,
 ) {
   Box(modifier.fillMaxWidth()) {
     if (listMode) {
@@ -341,7 +261,8 @@ private fun CatalogItems(
         if (scanning) item(key = "scan") { Box(Modifier.padding(bottom = 8.dp)) { scanPanel() } }
         if (items.isEmpty()) item(key = "empty") { EmptyText(emptyText) }
         itemsIndexed(items, key = { _, it -> it.id }) { i, it ->
-          PhoneListRow(it, first = i == 0, last = i == items.lastIndex, onTap = onTap, onHold = onHold, onMinus = onMinus)
+          if (till) TillListRow(it, first = i == 0, last = i == items.lastIndex, onTap = onTap, onHold = onHold, onMinus = onMinus)
+          else PhoneListRow(it, first = i == 0, last = i == items.lastIndex, onTap = onTap, onHold = onHold, onMinus = onMinus)
         }
       }
     } else {
@@ -362,7 +283,7 @@ private fun CatalogItems(
 }
 
 @Composable
-private fun EmptyText(text: String) {
+internal fun EmptyText(text: String) {
   Text(
     text,
     color = PhoneV3.colors.inkMuted,
@@ -373,7 +294,7 @@ private fun EmptyText(text: String) {
 }
 
 @Composable
-private fun RoundButton(label: String, onClick: () -> Unit, size: Dp, bg: Color?, content: @Composable () -> Unit) {
+internal fun RoundButton(label: String, onClick: () -> Unit, size: Dp, bg: Color?, content: @Composable () -> Unit) {
   Box(
     Modifier
       .size(size)
@@ -387,7 +308,7 @@ private fun RoundButton(label: String, onClick: () -> Unit, size: Dp, bg: Color?
 
 /** پیکانِ نازکِ برگشت — در راست‌به‌چپ رو به راست */
 @Composable
-private fun BackChevron(color: Color) {
+internal fun BackChevron(color: Color) {
   val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
   Canvas(Modifier.size(20.dp)) {
     val w = size.width
@@ -444,7 +365,7 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit, modifier
 
 /** چیپ‌های کوچکِ دسته: «همه»، دسته‌ها و «+» (دستهٔ تازه)؛ نگه داشتنِ دسته ⇐ حذف (با تأیید) */
 @Composable
-private fun CategoryChips(
+internal fun CategoryChips(
   categories: List<String>,
   category: String?,
   onCategory: (String?) -> Unit,
@@ -506,7 +427,7 @@ private fun Chip(text: String, selected: Boolean, onClick: () -> Unit, onHold: (
 
 /** «پرفروش‌ها»: قرص‌های یک‌ضربه‌ای (نام + قیمت) — سریع‌ترین راه به کالاهای همیشگی */
 @Composable
-private fun BestsellerRow(items: List<PhoneCatalogItem>, onTap: (PhoneCatalogItem) -> Unit) {
+internal fun BestsellerRow(items: List<PhoneCatalogItem>, onTap: (PhoneCatalogItem) -> Unit) {
   val v = PhoneV3.colors
   val haptic = LocalHapticFeedback.current
   Row(
@@ -546,11 +467,11 @@ private fun BestsellerRow(items: List<PhoneCatalogItem>, onTap: (PhoneCatalogIte
 }
 
 /** کالای «تمام شد»: محتوا کم‌رنگ (۴۵٪)، بی لرزش و بی پرش؛ زدنش پیامِ موجودی می‌دهد */
-private const val SOLD_OUT_ALPHA = 0.45f
+internal const val SOLD_OUT_ALPHA = 0.45f
 
 /** پرشِ کوچکِ کاشی وقتی مقدارش در سبد بیشتر شد (بندِ G) */
 @Composable
-private fun rememberAddPop(inCart: Double): Animatable<Float, AnimationVector1D> {
+internal fun rememberAddPop(inCart: Double): Animatable<Float, AnimationVector1D> {
   val pop = remember { Animatable(1f) }
   val last = remember { mutableStateOf(inCart) }
   LaunchedEffect(inCart) {
