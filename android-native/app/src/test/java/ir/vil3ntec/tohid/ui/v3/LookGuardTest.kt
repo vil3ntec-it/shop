@@ -91,7 +91,7 @@ class LookGuardTest {
     //  e-desk-d1 (خواستِ صاحب‌کار ۱۴۰۵/۰۸/۲۴ برای **کامپیوتر**: «طراحیِ موبایل رو نمی‌تونی روی کامپیوتر بیاری»): خانهٔ کامپیوتر
     //  داشبوردِ `ui/desk/DeskDashboard.kt` شد و این پرونده فقط به آن می‌رساند؛ هیچ پروندهٔ خانهٔ گوشی عوض نشد
     "ui/v3/shell/DeskHome.kt" to "9acb58dcdd66909f",
-    "ui/v3/shell/DashboardNumbers.kt" to "6c026a3633404708", // ۶۳f: فقط سرعت؛ ظاهر همان
+    "ui/v3/shell/DashboardNumbers.kt" to "188a6e3f6c31869c", // ۶۳f و #1056: فقط سرعت (یک‌خانه‌ایِ همان دفتر و روز)؛ ظاهر همان
     "ui/v3/shell/HeroMoney.kt" to "b543739c866c10d4",
     "ui/v3/shell/HeroMoneySheet.kt" to "74e98770e7221dce",
     "ui/v3/V3HeroCard.kt" to "95171b224dfd0333",

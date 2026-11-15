@@ -41,7 +41,18 @@ data class DashboardNumbers(
   val overdueOldestDays: Long,
 ) {
   companion object {
+    /**
+     *  PERF (#1056): عددها فقط تابعِ (همان دفتر، همان روز)‌اند (`nowMs` هم از همان `today`)؛ خانه با هر بار کشیدنِ دوباره
+     *  بی تغییرِ دفتر همان نتیجه را می‌گیرد — مثلِ جدول‌های یک‌خانه‌ایِ دیگر (`DebtRows`، `ShopStore.index`).
+     */
+    @Volatile private var memo: Triple<ShopData, String, DashboardNumbers>? = null
+
     fun of(d: ShopData, today: String): DashboardNumbers {
+      memo?.let { (md, mt, mv) -> if (md === d && mt == today) return mv }
+      return compute(d, today).also { memo = Triple(d, today, it) }
+    }
+
+    private fun compute(d: ShopData, today: String): DashboardNumbers {
       val monthPrefix = today.take(7)
       val stock = ShopStore.index(d)
 
