@@ -17,9 +17,9 @@ import java.util.Locale
  *   • همیشه (CI): ۲۰ هزار کالا، ۵ هزار مشتری، ۱۰ هزار فاکتور ([ScreenSpeed.CI]، در heap ِ پیش‌فرضِ ۵۱۲ مگ) — منطقِ هر بخش
  *     ([ScreenLogic]): میانهٔ گرمِ چند بار باید زیرِ [LOGIC_BUDGET_MS] باشد. سقف نصفِ بودجهٔ ۱۰۰ میلی‌ثانیه است تا لرزشِ
  *     رانرِ CI سرخ نکند و پس‌رفتِ واقعی (گشتنِ کلِ دفتر یا مرتب کردنِ همه چیز با هر باز شدن) سرخ کند.
- *   • سنجهٔ کامل (دستی؛ در CI هرگز): `TOHID_SCREEN_SPEED=1` — ۲۰ هزار کالا و ۱۰۰ هزار فاکتور ([ScreenSpeed.FULL]؛
+ *   • سنجهٔ کامل (دستی؛ در CI هرگز): `TOHID_SCREEN_SPEED=1` — ۲۰ هزار کالا و ۵۰ هزار فاکتور ([ScreenSpeed.FULL]؛
  *     `TOHID_SCREEN_SPEED_SALES=…` برای اندازهٔ دیگر)، منطق + نخستین قابِ Compose ِ هر مسیر ([ScreenFrame]) با نمونه‌برداریِ پشته:
- *       TOHID_SCREEN_SPEED=1 TOHID_BIG_LEDGER_HEAP=2500m gradle -p desktop test --tests '*ScreenSpeedBenchTest*' …
+ *       TOHID_SCREEN_SPEED=1 TOHID_BIG_LEDGER_HEAP=1800m gradle -p desktop test --tests '*ScreenSpeedBenchTest*' …
  *     خروجی: جدول در stdout و `desktop/build/screen-speed.txt`.
  *   • عددِ این‌جا JVM ِ کامپیوتر است؛ گوشیِ ارزان چند برابر کُندتر است (جدا سنجیده نشده).
  */

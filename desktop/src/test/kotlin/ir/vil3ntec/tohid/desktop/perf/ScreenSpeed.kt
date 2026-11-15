@@ -19,8 +19,8 @@ internal object ScreenSpeed {
 
   data class Size(val products: Int, val sales: Int, val suppliers: Int = 200, val purchases: Int = 5_000, val today: Int = 200)
 
-  /** سنجهٔ دستی: ۲۰ هزار کالا، ۱۰۰ هزار فاکتور (~۳۰۰ هزار قلم، ۲۰۰ هزار حرکت)، ۵ هزار مشتری (۳۰ هزار ردیفِ قرض) */
-  val FULL = Size(products = 20_000, sales = 100_000)
+  /** سنجهٔ دستی: ۲۰ هزار کالا، ۵۰ هزار فاکتور (~۱۵۰ هزار قلم، ۱۰۰ هزار حرکت)، ۵ هزار مشتری (۳۰ هزار ردیفِ قرض) — ~۲۸۰ هزار ردیفِ دفتر */
+  val FULL = Size(products = 20_000, sales = 50_000)
 
   /** آزمونِ همیشگیِ CI (heap ِ پیش‌فرضِ ۵۱۲ مگ ِ Gradle): همان ۲۰ هزار کالا و ۵ هزار مشتری، ۱۰ هزار فاکتور */
   val CI = Size(products = 20_000, sales = 10_000)
