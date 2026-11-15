@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.account.subscription
 
+import ir.vil3ntec.tohid.ui.v3.V3NavRowSpec
+import ir.vil3ntec.tohid.ui.v3.V3NavRow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,7 +51,6 @@ import ir.vil3ntec.tohid.ui.v3.V3Action
 import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
-import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Section
@@ -128,8 +129,9 @@ private fun Lines(title: String, lines: List<SubscriptionModel.Line>, empty: Str
   V3Section(title, modifier) {
     if (lines.isEmpty()) Text(empty, style = V3Type.callout, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(16.dp))
     lines.forEachIndexed { i, l ->
-      if (i > 0) V3Divider(start = 16.dp)
-      V3ListRow(l.title.ifBlank { "—" }, value = l.value, chevron = false)
+      if (i > 0) V3Divider(start = V3NavRowSpec.PAD_START_PLAIN)
+      //  ۶۵r: همان نوشتهٔ ردیفِ «بیشتر» (عنوانِ ۱۶، مقدارِ کم‌رنگِ ۱۳ در پایان)
+      V3NavRow(l.title.ifBlank { "—" }, icon = null, hue = null, value = l.value, chevron = false)
     }
   }
 }

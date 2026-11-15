@@ -48,7 +48,9 @@ import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
+import ir.vil3ntec.tohid.ui.v3.V3NavRowSpec
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
+import ir.vil3ntec.tohid.ui.v3.settings.SettingsRowLook
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3Type
 
@@ -78,11 +80,13 @@ internal fun NavBarScreen(allowed: Set<String>, onBack: (() -> Unit)?) {
     PlaceSheet(id, NavLayouts.slotOf(layout, id), onPick = { apply(NavLayouts.place(layout, id, it, null, allowed)) }, onDismiss = { placing = null })
   }
 
-  V3Scaffold(title = SettingsLayout.labelOf(SettingsLayout.NAV_BAR), onBack = onBack) { pad ->
+  //  ۶۵r: عنوان در سربرگ (نه درشت در بدنه) و ردیف‌ها همان ردیفِ «بیشتر» — همان قراردادِ `SettingsPageFrame`
+  V3Scaffold(title = SettingsLayout.labelOf(SettingsLayout.NAV_BAR), onBack = onBack, largeTitle = false) { pad ->
+    SettingsRowLook(SettingsLayout.NAV_BAR) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
       Column(
         Modifier.widthIn(max = 640.dp).fillMaxWidth().verticalScroll(rememberScrollState())
-          .padding(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding()),
+          .padding(start = V3NavRowSpec.GUTTER, end = V3NavRowSpec.GUTTER, bottom = pad.calculateBottomPadding()),
       ) {
         //  «این چه می‌کند؟» (تنظیماتِ کم) — صفحه قابِ خودش را دارد، پس کارت دستی
         SettingsWhatCard(SettingsLayout.NAV_BAR)
@@ -117,6 +121,7 @@ internal fun NavBarScreen(allowed: Set<String>, onBack: (() -> Unit)?) {
         Spacer(Modifier.height(24.dp))
       }
     }
+    }
   }
 }
 
@@ -149,10 +154,9 @@ private fun PlaceSheet(id: String, current: Slot, onPick: (Slot) -> Unit, onDism
   V3Sheet(onDismiss = onDismiss, title = StrSettings.placeOf(label)) { closer ->
     V3Card {
       Slot.entries.forEachIndexed { i, s ->
-        if (i > 0) V3Divider(start = 16.dp)
+        if (i > 0) V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.PAD_START_PLAIN)
         V3ListRow(
           slotAction(s),
-          tile = false,
           chevron = false,
           trailing = if (s == current) ({ Icon(Icons.Outlined.Check, contentDescription = null, tint = PhoneV3Roles.brandText(c), modifier = Modifier.size(20.dp)) }) else null,
           onClick = { closer.close { if (s != current) onPick(s) } },

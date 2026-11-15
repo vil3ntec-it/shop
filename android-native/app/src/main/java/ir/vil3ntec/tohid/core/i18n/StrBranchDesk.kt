@@ -16,6 +16,8 @@ object StrBranchDesk {
   val currentLabel: String get() = t("شعبهٔ این دستگاه", "This device's branch", "د دې وسیلې څانګه")
   val switch: String get() = t("تعویضِ شعبه", "Change branch", "څانګه بدلول")
   val pickTitle: String get() = t("در کدام شعبه کار می‌کنید؟", "Which branch are you working in?", "په کومه څانګه کې کار کوئ؟")
+  /** خطِ یک‌خطیِ ردیفِ «شعبه‌ها» در تنظیمات (۶۵r: در ۳۶۰dp یک خط) — شرحِ کامل همان [pickNote] */
+  val settingsLine: String get() = t("دادهٔ هر شعبه جدا می‌ماند", "Each branch keeps its own data", "د هرې څانګې معلومات جلا دي")
   val pickNote: String get() = t(
     "دادهٔ هر شعبه جداست: فروش، مصرف، موجودی و دخلِ این دستگاه فقط در شعبهٔ انتخابی می‌نشیند.",
     "Each branch keeps its own data: this device's sales, expenses, stock and cash go only to the chosen branch.",

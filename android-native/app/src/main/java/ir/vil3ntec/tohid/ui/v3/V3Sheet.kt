@@ -148,7 +148,10 @@ fun V3Sheet(
         .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
     ) {
       if (title != null) SheetTitle(title, headerEnd)
-      content(closer)
+      //  تصویرِ صفحهٔ زیرِ برگه می‌ایستد؛ تصویرِ درونِ همین برگه می‌جنبد (`LocalArtLayer`، قاعدهٔ «فقط وقتی دیده می‌شود»)
+      androidx.compose.runtime.CompositionLocalProvider(
+        ir.vil3ntec.tohid.ui.v3.art.LocalArtLayer provides ir.vil3ntec.tohid.ui.v3.art.LocalArtLayer.current + 1,
+      ) { content(closer) }
     }
   }
 }

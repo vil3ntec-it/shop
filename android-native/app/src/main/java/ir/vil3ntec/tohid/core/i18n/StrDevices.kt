@@ -129,7 +129,7 @@ object StrDevices {
   val newItem: String get() = t("ثبتِ کالا", "New item", "نوی توکی")
   fun countAdded(n: Any): String = t("شمارِ ${asIs(n)} کالا از بارکدخوان افزوده شد", "Counts for $n ${pl(n, "item", "items")} added from the scanner", "د $n توکو شمېر له بارکوډ لوستونکي ورزیات شو")
   //  ── «کارتِ فرمان» — فروشِ نقدیِ خودکار از بارکدخوان (راهِ «ب»، B، پیش‌فرض خاموش) ─────────────
-  val cashCardTitle: String get() = t("فروشِ نقدی با کارتِ فرمان", "Cash sales with the command card", "د امر کارت سره نغدي پلور")
+  val cashCardTitle: String get() = t("فروشِ نقدی با کارتِ فرمان", "Command-card cash sales", "د امر کارت سره نغدي پلور")
   val cashCardNote: String get() = t(
     "روشن ⇒ کالاها را اسکن کنید و بعد «نقد پرداخت شد» را از کارت؛ برنامه حتی بسته، فروشِ نقدی را با همان قیمت، تخفیفِ خودکار و گردکردنِ صندوق ثبت می‌کند و رسید چاپ می‌شود. قرض و مشتری همیشه از صندوق.",
     "On ⇒ scan the items, then \"Cash paid\" from the card; even with the app closed the cash sale is recorded with the till's prices, automatic discounts and rounding, and the receipt prints. Credit and customers always go through the till.",

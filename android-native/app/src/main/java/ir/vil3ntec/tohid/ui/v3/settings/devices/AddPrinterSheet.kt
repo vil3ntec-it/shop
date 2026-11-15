@@ -150,12 +150,11 @@ private fun Choices(
   val c = PhoneV3.colors
   V3Card {
     items.forEachIndexed { i, p ->
-      if (i > 0) V3Divider(start = 60.dp)
+      if (i > 0) V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.DIVIDER_START)
       V3ListRow(
         p.name,
         subtitle = subtitle(p),
         icon = icon,
-        tile = false,
         chevron = false,
         trailing = if (p.address == selected) ({ Icon(Icons.Outlined.Check, contentDescription = null, tint = PhoneV3Roles.brandText(c), modifier = Modifier.size(20.dp)) }) else null,
         onClick = { onPick(p) },

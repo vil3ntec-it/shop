@@ -94,7 +94,6 @@ internal fun RouteScope.AppLockScreen(onBack: (() -> Unit)?) {
             StrSettings.idleTitle,
             subtitle = StrSettings.idleNote,
             icon = Icons.Outlined.Timer,
-            tile = false,
             value = idleLabel(idle),
             onClick = { pickIdle = true },
           )
@@ -131,10 +130,9 @@ private fun IdleSheet(current: Int, onPick: (Int) -> Unit, onDismiss: () -> Unit
     SettingsNote(StrSettings.idleNote, Modifier.padding(bottom = 12.dp))
     ir.vil3ntec.tohid.ui.v3.V3Card {
       IdleLock.CHOICES.forEachIndexed { i, m ->
-        if (i > 0) V3Divider(start = 16.dp)
+        if (i > 0) V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.PAD_START_PLAIN)
         V3ListRow(
           idleLabel(m),
-          tile = false,
           chevron = false,
           trailing = if (m == current) ({ Icon(Icons.Outlined.Check, contentDescription = null, tint = PhoneV3Roles.brandText(c), modifier = Modifier.size(20.dp)) }) else null,
           onClick = { closer.close { onPick(m) } },

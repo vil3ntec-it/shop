@@ -128,6 +128,6 @@ internal fun DeviceCard(
   Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
     V3GroupTitle(title)
     V3Card(Modifier.border(2.dp, ring, RoundedCornerShape(PhoneV3.groupRadius)), padding = padding, content = content)
-    if (caption != null) Text(caption, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = 6.dp))
+    if (caption != null) Text(caption, style = V3Type.rowHelp, color = c.inkMuted, modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = 6.dp))
   }
 }

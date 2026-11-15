@@ -1,6 +1,13 @@
 package ir.vil3ntec.tohid.desktop
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.onNodeWithTag
+import ir.vil3ntec.tohid.ui.v3.V3_STATE_BLOCK
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.CloudOff
@@ -51,7 +58,8 @@ import org.junit.Test
  *   ۱) حالتِ خالی عنوان، راهنما، کار و تصویرِ همان زمینه را دارد (از روی همان آیکنِ امروزِ صدها جای صدا زدن)؛
  *   ۲) «کاهشِ حرکت» ⇒ تصویر بی ساعتِ حرکت (ایستا)؛ مرزِ مقابل: با حرکتِ روشن ساعت زنده است (سنجه کور نیست)؛
  *   ۳) نگهبان: جزءِ خطا (تمام‌صفحه، درونِ صفحه، خالیِ خطایی، قدیم) هرگز نشانی، http یا نامِ استثنا نشان نمی‌دهد؛ متنِ
- *      دوستانه (صفحه‌های همگام‌سازی، e-rows-63h) دست‌نخورده؛ یک کار با هدفِ لمسیِ ≥ ۴۸dp.
+ *      دوستانه (صفحه‌های همگام‌سازی، e-rows-63h) دست‌نخورده؛ یک کار با هدفِ لمسیِ ≥ ۴۸dp؛
+ *   ۴) (دستهٔ ۶۵) بلوکِ حالتِ خالی در میانهٔ صفحه، صحنهٔ ۲:۱ با پهنای کمینهٔ (جای خالی − ۳۲dp، ۳۶۰dp).
  */
 class StatesArtUiTest {
 
@@ -153,6 +161,40 @@ class StatesArtUiTest {
     rule.onAllNodes(hasText(StrKit.retry) and hasClickAction()).fetchSemanticsNodes().let { assertEquals(2, it.size) }
     rule.onNode(hasText(ir.vil3ntec.tohid.core.i18n.StrShellPages.tryAgain) and hasClickAction()).assertExists()
     rule.onAllNodes(hasText(StrKit.retry) and hasClickAction())[0].assertHeightIsAtLeast(48.dp)
+  }
+
+  /**
+   *  دستهٔ ۶۵ (خواستِ صاحب‌کار «در وسطِ صفحه»): کلِ بلوکِ حالتِ خالی (صحنه + عنوان + خط + کار) در میانهٔ جای خالی — مرکزِ
+   *  بلوک با مرکزِ صفحه (افقی و عمودی) کمتر از ۲dp فاصله دارد؛ صحنه پهنِ ۲:۱ با پهنای کمینهٔ (جای خالی − ۳۲dp، ۳۶۰dp).
+   */
+  @Test fun theEmptyStateBlockSitsInTheMiddleOfTheScreen() {
+    val width = androidx.compose.runtime.mutableIntStateOf(360)
+    rule.setContent {
+      CompositionLocalProvider(LocalContext provides ctx) {
+        TohidTheme(ThemeChoice.LIGHT) {
+          Box(Modifier.size(width.intValue.dp, 760.dp).testTag("screen")) {
+            V3EmptyState(Icons.Outlined.Inventory2, "هنوز کالایی ندارید", body = "نخستین کالا را بیفزایید", action = "افزودنِ کالا", onAction = {})
+          }
+        }
+      }
+    }
+    for ((w, artW) in listOf(360 to 328, 800 to 360)) {
+      width.intValue = w
+      rule.waitForIdle()
+      val screen = rule.onNodeWithTag("screen").getBoundsInRoot()
+      val block = rule.onNodeWithTag(V3_STATE_BLOCK, useUnmergedTree = true).getBoundsInRoot()
+      val art = rule.onNode(SemanticsMatcher.keyIsDefined(V3ArtKindKey), useUnmergedTree = true).getBoundsInRoot()
+      val dy = ((block.top + block.bottom) / 2 - (screen.top + screen.bottom) / 2).value
+      val dx = ((block.left + block.right) / 2 - (screen.left + screen.right) / 2).value
+      assertTrue("بلوک در میانهٔ عمودی نیست: $dy dp (پهنای $w)", kotlin.math.abs(dy) < 2f)
+      assertTrue("بلوک در میانهٔ افقی نیست: $dx dp (پهنای $w)", kotlin.math.abs(dx) < 2f)
+      //  مرزِ مقابل: بلوک واقعاً از بالای صفحه پایین آمده (نه چسبیده به بالا)
+      assertTrue("بلوک به بالای صفحه چسبیده", (block.top - screen.top).value > 100f)
+      assertEquals("پهنای صحنه (پهنای $w)", artW.toFloat(), (art.right - art.left).value, 1f)
+      assertEquals("صحنه ۲:۱ (پهنای $w)", (art.right - art.left).value / 2f, (art.bottom - art.top).value, 1f)
+      val artMid = ((art.left + art.right) / 2 - (screen.left + screen.right) / 2).value
+      assertTrue("صحنه در میانهٔ افقی نیست: $artMid", kotlin.math.abs(artMid) < 1f)
+    }
   }
 
   @Test fun friendlyTextFromTheSyncScreensIsShownUnchanged() {

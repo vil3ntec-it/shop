@@ -56,7 +56,7 @@ internal fun PrintersCard(highlight: Boolean) {
     }
   }
   DeviceCard(StrSettings.printers, StrSettings.printersNote, highlight) {
-    if (printers.isEmpty()) V3ListRow(StrSettings.noPrinterYet, icon = Icons.Outlined.Print, tile = false, chevron = false)
+    if (printers.isEmpty()) V3ListRow(StrSettings.noPrinterYet, icon = Icons.Outlined.Print, chevron = false)
     printers.forEachIndexed { i, p ->
       val isDefault = p.link == def
       V3Collapse(visible = p.id !in gone) {
@@ -79,12 +79,12 @@ internal fun PrintersCard(highlight: Boolean) {
         )
       }
     }
-    V3Divider(start = 64.dp)
+    V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.DIVIDER_START)
     V3ListRow(StrSettings.addPrinter, icon = Icons.Outlined.Add, onClick = { adding = true })
     //  ORD-10: برگهٔ سفارش روی چاپگرِ پیش‌فرضِ همین دستگاه — پس از «قبول» ِ همین‌جا، و (جدا) برای «قبولِ خودکار» ِ سرور
     var slipAuto by remember { mutableStateOf(OrderSlipPrint.auto(context)) }
     var slipServer by remember { mutableStateOf(OrderSlipPrint.autoServer(context)) }
-    V3Divider(start = 64.dp)
+    V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.DIVIDER_START)
     V3ToggleRow(StrOrderSlip.setting, checked = slipAuto, onCheckedChange = { slipAuto = it; OrderSlipPrint.setAuto(context, it) },
       subtitle = StrOrderSlip.settingNote, icon = Icons.Outlined.Print)
     V3ToggleRow(StrOrderSlip.serverSetting, checked = slipServer, onCheckedChange = { slipServer = it; OrderSlipPrint.setAutoServer(context, it) },
@@ -101,7 +101,7 @@ private fun PrinterRow(p: PrinterRegistry.Saved, isDefault: Boolean, divider: Bo
   var menu by remember { mutableStateOf(false) }
   val name = p.name.ifBlank { PrinterRegistry.label(p.link) }
   Column {
-    if (divider) V3Divider(start = 64.dp)
+    if (divider) V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.DIVIDER_START)
     V3ListRow(
       name,
       subtitle = listOfNotNull(

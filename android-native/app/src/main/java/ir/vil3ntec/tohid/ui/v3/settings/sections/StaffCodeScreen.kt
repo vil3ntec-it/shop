@@ -136,7 +136,7 @@ internal fun RouteScope.StaffCodeScreen(onBack: (() -> Unit)?) {
       }
     }
     item(key = "team") {
-      V3Section(null) { V3ListRow(Str.staff, icon = Icons.Outlined.Badge, tile = false, onClick = { nav.open(TEAM) }) }
+      V3Section(null) { V3ListRow(Str.staff, icon = Icons.Outlined.Badge, onClick = { nav.open(TEAM) }) }
     }
   }
 }

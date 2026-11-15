@@ -74,7 +74,7 @@ object StrReach {
   fun printerAdded(name: Any): String = t("«${asIs(name)}» به چاپگرها افزوده شد", "“$name” was added to printers", "«$name» چاپګرونو ته ورزیات شو")
   val hwTools: String get() = t("صف چاپ، برچسب، ترازو و نمایشگر", "Print queue, labels, scale and display", "د چاپ کتار، لیبل، تله او ښودونکی")
   val servers: String get() = t("سرورها", "Servers", "سرورونه")
-  val serversLine: String get() = t("وصل به سرورِ دیگر: شبکهٔ دکان، خانه یا اینترنت", "Connect to another server: shop network, home or internet", "بل سرور ته نښلول: د دوکان شبکه، کور یا انټرنېټ")
+  val serversLine: String get() = t("وصل به سرورِ دکان، خانه یا اینترنت", "Shop, home or internet server", "د دوکان، کور یا انټرنېټ سرور")
   val serversExample: String get() = t(
     "مثلاً سرورِ کوچکِ خودِ دکان: دادهٔ هر سرور روی همین دستگاه جداست و هرگز به سرورِ دیگر نمی‌رود.",
     "For example the shop's own small server: each server's data stays separate on this device and never goes to another.",

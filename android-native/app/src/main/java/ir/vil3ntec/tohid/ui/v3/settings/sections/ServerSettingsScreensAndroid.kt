@@ -134,7 +134,7 @@ internal fun RouteScope.OwnerReportScreen(onBack: (() -> Unit)?) {
         V3Section(null) {
           if (draft.frequency == OwnerReportPlan.WEEKLY) {
             V3PickerRow(StrSettingsPages.weekday, OwnerReportPlan.weekdayName(draft.weekday), onClick = { pick = PICK_WEEKDAY })
-            V3Divider(start = 16.dp)
+            V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.PAD_START_PLAIN)
           }
           V3PickerRow(StrSettingsPages.hour, OwnerReportPlan.hourLabel(draft.hour), onClick = { pick = PICK_HOUR })
         }
@@ -143,7 +143,7 @@ internal fun RouteScope.OwnerReportScreen(onBack: (() -> Unit)?) {
       item(key = "channels") {
         V3Section(null) {
           listOf(OwnerReportPlan.INAPP to StrSettingsPages.inApp, OwnerReportPlan.PUSH to StrSettingsPages.push, OwnerReportPlan.EMAIL to StrSettingsPages.email).forEachIndexed { i, (ch, label) ->
-            if (i > 0) V3Divider(start = 16.dp)
+            if (i > 0) V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.PAD_START_PLAIN)
             val usable = ch != OwnerReportPlan.EMAIL || v.emailAvailable
             V3ToggleRow(
               if (usable) label else StrSettingsPages.noEmail(label),

@@ -60,20 +60,8 @@ internal fun RouteScope.FeaturesScreen(onBack: (() -> Unit)?, onOptions: (String
   }
 }
 
-/** رنگِ نشانهٔ هر کارت — فقط برای جدا دیدنِ کارت‌ها، معنایی ندارد */
-private fun featureHue(key: String): V3Hue = when (key) {
-  SettingsLayout.GIFT_CARD -> V3Hue.PINK
-  SettingsLayout.LAYAWAY -> V3Hue.AMBER
-  SettingsLayout.LOYALTY -> V3Hue.VIOLET
-  SettingsLayout.SAFE_BOOK -> V3Hue.TEAL
-  SettingsLayout.SPECIAL_ORDER -> V3Hue.ORANGE
-  SettingsLayout.QUOTE -> V3Hue.BLUE
-  SettingsLayout.PRICE_LIST -> V3Hue.LIME
-  SettingsLayout.AUTO_FEES -> V3Hue.CORAL
-  SettingsLayout.DELIVER_LATER -> V3Hue.SKY
-  SettingsLayout.TAX_QUARTER -> V3Hue.PURPLE
-  else -> V3Hue.MINT
-}
+/** رنگِ نشانهٔ هر کارت — همان رنگی که ردیفش در دستهٔ خودش دارد (یک نقشه: `SettingsHues`، ۶۵r) */
+private fun featureHue(key: String): V3Hue = SettingsHues.of(key)
 
 /** «گزینه‌ها در «فروش و پرداخت · پرداخت»» — جایی که ردیفِ این قابلیت پس از روشن شدن دیده می‌شود */
 private fun featurePlace(key: String): String? {
@@ -94,8 +82,8 @@ private fun FeatureCard(key: String, on: Boolean, toggleable: Boolean, onToggle:
           Text(SettingsLayout.labelOf(key), style = V3Type.headline, fontWeight = FontWeight.SemiBold, color = c.ink, modifier = Modifier.weight(1f, fill = false))
           if (stateful) V3StatusPill(if (on) V3Status.DELIVERED else V3Status.INACTIVE, if (on) StrShell.switchOn else StrSettings.off)
         }
-        SettingsHelp.line(key)?.let { Text(it, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(top = 2.dp)) }
-        if (on) featurePlace(key)?.let { Text(StrSettingsHome.featureWhere(it), style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(top = 4.dp)) }
+        SettingsHelp.line(key)?.let { Text(it, style = V3Type.rowHelp, color = c.inkMuted, modifier = Modifier.padding(top = 2.dp)) }
+        if (on) featurePlace(key)?.let { Text(StrSettingsHome.featureWhere(it), style = V3Type.rowHelp, color = c.inkMuted, modifier = Modifier.padding(top = 4.dp)) }
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           when {

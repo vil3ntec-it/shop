@@ -6,7 +6,7 @@ package ir.vil3ntec.tohid.core.i18n
 @Suppress("unused")
 object StrDrawers {
 
-  val settingsTitle: String get() = t("چند کشو و شیفتِ شناور", "Multiple drawers and floating shift", "څو دخلونه او ګرځنده شیفټ")
+  val settingsTitle: String get() = t("چند کشو و شیفتِ شناور", "Drawers and floating shift", "څو دخلونه او ګرځنده شیفټ")
   val settingsNote: String get() = t(
     "هر صندوقدار یا کشو صندوقِ نام‌دارِ خودش را باز و بسته می‌کند و می‌تواند همان صندوق را روی دستگاهِ دیگری ادامه دهد. در کشوی نام‌دار فقط فروش، برگشت و دریافتِ همان کشو و ورود و خروجِ صریحش شمرده می‌شود؛ مصارف و خرید از کشوی اصلی‌اند. خاموش: همان یک صندوقِ امروز.",
     "Each cashier or drawer opens and closes its own named till and can continue it on another device. A named drawer counts only its own sales, returns, receipts and explicit cash moves; expenses and purchases belong to the main drawer. Off: the single till of today.",

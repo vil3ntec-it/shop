@@ -57,7 +57,8 @@ jobs:
   build:
     name: ساخت نسخهٔ بومی
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    #  معمولاً ۲۱ دقیقه (سنجشِ حساب‌ها ۵، APK ۸، کافه‌بازار ۸)؛ روی ماشینِ کندترِ GitHub همه ۴۵٪ کندتر شد و به سقفِ ۳۰ خورد (#1054)
+    timeout-minutes: 45
     outputs:
       publish: ${{ steps.meta.outputs.publish }}
       channel: ${{ steps.meta.outputs.channel }}

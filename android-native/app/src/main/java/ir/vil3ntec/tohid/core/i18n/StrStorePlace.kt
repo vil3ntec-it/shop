@@ -9,11 +9,7 @@ package ir.vil3ntec.tohid.core.i18n
 @Suppress("unused")
 object StrStorePlace {
   val section: String get() = t("نشانی و نقشهٔ دکان", "Shop address and map", "د دوکان پته او نقشه")
-  val line: String get() = t(
-    "مشتریِ «دریافت از دکان» نشانی و مسیرِ دکان را در ویترین می‌بیند",
-    "Pickup customers see your address and directions on the storefront",
-    "د «له دوکانه اخیستلو» پېرودونکی د دوکان پته او لار په ویترین کې ویني",
-  )
+  val line: String get() = t("نشانی و مسیرِ دکان در ویترین", "Shop address on the storefront", "په ویترین کې د دوکان پته")
   val address: String get() = t("نشانیِ دکان", "Shop address", "د دوکان پته")
   val addressHelper: String get() = t(
     "برای مشتریِ «دریافت از دکان»؛ مثلاً «کارتهٔ سه، سرکِ اول، کنارِ مسجد»",

@@ -61,7 +61,7 @@ internal fun DraftPhotoSource(open: Boolean, onDismiss: () -> Unit, onPicked: (U
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) openCamera()
         else ask.launch(Manifest.permission.CAMERA)
       })
-      V3Divider(start = 64.dp)
+      V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.DIVIDER_START)
       V3ListRow(StrSettings.gallery, subtitle = StrSettings.galleryPick, icon = Icons.Outlined.PhotoLibrary, onClick = {
         gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
       })

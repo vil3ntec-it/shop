@@ -8,7 +8,7 @@ package ir.vil3ntec.tohid.core.i18n
 object StrProduct {
 
   // تنظیمات
-  val section: String get() = t("کد، نام‌های دیگر و محلِ قفسه", "Code, other names and shelf location", "کوډ، نور نومونه او د المارۍ ځای")
+  val section: String get() = t("کد، نام‌های دیگر و محلِ قفسه", "Code, names and shelf spot", "کوډ، نور نومونه او د المارۍ ځای")
   val note: String get() = t(
     "روشن: فرمِ کالا کدِ کالا (SKU، با ساختِ خودکار)، «خدماتی یا بی موجودی»، نامِ پشتو و انگلیسی، مترادف‌ها، واژه‌های جست‌وجو، محلِ قفسه (راهرو، قفسه، طبقه)، کالاهای جایگزین و فیلدهای سفارشی را هم می‌گیرد؛ جست‌وجوی صندوق و فهرستِ کالا آن‌ها را هم می‌گردند، محلِ قفسه کنارِ اقلامِ سفارش دیده می‌شود و صندوق برای کالای تمام‌شده جایگزینِ موجود را پیشنهاد می‌کند. فقط روی همین دستگاه.",
     "On: the item form also takes an item code (SKU, with Generate), \"service or non-stock\", a Pashto and an English name, synonyms, search words, a shelf location (aisle, shelf, level), substitute items and custom fields; till search and the item list search them too, the shelf location shows next to order items and the till suggests an in-stock substitute for an item that ran out. This device only.",

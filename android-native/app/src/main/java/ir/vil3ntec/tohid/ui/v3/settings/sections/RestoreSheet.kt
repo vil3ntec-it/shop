@@ -50,7 +50,7 @@ internal fun RestoreSheet(current: ShopData, incoming: ShopData, photos: Int, on
         StrSettings.warehouseEntries to (current.warehouseEntries.size to incoming.warehouseEntries.size),
       )
       lines.forEachIndexed { i, (label, counts) ->
-        if (i > 0) V3Divider(start = 16.dp)
+        if (i > 0) V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.PAD_START_PLAIN)
         val (now, next) = counts
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
           Text(label, style = V3Type.body, color = c.ink, modifier = Modifier.weight(1f))

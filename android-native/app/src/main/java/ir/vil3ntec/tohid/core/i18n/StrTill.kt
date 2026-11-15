@@ -8,7 +8,7 @@ package ir.vil3ntec.tohid.core.i18n
 object StrTill {
 
   // ── S46 · تعویضِ کاربر روی صندوق ──
-  val switchTitle: String get() = t("تعویضِ کاربر روی صندوق (Ctrl+L)", "Switch user at the till (Ctrl+L)", "په صندوق کې د کارن بدلول (Ctrl+L)")
+  val switchTitle: String get() = t("تعویضِ کاربر (Ctrl+L)", "Switch user (Ctrl+L)", "د کارن بدلول (Ctrl+L)")
   val switchNote: String get() = t(
     "روشن: Ctrl+L صندوق را قفل می‌کند و هر کس با PIN ِ شخصیِ خودش باز می‌کند. هر کاربر سبدِ خودش را دارد و فروش و سابقه به نامِ همان کاربر ثبت می‌شود؛ کاربرِ صندوق هرگز بیش از حسابِ این دستگاه اختیار ندارد. حسابِ همین دستگاه هم PIN یا رمزِ دستگاه لازم دارد. فقط روی همین دستگاه.",
     "On: Ctrl+L locks the till and each person opens it with their own PIN. Each user has their own cart, and sales and history are recorded under that user; the till user never gets more rights than this device's account. This device's account also needs a PIN or the device code. This device only.",
