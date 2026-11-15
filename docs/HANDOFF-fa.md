@@ -68,7 +68,8 @@
     `extra` ⇒ چیزِ زیرِ عدد (نمودار). همهٔ پارامترها پیش‌فرض دارند (سازگار با پیش).
   - حالتِ باز/بسته: `SummaryFold` (`summary_folded:<صفحه>` در `tohid-ui`، کنارِ `view_mode`؛ همگام نمی‌شود)، `rememberSummaryFold` و
     `summaryFoldStore` در `V3SummaryFoldAndroid.kt` (مرزِ پلتفرم؛ سنجهٔ کیفیت).
-  - رنگِ بخش‌ها: `ui/theme/SectionColors.kt` (`V3Section`، `SectionTone`، روز/شب، `contrast`)؛ جدول در `RULES-fa.md`. **برای ۶۵r:** نگاشتِ
+  - رنگِ بخش‌ها — **یک منبع**: `ui/theme/SectionColors.kt` (`V3Section(hue)` = خانوادهٔ کاشیِ همان بخش در «بیشتر»، `V3Modules.HUE_BY_ID`؛
+    جدولِ خانواده‌ها روز/شب، `ofHue`، `contrast`)؛ جدول در `RULES-fa.md`. **برای ۶۵r:** نگاشتِ
     رنگِ کاشی‌های تنظیمات/ناوبری را می‌توان به همین فایل برد.
   - نمودارِ افقیِ درونِ کارت: `V3SummaryBars` (`ui/v3/V3SummaryBars.kt`): ۵ ردیف + «… N مورد دیگر»، زدن = پالایه.
   - `V3Scaffold`: پیش‌فرضِ `largeTitle` شد `false` — عنوان وسطِ نوار (چیدمانِ تازهٔ `V3HeaderBar`: اگر کارهای یک سو پهن‌اند، وسطِ جای
@@ -82,8 +83,8 @@
     `reports/purchases` (جای دو `V3Stat`)، قرض‌داران `reports/debtors` · REPORTS (بازه در گوشهٔ کارتِ سود و خرید)؛ تخفیف‌ها `promos` ·
     PROMOS (جای `MetricRows`، پالایهٔ «نمایش» در گوشه)؛ وضعیتِ ویترین `storefront/status` · ORDERS.
 - **ادغامِ `origin/claude/batch-66` (۶۵h)** در همین شاخه: تعارضِ `HistoryScreen.kt`/`HistoryParts.kt` حل شد (`RowCtx` هم `onReturns` و هم
-  `period`؛ `MoneySplit` ِ سه‌خانه فقط برای دوره‌های پیشینِ باز)؛ **`historyTone` (`HistoryTones.kt`) حالا از `SectionColors` می‌خواند** (نقد =
-  RECEIPTS، نسیه = PURCHASES، کارت = SALES، برگشت/لغو = DEBT، قرضِ وصول‌شده = SAFE) و `HistoryMeaningTest` آگاهانه به همین جدول عوض شد.
+  `period`؛ `MoneySplit` ِ سه‌خانه فقط برای دوره‌های پیشینِ باز)؛ **`historyTone` (`HistoryTones.kt`) حالا از `SectionColors.ofHue` می‌خواند** (نقد =
+  نعنایی، نسیه = کهربایی، کارت = آسمانی، برگشت/لغو = مرجانیِ سرخ، قرضِ وصول‌شده = صورتی — جدا از بنفشِ کارتِ فروش) و `HistoryMeaningTest` آگاهانه به همین جدول عوض شد.
 - **نوار**: عنوانِ وسط هرگز زیرِ آیکن نمی‌رود — `V3HeaderActions.visibleFor` از پهنای عنوان (`TextMeasurer`) و پنجره دست‌بالا دو کار
   (راهنما هم یک کار، واپسین) پیدا می‌گذارد و بقیه به «…» (راهنمای رفته نخستین ردیفِ آن)؛ چیدمانِ `V3HeaderBar` اگر باز هم جا نشد عنوان را کوتاه
   می‌کند. شاهد: `SectionHeaderUiTest` (مرزِ گرهِ عنوان با هیچ آیکنی برخورد ندارد، ۳۶۰dp، تاریخچه و هر صفحهٔ پرکار).

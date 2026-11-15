@@ -11,22 +11,42 @@ import kotlin.math.sqrt
 
 /**
  *  ۶۵s — جدولِ رنگِ بخش‌ها (`SectionColors`، صاحب‌کار: «تمام رنگ‌ها باید با دقت باشن»):
- *   • هر بخش روز و شب دارد؛
+ *   • هر خانواده روز و شب دارد و هر بخش همان خانوادهٔ کاشیِ ماژولِ خودش (یک منبع)؛
  *   • عدد (`strong`)، برچسب و نوشتهٔ اصلی روی تهِ‌رنگ دست‌کم ۴٫۵:۱ (WCAG AA)؛ تهِ‌رنگ از زمینهٔ صفحه جداست؛
- *   • جفت‌های کنارِ هم (قرض/دریافت، فروش/مصارف، خرید/فروش) در کوررنگیِ قرمز-سبز (پروتان، دوتان) هم دیده‌نی جدا (ΔE ≥ ۱۵)؛
+ *   • جفت‌های کنارِ هم (قرض/دریافت، فروش/مصارف، خرید/فروش و رنگ‌های پولِ تاریخچه) در کوررنگیِ قرمز-سبز (پروتان، دوتان) هم
+ *     دیده‌نی جدا (ΔE ≥ ۱۵)؛
  *   • هر `V3Summary(` در کدِ برنامه رنگِ بخشش را دارد و کارتِ خلاصه گرادیان نمی‌کشد.
  */
 class SectionColorsTest {
 
-  @Test fun `هر بخش روز و شب دارد`() {
-    assertEquals(V3Section.entries.toSet(), SectionColors.DAY.keys)
-    assertEquals(V3Section.entries.toSet(), SectionColors.NIGHT.keys)
+  @Test fun `هر خانواده روز و شب دارد و هر بخش خانواده‌ای از جدول`() {
+    assertEquals(SectionColors.DAY.keys, SectionColors.NIGHT.keys)
+    V3Section.entries.forEach { s -> assertTrue("$s", SectionColors.family(s.hue) in SectionColors.DAY.keys) }
+    //  هم‌معنی‌های پالت یک خانواده‌اند
+    assertEquals(PhoneV3Palette.Hue.MINT, SectionColors.family(PhoneV3Palette.Hue.TEAL))
+    assertEquals(PhoneV3Palette.Hue.AMBER, SectionColors.family(PhoneV3Palette.Hue.ORANGE))
+  }
+
+  /**
+   *  یک منبع: رنگِ کارتِ خلاصهٔ هر بخش همان خانوادهٔ کاشیِ خودش در «بیشتر» است (`V3Modules.HUE_BY_ID`/ورودیِ ماژول) — بخش و
+   *  کاشی دو رنگِ ناهم‌خوان ندارند.
+   */
+  @Test fun `رنگِ بخش همان خانوادهٔ کاشیِ ماژولِ خودش است`() {
+    val modules = mapOf(
+      V3Section.SALES to "history", V3Section.EXPENSES to "expenses", V3Section.PURCHASES to "purchasing",
+      V3Section.DEBT to "debtors", V3Section.RECEIPTS to "receipts", V3Section.REPORTS to "reports",
+      V3Section.PROMOS to "promos", V3Section.STOCK to "warehouse",
+    )
+    modules.forEach { (s, id) ->
+      val hue = ir.vil3ntec.tohid.ui.v3.nav.V3Modules.hueOf(id)
+      assertEquals("$s ⇐ کاشیِ «$id»", SectionColors.family(hue!!), SectionColors.family(s.hue))
+    }
   }
 
   @Test fun `نوشته روی تهِ‌رنگ AA است`() {
-    for (dark in listOf(false, true)) for (s in V3Section.entries) {
-      val t = SectionColors.of(s, dark)
-      val where = "$s ${if (dark) "شب" else "روز"}"
+    for (dark in listOf(false, true)) for (h in SectionColors.DAY.keys) {
+      val t = SectionColors.ofHue(h, dark)
+      val where = "$h ${if (dark) "شب" else "روز"}"
       assertTrue("$where عدد ${SectionColors.contrast(t.strong, t.tint)}", SectionColors.contrast(t.strong, t.tint) >= 4.5)
       assertTrue("$where برچسب ${SectionColors.contrast(t.label, t.tint)}", SectionColors.contrast(t.label, t.tint) >= 4.5)
       assertTrue("$where نوشته", SectionColors.contrast(t.ink, t.tint) >= 7.0)
@@ -71,9 +91,10 @@ class SectionColorsTest {
   }
 
   @Test fun `جفت‌های کنارِ هم در کوررنگی هم جدا می‌مانند`() {
-    for (dark in listOf(false, true)) for ((a, b) in SectionColors.PAIRS) {
-      val x = SectionColors.of(a, dark).strong
-      val y = SectionColors.of(b, dark).strong
+    val pairs = SectionColors.PAIRS.map { (a, b) -> a.hue to b.hue } + SectionColors.MONEY_PAIRS
+    for (dark in listOf(false, true)) for ((a, b) in pairs) {
+      val x = SectionColors.ofHue(a, dark).strong
+      val y = SectionColors.ofHue(b, dark).strong
       for ((name, m) in listOf("بینا" to null, "پروتان" to protan, "دوتان" to deutan)) {
         val d = deltaE(x, y, m)
         assertTrue("$a/$b ${if (dark) "شب" else "روز"} $name ΔE=$d", d >= 15.0)

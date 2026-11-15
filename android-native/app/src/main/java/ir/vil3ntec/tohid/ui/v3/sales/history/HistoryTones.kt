@@ -35,7 +35,7 @@ import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.ui.theme.Corner
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Colors
-import ir.vil3ntec.tohid.ui.theme.V3Section
+import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
 import ir.vil3ntec.tohid.ui.theme.SectionColors
 import ir.vil3ntec.tohid.ui.theme.V3Pair
 import ir.vil3ntec.tohid.ui.v3.V3Type
@@ -67,19 +67,20 @@ fun moneyKindOf(state: SaleState, payGroup: String): MoneyKind = when {
 }
 
 /**
- *  رنگِ هر معنا — **تنها** جای رنگِ پولِ تاریخچه. ۶۵s: از جدولِ رنگِ بخش‌ها (`ui/theme/SectionColors.kt`، روز و شب، عدد روی
- *  تهِ‌رنگ ≥ ۴٫۵:۱ و جفت‌های کنارِ هم در کوررنگی جدا): نقد = سبزِ دریافت، نسیه = کهربایی (خرید)، کارت/غیرنقد = آبیِ فروش،
- *  برگشت و لغو = سرخِ قرض، قرضِ وصول‌شده = فیروزه‌ایِ گاوصندوق؛ `fg` عددِ پررنگ و `bg` تهِ‌رنگِ همان. ردیف، خطِ نتیجه، سرخطِ
- *  روز و نمودارِ کارتِ خلاصه چیزی جز این نمی‌خوانند.
+ *  رنگِ هر معنا — **تنها** جای رنگِ پولِ تاریخچه. ۶۵s: از همان منبعِ رنگِ بخش‌ها (`ui/theme/SectionColors.kt`، خانواده‌های پالت،
+ *  روز و شب، عدد روی تهِ‌رنگ ≥ ۴٫۵:۱): نقد = نعنایی (همان «رسیدها»)، نسیه = کهربایی، کارت/غیرنقد = آسمانی، برگشت و لغو =
+ *  مرجانیِ سرخِ قرض، قرضِ وصول‌شده = صورتی (جدا از بنفشِ کارتِ فروش — «فروش نیست»)؛ `fg` عددِ پررنگ و `bg` تهِ‌رنگِ همان.
+ *  جفت‌های کنارِ هم در کوررنگی جدا (`SectionColors.MONEY_PAIRS`). ردیف، خطِ نتیجه، سرخطِ روز و نمودارِ کارتِ خلاصه چیزی جز این
+ *  نمی‌خوانند.
  */
 fun historyTone(c: PhoneV3Colors, kind: MoneyKind): V3Pair {
-  fun of(s: V3Section) = SectionColors.of(s, c.source.isDark).let { V3Pair(fg = it.strong, bg = it.tint) }
+  fun of(h: PhoneV3Palette.Hue) = SectionColors.ofHue(h, c.source.isDark).let { V3Pair(fg = it.strong, bg = it.tint) }
   return when (kind) {
-    MoneyKind.CASH -> of(V3Section.RECEIPTS)
-    MoneyKind.CREDIT -> of(V3Section.PURCHASES)
-    MoneyKind.CARD -> of(V3Section.SALES)
-    MoneyKind.RETURN, MoneyKind.CANCELLED -> of(V3Section.DEBT)
-    MoneyKind.DEBT_IN -> of(V3Section.SAFE)
+    MoneyKind.CASH -> of(PhoneV3Palette.Hue.MINT)
+    MoneyKind.CREDIT -> of(PhoneV3Palette.Hue.AMBER)
+    MoneyKind.CARD -> of(PhoneV3Palette.Hue.SKY)
+    MoneyKind.RETURN, MoneyKind.CANCELLED -> of(PhoneV3Palette.Hue.CORAL)
+    MoneyKind.DEBT_IN -> of(PhoneV3Palette.Hue.PINK)
     MoneyKind.NET -> V3Pair(fg = c.ink, bg = c.tile)
     MoneyKind.ONLINE -> V3Pair(fg = c.inkMuted, bg = c.tile)
   }
