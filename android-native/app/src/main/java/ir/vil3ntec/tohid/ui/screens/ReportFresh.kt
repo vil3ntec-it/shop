@@ -261,6 +261,7 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
     val view = ReportFreshModel.view(l, def.id, span, dim, today, clock, ReportFreshModel.costingOf(cost), lineSeller, rng)
     step()
     DeskFresh(
+      ledger = l,
       view = view,
       promo = if (def.id == PromoFresh.TAB_ID) PromoFresh.view(d, l, span, today, clock, cost) else null,
       stockCost = if (def.id == StockCostFresh.TAB_ID) ir.vil3ntec.tohid.core.report.ReportCore.stockCost(l) else null,
@@ -383,7 +384,8 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
     tables.forEach { t ->
       if (tables.size > 1) Text(t.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
       val sales = view?.sales
-      val l = ledger
+      //  ریز از همان درختی که نما از آن ساخته شد (`DeskFresh.ledger`)
+      val l = fresh?.ledger
       val onRow: ((List<JsonPrimitive>) -> Unit)? = when {
         dayEnd != null && t.id == DayEndModel.METHODS_ID -> { row -> DayEndModel.methodOf(dayEnd.report, row.first().content)?.let { drill = it } }
         l == null -> null

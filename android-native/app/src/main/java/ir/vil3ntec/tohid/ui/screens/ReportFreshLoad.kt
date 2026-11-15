@@ -52,6 +52,8 @@ internal fun <T : Any> rememberOffMainFor(match: Any?, vararg keys: Any?, comput
  *  صفحه بود و باز کردنِ «گزارش‌ها» با ۵۰ هزار فاکتور پنجره را چند ثانیه می‌ایستاند (`docs/PERFORMANCE-fa.md`).
  */
 internal class DeskFresh(
+  /** درختی که [view] از آن ساخته شد — ریزِ هر ردیف (`drill`) از همین، نه از درختِ تازه‌تری که هنوز نما ندارد */
+  val ledger: ir.vil3ntec.tohid.core.report.ReportLedger,
   val view: ReportFreshModel.View,
   val promo: PromoFresh.View?,
   val stockCost: ReportCore.StockCost?,
