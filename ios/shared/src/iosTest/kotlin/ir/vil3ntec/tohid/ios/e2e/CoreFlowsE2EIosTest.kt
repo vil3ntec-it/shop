@@ -149,8 +149,7 @@ class CoreFlowsE2EIosTest {
 
       e.step("04-till", "صندوق: فروشِ نقدِ «قلمِ آزاد» (TillSale.record) و رسیدنش به سرور", needs = listOf("02-login")) {
         e.toTab(NavCatalog.SALE)
-        //  صندوق نوارِ پایین ندارد: تا رفتنِ نوار صبر (دکمهٔ «بیشتر» ِ صندوق هم‌نامِ زبانهٔ «بیشتر» است)
-        e.gone(Find.tab(NavCatalog.HOME), "نوارِ پایین")
+        //  e-63r: نوارِ پایین روی صندوق هم هست؛ دکمهٔ «بیشتر» ِ صندوق هم‌نامِ زبانهٔ «بیشتر» است و `iconButton` فقط نقشِ Button را می‌گیرد
         e.waitFor(Find.iconButton(StrKit.more), StrKit.more)
         e.shot("04a-till")
         val before = store.data.value.sales.map { it.id }.toSet()
@@ -226,7 +225,6 @@ class CoreFlowsE2EIosTest {
 
       e.step("07-credit", "نسیهٔ بی قرض‌دار رد ⇐ «انتخابِ مشتری» ⇐ قرض‌دارِ تازه ⇐ نسیه ثبت (CreditDebtor)", needs = listOf("02-login")) {
         e.toTab(NavCatalog.SALE)
-        e.gone(Find.tab(NavCatalog.HOME), "نوارِ پایین")
         e.waitFor(Find.iconButton(StrKit.more), StrKit.more)
         val before = store.data.value.sales.map { it.id }.toSet()
         e.tap(Find.iconButton(StrKit.more), StrKit.more)

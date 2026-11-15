@@ -90,7 +90,7 @@ class SheetLangTest {
     )
     val tax = TaxQuarter.report(d, QuarterTax.Config(rateBp = 1_000), TaxQuarter.initial(today, QuarterTax.Config(rateBp = 1_000))!!)!!
     val rows = StockLedger.exportRows(emptyList()) { it }
-    return sections.map { ReportCsv.of(it, d, from, to, today) } +
+    return sections.map { ReportCsv.of(it, d, from, to, today, now = NOW) } +
       ReportCsv.of("sellers", d, from, to, today, lineSeller = true) +
       ReportCsv.statement(d, "c1", today) +
       ReportCsv.stockCount(listOf(WarehouseEngine.CountLine(d.products[0], 12.0, 11.0)), today) +
@@ -167,6 +167,8 @@ class SheetLangTest {
   }
 
   private companion object {
+    /** «اکنون» ِ ثابتِ برگهٔ «یادآوری» (روزهای بدهی از زمانِ ثبت؛ بی آن اثرِ انگشت هر روز عوض می‌شد) — همان لحظه‌ای که PERSIAN_SHA گرفته شد */
+    const val NOW = 1_794_657_600_000L   //  2026-11-14T12:00:00Z
     /** اثرِ برگه‌های فارسی با کدِ پیشین (همین شاخه بی LOC-06) — نگاه کنید به سرِ پرونده */
     const val PERSIAN_SHA = "ea86b342ec5ec79600dfa480b4581d2c38419aa8cdacaf3b367b26ae5037a227"
   }
