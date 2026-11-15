@@ -23,7 +23,9 @@ class PhoneV3RolesContrastTest {
     themes.forEach { c ->
       V3ButtonKind.entries.forEach { k ->
         val p = PhoneV3Roles.button(c, k)
-        assertTrue("$k ${if (c === PhoneV3Dark) "شب" else "روز"}: ${contrast(p.fg, p.bg)}", contrast(p.fg, p.bg) >= 4.5f)
+        //  ۶۹ p3: دکمهٔ سوم (`TERTIARY`) زمینه ندارد و روی کارت می‌نشیند ⇒ نوشته روی کارت سنجیده می‌شود
+        val ground = if (p.bg.alpha == 0f) c.card else p.bg
+        assertTrue("$k ${if (c === PhoneV3Dark) "شب" else "روز"}: ${contrast(p.fg, ground)}", contrast(p.fg, ground) >= 4.5f)
       }
       //  غیرفعال عمداً کم‌رنگ است (WCAG معافش می‌کند) ولی هنوز دیده می‌شود: ≥ ۲ —
       //  مقدارِ روزِ COLOR-SYSTEM (#94A3B8 روی #E2E8F0) ≈ ۲٫۰۴ است

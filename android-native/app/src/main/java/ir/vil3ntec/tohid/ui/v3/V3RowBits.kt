@@ -89,12 +89,12 @@ fun V3PillAction(label: String, onClick: () -> Unit, modifier: Modifier = Modifi
   }
   Row(
     modifier
-      .heightIn(min = 40.dp)
+      .heightIn(min = ir.vil3ntec.tohid.ui.theme.V3ButtonSpec.pillTouch)
       .v3Pressable(enabled = enabled, label = label, onClick = onClick),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Row(
-      Modifier.heightIn(min = 32.dp).clip(RoundedCornerShape(percent = 50)).background(if (neutral) calm.bg else PhoneV3Palette.selected(c)).padding(horizontal = 12.dp),
+      Modifier.heightIn(min = ir.vil3ntec.tohid.ui.theme.V3ButtonSpec.pillHeight).clip(RoundedCornerShape(percent = 50)).background(if (neutral) calm.bg else PhoneV3Palette.selected(c)).padding(horizontal = 12.dp),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {

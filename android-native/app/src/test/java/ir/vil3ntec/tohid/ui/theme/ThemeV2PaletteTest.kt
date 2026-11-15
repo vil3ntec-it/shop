@@ -13,7 +13,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- *  THEME-V2 (۱۴۰۵/۰۸/۰۲): سه تم × روز و شب عینِ جدولِ صاحب‌کار، تمِ پیش‌فرض «آسمان»، هفت رنگِ همراه،
+ *  THEME-V2 (۱۴۰۵/۰۸/۰۲) ⇐ ۶۹ p3: چهار تمِ گزیده × روز و شب عینِ جدول، تمِ پیش‌فرض «آسمان»، هفت رنگِ همراه،
  *  متنِ سفید روی کادرِ بزرگ، و این‌که لایه‌های گوشی (`PhoneV3Colors`، `PhoneV3Ui`، `PhoneV3Palette`) از
  *  همان `ShopColors` ِ تمِ جاری ساخته می‌شوند. قاعده‌های کنتراستِ همهٔ شش پالت در `Vill3nPaletteTest`.
  */
@@ -30,27 +30,32 @@ class ThemeV2PaletteTest {
   private val all: List<ShopColors> = ShopTheme.entries.flatMap { listOf(shopColors(it, false), shopColors(it, true)) }
 
   /**
-   *  ستون‌های جدولِ فایل: primary روشن، دکمهٔ اصلیِ روشن، primary تیره، گرادیانِ روشن، گرادیانِ تیره، زمینه/سطحِ روشن و تیره،
-   *  متنِ روز، متن و متنِ کم‌رنگِ شب. رنگِ برند و گرادیان همان THEME-V2؛ زمینه، سطح و متن از «خنثی‌های همان رنگ» (THEME-V3،
-   *  خواستِ صاحب‌کار ۱۴۰۵/۰۸/۱۳: «هر سه تم را جذاب‌تر کن و دارک‌مود را هم») — شب لایه‌های نزدیک‌به‌سیاه با پله‌های روشن.
+   *  ستون‌ها: primary روشن، دکمهٔ اصلیِ روشن، primary تیره، گرادیانِ روشن، گرادیانِ تیره، زمینه/سطحِ روشن و تیره، متنِ روز، متن و
+   *  متنِ کم‌رنگِ شب. ۶۹ p3 (عمدی، صاحب‌کار ۱۴۰۵/۰۸/۲۴: «از رنگ‌های مزخرف توی تم و رنگ و بک‌گراندِ دارک‌مود … همه چی افتضاحه»):
+   *  چهار تمِ گزیده از پالتِ برند — «آسمان» (روزش همان THEME-V3 ِ پسندیده؛ شبِ تازهٔ سه‌پله‌ای)، «سرمه‌ای»، «عاجی» و «گرافیت»؛
+   *  «اقیانوس» و «غروب» (صورتی) برداشته شدند (`ThemeMigrationTest`). عددها از `scratchpad/p3/design.py`.
    */
   private val owner = mapOf(
     ShopTheme.SKY to listOf(
-      "#2563EB", "#1D4ED8", "#60A5FA", "#2563EB #4F46E5 #7C3AED", "#1E3A8A #312E81 #4C1D95", "#F4F7FC/#FFFFFF", "#07090E/#11151E",
-      "#0B1324", "#EEF1F8", "#A2ACBE",
+      "#2563EB", "#1D4ED8", "#6EA3FF", "#2563EB #4F46E5 #7C3AED", "#1E3A8A #312E81 #4C1D95", "#F4F7FC/#FFFFFF", "#0A0E15/#161C27",
+      "#0B1324", "#EDF1F7", "#A9B3C2",
     ),
-    ShopTheme.OCEAN to listOf(
-      "#0284C7", "#0369A1", "#38BDF8", "#0369A1 #0EA5E9 #22D3EE", "#0C4A6E #075985 #155E75", "#F1F8FB/#FFFFFF", "#050A0C/#0E171B",
-      "#0A1A24", "#ECF4F7", "#9CB0B9",
+    ShopTheme.NAVY to listOf(
+      "#1E3A8A", "#1E3A8A", "#8CA9F0", "#172554 #1E3A8A #25407F", "#0F1A3D #172554 #1E3A8A", "#F3F5F9/#FFFFFF", "#090D18/#131B2D",
+      "#0B1426", "#ECF0F8", "#A6B0C3",
     ),
-    ShopTheme.DUSK to listOf(
-      "#4F46E5", "#4338CA", "#818CF8", "#4F46E5 #DB2777 #F97316", "#312E81 #831843 #9A3412", "#F7F6FE/#FFFFFF", "#09080E/#14121C",
-      "#14122A", "#F0EEF8", "#A9A5C0",
+    ShopTheme.IVORY to listOf(
+      "#8C5E1A", "#8C5E1A", "#D9B260", "#3A2C1E #5C4322 #8C5E1A", "#2A2016 #3D2F1C #5E4518", "#F7F5F1/#FFFFFF", "#100E0B/#1F1B17",
+      "#1C1814", "#F4EFE7", "#B7AEA2",
+    ),
+    ShopTheme.GRAPHITE to listOf(
+      "#334155", "#1F2937", "#CBD2DC", "#111827 #1F2937 #374151", "#23272E #30353E #454C58", "#F5F6F8/#FFFFFF", "#0D0E11/#191C20",
+      "#111318", "#F1F2F4", "#AEB2BA",
     ),
   )
 
   @Test
-  fun `سه تم در روز و شب عینِ جدولِ THEME-V2‌اند`() {
+  fun `چهار تم در روز و شب عینِ جدولِ ۶۹ p3‌اند`() {
     for ((t, w) in owner) {
       val l = shopColors(t, false)
       val d = shopColors(t, true)
@@ -70,22 +75,22 @@ class ThemeV2PaletteTest {
       assertEquals(l.brandPrimary, l.iconActive)
       assertEquals(d.brandPrimary, d.iconActive)
     }
-    assertEquals("شش پالتِ جدا", 6, all.toSet().size)
-    //  سطحِ ۲ِ «آسمان» از فایل؛ دو تمِ دیگر مشتق‌اند
+    assertEquals("هر تم یک ردیف", ShopTheme.entries.toSet(), owner.keys)
+    assertEquals("هشت پالتِ جدا", 8, all.toSet().size)
+    //  روزِ «آسمان» همان THEME-V3 ِ پسندیده (سطحِ ۲ از فایل)؛ شبِ «آسمان» سه پلهٔ تازه
     assertEquals("#F0F4FC", hex(shopColors(ShopTheme.SKY, false).surfaceElevated))
-    assertEquals("#1B202C", hex(shopColors(ShopTheme.SKY, true).surfaceElevated))
+    assertEquals("#202835", hex(shopColors(ShopTheme.SKY, true).surfaceElevated))
   }
 
   @Test
   fun `تمِ پیش‌فرض «آسمان» است و شناسهٔ ناشناخته هم «آسمان»`() {
-    assertEquals(listOf("sky", "ocean", "dusk"), ShopTheme.entries.map { it.id })
+    assertEquals(listOf("sky", "navy", "ivory", "graphite"), ShopTheme.entries.map { it.id })
     assertEquals(ShopTheme.SKY, ShopTheme.of(null))
     assertEquals(ShopTheme.SKY, ShopTheme.of("green"))
-    assertEquals(ShopTheme.OCEAN, ShopTheme.of("ocean"))
-    assertEquals(ShopTheme.DUSK, ShopTheme.of("dusk"))
+    for (t in ShopTheme.entries) assertEquals(t, ShopTheme.of(t.id))
     assertEquals(ShopTheme.SKY, ThemeStore.theme)
-    ThemeStore.preview(ShopTheme.DUSK)
-    assertEquals(ShopTheme.DUSK, ThemeStore.theme)
+    ThemeStore.preview(ShopTheme.IVORY)
+    assertEquals(ShopTheme.IVORY, ThemeStore.theme)
     ThemeStore.preview(ShopTheme.SKY)
     assertEquals(ShopTheme.SKY, ThemeStore.theme)
   }
@@ -104,9 +109,14 @@ class ThemeV2PaletteTest {
     assertEquals(day, ThemeAccents.ALL.map { hex(it) })
     assertEquals(day, ThemeAccents.DAY.map { hex(it) })
     assertEquals(night, ThemeAccents.NIGHT.map { hex(it) })
+    //  «آسمان» همان دو درخششِ پیشین؛ ۶۹ p3: هر تمِ دیگر دو درخششِ کادرِ خانهٔ خودش (جاهای ۰ و ۵)، بقیه در هر چهار تم یکی
+    assertEquals(day, shopColors(ShopTheme.SKY, false).accents.map { hex(it) })
+    assertEquals(night, shopColors(ShopTheme.SKY, true).accents.map { hex(it) })
+    assertEquals(listOf(1, 2, 3, 4, 6), ThemeAccents.SHARED_SLOTS)
     for (c in all) {
       val want = if (c.isDark) night else day
-      assertEquals(want, c.accents.map { hex(it) })
+      assertEquals(ThemeAccents.SHARED_SLOTS.map { want[it] }, ThemeAccents.SHARED_SLOTS.map { hex(c.accents[it]) })
+      assertEquals(7, c.accents.size)
       assertEquals("چرخشی", c.accent(0), c.accent(7))
       assertEquals("چرخشی", c.accent(6), c.accent(-1))
       for (i in want.indices) {
@@ -169,14 +179,12 @@ class ThemeV2PaletteTest {
   }
 
   @Test
-  fun `برچسب و زیرنویسِ سفیدِ کادرِ بزرگ — AA جز «اقیانوس» ِ روز (انحرافِ ثبت‌شده)`() {
-    //  «اقیانوس» ِ روز: گرادیانِ فایل (#0EA5E9 ⇐ #22D3EE) برای متنِ سفیدِ کوچک روشن است؛ با پردهٔ ۰٫۳ حدودِ
-    //  ۳٫۷:۱ می‌ماند (عددِ درشت و برچسبِ سرِ کادر AA‌اند). رساندنش به ۴٫۵ پردهٔ ~۰٫۵ می‌خواهد که فیروزه‌ایِ
-    //  کادر را تیره می‌کند — تصمیمِ صاحب‌کار؛ این‌جا فقط کفِ ۳٫۵ سنجیده می‌شود تا بدتر نشود.
+  fun `برچسب و زیرنویسِ سفیدِ کادرِ بزرگ — AA در هر هشت پالت`() {
+    //  ۶۹ p3: انحرافِ «اقیانوس» ِ روز (کفِ ۳٫۵) با برداشتنِ آن تم رفت ⇒ هر هشت پالت ≥ ۴٫۵
     val bad = mutableListOf<String>()
     for (t in ShopTheme.entries) for (dark in listOf(false, true)) {
       val c = shopColors(t, dark)
-      val min = if (t == ShopTheme.OCEAN && !dark) 3.5f else 4.5f
+      val min = 4.5f
       var worst = 99f
       var x = 0f
       while (x <= 0.66f) { worst = minOf(worst, contrast(Color.White, heroAt(c, x))); x += 0.02f }
@@ -186,7 +194,7 @@ class ThemeV2PaletteTest {
   }
 
   @Test
-  fun `«در انتظارِ تأیید» بنفش و هشدار کهربایی — در هر شش پالت`() {
+  fun `«در انتظارِ تأیید» بنفش و هشدار کهربایی — در هر هشت پالت`() {
     for (c in all) {
       assertEquals(c.status.needsReview, c.status.awaitingApproval)
       assertTrue(c.status.warning != c.status.awaitingApproval)
@@ -207,7 +215,9 @@ class ThemeV2PaletteTest {
       assertEquals(s.background, p.bg)
       assertEquals(s.surface, p.card)
       assertEquals(s.textPrimary, p.ink)
-      assertEquals(s.heroGradient.first(), p.accent)
+      //  ۶۹ p3 (عمدی): شب پُرِ دکمهٔ اصلی — سرِ گرادیانِ شب روی کارتِ شب گم می‌شد؛ روز همان سرِ گرادیان
+      assertEquals(if (s.isDark) s.button.primary.bg else s.heroGradient.first(), p.accent)
+      assertTrue("accent روی کارت ≥ ۳", contrast(p.accent, p.card) >= 3f)
       assertEquals(Color.White, p.onAccent)
       assertEquals(s.button.primary.bg, p.cart)
       assertEquals(s.button.primary.text, p.onCart)
@@ -223,9 +233,9 @@ class ThemeV2PaletteTest {
     }
     assertSame(PhoneV3Light, PhoneV3.forShop(LightColors))
     assertSame(PhoneV3Dark, PhoneV3.forShop(DarkColors))
-    val ocean = shopColors(ShopTheme.OCEAN, false)
-    assertSame("یک خانه حافظه", PhoneV3.forShop(ocean), PhoneV3.forShop(ocean))
-    assertSame(ocean, PhoneV3.forShop(ocean).source)
+    val navy = shopColors(ShopTheme.NAVY, false)
+    assertSame("یک خانه حافظه", PhoneV3.forShop(navy), PhoneV3.forShop(navy))
+    assertSame(navy, PhoneV3.forShop(navy).source)
   }
 
   @Test

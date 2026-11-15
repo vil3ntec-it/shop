@@ -57,6 +57,43 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۴ — عاملِ e-phone-p3 زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-phone-p3` (از `origin/claude/batch-69` 56791aae8) — حالتِ تیره، دکمه‌ها و فهرستِ تم‌ها
+
+- **خواست** (صاحب‌کار): «تمامِ بخش‌ها رو می‌خوام درست و اصولی، و خیلی جذاب. از رنگ‌های مزخرف توی تم و رنگ و بک‌گراندِ دارک‌مود، اشغالش،
+  نمی‌دونم تم‌هایی که به دکمه‌ها داده شده — همه چی افتضاحه.» (و پیش‌تر: «رنگ صورتی کار نگیر … رنگ‌های برند بزار، لوکس»).
+- **ساخته شد — تم‌ها** (`ui/theme/ShopThemes.kt`، عددها از `scratchpad/p3/design.py` که همهٔ قاعده‌ها را پیش از کاتلین می‌سنجد): چهار تمِ
+  گزیده از پالتِ برند — «آسمان» `sky` (پیش‌فرض؛ روزش دست نخورد جز دکمه‌ها)، «سرمه‌ای» `navy` (درخششِ طلایی)، «عاجی» `ivory` (خنثیِ گرم،
+  دکمهٔ مفرغی #8C5E1A)، «گرافیت» `graphite`. «اقیانوس» و «غروب» (صورتیِ #DB2777) برداشته شدند: `ShopTheme.LEGACY` (`ocean`⇐`navy`،
+  `dusk`⇐`sky` — کم‌ترین ΔE ِ برند + دکمهٔ اصلی) و `ThemeStore.load` شناسهٔ کهنه را همان‌جا بازنویسی می‌کند (`ShopTheme.migrated`).
+  رنگ‌های معنایی یک‌جا (`StatusDay/Night`، `MessageDay/Night`)؛ دو درخششِ کادرِ خانه برای هر تم (`ThemeAccents.of`، جاهای ۰ و ۵؛ «آسمان» همان).
+- **شب**: زمینهٔ نزدیک‌به‌سیاهِ هم‌خانوادهٔ تم + سه پله (زمینه ⇐ کارت/نوار/برگه ⇐ سطحِ درونی/کادر) هر پله ≥ ۱٫۱۲:۱؛ «آسمان» #0A0E15 ⇐
+  #161C27 ⇐ #202835 (پیش‌تر #07090E ⇐ #11151E). سطحِ وارونه (سبد، پرده، کادرِ خانه) عمداً گود و تیره ماند تا کادرِ پسندیدهٔ خانه و پردهٔ برگه
+  عوض نشوند. `PhoneV3Colors.accent` در شب = پُرِ دکمهٔ اصلی (سرِ گرادیانِ شب #1E3A8A روی کارت ۱٫۹:۱ بود)؛ دو جا که آن را نوشته کرده بودند
+  (`OrderDetailScreen` «چاپ»، `DebtorMergeSheet`) ⇐ `PhoneV3Roles.brandText`.
+- **دکمه‌ها** (`ui/theme/PhoneV3Roles.kt`): `V3ButtonKind` = PRIMARY/SECONDARY/NEUTRAL/**TERTIARY**/DANGER و `V3ButtonSpec` (۴۸، گوشهٔ ۱۲، شناور
+  ۵۶/۱۶، تراشه ۳۸، قرص ۳۲/۴۰، حلقهٔ تمرکز ۲dp، پردهٔ فشردن). اصلی پُرِ برند با نوشتهٔ سفید در روز و شب (پیش‌تر شب آبیِ کم‌رنگ با نوشتهٔ تیره)،
+  دوم تهِ‌رنگِ برند بی خط، خنثی خاکستری، خطر عقیقِ برند (#B4232F روز / #C42B38 شب، جای #DC2626). `V3Button`، `V3TextButton` و `V3Fab` حالتِ
+  فشرده و حلقهٔ تمرکزِ صفحه‌کلید گرفتند (`v3Pressable(interaction = …)`، `Modifier.v3FocusRing`)؛ سایهٔ دکمهٔ شناور خنثی شد (نه هالهٔ رنگی).
+  طرحِ متریالِ شب (صفحه‌های قدیمی/کامپیوتر): `primary` = برندِ روشن با نوشتهٔ زمینه (متریال یک رنگ را هم پُر و هم نوشته می‌کند).
+- **انتخابِ تم** («ظاهر»): کارتِ هر تم پیش‌نمایشِ واقعی است (زمینه، کادرِ خانه، کارت با دو خط، دکمهٔ اصلی) — `ThemePaletteRow`/`ThemeOption`.
+- **آزمون‌های عمداً عوض‌شده** (هیچ آستانه‌ای پایین نیامد): `ThemeV2PaletteTest` (جدولِ چهار تم، شناسه‌ها، درخشش‌های هر تم، انحرافِ ۳٫۵ ِ
+  «اقیانوس» رفت ⇒ همه ≥ ۴٫۵، `accent` ِ شب)، `Vill3nPaletteTest` (شبِ «آسمان»، دکمه‌ها، طرحِ متریالِ شب، رنگ‌های همراهِ مشترک)،
+  `PhoneV3RolesContrastTest` (دکمهٔ سوم روی کارت سنجیده می‌شود)، `SectionColorsTest` (زمینهٔ نشانه = کارتِ تازهٔ شب)، `E68cHomeShotsTest`
+  (`DUSK`⇐`NAVY`). تازه: `ThemeSetContrastTest`، `ButtonTokensTest`، `ThemeMigrationTest`، `ThemeStoreMigrationDesktopTest`، و در
+  `LuxPaletteGuardTest` «هیچ رنگِ هیچ تمی صورتی، لیمویی یا نئون نیست» (تنها استثنا سه رنگِ گرادیانِ قفل‌شدهٔ «آسمان»). عکس‌ها: `E69p3ShotsTest`
+  (`P3_SHOTS`، `P3_ONLY`).
+- **نتیجه**: اجرای کاملِ `test` ِ کامپیوتر روی همین شاخه (یک بار، پیش از push): **۴۶۰۴ آزمون، ۰ شکست، ۱۸ کنار** (عکس‌های پشتِ متغیر).
+  پیش از آن اجرای هدف‌دار: `ui.theme.*` + `LookGuardTest` + `V3NavRowGuardTest` + `ThemeStoreMigrationDesktopTest` — فقط `BackOfficeContrastTest`
+  (خطِ مویی شب ۱٫۲۳ < کفِ ۱٫۲۵) سرخ شد ⇐ خطِ مویی شبِ هر چهار تم روشن‌تر شد (کف دست نخورد). سبز: `ThemeSetContrastTest` ۴، `ButtonTokensTest` ۴،
+  `ThemeMigrationTest` ۲، `ThemeStoreMigrationDesktopTest` ۱، `LuxPaletteGuardTest` ۶، `ThemeV2PaletteTest` ۹، `Vill3nPaletteTest` ۶، `LookGuardTest` ۷،
+  `HardcodedColorsTest` ۲، `SectionColorsTest` ۷، `BackOfficeContrastTest` ۴، `PhoneV3RolesContrastTest` ۳، `V3NavRowGuardTest` ۶. `precheck.sh` fail=0؛
+  `whatsnew/check.mjs` سبز.
+- **عکس‌ها**: `scratchpad/p3/{before,after}/` و `compare-dark.png`، `compare-light.png`، `compare-buttons.png`، `compare-themes.png`،
+  `compare-theme-buttons.png`، `compare-theme-gallery.png` (پیش = همین آزمون روی batch-69).
+- **دست نخورد**: هش‌های داشبوردِ خانه، گرادیانِ آبی⇐بنفشِ کادرِ خانه، قرض‌داران (سرخ/سبز)، صفحهٔ ورود، چیدمانِ صفحه‌ها (p1/p2/کامپیوتر).
+- **قدمِ بعدی**: دکمه‌های متریالِ صفحه‌های قدیمی (`ui/screens`، کامپیوتر) هنوز `Button`/`TextButton` ِ متریال‌اند — اگر کامپیوتر هم باید عینِ کیت
+  شود، عاملِ کامپیوتر `V3Button` بگذارد. سبدِ صندوق در روز هنوز سطحِ سرمه‌ایِ r3 زیرِ صفحهٔ روشن است (چیدمانِ p1).
+
 ### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-68c زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-68c` (از `origin/claude/e-rows-65s` 6d697791f + ادغامِ `origin/claude/batch-68` 337caa416) — پالتِ لوکسِ برند و ردیف‌های آرامِ فهرست
 
 - **خواست** (صاحب‌کار): «رنگ صورتی کار نگیر، توی برنامه خیلی مسخره میشه. رنگ‌های برند بزار، لوکس.» و با عکسِ «خریدها» (شب) و عکسِ

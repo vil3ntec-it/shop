@@ -66,8 +66,9 @@ class SectionColorsTest {
       val edgeL = SectionColors.luminance(t.edge)
       val tintL = SectionColors.luminance(t.tint)
       assertTrue("$where مرز", if (dark) edgeL > tintL else edgeL < tintL)
-      //  ۶۸c: نشانهٔ کاشی روی زمینهٔ صفحه/کارتِ همان تم دست‌کم ۳:۱ (WCAG 1.4.11، آیکن) — روز روی سفید، شب روی کارتِ #11151E
-      val ground = if (dark) Color(0xFF11151E) else Color.White
+      //  ۶۸c: نشانهٔ کاشی روی زمینهٔ صفحه/کارتِ همان تم دست‌کم ۳:۱ (WCAG 1.4.11، آیکن) — روز روی سفید، شب روی کارتِ شب (۶۹ p3: کارتِ
+      //  تازهٔ سه‌پله‌ای `DarkColors.surface` به‌جای #11151E ِ پیشین؛ کفِ ۴٫۵ همان)
+      val ground = if (dark) DarkColors.surface else Color.White
       assertTrue("$where نشانه ${SectionColors.contrast(t.glyph, ground)}", SectionColors.contrast(t.glyph, ground) >= if (dark) 4.5 else 3.0)
     }
   }
