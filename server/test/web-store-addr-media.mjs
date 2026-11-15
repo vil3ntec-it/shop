@@ -75,8 +75,9 @@ const T = d1.body.accessToken;
 const shopId = (await call('POST', '/api/shop', { name: 'دکانِ دروازه' }, T)).body.shop.id;
 const A = (await call('POST', '/api/admin/login', { username: 'admin', password: 'Admin!12345' })).body.token;
 const flag = (key, value) => call('PUT', '/api/admin/pump/live-config', { scope: shopId, key, value }, A);
-for (const key of ['shop.orders', 'shop.storefront']) await flag(key, true);
 for (const key of require('../src/lib/flag-defaults').DEFAULT_ON) await flag(key, false);
+//  ترتیب: اول `false` ِ صریح، بعد کلیدهای همین آزمون — از ۱۴۰۵/۰۸/۲۴ `shop.orders` و `shop.storefront` هم در DEFAULT_ON اند
+for (const key of ['shop.orders', 'shop.storefront']) await flag(key, true);
 const slug = 'gate-store';
 const put = await call('PUT', '/api/shop/storefront', { slug, enabled: true, title: 'ویترینِ دروازه', contactPhone: '0700000001',
   acceptPickup: true, deliveryFeeMinor: 5000, minOrderMinor: 0 }, T);
