@@ -210,9 +210,12 @@ object DebtReminder {
     return (record(d, debtorId, channel, today, now, newId) as? DebtorEngine.Result.Ok)?.data
   }
 
-  fun dueSheet(d: ShopData, today: String, rule: Rule = Rule(), template: String = DEFAULT_TEMPLATE, store: String = ""): ReportCsv.Sheet {
+  fun dueSheet(
+    d: ShopData, today: String, rule: Rule = Rule(), template: String = DEFAULT_TEMPLATE, store: String = "",
+    now: Long = System.currentTimeMillis(),
+  ): ReportCsv.Sheet {
     val rows = mutableListOf(listOf(StrSheets.name, StrSheets.phone, StrSheets.balance, StrSheets.debtDays, StrSheets.overdueSince, StrSheets.lastReminder, StrSheets.messageText))
-    due(d, today, rule, template, store).forEach { x ->
+    due(d, today, rule, template, store, now).forEach { x ->
       rows += listOf(
         x.debtor.name, x.debtor.phone.ifBlank { x.debtor.phone2.orEmpty() }, Math.round(x.balance).toString(),
         x.debtDays?.toString().orEmpty(), x.overdueSince, x.lastReminded.orEmpty(), x.message,
