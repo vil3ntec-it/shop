@@ -75,7 +75,6 @@ object SearchIndex {
     Section(MoneyPaths.EXPENSES, Str.expenses, listOf("expenses")),
     Section(MoneyPaths.RECEIPTS, Str.receipts, listOf("receipts")),
     Section(AccountPaths.TEAM, Str.staff, listOf("team")),
-    Section(AnalyticsPaths.audit(), Str.auditLog, listOf("audit")),
     Section(AnalyticsPaths.ADMIN, Str.adminCenter, listOf("admin")),
     Section(SettingsPaths.DEVICES, Str.devices, listOf("devices")),
     Section(SettingsPaths.ROOT, Str.settings, listOf("settings")),

@@ -35,7 +35,7 @@ import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Collapse
 import ir.vil3ntec.tohid.ui.v3.V3Divider
-import ir.vil3ntec.tohid.ui.v3.V3HeroCard
+import ir.vil3ntec.tohid.ui.v3.V3Summary
 import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Message
@@ -45,7 +45,7 @@ import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.v3Shake
 
 /**
- *  برگهٔ «وضعیت»: کادرِ بزرگ (`V3HeroCard`) «مشتری الان این را می‌بیند» با وضعیتِ کوتاه، جملهٔ
+ *  برگهٔ «وضعیت»: خلاصهٔ آرام (`V3Summary`) «مشتری الان این را می‌بیند» با وضعیتِ کوتاه، جملهٔ
  *  کاملِ ویترین و ساعتِ دکان؛ پذیرشِ سفارش و آخرین تأییدِ اتصال؛ صفِ اعلامِ نرسیده با «دوباره
  *  بفرست»؛ و پنج اعلام به شکلِ کارت‌های انتخاب با «ثبت». «ثبت شد» فقط با رسیدِ سرور.
  */
@@ -70,11 +70,12 @@ fun StatusPane(
       .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = pad.calculateBottomPadding()),
   ) {
     if (st == null) V3Message(V3Tone.INFO, StrOnline.statusNotYet)
-    else V3HeroCard(
-      title = StrOnline.sfCustomerSees,
+    //  خلاصهٔ آرام (`V3Summary`) — کادرِ گرادیانی فقط ماندِ خانه است
+    else V3Summary(
+      label = StrOnline.sfCustomerSees,
       value = PresenceModel.headline(st),
-      label = PresenceModel.sentence(st),
-      caption = PresenceModel.caption(st),
+      caption = PresenceModel.sentence(st),
+      note = PresenceModel.caption(st).takeIf { it.isNotBlank() },
     )
     V3Section(null) {
       if (st != null) {

@@ -57,8 +57,8 @@ import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Chip
 import ir.vil3ntec.tohid.ui.v3.V3ChipRow
 import ir.vil3ntec.tohid.ui.v3.V3Divider
-import ir.vil3ntec.tohid.ui.v3.V3HeroCard
-import ir.vil3ntec.tohid.ui.v3.V3HeroChip
+import ir.vil3ntec.tohid.ui.v3.V3Summary
+import ir.vil3ntec.tohid.ui.v3.V3SummaryAction
 import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.V3IconTile
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
@@ -71,29 +71,9 @@ import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 
 /*
- *  تکه‌های صفحهٔ تاریخچه (`HistoryScreen`): کلیدِ روز/ماه/سال، کادرِ دورهٔ جاری، «نقد · نسیه · دیگر»، کارتِ
+ *  تکه‌های صفحهٔ تاریخچه (`HistoryScreen`): خلاصهٔ دوره، «نقد · نسیه · دیگر»، کارتِ
  *  بازشوِ هر دوره، ردیفِ فاکتور، فیلتر و نوارِ چاپ. رنگ هرگز تنها نیست: هر رنگ برچسب یا آیکن دارد.
  */
-
-private val UNITS = listOf(SalesPeriods.Unit.DAY, SalesPeriods.Unit.MONTH, SalesPeriods.Unit.YEAR)
-
-/** «روز | ماه | سال» زیرِ عنوان؛ با فیلترِ روشن، تراشه‌های همان فیلتر و «پاک کردن» زیرش */
-@Composable
-internal fun UnitBar(query: HistoryQuery, onFilter: () -> Unit) {
-  Column {
-    Box(Modifier.padding(horizontal = 16.dp)) {
-      V3Segmented(UNITS.map(PeriodLabel::unitName), UNITS.indexOf(query.unit), { query.unit = UNITS[it]; query.picked = null })
-    }
-    if (query.filtered) {
-      Spacer(Modifier.height(8.dp))
-      V3ChipRow {
-        if (query.filter != HistoryFilter.ALL) V3Chip(filterName(query.filter), true, onFilter, icon = Icons.Outlined.Tune)
-        if (query.channel != HistoryChannel.ALL) V3Chip(channelName(query.channel), true, onFilter, icon = Icons.Outlined.Tune)
-        V3Chip(StrHistory.clearFilters, false, { query.filter = HistoryFilter.ALL; query.channel = HistoryChannel.ALL }, icon = Icons.Outlined.Close)
-      }
-    }
-  }
-}
 
 internal fun filterName(f: HistoryFilter): String = when (f) {
   HistoryFilter.ALL -> StrSale.allChip
@@ -109,20 +89,17 @@ internal fun channelName(c: HistoryChannel): String = when (c) {
   HistoryChannel.ONLINE -> StrSale.online
 }
 
-/** کادرِ بزرگِ دوره: «جمع فروش» و شمارها؛ شمارشِ کور ⇒ فقط شمار */
+/** خلاصهٔ دوره (`V3Summary`، بی گرادیان): «جمع فروش · دوره»، مبلغ و شمارها؛ شمارشِ کور ⇒ فقط شمار */
 @Composable
-internal fun PeriodHero(p: SalesPeriods.Period, title: String, money: Boolean, chips: List<V3HeroChip>) {
+internal fun PeriodSummary(p: SalesPeriods.Period, title: String, money: Boolean, actions: List<V3SummaryAction>) {
   val t = p.totals
   val returns = if (money && t.refunds != 0L) " · " + StrHistory.returnsAmount(PeriodLabel.amount(t.refunds)) else ""
   val value = if (money) PeriodLabel.amount(t.sales) else StrHistory.invoices(plain(t.invoices))
-  V3HeroCard(
-    title = title,
+  V3Summary(
+    label = if (money) StrSale.salesTotal + " · " + title else title,
     value = value,
-    label = if (money) StrSale.salesTotal else null,
     caption = if (money) PeriodLabel.counts(t) + returns else StrHistory.countsOnly,
-    chips = chips,
-    //  «چاپ» کنارِ «صندوق باز — … · نقدِ مورد انتظار: …» در گوشیِ ۳۶۰ و درشتیِ ×۱٫۳ جا نمی‌شد و مبلغ بریده می‌شد
-    wrapChips = true,
+    actions = actions,
   )
 }
 

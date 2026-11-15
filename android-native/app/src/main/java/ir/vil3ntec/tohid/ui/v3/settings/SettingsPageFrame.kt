@@ -55,8 +55,8 @@ internal fun SettingsPageFrame(
   actions: List<V3Action> = emptyList(),
   state: LazyListState = rememberLazyListState(),
   bottomBar: (@Composable () -> Unit)? = null,
-  /** کادرِ جست‌وجوی صفحه — گوشی: پایینِ صفحه (`V3Dock`، کارِ یک‌دستی)؛ کامپیوتر: زیرِ عنوان */
-  search: (@Composable () -> Unit)? = null,
+  /** جست‌وجوی صفحه — گوشی: دکمهٔ جست‌وجوی نوار (`V3ScopedSearch`)؛ کامپیوتر: زیرِ عنوان */
+  search: ir.vil3ntec.tohid.ui.v3.V3Search? = null,
   content: LazyListScope.() -> Unit,
 ) {
   val stagger = rememberV3Stagger(title)

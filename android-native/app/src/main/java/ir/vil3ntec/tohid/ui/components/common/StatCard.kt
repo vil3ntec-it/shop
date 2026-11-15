@@ -45,7 +45,8 @@ enum class Trend { UP, DOWN, FLAT }
 data class StatDelta(val text: String, val trend: Trend, val good: Boolean = trend == Trend.UP)
 
 /**
- *  کارتِ آماری — VISUAL-DIRECTION §۳ بند ۲، v3 §۱۹.۵ بند ۲ و §۲۰.۳.
+ *  کارتِ آماری — VISUAL-DIRECTION §۳ بند ۲، v3 §۱۹.۵ بند ۲ و §۲۰.۳. فشرده (۶۳w، صاحب‌کار: «کادرهای بزرگ نه»):
+ *  حاشیهٔ ۱۲، عددِ ۲۲sp ِ نیم‌پررنگ و فاصله‌های ۴ — کاشیِ آیکن همان پیشین. شبکهٔ چند عددی بهتر است `MetricRows` باشد.
  *
  *  عنوان، عدد، تغییر (اختیاری؛ فقط وقتی دادهٔ دورهٔ قبل واقعاً هست) و
  *  بازهٔ زمانی. با کلیک فهرستِ فیلترشدهٔ همان عدد باز می‌شود؛ کارتِ بی
@@ -73,7 +74,7 @@ fun StatCard(
         contentDescription = listOfNotNull(title, value, delta?.text, period).joinToString(Str.listSep + " ")
         if (onClick != null) this.selected = selected
       }
-      .padding(16.dp),
+      .padding(12.dp),
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       if (icon != null) {
@@ -84,9 +85,9 @@ fun StatCard(
       }
       Text(title, style = MaterialTheme.typography.labelLarge, color = c.muted, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
-    Spacer(Modifier.height(12.dp))
-    Text(value, style = MaterialTheme.typography.headlineMedium.tabular(), color = c.text, fontWeight = FontWeight.Bold, maxLines = 1)
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(4.dp))
+    Text(value, style = MaterialTheme.typography.titleLarge.tabular(), color = c.text, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    Spacer(Modifier.height(2.dp))
     //  تغییر تا دو خط می‌شکند و بریده نمی‌شود (بازبینی: «کالای تازهٔ این ت…»)؛ بازه کنارش می‌ماند
     Row(verticalAlignment = Alignment.Top) {
       if (delta != null) {

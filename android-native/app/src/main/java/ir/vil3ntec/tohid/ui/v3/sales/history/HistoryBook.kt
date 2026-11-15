@@ -81,6 +81,14 @@ class HistoryBook(
 
   fun find(unit: SalesPeriods.Unit, key: String): SalesPeriods.Period? = if (key == currentKey(unit)) current(unit) else periods(unit).firstOrNull { it.key == key }
 
+  /** دورهٔ کادرِ کشویی: [key] (دیروزِ بی فروش هم، با جمعِ صفر) یا دورهٔ جاری */
+  fun pick(unit: SalesPeriods.Unit, key: String?): SalesPeriods.Period {
+    if (key.isNullOrEmpty()) return current(unit)
+    return find(unit, key) ?: SalesPeriods.range(key, unit, gregorian).let { (from, to) ->
+      SalesPeriods.Period(key, unit, from, to, SalesPeriods.Totals(), emptyList())
+    }
+  }
+
   companion object {
     /** تقویمِ گروه‌بندی همان نمایشِ تاریخ است (`displayDate`) */
     fun gregorianNow(): Boolean = I18n.gregorian(I18n.lang, LocaleChoice.calendar)

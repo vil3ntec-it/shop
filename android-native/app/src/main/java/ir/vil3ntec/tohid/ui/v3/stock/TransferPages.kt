@@ -138,9 +138,11 @@ internal fun TransferListScreen(
     title = StrTransfer.title,
     subtitle = StrTransfer.subtitle,
     onBack = onBack,
-    actions = listOf(V3Action(Icons.Outlined.Refresh, StrTransfer.refresh, onClick = onRefresh)),
-    //  کارِ یک‌دستی: «انتقالِ تازه» (کارِ اصلی) پایینِ صفحه؛ «تازه‌کردن» کم‌کاربرد در سربرگ می‌ماند
-    dock = listOf(V3Action(Icons.Outlined.Add, StrTransfer.newTransfer, dot = hasDraft, onClick = onNew)),
+    //  «انتقالِ تازه» (کارِ اصلی) اول، «تازه‌کردن» کنارش — هر دو در سربرگ
+    actions = listOf(
+      V3Action(Icons.Outlined.Add, StrTransfer.newTransfer, dot = hasDraft, onClick = onNew),
+      V3Action(Icons.Outlined.Refresh, StrTransfer.refresh, onClick = onRefresh),
+    ),
   ) { pad ->
     LazyColumn(
       Modifier.fillMaxSize(),

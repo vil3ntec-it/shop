@@ -97,7 +97,7 @@ object DeskMenu {
         add(Item("admin", Str.adminCenter, "Ctrl+M"))
         add(Item("receipts", Str.receipts))
         add(Item("devices", Str.devices))
-        if (canAdmin) add(Item("audit", StrNav.auditLogAlt))
+        //  «سابقهٔ عملیات» از ۶۳w در برنامه نیست (صاحب‌کار ۱۴۰۵/۰۸/۲۴)
         //  پشتیبان‌گیری بخشی از تنظیمات است (فقط صاحب/مدیر)
         if (canAdmin) add(Item("settings", StrNav.settingsBackup))
         add(Item("more", Str.more))
