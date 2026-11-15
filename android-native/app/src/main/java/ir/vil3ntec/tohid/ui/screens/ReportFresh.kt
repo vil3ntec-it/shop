@@ -227,7 +227,7 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   val today = ir.vil3ntec.tohid.todayIso()
   val clock = remember { ReportBridge.deviceClock() }
   //  PERF-DESK: JSON ِ کلِ دفتر بیرون از رشتهٔ صفحه (دفترِ تازه ⇒ تا آماده شدن همان درختِ پیشین)
-  val ledger = rememberOffMain(d) { _ -> ReportBridge.ledgerOf(d) }
+  val tree = rememberOffMain(d) { _ -> ReportBridge.ledgerOf(d) }
 
   var tab by remember { mutableStateOf(tabs.first().id) }
   var day by remember { mutableStateOf(today) }
@@ -256,8 +256,8 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   val comparing = keys && def.id in ReportFreshModel.COMPARABLE
   fun step(by: Int) { if (ReportFreshModel.canShift(span, today, shift + by)) shift += by }
   //  PERF-DESK: نما و زبانه‌های دفتری بیرون از رشتهٔ صفحه، فقط برای همین زبانه/بازه/تفکیک (`rememberOffMainFor`)
-  val fresh = rememberOffMainFor(listOf(def.id, span, dim, today, cost, lineSeller, rng), ledger) { step ->
-    val l = ledger ?: return@rememberOffMainFor null
+  val fresh = rememberOffMainFor(listOf(def.id, span, dim, today, cost, lineSeller, rng), tree) { step ->
+    val l = tree ?: return@rememberOffMainFor null
     val view = ReportFreshModel.view(l, def.id, span, dim, today, clock, ReportFreshModel.costingOf(cost), lineSeller, rng)
     step()
     DeskFresh(
@@ -385,25 +385,25 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
       if (tables.size > 1) Text(t.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
       val sales = view?.sales
       //  ریز از همان درختی که نما از آن ساخته شد (`DeskFresh.ledger`)
-      val l = fresh?.ledger
+      val ledger = fresh?.ledger
       val onRow: ((List<JsonPrimitive>) -> Unit)? = when {
         dayEnd != null && t.id == DayEndModel.METHODS_ID -> { row -> DayEndModel.methodOf(dayEnd.report, row.first().content)?.let { drill = it } }
-        l == null -> null
+        ledger == null -> null
         sales != null && (t.id.startsWith("sales.") || t.id == "profit") -> { row ->
           val dimNow = if (dim in ReportBoard.DIMS) dim else "product"
           //  POS-23: «فروشندهٔ هر ردیف» ⇒ ریزِ «کاربر» به فروشندهٔ ردیف؛ خاموش ⇒ همان فراخوانِ امروز
-          salesDrill = if (lineSeller) ReportFreshModel.drill(l, sales, dimNow, t.rows.indexOf(row), row.first().content, clock, lineSeller = true, doc = ::saleDoc)
-          else ReportFreshModel.drill(l, sales, dimNow, t.rows.indexOf(row), row.first().content, clock, ::saleDoc)
+          salesDrill = if (lineSeller) ReportFreshModel.drill(ledger, sales, dimNow, t.rows.indexOf(row), row.first().content, clock, lineSeller = true, doc = ::saleDoc)
+          else ReportFreshModel.drill(ledger, sales, dimNow, t.rows.indexOf(row), row.first().content, clock, ::saleDoc)
         }
         t.id == "today" -> { row ->
-          ReportFreshModel.dayDrill(l, row, clock, ::saleDoc)?.let { rowDrill = it to StrReportPages.dayDrillNote }
+          ReportFreshModel.dayDrill(ledger, row, clock, ::saleDoc)?.let { rowDrill = it to StrReportPages.dayDrillNote }
         }
         view?.debts != null && t.id.startsWith("debts.") -> { row ->
-          ReportFreshModel.debtDrill(l, view.debts, t.id == "debts.suppliers", t.rows.indexOf(row), row.first().content, clock, ::debtDoc)
+          ReportFreshModel.debtDrill(ledger, view.debts, t.id == "debts.suppliers", t.rows.indexOf(row), row.first().content, clock, ::debtDoc)
             ?.let { rowDrill = it to StrReportPages.debtDrillNote }
         }
         view?.fraud != null && t.id == "fraud" -> { row ->
-          ReportFreshModel.fraudDrill(l, view.fraud, t.rows.indexOf(row), clock, ::saleDoc)
+          ReportFreshModel.fraudDrill(ledger, view.fraud, t.rows.indexOf(row), clock, ::saleDoc)
             ?.let { rowDrill = it to StrReportPages.fraudDrillNote }
         }
         else -> null
