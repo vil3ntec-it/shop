@@ -815,6 +815,8 @@ function bodyFor(r, ids) {
     'PUT /shop/permissions/members/:id': { perms: {} },
     'PUT /shop/staff-scope/members/:id': { places: ['warehouse'] },
     'PATCH /shop/branches/:id': { name: 'شعبهٔ دزدیده' },
+    //  فازِ ۲: همان PATCH با POST (برنامه PATCH نمی‌فرستد)
+    'POST /shop/branches/:id': { name: 'شعبهٔ دزدیده' },
     'PUT /shop/branches/members/:id': { branches: [''] },
     'PUT /shop/branches/members/:id/perms': { perms: ['stock.view_other_branches'] },
     'PUT /shop/till-pin/members/:id': { pin: '390471' },

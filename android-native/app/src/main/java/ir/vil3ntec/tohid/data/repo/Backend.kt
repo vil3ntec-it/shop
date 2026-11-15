@@ -67,7 +67,8 @@ object Backend {
           "X-App-Id" to AppConfig.appId,
           "X-Device" to deviceUid,
           "X-App-Version" to AppConfig.appVersion,
-        )
+          //  شعبه درونِ یک دکان (فازِ ۲): شعبهٔ دفترِ روی میز؛ اصلی ⇒ هیچ (همان امروز) — `data/BranchDesk`
+        ) + ir.vil3ntec.tohid.data.BranchDesk.headers(app)
       },
     )
 

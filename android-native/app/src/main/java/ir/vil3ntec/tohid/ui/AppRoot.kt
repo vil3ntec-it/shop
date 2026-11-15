@@ -136,6 +136,8 @@ private fun AppRootActive(
 
   //  «رمز را دوباره بزنید» برای هر کارِ حساس (`reauth_required`، بندِ ۲۱.۱)
   ReauthHost()
+  //  شعبه درونِ یک دکان (فازِ ۲): «در کدام شعبه…» پس از ورود؛ پرچمِ خاموشِ `shop.branches` ⇒ هیچ
+  ir.vil3ntec.tohid.ui.v3.branches.BranchHost(store)
 
   /*
    *  دکانِ حساب — پرسیدنش فقط وقتی معلوم شود که ندارد. `askShop` یعنی «یک بار

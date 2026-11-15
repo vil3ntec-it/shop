@@ -165,7 +165,8 @@ sealed class ApiFailure(
     fun fromHttp(status: Int, body: String?, authenticated: Boolean): ApiFailure {
       val (parsedMessage, parsedCode) = parse(body)
       val code = parsedCode ?: machineCode(parsedMessage) ?: "http_$status"
-      val message = readable(parsedMessage) ?: known(code) ?: generic(status)
+      //  ردِ شعبه (`docs/BRANCHES-fa.md`): پیامِ روشنِ برنامه به‌جای متنِ فنیِ سرور
+      val message = branchText(code) ?: readable(parsedMessage) ?: known(code) ?: generic(status)
 
       return when {
         status == 401 && authenticated && parsedCode != "bad_credentials" -> SessionExpired()
@@ -212,6 +213,9 @@ sealed class ApiFailure(
      *  سرور است («هیچ جزئیاتِ فنی/زیرساخت در صفحه»، `docs/RULES-fa.md`).
      */
     private fun known(code: String): String? = knownFa(code)?.let(::localText)
+
+    private fun branchText(code: String): String? =
+      ir.vil3ntec.tohid.core.branch.BranchBook.refusalOf(code)?.let { ir.vil3ntec.tohid.core.i18n.branchRefusalText(it) }
 
     private fun knownFa(code: String): String? = when (code) {
       "not_found" -> "این بخش هنوز روی سرور فعال نیست؛ به پشتیبانی خبر بدهید."

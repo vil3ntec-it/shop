@@ -57,6 +57,21 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-54p (د۱۷، ادامه در حسابِ دیگر) زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-54p` (از `claude/batch-62`) — شعبه درونِ یک دکان، فازِ ۲ (برنامه‌ها)
+
+- **پیش از این سیزن (د۱۷، سقفِ مصرف):** core ِ `branch/BranchKey`/`BranchBook`/`BranchTally` (۶+۹+۴ آزمون)، `GET /shop` و `/shop/me` بیرون از
+  نگهبانِ شعبه، `POST /api/shop/branches/:id` همان PATCH (`shop-branches.test.js` ۱۰/۱۰).
+- **ساخته شد (همین سیزن، گوشی و کامپیوتر):** دفترِ جدای هر شعبه روی دستگاه (`data/BranchDeskAndroid.kt`: بایگانیِ حساب@دکان#شعبه،
+  تعویض زیرِ دورِ v3)؛ حال و صفِ v3 ِ هر شعبه جدا و دورِ شعبه فقط پس از پاسخِ روشنِ `GET /shop/branches` (`SyncV3Runner`)؛ سرآیندِ
+  `X-Branch-Id` روی هر درخواستِ حساب‌دار فقط برای شعبهٔ دیگر (`Backend` ⇐ `identity`؛ خریدارِ بی‌نام نه)؛ رفتن به حساب/دکان/سرورِ
+  دیگر از میزِ شعبه دفترِ اصلی را رونویسی نمی‌کند (`LedgerOwner`، `ServerSwitchAndroid`)؛ پیامِ روشنِ ردها (`ApiFailure` ⇐
+  `branchRefusalText`)؛ رابطِ `ui/v3/branches` (پرسشِ پس از ورود، ردیفِ «حسابِ من» و تنظیمات، صفحهٔ «شعبه‌ها» ِ صاحب، «گزارشِ
+  شعبه‌ها» با جمعِ فقط‌صاحب) — همه پشتِ `shop.branches`. طرح: `docs/BRANCHES-fa.md` §۱۱. **همراهِ فازِ ۳ ِ سرور (خواستِ هماهنگ‌کننده):**
+  `branch.catalog_read_only` ِ hello ⇒ ساختن/ویرایشِ کالا و مدیریتِ دسته در شعبه بسته (صفحه + سدِ `ShopStore`)، پیامِ `catalog_main_only`.
+- **آزمون:** اجرای کاملِ `desktop test` (flock، ‎-Xmx3g) پیش از آخرین ادغام: ۴۲۹۵ آزمون، ۵ سرخ، ۴ SKIP — ۲ از جداییِ آزمونِ تازهٔ خودم (قفلِ کاتالوگِ آزمونِ پیشین روی دیسک؛ رفع)، ۲ `PurchaseOrderRoutesUiTest` (رفع در batch-63 ‏9271f92cb، پس از ادغام سبز) و `SheetLangTest` (اثرِ SHA ِ برگه‌های فارسی؛ از batch-63، این شاخه به برگه‌ها دست نزده). پس از ادغام و رفع، هدف‌دار: ۲۵ آزمون، ۲۴ سبز (`BranchDeskDesktopTest` ۸/۸، `ui.v3.branches.*`، `PurchaseOrderRoutesUiTest`)، ۱ سرخ همان `SheetLangTest`. core `jvmTest` ۲۰۰۱، ۰ شکست، ۲ SKIP. سرور PGlite: shop-branches ۱۰/۱۰، shop-branches-doors ۷/۷، shop-branches-stock ۷/۷، tenant-matrix-branches ۱/۱، shop-route-inventory ۲/۲، paid-routes ۶/۶ و ۶/۶، route-authz-inventory ۴/۴، tenant-matrix ۵/۵، role-route-isolation ۳/۳، routes-idor-32 ۱۵/۱۵ و ۴/۴، api-contract ۲/۲. precheck `fail=0`، spec «سالم»، quality بی ❌. سرخِ پیش از کد برای آزمون‌های برنامه جدا اجرا نشد (صفِ Gradle)؛ نخستین اجرای کامل ۱۷ سرخِ i18n از همین StrBranchDesk گرفت (رفع).
+- **نیمه‌کاره/قدمِ بعد:** فازِ ۳ (آینهٔ کاتالوگ به بخشِ هر شعبه — دفترِ شعبهٔ تازه بی کالا شروع می‌شود؛ درهای `/shop/*` ِ شعبه‌شناس)،
+  فازِ ۴ (انتقال میانِ شعبه‌ها؛ POS-16 با پرسش از صاحب‌کار)، فازِ ۵ (روشن کردن روی دکانِ واقعی پس از رسیدنِ این نسخه به همهٔ دستگاه‌ها).
+  شعبهٔ دیگر فقط با Sync v3 کار می‌کند (دستگاهِ v1 با صفِ خالی و سرورِ دارای v3 خودکار به v3 می‌رود). آزمون روی دستگاهِ واقعی نشد.
 ### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-63c زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-63c` (از `origin/claude/batch-63` baff32f2e) — صندوقِ تعارضِ v3 در برنامه (SYN-07، S28، S28b)
 
 - **ساخته شد (پشتِ پرچمِ خاموشِ دکانِ `shop.sync_v3_inbox`، FLAGS-ON §۴۳؛ «بله» ِ پرسشِ ۳۲؛ موتورِ v3 همان پیش‌فرض‌خاموش):** صفحه و نوارِ

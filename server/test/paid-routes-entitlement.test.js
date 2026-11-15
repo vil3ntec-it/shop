@@ -103,7 +103,7 @@ const FREE = [
     'PUT /shop/staff-scope/members/:id']],
   ['شعبه درونِ دکان (فازِ ۱) بخشی از مجوزهای هستهٔ دکان است (کدام کارمند کدام دفتر را می‌بیند) و کلیدِ کاتالوگ ندارد، فقط '
     + 'پرچمِ shop.branches؛ صاحب باید پس از پایانِ اشتراک هم بتواند دسترسیِ کارمند را به شعبه ببندد یا شعبه را بایگانی کند', [
-    'POST /shop/branches', 'PATCH /shop/branches/:id', 'PUT /shop/branches/members/:id',
+    'POST /shop/branches', 'PATCH /shop/branches/:id', 'POST /shop/branches/:id', 'PUT /shop/branches/members/:id',
     //  POS-16/S17: مجوزِ «موجودیِ شعبه‌های دیگر» همان دسترسیِ کارمند به شعبه است (فقط صاحب)
     'PUT /shop/branches/members/:id/perms']],
   ['PIN ِ شخصیِ صندوق و نوبت‌های سنجیدهٔ صندوق (STF-04، S46، مهاجرتِ ۶۴۰) هویتِ کاربرِ صندوق‌اند، بخشی از مجوزهای هستهٔ دکان، '
