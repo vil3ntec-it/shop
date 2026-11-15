@@ -54,7 +54,9 @@ router.put('/permissions/members/:id', requireShop, requirePermission('members.r
 router.get('/devices', requireShop, requirePermission('members.view'), async (req, res) => {
   const devices = await deviceBlock.listForShop(req.shopId);
   const current = req.device?.id || null;
-  res.json({ devices: devices.map((d) => ({ ...d, current: d.id === current })) });
+  //  S44: دکمهٔ «بازیابی از پشتیبان» ِ دستگاهِ غیرفعال فقط با پرچمِ روشن (خاموش ⇒ پاسخ بایت‌به‌بایت همان پیشین)
+  const replay = (await require('../lib/lost-device-replay').isOn(req.shopId)) ? { replay: true } : {};
+  res.json({ devices: devices.map((d) => ({ ...d, current: d.id === current })), ...replay });
 });
 
 router.post('/devices/:id/disable', requireShop, requirePermission('members.manage'), async (req, res) => {

@@ -23,7 +23,6 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.perm.CreditLimitPerm
-import ir.vil3ntec.tohid.data.CreditLimitGate
 import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
@@ -39,17 +38,16 @@ import ir.vil3ntec.tohid.ui.v3.V3FieldKind
 import ir.vil3ntec.tohid.ui.v3.V3FormSheet
 import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.V3PageSwitch
-import ir.vil3ntec.tohid.ui.v3.V3Segmented
 import ir.vil3ntec.tohid.ui.v3.V3SuccessCheck
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.v3Shake
 import kotlinx.coroutines.delay
 
 /**
- *  قرض‌دارِ تازه / ویرایش (`debtors/new`، `debtors/{id}/edit`): نام (لازم)، تلفن، یادداشت و سقفِ
- *  اعتبار (خالی = بی سقف). ذخیره = `DebtorEngine.add` / `editWithLimit`؛ ردِ موتور پیامِ خودش را دارد.
- *  CRM-03: با پرچمِ `shop.credit_limit_perm` و کاربری که `customers.credit_limit` ندارد، کادرِ سقفِ مشتریِ موجود بسته است
- *  (با دلیل) یا تا سقفِ نقش باز است و بیشتر یا «بی سقف» خطای درجا می‌گیرد و ذخیره نمی‌شود (`CreditLimitGate`).
+ *  قرض‌دارِ تازه / ویرایش (`debtors/new`، `debtors/{id}/edit`) — صاحب‌کار ۱۴۰۵/۰۸/۲۳: «اسم و شماره بسه»: فقط نام (لازم)
+ *  و تلفن (اختیاری). ذخیره = `DebtorFormsModel.saveBasic` (`DebtorEngine.add` / `editWithLimit`)؛ ردِ موتور پیامِ خودش را
+ *  دارد. یادداشت، سقف (CRM-03: تازه ⇒ سقفِ پیش‌فرضِ دکان) و پروندهٔ CRM ِ مشتریِ کهنه (شمارهٔ دوم، برچسب، نشانی، رضایت)
+ *  پرسیده نمی‌شوند و دست نمی‌خورند.
  */
 @Composable
 internal fun DebtorFormSheet(
@@ -67,71 +65,17 @@ internal fun DebtorFormSheet(
   var tried by rememberSaveable { mutableStateOf(false) }
   var shake by remember { mutableStateOf(0) }
   val nameError = DebtorFormsModel.nameError(f)
-  val limitField = remember(debtor?.id, limitRules) { CreditLimitPerm.field(limitRules, existing = debtor != null) }
-  val limitError = DebtorFormsModel.limitError(f) ?: DebtorFormsModel.limitPermError(limitRules, debtor, f)
-  val consentError = DebtorFormsModel.consentError(f)
-  val pinError = DebtorFormsModel.pinError(f)
   V3FormSheet(title = if (debtor == null) StrMoney.newDebtor else StrMoney.editDebtor, dirty = f != initial, onClose = onClose) { sheet ->
     Column(Modifier.v3Shake(shake)) {
       V3TextField(f.name, { f = f.copy(name = it) }, StrMoney.name, required = true, error = nameError.takeIf { tried })
       Spacer(Modifier.height(12.dp))
       V3TextField(f.phone, { f = f.copy(phone = it) }, StrMoney.phoneOptional, kind = V3FieldKind.PHONE)
-      Spacer(Modifier.height(12.dp))
-      V3TextField(f.phone2, { f = f.copy(phone2 = it) }, StrMoney.phone2Optional, kind = V3FieldKind.PHONE)
-      Spacer(Modifier.height(12.dp))
-      V3TextField(f.notes, { f = f.copy(notes = it) }, StrMoney.notesOptional, singleLine = false)
-      Spacer(Modifier.height(12.dp))
-      V3TextField(
-        f.creditLimit, { f = f.copy(creditLimit = it) }, StrMoney.creditLimitField,
-        kind = V3FieldKind.MONEY, helper = CreditLimitGate.helper(limitField, fresh = debtor == null) ?: StrMoney.creditLimitHelper, error = limitError,
-        enabled = !limitField.locked,
-      )
-      Spacer(Modifier.height(12.dp))
-      V3TextField(f.tags, { f = f.copy(tags = it) }, StrMoney.tagsField, helper = StrMoney.tagsHelper)
-      Spacer(Modifier.height(14.dp))
-      //  CRM-09: نشانیِ تحویل (§۴.۴) — «نشانه + شماره»؛ همه اختیاری
-      Text(StrMoney.addressTitle, style = v3Text(13, FontWeight.SemiBold, 18), color = PhoneV3.colors.inkMuted)
-      Spacer(Modifier.height(6.dp))
-      V3TextField(f.address.landmark, { f = f.copy(address = f.address.copy(landmark = it)) }, StrMoney.addressLandmark,
-        placeholder = StrMoney.addressLandmarkHint)
-      Spacer(Modifier.height(10.dp))
-      V3TextField(f.address.area, { f = f.copy(address = f.address.copy(area = it)) }, StrMoney.addressArea)
-      Spacer(Modifier.height(10.dp))
-      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        V3TextField(f.address.gate, { f = f.copy(address = f.address.copy(gate = it)) }, StrMoney.addressGate, Modifier.weight(1f))
-        V3TextField(f.address.floor, { f = f.copy(address = f.address.copy(floor = it)) }, StrMoney.addressFloor, Modifier.weight(1f))
-      }
-      Spacer(Modifier.height(10.dp))
-      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        V3TextField(f.address.plusCode, { f = f.copy(address = f.address.copy(plusCode = it)) }, StrMoney.addressPlusCode, Modifier.weight(1f))
-        V3TextField(f.address.postalCode, { f = f.copy(address = f.address.copy(postalCode = it)) }, StrMoney.addressPostal, Modifier.weight(1f),
-          kind = V3FieldKind.NUMBER)
-      }
-      Spacer(Modifier.height(10.dp))
-      //  پین — منبعِ اصلیِ نشانی (§۴.۴): مختصات یا پیوندِ برنامهٔ نقشه، بی شبکه (`PinText`)
-      V3TextField(f.pinText, { f = f.copy(pinText = it) }, StrMoney.addressPin, placeholder = StrMoney.addressPinHint,
-        error = pinError.takeIf { tried })
-      Spacer(Modifier.height(14.dp))
-      Text(StrMoney.consentTitle, style = v3Text(13, FontWeight.SemiBold, 18), color = PhoneV3.colors.inkMuted)
-      Spacer(Modifier.height(6.dp))
-      V3Segmented(
-        listOf(StrMoney.consentUnknown, StrMoney.consentYes, StrMoney.consentNo),
-        selected = when (f.consent) { null -> 0; true -> 1; false -> 2 },
-        onSelect = { i -> f = f.copy(consent = when (i) { 1 -> true; 2 -> false; else -> null }) },
-      )
-      if (f.consent == true) {
-        Spacer(Modifier.height(10.dp))
-        V3TextField(
-          f.consentSource, { f = f.copy(consentSource = it) }, StrMoney.consentSource,
-          required = true, placeholder = StrMoney.consentSourceHint, error = consentError.takeIf { tried },
-        )
-      }
       Spacer(Modifier.height(18.dp))
       V3Button(
         StrKit.save,
         {
           tried = true
-          if (nameError != null || limitError != null || consentError != null || pinError != null) shake++
+          if (nameError != null) shake++
           else if (onSave(f)) sheet.finish(onSaved)
         },
         Modifier.fillMaxWidth(),
@@ -144,10 +88,11 @@ internal fun DebtorFormSheet(
 private enum class TxFormStep { FORM, OVER_LIMIT, DONE }
 
 /**
- *  ثبتِ تراکنش (`debtors/{id}/tx?kind=give|receive`، و گامِ ۲ ِ «دریافت»): «برد | رسید» (از
- *  `kind`)، مبلغ با «تسویهٔ کامل» (فقط رسید)، تاریخ، یادداشت، سررسیدِ برد، و «مانده پس از ثبت» ِ
- *  زنده. بردی که از سقف می‌گذرد ⇒ گامِ دومِ همین برگه با هشدار و «باز هم ثبت کن» (همان پرسشِ
- *  امروز، CRM-03). ثبت ⇒ تیکِ موفقیت و بسته شدن؛ حساب دوباره می‌شمارد.
+ *  ثبتِ تراکنش (`debtors/{id}/tx?kind=give|receive`، و گامِ ۲ ِ «دریافت») — برگهٔ کوچک‌شده (صاحب‌کار ۱۴۰۵/۰۸/۲۳):
+ *  سربرگِ «ثبتِ تراکنش» با تاریخِ نوشته‌ایِ کوچک روبه‌رویش (پیش‌فرض امروز؛ زدن ⇒ کادرِ تاریخ)، مبلغ با قوطیِ «برد/رسید»
+ *  کنارش (پیش‌فرض همان `kind` ِ دکمه‌ای که برگه را باز کرد؛ زدن ⇒ نوعِ دیگر) و «تسویهٔ کامل» (فقط رسید)، یادداشتِ یک‌خطی،
+ *  تراشه‌های سررسیدِ برد و «مانده پس از ثبت» ِ زنده. آن‌چه ذخیره می‌شود همان `TxForm` و همان `DebtorFormsModel.submit` است.
+ *  بردی که از سقف می‌گذرد ⇒ گامِ دومِ همین برگه با هشدار و «باز هم ثبت کن» (CRM-03). ثبت ⇒ تیکِ موفقیت و بسته شدن.
  */
 @Composable
 internal fun TxFormSheet(
@@ -164,36 +109,45 @@ internal fun TxFormSheet(
   var f by remember(debtor.id, initialKind) { mutableStateOf(initial) }
   var step by rememberSaveable { mutableStateOf(TxFormStep.FORM) }
   var tried by rememberSaveable { mutableStateOf(false) }
+  var dateOpen by rememberSaveable { mutableStateOf(false) }
   var shake by remember { mutableStateOf(0) }
   val receiving = f.kind == DebtorEngine.Kind.RECEIVE
   val amountError = DebtorFormsModel.amountError(f)
 
-  V3FormSheet(title = StrMoney.newTx, dirty = f != initial && step != TxFormStep.DONE, onClose = onClose) { sheet ->
+  V3FormSheet(
+    title = StrMoney.newTx,
+    dirty = f != initial && step != TxFormStep.DONE,
+    onClose = onClose,
+    headerEnd = { if (step == TxFormStep.FORM) TxDateLink(f.date, dateOpen) { dateOpen = !dateOpen } },
+  ) { sheet ->
     LaunchedEffect(step) { if (step == TxFormStep.DONE) { delay(450); sheet.finish(onDone) } }
     V3PageSwitch(step, depth = { it.ordinal }) { s ->
       when (s) {
         TxFormStep.FORM -> Column(Modifier.v3Shake(shake)) {
+          if (dateOpen) {
+            //  همان کادرِ تاریخِ همیشگی (نوشتن + «امروز/دیروز»)؛ تراشه ⇒ تاریخ و بسته شدن
+            V3DateField(f.date, { iso -> f = f.copy(date = iso); if (DebtBook.isIsoDate(iso) && iso.length == 10) dateOpen = false }, StrMoney.date)
+            Spacer(Modifier.height(12.dp))
+          }
           Text("${debtor.name} — ${MoneyText.state(balance)}", style = v3Text(13, FontWeight.Medium, 18), color = PhoneV3.colors.inkMuted)
           Spacer(Modifier.height(12.dp))
-          V3Segmented(
-            listOf(StrMoney.giveKind, StrMoney.receiveKind),
-            selected = if (receiving) 1 else 0,
-            onSelect = { i -> f = f.copy(kind = if (i == 1) DebtorEngine.Kind.RECEIVE else DebtorEngine.Kind.GIVE) },
-          )
-          Spacer(Modifier.height(14.dp))
-          V3TextField(f.amount, { f = f.copy(amount = it) }, StrMoney.amount, kind = V3FieldKind.MONEY, required = true, error = amountError.takeIf { tried })
+          Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            V3TextField(
+              f.amount, { f = f.copy(amount = it) }, StrMoney.amount, Modifier.weight(1f),
+              kind = V3FieldKind.MONEY, required = true, error = amountError.takeIf { tried },
+            )
+            TxKindToggle(f.kind, onToggle = { f = f.copy(kind = f.kind.flipped()) })
+          }
           val settle = DebtorFormsModel.settleAll(balance)
           if (receiving && settle != null) {
             Spacer(Modifier.height(8.dp))
             V3Chip(StrMoney.settleAll, selected = f.amount == settle, onClick = { f = f.copy(amount = settle) })
           }
           Spacer(Modifier.height(12.dp))
-          V3DateField(f.date, { f = f.copy(date = it) }, StrMoney.date)
-          Spacer(Modifier.height(12.dp))
           V3TextField(f.notes, { f = f.copy(notes = it) }, StrMoney.notesOptional)
           if (!receiving) {
-            Spacer(Modifier.height(12.dp))
-            DueDateEditor(f.due, { f = f.copy(due = it) }, onText = { f = f.copy(dueText = it) })
+            Spacer(Modifier.height(10.dp))
+            TxDueChips(f.due) { f = f.copy(due = it) }
           }
           Spacer(Modifier.height(14.dp))
           Text(

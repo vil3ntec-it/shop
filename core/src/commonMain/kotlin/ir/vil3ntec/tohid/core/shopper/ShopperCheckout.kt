@@ -11,7 +11,10 @@ data class CheckoutForm(
   /** `delivery` یا `pickup`؛ خالی ⇒ پیش‌فرضِ دکان ([CheckoutRules.fulfillmentOf]) */
   val fulfillment: String = "",
   val name: String = "",
+  /** شمارهٔ تماس برای پیک — فقط شکل، بی کد («فقط ایمیل»، ۱۴۰۵/۰۸/۲۳) */
   val phone: String = "",
+  /** ایمیلِ مشتری — هویت: کدِ تأیید به همین می‌رود و بلیت با همین است */
+  val email: String = "",
   val addressText: String = "",
   val landmark: String = "",
   val area: String = "",
@@ -42,7 +45,7 @@ data class CheckoutForm(
 data class AppliedPromo(val discountMinor: Long, val code: String = "", val deviceId: String? = null)
 
 /** چرا «ثبت» هنوز بسته است — هر کدام یک پیامِ روشن در [ShopperText.problem] دارد. */
-enum class CheckoutProblem { CLOSED, EMPTY, UNAVAILABLE_LINES, NO_FULFILLMENT, NAME, PHONE, VERIFY, ADDRESS, ZONE, SLOT, BELOW_MIN }
+enum class CheckoutProblem { CLOSED, EMPTY, UNAVAILABLE_LINES, NO_FULFILLMENT, NAME, PHONE, EMAIL, VERIFY, ADDRESS, ZONE, SLOT, BELOW_MIN }
 
 /**
  *  برگهٔ پولِ پیش از ثبت. [deliveryFeeMinor] null ⇒ «پس از گزینشِ ناحیه» (هنوز دانسته نیست). جمعِ نهایی را
@@ -145,14 +148,21 @@ object CheckoutRules {
   /** شمارهٔ نوشته‌شده به قالبِ سرور (`+93…`)؛ نادرست ⇒ null (`LocaleFormat.normalizePhone` ِ همان هسته) */
   fun phoneOf(form: CheckoutForm): String? = LocaleFormat.normalizePhone(form.phone)
 
-  /** بلیتِ همین شماره و هنوز معتبر؟ */
-  fun verified(form: CheckoutForm, ticket: PhoneTicket?, now: Long): Boolean {
-    val phone = phoneOf(form) ?: return false
-    return ticket != null && ticket.phone == phone && ticket.expiresAt > now
+  /** ایمیلِ نوشته‌شده، کوچک‌حرف و بی فاصلهٔ دو سر؛ نادرست ⇒ null (همان سنجشِ سرور: یک @ و بی فاصله) */
+  fun emailOf(form: CheckoutForm): String? {
+    val e = form.email.trim().lowercase()
+    val at = e.indexOf('@')
+    return if (at > 0 && at == e.lastIndexOf('@') && at < e.length - 1 && e.length <= 190 && e.none { it.isWhitespace() }) e else null
+  }
+
+  /** بلیتِ همین **ایمیل** و هنوز معتبر؟ («فقط ایمیل»: شماره هویت نیست؛ بلیتِ کهنهٔ بی ایمیل هرگز) */
+  fun verified(form: CheckoutForm, ticket: CustomerTicket?, now: Long): Boolean {
+    val email = emailOf(form) ?: return false
+    return ticket != null && ticket.email.isNotEmpty() && ticket.email == email && ticket.expiresAt > now
   }
 
   /** همهٔ دلیل‌های بسته بودنِ «ثبت»، به ترتیبِ برگه؛ خالی ⇒ آمادهٔ فرستادن */
-  fun problems(page: StorePage, cart: Cart?, form: CheckoutForm, ticket: PhoneTicket?, slots: SlotsPage?, now: Long): List<CheckoutProblem> {
+  fun problems(page: StorePage, cart: Cart?, form: CheckoutForm, ticket: CustomerTicket?, slots: SlotsPage?, now: Long): List<CheckoutProblem> {
     val out = mutableListOf<CheckoutProblem>()
     if (closed(page.shop)) out += CheckoutProblem.CLOSED
     if (cart == null || cart.lines.isEmpty()) out += CheckoutProblem.EMPTY
@@ -161,6 +171,7 @@ object CheckoutRules {
     if (f == null) out += CheckoutProblem.NO_FULFILLMENT
     if (form.name.isBlank()) out += CheckoutProblem.NAME
     if (phoneOf(form) == null) out += CheckoutProblem.PHONE
+    if (emailOf(form) == null) out += CheckoutProblem.EMAIL
     else if (!verified(form, ticket, now)) out += CheckoutProblem.VERIFY
     if (f == DELIVERY) {
       //  همان سرور: پین بس است؛ بی پین نشانی یا نشانه (CHK-08)
@@ -205,7 +216,8 @@ object CheckoutRules {
     form.cashTenderMinor?.takeIf { it in tenders(page, cart, form, slots, discountMinor) }
 
   /**
-   *  بدنهٔ `POST /checkout` (همان `orderBody` ِ وب). [phone] همان E.164 ِ بلیت؛ [promo] تخفیفِ گفتهٔ سرور برای همین سبد.
+   *  بدنهٔ `POST /checkout` (همان `orderBody` ِ وب). [phone] شمارهٔ تماسِ فرم (E.164، [phoneOf]؛ فقط برای پیک — هویت بلیتِ
+   *  ایمیل است)؛ [promo] تخفیفِ گفتهٔ سرور برای همین سبد.
    *  [deviceId] شناسهٔ **تصادفیِ** همین نصب (`ShopperMemory.withDevice`، نه شناسهٔ سخت‌افزار) — مثلِ وب در هر ثبت می‌رود
    *  (MKT-02 «یک بار برای هر دستگاه»، RSK-04 «دستگاهِ بسته»)؛ سرور فقط چکیدهٔ «دکان + شناسه» را و فقط با پرچمِ دکان نگه می‌دارد.
    */

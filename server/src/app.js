@@ -209,10 +209,9 @@ async function createApp({ runMigrations = true } = {}) {
       server: 'online',
       //  حالِ دیتابیس از آخرین سنجشِ پس‌زمینه می‌آید، نه از یک پرس‌وجوی تازه
       database: lastDbState ? 'connected' : 'unavailable',
-      email_worker: worker,
-      version: require('../package.json').version,
       time: now(),
-      uptimeSeconds: Math.round(process.uptime()),
+      //  نسخه، مدتِ روشن بودن و حالِ کارگر فقط برای میزبان/شبکهٔ درونیِ بی پیش‌کش (`lib/public-detail.js`)
+      ...require('./lib/public-detail').inside(req, { email_worker: worker, version: require('../package.json').version, uptimeSeconds: Math.round(process.uptime()) }),
     });
   };
 
@@ -229,8 +228,8 @@ async function createApp({ runMigrations = true } = {}) {
   const ready = async (req, res) => {
     const db = await healthy();
     res.status(db ? 200 : 503).json({
-      ok: db, database: db ? 'connected' : 'unavailable',
-      version: require('../package.json').version, time: now(),
+      ok: db, database: db ? 'connected' : 'unavailable', time: now(),
+      ...require('./lib/public-detail').inside(req, { version: require('../package.json').version }),
     });
   };
   app.get('/health', health);

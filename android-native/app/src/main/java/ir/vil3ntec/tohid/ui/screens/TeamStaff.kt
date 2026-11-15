@@ -414,8 +414,11 @@ fun DevicesSection(shops: ShopRepository, canEdit: Boolean, snackbar: SnackbarHo
   val scope = rememberCoroutineScope()
   var devices by remember { mutableStateOf<List<ShopDeviceDto>?>(null) }
   var confirm by remember { mutableStateOf<ShopDeviceDto?>(null) }
+  //  S44: «بازیابی از پشتیبان» ِ دستگاهِ غیرفعال — فقط با پرچمِ روشنِ سرور (`replay`)
+  var replay by remember { mutableStateOf(false) }
+  var restoring by remember { mutableStateOf<ShopDeviceDto?>(null) }
 
-  suspend fun load() { shops.devices().onSuccess { devices = it } }
+  suspend fun load() { shops.devicePage().onSuccess { devices = it.devices; replay = it.replay } }
   LaunchedEffect(Unit) { load() }
 
   val list = devices ?: return
@@ -460,10 +463,19 @@ fun DevicesSection(shops: ShopRepository, canEdit: Boolean, snackbar: SnackbarHo
             )
           }
         }
+        if (ir.vil3ntec.tohid.data.LostDeviceRestore.canReplay(disabled, d.current, canEdit, replay)) {
+          Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+            TohidSecondaryButton(text = ir.vil3ntec.tohid.core.i18n.StrLostDevice.button, onClick = { restoring = d })
+          }
+        }
       }
     }
   }
   Spacer(Modifier.height(18.dp))
+
+  restoring?.let { d ->
+    ir.vil3ntec.tohid.ui.v3.account.team.LostDeviceReplaySheet(d.id, onDismiss = { restoring = null }, onDone = { scope.launch { load() } })
+  }
 
   confirm?.let { d ->
     TohidConfirmDialog(

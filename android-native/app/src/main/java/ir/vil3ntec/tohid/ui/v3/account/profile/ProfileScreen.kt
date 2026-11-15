@@ -199,7 +199,8 @@ internal fun RouteScope.ProfileRoute() {
     menu = ProfileHomeModel.menu(signedIn, canSettings),
     alerts = alerts,
   )
-  ProfileContent(ui, bottomReserve, onOpen = { nav.open(it) }, modes = if (LocalDeskLayout.current) null else ({ ModeSwitcher() }))
+  //  پوسته جای نوارِ پایین را خودش نگه می‌دارد (`ShellFrame`) — دوباره‌شمردنش ۸۰dp ِ خالی می‌گذاشت
+  ProfileContent(ui, 0.dp, onOpen = { nav.open(it) }, modes = if (LocalDeskLayout.current) null else ({ ModeSwitcher() }))
 }
 
 /** وضعیتِ اشتراکِ همین حساب — مجوزِ امضاشدهٔ گوشی، وگرنه حرفِ سرور (`SubscriptionPulse`) */

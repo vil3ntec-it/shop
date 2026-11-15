@@ -48,7 +48,7 @@ class SyncV1Engine private constructor(context: Context) {
 
   /** کلیدِ حساب — نشستِ نبوده هم کلیدِ خودش را دارد. */
   private var accountKey: String = keyOf()
-  private var state = SyncStateV1(app, accountKey)
+  internal var state = SyncStateV1(app, accountKey)
   private var queue = OpQueue(app, accountKey)
 
   /**
@@ -75,7 +75,7 @@ class SyncV1Engine private constructor(context: Context) {
     SyncCommit(SyncCommit.Journal(java.io.File(app.filesDir, "sync-journal-${OpQueue.fileKey(key)}.json")), parts)
 
   /** §۹.۵: سرور از پشتیبان برگشت — شرح سرِ `V1Restore` و `core/sync/RestoreReplay.kt` */
-  private var restore = restoreFor(accountKey)
+  internal var restore = restoreFor(accountKey)
 
   private fun restoreFor(key: String) =
     V1Restore(state, queue, FileReplayStore.inDir(app.filesDir, "sync-replay-${OpQueue.fileKey(key)}"), commit, ::clock) {
@@ -171,7 +171,7 @@ class SyncV1Engine private constructor(context: Context) {
         synchronized(this) { commit.queueRecorded() }
         val before = queue.droppedCount()
         try {
-          pushQueue(pushClient(), deviceId())
+          pushQueue(pushClients.client(), deviceId())
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
           throw cancelled
         } catch (e: Throwable) {
@@ -211,7 +211,7 @@ class SyncV1Engine private constructor(context: Context) {
     busy = true
     publish()
     try {
-      val client = pushClient()
+      val client = pushClients.client()
       val device = store.deviceUid
       recoverWith(object : RecoverIo {
         override suspend fun push() = pushQueue(client, device)
@@ -422,8 +422,7 @@ class SyncV1Engine private constructor(context: Context) {
    *  `core/…/core/sync/PushSince.kt`. سرور فقط با پرچمِ دکانِ `sync.cursor_from_since` آن را می‌خواند؛
    *  بی پرچم (و برای پمپ) همان رفتارِ امروز.
    */
-  private fun pushClient(): SyncV1Client =
-    SyncV1Client(Backend.api(app)) { ir.vil3ntec.tohid.core.sync.PushSince.since(state.pushSince, state.cursor) }
+  private val pushClients = SyncV1PushClientAndroid(app) { state }
 
   /* ==========================================================
      ۲) یک دورِ کامل: Push تا ته، بعد Pull
@@ -444,7 +443,7 @@ class SyncV1Engine private constructor(context: Context) {
       try {
         //  ژورنالِ نیمه‌مانده پیش از هر Push/Pull (F0-05)
         if (commit.pending()) synchronized(this) { commit.recover(read()) }
-        val client = pushClient()
+        val client = pushClients.client()
         val device = deviceId()
 
         //  §۹.۵: سرور از پشتیبان برگشته؟ (هر دور) opهای گم‌شده — خودِ دستگاه و گرفته‌شده‌ها — به ترتیبِ سرور جلوی صف
@@ -492,7 +491,7 @@ class SyncV1Engine private constructor(context: Context) {
         var rounds = 0
         while (!state.restorePending && !state.restoredRebuild && rounds < 50) {
           rounds++
-          val got = client.pull(device, state.cursor)
+          val got = client.pull(device, state.cursor).also { ir.vil3ntec.tohid.platform.HubLinkV1Android.saw(app, it.ops.map { o -> o.opId }) }  // S29: «دیده از سرور» ِ هاب (خاموش ⇒ هیچ)
           //  §۹.۵: opهای دیگران با شماره‌شان — **پیش از** نشاندن — برای دوباره فرستادن پس از بازیابی
           if (got.seen.isNotEmpty()) restore.seen(got.seen)
           //  §۹.۵: دوران کنارِ pull ⇔ پرچمِ سرور روشن ⇒ دورِ بعد درِ دوران پرسیده می‌شود، وگرنه هرگز
@@ -600,7 +599,7 @@ class SyncV1Engine private constructor(context: Context) {
     try {
       //  opهای ژورنالِ «ثبت» که هنوز به صف نرسیده بودند (همان `op_id`)
       synchronized(this) { commit.queueRecorded() }
-      pushQueue(pushClient(), deviceId())
+      pushQueue(pushClients.client(), deviceId())
       Result.success(queue.size())
     } catch (cancelled: kotlinx.coroutines.CancellationException) {
       throw cancelled
@@ -627,7 +626,7 @@ class SyncV1Engine private constructor(context: Context) {
     publish()
     try {
       synchronized(this) { commit.queueRecorded() }
-      val client = pushClient()
+      val client = pushClients.client()
       val device = deviceId()
       //  §۹.۵: سرور از پشتیبان برگشته؟ opهای گم‌شده (خودی و گرفته‌شده، دفترچه رمزدار نیست) پیش از
       //  Snapshot جلوی صف ⇒ دفترِ بازسازی‌شده آن‌ها را هم دارد

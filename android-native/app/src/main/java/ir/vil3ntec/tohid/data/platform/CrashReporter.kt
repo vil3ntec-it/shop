@@ -59,15 +59,23 @@ object CrashReporter {
   /** خطا ⇒ گزارشِ پوشانده‌شده در صفِ روی دیسک */
   fun record(context: Context, error: Throwable, nowMs: Long) {
     val report = CrashReports.fromThrowable(error, AppConfig.appVersion, nowMs)
+    enqueue(context, report, nowMs)
+  }
+
+  /** گزارشِ ساخته‌شده (مثلاً جزئیاتِ پشتیبانیِ همگام‌سازی، `SupportDiagAndroid`) به همان صف */
+  fun enqueue(context: Context, report: CrashReport, nowMs: Long) {
     update(context) { CrashReports.enqueue(it, report, nowMs) }
   }
 
   /** فرستادنِ صف؛ ⇒ شمارِ فرستاده‌ها. نخستین شکست (نت نیست) بقیه را برای بعد می‌گذارد. */
-  suspend fun flush(context: Context): Int {
-    if (!runCatching { AppConfig.isConfigured(context) }.getOrDefault(false)) return 0
+  suspend fun flush(context: Context): Int = flushIds(context).size
+
+  /** همان [flush]، با شناسهٔ گزارش‌هایی که سرور گرفت */
+  suspend fun flushIds(context: Context): Set<String> {
+    if (!runCatching { AppConfig.isConfigured(context) }.getOrDefault(false)) return emptySet()
     val now = System.currentTimeMillis()
     val pending = synchronized(lock) { CrashReports.toSend(read(context), now) }
-    if (pending.isEmpty()) return 0
+    if (pending.isEmpty()) return emptySet()
     val api = Backend.api(context)
     val sent = HashSet<String>()
     for (r in pending) {
@@ -76,7 +84,9 @@ object CrashReporter {
     }
     //  «فرستاده» علامت می‌خورد؛ ردیف تا نشان دادنِ کدش (یا کهنه شدن) می‌ماند
     update(context) { CrashReports.settle(CrashReports.markSent(it, sent), now) }
-    return sent.size
+    //  گزارشِ پشتیبانیِ همگام‌سازی که در شروعِ برنامه رفت هم «خبردار شد» می‌شود
+    runCatching { SupportDiagAndroid.markSent(context, sent) }
+    return sent
   }
 
   /** کدِ گزارشی که هنوز به کاربر نشان داده نشده؛ null ⇒ هیچ */

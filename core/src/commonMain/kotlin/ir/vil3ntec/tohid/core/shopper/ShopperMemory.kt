@@ -26,7 +26,7 @@ data class ShopperState(
   val carts: List<Cart> = emptyList(),
   val orders: List<SavedOrder> = emptyList(),
   val recent: List<RecentShop> = emptyList(),
-  val ticket: PhoneTicket? = null,
+  val ticket: CustomerTicket? = null,
   /** فقط برای پُر کردنِ برگهٔ بعدی: نام و آخرین نشانی (همان `store-customer` ِ وب) */
   val name: String = "",
   val addressText: String = "",

@@ -48,7 +48,7 @@ data class DashboardNumbers(
       val todaySales = d.sales.filter { it.date == today && it.status != "cancelled" }
 
       //  یک گذر روی تراکنش‌ها، نه یک پیمایش به ازای هر قرض‌دار
-      val byDebtor = d.transactions.groupBy { it.debtorId }
+      val byDebtor = ir.vil3ntec.tohid.data.DebtRows.of(d)  // CRM-10: کلیدِ ماندگار
       val owing = d.debtors
         .map { debtor ->
           var amount = 0.0
@@ -83,8 +83,7 @@ data class DashboardNumbers(
        *  باز است و بیش از سی روز هیچ حرکتی — نه قرضِ تازه، نه پرداخت —
        *  روی آن نبوده. همان چیزی که دکاندار هم با آن حساب می‌کند.
        */
-      val lastMove = d.transactions
-        .groupBy { it.debtorId }
+      val lastMove = byDebtor
         .mapValues { (_, list) -> list.maxOf { isoMillis(it.date) } }
       val overdue = owing.filter { (debtor, _) ->
         val seen = lastMove[debtor.id] ?: 0L

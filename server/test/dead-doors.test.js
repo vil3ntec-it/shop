@@ -40,6 +40,8 @@ const GONE = [
   'GET /api/me/settings', 'PUT /api/me/settings', 'POST /api/me/redeem', 'POST /api/me/errors',
   'GET /api/portal/subscriptions',
   'POST /api/auth/staff-login',
+  //  «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): کدِ پیامکیِ افزودنِ شماره (AUTH-08 ِ پیشین) ⇐ به‌جایش `POST /api/me/email/code`
+  'POST /api/me/phone/code',
 ];
 /** دورِ دوم — هر کدام با «⇐ به‌جایش» در B15 ِ `docs/SECURITY-AUDIT-fa.md` */
 const GONE_2 = [

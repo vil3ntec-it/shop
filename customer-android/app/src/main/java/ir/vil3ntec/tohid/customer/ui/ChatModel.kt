@@ -18,7 +18,7 @@ import ir.vil3ntec.tohid.core.shopper.ChatOutbox
 import ir.vil3ntec.tohid.core.shopper.ChatPhoto
 import ir.vil3ntec.tohid.core.shopper.ChatReceiptNeed
 import ir.vil3ntec.tohid.core.shopper.ChatThread
-import ir.vil3ntec.tohid.core.shopper.PhoneTicket
+import ir.vil3ntec.tohid.core.shopper.CustomerTicket
 import ir.vil3ntec.tohid.core.shopper.ShopperApi
 import ir.vil3ntec.tohid.core.shopper.ShopperError
 import ir.vil3ntec.tohid.core.shopper.ShopperKeyValue
@@ -52,7 +52,7 @@ class ChatModel(
   internal val scope: CoroutineScope,
   internal val io: CoroutineDispatcher,
   internal val clock: () -> Long,
-  private val ticket: () -> PhoneTicket?,
+  private val ticket: () -> CustomerTicket?,
   private val ticketLost: () -> Unit,
   private val pollWaitMs: Int = 20_000,
   private val rand: () -> Double = { Random.nextDouble() },

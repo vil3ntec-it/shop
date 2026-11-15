@@ -13,6 +13,7 @@
 import { createRequire } from 'node:module';
 import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -81,8 +82,8 @@ const seen = (msAgo) => query(`UPDATE sync_devices SET last_seen_at=$2 WHERE app
 await seen(0);
 
 const phone = '0791115151';
-const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
-const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
 ok(vc.status === 200 && vc.body.ticket, 'شماره تأیید شد');
 const count = async () => Number((await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id=$1', [shopId])).n);
 const jsonOf = (v) => (typeof v === 'string' ? JSON.parse(v) : v) || {};
@@ -95,7 +96,7 @@ await ctx.addInitScript(([t]) => {
   if (localStorage.getItem('seeded')) return;
   localStorage.setItem('seeded', '1');
   localStorage.setItem('store-ticket', JSON.stringify(t));
-}, [{ phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt }]);
+}, [{ email: vc.body.email, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt }]);
 const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });
@@ -109,6 +110,7 @@ async function toCheckout(fulfillment) {
   await page.goto(`${base}/store/${slug}?r=${++loads}#/checkout`);
   await page.waitForSelector('#view-checkout:not([hidden]) #submit-order', { timeout: 15000 });
   await page.fill('#c-name', 'مشتری');
+  await page.fill('#c-phone', '0791230001');   //  «فقط ایمیل»: شمارهٔ تماسِ پیک جدا و بی کد
   await page.check(`input[name="fulfillment"][value="${fulfillment}"]`);
 }
 const trackedToken = () => page.evaluate(() => (/^#\/o\//.test(location.hash) ? decodeURIComponent(location.hash.slice(4)) : ''));

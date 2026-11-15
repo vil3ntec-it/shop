@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrSheets
 import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.report.ReportDates
 import ir.vil3ntec.tohid.formatDate
@@ -210,7 +211,7 @@ object DebtReminder {
   }
 
   fun dueSheet(d: ShopData, today: String, rule: Rule = Rule(), template: String = DEFAULT_TEMPLATE, store: String = ""): ReportCsv.Sheet {
-    val rows = mutableListOf(listOf("نام", "شماره تماس", "مانده", "روزهای بدهی", "سررسیدِ گذشته", "آخرین یادآوری", "متنِ پیام"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    val rows = mutableListOf(listOf(StrSheets.name, StrSheets.phone, StrSheets.balance, StrSheets.debtDays, StrSheets.overdueSince, StrSheets.lastReminder, StrSheets.messageText))
     due(d, today, rule, template, store).forEach { x ->
       rows += listOf(
         x.debtor.name, x.debtor.phone.ifBlank { x.debtor.phone2.orEmpty() }, Math.round(x.balance).toString(),

@@ -139,6 +139,11 @@ class SyncStateV1(context: Context, private val accountKey: String) : V1Restore.
     get() = prefs.getInt(k("serverSchema"), 0)
     set(v) = prefs.edit().putInt(k("serverSchema"), v).apply()
 
+  /** SYN-04: آخرین pull ِ با op ِ سرور `gzip_push` داشت (پرچمِ دکانِ `sync.gzip_push`) ⇒ push ِ بزرگ فشرده (`SyncV1Client.PushGzip`) */
+  var gzipPush: Boolean
+    get() = prefs.getBoolean(k("gzipPush"), false)
+    set(v) { if (v != gzipPush) prefs.edit().putBoolean(k("gzipPush"), v).apply() }
+
   var snapshotAt: Long
     get() = prefs.getLong(k("snapshotAt"), 0)
     set(v) = prefs.edit().putLong(k("snapshotAt"), v).apply()

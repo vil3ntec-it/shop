@@ -35,6 +35,8 @@ internal class TeamData {
   var courierAllowed by mutableStateOf(false)
   var perms by mutableStateOf<ShopPermsDto?>(null)
   var devices by mutableStateOf<List<ShopDeviceDto>?>(null)
+  /** S44: «بازیابی از پشتیبان» ِ دستگاهِ غیرفعال — پرچمِ `shop.lost_device_replay` (خاموش ⇒ دکمه نیست) */
+  var replay by mutableStateOf(false)
   /** STF-06: محدودهٔ مکانِ اعضا — `null` یعنی پرچم خاموش یا بی اجازه، پس بخش دیده نمی‌شود */
   var scope by mutableStateOf<StaffScopeMembersDto?>(null)
   /** دستگاه‌های شناختهٔ کارمندان (رازِ ورود با کد) و «شاید همان عضوِ کهنه» — `null` یعنی سرورِ قدیمی یا بی اجازه */
@@ -57,7 +59,7 @@ internal class TeamData {
     shops.standingState().let { (code, off) -> standing = code; standingOff = off }
     courierAllowed = isOwner && shops.courierInviteAllowed()
     shops.permissions().onSuccess { perms = it.shop }
-    shops.devices().onSuccess { devices = it }
+    shops.devicePage().onSuccess { devices = it.devices; replay = it.replay }
     scope = shops.staffScopeMembers()
     staffKeys = shops.staffKeys()
     loaded = true

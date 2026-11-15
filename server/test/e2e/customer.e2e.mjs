@@ -13,6 +13,7 @@
  * اجرا:  node test/e2e/customer.e2e.mjs
  */
 import { boot, assert, sameOrderLink } from './lib/harness.mjs';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const E = await boot({ name: 'customer', env: { CATALOG_REFRESH_THROTTLE_MS: '0' } });
 const { db } = E;
@@ -84,8 +85,8 @@ async function devCodeIn(page, sel) {
 }
 /** مشتری از راهِ API (همان بدنهٔ ویترین) — برای Y که فقط باید سفارشی داشته باشد */
 async function apiCustomer(slug, phone) {
-  const s = E.ok(await E.post(`/api/store/${slug}/verify/start`, { phone }), 'کدِ تأیید');
-  const v = E.ok(await E.post(`/api/store/${slug}/verify/check`, { phone, code: s.devCode }), 'تأییدِ شماره');
+  const s = E.ok(await E.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) }), 'کدِ تأیید');
+  const v = E.ok(await E.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: s.devCode }), 'تأییدِ شماره');
   return v.ticket;
 }
 /** هر کلیدِ بدنهٔ عمومی که بوی دادهٔ خصوصی بدهد (بهای خرید، عمده، ایمیل، رمز، مالک) */
@@ -194,6 +195,7 @@ await E.step('S133', 'بی شمارهٔ تأییدشده سفارش نهایی �
   assert.ok(await page.isVisible('#verify-text') && hint.length <= 120 && /تأیید/.test(hint) && /کد/.test(hint), hint);
   await page.fill('#c-name', 'مشتریِ ایکس');
   await page.fill('#c-phone', X);
+  await page.fill('#c-email', mailOf(X));
   assert.equal(await page.isDisabled('#submit-order'), true, 'نوشتنِ شماره بی کد «ثبت» را باز کرد');
   assert.ok(await page.isVisible('#verify-send'));
   //  سرور: بی بلیت ⇒ ۴۰۱ با پیامِ کوتاه؛ هیچ سفارشی
@@ -229,7 +231,7 @@ await E.step('S139', 'قطعِ شبکه هنگامِ فرستادن و زدنِ 
   await page.click('#verify-check');
   await page.waitForFunction(() => !document.getElementById('submit-order').disabled, null, { timeout: 10_000 });
   const tk = await ticketOf(page);
-  assert.equal(tk && tk.phone, X_E164);
+  assert.equal(tk && tk.email, mailOf(X_E164), '«فقط ایمیل»: بلیت مالِ ایمیل است');
   //  نشستِ موجود: شکستِ شبکه در «ثبت» بلیت را پاک نمی‌کند و چیزی هم ساخته نمی‌شود
   await page.route('**/checkout', (r) => r.abort('internetdisconnected'));
   await page.check('input[name="fulfillment"][value="pickup"]');
@@ -238,10 +240,11 @@ await E.step('S139', 'قطعِ شبکه هنگامِ فرستادن و زدنِ 
   await page.unroute('**/checkout');
   assert.deepEqual(await ticketOf(page), tk, 'بلیت با خطای شبکه پاک شد');
   assert.equal(await page.isEnabled('#submit-order'), true, 'پس از خطای شبکه «ثبت» بسته ماند');
-  //  و با بازکردنِ دوبارهٔ صفحه هم شماره تأییدشده می‌ماند
+  //  و با بازکردنِ دوبارهٔ صفحه هم ایمیلِ تأییدشده می‌ماند و شمارهٔ تماس (بی کد) روی همین دستگاه یاد مانده است
   await page.reload();
   await page.waitForSelector('#view-checkout:not([hidden])');
   assert.deepEqual(await ticketOf(page), tk);
+  assert.equal(await page.inputValue('#c-email'), mailOf(X_E164));
   assert.equal(await page.inputValue('#c-phone'), X);
   assert.equal((await orders()).length, 0, 'درخواستِ قطع‌شده سفارش ساخت');
 }, { needs: ['S133'] });
@@ -300,24 +303,21 @@ await E.step('S140', 'سبدِ مهمان با تأییدِ شماره نه کم
   await toCheckout(p);
   await p.fill('#c-name', 'مشتریِ وای');
   await p.fill('#c-phone', Y);
+  await p.fill('#c-email', mailOf(Y));
   await p.click('#verify-send');
   await p.waitForSelector('#verify-code-row:not([hidden])', { timeout: 10_000 });
   await p.fill('#v-code', await devCodeIn(p, '#verify-msg'));
   await p.click('#verify-check');
   await p.waitForFunction(() => !document.getElementById('submit-order').disabled, null, { timeout: 10_000 });
   const yTicket = await ticketOf(p);
-  assert.equal(yTicket.phone, Y_E164);
-  //  کسِ دیگری پشتِ همان مرورگر شمارهٔ خودش (X) را می‌نویسد ⇒ «ثبت» تا تأییدِ X بسته
+  assert.equal(yTicket.email, mailOf(Y_E164), '«فقط ایمیل»: بلیتِ Y مالِ ایمیلِ Y است');
+  //  کسِ دیگری پشتِ همان مرورگر ایمیلِ خودش (X) را می‌نویسد ⇒ «ثبت» تا تأییدِ ایمیلِ X بسته
   await p.fill('#c-phone', X);
+  await p.fill('#c-email', mailOf(X));
   assert.equal(await p.isDisabled('#submit-order'), true, 'سبد با بلیتِ Y برای X باز شد');
   assert.equal(await p.isVisible('#verify-send'), true);
-  //  و سرور هم بلیتِ Y را برای شمارهٔ X نمی‌پذیرد
-  const wrong = await E.post(`/api/store/${SLUG}/checkout`, {
-    fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: 'مشتریِ ایکس', phone: X }, lines: [{ productId: oil, qtyMilli: 1000 }],
-  }, null, { 'X-Store-Ticket': yTicket.ticket, 'Idempotency-Key': E.key('s140') });
-  assert.equal(wrong.status, 403, JSON.stringify(wrong.body));
-  assert.equal(wrong.body.error.code, 'phone_not_verified');
-  assert.equal((await orders()).length, 1, 'سفارش با بلیتِ شمارهٔ دیگر ساخته شد');
+  //  سرور هویت را فقط از بلیت می‌گیرد (ایمیل در بدنهٔ ثبت نیست؛ شمارهٔ تماس هویت نیست — `storefront.test.js` S133)
+  assert.equal((await orders()).length, 1, 'سفارشِ تازه‌ای ساخته شد');
   assert.deepEqual(Object.keys(await cartOf(p)), [oil], 'سبدِ این مرورگر عوض شد');
 }, { needs: ['S135'] });
 
@@ -337,22 +337,18 @@ await E.step('S134', 'سفارش با شمارهٔ تأییدشده به هما�
   //  حسابِ مشتری (نشستِ ماندگار) از همان بلیت ⇒ همان شماره و همان سفارش
   const acc = await E.post(`/api/store/${SLUG}/account`, { name: 'مشتریِ ایکس' }, null, { 'X-Store-Ticket': tk.ticket });
   assert.equal(acc.status, 201, JSON.stringify(acc.body));
-  assert.equal(acc.body.customer.phone, X_E164);
+  assert.equal(acc.body.customer.email, mailOf(X_E164), '«فقط ایمیل»: حساب = ایمیلِ تأییدشدهٔ X');
   const hist = E.ok(await E.get(`/api/store/${SLUG}/account/orders`, null, { 'X-Store-Session': acc.body.session }), 'تاریخچهٔ حساب').orders;
   assert.deepEqual(hist.map((o) => o.orderNo), [Number(first.order_no)], 'حسابِ X سفارشِ دیگری دارد');
-  //  و ثبت با نشستِ حساب (بی بلیت) هم به همان شماره می‌نشیند
+  //  و ثبت با نشستِ حساب (بی بلیت) هم به همان حساب و ایمیل می‌نشیند
   const viaSession = await E.post(`/api/store/${SLUG}/checkout`, {
     fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: 'مشتریِ ایکس', phone: X }, lines: [{ productId: rice, qtyMilli: 1000 }],
   }, null, { 'X-Store-Session': acc.body.session, 'Idempotency-Key': E.key('acc') });
   assert.equal(viaSession.status, 201, JSON.stringify(viaSession.body));
   const row = (await orders()).find((o) => Number(o.order_no) === viaSession.body.order.orderNo);
-  assert.equal(row.customer_phone, X_E164);
-  //  نشستِ X برای ثبت با شمارهٔ Y کار نمی‌کند
-  const cross = await E.post(`/api/store/${SLUG}/checkout`, {
-    fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: 'مشتریِ وای', phone: Y }, lines: [{ productId: rice, qtyMilli: 1000 }],
-  }, null, { 'X-Store-Session': acc.body.session, 'Idempotency-Key': E.key('cross') });
-  assert.equal(cross.status, 403, JSON.stringify(cross.body));
-  assert.equal((await orders()).filter((o) => o.customer_phone === Y_E164).length, 1);
+  assert.deepEqual([row.customer_phone, row.customer_email, row.store_customer_id], [X_E164, mailOf(X_E164), acc.body.customer.id]);
+  //  شمارهٔ تماس هویت نیست: سفارشِ Y فقط با ایمیلِ Y در «سفارش‌های من» ِ Y است، نه X
+  assert.equal((await orders()).filter((o) => o.customer_email === mailOf(Y_E164)).length, 1);
 }, { needs: ['S140'] });
 
 await E.step('S136', 'رسید: اقلام، مقدار، قیمتِ هر قلم، هزینهٔ ارسال، مبلغِ نهایی، پرداخت‌شده و مانده — همه همان سرور', async () => {
@@ -417,14 +413,14 @@ await E.step('S138', 'X از دستگاهِ دیگر سفارش‌های خود�
   //  دستگاهِ تازه: هیچ سفارشِ محلی؛ ورود با کد در «سفارش‌های من»ِ بازارچه
   await p.goto(`${E.apiBase}/market/#/orders`);
   await p.waitForSelector('#verify-card:not([hidden])', { timeout: 15_000 });
-  await p.fill('#v-phone', X);
+  await p.fill('#v-email', mailOf(X));   //  «فقط ایمیل»: ورود با کدِ ایمیل
   await p.click('#v-send');
   await p.waitForSelector('#v-code-row:not([hidden])', { timeout: 10_000 });
   await p.fill('#v-code', await devCodeIn(p, '#v-msg'));
   await p.click('#v-check');
   await p.waitForSelector('#who:not([hidden])', { timeout: 10_000 });
   await p.waitForFunction(() => document.querySelectorAll('#orders a').length > 0, null, { timeout: 10_000 });
-  const xMine = (await orders()).filter((o) => o.customer_phone === X_E164);
+  const xMine = (await orders()).filter((o) => o.customer_email === mailOf(X_E164));
   const hrefs = await p.$$eval('#orders a', (as) => as.map((a) => a.getAttribute('href')));
   assert.equal(hrefs.length, xMine.length, hrefs.join(' '));
   assert.ok(hrefs.every((h) => h.startsWith(`/store/${SLUG}#/o/`)), hrefs.join(' '));

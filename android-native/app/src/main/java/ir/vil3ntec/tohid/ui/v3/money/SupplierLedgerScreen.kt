@@ -53,7 +53,9 @@ import ir.vil3ntec.tohid.ui.v3.V3ChipRow
 import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
+import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
+import ir.vil3ntec.tohid.ui.v3.V3PillAction
 import ir.vil3ntec.tohid.ui.v3.V3MenuItem
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Section
@@ -153,7 +155,7 @@ internal fun SupplierLedgerScreen(id: String, d: ShopData, actions: SupplierLedg
           }
         }
         if (supplier.notes.isNotBlank()) Text(supplier.notes, style = v3Text(13, FontWeight.Normal, 19), color = PhoneV3.colors.inkMuted)
-        History(d, lines, showAll) { showAll = true }
+        History(d, lines, showAll, onNewPurchase = actions.onNewPurchase) { showAll = true }
         Spacer(Modifier.height(4.dp))
       }
     }
@@ -173,16 +175,19 @@ internal fun SupplierLedgerScreen(id: String, d: ShopData, actions: SupplierLedg
 
 /** خریدها (↗، بدهیِ ما بالا) و پرداخت‌ها (↙) در یک فهرست، تازه‌ترین اول */
 @Composable
-private fun History(d: ShopData, lines: List<SuppliersModel.Line>, showAll: Boolean, onShowAll: () -> Unit) {
+private fun History(d: ShopData, lines: List<SuppliersModel.Line>, showAll: Boolean, onNewPurchase: () -> Unit, onShowAll: () -> Unit) {
   val shown = if (showAll) lines else lines.take(SuppliersModel.SHOWN)
   val more = lines.size - shown.size
+  val today = remember { todayIso() }
   V3Section(
     title = StrMoney.history,
     action = if (more > 0) "${StrMoney.showAll} (${lines.size})" else null,
     onAction = if (more > 0) onShowAll else null,
   ) {
     if (shown.isEmpty()) {
-      Text(StrMoney.noHistory, style = v3Text(14, FontWeight.Medium, 20), color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(16.dp))
+      Text(StrMoney.noHistory, style = v3Text(14, FontWeight.Medium, 20), color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp))
+      //  گامِ بعدیِ روشن (e-rows-63d): همان «خریدِ تازه» ِ بالای پرونده، این‌جا هم
+      Box(Modifier.padding(start = 12.dp, bottom = 10.dp)) { V3PillAction(StrMoney.newPurchase, onNewPurchase) }
     }
     shown.forEachIndexed { i, l ->
       if (i > 0) V3Divider(start = 64.dp)
@@ -191,9 +196,11 @@ private fun History(d: ShopData, lines: List<SuppliersModel.Line>, showAll: Bool
         val name = d.products.find { it.id == l.productId }?.name ?: StrMoney.deletedProduct
         "$name — ${MoneyText.qtyUnit(l.quantity, l.unit)} × ${money(l.unitPrice)}"
       } else l.notes.ifBlank { StrMoney.payment }
+      //  سادهٔ e-rows-63d: تاریخِ کوتاه («دیروز»، «۲۸ میزان»)
+      val day = MoneyText.short(l.date, today)
       val sub = if (purchase) {
-        "${MoneyText.date(l.date)} — " + if (l.left > 0) StrMoney.leftToPay(money(l.left)) else StrMoney.purchaseSettled
-      } else MoneyText.date(l.date)
+        "$day · " + if (l.left > 0) StrMoney.leftToPay(money(l.left)) else StrMoney.purchaseSettled
+      } else day
       V3ListRow(
         title = title,
         subtitle = sub,

@@ -110,10 +110,10 @@ object StrV3Inbox {
     "Someone else or another device had already closed this; showing the server’s state.",
     "بل چا یا بلې وسیلې دا مخکې تړلی و؛ د سرور حالت ښودل کېږي.",
   )
-  fun refused(code: String): String = t(
-    "سرور این تصمیم را نپذیرفت (${asIs(code)})",
-    "The server did not accept this decision ($code)",
-    "سرور دا پرېکړه ونه منله ($code)",
+  val refused: String get() = t(
+    "سرور این تصمیم را نپذیرفت؛ تعارض باز می‌ماند و می‌توانید کارِ دیگری برگزینید.",
+    "The server did not accept this decision; the conflict stays open and you can choose another action.",
+    "سرور دا پرېکړه ونه منله؛ ټکر پرانیستی پاتې کېږي او بل کار ټاکلی شئ.",
   )
   fun closedAs(status: String, who: String): String = t("${asIs(status)} — ${asIs(who)}", "$status — $who", "$status — $who")
   val statusKept: String get() = t("فعلی ماند", "Current kept", "اوسنی پاتې شو")

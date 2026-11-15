@@ -155,6 +155,6 @@ internal fun v3Status(cf: V3Inbox.Conflict): String = when (cf.status) {
 internal fun v3NoteText(n: V3InboxModel.Note): String = when (n.fate) {
   V3InboxOutbox.Fate.DONE -> if (n.duplicate) StrV3Inbox.doneAlready else StrV3Inbox.done
   V3InboxOutbox.Fate.CLOSED -> StrV3Inbox.closedElsewhere
-  V3InboxOutbox.Fate.REFUSED -> StrV3Inbox.refused(n.code.ifBlank { "?" })
+  V3InboxOutbox.Fate.REFUSED -> StrV3Inbox.refused
   V3InboxOutbox.Fate.RETRY -> StrV3Inbox.queued
 }
