@@ -215,7 +215,7 @@ sealed class ApiFailure(
     private fun known(code: String): String? = knownFa(code)?.let(::localText)
 
     private fun branchText(code: String): String? =
-      ir.vil3ntec.tohid.core.branch.BranchBook.refusalOf(code)?.let(ir.vil3ntec.tohid.core.i18n::branchRefusalText)
+      ir.vil3ntec.tohid.core.branch.BranchBook.refusalOf(code)?.let { ir.vil3ntec.tohid.core.i18n.branchRefusalText(it) }
 
     private fun knownFa(code: String): String? = when (code) {
       "not_found" -> "این بخش هنوز روی سرور فعال نیست؛ به پشتیبانی خبر بدهید."
