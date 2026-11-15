@@ -57,6 +57,27 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۴ — عاملِ e-rows-64e زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-64e` (از `origin/claude/batch-64` 00e98a802) — ایمیلِ سرور برای سه ردیفِ «کد» (NOTIF-11، CHK-10، PRM-11)
+
+- **NOTIF-11 ⇒ IMPLEMENTED-VERIFIED** (پرچمِ خاموشِ `shop.order_notify_email`، FLAGS-ON §۴۴، مهاجرتِ ۹۴۴): کانالِ پشتیبانِ اعلانِ سفارش =
+  یک ایمیلِ سرور (`lib/mailer`) به ایمیلِ تأییدشدهٔ صاحب وقتی پوش نرسید یا کسی باز نکرد (`lib/order-notify-email.js`، از درونِ همان
+  `order-notify.escalate`)؛ سقفِ `shop.order_notify_email.per_day` (۳) زیرِ قفلِ دکان ⇒ `throttled`؛ صاحبِ بی ایمیل ⇒ `no_email`؛ ایمیلِ
+  پیکربندی‌نشده ⇒ `not_configured` بی تلاش (`customer-notify-email.ready`)؛ متن بی دادهٔ مشتری؛ خاموش ⇒ بایت‌به‌بایت همان.
+- **CHK-10 ⇒ IMPLEMENTED-VERIFIED** (پرچمِ خاموشِ `shop.storefront.area_email`، FLAGS-ON §۴۵، مهاجرتِ ۹۴۵): ⚠️ «رسیدیم» ِ این ردیف «به
+  محلِ شما رسیدیم» است (خبرم کن ِ **بیرونِ محدوده**)، نه «دوباره موجود شد» — آن (WEB-10، `storefront-alerts`) از پیش کانالِ ایمیل را
+  داشت. کارگرِ `lib/storefront-area-email.js`: ناحیهٔ فعال خانه را پوشاند ⇒ یک ایمیل به همان ایمیلِ تأییدشده و زبانِ ویترین، سپس
+  «انجام شد» (از فهرستِ دکان بیرون)؛ گرفتنِ اتمی، بی تکرار؛ سقفِ هزینهٔ مشترکِ NTF-02، `STORE_AREA_EMAIL_SHOP_PER_DAY` و ۳ برای هر
+  گیرنده (منتظر، نه رد)؛ رد ⇒ `failed` و هرگز دوباره.
+- **PRM-11:** فیلدِ ایمیلِ قرض‌دار ساخته شد (`Debtor.email` + کادرِ «ایمیل (اختیاری)» در `CrmProfileDialog` ِ کامپیوتر، فقط با «شمارهٔ
+  مشتریان»؛ FLAGS-ON §۴۶)؛ سرور همان تطبیقِ دقیقِ ایمیلِ **تأییدشده**؛ «حذفِ دادهٔ مشتری» پروندهٔ همان ایمیل را هم صف/پاک می‌کند
+  (`customer-erasure-ledger`)؛ بردارِ `ledger-sync-v1.json` با `email`؛ خروجیِ کاملِ صاحب ستونِ «ایمیل» (`OwnerExport.kt` + `license/owner-export.js`).
+- **آزمون‌ها:** سرور تازه `order-notify-email` ۶/۶، `storefront-area-email` ۵/۵، `customer-erasure-ledger` ۵/۵ (آزمونِ تازه پیش از کد سرخ؛
+  جهش‌های «بی سقف» سرخ)؛ کاملِ سرور در دو تکه روی PGlite: ۲۱۳۱ + ۲۲۰۹ سبز، تنها سرخ `owner-export` (ستونِ «ایمیل» در `license/`) که درست
+  و جدا ۱۳/۱۳ سبز شد؛ `sync-ledger-coverage` ۴/۴ با بردارِ تازه. Kotlin: `DebtorEmailTest` ۵/۵ (سرخ پیش از رفعِ آزمون: مرزِ ۱۹۰ نویسه)، `LedgerSyncCoverageTest` ۷/۷، `CustomerCrmTest` ۹، `CustomerProfileFormTest` ۶، `CustomerErasureLedgerTest` ۲، `CustomerMergeTest` ۱۱، `OwnerExportTest` ۹، `I18nCoverageTest` ۸، `DariCoverageTest` ۲۳، `InfraLeakGuardTest` ۸؛ اجرای کاملِ کامپیوتر ۴٬۳۱۹ آزمون، تنها سرخ `SheetLangTest` (اثرِ SHA ِ برگه‌های فارسی، از پیش سرخ و بی ربط — همان یادداشتِ `claude/e-rows-63c`). precheck ‏fail=0، quality بی ❌ (Models.kt زیرِ سقفِ ۹۲۴)، spec سالم.
+- **مانده:** روشن کردنِ سه پرچم برای دکانِ آزمایشی و SMTP ِ واقعیِ سرور (کارِ صاحب‌کار)؛ نشانِ «فعال/پیکربندی نشده» ِ کانالِ پشتیبان در
+  تنظیماتِ برنامه ساخته نشد (اختیاری؛ سرور در `/order-notify/config` می‌گوید). برگهٔ کوچکِ گوشیِ نسخهٔ ۳ («اسم و شماره بسه») ایمیل را نمی‌پرسد.
+  ⚠️ `/home/user/wt62` (هدفِ پیوندِ `server/node_modules` ِ همهٔ worktreeها) وسطِ کار پاک شد؛ این‌جا `npm ci` ِ جدا زده شد.
+
 ### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-63c زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-63c` (از `origin/claude/batch-63` baff32f2e) — صندوقِ تعارضِ v3 در برنامه (SYN-07، S28، S28b)
 
 - **ساخته شد (پشتِ پرچمِ خاموشِ دکانِ `shop.sync_v3_inbox`، FLAGS-ON §۴۳؛ «بله» ِ پرسشِ ۳۲؛ موتورِ v3 همان پیش‌فرض‌خاموش):** صفحه و نوارِ
