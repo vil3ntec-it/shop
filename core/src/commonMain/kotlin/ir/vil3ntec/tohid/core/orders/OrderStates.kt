@@ -211,7 +211,12 @@ object OrderText {
  *  قیمت به یک‌صدم می‌رود، بی ممیزِ شناور.
  */
 object OrderDraft {
-  data class LineInput(val name: String = "", val qty: String = "", val price: String = "")
+  /**
+   *  یک قلمِ فرم. [productId]/[unit] (۱۴۰۵/۰۸/۲۴، «سفارشِ دستی مثلِ سبد»): کالای برگزیده از فهرستِ کالاها با شناسه و واحدِ
+   *  موجودی، تا فروشِ تحویل همان کالا را کم کند (همان قاعدهٔ `DeliverLater`). تهی (قلمِ دستیِ بیرون از فهرست) ⇒ بدنه
+   *  بایت‌به‌بایت همان پیشین.
+   */
+  data class LineInput(val name: String = "", val qty: String = "", val price: String = "", val productId: String = "", val unit: String = "")
   data class Form(
     val source: String = "phone",
     val fulfillment: String = "pickup",
@@ -278,6 +283,9 @@ object OrderDraft {
     return m.groupValues[1].toLong() * pow + (if (f.isEmpty()) 0L else f.toLong())
   }
 
+  /** همان سقفِ واحدِ `lib/orders.js` (`text(x.unit, 30)`) */
+  private const val MAX_UNIT = 30
+
   fun build(form: Form): Result {
     fun err(m: String) = Result.Error(m)
     val delivery = form.fulfillment == "delivery"
@@ -299,7 +307,7 @@ object OrderDraft {
       val qtyMilli = scaled(q.ifEmpty { "1" }, 3)
       if (qtyMilli == null || qtyMilli == 0L) return err("مقدارِ «$ln» درست نیست")
       val unitPriceMinor = scaled(p, 2) ?: return err("قیمتِ «$ln» درست نیست")
-      lines += Line(ln, qtyMilli, unitPriceMinor)
+      lines += Line(ln, qtyMilli, unitPriceMinor, productId = r.productId.trim(), unit = r.unit.trim().take(MAX_UNIT))
     }
     if (lines.isEmpty()) return err("دست‌کم یک قلم بنویسید")
 

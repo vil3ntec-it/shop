@@ -10,6 +10,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CardGiftcard
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.ui.v3.V3Hue
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -67,7 +70,12 @@ fun GiftCardBar(d: ShopData, store: ShopStore, toast: (String) -> Unit, modifier
   var checking by remember { mutableStateOf(false) }
   var owed by remember { mutableStateOf(false) }
 
-  Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+  if (LocalTillMenu.current != null) {
+    //  «…» ِ سبدِ گوشی: همان سه کار با همان اجازه‌ها
+    TillOffer("gift.sell", if (!canSell) null else TillAction(50, StrGiftCard.sell, StrSale.hintGiftSell, Icons.Outlined.CardGiftcard, V3Hue.VIOLET, 1) { selling = true })
+    TillOffer("gift.check", TillAction(51, StrGiftCard.check, StrSale.hintGiftCheck, Icons.Outlined.CardGiftcard, V3Hue.VIOLET, 1) { checking = true })
+    TillOffer("gift.owed", if (!canMoney) null else TillAction(52, StrGiftCard.liability, StrSale.hintGiftOwed, Icons.Outlined.CardGiftcard, V3Hue.VIOLET, 1) { owed = true })
+  } else Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
     if (canSell) OutlinedButton(onClick = { selling = true }) { Text(StrGiftCard.sell) }
     TextButton(onClick = { checking = true }) { Text(StrGiftCard.check) }
     if (canMoney) TextButton(onClick = { owed = true }) { Text(StrGiftCard.liability) }

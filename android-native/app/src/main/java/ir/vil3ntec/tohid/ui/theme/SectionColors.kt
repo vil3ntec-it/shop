@@ -115,7 +115,7 @@ object SectionColors {
     Hue.SLATE to day(0xFFF2F4F7, 0xFFD2D8E1, 0xFF334155, 0xFF526177),
   )
 
-  /** شب: تهِ‌رنگِ تیره و پُرِ همان خانواده روی کارتِ شب (#11151E)، مرزِ روشن‌تر، عدد و نشانهٔ روشن (روی کارت ≥ ۶:۱) */
+  /** شب: تهِ‌رنگِ تیره و پُرِ همان خانواده روی کارتِ شب (`DarkColors.surface`)، مرزِ روشن‌تر، عدد و نشانهٔ روشن (روی کارت ≥ ۶:۱) */
   val NIGHT: Map<Hue, SectionTone> = mapOf(
     Hue.SKY to night(0xFF131D33, 0xFF27406B, 0xFFA9BEEC, 0xFF86A6E8),
     Hue.VIOLET to night(0xFF1C1D40, 0xFF34336F, 0xFFB3B3F3, 0xFF9696F0),

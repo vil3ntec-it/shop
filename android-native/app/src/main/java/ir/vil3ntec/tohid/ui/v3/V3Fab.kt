@@ -8,6 +8,9 @@ import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,6 +26,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,12 +44,14 @@ import ir.vil3ntec.tohid.ui.screens.MotionTokens
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
+import ir.vil3ntec.tohid.ui.theme.V3ButtonSpec
 
 /**
  *  دکمهٔ شناورِ کارِ اصلیِ صفحه («کالای تازه»): کامل (آیکن + برچسب) وقتی
  *  فهرست در بالاست، و با پیمایش به پایین با فنر به دایره جمع می‌شود (morph) —
  *  `V3Scaffold` همان `expanded` را می‌دهد. همان کار روی کامپیوتر با Ctrl+N
- *  (`AppNav.addAction`) هم صدا زده می‌شود.
+ *  (`AppNav.addAction`) هم صدا زده می‌شود. ظاهر در هر تم و روز/شب یکی (۶۹ p3): پُرِ برند (`V3ButtonKind.PRIMARY`) با آیکن و
+ *  نوشتهٔ سفید، بلندیِ ۵۶ و گوشهٔ ۱۶ (`V3ButtonSpec`)، سایهٔ نرمِ خنثی (نه هالهٔ رنگی که با نوارِ پایین رقابت کند)، فشرده با پرده.
  */
 @Composable
 fun V3Fab(
@@ -62,14 +69,19 @@ fun V3Fab(
     AppNav.addAction.value = action
     onDispose { if (AppNav.addAction.value === action) AppNav.addAction.value = null }
   }
-  val shape = RoundedCornerShape(18.dp)
+  val shape = RoundedCornerShape(V3ButtonSpec.fabRadius)
+  val src = remember { MutableInteractionSource() }
+  val down by src.collectIsPressedAsState()
+  val focused by src.collectIsFocusedAsState()
+  val shade = c.source.shadow
   Row(
     modifier
-      .v3Pressable(label = label, scale = 0.94f, haptic = true, role = Role.Button, onClick = onClick)
-      .height(56.dp)
-      .shadow(10.dp, shape, ambientColor = pair.bg.copy(alpha = 0.5f), spotColor = pair.bg.copy(alpha = 0.5f))
+      .v3Pressable(label = label, scale = 0.94f, haptic = true, role = Role.Button, interaction = src, onClick = onClick)
+      .height(V3ButtonSpec.fabHeight)
+      .shadow(8.dp, shape, ambientColor = shade, spotColor = shade)
+      .v3FocusRing(focused, PhoneV3Roles.focus(c), V3ButtonSpec.fabRadius)
       .clip(shape)
-      .background(pair.bg)
+      .background(if (down) PhoneV3Roles.pressed(c, V3ButtonKind.PRIMARY) else pair.bg)
       .padding(horizontal = 16.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {

@@ -23,7 +23,7 @@ const h = require('./helpers');
 const inv = require('./route-inventory');
 const { query, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
-const { KEYS: DEFAULT_ON } = require('../src/lib/flag-defaults');
+const { KEYS: DEFAULT_ON, ORDER_BASE } = require('../src/lib/flag-defaults');
 const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const ROUTES = nodePath.join(__dirname, '..', 'src', 'routes');
@@ -91,7 +91,8 @@ test('⛔ هر درِ پرچم‌دارِ ویترین با پرچمِ خامو�
   const token = u.accessToken;
   const shopId = (await h.post('/api/shop', { name: 'دکانِ نگهبان' }, { token })).body.shop.id;
   for (const k of ['shop.orders', 'shop.storefront']) await flag(shopId, k);
-  for (const k of DEFAULT_ON) await flag(shopId, k, false);
+  //  نمایشی‌های پیش‌فرض‌روشن خاموش؛ چهار کلیدِ پایهٔ سفارش (`ORDER_BASE`، ۱۴۰۵/۰۸/۲۴) همان روشنِ بالا
+  for (const k of DEFAULT_ON) if (!ORDER_BASE.includes(k)) await flag(shopId, k, false);
   const slug = `gate-${uniq()}`;
   const put = await h.put('/api/shop/storefront', { slug, enabled: true, title: 'ویترین', contactPhone: '0700000001', payAfterAccept: false }, { token });
   assert.equal(put.status, 200, JSON.stringify(put.body));

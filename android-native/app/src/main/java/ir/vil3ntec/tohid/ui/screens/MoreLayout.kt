@@ -81,6 +81,9 @@ object MoreLayout {
     })
   }
 
+  /** رنگِ کاشیِ «نسخه و به‌روزرسانی» — یک‌جا، تا منوی کامپیوتر (`DeskHues`) هم همین را بخواند */
+  val APP_HUE: ir.vil3ntec.tohid.ui.v3.V3Hue = ir.vil3ntec.tohid.ui.v3.V3Hue.BLUE
+
   private fun appItem(version: String) =
-    Item("app", StrAppData.versionUpdates, APP, version, icon = androidx.compose.material.icons.Icons.Outlined.SystemUpdate, hue = ir.vil3ntec.tohid.ui.v3.V3Hue.BLUE)
+    Item("app", StrAppData.versionUpdates, APP, version, icon = androidx.compose.material.icons.Icons.Outlined.SystemUpdate, hue = APP_HUE)
 }

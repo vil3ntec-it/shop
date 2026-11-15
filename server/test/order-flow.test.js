@@ -126,6 +126,8 @@ async function hesabpay(s) {
 
 test('«چرا سفارش نمی‌رسد؟» — هر دروازه با کد، حتی وقتی بخش خاموش است؛ با برداشتنِ هر کدام از فهرست می‌رود', async () => {
   const s = await newShop('تشخیص');
+  //  از ۱۴۰۵/۰۸/۲۴ این چهار پیش‌فرض روشن‌اند (FLAGS-ON §۴۸) ⇒ «خاموش» صریح نوشته می‌شود
+  for (const k of ['shop.orders', 'shop.storefront', 'shop.order_notify']) await flag(s.shopId, k, false);
   let cfg = (await h.get('/api/shop/orders/config', { token: s.token })).body;
   assert.equal(cfg.enabled, false);
   assert.ok(cfg.arrival, 'بخشِ خاموش هم دلیل دارد — شکستِ بی‌صدا نه');

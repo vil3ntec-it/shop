@@ -384,9 +384,18 @@ private fun AppRootActive(
     railOverlay = false
     uiPrefs.edit().putString("desk_rail_pos", m).apply()
   }
-  val shownRail = if (onSale && railMode != RailMode.HIDDEN) posRail else railMode
+  /*
+   *  e-desk-d1: پنجرهٔ کامپیوترِ باریک‌تر از `DeskSize.sidebarAutoCompactBelow` ⇒ منو خودبه‌خود فقط‌آیکن (انتخابِ ذخیره‌شده
+   *  دست نمی‌خورد)؛ «باز کردن» در همان پنجره منوی کامل را روی صفحه می‌آورد.
+   */
+  val deskNarrow = Platform.DESKTOP && androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < ir.vil3ntec.tohid.ui.desk.DeskSize.sidebarAutoCompactBelow.value
+  val chosenRail = if (onSale && railMode != RailMode.HIDDEN) posRail else railMode
+  val shownRail = if (deskNarrow && chosenRail == RailMode.FULL) RailMode.COMPACT else chosenRail
   /** حالتِ منوی همین صفحه را عوض می‌کند (صندوق: `desk_rail_pos`؛ بقیه: `desk_rail`) */
-  fun setShownRail(m: String) { if (onSale && m != RailMode.HIDDEN) setPosRail(m) else setRail(m) }
+  fun setShownRail(m: String) {
+    if (deskNarrow && m == RailMode.FULL && chosenRail != RailMode.HIDDEN) { railOverlay = true; return }
+    if (onSale && m != RailMode.HIDDEN) setPosRail(m) else setRail(m)
+  }
   /** ☰: ثابت ⇄ آیکن (برای همین صفحه)؛ در حالتِ پنهان، منو را روی صفحه باز/بسته می‌کند */
   fun onMenuPress() {
     when (shownRail) {
@@ -551,22 +560,9 @@ private fun AppRootActive(
       .onPreviewKeyEvent { lastActivity.set(System.nanoTime() / 1_000_000); false },
     containerColor = androidx.compose.ui.graphics.Color.Transparent,
     contentWindowInsets = WindowInsets(0, 0, 0, 0),
-    topBar = {
-      //  فقط کامپیوتر: سربرگِ باریکِ خودش، نوارِ اشتراک و نسخهٔ تازه. گوشی سربرگ ندارد —
-      //  هر صفحه `V3Scaffold` ِ خودش را دارد
-      if (Platform.DESKTOP) Column {
-        DeskHeader(
-          title = title,
-          d = data,
-          onBack = if (nav.canBack) ({ nav.back() }) else null,
-          onMenu = { onMenuPress() },
-          onSearch = { AppNav.palette.value = true },
-          onOpen = { nav.open(it) },
-          page = V3Modules.legacyId(current),
-        )
-        CompositionLocalProvider(ir.vil3ntec.tohid.ui.v3.nav.LocalV3Nav provides nav) { PreviewBanner(); ir.vil3ntec.tohid.ui.v3.shell.ShellNotice() }
-      }
-    },
+    //  کامپیوتر: سربرگ (`DeskHeader`) درونِ ستونِ محتواست، کنارِ منوی کناریِ تمام‌قد (e-desk-d1) — پایین‌تر. گوشی سربرگ
+    //  ندارد — هر صفحه `V3Scaffold` ِ خودش را دارد
+    topBar = {},
     //  پیام‌ها بالای صفحه می‌آیند، سرِ راهِ هیچ‌چیز نیستند
     snackbarHost = {
       Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars), contentAlignment = Alignment.TopCenter) {
@@ -586,6 +582,7 @@ private fun AppRootActive(
         val railBoard = ir.vil3ntec.tohid.ui.screens.rememberDeskAlerts(data)
         DeskRail(
           current = V3Modules.railId(current), onPick = { nav.openFromRail(it) }, compact = shownRail == RailMode.COMPACT, mode = shownRail, onMode = ::setShownRail,
+          path = current,
           badges = mapOf(
             "products" to railBoard.outOfStock.size + railBoard.lowStock.size,
             "warehouse" to railBoard.expiring.size,
@@ -616,15 +613,21 @@ private fun AppRootActive(
         ) {
           Box(Modifier.fillMaxSize().clickable { railOverlay = false }) {
             Box(Modifier.align(Alignment.CenterStart).fillMaxHeight()) {
-              DeskRail(current = V3Modules.railId(current), onPick = { nav.openFromRail(it); railOverlay = false }, mode = shownRail, onMode = ::setShownRail)
+              DeskRail(
+                current = V3Modules.railId(current), onPick = { nav.openFromRail(it); railOverlay = false },
+                //  پنجرهٔ باریک: منوی کاملِ روی صفحه همان حالتِ «باز» است
+                mode = if (deskNarrow && chosenRail == RailMode.FULL) RailMode.FULL else shownRail,
+                onMode = { m -> if (deskNarrow && m == RailMode.COMPACT) railOverlay = false else setShownRail(m) },
+                path = current,
+              )
             }
           }
         }
       }
       val railPad = when {
         !wide -> 0.dp
-        shownRail == RailMode.FULL -> DESK_RAIL_WIDTH
-        shownRail == RailMode.COMPACT -> DESK_RAIL_COMPACT
+        shownRail == RailMode.FULL -> if (Platform.DESKTOP) ir.vil3ntec.tohid.ui.desk.DeskSize.sidebar else DESK_RAIL_WIDTH
+        shownRail == RailMode.COMPACT -> if (Platform.DESKTOP) ir.vil3ntec.tohid.ui.desk.DeskSize.sidebarCompact else DESK_RAIL_COMPACT
         else -> 0.dp
       }
       //  جای نوارِ شناور: خانه خودش زیرِ نوار می‌کشد؛ صفحهٔ بی‌نوار (صندوق) فقط نوارِ سیستم
@@ -634,11 +637,41 @@ private fun AppRootActive(
         LocalV3Toasts provides toasts,
         //  نوارِ سیستم را پوسته همین‌جا حساب کرده است
         LocalV3SystemBottom provides 0.dp,
-        LocalV3Notice provides { Column { PreviewBanner(); ir.vil3ntec.tohid.ui.v3.shell.ShellNotice() } },
+        //  نوارِ «نسخهٔ پیش‌نمایش» دیگر روی هر صفحه نیست (۱۴۰۵/۰۸/۲۴) — فقط هشدارِ یک‌باره، یک بار در پوسته؛ نشانش در «درباره»
+        LocalV3Notice provides { ir.vil3ntec.tohid.ui.v3.shell.ShellNotice() },
         ir.vil3ntec.tohid.ui.v3.LocalV3NavSearch provides navSearch,
       ) {
-        PageWidth(Modifier.padding(start = railPad, bottom = pageBottom)) {
-          V3RouteHost(nav, shell, Modifier.fillMaxSize())
+        if (Platform.DESKTOP) Column(Modifier.padding(start = railPad).fillMaxSize()) {
+          //  کامپیوتر: سربرگِ همین ستون (عنوان، مسیر، جست‌وجو، کارِ اصلی)، سپس نوارِ اشتراک و نسخهٔ تازه، سپس صفحه
+          val crumbs = nav.stack.entries.dropLast(1).filter { nav.resolve(it)?.route?.kind != ir.vil3ntec.tohid.ui.v3.nav.RouteKind.SHEET }
+            .takeLast(2).mapNotNull { p -> nav.resolve(p)?.route?.title?.invoke()?.takeIf { it.isNotBlank() }?.let { it to p } }
+          DeskHeader(
+            title = title,
+            d = data,
+            onBack = if (nav.canBack) ({ nav.back() }) else null,
+            onMenu = { onMenuPress() },
+            onSearch = { AppNav.palette.value = true },
+            onOpen = { nav.open(it) },
+            page = V3Modules.legacyId(current),
+            menuVisible = shownRail != RailMode.HIDDEN,
+            crumbs = crumbs,
+            onCrumb = { target ->
+              //  برگشت تا همان صفحهٔ مسیر (حداکثر به اندازهٔ پشته)
+              repeat(nav.stack.entries.size) { if (nav.current != target && nav.canBack) nav.back() }
+            },
+          )
+          CompositionLocalProvider(ir.vil3ntec.tohid.ui.v3.nav.LocalV3Nav provides nav) { PreviewBanner(); ir.vil3ntec.tohid.ui.v3.shell.ShellNotice() }
+          PageWidth(Modifier.weight(1f).padding(bottom = pageBottom)) {
+            CompositionLocalProvider(ir.vil3ntec.tohid.ui.v3.LocalDeskPageTitle provides title) {
+              V3RouteHost(nav, shell, Modifier.fillMaxSize())
+            }
+          }
+        } else {
+          //  گوشی (e-phone-p2): نوارِ «نسخهٔ پیش‌نمایش» روی هیچ صفحه‌ای نیست؛ فقط هشدارِ یک‌باره، یک بار در پوسته
+          PreviewBanner(strip = false)
+          PageWidth(Modifier.padding(start = railPad, bottom = pageBottom)) {
+            V3RouteHost(nav, shell, Modifier.fillMaxSize())
+          }
         }
       }
       //  نوارِ شناورِ r10 — دایرهٔ شروع، قرص، دایرهٔ پایان؛ نگه‌داشتن = ویرایشگر

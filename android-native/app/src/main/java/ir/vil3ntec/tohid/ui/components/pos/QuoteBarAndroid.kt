@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -34,6 +35,8 @@ import ir.vil3ntec.tohid.core.hw.EscPos
 import ir.vil3ntec.tohid.core.hw.PrintQueue
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrPos
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.core.pos.Quote
 import ir.vil3ntec.tohid.data.CartStore
@@ -89,7 +92,11 @@ fun QuoteBar(d: ShopData, cart: CartStore, toast: (String) -> Unit, modifier: Mo
     else -> StrPos.quoteErrNotSaved
   }
 
-  Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+  if (LocalTillMenu.current != null) {
+    //  «…» ِ سبدِ گوشی: دو ردیف با توضیح؛ فهرستِ خالی ⇒ بی ردیف (`TillMenu`)
+    TillOffer("quote.new", if (lines.isEmpty()) null else TillAction(50, StrPos.quoteFromCart, StrSale.hintQuoteNew, Icons.Outlined.Description, V3Hue.SKY) { saving = true })
+    TillOffer("quote.list", if (book.items.isEmpty()) null else TillAction(30, StrPos.quoteList(book.items.size), StrSale.hintQuoteList, Icons.Outlined.Description, V3Hue.SKY, 1) { listing = true })
+  } else Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
     OutlinedButton(enabled = lines.isNotEmpty(), onClick = { saving = true }) { Text(StrPos.quoteFromCart) }
     TextButton(onClick = { listing = true }) { Text(StrPos.quoteList(book.items.size)) }
   }

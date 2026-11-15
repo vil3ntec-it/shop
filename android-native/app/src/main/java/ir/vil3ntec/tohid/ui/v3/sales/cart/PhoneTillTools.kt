@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrDeliver
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.ui.components.pos.DeliverLaterSheetWired
 import ir.vil3ntec.tohid.ui.components.pos.GiftCardBar
@@ -22,13 +23,17 @@ import ir.vil3ntec.tohid.ui.components.pos.InvoiceNoteButton
 import ir.vil3ntec.tohid.ui.components.pos.LayawayBar
 import ir.vil3ntec.tohid.ui.components.pos.LineSellerButton
 import ir.vil3ntec.tohid.ui.components.pos.LineSellerSheet
+import ir.vil3ntec.tohid.ui.components.pos.LocalTillMenu
 import ir.vil3ntec.tohid.ui.components.pos.PriceListAtPos
 import ir.vil3ntec.tohid.ui.components.pos.QuoteBar
 import ir.vil3ntec.tohid.ui.components.pos.SpecialOrderBar
+import ir.vil3ntec.tohid.ui.components.pos.TillAction
+import ir.vil3ntec.tohid.ui.components.pos.TillOffer
 import ir.vil3ntec.tohid.ui.components.pos.deliverLaterReady
 import ir.vil3ntec.tohid.ui.screens.TillReceivePhone
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.v3.V3Button
+import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 
 /**
@@ -37,6 +42,10 @@ import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
  *  سفارشِ ویژه (POS-26)، کارتِ هدیه (PAY-24)، فروشِ امانی (POS-27)، لیستِ قیمت (POS-18)، دریافتِ بدهی (POS-39)، یادداشتِ
  *  فاکتور (POS-11)، فروشندهٔ ردیف‌ها (POS-23) و «سبد ⇐ سفارشِ ارسال» (POS-38، با قیمتِ پس از تخفیفِ خودکار). امتیازِ وفاداری (PRM-13) در برگهٔ
  *  پرداخت است، کنارِ مشتریِ همان فاکتور.
+ *
+ *  ۱۴۰۵/۰۸/۲۴ (صاحب‌کار: «بخش سبد صدها دکمه داره»): صندوقِ گوشی [LocalTillMenu] می‌دهد ⇒ هیچ‌کدام دکمه نمی‌کشد؛ هر کدام یک ردیفِ
+ *  «…» ِ سبد با توضیحِ یک‌خطی است و پنجره‌هایش همین‌جا می‌مانند. `SaleScreen` این‌ها را همیشه (نه فقط با سبدِ باز) روی صفحه
+ *  نگه می‌دارد تا لیستِ قیمت و پنجره‌ها پس از بستنِ سبد هم کار کنند.
  */
 @Composable
 internal fun RouteScope.PhoneTillTools(lines: List<SalesEngine.CartLine>, priced: List<SalesEngine.CartLine>, debtorId: String?) {
@@ -56,7 +65,9 @@ internal fun RouteScope.PhoneTillTools(lines: List<SalesEngine.CartLine>, priced
     //  POS-23: فروشندهٔ ردیف‌ها (`LineSellerPref`؛ خاموش ⇒ هیچ) — همان برگهٔ کامپیوتر؛ پرداخت آن را روی قلم‌ها ثبت می‌کند
     LineSellerButton(lines.isNotEmpty()) { sellerOpen = true }
     if (deliverLater && lines.isNotEmpty()) {
-      V3Button(StrDeliver.button, { deliverOpen = true }, Modifier.fillMaxWidth(), kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.LocalShipping)
+      if (LocalTillMenu.current != null) {
+        TillOffer("deliver", TillAction(60, StrDeliver.button, StrSale.hintDeliverLater, Icons.Outlined.LocalShipping, V3Hue.SKY) { deliverOpen = true })
+      } else V3Button(StrDeliver.button, { deliverOpen = true }, Modifier.fillMaxWidth(), kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.LocalShipping)
     }
   }
   if (sellerOpen && lines.isNotEmpty()) {

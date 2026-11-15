@@ -231,9 +231,11 @@ class OrderFeedbackTest {
         .map { File(it, "ir/vil3ntec/tohid/$rel") }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد")
     //  صفحهٔ سفارش‌های نسخهٔ ۳ (صفحهٔ قدیمیِ `ui/screens/Orders.kt` بی‌راه بود و در LOC-06 برداشته شد)
     assertTrue(src("ui/v3/online/orders/OrderExtrasAndroid.kt").contains("OrderFeedbackEntry(api, c.permissions.manage, OrdersLive.rev.value)"))
+    //  ۱۴۰۵/۰۸/۲۴: دکمهٔ سرِ صف به ردیفِ «…» ِ سربرگ رفت (`QueueEntry`) — همان شرط: بی فهرستِ سرور هیچ ردیفی
+    assertTrue(src("ui/v3/online/orders/OrdersRouteContent.kt").contains("e.label?.let { label -> V3MenuItem("))
     val panel = src("ui/screens/OrderFeedbackPanel.kt")
     val entry = panel.substringAfter("internal fun OrderFeedbackEntry(").substringBefore("@Composable")
-    assertTrue(entry.indexOf("if (!b.visible) return") in 0 until entry.indexOf("TohidSecondaryButton("))
+    assertTrue(entry.indexOf("if (!b.visible) return QueueEntry.NONE") in 0 until entry.indexOf("return QueueEntry(if (b.waiting > 0)"))
     //  عکس فقط از مرزِ پلتفرم و با همان رمزگشاییِ رسانهٔ چت
     assertTrue(src("ui/screens/OrderFeedbackPhotoAndroid.kt").contains("BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()"))
     assertFalse(panel.contains("android."))

@@ -45,7 +45,16 @@ internal fun TillReceivePhone(d: ShopData, store: ShopStore, cartDebtorId: Strin
   var busy by remember { mutableStateOf(false) }
   var receiptOf by remember { mutableStateOf<Triple<ShopData, String, String>?>(null) }
 
-  OutlinedButton(
+  if (ir.vil3ntec.tohid.ui.components.pos.LocalTillMenu.current != null) {
+    //  «…» ِ سبدِ گوشی: همان کار (کلیدِ یکتای تازه با هر زدن، مشتریِ فاکتور یا انتخاب)
+    ir.vil3ntec.tohid.ui.components.pos.TillOffer(
+      "receive",
+      ir.vil3ntec.tohid.ui.components.pos.TillAction(
+        10, StrSalePages.receiveTitle, ir.vil3ntec.tohid.core.i18n.StrSale.hintReceiveDebt, Icons.Filled.Payments,
+        ir.vil3ntec.tohid.ui.v3.V3Hue.MINT, 1,
+      ) { key = newId(); if (cartDebtorId != null) forId = cartDebtorId else pick = true },
+    )
+  } else OutlinedButton(
     onClick = { key = newId(); if (cartDebtorId != null) forId = cartDebtorId else pick = true },
     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
   ) {

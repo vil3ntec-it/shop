@@ -72,8 +72,9 @@ data class PhoneV3Colors(
       blackRaised = s.inverseRaised,
       onBlack = s.onInverse,
       onBlackMuted = s.onInverseMuted,
-      //  سطح‌های پُرِ برند با متنِ سفید (سرِ خانه، کارت‌های آمار): سرِ گرادیانِ تم
-      accent = s.heroGradient.first(),
+      //  سطح‌های پُرِ برند با متنِ سفید (سرِ خانه، کارت‌های آمار): روز سرِ گرادیانِ تم؛ شب (۶۹ p3) پُرِ دکمهٔ اصلی — سرِ گرادیانِ شب
+      //  (مثلاً سرمه‌ایِ #1E3A8A) روی کارتِ شب ۱٫۹:۱ بود و نشانگر/آیکنِ «accent» در شب گم می‌شد
+      accent = if (s.isDark) s.button.primary.bg else s.heroGradient.first(),
       accentDeep = s.brandDeep,
       onAccent = Color.White,
       //  سبد و دکمهٔ اسکن: جفتِ دکمهٔ اصلیِ همین حالت

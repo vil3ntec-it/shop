@@ -182,6 +182,21 @@ object StrOrderFlow {
     "Another device made the invoice; it appears here after sync.",
     "بل بلې وسیلې جوړ کړ؛ له همغږۍ وروسته دلته هم ښکاري.",
   )
+  // ── ردیفِ «راه‌اندازیِ سفارشِ آنلاین» زیرِ برگه‌های صف (صاحب‌کار ۱۴۰۵/۰۸/۲۴: «صد تا هشدار اومده») ──
+  fun setupCount(n: Int): String = t(
+    "${asIs(n)} کار برای راه‌اندازیِ سفارشِ آنلاین", "$n ${pl(n, "step", "steps")} to set up online orders", "د آنلاین فرمایش د چمتو کولو لپاره $n کار",
+  )
+  val setupTitle: String get() = t("راه‌اندازیِ سفارشِ آنلاین", "Set up online orders", "د آنلاین فرمایش چمتو کول")
+  val setupHint: String get() = t(
+    "هر کار را با دکمهٔ کنارش انجام دهید؛ بعد سفارشِ مشتری از ویترین همین‌جا می‌رسد.",
+    "Do each step with the button beside it; then customer orders from the storefront arrive here.",
+    "هر کار د خپلې تڼۍ په مرسته وکړئ؛ بیا د ویترین فرمایشونه همدلته راځي.",
+  )
+  val setupOff: String get() = t("سفارشِ آنلاین برای این دکان خاموش است", "Online orders are off for this shop", "د دې دوکان لپاره آنلاین فرمایش بند دی")
+  val doStorefront: String get() = t("ساختنِ ویترین", "Create storefront", "ویترین جوړول")
+  val doStorefrontOn: String get() = t("روشن کردنِ ویترین", "Turn storefront on", "ویترین فعالول")
+  val doProducts: String get() = t("گذاشتنِ کالا", "Add products", "توکي ایښودل")
+
   fun invoiceFailed(m: String): String = t("فاکتور ثبت نشد — ${asIs(m)}", "Invoice not recorded — $m", "بل ثبت نه شو — $m")
   val ledgerNotReady: String get() = t("دفترِ دکان هنوز باز نشده؛ کمی بعد دوباره بزنید.", "The shop ledger isn't open yet; try again shortly.", "د دوکان دفتر لا نه دی پرانیستل شوی؛ لږ وروسته بیا یې ووهئ.")
   val notWritten: String get() = t("فاکتور روی این دستگاه نوشته نشد (قفلِ برنامه؟)؛ دوباره بزنید.", "The invoice wasn't written on this device (app lock?); tap again.", "بل په دې وسیله ونه لیکل شو (د برنامې قفل؟)؛ بیا یې ووهئ.")

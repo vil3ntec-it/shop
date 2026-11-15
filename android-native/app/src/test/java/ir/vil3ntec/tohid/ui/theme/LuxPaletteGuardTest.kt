@@ -128,6 +128,49 @@ class LuxPaletteGuardTest {
     assertTrue(bad.joinToString("\n"), bad.isEmpty())
   }
 
+  /** همهٔ رنگ‌هایی که یک تم خودش دارد (سطح، متن، برند، دکمه، گرادیان، درخشش، نمودار) — بی آلفا */
+  private fun themeOwned(s: ShopColors): List<Pair<String, Color>> = listOf(
+    "background" to s.background, "backgroundSubtle" to s.backgroundSubtle, "surface" to s.surface, "surfaceElevated" to s.surfaceElevated,
+    "surfaceSelected" to s.surfaceSelected, "textPrimary" to s.textPrimary, "textSecondary" to s.textSecondary, "textMuted" to s.textMuted,
+    "icon" to s.icon, "iconActive" to s.iconActive, "borderCard" to s.borderCard, "borderInput" to s.borderInput, "divider" to s.divider,
+    "brandPrimary" to s.brandPrimary, "brandDeep" to s.brandDeep, "brandText" to s.brandText, "link" to s.link, "focus" to s.focus,
+    "inverse" to s.inverse, "inverseRaised" to s.inverseRaised, "onInverse" to s.onInverse, "onInverseMuted" to s.onInverseMuted,
+    "brandOnInverse" to s.brandOnInverse, "glow" to s.glow, "auroraOne" to s.auroraOne, "auroraTwo" to s.auroraTwo, "auroraThree" to s.auroraThree,
+  ) + listOf("primary" to s.button.primary, "secondary" to s.button.secondary, "neutral" to s.button.neutral, "danger" to s.button.danger, "disabled" to s.button.disabled)
+    .flatMap { (k, t) -> listOf("button.$k.bg" to t.bg, "button.$k.text" to t.text, "button.$k.border" to t.border) } +
+    s.heroGradient.mapIndexed { i, c -> "heroGradient[$i]" to c } +
+    s.accents.mapIndexed { i, c -> "accents[$i]" to c } +
+    s.chart.series.mapIndexed { i, c -> "chart[$i]" to c }
+
+  /**
+   *  ۶۹ p3 (صاحب‌کار: «از رنگ‌های مزخرف توی تم … همه چی افتضاحه»؛ پیش‌تر «رنگ صورتی کار نگیر»): هیچ رنگی که یک تم خودش دارد — در هر
+   *  هشت پالت — صورتی/ارغوانی، لیمویی/زیتونی یا تند (نئون) نیست؛ «غروب» (#DB2777) و فیروزه‌ایِ تندِ «اقیانوس» (#22D3EE) با همین
+   *  برداشته شدند. تنها استثنا گرادیانِ پسندیده و قفل‌شدهٔ کادرِ خانهٔ «آسمان» ِ روز (آبی⇐نیلی⇐بنفش؛ بنفشِ #7C3AED کرومای ۰٫۲۴۷ دارد)
+   *  و لکه‌های نورِ صفحهٔ ورود که از همان سه رنگ‌اند. رنگ‌های معناییِ مشترک (وضعیت و پیام، در هر تم یکی) فقط قاعدهٔ فام را دارند —
+   *  بنفشِ «در انتظارِ تأیید» (#6D28D9) قاعدهٔ ثابتِ THEME-V2 است.
+   */
+  @Test fun `هیچ رنگِ هیچ تمی صورتی، لیمویی یا نئون نیست`() {
+    val pinned = SkyLight.heroGradient.map { it.copy(alpha = 1f) }.toSet()
+    val bad = mutableListOf<String>()
+    for (t in ShopTheme.entries) for (dark in listOf(false, true)) {
+      val s = shopColors(t, dark)
+      for ((k, c) in themeOwned(s)) {
+        val solid = c.copy(alpha = 1f)
+        if (solid in pinned) continue
+        forbidden(solid)?.let { bad += "${t.id}${if (dark) "-شب" else ""} $k ${hex(solid)}: $it" }
+      }
+      val semantic = s.status.all.flatMap { (k, v) -> listOf("status.$k.fg" to v.fg, "status.$k.bg" to v.bg) } +
+        s.message.all.flatMap { (k, v) -> listOf("message.$k.text" to v.text, "message.$k.icon" to v.icon, "message.$k.bg" to v.bg) }
+      for ((k, c) in semantic) {
+        val (h, sat) = hsl(c)
+        if (sat >= 0.15 && ((h >= 285 && h < 345) || (h >= 62 && h <= 100))) bad += "${t.id} $k ${hex(c)}: فامِ صورتی/لیمویی"
+      }
+    }
+    assertTrue(bad.joinToString("\n"), bad.isEmpty())
+    //  استثنا فقط همان سه رنگِ قفل‌شده است
+    assertEquals(listOf("#FF2563EB", "#FF4F46E5", "#FF7C3AED"), SkyLight.heroGradient.map(::hex))
+  }
+
   @Test fun `بخش‌های مشهود رنگِ پیشنهادیِ پالتِ لوکس را دارند — مصارف زر، خرید نفتی، قرض عقیق، سفارش نفتی`() {
     assertEquals(PhoneV3Palette.Hue.AMBER, V3Section.EXPENSES.hue)
     assertEquals(PhoneV3Palette.Hue.TEAL, V3Section.PURCHASES.hue)

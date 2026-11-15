@@ -13,6 +13,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import ir.vil3ntec.tohid.ui.desk.deskClickable
 import ir.vil3ntec.tohid.core.sync.SyncBadge
 import ir.vil3ntec.tohid.data.CashShift
 import ir.vil3ntec.tohid.data.ShopData
@@ -33,6 +37,7 @@ import ir.vil3ntec.tohid.core.i18n.Str
  *  همگام‌سازی، صندوق، فروشِ امروز، شمارِ کالا و قرض‌دار، تاریخِ شمسی،
  *  ساعت و نسخه. هر خانه که کاری دارد، با کلیک صفحه‌اش را باز می‌کند.
  *  ساعت هر ۳۰ ثانیه تازه می‌شود؛ بقیه فقط با عوض شدنِ دفتر.
+ *  e-desk-d1: همان خانه‌ها، خواناتر — ۱۳، جداکنندهٔ روشن، نقطهٔ رنگیِ همگام‌سازی (سبز/کهربایی/سرخ/خاکستری) و صندوق.
  */
 @Composable
 fun DeskStatusBar(d: ShopData) {
@@ -46,30 +51,34 @@ fun DeskStatusBar(d: ShopData) {
   val shift = remember(d) { CashShift.current(d) }
 
   val colors = Shop.colors
+  val c = ir.vil3ntec.tohid.ui.desk.Desk.colors
   Row(
-    //  نسخهٔ ۲: نوارِ باریکِ کم‌کنتراست، هم‌رنگِ ناحیهٔ منو و بی خطِ جداکننده
-    Modifier.fillMaxWidth().height(26.dp).background(colors.zoneNav)
-      .padding(horizontal = 10.dp),
+    //  e-desk-d1: ۲۸dp، سطحِ پوسته با خطِ مویی بالا، نوشتهٔ ۱۳ (`DeskType.secondary`) و جداکنندهٔ روشن میانِ خانه‌ها
+    Modifier.fillMaxWidth().height(ir.vil3ntec.tohid.ui.desk.DeskSize.statusBar).background(c.chrome).topLine(c.hairline)
+      .padding(horizontal = ir.vil3ntec.tohid.ui.desk.DeskSpace.x2)
+      .semantics(mergeDescendants = false) { contentDescription = ir.vil3ntec.tohid.core.i18n.StrDesk.statusBar },
     verticalAlignment = Alignment.CenterVertically,
   ) {
     val (dot, head) = when {
-      !signedIn -> colors.muted2 to StrNav.statusNoAccount
-      sync.dot == SyncDot.GREEN -> colors.success to (if (sync.live) StrNav.syncLive else StrNav.syncedWithServer)
+      !signedIn -> c.inkMuted to StrNav.statusNoAccount
+      sync.dot == SyncDot.GREEN -> c.positive to (if (sync.live) StrNav.syncLive else StrNav.syncedWithServer)
       //  SYN-12: قطعیِ بی هشدار (حکمِ موتور) برچسبِ خودش را دارد، نه «در صف» — همان `dotHead` ِ وب
-      sync.dot == SyncDot.YELLOW -> colors.warning to (SyncModel.quietHead(sync.outage) ?: StrNav.syncQueued)
-      sync.dot == SyncDot.RED -> colors.danger to StrNav.syncError
-      else -> colors.muted2 to StrNav.offlineHeld
+      sync.dot == SyncDot.YELLOW -> colors.message.warning.icon to (SyncModel.quietHead(sync.outage) ?: StrNav.syncQueued)
+      sync.dot == SyncDot.RED -> c.negative to StrNav.syncError
+      else -> c.inkMuted to StrNav.offlineHeld
     }
     //  SYN-08: شمارِ منتظر، آخرین همگام‌سازیِ موفق و خطای آخر همیشه پیداست — خطا فقط به شکلِ ساده (`SyncModel.reason`)
     val text = if (!signedIn) head else SyncBadge.line(head, sync.queued, sync.lastOkAt, SyncModel.reason(sync.lastError), now)
     Cell(onClick = { AppNav.go("devices") }) {
       Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
       Spacer(Modifier.width(6.dp))
-      Label(text, if (signedIn && sync.dot == SyncDot.RED) colors.danger else colors.muted)
+      Label(text, if (signedIn && sync.dot == SyncDot.RED) c.negative else c.ink)
     }
     Sep()
     Cell(onClick = { AppNav.go("sales") }) {
-      Label(if (shift != null) StrNav.registerOpen else StrNav.registerClosed, if (shift != null) colors.success else colors.muted)
+      Box(Modifier.size(6.dp).clip(CircleShape).background(if (shift != null) c.positive else c.inkMuted))
+      Spacer(Modifier.width(6.dp))
+      Label(if (shift != null) StrNav.registerOpen else StrNav.registerClosed, if (shift != null) c.positive else c.inkSecondary)
     }
     Sep()
     Cell(onClick = { AppNav.go("sales") }) {
@@ -81,9 +90,9 @@ fun DeskStatusBar(d: ShopData) {
     Cell(onClick = { AppNav.go("debtors") }) { Label(Str.debtorsCount(plain(d.debtors.size))) }
     Spacer(Modifier.weight(1f))
     //  «جست‌وجو Ctrl+K» این‌جا برداشته شد — جست‌وجو فقط یک جا (سربرگ یا کادرِ صندوق)
-    Label(ir.vil3ntec.tohid.formatDate(today) + " — " + clock(now))
+    Label(ir.vil3ntec.tohid.formatDate(today) + " — " + clock(now), modifier = Modifier.padding(horizontal = 6.dp))
     Sep()
-    Label(Str.version(ir.vil3ntec.tohid.BuildConfig.VERSION_NAME), colors.muted2)
+    Label(Str.version(ir.vil3ntec.tohid.BuildConfig.VERSION_NAME), c.inkSecondary, Modifier.padding(horizontal = 6.dp))
   }
 }
 
@@ -95,18 +104,23 @@ private fun clock(at: Long): String {
 @Composable
 private fun Cell(onClick: () -> Unit, content: @Composable RowScope.() -> Unit) {
   Row(
-    Modifier.clip(MaterialTheme.shapes.extraSmall).clickable(onClick = onClick).padding(horizontal = 6.dp, vertical = 3.dp),
+    Modifier.height(22.dp).deskClickable(onClick = onClick).padding(horizontal = 8.dp),
     verticalAlignment = Alignment.CenterVertically,
     content = content,
   )
 }
 
 @Composable
-private fun Label(text: String, color: Color = Shop.colors.muted) {
-  Text(text, style = MaterialTheme.typography.labelSmall, color = color, maxLines = 1)
+private fun Label(text: String, color: Color = ir.vil3ntec.tohid.ui.desk.Desk.colors.inkSecondary, modifier: Modifier = Modifier) {
+  Text(text, modifier, style = ir.vil3ntec.tohid.ui.desk.DeskType.secondary, color = color, maxLines = 1)
 }
 
 @Composable
 private fun Sep() {
-  Box(Modifier.padding(horizontal = 4.dp).width(1.dp).height(14.dp).background(Shop.colors.border))
+  Box(Modifier.padding(horizontal = 2.dp).width(1.dp).height(14.dp).background(ir.vil3ntec.tohid.ui.desk.Desk.colors.hairline))
+}
+
+/** خطِ مویی بالای نوار */
+private fun Modifier.topLine(color: Color): Modifier = drawBehind {
+  drawLine(color, androidx.compose.ui.geometry.Offset(0f, 0.5f), androidx.compose.ui.geometry.Offset(size.width, 0.5f), strokeWidth = 1.dp.toPx())
 }

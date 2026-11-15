@@ -126,8 +126,9 @@ fun ThemeGallery() {
 
 private fun themeName(): String = when (ThemeStore.theme) {
   ir.vil3ntec.tohid.ui.theme.ShopTheme.SKY -> "آسمان"
-  ir.vil3ntec.tohid.ui.theme.ShopTheme.OCEAN -> "اقیانوس"
-  ir.vil3ntec.tohid.ui.theme.ShopTheme.DUSK -> "غروب"
+  ir.vil3ntec.tohid.ui.theme.ShopTheme.NAVY -> "سرمه‌ای"
+  ir.vil3ntec.tohid.ui.theme.ShopTheme.IVORY -> "عاجی"
+  ir.vil3ntec.tohid.ui.theme.ShopTheme.GRAPHITE -> "گرافیت"
 }
 
 /** آیکنِ ثبت‌شدهٔ همان بخش در ثبتِ ماژول‌ها (نوار، «بیشتر» یا خانه) */

@@ -27,6 +27,7 @@ import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Action
 import ir.vil3ntec.tohid.ui.v3.V3Button
+import ir.vil3ntec.tohid.ui.v3.LocalV3Notice
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3MenuItem
 import ir.vil3ntec.tohid.ui.v3.V3Message
@@ -68,6 +69,10 @@ class QueueActions(
  *  صفِ سفارش‌ها (`orders?tab=`) — online.md: تب‌های `OrderStates.TABS` با شمار (تازه ⇐ نقطهٔ
  *  «در انتظارِ تأیید»، THEME-V2)، کارت‌ها با ورودِ پلکانی و جابه‌جاییِ نرم (`v3AnimateItem`)، اسکلت، خطا با «دوباره»،
  *  خالیِ هر برگه، و «سفارش‌های بیشتر». «+ سفارشِ دستی» فقط با `permissions.create`.
+ *
+ *  ۱۴۰۵/۰۸/۲۴ (صاحب‌کار: «صد تا هشدار اومده… مسخره»): زیرِ برگه‌ها دست‌بالا **یک** ردیفِ وضعیت ([setup]، فقط وقتی چیزی
+ *  جلوی سفارش را گرفته) و هیچ دیوارِ پیامی؛ یادداشتِ «اعلانِ فوری هنوز وصل نیست» به راهنما رفت، «گزارش‌ها و نظرها» به
+ *  «…»، و نوارِ «نسخهٔ پیش‌نمایش» این صفحه نیست (نشانش در «بیشتر/درباره» می‌ماند). برگه‌ها در ۳۶۰dp همه پیدا (`fit`).
  */
 @Composable
 fun OrdersScreen(
@@ -84,21 +89,29 @@ fun OrdersScreen(
   riskFlags: Map<String, OrderRisk.Flag> = emptyMap(),
   /** گزینه‌های افزودهٔ «…» (مثلاً RSK-04 «فهرستِ بسته و مطمئن»)، پس از «دوباره» */
   menu: List<V3MenuItem> = emptyList(),
+  /** تنها ردیفِ وضعیتِ زیرِ برگه‌ها (`OrderSetupModel.of(arrival)`)؛ آماده ⇒ هیچ */
+  setup: OrderSetupModel.Status = OrderSetupModel.Status.Ready,
+  onSetup: () -> Unit = {},
+  onSupport: () -> Unit = {},
 ) {
   val stagger = rememberV3Stagger(state.tab)
+  //  پیام‌های پوسته (اشتراک، پشتیبانی، نسخهٔ تازه…) می‌مانند؛ نوارِ «نسخهٔ پیش‌نمایش» ِ هر صفحه نه
+  val shellNotice: (@Composable () -> Unit)? = if (LocalV3Notice.current != null) ({ ir.vil3ntec.tohid.ui.v3.shell.ShellNotice() }) else null
   V3Scaffold(
     title = StrOnline.ordersTitle,
     subtitle = StrOnline.ordersCaption,
     modifier = modifier,
     onBack = onBack,
+    notice = shellNotice,
     //  «سفارشِ دستی» آیکنِ سربرگ؛ تب‌ها زیرِ عنوان — هیچ ردیفی بالای نوارِ پایین
     actions = if (state.perms.create) listOf(V3Action(Icons.Outlined.Add, StrOnline.manualOrder, onClick = actions.onNew)) else emptyList(),
     overflow = listOf(V3MenuItem(Icons.Outlined.Refresh, StrOnline.reload, onClick = actions.onRetry)) + menu,
     chips = {
       DraftCountTabs(
-        tabs = OrdersHubModel.tabs(state.counts, state.tab).map { t -> CountTab(t, StrOrdersHub.tab(t), state.counts[t] ?: 0, attention = t == "new") },
+        tabs = OrdersHubModel.tabs(state.counts, state.tab).map { t -> CountTab(t, StrOrdersHub.tabShort(t), state.counts[t] ?: 0, attention = t == "new") },
         selected = state.tab,
         onSelect = actions.onTab,
+        fit = true,
       )
     },
   ) { pad ->
@@ -107,7 +120,7 @@ fun OrdersScreen(
       contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding()),
       verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-      item(key = "live-note") { V3Message(V3Tone.INFO, StrOnline.liveNote) }
+      if (setup != OrderSetupModel.Status.Ready) item(key = "setup") { OrderSetupRow(setup, onSetup, onSupport) }
       if (header != null) item(key = "desk") { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { header() } }
       items(state.notes, key = { "ff-" + it.key }) { n ->
         V3Message(
