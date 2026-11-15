@@ -102,6 +102,8 @@ internal fun PurchasesTab(d: ShopData, from: String, to: String, spec: ReportLis
   val c = PhoneV3.colors
   val r = remember(d, from, to) { ReportEngine.purchases(d, from, to) }
   val names = remember(d) { d.products.associate { it.id to it.name } }
+  //  e-rows-63b: هر ردیف ⇐ جزئیاتِ همان خرید (اقلام، بارکد، پرداخت)، نه فقط صفحهٔ تأمین‌کننده
+  val invoiceOf = remember(d) { ir.vil3ntec.tohid.data.PurchaseBook.invoices(d).flatMap { inv -> inv.lines.map { it.id to inv.key } }.toMap() }
   val stagger = rememberV3Stagger(from, to)
   ReportList(spec) {
     item(key = "kpi") {
@@ -145,7 +147,7 @@ internal fun PurchasesTab(d: ShopData, from: String, to: String, spec: ReportLis
         subtitle = listOfNotNull(uiDate(p.date), "${qty(p.quantity)} ${p.unit}", supplier?.name).joinToString(" · "),
         icon = Icons.Outlined.LocalShipping, hue = V3Hue.PURPLE,
         value = afn(p.totalAmount), valueColor = c.ink,
-        onClick = { spec.onOpen(supplier?.let { MoneyPaths.supplier(it.id) } ?: MoneyPaths.PURCHASING) },
+        onClick = { spec.onOpen(invoiceOf[p.id]?.let(MoneyPaths::purchase) ?: supplier?.let { MoneyPaths.supplier(it.id) } ?: MoneyPaths.PURCHASING) },
       )
     }
     item(key = "end") { Spacer(Modifier.height(8.dp)) }

@@ -1,0 +1,89 @@
+package ir.vil3ntec.tohid.ui.v3.money
+
+import ir.vil3ntec.tohid.LocaleChoice
+import ir.vil3ntec.tohid.core.i18n.I18n
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrHistory
+import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrPurchases
+import ir.vil3ntec.tohid.core.i18n.StrRows
+import ir.vil3ntec.tohid.data.PurchasePeriods
+import ir.vil3ntec.tohid.data.PurchaseViews
+import ir.vil3ntec.tohid.money
+import ir.vil3ntec.tohid.ui.v3.RowWhen
+import ir.vil3ntec.tohid.ui.v3.V3RowStatus
+import ir.vil3ntec.tohid.ui.v3.V3RowTone
+
+/**
+ *  متن‌های آمادهٔ ردیفِ «خریدها» (e-rows-63b، قاعدهٔ ردیفِ ۶۳d): عنوان نامِ تأمین‌کننده؛ زیرِ آن روزِ کوتاه و اقلام
+ *  («امروز · آرد، روغن و ۳ قلمِ دیگر»)؛ خطِ سوم «۱۲٬۰۰۰ ؋ • نیمه‌پرداخت ۲٬۰۰۰ ؋ مانده • رسیده» به متنِ آرام — رنگ فقط برای
+ *  آنچه توجه می‌خواهد (نسیه، نیمه، نرسیده کهربایی؛ سررسید گذشته قرمز). خالص، بی Compose.
+ */
+internal class PurchaseRowText(
+  val title: String,
+  val subtitle: String,
+  val amount: String,
+  val pay: V3RowStatus?,
+  val receipt: V3RowStatus?,
+) {
+  companion object {
+    fun of(v: PurchaseViews.View, today: String): PurchaseRowText {
+      val day = MoneyText.short(v.date, today)
+      val head = listOfNotNull(day, v.no.takeIf { it > 0 && v.isOrder }?.let(StrPurchases::orderNo)).joinToString(" · ")
+      return PurchaseRowText(
+        title = v.supplierName.ifBlank { StrMoney.supplierLabel },
+        subtitle = "$head · ${items(v)}",
+        amount = amount(v),
+        pay = pay(v, today),
+        receipt = receipt(v),
+      )
+    }
+
+    /** «۱۲٬۰۰۰ ؋»؛ سندِ کسر «−۴۰۰ ؋» */
+    fun amount(v: PurchaseViews.View): String =
+      if (v.kind == PurchaseViews.Kind.RETURN) MoneyText.signed(-v.total, plus = false) + " ؋" else MoneyText.afn(v.total)
+
+    /** «آرد»، «آرد، روغن»، «آرد، روغن و ۳ قلمِ دیگر»؛ کالای حذف‌شده ⇒ «(محصول حذف‌شده)» */
+    fun items(v: PurchaseViews.View): String {
+      val names = v.names
+      if (names.isEmpty()) return StrMoney.deletedProduct
+      val shown = names.take(2).joinToString(StrRows.namesSep)
+      return if (names.size <= 2) shown else StrRows.andMore(shown, names.size - 2)
+    }
+
+    fun pay(v: PurchaseViews.View, today: String): V3RowStatus? = when (v.pay) {
+      PurchaseViews.Pay.PAID -> V3RowStatus(StrPurchases.paid)
+      PurchaseViews.Pay.PARTIAL -> V3RowStatus(StrPurchases.partly(money(v.remaining)), V3RowTone.ATTENTION)
+      PurchaseViews.Pay.CREDIT -> V3RowStatus(
+        v.dueDate?.let { StrPurchases.creditDue(RowWhen.of(it, today)) } ?: StrPurchases.credit,
+        V3RowTone.ATTENTION,
+      )
+      PurchaseViews.Pay.OVERDUE -> V3RowStatus(StrPurchases.overdue(money(v.remaining)), V3RowTone.DANGER)
+      PurchaseViews.Pay.NONE -> if (v.kind == PurchaseViews.Kind.RETURN) V3RowStatus(StrPurchases.returned) else null
+    }
+
+    fun receipt(v: PurchaseViews.View): V3RowStatus? = when {
+      v.kind == PurchaseViews.Kind.RETURN -> null
+      v.receipt == PurchaseViews.Receipt.RECEIVED -> V3RowStatus(StrPurchases.received)
+      v.receipt == PurchaseViews.Receipt.PARTIAL -> V3RowStatus(StrPurchases.partReceived, V3RowTone.ATTENTION)
+      else -> V3RowStatus(StrPurchases.notReceived, V3RowTone.ATTENTION)
+    }
+
+    /** نوشتهٔ کادرِ دوره: «همهٔ زمان‌ها»، «امروز»، «این ماه»، «میزان ۱۴۰۵»، «امسال»، «۱۴۰۴» */
+    fun period(key: String?, today: String, gregorian: Boolean = gregorian()): String {
+      if (key == null) return StrPurchases.allTime
+      return when (PurchasePeriods.kind(key, today, gregorian)) {
+        PurchasePeriods.Kind.TODAY -> Str.today
+        PurchasePeriods.Kind.THIS_MONTH -> StrHistory.thisMonth
+        PurchasePeriods.Kind.THIS_YEAR -> StrHistory.thisYear
+        PurchasePeriods.Kind.MONTH -> PurchasePeriods.yearMonth(key)?.let { (y, m) ->
+          val names = if (gregorian) I18n.gregorianMonths(I18n.lang) else I18n.solarMonths(I18n.lang, LocaleChoice.months)
+          names.getOrNull(m - 1)?.let { "$it $y" }
+        } ?: key.substringAfter(':')
+        PurchasePeriods.Kind.YEAR, PurchasePeriods.Kind.OTHER -> key.substringAfter(':')
+      }
+    }
+
+    fun gregorian(): Boolean = I18n.gregorian(I18n.lang, LocaleChoice.calendar)
+  }
+}

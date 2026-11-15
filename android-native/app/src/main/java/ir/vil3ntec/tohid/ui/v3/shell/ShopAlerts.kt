@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.shell
 
 import ir.vil3ntec.tohid.core.i18n.StrHome
+import ir.vil3ntec.tohid.core.i18n.StrPurchases
 import ir.vil3ntec.tohid.ui.screens.HomeAlerts
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 
@@ -39,6 +40,9 @@ object ShopAlerts {
   data class Low(val id: String, val name: String, val left: String)
   data class Owing(val id: String, val name: String, val amount: String)
 
+  /** خریدهایی که سررسیدِ پرداختشان گذشته (e-rows-63b، `PurchaseBook.overdue`): شمار، جمعِ مانده و تأمین‌کنندهٔ تنها */
+  data class SupplierDue(val count: Int, val amount: String, val onlySupplierId: String? = null)
+
   /** آنچه فقط زنگِ قدیم نشان می‌داد — از دفتر، بی هیچ شمارشِ تازه */
   data class Extras(
     val out: List<Product> = emptyList(),
@@ -51,6 +55,8 @@ object ShopAlerts {
     val backupText: String = "",
     /** سه قرض‌دارِ بیشترین قرض (همان قاعدهٔ زنگِ قدیم) */
     val topDebtors: List<Owing> = emptyList(),
+    /** e-rows-63b: «سررسیدِ پرداختِ تأمین‌کننده» — null ⇒ هیچ خریدی سررسیدش نگذشته */
+    val supplierDue: SupplierDue? = null,
   )
 
   data class Groups(val urgent: List<Item>, val rest: List<Item>) {
@@ -129,7 +135,12 @@ object ShopAlerts {
         add(Item("debtors:top", Kind.DEBTOR, StrHome.topDebts, sub, StrHome.actionFollowUp, ShellTargets.MOST_DEBT, ShellTargets.MOST_DEBT, V3Tone.INFO, false))
       }
     }
-    return Groups(urgent = fromHome.filter { it.urgent }, rest = fromHome.filterNot { it.urgent } + extra)
+    //  e-rows-63b: سررسیدِ گذشتهٔ پرداخت به تأمین‌کننده فوری است (مثلِ قرضِ سررسیدگذشته)؛ تنها ⇒ صفحهٔ همان، چند ⇒ خریدهای سررسیدگذشته
+    val due = x.supplierDue?.takeIf { it.count > 0 }?.let { s ->
+      val route = s.onlySupplierId?.let(ShellTargets::supplier) ?: ShellTargets.SUPPLIER_OVERDUE
+      Item("supplier-due", Kind.SUPPLIER, StrPurchases.dueAlert, StrPurchases.dueAlertBody(s.count, s.amount), StrHome.actionSee, route, route, V3Tone.ERROR, true)
+    }
+    return Groups(urgent = fromHome.filter { it.urgent } + listOfNotNull(due), rest = fromHome.filterNot { it.urgent } + extra)
   }
 
   /** نقطهٔ زنگ: هر هشدارِ فوری، یا خبرِ دیده‌نشده */

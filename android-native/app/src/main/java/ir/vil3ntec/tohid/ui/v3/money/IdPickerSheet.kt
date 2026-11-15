@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -42,6 +43,9 @@ internal fun IdPickerSheet(
   selected: String?,
   onPick: (String?) -> Unit,
   onDismiss: () -> Unit,
+  /** e-rows-63b: ردیفِ «+ تازه» بالای گزینه‌ها (تأمین‌کننده/کالای تازه در فرمِ خرید)؛ زدن ⇒ برگه بسته و [onAdd]؛ null ⇒ نیست */
+  addLabel: String? = null,
+  onAdd: (() -> Unit)? = null,
 ) {
   var query by rememberSaveable { mutableStateOf("") }
   val term = query.trim()
@@ -49,6 +53,10 @@ internal fun IdPickerSheet(
   V3Sheet(onDismiss = onDismiss, title = title) { closer ->
     if (options.size > 6) {
       V3SearchField(query, { query = it }, StrKit.searchHint)
+      Spacer(Modifier.height(10.dp))
+    }
+    if (addLabel != null && onAdd != null) {
+      V3ListRow(title = addLabel, icon = Icons.Outlined.Add, chevron = false, onClick = { closer.close(onAdd) })
       Spacer(Modifier.height(10.dp))
     }
     if (shown.isEmpty()) {

@@ -44,6 +44,8 @@ object ShellTargets {
   val MOST_DEBT: String = MoneyPaths.debtors(sort = "most")
   val EXPIRING: String = StockPaths.list(filter = "expiring")
   val PURCHASING: String = MoneyPaths.PURCHASING
+  /** e-rows-63b: خریدهایی که سررسیدِ پرداختشان گذشته */
+  val SUPPLIER_OVERDUE: String = MoneyPaths.purchasing(pay = "overdue")
 
   fun product(id: String): String = ProductsPaths.item(id)
   fun newProduct(barcode: String): String = ProductsPaths.new(barcode = barcode)

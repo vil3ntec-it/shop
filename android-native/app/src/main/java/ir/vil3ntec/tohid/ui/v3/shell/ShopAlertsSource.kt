@@ -14,7 +14,7 @@ import ir.vil3ntec.tohid.qty
  *  ِ سربرگِ قدیم (`ShopStore.stockStatus`، `supplierDebt`، `debt`، `BackupClock`)، یک بار
  *  به ازای هر دفتر. قاعده‌ای عوض نشده؛ فقط هر ردیف شناسهٔ خودش را دارد تا مستقیم باز شود.
  */
-fun shopAlertExtras(d: ShopData, backupStale: Boolean, backupText: String): ShopAlerts.Extras {
+fun shopAlertExtras(d: ShopData, backupStale: Boolean, backupText: String, today: String = ""): ShopAlerts.Extras {
   val stock = ShopStore.index(d)
   val owed = d.suppliers.map { it.id to ShopStore.supplierDebt(d, it.id) }.filter { it.second > 0 }
   val supplierTotal = owed.sumOf { it.second }
@@ -31,6 +31,10 @@ fun shopAlertExtras(d: ShopData, backupStale: Boolean, backupText: String): Shop
       .sortedByDescending { it.second }
       .take(3)
       .map { (debtor, amount) -> ShopAlerts.Owing(debtor.id, debtor.name, money(amount)) },
+    //  e-rows-63b: همان ماندهٔ واقعیِ `PurchaseBook.open` (پرداخت‌های بعدی و سندهای کسر)، سررسیدِ پیش از امروز
+    supplierDue = if (today.isBlank()) null else ir.vil3ntec.tohid.data.PurchaseBook.overdue(d, today).takeIf { it.isNotEmpty() }?.let { late ->
+      ShopAlerts.SupplierDue(late.size, money(late.sumOf { it.remaining }), late.map { it.supplierId }.distinct().singleOrNull())
+    },
   )
 }
 
@@ -40,6 +44,7 @@ fun rememberShopAlerts(d: ShopData, home: List<ir.vil3ntec.tohid.ui.screens.Home
   val context = LocalContext.current
   val stale = remember { BackupClock.isStale(context) }
   val backupText = remember { BackupClock.text(context) }
-  val extras = remember(d, stale) { shopAlertExtras(d, stale, backupText) }
+  val today = remember { ir.vil3ntec.tohid.todayIso() }
+  val extras = remember(d, stale, today) { shopAlertExtras(d, stale, backupText, today) }
   return remember(home, extras) { ShopAlerts.build(home, extras) }
 }
