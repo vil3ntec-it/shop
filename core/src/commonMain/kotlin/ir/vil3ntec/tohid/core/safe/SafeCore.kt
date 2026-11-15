@@ -27,6 +27,12 @@ package ir.vil3ntec.tohid.core.safe
  *  ([Walk]). ردیفی که جمعی را از آن بازه بیرون ببرد مثلِ ردیفِ بدشکل کنار می‌رود (`invalid`)
  *  — نه عددِ گردشده (§۲۸.۴)، نه خطایی که خواندنِ کلِ دفتر را بشکند. Kotlin خالص است — بی
  *  android.*، بی ساعت.
+ *
+ *  ── ارز ([SafeCurrency]) ──────────────────────────────────────────
+ *  هر ردیف یک ارز دارد (`currency`؛ نبودنش = افغانی) و هر ارز دفترِ جدای خودش است: مانده، شمارش،
+ *  اختلاف و «بیش از مانده» فقط روی ردیف‌های همان ارز ([view]، [build]) — هیچ تبدیل و هیچ جمعی
+ *  میانِ دو ارز. انتقال از/به دخل فقط افغانی است (دخل افغانی است). آستانهٔ اختلافِ شمارش (D-18) به
+ *  پولِ افغانی است، پس برای ارزِ دیگر هر اختلافی دلیل می‌خواهد (آستانه را بی نرخ به ارزِ دیگر نمی‌بریم).
  */
 object SafeCore {
 
@@ -73,6 +79,8 @@ object SafeCore {
     const val BAD_FIELD = "BAD_FIELD"
     const val INSUFFICIENT_FUNDS = "INSUFFICIENT_FUNDS"
     const val ID_CONFLICT = "ID_CONFLICT"
+    /** کدِ ارزِ نادرست، یا ارزِ جز افغانی روی انتقال از/به دخل */
+    const val BAD_CURRENCY = "BAD_CURRENCY"
   }
 
   /** یک ردیفِ دفتر؛ فیلدهای اختیاری برای نوعِ دیگر `null`اند */
@@ -92,6 +100,8 @@ object SafeCore {
     /** فقط [FROM_DRAWER]/[TO_DRAWER]: شناسهٔ `shift_open` و ردیفِ جفتِ سابقهٔ صندوق */
     val shiftId: String? = null,
     val auditId: String? = null,
+    /** کدِ ارز ([SafeCurrency])؛ null یعنی افغانی */
+    val currency: String? = null,
   )
 
   data class Line(
@@ -146,7 +156,18 @@ object SafeCore {
     val bagNo: String? = null,
     val shiftId: String? = null,
     val auditId: String? = null,
+    /** کدِ ارز؛ null یا `AFN` ⇒ افغانی (ردیفِ افغانی `currency` نمی‌نویسد) */
+    val currency: String? = null,
   )
+
+  /** ارزِ ردیف: نبودنش افغانی است */
+  fun currencyOf(e: Entry): String = e.currency ?: SafeCurrency.AFN
+
+  /** جای ردیفِ کنارگذاشته در دفترِ ارزها: کدِ نادرست ⇒ افغانی (دفترِ پیش‌فرض) */
+  private fun bucket(e: Entry): String = e.currency?.takeIf(SafeCurrency::isCode) ?: SafeCurrency.AFN
+
+  /** آستانهٔ اختلافِ شمارشِ [currency]: افغانی همان [afnThreshold]؛ ارزِ دیگر صفر (هر اختلاف دلیل می‌خواهد) */
+  fun thresholdFor(currency: String, afnThreshold: Long): Long = if (currency == SafeCurrency.AFN) afnThreshold else 0L
 
   private fun clean(s: String?): String? = s?.trim()?.ifEmpty { null }
   private fun tooLong(s: String?, max: Int) = s != null && s.length > max
@@ -161,6 +182,8 @@ object SafeCore {
     if (e.id.length > MAX_ID || tooLong(e.by, MAX_TEXT) || tooLong(e.reason, MAX_TEXT) || tooLong(e.note, MAX_TEXT) ||
       tooLong(e.bagNo, MAX_BAG) || tooLong(e.shiftId, MAX_ID) || tooLong(e.auditId, MAX_ID)
     ) return Code.TEXT_TOO_LONG
+    if (e.currency != null && !SafeCurrency.isCode(e.currency)) return Code.BAD_CURRENCY
+    if (e.kind in LINKED && currencyOf(e) != SafeCurrency.AFN) return Code.BAD_CURRENCY
     val allowed = REASONS[e.kind]
     when {
       allowed != null -> {
@@ -184,13 +207,13 @@ object SafeCore {
 
   private val ORDER = compareBy<Entry>({ it.at }, { it.id })
 
-  /** ردیف‌های درست، یک بار هر شناسه (نخستین)، به ترتیبِ دفتر؛ دومی شناسهٔ کنارگذاشته‌ها */
-  private fun usable(entries: List<Entry>): Pair<List<Entry>, List<String>> {
+  /** ردیف‌های درست، یک بار هر شناسه (نخستین)، به ترتیبِ دفتر؛ دومی ردیف‌های کنارگذاشته به ترتیبِ ورودی */
+  private fun usable(entries: List<Entry>): Pair<List<Entry>, List<Entry>> {
     val seen = HashSet<String>()
-    val bad = ArrayList<String>()
+    val bad = ArrayList<Entry>()
     val ok = ArrayList<Entry>()
     for (e in entries) {
-      if (check(e) != null || !seen.add(e.id)) bad += e.id else ok += e
+      if (check(e) != null || !seen.add(e.id)) bad += e else ok += e
     }
     return ok.sortedWith(ORDER) to bad
   }
@@ -256,19 +279,43 @@ object SafeCore {
     return w
   }
 
-  fun view(entries: List<Entry>): View {
-    val (rows, bad) = usable(entries)
-    val w = walk(rows)
+  /** دفترِ یک ارز از ردیف‌های مرتبِ [usable] — ردیفِ کنارگذاشته در دفترِ [bucket] ِ خودش */
+  private fun viewOf(rows: List<Entry>, bad: List<Entry>, currency: String): View {
+    val w = walk(rows.filter { currencyOf(it) == currency })
     return View(
       balanceMinor = w.balance, lastCount = w.last, inSinceCountMinor = w.inSince, outSinceCountMinor = w.outSince,
-      varianceTotalMinor = w.varianceTotal, negative = w.balance < 0, needsReview = w.review, invalid = bad + w.skipped,
+      varianceTotalMinor = w.varianceTotal, negative = w.balance < 0, needsReview = w.review,
+      invalid = bad.filter { bucket(it) == currency }.map { it.id } + w.skipped,
       history = w.lines.asReversed().toList(),
     )
   }
 
-  /** مانده درست پیش از جایگاهِ (`at`، `id`) */
-  fun balanceBefore(entries: List<Entry>, at: Long, id: String): Long =
-    walk(usable(entries).first, Entry(id, COUNT, 0, at)).balance
+  /** دفترِ [currency] (پیش‌فرض افغانی) — فقط ردیف‌های همان ارز؛ ارزِ دیگر هیچ عددی را عوض نمی‌کند */
+  fun view(entries: List<Entry>, currency: String = SafeCurrency.AFN): View {
+    val (rows, bad) = usable(entries)
+    return viewOf(rows, bad, currency)
+  }
+
+  /** ارزهایی که دفتر دارد: افغانی همیشه اول، بقیه به ترتیبِ الفبا */
+  fun currencies(entries: List<Entry>): List<String> {
+    val (rows, bad) = usable(entries)
+    return currenciesOf(rows, bad)
+  }
+
+  private fun currenciesOf(rows: List<Entry>, bad: List<Entry>): List<String> =
+    listOf(SafeCurrency.AFN) + (rows.map(::currencyOf) + bad.map(::bucket)).filter { it != SafeCurrency.AFN }.distinct().sorted()
+
+  /** دفترِ هر ارز ([currencies]، افغانی اول) با یک بار سنجیدنِ ردیف‌ها — جدا، هرگز جمع‌شده */
+  fun views(entries: List<Entry>): Map<String, View> {
+    val (rows, bad) = usable(entries)
+    val out = LinkedHashMap<String, View>()
+    for (c in currenciesOf(rows, bad)) out[c] = viewOf(rows, bad, c)
+    return out
+  }
+
+  /** ماندهٔ [currency] درست پیش از جایگاهِ (`at`، `id`) */
+  fun balanceBefore(entries: List<Entry>, at: Long, id: String, currency: String = SafeCurrency.AFN): Long =
+    walk(usable(entries).first.filter { currencyOf(it) == currency }, Entry(id, COUNT, 0, at)).balance
 
   /**
    *  سنجش و ساختِ ردیفِ تازه از روی دفترِ همین دستگاه.
@@ -278,29 +325,34 @@ object SafeCore {
    *  • خروج بیش از مانده `INSUFFICIENT_FUNDS`؛ اختلافِ شمارش (جز شمارشِ آغاز) بیش از [threshold]
    *    بی دلیل `REASON_REQUIRED`؛ ردیفی که [view] کنارش می‌گذاشت (جمعی بیرون از ±(۲^۵۳−۱))
    *    `INVALID_AMOUNT`.
+   *  • ارز: مانده، شمارش و «بیش از مانده» فقط روی ردیف‌های همان ارز؛ [threshold] پولِ افغانی است و
+   *    برای ارزِ دیگر صفر ([thresholdFor]). `AFN` ِ صریح همان «بی ارز» نوشته می‌شود.
    */
   fun build(entries: List<Entry>, input: Input, threshold: Long): Result<Entry> {
     val id = clean(input.id) ?: return Result.Err(Code.ID_REQUIRED)
     if (input.at <= 0) return Result.Err(Code.INVALID_TIME)
+    val currency = clean(input.currency)?.takeIf { it != SafeCurrency.AFN }
+    val code = currency ?: SafeCurrency.AFN
     val rows = usable(entries).first
     val prior = entries.firstOrNull { it.id == id }
     val at = prior?.at ?: maxOf(input.at, (rows.lastOrNull()?.at ?: 0L) + 1)
-    val w = walk(rows, Entry(id, COUNT, 0, at))
+    val w = walk(rows.filter { currencyOf(it) == code }, Entry(id, COUNT, 0, at))
     val before = w.balance
     val e = Entry(
       id = id, kind = input.kind, amountMinor = input.amountMinor, at = at,
       by = clean(input.by), reason = clean(input.reason), note = clean(input.note), bagNo = clean(input.bagNo),
       expectedMinor = if (input.kind == COUNT) before else null,
-      shiftId = clean(input.shiftId), auditId = clean(input.auditId),
+      shiftId = clean(input.shiftId), auditId = clean(input.auditId), currency = currency,
     )
     check(e)?.let { return Result.Err(it) }
     if (prior != null) {
-      fun same(x: Entry) = x.copy(at = 0, expectedMinor = null)
+      fun same(x: Entry) = x.copy(at = 0, expectedMinor = null, currency = currencyOf(x))
       return if (same(prior) == same(e)) Result.Ok(prior, duplicate = true) else Result.Err(Code.ID_CONFLICT)
     }
     if (e.kind == COUNT) {
       val v = e.amountMinor - before
-      if (w.lines.isNotEmpty() && (if (v < 0) -v else v) > threshold && e.reason == null) return Result.Err(Code.REASON_REQUIRED, varianceMinor = v)
+      val limit = thresholdFor(code, threshold)
+      if (w.lines.isNotEmpty() && (if (v < 0) -v else v) > limit && e.reason == null) return Result.Err(Code.REASON_REQUIRED, varianceMinor = v)
     } else if (e.kind !in INFLOW && e.amountMinor > before) return Result.Err(Code.INSUFFICIENT_FUNDS)
     //  ردیفِ تازه پس از همهٔ دیده‌هاست ([at])، پس [w] همان حالی است که view رویش می‌نشاندش
     if (w.lineOf(e) == null) return Result.Err(Code.INVALID_AMOUNT)

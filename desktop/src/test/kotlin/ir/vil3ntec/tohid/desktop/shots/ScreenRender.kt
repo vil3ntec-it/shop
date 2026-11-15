@@ -62,7 +62,8 @@ internal object ScreenRender {
     override fun toString() = "$kind «$text» $where"
   }
 
-  class Result(val name: String, val widthDp: Int, val en: Boolean, val findings: List<Finding>, val texts: List<String>)
+  /** [firstFrameMs]: از `setContent` تا پایانِ نخستین قاب (ساختن، چیدن و کشیدن) — فقط گزارش */
+  class Result(val name: String, val widthDp: Int, val en: Boolean, val findings: List<Finding>, val texts: List<String>, val firstFrameMs: Long = -1L)
 
   private val rawKey = Regex("^[a-z][a-zA-Z0-9]*([._][a-zA-Z0-9]+){1,}$")
 
@@ -103,6 +104,8 @@ internal object ScreenRender {
     I18n.source = { if (en) Lang.EN else Lang.FA }
     val scene = CanvasLayersComposeScene(Density(density), dir, IntSize(w, h), Dispatchers.Unconfined, platform)
     val surface = Surface.makeRasterN32Premul(w, h)
+    val t0 = System.nanoTime()
+    var first = -1L
     try {
       scene.setContent {
         CompositionLocalProvider(
@@ -122,6 +125,7 @@ internal object ScreenRender {
       repeat(frames.coerceAtLeast(2)) {
         surface.canvas.clear(0)
         scene.render(surface.canvas.asComposeCanvas(), t)
+        if (first < 0) first = (System.nanoTime() - t0) / 1_000_000
         between()
         t += 500_000_000L
         Thread.sleep(40)
@@ -135,7 +139,7 @@ internal object ScreenRender {
       val texts = ArrayList<String>()
       val found = ArrayList<Finding>()
       synchronized(owners) { owners.toList() }.forEach { walk(it.unmergedRootSemanticsNode, false, w, density, phone, found, texts) }
-      return Result(name, widthDp, en, found.distinct(), texts)
+      return Result(name, widthDp, en, found.distinct(), texts, first)
     } finally {
       scene.close()
       surface.close()
