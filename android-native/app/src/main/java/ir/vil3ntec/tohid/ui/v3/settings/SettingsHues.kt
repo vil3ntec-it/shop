@@ -12,7 +12,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Hue
  *  • هر بخشِ کوتاهِ دسته (`SettingsLayout.Part`) یک رنگ دارد ([PART]): بخشِ اولِ هر دسته همان رنگِ دسته، و بخش‌های
  *    دیگرِ همان صفحه رنگ‌های **جدا** از پالتِ همراهِ «بیشتر» (`V3Hue`) — نه برند کنارِ آسمانی/بنفش (در تمِ «اقیانوس» و
  *    «شامگاه» تقریباً یکی‌اند). معنا همان نقشهٔ ماژول‌ها (`V3Modules.HUE_BY_ID`): فاکتور بنفشِ تاریخچه، گزارش آسمانی،
- *    کالا کهربایی، مشتری و آنلاین مرجانی.
+ *    کالا کهربایی، مشتری مرجانی (آنلاین ِ «فروش و پرداخت» صورتی، چون مرجانی رنگِ همان دسته است).
  *  • هر ردیف رنگِ بخشِ خودش را دارد ([of])؛ ردیفِ ماژول رنگِ بخشی که در آن نشسته؛ ردیف‌های درونِ صفحهٔ یک بخش رنگِ
  *    همان بخش ([page]، از `SettingsPageFrame` در `LocalV3RowHue`).
  *
@@ -24,7 +24,9 @@ internal object SettingsHues {
   /** رنگِ هر دسته — همان کاشیِ «بیشتر ⇐ تنظیمات» و صفحهٔ اولِ تنظیمات */
   val GROUP: Map<String, V3Hue> = mapOf(
     SettingsLayout.SHOP to V3Hue.BRAND,
-    SettingsLayout.SALES to V3Hue.ORANGE,
+    //  ۱۴۰۵/۰۸/۲۴ (e-desk-d1): پیش‌تر `ORANGE` — همان شمارهٔ ۳ ِ «کالا و انبار» (`AMBER`)، دو کاشیِ هم‌رنگ کنارِ هم در صفحهٔ
+    //  اولِ تنظیمات و گروهِ «تنظیمات» ِ «بیشتر». مرجانی (شمارهٔ ۲) گرم‌ترین رنگِ آزادِ شش دسته است
+    SettingsLayout.SALES to V3Hue.CORAL,
     SettingsLayout.GOODS to V3Hue.AMBER,
     SettingsLayout.DEVICES to V3Hue.TEAL,
     SettingsLayout.DATA to V3Hue.PURPLE,
@@ -41,12 +43,12 @@ internal object SettingsHues {
     "shop" to V3Hue.BRAND,
     "access" to V3Hue.CORAL,
     "protect" to V3Hue.TEAL,
-    //  فروش و پرداخت: پرداخت (نارنجی) · فاکتور (بنفش) · رسید (آسمانی) · صندوق (لیمویی) · آنلاین (مرجانی)
-    "pay" to V3Hue.ORANGE,
+    //  فروش و پرداخت: پرداخت (مرجانی، رنگِ دسته) · فاکتور (بنفش) · رسید (آسمانی) · صندوق (لیمویی) · آنلاین (صورتی)
+    "pay" to V3Hue.CORAL,
     "invoice" to V3Hue.VIOLET,
     "receipt" to V3Hue.SKY,
     "till" to V3Hue.LIME,
-    "online" to V3Hue.CORAL,
+    "online" to V3Hue.PINK,
     //  کالا و انبار: کالا (کهربایی) · انبار (لیمویی)
     "goods" to V3Hue.AMBER,
     "stock" to V3Hue.LIME,
