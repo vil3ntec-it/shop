@@ -79,6 +79,14 @@
 - آزمون: `V3LiveGateTest` (زیرِ برگه، زیرِ دروازه، پس‌زمینه STARTED/CREATED، بیرون از قاب ⇒ صفر قاب و صفر تیک؛ برگشت ⇒ ادامه)؛
   نگهبان: `V3LiveGuardTest`.
 
+## ظاهرِ خانه همان (۶۳f فقط سرعت)
+
+سه پروندهٔ قفل‌شدهٔ داشبورد (`LookGuardTest`) با همین کار عوض شدند — `HomeHeroAndroid.kt` (تیکِ ساعت از `rememberV3LiveClock`)،
+`HomeShortcuts.kt` (چشمکِ سفارش از `v3LiveFloat`)، `DashboardNumbers.kt` (تاریخ و وضعیت یک بار) — و اثرشان با یادداشتِ
+«۶۳f: فقط سرعت؛ ظاهر همان» تازه شد. گواه: `HomeLookShotTest` (`TOHID_HOME_SHOT=…`، خانهٔ گوشی ۳۶۰dp، دفترِ قطعی، «کاهشِ حرکت»
+تا حالتِ نشسته) روی کدِ `origin/claude/batch-65` و روی این شاخه **بایت‌به‌بایت یک PNG** دادند (SHA-256 `080c5ec446e3a012…`،
+۷۲۰×۱۵۲۰): [`perf/home-look-63f.png`](perf/home-look-63f.png).
+
 ## بودجه‌های CI (`ScreenSpeedBenchTest` ِ همیشگی)
 
 - داده: `ScreenSpeed.CI` (۲۰ هزار کالا، ۵ هزار مشتری، ۱۰ هزار فاکتور؛ در heap ِ پیش‌فرضِ ۵۱۲ مگ). میانهٔ گرمِ ۷ بار پس از ۵ بارِ گرم‌کردن.
