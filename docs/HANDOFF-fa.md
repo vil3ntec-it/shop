@@ -94,9 +94,11 @@
   بخش را باز می‌کند و کالای همان بخش را می‌یابد («بستن» فهرست را برمی‌گرداند)، صندوق (آیکن‌ها و دسته‌ها بالا، اسکن تنها دکمهٔ پایین، ذره‌بین ⇒ جستجو)، کادرِ ماهِ
   مصارف ماه و عدد را عوض می‌کند، کادرِ دورهٔ تاریخچه، محتوا زیرِ نوار نمی‌رود، تسویه/اسکن بی نوار. `VisualSearchTest`: فروشِ سریع `dock =` ⇐ `actions =`.
   `HistoryPrintWiringTest`: `wrapChips = true` ⇐ `V3Summary` + `FlowRow` (ترتیبِ «چاپ» پیش از صندوق همان). `ModuleRegistryTest`، `AnalyticsRoutesTest`،
-  `MoreLayoutTest`، `DeskMenuTest`: «سابقهٔ عملیات» عمداً نیست (`assertNull`). تازه: `ShellFrameTest` +۲ (`navSearch`)، `LookGuardTest` (۶: گرادیان فقط خانه،
+  `MoreLayoutTest`، `DeskMenuTest`: «سابقهٔ عملیات» عمداً نیست (`assertNull`). `SettingsHomeTest`: صفحهٔ اولِ گوشی `SettingsSearchBox(query)` ⇐
+  `V3Search(query, …, StrSettingsHome.searchHint)` ِ قاب (کامپیوتر همان `SettingsSearchBox`، همان بند سنجیده می‌شود). `RouteUiHarness` +`loadedStore` (تازه؛
+  `memoryStore` دست نخورد) چون کالاها تا `loaded` اسکلت می‌کشند. تازه: `ShellFrameTest` +۲ (`navSearch`)، `LookGuardTest` (۶: گرادیان فقط خانه،
   بی dock، کادرِ کشویی، داشبوردِ بایت‌به‌بایت (۱۷ پرونده، پایانِ خطِ ویندوز نادیده)، آیکنِ ۲۷ بخش و جدولِ آیکنِ نوار، بی راهِ سابقه)، `LookModelsTest` (۳)،
-  `E63wShotsTest` (فقط با `E63W_SHOTS`). نتیجه‌ها: ⟪نتیجه⟫
+  `E63wShotsTest` (فقط با `E63W_SHOTS`). نتیجه‌ها: اجرای هدف‌دار زیرِ `flock` ۱۳۴ آزمون — ۳ سرخ (دو آزمونِ تازهٔ `OneHandShellUiTest` روی دفترِ «خوانده‌نشده»، و `SettingsHomeTest` ِ بالا) ⇐ درست شد؛ سپس **اجرای کاملِ کامپیوتر** (`test --continue`، ۴۳۰۹ آزمون): ۴۲۹۵ سبز، ۱۳ کنار، ۱ سرخ = `SheetLangTest` «فارسی بایت‌به‌بایت» که از پیش روی `batch-63` در اجرای کامل سرخ است (همان در اجرای کاملِ عامل‌های دیگر پیش از این شاخه، و تنها سبز) — به این کار ربطی ندارد (برگه‌های اکسل دست نخوردند). همهٔ آزمون‌های دست‌خورده سبز: `OneHandShellUiTest` ۸/۸، `ShellFrameTest` ۷/۷، `LookGuardTest` ۶/۶، `LookModelsTest` ۳/۳، `VisualSearchTest` ۶/۶، `HistoryPrintWiringTest` ۳/۳، `ModuleRegistryTest` ۱۱/۱۱، `AnalyticsRoutesTest` ۳/۳، `MoreLayoutTest` ۵/۵، `DeskMenuTest` ۷/۷، `SettingsHomeTest` ۱۱/۱۱، `StatusPaneUiTest` ۶/۶، `V3ReachabilityTest` ۹/۹، `InfraLeakGuardTest` ۸/۸. precheck: fail=0.
 - **عکس‌ها** (۳۶۰×۷۶۰dp، ×۲، روشن/تیره، فارسی، با نوارِ پایین): پیش و پس در پوشهٔ `scratchpad/e63w/{before,after}` ِ هماهنگ‌کننده — صندوق، تاریخچه، مصارف،
   کالاها، انبار، قرض‌داران، گزارش‌ها، تخفیف‌ها.
 - **قدمِ بعدی**: سنجشِ نخستین فریم روی دستگاه (این‌جا فقط ساختار: بی شمارنده در مرکزِ مدیریت، گزینه‌ها با `remember`)؛ تصمیمِ صاحب‌کار دربارهٔ «چه کسی پرونده را
