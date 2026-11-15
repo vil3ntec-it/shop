@@ -20,7 +20,6 @@ import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.SouthWest
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
@@ -30,7 +29,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.JALALI_MONTHS
 import ir.vil3ntec.tohid.core.i18n.I18n
@@ -41,7 +39,6 @@ import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.data.CustomerCrm
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.plain
-import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Chip
@@ -50,7 +47,10 @@ import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.InvoiceRefText
 import ir.vil3ntec.tohid.ui.v3.InvoiceRefs
-import ir.vil3ntec.tohid.ui.v3.V3ListRow
+import ir.vil3ntec.tohid.ui.v3.V3DataRow
+import ir.vil3ntec.tohid.ui.v3.V3DataRowSpec
+import ir.vil3ntec.tohid.ui.v3.V3RowMeta
+import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.V3PickerSheet
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Segmented
@@ -200,21 +200,16 @@ private fun ReceiptRow(row: ReceiptsModel.Row, first: Boolean, last: Boolean, ta
         val day = MoneyText.short(row.date, todayIso())
         if (row.note.isBlank()) listOf(InvoiceRefs.plain(day)) else listOf(InvoiceRefs.plain("$day · ")) + InvoiceRefs.split(row.note)
       }
-      V3ListRow(
+      //  کالبدِ ردیفِ داده (۶۸c): نام · «دیروز · فاکتور #n» (زدنی، یک خط) · مبلغ به رنگِ نوشته
+      V3DataRow(
         title = row.title,
-        below = { InvoiceRefText(line, maxLines = 2, debtorId = row.debtorId) },
+        secondaryContent = { InvoiceRefText(line, style = V3Type.rowHelp, maxLines = 1, debtorId = row.debtorId) },
+        meta = V3RowMeta(MoneyText.afn(row.amount)),
         icon = if (receipt) Icons.Outlined.SouthWest else Icons.Outlined.Payments,
         hue = if (receipt) V3Modules.hueOf("receipts") else V3Modules.hueOf("expenses"),
-        trailing = {
-          Text(
-            MoneyText.afn(row.amount),
-            style = v3Text(14, FontWeight.SemiBold, 20),
-            color = if (receipt) LedgerTone.SETTLED.ink() else c.ink,
-          )
-        },
         onClick = onClick,
       )
-      if (!last) V3Divider(start = 64.dp)
+      if (!last) V3Divider(start = V3DataRowSpec.DIVIDER_START)
     }
   }
 }

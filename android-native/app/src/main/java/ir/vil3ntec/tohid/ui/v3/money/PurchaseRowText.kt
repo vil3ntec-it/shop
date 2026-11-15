@@ -11,13 +11,15 @@ import ir.vil3ntec.tohid.data.PurchasePeriods
 import ir.vil3ntec.tohid.data.PurchaseViews
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.v3.RowWhen
+import ir.vil3ntec.tohid.ui.v3.V3RowMeta
 import ir.vil3ntec.tohid.ui.v3.V3RowStatus
 import ir.vil3ntec.tohid.ui.v3.V3RowTone
 
 /**
  *  متن‌های آمادهٔ ردیفِ «خریدها» (e-rows-63b، قاعدهٔ ردیفِ ۶۳d): عنوان نامِ تأمین‌کننده؛ زیرِ آن روزِ کوتاه و اقلام
- *  («امروز · آرد، روغن و ۳ قلمِ دیگر»)؛ خطِ سوم «۱۲٬۰۰۰ ؋ • نیمه‌پرداخت ۲٬۰۰۰ ؋ مانده • رسیده» به متنِ آرام — رنگ فقط برای
- *  آنچه توجه می‌خواهد (نسیه، نیمه، نرسیده کهربایی؛ سررسید گذشته قرمز). خالص، بی Compose.
+ *  («امروز · آرد، روغن و ۳ قلمِ دیگر»). [pay]/[receipt] نوشتهٔ کاملِ جزئیات («نیمه‌پرداخت ۲٬۰۰۰ ؋ مانده • رسیده»)؛ [meta]
+ *  خطِ مبلغِ یک‌خطیِ فهرست (۶۸c، کالبدِ `V3DataRow`): «۱۲٬۰۰۰ ؋ • ۲٬۰۰۰ ؋ مانده» — یک وضعیتِ کوتاهِ پرداخت و فقط وقتی کالا
+ *  هنوز نرسیده «نرسیده»؛ «رسیده» ِ عادی در فهرست نمی‌آید (در جزئیات هست). رنگ فقط برای «سررسید گذشته». خالص، بی Compose.
  */
 internal class PurchaseRowText(
   val title: String,
@@ -25,19 +27,36 @@ internal class PurchaseRowText(
   val amount: String,
   val pay: V3RowStatus?,
   val receipt: V3RowStatus?,
+  /** خطِ مبلغِ فهرست */
+  val meta: V3RowMeta = V3RowMeta(amount, pay, receipt),
 ) {
   companion object {
     fun of(v: PurchaseViews.View, today: String): PurchaseRowText {
       val day = MoneyText.short(v.date, today)
       val head = listOfNotNull(day, v.no.takeIf { it > 0 && v.isOrder }?.let(StrPurchases::orderNo)).joinToString(" · ")
+      val amount = amount(v)
       return PurchaseRowText(
         title = v.supplierName.ifBlank { StrMoney.supplierLabel },
         subtitle = "$head · ${items(v)}",
-        amount = amount(v),
+        amount = amount,
         pay = pay(v, today),
         receipt = receipt(v),
+        meta = V3RowMeta(amount, rowPay(v, today), rowReceipt(v)),
       )
     }
+
+    /**
+     *  وضعیتِ کوتاهِ پرداخت در خطِ مبلغِ فهرست: «پرداخت‌شده»، «۳٬۳۲۰ ؋ مانده»، «سررسید ۴ قوس» (نسیه)، «نسیه»، «سررسید گذشته —
+     *  ۲٬۱۰۰ ؋ مانده» (تنها رنگِ ردیف)، «برگشت». همان شدّتِ [pay].
+     */
+    fun rowPay(v: PurchaseViews.View, today: String): V3RowStatus? = when (v.pay) {
+      PurchaseViews.Pay.PARTIAL -> V3RowStatus(StrPurchases.leftAll(money(v.remaining)), V3RowTone.ATTENTION)
+      PurchaseViews.Pay.CREDIT -> V3RowStatus(v.dueDate?.let { StrPurchases.dueOn(RowWhen.of(it, today)) } ?: StrPurchases.credit, V3RowTone.ATTENTION)
+      else -> pay(v, today)
+    }
+
+    /** رسیدن در فهرست فقط وقتی کار مانده: «نیمه‌رسیده»، «هنوز نرسیده»؛ «رسیده» ِ عادی ⇒ null */
+    fun rowReceipt(v: PurchaseViews.View): V3RowStatus? = receipt(v)?.takeIf { v.receipt != PurchaseViews.Receipt.RECEIVED }
 
     /** «۱۲٬۰۰۰ ؋»؛ سندِ کسر «−۴۰۰ ؋» */
     fun amount(v: PurchaseViews.View): String =

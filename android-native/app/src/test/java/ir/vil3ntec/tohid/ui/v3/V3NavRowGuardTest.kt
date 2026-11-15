@@ -51,8 +51,8 @@ class V3NavRowGuardTest {
     //  همان ردیف = `V3ListRow` با نمای `NAV` (یک پیاده‌سازی، نه کپی)
     val kit = text("ui/v3/V3ListRow.kt")
     assertTrue(body(kit, "fun V3NavRow(").contains("look = V3RowLook.NAV"))
-    assertTrue(kit.contains("style = if (nav) V3Type.rowTitle else V3Type.body"))
-    assertTrue(kit.contains("maxLines = if (nav) 1 else subtitleLines"))
+    assertTrue(kit.contains("style = if (nav || data) V3Type.rowTitle else V3Type.body"))
+    assertTrue(kit.contains("maxLines = if (nav || data) 1 else subtitleLines"))
   }
 
   @Test
@@ -65,7 +65,7 @@ class V3NavRowGuardTest {
       .map { it.relativeTo(main).invariantSeparatorsPath }.toList()
     assertTrue("آیکنِ خطیِ بی‌کاشی در ردیفِ تنظیمات: $bare", bare.isEmpty())
     //  نمای `NAV` کاشی را حتی با `tile = false` می‌کشد
-    assertTrue(text("ui/v3/V3ListRow.kt").contains("val tiled = icon != null && (tile || nav)"))
+    assertTrue(text("ui/v3/V3ListRow.kt").contains("val tiled = icon != null && (tile || nav || data)"))
   }
 
   @Test

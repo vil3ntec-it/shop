@@ -6,6 +6,7 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.performSemanticsAction
+import ir.vil3ntec.tohid.core.i18n.StrHistory
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseOrders
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
@@ -65,10 +66,15 @@ class PurchasesRoutesUiTest {
     val big = views.getValue(PurchaseDemo.BIG_NO)
     h.await(PurchaseRowText.items(big), substring = true)
     assertEquals("آرد، روغن و 3 قلمِ دیگر", PurchaseRowText.items(big))
-    assertTrue(h.has(StrPurchases.partly(money(3320.0)), substring = true))
+    //  ۶۸c (عمدی، کالبدِ `V3DataRow`): خطِ مبلغِ یک‌خطی و کوتاه — «۸٬۳۲۰ ؋ • ۳٬۳۲۰ ؋ مانده»، «سررسید ۴ قوس» به‌جای «نسیه —
+    //  سررسید …»، و «رسیده» ِ عادی در فهرست نمی‌آید (جزئیات هنوز «نیمه‌پرداخت … • رسیده» را دارد)
+    assertTrue(h.has(StrPurchases.leftAll(money(3320.0)), substring = true))
+    assertFalse(h.has(StrPurchases.partly(money(3320.0)), substring = true))
     assertTrue(h.has(StrPurchases.overdue(money(2100.0)), substring = true))
-    assertTrue(h.has(StrPurchases.credit + " — ", substring = true))
-    assertTrue(h.has(StrPurchases.paid + " • " + StrPurchases.received, substring = true))
+    assertTrue(h.has(PurchaseRowText.rowPay(views.getValue(PurchaseDemo.CREDIT_NO), today)!!.text, substring = true))
+    assertFalse(h.has(StrPurchases.credit + " — ", substring = true))
+    assertTrue(h.has(PurchaseRowText.amount(views.getValue(PurchaseDemo.PAID_NO)) + " • " + StrPurchases.paid))
+    assertFalse(h.has(StrPurchases.paid + " • " + StrPurchases.received, substring = true))
     assertTrue(h.has("شرکت پخش البرز"))
     assertTrue(h.has("عمده‌فروشی پامیر"))
     //  تنها دکمهٔ شناور
@@ -118,22 +124,27 @@ class PurchasesRoutesUiTest {
     h.await(StrPurchaseOrders.receiveAll)
   }
 
+  /** ۶۸c (عمدی): پرداخت، تأمین‌کننده و رسیدن در برگهٔ «فیلتر» (ردیفِ کادرها دیگر بریده نمی‌شود)؛ همان کادرِ کشوییِ پرداخت */
   @Test fun payFilterDropdownNarrowsTheList() {
     h.show(MoneyPaths.PURCHASING, data)
+    h.await(StrHistory.filter)
+    assertFalse("کادرِ پرداخت دیگر در ردیفِ بالای فهرست نیست", h.has(StrPurchases.payAll))
+    h.click(StrHistory.filter)
     h.await(StrPurchases.payAll)
     h.click(StrPurchases.payAll)
     h.await(StrPurchases.overdueFilter)
     h.click(StrPurchases.overdueFilter)
+    h.click(ir.vil3ntec.tohid.core.i18n.Str.close)
     h.awaitThat { !h.has("عمده‌فروشی پامیر") }
     assertTrue(h.has(StrPurchases.overdue(money(2100.0)), substring = true))
-    assertFalse(h.has(StrPurchases.partly(money(3320.0)), substring = true))
+    assertFalse(h.has(StrPurchases.leftAll(money(3320.0)), substring = true))
   }
 
   @Test fun supplierPageListsItsPurchasesAndPayments() {
     h.show(MoneyPaths.supplier(PurchaseDemo.ALBORZ), data)
     h.await(StrPurchases.tabPurchases)
     assertTrue(h.has(StrPurchases.payments))
-    assertTrue(h.has(StrPurchases.partly(money(3320.0)), substring = true))
+    assertTrue(h.has(StrPurchases.leftAll(money(3320.0)), substring = true))
     assertTrue(h.has(StrPurchases.noPayments))
     assertFalse(h.has("عمده‌فروشی پامیر"))
     assertTrue(h.has(StrPurchases.newPurchase))

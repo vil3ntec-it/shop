@@ -54,7 +54,9 @@ import ir.vil3ntec.tohid.ui.v3.V3SummaryBars
 import ir.vil3ntec.tohid.ui.v3.summaryColors
 import ir.vil3ntec.tohid.ui.v3.V3Choice
 import ir.vil3ntec.tohid.ui.v3.V3Dropdown
-import ir.vil3ntec.tohid.ui.v3.V3ListRow
+import ir.vil3ntec.tohid.ui.v3.V3DataRow
+import ir.vil3ntec.tohid.ui.v3.V3DataRowSpec
+import ir.vil3ntec.tohid.ui.v3.V3RowMeta
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
 import ir.vil3ntec.tohid.ui.v3.V3TextButton
@@ -169,19 +171,19 @@ internal fun ExpensesScreen(d: ShopData, monthArg: String?, categoryArg: String?
             val last = i == shown.lastIndex
             val shape = RoundedCornerShape(topStart = if (first) r else 0.dp, topEnd = if (first) r else 0.dp, bottomStart = if (last) r else 0.dp, bottomEnd = if (last) r else 0.dp)
             Column(Modifier.v3AnimateItem(this).v3Stagger(stagger, e.id, i).clip(shape).background(PhoneV3.colors.card)) {
-              V3ListRow(
-                //  سادهٔ e-rows-63d: دسته فقط وقتی خودش عنوان نیست، و تاریخِ کوتاه («دیروز»، «۲۸ میزان»)
+              //  کالبدِ ردیفِ داده (۶۸c): عنوان · «دیروز · دسته» · مبلغ — سادهٔ e-rows-63d: دسته فقط وقتی خودش عنوان نیست
+              V3DataRow(
                 title = e.title.ifBlank { e.category },
-                subtitle = remember(e.title, e.category, e.date, today, I18n.lang) {
-                  listOf(e.category.takeIf { e.title.isNotBlank() }.orEmpty(), MoneyText.short(e.date, today)).filter { it.isNotBlank() }.joinToString(" · ")
+                secondary = remember(e.title, e.category, e.date, today, I18n.lang) {
+                  listOf(MoneyText.short(e.date, today), e.category.takeIf { e.title.isNotBlank() }.orEmpty()).filter { it.isNotBlank() }.joinToString(" · ")
                 },
+                meta = V3RowMeta(MoneyText.afn(e.amount)),
                 icon = Icons.Outlined.Payments,
                 hue = hue,
-                trailing = { Text(MoneyText.afn(e.amount), style = v3Text(14, FontWeight.SemiBold, 20), color = PhoneV3.colors.ink) },
                 endActions = listOf(V3SwipeAction(Icons.Outlined.DeleteOutline, StrMoney.delete, V3ButtonKind.DANGER) { confirm = e }),
                 onClick = { actions.onOpen(e.id) },
               )
-              if (!last) V3Divider(start = 64.dp)
+              if (!last) V3Divider(start = V3DataRowSpec.DIVIDER_START)
             }
           }
         }

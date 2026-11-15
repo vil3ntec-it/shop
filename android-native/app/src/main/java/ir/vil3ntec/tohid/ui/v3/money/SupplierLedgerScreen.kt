@@ -56,7 +56,9 @@ import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.todayIso
-import ir.vil3ntec.tohid.ui.v3.V3ListRow
+import ir.vil3ntec.tohid.ui.v3.V3DataRow
+import ir.vil3ntec.tohid.ui.v3.V3DataRowSpec
+import ir.vil3ntec.tohid.ui.v3.V3RowMeta
 import ir.vil3ntec.tohid.ui.v3.V3PillAction
 import ir.vil3ntec.tohid.ui.v3.V3MenuItem
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
@@ -187,7 +189,7 @@ private fun Bought(list: List<PurchaseViews.View>, today: String, showAll: Boole
     }
     val p = actions.purchases
     shown.forEachIndexed { i, v ->
-      if (i > 0) V3Divider(start = 64.dp)
+      if (i > 0) V3Divider(start = V3DataRowSpec.DIVIDER_START)
       PurchaseListRow(
         v, today,
         onOpen = { p?.onOpen?.invoke(v) },
@@ -212,13 +214,13 @@ private fun Payments(list: List<ir.vil3ntec.tohid.data.SupplierPayment>, today: 
       Text(StrPurchases.noPayments, style = v3Text(14, FontWeight.Medium, 20), color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(16.dp))
     }
     shown.forEachIndexed { i, pay ->
-      if (i > 0) V3Divider(start = 64.dp)
-      V3ListRow(
+      if (i > 0) V3Divider(start = V3DataRowSpec.DIVIDER_START)
+      //  کالبدِ ردیفِ داده (۶۸c): یادداشت · روز · مبلغ به رنگِ نوشته
+      V3DataRow(
         title = pay.notes.ifBlank { StrMoney.payment },
-        subtitle = MoneyText.short(pay.date, today),
+        secondary = MoneyText.short(pay.date, today),
+        meta = V3RowMeta(MoneyText.afn(pay.amount)),
         icon = Icons.Outlined.Payments,
-        trailing = { Text(MoneyText.afn(pay.amount), style = v3Text(14, FontWeight.SemiBold, 20), color = LedgerTone.SETTLED.ink()) },
-        chevron = false,
       )
     }
   }

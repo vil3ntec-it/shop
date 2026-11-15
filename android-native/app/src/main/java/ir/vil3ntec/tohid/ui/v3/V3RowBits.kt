@@ -15,38 +15,37 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Colors
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
-import ir.vil3ntec.tohid.ui.theme.V3Status
 
 /*
  *  سادگیِ ردیف‌ها (۱۴۰۵/۰۸/۲۴، `claude/e-rows-63d`): یک کارِ اصلی در هر ردیف، وضعیت به متنِ آرام، بی حذفِ قابلیت.
  *   • [V3RowStatus]: وضعیتی که کنارِ مبلغ با «•» می‌آید («۳۰۰ ؋ • لغوشده») — نه قرصِ رنگی. حالتِ عادی ⇒ null (هیچ).
- *     رنگ فقط برای آن‌چه توجه می‌خواهد: [V3RowTone.ATTENTION] (نسیه، کم، در انتظار) و [V3RowTone.DANGER] (خطا، تمام‌شده).
+ *     ۶۸c: رنگ فقط برای آن‌چه کار می‌خواهد — [V3RowTone.DANGER] (خطا، تمام‌شده، سررسید گذشته)؛ [V3RowTone.ATTENTION] (نسیه، کم،
+ *     در انتظار) واژهٔ آرامِ کم‌رنگ است، نه زرد.
  *   • [V3PillAction]: قرصِ نرمِ تنها کارِ اصلیِ ردیف («↻ دریافت»)؛ زدنِ خودِ ردیف جزئیات را باز می‌کند و کارهای دیگر در
  *     جزئیات، نگه‌داشتن یا «…» می‌مانند.
  */
 
-/** رنگِ متنِ وضعیت: آرام خاکستری، توجه کهربایی، خطر قرمز */
+/**
+ *  رنگِ متنِ وضعیت: آرام و «توجه» هر دو خاکستریِ کم‌رنگ (۶۸c، صاحب‌کار: «این شلوغی‌ها … دقیق و منظم» — هیچ خطِ زرد/کهربایی
+ *  در فهرست؛ واژه خودش «نسیه»، «کم»، «نرسیده» را می‌گوید)، فقط خطر (کار می‌خواهد: «سررسید گذشته»، «تمام‌شده») رنگِ خطرِ آرام.
+ *  شدّت در داده ([V3RowTone]) می‌ماند تا جزئیات و آزمون‌ها معنا را بدانند.
+ */
 fun v3RowToneColor(c: PhoneV3Colors, tone: V3RowTone): Color = when (tone) {
-  V3RowTone.QUIET -> c.inkMuted
-  V3RowTone.ATTENTION -> PhoneV3Roles.status(c, V3Status.WARNING).fg
+  V3RowTone.QUIET, V3RowTone.ATTENTION -> c.inkMuted
   V3RowTone.DANGER -> PhoneV3Roles.errorText(c)
 }
 
 /**
- *  «۳۰۰ ؋ • لغوشده» در یک نوشته (اگر جا نشد، وضعیت به خطِ دوم می‌رود). [status] null ⇒ فقط مبلغ.
- *  [struck] ⇒ مبلغِ خط‌خورده و کم‌رنگ (فاکتورِ لغوشده). [second]: وضعیتِ دومِ آرام با رنگِ خودش («… • نیمه‌پرداخت • رسیده»،
- *  خریدها ۶۳b) — null ⇒ همان یک وضعیت.
+ *  «۳۰۰ ؋ • لغوشده» در یک نوشته — همان قاعدهٔ خطِ مبلغِ ردیفِ داده ([v3MetaText]: مبلغ به رنگِ نوشته، وضعیت کم‌رنگ، دست‌بالا یک
+ *  واژهٔ رنگِ خطر). [status] null ⇒ فقط مبلغ. [struck] ⇒ مبلغِ خط‌خورده و کم‌رنگ (فاکتورِ لغوشده). [second]: وضعیتِ دومِ آرام
+ *  («… • نیمه‌پرداخت • رسیده»، صفحهٔ جزئیاتِ خرید) — null ⇒ همان یک وضعیت. [maxLines] ۱ در فهرست؛ جزئیات ۲.
  */
 @Composable
 fun V3AmountStatus(
@@ -56,22 +55,13 @@ fun V3AmountStatus(
   struck: Boolean = false,
   align: TextAlign = TextAlign.End,
   second: V3RowStatus? = null,
+  maxLines: Int = 1,
 ) {
-  val c = PhoneV3.colors
-  val text = buildAnnotatedString {
-    if (amount != null) {
-      withStyle(SpanStyle(color = if (struck) c.inkMuted else c.ink, textDecoration = if (struck) TextDecoration.LineThrough else null)) { append(amount) }
-    }
-    listOfNotNull(status, second).forEachIndexed { i, st ->
-      if (amount != null || i > 0) withStyle(SpanStyle(color = c.inkMuted)) { append(V3_ROW_DOT) }
-      withStyle(SpanStyle(color = v3RowToneColor(c, st.tone))) { append(st.text) }
-    }
-  }
   Text(
-    text,
+    v3MetaText(PhoneV3.colors, V3RowMeta(amount, status, second, struck)),
     style = if (amount != null) V3Type.callout else V3Type.footnote,
     textAlign = align,
-    maxLines = 2,
+    maxLines = maxLines,
     overflow = TextOverflow.Ellipsis,
     modifier = modifier,
   )
@@ -85,12 +75,18 @@ fun V3QuietStatus(status: V3RowStatus, modifier: Modifier = Modifier) {
 
 /**
  *  قرصِ نرمِ کارِ اصلیِ ردیف: زمینهٔ کم‌رنگِ برند، نوشتهٔ برند، بی مرز. ناحیهٔ لمس دست‌کم ۴۰dp بلند است
- *  (خودِ قرص ۳۲)؛ زدنش فقط همین کار را می‌کند و به زدنِ ردیف (جزئیات) نمی‌رسد.
+ *  (خودِ قرص ۳۲)؛ زدنش فقط همین کار را می‌کند و به زدنِ ردیف (جزئیات) نمی‌رسد. [neutral] (ردیفِ داده، ۶۸c): قرصِ خنثیِ
+ *  خاکستری با نوشتهٔ تیره — همان «↻ Rebook» ِ عکسِ صاحب‌کار، بی رنگِ برند در فهرست.
  */
 @Composable
-fun V3PillAction(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null, enabled: Boolean = true) {
+fun V3PillAction(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null, enabled: Boolean = true, neutral: Boolean = false) {
   val c = PhoneV3.colors
-  val fg = if (enabled) PhoneV3Roles.brandText(c) else c.inkMuted
+  val calm = PhoneV3Roles.button(c, ir.vil3ntec.tohid.ui.theme.V3ButtonKind.NEUTRAL)
+  val fg = when {
+    !enabled -> c.inkMuted
+    neutral -> calm.fg
+    else -> PhoneV3Roles.brandText(c)
+  }
   Row(
     modifier
       .heightIn(min = 40.dp)
@@ -98,7 +94,7 @@ fun V3PillAction(label: String, onClick: () -> Unit, modifier: Modifier = Modifi
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Row(
-      Modifier.heightIn(min = 32.dp).clip(RoundedCornerShape(percent = 50)).background(PhoneV3Palette.selected(c)).padding(horizontal = 12.dp),
+      Modifier.heightIn(min = 32.dp).clip(RoundedCornerShape(percent = 50)).background(if (neutral) calm.bg else PhoneV3Palette.selected(c)).padding(horizontal = 12.dp),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {

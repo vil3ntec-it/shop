@@ -36,7 +36,6 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -50,13 +49,14 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Space
 import ir.vil3ntec.tohid.ui.v3.V3Divider
-import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3ProductThumb
 import ir.vil3ntec.tohid.ui.v3.V3QuietStatus
 import ir.vil3ntec.tohid.ui.v3.V3Summary
 import ir.vil3ntec.tohid.ui.v3.V3RowStatus
 import ir.vil3ntec.tohid.ui.v3.V3RowTone
 import ir.vil3ntec.tohid.ui.v3.V3_ROW_DOT
+import ir.vil3ntec.tohid.ui.v3.V3DataRow
+import ir.vil3ntec.tohid.ui.v3.V3RowMeta
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.V3Card
@@ -88,9 +88,9 @@ internal class RowSwipes(val onEntry: () -> Unit, val onEdit: () -> Unit, val on
 }
 
 /**
- *  ردیفِ فهرست (۶۴dp): عکسِ ۴۸ یا کاشیِ حرف، نام، «دسته · موجودی»، قیمتِ فروشِ
- *  پررنگ و نشانِ وضعیت فقط وقتی «کم»، «تمام‌شده» یا «غیرفعال» است. در حالتِ انتخاب
- *  دایرهٔ تیک می‌آید و کشیدن خاموش است. `flash` = کالای تازه‌ثبت (۱٫۲ ثانیه درخشش).
+ *  ردیفِ فهرست (کالبدِ `V3DataRow`، ۶۸c): عکسِ ۴۸ یا کاشیِ حرف، نام، «دسته · موجودی»، و خطِ مبلغِ «۱۲۰ ؋ • کم» — وضعیت
+ *  فقط وقتی «کم»، «تمام‌شده» یا «غیرفعال» است و به واژهٔ آرام (فقط «تمام‌شده» رنگِ خطر). در حالتِ انتخاب دایرهٔ تیک می‌آید و
+ *  کشیدن خاموش است. `flash` = کالای تازه‌ثبت (۱٫۲ ثانیه درخشش).
  */
 @Composable
 internal fun ProductRow(
@@ -103,25 +103,16 @@ internal fun ProductRow(
   onClick: () -> Unit,
   onLongClick: (() -> Unit)?,
 ) {
-  val c = PhoneV3.colors
   Box(Modifier.draftFlash(flash)) {
-    V3ListRow(
+    V3DataRow(
       title = p.name,
-      subtitle = stockLine(p, stock),
-      subtitleLines = 1,
-      minHeight = 64.dp,
+      secondary = stockLine(p, stock),
+      meta = V3RowMeta("${money(p.salePrice)} ؋", badgeStatus(badge), struck = false),
       leading = {
         Box(Modifier.graphicsLayer { alpha = if (p.active) 1f else 0.55f }) {
           V3ProductThumb(p.id, p.name, size = 48.dp, version = ProductPhotos.version.intValue)
         }
       },
-      trailing = {
-        Column(horizontalAlignment = Alignment.End) {
-          Text("${money(p.salePrice)} ؋", style = V3Type.callout.copy(fontWeight = FontWeight.Bold), color = if (p.active) c.ink else c.inkMuted, maxLines = 1)
-          badgeStatus(badge)?.let { V3QuietStatus(it) }
-        }
-      },
-      chevron = false,
       startActions = swipes?.start.orEmpty(),
       endActions = swipes?.end.orEmpty(),
       selected = selected,
