@@ -90,11 +90,20 @@ class ThemeV2PaletteTest {
     assertEquals(ShopTheme.SKY, ThemeStore.theme)
   }
 
+  /**
+   *  ۶۸c (عمدی، صاحب‌کار: «رنگ صورتی کار نگیر … رنگ‌های برند بزار، لوکس»): هفت رنگِ همراه همان نشانهٔ هفت خانوادهٔ پالتِ لوکسِ
+   *  `SectionColors` (لاجوردی، نیلی، عقیق، زر، زمرد، گرافیت، نفتی) — روز پررنگ‌تر و شب روشن‌تر؛ پیش‌تر یک فهرستِ آسمانی/بنفش/
+   *  مرجانی/کهربایی/نعنایی/صورتی/لیمویی برای هر دو.
+   */
   @Test
   fun `هفت رنگِ همراه و پس‌زمینهٔ نرمشان`() {
-    val want = listOf("#0EA5E9", "#8B5CF6", "#F97362", "#F59E0B", "#14B8A6", "#EC4899", "#84CC16")
-    assertEquals(want, ThemeAccents.ALL.map { hex(it) })
+    val day = listOf("#1E40AF", "#4F46E5", "#B4232F", "#A87A12", "#05875F", "#526177", "#0E7490")
+    val night = listOf("#86A6E8", "#9696F0", "#E57B76", "#D9B260", "#4DC79A", "#9AA8BB", "#4FB6CC")
+    assertEquals(day, ThemeAccents.ALL.map { hex(it) })
+    assertEquals(day, ThemeAccents.DAY.map { hex(it) })
+    assertEquals(night, ThemeAccents.NIGHT.map { hex(it) })
     for (c in all) {
+      val want = if (c.isDark) night else day
       assertEquals(want, c.accents.map { hex(it) })
       assertEquals("چرخشی", c.accent(0), c.accent(7))
       assertEquals("چرخشی", c.accent(6), c.accent(-1))
@@ -219,10 +228,10 @@ class ThemeV2PaletteTest {
 
   @Test
   fun `هر بخش یک رنگِ همراهِ ثابت دارد`() {
-    //  «فروش آبی، دریافت نعنایی، ورودِ کالا کهربایی، تاریخچه بنفش، مشتری‌ها مرجانی، مصارف صورتی، گزارش آسمانی»
+    //  ۶۸c (عمدی): «فروش برند، دریافت زمردی، انبار گرافیت، تاریخچه نیلی، قرض‌داران عقیق، مصارف زر، گزارش لاجوردی» — بی صورتی
     val want = mapOf(
-      "sale" to V3Hue.BRAND, "receipts" to V3Hue.MINT, "warehouse" to V3Hue.AMBER, "history" to V3Hue.VIOLET,
-      "debtors" to V3Hue.CORAL, "expenses" to V3Hue.PINK, "reports" to V3Hue.SKY,
+      "sale" to V3Hue.BRAND, "receipts" to V3Hue.MINT, "warehouse" to V3Hue.SLATE, "history" to V3Hue.VIOLET,
+      "debtors" to V3Hue.CORAL, "expenses" to V3Hue.AMBER, "reports" to V3Hue.SKY,
     )
     for ((id, hue) in want) assertEquals(id, hue, V3Modules.hueOf(id))
     //  هر شناسهٔ این جدول در ثبتِ ماژول‌ها هم ورودی دارد (آیکنِ واقعیِ همان بخش)

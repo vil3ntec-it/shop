@@ -22,9 +22,13 @@ class SectionColorsTest {
   @Test fun `هر خانواده روز و شب دارد و هر بخش خانواده‌ای از جدول`() {
     assertEquals(SectionColors.DAY.keys, SectionColors.NIGHT.keys)
     V3Section.entries.forEach { s -> assertTrue("$s", SectionColors.family(s.hue) in SectionColors.DAY.keys) }
-    //  هم‌معنی‌های پالت یک خانواده‌اند
-    assertEquals(PhoneV3Palette.Hue.MINT, SectionColors.family(PhoneV3Palette.Hue.TEAL))
+    //  هم‌معنی‌های پالت یک خانواده‌اند؛ ۶۸c (عمدی): نفتی (TEAL) خانوادهٔ خودش است، جدا از زمردی (MINT) — هفت خانوادهٔ پالتِ لوکس
     assertEquals(PhoneV3Palette.Hue.AMBER, SectionColors.family(PhoneV3Palette.Hue.ORANGE))
+    assertEquals(PhoneV3Palette.Hue.SKY, SectionColors.family(PhoneV3Palette.Hue.BLUE))
+    assertEquals(PhoneV3Palette.Hue.VIOLET, SectionColors.family(PhoneV3Palette.Hue.PURPLE))
+    assertEquals(PhoneV3Palette.Hue.TEAL, SectionColors.family(PhoneV3Palette.Hue.TEAL))
+    assertEquals(7, SectionColors.DAY.size)
+    assertEquals(SectionColors.DAY.keys, SectionColors.ORDER.toSet())
   }
 
   /**
@@ -35,7 +39,7 @@ class SectionColorsTest {
     val modules = mapOf(
       V3Section.SALES to "history", V3Section.EXPENSES to "expenses", V3Section.PURCHASES to "purchasing",
       V3Section.DEBT to "debtors", V3Section.RECEIPTS to "receipts", V3Section.REPORTS to "reports",
-      V3Section.PROMOS to "promos", V3Section.STOCK to "warehouse",
+      V3Section.PROMOS to "promos", V3Section.STOCK to "warehouse", V3Section.ORDERS to "orders",
     )
     modules.forEach { (s, id) ->
       val hue = ir.vil3ntec.tohid.ui.v3.nav.V3Modules.hueOf(id)
@@ -62,6 +66,9 @@ class SectionColorsTest {
       val edgeL = SectionColors.luminance(t.edge)
       val tintL = SectionColors.luminance(t.tint)
       assertTrue("$where مرز", if (dark) edgeL > tintL else edgeL < tintL)
+      //  ۶۸c: نشانهٔ کاشی روی زمینهٔ صفحه/کارتِ همان تم دست‌کم ۳:۱ (WCAG 1.4.11، آیکن) — روز روی سفید، شب روی کارتِ #11151E
+      val ground = if (dark) Color(0xFF11151E) else Color.White
+      assertTrue("$where نشانه ${SectionColors.contrast(t.glyph, ground)}", SectionColors.contrast(t.glyph, ground) >= if (dark) 4.5 else 3.0)
     }
   }
 

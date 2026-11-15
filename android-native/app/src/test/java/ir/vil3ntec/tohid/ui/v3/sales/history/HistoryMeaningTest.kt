@@ -57,15 +57,16 @@ class HistoryMeaningTest {
       assertEquals(meanings.size, meanings.map { fg.getValue(it) }.toSet().size)
       assertEquals(fg.getValue(MoneyKind.RETURN), fg.getValue(MoneyKind.CANCELLED))
       assertEquals("خالص خنثیِ پررنگ است، همان رنگِ نوشته", c.ink, fg.getValue(MoneyKind.NET))
-      //  ۶۵s: رنگ از منبعِ رنگِ بخش‌ها (`SectionColors`، خانواده‌های پالت): نقد نعنایی (همان «رسیدها»)، نسیه کهربایی، کارت
-      //  آسمانی، برگشت مرجانیِ سرخِ قرض، قرضِ وصول‌شده صورتی — عدد روی تهِ‌رنگِ خودش ≥ ۴٫۵:۱ (`SectionColorsTest`)
+      //  ۶۵s: رنگ از منبعِ رنگِ بخش‌ها (`SectionColors`، خانواده‌های پالت): نقد زمردی (همان «رسیدها»)، نسیه زر، کارت
+      //  لاجوردی، برگشت عقیقِ سرخِ قرض، قرضِ وصول‌شده نفتی (۶۸c عمدی: دیگر صورتی نیست — «رنگ صورتی کار نگیر») — عدد روی
+      //  تهِ‌رنگِ خودش ≥ ۴٫۵:۱ (`SectionColorsTest`)
       fun tone(h: PhoneV3Palette.Hue) = SectionColors.ofHue(h, c.source.isDark)
       assertEquals(tone(PhoneV3Palette.Hue.MINT).strong, fg.getValue(MoneyKind.CASH))
       assertEquals(SectionColors.of(V3Section.RECEIPTS, c.source.isDark).strong, fg.getValue(MoneyKind.CASH))
       assertEquals(tone(PhoneV3Palette.Hue.AMBER).strong, fg.getValue(MoneyKind.CREDIT))
       assertEquals(tone(PhoneV3Palette.Hue.SKY).strong, fg.getValue(MoneyKind.CARD))
       assertEquals(SectionColors.of(V3Section.DEBT, c.source.isDark).strong, fg.getValue(MoneyKind.RETURN))
-      assertEquals(tone(PhoneV3Palette.Hue.PINK).strong, fg.getValue(MoneyKind.DEBT_IN))
+      assertEquals(tone(PhoneV3Palette.Hue.TEAL).strong, fg.getValue(MoneyKind.DEBT_IN))
       assertEquals(tone(PhoneV3Palette.Hue.MINT).tint, historyTone(c, MoneyKind.CASH).bg)
     }
     assertEquals("هر معنا آیکنِ خودش را دارد (رنگ هرگز تنها نیست)", MoneyKind.entries.size, MoneyKind.entries.map(::moneyIcon).toSet().size)
