@@ -73,7 +73,11 @@ AppCopyright=(c) VIL3NTEC
 DefaultDirName={localappdata}\Tohid
 DefaultGroupName=فروشگاه من
 DisableProgramGroupPage=yes
-DisableDirPage=auto
+; صاحب‌کار (۱۴۰۵/۰۸/۲۴): «چرا نمی‌شه پوشهٔ موردِ نظر رو انتخاب کرد» — صفحهٔ پوشه همیشه دیده می‌شود (پیش‌تر ‎auto‎: با نصبِ پیشین
+; اصلاً نمی‌آمد). پیش‌فرض همان پوشهٔ پیشین (‎UsePreviousAppDir‎) یا ‎{localappdata}\Tohid‎. دادهٔ دکان جدا از پوشهٔ نصب در
+; ‎%LOCALAPPDATA%\Tohid‎ می‌ماند (`DesktopContext`)، پس هر پوشه‌ای امن است. پوشهٔ بی اجازهٔ نوشتن (مثلِ Program Files بی مدیر)
+; همان‌جا با پیامِ روشن رد می‌شود (`DirWritable`، پایین)، نه با خطای نیمه‌کارهٔ نصب. نصبِ خاموشِ به‌روزرسانی (/VERYSILENT) صفحه ندارد.
+DisableDirPage=no
 DisableWelcomePage=no
 UsePreviousAppDir=yes
 PrivilegesRequired=lowest
@@ -149,6 +153,33 @@ begin
   Result := True;
   for I := 1 to ParamCount do
     if CompareText(ParamStr(I), '/NOLAUNCH') = 0 then Result := False;
+end;
+
+// پوشهٔ نصب نوشتنی است؟ (نصب با اجازهٔ کاربرِ عادی است؛ ‎PrivilegesRequired=lowest‎) — پوشه را اگر نیست می‌سازد و یک پروندهٔ آزمون
+// می‌نویسد و پاک می‌کند؛ پوشه‌ای که خودش این‌جا ساخته شد و خالی ماند برداشته می‌شود
+function DirWritable(const Dir: String): Boolean;
+var
+  Probe: String;
+  Made: Boolean;
+begin
+  Made := not DirExists(Dir);
+  Result := ForceDirectories(Dir);
+  if not Result then Exit;
+  Probe := AddBackslash(Dir) + '.tohid-write-test';
+  Result := SaveStringToFile(Probe, 'ok', False);
+  if Result then DeleteFile(Probe);
+  if Made then RemoveDir(Dir);
+end;
+
+function DirPageOk: Boolean;
+begin
+  Result := DirWritable(WizardDirValue);
+  if not Result then
+    SuppressibleMsgBox(
+      'فروشگاه من cannot be installed in this folder:' + #13#10 + WizardDirValue + #13#10#13#10 +
+      'Windows does not allow writing there without administrator rights.' + #13#10 +
+      'Please choose another folder (for example on drive D:, or your Documents folder).',
+      mbError, MB_OK, IDOK);
 end;
 
 #ifndef Offline
@@ -486,6 +517,7 @@ var
   Err: String;
 begin
   Result := True;
+  if CurPageID = wpSelectDir then begin Result := DirPageOk; Exit; end;
   if CurPageID <> wpReady then Exit;
   if UseLocalPayload then Exit;
   if not DownloadPayload(Err) then begin
@@ -498,6 +530,12 @@ begin
       mbCriticalError, MB_OK, IDOK);
     Result := False;
   end;
+end;
+#else
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if CurPageID = wpSelectDir then Result := DirPageOk;
 end;
 #endif
 
