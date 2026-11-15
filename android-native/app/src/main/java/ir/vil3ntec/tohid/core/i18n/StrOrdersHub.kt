@@ -31,6 +31,8 @@ object StrOrdersHub {
 
   // ── کارتِ صف ──
   val onlineBadge: String get() = t("سفارشِ آنلاین", "Online order", "آنلاین فرمایش")
+  /** خطِ دومِ کوتاهِ کارتِ صف (۶۸c): «آنلاین · ۶ دقیقه پیش · ۳ قلم» */
+  val onlineShort: String get() = t("آنلاین", "Online", "آنلاین")
   val byCourier: String get() = t("با پیک", "By courier", "د پیک له لارې")
   val selfPickup: String get() = t("خودش می‌آید", "Customer picks up", "پخپله راځي")
   fun itemsPreview(names: String, more: Int): String =

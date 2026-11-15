@@ -67,10 +67,11 @@ class PurchasesRoutesUiTest {
     h.await(PurchaseRowText.items(big), substring = true)
     assertEquals("آرد، روغن و 3 قلمِ دیگر", PurchaseRowText.items(big))
     //  ۶۸c (عمدی، کالبدِ `V3DataRow`): خطِ مبلغِ یک‌خطی و کوتاه — «۸٬۳۲۰ ؋ • ۳٬۳۲۰ ؋ مانده»، «سررسید ۴ قوس» به‌جای «نسیه —
-    //  سررسید …»، و «رسیده» ِ عادی در فهرست نمی‌آید (جزئیات هنوز «نیمه‌پرداخت … • رسیده» را دارد)
+    //  سررسید …»، «۲٬۱۰۰ ؋ • سررسید گذشته» (همهٔ مبلغ مانده)، و «رسیده» ِ عادی در فهرست نمی‌آید (جزئیات هنوز «نیمه‌پرداخت … •
+    //  رسیده» و «سررسید گذشته — … مانده» را دارد)
     assertTrue(h.has(StrPurchases.leftAll(money(3320.0)), substring = true))
     assertFalse(h.has(StrPurchases.partly(money(3320.0)), substring = true))
-    assertTrue(h.has(StrPurchases.overdue(money(2100.0)), substring = true))
+    assertTrue(h.has(PurchaseRowText.amount(views.getValue(PurchaseDemo.OVERDUE_NO)) + " • " + StrPurchases.overdueRow))
     assertTrue(h.has(PurchaseRowText.rowPay(views.getValue(PurchaseDemo.CREDIT_NO), today)!!.text, substring = true))
     assertFalse(h.has(StrPurchases.credit + " — ", substring = true))
     assertTrue(h.has(PurchaseRowText.amount(views.getValue(PurchaseDemo.PAID_NO)) + " • " + StrPurchases.paid))
@@ -136,7 +137,7 @@ class PurchasesRoutesUiTest {
     h.click(StrPurchases.overdueFilter)
     h.click(ir.vil3ntec.tohid.core.i18n.Str.close)
     h.awaitThat { !h.has("عمده‌فروشی پامیر") }
-    assertTrue(h.has(StrPurchases.overdue(money(2100.0)), substring = true))
+    assertTrue(h.has(StrPurchases.overdueRow, substring = true))
     assertFalse(h.has(StrPurchases.leftAll(money(3320.0)), substring = true))
   }
 

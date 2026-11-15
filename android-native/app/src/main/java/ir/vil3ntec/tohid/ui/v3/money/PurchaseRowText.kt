@@ -46,17 +46,24 @@ internal class PurchaseRowText(
     }
 
     /**
-     *  وضعیتِ کوتاهِ پرداخت در خطِ مبلغِ فهرست: «پرداخت‌شده»، «۳٬۳۲۰ ؋ مانده»، «سررسید ۴ قوس» (نسیه)، «نسیه»، «سررسید گذشته —
-     *  ۲٬۱۰۰ ؋ مانده» (تنها رنگِ ردیف)، «برگشت». همان شدّتِ [pay].
+     *  وضعیتِ کوتاهِ پرداخت در خطِ مبلغِ فهرست: «پرداخت‌شده»، «۳٬۳۲۰ ؋ مانده»، «سررسید ۴ قوس» (نسیه)، «نسیه»، «سررسید گذشته»
+     *  (تنها رنگِ ردیف)، «برگشت». همان شدّتِ [pay].
      */
     fun rowPay(v: PurchaseViews.View, today: String): V3RowStatus? = when (v.pay) {
       PurchaseViews.Pay.PARTIAL -> V3RowStatus(StrPurchases.leftAll(money(v.remaining)), V3RowTone.ATTENTION)
       PurchaseViews.Pay.CREDIT -> V3RowStatus(v.dueDate?.let { StrPurchases.dueOn(RowWhen.of(it, today)) } ?: StrPurchases.credit, V3RowTone.ATTENTION)
+      PurchaseViews.Pay.OVERDUE -> V3RowStatus(StrPurchases.overdueRow, V3RowTone.DANGER)
       else -> pay(v, today)
     }
 
-    /** رسیدن در فهرست فقط وقتی کار مانده: «نیمه‌رسیده»، «هنوز نرسیده»؛ «رسیده» ِ عادی ⇒ null */
-    fun rowReceipt(v: PurchaseViews.View): V3RowStatus? = receipt(v)?.takeIf { v.receipt != PurchaseViews.Receipt.RECEIVED }
+    /**
+     *  وضعیتِ دومِ خطِ مبلغ: سررسیدگذشتهٔ نیمه‌پرداخت ⇒ «۲٬۱۰۰ ؋ مانده»؛ وگرنه رسیدن فقط وقتی کار مانده («نیمه‌رسیده»، «هنوز
+     *  نرسیده»)؛ «رسیده» ِ عادی ⇒ null.
+     */
+    fun rowReceipt(v: PurchaseViews.View): V3RowStatus? = when {
+      v.pay == PurchaseViews.Pay.OVERDUE && v.remaining < kotlin.math.abs(v.total) - 0.5 -> V3RowStatus(StrPurchases.leftAll(money(v.remaining)))
+      else -> receipt(v)?.takeIf { v.receipt != PurchaseViews.Receipt.RECEIVED }
+    }
 
     /** «۱۲٬۰۰۰ ؋»؛ سندِ کسر «−۴۰۰ ؋» */
     fun amount(v: PurchaseViews.View): String =

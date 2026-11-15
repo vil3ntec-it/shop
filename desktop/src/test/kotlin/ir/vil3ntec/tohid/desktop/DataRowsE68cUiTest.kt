@@ -1,7 +1,10 @@
 package ir.vil3ntec.tohid.desktop
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.Configuration
@@ -18,6 +21,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.StrHistory
@@ -29,6 +33,7 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.desktop.shots.MoneyDemo
 import ir.vil3ntec.tohid.desktop.shots.StockDemo
+import ir.vil3ntec.tohid.desktop.shots.V3RoutePreview
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Light
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
@@ -83,6 +88,24 @@ class DataRowsE68cUiTest {
     return list.firstOrNull()
   }
 
+  /** همان مسیرِ برنامه در پهنای واقعیِ گوشی (۳۶۰dp، نه پنجرهٔ پهنِ آزمون؛ بلندیِ ۲۰۰۰ تا ردیف‌های زیرِ خلاصهٔ باز هم کشیده شوند) — سرور همان `TestBackend` ِ [h] */
+  private fun phone(path: String, data: ShopData) {
+    val store = RouteUiHarness.loadedStore(data)
+    rule.setContent {
+      CompositionLocalProvider(
+        LocalContext provides DesktopContext,
+        LocalView provides remember { android.view.View(DesktopContext) },
+        LocalConfiguration provides Configuration(360, 760),
+      ) {
+        TohidTheme(ThemeChoice.LIGHT) {
+          CompositionLocalProvider(LocalLayoutDirection provides if (I18n.lang == Lang.EN) LayoutDirection.Ltr else LayoutDirection.Rtl) {
+            Box(Modifier.requiredSize(360.dp, 2000.dp)) { V3RoutePreview(path, store, dark = false) }
+          }
+        }
+      }
+    }
+  }
+
   private fun rows(): List<SemanticsNode> = rule.onAllNodesWithTag(V3DataRowSpec.ROW_TAG, useUnmergedTree = true).fetchSemanticsNodes()
 
   /** کالبدِ هر ردیفِ دیدنی: یک قرص، عنوانِ یک‌خطیِ ۱۶، خطِ دومِ یک‌خطیِ ۱۳، خطِ مبلغِ یک‌خطی با دست‌بالا یک رنگ و بی زرد */
@@ -122,19 +145,19 @@ class DataRowsE68cUiTest {
   }
 
   @Test fun purchasesRowsHaveOneActionOneLineMetaAndNoYellow() {
-    h.show(MoneyPaths.PURCHASING, PurchaseDemo.full())
+    phone(MoneyPaths.PURCHASING, PurchaseDemo.full())
     h.await(StrPurchases.tabPurchases)
     assertAnatomy("خریدها", 4)
   }
 
   @Test fun suppliersListAndSupplierPageFollowTheAnatomy() {
-    h.show(MoneyPaths.purchasing(tab = "suppliers"), PurchaseDemo.full())
+    phone(MoneyPaths.purchasing(tab = "suppliers"), PurchaseDemo.full())
     h.await("شرکت پخش البرز")
     assertAnatomy("تأمین‌کننده‌ها", 2)
   }
 
   @Test fun supplierPageFollowsTheAnatomy() {
-    h.show(MoneyPaths.supplier(PurchaseDemo.ALBORZ), PurchaseDemo.full())
+    phone(MoneyPaths.supplier(PurchaseDemo.ALBORZ), PurchaseDemo.full())
     h.await(StrPurchases.tabPurchases)
     assertAnatomy("صفحهٔ تأمین‌کننده", 2)
   }
@@ -150,7 +173,7 @@ class DataRowsE68cUiTest {
   @Test fun stockFollowsTheAnatomy() = route("stock", StockDemo.full(), "انبار", 3)
 
   private fun route(path: String, data: ShopData, where: String, minRows: Int) {
-    h.show(path, data)
+    phone(path, data)
     rule.waitUntil(15_000) { rows().size >= minRows }
     assertAnatomy(where, minRows)
   }
@@ -172,11 +195,11 @@ class DataRowsE68cUiTest {
       ) {
         TohidTheme(ThemeChoice.LIGHT) {
           CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-            OrdersScreen(
+            Box(Modifier.requiredSize(360.dp, 760.dp)) { OrdersScreen(
               state = QueueState(items = orders, loading = false, perms = OrderPermsDto(manage = true), now = now),
               actions = QueueActions(onTab = {}, onOpen = {}, onStep = { _, _ -> }, onNew = {}, onRetry = {}, onMore = {}),
               onBack = {},
-            )
+            ) }
           }
         }
       }
@@ -201,7 +224,7 @@ class DataRowsE68cUiTest {
   }
 
   @Test fun thePurchaseFilterRowIsNeverCutAt360AndFilterOpensTheSheet() {
-    h.show(MoneyPaths.PURCHASING, PurchaseDemo.full())
+    phone(MoneyPaths.PURCHASING, PurchaseDemo.full())
     h.await(StrHistory.filter)
     assertFilterRowFits()
     h.click(StrHistory.filter)
@@ -212,8 +235,7 @@ class DataRowsE68cUiTest {
 
   @Test fun thePurchaseFilterRowFitsInEnglishToo() {
     I18n.source = { Lang.EN }
-    h.show(MoneyPaths.PURCHASING, PurchaseDemo.full())
-    I18n.source = { Lang.EN }
+    phone(MoneyPaths.PURCHASING, PurchaseDemo.full())
     rule.waitForIdle()
     assertFilterRowFits()
     assertEquals(1, rule.onAllNodesWithTag(PURCHASE_FILTER_ROW, useUnmergedTree = true).fetchSemanticsNodes().size)

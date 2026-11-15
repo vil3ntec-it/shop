@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -117,9 +118,10 @@ internal fun PurchaseFilterRow(d: ShopData, views: List<PurchaseViews.View>, tod
       onSelect = { onFilter(filter.copy(period = it.ifEmpty { null })) }, label = ir.vil3ntec.tohid.core.i18n.StrLook.period,
       modifier = Modifier.weight(1f, fill = false),
     )
+    //  همان بلندیِ کادرِ کشویی (۴۴) تا ردیف یک‌دست باشد
     V3Chip(
       StrHistory.filter, selected = active > 0, onClick = { sheet = true }, icon = Icons.Outlined.Tune,
-      count = active.takeIf { it > 0 },
+      count = active.takeIf { it > 0 }, modifier = Modifier.heightIn(min = 44.dp),
     )
   }
   if (sheet) PurchaseFilterSheet(d, filter, onFilter) { sheet = false }

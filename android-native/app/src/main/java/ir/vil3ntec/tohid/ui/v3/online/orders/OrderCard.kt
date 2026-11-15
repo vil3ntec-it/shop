@@ -52,10 +52,10 @@ import ir.vil3ntec.tohid.ui.v3.online.status.OnlineStatus
 
 /**
  *  کارتِ سفارش در صف (online.md) — ۶۸c: همان کالبدِ آرامِ ردیفِ داده (`V3DataRow`، صاحب‌کار: «این شلوغی‌ها … دقیق و منظم»):
- *  کاشیِ کره (سفارشِ آنلاین، جدا از فروشِ صندوق)، نامِ مشتری (وگرنه «#۱۰۴۲»)، خطِ دومِ آرامِ «سفارشِ آنلاین · #۱۰۴۲ · ۶ دقیقه
- *  پیش · ۳ قلم · با پیک»، و خطِ مبلغِ «۱۴۵٬۰۰۰ ؋ • تازه • پرداخت‌نشده» — وضعیت واژهٔ آرام، نه قرصِ رنگی؛ تنها نشانِ رنگی
- *  هشدارِ کارخواه (سابقهٔ مشتری RSK-03، بازبینیِ موجودی O-06). یک قرصِ خنثیِ گامِ بعدی؛ همهٔ نشان‌ها، اقلام و شمارهٔ پوشیده
- *  در سرِ جزئیات ([OrderTags]). سفارشِ تازه‌رسیده (`flash`) یک بار به رنگِ «در انتظارِ تأیید» می‌درخشد.
+ *  کاشیِ کره و واژهٔ «آنلاین» (سفارشِ آنلاین، جدا از فروشِ صندوق)، «#۱۰۴۲ · مریم احمدی»، خطِ دومِ آرامِ «آنلاین · ۶ دقیقه پیش
+ *  · ۳ قلم»، و خطِ مبلغِ «۱٬۴۵۰ افغانی • جدید» — وضعیت واژهٔ آرام، نه قرصِ رنگی؛ تنها نشانِ رنگی هشدارِ کارخواه (سابقهٔ مشتری
+ *  RSK-03، بازبینیِ موجودی O-06). یک قرصِ خنثیِ گامِ بعدی؛ روش، پرداخت، اقلام، شمارهٔ پوشیده و همهٔ نشان‌ها در سرِ جزئیات
+ *  ([OrderTags]). سفارشِ تازه‌رسیده (`flash`) یک بار به رنگِ «در انتظارِ تأیید» می‌درخشد.
  */
 @Composable
 fun OrderCard(
@@ -95,7 +95,7 @@ fun OrderCard(
       .border(if (selected || flash) 2.dp else 1.dp, glow.value, shape),
   ) {
     V3DataRow(
-      title = o.customer.name.ifBlank { OnlineFmt.orderNo(o.orderNo) },
+      title = OrderCardText.title(o),
       secondary = secondary,
       meta = meta,
       icon = Icons.Outlined.Language,
@@ -108,9 +108,9 @@ fun OrderCard(
 }
 
 /**
- *  متن‌های کارتِ صف (کالبدِ ۶۸c): خطِ دومِ «سفارشِ آنلاین · #۱۰۴۲ · ۶ دقیقه پیش · ۳ قلم · با پیک · برای ۱۸:۰۰» و خطِ مبلغِ
- *  «۱۴۵٬۰۰۰ ؋ • تازه • پرداخت‌نشده»؛ هشدارِ کارخواه (سابقهٔ مشتری، بازبینیِ موجودی) جای پرداخت می‌نشیند و تنها واژهٔ رنگیِ ردیف
- *  است، «آزمایشی» واژهٔ آرام. سرِ جزئیات همان [OrderTags] ِ کامل را دارد.
+ *  متن‌های کارتِ صف (کالبدِ ۶۸c): عنوانِ «#۱۰۴۲ · مریم احمدی»، خطِ دومِ «آنلاین · ۶ دقیقه پیش · ۳ قلم» و خطِ مبلغِ «۱٬۴۵۰
+ *  افغانی • جدید»؛ هشدارِ کارخواه (سابقهٔ مشتری، بازبینیِ موجودی) تنها واژهٔ رنگیِ ردیف است، «آزمایشی» واژهٔ آرام. روش و پرداخت
+ *  ([line]) و سرِ جزئیات ([OrderTags]) کامل‌اند.
  */
 internal object OrderCardText {
   /** خطِ روش، زمان، شمار و پرداخت (صفحه‌های دیگر و جزئیات) */
@@ -121,15 +121,17 @@ internal object OrderCardText {
     OnlineFmt.pay(o.paymentStatus, o.paymentMethod),
   ).joinToString(" · ")
 
+  /** عنوان: «#۱۰۴۲ · مریم احمدی» — شمارهٔ سفارش و مشتری در یک خط */
+  fun title(o: OrderDto): String = listOfNotNull(OnlineFmt.orderNo(o.orderNo), o.customer.name.ifBlank { null }).joinToString(" · ")
+
+  /** خطِ دومِ کوتاه: «آنلاین · ۶ دقیقه پیش · ۳ قلم» (زمان‌دار ⇒ «برای ۱۸:۰۰» به‌جای شمارِ اقلام) */
   fun secondary(o: OrderDto, now: Long): String = listOfNotNull(
-    StrOrdersHub.onlineBadge,
-    OnlineFmt.orderNo(o.orderNo).takeIf { o.customer.name.isNotBlank() },
+    StrOrdersHub.onlineShort,
     OnlineFmt.ago(o.createdAt, now).ifBlank { null },
-    StrOnline.items(o.itemsCount),
-    OrdersHubModel.method(o),
-    o.scheduledFor?.let { StrOnline.forTime(OrdersModel.scheduleLabel(it, now)) },
+    o.scheduledFor?.let { StrOnline.forTime(OrdersModel.scheduleLabel(it, now)) } ?: StrOnline.items(o.itemsCount),
   ).joinToString(" · ")
 
+  /** خطِ مبلغ: «۱٬۴۵۰ افغانی • جدید» و فقط هشدارِ کارخواه (سابقهٔ مشتری، بازبینیِ موجودی) یا «آزمایشی» */
   fun meta(o: OrderDto, risk: String?): V3RowMeta {
     val status = V3RowStatus.of(StrOnline.orderStatus(o.status), OnlineStatus.order(o.status))
     val alert = when {
@@ -138,7 +140,7 @@ internal object OrderCardText {
       o.isTest -> V3RowStatus(StrOnline.test)
       else -> null
     }
-    return V3RowMeta(OnlineFmt.afn(o.totalMinor), status, alert ?: V3RowStatus(OnlineFmt.pay(o.paymentStatus, o.paymentMethod)))
+    return V3RowMeta(OnlineFmt.afn(o.totalMinor), status, alert)
   }
 
   /** نشانهٔ قرصِ گامِ بعدی */
