@@ -73,6 +73,8 @@ class ContactPrivacyTest {
       "ui/v3/sales/checkout/CustomerPickerSheet.kt", "ui/v3/money/ReceivePickerSheet.kt", "ui/v3/money/DebtorMergeSheet.kt",
       "ui/screens/DeskCustomers.kt", "ui/screens/CrmProfileUi.kt", "ui/screens/PhoneDebtors.kt",
       "ui/v3/money/DebtorLedgerParts.kt", "ui/v3/money/DebtorLedgerScreen.kt",
+      //  ردیفِ سادهٔ قرض‌داران (`claude/e-rows-63q`): شماره از `DebtorRowModel` با همان مجوز
+      "ui/v3/money/DebtorsListScreen.kt",
     )
     for (p in pages) {
       val s = src(p)

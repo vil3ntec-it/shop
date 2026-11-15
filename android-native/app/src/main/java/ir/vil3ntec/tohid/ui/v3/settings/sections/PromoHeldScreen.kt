@@ -164,12 +164,15 @@ internal fun RouteScope.PromoHeldScreen(onBack: (() -> Unit)?) {
           PromoHeld.Sale.MISSING -> StrPromoHeld.missing to if (owner) StrPromoHeld.missingOwnerFooter else StrPromoHeld.missingFooter
         }
         V3Section(title, footer = footer) {
+          //  «فاکتور #n» ِ هر ردیف ⇒ همان فاکتور (`InvoiceLinks` ِ پوسته، `claude/e-rows-63q`)؛ فاکتورِ ناپیدا زدنی نیست
+          val links = ir.vil3ntec.tohid.ui.v3.LocalInvoiceLinks.current
           for (g in part) {
             val sale = bySale[g.saleId]
             val how = PromoHeld.release(g, owner, now)
             V3ListRow(
               title = StrPromoHeld.invoice(sale?.let { ReceiptModel.number(it) } ?: g.saleId.takeLast(6)),
               subtitle = StrPromoHeld.codes(g.codes.joinToString("، "), OrdersModel.stamp(g.at)),
+              onClick = if (sale != null && links != null) ({ links.open(sale.id) }) else null,
               chevron = false,
               trailing = if (how == PromoHeld.Release.NONE) null else {
                 {

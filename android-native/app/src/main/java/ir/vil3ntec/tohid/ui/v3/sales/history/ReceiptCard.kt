@@ -27,6 +27,8 @@ import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Divider
+import ir.vil3ntec.tohid.ui.v3.InvoiceRefText
+import ir.vil3ntec.tohid.ui.v3.InvoiceRefs
 import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.V3InvoiceItems
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
@@ -87,7 +89,8 @@ fun ReceiptCard(
     //  امتیازِ همین فاکتور و یادداشتِ فاکتور — همان‌جا که نمای فاکتورِ کامپیوتر نشان می‌دهد
     val extras = ReceiptModel.extras(d, sale)
     if (extras.isNotEmpty()) V3Card(radius = 16.dp, padding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) {
-      extras.forEach { Text(it, style = V3Type.callout, color = c.inkMuted, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) }
+      //  یادداشتی که «فاکتور #n» دارد (اصلاح، تعویض): فقط همان بخش زدنی ⇒ همان فاکتور (`InvoiceRef`)
+      extras.forEach { InvoiceRefText(InvoiceRefs.split(it), Modifier.fillMaxWidth().padding(vertical = 2.dp), style = V3Type.callout, debtorId = sale.debtorId) }
     }
   }
 }
