@@ -38,7 +38,10 @@ val FoundationModule = AppModule(
     ModuleEntry("whats-new", { StrSettings.whatsNew }, WHATS_NEW_ROUTE, Icons.Outlined.NewReleases, setOf(Place.MORE), MoreGroup.ACCOUNT, V3Hue.BRAND, order = 90),
   ),
   routes = listOf(
-    V3Route("more", RouteKind.TAB, { Str.more }, chrome = Chrome.OWN) { MoreScreen(store, data) { nav.open(it) } },
+    //  کامپیوتر: «همهٔ بخش‌ها» (شبکهٔ کارت‌ها، e-desk-d1)؛ گوشی همان «بیشتر»
+    V3Route("more", RouteKind.TAB, { if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) ir.vil3ntec.tohid.core.i18n.StrDesk.allSections else Str.more }, chrome = Chrome.OWN) {
+      MoreScreen(store, data) { nav.open(it) }
+    },
     V3Route("app/updates", RouteKind.PAGE, { StrNav.appUpdate }, aliases = listOf("app"), chrome = Chrome.OWN) {
       MoreAppPage(data) { back() }
     },
