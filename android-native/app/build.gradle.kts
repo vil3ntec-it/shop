@@ -476,15 +476,3 @@ tasks.withType<Test>().configureEach {
     }
   })
 }
-
-/*
- *  RATE-01 — «ستاره بدهید» (`docs/GOOGLE-PLAY-fa.md` §۹): API ِ نظرِ درون‌برنامهٔ Google Play فقط در نسخهٔ Play.
- *  `src/review-play` (با کتابخانه) یا `src/review-none` (بی آن): APK ِ سایت و بازار هیچ کدِ `com.google.android.play`
- *  ندارد (`PlayReviewSplitTest`). نسخهٔ 2.0.2 (اکتبر ۲۰۲۴، آخرین پایدار؛ همان play-services-tasks/basement ِ ۱۸.x).
- *  ⛔ بلوکِ جدا از `android {}` ِ بالا تا جداسازیِ به‌روزرسانی (`update/`) دست نخورد.
- */
-val rateStore = (project.findProperty("store") as String?)?.trim()?.ifBlank { null } ?: "direct"
-android.sourceSets.getByName("main").java.srcDir(if (rateStore == "play") "src/review-play/java" else "src/review-none/java")
-dependencies {
-  if (rateStore == "play") implementation("com.google.android.play:review:2.0.2")
-}

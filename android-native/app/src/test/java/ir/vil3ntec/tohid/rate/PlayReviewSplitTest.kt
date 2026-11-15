@@ -6,51 +6,49 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- *  RATE-01 — نگهبانِ جداییِ کتابخانهٔ نظرِ Google Play: APK ِ سایت/گیت‌هاب و کافه‌بازار (`src/main` + `src/review-none`)
- *  هیچ ارجاعی به `com.google.android.play.core` یا `com.google.android.play:review` ندارد؛ فقط `src/review-play` دارد و
- *  وابستگی فقط زیرِ `-Pstore=play` است. همین برای برنامهٔ خریدار (`customer-android`). روی کامپیوتر و اندروید هر دو.
+ *  RATE-01 — نگهبانِ «بی کتابخانهٔ نظرِ Google Play در هیچ ساختی»: «ستاره می‌دهم» ِ برگهٔ خودمان یک دکمه است و راهنمای Google
+ *  می‌گوید دکمه API ِ نظرِ درون‌برنامه را صدا نزند (سهمیه ⇒ شاید هیچ کارتی نیاید) و صفحهٔ Play را باز کند. پس در هیچ
+ *  پوشهٔ سورسِ برنامهٔ دکان، خریدار و کامپیوتر (`src/main`، Play، بازار، پیش‌نمایش…) ارجاعی به `com.google.android.play.core`
+ *  یا `com.google.android.play:review` نیست، و Play فقط با `market://details?id=` و `https://play.google.com/store/apps/details?id=`
+ *  باز می‌شود. روی کامپیوتر و اندروید هر دو.
  */
 class PlayReviewSplitTest {
 
-  private val banned = listOf("com.google.android.play.core", "com.google.android.play:review")
+  private val banned = listOf("com.google.android.play.core", "com.google.android.play:review", "ReviewManagerFactory")
 
-  /** ریشهٔ یک برنامهٔ اندروید از هر پوشهٔ کارِ آزمون (`android-native/app` یا `desktop`) */
-  private fun app(rel: String): File? =
-    listOf(".", "..", "../..", "../../..").map { File(it, rel) }.firstOrNull { File(it, "build.gradle.kts").isFile && File(it, "src/main").isDirectory }
-
-  private fun shop(): File =
-    listOf(File("."), File("../android-native/app"), File("android-native/app")).firstOrNull { File(it, "src/review-none").isDirectory }
-      ?: error("android-native/app پیدا نشد (cwd=${File(".").absoluteFile})")
+  /** ریشهٔ مخزن از هر پوشهٔ کارِ آزمون (`android-native/app` یا `desktop`) */
+  private val repo: File =
+    listOf(File("."), File(".."), File("../.."), File("../../..")).map { it.absoluteFile.normalize() }
+      .firstOrNull { File(it, "android-native/app/build.gradle.kts").isFile }
+      ?: error("ریشهٔ مخزن پیدا نشد (cwd=${File(".").absoluteFile})")
 
   private fun offenders(dir: File): List<String> =
-    dir.walkTopDown().filter { it.isFile && (it.extension == "kt" || it.extension == "java" || it.extension == "xml") }
+    dir.walkTopDown().filter { it.isFile && it.extension in setOf("kt", "kts", "java", "xml", "toml") && it.name != "PlayReviewSplitTest.kt" }
       .filter { f -> f.readText().let { t -> banned.any { it in t } } }
-      .map { it.path }.toList()
+      .map { it.relativeTo(repo).invariantSeparatorsPath }.toList()
 
-  private fun checkApp(root: File) {
-    assertEquals("${root.path}: کدِ Play در APK ِ بی Play", emptyList<String>(), offenders(File(root, "src/main")) + offenders(File(root, "src/review-none")))
-    val play = File(root, "src/review-play").walkTopDown().filter { it.isFile && it.extension == "kt" }.joinToString("\n") { it.readText() }
-    assertTrue("${root.path}: نسخهٔ Play خودِ API را دارد", "com.google.android.play.core.review.ReviewManagerFactory" in play)
-    val gradle = File(root, "build.gradle.kts").readLines()
-    val deps = gradle.filter { "com.google.android.play:review" in it }
-    assertEquals("${root.path}: یک وابستگیِ نظرِ Play", 1, deps.size)
-    assertTrue("${root.path}: وابستگی فقط با -Pstore=play: ${deps.single()}", deps.single().trim().startsWith("if (rateStore == \"play\") implementation("))
-    val split = gradle.single { "src/review-play/java" in it }
-    assertTrue("${root.path}: پوشهٔ Play فقط برای Play، بقیه review-none: $split",
-      Regex("""srcDir\(if \(rateStore == "play"\) "src/review-play/java" else "src/review-none/java"\)""").containsMatchIn(split))
+  private fun checkApp(rel: String) {
+    val root = File(repo, rel)
+    assertTrue("$rel پیدا نشد", File(root, "src/main").isDirectory)
+    val bad = offenders(File(root, "src")) + offenders(File(root, "build.gradle.kts"))
+    assertEquals("$rel: کدِ نظرِ درون‌برنامهٔ Play در یکی از ساخت‌ها", emptyList<String>(), bad)
+    val folders = File(root, "src").listFiles().orEmpty().filter { it.isDirectory && it.name.startsWith("review") }.map { it.name }
+    assertEquals("$rel: پوشهٔ ساختِ جدای نظرِ Play دیگر نیست", emptyList<String>(), folders)
   }
 
-  @Test fun shopApkWithoutPlayHasNoPlayReviewCode() = checkApp(shop())
+  @Test fun shopHasNoPlayReviewCodeInAnyBuild() = checkApp("android-native/app")
 
-  @Test fun shopperApkWithoutPlayHasNoPlayReviewCode() {
-    val root = app("customer-android/app") ?: return   //  پوشهٔ برنامهٔ خریدار در همین مخزن کنارِ android-native است
-    checkApp(root)
+  @Test fun shopperHasNoPlayReviewCodeInAnyBuild() = checkApp("customer-android/app")
+
+  @Test fun desktopAndCoreHaveNoPlayReviewCode() {
+    assertEquals(emptyList<String>(), offenders(File(repo, "desktop/src")) + offenders(File(repo, "core/src")))
   }
 
-  @Test fun desktopNeverCompilesEitherReviewFolder() {
-    val desk = listOf(File("."), File("../desktop"), File("desktop")).firstOrNull { File(it, "src/shim").isDirectory } ?: return
-    val gradle = File(desk, "build.gradle.kts").readText()
-    assertTrue("کامپیوتر فقط src/main ِ اندروید را کامپایل می‌کند", "review-play" !in gradle && "review-none" !in gradle)
-    assertEquals(emptyList<String>(), offenders(File(desk, "src")))
+  @Test fun rateButtonOpensThePlayListingDirectly() {
+    val shop = File(repo, "android-native/app/src/main/java/ir/vil3ntec/tohid/rate/RateStoreAndroid.kt").readText()
+    assertTrue("Play ⇒ صفحهٔ برنامه", Regex("""RateTarget\.PLAY -> openFirst\(context, RateLinks\.playListing\(""").containsMatchIn(shop))
+    val shopper = File(repo, "customer-android/app/src/main/java/ir/vil3ntec/tohid/customer/RateAndroid.kt").readText()
+    assertTrue("خریدار: Play ⇒ صفحهٔ برنامه", Regex("""RateHook\(RateTarget\.PLAY\) \{ listing\(activity\) \}""").containsMatchIn(shopper))
+    assertTrue("خریدار: همان درهای core", "RateLinks.playListing(" in shopper)
   }
 }

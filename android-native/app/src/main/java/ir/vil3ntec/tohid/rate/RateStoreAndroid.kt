@@ -11,22 +11,17 @@ import ir.vil3ntec.tohid.core.rate.RateTarget
 /**
  *  RATE-01 — باز کردنِ فروشگاهِ همین ساخت پس از «ستاره می‌دهم» (قاعده‌ها: `core/rate/RatePrompt.kt`).
  *
- *   • Play: API ِ رسمیِ نظرِ درون‌برنامهٔ Google Play ([playReview])؛ اگر نشد یا Play چیزی نشان نداد، صفحهٔ برنامه
- *     (`market://details?id=` و بی برنامهٔ Play، `https://play.google.com/store/apps/details?id=`).
+ *   • Play: صفحهٔ برنامه (`market://details?id=` و بی برنامهٔ Play، `https://play.google.com/store/apps/details?id=`).
+ *     ⛔ راهنمای Google: دکمه API ِ نظرِ درون‌برنامه را صدا نمی‌زند (سهمیه ⇒ شاید هیچ کارتی نیاید)؛ پس هیچ کتابخانهٔ Play
+ *     در هیچ ساختی نیست (`PlayReviewSplitTest`).
  *   • کافه‌بازار: درِ رسمیِ نظر و امتیاز (`ACTION_EDIT` روی `bazaar://details?id=` با بستهٔ `com.farsitel.bazaar`)، و صفحهٔ برنامه.
  *   • سایت/گیت‌هاب، پیش‌نمایش و کامپیوتر: [target] همیشه `NONE` ⇒ برگه هرگز ساخته نمی‌شود.
- *
- *  ⛔ کتابخانهٔ Play فقط در نسخهٔ Play است: [playReview] را `MainActivity` از `src/review-play` (Play) یا `src/review-none`
- *  (بقیه، بی هیچ کدِ Play) می‌نشاند؛ کدِ `src/main` هرگز آن کتابخانه را نمی‌شناسد (`PlayReviewSplitTest`). هیچ سنجه‌ای
- *  از اینکه چه کسی ستاره داد ثبت یا فرستاده نمی‌شود.
+ *  هیچ سنجه‌ای از اینکه چه کسی ستاره داد ثبت یا فرستاده نمی‌شود.
  */
 object RateStoreAndroid {
   /** تنظیمِ رابطِ همین دستگاه (`tohid-ui`، DATA-SAFETY §۵ «مالِ همین دستگاه»): نه دفتر، نه همگام، نه مالی */
   const val PREFS = "tohid-ui"
   const val KEY = "rate_prompt"
-
-  /** نظرِ درون‌برنامهٔ Play ِ همین ساخت: `done(true)` ⇒ Play کارتِ خودش را نشان داد؛ `false` ⇒ صفحهٔ برنامه */
-  var playReview: ((context: Context, done: (shown: Boolean) -> Unit) -> Unit)? = null
 
   /** `SKStoreReviewController` ِ آیفون — میزبانِ آیفونِ دکان هنوز نمی‌نشاند ⇒ آن‌جا هم `NONE` */
   var appStoreReview: (() -> Unit)? = null
@@ -41,11 +36,7 @@ object RateStoreAndroid {
   fun open(context: Context, target: RateTarget) {
     val app = context.packageName
     when (target) {
-      RateTarget.PLAY -> {
-        val review = playReview
-        if (review == null) openFirst(context, RateLinks.playListing(app))
-        else review(context) { shown -> if (!shown) openFirst(context, RateLinks.playListing(app)) }
-      }
+      RateTarget.PLAY -> openFirst(context, RateLinks.playListing(app))
       RateTarget.BAZAAR -> openFirst(context, RateLinks.bazaar(app))
       RateTarget.APP_STORE -> appStoreReview?.invoke()
       RateTarget.NONE -> Unit

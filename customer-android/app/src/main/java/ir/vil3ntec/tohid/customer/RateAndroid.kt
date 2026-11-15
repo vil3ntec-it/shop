@@ -10,15 +10,13 @@ import ir.vil3ntec.tohid.customer.ui.RateHook
 
 /**
  *  RATE-01 — مرزِ اندرویدِ «ستاره بدهید» ِ برنامهٔ خرید. برنامهٔ خرید فروشگاهِ بازار ندارد: فقط راهِ Play، و فقط در ساختِ
- *  `-Pstore=play`؛ هر ساختِ دیگر (پیش‌فرض) ⇒ `null` ⇒ برگه هرگز ساخته نمی‌شود. «ستاره می‌دهم» ⇒ نظرِ درون‌برنامهٔ Play
- *  ([PlayReview]، فقط در `src/review-play`)، و اگر نشد صفحهٔ برنامه (`market://` و سپس وبِ Play). هیچ سنجه‌ای فرستاده نمی‌شود.
+ *  `-Pstore=play`؛ هر ساختِ دیگر (پیش‌فرض) ⇒ `null` ⇒ برگه هرگز ساخته نمی‌شود. «ستاره می‌دهم» ⇒ صفحهٔ برنامه در Play
+ *  (`market://` و سپس وبِ Play) — نه API ِ نظرِ درون‌برنامه (راهنمای Google برای دکمه). هیچ سنجه‌ای فرستاده نمی‌شود.
  */
 object RateAndroid {
   fun hook(activity: Activity): RateHook? {
     if (RateTarget.of(BuildConfig.STORE) != RateTarget.PLAY) return null
-    return RateHook(RateTarget.PLAY) {
-      PlayReview.launch(activity) { shown -> if (!shown) listing(activity) }
-    }
+    return RateHook(RateTarget.PLAY) { listing(activity) }
   }
 
   private fun listing(activity: Activity) {

@@ -17,7 +17,7 @@ import ir.vil3ntec.tohid.core.platform.StoreChannel
 enum class RateTarget {
   /** APK ِ سایت/گیت‌هاب، نسخهٔ پیش‌نمایش و کامپیوتر: فروشگاهی نیست ⇒ هرگز پرسیده نمی‌شود */
   NONE,
-  /** Google Play: API ِ رسمیِ نظرِ درون‌برنامه، و اگر نشد صفحهٔ برنامه در Play */
+  /** Google Play: صفحهٔ برنامه در Play (دکمهٔ برگه API ِ نظرِ درون‌برنامه را صدا نمی‌زند — راهنمای Google) */
   PLAY,
   /** کافه‌بازار: درِ رسمیِ نظر و امتیاز (`ACTION_EDIT`)، و اگر نشد صفحهٔ برنامه */
   BAZAAR,
@@ -104,8 +104,6 @@ object RatePrompt {
   const val SESSION_WARMUP_MS = 3 * 60_000L
   /** خانه باید این‌قدر جلوی چشم بماند (نه چشمکِ میانِ دو صفحه) */
   const val SETTLE_MS = 1_500L
-  /** نظرِ درون‌برنامهٔ Play زودتر از این بسته شد ⇒ Play چیزی نشان نداد (سهمیه) ⇒ صفحهٔ برنامه در Play */
-  const val PLAY_QUICK_MS = 1_000L
   const val DAY_MS = 86_400_000L
 
   /** `null` ⇒ همین حالا بپرس؛ وگرنه نخستین قاعدهٔ بسته. ساعتِ عقب‌رفته همیشه «هنوز نه» است (هرگز زودتر) */
@@ -177,7 +175,7 @@ object RateLinks {
     RateLink(RateAction.VIEW, "https://cafebazaar.ir/app/$appId"),
   )
 
-  /** صفحهٔ برنامه در Play — وقتی نظرِ درون‌برنامه نشد: برنامهٔ Play، و بی آن وبِ Play */
+  /** صفحهٔ برنامه در Play: برنامهٔ Play، و بی آن وبِ Play */
   fun playListing(appId: String): List<RateLink> = listOf(
     RateLink(RateAction.VIEW, "market://details?id=$appId", PLAY_PACKAGE),
     RateLink(RateAction.VIEW, "https://play.google.com/store/apps/details?id=$appId"),

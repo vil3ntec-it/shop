@@ -97,12 +97,8 @@ tasks.withType<Test>().configureEach {
 
 /*
  *  RATE-01 — «ستاره بدهید» (`docs/GOOGLE-PLAY-fa.md` §۹). برنامهٔ خرید هنوز فروشگاه ندارد: پیش‌فرض `direct` ⇒ برگه هرگز
- *  (`BuildConfig.STORE`، `RateAndroid.hook`)؛ `-Pstore=play` ⇒ همان راهِ Play ِ برنامهٔ دکان: `src/review-play` (با کتابخانهٔ
- *  نظرِ Play 2.0.2) یا `src/review-none` (بی آن؛ `PlayReviewSplitTest`).
+ *  (`BuildConfig.STORE`، `RateAndroid.hook`)؛ `-Pstore=play` ⇒ «ستاره می‌دهم» صفحهٔ برنامه در Play را باز می‌کند (بی هیچ
+ *  کتابخانهٔ Play؛ `PlayReviewSplitTest`).
  */
 val rateStore = (project.findProperty("store") as String?)?.trim()?.ifBlank { null } ?: "direct"
 android.defaultConfig.buildConfigField("String", "STORE", "\"$rateStore\"")
-android.sourceSets.getByName("main").java.srcDir(if (rateStore == "play") "src/review-play/java" else "src/review-none/java")
-dependencies {
-  if (rateStore == "play") implementation("com.google.android.play:review:2.0.2")
-}
