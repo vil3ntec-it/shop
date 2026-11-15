@@ -105,14 +105,14 @@ test('عوض کردنِ رمزِ حسابِ رمزدار: «رمزِ فعلی» 
   assert.equal(bad.status, 401);
 });
 
-test('افزودنِ شماره (راهِ ورود) به حساب: نشستِ کهنه ۴۰۳؛ عوض کردنِ نام آزاد می‌ماند', async () => {
+//  «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): شماره دیگر راهِ ورود نیست ⇒ فیلدِ داده، بی تأییدِ دوباره؛ افزودنِ **ایمیل** به حسابِ
+//  بی‌ایمیل همان «کارِ حساس» است (`email-only-auth.test.js`: نشستِ کهنه ۴۰۳، سپس کدِ همان ایمیل)
+test('شمارهٔ حساب فیلدِ داده است: نشستِ کهنه هم نام و شماره را می‌نشاند', async () => {
   const u = await staleSession(await h.newUser('بی‌شماره'));
   assert.equal((await h.put('/api/me', { name: 'نامِ تازه' }, { token: u.accessToken })).status, 200, 'نام حساس نیست');
-  assertNeedsReauth(await h.put('/api/me', { name: 'نامِ تازه', phone: '0791112233' }, { token: u.accessToken }), 'PUT /me phone');
-  assert.equal((await one('SELECT phone FROM users WHERE id=$1', [u.user.id])).phone, null);
-  assert.equal((await reauthWithPassword(u)).status, 200);
   const ok = await h.put('/api/me', { name: 'نامِ تازه', phone: '0791112233' }, { token: u.accessToken });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal((await one('SELECT phone FROM users WHERE id=$1', [u.user.id])).phone, '+93791112233');
 });
 
 test('مجوز و نقشِ کارمندان: هر دو مسیر با نشستِ کهنه ۴۰۳ و پس از تأیید انجام', async () => {

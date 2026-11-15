@@ -107,7 +107,7 @@ object DashboardEngine {
     val expiring = runCatching { ExpiryEngine.alerts(d, today) }.getOrDefault(emptyList())
 
     //  قرض‌داران — تغییرِ بدهی در همین بازه
-    val txByDebtor = d.transactions.groupBy { it.debtorId }
+    val txByDebtor = DebtRows.of(d)  // CRM-10: کلیدِ ماندگار
     val debtLines = d.debtors.map { db ->
       val txs = txByDebtor[db.id].orEmpty()
       //  همان جمعِ `ShopStore.debt` (`DebtMinorFlag`: با `shop.debt_minor` به پول، خاموش همان Double)

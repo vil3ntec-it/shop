@@ -1384,6 +1384,94 @@
      "kind": "reversal"
     }
    ]
+  },
+  "merged": {
+   "debtors": [
+    {
+     "id": "k1",
+     "name": "احمد"
+    },
+    {
+     "id": "m1",
+     "name": "احمد کابلی",
+     "mergedInto": "k1"
+    },
+    {
+     "id": "m2",
+     "name": "احمد ک",
+     "mergedInto": "m1"
+    },
+    {
+     "id": "c1",
+     "name": "کریم",
+     "mergedInto": "c2"
+    },
+    {
+     "id": "c2",
+     "name": "کریم خان",
+     "mergedInto": "c1"
+    },
+    {
+     "id": "x1",
+     "name": "ولی",
+     "mergedInto": "zz"
+    },
+    {
+     "id": "b1",
+     "name": "بی ادغام",
+     "mergedInto": "  "
+    }
+   ],
+   "transactions": [
+    {
+     "id": "t1",
+     "debtorId": "k1",
+     "type": "give",
+     "amount": 1000,
+     "date": "2026-10-04",
+     "createdAt": 1790000000000
+    },
+    {
+     "id": "t2",
+     "debtorId": "m1",
+     "type": "give",
+     "amount": 500,
+     "date": "2026-08-15",
+     "createdAt": 1786000000000
+    },
+    {
+     "id": "t3",
+     "debtorId": "m2",
+     "type": "receive",
+     "amount": 300,
+     "date": "2026-10-01",
+     "createdAt": 1789800000000
+    },
+    {
+     "id": "t4",
+     "debtorId": "c2",
+     "type": "give",
+     "amount": 200,
+     "date": "2026-10-10",
+     "createdAt": 1790500000000
+    },
+    {
+     "id": "t5",
+     "debtorId": "x1",
+     "type": "give",
+     "amount": 100,
+     "date": "2026-06-01",
+     "createdAt": 1780000000000
+    },
+    {
+     "id": "t6",
+     "debtorId": "b1",
+     "type": "give",
+     "amount": 50,
+     "date": "2026-10-14",
+     "createdAt": 1790800000000
+    }
+   ]
   }
  },
  "cases": [
@@ -5625,6 +5713,108 @@
        0,
        0,
        0
+      ]
+     }
+    },
+    "suppliers": {
+     "rows": [],
+     "totals": {
+      "balance": 0,
+      "open": 0,
+      "credit": 0,
+      "buckets": [
+       0,
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "CRM-10: سنِ بدهی زیرِ مشتریِ ماندگار (ادغامِ بی ویرایشِ سند — زنجیره، حلقه، مقصدِ ناپیدا، فاصلهٔ خالی)",
+   "id": "CRM-10",
+   "fn": "debts",
+   "opts": {
+    "asOf": "2026-10-14"
+   },
+   "ledger": "merged",
+   "expect": {
+    "asOf": "2026-10-14",
+    "buckets": [
+     30,
+     60,
+     90
+    ],
+    "customers": {
+     "rows": [
+      {
+       "id": "k1",
+       "name": "احمد",
+       "balance": 120000,
+       "open": 120000,
+       "credit": 0,
+       "buckets": [
+        100000,
+        20000,
+        0,
+        0
+       ],
+       "oldestDays": 60
+      },
+      {
+       "id": "c1",
+       "name": "کریم",
+       "balance": 20000,
+       "open": 20000,
+       "credit": 0,
+       "buckets": [
+        20000,
+        0,
+        0,
+        0
+       ],
+       "oldestDays": 4
+      },
+      {
+       "id": "x1",
+       "name": "ولی",
+       "balance": 10000,
+       "open": 10000,
+       "credit": 0,
+       "buckets": [
+        0,
+        0,
+        0,
+        10000
+       ],
+       "oldestDays": 135
+      },
+      {
+       "id": "b1",
+       "name": "بی ادغام",
+       "balance": 5000,
+       "open": 5000,
+       "credit": 0,
+       "buckets": [
+        5000,
+        0,
+        0,
+        0
+       ],
+       "oldestDays": 0
+      }
+     ],
+     "totals": {
+      "balance": 155000,
+      "open": 155000,
+      "credit": 0,
+      "buckets": [
+       125000,
+       20000,
+       0,
+       10000
       ]
      }
     },

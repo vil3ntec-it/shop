@@ -26,6 +26,7 @@ import ir.vil3ntec.tohid.ui.v3.account.team.MemberRoute
 import ir.vil3ntec.tohid.ui.v3.account.team.NewCodeRoute
 import ir.vil3ntec.tohid.ui.v3.account.team.RemoveMemberRoute
 import ir.vil3ntec.tohid.ui.v3.account.team.RemoveStaleRoute
+import ir.vil3ntec.tohid.ui.v3.account.team.ReplayDeviceRoute
 import ir.vil3ntec.tohid.ui.v3.account.team.RevokeDeviceKeyRoute
 import ir.vil3ntec.tohid.ui.v3.account.team.RevealRoute
 import ir.vil3ntec.tohid.ui.v3.account.team.TeamRoute
@@ -50,6 +51,8 @@ object AccountPaths {
   fun member(id: String) = "team/members/" + RoutePaths.encode(id)
   fun removeMember(id: String) = member(id) + "/remove"
   fun blockDevice(id: String) = "team/devices/" + RoutePaths.encode(id) + "/block"
+  /** S44: «بازیابی از پشتیبان» ِ دستگاهِ غیرفعال (`POST /shop/devices/:id/replay`) */
+  fun replayDevice(id: String) = "team/devices/" + RoutePaths.encode(id) + "/replay"
   /** رازِ ورود با کدِ یک دستگاه (`/api/shop/staff-keys/:id/revoke`) */
   fun revokeDeviceKey(id: String) = "team/device-keys/" + RoutePaths.encode(id) + "/revoke"
   fun logoutEverywhere(id: String) = member(id) + "/logout-all"
@@ -93,6 +96,9 @@ val AccountModule = AppModule(
     },
     V3Route("team/devices/{id}/block", RouteKind.SHEET, { StrAccount.block }, parent = AccountPaths.TEAM, needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
       BlockDeviceRoute(args["id"].orEmpty())
+    },
+    V3Route("team/devices/{id}/replay", RouteKind.SHEET, { ir.vil3ntec.tohid.core.i18n.StrLostDevice.button }, parent = AccountPaths.TEAM, needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
+      ReplayDeviceRoute(args["id"].orEmpty())
     },
     V3Route("team/device-keys/{id}/revoke", RouteKind.SHEET, { StrAccount.revokeDeviceKey }, parent = AccountPaths.TEAM, needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
       RevokeDeviceKeyRoute(args["id"].orEmpty())

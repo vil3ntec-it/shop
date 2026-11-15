@@ -20,6 +20,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -98,8 +99,8 @@ const setStock = (productId, qtyMilli) => call('POST', '/api/shop/catalog/moves'
 ok((await setStock('rice', 5000)).status === 201, 'برنج موجود؛ چای تمام شده');
 
 const ticket = async (phone) => {
-  const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
-  const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+  const vs = await call('POST', `/api/store/${slug}/verify/start`, { email: mailOf(phone) });
+  const vc = await call('POST', `/api/store/${slug}/verify/check`, { email: mailOf(phone), code: vs.body.devCode });
   return vc.body;
 };
 const tk = await ticket('0791113377');
@@ -145,7 +146,7 @@ const errors = [];
 const violations = [];
 const ctx = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
 await ctx.grantPermissions(['notifications']);
-await ctx.addInitScript(seedTicket, { phone: tk.phone, ticket: tk.ticket, expiresAt: tk.expiresAt });
+await ctx.addInitScript(seedTicket, { email: tk.email, ticket: tk.ticket, expiresAt: tk.expiresAt });
 await ctx.addInitScript(stubPush, fakeSub);
 const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push(String(e)));
@@ -193,8 +194,8 @@ await page.click('#ps-ap-on');
 await page.waitForSelector('#ps-ap-off', { state: 'visible', timeout: 15000 });
 ok(/روشن است/.test(await text('#ps-ap-state')) && !(await visible('#ps-ap-on')), '«روشن است» و «خاموش کن»', await text('#ps-ap-state'));
 const r1 = await rows();
-ok(r1.length === 1 && r1[0].endpoint === fakeSub.endpoint && r1[0].page === `/store/${slug}` && r1[0].phone === '+93791113377' && r1[0].proof === 'ticket',
-  'سرور: یک اشتراک برای همین شماره، همین مرورگر و همین ویترین (اثبات: بلیت)', JSON.stringify(r1));
+ok(r1.length === 1 && r1[0].endpoint === fakeSub.endpoint && r1[0].page === `/store/${slug}` && r1[0].phone === mailOf('0791113377') && r1[0].proof === 'ticket',
+  'سرور: یک اشتراک برای همین ایمیلِ تأییدشده، همین مرورگر و همین ویترین (اثبات: بلیت)', JSON.stringify(r1));
 const scope = await page.evaluate(async (sc) => { const r = await navigator.serviceWorker.getRegistration(sc); return r ? r.scope : ''; }, `/store/${slug}`);
 ok(scope === `${base}/store/${slug}`, 'کارگرِ سرویس با دامنهٔ همین ویترین', scope);
 const appKey = await page.evaluate(() => localStorage.getItem('test-push-sub'));
@@ -254,12 +255,12 @@ ok(/روی همین دستگاه هم بگیرید/.test(await text('#ps-ap-stat
 await page.click('#ps-ap-on');
 await page.waitForSelector('#ps-ap-off', { state: 'visible', timeout: 15000 });
 const tk2 = await ticket('0791113388');
-await page.evaluate((t) => localStorage.setItem('store-ticket', JSON.stringify(t)), { phone: tk2.phone, ticket: tk2.ticket, expiresAt: tk2.expiresAt });
+await page.evaluate((t) => localStorage.setItem('store-ticket', JSON.stringify(t)), { email: tk2.email, ticket: tk2.ticket, expiresAt: tk2.expiresAt });
 const beforeOther = posts.length;
 await open('rice');
 await page.locator('#ps-alerts button', { hasText: 'وقتی ارزان شد خبرم کن' }).click();
 await page.waitForSelector('#ps-ap-on', { state: 'visible', timeout: 15000 });
-ok(posts.length === beforeOther && (await rows()).every((r) => r.phone === '+93791113377'), 'شمارهٔ دیگر: «روشن» نیست و بی لمس هیچ اشتراکی برایش ساخته نمی‌شود');
+ok(posts.length === beforeOther && (await rows()).every((r) => r.phone === mailOf('0791113377')), 'ایمیلِ دیگر: «روشن» نیست و بی لمس هیچ اشتراکی برایش ساخته نمی‌شود');
 await open('rice', '?lang=en');
 await page.waitForFunction(() => (document.getElementById('ps-ap-on') || {}).textContent === 'Notify me on this device too', null, { timeout: 10000 });
 ok(true, 'انگلیسی: «Notify me on this device too»');
@@ -273,7 +274,7 @@ const ctx2 = await browser.newContext({ viewport: { width: 360, height: 760 }, l
 await ctx2.addInitScript((t) => {
   localStorage.setItem('store-ticket', JSON.stringify(t));
   Object.defineProperty(Notification, 'permission', { get: () => 'denied' });
-}, { phone: tk.phone, ticket: tk.ticket, expiresAt: tk.expiresAt });
+}, { email: tk.email, ticket: tk.ticket, expiresAt: tk.expiresAt });
 const p2 = await ctx2.newPage();
 const errors2 = [];
 p2.on('pageerror', (e) => errors2.push(String(e)));
@@ -287,7 +288,7 @@ await ctx2.close();
 //  ── ۸) پرچمِ پوش خاموش ⇒ همان «خبرم کن» ِ پیشین ──
 ok((await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.storefront.web_push', value: false }, A)).status === 200, 'پرچمِ پوش خاموش شد');
 const ctx3 = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
-await ctx3.addInitScript((t) => { localStorage.setItem('store-ticket', JSON.stringify(t)); }, { phone: tk.phone, ticket: tk.ticket, expiresAt: tk.expiresAt });
+await ctx3.addInitScript((t) => { localStorage.setItem('store-ticket', JSON.stringify(t)); }, { email: tk.email, ticket: tk.ticket, expiresAt: tk.expiresAt });
 const p3 = await ctx3.newPage();
 const scripts3 = [];
 p3.on('request', (r) => { if (/\/store\/(alert-push|push-client)\.js$/.test(r.url())) scripts3.push(r.url()); });

@@ -139,6 +139,13 @@
     });
     pick.forEach(function (rev, orig) { drop.add(orig).add(rev); }); return drop;
   }
+  /** CRM-10 — همان `CustomerCrm.resolve` ِ برنامه: زنجیرهٔ `mergedInto`؛ مقصدِ ناپیدا ⇒ آخرین موجود؛ حلقه ⇒ کوچک‌ترین شناسهٔ حلقه */
+  function keeper(into, known, id) {
+    for (var path = [], cur = id, nx, at; ; cur = nx) {
+      nx = into[cur]; if (!Object.prototype.hasOwnProperty.call(into, cur) || !Object.prototype.hasOwnProperty.call(known, nx)) return cur;
+      path.push(cur); at = path.indexOf(nx); if (at >= 0) return path.slice(at).sort()[0];
+    }
+  }
   function ledger(raw) {
     if (raw && raw.__reportLedger === VERSION) return raw;
     raw = raw || {};
@@ -178,27 +185,20 @@
         date: str(r.date), createdAt: ms(r.createdAt),
       });
     });
-    arr(raw.debtors).forEach(function (d) { L.debtors[str(d.id)] = str(d.name); });
+    var into = {}, merged = false;  // CRM-10: سندِ مشتریِ ادغام‌شده (`mergedInto`) زیرِ ماندگار — ادغامِ بی ویرایشِ سندِ v3
+    arr(raw.debtors).forEach(function (d) { L.debtors[str(d.id)] = str(d.name); if (str(d.mergedInto).trim()) { into[str(d.id)] = str(d.mergedInto); merged = true; } });
     var neutral = reversalNeutral(arr(raw.transactions));  // S89: جفتِ معکوس بیرون — سنِ بدهی همان حذفِ امروز
     arr(raw.transactions).forEach(function (t) {
       if (neutral.has(str(t.id))) return;
-      L.transactions.push({
-        id: str(t.id), debtorId: str(t.debtorId), give: str(t.type) === 'give', amount: money(t.amount),
-        date: str(t.date), createdAt: ms(t.createdAt),
-      });
+      L.transactions.push({ id: str(t.id), debtorId: merged ? keeper(into, L.debtors, str(t.debtorId)) : str(t.debtorId),
+        give: str(t.type) === 'give', amount: money(t.amount), date: str(t.date), createdAt: ms(t.createdAt) });
     });
     arr(raw.suppliers).forEach(function (s) { L.suppliers[str(s.id)] = str(s.name); });
     arr(raw.purchases).forEach(function (p) {
-      L.purchases.push({
-        id: str(p.id), supplierId: str(p.supplierId), total: money(p.totalAmount), paid: money(p.paidAmount),
-        date: str(p.date), createdAt: ms(p.createdAt),
-      });
+      L.purchases.push({ id: str(p.id), supplierId: str(p.supplierId), total: money(p.totalAmount), paid: money(p.paidAmount), date: str(p.date), createdAt: ms(p.createdAt) });
     });
     arr(raw.supplierPayments).forEach(function (p) {
-      L.supplierPayments.push({
-        id: str(p.id), supplierId: str(p.supplierId), amount: money(p.amount),
-        date: str(p.date), createdAt: ms(p.createdAt),
-      });
+      L.supplierPayments.push({ id: str(p.id), supplierId: str(p.supplierId), amount: money(p.amount), date: str(p.date), createdAt: ms(p.createdAt) });
     });
     arr(raw.warehouseEntries).forEach(function (e) {
       L.entries.push({

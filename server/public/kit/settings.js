@@ -39,7 +39,7 @@
       var out = K.el('button', { class: 'btn btn-ghost btn-sm', text: K.t('set.out'), attrs: { type: 'button' } });
       out.addEventListener('click', function () { K.setTicket(null); d.close(); location.reload(); });
       d.append(K.el('div', { class: 'inner section' }, K.el('p', { class: 'small muted', text: K.t('set.phone') }),
-        K.el('div', { class: 'spread' }, K.el('b', { class: 'ltr', text: K.localPhone(t.phone) }), out)));
+        K.el('div', { class: 'spread' }, K.el('b', { class: 'ltr', text: t.email }), out)));
     }
     d.append(K.el('div', { class: 'row' }, close));
     document.body.appendChild(d);

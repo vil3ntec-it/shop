@@ -1,12 +1,11 @@
 {
   "ac.offer": "Create an account?",
   "ac.offer.p": "With an account you can order next time without a code, your named addresses are kept and your cart is the same on every device.",
-  "ac.make": "Create account with {phone}",
+  "ac.make": "Create account with {email}",
   "ac.in": "Sign in to your account",
   "ac.in.p": "With an account, your addresses and cart go with you on every device.",
   "ac.no": "No, thanks",
-  "ac.again": "To create or sign in to an account, confirm your number with a code now.",
-  "ac.phone": "Mobile number",
+  "ac.again": "To create or sign in to your account, verify your email with a code now.",
   "ac.send": "Send code",
   "ac.sent": "Code sent.",
   "ac.dev": "(test code: {code})",
@@ -45,5 +44,6 @@
   "am.err.mic": "The microphone is not available or permission was not given.",
   "am.err.unsupported_media": "This file is not accepted; send a photo or a recorded voice note.",
   "am.err.too_large": "The file is larger than allowed.",
-  "am.err.address_not_found": "This address no longer exists."
+  "am.err.address_not_found": "This address no longer exists.",
+  "ac.email": "Email"
 }

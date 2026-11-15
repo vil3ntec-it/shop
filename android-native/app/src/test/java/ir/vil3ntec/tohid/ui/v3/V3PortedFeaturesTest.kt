@@ -104,9 +104,11 @@ class V3PortedFeaturesTest {
     assertTrue(list.contains("DebtorListModel.rows(d, term, sort, System.currentTimeMillis(), tag)"))
     assertTrue(list.contains("V3Chip(StrMoney.allTags, tag == null, { tagPick = null })"))
     assertTrue(list.contains("DebtorListModel.keptTag(d, tagPick)"))
-    //  ویرایشِ هر دو در برگهٔ نسخهٔ ۳ (#393) هست
+    //  برگهٔ قرض‌دارِ نسخهٔ ۳ دیگر آن دو را نمی‌پرسد (صاحب‌کار ۱۴۰۵/۰۸/۲۳: «اسم و شماره بسه»)؛ ذخیره‌اش هم به آن‌ها دست
+    //  نمی‌زند (`saveBasic`) و همان‌ها در کشوی حساب و جست‌وجو و صافیِ برچسب می‌مانند — `DebtorCompactSheetsUiTest`، `MoneyFormsModelTest`
     val form = src("ui/v3/money/DebtorFormSheets.kt")
-    assertTrue(form.contains("StrMoney.phone2Optional") && form.contains("StrMoney.tagsField"))
+    assertFalse(form.contains("StrMoney.phone2Optional") || form.contains("StrMoney.tagsField"))
+    assertTrue(src("ui/v3/money/MoneyRoutes.kt").contains("DebtorFormsModel.saveBasic(data, id, f,"))
   }
 
   @Test

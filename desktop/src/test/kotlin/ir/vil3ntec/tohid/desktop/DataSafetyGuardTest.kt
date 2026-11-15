@@ -351,6 +351,9 @@ class DataSafetyGuardTest {
       "tohid-conflict-fix",
       //  OPS-02: پرچمِ «پشتیبانِ دستی و پوشه هم رمزدار» و شکستِ پشتیبانِ پوشه (`BackupDevice`)؛ کلیدِ عبارت مالِ همین دستگاه است
       "tohid-backup-device",
+      //  S29/SYN-09: cursor ِ هاب، `epoch` و حلقهٔ «دیده از سرور» (`HubLinkV1Android`)، و کلیدِ جفت‌شدن اگر Keystore ِ گوشی خراب است
+      //  (`HubKeyStore`) — مالِ همین دستگاه؛ پس از بازگردانی گوشی دوباره جفت می‌شود
+      "tohid-hub-link", "tohid-hub-secure-plain",
     ).forEach { put(it, Kind.DEVICE) }
     //  مانده (DATA-SAFETY §۶): رمزِ کارمندان عمداً از پشتیبان بیرون است — دوباره گذاشته می‌شود
     put("tohid-staff-pins", Kind.GAP)

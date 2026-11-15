@@ -326,7 +326,7 @@ object ReportEngine {
 
   fun debtors(d: ShopData): List<DebtorStat> {
     //  یک گذر روی تراکنش‌ها، نه یک پیمایشِ کامل به ازای هر قرض‌دار
-    val byDebtor = d.transactions.groupBy { it.debtorId }
+    val byDebtor = DebtRows.of(d)  // CRM-10: کلیدِ ماندگار
     return d.debtors.map { debtor ->
       //  S89: «داده/گرفته» بی جفتِ «اصل + سندِ معکوس» (همان حذفِ امروز؛ مانده همان جمع)
       val mine = DebtReverse.effective(byDebtor[debtor.id].orEmpty())

@@ -175,6 +175,16 @@ internal fun RouteScope.BlockDeviceRoute(id: String) {
   )
 }
 
+/** S44: برگهٔ `team/devices/{id}/replay` — فقط صاحب و فقط با پرچمِ روشن (`TeamData.replay`)؛ پس از بازیابی فهرست از نو */
+@Composable
+internal fun RouteScope.ReplayDeviceRoute(id: String) {
+  val shops = shopsRepo
+  val team = TeamSession.data
+  val owner = isOwner
+  if (!owner || !team.replay) { LaunchedEffect(id) { back() }; return }
+  LostDeviceReplaySheet(id, onDismiss = { back() }, onDone = { TeamSession.scope.launch { team.reload(shops, owner) } })
+}
+
 /**
  *  برگهٔ `team/device-keys/{id}/revoke`: «باطل کردنِ این دستگاه» — رازِ ورود با کد و نشست‌های همان دستگاه.
  *  سرور تصمیم می‌گیرد (members.manage) و دوباره‌زدنی است؛ فهرست پس از کار از سرور خوانده می‌شود.

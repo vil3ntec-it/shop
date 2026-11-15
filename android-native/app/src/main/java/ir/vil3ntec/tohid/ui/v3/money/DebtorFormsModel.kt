@@ -137,6 +137,24 @@ internal object DebtorFormsModel {
     return if (withConsent is DebtorEngine.Result.Ok) DebtorEngine.Result.Ok(withConsent.data, id) else withConsent
   }
 
+  /**
+   *  ذخیرهٔ برگهٔ کوچکِ امروز (صاحب‌کار ۱۴۰۵/۰۸/۲۳: «اسم و شماره بسه») — فقط نام و تلفن از برگه؛ یادداشت و سقف همان که
+   *  [of] آورد (مشتریِ تازه: سقفِ پیش‌فرضِ دکان، CRM-03 #۲۵) و همان سدِ [limitPermError]. شمارهٔ دوم، برچسب، نشانی، پین و
+   *  رضایت **نوشته نمی‌شوند**: مشتریِ کهنه هر چه داشت دست‌نخورده می‌ماند (و «بله» ِ بی منبعِ کهنه ذخیره را نمی‌بندد).
+   */
+  fun saveBasic(
+    d: ShopData,
+    editingId: String?,
+    f: DebtorForm,
+    now: Long,
+    limitRules: CreditLimitPerm.Rules,
+    newId: () -> String,
+  ): DebtorEngine.Result {
+    val editing = editingId?.let { id -> d.debtors.find { it.id == id } }
+    if (editingId == null || editing != null) limitPermError(limitRules, editing, f)?.let { return DebtorEngine.Result.Failed(it) }
+    return if (editingId == null) DebtorEngine.add(d, draft(f), now, newId) else DebtorEngine.editWithLimit(d, editingId, draft(f))
+  }
+
   /* ------------------------------ تراکنش ------------------------------ */
 
   fun amountOf(f: TxForm): Double = f.amount.trim().toDoubleOrNull() ?: 0.0

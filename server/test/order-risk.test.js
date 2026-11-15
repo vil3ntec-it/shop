@@ -78,9 +78,9 @@ const tickets = new Map();
 async function ticketFor(slug, phone) {
   const k = `${slug}|${phone}`;
   if (tickets.has(k)) return tickets.get(k);
-  const s = await h.post(`/api/store/${slug}/verify/start`, { phone });
+  const s = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf(phone) });
   assert.equal(s.status, 200, JSON.stringify(s.body));
-  const c = await h.post(`/api/store/${slug}/verify/check`, { phone, code: s.body.devCode });
+  const c = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf(phone), code: s.body.devCode });
   assert.equal(c.status, 200, JSON.stringify(c.body));
   tickets.set(k, c.body.ticket);
   return c.body.ticket;
@@ -101,6 +101,7 @@ async function checkout(o, body, { key = `rk-${uniq()}-key` } = {}) {
 const count = async (shopId) => (await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id=$1', [shopId])).n;
 const STAFF = (o) => ({ type: 'user', id: o.user.id, role: 'owner' });
 const orders = require('../src/lib/orders');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 async function deliver(o, orderId) {
   for (const to of ['accepted', 'picking', 'packed', 'out_for_delivery', 'delivered']) {
     await orders.transition(o.shopId, orderId, { to }, STAFF(o));
@@ -237,6 +238,28 @@ test('RSK-02: سبدِ بالای سقفِ مشتریِ تازه ⇒ new_custome
   assert.equal(small.status, 201, JSON.stringify(small.body));
   await deliver(o, small.body.order.token.split('.')[0]);
   assert.equal((await checkout(o, cart())).status, 201, 'پس از تحویل، دیگر تازه نیست');
+});
+
+test('«فقط ایمیل»: «مشتریِ آشنا» فقط با ایمیلِ تأییدشدهٔ خودش؛ شمارهٔ او با ایمیلِ دیگر معافیت نمی‌آورد؛ شمارهٔ دیگر از سقف نمی‌رهاند', async () => {
+  const o = await liveStore('آشنا', { policy: { newCustomerMaxTotalMinor: 50_000, newCustomerMaxOpen: 1 } });
+  const KNOWN = '0791110041';
+  const first = await checkout(o, cart({ phone: KNOWN, lines: [{ productId: 'rice', qtyMilli: 2000 }] }));
+  assert.equal(first.status, 201, JSON.stringify(first.body));
+  await deliver(o, first.body.order.token.split('.')[0]);
+  //  همان شمارهٔ تماس، ایمیلِ تأییدشدهٔ دیگر ⇒ هنوز «تازه» (پیش از این تغییر با شماره معاف می‌شد)
+  const as = async (body, ticketPhone) => h.post(`/api/store/${o.slug}/checkout`, body,
+    { headers: { 'Idempotency-Key': `rk-${uniq()}-key`, 'X-Store-Ticket': await ticketFor(o.slug, ticketPhone) } });
+  const spoof = await as(cart({ phone: KNOWN }), '0791110042');
+  assert.equal(spoof.status, 409, JSON.stringify(spoof.body));
+  assert.deepEqual([spoof.body.error.code, spoof.body.error.reason], ['new_customer_limit', 'amount']);
+  //  خودِ مشتریِ آشنا با شمارهٔ تماسِ دیگر هم آشناست (هویت ایمیل است)
+  assert.equal((await as(cart({ phone: '0791110043' }), KNOWN)).status, 201, 'آشنا با ایمیلِ خودش');
+  //  مشتریِ تازه با عوض کردنِ شمارهٔ تماس از سقفِ «سفارشِ باز» نمی‌رهد (همان ایمیل؛ پیش از این تغییر شمارهٔ دیگر آزاد بود)
+  const small = (phone, qty) => cart({ phone, fulfillment: 'pickup', lines: [{ productId: 'rice', qtyMilli: qty }] });
+  assert.equal((await as(small('0791110044', 1000), '0791110044')).status, 201);
+  const second = await as(small('0791110045', 1500), '0791110044');
+  assert.equal(second.status, 409, JSON.stringify(second.body));
+  assert.deepEqual([second.body.error.code, second.body.error.reason], ['new_customer_limit', 'open_orders']);
 });
 
 test('RSK-02: سفارشِ بازِ دومِ مشتریِ تازه ⇒ new_customer_limit (open_orders) با سقفِ ۱؛ سیاستِ نامعتبر ⇒ پیش‌فرض ۲', async () => {

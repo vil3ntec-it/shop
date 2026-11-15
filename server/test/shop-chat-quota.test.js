@@ -19,6 +19,7 @@ const h = require('./helpers');
 const { query, newId, now } = require('../src/db');
 const chat = require('../src/lib/shop-chat');
 const push = require('../src/lib/push');
+const mailOf = (p) => `c${String(p).replace(/\D/g, '').slice(-9)}@test.local`;   //  «فقط ایمیل»: بلیتِ مشتری با ایمیل (شمارهٔ تماس جدا)
 
 let admin = '';
 let seq = 0;
@@ -139,8 +140,8 @@ test('CHAT-11: مشتری از ویترین — تکرارِ پیام سهمیه
   const slug = `quota-${uniq()}`;
   const sf = await h.put('/api/shop/storefront', { slug, enabled: true, title: 'سهمیه', contactPhone: '0700000002' }, { token: o.token });
   assert.equal(sf.status, 200, JSON.stringify(sf.body));
-  const start = await h.post(`/api/store/${slug}/verify/start`, { phone: '0790000103' });
-  const check = await h.post(`/api/store/${slug}/verify/check`, { phone: '0790000103', code: start.body.devCode });
+  const start = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf('0790000103') });
+  const check = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf('0790000103'), code: start.body.devCode });
   assert.equal(check.status, 200, JSON.stringify(check.body));
   const headers = { 'X-Store-Ticket': check.body.ticket };
   const pub = (method, path, body) => h.api(method, `/api/store/${slug}/chat${path}`, { body: body || null, headers });
@@ -201,8 +202,8 @@ test('CHAT-11: ویرایشِ دکان، و حذف و بلاکِ مشتری هم
   //  مشتری: «حذف برای همه» و بلاک/برداشتنِ بلاک (هر کدام long-poll ِ دکان را بیدار می‌کند) سهمِ همان سقف
   const slug = `quota-w-${uniq()}`;
   assert.equal((await h.put('/api/shop/storefront', { slug, enabled: true, title: 'سهمیه', contactPhone: '0700000003' }, { token: o.token })).status, 200);
-  const start = await h.post(`/api/store/${slug}/verify/start`, { phone: '0790000105' });
-  const check = await h.post(`/api/store/${slug}/verify/check`, { phone: '0790000105', code: start.body.devCode });
+  const start = await h.post(`/api/store/${slug}/verify/start`, { email: mailOf('0790000105') });
+  const check = await h.post(`/api/store/${slug}/verify/check`, { email: mailOf('0790000105'), code: start.body.devCode });
   const pub = (method, path, body) => h.api(method, `/api/store/${slug}/chat${path}`, { body: body || null, headers: { 'X-Store-Ticket': check.body.ticket } });
   const opened = await pub('POST', '/conversations', {}); // ۱ از ۳
   assert.equal(opened.status, 201, JSON.stringify(opened.body));
