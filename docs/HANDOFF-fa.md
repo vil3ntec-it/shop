@@ -57,6 +57,21 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-63c زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-63c` (از `origin/claude/batch-63` baff32f2e) — صندوقِ تعارضِ v3 در برنامه (SYN-07، S28، S28b)
+
+- **ساخته شد (پشتِ پرچمِ خاموشِ دکانِ `shop.sync_v3_inbox`، FLAGS-ON §۴۰؛ «بله» ِ پرسشِ ۳۲؛ موتورِ v3 همان پیش‌فرض‌خاموش):** صفحه و نوارِ
+  «تعارض‌های همگام‌سازی» (`sync-conflicts`) در پوستهٔ گوشیِ نسخهٔ ۳ و کامپیوتر روی همان دو درِ امروزِ `/api/sync/v3/conflicts` (درِ موازی نه):
+  دو سو با دستگاه/زمان/مقدارِ هر فیلد، «مالِ من/مالِ دستگاهِ دیگر» (روی دستگاهِ سوم «فعلی/دیگر»)، «ادغام، فیلد به فیلد» برای ردیفِ چندفیلدیِ
+  دوسو‌دار (`clock_skew`)، «دیدم» برای وظیفه‌ها؛ صفِ بی‌اینترنت روی دیسک (پس از هر دورِ `SyncV1Worker` و از صفحه، یک قفل). منطق در
+  `core/sync/V3Inbox.kt`، `V3InboxOutbox.kt`، `V3InboxClient.kt` (commonMain، بی java.*)؛ رابط `ui/v3/shell/V3Inbox{Page,Sheet,Model,Android}.kt`،
+  `data/V3InboxOutboxAndroid.kt`، `data/repo/V3InboxHttp.kt`، `StrV3Inbox` (fa/en/ps). سرور فقط `lib/sync-v3-inbox.js` + چند خط در
+  `lib/sync-v3.js`/`routes/sync-v3.js`: با پرچم `inbox` در فهرست، `merge` + `fields`، تکرارِ همان تصمیمِ همان کاربر ⇒ `duplicate`؛ خاموش ⇒ همان امروز.
+  ⛔ `sync-v1.js`، `routes/sync-v1.js`، `PUMP_TABLES`، `/api/pump/*` و موتورِ v1 ِ کاتلین دست نخوردند (فقط یک خطِ `runCatching` در `sweepAfterPull`).
+- **آزمون‌ها:** سرور `sync-v3-inbox.test.js` ۴/۴ روی PGlite (پیش از کد ۳ از ۴ سرخ)، `sync-v3` ۳۲/۳۲، `sync-v3-client` ۱۸/۱۸، `sync-v3-batch` ۴/۴،
+  `sync-v3-to-v1` ۱۳/۱۳، `shop-branches` ۱۰/۱۰، `admin-flags` ۲/۲، `flag-defaults` ۳/۳؛ کاتلین @@KT@@
+- **مانده:** روشن کردنِ پرچم و v3 برای دکانِ آزمایشی (D-17، O-15)، سنجش روی دو دستگاهِ واقعی، شاهدِ CI. ادغامِ «مشتری/بارکدِ تکراری» (وظیفه) هنوز
+  فقط «دیدم» است — ادغامِ دو ردیف درِ سرور ندارد (طراحی §۳.۸.۲ «پیشنهادِ ادغام»؛ کارِ جدا).
+
 ### ۱۴۰۵/۰۸/۲۳ — عاملِ e-rows-59b زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-rows-59b` (از `origin/claude/batch-62` 21e7499a8) — شعبه درونِ یک دکان، فازِ ۳ ِ سرور
 
 - **ساخته شد (فقط سرور، پشتِ پرچمِ خاموشِ `shop.branches`؛ طراحی و جدولِ درها: [`BRANCHES-fa.md`](BRANCHES-fa.md) §۹؛ مهاجرتِ ۹۰۰ + rollback):**

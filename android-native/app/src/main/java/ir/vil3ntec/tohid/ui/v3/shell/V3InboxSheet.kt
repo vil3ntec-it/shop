@@ -60,7 +60,8 @@ internal fun V3InboxSheet(cf: V3Inbox.Conflict, model: V3InboxModel, data: ShopD
     }
   }
 
-  V3Sheet(onDismiss = onClose, title = v3RowTitle(cf, data)) { _ ->
+  //  همیشه تمام‌قد: دو سو باید با هم دیده شوند (نیمه‌باز سوی دوم را زیرِ لبه می‌برد)
+  V3Sheet(onDismiss = onClose, title = v3RowTitle(cf, data), detents = false) { _ ->
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
       Text(StrV3Inbox.kind(cf.kind), style = V3Type.body, color = c.ink)
       Text(SaleTime.stamp(cf.at), style = V3Type.footnote, color = c.inkMuted)

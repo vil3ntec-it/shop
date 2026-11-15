@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.StrV3Inbox
@@ -96,6 +97,13 @@ class V3InboxDesktopUiTest {
   private fun count(text: String, substring: Boolean = false) = rule.onAllNodesWithText(text, substring = substring).fetchSemanticsNodes().size
   private fun waitFor(text: String, substring: Boolean = false) = rule.waitUntil(10_000) { count(text, substring) > 0 }
 
+  /** دکمه یا گزینه درونِ برگهٔ بلند: اول پیمایش تا دیده شود */
+  private fun tap(text: String) {
+    val n = rule.onNodeWithText(text)
+    runCatching { n.performScrollTo() }
+    n.performClick()
+  }
+
   @Test fun flagOffShowsNothingAndDoesNotAskAgainSoon() {
     server.on(root) { 200 to """{"ok":true,"conflicts":[${skew()}]}""" }
     val m = model()
@@ -127,10 +135,10 @@ class V3InboxDesktopUiTest {
     //  این دستگاه (desk-c) بازنده است ⇒ «مالِ من» زیرِ مقدارِ دیگر، «مالِ دستگاهِ دیگر» زیرِ فعلی
     assertTrue(count(StrV3Inbox.keepMine) > 0 && count(StrV3Inbox.keepTheirs) > 0)
     assertTrue(count(StrV3Inbox.thisDevice, substring = true) > 0)
-    rule.onNodeWithText(StrV3Inbox.merge).performClick()
+    tap(StrV3Inbox.merge)
     waitFor(StrV3Inbox.mergeTitle)
-    rule.onNodeWithText(StrV3Inbox.pickOther + " · " + money(125.0)).performClick()
-    rule.onNodeWithText(StrV3Inbox.apply).performClick()
+    tap(StrV3Inbox.pickOther + " · " + money(125.0))
+    tap(StrV3Inbox.apply)
     rule.waitUntil(10_000) { server.hits("$root/cf_skew1/resolve") == 1 }
     assertEquals(listOf("""{"action":"merge","fields":["salePriceMinor"]}"""), bodies.toList())
     rule.waitUntil(10_000) { count(StrV3Inbox.kind("clock_skew")) == 0 }
@@ -149,7 +157,7 @@ class V3InboxDesktopUiTest {
     base = dead.baseUrl
     rule.onNodeWithText(StrV3Inbox.kind("clock_skew")).performClick()
     waitFor(StrV3Inbox.keepTheirs)
-    rule.onNodeWithText(StrV3Inbox.keepTheirs).performClick()
+    tap(StrV3Inbox.keepTheirs)
     waitFor(StrV3Inbox.queued)
     assertEquals(0, server.hits("$root/cf_skew1/resolve"))
     assertTrue("تصمیم روی دیسک", disk.text.orEmpty().contains("cf_skew1"))

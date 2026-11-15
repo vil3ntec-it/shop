@@ -135,7 +135,7 @@ object V3Inbox {
     val winnerDeleted = c.kind == "stale_after_delete"
     val (winVals, loseVals) = when (c.field) {
       WHOLE -> fieldsOf(c.winner).let { w -> fieldsOf(c.loser).keys.associateWith { w[it] } } to fieldsOf(c.loser)
-      DELETE -> emptyMap<String, JsonElement?>() to emptyMap()
+      DELETE -> emptyMap<String, JsonElement?>() to emptyMap<String, JsonElement?>()
       else -> mapOf(c.field to c.winner) to mapOf(c.field to c.loser)
     }
     val win = Side(who(c.winnerDevice, me), c.winnerDevice, Hlc.parse(c.winnerHlc)?.wall, true, winnerDeleted, if (winnerDeleted) emptyMap() else winVals)
@@ -216,16 +216,17 @@ object V3Inbox {
   fun base(field: String): String = field.removeSuffix("Minor").removeSuffix("Milli").ifEmpty { field }
 
   fun shown(field: String, v: JsonElement?): Shown {
-    val p = v as? JsonPrimitive
+    if (v == null || v is JsonNull) return Shown(Kind.EMPTY)
+    if (v is JsonArray) return Shown(Kind.LIST, v.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.joinToString("، "), size = v.size)
+    val p = v as? JsonPrimitive ?: return Shown(Kind.OTHER, size = (v as? JsonObject)?.size ?: 0)
+    if (p.isString) return if (p.content.isBlank()) Shown(Kind.EMPTY) else Shown(Kind.TEXT, p.content)
+    val b = p.booleanOrNull
+    if (b != null) return Shown(Kind.BOOL, number = if (b) 1L else 0L)
+    val n = p.longOrNull
     return when {
-      v == null || v is JsonNull -> Shown(Kind.EMPTY)
-      p != null && p.isString -> if (p.content.isBlank()) Shown(Kind.EMPTY) else Shown(Kind.TEXT, p.content)
-      p?.booleanOrNull != null -> Shown(Kind.BOOL, number = if (p.booleanOrNull == true) 1 else 0)
-      p?.longOrNull != null && field.endsWith("Minor") -> Shown(Kind.MONEY, number = p.longOrNull)
-      p?.longOrNull != null && field.endsWith("Milli") -> Shown(Kind.QTY, number = p.longOrNull)
-      p != null -> Shown(Kind.NUMBER, p.content)
-      v is JsonArray -> Shown(Kind.LIST, v.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.joinToString("، "), size = v.size)
-      else -> Shown(Kind.OTHER, size = (v as? JsonObject)?.size ?: 0)
+      n != null && field.endsWith("Minor") -> Shown(Kind.MONEY, number = n)
+      n != null && field.endsWith("Milli") -> Shown(Kind.QTY, number = n)
+      else -> Shown(Kind.NUMBER, p.content)
     }
   }
 }

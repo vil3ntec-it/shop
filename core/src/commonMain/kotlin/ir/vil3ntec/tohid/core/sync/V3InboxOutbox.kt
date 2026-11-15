@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.core.sync
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -45,9 +46,9 @@ object V3InboxOutbox {
   fun path(e: Entry): String = "${V3Inbox.ROOT}/${e.conflictId}/resolve"
 
   fun body(e: Entry): JsonObject = JsonObject(
-    buildMap {
+    buildMap<String, JsonElement> {
       put("action", JsonPrimitive(e.decision.action))
-      if (e.decision.action == V3Inbox.MERGE) put("fields", JsonArray(e.decision.fields.map(::JsonPrimitive)))
+      if (e.decision.action == V3Inbox.MERGE) put("fields", JsonArray(e.decision.fields.map { JsonPrimitive(it) }))
     },
   )
 
@@ -71,7 +72,7 @@ object V3InboxOutbox {
       JsonObject(
         mapOf(
           "c" to JsonPrimitive(it.conflictId), "a" to JsonPrimitive(it.decision.action),
-          "f" to JsonArray(it.decision.fields.map(::JsonPrimitive)), "t" to JsonPrimitive(it.at), "n" to JsonPrimitive(it.tries),
+          "f" to JsonArray(it.decision.fields.map { f -> JsonPrimitive(f) }), "t" to JsonPrimitive(it.at), "n" to JsonPrimitive(it.tries),
         ),
       )
     },
