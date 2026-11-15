@@ -78,6 +78,8 @@ internal fun PaletteBody(d: ShopData, sections: List<SearchIndex.Section>, onDis
   val list = rememberLazyListState()
   val appear = remember { Animatable(if (Motion.enabled) 0f else 1f) }
   LaunchedEffect(Unit) { runCatching { focus.requestFocus() }; appear.animateTo(1f, MotionSpec.sheet()) }
+  //  PERF-DESK: جدول‌های جست‌وجوی همین دفتر پیش از نخستین کلید، بیرون از رشتهٔ صفحه (`SearchIndex.warm`)
+  LaunchedEffect(d) { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { SearchIndex.warm(d) } }
   LaunchedEffect(hits) { index = 0 }
   LaunchedEffect(index) { if (hits.isNotEmpty()) list.animateScrollToItem(index.coerceIn(0, hits.lastIndex)) }
   val brand = PhoneV3Roles.brandText(c)

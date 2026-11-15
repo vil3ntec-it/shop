@@ -38,6 +38,28 @@ internal fun <T : Any> rememberOffMain(vararg keys: Any?, compute: (step: () -> 
   }.value
 
 /**
+ *  PERF-DESK — همان [rememberOffMain]، ولی نتیجه فقط وقتی نشان داده می‌شود که برای همین [match] ساخته شده باشد (زبانه، بازه،
+ *  تفکیک…): نتیجهٔ زبانهٔ پیشین هرگز زیرِ زبانهٔ تازه دیده نمی‌شود (تا آماده شدن `null`). عوض شدنِ [keys] ِ دیگر (دفترِ تازه
+ *  پس از یک فروش) همان نتیجهٔ پیشینِ همین [match] را تا آماده شدنِ تازه نگه می‌دارد، مثلِ [rememberOffMain].
+ */
+@Composable
+internal fun <T : Any> rememberOffMainFor(match: Any?, vararg keys: Any?, compute: (step: () -> Unit) -> T?): T? =
+  rememberOffMain(match, *keys) { step -> compute(step)?.let { match to it } }?.takeIf { it.first == match }?.second
+
+/**
+ *  PERF-DESK — هرچه «گزارشِ تازه» ِ کامپیوتر (`DeskFreshReports`) از درختِ گزارشِ دفتر می‌سازد: نما و دو زبانهٔ
+ *  دفتری (تخفیف، بهای میانگین) — یک‌جا بیرون از رشتهٔ صفحه، همان فراخوانی‌ها با همان ورودی‌ها. پیش‌تر هر کدام در ترکیبِ
+ *  صفحه بود و باز کردنِ «گزارش‌ها» با ۵۰ هزار فاکتور پنجره را چند ثانیه می‌ایستاند (`docs/PERFORMANCE-fa.md`).
+ */
+internal class DeskFresh(
+  /** درختی که [view] از آن ساخته شد — ریزِ هر ردیف (`drill`) از همین، نه از درختِ تازه‌تری که هنوز نما ندارد */
+  val ledger: ir.vil3ntec.tohid.core.report.ReportLedger,
+  val view: ReportFreshModel.View,
+  val promo: PromoFresh.View?,
+  val stockCost: ReportCore.StockCost?,
+)
+
+/**
  *  هرچه «گزارشِ تازه» ِ گوشی (`PhoneFreshReports`) از دفتر می‌سازد، همان فراخوانی‌ها با همان ورودی‌ها، یک‌جا بیرون از رشتهٔ
  *  صفحه. پیش‌تر همهٔ این‌ها در ترکیبِ صفحه بود: با ۵۰ هزار فاکتور چند ثانیه صفحه یخ می‌زد (`docs/PERFORMANCE-fa.md`).
  */

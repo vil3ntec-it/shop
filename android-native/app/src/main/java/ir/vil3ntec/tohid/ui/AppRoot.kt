@@ -582,7 +582,8 @@ private fun AppRootActive(
         return@Box
       }
       if (wide && shownRail != RailMode.HIDDEN) {
-        val railBoard = remember(data) { ir.vil3ntec.tohid.data.DashboardEngine.board(data, ir.vil3ntec.tohid.todayIso(), 7) }
+        //  PERF-DESK: همان هشدارهای سربرگ، یک بار و بیرون از رشتهٔ صفحه (`DeskAlerts`)
+        val railBoard = ir.vil3ntec.tohid.ui.screens.rememberDeskAlerts(data)
         DeskRail(
           current = V3Modules.railId(current), onPick = { nav.openFromRail(it) }, compact = shownRail == RailMode.COMPACT, mode = shownRail, onMode = ::setShownRail,
           badges = mapOf(
