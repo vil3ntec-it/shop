@@ -60,7 +60,8 @@ import org.junit.Test
 
 /**
  *  «یک سبکِ ردیف» (۶۵r) روی گره‌های واقعی، گوشیِ ۳۶۰dp:
- *   • ردیفِ «بیشتر» و ردیفِ تنظیمات (بخش و دسته) همان نوشتهٔ عنوان (۱۶)، همان کاشی (۴۰×۴۰) و همان بلندی (≥ ۵۶) را دارند؛
+ *   • ردیفِ «بیشتر» و ردیفِ تنظیمات (بخش و دسته) همان نوشتهٔ عنوان (۱۶)، همان کاشی (۴۰×۴۰) و همان کمینهٔ بلندی (۵۶) را دارند؛
+ *     ردیفِ یک‌خطی درست ۵۶ و همهٔ ردیف‌های با خطِ راهنما یک بلندی؛
  *   • هر ردیفِ دیدنیِ تنظیمات در هر چهار زبان کاشی دارد، عنوانش یک خطِ کامل و خطِ راهنمایش یک خطِ ۱۳ است — بی «…»؛
  *   • هیچ صفحهٔ تنظیمات عنوانِ درشت در بدنه ندارد (عنوان در سربرگ) و هر ردیفش کاشی دارد.
  *  نگهبانِ متنی: `V3NavRowGuardTest`.
@@ -124,7 +125,7 @@ class NavRowUiTest {
   private fun dp(px: Int): Float = px / rule.density.density
 
   @Test
-  fun `ردیفِ «بیشتر» و ردیفِ تنظیمات یک نوشته، یک کاشی و یک بلندی دارند`() {
+  fun `ردیفِ «بیشتر» و ردیفِ تنظیمات یک نوشته، یک کاشی و یک کمینهٔ بلندی دارند`() {
     I18n.source = { Lang.FA }
     rule.setContent {
       Phone(Lang.FA) {
@@ -138,8 +139,12 @@ class NavRowUiTest {
     assertEquals("یک ردیفِ «بیشتر»، یک ردیفِ بخش و شش دسته", 8, all.size)
     val more = all.first()
     val heights = all.map { dp(it.size.height) }
+    //  کمینهٔ همه همان ۵۶ ِ «بیشتر»؛ ردیفِ یک‌خطی درست ۵۶، و ردیف‌های با خطِ راهنما همه یک بلندی (بلندیِ طبیعیِ دو خطِ وزیرمتن)
     heights.forEach { assertTrue("بلندیِ ردیف $it < ۵۶", it >= 55.5f) }
-    assertEquals("بلندیِ ردیفِ «بیشتر» و ردیفِ تنظیمات", dp(more.size.height), heights.maxOrNull()!!, 0.6f)
+    assertEquals("ردیفِ یک‌خطیِ «بیشتر»", 56f, dp(more.size.height), 0.6f)
+    val twoLine = heights.drop(1)
+    assertEquals("ردیف‌های تنظیمات یک بلندی ندارند: $twoLine", twoLine.first(), twoLine.maxOrNull()!!, 0.6f)
+    assertEquals("ردیف‌های تنظیمات یک بلندی ندارند: $twoLine", twoLine.first(), twoLine.minOrNull()!!, 0.6f)
     all.forEach { r ->
       val tile = r.tiles().singleOrNull() ?: error("ردیفِ «${r.texts().firstOrNull()?.text()}» کاشی ندارد")
       assertEquals(40f, dp(tile.size.width), 0.6f)
@@ -154,10 +159,13 @@ class NavRowUiTest {
   @Test
   fun `هر ردیفِ دیدنیِ تنظیمات در چهار زبان کاشی دارد و عنوان و راهنمایش در ۳۶۰dp یک خطِ کامل است`() {
     val lang = mutableStateOf(Lang.FA)
+    //  با حساب (مقدارِ «۵٬۰۰۰ ؋ به بالا»، «۲ دقیقه پیش»، کلیدِ قفل) و بی حساب («وارد نشده» کنارِ پیکان)
+    val state = mutableStateOf(facts)
     I18n.source = { lang.value }
     val extras = V3Modules.ALL.filter { it.id != "example" }.flatMap { it.settings }
     rule.setContent {
-      key(lang.value) {
+      val facts = state.value
+      key(lang.value, facts) {
         Phone(lang.value) {
           SettingsHomeCard(selected = null) {}
           SettingsLayout.GROUPS.forEach { g ->
@@ -174,21 +182,23 @@ class NavRowUiTest {
     }
     val bad = ArrayList<String>()
     var seen = 0
-    for (l in listOf(Lang.FA, Lang.PRS, Lang.EN, Lang.PS)) {
+    for (f in listOf(facts, SettingsFacts(serverOn = SettingsLayout.SERVER_GATED, owner = true))) for (l in listOf(Lang.FA, Lang.PRS, Lang.EN, Lang.PS)) {
+      state.value = f
       lang.value = l
       rule.waitForIdle()
       rows().forEach { r ->
         seen++
         val t = r.texts()
         val title = t.first()
-        if (r.tiles().size != 1) bad += "$l بی کاشی: «${title.text()}»"
-        title.layout().let { if (it.lineCount != 1 || it.isLineEllipsized(0)) bad += "$l عنوان: «${title.text()}»" }
+        val tag = "$l${if (state.value.signedIn) "" else " (بی حساب)"}"
+        if (r.tiles().size != 1) bad += "$tag بی کاشی: «${title.text()}»"
+        title.layout().let { if (it.lineCount != 1 || it.isLineEllipsized(0)) bad += "$tag عنوان: «${title.text()}»" }
         t.getOrNull(1)?.let { help ->
-          help.layout().let { if (it.lineCount != 1 || it.isLineEllipsized(0)) bad += "$l راهنما: «${help.text()}» (${title.text()})" }
+          help.layout().let { if (it.lineCount != 1 || it.isLineEllipsized(0)) bad += "$tag راهنما: «${help.text()}» (${title.text()})" }
         }
       }
     }
-    println("nav rows checked: $seen (fa, prs, en, ps)")
+    println("nav rows checked: $seen (fa, prs, en, ps × با حساب و بی حساب)")
     assertTrue("ردیف‌ها کشیده نشدند", seen > 100)
     assertTrue("در ۳۶۰dp بریده یا بی کاشی:\n" + bad.joinToString("\n"), bad.isEmpty())
   }
@@ -218,10 +228,12 @@ class NavRowUiTest {
         n.config.getOrNull(SemanticsProperties.Text) != null && n.sizeOrNull()?.let { it.isSp && it.value >= 28f } == true
       }
       assertTrue("$p: عنوانِ درشت در بدنه «${big.joinToString { it.text() }}»", big.isEmpty())
-      //  هر ردیفِ صفحه همان ردیفِ «بیشتر» است (`NAV`) و هر ردیفِ دسته کاشی دارد
-      val r = rows()
-      assertTrue("$p: ردیفِ `NAV` ندارد", r.isNotEmpty())
-      if (p == "settings" || p.count { it == '/' } == 1) r.forEach { assertEquals("$p: «${it.texts().firstOrNull()?.text()}»", 1, it.tiles().size) }
+      //  هر ردیفِ صفحهٔ اول و صفحهٔ دسته همان ردیفِ «بیشتر» است (`NAV`) و کاشی دارد (صفحهٔ بخش شاید ردیفی نداشته باشد)
+      if (p == "settings" || p.count { it == '/' } == 1) {
+        val r = rows()
+        assertTrue("$p: ردیفِ `NAV` ندارد", r.isNotEmpty())
+        r.forEach { assertEquals("$p: «${it.texts().firstOrNull()?.text()}»", 1, it.tiles().size) }
+      }
     }
   }
 

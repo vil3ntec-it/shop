@@ -46,7 +46,7 @@ object StrSettingsHelp {
     "For example, give the code to a new staff member; they sign in without knowing your password.",
     "د بېلګې په توګه، کوډ نوي شاګرد ته ورکړئ؛ ستاسو له پټنوم پرته ننوځي.",
   )
-  val passwordLine: String get() = t("رمزِ ورود به حسابِ خودتان را عوض کنید", "Change your account password", "د خپل حساب پټنوم بدل کړئ")
+  val passwordLine: String get() = t("عوض کردنِ رمزِ ورود", "Change password", "د پټنوم بدلول")
   val passwordExample: String get() = t(
     "مثلاً اگر کسی رمزتان را دیده، همین‌جا رمزِ تازه بگذارید.",
     "For example, if someone saw your password, set a new one here.",
@@ -117,7 +117,7 @@ object StrSettingsHelp {
     "For example, if the device is stolen, the book file can't be read without the key.",
     "د بېلګې په توګه، که وسیله غلا شي، د حسابونو فایل بې کیلي نه لوستل کېږي.",
   )
-  val sessionsLine: String get() = t("دستگاه‌های واردِ حسابِ شما", "Signed-in devices", "ستاسو په حساب ننوتې وسیلې")
+  val sessionsLine: String get() = t("دستگاه‌های این حساب", "Signed-in devices", "د دې حساب وسیلې")
   val sessionsExample: String get() = t(
     "مثلاً دستگاهِ گم‌شده را از همین‌جا بیرون کنید.",
     "For example, sign out a lost device from here.",

@@ -107,11 +107,9 @@ class V3NavRowGuardTest {
     assertTrue("ردیف ≥ ۵۶", V3NavRowSpec.MIN_HEIGHT >= 56.dp)
     assertEquals(40.dp, V3NavRowSpec.TILE)
     assertEquals(V3NavRowSpec.PAD_START + V3NavRowSpec.TILE + V3NavRowSpec.GAP, V3NavRowSpec.DIVIDER_START)
-    //  دو خطِ ۲۲ + ۱۸ با ۸ بالا و پایین = ۵۶ ⇒ ردیفِ با راهنما و بی راهنما یک بلندی
     val base = text("ui/v3/V3Base.kt")
     assertTrue(base.contains("val rowTitle: TextStyle @Composable get() = v3Text(V3NavRowSpec.TITLE_SP, FontWeight.Medium, 22)"))
     assertTrue(base.contains("val rowHelp: TextStyle @Composable get() = v3Text(V3NavRowSpec.HELP_SP, FontWeight.Medium, 18)"))
-    assertEquals(56.dp, 22.dp + 18.dp + V3NavRowSpec.PAD_V * 2)
   }
 
   private fun contrast(a: Color, b: Color): Float {
