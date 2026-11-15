@@ -36,6 +36,10 @@ import ir.vil3ntec.tohid.desktop.shots.MoneyDemo
 import ir.vil3ntec.tohid.desktop.shots.V3RoutePreview
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
+import ir.vil3ntec.tohid.ui.components.pos.PhoneCatalogItem
+import ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout
+import ir.vil3ntec.tohid.ui.v3.sales.cart.SaleActions
+import ir.vil3ntec.tohid.ui.v3.sales.cart.SaleScreen
 import ir.vil3ntec.tohid.ui.v3.analytics.AnalyticsPaths
 import ir.vil3ntec.tohid.ui.v3.money.MoneyPaths
 import ir.vil3ntec.tohid.ui.v3.products.ProductsPaths
@@ -54,7 +58,8 @@ import java.io.File
  *  کارِ یک‌دستی (صاحب‌کار ۱۴۰۵/۰۸/۲۳) در پنجرهٔ واقعیِ Compose ِ **گوشیِ نسخهٔ ۳** — همان پوسته‌ای که برنامه دارد
  *  (`V3RoutePreview`: پشتهٔ پدرها، `ShellFrame`، نوارِ شناور):
  *   • نوارِ پایین روی کالاها و هر بخشِ اصلیِ دیگر (پیش‌تر فقط روی ریشهٔ تب‌ها؛ صندوق و بخش‌های «بیشتر» بی نوار)؛
- *   • جست‌وجو، اسکن و «کالای تازه» ِ کالاها و جستجو، اسکن و دسته‌های صندوق در نیمهٔ پایینِ صفحه (مرزِ گره‌ها) و بالای نوار؛
+ *   • جست‌وجو، اسکن و «کالای تازه» ِ کالاها (بالای نوار) و جستجو، اسکن، نما، «…» و دسته‌های صندوق در نیمهٔ پایینِ صفحه
+ *     (مرزِ گره‌ها)؛
  *   • محتوا هرگز زیرِ نوار نمی‌ماند؛
  *   • دوربینِ اسکن و تسویه نوار ندارند.
  */
@@ -148,19 +153,39 @@ class OneHandShellUiTest {
     assertTrue("کالای تازه زیرِ نوار نمی‌رود", bottom(add) <= bar)
   }
 
+  /**
+   *  مسیرِ `sale` در آزمون پشتِ سدِ اشتراک (`VipGate`) است، پس خودِ صندوقِ گوشی (`SaleScreen`) با همان چیدمانِ برنامه
+   *  کشیده می‌شود؛ نوارِ پایینِ صندوق را آزمونِ بخش‌ها و آزمونِ تسویه/اسکن (پوسته) می‌سنجند.
+   */
   @Test
-  fun `صندوق — نوار پیداست و جستجو، اسکن و دسته‌ها پایین`() {
-    show(SalesPaths.SALE)
+  fun `صندوق — جستجو، اسکن، نما، «…» و دسته‌ها در نیمهٔ پایین`() {
+    I18n.source = { Lang.FA }
+    val noop: (PhoneCatalogItem) -> Unit = {}
+    val actions = SaleActions(
+      tap = noop, hold = noop, minus = noop, step = { _, _ -> }, line = {}, customer = {}, clearCustomer = {}, pay = {}, scan = {},
+      categories = {}, freeLine = {}, quickSale = {}, history = {}, back = {}, toggleMode = {},
+    )
+    rule.setContent {
+      CompositionLocalProvider(
+        LocalContext provides DesktopContext,
+        LocalView provides remember { android.view.View(DesktopContext) },
+        LocalConfiguration provides Configuration(360, 760),
+        LocalDeskLayout provides false,
+      ) {
+        TohidTheme(ThemeChoice.LIGHT) { SaleScreen(data, emptyList(), 0.0, null, listMode = false, actions = actions) }
+      }
+    }
     val search = hasSetTextAction() and hasContentDescription(StrSale.searchItems)
     await(search)
-    assertTrue("صندوق نوارِ پایین دارد", barShown())
-    val scan = hasContentDescription(StrKit.scanBarcode) and hasClickAction()
-    val all = hasText(StrSale.allChip) and hasClickAction()
     val half = middle()
     assertTrue("جستجو پایین", top(search) > half)
-    assertTrue("اسکن پایین", top(scan) > half)
-    assertTrue("«همه» پایین", top(all) > half)
-    assertTrue("جستجو بالای نوار", bottom(search) <= barTop())
+    assertTrue("اسکن پایین", top(hasContentDescription(StrKit.scanBarcode) and hasClickAction()) > half)
+    assertTrue("کاشی/فهرست پایین", top(hasContentDescription(StrSale.listView) and hasClickAction()) > half)
+    assertTrue("«…» پایین", top(hasContentDescription(StrKit.more) and hasClickAction()) > half)
+    assertTrue("«همه» پایین", top(hasText(StrSale.allChip) and hasClickAction()) > half)
+    assertTrue("«+» ِ دسته پایین", top(hasContentDescription(StrSale.newCategory) and hasClickAction()) > half)
+    //  بالا فقط برگشت و نامِ صفحه
+    assertTrue("برگشت بالا", top(hasContentDescription(StrKit.back) and hasClickAction()) < half)
   }
 
   @Test
