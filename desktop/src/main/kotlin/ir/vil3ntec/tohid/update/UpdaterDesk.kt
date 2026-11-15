@@ -266,7 +266,7 @@ object Updater {
   private fun reason(code: Int): String = when (code) {
     403, 429 -> StrUpdate.githubBusy
     404 -> StrUpdate.githubNoFile
-    in 500..599 -> StrUpdate.githubError(code)
-    else -> StrUpdate.updateServerNoAnswer(code)
+    in 500..599 -> StrUpdate.updateServerError
+    else -> StrUpdate.updateServerNoAnswer
   }
 }

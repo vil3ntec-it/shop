@@ -337,14 +337,23 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
     pump(300)
   }
 
-  /** تا زبانهٔ نوارِ پایین: صفحهٔ درونی ⇐ «بازگشت» (نوار فقط روی ریشهٔ زبانه‌هاست، `ShellFrame`) */
+  /**
+   *  تا **ریشهٔ** زبانهٔ نوارِ پایین. نوار از e-63r روی همهٔ صفحه‌های گوشی است و هر زبانه پشتهٔ خودش را نگه می‌دارد
+   *  (`V3Nav.toTab`، AUDIT-NAV N6): زدنِ زبانه همان صفحهٔ درونیِ پیشینش را باز می‌کند (مثلاً «بیشتر ⇐ تازه‌ها»)؛ مثلِ کاربر،
+   *  زدنِ دوبارهٔ زبانهٔ باز ⇐ ریشهٔ همان. بی نوار (برگه یا دروازهٔ باز) ⇐ «بازگشت».
+   */
   fun toTab(id: String) {
     val tab = Find.tab(id)
+    val name = "زبانهٔ «${NavCatalog.of(id)!!.label}»"
     repeat(6) {
-      if (shown(tab)) return tap(tab, "زبانهٔ «${NavCatalog.of(id)!!.label}»")
+      if (shown(tab)) {
+        tap(tab, name)
+        if (shown(Find.back)) tap(tab, "دوباره $name (ریشهٔ زبانه)")
+        return
+      }
       if (shown(Find.back)) tap(Find.back, "بازگشت") else pump(800)
     }
-    tap(tab, "زبانهٔ «${NavCatalog.of(id)!!.label}»")
+    tap(tab, name)
   }
 
   /** عکسِ کلِ صفحهٔ گوشی (همهٔ لایه‌ها: برگه‌ها و پنجره‌ها) و درختِ دسترس‌پذیریِ همان لحظه */

@@ -4,8 +4,8 @@
  *
  * این درها فقط دادهٔ **شعبهٔ اصلی** را دارند (حسابِ امروزِ دکان): Sync v1 (`routes/sync-v1.js`، مشترک با پمپ و
  * دست‌نخورده)، راهِ قدیمِ همگام‌سازی (`/sync`، `/shop/sync`)، همهٔ `/shop/*` جز `/shop/branches`، `/shop/approval-requests`
- * و `/shop/catalog` (شعبه‌شناس؛ فازِ ۳)، `/events` و
- * `/me/backups` (پشتیبانِ کاملِ دفترِ دکان). پس با پرچمِ روشنِ `shop.branches`:
+ * و `/shop/catalog` (شعبه‌شناس؛ فازِ ۳)، نگه‌داشته، سفارشِ خرید، صندوقِ تعارض، نوبت‌های صندوق و `/events` (شعبه‌شناس؛
+ * فازِ ۳ب)، و `/me/backups` (پشتیبانِ کاملِ دفترِ دکان — تصمیمِ صاحب‌کار، `BRANCHES-fa.md` §۹). پس با پرچمِ روشنِ `shop.branches`:
  *   ⛔ عضوی که شعبهٔ اصلی را ندارد (کارمندِ فقط شعبهٔ دیگر) ⇒ ۴۰۳ `branch_main_only` — هرگز دادهٔ اصلی را نمی‌خواند
  *      و دادهٔ شعبهٔ خودش را در اصلی نمی‌نویسد.
  *   ⛔ هر ادعای شعبهٔ غیرِ اصلی (`X-Branch-Id`) روی این درها ⇒ ۴۰۳ `branch_unsupported` (حتی صاحب): وگرنه دستگاهی
@@ -28,8 +28,13 @@ function kindOf(p, method = 'GET') {
   if (method === 'POST' && /^\/shop(\/create|\/join|\/staff\/join)?\/?$/.test(path)) return null;
   if (/^\/sync\/v3(\/|$)/.test(path)) return null;
   if (/^\/sync\/v1(\/|$)/.test(path)) return 'v1';
-  //  درهای شعبه‌شناس: خودشان دسترسیِ شعبه را می‌سنجند (فازِ ۳: موجودیِ سرورِ `/shop/catalog` با `branches.restOf`)
+  //  درهای شعبه‌شناس: خودشان دسترسیِ شعبه را می‌سنجند (فازِ ۳: موجودیِ سرورِ `/shop/catalog` با `branches.restOf`؛ فازِ ۳ب:
+  //  نگه‌داشته، سفارشِ خرید، صندوقِ تعارض، نوبت‌های صندوق و خبرها با `branch-rest.scope`). مدیریتِ PIN ِ دیگران
+  //  (`/shop/till-pin/members…`) مدیریتِ اعضاست ⇒ مثلِ بقیهٔ آن فقط شعبهٔ اصلی (همین نگهبان).
   if (/^\/shop\/(branches|approval-requests|catalog)(\/|$)/.test(path)) return null;
+  if (/^\/shop\/(held-invoices|purchase-orders|conflict-inbox)(\/|$)/.test(path)) return null;
+  if (/^\/shop\/till-pin(\/|$)/.test(path) && !/^\/shop\/till-pin\/members(\/|$)/.test(path)) return null;
+  if (/^\/events(\/|$)/.test(path)) return null;
   //  کلیدِ تأییدکنندهٔ خودِ عضو (STF-02): سطحِ دکان، بی دادهٔ هیچ شعبه — مدیرِ فقط شعبهٔ دیگر هم باید بتواند ثبت/باطل کند
   if (/^\/shop\/approver-keys(\/|$)/.test(path)) return null;
   if (/^\/(shop|sync|events)(\/|$)/.test(path)) return 'rest';

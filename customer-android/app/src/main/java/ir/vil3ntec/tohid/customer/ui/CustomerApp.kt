@@ -80,6 +80,7 @@ fun CustomerApp(model: CustomerModel, platform: Platform) {
               is Route.Placed -> PlacedScreen(model, r.slug, r.token)
               is Route.Track -> TrackScreen(model, r.slug, r.token)
               Route.Settings -> SettingsScreen(model)
+              is LegalRoute -> LegalScreen(model, r.kind)
               Route.Addresses -> AddressesScreen(model)
               is Route.AddressEdit -> AddressEditScreen(model, r.id)
               is Route.Chat -> ChatScreen(model, r.slug, r.orderNo)

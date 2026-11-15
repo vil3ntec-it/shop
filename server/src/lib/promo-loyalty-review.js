@@ -366,11 +366,13 @@ async function review(who, saleIds, shape, store) {
     if (!problems.length) continue;
     const r = await audit.log({
       shopId: who.shopId, actorType: 'user', userId: who.userId || '', ip: who.ip || '', once: true,
-      action: ACTION, targetType: 'sale', targetId: h.id.slice(0, 128),
+      //  شعبهٔ غیرِ اصلی (فازِ ۳ب): هدفِ `<شعبه>|<فاکتور>` تا `once` ِ دو شعبه یکی نشود؛ اصلی همان امروز
+      action: ACTION, targetType: 'sale', targetId: (who.branch ? `${who.branch}|${h.id}` : h.id).slice(0, 128),
       detail: {
         problem: 'promo_loyalty_review', review: true, problems: problems.join(','), path: who.path, deviceId: str(who.deviceId).slice(0, 64),
         role: str(who.role).slice(0, 24), invoice: s.invoiceNumber ?? null, ...detail,
         text: 'تخفیفِ خودکار یا مصرفِ امتیازِ این فاکتور با تعریف‌های دکان جور نیست — فروش ثبت شد؛ بررسی کنید',
+        ...(who.branch ? { branch: who.branch } : {}),
       },
     });
     if (r) n++;
@@ -419,8 +421,10 @@ function v3(ctx, deviceId, ops, results, { ip = '' } = {}) {
       if (!isObj(op) || !r || (r.status !== 'applied' && r.status !== 'partial')) return;
       ids.push(saleIdOf(op.table, op.kind ?? op.type, op.row_id, op.fields));
     });
-    return review({ shopId: ctx.accountId, role: ctx.role, userId: ctx.userId, deviceId, ip, path: 'v3' }, ids, 'v3',
-      syncStore('sync_v3_rows', ctx));
+    //  شعبه (فازِ ۳ب ِ `docs/BRANCHES-fa.md`): دفتر از همین بخش (`ctx.accountId`)، تعریف‌ها/پرچم/ساعت سطحِ دکان، سابقه با شعبه
+    const branch = require('./branch-key').branchOf(ctx);
+    return review({ shopId: require('./branch-key').shopOf(ctx), ...(branch ? { branch } : {}), role: ctx.role, userId: ctx.userId,
+      deviceId, ip, path: 'v3' }, ids, 'v3', syncStore('sync_v3_rows', ctx));
   });
 }
 

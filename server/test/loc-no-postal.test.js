@@ -46,7 +46,6 @@ const REVIEWED_OPTIONAL = new Map([
   [KT + 'data/CustomerCrm.kt|listOf(a.landmark, a.area, a.gate, a.floor, a.plusCode, a.postalCode).filter { it.isNotBlank() }.joinToString(" · ")', 'نمایش؛ بخشِ خالی نمی‌آید'],
   [KT + 'data/DeliveryAddress.kt|*  منزل؛ `floor` = طبقه؛ `plusCode` = Plus Code (بزرگ)؛ `postalCode` = فقط رقم.', 'شرح؛ همان‌جا: «هر بخش اختیاری»'],
   [KT + 'data/DeliveryAddress.kt|@OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val postalCode: String = "",', 'پیش‌فرضِ خالی و نوشته نمی‌شود'],
-  [KT + 'ui/v3/money/DebtorFormSheets.kt|V3TextField(f.address.postalCode, { f = f.copy(address = f.address.copy(postalCode = it)) }, StrMoney.addressPostal, Modifier.weight(1f),', 'کادرِ اختیاری با همان برچسب'],
 ]);
 const EXT = new Set(['.js', '.mjs', '.cjs', '.html', '.json', '.sql', '.kt', '.kts', '.css']);
 const SKIP_DIR = new Set(['node_modules', 'vendor', 'build', '.gradle', 'test', 'tests']);

@@ -14,8 +14,8 @@ package ir.vil3ntec.tohid.core.account
  */
 object AccountDeletion {
 
-  /** صفحهٔ حریمِ خصوصی (GitHub Pages ِ همین مخزن، `privacy.html`) — همان نشانیِ Play Console */
-  const val PRIVACY_URL = "https://vil3ntec-it.github.io/shop/privacy.html"
+  //  صفحهٔ حریمِ خصوصی دیگر نشانیِ بیرونی نیست: درونِ برنامه (`core/legal/Legal.kt`، مسیرِ `legal/privacy`)؛
+  //  نشانیِ عمومیِ فهرستِ فروشگاه‌ها `GET /legal/privacy` ِ خودِ سرور است (`server/src/routes/legal-pages.js`).
 
   enum class Stage {
     /** پیش‌نمایش هنوز نیامده */

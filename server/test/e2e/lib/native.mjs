@@ -269,7 +269,9 @@ export const KOTLIN = {
   snapshotShaped: /modelTree\(/.test(bodyOf('writeShadow', SYNC_V1_ENGINE_KT)),
   keepsUnknownFields: /isModelField\(/.test(bodyOf('changedFields')),
   diffInModelTerms: /modelView\(/.test(bodyOf('diff')),
-  capsA00: /put\("caps"/.test(bodyOf('push', SYNC_V1_CLIENT_KT)),
+  //  بدنهٔ push از ۶۰h در `pushBody` ِ همان پرونده ساخته می‌شود (همان بایت‌ها به هاب هم می‌روند) ⇒ نشان در خودِ push یا در pushBody ای که push صدا می‌زند
+  capsA00: /put\("caps"/.test(bodyOf('push', SYNC_V1_CLIENT_KT))
+    || (/\bpushBody\(/.test(bodyOf('push', SYNC_V1_CLIENT_KT)) && /put\("caps"/.test(bodyOf('pushBody', SYNC_V1_CLIENT_KT))),
   //  S143: بازیابی از `RestoreRoute.decide` ِ core می‌گذرد و هرگز op نمی‌سازد (پیش از آن «ذخیره»ٔ عادی بود)
   restoreNoOps: restoreWiredNoOps(bodyOf('restoreBackup', fs.readFileSync(
     path.join(ROOT, 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'data', 'ShopStore.kt'), 'utf8'))),
