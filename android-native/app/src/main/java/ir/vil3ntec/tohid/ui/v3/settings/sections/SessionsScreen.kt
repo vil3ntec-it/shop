@@ -104,7 +104,7 @@ internal fun RouteScope.SessionsScreen(onBack: (() -> Unit)?) {
 @Composable
 private fun SessionRow(d: DeviceDto, isThis: Boolean, divider: Boolean, onClose: () -> Unit) {
   Column {
-    if (divider) V3Divider(start = 64.dp)
+    if (divider) V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.DIVIDER_START)
     V3ListRow(
       d.label,
       subtitle = if (isThis) StrSettings.thisDevice else d.lastSeenAt?.let { StrSettings.lastSeen(displayMillis(it)) },

@@ -698,7 +698,8 @@ class DariCoverageTest {
       ir.vil3ntec.tohid.core.report.OwnerReportPlan.coverage(ir.vil3ntec.tohid.core.report.OwnerReportPlan.Settings(hour = 21)),
     )
     assertEquals("قرص حداکثر 5 جا دارد", ir.vil3ntec.tohid.ui.components.common.NavLayouts.Problem.PILL_FULL.message)
-    assertEquals("ثبتِ سریع و واحدِ بزرگ در صندوق", ir.vil3ntec.tohid.ui.screens.SettingsLayout.labelOf(ir.vil3ntec.tohid.ui.screens.SettingsLayout.TILL_GOODS))
+    //  ۶۵r: نامِ ردیف کوتاه شد تا در ۳۶۰dp یک خط بماند (کلیدِ بخش همان «ثبتِ سریع و واحدِ بزرگ در صندوق» است)
+    assertEquals("ثبتِ سریع و واحدِ بزرگ", ir.vil3ntec.tohid.ui.screens.SettingsLayout.labelOf(ir.vil3ntec.tohid.ui.screens.SettingsLayout.TILL_GOODS))
     I18n.source = { Lang.PRS }
     assertEquals("دریافتِ 1,200 ؋ از «کریم» ثبت گردید", StrSalePages.received("1,200", "کریم"))
     assertEquals("نشانه یا آدرس لازم است.", StrOrderPages.addrNeedOne)
@@ -707,7 +708,7 @@ class DariCoverageTest {
     assertTrue(StrSalePages.received("1,200", "فروشگاه گوشی").contains("«فروشگاه گوشی»"))
     I18n.source = { Lang.EN }
     val layout = ir.vil3ntec.tohid.ui.screens.SettingsLayout
-    assertEquals("Quick add and big units at the till", layout.labelOf(layout.TILL_GOODS))
+    assertEquals("Quick add and big units", layout.labelOf(layout.TILL_GOODS))
     assertEquals(layout.TILL_GOODS, layout.keyOf(layout.labelOf(layout.TILL_GOODS)))
   }
 }

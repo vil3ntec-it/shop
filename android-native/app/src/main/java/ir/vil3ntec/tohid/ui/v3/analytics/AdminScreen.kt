@@ -42,7 +42,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Chevron
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3Hue
-import ir.vil3ntec.tohid.ui.v3.V3ListRow
+import ir.vil3ntec.tohid.ui.v3.nav.V3Modules
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Type
@@ -101,15 +101,16 @@ fun AdminScreen(
       )
       V3Section(null) {
         val rows = buildList {
-          if (canManage) add(AdminLink(StrReports.staff, Icons.Outlined.Badge, V3Hue.BLUE, AccountPaths.TEAM, membersValue(members)))
+          //  ۶۵r: رنگ همان رنگِ بخشِ مقصد در «بیشتر» (`V3Modules.hueOf`)؛ «تنظیمات» `SettingsHues.ROOT` (پیش‌تر خاکستری)
+          if (canManage) add(AdminLink(StrReports.staff, Icons.Outlined.Badge, V3Modules.hueOf("team"), AccountPaths.TEAM, membersValue(members)))
           if (staffTime) add(AdminLink(StrReach.staffTime, Icons.Outlined.Schedule, V3Hue.TEAL, AnalyticsPaths.STAFF_TIME, null))
           //  «سابقهٔ عملیات» از ۶۳w در برنامه نیست (صاحب‌کار) — `canAudit` فقط برای سازگاریِ صدازننده‌ها می‌ماند
-          add(AdminLink(StrReports.subscription, Icons.Outlined.WorkspacePremium, V3Hue.ORANGE, AccountPaths.SUBSCRIPTION, null))
-          if (canManage) add(AdminLink(Str.settings, Icons.Outlined.Settings, null, SettingsPaths.ROOT, null))
+          add(AdminLink(StrReports.subscription, Icons.Outlined.WorkspacePremium, V3Modules.hueOf("myplan"), AccountPaths.SUBSCRIPTION, null))
+          if (canManage) add(AdminLink(Str.settings, Icons.Outlined.Settings, ir.vil3ntec.tohid.ui.v3.settings.SettingsHues.ROOT, SettingsPaths.ROOT, null))
         }
         rows.forEachIndexed { i, l ->
-          if (i > 0) V3Divider(start = 64.dp)
-          V3ListRow(l.title, icon = l.icon, hue = l.hue, value = l.value, onClick = { onOpen(l.route) })
+          if (i > 0) V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.DIVIDER_START)
+          ir.vil3ntec.tohid.ui.v3.V3NavRow(l.title, icon = l.icon, hue = l.hue, value = l.value, onClick = { onOpen(l.route) })
         }
       }
       Spacer(Modifier.height(8.dp))

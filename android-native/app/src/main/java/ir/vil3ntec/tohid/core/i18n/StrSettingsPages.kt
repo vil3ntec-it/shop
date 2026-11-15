@@ -328,29 +328,13 @@ object StrSettingsPages {
   )
 
   // ── `OwnerReportSettings.kt` ──
-  val titleOwnerReport: String get() = t(
-    "گزارشِ خودکار برای صاحب",
-    "Automatic report for the owner",
-    "خاوند ته اتومات راپور",
-  )
+  val titleOwnerReport: String get() = t("گزارشِ خودکار برای صاحب", "Owner's daily report", "خاوند ته اتومات راپور")
 
   // ── `StorefrontOwnerSettings.kt` ──
-  val titleStorefrontEta: String get() = t(
-    "زمانِ تقریبیِ تحویلِ ویترین",
-    "Storefront approximate delivery time",
-    "د ویترین د سپارلو نږدې وخت",
-  )
-  val titlePromoGuard: String get() = t(
-    "تخفیفِ اولین خرید و سدِ سوءاستفاده",
-    "First-order discount and abuse guard",
-    "د لومړي پېر تخفیف او د ناوړه ګټې مخنیوی",
-  )
+  val titleStorefrontEta: String get() = t("زمانِ تقریبیِ تحویلِ ویترین", "Storefront delivery time", "د ویترین د سپارلو نږدې وخت")
+  val titlePromoGuard: String get() = t("تخفیفِ امنِ اولین خرید", "Safe first-order discount", "د لومړي پېر خوندي تخفیف")
 
   // ── `TillGoodsSettingsAndroid.kt` ──
-  val titleTillGoods: String get() = t(
-    "ثبتِ سریع و واحدِ بزرگ در صندوق",
-    "Quick add and big units at the till",
-    "په صندوق کې چټک ثبت او لوی واحد",
-  )
+  val titleTillGoods: String get() = t("ثبتِ سریع و واحدِ بزرگ", "Quick add and big units", "چټک ثبت او لوی واحد")
   // </moved-raw-text>
 }

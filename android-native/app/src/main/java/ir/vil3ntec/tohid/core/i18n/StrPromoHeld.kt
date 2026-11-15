@@ -8,6 +8,8 @@ package ir.vil3ntec.tohid.core.i18n
 object StrPromoHeld {
 
   val title: String get() = t("کدهای تخفیفِ نگه‌داشته", "Held discount codes", "ساتل شوي تخفیف کوډونه")
+  /** خطِ یک‌خطیِ ردیفِ تنظیمات (۶۵r: در ۳۶۰dp یک خط) — شرحِ بلندتر همان [line] ِ صفحه */
+  val rowLine: String get() = t("کدهایی که آزاد نشدند", "Codes that were not released", "هغه کوډونه چې خوشې نه شول")
   val line: String get() = t(
     "ظرفیتِ کدی که لغوکنندهٔ فاکتور نتوانست آزاد کند",
     "Capacity of codes the cancelling cashier could not release",

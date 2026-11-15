@@ -9,12 +9,8 @@ package ir.vil3ntec.tohid.core.i18n
  */
 @Suppress("unused")
 object StrStoreStock {
-  val section: String get() = t("کالای ناموجود در ویترین", "Out-of-stock items on the storefront", "په ویترین کې نشته توکي")
-  val line: String get() = t(
-    "ناموجود در ویترین «ناموجود» بماند یا پنهان شود",
-    "Show out-of-stock items as “Out of stock” or hide them",
-    "نشته توکي په ویترین کې «نشته» ښکاره شي که پټ شي",
-  )
+  val section: String get() = t("کالای ناموجود در ویترین", "Out of stock on storefront", "په ویترین کې نشته توکي")
+  val line: String get() = t("ناموجود در ویترین: نشان یا پنهان", "Show or hide out-of-stock items", "نشته توکي: ښکاره یا پټ")
   val hide: String get() = t("کالای ناموجود را پنهان کن", "Hide out-of-stock items", "نشته توکي پټ کړه")
   val help: String get() = t(
     "خاموش: کالای ناموجود با نشانِ «ناموجود» دیده می‌شود. روشن: از فهرست و جست‌وجوی ویترین برداشته می‌شود و با موجود شدن خودش برمی‌گردد. کالایی که موجودی‌اش هنوز روشن نیست هرگز پنهان نمی‌شود.",

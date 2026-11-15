@@ -42,7 +42,8 @@ class SettingsModelsTest {
       signedIn = true, sessions = 3, blockExpired = false, printer = "XP-58", cameraGranted = true,
       sync = SyncState.OK, lastSyncOk = 1_000_000, now = 1_000_000 + 2 * 60_000, version = "2.14.3", lockOn = true,
     )
-    assertEquals("قرض از 5,000 ؋ به بالا", SettingsIndexModel.value("هشدارها", f))
+    //  ۶۵r: مقدارِ کوتاهِ کنارِ پیکان («قرض» در خطِ راهنمای ردیف است) تا راهنما در ۳۶۰dp یک خط بماند
+    assertEquals("5,000 ؋ به بالا", SettingsIndexModel.value("هشدارها", f))
     assertEquals("خودکار", SettingsIndexModel.value("ظاهر", f))
     assertEquals("فارسی", SettingsIndexModel.value("زبان", f))
     assertEquals("رقمِ فارسی · ؋", SettingsIndexModel.value("تاریخ و رقم", f))

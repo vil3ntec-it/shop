@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.account.profile
 
+import ir.vil3ntec.tohid.ui.v3.V3NavRow
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -31,7 +32,6 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3Hue
-import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import java.io.File
@@ -93,9 +93,9 @@ internal fun AvatarSourceSheet(picker: AvatarPicker, onDismiss: () -> Unit) {
       modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
     )
     V3Card(padding = PaddingValues(vertical = 4.dp)) {
-      V3ListRow(StrAccount.camera, subtitle = StrAccount.cameraBody, icon = Icons.Outlined.PhotoCamera, hue = V3Hue.BRAND, onClick = { closer.close(picker.camera) })
+      V3NavRow(StrAccount.camera, icon = Icons.Outlined.PhotoCamera, hue = V3Hue.BRAND, help = StrAccount.cameraBody, onClick = { closer.close(picker.camera) })
       V3Divider(start = 64.dp)
-      V3ListRow(StrAccount.gallery, subtitle = StrAccount.galleryBody, icon = Icons.Outlined.PhotoLibrary, hue = V3Hue.BLUE, onClick = { closer.close(picker.gallery) })
+      V3NavRow(StrAccount.gallery, icon = Icons.Outlined.PhotoLibrary, hue = V3Hue.BLUE, help = StrAccount.galleryBody, onClick = { closer.close(picker.gallery) })
     }
   }
 }

@@ -68,7 +68,7 @@ internal object SettingsIndexModel {
   }
 
   fun value(key: String, f: SettingsFacts): String? = when (key) {
-    "هشدارها" -> if (f.debtLimit > 0) StrSettings.debtFrom(money(f.debtLimit)) else StrSettings.off
+    "هشدارها" -> if (f.debtLimit > 0) StrSettings.debtAtLeast(money(f.debtLimit)) else StrSettings.off
     "ظاهر" -> themeLabel(f.theme)
     "زبان" -> f.lang.native
     "تاریخ و رقم" -> digitsLabel(f.digits) + " · " + symbolLabel(f.symbol)

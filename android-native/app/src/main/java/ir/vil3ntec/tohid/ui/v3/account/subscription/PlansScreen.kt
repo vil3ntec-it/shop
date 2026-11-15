@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.account.subscription
 
+import ir.vil3ntec.tohid.ui.v3.V3NavRowSpec
+import ir.vil3ntec.tohid.ui.v3.V3NavRow
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Box
@@ -52,7 +54,6 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3Hue
-import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Section
@@ -144,13 +145,14 @@ internal fun PlansContent(ui: PlansUi, actions: PlansActions) {
         }
 
         V3Section(null, Modifier.v3Stagger(stagger, "redeem", ui.options.size)) {
-          V3ListRow(StrAccount.haveCode, subtitle = StrAccount.sixDigitHint, icon = Icons.Outlined.Redeem, hue = V3Hue.BRAND, onClick = { actions.open(AccountPaths.REDEEM) })
-          V3Divider(start = 64.dp)
-          V3ListRow(StrAccount.noOnlinePay, icon = Icons.Outlined.CreditCardOff, chevron = false)
+          //  ۶۵r: همان ردیفِ «بیشتر» (`V3NavRow`)؛ رنگ‌ها همان رنگِ «اشتراکِ من» در «بیشتر»
+          V3NavRow(StrAccount.haveCode, icon = Icons.Outlined.Redeem, hue = V3Hue.BRAND, help = StrAccount.sixDigitHint, onClick = { actions.open(AccountPaths.REDEEM) })
+          V3Divider(start = V3NavRowSpec.DIVIDER_START)
+          V3NavRow(StrAccount.noOnlinePay, icon = Icons.Outlined.CreditCardOff, hue = ir.vil3ntec.tohid.ui.v3.nav.V3Modules.hueOf("myplan"), chevron = false)
         }
         if (!ui.storeBuild) {
           V3Section(StrAccount.contactWays, Modifier.v3Stagger(stagger, "contact", ui.options.size + 1)) {
-            V3ListRow(
+            V3NavRow(
               StrAccount.whatsapp,
               icon = Icons.AutoMirrored.Outlined.Chat,
               hue = V3Hue.TEAL,

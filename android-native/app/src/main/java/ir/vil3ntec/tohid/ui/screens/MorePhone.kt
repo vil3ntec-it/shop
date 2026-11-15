@@ -27,7 +27,8 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.v3.V3Divider
-import ir.vil3ntec.tohid.ui.v3.V3ListRow
+import ir.vil3ntec.tohid.ui.v3.V3NavRow
+import ir.vil3ntec.tohid.ui.v3.V3NavRowSpec
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.nav.ModuleFlags
@@ -89,26 +90,26 @@ fun PhoneMoreScreen(
           .widthIn(max = 560.dp)
           .fillMaxWidth()
           .verticalScroll(scroll)
-          .padding(start = 20.dp, end = 20.dp, bottom = pad.calculateBottomPadding()),
+          .padding(start = V3NavRowSpec.GUTTER, end = V3NavRowSpec.GUTTER, bottom = pad.calculateBottomPadding()),
       ) {
         var index = 0
         groups.forEach { g ->
           V3Section(g.title, modifier = Modifier.v3Stagger(stagger, g.title, index++)) {
             g.items.forEachIndexed { i, item ->
-              if (i > 0) V3Divider(start = 64.dp)
-              V3ListRow(
-                title = item.label,
-                icon = item.icon,
-                hue = item.hue,
-                value = item.value,
-                onClick = { onOpen(item.route) },
-              )
+              if (i > 0) V3Divider(start = V3NavRowSpec.DIVIDER_START)
+              MoreRow(item) { onOpen(item.route) }
             }
           }
         }
       }
     }
   }
+}
+
+/** یک ردیفِ «بیشتر» — همان `V3NavRow` که تنظیمات، حساب و مرکزِ مدیریت هم می‌کشند (۶۵r، `V3NavRowGuardTest`) */
+@Composable
+internal fun MoreRow(item: MoreLayout.Item, onClick: () -> Unit) {
+  V3NavRow(title = item.label, icon = item.icon, hue = item.hue, value = item.value, onClick = onClick)
 }
 
 /**
@@ -120,7 +121,7 @@ internal fun MoreAppPage(d: ShopData, onBack: () -> Unit) {
   val c = PhoneV3.colors
   V3Scaffold(title = StrNav.appUpdate, onBack = onBack) { pad ->
     Column(
-      Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding()),
+      Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = V3NavRowSpec.GUTTER, end = V3NavRowSpec.GUTTER, bottom = pad.calculateBottomPadding()),
     ) {
       //  نسخهٔ بازار خودش را به‌روز نمی‌کند — به‌روزرسانی فقط از خودِ بازار (قانونِ بازار)
       if (!StoreChannel.storeManaged(BuildConfig.STORE)) {
@@ -132,17 +133,17 @@ internal fun MoreAppPage(d: ShopData, onBack: () -> Unit) {
         }
       }
       V3Section(StrNav.status) {
-        V3ListRow(StrNav.versionLabel, value = BuildConfig.VERSION_NAME, chevron = false)
-        V3Divider(start = 16.dp)
-        V3ListRow(StrNav.goods, value = plain(d.products.size), chevron = false)
-        V3Divider(start = 16.dp)
-        V3ListRow(Str.invoices, value = plain(d.sales.size), chevron = false)
-        V3Divider(start = 16.dp)
-        V3ListRow(Str.debtors, value = plain(d.debtors.size), chevron = false)
-        V3Divider(start = 16.dp)
-        V3ListRow(Str.expenses, value = plain(d.expenses.size), chevron = false)
-        V3Divider(start = 16.dp)
-        V3ListRow(StrNav.suppliers, value = plain(d.suppliers.size), chevron = false)
+        listOf(
+          StrNav.versionLabel to BuildConfig.VERSION_NAME,
+          StrNav.goods to plain(d.products.size),
+          Str.invoices to plain(d.sales.size),
+          Str.debtors to plain(d.debtors.size),
+          Str.expenses to plain(d.expenses.size),
+          StrNav.suppliers to plain(d.suppliers.size),
+        ).forEachIndexed { i, (label, value) ->
+          if (i > 0) V3Divider(start = V3NavRowSpec.PAD_START_PLAIN)
+          V3NavRow(label, icon = null, hue = null, value = value, chevron = false)
+        }
       }
     }
   }

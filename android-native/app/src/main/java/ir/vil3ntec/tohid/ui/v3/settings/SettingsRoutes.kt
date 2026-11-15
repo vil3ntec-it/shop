@@ -125,7 +125,7 @@ val SettingsModule = AppModule(
   settings = listOf(
     SettingsEntry({ StrLateApology.title }, SettingsPaths.LATE_APOLOGY, Icons.Outlined.Schedule, SettingsLayout.SALES, setOf(Need.MANAGE), shown = { lateApologyRow(lateApologyApi()) }, subtitle = { StrSettingsHelp.lateApologyLine }, part = "online"),
     //  PRM-02: «کدهای تخفیفِ نگه‌داشته» فقط با شمارشِ روشنِ سرور (`shop.promo_uses`) و اجازهٔ لغوِ فاکتور (`promoHeldRow`)
-    SettingsEntry({ StrPromoHeld.title }, SettingsPaths.PROMO_HELD, Icons.Outlined.LocalOffer, SettingsLayout.SALES, setOf(Need.MANAGE), shown = { promoHeldRow() }, subtitle = { StrPromoHeld.line }, part = "receipt"),
+    SettingsEntry({ StrPromoHeld.title }, SettingsPaths.PROMO_HELD, Icons.Outlined.LocalOffer, SettingsLayout.SALES, setOf(Need.MANAGE), shown = { promoHeldRow() }, subtitle = { StrPromoHeld.rowLine }, part = "receipt"),
   ),
   entries = listOf(
     ModuleEntry("settings", { Str.settings }, SettingsPaths.ROOT, Icons.Outlined.Settings, setOf(Place.NAV), needs = setOf(Need.MANAGE), order = 90),

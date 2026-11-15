@@ -56,10 +56,9 @@ internal fun RouteScope.WebcamScreen(onBack: (() -> Unit)?) {
         } else {
           V3Section(StrDevices.webcamPick, footer = StrDevices.webcamTip) {
             cameras.forEachIndexed { i, cam ->
-              if (i > 0) V3Divider(start = 22.dp)
+              if (i > 0) V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.PAD_START_PLAIN)
               V3ListRow(
                 cam.name.ifBlank { StrDevices.webcamFirst },
-                tile = false,
                 chevron = false,
                 trailing = if (cam.id == current?.id) ({ Chosen() }) else null,
                 onClick = { WebcamPref.choose(context, cam.id) },

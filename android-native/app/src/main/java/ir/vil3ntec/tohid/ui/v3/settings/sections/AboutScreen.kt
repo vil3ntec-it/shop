@@ -69,7 +69,7 @@ internal fun AboutScreen(data: ShopData, onBack: (() -> Unit)?) {
     item(key = "whats-new") {
       val nav = LocalV3Nav.current
       V3Section(StrSettings.whatsNew) {
-        V3ListRow(StrSettings.whatsNewAll, icon = Icons.Outlined.NewReleases, hue = V3Hue.BRAND, onClick = { openWhatsNew(nav) })
+        V3ListRow(StrSettings.whatsNewAll, icon = Icons.Outlined.NewReleases, onClick = { openWhatsNew(nav) })
       }
     }
     //  قاعدهٔ Google Play: حریمِ خصوصی و شرایط **درونِ خودِ برنامه** (نه صفحهٔ بیرونی)، برای همه (مهمان و کارمند هم)
@@ -77,19 +77,19 @@ internal fun AboutScreen(data: ShopData, onBack: (() -> Unit)?) {
       val nav = LocalV3Nav.current
       V3Section(StrAccount.privacyPolicy) {
         V3ListRow(
-          StrAccount.privacyPolicy, subtitle = StrAccount.privacyLine, icon = Icons.Outlined.PrivacyTip, hue = V3Hue.BRAND,
+          StrAccount.privacyPolicy, subtitle = StrAccount.privacyLine, icon = Icons.Outlined.PrivacyTip,
           onClick = { nav?.open(OnboardingPaths.PRIVACY) },
         )
-        V3Divider(start = 64.dp)
+        V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.DIVIDER_START)
         V3ListRow(
-          StrAuth.termsShort, subtitle = StrAuth.termsTap(Terms.SECTIONS.size), icon = Icons.Outlined.Description, hue = V3Hue.VIOLET,
+          StrAuth.termsShort, subtitle = StrAuth.termsTap(Terms.SECTIONS.size), icon = Icons.Outlined.Description,
           onClick = { nav?.open(OnboardingPaths.TERMS) },
         )
       }
     }
     item(key = "status") {
       V3Section(StrNav.status) {
-        V3ListRow(StrNav.versionLabel, value = BuildConfig.VERSION_NAME, tile = false, chevron = false)
+        V3ListRow(StrNav.versionLabel, value = BuildConfig.VERSION_NAME, chevron = false)
         listOf(
           StrNav.goods to data.products.size,
           Str.invoices to data.sales.size,
@@ -97,9 +97,9 @@ internal fun AboutScreen(data: ShopData, onBack: (() -> Unit)?) {
           Str.expenses to data.expenses.size,
           StrNav.suppliers to data.suppliers.size,
         ).forEach { (label, n) ->
-          V3Divider(start = 22.dp)
+          V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.PAD_START_PLAIN)
           //  شمارهٔ دفتر بالا می‌شمارد (کیت: `rememberCountUp`)، عددِ پایانی دقیق
-          V3ListRow(label, value = rememberCountUp(n.toDouble()).toLong().toString(), tile = false, chevron = false)
+          V3ListRow(label, value = rememberCountUp(n.toDouble()).toLong().toString(), chevron = false)
         }
       }
     }

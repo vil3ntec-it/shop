@@ -290,7 +290,8 @@ class SettingsHomeTest {
     val off = SettingsSearchIndex.docs(desktop = false, serverOn = emptySet())
     assertTrue(SettingsSearchIndex.search(off, "ناموجود").none { it.key == SettingsLayout.STORE_STOCK })
     I18n.source = { Lang.EN }
-    assertEquals("Out-of-stock items on the storefront", SettingsLayout.labelOf(SettingsLayout.STORE_STOCK))
+    //  ۶۵r: نامِ ردیف کوتاه شد تا در ۳۶۰dp یک خط بماند
+    assertEquals("Out of stock on storefront", SettingsLayout.labelOf(SettingsLayout.STORE_STOCK))
     I18n.source = { Lang.FA }
   }
 

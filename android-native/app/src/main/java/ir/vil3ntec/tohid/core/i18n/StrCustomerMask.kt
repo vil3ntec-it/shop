@@ -5,13 +5,9 @@ package ir.vil3ntec.tohid.core.i18n
  */
 @Suppress("unused")
 object StrCustomerMask {
-  val section: String get() = t("شمارهٔ مشتری روی چاپ", "Customer number on printouts", "په چاپ کې د پېرودونکي شمېره")
+  val section: String get() = t("شمارهٔ مشتری روی چاپ", "Customer phone on prints", "په چاپ کې د پېرودونکي شمېره")
   val printFull: String get() = t("چاپِ شمارهٔ کامل", "Print the full number", "بشپړه شمېره چاپ کړئ")
-  val helpLine: String get() = t(
-    "رسید و صورت‌حساب شمارهٔ مشتری را پوشیده یا کامل چاپ کنند",
-    "Whether receipts and statements print the customer's number masked or in full",
-    "رسید او حساب د پېرودونکي شمېره پټه یا بشپړه چاپ کړي",
-  )
+  val helpLine: String get() = t("شمارهٔ مشتری: پوشیده یا کامل", "Customer number on receipts", "په رسید د پېرودونکي شمېره")
   val helpExample: String get() = t(
     "مثلاً: خاموش ⇒ «تلفن: •••• ۰۰۸»؛ روشن ⇒ همهٔ شماره.",
     "For example: off ⇒ “Phone: •••• 008”; on ⇒ the whole number.",

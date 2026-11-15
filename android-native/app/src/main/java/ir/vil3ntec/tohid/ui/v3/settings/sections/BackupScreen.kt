@@ -97,21 +97,21 @@ internal fun RouteScope.BackupScreen(onBack: (() -> Unit)?) {
     item(key = "summary") { SettingsNote(StrSettings.dataSummary(data.products.size, data.sales.size, data.debtors.size)) }
     item(key = "manual") {
       V3Section(StrSettings.manualBackup) {
-        V3ListRow(StrSettings.fullBackup, subtitle = StrSettings.fullBackupDesc, icon = Icons.Outlined.CloudUpload, tile = false, onClick = launch.full)
+        V3ListRow(StrSettings.fullBackup, subtitle = StrSettings.fullBackupDesc, icon = Icons.Outlined.CloudUpload, onClick = launch.full)
         V3Divider(start = ROW_DIVIDER_START)
-        V3ListRow(StrSettings.ledgerOnly, subtitle = if (ctrl.backupSealOn) StrBackupSafety.ledgerOnlySealedDesc else StrSettings.ledgerOnlyDesc, icon = Icons.Outlined.Description, tile = false, onClick = launch.ledger)
+        V3ListRow(StrSettings.ledgerOnly, subtitle = if (ctrl.backupSealOn) StrBackupSafety.ledgerOnlySealedDesc else StrSettings.ledgerOnlyDesc, icon = Icons.Outlined.Description, onClick = launch.ledger)
       }
     }
     item(key = "export") {
       V3Section(StrSettings.exportTitle) {
-        V3ListRow(StrSettings.exportExcel, subtitle = StrSettings.exportExcelDesc, icon = Icons.Outlined.TableChart, tile = false, onClick = launch.excel)
+        V3ListRow(StrSettings.exportExcel, subtitle = StrSettings.exportExcelDesc, icon = Icons.Outlined.TableChart, onClick = launch.excel)
         V3Divider(start = ROW_DIVIDER_START)
-        V3ListRow(StrSettings.exportJson, subtitle = StrSettings.exportJsonDesc, icon = Icons.Outlined.Description, tile = false, onClick = launch.json)
+        V3ListRow(StrSettings.exportJson, subtitle = StrSettings.exportJsonDesc, icon = Icons.Outlined.Description, onClick = launch.json)
       }
     }
     item(key = "restore") {
       V3Section(StrSettings.restoreFromFile) {
-        V3ListRow(StrSettings.restoreFromFile, subtitle = StrSettings.restoreDesc, icon = Icons.Outlined.CloudDownload, tile = false, onClick = launch.restore)
+        V3ListRow(StrSettings.restoreFromFile, subtitle = StrSettings.restoreDesc, icon = Icons.Outlined.CloudDownload, onClick = launch.restore)
       }
       ctrl.restoreError?.let { V3Message(V3Tone.ERROR, it, Modifier.padding(top = 8.dp)) }
     }
@@ -121,7 +121,7 @@ internal fun RouteScope.BackupScreen(onBack: (() -> Unit)?) {
           autoBackups.forEachIndexed { i, snap ->
             if (i > 0) V3Divider(start = ROW_DIVIDER_START)
             val icon = if (snap.file.name in sealed) Icons.Outlined.Lock else Icons.Outlined.History
-            V3ListRow(displayMillis(snap.at), subtitle = StrSettings.snapshotDesc((snap.bytes / 1024).toInt()), icon = icon, tile = false, onClick = { ctrl.readSnapshot(snap) })
+            V3ListRow(displayMillis(snap.at), subtitle = StrSettings.snapshotDesc((snap.bytes / 1024).toInt()), icon = icon, onClick = { ctrl.readSnapshot(snap) })
           }
         }
       }
@@ -142,7 +142,7 @@ internal fun RouteScope.BackupScreen(onBack: (() -> Unit)?) {
           )
           if (ctrl.sealOn) {
             V3Divider(start = ROW_DIVIDER_START)
-            V3ListRow(StrBackupSafety.newPhrase, subtitle = StrBackupSafety.newPhraseLine, icon = Icons.Outlined.Key, tile = false, onClick = ctrl::startPhrase)
+            V3ListRow(StrBackupSafety.newPhrase, subtitle = StrBackupSafety.newPhraseLine, icon = Icons.Outlined.Key, onClick = ctrl::startPhrase)
             //  OPS-02: پشتیبانِ دستی و پوشه با همان کلیدِ عبارت (`BackupSeal`، پیش‌فرض خاموش)
             V3Divider(start = ROW_DIVIDER_START)
             V3ToggleRow(
@@ -166,11 +166,11 @@ internal fun RouteScope.BackupScreen(onBack: (() -> Unit)?) {
       item(key = "care") {
         V3Section(StrSettings.careTitle) {
           if (plan.total > 0) {
-            V3ListRow(StrSettings.compactLedger, subtitle = StrSettings.compactDesc(plan.total), icon = Icons.Outlined.Compress, tile = false, onClick = { ask = Ask.COMPACT })
+            V3ListRow(StrSettings.compactLedger, subtitle = StrSettings.compactDesc(plan.total), icon = Icons.Outlined.Compress, onClick = { ask = Ask.COMPACT })
           }
           if (plan.total > 0 && ctrl.canUndo) V3Divider(start = ROW_DIVIDER_START)
           if (ctrl.canUndo) {
-            V3ListRow(StrSettings.undoRestore, subtitle = StrSettings.undoRestoreDesc, icon = Icons.Outlined.Restore, tile = false, onClick = { ctrl.undoRestore() })
+            V3ListRow(StrSettings.undoRestore, subtitle = StrSettings.undoRestoreDesc, icon = Icons.Outlined.Restore, onClick = { ctrl.undoRestore() })
           }
         }
       }
@@ -179,7 +179,7 @@ internal fun RouteScope.BackupScreen(onBack: (() -> Unit)?) {
       item(key = "wipe") {
         Spacer(Modifier.height(12.dp))
         V3Section(null, footer = StrSettings.wipeWarn) {
-          V3ListRow(StrSettings.wipeAll, icon = Icons.Outlined.DeleteForever, tile = false, danger = true, chevron = false, onClick = { ask = Ask.WIPE })
+          V3ListRow(StrSettings.wipeAll, icon = Icons.Outlined.DeleteForever, danger = true, chevron = false, onClick = { ask = Ask.WIPE })
         }
       }
     }
@@ -204,7 +204,7 @@ private fun CloudSection(ctrl: BackupController, signedIn: Boolean) {
           style = V3Type.footnote, color = c.inkMuted,
         )
       }
-      V3Divider(start = 16.dp)
+      V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.PAD_START_PLAIN)
     }
     V3ListRow(
       if (ctrl.cloudBusy) StrSettings.sendingDots else StrSettings.sendToServerNow,
@@ -215,7 +215,6 @@ private fun CloudSection(ctrl: BackupController, signedIn: Boolean) {
         else -> null
       },
       icon = Icons.Outlined.CloudUpload,
-      tile = false,
       trailing = if (ctrl.cloudBusy) ({ Spinner() }) else null,
       onClick = { ctrl.pushCloud(signedIn) },
     )
@@ -225,7 +224,6 @@ private fun CloudSection(ctrl: BackupController, signedIn: Boolean) {
         displayMillis(b.createdAt),
         subtitle = StrSettings.kb((b.bytes / 1024).toInt()) + " · " + (if (b.kind == "manual") StrSettings.manual else StrSettings.auto),
         icon = Icons.Outlined.CloudDone,
-        tile = false,
         chevron = false,
       )
     }
@@ -247,7 +245,6 @@ private fun MirrorSection(ctrl: BackupController, signedIn: Boolean) {
       if (ctrl.mirrorBusy) StrSettings.buildingDots else StrSettings.mirrorNow,
       subtitle = StrSettings.mirrorDesc(files.size) + (files.firstOrNull()?.let { " · " + StrSettings.lastLabel + " " + displayMillis(it.lastModified()) } ?: ""),
       icon = Icons.Outlined.CloudUpload,
-      tile = false,
       trailing = if (ctrl.mirrorBusy) ({ Spinner() }) else null,
       onClick = { ctrl.mirrorNow(signedIn) },
     )
