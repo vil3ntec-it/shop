@@ -95,7 +95,7 @@
 - **اجرا:** هدف‌دار زیرِ `flock` (‹`OpeningStockTest`، `ExpiryAlertsTest`، `ExpiryEngineTest`، `WholesalePriceTest`، `DebtSettledTest`، `ui.v3.products.*`،
   `ui.v3.shell.*`، `PhoneHomeModelTest`، `StockListModelTest`، `ScenarioS22Test`، `ScenarioS96Test`، `core.i18n.*` با `InfraLeakGuardTest` ۸،
   `I18nCoverageTest` ۸، `DariWordsTest` ۱۷ و `DariCoverageTest` ۲۳، `NewProductFormUiTest`، `WholesaleFieldUiTest`، `NewProductFormRenderTest`›)
-  ۲۶۸/۲۶۸ در نخستین اجرا؛ FULL_PLACEHOLDER. precheck `fail=0`، quality بی ردیفِ «همین تغییر»، spec «سالم»، whatsnew و secret-scan سبز.
+  ۲۶۸/۲۶۸ در نخستین اجرا؛ اجرای کاملِ `desktop test` (۴۳۱۵ آزمون): ۴۳۰۹ سبز، ۵ کنار رفته (همه دروازه‌دار: ACL ِ ویندوز، دو سنجهٔ دستی، دو گزارشِ کشیدن بی `TOHID_RENDER_OUT`) و ۱ سرخ: `SheetLangTest` ‹اثرِ برگه‌های فارسی›، وابسته به ساعتِ دیوار (روزهای بدهیِ برگهٔ «یادآوری») و نه از این کار — رفعش `39edc29b5` روی `claude/batch-63` پس از نقطهٔ شاخه بود؛ پس از ادغامِ آن (و `origin/main` ِ #1050، درختِ یکسان) همان آزمون ۴/۴ و آزمون‌های تازه ۲۰/۲۰ دوباره سبز. precheck `fail=0`، quality بی ردیفِ «همین تغییر»، spec «سالم»، whatsnew و secret-scan سبز.
   عکس‌ها: `/tmp/claude-0/-home-user/f1a91bac-436d-52ce-8105-79a315de1198/scratchpad/e63k/new-product-{empty,filled,errors}-{light,dark}-fa.png`
   (یافتهٔ «clipped» ِ `render-report.json` برای همهٔ نوشته‌ها، حتی عنوانِ صفحه، است و در عکس هیچ بریدگی‌ای نیست ⇒ نویزِ قلمِ محلی؛ offscreen
   و raw-key صفر). قابِ نخست: محاسبهٔ تازه‌ای ندارد (فهرستِ کشویی تا باز نشود ساخته نمی‌شود، «امروز» یک بار)؛ زمانش جدا سنجیده نشد.
