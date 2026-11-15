@@ -69,7 +69,6 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.v3.LocalV3NavSearch
-import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.V3Search
 import ir.vil3ntec.tohid.ui.v3.V3SearchBar
 import ir.vil3ntec.tohid.ui.v3.V3Type
@@ -252,7 +251,7 @@ private fun TillThumb(item: PhoneCatalogItem) {
     if (image != null) {
       Image(image, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(40.dp))
     } else {
-      val hue = V3Hue.entries[(item.name.hashCode() and 0x7fffffff) % V3Hue.entries.size]
+      val hue = ir.vil3ntec.tohid.ui.v3.v3ThumbHue(item.name)   // e-phone-p2: همان شش خانوادهٔ آرامِ برند، بی صورتی و سرخ
       Text(CartSummary.initials(item.name), style = v3Text(17, FontWeight.Bold, 22), color = PhoneV3Palette.glyph(v, hue), maxLines = 1)
     }
   }
