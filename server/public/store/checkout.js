@@ -365,7 +365,7 @@
     function notifyMe() {
       if (!area) return;
       if (!verifiedFor($('c-email').value)) { K.note($('zone-msg'), 'warn', t('err.verification_required')); $('c-email').focus(); return; }
-      api('/area-request', { method: 'POST', body: { lat: area.lat, lng: area.lng } }).then(function () {
+      api('/area-request', { method: 'POST', body: { lat: area.lat, lng: area.lng, lang: K.lang } }).then(function () {
         area.done = true; renderCheckout();
       }).catch(function (e) { K.note($('zone-msg'), 'err', e.message); });
     }

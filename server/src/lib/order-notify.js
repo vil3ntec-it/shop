@@ -24,8 +24,10 @@
  *     نمی‌تواند حلقهٔ بی‌پایان بسازد.
  *   • کانالِ پشتیبان (§۳۰.۴) حداکثر یک بار برای هر اعلان (`fallback_at`
  *     اتمی گرفته می‌شود). «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): پیامک دیگر کانالِ
- *     پشتیبان نیست؛ کانالِ پیش‌فرض `email` است و امروز هیچ سرویس‌دهنده‌ای
- *     نشانده نشده ⇒ حالِ صادقانهٔ `not_configured`؛ **هیچ پیامِ واقعی‌ای نمی‌رود**.
+ *     پشتیبان نیست؛ کانال `email` است: با پرچمِ خاموشِ `shop.order_notify_email`
+ *     ایمیلِ سرور به ایمیلِ تأییدشدهٔ صاحب با سقفِ روزانه (`lib/order-notify-email.js`،
+ *     NOTIF-11)؛ بی پرچم یا بی ایمیلِ پیکربندی‌شده ⇒ حالِ صادقانهٔ `not_configured`
+ *     و **هیچ پیامِ واقعی‌ای نمی‌رود**.
  *   • متنِ اعلان هیچ دادهٔ مشتری ندارد (§۳۰.۱ بندِ ۴): فقط شمارهٔ سفارش.
  *     لمسِ اعلان باید `/api/shop/orders/:id` را بخواند (دسترسی دوباره
  *     سنجیده می‌شود)؛ payload منبعِ داده نیست (بندِ ۵).
@@ -151,16 +153,15 @@ async function reviewOpen(row, at) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  کانالِ پشتیبان (§۳۰.۴) — امروز «تنظیم نشده»
+//  کانالِ پشتیبان (§۳۰.۴) — ایمیلِ سرور به صاحب پشتِ پرچمِ خاموش (NOTIF-11)
 // ════════════════════════════════════════════════════════════════════
 
 /**
  * `{ channel: 'email', send: async ({shopId, orderId, orderNo, notifId, reason}) => ({ok, error}) }`
  *
- * ⛔ در کارِ عادی هیچ‌وقت مقدار نمی‌گیرد: سرویس‌دهندهٔ کانالِ پشتیبانِ هشدار به مالک (پیامک با «فقط ایمیل» رفت)
- * (با قالب، رضایت و سقفِ هزینهٔ خودش) بیرونی است و هنوز تصویب نشده
- * (BLOCKED-EXTERNAL). فقط `test/*.test.js` آن را می‌نشاند تا «حداکثر یک
- * بار» سنجیده شود — همان الگوی `push.setDeliver`.
+ * ⛔ در کارِ عادی هیچ‌وقت مقدار نمی‌گیرد: فقط `test/*.test.js` آن را می‌نشاند تا «حداکثر یک بار» سنجیده شود — همان
+ * الگوی `push.setDeliver`. کانالِ واقعیِ بی حسابِ بیرونی (NOTIF-11، «فقط ایمیل»): `lib/order-notify-email.js` — ایمیلِ
+ * سرور به ایمیلِ تأییدشدهٔ صاحب، با سقفِ روزانهٔ هر دکان، پشتِ پرچمِ خاموشِ `shop.order_notify_email`.
  */
 let fallback = null;
 function setFallback(fb) { fallback = fb && typeof fb.send === 'function' ? fb : null; }
@@ -173,7 +174,8 @@ async function escalate(row, lock, at, reason) {
     [row.id, at, lock]
   );
   if (!won.rows[0]) return {};
-  if (!fallback) return { fallback_channel: 'email', fallback_state: 'not_configured' };
+  //  NOTIF-11: بی سرویس‌دهندهٔ آزمون ⇒ ایمیلِ سرور به صاحب (`order-notify-email`، پرچمِ خاموشِ `shop.order_notify_email`؛ خاموش ⇒ null ⇒ همان پیشین)
+  if (!fallback) return (await require('./order-notify-email').escalate(row, at, reason)) || { fallback_channel: 'email', fallback_state: 'not_configured' };
   const channel = String(fallback.channel || 'email').slice(0, 20);
   try {
     const out = await fallback.send({
@@ -472,7 +474,8 @@ async function config(shopId, { userId = '', deviceUid = '' } = {}) {
       shopDevices: devices.n,
       thisDeviceRegistered: mine.n > 0,
     },
-    fallback: { email: fallback ? 'configured' : 'not_configured' },
+    //  NOTIF-11: پرچمِ `shop.order_notify_email` خاموش ⇒ همان `not_configured` ِ پیشین
+    fallback: { email: fallback ? 'configured' : ((await require('./order-notify-email').status(shopId)) || 'not_configured') },
     policy: { maxAttempts: MAX_ATTEMPTS, backoffMs: BACKOFF_MS, ackWindowMs: ACK_WINDOW_MS, maxReminders: MAX_REMINDERS },
   };
 }

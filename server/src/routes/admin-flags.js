@@ -82,6 +82,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.storefront.seo', scope: 'shop', default: false, what: 'صفحهٔ کالای `/p/<id>` با Open Graph و JSON-LD، نقشهٔ سایت و «فرستادنِ نشانی» (WEB-17/20)' },
   { key: 'shop.storefront.zones', scope: 'shop', default: false, what: 'ناحیه‌های ارسال با هزینه، حداقل و «رایگان از…» در فرمِ سفارش (CHK-05/06/07/10)' },
   { key: 'shop.storefront.notify_area', scope: 'shop', default: false, what: '«وقتی به محلِ شما رسیدیم خبرم کن» برای نشانیِ بیرون از ناحیه (CHK-10)' },
+  { key: 'shop.storefront.area_email', scope: 'shop', default: false, what: 'CHK-10: پیامِ خودکارِ «رسیدیم» — یک ایمیلِ سرور به ایمیلِ تأییدشدهٔ «خبرم کن» وقتی ناحیهٔ فعال خانه‌اش را پوشاند؛ با `shop.storefront.notify_area`' },
   { key: 'shop.storefront.address_extra', scope: 'shop', default: true, what: 'شمارهٔ دوم، Plus Code و ولایت/گذر/منزل در نشانیِ سفارش (CHK-08)' },
   { key: 'shop.storefront.address_media', scope: 'shop', default: false, what: 'عکسِ دروازه و یادداشتِ صوتیِ اختیاری برای نشانیِ حسابِ مشتری و نشانیِ هر سفارش؛ دیدن فقط صاحب/مدیرِ دارای تماسِ مشتری و پیکِ همان مأموریت، تا سفارش باز است (CRM-09/CHK-08)' },
   { key: 'shop.storefront.map_pin', scope: 'shop', default: true, what: '«انتخاب روی نقشه» (OpenStreetMap) برای پینِ نشانی در ثبتِ ویترین؛ بی STORE_MAP_TILES ِ سرور هیچ (CHK-08، ۴-۳)' },
@@ -155,6 +156,8 @@ const KNOWN = Object.freeze([
   //  O-01 (docs/FIREBASE-SETUP-fa.md): هر دو برای «سفارش با برنامهٔ بسته» لازم‌اند
   { key: 'shop.order_notify', scope: 'shop', default: false, what: 'اعلانِ سفارشِ تازه، پرداخت و لغوِ مشتری به گوشی‌های دکان (صفِ پایدار و یادآوری)' },
   { key: 'shop.device_push', scope: 'shop', default: false, what: 'پوشِ گوشی با Firebase: ثبتِ توکنِ دستگاه‌های دکان (برنامهٔ بسته هم زنگ می‌زند)' },
+  { key: 'shop.order_notify_email', scope: 'shop', default: false, what: 'NOTIF-11: کانالِ پشتیبانِ اعلانِ سفارش = ایمیلِ سرور به ایمیلِ تأییدشدهٔ صاحب، وقتی پوش نرسید یا کسی باز نکرد؛ با `shop.order_notify`' },
+  { key: 'shop.order_notify_email.per_day', scope: 'shop', default: 3, what: 'سقفِ نامه‌های پشتیبانِ اعلانِ سفارشِ هر دکان در ۲۴ ساعت (۱ تا ۵۰؛ نامعتبر ⇒ ۳)؛ با `shop.order_notify_email`' },
   //  دستهٔ ۳۸: هر کلیدِ دیگری که کدِ غیرِ پمپ می‌خواند (سنجه: `console-shell.test.js` + `test/flag-scan.js`). پیش‌فرض همان پیش‌فرضِ کد است
   //  (`admin-flags.test.js`)؛ عدد/شیء = تنظیمِ زنده. بیرون: مشترک با پمپ (`sync.device_bind`، `sync.live_expiry_close`) و پویا (`stage.*`)
   //  ── پیک و تحویل (همه با `shop.delivery`)
