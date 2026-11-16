@@ -63,6 +63,6 @@ val PromosModule = AppModule(
     ModuleEntry("promos", { StrKit.promos }, "promos", Icons.Outlined.LocalOffer, setOf(Place.MORE), MoreGroup.SALES, V3Hue.TEAL, needs = setOf(Need.MANAGE), order = 30),
   ),
   routes = listOf(
-    V3Route("promos", RouteKind.PAGE, { StrKit.promos }, parent = "more", needs = setOf(Need.MANAGE)) { PromosScreen(data, snackbar) },
+    V3Route("promos", RouteKind.PAGE, { StrKit.promos }, parent = "more", needs = setOf(Need.MANAGE), chrome = Chrome.OWN) { PromosScreen(data, snackbar, onBack = backOrNull) },
   ),
 )

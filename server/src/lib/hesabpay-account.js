@@ -285,6 +285,9 @@ async function fullOf(shopId, row, actor = null) {
  * برای صندوق (`/shop/payments/config`): حالت، — فقط در «ساده» — شماره و QR ِ خودِ دکان، و گیرندهٔ فعال
  * («پول به حسابِ <نام> — <۴ رقم>» و اثرِ انگشتی که صندوق روی ردیفِ پرداخت می‌گذارد). حسابِ در انتظار هرگز.
  * `payees`: حساب‌هایی که روزی فعال بودند (فقط نام، ۴ رقم و اثرِ انگشت) ⇐ X/Z ِ صندوق به تفکیکِ حساب.
+ * `pendingUntil` (e-paymethods، ۱۴۰۵/۰۸/۲۵): فقط وقتی دکان **هیچ** حسابِ فعالی ندارد و حسابی ۲۴ ساعت در انتظار است — تنها
+ * زمانِ فعال شدن (بی شماره، QR، نام، ۴ رقم یا حالت) تا صندوق ردیفِ خاموشِ «حساب‌پی از … فعال می‌شود» را نشان دهد. با حسابِ
+ * فعال (پول هنوز به حسابِ کهنه) هیچ نشانی از حسابِ تازه نمی‌آید (`hesabpay-guard.test.js` ۲ و ۲ب). مهلت همان ۲۴ ساعت است.
  */
 async function tillView(shopId) {
   await guard.activateDue(shopId);
@@ -294,10 +297,12 @@ async function tillView(shopId) {
   const hist = (await query(
     'SELECT fp, name, last4, retired_at FROM hesabpay_payees WHERE shop_id=$1 ORDER BY active_from DESC LIMIT 20', [shopId]
   )).rows.map((x) => ({ fp: x.fp, name: x.name, last4: x.last4, active: Boolean(p && p.fp === x.fp) }));
+  const waiting = !p ? guard.pendingOf(r) : null;
   return {
     mode, simple: mode === 'simple' ? { account: r.account, qrPayload: r.qr_payload } : null,
     payee: p ? { name: p.name, last4: p.last4, fp: p.fp } : null,
     payees: hist,
+    ...(waiting && waiting.until > now() ? { pendingUntil: waiting.until } : {}),
   };
 }
 

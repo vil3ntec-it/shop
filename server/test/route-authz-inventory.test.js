@@ -47,6 +47,8 @@ const PUBLIC = [
     'POST /api/errors', 'POST /api/location', 'POST /api/visit']],
   ['پشتیبانیِ مهمانِ بی‌حساب: رشته از توکن یا شناسهٔ دستگاه، نه از شناسهٔ رشته (routes/support.js)', [
     'POST /api/support/messages', 'POST /api/support/read', 'POST /api/support/push', 'DELETE /api/support/push']],
+  //  «از پشتیبانی بخواه» (مهاجرتِ ۹۶۰): همان `support.who` (توکن، وگرنه شناسهٔ دستگاه)؛ دکان فقط از توکن، شناسهٔ دکان/رشته در بدنه نادیده
+  ['درخواستِ ساختاریِ پشتیبانی، همان کیستیِ چتِ مهمان (routes/support-requests.js)', ['POST /api/support/requests']],
   ['پمپ: فعال‌سازیِ کامپیوتر با کدِ پمپ، و چتِ مشتریِ کیوآر با کدِ پمپ + شناسهٔ حساب (pump-device، pump-public)', [
     'POST /api/pump/device/activate', 'POST /api/pump/public/join',
     'POST /api/pump/public/:code/acct/:id/chat', 'POST /api/pump/public/:code/acct/:id/chat/media',

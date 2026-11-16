@@ -54,6 +54,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrAccount
+import ir.vil3ntec.tohid.core.i18n.StrSupportAsk
 import ir.vil3ntec.tohid.core.model.SupportMessageDto
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.SyncStore
@@ -87,6 +88,8 @@ internal data class SupportUi(
   val error: String? = null,
   val draft: String = "",
   val sending: Boolean = false,
+  /** «از پشتیبانی بخواه»: نوارِ حالِ همان درخواست (فرستاده می‌شود، رسید، پیش‌تر رفته، همکار خواسته، نرفت) */
+  val ask: SupportAskModel.Ui? = null,
 )
 
 /**
@@ -95,7 +98,7 @@ internal data class SupportUi(
  *  نوشتن که بالای صفحه‌کلید می‌ماند — «فرستادن» تا نوشته خالی است خاموش.
  */
 @Composable
-internal fun SupportContent(ui: SupportUi, onBack: (() -> Unit)?, onDraft: (String) -> Unit, onSend: () -> Unit) {
+internal fun SupportContent(ui: SupportUi, onBack: (() -> Unit)?, onDraft: (String) -> Unit, onSend: () -> Unit, onRetryAsk: (() -> Unit)? = null) {
   val c = PhoneV3.colors
   val list = rememberLazyListState()
   val stagger = rememberV3Stagger()
@@ -109,6 +112,20 @@ internal fun SupportContent(ui: SupportUi, onBack: (() -> Unit)?, onDraft: (Stri
     Column(Modifier.fillMaxSize()) {
       Text(StrAccount.supportSubtitle, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.fillMaxWidth().padding(top = 6.dp), textAlign = TextAlign.Center)
       ui.error?.let { Box(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) { V3Message(V3Tone.ERROR, it) } }
+      ui.ask?.let { a ->
+        val tone = when (a.state) {
+          SupportAskModel.State.FAILED -> V3Tone.WARNING
+          SupportAskModel.State.SENT -> V3Tone.SUCCESS
+          else -> V3Tone.INFO
+        }
+        Box(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+          V3Message(
+            tone, a.title, body = a.body,
+            action = if (a.state == SupportAskModel.State.FAILED && onRetryAsk != null) StrSupportAsk.retry else null,
+            onAction = if (a.state == SupportAskModel.State.FAILED) onRetryAsk else null,
+          )
+        }
+      }
       when {
         ui.loading && ui.items.isEmpty() -> Box(Modifier.padding(16.dp)) { V3Skeleton(rows = 3) }
         ui.items.isEmpty() -> V3EmptyState(Icons.Outlined.SupportAgent, ui.greeting.ifBlank { StrAccount.supportIntro })
@@ -219,6 +236,10 @@ internal fun RouteScope.SupportRoute() {
   var loading by remember { mutableStateOf(true) }
   var error by remember { mutableStateOf<String?>(null) }
   var lastAt by remember { mutableLongStateOf(0L) }
+  //  «از پشتیبانی بخواه» (`?ask=`): همان یک لمس می‌فرستد؛ `asked` ماندگار ⇒ چرخشِ صفحه/برگشت درخواستِ دوم نمی‌فرستد (سرور هم یکتاست)
+  val pendingAsk = remember { SupportAskModel.pendingOf { args.query(it) } }
+  var asked by rememberSaveable { mutableStateOf(false) }
+  var askUi by remember { mutableStateOf<SupportAskModel.Ui?>(null) }
 
   suspend fun load(after: Long) {
     Backend.support(context).thread(state.deviceUid, after)
@@ -231,16 +252,27 @@ internal fun RouteScope.SupportRoute() {
       .onFailure { error = it.userMessage }
     loading = false
   }
+  suspend fun sendAsk(p: SupportAskModel.Pending) {
+    askUi = SupportAskModel.ui(p.code, SupportAskModel.State.SENDING)
+    val facts = SupportAskModel.factsToSend(p, ir.vil3ntec.tohid.core.config.AppConfig.appVersion, SupportAskModel.platform())
+    Backend.support(context).ask(state.deviceUid, state.accountName, p.code, facts, ir.vil3ntec.tohid.core.i18n.I18n.lang.code, p.contact)
+      .onSuccess { askUi = SupportAskModel.ui(p.code, SupportAskModel.stateOf(it)); load(lastAt) }
+      .onFailure { askUi = SupportAskModel.ui(p.code, SupportAskModel.State.FAILED) }
+  }
   LaunchedEffect(Unit) {
     load(0)
     Backend.support(context).markRead(state.deviceUid)
+    if (pendingAsk != null && !asked) {
+      asked = true
+      sendAsk(pendingAsk)
+    }
   }
   ir.vil3ntec.tohid.ui.v3.V3LiveEffect(lastAt) {
     while (true) { delay(8_000); load(lastAt) }
   }
 
   SupportContent(
-    SupportUi(SupportModel.items(messages, System.currentTimeMillis(), pending), greeting, loading, error, draft, pending != null),
+    SupportUi(SupportModel.items(messages, System.currentTimeMillis(), pending), greeting, loading, error, draft, pending != null, askUi),
     onBack = backOrNull,
     onDraft = { draft = it },
     onSend = {
@@ -256,5 +288,6 @@ internal fun RouteScope.SupportRoute() {
         }
       }
     },
+    onRetryAsk = pendingAsk?.let { p -> { if (askUi?.state == SupportAskModel.State.FAILED) scope.launch { sendAsk(p) } } },
   )
 }

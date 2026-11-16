@@ -277,7 +277,7 @@ internal fun DeskStockScreen(
       if (selected != null) {
         Spacer(Modifier.width(DeskSpace.gap))
         Box(Modifier.width(420.dp).fillMaxHeight().deskCard(dc)) {
-          StockItemScreen(data, today, selected, itemActions, onBack = onClose, largeTitle = false)
+          StockItemScreen(data, today, selected, itemActions, onBack = onClose)
         }
       }
     }

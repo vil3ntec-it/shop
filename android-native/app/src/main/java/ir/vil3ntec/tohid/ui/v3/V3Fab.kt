@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -76,6 +77,7 @@ fun V3Fab(
   val shade = c.source.shadow
   Row(
     modifier
+      .testTag(V3Anatomy.FAB)
       .v3Pressable(label = label, scale = 0.94f, haptic = true, role = Role.Button, interaction = src, onClick = onClick)
       .height(V3ButtonSpec.fabHeight)
       .shadow(8.dp, shape, ambientColor = shade, spotColor = shade)

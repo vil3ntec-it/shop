@@ -10,6 +10,10 @@
  *            `docs/FLAGS-ON-fa.md` و `default: true` در `routes/admin-flags.js` (KNOWN) می‌آید.
  *   استثنا ─ چهار کلیدِ پایهٔ سفارش (`shop.orders`، `shop.storefront`، `shop.order_notify`، `shop.device_push`) با تصمیمِ صریحِ
  *            صاحب‌کار (۱۴۰۵/۰۸/۲۴) نه با سنجهٔ «فقط نمایش»؛ `orders.flagOf`، `order-notify.flagIn` و `shop-push` همین فهرست را می‌خوانند.
+ *            و `pay.hesabpay` با تصمیمِ صریحِ صاحب‌کار (۱۴۰۵/۰۸/۲۵، «این‌ها همه باید بیایند»، FLAGS-ON §۴۹) — پول است، پس نه
+ *            با سنجهٔ نمایش: پرچم فقط درِ حساب‌پی را باز می‌کند؛ پول هنوز فقط به حسابِ خودِ همان دکان (کلیدِ سکو هرگز جایگزین
+ *            نیست)، «خودکار» فقط با کلید و رازِ خودِ دکان و «پرداخت شد» فقط از وب‌هوکِ امضاشدهٔ رسمی، نگهبانِ ۲۴ ساعتهٔ حسابِ
+ *            گیرنده و اشتراکِ فعال برای سفارشِ آنلاین دست نخوردند.
  *   ⛔ دری که جز پرچم شرطِ دیگری هم دارد همان می‌ماند (مثلاً `map_pin` بی `STORE_MAP_TILES` نقشه ندارد، `gallery` بی
  *      `shop.image_bank` گالری ندارد، اعلانِ بازپرداخت بی `shop.customer_notify` پیامی نمی‌فرستد).
  *   آزمون: `test/flag-defaults.test.js`.
@@ -39,10 +43,15 @@ const KEYS = Object.freeze([
   'shop.storefront',                //  ویترینِ عمومی و مدیریتش (هنوز با `shop.orders`، کلیدِ اشتراکِ `storefront` و ویترینِ ساخته‌وروشنِ خودِ دکان)
   'shop.order_notify',              //  اعلانِ سفارشِ تازه/پرداخت/لغو به گوشی‌های همان دکان (صفِ پایدار؛ پوش رایگان، بی FCM ِ سرور فقط نمی‌رود)
   'shop.device_push',               //  ثبتِ توکنِ پوشِ دستگاه‌های دکان؛ بی حسابِ Firebase ِ سرور هیچ پوشی فرستاده نمی‌شود (`push.sendTo` ⇒ `skipped`)
+  //  ── تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۵ («جای پرداخت … این‌ها همه باید بیایند»، FLAGS-ON §۴۹): همهٔ روش‌های پرداختِ دکان در صندوق
+  'pay.hesabpay',                   //  حساب‌پیِ خودِ دکان (QR/NFC ِ صندوق، «خودکار» با کلیدِ خودِ دکان)؛ پول فقط به حسابِ دکان، تأیید فقط وب‌هوکِ رسمی
 ]);
 
 /** چهار کلیدِ پایهٔ سفارش (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۴) — جدا از ۱۷ کلیدِ نمایشی تا آزمونِ «پاسخِ پیش از ۱۴۰۵/۰۸/۲۲» پایه را نبندد */
 const ORDER_BASE = Object.freeze(['shop.orders', 'shop.storefront', 'shop.order_notify', 'shop.device_push']);
+
+/** کلیدِ پرداخت با تصمیمِ صاحب‌کار (۱۴۰۵/۰۸/۲۵) — نه نمایشی، نه پایهٔ سفارش؛ `defaultOnOff` ِ آزمون‌ها آن را هم خاموش می‌کند */
+const PAY_BASE = Object.freeze(['pay.hesabpay']);
 
 //  Set ِ واقعی (has/size/iteration) ولی فقط‌خواندنی: `Object.freeze` به‌تنهایی جلوی add/delete/clear را نمی‌گیرد
 const DEFAULT_ON = new Set(KEYS);
@@ -51,4 +60,4 @@ for (const m of ['add', 'delete', 'clear']) {
 }
 Object.freeze(DEFAULT_ON);
 
-module.exports = { DEFAULT_ON, KEYS, ORDER_BASE };
+module.exports = { DEFAULT_ON, KEYS, ORDER_BASE, PAY_BASE };

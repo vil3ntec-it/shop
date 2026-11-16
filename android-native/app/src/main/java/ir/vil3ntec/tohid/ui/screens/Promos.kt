@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.LocalOffer
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
@@ -96,7 +97,7 @@ import kotlinx.coroutines.launch
  *  نیامده‌اند — هنوز چیزی پشتشان نیست و دکمهٔ بی اثر نمی‌سازیم.
  */
 @Composable
-fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
+fun PromosScreen(d: ShopData, snackbar: SnackbarHostState, onBack: (() -> Unit)? = null) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val c = Shop.colors
@@ -115,12 +116,8 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
   var busy by remember { mutableStateOf(false) }
   val today = todayIso()
   fun say(m: String) { scope.launch { snackbar.showSnackbar(m) } }
-  //  «قاعدهٔ تازه» با Ctrl+N هم (`AppNav.addAction`) — فقط برای صاحب و مدیر
+  //  «قاعدهٔ تازه» — دکمهٔ شناورِ قاب (فقط صاحب و مدیر)؛ Ctrl+N (`AppNav.addAction`) را خودِ `V3Fab` ثبت می‌کند
   val addNew = remember { { editing = PromoCore.Rule(id = newPromoId(), channels = listOf("pos")) } }
-  androidx.compose.runtime.DisposableEffect(snap.manage) {
-    if (snap.manage) ir.vil3ntec.tohid.ui.AppNav.addAction.value = addNew
-    onDispose { if (ir.vil3ntec.tohid.ui.AppNav.addAction.value === addNew) ir.vil3ntec.tohid.ui.AppNav.addAction.value = null }
-  }
 
   val columns = remember(d) {
     listOf(
@@ -151,18 +148,44 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
     }
   }
 
+  //  کالبدِ یکسان (p0): خودِ صفحه `V3Scaffold` دارد (`Chrome.OWN`) — «قاعدهٔ تازه» تنها دکمهٔ شناور، خلاصهٔ تخفیف‌ها نخستین چیزِ
+  //  بدنه، کلیدِ «تخفیفِ خودکار در صندوق» زیرش، و توضیحِ صفحه خطِ کم‌رنگِ پایان — پیش‌تر توضیح و دکمهٔ Material سرِ صفحه
+  ir.vil3ntec.tohid.ui.v3.V3Scaffold(
+    title = ir.vil3ntec.tohid.core.i18n.StrKit.promos,
+    onBack = onBack,
+    fab = if (snap.manage) ({ e -> ir.vil3ntec.tohid.ui.v3.V3Fab(Icons.Filled.Add, StrPromoPages.newRuleBtn.removePrefix("+").trim(), e, addNew) }) else null,
+  ) { pad ->
   Box(Modifier.fillMaxSize()) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(Space.md)) {
-      item(key = "head") {
-        //  نامِ صفحه را سربرگ می‌گوید؛ این‌جا فقط توضیح و «قاعدهٔ تازه» (بی تکرار)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-          Text(StrPromoPages.subtitle, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = c.muted)
-          if (snap.manage) Button(onClick = addNew) { Text(StrPromoPages.newRuleBtn) }
-        }
-        Spacer(Modifier.height(Space.md))
-      }
+    LazyColumn(
+      Modifier.fillMaxSize(),
+      contentPadding = PaddingValues(start = Space.md, end = Space.md, top = Space.sm, bottom = Space.md + pad.calculateBottomPadding()),
+    ) {
       if (!ready) {
         item(key = "signin") { Panel { EmptyNote(StrPromoPages.signInNote) } }
+      }
+      //  ۶۵s (صاحب‌کار: سربرگ وسط، تاشو و به رنگِ بخش؛ کادرِ کشویی درونِ کارت): خلاصهٔ بنفشِ تخفیف‌ها — شمارِ فعال درشت،
+      //  «با کد · زمان‌دار · همه» زیرش و پالایهٔ «همه / فعال / …» (`V3Dropdown`) در گوشهٔ همان کارت (جای چهار عددِ ۶۳w)
+      item(key = "stats") {
+        val active = snap.rules.count { PromoText.status(it, today) == PromoText.Status.ACTIVE }
+        val coded = snap.rules.count { it.code.isNotEmpty() }
+        val timed = snap.rules.count { PromoText.windowText(it) != ir.vil3ntec.tohid.core.i18n.StrMarketPages.always }
+        ir.vil3ntec.tohid.ui.v3.V3Summary(
+          label = StrKit.promos + " · " + StrSettings.active,
+          value = active.toString(),
+          caption = "$coded ${StrPromoPages.withCode} · $timed ${StrPromoPages.timed} · ${snap.rules.size} ${StrPromoPages.ruleWord}",
+          collapseKey = "promos",
+          section = ir.vil3ntec.tohid.ui.theme.V3Section.PROMOS,
+          corner = {
+            ir.vil3ntec.tohid.ui.v3.V3Dropdown(
+              value = tab.label,
+              choices = PromoText.Tab.entries.map { ir.vil3ntec.tohid.ui.v3.V3Choice(it.name, it.label) },
+              selected = tab.name,
+              onSelect = { k -> PromoText.Tab.entries.firstOrNull { it.name == k }?.let { tab = it } },
+              label = ir.vil3ntec.tohid.core.i18n.StrLook.show,
+            )
+          },
+        )
+        Spacer(Modifier.height(Space.sm))
       }
       item(key = "switch") {
         Row(
@@ -190,30 +213,6 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
             },
           )
         }
-        Spacer(Modifier.height(Space.sm))
-      }
-      //  ۶۵s (صاحب‌کار: سربرگ وسط، تاشو و به رنگِ بخش؛ کادرِ کشویی درونِ کارت): خلاصهٔ بنفشِ تخفیف‌ها — شمارِ فعال درشت،
-      //  «با کد · زمان‌دار · همه» زیرش و پالایهٔ «همه / فعال / …» (`V3Dropdown`) در گوشهٔ همان کارت (جای چهار عددِ ۶۳w)
-      item(key = "stats") {
-        val active = snap.rules.count { PromoText.status(it, today) == PromoText.Status.ACTIVE }
-        val coded = snap.rules.count { it.code.isNotEmpty() }
-        val timed = snap.rules.count { PromoText.windowText(it) != ir.vil3ntec.tohid.core.i18n.StrMarketPages.always }
-        ir.vil3ntec.tohid.ui.v3.V3Summary(
-          label = StrKit.promos + " · " + StrSettings.active,
-          value = active.toString(),
-          caption = "$coded ${StrPromoPages.withCode} · $timed ${StrPromoPages.timed} · ${snap.rules.size} ${StrPromoPages.ruleWord}",
-          collapseKey = "promos",
-          section = ir.vil3ntec.tohid.ui.theme.V3Section.PROMOS,
-          corner = {
-            ir.vil3ntec.tohid.ui.v3.V3Dropdown(
-              value = tab.label,
-              choices = PromoText.Tab.entries.map { ir.vil3ntec.tohid.ui.v3.V3Choice(it.name, it.label) },
-              selected = tab.name,
-              onSelect = { k -> PromoText.Tab.entries.firstOrNull { it.name == k }?.let { tab = it } },
-              label = ir.vil3ntec.tohid.core.i18n.StrLook.show,
-            )
-          },
-        )
         Spacer(Modifier.height(Space.sm))
       }
       item(key = "toolbar") {
@@ -256,7 +255,10 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
           )
         }
       }
-      item(key = "foot") { Spacer(Modifier.height(96.dp)) }
+      item(key = "foot") {
+        ir.vil3ntec.tohid.ui.v3.nav.V3PageFootnote(StrPromoPages.subtitle)
+        Spacer(Modifier.height(96.dp))
+      }
     }
 
     if (snap.manage && table.selected.isNotEmpty() && view.mode == ViewMode.TABLE) {
@@ -271,6 +273,7 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
         modifier = Modifier.align(Alignment.BottomCenter).padding(Space.md),
       )
     }
+  }
   }
 
   editing?.let { r ->

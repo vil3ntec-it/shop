@@ -48,6 +48,11 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3Space
 import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.v3.V3Card
+import ir.vil3ntec.tohid.ui.theme.V3Section
+import ir.vil3ntec.tohid.ui.v3.V3Summary
+import ir.vil3ntec.tohid.ui.v3.V3SummaryAction
+import ir.vil3ntec.tohid.ui.v3.summaryColors
+import androidx.compose.material.icons.outlined.Inventory2
 import ir.vil3ntec.tohid.ui.v3.V3Chevron
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
@@ -89,50 +94,49 @@ internal fun ProductHero(p: Product, status: Status, onPhoto: () -> Unit) {
   }
 }
 
-/** کارتِ عددها: موجودیِ فعلی (درشت، زدن ⇐ انبار) و زیرش قیمتِ فروش | قیمتِ خرید */
+/**
+ *  خلاصهٔ سرِ جزئیاتِ کالا — کالبدِ یکسانِ صفحه (`claude/e-phone-p0`؛ جای کارتِ دست‌سازِ عددِ درشتِ `V3Type.largeTitle`): همان
+ *  `V3Summary` ِ هر بخش با رنگِ انبار، وسط‌چین و تاشو (کلیدِ `products/item`). موجودیِ فعلی درشت؛ زیرش قیمتِ فروش | قیمتِ خرید و
+ *  بهای میانگین (PRD-15)؛ «انبار» ⇐ انبارِ همین کالا (همان زدنِ پیشینِ عدد). وضعیت (تمام/کم) همان قرصِ سرِ صفحه ([ProductHero]).
+ */
 @Composable
 internal fun FiguresCard(p: Product, f: ProductDetailModel.Figures, onStock: () -> Unit) {
-  val c = PhoneV3.colors
   val stock = rememberCountUp(f.stock)
   val sale = rememberCountUp(p.salePrice)
   val buy = rememberCountUp(p.purchasePrice)
-  Column(Modifier.padding(top = 16.dp)) {
-    V3Card(radius = V3Space.featuredRadius, padding = PaddingValues(0.dp)) {
-      Row(
-        Modifier.fillMaxWidth().v3Pressable(label = StrProducts.stockNow, onClick = onStock).padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        Column(Modifier.weight(1f)) {
-          Text(StrProducts.stockNow, style = V3Type.footnote, color = c.inkMuted)
-          Text(qty(stock) + unitOf(p), style = V3Type.largeTitle, color = if (f.status == Status.OUT) PhoneV3Roles.errorText(c) else c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        V3Chevron()
-      }
-      V3Divider()
+  val sc = summaryColors(V3Section.STOCK)
+  V3Summary(
+    label = StrProducts.stockNow,
+    value = qty(stock) + unitOf(p),
+    modifier = Modifier.padding(top = 16.dp),
+    actions = listOf(V3SummaryAction(Str.warehouse, Icons.Outlined.Inventory2, onStock)),
+    collapseKey = "products/item",
+    section = V3Section.STOCK,
+    extra = {
+      Spacer(Modifier.height(12.dp))
       Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         MoneyCell(StrProducts.salePrice, money(sale), Modifier.weight(1f))
-        Spacer(Modifier.width(1.dp).fillMaxHeight().background(c.hairline))
+        Spacer(Modifier.width(1.dp).fillMaxHeight().background(sc.track))
         MoneyCell(StrProducts.purchasePrice, money(buy), Modifier.weight(1f))
       }
       //  PRD-15: بهای میانگینِ موزون — فقط خواندنی (نه زدنی، نه کادر)؛ موجودیِ تمام‌شده یا پایهٔ نامعلوم ⇒ «تقریبی»
       f.avgCost?.let { a ->
-        V3Divider()
-        Column(Modifier.fillMaxWidth().padding(16.dp)) {
-          Text(if (a.approximate) StrProducts.avgCostApprox else StrProducts.avgCost, style = V3Type.footnote, color = c.inkMuted, maxLines = 1)
-          Text(a.unitCostMinor?.let { "${money(it / 100.0)} ؋" } ?: "—", style = V3Type.figure, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-          Text(StrProducts.avgCostNote, style = V3Type.footnote, color = c.inkMuted)
-        }
+        Spacer(Modifier.height(10.dp))
+        Text(if (a.approximate) StrProducts.avgCostApprox else StrProducts.avgCost, style = V3Type.footnote, color = sc.label, maxLines = 1, textAlign = TextAlign.Center)
+        Text(a.unitCostMinor?.let { "${money(it / 100.0)} ؋" } ?: "—", style = V3Type.figure, color = sc.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+        Text(StrProducts.avgCostNote, style = V3Type.footnote, color = sc.label, textAlign = TextAlign.Center)
       }
-    }
-  }
+    },
+  )
 }
 
+/** یک خانهٔ قیمت درونِ خلاصه — رنگ‌های همان کارتِ بخش (`summaryColors`) */
 @Composable
 private fun MoneyCell(label: String, value: String, modifier: Modifier) {
-  val c = PhoneV3.colors
-  Column(modifier.padding(16.dp)) {
-    Text(label, style = V3Type.footnote, color = c.inkMuted, maxLines = 1)
-    Text("$value ؋", style = V3Type.figure, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+  val sc = summaryColors(V3Section.STOCK)
+  Column(modifier.padding(horizontal = 8.dp, vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Text(label, style = V3Type.footnote, color = sc.label, maxLines = 1, textAlign = TextAlign.Center)
+    Text("$value ؋", style = V3Type.figure, color = sc.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
   }
 }
 

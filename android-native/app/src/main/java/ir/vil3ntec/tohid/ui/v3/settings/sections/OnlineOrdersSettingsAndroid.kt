@@ -32,6 +32,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3ToggleRow
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.online.orders.OrderArrivalCardV3
+import ir.vil3ntec.tohid.ui.v3.online.orders.openAsk
 import ir.vil3ntec.tohid.ui.v3.online.orders.openFix
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsBlock
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsNote
@@ -93,7 +94,7 @@ internal fun RouteScope.OnlineOrdersScreen(onBack: (() -> Unit)?) {
       item(key = "off") { SettingsNote(StrSettings.off) }
       return@SettingsPageFrame
     }
-    item(key = "arrival") { OrderArrivalCardV3(arrival, onFix = { openFix(it) }, showOk = true) }
+    item(key = "arrival") { OrderArrivalCardV3(arrival, onFix = { openFix(it) }, showOk = true, onAsk = { openAsk(it, "settings:orders") }) }
     item(key = "device") {
       val pushLine = pushLine(push.state)
       if (push.state != PushPolicy.State.ACTIVE) SettingsNote(StrOrderFlow.foregroundOnly)

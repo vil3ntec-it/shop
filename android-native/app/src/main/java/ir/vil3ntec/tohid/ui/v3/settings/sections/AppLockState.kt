@@ -27,6 +27,9 @@ internal object SettingsShotState {
   /** صفحهٔ همگام‌سازی: «وارد شده» و خطای آخرین دور، برای عکسِ حالتِ خطا */
   var signedIn: Boolean? = null
   var syncError: String? = null
+  /** e-newinstall: کدِ ماشینیِ همان خطا (`SyncStatus.errorCode`) و برگهٔ «جزئیات» ِ باز، برای عکسِ حالت‌های گره */
+  var syncCode: String? = null
+  var syncDetailsOpen: Boolean = false
   /** پشتیبان: برگهٔ تأییدِ «پاک‌سازی کامل» باز */
   var wipeSheet: Boolean = false
   /** صفحهٔ اول: نوشتهٔ کادرِ جست‌وجو از آغاز (عکسِ نتیجه‌های جست‌وجو) */

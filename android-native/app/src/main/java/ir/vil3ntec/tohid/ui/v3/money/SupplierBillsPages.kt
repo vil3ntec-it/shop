@@ -43,6 +43,15 @@ import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
+import ir.vil3ntec.tohid.ui.v3.nav.V3Modules
+import ir.vil3ntec.tohid.ui.v3.nav.V3PageFootnote
+import ir.vil3ntec.tohid.ui.v3.nav.V3RoutePage
+import ir.vil3ntec.tohid.ui.v3.V3DataRow
+import ir.vil3ntec.tohid.ui.v3.V3DataRowSpec
+import ir.vil3ntec.tohid.ui.v3.V3Fab
+import ir.vil3ntec.tohid.ui.v3.V3RowMeta
+import ir.vil3ntec.tohid.ui.v3.V3Summary
+import ir.vil3ntec.tohid.ui.theme.V3Section as V3SectionTone
 import kotlinx.coroutines.launch
 
 /*
@@ -78,7 +87,10 @@ private fun GateState(cfg: PoConfigDto?, failed: Boolean, onRetry: () -> Unit): 
   return false
 }
 
-/** `purchasing/bills` */
+/**
+ *  `purchasing/bills` — کالبدِ یکسان (p0): خودِ صفحه `V3Scaffold` دارد، هر سفارش یک `V3DataRow` و یادداشتِ بخش خطِ کم‌رنگِ پایان
+ *  (پیش‌تر سرِ صفحه).
+ */
 @Composable
 internal fun RouteScope.SupplierBillsRoute() {
   val repo = rememberPurchaseOrderHost().repo
@@ -99,8 +111,7 @@ internal fun RouteScope.SupplierBillsRoute() {
     if (page == null) failed = true else { orders = page.orders; next = page.next }
   }
   val c = PhoneV3.colors
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-    Text(StrSupplierBills.note, style = V3Type.footnote, color = c.inkMuted)
+  V3RoutePage(StrSupplierBills.title) {
     val open = GateState(cfg, failed) { tick++ }
     val list = orders?.let(PurchaseOrderBook::billable)
     when {
@@ -110,11 +121,13 @@ internal fun RouteScope.SupplierBillsRoute() {
       list.isEmpty() && next == null -> V3EmptyState(Icons.AutoMirrored.Outlined.ReceiptLong, StrSupplierBills.none)
       else -> V3Section(null) {
         list.forEachIndexed { i, o ->
-          if (i > 0) V3Divider()
-          V3ListRow(
-            StrSupplierBills.orderTitle(o.no, o.supplierName),
-            subtitle = StrSupplierBills.line(PurchaseOrderBook.label(PurchaseOrderBook.status(o)), StrSupplierBills.bills(o.billCount)),
+          if (i > 0) V3Divider(start = V3DataRowSpec.DIVIDER_START)
+          V3DataRow(
+            title = StrSupplierBills.orderTitle(o.no, o.supplierName),
+            secondary = StrSupplierBills.line(PurchaseOrderBook.label(PurchaseOrderBook.status(o)), StrSupplierBills.bills(o.billCount)),
+            meta = V3RowMeta("${money(PurchaseOrderBook.asAfn(o.totals.orderedMinor))} ؋"),
             icon = Icons.AutoMirrored.Outlined.ReceiptLong,
+            hue = V3Modules.hueOf("purchasing"),
             onClick = { nav.open(MoneyPaths.supplierBill(o.id)) },
           )
         }
@@ -134,10 +147,14 @@ internal fun RouteScope.SupplierBillsRoute() {
         Modifier.fillMaxWidth().padding(top = 12.dp), kind = V3ButtonKind.SECONDARY, loading = more,
       )
     }
+    V3PageFootnote(StrSupplierBills.note)
   }
 }
 
-/** `purchasing/bills/{id}` */
+/**
+ *  `purchasing/bills/{id}` — کالبدِ یکسان (p0): سرِ صفحه `V3Summary` ِ رنگِ خرید (شماره و تأمین‌کننده، جمعِ سفارش، وضعیت و شمارِ
+ *  فاکتور، سفارش/رسیده) و «فاکتورِ تازه» تنها دکمهٔ شناور — پیش‌تر عنوانِ درشت، دو خطِ کم‌رنگ و دکمهٔ تمام‌پهنا.
+ */
 @Composable
 internal fun RouteScope.SupplierBillRoute(id: String) {
   val repo = rememberPurchaseOrderHost().repo
@@ -159,7 +176,13 @@ internal fun RouteScope.SupplierBillRoute(id: String) {
   }
   val c = PhoneV3.colors
   val manage = cfg?.permissions?.manage == true
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+  val billable = order?.takeIf { cfg?.enabled == true && manage && PurchaseOrderBook.canBill(it, manage) }
+  V3RoutePage(
+    StrSupplierBills.order,
+    fab = if (billable == null) null else ({ e ->
+      V3Fab(Icons.Outlined.Add, StrSupplierBills.newBill, e, { if (!busy) nav.openForResult(MoneyPaths.newSupplierBill(billable.id)) { done -> if (done != null) tick++ } })
+    }),
+  ) {
     val open = GateState(cfg, failed) { tick++ }
     val o = order
     when {
@@ -167,22 +190,14 @@ internal fun RouteScope.SupplierBillRoute(id: String) {
       o == null && failed -> V3EmptyState(Icons.Outlined.CloudOff, StrSupplierBills.failed, action = StrSupplierBills.retry, onAction = { tick++ })
       o == null -> Text(StrSupplierBills.loading, style = V3Type.callout, color = c.inkMuted)
       else -> {
-        Text(StrSupplierBills.orderTitle(o.no, o.supplierName), style = V3Type.title, color = c.ink)
-        Text(
-          StrSupplierBills.line(PurchaseOrderBook.label(PurchaseOrderBook.status(o)), StrSupplierBills.bills(o.billCount)),
-          style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(top = 4.dp),
+        V3Summary(
+          label = StrSupplierBills.orderTitle(o.no, o.supplierName),
+          value = "${money(PurchaseOrderBook.asAfn(o.totals.orderedMinor))} ؋",
+          caption = StrSupplierBills.line(PurchaseOrderBook.label(PurchaseOrderBook.status(o)), StrSupplierBills.bills(o.billCount)),
+          note = StrSupplierBills.totals(money(PurchaseOrderBook.asAfn(o.totals.orderedMinor)), money(PurchaseOrderBook.asAfn(o.totals.acceptedMinor))),
+          collapseKey = "purchasing/bill",
+          section = V3SectionTone.PURCHASES,
         )
-        Text(
-          StrSupplierBills.totals(money(PurchaseOrderBook.asAfn(o.totals.orderedMinor)), money(PurchaseOrderBook.asAfn(o.totals.acceptedMinor))),
-          style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(top = 4.dp),
-        )
-        if (PurchaseOrderBook.canBill(o, manage)) {
-          V3Button(
-            StrSupplierBills.newBill,
-            { nav.openForResult(MoneyPaths.newSupplierBill(o.id)) { done -> if (done != null) tick++ } },
-            Modifier.fillMaxWidth().padding(top = 12.dp), icon = Icons.Outlined.Add, enabled = !busy,
-          )
-        }
         PoBillsList(o, manage, busy) { voidAsk = it }
         if (o.receipts.isNotEmpty() || PurchaseOrderBook.hasSupplierBills(o)) PoMatchLines(data, o)
       }

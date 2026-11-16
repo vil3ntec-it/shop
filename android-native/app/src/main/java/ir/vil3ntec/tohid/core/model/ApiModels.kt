@@ -393,6 +393,24 @@ data class SupportSendDto(
   val message: SupportMessageDto = SupportMessageDto(),
 )
 
+/** «از پشتیبانی بخواه» — فقط کد و حال (`POST /api/support/requests`)؛ متنِ کاربر همان پیامِ رشته است */
+@Serializable
+data class SupportRequestDto(
+  val id: String = "",
+  val code: String = "",
+  val status: String = "open",
+  val createdAt: Long = 0,
+)
+
+@Serializable
+data class SupportAskDto(
+  val request: SupportRequestDto = SupportRequestDto(),
+  /** false ⇒ همین درخواست پیش‌تر باز بود (لمسِ دوباره) */
+  val created: Boolean = false,
+  /** همکارِ همین دکان همین را خواسته (پیامش در رشتهٔ اوست) */
+  val sameShop: Boolean = false,
+)
+
 /* ============================== تپشِ بازدید ============================== */
 
 @Serializable

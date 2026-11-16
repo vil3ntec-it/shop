@@ -517,7 +517,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/releases', require('./routes/releases'));
     //  پشتیبانی و تپشِ بازدید عمداً توکن اجباری ندارند: همان کسی که
     //  هنوز حساب نساخته، بیشتر از همه به هر دو نیاز دارد.
-    api.use('/support', require('./routes/support'));
+    api.use('/support', require('./routes/support-requests'), require('./routes/support'));   //  + «از پشتیبانی بخواه» (`/support/requests`، مهاجرتِ ۹۶۰)
     api.use('/visit', require('./routes/visit'));
     api.use('/vip', require('./routes/vip'));
 

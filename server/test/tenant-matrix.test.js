@@ -342,6 +342,9 @@ function casesFor(I) {
   add('POST /api/support/read', { url: '/api/support/read', body: {} });
   add('POST /api/support/push', { url: '/api/support/push', body: () => ({ token: `push-${uniq()}` }) });
   add('DELETE /api/support/push', { url: '/api/support/push', body: () => ({ token: `push-${uniq()}` }) });
+  //  «از پشتیبانی بخواه» (مهاجرتِ ۹۶۰): دکان فقط از توکن؛ شناسهٔ «الف» در بدنه/نشانی هیچ اثری ندارد
+  add('POST /api/support/requests', { url: '/api/support/requests', body: { code: 'flag_off:shop.chat' } });
+  add('GET /api/support/requests', { url: '/api/support/requests' });
   return C;
 }
 
@@ -593,6 +596,10 @@ const ADMIN_SUBJECT = {
     noGrant: 'گفت‌وگویی که خودِ کاربر با پشتیبانی باز کرده — پاسخ دادنش کارِ پشتیبانی است و رضایتِ دکان نمی‌خواهد (صندوقش هم CONTENT_LIST_OK)؛ رشته‌های پمپ هم همین درند',
   },
   'GET /api/admin/accounts/:app/:tenantId/backups/:id': { audited: 'admin.account_backup_downloaded', grant: 'export' },
+  //  «از پشتیبانی بخواه» (مهاجرتِ ۹۶۰): فقط با شناسهٔ واقعیِ درخواست ۲۰۰ می‌دهند (این ماتریس درخواستی نمی‌سازد) ⇒ سابقهٔ هر پاسخِ
+  //  موفق (`admin.support_request_viewed`، `admin.support_sync_error_viewed`) و اجازهٔ `read_private` ِ جزئیاتِ خطا در `support-requests.test.js`
+  'GET /api/admin/support-requests/:id': { exempt: 'پروندهٔ درخواستی که خودِ کاربر به پشتیبانی فرستاده (همان رشتهٔ `support/threads/:id`)؛ هر پاسخِ موفق سابقه می‌نویسد (support-requests.test.js)' },
+  'GET /api/admin/support-requests/:id/sync-error': { exempt: 'خلاصهٔ پوشاندهٔ خطای همگام‌سازیِ همان دکان؛ هر پاسخِ موفق سابقه می‌نویسد و Stack/لاگ/دستگاه فقط با اجازهٔ زندهٔ `read_private` (support-requests.test.js)' },
   //  ⛔ کدِ پمپ بی اجازهٔ صاحب‌کار دست نمی‌خورد: سابقهٔ این دو (و آزمونش) در #615 است
   'GET /api/admin/pump/stations/:id': { pending: 'کدِ پمپ — `admin.station_viewed` در #615 (`claude/sec-pump-pending`)، نیازمندِ اجازهٔ صاحب‌کار' },
   'GET /api/admin/pump/stations/:id/events': { pending: 'کدِ پمپ — `admin.station_events_viewed` در #615 (`claude/sec-pump-pending`)، نیازمندِ اجازهٔ صاحب‌کار' },

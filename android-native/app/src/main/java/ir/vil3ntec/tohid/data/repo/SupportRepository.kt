@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data.repo
 
+import ir.vil3ntec.tohid.core.model.SupportAskDto
 import ir.vil3ntec.tohid.core.model.SupportSendDto
 import ir.vil3ntec.tohid.core.model.SupportViewDto
 import ir.vil3ntec.tohid.core.model.VipRedeemDto
@@ -76,6 +77,41 @@ class SupportRepository(private val api: ApiClient, private val signedIn: () -> 
           put("app", JsonPrimitive(ir.vil3ntec.tohid.core.config.AppConfig.appId))
           put("body", JsonPrimitive(body.trim()))
           if (name.isNotBlank()) put("name", JsonPrimitive(name.trim()))
+        },
+      )
+    )
+  }
+
+  /**
+   *  «از پشتیبانی بخواه» — یک لمس، یک درخواستِ ساخت‌یافته در همان رشته (`POST /api/support/requests`). کد و واقعیت‌ها از
+   *  `core/support/SupportProblem` (فقط مجازها)؛ دکان را سرور از توکن می‌گیرد. تکرارِ همان درخواستِ باز ⇒ همان (`created: false`).
+   *  @param contact برای مهمانِ بی‌حساب (کدِ ورود نمی‌رسد): همان ایمیلی که «تماس» ِ رشته است
+   */
+  suspend fun ask(
+    deviceUid: String,
+    name: String,
+    code: String,
+    facts: Map<String, Any>,
+    lang: String,
+    contact: String = "",
+  ): ApiResult<SupportAskDto> = result {
+    ApiJson.decode<SupportAskDto>(
+      send(
+        "POST",
+        ApiEndpoints.Support.REQUESTS,
+        buildJsonObject {
+          put("deviceUid", JsonPrimitive(deviceUid))
+          put("app", JsonPrimitive(ir.vil3ntec.tohid.core.config.AppConfig.appId))
+          put("code", JsonPrimitive(code))
+          put("lang", JsonPrimitive(lang))
+          if (name.isNotBlank()) put("name", JsonPrimitive(name.trim()))
+          if (contact.isNotBlank()) put("contact", JsonPrimitive(contact.trim()))
+          put(
+            "context",
+            buildJsonObject {
+              facts.forEach { (k, v) -> put(k, if (v is Number) JsonPrimitive(v) else JsonPrimitive(v.toString())) }
+            },
+          )
         },
       )
     )

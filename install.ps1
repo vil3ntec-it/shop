@@ -1,4 +1,4 @@
-# My Shop (فروشگاه من) — Windows installer bootstrap
+# Daily Shop — Windows installer bootstrap
 #
 #   irm https://vil3ntec-it.github.io/shop/install.ps1 | iex
 #
@@ -21,7 +21,7 @@ $ProgressPreference = 'SilentlyContinue'
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
 
 if (-not [Environment]::Is64BitOperatingSystem) {
-  Write-Host 'My Shop needs 64-bit Windows 10 or 11. On this PC use the Android app on a phone or tablet: https://vil3ntec-it.github.io/shop/download.html' -ForegroundColor Red
+  Write-Host 'Daily Shop needs 64-bit Windows 10 or 11. On this PC use the Android app on a phone or tablet: https://vil3ntec-it.github.io/shop/download.html' -ForegroundColor Red
   return
 }
 
@@ -102,7 +102,7 @@ $exe = $null
 foreach ($src in $sources) {
   for ($try = 1; $try -le 2 -and -not $ok; $try++) {
     try {
-      Write-Host "Downloading My Shop (one full installer, about 130 MB) from $src ..."
+      Write-Host "Downloading Daily Shop (one full installer, about 130 MB) from $src ..."
       $sums = (Invoke-WebRequest -UseBasicParsing "$src/SHA256SUMS.txt").Content
       if ($sums -is [byte[]]) { $sums = [Text.Encoding]::UTF8.GetString($sums) }
       $line = ($sums -split "`n") | Where-Object { $_ -match "\s\*?$([regex]::Escape($name))\s*$" } | Select-Object -First 1
@@ -122,7 +122,7 @@ foreach ($src in $sources) {
   if ($ok) { break }
 }
 if (-not $ok) {
-  Write-Host 'Could not download My Shop. Check the internet connection (VPN/proxy on or off) and run the command again.' -ForegroundColor Red
+  Write-Host 'Could not download Daily Shop. Check the internet connection (VPN/proxy on or off) and run the command again.' -ForegroundColor Red
   return
 }
 

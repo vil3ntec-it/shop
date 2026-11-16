@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ui.screens
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -64,20 +65,20 @@ fun StockPlacesEntry(context: android.content.Context, store: ShopStore, d: Shop
     }
   }
 
-  if (placesOn) {
-    Spacer(Modifier.height(8.dp))
-    OutlinedButton(onClick = { openPlaces = true }, modifier = Modifier.fillMaxWidth()) {
-      Icon(Icons.Filled.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp))
-      Spacer(Modifier.width(6.dp))
-      Text(StrPlaces.openPlaces)
+  //  کالبدِ یکسان (p0): دو درِ صفحه ردیفِ ناوبریِ کیت‌اند (کاشی · نام · پیکان)، نه دو دکمهٔ تمام‌پهنای Material
+  ir.vil3ntec.tohid.ui.v3.V3Section(null, Modifier.padding(top = 8.dp)) {
+    if (placesOn) {
+      ir.vil3ntec.tohid.ui.v3.V3NavRow(
+        StrPlaces.openPlaces, Icons.Filled.SwapHoriz, ir.vil3ntec.tohid.ui.v3.nav.V3Modules.hueOf("warehouse"),
+        onClick = { openPlaces = true },
+      )
     }
-  }
-  if (repackOn) {
-    Spacer(Modifier.height(8.dp))
-    OutlinedButton(onClick = { openRepack = true }, modifier = Modifier.fillMaxWidth()) {
-      Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(18.dp))
-      Spacer(Modifier.width(6.dp))
-      Text(StrPlaces.openRepack)
+    if (placesOn && repackOn) ir.vil3ntec.tohid.ui.v3.V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.DIVIDER_START)
+    if (repackOn) {
+      ir.vil3ntec.tohid.ui.v3.V3NavRow(
+        StrPlaces.openRepack, Icons.Filled.Inventory2, ir.vil3ntec.tohid.ui.v3.nav.V3Modules.hueOf("warehouse"),
+        onClick = { openRepack = true },
+      )
     }
   }
 

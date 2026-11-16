@@ -14,7 +14,7 @@ object ShopPolicy {
   private const val BLOCK_EXPIRED = "block_expired"
   private const val CRM_REPORTS = "crm_reports"
 
-  private fun prefs(context: Context) =
+  internal fun prefs(context: Context) =
     context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
   fun blockExpired(context: Context): Boolean = prefs(context).getBoolean(BLOCK_EXPIRED, false)
@@ -24,16 +24,21 @@ object ShopPolicy {
   }
 
   /*
-   *  PAY (v3 A4) — «پرداختِ ترکیبی و صندوقِ شیفت» (`PayFlow`). پیش‌فرض **خاموش**:
-   *  فروش همان نقد/نسیه و صندوق همان `CashShift`ِ امروز. فقط روی همین دستگاه.
+   *  PAY (v3 A4) — «پرداختِ ترکیبی و صندوقِ شیفت» (`PayFlow`). فقط روی همین دستگاه.
+   *  از ۱۴۰۵/۰۸/۲۵ (صاحب‌کار: «این‌ها همه باید بیایند»، `claude/e-paymethods`) پیش‌فرضِ دستگاهی که هرگز انتخاب نکرده
+   *  **روشن** است — ولی نه با خواندنِ این کلید: شروعِ برنامه یک بار `PayV2Pref.adopt` را می‌زند و فقط وقتی هیچ صندوقِ
+   *  سادهٔ بازی عددش در صندوقِ شیفت عوض نمی‌شود `true` می‌نویسد (`PayV2Default`). تا آن دم همان نقد/نسیه و `CashShift`.
+   *  انتخابِ صریحِ کاربر (روشن یا خاموش) هرگز عوض نمی‌شود؛ تنظیم همان راهِ برگشت است.
    */
-  private const val PAY_V2 = "pay_v2"
+  /** کلید و پروندهٔ همین دستگاه — `PayV2Pref` (پیش‌فرضِ شروعِ برنامه) هم همین را می‌خواند */
+  internal const val PAY_V2 = "pay_v2"
 
   fun payV2(context: Context): Boolean = prefs(context).getBoolean(PAY_V2, false)
 
   fun setPayV2(context: Context, on: Boolean) {
     prefs(context).edit().putBoolean(PAY_V2, on).apply()
   }
+
 
   /*
    *  PAY-13 — «شمارشِ کور» ِ صندوقِ شیفت، انتخابِ دکان‌دار (تنظیمات › فروش و پرداخت › پرداخت). پیش‌فرض **روشن** =

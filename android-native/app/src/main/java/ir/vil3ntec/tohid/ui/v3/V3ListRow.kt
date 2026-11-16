@@ -288,7 +288,7 @@ fun V3ListRow(
           else Modifier,
         )
         .semantics { if (selected != null) this.selected = selected }
-        .then(if (nav) Modifier.testTag(V3NavRowSpec.ROW_TAG) else if (data) Modifier.testTag(V3DataRowSpec.ROW_TAG) else Modifier)
+        .then(if (nav) Modifier.testTag(V3NavRowSpec.ROW_TAG) else if (data) Modifier.testTag(V3DataRowSpec.ROW_TAG) else Modifier.testTag(V3Anatomy.LIST_ROW))
         .padding(start = startPad, end = V3NavRowSpec.PAD_END, top = padV, bottom = padV),
       verticalAlignment = Alignment.CenterVertically,
     ) {

@@ -358,6 +358,8 @@ object ApiEndpoints {
     const val MESSAGES = "/support/messages"
     const val READ = "/support/read"
     const val PUSH = "/support/push"
+    /** «از پشتیبانی بخواه»: درخواستِ ساخت‌یافته در همان رشته (`routes/support-requests.js`) */
+    const val REQUESTS = "/support/requests"
   }
 
   /**

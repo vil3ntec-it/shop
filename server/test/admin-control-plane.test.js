@@ -236,6 +236,8 @@ const MOUNTS = {
   //  پنلِ مرکزی، فاز ۳
   'admin-shop-state.js': '/admin/shops/:id',
   'admin-flags.js': '/admin/flags',
+  //  «از پشتیبانی بخواه» (مهاجرتِ ۹۶۰)
+  'admin-support-requests.js': '/admin/support-requests',
   'admin-service-keys.js': '/admin/service-keys',
   //  پوستهٔ کنسول (جست‌وجوی سراسری)
   'admin-search.js': '/admin/search',
@@ -403,6 +405,10 @@ const CAPABILITY_PROBES = {
   'trust-read.v1': ['GET /admin/trust/cases', 'GET /admin/trust/cases/x1', 'GET /admin/trust/sanctions'],
   'support-grant-read.v1': ['GET /admin/shops/x1/staff-perms', 'GET /admin/shops/x1/images/changes/x1', 'GET /admin/sync/conflicts?account=x1',
     'GET /admin/shops/x1', 'GET /admin/users/x1'],
+  'support-requests.v1': ['GET /admin/support-requests', 'GET /admin/support-requests/x1', 'GET /admin/support-requests/x1/sync-error',
+    'POST /admin/support-requests/x1/resolve', 'POST /admin/support-requests/x1/fix/enable-flag',
+    'POST /admin/support-requests/x1/fix/grant-subscription', 'POST /admin/support-requests/x1/fix/raise-device-limit',
+    'POST /admin/support-requests/x1/fix/resend-email-code'],
 };
 
 test('GET /api/admin/me: فهرستِ «توانایی»ها با همان نام‌های پل، و درِ هر کدام واقعاً هست', async () => {

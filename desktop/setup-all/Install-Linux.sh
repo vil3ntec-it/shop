@@ -1,5 +1,5 @@
 #!/bin/sh
-# «فروشگاه من» — نصب روی لینوکسِ ۶۴ بیتی (دبیان، اوبونتو، مینت)
+# «Daily Shop» — نصب روی لینوکسِ ۶۴ بیتی (دبیان، اوبونتو، مینت)
 cd "$(dirname "$0")" || exit 1
 case "$(uname -m)" in
   x86_64|amd64) ;;
@@ -11,4 +11,4 @@ if command -v apt >/dev/null 2>&1; then
 else
   sudo dpkg -i "./Linux/MyShop-Linux.deb"
 fi
-echo "نصب شد — «فروشگاه من» را از منوی برنامه‌ها باز کنید."
+echo "نصب شد — «Daily Shop» را از منوی برنامه‌ها باز کنید."

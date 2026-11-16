@@ -46,12 +46,16 @@ async function setFlag(scope, k, value) {
   assert.equal(r.status, 200, JSON.stringify(r.body));
 }
 
+/**
+ * `flag`: `true` ⇒ ردیفِ `true`؛ `false` ⇒ `false` ِ **صریح** (از ۱۴۰۵/۰۸/۲۵ `pay.hesabpay` پیش‌فرض‌روشن است ‹`lib/flag-defaults.js`›،
+ * پس «بی پرچم» دیگر یعنی خاموشِ صریح، نه بی ردیف)؛ `null` ⇒ هیچ ردیفی (همان پیش‌فرض).
+ */
 async function shop(label, { flag = true } = {}) {
   const owner = await h.newUser(`صاحب-${label}`);
   const made = await h.post('/api/shop', { name: `دکانِ ${label}` }, { token: owner.accessToken });
   assert.equal(made.status, 201, JSON.stringify(made.body));
   const shopId = made.body.shop.id;
-  if (flag) await setFlag(shopId, pay.FLAG_KEY, true);
+  if (flag !== null) await setFlag(shopId, pay.FLAG_KEY, flag);
   return { owner, shopId, t: owner.accessToken };
 }
 
@@ -110,7 +114,8 @@ test('ساختگی هرگز در تولید: PAYMENTS_PROVIDER=fake + NODE_ENV=p
   assert.equal(P.activeName(), 'fake');
 });
 
-test('پیکربندی: بی کلید یا بی پرچم ⇒ خاموش و ساختن ۴۰۳ hesabpay_disabled', async () => {
+test('پیکربندی: بی کلید یا با پرچمِ خاموش ⇒ خاموش و ساختن ۴۰۳ hesabpay_disabled', async () => {
+  //  ۱۴۰۵/۰۸/۲۵: پیش‌فرض روشن — فقط `false` ِ صریح خاموش می‌کند (پیش‌تر «بی ردیف» همین را می‌سنجید)
   const off = await shop('بی‌پرچم', { flag: false });
   assert.deepEqual((await h.get('/api/v1/shop/payments/config', { token: off.t })).body, { hesabpay: { enabled: false, flag: false, mode: 'off' } });
   const r = await createPos(off);
@@ -133,6 +138,40 @@ test('پیکربندی: بی کلید یا بی پرچم ⇒ خاموش و سا�
     }
   }
   assert.equal((await h.get('/api/shop/payments/config')).status, 401);
+});
+
+test('پیش‌فرضِ روشن (۱۴۰۵/۰۸/۲۵): بی ردیف ⇒ پرچم روشن؛ false ِ دکان یا all خاموش؛ کلیدِ سکو هرگز جایگزینِ حسابِ دکان نیست', async () => {
+  const def = await shop('پیش‌فرض', { flag: null });
+  assert.equal(await query('SELECT 1 FROM live_config WHERE scope=$1 AND key=$2', [def.shopId, pay.FLAG_KEY]).then((x) => x.rows.length), 0);
+  //  ارائه‌دهندهٔ ساختگیِ آزمون ⇒ درگاه هست؛ پرچم بی ردیف روشن
+  assert.deepEqual((await h.get('/api/shop/payments/config', { token: def.t })).body, { hesabpay: { enabled: true, flag: true, mode: 'off' } });
+  assert.equal((await createPos(def)).status, 201);
+  //  حساب‌پیِ واقعی بی حسابِ خودِ دکان ⇒ با پرچمِ پیش‌فرض هم «خودکار» نیست و قصدی ساخته نمی‌شود — کلیدِ سکو (`HESABPAY_*`) هرگز
+  const keep = { ...process.env };
+  Object.assign(process.env, { PAYMENTS_PROVIDER: '', HESABPAY_API_KEY: 'platform-key-456', HESABPAY_WEBHOOK_SECRET: 'platform-secret-2',
+    HESABPAY_CRED_KEY: 'cred-key-for-default-test-0123456789abcd' });
+  try {
+    assert.deepEqual((await h.get('/api/shop/payments/config', { token: def.t })).body, { hesabpay: { enabled: false, flag: true, mode: 'off' } });
+    assert.equal((await createPos(def)).body.error.code, 'hesabpay_disabled');
+  } finally {
+    for (const k of ['PAYMENTS_PROVIDER', 'HESABPAY_API_KEY', 'HESABPAY_WEBHOOK_SECRET', 'HESABPAY_CRED_KEY']) {
+      if (keep[k] === undefined) delete process.env[k]; else process.env[k] = keep[k];
+    }
+  }
+  //  `false` ِ صریحِ همین دکان ⇒ خاموش؛ `false` ِ `all` ⇒ خاموش برای دکانِ بی ردیف؛ `true` ِ دکان بر `all` جلو
+  await setFlag(def.shopId, pay.FLAG_KEY, false);
+  assert.deepEqual((await h.get('/api/shop/payments/config', { token: def.t })).body, { hesabpay: { enabled: false, flag: false, mode: 'off' } });
+  assert.equal((await createPos(def)).body.error.code, 'hesabpay_disabled');
+  const other = await shop('پیش‌فرضِ دوم', { flag: null });
+  await setFlag('all', pay.FLAG_KEY, false);
+  try {
+    assert.equal((await h.get('/api/shop/payments/config', { token: other.t })).body.hesabpay.flag, false);
+    await setFlag(other.shopId, pay.FLAG_KEY, true);
+    assert.equal((await h.get('/api/shop/payments/config', { token: other.t })).body.hesabpay.flag, true);
+  } finally {
+    await query('DELETE FROM live_config WHERE scope=$1 AND key=$2', ['all', pay.FLAG_KEY]);
+    require('../src/lib/hot-cache').invalidate('flag');
+  }
 });
 
 test('ساختن: قرارداد، کلیدِ یکتایی، اعتبارسنجی و قصدِ زندهٔ همان فروش', async () => {

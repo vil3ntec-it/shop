@@ -8,8 +8,8 @@ package ir.vil3ntec.tohid.core.i18n
  */
 @Suppress("unused")
 object StrDesktop {
-  /** منوی سینی ⇐ همان `StrAppData.fpTitle` («باز کردن فروشگاه من») */
-  val trayOpen: String get() = t("باز کردنِ فروشگاه من", "Open My Shop", "زما دوکان خلاصول")
+  /** منوی سینی ⇐ همان `StrAppData.fpTitle` («باز کردن Daily Shop») */
+  val trayOpen: String get() = t("باز کردنِ Daily Shop", "Open Daily Shop", "Daily Shop خلاصول")
 
   /** عنوانِ پنجرهٔ «باز کردنِ فایل» ِ سیستم ⇐ همان `StrReach.importPick` («انتخابِ فایل») */
   val pickFile: String get() = t("انتخاب فایل", "Choose a file", "فایل وټاکئ")

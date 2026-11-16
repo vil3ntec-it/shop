@@ -188,6 +188,29 @@ test('۲. حسابِ دوم ۲۴ ساعت در انتظار: صندوق و در�
   assert.deepEqual(hist.map((x) => [x.last4, x.retired_at === null]), [['1222', false], ['3444', true]]);
 });
 
+test('۲ب. حسابِ برداشته و حسابِ تازه در انتظار: صندوق فقط زمانِ فعال شدن را می‌بیند (بی شماره، QR، نام و ۴ رقم)؛ مهلت همان ۲۴ ساعت', async () => {
+  const s = await shop('برداشته-در-انتظار');
+  await ready(s, '0799111222');
+  //  با حسابِ فعال هیچ زمانی هم نمی‌آید (پول هنوز به حسابِ فعال؛ بند ۲)
+  assert.equal((await till(s)).pendingUntil, undefined);
+  const rm = await h.post(`${URL}/account/remove`, { pin: PIN }, { token: s.t });
+  assert.equal(rm.status, 200, JSON.stringify(rm.body));
+  assert.deepEqual(await till(s), { enabled: false, flag: true, mode: 'off', payees: (await till(s)).payees });
+  const r = await save(s, simple('0788333444', { name: 'حسابِ تازه' }));
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.ok(r.body.pending && r.body.pending.until >= now() + DAY - 60_000, 'حسابِ دوم پس از برداشتن هم ۲۴ ساعت در انتظار');
+  const cashier = await member(s, 'staff');
+  const cfg = (await h.get('/api/v1/shop/payments/config', { token: cashier })).body.hesabpay;
+  assert.deepEqual([cfg.mode, cfg.simple, cfg.payee, cfg.enabled], ['off', undefined, undefined, false]);
+  assert.equal(cfg.pendingUntil, Number((await rowOf(s)).pending_until));
+  const text = JSON.stringify(cfg);
+  for (const leak of ['0788333444', '3444', 'حسابِ تازه', 'qr', 'simple']) assert.ok(!text.includes(leak), `صندوق «${leak}» را دید`);
+  //  ۲۴ ساعت گذشت ⇒ حسابِ تازه فعال و زمانِ انتظار دیگر نمی‌آید
+  await elapse(s);
+  const on = await till(s);
+  assert.deepEqual([on.simple.account, on.payee.last4, on.pendingUntil], ['0788333444', '3444', undefined]);
+});
+
 test('۳. «این من نبودم — لغو کن»: تأییدِ دوبارهٔ ورود، حسابِ تازه پاک، بخش ۲۴ ساعت بسته، پول همان حسابِ کهنه', async () => {
   const s = await shop('لغو');
   await ready(s, '0799111222');

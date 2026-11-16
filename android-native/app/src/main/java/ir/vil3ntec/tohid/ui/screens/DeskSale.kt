@@ -405,6 +405,8 @@ fun DeskSaleScreen(
   //  PAY-21 + S22: درگاه‌های تسویه — پیش از گرفتنِ پول تأییدِ منقضی و ثبت‌شدنیِ همین فاکتور با همان `expiryGate` (`DeskExpiryPay`)
   val prePay = rememberDeskExpiryPay(saleKey)
   val gateways = prePay.hook(remember { ir.vil3ntec.tohid.pay.platform.HesabPayEnv.of(context) }, saleKey, d, loyal, checkout.copy(expiryGate = expiryGateOn))
+  val payTiles = rememberDeskPayTiles(payV2, gateways, saleKey, hesabOk = !discountBad && gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED) // e-paymethods
+  var payInitial by remember { mutableStateOf<ir.vil3ntec.tohid.core.pay.TillMethods.Tile?>(null) } // e-paymethods: کاشیِ زده‌شدهٔ کنارِ سبد ⇒ همان روش در پنل
   //  CRM-03 / S07 (پشتِ `ShopPolicy.creditGate`، پیش‌فرض خاموش): نسیهٔ بیش از سقف ⇒ «درخواستِ تأیید»
   val creditGateOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.creditGate(context) }
   //  تأییدِ بیش از سقف در حالت نگه داشته نمی‌شود — مثلِ گوشی (`QuickSale`، `Sale`) فقط به همان یک تلاشِ
@@ -754,6 +756,10 @@ fun DeskSaleScreen(
       },
       methods = {
         if (payV2) {
+          //  e-paymethods: هر کاشی پنلِ پرداخت را با همان روش باز می‌کند؛ ⛔ نسیه بی مشتری اول گزینشِ مشتری، سپس همان پنل (POS-41)
+          DeskPayTiles(payTiles, enabled = cart.isNotEmpty() && !posting, tone = tone) { t ->
+            payInitial = t; if (t.kind == ir.vil3ntec.tohid.core.pay.TillMethods.Kind.CREDIT && cartDebtorId == null) { payAfterPick = true; pickDebtor = true } else payOpen = true
+          }
           //  PAY (v3 A4): روش‌ها در پنلِ پرداخت‌اند — نقد، کیف پول، کارت، حواله و به حساب
           Text(
             StrPos.mixedPayHint,
@@ -1033,8 +1039,9 @@ fun DeskSaleScreen(
       customerName = debtor?.name,
       busy = posting,
       target = target,
-      onDismiss = { payOpen = false; refocus() },
-      onConfirm = { st -> finish(st) }, onPickCustomer = { payOpen = false; payAfterPick = true; pickDebtor = true }, // پس از گزینش، همان پنل (POS-41)
+      onDismiss = { payOpen = false; payInitial = null; refocus() },
+      onConfirm = { st -> payInitial = null; finish(st) }, tiles = payTiles, initial = payInitial, // e-paymethods: کاشی‌ها و روشِ زده‌شده
+      onPickCustomer = { payOpen = false; payAfterPick = true; pickDebtor = true }, // پس از گزینش، همان پنل (POS-41)
       //  PAY-21: حساب‌پی برای باقی‌ماندهٔ پنل — نه با تخفیفِ تأییدنشده (پول گرفته و فروش رد نشود)
       gateways = gateways.takeIf { !discountBad && gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED },
       //  PAY-24: کارتِ هدیه و اعتبارِ فروشگاه فقط با تنظیمِ همین دستگاه (پیش‌فرض خاموش ⇒ همان پنل)
