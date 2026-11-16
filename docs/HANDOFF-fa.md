@@ -85,6 +85,150 @@
   جای‌ها، دفترِ انبار، گزارش‌های آنلاین/شعبه، تخفیف‌ها…)؛ پرسش از صاحب‌کار: نوارِ چسبانِ پایینِ جزئیاتِ کالا و انبار (`V3FormBar`) هم `V3Fab` شود؟
   `PageAnatomyUiTest` روی درختِ هر مسیر هنوز ساخته نشده.
 
+### ۱۴۰۵/۰۸/۲۶ — عاملِ e-support زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-support` (از `origin/main` a0b0f9355، ادغامِ main f7641ab93) + server `claude/support-inbox` (۱.۵۲.۰) — «از پشتیبانی بخواه»
+
+- **چه شد**: فهرستِ یکتای مشکل‌ها (`server/src/lib/support-problems.json` ⇄ `core/support/SupportProblem.kt`): `flag_off:<پرچم>`، `plan_required:<قابلیت>`،
+  `subscription_expired`، `device_limit`، `sync_no_shop`، `sync_refused`، `email_code_not_arriving`، `other` — هر کدام سه زبان و کارِ مدیر. سرور: مهاجرتِ
+  **۹۶۰** (`support_requests`، `support_request_fixes`)، `POST|GET /api/support/requests` (همان رشتهٔ پشتیبانی، یکتا تا باز است برای دکان+کد)،
+  `/api/admin/support-requests` (صف با پالایه، پرونده، «حل شد»، روشن کردنِ پرچمِ همان دکان، تمدید و سقفِ دستگاه از `grantOnce`، فرستادنِ دوبارهٔ همان
+  کد، خطای همگام‌سازی با اجازهٔ `read_private`) + توانایی `support-requests.v1`. برنامه: دکمهٔ «از پشتیبانی بخواه» (`AskSupport.kt`) در ردیفِ «خاموش
+  است» ِ سفارش‌ها، کارتِ «چرا نمی‌رسد»، برگهٔ بخشِ خاموشِ صاحب، قفلِ اشتراک/دستگاه، گرهٔ همگام‌سازی و برگهٔ کدِ ایمیل؛ گفت‌وگو همان لمس را
+  می‌فرستد و نوارِ حال دارد. پنل (server ۱.۵۲.۰): برگهٔ «درخواست‌ها»، نشانِ «درخواست»، کارتِ مشکل با «درستش کن» و «حل شد».
+- **تغییرِ آگاهانهٔ آزمون**: `DeskMenuTest` (صاحب، `off:orders`) و `DeskRailOffUiTest` (برگهٔ صاحب) پیش‌تر برچسبِ «پیام به پشتیبانی برای روشن کردن» و
+  مقصدِ `support?text=<پیش‌نویس>` را می‌سنجیدند؛ حالا «از پشتیبانی بخواه» و `support?ask=flag_off:shop.orders&f.screen=desk:off:orders` (و این‌که هر بخشِ
+  خاموش کدِ معتبر دارد و پیش‌نویسِ دستی نیست). شاگرد همان «پشتیبانی» ِ ساده را دارد (همان سنجه، + «از پشتیبانی بخواه» نیست). هیچ سنجه‌ای کم نشد.
+  `admin-control-plane.test.js` (MOUNTS + CAPABILITY_PROBES) و `tenant-matrix.test.js` (دو درِ کاربر در ماتریس، دو درِ موضوع‌دارِ مدیر `exempt` با دلیل —
+  سابقهٔ هر پاسخِ موفق در `support-requests.test.js` سنجیده می‌شود) فقط افزوده شدند.
+- **آزمون‌ها**: سرور `support-requests.test.js` ۱۱/۱۱ + ماتریس/کنترل/چت/قرارداد سبز؛ کاتلین (دسکتاپ) `SupportProblemMirrorTest`، `SupportAskUiTest`،
+  `DeskMenuTest`، `DeskRailOffUiTest`، `OrdersP4UiTest`، `I18nCoverageTest`، `InfraLeakGuardTest`؛ پنل `console-support-requests.mjs` ۱۹، `support-requests-ui.mjs`
+  ۱۴ (کرومیوم)، `bridge-roles.mjs` ۳۳ (shop@main و همین شاخه). عکس‌ها: `/home/user/wt-support-shots/` (`phone/`، `control-center/`).
+- **نیمه‌کاره / قدمِ بعد**: (۱) دکمه هنوز روی درِ «حساب‌پی خاموش» (`flag_off:pay.hesabpay`) و «قابلیت بیرونِ پلن» (`plan_required:*`) جایی از برنامه
+  نیست — سرور و پنل آماده‌اند؛ `LockedFeature` کلیدِ قابلیت را ندارد و فعلاً `subscription_expired` می‌فرستد. (۲) پس از مرجِ shop، `account-server.yml` روی
+  server تا پنلِ ۱.۵۲.۰ توانایی را ببیند (بی آن کارت «در دسترس نیست» می‌گوید). (۳) مهاجرتِ ۹۴۶–۹۵۹ برای کارهای هم‌زمان خالی ماند.
+- **پیش‌آگاهی**: `precheck.sh` روی همین شاخه یک ❌ ِ «اندازهٔ فایل» دارد که مالِ main ِ پس از دستهٔ ۷۱ است، نه این کار:
+  `data/ShopStore.kt` ۱۲۴۲ خط در برابرِ سقفِ ۱۲۴۱ ِ `tools/quality/baseline.json` (روی `origin/main` f7641ab93 ِ بی‌دست‌خورده هم همین). این شاخه
+  `ShopStore.kt` را دست نزد؛ یا یک خط کم شود یا سقف با دلیل بالا برود.
+- **CI ِ #1059 (هماهنگ‌کننده)**: (۱) `DariCoverageTest`: «دوباره بزنید» ِ `StrSupportAsk.failed` ⇒ جملهٔ کاملِ دری در `DariText.PHRASES` (+ `dari.js`، ردیفِ `DARI-REVIEW-fa.md`) و پیامِ درونیِ `AskSupport` بی فارسیِ خام. (۲) `route-authz-inventory` (SEC-AUTH-10): `POST /api/support/requests` در گروهِ PUBLIC ِ «پشتیبانیِ مهمان» کنارِ `POST /api/support/messages` — همان `support.who`، دکان فقط از توکن (ردهٔ درست، نه سست‌تر).
+### ۱۴۰۵/۰۸/۲۶ — هماهنگ‌کننده (سیزنِ 01GcPTAL…)، دستهٔ ۷۱ (`claude/batch-71`)
+
+- **درونِ دسته**: e-newinstall (همگام‌سازیِ برنامهٔ تازه: «دکان ندارید»/«وارد نشده‌اید»/پیامِ سرور، «جزئیات» با رونوشت، صفِ نرفتهٔ پشتیبانِ
+  برنامهٔ قدیم)، e-paymethods (کاشی‌های روشِ پرداخت، «ترکیبی و شیفت» پیش‌فرضِ دستگاهِ بی انتخاب پس از بستنِ صندوقِ باز، `pay.hesabpay`
+  پیش‌فرض روشن)، e-name (نامِ نمایشیِ Daily Shop؛ شناسه‌ها و پوشه‌های داده همان)، e-swipe (کشیدنِ برگشت از هر جای صفحه، نوارهای سیستمِ
+  همرنگِ تم). ادغام بی تعارض؛ precheck fail=0؛ آزمونِ هدف‌دارِ میانِ‌شاخه‌ای ۱۵۵/۰؛ سرور ۹۹/۹۹؛ `test:web-store` روی e-paymethods ۱۷۰۶ ✅.
+- **CI ِ #1058**: (۱) `index.html`: نامِ تازه متنِ اسکریپتِ درون‌خطیِ «برنامه را نصب کنید» را عوض کرد و هشِ CSP نه ⇒ هش از خودِ اسکریپت
+  (`web-shop-gone` ۱۱/۱۱). (۲) **تغییرِ آگاهانهٔ آزمون** `server/test/e2e/lib/native.mjs` ‹`restoreWiredNoOps`›: کاوشگرِ شکلِ کدِ
+  `ShopStore.restoreBackup` فقط `rebuildFromServer(next, pushedStaging)` را می‌شناخت و با `carry` ِ e-newinstall «ذخیره» می‌پنداشت (S143 سرخ)
+  ⇒ آرگومانِ سومِ اختیاریِ `carry` پذیرفته شد (همان راه؛ پیش‌فرض خالی). E2E ِ کامل ۲۸۰ ✅.
+- **متوقف به خواستِ صاحب‌کار (صرفه‌جویی)، بیرون از دسته**: `claude/e-phone-p0` (0aee92b40، کالبدِ یکسان: جزئیاتِ کالا/انبار و سفارشِ خرید؛
+  آزمون‌های هدف‌دار سبز، اجرای کامل نه) و `claude/e-desk-d3c` (5d7d5cbb9، پنجره‌های کامپیوتر و فرمِ فاکتورِ خرید؛ بی آزمونِ تازه و عکس).
+- **صفِ بعد (یکی‌یکی)**: پشتیبانیِ «یک‌کلیکی» (دکمهٔ «از پشتیبانی بخواه» با کدِ مشکل ⇐ صندوقِ پشتیبانی در مرکزِ فرمان با دکمهٔ رفعِ همان
+  مشکل؛ پایه: `routes/support.js`، `shop-support-access.js`)، سپس p0، سپس d3c. پرسشِ باز از صاحب‌کار: نوارِ دکمهٔ چسبیدهٔ جزئیاتِ کالا/انبار
+  هم دکمهٔ شناور شود؟ و استثنای «جزئیات» در قاعدهٔ «هیچ جزئیاتِ فنی در صفحه» (`RULES-fa.md`).
+
+### ۱۴۰۵/۰۸/۲۶ — هماهنگ‌کننده، شاخهٔ `claude/e-swipe` (از main a0b0f9355) — کشیدنِ برگشت از هر جای صفحه
+
+- **خواست**: «الان باید لبهٔ گوشی راست رو به چپ کشید … از وسط یا آخرِ صفحه هم کشیده بشه و بیاد از اون بخش بیرون».
+- **ساخته شد** (`ui/v3/nav/EdgeSwipeBack.kt`): لبه (۲۴dp) مثلِ پیش در گذرِ Initial؛ هر جای دیگر در گذرِ Main و فقط اگر فرزندی کشیدن
+  را نخورده باشد (برگه‌های افقیِ «کالا/انبار»، تراشه، کاروسل، کشیدنِ ردیف، لغزنده کارِ خودشان را می‌کنند)؛ میانه افقیِ دست‌کم دو برابرِ
+  عمودی می‌خواهد (`EdgeSwipe.MID_DOMINANCE`) تا پیمایشِ کج برگشت نشود؛ آستانهٔ ۳۰٪/پرتاب همان.
+- **تغییرِ آگاهانهٔ آزمون** (`EdgeSwipeBackUiTest`): بندِ «میانهٔ صفحه مالِ خودِ صفحه است» (جزئیاتِ کالا) به خواستِ تازه شد «میانهٔ
+  جزئیاتِ کالا ⇒ فهرست» — آن صفحه کشیدنِ افقیِ «کالا/انبار» ندارد و آزمونِ پیشین فقط «هیچ نشد» را می‌سنجید؛ به‌جایش آزمونِ تازه: کشیدنی
+  که `LazyRow` ِ افقی خورد برگشت نیست و همان کشیدن روی جای خالی برگشت است؛ میانه/آخرِ صفحه روی «درباره» + کج (نسبت به پهنا) و عمودی؛
+  `starts`/`vertical` خالص. رفعِ نخستین اجرا: فرودِ خورده‌شدهٔ ردیف‌های زدنی (`detectTapGestures`) کشیدنِ میانه را می‌بست.
+- **نوارهای سیستم همرنگِ برنامه** (عکسِ صاحب‌کار: برنامهٔ تیره با نوارِ سه‌دکمه‌ایِ سفیدِ سامسونگ): `enableEdgeToEdge` نشانه‌ها را از
+  روز/شبِ گوشی می‌گرفت و روی نوارِ سه‌دکمه‌ای پردهٔ کنتراست می‌کشید ⇒ `Platform.SystemBars(dark)` (`ui/SystemBarsAndroid.kt`، از
+  `TohidTheme`): هر دو نوار شفاف روی پس‌زمینهٔ برنامه، `isNavigationBarContrastEnforced=false`، نشانه‌ها به تمِ برنامه؛ اندرویدِ پیش از ۸
+  در تمِ روشن همان پردهٔ نیم‌تیره. کامپیوتر/آیفون بی‌اثر (`replaced` و `ios-exclude.txt`). ⚠️ کامپایلِ اندرویدیِ این فایل فقط در CI
+  (ساختِ کامپیوتر آن را کنار می‌گذارد).
+- **قدمِ بعدی**: نتیجهٔ آزمونِ هدف‌دار (EdgeSwipeBackUiTest، V3A11yGuard، LookGuard، SaleFocus) و رفتن با دستهٔ بعد.
+
+### ۱۴۰۵/۰۸/۲۵ — عاملِ e-name زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-name` (از `origin/main` a0b0f9355) — نامِ برنامه «Daily Shop»
+
+- **خواستِ صاحب‌کار**: «اسم برنامه رو هم daily Shop بزار» — پس از شناسهٔ نصبِ تازه، روی گوشی دو برنامه هر دو «توحید · پیش‌نمایش» بودند.
+  نامِ دیدنی در **هر زبان** همین لاتینِ «Daily Shop» است؛ پیش‌نمایش «Daily Shop · پیش‌نمایش». قاعده در `RULES-fa.md` («⛔ نامِ برنامه …») به‌روز شد.
+- **جاهای عوض‌شده (فقط نمایش)**: `app_name` ِ main و preview؛ `Str.appName`، `StrAccount.systemSender`، `StrAppData.notOurBackup`/`fpTitle`/`exportNotOurs`،
+  `StrDesktop.trayOpen`، `StrSettings.aboutText`، `StrSync.codeSignature`؛ نوارِ به‌روزرسانی (`UpdateBanner`)، پیامِ خریدِ اشتراک (`PlansScreen`)،
+  اعلانِ «هنوز باز است» ِ کامپیوتر؛ کامپیوتر: `description`، `menuGroup` ِ MSI، `macOS.packageName`/`dockName` (فقط CFBundleName — بسته همان `Tohid.app`)؛
+  Inno: `AppName`، `AppVerName`، `DefaultGroupName`، `UninstallDisplayName`، میان‌برها، پیام‌ها، و **`[InstallDelete]` برای میان‌برهای «فروشگاه من.lnk»**
+  (میز کار فقط با تیکِ همان میان‌بر) تا پس از به‌روزرسانی دو میان‌بر نماند؛ `setup-all/*`، `install.ps1`؛ آیفون `APP_NAME` و متنِ Face ID؛
+  حریمِ خصوصی (منبعِ `core/legal/legal-texts.json` + `generate.mjs` ⇐ رونوشتِ سرور و کاتلین، و `privacy.html`)؛ `index.html` (پنج زبان)،
+  `download.html`، `manifest.webmanifest`؛ پیش‌فرض‌های سرور (نامِ فرستندهٔ ایمیل، عنوانِ کدِ ورود، `vip-codes`، ایمیل/پیامکِ آزمایشیِ مدیر)؛
+  عنوان و متنِ انتشارها در سه ورک‌فلو (نامِ ورک‌فلوها نه) و هشدارِ عنوانِ پنجرهٔ CI ِ کامپیوتر؛ `GOOGLE-PLAY-fa.md` (متنِ فروشگاه)، `i18n-glossary.md`، `GOOGLE-LOGIN.md`.
+- **شناسه‌هایی که عمداً ماندند**: `com.vill3n.dailyshop`(+`.preview`)، بسته‌های `ir.vil3ntec.tohid`، `packageName = "Tohid"` ِ کامپیوتر (`Tohid.exe`، `Tohid.app`)،
+  `bundleID`، `upgradeUuid`، `AppId` و `DefaultDirName={localappdata}\Tohid` ِ Inno (دستشان بخورد نصبِ کهنه یتیم می‌شود)؛ پوشهٔ داده `Tohid`؛ پوشهٔ پشتیبانِ
+  «اسناد ⇐ فروشگاه من ⇐ پشتیبان» (`PlatformDesk`، داده روی دیسک)؛ برچسب/سرویسِ کلیددان (`My Shop data key`، `My Shop session key`، DPAPI `My Shop` —
+  `KekVault`، `LinuxSecretTool`، `WindowsDpapi`)؛ نامِ دارایی‌های انتشار (`MyShop-*`، `Tohid-*`)؛ نامِ ورک‌فلوها؛ مهاجرتِ ۰۰۸ ِ سرور؛ `senderName` ِ
+  پیامِ سیستمِ پشتیبانی در `support.js` (دادهٔ ذخیره‌شده و مشترک با پمپ؛ برنامه همان `StrAccount.systemSender` را نشان می‌دهد)؛ `KEEP` ِ `DariText` و
+  `license/dari.js` (بی‌زیان، آینه‌دار)؛ «دکان من» = نامِ پیش‌فرضِ دکانِ کاربر (نامِ برنامه نیست)؛ برنامهٔ مدیر «توحید مدیریت» (برنامهٔ دیگری است)؛
+  `license/*.js` (وبِ بازنشسته؛ فقط سرآیندِ توضیح)؛ `server/.env.example` و `FIREBASE-SETUP-fa.md` (نامِ کنسول، دیده نمی‌شود).
+- **آزمون‌هایی که عمداً عوض شدند (فقط رشتهٔ نام)**: `DariCoverageTest` (دو `notOurBackup`)، `DesktopTextTest` (سه ردیفِ `moved`؛ و برای خودِ نام به‌جای
+  «انگلیسی ≠ فارسی» حالا «در هر زبان دقیقاً Daily Shop» — سخت‌تر)، `SupportModelTest` («خبر از Daily Shop»)، `LegalTest` (دری: `contains("Daily Shop")`)،
+  `legal-pages.test.js` (عنوانِ انگلیسی)، `web-shop-gone.mjs` (عنوانِ انگلیسیِ صفحه). تازه: `AppNameTest` (۳: دو `app_name`، `Str.appName` در هر زبان،
+  Inno/مک/آیفون + ماندنِ `AppId`، پوشهٔ نصب، `packageName = "Tohid"` و `bundleID`).
+- **سنجش**: کاتلین (‎desktop/gradlew‎ قفلِ A): `core.i18n.*` (۱۱ کلاس، با `AppNameTest` ۳، `DariCoverageTest` ۲۳، `DariWordsTest` ۱۷، `DesktopTextTest` ۳)، `SupportModelTest`، `LookGuardTest` (۷؛ هیچ پروندهٔ هش‌دار دست نخورد)، `LinuxSecretToolTest` ⇐ ۱۰۰ ✅ ۰ ❌؛ `core` ‏`jvmTest` `core.legal.*` + `core.text.*` ⇐ ۵۰ ✅ ۰ ❌. سرور (PGlite): `legal-texts`، `legal-pages`، `mail-templates`، `platform`، `sms-admin`، `email-only-auth`، `auth`، `dari-text`، `kotlin-file-mirrors`، `backup-passphrase-warning`، `admin-ops-sms-usage`، `app-identity`، `card-data` ⇐ ۱۳۹ ✅ ۰ ❌. `generate.mjs --check` سالم؛ `precheck.sh` پس از کامیت ⇐ fail=0 (whatsnew: ۱ سطرِ تازه). نصابِ Inno، MSI، مک و آیفون این‌جا ساخته نشدند (CI ِ ویندوز/مک).
+- **قدمِ بعد (صاحب‌کار، بیرون از کد)**: نامِ صفحهٔ رضایتِ گوگل (OAuth consent) را در Google Cloud به «Daily Shop» عوض کنید؛ اگر `EMAIL_FROM_NAME`/نامِ فرستنده یا
+  عنوانِ کدِ ورود در پنلِ مدیر دستی «فروشگاه من» است، همان‌جا عوض شود (پیش‌فرضِ کد فقط وقتی خالی است به کار می‌رود). روی مک بسته همان `Tohid.app` است.
+### ۱۴۰۵/۰۸/۲۵ — عاملِ e-paymethods زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-paymethods` (از `origin/main` a0b0f9355) — همهٔ روش‌های پرداخت در صندوق
+صاحب‌کار (با عکسِ برگهٔ «تسویهٔ فروش» ِ گوشی که فقط «نقدی | نسیه» داشت): «جای پرداخت چرا حساب‌های کاربری نمیاد، مثل کیو‌آر که ثبت کرده بود از
+حساب‌پی یا ان‌اف‌سی یا کارت‌خوانِ دستگاه — این‌ها همه باید بیایند یا نقدی».
+- **پیش‌فرضِ «ترکیبی و شیفت»** (`data/PayV2Default.kt` خالص + `PayV2DefaultAndroid.kt` ‹`PayV2Pref`›): دستگاهی که کلیدِ `pay_v2` ندارد در شروعِ
+  برنامه (`loadAndSummarize(adoptPay = true)`، فقط `MainActivity` و `desktop/Main.kt`، درونِ `load` پیش از `loaded`) `true` می‌گیرد — فقط وقتی هیچ
+  صندوقی باز نیست یا هر صندوقِ باز در `PayFlow.report` بی `skipped` و با همان نقدِ موردِ انتظارِ `CashShift.totals` خوانده می‌شود؛ وگرنه `WAIT`
+  تا بسته شدن. خواندنِ `ShopPolicy.payV2` همان (بی کلید = خاموش) ⇒ آزمون‌ها و صفحه‌ها هرگز وسطِ کار عوض نمی‌شوند؛ انتخابِ صریح دست نمی‌خورد؛
+  برچسبِ تنظیم «فقط نقد و نسیه | ترکیبی و شیفت».
+- **کاشی‌ها** (`core/pay/TillMethods.kt`): نقد، کارت (کارت‌خوان؛ ثبتِ دستیِ شمارهٔ تأیید، `afpay_card` ِ PAY-06)، حساب‌پی (QR/NFC، `tillNfc`)،
+  کیف پول، حواله، نسیه؛ برداشته‌های `PayMethodsPref` بیرون. گوشی: `ui/v3/sales/checkout/CheckoutMethods.kt` بالای `CheckoutPaySplit`؛ «نقد» ِ خودکار
+  (`PayPanelState.cashAuto`، هر `CheckoutSession.reset`) ⇒ «ثبت فروش» بی زدن = فروشِ نقدیِ کامل؛ ردیفِ جدای «پرداخت با حساب‌پی» با پنلِ ترکیبی
+  دیگر نیست (کاشی جایش؛ پس از پولِ تأییدشده همان ردیفِ «ثبتِ فروش» می‌ماند). کامپیوتر: `DeskPayTiles` کنارِ سبد (زدن ⇒ `PayPanelDialog` با
+  `initial`) و `PanelTiles` درونِ پنل؛ کاشیِ حساب‌پی برگهٔ همان دکمهٔ درگاه را باز می‌کند (`CheckoutGateways.openHesab`).
+- **حساب‌پیِ در انتظار**: سرور `/shop/payments/config` فقط وقتی هیچ حسابِ فعالی نیست `pendingUntil` (فقط عدد) می‌دهد (`hesabpay-account.tillView`)؛
+  کاشیِ خاموش «به‌زودی» با «… از <زمان> فعال می‌شود»؛ مهلتِ ۲۴ ساعت دست نخورد. راه‌اندازی‌نشده ⇒ هیچ کاشی و پیوندِ «راه‌اندازیِ حساب‌پی» فقط
+  برای صاحب (گوشی، ⇐ تنظیماتِ «حساب‌پیِ دکان»).
+- **سرور**: `pay.hesabpay` در `flag-defaults.js` (`PAY_BASE`، تصمیمِ صاحب‌کار)، `KNOWN` ِ `admin-flags.js` `default: true`، FLAGS-ON §۴۹، RULES (پرداخت،
+  حساب‌پی، نقشهٔ پرچم‌ها). `false` ِ صریح (دکان یا `all`) هنوز خاموش می‌کند؛ پول فقط حسابِ خودِ دکان؛ تأییدِ خودکار فقط وب‌هوکِ رسمی (دست‌نخورده).
+- **تغییرِ آگاهانهٔ آزمون**: `flag-defaults.test.js` ۲۱ ⇒ ۲۲ کلید (+ گروه‌های `ORDER_BASE`/`PAY_BASE`)؛ `payment-intents.test.js` ِ «بی پرچم» حالا `false` ِ
+  **صریح** می‌نویسد (پیش‌تر «بی ردیف» همان را می‌سنجید) و آزمونِ تازهٔ «بی ردیف ⇒ روشن، کلیدِ سکو هرگز، `false` ِ دکان و `all`» افزوده شد — هیچ سنجه‌ای کم
+  نشد. `hesabpay-guard.test.js` ۲ب تازه (حسابِ برداشته + در انتظار: صندوق فقط زمان را می‌بیند).
+- **آزمون‌ها**: کاتلین (یک فرمانِ لاینِ B، الگوهای `*Checkout*`، `*PayFlow*`، `*CashShift*`، `*HesabPay*`، `*Till*`، `*Drawer*`، `*Shift*`،
+  `*Wiring*`، `*GiftCard*`، `*DeskSale*`، `*LookGuard*`، `*V3A11yGuard*`، `*I18n*`، `*Dari*`، …) **۵۷۸ ✅، ۰ ❌، ۰ رد** — تازه‌ها: `TillMethodsTest` ۷،
+  `PayV2DefaultTest` ۵، `PayPanelTilesTest` ۵، `PayV2AdoptStoreTest` ۴، `PayMethodsCheckoutUiTest` ۷ (نقدِ یک‌زدنی، کارت با شمارهٔ تأیید، نسیه با
+  گزینشِ مشتری، حساب‌پیِ در انتظار/آماده/راه‌اندازی‌نشده، شاگرد بی پیوند)، `DeskPayTilesUiTest` ۲؛ پس از آخرین دستکاری (هم‌قدیِ کاشی‌ها، برچسبِ «مشتری (اختیاری)») دوباره ۶۲ ✅ (`PayMethodsCheckoutUi`، `DeskPayTiles`، `V3A11yGuard`، `LookGuard`، سیم‌کشی‌های تسویه، `EPayShotsTest`). سرور (`TEST_DATABASE_URL=pglite:memory`، ۴۱ پرونده‌ی
+  مرتبط با حساب‌پی، پرچم‌ها، ویترین و فروش): **۳۲۸ ✅، ۰ ❌**؛ `flag-defaults.test.js` ۳/۳. `LookGuardTest` بی تغییرِ هش (هیچ پروندهٔ قفل‌شده دست نخورد).
+- **عکس‌ها** (بیرون از ریپو): `/home/user/wt-pay-shots/` — `EPAY_SHOTS=<پوشه> EPAY_TAG=before|after --tests '*EPayShotsTest*'` (گوشی ۳۶۰×۷۶۰ روز/شب،
+  صندوق و پنلِ کامپیوتر ۱۳۶۶×۷۶۸)؛ «پیش» از درختِ دست‌نخوردهٔ `origin/main`.
+- **نیمه‌کاره / بسته**: یکپارچگیِ خودکارِ کارت‌خوان (`DevicePaySettle`، `VendorAppTerminal`) هنوز بی سندِ D-08 ِ فروشنده — کاشیِ «کارت» همان ثبتِ دستیِ
+  شمارهٔ تأیید است، هرگز «تأییدِ دستگاه». پیوندِ «راه‌اندازیِ حساب‌پی» در کامپیوتر نیست (فقط گوشی). عکسِ دستگاهِ واقعی گرفته نشد.
+- قدمِ بعد: هماهنگ‌کننده ادغام کند؛ صفحهٔ «ترکیبی و شیفت» برای کارمند (شمارشِ کور، پیش‌فرض روشن) را در نخستین روزِ دکان‌ها ببیند.
+
+### ۱۴۰۵/۰۸/۲۵ — عاملِ e-newinstall (شاخهٔ `claude/e-newinstall`، 2.14.5): برنامهٔ تازه کنارِ قدیم — «همگام‌سازی کامل نشد»
+
+- **بازسازی (سرتاسری، سرورِ واقعی)**: `desktop/…/offline/NewInstallSyncDesktopTest` روی `server/test/e2e/lib/newinstall-backend.mjs` (همان
+  `createApp` روی PGlite؛ «برنامهٔ قدیم» دستگاهِ پروتکل با دکانِ پُر) و **همان موتورِ برنامه** (`SyncV1Engine`، `ShopStore`، `AccountBind`،
+  `SyncV1Worker.doWork`؛ نشانی از درِ «سرورها»): (الف) حسابِ موجود روی نصبِ تازه، (ب) کار پیش از ورود و بعد ورود، (ج) «ادامه بدون حساب» و بعد
+  ورود — هر سه **سبز بی هیچ تغییرِ موتور** (کالا، ورودِ انبار، مشتری و فروش می‌آیند؛ ردیف‌های پیش از ورود با `prepare` درج می‌روند).
+  (د) حسابِ بی دکان و (ه) کارِ نرفتهٔ برنامهٔ قدیم با پشتیبان ⇐ بازگردانی — هر دو پیش از درمان سرخ. قرارِ سرور: `server/test/new-install-contract.test.js`.
+- **ریشه‌ها**: (۱) نشستی که دکان ندارد (حسابِ تازه با ایمیلِ دیگر، یا «بعداً» ِ برگهٔ ساختِ دکان) ⇐ push/pull/snapshot ۴۰۳ `no_shop` با «برای این
+  حساب دکانی ثبت نشده است»؛ `SyncV1Engine` کدِ ماشینی را دور می‌ریخت، حکمِ AUTH ِ هر ۴۰۳ «نشست تمام شده» می‌گفت و پس از بازگشایی هیچ نشانه‌ای
+  نمی‌خورد ⇒ `Problem.UNKNOWN` («همگام‌سازی کامل نشد» — همان عکسِ صاحب)، و `AutoSync.needsShop` از وقتی دفتر با Sync v1 می‌رود هرگز روشن
+  نمی‌شود. هیچ دادهٔ دکان هم نمی‌آید چون این حساب دکانی ندارد. (۲) هر ردِ دیگرِ سرور با پیامِ سادهٔ فارسی (اشتراک، نقش…) هم UNKNOWN می‌شد.
+  (۳) «جزئیات» که کارت می‌گفت بفرستید هیچ‌جا نبود. (۴) بازگردانیِ پشتیبانِ برنامهٔ قدیم در برنامهٔ تازه (راهِ «از سرور») ردیف‌های نرفته را فقط
+  می‌شمرد؛ صفِ نرفتهٔ پشتیبان (`pending-ops.json`) فقط در راهِ «دستگاهِ گم‌شده» به کار می‌رفت.
+- **درمان**: `SyncStateV1.lastErrorCode` (ماندگار، با `SyncFailure.note`) ⇐ `SyncStatus.errorCode`؛ `SyncModel.diagnose(code, signedIn, queued)`:
+  `NO_SHOP` (کد/متن) با دکمهٔ «ساختن یا پیوستن به دکان» و راهنمای «همان ایمیلِ حسابِ دکان»، `NOT_SIGNED_IN` با «ورود»، `REFUSED` با پیامِ خودِ
+  سرور، ۴۰۳ ِ کددارِ غیرِ نشست دیگر «نشست» نیست. کارت: دکمهٔ «جزئیات» (پنهان تا زدن، برگه با `SyncModel.detailsText` ِ پوشانده و «رونوشت»).
+  پشتیبان: `BackupRestore.carryOf` (فقط مُهرِ همین حساب/دکان و صفِ دستگاهِ دیگر) ⇐ `SyncV1Engine.rebuildFromServer(carry)` همان `op_id`ها را جلوی
+  صف و پیش از Snapshot می‌فرستد؛ برنامهٔ قدیم که بعداً بفرستد ⇒ `duplicate`. برگهٔ `AppMove` گام‌به‌گام (`AppMove.steps`). `AccountBind.bootstrapSoon`
+  حالا `Job` ِ خودش را برمی‌گرداند (آزمون `join` می‌کند).
+- **آزمون‌ها**: کاتلین (همان دستورِ lane A) ۳۸ کلاس، ۳۳۵ آزمون سبز — `*NewInstall*` (۵ سرتاسری + عکس‌ها)، `SyncDiagnosisNewInstallTest` (۶)،
+  و خانواده‌های `*SyncV1*`، `*Sync*Test`، `*Backup*`، `*AppMove*`، `*Restore*`، `*AccountBind*`، `*SignOut*`، `InfraLeakGuardTest`،
+  `DariCoverageTest`، `SettingsModelsTest`، `*WhatsNew*`. سرور: `new-install-contract` + `sync-v1` + `app-identity` = ۴۸/۴۸. نخستین اجرا ۹ آزمونِ
+  `BackupRestoreDrillTest`/`BackupSealDrillTest` را سرخ کرد چون آزمونِ سرتاسری نشست را در `DesktopContext` جا می‌گذاشت؛ `@AfterClass` حالا پوشه را
+  خالی می‌کند (همان `wipe` ِ «نصبِ تازه»). عکس‌ها (گوشی، روز/شب): `/home/user/wt-sync-shots/` با `NI_SHOTS=<پوشه>`.
+- **تغییرِ آگاهانهٔ قاعده**: استثنای «جزئیات» زیرِ «⛔ هیچ جزئیاتِ فنی/زیرساخت در صفحه» در `docs/RULES-fa.md` (خواستِ هماهنگ‌کننده از عکسِ صاحب).
+  هیچ آزمونی ضعیف یا کنار گذاشته نشد؛ هیچ کدِ مشترکِ پمپ (`sync-v1.js` و …) دست نخورد.
+- **نیمه‌کاره / قدمِ بعدی**: (۱) صفِ مهمانِ پیش از ورود زیرِ کلیدِ دستگاه می‌ماند (`SyncAccountKey.carryFrom` کلیدِ دستگاه را نمی‌برد)؛ ردیف‌هایش با
+  `prepare` درج می‌روند ولی ویرایشِ فهرست‌های تنظیماتی (دسته/واحد) ِ مهمان نه. (۲) بازگردانی در حالتِ مهمان (`RestoreRoute.LOCAL`) صفِ پشتیبان را
+  نمی‌برد — راهنما می‌گوید اول وارد شوید. (۳) `AppRoot` هنوز فقط سرِ باز شدن `no_shop` را می‌پرسد (برگهٔ دکان)، نه از خطای موتور.
 ### ۱۴۰۵/۰۸/۲۵ — هماهنگ‌کننده (سیزنِ 01GcPTAL…)، پایانِ سیزن: دستهٔ ۷۰ (`claude/batch-70`، PR #1057)
 
 - **مرج‌شده در این سیزن**: #1053 (۶۶)، #1054 (۶۷)، #1055 (۶۸)، #1056 (۶۹)؛ سرور #151 (۱.۵۱.۲: کارتِ «اعلانِ گوشی (Firebase)» و دکمهٔ

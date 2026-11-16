@@ -15,8 +15,11 @@ import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrDeskOff
 import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.i18n.StrOrderFlow
+import ir.vil3ntec.tohid.core.i18n.StrSupportAsk
+import ir.vil3ntec.tohid.core.support.SupportProblem
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.v3.account.AccountPaths
+import ir.vil3ntec.tohid.ui.v3.account.support.supportAsk
 import ir.vil3ntec.tohid.ui.v3.shell.ShellTargets
 
 /**
@@ -25,7 +28,7 @@ import ir.vil3ntec.tohid.ui.v3.shell.ShellTargets
  *
  *  - روشن کردن کارِ پنلِ سکوست، نه کاربرِ دکان؛ پس برگه **نه** گامِ پنل دارد **نه** نامِ درونیِ پرچم (قاعدهٔ «هیچ جزئیاتِ
  *    فنی/زیرساخت در صفحه» برای همهٔ نقش‌ها، تصمیمِ هماهنگ‌کننده ۱۴۰۵/۰۸/۲۴ — صاحبِ هر دکانی این برگه را می‌بیند و به پنل راه ندارد).
- *  - صاحبِ دکان: «پیام به پشتیبانی برای روشن کردن» (گفت‌وگوی پشتیبانی با پیش‌نویسِ آماده)؛ دیگران: «برای روشن کردن با
+ *  - صاحبِ دکان: «از پشتیبانی بخواه» (درخواستِ ساخت‌یافتهٔ همین پرچم با یک لمس در گفت‌وگوی پشتیبانی، `AskSupport.kt`)؛ دیگران: «برای روشن کردن با
  *    پشتیبانی تماس بگیرید» و دکمهٔ همان «پشتیبانی». سفارش‌ها برای صاحب/مدیر «چرا سفارشِ آنلاین نمی‌رسد» را هم دارد
  *    (`ShellTargets.ORDERS_SETUP`، همان کاشیِ خاموشِ خانه).
  *
@@ -79,7 +82,8 @@ object DeskOff {
       note = if (s.partOfOrders) StrDeskOff.partOf(name) else null,
       contact = if (owner) null else StrDeskOff.callSupport,
       actions = buildList {
-        if (owner) add(Action(StrDeskOff.askSupport, AccountPaths.support(StrDeskOff.supportDraft(name)), primary = true))
+        //  «از پشتیبانی بخواه»: همان یک لمس درخواستِ ساخت‌یافتهٔ «همین پرچم برای همین دکان» را می‌فرستد (پیش‌نویسِ دستیِ پیشین نه)
+        if (owner) add(Action(StrSupportAsk.button, AccountPaths.supportAsk(SupportProblem.code(SupportProblem.FLAG_OFF, s.flag), mapOf("screen" to "desk:$id")), primary = true))
         else add(Action(Str.support, AccountPaths.SUPPORT, primary = true))
         if (orders && (owner || canAdmin)) add(Action(StrOrderFlow.arrivalTitle, ShellTargets.ORDERS_SETUP, primary = false))
       },

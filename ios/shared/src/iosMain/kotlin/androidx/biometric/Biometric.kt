@@ -13,7 +13,7 @@ import platform.LocalAuthentication.LAPolicyDeviceOwnerAuthenticationWithBiometr
 /*
  *  shim ِ iOS ِ `androidx.biometric` (گامِ ۶) — Face ID / Touch ID با LocalAuthentication، تا خودِ `data/Fingerprint.kt` ِ
  *  اندروید روی آیفون کامپایل و اجرا شود (جایگزینِ `FingerprintIos` حذف شد؛ رفتار همان):
- *  - «دلیل» ِ پنجرهٔ iOS = `title` ِ اندروید («باز کردن فروشگاه من»)؛ `subtitle` («انگشتتان را…») به iOS نمی‌رود چون روی
+ *  - «دلیل» ِ پنجرهٔ iOS = `title` ِ اندروید («باز کردن Daily Shop»)؛ `subtitle` («انگشتتان را…») به iOS نمی‌رود چون روی
  *    Face ID نادرست است. دکمهٔ دوم = `negativeButtonText` («با رمز وارد می‌شوم»).
  *  - لغوِ کاربر/برنامه/سیستم ⇐ `ERROR_USER_CANCELED` و «با رمز» ⇐ `ERROR_NEGATIVE_BUTTON`: کدِ اندروید هر دو را بی پیام
  *    می‌گذارد. خطای دیگر ⇐ پیامِ خودِ iOS. پاسخ روی همان `Executor` ِ صدازننده (رشتهٔ اصلی).

@@ -206,6 +206,23 @@ object StrUpdate {
     "Everything has reached the server. Once you've signed in to the new app and see your ledger there, you can remove this app.",
     "ټول شیان سرور ته رسېدلي. کله چې په نوي اپ کې ننوتئ او خپل دفتر مو هلته ولید، دا اپ لرې کولی شئ.",
   )
+  //  e-newinstall: گام‌های جابه‌جایی (`AppMove.steps`)
+  val movedStepsTitle: String get() = t("جابه‌جایی بی گم شدنِ داده", "Moving without losing data", "پرته له معلوماتو د ورکېدو لېږد")
+  val movedStepKeep: String get() = t(
+    "این برنامهٔ قدیم را نگه دارید تا «همگام‌سازی»اش بگوید «همه‌چیز روی سرور نشسته».",
+    "Keep this old app until its “Sync” page says “Everything is on the server”.",
+    "دا زوړ اپ وساتئ تر څو یې «همغږي» ووايي «هر څه په سرور کې دي».",
+  )
+  val movedStepAccount: String get() = t(
+    "در برنامهٔ تازه با همان حساب (همان ایمیل) وارد شوید — نه «ادامه بدون حساب» و نه حسابِ تازه. دکان، کالاها، موجودی و مشتری‌ها از سرور می‌آیند.",
+    "In the new app, sign in with the same account (the same email) — not “Continue without an account” and not a new account. The shop, products, stock and customers come from the server.",
+    "په نوي اپ کې په هماغه حساب (هماغه برېښنالیک) ننوځئ — نه «بې حسابه دوام» او نه نوی حساب. دوکان، توکي، زېرمه او پیرودونکي له سرور راځي.",
+  )
+  val movedStepBackup: String get() = t(
+    "اگر چیزی همگام نشد: در همین برنامهٔ قدیم «پشتیبان و بازگردانی» ⇐ پشتیبانِ کامل بگیرید و فایل را در «دانلودها»ی گوشی ذخیره کنید؛ بعد در برنامهٔ تازه (واردشده با همان حساب) همان‌جا «بازگردانی» را بزنید و همان فایل را بردارید.",
+    "If something didn't sync: in this old app open “Backup & restore” ⇒ take a full backup and save the file in the phone's “Downloads”; then in the new app (signed in with the same account) tap “Restore” in the same place and pick that file.",
+    "که څه همغږي نه شول: په همدې زاړه اپ کې «بیک‌اپ او بېرته راوستل» ⇐ بشپړ بیک‌اپ واخلئ او دوتنه د تلیفون په «ډاونلوډونو» کې خوندي کړئ؛ بیا په نوي اپ کې (په هماغه حساب ننوتي) په همغه ځای «بېرته راوستل» ووهئ او هماغه دوتنه وټاکئ.",
+  )
   val movedInstall: String get() = t("گرفتن و نصبِ برنامهٔ تازه", "Get and install the new app", "نوی اپ ترلاسه او نصب کړئ")
   val movedInstallReady: String get() = t("نصبِ برنامهٔ تازه", "Install the new app", "نوی اپ نصب کړئ")
   val movedLater: String get() = t("بعداً", "Later", "وروسته")

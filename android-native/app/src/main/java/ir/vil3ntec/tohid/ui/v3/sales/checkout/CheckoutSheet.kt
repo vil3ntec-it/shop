@@ -94,6 +94,10 @@ data class CheckoutView(
   val creditBlock: String? = null,
   /** PAY-21 — ردیفِ «پرداخت با حساب‌پی (NFC/QR)» (`TillHesab.tillNfc`)؛ `null` ⇒ پنهان */
   val hesab: HesabEntry? = null,
+  /** e-paymethods — کاشی‌های «روشِ پرداخت» ِ پنلِ ترکیبی (`TillMethods.tiles`)؛ `null` ⇒ بی کاشی (صندوقِ «نقدی | نسیه») */
+  val methods: List<ir.vil3ntec.tohid.core.pay.TillMethods.Tile>? = null,
+  /** حساب‌پی راه‌اندازی نشده و کاربر صاحبِ دکان است ⇒ پیوندِ «راه‌اندازیِ حساب‌پی» زیرِ کاشی‌ها */
+  val hesabSetup: Boolean = false,
 )
 
 /** ردیفِ حساب‌پیِ برگهٔ تسویه: عنوان، زیرنویس (حالت یا «باقی را می‌پردازد») و زدنی بودن */
@@ -111,6 +115,10 @@ class CheckoutActions(
   val close: () -> Unit,
   /** PAY-21 — «پرداخت با حساب‌پی (NFC/QR)» ⇐ `sale/checkout/hesabpay` (یا ثبتِ دوبارهٔ پرداختِ تأییدشده) */
   val hesabPay: () -> Unit = {},
+  /** e-paymethods — زدنِ یک کاشیِ «روشِ پرداخت» */
+  val method: (ir.vil3ntec.tohid.core.pay.TillMethods.Tile) -> Unit = {},
+  /** e-paymethods — «راه‌اندازیِ حساب‌پی» (فقط صاحب) ⇐ تنظیماتِ «حساب‌پیِ دکان» */
+  val setupHesab: () -> Unit = {},
 )
 
 /**
@@ -183,6 +191,11 @@ private fun FormBody(v: CheckoutView, pay: PayPanelState, a: CheckoutActions) {
 
       Spacer(Modifier.height(12.dp))
       if (v.payV2) {
+        //  e-paymethods: همهٔ روش‌های دکان به‌صورتِ کاشی بالای پنل (نقد، کارت، حساب‌پی، کیف پول، حواله، نسیه)
+        v.methods?.let { tiles ->
+          CheckoutMethods(tiles, pay, v.numbers.finalTotal, f.debtorId, v.busy, a.method, onSetup = if (v.hesabSetup) a.setupHesab else null)
+          Spacer(Modifier.height(4.dp))
+        }
         CheckoutPaySplit(pay, v.numbers.finalTotal, f.debtorId, v.customerName, onSubmit = a.submit, error = v.payError, ledger = v.giftLedger)
         Spacer(Modifier.height(12.dp))
       } else if (f.payment == SalesEngine.Payment.CREDIT) {
@@ -300,6 +313,8 @@ private fun PromoCodeBox(
 private fun CustomerRow(v: CheckoutView, a: CheckoutActions) {
   val f = v.form
   val label = when {
+    //  e-paymethods: با کاشی‌ها نقد پیش‌فرض است و «نسیه» خودش کاشی دارد ⇒ مشتری اختیاری است، نه «باقی به حسابش»
+    v.payV2 && v.methods != null -> StrSale.customerOptional
     v.payV2 -> StrSale.customerToAccount
     f.payment == SalesEngine.Payment.CREDIT -> StrSale.debtorWord
     else -> StrSale.customerOptional

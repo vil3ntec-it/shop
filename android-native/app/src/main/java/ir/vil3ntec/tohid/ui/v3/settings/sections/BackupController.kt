@@ -68,6 +68,8 @@ internal class BackupController(
   /** فایلِ خوانده و سنجیده‌شده، پیش از آنکه دفتر عوض شود (برگهٔ تأیید) */
   var pendingRestore by mutableStateOf<ShopData?>(null)
     private set
+  /** e-newinstall: صفِ نرفتهٔ نصبِ دیگرِ همین حساب از همان پشتیبان (`BackupRestore.carryOf`) */
+  private var pendingCarry: List<ir.vil3ntec.tohid.sync.v1.SyncOp> = emptyList()
   var restorePhotos by mutableIntStateOf(0)
     private set
   var restoreError by mutableStateOf<String?>(null)
@@ -187,7 +189,7 @@ internal class BackupController(
         val input = context.contentResolver.openInputStream(uri) ?: error(StrSettings.fileNotOpened)
         input.use { BackupRestore.open(context, store, it, typed).getOrThrow() }
       }
-    }.onSuccess { unlockFile = null; unlockError = null; pendingRestore = it.data; restorePhotos = it.photos; restoreError = null }
+    }.onSuccess { unlockFile = null; unlockError = null; pendingRestore = it.data; restorePhotos = it.photos; restoreError = null; pendingCarry = BackupRestore.carryOf(context, it) }
       .onFailure { e ->
         BackupBundle.dropStaging(context)
         when {
@@ -202,7 +204,7 @@ internal class BackupController(
   /** @param typed عبارتِ بازیابی برای نسخهٔ رمزداری که کلیدش این‌جا نیست ([unlock]) */
   fun readSnapshot(snap: AutoBackup.Snapshot, typed: String? = null) = scope.launch {
     withContext(Dispatchers.IO) { BackupRestore.openSnapshot(context, store, snap.file, typed) }
-      .onSuccess { unlock = null; unlockError = null; pendingRestore = it; restorePhotos = 0; restoreError = null }
+      .onSuccess { unlock = null; unlockError = null; pendingRestore = it; restorePhotos = 0; restoreError = null; pendingCarry = emptyList() }
       .onFailure { e ->
         when {
           typed == null && BackupRestore.needsPhrase(e, snap.file) -> { unlock = snap; unlockError = null; restoreError = null }
@@ -223,16 +225,19 @@ internal class BackupController(
   fun cancelRestore() {
     BackupBundle.dropStaging(context)
     pendingRestore = null
+    pendingCarry = emptyList()
     restorePhotos = 0
   }
 
   fun confirmRestore() {
     val next = pendingRestore ?: return
+    val carry = pendingCarry
     pendingRestore = null
+    pendingCarry = emptyList()
     scope.launch {
       //  ⚠️ بازیابیِ پشتیبان دادهٔ خودِ کاربر است؛ قفلِ نرمِ پایانِ اشتراک گروگانش نمی‌گیرد. OPS-02 (`BackupRestore.confirm`):
       //  عکس‌ها و تنظیمات فقط پس از نشستنِ دفتر؛ ردشده («اول وارد شوید»، صفِ نرفته…) ⇒ پیامِ خودش، نه «روی حافظه نوشته نشد»
-      val r = BackupRestore.confirm(context, store, next)
+      val r = BackupRestore.confirm(context, store, next, carry)
       if (!r.ok) { toasts.show(r.message.ifBlank { StrSettings.restoreDiskFail }); return@launch }
       canUndo = true
       restorePhotos = 0

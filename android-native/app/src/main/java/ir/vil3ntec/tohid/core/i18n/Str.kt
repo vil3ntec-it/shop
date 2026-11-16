@@ -61,7 +61,7 @@ object Str {
   val staff: String get() = t("کارمندان دکان", "Shop staff", "د دوکان کارکوونکي")
   val orders: String get() = t("سفارش‌ها", "Orders", "فرمایشونه")
   val storefront: String get() = t("ویترینِ اینترنتی", "Online storefront", "آنلاین ویترین")
-  val appName: String get() = t("فروشگاه من", "My Shop", "زما دوکان")
+  val appName: String get() = t("Daily Shop", "Daily Shop", "Daily Shop") // نامِ برنامه در هر زبان همین لاتین (خواستِ صاحب‌کار ۱۴۰۵/۰۸/۲۵)
   val shop: String get() = t("دکان", "Shop", "دوکان")
 
   // بخش‌های تنظیمات (عنوانِ کارت و فهرستِ کامپیوتر — یکی‌اند)

@@ -109,6 +109,9 @@ fun CheckoutGateways(
   busy: Boolean,
   onPaid: (Settlement) -> Unit,
   modifier: Modifier = Modifier,
+  /** e-paymethods — کاشیِ «حساب‌پی» ِ پنل زده شد (شمارنده؛ ۰ ⇒ هیچ) ⇒ برگهٔ همان دکمه خودش باز می‌شود و [onHesabOpened] */
+  openHesab: Int = 0,
+  onHesabOpened: () -> Unit = {},
 ) {
   var till by remember { mutableStateOf(TillHesab.OFF) }
   //  هر فاکتورِ تازه دوباره می‌پرسد (یک دقیقه در حافظه): پرچم یا نت که عوض شد، صفحهٔ ماندگارِ کامپیوتر هم می‌فهمد
@@ -116,9 +119,9 @@ fun CheckoutGateways(
   if (!till.any) return
   Column(modifier) {
     //  درگاهِ خودکار با کلیدِ خودِ دکان (قصدِ سرور + وب‌هوکِ امضاشده)
-    if (till.gateway) HesabPayEntry(hook, total, panel?.draft(total, customerId), enabled, busy, onPaid, payee = till.payee)
+    if (till.gateway) HesabPayEntry(hook, total, panel?.draft(total, customerId), enabled, busy, onPaid, payee = till.payee, ask = openHesab, onAsked = onHesabOpened)
     //  حالتِ ساده: شماره/QR ِ خودِ دکان (فقط از حسابِ ذخیره‌شده در سرور)؛ تأیید فقط با «پول رسید» ِ صندوقدار
-    till.simple?.let { HesabPaySimpleEntry(hook, it, till.payee, total, panel?.draft(total, customerId), enabled, busy, onPaid) }
+    till.simple?.let { HesabPaySimpleEntry(hook, it, till.payee, total, panel?.draft(total, customerId), enabled, busy, onPaid, ask = openHesab, onAsked = onHesabOpened) }
     //  کارت‌خوان (آداپتورِ دستی) فقط جایی که ثبتِ دستیِ PAY-06 هست: پنلِ ترکیبی
     if (panel != null && till.gateway) CardTerminalEntry(hook.saleKey, total, panel, customerId, enabled, busy, hook.ready)
   }
@@ -135,6 +138,8 @@ private fun HesabPayEntry(
   onPaid: (Settlement) -> Unit,
   modifier: Modifier = Modifier,
   payee: Payee? = null,
+  ask: Int = 0,
+  onAsked: () -> Unit = {},
 ) {
   val env = hook.env
   val saleKey = hook.saleKey ?: return
@@ -145,6 +150,8 @@ private fun HesabPayEntry(
   val resumable = stored != null && stored.amountMinor == due.minor && stored.status in RESUMABLE
   //  برنامه وسطِ پرداخت بسته شده بود ⇐ همان پرداخت خودش دوباره باز و پاییده می‌شود
   LaunchedEffect(saleKey, resumable) { if (resumable && enabled) open = true }
+  //  e-paymethods: کاشیِ «حساب‌پی» ِ پنل همان زدنِ این دکمه است (با همان `ready` ِ پیش از پول)
+  LaunchedEffect(ask) { if (ask > 0) { onAsked(); if (enabled && !busy && (resumable || hook.ready())) open = true } }
 
   Column(modifier) {
     OutlinedButton(

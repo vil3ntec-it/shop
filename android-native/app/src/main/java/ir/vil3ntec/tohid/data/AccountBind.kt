@@ -89,11 +89,12 @@ object AccountBind {
    *  سه درخواستِ دیگر (تپش، سری سند، زنجیرهٔ سند) می‌زد. `prepare` زیرِ قفلِ موتور و یک‌باره است، پس اجرای
    *  هم‌زمان با کارگر چیزی را دو بار نمی‌نشاند.
    */
-  fun bootstrapSoon(context: Context, store: ShopStore) {
+  fun bootstrapSoon(context: Context, store: ShopStore): kotlinx.coroutines.Job? {
     val app = context.applicationContext
     val engine = SyncV1Engine.of(app)
-    if (store.training) return
-    background.launch {
+    if (store.training) return null
+    //  `Job` ِ همین کار: صفحه منتظر نمی‌ماند؛ آزمونِ سرتاسریِ نصبِ تازه (`NewInstallSyncDesktopTest`) `join` می‌کند
+    return background.launch {
       val read = { store.ledgerNow() }
       val write = { next: ShopData -> store.applyFromServerNow(next) }
       //  DATA-06: حالِ پشتیبانِ گوشیِ دیگر ⇒ اول «بازسازی از سرور» با همین دفترِ صفحه (نه نمونهٔ کارگر) — `V1Replica.rebuildRestored`

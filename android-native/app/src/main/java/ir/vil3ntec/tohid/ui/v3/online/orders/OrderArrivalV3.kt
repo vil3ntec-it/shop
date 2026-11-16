@@ -8,11 +8,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrOrderFlow
+import ir.vil3ntec.tohid.core.i18n.StrSupportAsk
 import ir.vil3ntec.tohid.core.model.OrderArrivalDto
 import ir.vil3ntec.tohid.core.orders.OrderFlow
+import ir.vil3ntec.tohid.core.support.SupportProblem
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.account.AccountPaths
+import ir.vil3ntec.tohid.ui.v3.account.support.supportAsk
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.online.OnlinePaths
 import ir.vil3ntec.tohid.ui.v3.online.storefront.StorefrontModel
@@ -29,18 +32,22 @@ internal fun OrderArrivalCardV3(
   onFix: (OrderFlow.Fix) -> Unit,
   modifier: Modifier = Modifier,
   showOk: Boolean = false,
+  /** «از پشتیبانی بخواه» برای دروازهٔ کارِ پشتیبانی (`SupportProblem.forOrderBlocker`)؛ null ⇒ همان «پشتیبانی» ِ ساده */
+  onAsk: ((String) -> Unit)? = null,
 ) {
   if (arrival.ok && arrival.warnings.isEmpty() && !showOk) return
   Column(modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     if (arrival.ok && showOk) V3Message(V3Tone.SUCCESS, StrOrderFlow.arrivalOk)
     arrival.blockers.forEachIndexed { i, b ->
       val fix = OrderFlow.fixOf(b.fix)
+      //  کارِ پشتیبانی ⇒ درخواستِ ساخت‌یافته با یک لمس (کد هرگز روی صفحه نیست)
+      val ask = if (fix == OrderFlow.Fix.SUPPORT && onAsk != null) SupportProblem.forOrderBlocker(b.code) else null
       V3Message(
         if (i == 0) V3Tone.WARNING else V3Tone.INFO,
         StrOrderFlow.blocker(b.code),
         body = StrOrderFlow.blockerHow(b.code),
-        action = fixLabel(fix),
-        onAction = fixLabel(fix)?.let { { onFix(fix) } },
+        action = if (ask != null) StrSupportAsk.button else fixLabel(fix),
+        onAction = if (ask != null) ({ onAsk?.invoke(ask) }) else fixLabel(fix)?.let { { onFix(fix) } },
       )
     }
     arrival.warnings.forEach { w ->
@@ -56,6 +63,11 @@ internal fun fixLabel(fix: OrderFlow.Fix): String? = when (fix) {
   OrderFlow.Fix.SUBSCRIBE -> StrOrderFlow.fixSubscribe
   OrderFlow.Fix.SUPPORT -> StrOrderFlow.fixSupport
   OrderFlow.Fix.SERVER, OrderFlow.Fix.NONE -> null
+}
+
+/** «از پشتیبانی بخواه» ِ همین کد از صفحهٔ `screen` (نامک، فقط برای پشتیبانی) */
+internal fun RouteScope.openAsk(code: String, screen: String) {
+  nav.open(AccountPaths.supportAsk(code, mapOf("screen" to screen)))
 }
 
 /** دکمهٔ کارت ⇒ همان صفحهٔ برنامه (تنظیمِ ویترین، کالاهای ویترین، اشتراک، پشتیبانی) */

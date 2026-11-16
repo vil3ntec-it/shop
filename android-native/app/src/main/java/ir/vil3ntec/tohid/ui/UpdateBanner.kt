@@ -48,7 +48,7 @@ private fun updateMessage(version: String, required: Boolean, progress: Int, rea
   ready && Platform.DESKTOP -> "نسخهٔ $version آماده است. «به‌روزرسانی» برنامه را چند ثانیه می‌بندد و دوباره باز می‌کند؛ دفتر سرِ جایش می‌ماند."
   ready -> "نسخهٔ $version گرفته شد — آمادهٔ نصب."
   required -> "این نسخه (${BuildConfig.VERSION_NAME}) دیگر پشتیبانی نمی‌شود. لطفاً به $version به‌روز کنید؛ دفترتان سرِ جایش می‌ماند."
-  else -> "نسخهٔ تازهٔ فروشگاه من آمد: $version"
+  else -> "نسخهٔ تازهٔ Daily Shop آمد: $version"
 }
 
 /**

@@ -374,7 +374,7 @@ jobs:
           Start-Sleep 3
           if ($alive -eq 0) { throw "برنامه باز شد و خودش بسته شد" }
           if ($mem -lt 150) { throw "JVMِ برنامه بالا نیامد (حافظه $mem مگابایت)" }
-          if ($title -notmatch 'فروشگاه من') { Write-Host "::warning::عنوانِ پنجره «$title» است (روی CI ممکن است پنجره ساخته نشود)" }
+          if ($title -notmatch 'Daily Shop') { Write-Host "::warning::عنوانِ پنجره «$title» است (روی CI ممکن است پنجره ساخته نشود)" }
           Write-Host "✓ برنامه باز شد و ماند"
           #  PERF-DESK: زمانِ باز شدن، موتورِ کشیدنِ Skiko و heap روی همین ویندوز (‎desktop/…/StartupTrace.kt‎) — فقط چاپ
           Get-Content (Join-Path $env:LOCALAPPDATA 'Tohid\files\startup.txt') -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "   startup: $_" }
@@ -489,7 +489,7 @@ jobs:
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: tohid-desktop-beta
-          name: فروشگاه من — کامپیوتر، نسخهٔ آزمایشی (beta)
+          name: Daily Shop — کامپیوتر، نسخهٔ آزمایشی (beta)
           prerelease: true
           target_commitish: ${{ github.sha }}
           body: |
@@ -515,11 +515,11 @@ jobs:
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: tohid-desktop
-          name: فروشگاه من — برنامهٔ کامپیوتر
+          name: Daily Shop — برنامهٔ کامپیوتر
           prerelease: true
           target_commitish: ${{ github.sha }}
           body: |
-            ## فروشگاه من — برنامهٔ کامپیوتر (ویندوز · مک · لینوکس)
+            ## Daily Shop — برنامهٔ کامپیوتر (ویندوز · مک · لینوکس)
 
             همان برنامهٔ گوشی، بومی روی کامپیوتر — Kotlin و Compose، بی مرورگر و بی WebView.
             همان حساب، همان دکان، همان اشتراک.
@@ -554,7 +554,7 @@ jobs:
           }
           files="Tohid-Windows-Offline.exe Tohid-Windows.msi Tohid-Mac-AppleSilicon.dmg Tohid-Mac-Intel.dmg Tohid-Linux.deb"
           for f in $files; do up "$f"; done
-          #  نام‌های رو به کاربر «MyShop-…» (برنامه «فروشگاه من» است)؛ «Tohid-…» فقط برای
+          #  نام‌های رو به کاربر «MyShop-…» (برنامه «Daily Shop» است)؛ «Tohid-…» فقط برای
           #  به‌روزرسانیِ درون‌برنامهٔ نسخه‌های نصب‌شده می‌ماند. یک نصابِ ویندوز (2.14.5): ‎MyShop-Windows-Setup.exe‎
           #  همان بایت‌های نصابِ کامل است — هنگامِ نصب هیچ دانلودی نیست (‎release-rehearsal.js‎ همین برابری را در فهرست می‌سنجد).
           cp Tohid-Windows-Offline.exe MyShop-Windows-Setup.exe; up MyShop-Windows-Setup.exe

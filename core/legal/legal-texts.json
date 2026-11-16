@@ -21,7 +21,7 @@
     "version": "1405-08-13",
     "fa": {
       "short": "حریمِ خصوصی",
-      "title": "حریمِ خصوصیِ «فروشگاه من»",
+      "title": "حریمِ خصوصیِ «Daily Shop»",
       "lead": "آخرین بازبینی: ۱۴۰۵/۰۸/۱۳ — برای برنامهٔ اندروید، کامپیوتر و نسخهٔ وب.",
       "sections": [
         {
@@ -31,7 +31,7 @@
           "items": [
             "داده‌های دکانِ شما (کالا، فروش، مشتری، قرض، خرید، مصارف) **مالِ شماست** و فروخته یا به کسی داده نمی‌شود.",
             "بی ساختنِ حساب، داده‌های دکان فقط روی دستگاهِ خودتان می‌ماند.",
-            "با حساب، داده برای همگام‌سازی میانِ دستگاه‌ها و پشتیبان روی سرورِ «فروشگاه من» نگه داشته می‌شود.",
+            "با حساب، داده برای همگام‌سازی میانِ دستگاه‌ها و پشتیبان روی سرورِ «Daily Shop» نگه داشته می‌شود.",
             "تبلیغ و ردیاب و فروشِ داده نداریم."
           ]
         },
@@ -87,7 +87,7 @@
           "paras": [],
           "items": [
             "**در برنامه:** «حساب من ← ویرایش حساب ← حذفِ حساب». پس از تأییدِ دوبارهٔ رمز (یا کدِ ایمیل) و نوشتنِ ایمیل یا شمارهٔ همان حساب، حساب و همهٔ دادهٔ روی سرورش پاک می‌شود.",
-            "**بی برنامه، از وب:** در [پورتالِ وبِ «فروشگاه من»](/portal/#delete-account) با ایمیل و کدِ شش‌رقمی وارد شوید و برگهٔ «حذفِ حساب» را بزنید. لازم نیست برنامه را دوباره نصب کنید.",
+            "**بی برنامه، از وب:** در [پورتالِ وبِ «Daily Shop»](/portal/#delete-account) با ایمیل و کدِ شش‌رقمی وارد شوید و برگهٔ «حذفِ حساب» را بزنید. لازم نیست برنامه را دوباره نصب کنید.",
             "**از پشتیبانی:** اگر حذف از خودِ برنامه هنوز روشن نشده یا حساب پمپ هم دارد، همان برگه درخواستِ حذف را به «پشتیبانی» می‌فرستد و حساب به دستِ مدیرِ سامانه پاک می‌شود.",
             "**چه پاک می‌شود:** خودِ حساب، نشست‌ها و دستگاه‌ها، و دکان‌هایی که صاحبشان هستید با کالا، فروش، مشتری، قرض، دفترِ همگام‌سازی و پشتیبان‌های روی سرورشان. کارمندانِ آن دکان‌ها دسترسی‌شان را از دست می‌دهند. حذف برگشت‌پذیر نیست.",
             "**چه می‌ماند:** سندِ پرداخت‌های اشتراک (دفترِ مالیِ سامانه)، سابقهٔ خودِ حذف بی ایمیل و شماره، و نسخه‌های پشتیبانِ کلِ سرور تا پایانِ دورهٔ نگه‌داری‌شان. دکانِ کسِ دیگری که فقط عضوش بودید پاک نمی‌شود؛ فقط عضویتِ شما.",
@@ -123,7 +123,7 @@
     },
     "en": {
       "short": "Privacy policy",
-      "title": "Privacy policy of “My Shop”",
+      "title": "Privacy policy of “Daily Shop”",
       "lead": "Last reviewed: 4 November 2026 (1405/08/13) — for the Android app, the computer app and the web version.",
       "sections": [
         {
@@ -133,7 +133,7 @@
           "items": [
             "Your shop’s data (goods, sales, customers, debts, purchases, expenses) **belongs to you** and is never sold or given to anyone.",
             "Without an account, the shop’s data stays only on your own device.",
-            "With an account, data is kept on the “My Shop” server to sync between devices and as a backup.",
+            "With an account, data is kept on the “Daily Shop” server to sync between devices and as a backup.",
             "We have no ads, no trackers and no data selling."
           ]
         },
@@ -189,7 +189,7 @@
           "paras": [],
           "items": [
             "**In the app:** “My account → Edit account & shop → Delete account”. After confirming your password again (or an email code) and typing that account’s email or number, the account and all of its data on the server are deleted.",
-            "**Without the app, on the web:** sign in to the [“My Shop” web portal](/portal/#delete-account) with your email and a six-digit code and open the “Delete account” tab. You do not need to reinstall the app.",
+            "**Without the app, on the web:** sign in to the [“Daily Shop” web portal](/portal/#delete-account) with your email and a six-digit code and open the “Delete account” tab. You do not need to reinstall the app.",
             "**Through support:** if deletion from the app itself is not turned on yet, or the account also has a pump, the same sheet sends a deletion request to “Support” and the system administrator deletes the account.",
             "**What is deleted:** the account itself, its sessions and devices, and the shops you own with their goods, sales, customers, debts, sync ledger and backups on the server. Staff of those shops lose their access. Deletion cannot be undone.",
             "**What remains:** records of subscription payments (the system’s financial ledger), a record of the deletion itself without email or number, and full-server backups until the end of their retention period. Someone else’s shop that you were only a member of is not deleted; only your membership is.",
@@ -225,7 +225,7 @@
     },
     "ps": {
       "short": "د محرمیت تګلاره",
-      "title": "د «زما دوکان» د محرمیت تګلاره",
+      "title": "د «Daily Shop» د محرمیت تګلاره",
       "lead": "وروستۍ کتنه: ۱۴۰۵/۰۸/۱۳ — د اندروید اپ، د کمپیوټر اپ او د وېب نسخې لپاره.",
       "sections": [
         {
@@ -235,7 +235,7 @@
           "items": [
             "ستاسو د دوکان معلومات (توکي، پلور، پېرودونکي، پور، پېر، لګښتونه) **ستاسو دي** او نه پلورل کېږي او نه چا ته ورکول کېږي.",
             "که حساب جوړ نه کړئ، د دوکان معلومات یوازې ستاسو په خپله وسیله کې پاتې کېږي.",
-            "له حساب سره، معلومات د وسیلو ترمنځ د همغږۍ او د بیک‌اپ لپاره د «زما دوکان» په سرور کې ساتل کېږي.",
+            "له حساب سره، معلومات د وسیلو ترمنځ د همغږۍ او د بیک‌اپ لپاره د «Daily Shop» په سرور کې ساتل کېږي.",
             "موږ اعلانونه، تعقیبوونکي او د معلوماتو پلور نه لرو."
           ]
         },
@@ -291,7 +291,7 @@
           "paras": [],
           "items": [
             "**په اپ کې:** «زما حساب ← حساب او دوکان سمول ← حساب ړنګول». د پټنوم (یا د برېښنالیک کوډ) له بیا تایید او د همغه حساب د برېښنالیک یا شمېرې له لیکلو وروسته، حساب او په سرور کې د هغه ټول معلومات پاکېږي.",
-            "**له اپ پرته، له وېب څخه:** د [«زما دوکان» وېب پورټال](/portal/#delete-account) ته په برېښنالیک او شپږ عددي کوډ ننوځئ او د «حساب ړنګول» پاڼه ووهئ. اړتیا نشته چې اپ بیا نصب کړئ.",
+            "**له اپ پرته، له وېب څخه:** د [«Daily Shop» وېب پورټال](/portal/#delete-account) ته په برېښنالیک او شپږ عددي کوډ ننوځئ او د «حساب ړنګول» پاڼه ووهئ. اړتیا نشته چې اپ بیا نصب کړئ.",
             "**له ملاتړ څخه:** که له پخپله اپ څخه ړنګول لا فعال شوي نه وي یا حساب پمپ هم ولري، همغه پاڼه د ړنګولو غوښتنه «ملاتړ» ته لېږي او حساب د سیسټم مدیر له خوا پاکېږي.",
             "**څه پاکېږي:** پخپله حساب، ناستې او وسیلې، او هغه دوکانونه چې تاسو یې خاوند یاست د هغوی له توکو، پلور، پېرودونکو، پور، د همغږۍ دفتر او په سرور کې له بیک‌اپونو سره. د هغو دوکانونو کارکوونکي خپل لاسرسی له لاسه ورکوي. ړنګول بېرته نه ګرځي.",
             "**څه پاتې کېږي:** د ګډون د تادیو سندونه (د سیسټم مالي دفتر)، پخپله د ړنګولو مخینه له برېښنالیک او شمېرې پرته، او د ټول سرور بیک‌اپ نسخې د هغوی د ساتنې د مودې تر پایه. د بل چا دوکان چې تاسو یوازې غړی یې وئ نه پاکېږي؛ یوازې ستاسو غړیتوب.",

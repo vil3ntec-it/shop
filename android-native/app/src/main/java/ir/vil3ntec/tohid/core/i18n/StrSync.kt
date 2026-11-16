@@ -36,9 +36,9 @@ object StrSync {
     "کوډ بشپړ یا سم نه دی — ټول ۱۳۸ توري ولګوئ",
   )
   val codeSignature: String get() = t(
-    "این کد از سرورِ «فروشگاه من» نیست یا دست خورده است",
-    "This code isn't from the My Shop server or has been tampered with",
-    "دا کوډ د زما دوکان له سرور نه دی یا لاس پرې وهل شوی",
+    "این کد از سرورِ «Daily Shop» نیست یا دست خورده است",
+    "This code isn't from the Daily Shop server or has been tampered with",
+    "دا کوډ د Daily Shop له سرور نه دی یا لاس پرې وهل شوی",
   )
   val codeComputer: String get() = t(
     "این کد برای کامپیوترِ دیگری ساخته شده است",
