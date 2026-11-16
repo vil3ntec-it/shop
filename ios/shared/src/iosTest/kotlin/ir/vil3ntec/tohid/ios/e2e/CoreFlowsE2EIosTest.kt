@@ -2,7 +2,10 @@ package ir.vil3ntec.tohid.ios.e2e
 
 import android.content.IosContext
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.isNotEnabled
 import androidx.compose.ui.test.runSkikoComposeUiTest
@@ -12,6 +15,7 @@ import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.guide.WhatsNew
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrAuth
 import ir.vil3ntec.tohid.core.i18n.StrHero
@@ -347,10 +351,15 @@ class CoreFlowsE2EIosTest {
         e.until("کاشی سفارشِ تازه را می‌شمارد", 60_000) { e.shown(Find.clickLabel(StrOrdersHub.tileFresh(1))) }
         e.shot("10a-home-orders")
         e.tap(tile, StrOrdersHub.tile)
-        val card = Find.button(StrOnline.orderTitle(order.orderNo))
-        e.waitFor(card, StrOnline.orderTitle(order.orderNo), 60_000)
+        //  ۶۸c/۶۹: کارتِ صف ردیفِ دادهٔ آرام است (`OrderCard` ⇒ `V3DataRow`) با عنوانِ «#شماره · نامِ مشتری» (`OrderCardText.title`) و همان
+        //  عنوان برچسبِ کلیکِ ردیف است؛ «سفارش #…» فقط سرخطِ جزئیات. دقیقاً همین شماره (نه «#10» برای «#1»)
+        val no = OnlineFmt.orderNo(order.orderNo)
+        val card = SemanticsMatcher("ردیفِ صف «$no»") {
+          it.config.getOrNull(SemanticsActions.OnClick)?.label?.let { l -> l == no || l.startsWith("$no · ") } == true
+        }
+        e.waitFor(card, no, 60_000)
         e.shot("10b-queue")
-        e.tap(card, StrOnline.orderTitle(order.orderNo))
+        e.tap(card, no)
         //  قبول: دکمهٔ نوارِ پایین ⇐ برگهٔ «زمانِ آماده» (۱۵ دقیقه از پیش) با دکمهٔ هم‌نام ⇐ همان
         val accept = Find.button(StrOnline.orderAction("accepted")) and isEnabled()
         e.waitFor(accept, StrOnline.orderAction("accepted"), 30_000)
