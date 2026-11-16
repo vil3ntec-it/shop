@@ -81,7 +81,7 @@ fun V3RouteHost(nav: V3Nav, shell: ShellContext, modifier: Modifier = Modifier) 
     }
   }
   val endSign = if (dir == LayoutDirection.Rtl) -1f else 1f
-  //  کشیدن از لبهٔ راست ⇒ برگشت (۱۴۰۵/۰۸/۲۵، `EdgeSwipe`): فقط گوشی، فقط وقتی برگشت هست، نه زیرِ برگه، دروازه یا سبدِ بازِ صندوق
+  //  کشیدنِ راست به چپ (از لبه یا هر جای صفحه که فرزندی آن را نخورد) ⇒ برگشت (۱۴۰۵/۰۸/۲۵ و ۲۶، `EdgeSwipe`): فقط گوشی، فقط وقتی برگشت هست، نه زیرِ برگه، دروازه یا سبدِ بازِ صندوق
   var edgeProgress by remember { mutableFloatStateOf(0f) }
   val edgeScope = rememberCoroutineScope()
   val edgeOn = !nav.wide && nav.canBack && nav.gate == null && !topIsSheet && !ir.vil3ntec.tohid.ui.components.pos.PhoneCartUi.sheetOpen.value

@@ -413,6 +413,8 @@ fun TohidTheme(
     ThemeChoice.DARK -> true
     ThemeChoice.SYSTEM -> isSystemInDarkTheme()
   }
+  //  نوارهای گوشی همرنگِ تمِ برنامه (نه روز/شبِ خودِ گوشی) — فقط اندروید
+  ir.vil3ntec.tohid.ui.Platform.SystemBars(dark)
   //  تمِ همین دستگاه (`ThemeStore`، پیش‌فرض «آسمان») × روز/شب
   val target = shopColors(ThemeStore.theme, dark)
   //  عوض‌شدنِ روز/شب یا تم مثلِ خاموش‌وروشنِ چراغ نیست: رنگ‌های اصلی در ۲۵۰ms نرم جابه‌جا می‌شوند

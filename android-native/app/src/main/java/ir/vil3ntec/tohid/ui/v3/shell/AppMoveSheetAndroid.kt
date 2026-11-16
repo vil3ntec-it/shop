@@ -65,6 +65,17 @@ private fun AppMoveSheet() {
     Spacer(Modifier.height(8.dp))
     Text(StrUpdate.movedSide, style = V3Type.footnote, color = c.inkMuted)
     Spacer(Modifier.height(14.dp))
+    //  e-newinstall: گام‌ها، شماره‌دار (`AppMove.steps`)
+    Text(StrUpdate.movedStepsTitle, style = V3Type.headline, color = c.ink)
+    AppMove.steps(advice).forEachIndexed { i, step ->
+      val line = when (step) {
+        AppMove.Step.KEEP_OLD -> StrUpdate.movedStepKeep
+        AppMove.Step.SAME_ACCOUNT -> StrUpdate.movedStepAccount
+        AppMove.Step.BACKUP_IF_STUCK -> StrUpdate.movedStepBackup
+      }
+      Text("${i + 1}. $line", style = V3Type.callout, color = c.ink, modifier = Modifier.padding(top = 6.dp))
+    }
+    Spacer(Modifier.height(14.dp))
     val (tone, text) = when (advice) {
       AppMove.Advice.SAFE -> V3Tone.SUCCESS to StrUpdate.movedSafe
       AppMove.Advice.PENDING -> V3Tone.WARNING to (if (pending > 0) StrUpdate.movedPending(pending) else StrUpdate.movedNotSynced)

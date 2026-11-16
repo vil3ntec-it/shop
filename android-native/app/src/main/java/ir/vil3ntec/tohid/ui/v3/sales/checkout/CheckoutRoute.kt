@@ -48,6 +48,7 @@ import ir.vil3ntec.tohid.core.gateway.TillHesab
 import ir.vil3ntec.tohid.core.i18n.StrPay
 import ir.vil3ntec.tohid.core.i18n.StrTillPay
 import ir.vil3ntec.tohid.core.pay.Settlement
+import ir.vil3ntec.tohid.core.pay.TillMethods
 import ir.vil3ntec.tohid.pay.HesabPaySettle
 import ir.vil3ntec.tohid.pay.platform.HesabPayEnv
 import androidx.compose.runtime.produceState
@@ -138,12 +139,19 @@ fun RouteScope.CheckoutRoute() {
     val discountError = CheckoutModel.discountError(form, canDiscount)
     val paidError = CheckoutModel.paidError(form, payV2)
     val debtor = form.debtorId?.let { id -> data.debtors.find { it.id == id } }
+    //  e-paymethods: «نقد» ِ خودکار (پیش‌فرضِ هر تسویهٔ تازه) همان مبلغِ لازمِ همین لحظه — با تخفیف یا ردیفِ تازه دوباره
+    if (payV2) CheckoutSession.pay.syncAuto(n.finalTotal, form.debtorId)
     //  ⛔ نسیه بی مشتری (`CreditDebtor`): هر سهمِ نپرداخته مشتریِ موجود و فعال می‌خواهد ⇒ «ثبت» خاموش با «انتخابِ مشتری»
     val split = if (payV2) ir.vil3ntec.tohid.data.PayFlow.preview(CheckoutSession.pay.draft(n.finalTotal, form.debtorId)).valueOrNull() else null
     val creditBlock = CheckoutModel.creditBlock(data, form, n, payV2, split)
     //  PAY-21: «پرداخت با حساب‌پی (NFC/QR)» — فقط با `pay.hesabpay`، گیرندهٔ معلوم و نت (`TillHesab.tillNfc`)؛ یک دقیقه در حافظه
     val hesabEnv = remember { HesabPayEnv.of(context) }
     val till by produceState(TillHesab.OFF, saleKey) { value = hesabEnv.till() }
+    //  e-paymethods: همهٔ روش‌های دکان به‌صورتِ کاشی (`TillMethods`): روش‌های روشنِ پنل (برداشته‌های دکان بیرون) + حالِ حساب‌پیِ
+    //  خودِ دکان (آماده / ۲۴ ساعتِ در انتظار / راه‌اندازی‌نشده). فقط با پنلِ ترکیبی؛ «نقدی | نسیه» ِ پیشین بی کاشی می‌ماند
+    val hesabState = TillMethods.hesab(till, ir.vil3ntec.tohid.data.ReportBridge.nowMs())
+    val tiles = if (payV2) TillMethods.tiles(CheckoutSession.pay.methods(), hesabState) else null
+    val isOwner = remember { ShopRole.current(context) == ShopRole.OWNER }
 
     /**
      *  S22: برگهٔ تأییدِ فروشِ منقضی (همان PIN ِ سقفِ اعتبار، `ExpiryApprovalRoute`) برای نیازِ [need] ِ همین سبد.
@@ -272,6 +280,24 @@ fun RouteScope.CheckoutRoute() {
       if (freshExpiry != null && CheckoutSession.expiryPending && !submitted) { CheckoutSession.expiryPending = false; submit(CheckoutSession.hesabPaid) }
     }
 
+    /** «پرداخت با حساب‌پی (NFC/QR)» ⇐ `sale/checkout/hesabpay` (یا ثبتِ دوبارهٔ پرداختِ تأییدشده) — ردیفِ پیشین و کاشیِ حساب‌پی */
+    val hesabPay = {
+      //  S22: منقضیِ نپوشیده ⇒ تأییدِ مدیر پیش از گرفتنِ پول (پیش‌سنجیِ زیر هم با همان `checkout` رد می‌کرد)
+      val expired = if (hesabPaid == null) CheckoutExpiry.uncovered(data, loyal, checkout, todayIso()) else null
+      if (hesabPaid != null) submit(hesabPaid)
+      else if (expired != null) askExpiry(expired, resubmit = false)
+      else {
+        val draft = if (payV2) CheckoutSession.pay.draft(n.finalTotal, form.debtorId) else null
+        //  پیش از گرفتنِ پول: همین فاکتور همین حالا ثبت‌شدنی است؟ (موجودی، تکرار، قاعده‌های POS-24) — همان سنجشِ صندوقِ کامپیوتر
+        CheckoutSession.hesab = HesabTillModel.Ask(saleKey, n.finalTotal, draft, till) {
+          HesabTillModel.precheck(data, loyal, checkout.copy(debtorId = form.debtorId), saleKey, todayIso())
+        }
+        CheckoutSession.hesabEnv = hesabEnv
+        nav.open(SalesPaths.HESAB)
+      }
+      Unit
+    }
+
     actions = CheckoutActions(
       form = { CheckoutSession.form = it },
       customer = {
@@ -292,21 +318,27 @@ fun RouteScope.CheckoutRoute() {
       removeCoupon = { PromoLive.removeCoupon(it) },
       submit = { submit() },
       close = ::close,
-      hesabPay = {
-        //  S22: منقضیِ نپوشیده ⇒ تأییدِ مدیر پیش از گرفتنِ پول (پیش‌سنجیِ زیر هم با همان `checkout` رد می‌کرد)
-        val expired = if (hesabPaid == null) CheckoutExpiry.uncovered(data, loyal, checkout, todayIso()) else null
-        if (hesabPaid != null) submit(hesabPaid)
-        else if (expired != null) askExpiry(expired, resubmit = false)
-        else {
-          val draft = if (payV2) CheckoutSession.pay.draft(n.finalTotal, form.debtorId) else null
-          //  پیش از گرفتنِ پول: همین فاکتور همین حالا ثبت‌شدنی است؟ (موجودی، تکرار، قاعده‌های POS-24) — همان سنجشِ صندوقِ کامپیوتر
-          CheckoutSession.hesab = HesabTillModel.Ask(saleKey, n.finalTotal, draft, till) {
-            HesabTillModel.precheck(data, loyal, checkout.copy(debtorId = form.debtorId), saleKey, todayIso())
+      method = { t ->
+        val p = CheckoutSession.pay
+        when (t.kind) {
+          TillMethods.Kind.CASH -> p.takeCash(n.finalTotal, form.debtorId)
+          TillMethods.Kind.CARD, TillMethods.Kind.WALLET, TillMethods.Kind.TRANSFER -> t.method?.let { p.takeMethod(it, n.finalTotal) }
+          //  ⛔ نسیه بی مشتری ثبت نمی‌شود (`CreditDebtor`): اول «انتخابِ مشتری»، و پس از گزینش باقی به حسابش
+          TillMethods.Kind.CREDIT -> if (form.debtorId == null) {
+            nav.openForResult(SalesPaths.customer(null)) { picked ->
+              if (!picked.isNullOrEmpty()) { CheckoutSession.form = (CheckoutSession.form ?: form).copy(debtorId = picked); CheckoutSession.pay.takeCredit() }
+            }
+          } else p.takeCredit()
+          //  حساب‌پی باقی را می‌گیرد: نقدی که همهٔ فاکتور را می‌پوشاند کنار، سپس همان برگهٔ `sale/checkout/hesabpay`
+          TillMethods.Kind.HESABPAY -> if (t.enabled) {
+            p.clearCoveringCash(n.finalTotal)
+            //  ردیف‌های دیگر همهٔ فاکتور را پوشانده‌اند ⇒ چیزی برای حساب‌پی نمانده (همان شرطِ ردیفِ پیشین)
+            if (HesabPaySettle.due(n.finalTotal, p.draft(n.finalTotal, form.debtorId)) is HesabPaySettle.Due.Amount) hesabPay()
           }
-          CheckoutSession.hesabEnv = hesabEnv
-          nav.open(SalesPaths.HESAB)
         }
       },
+      setupHesab = { nav.open(ir.vil3ntec.tohid.ui.v3.settings.SettingsPaths.section(ir.vil3ntec.tohid.ui.screens.SettingsLayout.HESAB_SHOP)) },
+      hesabPay = hesabPay,
     )
     CheckoutView(
       form = form,
@@ -331,12 +363,19 @@ fun RouteScope.CheckoutRoute() {
       creditBlock = creditBlock,
       hesab = when {
         hesabPaid != null -> HesabEntry(StrPay.recordSale, StrTillPay.confirmed, enabled = !busy)
+        //  e-paymethods: با پنلِ ترکیبی حساب‌پی کاشیِ خودش را دارد (`methods`)
+        payV2 -> null
         till.tillNfc && HesabPaySettle.due(n.finalTotal, if (payV2) CheckoutSession.pay.draft(n.finalTotal, form.debtorId) else null) is HesabPaySettle.Due.Amount ->
           HesabEntry(StrTillPay.entry, if (till.gateway) StrTillPay.entryAuto else StrTillPay.entrySimple, enabled = !busy && discountError == null && gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED)
         else -> null
       },
       canAskApproval = !busy,
       giftLedger = data.takeIf { giftOn },
+      methods = tiles?.map { t ->
+        //  حساب‌پی فقط وقتی پول گرفتنی است: نه با تخفیفِ تأییدنشده یا ممنوع (پول گرفته و فروش رد نشود — همان سدِ ردیفِ پیشین)
+        if (t.kind == TillMethods.Kind.HESABPAY && t.enabled) t.copy(enabled = discountError == null && gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED) else t
+      },
+      hesabSetup = payV2 && isOwner && hesabState == TillMethods.Hesab.Setup,
       points = if (loyalty != null) ({ LoyaltyBar(loyalty) }) else null,
     ).also { last[0] = it }
   }

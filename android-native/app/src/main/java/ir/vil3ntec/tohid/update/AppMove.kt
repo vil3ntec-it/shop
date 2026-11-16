@@ -78,6 +78,21 @@ object AppMove {
     else -> Advice.SAFE
   }
 
+  /**
+   *  e-newinstall — گام‌های جابه‌جایی بی گم شدنِ داده، به همین ترتیب (برگهٔ راهنما شماره‌دار نشانشان می‌دهد):
+   *   [KEEP_OLD] برنامهٔ قدیم بماند تا همگام‌سازی‌اش «همه‌چیز روی سرور نشسته» بگوید؛
+   *   [SAME_ACCOUNT] در برنامهٔ تازه با **همان حساب** (همان ایمیل) وارد شوید — نه «ادامه بدون حساب»، نه حسابِ تازه؛
+   *     دکان، کالا، موجودی و مشتری‌ها از سرور می‌آیند و تنظیماتِ دکان از آخرین پشتیبانِ ابری؛
+   *   [BACKUP_IF_STUCK] اگر چیزی همگام نشد: «پشتیبان و بازگردانی» در برنامهٔ قدیم ⇐ «بازگردانی» در برنامهٔ تازه.
+   *  [Advice.SAFE] ⇒ گامِ پشتیبان لازم نیست (همه رسیده)؛ گامِ آخرِ همیشگی (پاک کردن) فقط در متنِ «امن».
+   */
+  enum class Step { KEEP_OLD, SAME_ACCOUNT, BACKUP_IF_STUCK }
+
+  fun steps(advice: Advice): List<Step> = when (advice) {
+    Advice.SAFE -> listOf(Step.KEEP_OLD, Step.SAME_ACCOUNT)
+    else -> listOf(Step.KEEP_OLD, Step.SAME_ACCOUNT, Step.BACKUP_IF_STUCK)
+  }
+
   /** کلیدِ «برگهٔ راهنما یک بار خودش باز شد» — برای هر شناسهٔ تازه جدا */
   fun seenKey(to: String): String = "app_move_seen_$to"
 }

@@ -93,11 +93,15 @@ internal fun HesabPaySimpleEntry(
   busy: Boolean,
   onPaid: (Settlement) -> Unit,
   modifier: Modifier = Modifier,
+  /** e-paymethods — کاشیِ «حساب‌پی» ِ پنل (شمارنده؛ `CheckoutGateways.openHesab`) */
+  ask: Int = 0,
+  onAsked: () -> Unit = {},
 ) {
   val saleKey = hook.saleKey ?: return
   val due = HesabPaySettle.due(total, draft)
   if (due !is HesabPaySettle.Due.Amount) return
   var open by remember(saleKey) { mutableStateOf(false) }
+  LaunchedEffect(ask) { if (ask > 0) { onAsked(); if (enabled && !busy && hook.ready()) open = true } }
   Column(modifier) {
     OutlinedButton(
       onClick = { if (hook.ready()) open = true },

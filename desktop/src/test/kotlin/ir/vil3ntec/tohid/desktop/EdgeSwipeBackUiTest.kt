@@ -38,6 +38,13 @@ import ir.vil3ntec.tohid.ui.v3.nav.V3Nav
 import ir.vil3ntec.tohid.ui.v3.nav.V3RouteHost
 import ir.vil3ntec.tohid.ui.v3.products.ProductsPaths
 import ir.vil3ntec.tohid.ui.v3.rememberV3Toasts
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.lazy.items
+import ir.vil3ntec.tohid.ui.v3.nav.edgeSwipeBack
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -45,9 +52,9 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- *  کشیدن از لبهٔ راست ⇒ برگشت (صاحب‌کار ۱۴۰۵/۰۸/۲۵: «وقتی صفحه رو از راست به چپ بکشم از اون بخش بیاد بیرون») در همان
- *  میزبانِ مسیرها (`V3RouteHost`): کشیدنِ لبه صفحهٔ درونی را می‌بندد؛ کشیدنِ افقی از میانهٔ صفحه (تراشه‌ها، کاروسل، کشیدنِ ردیف)
- *  و کشیدنِ کوتاه دست نمی‌خورند.
+ *  کشیدنِ راست به چپ ⇒ برگشت (صاحب‌کار ۱۴۰۵/۰۸/۲۵: «وقتی صفحه رو از راست به چپ بکشم از اون بخش بیاد بیرون»؛ ۱۴۰۵/۰۸/۲۶: «از
+ *  وسط یا آخرِ صفحه هم») در همان میزبانِ مسیرها (`V3RouteHost`): کشیدنِ لبه و کشیدنِ میانهٔ صفحه هر دو صفحهٔ درونی را می‌بندند؛
+ *  کشیدنی که فرزندِ افقی خورد (برگه‌های «کالا/انبار»، تراشه، کاروسل، کشیدنِ ردیف)، کشیدنِ کوتاه، عمودی و کج دست نمی‌خورند.
  */
 @OptIn(ExperimentalTestApi::class)
 class EdgeSwipeBackUiTest {
@@ -56,10 +63,10 @@ class EdgeSwipeBackUiTest {
 
   private val detail = ProductsPaths.item("p-rice")
 
-  private fun show(): V3Nav {
+  private fun show(path: String = detail): V3Nav {
     I18n.source = { Lang.FA }
     ShopRole.remember(DesktopContext, ShopRole.OWNER)
-    val nav = V3Nav(V3Modules.table, "home", NavStack.of("home")).also { it.isTab = { p -> p in TillShellHarness.navRoutes }; it.openDeep(detail) }
+    val nav = V3Nav(V3Modules.table, "home", NavStack.of("home")).also { it.isTab = { p -> p in TillShellHarness.navRoutes }; it.openDeep(path) }
     val store = RouteUiHarness.loadedStore(MoneyDemo.full())
     rule.setContent {
       CompositionLocalProvider(
@@ -82,13 +89,13 @@ class EdgeSwipeBackUiTest {
       }
     }
     rule.waitForIdle()
-    assertEquals(detail, nav.current)
+    assertEquals(path, nav.current)
     return nav
   }
 
-  private fun drag(fromX: (Float) -> Float, toX: (Float) -> Float, dy: Float = 0f) {
+  private fun drag(fromX: (Float) -> Float, toX: (Float) -> Float, dy: Float = 0f, dyOfWidth: Float = 0f) {
     rule.onRoot().performTouchInput {
-      swipe(Offset(fromX(width.toFloat()), centerY), Offset(toX(width.toFloat()), centerY + dy), durationMillis = 300)
+      swipe(Offset(fromX(width.toFloat()), centerY), Offset(toX(width.toFloat()), centerY + dy + dyOfWidth * width), durationMillis = 300)
     }
     rule.mainClock.advanceTimeBy(1_000)
     rule.waitForIdle()
@@ -102,15 +109,53 @@ class EdgeSwipeBackUiTest {
   }
 
   @Test
-  fun `کشیدنِ افقی از میانهٔ صفحه، کوتاه یا عمودی برگشت نیست`() {
+  fun `کشیدنِ کوتاه یا عمودی برگشت نیست؛ کشیدن از میانهٔ جزئیاتِ کالا برگشت است`() {
     val nav = show()
     drag({ w -> w - 4f }, { w -> w * 0.9f })
     assertEquals("کوتاه‌تر از ۳۰٪ ⇒ سرِ جا", detail, nav.current)
     drag({ w -> w - 4f }, { w -> w - 10f }, dy = 300f)
     assertEquals("عمودی از لبه ⇒ پیمایش، نه برگشت", detail, nav.current)
-    //  میانهٔ صفحه مالِ خودِ صفحه است: جزئیاتِ کالا با کشیدنِ افقی میانِ «کالا» و «انبار» ِ همان کالا می‌رود — برگشت نیست
+    //  خواستِ ۱۴۰۵/۰۸/۲۶: میانهٔ صفحه هم برگشت است (جزئیاتِ کالا کشیدنِ افقیِ خودش را ندارد؛ آزمونِ پیشین چنین می‌پنداشت)
     drag({ w -> w * 0.6f }, { w -> w * 0.05f })
-    assertTrue("میانهٔ صفحه به فهرست برنگشت: ${nav.current}", nav.current != ProductsPaths.LIST && nav.current.endsWith("/p-rice"))
+    assertEquals("میانهٔ جزئیاتِ کالا ⇒ فهرستِ کالاها", ProductsPaths.LIST, nav.current)
+  }
+
+  @Test
+  fun `کشیدنی که ردیفِ پیمایشیِ افقی خورد برگشت نیست؛ همان کشیدن روی جای خالی برگشت است`() {
+    var backs = 0
+    rule.setContent {
+      val scope = androidx.compose.runtime.rememberCoroutineScope()
+      androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().edgeSwipeBack(true, scope, onProgress = {}) { backs++ }) {
+        androidx.compose.foundation.lazy.LazyRow(
+          Modifier.fillMaxWidth().height(80.dp).testTag("row"),
+        ) {
+          items(50) { i -> androidx.compose.foundation.layout.Box(Modifier.size(60.dp).testTag("i$i")) }
+        }
+      }
+    }
+    rule.onNodeWithTag("row").performTouchInput { swipe(Offset(width * 0.8f, centerY), Offset(width * 0.1f, centerY), durationMillis = 300) }
+    rule.mainClock.advanceTimeBy(1_000)
+    rule.waitForIdle()
+    assertEquals("ردیفِ تراشه/کاروسل کشیدن را خورد ⇒ برگشت نیست", 0, backs)
+    rule.onRoot().performTouchInput { swipe(Offset(width * 0.8f, height * 0.7f), Offset(width * 0.1f, height * 0.7f), durationMillis = 300) }
+    rule.mainClock.advanceTimeBy(1_000)
+    rule.waitForIdle()
+    assertEquals("جای خالیِ صفحه ⇒ برگشت", 1, backs)
+  }
+
+  @Test
+  fun `کشیدن از میانه یا آخرِ صفحه هم می‌بندد؛ کشیدنِ کج یا عمودی نه`() {
+    val about = ir.vil3ntec.tohid.ui.v3.settings.SettingsPaths.ABOUT
+    var nav = show(about)
+    drag({ w -> w * 0.6f }, { w -> w * 0.2f }, dyOfWidth = 0.3f)
+    assertEquals("کج (افقی کمتر از دو برابرِ عمودی) ⇒ سرِ جا", about, nav.current)
+    drag({ w -> w * 0.5f }, { w -> w * 0.5f + 4f }, dy = 300f)
+    assertEquals("عمودی از میانه ⇒ پیمایش", about, nav.current)
+    drag({ w -> w * 0.6f }, { w -> w * 0.1f })
+    assertTrue("میانهٔ صفحه ⇒ برگشت: ${nav.current}", nav.current != about)
+    nav = show(about)
+    drag({ w -> w * 0.35f }, { w -> 4f })
+    assertTrue("آخرِ صفحه (سمتِ چپ) ⇒ برگشت: ${nav.current}", nav.current != about)
   }
 
   @Test
@@ -119,5 +164,10 @@ class EdgeSwipeBackUiTest {
     assertTrue(EdgeSwipe.commits(0.3f, 0f))
     assertTrue("پرتابِ تند به چپ", EdgeSwipe.commits(0.1f, -1_500f))
     assertFalse("پرتاب به راست", EdgeSwipe.commits(0.1f, 1_500f))
+    assertTrue("لبه: افقیِ چیره", EdgeSwipe.starts(-30f, -20f, 8f, fromEdge = true))
+    assertFalse("میانه: افقی باید دو برابرِ عمودی باشد", EdgeSwipe.starts(-30f, -20f, 8f, fromEdge = false))
+    assertTrue("میانه: افقیِ روشن", EdgeSwipe.starts(-50f, -20f, 8f, fromEdge = false))
+    assertFalse("به راست هرگز", EdgeSwipe.starts(50f, 0f, 8f, fromEdge = true))
+    assertTrue("عمودی", EdgeSwipe.vertical(5f, 30f, 8f))
   }
 }

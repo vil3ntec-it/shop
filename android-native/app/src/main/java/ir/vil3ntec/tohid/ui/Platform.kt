@@ -39,4 +39,11 @@ object Platform {
    */
   @androidx.compose.runtime.Composable
   fun SecureWindow(on: Boolean) = secureWindowAndroid(on)
+
+  /**
+   *  نوارِ وضعیت و نوارِ دکمه‌های پایینِ گوشی همرنگِ برنامه: شفاف روی پس‌زمینهٔ برنامه، نشانه‌ها به تمِ **برنامه** ([dark])، نه
+   *  روز/شبِ گوشی (`TohidTheme`). پیاده‌سازی در ‎ui/SystemBarsAndroid.kt‎؛ کامپیوتر و آیفون: هیچ.
+   */
+  @androidx.compose.runtime.Composable
+  fun SystemBars(dark: Boolean) = systemBarsAndroid(dark)
 }

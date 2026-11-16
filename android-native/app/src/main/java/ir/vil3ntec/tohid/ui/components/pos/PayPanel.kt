@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -60,6 +61,7 @@ import ir.vil3ntec.tohid.core.pay.Settlement
 import ir.vil3ntec.tohid.core.pay.GiftCard
 import ir.vil3ntec.tohid.core.pay.PayMethod
 import ir.vil3ntec.tohid.core.pay.StoredPay
+import ir.vil3ntec.tohid.core.pay.TillMethods
 import ir.vil3ntec.tohid.core.i18n.StrGiftCard
 import ir.vil3ntec.tohid.core.i18n.StrRounding
 import ir.vil3ntec.tohid.data.GiftCards
@@ -146,6 +148,61 @@ class PayPanelState {
   fun fillExact(total: Double, customerId: String?) {
     val r = PayFlow.exactCash(draft(total, customerId))
     if (r is PayFlow.Outcome.Ok) cash = if (r.value > 0) plainAmount(r.value) else ""
+  }
+
+  /**
+   *  e-paymethods — «نقد» ِ پیش‌فرضِ تسویهٔ گوشی: تا صندوقدار خودش عددی ننوشته یا روشِ دیگری نزده، نقد همان مبلغِ لازم می‌ماند
+   *  (با هر تغییرِ تخفیف یا ردیف دوباره [syncAuto])، پس «ثبتِ فروش» بی هیچ زدنی همان فروشِ نقدیِ «نقدی» ِ پیشین است. پنلِ
+   *  کامپیوتر خاموش می‌گذاردش (Enter ِ کادرِ خالی همان «نقدِ دقیق» است).
+   */
+  var cashAuto by mutableStateOf(false)
+
+  /** نقدِ خودکار ⇒ همان «نقدِ دقیق» ِ همین لحظه (نوشتنِ همان متن صفحه را دوباره نمی‌کشد) */
+  fun syncAuto(total: Double, customerId: String?) { if (cashAuto) fillExact(total, customerId) }
+
+  /** کاشیِ «نقد»: نقد همان مبلغِ لازم و خودکار تا صندوقدار عوضش کند */
+  fun takeCash(total: Double, customerId: String?) {
+    cashAuto = true
+    fillExact(total, customerId)
+  }
+
+  /** نوعِ کاشیِ ردیف‌های غیرنقدِ همین پنل (کارت، کیف پول، حواله) */
+  fun tileKinds(): Set<TillMethods.Kind> =
+    rows.mapNotNullTo(LinkedHashSet()) { r -> PayFlow.method(r.method)?.let(TillMethods::kindOf) }
+
+  /**
+   *  کاشیِ کارت/کیف پول/حواله: ردیفِ همان نوع اگر هست همان (دوتایی نه)؛ وگرنه ردیفِ تازهٔ [method] با باقیِ فاکتور — آنچه
+   *  ردیف‌های دیگر و نقدِ نوشته‌شده نپوشانده‌اند؛ نقدی که همهٔ فاکتور را می‌پوشاند (نقدِ خودکار یا «نقدِ دقیق») کنار می‌رود و
+   *  همان مبلغ به این روش می‌آید. شمارهٔ مرجع را صندوقدار می‌نویسد (هسته بی آن ثبت نمی‌کند). شمارهٔ ردیف برمی‌گردد.
+   */
+  fun takeMethod(method: String, total: Double): Int {
+    val kind = PayFlow.method(method)?.let(TillMethods::kindOf)
+    rows.indexOfFirst { r -> kind != null && PayFlow.method(r.method)?.let(TillMethods::kindOf) == kind }.takeIf { it >= 0 }?.let { return it }
+    cashAuto = false
+    val others = rows.sumOf { PayFlow.minor(PayFlow.amountOf(it.amount)?.takeIf { a -> !a.isNaN() } ?: 0.0) }
+    val rest = PayFlow.minor(total) - others
+    val typed = PayFlow.minor(PayFlow.amountOf(cash)?.takeIf { !it.isNaN() } ?: 0.0)
+    val amount = when {
+      rest <= 0 -> 0L
+      typed in 1 until rest -> rest - typed
+      else -> { cash = ""; rest }
+    }
+    rows += PayFlow.DraftRow(method, "", if (amount > 0) plainAmount(PayFlow.major(amount)) else "")
+    return rows.lastIndex
+  }
+
+  /** کاشیِ «نسیه» (مشتری انتخاب شده): نقدِ نوشته کنار ⇒ باقیِ فاکتور پس از ردیف‌های دیگر به حسابِ مشتری (`Pay.settle`) */
+  fun takeCredit() {
+    cashAuto = false
+    cash = ""
+  }
+
+  /** کاشیِ «حساب‌پی»: نقدی که همهٔ فاکتور را می‌پوشاند کنار می‌رود تا حساب‌پی باقی را بگیرد؛ نقدِ بخشی (دستی) می‌ماند */
+  fun clearCoveringCash(total: Double) {
+    val others = rows.sumOf { PayFlow.minor(PayFlow.amountOf(it.amount)?.takeIf { a -> !a.isNaN() } ?: 0.0) }
+    val typed = PayFlow.minor(PayFlow.amountOf(cash)?.takeIf { !it.isNaN() } ?: 0.0)
+    if (cashAuto || typed >= PayFlow.minor(total) - others) cash = ""
+    cashAuto = false
   }
 }
 
@@ -441,12 +498,29 @@ fun PayPanelDialog(
   offMethods: Set<String> = emptySet(),
   /** PAY-10 — جدولِ نرخِ دکان فقط با تنظیمِ روشن (`FxTillPref.tillRates`)؛ خالی ⇒ بی کادرِ ارز، همان پنل */
   fxRates: List<ir.vil3ntec.tohid.core.pay.FxRate> = emptyList(),
+  /** e-paymethods — کاشی‌های همهٔ روش‌های دکان (`TillMethods.tiles`) بالای پنل؛ خالی ⇒ همان پنلِ پیشین */
+  tiles: List<TillMethods.Tile> = emptyList(),
+  /** e-paymethods — کاشی‌ای که کنارِ سبد زده شد ⇒ با باز شدنِ پنل همان کار (یک بار) */
+  initial: TillMethods.Tile? = null,
 ) {
   val printToggle = onTogglePrint.takeIf { print != null }
   val state = remember { PayPanelState().also { it.stored = stored; it.cashRounding = cashRounding; it.off = offMethods; it.fxRates = fxRates; it.clock = ir.vil3ntec.tohid.data.ReportBridge::nowMs } }
   val cashFocus = remember { FocusRequester() }
   LaunchedEffect(Unit) { runCatching { cashFocus.requestFocus() } }
   var error by remember { mutableStateOf<String?>(null) }
+  //  e-paymethods: کاشیِ «حساب‌پی» ⇒ برگهٔ همان دکمهٔ درگاه (`CheckoutGateways.openHesab`)
+  var hesabAsk by remember { mutableStateOf(0) }
+  fun pick(t: TillMethods.Tile) {
+    error = null
+    when (t.kind) {
+      TillMethods.Kind.CASH -> { state.fillExact(total, customerId); runCatching { cashFocus.requestFocus() } }
+      TillMethods.Kind.CARD, TillMethods.Kind.WALLET, TillMethods.Kind.TRANSFER -> t.method?.let { state.takeMethod(it, total) }
+      //  ⛔ نسیه بی مشتری ثبت نمی‌شود: گزینشِ مشتری (پنل پس از گزینش دوباره باز می‌شود، POS-41)
+      TillMethods.Kind.CREDIT -> if (customerId == null) (onPickCustomer ?: onCustomer)?.invoke() else state.takeCredit()
+      TillMethods.Kind.HESABPAY -> if (t.enabled && gateways != null) { state.clearCoveringCash(total); hesabAsk++ }
+    }
+  }
+  LaunchedEffect(Unit) { initial?.let(::pick) }
   fun submit() {
     if (busy) return
     when (val r = PayFlow.checkout(state.draft(total, customerId))) {
@@ -479,10 +553,12 @@ fun PayPanelDialog(
           style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
         )
         Spacer(Modifier.height(10.dp))
+        if (tiles.isNotEmpty()) PanelTiles(tiles, state, total, customerId, busy, target, ::pick)
         PaySplitSection(state, total, customerId, customerName, target, cashFocus, ::submit, ledger)
         if (gateways != null) CheckoutGateways(
           hook = gateways, total = total, panel = state, customerId = customerId, enabled = true, busy = busy,
           onPaid = onConfirm, modifier = Modifier.padding(top = 8.dp),
+          openHesab = hesabAsk, onHesabOpened = { hesabAsk = 0 },
         )
         error?.let {
           Spacer(Modifier.height(4.dp))
@@ -509,4 +585,52 @@ fun PayPanelDialog(
       }
     }
   }
+}
+
+/**
+ *  e-paymethods — کاشی‌های «روشِ پرداخت» ِ پنلِ کامپیوتر (`TillMethods`): نقد، کارت (کارت‌خوان)، حساب‌پی (QR/NFC)، کیف پول،
+ *  حواله، نسیه — همان کارهای کاشیِ گوشی روی همین [state]. حساب‌پیِ در انتظار ⇒ خاموش با زمانِ فعال شدن.
+ */
+@Composable
+private fun PanelTiles(
+  tiles: List<TillMethods.Tile>,
+  state: PayPanelState,
+  total: Double,
+  customerId: String?,
+  busy: Boolean,
+  target: Dp,
+  onPick: (TillMethods.Tile) -> Unit,
+) {
+  val s = PayFlow.preview(state.draft(total, customerId)).valueOrNull()
+  val kinds = state.tileKinds()
+  Text(ir.vil3ntec.tohid.core.i18n.StrTillPay.methodsTitle, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+  tiles.chunked(3).forEach { line ->
+    Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+      line.forEach { t ->
+        val on = when (t.kind) {
+          TillMethods.Kind.CASH -> (PayFlow.amountOf(state.cash)?.takeIf { !it.isNaN() } ?: 0.0) > 0
+          TillMethods.Kind.CREDIT -> customerId != null && (s?.toAccount ?: 0L) > 0
+          TillMethods.Kind.HESABPAY -> false
+          else -> t.kind in kinds
+        }
+        androidx.compose.material3.FilterChip(
+          selected = on,
+          onClick = { onPick(t) },
+          enabled = t.enabled && !busy,
+          label = { Text(ir.vil3ntec.tohid.ui.v3.sales.checkout.tileLabel(t.kind).first, maxLines = 1) },
+          leadingIcon = { Icon(ir.vil3ntec.tohid.ui.v3.sales.checkout.tileIcon(t.kind), contentDescription = null, modifier = Modifier.size(18.dp)) },
+          modifier = Modifier.weight(1f).heightIn(min = maxOf(target, 40.dp)),
+        )
+      }
+      repeat(3 - line.size) { Spacer(Modifier.weight(1f)) }
+    }
+  }
+  tiles.firstOrNull { it.until != null }?.until?.let { until ->
+    Text(
+      ir.vil3ntec.tohid.core.i18n.StrTillPay.hesabPending(ir.vil3ntec.tohid.ui.v3.sales.history.SaleTime.stamp(until)),
+      style = MaterialTheme.typography.labelSmall, color = Shop.colors.warning,
+    )
+  }
+  if (TillMethods.Kind.CARD in kinds) Text(ir.vil3ntec.tohid.core.i18n.StrTillPay.cardRefHint, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+  Spacer(Modifier.height(8.dp))
 }

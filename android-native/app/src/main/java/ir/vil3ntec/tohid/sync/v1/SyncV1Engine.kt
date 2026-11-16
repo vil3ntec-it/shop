@@ -176,7 +176,7 @@ class SyncV1Engine private constructor(context: Context) {
           throw cancelled
         } catch (e: Throwable) {
           error = e.message ?: "خطای نامشخص"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
-          state.lastError = error
+          state.lastError = error; state.lastErrorCode = SyncFailure.code(e)
         }
         rejected = (queue.droppedCount() - before).coerceAtLeast(0)
       } finally {
@@ -618,14 +618,15 @@ class SyncV1Engine private constructor(context: Context) {
    *
    *  @param base از آن فقط بخش‌های بیرون از همگام‌سازی (تنظیمات) برمی‌دارد
    *  @param files کناری و جابه‌جاییِ دفتر (`ShopStore`)؛ زیرِ قفلِ همین موتور صدا زده می‌شوند
+   *  @param carry e-newinstall: صفِ نرفتهٔ نصبِ دیگرِ همین حساب از پشتیبان، جلوی صف پیش از Snapshot (`BackupRestore.carryOf`)
    *  @throws Exception شبکه یا دیسک؛ تا پیش از `commitShadow` هیچ چیزی عوض نشده است
    */
-  internal suspend fun rebuildFromServer(base: ShopData, files: SyncRebuild.Staging): SyncRebuild.Outcome = gate.withLock {
+  internal suspend fun rebuildFromServer(base: ShopData, files: SyncRebuild.Staging, carry: List<SyncOp> = emptyList()): SyncRebuild.Outcome = gate.withLock {
     busy = true
     rebuilding = true
     publish()
     try {
-      synchronized(this) { commit.queueRecorded() }
+      synchronized(this) { commit.queueRecorded(); if (carry.isNotEmpty()) queue.pushFront(carry) }
       val client = pushClients.client()
       val device = deviceId()
       //  §۹.۵: سرور از پشتیبان برگشته؟ opهای گم‌شده (خودی و گرفته‌شده، دفترچه رمزدار نیست) پیش از
@@ -878,7 +879,7 @@ class SyncV1Engine private constructor(context: Context) {
       upgradeAvailable = state.upgradeAvailable,
       schemaVersion = LedgerDiff.SCHEMA_VERSION,
       serverSchema = state.serverSchema,
-      live = liveConnected, outage = outage.kind,
+      live = liveConnected, outage = outage.kind, errorCode = if (state.lastError.isBlank()) "" else state.lastErrorCode,
     )
   }
 

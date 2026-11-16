@@ -45,8 +45,8 @@ import kotlinx.serialization.json.put
  *  خالص است: نه Context، نه ساعت، نه دیسک. دفتر، ساعت و شناسه را صفحه می‌دهد.
  *
  *  ── پشتِ پرچم ─────────────────────────────────────────────────────
- *  هیچ‌کدام بی `ShopPolicy.payV2` صدا زده نمی‌شود؛ پیش‌فرض خاموش است و فروش و صندوقِ
- *  امروز (`SalesEngine` بی `settlement`، `CashShift`) دست نمی‌خورد.
+ *  هیچ‌کدام بی `ShopPolicy.payV2` صدا زده نمی‌شود؛ خاموش ⇒ فروش و صندوقِ ساده (`SalesEngine` بی `settlement`،
+ *  `CashShift`) دست نمی‌خورد. از e-paymethods دستگاهِ بی انتخاب در شروعِ برنامه روشن می‌شود (`PayV2Default`).
  *
  *  ── شکلِ داده: فقط افزودن ────────────────────────────────────────
  *  فروش: `payments`، `tenderedMinor`، `changeMinor`؛ معنای `paidAmount`، `remaining`،

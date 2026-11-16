@@ -7,7 +7,7 @@ internal object LegalTextsEn : LegalTextSet {
   override val privacy = LegalDoc(
     LegalKind.PRIVACY, "1405-08-13",
     short = "Privacy policy",
-    title = "Privacy policy of “My Shop”",
+    title = "Privacy policy of “Daily Shop”",
     lead = "Last reviewed: 4 November 2026 (1405/08/13) — for the Android app, the computer app and the web version.",
     sections = listOf(
       LegalSection(
@@ -16,7 +16,7 @@ internal object LegalTextsEn : LegalTextSet {
         items = listOf(
           "Your shop’s data (goods, sales, customers, debts, purchases, expenses) **belongs to you** and is never sold or given to anyone.",
           "Without an account, the shop’s data stays only on your own device.",
-          "With an account, data is kept on the “My Shop” server to sync between devices and as a backup.",
+          "With an account, data is kept on the “Daily Shop” server to sync between devices and as a backup.",
           "We have no ads, no trackers and no data selling.",
         ),
       ),
@@ -68,7 +68,7 @@ internal object LegalTextsEn : LegalTextSet {
         paras = emptyList(),
         items = listOf(
           "**In the app:** “My account → Edit account & shop → Delete account”. After confirming your password again (or an email code) and typing that account’s email or number, the account and all of its data on the server are deleted.",
-          "**Without the app, on the web:** sign in to the [“My Shop” web portal](/portal/#delete-account) with your email and a six-digit code and open the “Delete account” tab. You do not need to reinstall the app.",
+          "**Without the app, on the web:** sign in to the [“Daily Shop” web portal](/portal/#delete-account) with your email and a six-digit code and open the “Delete account” tab. You do not need to reinstall the app.",
           "**Through support:** if deletion from the app itself is not turned on yet, or the account also has a pump, the same sheet sends a deletion request to “Support” and the system administrator deletes the account.",
           "**What is deleted:** the account itself, its sessions and devices, and the shops you own with their goods, sales, customers, debts, sync ledger and backups on the server. Staff of those shops lose their access. Deletion cannot be undone.",
           "**What remains:** records of subscription payments (the system’s financial ledger), a record of the deletion itself without email or number, and full-server backups until the end of their retention period. Someone else’s shop that you were only a member of is not deleted; only your membership is.",

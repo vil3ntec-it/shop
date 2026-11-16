@@ -66,6 +66,10 @@ object Platform {
   @androidx.compose.runtime.Composable
   fun SecureWindow(on: Boolean) = Unit
 
+  /** نوارهای سیستمِ گوشی — کامپیوتر پنجرهٔ خودش را دارد */
+  @androidx.compose.runtime.Composable
+  fun SystemBars(dark: Boolean) = Unit
+
   fun saveFile(suggestedName: String, bytes: ByteArray): String? {
     var picked: java.io.File? = null
     val run = Runnable {
