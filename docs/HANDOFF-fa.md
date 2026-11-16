@@ -94,6 +94,9 @@
 - **CI ِ #1065 (هماهنگ‌کننده)**: `core-fuzz.test.js` («پیکرهٔ فاز همان خروجیِ امروزِ مولّد… بایت‌به‌بایت») سرخ — `afpay_card.needsRef = false` در
   `pay-core.js` چهار موردِ `pay.settle`/`pay.fix` ِ پیکره را عوض کرد و پیکره بازساخته نشده بود. `node server/scripts/core-fuzz.js --write`
   (۴ مورد در `core/test-vectors/core-fuzz-v1.json`)؛ پیش ۳/۴، پس ۴/۴؛ `CoreFuzzTest`/`CoreVectors*` ِ core روی همان پیکره.
+- **CI ِ #1065 (۲)**: «آزمون‌های سرور روی PostgreSQL» — `shop-route-inventory.test.js` («هر مسیرِ شناسه‌دار… با ردیفِ واقعیِ الف»)
+  مسیرِ تازهٔ `GET /shop/payments/qr-image/:hash` را بی ردیفِ واقعی یافت. نخستین حسابِ حساب‌پیِ «الف» در همان آزمون حالا `qr` و `qrImage`
+  (JPEG ِ ۶۴×۶۴) می‌فرستد و هشِ عکسِ فعال `ids.qrImage` است + قاعدهٔ `concreteFor`. نسخهٔ پیشین روی PGlite ۱/۲ (همان پیام)، پس ۲/۲.
 ### ۱۴۰۵/۰۸/۲۶ — عاملِ e-phone-p0r3 زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-phone-p0r3` (از `origin/main` 7e2a36923، پس از #1060) — کالبدِ یکسان، دورِ سوم و دو خواستِ صاحب‌کار
 
 - **خواستِ صاحب‌کار ۱ (عکسِ «مصارف»، همه‌جا با اجزای مشترک)**: ردیفِ داده (`V3DataRow`) ⇐ [کاشی] · [عنوان ……… مبلغ] / [جزئیات · وضعیت] —

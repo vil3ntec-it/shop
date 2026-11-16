@@ -645,8 +645,14 @@ async function seedShop(a) {
 
   //  «حساب‌پیِ دکان» ِ «الف» (رمزِ جدا + شمارهٔ حالتِ ساده) — توکنِ «ب» نه می‌بیند، نه عوض می‌کند
   assert.equal((await h.put('/api/shop/hesabpay/pin', { newPin: '258014' }, { token: a.accessToken })).status, 200);
-  const hp = await h.put('/api/shop/hesabpay/account', { pin: '258014', name: 'دکانِ الف', mode: 'simple', account: '0799123456' }, { token: a.accessToken });
+  //  همراهِ عکسِ QR ِ همان شماره (مهاجرتِ ۹۷۰): نخستین حساب بی‌درنگ فعال ⇒ هشِ عکس برای `/shop/payments/qr-image/:hash`
+  const hp = await h.put('/api/shop/hesabpay/account', {
+    pin: '258014', name: 'دکانِ الف', mode: 'simple', account: '0799123456',
+    qr: 'HP|+93799123456|shop', qrImage: F.jpeg(64, 64, { seed: 970 }).toString('base64'),
+  }, { token: a.accessToken });
   assert.equal(hp.status, 200, JSON.stringify(hp.body));
+  ids.qrImage = hp.body.qrImage;
+  assert.match(ids.qrImage || '', /^[0-9a-f]{64}$/, 'هشِ عکسِ QR ِ الف');
   //  حسابِ دوم ⇒ «در انتظار» (نگهبانِ ۲۰۵) — توکنِ «ب» نه لغوش می‌کند، نه می‌بیندش
   const hp2 = await h.put('/api/shop/hesabpay/account', { pin: '258014', name: 'دکانِ الف', mode: 'simple', account: '0788123456' }, { token: a.accessToken });
   assert.equal(hp2.status, 200, JSON.stringify(hp2.body));
@@ -749,6 +755,7 @@ function concreteFor(ids) {
     [/^(\/shop\/purchase-orders\/):id/, ids.purchaseOrder],
     [/(\/bills\/):billId/, ids.purchaseBill],
     [/^(\/shop\/payments\/intents\/):id/, ids.paymentIntent],
+    [/^(\/shop\/payments\/qr-image\/):hash/, ids.qrImage],
   ];
   const QUERY = {
     'DELETE /shop/chat/conversations/:id/messages/:mid': '?for=all',
