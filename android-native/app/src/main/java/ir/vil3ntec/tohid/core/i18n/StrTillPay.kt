@@ -47,6 +47,70 @@ object StrTillPay {
   )
   val title: String get() = t("پرداخت با حساب‌پی", "Pay with HesabPay", "د حساب‌پې ورکړه")
 
+  // گامِ پرداخت (`PayStep`، e-paystep): «پرداخت» ⇒ هر پرداخت جدا تأیید ⇒ فروش فقط پس از پرداختِ کامل
+  fun payAmount(a: Any): String = t("پرداخت ${asIs(a)}", "Pay $a", "ورکړه $a")
+  val payTitle: String get() = t("پرداخت", "Payment", "ورکړه")
+  val amountDue: String get() = t("مبلغِ قابلِ پرداخت", "Amount due", "د ورکړې مبلغ")
+  val remainingDue: String get() = t("باقی‌مانده", "Remaining", "پاتې")
+  fun paidSummary(total: Any, paid: Any): String = t(
+    "جمعِ فاکتور ${asIs(total)} · دریافت‌شده ${asIs(paid)}",
+    "Invoice total $total · received $paid",
+    "د بل ټول $total · ترلاسه شوي $paid",
+  )
+  val paidTitle: String get() = t("پرداخت‌شده‌ها", "Payments taken", "ترلاسه شوې ورکړې")
+  val otherForRest: String get() = t("روشِ دیگر برای باقی‌مانده", "Another method for the rest", "د پاتې لپاره بله طریقه")
+  val pickMethod: String get() = t("روشِ پرداخت را انتخاب کنید", "Choose how the customer pays", "د ورکړې طریقه وټاکئ")
+  fun cashBlankExact(a: Any): String = t("خالی = دقیق (${asIs(a)})", "Empty = exact ($a)", "تش = سم ($a)")
+  fun changeDue(a: Any): String = t("پولِ پس: ${asIs(a)}", "Change: $a", "بېرته پیسې: $a")
+  val received: String get() = t("دریافت شد", "Received", "ترلاسه شو")
+  fun cardCharge(a: Any): String = t(
+    "${asIs(a)} را روی کارت‌خوان بزنید؛ وقتی کارت‌خوان تأیید کرد، دکمهٔ زیر را بزنید",
+    "Charge $a on the card terminal; when it approves, tap the button below",
+    "$a په کارت لوستونکي ووهئ؛ کله چې کارت لوستونکي تایید کړ، لاندې تڼۍ ووهئ",
+  )
+  val cardApproved: String get() = t("کارت‌خوان تأیید کرد", "Terminal approved", "کارت لوستونکي تایید کړ")
+  val approvalOptional: String get() = t("شمارهٔ تأیید (اختیاری)", "Approval no. (optional)", "د تایید شمېره (اختیاري)")
+  val confirmPaid: String get() = t("تأییدِ پرداخت", "Confirm payment", "ورکړه تایید کړئ")
+  val toAccountButton: String get() = t("ثبت به حسابِ مشتری", "Put on customer's account", "د پیرودونکي حساب ته ثبت")
+  fun toAccountLine(a: Any, name: Any): String = t(
+    "${asIs(a)} به حسابِ «${asIs(name)}» می‌رود",
+    "$a goes on “$name”'s account",
+    "$a د «$name» حساب ته ځي",
+  )
+  val creditPickFirst: String get() = t("نسیه فقط با مشتری — اول مشتری را انتخاب کنید", "Credit needs a customer — choose one first", "پور یوازې له پیرودونکي سره — لومړی پیرودونکی وټاکئ")
+  val backToCart: String get() = t("بازگشت به سبد", "Back to cart", "سبد ته بېرته")
+  fun removePaid(name: Any): String = t("برداشتنِ ${asIs(name)}", "Remove $name", "$name لرې کړئ")
+  val recordPaid: String get() = t("ثبتِ فروش (پرداخت دریافت شد)", "Record sale (payment received)", "پلور ثبت کړئ (ورکړه ترلاسه شوه)")
+  val paidWaiting: String get() = t(
+    "پول گرفته شد ولی فروش هنوز ثبت نشده — «ثبتِ فروش» را بزنید؛ پرداختِ دوباره لازم نیست",
+    "The money was taken but the sale isn't recorded yet — tap “Record sale”; no second payment",
+    "پیسې واخیستل شوې خو پلور لا نه دی ثبت — «پلور ثبت کړئ» ووهئ؛ بیا ورکړه نه غواړي",
+  )
+
+  //  عکسِ QR ِ حساب‌پیِ دکان (صاحب‌کار ۱۴۰۵/۰۸/۲۶ — «عکسِ QR ِ حساب‌پیم را بار می‌کنم»)
+  val pickQrImage: String get() = t("انتخابِ عکسِ QR", "Choose QR picture", "د QR انځور وټاکئ")
+  val shopQrImage: String get() = t("عکسِ QR ِ حساب‌پیِ دکان", "The shop's HesabPay QR picture", "د دوکان د حساب‌پې QR انځور")
+  val qrImageReady: String get() = t(
+    "QR ِ عکس خوانده شد — پس از ذخیره همین عکس در صندوق و نمایشگرِ مشتری بزرگ نشان داده می‌شود",
+    "The picture's QR was read — after saving, this picture is shown large at the till and on the customer display",
+    "د انځور QR ولوستل شو — له ساتلو وروسته همدا انځور په صندوق او د پیرودونکي پرده کې لوی ښودل کېږي",
+  )
+  val qrImageNoQr: String get() = t(
+    "در این عکس QR ای خوانده نشد؛ اسکرین‌شاتِ QR یا عکسِ روشن‌ترش را بدهید",
+    "No QR could be read in this picture; use a screenshot of the QR or a clearer photo",
+    "په دې انځور کې QR ونه لوستل شو؛ د QR سکرین‌شاټ یا روښانه انځور ورکړئ",
+  )
+  val qrImageHas: String get() = t(
+    "عکسِ QR ِ دکان در صندوق نشان داده می‌شود؛ عکسِ تازه همان ۲۴ ساعتِ حسابِ تازه را دارد",
+    "The shop's QR picture is shown at the till; a new picture waits the same 24 hours as a new account",
+    "د دوکان QR انځور په صندوق کې ښودل کېږي؛ نوی انځور د نوي حساب په څېر ۲۴ ساعته انتظار کوي",
+  )
+  fun qrImagePending(at: String): String = t(
+    "عکسِ QR ِ تازه از ${asIs(at)} در صندوق نشان داده می‌شود؛ تا آن دم همان QR ِ پیشین",
+    "The new QR picture shows at the till from $at; until then the previous QR",
+    "نوی QR انځور له $at څخه په صندوق کې ښودل کېږي؛ تر هغه پخوانی QR",
+  )
+
   // روش‌های پرداختِ صندوق (`core/pay/TillMethods`، e-paymethods)
   val methodsTitle: String get() = t("روشِ پرداخت", "Payment method", "د ورکړې طریقه")
   val tileCash: String get() = t("نقد", "Cash", "نغد")
@@ -72,11 +136,11 @@ object StrTillPay {
     "Money goes straight to the shop's own account — QR and NFC right at this till",
     "پیسې مستقیم د دوکان خپل حساب ته — QR او NFC په همدې صندوق کې",
   )
-  /** کاشیِ کارت: مبلغ روی کارت‌خوان، شمارهٔ تأییدِ رسید در ردیف */
+  /** کاشیِ کارت: مبلغ روی کارت‌خوان؛ شمارهٔ تأییدِ رسید اختیاری (صاحب‌کار ۱۴۰۵/۰۸/۲۶) */
   val cardRefHint: String get() = t(
-    "مبلغ را روی کارت‌خوان بزنید و شمارهٔ تأییدِ رسید را در «شمارهٔ مرجع» بنویسید",
-    "Charge the amount on the card terminal and type the slip's approval number in “Reference no.”",
-    "مبلغ په کارت لوستونکي ووهئ او د رسید د تایید شمېره په «د مرجع شمېره» کې ولیکئ",
+    "مبلغ را روی کارت‌خوان بزنید؛ شمارهٔ تأییدِ رسید (اختیاری) را در «شمارهٔ مرجع» بنویسید",
+    "Charge the amount on the card terminal; the slip's approval number (optional) goes in “Reference no.”",
+    "مبلغ په کارت لوستونکي ووهئ؛ د رسید د تایید شمېره (اختیاري) په «د مرجع شمېره» کې ولیکئ",
   )
   val tapNow: String get() = t(
     "گوشیِ مشتری را به پشتِ این دستگاه نزدیک کنید؛ یا مشتری QR را اسکن کند",

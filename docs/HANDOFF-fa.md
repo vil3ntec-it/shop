@@ -57,6 +57,32 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۶ — عاملِ e-paystep زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-paystep` (از main ‏7e2a36923، #1060) — پرداخت در دو گام، کارت‌خوانِ هر برند، عکسِ QR ِ حساب‌پی
+
+- **خواستهٔ صاحب‌کار** (عکسِ برگهٔ «تسویهٔ فروش» با «ثبتِ فروش»): «وقتی ثبتِ فروش می‌زنم نباید پرداخت بشه؛ این باید ببره پیشِ بخشِ پرداخت…» و
+  تصمیم‌های ۱۴۰۵/۰۸/۲۶ (ثبت در `OWNER-DECISIONS-fa.md`): حساب‌پی فعلاً فقط «ساده» (API گرفته نمی‌شود)، عکسِ QR ِ حساب‌پی، کارت با هر کارت‌خوان و
+  شمارهٔ تأییدِ اختیاری.
+- **ساخته شد**: (۱) تسویهٔ گوشی فقط «پرداخت ‹مبلغ›» دارد و هیچ ثبت نمی‌کند ⇒ برگهٔ `sale/checkout/pay` (`PayStepRoute`)؛ کامپیوتر:
+  `PayStepDialog` (`ui/components/pos/PayStepDesk.kt`) با F9، دکمهٔ «پرداخت ‹مبلغ›» و کاشی‌های کنارِ سبد؛ منطقِ مشترک `ui/components/pos/PayStep.kt`
+  (`PayEntry` + `PayPanelState`): نقد (خالی = دقیق، دکمهٔ تند، پولِ پس)، کارت «کارت‌خوان تأیید کرد»، کیف پول/حواله با مرجع، نسیه با گزینشِ مشتری،
+  «روشِ دیگر برای باقی‌مانده»؛ فروش فقط با `Result.Done` از همان `submit`/`finish` ِ همیشگی. پرداختِ گرفته‌شده در `CheckoutSession.settled` تا ثبت
+  (فقط همان مبلغ و همان مشتری). گام به `payV2` بسته نیست. (۲) `afpay_card.needsRef = false` در `Payment.kt`، `pay-core.js` و `pay-v1.json`.
+  (۳) عکسِ QR: مهاجرتِ ۹۷۰ (`hesabpay_qr_images`، `shop_hesabpay.qr_image`)، `lib/hesabpay-qr-image.js` (دوباره رمزگذاری، بی فراداده)، همان درِ
+  تغییرِ حساب و ۲۴ ساعت، `GET /shop/payments/qr-image/:hash` فقط عکسِ فعال؛ برنامه: `pay/platform/ShopQrPicture` (ML Kit / ZXing + ImageIO) و
+  `HesabPayEnv.qrPicture` (هش + دوباره خواندن) ⇒ برگهٔ حساب‌پی، «پرداخت به حسابِ دکان» و نمایشگرِ مشتری؛ «انتخابِ عکسِ QR» در «حساب‌پیِ دکان».
+- **پاسخِ «چرا هنوز نقدی | نسیه؟»**: آن بخش پیرو ِ `ShopPolicy.payV2` بود — یا ساختِ پیش از #1058، یا `pay_v2=false` ِ صریح (تنظیمِ **دکان** و
+  همگام: «فقط نقد و نسیه» ِ هر دستگاه یا پشتیبانِ بازیابی‌شده به همه می‌رسد و پذیرش هرگز انتخابِ صریح را عوض نمی‌کند)، یا صندوقِ بازِ کهنه با
+  عددِ ناهمخوان (WAIT). حالا گامِ پرداخت به پرچم بسته نیست: هر دستگاه همان دم همهٔ روش‌ها را دارد (پرچم فقط صندوقِ شیفت را می‌گزیند).
+  خطرِ مانده (ساخته نشد): `pay_v2=true` ِ همگام‌شده می‌تواند صفحهٔ صندوقِ شیفتِ دستگاهِ دیگر را وسطِ شیفت عوض کند.
+- **آزمونِ عوض‌شده (عمدی)**: `PayMethodsCheckoutUiTest`، `DeskPayTilesUiTest`، `DeskSaleD3aUiTest` (F9 ⇒ گام، Enter، Enter)، `DeskExpiryPayUiTest`
+  (کاشیِ حساب‌پی ⇒ گام)، `PayPanelTilesTest` (کارت بی مرجع)، `GiftCardWiringTest` و `CheckoutCreditGateTest` (سیم‌کشیِ تازه در `PayStep`)،
+  `hesabpay-guard.test.js` (عکس بی متن ⇒ `hesabpay_qr_image_unread`)، `pay-v1.json` (حالتِ «کارت بی شمارهٔ تأیید»).
+- **آزمون‌ها**: تازه `PayStepTest` ۷، `HesabQrImageTest` ۴، `ShopQrPictureTest` ۳، `hesabpay-qr-image.test.js` ۳؛ اجرای هدف‌دارِ کامپیوتر ۵۱۷ آزمون
+  (`*PayStep*`، `*PayMethods*`، `*Checkout*`، `*Till*`، `*Hesab*`، `*Dari*`، `*LookGuard*`، `*PageAnatomyGuard*`، …) سبز پس از رفعِ دو آزمونِ کلید/عکس؛
+  سرور ۸۵ + ۲۸ + ۱۷ سبز روی PGlite. عکس‌ها: `/home/user/wt-pay-shots/paystep/` (پیش از main، پس از همین شاخه؛ روشن/تیره).
+- **نیمه‌کاره / قدمِ بعد**: آزمونِ روی دستگاهِ واقعی (ML Kit روی گوشی، پنجرهٔ فایلِ ویندوز)؛ اتصالِ خودکارِ کارت‌خوان (`DevicePaySettle`) و درگاهِ
+  خودکارِ حساب‌پی خاموش ماندند تا صاحب‌کار API را بگیرد؛ ردیف‌های PAY-06/PAY-21 همچنان PARTIAL.
+
 ### ۱۴۰۵/۰۸/۲۶ — عاملِ e-phone-p0 زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-phone-p0` (از batch-69، ادغامِ main تا #1059 1802fca1a) — کالبدِ یکسانِ صفحه‌های گوشی (دورِ دوم)
 
 - **پیشین (۰۸/۲۴)**: نشان‌های `V3Anatomy` روی اجزای مشترک، `PageAnatomyGuardTest`، ممیزیِ `PhoneAnatomyAuditTest` (`P0_AUDIT`، `AnatomyProbe`)،

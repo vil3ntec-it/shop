@@ -187,7 +187,8 @@ object Pay {
     PayMethod("my_money", "wallet", "My Money", needsRef = true),
     PayMethod("atoma_pay", "wallet", "ATOMA Pay", needsRef = true, limit = 1_500_000),
     PayMethod("m_paisa", "wallet", "M-Paisa", needsRef = true),
-    PayMethod("afpay_card", "card", "کارت AfPay", needsRef = true),
+    //  صاحب‌کار ۱۴۰۵/۰۸/۲۶: «با هر کارت‌خوانی؛ کارت‌خوان تأیید کرد، پرداخت هم تأیید» ⇒ شمارهٔ تأییدِ کارت اختیاری (هم‌زاد: pay-core.js، بردار)
+    PayMethod("afpay_card", "card", "کارت AfPay"),
     PayMethod("hawala", "transfer", "حواله", needsRef = true),
     PayMethod("store_credit", "store_credit", "اعتبار فروشگاه", enabled = false),
     PayMethod("gift_card", "gift_card", "کارت هدیه", needsRef = true, enabled = false),

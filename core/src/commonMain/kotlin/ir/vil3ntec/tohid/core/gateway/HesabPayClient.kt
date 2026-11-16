@@ -61,6 +61,19 @@ class HesabPayClient(private val transport: GatewayTransport) {
   }
 
   /**
+   *  عکسِ QR ِ فعالِ دکان (`SimpleAccount.qrImage`، ۱۴۰۵/۰۸/۲۶) ⇒ بایت‌ها فقط اگر sha256 شان همان [hash] است؛ هر خطا ⇒ null
+   *  (صندوق همان QR ِ کشیده‌شده از متن را نشان می‌دهد).
+   */
+  suspend fun qrImage(hash: String): ByteArray? {
+    if (SimpleAccount.imageHash(hash).isEmpty()) return null
+    val r = transport.get("$ROOT/qr-image/$hash")
+    if (r.status !in 200..299) return null
+    val data = r.body?.get("data") as? String ?: return null
+    val bytes = runCatching { kotlin.io.encoding.Base64.decode(data) }.getOrNull() ?: return null
+    return bytes.takeIf { bytes.isNotEmpty() && ir.vil3ntec.tohid.core.audit.Sha256.hex(ir.vil3ntec.tohid.core.audit.Sha256.digest(it)) == hash }
+  }
+
+  /**
    *  ساختنِ قصد برای فروشِ صندوق. `refId` همان شناسهٔ فروشی است که پس از پرداخت ثبت می‌شود؛
    *  `idempotencyKey` یک بار برای هر تلاشِ پرداخت ساخته و نگه داشته می‌شود (تکرار ⇐ همان قصد).
    */

@@ -34,6 +34,7 @@ import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrDeskWork
 import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrTillPay
 import ir.vil3ntec.tohid.core.i18n.StrSalePages
 import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.Debtor
@@ -53,6 +54,7 @@ import ir.vil3ntec.tohid.ui.screens.DeskCatalogTable
 import ir.vil3ntec.tohid.ui.screens.DeskSaleScreen
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
+import ir.vil3ntec.tohid.core.pay.CashKeys
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -175,7 +177,18 @@ class DeskSaleD3aUiTest {
     assertTrue(shown(tea.name))
     assertTrue(shown(ir.vil3ntec.tohid.money(4 * 80.0)))
     assertTrue(shown(StrSale.payable))
+    //  e-paystep: F9 ⇒ گامِ پرداخت (هنوز هیچ ثبت نشده)؛ Enter ِ کادرِ نقدِ خالی ⇒ نقدِ دقیق، Enter ِ دوم ⇒ «دریافت شد» و ثبت
     scan.performKeyInput { pressKey(Key.F9) }
+    rule.waitUntil(10_000) { shown("${StrTillPay.received} (Enter)") }
+    assertEquals(before, t.store.data.value.sales.size)
+    Thread.sleep(CashKeys.ENTER_GUARD_MS + 60) // PAY-04: Enter ِ همان دمِ باز شدن خورده می‌شود
+    val cash = rule.onAllNodes(hasSetTextAction() and hasText(StrPos.cashReceived))[0]
+    cash.performClick()
+    rule.waitForIdle()
+    cash.performKeyInput { pressKey(Key.Enter) }
+    rule.waitForIdle()
+    assertEquals(before, t.store.data.value.sales.size)
+    cash.performKeyInput { pressKey(Key.Enter) }
     rule.waitUntil(20_000) { t.store.data.value.sales.size == before + 1 }
     val sale = t.store.data.value.sales.last()
     assertEquals(45.0 + 4 * 80.0, sale.finalTotal, 0.001)
@@ -198,10 +211,11 @@ class DeskSaleD3aUiTest {
       assertTrue("«$label» نیست", shown(label))
     }
     //  دکمه‌های سبد، مشتری، روش‌ها، ثبت و چاپ — هر کدام با نامِ دسترسی و زدنی
-    for (label in listOf(StrSale.freeItemAlt, StrPos.emptyCart, StrPos.pickCustomer, StrPos.recordSaleBtn, StrPos.printLastInvoice, StrSale.oneMore(milk.name), StrSale.oneLess(milk.name), StrSale.editQtyPrice)) {
+    //  e-paystep: «ثبت فروش» ⇒ «پرداخت ‹مبلغ›» (گامِ پرداخت)؛ «نقدی | نسیه» ⇒ کاشی‌های همهٔ روش‌ها
+    for (label in listOf(StrSale.freeItemAlt, StrPos.emptyCart, StrPos.pickCustomer, StrTillPay.payAmount("${ir.vil3ntec.tohid.money(2 * 45.0)} ؋"), StrPos.printLastInvoice, StrSale.oneMore(milk.name), StrSale.oneLess(milk.name), StrSale.editQtyPrice)) {
       assertTrue("«$label» زدنی نیست", count(clickLabel(label)) > 0)
     }
-    assertTrue(shown(Str.cashSale) && shown(Str.credit))
+    assertTrue(shown(StrTillPay.tileCash) && shown(StrTillPay.tileCredit))
     //  + شمارنده ⇒ ۳
     tap(clickLabel(StrSale.oneMore(milk.name)))
     assertEquals(3.0, t.cart.lines.value.single().quantity, 0.0)

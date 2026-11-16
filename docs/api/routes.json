@@ -20,18 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1033,
+    "routes": 1034,
     "byAuth": {
       "none-detected": 201,
       "admin": 299,
       "inline": 2,
-      "user": 488,
+      "user": 489,
       "device": 42,
       "optional": 1
     },
     "byShape": {
       "extracted": 678,
-      "empty": 353,
+      "empty": 354,
       "unresolved": 2
     }
   },
@@ -799,6 +799,7 @@
     {"method":"GET","path":"/api/shop/payments/intents/:id","area":"shop","source":"server/src/routes/shop-payments.js","auth":"user","guards":["requireUser","requireShop","requirePermission('data.write')"],"params":["id"],"query":["wait"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/payments/intents/:id/cancel","area":"shop","source":"server/src/routes/shop-payments.js","auth":"user","guards":["requireUser","requireShop","requirePermission('data.write')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/shop/payments/mirror","area":"shop","source":"server/src/routes/shop-payments.js","auth":"user","guards":["requireUser","requireShop","requirePermission('data.write')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"GET","path":"/api/shop/payments/qr-image/:hash","area":"shop","source":"server/src/routes/shop-payments.js","auth":"user","guards":["requireUser","requireShop","requirePermission('data.write')"],"params":["hash"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":["404 hesabpay_qr_image_missing"],"shape":"empty"},
     {"method":"GET","path":"/api/shop/permissions","area":"shop","source":"server/src/routes/shop-staff.js","auth":"user","guards":["requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"PUT","path":"/api/shop/permissions/members/:id","area":"shop","source":"server/src/routes/shop-staff.js","auth":"user","guards":["requireUser","requireShop","requirePermission('members.role')","requireRecentAuth"],"params":["id"],"query":[],"body":["perms"],"response":{"statuses":[200],"keys":["perms","shop","userId"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/promos","area":"shop","source":"server/src/routes/shop-promos.js","auth":"user","guards":["requireUser","requireShop","requirePermission('data.read')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","permissions","redeem","stamp","tierPrice","version"]},"errors":[],"shape":"extracted"},

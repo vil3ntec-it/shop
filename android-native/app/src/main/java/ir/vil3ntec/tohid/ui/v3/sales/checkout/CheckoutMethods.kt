@@ -39,8 +39,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrTillPay
 import ir.vil3ntec.tohid.core.pay.TillMethods
-import ir.vil3ntec.tohid.data.PayFlow
-import ir.vil3ntec.tohid.ui.components.pos.PayPanelState
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
@@ -59,37 +57,25 @@ import ir.vil3ntec.tohid.ui.screens.v3Text
 @Composable
 internal fun CheckoutMethods(
   tiles: List<TillMethods.Tile>,
-  pay: PayPanelState,
-  total: Double,
-  customerId: String?,
+  /** کاشیِ «انتخاب‌شده» (گامِ پرداخت: کاشیِ باز) */
+  selected: (TillMethods.Tile) -> Boolean,
   busy: Boolean,
   onPick: (TillMethods.Tile) -> Unit,
   onSetup: (() -> Unit)? = null,
+  title: String = StrTillPay.methodsTitle,
 ) {
   val c = PhoneV3.colors
-  val s = PayFlow.preview(pay.draft(total, customerId)).valueOrNull()
-  val kinds = pay.tileKinds()
-  fun on(t: TillMethods.Tile): Boolean = when (t.kind) {
-    TillMethods.Kind.CASH -> (PayFlow.amountOf(pay.cash)?.takeIf { !it.isNaN() } ?: 0.0) > 0
-    TillMethods.Kind.CREDIT -> customerId != null && (s?.toAccount ?: 0L) > 0
-    TillMethods.Kind.HESABPAY -> false
-    else -> t.kind in kinds
-  }
   Column(Modifier.fillMaxWidth()) {
-    Text(StrTillPay.methodsTitle, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(bottom = 6.dp))
+    Text(title, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(bottom = 6.dp))
     tiles.chunked(3).forEach { line ->
       //  کاشی‌های یک سطر هم‌قد (با زیرنویس و بی آن)
       Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        line.forEach { t -> MethodTile(t, on(t), enabled = t.enabled && !busy, Modifier.weight(1f).fillMaxHeight()) { onPick(t) } }
+        line.forEach { t -> MethodTile(t, selected(t), enabled = t.enabled && !busy, Modifier.weight(1f).fillMaxHeight()) { onPick(t) } }
         repeat(3 - line.size) { Spacer(Modifier.weight(1f)) }
       }
     }
     tiles.firstOrNull { it.kind == TillMethods.Kind.HESABPAY && it.until != null }?.until?.let { until ->
       Text(StrTillPay.hesabPending(SaleTime.stamp(until)), style = V3Type.footnote, color = PhoneV3Roles.toneIcon(c, ir.vil3ntec.tohid.ui.theme.V3Tone.WARNING))
-      Spacer(Modifier.height(4.dp))
-    }
-    if (kinds.contains(TillMethods.Kind.CARD)) {
-      Text(StrTillPay.cardRefHint, style = V3Type.footnote, color = c.inkMuted)
       Spacer(Modifier.height(4.dp))
     }
     if (onSetup != null) {
