@@ -20,18 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1034,
+    "routes": 1039,
     "byAuth": {
       "none-detected": 201,
       "admin": 299,
       "inline": 2,
-      "user": 489,
+      "user": 494,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-      "extracted": 678,
-      "empty": 354,
+      "extracted": 680,
+      "empty": 357,
       "unresolved": 2
     }
   },
@@ -580,15 +580,20 @@
     {"method":"GET","path":"/api/shop/branches-report","area":"shop","source":"server/src/routes/branches-report.js","auth":"user","guards":["rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'branches-report-ip' })","requireUser","requireShop","rateLimit({ max: 20, windowMs: 60 * 1000, keyPrefix: 'branches-report', key: (re"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"PATCH","path":"/api/shop/branches/:id","area":"shop","source":"server/src/routes/shop-branches.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'branches-ip' })","requireUser","requireShop","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'branches', key: (req) => r","requireRecentAuth"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["branch","branches"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/branches/:id","area":"shop","source":"server/src/routes/shop-branches.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'branches-ip' })","requireUser","requireShop","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'branches', key: (req) => r","requireRecentAuth"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["branch","branches"]},"errors":[],"shape":"extracted"},
-    {"method":"GET","path":"/api/shop/branches/members","area":"shop","source":"server/src/routes/shop-branches.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'branches-ip' })","requireUser","requireShop","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'branches', key: (req) => r"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["branches","members"]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/branches/members","area":"shop","source":"server/src/routes/shop-branches.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'branches-ip' })","requireUser","requireShop","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'branches', key: (req) => r"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["branches","members","settings"]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/shop/branches/members/:id","area":"shop","source":"server/src/routes/shop-branches.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'branches-ip' })","requireUser","requireShop","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'branches', key: (req) => r","requireRecentAuth"],"params":["id"],"query":[],"body":["branches"],"response":{"statuses":[200],"keys":["branches","members","userId"]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/shop/branches/members/:id/perms","area":"shop","source":"server/src/routes/shop-branches.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'branches-ip' })","requireUser","requireShop","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'branches', key: (req) => r","requireRecentAuth"],"params":["id"],"query":[],"body":["perms"],"response":{"statuses":[200],"keys":["members","perms","userId"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/branches/report","area":"shop","source":"server/src/routes/shop-branches.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'branches-ip' })","requireUser","requireShop","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'branches', key: (req) => r"],"params":[],"query":["branch"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":["403 branch_forbidden"],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/branches/settings","area":"shop","source":"server/src/routes/shop-branches.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'branches-ip' })","requireUser","requireShop","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'branches', key: (req) => r"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["settings"]},"errors":[],"shape":"extracted"},
+    {"method":"PUT","path":"/api/shop/branches/settings","area":"shop","source":"server/src/routes/shop-branches.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'branches-ip' })","requireUser","requireShop","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'branches', key: (req) => r","requireRecentAuth"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["settings"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/catalog/branch-transfers","area":"shop","source":"server/src/routes/branch-transfers.js","auth":"user","guards":["requireUser","requireShop","requirePermission('stock.view')"],"params":[],"query":["direction","limit","status"],"body":[],"response":{"statuses":[200],"keys":["branch","transfers"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/catalog/branch-transfers","area":"shop","source":"server/src/routes/branch-transfers.js","auth":"user","guards":["requireUser","requireShop","requirePermission('stock.view')"],"params":[],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/shop/catalog/branch-transfers/:id","area":"shop","source":"server/src/routes/branch-transfers.js","auth":"user","guards":["requireUser","requireShop","requirePermission('stock.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"PUT","path":"/api/shop/catalog/branch-transfers/:id","area":"shop","source":"server/src/routes/branch-transfers.js","auth":"user","guards":["requireUser","requireShop","requirePermission('stock.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/shop/catalog/branch-transfers/:id/cancel","area":"shop","source":"server/src/routes/branch-transfers.js","auth":"user","guards":["requireUser","requireShop","requirePermission('stock.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/catalog/branch-transfers/:id/receive","area":"shop","source":"server/src/routes/branch-transfers.js","auth":"user","guards":["requireUser","requireShop","requirePermission('stock.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/catalog/branch-transfers/:id/reject","area":"shop","source":"server/src/routes/branch-transfers.js","auth":"user","guards":["requireUser","requireShop","requirePermission('stock.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/shop/catalog/branch-transfers/:id/send","area":"shop","source":"server/src/routes/branch-transfers.js","auth":"user","guards":["requireUser","requireShop","requirePermission('stock.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/shop/catalog/branch-transfers/destinations","area":"shop","source":"server/src/routes/branch-transfers.js","auth":"user","guards":["requireUser","requireShop","requirePermission('stock.view')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["branch","destinations"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/catalog/config","area":"shop","source":"server/src/routes/catalog.js","auth":"user","guards":["requireUser","requireShop","requirePermission('stock.view')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","enabled","kinds","locations","permissions","sellableChoices","settings"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/catalog/moves","area":"shop","source":"server/src/routes/catalog.js","auth":"user","guards":["requireUser","requireShop","requirePermission('stock.view')"],"params":[],"query":["cursor","limit","productId"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},

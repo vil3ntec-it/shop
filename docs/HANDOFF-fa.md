@@ -97,6 +97,38 @@
 - **CI ِ #1065 (۲)**: «آزمون‌های سرور روی PostgreSQL» — `shop-route-inventory.test.js` («هر مسیرِ شناسه‌دار… با ردیفِ واقعیِ الف»)
   مسیرِ تازهٔ `GET /shop/payments/qr-image/:hash` را بی ردیفِ واقعی یافت. نخستین حسابِ حساب‌پیِ «الف» در همان آزمون حالا `qr` و `qrImage`
   (JPEG ِ ۶۴×۶۴) می‌فرستد و هشِ عکسِ فعال `ids.qrImage` است + قاعدهٔ `concreteFor`. نسخهٔ پیشین روی PGlite ۱/۲ (همان پیام)، پس ۲/۲.
+### ۱۴۰۵/۰۸/۲۶ — عاملِ e-branches4 زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-branches4` (از `origin/main` 7e2a36923) — پایانِ فازِ ۴ ِ شعبه‌ها
+
+- **خواست**: آخرین ردیف‌های «کد» ِ PARTIAL-MAP — INV-11/S21 (انتقالِ میانِ شعبه‌ها با «در راه» و حرکت در هر دو سو)، POS-16/S17 (موجودیِ
+  شعبه‌های دیگر؛ تصمیمِ هماهنگ‌کننده: صاحب و مدیر همیشه، شاگرد فقط با کلیدِ دکان، پیش‌فرض خاموش)، RPT-18، INV-01، STF-06. قاعدهٔ صاحب‌کار:
+  «شعبه‌ها داخلِ یک دکان، دادهٔ هر شعبه کاملاً جدا». شرحِ کامل: `docs/BRANCHES-fa.md` §۱۰ «پایانِ فازِ ۴».
+- **سرور** (مهاجرتِ **۹۴۶** + rollback؛ ۹۴۶–۹۵۹ آزاد بودند): پیش‌نویس/ویرایش/ارسالِ پیش‌نویس/لغو (`PUT /:id`، `POST /:id/send|cancel`،
+  `draft: true`)، تریگرِ بازنوشته، `sent_at/sent_by`، `returnedMilli` ِ نما؛ `shop_branch_settings` (`staffOtherStock`، `transferNegative`) با
+  `GET/PUT /api/shop/branches/settings` (فقط صاحب، احرازِ تازه، سابقه)؛ مدیر در `other-branches.seesAll`؛ `catalog.ingestTx` ردیفِ آینهٔ انتقالِ
+  واقعی را نمی‌شمرد. هیچ کدِ مشترک با پمپ دست نخورد؛ هیچ جدولِ همگامِ تازه (آینه همان `warehouseEntries`).
+- **برنامه**: `core/stock/BranchTransfer` (وضعیت‌ها و گام‌های تازه)، `core/stock/BranchTransferLedger` (آینهٔ دفتر)، `BranchStock` (کلیدها)؛
+  `data/BranchTransferBookAndroid.kt`، `data/repo/BranchTransfersRepository.kt`؛ صفحه‌های گوشی `ui/v3/branches/BranchTransfersPages.kt` (+ حال در
+  `BranchTransfersState.kt`) و کامپیوتر `DeskBranchTransfers.kt`/`DeskBranchReport.kt`؛ راه از «شعبه‌ها» و «…» ِ «انبار»؛ کلیدهای صاحب و تراشهٔ
+  مجوزِ هر شاگرد در «شعبه‌ها»؛ «گزارشِ شعبه‌ها» روی کالبد. نوشته‌ها `StrBranchTransfers` (+ یک عبارتِ دری، `dari-words.js --write`، ردیف در
+  `DARI-REVIEW-fa.md`).
+- **آزمون‌های عمداً عوض‌شده**: `branch-transfers.test.js` — فهرستِ دقیقِ کلیدهای نما `sentAt`/`sentBy`/`returnedMilli` گرفت، و آزمونِ برگشتِ ۹۳۵
+  اول ۹۴۶ را برمی‌گرداند (ترتیبِ واقعیِ برگشت؛ دوباره بالا هر دو را می‌زند). `branch-stock-peek.test.js` و `tenant-matrix-branches.test.js` —
+  مدیرِ «الف» حالا عددِ «ب» را می‌بیند (تصمیمِ هماهنگ‌کننده)؛ کارمند همان «هیچ»، و سنجش سخت‌تر شد (فقط سه کلیدِ عدد، کلیدِ دکان روشن/خاموش،
+  پیش‌نویسِ «ب» و درهای تازه در ماتریس). `paid-routes-entitlement.test.js` — چهار درِ نوشتنیِ تازه دسته گرفتند.
+- **نتیجه**: سرور (PGlite، محلی): `branch-transfers-drafts` ۸/۸ (تازه)، `branch-transfers` ۹/۹، `branch-stock-peek` ۳/۳،
+  `tenant-matrix-branches` ۱/۱، `paid-routes-entitlement` ۶/۶، `route-authz-inventory` ۴/۴، `shop-route-inventory` ۲/۲، `upgrade-rehearsal` ۹/۹،
+  `shop-branches` ۱۰/۱۰، `shop-branches-stock` ۷/۷، `catalog-stock` ۲۷/۲۷، `catalog-transfers` ۹/۹، `catalog-transfer-steps-v3` ۵/۵، `staff-scope` ۵/۵،
+  `owner-report` ۹/۹، `dari-text` ۱۷/۱۷، `api-contract` ۲/۲. core: `BranchTransferLedgerTest` ۵/۵ (تازه)، `BranchTransferTest` ۵/۵، `BranchStockTest` ۴/۴،
+  `BranchBookTest` ۱۰/۱۰. برنامه (هدف‌دار): `BranchTransfersStateTest` ۶/۶، `BranchTransfersRoutesUiTest` ۵/۵ (فهرست و پالایه، دریافتِ همه یک گام و دفترِ +۳ یک بار، ارسالِ پیش‌نویس و دفترِ −۲ و لغوِ بی دلیل نه، فرمِ ارسال، جدولِ کامپیوتر)، `BranchesStateTest` ۶/۶، `BranchesReportPageTest` ۴/۴، `PageAnatomyGuardTest` ۹/۹، `LookGuardTest` ۷/۷، `HardcodedColorsTest` ۲/۲، `DariCoverageTest` ۲۳/۲۳، `DariWordsTest` ۱۷/۱۷، `I18nCoverageTest` ۸/۸، `InfraLeakGuardTest` ۸/۸، `StockExtrasTest` ۵/۵، `V3ReachabilityTest` ۹/۹، `BranchDeskDesktopTest` ۸/۸، `V3DataRowGuardTest` ۵/۵، `SectionColorsTest` ۷/۷، `PriceCheckDataTest` ۵/۵ (`./desktop/gradlew -p desktop test --tests …`، محلی؛ عکس‌ها `BranchTransfersShotsTest`). عکس‌ها: `/home/user/wt-br4-shots/` (فهرست، جزئیات، فرمِ گوشی و جدولِ
+  کامپیوتر ۱۳۶۶×۷۶۸، روز و شب؛ `BR4_SHOTS=<پوشه>`). ابزار: `api-contract` (`docs/api/routes.json` تازه)، `dari-words.js --write`.
+- **CI ِ #1063، تغییرِ آگاهانهٔ آزمون** (هماهنگ‌کننده): `TillReceiveStaleTest` («دو ضربه با یک کلید…») انتظارِ `q0 + 2` داشت و `q0 + 6` دید
+  (۴۷۸۳ آزمون، فقط همین سرخ). کدِ این دسته به `ShopStore`/`DebtEntry`/`TillReceivePref` دست نزده؛ صفِ `SyncV1Engine.of` میانِ همهٔ آزمون‌های
+  JVM ِ کامپیوتر مشترک است (~۲۷۱ هزار op) و نوشتنِ دیرهنگامِ آزمونِ دیگری میانِ دو شمارش نشسته بود. سه سنجهٔ صف حالا فقط opهای همین
+  آزمون را می‌شمرند (`ownOps`: ردیف با پیشوندِ `$p-` یا سابقه با `refId` ِ همان)؛ سنجه همان: یک INSERT برای رسید و یکی برای سابقه، ردِ
+  قاعده هیچ op، هیچ DELETE برای رسیدِ گوشی. ریشهٔ دوم (کدام آزمون پس از پایانش هنوز می‌نویسد) برای دورِ بعد؛ پیام‌های سنجه opها را نشان می‌دهند.
+- **قدمِ بعدی**: روشن کردن روی یک دکانِ آزمایشی و آزمونِ دستی (ستونِ «صاحب‌کار دقیقاً چه کند» ِ هفت ردیف در PARTIAL-MAP «پرچم»)؛ انتقالِ
+  **درونِ** شعبهٔ غیرِ اصلی هنوز `branch_unsupported` (کارِ جدا، §۱۰)؛ صفحهٔ ریشهٔ «شعبه‌ها» هنوز `V3Scaffold` ِ مستقیم دارد (نه `V3RoutePage`).
+
 ### ۱۴۰۵/۰۸/۲۶ — عاملِ e-phone-p0r3 زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-phone-p0r3` (از `origin/main` 7e2a36923، پس از #1060) — کالبدِ یکسان، دورِ سوم و دو خواستِ صاحب‌کار
 
 - **خواستِ صاحب‌کار ۱ (عکسِ «مصارف»، همه‌جا با اجزای مشترک)**: ردیفِ داده (`V3DataRow`) ⇐ [کاشی] · [عنوان ……… مبلغ] / [جزئیات · وضعیت] —
