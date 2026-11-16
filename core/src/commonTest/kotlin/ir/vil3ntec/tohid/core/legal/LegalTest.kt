@@ -55,8 +55,8 @@ class LegalTest {
     //  «حفظ و محرمانگی اطلاعات» ⇐ «… معلومات»
     assertNotEquals(fa.sections[0].title, prs.sections[0].title)
     assertTrue(prs.sections[0].title.contains("معلومات"))
-    //  نامِ برنامه در دری هم همان است
-    assertTrue(Legal.doc(LegalKind.PRIVACY, "prs").title.contains("فروشگاه من"))
+    //  نامِ برنامه در دری هم همان است («Daily Shop»، لاتین؛ از ۱۴۰۵/۰۸/۲۵ به‌جای «فروشگاه من»)
+    assertTrue(Legal.doc(LegalKind.PRIVACY, "prs").title.contains("Daily Shop"))
   }
 
   @Test fun unknown_language_falls_back_to_persian() {

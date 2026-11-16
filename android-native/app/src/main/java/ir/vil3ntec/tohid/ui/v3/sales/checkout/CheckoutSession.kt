@@ -53,6 +53,8 @@ object CheckoutSession {
   fun reset() {
     form = null
     pay.cash = ""
+    //  e-paymethods: هر تسویهٔ تازه با «نقد» ِ خودکار (همان پیش‌فرضِ «نقدی» ِ پیشین) — کاشیِ دیگر یا نوشتنِ دستی خاموشش می‌کند
+    pay.cashAuto = true
     pay.rows.clear()
     pay.fxAmount = ""
     approval = null

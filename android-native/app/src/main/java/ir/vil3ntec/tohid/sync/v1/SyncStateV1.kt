@@ -95,9 +95,19 @@ class SyncStateV1(context: Context, private val accountKey: String) : V1Restore.
     get() = prefs.getLong(k("pushSince"), -1L)
     set(v) = prefs.edit().putLong(k("pushSince"), v).apply()
 
+  /** متنِ خامِ آخرین شکست — هر نوشتنِ تازه کدِ ماشینیِ پیشین ([lastErrorCode]) را برمی‌دارد (کد را فقط `SyncFailure.note` می‌نویسد) */
   var lastError: String
     get() = prefs.getString(k("lastError"), "").orEmpty()
-    set(v) = prefs.edit().putString(k("lastError"), v).apply()
+    set(v) = prefs.edit().putString(k("lastError"), v).remove(k("lastErrorCode")).apply()
+
+  /**
+   *  e-newinstall: کدِ ماشینیِ همان شکست (`ApiFailure.code`: `no_shop`، `session_expired`، `feature_locked`…) — ماندگار، تا
+   *  تشخیصِ صفحه (`SyncModel.diagnose`) پس از بستن و باز کردنِ برنامه هم «دکان ندارید» را از «نشست تمام شد» جدا کند.
+   *  پیش‌تر فقط رشتهٔ در حافظه (`SyncOutage.Streak`) کد داشت و ۴۰۳ ِ «دکانی ثبت نشده» یا «نشست» دیده می‌شد یا «ناشناخته».
+   */
+  var lastErrorCode: String
+    get() = prefs.getString(k("lastErrorCode"), "").orEmpty()
+    set(v) = prefs.edit().putString(k("lastErrorCode"), v).apply()
 
   /** `device_id` ِ همین حساب روی همین دستگاه برای سرور، یک بار انتخاب و نگه داشته (`V1ReplicaAndroid.kt`) */
   var replica: String
@@ -207,7 +217,7 @@ class SyncStateV1(context: Context, private val accountKey: String) : V1Restore.
     store.reset()
     prefs.edit()
       .remove(k("cursor")).remove(k("shadow")).remove(k("lastOkAt"))
-      .remove(k("lastPushAt")).remove(k("lastPullAt")).remove(k("lastError"))
+      .remove(k("lastPushAt")).remove(k("lastPullAt")).remove(k("lastError")).remove(k("lastErrorCode"))
       .remove(k("holding")).remove(k("upgrade")).remove(k("serverSchema"))
       .remove(k("snapshotAt")).remove(k("legacyOpsUpTo"))
       .apply()
@@ -253,6 +263,7 @@ internal object SyncFailure {
   fun note(state: SyncStateV1, prev: SyncOutage.Streak?, error: Throwable, message: String, now: Long): SyncOutage.Streak {
     val before = state.lastError
     state.lastError = message
+    state.lastErrorCode = code(error)
     return SyncOutage.next(prev, before, status(error), code(error), message, now)
   }
 }
@@ -272,4 +283,6 @@ data class SyncStatus(
   val live: Boolean,
   /** SYN-12: چرا نرسید — شبکهٔ دستگاه، سرور، قطعیِ سراسری یا نشست (`SyncOutage.of`) */
   val outage: SyncOutage.Kind = SyncOutage.Kind.OK,
+  /** e-newinstall: کدِ ماشینیِ همان [lastError] (`SyncStateV1.lastErrorCode`)؛ خالی ⇒ نامعلوم یا خطای محلی */
+  val errorCode: String = "",
 )

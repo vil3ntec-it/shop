@@ -76,7 +76,7 @@ class ShopStore(
    *         لحظه دفتر را برنمی‌دارد، پس ذخیره‌ای که از دفترِ پیش از sweep ساخته شده باشد پیش نمی‌آید
    *         و sweep (با ردهای دفترچه‌اش) برنمی‌گردد. کارگر و خلاصه (`load()` ِ بی sweep) چیزی نمی‌نویسند.
    */
-  suspend fun load(sweep: Boolean = false) {
+  suspend fun load(sweep: Boolean = false, adoptPay: Boolean = false) {
     withContext(Dispatchers.IO) {
       //  نشانِ دیسک **پیش از** خواندن — نوشتنی که میانِ خواندن برسد پایین دیده می‌شود
       val mark = follow.mark()
@@ -105,6 +105,7 @@ class ShopStore(
       if (follow.on) synchronized(SyncV1Engine.of(context)) { follow.loadedLocked(mark) } else follow.loadedLocked(mark)
     }
     if (sweep) quietly { sweepNow(requireLoaded = false) }
+    if (adoptPay) adoptPayDefault() //  e-paymethods: پیش از `loaded` تا هیچ صفحه‌ای حالتِ پرداخت را پیش از تصمیم نخواند
     _loaded.value = true
   }
 
@@ -190,14 +191,22 @@ class ShopStore(
    *  یک بار دوباره ساخته می‌شود و کارهای پس‌زمینه از آن به بعد ارزان
    *  می‌مانند.
    */
-  suspend fun loadAndSummarize() {
-    //  CRM-10: sweep ِ شروع درونِ `load`، پیش از `loaded` (شرح سرِ `load`)
-    load(sweep = true)
+  suspend fun loadAndSummarize(adoptPay: Boolean = false) {
+    //  CRM-10: sweep ِ شروع درونِ `load`، پیش از `loaded` (شرح سرِ `load`)؛ e-paymethods: [adoptPayDefault] فقط از شروعِ برنامه
+    load(sweep = true, adoptPay = adoptPay)
     //  دفترِ خوانده‌نشده خلاصهٔ «خالی» نمی‌گیرد
     if (_unreadable.value == null && !training) withContext(Dispatchers.IO) { LedgerSummary.write(context, _data.value) }
     //  SEC-01: با تنظیمِ خاموش و دفترِ ساده فقط سرآیندِ چند فایل خوانده می‌شود
     convergeAtRest()
   }
+
+  /**
+   *  e-paymethods — پیش‌فرضِ «ترکیبی و شیفت» برای دستگاهی که هرگز انتخاب نکرده (`PayV2Pref`، `PayV2Default`): فقط شروعِ برنامه
+   *  (`loadAndSummarize(adoptPay = true)`) درونِ [load] پیش از `loaded`، نه صفحه‌ها و نه عوضِ حساب. دفترِ خوانده‌نشده «بی صندوق»
+   *  نیست و دفترِ آموزشی تصمیم نمی‌گیرد ⇒ `null` و هیچ نوشتنی. انتخابِ صریح دست نمی‌خورد.
+   */
+  fun adoptPayDefault(now: Long = ReportBridge.nowMs()): PayV2Default.Step? =
+    if (training || _unreadable.value != null) null else runCatching { PayV2Pref.adopt(context, _data.value, now) }.getOrNull()
 
   /**
    *  CRM-10: ردیف‌های دیررسیده (فروش یا قرضی که دستگاهِ آفلاین یا ساختِ قدیمی روی مشتریِ
@@ -369,7 +378,8 @@ class ShopStore(
    *  خوانده‌نشده همان «بازسازی از سرور» (SEC-01).
    *  @return `message` ِ خالی یعنی نوشته شد و حرفی نیست
    */
-  suspend fun restoreBackup(next: ShopData): Rebuilt = withContext(Dispatchers.IO) {
+  /** @param carry e-newinstall: صفِ نرفتهٔ نصبِ دیگرِ همین حساب از همان پشتیبان — فقط راهِ «از سرور» (`SyncV1Engine.rebuildFromServer`) */
+  suspend fun restoreBackup(next: ShopData, carry: List<ir.vil3ntec.tohid.sync.v1.SyncOp> = emptyList()): Rebuilt = withContext(Dispatchers.IO) {
     if (TrainingMode.on) return@withContext Rebuilt(false, TRAINING_SEALED)
     extras = null; if (_unreadable.value != null) return@withContext rebuildFromServer(next)
     val engine = SyncV1Engine.of(context)
@@ -388,7 +398,7 @@ class ShopStore(
       RestoreRoute.Route.NEED_NET -> Rebuilt(false, StrSettings.restoreNeedNet)
       RestoreRoute.Route.NOT_ON_V3 -> Rebuilt(false, StrSettings.restoreNotOnV3)
       RestoreRoute.Route.FROM_SERVER -> try {
-        when (val out = engine.rebuildFromServer(next, pushedStaging)) {
+        when (val out = engine.rebuildFromServer(next, pushedStaging, carry)) {
           is SyncRebuild.Outcome.QueueLeft -> Rebuilt(false, StrSettings.restoreQueueLeft(out.count))
           is SyncRebuild.Outcome.Done -> Rebuilt(
             true,

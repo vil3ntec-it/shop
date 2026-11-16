@@ -200,7 +200,8 @@ const KNOWN = Object.freeze([
   { key: 'image_bank.zoom', scope: 'shop', default: false, what: 'نسخهٔ بزرگِ ۲۴۰۰px ِ عکسِ بانک برای بزرگ‌نمایی، ساختهٔ سرور با sharp و نگه‌داشته روی دیسک (IMG-11)' },
   { key: 'shop.image_studio', scope: 'shop', default: false, what: 'استودیوی عکس روی سرورِ خودمان: صفِ پردازشِ گروهی، خروجی فقط پس از تأییدِ دکان (AI-02/05)؛ با `shop.image_bank`' },
   { key: 'image_bank.resume', scope: 'all', default: false, what: 'ادامهٔ بارگذاریِ دسته‌ایِ بانکِ تصاویر بی فرستادنِ دوبارهٔ همان فایل (IMG-14)' },
-  { key: 'pay.hesabpay', scope: 'shop', default: false, what: 'حساب‌پی ِ خودکار با کلیدهای خودِ دکان؛ پول مستقیم به حسابِ دکان، تأیید فقط با webhook' },
+  //  پیش‌فرض روشن از ۱۴۰۵/۰۸/۲۵ (تصمیمِ صاحب‌کار، `lib/flag-defaults.js` ‹PAY_BASE›، FLAGS-ON §۴۹): فقط `false` ِ صریح خاموش
+  { key: 'pay.hesabpay', scope: 'shop', default: true, what: 'حساب‌پیِ خودِ دکان در صندوق (QR/NFC، «خودکار» با کلیدهای خودِ دکان)؛ پول مستقیم به حسابِ دکان، تأیید فقط با webhook' },
   { key: 'shop.pay_status_mirror', scope: 'shop', default: false, what: 'آینهٔ وضعیتِ بعدیِ حساب‌پیِ خودکار («نیازمند بررسی»/«بازپرداخت» ِ سرور) روی ردیفِ درگاهِ فاکتورِ دستگاه (PAY-07)؛ با `pay.hesabpay`' },
   //  ── همگام‌سازیِ دکان (پمپ هیچ‌کدام را نمی‌خواند)
   { key: 'shop.sync.doc_roles', scope: 'shop', default: false, what: 'داوریِ نقشِ سندهای سابقه‌سوار (کارتِ هدیه، امتیاز، امانی…) در Sync v3' },

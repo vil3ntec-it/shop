@@ -159,14 +159,14 @@ jobs:
           cat > "$RUNNER_TEMP/notes.md" <<EOF
           ## پیش‌نمایشِ برنامهٔ در حالِ بازسازی (موقت)
 
-          فقط برای دیدن، نه کارِ روزانه. کنارِ «فروشگاه من» با نامِ «توحید · پیش‌نمایش» نصب می‌شود و به داده‌اش دست نمی‌زند.
+          فقط برای دیدن، نه کارِ روزانه. کنارِ «Daily Shop» با نامِ «Daily Shop · پیش‌نمایش» نصب می‌شود و به داده‌اش دست نمی‌زند.
 
           **نصبِ اول:** [tohid-preview.zip](https://github.com/$REPO/releases/download/$TAG/tohid-preview.zip) را بگیرید، باز کنید و \`tohid-preview.apk\` را نصب کنید. بعد از آن، خودِ برنامه از همین‌جا به‌روز می‌شود.
 
           ---
           <sub>نسخهٔ \`$VERSION\` — شاخهٔ \`$BRANCH\` — \`$SHA\`</sub>
           EOF
-          title="توحید — پیش‌نمایش (موقت)"
+          title="Daily Shop — پیش‌نمایش (موقت)"
           if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
             gh release edit "$TAG" -R "$REPO" --prerelease --latest=false --title "$title" --notes-file "$RUNNER_TEMP/notes.md"
           else

@@ -27,7 +27,7 @@ class SupportModelTest {
     assertEquals(listOf("دیروز", "امروز"), days)
     val bubbles = items.filterIsInstance<Item.Bubble>()
     assertEquals(listOf(SupportModel.Kind.MINE, SupportModel.Kind.THEIRS, SupportModel.Kind.SYSTEM, SupportModel.Kind.MINE), bubbles.map { it.kind })
-    assertEquals(listOf(null, "پشتیبانی", "خبر از فروشگاه من", null), bubbles.map { it.sender })
+    assertEquals(listOf(null, "پشتیبانی", "خبر از Daily Shop", null), bubbles.map { it.sender })
     assertTrue(bubbles.last().sending)
     assertEquals(items.size, items.map { it.key }.toSet().size)
   }

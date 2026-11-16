@@ -2,7 +2,7 @@
 #
 #   powershell -ExecutionPolicy Bypass -File bench\desktop-cold-start.ps1 [-Runs 10] [-Exe "C:\...\app.exe"]
 #
-# بی -Exe، میان‌برِ «فروشگاه من / My Shop / Tohid» در منوی Start پیدا می‌شود.
+# بی -Exe، میان‌برِ «Daily Shop / فروشگاه من / My Shop / Tohid» در منوی Start پیدا می‌شود.
 # هر دور: برنامه بسته می‌شود، دوباره باز می‌شود، و زمان تا وقتی شمرده
 # می‌شود که پنجرهٔ اصلی ساخته شده و پاسخ‌گوست. این «کفِ» شروعِ سرد است —
 # کشیدنِ محتوای نخستین صفحه کمی بعد است.
@@ -17,7 +17,7 @@ if (-not $Exe) {
   $sh = New-Object -ComObject WScript.Shell
   $dirs = @("$env:APPDATA\Microsoft\Windows\Start Menu\Programs", "$env:ProgramData\Microsoft\Windows\Start Menu\Programs")
   $lnk = Get-ChildItem $dirs -Recurse -Filter *.lnk -ErrorAction SilentlyContinue |
-    Where-Object { $_.BaseName -match 'My Shop|MyShop|Tohid|فروشگاه' } | Select-Object -First 1
+    Where-Object { $_.BaseName -match 'Daily Shop|My Shop|MyShop|Tohid|فروشگاه' } | Select-Object -First 1
   if ($lnk) { $Exe = $sh.CreateShortcut($lnk.FullName).TargetPath }
 }
 if (-not $Exe -or -not (Test-Path $Exe)) { Write-Host "App not found; pass the exe path with -Exe"; exit 2 }

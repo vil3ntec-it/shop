@@ -625,11 +625,11 @@ class DariCoverageTest {
     assertEquals("چاپگر در شبکه جواب نداد (10.0.0.9) — روشن است؟", StrPrint.netNoAnswer("10.0.0.9"))
     assertEquals("همگام با سرور", StrSync.dotGreen)
     assertEquals("نسخهٔ شما تازه‌ترین است.", StrUpdate.upToDate)
-    assertEquals("این فایل، پشتیبانِ فروشگاه من نیست", StrAppData.notOurBackup)
+    assertEquals("این فایل، پشتیبانِ Daily Shop نیست", StrAppData.notOurBackup)
     I18n.source = { Lang.PRS }
     //  نامِ مشتری و کالا (داده) در دری همان می‌ماند
     assertEquals("«فروشگاه گوشی»: 2 موجود است، شما 5 خواستید.", StrLedger.shortStock("فروشگاه گوشی", "2", "", "5"))
-    assertEquals("این فایل، پشتیبانِ فروشگاه من نیست", StrAppData.notOurBackup) // «فروشگاه من» نامِ برنامه است
+    assertEquals("این فایل، پشتیبانِ Daily Shop نیست", StrAppData.notOurBackup) // «Daily Shop» نامِ برنامه است (لاتین؛ لایهٔ دری دستش نمی‌زند)
     I18n.source = { Lang.EN }
     assertEquals("Customer not found", StrLedger.customerNotFound)
     assertEquals("In sync with the server", StrSync.dotGreen)
