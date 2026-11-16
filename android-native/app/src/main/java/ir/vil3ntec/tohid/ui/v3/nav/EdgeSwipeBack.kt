@@ -5,9 +5,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
@@ -63,8 +64,10 @@ fun Modifier.edgeSwipeBack(enabled: Boolean, scope: CoroutineScope, onProgress: 
         val change = awaitPointerEvent(pass).changes.firstOrNull { it.id == down.id } ?: break
         tracker.addPosition(change.uptimeMillis, change.position)
         if (!change.pressed) break
-        if (!dragging && !fromEdge && change.isConsumed) return@awaitEachGesture
-        val d = change.positionChange()
+        val d = change.positionChangeIgnoreConsumed()
+        //  فرزندی **جابه‌جایی** را خورد (پیمایش، برگه‌های افقی، کشیدنِ ردیف) ⇒ کشیدن مالِ اوست. «فرودِ» خورده‌شده نه: هر ردیفِ
+        //  زدنی (`clickable`/`detectTapGestures`) فرود را می‌خورد و آن نباید جلوی برگشت را بگیرد
+        if (!dragging && !fromEdge && change.isConsumed && d != Offset.Zero) return@awaitEachGesture
         dx += d.x
         dy += d.y
         if (!dragging) {
