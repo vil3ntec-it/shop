@@ -57,7 +57,7 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
-### ۱۴۰۵/۰۸/۲۶ — عاملِ e-devver زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-devver` (از `origin/claude/e-pur11`، روی #1066؛ ادغامِ تا 2b934795a) — نسخهٔ برنامهٔ دستگاه‌های دکان و پرسشِ کلیدِ «خرید به ارزِ دیگر»
+### ۱۴۰۵/۰۸/۲۶ — عاملِ e-devver زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-devver` (از `origin/claude/e-pur11`، روی #1066؛ ادغامِ تا 2ae34dbda) — نسخهٔ برنامهٔ دستگاه‌های دکان و پرسشِ کلیدِ «خرید به ارزِ دیگر»
 
 - **خواست**: صاحب ببیند کدام دستگاهِ دکان برنامهٔ کهنه دارد، و کلیدِ «خرید به ارزِ دیگر» (PUR-11) پیش از روشن شدن همان را بپرسد.
   قاعده: `RULES-fa.md` ⇐ بندِ PUR-11 (۷) و بندِ تازهٔ «🧑‍🤝‍🧑 نسخهٔ برنامهٔ دستگاه‌های دکان».
@@ -94,6 +94,9 @@
   `DeskSettingsCoverageTest` ۳، `DesktopPhrasesTest` ۴، `TeamModelTest` ۷، `LostDeviceRestoreDesktopTest` ۴، `V3A11yGuardTest` ۶،
   `InfraLeakGuardTest` ۸، `DroppedResend*` ۱۱، `ShopSettingsSyncTest` ۱۴، `MoneyPagesModelTest` ۱۶، `NavRowUiTest` ۳، `DeskD3cUiTest` ۸
   (۴ سرخِ نخستِ `DeviceVersionUiTest` از خودِ آزمون بود: مسیرِ `/api/v1` و `Backend.shop` ِ بی سرورِ ساختگی ⇒ `TestBackendShop.kt`).
+  **پس از ادغامِ `claude/e-pur11` (با main تا #1063، 2ae34dbda):** همان ۳۷ کلاس + `BranchTransfers*` ⇒ ۴۰ کلاس، **۲۷۴ آزمون، ۰ شکست،
+  ۲ SKIP** (دو آزمونِ عکس)؛ هسته `DariTextTest` ۱۶، `WhatsNewFileTest` ۴، `PurchaseFxTest` ۱۳؛ سرور دوباره `shop-device-version` ۶،
+  `staff-perms` ۹، `route-authz-inventory` ۴، `api-contract` ۲، `dari-text` ۱۷، `web-i18n` ۴۱؛ precheck `fail=0`.
 - **آزمون‌های عمداً عوض‌شده**: هیچ.
 - **عکس‌ها**: `DeviceVersionShotsTest` (`DEVVER_SHOTS`، `DEVVER_TAG`) در `/home/user/wt-devver-shots/{before,after}/`: گوشی ۳۶۰×۷۶۰
   روشن/تیره `phone-member-devices`، `phone-team-devices`، `phone-fx-switch-on`؛ کامپیوتر ۱۳۶۶×۷۶۸ `desk-member-devices`، `desk-fx-switch-on`
