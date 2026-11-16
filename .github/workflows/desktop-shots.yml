@@ -297,8 +297,11 @@ jobs:
       - name: قلم
         run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-core >/dev/null
 
+      #  ⏱ مهلتِ همین گام (کلِ کلاس روی کامپیوترِ خودی ~۴۰ ثانیه، کامپایل چند دقیقه): گیر ⇒ چند دقیقه، نه ۴۰ دقیقهٔ بی‌صدا.
+      #  هر آزمون هم مهلتِ خودش و رونوشتِ نخ‌ها را دارد (`shots/RenderWatchdog.kt` ⇒ thread-dump-*.txt در همان artifact).
       - name: کشیدن و سنجیدن
         continue-on-error: true
+        timeout-minutes: 25
         working-directory: desktop
         env:
           TOHID_RENDER_OUT: ${{ github.workspace }}/desktop/build/render-report
@@ -314,6 +317,10 @@ jobs:
           path, out = os.environ["REPORT"], os.environ["GITHUB_STEP_SUMMARY"]
           esc = lambda t: str(t).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
           cell = lambda t: str(t).replace("|", "\\|").replace("\n", " ")
+          import glob
+          for dump in sorted(glob.glob(os.path.join(os.path.dirname(path), "thread-dump-*.txt"))):
+              print(f"::error::کشیدن گیر کرد — رونوشتِ نخ‌ها: {os.path.basename(dump)}")
+              print(open(dump, encoding="utf-8", errors="replace").read()[:60000])
           if not os.path.isfile(path):
               print("::warning::render-report.json ساخته نشد (کامپایل یا آزمون پیش از گزارش شکست؛ لاگِ گامِ کشیدن)")
               raise SystemExit(0)

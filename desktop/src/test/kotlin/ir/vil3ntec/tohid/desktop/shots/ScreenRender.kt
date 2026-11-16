@@ -33,7 +33,7 @@ import ir.vil3ntec.tohid.desktop.DesktopContext
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -46,6 +46,8 @@ import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Surface
 import java.io.File
 import java.util.Collections
+import java.util.concurrent.ConcurrentLinkedQueue
+import kotlin.coroutines.CoroutineContext
 
 /**
  *  کشیدنِ یک صفحه بی پنجره و بی Xvfb (رَسترِ Skia ِ همان Compose ِ کامپیوتر) — همان پوشش‌های پیش‌نمایشِ گوشی
@@ -64,6 +66,23 @@ internal object ScreenRender {
 
   /** [firstFrameMs]: از `setContent` تا پایانِ نخستین قاب (ساختن، چیدن و کشیدن) — فقط گزارش */
   class Result(val name: String, val widthDp: Int, val en: Boolean, val findings: List<Finding>, val texts: List<String>, val firstFrameMs: Long = -1L)
+
+  /**
+   *  همهٔ کارهای صحنه (اثرها، بازسازی و ادامهٔ coroutineها پس از `withContext(IO)` یا `delay`) روی **همین نخِ کشیدن**.
+   *  پیش‌تر `Dispatchers.Unconfined` بود: ادامه‌ها روی نخِ IO ِ سرورِ ساختگی یا `DefaultExecutor` اجرا می‌شدند، هم‌زمان با
+   *  `scene.render` ِ نخِ آزمون — همان بن‌بستِ ABBA ِ `runLock` ِ Compose و قفلِ دفتر (`synchronized(engine)` ِ `ShopStore`)
+   *  که در آیفون (#1037، #1039) دیده شد؛ گیرِ گاه‌به‌گاهِ ۴۰ دقیقه‌ایِ کارِ «(گزارش)». حالا کارها در صف می‌مانند و
+   *  [drain] پیش و پس از هر قاب آن‌ها را روی همین نخ اجرا می‌کند؛ نخِ دیگری هرگز واردِ صحنه نمی‌شود.
+   */
+  private class SceneDispatcher : CoroutineDispatcher() {
+    private val queue = ConcurrentLinkedQueue<Runnable>()
+    override fun dispatch(context: CoroutineContext, block: Runnable) { queue.add(block) }
+    /** کارهای صف تا خالی شدن؛ سقف تا حلقهٔ خودتکرار (`while(true){ yield() }`) قاب را نگه ندارد */
+    fun drain(max: Int = 10_000) {
+      var n = 0
+      while (n++ < max) (queue.poll() ?: return).run()
+    }
+  }
 
   private val rawKey = Regex("^[a-z][a-zA-Z0-9]*([._][a-zA-Z0-9]+){1,}$")
 
@@ -102,7 +121,8 @@ internal object ScreenRender {
     val dir = if (en) LayoutDirection.Ltr else LayoutDirection.Rtl
     val before = I18n.source
     I18n.source = { if (en) Lang.EN else Lang.FA }
-    val scene = CanvasLayersComposeScene(Density(density), dir, IntSize(w, h), Dispatchers.Unconfined, platform)
+    val tasks = SceneDispatcher()
+    val scene = CanvasLayersComposeScene(Density(density), dir, IntSize(w, h), tasks, platform)
     val surface = Surface.makeRasterN32Premul(w, h)
     val t0 = System.nanoTime()
     var first = -1L
@@ -121,15 +141,20 @@ internal object ScreenRender {
           }
         }
       }
+      tasks.drain()
       var t = 0L
       repeat(frames.coerceAtLeast(2)) {
+        tasks.drain()
         surface.canvas.clear(0)
         scene.render(surface.canvas.asComposeCanvas(), t)
         if (first < 0) first = (System.nanoTime() - t0) / 1_000_000
+        tasks.drain()
         between()
+        tasks.drain()
         t += 500_000_000L
         Thread.sleep(40)
       }
+      tasks.drain()
       surface.canvas.clear(0)
       scene.render(surface.canvas.asComposeCanvas(), t)
       RenderReport.out?.let { o ->
@@ -142,6 +167,8 @@ internal object ScreenRender {
       return Result(name, widthDp, en, found.distinct(), texts, first)
     } finally {
       scene.close()
+      //  لغوِ اثرهای بسته‌شده هم روی همین نخ تمام شود (نه coroutineِ نیمه‌کاره‌ای که قفلی را نگه دارد)
+      tasks.drain()
       surface.close()
       I18n.source = before
     }

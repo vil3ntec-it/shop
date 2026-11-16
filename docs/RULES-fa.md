@@ -1631,6 +1631,12 @@
   آینه‌نشدنی: `*VectorsTest` ِ پیاده‌سازیِ کاتلین (همتای JS ِ خودشان)، «کلیدِ زنده» ِ DariWordsTest (جدول‌های `Str*`)، `WhatsNew.plan`، Offline30، قاعده‌های KeyMapTest.
   جدول‌های `Str*` ِ `I18nTables.all` (دستهٔ ۴۳، f067bf9c: فقط CI ِ اندروید سرخ شد): `KT.appTexts` فارسیِ هر `t`/`td` را از خودِ Str*.kt می‌خواند (قالب ⇒ `protect`، `+`، چندسطری، `if … else` هر دو شاخه، ثابتِ `Obj.X`/`LIST[i]` ِ پروندهٔ دیگر) و همان `of` + `farsiOnlyLeft`؛ خوانده‌نشده شمرده می‌شود و از `APP_UNREAD_MAX` (۲، با نام) بالا نمی‌رود.
 
+- ⛔ **کشیدنِ بی پنجره هرگز با `Dispatchers.Unconfined`** (`desktop/src/test/.../shots/ScreenRender.kt`، `claude/e-sec-close`): ادامهٔ
+  `withContext(IO)`/`delay` ِ اثرها روی نخِ دیگری هم‌زمان با `scene.render` می‌دوید — بن‌بستِ `runLock` ِ Compose با قفلِ دفتر (همان
+  #1037/#1039 ِ آیفون و `perf/ScreenFrame.kt`) و گیرِ ۴۰ دقیقه‌ایِ گاه‌به‌گاهِ کارِ «(گزارش)». صف (`SceneDispatcher`) روی همان نخِ کشیدن
+  پیش و پس از هر قاب خالی می‌شود. هر آزمونِ کشیدن `RenderWatchdog` دارد (مهلت + رونوشتِ نخ‌ها در `thread-dump-*.txt` ِ artifact و
+  کنار رفتنِ بقیهٔ همان کلاس)؛ گامِ «کشیدن و سنجیدن» ِ `desktop-shots.yml` مهلتِ ۲۵ دقیقه دارد. آزمونِ خودِ نگهبان: `RenderWatchdogTest`.
+
 ### v3 · نقشهٔ پرچم‌ها
 
 قاعدهٔ مشترکِ پرچم‌های دکان: `live_config` با scope = شناسهٔ دکان یا `all`، مقدارِ خودِ دکان بر `all` جلو می‌افتد و فقط

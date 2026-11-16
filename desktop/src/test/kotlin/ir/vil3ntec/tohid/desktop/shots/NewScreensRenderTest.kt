@@ -56,6 +56,7 @@ import kotlinx.serialization.json.Json
 import org.junit.AfterClass
 import org.junit.Assume
 import org.junit.BeforeClass
+import org.junit.Rule
 import org.junit.Test
 
 /**
@@ -67,6 +68,9 @@ import org.junit.Test
  *  یافته‌ها و شکستِ کشیدن در `render-report.json` می‌روند، نه در نتیجهٔ آزمون. کنار رفتن: [RenderReport.skipReason].
  */
 class NewScreensRenderTest {
+
+  /** مهلتِ هر آزمون + رونوشتِ نخ‌ها هنگامِ گیر (`RenderWatchdog`)؛ کلِ کلاس روی کامپیوترِ خودی ~۴۰ ثانیه است */
+  @get:Rule val watchdog = RenderWatchdog(4 * 60_000L)
 
   companion object {
     private const val PHONE = 360
