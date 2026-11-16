@@ -730,6 +730,11 @@
 - سرور را برای این کار نرم نکن: چرخش و ردِ `refresh_reused` (`login-contract ۹`) قفل است (#246).
 - دستگاهِ از کار افتاده `403 device_disabled` می‌گیرد، نه `401`؛ صاحب دستگاهی را که با آن کار می‌کند نمی‌بندد (S44، #243).
 - ⛔ هشِ رمز scrypt با `N=2^14, r=8, p=5` (هم‌ارزِ کفِ OWASP، ۱۶MB)؛ هشِ کهنه پس از ورودِ **درست** شرطی بازنویسی می‌شود (`auth.upgradeHash`). `PASSWORD_SCRYPT_P` فقط برای تندیِ آزمون است و بی `NODE_ENV=test|development` هرگز زیرِ ۵ نمی‌رود (SEC-AUTH-01، `sec-auth.test.js`).
+- ⛔ **رازِ TOTP ِ مدیرِ سرور در دیتابیس رمزشده است** (C-01، `claude/e-sec-close`): `admins.totp_secret`/`totp_pending` فقط پاکتِ
+  `ats1.` ِ `lib/admin-totp-seal.js` (AES-256-GCM، کلید با HKDF از `API_SECRET`، AAD = شناسهٔ مدیر) — هرگز base32 ِ خام. هر خواندنِ
+  راز از `openSecret` می‌گذرد (ورود فقط `checkSecondFactor`)؛ پاکتِ ناخوانا ⇒ هیچ کدی پذیرفته نیست. ردیفِ خامِ کهنه در هر
+  راه‌اندازی (`app.js` ⇐ `sealLegacy`) رمز می‌شود؛ برگشت به نسخهٔ پیشین: `node scripts/admin-totp-seal.js unseal`.
+  آزمون: `test/admin-totp-at-rest.test.js` (ردیفِ واقعیِ دیتابیس).
 - ⛔ `X-Forwarded-For` فقط وقتی خوانده می‌شود که `TRUST_PROXY=true` **و** همسایهٔ سوکت loopback/خصوصی (یا در `TRUST_PROXY_FROM`) باشد، و فقط راست‌ترین بخش؛ همین تابع (`ratelimit.trustedPeer`) برای `trust proxy`ِ Express (SEC-AUTH-05).
 - ⛔ `devCode` (کدِ یک‌بارمصرف در پاسخ) و کدِ خام در لاگ فقط با `NODE_ENV`ِ **صریحِ** `test` یا `development` (`config.devCodes`)؛ سرورِ بی `NODE_ENV` production حساب می‌شود (SEC-AUTH-06).
 - ⛔ قفلِ ورودِ مدیر همان دو شمارندهٔ کاربران است: «نام + IP» (`lockoutTries`) و «نام، از همه‌جا» (`lockoutGlobalTries`)؛ نامِ ناموجود/غیرفعال همان scrypt را می‌سوزاند (SEC-AUTH-03/04).

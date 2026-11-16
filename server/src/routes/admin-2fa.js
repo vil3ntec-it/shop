@@ -22,6 +22,7 @@ const { one, now } = require('../db');
 const pw = require('../lib/password');
 const audit = require('../lib/audit');
 const totp = require('../lib/totp');
+const totpSeal = require('../lib/admin-totp-seal');
 const { checkSecondFactor, recoveryLeft } = require('../lib/admin-2fa');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { badRequest, forbidden, conflict } = require('../middleware/errors');
@@ -54,7 +55,8 @@ router.post('/setup', async (req, res, next) => {
     await needPassword(admin, req.body?.password);
     if (admin.totp_enabled_at) throw conflict('تأییدِ دومرحله‌ای همین حالا روشن است', 'totp_already_enabled');
     const secret = totp.newSecret();
-    await one('UPDATE admins SET totp_pending=$2 WHERE id=$1 RETURNING id', [admin.id, secret]);
+    //  C-01: در دیتابیس فقط پاکت (`lib/admin-totp-seal.js`)؛ خامِ راز فقط همین یک پاسخ
+    await one('UPDATE admins SET totp_pending=$2 WHERE id=$1 RETURNING id', [admin.id, totpSeal.sealSecret(admin.id, secret)]);
     res.set('Cache-Control', 'no-store');
     res.json({ secret, otpauth_url: totp.otpauthUrl(secret, admin.username) });
   } catch (err) { next(err); }
@@ -65,7 +67,7 @@ router.post('/enable', async (req, res, next) => {
     const admin = await fresh(req.admin.id);
     if (admin.totp_enabled_at) throw conflict('تأییدِ دومرحله‌ای همین حالا روشن است', 'totp_already_enabled');
     if (!admin.totp_pending) throw badRequest('اول «روشن کردن» را بزنید', 'totp_not_started');
-    const step = totp.verify(admin.totp_pending, req.body?.code);
+    const step = totp.verify(totpSeal.openSecret(admin.id, admin.totp_pending), req.body?.code);
     if (step === null) throw badRequest('کدِ برنامهٔ تأیید درست نیست؛ ساعتِ گوشی را هم ببینید', 'totp_invalid');
     const codes = totp.newRecoveryCodes();
     const row = await one(

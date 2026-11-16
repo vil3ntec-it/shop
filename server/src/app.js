@@ -44,6 +44,10 @@ async function createApp({ runMigrations = true } = {}) {
     password: process.env.ADMIN_BOOTSTRAP_PASSWORD,
     log: (m) => console.log(`[admin] ${m}`),
   });
+  //  C-01: رازِ TOTP ِ خامِ مانده از نسخه‌های پیشین یک بار رمز می‌شود (`lib/admin-totp-seal.js`) — پیش از نخستین درخواست
+  await require('./lib/admin-totp-seal').sealLegacy()
+    .then((n) => { if (n) console.log(`[admin] رازِ تأییدِ دومرحله‌ایِ ${n} مدیر رمز شد`); })
+    .catch((err) => console.error('[admin] رمز کردنِ رازِ تأییدِ دومرحله‌ای نشد:', err.message));
   //  فاز ۳: «مالکِ اصلی» (پیشین‌ترین ارشد) نشان بخورد — مدیرِ دیگری غیرفعال یا تنزلش نمی‌دهد
   await require('./lib/admin-owner').ownerId();
 

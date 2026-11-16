@@ -8,6 +8,7 @@
  */
 const { one } = require('../db');
 const totp = require('./totp');
+const totpSeal = require('./admin-totp-seal');
 
 function recoveryList(admin) {
   try {
@@ -25,7 +26,8 @@ async function checkSecondFactor(admin, { code, recovery } = {}) {
   if (!admin || !admin.totp_enabled_at || !admin.totp_secret) return null;
   const c = String(code || '').trim();
   if (c) {
-    const step = totp.verify(admin.totp_secret, c, { afterStep: Number(admin.totp_last_step || 0) });
+    //  C-01: رازِ روی دیسک پاکت است؛ باز نشد (دست‌خورده/مدیرِ دیگر/کلیدِ دیگر) ⇒ null ⇒ هیچ کدی پذیرفته نیست
+    const step = totp.verify(totpSeal.openSecret(admin.id, admin.totp_secret), c, { afterStep: Number(admin.totp_last_step || 0) });
     if (step === null) return null;
     const row = await one(
       'UPDATE admins SET totp_last_step=$2 WHERE id=$1 AND totp_last_step < $2 RETURNING id',
