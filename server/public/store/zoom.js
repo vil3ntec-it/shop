@@ -157,6 +157,9 @@
     }
     //  برگشتِ مرورگر برگهٔ کالا را می‌بندد ⇒ بیننده هم
     window.addEventListener('hashchange', hide);
+    //  dialog ِ aria-modal تمرکز را نگه می‌دارد: تمرکزِ دیرهنگامِ برگهٔ کالا (`K.openSheet`، ۶۰ms) یا هر چیزِ دیگری بیرون از بیننده ⇒
+    //  دوباره «بستن»؛ وگرنه «+»/Esc به برگهٔ زیرین می‌رسید (CI ِ #1061)
+    document.addEventListener('focusin', function (e) { if (!root.hidden && !root.contains(e.target)) close.focus(); });
     v = { show: show, hide: hide, root: root };
     return v;
   }

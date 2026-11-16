@@ -86,7 +86,8 @@ internal fun DeskPayStatus(store: ShopStore, d: ShopData, sale: Sale, user: Desk
       if (r.targets.isNotEmpty()) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
           r.targets.forEach { to ->
-            OutlinedButton(enabled = !busy, onClick = {
+            //  کامپیوتر (`claude/e-desk-d3c`): دکمهٔ `ui/desk` — همان کار و همان کلیدِ یکتا
+            ir.vil3ntec.tohid.ui.desk.DeskButton(PayStatusText.action(to), enabled = !busy, onClick = {
               busy = true
               val key = Ulid.next()
               val req = PayStatusFlow.Request(sale.id, r.view.index, to, me, sell, manage)
@@ -101,7 +102,7 @@ internal fun DeskPayStatus(store: ShopStore, d: ShopData, sale: Sale, user: Desk
                 )
                 busy = false
               }
-            }) { Text(PayStatusText.action(to), style = MaterialTheme.typography.labelMedium) }
+            })
           }
         }
       }

@@ -183,7 +183,8 @@ fun DeskShortcut(keys: String, modifier: Modifier = Modifier, onPrimary: Boolean
 
 private val RoundedShape4 = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
 
-enum class DeskButtonKind { PRIMARY, SECONDARY, GHOST }
+/** [DANGER] (e-desk-d3c): کارِ پاک‌کنندهٔ پنجره (لغو، پاک کردن، باطل) — پُر با رنگِ «بد» ِ همان تم */
+enum class DeskButtonKind { PRIMARY, SECONDARY, GHOST, DANGER }
 
 /** دکمهٔ کامپیوتر (۳۶dp): اصلی (پُر)، دوم (خطِ دور) یا بی‌زمینه — با آیکن و میان‌برِ اختیاری */
 @Composable
@@ -198,17 +199,24 @@ fun DeskButton(
 ) {
   val c = Desk.colors
   val primary = kind == DeskButtonKind.PRIMARY
+  val danger = kind == DeskButtonKind.DANGER
   val fg = when {
     !enabled -> c.inkMuted
     primary -> c.onPrimary
+    danger -> c.onAlert
     else -> c.ink
   }
   val rest = when (kind) {
     DeskButtonKind.PRIMARY -> if (enabled) c.primary else c.surfaceAlt
     DeskButtonKind.SECONDARY -> c.surface
     DeskButtonKind.GHOST -> Color.Transparent
+    DeskButtonKind.DANGER -> if (enabled) c.negative else c.surfaceAlt
   }
-  val hover = if (primary) androidx.compose.ui.graphics.lerp(c.primary, c.ink, if (c.isDark) 0.12f else 0.18f) else c.hover
+  val hover = when {
+    primary -> androidx.compose.ui.graphics.lerp(c.primary, c.ink, if (c.isDark) 0.12f else 0.18f)
+    danger -> androidx.compose.ui.graphics.lerp(c.negative, c.ink, if (c.isDark) 0.12f else 0.18f)
+    else -> c.hover
+  }
   Row(
     modifier
       .heightIn(min = DeskSize.control)
@@ -225,7 +233,7 @@ fun DeskButton(
     Text(text, style = DeskType.bodyStrong, color = fg, maxLines = 1)
     if (shortcut != null) {
       Spacer(Modifier.width(DeskSpace.x2))
-      DeskShortcut(shortcut, onPrimary = primary && enabled)
+      DeskShortcut(shortcut, onPrimary = (primary || danger) && enabled)
     }
   }
 }

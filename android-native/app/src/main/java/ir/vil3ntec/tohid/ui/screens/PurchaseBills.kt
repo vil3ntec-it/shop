@@ -76,6 +76,42 @@ internal fun PoBill(d: ShopData, repo: PurchaseOrderRepository, order: PurchaseO
     }
   }
 
+  //  کامپیوتر (`claude/e-desk-d3c`): کادرها و دکمهٔ `ui/desk` (مقدارها با `DeskNumberField` ِ نگهبانِ اسکن)؛ سنجش و فرستادن همان
+  if (ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout.current) {
+    val dc = ir.vil3ntec.tohid.ui.desk.Desk.colors
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(ir.vil3ntec.tohid.ui.desk.DeskSpace.x3)) {
+      Column {
+        ir.vil3ntec.tohid.ui.desk.DeskSectionTitle(StrPurchasePages.billTitle(order.no, order.supplierName))
+        ir.vil3ntec.tohid.ui.desk.DeskNote(StrPurchasePages.billNote, maxLines = 3)
+      }
+      Row(horizontalArrangement = Arrangement.spacedBy(ir.vil3ntec.tohid.ui.desk.DeskSpace.x3)) {
+        DeskFormLabeled(StrPurchasePages.billNo, Modifier.weight(1f)) {
+          ir.vil3ntec.tohid.ui.desk.DeskTextField(billNo, { billNo = it.take(60); error = null }, Modifier.fillMaxWidth(), description = StrPurchasePages.billNo)
+        }
+        DeskFormLabeled(StrPurchasePages.dateIso, Modifier.weight(1f)) {
+          ir.vil3ntec.tohid.ui.desk.DeskTextField(billDate, { billDate = it.take(10); error = null }, Modifier.fillMaxWidth(), description = StrPurchasePages.dateIso)
+        }
+      }
+      rows.forEachIndexed { i, r ->
+        Column {
+          Text(r.name.ifBlank { names[r.productId] ?: r.productId }, style = ir.vil3ntec.tohid.ui.desk.DeskType.bodyStrong, color = dc.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+          Row(horizontalArrangement = Arrangement.spacedBy(ir.vil3ntec.tohid.ui.desk.DeskSpace.x3)) {
+            DeskNumberField(r.qty, { v -> rows = rows.toMutableList().also { it[i] = r.copy(qty = v) }; error = null }, StrPurchasePages.qtyUnit(r.unit), Modifier.weight(1f))
+            DeskNumberField(r.total, { v -> rows = rows.toMutableList().also { it[i] = r.copy(total = v) }; error = null }, StrPurchasePages.rowTotalAfn, Modifier.weight(1f))
+          }
+        }
+      }
+      DeskFormLabeled(StrDeliver.noteField) {
+        ir.vil3ntec.tohid.ui.desk.DeskTextField(note, { note = it.take(500) }, Modifier.fillMaxWidth(), description = StrDeliver.noteField)
+      }
+      error?.let { Text(it, style = ir.vil3ntec.tohid.ui.desk.DeskType.secondary, color = dc.negative) }
+      ir.vil3ntec.tohid.ui.desk.DeskButton(
+        if (busy) StrSale.posting else StrPurchasePages.saveBill, { submit() }, Modifier.fillMaxWidth(),
+        kind = ir.vil3ntec.tohid.ui.desk.DeskButtonKind.PRIMARY, enabled = !busy,
+      )
+    }
+    return
+  }
   Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
     Text(StrPurchasePages.billTitle(order.no, order.supplierName), style = MaterialTheme.typography.titleSmall, color = c.text)
     Text(StrPurchasePages.billNote,
@@ -111,6 +147,24 @@ internal fun PoBill(d: ShopData, repo: PurchaseOrderRepository, order: PurchaseO
 @Composable
 internal fun PoBillsList(order: PurchaseOrderDto, manage: Boolean, busy: Boolean, onVoid: (PoBillDto) -> Unit) {
   if (order.bills.isEmpty()) return
+  //  کامپیوتر (`claude/e-desk-d3c`): ردیفِ آرامِ `ui/desk` و دکمهٔ «باطل» ِ کامپیوتر — همان داده و همان شرطِ «باطل»
+  if (ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout.current) {
+    val dc = ir.vil3ntec.tohid.ui.desk.Desk.colors
+    ir.vil3ntec.tohid.ui.desk.DeskSubhead(StrSupplierBills.title, Modifier.padding(top = 14.dp, bottom = 4.dp))
+    order.bills.forEach { b ->
+      Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+          Text(
+            PurchaseOrderBook.billLine(b), style = ir.vil3ntec.tohid.ui.desk.DeskType.body, color = if (b.active) dc.ink else dc.inkMuted,
+            textDecoration = if (b.active) null else TextDecoration.LineThrough,
+          )
+          b.voidReason?.takeIf { !b.active }?.let { ir.vil3ntec.tohid.ui.desk.DeskNote(StrPurchasePages.voidedWhy(it)) }
+        }
+        if (PurchaseOrderBook.canVoid(b, manage)) ir.vil3ntec.tohid.ui.desk.DeskButton(StrPurchasePages.voidBtn, { onVoid(b) }, enabled = !busy, kind = ir.vil3ntec.tohid.ui.desk.DeskButtonKind.GHOST)
+      }
+    }
+    return
+  }
   val c = Shop.colors
   Spacer(Modifier.height(14.dp))
   Text(StrSupplierBills.title, style = MaterialTheme.typography.labelLarge, color = c.muted, fontWeight = FontWeight.SemiBold)
@@ -155,6 +209,14 @@ internal fun PoMatchLines(d: ShopData, order: PurchaseOrderDto) {
 internal fun PoBillVoidDialog(bill: PoBillDto, busy: Boolean, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
   val c = Shop.colors
   var why by remember(bill.id) { mutableStateOf("") }
+  //  کامپیوتر (`claude/e-desk-d3c`): پنجرهٔ دلیلِ `ui/desk` — همان دلیلِ لازم و همان [onConfirm]؛ گوشی همان پنجرهٔ پیشین
+  if (ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout.current) {
+    ir.vil3ntec.tohid.ui.desk.DeskReasonDialog(
+      StrPurchasePages.voidAsk(bill.billNo), StrPurchasePages.voidNote, StrLoyalty.adjustReason, why, { why = it.take(300) },
+      StrPurchasePages.voidIt, enabled = why.isNotBlank() && !busy, onConfirm = { onConfirm(why.trim()) }, onDismiss = onDismiss,
+    )
+    return
+  }
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = c.surfaceSolid,

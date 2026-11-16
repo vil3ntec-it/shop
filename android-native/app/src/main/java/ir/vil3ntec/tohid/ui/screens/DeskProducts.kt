@@ -448,35 +448,27 @@ private fun LevelsInputDialog(count: Int, onDismiss: () -> Unit, onNext: (StockL
     max = levelEdit(max, clearMax) ?: StockLevelRules.Edit.Keep,
   )
   val bad = listOf(min to clearMin, reorder to clearReorder, max to clearMax).any { (t, c) -> !c && t.isNotBlank() && levelEdit(t, false) == null }
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    containerColor = Shop.colors.surfaceSolid,
-    title = { Text(ir.vil3ntec.tohid.core.i18n.StrProductPages.levelsFor(plain(count)), color = Shop.colors.text) },
-    text = {
-      Column(Modifier.widthIn(min = 340.dp, max = 480.dp)) {
-        Text(ir.vil3ntec.tohid.core.i18n.StrProductPages.emptyUntouched, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
-        Spacer(Modifier.height(8.dp))
-        @Composable fun Line(v: String, set: (String) -> Unit, label: String, clear: Boolean, setClear: (Boolean) -> Unit) {
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-              value = v, onValueChange = { set(ir.vil3ntec.tohid.numericInput(it)) }, enabled = !clear,
-              label = { Text(label) }, singleLine = true, modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.width(6.dp))
-            Checkbox(checked = clear, onCheckedChange = setClear)
-            Text(ir.vil3ntec.tohid.core.i18n.StrSale.clearIt, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
-          }
-          Spacer(Modifier.height(6.dp))
-        }
-        Line(min, { min = it }, ir.vil3ntec.tohid.core.i18n.StrStock.minStock, clearMin) { clearMin = it }
-        Line(reorder, { reorder = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.reorderPoint, clearReorder) { clearReorder = it }
-        Line(max, { max = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.maxStock, clearMax) { clearMax = it }
-        if (bad) Text(ir.vil3ntec.tohid.core.i18n.StrSale.badNumberShort, style = MaterialTheme.typography.bodySmall, color = Shop.colors.danger)
+  //  کامپیوتر (`claude/e-desk-d3c`): پنجره، کادر و تیکِ `ui/desk` — همان سه حد، همان «پاک» و همان «پیش‌نمایش»
+  ir.vil3ntec.tohid.ui.desk.DeskDialog(
+    title = ir.vil3ntec.tohid.core.i18n.StrProductPages.levelsFor(plain(count)),
+    onDismiss = onDismiss,
+    subtitle = ir.vil3ntec.tohid.core.i18n.StrProductPages.emptyUntouched,
+    width = ir.vil3ntec.tohid.ui.desk.DeskDialogSize.form,
+    confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(ir.vil3ntec.tohid.core.i18n.StrDevicePages.preview, enabled = !bad && !patch.isNoop) { onNext(patch) },
+    dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(ir.vil3ntec.tohid.core.i18n.Str.cancel, onClick = onDismiss),
+  ) {
+    @Composable fun Line(v: String, set: (String) -> Unit, label: String, clear: Boolean, setClear: (Boolean) -> Unit) {
+      Row(verticalAlignment = Alignment.Bottom) {
+        ir.vil3ntec.tohid.ui.desk.DeskDialogField(label, v, { set(ir.vil3ntec.tohid.numericInput(it)) }, Modifier.weight(1f), enabled = !clear)
+        Spacer(Modifier.width(DeskSpace.x3))
+        DeskToggleRow(clear, ir.vil3ntec.tohid.core.i18n.StrSale.clearIt, setClear)
       }
-    },
-    confirmButton = { Button(onClick = { onNext(patch) }, enabled = !bad && !patch.isNoop) { Text(ir.vil3ntec.tohid.core.i18n.StrDevicePages.preview) } },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(ir.vil3ntec.tohid.core.i18n.Str.cancel) } },
-  )
+    }
+    Line(min, { min = it }, ir.vil3ntec.tohid.core.i18n.StrStock.minStock, clearMin) { clearMin = it }
+    Line(reorder, { reorder = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.reorderPoint, clearReorder) { clearReorder = it }
+    Line(max, { max = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.maxStock, clearMax) { clearMax = it }
+    if (bad) ir.vil3ntec.tohid.ui.desk.DeskDialogText(ir.vil3ntec.tohid.core.i18n.StrSale.badNumberShort, color = Desk.colors.negative)
+  }
 }
 
 /** کارِ گروهیِ در انتظارِ تأیید */
