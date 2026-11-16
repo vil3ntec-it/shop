@@ -156,7 +156,13 @@ class SummaryCardUiTest {
     return out.single().lineCount
   }
 
-  private fun collapsed() = "$label · $value"
+  /** p0r3 (صاحب‌کار): بسته فقط مبلغ است — بی برچسبِ «جمعِ …» — در سوی پایانِ کارت کنارِ پیکان (چپ در فارسی) */
+  private fun collapsed() = value
+
+  private fun assertCollapsedAtTheEnd(n: SemanticsNode, c: Rect = card()) {
+    assertTrue("مبلغِ بسته نه وسط، در سوی پایان (چپ): ${n.boundsInRoot.center.x} در برابرِ ${c.center.x}", n.boundsInRoot.center.x < c.center.x - px(40f))
+    assertTrue("برچسبِ «جمعِ …» در حالتِ بسته نیست", textNodes(label).isEmpty())
+  }
 
   @Test fun everyPartIsCentredInTheFullWidthCard() {
     show("test65s/a")
@@ -182,8 +188,10 @@ class SummaryCardUiTest {
     assertEquals(StrA11y.collapsed, state())
     val line = textNode(collapsed())
     assertEquals("بسته فقط یک خط", 1, lines(line))
-    assertCentred("خطِ بسته", line.boundsInRoot)
-    assertTrue("عدد، خطِ کم‌رنگ و کار پنهان", textNodes(value).isEmpty() && textNodes(caption).isEmpty() && !rule.onAllNodes(hasText(action)).fetchSemanticsNodes().any())
+    assertCollapsedAtTheEnd(line)
+    //  برچسب برای صفحه‌خوان در توضیحِ همان دکمه می‌ماند
+    assertEquals(listOf("$label: $value"), headerNode().config.getOrNull(SemanticsProperties.ContentDescription))
+    assertTrue("خطِ کم‌رنگ و کار پنهان", textNodes(caption).isEmpty() && !rule.onAllNodes(hasText(action)).fetchSemanticsNodes().any())
     val h = card().height
     assertTrue("کارتِ بسته فشرده است: $h از $open", h <= px(56f) && h < open / 2)
     rule.onNode(header).performClick()
@@ -319,19 +327,28 @@ class SummaryCardUiTest {
     assertEquals(1, textNodes(collapsed()).size)
   }
 
-  @Test fun breakdownChartRowsAreInsideTheCardWithMoreAndPick() {
+  /**
+   *  p0r3 (صاحب‌کار: «ردیف‌های تفکیک زیرِ هم کارت را خیلی بلند می‌کند»): نمودارِ ستونیِ فشرده — همهٔ دسته‌ها ستون‌های کنارِ هم
+   *  (بی «… N مورد دیگر»)، هم‌ردیف، کارت کوتاه؛ اگر جا نشد پیمایشِ افقی؛ زدن همان پالایه. پیش‌تر: پنج ردیفِ افقیِ زیرِ هم و «بیشتر».
+   */
+  @Test fun breakdownChartColumnsAreInsideTheCardSideBySideAndPick() {
     val colors = listOf(Color.Red, Color.Blue, Color.Green, Color.Magenta, Color.Cyan, Color.Yellow, Color.Gray)
     val bars = (1..7).map { i -> V3Bar("k$i", "دسته $i", "${i * 100}", i * 100.0, colors[i - 1]) }.reversed()
     show("test65s/i", section = V3Section.EXPENSES, bars = bars)
     val c = card()
     fun row(i: Int) = rule.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("دسته $i: ${i * 100}")))
       .fetchSemanticsNodes()
-    //  پنج ردیفِ بزرگ پیدا، دو تا زیرِ «… ۲ مورد دیگر»
-    (3..7).forEach { i -> val r = row(i).single().boundsInRoot; assertTrue("ردیفِ $i درونِ کارت", r.top >= c.top && r.bottom <= c.bottom && r.left >= c.left && r.right <= c.right) }
-    assertTrue(row(1).isEmpty() && row(2).isEmpty())
-    rule.onAllNodes(hasClickAction() and hasText(StrLook.moreRows(2)))[0].performClick()
-    rule.waitForIdle()
-    assertTrue("زدنِ «بیشتر» همه را نشان می‌دهد", row(1).size == 1 && row(2).size == 1)
+    //  همهٔ هفت دسته، بی «بیشتر»
+    (1..7).forEach { i -> assertEquals("ستونِ $i", 1, row(i).size) }
+    assertTrue(rule.onAllNodes(hasText(StrLook.moreRows(2))).fetchSemanticsNodes().isEmpty())
+    //  کنارِ هم: ستون‌های پیدا یک ردیف (بالای یکسان)؛ بقیه بیرون از دید با پیمایشِ افقی (کرانهٔ بریدهٔ تهی)
+    val shown = (1..7).map { row(it).single().boundsInRoot }.filter { it.width > 0f && it.height > 0f }
+    assertTrue("دست‌کم چهار ستون در ۳۶۰dp پیدا: ${shown.size}", shown.size >= 4)
+    val tops = shown.map { it.top }
+    assertTrue("ستون‌ها هم‌ردیف: $tops", tops.max() - tops.min() <= px(2f))
+    val first = row(7).single().boundsInRoot
+    assertTrue("نخستین ستون درونِ کارت", first.top >= c.top && first.bottom <= c.bottom && first.left >= c.left - 1f && first.right <= c.right + 1f)
+    assertTrue("نمودار فشرده: بلندیِ ستون ${first.height}", first.height <= px(120f))
     rule.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("دسته 6: 600")))[0].performClick()
     rule.waitForIdle()
     assertEquals(listOf("k6"), picked)

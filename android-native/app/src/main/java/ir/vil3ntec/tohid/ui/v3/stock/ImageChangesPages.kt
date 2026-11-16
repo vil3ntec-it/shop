@@ -48,6 +48,7 @@ import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.nav.V3PageFootnote
+import ir.vil3ntec.tohid.ui.v3.nav.V3PageSaveBar
 import ir.vil3ntec.tohid.ui.v3.nav.V3RoutePage
 import ir.vil3ntec.tohid.ui.v3.V3DataRow
 import ir.vil3ntec.tohid.ui.v3.V3DataRowSpec
@@ -207,7 +208,7 @@ internal fun RouteScope.ImageBatchRoute() {
   var q by remember { mutableStateOf("") }
   var note by remember { mutableStateOf("") }
   val c = PhoneV3.colors
-  if (state == null) { V3EmptyState(Icons.Outlined.Collections, StrImageChanges.off); return }
+  if (state == null) { V3RoutePage(StrImageChanges.newBatch) { V3EmptyState(Icons.Outlined.Collections, StrImageChanges.off) }; return }
   state.done?.let { ch ->
     LaunchedEffect(ch.id) {
       toasts.show(StrImageChanges.appliedToast, V3Tone.SUCCESS)
@@ -216,9 +217,9 @@ internal fun RouteScope.ImageBatchRoute() {
   }
   val products = remember(data.products) { data.products.filter { it.active } }
   val byId = remember(products) { products.associate { it.id to ImageChanges.Product(it.id, it.name, it.barcodes.firstOrNull().orEmpty()) } }
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-    Text(StrImageChanges.storefrontNote, style = V3Type.footnote, color = c.inkMuted)
-    V3ChipRow(Modifier.padding(top = 12.dp), contentPadding = PaddingValues(0.dp)) {
+  //  کالبدِ یکسان (p0): قابِ خودِ صفحه، «بررسی»/«اعمال» نوارِ چسبانِ پایین و یادداشتِ ویترین خطِ کم‌رنگِ پایان
+  V3RoutePage(StrImageChanges.newBatch) {
+    V3ChipRow(Modifier.padding(top = 4.dp), contentPadding = PaddingValues(0.dp)) {
       V3Chip(StrImageChanges.actionLatest, state.action == ImageChanges.Action.LATEST_CENTRAL, { state.choose(ImageChanges.Action.LATEST_CENTRAL) })
       V3Chip(StrImageChanges.actionRevert, state.action == ImageChanges.Action.REVERT_CENTRAL, { state.choose(ImageChanges.Action.REVERT_CENTRAL) })
     }
@@ -239,12 +240,13 @@ internal fun RouteScope.ImageBatchRoute() {
           )
         }
       }
-      V3Button(
+      V3PageSaveBar(
         if (state.checking) StrImageChanges.checking else StrImageChanges.check, { scope.launch { state.check(byId) } },
-        Modifier.fillMaxWidth().padding(top = 16.dp), enabled = state.selected.isNotEmpty(), loading = state.checking,
+        enabled = state.selected.isNotEmpty(), loading = state.checking,
       )
       state.message?.let { Text(it, style = V3Type.callout, color = PhoneV3Roles.errorText(c), modifier = Modifier.padding(top = 8.dp)) }
-      return@Column
+      V3PageFootnote(StrImageChanges.storefrontNote)
+      return@V3RoutePage
     }
     val send = planned.filterIsInstance<ImageChanges.Planned.Send>()
     val skipped = planned.filterIsInstance<ImageChanges.Planned.Skipped>()
@@ -288,11 +290,9 @@ internal fun RouteScope.ImageBatchRoute() {
     }
     if (send.isNotEmpty()) {
       V3TextField(note, { note = it.take(ImageChanges.NOTE_MAX) }, StrImageChanges.note, Modifier.padding(top = 12.dp))
-      V3Button(
-        StrImageChanges.apply, { scope.launch { state.send(note) } }, Modifier.fillMaxWidth().padding(top = 12.dp),
-        loading = state.sending, enabled = problem?.confirmable != true,
-      )
+      V3PageSaveBar(StrImageChanges.apply, { scope.launch { state.send(note) } }, loading = state.sending, enabled = problem?.confirmable != true)
     }
+    V3PageFootnote(StrImageChanges.storefrontNote)
   }
 }
 

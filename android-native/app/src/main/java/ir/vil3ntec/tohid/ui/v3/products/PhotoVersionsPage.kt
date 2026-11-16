@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.products
 
+import ir.vil3ntec.tohid.ui.v3.nav.V3RoutePage
+import ir.vil3ntec.tohid.ui.v3.nav.V3PageFootnote
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -205,14 +207,14 @@ private fun flagLabel(f: ImageQuality.Flag): String = when (f) {
 
 /** `products/{id}/photo/versions` */
 @Composable
-internal fun PhotoVersionsPage(productId: String) {
+internal fun ir.vil3ntec.tohid.ui.v3.nav.RouteScope.PhotoVersionsPage(productId: String) {
   val api = onlineReportApi()
   val state = remember(api, productId) { api?.let { PhotoVersionsState(PhotoVersionsRepository(it), productId) } }
   var tick by remember { mutableStateOf(0) }
   if (state != null) LaunchedEffect(state, tick) { state.load() }
   val c = PhoneV3.colors
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-    Text(StrImageChanges.versionsNote, style = V3Type.footnote, color = c.inkMuted)
+  //  کالبدِ یکسان (p0): قابِ خودِ صفحه؛ یادداشتِ نسخه‌ها خطِ کم‌رنگِ پایان
+  V3RoutePage(StrImageChanges.versionsTitle) {
     val shown = state?.shown
     when {
       state == null || state.off -> V3EmptyState(Icons.Outlined.PhotoSizeSelectLarge, StrImageChanges.off)
@@ -222,6 +224,7 @@ internal fun PhotoVersionsPage(productId: String) {
       !state.loaded -> Text(StrImageChanges.loading, style = V3Type.callout, color = c.inkMuted, modifier = Modifier.padding(top = 16.dp))
       else -> VersionsBody(state)
     }
+    V3PageFootnote(StrImageChanges.versionsNote)
   }
 }
 

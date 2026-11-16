@@ -142,7 +142,7 @@ val SalesModule = AppModule(
   ),
   routes = listOf(
     V3Route(SalesPaths.SALE, RouteKind.TAB, { Str.sale }, chrome = Chrome.OWN) {
-      VipGate(Str.saleRegister) {
+      VipGate(Str.saleRegister, feature = "sales") {
         if (desk) {
           if (args.flag("scan")) LaunchedEffect(args.path) { PhoneNav.scanRequest.value = true }
           DeskSaleScreen(store = store, cartStore = cart, d = data, snackbar = snackbar) { code -> nav.open(ProductsPaths.new(barcode = code)) }
@@ -150,7 +150,7 @@ val SalesModule = AppModule(
       }
     },
     V3Route(SalesPaths.QUICK, RouteKind.PAGE, { StrSale.quickSale }, parent = SalesPaths.SALE, aliases = listOf("quick"), chrome = Chrome.OWN) {
-      VipGate(Str.saleRegister) { QuickSaleRoute() }
+      VipGate(Str.saleRegister, feature = "sales") { QuickSaleRoute() }
     },
     V3Route(SalesPaths.CHECKOUT, RouteKind.SHEET, { StrSale.checkoutTitle }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { CheckoutRoute() },
     V3Route("sale/checkout/customer", RouteKind.SHEET, { StrSale.pickCustomer }, parent = SalesPaths.CHECKOUT, chrome = Chrome.OWN) { CustomerRoute() },

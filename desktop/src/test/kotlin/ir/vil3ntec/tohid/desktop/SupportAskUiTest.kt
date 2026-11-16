@@ -147,6 +147,32 @@ class SupportAskUiTest {
     assertEquals("device_limit", RoutePaths.parse(AppNav.request.value.orEmpty()).second["ask"])
   }
 
+  /** p0r3: بخشی که در اشتراک نیست کلیدِ خودِ قابلیت را می‌فرستد؛ اشتراکِ تمام‌شده همان `subscription_expired` */
+  @Test fun lockedSectionAsksForItsOwnFeatureNotJustAnExpiredPlan() {
+    val expired = androidx.compose.runtime.mutableStateOf(false)
+    rule.setContent { Phone { LockedFeature("قرض‌داران", signedIn = true, feature = "debtors", expired = expired.value) } }
+    rule.waitForIdle()
+    noInternals()
+    clickButton()
+    assertEquals("plan_required:debtors", RoutePaths.parse(AppNav.request.value.orEmpty()).second["ask"])
+    expired.value = true
+    rule.waitForIdle()
+    clickButton()
+    assertEquals("subscription_expired", RoutePaths.parse(AppNav.request.value.orEmpty()).second["ask"])
+  }
+
+  /** p0r3: «حساب‌پی برای این دکان روشن نیست» ِ صندوق ⇒ `flag_off:pay.hesabpay` */
+  @Test fun hesabPayOffAtTheTillAsksSupportToTurnTheFlagOn() {
+    val opened = ArrayList<String>()
+    rule.setContent { Phone { AskSupportButton(ir.vil3ntec.tohid.pay.HesabPayIntentFlow.HESAB_OFF, facts = mapOf("screen" to "till:hesabpay"), onOpen = { opened += it }) } }
+    rule.waitForIdle()
+    noInternals()
+    clickButton()
+    val q = RoutePaths.parse(opened.single()).second
+    assertEquals("flag_off:pay.hesabpay", q["ask"])
+    assertEquals("till:hesabpay", q["f.screen"])
+  }
+
   @Test fun lockedWithoutAccountHasNoAskButton() {
     rule.setContent { Phone { LockedFeature("فروش", signedIn = false) } }
     rule.waitForIdle()

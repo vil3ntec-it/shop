@@ -234,7 +234,13 @@ private fun Status(ask: HesabTillModel.Ask, s: HesabTill.State?, stop: HesabPayI
   val m = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }
   when {
     error != null -> V3Message(V3Tone.ERROR, error, m)
-    stop != null -> V3Message(if (stop.retry) V3Tone.WARNING else V3Tone.ERROR, stop.message, m)
+    stop != null -> androidx.compose.foundation.layout.Column {
+      V3Message(if (stop.retry) V3Tone.WARNING else V3Tone.ERROR, stop.message, m)
+      //  «حساب‌پی برای این دکان روشن نیست» ⇒ «از پشتیبانی بخواه» (`flag_off:pay.hesabpay`)، کنارِ همان پیام
+      stop.support?.let { code ->
+        ir.vil3ntec.tohid.ui.v3.account.support.AskSupportButton(code, Modifier.padding(top = 8.dp), facts = mapOf("screen" to "till:hesabpay"))
+      }
+    }
     s is HesabTill.State.Confirmed -> V3Message(V3Tone.SUCCESS, StrTillPay.confirmed, m)
     s is HesabTill.State.Review -> V3Message(V3Tone.WARNING, HesabHold.text(s.hold), m)
     s is HesabTill.State.Ended -> V3Message(

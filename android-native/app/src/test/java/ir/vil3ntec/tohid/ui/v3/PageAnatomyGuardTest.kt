@@ -158,25 +158,8 @@ class PageAnatomyGuardTest {
    *  صفحهٔ کوچیده از این فهرست بیرون می‌رود (فهرست کهنه نمی‌ماند).
    */
   private val shellAllowed = mapOf(
-    "\"purchasing/bills/{id}/new\"" to "فرمِ فاکتورِ تأمین‌کننده (`PoBill` ِ مشترک با کامپیوتر) — کالبدِ فرم",
-    "MoneyPaths.NEW_PURCHASE_ORDER" to "فرمِ ساختنِ سفارشِ خرید — کالبدِ فرم",
-    "\"purchasing/orders/{id}/edit\"" to "فرمِ ویرایشِ پیش‌نویس — کالبدِ فرم",
-    "\"purchasing/orders/{id}/receive\"" to "فرمِ دریافت با اسکن — کالبدِ فرم",
-    "MoneyPaths.PURCHASE_ORDER_SUGGEST" to "⏳ پیشنهادِ سفارش (`PoSuggest` ِ مشترک با کامپیوتر)",
-    "\"purchasing/orders/{id}/match\"" to "⏳ تطبیقِ سفارش، رسید و فاکتور",
     "SalesPaths.TABLE" to "جدولِ فاکتورها (نمای جدولیِ کامپیوترگونه، آگاهانه `Chrome.SHELL`)",
-    "OnlinePaths.RISK_LISTS" to "⏳ فهرست‌های ریسک (صفحهٔ مشترکِ `ui/screens`)",
-    "OnlinePaths.STOREFRONT_CAMPAIGNS" to "⏳ پیوند و QR ِ کارزار (`CampaignsPane` ِ مشترک)",
-    "OnlinePaths.STOREFRONT_MEDIA" to "⏳ عکس و ویدیوی ویترین (`StorefrontMediaPanel` ِ مشترک)",
-    "OnlinePaths.STOREFRONT_TRUST" to "⏳ شکایت و گزارشِ خریداران",
     "\"courier/missions/{id}\"" to "بی رابط: فقط پرش به حالتِ پیک (`LandOn`)",
-    "\"products/{id}/photo/versions\"" to "⏳ نسخه‌های عکسِ کالا",
-    "\"products/{id}/photo/gallery\"" to "⏳ گالریِ عکسِ کالا",
-    "StockPaths.BOOK" to "⏳ دفترِ موجودی (`StockBook.kt`، صفحهٔ Material ِ مشترک با کامپیوتر)",
-    "StockPaths.IMAGE_CHANGES_NEW" to "فرمِ دستهٔ تازهٔ تغییرِ عکس — کالبدِ فرم",
-    "StockPaths.IMAGE_STUDIO_NEW" to "فرمِ دستهٔ تازهٔ استودیو — کالبدِ فرم",
-    "\"stock/images/studio/{id}\"" to "⏳ جزئیاتِ دستهٔ استودیو",
-    "AnalyticsPaths.STAFF_TIME" to "⏳ ساعتِ کار و پورسانت (`StaffTimeHub` ِ مشترک)",
   )
 
   @Test fun `فقط صفحه‌های شناخته‌شده سربرگ را از پوسته می‌گیرند`() {
@@ -215,6 +198,32 @@ class PageAnatomyGuardTest {
       assertFalse("$fn: یادداشتِ سرِ صفحه/دکمهٔ تمام‌پهنای «تازه»", Regex("""V3Button\(\s*Str\w+\.new""").containsMatchIn(body))
     }
     assertTrue("تخفیف‌ها: «قاعدهٔ تازه» دکمهٔ شناورِ قاب", text("ui/screens/Promos.kt").contains("fab = if (snap.manage)"))
+  }
+
+  /**
+   *  دورِ سوم (p0r3): فرم‌های پیشینِ پوسته دکمهٔ ذخیره‌شان را نوارِ چسبانِ پایینِ قاب می‌کنند (`V3PageSaveBar`، تصمیمِ صاحب‌کار:
+   *  «نوارِ چسبانِ ذخیره روی فرم و جزئیات بماند»)، نه دکمهٔ تمام‌پهنای پایانِ فرم؛ صفحه‌های بی‌پلتفرم (`*Content`) همان قاب را
+   *  با `V3PageFrame` دارند.
+   */
+  @Test fun `فرم‌ها نوارِ چسبانِ ذخیره دارند و صفحه‌های بی‌پلتفرم همان قاب را`() {
+    val forms = mapOf(
+      "ui/v3/money/PurchaseOrderPages.kt" to "StrPurchasePages.saveDraft else StrKit.save, { save() }",
+      "ui/v3/money/PurchaseOrderReceivePages.kt" to "V3PageSaveBar(StrLayaway.payConfirm",
+      "ui/screens/PurchaseBills.kt" to "V3PageSaveBar(StrPurchasePages.saveBill",
+      "ui/v3/stock/ImageChangesPages.kt" to "V3PageSaveBar(StrImageChanges.apply",
+      "ui/v3/stock/ImageStudioPages.kt" to "V3PageSaveBar(",
+    )
+    for ((f, needle) in forms) {
+      val src = text(f)
+      assertTrue("$f: نوارِ چسبانِ ذخیره", "V3PageSaveBar(" in src && needle in src)
+    }
+    assertFalse("دکمهٔ تمام‌پهنای «ذخیرهٔ پیش‌نویس»", Regex("""V3Button\(\s*if \(base == null\) StrPurchasePages\.saveDraft""").containsMatchIn(text("ui/v3/money/PurchaseOrderPages.kt")))
+    for (f in listOf("ui/v3/online/orders/OrderRiskListsV3.kt", "ui/v3/online/storefront/TrustCasesV3.kt")) {
+      assertTrue("$f: قابِ کالبد", "V3PageFrame(" in text(f))
+    }
+    //  نوارِ ذخیره یک بار نوشته می‌شود، نه در هر ترکیب (حلقه نمی‌سازد) و با رفتنِ فرم برمی‌خیزد
+    val frame = text("ui/v3/nav/V3RoutePage.kt")
+    assertTrue(frame.contains("SideEffect {") && frame.contains("onDispose { if (slot.bar?.onClick === click) slot.bar = null }"))
   }
 
   @Test fun `یک سبکِ برگه — V3Sheet`() {

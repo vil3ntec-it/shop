@@ -101,7 +101,7 @@ val AnalyticsModule = AppModule(
         staffTime = rememberStaffTimeConfig()?.enabled == true,
       )
     },
-    V3Route(AnalyticsPaths.STAFF_TIME, RouteKind.PAGE, { StrReach.staffTime }, parent = AnalyticsPaths.ADMIN) { StaffTimePage(data) },
+    V3Route(AnalyticsPaths.STAFF_TIME, RouteKind.PAGE, { StrReach.staffTime }, parent = AnalyticsPaths.ADMIN, chrome = Chrome.OWN) { StaffTimePage(data) },
     V3Route(AnalyticsPaths.ONLINE_REPORT, RouteKind.PAGE, { StrOnlineReport.title }, parent = AnalyticsPaths.REPORTS, chrome = Chrome.OWN) { OnlineReportPage() },
     V3Route(AnalyticsPaths.BRANCHES_REPORT, RouteKind.PAGE, { StrBranches.title }, parent = AnalyticsPaths.REPORTS, chrome = Chrome.OWN) { BranchesReportPage() },
     V3Route("reports/export", RouteKind.SHEET, { Str.reports }, parent = AnalyticsPaths.REPORTS) { LandOn(AnalyticsPaths.REPORTS) },

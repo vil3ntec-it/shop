@@ -55,6 +55,10 @@ import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.nav.V3PageFootnote
+import ir.vil3ntec.tohid.ui.v3.nav.V3PageSaveBar
+import ir.vil3ntec.tohid.ui.v3.V3MenuItem
+import ir.vil3ntec.tohid.ui.v3.V3Summary
+import androidx.compose.material.icons.outlined.Refresh
 import ir.vil3ntec.tohid.ui.v3.nav.V3RoutePage
 import ir.vil3ntec.tohid.ui.v3.V3DataRow
 import ir.vil3ntec.tohid.ui.v3.V3DataRowSpec
@@ -150,7 +154,8 @@ internal fun RouteScope.ImageStudioNewRoute() {
   if (state != null) LaunchedEffect(state, tick) { state.load() }
   state?.error?.let { e -> LaunchedEffect(e) { toasts.show(e, V3Tone.ERROR) } }
   val c = PhoneV3.colors
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+  //  کالبدِ یکسان (p0): قابِ خودِ صفحه و «شروع» نوارِ چسبانِ پایین
+  V3RoutePage(StrImageStudio.newBatch) {
     val photos = state?.photos
     when {
       state == null || state.off -> V3EmptyState(Icons.Outlined.AutoFixHigh, StrImageStudio.off)
@@ -181,10 +186,10 @@ internal fun RouteScope.ImageStudioNewRoute() {
           }
         }
         if (state.next != null) V3Button(StrImageStudio.more, { scope.launch { state.more() } }, kind = V3ButtonKind.SECONDARY)
-        V3Button(
+        V3PageSaveBar(
           StrImageStudio.start,
           { scope.launch { state.start()?.let { nav.replace(StockPaths.imageStudio(it)) } } },
-          Modifier.fillMaxWidth().padding(top = 12.dp), loading = state.busy, enabled = !state.busy,
+          loading = state.busy, enabled = !state.busy,
         )
       }
     }
@@ -209,25 +214,28 @@ internal fun RouteScope.ImageStudioBatchRoute(id: String) {
     }
   }
   val c = PhoneV3.colors
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+  val shown = state?.batch
+  //  کالبدِ یکسان (p0): کارهای دسته (`b.actions`) و «دوباره» در «…» ِ نوار، سرِ صفحه `V3Summary` ِ رنگِ انبار
+  V3RoutePage(
+    StrImageStudio.batch,
+    overflow = if (state == null || shown == null) emptyList() else
+      shown.actions.map { a -> V3MenuItem(Icons.Outlined.AutoFixHigh, actionLabel(a)) { if (!state.busy) scope.launch { state.act(a) } } } +
+        V3MenuItem(Icons.Outlined.Refresh, StrImageStudio.retry) { tick++ },
+  ) {
     val b = state?.batch
     when {
       state == null || state.off -> V3EmptyState(Icons.Outlined.AutoFixHigh, StrImageStudio.off)
       b == null && state.failed -> V3EmptyState(Icons.Outlined.CloudOff, StrImageStudio.failed, action = StrImageStudio.retry, onAction = { tick++ })
       b == null -> Text(StrImageStudio.loading, style = V3Type.callout, color = c.inkMuted)
       else -> {
-        Text(presetLabel(b.preset), style = V3Type.headline, color = c.ink)
-        Text(
-          StrImageStudio.line(stateLabel(b.state, b.finished), StrImageStudio.progress(b.progress.finished, b.total, b.progress.percent)),
-          style = V3Type.callout, color = c.inkMuted,
+        V3Summary(
+          label = presetLabel(b.preset),
+          value = StrImageStudio.progress(b.progress.finished, b.total, b.progress.percent),
+          caption = stateLabel(b.state, b.finished),
+          note = if (b.needsReview > 0) StrImageStudio.toReview(b.needsReview) else null,
+          collapseKey = "stock/images/studio-batch",
+          section = ir.vil3ntec.tohid.ui.theme.V3Section.STOCK,
         )
-        if (b.needsReview > 0) Text(StrImageStudio.toReview(b.needsReview), style = V3Type.callout, color = c.ink)
-        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          b.actions.forEach { a ->
-            V3Button(actionLabel(a), { scope.launch { state.act(a) } }, kind = V3ButtonKind.SECONDARY, enabled = !state.busy)
-          }
-          V3Button(StrImageStudio.retry, { tick++ }, kind = V3ButtonKind.SECONDARY)
-        }
         b.items.forEach { it0 ->
           V3Section(null, Modifier.padding(top = 12.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

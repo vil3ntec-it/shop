@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.online.storefront
 
+import ir.vil3ntec.tohid.ui.v3.nav.V3RoutePage
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -36,14 +37,15 @@ internal fun RouteScope.storefrontExtras(cfg: StorefrontConfigDto?): List<V3Menu
 
 @Composable
 internal fun RouteScope.StorefrontCampaignsRoute() {
-  Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
+  //  کالبدِ یکسان (p0): قابِ خودِ صفحه؛ `CampaignsPane` ِ مشترک خودش پیمایش می‌کند
+  V3RoutePage(StrReach.campaigns, scroll = false) {
     CampaignsPane(StorefrontGate.config.value?.settings?.title.orEmpty(), snackbar)
   }
 }
 
 @Composable
 internal fun RouteScope.StorefrontMediaRoute() {
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
+  V3RoutePage(StrReach.media) {
     StorefrontMediaPanel(snackbar)
   }
 }

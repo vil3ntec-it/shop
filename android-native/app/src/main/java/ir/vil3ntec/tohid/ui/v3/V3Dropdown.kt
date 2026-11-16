@@ -47,6 +47,12 @@ data class V3Choice(val key: String, val label: String, val divider: Boolean = f
  *
  *  @param label نامِ کادر برای صفحه‌خوان («دوره»، «ماه»)
  */
+/**
+ *  p0r3 (صاحب‌کار: «جعبهٔ سفید با مرز نه؛ فقط نوشته و ▾»): درونِ کارتِ خلاصه (`V3SummaryFrame` آن را روشن می‌کند) کادرِ کشویی
+ *  دکمهٔ نوشته‌ای است — همان نوشته و ▾، همان فهرست با زدن، بی زمینه و مرز؛ جای زدنِ ۴۴dp همان.
+ */
+val LocalV3DropdownPlain = androidx.compose.runtime.staticCompositionLocalOf { false }
+
 @Composable
 fun V3Dropdown(
   value: String,
@@ -59,20 +65,23 @@ fun V3Dropdown(
   val c = PhoneV3.colors
   var open by remember { mutableStateOf(false) }
   val shape = RoundedCornerShape(12.dp)
+  val plain = LocalV3DropdownPlain.current
   Box(modifier) {
     Row(
       Modifier
         .heightIn(min = 44.dp)
         .clip(shape)
-        .background(c.card)
-        .border(1.dp, c.hairline, shape)
+        .then(if (plain) Modifier else Modifier.background(c.card).border(1.dp, c.hairline, shape))
         .v3Pressable(label = "$label: $value", role = Role.DropdownList) { open = true }
-        .padding(start = 14.dp, end = 10.dp),
+        .padding(start = if (plain) 6.dp else 14.dp, end = if (plain) 2.dp else 10.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      Text(value, style = V3Type.callout, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-      Spacer(Modifier.width(4.dp))
-      Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null, tint = c.inkMuted, modifier = Modifier.size(18.dp))
+      Text(
+        value, style = if (plain) V3Type.callout.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold) else V3Type.callout,
+        color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+      )
+      Spacer(Modifier.width(if (plain) 2.dp else 4.dp))
+      Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null, tint = if (plain) c.ink else c.inkMuted, modifier = Modifier.size(18.dp))
     }
     DropdownMenu(
       expanded = open,
