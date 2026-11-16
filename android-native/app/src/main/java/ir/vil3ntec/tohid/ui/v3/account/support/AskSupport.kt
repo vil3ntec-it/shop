@@ -49,7 +49,7 @@ object SupportAskModel {
 
   /** نشانیِ گفت‌وگو با درخواستِ آماده؛ کدِ ناشناخته ⇒ IllegalArgumentException (خطای برنامه‌نویس) */
   fun path(code: String, facts: Map<String, Any> = emptyMap(), contact: String? = null): String {
-    val (def, _) = requireNotNull(SupportProblem.parse(code)) { "مشکلِ ناشناخته: $code" }
+    val (def, _) = requireNotNull(SupportProblem.parse(code)) { "unknown support problem: $code" }
     val clean = SupportProblem.facts(def, facts)
     val args = buildList {
       add(ASK to code)
