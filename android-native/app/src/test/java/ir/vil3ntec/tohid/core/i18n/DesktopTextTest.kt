@@ -31,9 +31,10 @@ class DesktopTextTest {
 
   /** متنِ خامِ پیشینِ کامپیوتر ⇐ نوشتهٔ جدول (`Main.kt`، `Contracts.kt`، `PlatformDesk.kt`) */
   private val moved: List<Pair<String, () -> String>> = listOf(
-    "فروشگاه من" to { Str.appName }, // راهنمای سینی و عنوانِ پنجره
-    "باز کردنِ فروشگاه من" to { StrDesktop.trayOpen },
-    "نمایشگرِ مشتری — فروشگاه من" to { "${StrDevices.kindDisplay} — ${Str.appName}" },
+    //  نامِ برنامه از ۱۴۰۵/۰۸/۲۵ «Daily Shop» است (پیش‌تر «فروشگاه من»)
+    "Daily Shop" to { Str.appName }, // راهنمای سینی و عنوانِ پنجره
+    "باز کردنِ Daily Shop" to { StrDesktop.trayOpen },
+    "نمایشگرِ مشتری — Daily Shop" to { "${StrDevices.kindDisplay} — ${Str.appName}" },
     "همه‌جا" to { StrCourierArea.everywhere }, // فهرستِ میان‌برها (تنظیمِ «راهنمای کلید» خاموش)
     "مرکزِ مدیریت" to { Str.adminCenter },
     "برگشت" to { Str.back },
@@ -58,6 +59,11 @@ class DesktopTextTest {
       I18n.audit = null
       assertTrue("$fa از جدول نمی‌خواند", seen.isNotEmpty())
       for (e in seen) assertTrue("$fa: ترجمهٔ «${e.fa}» جاافتاده است", e.en != null && e.ps != null)
+      //  تنها استثنا خودِ نامِ برنامه است: به خواستِ صاحب‌کار در هر زبان دقیقاً همان «Daily Shop» (سخت‌تر از «فرق دارد»)
+      if (fa == "Daily Shop") {
+        for (l in Lang.entries) assertEquals("نامِ برنامه در $l", "Daily Shop", at(l, text))
+        continue
+      }
       assertNotEquals("$fa: انگلیسی همان فارسی است", fa, at(Lang.EN, text))
     }
   }

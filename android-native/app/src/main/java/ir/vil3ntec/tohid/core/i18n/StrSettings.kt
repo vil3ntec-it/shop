@@ -159,7 +159,7 @@ object StrSettings {
   val undone: String get() = t("به وضعیت پیش از بازیابی برگشت", "Back to the state before the restore", "له بېرته راګرځولو مخکې حالت ته ستون شو")
   val undoFailed: String get() = t("برگرداندن ممکن نشد", "Couldn't undo", "ستنول ونه شول")
   val wipeAll: String get() = t("پاک‌سازی کامل اطلاعات", "Erase all data", "ټول معلومات پاکول")
-  val aboutText: String get() = td("فروشگاه من — برنامهٔ اندروید.\nتمام اطلاعات روی همین گوشی ذخیره می‌شود؛ هر چند وقت یک‌بار پشتیبان بگیرید.", "My Shop — Android app.\nAll data is stored on this phone; take a backup every now and then.", "زما دوکان — د اندروید اپ.\nټول معلومات په همدې موبایل کې خوندي کېږي؛ وخت ناوخت بیک‌اپ واخلئ.", "My Shop — computer app.\nAll data is stored on this computer; take a backup every now and then.", "زما دوکان — د کمپیوټر اپ.\nټول معلومات په همدې کمپیوټر کې خوندي کېږي؛ وخت ناوخت بیک‌اپ واخلئ.")
+  val aboutText: String get() = td("Daily Shop — برنامهٔ اندروید.\nتمام اطلاعات روی همین گوشی ذخیره می‌شود؛ هر چند وقت یک‌بار پشتیبان بگیرید.", "Daily Shop — Android app.\nAll data is stored on this phone; take a backup every now and then.", "Daily Shop — د اندروید اپ.\nټول معلومات په همدې موبایل کې خوندي کېږي؛ وخت ناوخت بیک‌اپ واخلئ.", "Daily Shop — computer app.\nAll data is stored on this computer; take a backup every now and then.", "Daily Shop — د کمپیوټر اپ.\nټول معلومات په همدې کمپیوټر کې خوندي کېږي؛ وخت ناوخت بیک‌اپ واخلئ.")
   val getLatest: String get() = t("دریافت آخرین نسخه", "Get the latest version", "وروستۍ نسخه واخلئ")
   fun installedVersion(v: Any): String = t("نسخهٔ نصب‌شده: ${asIs(v)}", "Installed version: $v", "نصب شوې نسخه: $v")
   //  «چه چیزی تازه است» (OPS-05)
