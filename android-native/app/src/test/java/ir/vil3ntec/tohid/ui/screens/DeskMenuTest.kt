@@ -11,6 +11,8 @@ import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrDeskOff
+import ir.vil3ntec.tohid.core.i18n.StrSupportAsk
+import ir.vil3ntec.tohid.ui.v3.account.support.SupportAskModel
 import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.nav.RoutePaths
 import ir.vil3ntec.tohid.core.orders.OrderStates
@@ -161,11 +163,19 @@ class DeskMenuTest {
     assertEquals(StrNav.ordersSub, i.what)
     assertEquals(StrDeskOff.built, i.status)
     assertNull(i.contact)
-    assertEquals(StrDeskOff.askSupport, i.actions[0].label)
+    //  e-support: «از پشتیبانی بخواه» با درخواستِ ساخت‌یافتهٔ همین پرچم (یک لمس) به‌جای پیش‌نویسِ دستیِ پیشین
+    assertEquals(StrSupportAsk.button, i.actions[0].label)
     assertTrue(i.actions[0].primary)
-    assertEquals(AccountPaths.support(StrDeskOff.supportDraft(StrNav.onlineOrders)), i.actions[0].target)
+    assertEquals(SupportAskModel.path("flag_off:shop.orders", mapOf("screen" to "desk:off:orders")), i.actions[0].target)
     assertTrue(routed(i.actions[0].target))
-    assertEquals("سلام، لطفاً «سفارش‌های آنلاین» را برای همین دکان روشن کنید.", RoutePaths.parse(i.actions[0].target).second["text"])
+    val q = RoutePaths.parse(i.actions[0].target).second
+    assertEquals("flag_off:shop.orders", q["ask"])
+    assertEquals("desk:off:orders", q["f.screen"])
+    assertNull("پیش‌نویسِ دستی دیگر نیست", q["text"])
+    for (id in DeskOff.ids) {
+      val ask = RoutePaths.parse(DeskOff.info(id, owner = true, canAdmin = true)!!.actions[0].target).second["ask"]
+      assertNotNull(id, ask?.let { ir.vil3ntec.tohid.core.support.SupportProblem.parse(it) })
+    }
     //  همان «چرا سفارشِ آنلاین نمی‌رسد» ِ کاشیِ خاموشِ خانه
     assertEquals(ShellTargets.ORDERS_SETUP, i.actions[1].target)
     assertTrue(routed(i.actions[1].target))

@@ -50,6 +50,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Message
+import ir.vil3ntec.tohid.ui.v3.account.support.AskSupportButton
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3TextButton
 import ir.vil3ntec.tohid.ui.v3.V3Type
@@ -145,6 +146,7 @@ internal fun RouteScope.SyncScreen(onBack: (() -> Unit)?) {
           details = if (d.detail == null) null else { { SyncModel.detailsText(d, v1.queued, v1.dropped, lastOk, now) } },
           onCopied = { toasts.show(StrSettings.diagDetailsCopied) },
           startOpen = SettingsShotState.syncDetailsOpen,
+          ask = if (signedIn) SyncModel.askOf(d, v1.dropped) else null,
         )
       }
     }
@@ -193,6 +195,8 @@ internal fun DiagnosisCard(
   details: (() -> String)? = null,
   onCopied: () -> Unit = {},
   startOpen: Boolean = false,
+  /** «از پشتیبانی بخواه»: گرهی که کارش پشتیبانی است (دکان پیدا نمی‌شود، تغییرِ پذیرفته‌نشده/ردِ سرور) — کد و شمار، هرگز متنِ خام */
+  ask: SyncModel.Ask? = null,
 ) {
   var open by remember { mutableStateOf(startOpen) }
   Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
@@ -203,6 +207,7 @@ internal fun DiagnosisCard(
       SyncModel.Fix.SHOP -> V3Button(StrSettings.diagShopAction, onFix, Modifier.fillMaxWidth().padding(top = 10.dp), icon = Icons.Outlined.Storefront)
       SyncModel.Fix.NONE -> Unit
     }
+    ask?.let { AskSupportButton(it.code, Modifier.padding(top = 10.dp), facts = it.facts) }
     if (details != null) {
       V3TextButton(StrSettings.diagDetailsAction, { open = true }, Modifier.padding(top = 4.dp))
     }

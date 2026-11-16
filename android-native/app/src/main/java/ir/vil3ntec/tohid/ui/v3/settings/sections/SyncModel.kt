@@ -176,6 +176,17 @@ internal object SyncModel {
     else -> null
   }
 
+  /** «از پشتیبانی بخواه» ِ یک گره: کدِ `SupportProblem` و واقعیت‌های مجاز (نامکِ صفحه، کدِ کوتاه، شمار) — هرگز متنِ خام */
+  data class Ask(val code: String, val facts: Map<String, Any>)
+
+  /** فقط گرهی که کارش با پشتیبانی است: دکانِ حساب پیدا نمی‌شود، یا سرور تغییرهایی را نپذیرفت */
+  fun askOf(d: Diagnosis, dropped: Int): Ask? = when (d.problem) {
+    Problem.NO_SHOP -> Ask(ir.vil3ntec.tohid.core.support.SupportProblem.SYNC_NO_SHOP, mapOf("screen" to "settings:sync", "syncError" to "no_shop"))
+    Problem.REJECTED -> Ask(ir.vil3ntec.tohid.core.support.SupportProblem.SYNC_REFUSED, mapOf("screen" to "settings:sync", "syncError" to "rejected", "rejected" to dropped))
+    Problem.REFUSED -> Ask(ir.vil3ntec.tohid.core.support.SupportProblem.SYNC_REFUSED, mapOf("screen" to "settings:sync", "syncError" to "refused"))
+    else -> null
+  }
+
   /**
    *  ترتیب: بی نشست (مهمان) ⇐ سرورِ عقب‌مانده (چیزی نمی‌رود تا به‌روز شود) ⇐ نبودنِ دکان (کدِ سرور، نشانهٔ متن یا
    *  `AutoSync`) ⇐ کدِ نشست ⇐ حکمِ موتور (SYN-12) ⇐ نتِ دستگاه ⇐ خطای آخرین دور ⇐ تغییرهای ردشده. سرورِ گرفتار

@@ -34,7 +34,7 @@ const val ORDER_SETUP_ROW = "order-setup-row"
 
 /**
  *  تنها ردیفِ وضعیتِ صف (`OrderSetupModel`): «۲ کار برای راه‌اندازیِ سفارشِ آنلاین ←» ⇒ برگهٔ فهرست، یا «سفارشِ آنلاین برای
- *  این دکان خاموش است» با «پشتیبانی». آماده ⇒ هیچ (هیچ ردیفی، هیچ جایی).
+ *  این دکان خاموش است» با «از پشتیبانی بخواه». آماده ⇒ هیچ (هیچ ردیفی، هیچ جایی).
  */
 @Composable
 internal fun OrderSetupRow(status: OrderSetupModel.Status, onOpen: () -> Unit, onSupport: () -> Unit) {
@@ -50,7 +50,8 @@ internal fun OrderSetupRow(status: OrderSetupModel.Status, onOpen: () -> Unit, o
       V3DataRow(
         StrOrderFlow.setupOff, Modifier.testTag(ORDER_SETUP_ROW),
         icon = Icons.Outlined.PowerSettingsNew, hue = V3Hue.AMBER,
-        action = V3RowAction(StrOrderFlow.fixSupport, null, onClick = onSupport), onClick = onSupport,
+        //  «از پشتیبانی بخواه»: همان یک لمس درخواستِ ساخت‌یافتهٔ همین دروازه را در گفت‌وگوی پشتیبانی می‌فرستد
+        action = V3RowAction(ir.vil3ntec.tohid.core.i18n.StrSupportAsk.button, null, onClick = onSupport), onClick = onSupport,
       )
     }
   }

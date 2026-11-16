@@ -20,18 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1023,
+    "routes": 1033,
     "byAuth": {
-      "none-detected": 199,
-      "admin": 291,
+      "none-detected": 201,
+      "admin": 299,
       "inline": 2,
       "user": 488,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-      "extracted": 669,
-      "empty": 352,
+      "extracted": 678,
+      "empty": 353,
       "unresolved": 2
     }
   },
@@ -301,6 +301,14 @@
     {"method":"GET","path":"/api/admin/subscriptions/expiring","area":"admin","source":"server/src/routes/admin-platform.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":["days","expired","limit"],"body":[],"response":{"statuses":[200],"keys":["expiring","serverTime"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/admin/subscriptions/notify-expiring","area":"admin","source":"server/src/routes/admin-platform.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/admin/subscriptions/period-end","area":"admin","source":"server/src/routes/admin-bridge.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":["amount","app","from","unit"],"body":[],"response":{"statuses":[200],"keys":["amount","app","base","endsAt","rule","serverTime","unit","zone"]},"errors":["400 bad_amount","400 bad_app","400 bad_from","400 bad_unit"],"shape":"extracted"},
+    {"method":"GET","path":"/api/admin/support-requests","area":"admin","source":"server/src/routes/admin-support-requests.js","auth":"admin","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'admin-support-requests-ip","requireAdmin"],"params":[],"query":["limit","maxAgeHours","minAgeHours","offset","problem","shop","status"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/admin/support-requests/:id","area":"admin","source":"server/src/routes/admin-support-requests.js","auth":"admin","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'admin-support-requests-ip","requireAdmin"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/admin/support-requests/:id/fix/enable-flag","area":"admin","source":"server/src/routes/admin-support-requests.js","auth":"admin","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'admin-support-requests-ip","requireAdmin","requireSuperAdmin"],"params":["id"],"query":[],"body":["days","devices","note","resolve"],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/admin/support-requests/:id/fix/grant-subscription","area":"admin","source":"server/src/routes/admin-support-requests.js","auth":"admin","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'admin-support-requests-ip","requireAdmin","requireSuperAdmin"],"params":["id"],"query":[],"body":["days","devices","note","resolve"],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/admin/support-requests/:id/fix/raise-device-limit","area":"admin","source":"server/src/routes/admin-support-requests.js","auth":"admin","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'admin-support-requests-ip","requireAdmin","requireSuperAdmin"],"params":["id"],"query":[],"body":["days","devices","note","resolve"],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/admin/support-requests/:id/fix/resend-email-code","area":"admin","source":"server/src/routes/admin-support-requests.js","auth":"admin","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'admin-support-requests-ip","requireAdmin"],"params":["id"],"query":[],"body":["days","devices","note","resolve"],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/admin/support-requests/:id/resolve","area":"admin","source":"server/src/routes/admin-support-requests.js","auth":"admin","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'admin-support-requests-ip","requireAdmin"],"params":["id"],"query":[],"body":["note"],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/admin/support-requests/:id/sync-error","area":"admin","source":"server/src/routes/admin-support-requests.js","auth":"admin","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'admin-support-requests-ip","requireAdmin"],"params":["id"],"query":["shopId"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/admin/support/broadcast","area":"admin","source":"server/src/routes/admin-platform.js","auth":"admin","guards":["requireAdmin","rateLimit({ max: require('../config').rateLimit.broadcastMax, keyPrefix: 'admin-"],"params":[],"query":[],"body":["app","body","limit","target"],"response":{"statuses":[200],"keys":["app","failed","sent","target","targets"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/admin/support/media/:mid","area":"admin","source":"server/src/routes/admin-platform.js","auth":"admin","guards":["requireAdmin"],"params":["mid"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":["404 media_gone"],"shape":"empty"},
     {"method":"GET","path":"/api/admin/support/threads","area":"admin","source":"server/src/routes/admin-platform.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":["app","limit","offset","q","status"],"body":[],"response":{"statuses":[200],"keys":["threads","unread"]},"errors":[],"shape":"extracted"},
@@ -1013,6 +1021,8 @@
     {"method":"DELETE","path":"/api/support/push","area":"support","source":"server/src/routes/support.js","auth":"none-detected","guards":[],"params":[],"query":["token"],"body":["token"],"response":{"statuses":[200],"keys":["ok"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/support/push","area":"support","source":"server/src/routes/support.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":["platform","provider","token"],"response":{"statuses":[201],"keys":["ok"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/support/read","area":"support","source":"server/src/routes/support.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["ok"]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/support/requests","area":"support","source":"server/src/routes/support-requests.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["requests"]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/support/requests","area":"support","source":"server/src/routes/support-requests.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":["code","context","lang","param"],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/support/thread","area":"support","source":"server/src/routes/support.js","auth":"none-detected","guards":[],"params":[],"query":["after"],"body":[],"response":{"statuses":[200],"keys":["messages","serverTime","thread"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/sync","area":"sync","source":"server/src/routes/sync.js","auth":"user","guards":["requireUser","requireShop"],"params":[],"query":["deviceId","limit","since"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/sync","area":"sync","source":"server/src/routes/sync.js","auth":"user","guards":["requireUser","requireShop","requireDataWrite"],"params":[],"query":[],"body":["changes","clientOperationId","deviceId","operationId"],"response":{"statuses":[200],"keys":["...","replayed","serverTime"]},"errors":[],"shape":"extracted"},

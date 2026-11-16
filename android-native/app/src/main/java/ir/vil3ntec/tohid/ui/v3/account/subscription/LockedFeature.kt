@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.account.DeviceCap
+import ir.vil3ntec.tohid.core.support.SupportProblem
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrAccount
 import ir.vil3ntec.tohid.core.i18n.StrSettings
@@ -22,6 +23,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.account.AccountLinks
 import ir.vil3ntec.tohid.ui.v3.account.AccountPaths
+import ir.vil3ntec.tohid.ui.v3.account.support.AskSupportButton
 import ir.vil3ntec.tohid.ui.v3.nav.LocalV3Nav
 
 /**
@@ -39,6 +41,8 @@ internal fun LockedFeature(label: String, signedIn: Boolean, serverDenied: Strin
   Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
     V3Card(Modifier.widthIn(max = 420.dp).fillMaxWidth(), radius = 16.dp) {
       V3EmptyState(
+        //  `weight(…, fill = false)`: صحنه هر چه جا مانده می‌گیرد، نه بیشتر — «از پشتیبانی بخواه» ِ زیرش دیده می‌ماند
+        modifier = Modifier.weight(1f, fill = false),
         icon = when (next) {
           DeviceCap.Next.SIGN_UP -> Icons.Outlined.PersonAdd
           DeviceCap.Next.DEVICES -> Icons.Outlined.Devices
@@ -69,6 +73,15 @@ internal fun LockedFeature(label: String, signedIn: Boolean, serverDenied: Strin
           )
         },
       )
+      //  «از پشتیبانی بخواه» (کنارِ راهِ خودِ برنامه، نه جایش): جای دستگاه ⇒ `device_limit`، اشتراک ⇒ `subscription_expired`
+      val ask = when (next) {
+        DeviceCap.Next.DEVICES -> SupportProblem.DEVICE_LIMIT
+        DeviceCap.Next.PLANS -> SupportProblem.SUBSCRIPTION_EXPIRED
+        DeviceCap.Next.SIGN_UP -> null
+      }
+      if (ask != null) {
+        AskSupportButton(ask, Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp), facts = mapOf("screen" to "locked"), onOpen = { open(it) })
+      }
     }
   }
 }
