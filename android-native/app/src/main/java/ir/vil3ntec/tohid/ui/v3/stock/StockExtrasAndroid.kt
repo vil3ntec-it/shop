@@ -16,6 +16,7 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Print
+import androidx.compose.material.icons.outlined.Store
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.runtime.Composable
@@ -108,7 +109,8 @@ internal fun RouteScope.rememberStockExtras(): List<V3MenuItem> {
   val transfers = StockTransferFlag.visible.value ?: stored
   //  ۱۴۰۵/۰۸/۲۴: «ثبتِ چند کالا با هم» ِ گوشی همان فرمِ چندردیفیِ کالاها (کادرِ کشویی، نه دیوارِ تراشه)؛ کامپیوتر برگهٔ پیشین
   val bulkProducts = if (desk) StockPaths.BULK_PRODUCTS else ProductsPaths.newMany()
-  return StockExtras.of(flags.copy(imageChanges = imageChanges, transfers = transfers)).map { x ->
+  val branchTransfers = ir.vil3ntec.tohid.ui.v3.branches.BranchLive.book != null
+  return StockExtras.of(flags.copy(imageChanges = imageChanges, transfers = transfers, branchTransfers = branchTransfers)).map { x ->
     when (x) {
       StockExtra.PLACES -> V3MenuItem(Icons.Outlined.SwapHoriz, StrReach.places) { nav.open(x.route) }
       StockExtra.LABELS -> V3MenuItem(Icons.Outlined.Print, StrLabel.openButton) { nav.open(x.route) }
@@ -118,6 +120,7 @@ internal fun RouteScope.rememberStockExtras(): List<V3MenuItem> {
       StockExtra.IMAGE_CHANGES -> V3MenuItem(Icons.Outlined.Collections, StrImageChanges.title) { nav.open(x.route) }
       StockExtra.IMAGE_STUDIO -> V3MenuItem(Icons.Outlined.AutoFixHigh, StrImageStudio.title) { nav.open(x.route) }
       StockExtra.TRANSFERS -> V3MenuItem(Icons.Outlined.LocalShipping, StrTransfer.title) { nav.open(x.route) }
+      StockExtra.BRANCH_TRANSFERS -> V3MenuItem(Icons.Outlined.Store, ir.vil3ntec.tohid.core.i18n.StrBranchTransfers.title) { nav.open(x.route) }
     }
   }
 }

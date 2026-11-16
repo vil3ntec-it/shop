@@ -20,12 +20,15 @@ import kotlin.random.Random
  *
  *  چرخه:  ارسال از شعبهٔ «الف» ⇒ `in_transit` (کالا از مبدأ ِ الف کم و «در مسیر» ِ الف) ⇒ در شعبهٔ «ب»: دریافتِ ناقص (هر چند
  *         بار) و/یا دریافتِ پایانی (کسری فقط با دلیل) ⇒ `received`، یا رد (ماندهٔ در مسیر به مبدأ ِ الف) ⇒ `rejected`.
+ *         ۹۴۶: پیش‌نویس (`draft`، فقط الف می‌بیند، بی اثرِ موجودی) ⇒ ویرایش/ارسال/لغو؛ لغوِ «در مسیر» ِ هیچ‌نرسیده (الف، با دلیل) ⇒
+ *         `cancelled` (همه به مبدأ). دفترِ دستگاهِ هر سو آینه‌اش را از [BranchTransferLedger] می‌گیرد.
  *
  *  ⛔ شعبهٔ کننده فقط سرآیندِ `X-Branch-Id` ِ همین درخواست است ([headers])؛ شعبهٔ مقصد در بدنهٔ ارسال «هدف» است و سرور با
  *     شعبه‌های فعالِ همان دکان می‌سنجد. دریافت/رد فقط وقتی پیشنهاد می‌شود که همین شعبه مقصد است ([canAct]) — سرور باز هم
  *     می‌سنجد (`transfer_wrong_branch`).
  *  ⛔ هر گام یک کلیدِ یکتایی ([newKey]) که برای فرستادنِ دوبارهٔ **همان** فرم ثابت می‌ماند (تکرار ⇒ همان پاسخ، بی اثرِ دوم).
- *  ⛔ این‌جا هیچ موجودیِ دفترِ دستگاه عوض نمی‌شود: انتقالِ میانِ شعبه برخط و داورش سرور است (§۱۰ «دفترِ دستگاه»).
+ *  ⛔ این‌جا هیچ موجودیِ دفترِ دستگاه عوض نمی‌شود: انتقالِ میانِ شعبه برخط و داورش سرور است؛ آینهٔ دفتر فقط پس از پاسخِ سرور
+ *     ([BranchTransferLedger]، `data/BranchTransferBookAndroid.kt`).
  *  مقدار همه‌جا به هزارم (Long). منطقِ خالص (iOS هم)؛ آزمون: `BranchTransferTest` (commonTest).
  */
 object BranchTransfer {
@@ -50,9 +53,12 @@ object BranchTransfer {
   private const val KEY_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
   enum class Status(val wire: String) {
-    IN_TRANSIT("in_transit"), PARTIAL("partial"), RECEIVED("received"), REJECTED("rejected");
+    DRAFT("draft"), IN_TRANSIT("in_transit"), PARTIAL("partial"), RECEIVED("received"), REJECTED("rejected"), CANCELLED("cancelled");
 
+    /** «در مسیر» (دریافت/رد در مقصد) */
     val open: Boolean get() = this == IN_TRANSIT || this == PARTIAL
+    /** هنوز بسته نشده (پیش‌نویس هم) */
+    val live: Boolean get() = this == DRAFT || open
 
     companion object {
       fun of(wire: String?): Status? = entries.firstOrNull { it.wire == wire }
@@ -72,8 +78,11 @@ object BranchTransfer {
 
   data class Line(val productId: String, val qtyMilli: Long)
 
-  /** ردیفِ انتقال: فرستاده، رسیدهٔ تا اینجا (`null` = هنوز هیچ گامی)، ماندهٔ در مسیر، کسریِ پس از بستن */
-  data class TLine(val productId: String, val sentMilli: Long, val receivedMilli: Long?, val pendingMilli: Long, val shortMilli: Long)
+  /** ردیفِ انتقال: فرستاده، رسیدهٔ تا اینجا (`null` = هنوز هیچ گامی)، ماندهٔ در مسیر، کسریِ پس از بستن، برگشته به مبدأ (رد/لغو) */
+  data class TLine(
+    val productId: String, val sentMilli: Long, val receivedMilli: Long?, val pendingMilli: Long, val shortMilli: Long,
+    val returnedMilli: Long = 0,
+  )
 
   data class Transfer(
     val id: String,
@@ -90,9 +99,15 @@ object BranchTransfer {
     val createdAt: Long = 0,
     val closedBy: String = "",
     val closedAt: Long? = null,
+    /** لحظهٔ ارسال (`null` ⇒ هرگز فرستاده نشد: پیش‌نویس یا لغوِ پیش‌نویس) */
+    val sentAt: Long? = null,
+    val sentBy: String = "",
   ) {
     val pendingMilli: Long get() = lines.sumOf { it.pendingMilli }
     val shortMilli: Long get() = lines.sumOf { it.shortMilli }
+    val returnedMilli: Long get() = lines.sumOf { it.returnedMilli }
+    val sentMilli: Long get() = lines.sumOf { it.sentMilli }
+    val receivedMilli: Long get() = lines.sumOf { it.receivedMilli ?: 0L }
   }
 
   data class Step(
@@ -127,6 +142,7 @@ object BranchTransfer {
     BAD_KEY("bad_idempotency_key"), REASON_REQUIRED("reason_required"),
     OVER_RECEIVED("over_received"), NOT_IN_TRANSFER("product_not_in_transfer"), NOTHING_RECEIVED("nothing_received"),
     NOT_DESTINATION("transfer_wrong_branch"), CLOSED("transfer_closed"),
+    NOT_SENDER("transfer_not_sender"), PARTIAL_RECEIVED("transfer_partial"), BAD_STATE("transfer_bad_state"),
   }
 
   sealed interface Result {
@@ -178,16 +194,65 @@ object BranchTransfer {
     else -> null
   }
 
-  /** ارسال از شعبهٔ [here] (همان سرآیند) */
-  fun send(here: String, d: Draft): Result {
+  private fun draftBody(d: Draft, draft: Boolean): JsonObject = buildJsonObject {
+    put("toBranch", d.toBranch!!)
+    put("from", d.from); put("to", d.to)
+    put("lines", lines(d.lines))
+    put("note", d.note.trim().take(MAX_NOTE))
+    if (draft) put("draft", true)
+  }
+
+  /** ارسال از شعبهٔ [here] (همان سرآیند)؛ [draft] ⇒ پیش‌نویسِ سرور (بی اثرِ موجودی، فقط همین شعبه می‌بیند) */
+  fun send(here: String, d: Draft, draft: Boolean = false): Result {
     validate(here, d)?.let { return Result.Bad(it) }
-    val body = buildJsonObject {
-      put("toBranch", d.toBranch!!)
-      put("from", d.from); put("to", d.to)
-      put("lines", lines(d.lines))
-      put("note", d.note.trim().take(MAX_NOTE))
-    }
-    return Result.Ok(Call("POST", PATH, headers(here, d.key), body))
+    return Result.Ok(Call("POST", PATH, headers(here, d.key), draftBody(d, draft)))
+  }
+
+  /** پیش‌نویس، ویرایش، ارسالِ پیش‌نویس و لغو فقط در شعبهٔ فرستنده */
+  private fun mine(t: Transfer, here: String): Boolean = t.fromBranch.id == here && t.direction == Direction.OUT
+
+  fun canEdit(t: Transfer, here: String): Boolean = t.status == Status.DRAFT && mine(t, here)
+  fun canSend(t: Transfer, here: String): Boolean = canEdit(t, here)
+  /** لغو: پیش‌نویس، یا «در مسیر» ای که هنوز هیچ‌اش نرسیده */
+  fun canCancel(t: Transfer, here: String): Boolean =
+    mine(t, here) && (t.status == Status.DRAFT || (t.status == Status.IN_TRANSIT && t.receivedMilli == 0L))
+  /** لغوِ فرستاده دلیل می‌خواهد (کالا به مبدأ برمی‌گردد) */
+  fun cancelNeedsReason(t: Transfer): Boolean = t.status != Status.DRAFT
+
+  /** پیش‌نویسِ سرور ⇒ فرمِ ویرایش با کلیدِ تازه */
+  fun draftOf(t: Transfer, key: String): Draft = Draft(
+    key = key, toBranch = t.toBranch.id, from = t.from, to = t.to,
+    lines = t.lines.map { Line(it.productId, it.sentMilli) }, note = t.note,
+  )
+
+  private fun mineCheck(here: String, t: Transfer, key: String, ok: Boolean): Problem? = when {
+    !KEY_RE.matches(key) -> Problem.BAD_KEY
+    !mine(t, here) -> Problem.NOT_SENDER
+    !t.status.live -> Problem.CLOSED
+    t.status == Status.PARTIAL -> Problem.PARTIAL_RECEIVED
+    !ok -> Problem.BAD_STATE
+    else -> null
+  }
+
+  /** ویرایشِ پیش‌نویسِ [t] با فرمِ [d] (کلیدِ همین گام [Draft.key]) */
+  fun edit(here: String, t: Transfer, d: Draft): Result {
+    mineCheck(here, t, d.key, canEdit(t, here))?.let { return Result.Bad(it) }
+    validate(here, d)?.let { return Result.Bad(it) }
+    return Result.Ok(Call("PUT", "$PATH/${enc(t.id)}", headers(here, d.key), draftBody(d, draft = false)))
+  }
+
+  /** ارسالِ پیش‌نویسِ [t] */
+  fun sendDraft(here: String, t: Transfer, key: String): Result {
+    mineCheck(here, t, key, canSend(t, here))?.let { return Result.Bad(it) }
+    return Result.Ok(Call("POST", "$PATH/${enc(t.id)}/send", headers(here, key), buildJsonObject { }))
+  }
+
+  /** لغوِ فرستنده؛ «در مسیر» فقط با [reason] */
+  fun cancel(here: String, t: Transfer, key: String, reason: String = ""): Result {
+    mineCheck(here, t, key, canCancel(t, here))?.let { return Result.Bad(it) }
+    val r = reason.trim().take(MAX_REASON)
+    if (cancelNeedsReason(t) && r.isEmpty()) return Result.Bad(Problem.REASON_REQUIRED)
+    return Result.Ok(Call("POST", "$PATH/${enc(t.id)}/cancel", headers(here, key), buildJsonObject { if (r.isNotEmpty()) put("reason", r) }))
   }
 
   /** دریافت و رد فقط در شعبهٔ مقصد و فقط تا باز است */
@@ -271,10 +336,13 @@ object BranchTransfer {
       id = id, direction = direction, fromBranch = fromB, toBranch = toB, from = x.s("from"), to = x.s("to"), status = status,
       lines = x["lines"].arr().mapNotNull { l ->
         val pid = l.s("productId").takeIf { it.isNotEmpty() } ?: return@mapNotNull null
-        TLine(pid, l.l("sentMilli") ?: 0, l.l("receivedMilli"), l.l("pendingMilli") ?: 0, l.l("shortMilli") ?: 0)
+        TLine(pid, l.l("sentMilli") ?: 0, l.l("receivedMilli"), l.l("pendingMilli") ?: 0, l.l("shortMilli") ?: 0, l.l("returnedMilli") ?: 0)
       },
       note = x.s("note"), reason = x.s("reason"), createdBy = x.s("createdBy"), createdAt = x.l("createdAt") ?: 0,
       closedBy = x.s("closedBy"), closedAt = x.l("closedAt"),
+      //  پاسخِ پیش از ۹۴۶ `sentAt` ندارد: هر انتقالِ آن روز در دمِ ساختن فرستاده شد
+      sentAt = if (x.containsKey("sentAt")) x.l("sentAt") else x.l("createdAt"),
+      sentBy = if (x.containsKey("sentBy")) x.s("sentBy") else x.s("createdBy"),
     )
   }
 
