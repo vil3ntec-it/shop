@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -124,7 +126,7 @@ private fun DeliveryPrefsDialog(o: OrderDto, repo: OrdersRepository, onDismiss: 
     }
   }
 
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     containerColor = c.surfaceSolid,
     title = { Text(StrOrderPages.prefTitle(o.orderNo), color = c.text) },
@@ -149,7 +151,7 @@ private fun DeliveryPrefsDialog(o: OrderDto, repo: OrdersRepository, onDismiss: 
         }
       }
     },
-    confirmButton = { TextButton(onClick = { save() }, enabled = !busy) { Text(if (busy) StrOrderPages.saving else StrKit.save) } },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel) } },
+    confirmButton = { ShopTextButton(onClick = { save() }, enabled = !busy) { Text(if (busy) StrOrderPages.saving else StrKit.save) } },
+    dismissButton = { ShopTextButton(onClick = onDismiss) { Text(Str.cancel) } },
   )
 }

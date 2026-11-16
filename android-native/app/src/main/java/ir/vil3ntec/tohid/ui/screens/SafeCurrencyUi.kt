@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -85,7 +87,7 @@ internal fun SafeAddCurrencyDialog(onAdd: (String, String) -> String?, onDismiss
   var code by remember { mutableStateOf("") }
   var name by remember { mutableStateOf("") }
   var error by remember { mutableStateOf<String?>(null) }
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     containerColor = Shop.colors.surfaceSolid,
     title = { Text(StrSafeCur.addTitle, color = Shop.colors.text) },
@@ -104,8 +106,8 @@ internal fun SafeAddCurrencyDialog(onAdd: (String, String) -> String?, onDismiss
         error?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger, modifier = Modifier.padding(top = 6.dp)) }
       }
     },
-    confirmButton = { TextButton(onClick = { error = onAdd(code, name); if (error == null) onDismiss() }) { Text(StrSafeCur.add) } },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(StrSafe.cancel) } },
+    confirmButton = { ShopTextButton(onClick = { error = onAdd(code, name); if (error == null) onDismiss() }) { Text(StrSafeCur.add) } },
+    dismissButton = { ShopTextButton(onClick = onDismiss) { Text(StrSafe.cancel) } },
   )
 }
 

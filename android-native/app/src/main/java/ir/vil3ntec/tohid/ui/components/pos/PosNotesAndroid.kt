@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -120,12 +122,12 @@ fun InvoiceNoteButton(note: String?, show: Boolean, onNote: (String?) -> Boolean
   }
   if (!open) return
   var text by remember { mutableStateOf(note.orEmpty()) }
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = { open = false },
     shape = Shape.dialog,
     title = { Text(StrSalePages.invoiceNote) },
     text = { Column { PosNoteField(text, { text = it }, StrSalePages.printedOnReceipt) } },
-    confirmButton = { TextButton(onClick = { if (onNote(SaleNotes.clean(text))) open = false }) { Text(StrSalePages.record) } },
-    dismissButton = { TextButton(onClick = { open = false }) { Text(Str.cancel) } },
+    confirmButton = { ShopTextButton(onClick = { if (onNote(SaleNotes.clean(text))) open = false }) { Text(StrSalePages.record) } },
+    dismissButton = { ShopTextButton(onClick = { open = false }) { Text(Str.cancel) } },
   )
 }

@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -110,7 +112,7 @@ fun ReturnModeDialog(
     ReturnMode.pick(found)?.let(onPick)
   }
 
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     containerColor = Shop.colors.surfaceSolid,
     title = { Text(StrInvoices.returnOrExchange, color = Shop.colors.text) },
@@ -138,8 +140,8 @@ fun ReturnModeDialog(
         Spacer(Modifier.height(2.dp))
       }
     },
-    confirmButton = { TextButton(onClick = onNoReceipt) { Text(StrPos.returnNoReceipt) } },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.goBack) } },
+    confirmButton = { ShopTextButton(onClick = onNoReceipt) { Text(StrPos.returnNoReceipt) } },
+    dismissButton = { ShopTextButton(onClick = onDismiss) { Text(Str.goBack) } },
   )
 }
 

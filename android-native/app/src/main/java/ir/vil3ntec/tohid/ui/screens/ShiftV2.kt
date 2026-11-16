@@ -1,5 +1,9 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopButton
+import ir.vil3ntec.tohid.ui.components.common.ShopOutlinedButton
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -193,7 +197,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
         dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(Str.cancel) { openDialog = false },
       ) { ir.vil3ntec.tohid.ui.desk.DeskDialogField(StrShift.openingCash, amount, { amount = numericInput(it) }, focusRequester = field, textAlign = androidx.compose.ui.text.style.TextAlign.End) }
     }
-    else AlertDialog(
+    else ShopAlertDialog(
       onDismissRequest = { openDialog = false },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrShift.openRegisterTitle, color = Shop.colors.text) },
@@ -203,8 +207,8 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth(),
         )
       },
-      confirmButton = { TextButton(onClick = ::doOpen) { Text(StrShift.openIt) } },
-      dismissButton = { TextButton(onClick = { openDialog = false }) { Text(Str.cancel) } },
+      confirmButton = { ShopTextButton(onClick = ::doOpen) { Text(StrShift.openIt) } },
+      dismissButton = { ShopTextButton(onClick = { openDialog = false }) { Text(Str.cancel) } },
     )
   }
 
@@ -223,7 +227,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
     //  همان مجوزِ گوشیِ نسخهٔ ۳ (`DrawerNoSale.phoneAction` با `drawer.open`)، نه «شاگرد نیست»: بی مجوز بسته حتی با چاپگر
     val action = DrawerNoSale.phoneAction(drawer != null, remember { ir.vil3ntec.tohid.data.ShopRole.canOpenDrawer(context) })
     val denied = action == DrawerNoSale.PhoneAction.DENIED
-    AlertDialog(
+    ShopAlertDialog(
       onDismissRequest = { moveMode = null },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(if (noSale) StrShift.noSaleTitle else StrShift.cashInOut, color = Shop.colors.text) },
@@ -232,16 +236,16 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
           if (!noSale) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
               listOf("cash_out" to StrShift.outOfDrawer, "cash_in" to StrShift.intoDrawer).forEach { (k, l) ->
-                if (k == mode) Button(onClick = {}, modifier = Modifier.weight(1f)) { Text(l) }
-                else OutlinedButton(onClick = { mode = k }, modifier = Modifier.weight(1f)) { Text(l) }
+                if (k == mode) ShopButton(onClick = {}, modifier = Modifier.weight(1f)) { Text(l) }
+                else ShopOutlinedButton(onClick = { mode = k }, modifier = Modifier.weight(1f)) { Text(l) }
               }
             }
             Spacer(Modifier.height(8.dp))
             Text(StrShift.reason, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
               ShiftCore.MOVE_REASONS[mode].orEmpty().forEach { r ->
-                if (r == reason) Button(onClick = {}) { Text(moveLabel(r)) }
-                else OutlinedButton(onClick = { reason = r }) { Text(moveLabel(r)) }
+                if (r == reason) ShopButton(onClick = {}) { Text(moveLabel(r)) }
+                else ShopOutlinedButton(onClick = { reason = r }) { Text(moveLabel(r)) }
               }
             }
             OutlinedTextField(
@@ -267,7 +271,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
         }
       },
       confirmButton = {
-        TextButton(enabled = !(noSale && denied), onClick = move@{
+        ShopTextButton(enabled = !(noSale && denied), onClick = move@{
           //  PAY-19: همان راهِ «باز کردنِ کشو» ِ دستگاه‌ها (`PrintSpooler.openDrawer`): مجوزِ drawer.open، دلیل، و ردیفِ
           //  no_sale ِ همین صندوق فقط وقتی ضربه به چاپگر رسید — نه ردیفی بی کشو، نه کشویی بی ردیف
           if (noSale && action == DrawerNoSale.PhoneAction.KICK && drawer != null) {
@@ -292,7 +296,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
           }
         }) { Text(StrShift.record) }
       },
-      dismissButton = { TextButton(onClick = { moveMode = null }) { Text(Str.cancel) } },
+      dismissButton = { ShopTextButton(onClick = { moveMode = null }) { Text(Str.cancel) } },
     )
   }
 
@@ -306,7 +310,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
     var reason by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     val parsed: Map<String, Long> = counts.mapNotNull { (k, v) -> v.trim().takeIf { it.isNotEmpty() }?.let { k to (it.toLongOrNull() ?: -1L) } }.toMap()
-    AlertDialog(
+    ShopAlertDialog(
       onDismissRequest = { closeDialog = false },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrShift.closeCountTitle, color = Shop.colors.text) },
@@ -364,7 +368,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
         }
       },
       confirmButton = {
-        TextButton(onClick = close@{
+        ShopTextButton(onClick = close@{
           val mc = when (val m = ShiftSlip.methodCounts(methodTexts, methods)) {
             is PayResult.Ok -> m.value
             is PayResult.Err -> { error = StrShift.badMethodCount(PayFlow.methodName(m.method.orEmpty())); return@close }
@@ -389,7 +393,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
           }
         }) { Text(StrShift.closeIt) }
       },
-      dismissButton = { TextButton(onClick = { closeDialog = false }) { Text(Str.cancel) } },
+      dismissButton = { ShopTextButton(onClick = { closeDialog = false }) { Text(Str.cancel) } },
     )
   }
 
@@ -406,7 +410,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
       //  «ثبت از اسکنر» (کارتِ فرمان) در همین بازه
       ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerModel.scannerLine(d, rep.openedAt, rep.at, seesMoney = !staff)?.let { ir.vil3ntec.tohid.ui.desk.DeskDialogText(it) }
     }
-    else AlertDialog(
+    else ShopAlertDialog(
       onDismissRequest = { showReport = null },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(reportTitle(rep), color = Shop.colors.text) },
@@ -419,8 +423,8 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
           }
         }
       },
-      confirmButton = { TextButton(onClick = { showReport = null }) { Text(Str.close) } },
-      dismissButton = { TextButton(onClick = { printReport(seen, copy = reprint) }) { Text(StrShift.print) } },
+      confirmButton = { ShopTextButton(onClick = { showReport = null }) { Text(Str.close) } },
+      dismissButton = { ShopTextButton(onClick = { printReport(seen, copy = reprint) }) { Text(StrShift.print) } },
     )
   }
 
@@ -465,7 +469,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
         }
       }
     }
-    else AlertDialog(
+    else ShopAlertDialog(
       onDismissRequest = { history = false },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrShift.registerHistory, color = Shop.colors.text) },
@@ -485,14 +489,14 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
               c.z?.let { PayFlow.reportOf(it) }?.let { z ->
                 //  PAY-14: اختلاف خودکار اصلاح نمی‌شود؛ مدیر از همین فهرست می‌بیند کدام بستن بررسی می‌خواهد و بررسی را ثبت می‌کند
                 if (!staff) ShiftReviewBadge(d, c) { history = false; reviewing = c }
-                if (canReport) TextButton(onClick = { history = false; reprint = true; showReport = z }) { Text(StrShift.zReport) }
+                if (canReport) ShopTextButton(onClick = { history = false; reprint = true; showReport = z }) { Text(StrShift.zReport) }
               }
             }
             HorizontalDivider(Modifier.padding(vertical = 6.dp), color = Shop.colors.border)
           }
         }
       },
-      confirmButton = { TextButton(onClick = { history = false }) { Text(Str.close) } },
+      confirmButton = { ShopTextButton(onClick = { history = false }) { Text(Str.close) } },
     )
   }
 }

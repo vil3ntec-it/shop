@@ -1085,7 +1085,7 @@ fun SettingsScreen(
   /* ---------------------------- پنجره‌ها ---------------------------- */
 
   pendingRestore?.let { incoming ->
-    AlertDialog(
+    ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog(danger = true,
       onDismissRequest = { BackupBundle.dropStaging(context); pendingRestore = null; restorePhotos = 0 },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrSettings.restoreQ, color = Shop.colors.text) },
@@ -1112,7 +1112,7 @@ fun SettingsScreen(
         }
       },
       confirmButton = {
-        TextButton(onClick = {
+        ir.vil3ntec.tohid.ui.components.common.ShopTextButton(onClick = {
           val next = incoming
           pendingRestore = null
           scope.launch {
@@ -1130,7 +1130,7 @@ fun SettingsScreen(
         }) { Text(StrSettings.restore, color = Shop.colors.danger) }
       },
       dismissButton = {
-        TextButton(onClick = {
+        ir.vil3ntec.tohid.ui.components.common.ShopTextButton(onClick = {
           BackupBundle.dropStaging(context)
           pendingRestore = null
           restorePhotos = 0
@@ -1140,7 +1140,7 @@ fun SettingsScreen(
   }
 
   if (confirmCompact) {
-    AlertDialog(
+    ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog(danger = true,
       onDismissRequest = { confirmCompact = false },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrSettings.compactQ, color = Shop.colors.text) },
@@ -1152,7 +1152,7 @@ fun SettingsScreen(
         )
       },
       confirmButton = {
-        TextButton(onClick = {
+        ir.vil3ntec.tohid.ui.components.common.ShopTextButton(onClick = {
           confirmCompact = false
           scope.launch {
             val done = withContext(Dispatchers.IO) { LedgerArchive.compact(context, d) }
@@ -1165,12 +1165,12 @@ fun SettingsScreen(
           }
         }) { Text(StrSettings.compactDo) }
       },
-      dismissButton = { TextButton(onClick = { confirmCompact = false }) { Text(Str.goBack) } },
+      dismissButton = { ir.vil3ntec.tohid.ui.components.common.ShopTextButton(onClick = { confirmCompact = false }) { Text(Str.goBack) } },
     )
   }
 
   if (confirmRotate) {
-    AlertDialog(
+    ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog(danger = true,
       onDismissRequest = { confirmRotate = false },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrSettings.rotateQ, color = Shop.colors.text) },
@@ -1182,7 +1182,7 @@ fun SettingsScreen(
         )
       },
       confirmButton = {
-        TextButton(onClick = {
+        ir.vil3ntec.tohid.ui.components.common.ShopTextButton(onClick = {
           confirmRotate = false
           staffCodeBusy = true
           scope.launch {
@@ -1198,7 +1198,7 @@ fun SettingsScreen(
           }
         }) { Text(StrSettings.make) }
       },
-      dismissButton = { TextButton(onClick = { confirmRotate = false }) { Text(Str.cancel) } },
+      dismissButton = { ir.vil3ntec.tohid.ui.components.common.ShopTextButton(onClick = { confirmRotate = false }) { Text(Str.cancel) } },
     )
   }
 
@@ -1325,7 +1325,7 @@ private fun PinDialog(onDismiss: () -> Unit, onSet: (String) -> Unit) {
   val colors = Shop.colors
   val ready = first.length == MAX_PIN && first == again
 
-  AlertDialog(
+  ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog(
     onDismissRequest = onDismiss,
     containerColor = colors.surfaceSolid,
     title = { Text(StrSettings.appPin, color = colors.text) },
@@ -1347,11 +1347,11 @@ private fun PinDialog(onDismiss: () -> Unit, onSet: (String) -> Unit) {
       }
     },
     confirmButton = {
-      TextButton(enabled = ready, onClick = { onSet(first) }) {
+      ir.vil3ntec.tohid.ui.components.common.ShopTextButton(enabled = ready, onClick = { onSet(first) }) {
         Text(StrSettings.put, color = if (ready) colors.primary else colors.muted2)
       }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel, color = colors.muted) } },
+    dismissButton = { ir.vil3ntec.tohid.ui.components.common.ShopTextButton(onClick = onDismiss) { Text(Str.cancel, color = colors.muted) } },
   )
 }
 

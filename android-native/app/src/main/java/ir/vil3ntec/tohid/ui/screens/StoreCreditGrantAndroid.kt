@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -93,7 +95,7 @@ private fun StoreCreditGrantDialog(store: ShopStore, d: ShopData, debtor: Debtor
     }
   }
 
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = { if (!busy) onDismiss() },
     containerColor = Shop.colors.surfaceSolid,
     title = { Text("${StrGiftCard.grantTitle} — ${debtor.name}", color = Shop.colors.text) },
@@ -124,16 +126,16 @@ private fun StoreCreditGrantDialog(store: ShopStore, d: ShopData, debtor: Debtor
       }
     },
     confirmButton = {
-      TextButton(enabled = !busy, onClick = {
-        val m = minor ?: run { error = GiftCards.message(StoreCredit.INVALID_AMOUNT); return@TextButton }
-        if (reason.trim().length < GiftCard.REASON_MIN) { error = GiftCards.message(GiftCard.Code.REASON_REQUIRED); return@TextButton }
+      ShopTextButton(enabled = !busy, onClick = {
+        val m = minor ?: run { error = GiftCards.message(StoreCredit.INVALID_AMOUNT); return@ShopTextButton }
+        if (reason.trim().length < GiftCard.REASON_MIN) { error = GiftCards.message(GiftCard.Code.REASON_REQUIRED); return@ShopTextButton }
         //  همان هستهٔ مجوزِ سرور: «نیازمندِ تأیید» ⇒ PIN ِ مدیر/صاحب (نه برای خودِ تأییدکننده)؛ «ممنوع» ⇒ نه
         val decision = ShopRole.decide(context, "sales.discount", mapOf("amount" to m.toDouble())).decision
-        if (decision == "approve" && !ir.vil3ntec.tohid.core.credit.CreditGate.canApprove(selfRole)) { asking = m; return@TextButton }
+        if (decision == "approve" && !ir.vil3ntec.tohid.core.credit.CreditGate.canApprove(selfRole)) { asking = m; return@ShopTextButton }
         save(m, decision, null)
       }) { Text(StrGiftCard.grantSave) }
     },
-    dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(StrGiftCard.cancel) } },
+    dismissButton = { ShopTextButton(enabled = !busy, onClick = onDismiss) { Text(StrGiftCard.cancel) } },
   )
   asking?.let { m ->
     ir.vil3ntec.tohid.ui.components.staff.PinApprovalDialog(

@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -128,7 +130,8 @@ fun ServersSettings(controller: ServersController, toast: (String) -> Unit) {
       },
       dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.no) { switching = null },
     ) { ir.vil3ntec.tohid.ui.desk.DeskDialogText(StrSetupPages.switchNote1 + StrSetupPages.switchNote2) }
-    else AlertDialog(
+    else ShopAlertDialog(
+      danger = true,
       onDismissRequest = { switching = null },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrSetupPages.switchTo(p.name), color = Shop.colors.text) },
@@ -141,13 +144,13 @@ fun ServersSettings(controller: ServersController, toast: (String) -> Unit) {
         )
       },
       confirmButton = {
-        TextButton(onClick = {
+        ShopTextButton(onClick = {
           val error = controller.switchTo(p.id)
           switching = null
           if (error != null) toast(error) else controller.restartNow()
         }) { Text(StrSetupPages.goAndClose) }
       },
-      dismissButton = { TextButton(onClick = { switching = null }) { Text(StrPos.no) } },
+      dismissButton = { ShopTextButton(onClick = { switching = null }) { Text(StrPos.no) } },
     )
   }
 
@@ -161,7 +164,8 @@ fun ServersSettings(controller: ServersController, toast: (String) -> Unit) {
       },
       dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.no) { removing = null },
     ) { ir.vil3ntec.tohid.ui.desk.DeskDialogText(StrSetupPages.removeNote) }
-    else AlertDialog(
+    else ShopAlertDialog(
+      danger = true,
       onDismissRequest = { removing = null },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrSetupPages.removeServer(p.name), color = Shop.colors.text) },
@@ -173,13 +177,13 @@ fun ServersSettings(controller: ServersController, toast: (String) -> Unit) {
         )
       },
       confirmButton = {
-        TextButton(onClick = {
+        ShopTextButton(onClick = {
           val error = controller.remove(p.id)
           removing = null
           if (error != null) toast(error) else reload()
         }) { Text(StrAccount.removeConfirm) }
       },
-      dismissButton = { TextButton(onClick = { removing = null }) { Text(StrPos.no) } },
+      dismissButton = { ShopTextButton(onClick = { removing = null }) { Text(StrPos.no) } },
     )
   }
 
@@ -193,7 +197,8 @@ fun ServersSettings(controller: ServersController, toast: (String) -> Unit) {
       },
       dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.no) { turningOff = false },
     ) { ir.vil3ntec.tohid.ui.desk.DeskDialogText(StrSetupPages.backToMainNote) }
-    else AlertDialog(
+    else ShopAlertDialog(
+      danger = true,
       onDismissRequest = { turningOff = false },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrSetupPages.backToMain, color = Shop.colors.text) },
@@ -205,13 +210,13 @@ fun ServersSettings(controller: ServersController, toast: (String) -> Unit) {
         )
       },
       confirmButton = {
-        TextButton(onClick = {
+        ShopTextButton(onClick = {
           turningOff = false
           if (controller.setEnabled(false)) controller.restartNow()
           on = false
         }) { Text(StrSetupPages.offAndClose) }
       },
-      dismissButton = { TextButton(onClick = { turningOff = false }) { Text(StrPos.no) } },
+      dismissButton = { ShopTextButton(onClick = { turningOff = false }) { Text(StrPos.no) } },
     )
   }
 
@@ -225,7 +230,7 @@ fun ServersSettings(controller: ServersController, toast: (String) -> Unit) {
         dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.no) { pinFor = null },
       ) { ir.vil3ntec.tohid.ui.desk.DeskDialogField(StrSetupPages.appPin, pin, { pin = it.filter(Char::isDigit).take(12) }, focusRequester = field, password = true) }
     }
-    else AlertDialog(
+    else ShopAlertDialog(
       onDismissRequest = { pinFor = null },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrSetupPages.appPin, color = Shop.colors.text) },
@@ -239,11 +244,11 @@ fun ServersSettings(controller: ServersController, toast: (String) -> Unit) {
         )
       },
       confirmButton = {
-        TextButton(onClick = {
+        ShopTextButton(onClick = {
           if (controller.pinOk(pin)) { pinFor = null; action() } else toast(StrAuth.lockWrong)
         }) { Text(StrAuth.confirm) }
       },
-      dismissButton = { TextButton(onClick = { pinFor = null }) { Text(StrPos.no) } },
+      dismissButton = { ShopTextButton(onClick = { pinFor = null }) { Text(StrPos.no) } },
     )
   }
 
@@ -353,7 +358,7 @@ private fun AddServerDialog(controller: ServersController, onDismiss: () -> Unit
     }
   }
 
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     containerColor = Shop.colors.surfaceSolid,
     title = { Text(StrSetupPages.addServer, color = Shop.colors.text) },
@@ -373,7 +378,7 @@ private fun AddServerDialog(controller: ServersController, onDismiss: () -> Unit
             Text(StrSetupPages.lanServer, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
           }
           if (!Platform.DESKTOP) {
-            TextButton(onClick = { scanning = true }) {
+            ShopTextButton(onClick = { scanning = true }) {
               androidx.compose.material3.Icon(Icons.Filled.QrCodeScanner, null)
               Spacer(Modifier.width(6.dp))
               Text(StrSetupPages.scanServerQr)
@@ -416,15 +421,15 @@ private fun AddServerDialog(controller: ServersController, onDismiss: () -> Unit
     confirmButton = {
       val c = ready
       if (c == null) {
-        TextButton(enabled = !busy && input.isNotBlank(), onClick = { check() }) { Text(if (busy) StrAuth.verifying else StrHome.actionCheck) }
+        ShopTextButton(enabled = !busy && input.isNotBlank(), onClick = { check() }) { Text(if (busy) StrAuth.verifying else StrHome.actionCheck) }
       } else {
-        TextButton(onClick = {
+        ShopTextButton(onClick = {
           val e = controller.add(c)
           if (e != null) error = e else onAdded()
         }) { Text(StrSetupPages.confirmAndAdd) }
       }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.close) } },
+    dismissButton = { ShopTextButton(onClick = onDismiss) { Text(Str.close) } },
   )
 
   certToTrust?.let { fp ->
@@ -436,7 +441,8 @@ private fun AddServerDialog(controller: ServersController, onDismiss: () -> Unit
       ir.vil3ntec.tohid.ui.desk.DeskDialogText(StrSetupPages.selfSignedNote)
       ir.vil3ntec.tohid.ui.desk.DeskDialogText(fp.chunked(2).joinToString(":").uppercase(), strong = true)
     }
-    else AlertDialog(
+    else ShopAlertDialog(
+      danger = true,
       onDismissRequest = { certToTrust = null },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrSetupPages.unknownCert, color = Shop.colors.text) },
@@ -452,9 +458,9 @@ private fun AddServerDialog(controller: ServersController, onDismiss: () -> Unit
         }
       },
       confirmButton = {
-        TextButton(onClick = { trusted = fp; certToTrust = null; check() }) { Text(StrSetupPages.sameConfirm) }
+        ShopTextButton(onClick = { trusted = fp; certToTrust = null; check() }) { Text(StrSetupPages.sameConfirm) }
       },
-      dismissButton = { TextButton(onClick = { certToTrust = null }) { Text(StrPos.no) } },
+      dismissButton = { ShopTextButton(onClick = { certToTrust = null }) { Text(StrPos.no) } },
     )
   }
 

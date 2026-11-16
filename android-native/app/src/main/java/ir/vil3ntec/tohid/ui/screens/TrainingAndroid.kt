@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopButton
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,7 +58,7 @@ fun TrainingFrame(content: @Composable () -> Unit) {
     }
     Box(Modifier.weight(1f).fillMaxWidth()) { content() }
   }
-  if (asking) AlertDialog(
+  if (asking) ShopAlertDialog(
     onDismissRequest = { asking = false },
     title = { Text(StrTraining.exitTitle) },
     text = {
@@ -67,7 +70,7 @@ fun TrainingFrame(content: @Composable () -> Unit) {
         }
       }
     },
-    confirmButton = { Button(onClick = { asking = false; TrainingLedger.exit(context, wipe) }) { Text(StrTraining.exit) } },
-    dismissButton = { TextButton(onClick = { asking = false }) { Text(StrTraining.cancel) } },
+    confirmButton = { ShopButton(onClick = { asking = false; TrainingLedger.exit(context, wipe) }) { Text(StrTraining.exit) } },
+    dismissButton = { ShopTextButton(onClick = { asking = false }) { Text(StrTraining.cancel) } },
   )
 }
