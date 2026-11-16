@@ -2,8 +2,9 @@
 /**
  * پرچم‌های پیش‌فرض‌روشنِ `orders.flagOf` (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲، خواستِ صاحب‌کار «کلیدهای کم‌خطر را روشن کن»).
  *
- *   - هر ۲۱ کلید بی ردیف ⇒ روشن (بیرون و درونِ تراکنش)؛ کاتالوگِ پنل (`KNOWN`) همان پیش‌فرض را نشان می‌دهد — ۱۷ کلیدِ
- *     نمایشیِ ۱۴۰۵/۰۸/۲۲ و چهار کلیدِ پایهٔ سفارش با تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۴ (FLAGS-ON §۴۸؛ آزمونِ کامل: `order-defaults-on.test.js`).
+ *   - هر ۲۲ کلید بی ردیف ⇒ روشن (بیرون و درونِ تراکنش)؛ کاتالوگِ پنل (`KNOWN`) همان پیش‌فرض را نشان می‌دهد — ۱۷ کلیدِ
+ *     نمایشیِ ۱۴۰۵/۰۸/۲۲، چهار کلیدِ پایهٔ سفارش با تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۴ (FLAGS-ON §۴۸؛ آزمونِ کامل: `order-defaults-on.test.js`)
+ *     و `pay.hesabpay` با تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۵ (FLAGS-ON §۴۹؛ پول فقط به حسابِ خودِ دکان: `payment-intents.test.js`).
  *   - `false` ِ صریحِ دکان یا `all` ⇒ خاموش؛ `true` ِ دکان بر `false` ِ `all` جلو؛ مقدارِ نادرست ⇒ همان پیش‌فرضِ روشن.
  *   - «غیرفعال کردنِ سرویس» ِ `shop_holds` ⇒ خاموش (فقط همان دکان).
  *   - کلیدِ بیرون از فهرست همان قاعدهٔ پیشین: بی ردیف خاموش، فقط `true` روشن.
@@ -13,7 +14,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { query, newId, tx } = require('../src/db');
 const orders = require('../src/lib/orders');
-const { DEFAULT_ON, KEYS } = require('../src/lib/flag-defaults');
+const { DEFAULT_ON, KEYS, ORDER_BASE, PAY_BASE } = require('../src/lib/flag-defaults');
 
 const LIST = [
   'shop.storefront.filters', 'shop.storefront.recent', 'shop.storefront.search', 'shop.storefront.search_core',
@@ -22,6 +23,8 @@ const LIST = [
   'shop.branches_report', 'shop.delivery_route', 'shop.delivery_map', 'shop.orders.start_alert', 'shop.orders.stuck_alert',
   //  تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۴: همهٔ قابلیت‌های سفارش پیش‌فرض روشن
   'shop.orders', 'shop.storefront', 'shop.order_notify', 'shop.device_push',
+  //  تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۵ («این‌ها همه باید بیایند»): حساب‌پیِ خودِ دکان در صندوق
+  'pay.hesabpay',
 ];
 //  بیرون از فهرست: پول، داده یا هزینه — همان پیش‌فرضِ خاموش (`shop.orders`/`shop.storefront` از ۱۴۰۵/۰۸/۲۴ در فهرست‌اند)
 const OFF = ['shop.delivery', 'shop.stock_reserve', 'shop.orders.refunds', 'shop.storefront.alerts', 'shop.customer_notify', 'shop.orders.subscribers_only'];
@@ -47,9 +50,14 @@ const hold = (shopId, key) => query(
 //  درونِ تراکنش (`run` ِ اتصالِ جاری) همان پاسخ
 const inTx = (shopId, key) => tx((c) => orders.flagOf(shopId, key, (sql, p) => c.query(sql, p)));
 
-test('فهرست: همان ۲۱ کلید، فقط‌خواندنی، و کاتالوگِ پنل همان پیش‌فرض را دارد', () => {
+test('فهرست: همان ۲۲ کلید، فقط‌خواندنی، و کاتالوگِ پنل همان پیش‌فرض را دارد', () => {
   assert.deepEqual([...DEFAULT_ON].sort(), [...LIST].sort());
-  assert.equal(DEFAULT_ON.size, 21);
+  assert.equal(DEFAULT_ON.size, 22);
+  //  دو گروهِ «تصمیمِ صاحب‌کار» جدا از ۱۷ کلیدِ نمایشی (`helpers.defaultOnOff` پایهٔ سفارش را نمی‌بندد، حساب‌پی را می‌بندد)
+  assert.deepEqual([...ORDER_BASE], ['shop.orders', 'shop.storefront', 'shop.order_notify', 'shop.device_push']);
+  assert.deepEqual([...PAY_BASE], ['pay.hesabpay']);
+  assert.ok(Object.isFrozen(ORDER_BASE) && Object.isFrozen(PAY_BASE));
+  assert.ok([...ORDER_BASE, ...PAY_BASE].every((k) => DEFAULT_ON.has(k)));
   assert.deepEqual([...KEYS].sort(), [...LIST].sort());
   assert.ok(Object.isFrozen(KEYS) && Object.isFrozen(DEFAULT_ON));
   assert.throws(() => DEFAULT_ON.add('shop.delivery'), TypeError);

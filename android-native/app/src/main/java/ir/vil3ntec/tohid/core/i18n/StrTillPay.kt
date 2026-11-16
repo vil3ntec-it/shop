@@ -46,6 +46,38 @@ object StrTillPay {
     "فاکتور د حساب‌پې په تایید تړل کېږي",
   )
   val title: String get() = t("پرداخت با حساب‌پی", "Pay with HesabPay", "د حساب‌پې ورکړه")
+
+  // روش‌های پرداختِ صندوق (`core/pay/TillMethods`، e-paymethods)
+  val methodsTitle: String get() = t("روشِ پرداخت", "Payment method", "د ورکړې طریقه")
+  val tileCash: String get() = t("نقد", "Cash", "نغد")
+  val tileCard: String get() = t("کارت", "Card", "کارت")
+  val tileCardSub: String get() = t("کارت‌خوان", "Card terminal", "کارت لوستونکی")
+  val tileHesab: String get() = t("حساب‌پی", "HesabPay", "حساب‌پې")
+  val tileHesabSub: String get() = t("QR / NFC", "QR / NFC", "QR / NFC")
+  val tileWallet: String get() = t("کیف پول", "Wallet", "بټوه")
+  val tileTransfer: String get() = t("حواله", "Transfer", "حواله")
+  val tileCredit: String get() = t("نسیه", "On credit", "پور")
+  val tileCreditSub: String get() = t("به حسابِ مشتری", "To customer's account", "د پیرودونکي حساب ته")
+  val tileSoon: String get() = t("به‌زودی", "Soon", "ژر")
+  /** کاشیِ خاموشِ حساب‌پی: حسابِ تازه در ۲۴ ساعتِ امنیتی (`TillMethods.Hesab.Pending`) */
+  fun hesabPending(at: Any): String = t(
+    "حساب‌پی هنوز فعال نیست: حسابِ تازهٔ دکان برای امنیت ۲۴ ساعت در انتظار است و از ${asIs(at)} فعال می‌شود.",
+    "HesabPay isn't active yet: the shop's new account is on a 24-hour security hold and becomes active at $at.",
+    "حساب‌پې لا فعاله نه ده: د دوکان نوی حساب د امنیت لپاره ۲۴ ساعته په تمه دی او له $at څخه فعالېږي.",
+  )
+  /** فقط صاحبِ دکان: حساب‌پی هنوز راه‌اندازی نشده (`TillMethods.Hesab.Setup`) */
+  val hesabSetup: String get() = t("راه‌اندازیِ حساب‌پی", "Set up HesabPay", "حساب‌پې جوړ کړئ")
+  val hesabSetupNote: String get() = t(
+    "پول مستقیم به حسابِ خودِ دکان — QR و NFC در همین صندوق",
+    "Money goes straight to the shop's own account — QR and NFC right at this till",
+    "پیسې مستقیم د دوکان خپل حساب ته — QR او NFC په همدې صندوق کې",
+  )
+  /** کاشیِ کارت: مبلغ روی کارت‌خوان، شمارهٔ تأییدِ رسید در ردیف */
+  val cardRefHint: String get() = t(
+    "مبلغ را روی کارت‌خوان بزنید و شمارهٔ تأییدِ رسید را در «شمارهٔ مرجع» بنویسید",
+    "Charge the amount on the card terminal and type the slip's approval number in “Reference no.”",
+    "مبلغ په کارت لوستونکي ووهئ او د رسید د تایید شمېره په «د مرجع شمېره» کې ولیکئ",
+  )
   val tapNow: String get() = t(
     "گوشیِ مشتری را به پشتِ این دستگاه نزدیک کنید؛ یا مشتری QR را اسکن کند",
     "Hold the customer's phone to the back of this device, or let them scan the QR",

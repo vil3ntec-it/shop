@@ -71,15 +71,16 @@ fun CheckoutPaySplit(
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       V3TextField(
         value = state.cash,
-        onValueChange = { state.cash = it },
+        //  e-paymethods: نوشتنِ دستی ⇒ نقد دیگر خودکار «همان مبلغِ لازم» نیست
+        onValueChange = { state.cash = it; state.cashAuto = false },
         label = StrSale.cashReceived,
         kind = V3FieldKind.MONEY,
         helper = StrSale.exactCashHint,
         imeAction = androidx.compose.ui.text.input.ImeAction.Done,
-        onImeAction = { if (state.cash.isBlank()) state.fillExact(total, customerId) else onSubmit() },
+        onImeAction = { if (state.cash.isBlank()) state.takeCash(total, customerId) else onSubmit() },
         modifier = Modifier.weight(1f),
       )
-      V3Button(StrSale.exactCash, { state.fillExact(total, customerId) }, kind = V3ButtonKind.SECONDARY, height = 44.dp)
+      V3Button(StrSale.exactCash, { state.takeCash(total, customerId) }, kind = V3ButtonKind.SECONDARY, height = 44.dp)
     }
     state.rows.forEachIndexed { i, row ->
       val bad = preview is PayFlow.Outcome.Bad && preview.problem.index == i

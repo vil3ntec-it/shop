@@ -76,7 +76,7 @@ class ShopStore(
    *         لحظه دفتر را برنمی‌دارد، پس ذخیره‌ای که از دفترِ پیش از sweep ساخته شده باشد پیش نمی‌آید
    *         و sweep (با ردهای دفترچه‌اش) برنمی‌گردد. کارگر و خلاصه (`load()` ِ بی sweep) چیزی نمی‌نویسند.
    */
-  suspend fun load(sweep: Boolean = false) {
+  suspend fun load(sweep: Boolean = false, adoptPay: Boolean = false) {
     withContext(Dispatchers.IO) {
       //  نشانِ دیسک **پیش از** خواندن — نوشتنی که میانِ خواندن برسد پایین دیده می‌شود
       val mark = follow.mark()
@@ -105,6 +105,7 @@ class ShopStore(
       if (follow.on) synchronized(SyncV1Engine.of(context)) { follow.loadedLocked(mark) } else follow.loadedLocked(mark)
     }
     if (sweep) quietly { sweepNow(requireLoaded = false) }
+    if (adoptPay) adoptPayDefault() //  e-paymethods: پیش از `loaded` تا هیچ صفحه‌ای حالتِ پرداخت را پیش از تصمیم نخواند
     _loaded.value = true
   }
 
@@ -190,14 +191,22 @@ class ShopStore(
    *  یک بار دوباره ساخته می‌شود و کارهای پس‌زمینه از آن به بعد ارزان
    *  می‌مانند.
    */
-  suspend fun loadAndSummarize() {
-    //  CRM-10: sweep ِ شروع درونِ `load`، پیش از `loaded` (شرح سرِ `load`)
-    load(sweep = true)
+  suspend fun loadAndSummarize(adoptPay: Boolean = false) {
+    //  CRM-10: sweep ِ شروع درونِ `load`، پیش از `loaded` (شرح سرِ `load`)؛ e-paymethods: [adoptPayDefault] فقط از شروعِ برنامه
+    load(sweep = true, adoptPay = adoptPay)
     //  دفترِ خوانده‌نشده خلاصهٔ «خالی» نمی‌گیرد
     if (_unreadable.value == null && !training) withContext(Dispatchers.IO) { LedgerSummary.write(context, _data.value) }
     //  SEC-01: با تنظیمِ خاموش و دفترِ ساده فقط سرآیندِ چند فایل خوانده می‌شود
     convergeAtRest()
   }
+
+  /**
+   *  e-paymethods — پیش‌فرضِ «ترکیبی و شیفت» برای دستگاهی که هرگز انتخاب نکرده (`PayV2Pref`، `PayV2Default`): فقط شروعِ برنامه
+   *  (`loadAndSummarize(adoptPay = true)`) درونِ [load] پیش از `loaded`، نه صفحه‌ها و نه عوضِ حساب. دفترِ خوانده‌نشده «بی صندوق»
+   *  نیست و دفترِ آموزشی تصمیم نمی‌گیرد ⇒ `null` و هیچ نوشتنی. انتخابِ صریح دست نمی‌خورد.
+   */
+  fun adoptPayDefault(now: Long = ReportBridge.nowMs()): PayV2Default.Step? =
+    if (training || _unreadable.value != null) null else runCatching { PayV2Pref.adopt(context, _data.value, now) }.getOrNull()
 
   /**
    *  CRM-10: ردیف‌های دیررسیده (فروش یا قرضی که دستگاهِ آفلاین یا ساختِ قدیمی روی مشتریِ
