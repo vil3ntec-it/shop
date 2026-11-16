@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.analytics
 
+import ir.vil3ntec.tohid.ui.v3.nav.V3RoutePage
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -22,10 +23,11 @@ import ir.vil3ntec.tohid.ui.v3.V3Type
  *  خروج، نوبت‌ها، کارکردِ هفته و ماه، نرخِ پورسانتِ هر فروشنده) با پرچمِ `shop.staff_time` ِ سرور؛ بازهٔ «این ماه».
  */
 @Composable
-internal fun StaffTimePage(d: ShopData) {
+internal fun ir.vil3ntec.tohid.ui.v3.nav.RouteScope.StaffTimePage(d: ShopData) {
   val cfg = rememberStaffTimeConfig()
   val today = todayIso()
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+  //  کالبدِ یکسان (p0): قابِ خودِ صفحه (`StaffTimeHub` ِ مشترک درونش)
+  V3RoutePage(StrReach.staffTime) {
     when {
       cfg == null -> Text(StrReach.staffTimeLoading, style = V3Type.callout, color = PhoneV3.colors.inkMuted)
       !cfg.enabled -> Text(StrReach.staffTimeOff, style = V3Type.callout, color = PhoneV3.colors.inkMuted)

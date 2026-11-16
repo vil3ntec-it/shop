@@ -73,7 +73,7 @@ internal fun TillReceivePhone(d: ShopData, store: ShopStore, cartDebtorId: Strin
         name = name,
         balanceMinor = ir.vil3ntec.tohid.data.TillReceiveFlow.balanceMinor(d, id),
         busy = busy,
-        gate = { content -> VipGate(Str.debtors) { content() } },
+        gate = { content -> VipGate(Str.debtors, feature = "debtors") { content() } },
         onDismiss = { forId = null },
         onSubmit = { amount, notes, prepay ->
           busy = true

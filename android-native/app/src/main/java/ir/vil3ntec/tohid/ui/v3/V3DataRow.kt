@@ -1,5 +1,10 @@
 package ir.vil3ntec.tohid.ui.v3
 
+import ir.vil3ntec.tohid.ui.screens.v3Text
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -43,8 +48,11 @@ object V3DataRowSpec {
   val PAD_END: Dp = V3NavRowSpec.PAD_END
   /** بالا و پایین — آرام، همهٔ ردیف‌ها یک‌اندازه */
   val PAD_V: Dp = 12.dp
-  /** بلندیِ کم: سه خطِ کالبد */
-  val MIN_HEIGHT: Dp = 72.dp
+  /**
+   *  بلندیِ کم: دو خطِ کالبد (p0r3، صاحب‌کار: «مبلغ هم‌خطِ عنوان، جزئیات یک خط، همهٔ ردیف‌ها یک‌اندازه و فشرده») —
+   *  ۱۲ + ۲۲ + ۱۸ + ۱۲ = ۶۴، همان ردیفِ فشردهٔ کالاها.
+   */
+  val MIN_HEIGHT: Dp = 64.dp
   /**
    *  ردیفِ فشردهٔ دوخطی (`V3DataRow(dense = true)`: عنوان + خطِ مبلغ، بی خطِ دوم) — «کالاها» ِ گوشی (۱۴۰۵/۰۸/۲۴: دست‌کم ۸ ردیفِ کامل
    *  در ۳۶۰×۷۶۰ زیرِ سربرگ، تراشه‌ها و نوارِ پایین). ۱۰ + ۲۲ + ۲ + ۲۰ + ۱۰ = ۶۴.
@@ -96,7 +104,38 @@ fun v3MetaText(c: PhoneV3Colors, meta: V3RowMeta): AnnotatedString = buildAnnota
   }
 }
 
-/** خطِ مبلغِ یک‌خطی — همان [v3MetaText] */
+/**
+ *  خطِ دومِ ردیف (p0r3): جزئیات و وضعیت هم‌خط — «امروز · متفرقه · سررسید گذشته»؛ همان قاعدهٔ «یک نشانِ رنگی» ِ [v3MetaText]
+ *  (فقط نخستین وضعیتِ خطر به رنگِ خطرِ آرام، بقیه کم‌رنگ). خالص تا آزمون هم بسنجد.
+ */
+fun v3SecondText(c: PhoneV3Colors, secondary: String?, meta: V3RowMeta?): AnnotatedString = buildAnnotatedString {
+  var first = true
+  if (!secondary.isNullOrBlank()) { withStyle(SpanStyle(color = c.inkMuted)) { append(secondary) }; first = false }
+  var accent = false
+  listOfNotNull(meta?.status, meta?.second).forEach { st ->
+    if (!first) withStyle(SpanStyle(color = c.inkMuted)) { append(" · ") }
+    first = false
+    val loud = st.tone == V3RowTone.DANGER && !accent
+    if (loud) accent = true
+    withStyle(SpanStyle(color = if (loud) v3RowToneColor(c, V3RowTone.DANGER) else c.inkMuted)) { append(st.text) }
+  }
+}
+
+/** مبلغِ پایانِ خطِ عنوان — رقمِ هم‌پهنا، به رنگِ نوشته (خط‌خورده ⇒ کم‌رنگ و خط‌خورده) */
+@Composable
+fun V3RowAmount(meta: V3RowMeta, modifier: Modifier = Modifier) {
+  val c = PhoneV3.colors
+  Text(
+    meta.amount.orEmpty(),
+    style = v3Text(V3DataRowSpec.TITLE_SP, FontWeight.SemiBold, 22).copy(fontFeatureSettings = "tnum"),
+    color = if (meta.struck) c.inkMuted else c.ink,
+    textDecoration = if (meta.struck) TextDecoration.LineThrough else null,
+    maxLines = 1,
+    modifier = modifier.testTag(V3DataRowSpec.META_TAG),
+  )
+}
+
+/** خطِ مبلغِ یک‌خطی — همان [v3MetaText] (خطِ ویژهٔ صفحه‌ای که خودش می‌کشد) */
 @Composable
 fun V3RowMetaLine(meta: V3RowMeta, modifier: Modifier = Modifier, align: TextAlign = TextAlign.Start) {
   Text(
@@ -135,14 +174,20 @@ fun V3DataRow(
   dense: Boolean = false,
   onClick: (() -> Unit)? = null,
 ) {
-  val hasBelow = secondaryContent != null || meta != null || metaContent != null
+  //  p0r3 (صاحب‌کار، عکسِ «مصارف»): [کاشی] · [عنوان ……… مبلغ] / [جزئیات · وضعیت] — مبلغ هم‌خطِ عنوان در سوی پایان، جزئیات و
+  //  وضعیت یک خطِ افقی، همهٔ ردیف‌ها دوخطی و هم‌بلندی. خطِ مبلغِ ویژه ([metaContent]) همان خطِ زیرین می‌ماند.
+  val c = PhoneV3.colors
+  val amount = meta?.takeIf { metaContent == null && it.amount != null }
+  val statusMeta = meta?.takeIf { metaContent == null && (it.status != null || it.second != null) }
+  val second = if (secondaryContent == null && (!secondary.isNullOrBlank() || statusMeta != null)) v3SecondText(c, secondary, statusMeta) else null
+  val hasBelow = secondaryContent != null || second != null || metaContent != null
   val pill: (@Composable () -> Unit)? = action?.let { a ->
     @Composable { V3PillAction(a.label, a.onClick, Modifier.testTag(V3DataRowSpec.ACTION_TAG), icon = a.icon, enabled = a.enabled, neutral = true) }
   }
   V3ListRow(
     title = title,
     modifier = modifier,
-    subtitle = secondary.takeIf { secondaryContent == null },
+    subtitle = null,
     icon = icon,
     hue = hue,
     tile = true,
@@ -158,15 +203,28 @@ fun V3DataRow(
     onLongClick = onLongClick,
     below = if (!hasBelow) null else ({
       Column {
-        secondaryContent?.invoke()
-        if (meta != null || metaContent != null) {
+        if (secondaryContent != null) {
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f, fill = false)) { secondaryContent() }
+            if (statusMeta != null) {
+              Text(
+                buildAnnotatedString { withStyle(SpanStyle(color = c.inkMuted)) { append(" · ") }; append(v3SecondText(c, null, statusMeta)) },
+                style = V3Type.rowHelp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+              )
+            }
+          }
+        } else if (second != null) {
+          Text(second, style = V3Type.rowHelp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (metaContent != null) {
           Spacer(Modifier.height(V3DataRowSpec.META_GAP))
-          if (metaContent != null) metaContent() else V3RowMetaLine(meta!!)
+          metaContent()
         }
       }
     }),
     look = V3RowLook.DATA,
     dense = dense,
+    titleEnd = amount?.let { m -> { V3RowAmount(m) } },
     onClick = onClick,
   )
 }

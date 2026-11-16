@@ -33,7 +33,7 @@ import ir.vil3ntec.tohid.ui.v3.nav.LocalV3Nav
  *  «اشتراک و قیمت‌ها». بقیهٔ برنامه همیشه باز است و متن همین را می‌گوید.
  */
 @Composable
-internal fun LockedFeature(label: String, signedIn: Boolean, serverDenied: String? = null) {
+internal fun LockedFeature(label: String, signedIn: Boolean, serverDenied: String? = null, feature: String? = null, expired: Boolean = false) {
   val nav = LocalV3Nav.current
   fun open(path: String) { nav?.open(path) ?: AppNav.go(path) }
   //  O-09: `device_limit` یعنی اشتراک هست و جای دستگاه نیست ⇒ «دستگاه‌های وصل»، نه «قیمت‌ها» (بن‌بست)
@@ -73,10 +73,11 @@ internal fun LockedFeature(label: String, signedIn: Boolean, serverDenied: Strin
           )
         },
       )
-      //  «از پشتیبانی بخواه» (کنارِ راهِ خودِ برنامه، نه جایش): جای دستگاه ⇒ `device_limit`، اشتراک ⇒ `subscription_expired`
+      //  «از پشتیبانی بخواه» (کنارِ راهِ خودِ برنامه، نه جایش): جای دستگاه ⇒ `device_limit`؛ اشتراکِ تمام‌شده ⇒ `subscription_expired`؛
+      //  بخشی که در اشتراک نیست ⇒ `plan_required:<قابلیتِ همان بخش>` (`SupportProblem.forLocked`)
       val ask = when (next) {
         DeviceCap.Next.DEVICES -> SupportProblem.DEVICE_LIMIT
-        DeviceCap.Next.PLANS -> SupportProblem.SUBSCRIPTION_EXPIRED
+        DeviceCap.Next.PLANS -> SupportProblem.forLocked(feature, expired)
         DeviceCap.Next.SIGN_UP -> null
       }
       if (ask != null) {

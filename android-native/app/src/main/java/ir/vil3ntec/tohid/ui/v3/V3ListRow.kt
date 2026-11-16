@@ -255,6 +255,8 @@ fun V3ListRow(
   valueDot: Color? = null,
   /** فقط نمای `DATA`: ردیفِ فشردهٔ دوخطی (`V3DataRowSpec.DENSE_*`) */
   dense: Boolean = false,
+  /** پایانِ خطِ عنوان (مبلغِ ردیفِ داده) — هم‌خط با عنوان، در سوی پایان */
+  titleEnd: (@Composable () -> Unit)? = null,
   onClick: (() -> Unit)? = null,
 ) {
   val c = PhoneV3.colors
@@ -307,7 +309,19 @@ fun V3ListRow(
         }
       }
       Column(Modifier.weight(1f)) {
-        Text(title, style = if (nav || data) V3Type.rowTitle else V3Type.body, color = if (danger) c.negative else c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (titleEnd == null) {
+          Text(title, style = if (nav || data) V3Type.rowTitle else V3Type.body, color = if (danger) c.negative else c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        } else {
+          //  صاحب‌کار (p0r3، «مثلِ برنامه‌های مالیِ حرفه‌ای»): مبلغ هم‌خطِ عنوان و در سوی پایان؛ عنوان جای مانده را می‌گیرد و بریده می‌شود
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+              title, style = if (nav || data) V3Type.rowTitle else V3Type.body, color = if (danger) c.negative else c.ink,
+              maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(8.dp))
+            titleEnd()
+          }
+        }
         if (subtitle != null) {
           //  ناوبری و داده: راهنما/خطِ دوم همیشه یک خط (۶۵r، ۶۸c — «هرگز دو و سه خط»)
           Text(
