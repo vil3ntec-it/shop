@@ -76,6 +76,42 @@ internal fun PoBill(d: ShopData, repo: PurchaseOrderRepository, order: PurchaseO
     }
   }
 
+  //  کامپیوتر (`claude/e-desk-d3c`): کادرها و دکمهٔ `ui/desk` (مقدارها با `DeskNumberField` ِ نگهبانِ اسکن)؛ سنجش و فرستادن همان
+  if (ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout.current) {
+    val dc = ir.vil3ntec.tohid.ui.desk.Desk.colors
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(ir.vil3ntec.tohid.ui.desk.DeskSpace.x3)) {
+      Column {
+        ir.vil3ntec.tohid.ui.desk.DeskSectionTitle(StrPurchasePages.billTitle(order.no, order.supplierName))
+        ir.vil3ntec.tohid.ui.desk.DeskNote(StrPurchasePages.billNote, maxLines = 3)
+      }
+      Row(horizontalArrangement = Arrangement.spacedBy(ir.vil3ntec.tohid.ui.desk.DeskSpace.x3)) {
+        DeskFormLabeled(StrPurchasePages.billNo, Modifier.weight(1f)) {
+          ir.vil3ntec.tohid.ui.desk.DeskTextField(billNo, { billNo = it.take(60); error = null }, Modifier.fillMaxWidth(), description = StrPurchasePages.billNo)
+        }
+        DeskFormLabeled(StrPurchasePages.dateIso, Modifier.weight(1f)) {
+          ir.vil3ntec.tohid.ui.desk.DeskTextField(billDate, { billDate = it.take(10); error = null }, Modifier.fillMaxWidth(), description = StrPurchasePages.dateIso)
+        }
+      }
+      rows.forEachIndexed { i, r ->
+        Column {
+          Text(r.name.ifBlank { names[r.productId] ?: r.productId }, style = ir.vil3ntec.tohid.ui.desk.DeskType.bodyStrong, color = dc.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+          Row(horizontalArrangement = Arrangement.spacedBy(ir.vil3ntec.tohid.ui.desk.DeskSpace.x3)) {
+            DeskNumberField(r.qty, { v -> rows = rows.toMutableList().also { it[i] = r.copy(qty = v) }; error = null }, StrPurchasePages.qtyUnit(r.unit), Modifier.weight(1f))
+            DeskNumberField(r.total, { v -> rows = rows.toMutableList().also { it[i] = r.copy(total = v) }; error = null }, StrPurchasePages.rowTotalAfn, Modifier.weight(1f))
+          }
+        }
+      }
+      DeskFormLabeled(StrDeliver.noteField) {
+        ir.vil3ntec.tohid.ui.desk.DeskTextField(note, { note = it.take(500) }, Modifier.fillMaxWidth(), description = StrDeliver.noteField)
+      }
+      error?.let { Text(it, style = ir.vil3ntec.tohid.ui.desk.DeskType.secondary, color = dc.negative) }
+      ir.vil3ntec.tohid.ui.desk.DeskButton(
+        if (busy) StrSale.posting else StrPurchasePages.saveBill, { submit() }, Modifier.fillMaxWidth(),
+        kind = ir.vil3ntec.tohid.ui.desk.DeskButtonKind.PRIMARY, enabled = !busy,
+      )
+    }
+    return
+  }
   Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
     Text(StrPurchasePages.billTitle(order.no, order.supplierName), style = MaterialTheme.typography.titleSmall, color = c.text)
     Text(StrPurchasePages.billNote,

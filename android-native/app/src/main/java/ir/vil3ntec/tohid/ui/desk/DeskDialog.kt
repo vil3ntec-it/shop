@@ -87,6 +87,8 @@ fun DeskDialog(
   extra: List<DeskDialogAction> = emptyList(),
   width: Dp = DeskDialogSize.narrow,
   scroll: Boolean = true,
+  /** کادر/دکمه‌ای در بدنه که از آغاز فوکوس می‌گیرد (کادرِ نام، نخستین «باز کن»)؛ بی آن خودِ پنجره یا «انصراف» ِ کارِ پاک‌کننده */
+  initialFocus: FocusRequester? = null,
   content: @Composable ColumnScope.() -> Unit = {},
 ) {
   val c = Desk.colors
@@ -112,7 +114,7 @@ fun DeskDialog(
         .focusRequester(card)
         .focusable(),
     ) {
-      LaunchedEffect(Unit) { runCatching { if (safeFirst) safe.requestFocus() else card.requestFocus() } }
+      LaunchedEffect(Unit) { runCatching { (initialFocus ?: if (safeFirst) safe else card).requestFocus() } }
       Row(
         Modifier.fillMaxWidth().padding(start = DeskSpace.card, end = DeskSpace.x3, top = DeskSpace.x4, bottom = DeskSpace.x3),
         verticalAlignment = Alignment.CenterVertically,
@@ -211,6 +213,8 @@ fun DeskDialogField(
   placeholder: String? = null,
   focusRequester: FocusRequester? = null,
   textAlign: androidx.compose.ui.text.style.TextAlign = androidx.compose.ui.text.style.TextAlign.Start,
+  /** رمز/PIN: نوشته پوشیده دیده می‌شود */
+  password: Boolean = false,
 ) {
   val c = Desk.colors
   Column(modifier.fillMaxWidth()) {
@@ -218,6 +222,7 @@ fun DeskDialogField(
     DeskTextField(
       value, onValueChange, Modifier.fillMaxWidth(), placeholder = placeholder, enabled = enabled, isError = isError,
       focusRequester = focusRequester, textAlign = textAlign, description = label,
+      visualTransformation = if (password) androidx.compose.ui.text.input.PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
     )
     if (note != null) Text(note, Modifier.padding(top = DeskSpace.x1), style = DeskType.secondary, color = if (isError) c.negative else c.inkSecondary)
   }
@@ -247,9 +252,9 @@ fun DeskReasonDialog(
     danger = danger,
     confirm = DeskDialogAction(confirm, enabled = enabled, danger = danger, onClick = onConfirm),
     dismiss = DeskDialogAction(StrKit.cancel, onClick = onDismiss),
+    initialFocus = field,
   ) {
     if (message.isNotEmpty()) DeskDialogText(message)
     DeskDialogField(label, reason, onReason, focusRequester = field)
-    LaunchedEffect(Unit) { runCatching { field.requestFocus() } }
   }
 }

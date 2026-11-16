@@ -57,31 +57,33 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
-### ۱۴۰۵/۰۸/۲۶ — عاملِ e-desk-d3c زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-desk-d3c` (از `origin/main` a0b0f9355) — فرم‌های خرید و پنجره‌های کامپیوتر روی `ui/desk` (WIP، مکث به خواستِ صاحب‌کار)
+### ۱۴۰۵/۰۸/۲۶ — عاملِ e-desk-d3c زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-desk-d3c` (از `origin/main` a0b0f9355، `origin/main` 7e2a36923 ادغام شد) — فرم‌های خرید و پنجره‌های کامپیوتر روی `ui/desk`
 
-- **خواست**: باقیِ طراحیِ کامپیوتر (d3b): فرمِ «فاکتورِ خریدِ تازه» و ویرایشگرِ سفارشِ خرید روی `ui/desk`، پنجره‌های تأییدِ کامپیوتر
-  بی دکمهٔ Material، و عکس‌های پیش/پسِ d3b دوباره. منطق و داده دست نمی‌خورد؛ گوشی همان.
-- **انجام‌شده** (کامپایلِ کامل سبز؛ از آزمون‌ها فقط `DeskDataScreensUiTest` اجرا شد: ۱۰ از ۱۰ سبز؛ آزمونِ تازه هنوز نیست):
-  - `ui/desk/DeskDialog.kt` (تازه، افزودنی): `DeskDialog` (کارتِ وسط، سرخط با کاشیِ آیکن، بدنهٔ پیمایشی، ردیفِ `DeskButton`؛ Esc/بیرون =
-    انصراف، Enter = کارِ اصلی، کارِ پاک‌کننده با فوکوسِ آغاز روی «انصراف»)، `DeskDialogAction`، `DeskDialogSize`، `DeskConfirmDialog`،
-    `DeskReasonDialog` (کادرِ دلیل با فوکوس)، `DeskDialogText`، `DeskDialogField`. `DeskKit`: `DeskButtonKind.DANGER` (افزودنی).
-  - `V3ConfirmSheet` با `LocalDeskLayout` ⇒ `DeskConfirmDialog` (۴۸ پرسشِ تأیید روی کامپیوتر؛ گوشی و پیش‌نمایشِ گوشی همان برگه).
-  - پنجره‌های فقط‌کامپیوتر روی `DeskDialog`: خالی کردنِ سبدِ صندوق (`DeskSale`)، حدهای موجودیِ گروهی (`DeskProducts`)، سقفِ اعتبار
-    (`DeskCreditLimitDialog`)، `BulkConfirmDialog`/`BulkResultDialog` (تنها کاربر: کالاهای کامپیوتر؛ ردیفِ آرام، وضعیت به واژه)؛ شاخهٔ
-    `LocalDeskLayout` در `PoBillVoidDialog` و `PoBillsList` (گوشی همان)؛ «برگشت به جدول» ِ `DeskInvoices` ⇒ `DeskButton`.
-  - `Fields.kt`: `DeskNumberField` (همان پالایهٔ رقم و نگهبانِ اسکنِ HW-05 روی کادرِ کامپیوتر). `PurchaseUnitPicker` (فقط فرم‌های خریدِ
-    کامپیوتر) ⇒ `DeskChip`/`DeskNote`.
-  - **فاکتورِ خریدِ تازه**: `NewPurchaseInvoice` (`DeskPurchasing.kt`) روی `DeskPage`/`DeskCard`/`DeskTableHead`/`DeskTextField`/`DeskDropdown`
-    و اجزای `ui/screens/DeskPurchaseForm.kt` (تازه: `PurchaseDraft` = همان `Draft`، `purchaseDefaultPrice`، `DeskPurchaseLineRow`، فهرستِ
-    پیشنهادِ بی‌دزدیِ فوکوس، نوارِ کلیدها). ردیف‌ها، اسکن، کلیدها (Enter/F9/Ctrl+Enter/Ctrl+S/Ctrl+I/Esc) و `save()` بایت‌به‌بایت همان.
-    نوشته‌های تازه در `StrDeskData` (۵ کلید).
-- **نیمه‌کاره / قدمِ بعدی**: (۱) ویرایشگر و جزئیات و دریافتِ سفارشِ خرید (`PoEditor`/`PoDetail`/`PoReceive`/`PriceHistoryDialog`/`PoProductPicker`
-  در `PurchaseOrders.kt`، فقط کامپیوتر) هنوز Material‌اند — همان الگوی بالا (`DeskNumberField` برای مقدار/فی، `DeskReasonDialog` برای لغو)؛
-  (۲) آزمونِ تازه: باز کردن/پر کردن/ثبتِ فاکتورِ خرید (ردیف و موجودی در دفتر همان پیشین) و پنجره‌ها (Enter/Esc، فوکوسِ «انصراف»)؛
-  سپس آزمون‌های میزِ موجود (`DeskDataScreensUiTest`، `DeskSaleD3aUiTest`، `LookGuardTest`، `HardcodedColorsTest`، `ScreenSpeedBenchTest`) و اجرای
-  کاملِ `desktop test`؛ (۳) عکس‌ها: «پیش» ِ d3c روی `origin/main`، پیش ِ d3b روی `origin/claude/e-desk-d1` (مشتری‌ها با بدنه) و `compare-*.png`
-  در `/home/user/wt-d3c-shots/` — هیچ‌کدام گرفته نشد؛ (۴) `AlertDialog` ِ پرونده‌های مشترک (۵۶ پرونده، مثلِ `HeldInvoiceBar`، `Servers`،
-  `ShiftV2`) هنوز Material‌اند. `quality` ِ precheck روی `origin/main` هم ۵ پروندهٔ بالای سقفِ `platform-deps` دارد که این شاخه دست نزده.
+- **خواست**: باقیِ طراحیِ کامپیوتر (d3b): فرمِ «فاکتورِ خریدِ تازه» و پنجرهٔ سفارشِ خرید روی `ui/desk`، پنجره‌های گفت‌وگوی کامپیوتر
+  بی دکمهٔ Material، عکسِ پیش/پس. منطق و داده دست نخورد؛ گوشی (و پیش‌نمایشِ گوشی) همان. قاعده: `RULES-fa.md` ⇐ «🖥️ ظاهرِ کامپیوتری» ⇐
+  «پنجره‌ها و فرم‌های خریدِ کامپیوتر».
+- **اجزا** (افزودنی): `ui/desk/DeskDialog.kt` — `DeskDialog` (کارتِ وسط، سرخط با کاشیِ آیکن، بدنهٔ پیمایشی، ردیفِ `DeskButton`؛ Esc/بیرون =
+  انصراف، Enter = کارِ اصلی، کارِ پاک‌کننده با فوکوسِ آغاز روی «انصراف»، `initialFocus`)، `DeskDialogAction`، `DeskDialogSize`،
+  `DeskConfirmDialog`، `DeskReasonDialog`، `DeskDialogText`، `DeskDialogField` (`password`)؛ `DeskButtonKind.DANGER`؛ `DeskTextField(visualTransformation)`؛
+  `Fields.kt`: `DeskNumberField` (همان پالایه و نگهبانِ اسکنِ HW-05). نوشته‌ها: ۵ کلیدِ تازه در `StrDeskData`.
+- **صفحه‌ها و پنجره‌ها**: «فاکتورِ خریدِ تازه» (`NewPurchaseInvoice` + `DeskPurchaseForm.kt`؛ `save()` و کلیدها همان)؛ `PurchaseOrders.kt` (فقط
+  کامپیوتر): ویرایشگر، جزئیات، دریافت، تاریخچهٔ قیمت، جست‌وجوی کالا و لغو با `DeskReasonDialog`؛ `PurchaseUnitPicker` ⇒ `DeskChip`؛ شاخهٔ
+  `LocalDeskLayout` در `PoBill`، `PoSuggest`، `PoBillsList`، `PoBillVoidDialog`، `V3ConfirmSheet` (۴۸ پرسش ⇒ `DeskConfirmDialog`)، `HeldInvoiceBar`
+  (نگه داشتن، فهرست، دور انداختن، پاک کردنِ کهنه‌ها، گرفتن از دستگاهِ دیگر، دو دستگاه)، `Servers.kt` (رفتن، برداشتن، خاموش، PIN، گواهی)، `ShiftV2`
+  (باز کردن، گزارشِ X/Z، سابقه)؛ فقط‌کامپیوتر: خالی کردنِ سبد (`DeskSale`)، حدهای گروهی (`DeskProducts`)، `BulkConfirmDialog`/`BulkResultDialog`،
+  `DeskCreditLimitDialog`، دکمه‌های `DeskPayStatus` و «برگشت به جدول» ِ `DeskInvoices`.
+- **آزمون‌ها**: تازه `DeskD3cUiTest` (۸: فاکتورِ خرید = خروجیِ `PurchaseBook.record` با همان ورودی روی دفترِ دیسک؛ سفارش ساختن/فرستادن/دریافت/
+  ثبت در دفتر با `FakePurchaseOrders`؛ Esc/Enter و فوکوسِ «انصراف» ِ کارِ پاک‌کننده؛ سقفِ اعتبار، باطل کردن با دلیل، پیش‌نمایشِ گروهیِ خطرناک
+  (Enter نمی‌زند)، باز کردنِ صندوق). اجرای هدف‌دار (نه کامل): DeskData/DeskSaleD3a/DeskMenu/DeskRailOff/LookGuard/HardcodedColors/PageAnatomyGuard/
+  HeldClaimSheets/PoSuggest/PurchaseOrderRoutes/SupplierBillRoutes/DeskStyle/DariCoverage/V3A11yGuard/ScreenGuidesText/MoneyPagesModel/ScenarioS25/
+  DeskProductsD3a/PriceCheckEsc همه سبز. هیچ آزمونِ پیشین عوض نشد؛ هیچ هشِ `LookGuardTest` عوض نشد.
+- **عکس‌ها**: `D3cShotsTest` (`D3C_SHOTS`، `D3C_TAG`) — ۱۱ صحنه × روشن/تیره در ۱۳۶۶×۷۶۸، پیش روی `origin/main` 7e2a36923، پس روی همین شاخه،
+  با `compare-*.png` در `/home/user/wt-d3c-shots/` (بیرون از مخزن).
+- **مانده**: (۱) `AlertDialog` ِ دیگرِ پرونده‌های مشترک هنوز Material‌اند (حدودِ ۴۵ پرونده: `GiftCardBarAndroid`، `LayawayBarAndroid`، `Settings`، `Profile`،
+  `SpecialOrderBarAndroid`، `SecuritySettings`، `DeviceHubUi`، `WipeAllDialog`، `SalesVoidDialogs` …) و در `ShiftV2` «ورود/خروجِ نقد» و «بستن با
+  شمارش»، در `Servers` «افزودنِ سرور» (فرم‌های بلند؛ کنترلِ تأییدشان درون‌خطی است) — همان الگو: شاخهٔ `LocalDeskLayout` با `DeskDialog`؛ (۲) عکس‌های
+  «پیش» ِ d3b روی `origin/claude/e-desk-d1` دوباره گرفته نشد (پرهیز از ساختِ سوم به خواستِ صرفه‌جویی)؛ (۳) اجرای کاملِ `desktop test` نشد.
+
 ### ۱۴۰۵/۰۸/۲۶ — عاملِ e-phone-p0 زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-phone-p0` (از batch-69، ادغامِ main تا #1059 1802fca1a) — کالبدِ یکسانِ صفحه‌های گوشی (دورِ دوم)
 
 - **پیشین (۰۸/۲۴)**: نشان‌های `V3Anatomy` روی اجزای مشترک، `PageAnatomyGuardTest`، ممیزیِ `PhoneAnatomyAuditTest` (`P0_AUDIT`، `AnatomyProbe`)،
