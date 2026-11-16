@@ -57,6 +57,26 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۵ — عاملِ e-support زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-support` (از `origin/main` a0b0f9355) + server `claude/support-inbox` (۱.۵۲.۰) — «از پشتیبانی بخواه»
+
+- **چه شد**: فهرستِ یکتای مشکل‌ها (`server/src/lib/support-problems.json` ⇄ `core/support/SupportProblem.kt`): `flag_off:<پرچم>`، `plan_required:<قابلیت>`،
+  `subscription_expired`، `device_limit`، `sync_no_shop`، `sync_refused`، `email_code_not_arriving`، `other` — هر کدام سه زبان و کارِ مدیر. سرور: مهاجرتِ
+  **۹۶۰** (`support_requests`، `support_request_fixes`)، `POST|GET /api/support/requests` (همان رشتهٔ پشتیبانی، یکتا تا باز است برای دکان+کد)،
+  `/api/admin/support-requests` (صف با پالایه، پرونده، «حل شد»، روشن کردنِ پرچمِ همان دکان، تمدید و سقفِ دستگاه از `grantOnce`، فرستادنِ دوبارهٔ همان
+  کد، خطای همگام‌سازی با اجازهٔ `read_private`) + توانایی `support-requests.v1`. برنامه: دکمهٔ «از پشتیبانی بخواه» (`AskSupport.kt`) در ردیفِ «خاموش
+  است» ِ سفارش‌ها، کارتِ «چرا نمی‌رسد»، برگهٔ بخشِ خاموشِ صاحب، قفلِ اشتراک/دستگاه، گرهٔ همگام‌سازی و برگهٔ کدِ ایمیل؛ گفت‌وگو همان لمس را
+  می‌فرستد و نوارِ حال دارد. پنل (server ۱.۵۲.۰): برگهٔ «درخواست‌ها»، نشانِ «درخواست»، کارتِ مشکل با «درستش کن» و «حل شد».
+- **تغییرِ آگاهانهٔ آزمون**: `DeskMenuTest` (صاحب، `off:orders`) و `DeskRailOffUiTest` (برگهٔ صاحب) پیش‌تر برچسبِ «پیام به پشتیبانی برای روشن کردن» و
+  مقصدِ `support?text=<پیش‌نویس>` را می‌سنجیدند؛ حالا «از پشتیبانی بخواه» و `support?ask=flag_off:shop.orders&f.screen=desk:off:orders` (و این‌که هر بخشِ
+  خاموش کدِ معتبر دارد و پیش‌نویسِ دستی نیست). شاگرد همان «پشتیبانی» ِ ساده را دارد (همان سنجه، + «از پشتیبانی بخواه» نیست). هیچ سنجه‌ای کم نشد.
+  `admin-control-plane.test.js` (MOUNTS + CAPABILITY_PROBES) و `tenant-matrix.test.js` (دو درِ کاربر در ماتریس، دو درِ موضوع‌دارِ مدیر `exempt` با دلیل —
+  سابقهٔ هر پاسخِ موفق در `support-requests.test.js` سنجیده می‌شود) فقط افزوده شدند.
+- **آزمون‌ها**: سرور `support-requests.test.js` ۱۱/۱۱ + ماتریس/کنترل/چت/قرارداد سبز؛ کاتلین (دسکتاپ) `SupportProblemMirrorTest`، `SupportAskUiTest`،
+  `DeskMenuTest`، `DeskRailOffUiTest`، `OrdersP4UiTest`، `I18nCoverageTest`، `InfraLeakGuardTest`؛ پنل `console-support-requests.mjs` ۱۹، `support-requests-ui.mjs`
+  ۱۴ (کرومیوم)، `bridge-roles.mjs` ۳۳ (shop@main و همین شاخه). عکس‌ها: `/home/user/wt-support-shots/` (`phone/`، `control-center/`).
+- **نیمه‌کاره / قدمِ بعد**: (۱) دکمه هنوز روی درِ «حساب‌پی خاموش» (`flag_off:pay.hesabpay`) و «قابلیت بیرونِ پلن» (`plan_required:*`) جایی از برنامه
+  نیست — سرور و پنل آماده‌اند؛ `LockedFeature` کلیدِ قابلیت را ندارد و فعلاً `subscription_expired` می‌فرستد. (۲) پس از مرجِ shop، `account-server.yml` روی
+  server تا پنلِ ۱.۵۲.۰ توانایی را ببیند (بی آن کارت «در دسترس نیست» می‌گوید). (۳) مهاجرتِ ۹۴۶–۹۵۹ برای کارهای هم‌زمان خالی ماند.
 ### ۱۴۰۵/۰۸/۲۵ — هماهنگ‌کننده (سیزنِ 01GcPTAL…)، پایانِ سیزن: دستهٔ ۷۰ (`claude/batch-70`، PR #1057)
 
 - **مرج‌شده در این سیزن**: #1053 (۶۶)، #1054 (۶۷)، #1055 (۶۸)، #1056 (۶۹)؛ سرور #151 (۱.۵۱.۲: کارتِ «اعلانِ گوشی (Firebase)» و دکمهٔ

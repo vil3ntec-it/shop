@@ -1037,6 +1037,36 @@
 - ⛔ ویترین، گشودنِ رشته (`hold` ِ `store/chat.js`، `claude/chat-thread`): تا پاسخِ POST ِ `/chat/conversations` ِ همان رشته برگه نه پیام‌ها، سنجاق‌ها و کادرِ رشتهٔ پیشین را دارد و نه کاری می‌پذیرد (`conv` ِ تهی: فرستادن، عکس، صدا، «مشکل دارم»، رسید؛ `loop` ِ تازه: long-poll)؛ عنوان از خودِ درخواست و «در حالِ باز کردن…» با `aria-busy`. هر کار شناسهٔ رشته را هنگامِ آغاز می‌گیرد و پاسخِ دیرِ رشته‌ای که دیگر نشان داده نمی‌شود (گشودنِ پیشین `opening`، `prev`، `reload`، `issue`، حذف، ویرایش) نمی‌نشیند؛ صف هر پیام را با `convId` ِ همان دمِ نوشتن می‌فرستد و متنِ نیمه‌نوشتهٔ کادر به رشتهٔ دیگر نمی‌رود (`draftOf`). سرور پیامِ رشتهٔ دیگرِ همان مشتری را می‌پذیرد (مالِ خودش است) ⇒ مرز همین برگه است. آزمون: POST ِ گشودنِ o3 و o4 با `page.route` نگه داشته (`web-store-chat.mjs`؛ پیش‌تر پیامِ o4 به رشتهٔ o3 رفت).
 - ⛔ برنامهٔ خریدِ مشتری، پاسخ/ویرایش/سنجاق/جست‌وجو و صدا (CHAT-14/07، `core/shopper/ShopperChatActs.kt` و `ShopperVoice.kt`، صفحه‌ها در `customer-android/…/ui/ChatActsModel.kt`/`ChatVoiceModel.kt`/`ChatExtras.kt`؛ همتای `store/chat-acts.js` و `store/chat-voice.js`): همان درها و همان مرزهای سرور؛ ویرایش با `POST …/messages/:mid/edit` ِ ویترین (همان PATCH؛ HttpURLConnection ِ اندروید و JDK روش PATCH نمی‌فرستد) و در صف نمی‌رود؛ صدا فقط با `limits.voice` و سکوی دارای میکروفون (`VoiceDevice`؛ آیفون هنوز null ⇒ نه دکمه، نه پخش)، اجازهٔ `RECORD_AUDIO` فقط با زدنِ میکروفون (`VoiceAndroid.kt`)، AAC/MP4، از همان صفِ عکس با یک `clientId` و همان بایت (فقط در حافظه)؛ پخش بی هیچ بایت پیش از «پخش»، ۴۰۴/۴۱۰ بی «دوباره». ⛔ پیوندِ رشته (دستهٔ ۴۲ ِ وب: `hold`/`opening`/`draftOf`): هر نوشته — متن، پاسخ، ویرایش، عکس، صدا — فقط به رشته‌ای می‌رود که در آن نوشته شد (`ChatCompose`، `ChatOpening`)؛ گشودنِ رشتهٔ دیگر همان دم کارها، پاسخ/ویرایش، جست‌وجو، ضبط (میکروفون بسته) و پخش را برمی‌دارد، پاسخِ دیرِ گشودنِ پیشین و خطا/نتیجهٔ دیرِ کارِ رشتهٔ پیشین هیچ‌جا نمی‌نشیند؛ پس از حذف تمرکز به دکمهٔ «کارها» ِ سنگِ قبر یا کادرِ نوشتن (`CustomerChatActsTest`، `CustomerChatVoiceTest`، `ShopperChatActsTest`، `ShopperVoiceTest`؛ `shop-chat-web-acts.test.js` برای `…/edit`).
 
+### v3 · پشتیبانی — «از پشتیبانی بخواه» (`claude/e-support`، ۱۴۰۵/۰۸/۲۵، مهاجرتِ ۹۶۰)
+
+- ⛔ **یک فهرست، دو آینه**: مشکل‌هایی که کاربر باید از پشتیبانی بخواهد فقط در `server/src/lib/support-problems.json` (کد، پارامترهای مجاز،
+  نیازِ دکان، کارِ مدیر، واقعیت‌های مجاز و متنِ فارسی/انگلیسی/پشتو) و آینه‌اش `core/support/SupportProblem.kt`؛ سنجه: `SupportProblemMirrorTest`
+  و `server/test/support-requests.test.js`. کدِ تازه/پارامترِ تازه هر دو را با هم عوض می‌کند؛ پرچمِ `flag_off` باید در `KNOWN` ِ
+  `admin-flags.js` و قابلیتِ `plan_required` در `GRANTABLE_KEYS` باشد.
+- ⛔ **چتِ دوم نیست**: `POST /api/support/requests` (کیستی همان `routes/support.who`، دکان فقط از توکن) پیامِ متنِ همان مشکل (زبانِ کاربر) را در
+  **همان** رشتهٔ پشتیبانی با `support.post` می‌گذارد و یک ردیفِ `support_requests` کنارش. ⛔ `routes/support.js` (مشترک با پمپ) و `senderName`
+  ِ ذخیره دست نخورد؛ پمپ (`app: pump`) ⇒ ۴۰۰ `bad_app`.
+- ⛔ **یکتا تا باز است**: یک درخواستِ باز برای هر (دکان — یا رشتهٔ مهمانِ بی‌دکان — ، کد، پارامتر) با نمایهٔ یکتای جزئی؛ لمسِ دوباره و همکارِ همان
+  دکان همان ردیف را می‌گیرند (`created: false`، همکار `sameShop: true`، بی پیامِ دوم). «حل شد» ⇒ لمسِ بعدی درخواستِ تازه است.
+- ⛔ **واقعیت‌ها فقط فهرست‌شده** (`appVersion` نسخه، `platform`، `screen`/`syncError` نامکِ `[a-z0-9][a-z0-9_.:-]{0,39}`، `rejected`/`devices`/`maxDevices`
+  شمار) — ایمیل، متنِ آزاد، توکن و کارت از هیچ‌کدام نمی‌گذرد؛ ناشناخته بی‌صدا می‌افتد. ⛔ کد و نامِ پرچم هرگز روی صفحهٔ برنامه نیست (فقط سرخطِ
+  خواندنی؛ «هیچ جزئیاتِ فنی در صفحه»).
+- ⛔ **«درستش کن» ِ مدیر** (`/api/admin/support-requests`، توانایی `support-requests.v1`): هر کار فقط همان `fix` ِ فهرست (وگرنه ۴۰۹
+  `fix_not_for_problem`)، فقط درخواستِ باز، `shopId` ِ بدنه = دکانِ درخواست (وگرنه ۴۰۴)، `Idempotency-Key` با `admin-write-once` و **یک بار برای هر
+  (درخواست، کار)** (`support_request_fixes`، UNIQUE؛ بار دوم `already: true` بی سابقه/پیام/پوشِ دوم). پرچم: فقط ارشد، ردیفِ صریحِ `true` فقط برای
+  همان دکان با `live-config.set` (تاریخچه + دلیلِ «پشتیبانی: درخواستِ …»)، `all` و دکانِ دیگر دست نمی‌خورند؛ «غیرفعال کردنِ سرویس» ⇒ ۴۰۹
+  `shop_hold_active`. اشتراک و سقفِ دستگاه: ارشد + `confirm: true`، فقط از راهِ `subscriptions.grantOnce` با کلیدِ یکتاییِ خودِ درخواست (هرگز دورهٔ
+  دوم؛ معلق ⇒ ۴۰۹). کدِ ایمیل: همان کدِ زنده (`login-outbox`، سپس `otp.resend`)، هرگز کد یا ایمیلِ خام در پاسخ/سابقه. خطای همگام‌سازی: خلاصهٔ
+  پوشانده همیشه، Stack/لاگ/دستگاه فقط با اجازهٔ زندهٔ `read_private` ِ همین مدیر (`support-access.useGrant`).
+- ⛔ هر «درستش کن» ⇒ ردیفِ `admin.support_request_fix` (کار، پیش ⇒ پس، دلیل؛ کلیدها بی «code/token» تا `audit.scrub` نبُرد) + پاسخِ خودکار در رشتهٔ
+  کاربر به زبانِ خودش + پوش به دستگاه‌های دیگرِ همان دکان (`exceptUserId` ِ درخواست‌کننده که پوشِ پیام را دارد). دیدنِ پرونده
+  `admin.support_request_viewed`، «حل شد» `admin.support_request_resolved` در همان تراکنش.
+- برنامه (`ui/v3/account/support/AskSupport.kt`): `AskSupportButton` ⇒ `support?ask=<کد>&f.<واقعیت>=…` و گفت‌وگو همان یک لمس را می‌فرستد
+  (`asked` ِ ماندگار)؛ نوارِ حال: فرستاده می‌شود/رسید/پیش‌تر رفته/همکار خواسته/نرفت + «دوباره بفرست». جاها: ردیفِ «خاموش است» ِ «سفارش‌ها» و کارتِ
+  «چرا نمی‌رسد» (`SupportProblem.forOrderBlocker`)، برگهٔ بخشِ خاموشِ صاحب (`DeskOff`)، قفلِ اشتراک/جای دستگاه (`LockedFeature`)، گرهٔ «دکان پیدا
+  نمی‌شود»/«نپذیرفت» ِ همگام‌سازی (`SyncModel.askOf`)، و «کدِ ورود نمی‌رسد» پس از شمارشِ ارسالِ دوباره (`EmailCodeSheet`، مهمان هم با «تماس»).
+  آزمون: `SupportAskUiTest`، `DeskMenuTest`، `DeskRailOffUiTest`.
+
 ### v3 · عکس و بانکِ تصاویر
 
 - سه فضای جدا: `central` (فقط پس از تأییدِ مدیرِ ارشد)، `shop` (فقط دکانِ صاحب)، `pending`؛ مدیر عکسِ اختصاصیِ دکان را نمی‌بیند (§۳۷.۲، #262).
@@ -1791,6 +1821,7 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 
+- ۹۶۰ (`960_support_requests.sql`: `support_requests` و `support_request_fixes` — «از پشتیبانی بخواه»، `claude/e-support`؛ ۱۴۰۵/۰۸/۲۵ پس از سنجشِ پایه (`origin/main`، بزرگ‌ترین ۹۴۵) و ۴۰ شاخهٔ تازهٔ دور (۹۴۶+ هیچ)؛ ۹۴۶–۹۵۹ برای کارهای هم‌زمان خالی ماند؛ rollback در `server/migrations/rollback/`).
 - ۹۴۴ (`944_order_notify_email.sql`: CHECK ِ `order_notify_outbox.fallback_state` + `throttled`/`no_email` و نمایهٔ جزئیِ نامه‌های پشتیبان — NOTIF-11) و ۹۴۵ (`945_storefront_area_email.sql`: `storefront_area_requests.lang`/`notice`/`tried`/`sent_at` — «رسیدیم» ِ CHK-10)، `claude/e-rows-64e`؛ ۱۴۰۵/۰۸/۲۴ پس از سنجشِ پایه (`claude/batch-64`، بزرگ‌ترین ۹۳۵)؛ ۹۳۶–۹۴۳ برای کارهای هم‌زمانِ همین دور؛ rollback در `server/migrations/rollback/`.
 - ۹۳۵ (`935_branch_transfers.sql`: `branch_transfers`، `branch_transfer_steps`، تریگرِ `branch_transfer_guard` و `shop_member_branch_perms` — انتقالِ میانِ شعبه‌ها INV-11/S21 و مجوزِ «موجودیِ شعبه‌های دیگر» POS-16/S17، `claude/e-rows-63t`؛ ۱۴۰۵/۰۸/۲۳ پس از سنجشِ پایه (`claude/batch-63`، بزرگ‌ترین ۹۱۲) و همهٔ شاخه‌های دور (۹xx فقط ۹۰۰ و ۹۱۲)؛ ۹۱۳–۹۳۴ برای کارهای هم‌زمان؛ rollback در `server/migrations/rollback/` که با انتقالِ باز رد می‌شود).
 - ۸۹۵ (`895_customer_erasure_ledger.sql`: `customer_erasure_ledger` — فرمانِ پاک کردنِ پروندهٔ مشتری در دفترِ دستگاه پس از SEC-10، CRM-15، `claude/e-rows-55s`؛ ۱۴۰۵/۰۸/۲۳ پس از سنجشِ پایه (`claude/batch-62`، بزرگ‌ترین ۸۸۰)؛ ۸۸۱–۸۹۴ برای عامل‌های هم‌زمان؛ rollback در `server/migrations/rollback/`).

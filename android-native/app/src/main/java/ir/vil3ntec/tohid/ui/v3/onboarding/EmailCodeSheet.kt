@@ -80,6 +80,7 @@ fun EmailCodeContent(
   val repo = remember { Backend.codeLogin(context) }
   val scope = rememberCoroutineScope()
   var ui by remember { mutableStateOf(initial) }
+  val nav = ir.vil3ntec.tohid.ui.v3.nav.LocalV3Nav.current
   var resendAt by remember { mutableLongStateOf(0L) }
   var left by remember { mutableStateOf(0) }
   val focus = remember { FocusRequester() }
@@ -174,6 +175,13 @@ fun EmailCodeContent(
     onResend = ::resend,
     onOtherEmail = { ui = ui.copy(requestId = "", code = "").say("") },
     onClose = onClose,
+    //  «کدِ ورود نمی‌رسد» ⇒ همان گفت‌وگوی پشتیبانی (بی‌حساب هم) با درخواستِ ساخت‌یافته و همین ایمیل به‌عنوانِ «تماس»؛ فقط وقتی راهی هست
+    onAskSupport = nav?.let { n ->
+      {
+        onClose()
+        n.open(ir.vil3ntec.tohid.ui.v3.account.support.SupportAskModel.path(ir.vil3ntec.tohid.core.support.SupportProblem.EMAIL_CODE, mapOf("screen" to "auth:code"), ui.email))
+      }
+    },
   )
 }
 
@@ -191,6 +199,8 @@ internal fun EmailCodeBody(
   onResend: () -> Unit,
   onOtherEmail: () -> Unit,
   onClose: () -> Unit,
+  /** «از پشتیبانی بخواه» پس از گذشتنِ مهلتِ ارسالِ دوباره (کد نرسیده)؛ null ⇒ دکمه نیست */
+  onAskSupport: (() -> Unit)? = null,
 ) {
   val c = PhoneV3.colors
   Column(Modifier.fillMaxWidth()) {
@@ -229,6 +239,9 @@ internal fun EmailCodeBody(
           Spacer(Modifier.height(6.dp))
           SubmitButton(Str.signIn, enabled = !ui.busy, loading = ui.busy, done = false, onClick = onSubmit)
           Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { V3TextButton(StrAuth.otherEmail, onOtherEmail) }
+          if (onAskSupport != null && left == 0) {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { V3TextButton(ir.vil3ntec.tohid.core.i18n.StrSupportAsk.button, onAskSupport) }
+          }
         }
       }
     }

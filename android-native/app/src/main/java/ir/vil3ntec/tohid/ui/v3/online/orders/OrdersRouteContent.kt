@@ -154,7 +154,11 @@ private fun RouteScope.OrdersRouteBody(wide: Boolean) {
     onDispose { if (AppNav.addAction.value === action) AppNav.addAction.value = null }
   }
   val onSetup = { setupOpen = true }
-  val onSupport = { openFix(ir.vil3ntec.tohid.core.orders.OrderFlow.Fix.SUPPORT) }
+  //  «خاموش است» ⇒ «از پشتیبانی بخواه» با کدِ همان دروازه (`SupportProblem.forOrderBlocker`)؛ ناشناخته ⇒ همان «پشتیبانی» ِ ساده
+  val onSupport = {
+    val ask = (setup as? OrderSetupModel.Status.Off)?.code?.let(ir.vil3ntec.tohid.core.support.SupportProblem::forOrderBlocker)
+    if (ask != null) openAsk(ask, "orders:setup") else openFix(ir.vil3ntec.tohid.core.orders.OrderFlow.Fix.SUPPORT)
+  }
   if (!wide) {
     OrdersScreen(
       state, actions, backOrNull, header = header, picked = picked, riskFlags = riskFlags, menu = menu,

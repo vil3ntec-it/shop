@@ -139,6 +139,16 @@ internal object SyncModel {
    *  خطای آخرین دور ⇐ تغییرهای ردشده. `detail` همان متنِ خام **فقط برای پشتیبانی** است (`SupportDiagAndroid`) و
    *  هرگز در صفحه نشان داده نمی‌شود. سرورِ گرفتار (حکمِ موتور) زرد است، نه سرخ: تقصیرِ این دستگاه نیست و خودش دوباره می‌رود.
    */
+  /** «از پشتیبانی بخواه» ِ یک گره: کدِ `SupportProblem` و واقعیت‌های مجاز (نامکِ صفحه، کدِ کوتاه، شمار) — هرگز متنِ خام */
+  data class Ask(val code: String, val facts: Map<String, Any>)
+
+  /** فقط گرهی که کارش با پشتیبانی است: دکانِ حساب پیدا نمی‌شود، یا سرور تغییرهایی را نپذیرفت */
+  fun askOf(d: Diagnosis, dropped: Int): Ask? = when (d.problem) {
+    Problem.NO_SHOP -> Ask(ir.vil3ntec.tohid.core.support.SupportProblem.SYNC_NO_SHOP, mapOf("screen" to "settings:sync", "syncError" to "no_shop"))
+    Problem.REJECTED -> Ask(ir.vil3ntec.tohid.core.support.SupportProblem.SYNC_REFUSED, mapOf("screen" to "settings:sync", "syncError" to "rejected", "rejected" to dropped))
+    else -> null
+  }
+
   fun diagnose(error: String, holding: Boolean, dropped: Int, needsShop: Boolean, server: ServerPulse.State, outage: SyncOutage.Kind? = null): Diagnosis {
     val raw = error.trim()
     val judged = if (raw.isNotEmpty()) fromOutage(outage) else null

@@ -17,6 +17,7 @@ import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrDeskOff
 import ir.vil3ntec.tohid.core.i18n.StrNav
+import ir.vil3ntec.tohid.core.i18n.StrSupportAsk
 import ir.vil3ntec.tohid.core.model.OrdersConfigDto
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.ui.OrdersLive
@@ -26,6 +27,7 @@ import ir.vil3ntec.tohid.ui.screens.StorefrontGate
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
 import ir.vil3ntec.tohid.ui.v3.account.AccountPaths
+import ir.vil3ntec.tohid.ui.v3.account.support.SupportAskModel
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -88,9 +90,10 @@ class DeskRailOffUiTest {
     //  نه نامِ پرچم، نه گامِ پنل — صاحبِ هر دکانی این برگه را می‌بیند (تصمیمِ ۱۴۰۵/۰۸/۲۴)
     assertEquals(0, count("shop.", substring = true))
     assertEquals(0, count("پنل", substring = true))
-    click(StrDeskOff.askSupport)
+    //  e-support: «از پشتیبانی بخواه» ⇒ گفت‌وگوی پشتیبانی با درخواستِ ساخت‌یافتهٔ همین پرچم (نه پیش‌نویسِ دستی)
+    click(StrSupportAsk.button)
     rule.waitUntil(5_000) { picks.isNotEmpty() }
-    assertEquals(listOf(AccountPaths.support(StrDeskOff.supportDraft(StrNav.onlineOrders))), picks)
+    assertEquals(listOf(SupportAskModel.path("flag_off:shop.orders", mapOf("screen" to "desk:off:orders"))), picks)
     //  برگه با رفتن بسته می‌شود
     rule.waitUntil(5_000) { count(StrDeskOff.whatTitle) == 0 }
   }
@@ -106,6 +109,7 @@ class DeskRailOffUiTest {
     assertEquals(1, count(StrDeskOff.partOf(StrNav.onlineOrders)))
     assertEquals(0, count("shop.", substring = true))
     assertEquals(0, count(StrDeskOff.askSupport))
+    assertEquals(0, count(StrSupportAsk.button))
     click(Str.support)
     rule.waitUntil(5_000) { picks.isNotEmpty() }
     assertEquals(listOf(AccountPaths.SUPPORT), picks)

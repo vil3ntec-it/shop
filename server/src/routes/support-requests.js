@@ -5,7 +5,7 @@
  *   POST /api/support/requests   {code, context?, lang?, deviceUid?, name?, contact?}  ⇒ ۲۰۱ تازه | ۲۰۰ همان درخواستِ باز
  *   GET  /api/support/requests                                                     ⇒ درخواست‌های بازِ خودم/دکانم (فقط کد و حال)
  *
- * کیستی همان `routes/support.who` است (توکن، وگرنه شناسهٔ دستگاه): کاربر شناسهٔ رشته یا دکان نمی‌فرستد و هر شناسهٔ
+ * سوار بر `/api/support` پیش از `routes/support.js` (همان خط در `app.js`، زیرِ سقفِ اندازه). کیستی همان `routes/support.who` است (توکن، وگرنه شناسهٔ دستگاه): کاربر شناسهٔ رشته یا دکان نمی‌فرستد و هر شناسهٔ
  * دکان در بدنه/نشانی نادیده است — دکان فقط از توکن. ⛔ `routes/support.js` (مشترک با پمپ) دست نخورد.
  */
 const express = require('express');
@@ -17,7 +17,7 @@ const router = express.Router();
 //  یک لمس، یک درخواست: سقف تنگ‌تر از پیامِ آزاد (۳۰) — تکرارِ همان درخواست هم شمرده می‌شود
 const askLimit = rateLimit({ max: 20, keyPrefix: 'support-request' });
 
-router.post('/', askLimit, async (req, res, next) => {
+router.post('/requests', askLimit, async (req, res, next) => {
   try {
     const id = await who(req);
     const out = await requests.open(id, {
@@ -29,7 +29,7 @@ router.post('/', askLimit, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/', async (req, res, next) => {
+router.get('/requests', async (req, res, next) => {
   try {
     res.set('Cache-Control', 'no-store');
     res.json({ requests: await requests.mine(await who(req)) });

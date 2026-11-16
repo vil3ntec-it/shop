@@ -47,6 +47,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Message
+import ir.vil3ntec.tohid.ui.v3.account.support.AskSupportButton
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3TextButton
 import ir.vil3ntec.tohid.ui.v3.V3Type
@@ -125,7 +126,7 @@ internal fun RouteScope.SyncScreen(onBack: (() -> Unit)?) {
             notified = SupportDiagAndroid.report(context, d.problem.name, support, SyncModel.facts(v1, ServerPulse.version, ServerPulse.prefix))
           }
         }
-        if (d.problem != SyncModel.Problem.NONE) DiagnosisCard(d, if (support == null) null else notified)
+        if (d.problem != SyncModel.Problem.NONE) DiagnosisCard(d, if (support == null) null else notified, SyncModel.askOf(d, v1.dropped))
       }
     }
     item(key = "server") {
@@ -164,10 +165,12 @@ internal fun RouteScope.SyncScreen(onBack: (() -> Unit)?) {
  *  فرستاده می‌شود؛ [notified]: `null` ⇒ چیزی برای پشتیبانی نیست، `true` ⇒ «پشتیبانی خبردار شد»، `false` ⇒ «فرستاده می‌شود».
  */
 @Composable
-private fun DiagnosisCard(d: SyncModel.Diagnosis, notified: Boolean?) {
+private fun DiagnosisCard(d: SyncModel.Diagnosis, notified: Boolean?, ask: SyncModel.Ask? = null) {
   Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
     V3Message(d.tone, d.title, body = d.body + "\n\n" + StrSettings.whatToDo + ": " + d.action)
     notified?.let { Text(if (it) StrSyncPlain.supportNotified else StrSyncPlain.supportPending, style = V3Type.caption, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = 6.dp)) }
+    //  «از پشتیبانی بخواه»: گرهی که کارش پشتیبانی است (دکان پیدا نمی‌شود، تغییرِ پذیرفته‌نشده) — کد و شمار، هرگز متنِ خام
+    ask?.let { AskSupportButton(it.code, Modifier.padding(top = 10.dp), facts = it.facts) }
   }
 }
 
