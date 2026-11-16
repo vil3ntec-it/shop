@@ -32,6 +32,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
+ *  رنگِ کاشیِ حرفِ کالا (بی عکس) — فقط شش خانوادهٔ آرامِ پالتِ برند (۶۸c، `SectionColors`: لاجوردی، نیلی، نفتی، زمردی، زر،
+ *  گرافیت): **هیچ صورتی** و هرگز عقیقِ سرخ (فقط خطر و بدهی؛ کاشیِ سرخ کنارِ «تمام‌شده» معنای خطر می‌داد) و بی هم‌معنی‌های تکراریِ
+ *  `Hue` (BLUE = SKY، …) که یک رنگ را دو بار می‌آوردند. پایدار برای هر نام (`ThumbHueGuardTest`).
+ */
+val V3ThumbHues: List<V3Hue> = listOf(V3Hue.SKY, V3Hue.VIOLET, V3Hue.TEAL, V3Hue.MINT, V3Hue.AMBER, V3Hue.SLATE)
+
+fun v3ThumbHue(name: String): V3Hue = V3ThumbHues[(name.hashCode() and 0x7fffffff) % V3ThumbHues.size]
+
+/**
  *  عکسِ کوچکِ کالا: همان عکسِ `PhotoStore` (و همگامِ دستگاه‌های دیگر)؛ بی عکس —
  *  یا وقتی نمایشِ عکس در این دستگاه خاموش است — کاشیِ حرفِ اولِ نام با رنگِ
  *  پایدارِ پالتِ پشتیبان، تا فهرست هرگز خالی/خاکستریِ بی‌معنی نشود.
@@ -63,7 +72,7 @@ fun V3ProductThumb(
     if (image != null) {
       Image(image.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(size))
     } else {
-      val hue = V3Hue.entries[(name.hashCode() and 0x7fffffff) % V3Hue.entries.size]
+      val hue = v3ThumbHue(name)
       Text(
         name.trim().take(1).ifEmpty { "•" },
         style = V3Type.headline.copy(fontSize = (size.value * 0.42f).sp, fontWeight = FontWeight.Bold),

@@ -28,6 +28,30 @@ class ScreenSpeedBenchTest {
   companion object {
     /** سقفِ میانهٔ گرمِ منطقِ هر بخش روی دادهٔ CI — نصفِ بودجهٔ ۱۰۰ میلی‌ثانیهٔ صفحه */
     const val LOGIC_BUDGET_MS = 50.0
+
+    /**
+     *  سنجشِ سرعتِ خودِ ماشین (#1056): ماشین‌های اشتراکیِ GitHub تا دو برابر کندتر از هم‌اند و میانهٔ «خانه» با همان کد
+     *  یک بار ۳۷ و بار دیگر ۷۲ میلی‌ثانیه شد. کارِ ثابتِ [calibrationMs] روی ماشینِ مرجع حدودِ [CALIB_REF_MS] است؛ ماشینِ
+     *  کندتر سقف را به همان نسبت بالا می‌برد، **هرگز بیش از [MAX_SLOWDOWN] برابر** (کندیِ واقعیِ کد هنوز می‌شکند) و ماشینِ
+     *  تندتر سقف را **پایین نمی‌آورد** (همان ۵۰).
+     */
+    const val CALIB_REF_MS = 20.0
+    const val MAX_SLOWDOWN = 2.5
+  }
+
+  private var sink = 0L
+
+  /** کارِ ثابت و قطعی: مرتب کردنِ ۳۰۰ هزار عددِ شبه‌تصادفی (بذرِ ۴۲) و یک گذرِ درهم‌سازی؛ میانهٔ ۵ بار پس از ۳ بارِ گرم‌کردن */
+  private fun calibrationMs(): Double {
+    val r = java.util.Random(42)
+    val xs = LongArray(300_000) { r.nextLong() }
+    fun once(): Long = PosSpeed.nanos {
+      val a = xs.copyOf(); a.sort()
+      var h = 0L; var i = 0; while (i < a.size) { h = h * 31 + a[i]; i += 7 }
+      sink = h
+    }
+    repeat(3) { once() }
+    return ms(List(5) { once() }.sorted()[2])
   }
 
   private fun wanted(): Boolean = System.getenv("TOHID_SCREEN_SPEED")?.isNotBlank() == true
@@ -77,10 +101,17 @@ class ScreenSpeedBenchTest {
     val d = ScreenSpeed.shop(ScreenSpeed.CI)
     val c = ctx(d)
     val log = StringBuilder(header(d))
+    val calib = calibrationMs()
+    val slow = (calib / CALIB_REF_MS).coerceIn(1.0, MAX_SLOWDOWN)
+    log.appendLine("[calib] %.1f ms (مرجع %.1f) ⇒ ضریبِ سقف %.2f".format(Locale.ROOT, calib, CALIB_REF_MS, slow))
     val rows = ScreenLogic.SECTIONS.map { (name, f) -> logic(c, name, f, warm = 5, runs = 7, sampler = false, log = log) }
     write("screen-speed-ci.txt", log.toString())
-    val over = rows.filter { it.median > (ScreenLogic.OFF_MAIN_BUDGET_MS[it.name] ?: LOGIC_BUDGET_MS) }
-    assertTrue("بیش از سقف (رشتهٔ صفحه ${LOGIC_BUDGET_MS}ms، بیرون از آن ${ScreenLogic.OFF_MAIN_BUDGET_MS}؛ میانهٔ گرم):\n" + over.joinToString("\n"), over.isEmpty())
+    val over = rows.filter { it.median > (ScreenLogic.OFF_MAIN_BUDGET_MS[it.name] ?: LOGIC_BUDGET_MS) * slow }
+    assertTrue(
+      "بیش از سقف (رشتهٔ صفحه ${LOGIC_BUDGET_MS}ms، بیرون از آن ${ScreenLogic.OFF_MAIN_BUDGET_MS}، ضریبِ ماشین %.2f از سنجشِ %.1f ms؛ میانهٔ گرم):\n"
+        .format(Locale.ROOT, slow, calib) + over.joinToString("\n"),
+      over.isEmpty(),
+    )
   }
 
   /** دستی: `TOHID_SCREEN_SPEED=1` — منطق و نخستین قابِ هر بخش روی دفترِ بزرگ */

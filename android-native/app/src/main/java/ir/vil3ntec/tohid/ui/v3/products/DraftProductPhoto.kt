@@ -30,7 +30,6 @@ import ir.vil3ntec.tohid.sync.PhotoSync
 import ir.vil3ntec.tohid.ui.screens.PhotoPrefs
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
-import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -50,6 +49,8 @@ internal fun DraftProductPhoto(
   modifier: Modifier = Modifier,
   radius: Dp = 16.dp,
   force: Boolean = false,
+  /** اندازهٔ حرفِ کاشیِ بی‌عکس نسبت به ضلع */
+  glyphScale: Float = 0.38f,
 ) {
   val c = PhoneV3.colors
   val context = LocalContext.current
@@ -71,9 +72,9 @@ internal fun DraftProductPhoto(
     if (image != null) {
       Image(image.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
     } else {
-      val hue = V3Hue.entries[(name.hashCode() and 0x7fffffff) % V3Hue.entries.size]
+      val hue = ir.vil3ntec.tohid.ui.v3.v3ThumbHue(name)
       Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        val size = edge.value * 0.38f
+        val size = edge.value * glyphScale
         Text(
           name.trim().take(1).ifEmpty { "•" },
           style = V3Type.headline.copy(fontSize = size.sp, lineHeight = (size * 1.25f).sp, fontWeight = FontWeight.Bold),

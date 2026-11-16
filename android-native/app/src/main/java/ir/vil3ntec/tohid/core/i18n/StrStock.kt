@@ -17,6 +17,12 @@ object StrStock {
   val statCartons: String get() = t("کارتن", "Cartons", "کارټنونه")
   val statUnits: String get() = t("واحد", "Units", "واحدونه")
   val statValue: String get() = t("ارزشِ تقریبی", "Approx. value", "نږدې ارزښت")
+  /** پایانِ فهرستِ انبار (۱۴۰۵/۰۸/۲۴، جای کارتِ آمارِ بالا — صاحب‌کار: «سربرگِ گدام رو می‌خوام چی کار؟»): یک خطِ کم‌رنگ */
+  fun listFooter(items: Any, cartons: Any, units: Any, value: Any): String = t(
+    "${asIs(items)} قلم · ${asIs(cartons)} کارتن · ${asIs(units)} واحد · ارزشِ تقریبی ${asIs(value)} ؋",
+    "$items items · $cartons cartons · $units units · approx. value $value ؋",
+    "$items توکي · $cartons کارټنونه · $units واحدونه · نږدې ارزښت $value ؋",
+  )
   fun alertOut(n: Any): String = t("${asIs(n)} تمام‌شده", "$n out of stock", "$n خلاص شوي")
   fun alertLow(n: Any): String = t("${asIs(n)} کم", "$n low", "$n کم")
   val filterAll: String get() = t("همه", "All", "ټول")

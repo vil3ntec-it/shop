@@ -253,6 +253,8 @@ fun V3ListRow(
   look: V3RowLook? = null,
   /** نقطهٔ وضعیتِ کوچکِ پیش از مقدار (همگام‌سازی: رنگ + نوشته، نه رنگِ تنها) */
   valueDot: Color? = null,
+  /** فقط نمای `DATA`: ردیفِ فشردهٔ دوخطی (`V3DataRowSpec.DENSE_*`) */
+  dense: Boolean = false,
   onClick: (() -> Unit)? = null,
 ) {
   val c = PhoneV3.colors
@@ -266,10 +268,10 @@ fun V3ListRow(
   val tileHue = hue ?: if (nav) LocalV3RowHue.current else null
   val minH = when {
     nav -> maxOf(minHeight, V3NavRowSpec.MIN_HEIGHT)
-    data -> maxOf(minHeight, V3DataRowSpec.MIN_HEIGHT)
+    data -> maxOf(minHeight, if (dense) V3DataRowSpec.DENSE_MIN_HEIGHT else V3DataRowSpec.MIN_HEIGHT)
     else -> minHeight
   }
-  val padV = if (data) V3DataRowSpec.PAD_V else V3NavRowSpec.PAD_V
+  val padV = if (data) (if (dense) V3DataRowSpec.DENSE_PAD_V else V3DataRowSpec.PAD_V) else V3NavRowSpec.PAD_V
   val startPad = when {
     tile && !nav || leading != null || selected != null || tiled -> V3NavRowSpec.PAD_START
     nav -> V3NavRowSpec.PAD_START_PLAIN

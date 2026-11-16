@@ -10,6 +10,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Inventory2
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.ui.v3.V3Hue
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -65,7 +68,14 @@ fun SpecialOrderBar(d: ShopData, store: ShopStore, debtorId: String?, toast: (St
   //  POS-26: رسیدِ چاپیِ پیش‌پرداخت — همان رسیدِ دفترِ قرض (`DebtReceiptDialog`: «چاپ / PDF»)؛ (دفتر، مشتری، ردیف)
   var receipt by remember { mutableStateOf<Triple<ShopData, String, String>?>(null) }
 
-  Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+  if (LocalTillMenu.current != null) {
+    //  «…» ِ سبدِ گوشی: «تازه» همیشه (بی مشتری ⇒ همان پیامِ «اول مشتری»)، فهرست فقط وقتی سفارشی هست
+    val open = views.count { it.active }
+    TillOffer("special.new", TillAction(20, StrSpecialOrder.newOrder, StrSale.hintSpecialNew, Icons.Outlined.Inventory2, V3Hue.AMBER, 1) {
+      if (debtorId == null) toast(StrSpecialOrder.pickCustomerFirst) else making = true
+    })
+    TillOffer("special.list", if (views.isEmpty()) null else TillAction(21, if (open > 0) StrSpecialOrder.list(open) else StrSale.specialOrders, StrSale.hintSpecialList, Icons.Outlined.Inventory2, V3Hue.AMBER, 1) { listing = true })
+  } else Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
     OutlinedButton(onClick = { if (debtorId == null) toast(StrSpecialOrder.pickCustomerFirst) else making = true }) { Text(StrSpecialOrder.newOrder) }
     TextButton(onClick = { listing = true }) { Text(StrSpecialOrder.list(views.count { it.active })) }
   }

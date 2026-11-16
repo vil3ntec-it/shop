@@ -47,7 +47,8 @@ async function shop(label, { on = true } = {}) {
   const made = await h.post('/api/shop', { name: `دکانِ ${label}` }, { token: u.accessToken });
   assert.equal(made.status, 201, JSON.stringify(made.body));
   const s = { ...u, token: u.accessToken, shopId: made.body.shop.id };
-  if (on) await setFlag(s.shopId, 'shop.orders', true);
+  //  صریح در هر دو حال: از ۱۴۰۵/۰۸/۲۴ `shop.orders` پیش‌فرض روشن است (FLAGS-ON §۴۸)
+  await setFlag(s.shopId, 'shop.orders', on);
   return s;
 }
 

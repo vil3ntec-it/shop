@@ -69,6 +69,8 @@ class V3A11yGuardTest {
   private val ALTERNATIVES = mapOf(
     "v3/shell/HomeScreen.kt" to "کششِ کادرِ صندوقِ خانه: دستگیرهٔ زدنیِ «صندوق، باز/بسته» (PullHandle) و کارهای سفارشیِ «پنهان کردن/صفحهٔ بعد/پیش» ِ خودِ کادر (HomeHeroCard)",
     "components/pos/PhoneCart.kt" to "کشیدنِ سبدِ صندوق: زدنِ نوارِ سبد بازش می‌کند و زدنِ تکهٔ پیدای کالاها («بستنِ سبد») می‌بنددش",
+    "v3/nav/EdgeSwipeBack.kt" to "کشیدن از لبهٔ راست ⇒ برگشت: همان پیکانِ برگشتِ سربرگ و دکمهٔ برگشتِ گوشی (`V3Nav.back`)",
+    "v3/sales/cart/TillFrame.kt" to "کشیدنِ برگهٔ سبدِ صندوق (حالتِ تمرکز): زدنِ «N قلم / جمع» ِ نوار بازش می‌کند؛ دستگیره (دکمهٔ «بستنِ سبد»)، زدنِ پرده و برگشت می‌بندندش",
   )
 
   private val GESTURE = Regex(

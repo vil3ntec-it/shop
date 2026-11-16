@@ -74,9 +74,10 @@ const T = d1.body.accessToken;
 const shopId = (await call('POST', '/api/shop', { name: 'دکانِ ناحیه' }, T)).body.shop.id;
 const A = (await call('POST', '/api/admin/login', { username: 'admin', password: 'Admin!12345' })).body.token;
 const flag = (key, value) => call('PUT', '/api/admin/pump/live-config', { scope: shopId, key, value }, A);
-for (const key of ['shop.orders', 'shop.storefront']) await flag(key, true);
 //  پیش‌فرض‌روشن‌ها (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) `false` ِ صریح ⇒ همان ویترینِ پیشین؛ هر بخش کلیدِ خودش را روشن می‌کند
 for (const key of require('../src/lib/flag-defaults').DEFAULT_ON) await flag(key, false);
+//  ترتیب: اول `false` ِ صریح، بعد کلیدهای همین آزمون — از ۱۴۰۵/۰۸/۲۴ `shop.orders` و `shop.storefront` هم در DEFAULT_ON اند
+for (const key of ['shop.orders', 'shop.storefront']) await flag(key, true);
 const slug = 'zone-store';
 const put = await call('PUT', '/api/shop/storefront', {
   slug, enabled: true, title: 'ویترینِ ناحیه', contactPhone: '0700000001', acceptPickup: true, deliveryFeeMinor: 5000, minOrderMinor: 0,

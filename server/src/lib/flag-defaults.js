@@ -8,6 +8,8 @@
  *   مرز ─── فقط نمایش، راحتی یا خواندنی: هیچ‌کدام پول یا داده را بازنویسی نمی‌کند، سندی را عوض نمی‌کند، هزینهٔ بیرونی
  *            ندارد و دادهٔ خصوصی را به کسی که پیش‌تر نمی‌دید نشان نمی‌دهد. کلیدِ تازه فقط با همین سنجه و ردیفی در
  *            `docs/FLAGS-ON-fa.md` و `default: true` در `routes/admin-flags.js` (KNOWN) می‌آید.
+ *   استثنا ─ چهار کلیدِ پایهٔ سفارش (`shop.orders`، `shop.storefront`، `shop.order_notify`، `shop.device_push`) با تصمیمِ صریحِ
+ *            صاحب‌کار (۱۴۰۵/۰۸/۲۴) نه با سنجهٔ «فقط نمایش»؛ `orders.flagOf`، `order-notify.flagIn` و `shop-push` همین فهرست را می‌خوانند.
  *   ⛔ دری که جز پرچم شرطِ دیگری هم دارد همان می‌ماند (مثلاً `map_pin` بی `STORE_MAP_TILES` نقشه ندارد، `gallery` بی
  *      `shop.image_bank` گالری ندارد، اعلانِ بازپرداخت بی `shop.customer_notify` پیامی نمی‌فرستد).
  *   آزمون: `test/flag-defaults.test.js`.
@@ -30,7 +32,17 @@ const KEYS = Object.freeze([
   'shop.delivery_map',              //  پیوندِ مسیریاب و نقشهٔ آفلاینِ پیک (فقط فایل‌های خودِ سرور)
   'shop.orders.start_alert',        //  یادداشت و پوشِ «شروعِ سفارشِ زمان‌بندی‌شده» به خودِ دکان؛ وضعیت عوض نمی‌شود
   'shop.orders.stuck_alert',        //  یادداشت و پوشِ «سفارشِ گیرکرده» به خودِ دکان؛ وضعیت عوض نمی‌شود
+  //  ── تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۴ («همهٔ این‌ها رو فعال‌شده بذار»؛ `docs/FLAGS-ON-fa.md` §۴۸): همهٔ قابلیت‌های سفارش
+  //     پیش‌فرض روشن — پایهٔ سفارش و ویترین و اعلانِ سفارش، نه فقط نمایشی. اشتراک (`online_orders`/`storefront`)، ساختن و
+  //     روشن کردنِ ویترین به دستِ خودِ دکان، `shop.orders.subscribers_only` و «غیرفعال کردنِ سرویس» همان دروازه‌اند.
+  'shop.orders',                    //  بخشِ «سفارش‌ها» و ثبتِ سفارش (`/api/shop/orders/*`؛ نوشتن هنوز کلیدِ اشتراکِ `online_orders` می‌خواهد)
+  'shop.storefront',                //  ویترینِ عمومی و مدیریتش (هنوز با `shop.orders`، کلیدِ اشتراکِ `storefront` و ویترینِ ساخته‌وروشنِ خودِ دکان)
+  'shop.order_notify',              //  اعلانِ سفارشِ تازه/پرداخت/لغو به گوشی‌های همان دکان (صفِ پایدار؛ پوش رایگان، بی FCM ِ سرور فقط نمی‌رود)
+  'shop.device_push',               //  ثبتِ توکنِ پوشِ دستگاه‌های دکان؛ بی حسابِ Firebase ِ سرور هیچ پوشی فرستاده نمی‌شود (`push.sendTo` ⇒ `skipped`)
 ]);
+
+/** چهار کلیدِ پایهٔ سفارش (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۲۴) — جدا از ۱۷ کلیدِ نمایشی تا آزمونِ «پاسخِ پیش از ۱۴۰۵/۰۸/۲۲» پایه را نبندد */
+const ORDER_BASE = Object.freeze(['shop.orders', 'shop.storefront', 'shop.order_notify', 'shop.device_push']);
 
 //  Set ِ واقعی (has/size/iteration) ولی فقط‌خواندنی: `Object.freeze` به‌تنهایی جلوی add/delete/clear را نمی‌گیرد
 const DEFAULT_ON = new Set(KEYS);
@@ -39,4 +51,4 @@ for (const m of ['add', 'delete', 'clear']) {
 }
 Object.freeze(DEFAULT_ON);
 
-module.exports = { DEFAULT_ON, KEYS };
+module.exports = { DEFAULT_ON, KEYS, ORDER_BASE };

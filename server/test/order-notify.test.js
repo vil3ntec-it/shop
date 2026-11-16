@@ -93,8 +93,10 @@ async function readyShop(name, tokens = ['tok']) {
    ۱–۲) پیش‌فرض خاموش؛ سفارشِ کارمند دست نمی‌خورد
    ══════════════════════════════════════════════════════════════════ */
 
-test('بی پرچم: سفارشِ مشتری ثبت می‌شود ولی هیچ ردیفِ اعلانی نه', async () => {
+test('پرچمِ خاموشِ صریح: سفارشِ مشتری ثبت می‌شود ولی هیچ ردیفِ اعلانی نه', async () => {
   const a = await shopOwner('خاموش');
+  //  از ۱۴۰۵/۰۸/۲۴ `shop.order_notify` پیش‌فرض روشن است (FLAGS-ON §۴۸) ⇒ «خاموش» صریح
+  await setFlag(a.shopId, false);
   const out = await customerOrder(a.shopId);
   assert.equal(out.replayed, false);
   assert.ok(await one('SELECT id FROM online_orders WHERE id=$1', [out.order.id]));

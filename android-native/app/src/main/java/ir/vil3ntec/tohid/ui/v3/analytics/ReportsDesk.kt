@@ -58,6 +58,26 @@ import ir.vil3ntec.tohid.ui.screens.DeskSimpleAsk
 import ir.vil3ntec.tohid.ui.screens.ReportCompareLine
 import ir.vil3ntec.tohid.ui.screens.ReportKeys
 import ir.vil3ntec.tohid.core.keymap.KeyMap
+import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.WarningAmber
+import ir.vil3ntec.tohid.ui.desk.Desk
+import ir.vil3ntec.tohid.ui.desk.DeskButton
+import ir.vil3ntec.tohid.ui.desk.DeskButtonKind
+import ir.vil3ntec.tohid.ui.desk.DeskDropdown
+import ir.vil3ntec.tohid.ui.desk.DeskHues
+import ir.vil3ntec.tohid.ui.desk.DeskKpi
+import ir.vil3ntec.tohid.ui.desk.DeskKpiCard
+import ir.vil3ntec.tohid.ui.desk.DeskNote
+import ir.vil3ntec.tohid.ui.desk.DeskOption
+import ir.vil3ntec.tohid.ui.desk.DeskSize
+import ir.vil3ntec.tohid.ui.desk.DeskSkeleton
+import ir.vil3ntec.tohid.ui.desk.DeskSpace
+import ir.vil3ntec.tohid.ui.desk.DeskTextField
+import ir.vil3ntec.tohid.ui.desk.DeskToolbar
+import ir.vil3ntec.tohid.ui.desk.DeskType
+import ir.vil3ntec.tohid.ui.desk.deskCard
+import ir.vil3ntec.tohid.ui.desk.deskClickable
+import ir.vil3ntec.tohid.ui.desk.rememberDeskLoad
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.ReportDrillSheet
 import ir.vil3ntec.tohid.data.ReportEngine
@@ -196,10 +216,13 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState, onOpen: (String) -> Un
   val lineSeller = remember { ir.vil3ntec.tohid.data.LineSellerPref.on(context) } // POS-23: فروشندهٔ هر ردیف
   val contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts() // CRM-15: شمارهٔ مشتری در برگه
   val phoneOf: (String) -> String = { ir.vil3ntec.tohid.ui.components.customerPhoneExport(it, contacts) }
-  val base = remember(d, rep, from, to, contacts) { ReportCsv.of(rep.key, d, from, to, today, reminderTemplate, phone = phoneOf).let { ReportCsv.lineSellers(it, rep.key, d, from, to, lineSeller) } }
+  //  PERF (e-desk-d3b): برگه و برگهٔ «دورهٔ قبل» بیرون از رشتهٔ صفحه — دفترِ بزرگ صفحه را نمی‌خواباند
+  val base = rememberDeskLoad(d, rep, from, to, contacts) { rep to ReportCsv.of(rep.key, d, from, to, today, reminderTemplate, phone = phoneOf).let { ReportCsv.lineSellers(it, rep.key, d, from, to, lineSeller) } }
+    ?.takeIf { it.first == rep }?.second
   //  RPT-13: «مقایسه» ⇒ ستونِ «دورهٔ قبل» و «تغییر» در خودِ جدول (چاپ و اکسل همان جدول): برگهٔ کلیددار ردیف‌به‌ردیف، برگهٔ
   //  فهرستیِ سند (فاکتور، خرید، مصرف) گروه‌شده با روشِ پرداخت/تأمین‌کننده/دسته (`ReportCsv.compareGroup`)
-  val sheet = remember(base, keys, compare, span, from, to) {
+  val sheet = rememberDeskLoad(base, keys, compare, span, from, to) {
+    val base = base ?: return@rememberDeskLoad null
     val keyed = ReportCsv.compareColumn(rep.key) != null
     val prev = if (keys && compare && rep.ranged && (keyed || ReportCsv.compareGroup(rep.key) != null))
       ir.vil3ntec.tohid.core.report.ReportPeriod.shift(ReportKeys.unitOf(span.name), from, to, -1, today) else null
@@ -209,18 +232,19 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState, onOpen: (String) -> Un
       if (keyed) ReportCsv.compared(rep.key, base, past, StrReach.prevColumn, StrReach.changeColumn)
       else ReportCsv.comparedList(rep.key, base, past, StrReports.colCount, StrReach.prevColumn, StrReach.changeColumn)
     }
-  }
+  }?.takeIf { base != null }
   //  RPT-13: «ریز» ِ ردیف (کلیک یا Enter ِ `reports.drill`) در هر برگهٔ `ReportDrillSheet.KEYS` (فروش، فروشِ هر کاربر، سود و زیان،
   //  ردیفِ کالا، ردیفِ مشتری؛ برگه‌های تک‌سند `RECORD_ROWS` ریز ندارند) — فقط برگهٔ همان
   //  دوره بی «مقایسه» (ستون‌ها و ردیف‌های مقایسه جای ردیف را عوض می‌کنند) و بی «فروشندهٔ هر ردیف» در «فروشِ هر کاربر»
   var rowDrill by remember(rep, from, to) { mutableStateOf<ReportCsv.Sheet?>(null) }
   val onRow: ((Int) -> Unit)? =
-    if (sheet === base && rep.key in ReportDrillSheet.KEYS && !(rep.key == "sellers" && lineSeller)) ({ i: Int ->
+    if (sheet != null && sheet === base && rep.key in ReportDrillSheet.KEYS && !(rep.key == "sellers" && lineSeller)) ({ i: Int ->
       ReportDrillSheet.of(rep.key, d, from, to, i, lineSeller, today)?.let { rowDrill = it }
     }) else null
   //  «پرسشِ ساده» برگه ندارد: Ctrl+P/Ctrl+E آن‌جا کاری نمی‌کنند
-  fun print() { if (rep != DeskRep.ASK) { onExport(rep.key); ReportPrint.print(context, sheet, sheet.name) } }
+  fun print() { val sheet = sheet ?: return; if (rep != DeskRep.ASK) { onExport(rep.key); ReportPrint.print(context, sheet, sheet.name) } }
   fun excel() {
+    val sheet = sheet ?: return
     if (rep == DeskRep.ASK) return
     Platform.saveFile("${sheet.name}.xlsx", Xlsx.of(sheet))?.let { onExport(rep.key); scope.launch { snackbar.showSnackbar(StrReports.savedTo(it)) } }
   }
@@ -228,7 +252,7 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState, onOpen: (String) -> Un
   fun step(by: Int) { if (ReportKeys.can(span.name, baseFrom, baseTo, shift + by, today)) shift += by }
 
   Row(
-    Modifier.fillMaxSize().background(c.bg).onPreviewKeyEvent { e ->
+    Modifier.fillMaxSize().background(Desk.colors.app).onPreviewKeyEvent { e ->
       when {
         e.matches(KeyMap.GLOBAL_PRINT) -> { print(); true }
         e.matches(KeyMap.GLOBAL_EXPORT) -> { excel(); true }
@@ -238,57 +262,52 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState, onOpen: (String) -> Un
         keys && rep.ranged && e.matches(KeyMap.REPORTS_COMPARE) -> { compare = !compare; true }
         else -> false
       }
-    }.padding(16.dp),
-    horizontalArrangement = Arrangement.spacedBy(16.dp),
+    }.padding(horizontal = DeskSpace.page, vertical = DeskSpace.x4),
+    horizontalArrangement = Arrangement.spacedBy(DeskSpace.gap),
   ) {
-    //  زیرنوارِ نوعِ گزارش (سمتِ آغاز)
-    V3Card(Modifier.width(220.dp).fillMaxHeight(), padding = PaddingValues(8.dp)) {
-      Text(StrReports.reportType, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(start = 10.dp, top = 6.dp, bottom = 6.dp))
+    //  زیرنوارِ نوعِ گزارش (سمتِ آغاز) — کارتِ کامپیوتر با ردیفِ ۳۶dp
+    Column(Modifier.width(220.dp).fillMaxHeight().deskCard(Desk.colors).padding(DeskSpace.x2)) {
+      Text(StrReports.reportType, style = DeskType.caption, color = Desk.colors.inkSecondary, modifier = Modifier.padding(start = 10.dp, top = 6.dp, bottom = 6.dp))
       reps.forEach { r -> RailItem(r.label(), r == rep) { rep = r } }
     }
-    Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-      Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(Str.reports, style = V3Type.title, color = c.ink, modifier = Modifier.weight(1f))
-        Text(StrReports.freshReport, style = V3Type.callout, color = c.inkMuted)
-        Spacer(Modifier.width(8.dp))
-        V3Toggle(ReportFresh.on.value, StrReports.freshReport) { ReportFresh.set(context, it) }
-        Spacer(Modifier.width(16.dp))
-        if (online) {
-          V3Button(StrOnlineReport.title, { onOpen(AnalyticsPaths.ONLINE_REPORT) }, kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.InsertChart, height = 40.dp)
-          Spacer(Modifier.width(8.dp))
+    Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(DeskSpace.x3)) {
+      DeskToolbar(
+        end = {
+          Text(StrReports.freshReport, style = DeskType.secondary, color = Desk.colors.inkSecondary)
+          V3Toggle(ReportFresh.on.value, StrReports.freshReport) { ReportFresh.set(context, it) }
+          if (online) {
+            DeskButton(StrOnlineReport.title, { onOpen(AnalyticsPaths.ONLINE_REPORT) }, icon = Icons.Outlined.InsertChart)
+          }
+          if (branches) {
+            DeskButton(StrBranches.title, { onOpen(AnalyticsPaths.BRANCHES_REPORT) }, icon = Icons.Outlined.Storefront)
+          }
+          DeskButton(StrReports.printShort, ::print, icon = Icons.Outlined.Print, shortcut = KeyMap.GLOBAL_PRINT.hint)
+          DeskButton(StrReports.excel, ::excel, kind = DeskButtonKind.PRIMARY, icon = Icons.Outlined.TableChart, shortcut = KeyMap.GLOBAL_EXPORT.hint)
+        },
+      ) {
+        if (rep.ranged && rep != DeskRep.ASK) {
+          DeskDropdown(span, DeskSpan.entries.map { DeskOption(it, it.label()) }, { span = it }, label = ir.vil3ntec.tohid.core.i18n.StrLook.period)
+          if (span == DeskSpan.CUSTOM) {
+            DeskTextField(fromText, { fromText = it }, StrReports.from, Modifier.width(150.dp))
+            DeskTextField(toText, { toText = it }, StrReports.to, Modifier.width(150.dp))
+          }
+          if (shifting) {
+            DeskButton(StrReach.prevPeriod, { step(-1) }, kind = DeskButtonKind.GHOST, shortcut = KeyMap.REPORTS_PREV_PERIOD.hint)
+            DeskButton(StrReach.nextPeriod, { step(1) }, kind = DeskButtonKind.GHOST, shortcut = KeyMap.REPORTS_NEXT_PERIOD.hint)
+          }
+          if (keys) DeskButton(StrReach.compare, { compare = !compare }, kind = if (compare) DeskButtonKind.PRIMARY else DeskButtonKind.SECONDARY, shortcut = KeyMap.REPORTS_COMPARE.hint)
         }
-        if (branches) {
-          V3Button(StrBranches.title, { onOpen(AnalyticsPaths.BRANCHES_REPORT) }, kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.Storefront, height = 40.dp)
-          Spacer(Modifier.width(8.dp))
-        }
-        V3Button("${StrReports.printShort}  ${KeyMap.GLOBAL_PRINT.hint}", ::print, kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.Print, height = 40.dp)
-        Spacer(Modifier.width(8.dp))
-        V3Button("${StrReports.excel}  ${KeyMap.GLOBAL_EXPORT.hint}", ::excel, icon = Icons.Outlined.TableChart, height = 40.dp)
       }
       if (rep == DeskRep.ASK) {
         DeskSimpleAsk(d, canSeeMoney, Modifier.weight(1f))
         return@Column
       }
-      if (rep.ranged) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-          V3ChipRow(Modifier.weight(1f), contentPadding = PaddingValues(0.dp)) {
-            DeskSpan.entries.forEach { s -> V3Chip(s.label(), span == s, { span = s }) }
-            if (span == DeskSpan.CUSTOM) {
-              V3TextField(fromText, { fromText = it }, StrReports.from, Modifier.width(150.dp))
-              V3TextField(toText, { toText = it }, StrReports.to, Modifier.width(150.dp))
-            }
-            if (shifting) {
-              V3Chip("${StrReach.prevPeriod}  ${KeyMap.REPORTS_PREV_PERIOD.hint}", false, { step(-1) })
-              V3Chip("${StrReach.nextPeriod}  ${KeyMap.REPORTS_NEXT_PERIOD.hint}", false, { step(1) })
-            }
-            if (keys) V3Chip("${StrReach.compare}  ${KeyMap.REPORTS_COMPARE.hint}", compare, { compare = !compare })
-          }
-          Text(if (ReportsModel.isAllTime(from)) StrReports.allDates else StrReports.rangeSpan(uiDateLong(from), uiDateLong(to)), style = V3Type.footnote, color = c.inkMuted)
-        }
-      } else Text(StrReports.rightNow, style = V3Type.footnote, color = c.inkMuted)
+      DeskNote(if (!rep.ranged) StrReports.rightNow else if (ReportsModel.isAllTime(from)) StrReports.allDates else StrReports.rangeSpan(uiDateLong(from), uiDateLong(to)))
       if (keys && compare && rep.ranged) ReportCompareLine(d, rep.key, span.name, from, to, today)
       DeskKpis(d, rep, from, to)
-      SheetTable(sheet, Modifier.weight(1f).fillMaxWidth(), onRow)
+      val s = sheet
+      if (s == null) DeskSkeleton(Modifier.weight(1f).fillMaxWidth())
+      else SheetTable(s, Modifier.weight(1f).fillMaxWidth(), onRow)
     }
   }
   rowDrill?.let { s ->
@@ -298,78 +317,99 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState, onOpen: (String) -> Un
   }
 }
 
-/** یک موردِ زیرنوار: انتخاب‌شده با سطحِ انتخاب و متنِ برند */
+/** یک موردِ زیرنوار: انتخاب‌شده با سطحِ انتخاب و نوارِ برند (همان ردیفِ منوی کامپیوتر)، بی انیمیشن */
 @Composable
 private fun RailItem(label: String, on: Boolean, onClick: () -> Unit) {
-  val c = PhoneV3.colors
-  val bg by animateColorAsState(if (on) PhoneV3Palette.selected(c) else c.card, MotionSpec.tweenOf(MotionTokens.SHORT), label = "rail")
+  val c = Desk.colors
   Box(
-    Modifier.fillMaxWidth().height(42.dp).clip(RoundedCornerShape(10.dp)).background(bg)
-      .v3Pressable(label = label, role = Role.Tab, onClick = onClick).padding(horizontal = 12.dp),
+    Modifier.fillMaxWidth().height(DeskSize.navItem)
+      .deskClickable(label = label, role = Role.Tab, selected = on, onClick = onClick).padding(horizontal = DeskSpace.x3),
     contentAlignment = Alignment.CenterStart,
-  ) { Text(label, style = V3Type.callout, color = if (on) PhoneV3Roles.brandText(c) else c.ink) }
+  ) { Text(label, style = if (on) DeskType.bodyStrong else DeskType.navItem, color = if (on) c.brandInk else c.ink, maxLines = 1) }
 }
 
 /** عددهای کلِ بازه — همان عددهای امروزِ صفحهٔ کامپیوتر */
 @Composable
 private fun DeskKpis(d: ShopData, rep: DeskRep, from: String, to: String) {
   val count: (Double) -> String = { it.toLong().toString() }
-  Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+  Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(DeskSpace.gap)) {
     val m = Modifier.weight(1f)
     when (rep) {
       DeskRep.SALES, DeskRep.PROFIT, DeskRep.SELLERS -> {
-        val r = remember(d, from, to) { ReportEngine.sales(d, from, to) }
-        V3Stat(StrReports.netSales, r.net, ::afn, m, hue = V3Hue.BRAND)
-        V3Stat(StrReports.invoices, r.count.toDouble(), count, m)
-        V3Stat(if (r.grossProfit < 0) StrReports.grossLoss else StrReports.grossProfit, kotlin.math.abs(r.grossProfit), ::afn, m, hue = V3Hue.TEAL)
-        V3Stat(StrReports.expenses, r.expenses, ::afn, m, hue = V3Hue.PURPLE)
-        V3Stat(if (r.netProfit < 0) StrReports.netLoss else StrReports.netProfit, kotlin.math.abs(r.netProfit), ::afn, m, valueColor = if (r.netProfit < 0) PhoneV3.colors.negative else null)
+        val r = rememberDeskLoad(d, from, to) { ReportEngine.sales(d, from, to) } ?: return@Row
+        KpiStat(StrReports.netSales, r.net, ::afn, m, hue = V3Hue.BRAND)
+        KpiStat(StrReports.invoices, r.count.toDouble(), count, m)
+        KpiStat(if (r.grossProfit < 0) StrReports.grossLoss else StrReports.grossProfit, kotlin.math.abs(r.grossProfit), ::afn, m, hue = V3Hue.TEAL)
+        KpiStat(StrReports.expenses, r.expenses, ::afn, m, hue = V3Hue.PURPLE)
+        KpiStat(if (r.netProfit < 0) StrReports.netLoss else StrReports.netProfit, kotlin.math.abs(r.netProfit), ::afn, m, valueColor = if (r.netProfit < 0) PhoneV3.colors.negative else null)
       }
       DeskRep.PURCHASES -> {
-        val r = remember(d, from, to) { ReportEngine.purchases(d, from, to) }
-        V3Stat(StrReports.purchasesTotal, r.total, ::afn, m, hue = V3Hue.PURPLE)
-        V3Stat(StrReports.paid, r.paid, ::afn, m, hue = V3Hue.BRAND)
-        V3Stat(StrReports.onSupplierAccount, r.debt, ::afn, m, hue = V3Hue.ORANGE)
-        V3Stat(StrReports.topSupplier, 0.0, { r.bySupplier.firstOrNull()?.first ?: "—" }, m)
+        val r = rememberDeskLoad(d, from, to) { ReportEngine.purchases(d, from, to) } ?: return@Row
+        KpiStat(StrReports.purchasesTotal, r.total, ::afn, m, hue = V3Hue.PURPLE)
+        KpiStat(StrReports.paid, r.paid, ::afn, m, hue = V3Hue.BRAND)
+        KpiStat(StrReports.onSupplierAccount, r.debt, ::afn, m, hue = V3Hue.ORANGE)
+        KpiStat(StrReports.topSupplier, 0.0, { r.bySupplier.firstOrNull()?.first ?: "—" }, m)
       }
       DeskRep.EXPENSES -> {
         val rows = remember(d, from, to) { d.expenses.filter { it.date in from..to } }
         val top = remember(rows) { rows.groupBy { it.category }.maxByOrNull { (_, l) -> l.sumOf { it.amount } }?.key }
-        V3Stat(StrReports.expensesTotal, rows.sumOf { it.amount }, ::afn, m, hue = V3Hue.PURPLE)
-        V3Stat(StrReports.topCategory, 0.0, { top?.ifBlank { StrReports.noCategory } ?: "—" }, m)
+        KpiStat(StrReports.expensesTotal, rows.sumOf { it.amount }, ::afn, m, hue = V3Hue.PURPLE)
+        KpiStat(StrReports.topCategory, 0.0, { top?.ifBlank { StrReports.noCategory } ?: "—" }, m)
       }
       DeskRep.PRODUCTS, DeskRep.STOCK, DeskRep.EXPIRY -> {
         //  ۳-۱۶ (۲): همان ارزشِ میانگینِ موزونِ گزارشِ محصولات (`ReportEngine.stockValue`)، نه «قیمتِ خرید» ِ کارت
-        val sv = remember(d) { ReportEngine.stockValue(d) }
+        val sv = rememberDeskLoad(d) { ReportEngine.stockValue(d) } ?: return@Row
         val value = sv.valuation.costMinor / 100.0
         val out = remember(d) { d.products.count { ShopStore.stockStatus(d, it) == "out" } }
         val low = remember(d) { d.products.count { ShopStore.stockStatus(d, it) == "low" } }
-        V3Stat(StrReports.inventoryValue, value, ::afn, m, hue = V3Hue.BRAND,
+        KpiStat(StrReports.inventoryValue, value, ::afn, m, hue = V3Hue.BRAND,
           caption = inventoryCaption(sv.approximate, sv.valuation.negative.size, sv.kits))
-        V3Stat(StrReports.items, d.products.size.toDouble(), count, m)
-        V3Stat(StrReports.soldOut, out.toDouble(), count, m, valueColor = if (out > 0) PhoneV3.colors.negative else null)
-        V3Stat(StrReports.lowStock, low.toDouble(), count, m, hue = V3Hue.ORANGE)
+        KpiStat(StrReports.items, d.products.size.toDouble(), count, m)
+        KpiStat(StrReports.soldOut, out.toDouble(), count, m, valueColor = if (out > 0) PhoneV3.colors.negative else null)
+        KpiStat(StrReports.lowStock, low.toDouble(), count, m, hue = V3Hue.ORANGE)
       }
       DeskRep.DEBTORS -> {
-        val total = remember(d) { d.debtors.sumOf { ShopStore.debt(d, it.id).coerceAtLeast(0.0) } }
-        V3Stat(StrReports.totalReceivable, total, ::afn, m, hue = V3Hue.BLUE)
-        V3Stat(StrReports.debtorsOwing, d.debtors.count { ShopStore.debt(d, it.id) > 0.5 }.toDouble(), count, m)
+        val total = rememberDeskLoad(d) { d.debtors.sumOf { ShopStore.debt(d, it.id).coerceAtLeast(0.0) } } ?: return@Row
+        KpiStat(StrReports.totalReceivable, total, ::afn, m, hue = V3Hue.BLUE)
+        KpiStat(StrReports.debtorsOwing, d.debtors.count { ShopStore.debt(d, it.id) > 0.5 }.toDouble(), count, m)
       }
       DeskRep.GAPS -> {
         val g = remember(d) { DocGapsSheet.report(d) }
-        V3Stat(StrReports.kpiMissing, g.missing.toDouble(), count, m, valueColor = if (g.missing > 0) PhoneV3.colors.negative else null)
-        V3Stat(StrReports.kpiJumped, g.jumped.toDouble(), count, m)
-        V3Stat(StrReports.kpiDuplicates, g.duplicates.toDouble(), count, m, hue = V3Hue.ORANGE)
-        V3Stat(StrReports.kpiCancelled, g.cancelled.toDouble(), count, m)
+        KpiStat(StrReports.kpiMissing, g.missing.toDouble(), count, m, valueColor = if (g.missing > 0) PhoneV3.colors.negative else null)
+        KpiStat(StrReports.kpiJumped, g.jumped.toDouble(), count, m)
+        KpiStat(StrReports.kpiDuplicates, g.duplicates.toDouble(), count, m, hue = V3Hue.ORANGE)
+        KpiStat(StrReports.kpiCancelled, g.cancelled.toDouble(), count, m)
       }
       DeskRep.SHRINK -> {
-        val r = remember(d, from, to) { ShrinkLoss.report(d, from, to) }
-        V3Stat(StrShrink.wasteTotal, r.wasteMinor / 100.0, ::afn, m, hue = V3Hue.ORANGE)
-        V3Stat(StrShrink.shrinkTotal, r.shrinkMinor / 100.0, ::afn, m, valueColor = if (r.shrinkMinor > 0) PhoneV3.colors.negative else null)
-        V3Stat(StrShrink.netLoss, r.netLossMinor / 100.0, ::afn, m, valueColor = if (r.netLossMinor > 0) PhoneV3.colors.negative else null)
+        val r = rememberDeskLoad(d, from, to) { ShrinkLoss.report(d, from, to) } ?: return@Row
+        KpiStat(StrShrink.wasteTotal, r.wasteMinor / 100.0, ::afn, m, hue = V3Hue.ORANGE)
+        KpiStat(StrShrink.shrinkTotal, r.shrinkMinor / 100.0, ::afn, m, valueColor = if (r.shrinkMinor > 0) PhoneV3.colors.negative else null)
+        KpiStat(StrShrink.netLoss, r.netLossMinor / 100.0, ::afn, m, valueColor = if (r.netLossMinor > 0) PhoneV3.colors.negative else null)
       }
       //  بقیهٔ زبانه‌های اختیاری: همهٔ عددها در جدولِ همان برگه
       DeskRep.INSIGHT, DeskRep.REORDER, DeskRep.ASK, DeskRep.AGING, DeskRep.RFM, DeskRep.DUPLICATES, DeskRep.REMINDERS -> Unit
     }
   }
+}
+
+/**
+ *  کارتِ KPI ِ کامپیوتر به جای `V3Stat` ِ گوشی (`claude/e-desk-d3b`) — همان پارامترها: رنگ از نقشهٔ یکتای رنگ‌ها، «زیان»/«ته‌کشیده»
+ *  ([valueColor]) با رنگِ سرخِ نوشته در خطِ زیر، نه رنگِ عدد.
+ */
+@Composable
+private fun KpiStat(
+  label: String,
+  value: Double,
+  format: (Double) -> String,
+  modifier: Modifier,
+  hue: V3Hue = V3Hue.SKY,
+  valueColor: androidx.compose.ui.graphics.Color? = null,
+  caption: String? = null,
+) {
+  val icon = when (hue) {
+    V3Hue.PURPLE, V3Hue.VIOLET -> Icons.Outlined.Payments
+    V3Hue.ORANGE, V3Hue.AMBER -> Icons.Outlined.WarningAmber
+    else -> Icons.Outlined.InsertChart
+  }
+  DeskKpiCard(DeskKpi(label, format(value), icon, DeskHues.tone(if (valueColor != null) V3Hue.AMBER else hue), fallback = caption), modifier)
 }

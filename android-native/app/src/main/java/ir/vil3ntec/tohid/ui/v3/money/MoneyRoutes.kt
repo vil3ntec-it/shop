@@ -194,7 +194,11 @@ val MoneyModule = AppModule(
 
     /* ------------------------------ رسیدها ------------------------------ */
     V3Route(MoneyPaths.RECEIPTS, RouteKind.PAGE, { Str.receipts }, chrome = Chrome.OWN) {
-      ReceiptsScreen(
+      //  کامپیوتر (`claude/e-desk-d3b`): جدولِ آرام با کارتِ جمع، همان مدل و همان کارها
+      if (desk) DeskReceiptsScreen(
+        d = data, tabArg = args.query("tab"), yearArg = args.int("y"), monthArg = args.int("m"),
+        onOpenDebtor = { nav.open(MoneyPaths.debtor(it)) }, onOpenExpense = { nav.open(MoneyPaths.expense(it)) },
+      ) else ReceiptsScreen(
         d = data,
         tabArg = args.query("tab"),
         yearArg = args.int("y"),
@@ -305,18 +309,21 @@ val MoneyModule = AppModule(
 
     /* ------------------------------ مصارف ------------------------------ */
     V3Route(MoneyPaths.EXPENSES, RouteKind.TAB, { Str.expenses }, chrome = Chrome.OWN) {
-      ExpensesScreen(
+      val expensesActions = ExpensesActions(
+        onBack = backOrNull,
+        onNew = { nav.open(MoneyPaths.NEW_EXPENSE) },
+        onOpen = { nav.open(MoneyPaths.expense(it)) },
+        onDelete = { id -> MoneyWriter.ledger(store, toasts, null, data, LedgerEngine.deleteExpense(data, id), StrMoney.deleted) },
+        onPickMonth = { current, then -> nav.openForResult(MoneyPaths.expenseMonth(current)) { m -> m?.let(then) } },
+        onBreakdown = { month, category, then -> nav.openForResult(MoneyPaths.breakdown(month, category)) { c -> if (c != null) then(c) } },
+      )
+      //  کامپیوتر (`claude/e-desk-d3b`): کارتِ KPI، جدول و سهمِ دسته‌ها در کنار — همان مدل و همان کارها
+      if (desk) DeskExpensesScreen(data, args.query("month"), args.query("category"), expensesActions)
+      else ExpensesScreen(
         d = data,
         monthArg = args.query("month"),
         categoryArg = args.query("category"),
-        actions = ExpensesActions(
-          onBack = backOrNull,
-          onNew = { nav.open(MoneyPaths.NEW_EXPENSE) },
-          onOpen = { nav.open(MoneyPaths.expense(it)) },
-          onDelete = { id -> MoneyWriter.ledger(store, toasts, null, data, LedgerEngine.deleteExpense(data, id), StrMoney.deleted) },
-          onPickMonth = { current, then -> nav.openForResult(MoneyPaths.expenseMonth(current)) { m -> m?.let(then) } },
-          onBreakdown = { month, category, then -> nav.openForResult(MoneyPaths.breakdown(month, category)) { c -> if (c != null) then(c) } },
-        ),
+        actions = expensesActions,
       )
     },
     V3Route(MoneyPaths.NEW_EXPENSE, RouteKind.SHEET, { StrMoney.newExpense }, parent = MoneyPaths.EXPENSES, chrome = Chrome.OWN) { ExpenseFormRoute(null) },

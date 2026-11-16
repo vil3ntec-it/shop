@@ -36,6 +36,8 @@ object ProductsPaths {
   fun list(filter: String? = null, q: String? = null) = RoutePaths.withQuery(LIST, "filter" to filter, "q" to q)
   fun item(id: String) = "products/" + RoutePaths.encode(id)
   fun new(barcode: String? = null) = RoutePaths.withQuery("products/new", "barcode" to barcode)
+  /** فرمِ چندردیفیِ «ثبتِ چند کالا با هم» (همان مسیر با `many=1`؛ «…» ِ کالاها و انبار) — `new()` فرمِ سادهٔ یک‌کالایی است */
+  fun newMany() = RoutePaths.withQuery("products/new", "many" to "1")
   fun edit(id: String) = item(id) + "/edit"
   fun photo(id: String) = item(id) + "/photo"
   fun studio(id: String, source: String) = RoutePaths.withQuery(photo(id) + "/studio", "src" to source)
@@ -93,13 +95,19 @@ val ProductsModule = AppModule(
         storefront = { ProductStorefrontSlot(id) },
       )
     },
-    //  بارکدِ ناشناس (صندوق، انبار، جست‌وجو) ⇐ همین فرم با بارکدِ پرشده؛ یک کالا ثبت شد ⇐ ورودِ انبارِ همان (مثلِ امروز)
+    //  بارکدِ ناشناس (صندوق، انبار، جست‌وجو) ⇐ همین فرم با بارکدِ پرشده؛ یک کالا ثبت شد ⇐ ورودِ انبارِ همان (مثلِ امروز)، مگر
+    //  موجودی‌اش همین‌جا نوشته شده باشد. گوشی (۱۴۰۵/۰۸/۲۴): فرمِ سادهٔ یک‌کالایی (`QuickProductScreen`)؛ `?many=1` ⇐ فرمِ چندردیفی.
+    //  کامپیوتر همان فرمِ چندردیفیِ پیشین.
     V3Route("products/new", RouteKind.PAGE, { StrProducts.newProduct }, parent = ProductsPaths.LIST, chrome = Chrome.OWN) {
       val barcode = args.query("barcode")?.takeIf { it.isNotBlank() }
+      val many = args.flag("many")
       //  شعبه، فازِ ۳: کالا فقط از شعبهٔ اصلی (`BranchCatalogGate`)
       BranchCatalogGate {
-        NewProductsScreen(store, data, toasts, barcode, formNav()) { ids ->
+        if (many || desk) NewProductsScreen(store, data, toasts, barcode, formNav()) { ids ->
           if (barcode != null && ids.size == 1) nav.replace(StockPaths.entry(product = ids.first())) else back()
+        }
+        else QuickProductScreen(store, data, toasts, barcode, formNav()) { ids, stocked ->
+          if (barcode != null && ids.size == 1 && !stocked) nav.replace(StockPaths.entry(product = ids.first())) else back()
         }
       }
     },
@@ -162,6 +170,7 @@ private fun RouteScope.listNav() = ProductsListNav(
   edit = { nav.open(ProductsPaths.edit(it)) },
   entry = { nav.open(StockPaths.entry(product = it)) },
   new = { nav.open(ProductsPaths.new()) },
+  newMany = { nav.open(ProductsPaths.newMany()) },
   scan = {
     nav.openForResult(SalesPaths.scan("product")) { code ->
       code?.let { nav.open(ProductsListModel.scanTarget(ShopStore.barcodeIndex(store.data.value), it)) }

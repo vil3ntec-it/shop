@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.unit.dp
 
 /**
@@ -14,8 +15,48 @@ import androidx.compose.ui.unit.dp
 /** یک جفتِ رنگِ پیش‌زمینه/زمینه (+ مرز) */
 data class V3Pair(val fg: Color, val bg: Color, val border: Color = bg)
 
-/** §۷: پنج گونهٔ دکمه */
-enum class V3ButtonKind { PRIMARY, SECONDARY, NEUTRAL, DANGER }
+/**
+ *  §۷: یک سلسله‌مراتبِ دکمه در همهٔ برنامه (۶۹ p3) — هر صفحه از همین می‌گیرد، هیچ تمی رنگِ جدا به دکمه نمی‌دهد:
+ *   • [PRIMARY] اصلی: پُرِ برند با نوشتهٔ سفید — یک کارِ اصلی در هر صفحه/برگه (و دکمهٔ شناور، `V3Fab`)؛
+ *   • [SECONDARY] دوم: تهِ‌رنگِ برند با نوشتهٔ برند، بی خطِ دور («پیش‌نویس»، «بعدی»)؛
+ *   • [NEUTRAL] خنثی: تهِ‌رنگِ خاکستریِ همان تم («انصراف» کنارِ کارِ اصلی)؛
+ *   • [TERTIARY] سوم: فقط نوشتهٔ برند، بی زمینه (`V3TextButton` همین است)؛
+ *   • [DANGER] خطر: عقیقِ برند با نوشتهٔ سفید — فقط کارِ پاک‌کننده.
+ *  غیرفعال (`PhoneV3Roles.disabled`) جدا. اندازه‌ها در [V3ButtonSpec]؛ قاعده‌ها در `ButtonTokensTest`.
+ */
+enum class V3ButtonKind { PRIMARY, SECONDARY, NEUTRAL, TERTIARY, DANGER }
+
+/**
+ *  اندازه و حالت‌های دکمه — یک جا برای همه (۶۹ p3). گوشی: بلندیِ ۴۸، گوشهٔ ۱۲، دکمهٔ شناور ۵۶ با گوشهٔ ۱۶، تراشه ۳۸ (قرصی)،
+ *  قرصِ کارِ ردیف ۳۲ (ناحیهٔ لمس ۴۰). فشردن (و کوچک‌شدنِ فنری): زمینهٔ پُر با نوشتهٔ روشن ⇐ پردهٔ سیاهِ ۱۲٪ (نوشتهٔ سفید خوانا
+ *  می‌ماند)، زمینهٔ تهِ‌رنگ با نوشتهٔ تیره ⇐ ۱۰٪ ِ رنگِ نوشته، دکمهٔ بی زمینه ⇐ تهِ‌رنگِ برند؛ تمرکزِ صفحه‌کلید: حلقهٔ ۲dp ِ `focus` با
+ *  ۲dp فاصله بیرونِ دکمه؛ غیرفعال: جفتِ `disabled` و بی‌لمس.
+ */
+object V3ButtonSpec {
+  val height = 48.dp
+  val compactHeight = 40.dp
+  val radius = 12.dp
+  val paddingH = 20.dp
+  val icon = 20.dp
+  val iconGap = 8.dp
+  val fabHeight = 56.dp
+  val fabRadius = 16.dp
+  val chipHeight = 38.dp
+  val pillHeight = 32.dp
+  val pillTouch = 40.dp
+  val focusRing = 2.dp
+  val focusGap = 2.dp
+  /** پردهٔ فشردنِ زمینهٔ پُر (نوشتهٔ روشن) و تهِ‌رنگ (نوشتهٔ تیره) */
+  const val PRESSED_FILL = 0.12f
+  const val PRESSED_TONAL = 0.10f
+
+  /** زمینهٔ فشردهٔ دکمه‌ای با زمینهٔ [bg] و نوشتهٔ [fg]؛ زمینهٔ شفاف (دکمهٔ سوم) ⇐ [tint] */
+  fun pressed(bg: Color, fg: Color, tint: Color): Color = when {
+    bg.alpha == 0f -> tint
+    SectionColors.luminance(fg) > 0.5 -> Color.Black.copy(alpha = PRESSED_FILL).compositeOver(bg)
+    else -> fg.copy(alpha = PRESSED_TONAL).compositeOver(bg)
+  }
+}
 
 /** §۸: هفت وضعیتِ سفارش — یک معنی در همه‌جا (مشتری، دکان، پیک، مدیر) */
 enum class V3Status { DELIVERED, IN_DELIVERY, AWAITING, CANCELLED, REVIEW, PREPARING, INACTIVE, WARNING }
@@ -34,17 +75,21 @@ object PhoneV3Roles {
   private fun pair(t: MessageTone) = V3Pair(fg = t.text, bg = t.bg, border = t.border)
 
   /**
-   *  دکمه‌ها (§۷). دکمهٔ اصلیِ روز `brandDeep` با متنِ سفید است — انحرافِ تأییدشدهٔ design-v2
-   *  (#108B81 با سفید فقط ۴٫۱۷:۱) که خودِ `ShopColors` دارد.
+   *  دکمه‌ها (§۷، [V3ButtonKind]): همه از جفت‌های `ShopColors.button` ِ تمِ جاری؛ دکمهٔ سوم زمینهٔ شفاف و نوشتهٔ برند (`brandText`).
    */
   fun button(c: PhoneV3Colors, kind: V3ButtonKind): V3Pair = shop(c).button.let { b ->
     when (kind) {
       V3ButtonKind.PRIMARY -> pair(b.primary)
       V3ButtonKind.SECONDARY -> pair(b.secondary)
       V3ButtonKind.NEUTRAL -> pair(b.neutral)
+      V3ButtonKind.TERTIARY -> V3Pair(fg = shop(c).brandText, bg = Color.Transparent, border = Color.Transparent)
       V3ButtonKind.DANGER -> pair(b.danger)
     }
   }
+
+  /** زمینهٔ فشردهٔ دکمهٔ [kind] ([V3ButtonSpec.pressed]) */
+  fun pressed(c: PhoneV3Colors, kind: V3ButtonKind): Color =
+    button(c, kind).let { V3ButtonSpec.pressed(it.bg, it.fg, shop(c).surfaceSelected) }
 
   fun disabled(c: PhoneV3Colors): V3Pair = pair(shop(c).button.disabled)
 
@@ -104,10 +149,10 @@ object V3Space {
   /** گوشهٔ کارتِ معمولی و کارتِ برجسته */
   val cardRadius = 12.dp
   val featuredRadius = 16.dp
-  /** گوشهٔ دکمه و کادرِ ورودی */
-  val controlRadius = 10.dp
-  /** بلندیِ دکمه و کادر — هدفِ لمسیِ ≥ ۴۸ */
-  val control = 50.dp
+  /** گوشهٔ دکمه و کادرِ ورودی ([V3ButtonSpec.radius]) */
+  val controlRadius = V3ButtonSpec.radius
+  /** بلندیِ دکمه و کادر — هدفِ لمسیِ ۴۸ ([V3ButtonSpec.height]) */
+  val control = V3ButtonSpec.height
   /** بلندیِ ردیفِ فهرست */
   val row = 60.dp
 }

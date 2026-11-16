@@ -14,6 +14,12 @@ object StrProducts {
   val statItems: String get() = t("قلم کالا", "Items", "توکي")
   val statPotential: String get() = t("سود بالقوه", "Potential profit", "احتمالي ګټه")
   val statPotentialCaption: String get() = t("اگر همه فروخته شود", "If everything sells", "که ټول وپلورل شي")
+  /** پایانِ فهرست (۱۴۰۵/۰۸/۲۴، جای کارتِ آمارِ بالا): یک خطِ کم‌رنگ */
+  fun listFooter(items: Any, profit: Any): String = t(
+    "${asIs(items)} قلم کالا · سودِ بالقوه ${asIs(profit)} ؋ اگر همه فروخته شود",
+    "Items: $items · potential profit $profit ؋ if everything sells",
+    "$items توکي · احتمالي ګټه $profit ؋ که ټول وپلورل شي",
+  )
   val filterLow: String get() = t("کم", "Low", "لږ")
   val filterOut: String get() = t("تمام‌شده", "Out", "پای ته رسېدلی")
   val filterInactive: String get() = t("غیرفعال", "Inactive", "غیرفعال")

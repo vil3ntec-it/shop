@@ -33,7 +33,7 @@ private val THEMES = listOf(ThemeChoice.LIGHT, ThemeChoice.DARK, ThemeChoice.SYS
 
 /**
  *  `settings/general/appearance`: روشن / تیره / خودکار (همان `onTheme` ِ پوسته،
- *  همان لحظه)، ردیفِ «تم» (THEME-V2: آسمان / اقیانوس / غروب — `ThemeStore`، فقط همین دستگاه، گذرِ
+ *  همان لحظه)، ردیفِ «تم» (۶۹ p3: آسمان / سرمه‌ای / عاجی / گرافیت — `ThemeStore`، فقط همین دستگاه، گذرِ
  *  ۲۵۰ms بی راه‌اندازیِ دوباره) و «انیمیشن روشن» (`Motion.set`: `full` همیشه، `auto` مثل تنظیم گوشی).
  */
 @Composable
@@ -51,10 +51,16 @@ internal fun RouteScope.AppearanceScreen(onBack: (() -> Unit)?) {
       SettingsNote(StrSettings.themeNote)
     }
     item(key = "palette") {
-      //  پیش‌نمایشِ هر کارت همان گرادیانِ کادرِ بزرگِ آن تم در حالتِ جاری (روز/شب)
+      //  پیش‌نمایشِ هر کارت همان رنگ‌های واقعیِ آن تم در حالتِ جاری (روز/شب): زمینه، کادرِ گرادیانیِ خانه، کارت و دکمهٔ اصلی
       val dark = PhoneV3.colors.source.isDark
       val options = remember(dark) {
-        ShopTheme.entries.map { t -> ThemeOption(t.id, { themeName(t) }, Brush.linearGradient(shopColors(t, dark).heroGradient)) }
+        ShopTheme.entries.map { t ->
+          val s = shopColors(t, dark)
+          ThemeOption(
+            t.id, { themeName(t) }, Brush.linearGradient(s.heroGradient),
+            page = s.background, card = s.surface, edge = s.borderCard, ink = s.textPrimary, muted = s.textMuted, primary = s.button.primary.bg,
+          )
+        }
       }
       SettingsBlock {
         Text(StrSettings.themeRow, style = V3Type.headline, color = PhoneV3.colors.ink)
@@ -82,6 +88,7 @@ internal fun RouteScope.AppearanceScreen(onBack: (() -> Unit)?) {
 /** نامِ هر تم به زبانِ صفحه */
 private fun themeName(t: ShopTheme): String = when (t) {
   ShopTheme.SKY -> StrSettings.themeSky
-  ShopTheme.OCEAN -> StrSettings.themeOcean
-  ShopTheme.DUSK -> StrSettings.themeSunset
+  ShopTheme.NAVY -> StrSettings.themeNavy
+  ShopTheme.IVORY -> StrSettings.themeIvory
+  ShopTheme.GRAPHITE -> StrSettings.themeGraphite
 }

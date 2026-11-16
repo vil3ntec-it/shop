@@ -282,10 +282,11 @@ async function roleLayer(token, role, perms) {
 }
 
 /**
- * پرچم‌های پیش‌فرض‌روشنِ `lib/flag-defaults.js` (۱۴۰۵/۰۸/۲۲) برای یک دکان `false` ِ صریح ⇒ همان رفتارِ پیش از آن تاریخ.
+ * پرچم‌های پیش‌فرض‌روشنِ نمایشیِ `lib/flag-defaults.js` (۱۴۰۵/۰۸/۲۲) برای یک دکان `false` ِ صریح ⇒ همان رفتارِ پیش از آن تاریخ.
  * برای آزمونی که «خاموش» یا شکلِ دقیقِ پاسخِ پیشین را می‌سنجد؛ آزمون هر کلیدی را که می‌خواهد پس از این خودش روشن می‌کند.
+ * چهار کلیدِ پایهٔ سفارش (`ORDER_BASE`، ۱۴۰۵/۰۸/۲۴) این‌جا نیستند: همین آزمون‌ها پایه را خودشان روشن می‌کنند.
  */
-async function defaultOnOff(shopId, keys = [...require('../src/lib/flag-defaults').DEFAULT_ON]) {
+async function defaultOnOff(shopId, keys = (({ DEFAULT_ON, ORDER_BASE }) => [...DEFAULT_ON].filter((k) => !ORDER_BASE.includes(k)))(require('../src/lib/flag-defaults'))) {
   for (const key of keys) {
     await query(
       `INSERT INTO live_config (scope, key, value, updated_at) VALUES ($1,$2,'false',$3)

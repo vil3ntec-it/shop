@@ -13,12 +13,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- *  قاعده‌های پالت — از THEME-V2 (۱۴۰۵/۰۸/۰۲، `THEME-V2.md`) برای **هر شش پالت** (سه تم × روز و شب).
+ *  قاعده‌های پالت — از THEME-V2 (۱۴۰۵/۰۸/۰۲، `THEME-V2.md`) برای **هر هشت پالت** (چهار تمِ ۶۹ p3 × روز و شب).
  *  نامِ آزمون از سیستمِ VILL3N مانده؛ عددهای سبزِ آن با دستورِ تازه کنار رفت.
  *
  *  ۱. عددهای «آسمان» (پیش‌فرض = `LightColors`/`DarkColors`) عینِ فایل‌اند؛ هر انحراف در `deviations`
  *     نام و دلیل دارد. عددهای دو تمِ دیگر در `ThemeV2PaletteTest`.
- *  ۲. جدولِ کنتراست (WCAG AA) در هر شش پالت: متنِ کوچک ≥ ۴٫۵:۱، آیکن و نشانگر و خطِ کادر ≥ ۳:۱.
+ *  ۲. جدولِ کنتراست (WCAG AA) در هر هشت پالت: متنِ کوچک ≥ ۴٫۵:۱، آیکن و نشانگر و خطِ کادر ≥ ۳:۱.
  *  ۳. هفت وضعیتِ سفارش یک معنا دارند: هر وضعیتِ `OrderText.STATUS` نشانِ ثبت‌شده
  *     دارد و پیک همان معنا را با نام‌های خودش می‌گیرد.
  */
@@ -32,7 +32,7 @@ class Vill3nPaletteTest {
 
   private fun hex(c: Color) = "#%06X".format(c.toArgb() and 0xFFFFFF)
 
-  /** هر شش پالت با نامشان */
+  /** هر هشت پالت با نامشان */
   private val palettes: List<Pair<String, ShopColors>> =
     ShopTheme.entries.flatMap { t -> listOf("${t.id}-روز" to shopColors(t, false), "${t.id}-شب" to shopColors(t, true)) }
 
@@ -46,10 +46,12 @@ class Vill3nPaletteTest {
     "borderCard" to "#D4DCE8", "borderInput" to "#C2CDDC", "divider" to "#ECF0F6",
     "brandPrimary" to "#2563EB", "brandDeep" to "#1D4ED8", "link" to "#1D4ED8",
   )
+  //  ۶۹ p3 (عمدی، صاحب‌کار: «رنگ و بک‌گراندِ دارک‌مود … افتضاحه»): شبِ «آسمان» زمینهٔ نزدیک‌به‌سیاهِ آبی‌خاکستری و سه پلهٔ دیدنی
+  //  (هر پله ≥ ۱٫۱۲:۱، `ThemeSetContrastTest`) به‌جای سیاهِ تخت (#07090E ⇐ #11151E)؛ برندِ شب روشن‌تر برای نشانگر روی پله‌ها
   private val ownerDark = mapOf(
-    "background" to "#07090E", "surface" to "#11151E", "surfaceElevated" to "#1B202C",
-    "textPrimary" to "#EEF1F8", "textSecondary" to "#A2ACBE", "textMuted" to "#8E99AC",
-    "iconActive" to "#60A5FA", "brandPrimary" to "#60A5FA",
+    "background" to "#0A0E15", "surface" to "#161C27", "surfaceElevated" to "#202835",
+    "textPrimary" to "#EDF1F7", "textSecondary" to "#A9B3C2", "textMuted" to "#8D98AA",
+    "iconActive" to "#6EA3FF", "brandPrimary" to "#6EA3FF",
   )
 
   private fun tokens(c: ShopColors) = mapOf(
@@ -71,7 +73,7 @@ class Vill3nPaletteTest {
     //  #CBD5E1 روی سفید ۱٫۴۸:۱ — کفِ خطِ کادرِ ورودی ۱٫۵
     "light:borderInput" to ("#CBD5E1" to "#C2CDDC"),
     //  در شب `textMuted` متنِ عادی است و روی سطحِ ۲ باید ≥ ۴٫۵:۱ بماند
-    "dark:textMuted" to ("#7C8BA1" to "#8E99AC"),
+    "dark:textMuted" to ("#7C8BA1" to "#8D98AA"),
   )
 
   @Test
@@ -93,32 +95,37 @@ class Vill3nPaletteTest {
     assertSame(shopColors(ShopTheme.SKY, false), LightColors)
     assertSame(shopColors(ShopTheme.SKY, true), DarkColors)
     for ((name, c) in palettes) for ((k, v) in tokens(c)) if (v.alpha != 1f) bad += "$name:$k شفاف است"
-    //  سری‌های نمودار به ترتیبِ رنگ‌های همراه، در هر سه پالتِ روز یکی و در هر سه پالتِ شب یکی (۶۸c عمدی: پالتِ لوکسِ
-    //  `SectionColors` — روز و شب جدا، بی صورتی و لیمویی)
+    //  سری‌های نمودار به ترتیبِ رنگ‌های همراه، در هر چهار پالتِ روز یکی و در هر چهار پالتِ شب یکی (۶۸c عمدی: پالتِ لوکسِ
+    //  `SectionColors` — روز و شب جدا، بی صورتی و لیمویی). ۶۹ p3: رنگ‌های همراه جز دو درخششِ کادرِ خانه (جاهای ۰ و ۵) یکی‌اند
     for ((name, c) in palettes) {
-      val accents = (if (c.isDark) ThemeAccents.NIGHT else ThemeAccents.DAY).map(::hex)
+      val accents = (if (c.isDark) ThemeAccents.NIGHT else ThemeAccents.DAY).let { a -> ThemeAccents.SHARED_SLOTS.map { hex(a[it]) } }
       //  نمودار همان هفت رنگ به ترتیبِ معنا (هزینه عقیق)؛ رنگ‌های همراه به ترتیبِ جاهای خانه
       val series = SectionColors.CHART.map { hex(SectionColors.glyph(it, c.isDark)) }
       if (c.chart.series.map(::hex) != series) bad += "$name: سری‌های نمودار ≠ رنگ‌های همراه"
       if (c.chart.series.map(::hex).toSet() != SectionColors.ORDER.map { hex(SectionColors.glyph(it, c.isDark)) }.toSet()) bad += "$name: سری‌های نمودار بیرون از هفت خانواده"
-      if (c.accents.map(::hex) != accents) bad += "$name: رنگ‌های همراه"
+      if (ThemeAccents.SHARED_SLOTS.map { hex(c.accents[it]) } != accents) bad += "$name: رنگ‌های همراه"
     }
     assertEquals("#E2E8F0", hex(LightColors.chart.grid))
     assertEquals(emptyList<String>(), bad)
   }
 
+  /**
+   *  ۶۹ p3 (عمدی، صاحب‌کار: «تم‌هایی که به دکمه‌ها داده شده — همه چی افتضاحه»): یک سلسله‌مراتب — اصلی پُرِ برند با نوشتهٔ سفید در
+   *  روز **و** شب (پیش‌تر شب آبیِ کم‌رنگ با نوشتهٔ تیره)، دوم تهِ‌رنگِ برند بی خط (پیش‌تر سفید با خطِ آبی)، خطر عقیقِ برند (پیش‌تر
+   *  قرمزِ تند #DC2626). قاعده‌های همهٔ تم‌ها در `ButtonTokensTest`.
+   */
   @Test
   fun `دکمه‌ها و هفت وضعیتِ «آسمان» عینِ عددهای ثبت‌شده‌اند`() {
     fun b(t: ButtonTone) = listOf(hex(t.bg), hex(t.text), hex(t.border))
     val l = LightColors.button
     val d = DarkColors.button
     assertEquals(listOf("#1D4ED8", "#FFFFFF", "#1D4ED8"), b(l.primary))
-    assertEquals(listOf("#FFFFFF", "#1D4ED8"), b(l.secondary).take(2))
-    assertEquals(listOf("#DC2626", "#FFFFFF"), b(l.danger).take(2))
-    assertEquals(listOf("#E2E8F0", "#94A3B8"), b(l.disabled).take(2))
-    assertEquals(listOf("#60A5FA", "#0B1020"), b(d.primary).take(2))
-    assertEquals(listOf("#11151E", "#60A5FA"), b(d.secondary).take(2))
-    assertEquals(listOf("#DC2626", "#FFFFFF"), b(d.danger).take(2))
+    assertEquals(listOf("#E4EBFC", "#1D4ED8", "#E4EBFC"), b(l.secondary))
+    assertEquals(listOf("#B4232F", "#FFFFFF"), b(l.danger).take(2))
+    assertEquals(listOf("#E9EDF3", "#98A3B5"), b(l.disabled).take(2))
+    assertEquals(listOf("#2563EB", "#FFFFFF"), b(d.primary).take(2))
+    assertEquals(listOf("#1B2A48", "#A9C7FF"), b(d.secondary).take(2))
+    assertEquals(listOf("#C42B38", "#FFFFFF"), b(d.danger).take(2))
     //  وضعیت‌ها ثابت‌اند و به تم بستگی ندارند (THEME-V2 «رنگ‌های معنایی»): «در انتظارِ تأیید» بنفش
     //  (همان بنفشِ «نیازِ بررسی»)، هشدار کهربایی
     assertEquals(
@@ -137,7 +144,7 @@ class Vill3nPaletteTest {
   }
 
   @Test
-  fun `جدولِ کنتراست — متن ≥ ۴٫۵، آیکن و نشانگر ≥ ۳ در هر شش پالت`() {
+  fun `جدولِ کنتراست — متن ≥ ۴٫۵، آیکن و نشانگر ≥ ۳ در هر هشت پالت`() {
     val bad = mutableListOf<String>()
     fun need(theme: String, what: String, fg: Color, bg: Color, min: Float) {
       val r = contrast(fg, bg)
@@ -202,8 +209,9 @@ class Vill3nPaletteTest {
   fun `طرحِ متریال از توکن‌ها می‌آید`() {
     for ((_, c) in palettes) {
       val m = materialScheme(c)
-      assertEquals(c.button.primary.bg, m.primary)
-      assertEquals(c.button.primary.text, m.onPrimary)
+      //  روز: پُرِ دکمهٔ اصلی؛ شب (۶۹ p3): برندِ روشن با نوشتهٔ زمینه — متریال یک رنگ برای پُر و نوشته دارد (`ThemeSetContrastTest`)
+      assertEquals(if (c.isDark) c.brandPrimary else c.button.primary.bg, m.primary)
+      assertEquals(if (c.isDark) c.background else c.button.primary.text, m.onPrimary)
       assertEquals(c.background, m.background)
       assertEquals(c.surface, m.surface)
       assertEquals(c.textPrimary, m.onSurface)

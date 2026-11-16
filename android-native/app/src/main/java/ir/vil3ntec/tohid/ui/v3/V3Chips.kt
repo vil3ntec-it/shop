@@ -87,7 +87,7 @@ fun V3Chip(
   Row(
     modifier
       .v3Pressable(label = label, role = Role.Tab, onClick = onClick)
-      .heightIn(min = 38.dp)
+      .heightIn(min = ir.vil3ntec.tohid.ui.theme.V3ButtonSpec.chipHeight)
       .clip(shape)
       .background(bg)
       .border(1.dp, edge, shape)
@@ -119,7 +119,7 @@ fun V3AddChip(label: String, onClick: () -> Unit) {
   Row(
     Modifier
       .v3Pressable(label = label, onClick = onClick)
-      .heightIn(min = 38.dp)
+      .heightIn(min = ir.vil3ntec.tohid.ui.theme.V3ButtonSpec.chipHeight)
       .clip(shape)
       .background(c.tile)
       .border(1.dp, c.hairline, shape)

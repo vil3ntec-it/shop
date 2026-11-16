@@ -139,6 +139,12 @@ fun rememberV3HeaderState(): V3HeaderState = remember { V3HeaderState() }
  *  وقتی نوار آن دکمه را ندارد، ذره‌بینِ سربرگ باز می‌شود: نوارِ جست‌وجو جای سربرگ، فهرستِ همین بخش زیرش؛ کامپیوتر
  *  (`LocalDeskLayout`) کادر را همیشه زیرِ عنوان دارد.
  */
+/**
+ *  کامپیوتر: عنوانی که `DeskHeader` ِ پوسته بالای همین صفحه نشان می‌دهد (`AppRoot`). وقتی عنوانِ [V3Scaffold] همان است،
+ *  نوارِ صفحه عنوان را دوباره نمی‌نویسد (فقط برگشت و دکمه‌ها) — «عنوان دو بار» ِ e-desk-d1. صفحهٔ تودرتو با عنوانِ دیگر همان می‌ماند.
+ */
+val LocalDeskPageTitle = androidx.compose.runtime.compositionLocalOf<String?> { null }
+
 @Composable
 fun V3Scaffold(
   title: String,
@@ -173,7 +179,9 @@ fun V3Scaffold(
   //  پنجرهٔ کوتاه (افقی، دوپاره): عنوانِ درشت نه — همه‌جا برای فهرست (AUDIT-NAV S3)
   val large = largeTitle && !searching && LocalConfiguration.current.screenHeightDp >= COMPACT_HEIGHT
   //  عنوانِ کوچکِ سربرگ فقط وقتی عوض می‌شود که مرز رد شود — نه هر فریم (AUDIT-NAV F1)
-  val showTitle by remember(large) { derivedStateOf { !large || state.titleFraction > 0.65f } }
+  val deskTitle = LocalDeskPageTitle.current
+  val shownAbove = ir.vil3ntec.tohid.ui.Platform.DESKTOP && deskTitle != null && deskTitle == title
+  val showTitle by remember(large, shownAbove) { derivedStateOf { !shownAbove && (!large || state.titleFraction > 0.65f) } }
   val settle = remember { Animatable(0f) }
   val connection = remember(state) {
     object : NestedScrollConnection {

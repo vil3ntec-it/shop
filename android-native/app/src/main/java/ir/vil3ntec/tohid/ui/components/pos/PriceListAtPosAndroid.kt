@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocalOffer
+import androidx.compose.material.icons.outlined.Sell
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.ui.v3.V3Hue
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -126,14 +129,26 @@ fun PriceListAtPos(cartStore: CartStore, d: ShopData, cart: List<SalesEngine.Car
       ?: r.special.takeIf { it > 0 }?.let(StrCustomerPrices::specialLines)
     if (r.cart !== cart) cartStore.set(r.cart)
   }
-  Column(modifier.padding(bottom = 6.dp)) {
+  //  صندوقِ گوشی (`LocalTillMenu`): نشان ردیفِ «…» است و پیامِ قیمتِ خاص نشانِ کم‌رنگِ کنارِ جمع
+  val menu = LocalTillMenu.current != null
+  Column(if (menu) Modifier else modifier.padding(bottom = 6.dp)) {
     PriceListChip(state.list, { toggle() }, Modifier)
-    notice?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2) }
+    if (menu) TillNotice("price.2", notice) else notice?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2) }
   }
 }
 
+/**
+ *  نشانِ لیستِ قیمت. در صندوقِ گوشی ([LocalTillMenu]): یک ردیفِ «…» برای عوض کردن و نشانِ کم‌رنگِ «لیستِ قیمت: عمده» کنارِ
+ *  جمع **فقط** وقتی لیستِ غیرِ پیش‌فرض (عمده) روی فاکتور است — خرده هیچ نشانی ندارد.
+ */
 @Composable
 private fun PriceListChip(list: String, onClick: () -> Unit, modifier: Modifier) {
+  if (LocalTillMenu.current != null) {
+    val wholesale = list == PriceList.WHOLESALE
+    TillOffer("price.list", TillAction(30, if (wholesale) StrSale.retailBack else StrSale.wholesaleOn, StrSale.hintPriceList, Icons.Outlined.Sell, V3Hue.MINT, onClick = onClick))
+    TillNotice("price.1", if (wholesale) StrPos.priceListWholesaleChip else null)
+    return
+  }
   FilterChip(
     selected = list == PriceList.WHOLESALE,
     onClick = onClick,

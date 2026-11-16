@@ -70,12 +70,13 @@ const d1 = await call('POST', '/api/auth/register/complete', { ticket: v1.body.t
 const T = d1.body.accessToken;
 const shopId = (await call('POST', '/api/shop', { name: 'دکانِ انبار' }, T)).body.shop.id;
 const A = (await call('POST', '/api/admin/login', { username: 'admin', password: 'Admin!12345' })).body.token;
-for (const key of ['shop.orders', 'shop.storefront', 'shop.catalog']) {
-  await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key, value: true }, A);
-}
 //  پیش‌فرض‌روشن‌ها (`lib/flag-defaults.js`، ۱۴۰۵/۰۸/۲۲) `false` ِ صریح ⇒ همان ویترینِ پیشین
 for (const key of require('../src/lib/flag-defaults').DEFAULT_ON) {
   await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key, value: false }, A);
+}
+//  ترتیب: اول `false` ِ صریح، بعد کلیدهای همین آزمون — از ۱۴۰۵/۰۸/۲۴ `shop.orders` و `shop.storefront` هم در DEFAULT_ON اند
+for (const key of ['shop.orders', 'shop.storefront', 'shop.catalog']) {
+  await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key, value: true }, A);
 }
 const slug = 'stock-store';
 const put = await call('PUT', '/api/shop/storefront', {

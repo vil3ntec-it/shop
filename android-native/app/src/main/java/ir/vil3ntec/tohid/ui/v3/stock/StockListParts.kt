@@ -28,7 +28,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.data.WarehouseEngine
@@ -81,6 +83,23 @@ internal fun StockStatsCard(summary: WarehouseEngine.Summary, onFilter: (StockFi
         }
       }
     },
+  )
+}
+
+/**
+ *  پایانِ فهرستِ انبارِ گوشی (۱۴۰۵/۰۸/۲۴، جای [StockStatsCard]): **یک** خطِ کم‌رنگِ وسط — «۴۰ قلم · ۲۰ کارتن · ۱٬۲۳۴ واحد · ارزشِ
+ *  تقریبی ۱۲٬۳۴۵٬۶۷۸ ؋»؛ همان عددهای `WarehouseEngine.summary` ِ کارتِ پیشین، هیچ عددی گم نمی‌شود.
+ */
+@Composable
+internal fun StockListFooter(summary: WarehouseEngine.Summary, modifier: Modifier = Modifier) {
+  Text(
+    StrStock.listFooter(money(summary.products.toDouble()), qty(summary.cartons), qty(summary.units), money(summary.value)),
+    style = V3Type.footnote,
+    color = PhoneV3.colors.inkMuted,
+    textAlign = TextAlign.Center,
+    maxLines = 2,
+    overflow = TextOverflow.Ellipsis,
+    modifier = modifier.fillMaxWidth().testTag(StockListSpec.FOOTER_TAG).padding(horizontal = 8.dp, vertical = 14.dp),
   )
 }
 

@@ -82,7 +82,7 @@ internal fun rememberSettingsFacts(theme: ThemeChoice): SettingsFacts {
     ),
     lastSyncOk = maxOf(lastSync, v1.lastOkAt),
     now = System.currentTimeMillis(),
-    version = BuildConfig.VERSION_NAME,
+    version = ir.vil3ntec.tohid.ui.previewVersionLabel(BuildConfig.VERSION_NAME),
     serverOn = rememberServerSections(),
     owner = remember { ir.vil3ntec.tohid.data.ShopRole.current(context) == ir.vil3ntec.tohid.data.ShopRole.OWNER },
   )

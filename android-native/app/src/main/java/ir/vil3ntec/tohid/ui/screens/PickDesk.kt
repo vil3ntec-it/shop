@@ -59,12 +59,13 @@ import kotlinx.serialization.json.JsonObject
  *  ⛔ این فایل بی Context است (راهِ آیفون)؛ `api` و لرزش از صفحهٔ سفارش‌ها می‌آیند.
  */
 @Composable
-internal fun PickDeskEntry(cfg: OrdersConfigDto, api: ApiClient, buzz: (Boolean) -> Unit, onChanged: () -> Unit) {
-  if (!cfg.picking || !cfg.permissions.manage) return
+internal fun PickDeskEntry(cfg: OrdersConfigDto, api: ApiClient, buzz: (Boolean) -> Unit, onChanged: () -> Unit): QueueEntry {
+  if (!cfg.picking || !cfg.permissions.manage) return QueueEntry.NONE
   var open by remember { mutableStateOf(false) }
-  Spacer(Modifier.width(8.dp))
-  TohidSecondaryButton(StrPick.desk, onClick = { open = true })
-  if (open) PickDeskSheet(api, cfg.permissions, buzz, onClose = { open = false }, onChanged = onChanged)
+  //  ۱۴۰۵/۰۸/۲۴: دکمهٔ سرِ صف به «…» ِ سربرگ رفت
+  return QueueEntry(StrPick.desk, { open = true }) {
+    if (open) PickDeskSheet(api, cfg.permissions, buzz, onClose = { open = false }, onChanged = onChanged)
+  }
 }
 
 @Composable

@@ -62,7 +62,7 @@ internal fun DebtorMergeSheet(
             subtitle = m.phone.takeIf { it.isNotBlank() }?.let { ir.vil3ntec.tohid.ui.components.customerPhone(it, contacts) }, // CRM-15
             tile = false,
             value = if (keep) StrMoney.mergeKeep else if (blocked == null) StrMoney.mergeAction else null,
-            valueColor = if (keep) c.inkMuted else c.accent,
+            valueColor = if (keep) c.inkMuted else ir.vil3ntec.tohid.ui.theme.PhoneV3Roles.brandText(c),
             chevron = !keep && blocked == null,
             onClick = if (keep || blocked != null) null else ({ onMerge(g.keep.id, m.id) }),
           )
