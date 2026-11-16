@@ -27,6 +27,7 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
@@ -128,7 +129,8 @@ class D3cShotsTest {
             }
           }
           repeat(6) { waitForIdle(); Thread.sleep(150) }
-          interact()
+          //  کاری که در یک شاخه نشد عکس را نمی‌گیرد: همان صحنه تا جایی که رسید
+          runCatching { interact() }.onFailure { System.err.println("D3cShots[$name/$tag]: ${it.message?.take(200)}") }
           repeat(8) { waitForIdle(); Thread.sleep(200) }
           val img = captureToImage().toAwtImage()
           ImageIO.write(img, "png", File(out!!.apply { mkdirs() }, "$name-1366-$tag-${if (dark) "dark" else "light"}.png"))
@@ -145,7 +147,9 @@ class D3cShotsTest {
   }
 
   private fun ComposeUiTest.typeInto(desc: String, text: String, enter: Boolean = false) {
-    val f = onAllNodes(hasSetTextAction() and (hasContentDescription(desc) or hasText(desc)))[0]
+    //  کادرِ نام‌دار؛ وگرنه (فرمِ پیشینِ بی‌برچسب) همان کادری که فرم به آن فوکوس داده
+    val named = onAllNodes(hasSetTextAction() and (hasContentDescription(desc) or hasText(desc)))
+    val f = if (named.fetchSemanticsNodes().isNotEmpty()) named[0] else onAllNodes(hasSetTextAction() and isFocused())[0]
     f.performTextInput(text)
     if (enter) f.performKeyInput { pressKey(Key.Enter) }
     waitForIdle()
