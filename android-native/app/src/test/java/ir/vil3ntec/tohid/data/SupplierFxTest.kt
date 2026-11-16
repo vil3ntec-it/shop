@@ -179,4 +179,17 @@ class SupplierFxTest {
     //  ردیفِ پایانی: اختلافِ نرخِ پرداخت‌های بازه (۸۰ افغانی زیان)
     assertEquals(listOf(ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.fxDiffCol, "80"), csv.rows.last().filter { it.isNotEmpty() })
   }
+
+  @Test fun `کلیدِ دکان خاموش ⇒ فاکتورِ تازه فقط افغانی؛ بدهیِ دالریِ پیشین همچنان دیده و پرداخت می‌شود`() {
+    val all = listOf("AFN", "USD", "PKR")
+    assertEquals(listOf("AFN"), SupplierFx.offered(false, all))
+    assertEquals(all, SupplierFx.offered(true, all))
+    //  حساب و پرداخت از کلید نمی‌گذرند: ۱۱۷ دالر بدهی، پرداختِ همهٔ آن به افغانی با نرخِ ۷۲ ⇒ صاف، اختلاف ۲۳۴ افغانی زیان
+    val d = usdBill()
+    assertEquals(PurchaseFx.Account("USD", 11_700, 819_000), SupplierFx.account(d, "s1", "USD"))
+    val paid = ok(SupplierFx.pay(d, "s1", "USD", 842_400, inAfn = true, rate = PurchaseFx.Rate("USD", 7_200, 1), date = "2026-11-12", notes = "", today = "2026-11-12", now = 20, newId = ::newId, key = "pay"))
+    assertEquals(PurchaseFx.Account("USD", 0, 0), SupplierFx.account(paid, "s1", "USD"))
+    assertEquals(23_400L, paid.supplierPayments.single().fxDiffMinor)
+    assertEquals(0.0, ShopStore.supplierDebt(paid, "s1"), 0.0)
+  }
 }

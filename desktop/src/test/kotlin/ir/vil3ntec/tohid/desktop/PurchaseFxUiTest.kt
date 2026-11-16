@@ -20,6 +20,7 @@ import ir.vil3ntec.tohid.core.i18n.StrSafeCur
 import ir.vil3ntec.tohid.core.purchase.PurchaseFx
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.PurchaseBook
+import ir.vil3ntec.tohid.data.PurchaseFxPref
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.ShopStore
@@ -29,6 +30,7 @@ import ir.vil3ntec.tohid.ui.v3.money.MoneyPaths
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -37,6 +39,8 @@ import org.junit.Test
 /**
  *  PUR-11 روی صفحه‌ها: فاکتورِ خریدِ دالری در فرمِ گوشی و فاکتورِ کامپیوتر ⇒ بهای کالا و انبار به معادلِ افغانی، بدهیِ دالریِ
  *  تأمین‌کننده؛ صفحهٔ تأمین‌کننده ماندهٔ هر ارز را نشان می‌دهد؛ پرداختِ دالری با نرخِ دیگر ⇒ اختلافِ نرخِ ثابت.
+ *  کلیدِ دکانِ «خرید به ارزِ دیگر» (`PurchaseFxPref`) پیش‌فرض خاموش است: بی آن کادرِ ارز نیست، ولی بدهیِ ارزیِ پیشین دیده و
+ *  پرداخت می‌شود (آزمون‌های صفحهٔ تأمین‌کننده و پرداخت عمداً با کلیدِ خاموش‌اند).
  */
 @OptIn(ExperimentalTestApi::class)
 class PurchaseFxUiTest {
@@ -55,6 +59,7 @@ class PurchaseFxUiTest {
   private fun clean() {
     ctx.filesDir.listFiles().orEmpty().filter { it.name.startsWith("shop-data.json") }.forEach { it.deleteRecursively() }
     ShopRole.remember(ctx, ShopRole.OWNER)
+    PurchaseFxPref.set(ctx, false)
   }
 
   @Before fun up() { clean(); I18n.source = { Lang.FA }; h = RouteUiHarness(rule) }
@@ -73,7 +78,24 @@ class PurchaseFxUiTest {
     rule.waitForIdle()
   }
 
+  @Test fun phoneFormHasNoCurrencyPickerWhileTheShopSwitchIsOff() {
+    assertFalse(PurchaseFxPref.on(ctx))
+    h.show(MoneyPaths.newPurchase("dubai"), disk())
+    h.await(StrPurchases.receivedNow)
+    h.await(StrMoney.pickItem)
+    assertFalse(h.has(StrSafeCur.currency))
+    assertFalse(h.has(StrPurchaseFx.section))
+  }
+
+  @Test fun phoneFormShowsTheCurrencyPickerWhenTheShopSwitchIsOn() {
+    PurchaseFxPref.set(ctx, true)
+    h.show(MoneyPaths.newPurchase("dubai"), disk())
+    h.await(StrPurchases.receivedNow)
+    h.await(StrSafeCur.currency)
+  }
+
   @Test fun phoneFormRecordsAUsdBillAtTheRecordedRate() {
+    PurchaseFxPref.set(ctx, true)
     val store = disk()
     h.show(MoneyPaths.newPurchase("dubai"), store)
     h.await(StrPurchases.receivedNow)
@@ -108,6 +130,7 @@ class PurchaseFxUiTest {
   }
 
   @Test fun supplierPageShowsTheBalanceOfEachCurrency() {
+    assertFalse(PurchaseFxPref.on(ctx))
     h.show(MoneyPaths.supplier("dubai"), withUsdBill())
     h.await(StrPurchaseFx.byCurrency)
     assertTrue(h.has(StrPurchaseFx.owed("100 USD", "7,000 ؋"), substring = true))
@@ -116,6 +139,7 @@ class PurchaseFxUiTest {
   }
 
   @Test fun phonePaymentInUsdAtAnotherRateRecordsTheExchangeDifference() {
+    assertFalse(PurchaseFxPref.on(ctx))
     val store = disk(withUsdBill())
     h.show(MoneyPaths.paySupplier("dubai"), store)
     h.await(StrPurchaseFx.account)
@@ -133,5 +157,22 @@ class PurchaseFxUiTest {
     assertEquals(8_000L, pay.fxDiffMinor)
     assertEquals(2_800.0, pay.amount, 0.0)
     assertEquals(PurchaseFx.Account("USD", 6_000, 420_000), SupplierFx.account(store.data.value, "dubai", "USD"))
+  }
+
+  @Test fun usdDebtStaysPayableInFullWhileTheShopSwitchIsOff() {
+    assertFalse(PurchaseFxPref.on(ctx))
+    val store = disk(withUsdBill())
+    h.show(MoneyPaths.paySupplier("dubai"), store)
+    h.await(StrPurchaseFx.account)
+    h.click("USD")
+    h.await(StrPurchaseFx.payWith)
+    replace(StrPurchaseFx.rateLabel("1", "USD"), "70")
+    h.type(StrPurchaseFx.amountIn("USD"), "100")
+    h.click(StrMoney.recordPayment)
+    h.awaitThat { store.data.value.supplierPayments.isNotEmpty() }
+    val d = store.data.value
+    assertEquals(PurchaseFx.Account("USD", 0, 0), SupplierFx.account(d, "dubai", "USD"))
+    assertEquals(0.0, ShopStore.supplierDebt(d, "dubai"), 0.0)
+    assertEquals(null, d.supplierPayments.single().fxDiffMinor)
   }
 }

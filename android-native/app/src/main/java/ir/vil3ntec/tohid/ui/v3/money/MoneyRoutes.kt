@@ -285,6 +285,7 @@ val MoneyModule = AppModule(
       //  PUR-11: ارزهای افزودهٔ دکان (تنظیمِ گاوصندوق) یک بار برای همین فرم
       val customCurrencies = remember { ir.vil3ntec.tohid.data.SafeCurrencyPref.custom(context) }
       val tillRates = remember { ir.vil3ntec.tohid.data.FxTillPref.rates(context) }
+      val fxOn = remember { ir.vil3ntec.tohid.data.PurchaseFxPref.on(context) }
       PurchaseFormScreen(
         d = data,
         supplierArg = args.query("supplier"),
@@ -308,9 +309,10 @@ val MoneyModule = AppModule(
         onScan = purchaseScan(),
         laterOn = rememberPoManage(rememberPurchaseOrdersDoor()),
         onSaveLater = rememberSaveLater(saveKey),
-        //  PUR-11: ارزهای گاوصندوق (+ ارزهای دفترِ خرید) و آخرین نرخِ هر ارز (خرید/پرداخت، وگرنه نرخِ صندوقِ PAY-10)
+        //  PUR-11: ارزهای گاوصندوق (+ ارزهای دفترِ خرید) و آخرین نرخِ هر ارز (خرید/پرداخت، وگرنه نرخِ صندوقِ PAY-10)؛
+        //  کلیدِ دکانِ «خرید به ارزِ دیگر» خاموش ⇒ فقط افغانی (بی کادرِ ارز، `SupplierFx.offered`)
         currencies = remember(data.purchases, data.supplierPayments) {
-          ir.vil3ntec.tohid.data.SafeCurrencies.all(customCurrencies, ir.vil3ntec.tohid.data.SupplierFx.inLedger(data))
+          ir.vil3ntec.tohid.data.SupplierFx.offered(fxOn, ir.vil3ntec.tohid.data.SafeCurrencies.all(customCurrencies, ir.vil3ntec.tohid.data.SupplierFx.inLedger(data)))
         },
         currencyName = { code -> ir.vil3ntec.tohid.data.SafeCurrencies.name(code, customCurrencies) },
         lastRate = { code -> ir.vil3ntec.tohid.data.SupplierFx.defaultRate(data, code, tillRates) },

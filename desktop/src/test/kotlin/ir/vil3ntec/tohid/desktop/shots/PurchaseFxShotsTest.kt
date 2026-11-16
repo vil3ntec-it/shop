@@ -36,10 +36,12 @@ import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseFx
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
 import ir.vil3ntec.tohid.core.i18n.StrSafeCur
+import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.core.purchase.PurchaseFx
 import ir.vil3ntec.tohid.data.LedgerEngine
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.PurchaseBook
+import ir.vil3ntec.tohid.data.PurchaseFxPref
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.Supplier
@@ -50,7 +52,9 @@ import ir.vil3ntec.tohid.scan.ScanRouter
 import ir.vil3ntec.tohid.ui.screens.DeskPurchasingScreen
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
+import ir.vil3ntec.tohid.ui.screens.SettingsLayout
 import ir.vil3ntec.tohid.ui.v3.money.MoneyPaths
+import ir.vil3ntec.tohid.ui.v3.settings.SettingsPaths
 import ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout
 import org.junit.Assume
 import org.junit.Test
@@ -61,7 +65,8 @@ import kotlin.time.Duration.Companion.minutes
 /**
  *  عکس‌های PUR-11 برای صاحب‌کار: فرمِ «ثبت خرید» به دالر، جزئیاتِ خریدِ دالری، صفحهٔ تأمین‌کننده با «بدهی به تفکیکِ ارز» و برگهٔ
  *  پرداختِ دالری با اختلافِ نرخ — گوشیِ ۳۶۰×۷۶۰dp (چگالیِ ۲) روشن و تیره؛ و فاکتورِ خریدِ کامپیوتر به دالر و حسابِ تأمین‌کننده
- *  در ۱۳۶۶×۷۶۸. فقط با `PUR11_SHOTS=<پوشه>` (آزمونِ سد نیست؛ بی آن کنار می‌رود).
+ *  در ۱۳۶۶×۷۶۸؛ و کلیدِ دکانِ «خرید به ارزِ دیگر» در تنظیمات پیش و پس از روشن کردن. فقط با `PUR11_SHOTS=<پوشه>` (آزمونِ سد
+ *  نیست؛ بی آن کنار می‌رود).
  */
 @OptIn(ExperimentalTestApi::class)
 class PurchaseFxShotsTest {
@@ -165,7 +170,14 @@ class PurchaseFxShotsTest {
     ShopRole.remember(DesktopContext, ShopRole.OWNER)
     val d = ledger()
     val bill = PurchaseBook.invoices(d).single()
+    val switch = SettingsPaths.section(SettingsLayout.PURCHASE_FX)
     for (dark in listOf(false, true)) {
+      //  کلیدِ دکان: پیش (خاموش، پیش‌فرض) و پس از «روشن»
+      PurchaseFxPref.set(DesktopContext, false)
+      phone("phone-settings-purchase-fx-off", dark, switch, base)
+      PurchaseFxPref.set(DesktopContext, false)
+      phone("phone-settings-purchase-fx-on", dark, switch, base) { click(StrShell.switchOn) }
+      PurchaseFxPref.set(DesktopContext, true)
       phone("phone-new-purchase-usd", dark, MoneyPaths.newPurchase("dubai"), base) {
         click(StrSafeCur.currency)
         click(StrFx.usd)
@@ -183,6 +195,7 @@ class PurchaseFxShotsTest {
         typeIn(StrPurchaseFx.amountIn("USD"), "30")
       }
     }
+    PurchaseFxPref.set(DesktopContext, true)
     desk("desk-new-invoice-usd", base) {
       click(StrPurchasePages.newPurchaseKey)
       onAllNodes(hasText(StrSafeCur.afn) and hasClickAction())[0].performSemanticsAction(SemanticsActions.OnClick)
@@ -202,6 +215,7 @@ class PurchaseFxShotsTest {
       click(StrPurchasePages.paySupplierKey)
       click("USD")
     }
+    PurchaseFxPref.set(DesktopContext, false)
     //  حالِ همین دفتر برای گزارشِ عکس‌ها
     File(out!!, "ledger.txt").writeText(
       listOf(

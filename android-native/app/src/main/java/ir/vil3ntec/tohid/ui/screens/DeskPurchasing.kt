@@ -348,10 +348,12 @@ private fun NewPurchaseInvoice(
   val buys = remember(d) { ir.vil3ntec.tohid.data.PurchaseOrderBook.buys(d) }
   var touched by remember { mutableStateOf<PurchaseDraft?>(null) }
   var historyFor by remember { mutableStateOf<String?>(null) }
-  //  PUR-11: ارزِ فاکتور (ارزهای گاوصندوق + دفتر؛ `DeskPurchaseFx.kt`)؛ افغانی ⇒ همان فرمِ پیشین. ارزِ تازه قیمت‌های تایپی را پاک می‌کند
+  //  PUR-11: ارزِ فاکتور (ارزهای گاوصندوق + دفتر؛ `DeskPurchaseFx.kt`)؛ افغانی ⇒ همان فرمِ پیشین. ارزِ تازه قیمت‌های تایپی را پاک می‌کند.
+  //  کلیدِ دکانِ «خرید به ارزِ دیگر» خاموش ⇒ فقط افغانی و کادرِ ارز نیست (`SupplierFx.offered`)
   val customCurrencies = remember { ir.vil3ntec.tohid.data.SafeCurrencyPref.custom(context) }
   val tillRates = remember { ir.vil3ntec.tohid.data.FxTillPref.rates(context) }
-  val currencies = remember(d.purchases, d.supplierPayments) { ir.vil3ntec.tohid.data.SafeCurrencies.all(customCurrencies, ir.vil3ntec.tohid.data.SupplierFx.inLedger(d)) }
+  val fxOn = remember { ir.vil3ntec.tohid.data.PurchaseFxPref.on(context) }
+  val currencies = remember(d.purchases, d.supplierPayments) { ir.vil3ntec.tohid.data.SupplierFx.offered(fxOn, ir.vil3ntec.tohid.data.SafeCurrencies.all(customCurrencies, ir.vil3ntec.tohid.data.SupplierFx.inLedger(d))) }
   val fxState = remember { DeskFxInvoice() }
   val fx = fxState.fx; val fxCode = fxState.code
   fun pickCurrency(code: String) { if (fxState.pick(code) { ir.vil3ntec.tohid.data.SupplierFx.defaultRate(d, it, tillRates) }) { lines.forEach { it.price = "" }; paid = "" } }

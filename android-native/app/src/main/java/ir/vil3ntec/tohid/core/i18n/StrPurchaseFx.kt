@@ -73,4 +73,29 @@ object StrPurchaseFx {
     "Positive = loss (paid more than the book value), negative = gain. Not part of the sales profit.",
     "مثبت = تاوان (له دفتري ارزښت زیات ورکړل شو)، منفي = ګټه. د پلور د ګټې برخه نه ده.",
   )
+
+  // ── کلیدِ دکان (تنظیمات ← کالا و انبار؛ `PurchaseFxPref`، پیش‌فرض خاموش) ──
+  val settingTitle: String get() = t("خرید به ارزِ دیگر", "Buying in another currency", "په بل اسعارو پېرود")
+  val settingOn: String get() = t("فاکتورِ خرید ارز و نرخ می‌گیرد", "Purchase invoices take a currency and rate", "د پېرود بل اسعار او نرخ اخلي")
+  val helpLine: String get() = t("فاکتورِ خرید به دالر، کلدار یا ارزِ دیگر", "Purchase invoices in USD, PKR or another currency", "د پېرود بل په ډالرو، کلدارو یا بل اسعارو")
+  val helpExample: String get() = t(
+    "۱۰۰ دالر جنس به نرخِ ۷۰: بهای کالا ۷٬۰۰۰ افغانی و بدهی به تأمین‌کننده ۱۰۰ دالر.",
+    "100 USD of goods at 70: stock cost 7,000 AFN and you owe the supplier 100 USD.",
+    "د ۷۰ په نرخ ۱۰۰ ډالر توکي: د توکو بیه ۷٬۰۰۰ افغانۍ او عرضه‌کوونکي ته پور ۱۰۰ ډالر.",
+  )
+  val settingNote: String get() = t(
+    "روشن باشد، در فاکتورِ خرید ارز و نرخ را انتخاب می‌کنید. خاموش باشد، فاکتورِ تازه به افغانی است؛ فاکتور و بدهیِ ارزیِ پیشین همچنان دیده و پرداخت می‌شود.",
+    "When on, you choose the currency and rate on a purchase invoice. When off, new invoices are in AFN; earlier foreign-currency invoices and debts still show and can still be paid.",
+    "کله چې روښانه وي، د پېرود په بل کې اسعار او نرخ ټاکئ. کله چې بند وي، نوی بل په افغانیو دی؛ پخواني بلونه او په بل اسعارو پورونه لا هم ښکاري او ورکول کېږي.",
+  )
+  val updateFirst: String get() = t(
+    "پیش از روشن کردن، همهٔ دستگاه‌های دکان را به‌روز کنید. دستگاهِ کهنه خریدِ ارزی را افغانی می‌خواند و پرداختِ ارزی را از دخلِ افغانی کم می‌کند.",
+    "Before switching on, update every device in the shop. An old device reads a foreign-currency purchase as AFN and takes a foreign-currency payment out of the AFN drawer.",
+    "د روښانولو مخکې د دوکان ټول وسایل تازه کړئ. زړه وسیله په بل اسعارو پېرود افغانۍ لولي او په بل اسعارو تادیه د افغانیو له دخل څخه کموي.",
+  )
+  val managersOnly: String get() = t(
+    "فقط صاحب یا مدیرِ دکان این کلید را عوض می‌کند.",
+    "Only the shop owner or a manager can change this switch.",
+    "یوازې د دوکان خاوند یا مدیر دا کیلي بدلولی شي.",
+  )
 }

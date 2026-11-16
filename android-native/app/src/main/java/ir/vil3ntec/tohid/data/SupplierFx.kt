@@ -82,6 +82,12 @@ object SupplierFx {
     return out.toList()
   }
 
+  /**
+   *  ارزهای کادرِ فاکتورِ **تازه**: کلیدِ دکانِ «خرید به ارزِ دیگر» (`PurchaseFxPref`) خاموش ⇒ فقط افغانی (کادر پنهان، همان
+   *  فرمِ پیشین). حساب، فاکتور و پرداختِ ارزیِ پیشین از این نمی‌گذرند و همیشه دیده و پرداخت می‌شوند.
+   */
+  fun offered(on: Boolean, all: List<String>): List<String> = if (on) all else listOf(PurchaseFx.AFN)
+
   /** آخرین نرخِ ثبت‌شدهٔ [currency] در خرید یا پرداخت (پیش‌پُرِ کادرِ نرخ)؛ نبود ⇒ null */
   fun lastRate(d: ShopData, currency: String): PurchaseFx.Rate? {
     val a = d.purchases.filter { cur(it.currency) == currency && rateOf(it) != null }.maxByOrNull { it.createdAt }

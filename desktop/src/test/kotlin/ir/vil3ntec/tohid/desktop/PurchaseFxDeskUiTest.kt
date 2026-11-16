@@ -24,17 +24,21 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
+import ir.vil3ntec.tohid.core.i18n.StrCustomerPages
 import ir.vil3ntec.tohid.core.i18n.StrFx
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseFx
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
 import ir.vil3ntec.tohid.core.i18n.StrSafeCur
 import ir.vil3ntec.tohid.core.purchase.PurchaseFx
 import ir.vil3ntec.tohid.data.Product
+import ir.vil3ntec.tohid.data.PurchaseBook
+import ir.vil3ntec.tohid.data.PurchaseFxPref
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.ShopStore
@@ -48,12 +52,16 @@ import ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import kotlin.time.Duration.Companion.minutes
 
-/** PUR-11 روی فاکتورِ خریدِ کامپیوتر (`DeskPurchasing`): ارز، نرخ، قیمتِ دالری ⇒ بهای افغانی و بدهیِ دالری */
+/**
+ *  PUR-11 روی فاکتورِ خریدِ کامپیوتر (`DeskPurchasing`): ارز، نرخ، قیمتِ دالری ⇒ بهای افغانی و بدهیِ دالری. کلیدِ دکانِ «خرید به
+ *  ارزِ دیگر» (`PurchaseFxPref`) خاموش ⇒ کادرِ ارز نیست، ولی بدهیِ دالریِ پیشین در پروندهٔ تأمین‌کننده دیده و پرداخت می‌شود.
+ */
 @OptIn(ExperimentalTestApi::class)
 class PurchaseFxDeskUiTest {
 
@@ -66,6 +74,7 @@ class PurchaseFxDeskUiTest {
   private fun clean() {
     ctx.filesDir.listFiles().orEmpty().filter { it.name.startsWith("shop-data.json") }.forEach { it.deleteRecursively() }
     ShopRole.remember(ctx, ShopRole.OWNER)
+    PurchaseFxPref.set(ctx, false)
   }
 
   @Before fun up() { clean(); I18n.source = { Lang.FA } }
@@ -97,7 +106,55 @@ class PurchaseFxDeskUiTest {
     waitForIdle()
   }
 
+  private fun ComposeUiTest.field(label: String) = onAllNodes(hasSetTextAction() and hasContentDescription(label))[0]
+
+  @Test fun desktopInvoiceHasNoCurrencyPickerWhileTheShopSwitchIsOff() = desk { set ->
+    assertFalse(PurchaseFxPref.on(ctx))
+    val store = ShopStore(ctx).also { s -> runBlocking { s.load(); assertTrue(s.replaceAll(data)) } }
+    set {
+      val d by store.data.collectAsState()
+      DeskPurchasingScreen(store, d, remember { SnackbarHostState() })
+    }
+    await(StrPurchasePages.newPurchaseKey)
+    tap(StrPurchasePages.newPurchaseKey)
+    await(StrPurchasePages.saveInvoiceKey)
+    assertFalse(has(StrSafeCur.currency))
+    assertFalse(has(StrSafeCur.afn))
+  }
+
+  @Test fun desktopUsdDebtStaysVisibleAndPayableWhileTheShopSwitchIsOff() = desk { set ->
+    assertFalse(PurchaseFxPref.on(ctx))
+    var seq = 0
+    val bill = (PurchaseBook.record(
+      data, "dubai", listOf(PurchaseBook.Line("tea", 10.0, 0.0, fxPrice = 1_000)), 0.0, "2026-11-10", "", "2026-11-10", 1,
+      { "id${seq++}" }, key = "bill", fx = PurchaseFx.Rate("USD", 7_000, 1),
+    ) as PurchaseBook.Result.Ok).data
+    val store = ShopStore(ctx).also { s -> runBlocking { s.load(); assertTrue(s.replaceAll(bill)) } }
+    set {
+      val d by store.data.collectAsState()
+      DeskPurchasingScreen(store, d, remember { SnackbarHostState() })
+    }
+    await(StrPurchasePages.suppliers)
+    tap(StrPurchasePages.suppliers)
+    await("دوبی‌تریدرز")
+    tap("دوبی‌تریدرز")
+    await(StrPurchaseFx.byCurrency, substring = true)
+    tap(StrPurchasePages.paySupplierKey)
+    await(StrPurchaseFx.account)
+    tap("USD")
+    await(StrPurchaseFx.payWith)
+    field(StrPurchaseFx.rateLabel("1", "USD")).performTextReplacement("70")
+    field(StrPurchaseFx.amountIn("USD")).performTextInput("100")
+    waitForIdle()
+    tap(StrCustomerPages.saveKey)
+    waitUntil(timeoutMillis = 20_000) { store.data.value.supplierPayments.isNotEmpty() }
+    val d = store.data.value
+    assertEquals(PurchaseFx.Account("USD", 0, 0), SupplierFx.account(d, "dubai", "USD"))
+    assertEquals(0.0, ShopStore.supplierDebt(d, "dubai"), 0.0)
+  }
+
   @Test fun desktopInvoiceInUsdKeepsTheAfnCostAndTheUsdDebt() = desk { set ->
+    PurchaseFxPref.set(ctx, true)
     val store = ShopStore(ctx).also { s -> runBlocking { s.load(); assertTrue(s.replaceAll(data)) } }
     set {
       val d by store.data.collectAsState()
