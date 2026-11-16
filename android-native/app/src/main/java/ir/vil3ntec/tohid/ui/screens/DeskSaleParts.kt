@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -40,10 +41,13 @@ import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -538,6 +542,70 @@ internal fun DeskPayMethods(methods: List<PosPayMethod>, selected: SalesEngine.P
         Spacer(Modifier.width(DeskSpace.x2))
         Text(m.label, style = DeskType.bodyStrong, color = if (on) tone.ink else c.ink, maxLines = 1)
       }
+    }
+  }
+}
+
+/**
+ *  e-paymethods — کاشی‌های روش‌های دکان برای صندوقِ کامپیوتر (فقط با پنلِ پرداخت): روش‌های روشنِ پنل (کارتِ هدیه و اعتبار با
+ *  `GiftCardPref`، برداشته‌های `PayMethodsPref` بیرون) و حالِ حساب‌پیِ خودِ دکان (`HesabPayEnv.till`، یک دقیقه در حافظه).
+ *  [hesabOk] = پول گرفتنی است (نه تخفیفِ تأییدنشده یا ممنوع) ⇒ وگرنه کاشیِ حساب‌پی خاموش.
+ */
+@Composable
+internal fun rememberDeskPayTiles(
+  payV2: Boolean,
+  gateways: ir.vil3ntec.tohid.ui.components.pos.GatewayHook,
+  saleKey: String?,
+  hesabOk: Boolean,
+): List<ir.vil3ntec.tohid.core.pay.TillMethods.Tile> {
+  if (!payV2) return emptyList()
+  val context = androidx.compose.ui.platform.LocalContext.current
+  val gift = remember { ir.vil3ntec.tohid.data.GiftCardPref.on(context) }
+  val off = remember { ir.vil3ntec.tohid.data.PayMethodsPref.off(context) }
+  val till by androidx.compose.runtime.produceState(ir.vil3ntec.tohid.core.gateway.TillHesab.OFF, saleKey) { value = gateways.env.till() }
+  val hesab = ir.vil3ntec.tohid.core.pay.TillMethods.hesab(till, ir.vil3ntec.tohid.data.ReportBridge.nowMs())
+  return ir.vil3ntec.tohid.core.pay.TillMethods.tiles(ir.vil3ntec.tohid.data.PayFlow.panelMethods(gift, off), hesab).map { t ->
+    if (t.kind == ir.vil3ntec.tohid.core.pay.TillMethods.Kind.HESABPAY && t.enabled && !hesabOk) t.copy(enabled = false) else t
+  }
+}
+
+/**
+ *  e-paymethods — با پنلِ پرداخت (`payV2`): همهٔ روش‌های دکان (`core/pay/TillMethods`) کنارِ سبد، سه در هر سطر، به همان ریختِ
+ *  [DeskPayMethods]. زدن ⇒ پنلِ پرداخت با همان روش (`PayPanelDialog.initial`). حساب‌پیِ ۲۴ ساعتِ در انتظار ⇒ کاشیِ خاموش و
+ *  زیرش زمانِ فعال شدن. نام و آیکن همان کاشی‌های گوشی (`tileLabel`/`tileIcon`).
+ */
+@Composable
+internal fun DeskPayTiles(tiles: List<ir.vil3ntec.tohid.core.pay.TillMethods.Tile>, enabled: Boolean, tone: DeskHue, onPick: (ir.vil3ntec.tohid.core.pay.TillMethods.Tile) -> Unit) {
+  if (tiles.isEmpty()) return
+  val c = Desk.colors
+  Column(Modifier.fillMaxWidth().padding(top = DeskSpace.x2), verticalArrangement = Arrangement.spacedBy(DeskSpace.x2)) {
+    tiles.chunked(3).forEach { line ->
+      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(DeskSpace.x2)) {
+        line.forEach { t ->
+          val (name, _) = ir.vil3ntec.tohid.ui.v3.sales.checkout.tileLabel(t.kind)
+          val on = enabled && t.enabled
+          Row(
+            Modifier
+              .weight(1f)
+              .height(40.dp)
+              .clip(DeskRadius.controlShape)
+              .background(c.surface)
+              .border(DeskSize.hairline, c.hairline, DeskRadius.controlShape)
+              .clickable(enabled = on, role = Role.Button) { onPick(t) }
+              .alpha(if (t.enabled) 1f else 0.5f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+          ) {
+            Icon(ir.vil3ntec.tohid.ui.v3.sales.checkout.tileIcon(t.kind), contentDescription = null, tint = tone.glyph, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(DeskSpace.x1))
+            Text(name, style = DeskType.bodyStrong, color = c.ink, maxLines = 1)
+          }
+        }
+        repeat(3 - line.size) { Spacer(Modifier.weight(1f)) }
+      }
+    }
+    tiles.firstOrNull { it.until != null }?.until?.let { until ->
+      Text(ir.vil3ntec.tohid.core.i18n.StrTillPay.hesabPending(ir.vil3ntec.tohid.ui.v3.sales.history.SaleTime.stamp(until)), style = DeskType.secondary, color = c.warning)
     }
   }
 }

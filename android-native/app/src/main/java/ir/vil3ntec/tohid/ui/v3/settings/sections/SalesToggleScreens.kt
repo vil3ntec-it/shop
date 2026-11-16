@@ -34,7 +34,7 @@ import ir.vil3ntec.tohid.ui.v3.settings.SettingsPageFrame
 /** خاموش | روشن — برچسب‌های همان رابطِ امروز */
 private val OFF_ON: List<String> get() = listOf(StrShell.switchOff, StrShell.switchOn)
 
-/** `settings/sales/payments`: «نقد و نسیه (امروز) | ترکیبی و شیفت» — همان `ShopPolicy.setPayV2` (PAY، v3 A4) */
+/** `settings/sales/payments`: «فقط نقد و نسیه | ترکیبی و شیفت» — همان `ShopPolicy.setPayV2` (PAY، v3 A4)؛ از e-paymethods دستگاهِ بی انتخاب خودش «ترکیبی» */
 @Composable
 internal fun RouteScope.PaySettingsScreen(onBack: (() -> Unit)?) {
   val context = LocalContext.current

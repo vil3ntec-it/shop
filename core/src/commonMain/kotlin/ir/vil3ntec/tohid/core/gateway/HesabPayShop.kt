@@ -65,6 +65,11 @@ data class TillHesab(
   val payees: List<Payee> = emptyList(),
   /** پرچمِ `pay.hesabpay` ِ همین دکان (`/config` ِ `flag`؛ سرورِ کهنه ⇒ همان `enabled`) */
   val flag: Boolean = gateway,
+  /**
+   *  e-paymethods: دکان هیچ حسابِ فعالی ندارد و حسابی ۲۴ ساعت در انتظار است ⇒ فقط زمانِ فعال شدن (میلی‌ثانیه، ساعتِ سرور؛
+   *  `/config` ِ `pendingUntil`). هیچ چیزِ دیگرِ حسابِ تازه به صندوق نمی‌رسد. سرورِ کهنه ⇒ `null`.
+   */
+  val pendingUntil: Long? = null,
 ) {
   val any: Boolean get() = gateway || simple != null
 
@@ -87,7 +92,8 @@ data class TillHesab(
       val known = (h["payees"] as? List<*>).orEmpty().mapNotNull { Payee.fromMap(it as? Map<*, *>) }.filter { it.fp.isNotBlank() }
       val enabled = h["enabled"] == true
       val flag = (h["flag"] as? Boolean) ?: enabled
-      return TillHesab(enabled, mode, simple, if (mode == HesabPayShop.OFF) null else Payee.fromMap(h["payee"] as? Map<*, *>), known, flag)
+      val until = (h["pendingUntil"] as? Number)?.toLong()?.takeIf { it > 0 }
+      return TillHesab(enabled, mode, simple, if (mode == HesabPayShop.OFF) null else Payee.fromMap(h["payee"] as? Map<*, *>), known, flag, until)
     }
   }
 }

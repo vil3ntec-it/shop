@@ -88,7 +88,8 @@ fun main() {
   ir.vil3ntec.tohid.sync.LicenseGuard.warm() // وضعِ سراسریِ Compose پیش از کارِ پس‌زمینه و نخستین ترکیب (#1028)
   val store = ShopStore(context)
   val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-  scope.launch { store.loadAndSummarize(); StartupTrace.ledgerReady() }
+  //  e-paymethods: پس از خواندنِ دفتر، پیش‌فرضِ «ترکیبی و شیفت» برای دستگاهی که هرگز انتخاب نکرده (`ShopStore.adoptPayDefault`)
+  scope.launch { store.loadAndSummarize(adoptPay = true); StartupTrace.ledgerReady() }
   scope.launch(Dispatchers.IO) { runCatching { ir.vil3ntec.tohid.data.platform.CrashReporter.flush(context) } }
 
   runCatching { ir.vil3ntec.tohid.sync.SavedLogins.purgeTokens(context) }
