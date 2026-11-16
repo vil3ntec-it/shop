@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -139,7 +141,7 @@ fun LoyaltyBar(till: LoyaltyTill?, modifier: Modifier = Modifier) {
     var text by remember { mutableStateOf(till.cap.toString()) }
     val n = normalizeDigits(text).trim().toLongOrNull()
     val ok = n != null && n in 1..till.cap
-    AlertDialog(
+    ShopAlertDialog(
       onDismissRequest = { asking = false },
       title = { Text(StrLoyalty.use) },
       text = {
@@ -149,8 +151,8 @@ fun LoyaltyBar(till: LoyaltyTill?, modifier: Modifier = Modifier) {
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
       },
-      confirmButton = { TextButton(onClick = { till.setPoints(n ?: 0); asking = false }, enabled = ok) { Text(StrLoyalty.apply) } },
-      dismissButton = { TextButton(onClick = { asking = false }) { Text(StrLoyalty.cancel) } },
+      confirmButton = { ShopTextButton(onClick = { till.setPoints(n ?: 0); asking = false }, enabled = ok) { Text(StrLoyalty.apply) } },
+      dismissButton = { ShopTextButton(onClick = { asking = false }) { Text(StrLoyalty.cancel) } },
     )
   }
 }
@@ -218,7 +220,7 @@ private fun LoyaltyAdjustDialog(store: ShopStore, debtorId: String, rule: Loyalt
   var busy by remember { mutableStateOf(false) }
   val n = normalizeDigits(text).trim().toLongOrNull()
   val ok = n != null && n in 1..Loyalty.MAX_POINTS && reason.isNotBlank() && !busy
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onClose,
     title = { Text(StrLoyalty.adjust) },
     text = {
@@ -241,7 +243,7 @@ private fun LoyaltyAdjustDialog(store: ShopStore, debtorId: String, rule: Loyalt
       }
     },
     confirmButton = {
-      TextButton(enabled = ok, onClick = {
+      ShopTextButton(enabled = ok, onClick = {
         val delta = if (add) n!! else -n!!
         busy = true
         scope.launch {
@@ -260,7 +262,7 @@ private fun LoyaltyAdjustDialog(store: ShopStore, debtorId: String, rule: Loyalt
         }
       }) { Text(StrLoyalty.apply) }
     },
-    dismissButton = { TextButton(onClick = onClose) { Text(StrLoyalty.cancel) } },
+    dismissButton = { ShopTextButton(onClick = onClose) { Text(StrLoyalty.cancel) } },
   )
 }
 

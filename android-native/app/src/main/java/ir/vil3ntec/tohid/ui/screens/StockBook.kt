@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -595,7 +597,7 @@ private fun CountTab(
   }
 
   confirm?.let { what ->
-    AlertDialog(
+    ShopAlertDialog(
       onDismissRequest = { confirm = null },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(if (what == "save") StrStockPages.saveDiffsAsk(review.variance) else StrStockPages.dropAsk, color = Shop.colors.text) },
@@ -607,16 +609,16 @@ private fun CountTab(
         )
       },
       confirmButton = {
-        TextButton(onClick = {
+        ShopTextButton(onClick = {
           confirm = null
-          if (what == "drop") { keep(null); return@TextButton }
+          if (what == "drop") { keep(null); return@ShopTextButton }
           when (val r = StockActions.saveCount(d, v, dr, user, todayIso(), System.currentTimeMillis(), ::newId)) {
             is StockActions.Result.Failed -> onFail(r.message)
             is StockActions.Result.Ok -> { keep(null); onSaved(r.data, r.id) }
           }
         }) { Text(if (what == "save") StrStockPages.saveIt else StrStockPages.setAside) }
       },
-      dismissButton = { TextButton(onClick = { confirm = null }) { Text(Str.cancel) } },
+      dismissButton = { ShopTextButton(onClick = { confirm = null }) { Text(Str.cancel) } },
     )
   }
 }

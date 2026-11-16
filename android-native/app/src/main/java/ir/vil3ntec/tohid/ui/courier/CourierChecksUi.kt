@@ -2,6 +2,8 @@ package ir.vil3ntec.tohid.ui.courier
 
 // i18n: سه‌زبانه
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -71,7 +73,7 @@ internal fun BagScanDialog(c: MissionCard, onDismiss: () -> Unit, onDone: (List<
   val s = rememberBagScan(c)
   val bags = s.bags
   val missing = s.missing
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     containerColor = colors.surfaceSolid,
     title = { Text(StrCourier.bagsTitle, color = colors.text) },
@@ -90,7 +92,7 @@ internal fun BagScanDialog(c: MissionCard, onDismiss: () -> Unit, onDone: (List<
             modifier = Modifier.weight(1f),
           )
           Spacer(Modifier.width(8.dp))
-          TextButton(enabled = s.input.isNotBlank(), onClick = { s.submit() }) { Text(StrCourier.add, color = colors.primary) }
+          ShopTextButton(enabled = s.input.isNotBlank(), onClick = { s.submit() }) { Text(StrCourier.add, color = colors.primary) }
         }
         s.note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = colors.danger) }
         Spacer(Modifier.height(6.dp))
@@ -101,9 +103,9 @@ internal fun BagScanDialog(c: MissionCard, onDismiss: () -> Unit, onDone: (List<
       }
     },
     confirmButton = {
-      TextButton(enabled = s.ready, onClick = { onDone(s.labels()) }) { Text(StrCourier.pickedUp, color = colors.primary) }
+      ShopTextButton(enabled = s.ready, onClick = { onDone(s.labels()) }) { Text(StrCourier.pickedUp, color = colors.primary) }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel, color = colors.muted) } },
+    dismissButton = { ShopTextButton(onClick = onDismiss) { Text(Str.cancel, color = colors.muted) } },
   )
 }
 
@@ -115,7 +117,7 @@ internal fun NearPinFlow(c: MissionCard, onDismiss: () -> Unit, onReady: (Courie
   val colors = Shop.colors
   val s = rememberNearPin(c, onReady)
   val busy = s.busy
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     containerColor = colors.surfaceSolid,
     title = { Text(StrCourier.pinTitle, color = colors.text) },
@@ -125,8 +127,8 @@ internal fun NearPinFlow(c: MissionCard, onDismiss: () -> Unit, onReady: (Courie
         style = MaterialTheme.typography.bodyMedium, color = if (busy) colors.muted else colors.text,
       )
     },
-    confirmButton = { TextButton(enabled = !busy, onClick = { s.start() }) { Text(StrCourier.checkAgain, color = colors.primary) } },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel, color = colors.muted) } },
+    confirmButton = { ShopTextButton(enabled = !busy, onClick = { s.start() }) { Text(StrCourier.checkAgain, color = colors.primary) } },
+    dismissButton = { ShopTextButton(onClick = onDismiss) { Text(Str.cancel, color = colors.muted) } },
   )
 }
 
@@ -171,7 +173,7 @@ internal fun RouteSheet(cards: List<MissionCard>, onDismiss: () -> Unit) {
 internal fun RateDialog(onDismiss: () -> Unit, onDone: (stars: Int, tags: List<String>) -> Unit) {
   val colors = Shop.colors
   val s = rememberRating()
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     containerColor = colors.surfaceSolid,
     title = { Text(StrCourier.rateTitle, color = colors.text) },
@@ -187,8 +189,8 @@ internal fun RateDialog(onDismiss: () -> Unit, onDone: (stars: Int, tags: List<S
       }
     },
     confirmButton = {
-      TextButton(enabled = s.ok, onClick = { onDone(s.stars, s.chosen()) }) { Text(StrCourier.send, color = colors.primary) }
+      ShopTextButton(enabled = s.ok, onClick = { onDone(s.stars, s.chosen()) }) { Text(StrCourier.send, color = colors.primary) }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel, color = colors.muted) } },
+    dismissButton = { ShopTextButton(onClick = onDismiss) { Text(Str.cancel, color = colors.muted) } },
   )
 }

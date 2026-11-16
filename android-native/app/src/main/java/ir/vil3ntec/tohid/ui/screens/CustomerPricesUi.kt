@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -56,7 +58,7 @@ internal fun CustomerPricesDialog(
   var editing by remember(debtor.id, debtor.specialPrices) { mutableStateOf<CustomerPriceEditor?>(null) }
   val products = remember(d.products) { d.products.associateBy { it.id } }
   val ed = editing
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     containerColor = Shop.colors.surfaceSolid,
     title = { Text("${StrCustomerPrices.title} — ${debtor.name}", color = Shop.colors.text) },
@@ -77,8 +79,8 @@ internal fun CustomerPricesDialog(
                 customerPriceRange(e, today)?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2) }
               }
               if (allowed) {
-                TextButton(onClick = { editing = CustomerPriceEditor.of(e) }) { Text(StrCustomerPrices.edit) }
-                TextButton(onClick = { onRemove(e.productId) }) { Text(StrCustomerPrices.remove, color = Shop.colors.danger) }
+                ShopTextButton(onClick = { editing = CustomerPriceEditor.of(e) }) { Text(StrCustomerPrices.edit) }
+                ShopTextButton(onClick = { onRemove(e.productId) }) { Text(StrCustomerPrices.remove, color = Shop.colors.danger) }
               }
             }
           }
@@ -92,13 +94,13 @@ internal fun CustomerPricesDialog(
     },
     confirmButton = {
       when {
-        ed != null -> TextButton(enabled = ed.ready(), onClick = { ed.entry()?.let { onSave(ed.replacing, it) } }) { Text(StrCustomerPrices.save) }
-        allowed -> TextButton(onClick = { editing = CustomerPriceEditor() }) { Text(StrCustomerPrices.add) }
+        ed != null -> ShopTextButton(enabled = ed.ready(), onClick = { ed.entry()?.let { onSave(ed.replacing, it) } }) { Text(StrCustomerPrices.save) }
+        allowed -> ShopTextButton(onClick = { editing = CustomerPriceEditor() }) { Text(StrCustomerPrices.add) }
         else -> {}
       }
     },
     dismissButton = {
-      TextButton(onClick = { if (ed != null) editing = null else onDismiss() }) { Text(if (ed != null) Str.cancel else Str.close) }
+      ShopTextButton(onClick = { if (ed != null) editing = null else onDismiss() }) { Text(if (ed != null) Str.cancel else Str.close) }
     },
   )
 }

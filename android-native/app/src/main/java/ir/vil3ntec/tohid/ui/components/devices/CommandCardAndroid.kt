@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.components.devices
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -88,16 +90,16 @@ fun CommandCardBody(colors: HubColors, toast: (String) -> Unit) {
     }
   }
   if (askNew) {
-    AlertDialog(
+    ShopAlertDialog(
       onDismissRequest = { askNew = false },
       text = { Text(StrDevices.newCardAsk) },
       confirmButton = {
-        TextButton(onClick = {
+        ShopTextButton(onClick = {
           askNew = false
           ScanCashPref.rotate(context)
         }) { Text(StrDevices.newCard) }
       },
-      dismissButton = { TextButton(onClick = { askNew = false }) { Text(Str.cancel) } },
+      dismissButton = { ShopTextButton(onClick = { askNew = false }) { Text(Str.cancel) } },
     )
   }
 }

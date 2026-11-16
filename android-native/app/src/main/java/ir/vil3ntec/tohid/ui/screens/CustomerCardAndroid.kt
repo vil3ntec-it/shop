@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopOutlinedButton
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -74,7 +77,7 @@ fun CustomerCardButton(store: ShopStore, d: ShopData, debtorId: String, onMessag
     }
   }
 
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = { open = false },
     containerColor = Shop.colors.surfaceSolid,
     title = { Text("${StrCustomerCard.title} — ${debtor.name}", color = Shop.colors.text) },
@@ -85,7 +88,7 @@ fun CustomerCardButton(store: ShopStore, d: ShopData, debtorId: String, onMessag
           style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text,
         )
         Spacer(Modifier.height(8.dp))
-        OutlinedButton(enabled = !busy, onClick = { write(StrCustomerCard.saved) { cur -> CustomerCards.assign(cur, debtorId, null) } }, modifier = Modifier.fillMaxWidth()) {
+        ShopOutlinedButton(enabled = !busy, onClick = { write(StrCustomerCard.saved) { cur -> CustomerCards.assign(cur, debtorId, null) } }, modifier = Modifier.fillMaxWidth()) {
           Text(StrCustomerCard.generate)
         }
         Spacer(Modifier.height(8.dp))
@@ -95,18 +98,18 @@ fun CustomerCardButton(store: ShopStore, d: ShopData, debtorId: String, onMessag
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
           modifier = Modifier.fillMaxWidth(),
         )
-        TextButton(enabled = !busy && manual.isNotBlank(), onClick = { val m = manual; write(StrCustomerCard.saved) { cur -> CustomerCards.assign(cur, debtorId, m) } }) {
+        ShopTextButton(enabled = !busy && manual.isNotBlank(), onClick = { val m = manual; write(StrCustomerCard.saved) { cur -> CustomerCards.assign(cur, debtorId, m) } }) {
           Text(StrCustomerCard.useManual)
         }
         val code = debtor.cardCode
         if (code != null) {
-          TextButton(enabled = !busy, onClick = { scope.launch { onMessage(CustomerCardPrint.print(context, debtor.name, code)) } }) { Text(StrCustomerCard.print) }
-          TextButton(enabled = !busy, onClick = { write(StrCustomerCard.removed) { cur -> CustomerCards.remove(cur, debtorId) } }) {
+          ShopTextButton(enabled = !busy, onClick = { scope.launch { onMessage(CustomerCardPrint.print(context, debtor.name, code)) } }) { Text(StrCustomerCard.print) }
+          ShopTextButton(enabled = !busy, onClick = { write(StrCustomerCard.removed) { cur -> CustomerCards.remove(cur, debtorId) } }) {
             Text(StrCustomerCard.remove, color = Shop.colors.danger)
           }
         }
       }
     },
-    confirmButton = { TextButton(onClick = { open = false }) { Text(StrCustomerCard.close) } },
+    confirmButton = { ShopTextButton(onClick = { open = false }) { Text(StrCustomerCard.close) } },
   )
 }

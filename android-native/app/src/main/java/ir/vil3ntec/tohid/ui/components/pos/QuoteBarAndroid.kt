@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -182,7 +184,7 @@ fun QuoteBar(d: ShopData, cart: CartStore, toast: (String) -> Unit, modifier: Mo
 private fun QuoteSaveDialog(onDismiss: () -> Unit, onSave: (Int, String) -> Unit) {
   var days by remember { mutableStateOf(Quote.DEFAULT_DAYS.toString()) }
   var note by remember { mutableStateOf("") }
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     title = { Text(StrPos.quoteSaveTitle) },
     text = {
@@ -200,8 +202,8 @@ private fun QuoteSaveDialog(onDismiss: () -> Unit, onSave: (Int, String) -> Unit
         )
       }
     },
-    confirmButton = { TextButton(onClick = { onSave(days.toIntOrNull() ?: 0, note) }) { Text(StrPos.quoteSave) } },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(StrPos.quoteCancel) } },
+    confirmButton = { ShopTextButton(onClick = { onSave(days.toIntOrNull() ?: 0, note) }) { Text(StrPos.quoteSave) } },
+    dismissButton = { ShopTextButton(onClick = onDismiss) { Text(StrPos.quoteCancel) } },
   )
 }
 
@@ -221,7 +223,7 @@ private fun QuoteListDialog(
   onShare: (SavedQuote) -> Unit = {},
   onPdf: (SavedQuote) -> Unit = {},
 ) {
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     title = { Text(StrPos.quoteListTitle) },
     text = {
@@ -237,17 +239,17 @@ private fun QuoteListDialog(
             color = if (st == Quote.State.EXPIRED) Shop.colors.danger else Shop.colors.muted,
           )
           Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            TextButton(onClick = { onPrint(q) }) { Text(StrPos.quotePrint) }
-            TextButton(onClick = { onShare(q) }) { Text(if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) StrPos.quoteCopy else StrPos.quoteShare) }
-            TextButton(onClick = { onPdf(q) }) { Text(if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) StrPos.quotePdfSave else StrPos.quotePdfSend) }
-            if (st == Quote.State.VALID || st == Quote.State.IN_CART) TextButton(onClick = { onConvert(q) }) { Text(StrPos.quoteToCart) }
-            TextButton(onClick = { onDelete(q) }) { Text(StrPos.quoteDelete, color = Shop.colors.danger) }
+            ShopTextButton(onClick = { onPrint(q) }) { Text(StrPos.quotePrint) }
+            ShopTextButton(onClick = { onShare(q) }) { Text(if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) StrPos.quoteCopy else StrPos.quoteShare) }
+            ShopTextButton(onClick = { onPdf(q) }) { Text(if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) StrPos.quotePdfSave else StrPos.quotePdfSend) }
+            if (st == Quote.State.VALID || st == Quote.State.IN_CART) ShopTextButton(onClick = { onConvert(q) }) { Text(StrPos.quoteToCart) }
+            ShopTextButton(onClick = { onDelete(q) }) { Text(StrPos.quoteDelete, color = Shop.colors.danger) }
           }
           HorizontalDivider(color = Shop.colors.fieldBorder.copy(alpha = 0.35f))
         }
       }
     },
-    confirmButton = { TextButton(onClick = onDismiss) { Text(StrPos.quoteClose) } },
+    confirmButton = { ShopTextButton(onClick = onDismiss) { Text(StrPos.quoteClose) } },
   )
 }
 

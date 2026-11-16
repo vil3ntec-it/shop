@@ -57,6 +57,21 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۶ — عاملِ e-desk-d3d زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-desk-d3d` (از `origin/main` e8a22edfd) — همهٔ پنجره‌های مشترک روی کامپیوتر با پلِ `ShopAlertDialog`
+
+- **خواست**: باقیِ `AlertDialog`/دکمهٔ Material ِ پرونده‌های مشترک روی کامپیوتر ⇐ پنجرهٔ کامپیوتر؛ گوشی و رفتار/داده همان.
+- **پل** (`ui/components/common/ShopDialogs.kt`، تازه): `ShopAlertDialog` (همان پارامترهای `AlertDialog` + `danger`)، `ShopTextButton`، `ShopButton`،
+  `ShopOutlinedButton`. گوشی (`LocalDeskLayout` = false) همان فراخوانِ Material با همان آرگومان‌ها؛ کامپیوتر کارتِ `ui/desk`، سرخط و «بستن»، بدنه
+  با قلم/رنگِ کامپیوتر، دکمه‌های خط‌دار (رنگِ دستیِ `Text` خوانا می‌ماند)، Esc = `onDismissRequest`، Enter = «تأیید» (ثبت از `SideEffect` ِ همان دکمه)،
+  `danger` ⇒ «تأیید» ِ سرخ، Enter نه، فوکوس روی «انصراف». برچسبِ آزمون `SHOP_DIALOG_TAG`.
+- **تبدیل** (فقط نامِ فراخوان؛ اسکریپتِ پرانتزشمارِ آگاه از رشته): ۹۹ `AlertDialog` در ۵۱ پرونده — از جمله `GiftCardBarAndroid` (۶)، `LayawayBarAndroid` (۵)،
+  `Settings` (۴)، `Profile` (۴)، `SpecialOrderBarAndroid` (۴)، `SecuritySettings` (۳)، `DeviceHubUi` (۳)، `CourierChecksUi` (۳)، `WipeAllDialog` (۲)،
+  `SalesVoidDialogs` (۲)، `ShiftV2` (ورود/خروجِ نقد و بستن با شمارش + شاخه‌های پیشین)، `Servers` (افزودنِ سرور و …)، `Sale`، `SaleDialogs`، `SalesHistory`،
+  `SafePanelAndroid`، `ProductImportDialog`، `HesabPayAccountSettings`، `DevicesHw`، `QuoteBarAndroid`، `LoyaltyBarAndroid` و یک‌پنجره‌ای‌ها. ۳۲ پنجرهٔ
+  پاک‌کننده `danger = true` گرفتند (رنگِ سرخِ دکمه یا واژهٔ پاک/لغو/باطل/برداشتن). در `Profile`/`Sale`/`SaleDialogs`/`Settings` نامِ کامل (بی import) تا
+  سقفِ خطِ `tools/quality` نگه داشته شود.
+- **مانده**: کادرهای متنِ درونِ پنجره‌ها هنوز `OutlinedTextField` ِ Material‌اند (فقط قاب و دکمه‌ها کامپیوتری شدند)؛ `IconButton`/`RadioButton`/`Checkbox`
+  ِ درونِ بدنه همان Material.
 ### ۱۴۰۵/۰۸/۲۶ — عاملِ e-desk-d3c زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-desk-d3c` (از `origin/main` a0b0f9355، `origin/main` 7e2a36923 ادغام شد) — فرم‌های خرید و پنجره‌های کامپیوتر روی `ui/desk`
 
 - **خواست**: باقیِ طراحیِ کامپیوتر (d3b): فرمِ «فاکتورِ خریدِ تازه» و پنجرهٔ سفارشِ خرید روی `ui/desk`، پنجره‌های گفت‌وگوی کامپیوتر

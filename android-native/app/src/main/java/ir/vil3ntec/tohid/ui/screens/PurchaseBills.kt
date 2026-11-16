@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -217,7 +219,8 @@ internal fun PoBillVoidDialog(bill: PoBillDto, busy: Boolean, onDismiss: () -> U
     )
     return
   }
-  AlertDialog(
+  ShopAlertDialog(
+    danger = true,
     onDismissRequest = onDismiss,
     containerColor = c.surfaceSolid,
     title = { Text(StrPurchasePages.voidAsk(bill.billNo), color = c.text) },
@@ -229,8 +232,8 @@ internal fun PoBillVoidDialog(bill: PoBillDto, busy: Boolean, onDismiss: () -> U
       }
     },
     confirmButton = {
-      TextButton(enabled = why.isNotBlank() && !busy, onClick = { onConfirm(why.trim()) }) { Text(StrPurchasePages.voidIt, color = c.danger) }
+      ShopTextButton(enabled = why.isNotBlank() && !busy, onClick = { onConfirm(why.trim()) }) { Text(StrPurchasePages.voidIt, color = c.danger) }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel) } },
+    dismissButton = { ShopTextButton(onClick = onDismiss) { Text(Str.cancel) } },
   )
 }
