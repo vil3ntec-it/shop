@@ -44,6 +44,16 @@ field() { sed -n "s/.* $1='\([^']*\)'.*/\1/p" <<<"$2"; }
 #  «Signer (minSdkVersion=…) certificate …» یا «V3.0 Signer: certificate …»
 #  می‌نویسد — هر سه پذیرفته است؛ فقط اثر انگشتِ **گواهی** (نه کلیدِ عمومی)
 cert() { { "$apksigner" verify --print-certs -v "$1" 2>&1 || true; } | sed -nE 's/^.*Signer.*certificate SHA-256 digest: *([0-9a-fA-F]{64}).*$/\1/p' | sed -n '1p'; }
+#  F0-09/SEC-08 — پس از چرخشِ v3 (`tools/sign-rotated.sh`، ورک‌فلو `TOHID_SIGNING_ROTATED=1` می‌دهد): apksigner بی بازه
+#  امضاکنندهٔ **تازه** را چاپ می‌کند؛ پس ملاکِ «همان امضا» امضاکنندهٔ اندروید ۷–۸ (v2، همان کلیدِ پیشین) است، و جدا سنجیده
+#  می‌شود که امضاکنندهٔ ۹+ ِ نسخهٔ منتشرشده در دودمانِ همین ساخت باشد (`in_lineage`). بی متغیر ⇒ دقیقاً همان دستورِ امروز.
+rotated=0
+if [ "${TOHID_SIGNING_ROTATED:-}" = 1 ]; then
+  rotated=1
+  cert() { { "$apksigner" verify --print-certs -v --min-sdk-version 24 --max-sdk-version 27 "$1" 2>&1 || true; } | sed -nE 's/^.*Signer.*certificate SHA-256 digest: *([0-9a-fA-F]{64}).*$/\1/p' | sed -n '1p'; }
+  cert_new() { { "$apksigner" verify --print-certs -v --min-sdk-version 28 "$1" 2>&1 || true; } | sed -nE 's/^.*Signer.*certificate SHA-256 digest: *([0-9a-fA-F]{64}).*$/\1/p' | sed -n '1p'; }
+  in_lineage() { [ -n "$2" ] && { "$apksigner" lineage --in "$1" --print-certs 2>&1 || true; } | grep -qi -- "$2"; }
+fi
 
 #  استثنای یک‌بارهٔ دروازهٔ حجم — هر خط «نام  رشدِ پذیرفته‌شده٪  نشانِ dex  دلیل»؛ فقط با تصمیمِ صاحب محصول
 exceptions="$(dirname "$0")/apk-size-exceptions.txt"
@@ -104,6 +114,9 @@ if [ -n "$ref" ]; then
     esac
   fi
   [ "$ref_fp" = "$fp" ] || err "اثر انگشتِ امضا با نسخهٔ منتشرشده یکی نیست — به‌روزرسانی روی گوشی‌ها نصب نمی‌شود"
+  if [ "$rotated" = 1 ]; then
+    in_lineage "$apk" "$(cert_new "$ref")" || err "امضاکنندهٔ اندروید ۹+ ِ نسخهٔ منتشرشده در دودمانِ این ساخت نیست — به‌روزرسانی روی گوشی‌های ۹+ نصب نمی‌شود"
+  fi
   #  versionCode = ۱۰۰ + `run_number`. اجرای PR شماره‌اش را هنگامِ push می‌گیرد؛ اگر در صفِ CI بماند و
   #  main پیش از آن یک نسخهٔ آزمایشیِ تازه منتشر کند، PR بی هیچ ایرادی «کمتر» می‌شود (#608، ۱۵۱۳ در
   #  برابرِ ۱۵۱۴). PR هرگز منتشر نمی‌شود ⇒ آن‌جا فقط هشدار؛ بیرون از PR (push به main و انتشارِ
@@ -154,6 +167,9 @@ if [ "${ref_from:-}" = tohid-native-beta ]; then
     st_code=$(field versionCode "$(badge "$st_dir/Tohid-Native.apk")")
     st_fp=$(cert "$st_dir/Tohid-Native.apk")
     [ "$st_fp" = "$fp" ] || err "اثر انگشتِ امضا با نسخهٔ پایدارِ منتشرشده ($st_fp) یکی نیست — به‌روزرسانی روی گوشی‌های پایدار نصب نمی‌شود"
+    if [ "$rotated" = 1 ]; then
+      in_lineage "$apk" "$(cert_new "$st_dir/Tohid-Native.apk")" || err "امضاکنندهٔ اندروید ۹+ ِ نسخهٔ پایدار در دودمانِ این ساخت نیست"
+    fi
     if [[ "$st_code" =~ ^[0-9]+$ ]] && [ "$code" -lt "$st_code" ]; then
       if [ -n "${PR_NUMBER:-}" ]; then
         echo "::warning::versionCode ($code) از نسخهٔ پایدار ($st_code) کمتر است — فقط PR"

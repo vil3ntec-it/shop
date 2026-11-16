@@ -69,6 +69,10 @@ jobs:
   build:
     name: ساخت نسخهٔ بومی
     runs-on: ubuntu-latest
+    #  F0-09/SEC-08 — چرخشِ v3 ِ کلیدِ امضا فقط وقتی secret ِ دودمان هست (`android-native/tools/sign-rotated.sh`،
+    #  docs/OWNER-ACTIONS-fa.md). نبودش ⇒ گام‌های چرخش اجرا نمی‌شوند و APK بایت‌به‌بایت همان امروز است.
+    env:
+      HAS_SIGNING_LINEAGE: ${{ secrets.TOHID_SIGNING_LINEAGE_B64 != '' }}
     #  معمولاً ۲۱ دقیقه (سنجشِ حساب‌ها ۵، APK ۸، کافه‌بازار ۸)؛ روی ماشینِ کندترِ GitHub همه ۴۵٪ کندتر شد و به سقفِ ۳۰ خورد (#1054)
     timeout-minutes: 45
     outputs:
@@ -190,6 +194,23 @@ jobs:
           TOHID_LICENSE_PUBLIC_KEY: ${{ vars.TOHID_LICENSE_PUBLIC_KEY }}
         run: gradle --no-daemon assembleRelease -PbuildNumber=${{ github.run_number }}
 
+      #  F0-09/SEC-08 — v2 با کلیدِ پیشین (اندروید ۷–۸)، v3 با کلیدِ تازه + دودمان (اندروید ۹+)؛ پیش از دروازه‌ها تا همه
+      #  همان فایلِ نهایی را بسنجند. بی secret ِ دودمان این گام اصلاً اجرا نمی‌شود.
+      - name: چرخشِ کلیدِ امضا (v3، فقط با secret ِ دودمان)
+        if: env.HAS_SIGNING_LINEAGE == 'true'
+        working-directory: android-native
+        env:
+          ROTATION_LINEAGE_B64: ${{ secrets.TOHID_SIGNING_LINEAGE_B64 }}
+          ROTATION_KEYSTORE_B64: ${{ secrets.TOHID_ROTATION_KEYSTORE_B64 }}
+          ROTATION_KEYSTORE_PASSWORD: ${{ secrets.TOHID_ROTATION_KEYSTORE_PASSWORD }}
+          ROTATION_KEY_ALIAS: ${{ secrets.TOHID_ROTATION_KEY_ALIAS }}
+          ROTATION_KEY_PASSWORD: ${{ secrets.TOHID_ROTATION_KEY_PASSWORD }}
+          TOHID_KEYSTORE_PASSWORD: ${{ secrets.TOHID_KEYSTORE_PASSWORD }}
+          TOHID_KEY_ALIAS: ${{ secrets.TOHID_KEY_ALIAS }}
+          TOHID_KEY_PASSWORD: ${{ secrets.TOHID_KEY_PASSWORD }}
+          TOHID_SIGNING_SHA256_EXTRA: ${{ vars.TOHID_SIGNING_SHA256_EXTRA }}
+        run: bash tools/sign-rotated.sh app/build/outputs/apk/release/app-release.apk
+
       #  معیارِ «قدم صفر»ِ ۳.۳: applicationId، versionCode و اثر انگشتِ امضا همان
       #  نسخهٔ منتشرشده؛ حجم در ±۵٪ (سخت برای PRی که فایلِ ساخت را عوض کرده) و شمارِ
       #  آزمون‌ها در خلاصهٔ اجرا. پیش از انتشار، تا APKِ ناسازگار هرگز به گوشی‌ها نرسد.
@@ -198,6 +219,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          #  F0-09/SEC-08: پس از چرخش ملاکِ «همان امضا» امضای v2 است و دودمان (خالی ⇒ همان سنجشِ امروز)
+          TOHID_SIGNING_ROTATED: ${{ env.HAS_SIGNING_LINEAGE == 'true' && '1' || '' }}
         run: >-
           bash tools/apk-gates.sh app/build/outputs/apk/release/app-release.apk
           $((100 + ${{ github.run_number }})) app/build/test-results/testReleaseUnitTest
@@ -275,6 +298,21 @@ jobs:
               echo "::error::نسخهٔ بازار هنوز اجازهٔ نصبِ بسته دارد"; exit 1
             fi
           fi
+      - name: چرخشِ کلیدِ امضا ِ نسخهٔ کافه‌بازار (v3، فقط با secret ِ دودمان)
+        if: env.HAS_SIGNING_LINEAGE == 'true'
+        working-directory: android-native
+        env:
+          ROTATION_LINEAGE_B64: ${{ secrets.TOHID_SIGNING_LINEAGE_B64 }}
+          ROTATION_KEYSTORE_B64: ${{ secrets.TOHID_ROTATION_KEYSTORE_B64 }}
+          ROTATION_KEYSTORE_PASSWORD: ${{ secrets.TOHID_ROTATION_KEYSTORE_PASSWORD }}
+          ROTATION_KEY_ALIAS: ${{ secrets.TOHID_ROTATION_KEY_ALIAS }}
+          ROTATION_KEY_PASSWORD: ${{ secrets.TOHID_ROTATION_KEY_PASSWORD }}
+          TOHID_KEYSTORE_PASSWORD: ${{ secrets.TOHID_KEYSTORE_PASSWORD }}
+          TOHID_KEY_ALIAS: ${{ secrets.TOHID_KEY_ALIAS }}
+          TOHID_KEY_PASSWORD: ${{ secrets.TOHID_KEY_PASSWORD }}
+          TOHID_SIGNING_SHA256_EXTRA: ${{ vars.TOHID_SIGNING_SHA256_EXTRA }}
+        run: bash tools/sign-rotated.sh out/MyShop-Bazaar.apk
+
       #  SEC-ART-01/05: خودِ محتوای هر APK (نه نامِ فایل) — بی کلیدِ خصوصی، انبارِ کلید، .env، پشتیبان،
       #  .git، سورسِ بک‌اند و رازِ شناخته؛ پیش از upload و انتشار. کلیدِ عمومیِ مجوز اگر در vars هست باید
       #  واقعاً در APK باشد (خالی ⇒ فقط هشدار). شرح و آزمون: tools/security/، docs/security/artifacts-fa.md

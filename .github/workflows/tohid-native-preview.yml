@@ -45,6 +45,9 @@ jobs:
     name: ساخت و انتشارِ پیش‌نمایش
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    #  F0-09/SEC-08 — همان چرخشِ v3 ِ `tohid-native.yml`؛ بی secret ِ دودمان گامش اجرا نمی‌شود
+    env:
+      HAS_SIGNING_LINEAGE: ${{ secrets.TOHID_SIGNING_LINEAGE_B64 != '' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -88,10 +91,27 @@ jobs:
           TOHID_KEYSTORE_PASSWORD: ${{ secrets.TOHID_KEYSTORE_PASSWORD }}
           TOHID_KEY_ALIAS: ${{ secrets.TOHID_KEY_ALIAS }}
           TOHID_KEY_PASSWORD: ${{ secrets.TOHID_KEY_PASSWORD }}
+          #  F0-09/SEC-08: کلیدِ تازهٔ چرخش در بررسیِ امضای خودِ برنامه — فقط وقتی چرخش روشن است (بی آن همان امروز)
+          TOHID_SIGNING_SHA256_EXTRA: ${{ env.HAS_SIGNING_LINEAGE == 'true' && vars.TOHID_SIGNING_SHA256_EXTRA || '' }}
           TOHID_API_BASE: ${{ vars.TOHID_API_BASE }}
           TOHID_UPDATE_PUBLIC_KEY: ${{ vars.TOHID_UPDATE_PUBLIC_KEY }}
           TOHID_LICENSE_PUBLIC_KEY: ${{ vars.TOHID_LICENSE_PUBLIC_KEY }}
         run: gradle --no-daemon assemblePreview -PbuildNumber=${{ github.run_number }}
+
+      - name: چرخشِ کلیدِ امضا (v3، فقط با secret ِ دودمان)
+        if: env.HAS_SIGNING_LINEAGE == 'true'
+        working-directory: android-native
+        env:
+          ROTATION_LINEAGE_B64: ${{ secrets.TOHID_SIGNING_LINEAGE_B64 }}
+          ROTATION_KEYSTORE_B64: ${{ secrets.TOHID_ROTATION_KEYSTORE_B64 }}
+          ROTATION_KEYSTORE_PASSWORD: ${{ secrets.TOHID_ROTATION_KEYSTORE_PASSWORD }}
+          ROTATION_KEY_ALIAS: ${{ secrets.TOHID_ROTATION_KEY_ALIAS }}
+          ROTATION_KEY_PASSWORD: ${{ secrets.TOHID_ROTATION_KEY_PASSWORD }}
+          TOHID_KEYSTORE_PASSWORD: ${{ secrets.TOHID_KEYSTORE_PASSWORD }}
+          TOHID_KEY_ALIAS: ${{ secrets.TOHID_KEY_ALIAS }}
+          TOHID_KEY_PASSWORD: ${{ secrets.TOHID_KEY_PASSWORD }}
+          TOHID_SIGNING_SHA256_EXTRA: ${{ vars.TOHID_SIGNING_SHA256_EXTRA }}
+        run: bash tools/sign-rotated.sh app/build/outputs/apk/preview/app-preview.apk
 
       #  بسته باید `.preview` باشد (هرگز روی برنامهٔ اصلی ننشیند)، نسخه `-preview`
       #  و versionCode همان «۱۰۰ + شمارهٔ اجرا» (همیشه رو به بالا)
