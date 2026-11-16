@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -108,7 +110,7 @@ fun LineSellerSheet(
   var picked by remember { mutableStateOf(if (first != null) setOf(first.productId) else cart.map { it.productId }.toSet()) }
   var error by remember { mutableStateOf(false) }
   val names = remember(d.products) { d.products.associate { it.id to it.name } }
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onClose,
     shape = Shape.dialog,
     title = { Text(StrLineSeller.sheetTitle) },
@@ -133,13 +135,13 @@ fun LineSellerSheet(
       }
     },
     confirmButton = {
-      TextButton(onClick = {
-        if (picked.isEmpty()) { error = true; return@TextButton }
+      ShopTextButton(onClick = {
+        if (picked.isEmpty()) { error = true; return@ShopTextButton }
         val next = CartSellers.assign(cart, picked, who, invoice, invoice, others)
         if (onApply(next)) onClose()
       }) { Text(StrSalePages.record) }
     },
-    dismissButton = { TextButton(onClick = onClose) { Text(Str.cancel) } },
+    dismissButton = { ShopTextButton(onClick = onClose) { Text(Str.cancel) } },
   )
 }
 

@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import ir.vil3ntec.tohid.data.invoiceLabel
 import ir.vil3ntec.tohid.data.isOnlineOrder
 import androidx.compose.foundation.background
@@ -344,7 +346,7 @@ fun SalesHistoryScreen(
     var amount by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     val t = shift?.let { ir.vil3ntec.tohid.data.CashShift.totalsOf(d, it, System.currentTimeMillis()) }
-    AlertDialog(
+    ShopAlertDialog(
       onDismissRequest = { shiftDialog = false },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(if (shift == null) StrInvoices.openRegisterTitle else StrInvoices.closeRegisterTitle, color = Shop.colors.text) },
@@ -404,7 +406,7 @@ fun SalesHistoryScreen(
         }
       },
       confirmButton = {
-        TextButton(onClick = {
+        ShopTextButton(onClick = {
           val v = amount.toDoubleOrNull() ?: Double.NaN
           val r = if (shift == null) {
             ir.vil3ntec.tohid.data.CashShift.open(d, v, me, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)
@@ -421,13 +423,13 @@ fun SalesHistoryScreen(
           }
         }) { Text(if (shift == null) StrInvoices.openIt else StrInvoices.closeIt) }
       },
-      dismissButton = { TextButton(onClick = { shiftDialog = false }) { Text(Str.cancel) } },
+      dismissButton = { ShopTextButton(onClick = { shiftDialog = false }) { Text(Str.cancel) } },
     )
   }
 
   if (shiftHistory) {
     val shifts = remember(d) { ir.vil3ntec.tohid.data.CashShift.list(d).take(60) }
-    AlertDialog(
+    ShopAlertDialog(
       onDismissRequest = { shiftHistory = false },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrInvoices.registerHistory, color = Shop.colors.text) },
@@ -448,7 +450,7 @@ fun SalesHistoryScreen(
           }
         }
       },
-      confirmButton = { TextButton(onClick = { shiftHistory = false }) { Text(Str.close) } },
+      confirmButton = { ShopTextButton(onClick = { shiftHistory = false }) { Text(Str.close) } },
     )
   }
 

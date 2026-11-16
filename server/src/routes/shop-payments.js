@@ -4,6 +4,8 @@
  * PAY-21، PAY-08، S35. قرارداد و شرح: `docs/PAYMENTS-HESABPAY-fa.md`.
  *
  *   GET  /config               { hesabpay: { enabled } } — همیشه جواب می‌دهد
+ *   GET  /qr-image/:hash       عکسِ QR ِ حساب‌پیِ **فعالِ** حالتِ ساده (۱۴۰۵/۰۸/۲۶، `lib/hesabpay-qr-image.js`) ⇒
+ *                              `{ hash, mime, width, height, data }` (base64)؛ عکسِ دیگر یا حسابِ در انتظار ⇒ ۴۰۴
  *   POST /intents              ساختنِ قصدِ پرداخت (پرچمِ `pay.hesabpay` + کلیدهای HESABPAY_*)
  *   GET  /intents/:id[?wait=25] وضعیت؛ با wait تا ۲۵ ثانیه منتظرِ تغییر می‌ماند
  *   POST /intents/:id/cancel   فقط از created/pending
@@ -21,7 +23,7 @@ const express = require('express');
 const pay = require('../lib/payment-intents');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
-const { forbidden } = require('../middleware/errors');
+const { forbidden, notFound } = require('../middleware/errors');
 
 const router = express.Router();
 
@@ -58,6 +60,18 @@ router.get('/mirror', mirrorLimit, async (req, res) => {
 
 router.get('/config', async (req, res) => {
   res.json(await pay.configOf(req.shopId));
+});
+
+const imageLimit = rateLimit({
+  max: Number(process.env.RATE_PAY_QR_IMAGE_MAX) || 30, windowMs: 60 * 1000, keyPrefix: 'pay-qr-image', key: perUser,
+});
+
+//  صندوق (هر عضوِ فروشنده): نشانی از محتوا ⇒ همان هش همیشه همان عکس؛ برنامه هش را دوباره می‌سنجد و QR را دوباره می‌خواند
+router.get('/qr-image/:hash', imageLimit, async (req, res) => {
+  const img = await require('../lib/hesabpay-qr-image').forTill(req.shopId, req.params.hash);
+  if (!img) throw notFound('این عکسِ QR برای حساب‌پیِ فعالِ دکان نیست.', 'hesabpay_qr_image_missing');
+  res.set('Cache-Control', 'private, max-age=86400');
+  res.json(img);
 });
 
 router.post('/intents', createLimit, needEnabled, async (req, res) => {

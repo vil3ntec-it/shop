@@ -375,7 +375,7 @@ fun ProfileScreen(
   if (blockSignOut) {
     val verdict = LogoutGuard.decide(v1.queued, AutoSync.pendingCount)
     val online = remember(v1) { Backend.isOnline(context) }
-    AlertDialog(
+    ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog(danger = true,
       onDismissRequest = { if (!busy) blockSignOut = false },
       containerColor = colors.bg,
       title = { Text(if (verdict is LogoutGuard.Block) LogoutGuard.TITLE else ir.vil3ntec.tohid.core.i18n.StrAccount.allSentTitle, color = colors.text) },
@@ -395,12 +395,12 @@ fun ProfileScreen(
           if (verdict is LogoutGuard.Block && unreadable != null) {
             //  پشتیبانِ پوشه از دفترِ خوانده‌نشده ساخته نمی‌شود؛ صف را «همین حالا همگام کن» می‌فرستد
             Spacer(Modifier.height(8.dp))
-            TextButton(enabled = !busy, onClick = { blockSignOut = false; forceUnreadable = true }) {
+            ir.vil3ntec.tohid.ui.components.common.ShopTextButton(enabled = !busy, onClick = { blockSignOut = false; forceUnreadable = true }) {
               Text(LogoutGuard.FORCE_UNREADABLE, color = colors.danger)
             }
           } else if (verdict is LogoutGuard.Block) {
             Spacer(Modifier.height(8.dp))
-            TextButton(enabled = !busy, onClick = {
+            ir.vil3ntec.tohid.ui.components.common.ShopTextButton(enabled = !busy, onClick = {
               busy = true
               scope.launch {
                 val written = withContext(Dispatchers.IO) { BackupMirror.write(context) }
@@ -415,65 +415,65 @@ fun ProfileScreen(
       },
       confirmButton = {
         if (verdict is LogoutGuard.Block) {
-          TextButton(enabled = !busy, onClick = {
+          ir.vil3ntec.tohid.ui.components.common.ShopTextButton(enabled = !busy, onClick = {
             runCatching { SyncV1Worker.reconnect.userAsked(); SyncV1Worker.now(context) }
               .onSuccess { toast(ir.vil3ntec.tohid.core.i18n.StrAccount.syncStarted) }
               .onFailure { toast(it.userText(ir.vil3ntec.tohid.core.i18n.StrAccount.syncFailed)) }
           }) { Text(LogoutGuard.SYNC_NOW, color = colors.primary) }
         } else {
-          TextButton(enabled = !busy, onClick = { blockSignOut = false; confirmSignOut = true }) {
+          ir.vil3ntec.tohid.ui.components.common.ShopTextButton(enabled = !busy, onClick = { blockSignOut = false; confirmSignOut = true }) {
             Text(ir.vil3ntec.tohid.core.i18n.StrAccount.signOutAction, color = colors.danger)
           }
         }
       },
       dismissButton = {
-        TextButton(enabled = !busy, onClick = { blockSignOut = false }) { Text(LogoutGuard.STAY, color = colors.muted) }
+        ir.vil3ntec.tohid.ui.components.common.ShopTextButton(enabled = !busy, onClick = { blockSignOut = false }) { Text(LogoutGuard.STAY, color = colors.muted) }
       },
     )
   }
 
   if (forceUnreadable) {
     val pending = (LogoutGuard.decide(v1.queued, AutoSync.pendingCount) as? LogoutGuard.Block)?.pending ?: 0
-    AlertDialog(
+    ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog(danger = true,
       onDismissRequest = { forceUnreadable = false },
       containerColor = colors.bg,
       title = { Text(LogoutGuard.FORCE_TITLE, color = colors.text) },
       text = { Text(LogoutGuard.forceUnreadableMessage(pending), color = colors.muted) },
       confirmButton = {
-        TextButton(enabled = !busy, onClick = {
+        ir.vil3ntec.tohid.ui.components.common.ShopTextButton(enabled = !busy, onClick = {
           forceUnreadable = false
           //  کلیکِ «خروج بی پشتیبان» تأییدِ اول بود، این دومی است
           if (LogoutGuard.canForceUnreadable(unreadable != null, confirmations = 2)) signOutNow(forced = true)
         }) { Text(ir.vil3ntec.tohid.core.i18n.StrAccount.signOutAnyway, color = colors.danger) }
       },
       dismissButton = {
-        TextButton(onClick = { forceUnreadable = false }) { Text(LogoutGuard.STAY, color = colors.muted) }
+        ir.vil3ntec.tohid.ui.components.common.ShopTextButton(onClick = { forceUnreadable = false }) { Text(LogoutGuard.STAY, color = colors.muted) }
       },
     )
   }
 
   forcedBackup?.let { path ->
     val pending = (LogoutGuard.decide(v1.queued, AutoSync.pendingCount) as? LogoutGuard.Block)?.pending ?: 0
-    AlertDialog(
+    ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog(danger = true,
       onDismissRequest = { forcedBackup = null },
       containerColor = colors.bg,
       title = { Text(LogoutGuard.FORCE_TITLE, color = colors.text) },
       text = { Text(LogoutGuard.forceMessage(pending, path), color = colors.muted) },
       confirmButton = {
-        TextButton(enabled = !busy, onClick = {
+        ir.vil3ntec.tohid.ui.components.common.ShopTextButton(enabled = !busy, onClick = {
           forcedBackup = null
           //  کلیکِ «خروجِ اجباری» تأییدِ اول بود، این دومی است
           if (LogoutGuard.canForce(backupWritten = true, confirmations = 2)) signOutNow(forced = true)
         }) { Text(ir.vil3ntec.tohid.core.i18n.StrAccount.signOutAnyway, color = colors.danger) }
       },
       dismissButton = {
-        TextButton(onClick = { forcedBackup = null }) { Text(LogoutGuard.STAY, color = colors.muted) }
+        ir.vil3ntec.tohid.ui.components.common.ShopTextButton(onClick = { forcedBackup = null }) { Text(LogoutGuard.STAY, color = colors.muted) }
       },
     )
   }
 
   if (confirmSignOut) {
-    AlertDialog(
+    ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog(danger = true,
       onDismissRequest = { confirmSignOut = false },
       containerColor = colors.bg,
       title = { Text(ir.vil3ntec.tohid.core.i18n.StrAccount.signOutTitle, color = colors.text) },
@@ -484,7 +484,7 @@ fun ProfileScreen(
         )
       },
       confirmButton = {
-        TextButton(enabled = !busy, onClick = {
+        ir.vil3ntec.tohid.ui.components.common.ShopTextButton(enabled = !busy, onClick = {
           confirmSignOut = false
           /*
            *  خروج، واقعاً: اول به سرور می‌گوییم نشست را باطل کند و بعد گوشی را
@@ -498,7 +498,7 @@ fun ProfileScreen(
         }) { Text(ir.vil3ntec.tohid.core.i18n.StrAccount.signOutAction, color = colors.danger) }
       },
       dismissButton = {
-        TextButton(onClick = { confirmSignOut = false }) { Text(ir.vil3ntec.tohid.core.i18n.StrAccount.stay, color = colors.muted) }
+        ir.vil3ntec.tohid.ui.components.common.ShopTextButton(onClick = { confirmSignOut = false }) { Text(ir.vil3ntec.tohid.core.i18n.StrAccount.stay, color = colors.muted) }
       },
     )
   }

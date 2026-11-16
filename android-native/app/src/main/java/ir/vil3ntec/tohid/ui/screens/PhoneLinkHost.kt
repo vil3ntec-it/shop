@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -41,13 +43,13 @@ fun PhoneLinkHost(store: ShopStore, data: ShopData, snackbar: SnackbarHostState)
   val request = PhoneScanner.photoRequest.value
   var pickFor by remember { mutableStateOf<Pair<String, String>?>(null) }
   if (request != null) {
-    AlertDialog(
+    ShopAlertDialog(
       onDismissRequest = { PhoneScanner.photoRequest.value = null },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrScanPages.pcWantsPhoto, color = Shop.colors.text) },
       text = { Text(StrScanPages.takePhotoOf(request.second.ifBlank { Str.product }), color = Shop.colors.muted) },
-      confirmButton = { TextButton(onClick = { pickFor = request; PhoneScanner.photoRequest.value = null }) { Text(StrPick.photoTake) } },
-      dismissButton = { TextButton(onClick = { PhoneScanner.photoRequest.value = null }) { Text(StrDevices.later) } },
+      confirmButton = { ShopTextButton(onClick = { pickFor = request; PhoneScanner.photoRequest.value = null }) { Text(StrPick.photoTake) } },
+      dismissButton = { ShopTextButton(onClick = { PhoneScanner.photoRequest.value = null }) { Text(StrDevices.later) } },
     )
   }
   PhotoSourceSheet(

@@ -21,7 +21,7 @@
       { "id": "my_money", "kind": "wallet", "name": "My Money", "needsRef": true, "limit": null, "enabled": true },
       { "id": "atoma_pay", "kind": "wallet", "name": "ATOMA Pay", "needsRef": true, "limit": 1500000, "enabled": true },
       { "id": "m_paisa", "kind": "wallet", "name": "M-Paisa", "needsRef": true, "limit": null, "enabled": true },
-      { "id": "afpay_card", "kind": "card", "name": "کارت AfPay", "needsRef": true, "limit": null, "enabled": true },
+      { "id": "afpay_card", "kind": "card", "name": "کارت AfPay", "needsRef": false, "limit": null, "enabled": true },
       { "id": "hawala", "kind": "transfer", "name": "حواله", "needsRef": true, "limit": null, "enabled": true },
       { "id": "store_credit", "kind": "store_credit", "name": "اعتبار فروشگاه", "needsRef": false, "limit": null, "enabled": false },
       { "id": "gift_card", "kind": "gift_card", "name": "کارت هدیه", "needsRef": true, "limit": null, "enabled": false }
@@ -109,6 +109,9 @@
     { "name": "سقفِ ATOMA Pay یک پول بیشتر", "input": { "total": 2000000, "tenders": [{ "method": "atoma_pay", "amount": 1500001, "ref": "A" }] }, "expect": { "ok": false, "error": "METHOD_LIMIT", "index": 0 } },
     { "name": "دالر در فاکتورِ افغانی رد می‌شود (فقط با تبادل)", "input": { "total": 100000, "tenders": [{ "method": "cash", "amount": 50000 }, { "method": "cash", "amount": 1000, "currency": "USD" }] }, "expect": { "ok": false, "error": "CURRENCY_MISMATCH", "index": 1 } },
     { "name": "کیف پول بی شمارهٔ مرجع", "input": { "total": 100000, "tenders": [{ "method": "hesabpay", "amount": 50000, "ref": "   " }] }, "expect": { "ok": false, "error": "REF_REQUIRED", "index": 0 } },
+    { "name": "کارت بی شمارهٔ تأیید — اختیاری از ۱۴۰۵/۰۸/۲۶ (کارت‌خوان تأیید کرد)", "input": { "total": 100000, "tenders": [{ "method": "afpay_card", "amount": 100000, "ref": "  " }] },
+      "expect": { "ok": true, "currency": "AFN", "status": "paid", "total": 100000, "rounding": 0, "due": 100000, "tendered": 100000, "change": 0, "remaining": 0, "toAccount": 0,
+        "payments": [{ "method": "afpay_card", "kind": "card", "amount": 100000, "ref": null, "status": "pending", "verification": "manual" }] } },
     { "name": "روشِ خاموش", "input": { "total": 100000, "tenders": [{ "method": "store_credit", "amount": 1000 }] }, "expect": { "ok": false, "error": "METHOD_DISABLED", "index": 0 } },
     { "name": "روشِ ناشناخته", "input": { "total": 100000, "tenders": [{ "method": "bitcoin", "amount": 1000 }] }, "expect": { "ok": false, "error": "UNKNOWN_METHOD", "index": 0 } },
     { "name": "account تحویل‌دادنی نیست", "input": { "total": 100000, "tenders": [{ "method": "account", "amount": 1000 }] }, "expect": { "ok": false, "error": "UNKNOWN_METHOD", "index": 0 } },

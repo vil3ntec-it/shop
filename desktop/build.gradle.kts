@@ -133,6 +133,8 @@ val replaced = listOf(
   "pay/platform/HesabPayHceService.kt",
   //  «حساب‌پیِ دکان»: پیشنهاد از اعلانِ برنامهٔ حساب‌پی فقط اندروید؛ کامپیوتر: ‎pay/platform/HesabPayNoticeDesk.kt‎
   "pay/platform/HesabPayNoticeAndroid.kt",
+  //  عکسِ QR ِ دکان (۱۴۰۵/۰۸/۲۶): گوشی ML Kit و گالریِ سیستم؛ کامپیوتر: ‎pay/platform/ShopQrPictureDesk.kt‎ (ZXing، ImageIO، پنجرهٔ فایل)
+  "pay/platform/ShopQrPicture.kt",
   //  O-01: پوشِ گوشی با Firebase (FCM) فقط اندروید؛ کامپیوتر جایگزین ندارد (`DevicePush.platform` تهی ⇒ «پشتیبانی نمی‌شود»)
   "data/push/FcmPushAndroid.kt",
 ).map { "ir/vil3ntec/tohid/$it" }

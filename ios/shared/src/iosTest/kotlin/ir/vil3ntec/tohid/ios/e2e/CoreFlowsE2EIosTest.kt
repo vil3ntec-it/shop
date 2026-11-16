@@ -3,8 +3,8 @@ package ir.vil3ntec.tohid.ios.e2e
 import android.content.IosContext
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isEnabled
-import androidx.compose.ui.test.isNotEnabled
 import androidx.compose.ui.test.runSkikoComposeUiTest
 import androidx.compose.ui.unit.Density
 import ir.vil3ntec.tohid.LocaleChoice
@@ -44,6 +44,8 @@ import kotlinx.coroutines.runBlocking
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.components.common.NavCatalog
 import ir.vil3ntec.tohid.ui.v3.modes.ModeState
+import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
+import ir.vil3ntec.tohid.ui.v3.products.QuickProductSpec
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -164,9 +166,15 @@ class CoreFlowsE2EIosTest {
         e.waitFor(Find.button(StrSale.pay), StrSale.pay)
         e.shot("04c-cart")
         e.tap(Find.button(StrSale.pay), StrSale.pay)
-        e.waitFor(Find.button(StrSale.recordSale) and isEnabled(), StrSale.recordSale)
+        //  e-paystep (۱۴۰۵/۰۸/۲۶): تسویه فقط «پرداخت ‹مبلغ›» دارد و هیچ ثبت نمی‌کند ⇐ گامِ پرداخت ⇐ «دریافت شد» (نقدِ خالی = دقیق)
+        val payNow = Find.button(StrTillPay.payAmount(PhoneSaleText.amount(FREE_PRICE))) and isEnabled()
+        e.waitFor(payNow, "«پرداخت ‹مبلغ›»")
         e.shot("04d-checkout")
-        e.tap(Find.button(StrSale.recordSale) and isEnabled(), StrSale.recordSale)
+        e.tap(payNow, "«پرداخت ‹مبلغ›»")
+        e.waitFor(Find.button(StrTillPay.received) and isEnabled(), StrTillPay.received)
+        assertTrue(store.data.value.sales.none { it.id !in before }, "«پرداخت» پیش از تأییدِ پرداخت فروش ثبت کرد")
+        e.shot("04d2-paystep")
+        e.tap(Find.button(StrTillPay.received) and isEnabled(), StrTillPay.received)
         e.waitFor(Find.button(StrSale.newSale), StrSale.newSale, 30_000)
         e.shot("04e-receipt")
         val sale = store.data.value.sales.singleOrNull { it.id !in before } ?: throw AssertionError("فروشِ تازه در دفتر نیست")
@@ -189,6 +197,10 @@ class CoreFlowsE2EIosTest {
         e.shot("05a-products")
         e.tap(Find.button(StrProducts.newProduct), StrProducts.newProduct)
         e.type(StrProducts.name, newProduct)
+        e.type(StrProducts.salePrice, "85")
+        //  e-phone-p2 (دستهٔ ۷۰): فرمِ سادهٔ یک‌کالایی — نام و قیمتِ فروش بیرون، قیمتِ خرید، دسته و واحد زیرِ «بیشتر» ِ تاشو
+        //  (نشانِ آزمون، نه نوشته: «بیشتر» هم‌نامِ زبانهٔ «بیشتر» ِ نوارِ پایین است)
+        e.tap(hasTestTag(QuickProductSpec.MORE_TAG), StrProducts.groupMore)
         //  ۶۳k: دسته و واحد کادرِ کشویی‌اند؛ «+ دستهٔ تازه» آخرین گزینهٔ همان فهرست ⇐ برگهٔ کوچکِ نام ⇐ «افزودن» ⇐ همان دسته
         //  برگزیده می‌شود. تا برگه کامل نرفته چیزی زده نمی‌شود (زدن روی پردهٔ برگهٔ در حالِ رفتن فرمِ زیرش را هم می‌بندد)
         e.tap(Find.dropdown(StrProducts.category), StrProducts.category)
@@ -200,9 +212,8 @@ class CoreFlowsE2EIosTest {
         e.tap(Find.button("عدد"), "عدد")
         e.waitFor(Find.dropdown(StrProducts.unit, "عدد"), "عدد")
         e.type(StrProducts.purchasePrice, "60")
-        e.type(StrProducts.salePrice, "85")
         e.shot("05b-new-product")
-        e.tap(Find.button(StrProducts.saveAll) and isEnabled(), StrProducts.saveAll)
+        e.tap(Find.button(StrKit.save) and isEnabled(), StrKit.save)
         e.until("کالای «$newProduct» در دفتر", 20_000) { store.data.value.products.any { it.name == newProduct } }
         val p = store.data.value.products.first { it.name == newProduct }
         assertEquals(85.0, p.salePrice, "قیمتِ فروش")
@@ -237,30 +248,29 @@ class CoreFlowsE2EIosTest {
         e.gone(Find.field(StrSale.nameLabel), StrSale.freeItem)
         e.tap(Find.clickLabel(StrSale.openCart), StrSale.openCart)
         e.tap(Find.button(StrSale.pay), StrSale.pay)
-        e.waitFor(Find.button(StrSale.recordSale) and isEnabled(), StrSale.recordSale)
-        e.tap(Find.button(StrSale.creditPay), StrSale.creditPay)
-        //  ⛔ نسیه بی مشتری: «ثبت فروش» خاموش با پیامِ روشن و میان‌برِ «انتخابِ مشتری»؛ زدنِ خودِ دکمهٔ خاموش هم هیچ نمی‌نویسد
-        val blocked = Find.button(StrSale.recordSale) and isNotEnabled()
-        e.waitFor(Find.text(StrTillPay.creditNeedsCustomer), "پیامِ «نسیه بی مشتری ثبت نمی‌شود»")
-        e.waitFor(blocked, "«${StrSale.recordSale}» ِ خاموش")
+        //  e-paystep (۱۴۰۵/۰۸/۲۶): «پرداخت ‹مبلغ›» ⇐ گامِ پرداخت ⇐ کاشیِ «نسیه»
+        val payNow = Find.button(StrTillPay.payAmount(PhoneSaleText.amount(CREDIT_PRICE))) and isEnabled()
+        e.waitFor(payNow, "«پرداخت ‹مبلغ›»")
+        e.tap(payNow, "«پرداخت ‹مبلغ›»")
+        e.waitFor(Find.clickLabel(StrTillPay.tileCredit), StrTillPay.tileCredit)
+        //  ⛔ نسیه بی مشتری: کاشیِ «نسیه» هیچ ثبت نمی‌کند و اول «انتخابِ مشتری» را باز می‌کند (`CreditDebtor` در `PayStep` هم سد است)
+        e.tap(Find.clickLabel(StrTillPay.tileCredit), StrTillPay.tileCredit)
+        e.waitFor(Find.button(StrSale.newDebtor), "«${StrSale.pickCustomer}» پس از «نسیه» ِ بی مشتری")
         e.shot("07a-credit-blocked")
-        e.pressDisabled(blocked, "«${StrSale.recordSale}» ِ خاموش")
         assertTrue(store.data.value.sales.none { it.id !in before }, "نسیهٔ بی قرض‌دار در دفتر نشست")
-        assertTrue(e.shown(blocked), "«${StrSale.recordSale}» بی قرض‌دار روشن شد")
-        //  «انتخابِ مشتری» ⇐ «قرض‌دارِ تازه» ⇐ نام ⇐ ذخیره ⇐ همان قرض‌دار روی برگهٔ پرداخت
-        e.tap(Find.button(StrSale.pickCustomer), StrSale.pickCustomer)
+        //  «قرض‌دارِ تازه» ⇐ نام ⇐ ذخیره ⇐ همان گامِ پرداخت با «نسیه» و همان قرض‌دار
         e.tap(Find.button(StrSale.newDebtor), StrSale.newDebtor)
         e.type(StrMoney.name, DEBTOR)
         e.shot("07b-new-debtor")
         e.tap(Find.button(StrKit.save) and isEnabled(), StrKit.save)
         e.gone(Find.field(StrMoney.name), StrSale.newDebtor)
-        e.until("قرض‌دارِ «$DEBTOR» روی برگهٔ پرداخت و «${StrSale.recordSale}» روشن", 20_000) {
-          e.shown(Find.text(DEBTOR)) && e.shown(Find.button(StrSale.recordSale) and isEnabled())
+        e.until("قرض‌دارِ «$DEBTOR» در گامِ پرداخت و «${StrTillPay.toAccountButton}» روشن", 20_000) {
+          e.shown(Find.text(DEBTOR, substring = true)) && e.shown(Find.button(StrTillPay.toAccountButton) and isEnabled())
         }
-        assertTrue(!e.shown(Find.text(StrTillPay.creditNeedsCustomer)), "پیامِ «نسیه بی مشتری» با قرض‌دار ماند")
+        assertTrue(!e.shown(Find.text(StrTillPay.creditPickFirst)), "«اول مشتری را انتخاب کنید» با قرض‌دار ماند")
         e.shot("07c-credit-debtor")
         IosHaptics.clearRecent()
-        e.tap(Find.button(StrSale.recordSale) and isEnabled(), StrSale.recordSale)
+        e.tap(Find.button(StrTillPay.toAccountButton) and isEnabled(), StrTillPay.toAccountButton)
         e.waitFor(Find.button(StrSale.newSale), StrSale.newSale, 30_000)
         e.shot("07d-credit-receipt")
         val d = store.data.value

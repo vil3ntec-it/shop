@@ -13,6 +13,8 @@ import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.data.PermPolicy
 import ir.vil3ntec.tohid.data.repo.Backend
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -73,10 +75,44 @@ class HesabPayEnv private constructor(private val app: Context) {
   /** پس از تغییرِ «حساب‌پیِ دکان»: صندوقِ همین دستگاه زود بفهمد */
   fun forget() { cached = null }
 
+  /** عکسِ QR ِ خوانده‌وسنجیده (هش + متن ⇒ بیت‌مپ)؛ فقط یکی، همان عکسِ فعالِ دکان */
+  @Volatile private var picture: Triple<String, String, androidx.compose.ui.graphics.ImageBitmap>? = null
+
+  /**
+   *  عکسِ QR ِ دکان برای صندوق و نمایشگرِ مشتری (صاحب‌کار ۱۴۰۵/۰۸/۲۶): بایت‌ها از پوشهٔ همین دستگاه (`hesabpay-qr/<hash>`) یا
+   *  `GET /shop/payments/qr-image/<hash>` (هشِ بایت‌ها سنجیده)، سپس **دوباره خوانده** و فقط اگر همان متنِ QR ِ حساب بود ⇒ بیت‌مپ.
+   *  بی عکس، بی نت، عکسِ دیگر یا خوانده‌نشده ⇒ null (صندوق همان QR ِ کشیده از متن را نشان می‌دهد).
+   */
+  suspend fun qrPicture(simple: ir.vil3ntec.tohid.core.gateway.SimpleAccount?): androidx.compose.ui.graphics.ImageBitmap? {
+    val hash = simple?.qrImage.orEmpty()
+    val payload = simple?.qrPayload?.trim().orEmpty()
+    if (hash.isEmpty() || payload.isEmpty()) return null
+    picture?.let { (h, p, img) -> if (h == hash && p == payload) return img }
+    val bytes = qrBytes(hash) ?: return null
+    if (ShopQrPicture.read(bytes)?.trim() != payload) return null
+    val img = ShopQrPicture.bitmap(bytes) ?: return null
+    picture = Triple(hash, payload, img)
+    return img
+  }
+
+  private suspend fun qrBytes(hash: String): ByteArray? = withContext(Dispatchers.IO) {
+    val dir = java.io.File(app.filesDir, QR_DIR)
+    val file = java.io.File(dir, hash)
+    val local = runCatching { file.takeIf { it.isFile }?.readBytes() }.getOrNull()
+      ?.takeIf { ir.vil3ntec.tohid.core.audit.Sha256.hex(ir.vil3ntec.tohid.core.audit.Sha256.digest(it)) == hash }
+    if (local != null) return@withContext local
+    if (!online()) return@withContext null
+    val got = client.qrImage(hash) ?: return@withContext null
+    //  فقط عکسِ فعالِ امروز روی دیسک
+    runCatching { dir.mkdirs(); dir.listFiles().orEmpty().filter { it.name != hash }.forEach { it.delete() }; file.writeBytes(got) }
+    got
+  }
+
   companion object {
     private const val PREFS = "tohid-hesabpay"
     private const val KEY = "pending"
     private const val TTL_MS = 60_000L
+    private const val QR_DIR = "hesabpay-qr"
 
     @Volatile private var one: HesabPayEnv? = null
 

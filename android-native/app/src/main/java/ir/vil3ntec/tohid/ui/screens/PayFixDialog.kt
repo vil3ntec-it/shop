@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -68,7 +70,7 @@ fun PayFixDialog(
   var reason by remember(sale.id) { mutableStateOf("") }
   val needsRef = PayFixFlow.targets().find { it.id == to }?.needsRef == true
 
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = { if (!busy) onDismiss() },
     title = { Text(StrPayFix.title(sale.invoiceLabel() ?: "0")) },
     text = {
@@ -130,11 +132,11 @@ fun PayFixDialog(
       }
     },
     confirmButton = {
-      TextButton(enabled = !busy && from.isNotEmpty() && to.isNotEmpty(), onClick = {
+      ShopTextButton(enabled = !busy && from.isNotEmpty() && to.isNotEmpty(), onClick = {
         //  متنِ نامعتبر ⇒ ۰ ⇒ ردِ «مبلغ درست نیست» ِ هسته؛ هیچ Doubleی خوانده نمی‌شود
         onSubmit(PayFixDraft(from, to, CashKeys.cashMinor(amount) ?: 0L, reason, if (needsRef) ref else ""))
       }) { Text(StrPayFix.save) }
     },
-    dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(StrPayFix.cancel) } },
+    dismissButton = { ShopTextButton(enabled = !busy, onClick = onDismiss) { Text(StrPayFix.cancel) } },
   )
 }

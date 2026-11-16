@@ -92,8 +92,13 @@ class CheckoutCreditGateTest {
     assertTrue(desk.contains("CreditDebtor.tillBlock(") && desk.contains("canPost = cart.isNotEmpty() && deskCredit == null"))
     val panel = File(src, "components/pos/PayPanel.kt").readText()
     assertTrue(panel.contains("CreditDebtor.tillBlock(") && panel.contains("enabled = !busy && creditBlock == null"))
+    //  e-paystep (۱۴۰۵/۰۸/۲۶، تغییرِ عمدیِ آزمون): گوشی و پنجرهٔ کامپیوتر پول را در گامِ پرداخت می‌گیرند — نسیهٔ بی مشتری همان
+    //  قاعده در `PayStep` (تأییدِ «نسیه» و تسویهٔ نهایی)؛ ثبتِ تسویه فقط با پرداختِ تأییدشده
+    val step = File(src, "components/pos/PayStep.kt").readText()
+    assertTrue(step.contains("CreditDebtor.tillBlock(it, customerId, CreditDebtor.splitOwed(r.value), split = true)"))
     val phone = File(src, "v3/sales/checkout/CheckoutRoute.kt").readText()
-    assertTrue(phone.contains("CheckoutModel.creditBlock(") && phone.contains("canSubmit = CheckoutModel.canSubmit(busy, discountError, paidError, gate, creditBlock)"))
+    assertTrue(phone.contains("canSubmit = CheckoutModel.canSubmit(busy, discountError, null, gate, null)") && phone.contains("if (paid == null) return"))
+    assertTrue(File(src, "components/pos/PayStepDesk.kt").readText().contains("PayStep.confirm(entry, state, total, customerId, ledger)"))
   }
 
   private companion object {

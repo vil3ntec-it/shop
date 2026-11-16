@@ -74,7 +74,7 @@
     m('my_money', 'wallet', 'My Money', true, null, true),
     m('atoma_pay', 'wallet', 'ATOMA Pay', true, 1500000, true),
     m('m_paisa', 'wallet', 'M-Paisa', true, null, true),
-    m('afpay_card', 'card', 'کارت AfPay', true, null, true),  // داده: نامِ روشِ پیش‌فرض (Pay.DEFAULT_METHODS، ذخیره و همگام می‌شود)
+    m('afpay_card', 'card', 'کارت AfPay', false, null, true),  //  صاحب‌کار ۱۴۰۵/۰۸/۲۶: شمارهٔ تأییدِ کارت اختیاری (هم‌زاد: Payment.kt، بردار)  // داده: نامِ روشِ پیش‌فرض (Pay.DEFAULT_METHODS، ذخیره و همگام می‌شود)
     m('hawala', 'transfer', 'حواله', true, null, true),  // داده: نامِ روشِ پیش‌فرض (Pay.DEFAULT_METHODS، ذخیره و همگام می‌شود)
     m('store_credit', 'store_credit', 'اعتبار فروشگاه', false, null, false),  // داده: نامِ روشِ پیش‌فرض (Pay.DEFAULT_METHODS، ذخیره و همگام می‌شود)
     m('gift_card', 'gift_card', 'کارت هدیه', true, null, false),  // داده: نامِ روشِ پیش‌فرض (Pay.DEFAULT_METHODS، ذخیره و همگام می‌شود)

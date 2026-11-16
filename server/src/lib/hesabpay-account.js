@@ -27,7 +27,12 @@
  * ── نگهبانِ حسابِ گیرنده (مهاجرتِ ۲۰۵؛ `lib/hesabpay-guard.js`) ──────────
  *   نخستین حساب فوری؛ هر حسابِ بعدی ۲۴ ساعت «در انتظار» (حسابِ کهنه فعال می‌ماند) با پوش و «این من نبودم —
  *   لغو کن»؛ هر تغییر فقط از دستگاهِ مطمئن + رمزِ حساب‌پی + تأییدِ دوبارهٔ ورود؛ QR فقط وقتی شمارهٔ درونش همان
- *   شمارهٔ حساب است (عکس هرگز)؛ اثرِ انگشتِ گیرنده روی هر پرداخت.
+ *   شمارهٔ حساب است؛ اثرِ انگشتِ گیرنده روی هر پرداخت.
+ *
+ * ── عکسِ QR (صاحب‌کار ۱۴۰۵/۰۸/۲۶، مهاجرتِ ۹۷۰؛ `lib/hesabpay-qr-image.js`) ──────────
+ *   عکس/اسکرین‌شاتِ QR ِ خودِ دکان فقط **همراهِ** متنِ همان QR (برنامه از خودِ عکس خوانده و همان سنجشِ شماره) و از همین درِ
+ *   تغییرِ حساب (همان رمز، دستگاهِ مطمئن، سابقه، پوش و ۲۴ ساعت)؛ دوباره رمزگذاری‌شده و بی فراداده. صندوق فقط عکسِ فعال را
+ *   می‌گیرد و پیش از نشان دادن دوباره می‌خواندش. فیلدهای دیگرِ عکس و `data:` در متنِ QR همان ۴۰۰ ِ `hesabpay_qr_image`.
  */
 const crypto = require('crypto');
 const { promisify } = require('util');
@@ -35,6 +40,7 @@ const config = require('../config');
 const { one, query, tx, now } = require('../db');
 const audit = require('./audit');
 const guard = require('./hesabpay-guard');
+const qrImg = require('./hesabpay-qr-image');
 const { badRequest, forbidden, conflict, ApiError } = require('../middleware/errors');
 
 const pbkdf2 = promisify(crypto.pbkdf2);
@@ -196,8 +202,11 @@ function normQr(v) {
   return s;
 }
 
-/** عکس (data: یا فیلدِ عکس) هرگز گیرندهٔ پول نیست: QR فقط اسکن و به شماره خوانده می‌شود */
-const QR_IMAGE_FIELDS = Object.freeze(['qrImage', 'qrPng', 'image', 'file']);
+/**
+ * عکس هرگز گیرندهٔ پول نیست: QR همیشه متن است و به شماره خوانده می‌شود. عکسِ QR فقط از `qrImage` و فقط همراهِ همان متن
+ * (۱۴۰۵/۰۸/۲۶)؛ هر فیلدِ دیگرِ عکس یا `data:` در متنِ QR ⇒ رد.
+ */
+const QR_IMAGE_FIELDS = Object.freeze(['qrPng', 'image', 'file']);
 const isQrImage = (b) => QR_IMAGE_FIELDS.some((k) => b[k] !== undefined) || (typeof b.qr === 'string' && /^\s*data:/i.test(b.qr));
 
 /** شماره‌ای که در خودِ QR آمده (اگر آمده) */
@@ -271,6 +280,8 @@ async function fullOf(shopId, row, actor = null) {
     ...base,
     account: row.mode === 'simple' ? row.account : '',
     qrPayload: row.mode === 'simple' ? row.qr_payload : '',
+    //  هشِ عکسِ QR ِ فعال (صاحب پیش‌نمایش را از همان درِ صندوق می‌گیرد)
+    qrImage: row.mode === 'simple' ? (row.qr_image || '') : '',
     auto: row.mode === 'auto' ? {
       keyLast4: row.key_last4,
       merchantLast4: row.merchant_last4 || '',
@@ -299,7 +310,8 @@ async function tillView(shopId) {
   )).rows.map((x) => ({ fp: x.fp, name: x.name, last4: x.last4, active: Boolean(p && p.fp === x.fp) }));
   const waiting = !p ? guard.pendingOf(r) : null;
   return {
-    mode, simple: mode === 'simple' ? { account: r.account, qrPayload: r.qr_payload } : null,
+    //  `qrImage`: هشِ عکسِ QR ِ فعال (۱۴۰۵/۰۸/۲۶) ⇐ `GET /shop/payments/qr-image/<hash>`؛ عکسِ حسابِ در انتظار هرگز
+    mode, simple: mode === 'simple' ? { account: r.account, qrPayload: r.qr_payload, ...(r.qr_image ? { qrImage: r.qr_image } : {}) } : null,
     payee: p ? { name: p.name, last4: p.last4, fp: p.fp } : null,
     payees: hist,
     ...(waiting && waiting.until > now() ? { pendingUntil: waiting.until } : {}),
@@ -459,10 +471,10 @@ async function open(shopId, body, actor) {
 
 /** ستون‌های حسابِ فعال در یک `UPDATE` (فوری یا فعال شدنِ حسابِ در انتظار) */
 const ACTIVE_COLS = Object.freeze(['mode', 'account', 'qr_payload', 'api_key_enc', 'secret_enc', 'merchant_enc', 'key_last4',
-  'merchant_last4', 'account_name', 'payee_fp']);
+  'merchant_last4', 'account_name', 'payee_fp', 'qr_image']);
 /** حسابِ پاک (برداشتن، بازنشانی) */
 const CLEARED = Object.freeze({ mode: 'off', account: '', qr_payload: '', api_key_enc: '', secret_enc: '', merchant_enc: '',
-  key_last4: '', merchant_last4: '', account_name: '', payee_fp: '' });
+  key_last4: '', merchant_last4: '', account_name: '', payee_fp: '', qr_image: '' });
 const payeeOfCols = (cols) => ({ mode: cols.mode, name: cols.account_name, last4: guard.last4Of(cols), fp: cols.payee_fp });
 
 /** `UPDATE` ِ ستون‌های حسابِ فعال + `extra` (ستون ⇒ مقدار) ⇒ ردیفِ تازه */
@@ -533,6 +545,7 @@ async function resetPin(shopId, actor) {
       pin_hash: '', pin_failures: 0, pin_locked_until: 0, pin_changed_at: t, hold_until: t + RESET_HOLD_MS,
       active_since: null, pending: null, pending_until: 0, updated_by: String(actor.id || ''), updated_at: t,
     });
+    await qrImg.pruneIn(c, shopId, []);
     await guard.payeeSwitch(c, shopId, guard.fpOfRow(row), null, t);
     await logIn(c, shopId, actor, 'hesabpay.pin_reset', {
       previousMode: row.mode, pendingDropped: Boolean(row.pending), holdHours: RESET_HOLD_MS / 3_600_000,
@@ -545,7 +558,8 @@ async function resetPin(shopId, actor) {
 /**
  * ورودیِ حساب ⇒ ستون‌های تازه، نام و اثرِ انگشت (پیش از رمز سنجیده می‌شود تا خطای فرم تلاشِ رمز را نسوزاند).
  * ⛔ QR فقط متن و فقط وقتی شمارهٔ درونش همان شمارهٔ حساب است — QR ِ کسِ دیگر کنارِ شمارهٔ دکان پذیرفته نمی‌شود؛
- * عکس هرگز. «خودکار» بی شناسهٔ پذیرنده نه (وب‌هوک باید بگوید پول به پذیرندهٔ **همین** دکان رسید).
+ * عکسِ QR (`qrImage`) فقط همراهِ همان متن ⇒ `_image` (بایت‌ها، بیرون از ستون‌ها و `pending`). `keepQrImage` ⇒ عکسِ فعال
+ * اگر متنِ QR همان است (`_keep`). «خودکار» بی شناسهٔ پذیرنده نه (وب‌هوک باید بگوید پول به پذیرندهٔ **همین** دکان رسید).
  */
 function parseAccount(shopId, body) {
   const b = body && typeof body === 'object' ? body : {};
@@ -555,7 +569,7 @@ function parseAccount(shopId, body) {
   if (name === null) throw badRequest(`نامِ صاحبِ حساب باید متنِ کوتاه (تا ${guard.NAME_MAX} نویسه) باشد.`, 'hesabpay_bad_name');
   if (!name) throw badRequest('نامِ صاحبِ حسابِ حساب‌پی را بنویسید (همان که در صندوق کنارِ QR دیده می‌شود).', 'hesabpay_name_required');
   if (mode === 'simple') {
-    if (isQrImage(b)) throw badRequest('عکسِ QR پذیرفته نمی‌شود؛ QR ِ دکان را با دوربینِ برنامه اسکن کنید.', 'hesabpay_qr_image');
+    if (isQrImage(b)) throw badRequest('عکسِ QR فقط از «انتخابِ عکسِ QR» پذیرفته می‌شود.', 'hesabpay_qr_image');
     const qr = normQr(b.qr);
     if (qr === null) throw badRequest('متنِ QR نامعتبر یا بلند است.', 'hesabpay_bad_qr');
     const given = b.account === undefined || b.account === null || b.account === '' ? '' : normAccount(b.account);
@@ -565,9 +579,14 @@ function parseAccount(shopId, body) {
     if (qr && given && inQr !== given) throw badRequest('شمارهٔ درونِ QR با شمارهٔ حساب یکی نیست.', 'hesabpay_qr_mismatch');
     const account = given || inQr;
     if (!account) throw badRequest('شمارهٔ حساب‌پیِ دکان یا QR ِ آن را بدهید.', 'hesabpay_account_required');
+    const hasImage = b.qrImage !== undefined && b.qrImage !== null && b.qrImage !== '';
+    //  عکس فقط با متنِ QR ای که برنامه از خودِ آن خوانده (و شماره‌اش همان حساب است)
+    if (hasImage && !qr) throw badRequest('QR ِ این عکس خوانده نشد؛ عکسِ روشن‌ترِ QR بدهید.', 'hesabpay_qr_image_unread');
+    const image = hasImage ? qrImg.prepare(b.qrImage) : null;
     return {
       mode, account, qr_payload: qr, api_key_enc: '', secret_enc: '', merchant_enc: '', key_last4: '', merchant_last4: '',
-      account_name: name, payee_fp: guard.fpOf(shopId, 'simple', account),
+      account_name: name, payee_fp: guard.fpOf(shopId, 'simple', account), qr_image: image ? image.hash : '',
+      _image: image, _keep: !image && b.keepQrImage === true && Boolean(qr),
     };
   }
   if (!credKeyReady()) throw credKeyError();
@@ -593,7 +612,7 @@ function parseAccount(shopId, body) {
  * نخستین حسابِ دکان فوری فعال؛ هر حسابِ بعدی ۲۴ ساعت «در انتظار» (حسابِ کهنه فعال می‌ماند) با پوش و «این من نبودم».
  */
 async function saveAccount(shopId, body, actor) {
-  const cols = parseAccount(shopId, body);
+  const { _image: image, _keep: keep, ...cols } = parseAccount(shopId, body);
   const pin = pinGiven(body);
   await guard.activateDue(shopId);
   const out = await withPin(shopId, pin, actor, async (c, row, t) => {
@@ -604,14 +623,18 @@ async function saveAccount(shopId, body, actor) {
     }
     if (row.mode === 'auto' && await openGatewayPayment(c, shopId, t)) return { error: openPaymentError() };
     const by = String(actor.id || '');
+    //  عکسِ QR: تازه ⇒ در همین تراکنش؛ «همان عکس» ⇒ عکسِ فعال اگر متنِ QR همان است
+    if (keep && row.mode === 'simple' && row.qr_payload === cols.qr_payload && row.qr_image) cols.qr_image = row.qr_image;
+    if (image) await qrImg.storeIn(c, shopId, image, t, by);
     //  نشانیِ وب‌هوک از همین حالا (صاحب پیش از فعال شدن در داشبوردِ حساب‌پی ثبتش می‌کند)؛ اعتبار فقط امضای رازِ دکان
     const token = cols.mode === 'auto' ? (row.webhook_token || crypto.randomBytes(24).toString('base64url')) : row.webhook_token;
     const next = payeeOfCols(cols);
-    const brief = { mode: cols.mode, previousMode: row.mode, last4: next.last4, qr: Boolean(cols.qr_payload) };
+    const brief = { mode: cols.mode, previousMode: row.mode, last4: next.last4, qr: Boolean(cols.qr_payload), qrImage: Boolean(cols.qr_image) };
     if (row.first_set_at === null || row.first_set_at === undefined) {
       const r = await writeActive(c, shopId, cols, {
         webhook_token: token, active_since: t, first_set_at: t, pending: null, pending_until: 0, updated_by: by, updated_at: t,
       });
+      await qrImg.pruneIn(c, shopId, [cols.qr_image]);
       await guard.payeeSwitch(c, shopId, guard.fpOfRow(row), next, t);
       await logIn(c, shopId, actor, 'hesabpay.account_set', { ...brief, immediate: true });
       return { row: r, notify: 'account_changed' };
@@ -622,6 +645,8 @@ async function saveAccount(shopId, body, actor) {
               updated_at=$6 WHERE shop_id=$1 RETURNING *`,
       [shopId, JSON.stringify({ ...cols, at: t, by }), until, token, by, t]
     )).rows[0];
+    //  عکسِ فعال تا فعال شدنِ تازه می‌ماند؛ عکسِ حسابِ در انتظارِ پیشین (جایگزین‌شده) می‌رود
+    await qrImg.pruneIn(c, shopId, [row.qr_image, cols.qr_image]);
     await logIn(c, shopId, actor, 'hesabpay.change_pending', { ...brief, replaced: Boolean(row.pending), activatesAt: until });
     return { row: r, notify: 'change_pending', notifyData: { until } };
   }, { trust: true, op: 'save' });
@@ -638,6 +663,7 @@ async function removeAccount(shopId, body, actor) {
     const r = await writeActive(c, shopId, CLEARED, {
       active_since: null, pending: null, pending_until: 0, updated_by: String(actor.id || ''), updated_at: t,
     });
+    await qrImg.pruneIn(c, shopId, []);
     await guard.payeeSwitch(c, shopId, guard.fpOfRow(row), null, t);
     await logIn(c, shopId, actor, 'hesabpay.account_removed', { previousMode: row.mode, pendingDropped: Boolean(row.pending) });
     return { row: r, notify: 'account_removed' };

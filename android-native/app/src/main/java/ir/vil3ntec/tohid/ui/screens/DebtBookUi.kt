@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.background
@@ -284,7 +286,8 @@ internal fun DueDateDialog(entry: DebtBook.Entry, onDismiss: () -> Unit, onSave:
 /** برد از سقفِ اعتبار بیرون می‌زند — فقط با تأییدِ صریح ثبت می‌شود و ردش می‌ماند (CRM-03) */
 @Composable
 internal fun OverLimitDialog(credit: DebtBook.Credit, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-  AlertDialog(
+  ShopAlertDialog(
+    danger = true,
     onDismissRequest = onDismiss,
     containerColor = Shop.colors.surfaceSolid,
     title = { Text(StrMoney.overLimitTitle, color = Shop.colors.danger) },
@@ -294,8 +297,8 @@ internal fun OverLimitDialog(credit: DebtBook.Credit, onConfirm: () -> Unit, onD
         style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
       )
     },
-    confirmButton = { TextButton(onClick = onConfirm) { Text(StrDebtPages.recordAnyway, color = Shop.colors.danger) } },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel) } },
+    confirmButton = { ShopTextButton(onClick = onConfirm) { Text(StrDebtPages.recordAnyway, color = Shop.colors.danger) } },
+    dismissButton = { ShopTextButton(onClick = onDismiss) { Text(Str.cancel) } },
   )
 }
 

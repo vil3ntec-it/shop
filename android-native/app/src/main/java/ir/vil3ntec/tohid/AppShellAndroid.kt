@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import android.content.Context
 import android.content.Intent
 import androidx.compose.animation.AnimatedContent
@@ -197,7 +199,7 @@ private fun CrashNotice(context: Context) {
     runCatching { ir.vil3ntec.tohid.data.platform.CrashReporter.markShown(context, shown) }
     code = null
   }
-  androidx.compose.material3.AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = done,
     title = { androidx.compose.material3.Text(ir.vil3ntec.tohid.core.i18n.StrShell.crashTitle) },
     text = {
@@ -213,7 +215,7 @@ private fun CrashNotice(context: Context) {
       }
     },
     confirmButton = {
-      androidx.compose.material3.TextButton(onClick = done) {
+      ShopTextButton(onClick = done) {
         androidx.compose.material3.Text(ir.vil3ntec.tohid.core.i18n.StrShell.crashOk)
       }
     },

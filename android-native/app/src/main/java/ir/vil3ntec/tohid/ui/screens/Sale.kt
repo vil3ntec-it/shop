@@ -1122,7 +1122,7 @@ fun SaleScreen(
   /* ------------------ گوشی: دستهٔ تازه و حذفِ دسته ------------------ */
 
   newCategory?.let { value ->
-    AlertDialog(
+    ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog(
       onDismissRequest = { newCategory = null },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(ir.vil3ntec.tohid.core.i18n.StrSalePages.newCategory, color = Shop.colors.text) },
@@ -1135,7 +1135,7 @@ fun SaleScreen(
         )
       },
       confirmButton = {
-        TextButton(onClick = {
+        ir.vil3ntec.tohid.ui.components.common.ShopTextButton(onClick = {
           when (val result = WarehouseEngine.addCategory(d, value)) {
             is WarehouseEngine.Result.Failed -> toast(result.message)
             is WarehouseEngine.Result.Ok -> {
@@ -1147,12 +1147,12 @@ fun SaleScreen(
           }
         }) { Text(ir.vil3ntec.tohid.core.i18n.StrCourier.add) }
       },
-      dismissButton = { TextButton(onClick = { newCategory = null }) { Text(Str.cancel) } },
+      dismissButton = { ir.vil3ntec.tohid.ui.components.common.ShopTextButton(onClick = { newCategory = null }) { Text(Str.cancel) } },
     )
   }
 
   confirmDeleteCategory?.let { name ->
-    AlertDialog(
+    ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog(danger = true,
       onDismissRequest = { confirmDeleteCategory = null },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(ir.vil3ntec.tohid.core.i18n.StrProducts.deleteCategoryTitle, color = Shop.colors.text) },
@@ -1164,7 +1164,7 @@ fun SaleScreen(
         )
       },
       confirmButton = {
-        TextButton(onClick = {
+        ir.vil3ntec.tohid.ui.components.common.ShopTextButton(onClick = {
           when (val result = WarehouseEngine.removeCategory(d, name)) {
             is WarehouseEngine.Result.Failed -> toast(result.message)
             is WarehouseEngine.Result.Ok -> {
@@ -1176,7 +1176,7 @@ fun SaleScreen(
           confirmDeleteCategory = null
         }) { Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPrices.remove, color = Shop.colors.danger) }
       },
-      dismissButton = { TextButton(onClick = { confirmDeleteCategory = null }) { Text(Str.cancel) } },
+      dismissButton = { ir.vil3ntec.tohid.ui.components.common.ShopTextButton(onClick = { confirmDeleteCategory = null }) { Text(Str.cancel) } },
     )
   }
 

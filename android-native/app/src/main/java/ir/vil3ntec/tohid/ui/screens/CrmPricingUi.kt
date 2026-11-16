@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -40,7 +42,7 @@ internal fun CrmPricingDialog(d: ShopData, debtor: Debtor, onDismiss: () -> Unit
   var input by remember(debtor.id) { mutableStateOf(CrmPricingForm.of(debtor)) }
   val missingSource = CrmPricingForm.needsSource(debtor, input)
   val last = remember(d, debtor.id) { CrmPricingForm.lastConsent(d, debtor.id) }
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     containerColor = Shop.colors.surfaceSolid,
     title = { Text("${StrFields.crmPricingTitle} — ${debtor.name}", color = Shop.colors.text) },
@@ -96,8 +98,8 @@ internal fun CrmPricingDialog(d: ShopData, debtor: Debtor, onDismiss: () -> Unit
         }
       }
     },
-    confirmButton = { TextButton(enabled = !missingSource, onClick = { onSave(input) }) { Text(StrFields.crmSave) } },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel) } },
+    confirmButton = { ShopTextButton(enabled = !missingSource, onClick = { onSave(input) }) { Text(StrFields.crmSave) } },
+    dismissButton = { ShopTextButton(onClick = onDismiss) { Text(Str.cancel) } },
   )
 }
 

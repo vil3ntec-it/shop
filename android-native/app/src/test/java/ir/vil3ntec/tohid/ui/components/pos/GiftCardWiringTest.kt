@@ -56,8 +56,11 @@ class GiftCardWiringTest {
     assertTrue(s.contains("GiftCardPrint.print(context, sheet)"))
     val v3 = "ir/vil3ntec/tohid/ui/v3/sales/checkout/"
     assertEquals(1, count(v3 + "CheckoutRoute.kt", "GiftCardPref.on(context)"))
-    assertEquals(1, count(v3 + "CheckoutRoute.kt", "CheckoutStoredPay.settle(data, CheckoutSession.pay.draft("))
-    assertEquals(1, count(v3 + "CheckoutRoute.kt", "giftLedger = data.takeIf { giftOn }"))
+    //  e-paystep (۱۴۰۵/۰۸/۲۶، تغییرِ عمدیِ آزمون): پول در گامِ پرداخت گرفته می‌شود — پیش‌سنجیِ کارت/اعتبار در `PayStep` (هر پرداخت و
+    //  تسویهٔ نهایی، فقط با همان تنظیم) و راهنمای مانده در `PayStepRoute`؛ تسویه با همان `CheckoutSession.pay` (تنظیمِ `stored`)
+    assertEquals(1, count(v3 + "CheckoutRoute.kt", "if (CheckoutSession.pay.stored != giftOn) CheckoutSession.pay.stored = giftOn"))
+    assertEquals(2, count("ir/vil3ntec/tohid/ui/components/pos/PayStep.kt", "if (panel.stored && ledger != null) GiftCards.problem(ledger,"))
+    assertEquals(1, count(v3 + "PayStepRoute.kt", "CheckoutStoredPay.hint(book, giftView,"))
     val split = src(v3 + "CheckoutPaySplit.kt")
     assertTrue(split.contains("state.methods().forEach"))
     assertFalse(split.contains("PayFlow.panelMethods()"))

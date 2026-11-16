@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopButton
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -503,7 +506,7 @@ private fun HeldDialogs(ui: HeldInvoicesUi, items: List<HeldInvoice>) {
         ir.vil3ntec.tohid.ui.desk.DeskDialogField(StrPos.nameOrNumberOptional, label, { label = it.take(HeldRules.LABEL_MAX) }, focusRequester = focus)
         ir.vil3ntec.tohid.ui.desk.DeskDialogField(StrPos.noteOptional, note, { note = it.take(HeldRules.NOTE_MAX) })
       }
-      else AlertDialog(
+      else ShopAlertDialog(
         onDismissRequest = { ui.close() },
         shape = Shape.dialog,
         title = { Text(StrPos.holdInvoice) },
@@ -531,8 +534,8 @@ private fun HeldDialogs(ui: HeldInvoicesUi, items: List<HeldInvoice>) {
             )
           }
         },
-        confirmButton = { Button(onClick = { ui.hold(label, note) }) { Text(StrPos.holdIt) } },
-        dismissButton = { TextButton(onClick = { ui.close() }) { Text(StrPos.nevermind) } },
+        confirmButton = { ShopButton(onClick = { ui.hold(label, note) }) { Text(StrPos.holdIt) } },
+        dismissButton = { ShopTextButton(onClick = { ui.close() }) { Text(StrPos.nevermind) } },
       )
     }
     HeldDialog.List -> {
@@ -575,7 +578,7 @@ private fun HeldDialogs(ui: HeldInvoicesUi, items: List<HeldInvoice>) {
           }
         }
       }
-      else AlertDialog(
+      else ShopAlertDialog(
         onDismissRequest = { ui.close() },
         shape = Shape.dialog,
         title = { Text(StrPos.heldInvoices) },
@@ -602,15 +605,15 @@ private fun HeldDialogs(ui: HeldInvoicesUi, items: List<HeldInvoice>) {
                   )
                   if (h.note.isNotBlank()) Text(h.note, style = MaterialTheme.typography.labelSmall, color = colors.muted2, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
-                TextButton(onClick = { ui.dialog = HeldDialog.Discard(h) }) { Text(StrPos.discardIt, color = colors.danger) }
-                Button(onClick = { ui.resume(h.id) }, modifier = if (i == 0) Modifier.focusRequester(first) else Modifier) { Text(StrPos.openIt) }
+                ShopTextButton(onClick = { ui.dialog = HeldDialog.Discard(h) }) { Text(StrPos.discardIt, color = colors.danger) }
+                ShopButton(onClick = { ui.resume(h.id) }, modifier = if (i == 0) Modifier.focusRequester(first) else Modifier) { Text(StrPos.openIt) }
               }
             }
           }
         },
-        confirmButton = { TextButton(onClick = { ui.close() }) { Text(Str.close) } },
+        confirmButton = { ShopTextButton(onClick = { ui.close() }) { Text(Str.close) } },
         dismissButton = if (ui.canDropStale && stale.isNotEmpty()) {
-          { TextButton(onClick = { ui.dialog = HeldDialog.DropStale }) { Text(StrPos.clearStale(plain(stale.size)), color = colors.danger) } }
+          { ShopTextButton(onClick = { ui.dialog = HeldDialog.DropStale }) { Text(StrPos.clearStale(plain(stale.size)), color = colors.danger) } }
         } else null,
       )
     }
@@ -619,56 +622,58 @@ private fun HeldDialogs(ui: HeldInvoicesUi, items: List<HeldInvoice>) {
       confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.discardIt, danger = true) { ui.discard(dlg.invoice) },
       dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.no) { ui.dialog = HeldDialog.List },
     ) { ir.vil3ntec.tohid.ui.desk.DeskDialogText(StrPos.discardWarn(dlg.invoice.label.ifBlank { StrPos.unnamed }, summary(ui.data, dlg.invoice.draft()))) }
-    else AlertDialog(
+    else ShopAlertDialog(
+      danger = true,
       onDismissRequest = { ui.dialog = HeldDialog.List },
       shape = Shape.dialog,
       title = { Text(StrPos.discardQ(plain(dlg.invoice.number))) },
       text = { Text(StrPos.discardWarn(dlg.invoice.label.ifBlank { StrPos.unnamed }, summary(ui.data, dlg.invoice.draft()))) },
       confirmButton = {
-        Button(onClick = { ui.discard(dlg.invoice) }, colors = ButtonDefaults.buttonColors(containerColor = colors.danger)) { Text(StrPos.discardIt) }
+        ShopButton(onClick = { ui.discard(dlg.invoice) }, colors = ButtonDefaults.buttonColors(containerColor = colors.danger)) { Text(StrPos.discardIt) }
       },
-      dismissButton = { TextButton(onClick = { ui.dialog = HeldDialog.List }) { Text(StrPos.no) } },
+      dismissButton = { ShopTextButton(onClick = { ui.dialog = HeldDialog.List }) { Text(StrPos.no) } },
     )
     HeldDialog.DropStale -> if (desk) ir.vil3ntec.tohid.ui.desk.DeskDialog(
       title = StrPos.clearStaleQ, onDismiss = { ui.dialog = HeldDialog.List },
       confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.clearIt, danger = true) { ui.dropStale() },
       dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.no) { ui.dialog = HeldDialog.List },
     ) { ir.vil3ntec.tohid.ui.desk.DeskDialogText(StrPos.clearStaleWarn(plain(HeldRules.STALE_HOURS))) }
-    else AlertDialog(
+    else ShopAlertDialog(
+      danger = true,
       onDismissRequest = { ui.dialog = HeldDialog.List },
       shape = Shape.dialog,
       title = { Text(StrPos.clearStaleQ) },
       text = { Text(StrPos.clearStaleWarn(plain(HeldRules.STALE_HOURS))) },
       confirmButton = {
-        Button(onClick = { ui.dropStale() }, colors = ButtonDefaults.buttonColors(containerColor = colors.danger)) { Text(StrPos.clearIt) }
+        ShopButton(onClick = { ui.dropStale() }, colors = ButtonDefaults.buttonColors(containerColor = colors.danger)) { Text(StrPos.clearIt) }
       },
-      dismissButton = { TextButton(onClick = { ui.dialog = HeldDialog.List }) { Text(StrPos.no) } },
+      dismissButton = { ShopTextButton(onClick = { ui.dialog = HeldDialog.List }) { Text(StrPos.no) } },
     )
     is HeldDialog.TakeOver -> if (desk) ir.vil3ntec.tohid.ui.desk.DeskDialog(
       title = heldTakeTitle(dlg.held), onDismiss = { ui.close() },
       confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.heldTakeOver, danger = true) { ui.resume(dlg.invoice.id, force = true) },
       dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.no) { ui.close() },
     ) { ir.vil3ntec.tohid.ui.desk.DeskDialogText(StrPos.heldTakeWarn) }
-    else AlertDialog(
+    else ShopAlertDialog(
       onDismissRequest = { ui.close() },
       shape = Shape.dialog,
       title = { Text(heldTakeTitle(dlg.held)) },
       text = { Text(StrPos.heldTakeWarn) },
       confirmButton = {
-        Button(onClick = { ui.resume(dlg.invoice.id, force = true) }, colors = ButtonDefaults.buttonColors(containerColor = colors.warning)) { Text(StrPos.heldTakeOver) }
+        ShopButton(onClick = { ui.resume(dlg.invoice.id, force = true) }, colors = ButtonDefaults.buttonColors(containerColor = colors.warning)) { Text(StrPos.heldTakeOver) }
       },
-      dismissButton = { TextButton(onClick = { ui.close() }) { Text(StrPos.no) } },
+      dismissButton = { ShopTextButton(onClick = { ui.close() }) { Text(StrPos.no) } },
     )
     is HeldDialog.Twice -> if (desk) ir.vil3ntec.tohid.ui.desk.DeskDialog(
       title = StrPos.heldTwiceTitle, onDismiss = { ui.seen(dlg.id) },
       confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.heldSeen) { ui.seen(dlg.id) },
     ) { ir.vil3ntec.tohid.ui.desk.DeskDialogText(heldTwiceText(dlg.conflict)) }
-    else AlertDialog(
+    else ShopAlertDialog(
       onDismissRequest = { ui.seen(dlg.id) },
       shape = Shape.dialog,
       title = { Text(StrPos.heldTwiceTitle) },
       text = { Text(heldTwiceText(dlg.conflict)) },
-      confirmButton = { Button(onClick = { ui.seen(dlg.id) }) { Text(StrPos.heldSeen) } },
+      confirmButton = { ShopButton(onClick = { ui.seen(dlg.id) }) { Text(StrPos.heldSeen) } },
     )
   }
 }

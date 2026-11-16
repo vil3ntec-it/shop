@@ -69,7 +69,11 @@ function payeeOf(row) {
 function pendingOf(row) {
   const p = row && row.pending;
   if (!p || typeof p !== 'object' || !Number(row.pending_until)) return null;
-  return { mode: p.mode, name: p.account_name || '', last4: last4Of(p), at: Number(p.at) || null, until: Number(row.pending_until) };
+  return {
+    mode: p.mode, name: p.account_name || '', last4: last4Of(p), at: Number(p.at) || null, until: Number(row.pending_until),
+    //  حسابِ در انتظار عکسِ QR ِ تازه دارد؟ (صاحب زمانِ فعال شدنش را روشن می‌بیند؛ خودِ عکس نه)
+    qrImage: Boolean(p.qr_image),
+  };
 }
 
 /** نامِ صاحبِ حساب: ۱ تا ۶۰ نویسه، بی نویسهٔ کنترلی؛ نداده ⇒ '' (فراخواننده نامِ دکان را می‌گذارد) */
@@ -204,10 +208,12 @@ async function activateDue(shopId) {
     await c.query(
       `UPDATE shop_hesabpay SET mode=$2, account=$3, qr_payload=$4, api_key_enc=$5, secret_enc=$6, merchant_enc=$7,
               key_last4=$8, merchant_last4=$9, account_name=$10, payee_fp=$11, active_since=$12, pending=NULL,
-              pending_until=0, version=version+1, updated_at=$12 WHERE shop_id=$1`,
+              pending_until=0, qr_image=$13, version=version+1, updated_at=$12 WHERE shop_id=$1`,
       [shopId, p.mode, p.account || '', p.qr_payload || '', p.api_key_enc || '', p.secret_enc || '', p.merchant_enc || '',
-        p.key_last4 || '', p.merchant_last4 || '', p.account_name || '', p.payee_fp || '', t]
+        p.key_last4 || '', p.merchant_last4 || '', p.account_name || '', p.payee_fp || '', t, p.qr_image || '']
     );
+    //  عکسِ QR ِ حسابِ تازه جای کهنه (مهاجرتِ ۹۷۰)
+    await require('./hesabpay-qr-image').pruneIn(c, shopId, [p.qr_image]);
     const next = { mode: p.mode, name: p.account_name || '', last4: last4Of(p), fp: p.payee_fp || '' };
     await payeeSwitch(c, shopId, prev && prev.fp, next, t);
     await audit.logIn(c, {
@@ -236,6 +242,8 @@ async function cancelPending(shopId, actor) {
       `UPDATE shop_hesabpay SET pending=NULL, pending_until=0, section_locked_until=$2, version=version+1, updated_by=$3,
               updated_at=$4 WHERE shop_id=$1`, [shopId, until, String(actor.id || ''), t]
     );
+    //  عکسِ QR ِ حسابِ لغوشده هم می‌رود؛ عکسِ فعال می‌ماند
+    await require('./hesabpay-qr-image').pruneIn(c, shopId, [row.qr_image]);
     await acc().logIn(c, shopId, actor, 'hesabpay.change_cancelled', {
       mode: row.pending.mode, last4: last4Of(row.pending), requestedBy: row.pending.by || '', lockedUntil: until,
     });

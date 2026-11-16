@@ -2,6 +2,8 @@ package ir.vil3ntec.tohid.ui.screens
 
 // i18n: سه‌زبانه (`StrGrid`)
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -262,12 +264,13 @@ fun ProductGridSheet(store: ShopStore, d: ShopData, ids: List<String>, by: Strin
     }
   }
 
-  if (askDiscard) AlertDialog(
+  if (askDiscard) ShopAlertDialog(
+    danger = true,
     onDismissRequest = { askDiscard = false },
     title = { Text(StrGrid.discardTitle) },
     text = { Text(StrGrid.discardText) },
-    confirmButton = { TextButton(onClick = { askDiscard = false; onClose() }) { Text(StrGrid.discard, color = c.danger) } },
-    dismissButton = { TextButton(onClick = { askDiscard = false }) { Text(StrGrid.keep) } },
+    confirmButton = { ShopTextButton(onClick = { askDiscard = false; onClose() }) { Text(StrGrid.discard, color = c.danger) } },
+    dismissButton = { ShopTextButton(onClick = { askDiscard = false }) { Text(StrGrid.keep) } },
   )
 }
 

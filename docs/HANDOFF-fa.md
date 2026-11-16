@@ -124,6 +124,85 @@
   سه فیلد در یک خطِ `Models.kt` پیش‌فرضِ `Purchase.currency` را «null, @OptIn(…» می‌دید. هر فیلدِ ارزی حالا خطِ خودش را دارد (همان شکلِ
   `unitName`)؛ سقفِ `tools/quality/baseline.json` برای `Models.kt` ۹۳۰ ⇐ **۹۳۸** (دلیل: ۱۲ فیلدِ همگام‌شونده، یکی در هر خط، قراردادِ همین
   خواننده). `fields` پیش ۱ قرمز، پس ۰؛ `journeys-b` و `sync` سبز.
+### ۱۴۰۵/۰۸/۲۶ — عاملِ e-paystep زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-paystep` (از main ‏7e2a36923، #1060) — پرداخت در دو گام، کارت‌خوانِ هر برند، عکسِ QR ِ حساب‌پی
+
+- **خواستهٔ صاحب‌کار** (عکسِ برگهٔ «تسویهٔ فروش» با «ثبتِ فروش»): «وقتی ثبتِ فروش می‌زنم نباید پرداخت بشه؛ این باید ببره پیشِ بخشِ پرداخت…» و
+  تصمیم‌های ۱۴۰۵/۰۸/۲۶ (ثبت در `OWNER-DECISIONS-fa.md`): حساب‌پی فعلاً فقط «ساده» (API گرفته نمی‌شود)، عکسِ QR ِ حساب‌پی، کارت با هر کارت‌خوان و
+  شمارهٔ تأییدِ اختیاری.
+- **ساخته شد**: (۱) تسویهٔ گوشی فقط «پرداخت ‹مبلغ›» دارد و هیچ ثبت نمی‌کند ⇒ برگهٔ `sale/checkout/pay` (`PayStepRoute`)؛ کامپیوتر:
+  `PayStepDialog` (`ui/components/pos/PayStepDesk.kt`) با F9، دکمهٔ «پرداخت ‹مبلغ›» و کاشی‌های کنارِ سبد؛ منطقِ مشترک `ui/components/pos/PayStep.kt`
+  (`PayEntry` + `PayPanelState`): نقد (خالی = دقیق، دکمهٔ تند، پولِ پس)، کارت «کارت‌خوان تأیید کرد»، کیف پول/حواله با مرجع، نسیه با گزینشِ مشتری،
+  «روشِ دیگر برای باقی‌مانده»؛ فروش فقط با `Result.Done` از همان `submit`/`finish` ِ همیشگی. پرداختِ گرفته‌شده در `CheckoutSession.settled` تا ثبت
+  (فقط همان مبلغ و همان مشتری). گام به `payV2` بسته نیست. (۲) `afpay_card.needsRef = false` در `Payment.kt`، `pay-core.js` و `pay-v1.json`.
+  (۳) عکسِ QR: مهاجرتِ ۹۷۰ (`hesabpay_qr_images`، `shop_hesabpay.qr_image`)، `lib/hesabpay-qr-image.js` (دوباره رمزگذاری، بی فراداده)، همان درِ
+  تغییرِ حساب و ۲۴ ساعت، `GET /shop/payments/qr-image/:hash` فقط عکسِ فعال؛ برنامه: `pay/platform/ShopQrPicture` (ML Kit / ZXing + ImageIO) و
+  `HesabPayEnv.qrPicture` (هش + دوباره خواندن) ⇒ برگهٔ حساب‌پی، «پرداخت به حسابِ دکان» و نمایشگرِ مشتری؛ «انتخابِ عکسِ QR» در «حساب‌پیِ دکان».
+- **پاسخِ «چرا هنوز نقدی | نسیه؟»**: آن بخش پیرو ِ `ShopPolicy.payV2` بود — یا ساختِ پیش از #1058، یا `pay_v2=false` ِ صریح (تنظیمِ **دکان** و
+  همگام: «فقط نقد و نسیه» ِ هر دستگاه یا پشتیبانِ بازیابی‌شده به همه می‌رسد و پذیرش هرگز انتخابِ صریح را عوض نمی‌کند)، یا صندوقِ بازِ کهنه با
+  عددِ ناهمخوان (WAIT). حالا گامِ پرداخت به پرچم بسته نیست: هر دستگاه همان دم همهٔ روش‌ها را دارد (پرچم فقط صندوقِ شیفت را می‌گزیند).
+  خطرِ مانده (ساخته نشد): `pay_v2=true` ِ همگام‌شده می‌تواند صفحهٔ صندوقِ شیفتِ دستگاهِ دیگر را وسطِ شیفت عوض کند.
+- **آزمونِ عوض‌شده (عمدی)**: `PayMethodsCheckoutUiTest`، `DeskPayTilesUiTest`، `DeskSaleD3aUiTest` (F9 ⇒ گام، Enter، Enter)، `DeskExpiryPayUiTest`
+  (کاشیِ حساب‌پی ⇒ گام)، `PayPanelTilesTest` (کارت بی مرجع)، `GiftCardWiringTest` و `CheckoutCreditGateTest` (سیم‌کشیِ تازه در `PayStep`)،
+  `hesabpay-guard.test.js` (عکس بی متن ⇒ `hesabpay_qr_image_unread`)، `pay-v1.json` (حالتِ «کارت بی شمارهٔ تأیید»).
+- **آزمون‌ها**: تازه `PayStepTest` ۷، `HesabQrImageTest` ۴، `ShopQrPictureTest` ۳، `hesabpay-qr-image.test.js` ۳؛ اجرای هدف‌دارِ کامپیوتر ۵۱۷ آزمون
+  (`*PayStep*`، `*PayMethods*`، `*Checkout*`، `*Till*`، `*Hesab*`، `*Dari*`، `*LookGuard*`، `*PageAnatomyGuard*`، …) سبز پس از رفعِ دو آزمونِ کلید/عکس؛
+  سرور ۸۵ + ۲۸ + ۱۷ سبز روی PGlite. عکس‌ها: `/home/user/wt-pay-shots/paystep/` (پیش از main، پس از همین شاخه؛ روشن/تیره).
+- **آیفون** (خواستِ هماهنگ‌کننده؛ iosTest روی لینوکس اجرا نمی‌شود، پس فقط ویرایشِ کمینه با برچسب‌های موجود): `CoreFlowsE2EIosTest`
+  «04-till»: پس از «پرداخت» ِ سبد، دکمهٔ «پرداخت ‹مبلغ›» (`StrTillPay.payAmount(PhoneSaleText.amount(FREE_PRICE))`) ⇐ گامِ پرداخت ⇐ پیش از
+  تأیید هیچ فروش (سنجهٔ تازه) ⇐ «دریافت شد» (`StrTillPay.received`) ⇐ همان سنجه‌ها (نقد، مبلغ، قلم، سرور)؛ عکسِ تازهٔ `04d2-paystep`.
+  «07-credit»: «پرداخت ‹مبلغ›» ⇐ کاشیِ «نسیه» (`Find.clickLabel(StrTillPay.tileCredit)`) ⇐ بی مشتری هیچ فروش و «انتخابِ مشتری» باز
+  (`StrSale.newDebtor` دیده می‌شود؛ جای «ثبت فروش» ِ خاموش و `creditNeedsCustomer`) ⇐ قرض‌دارِ تازه ⇐ همان گام با «نسیه» و نامِ قرض‌دار
+  ⇐ «ثبت به حسابِ مشتری» (`StrTillPay.toAccountButton`) ⇐ همان سنجه‌های نسیه. `E2eSupport.toTab` دست نخورد (شاخهٔ `claude/e-ios-e2e`).
+  کدِ مشترک: `pay/platform/ShopQrPicture.kt` در `ios-exclude.txt` با همتای `ShopQrPictureIos.kt` (`CAN_READ = false`: دکمهٔ عکس پنهان،
+  صندوقِ آیفون همان QR ِ کشیده)؛ کامپایلِ آیفون این‌جا آزموده نشد.
+- **نیمه‌کاره / قدمِ بعد**: آزمونِ روی دستگاهِ واقعی (ML Kit روی گوشی، پنجرهٔ فایلِ ویندوز)؛ خواندنِ QR از عکس در آیفون (Vision)؛ اتصالِ خودکارِ کارت‌خوان (`DevicePaySettle`) و درگاهِ
+  خودکارِ حساب‌پی خاموش ماندند تا صاحب‌کار API را بگیرد؛ ردیف‌های PAY-06/PAY-21 همچنان PARTIAL.
+
+- **CI ِ #1065 (هماهنگ‌کننده)**: `core-fuzz.test.js` («پیکرهٔ فاز همان خروجیِ امروزِ مولّد… بایت‌به‌بایت») سرخ — `afpay_card.needsRef = false` در
+  `pay-core.js` چهار موردِ `pay.settle`/`pay.fix` ِ پیکره را عوض کرد و پیکره بازساخته نشده بود. `node server/scripts/core-fuzz.js --write`
+  (۴ مورد در `core/test-vectors/core-fuzz-v1.json`)؛ پیش ۳/۴، پس ۴/۴؛ `CoreFuzzTest`/`CoreVectors*` ِ core روی همان پیکره.
+- **CI ِ #1065 (۲)**: «آزمون‌های سرور روی PostgreSQL» — `shop-route-inventory.test.js` («هر مسیرِ شناسه‌دار… با ردیفِ واقعیِ الف»)
+  مسیرِ تازهٔ `GET /shop/payments/qr-image/:hash` را بی ردیفِ واقعی یافت. نخستین حسابِ حساب‌پیِ «الف» در همان آزمون حالا `qr` و `qrImage`
+  (JPEG ِ ۶۴×۶۴) می‌فرستد و هشِ عکسِ فعال `ids.qrImage` است + قاعدهٔ `concreteFor`. نسخهٔ پیشین روی PGlite ۱/۲ (همان پیام)، پس ۲/۲.
+### ۱۴۰۵/۰۸/۲۶ — هماهنگ‌کننده، شاخهٔ `claude/e-ios-e2e` (از `origin/main` e8a22edfd) — سناریوهای آیفون پس از دستهٔ ۷۰
+
+- **یافته**: کارِ «برنامهٔ آیفون — چارچوب، Xcode و شبیه‌ساز (گزارش)» (بی‌سد) از دستهٔ ۷۰ سرخ است؛ دستهٔ ۶۸ سبز بود. از «۰۴-صندوق» به بعد
+  همه رد. ریشه آزمون است، نه برنامه: (۱) e-phone-p1 صندوقِ گوشی را «حالتِ تمرکز» کرد (نوارِ پایین پنهان، «بازگشت» دیده می‌شود) و
+  `E2eSupport.toTab` با دیدنِ «بازگشت» زبانه را دوباره می‌زد که دیگر نبود؛ (۲) e-phone-p2 فرمِ «کالای تازه» را یک‌کالایی کرد (قیمتِ خرید،
+  دسته و واحد زیرِ «بیشتر» ِ تاشو، دکمه «ذخیره»). سناریوهای بعدی در همان حالِ گیرکرده می‌ماندند.
+- **کار**: `toTab` زدنِ دوباره را فقط وقتی نوار هنوز هست؛ «۰۵-کالا» قیمتِ فروش را بیرون می‌نویسد، «بیشتر» را با نشانِ
+  `QuickProductSpec.MORE_TAG` باز می‌کند (نوشته‌اش هم‌نامِ زبانهٔ «بیشتر» است) و با `StrKit.save` ذخیره می‌کند. گامِ پرداختِ «۰۴» و «۰۷» با
+  کارِ `claude/e-paystep` (گامِ جدای پرداخت) هم‌گام می‌شود.
+- **سنجش**: فقط روی مکِ CI (این‌جا لینوکس است و `iosTest` ساخته نمی‌شود) — نتیجه در همان کارِ گزارش.
+
+### ۱۴۰۵/۰۸/۲۶ — عاملِ e-desk-d3d زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-desk-d3d` (از `origin/main` e8a22edfd) — همهٔ پنجره‌های مشترک روی کامپیوتر با پلِ `ShopAlertDialog`
+
+- **خواست**: باقیِ `AlertDialog`/دکمهٔ Material ِ پرونده‌های مشترک روی کامپیوتر ⇐ پنجرهٔ کامپیوتر؛ گوشی و رفتار/داده همان.
+- **پل** (`ui/components/common/ShopDialogs.kt`، تازه): `ShopAlertDialog` (همان پارامترهای `AlertDialog` + `danger`)، `ShopTextButton`، `ShopButton`،
+  `ShopOutlinedButton`. گوشی (`LocalDeskLayout` = false) همان فراخوانِ Material با همان آرگومان‌ها؛ کامپیوتر کارتِ `ui/desk`، سرخط و «بستن»، بدنه
+  با قلم/رنگِ کامپیوتر، دکمه‌های خط‌دار (رنگِ دستیِ `Text` خوانا می‌ماند)، Esc = `onDismissRequest`، Enter = «تأیید» (ثبت از `SideEffect` ِ همان دکمه)،
+  `danger` ⇒ «تأیید» ِ سرخ، Enter نه، فوکوس روی «انصراف». برچسبِ آزمون `SHOP_DIALOG_TAG`.
+- **تبدیل** (فقط نامِ فراخوان؛ اسکریپتِ پرانتزشمارِ آگاه از رشته): ۹۹ `AlertDialog` در ۵۱ پرونده — از جمله `GiftCardBarAndroid` (۶)، `LayawayBarAndroid` (۵)،
+  `Settings` (۴)، `Profile` (۴)، `SpecialOrderBarAndroid` (۴)، `SecuritySettings` (۳)، `DeviceHubUi` (۳)، `CourierChecksUi` (۳)، `WipeAllDialog` (۲)،
+  `SalesVoidDialogs` (۲)، `ShiftV2` (ورود/خروجِ نقد و بستن با شمارش + شاخه‌های پیشین)، `Servers` (افزودنِ سرور و …)، `Sale`، `SaleDialogs`، `SalesHistory`،
+  `SafePanelAndroid`، `ProductImportDialog`، `HesabPayAccountSettings`، `DevicesHw`، `QuoteBarAndroid`، `LoyaltyBarAndroid` و یک‌پنجره‌ای‌ها. ۳۲ پنجرهٔ
+  پاک‌کننده `danger = true` گرفتند (رنگِ سرخِ دکمه یا واژهٔ پاک/لغو/باطل/برداشتن). در `Profile`/`Sale`/`SaleDialogs`/`Settings` نامِ کامل (بی import) تا
+  سقفِ خطِ `tools/quality` نگه داشته شود.
+- **آزمون‌ها** (هدف‌دار، lane A): ۷۹ کلاس، ۴۳۵ آزمون — `DeskDialogBridgeUiTest` (پارامتری، ۴ پنجره × Esc و Enter/فوکوسِ امن: نمونهٔ عادی،
+  نمونهٔ پاک‌کننده، «پاک کردنِ همه»، «دلیلِ چاپِ دوباره»)، `WipeAllUiTest`، `ShiftNoSaleDeskUiTest`، `HeldClaimSheetsUiTest`، `SaleFocusUiTest`،
+  `QuotePdfDeskTest`، `SafeCurrencyUiTest`، `TillNewCustomerUiTest`، `OrderRefundReceiptsUiTest`، همهٔ سیم‌کشی‌های منبعِ پرونده‌های دست‌خورده،
+  `LookGuardTest`، `HardcodedColorsTest`، `PageAnatomyGuardTest`، `NavRowUiTest`، `DariCoverageTest`، `DariWordsTest` سبز. تنها قرمز
+  (`DeskProductsD3aUiTest` «هر کارِ پیشین…») از دادهٔ کهنهٔ `desktop/build/test-data` بود: پس از `rm -rf` همان ۳ از ۳ سبز (روی main هم سبز).
+  هیچ آزمونِ پیشین و هیچ هشِ `LookGuardTest` عوض نشد.
+- **عکس‌ها**: `D3dShotsTest` (`D3D_SHOTS`/`D3D_TAG`) — ۱۰ پنجره (پاک کردنِ همه ۱ و ۲، دلیلِ چاپِ دوباره، قیمتِ CRM، بازگشاییِ فاکتور، لغوِ فاکتور،
+  ارزِ گاوصندوق، سابقهٔ ورودِ کالا، ورود/خروجِ نقد، بستن با شمارش) × روشن/تیره، پیش روی `origin/main` e8a22edfd و پس، با `compare-*.png` در
+  `/home/user/wt-d3c-shots/d3d/`.
+- **مانده**: کادرهای متنِ درونِ پنجره‌ها هنوز `OutlinedTextField` ِ Material‌اند (فقط قاب و دکمه‌ها کامپیوتری شدند)؛ `IconButton`/`RadioButton`/`Checkbox`
+  ِ درونِ بدنه همان Material.
+- **پس از گزارشِ عامل (هماهنگ‌کننده)**: در عکس‌ها «تأیید» و «انصراف» هم‌وزن دیده می‌شدند (هر دو خطِ دور روی سطحِ کارت). «تأیید» حالا
+  زمینهٔ کم‌رنگِ برند (`Desk.colors.selected`) و کارِ پاک‌کننده زمینهٔ `negativeSoft` دارد؛ خطِ دور و نوشته همان. زمینهٔ پُرِ برند نه، تا رنگِ
+  دستیِ `Text` ِ صفحه خوانا بماند. `DeskDialogBridgeUiTest`، `D3dShotsTest`، `HardcodedColorsTest`، `LookGuardTest`: ۱۸/۱۸ (خطِ A)؛ عکس‌های تازه
+  `/home/user/wt-d3c-shots/d3d-v2/` (+ `compare/`).
 ### ۱۴۰۵/۰۸/۲۶ — عاملِ e-branches4 زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-branches4` (از `origin/main` 7e2a36923) — پایانِ فازِ ۴ ِ شعبه‌ها
 
 - **خواست**: آخرین ردیف‌های «کد» ِ PARTIAL-MAP — INV-11/S21 (انتقالِ میانِ شعبه‌ها با «در راه» و حرکت در هر دو سو)، POS-16/S17 (موجودیِ

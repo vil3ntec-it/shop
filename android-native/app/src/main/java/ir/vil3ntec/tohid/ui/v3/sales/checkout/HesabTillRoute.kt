@@ -147,6 +147,8 @@ private fun HesabTillSheet(ask: HesabTillModel.Ask, env: HesabPayEnv, onPaid: (i
 
   //  NFC (HCE) و نمایشگرِ رو به مشتری فقط تا «در انتظار»
   val qr = HesabTillModel.link(ask, s)
+  //  صاحب‌کار ۱۴۰۵/۰۸/۲۶: «ساده» ⇒ عکسِ QR ِ خودِ دکان (اگر بار شده و همان متن است) بزرگ، برای صندوق و نمایشگرِ مشتری
+  val picture = if (ask.mode == HesabTill.Mode.SIMPLE) ir.vil3ntec.tohid.ui.components.pos.rememberShopQr(env, ask.till.simple) else null
   val tag = remember(s) { HesabTillModel.tag(ask, s) }
   DisposableEffect(tag) {
     HceSlot.ndef = tag
@@ -154,7 +156,7 @@ private fun HesabTillSheet(ask: HesabTillModel.Ask, env: HesabPayEnv, onPaid: (i
   }
   PayDevice.HceForeground(active = tag != null)
   val shown = when (s) {
-    is HesabTill.State.Pending -> qr?.let { CustomerPay.View(amount, it, CustomerPay.Stage.WAITING) }
+    is HesabTill.State.Pending -> qr?.let { CustomerPay.View(amount, it, CustomerPay.Stage.WAITING, picture) }
     is HesabTill.State.Confirmed -> CustomerPay.View(amount, "", CustomerPay.Stage.PAID)
     else -> null
   }
@@ -170,7 +172,7 @@ private fun HesabTillSheet(ask: HesabTillModel.Ask, env: HesabPayEnv, onPaid: (i
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
       Text("${amountText(amount)} ؋", style = V3Type.figure.copy(fontSize = 34.sp, lineHeight = 42.sp), color = c.ink)
       Spacer(Modifier.height(10.dp))
-      QrBox(qr.takeIf { s is HesabTill.State.Pending })
+      QrBox(qr.takeIf { s is HesabTill.State.Pending }, picture)
       ask.payee?.let { p ->
         Text(StrPay.payeeLine(p.name.ifBlank { "—" }, p.last4), style = V3Type.headline, color = c.ink, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
       }
@@ -200,16 +202,17 @@ private fun HesabTillSheet(ask: HesabTillModel.Ask, env: HesabPayEnv, onPaid: (i
 }
 
 @Composable
-private fun QrBox(payload: String?) {
+private fun QrBox(payload: String?, picture: androidx.compose.ui.graphics.ImageBitmap?) {
   val rows = remember(payload) { payload?.takeIf { it.isNotBlank() }?.let { runCatching { QrCode.encode(it, QrCode.LARGE_MAX_VERSION) }.getOrNull() } }
   //  کادرِ QR در هر دو تم روشن (QR ِ وارونه را بیشترِ دوربین‌ها نمی‌خوانند) — پالتِ روزِ Theme.kt، همان `HesabPaySheet`
   Box(
-    Modifier.size(240.dp).clip(RoundedCornerShape(16.dp)).background(LightColors.surface)
+    Modifier.size(if (picture != null) 280.dp else 240.dp).clip(RoundedCornerShape(16.dp)).background(LightColors.surface)
       //  QR فقط رسم است — صفحه‌خوان بی این نام چیزی نمی‌شنید
       .semantics { contentDescription = StrA11y.payQr; role = Role.Image },
     contentAlignment = Alignment.Center,
   ) {
-    if (rows != null) QrImage(rows, Modifier.fillMaxSize().padding(8.dp)) else Text("…", fontSize = 48.sp, color = LightColors.textPrimary)
+    if (picture != null && payload != null) ir.vil3ntec.tohid.ui.components.pos.ShopQrPicture(picture, Modifier.fillMaxSize().padding(8.dp))
+    else if (rows != null) QrImage(rows, Modifier.fillMaxSize().padding(8.dp)) else Text("…", fontSize = 48.sp, color = LightColors.textPrimary)
   }
 }
 

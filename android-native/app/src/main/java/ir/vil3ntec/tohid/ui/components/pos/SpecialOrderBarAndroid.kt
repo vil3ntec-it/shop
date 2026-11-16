@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -146,7 +148,7 @@ private fun SpecialOrderNewDialog(
     else d.products.filter { it.active && (q in it.barcodes || TextNormalizer.matches(it.name, q)) }.take(5)
   }
 
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = { if (!busy) onDismiss() },
     title = { Text(StrSpecialOrder.newOrder) },
     text = {
@@ -156,7 +158,7 @@ private fun SpecialOrderNewDialog(
         if (linked != null) {
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(StrSpecialOrder.linked(linked.name), style = MaterialTheme.typography.bodyMedium, color = Shop.colors.primary)
-            TextButton(onClick = { productId = null }) { Text(StrSpecialOrder.unlink) }
+            ShopTextButton(onClick = { productId = null }) { Text(StrSpecialOrder.unlink) }
           }
         } else {
           OutlinedTextField(
@@ -164,7 +166,7 @@ private fun SpecialOrderNewDialog(
             label = { Text(StrSpecialOrder.itemField) }, singleLine = true, modifier = Modifier.fillMaxWidth(),
           )
           matches.forEach { p ->
-            TextButton(onClick = {
+            ShopTextButton(onClick = {
               productId = p.id
               item = p.name
               val q = ir.vil3ntec.tohid.numericInput(qty).toDoubleOrNull() ?: 1.0
@@ -193,7 +195,7 @@ private fun SpecialOrderNewDialog(
       }
     },
     confirmButton = {
-      TextButton(enabled = !busy, onClick = {
+      ShopTextButton(enabled = !busy, onClick = {
         val order = SpecialOrders.NewOrder(
           debtorId = debtorId, productId = productId, item = linked?.name ?: item,
           qtyMilli = ir.vil3ntec.tohid.numericInput(qty).toDoubleOrNull()?.takeIf { it > 0 && it < 1e7 }?.let { Math.round(it * 1000) },
@@ -215,7 +217,7 @@ private fun SpecialOrderNewDialog(
         }
       }) { Text(StrSpecialOrder.save) }
     },
-    dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(StrSpecialOrder.cancel) } },
+    dismissButton = { ShopTextButton(enabled = !busy, onClick = onDismiss) { Text(StrSpecialOrder.cancel) } },
   )
 }
 
@@ -246,7 +248,7 @@ private fun SpecialOrderListDialog(
   var cancelling by remember { mutableStateOf<SpecialOrders.View?>(null) }
   val shown = remember(views) { views.filter { it.active } + views.filter { !it.active }.take(CLOSED_SHOWN) }
 
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     title = { Text(StrSpecialOrder.list(views.count { it.active })) },
     text = {
@@ -270,10 +272,10 @@ private fun SpecialOrderListDialog(
           )
           //  POS-26: رسیدِ پیش‌پرداخت (چاپِ دوباره) برای هر سفارشی که پیش‌پرداخت دارد، باز یا بسته
           SpecialOrders.depositTx(d, v.id)?.let { tx ->
-            TextButton(onClick = { onReceipt(Triple(d, tx.debtorId, tx.id)) }) { Text(StrSpecialOrder.depositReceipt) }
+            ShopTextButton(onClick = { onReceipt(Triple(d, tx.debtorId, tx.id)) }) { Text(StrSpecialOrder.depositReceipt) }
           }
           if (v.active) Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (v.status == SpecialOrder.Status.OPEN) TextButton(onClick = {
+            if (v.status == SpecialOrder.Status.OPEN) ShopTextButton(onClick = {
               val key = newId()
               scope.launch {
                 val now = System.currentTimeMillis()
@@ -281,14 +283,14 @@ private fun SpecialOrderListDialog(
                   .show(toast) { if (!it.again) toast(StrSpecialOrder.readyDone) }
               }
             }) { Text(StrSpecialOrder.markReady) }
-            TextButton(onClick = { delivering = v }) { Text(StrSpecialOrder.deliver) }
-            TextButton(onClick = { cancelling = v }) { Text(StrSpecialOrder.cancelOrder, color = Shop.colors.danger) }
+            ShopTextButton(onClick = { delivering = v }) { Text(StrSpecialOrder.deliver) }
+            ShopTextButton(onClick = { cancelling = v }) { Text(StrSpecialOrder.cancelOrder, color = Shop.colors.danger) }
           }
           HorizontalDivider(color = Shop.colors.fieldBorder.copy(alpha = 0.35f))
         }
       }
     },
-    confirmButton = { TextButton(onClick = onDismiss) { Text(StrSpecialOrder.close) } },
+    confirmButton = { ShopTextButton(onClick = onDismiss) { Text(StrSpecialOrder.close) } },
   )
 
   delivering?.let { v -> SpecialOrderDeliverDialog(store, v, me, today, toast) { delivering = null } }
@@ -303,7 +305,7 @@ private fun SpecialOrderDeliverDialog(store: ShopStore, v: SpecialOrders.View, m
   val key = remember(v.id) { newId() }
   val s = remember(v) { SpecialOrders.settle(v) }
   var busy by remember { mutableStateOf(false) }
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = { if (!busy) onDismiss() },
     title = { Text(StrSpecialOrder.deliverTitle) },
     text = {
@@ -317,7 +319,7 @@ private fun SpecialOrderDeliverDialog(store: ShopStore, v: SpecialOrders.View, m
       }
     },
     confirmButton = {
-      TextButton(enabled = !busy, onClick = {
+      ShopTextButton(enabled = !busy, onClick = {
         busy = true
         scope.launch {
           val now = System.currentTimeMillis()
@@ -337,7 +339,7 @@ private fun SpecialOrderDeliverDialog(store: ShopStore, v: SpecialOrders.View, m
         }
       }) { Text(StrSpecialOrder.deliverConfirm) }
     },
-    dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(StrSpecialOrder.cancel) } },
+    dismissButton = { ShopTextButton(enabled = !busy, onClick = onDismiss) { Text(StrSpecialOrder.cancel) } },
   )
 }
 
@@ -349,7 +351,8 @@ private fun SpecialOrderCancelDialog(store: ShopStore, v: SpecialOrders.View, me
   val allowed = remember { ir.vil3ntec.tohid.data.ShopRole.canCancelSale(context) }
   var reason by remember { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
-  AlertDialog(
+  ShopAlertDialog(
+    danger = true,
     onDismissRequest = { if (!busy) onDismiss() },
     title = { Text(StrSpecialOrder.cancelTitle) },
     text = {
@@ -364,7 +367,7 @@ private fun SpecialOrderCancelDialog(store: ShopStore, v: SpecialOrders.View, me
       }
     },
     confirmButton = {
-      TextButton(enabled = allowed && !busy, onClick = {
+      ShopTextButton(enabled = allowed && !busy, onClick = {
         busy = true
         scope.launch {
           val now = System.currentTimeMillis()
@@ -378,7 +381,7 @@ private fun SpecialOrderCancelDialog(store: ShopStore, v: SpecialOrders.View, me
         }
       }) { Text(StrSpecialOrder.cancelConfirm, color = Shop.colors.danger) }
     },
-    dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(StrSpecialOrder.cancel) } },
+    dismissButton = { ShopTextButton(enabled = !busy, onClick = onDismiss) { Text(StrSpecialOrder.cancel) } },
   )
 }
 

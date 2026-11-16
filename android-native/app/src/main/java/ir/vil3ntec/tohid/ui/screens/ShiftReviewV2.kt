@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -56,7 +58,7 @@ fun ShiftReviewDialog(
 ) {
   var note by remember { mutableStateOf("") }
   var error by remember { mutableStateOf<String?>(null) }
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = dismiss,
     containerColor = Shop.colors.surfaceSolid,
     title = { Text(StrShiftReview.title, color = Shop.colors.text) },
@@ -73,14 +75,14 @@ fun ShiftReviewDialog(
       }
     },
     confirmButton = {
-      TextButton(onClick = {
+      ShopTextButton(onClick = {
         when (val r = ShiftReviewFlow.row(d, close, ShiftReviewFlow.roleOf(role), me, note, ir.vil3ntec.tohid.todayIso(), now, ::newId)) {
           is PayFlow.Outcome.Ok -> save(r.value)
           is PayFlow.Outcome.Bad -> error = reviewMessage(r.problem.code)
         }
       }) { Text(StrShiftReview.save) }
     },
-    dismissButton = { TextButton(onClick = dismiss) { Text(StrShiftReview.cancel) } },
+    dismissButton = { ShopTextButton(onClick = dismiss) { Text(StrShiftReview.cancel) } },
   )
 }
 

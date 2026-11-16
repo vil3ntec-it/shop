@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -48,7 +50,8 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  */
 @Composable
 internal fun ReopenInvoiceDialog(sale: Sale, onDismiss: () -> Unit, onConfirm: () -> Unit) {
-  AlertDialog(
+  ShopAlertDialog(
+    danger = true,
     onDismissRequest = onDismiss,
     containerColor = Shop.colors.surfaceSolid,
     title = { Text(StrInvoices.reopenTitle, color = Shop.colors.text) },
@@ -59,8 +62,8 @@ internal fun ReopenInvoiceDialog(sale: Sale, onDismiss: () -> Unit, onConfirm: (
         color = Shop.colors.muted,
       )
     },
-    confirmButton = { TextButton(onClick = onConfirm) { Text(StrInvoices.cancelAndToCart) } },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.goBack) } },
+    confirmButton = { ShopTextButton(onClick = onConfirm) { Text(StrInvoices.cancelAndToCart) } },
+    dismissButton = { ShopTextButton(onClick = onDismiss) { Text(Str.goBack) } },
   )
 }
 
@@ -68,7 +71,8 @@ internal fun ReopenInvoiceDialog(sale: Sale, onDismiss: () -> Unit, onConfirm: (
 @Composable
 internal fun CancelInvoiceDialog(sale: Sale, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
   var reason by remember(sale.id) { mutableStateOf("") }
-  AlertDialog(
+  ShopAlertDialog(
+    danger = true,
     onDismissRequest = onDismiss,
     containerColor = Shop.colors.surfaceSolid,
     title = { Text(StrInvoices.cancelSaleTitle, color = Shop.colors.text) },
@@ -90,11 +94,11 @@ internal fun CancelInvoiceDialog(sale: Sale, onDismiss: () -> Unit, onConfirm: (
       }
     },
     confirmButton = {
-      TextButton(enabled = reason.isNotBlank(), onClick = { onConfirm(reason) }) {
+      ShopTextButton(enabled = reason.isNotBlank(), onClick = { onConfirm(reason) }) {
         Text(StrInvoices.cancelSale, color = if (reason.isNotBlank()) Shop.colors.danger else Shop.colors.muted)
       }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.goBack) } },
+    dismissButton = { ShopTextButton(onClick = onDismiss) { Text(Str.goBack) } },
   )
 }
 

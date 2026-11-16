@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -198,15 +200,15 @@ fun SecuritySection(store: ShopStore, toast: (String) -> Unit) {
   }
 
   if (askOn) {
-    AlertDialog(
+    ShopAlertDialog(
       onDismissRequest = { askOn = false },
       containerColor = colors.bg,
       title = { Text(StrSecurity.askOnTitle, color = colors.text) },
       text = { Text(enableWarning(), color = colors.muted) },
       confirmButton = {
-        TextButton(onClick = { askOn = false; setEncryption(true) }) { Text(StrSecurity.turnOn, color = colors.primary) }
+        ShopTextButton(onClick = { askOn = false; setEncryption(true) }) { Text(StrSecurity.turnOn, color = colors.primary) }
       },
-      dismissButton = { TextButton(onClick = { askOn = false }) { Text(StrPos.no, color = colors.muted) } },
+      dismissButton = { ShopTextButton(onClick = { askOn = false }) { Text(StrPos.no, color = colors.muted) } },
     )
   }
 
@@ -263,7 +265,8 @@ internal fun enableWarning(): String = buildString {
 @Composable
 private fun RebuildDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
   val colors = Shop.colors
-  AlertDialog(
+  ShopAlertDialog(
+    danger = true,
     onDismissRequest = onDismiss,
     containerColor = colors.bg,
     title = { Text(StrSecurity.rebuildAsk(REBUILD), color = colors.text) },
@@ -273,8 +276,8 @@ private fun RebuildDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
         color = colors.muted,
       )
     },
-    confirmButton = { TextButton(onClick = onConfirm) { Text(REBUILD, color = colors.primary) } },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(StrPos.no, color = colors.muted) } },
+    confirmButton = { ShopTextButton(onClick = onConfirm) { Text(REBUILD, color = colors.primary) } },
+    dismissButton = { ShopTextButton(onClick = onDismiss) { Text(StrPos.no, color = colors.muted) } },
   )
 }
 
@@ -306,7 +309,7 @@ fun UnreadableLedgerDialog(
       if (msg != null) toast(msg)
     }
   }
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = { if (!busy) onDismiss() },
     containerColor = colors.bg,
     title = { Text(if (damage != null) StrSecurity.damagedTitle else StrSecurity.unreadableTitle, color = colors.text) },
@@ -319,23 +322,23 @@ fun UnreadableLedgerDialog(
     confirmButton = {
       when {
         damage == ir.vil3ntec.tohid.data.LedgerRecovery.Damage.READ_ERROR ->
-          TextButton(enabled = !busy, onClick = {
+          ShopTextButton(enabled = !busy, onClick = {
             direct { if (store.retryRead()) { onDismiss(); StrSecurity.ledgerOpened } else StrSecurity.stillNotOpened }
           }) { Text(StrSecurity.retry, color = colors.primary) }
         damage != null && copy != null ->
-          TextButton(enabled = !busy, onClick = {
+          ShopTextButton(enabled = !busy, onClick = {
             direct { store.recoverFromCopy().also { if (it.ok) onDismiss() }.message }
           }) { Text(if (busy) StrSecurity.rebuilding else StrSecurity.recoverFromCopy, color = colors.primary) }
         else ->
-          TextButton(enabled = !busy, onClick = { ask = true }) {
+          ShopTextButton(enabled = !busy, onClick = { ask = true }) {
             Text(if (busy) StrSecurity.rebuilding else REBUILD, color = colors.primary)
           }
       }
     },
     dismissButton = {
       Row {
-        TextButton(enabled = !busy, onClick = onOpenSecurity) { Text(SECURITY_SECTION_TITLE, color = colors.muted) }
-        TextButton(enabled = !busy, onClick = onDismiss) { Text(StrSecurity.later, color = colors.muted) }
+        ShopTextButton(enabled = !busy, onClick = onOpenSecurity) { Text(SECURITY_SECTION_TITLE, color = colors.muted) }
+        ShopTextButton(enabled = !busy, onClick = onDismiss) { Text(StrSecurity.later, color = colors.muted) }
       }
     },
   )

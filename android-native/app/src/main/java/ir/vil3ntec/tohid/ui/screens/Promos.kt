@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -290,7 +292,8 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState, onBack: (() -> Unit)?
   if (deleting.isNotEmpty()) {
     val names = deleting.joinToString("، ") { "«${it.name}»" }
     val codes = deleting.mapNotNull { it.code.takeIf { c -> c.isNotEmpty() } }
-    AlertDialog(
+    ShopAlertDialog(
+      danger = true,
       onDismissRequest = { if (!busy) deleting = emptyList() },
       title = { Text(StrPromoPages.deleteRule) },
       text = {
@@ -300,7 +303,7 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState, onBack: (() -> Unit)?
         )
       },
       confirmButton = {
-        TextButton(enabled = !busy, onClick = {
+        ShopTextButton(enabled = !busy, onClick = {
           scope.launch {
             busy = true
             var failed = 0
@@ -312,7 +315,7 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState, onBack: (() -> Unit)?
           }
         }) { Text(StrMoney.delete, color = Shop.colors.danger) }
       },
-      dismissButton = { TextButton(enabled = !busy, onClick = { deleting = emptyList() }) { Text(Str.cancel) } },
+      dismissButton = { ShopTextButton(enabled = !busy, onClick = { deleting = emptyList() }) { Text(Str.cancel) } },
     )
   }
 }

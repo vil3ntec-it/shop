@@ -556,7 +556,7 @@ internal fun ReprintReasonDialog(onDismiss: () -> Unit, onConfirm: (String) -> U
   var picked by remember { mutableStateOf<String?>(null) }
   var other by remember { mutableStateOf("") }
   val reason = picked ?: other.trim()
-  AlertDialog(
+  ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog(
     onDismissRequest = onDismiss,
     title = { Text(ir.vil3ntec.tohid.core.i18n.StrSale.reprintTitle) },
     text = {
@@ -576,8 +576,8 @@ internal fun ReprintReasonDialog(onDismiss: () -> Unit, onConfirm: (String) -> U
         )
       }
     },
-    confirmButton = { Button(onClick = { onConfirm(reason) }, enabled = reason.isNotBlank()) { Text(ir.vil3ntec.tohid.core.i18n.StrSale.reprint) } },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(ir.vil3ntec.tohid.core.i18n.Str.cancel) } },
+    confirmButton = { ir.vil3ntec.tohid.ui.components.common.ShopButton(onClick = { onConfirm(reason) }, enabled = reason.isNotBlank()) { Text(ir.vil3ntec.tohid.core.i18n.StrSale.reprint) } },
+    dismissButton = { ir.vil3ntec.tohid.ui.components.common.ShopTextButton(onClick = onDismiss) { Text(ir.vil3ntec.tohid.core.i18n.Str.cancel) } },
   )
 }
 
