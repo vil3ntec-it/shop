@@ -2,11 +2,13 @@ package ir.vil3ntec.tohid.desktop
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performSemanticsAction
 import ir.vil3ntec.tohid.core.i18n.StrGoods
+import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrLayaway
 import ir.vil3ntec.tohid.core.i18n.StrLoyalty
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseOrders
@@ -104,8 +106,12 @@ class PurchaseOrderRoutesUiTest {
     assertEquals(1, fake.writes("/po-d/send").size)
     h.await(StrPurchasePages.receiveGoods)
 
+    //  p0 (کالبدِ یکسان): «لغو کن» دیگر دکمهٔ تمام‌پهنای بدنه نیست — کارِ خطرناکِ «…» ِ نوار است؛ پس اول «…»، سپس همان کار، و
+    //  برگهٔ «لغوِ سفارشِ #…؟» با دکمهٔ تأییدِ «لغو کن» (آخرین گرهِ کلیک‌پذیر با همین نوشته)
+    openMore()
     h.click(StrPurchasePages.cancelIt)
-    h.awaitThat { rule.onAllNodes(hasText(StrPurchasePages.cancelIt) and hasClickAction()).fetchSemanticsNodes().size >= 2 }
+    h.await(StrPurchasePages.cancelPoAsk(PoDemoOrders.draft.no))
+    rule.waitForIdle()
     val confirm = { rule.onAllNodes(hasText(StrPurchasePages.cancelIt) and hasClickAction()).let { it[it.fetchSemanticsNodes().size - 1] } }
     confirm().performSemanticsAction(SemanticsActions.OnClick)
     h.await(StrPurchaseOrders.reasonNeeded)
@@ -141,8 +147,19 @@ class PurchaseOrderRoutesUiTest {
     fake.perms = PoPermsDto(manage = false, receive = true)
     h.show("purchasing/orders/${PoDemoOrders.sent.id}", data)
     h.await(StrPurchasePages.receiveGoods)
+    //  p0: کارهای دیگر در «…» ِ نوارند — اگر «…» هست بازش می‌کنیم تا «لغو» آن‌جا هم نباشد
+    if (moreButton().fetchSemanticsNodes().isNotEmpty()) openMore()
     assertFalse(h.has(StrPurchasePages.cancelIt))
     assertFalse(h.has(StrPurchasePages.sendToSupplier))
+  }
+
+  private fun moreButton() = rule.onAllNodes(hasContentDescription(StrKit.more) and hasClickAction())
+
+  /** «…» ِ نوارِ بالا (`V3Scaffold`) — کارهای بیشتر و کارِ خطرناک */
+  private fun openMore() {
+    h.awaitThat { moreButton().fetchSemanticsNodes().isNotEmpty() }
+    moreButton()[0].performSemanticsAction(SemanticsActions.OnClick)
+    rule.waitForIdle()
   }
 
   @Test fun staffListHasNoNewOrderButton() {

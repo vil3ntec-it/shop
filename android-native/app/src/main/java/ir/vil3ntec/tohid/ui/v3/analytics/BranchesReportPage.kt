@@ -35,6 +35,9 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.v3.V3Chip
 import ir.vil3ntec.tohid.ui.v3.V3ChipRow
+import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
+import ir.vil3ntec.tohid.ui.v3.nav.V3PageFootnote
+import ir.vil3ntec.tohid.ui.v3.nav.V3RoutePage
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3Hue
@@ -95,16 +98,20 @@ internal fun rememberBranchesReportVisible(): Boolean {
 }
 
 @Composable
-internal fun BranchesReportPage() {
+internal fun RouteScope.BranchesReportPage() {
   val api = onlineReportApi()
   val state = remember(api) { api?.let { BranchesReportState(BranchesReportRepository(it)) } }
   var tick by remember { mutableStateOf(0) }
   if (state != null) LaunchedEffect(state, state.days, tick) { state.load(todayIso()) }
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-    V3ChipRow(contentPadding = PaddingValues(0.dp)) {
-      BranchesReport.SPANS.forEach { d -> V3Chip(StrBranches.span(d), state?.days == d, { state?.days = d }) }
-    }
-    Text(StrBranches.spanNote, style = V3Type.footnote, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(top = 8.dp))
+  //  کالبدِ یکسان (p0): خودِ صفحه `V3Scaffold` دارد، تراشه‌های بازه در جای قاب و یادداشتِ بازه خطِ کم‌رنگِ پایان
+  V3RoutePage(
+    StrBranches.title,
+    chips = {
+      V3ChipRow {
+        BranchesReport.SPANS.forEach { d -> V3Chip(StrBranches.span(d), state?.days == d, { state?.days = d }) }
+      }
+    },
+  ) {
     val a = state?.answer
     when {
       state == null || a == BranchesReport.Answer.Off -> V3EmptyState(Icons.Outlined.Storefront, StrBranches.off)
@@ -116,6 +123,7 @@ internal fun BranchesReportPage() {
       }
       else -> Text(StrBranches.loading, style = V3Type.callout, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(top = 16.dp))
     }
+    V3PageFootnote(StrBranches.spanNote)
   }
 }
 

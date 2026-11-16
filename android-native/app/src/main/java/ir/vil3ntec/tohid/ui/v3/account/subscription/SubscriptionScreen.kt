@@ -2,10 +2,8 @@ package ir.vil3ntec.tohid.ui.v3.account.subscription
 
 import ir.vil3ntec.tohid.ui.v3.V3NavRowSpec
 import ir.vil3ntec.tohid.ui.v3.V3NavRow
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudOff
@@ -30,10 +27,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrAccount
@@ -42,13 +36,13 @@ import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.v1.HeartbeatCache
 import ir.vil3ntec.tohid.sync.v1.SoftLock
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
-import ir.vil3ntec.tohid.ui.theme.PhoneV3Dark
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
-import ir.vil3ntec.tohid.ui.theme.V3Space
 import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Action
-import ir.vil3ntec.tohid.ui.v3.V3Button
+import ir.vil3ntec.tohid.ui.v3.V3Fab
+import ir.vil3ntec.tohid.ui.v3.V3Summary
+import ir.vil3ntec.tohid.ui.v3.summaryColors
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3Message
@@ -91,6 +85,8 @@ internal fun SubscriptionContent(ui: SubscriptionUi, onBack: (() -> Unit)?, onRe
     onBack = onBack,
     notice = null,
     actions = if (ui.signedIn) listOf(V3Action(Icons.Outlined.Refresh, StrAccount.refreshFromServer, onClick = onRefresh)) else emptyList(),
+    //  p0 (کالبدِ یکسان): کارِ اصلی — «تمدید» — دکمهٔ شناورِ همیشگیِ همهٔ صفحه‌هاست، نه دکمهٔ تمام‌پهنای بدنه
+    fab = if (ui.signedIn && ui.sub != null) ({ expanded -> V3Fab(Icons.Outlined.WorkspacePremium, Str.renew, expanded, onClick = { onOpen(AccountPaths.PLANS) }) }) else null,
   ) { pad ->
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
       Column(Modifier.widthIn(max = 640.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding())) {
@@ -110,8 +106,6 @@ internal fun SubscriptionContent(ui: SubscriptionUi, onBack: (() -> Unit)?, onRe
               SubscriptionModel.Notice.EXPIRED -> { Spacer(Modifier.height(12.dp)); V3Message(V3Tone.ERROR, StrAccount.bannerExpiredTitle, body = StrAccount.expiredBody) }
               SubscriptionModel.Notice.NONE -> Unit
             }
-            Spacer(Modifier.height(14.dp))
-            V3Button(Str.renew, { onOpen(AccountPaths.PLANS) }, Modifier.fillMaxWidth(), icon = Icons.Outlined.WorkspacePremium, haptic = true)
           }
         }
         if (ui.note.isNotBlank() && sub != null) { Spacer(Modifier.height(10.dp)); V3Message(V3Tone.ERROR, ui.note) }
@@ -136,47 +130,35 @@ private fun Lines(title: String, lines: List<SubscriptionModel.Line>, empty: Str
   }
 }
 
-/** کارتِ وارونهٔ پلن (r16): نام، سرخطِ درشت، نوارِ دوره به رنگِ سرور، آغاز و پایان */
+/**
+ *  خلاصهٔ پلن — همان `V3Summary` ِ همهٔ بخش‌ها (p0: کالبدِ یکسان؛ پیش‌تر کارتِ وارونهٔ گرادیانیِ خودش): برچسب «پلن · نام»، عددِ
+ *  درشت روزِ مانده (یا «دائمی ✓» / «تمام شده»)، یک خطِ کم‌رنگِ «آغاز – پایان · وضعیت» و نوارِ دوره به رنگِ وضعیت (`extra`).
+ *  تاشو مثلِ هر خلاصه (`collapseKey = "subscription"`).
+ */
 @Composable
 private fun HeroCard(h: SubscriptionModel.Hero) {
   val c = PhoneV3.colors
-  //  رنگ‌های روشنِ شب تا روی سطحِ وارونه خوانا باشند (مثلِ نقطهٔ پیامِ کوتاه)
-  val tone = PhoneV3Roles.status(PhoneV3Dark, when (h.tone) {
+  val tone = PhoneV3Roles.status(c, when (h.tone) {
     SubscriptionModel.Tone.GREEN -> V3Status.DELIVERED
     SubscriptionModel.Tone.YELLOW -> V3Status.WARNING
     SubscriptionModel.Tone.RED -> V3Status.CANCELLED
     SubscriptionModel.Tone.GREY -> V3Status.INACTIVE
   }).fg
-  val shape = RoundedCornerShape(V3Space.featuredRadius)
-  Column(
-    Modifier.fillMaxWidth().clip(shape).background(Brush.linearGradient(listOf(c.black, c.blackRaised))).padding(20.dp),
-  ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      Text(StrAccount.plan, style = V3Type.footnote, color = c.onBlackMuted, modifier = Modifier.weight(1f))
-      Text(h.plan, style = V3Type.callout, color = c.onBlack, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-    Spacer(Modifier.height(10.dp))
-    //  روزِ مانده می‌شمارد (عددِ پایانی دقیق)
-    val shown = rememberCountUp(h.days.toDouble()).toInt()
-    Text(if (h.countsDays) StrAccount.daysLeft(shown) else h.headline, style = V3Type.largeTitle, color = tone)
-    Spacer(Modifier.height(12.dp))
-    DraftProgressBar(h.progress, tone, c.onBlack.copy(alpha = 0.16f))
-    Spacer(Modifier.height(14.dp))
-    Row {
-      Column(Modifier.weight(1f)) {
-        Text(StrAccount.starts, style = V3Type.caption, color = c.onBlackMuted)
-        Text(h.starts, style = V3Type.callout, color = c.onBlack)
-      }
-      Column(Modifier.weight(1f)) {
-        Text(StrAccount.ends, style = V3Type.caption, color = c.onBlackMuted)
-        Text(h.ends, style = V3Type.callout, color = c.onBlack)
-      }
-      Column(Modifier.weight(1f)) {
-        Text(StrAccount.status, style = V3Type.caption, color = c.onBlackMuted)
-        Text(h.status, style = V3Type.callout, color = c.onBlack, maxLines = 1, overflow = TextOverflow.Ellipsis)
-      }
-    }
-  }
+  //  روزِ مانده می‌شمارد (عددِ پایانی دقیق)
+  val shown = rememberCountUp(h.days.toDouble()).toInt()
+  V3Summary(
+    label = StrAccount.plan + " · " + h.plan,
+    value = if (h.countsDays) StrAccount.daysLeft(shown) else h.headline,
+    caption = "${StrAccount.starts} ${h.starts} · ${StrAccount.ends} ${h.ends}",
+    note = "${StrAccount.status}: ${h.status}",
+    collapseKey = "subscription",
+    //  رنگِ کاشیِ «اشتراکِ من» در «بیشتر» (زرِ گرم، `V3Modules.hueOf("myplan")`) — همان خانوادهٔ `PROMOS`؛ هر خلاصه رنگِ بخش دارد
+    section = ir.vil3ntec.tohid.ui.theme.V3Section.PROMOS,
+    extra = {
+      Spacer(Modifier.height(10.dp))
+      DraftProgressBar(h.progress, tone, summaryColors(ir.vil3ntec.tohid.ui.theme.V3Section.PROMOS).track)
+    },
+  )
 }
 
 /**

@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -78,6 +79,7 @@ fun V3Card(
   Column(
     modifier
       .fillMaxWidth()
+      .testTag(V3Anatomy.CARD)
       .clip(shape)
       .background(c.card)
       .border(1.dp, c.hairline, shape)

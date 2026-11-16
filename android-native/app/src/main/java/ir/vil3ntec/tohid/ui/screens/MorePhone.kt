@@ -67,7 +67,7 @@ fun PhoneMoreScreen(
     ordersOn = ir.vil3ntec.tohid.ui.OrdersLive.enabled,
     newOrders = ir.vil3ntec.tohid.ui.OrdersLive.newCount,
     chatOn = ir.vil3ntec.tohid.data.ShopChatSync.config.value?.enabled == true,
-    version = BuildConfig.VERSION_NAME,
+    version = ir.vil3ntec.tohid.ui.previewVersionLabel(BuildConfig.VERSION_NAME),
     storefrontOn = StorefrontGate.visible,
     deliveryOn = DeliveryGate.visible,
     flags = ModuleFlags.on.value,
@@ -134,7 +134,7 @@ internal fun MoreAppPage(d: ShopData, onBack: () -> Unit) {
       }
       V3Section(StrNav.status) {
         listOf(
-          StrNav.versionLabel to BuildConfig.VERSION_NAME,
+          StrNav.versionLabel to ir.vil3ntec.tohid.ui.previewVersionLabel(BuildConfig.VERSION_NAME),
           StrNav.goods to plain(d.products.size),
           Str.invoices to plain(d.sales.size),
           Str.debtors to plain(d.debtors.size),

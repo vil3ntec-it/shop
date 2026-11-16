@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -232,7 +233,7 @@ fun V3Scaffold(
     (if (menu.isEmpty()) emptyList() else listOf(V3Action(Icons.Outlined.MoreHoriz, StrKit.more, dot = split.menuDot) { menuOpen = true }))
 
   //  زدنِ بیرون از کادرِ نوشتن ⇒ صفحه‌کلید بسته (`v3ClearFocusOnTap`، یک جا برای همهٔ صفحه‌های کیت)
-  Box((if (backdrop != null) modifier.fillMaxSize().then(backdrop) else modifier.fillMaxSize().background(c.bg)).v3ClearFocusOnTap()) {
+  Box((if (backdrop != null) modifier.fillMaxSize().then(backdrop) else modifier.fillMaxSize().background(c.bg)).v3ClearFocusOnTap().testTag(V3Anatomy.PAGE)) {
     Column(Modifier.fillMaxSize().nestedScroll(connection)) {
       if (searching && search != null) V3SearchBar(search, finder.close, transparent = backdrop != null)
       else V3HeaderBar(title, onBack, headerActions, showTitle = showTitle, divider = { if (large) state.fraction else 1f }, transparent = backdrop != null, heading = !large)
@@ -338,7 +339,7 @@ internal fun V3HeaderBar(
 ) {
   val c = PhoneV3.colors
   val alpha by animateFloatAsState(if (showTitle) 1f else 0f, MotionSpec.tweenOf(150), label = "barTitle")
-  Column(Modifier.fillMaxWidth().background(if (transparent) Color.Transparent else c.bg).windowInsetsPadding(WindowInsets.statusBars)) {
+  Column(Modifier.fillMaxWidth().background(if (transparent) Color.Transparent else c.bg).windowInsetsPadding(WindowInsets.statusBars).testTag(V3Anatomy.BAR)) {
     //  ۶۵s: عنوان وسطِ نوار میانِ برگشت و کارها؛ اگر کارهای یک سو پهن‌اند و وسط جا نیست، وسطِ جای خالیِ میانشان — هرگز زیرِ آیکن.
     //  چیدمانِ نوار در **هر زبان همان** است (صاحب‌کار: «لی‌اوتش به دیگه جهت نره حتی با عوض کردن زبان»): برگشت در راست، کارها در
     //  چپ، عنوان وسط — جهتِ چیدمان ثابتِ راست‌به‌چپ؛ جهتِ خودِ نوشته از محتوایش (انگلیسی همان چپ‌به‌راست خوانده می‌شود)
@@ -416,6 +417,7 @@ private fun V3LargeTitle(title: String, subtitle: String?, state: V3HeaderState)
     Modifier
       .fillMaxWidth()
       .heightIn(min = if (subtitle != null) LARGE_WITH_SUB else LARGE)
+      .testTag(V3Anatomy.LARGE_TITLE)
       .onSizeChanged { state.titleMax = it.height.toFloat() }
       .padding(start = 20.dp, end = 20.dp)
       .graphicsLayer {

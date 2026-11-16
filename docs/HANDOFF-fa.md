@@ -57,6 +57,50 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۶ — عاملِ e-phone-p0 زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-phone-p0` (از batch-69، ادغامِ main تا #1059 1802fca1a) — کالبدِ یکسانِ صفحه‌های گوشی (دورِ دوم)
+
+- **پیشین (۰۸/۲۴)**: نشان‌های `V3Anatomy` روی اجزای مشترک، `PageAnatomyGuardTest`، ممیزیِ `PhoneAnatomyAuditTest` (`P0_AUDIT`، `AnatomyProbe`)،
+  `AdaptiveSheet` ِ گوشی = `V3Sheet`، «اشتراکِ من»: کارتِ گرادیانی ⇐ `V3Summary` و «تمدید» ⇐ `V3Fab`.
+- **ادغامِ main (#1056، #1057)**: پایهٔ سه‌طرفه همان نقطهٔ انشعاب (`git merge-tree --merge-base=56791aae8`) تا فقط تغییرِ p0 روی main بنشیند؛
+  پنج تعارض. رفتارِ main ماند: نوارِ پیش‌نمایش = `PreviewBanner(strip = false)` ِ گوشی و نوارِ زیرِ سربرگِ کامپیوتر؛ `previewVersion` ِ p0 و
+  `PreviewAccountWarning` کنار رفتند و «بیشتر» هم `previewVersionLabel` ِ main را می‌خواند؛ `V3Fab` همان main با `testTag(V3Anatomy.FAB)`.
+- **کوچ (۰۸/۲۵)**: جزئیاتِ کالا (`ProductDetailParts.FiguresCard`) و جزئیاتِ انبار (`StockItemScreen`) ⇐ `V3Summary` ِ رنگِ انبار (کلیدهای
+  `products/item`، `stock/item`)؛ پارامترِ `largeTitle` ِ `StockItemScreen` برداشته شد (نام وسطِ نوار، گوشی و پنلِ کامپیوتر). سفارش‌های خرید
+  (فهرست و جزئیات) `Chrome.OWN` با `PoScaffold`: تراشه در `chips =`، «سفارشِ تازه»/«فرستادن»/«دریافت» تنها `V3Fab`، «پیشنهادِ سفارش»، ویرایش،
+  تطبیق و فاکتورها آیکنِ نوار، «لغو» در «…»، سرِ جزئیات `V3Summary` (`purchasing/order`)، یادداشت‌ها خطِ کم‌رنگِ پایان. خلاصهٔ «اشتراکِ من»
+  رنگِ بخش گرفت (`PROMOS`، همان زرِ کاشیِ «اشتراکِ من») چون `SectionColorsTest` ِ main آن را می‌خواهد. قاعده در RULES («کالبدِ یکسانِ هر صفحهٔ
+  گوشی»)، WHATS-NEW (بخشِ ۰۸/۲۵).
+- **آزمون‌های عمداً عوض‌شده**: `PageAnatomyGuardTest` — الگوی `largeTitle\s*=\s*(?!false)` با پس‌روی هر `= false` را هم می‌گرفت (هرگز اجرا
+  نشده بود) ⇐ `largeTitle\s*=(?!\s*false\b)`؛ دو استثنای ⏳ برداشته و سنجشِ `V3Summary` ِ رنگِ انبار و آزمونِ تازهٔ «سفارشِ خرید روی کالبد»
+  افزوده شد؛ آزمونِ نوارِ پیش‌نمایش با تصمیمِ main هم‌سو شد (فقط پوسته، یک نوارِ کامپیوتر، `strip = false` ِ گوشی). `PurchaseOrderRoutesUiTest`:
+  «لغو» از «…» باز می‌شود و برگهٔ «لغوِ سفارشِ #…؟» منتظر می‌ماند؛ آزمونِ شاگرد «…» را هم باز می‌کند تا «لغو» آن‌جا هم نباشد (سست نشد).
+- **نتیجه**: اجرای هدف‌دار ۹۵ آزمون: همه سبز جز `SectionColorsTest` (اشتراک بی `section`) ⇐ درست شد؛ اجرای کوچکِ پس از آن: `SectionColorsTest` ۷/۷، `PageAnatomyGuardTest` ۸/۸، `SummaryFoldTest` ۳/۳، `PurchaseOrderRoutesUiTest` ۷/۷.
+  سبز: `PageAnatomyGuardTest` ۸، `LookGuardTest` ۷ (هش‌ها دست نخورد)، `HardcodedColorsTest` ۲، `SummaryFoldTest` ۳، `PurchaseOrderRoutesUiTest` ۷،
+  `SupplierBillRoutesUiTest` ۶، `ProductStorefrontUiTest` ۶، `SummaryCardUiTest` ۱۰، `V3DataRowGuardTest` ۵، `V3ReachabilityTest` ۹،
+  `DeskStockD3aUiTest` ۶، `CatalogPhoneP2UiTest` ۹، `OneHandShellUiTest` ۸. عکس‌ها: `/home/user/wt-p0-shots/{before,after}` و `audit.md` (`P0ShotsTest`).
+- **اجرا نشده**: اجرای کامل و عکسِ «اشتراکِ من» (ورودِ واقعی می‌خواهد).
+- **precheck** (دورِ دوم، روی درختِ تمیز پس از کامیت): `fail=0`؛ `whatsnew/check.mjs --base origin/main` سبز (۱۰ سطر). «fail=1» ِ دورِ اول از درختِ
+  کثیف/پایهٔ کهنه بود.
+- **دورِ دوم (۰۸/۲۶)**: ادغامِ main (#1058، #1059؛ فقط تعارضِ سندها، از هر دو سو). ابزارِ مشترکِ `RouteScope.V3RoutePage` و `V3PageFootnote`
+  (`ui/v3/nav/V3RoutePage.kt`؛ `PoScaffold` همان را صدا می‌زند). کوچ به `Chrome.OWN`: فاکتورهای تأمین‌کننده (فهرست `V3DataRow` با مبلغ؛ جزئیات
+  `V3Summary` ِ `purchasing/bill` و «ثبتِ فاکتور» تنها `V3Fab`)، تغییرِ عکس‌ها (فهرست: «دستهٔ تازه» `V3Fab`، `V3DataRow`؛ جزئیات: `V3Summary` ِ
+  `stock/images/change`، «بازگرداندنِ همه» در «…» و دلیلش یک `V3Sheet`)، استودیوی عکس (فهرست)، «محل‌ها و بسته‌بندی» (دو دکمهٔ Material ⇐ دو
+  `V3NavRow`)، گزارشِ آنلاین و شعبه‌ها (تراشهٔ بازه در `chips =`، یادداشت پایان)، تخفیف‌ها (`PromosScreen(onBack)`: «قاعدهٔ تازه» `V3Fab`، خلاصه
+  اول و کلیدِ صندوق زیرش، توضیح پایان). هیچ قابلیتی برداشته نشد. نوارِ چسبانِ جزئیاتِ کالا/انبار دست نخورد (منتظرِ پاسخِ صاحب‌کار).
+- **نگهبانِ تازه** (`PageAnatomyGuardTest` ۹): فهرستِ دلیل‌دارِ صفحه‌های ماندهٔ `Chrome.SHELL` (`shellAllowed`، کهنه‌شدنی) — صفحهٔ تازهٔ پوسته سرخ
+  می‌کند؛ صفحه‌های کوچیده `V3RoutePage` دارند و دکمهٔ تمام‌پهنای «… تازه» ندارند.
+- **نتیجهٔ دورِ دوم** (هدف‌دار، ۲۲ کلاس، ۱۲۶ آزمون، همه سبز): `PageAnatomyGuardTest` ۹، `PhoneAnatomyAuditTest` ۱ (۱۰۵ مسیر × روز/شب)، `LookGuardTest` ۷،
+  `HardcodedColorsTest` ۲، `SectionColorsTest` ۷، `SummaryFoldTest` ۳، `V3DataRowGuardTest` ۵، `V3NavRowGuardTest` ۶، `V3ReachabilityTest` ۹،
+  `SupplierBillRoutesUiTest` ۶، `PurchaseOrderRoutesUiTest` ۷، `SectionHeaderUiTest` ۷، `SummaryCardUiTest` ۱۰، `ImageChangesPagesTest` ۶،
+  `ImageStudioPagesTest` ۵، `OnlineReportPageTest` ۳، `BranchesReportPageTest` ۴، `DeskStyleTest` ۶، `ScreenGuidesTextTest` ۴، `DataSafetyGuardTest` ۱۰،
+  `OneHandShellUiTest` ۸، `P0Round2ShotsTest` ۱. عکس‌ها: `/home/user/wt-p0-shots/round2/{before,after}` و `audit.md`؛ ممیزی `round2/audit/audit.json`.
+- **ممیزی**: هیچ مسیری عنوانِ درشتِ بدنه، دو دکمهٔ شناور یا دو خلاصه ندارد؛ `stock/import` در محیطِ بی‌نمایشگر `HeadlessException` (انتخابگرِ پرونده).
+  نوشتهٔ درشتِ بیرون از قاب: داشبورد/آمار (مجاز)، `sales/table` (آگاهانه پوسته)، کاشیِ حرفِ عکس، و ⏳ سرخطِ «انبارگردانی» ِ `stock/count` (۲۲sp)،
+  عددهای «حساب من» و قیمتِ طرح‌های اشتراک (۲۴sp).
+- **قدمِ بعدی**: ⏳ های `shellAllowed` (پیشنهاد و تطبیقِ سفارش، فهرست‌های ریسک، کارزار، رسانه و شکایتِ ویترین، نسخه/گالریِ عکس، دفترِ انبار ِ
+  Material، جزئیاتِ دستهٔ استودیو، ساعتِ کار) و سه یافتهٔ ممیزیِ بالا؛ پرسش از صاحب‌کار: نوارِ چسبانِ جزئیاتِ کالا/انبار `V3Fab` شود؟ `PageAnatomyUiTest`
+  روی درختِ هر مسیر هنوز ساخته نشده (ممیزیِ `P0_AUDIT` همان شمارش را دارد).
+
 ### ۱۴۰۵/۰۸/۲۶ — عاملِ e-support زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-support` (از `origin/main` a0b0f9355، ادغامِ main f7641ab93) + server `claude/support-inbox` (۱.۵۲.۰) — «از پشتیبانی بخواه»
 
 - **چه شد**: فهرستِ یکتای مشکل‌ها (`server/src/lib/support-problems.json` ⇄ `core/support/SupportProblem.kt`): `flag_off:<پرچم>`، `plan_required:<قابلیت>`،
