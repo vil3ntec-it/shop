@@ -100,6 +100,7 @@ router.use('/calendar', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'ad
 router.use('/search/synonyms', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-synonyms-ip' }));   //  ۴-۱ «ب» (`admin-synonyms.js`)
 router.use('/shops/:id/access-grants', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-access-grants-ip' }));   //  ۲-۹ (`admin-access-grants.js`)
 router.use('/shops/:id/images/changes', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-image-changes-ip' }));   //  IMG-PRO-17 (`admin-image-changes.js`)
+router.use('/support-requests', rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'admin-support-requests-ip' }));   //  «از پشتیبانی بخواه» (`admin-support-requests.js`)
 
 router.use(requireAdmin);
 
@@ -751,6 +752,7 @@ router.use('/sync', require('./admin-sync'));
 //  پنلِ مرکزی، فاز ۳: سلامت و حالت‌های مدیریتیِ دکان، پرچم‌ها با تاریخچه، کلیدِ سرویسِ پلِ پنل
 router.use('/shops/:id', require('./admin-shop-state'), require('./admin-access-grants'), require('./admin-image-changes'));   //  + ۲-۹ دسترسیِ پشتیبانی، IMG-PRO-17
 router.use('/flags', require('./admin-flags'));
+router.use('/support-requests', require('./admin-support-requests'));   //  صفِ «از پشتیبانی بخواه» و «درستش کن» (مهاجرتِ ۹۶۰)
 //  پوستهٔ کنسول — جست‌وجوی سراسریِ بخشِ «فروشگاه» ِ پنل (توانایی `search.v1`)
 router.use('/search', require('./admin-synonyms'), require('./admin-search'));   //  + ۴-۱ «ب» فهرستِ مرکزیِ مترادف
 router.use('/service-keys', require('./admin-service-keys'));

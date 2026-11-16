@@ -48,6 +48,8 @@ const CAPABILITIES = Object.freeze([
   //  TEN-04 (۱۴۰۵/۰۸/۲۲): با پرچمِ `security / admin.support_grant` درهای خواندنِ محتوای خصوصیِ دکان اجازهٔ زندهٔ `read_private`
   //  می‌خواهند (‎403 grant_required‎) و پرونده‌های دکان/کاربر بی اجازه فقط فراداده با `restricted` می‌دهند (`lib/admin-dossier.js`)
   'support-grant-read.v1',  //  GET /admin/shops/:id/staff-perms · …/images/changes/:cid · /admin/sync/conflicts · /admin/shops/:id · /admin/users/:id
+  //  «از پشتیبانی بخواه» (مهاجرتِ ۹۶۰): صف، پرونده، «حل شد» و چهار «درستش کن» (پرچم، اشتراک، سقفِ دستگاه: ارشد؛ کدِ ورود: مدیر)
+  'support-requests.v1',    //  GET /admin/support-requests[/:id[/sync-error]] · POST …/:id/resolve · POST …/:id/fix/(enable-flag|grant-subscription|raise-device-limit|resend-email-code)
 ]);
 
 /*

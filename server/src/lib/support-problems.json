@@ -1,0 +1,110 @@
+{
+  "about": "فهرستِ یکتای «مشکل‌هایی که کاربر باید از پشتیبانی بخواهد» (درخواستِ پشتیبانی با یک لمس). سرور: lib/support-requests.js؛ برنامه: core/support/SupportProblem.kt — آینهٔ همین فایل، سنجه: SupportProblemMirrorTest و test/support-requests.test.js. ⛔ کد و param هرگز روی صفحهٔ کاربر نمی‌آیند؛ متن‌ها همین‌جا.",
+  "version": 1,
+  "facts": {
+    "appVersion": "version",
+    "platform": "platform",
+    "screen": "slug",
+    "syncError": "slug",
+    "rejected": "count",
+    "devices": "count",
+    "maxDevices": "count"
+  },
+  "names": {
+    "shop.orders": { "fa": "سفارشِ آنلاین", "en": "Online orders", "ps": "آنلاین فرمایښتونه" },
+    "shop.storefront": { "fa": "ویترین و بازارچه", "en": "Storefront and marketplace", "ps": "ویترین او بازار" },
+    "pay.hesabpay": { "fa": "پرداخت با حساب‌پی", "en": "HesabPay payments", "ps": "د حساب‌پې تادیه" },
+    "shop.delivery": { "fa": "تحویل و پیک", "en": "Delivery and couriers", "ps": "سپارل او پیک" },
+    "shop.chat": { "fa": "گفت‌وگو با مشتری", "en": "Customer chat", "ps": "له پېرودونکي سره خبرې" },
+    "shop.order_notify": { "fa": "خبرِ سفارشِ تازه", "en": "New-order alerts", "ps": "د نوي فرمایښت خبرتیا" },
+    "sales": { "fa": "فروش (صندوق)", "en": "Sales (till)", "ps": "پلور (صندوق)" },
+    "debtors": { "fa": "قرض‌داران", "en": "Debtors", "ps": "پوروړي" },
+    "barcode": { "fa": "اسکنرِ بارکد", "en": "Barcode scanner", "ps": "د بارکوډ سکنر" },
+    "multi_device": { "fa": "چند کاربر روی یک دکان", "en": "Several users on one shop", "ps": "په یوه دوکان کې څو کاروونکي" },
+    "online_orders": { "fa": "سفارشِ آنلاین", "en": "Online orders", "ps": "آنلاین فرمایښتونه" },
+    "storefront": { "fa": "ویترینِ اینترنتی", "en": "Online storefront", "ps": "انټرنېټي ویترین" },
+    "delivery": { "fa": "تحویل و پیک", "en": "Delivery and couriers", "ps": "سپارل او پیک" }
+  },
+  "problems": [
+    {
+      "code": "flag_off",
+      "param": ["shop.orders", "shop.storefront", "pay.hesabpay", "shop.delivery", "shop.chat", "shop.order_notify"],
+      "needsShop": true,
+      "fix": "enable_flag",
+      "facts": ["appVersion", "platform", "screen"],
+      "title": { "fa": "{name} برای این دکان خاموش است", "en": "{name} is turned off for this shop", "ps": "{name} د دې دوکان لپاره بند دی" },
+      "ask": { "fa": "لطفاً {name} را برای دکانِ من روشن کنید.", "en": "Please turn {name} on for my shop.", "ps": "مهرباني وکړئ {name} زما د دوکان لپاره فعال کړئ." },
+      "done": { "fa": "پشتیبانی {name} را برای دکانِ شما روشن کرد.", "en": "Support turned {name} on for your shop.", "ps": "ملاتړ {name} ستاسو د دوکان لپاره فعال کړ." }
+    },
+    {
+      "code": "plan_required",
+      "param": ["sales", "debtors", "barcode", "multi_device", "online_orders", "storefront", "delivery"],
+      "needsShop": true,
+      "fix": "grant_subscription",
+      "facts": ["appVersion", "platform", "screen"],
+      "title": { "fa": "{name} در اشتراکِ این دکان نیست", "en": "{name} is not in this shop's plan", "ps": "{name} د دې دوکان په ګډون کې نشته" },
+      "ask": { "fa": "لطفاً {name} را به اشتراکِ دکانِ من اضافه کنید.", "en": "Please add {name} to my shop's plan.", "ps": "مهرباني وکړئ {name} زما د دوکان ګډون ته ور زیات کړئ." },
+      "done": { "fa": "پشتیبانی اشتراکِ دکانِ شما را به‌روز کرد؛ {name} باز است.", "en": "Support updated your shop's plan; {name} is open now.", "ps": "ملاتړ ستاسو د دوکان ګډون تازه کړ؛ {name} اوس پرانیستی دی." }
+    },
+    {
+      "code": "subscription_expired",
+      "param": [],
+      "needsShop": true,
+      "fix": "grant_subscription",
+      "facts": ["appVersion", "platform", "screen"],
+      "title": { "fa": "اشتراکِ این دکان تمام شده است", "en": "This shop's subscription has ended", "ps": "د دې دوکان ګډون پای ته رسېدلی" },
+      "ask": { "fa": "لطفاً اشتراکِ دکانِ من را تمدید کنید.", "en": "Please renew my shop's subscription.", "ps": "مهرباني وکړئ زما د دوکان ګډون نوی کړئ." },
+      "done": { "fa": "پشتیبانی اشتراکِ دکانِ شما را تمدید کرد.", "en": "Support renewed your shop's subscription.", "ps": "ملاتړ ستاسو د دوکان ګډون نوی کړ." }
+    },
+    {
+      "code": "device_limit",
+      "param": [],
+      "needsShop": true,
+      "fix": "raise_device_limit",
+      "facts": ["appVersion", "platform", "screen", "devices", "maxDevices"],
+      "title": { "fa": "جای دستگاهِ تازه در اشتراک نیست", "en": "There is no room for another device in the plan", "ps": "په ګډون کې د بلې وسیلې ځای نشته" },
+      "ask": { "fa": "لطفاً شمارِ دستگاه‌های اشتراکِ دکانِ من را بیشتر کنید.", "en": "Please allow more devices on my shop's plan.", "ps": "مهرباني وکړئ زما د دوکان په ګډون کې د وسیلو شمېر زیات کړئ." },
+      "done": { "fa": "پشتیبانی شمارِ دستگاه‌های اشتراکِ دکانِ شما را بیشتر کرد.", "en": "Support allowed more devices on your shop's plan.", "ps": "ملاتړ ستاسو د دوکان په ګډون کې د وسیلو شمېر زیات کړ." }
+    },
+    {
+      "code": "sync_no_shop",
+      "param": [],
+      "needsShop": false,
+      "fix": "show_sync_error",
+      "facts": ["appVersion", "platform", "screen", "syncError"],
+      "title": { "fa": "همگام‌سازی دکانی برای این حساب پیدا نمی‌کند", "en": "Sync can't find a shop for this account", "ps": "همغږي د دې حساب لپاره دوکان نه مومي" },
+      "ask": { "fa": "همگام‌سازیِ برنامه دکانِ مرا پیدا نمی‌کند؛ لطفاً بررسی کنید.", "en": "Sync can't find my shop; please take a look.", "ps": "همغږي زما دوکان نه مومي؛ مهرباني وکړئ وګورئ." },
+      "done": { "fa": "پشتیبانی همگام‌سازیِ دکانِ شما را بررسی کرد.", "en": "Support checked your shop's sync.", "ps": "ملاتړ ستاسو د دوکان همغږي وکتله." }
+    },
+    {
+      "code": "sync_refused",
+      "param": [],
+      "needsShop": true,
+      "fix": "show_sync_error",
+      "facts": ["appVersion", "platform", "screen", "syncError", "rejected"],
+      "title": { "fa": "سرور چند تغییرِ این دستگاه را نپذیرفت", "en": "Some changes from this device were not accepted", "ps": "د دې وسیلې ځینې بدلونونه ونه منل شول" },
+      "ask": { "fa": "چند تغییرِ این دستگاه پذیرفته نشد؛ لطفاً بررسی کنید.", "en": "Some changes from this device were not accepted; please take a look.", "ps": "د دې وسیلې ځینې بدلونونه ونه منل شول؛ مهرباني وکړئ وګورئ." },
+      "done": { "fa": "پشتیبانی همگام‌سازیِ دکانِ شما را بررسی کرد.", "en": "Support checked your shop's sync.", "ps": "ملاتړ ستاسو د دوکان همغږي وکتله." }
+    },
+    {
+      "code": "email_code_not_arriving",
+      "param": [],
+      "needsShop": false,
+      "fix": "resend_email_code",
+      "facts": ["appVersion", "platform", "screen"],
+      "title": { "fa": "کدِ ورود به ایمیل نمی‌رسد", "en": "The sign-in code isn't arriving by email", "ps": "د ننوتلو کوډ برېښنالیک ته نه رسېږي" },
+      "ask": { "fa": "کدِ ورود به ایمیلم نمی‌رسد؛ لطفاً کمک کنید.", "en": "My sign-in code isn't arriving by email; please help.", "ps": "زما د ننوتلو کوډ برېښنالیک ته نه رسېږي؛ مهرباني وکړئ مرسته وکړئ." },
+      "done": { "fa": "پشتیبانی کدِ ورود را دوباره به ایمیلِ شما فرستاد؛ پوشهٔ هرزنامه (Spam) را هم ببینید.", "en": "Support sent your sign-in code again; please check your spam folder too.", "ps": "ملاتړ ستاسو د ننوتلو کوډ بیا ولېږه؛ مهرباني وکړئ د سپام فولډر هم وګورئ." }
+    },
+    {
+      "code": "other",
+      "param": [],
+      "needsShop": false,
+      "fix": "none",
+      "facts": ["appVersion", "platform", "screen"],
+      "title": { "fa": "کمک از پشتیبانی", "en": "Help from support", "ps": "له ملاتړ څخه مرسته" },
+      "ask": { "fa": "به کمکِ پشتیبانی نیاز دارم.", "en": "I need help from support.", "ps": "د ملاتړ مرستې ته اړتیا لرم." },
+      "done": { "fa": "پشتیبانی به درخواستِ شما رسیدگی کرد.", "en": "Support handled your request.", "ps": "ملاتړ ستاسو غوښتنه وڅېړله." }
+    }
+  ]
+}
