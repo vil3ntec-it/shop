@@ -52,6 +52,8 @@ const FREE = [
     'POST /shop/catalog/transfers', 'POST /shop/catalog/transfers/:id/receive', 'POST /shop/catalog/transfers/:id/reject',
     //  انتقالِ میانِ شعبه‌ها (INV-11، فازِ ۴ ِ BRANCHES §۱۰) همان موجودیِ سرور است — فقط پرچم‌های shop.branches و shop.catalog
     'POST /shop/catalog/branch-transfers', 'POST /shop/catalog/branch-transfers/:id/receive', 'POST /shop/catalog/branch-transfers/:id/reject',
+    //  ۹۴۶: پیش‌نویس (ویرایش/ارسال) و لغوِ فرستنده — همان موجودیِ سرور
+    'PUT /shop/catalog/branch-transfers/:id', 'POST /shop/catalog/branch-transfers/:id/send', 'POST /shop/catalog/branch-transfers/:id/cancel',
     'POST /shop/images/select', 'POST /shop/images', 'PUT /shop/images/:id/v/:version/:size',
     'POST /shop/images/:id/propose', 'POST /shop/images/:id/report', 'POST /shop/images/:id/detach',
     'POST /shop/images/changes', 'POST /shop/images/changes/:id/rollback',
@@ -107,7 +109,9 @@ const FREE = [
     + 'پرچمِ shop.branches؛ صاحب باید پس از پایانِ اشتراک هم بتواند دسترسیِ کارمند را به شعبه ببندد یا شعبه را بایگانی کند', [
     'POST /shop/branches', 'PATCH /shop/branches/:id', 'POST /shop/branches/:id', 'PUT /shop/branches/members/:id',
     //  POS-16/S17: مجوزِ «موجودیِ شعبه‌های دیگر» همان دسترسیِ کارمند به شعبه است (فقط صاحب)
-    'PUT /shop/branches/members/:id/perms']],
+    'PUT /shop/branches/members/:id/perms',
+    //  ۹۴۶: کلیدهای شعبه‌ایِ دکان (کارمند موجودیِ شعبه‌های دیگر را ببیند؛ ارسالِ بیش از موجودی) — قاعدهٔ دسترسی، فقط صاحب
+    'PUT /shop/branches/settings']],
   ['PIN ِ شخصیِ صندوق و نوبت‌های سنجیدهٔ صندوق (STF-04، S46، مهاجرتِ ۶۴۰) هویتِ کاربرِ صندوق‌اند، بخشی از مجوزهای هستهٔ دکان، '
     + 'و کلیدِ کاتالوگ ندارند، فقط پرچمِ shop.till_pin؛ صاحب باید پس از پایانِ اشتراک هم PIN را بگذارد/بردارد و قفلش را باز کند', [
     'PUT /shop/till-pin/me', 'PUT /shop/till-pin/members/:id', 'DELETE /shop/till-pin/members/:id', 'POST /shop/till-pin/members/:id/unlock',

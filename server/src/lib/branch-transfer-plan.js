@@ -3,13 +3,17 @@
  * انتقالِ میانِ شعبه‌ها — قاعده‌های خالص (بی پایگاه): شکلِ درخواست، ماشینِ وضعیت و حرکت‌های هر گام (INV-11/S21، فازِ ۴ ِ
  * `docs/BRANCHES-fa.md` §۱۰). نوشتن و قفل در `lib/branch-transfers.js`.
  *
- *   ماشینِ وضعیت (همان CHECK و تریگرِ مهاجرتِ ۹۳۵):
+ *   ماشینِ وضعیت (همان CHECK و تریگرِ مهاجرت‌های ۹۳۵ و ۹۴۶):
+ *     (پیش‌نویس) ⇒ draft ─┬─ ویرایش ⇒ draft (فقط فرستنده؛ مقصد آن را نمی‌بیند)
+ *                         ├─ لغو ⇒ cancelled (بی هیچ اثرِ موجودی)
+ *                         └─ ارسال ⇒ in_transit
  *     (ارسال) ⇒ in_transit ─┬─ دریافتِ ناقص ⇒ partial ─┬─ دریافتِ ناقص ⇒ partial
  *                           │                         ├─ دریافتِ پایانی / همه رسید ⇒ received
  *                           │                         └─ رد ⇒ rejected
  *                           ├─ دریافتِ پایانی / همه رسید ⇒ received
- *                           └─ رد ⇒ rejected
- *     received و rejected پایانی‌اند.
+ *                           ├─ رد ⇒ rejected
+ *                           └─ لغوِ فرستنده (هنوز هیچ نرسیده) ⇒ cancelled (همهٔ «در مسیر» به مبدأ)
+ *     received، rejected و cancelled پایانی‌اند.
  *
  *   هر حرکت یک «سو» دارد: `from` = بخشِ شعبهٔ فرستنده (کالا تا پذیرفتن مالِ فرستنده است و «در مسیر»ش همان‌جاست)، `to` =
  *   بخشِ شعبهٔ گیرنده (فقط ورودِ رسیده). کلیدِ یکتای هر حرکت `bxfer:<شناسه>:<گام>:<ردیف>` (جدا از `xfer:` ِ انتقالِ درونِ شعبه).
@@ -26,15 +30,20 @@ const { badRequest } = require('../middleware/errors');
 const { parseReceive } = require('./stock-transfers');
 
 const ENDPOINTS = Object.freeze(['shop_floor', 'warehouse']);
-const STATUSES = Object.freeze(['in_transit', 'partial', 'received', 'rejected']);
+const STATUSES = Object.freeze(['draft', 'in_transit', 'partial', 'received', 'rejected', 'cancelled']);
+/** «در مسیر» (دریافت/رد در مقصد) */
 const OPEN = Object.freeze(['in_transit', 'partial']);
-/** گذارهای مجاز؛ کلیدِ '' = پیش از ارسال */
+/** هنوز بسته نشده (پیش‌نویس هم) */
+const LIVE = Object.freeze(['draft', 'in_transit', 'partial']);
+/** گذارهای مجاز؛ کلیدِ '' = پیش از ساختن */
 const TRANSITIONS = Object.freeze({
-  '': Object.freeze(['in_transit']),
-  in_transit: Object.freeze(['partial', 'received', 'rejected']),
+  '': Object.freeze(['draft', 'in_transit']),
+  draft: Object.freeze(['draft', 'in_transit', 'cancelled']),
+  in_transit: Object.freeze(['partial', 'received', 'rejected', 'cancelled']),
   partial: Object.freeze(['partial', 'received', 'rejected']),
   received: Object.freeze([]),
   rejected: Object.freeze([]),
+  cancelled: Object.freeze([]),
 });
 const MAX_LINES = 100;
 const MAX_QTY_MILLI = 1_000_000_000;
@@ -86,15 +95,22 @@ function parseSend(body) {
 
 const received = (l) => (l.receivedMilli === null || l.receivedMilli === undefined ? 0 : num(l.receivedMilli));
 
-/** ردیف‌های `lines` ⇒ نمای هر ردیف (همان شکلِ انتقالِ درونِ شعبه) */
-function linesView(raw, status) {
+/**
+ * ردیف‌های `lines` ⇒ نمای هر ردیف (همان شکلِ انتقالِ درونِ شعبه). `returnedMilli` = آن‌چه به مبدأ ِ فرستنده برگشت (رد: ماندهٔ
+ * در مسیر؛ لغوِ فرستاده: همه) — دفترِ دستگاهِ فرستنده با همین «فرستاده − برگشته» را کم دارد (`core/stock/BranchTransferLedger`).
+ * کسری فقط در دریافتِ پایانی (`received`)؛ پیش‌نویس هیچ «در مسیر» ندارد. [sent] = آیا این انتقال فرستاده شد.
+ */
+function linesView(raw, status, sent = status !== 'draft' && status !== 'cancelled') {
   const open = OPEN.includes(status);
   return (Array.isArray(raw) ? raw : JSON.parse(raw || '[]')).map((l) => {
     const got = l.receivedMilli === null || l.receivedMilli === undefined ? null : num(l.receivedMilli);
+    const sentMilli = num(l.sentMilli);
+    const returnedMilli = status === 'rejected' ? sentMilli - (got || 0) : (status === 'cancelled' && sent ? sentMilli - (got || 0) : 0);
     return {
-      productId: l.productId, sentMilli: num(l.sentMilli), receivedMilli: got,
-      shortMilli: got === null || open ? 0 : num(l.sentMilli) - got,
-      pendingMilli: open ? num(l.sentMilli) - (got || 0) : 0,
+      productId: l.productId, sentMilli, receivedMilli: got,
+      shortMilli: got === null || status !== 'received' ? 0 : sentMilli - got,
+      pendingMilli: open ? sentMilli - (got || 0) : 0,
+      returnedMilli,
     };
   });
 }
@@ -190,6 +206,33 @@ function rejectPlan(body) {
   };
 }
 
+/**
+ * طرحِ لغوِ فرستنده: پیش‌نویس ⇒ بی هیچ حرکت (دلیل اختیاری)؛ «در مسیر» ِ هنوز هیچ‌نرسیده ⇒ همهٔ فرستاده از `in_transit` ِ
+ * فرستنده به مبدأ (دلیل اجباری، همان قاعدهٔ رد). نیمه‌رسیده ⇒ لغو نه (`transfer_partial`، سنجش در `lib/branch-transfers.js`).
+ */
+function cancelPlan(body) {
+  const reason = noteOf(isObj(body) ? body.reason : '', 120);
+  return (t) => {
+    const draft = t.status === 'draft';
+    if (!draft && !reason) throw badRequest('برای لغوِ انتقالِ فرستاده دلیل لازم است', 'reason_required');
+    return {
+      kind: 'cancel',
+      status: 'cancelled',
+      lines: t.lines.map((l) => ({ productId: l.productId, sentMilli: l.sentMilli, receivedMilli: null })),
+      reason,
+      note: reason,
+      final: true,
+      stepLines: draft ? [] : t.lines.map((l) => ({ productId: l.productId, qtyMilli: l.sentMilli })),
+      moves: draft ? [] : t.lines.flatMap((l, i) => [
+        { side: 'from', productId: l.productId, location: 'in_transit', type: 'transfer_out', qtyMilli: l.sentMilli, reason: 'branch_transfer_cancel', sourceKey: `bxfer:${t.id}:cancel-out:${i + 1}` },
+        { side: 'from', productId: l.productId, location: t.from, type: 'transfer_in', qtyMilli: l.sentMilli, reason: 'branch_transfer_cancel', sourceKey: `bxfer:${t.id}:cancel-in:${i + 1}` },
+      ]),
+      tasks: [],
+    };
+  };
+}
+
 module.exports = {
-  ENDPOINTS, STATUSES, OPEN, TRANSITIONS, MAX_LINES, ID_RE, allowed, parseSend, linesView, sendMoves, receivePlan, rejectPlan, noteOf,
+  ENDPOINTS, STATUSES, OPEN, LIVE, TRANSITIONS, MAX_LINES, ID_RE, allowed, parseSend, linesView, sendMoves, receivePlan, rejectPlan,
+  cancelPlan, noteOf,
 };

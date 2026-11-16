@@ -9,6 +9,8 @@
  *   GET   /members          اعضا و شعبه‌هایشان — فقط صاحب
  *   PUT   /members/:id      { branches: [...] } — فقط صاحب؛ [''] = پیش‌فرض (فقط اصلی)
  *   PUT   /members/:id/perms { perms: ['stock.view_other_branches'] | [] } — فقط صاحب (POS-16/S17، `lib/other-branches.js`)
+ *   GET   /settings         تنظیم‌های شعبه‌ایِ دکان — فقط صاحب (`lib/branch-settings.js`، مهاجرتِ ۹۴۶)
+ *   PUT   /settings         { staffOtherStock?, transferNegative? } (بولی) — فقط صاحب
  *   GET   /report           ?from&to&branch ⇐ خلاصهٔ هر شعبه؛ `totals` فقط برای صاحب (`lib/branch-report.js`)
  *
  * ⛔ پرچمِ `shop.branches` خاموش ⇒ **همه** همان پاسخِ مسیرِ ناشناخته (درِ تازه بی صدازننده تا فازِ ۲؛ STATUS/RPT-18).
@@ -21,6 +23,7 @@ const audit = require('../lib/audit');
 const branches = require('../lib/branches');
 const report = require('../lib/branch-report');
 const other = require('../lib/other-branches');
+const bset = require('../lib/branch-settings');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { forbidden, notFoundHandler } = require('../middleware/errors');
 const { clientIp, rateLimit } = require('../middleware/ratelimit');
@@ -72,7 +75,22 @@ router.post('/:id', needOwner, requireRecentAuth, updateBranch);
 
 router.get('/members', needOwner, async (req, res) => {
   res.set('Cache-Control', 'private, no-store');
-  res.json({ branches: await branches.list(req.shopId), members: await other.withPerms(req.shopId, await branches.members(req.shopId)) });
+  res.json({
+    branches: await branches.list(req.shopId), members: await other.withPerms(req.shopId, await branches.members(req.shopId)),
+    settings: await bset.get(req.shopId),
+  });
+});
+
+//  ۹۴۶: «کارمند موجودیِ شعبه‌های دیگر را ببیند» (POS-16/S17) و «ارسالِ بیش از موجودی» (INV-11) — فقط صاحب
+router.get('/settings', needOwner, async (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  res.json({ settings: await bset.get(req.shopId) });
+});
+
+router.put('/settings', needOwner, requireRecentAuth, async (req, res) => {
+  const { before, after } = await bset.set(req.shopId, req.body, req.user.id);
+  await log(req, 'branch.settings', 'shop', { before, after });
+  res.json({ settings: after });
 });
 
 router.put('/members/:id', needOwner, requireRecentAuth, async (req, res) => {

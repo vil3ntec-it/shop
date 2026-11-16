@@ -112,7 +112,7 @@ test('پرچمِ خاموش ⇒ درِ موجودیِ شعبه‌های دیگر
   assert.deepEqual([r.status, r.body], [u2.status, u2.body]);
 });
 
-test('فقط عدد: صاحب همهٔ شعبه‌های دیگر را می‌بیند؛ کارمند فقط دسترسی‌اش؛ مجوزِ صاحب ⇒ همه؛ برداشتن ⇒ باز فقط خودش', async () => {
+test('فقط عدد: صاحب و مدیر همهٔ شعبه‌های دیگر را می‌بینند؛ کارمند فقط دسترسی‌اش؛ کلیدِ دکان یا مجوزِ صاحب ⇒ همه؛ برداشتن ⇒ باز فقط خودش', async () => {
   const w = await world('عدد');
   const { s, A, Bid, C } = w;
   //  صاحب با سرآیندِ الف: اصلی، ب و ج (الف خودش نیست)
@@ -128,10 +128,20 @@ test('فقط عدد: صاحب همهٔ شعبه‌های دیگر را می‌ب
   assert.equal(own.headers.get('cache-control'), 'private, no-store');
   //  صاحب با سرآیندِ اصلی ⇒ الف ۹ (۱۰ − فروشِ ۱)
   assert.deepEqual(qtyOf(await peek(s, undefined)), { الف: 9000, ب: 7000, ج: 0 });
-  //  کارمندِ فقط الف ⇒ هیچ؛ مدیرِ الف‌وب با سرآیندِ الف ⇒ فقط ب، با سرآیندِ ب ⇒ فقط الف
+  //  کارمندِ فقط الف ⇒ هیچ. ۹۴۶ (تصمیمِ هماهنگ‌کننده، همان Square/Shopify/Lightspeed): مدیر — حتی مدیرِ فقط الف‌وب — همهٔ
+  //  شعبه‌های فعالِ دیگر را می‌بیند (پیش‌تر فقط شعبه‌های خودش؛ آزمون آگاهانه عوض شد، `docs/HANDOFF-fa.md`)
   assert.deepEqual((await peek(w.staffA, A)).body, { branches: [] });
-  assert.deepEqual(qtyOf(await peek(w.mgrAB, A)), { ب: 7000 });
-  assert.deepEqual(qtyOf(await peek(w.mgrAB, Bid)), { الف: 9000 });
+  assert.deepEqual(qtyOf(await peek(w.mgrAB, A)), { 'شعبهٔ اصلی': 4000, ب: 7000, ج: 0 });
+  assert.deepEqual(qtyOf(await peek(w.mgrAB, Bid)), { 'شعبهٔ اصلی': 4000, الف: 9000, ج: 0 });
+  //  کلیدِ دکان (فقط صاحب، ۹۴۶): «کارمند موجودیِ شعبه‌های دیگر را ببیند» ⇒ کارمند همه؛ خاموش ⇒ باز هیچ
+  const on = await h.put('/api/shop/branches/settings', { staffOtherStock: true }, { token: s.token });
+  assert.equal(on.status, 200, JSON.stringify(on.body));
+  assert.deepEqual(on.body.settings, { staffOtherStock: true, transferNegative: false });
+  assert.deepEqual(qtyOf(await peek(w.staffA, A)), { 'شعبهٔ اصلی': 4000, ب: 7000, ج: 0 });
+  assert.equal((await h.put('/api/shop/branches/settings', { staffOtherStock: true }, { token: w.mgrAB.token })).status, 403, 'فقط صاحب');
+  assert.equal((await h.put('/api/shop/branches/settings', { staffOtherStock: false }, { token: s.token })).status, 200);
+  assert.deepEqual((await peek(w.staffA, A)).body, { branches: [] });
+  assert.ok(await one("SELECT 1 AS x FROM audit_logs WHERE shop_id=$1 AND action='branch.settings'", [s.shopId]));
   //  مجوز از صاحب ⇒ همه؛ فهرستِ اعضا نشانش می‌دهد؛ برداشتن ⇒ باز هیچ
   const g = await grant(s, w.staffA, ['stock.view_other_branches']);
   assert.equal(g.status, 200, JSON.stringify(g.body));
