@@ -176,7 +176,7 @@ class SyncV1Engine private constructor(context: Context) {
           throw cancelled
         } catch (e: Throwable) {
           error = e.message ?: "خطای نامشخص"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
-          state.lastError = error; state.lastErrorCode = SyncFailure.code(e)
+          state.lastError = error; state.lastErrorCode = SyncFailure.code(e); state.lastErrorStatus = SyncFailure.status(e)
         }
         rejected = (queue.droppedCount() - before).coerceAtLeast(0)
       } finally {
@@ -532,10 +532,10 @@ class SyncV1Engine private constructor(context: Context) {
    *  @throws SyncV1Client.UpgradeRequired سرور عقب‌تر است: هیچ opی پاک نمی‌شود
    */
   private suspend fun pushQueue(client: SyncV1Client, device: String) {
-    var guard = 0
+    var guard = 0; var cap = OpQueue.MAX_OPS  // e-syncdiag: سقفِ دسته پس از ۴۱۳ کوچک می‌شود (`PushTooLarge`)
     while (queue.size() > 0 && guard < 500) {
       guard++
-      val batch = queue.batch()
+      val batch = queue.batch(maxOps = cap)
       if (batch.isEmpty()) break
       //  A00: opهای ساختِ پیش از A00 بی `caps` می‌روند تا تورِ سرور null ِ کهنه‌شان را بپالاید
       val legacy = state.legacyOpsUpTo
@@ -555,7 +555,7 @@ class SyncV1Engine private constructor(context: Context) {
         state.lastError = upgrade.reason
         publish()
         throw upgrade
-      }
+      } catch (big: ir.vil3ntec.tohid.core.net.ApiFailure) { cap = PushTooLarge.next(big, batch, queue, restore::isReplay) { state.lastPushAt = clock() }; continue }  // e-syncdiag: ۴۱۳ ⇒ دستهٔ کوچک‌تر؛ تنها op ِ ۴۱۳ ⇒ دفترِ کنار
       state.holding = false
       state.serverSchema = out.serverSchema
       state.upgradeAvailable = out.upgradeAvailable
@@ -879,7 +879,7 @@ class SyncV1Engine private constructor(context: Context) {
       upgradeAvailable = state.upgradeAvailable,
       schemaVersion = LedgerDiff.SCHEMA_VERSION,
       serverSchema = state.serverSchema,
-      live = liveConnected, outage = outage.kind, errorCode = if (state.lastError.isBlank()) "" else state.lastErrorCode,
+      live = liveConnected, outage = outage.kind, errorCode = if (state.lastError.isBlank()) "" else state.lastErrorCode, errorStatus = if (state.lastError.isBlank()) null else state.lastErrorStatus,
     )
   }
 

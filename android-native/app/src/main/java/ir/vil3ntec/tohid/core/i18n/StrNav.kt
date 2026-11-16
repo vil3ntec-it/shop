@@ -107,6 +107,8 @@ object StrNav {
   // سرور و همگام‌سازی
   val server: String get() = t("سرور", "Server", "سرور")
   val serverUp: String get() = t("وصل است", "Connected", "وصل دی")
+  /** e-syncdiag: سرور به سنجش جواب داد ولی همگام‌سازی از آن نمی‌گذرد — نه «وصل است» ِ سبز (`SyncModel.server`) */
+  val serverReachable: String get() = t("در دسترس است", "Reachable", "د لاسرسي وړ دی")
   val serverDown: String get() = t("وصل نمی‌شود", "Can't connect", "نه وصلېږي")
   val phoneOffline: String get() = td("نتِ گوشی قطع است", "The phone's internet is off", "د موبایل انټرنېټ پرې دی", "The computer's internet is off", "د کمپیوټر انټرنېټ پرې دی")
   val checking: String get() = t("در حال سنجش…", "Checking…", "کتل کېږي…")
