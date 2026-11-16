@@ -485,6 +485,8 @@ private fun ago(now: Long, at: Long): String {
 @Composable
 private fun HeldDialogs(ui: HeldInvoicesUi, items: List<HeldInvoice>) {
   val colors = Shop.colors
+  //  کامپیوتر (`claude/e-desk-d3c`): همان پنجره‌ها و کارها روی `DeskDialog` (کارِ پاک‌کننده سرخ با فوکوسِ آغاز روی «نه»)؛ گوشی همان
+  val desk = ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout.current
   when (val dlg = ui.dialog) {
     null -> Unit
     is HeldDialog.Hold -> {
@@ -492,7 +494,16 @@ private fun HeldDialogs(ui: HeldInvoicesUi, items: List<HeldInvoice>) {
       var note by remember(dlg) { mutableStateOf(dlg.note) }
       val focus = remember { FocusRequester() }
       LaunchedEffect(dlg) { runCatching { focus.requestFocus() } }
-      AlertDialog(
+      if (desk) ir.vil3ntec.tohid.ui.desk.DeskDialog(
+        title = StrPos.holdInvoice, onDismiss = { ui.close() }, subtitle = StrPos.holdNote, initialFocus = focus,
+        confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.holdIt) { ui.hold(label, note) },
+        dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.nevermind) { ui.close() },
+      ) {
+        //  کیبورد: F6 → نام → Enter (Enter ِ پنجره همان «نگه داشتن» است)
+        ir.vil3ntec.tohid.ui.desk.DeskDialogField(StrPos.nameOrNumberOptional, label, { label = it.take(HeldRules.LABEL_MAX) }, focusRequester = focus)
+        ir.vil3ntec.tohid.ui.desk.DeskDialogField(StrPos.noteOptional, note, { note = it.take(HeldRules.NOTE_MAX) })
+      }
+      else AlertDialog(
         onDismissRequest = { ui.close() },
         shape = Shape.dialog,
         title = { Text(StrPos.holdInvoice) },
@@ -530,7 +541,41 @@ private fun HeldDialogs(ui: HeldInvoicesUi, items: List<HeldInvoice>) {
       //  فوکوس روی نخستین «باز کن» تا رقم، Tab و Enter همان‌جا کار کنند
       val first = remember { FocusRequester() }
       LaunchedEffect(items.size) { runCatching { first.requestFocus() } }
-      AlertDialog(
+      if (desk) {
+        val dc = ir.vil3ntec.tohid.ui.desk.Desk.colors
+        ir.vil3ntec.tohid.ui.desk.DeskDialog(
+          title = StrPos.heldInvoices, onDismiss = { ui.close() }, width = ir.vil3ntec.tohid.ui.desk.DeskDialogSize.form, initialFocus = if (items.isEmpty()) null else first,
+          dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(Str.close) { ui.close() },
+          extra = if (ui.canDropStale && stale.isNotEmpty()) listOf(ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.clearStale(plain(stale.size)), danger = true) { ui.dialog = HeldDialog.DropStale }) else emptyList(),
+        ) {
+          if (items.isEmpty()) ir.vil3ntec.tohid.ui.desk.DeskDialogText(StrPos.noHeldInvoices)
+          else Column(
+            Modifier.onPreviewKeyEvent { e ->
+              //  رقمِ ۱ تا ۹ ⇒ همان شماره باز می‌شود
+              if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+              val n = DIGITS.indexOfFirst { it.matchesKey(e) } + 1
+              val h = items.firstOrNull { it.number == n } ?: return@onPreviewKeyEvent false
+              ui.resume(h.id); true
+            },
+          ) {
+            items.forEachIndexed { i, h ->
+              Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                  Text("#${plain(h.number)} · ${h.label.ifBlank { null } ?: customerName(ui.data, h.debtorId) ?: StrPos.invoice}", style = ir.vil3ntec.tohid.ui.desk.DeskType.bodyStrong, color = dc.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                  Text(
+                    summary(ui.data, h.draft()) + " · " + ago(now, h.heldAt) + if (h in stale) " · " + StrPos.stale else "",
+                    style = ir.vil3ntec.tohid.ui.desk.DeskType.secondary, color = if (h in stale) dc.warning else dc.inkSecondary,
+                  )
+                  if (h.note.isNotBlank()) Text(h.note, style = ir.vil3ntec.tohid.ui.desk.DeskType.secondary, color = dc.inkMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+                ir.vil3ntec.tohid.ui.desk.DeskButton(StrPos.discardIt, { ui.dialog = HeldDialog.Discard(h) }, kind = ir.vil3ntec.tohid.ui.desk.DeskButtonKind.GHOST)
+                ir.vil3ntec.tohid.ui.desk.DeskButton(StrPos.openIt, { ui.resume(h.id) }, if (i == 0) Modifier.focusRequester(first) else Modifier, kind = ir.vil3ntec.tohid.ui.desk.DeskButtonKind.PRIMARY)
+              }
+            }
+          }
+        }
+      }
+      else AlertDialog(
         onDismissRequest = { ui.close() },
         shape = Shape.dialog,
         title = { Text(StrPos.heldInvoices) },
@@ -569,7 +614,12 @@ private fun HeldDialogs(ui: HeldInvoicesUi, items: List<HeldInvoice>) {
         } else null,
       )
     }
-    is HeldDialog.Discard -> AlertDialog(
+    is HeldDialog.Discard -> if (desk) ir.vil3ntec.tohid.ui.desk.DeskDialog(
+      title = StrPos.discardQ(plain(dlg.invoice.number)), onDismiss = { ui.dialog = HeldDialog.List },
+      confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.discardIt, danger = true) { ui.discard(dlg.invoice) },
+      dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.no) { ui.dialog = HeldDialog.List },
+    ) { ir.vil3ntec.tohid.ui.desk.DeskDialogText(StrPos.discardWarn(dlg.invoice.label.ifBlank { StrPos.unnamed }, summary(ui.data, dlg.invoice.draft()))) }
+    else AlertDialog(
       onDismissRequest = { ui.dialog = HeldDialog.List },
       shape = Shape.dialog,
       title = { Text(StrPos.discardQ(plain(dlg.invoice.number))) },
@@ -579,7 +629,12 @@ private fun HeldDialogs(ui: HeldInvoicesUi, items: List<HeldInvoice>) {
       },
       dismissButton = { TextButton(onClick = { ui.dialog = HeldDialog.List }) { Text(StrPos.no) } },
     )
-    HeldDialog.DropStale -> AlertDialog(
+    HeldDialog.DropStale -> if (desk) ir.vil3ntec.tohid.ui.desk.DeskDialog(
+      title = StrPos.clearStaleQ, onDismiss = { ui.dialog = HeldDialog.List },
+      confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.clearIt, danger = true) { ui.dropStale() },
+      dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.no) { ui.dialog = HeldDialog.List },
+    ) { ir.vil3ntec.tohid.ui.desk.DeskDialogText(StrPos.clearStaleWarn(plain(HeldRules.STALE_HOURS))) }
+    else AlertDialog(
       onDismissRequest = { ui.dialog = HeldDialog.List },
       shape = Shape.dialog,
       title = { Text(StrPos.clearStaleQ) },
@@ -589,7 +644,12 @@ private fun HeldDialogs(ui: HeldInvoicesUi, items: List<HeldInvoice>) {
       },
       dismissButton = { TextButton(onClick = { ui.dialog = HeldDialog.List }) { Text(StrPos.no) } },
     )
-    is HeldDialog.TakeOver -> AlertDialog(
+    is HeldDialog.TakeOver -> if (desk) ir.vil3ntec.tohid.ui.desk.DeskDialog(
+      title = heldTakeTitle(dlg.held), onDismiss = { ui.close() },
+      confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.heldTakeOver, danger = true) { ui.resume(dlg.invoice.id, force = true) },
+      dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.no) { ui.close() },
+    ) { ir.vil3ntec.tohid.ui.desk.DeskDialogText(StrPos.heldTakeWarn) }
+    else AlertDialog(
       onDismissRequest = { ui.close() },
       shape = Shape.dialog,
       title = { Text(heldTakeTitle(dlg.held)) },
@@ -599,7 +659,11 @@ private fun HeldDialogs(ui: HeldInvoicesUi, items: List<HeldInvoice>) {
       },
       dismissButton = { TextButton(onClick = { ui.close() }) { Text(StrPos.no) } },
     )
-    is HeldDialog.Twice -> AlertDialog(
+    is HeldDialog.Twice -> if (desk) ir.vil3ntec.tohid.ui.desk.DeskDialog(
+      title = StrPos.heldTwiceTitle, onDismiss = { ui.seen(dlg.id) },
+      confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.heldSeen) { ui.seen(dlg.id) },
+    ) { ir.vil3ntec.tohid.ui.desk.DeskDialogText(heldTwiceText(dlg.conflict)) }
+    else AlertDialog(
       onDismissRequest = { ui.seen(dlg.id) },
       shape = Shape.dialog,
       title = { Text(StrPos.heldTwiceTitle) },

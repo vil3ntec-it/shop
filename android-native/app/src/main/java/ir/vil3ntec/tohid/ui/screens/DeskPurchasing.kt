@@ -314,26 +314,7 @@ internal fun purchaseUnitsOn(): Boolean {
   return remember { ir.vil3ntec.tohid.data.ShopPolicy.productTools(context) }
 }
 
-private class Draft(product: Product? = null, unit: String? = null) {
-  var productId by mutableStateOf(product?.id.orEmpty())
-  /** PRD-07: نامِ واحدِ خرید؛ null = واحدِ پایه */
-  var unitName by mutableStateOf(unit)
-  var query by mutableStateOf(product?.name.orEmpty())
-  var qty by mutableStateOf(if (product != null) "1" else "")
-  var price by mutableStateOf(product?.let { defaultPrice(it, unit) }.orEmpty())
-  var expiry by mutableStateOf("")
-  val focus = FocusRequester()
-  val qtyFocus = FocusRequester()
-  val priceFocus = FocusRequester()
-  fun total(): Double = Math.round((qty.toDoubleOrNull() ?: 0.0) * (price.toDoubleOrNull() ?: 0.0)).toDouble()
-}
-
-/** قیمتِ پیش‌فرضِ ردیف: قیمتِ خریدِ واحدِ پایه، یا (PRD-07) همان × ضریبِ واحدِ خرید */
-private fun defaultPrice(p: Product, unit: String?): String {
-  val base = p.purchasePrice.takeIf { it > 0 } ?: return ""
-  val f = ir.vil3ntec.tohid.core.product.PurchaseUnits.find(p.purchaseUnits?.map(ShopStore::coreOf), unit)?.factorMilli ?: 1000L
-  return Math.round(base * f / 1000.0).toString()
-}
+//  ردیفِ نوشتنی (`PurchaseDraft`) و قیمتِ پیش‌فرض (`purchaseDefaultPrice`) در `DeskPurchaseForm.kt` (e-desk-d3c)
 
 @Composable
 private fun NewPurchaseInvoice(
@@ -358,13 +339,13 @@ private fun NewPurchaseInvoice(
   var landed by remember { mutableStateOf("") }
   var due by remember { mutableStateOf("") }
   val context = androidx.compose.ui.platform.LocalContext.current
-  val lines = remember { mutableStateListOf(Draft()) }
+  val lines = remember { mutableStateListOf(PurchaseDraft()) }
   val no = remember(d) { PurchaseBook.nextNo(d) }
   //  PUR-05: یک کلید برای همین فرم — F9 یا Ctrl+Enter ِ پشتِ‌سرِهم (تکرارِ کلید) یک فاکتور است
   val saveKey = remember { newId() }
   //  PUR-09: آخرین فیِ همین تأمین‌کننده زیرِ هر ردیف و Ctrl+I تاریخچهٔ کالای آخرین ردیفِ دست‌خورده
   val buys = remember(d) { ir.vil3ntec.tohid.data.PurchaseOrderBook.buys(d) }
-  var touched by remember { mutableStateOf<Draft?>(null) }
+  var touched by remember { mutableStateOf<PurchaseDraft?>(null) }
   var historyFor by remember { mutableStateOf<String?>(null) }
 
   //  بارکد از بارکدخوان ⇐ ردیف (همان کالا دوباره ⇐ یکی بیشتر)
@@ -380,8 +361,8 @@ private fun NewPurchaseInvoice(
       else {
         val empty = lines.lastOrNull()?.takeIf { it.productId.isBlank() && it.query.isBlank() }
         if (empty != null) lines.remove(empty)
-        lines += Draft(p, unit)
-        lines += Draft()
+        lines += PurchaseDraft(p, unit)
+        lines += PurchaseDraft()
       }
     }
   }
@@ -411,181 +392,106 @@ private fun NewPurchaseInvoice(
     }
   }
 
-  Column(
-    Modifier
-      .fillMaxSize()
-      .onPreviewKeyEvent { e ->
-        if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-        when {
-          e.key == Key.F9 || (e.isPrimaryModifier && (e.key == Key.Enter || e.key == Key.S)) -> { save(); true }
-          e.key == Key.Escape -> { onClose(); true }
-          e.isPrimaryModifier && e.key == Key.I -> {
-            historyFor = (touched?.takeIf { it in lines && it.productId.isNotBlank() } ?: lines.lastOrNull { it.productId.isNotBlank() })?.productId
-            historyFor != null
-          }
-          else -> false
+  //  کامپیوتر (`claude/e-desk-d3c`): همان فرم روی `ui/desk` — سرخط، کارتِ «مشخصات»، جدولِ ردیف‌ها با نوارِ کلیدها و کارتِ پرداخت؛
+  //  کلیدها، ردیف‌ها و `save()` همان پیشین
+  val dc = Desk.colors
+  val supplierName = d.suppliers.find { it.id == supplierId }?.name
+  DeskPage(
+    Modifier.onPreviewKeyEvent { e ->
+      if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+      when {
+        e.key == Key.F9 || (e.isPrimaryModifier && (e.key == Key.Enter || e.key == Key.S)) -> { save(); true }
+        e.key == Key.Escape -> { onClose(); true }
+        e.isPrimaryModifier && e.key == Key.I -> {
+          historyFor = (touched?.takeIf { it in lines && it.productId.isNotBlank() } ?: lines.lastOrNull { it.productId.isNotBlank() })?.productId
+          historyFor != null
         }
+        else -> false
       }
-      .padding(16.dp),
+    },
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      IconButton(onClick = onClose) { Icon(Icons.Filled.ArrowForward, Str.back, tint = Shop.colors.text) }
-      Text(StrPurchasePages.newPurchaseNo(no), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Shop.colors.text)
-      Spacer(Modifier.weight(1f))
-      Text(StrPurchasePages.purchaseKeys, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+      DeskIconButton(Icons.Filled.ArrowForward, Str.back, onClose)
+      Spacer(Modifier.width(DeskSpace.x2))
+      Text(StrPurchasePages.newPurchaseNo(no), Modifier.weight(1f), style = DeskType.pageTitle, color = dc.ink, maxLines = 1)
+      DeskButton(ir.vil3ntec.tohid.core.i18n.StrKit.cancel, onClose, kind = DeskButtonKind.GHOST, shortcut = "Esc")
     }
-    Spacer(Modifier.height(10.dp))
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      Box {
-        OutlinedButton(onClick = { supplierMenu = true }, modifier = Modifier.width(280.dp)) {
-          Text(StrPurchasePages.supplierColon + (d.suppliers.find { it.id == supplierId }?.name ?: StrMoney.pickSupplier), maxLines = 1)
+    //  مشخصات: تأمین‌کننده (کشویی)، «تأمین‌کنندهٔ تازه + Enter» و تاریخِ خورشیدی
+    ir.vil3ntec.tohid.ui.desk.DeskCard(Modifier.fillMaxWidth(), title = StrDeskData.invoiceHead) {
+      Row(horizontalArrangement = Arrangement.spacedBy(DeskSpace.x3), verticalAlignment = Alignment.Top) {
+        DeskFormLabeled(StrMoney.supplierLabel) {
+          DeskDropdown(
+            supplierId, d.suppliers.map { DeskOption<String?>(it.id, it.name) }, { supplierId = it },
+            Modifier.widthIn(min = 260.dp), shown = if (supplierName == null) StrMoney.pickSupplier else null,
+          )
         }
-        DropdownMenu(expanded = supplierMenu, onDismissRequest = { supplierMenu = false }) {
-          d.suppliers.forEach { s -> DropdownMenuItem(text = { Text(s.name) }, onClick = { supplierId = s.id; supplierMenu = false }) }
+        DeskFormLabeled(StrPurchasePages.newSupplierName) {
+          DeskTextField(
+            newSupplier, { newSupplier = it }, Modifier.width(260.dp), placeholder = StrPurchasePages.orNewSupplier,
+            description = StrPurchasePages.orNewSupplier,
+            onKey = { e ->
+              if (e.type == KeyEventType.KeyDown && (e.key == Key.Enter || e.key == Key.NumPadEnter)) {
+                when (val r = LedgerEngine.addSupplier(d, LedgerEngine.SupplierDraft(name = newSupplier), System.currentTimeMillis(), ::newId)) {
+                  is LedgerEngine.Result.Failed -> toast(r.message)
+                  is LedgerEngine.Result.Ok -> { scope.launch { store.save(d, r.data) }; supplierId = r.id; newSupplier = "" }
+                }
+                true
+              } else false
+            },
+          )
+        }
+        DeskFormLabeled(StrPurchasePages.dateSolar) {
+          DeskTextField(date, { date = it }, Modifier.width(180.dp), description = StrPurchasePages.dateSolar)
         }
       }
-      Spacer(Modifier.width(8.dp))
-      OutlinedTextField(
-        newSupplier, { newSupplier = it }, singleLine = true, label = { Text(StrPurchasePages.orNewSupplier) },
-        modifier = Modifier.width(240.dp).onPreviewKeyEvent { e ->
-          if (e.type == KeyEventType.KeyDown && (e.key == Key.Enter || e.key == Key.NumPadEnter)) {
-            when (val r = LedgerEngine.addSupplier(d, LedgerEngine.SupplierDraft(name = newSupplier), System.currentTimeMillis(), ::newId)) {
-              is LedgerEngine.Result.Failed -> toast(r.message)
-              is LedgerEngine.Result.Ok -> { scope.launch { store.save(d, r.data) }; supplierId = r.id; newSupplier = "" }
-            }
-            true
-          } else false
-        },
-      )
-      Spacer(Modifier.width(8.dp))
-      OutlinedTextField(date, { date = it }, singleLine = true, label = { Text(StrPurchasePages.dateSolar) }, modifier = Modifier.width(200.dp))
     }
-    Spacer(Modifier.height(10.dp))
 
-    //  ردیف‌ها — جدولِ نوشتنی
-    val line = Shop.colors.border
-    Column(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(8.dp)).border(1.dp, line, RoundedCornerShape(8.dp))) {
-      Row(Modifier.fillMaxWidth().background(Shop.colors.surface2).padding(horizontal = 8.dp, vertical = 8.dp)) {
-        listOf("#" to 36.dp, StrPurchasePages.itemNameBarcode to 0.dp, StrPlaces.amount to 100.dp, StrReturnPages.unitPriceAfn to 130.dp, StrPurchasePages.expiryOptional to 150.dp, StrInvoices.total to 130.dp, "" to 40.dp).forEach { (t, w) ->
-          Text(t, if (w == 0.dp) Modifier.weight(1f) else Modifier.width(w), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
-        }
-      }
+    //  ردیف‌ها — جدولِ نوشتنی (`DeskPurchaseLineRow`)
+    ir.vil3ntec.tohid.ui.desk.DeskCard(Modifier.weight(1f).fillMaxWidth(), title = StrDeskData.invoiceLines, action = { DeskNote(StrDeskData.rowsShown(lines.count { it.productId.isNotBlank() })) }) {
+      ir.vil3ntec.tohid.ui.desk.DeskTableHead(purchaseLineColumns())
       LazyColumn(Modifier.weight(1f)) {
         itemsIndexed(lines, key = { _, l -> System.identityHashCode(l) }) { i, l ->
-          LineRow(i, l, d, ir.vil3ntec.tohid.data.PurchaseOrderBook.lastPriceHint(buys, l.productId, supplierId), unitsOn, supplierId, onTouch = { touched = l }, onNext = {
-            if (i == lines.lastIndex) lines += Draft()
+          DeskPurchaseLineRow(i, l, d, ir.vil3ntec.tohid.data.PurchaseOrderBook.lastPriceHint(buys, l.productId, supplierId), unitsOn, supplierId, onTouch = { touched = l }, onNext = {
+            if (i == lines.lastIndex) lines += PurchaseDraft()
             scope.launch { kotlinx.coroutines.delay(60); runCatching { lines[i + 1].focus.requestFocus() } }
           }, onRemove = { if (lines.size > 1) lines.remove(l) else { l.productId = ""; l.query = ""; l.qty = ""; l.price = ""; l.unitName = null } })
         }
       }
+      Spacer(Modifier.height(DeskSpace.x2))
+      DeskPurchaseKeys()
     }
-    Spacer(Modifier.height(10.dp))
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      OutlinedTextField(notes, { notes = it }, singleLine = true, label = { Text(StrPurchasePages.notesSellerNo) }, modifier = Modifier.weight(1f))
-      Spacer(Modifier.width(10.dp))
-      OutlinedTextField(paid, { paid = ir.vil3ntec.tohid.numericInput(it) }, singleLine = true, label = { Text(StrPurchasePages.paidAfn) }, modifier = Modifier.width(170.dp))
-      TextButton(onClick = { paid = Math.round(total).toString() }) { Text(Str.all) }
-      if (stockOn) {
-        Spacer(Modifier.width(10.dp))
-        OutlinedTextField(
-          landed, { landed = ir.vil3ntec.tohid.numericInput(it) }, singleLine = true,
-          label = { Text(StrPurchasePages.landedAfn) },
-          supportingText = { Text(StrPurchasePages.landedNote) },
-          modifier = Modifier.width(190.dp),
-        )
-        Spacer(Modifier.width(10.dp))
-        OutlinedTextField(
-          due, { due = it }, singleLine = true,
-          label = { Text(StrPurchasePages.payDue) },
-          supportingText = { Text(StrPurchasePages.optionalReminder) },
-          modifier = Modifier.width(160.dp),
-        )
+
+    //  پرداخت و جمع: یادداشت، پرداخت‌شده («همه»)، (موتورِ تازه) هزینهٔ جانبی و سررسید، جمع و «ثبتِ فاکتور»
+    ir.vil3ntec.tohid.ui.desk.DeskCard(Modifier.fillMaxWidth()) {
+      Row(horizontalArrangement = Arrangement.spacedBy(DeskSpace.x3), verticalAlignment = Alignment.Top) {
+        DeskFormLabeled(StrPurchasePages.notesSellerNo, Modifier.weight(1f)) {
+          DeskTextField(notes, { notes = it }, Modifier.fillMaxWidth(), description = StrPurchasePages.notesSellerNo)
+        }
+        DeskFormLabeled(StrPurchasePages.paidAfn) {
+          DeskTextField(
+            paid, { paid = ir.vil3ntec.tohid.numericInput(it) }, Modifier.width(180.dp), textAlign = TextAlign.End, description = StrPurchasePages.paidAfn,
+            trailing = { ir.vil3ntec.tohid.ui.desk.DeskLink(Str.all, { paid = Math.round(total).toString() }) },
+          )
+        }
+        if (stockOn) {
+          DeskFormLabeled(StrPurchasePages.landedAfn, Modifier.width(200.dp), note = StrPurchasePages.landedNote) {
+            DeskTextField(landed, { landed = ir.vil3ntec.tohid.numericInput(it) }, Modifier.fillMaxWidth(), textAlign = TextAlign.End, description = StrPurchasePages.landedAfn)
+          }
+          DeskFormLabeled(StrPurchasePages.payDue, Modifier.width(170.dp), note = StrPurchasePages.optionalReminder) {
+            DeskTextField(due, { due = it }, Modifier.fillMaxWidth(), description = StrPurchasePages.payDue)
+          }
+        }
+        Column(Modifier.widthIn(min = 220.dp), horizontalAlignment = Alignment.End) {
+          Text(StrPurchasePages.invoiceTotal(money(total)), style = DeskType.sectionTitle, color = dc.ink, maxLines = 1)
+          Text(StrPurchasePages.toSupplierAccount(money((total - paidValue).coerceAtLeast(0.0))), style = DeskType.secondary, color = dc.negative, maxLines = 1)
+          Spacer(Modifier.height(DeskSpace.x2))
+          DeskButton(StrPurchasePages.saveInvoiceKey, ::save, kind = DeskButtonKind.PRIMARY, enabled = total > 0 && supplierId != null)
+        }
       }
-      Spacer(Modifier.width(10.dp))
-      Column(horizontalAlignment = Alignment.End, modifier = Modifier.width(220.dp)) {
-        Text(StrPurchasePages.invoiceTotal(money(total)), fontWeight = FontWeight.Bold, color = Shop.colors.text)
-        Text(StrPurchasePages.toSupplierAccount(money((total - paidValue).coerceAtLeast(0.0))), color = Shop.colors.danger, style = MaterialTheme.typography.bodySmall)
-      }
-      Spacer(Modifier.width(10.dp))
-      Button(onClick = ::save, enabled = total > 0 && supplierId != null, modifier = Modifier.height(52.dp)) { Text(StrPurchasePages.saveInvoiceKey, fontWeight = FontWeight.Bold) }
     }
   }
   LaunchedEffect(Unit) { runCatching { lines.first().focus.requestFocus() } }
   historyFor?.let { pid -> PriceHistoryDialog(d, buys, pid, supplierId.orEmpty()) { historyFor = null } }
-}
-
-@Composable
-private fun LineRow(i: Int, l: Draft, d: ShopData, hint: String?, unitsOn: Boolean, supplierId: String?, onTouch: () -> Unit, onNext: () -> Unit, onRemove: () -> Unit) {
-  var menu by remember { mutableStateOf(false) }
-  val index = remember(d) { ShopStore.barcodeIndex(d) }
-  val matches = remember(l.query, d) {
-    val q = l.query.trim()
-    if (q.isEmpty() || l.productId.isNotBlank()) emptyList()
-    else d.products.filter { it.name.contains(q, true) || it.barcodes.any { b -> b == q } }.take(8)
-  }
-  fun pick(p: Product) {
-    l.productId = p.id; l.query = p.name; menu = false; onTouch()
-    //  PRD-07: واحدِ پیش‌فرضِ همین تأمین‌کننده (کارتنِ ۲۴ ِ ب)، وگرنه واحدِ پایه
-    l.unitName = if (unitsOn) ir.vil3ntec.tohid.core.product.PurchaseUnits.defaultFor(p.purchaseUnits?.map(ShopStore::coreOf), supplierId)?.name else null
-    if (l.qty.isBlank()) l.qty = "1"
-    if (l.price.isBlank()) l.price = defaultPrice(p, l.unitName)
-    runCatching { l.qtyFocus.requestFocus() }
-  }
-  fun enterOn(next: () -> Unit) = Modifier.onPreviewKeyEvent { e ->
-    if (e.type == KeyEventType.KeyDown && (e.key == Key.Enter || e.key == Key.NumPadEnter)) { next(); true } else false
-  }
-  Column(Modifier.fillMaxWidth()) {
-  Row(
-    Modifier.fillMaxWidth().background(if (i % 2 == 1) Shop.colors.surface2.copy(alpha = 0.35f) else Shop.colors.surface).padding(horizontal = 8.dp, vertical = 4.dp),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    Text("${i + 1}", Modifier.width(36.dp), color = Shop.colors.muted)
-    Box(Modifier.weight(1f)) {
-      OutlinedTextField(
-        l.query,
-        { l.query = it; l.productId = ""; menu = true },
-        singleLine = true,
-        isError = l.query.isNotBlank() && l.productId.isBlank() && matches.isEmpty(),
-        modifier = Modifier.fillMaxWidth().focusRequester(l.focus).then(enterOn {
-          val q = l.query.trim()
-          val byCode = index[q]?.let { id -> d.products.find { it.id == id } }
-          (byCode ?: matches.firstOrNull())?.let(::pick)
-        }),
-      )
-      DropdownMenu(expanded = menu && matches.isNotEmpty(), onDismissRequest = { menu = false }) {
-        matches.forEach { p ->
-          DropdownMenuItem(
-            text = { Text(StrPurchasePages.pickRow(p.name, qtyText(ShopStore.stock(d, p.id)), p.unit)) },
-            onClick = { pick(p) },
-          )
-        }
-      }
-    }
-    Spacer(Modifier.width(6.dp))
-    OutlinedTextField(l.qty, { l.qty = ir.vil3ntec.tohid.numericInput(it); onTouch() }, singleLine = true,
-      modifier = Modifier.width(94.dp).focusRequester(l.qtyFocus).then(enterOn { runCatching { l.priceFocus.requestFocus() } }))
-    Spacer(Modifier.width(6.dp))
-    OutlinedTextField(l.price, { l.price = ir.vil3ntec.tohid.numericInput(it); onTouch() }, singleLine = true,
-      modifier = Modifier.width(124.dp).focusRequester(l.priceFocus).then(enterOn(onNext)))
-    Spacer(Modifier.width(6.dp))
-    OutlinedTextField(l.expiry, { l.expiry = it.take(10) }, singleLine = true, placeholder = { Text("۱۴۰۶/۰۳/۳۱") },
-      modifier = Modifier.width(144.dp).then(enterOn(onNext)))
-    Text(if (l.productId.isNotBlank()) money(l.total()) else "", Modifier.width(130.dp), textAlign = TextAlign.End, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
-    IconButton(onClick = onRemove, modifier = Modifier.width(40.dp)) { Icon(Icons.Filled.Close, StrStock.removeRow, tint = Shop.colors.muted) }
-  }
-  //  PRD-07: واحدِ خریدِ همین ردیف و مقدار/بهای واحدِ پایه از هسته (`PurchaseUnits.baseCost`)
-  val product = if (unitsOn && l.productId.isNotBlank()) d.products.find { it.id == l.productId } else null
-  if (product != null && !product.purchaseUnits.isNullOrEmpty()) PurchaseUnitPicker(product, l.unitName, l.qty, l.total()) { u ->
-    val before = defaultPrice(product, l.unitName)
-    l.unitName = u
-    if (l.price.isBlank() || l.price == before) l.price = defaultPrice(product, u)
-    onTouch()
-  }
-  //  PUR-09: آخرین فیِ همین تأمین‌کننده برای همین کالا (هنگامِ ورود)
-  if (hint != null) {
-    Text(hint, Modifier.fillMaxWidth().padding(start = 44.dp, bottom = 4.dp), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-  }
-  }
 }
 
 /* ══════════════════════════ تأمین‌کنندگان ══════════════════════════ */

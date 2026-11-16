@@ -115,7 +115,7 @@ fun DeskInvoicesScreen(store: ShopStore, cartStore: CartStore, d: ShopData, snac
   var classic by remember { mutableStateOf(false) }
   if (classic) {
     Column(Modifier.fillMaxSize()) {
-      TextButton(onClick = { classic = false }, modifier = Modifier.padding(8.dp)) { Text(StrInvoices.backToTable) }
+      ir.vil3ntec.tohid.ui.desk.DeskButton(StrInvoices.backToTable, { classic = false }, Modifier.padding(8.dp), kind = ir.vil3ntec.tohid.ui.desk.DeskButtonKind.GHOST)
       Box(Modifier.weight(1f)) { SalesHistoryScreen(store, cartStore, d, snackbar, onEdit) }
     }
     return

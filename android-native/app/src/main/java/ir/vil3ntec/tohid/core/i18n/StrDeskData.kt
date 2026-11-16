@@ -61,4 +61,11 @@ object StrDeskData {
   val breakdown: String get() = t("تفکیک", "Breakdown", "وېش")
   val salesByHour: String get() = t("فروشِ ساعت‌به‌ساعت", "Sales by hour", "د ساعت په ساعت پلور")
   val salesByMonth: String get() = t("فروشِ ماهانه", "Monthly sales", "میاشتنی پلور")
+
+  //  ── فرم‌ها و پنجره‌های کامپیوتر (e-desk-d3c) ──
+  val invoiceHead: String get() = t("مشخصاتِ فاکتور", "Invoice details", "د بل جزییات")
+  val invoiceLines: String get() = t("اقلامِ فاکتور", "Invoice items", "د بل توکي")
+  val keyNextRow: String get() = t("ردیفِ بعد", "Next row", "بل قطار")
+  val keyPriceHistory: String get() = t("تاریخچهٔ قیمت", "Price history", "د بیې تاریخچه")
+  val scannerAddsRow: String get() = t("بارکدخوان ردیف می‌افزاید", "The scanner adds a row", "بارکوډ لوستونکی قطار زیاتوي")
 }
