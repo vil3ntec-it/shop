@@ -234,12 +234,15 @@ class NavRowUiTest {
       if (p == "settings" || p.count { it == '/' } == 1) {
         //  فهرستِ تنبل فقط ردیف‌های در قاب را می‌سازد؛ بالای «درباره» کارتِ به‌روزرسانی است که بلندی‌اش به پاسخِ شبکه بسته است
         //  (CI ِ #1061: کارتِ بلند ردیف‌ها را بیرون از قابِ ۷۶۰ برد) ⇒ تا ردیفی پیدا شود پایین کشیده می‌شود؛ سنجه همان
-        var r = rows()
+        //  همهٔ ردیف‌ها کاشی دارند، جز ردیف‌های فقط‌خواندنیِ «وضعیت» ِ «درباره» (نسخه، شمارِ دفتر: بی کلیک، بی پیکان) که پیش از این
+        //  فقط چون بیرون از قاب بودند دیده نمی‌شدند ⇒ در «درباره» فقط ردیف‌های زدنی
+        val tapped = { if (p == "settings/about") rows().filter { it.config.contains(SemanticsActions.OnClick) } else rows() }
+        var r = tapped()
         var swipes = 0
         while (r.isEmpty() && swipes < 6) {
           rule.onRoot().performTouchInput { swipeUp() }
           rule.waitForIdle()
-          r = rows()
+          r = tapped()
           swipes++
         }
         assertTrue("$p: ردیفِ `NAV` ندارد", r.isNotEmpty())
