@@ -54,10 +54,11 @@ object SupplierFx {
 
   /** همهٔ حساب‌های ارزیِ یک تأمین‌کننده (هر ارزی که سندی دارد)، به ترتیبِ کد */
   fun accounts(d: ShopData, supplierId: String): List<PurchaseFx.Account> {
-    val codes = sortedSetOf<String>()
+    //  `mutableSetOf` + `sorted()`، نه `sortedSetOf` (فقط JVM؛ آیفون همین پرونده را می‌سازد)
+    val codes = mutableSetOf<String>()
     d.purchases.forEach { if (it.supplierId == supplierId) cur(it.currency)?.let(codes::add) }
     d.supplierPayments.forEach { if (it.supplierId == supplierId) cur(it.currency)?.let(codes::add) }
-    return codes.map { account(d, supplierId, it) }
+    return codes.sorted().map { account(d, supplierId, it) }
   }
 
   /** پولِ نقدِ افغانی که این پرداخت از دخل برد: ردیفِ پیشین ⇒ `amount`؛ حسابِ ارزی به افغانی ⇒ همان پول؛ به ارز ⇒ صفر */
@@ -76,10 +77,10 @@ object SupplierFx {
 
   /** ارزهایی که دفترِ خرید دارد (برای کادرِ انتخابِ ارز، کنارِ ارزهای گاوصندوق) */
   fun inLedger(d: ShopData): List<String> {
-    val out = sortedSetOf<String>()
+    val out = mutableSetOf<String>()
     d.purchases.forEach { cur(it.currency)?.let(out::add) }
     d.supplierPayments.forEach { cur(it.currency)?.let(out::add) }
-    return out.toList()
+    return out.sorted()
   }
 
   /**
