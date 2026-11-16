@@ -152,9 +152,11 @@ private fun HeroCard(h: SubscriptionModel.Hero) {
     caption = "${StrAccount.starts} ${h.starts} · ${StrAccount.ends} ${h.ends}",
     note = "${StrAccount.status}: ${h.status}",
     collapseKey = "subscription",
+    //  رنگِ کاشیِ «اشتراکِ من» در «بیشتر» (زرِ گرم، `V3Modules.hueOf("myplan")`) — همان خانوادهٔ `PROMOS`؛ هر خلاصه رنگِ بخش دارد
+    section = ir.vil3ntec.tohid.ui.theme.V3Section.PROMOS,
     extra = {
       Spacer(Modifier.height(10.dp))
-      DraftProgressBar(h.progress, tone, summaryColors(null).track)
+      DraftProgressBar(h.progress, tone, summaryColors(ir.vil3ntec.tohid.ui.theme.V3Section.PROMOS).track)
     },
   )
 }

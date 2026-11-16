@@ -57,13 +57,34 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
-### ۱۴۰۵/۰۸/۲۴ — عاملِ e-phone-p0 زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-phone-p0` (از `origin/claude/batch-69` 56791aae8) — کالبدِ یکسانِ صفحه‌های گوشی (⏸ نیمه‌کاره، به خواستِ صاحب‌کار برای صرفه‌جویی متوقف شد)
+### ۱۴۰۵/۰۸/۲۵ — عاملِ e-phone-p0 زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-phone-p0` (از batch-69، ادغامِ main تا #1057 a0b0f9355) — کالبدِ یکسانِ صفحه‌های گوشی (⏸ دوباره به خواستِ صاحب‌کار برای صرفه‌جویی متوقف شد؛ WIP)
 
-- **شد (بی اجرای Gradle — صف‌های A/B پر بود؛ هیچ آزمون و عکسی هنوز اجرا نشده)**: نشان‌های `V3Anatomy` (قاب، نوار، عنوانِ درشت، خلاصه، `V3Fab`، تراشه، کارت، ردیفِ ساده) روی اجزای مشترک؛ ممیزیِ عکسِ همهٔ مسیرهای TAB/PAGE ِ دکان `PhoneAnatomyAuditTest` (`P0_AUDIT=<پوشه>`، ابزارِ مشترک `AnatomyProbe`) و سازندهٔ برگهٔ تماس/جدول `scratchpad/p0/mk_audit.py` (audit.md هنوز ساخته نشده).
-- **شد**: نوارِ زردِ «نسخهٔ پیش‌نمایش» از همهٔ صفحه‌ها برداشته شد (نشانش کنارِ نسخه در «بیشتر»/«درباره»، `previewVersion`؛ هشدارِ یک‌باره یک بار در پوسته)؛ `AdaptiveSheet` ِ گوشی = `V3Sheet`؛ «اشتراکِ من»: کارتِ گرادیانیِ وارونه ⇐ `V3Summary` (`collapseKey = "subscription"`) و «تمدید» ⇐ `V3Fab` (دیده‌نشده در عکس).
-- **نگهبان**: `PageAnatomyGuardTest` (متن: عنوانِ درشت فقط تنظیمات، `V3Type.largeTitle` فقط فهرستِ دلیل‌دار، `V3HeroCard` فقط خانه، بی سربرگ/FAB ِ خامِ Material، `V3Fab` فقط در `fab =`، برگه فقط `V3Sheet`، بی نوارِ پیش‌نمایش) — اجرا نشده.
-- **تصمیم**: جای دکمهٔ شناور همان گوشهٔ پایانِ `V3Scaffold` ماند (در فارسی چپ، مثلِ قاعدهٔ آینه‌ایِ Material/تلگرام) و یکی است؛ «AddFab» ِ پیام وجود ندارد — همان `V3Fab`.
-- **قدمِ بعدی**: کامپایل و اجرای `PageAnatomyGuardTest` و ممیزی (`wt-p0` با `P0_AUDIT`)، ساختنِ audit.md/audit-before.png، کوچِ `ProductDetailParts`/`StockItemScreen` (عددِ درشت ⇐ `V3Summary`، دو بندِ ⏳ ِ نگهبان)، صفحه‌های قدیمِ `Chrome.SHELL` (سفارشِ خرید: یادداشتِ سر، تراشه در بدنه و دکمه‌های تمام‌پهنا ⇐ `chips`/`V3Fab`/«…»)، `PageAnatomyUiTest` روی درختِ هر مسیر، بندِ RULES «کالبدِ یکسان» و WHATS-NEW.
+- **پیشین (۰۸/۲۴)**: نشان‌های `V3Anatomy` روی اجزای مشترک، `PageAnatomyGuardTest`، ممیزیِ `PhoneAnatomyAuditTest` (`P0_AUDIT`، `AnatomyProbe`)،
+  `AdaptiveSheet` ِ گوشی = `V3Sheet`، «اشتراکِ من»: کارتِ گرادیانی ⇐ `V3Summary` و «تمدید» ⇐ `V3Fab`.
+- **ادغامِ main (#1056، #1057)**: پایهٔ سه‌طرفه همان نقطهٔ انشعاب (`git merge-tree --merge-base=56791aae8`) تا فقط تغییرِ p0 روی main بنشیند؛
+  پنج تعارض. رفتارِ main ماند: نوارِ پیش‌نمایش = `PreviewBanner(strip = false)` ِ گوشی و نوارِ زیرِ سربرگِ کامپیوتر؛ `previewVersion` ِ p0 و
+  `PreviewAccountWarning` کنار رفتند و «بیشتر» هم `previewVersionLabel` ِ main را می‌خواند؛ `V3Fab` همان main با `testTag(V3Anatomy.FAB)`.
+- **کوچ (۰۸/۲۵)**: جزئیاتِ کالا (`ProductDetailParts.FiguresCard`) و جزئیاتِ انبار (`StockItemScreen`) ⇐ `V3Summary` ِ رنگِ انبار (کلیدهای
+  `products/item`، `stock/item`)؛ پارامترِ `largeTitle` ِ `StockItemScreen` برداشته شد (نام وسطِ نوار، گوشی و پنلِ کامپیوتر). سفارش‌های خرید
+  (فهرست و جزئیات) `Chrome.OWN` با `PoScaffold`: تراشه در `chips =`، «سفارشِ تازه»/«فرستادن»/«دریافت» تنها `V3Fab`، «پیشنهادِ سفارش»، ویرایش،
+  تطبیق و فاکتورها آیکنِ نوار، «لغو» در «…»، سرِ جزئیات `V3Summary` (`purchasing/order`)، یادداشت‌ها خطِ کم‌رنگِ پایان. خلاصهٔ «اشتراکِ من»
+  رنگِ بخش گرفت (`PROMOS`، همان زرِ کاشیِ «اشتراکِ من») چون `SectionColorsTest` ِ main آن را می‌خواهد. قاعده در RULES («کالبدِ یکسانِ هر صفحهٔ
+  گوشی»)، WHATS-NEW (بخشِ ۰۸/۲۵).
+- **آزمون‌های عمداً عوض‌شده**: `PageAnatomyGuardTest` — الگوی `largeTitle\s*=\s*(?!false)` با پس‌روی هر `= false` را هم می‌گرفت (هرگز اجرا
+  نشده بود) ⇐ `largeTitle\s*=(?!\s*false\b)`؛ دو استثنای ⏳ برداشته و سنجشِ `V3Summary` ِ رنگِ انبار و آزمونِ تازهٔ «سفارشِ خرید روی کالبد»
+  افزوده شد؛ آزمونِ نوارِ پیش‌نمایش با تصمیمِ main هم‌سو شد (فقط پوسته، یک نوارِ کامپیوتر، `strip = false` ِ گوشی). `PurchaseOrderRoutesUiTest`:
+  «لغو» از «…» باز می‌شود و برگهٔ «لغوِ سفارشِ #…؟» منتظر می‌ماند؛ آزمونِ شاگرد «…» را هم باز می‌کند تا «لغو» آن‌جا هم نباشد (سست نشد).
+- **نتیجه**: اجرای هدف‌دار ۹۵ آزمون: همه سبز جز `SectionColorsTest` (اشتراک بی `section`) ⇐ درست شد؛ اجرای کوچکِ پس از آن: `SectionColorsTest` ۷/۷، `PageAnatomyGuardTest` ۸/۸، `SummaryFoldTest` ۳/۳، `PurchaseOrderRoutesUiTest` ۷/۷.
+  سبز: `PageAnatomyGuardTest` ۸، `LookGuardTest` ۷ (هش‌ها دست نخورد)، `HardcodedColorsTest` ۲، `SummaryFoldTest` ۳، `PurchaseOrderRoutesUiTest` ۷،
+  `SupplierBillRoutesUiTest` ۶، `ProductStorefrontUiTest` ۶، `SummaryCardUiTest` ۱۰، `V3DataRowGuardTest` ۵، `V3ReachabilityTest` ۹،
+  `DeskStockD3aUiTest` ۶، `CatalogPhoneP2UiTest` ۹، `OneHandShellUiTest` ۸. عکس‌ها: `/home/user/wt-p0-shots/{before,after}` و `audit.md` (`P0ShotsTest`).
+- **اجرا نشده**: ممیزیِ کاملِ `PhoneAnatomyAuditTest`، اجرای کامل و عکسِ «اشتراکِ من» (ورودِ واقعی می‌خواهد).
+- **precheck**: `fail=1` فقط از «وابستگیِ پلتفرمی» (`quality.mjs`): `QuickProductScreen.kt` و `TillFrame.kt` بالای سقفِ `baseline.json` — هر دو
+  پرونده و خط‌مبنا عینِ `origin/main` (#1057)اند، نه کارِ p0؛ دست زده نشد. `whatsnew/check.mjs --base origin/main` سبز (۵ سطر).
+- **قدمِ بعدی**: اجرای کامل و `precheck.sh`؛ ممیزیِ `P0_AUDIT` و فهرستِ صفحه‌های مانده؛ دیگر صفحه‌های `Chrome.SHELL` (فاکتورهای تأمین‌کننده، عکس‌ها،
+  جای‌ها، دفترِ انبار، گزارش‌های آنلاین/شعبه، تخفیف‌ها…)؛ پرسش از صاحب‌کار: نوارِ چسبانِ پایینِ جزئیاتِ کالا و انبار (`V3FormBar`) هم `V3Fab` شود؟
+  `PageAnatomyUiTest` روی درختِ هر مسیر هنوز ساخته نشده.
+
 ### ۱۴۰۵/۰۸/۲۵ — هماهنگ‌کننده (سیزنِ 01GcPTAL…)، پایانِ سیزن: دستهٔ ۷۰ (`claude/batch-70`، PR #1057)
 
 - **مرج‌شده در این سیزن**: #1053 (۶۶)، #1054 (۶۷)، #1055 (۶۸)، #1056 (۶۹)؛ سرور #151 (۱.۵۱.۲: کارتِ «اعلانِ گوشی (Firebase)» و دکمهٔ

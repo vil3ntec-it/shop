@@ -1,6 +1,8 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -22,6 +24,7 @@ import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MoveToInbox
@@ -37,6 +40,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrDeliver
@@ -78,9 +83,14 @@ import ir.vil3ntec.tohid.ui.screens.purchaseUnitsOn
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
-import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.theme.V3Tone
+import ir.vil3ntec.tohid.ui.v3.V3Action
 import ir.vil3ntec.tohid.ui.v3.V3Button
+import ir.vil3ntec.tohid.ui.v3.V3Fab
+import ir.vil3ntec.tohid.ui.v3.V3MenuItem
+import ir.vil3ntec.tohid.ui.v3.V3Scaffold
+import ir.vil3ntec.tohid.ui.v3.V3Summary
+import ir.vil3ntec.tohid.ui.theme.V3Section as V3SectionTone
 import ir.vil3ntec.tohid.ui.v3.V3Chip
 import ir.vil3ntec.tohid.ui.v3.V3ChipRow
 import ir.vil3ntec.tohid.ui.v3.V3Divider
@@ -93,7 +103,6 @@ import ir.vil3ntec.tohid.ui.v3.V3PickerRow
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3Skeleton
-import ir.vil3ntec.tohid.ui.v3.V3StatusPill
 import ir.vil3ntec.tohid.ui.v3.V3TextButton
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
@@ -181,14 +190,6 @@ internal fun PoGateView(gate: PoForms.Gate, failure: ApiFailure?, denied: String
   }
 }
 
-private fun pill(s: PurchaseOrderCore.Status): V3Status = when (s) {
-  PurchaseOrderCore.Status.DRAFT -> V3Status.INACTIVE
-  PurchaseOrderCore.Status.SENT -> V3Status.AWAITING
-  PurchaseOrderCore.Status.PARTIAL -> V3Status.WARNING
-  PurchaseOrderCore.Status.COMPLETE -> V3Status.DELIVERED
-  PurchaseOrderCore.Status.CANCELLED -> V3Status.CANCELLED
-}
-
 internal fun poAfn(minor: Long): String = money(PurchaseOrderBook.asAfn(minor))
 internal fun poUnits(milli: Long): String = qty(PurchaseOrderBook.units(milli))
 
@@ -198,9 +199,48 @@ internal fun PoPage(content: @Composable () -> Unit) {
   Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) { content() }
 }
 
+/**
+ *  کالبدِ یکسانِ فهرست و جزئیاتِ سفارشِ خرید (`claude/e-phone-p0`، صاحب‌کار: «یک بخش یک مدل، یک بخش مدلِ دیگه»): خودِ صفحه
+ *  `V3Scaffold` دارد (`Chrome.OWN`) — تراشه‌ها زیرِ نوار، کارِ اصلی یک `V3Fab` در جای همیشگیِ قاب، کارهای دیگر آیکنِ نوار و
+ *  «…»؛ بدنه همان ستونِ پیمایش‌پذیرِ [PoPage] با جای دکمهٔ شناور. صفحه‌های فرم (ساختن، دریافت، تطبیق) همان [PoPage] ِ پوسته‌اند.
+ */
+@Composable
+internal fun RouteScope.PoScaffold(
+  title: String,
+  actions: List<V3Action> = emptyList(),
+  overflow: List<V3MenuItem> = emptyList(),
+  chips: (@Composable () -> Unit)? = null,
+  fab: (@Composable BoxScope.(expanded: Boolean) -> Unit)? = null,
+  content: @Composable ColumnScope.() -> Unit,
+) {
+  V3Scaffold(title = title, onBack = backOrNull, actions = actions, overflow = overflow, chips = chips, fab = fab) { pad ->
+    Column(
+      Modifier
+        .fillMaxSize()
+        .verticalScroll(rememberScrollState())
+        .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding() + if (fab != null) 72.dp else 0.dp),
+    ) { content() }
+  }
+}
+
+/** یادداشتِ آرامِ پایانِ فهرست (پیش‌تر سرِ صفحه) — هیچ نوشته‌ای گم نمی‌شود */
+@Composable
+private fun PoFootnote(text: String) {
+  Text(
+    text, style = V3Type.footnote, color = PhoneV3.colors.inkMuted, textAlign = TextAlign.Center,
+    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 16.dp),
+  )
+}
+
+/** کارِ اصلیِ جزئیات (دکمهٔ شناور): فرستادنِ پیش‌نویس یا دریافتِ فرستاده */
+private class PoMain(val icon: ImageVector, val label: String, val run: () -> Unit)
+
 /* ══════════════════════════ فهرست ══════════════════════════ */
 
-/** `purchasing/orders` */
+/**
+ *  `purchasing/orders` — کالبدِ یکسان (p0): تراشه‌های وضعیت زیرِ نوار، «سفارشِ خریدِ تازه» تنها دکمهٔ شناور (فقط مدیر)،
+ *  «پیشنهادِ سفارش» آیکنِ نوار، یادداشتِ بخش پایانِ فهرست — پیش‌تر یادداشتِ سر، تراشه در بدنه و دو دکمهٔ تمام‌پهنا.
+ */
 @Composable
 internal fun RouteScope.PurchaseOrdersRoute() {
   val repo = rememberPurchaseOrderHost().repo
@@ -211,33 +251,26 @@ internal fun RouteScope.PurchaseOrdersRoute() {
   var extra by remember(filter, tick) { mutableStateOf(emptyList<PurchaseOrderDto>()) }
   var next by remember(filter, st.value) { mutableStateOf(st.value?.next) }
   var more by remember { mutableStateOf(false) }
-  val c = PhoneV3.colors
   val perms = st.cfg?.permissions ?: PoPermsDto()
-  PoPage {
-    Text(StrPurchaseOrders.note, style = V3Type.footnote, color = c.inkMuted)
-    val gate = st.gate { true }
-    if (gate != PoForms.Gate.OPEN) {
-      PoGateView(gate, st.failure ?: st.cfgFailure, StrPurchaseOrders.manageOnly) { tick++ }
-      return@PoPage
-    }
-    Spacer(Modifier.height(12.dp))
-    V3ChipRow(contentPadding = PaddingValues(0.dp)) {
-      PoForms.Filter.entries.forEach { f -> V3Chip(PoForms.label(f), selected = filter == f, onClick = { filter = f }) }
-    }
-    Spacer(Modifier.height(12.dp))
-    //  زیرِ هم با پهنای کامل (همان کارهای صفحهٔ جزئیات): کنارِ هم در ۳۶۰dp نوشتهٔ هر دو دکمه بریده می‌شد («New purcha…»)
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-      if (perms.manage) {
-        V3Button(
-          StrPurchasePages.newPoTitle,
-          { nav.openForResult(MoneyPaths.NEW_PURCHASE_ORDER) { id -> tick++; if (id != null) nav.open(MoneyPaths.purchaseOrder(id)) } },
-          Modifier.fillMaxWidth(), icon = Icons.Outlined.Add,
-        )
+  val gate = st.gate { true }
+  val open = gate == PoForms.Gate.OPEN
+  val newOrder = { nav.openForResult(MoneyPaths.NEW_PURCHASE_ORDER) { id -> tick++; if (id != null) nav.open(MoneyPaths.purchaseOrder(id)) } }
+  PoScaffold(
+    title = StrPurchasePages.purchaseOrders,
+    actions = if (!open) emptyList() else listOf(
+      V3Action(Icons.Outlined.Lightbulb, StrPurchasePages.reorderSuggest) { nav.open(MoneyPaths.PURCHASE_ORDER_SUGGEST) },
+    ),
+    chips = if (!open) null else ({
+      V3ChipRow {
+        PoForms.Filter.entries.forEach { f -> V3Chip(PoForms.label(f), selected = filter == f, onClick = { filter = f }) }
       }
-      V3Button(
-        StrPurchasePages.reorderSuggest, { nav.open(MoneyPaths.PURCHASE_ORDER_SUGGEST) }, Modifier.fillMaxWidth(),
-        kind = V3ButtonKind.SECONDARY,
-      )
+    }),
+    fab = if (open && perms.manage) ({ e -> V3Fab(Icons.Outlined.Add, StrPurchasePages.newPoTitle, e, newOrder) }) else null,
+  ) {
+    if (!open) {
+      PoGateView(gate, st.failure ?: st.cfgFailure, StrPurchaseOrders.manageOnly) { tick++ }
+      PoFootnote(StrPurchaseOrders.note)
+      return@PoScaffold
     }
     val all = st.value?.orders.orEmpty() + extra
     val list = PoForms.shown(all, filter)
@@ -280,12 +313,17 @@ internal fun RouteScope.PurchaseOrdersRoute() {
         Modifier.fillMaxWidth().padding(top = 12.dp), kind = V3ButtonKind.SECONDARY, loading = more,
       )
     }
+    PoFootnote(StrPurchaseOrders.note)
   }
 }
 
 /* ══════════════════════════ جزئیات ══════════════════════════ */
 
-/** `purchasing/orders/{id}` — نتیجه (`nav.finish`) ندارد؛ فهرست با برگشت دوباره می‌خواند */
+/**
+ *  `purchasing/orders/{id}` — نتیجه (`nav.finish`) ندارد؛ فهرست با برگشت دوباره می‌خواند. کالبدِ یکسان (p0): سرِ صفحه یک
+ *  `V3Summary` (شماره و تأمین‌کننده، جمعِ سفارش، وضعیت و رسیده/باقی‌مانده)، کارِ اصلی یک دکمهٔ شناور (پیش‌نویس ⇐ «فرستادن»،
+ *  فرستاده ⇐ «دریافتِ کالا»)، ویرایش/تطبیق/فاکتورها آیکنِ نوار و «لغو» در «…» — پیش‌تر شش دکمهٔ تمام‌پهنا زیرِ هم.
+ */
 @Composable
 internal fun RouteScope.PurchaseOrderRoute(id: String) {
   val host = rememberPurchaseOrderHost()
@@ -327,65 +365,54 @@ internal fun RouteScope.PurchaseOrderRoute(id: String) {
     }
   }
 
-  PoPage {
-    val gate = st.gate { true }
-    val o = st.value
-    if (gate != PoForms.Gate.OPEN || o == null) {
+  val gate = st.gate { true }
+  val loaded = st.value.takeIf { gate == PoForms.Gate.OPEN }
+  //  کارها: فقط آن‌چه نقش × وضعیت اجازه می‌دهد (`PoForms.actions`)؛ در میانِ کارِ سرور (`busy`) هیچ‌کدام دوباره نمی‌رود
+  val can = loaded?.let { PoForms.actions(it, perms) }
+  val main: PoMain? = when {
+    loaded == null || can == null -> null
+    can.send -> PoMain(Icons.AutoMirrored.Outlined.Send, StrPurchasePages.sendToSupplier) { if (!busy) act({ repo.send(loaded.id) }, StrPurchasePages.poSent) }
+    can.receive -> PoMain(Icons.Outlined.MoveToInbox, StrPurchasePages.receiveGoods) { if (!busy) nav.openForResult(MoneyPaths.receivePurchaseOrder(loaded.id)) { tick++ } }
+    else -> null
+  }
+  val actions = if (loaded == null || can == null) emptyList() else listOfNotNull(
+    if (can.edit) V3Action(Icons.Outlined.Edit, StrMoney.edit) { if (!busy) nav.openForResult(MoneyPaths.editPurchaseOrder(loaded.id)) { tick++ } } else null,
+    if (loaded.receipts.isNotEmpty() || PurchaseOrderBook.hasSupplierBills(loaded)) {
+      V3Action(Icons.AutoMirrored.Outlined.FactCheck, StrPurchaseOrders.match) { nav.open(MoneyPaths.matchPurchaseOrder(loaded.id)) }
+    } else null,
+    //  PUR-14: فاکتورِ کاغذیِ تأمین‌کننده و «باطل» همان صفحه‌های گوشی (`SupplierBillsPages.kt`)
+    if (can.bill) V3Action(Icons.AutoMirrored.Outlined.ReceiptLong, StrSupplierBills.title) { nav.openForResult(MoneyPaths.supplierBill(loaded.id)) { tick++ } } else null,
+  )
+  val overflow = if (can?.cancel == true) listOf(V3MenuItem(Icons.Outlined.Block, StrPurchasePages.cancelIt, danger = true) { if (!busy) cancelAsk = true }) else emptyList()
+
+  PoScaffold(
+    title = StrSupplierBills.order,
+    actions = actions,
+    overflow = overflow,
+    fab = if (main == null) null else ({ e -> V3Fab(main.icon, main.label, e, main.run) }),
+  ) {
+    val o = loaded
+    if (o == null || can == null) {
       PoGateView(gate, st.failure ?: st.cfgFailure, StrPurchaseOrders.manageOnly) { tick++ }
-      return@PoPage
+      return@PoScaffold
     }
     val s = PurchaseOrderBook.status(o)
-    val can = PoForms.actions(o, perms)
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      Text(
-        StrSupplierBills.orderTitle(o.no, o.supplierName), style = V3Type.title, color = c.ink,
-        modifier = Modifier.weight(1f).semantics { heading() },
-      )
-      V3StatusPill(pill(s), PurchaseOrderBook.label(s))
-    }
     val meta = listOfNotNull(
+      PurchaseOrderBook.label(s),
       o.expectedDate?.let { StrPurchasePages.arrivesOn(formatDate(it)) },
       o.note.takeIf { it.isNotBlank() },
       o.cancelReason?.takeIf { s == PurchaseOrderCore.Status.CANCELLED }?.let { StrPurchasePages.cancelReasonIs(it) },
     )
-    if (meta.isNotEmpty()) Text(meta.joinToString(" · "), style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(top = 4.dp))
-    Text(
-      StrPurchasePages.poTotals(poAfn(o.totals.orderedMinor), poAfn(o.totals.acceptedMinor), poAfn(o.totals.remainingMinor)),
-      style = V3Type.callout, color = c.ink, modifier = Modifier.padding(top = 8.dp),
+    //  سرِ صفحه همان خلاصهٔ هر بخش (رنگِ خرید، وسط‌چین و تاشو): «#شماره · تأمین‌کننده»، جمعِ سفارش درشت، وضعیت و تاریخ، رسیده/مانده
+    V3Summary(
+      label = StrSupplierBills.orderTitle(o.no, o.supplierName),
+      value = "${poAfn(o.totals.orderedMinor)} ؋",
+      caption = meta.joinToString(" · "),
+      note = StrPurchasePages.poTotals(poAfn(o.totals.orderedMinor), poAfn(o.totals.acceptedMinor), poAfn(o.totals.remainingMinor)),
+      collapseKey = "purchasing/order",
+      section = V3SectionTone.PURCHASES,
     )
-
-    //  کارها: فقط آن‌چه نقش × وضعیت اجازه می‌دهد (`PoForms.actions`)
-    Column(Modifier.fillMaxWidth().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-      if (can.receive) V3Button(
-        StrPurchasePages.receiveGoods,
-        { nav.openForResult(MoneyPaths.receivePurchaseOrder(o.id)) { tick++ } },
-        Modifier.fillMaxWidth(), icon = Icons.Outlined.MoveToInbox, enabled = !busy,
-      )
-      if (can.send) {
-        V3Button(
-          StrPurchasePages.sendToSupplier, { act({ repo.send(o.id) }, StrPurchasePages.poSent) },
-          Modifier.fillMaxWidth(), icon = Icons.AutoMirrored.Outlined.Send, loading = busy, haptic = true,
-        )
-        Text(StrPurchaseOrders.sendNote, style = V3Type.footnote, color = c.inkMuted)
-      }
-      if (can.edit) V3Button(
-        StrMoney.edit, { nav.openForResult(MoneyPaths.editPurchaseOrder(o.id)) { tick++ } },
-        Modifier.fillMaxWidth(), kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.Edit, enabled = !busy,
-      )
-      if (o.receipts.isNotEmpty() || PurchaseOrderBook.hasSupplierBills(o)) V3Button(
-        StrPurchaseOrders.match, { nav.open(MoneyPaths.matchPurchaseOrder(o.id)) },
-        Modifier.fillMaxWidth(), kind = V3ButtonKind.SECONDARY, icon = Icons.AutoMirrored.Outlined.FactCheck,
-      )
-      //  PUR-14: فاکتورِ کاغذیِ تأمین‌کننده و «باطل» همان صفحه‌های گوشی (`SupplierBillsPages.kt`)
-      if (can.bill) V3Button(
-        StrSupplierBills.title, { nav.openForResult(MoneyPaths.supplierBill(o.id)) { tick++ } },
-        Modifier.fillMaxWidth(), kind = V3ButtonKind.SECONDARY, icon = Icons.AutoMirrored.Outlined.ReceiptLong,
-      )
-      if (can.cancel) V3Button(
-        StrPurchasePages.cancelIt, { cancelAsk = true },
-        Modifier.fillMaxWidth(), kind = V3ButtonKind.DANGER, icon = Icons.Outlined.Block, enabled = !busy,
-      )
-    }
+    if (can.send) PoFootnote(StrPurchaseOrders.sendNote)
 
     //  قلم‌ها: سفارش، پذیرفته، خراب، باقی‌مانده و فی (PUR-04)
     val names = remember(data) { data.products.associate { it.id to it.name } }

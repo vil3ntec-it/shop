@@ -12,8 +12,8 @@ import java.io.File
  *  نوارِ `V3Scaffold` (عنوانِ وسط، بی عنوانِ درشتِ بدنه) · دست‌بالا یک `V3Summary` · پالایه‌ها یک ردیف زیرِ نوار · فهرست با
  *  `V3DataRow`/`V3NavRow` · کارِ اصلی یک `V3Fab` در جای همیشگی · خالی `V3EmptyState` · برگه فقط `V3Sheet`.
  *
- *  هر استثنا این‌جا با **دلیلِ نوشته** است؛ صفحهٔ تازه به فهرست نمی‌رود مگر دلیلی از همین جنس داشته باشد. نگهبانِ روی درختِ
- *  واقعیِ هر مسیر: `PageAnatomyUiTest` (کامپیوتر)؛ عکسِ همهٔ مسیرها: `PhoneAnatomyAuditTest` (`P0_AUDIT=<پوشه>`).
+ *  هر استثنا این‌جا با **دلیلِ نوشته** است؛ صفحهٔ تازه به فهرست نمی‌رود مگر دلیلی از همین جنس داشته باشد. عکس و شمارِ کالبدِ
+ *  همهٔ مسیرها: `PhoneAnatomyAuditTest` (`P0_AUDIT=<پوشه>`)؛ پیش/پسِ صفحه‌های کوچیده: `P0ShotsTest` (`P0_SHOTS=<پوشه>`).
  */
 class PageAnatomyGuardTest {
 
@@ -44,7 +44,8 @@ class PageAnatomyGuardTest {
 
   @Test fun `عنوانِ درشت فقط در قابِ تنظیمات — هیچ صفحه‌ای عنوانش را درشت در بدنه نمی‌نویسد`() {
     //  `V3Scaffold(largeTitle = …)`: تنها روشن‌کننده `SettingsPageFrame` است (دسته‌های تنظیمات، ۶۵r) — بقیه عنوان را در نوار دارند
-    val bad = uses(Regex("""largeTitle\s*=\s*(?!false\b)""")).keys - setOf("ui/v3/V3Scaffold.kt", "ui/v3/settings/SettingsPageFrame.kt", "ui/v3/V3Anatomy.kt")
+    //  «= false» با هر فاصله‌ای مجاز است (نگاهِ پیشِ رو پس از فاصله‌ها، نه وسطشان — وگرنه هر `largeTitle = false` هم شمرده می‌شد)
+    val bad = uses(Regex("""largeTitle\s*=(?!\s*false\b)""")).keys - setOf("ui/v3/V3Scaffold.kt", "ui/v3/settings/SettingsPageFrame.kt", "ui/v3/V3Anatomy.kt")
     assertTrue("عنوانِ درشت بیرون از تنظیمات: $bad", bad.isEmpty())
     //  پیش‌فرضِ قاب همان «عنوان در نوار» است
     assertTrue(text("ui/v3/V3Scaffold.kt").contains("largeTitle: Boolean = false"))
@@ -65,9 +66,7 @@ class PageAnatomyGuardTest {
     "ui/v3/onboarding/GateFrame.kt" to "صفحهٔ ورودِ قدیمی — پسندیدهٔ صاحب‌کار، `LookGuardTest`",
     "ui/v3/onboarding/LockGate.kt" to "قفلِ رمز — همان زمینهٔ ورود، `LookGuardTest`",
     "ui/v3/analytics/StatsPage.kt" to "ورقهٔ دومِ خانه (`HomePager`) — خانه سربرگِ خودش را دارد",
-    //  ⏳ مانده برای گامِ بعدیِ p0 (عددِ درشتِ موجودی ⇒ `V3Summary`)؛ با کوچ از این فهرست برمی‌دارید
-    "ui/v3/products/ProductDetailParts.kt" to "⏳ گامِ بعدی: موجودیِ درشتِ جزئیاتِ کالا ⇒ V3Summary",
-    "ui/v3/stock/StockItemScreen.kt" to "⏳ گامِ بعدی: موجودیِ درشتِ جزئیاتِ انبار ⇒ V3Summary",
+    //  جزئیاتِ کالا و انبار دیگر این‌جا نیستند: موجودیِ درشتشان `V3Summary` شد (p0، `ProductDetailParts.FiguresCard`، `StockItemScreen`)
   )
 
   @Test fun `نوشتهٔ عنوانِ درشت در بدنه نیست — عددِ سرِ صفحه خلاصه است`() {
@@ -76,6 +75,12 @@ class PageAnatomyGuardTest {
     //  فهرستِ استثنا کهنه نمی‌ماند
     val stale = largeTypeAllowed.keys.filter { !File(main, it).isFile || !text(it).contains("V3Type.largeTitle") }
     assertTrue("استثنای کهنه: $stale", stale.isEmpty())
+    //  جزئیاتِ کالا و انبار: عددِ موجودی خلاصهٔ کیت است (رنگِ انبار، تاشو)، نه کارتِ دست‌ساز
+    for (f in listOf("ui/v3/products/ProductDetailParts.kt", "ui/v3/stock/StockItemScreen.kt")) {
+      val t = text(f)
+      assertTrue("$f: V3Summary", t.contains("V3Summary("))
+      assertTrue("$f: رنگِ انبار", t.contains("section = V3Section.STOCK"))
+    }
   }
 
   @Test fun `کادرِ بزرگِ گرادیانی فقط در خانه`() {
@@ -122,6 +127,31 @@ class PageAnatomyGuardTest {
     assertEquals(1, Regex("""\.align\(Alignment\.Bottom(End|Start)\)""").findAll(scaffold).count())
   }
 
+  /**
+   *  صفحه‌های قدیمِ `Chrome.SHELL` ِ سفارشِ خرید (فهرست و جزئیات) روی همان کالبد (p0): خودِ صفحه `V3Scaffold` دارد، تراشه‌های
+   *  وضعیت در جای قاب (`chips =`)، کارِ اصلی `V3Fab`، سرِ جزئیات `V3Summary` — نه یادداشتِ سر، تراشه در بدنه و دکمه‌های تمام‌پهنا.
+   */
+  @Test fun `سفارشِ خرید روی کالبدِ یکسان`() {
+    val routes = text("ui/v3/money/MoneyRoutes.kt").lines()
+    for (r in listOf("PurchaseOrdersRoute()", "PurchaseOrderRoute(args")) {
+      val line = routes.single { r in it && "V3Route(" in it }
+      assertTrue("سربرگِ خودِ صفحه: $line", "chrome = Chrome.OWN" in line)
+    }
+    val po = text("ui/v3/money/PurchaseOrderPages.kt")
+    fun body(name: String): String {
+      val at = po.indexOf("internal fun RouteScope.$name(")
+      assertTrue(name, at >= 0)
+      val next = po.indexOf("\n@Composable", at + 1).let { if (it < 0) po.length else it }
+      return po.substring(at, next)
+    }
+    val list = body("PurchaseOrdersRoute")
+    assertTrue(list.contains("PoScaffold(") && list.contains("chips = ") && list.contains("V3Fab("))
+    assertFalse("دکمهٔ تمام‌پهنای «سفارشِ تازه»", Regex("""V3Button\(\s*StrPurchasePages\.newPoTitle""").containsMatchIn(list))
+    val detail = body("PurchaseOrderRoute")
+    assertTrue(detail.contains("PoScaffold(") && detail.contains("V3Summary(") && detail.contains("V3Fab("))
+    assertFalse("دکمه‌های تمام‌پهنای جزئیات", detail.contains("V3Button("))
+  }
+
   @Test fun `یک سبکِ برگه — V3Sheet`() {
     val allowed = mapOf(
       "ui/v3/V3Sheet.kt" to "خودِ برگهٔ کیت",
@@ -135,14 +165,26 @@ class PageAnatomyGuardTest {
   }
 
   @Test fun `نوارِ «نسخهٔ پیش‌نمایش» روی هیچ صفحه‌ای نیست`() {
-    assertTrue("PreviewBanner برگشت: ${uses(Regex("""\bPreviewBanner\("""))}", uses(Regex("""\bPreviewBanner\(""")).isEmpty())
+    //  پس از ادغامِ main (۷۰): گوشی `PreviewBanner(strip = false)` یک بار در پوسته (فقط هشدارِ یک‌باره)، کامپیوتر همان نوارِ زیرِ
+    //  سربرگِ خودش (`Platform.DESKTOP`) — هیچ صفحه‌ای جز پوستهٔ ریشه آن را نمی‌خواند
+    val calls = uses(Regex("""(?<!fun )\bPreviewBanner\("""))
+    assertEquals("PreviewBanner بیرون از پوسته: $calls", setOf("ui/AppRoot.kt"), calls.keys)
     val root = text("ui/AppRoot.kt")
+    val bare = root.lines().filter { Regex("""\bPreviewBanner\(\)""").containsMatchIn(it) }
+    assertEquals("نوارِ پیش‌نمایش فقط یک بار (کامپیوتر): $bare", 1, bare.size)
+    assertTrue(root.contains("PreviewBanner(strip = false)"))
+    //  تنها نوار درونِ ستونِ کامپیوتر است، نه گوشی
+    val deskCol = root.indexOf("if (Platform.DESKTOP) Column(Modifier.padding(start = railPad)")
+    val bareAt = root.indexOf(bare.single().trim())
+    val phoneElse = root.indexOf("PreviewBanner(strip = false)")
+    assertTrue("نوارِ پیش‌نمایش بیرون از ستونِ کامپیوتر", deskCol in 0 until bareAt && bareAt < phoneElse)
     val notice = root.lines().filter { "LocalV3Notice provides" in it }
     assertTrue(notice.isNotEmpty())
     assertFalse("پیش‌نمایش در جای پیامِ صفحه: $notice", notice.any { "Preview" in it })
     //  نشانش کنارِ نسخه در «بیشتر» و «درباره» است
-    assertTrue(text("ui/screens/MorePhone.kt").contains("previewVersion("))
-    assertTrue(text("ui/v3/settings/sections/AboutScreen.kt").contains("previewVersion("))
-    assertFalse("نوارِ رنگی", text("ui/PreviewBanner.kt").contains(".background("))
+    assertTrue(text("ui/screens/MorePhone.kt").contains("previewVersionLabel("))
+    assertTrue(text("ui/v3/settings/sections/AboutScreen.kt").contains("previewVersionLabel("))
+    //  نوار فقط با `strip` کشیده می‌شود
+    assertTrue(text("ui/PreviewBanner.kt").contains("if (strip) Text("))
   }
 }

@@ -54,7 +54,9 @@ import ir.vil3ntec.tohid.ui.theme.V3Space
 import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.v3.V3Action
 import ir.vil3ntec.tohid.ui.v3.V3FormBar
-import ir.vil3ntec.tohid.ui.v3.V3Card
+import ir.vil3ntec.tohid.ui.v3.V3Summary
+import ir.vil3ntec.tohid.ui.v3.summaryColors
+import ir.vil3ntec.tohid.ui.theme.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
@@ -98,8 +100,6 @@ fun StockItemScreen(
   actions: StockItemActions,
   onBack: (() -> Unit)?,
   modifier: Modifier = Modifier,
-  /** پنلِ کنارِ جدولِ انبارِ کامپیوتر (`DeskStockScreen`) ⇒ عنوانِ کوچکِ سربرگ؛ گوشی همان عنوانِ درشت */
-  largeTitle: Boolean = true,
 ) {
   val item = remember(data, productId, today) { StockItemModel.of(data, productId, today) }
   if (item == null) {
@@ -117,7 +117,7 @@ fun StockItemScreen(
     title = p.name,
     modifier = modifier,
     onBack = onBack,
-    largeTitle = largeTitle,
+    //  کالبدِ یکسان (p0): نامِ کالا وسطِ نوار، نه عنوانِ درشتِ بدنه — گوشی و پنلِ کنارِ جدولِ کامپیوتر یکی
     actions = listOf(V3Action(Icons.Outlined.Edit, StrStock.edit) { actions.edit(p.id) }),
     overflow = listOf(
       V3MenuItem(Icons.Outlined.Visibility, StrStock.viewProduct) { actions.view(p.id) },
@@ -182,50 +182,49 @@ fun StockItemScreen(
   }
 }
 
+/**
+ *  خلاصهٔ سرِ جزئیاتِ انبار — کالبدِ یکسانِ صفحه (`claude/e-phone-p0`؛ جای کارتِ دست‌سازِ عددِ درشتِ `V3Type.largeTitle`): همان
+ *  `V3Summary` ِ بخشِ انبار، وسط‌چین و تاشو (کلیدِ `stock/item`). موجودی درشت و قرصِ «تمام/کم»؛ زیرش بها، قیمتِ فروش، حداقلِ
+ *  موجودی و بارکد (زدن ⇐ کپی) — همان ردیف‌های پیشین با رنگِ کارتِ بخش.
+ */
 @Composable
 private fun FiguresCard(item: StockItemUi, onCopied: () -> Unit) {
-  val c = PhoneV3.colors
   val p = item.product
   val shown = rememberCountUp(item.stock)
-  V3Card(radius = V3Space.featuredRadius, padding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      Column(Modifier.weight(1f)) {
-        Text(StrStock.stock, style = V3Type.footnote, color = c.inkMuted)
-        Text(
-          listOf(qty(shown), p.unit).filter { it.isNotBlank() }.joinToString(" "),
-          style = V3Type.largeTitle,
-          color = c.ink,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
-      }
+  val sc = summaryColors(V3Section.STOCK)
+  V3Summary(
+    label = StrStock.stock,
+    value = listOf(qty(shown), p.unit).filter { it.isNotBlank() }.joinToString(" "),
+    collapseKey = "stock/item",
+    section = V3Section.STOCK,
+    extra = {
       when (item.level) {
-        StockLevel.OUT -> V3StatusPill(V3Status.CANCELLED, StrStock.pillOut)
-        StockLevel.LOW -> V3StatusPill(V3Status.WARNING, StrStock.pillLow)
+        StockLevel.OUT -> { Spacer(Modifier.height(6.dp)); V3StatusPill(V3Status.CANCELLED, StrStock.pillOut) }
+        StockLevel.LOW -> { Spacer(Modifier.height(6.dp)); V3StatusPill(V3Status.WARNING, StrStock.pillLow) }
         StockLevel.OK -> Unit
       }
-    }
-    Spacer(Modifier.height(10.dp))
-    Box(Modifier.fillMaxWidth().height(1.dp).background(c.hairline))
-    FigureRow(StrStock.purchasePrice, "${money(p.purchasePrice)} ؋")
-    FigureRow(StrStock.salePriceLabel, "${money(p.salePrice)} ؋")
-    FigureRow(StrStock.minStock, listOf(qty(p.minStock), p.unit).filter { it.isNotBlank() }.joinToString(" "))
-    BarcodeRow(p.barcodes, onCopied)
-  }
+      Spacer(Modifier.height(10.dp))
+      Box(Modifier.fillMaxWidth().height(1.dp).background(sc.track))
+      FigureRow(StrStock.purchasePrice, "${money(p.purchasePrice)} ؋")
+      FigureRow(StrStock.salePriceLabel, "${money(p.salePrice)} ؋")
+      FigureRow(StrStock.minStock, listOf(qty(p.minStock), p.unit).filter { it.isNotBlank() }.joinToString(" "))
+      BarcodeRow(p.barcodes, onCopied)
+    },
+  )
 }
 
 @Composable
 private fun FigureRow(label: String, value: String) {
-  val c = PhoneV3.colors
+  val sc = summaryColors(V3Section.STOCK)
   Row(Modifier.fillMaxWidth().padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-    Text(label, style = V3Type.callout, color = c.inkMuted, modifier = Modifier.weight(1f))
-    Text(value, style = V3Type.body, color = c.ink, maxLines = 1)
+    Text(label, style = V3Type.callout, color = sc.label, modifier = Modifier.weight(1f))
+    Text(value, style = V3Type.body, color = sc.ink, maxLines = 1)
   }
 }
 
 @Composable
 private fun BarcodeRow(codes: List<String>, onCopied: () -> Unit) {
-  val c = PhoneV3.colors
+  val sc = summaryColors(V3Section.STOCK)
   val clipboard = LocalClipboardManager.current
   val context = LocalContext.current
   val code = codes.joinToString("، ")
@@ -244,10 +243,10 @@ private fun BarcodeRow(codes: List<String>, onCopied: () -> Unit) {
       .padding(vertical = 9.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    Text(StrStock.barcode, style = V3Type.callout, color = c.inkMuted, modifier = Modifier.weight(1f))
-    Text(code, style = V3Type.body, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1.4f, fill = false))
+    Text(StrStock.barcode, style = V3Type.callout, color = sc.label, modifier = Modifier.weight(1f))
+    Text(code, style = V3Type.body, color = sc.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1.4f, fill = false))
     Spacer(Modifier.size(8.dp))
-    Icon(Icons.Outlined.ContentCopy, contentDescription = StrStock.copyBarcode, tint = c.icon, modifier = Modifier.size(18.dp))
+    Icon(Icons.Outlined.ContentCopy, contentDescription = StrStock.copyBarcode, tint = sc.label, modifier = Modifier.size(18.dp))
   }
 }
 
