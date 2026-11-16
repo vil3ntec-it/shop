@@ -174,6 +174,8 @@ internal fun PurchaseFormScreen(
   laterOn: Boolean = false,
   /** e-rows-63b: کالای نرسیده ⇒ سفارشِ خرید (و پیش‌پرداخت)؛ پاسخ با `true` ⇐ فرستاده شد */
   onSaveLater: (PurchaseForm, (Boolean) -> Unit) -> Unit = { _, done -> done(false) },
+  /** PUR-12/AI-10: «از عکسِ فاکتور» (`ui/screens/InvoiceOcrUi.kt`)؛ null یا پرچمِ خاموش ⇒ نه دکمه، نه برگه */
+  ocr: ir.vil3ntec.tohid.ui.screens.InvoiceOcrController? = null,
 ) {
   val initial = remember(supplierArg) { PurchaseFormModel.initial(supplierArg?.takeIf { id -> d.suppliers.any { it.id == id } }, todayIso()) }
   //  نوشته‌ها با چرخشِ گوشی و برگشت از «کالای تازه» نمی‌روند
@@ -263,6 +265,11 @@ internal fun PurchaseFormScreen(
     summary = if (total > 0) "${StrMoney.purchaseTotal}: ${MoneyText.afn(total)}" else null,
   ) {
     Column(Modifier.v3Shake(shake)) {
+      //  PUR-12/AI-10: آغاز از عکسِ فاکتورِ کاغذی (بالای فرم، پیش از نوشتنِ ردیف‌ها) — فقط ردیف‌های تأییدشده به همین فرم می‌آیند؛
+      //  ثبت همان «ثبت» است. پرچمِ خاموش یا بی اجازه ⇒ هیچ
+      if (ocr != null && d.products.isNotEmpty()) {
+        ir.vil3ntec.tohid.ui.screens.InvoiceOcrPhoneButton(ocr, Modifier.fillMaxWidth().padding(bottom = 8.dp))
+      }
       //  تأمین‌کننده و کالا در یک کارت — برچسبِ هر ردیف خودش سرخط است
       V3Section(null, padding = PaddingValues(vertical = 4.dp)) {
         V3PickerRow(
@@ -435,6 +442,15 @@ internal fun PurchaseFormScreen(
         V3TextField(form.notes, { form = form.copy(notes = it) }, StrMoney.notesField, singleLine = false)
       }
       Spacer(Modifier.height(16.dp))
+    }
+  }
+
+  if (ocr != null) {
+    ir.vil3ntec.tohid.ui.screens.InvoiceOcrPhoneHost(ocr, d.products) { rows ->
+      val (next, added) = PurchaseFormModel.withAccepted(form, rows, d)
+      form = next
+      if (added > 0) notify(V3Tone.SUCCESS, ir.vil3ntec.tohid.core.i18n.StrInvoiceOcr.added(added))
+      if (added < rows.size) notify(V3Tone.WARNING, ir.vil3ntec.tohid.core.i18n.StrInvoiceOcr.notAdded(rows.size - added))
     }
   }
 

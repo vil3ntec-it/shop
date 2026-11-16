@@ -347,6 +347,22 @@ private fun NewPurchaseInvoice(
   val buys = remember(d) { ir.vil3ntec.tohid.data.PurchaseOrderBook.buys(d) }
   var touched by remember { mutableStateOf<PurchaseDraft?>(null) }
   var historyFor by remember { mutableStateOf<String?>(null) }
+  //  PUR-12/AI-10: «از عکسِ فاکتور» — فقط ردیف‌های تأییدشده به جدولِ همین فرم می‌آیند؛ ثبت همان F9 / «ثبتِ فاکتور»
+  val ocr = rememberInvoiceOcr(d.products)
+  fun addOcr(rows: List<ir.vil3ntec.tohid.core.purchase.InvoiceOcr.Accepted>) {
+    var added = 0
+    lines.lastOrNull()?.takeIf { it.productId.isBlank() && it.query.isBlank() }?.let { lines.remove(it) }
+    for (a in rows) {
+      val p = d.products.find { it.id == a.productId } ?: continue
+      lines += PurchaseDraft(p).also {
+        it.qty = ir.vil3ntec.tohid.core.purchase.InvoiceOcr.text(a.qty)
+        it.price = ir.vil3ntec.tohid.core.purchase.InvoiceOcr.text(a.price)
+      }
+      added++
+    }
+    lines += PurchaseDraft()
+    if (added > 0) toast(ir.vil3ntec.tohid.core.i18n.StrInvoiceOcr.added(added))
+  }
 
   //  بارکد از بارکدخوان ⇐ ردیف (همان کالا دوباره ⇐ یکی بیشتر)
   LaunchedEffect(pending.size) {
@@ -414,6 +430,8 @@ private fun NewPurchaseInvoice(
       DeskIconButton(Icons.Filled.ArrowForward, Str.back, onClose)
       Spacer(Modifier.width(DeskSpace.x2))
       Text(StrPurchasePages.newPurchaseNo(no), Modifier.weight(1f), style = DeskType.pageTitle, color = dc.ink, maxLines = 1)
+      InvoiceOcrDeskButton(ocr)
+      Spacer(Modifier.width(DeskSpace.x2))
       DeskButton(ir.vil3ntec.tohid.core.i18n.StrKit.cancel, onClose, kind = DeskButtonKind.GHOST, shortcut = "Esc")
     }
     //  مشخصات: تأمین‌کننده (کشویی)، «تأمین‌کنندهٔ تازه + Enter» و تاریخِ خورشیدی
@@ -492,6 +510,7 @@ private fun NewPurchaseInvoice(
   }
   LaunchedEffect(Unit) { runCatching { lines.first().focus.requestFocus() } }
   historyFor?.let { pid -> PriceHistoryDialog(d, buys, pid, supplierId.orEmpty()) { historyFor = null } }
+  InvoiceOcrDeskHost(ocr, ::addOcr)
 }
 
 /* ══════════════════════════ تأمین‌کنندگان ══════════════════════════ */

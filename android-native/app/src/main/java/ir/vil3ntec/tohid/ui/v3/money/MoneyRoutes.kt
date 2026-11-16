@@ -304,6 +304,8 @@ val MoneyModule = AppModule(
         onScan = purchaseScan(),
         laterOn = rememberPoManage(rememberPurchaseOrdersDoor()),
         onSaveLater = rememberSaveLater(saveKey),
+        //  PUR-12/AI-10: «از عکسِ فاکتور» — دکمه فقط با پرچمِ روشن و اجازهٔ خرید (`GET /shop/purchase-ocr/config`)
+        ocr = ir.vil3ntec.tohid.ui.screens.rememberInvoiceOcr(data.products),
       )
     },
 

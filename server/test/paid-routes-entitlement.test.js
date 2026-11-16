@@ -23,7 +23,9 @@ const { query, newId, now } = require('../src/db');
 const { PAID_KEYS } = require('../src/lib/features');
 
 const DAY = 24 * 60 * 60 * 1000;
-const PAID = /^(POST|PUT|PATCH|DELETE) \/shop\/(orders|order-feedback|order-returns|storefront|market|delivery)(\/|$)|^POST \/shop\/(staff-code|invite|staff-code\/rotate)$/;
+const PAID = new RegExp(/^(POST|PUT|PATCH|DELETE) \/shop\/(orders|order-feedback|order-returns|storefront|market|delivery)(\/|$)|^POST \/shop\/(staff-code|invite|staff-code\/rotate)$/.source
+  //  PUR-12/AI-10: «از عکسِ فاکتور» پردازندهٔ سرورِ صاحب را می‌خورد ⇒ اشتراکِ فعال یا آزمایشی (`needPaid`)؛ خودِ فاکتورِ خرید بی عکس آزاد می‌ماند
+  + '|^POST \\/shop\\/purchase-ocr$');
 const JOIN = ['POST /shop/staff/join', 'POST /shop/join'];
 const STAFF = ['POST /shop/sync', 'POST /shop/sync/push'];
 /** نوشتنی‌های بی کلیدِ پولی — هر کدام با دلیل؛ فهرست باید با سورس یکی بماند. */
@@ -165,6 +167,8 @@ FLAGS.push('shop.orders.late_apology');
 FLAGS.push('shop.loyalty_rule');
 //  AI-11: «جست‌وجو با عکس» (`POST /shop/visual-search`) با پرچمِ خودش
 FLAGS.push('shop.visual_search');
+//  PUR-12/AI-10: «از عکسِ فاکتور» (`POST /shop/purchase-ocr`، PAID با needPaid) با پرچمِ خودش
+FLAGS.push('shop.purchase_ocr');
 //  O-01: پوشِ گوشی (`/shop/push/devices`، FREE) با پرچمِ خودش
 FLAGS.push('shop.device_push');
 //  STF-02: «درخواستِ تأیید» از راهِ دور (`/shop/approval-requests`، FREE) با پرچمِ خودش
@@ -178,7 +182,7 @@ FLAGS.push('shop.held_sync');
 //  S09: «یک فاکتور در دو دستگاه» ⇒ صندوقِ صاحب (`POST /shop/held-invoices/:id/twice`، FREE) با پرچمِ خودش
 FLAGS.push('shop.held_twice_cancel');
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
-const paidGate = (r) => /\bneedWrite\b/.test(r.head)
+const paidGate = (r) => /\b(needWrite|needPaid)\b/.test(r.head)
   || [...`${r.uses} ${r.head}`.matchAll(/requireFeature\(\s*'([^']+)'/g)].some((m) => PAID_KEYS.includes(m[1]));
 const code = (r) => r.body?.error?.code || '';
 const blocked = (r) => r.status === 403 && ['subscription_expired', 'subscription_required'].includes(code(r));

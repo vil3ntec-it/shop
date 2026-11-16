@@ -115,6 +115,30 @@ internal object PurchaseFormModel {
     return setRow(f, index, picked(r, product, defaultUnit(product, f.supplierId, unitsOn)))
   }
 
+  /**
+   *  PUR-12/AI-10: ردیف‌های **تأییدشدهٔ** «از عکسِ فاکتور» ⇒ ردیف‌های همین فرم: ردیفِ نخستِ خالی، سپس ردیف‌های خالیِ افزوده،
+   *  سپس ردیفِ تازه تا [MAX_ROWS]؛ مقدار به واحدِ پایه (`unitName = null`) و فی همان که کاربر تأیید کرد. ثبت هنوز همان «ثبت» ِ فرم
+   *  است (`PurchaseBook.record`). ⇒ (فرم، شمارِ افزوده)؛ کالای نبودِ دفتر کنار می‌رود.
+   */
+  fun withAccepted(f: PurchaseForm, rows: List<ir.vil3ntec.tohid.core.purchase.InvoiceOcr.Accepted>, d: ShopData): Pair<PurchaseForm, Int> {
+    var out = f
+    var added = 0
+    fun blank(r: PurchaseRow) = r.productId == null && r.quantity.isBlank() && r.price.isBlank()
+    for (a in rows) {
+      if (d.products.none { it.id == a.productId }) continue
+      val r = PurchaseRow(a.productId, ir.vil3ntec.tohid.core.purchase.InvoiceOcr.text(a.qty), ir.vil3ntec.tohid.core.purchase.InvoiceOcr.text(a.price))
+      val empty = out.more.indexOfFirst(::blank)
+      out = when {
+        blank(first(out)) -> withFirst(out, r.copy(expiry = out.expiry))
+        empty >= 0 -> setRow(out, empty, r)
+        out.more.size + 1 >= MAX_ROWS -> break
+        else -> out.copy(more = out.more + r)
+      }
+      added++
+    }
+    return out to added
+  }
+
   /** باقی (نسیه) = جمع − پرداخت‌شده، نه کمتر از صفر */
   fun remaining(f: PurchaseForm): Double = (total(f) - paid(f)).coerceAtLeast(0.0)
 

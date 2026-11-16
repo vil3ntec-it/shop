@@ -70,6 +70,7 @@ const PARITY = [
   ['shop.promo_expiry', flagAt('routes/shop-promos.js', 'EXPIRY_FLAG', 'shop.promo_expiry')],
   ['shop.promo_tier_price', flagAt('routes/shop-promos.js', 'TIER_PRICE_FLAG', 'shop.promo_tier_price')],
   ['shop.purchase_orders', (s) => L('purchase-orders').enabled(s)],
+  ['shop.purchase_ocr', (s) => L('purchase-ocr').enabled(s)],
   ['shop.staff_time', (s) => L('staff-time').flagOf(s)],
   ['shop.stock_v2', flagAt('routes/shop-stock-ledger.js', 'FLAG_KEY', 'shop.stock_v2')],
   ['shop.order_risk', (s) => L('order-risk').flagIn(run, s)],
@@ -116,7 +117,7 @@ const putFlag = (scope, key, value) => h.put('/api/admin/flags', { scope, key, v
 test('کاتالوگ: هر ردیفِ تازه همان پیش‌فرضِ کد است؛ نوشتنِ پیش‌فرض بی‌اثر، مقدارِ دیگر اثردار', async () => {
   const { KNOWN } = require('../src/routes/admin-flags');
   assert.equal(new Set(PARITY.map((p) => p[0])).size, PARITY.length, 'کلیدِ تکراری در جدول');
-  assert.equal(PARITY.length, 57);   //  «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): `auth.phone_add_code` با درِ کدِ شماره رفت
+  assert.equal(PARITY.length, 58);   //  «فقط ایمیل» (۱۴۰۵/۰۸/۲۳): `auth.phone_add_code` با درِ کدِ شماره رفت؛ +۱ `shop.purchase_ocr` (PUR-12/AI-10)
   for (const [key, read, other, needs = []] of PARITY) {
     const k = KNOWN.find((x) => x.key === key);
     assert.ok(k, `${key}: در کاتالوگ نیست`);

@@ -188,6 +188,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.promo_expiry', scope: 'shop', default: false, what: 'قاعدهٔ «تخفیفِ نزدیکِ انقضا» (PRM-10)' },
   { key: 'shop.promo_tier_price', scope: 'shop', default: false, what: 'پلهٔ «قیمتِ ثابتِ هر واحد» در تخفیفِ پله‌ای (POS-19)' },
   { key: 'shop.purchase_orders', scope: 'shop', default: false, what: 'سفارشِ خرید، رسیدِ دریافت و فاکتورِ تأمین‌کننده (PUR-02/04/14)' },
+  { key: 'shop.purchase_ocr', scope: 'shop', default: false, what: '«از عکسِ فاکتور»: خواندنِ عکسِ فاکتورِ کاغذیِ تأمین‌کننده با Tesseract ِ همین سرور ⇒ پیش‌نویسِ ردیف‌ها با تأییدِ ردیف‌به‌ردیف در برنامه (PUR-12/AI-10، پس از انتشار)' },
   { key: 'shop.staff_time', scope: 'shop', default: false, what: 'ورود و خروجِ کارمند و پورسانتِ ماه (STF-07/08)' },
   { key: 'shop.till_pin', scope: 'shop', default: false, what: 'PIN ِ شخصیِ صندوق در سرور و نوبت‌های سنجیدهٔ صندوق: چه کسی پشتِ کدام دستگاه بود (STF-04، S46)' },
   { key: 'shop.till_op_user', scope: 'shop', default: false, what: 'کاربرِ سنجیدهٔ صندوق روی هر op ِ نشستهٔ v1/v3 (جدولِ کنار، مهاجرتِ ۷۹۰؛ با `shop.till_pin`؛ S46)' },
