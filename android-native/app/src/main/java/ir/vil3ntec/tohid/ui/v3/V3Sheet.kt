@@ -195,6 +195,11 @@ fun V3ConfirmSheet(
   icon: ImageVector? = null,
   danger: Boolean = true,
 ) {
+  //  کامپیوتر (`claude/e-desk-d3c`): پنجرهٔ تأییدِ `ui/desk` (همان نوشته‌ها و ترتیبِ «بستن ⇐ کار»)، نه برگهٔ پایینِ گوشی؛ گوشی همان برگه
+  if (ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout.current) {
+    ir.vil3ntec.tohid.ui.desk.DeskConfirmDialog(title, message, confirm, onConfirm, onDismiss, icon, danger)
+    return
+  }
   val c = PhoneV3.colors
   V3Sheet(onDismiss = onDismiss, detents = false) { closer ->
     if (icon != null) {

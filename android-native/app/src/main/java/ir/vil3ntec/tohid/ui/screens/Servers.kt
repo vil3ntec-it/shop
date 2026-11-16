@@ -116,8 +116,19 @@ fun ServersSettings(controller: ServersController, toast: (String) -> Unit) {
     )
   }
 
+  //  کامپیوتر (`claude/e-desk-d3c`): همان پرسش‌ها و کارها روی `DeskDialog` (رفتن/برداشتن/خاموش سرخ با فوکوسِ آغاز روی «نه»)؛ گوشی همان
+  val desk = ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout.current
   switching?.let { p ->
-    AlertDialog(
+    if (desk) ir.vil3ntec.tohid.ui.desk.DeskDialog(
+      title = StrSetupPages.switchTo(p.name), onDismiss = { switching = null },
+      confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrSetupPages.goAndClose, danger = true) {
+        val error = controller.switchTo(p.id)
+        switching = null
+        if (error != null) toast(error) else controller.restartNow()
+      },
+      dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.no) { switching = null },
+    ) { ir.vil3ntec.tohid.ui.desk.DeskDialogText(StrSetupPages.switchNote1 + StrSetupPages.switchNote2) }
+    else AlertDialog(
       onDismissRequest = { switching = null },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrSetupPages.switchTo(p.name), color = Shop.colors.text) },
@@ -141,7 +152,16 @@ fun ServersSettings(controller: ServersController, toast: (String) -> Unit) {
   }
 
   removing?.let { p ->
-    AlertDialog(
+    if (desk) ir.vil3ntec.tohid.ui.desk.DeskDialog(
+      title = StrSetupPages.removeServer(p.name), onDismiss = { removing = null },
+      confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrAccount.removeConfirm, danger = true) {
+        val error = controller.remove(p.id)
+        removing = null
+        if (error != null) toast(error) else reload()
+      },
+      dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.no) { removing = null },
+    ) { ir.vil3ntec.tohid.ui.desk.DeskDialogText(StrSetupPages.removeNote) }
+    else AlertDialog(
       onDismissRequest = { removing = null },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrSetupPages.removeServer(p.name), color = Shop.colors.text) },
@@ -164,7 +184,16 @@ fun ServersSettings(controller: ServersController, toast: (String) -> Unit) {
   }
 
   if (turningOff) {
-    AlertDialog(
+    if (desk) ir.vil3ntec.tohid.ui.desk.DeskDialog(
+      title = StrSetupPages.backToMain, onDismiss = { turningOff = false },
+      confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrSetupPages.offAndClose, danger = true) {
+        turningOff = false
+        if (controller.setEnabled(false)) controller.restartNow()
+        on = false
+      },
+      dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.no) { turningOff = false },
+    ) { ir.vil3ntec.tohid.ui.desk.DeskDialogText(StrSetupPages.backToMainNote) }
+    else AlertDialog(
       onDismissRequest = { turningOff = false },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrSetupPages.backToMain, color = Shop.colors.text) },
@@ -188,7 +217,15 @@ fun ServersSettings(controller: ServersController, toast: (String) -> Unit) {
 
   pinFor?.let { action ->
     var pin by remember { mutableStateOf("") }
-    AlertDialog(
+    if (desk) {
+      val field = remember { androidx.compose.ui.focus.FocusRequester() }
+      ir.vil3ntec.tohid.ui.desk.DeskDialog(
+        title = StrSetupPages.appPin, onDismiss = { pinFor = null }, initialFocus = field,
+        confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrAuth.confirm) { if (controller.pinOk(pin)) { pinFor = null; action() } else toast(StrAuth.lockWrong) },
+        dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.no) { pinFor = null },
+      ) { ir.vil3ntec.tohid.ui.desk.DeskDialogField(StrSetupPages.appPin, pin, { pin = it.filter(Char::isDigit).take(12) }, focusRequester = field, password = true) }
+    }
+    else AlertDialog(
       onDismissRequest = { pinFor = null },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrSetupPages.appPin, color = Shop.colors.text) },
@@ -391,7 +428,15 @@ private fun AddServerDialog(controller: ServersController, onDismiss: () -> Unit
   )
 
   certToTrust?.let { fp ->
-    AlertDialog(
+    if (ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout.current) ir.vil3ntec.tohid.ui.desk.DeskDialog(
+      title = StrSetupPages.unknownCert, onDismiss = { certToTrust = null },
+      confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrSetupPages.sameConfirm, danger = true) { trusted = fp; certToTrust = null; check() },
+      dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrPos.no) { certToTrust = null },
+    ) {
+      ir.vil3ntec.tohid.ui.desk.DeskDialogText(StrSetupPages.selfSignedNote)
+      ir.vil3ntec.tohid.ui.desk.DeskDialogText(fp.chunked(2).joinToString(":").uppercase(), strong = true)
+    }
+    else AlertDialog(
       onDismissRequest = { certToTrust = null },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrSetupPages.unknownCert, color = Shop.colors.text) },

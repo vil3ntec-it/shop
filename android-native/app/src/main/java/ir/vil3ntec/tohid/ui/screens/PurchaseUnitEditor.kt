@@ -107,18 +107,20 @@ fun purchaseUnitDrafts(p: ir.vil3ntec.tohid.data.Product): List<PurchaseUnits.Dr
  */
 @Composable
 fun PurchaseUnitPicker(product: ir.vil3ntec.tohid.data.Product, unit: String?, qty: String, total: Double, onPick: (String?) -> Unit) {
-  val c = Shop.colors
+  //  کامپیوتر (`claude/e-desk-d3c`): تنها کاربرها فرم‌های خریدِ کامپیوترند ⇒ تراشه و نوشتهٔ `ui/desk`؛ همان گزینه‌ها و همان حساب
+  val c = ir.vil3ntec.tohid.ui.desk.Desk.colors
   val all = product.purchaseUnits.orEmpty().map(ir.vil3ntec.tohid.data.ShopStore::coreOf)
   val chosen = PurchaseUnits.find(all, unit)
+  val inset = ir.vil3ntec.tohid.ui.desk.DeskSpace.x3 * 2 + 32.dp
   Row(
-    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 44.dp),
-    horizontalArrangement = Arrangement.spacedBy(6.dp),
+    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = inset, bottom = ir.vil3ntec.tohid.ui.desk.DeskSpace.x1),
+    horizontalArrangement = Arrangement.spacedBy(ir.vil3ntec.tohid.ui.desk.DeskSpace.x2),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    Text(StrPurchaseUnits.unit, style = MaterialTheme.typography.labelSmall, color = c.muted)
-    FilterChip(selected = chosen == null, onClick = { onPick(null) }, label = { Text(StrPurchaseUnits.baseOnly(product.unit)) })
+    Text(StrPurchaseUnits.unit, style = ir.vil3ntec.tohid.ui.desk.DeskType.label, color = c.inkSecondary)
+    ir.vil3ntec.tohid.ui.desk.DeskChip(StrPurchaseUnits.baseOnly(product.unit), chosen == null, { onPick(null) })
     all.forEach { u ->
-      FilterChip(selected = chosen == u, onClick = { onPick(u.name) }, label = { Text(PurchaseUnits.label(u, product.unit)) })
+      ir.vil3ntec.tohid.ui.desk.DeskChip(PurchaseUnits.label(u, product.unit), chosen == u, { onPick(u.name) })
     }
   }
   val q = qty.toDoubleOrNull()
@@ -127,11 +129,9 @@ fun PurchaseUnitPicker(product: ir.vil3ntec.tohid.data.Product, unit: String?, q
       PurchaseUnits.baseCost(ir.vil3ntec.tohid.data.StockLedger.milli(q), chosen.factorMilli, ir.vil3ntec.tohid.data.StockLedger.minor(total))
     }.getOrNull()
     if (bc != null) {
-      Text(
+      ir.vil3ntec.tohid.ui.desk.DeskNote(
         StrPurchaseUnits.lineBase(ir.vil3ntec.tohid.qty(bc.baseQtyMilli / 1000.0), product.unit, ir.vil3ntec.tohid.money(bc.unitCostMinor / 100.0)),
-        Modifier.padding(start = 44.dp),
-        style = MaterialTheme.typography.labelSmall,
-        color = c.muted,
+        Modifier.padding(start = inset),
       )
     }
   }

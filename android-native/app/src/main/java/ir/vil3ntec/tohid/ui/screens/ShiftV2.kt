@@ -175,9 +175,25 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
   }
 
   /* ── باز کردن با موجودی (PAY-11) — همان ردیفِ `shift_open`ِ امروز ── */
+  //  کامپیوتر (`claude/e-desk-d3c`): باز کردن، گزارشِ X/Z و سابقه روی `DeskDialog` (همان کارها)؛ گوشی همان پنجره‌ها
+  val desk = ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout.current
   if (openDialog) {
     var amount by remember { mutableStateOf("") }
-    AlertDialog(
+    fun doOpen() {
+      when (val r = CashShift.open(d, amount.toDoubleOrNull() ?: Double.NaN, me, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)) {
+        is CashShift.Result.Failed -> toast(r.message)
+        is CashShift.Result.Ok -> { scope.launch { store.save(d, r.data) }; toast(StrShift.registerOpened); openDialog = false }
+      }
+    }
+    if (desk) {
+      val field = remember { androidx.compose.ui.focus.FocusRequester() }
+      ir.vil3ntec.tohid.ui.desk.DeskDialog(
+        title = StrShift.openRegisterTitle, onDismiss = { openDialog = false }, initialFocus = field,
+        confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrShift.openIt, onClick = ::doOpen),
+        dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(Str.cancel) { openDialog = false },
+      ) { ir.vil3ntec.tohid.ui.desk.DeskDialogField(StrShift.openingCash, amount, { amount = numericInput(it) }, focusRequester = field, textAlign = androidx.compose.ui.text.style.TextAlign.End) }
+    }
+    else AlertDialog(
       onDismissRequest = { openDialog = false },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrShift.openRegisterTitle, color = Shop.colors.text) },
@@ -187,14 +203,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth(),
         )
       },
-      confirmButton = {
-        TextButton(onClick = {
-          when (val r = CashShift.open(d, amount.toDoubleOrNull() ?: Double.NaN, me, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)) {
-            is CashShift.Result.Failed -> toast(r.message)
-            is CashShift.Result.Ok -> { scope.launch { store.save(d, r.data) }; toast(StrShift.registerOpened); openDialog = false }
-          }
-        }) { Text(StrShift.openIt) }
-      },
+      confirmButton = { TextButton(onClick = ::doOpen) { Text(StrShift.openIt) } },
       dismissButton = { TextButton(onClick = { openDialog = false }) { Text(Str.cancel) } },
     )
   }
@@ -388,7 +397,16 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
   showReport?.let { rep ->
     //  PAY-13: شاگرد نه در X و نه در Z مورد انتظار و اختلاف را می‌بیند؛ چاپ هم همین نماست
     val seen = ShiftSlip.forViewer(rep, seesExpected = !staff)
-    AlertDialog(
+    if (desk) ir.vil3ntec.tohid.ui.desk.DeskDialog(
+      title = reportTitle(rep), onDismiss = { showReport = null }, width = ir.vil3ntec.tohid.ui.desk.DeskDialogSize.form,
+      confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(Str.close) { showReport = null },
+      extra = listOf(ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrShift.print) { printReport(seen, copy = reprint) }),
+    ) {
+      ShiftReportLines(seen, desk = true)
+      //  «ثبت از اسکنر» (کارتِ فرمان) در همین بازه
+      ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerModel.scannerLine(d, rep.openedAt, rep.at, seesMoney = !staff)?.let { ir.vil3ntec.tohid.ui.desk.DeskDialogText(it) }
+    }
+    else AlertDialog(
       onDismissRequest = { showReport = null },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(reportTitle(rep), color = Shop.colors.text) },
@@ -417,7 +435,37 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
   /* ── سابقه، با Zِ ذخیره‌شده ── */
   if (history) {
     val shifts = remember(d) { CashShift.list(d).take(60) }
-    AlertDialog(
+    if (desk) {
+      val dc = ir.vil3ntec.tohid.ui.desk.Desk.colors
+      ir.vil3ntec.tohid.ui.desk.DeskDialog(
+        title = StrShift.registerHistory, onDismiss = { history = false }, width = ir.vil3ntec.tohid.ui.desk.DeskDialogSize.form,
+        confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(Str.close) { history = false },
+      ) {
+        if (shifts.isEmpty()) ir.vil3ntec.tohid.ui.desk.DeskDialogText(StrShift.noShiftsYet)
+        //  RPT-04: Z ِ جاافتاده یا شمارهٔ تکراری در سریِ هر دستگاه
+        ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerModel.zLines(d).forEach { ir.vil3ntec.tohid.ui.desk.DeskDialogText(it, color = dc.warning) }
+        shifts.forEach { sh ->
+          Column {
+            Text(formatMillis(sh.open.createdAt) + " — " + sh.open.notes, style = ir.vil3ntec.tohid.ui.desk.DeskType.body, color = dc.ink)
+            Text(
+              //  ⛔ PAY-13: شاگرد متنِ بستن (مدیر یا قدیمی: «مورد انتظار» و «اختلاف») را نمی‌بیند — فقط شمرده‌ها
+              sh.close?.let { formatMillis(it.createdAt) + " — " + PayFlow.closeNote(it, seesExpected = !staff) } ?: StrShift.stillOpen,
+              style = ir.vil3ntec.tohid.ui.desk.DeskType.secondary, color = if (sh.close == null) dc.warning else dc.inkSecondary,
+            )
+            sh.close?.let { c ->
+              c.z?.let { PayFlow.reportOf(it) }?.let { z ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                  if (!staff) ShiftReviewBadge(d, c) { history = false; reviewing = c }
+                  if (canReport) ir.vil3ntec.tohid.ui.desk.DeskButton(StrShift.zReport, { history = false; reprint = true; showReport = z }, kind = ir.vil3ntec.tohid.ui.desk.DeskButtonKind.GHOST)
+                }
+              }
+            }
+            ir.vil3ntec.tohid.ui.desk.DeskDivider(Modifier.padding(vertical = 6.dp))
+          }
+        }
+      }
+    }
+    else AlertDialog(
       onDismissRequest = { history = false },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrShift.registerHistory, color = Shop.colors.text) },
@@ -493,9 +541,15 @@ private fun countLine(r: ShiftSlip.Row): Pair<String, String>? {
 }
 
 @Composable
-private fun ShiftReportLines(rep: ShiftReport) {
+private fun ShiftReportLines(rep: ShiftReport, desk: Boolean = false) {
   ShiftSlip.rows(rep).forEach { r ->
     val (label, value) = slipLine(r)
+    //  کامپیوتر (`claude/e-desk-d3c`): ردیفِ «برچسب — مقدار» ِ `ui/desk`؛ «نیازِ بررسی» به واژهٔ رنگِ هشدار، بی قرص
+    if (desk) {
+      if (r.kind == ShiftSlip.Kind.NEEDS_REVIEW) ir.vil3ntec.tohid.ui.desk.DeskDialogText(label, strong = true, color = ir.vil3ntec.tohid.ui.desk.Desk.colors.warning)
+      else ir.vil3ntec.tohid.ui.desk.DeskValueRow(label, value, strong = r.strong)
+      return@forEach
+    }
     if (r.kind == ShiftSlip.Kind.NEEDS_REVIEW) {
       Spacer(Modifier.height(4.dp))
       StatusPill(label, PillTone.WARNING)
