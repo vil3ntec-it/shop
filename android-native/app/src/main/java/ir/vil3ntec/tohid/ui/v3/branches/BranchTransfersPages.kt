@@ -30,18 +30,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrBranchTransfers
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrTransfer
 import ir.vil3ntec.tohid.core.stock.BranchTransfer
 import ir.vil3ntec.tohid.core.stock.BranchTransfer.Status
-import ir.vil3ntec.tohid.data.BranchDesk
-import ir.vil3ntec.tohid.data.BranchTransferBook
 import ir.vil3ntec.tohid.data.CountSheetModel
 import ir.vil3ntec.tohid.data.ShopData
-import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.BranchTransfersRepository
 import ir.vil3ntec.tohid.formatMillis
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -91,18 +87,6 @@ import kotlinx.coroutines.launch
  *   • `branches/transfers/{id}/edit` ویرایشِ پیش‌نویس
  *  ⛔ پس از هر پاسخِ روشن دفترِ همین دستگاه با سرور هم‌تراز می‌شود (`BranchTransferBook.mirror`، فقط شعبهٔ میز).
  */
-
-/** شعبهٔ میز و پیوندِ آینهٔ دفتر برای حال‌ها */
-@Composable
-internal fun RouteScope.rememberTransferHost(): Pair<BranchTransfersRepository?, Pair<String, suspend (List<BranchTransfer.Transfer>) -> Unit>> {
-  val context = LocalContext.current
-  //  همان راهِ `PurchaseOrderHost`: بی ورود هر درخواست روشن رد می‌شود (صفحه «نیامد» می‌گوید)، نه صفحهٔ خالی
-  val here = remember { BranchDesk.current(context) }
-  val repo: BranchTransfersRepository? = remember(context) { BranchTransfersRepository(Backend.api(context)) }
-  val st = store
-  val mirror: suspend (List<BranchTransfer.Transfer>) -> Unit = { ts -> BranchTransferBook.mirror(context, st, here, ts) }
-  return repo to (here to mirror)
-}
 
 internal fun statusPill(s: Status): V3Status = when (s) {
   Status.DRAFT -> V3Status.REVIEW
