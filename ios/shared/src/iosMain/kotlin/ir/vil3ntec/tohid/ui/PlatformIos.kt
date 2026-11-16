@@ -38,4 +38,8 @@ object Platform {
   /** OPS-02 — iOS پنجرهٔ «امن» در برابرِ عکسِ صفحه ندارد (برنامه نمی‌تواند آن را ببندد)؛ همان API بی‌اثر */
   @androidx.compose.runtime.Composable
   fun SecureWindow(on: Boolean) = Unit
+
+  /** نوارهای سیستمِ اندروید — آیفون نوارِ وضعیت را از خودِ نما می‌گیرد */
+  @androidx.compose.runtime.Composable
+  fun SystemBars(dark: Boolean) = Unit
 }
