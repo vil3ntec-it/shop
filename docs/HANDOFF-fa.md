@@ -120,6 +120,10 @@
   (همان ترتیب). (۲) «ساخت نسخهٔ بومی» — `DroppedResendTest` («بردارِ سرور همان خروجیِ امروزِ کد است»): ردیفِ کاملِ `pu-full` حالا فیلدهای
   ارزی دارد و `core/test-vectors/resend-dropped-v1.json` کهنه بود ⇒ `TOHID_WRITE_VECTORS=resend-dropped` (خطِ A، `*DroppedResend*` ۱۱/۱۱)؛
   `sync-resend-dropped.test.js` ِ سرور با همان بردار ۵/۵.
+  (۳) «سناریوهای سرتاسری» — `UF.batch30` و `JB3`: خوانندهٔ مدلِ کاتلینِ E2E (`server/test/e2e/lib/native.mjs`) هر فیلد را یک خط می‌خواند و
+  سه فیلد در یک خطِ `Models.kt` پیش‌فرضِ `Purchase.currency` را «null, @OptIn(…» می‌دید. هر فیلدِ ارزی حالا خطِ خودش را دارد (همان شکلِ
+  `unitName`)؛ سقفِ `tools/quality/baseline.json` برای `Models.kt` ۹۳۰ ⇐ **۹۳۸** (دلیل: ۱۲ فیلدِ همگام‌شونده، یکی در هر خط، قراردادِ همین
+  خواننده). `fields` پیش ۱ قرمز، پس ۰؛ `journeys-b` و `sync` سبز.
 ### ۱۴۰۵/۰۸/۲۶ — عاملِ e-phone-p0r3 زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-phone-p0r3` (از `origin/main` 7e2a36923، پس از #1060) — کالبدِ یکسان، دورِ سوم و دو خواستِ صاحب‌کار
 
 - **خواستِ صاحب‌کار ۱ (عکسِ «مصارف»، همه‌جا با اجزای مشترک)**: ردیفِ داده (`V3DataRow`) ⇐ [کاشی] · [عنوان ……… مبلغ] / [جزئیات · وضعیت] —
