@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.PhotoCamera
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -75,6 +74,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Chip
 import ir.vil3ntec.tohid.ui.v3.V3FieldKind
+import ir.vil3ntec.tohid.ui.v3.V3LiveSpinner
 import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3StatusPill
@@ -281,7 +281,7 @@ internal fun InvoiceOcrPhoneHost(ctl: InvoiceOcrController, products: List<Produ
   V3Sheet(onDismiss = ctl::close, title = StrInvoiceOcr.title) {
     when (ctl.phase) {
       OcrPhase.SENDING -> Row(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+        V3LiveSpinner(Modifier.size(20.dp), strokeWidth = 2.dp)
         Spacer(Modifier.width(10.dp))
         Text(StrInvoiceOcr.busy, style = V3Type.body, color = c.inkMuted)
       }
@@ -387,7 +387,7 @@ internal fun InvoiceOcrDeskHost(ctl: InvoiceOcrController, onAccept: (List<Invoi
     val dc = Desk.colors
     when (ctl.phase) {
       OcrPhase.SENDING -> Row(verticalAlignment = Alignment.CenterVertically) {
-        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+        V3LiveSpinner(Modifier.size(18.dp), strokeWidth = 2.dp)
         Spacer(Modifier.width(DeskSpace.x2))
         DeskDialogText(StrInvoiceOcr.busy)
       }
