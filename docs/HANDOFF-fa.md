@@ -81,6 +81,11 @@
   `owner-report` ۹/۹، `dari-text` ۱۷/۱۷، `api-contract` ۲/۲. core: `BranchTransferLedgerTest` ۵/۵ (تازه)، `BranchTransferTest` ۵/۵، `BranchStockTest` ۴/۴،
   `BranchBookTest` ۱۰/۱۰. برنامه (هدف‌دار): `BranchTransfersStateTest` ۶/۶، `BranchTransfersRoutesUiTest` ۵/۵ (فهرست و پالایه، دریافتِ همه یک گام و دفترِ +۳ یک بار، ارسالِ پیش‌نویس و دفترِ −۲ و لغوِ بی دلیل نه، فرمِ ارسال، جدولِ کامپیوتر)، `BranchesStateTest` ۶/۶، `BranchesReportPageTest` ۴/۴، `PageAnatomyGuardTest` ۹/۹، `LookGuardTest` ۷/۷، `HardcodedColorsTest` ۲/۲، `DariCoverageTest` ۲۳/۲۳، `DariWordsTest` ۱۷/۱۷، `I18nCoverageTest` ۸/۸، `InfraLeakGuardTest` ۸/۸، `StockExtrasTest` ۵/۵، `V3ReachabilityTest` ۹/۹، `BranchDeskDesktopTest` ۸/۸، `V3DataRowGuardTest` ۵/۵، `SectionColorsTest` ۷/۷، `PriceCheckDataTest` ۵/۵ (`./desktop/gradlew -p desktop test --tests …`، محلی؛ عکس‌ها `BranchTransfersShotsTest`). عکس‌ها: `/home/user/wt-br4-shots/` (فهرست، جزئیات، فرمِ گوشی و جدولِ
   کامپیوتر ۱۳۶۶×۷۶۸، روز و شب؛ `BR4_SHOTS=<پوشه>`). ابزار: `api-contract` (`docs/api/routes.json` تازه)، `dari-words.js --write`.
+- **CI ِ #1063، تغییرِ آگاهانهٔ آزمون** (هماهنگ‌کننده): `TillReceiveStaleTest` («دو ضربه با یک کلید…») انتظارِ `q0 + 2` داشت و `q0 + 6` دید
+  (۴۷۸۳ آزمون، فقط همین سرخ). کدِ این دسته به `ShopStore`/`DebtEntry`/`TillReceivePref` دست نزده؛ صفِ `SyncV1Engine.of` میانِ همهٔ آزمون‌های
+  JVM ِ کامپیوتر مشترک است (~۲۷۱ هزار op) و نوشتنِ دیرهنگامِ آزمونِ دیگری میانِ دو شمارش نشسته بود. سه سنجهٔ صف حالا فقط opهای همین
+  آزمون را می‌شمرند (`ownOps`: ردیف با پیشوندِ `$p-` یا سابقه با `refId` ِ همان)؛ سنجه همان: یک INSERT برای رسید و یکی برای سابقه، ردِ
+  قاعده هیچ op، هیچ DELETE برای رسیدِ گوشی. ریشهٔ دوم (کدام آزمون پس از پایانش هنوز می‌نویسد) برای دورِ بعد؛ پیام‌های سنجه opها را نشان می‌دهند.
 - **قدمِ بعدی**: روشن کردن روی یک دکانِ آزمایشی و آزمونِ دستی (ستونِ «صاحب‌کار دقیقاً چه کند» ِ هفت ردیف در PARTIAL-MAP «پرچم»)؛ انتقالِ
   **درونِ** شعبهٔ غیرِ اصلی هنوز `branch_unsupported` (کارِ جدا، §۱۰)؛ صفحهٔ ریشهٔ «شعبه‌ها» هنوز `V3Scaffold` ِ مستقیم دارد (نه `V3RoutePage`).
 
