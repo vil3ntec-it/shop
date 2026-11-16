@@ -8,7 +8,6 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -29,10 +28,11 @@ import java.util.concurrent.TimeUnit
  *  است که Doze و «ذخیرهٔ باتری» را می‌فهمد و کار را وقتی شبکه هست
  *  اجرا می‌کند، نه وقتی ما می‌خواهیم.
  *
- *  ⚠️ **`setExpedited` فقط برای دستهٔ کوچکِ پس از یک تغییر** است. کارِ
- *  فوری سهمیهٔ محدودی دارد؛ ریختنِ همه‌چیز در آن یعنی اندروید کم‌کم
- *  همه‌شان را عقب می‌اندازد. کارِ سنگین (Snapshot، صفِ سه‌روزه) با کارِ
- *  دوره‌ای می‌رود.
+ *  ⛔ **کارِ یک‌باره `setExpedited` ندارد** (e-syncdiag): androidx.work 2.9.1 کارِ فوریِ مکث‌دار را در `build()` با
+ *  `IllegalArgumentException("Expedited jobs cannot be delayed")` رد می‌کند و مکثِ ۵۰۰ms همان Debounceِ بندِ ۲۰.۲ است.
+ *  با هر دو، [now] روی گوشی **همیشه** پرتاب می‌کرد (همه‌جا در `runCatching`): نه «همگام‌سازی حالا» دوری راه می‌انداخت
+ *  («همگام‌سازی ناموفق بود»)، نه ذخیره، نه سوکتِ زنده، نه ورود — فقط کارِ دوره‌ای. شیمِ کامپیوتر همان سنجش را دارد
+ *  (`desktop/src/shim/kotlin/androidx/work/Work.kt`، `SyncNowRequestTest`).
  *
  *  ⚠️ `NetworkType.CONNECTED` یعنی بی نت اصلاً اجرا نمی‌شود — نه اینکه
  *  اجرا شود و خطا بدهد. خطای بی‌فایده باتری می‌خورد.
@@ -203,7 +203,6 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
       val work = OneTimeWorkRequestBuilder<SyncV1Worker>()
         .setConstraints(net)
         .setInitialDelay(500, TimeUnit.MILLISECONDS)
-        .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
         .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
         .build()
       WorkManager.getInstance(context.applicationContext)

@@ -74,22 +74,35 @@ class OneTimeWorkRequest internal constructor(w: Class<out CoroutineWorker>, d: 
 abstract class WorkBuilder<B : WorkBuilder<B, R>, R : WorkRequest>(internal val worker: Class<out CoroutineWorker>) {
   internal var delayMs = 0L
   internal var backoffMs = 30_000L
+  internal var expedited = false
   @Suppress("UNCHECKED_CAST") private fun self() = this as B
   fun setInitialDelay(d: Long, unit: TimeUnit): B = self().also { delayMs = unit.toMillis(d) }
   fun setConstraints(c: Constraints): B = self()
   fun setBackoffCriteria(p: BackoffPolicy, d: Long, unit: TimeUnit): B = self().also { backoffMs = unit.toMillis(d) }
-  fun setExpedited(p: OutOfQuotaPolicy): B = self()
+  fun setExpedited(p: OutOfQuotaPolicy): B = self().also { expedited = true }
   fun addTag(t: String): B = self()
   abstract fun build(): R
 }
 
 class PeriodicBuilder(w: Class<out CoroutineWorker>, private val periodMs: Long) :
   WorkBuilder<PeriodicBuilder, PeriodicWorkRequest>(w) {
-  override fun build() = PeriodicWorkRequest(worker, delayMs, periodMs, backoffMs)
+  override fun build(): PeriodicWorkRequest {
+    //  همان سنجشِ `PeriodicWorkRequest.Builder` ِ androidx.work 2.9.1
+    require(!expedited) { "PeriodicWorkRequests cannot be expedited" }
+    return PeriodicWorkRequest(worker, delayMs, periodMs, backoffMs)
+  }
 }
 
 class OneTimeBuilder(w: Class<out CoroutineWorker>) : WorkBuilder<OneTimeBuilder, OneTimeWorkRequest>(w) {
-  override fun build() = OneTimeWorkRequest(worker, delayMs, backoffMs)
+  /**
+   *  e-syncdiag: همان سنجشِ `WorkRequest.Builder.build` ِ androidx.work 2.9.1 (بایت‌کدِ همان نسخهٔ `work-runtime` ِ گوشی):
+   *  کارِ فوری مکث نمی‌پذیرد. این‌جا پیش‌تر `setExpedited` هیچ نمی‌کرد و «همگام‌سازی حالا» ِ گوشی که همین را پرتاب می‌کرد روی
+   *  کامپیوتر و آزمون‌ها سبز می‌ماند.
+   */
+  override fun build(): OneTimeWorkRequest {
+    require(!(expedited && delayMs > 0)) { "Expedited jobs cannot be delayed" }
+    return OneTimeWorkRequest(worker, delayMs, backoffMs)
+  }
 }
 
 inline fun <reified W : CoroutineWorker> PeriodicWorkRequestBuilder(interval: Long, unit: TimeUnit) =
