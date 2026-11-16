@@ -90,6 +90,7 @@
   (`HeadlessException`). عکس‌ها: `/home/user/wt-p0-shots/round3/{before,after,owner-rows,manual-order,audit}` و `audit.md`.
 - **قدمِ بعدی**: ریشهٔ «مصارفِ ناپدید» با دادهٔ صاحب‌کار (همگام‌سازی)؛ `PageAnatomyUiTest` روی درختِ هر مسیر؛ `sales/table` اگر صاحب‌کار بخواهد.
 
+- **CI ِ #1062 (هماهنگ‌کننده)**: `TillReceivePhoneWiringTest` (فقط در آزمونِ واحدِ اندرویدِ «ساختِ نسخهٔ بومی») خطِ `VipGate(Str.debtors)` را می‌خواست؛ دورِ ۳ کلیدِ بخش را به قفل داد ⇒ سنجهٔ متنی به `VipGate(Str.debtors, feature = "debtors")` (همان سنجه، شکلِ تازه).
 ### ۱۴۰۵/۰۸/۲۶ — عاملِ e-phone-p0 زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-phone-p0` (از batch-69، ادغامِ main تا #1059 1802fca1a) — کالبدِ یکسانِ صفحه‌های گوشی (دورِ دوم)
 
 - **پیشین (۰۸/۲۴)**: نشان‌های `V3Anatomy` روی اجزای مشترک، `PageAnatomyGuardTest`، ممیزیِ `PhoneAnatomyAuditTest` (`P0_AUDIT`، `AnatomyProbe`)،
