@@ -196,6 +196,12 @@ object LedgerEngine {
      *  خودِ [InUnit.totalMinor] است، بی گرد کردنِ دوباره. `null` = همان خریدِ امروز.
      */
     val inUnit: InUnit? = null,
+    /**
+     *  PUR-11 — جمعِ **دقیقِ** ردیف به صدمِ افغانی (معادلِ افغانیِ ردیفِ خریدِ ارزی، `PurchaseFx.doc`): جمعِ خرید، بدهی و ارزشِ انبار
+     *  (`WarehouseEntry.costMinor`) همین است و بهای واحد = همین ÷ مقدار (`StockLedger.unitCostMinor`)، بی گرد کردنِ دوباره به افغانی؛
+     *  `purchasePrice` ِ بالا نادیده. با [inUnit] نادیده (آن‌جا [InUnit.totalMinor] همین کار را می‌کند). `null` = همان خریدِ امروز.
+     */
+    val exactTotalMinor: Long? = null,
   )
 
   /** ردیفِ خرید به واحدِ خرید: نام، مقدار به همان واحد (هزارم)، ضریب به واحدِ پایه (هزارم) و جمعِ دقیقِ ردیف (صدمِ افغانی) */
@@ -226,7 +232,13 @@ object LedgerEngine {
         ?: return Result.Failed(StrStock.errAmount)
     }
     val quantity = pu?.let { it.baseQtyMilli / 1000.0 } ?: draft.quantity
-    val unitPrice = pu?.let { it.unitCostMinor / 100.0 } ?: draft.purchasePrice
+    //  PUR-11: جمعِ دقیقِ ردیفِ ارزی (به افغانی) ⇒ بهای واحد از همان، نه از فیِ گردشده
+    val exact = draft.exactTotalMinor.takeIf { pu == null }
+    if (exact != null && exact < 0) return Result.Failed(StrStock.errPrice)
+    if (exact != null && (quantity.isNaN() || StockLedger.milli(quantity) <= 0)) return Result.Failed(StrStock.errAmount)
+    val unitPrice = pu?.let { it.unitCostMinor / 100.0 }
+      ?: exact?.let { StockLedger.unitCostMinor(it, StockLedger.milli(quantity)) / 100.0 }
+      ?: draft.purchasePrice
     if (quantity.isNaN() || quantity <= 0) return Result.Failed(StrStock.errAmount)
     if (unitPrice.isNaN() || unitPrice < 0) return Result.Failed(StrStock.errPrice)
     if (draft.landedCost != null && (draft.landedCost.isNaN() || draft.landedCost < 0)) return Result.Failed(StrPurchasePages.landedBad)
@@ -238,7 +250,7 @@ object LedgerEngine {
     if (due != null && due < date) return Result.Failed(PurchaseBook.DUE_BEFORE_DATE)
     val unit = draft.unit.ifBlank { product.unit }
     // گِرد کردن دقیقاً همان‌جای نسخهٔ وب است
-    val totalAmount = pu?.let { it.totalMinor / 100.0 } ?: Math.round(quantity * unitPrice).toDouble()
+    val totalAmount = pu?.let { it.totalMinor / 100.0 } ?: exact?.let { it / 100.0 } ?: Math.round(quantity * unitPrice).toDouble()
     var paid = if (draft.paidAmount.isNaN() || draft.paidAmount < 0) 0.0 else draft.paidAmount
     paid = minOf(paid, totalAmount)
 
@@ -305,7 +317,7 @@ object LedgerEngine {
           landedCost = landed,
           landedCostMinor = landed?.let(StockLedger::minor),
           userId = draft.userId?.trim()?.ifEmpty { null },
-          costMinor = pu?.totalMinor,
+          costMinor = pu?.totalMinor ?: exact,
         ),
         purchases = d.purchases + Purchase(
           id = purchaseId,

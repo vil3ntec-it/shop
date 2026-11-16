@@ -309,7 +309,7 @@ BROKEN ۰ ⇒ حدودِ ۷۱٪** (V = ۱، P = ۰٫۵). PRهای باز (§۶.�
 | POS صندوق | ۴۲ | ۱۹ / ۲۱ / ۱ / ۱ / ۰ | POS-37 مالیات (پشتِ D-11)؛ POS-42 سرعتِ اسکن روی دستگاهِ واقعی (NV)؛ ۱۷ PARTIAL ِ P0/P1 (POS-01…06، 10، 12، 15، 18…) | `core/.../core/{pos,sale}`، `ui/v3/sales`، `ui/screens`؛ سرور `lib/till-guard.js`، `finalized-sales.js` |
 | INV انبار | ۳۹ | ۲۷ / ۱۲ / ۰ / ۰ / ۰ | INV-01، 03، 09، 10، 11، 13، 16 (شمارش حینِ فروش، پیشنهادِ خرید) | `core/.../core/stock`، `ui/v3/stock`؛ `lib/stock*.js`، `stock-transfers.js` |
 | PAY پرداخت | ۲۴ | ۱۱ / ۱۲ / ۱ / ۰ / ۰ | PAY-22 (QR ِ ملیِ APS/AfPay، مشخصاتِ بیرونی)؛ PAY-06/08/21 پشتِ D-08 (حساب‌پیِ واقعی)؛ PAY-07 | `core/.../core/{pay,gateway,safe}`، `android-native/.../pay`؛ `lib/payment-*.js`، `hesabpay-*.js`، `safe-ledger.js`؛ `docs/PAYMENTS-HESABPAY-fa.md` |
-| PUR خرید | ۱۴ | ۶ / ۶ / ۲ / ۰ / ۰ | PUR-11 ارزِ دیگر (⛔ D-15: تا دکانِ واقعی نخواهد نسازید؛ #784 پیش‌نویس)؛ PUR-12 عکسِ فاکتور (همراهِ AI-10) | `core/.../core/purchase`؛ `lib/purchase-order*.js`؛ PR ‏#950 باز |
+| PUR خرید | ۱۴ | ۶ / ۶ / ۲ / ۰ / ۰ | PUR-11 ارزِ دیگر (D-15 ب ۱۴۰۵/۰۸/۲۶: ساخته شد، `core/purchase/PurchaseFx` + `data/SupplierFx`؛ سفارشِ خریدِ سرور هنوز افغانی)؛ PUR-12 عکسِ فاکتور (همراهِ AI-10) | `core/.../core/purchase`؛ `lib/purchase-order*.js`؛ PR ‏#950 باز |
 | RPT گزارش | ۱۸ | ۸ / ۱۰ / ۰ / ۰ / ۰ | RPT-10 فاکتورِ قانونی (D-11 + D-25)؛ RPT-03/04/11/13/14/17 | `core/.../core/report`، `ui/screens/ReportFresh*.kt`، `ui/v3/analytics`؛ `lib/report-core.js`، `finance-reports.js`، `owner-report.js` |
 | STF کارمند | ۱۱ | ۳ / ۸ / ۰ / ۰ / ۰ | نقش‌های بیشتر (STF-01)، سه‌حالتهٔ مجوز و برگهٔ تأیید (STF-02/03)، PIN ِ شخصی (STF-04)؛ S144 (D-26 گرفته، ساخته نشده) | `core/.../core/{staff,perm}`؛ `lib/staff-*.js`، `permissions.js`، `perm-core.js` |
 | DLV پیک و تحویل | ۲۰ | ۱۴ / ۶ / ۰ / ۰ / ۰ | DLV-01، 02، 05، 06، 16 | `core/.../core/{delivery,courier}`، `ui/courier`؛ `lib/delivery-*.js`، `courier-*.js` |
@@ -346,7 +346,7 @@ BROKEN ۰ ⇒ حدودِ ۷۱٪** (V = ۱، P = ۰٫۵). PRهای باز (§۶.�
 - **بعد:** PAY-07؛ پاک کردنِ کامل کدِ رابطِ قدیم (legacy) پس از اطمینان که هیچ صفحه به آن تکیه ندارد؛ کمبودهای PARTIAL
   (اول مدیریت و پیک، بعد ویترین)؛ MISSING ِ بی مانع (ORD-20، MKT-03…08، HW-08، PUR-12 با AI-10 پس از تصمیمِ مدل، S121،
   S122)؛ دورِ تازهٔ «شاهدِ CI» پس از هر دسته؛ آیفون در هر دسته یک گام (تصمیمِ صاحب‌کار).
-- **نسازید:** تصمیم‌های به‌تعویق‌افتاده (PUR-11 با D-15؛ S47 با D-05 تعارض دارد)؛ هر چیزی که حساب/کلیدِ بیرونی می‌خواهد
+- **نسازید:** تصمیم‌های به‌تعویق‌افتاده (S47 با D-05 تعارض دارد؛ PUR-11 با D-15 ب ۱۴۰۵/۰۸/۲۶ ساخته شد)؛ هر چیزی که حساب/کلیدِ بیرونی می‌خواهد
   تا صاحب‌کار بدهد (§ `OWNER-TODO`). ترتیبِ صاحب‌کار: مدیریت + پیک ⇐ برنامهٔ خرید (ویترین) ⇐ بقیه.
 
 ---

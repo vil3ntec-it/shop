@@ -197,8 +197,10 @@ object CashShift {
         //  پرداختیِ امانیِ لغوشده (`Layaways.REFUND`؛ پیش‌پرداخت و قسط‌ها خودشان رسیدند). بی امانی ⇒ همان جمع
         d.transactions.filter { (SpecialOrders.isRefund(it) || Layaways.isRefund(it)) && inWindow(it.createdAt) }.sumOf { it.amount },
       expenses = d.expenses.filter { inWindow(it.createdAt) }.sumOf { it.amount },
-      suppliers = d.supplierPayments.filter { inWindow(it.createdAt) }.sumOf { it.amount } +
-        d.purchases.filter { inWindow(it.createdAt) }.sumOf { it.paidAmount },
+      //  PUR-11: پولی که به ارز به تأمین‌کننده رفت از دخلِ افغانی نیست؛ پرداختِ حسابِ ارزی به افغانی همان پولِ داده‌شده
+      //  (`SupplierFx.drawerOut`/`drawerPaid`؛ ردیفِ بی ارز بیت‌به‌بیت همان `amount`/`paidAmount`)
+      suppliers = d.supplierPayments.filter { inWindow(it.createdAt) }.sumOf { SupplierFx.drawerOut(it) } +
+        d.purchases.filter { inWindow(it.createdAt) }.sumOf { SupplierFx.drawerPaid(it) },
       cashIn = moves.filter { it.type == "cash_in" }.sumOf { it.amount },
       cashOut = moves.filter { it.type == "cash_out" }.sumOf { it.amount },
     )

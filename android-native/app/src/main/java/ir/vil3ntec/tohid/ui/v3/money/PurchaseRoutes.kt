@@ -46,7 +46,11 @@ internal fun rememberOpenOrders(door: Boolean): OpenOrders {
 
 /** «پرداخت» ِ یک خرید: برگهٔ پرداختِ تأمین‌کننده با ماندهٔ همین خرید و یادداشتی که آن را نام می‌برد (`PurchaseBook.payNote`) */
 internal fun RouteScope.payPurchase(v: PurchaseViews.View) {
-  nav.open(MoneyPaths.payPurchase(v.supplierId, v.remaining, v.no.takeIf { it > 0 && !v.isOrder }))
+  val code = v.currency
+  //  PUR-11: فاکتورِ ارزی ⇒ ماندهٔ همان ارز روی حسابِ همان ارز
+  if (code != null && v.fxRemaining != null) {
+    nav.open(MoneyPaths.payPurchase(v.supplierId, ir.vil3ntec.tohid.core.safe.SafeCurrency.major(v.fxRemaining, code), v.no.takeIf { it > 0 && !v.isOrder }, code))
+  } else nav.open(MoneyPaths.payPurchase(v.supplierId, v.remaining, v.no.takeIf { it > 0 && !v.isOrder }))
 }
 
 /** کارهای فهرستِ «خریدها» در زبانهٔ خرید */

@@ -25,6 +25,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Summary
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseFx
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrPlaces
 import ir.vil3ntec.tohid.core.i18n.StrReports
@@ -151,12 +152,39 @@ internal fun PurchasesTab(d: ShopData, from: String, to: String, spec: ReportLis
         }
       }
     }
+    //  PUR-11: خریدهای ارزیِ بازه (به همان ارز؛ جمعِ بالا معادلِ افغانی است) و اختلافِ نرخِ پرداخت‌ها — فقط وقتی هست
+    if (r.byCurrency.isNotEmpty() || r.fxDiff != 0L) {
+      item(key = "fx") {
+        V3Section(StrPurchaseFx.boughtIn, spec.appear("fx", 2)) {
+          r.byCurrency.forEach { (code, minor) ->
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
+              Text(ir.vil3ntec.tohid.data.SafeCurrencies.name(code), style = V3Type.callout, color = c.ink, modifier = Modifier.weight(1f), maxLines = 1)
+              Text(ir.vil3ntec.tohid.data.SafeCurrencies.format(minor, code), style = V3Type.subhead, color = c.ink)
+            }
+          }
+          if (r.fxDiff != 0L) {
+            val a = afn(kotlin.math.abs(r.fxDiff) / 100.0)
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
+              Row {
+                Text(StrPurchaseFx.fxDiffReport, style = V3Type.callout, color = c.ink, modifier = Modifier.weight(1f))
+                Text(if (r.fxDiff > 0) StrPurchaseFx.fxLoss(a) else StrPurchaseFx.fxGain(a), style = V3Type.subhead, color = c.ink)
+              }
+              Text(StrPurchaseFx.fxDiffReportNote, style = V3Type.footnote, color = c.inkMuted)
+            }
+          }
+        }
+      }
+    }
     item(key = "rows-title") { SectionTitle(StrReports.purchaseRows) }
     rowCards(stagger, r.rows, { it.id }) { p ->
       val supplier = d.suppliers.firstOrNull { it.id == p.supplierId }
+      val fxCode = ir.vil3ntec.tohid.data.SupplierFx.cur(p.currency)
       V3ListRow(
         names[p.productId] ?: StrReports.unknownProduct,
-        subtitle = listOfNotNull(uiDate(p.date), "${qty(p.quantity)} ${p.unit}", supplier?.name).joinToString(" · "),
+        subtitle = listOfNotNull(
+          uiDate(p.date), "${qty(p.quantity)} ${p.unit}", supplier?.name,
+          fxCode?.let { ir.vil3ntec.tohid.data.SupplierFx.text(p.fxTotalMinor ?: 0L, it) },
+        ).joinToString(" · "),
         icon = Icons.Outlined.LocalShipping, hue = V3Hue.PURPLE,
         value = afn(p.totalAmount), valueColor = c.ink,
         onClick = { spec.onOpen(invoiceOf[p.id]?.let(MoneyPaths::purchase) ?: supplier?.let { MoneyPaths.supplier(it.id) } ?: MoneyPaths.PURCHASING) },

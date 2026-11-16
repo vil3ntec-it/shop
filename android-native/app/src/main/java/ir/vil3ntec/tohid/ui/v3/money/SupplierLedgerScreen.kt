@@ -45,6 +45,9 @@ import ir.vil3ntec.tohid.data.PurchaseViews
 import ir.vil3ntec.tohid.core.i18n.StrPurchases
 import ir.vil3ntec.tohid.ui.v3.V3Fab
 import ir.vil3ntec.tohid.ui.v3.V3Summary
+import ir.vil3ntec.tohid.ui.v3.V3Type
+import androidx.compose.material.icons.outlined.CurrencyExchange
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseFx
 import ir.vil3ntec.tohid.ui.v3.V3SummaryAction
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.screens.v3Text
@@ -153,6 +156,9 @@ internal fun SupplierLedgerScreen(id: String, d: ShopData, actions: SupplierLedg
           }
         }
         if (supplier.notes.isNotBlank()) Text(supplier.notes, style = v3Text(13, FontWeight.Normal, 19), color = PhoneV3.colors.inkMuted)
+        //  PUR-11: بدهی به تفکیکِ ارز — ماندهٔ هر ارز با ارزشِ دفتریِ افغانیِ همان (جزوِ بدهیِ افغانیِ بالا)
+        val fxAccounts = remember(d, id) { ir.vil3ntec.tohid.data.SupplierFx.accounts(d, id) }
+        if (fxAccounts.isNotEmpty()) FxAccounts(fxAccounts)
         Bought(bought, today, showAll, actions) { showAll = true }
         Payments(payments, today, allPays) { allPays = true }
         Spacer(Modifier.height(4.dp))
@@ -200,6 +206,24 @@ private fun Bought(list: List<PurchaseViews.View>, today: String, showAll: Boole
   }
 }
 
+/** PUR-11: ماندهٔ هر ارزِ تأمین‌کننده (همان `SupplierFx.accounts`) — ارز، مانده به همان ارز و ارزشِ دفتری */
+@Composable
+private fun FxAccounts(list: List<ir.vil3ntec.tohid.core.purchase.PurchaseFx.Account>) {
+  V3Section(title = StrPurchaseFx.byCurrency) {
+    list.forEachIndexed { i, a ->
+      if (i > 0) V3Divider(start = V3DataRowSpec.DIVIDER_START)
+      val fx = ir.vil3ntec.tohid.data.SafeCurrencies.format(kotlin.math.abs(a.fx), a.currency)
+      V3DataRow(
+        title = ir.vil3ntec.tohid.data.SafeCurrencies.name(a.currency),
+        secondary = if (a.fx >= 0) StrPurchaseFx.owed(fx, MoneyText.afn(a.afn / 100.0)) else StrPurchaseFx.credit(fx),
+        meta = V3RowMeta(ir.vil3ntec.tohid.data.SupplierFx.ltr(fx)),
+        icon = Icons.Outlined.CurrencyExchange,
+      )
+    }
+    Text(StrPurchaseFx.bookValueNote, style = V3Type.footnote, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(16.dp))
+  }
+}
+
 /** پرداخت‌های بعدیِ همین تأمین‌کننده (پرداختِ هنگامِ خرید در خودِ ردیفِ خرید است) */
 @Composable
 private fun Payments(list: List<ir.vil3ntec.tohid.data.SupplierPayment>, today: String, showAll: Boolean, onShowAll: () -> Unit) {
@@ -216,10 +240,20 @@ private fun Payments(list: List<ir.vil3ntec.tohid.data.SupplierPayment>, today: 
     shown.forEachIndexed { i, pay ->
       if (i > 0) V3Divider(start = V3DataRowSpec.DIVIDER_START)
       //  کالبدِ ردیفِ داده (۶۸c): یادداشت · روز · مبلغ به رنگِ نوشته
+      //  PUR-11: پرداختِ حسابِ ارزی ⇒ مبلغِ همان ارز، نرخ و اختلافِ نرخ
+      val code = ir.vil3ntec.tohid.data.SupplierFx.cur(pay.currency)
+      val fxLine = code?.let { c ->
+        val rate = ir.vil3ntec.tohid.data.SupplierFx.rateOf(pay)?.let { ir.vil3ntec.tohid.core.purchase.PurchaseFx.rateLine(it) }.orEmpty()
+        val diff = pay.fxDiffMinor?.takeIf { it != 0L }?.let { x ->
+          val a = MoneyText.afn(kotlin.math.abs(x) / 100.0)
+          " · " + if (x > 0) StrPurchaseFx.fxLoss(a) else StrPurchaseFx.fxGain(a)
+        }.orEmpty()
+        StrPurchaseFx.docLine(ir.vil3ntec.tohid.data.SafeCurrencies.format(pay.fxAmountMinor ?: 0L, c), rate) + diff
+      }
       V3DataRow(
         title = pay.notes.ifBlank { StrMoney.payment },
-        secondary = MoneyText.short(pay.date, today),
-        meta = V3RowMeta(MoneyText.afn(pay.amount)),
+        secondary = listOfNotNull(MoneyText.short(pay.date, today), fxLine).joinToString(" · "),
+        meta = V3RowMeta(MoneyText.afn(pay.afnPaidMinor?.let { it / 100.0 } ?: pay.amount)),
         icon = Icons.Outlined.Payments,
       )
     }

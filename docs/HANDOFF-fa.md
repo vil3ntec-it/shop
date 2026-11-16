@@ -57,6 +57,73 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۶ — عاملِ e-pur11 زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-pur11` (از `origin/main` 7e2a36923) — PUR-11: خرید به ارزِ دیگر (D-15 ب)
+
+- **تصمیمِ صاحب‌کار (۱۴۰۵/۰۸/۲۶): «همه را تمام کن»** ⇒ D-15 از «الف» (فقط وقتی دکانی خواست) به «ب»؛ ثبت در `OWNER-DECISIONS-fa.md` (جدول و §D-15)،
+  `OWNER-PENDING-fa.md`، `spec/BLOCKERS.md`، `MAINTAINER-fa.md`، `PROGRESS-fa.md` و README ِ `tools/claude-ops`. از #784 فقط ایده؛ کد تازه روی main.
+- **هسته** `core/purchase/PurchaseFx.kt` (commonMain، بی Double): `Rate(currency, rate, per)` = پول برای `per` واحد (`Pay.FX_PER`، ارزهای گاوصندوق)؛
+  `toAfn`/`fromAfn`/`lineFx` نیمه رو به بالا (به سوی +∞)؛ `doc` = یک تبدیل برای کلِ سند (به یک پول) + `allocate` ِ بزرگ‌ترین باقی‌مانده؛
+  `Account` (ماندهٔ ارزی + ارزشِ دفتری)، `payInFx`/`payInAfn` ⇒ `Settle(fx, value, carried, afnPaid)`، `diff = value − carried`؛ ضربِ ۱۲۸ بیتی.
+  **گرد:** ردیف ⇐ یک واحدِ کوچکِ ارز؛ سند ⇐ یک پول؛ پرداختِ بخشی ⇐ `round(afn × fx ÷ مانده)`؛ همهٔ مانده ⇐ همهٔ ارزشِ دفتری (+ بیشِ آن به نرخِ
+  پرداخت)؛ پولِ «همه» به افغانی دقیقاً همهٔ مانده را صاف می‌کند (ریالِ درشت‌دانه).
+- **دفتر:** `LedgerEngine.PurchaseDraft.exactTotalMinor` (بهای واحد از جمعِ دقیق، `costMinor`)؛ `PurchaseBook.record(fx, fxPaid)` و `Line.fxPrice`؛
+  فیلدهای افزودنیِ `Purchase`/`SupplierPayment` (`currency`، `fx…`؛ `amount` ِ پرداختِ ارزی = ارزشِ دفتری)؛ `data/SupplierFx.kt` (حساب‌ها، `pay`،
+  `drawerOut`/`drawerPaid` برای `CashShift` و `PayFlow`، `diff`، `defaultRate`، `returnRate`)؛ `PurchaseBook.open` هر ارز گروهِ خودش
+  (`fifo` ِ مشترک، افغانی بیت‌به‌بیت همان)؛ `supplierReturn(fx, fxPrice)`؛ `PurchaseViews` (`currency`، `fxTotal`، `fxRemaining`)؛ صورت‌حساب، برگه‌ها،
+  `ReportEngine.purchases` (`byCurrency`، `fxDiff`)، `ReportCsv` (ستون‌های ارز فقط وقتی هست)، `OwnerExport.HEADERS` + `license/owner-export.js`.
+- **صفحه:** گوشی — فرمِ «ثبت خرید» (ردیفِ «ارز» فقط با بیش از یک ارز؛ بخشِ «ارز و نرخ»؛ ارزِ تازه قیمت‌ها را پاک و نرخ را پیش‌پُر می‌کند؛ «نرسیده»
+  با ارز رد)، برگهٔ «پرداخت» (حساب/پرداخت با/نرخ/پیش‌نمایش)، صفحهٔ تأمین‌کننده («بدهی به تفکیکِ ارز»، پرداخت‌ها با ارز و اختلاف)، جزئیات و فهرستِ
+  خرید، گزارشِ خرید؛ کامپیوتر — `ui/screens/DeskPurchaseFx.kt` (کادرهای فاکتور، ردیفِ پرداختِ حسابِ ارزی، سطرهای پنجرهٔ فاکتور)، ستونِ قیمت به ارز،
+  کاشیِ «اختلافِ نرخ» ِ گزارش؛ برگهٔ مشترکِ «برگشت به تأمین‌کننده» به همان ارز و نرخ. رشته‌ها `StrPurchaseFx` (fa/en/ps، در `I18nTables`)؛ دری:
+  ۱۰ جمله در `DariText.PHRASES` + `dari-words.js --write` + `DARI-REVIEW-fa.md` §۱۴.
+- **همگام‌سازی:** همان جدول‌ها، فیلدِ افزودنی؛ بردارِ `ledger-sync-v1.json` با فیلدهای تازه (`TOHID_WRITE_VECTORS=ledger-sync`). `sync-v1.js`،
+  `routes/sync-v1.js`، PUMP_TABLES، `/api/pump/*`، admin-pump و pump-device دست نخوردند؛ هیچ تغییرِ سرورِ لازم نبود.
+- **کلیدِ دکانِ «خرید به ارزِ دیگر» (تصمیمِ ایمنیِ هماهنگ‌کننده، پس از ادغامِ #1062؛ OWNER-DECISIONS §D-15):** چون ساختِ کهنه ردیفِ ارزی را
+  افغانی می‌خواند و پرداختِ ارزی را از دخلِ افغانی کم می‌کند، کار پشتِ `data/PurchaseFxPrefAndroid.kt` ‹`tohid-policy:purchase_fx`، پیش‌فرض خاموش،
+  `ShopSettingsKeys` ِ دکان› رفت — همان راهِ `FxTillPref` (PAY-10)، بی کلیدِ سرور (پرچمِ سرور مالِ پنل است، نه صاحب‌کار؛ `route-authz-inventory` و
+  پرداختی دست نخوردند). صفحه: «تنظیمات ← کالا و انبار ← خرید به ارز دیگر» (`settings/goods/purchase-fx`، `PurchaseFxSettingsAndroid.kt`، `ToggleScreen`؛
+  بخشِ تنظیمات `Need.MANAGE` و نوشتن فقط با `!ShopRole.isStaff` = صاحب/مدیر) با «پیش از روشن کردن، همهٔ دستگاه‌های دکان را به‌روز کنید» و چرایش.
+  `ShopDeviceDto` نسخهٔ برنامه ندارد ⇒ فقط هشدار (فهرستِ دستگاهِ کهنه و تأیید نیست)؛ ثابتِ نسخه هم فقط `versionBase = "3.2"` است که ساخت‌های بی این
+  کار هم دارند ⇒ عددِ نسخه در هشدار نیامد. خاموش ⇒ `SupplierFx.offered` فقط افغانی به فرمِ گوشی (`MoneyRoutes` ‹`purchasing/new`›) و فاکتورِ
+  کامپیوتر (`DeskPurchasing`) می‌دهد ⇒ کادرِ ارز نیست؛ حساب‌های ارزی، صفحهٔ تأمین‌کننده، پرداخت، برگشت و گزارش پشتِ کلید نیستند. سیم: `SettingsLayout`
+  (`PURCHASE_FX`، بخشِ «کالا»، نشانی، `labelOf`)، `SettingsSearchIndex`، `SettingsTiers` (خط و مثال)، `SettingsPages`، رشته‌ها در `StrPurchaseFx`
+  (+ ۵ جملهٔ دری در `DariText` و `DARI-REVIEW-fa.md` §۱۴)، `DATA-SAFETY-fa.md` §۶.
+- **آزمون‌های عمداً عوض‌شده:** `PurchaseFxUiTest.phoneFormRecordsAUsdBillAtTheRecordedRate` و `PurchaseFxDeskUiTest.desktopInvoiceInUsdKeepsTheAfnCostAndTheUsdDebt`
+  حالا اول کلید را روشن می‌کنند (پیش‌شرطِ تازه، همان اثبات‌ها) و `clean()` ِ هر دو کلید را خاموش می‌کند؛ `PurchaseFxShotsTest` پیش از عکس‌های ارزی
+  روشن و در پایان خاموش. `SettingsTiersTest.B_PREFS` + `PURCHASE_FX` (سخت‌تر: پیش‌فرضِ خاموش سنجیده می‌شود). `MoneyPagesModelTest` — رشتهٔ فراخوانِ `PurchaseBook.record` ِ مسیر حالا `fx = extras.fx, fxPaid = extras.fxPaid` را هم
+  می‌خواهد (سخت‌تر، نه سست‌تر). `tools/quality/baseline.json`: سقفِ `Models.kt` ۹۲۴ ⇐ ۹۳۰ (دلیل: ۱۲ فیلدِ افزودنیِ همگام‌شونده باید روی همان
+  مدل‌های سریالی باشند؛ فشرده در ۶ خط). `DeskPurchasing.kt` زیرِ ۸۰۰ ماند (کارِ تازه در `DeskPurchaseFx.kt`).
+- **نتیجه (lane A):** `PurchaseFxTest` ۱۳/۱۳؛ اجرای هدف‌دارِ ۵۷ کلاس ⇒ **۴۸۳ آزمون، ۰ شکست، ۰ SKIP** (تازه: `SupplierFxTest` ۱۰، `PurchaseFxFormTest` ۴،
+  `PurchaseFxUiTest` ۳، `PurchaseFxDeskUiTest` ۱؛ `LedgerSyncCoverageTest` ۷، `PageAnatomyGuardTest` ۹، `LookGuardTest` ۷، `HardcodedColorsTest` ۲،
+  `Dari*` و خانوادهٔ خرید/تأمین‌کننده/دخل/گزارش سبز — فهرست در STATUS ِ PUR-11). سرور (PGlite): `sync-ledger-coverage` ۴/۴، `owner-export` ۱۴/۱۴،
+  `dari-text` ۱۷/۱۷، `web-i18n` ۴۱/۴۱. عکس‌ها (`PUR11_SHOTS`، `PurchaseFxShotsTest`؛ گوشی روشن/تیره راست‌به‌چپ، کامپیوتر ۱۳۶۶×۷۶۸):
+  `/home/user/wt-pur11-shots/`. **پس از ادغامِ main (#1061، فرمِ خریدِ کامپیوتر روی `ui/desk` ⇐ `DeskPurchaseForm.kt`):** کارِ کامپیوتر روی
+  ساختارِ تازه دوباره نشست (کادرهای «ارز/نرخ/نرخ برای» در کارتِ «مشخصات» با `DeskFormLabeled`/`DeskDropdown`، `DeskPurchaseLineRow(fx)`،
+  `purchaseLineColumns(fxCode)`)؛ اجرای دوبارهٔ ۶۲ کلاس (با `DeskD3cUiTest` ۸ و `NavRowUiTest` ۳) ⇒ **۵۰۹ آزمون، ۰ شکست، ۰ SKIP**؛
+  سرور ۷۶/۷۶؛ precheck `fail=0`. نوشته‌های ارزی با LRI…PDI جدا (`SupplierFx.ltr`/`text`/`rateText`) تا در راست‌به‌چپ «۱۲٫۵۰ USD» بماند.
+  **پس از ادغامِ main (#1062):** ۳۵ کلاس ⇒ **۳۲۵ آزمون، ۰ شکست، ۰ SKIP**. **پس از کلیدِ دکان (r9):** ۲۷ کلاس ⇒ **۲۰۶ آزمون، ۰ شکست، ۰ SKIP** —
+  `SupplierFxTest` ۱۱ (+ «کلید خاموش ⇒ فقط افغانی؛ بدهیِ دالری همچنان صاف می‌شود»)، `PurchaseFxUiTest` ۶ (+ خاموش ⇒ بی کادرِ ارز، روشن ⇒ کادر،
+  پرداختِ کاملِ ۱۰۰ دالر با کلیدِ خاموش)، `PurchaseFxDeskUiTest` ۳ (+ خاموش ⇒ بی کادر، پرونده و پرداختِ دالری با کلیدِ خاموش)، `PurchaseFxFormTest` ۴،
+  `LookGuardTest` ۷، `PageAnatomyGuardTest` ۱۰، `HardcodedColorsTest` ۲، `DariCoverageTest` ۲۳، `DariWordsTest` ۱۷، `I18nCoverageTest` ۸،
+  `I18nFormatTest` ۱۱، `ShopSettingsSyncTest` ۱۴، `Settings*` (Layout ۷، Tiers ۷، Port ۸، Home ۱۱، Models ۱۲، DeskSettingsCoverage ۳…)،
+  `InfraLeakGuardTest` ۸، `MoneyPagesModelTest` ۱۶. جمله‌های دریِ کلید پس از r9 افزوده شد ⇒ r10 یک سرخِ درست داد (`DariWordsTest`: «تازه» و «پیش از»
+  در جملهٔ دری ماند) ⇒ «جدید»/«قبل از»؛ r11: `DariTextTest` (core) ۱۶، `DariCoverageTest` ۲۳، `DariWordsTest` ۱۷، `I18nCoverageTest` ۸، `I18nFormatTest` ۱۱،
+  `SupplierFxTest` ۱۱ ⇒ ۰ شکست؛ سرور `dari-text` ۱۷/۱۷ و `web-i18n` ۴۱/۴۱؛ precheck `fail=0`. عکسِ پیش/پس: `/home/user/wt-pur11-shots/phone-settings-purchase-fx-{off,on}-{light,dark}.png`.
+- **مانده:** (۱) سفارشِ خریدِ سرور (PUR-02/04/14) به ارز: مهاجرتِ ستون‌های ارز/نرخ در `purchase_orders` و رسید/فاکتورِ تأمین‌کننده، فرمِ سفارش و
+  ارسالِ رسید با نرخِ سفارش — PUR-11 تا آن PARTIAL (PARTIAL-MAP «کد»). (۲) ⚠️ ساختِ کهنه ردیفِ ارزی را معادلِ افغانی می‌بیند و پرداختِ به ارز را از
+  دخلِ افغانی کم می‌کند ⇒ کلیدِ دکان پیش‌فرض خاموش و با هشدار است؛ برنامه نسخهٔ دستگاه‌ها را نمی‌داند، پس به‌روز بودنِ همه با صاحب‌کار است
+  (گزارشِ نسخه در فهرستِ دستگاه‌ها کارِ جدای سرور است). (۳) پولِ ارزیِ داده‌شده از گاوصندوقِ چندارزی خودکار برداشته نمی‌شود
+  (برداشتِ گاوصندوق را جدا ثبت کنید). (۴) `verify-data` ِ سرور (`sum.purchase_line`، فقط هشدار) برای ردیفِ ارزی با بیش از ~۲۰۰ واحد ممکن است
+  اختلافِ گردِ پول را هشدار دهد (همان حالِ PRD-07). (۵) آیفون ساخته نشد؛ دیدن روی دستگاهِ واقعی.
+
+- **CI ِ #1066 (هماهنگ‌کننده)**: (۱) «رابطِ مشترکِ آیفون — klib» — `sortedSetOf` (فقط JVM) در `SupplierFx.kt` ⇒ `mutableSetOf` + `sorted()`
+  (همان ترتیب). (۲) «ساخت نسخهٔ بومی» — `DroppedResendTest` («بردارِ سرور همان خروجیِ امروزِ کد است»): ردیفِ کاملِ `pu-full` حالا فیلدهای
+  ارزی دارد و `core/test-vectors/resend-dropped-v1.json` کهنه بود ⇒ `TOHID_WRITE_VECTORS=resend-dropped` (خطِ A، `*DroppedResend*` ۱۱/۱۱)؛
+  `sync-resend-dropped.test.js` ِ سرور با همان بردار ۵/۵.
+  (۳) «سناریوهای سرتاسری» — `UF.batch30` و `JB3`: خوانندهٔ مدلِ کاتلینِ E2E (`server/test/e2e/lib/native.mjs`) هر فیلد را یک خط می‌خواند و
+  سه فیلد در یک خطِ `Models.kt` پیش‌فرضِ `Purchase.currency` را «null, @OptIn(…» می‌دید. هر فیلدِ ارزی حالا خطِ خودش را دارد (همان شکلِ
+  `unitName`)؛ سقفِ `tools/quality/baseline.json` برای `Models.kt` ۹۳۰ ⇐ **۹۳۸** (دلیل: ۱۲ فیلدِ همگام‌شونده، یکی در هر خط، قراردادِ همین
+  خواننده). `fields` پیش ۱ قرمز، پس ۰؛ `journeys-b` و `sync` سبز.
 ### ۱۴۰۵/۰۸/۲۶ — عاملِ e-syncdiag زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-syncdiag` (از `origin/main` 57c2aa992) — «سرور وصل است» ولی «همگام‌سازی ناموفق»، ۴ تغییر یک روز در صف
 
 - **عکسِ صاحب‌کار** (برنامهٔ `com.vill3n.dailyshop.preview`): بنرِ «همگام‌سازی ناموفق بود»، «آخرین تلاش ناموفق بود»، «در صف: 4»، کارتِ سرخِ

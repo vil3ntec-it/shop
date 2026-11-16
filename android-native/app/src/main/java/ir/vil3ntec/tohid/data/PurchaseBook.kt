@@ -30,6 +30,11 @@ object PurchaseBook {
      *  ردیف (`LedgerEngine.InUnit`). `null` = واحدِ پایه، همان امروز.
      */
     val unitName: String? = null,
+    /**
+     *  PUR-11 — فیِ ردیف به واحدِ کوچکِ ارزِ سند (سنت، ریال؛ به همان واحدِ [quantity]) وقتی فاکتور به ارزِ دیگر است ([record] با
+     *  `fx`)؛ آن‌جا [price] نادیده است و بهای افغانی از معادلِ سند می‌آید. فاکتورِ افغانی آن را نادیده می‌گیرد.
+     */
+    val fxPrice: Long? = null,
   )
 
   sealed interface Result {
@@ -91,6 +96,13 @@ object PurchaseBook {
      *  می‌کند)، با دفترِ تازه رد ([ALREADY_RECORDED])؛ نه موجودیِ دوم، نه بدهیِ دوم. `null` = رفتارِ پیشین.
      */
     key: String? = null,
+    /**
+     *  PUR-11 — فاکتور به ارزِ دیگر با نرخِ ثبت‌شدهٔ همین سند (`PurchaseFx.rate`)؛ فیِ هر ردیف [Line.fxPrice] و پرداختِ هنگامِ
+     *  خرید [fxPaid] (واحدِ کوچکِ همان ارز؛ [paid] ِ افغانی نادیده). معادلِ افغانیِ سند یک بار و سهمِ ردیف‌ها دقیق
+     *  (`PurchaseFx.doc`) ⇒ همان `addPurchase` ِ هر ردیف با جمعِ دقیقِ افغانی (انبار، بهای تمام‌شده، بدهی). `null` = افغانی، همان پیشین.
+     */
+    fx: ir.vil3ntec.tohid.core.purchase.PurchaseFx.Rate? = null,
+    fxPaid: Long = 0,
   ): Result {
     val k = key?.trim()?.ifEmpty { null }
     if (k != null && d.purchases.any { it.id.startsWith("$k-") }) return Result.Failed(ALREADY_RECORDED)
@@ -102,15 +114,25 @@ object PurchaseBook {
     if (real.isEmpty()) return Result.Failed(StrGoods.oneRowNeeded)
     real.forEachIndexed { i, l ->
       if (l.quantity.isNaN() || l.quantity <= 0) return Result.Failed(StrGoods.rowQtyBad(i + 1))
-      if (l.price.isNaN() || l.price < 0) return Result.Failed(StrGoods.rowPriceBad(i + 1))
+      if (fx == null && (l.price.isNaN() || l.price < 0)) return Result.Failed(StrGoods.rowPriceBad(i + 1))
+      if (fx != null && (l.fxPrice == null || l.fxPrice < 0)) return Result.Failed(StrGoods.rowPriceBad(i + 1))
     }
+    //  PUR-11: سندِ ارزی ⇒ جمعِ ارزیِ ردیف‌ها، معادلِ افغانیِ یک‌بارهٔ سند و سهمِ دقیقِ هر ردیف (افغانی و پرداخت)
+    val doc = fx?.let { r ->
+      if (fxPaid < 0) return Result.Failed(ir.vil3ntec.tohid.core.i18n.StrLedger.amountBad)
+      runCatching {
+        ir.vil3ntec.tohid.core.purchase.PurchaseFx.doc(r, real.map { l -> ir.vil3ntec.tohid.core.purchase.PurchaseFx.lineFx(StockLedger.milli(l.quantity), l.fxPrice ?: 0L) }, fxPaid)
+      }.getOrNull() ?: return Result.Failed(ir.vil3ntec.tohid.core.i18n.StrLedger.amountBad)
+    }
+    /** جمعِ افغانیِ ردیفِ [i]: سندِ ارزی ⇒ سهمِ دقیقِ همان (صدمِ افغانی)، وگرنه همان [lineTotal] */
+    fun afnOf(i: Int): Double = doc?.let { it.afnLines[i] / 100.0 } ?: lineTotal(real[i])
     //  PRD-07: واحدِ خریدِ هر ردیف ⇐ ضریب (پیش از هر اثر؛ ردیفِ بی واحد همان امروز)
     val inUnits = real.mapIndexed { i, l ->
       val name = l.unitName?.trim()?.ifEmpty { null } ?: return@mapIndexed null
       val product = d.products.find { it.id == l.productId } ?: return Result.Failed(StrGoods.rowOfWhy(i + 1, ir.vil3ntec.tohid.core.i18n.StrLedger.pickProduct))
-      inUnitOf(product, name, l.quantity, lineTotal(l)) ?: return Result.Failed(StrGoods.rowOfWhy(i + 1, unitWhy(product, name, l.quantity)))
+      inUnitOf(product, name, l.quantity, afnOf(i)) ?: return Result.Failed(StrGoods.rowOfWhy(i + 1, unitWhy(product, name, l.quantity)))
     }
-    val total = real.sumOf { lineTotal(it) }
+    val total = real.indices.sumOf { afnOf(it) }
     var left = if (paid.isNaN() || paid < 0) 0.0 else minOf(paid, total)
 
     val no = nextNo(d)
@@ -118,19 +140,21 @@ object PurchaseBook {
     var cur = d
     val ids = mutableListOf<String>()
     for ((i, l) in real.withIndex()) {
-      val lt = lineTotal(l)
-      val pay = minOf(left, lt)
+      val lt = afnOf(i)
+      //  سندِ ارزی: پرداختِ ردیف همان سهمِ دقیقِ افغانیِ پرداختِ ارزی (همان نرخ، بی اختلاف)
+      val pay = doc?.let { it.afnPaidLines[i] / 100.0 } ?: minOf(left, lt)
       left -= pay
       val lineIds = if (k == null) newId else keyedIds(k, i + 1)
       val r = LedgerEngine.addPurchase(
         cur,
         LedgerEngine.PurchaseDraft(
           supplierId = supplierId, productId = l.productId, quantity = l.quantity, unit = l.unit,
-          purchasePrice = l.price, paidAmount = pay, date = date,
+          purchasePrice = if (doc != null) 0.0 else l.price, paidAmount = pay, date = date,
           notes = listOf(tag, notes.trim()).filter { it.isNotBlank() }.joinToString(" — "),
           expiryDate = l.expiryDate,
           dueDate = dueDate,
           inUnit = inUnits[i],
+          exactTotalMinor = doc?.afnLines?.get(i),
         ),
         today, now, lineIds,
       )
@@ -140,8 +164,19 @@ object PurchaseBook {
       }
     }
     val set = ids.toSet()
-    cur = cur.copy(purchases = cur.purchases.map { if (it.id in set) it.copy(invoiceNo = no) else it })
-    val landed = StockLedger.spreadLanded(StockLedger.minor(landedTotal), real.map { StockLedger.minor(lineTotal(it)) })
+    val fxById = if (doc == null || fx == null) emptyMap() else ids.withIndex().associate { (i, id) -> id to i }
+    cur = cur.copy(
+      purchases = cur.purchases.map { p ->
+        if (p.id !in set) return@map p
+        val i = fxById[p.id]
+        if (i == null || doc == null || fx == null) p.copy(invoiceNo = no)
+        else p.copy(
+          invoiceNo = no, currency = fx.currency, fxRate = fx.rate, fxPer = fx.per, fxPriceMinor = real[i].fxPrice,
+          fxTotalMinor = doc.fxLines[i], fxPaidMinor = doc.fxPaidLines[i],
+        )
+      },
+    )
+    val landed = StockLedger.spreadLanded(StockLedger.minor(landedTotal), real.indices.map { StockLedger.minor(afnOf(it)) })
       .let { shares -> ids.zip(shares).toMap() }
     val loc = locationId?.trim()?.ifEmpty { null }
     val user = userId?.trim()?.ifEmpty { null }
@@ -184,6 +219,11 @@ object PurchaseBook {
     val isReturn: Boolean get() = total < 0
     /** سررسیدِ پرداخت (PUR-07) — زودترین سررسیدِ ردیف‌ها */
     val dueDate: String? get() = lines.mapNotNull { it.dueDate?.takeIf { d -> d.isNotBlank() } }.minOrNull()
+    /** PUR-11 — ارزِ سند (`null` = افغانی) و نرخِ ثبت‌شده‌اش؛ جمع و پرداختِ هنگامِ خرید به همان ارز (واحدِ کوچک) */
+    val currency: String? get() = SupplierFx.cur(lines.firstOrNull()?.currency)
+    val fxRate: ir.vil3ntec.tohid.core.purchase.PurchaseFx.Rate? get() = lines.firstOrNull()?.let(SupplierFx::rateOf)
+    val fxTotal: Long get() = lines.sumOf { it.fxTotalMinor ?: 0L }
+    val fxPaid: Long get() = lines.sumOf { it.fxPaidMinor ?: 0L }
   }
 
   /**
@@ -236,8 +276,11 @@ object PurchaseBook {
 
   /* ── سررسید و یادآور (PUR-07) ──────────────────────────────────── */
 
-  /** فاکتورِ خرید با ماندهٔ **واقعی**اش (پس از پرداخت‌های بعدی و سندهای کسر) */
-  data class Due(val invoice: Invoice, val remaining: Double) {
+  /**
+   *  فاکتورِ خرید با ماندهٔ **واقعی**اش (پس از پرداخت‌های بعدی و سندهای کسر). PUR-11: سندِ ارزی ماندهٔ ارزی‌اش را هم دارد
+   *  ([fxRemaining]، واحدِ کوچکِ ارز)؛ [remaining] همان ارزشِ دفتریِ افغانی.
+   */
+  data class Due(val invoice: Invoice, val remaining: Double, val fxRemaining: Long? = null) {
     val supplierId: String get() = invoice.supplierId
     val dueDate: String? get() = invoice.dueDate
   }
@@ -250,32 +293,52 @@ object PurchaseBook {
    */
   fun open(d: ShopData, supplierId: String? = null): List<Due> {
     val out = ArrayList<Due>()
-    invoices(d, supplierId).groupBy { it.supplierId }.forEach { (sid, list) ->
-      val bills = list.filter { !it.isReturn }
-      //  e-rows-63b: پرداختی که فاکتورش را نام می‌برد ([payNote]، «پرداخت» ِ جزئیاتِ خرید) اول همان فاکتور را صاف می‌کند؛
-      //  بیشِ آن و بقیهٔ پرداخت‌ها همان FIFO. جمعِ مانده‌ها همچنان `max(0, supplierDebt)` است.
-      val left = HashMap<String, Double>(bills.size * 2)
-      bills.forEach { left[it.key] = it.debt.coerceAtLeast(0.0) }
-      val byNo = bills.filter { it.no > 0 }.associateBy { it.no }
-      var credit = list.filter { it.isReturn }.sumOf { -it.total } + bills.sumOf { (-it.debt).coerceAtLeast(0.0) }
-      d.supplierPayments.filter { it.supplierId == sid }.forEach { p ->
-        var amount = p.amount
-        val target = if (amount > 0) paidInvoiceNo(p.notes)?.let(byNo::get) else null
-        if (target != null) {
-          val take = minOf(amount, left[target.key] ?: 0.0)
-          left[target.key] = (left[target.key] ?: 0.0) - take
-          amount -= take
-        }
-        credit += amount
-      }
-      bills.sortedWith(compareBy<Invoice> { it.date }.thenBy { it.createdAt }.thenBy { it.key }).forEach { inv ->
-        val debt = left[inv.key] ?: 0.0
-        val take = minOf(debt, credit.coerceAtLeast(0.0))
-        credit -= take
-        out += Due(inv, debt - take)
-      }
+    //  PUR-11: هر ارز حسابِ جدا — پرداختِ حسابِ دالری فقط فاکتورهای دالری را صاف می‌کند (افغانی همان گروهِ پیشین، بیت‌به‌بیت)
+    invoices(d, supplierId).groupBy { it.supplierId to it.currency }.forEach { (key, list) ->
+      val (sid, cur) = key
+      val pays = d.supplierPayments.filter { it.supplierId == sid && SupplierFx.cur(it.currency) == cur }
+      val afn = fifo(list, pays, { it.total }, { it.debt }, { it.amount })
+      val fx = if (cur == null) null
+      else fifo(list, pays, { it.fxTotal.toDouble() }, { (it.fxTotal - it.fxPaid).toDouble() }, { (it.fxAmountMinor ?: 0L).toDouble() })
+        .associate { (inv, left) -> inv.key to Math.round(left) }
+      afn.forEach { (inv, left) -> out += Due(inv, left, fx?.get(inv.key)) }
     }
     return out
+  }
+
+  /**
+   *  ماندهٔ هر فاکتورِ یک حساب ([list] و پرداخت‌هایش [pays]) با [totalOf]/[debtOf]/[payOf] ِ یک واحد (افغانی، یا واحدِ کوچکِ ارز):
+   *  e-rows-63b — پرداختی که فاکتورش را نام می‌برد ([payNote]، «پرداخت» ِ جزئیاتِ خرید) اول همان فاکتور را صاف می‌کند؛ بیشِ آن و
+   *  بقیهٔ پرداخت‌ها، سندهای کسر و اضافه‌پرداختِ هر فاکتور FIFO روی قدیمی‌ترین‌ها. جمعِ مانده‌ها همان `max(0, بدهی)` است.
+   */
+  private fun fifo(
+    list: List<Invoice>,
+    pays: List<SupplierPayment>,
+    totalOf: (Invoice) -> Double,
+    debtOf: (Invoice) -> Double,
+    payOf: (SupplierPayment) -> Double,
+  ): List<Pair<Invoice, Double>> {
+    val bills = list.filter { !it.isReturn }
+    val left = HashMap<String, Double>(bills.size * 2)
+    bills.forEach { left[it.key] = debtOf(it).coerceAtLeast(0.0) }
+    val byNo = bills.filter { it.no > 0 }.associateBy { it.no }
+    var credit = list.filter { it.isReturn }.sumOf { -totalOf(it) } + bills.sumOf { (-debtOf(it)).coerceAtLeast(0.0) }
+    pays.forEach { p ->
+      var amount = payOf(p)
+      val target = if (amount > 0) paidInvoiceNo(p.notes)?.let(byNo::get) else null
+      if (target != null) {
+        val take = minOf(amount, left[target.key] ?: 0.0)
+        left[target.key] = (left[target.key] ?: 0.0) - take
+        amount -= take
+      }
+      credit += amount
+    }
+    return bills.sortedWith(compareBy<Invoice> { it.date }.thenBy { it.createdAt }.thenBy { it.key }).map { inv ->
+      val debt = left[inv.key] ?: 0.0
+      val take = minOf(debt, credit.coerceAtLeast(0.0))
+      credit -= take
+      inv to (debt - take)
+    }
   }
 
   /**
@@ -350,15 +413,43 @@ object PurchaseBook {
      *  از انبار مقدار × ضریب به واحدِ پایه بیرون می‌رود و سندِ کسر جمعِ دقیقِ همان ردیف است. `null` = واحدِ پایه.
      */
     unitName: String? = null,
+    /**
+     *  PUR-11 — برگشتِ کالای خریده به ارزِ دیگر: اعتبار به همان ارز ([fxPrice] فیِ هر واحد به واحدِ کوچکِ ارز؛ [unitPrice] ِ
+     *  افغانی نادیده) با نرخِ [fx] (پیش‌فرضِ صفحه: نرخِ آخرین خریدِ همین کالا از همین تأمین‌کننده، `SupplierFx.returnRate`) —
+     *  معادلِ افغانی [PurchaseFx.toAfn] ِ جمعِ ارزی، دقیق. `null` = افغانی، همان پیشین.
+     */
+    fx: ir.vil3ntec.tohid.core.purchase.PurchaseFx.Rate? = null,
+    fxPrice: Long? = null,
+    /** جمعِ دقیقِ سندِ کسر به صدمِ افغانی (فقط از راهِ ارزیِ همین تابع) */
+    exactMinor: Long? = null,
   ): Result {
     val k = key?.trim()?.ifEmpty { null }
     if (k != null && d.purchases.any { it.id == k }) return Result.Failed(ALREADY_RETURNED)
+    if (fx != null) {
+      if (quantity.isNaN() || quantity <= 0) return Result.Failed(StrStock.errAmount)
+      val price = fxPrice?.takeIf { it >= 0 } ?: return Result.Failed(StrGoods.returnPriceBad2)
+      val fxAmount = runCatching { ir.vil3ntec.tohid.core.purchase.PurchaseFx.lineFx(StockLedger.milli(quantity), price) }.getOrNull()
+        ?: return Result.Failed(StrGoods.returnPriceBad2)
+      val afn = runCatching { ir.vil3ntec.tohid.core.purchase.PurchaseFx.toAfn(fxAmount, fx) }.getOrNull() ?: return Result.Failed(StrGoods.returnPriceBad2)
+      val before = d.purchases.mapTo(HashSet()) { it.id }
+      val r = supplierReturn(d, supplierId, productId, quantity, afn / 100.0 / quantity, reason, date, today, now, newId, userId, key, unitName, exactMinor = afn)
+      if (r !is Result.Ok) return r
+      return Result.Ok(
+        r.data.copy(
+          purchases = r.data.purchases.map { p ->
+            if (p.id in before) p
+            else p.copy(currency = fx.currency, fxRate = fx.rate, fxPer = fx.per, fxPriceMinor = price, fxTotalMinor = -fxAmount)
+          },
+        ),
+        0,
+      )
+    }
     val supplier = d.suppliers.find { it.id == supplierId } ?: return Result.Failed(StrPurchasePages.chooseSupplier)
     val product = d.products.find { it.id == productId } ?: return Result.Failed(StrGoods.pickItem)
     if (quantity.isNaN() || quantity <= 0) return Result.Failed(StrStock.errAmount)
     if (unitPrice.isNaN() || unitPrice < 0) return Result.Failed(StrGoods.returnPriceBad2)
     val inUnit = unitName?.trim()?.ifEmpty { null }?.let { n ->
-      inUnitOf(product, n, quantity, Math.round(quantity * unitPrice).toDouble()) ?: return Result.Failed(unitWhy(product, n, quantity))
+      inUnitOf(product, n, quantity, exactMinor?.let { it / 100.0 } ?: Math.round(quantity * unitPrice).toDouble()) ?: return Result.Failed(unitWhy(product, n, quantity))
     }
     if (inUnit != null) {
       val bc = ir.vil3ntec.tohid.core.product.PurchaseUnits.baseCost(inUnit.qtyMilli, inUnit.factorMilli, inUnit.totalMinor)
@@ -374,7 +465,7 @@ object PurchaseBook {
     if (quantity > cap) return Result.Failed(StrGoods.returnCap(supplier.name, ir.vil3ntec.tohid.qty(cap), product.unit))
     val day = date.ifBlank { today }
     if (!ir.vil3ntec.tohid.core.stock.StockCore.isoDateOk(day)) return Result.Failed(StrGoods.dateBad)
-    val amount = Math.round(quantity * unitPrice).toDouble()
+    val amount = exactMinor?.let { it / 100.0 } ?: Math.round(quantity * unitPrice).toDouble()
     val purchaseId = k ?: newId()
     val entryId = if (k != null) "$k-w" else newId()
     val user = userId?.trim()?.ifEmpty { null }
@@ -468,12 +559,12 @@ object PurchaseBook {
         evs += Ev(inv.date, inv.createdAt, 0, StrSheets.supplierReturnNote, 0.0, -inv.total, inv.key)
         return@forEach
       }
-      val title = if (inv.no > 0) StrSheets.purchaseInvoiceTitle(inv.no, inv.lines.size) else StrSheets.purchase
+      val title = (if (inv.no > 0) StrSheets.purchaseInvoiceTitle(inv.no, inv.lines.size) else StrSheets.purchase) + fxNote(inv)
       evs += Ev(inv.date, inv.createdAt, 0, title, inv.total, 0.0, inv.key)
       if (inv.paid > 0) evs += Ev(inv.date, inv.createdAt, 1, StrSheets.paidAtPurchase, 0.0, inv.paid, inv.key)
     }
     d.supplierPayments.filter { it.supplierId == supplierId }.forEach { p ->
-      evs += Ev(p.date, p.createdAt, 2, p.notes.ifBlank { StrSheets.payment }, 0.0, p.amount, null)
+      evs += Ev(p.date, p.createdAt, 2, p.notes.ifBlank { StrSheets.payment } + fxNote(p), 0.0, p.amount, null)
     }
     var run = 0.0
     return evs.sortedWith(compareBy<Ev> { it.date }.thenBy { it.at }.thenBy { it.order })
@@ -481,6 +572,26 @@ object PurchaseBook {
         run += e.bill - e.pay
         LedgerLine(i + 1, e.date, e.text, e.bill, e.pay, run, e.key)
       }
+  }
+
+  /** PUR-11: «— 100.00 USD · نرخ 1 USD = 70 AFN» ِ فاکتورِ ارزی؛ افغانی ⇒ "" */
+  private fun fxNote(inv: Invoice): String {
+    val code = inv.currency ?: return ""
+    return " — " + ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.docLine(
+      SafeCurrencies.format(kotlin.math.abs(inv.fxTotal), code), inv.fxRate?.let(ir.vil3ntec.tohid.core.purchase.PurchaseFx::rateLine).orEmpty(),
+    )
+  }
+
+  /** PUR-11: پرداختِ حسابِ ارزی ⇒ مبلغ به همان ارز، نرخِ همین پرداخت و اختلافِ نرخ؛ پیشین ⇒ "" */
+  private fun fxNote(p: SupplierPayment): String {
+    val code = SupplierFx.cur(p.currency) ?: return ""
+    val diff = p.fxDiffMinor?.takeIf { it != 0L }?.let { x ->
+      val a = ir.vil3ntec.tohid.money(kotlin.math.abs(x) / 100.0)
+      " · " + if (x > 0) ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.fxLoss(a) else ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.fxGain(a)
+    }.orEmpty()
+    return " — " + ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.docLine(
+      SafeCurrencies.format(p.fxAmountMinor ?: 0L, code), SupplierFx.rateOf(p)?.let(ir.vil3ntec.tohid.core.purchase.PurchaseFx::rateLine).orEmpty(),
+    ) + diff
   }
 
   /* ── برگه‌های اکسل و چاپ ─────────────────────────────────────────── */
@@ -510,6 +621,11 @@ object PurchaseBook {
     inv.lines.forEachIndexed { i, p ->
       rows += listOf((i + 1).toString(), names[p.productId].orEmpty(), q(p.quantity), p.unit, r(p.purchasePrice), r(p.totalAmount))
     }
+    //  PUR-11: فاکتورِ ارزی ⇒ جمع به همان ارز و نرخِ ثبت‌شده (ردیف‌ها و جمع‌های افغانی همان معادل‌اند)
+    inv.currency?.let { code ->
+      rows += listOf("", ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.totalIn(code), "", "", "", SafeCurrencies.number(inv.fxTotal, code))
+      inv.fxRate?.let { rows += listOf("", ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.rateLine(ir.vil3ntec.tohid.core.purchase.PurchaseFx.rateLine(it)), "", "", "", "") }
+    }
     rows += listOf("", StrSheets.total, "", "", "", r(inv.total))
     val left = remaining?.coerceAtLeast(0.0) ?: inv.debt
     rows += listOf("", StrSheets.paidDone, "", "", "", r(if (remaining == null) inv.paid else inv.total - left))
@@ -520,9 +636,14 @@ object PurchaseBook {
 
   fun invoicesSheet(d: ShopData, list: List<Invoice>, today: String): ReportCsv.Sheet {
     val names = d.suppliers.associate { it.id to it.name }
-    val rows = mutableListOf(listOf(StrSheets.invoice, StrSheets.date, StrSheets.supplier, StrSheets.rows, StrSheets.total, StrSheets.paidDone, StrSheets.balance))
+    //  PUR-11: ستون‌های ارز فقط وقتی فهرست فاکتورِ ارزی دارد
+    val fx = list.any { it.currency != null }
+    val head = listOf(StrSheets.invoice, StrSheets.date, StrSheets.supplier, StrSheets.rows, StrSheets.total, StrSheets.paidDone, StrSheets.balance)
+    val rows = mutableListOf(if (fx) head + listOf(ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.currencyCol, ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.fxAmountCol) else head)
     list.forEach { v ->
-      rows += listOf(if (v.no > 0) v.no.toString() else "", v.date, names[v.supplierId].orEmpty(), v.lines.size.toString(), r(v.total), r(v.paid), r(v.debt))
+      val base = listOf(if (v.no > 0) v.no.toString() else "", v.date, names[v.supplierId].orEmpty(), v.lines.size.toString(), r(v.total), r(v.paid), r(v.debt))
+      val code = v.currency
+      rows += if (!fx) base else base + if (code == null) listOf("AFN", "") else listOf(code, SafeCurrencies.number(v.fxTotal, code))
     }
     return ReportCsv.Sheet("فاکتورهای-خرید-$today", rows)  // داده: نامِ پروندهٔ خروجی
   }

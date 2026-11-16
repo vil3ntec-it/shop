@@ -145,6 +145,8 @@ object SettingsLayout {
   const val GIFT_RECEIPT = "رسیدِ هدیه" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
   /** CRM-15: «چاپِ شمارهٔ کامل» ِ مشتری روی رسید و صورت‌حساب (`CustomerPrintPref`، فقط صاحب) */
   const val PRINT_PHONE = "شمارهٔ مشتری روی چاپ" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
+  /** PUR-11: «خرید به ارزِ دیگر» — کلیدِ دکان، پیش‌فرض خاموش (`PurchaseFxPref`) */
+  const val PURCHASE_FX = "خرید به ارز دیگر" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
   /** فروش با تحویلِ بعدی (POS-38، `DeliverLaterPrefs`) */
   const val DELIVER_LATER = "فروش با تحویلِ بعدی" // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
   /** سفارشِ ویژه با پیش‌پرداخت (POS-26، `SpecialOrderPref`) */
@@ -243,7 +245,7 @@ object SettingsLayout {
     Group(
       GOODS,
       listOf(
-        Part("goods", listOf(TILL_GOODS, PRODUCT_INFO, PRODUCT_SUGGEST, LABEL_TOOLS, PRODUCT_TOOLS)),
+        Part("goods", listOf(TILL_GOODS, PRODUCT_INFO, PRODUCT_SUGGEST, LABEL_TOOLS, PRODUCT_TOOLS, PURCHASE_FX)),
         Part("stock", listOf(STOCK_PLACES, COUNT_TOOLS, SHRINK_REPORT, STOCK_LEVELS, STOCK_INSIGHT, STOCK_MODE, SMART_FORECAST)),
       ),
     ),
@@ -369,6 +371,7 @@ object SettingsLayout {
     ONLINE_ORDERS to "online-orders",
     GIFT_RECEIPT to "gift-receipt",
     PRINT_PHONE to "print-phone",
+    PURCHASE_FX to "purchase-fx",
     DELIVER_LATER to "deliver-later",
     SPECIAL_ORDER to "special-orders",
     PRICE_WHY to "price-why",
@@ -458,6 +461,7 @@ object SettingsLayout {
     ONLINE_ORDERS -> ir.vil3ntec.tohid.core.i18n.StrOrderFlow.settingsTitle
     GIFT_RECEIPT -> ir.vil3ntec.tohid.core.i18n.StrGift.section
     PRINT_PHONE -> ir.vil3ntec.tohid.core.i18n.StrCustomerMask.section
+    PURCHASE_FX -> ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.settingTitle
     DELIVER_LATER -> ir.vil3ntec.tohid.core.i18n.StrDeliver.section
     SPECIAL_ORDER -> ir.vil3ntec.tohid.core.i18n.StrSpecialOrder.settingsTitle
     PRICE_WHY -> ir.vil3ntec.tohid.core.i18n.StrWhy.section

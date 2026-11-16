@@ -29,10 +29,12 @@ internal fun RouteScope.SupplierReturnRoute() {
   if (data.suppliers.none { it.id == supplierId }) { LandOn(MoneyPaths.PURCHASING); return }
   val context = LocalContext.current
   val d = data
-  SupplierReturnDialog(d, supplierId, onDismiss = { back() }) { productId, q, price, reason, date, key ->
+  SupplierReturnDialog(d, supplierId, onDismiss = { back() }) { productId, q, price, reason, date, key, fx, fxPrice ->
     when (val r = PurchaseBook.supplierReturn(
       d, supplierId, productId, q, price, reason, date, todayIso(), System.currentTimeMillis(), ::moneyId,
       userId = runCatching { SyncStore(context).accountName }.getOrNull(), key = key,
+      //  PUR-11: کالای خریده به ارز ⇒ سندِ کسر به همان ارز و نرخ
+      fx = fx, fxPrice = fxPrice,
     )) {
       is PurchaseBook.Result.Failed -> toasts.show(r.message, V3Tone.ERROR)
       is PurchaseBook.Result.Ok -> {
