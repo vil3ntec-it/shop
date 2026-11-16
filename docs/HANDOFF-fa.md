@@ -84,7 +84,11 @@
 - **نتیجه (lane A):** `PurchaseFxTest` ۱۳/۱۳؛ اجرای هدف‌دارِ ۵۷ کلاس ⇒ **۴۸۳ آزمون، ۰ شکست، ۰ SKIP** (تازه: `SupplierFxTest` ۱۰، `PurchaseFxFormTest` ۴،
   `PurchaseFxUiTest` ۳، `PurchaseFxDeskUiTest` ۱؛ `LedgerSyncCoverageTest` ۷، `PageAnatomyGuardTest` ۹، `LookGuardTest` ۷، `HardcodedColorsTest` ۲،
   `Dari*` و خانوادهٔ خرید/تأمین‌کننده/دخل/گزارش سبز — فهرست در STATUS ِ PUR-11). سرور (PGlite): `sync-ledger-coverage` ۴/۴، `owner-export` ۱۴/۱۴،
-  `dari-text` ۱۷/۱۷، `web-i18n` ۴۱/۴۱. عکس‌ها (`PUR11_SHOTS`، `PurchaseFxShotsTest`): `/home/user/wt-pur11-shots/`.
+  `dari-text` ۱۷/۱۷، `web-i18n` ۴۱/۴۱. عکس‌ها (`PUR11_SHOTS`، `PurchaseFxShotsTest`؛ گوشی روشن/تیره راست‌به‌چپ، کامپیوتر ۱۳۶۶×۷۶۸):
+  `/home/user/wt-pur11-shots/`. **پس از ادغامِ main (#1061، فرمِ خریدِ کامپیوتر روی `ui/desk` ⇐ `DeskPurchaseForm.kt`):** کارِ کامپیوتر روی
+  ساختارِ تازه دوباره نشست (کادرهای «ارز/نرخ/نرخ برای» در کارتِ «مشخصات» با `DeskFormLabeled`/`DeskDropdown`، `DeskPurchaseLineRow(fx)`،
+  `purchaseLineColumns(fxCode)`)؛ اجرای دوبارهٔ ۶۲ کلاس (با `DeskD3cUiTest` ۸ و `NavRowUiTest` ۳) ⇒ **۵۰۹ آزمون، ۰ شکست، ۰ SKIP**؛
+  سرور ۷۶/۷۶؛ precheck `fail=0`. نوشته‌های ارزی با LRI…PDI جدا (`SupplierFx.ltr`/`text`/`rateText`) تا در راست‌به‌چپ «۱۲٫۵۰ USD» بماند.
 - **مانده:** (۱) سفارشِ خریدِ سرور (PUR-02/04/14) به ارز: مهاجرتِ ستون‌های ارز/نرخ در `purchase_orders` و رسید/فاکتورِ تأمین‌کننده، فرمِ سفارش و
   ارسالِ رسید با نرخِ سفارش — PUR-11 تا آن PARTIAL (PARTIAL-MAP «کد»). (۲) ⚠️ ساختِ کهنه ردیفِ ارزی را معادلِ افغانی می‌بیند و پرداختِ به ارز را از
   دخلِ افغانی کم می‌کند ⇒ پیش از نخستین خریدِ ارزی همهٔ دستگاه‌ها به‌روز شوند. (۳) پولِ ارزیِ داده‌شده از گاوصندوقِ چندارزی خودکار برداشته نمی‌شود
