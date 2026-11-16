@@ -152,6 +152,71 @@ class PageAnatomyGuardTest {
     assertFalse("دکمه‌های تمام‌پهنای جزئیات", detail.contains("V3Button("))
   }
 
+  /**
+   *  صفحه‌هایی که هنوز سربرگ را از پوسته می‌گیرند (`Chrome.SHELL`: پوسته فقط نوار می‌پیچد و بدنه کالبد ندارد) فقط همین‌ها، هر کدام با
+   *  دلیل؛ ⏳ یعنی کوچش مانده (`docs/HANDOFF-fa.md`، بندِ e-phone-p0). صفحهٔ تازه `Chrome.OWN` با `V3RoutePage`/`V3Scaffold` است و هر
+   *  صفحهٔ کوچیده از این فهرست بیرون می‌رود (فهرست کهنه نمی‌ماند).
+   */
+  private val shellAllowed = mapOf(
+    "\"purchasing/bills/{id}/new\"" to "فرمِ فاکتورِ تأمین‌کننده (`PoBill` ِ مشترک با کامپیوتر) — کالبدِ فرم",
+    "MoneyPaths.NEW_PURCHASE_ORDER" to "فرمِ ساختنِ سفارشِ خرید — کالبدِ فرم",
+    "\"purchasing/orders/{id}/edit\"" to "فرمِ ویرایشِ پیش‌نویس — کالبدِ فرم",
+    "\"purchasing/orders/{id}/receive\"" to "فرمِ دریافت با اسکن — کالبدِ فرم",
+    "MoneyPaths.PURCHASE_ORDER_SUGGEST" to "⏳ پیشنهادِ سفارش (`PoSuggest` ِ مشترک با کامپیوتر)",
+    "\"purchasing/orders/{id}/match\"" to "⏳ تطبیقِ سفارش، رسید و فاکتور",
+    "SalesPaths.TABLE" to "جدولِ فاکتورها (نمای جدولیِ کامپیوترگونه، آگاهانه `Chrome.SHELL`)",
+    "OnlinePaths.RISK_LISTS" to "⏳ فهرست‌های ریسک (صفحهٔ مشترکِ `ui/screens`)",
+    "OnlinePaths.STOREFRONT_CAMPAIGNS" to "⏳ پیوند و QR ِ کارزار (`CampaignsPane` ِ مشترک)",
+    "OnlinePaths.STOREFRONT_MEDIA" to "⏳ عکس و ویدیوی ویترین (`StorefrontMediaPanel` ِ مشترک)",
+    "OnlinePaths.STOREFRONT_TRUST" to "⏳ شکایت و گزارشِ خریداران",
+    "\"courier/missions/{id}\"" to "بی رابط: فقط پرش به حالتِ پیک (`LandOn`)",
+    "\"products/{id}/photo/versions\"" to "⏳ نسخه‌های عکسِ کالا",
+    "\"products/{id}/photo/gallery\"" to "⏳ گالریِ عکسِ کالا",
+    "StockPaths.BOOK" to "⏳ دفترِ موجودی (`StockBook.kt`، صفحهٔ Material ِ مشترک با کامپیوتر)",
+    "StockPaths.IMAGE_CHANGES_NEW" to "فرمِ دستهٔ تازهٔ تغییرِ عکس — کالبدِ فرم",
+    "StockPaths.IMAGE_STUDIO_NEW" to "فرمِ دستهٔ تازهٔ استودیو — کالبدِ فرم",
+    "\"stock/images/studio/{id}\"" to "⏳ جزئیاتِ دستهٔ استودیو",
+    "AnalyticsPaths.STAFF_TIME" to "⏳ ساعتِ کار و پورسانت (`StaffTimeHub` ِ مشترک)",
+  )
+
+  @Test fun `فقط صفحه‌های شناخته‌شده سربرگ را از پوسته می‌گیرند`() {
+    val shell = LinkedHashMap<String, String>()
+    for (f in phoneUi()) {
+      val src = f.readText()
+      Regex("""(?<![\w.])V3Route\(""").findAll(src).forEach { m ->
+        if (src.substring(maxOf(0, m.range.first - 6), m.range.first).endsWith("class ")) return@forEach
+        var depth = 0
+        var i = m.range.last
+        while (i < src.length) {
+          when (src[i]) { '(' -> depth++; ')' -> { depth--; if (depth == 0) break } }
+          i++
+        }
+        val args = src.substring(m.range.last + 1, i)
+        if ("RouteKind.SHEET" in args || "RouteKind.GATE" in args || "Chrome.OWN" in args) return@forEach
+        shell[args.substringBefore(',').trim()] = rel(f)
+      }
+    }
+    val unknown = shell.keys - shellAllowed.keys
+    assertTrue("صفحهٔ تازه با سربرگِ پوسته (به‌جایش `Chrome.OWN` و `V3RoutePage`): ${unknown.map { "$it (${shell[it]})" }}", unknown.isEmpty())
+    val stale = shellAllowed.keys - shell.keys
+    assertTrue("استثنای کهنه (صفحه کوچیده است؛ از فهرست بردارید): $stale", stale.isEmpty())
+    //  صفحه‌های کوچیدهٔ دورِ دوم خودِ قاب را می‌کشند
+    for ((file, fn) in listOf(
+      "ui/v3/money/SupplierBillsPages.kt" to "SupplierBillsRoute", "ui/v3/money/SupplierBillsPages.kt" to "SupplierBillRoute",
+      "ui/v3/stock/ImageChangesPages.kt" to "ImageChangesRoute", "ui/v3/stock/ImageChangesPages.kt" to "ImageChangeRoute",
+      "ui/v3/stock/ImageStudioPages.kt" to "ImageStudioRoute", "ui/v3/stock/StockExtrasAndroid.kt" to "StockPlacesRoute",
+      "ui/v3/analytics/OnlineReportPage.kt" to "OnlineReportPage", "ui/v3/analytics/BranchesReportPage.kt" to "BranchesReportPage",
+    )) {
+      val src = text(file)
+      val at = src.indexOf("fun RouteScope.$fn(")
+      assertTrue("$file: $fn", at >= 0)
+      val body = src.substring(at, src.indexOf("\n}\n", at).let { if (it < 0) src.length else it })
+      assertTrue("$fn: قابِ کالبد", "V3RoutePage(" in body)
+      assertFalse("$fn: یادداشتِ سرِ صفحه/دکمهٔ تمام‌پهنای «تازه»", Regex("""V3Button\(\s*Str\w+\.new""").containsMatchIn(body))
+    }
+    assertTrue("تخفیف‌ها: «قاعدهٔ تازه» دکمهٔ شناورِ قاب", text("ui/screens/Promos.kt").contains("fab = if (snap.manage)"))
+  }
+
   @Test fun `یک سبکِ برگه — V3Sheet`() {
     val allowed = mapOf(
       "ui/v3/V3Sheet.kt" to "خودِ برگهٔ کیت",

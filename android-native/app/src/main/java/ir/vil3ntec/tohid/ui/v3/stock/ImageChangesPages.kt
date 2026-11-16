@@ -47,6 +47,15 @@ import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
+import ir.vil3ntec.tohid.ui.v3.nav.V3PageFootnote
+import ir.vil3ntec.tohid.ui.v3.nav.V3RoutePage
+import ir.vil3ntec.tohid.ui.v3.V3DataRow
+import ir.vil3ntec.tohid.ui.v3.V3DataRowSpec
+import ir.vil3ntec.tohid.ui.v3.V3Fab
+import ir.vil3ntec.tohid.ui.v3.V3MenuItem
+import ir.vil3ntec.tohid.ui.v3.V3Sheet
+import ir.vil3ntec.tohid.ui.v3.V3Summary
+import ir.vil3ntec.tohid.ui.theme.V3Section as V3SectionTone
 import kotlinx.coroutines.launch
 
 /*
@@ -76,7 +85,10 @@ private fun skipLabel(s: ImageChanges.Skip): String = when (s) {
 
 private fun RouteScope.nameOf(id: String): String = data.products.firstOrNull { it.id == id }?.name?.ifBlank { null } ?: id
 
-/** `stock/images/changes` */
+/**
+ *  `stock/images/changes` — کالبدِ یکسان (p0): «دستهٔ تازه» تنها دکمهٔ شناور، هر دسته یک `V3DataRow`، یادداشتِ ویترین خطِ کم‌رنگِ
+ *  پایان — پیش‌تر یادداشتِ سر و دکمهٔ بدنه.
+ */
 @Composable
 internal fun RouteScope.ImageChangesRoute() {
   val api = onlineReportApi()
@@ -84,11 +96,10 @@ internal fun RouteScope.ImageChangesRoute() {
   var tick by remember { mutableStateOf(0) }
   if (state != null) LaunchedEffect(state, tick) { state.load() }
   val c = PhoneV3.colors
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-    Text(StrImageChanges.storefrontNote, style = V3Type.footnote, color = c.inkMuted)
-    if (state != null && !state.off) {
-      V3Button(StrImageChanges.newBatch, { nav.open(StockPaths.IMAGE_CHANGES_NEW) }, Modifier.padding(top = 12.dp), icon = Icons.Outlined.Add)
-    }
+  V3RoutePage(
+    StrImageChanges.title,
+    fab = if (state == null || state.off) null else ({ e -> V3Fab(Icons.Outlined.Add, StrImageChanges.newBatch, e, { nav.open(StockPaths.IMAGE_CHANGES_NEW) }) }),
+  ) {
     val list = state?.changes
     when {
       state == null || state.off -> V3EmptyState(Icons.Outlined.Collections, StrImageChanges.off)
@@ -97,20 +108,24 @@ internal fun RouteScope.ImageChangesRoute() {
       list.isEmpty() -> V3EmptyState(Icons.Outlined.History, StrImageChanges.none)
       else -> V3Section(null) {
         list.forEachIndexed { i, ch ->
-          if (i > 0) V3Divider()
-          V3ListRow(
-            ch.note.ifBlank { StrImageChanges.batch },
-            subtitle = StrImageChanges.line(statusLabel(ch), StrImageChanges.items(ch.itemCount), displayMillis(ch.createdAt)),
+          if (i > 0) V3Divider(start = V3DataRowSpec.DIVIDER_START)
+          V3DataRow(
+            title = ch.note.ifBlank { StrImageChanges.batch },
+            secondary = StrImageChanges.line(statusLabel(ch), StrImageChanges.items(ch.itemCount), displayMillis(ch.createdAt)),
             icon = if (ch.rolledBack) Icons.AutoMirrored.Outlined.Undo else Icons.Outlined.Collections,
             onClick = { nav.open(StockPaths.imageChange(ch.id)) },
           )
         }
       }
     }
+    V3PageFootnote(StrImageChanges.storefrontNote)
   }
 }
 
-/** `stock/images/changes/{id}` */
+/**
+ *  `stock/images/changes/{id}` — کالبدِ یکسان (p0): سرِ صفحه `V3Summary` ِ رنگِ انبار (نامِ دسته، شمارِ کالا، وضعیت و زمان، بازگشت)،
+ *  «بازگرداندنِ همه» کارِ خطرناکِ «…» و پرسشِ دلیلش یک `V3Sheet` — پیش‌تر عنوانِ درشت، خط‌های کم‌رنگ و دکمه/فرمِ درونِ بدنه.
+ */
 @Composable
 internal fun RouteScope.ImageChangeRoute(id: String) {
   val api = onlineReportApi()
@@ -131,24 +146,27 @@ internal fun RouteScope.ImageChangeRoute(id: String) {
     }
   }
   val c = PhoneV3.colors
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+  val live = state?.change?.takeIf { !it.rolledBack }
+  V3RoutePage(
+    StrImageChanges.batch,
+    overflow = if (state == null || live == null) emptyList() else listOf(
+      V3MenuItem(Icons.AutoMirrored.Outlined.Undo, StrImageChanges.rollbackAll, danger = true) { state.clearOutcome(); asking = true },
+    ),
+  ) {
     val ch = state?.change
     when {
       state == null || state.off -> V3EmptyState(Icons.Outlined.Collections, StrImageChanges.off)
       ch == null && state.failed -> V3EmptyState(Icons.Outlined.CloudOff, StrImageChanges.failed, action = StrImageChanges.retry, onAction = { tick++ })
       ch == null -> Text(StrImageChanges.loading, style = V3Type.callout, color = c.inkMuted)
       else -> {
-        Text(ch.note.ifBlank { StrImageChanges.batch }, style = V3Type.title, color = c.ink)
-        Text(
-          StrImageChanges.line(statusLabel(ch), StrImageChanges.items(ch.itemCount), displayMillis(ch.createdAt)),
-          style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(top = 4.dp),
+        V3Summary(
+          label = ch.note.ifBlank { StrImageChanges.batch },
+          value = StrImageChanges.items(ch.itemCount),
+          caption = "${statusLabel(ch)} · ${displayMillis(ch.createdAt)}",
+          note = if (ch.rolledBack) StrImageChanges.rolledBackLine(displayMillis(ch.rolledBackAt ?: 0L), ch.rollbackReason) else null,
+          collapseKey = "stock/images/change",
+          section = V3SectionTone.STOCK,
         )
-        if (ch.rolledBack) {
-          Text(
-            StrImageChanges.rolledBackLine(displayMillis(ch.rolledBackAt ?: 0L), ch.rollbackReason),
-            style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(top = 4.dp),
-          )
-        }
         V3Section(StrImageChanges.pick) {
           ch.items.forEachIndexed { i, it ->
             if (i > 0) V3Divider()
@@ -161,24 +179,20 @@ internal fun RouteScope.ImageChangeRoute(id: String) {
             style = V3Type.callout, color = PhoneV3Roles.errorText(c), modifier = Modifier.padding(top = 12.dp),
           )
         }
-        if (!ch.rolledBack) {
-          if (asking) {
-            Text(StrImageChanges.rollbackMessage, style = V3Type.callout, color = c.ink, modifier = Modifier.padding(top = 16.dp))
-            V3TextField(reason, { reason = it.take(ImageChanges.REASON_MAX) }, StrImageChanges.reason, Modifier.padding(top = 8.dp))
-            Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-              V3Button(
-                StrImageChanges.rollbackAll, { scope.launch { state.rollback(reason); asking = false } },
-                Modifier.weight(1f), kind = V3ButtonKind.DANGER, loading = state.busy, icon = Icons.AutoMirrored.Outlined.Undo,
-              )
-              V3Button(ir.vil3ntec.tohid.core.i18n.Str.cancel, { asking = false }, Modifier.weight(1f), kind = V3ButtonKind.SECONDARY)
-            }
-          } else {
-            V3Button(
-              StrImageChanges.rollbackAll, { state.clearOutcome(); asking = true },
-              Modifier.fillMaxWidth().padding(top = 16.dp), kind = V3ButtonKind.SECONDARY, icon = Icons.AutoMirrored.Outlined.Undo,
-            )
-          }
-        }
+      }
+    }
+  }
+  //  پرسشِ دلیلِ بازگرداندن: یک برگهٔ کیت (`V3Sheet`)، نه فرمِ درونِ بدنه
+  if (asking && state != null && live != null) {
+    V3Sheet(onDismiss = { asking = false }, title = StrImageChanges.rollbackAll, detents = false) { closer ->
+      Text(StrImageChanges.rollbackMessage, style = V3Type.callout, color = c.ink)
+      V3TextField(reason, { reason = it.take(ImageChanges.REASON_MAX) }, StrImageChanges.reason, Modifier.padding(top = 8.dp))
+      Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        V3Button(
+          StrImageChanges.rollbackAll, { scope.launch { state.rollback(reason); closer.close { asking = false } } },
+          Modifier.weight(1f), kind = V3ButtonKind.DANGER, loading = state.busy, icon = Icons.AutoMirrored.Outlined.Undo,
+        )
+        V3Button(ir.vil3ntec.tohid.core.i18n.Str.cancel, { closer.close { asking = false } }, Modifier.weight(1f), kind = V3ButtonKind.SECONDARY)
       }
     }
   }

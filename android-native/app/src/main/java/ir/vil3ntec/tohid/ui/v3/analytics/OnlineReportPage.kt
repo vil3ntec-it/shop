@@ -33,6 +33,9 @@ import ir.vil3ntec.tohid.ui.screens.serverRefused
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.v3.V3Chip
 import ir.vil3ntec.tohid.ui.v3.V3ChipRow
+import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
+import ir.vil3ntec.tohid.ui.v3.nav.V3PageFootnote
+import ir.vil3ntec.tohid.ui.v3.nav.V3RoutePage
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3Hue
@@ -91,16 +94,21 @@ internal fun rememberOnlineReportVisible(): Boolean {
   return api != null && OnlineReportLive.visible
 }
 
+/** کالبدِ یکسان (p0): خودِ صفحه `V3Scaffold` دارد و تراشه‌های بازه در جای قاب‌اند، نه در بدنه */
 @Composable
-internal fun OnlineReportPage() {
+internal fun RouteScope.OnlineReportPage() {
   val api = onlineReportApi()
   val state = remember(api) { api?.let { OnlineReportState(OnlineReportRepository(it)) } }
   var tick by remember { mutableStateOf(0) }
   if (state != null) LaunchedEffect(state, state.days, tick) { state.load(platformNow()) }
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-    V3ChipRow(contentPadding = PaddingValues(0.dp)) {
-      OnlineReport.SPANS.forEach { d -> V3Chip(StrOnlineReport.span(d), state?.days == d, { state?.days = d }) }
-    }
+  V3RoutePage(
+    StrOnlineReport.title,
+    chips = {
+      V3ChipRow {
+        OnlineReport.SPANS.forEach { d -> V3Chip(StrOnlineReport.span(d), state?.days == d, { state?.days = d }) }
+      }
+    },
+  ) {
     val v = state?.view
     when {
       state == null || state.off -> V3EmptyState(Icons.Outlined.InsertChart, StrOnlineReport.off)

@@ -243,8 +243,8 @@ val MoneyModule = AppModule(
     V3Route("purchasing/purchases/{key}", RouteKind.PAGE, { StrPurchases.purchase }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) {
       PurchaseDetailRoute(args["key"].orEmpty())
     },
-    V3Route(MoneyPaths.SUPPLIER_BILLS, RouteKind.PAGE, { StrSupplierBills.title }, parent = MoneyPaths.PURCHASING) { SupplierBillsRoute() },
-    V3Route("purchasing/bills/{id}", RouteKind.PAGE, { StrSupplierBills.order }, parent = MoneyPaths.SUPPLIER_BILLS) { SupplierBillRoute(args["id"].orEmpty()) },
+    V3Route(MoneyPaths.SUPPLIER_BILLS, RouteKind.PAGE, { StrSupplierBills.title }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) { SupplierBillsRoute() },
+    V3Route("purchasing/bills/{id}", RouteKind.PAGE, { StrSupplierBills.order }, parent = MoneyPaths.SUPPLIER_BILLS, chrome = Chrome.OWN) { SupplierBillRoute(args["id"].orEmpty()) },
     V3Route("purchasing/bills/{id}/new", RouteKind.PAGE, { StrSupplierBills.newBill }, parent = "purchasing/bills/{id}") { SupplierBillNewRoute(args["id"].orEmpty()) },
     V3Route(MoneyPaths.PURCHASE_ORDERS, RouteKind.PAGE, { StrPurchasePages.purchaseOrders }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) { PurchaseOrdersRoute() },
     V3Route(MoneyPaths.NEW_PURCHASE_ORDER, RouteKind.PAGE, { StrPurchasePages.newPoTitle }, parent = MoneyPaths.PURCHASE_ORDERS) { PurchaseOrderNewRoute() },

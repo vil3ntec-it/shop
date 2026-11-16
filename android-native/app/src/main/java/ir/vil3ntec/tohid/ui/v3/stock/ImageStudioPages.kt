@@ -54,6 +54,11 @@ import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
+import ir.vil3ntec.tohid.ui.v3.nav.V3PageFootnote
+import ir.vil3ntec.tohid.ui.v3.nav.V3RoutePage
+import ir.vil3ntec.tohid.ui.v3.V3DataRow
+import ir.vil3ntec.tohid.ui.v3.V3DataRowSpec
+import ir.vil3ntec.tohid.ui.v3.V3Fab
 import ir.vil3ntec.tohid.ui.v3.products.decodeVersion
 import kotlinx.coroutines.launch
 
@@ -97,7 +102,9 @@ private fun BankPicture(src: ImageStudioSource, url: String?, side: Int) {
   }
 }
 
-/** `stock/images/studio` */
+/**
+ *  `stock/images/studio` — کالبدِ یکسان (p0): «دستهٔ تازه» تنها دکمهٔ شناور، هر دسته یک `V3DataRow`، یادداشتِ بخش خطِ کم‌رنگِ پایان.
+ */
 @Composable
 internal fun RouteScope.ImageStudioRoute() {
   val api = onlineReportApi()
@@ -105,11 +112,10 @@ internal fun RouteScope.ImageStudioRoute() {
   var tick by remember { mutableStateOf(0) }
   if (state != null) LaunchedEffect(state, tick) { state.load() }
   val c = PhoneV3.colors
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-    Text(StrImageStudio.note, style = V3Type.footnote, color = c.inkMuted)
-    if (state != null && !state.off) {
-      V3Button(StrImageStudio.newBatch, { nav.open(StockPaths.IMAGE_STUDIO_NEW) }, Modifier.padding(top = 12.dp), icon = Icons.Outlined.Add)
-    }
+  V3RoutePage(
+    StrImageStudio.title,
+    fab = if (state == null || state.off) null else ({ e -> V3Fab(Icons.Outlined.Add, StrImageStudio.newBatch, e, { nav.open(StockPaths.IMAGE_STUDIO_NEW) }) }),
+  ) {
     val list = state?.batches
     when {
       state == null || state.off -> V3EmptyState(Icons.Outlined.AutoFixHigh, StrImageStudio.off)
@@ -118,10 +124,10 @@ internal fun RouteScope.ImageStudioRoute() {
       list.isEmpty() -> V3EmptyState(Icons.Outlined.PhotoLibrary, StrImageStudio.none)
       else -> V3Section(null) {
         list.forEachIndexed { i, b ->
-          if (i > 0) V3Divider()
-          V3ListRow(
-            presetLabel(b.preset),
-            subtitle = StrImageStudio.line(stateLabel(b.state, b.finished >= b.total), StrImageStudio.progress(b.finished, b.total, b.percent)) +
+          if (i > 0) V3Divider(start = V3DataRowSpec.DIVIDER_START)
+          V3DataRow(
+            title = presetLabel(b.preset),
+            secondary = StrImageStudio.line(stateLabel(b.state, b.finished >= b.total), StrImageStudio.progress(b.finished, b.total, b.percent)) +
               " · " + displayMillis(b.createdAt),
             icon = Icons.Outlined.AutoFixHigh,
             onClick = { nav.open(StockPaths.imageStudio(b.id)) },
@@ -129,6 +135,7 @@ internal fun RouteScope.ImageStudioRoute() {
         }
       }
     }
+    V3PageFootnote(StrImageStudio.note)
   }
 }
 

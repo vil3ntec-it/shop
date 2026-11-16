@@ -62,6 +62,7 @@ import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3MenuItem
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
+import ir.vil3ntec.tohid.ui.v3.nav.V3RoutePage
 import ir.vil3ntec.tohid.ui.v3.nav.LandOn
 import ir.vil3ntec.tohid.ui.v3.products.ProductsPaths
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsPaths
@@ -162,7 +163,8 @@ internal fun RouteScope.StockPlacesRoute() {
   val context = LocalContext.current
   val stockOn = remember(data.auditLog, StockLedger.serverFlag) { StockLedger.isOn(data) }
   val writer = rememberStockWriter()
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
+  //  کالبدِ یکسان (p0): خودِ صفحه `V3Scaffold` دارد (`Chrome.OWN`)؛ درها ردیفِ ناوبری‌اند
+  V3RoutePage(StrReach.places) {
     StockPlacesEntry(context, store, data, stockOn) { writer.info(it) }
   }
 }

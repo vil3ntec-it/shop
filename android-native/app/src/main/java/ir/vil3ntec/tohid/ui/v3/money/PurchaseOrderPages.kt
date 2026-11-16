@@ -88,7 +88,6 @@ import ir.vil3ntec.tohid.ui.v3.V3Action
 import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Fab
 import ir.vil3ntec.tohid.ui.v3.V3MenuItem
-import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Summary
 import ir.vil3ntec.tohid.ui.theme.V3Section as V3SectionTone
 import ir.vil3ntec.tohid.ui.v3.V3Chip
@@ -107,6 +106,8 @@ import ir.vil3ntec.tohid.ui.v3.V3TextButton
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
+import ir.vil3ntec.tohid.ui.v3.nav.V3PageFootnote
+import ir.vil3ntec.tohid.ui.v3.nav.V3RoutePage
 import ir.vil3ntec.tohid.ui.v3.stock.ProductPickerList
 import kotlinx.coroutines.launch
 
@@ -212,25 +213,11 @@ internal fun RouteScope.PoScaffold(
   chips: (@Composable () -> Unit)? = null,
   fab: (@Composable BoxScope.(expanded: Boolean) -> Unit)? = null,
   content: @Composable ColumnScope.() -> Unit,
-) {
-  V3Scaffold(title = title, onBack = backOrNull, actions = actions, overflow = overflow, chips = chips, fab = fab) { pad ->
-    Column(
-      Modifier
-        .fillMaxSize()
-        .verticalScroll(rememberScrollState())
-        .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding() + if (fab != null) 72.dp else 0.dp),
-    ) { content() }
-  }
-}
+) = V3RoutePage(title, actions, overflow, chips, fab, content)
 
 /** یادداشتِ آرامِ پایانِ فهرست (پیش‌تر سرِ صفحه) — هیچ نوشته‌ای گم نمی‌شود */
 @Composable
-private fun PoFootnote(text: String) {
-  Text(
-    text, style = V3Type.footnote, color = PhoneV3.colors.inkMuted, textAlign = TextAlign.Center,
-    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 16.dp),
-  )
-}
+private fun PoFootnote(text: String) = V3PageFootnote(text)
 
 /** کارِ اصلیِ جزئیات (دکمهٔ شناور): فرستادنِ پیش‌نویس یا دریافتِ فرستاده */
 private class PoMain(val icon: ImageVector, val label: String, val run: () -> Unit)
