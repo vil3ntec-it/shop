@@ -365,6 +365,30 @@ test('جدایی: سرآیندِ جعلی ۴۰۳ پیش از در؛ دکانِ �
   assert.equal((await sendDraft(s, A, d.id)).status, 200);
 });
 
+// ── STF-06: محدودهٔ مکان روی درهای تازه ──────────────────────────────────
+
+test('STF-06: عضوِ محدود به انبار پیش‌نویسِ قفسه نمی‌سازد و پیش‌نویس/ارسالِ قفسه را ویرایش، ارسال یا لغو نمی‌کند', async () => {
+  const w = await world('محدوده');
+  const { s, A } = w;
+  await flag(s, 'shop.staff_scope');
+  assert.equal((await h.put(`/api/shop/staff-scope/members/${w.staffA.user.id}`, { places: ['warehouse'] }, { token: s.token })).status, 200);
+  const no = await send(w.staffA, A, body1(w, { draft: true }));
+  assert.equal(no.status, 403, JSON.stringify(no.body));
+  assert.equal(no.body.error.code, 'location_out_of_scope');
+  const d = (await send(w.mgrA, A, body1(w, { draft: true }))).body.transfer;
+  const m0 = await movesOf(s.shopId);
+  for (const r of [await edit(w.staffA, A, d.id, body1(w)), await sendDraft(w.staffA, A, d.id), await cancel(w.staffA, A, d.id)]) {
+    assert.equal(r.status, 403, JSON.stringify(r.body));
+    assert.equal(r.body.error.code, 'location_out_of_scope');
+  }
+  //  ویرایش به مبدأِ دیگری که در محدوده نیست هم نه؛ به انبار (محدوده) ⇒ بله
+  assert.equal((await edit(w.staffA, A, d.id, body1(w, { from: 'warehouse' }))).body.error.code, 'location_out_of_scope', 'ردیفِ کنونی قفسه است');
+  assert.deepEqual(await movesOf(s.shopId), m0);
+  assert.equal((await one('SELECT status FROM branch_transfers WHERE id=$1', [d.id])).status, 'draft');
+  //  مدیر (بی محدوده) همان کار را می‌کند
+  assert.equal((await sendDraft(w.mgrA, A, d.id)).status, 200);
+});
+
 // ── مهاجرتِ ۹۴۶ ───────────────────────────────────────────────────────
 
 test('مهاجرتِ ۹۴۶: با پیش‌نویسِ باز برگشت رد؛ بی آن پایین (لغوشده پاک، فرستاده همان ۹۳۵) و دوباره بالا', async () => {
