@@ -190,6 +190,10 @@ test('ماتریسِ شعبه: هیچ درِ /api/shop/* و /api/sync/v3/* دا�
   const ownX = await h.api('GET', '/api/shop/catalog/branch-transfers', { token: mgrB.token, headers: { 'X-Branch-Id': Bid } });
   assert.deepEqual(ownX.body.transfers.map((t) => t.id).sort(), [bXfer, abXfer].sort());
   assert.ok(JSON.stringify(ownX.body).includes('bsec-xfer-note'));
+  //  ۹۴۶: پیش‌نویسِ «ب» (فقط «ب» می‌بیند)
+  r = await xf(mgrB, Bid, { toBranch: A, from: 'shop_floor', to: 'shop_floor', lines: [{ productId: 'p1', qtyMilli: 1000 }], note: 'bsec-draft', draft: true });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const bDraft = r.body.transfer.id;
   const ownPeek = await h.api('GET', '/api/shop/catalog/products/p1/other-branches', { token: s.token, headers: { 'X-Branch-Id': A } });
   assert.deepEqual(ownPeek.body.branches.find((b) => b.branchId === Bid), { branchId: Bid, branchName: 'ب', qty: 6000 }, JSON.stringify(ownPeek.body));
   const before = await printOf(s.shopId, Bid);
@@ -247,7 +251,16 @@ test('ماتریسِ شعبه: هیچ درِ /api/shop/* و /api/sync/v3/* دا�
     ['GET', `${X}/${abXfer}`], ['POST', `${X}/${abXfer}/receive`, { lines: [{ productId: 'p1', receivedMilli: 1000 }] }],
     ['POST', `${X}/${abXfer}/reject`, { reason: 'x' }],
     ['POST', X, { toBranch: 'main', from: 'shop_floor', to: 'shop_floor', lines: [{ productId: 'p1', qtyMilli: 1 }] }],
-    //  POS-16/S17: عددِ موجودیِ «ب» فقط با دسترسی به «ب» یا مجوزِ صاحب — «الف» هیچ (حتی نامِ «ب»)
+    //  ۹۴۶: ویرایش/ارسال/لغو روی انتقالِ «ب» و پیش‌نویسِ «ب» (حتی پیش‌نویسی که مقصدش «الف» است) ⇒ ناموجود؛ روی «الف» ⇒ «ب» ِ
+    //  فرستاده ⇒ فقط ۴۰۹ ِ وضعیت (فرستنده خودِ «الف» است؛ لغوش دادهٔ «ب» را عوض می‌کرد، پس این‌جا زده نمی‌شود)
+    ['PUT', `${X}/${bXfer}`, { toBranch: A, from: 'shop_floor', to: 'shop_floor', lines: [{ productId: 'p1', qtyMilli: 1 }] }],
+    ['POST', `${X}/${bXfer}/send`, {}], ['POST', `${X}/${bXfer}/cancel`, { reason: 'x' }],
+    ['GET', `${X}/${bDraft}`], ['PUT', `${X}/${bDraft}`, { toBranch: 'main', from: 'shop_floor', to: 'shop_floor', lines: [{ productId: 'p1', qtyMilli: 1 }] }],
+    ['POST', `${X}/${bDraft}/send`, {}], ['POST', `${X}/${bDraft}/cancel`, {}], ['POST', `${X}/${bDraft}/receive`, {}],
+    ['PUT', `${X}/${abXfer}`, { toBranch: Bid, from: 'shop_floor', to: 'warehouse', lines: [{ productId: 'p1', qtyMilli: 1 }] }],
+    ['POST', `${X}/${abXfer}/send`, {}],
+    //  POS-16/S17: عددِ موجودیِ «ب» فقط برای صاحب و مدیر (۹۴۶، تصمیمِ هماهنگ‌کننده)، یا کارمند با دسترسی به «ب»، کلیدِ دکان یا
+    //  مجوزِ صاحب — کارمندِ «الف» هیچ (حتی نامِ «ب»)؛ مدیرِ «الف» فقط سه کلیدِ عدد، هیچ سندِ «ب»
     ['GET', `/api/shop/catalog/products/p1/other-branches?branch=${Bid}&branchId=${Bid}`]];
   for (const who of [mgrA, staffA]) {
     for (const [method, url, body] of xdoors) {
@@ -259,11 +272,17 @@ test('ماتریسِ شعبه: هیچ درِ /api/shop/* و /api/sync/v3/* دا�
           headers: { ...(claim === undefined ? {} : { 'X-Branch-Id': claim }), 'Idempotency-Key': `brm-${newId('k')}` } });
         calls += 1;
         const text = JSON.stringify(res.body || '');
-        if (text.includes('bsec') || text.includes(bXfer)) leaks.push(`${method} ${url} [${claim === undefined ? 'بی سرآیند' : claim}] ${res.status}`);
+        if (text.includes('bsec') || text.includes(bXfer) || text.includes(bDraft)) leaks.push(`${method} ${url} [${claim === undefined ? 'بی سرآیند' : claim}] ${res.status}`);
         if (claim !== A) assert.equal(res.status, 403, `${method} ${url} ${claim} ${text}`);
-        else if (url.includes(bXfer)) assert.equal(res.status, 404, `${method} ${url} ${text}`);
+        else if (url.includes(bXfer) || url.includes(bDraft)) assert.equal(res.status, 404, `${method} ${url} ${text}`);
+        else if (url.includes(abXfer) && (method === 'PUT' || url.endsWith('/send'))) assert.equal(res.body.error.code, 'transfer_bad_state', `${url} ${text}`);
         else if (method === 'POST' && url.includes(abXfer)) assert.equal(res.body.error.code, 'transfer_wrong_branch', `${url} ${text}`);
-        else if (url.includes('/other-branches')) assert.deepEqual(res.body, { branches: [] }, `${url} ${text}`);
+        else if (url.includes('/other-branches') && who === staffA) assert.deepEqual(res.body, { branches: [] }, `${url} ${text}`);
+        else if (url.includes('/other-branches')) {
+          assert.deepEqual(Object.keys(res.body), ['branches'], text);
+          for (const b of res.body.branches) assert.deepEqual(Object.keys(b).sort(), ['branchId', 'branchName', 'qty'], text);
+          assert.deepEqual(res.body.branches.find((b) => b.branchId === Bid), { branchId: Bid, branchName: 'ب', qty: 6000 }, text);
+        }
       }
     }
   }

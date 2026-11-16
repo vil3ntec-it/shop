@@ -23,6 +23,8 @@ enum class StockExtra(val route: String) {
   IMAGE_STUDIO(StockPaths.IMAGE_STUDIO),
   /** INV-11 — فقط با پرچمِ `shop.catalog` و `stock.move` ِ سرور (`StockTransferFlag.on`) */
   TRANSFERS(StockPaths.TRANSFERS),
+  /** INV-11 میانِ شعبه‌ها (فازِ ۴) — فقط با شعبه‌های روشن (`BranchLive.book`) و همان دروازهٔ [TRANSFERS] */
+  BRANCH_TRANSFERS(ir.vil3ntec.tohid.ui.v3.branches.BranchTransferPaths.LIST),
 }
 
 object StockExtras {
@@ -37,6 +39,8 @@ object StockExtras {
     val imageChanges: Boolean = false,
     /** INV-11: انتقالِ موجودیِ سرور برای این دکان و این کاربر روشن است */
     val transfers: Boolean = false,
+    /** INV-11 میانِ شعبه‌ها: شعبه‌ها برای این دکان روشن است (پاسخِ روشنِ `GET /shop/branches`) */
+    val branchTransfers: Boolean = false,
   )
 
   /** کارهای دیدنی، به ترتیبِ صفحهٔ انبارِ پیشین */
@@ -49,6 +53,7 @@ object StockExtras {
     if (f.imageChanges && !f.staff) add(StockExtra.IMAGE_CHANGES)
     if (f.imageChanges && !f.staff) add(StockExtra.IMAGE_STUDIO)
     if (f.transfers) add(StockExtra.TRANSFERS)
+    if (f.transfers && f.branchTransfers) add(StockExtra.BRANCH_TRANSFERS)
   }
 
   /**

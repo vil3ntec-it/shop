@@ -5,9 +5,11 @@
  *
  *   ⛔ پاسخ فقط `[{ branchId, branchName, qty }]`: هیچ بها، فروش، حرکت، وظیفه یا سندِ آن شعبه. `qty` = «آزاد» ِ همان شعبه به
  *      هزارم (مکان‌های قابل‌فروش منهای نگه‌داشتهٔ سفارشِ آنلاین، هرگز منفی — منفی خودش نشانِ بررسیِ داخلیِ آن شعبه است).
- *   ⛔ کدام شعبه‌ها فقط از سرور: شعبه‌های فعالِ همین دکان جز شعبهٔ همین درخواست (سرآیندِ سنجیده)، و از آن‌ها فقط آن‌هایی که این
- *      عضو دسترسی دارد (`shop_member_branches`) — یا همه اگر مجوزِ `stock.view_other_branches` را دارد (صاحب همیشه؛ دیگران فقط
- *      وقتی صاحب داده، `shop_member_branch_perms`، مهاجرتِ ۹۳۵). هیچ شناسهٔ شعبه‌ای از درخواست خوانده نمی‌شود.
+ *   ⛔ کدام شعبه‌ها فقط از سرور: شعبه‌های فعالِ همین دکان جز شعبهٔ همین درخواست (سرآیندِ سنجیده). همه برای صاحب و **مدیر**
+ *      (تصمیمِ ۱۴۰۵/۰۸/۲۶ ِ هماهنگ‌کننده، همان Square/Shopify POS/Lightspeed: مدیر موجودیِ مکان‌های دیگر را می‌بیند)؛ کارمندِ دیگر
+ *      فقط اگر دکان روشن کرده (`shop_branch_settings.staff_other_stock`، مهاجرتِ ۹۴۶، پیش‌فرض خاموش) یا صاحب همان عضو را مجاز کرده
+ *      (`stock.view_other_branches` در `shop_member_branch_perms`، ۹۳۵) — وگرنه فقط شعبه‌هایی که خودش دارد (`shop_member_branches`).
+ *      هیچ شناسهٔ شعبه‌ای از درخواست خوانده نمی‌شود.
  *   ⛔ پشتِ `shop.branches` (و موجودیِ سرور `shop.catalog`)؛ خاموش ⇒ درِ ناشناخته.
  */
 const { one, many, tx, now } = require('../db');
@@ -15,6 +17,7 @@ const stock = require('./stock');
 const catalog = require('./catalog');
 const branches = require('./branches');
 const cb = require('./catalog-branch');
+const bset = require('./branch-settings');
 const { badRequest, notFound } = require('../middleware/errors');
 
 const PERM = 'stock.view_other_branches';
@@ -61,10 +64,14 @@ async function setPerms(shopId, idOrUserId, raw, byUserId) {
   });
 }
 
-/** آیا این عضو موجودیِ همهٔ شعبه‌ها را می‌بیند (صاحب همیشه) */
+/** نقش‌هایی که همیشه موجودیِ همهٔ شعبه‌ها را می‌بینند */
+const ALWAYS = Object.freeze(['owner', 'manager']);
+
+/** آیا این عضو موجودیِ همهٔ شعبه‌ها را می‌بیند: صاحب و مدیر همیشه؛ کارمند با کلیدِ دکان یا مجوزِ خودش */
 async function seesAll(shopId, member) {
   if (!member) return false;
-  if (member.role === 'owner') return true;
+  if (ALWAYS.includes(member.role)) return true;
+  if ((await bset.get(shopId)).staffOtherStock) return true;
   return !!(await one('SELECT 1 AS x FROM shop_member_branch_perms WHERE shop_id=$1 AND user_id=$2 AND perm=$3',
     [shopId, String(member.user_id || ''), PERM]));
 }
@@ -97,4 +104,4 @@ async function stockElsewhere(shopId, here, member, productId) {
   return out;
 }
 
-module.exports = { PERM, PERMS, grantsOf, withPerms, setPerms, seesAll, stockElsewhere };
+module.exports = { PERM, PERMS, ALWAYS, grantsOf, withPerms, setPerms, seesAll, stockElsewhere };

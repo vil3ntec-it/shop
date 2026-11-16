@@ -15,6 +15,7 @@ import ir.vil3ntec.tohid.sync.v1.SoftLock
 import ir.vil3ntec.tohid.sync.v1.SyncOp
 import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -85,6 +86,16 @@ class TillReceiveStaleTest {
     return ui
   }
 
+  /**
+   *  opهای **همین** آزمون از [q0] به بعد. صفِ موتور (`SyncV1Engine.of`) میانِ همهٔ آزمون‌های این JVM مشترک است و نوشتنِ
+   *  دیرهنگامِ آزمونِ دیگری روی همان پوشه شمارشِ خامِ `queueSize` را می‌شکست (CI ِ دستهٔ ۷۶: چهار op ِ بیگانه میانِ دو
+   *  شمارش، آزمون‌های پیشین همه سبز). ردیف‌های این آزمون پیشوندِ `$p-` دارند؛ سابقهٔ `customer_payment` شناسهٔ تصادفی دارد و
+   *  با `refId` ِ رسید شناخته می‌شود. op ِ تکراریِ همین آزمون هنوز دیده و شمرده می‌شود (سنجه همان `+۲` و `+۰` است).
+   */
+  private fun ownOps(q0: Int, p: String): List<SyncOp> = engine.queuedOps().drop(q0).filter { op ->
+    op.rowId.startsWith("$p-") || (op.fields?.get("refId") as? JsonPrimitive)?.content?.startsWith("$p-") == true
+  }
+
   private fun receive(store: ShopStore, p: String, key: String, minor: Long, prepay: Boolean = false): DebtEntry.Result =
     runBlocking { TillReceivePref.record(store, "$p-c1", minor, "", key, prepay) }
 
@@ -100,7 +111,7 @@ class TillReceiveStaleTest {
     assertEquals("دریافت از صندوق", disk.transactions.single { it.id == "$p-k1" }.notes)
     assertTrue(disk.auditLog.any { it.type == "customer_payment" && it.refId == "$p-k1" })
     assertEquals("صفحه همان دفترِ دیسک را دارد", disk, ui.data.value)
-    val ops = engine.queuedOps().drop(q0)
+    val ops = ownOps(q0, p)
     assertFalse("هیچ DELETE ای برای رسیدِ گوشی: $ops", ops.any { it.type == SyncOp.DELETE })
     assertEquals(listOf("$p-k1"), ops.filter { it.table == "transactions" }.map { it.rowId })
   }
@@ -117,7 +128,7 @@ class TillReceiveStaleTest {
     //  صفحه هنوز ۱۰۰۰ بدهی می‌بیند و ۱۰۰۰ را «همهٔ بدهی» می‌داند؛ روی دیسک ۷۰۰ است ⇒ ۳۰۰ پیش‌پرداخت، بی تأیید رد
     assertEquals(DebtEntry.Result.Failed(TillReceiveFlow.prepayMessage(70_000)), receive(ui, p, "$p-k1", 100_000))
     assertEquals(listOf("$p-g1", "$p-phone"), open().data.value.transactions.map { it.id })
-    assertEquals("ردِ قاعده هیچ op نمی‌سازد", q0, engine.queueSize())
+    assertEquals("ردِ قاعده هیچ op نمی‌سازد", emptyList<SyncOp>(), ownOps(q0, p))
 
     assertEquals(DebtEntry.Result.Ok("$p-k1", again = false), receive(ui, p, "$p-k1", 100_000, prepay = true))
     val disk = open().data.value
@@ -137,6 +148,8 @@ class TillReceiveStaleTest {
     val disk = open().data.value
     assertEquals(1, disk.transactions.count { it.type == "receive" })
     assertEquals(1, disk.auditLog.count { it.type == "customer_payment" })
-    assertEquals("یک INSERT برای رسید و یکی برای سابقه", q0 + 2, engine.queueSize())
+    val ops = ownOps(q0, p)
+    assertEquals("یک INSERT برای رسید و یکی برای سابقه: $ops", listOf("auditLog/insert", "transactions/insert"), ops.map { "${it.table}/${it.type}" }.sorted())
+    assertEquals("$p-k1", ops.single { it.table == "transactions" }.rowId)
   }
 }
