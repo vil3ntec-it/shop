@@ -39,7 +39,7 @@ class PayPanelTilesTest {
     assertEquals(100_000L, PayFlow.checkout(p.draft(1000.0, null)).valueOrNull()!!.change)
   }
 
-  @Test fun `کارت کلِ فاکتور را از نقدِ خودکار می‌گیرد، بی شمارهٔ تأیید ثبت نمی‌شود و با آن ثبتِ دستی است`() {
+  @Test fun `کارت کلِ فاکتور را از نقدِ خودکار می‌گیرد، بی شمارهٔ تأیید هم ثبت می‌شود و با آن همان ثبتِ دستی است`() {
     val p = panel()
     p.syncAuto(1080.0, null)
     val i = p.takeMethod("afpay_card", 1080.0)
@@ -47,7 +47,9 @@ class PayPanelTilesTest {
     assertEquals("", p.cash)
     assertEquals(PayFlow.DraftRow("afpay_card", "", "1080"), p.rows[i])
     assertEquals(setOf(TillMethods.Kind.CARD), p.tileKinds())
-    assertEquals("REF_REQUIRED", (PayFlow.checkout(p.draft(1080.0, null)) as PayFlow.Outcome.Bad).problem.code)
+    //  صاحب‌کار ۱۴۰۵/۰۸/۲۶: «کارت‌خوان تأیید کرد» بس است — شمارهٔ تأییدِ کارت اختیاری (پیش‌تر REF_REQUIRED)
+    val bare = PayFlow.checkout(p.draft(1080.0, null)).valueOrNull()!!.payments.single { it.amount > 0 }
+    assertEquals(listOf("afpay_card", "card", null, "manual"), listOf(bare.method, bare.kind, bare.ref, bare.verification))
     p.rows[i] = p.rows[i].copy(ref = "TRM-1")
     val s = PayFlow.checkout(p.draft(1080.0, null)).valueOrNull()!!
     val card = s.payments.single { it.amount > 0 }

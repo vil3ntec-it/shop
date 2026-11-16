@@ -12,7 +12,8 @@ import androidx.compose.runtime.mutableStateOf
 object CustomerPay {
   enum class Stage { WAITING, PAID }
 
-  data class View(val amountMinor: Long, val qrPayload: String, val stage: Stage)
+  /** `picture` = عکسِ QR ِ خودِ دکان (۱۴۰۵/۰۸/۲۶)، خوانده و سنجیده؛ `null` ⇒ همان QR ِ کشیده از [qrPayload] */
+  data class View(val amountMinor: Long, val qrPayload: String, val stage: Stage, val picture: androidx.compose.ui.graphics.ImageBitmap? = null)
 
   val view = mutableStateOf<View?>(null)
 }

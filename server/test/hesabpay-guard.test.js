@@ -296,14 +296,16 @@ test('۴ب. صاحبِ تازه از نخستین دستگاهش؛ کسی که �
   assert.equal((await save(s, simple('0700999888'), thief)).body.error.code, 'hesabpay_device_untrusted');
 });
 
-test('۵. QR: فقط متن و فقط با همان شمارهٔ حساب — QR ِ کسِ دیگر، بی شماره، یا عکس ⇒ رد', async () => {
+test('۵. QR: فقط متن و فقط با همان شمارهٔ حساب — QR ِ کسِ دیگر، بی شماره، یا عکسِ بی متن ⇒ رد', async () => {
   const s = await shop('QR');
   assert.equal((await h.put(`${URL}/pin`, { newPin: PIN }, { token: s.t })).status, 200);
   for (const [body, code] of [
     [simple('0799111222', { qr: 'hesabpay://pay?to=0700999888' }), 'hesabpay_qr_mismatch'],
     [simple('', { qr: 'https://evil.example/pay/me' }), 'hesabpay_qr_no_account'],
     [simple('0799111222', { qr: 'data:image/png;base64,iVBORw0KGgo=' }), 'hesabpay_qr_image'],
-    [simple('0799111222', { qrImage: 'iVBORw0KGgo=' }), 'hesabpay_qr_image'],
+    //  ۱۴۰۵/۰۸/۲۶: عکسِ QR فقط از `qrImage` و فقط همراهِ متنِ همان QR (`hesabpay-qr-image.test.js`)؛ فیلدِ دیگرِ عکس همان رد
+    [simple('0799111222', { qrImage: 'iVBORw0KGgo=' }), 'hesabpay_qr_image_unread'],
+    [simple('0799111222', { qrPng: 'iVBORw0KGgo=' }), 'hesabpay_qr_image'],
     [{ ...simple('0799111222'), name: '' }, 'hesabpay_name_required'],
     [{ ...simple('0799111222'), name: 'x'.repeat(61) }, 'hesabpay_bad_name'],
     [{ pin: PIN, name: 'الف', mode: 'auto', apiKey: 'KEY-QR-00001', webhookSecret: 'whsec-QR-0001' }, 'hesabpay_merchant_required'],

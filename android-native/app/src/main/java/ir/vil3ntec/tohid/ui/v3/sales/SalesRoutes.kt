@@ -37,6 +37,7 @@ import ir.vil3ntec.tohid.ui.v3.sales.checkout.ExpiryApprovalRoute
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.HesabTillRoute
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.CheckoutRoute
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.CustomerRoute
+import ir.vil3ntec.tohid.ui.v3.sales.checkout.PayStepRoute
 import ir.vil3ntec.tohid.ui.v3.sales.cart.PriceCheckRoute
 import ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerAllRoute
 import ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerCloseRoute
@@ -79,6 +80,8 @@ object SalesPaths {
   const val EXPIRY = "sale/checkout/expiry"
   /** «پرداخت با حساب‌پی (NFC/QR)» (PAY-21، پشتِ `pay.hesabpay`) */
   const val HESAB = "sale/checkout/hesabpay"
+  /** e-paystep — «گامِ پرداخت»: هر پرداخت جدا تأیید، فروش فقط پس از پرداختِ کامل */
+  const val PAY = "sale/checkout/pay"
   /** «تعداد و قیمت»ِ ردیفِ `i` ِ سبد */
   fun line(i: Int) = "sale/line/$i"
   const val FREE_LINE = "sale/free-line"
@@ -154,6 +157,7 @@ val SalesModule = AppModule(
     V3Route(SalesPaths.APPROVE, RouteKind.SHEET, { StrSale.discountApproval }, parent = SalesPaths.CHECKOUT, chrome = Chrome.OWN) { ApprovalRoute() },
     V3Route(SalesPaths.CREDIT, RouteKind.SHEET, { StrPos.creditOverTitle }, parent = SalesPaths.CHECKOUT, chrome = Chrome.OWN) { CreditApprovalRoute() },
     V3Route(SalesPaths.EXPIRY, RouteKind.SHEET, { StrPos.expiredSaleTitle }, parent = SalesPaths.CHECKOUT, chrome = Chrome.OWN) { ExpiryApprovalRoute() },
+    V3Route(SalesPaths.PAY, RouteKind.SHEET, { ir.vil3ntec.tohid.core.i18n.StrTillPay.payTitle }, parent = SalesPaths.CHECKOUT, chrome = Chrome.OWN) { PayStepRoute() },
     V3Route(SalesPaths.HESAB, RouteKind.SHEET, { ir.vil3ntec.tohid.core.i18n.StrTillPay.title }, parent = SalesPaths.CHECKOUT, chrome = Chrome.OWN) { HesabTillRoute() },
     V3Route("sale/line/{i}", RouteKind.SHEET, { StrSale.lineDetails }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { LineRoute() },
     V3Route(SalesPaths.PRICE_CHECK, RouteKind.SHEET, { ir.vil3ntec.tohid.core.i18n.StrPriceCheck.title }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { PriceCheckRoute() },

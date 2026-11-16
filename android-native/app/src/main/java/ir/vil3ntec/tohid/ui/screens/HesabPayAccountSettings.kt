@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -107,6 +108,36 @@ fun HesabPayAccountSettings(ready: Boolean, toast: (String) -> Unit, onView: (He
   var askRemove by remember { mutableStateOf(false) }
   var scanning by remember { mutableStateOf(false) }
   var hintOn by remember { mutableStateOf(deps.hintOn()) }
+  //  عکسِ QR ِ برگزیده (۱۴۰۵/۰۸/۲۶): JPEG ِ آماده، متنی که از خودِ آن خوانده شد و پیش‌نمایش؛ متن که دستی عوض شود عکس کنار می‌رود
+  var pickedJpeg by remember { mutableStateOf<ByteArray?>(null) }
+  var pickedPayload by remember { mutableStateOf("") }
+  var pickedPreview by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+  fun dropPicked() { pickedJpeg = null; pickedPayload = ""; pickedPreview = null }
+  /** متنِ QR (اسکن یا عکس) ⇒ همان سه سنجشِ شماره؛ درست ⇒ `true` */
+  fun takeQr(text: String): Boolean {
+    val parsed = HesabPayShop.parseQr(text)
+    when {
+      parsed == null -> toast(StrPayPages.qrUnreadable)
+      parsed.account.isEmpty() -> toast(StrPayPages.qrNoAccount)
+      account.isNotBlank() && HesabPayShop.normalizeAccount(account) != parsed.account -> toast(StrPayPages.qrMismatch)
+      else -> { qr = parsed.payload; account = parsed.account; return true }
+    }
+    return false
+  }
+  val pickImage = ir.vil3ntec.tohid.pay.platform.ShopQrPicture.picker { bytes ->
+    if (bytes == null) { toast(ir.vil3ntec.tohid.core.i18n.StrGoods.notImage); return@picker }
+    scope.launch {
+      when (val r = ir.vil3ntec.tohid.pay.platform.ShopQrPicture.prepare(bytes)) {
+        is ir.vil3ntec.tohid.pay.platform.ShopQrPicture.Prep.Ok -> if (takeQr(r.payload)) {
+          pickedJpeg = r.jpeg; pickedPayload = qr; pickedPreview = ir.vil3ntec.tohid.pay.platform.ShopQrPicture.bitmap(r.jpeg)
+          toast(ir.vil3ntec.tohid.core.i18n.StrTillPay.qrImageReady)
+        }
+        ir.vil3ntec.tohid.pay.platform.ShopQrPicture.Prep.NoQr -> toast(ir.vil3ntec.tohid.core.i18n.StrTillPay.qrImageNoQr)
+        ir.vil3ntec.tohid.pay.platform.ShopQrPicture.Prep.TooBig -> toast(ir.vil3ntec.tohid.core.i18n.StrGoods.imageTooBig)
+        ir.vil3ntec.tohid.pay.platform.ShopQrPicture.Prep.NotImage -> toast(ir.vil3ntec.tohid.core.i18n.StrGoods.notImage)
+      }
+    }
+  }
 
   fun show(v: HesabAccountView?) {
     view = v
@@ -200,14 +231,15 @@ fun HesabPayAccountSettings(ready: Boolean, toast: (String) -> Unit, onView: (He
           }
           else -> HpOpened(
             v = v, busy = busy, mode = mode, onMode = { mode = it },
-            account = account, onAccount = { account = it }, qr = qr, onQr = { qr = it },
+            account = account, onAccount = { account = it }, qr = qr, onQr = { qr = it; if (it.trim() != pickedPayload) dropPicked() },
             apiKey = apiKey, onApiKey = { apiKey = it }, secret = secret, onSecret = { secret = it },
             merchant = merchant, onMerchant = { merchant = it },
             holder = holder, onHolder = { holder = it },
             onScan = { scanning = true },
+            onPickImage = pickImage, picked = pickedPreview,
             onSave = {
               val saved: (HesabAccountView) -> Unit = {
-                show(it); env.forget(); apiKey = ""; secret = ""
+                show(it); env.forget(); apiKey = ""; secret = ""; dropPicked()
                 toast(if (it.pending != null) StrPayPages.newAccountIn24h else StrPayPages.accountSaved)
               }
               if (holder.isBlank()) {
@@ -219,7 +251,9 @@ fun HesabPayAccountSettings(ready: Boolean, toast: (String) -> Unit, onView: (He
                 } else if (num.isEmpty() && qr.isBlank()) {
                   toast(StrPayPages.accountOrQr)
                 } else {
-                  act({ env.account.saveSimple(pin, holder, num, qr) }, saved)
+                  //  عکسِ تازه، یا «همان عکس» اگر متنِ QR عوض نشده (سرور هم همان متن را می‌سنجد)
+                  val image = pickedJpeg?.takeIf { qr.trim() == pickedPayload }
+                  act({ env.account.saveSimple(pin, holder, num, qr, qrImage = image, keepQrImage = image == null && v.qrImage.isNotEmpty()) }, saved)
                 }
               } else if (merchant.isBlank()) {
                 toast(StrPayPages.merchantNeeded)
@@ -294,14 +328,8 @@ fun HesabPayAccountSettings(ready: Boolean, toast: (String) -> Unit, onView: (He
   }
   if (scanning) HpQrScanDialog(onDismiss = { scanning = false }) { text ->
     scanning = false
-    val parsed = HesabPayShop.parseQr(text)
-    if (parsed == null) toast(StrPayPages.qrUnreadable)
-    else if (parsed.account.isEmpty()) toast(StrPayPages.qrNoAccount)
-    else if (account.isNotBlank() && HesabPayShop.normalizeAccount(account) != parsed.account) toast(StrPayPages.qrMismatch)
-    else {
-      qr = parsed.payload
-      account = parsed.account
-    }
+    //  اسکنِ دوربین متن را عوض می‌کند ⇒ عکسِ برگزیدهٔ دیگر کنار می‌رود
+    if (takeQr(text) && qr.trim() != pickedPayload) dropPicked()
   }
 }
 
@@ -324,6 +352,8 @@ private fun HpOpened(
   holder: String,
   onHolder: (String) -> Unit,
   onScan: () -> Unit,
+  onPickImage: () -> Unit,
+  picked: androidx.compose.ui.graphics.ImageBitmap?,
   onSave: () -> Unit,
   onRemove: () -> Unit,
 ) {
@@ -348,7 +378,18 @@ private fun HpOpened(
       value = qr, onValueChange = onQr, label = { Text(StrPayPages.qrField) },
       singleLine = true, modifier = Modifier.fillMaxWidth(),
     )
-    if (!Platform.DESKTOP) TextButton(onClick = onScan, enabled = !busy) { Text(StrPayPages.scanQr) }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      if (!Platform.DESKTOP) TextButton(onClick = onScan, enabled = !busy) { Text(StrPayPages.scanQr) }
+      //  صاحب‌کار ۱۴۰۵/۰۸/۲۶: عکس/اسکرین‌شاتِ QR ِ حساب‌پی از گالری یا فایل — صندوق همان را بزرگ نشان می‌دهد
+      if (ir.vil3ntec.tohid.pay.platform.ShopQrPicture.CAN_READ) TextButton(onClick = onPickImage, enabled = !busy) { Text(ir.vil3ntec.tohid.core.i18n.StrTillPay.pickQrImage) }
+    }
+    if (picked != null) {
+      androidx.compose.foundation.Image(
+        picked, ir.vil3ntec.tohid.core.i18n.StrTillPay.shopQrImage,
+        Modifier.padding(vertical = 4.dp).size(140.dp), contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+      )
+      HpNote(ir.vil3ntec.tohid.core.i18n.StrTillPay.qrImageReady)
+    } else if (v.qrImage.isNotEmpty()) HpNote(ir.vil3ntec.tohid.core.i18n.StrTillPay.qrImageHas)
   } else {
     if (!v.autoAvailable) {
       HpNote(
@@ -380,6 +421,8 @@ internal fun HpPendingCard(p: PendingPayee, now: Long, busy: Boolean, onCancel: 
     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
       Text(StrPay.changeNotice(p.name.ifBlank { "—" }, p.last4), color = c.warning, fontWeight = FontWeight.Bold)
       HpNote(StrPayPages.activeInHours(maxOf(1L, hpMinutesLeft(p.until, now) / 60), StrPay.changeNoticeDetail))
+      //  عکسِ QR ِ تازه: زمانِ دقیقِ آمدنش به صندوق (همان ۲۴ ساعت)
+      if (p.qrImage) HpNote(ir.vil3ntec.tohid.core.i18n.StrTillPay.qrImagePending(ir.vil3ntec.tohid.ui.v3.sales.history.SaleTime.stamp(p.until)))
       Button(onClick = onCancel, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(StrPay.notMe) }
     }
   }

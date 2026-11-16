@@ -176,7 +176,7 @@ fun DeskSaleScreen(
   //  POS-15 (پشتِ `PosPriceCheckPrefs`، پیش‌فرض روشن): Ctrl+I قیمت‌پرسی بی افزودن به فاکتور
   ir.vil3ntec.tohid.ui.components.pos.PosPriceCheckPrefs.load(context)
   var priceCheck by remember { mutableStateOf(false) }
-  val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(context) } // PAY (v3 A4): پرداختِ ترکیبی — فقط با پرچم؛ F9 پنلِ پرداخت، F12 نقدِ دقیق
+  val payV2 = true // e-paystep: «پرداخت» (F9) همیشه گامِ پرداخت است، با پرچمِ `ShopPolicy.payV2` و بی آن (پرچم فقط صندوقِ شیفت را می‌گزیند)؛ F12 نقدِ دقیق
   var payOpen by remember { mutableStateOf(false) }
   val enterGate = remember { ir.vil3ntec.tohid.core.pay.EmptyEnterGate() } // S11 (§۵.۲): Enter در کادرِ خالی ⇒ پنل، ≥ ۵۰۰ ms پس از اسکن/Enter
   val seller = remember { ir.vil3ntec.tohid.data.TillUser.me(context) } // S46: کاربرِ صندوق؛ تنظیمِ خاموش ⇒ همان نامِ حساب
@@ -755,36 +755,15 @@ fun DeskSaleScreen(
         }
       },
       methods = {
-        if (payV2) {
-          //  e-paymethods: هر کاشی پنلِ پرداخت را با همان روش باز می‌کند؛ ⛔ نسیه بی مشتری اول گزینشِ مشتری، سپس همان پنل (POS-41)
-          DeskPayTiles(payTiles, enabled = cart.isNotEmpty() && !posting, tone = tone) { t ->
-            payInitial = t; if (t.kind == ir.vil3ntec.tohid.core.pay.TillMethods.Kind.CREDIT && cartDebtorId == null) { payAfterPick = true; pickDebtor = true } else payOpen = true
-          }
-          //  PAY (v3 A4): روش‌ها در پنلِ پرداخت‌اند — نقد، کیف پول، کارت، حواله و به حساب
-          Text(
-            StrPos.mixedPayHint,
-            Modifier.padding(top = DeskSpace.x2),
-            style = DeskType.secondary, color = dc.inkSecondary,
-          )
-        } else {
-          DeskPayMethods(PosPayments.configured(), payment, tone) { m ->
-            if (m.payment != payment) { payment = m.payment; if (m.needsCustomer && cartDebtorId == null) pickDebtor = true }
-          }
-          if (payment == SalesEngine.Payment.CREDIT) {
-            DeskInlineNumber(StrPos.paidNowShort, paidText, { paidText = numericInput(it) }, paidBad, "؋")
-            ir.vil3ntec.tohid.ui.components.pos.CreditDebtorHint(deskCredit) { pickDebtor = true }
-          }
-          //  PAY-21: حساب‌پی (کلِ فاکتور؛ با پنلِ ترکیبی در همان پنل و برای باقی‌مانده)
-          ir.vil3ntec.tohid.ui.components.pos.CheckoutGateways(
-            hook = gateways, total = totals.finalTotal,
-            panel = null, customerId = cartDebtorId, busy = posting, modifier = Modifier.padding(top = 8.dp), onPaid = { st -> finish(st) },
-            enabled = !discountBad && gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED,
-          )
+        //  e-paymethods/e-paystep: هر کاشی گامِ پرداخت را با همان روش باز می‌کند؛ ⛔ نسیه بی مشتری اول گزینشِ مشتری، سپس همان گام (POS-41)
+        DeskPayTiles(payTiles, enabled = cart.isNotEmpty() && !posting, tone = tone) { t ->
+          payInitial = t; if (t.kind == ir.vil3ntec.tohid.core.pay.TillMethods.Kind.CREDIT && cartDebtorId == null) { payAfterPick = true; pickDebtor = true } else payOpen = true
         }
+        Text(StrPos.mixedPayHint, Modifier.padding(top = DeskSpace.x2), style = DeskType.secondary, color = dc.inkSecondary) // روش‌ها در گامِ پرداخت‌اند
       },
       actions = {
         DeskPayActions(
-          postLabel = StrPos.recordSaleBtn,
+          postLabel = ir.vil3ntec.tohid.core.i18n.StrTillPay.payAmount("${ir.vil3ntec.tohid.money(totals.finalTotal)} ؋"), // e-paystep: «پرداخت»، نه «ثبت»
           postHint = KeyMap.SALE_PAY_PANEL.hint,
           printHint = KeyMap.SALE_REPRINT.hint,
           canPost = cart.isNotEmpty() && deskCredit == null,
@@ -1033,7 +1012,7 @@ fun DeskSaleScreen(
   //  S22: تأییدِ پیش از پول (درگاه‌ها) فقط در حالتِ همین فاکتور می‌نشیند؛ برگهٔ پول با زدنِ دوباره باز می‌شود
   prePay.ask?.let { need -> DeskExpiryDialog(d, need, seller, { a -> prePay.ask = null; prePay.approval = a; refocus() }) { prePay.ask = null; refocus() } }
   if (payOpen) {
-    PayPanelDialog(
+    ir.vil3ntec.tohid.ui.components.pos.PayStepDialog(
       total = totals.finalTotal,
       customerId = cartDebtorId,
       customerName = debtor?.name,

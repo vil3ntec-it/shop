@@ -49,13 +49,28 @@ object CheckoutSession {
   var hesabEnv: ir.vil3ntec.tohid.pay.platform.HesabPayEnv? = null
   /** تسویهٔ تأییدشدهٔ حساب‌پی که هنوز ثبت نشده (ثبتِ ردشده ⇒ همان دوباره، بی پرداختِ دوم) */
   var hesabPaid by mutableStateOf<ir.vil3ntec.tohid.core.pay.Settlement?>(null)
+  /** e-paystep — آنچه صندوقدار در «گامِ پرداخت» (`sale/checkout/pay`) همین حالا می‌نویسد */
+  val entry = ir.vil3ntec.tohid.ui.components.pos.PayEntry()
+  /** e-paystep — همهٔ فاکتور پرداخت یا به حساب رفت (`PayStep.Result.Done`) و هنوز ثبت نشده؛ ثبت فقط با همین */
+  var settled by mutableStateOf<ir.vil3ntec.tohid.core.pay.Settlement?>(null)
+  /** مشتریِ همان تسویه (سهمِ به‌حساب فقط برای همان مشتری ثبت می‌شود) */
+  var settledFor: String? = null
+  /** e-paystep — آنچه گامِ پرداخت از تسویه می‌خواهد (مبلغ، مشتری، کاشی‌ها، حساب‌پی)؛ `CheckoutRoute` هر بار تازه می‌کند */
+  var payCtx by mutableStateOf<PayCtx?>(null)
+  /** e-paystep — «نسیه» در گامِ پرداخت مشتری خواست ⇒ پس از گزینش (و جمعِ تازه با همان مشتری) همان گام دوباره با «نسیه» */
+  var reopenPay by mutableStateOf<ir.vil3ntec.tohid.core.pay.TillMethods.Kind?>(null)
 
   fun reset() {
     form = null
     pay.cash = ""
-    //  e-paymethods: هر تسویهٔ تازه با «نقد» ِ خودکار (همان پیش‌فرضِ «نقدی» ِ پیشین) — کاشیِ دیگر یا نوشتنِ دستی خاموشش می‌کند
-    pay.cashAuto = true
+    //  e-paystep: هیچ پرداختی پیش از «گامِ پرداخت» نیست؛ هر پرداخت آن‌جا جدا تأیید می‌شود
+    pay.cashAuto = false
     pay.rows.clear()
+    entry.clear()
+    settled = null
+    settledFor = null
+    payCtx = null
+    reopenPay = null
     pay.fxAmount = ""
     approval = null
     capSlips = emptyMap()
@@ -71,3 +86,21 @@ object CheckoutSession {
     hesabPaid = null
   }
 }
+
+/**
+ *  e-paystep — داده‌ای که «گامِ پرداخت» (`PayStepRoute`) از تسویه می‌گیرد: مبلغِ نهایی، مشتری، کاشی‌های روش‌های دکان، دفترِ صفحه
+ *  (کارتِ هدیه و نسیهٔ بی مشتری) و آغازِ حساب‌پی (همان قلابِ ردیفِ پیشین، با پیش‌سنجیِ ثبت‌شدنی پیش از گرفتنِ پول).
+ */
+data class PayCtx(
+  val saleKey: String,
+  val total: Double,
+  val customerId: String?,
+  val customerName: String?,
+  val tiles: List<ir.vil3ntec.tohid.core.pay.TillMethods.Tile>,
+  val hesabSetup: Boolean,
+  val ledger: ShopData,
+  val startHesab: () -> Unit,
+  /** حالِ حساب‌پی زنده در خودِ گام (زدنِ «پرداخت» پیش از رسیدنِ پاسخِ حساب ⇒ کاشی پس از رسیدن می‌آید): همان کاشی‌ها برای حالِ تازه و «راه‌اندازی» برای صاحب */
+  val retile: (ir.vil3ntec.tohid.core.gateway.TillHesab) -> Pair<List<ir.vil3ntec.tohid.core.pay.TillMethods.Tile>, Boolean> = { tiles to hesabSetup },
+)
+

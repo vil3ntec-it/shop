@@ -98,6 +98,10 @@ data class CheckoutView(
   val methods: List<ir.vil3ntec.tohid.core.pay.TillMethods.Tile>? = null,
   /** حساب‌پی راه‌اندازی نشده و کاربر صاحبِ دکان است ⇒ پیوندِ «راه‌اندازیِ حساب‌پی» زیرِ کاشی‌ها */
   val hesabSetup: Boolean = false,
+  /** e-paystep — متنِ دکمهٔ اصلی («پرداخت ‹مبلغ›»)؛ `null` ⇒ همان «ثبت فروش» ِ پیشین (پیش‌نمایش‌ها) */
+  val payLabel: String? = null,
+  /** e-paystep — پول گرفته شده ولی فروش هنوز ثبت نشده ⇒ یادداشت بالای دکمه */
+  val paidLine: String? = null,
 )
 
 /** ردیفِ حساب‌پیِ برگهٔ تسویه: عنوان، زیرنویس (حالت یا «باقی را می‌پردازد») و زدنی بودن */
@@ -173,7 +177,8 @@ private fun FormBody(v: CheckoutView, pay: PayPanelState, a: CheckoutActions) {
       }
       Spacer(Modifier.height(16.dp))
 
-      if (!v.payV2) {
+      //  e-paystep: روش‌ها فقط در گامِ پرداخت؛ این بخش فقط پیش‌نمایش‌های قدیمِ بی `payLabel` است
+      if (!v.payV2 && v.payLabel == null) {
         V3Segmented(
           options = listOf(StrSale.cashPay, StrSale.creditPay),
           selected = if (f.payment == SalesEngine.Payment.CREDIT) 1 else 0,
@@ -190,10 +195,11 @@ private fun FormBody(v: CheckoutView, pay: PayPanelState, a: CheckoutActions) {
       }
 
       Spacer(Modifier.height(12.dp))
-      if (v.payV2) {
+      if (v.payLabel != null) Unit
+      else if (v.payV2) {
         //  e-paymethods: همهٔ روش‌های دکان به‌صورتِ کاشی بالای پنل (نقد، کارت، حساب‌پی، کیف پول، حواله، نسیه)
         v.methods?.let { tiles ->
-          CheckoutMethods(tiles, pay, v.numbers.finalTotal, f.debtorId, v.busy, a.method, onSetup = if (v.hesabSetup) a.setupHesab else null)
+          CheckoutMethods(tiles, { it.kind in pay.tileKinds() }, v.busy, a.method, onSetup = if (v.hesabSetup) a.setupHesab else null)
           Spacer(Modifier.height(4.dp))
         }
         CheckoutPaySplit(pay, v.numbers.finalTotal, f.debtorId, v.customerName, onSubmit = a.submit, error = v.payError, ledger = v.giftLedger)
@@ -226,8 +232,12 @@ private fun FormBody(v: CheckoutView, pay: PayPanelState, a: CheckoutActions) {
       V3Message(V3Tone.WARNING, it, Modifier.semantics { liveRegion = LiveRegionMode.Polite }, action = StrSale.pickCustomer, onAction = a.customer)
       Spacer(Modifier.height(10.dp))
     }
+    v.paidLine?.let {
+      V3Message(V3Tone.SUCCESS, it, Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+      Spacer(Modifier.height(10.dp))
+    }
     V3Button(
-      if (v.busy) StrSale.posting else StrSale.recordSale,
+      if (v.busy) StrSale.posting else v.payLabel ?: StrSale.recordSale,
       a.submit,
       Modifier.fillMaxWidth(),
       enabled = v.canSubmit,
@@ -314,7 +324,7 @@ private fun CustomerRow(v: CheckoutView, a: CheckoutActions) {
   val f = v.form
   val label = when {
     //  e-paymethods: با کاشی‌ها نقد پیش‌فرض است و «نسیه» خودش کاشی دارد ⇒ مشتری اختیاری است، نه «باقی به حسابش»
-    v.payV2 && v.methods != null -> StrSale.customerOptional
+    v.payLabel != null || (v.payV2 && v.methods != null) -> StrSale.customerOptional
     v.payV2 -> StrSale.customerToAccount
     f.payment == SalesEngine.Payment.CREDIT -> StrSale.debtorWord
     else -> StrSale.customerOptional
