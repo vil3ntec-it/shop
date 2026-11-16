@@ -57,6 +57,42 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۶ — عاملِ e-ocr زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-ocr` (از `origin/main` e8a22edfd، ادغامِ main ‏03cdf4a0f) — «از عکسِ فاکتور» (PUR-12/AI-10)
+
+- **چرا حالا:** هر دو ردیف به تصمیمِ صاحب‌کار (۱۴۰۵/۰۸/۲۰، `RELEASE-1-fa.md`، `BLOCKERS.md` §د) «پس از انتشار»اند؛ هماهنگ‌کننده به خواستِ
+  صاحب‌کار («کارهای مانده را تمام کن») ساختشان را خواست. نشانِ «پس از انتشار» و فهرستِ نسخهٔ ۱ دست نخورد؛ کد پشتِ کلیدِ **خاموشِ**
+  `shop.purchase_ocr` است (همان الگوی `shop.visual_search` ِ AI-11). STATUS: هر دو MISSING ⇐ PARTIAL (دستهٔ «دستگاه» در PARTIAL-MAP).
+- **سرور** (`lib/purchase-ocr.js`، `purchase-ocr-thread.js`، `routes/purchase-ocr.js`): `GET /api/shop/purchase-ocr/config` و `POST /api/shop/purchase-ocr`
+  (بدنه = بایتِ عکس) ⇒ فقط خط‌های متن `{text, conf}`؛ Tesseract ِ رایگان روی همان سرور (بی ابر/API ِ پولی/مدل). سقفِ ۶MB، نوع از محتوا،
+  ابعاد، بازسازی به PGM ِ بی EXIF در رشتهٔ جدا، `spawn` با آرایه و محیطِ کمینه، `OMP_THREAD_LIMIT=1` (⚠️ بی آن Tesseract ۵.۳ ِ این‌جا روی
+  ۴ هسته بیش از ۲ دقیقه ماند)، مهلتِ ۲۴s، همزمانی ۱ (`PURCHASE_OCR_WORKERS` تا ۲)، سقفِ نرخِ IP و دکان (۲۰/ربع، ۱۰۰/روز)، پوشهٔ موقتِ ۰۷۰۰
+  همیشه‌پاک، هیچ ردیف/لاگی از عکس و متن. پولی (`needPaid`) و `stock.adjust`. زبان `fas+eng` (`PURCHASE_OCR_LANG=fas` فقط فارسی — روی نمونه
+  سرخطِ فارسی را کمی بهتر خواند، نامِ لاتین بدتر).
+- **برنامه:** `core/purchase/InvoiceOcr` (خالص، مشترک) — عددِ تحمل‌گر (۰–۹ فارسی/عربی، «٬ ٫ , . /»)، سه‌تاییِ مقدار × فی ≈ جمع وگرنه خالی با نشان،
+  ترتیبِ ستون از سرخط یا قیمتِ خریدِ کالا، تطبیقِ نام با `TextNormalizer` (ي/ی، ك/ک، نیم‌فاصله) و بارکدِ چاپی، بازبینیِ ردیف‌به‌ردیف بی تأییدِ
+  خودکار. گوشی: دکمه بالای «ثبت خرید» + `V3Sheet` (پیشنهادها تراشه، «کالای دیگر…» = `IdPickerSheet`)، `PurchaseFormModel.withAccepted`؛
+  کامپیوتر: دکمهٔ سرخطِ «فاکتورِ خریدِ تازه» + `DeskDialog`. عکس: `PhotoSourceSheet` (آیفون همان؛ بی سطرِ `ios-exclude`)، کامپیوتر پنجرهٔ
+  فایل؛ `invoiceJpeg` جهتِ EXIF را روی پیکسل می‌برد. نوشته‌ها `StrInvoiceOcr` (+ ۱۷ جملهٔ `DariText.PHRASES`، `dari-words.js --write`، DARI-REVIEW).
+- **استقرار:** سرورِ خانگی ویندوز است و پنلِ خانگی همین سرور را بالا می‌آورد (ریپوی server دست نخورد) ⇒ نصبِ یک‌خطی در `OWNER-ACTIONS-fa.md`
+  §۱۱ (winget/UB-Mannheim + Persian؛ لینوکس `apt install tesseract-ocr tesseract-ocr-fas`)؛ سرور مسیرِ پیش‌فرضِ ویندوز را خودش پیدا می‌کند.
+  `server/Dockerfile` (Alpine) `tesseract-ocr tesseract-ocr-data-fas tesseract-ocr-data-eng` با `|| echo` (نامِ بسته‌های Alpine این‌جا سنجیده
+  نشد — شبکهٔ سیزن بسته بود؛ نبودشان ساخت را نمی‌شکند).
+- **آزمون‌ها (همه سبز):** سرور `purchase-ocr.test.js` ۱۱/۱۱ (Tesseract ِ ساختگی با `TESSERACT_BIN`؛ یکی با Tesseract ِ **واقعی** روی
+  `fixtures/purchase-ocr/invoice-fa.jpg` که بی نصب رد می‌شود)، `paid-routes-entitlement` ۶، `route-authz-inventory` ۴ (درِ تازه BOUND)،
+  `shop-route-inventory` ۲، `admin-flags` ۲، `console-shell` ۸، `tenant-matrix` ۵، `tenant-matrix-branches` ۱، `courier-scope` ۱۲، `role-route-isolation` ۳،
+  `dari-text` ۱۷، `kotlin-file-mirrors` ۴، `kotlin-test-names-windows` ۳؛ core `InvoiceOcrTest` ۹ (خروجیِ واقعیِ Tesseract)، `DariTextTest` ۱۶؛
+  desktop `InvoiceOcrDeskUiTest` ۳، `InvoiceOcrPhoneUiTest` ۱، `PurchaseFormOcrTest` ۳، و نگهبان‌ها `DariCoverage` ۲۳، `DariWords` ۱۷، `I18nCoverage` ۸،
+  `InfraLeakGuard` ۸، `PageAnatomyGuard` ۹، `HardcodedColors` ۲، `LookGuard` ۷، `V3A11yGuard` ۶، `DeskStyle` ۶، `DeskD3cUi` ۸، `PurchaseFormUnits` ۵،
+  `PurchasesRoutesUi` ۷. اجرای کامل نشد.
+- **تغییرِ آگاهانهٔ آزمون (افزودنی، نه سست‌تر):** `paid-routes-entitlement`: `POST /shop/purchase-ocr` در PAID و `needPaid` کنارِ `needWrite` در
+  `paidGate` (درِ پولیِ بی دسته یا دسته‌ای بی دروازه هنوز سرخ)، `shop.purchase_ocr` در FLAGS؛ `shop-route-inventory`: همان پرچم در FLAGS؛
+  `admin-flags`: ردیفِ پرچم در PARITY و شمارِ ۵۷ ⇐ ۵۸.
+- **عکس‌ها:** `OcrShotsTest` (`OCR_SHOTS`) ⇐ `/home/user/wt-ocr-shots/` (گوشی ۳۶۰×۷۶۰ و کامپیوتر ۱۳۶۶×۷۶۸، روشن/تیره: پیش = کلیدِ خاموش که
+  همان صفحهٔ main است، پس = دکمه، فهرستِ بازبینی، «نصب نیست»؛ `compare-phone.png`، `compare-desk.png`).
+- **مانده:** دوربینِ گوشیِ واقعی و فاکتورهای چاپیِ واقعی (آستانه‌ها فقط روی نمونه‌ها)، دست‌نوشته پشتیبانی نمی‌شود (Tesseract برای آن
+  ساخته نشده)، واحدِ خرید از عکس (ردیف‌ها به واحدِ پایه می‌آیند)، و ساختِ آیفون (کامپایلِ klib این‌جا اجرا نشد).
+- **CI ِ #1067 (هماهنگ‌کننده)**: «کامپایل و آزمون» — `V3LiveGuardTest` («اسپینرِ بی‌پایانِ تازه فقط V3LiveSpinner»، ۴۸۰۱ آزمون، فقط همین
+  سرخ): دو `CircularProgressIndicator` ِ «در حالِ خواندن» در `InvoiceOcrUi.kt` (گوشی و کامپیوتر) ⇒ `V3LiveSpinner` (پوشیده/پس‌زمینه ⇒ حلقهٔ ایستا).
 ### ۱۴۰۵/۰۸/۲۶ — عاملِ e-branches4 زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-branches4` (از `origin/main` 7e2a36923) — پایانِ فازِ ۴ ِ شعبه‌ها
 
 - **خواست**: آخرین ردیف‌های «کد» ِ PARTIAL-MAP — INV-11/S21 (انتقالِ میانِ شعبه‌ها با «در راه» و حرکت در هر دو سو)، POS-16/S17 (موجودیِ

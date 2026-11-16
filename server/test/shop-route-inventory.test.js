@@ -224,6 +224,8 @@ FLAGS.push('shop.orders.dispute_file');
 FLAGS.push('shop.loyalty_rule');
 //  AI-11: «جست‌وجو با عکس» (`POST /shop/visual-search`) — فقط کالاهای دکانِ توکن
 FLAGS.push('shop.visual_search');
+//  PUR-12/AI-10: «از عکسِ فاکتور» (`/shop/purchase-ocr`) — فقط متنِ عکسِ همان درخواست؛ هیچ دادهٔ دکانی نمی‌خواند یا نمی‌نویسد
+FLAGS.push('shop.purchase_ocr');
 //  O-01: پوشِ گوشی (`/shop/push/devices`) — «ب» فقط توکنِ خودش را ثبت/پاک می‌کند، هرگز توکنِ «الف»
 FLAGS.push('shop.device_push');
 //  STF-02: «درخواستِ تأیید» از راهِ دور (`/shop/approval-requests/:id…`) — «ب» نه می‌بیند، نه تأیید/رد/لغو می‌کند
