@@ -26,11 +26,22 @@ internal object SyncModel {
     AutoSync.Health.FAILED -> SyncState.FAILED
   }
 
-  /** @param failed گرهِ سرخِ موتور (`diagnose(...).tone == ERROR`) — شکستِ Sync v1 در `AutoSync.health` دیده نمی‌شود */
-  fun headline(health: AutoSync.Health, running: Boolean, pending: Int, failed: Boolean = false): Line = when {
+  /**
+   *  @param failed گرهِ سرخِ موتور (`diagnose(...).tone == ERROR`) — شکستِ Sync v1 در `AutoSync.health` دیده نمی‌شود
+   *  @param held e-syncdiag: گرهِ زردی که همگام‌سازی را نگه داشته ([holds]: سرورِ عقب، دکان، بی‌نت…) — «همه‌چیز روی سرور
+   *    نشسته» ِ سبز کنارِ «در صف: ۴» و کارتِ «سرور از برنامه عقب‌تر است» دروغ بود
+   *  @param rejected opهای دفترِ کنار (`SyncStatus.dropped`)
+   */
+  fun headline(health: AutoSync.Health, running: Boolean, pending: Int, failed: Boolean = false, held: Boolean = false, rejected: Int = 0): Line = when {
     failed -> Line(StrNav.lastAttemptFailed, V3Tone.ERROR)
+    health == AutoSync.Health.OK && pending > 0 -> Line(if (running) Str.sending else StrNav.pendingItems(pending), V3Tone.WARNING)
+    health == AutoSync.Health.OK && held -> Line(StrNav.lastAttemptFailed, V3Tone.WARNING)
+    health == AutoSync.Health.OK && rejected > 0 -> Line(StrSyncPlain.rejectedTitle(rejected), V3Tone.WARNING)
     else -> headlineOf(health, running, pending)
   }
+
+  /** e-syncdiag: گرهی که «همه‌چیز روی سرور نشسته» را نادرست می‌کند (ردشده‌ها جدا شمرده می‌شوند، تلاشِ دوبارهٔ کوتاه نه) */
+  fun holds(d: Diagnosis): Boolean = d.problem !in setOf(Problem.NONE, Problem.REJECTED, Problem.RETRYING, Problem.NOT_SIGNED_IN)
 
   private fun headlineOf(health: AutoSync.Health, running: Boolean, pending: Int): Line = when (health) {
     AutoSync.Health.OK -> Line(StrNav.syncAllOnServer, V3Tone.SUCCESS)
@@ -38,7 +49,31 @@ internal object SyncModel {
     AutoSync.Health.FAILED -> Line(StrNav.lastAttemptFailed, V3Tone.ERROR)
   }
 
-  fun server(state: ServerPulse.State): Line = when (state) {
+  /**
+   *  ردیفِ «وضعیت» ِ بخشِ «سرور». e-syncdiag: «وصل است» فقط یعنی «به آن می‌رسیم»؛ کنارِ «همگام‌سازی ناموفق» دو حرفِ ناجور بود
+   *  («سرور سرور»). سرورِ رسیدنی که خودش تغییرها را رد کرد ([REFUSING]) یا همگام‌سازی‌اش جواب نداد ([DOUBTFUL]) ⇒ «در دسترس است»
+   *  ِ زرد و چرایش در [serverNote]؛ گرهِ خودِ این دستگاه یا ردِ تک‌تکِ opها ⇒ همان «وصل است» (سرور سالم است).
+   */
+  fun server(state: ServerPulse.State, d: Diagnosis? = null): Line = when {
+    state == ServerPulse.State.UP && d != null && (d.problem in REFUSING || d.problem in DOUBTFUL) -> Line(StrNav.serverReachable, V3Tone.WARNING)
+    else -> serverOf(state)
+  }
+
+  /** یادداشتِ زیرِ بخشِ «سرور» وقتی سرور رسیدنی است ولی همگام‌سازی نمی‌رود — همان چرای کارتِ وضعیت ([reasonLine]) */
+  fun serverNote(state: ServerPulse.State, d: Diagnosis, rejected: Map<String, Int> = emptyMap()): String? = when {
+    state != ServerPulse.State.UP -> null
+    d.problem in REFUSING -> StrSyncPlain.serverRefusing(reasonLine(d, rejected)?.text.orEmpty())
+    d.problem in DOUBTFUL -> StrSyncPlain.serverNotSyncing
+    else -> null
+  }
+
+  /** سرور پاسخ داد و نپذیرفت (نشست، دکان، سرورِ قدیمی، ردِ درخواست، خطای خودِ سرور) */
+  private val REFUSING = setOf(Problem.SERVER_BEHIND, Problem.SERVER_OLD, Problem.NO_SHOP, Problem.SIGN_IN, Problem.REFUSED, Problem.SERVER)
+
+  /** سرور به سنجش جواب داد ولی دورِ همگام‌سازی نه، یا نمی‌دانیم چرا */
+  private val DOUBTFUL = setOf(Problem.UNREACHABLE, Problem.UNKNOWN)
+
+  private fun serverOf(state: ServerPulse.State): Line = when (state) {
     ServerPulse.State.UP -> Line(StrNav.serverUp, V3Tone.SUCCESS)
     ServerPulse.State.DOWN -> Line(StrNav.serverDown, V3Tone.ERROR)
     ServerPulse.State.NO_NET -> Line(StrNav.phoneOffline, V3Tone.WARNING)
@@ -54,7 +89,13 @@ internal object SyncModel {
    *  گرهِ همگام‌سازی به زبانِ آدم — چه شده، چه نگه داشته شده، کاربر چه کند. e-newinstall: [NOT_SIGNED_IN] (مهمان، «ادامه بدون
    *  حساب») و [REFUSED] (سرور با پیامِ سادهٔ خودش رد کرد — همان پیام روی کارت، نه «همگام‌سازی کامل نشد»).
    */
-  enum class Problem { NONE, OFFLINE, SIGN_IN, NOT_SIGNED_IN, SERVER, SERVER_BEHIND, NO_SHOP, LOCAL, REJECTED, REFUSED, UNKNOWN, UNREACHABLE, RETRYING }
+  enum class Problem {
+    NONE, OFFLINE, SIGN_IN, NOT_SIGNED_IN, SERVER, SERVER_BEHIND, NO_SHOP, LOCAL, REJECTED, REFUSED, UNKNOWN, UNREACHABLE, RETRYING,
+    /** e-syncdiag: سرور راهِ همگام‌سازی را ندارد (۴۰۴) — سرورِ قدیمی‌تر از برنامه */
+    SERVER_OLD,
+    /** e-syncdiag: خطا در خودِ برنامهٔ این دستگاه (نه پاسخِ سرور، نه شبکه) — `SyncFailure.status` = محلی */
+    DEVICE,
+  }
 
   /** دکمهٔ کارتِ گره — کاری که کاربر همان‌جا می‌کند */
   enum class Fix { NONE, SIGN_IN, SHOP }
@@ -137,6 +178,7 @@ internal object SyncModel {
     "holding" to v1.holding.toString(),
     "outage" to v1.outage.name,
     "lastOkAt" to v1.lastOkAt.toString(),
+    "errorStatus" to (v1.errorStatus?.toString() ?: ""),
   )
 
   /** یادداشتِ زیرِ «وضعیتِ سرور»: سرورِ بالا ولی ناآماده ⇒ همان جملهٔ ساده؛ جواب نداد ⇒ [reason]؛ بقیه هیچ */
@@ -165,6 +207,30 @@ internal object SyncModel {
     SyncOutage.Kind.RETRYING -> StrSettings.diagRetryingTitle
     SyncOutage.Kind.UNREACHABLE -> StrSettings.diagUnreachableTitle
     SyncOutage.Kind.SERVER -> StrSettings.diagServerTitle
+    else -> null
+  }
+
+  /**
+   *  e-syncdiag: کدِ HTTP ِ ماندگارِ شکست (`SyncStatus.errorStatus`) ⇒ گره، پیش از نشانه‌های متنی — متنِ خامِ ناآشنا («schema_version
+   *  لازم است»، پیامِ انگلیسیِ کتابخانه) پیش‌تر همه «همگام‌سازی کامل نشد» بود. `null` ⇒ کد نیست (ساختِ پیشین، خطای `AutoSync`).
+   *  محلی ⇒ فقط نشانه‌های دفتر و اینترنت (نه «token» ِ پیامِ JSON که «نشست» می‌شد)، وگرنه [Problem.DEVICE].
+   */
+  fun fromStatus(status: Int?, raw: String): Problem? = when {
+    status == null -> null
+    status == SyncOutage.LOCAL -> {
+      val low = raw.lowercase()
+      when {
+        LOCAL_HINTS.any { it in low } -> Problem.LOCAL
+        OFFLINE_HINTS.any { it in low } -> Problem.OFFLINE
+        else -> Problem.DEVICE
+      }
+    }
+    status == SyncOutage.NO_RESPONSE -> Problem.UNREACHABLE
+    status == 426 -> Problem.SERVER_BEHIND
+    status == 404 -> Problem.SERVER_OLD
+    status == 401 -> Problem.SIGN_IN
+    status == 429 || status >= 500 -> Problem.SERVER
+    status in 400..499 -> Problem.REFUSED
     else -> null
   }
 
@@ -213,11 +279,14 @@ internal object SyncModel {
     code: String = "",
     signedIn: Boolean = true,
     queued: Int = 0,
+    /** e-syncdiag: کدِ HTTP ِ همان شکست (`SyncStatus.errorStatus`)؛ null ⇒ نامعلوم */
+    status: Int? = null,
   ): Diagnosis {
     val raw = error.trim()
     val byCode = if (raw.isNotEmpty()) fromCode(code) else null
     //  حکمِ AUTH ِ موتور برای هر ۴۰۱/۴۰۳ است؛ ۴۰۳ ِ کددارِ دیگر (اشتراک، نقش، دستگاهِ بسته) نشست نیست
     val judged = if (raw.isNotEmpty()) fromOutage(outage)?.takeUnless { it == Problem.SIGN_IN && code.isNotBlank() && byCode == null } else null
+    val byStatus = if (raw.isNotEmpty()) fromStatus(status, raw) else null
     val problem = when {
       !signedIn -> Problem.NOT_SIGNED_IN
       holding -> Problem.SERVER_BEHIND
@@ -225,6 +294,7 @@ internal object SyncModel {
       byCode != null -> byCode
       judged != null -> judged
       server == ServerPulse.State.NO_NET && raw.isNotEmpty() -> Problem.OFFLINE
+      byStatus != null -> byStatus
       raw.isNotEmpty() -> classify(raw).let { if (it == Problem.UNKNOWN && plain(raw)) Problem.REFUSED else it }
       dropped > 0 -> Problem.REJECTED
       else -> Problem.NONE
@@ -245,19 +315,67 @@ internal object SyncModel {
       Problem.LOCAL -> d(StrSettings.diagLocalTitle, StrSettings.diagLocalBody, StrSettings.diagLocalDo, V3Tone.ERROR)
       Problem.REJECTED -> d(StrSyncPlain.rejectedTitle(dropped), StrNav.droppedChanges(dropped), StrSettings.diagRejectedDo, V3Tone.WARNING, det = null)
       //  پیامِ سادهٔ خودِ سرور (`plain`: بی نشانی، بی کد و عددِ لاتین) همان بدنهٔ کارت است
-      Problem.REFUSED -> d(StrSettings.diagRefusedTitle, raw + "\n" + StrSettings.diagUnknownBody, StrSettings.diagRefusedDo, V3Tone.ERROR)
+      Problem.REFUSED -> if (plain(raw)) d(StrSettings.diagRefusedTitle, raw + "\n" + StrSettings.diagUnknownBody, StrSettings.diagRefusedDo, V3Tone.ERROR)
+        //  e-syncdiag: ردِ سرور با متنِ فنی (کدِ ۴xx) — جملهٔ ساده؛ متنِ خام فقط در «جزئیات»
+        else d(StrSettings.diagRefusedTitle, StrSettings.diagRefusedBodyPlain, StrSettings.diagUnknownDo, V3Tone.ERROR)
+      Problem.SERVER_OLD -> d(StrSettings.diagOldServerTitle, StrNav.serverBehind, StrSettings.diagBehindDo, V3Tone.WARNING)
+      Problem.DEVICE -> d(StrSettings.diagDeviceTitle, StrSettings.diagDeviceBody, StrSettings.diagUnknownDo, V3Tone.ERROR)
       Problem.UNKNOWN -> d(StrSettings.diagUnknownTitle, StrSettings.diagUnknownBody, StrSettings.diagUnknownDo, V3Tone.ERROR)
     }
   }
+
+  /**
+   *  e-syncdiag: یک خطِ «چه شد» زیرِ سرخطِ کارتِ وضعیت — بی نیاز به «جزئیات»، به زبانِ ساده، بی جزئیاتِ فنی. پیامِ سادهٔ خودِ
+   *  سرور ([plain]) همان؛ متنِ فنی هرگز. `null` ⇒ چیزی برای گفتن نیست (همگام، مهمان، تلاشِ دوبارهٔ کوتاه).
+   *  @param rejected شمارِ opهای دفترِ کنار به‌ازای دلیلِ سرور ([rejectedReasons])
+   */
+  fun reasonLine(d: Diagnosis, rejected: Map<String, Int> = emptyMap()): Line? = when (d.problem) {
+    Problem.NONE, Problem.NOT_SIGNED_IN, Problem.RETRYING -> null
+    Problem.OFFLINE -> Line(StrSyncPlain.reasonOffline, V3Tone.WARNING)
+    Problem.SIGN_IN -> Line(StrSyncPlain.reasonSignIn, V3Tone.ERROR)
+    Problem.SERVER -> Line(StrSyncPlain.reasonServerError, V3Tone.WARNING)
+    Problem.UNREACHABLE -> Line(StrSyncPlain.reasonUnreachable, V3Tone.WARNING)
+    Problem.SERVER_BEHIND, Problem.SERVER_OLD -> Line(StrSyncPlain.reasonOldServer, V3Tone.WARNING)
+    Problem.NO_SHOP -> Line(StrSyncPlain.reasonNoShop, V3Tone.WARNING)
+    Problem.LOCAL -> Line(StrSettings.diagLocalTitle, V3Tone.ERROR)
+    Problem.DEVICE -> Line(StrSyncPlain.reasonDevice, V3Tone.ERROR)
+    Problem.REJECTED -> rejectedLine(rejected.values.sum().coerceAtLeast(1), rejected)
+    Problem.REFUSED -> d.detail?.takeIf { plain(it) }?.let { Line(StrSyncPlain.reasonRefusedSaid(it), V3Tone.ERROR) } ?: Line(StrSyncPlain.reasonRefused, V3Tone.ERROR)
+    Problem.UNKNOWN -> Line(StrSyncPlain.reasonUnknown, V3Tone.ERROR)
+  }
+
+  /** دلیل‌های سرور که یعنی «سرورِ دکان این نوع تغییر را نمی‌شناسد» — سرورِ قدیمی‌تر از برنامه (`lib/sync-v1.js` `validateOp`) */
+  private val OLD_SERVER_REASONS = setOf("unknown_table", "bad_type", "bad_field_name", "bad_delta", "no_schema")
+  private val TOO_LARGE_REASONS = setOf("body_too_large", "fields_too_large")
+  /** ردِ اجازه یا تأیید — همان گونه‌هایی که صاحب/مدیر در «سندهای ردشده» می‌بیند (`lib/conflict-inbox.js`) */
+  private fun permission(reason: String) = reason == "perm_denied" || reason == "permission_denied" || reason == "table_not_allowed" ||
+    reason == "tx_rejected" || reason.startsWith("approval_")
+
+  /** شمارِ ردشده‌ها؛ چیرگی: سرورِ قدیمی ⇐ بزرگ ⇐ اجازه/تأیید ⇐ بقیه */
+  private fun rejectedLine(n: Int, rejected: Map<String, Int>): Line {
+    val keys = rejected.filterValues { it > 0 }.keys
+    return when {
+      keys.any { it in OLD_SERVER_REASONS } -> Line(StrSyncPlain.reasonRejectedOld(n), V3Tone.WARNING)
+      keys.any { it in TOO_LARGE_REASONS } -> Line(StrSyncPlain.reasonRejectedLarge(n), V3Tone.WARNING)
+      keys.any(::permission) -> Line(StrSyncPlain.reasonRejectedInbox(n), V3Tone.WARNING)
+      else -> Line(StrSyncPlain.reasonRejected(n), V3Tone.WARNING)
+    }
+  }
+
+  /** دفترِ کنارِ صف (`OpQueue.dropped`: `{op, reason, at}`) ⇒ شمار به‌ازای دلیل */
+  fun rejectedReasons(book: List<kotlinx.serialization.json.JsonObject>): Map<String, Int> = book
+    .groupingBy { (it["reason"] as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty().ifBlank { "rejected" } }
+    .eachCount()
 
   /**
    *  متنِ برگهٔ «جزئیات» (فقط با زدن، `SyncScreen`) — همان چیزی که پشتیبانی لازم دارد: نامِ گره، کد، متنِ خامِ خطا،
    *  صف و ردشده‌ها و آخرین موفق. ⛔ نشانیِ سرور پوشانده (`SupportDiag.clean`: `api.•••`، IP ⇒ `•••`)؛ نسخهٔ سرور، Schema و
    *  راهِ API هرگز (آن‌ها فقط در گزارشِ فرستاده‌شده‌اند، [facts]).
    */
-  fun detailsText(d: Diagnosis, queued: Int, dropped: Int, lastOkAt: Long, now: Long): String = buildString {
+  fun detailsText(d: Diagnosis, queued: Int, dropped: Int, lastOkAt: Long, now: Long, status: Int? = null): String = buildString {
     append("sync: ").append(d.problem.name.lowercase())
     if (d.code.isNotBlank()) append(" · code: ").append(SupportDiag.clean(d.code, 64))
+    status?.let { append(" · status: ").append(it) }
     append('\n')
     d.detail?.takeIf { it.isNotBlank() }?.let { append(SupportDiag.clean(it, DETAIL_MAX)).append('\n') }
     append("queued: ").append(queued).append(" · dropped: ").append(dropped).append('\n')

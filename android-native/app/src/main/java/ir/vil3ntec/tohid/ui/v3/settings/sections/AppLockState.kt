@@ -30,6 +30,8 @@ internal object SettingsShotState {
   /** e-newinstall: کدِ ماشینیِ همان خطا (`SyncStatus.errorCode`) و برگهٔ «جزئیات» ِ باز، برای عکسِ حالت‌های گره */
   var syncCode: String? = null
   var syncDetailsOpen: Boolean = false
+  /** e-syncdiag: دلیل‌های دفترِ کنار (`SyncModel.rejectedReasons`) برای عکسِ «تغییرِ ردشده» */
+  var syncRejected: Map<String, Int>? = null
   /** پشتیبان: برگهٔ تأییدِ «پاک‌سازی کامل» باز */
   var wipeSheet: Boolean = false
   /** صفحهٔ اول: نوشتهٔ کادرِ جست‌وجو از آغاز (عکسِ نتیجه‌های جست‌وجو) */

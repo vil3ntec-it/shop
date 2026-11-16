@@ -476,7 +476,26 @@ object StrSettings {
   val diagServerBody: String get() = t("گره در سرور است، نه در این دستگاه. تغییرها نگه داشته می‌شوند و بعد خودشان می‌روند.", "The problem is on the server, not this device. Changes are kept and go out later by themselves.", "ستونزه په سرور کې ده، نه په دې وسیله کې. بدلونونه ساتل کېږي او وروسته پخپله ځي.")
   val diagServerDo: String get() = t("چند دقیقهٔ دیگر «همگام‌سازی حالا» را بزنید؛ اگر ماند، به پشتیبانی خبر دهید.", "Tap “Sync now” in a few minutes; if it stays, tell support.", "څو دقیقې وروسته «اوس همغږي» ووهئ؛ که پاتې شوه، ملاتړ ته ووایاست.")
   val diagBehindTitle: String get() = t("سرور از برنامه عقب‌تر است", "The server is older than the app", "سرور له اپ زوړ دی")
-  val diagBehindDo: String get() = t("سرور باید به‌روز شود؛ تا آن وقت کارتان را ادامه دهید.", "The server needs an update; keep working until then.", "سرور باید تازه شي؛ تر هغه خپل کار ته دوام ورکړئ.")
+  val diagBehindDo: String get() = t(
+    "سرور را از «مرکزِ فرمان» به‌روز کنید یا به صاحبِ دکان بگویید؛ تا آن وقت کارتان را ادامه دهید — تغییرها پس از به‌روز شدن خودشان می‌روند.",
+    "Update the server from the Control Center, or tell the shop owner; keep working until then — changes go through by themselves once it's updated.",
+    "سرور له «د کنټرول مرکز» څخه تازه کړئ یا د دوکان خاوند ته ووایاست؛ تر هغه خپل کار ته دوام ورکړئ — بدلونونه له تازه کېدو وروسته پخپله ځي.",
+  )
+  /** e-syncdiag: سرور راهِ همگام‌سازی را ندارد (۴۰۴ ِ همان راه) — سرورِ قدیمی‌تر از برنامه */
+  val diagOldServerTitle: String get() = t("سرورِ دکان قدیمی است", "The shop server is out of date", "د دوکان سرور زوړ دی")
+  /** e-syncdiag: خطا در خودِ برنامهٔ این دستگاه (نه پاسخِ سرور) */
+  val diagDeviceTitle: String get() = t("همگام‌سازی روی همین دستگاه گیر کرد", "Sync got stuck on this device", "همغږي په همدې وسیله کې بنده شوه")
+  val diagDeviceBody: String get() = t(
+    "گره در خودِ برنامهٔ این دستگاه است، نه در سرور. تغییرها روی همین دستگاه نگه داشته می‌شوند و گم نمی‌شوند.",
+    "The problem is in the app on this device, not on the server. Changes are kept on this device and aren't lost.",
+    "ستونزه د دې وسیلې په اپ کې ده، نه په سرور کې. بدلونونه په همدې وسیله ساتل کېږي او نه ورکېږي.",
+  )
+  /** e-syncdiag: ردِ سرور با متنِ فنی (۴xx ِ بی پیامِ ساده) — متنِ خام فقط در «جزئیات» */
+  val diagRefusedBodyPlain: String get() = t(
+    "سرور درخواستِ همگام‌سازیِ این دستگاه را نپذیرفت. تغییرها روی همین دستگاه نگه داشته می‌شوند و گم نمی‌شوند.",
+    "The server refused this device's sync request. Changes are kept on this device and aren't lost.",
+    "سرور د دې وسیلې د همغږۍ غوښتنه ونه منله. بدلونونه په همدې وسیله ساتل کېږي او نه ورکېږي.",
+  )
   val diagNoShopTitle: String get() = t("برای این حساب دکانی ساخته نشده", "This account has no shop yet", "دې حساب ته لا دوکان نه دی جوړ شوی")
   val diagNoShopBody: String get() = t("همگام‌سازی جایی برای فرستادنِ دفتر ندارد؛ دفتر روی همین دستگاه کامل کار می‌کند.", "Sync has nowhere to send the ledger; the ledger works fully on this device.", "همغږي د دفتر لېږلو ځای نه لري؛ دفتر په همدې وسیله بشپړ کار کوي.")
   val diagNoShopDo: String get() = t("اگر دکان را پیش‌تر در برنامهٔ دیگری ساخته‌اید، خارج شوید و با همان ایمیلِ همان حساب وارد شوید؛ وگرنه دکان را بسازید یا با کدِ دکان بپیوندید.", "If you already made the shop in another app, sign out and sign in with that same account's email; otherwise create the shop or join with a shop code.", "که مو دوکان مخکې په بل اپ کې جوړ کړی، ووځئ او د هماغه حساب په برېښنالیک ننوځئ؛ که نه، دوکان جوړ کړئ یا د دوکان په کوډ یوځای شئ.")

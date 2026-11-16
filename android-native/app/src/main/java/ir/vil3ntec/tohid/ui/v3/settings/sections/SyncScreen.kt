@@ -22,6 +22,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -92,15 +93,27 @@ internal fun RouteScope.SyncScreen(onBack: (() -> Unit)?) {
     SettingsShotState.syncError ?: v1.lastError.ifBlank { AutoSync.lastError.orEmpty() }, v1.holding, v1.dropped, AutoSync.needsShop,
     ServerPulse.state, if (engineError) v1.outage else null,
     code = SettingsShotState.syncCode ?: if (engineError) v1.errorCode else "", signedIn = signedIn, queued = v1.queued,
+    status = if (engineError) v1.errorStatus else null,
   )
+  //  e-syncdiag: دلیلِ سرور برای هر op ِ دفترِ کنار — «چه شد» ِ کارتِ وضعیت (`SyncModel.reasonLine`)
+  val book by produceState(emptyMap<String, Int>(), v1.dropped) {
+    value = if (v1.dropped == 0) emptyMap() else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+      runCatching { SyncModel.rejectedReasons(SyncV1Engine.of(context).droppedOps()) }.getOrDefault(emptyMap())
+    }
+  }
+  val rejected = SettingsShotState.syncRejected ?: book
+  val reason = SyncModel.reasonLine(d, rejected)
 
   SettingsPageFrame(title = SettingsLayout.labelOf("همگام‌سازی"), onBack = onBack) {
     item(key = "hero") {
       SettingsBlock {
         if (signedIn) {
           //  e-newinstall: کارتِ سرخِ گره ⇒ سرخطِ «آخرین تلاش ناموفق بود»، نه «همه‌چیز روی سرور نشسته» (شکستِ موتور در `AutoSync` نیست)
-          val head = SyncModel.headline(AutoSync.health, AutoSync.running, AutoSync.pendingCount + v1.queued, failed = d.tone == V3Tone.ERROR)
+          val head = SyncModel.headline(AutoSync.health, AutoSync.running, AutoSync.pendingCount + v1.queued, failed = d.tone == V3Tone.ERROR,
+            held = SyncModel.holds(d), rejected = v1.dropped)
           StatusLine(head)
+          //  e-syncdiag: چه شد — بی نیاز به «جزئیات»
+          reason?.let { Text(it.text, style = V3Type.subhead, color = PhoneV3.colors.ink, modifier = Modifier.padding(top = 6.dp)) }
           Spacer(Modifier.height(4.dp))
           Text(StrNav.lastSync(SettingsIndexModel.since(lastOk, now)), style = V3Type.footnote, color = PhoneV3.colors.inkMuted)
           if (v1.queued > 0) Text(StrSettings.queueSize(v1.queued), style = V3Type.footnote, color = PhoneV3.colors.inkMuted)
@@ -143,7 +156,7 @@ internal fun RouteScope.SyncScreen(onBack: (() -> Unit)?) {
               SyncModel.Fix.NONE -> Unit
             }
           },
-          details = if (d.detail == null) null else { { SyncModel.detailsText(d, v1.queued, v1.dropped, lastOk, now) } },
+          details = if (d.detail == null) null else { { SyncModel.detailsText(d, v1.queued, v1.dropped, lastOk, now, if (engineError) v1.errorStatus else null) } },
           onCopied = { toasts.show(StrSettings.diagDetailsCopied) },
           startOpen = SettingsShotState.syncDetailsOpen,
           ask = if (signedIn) SyncModel.askOf(d, v1.dropped) else null,
@@ -151,12 +164,15 @@ internal fun RouteScope.SyncScreen(onBack: (() -> Unit)?) {
       }
     }
     item(key = "server") {
-      val pulse = SyncModel.server(ServerPulse.state)
+      //  e-syncdiag: «وصل است» فقط وقتی همگام‌سازی هم از آن می‌گذرد؛ وگرنه «در دسترس است» و چرایش زیرِ بخش
+      val pulse = SyncModel.server(ServerPulse.state, d)
       V3Section(StrNav.server) {
         V3ListRow(StrSettings.serverStatus, chevron = false, trailing = { StatusLine(pulse, small = true) })
         if (ServerPulse.at > 0) { V3Divider(start = ir.vil3ntec.tohid.ui.v3.V3NavRowSpec.PAD_START_PLAIN); V3ListRow(StrNav.lastCheck(SettingsIndexModel.since(ServerPulse.at, now)), chevron = false) }
       }
-      SyncModel.pulseNote(ServerPulse.state, ServerPulse.note)?.let { ErrorText(it) }
+      val refusing = SyncModel.serverNote(ServerPulse.state, d, rejected)
+      if (refusing != null) Text(refusing, style = V3Type.footnote, color = PhoneV3.colors.ink, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+      else SyncModel.pulseNote(ServerPulse.state, ServerPulse.note)?.let { ErrorText(it) }
       V3TextButton(
         if (ServerPulse.state == ServerPulse.State.CHECKING) StrNav.checking else StrNav.checkAgain,
         { if (ServerPulse.state != ServerPulse.State.CHECKING) scope.launch { ServerPulse.probe(context, force = true) } },
