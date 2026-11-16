@@ -129,8 +129,8 @@ val ProductsModule = AppModule(
     //  بانکِ تصاویر (۳۶.۶) و دوربینِ راهنما (۳۷.۵) — همان پنجره‌های صفحهٔ کالای پیشین (`ProductPhotoExtrasAndroid.kt`)
     V3Route("products/{id}/photo/bank", RouteKind.SHEET, { StrProducts.photoTitle }, parent = "products/{id}", chrome = Chrome.OWN) { PhotoBankRoute(args["id"].orEmpty()) },
     V3Route("products/{id}/photo/guided", RouteKind.SHEET, { StrProducts.photoTitle }, parent = "products/{id}", chrome = Chrome.OWN) { PhotoGuidedRoute(args["id"].orEmpty()) },
-    V3Route("products/{id}/photo/versions", RouteKind.PAGE, { StrImageChanges.versionsTitle }, parent = "products/{id}") { PhotoVersionsPage(args["id"].orEmpty()) },
-    V3Route("products/{id}/photo/gallery", RouteKind.PAGE, { StrProductGallery.title }, parent = "products/{id}") { ProductGalleryPage(args["id"].orEmpty()) },
+    V3Route("products/{id}/photo/versions", RouteKind.PAGE, { StrImageChanges.versionsTitle }, parent = "products/{id}", chrome = Chrome.OWN) { PhotoVersionsPage(args["id"].orEmpty()) },
+    V3Route("products/{id}/photo/gallery", RouteKind.PAGE, { StrProductGallery.title }, parent = "products/{id}", chrome = Chrome.OWN) { ProductGalleryPage(args["id"].orEmpty()) },
     V3Route("products/{id}/photo/studio", RouteKind.PAGE, { StrProducts.studioTitle }, parent = "products/{id}", chrome = Chrome.OWN) {
       val id = args["id"].orEmpty()
       val src = args.query("src")

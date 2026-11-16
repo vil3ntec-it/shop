@@ -159,7 +159,8 @@ private fun DoorBox(d: ProfileHomeModel.Door, modifier: Modifier, onClick: () ->
     horizontalAlignment = Alignment.CenterHorizontally,
     verticalArrangement = Arrangement.Center,
   ) {
-    Text(shown.toLong().toString(), style = V3Type.figure, color = c.ink, maxLines = 1)
+    //  کالبدِ یکسان (p0r3): عددِ کاشیِ کوچک با نوشتهٔ عنوانِ کیت (۱۹)، نه عددِ درشتِ ۲۴ ِ بیرون از خلاصه
+    Text(shown.toLong().toString(), style = V3Type.title, color = c.ink, maxLines = 1)
     Text(d.label, style = V3Type.footnote, color = c.inkMuted, maxLines = 1)
   }
 }

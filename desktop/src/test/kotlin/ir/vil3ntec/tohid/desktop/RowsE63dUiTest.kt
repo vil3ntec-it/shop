@@ -212,7 +212,8 @@ class RowsE63dUiTest {
     var opened = 0
     var received = 0
     show { PoListRow(po("partial"), PoPermsDto(manage = true, receive = true), "2026-11-14", onOpen = { opened++ }, onReceive = { received++ }) }
-    assertEquals(1, count(" • " + StrGoods.poPartial, substring = true))
+    //  p0r3 (عمدی): وضعیت در خطِ دوم کنارِ جزئیات («… · بخشی دریافت‌شده»)، مبلغ هم‌خطِ عنوان
+    assertEquals(1, count(" · " + StrGoods.poPartial, substring = true))
     click(StrPurchasePages.receiveGoods)
     assertEquals(1, received)
     assertEquals(0, opened)

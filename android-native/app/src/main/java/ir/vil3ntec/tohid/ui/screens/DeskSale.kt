@@ -929,7 +929,7 @@ fun DeskSaleScreen(
         name = name,
         balanceMinor = ir.vil3ntec.tohid.data.TillReceiveFlow.balanceMinor(d, id),
         busy = receiveBusy,
-        gate = { content -> VipGate(Str.debtors) { content() } },
+        gate = { content -> VipGate(Str.debtors, feature = "debtors") { content() } },
         onDismiss = { receiveFor = null; refocus() },
         onSubmit = { amount, notes, prepay ->
           receiveBusy = true
