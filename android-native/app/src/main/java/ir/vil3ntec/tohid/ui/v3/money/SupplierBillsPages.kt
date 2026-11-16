@@ -239,8 +239,9 @@ internal fun RouteScope.SupplierBillNewRoute(id: String) {
     if (r == null) failed = true else order = r
   }
   val c = PhoneV3.colors
-  Box(Modifier.fillMaxSize().padding(16.dp)) {
-    Column {
+  //  کالبدِ یکسان (p0): قابِ خودِ صفحه؛ فرمِ مشترکِ `PoBill` خودش پیمایش می‌کند و «ثبت» را نوارِ چسبانِ پایین می‌کند
+  V3RoutePage(StrSupplierBills.newBill, scroll = false) {
+    run {
       val open = GateState(cfg, failed) { tick++ }
       val o = order
       when {

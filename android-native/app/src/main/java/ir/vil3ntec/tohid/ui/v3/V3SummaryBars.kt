@@ -1,5 +1,11 @@
 package ir.vil3ntec.tohid.ui.v3
 
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -51,10 +57,10 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
 data class V3Bar(val key: String, val label: String, val amount: String, val value: Double, val color: Color)
 
 /**
- *  نمودارِ افقیِ درونِ کارتِ خلاصه (۶۵s، صاحب‌کار: تفکیک درونِ همان کارت، نه کارتِ جدا زیرش): هر ردیف نقطهٔ رنگ، نام،
- *  نوارِ سهم (درازی نسبت به بزرگ‌ترین) و مبلغ — رنگ هرگز تنها نیست. [top] ردیفِ نخست پیدا، بقیه زیرِ «… N مورد دیگر» که
- *  با زدن همه را نشان می‌دهد. [onPick] ⇒ زدنِ ردیف همان پالایه (دوباره ⇒ همه)؛ ردیفِ برگزیده پررنگ و بقیه کم‌رنگ.
- *  نوار با `rememberV3Grow` از آغاز می‌روید (کاهشِ حرکت ⇒ همان دم).
+ *  نمودارِ ستونیِ فشردهٔ درونِ کارتِ خلاصه (p0r3، صاحب‌کار: «ردیف‌های تفکیک زیرِ هم کارت را خیلی بلند می‌کند») — ستون‌ها کنارِ هم:
+ *  مبلغ بالای ستون، ستونِ رنگی (بلندی نسبت به بزرگ‌ترین) و نام زیرش؛ اگر جا نشد، ردیف به پهنا پیمایش می‌شود (هیچ دسته‌ای پنهان
+ *  نیست). رنگ هرگز تنها نیست (نام و مبلغ کنارش). [onPick] ⇒ زدنِ ستون همان پالایه (دوباره ⇒ همه)؛ ستونِ برگزیده پررنگ و بقیه
+ *  کم‌رنگ. ستون با `rememberV3Grow` از پایین می‌روید (کاهشِ حرکت ⇒ همان دم). [top] دیگر به کار نمی‌رود (همهٔ ستون‌ها پیدا).
  */
 @Composable
 fun V3SummaryBars(
@@ -62,72 +68,70 @@ fun V3SummaryBars(
   modifier: Modifier = Modifier,
   selected: String? = null,
   onPick: ((String) -> Unit)? = null,
-  top: Int = 5,
+  @Suppress("UNUSED_PARAMETER") top: Int = 5,
   track: Color = PhoneV3.colors.tile,
 ) {
   if (bars.isEmpty()) return
-  var all by rememberSaveable { mutableStateOf(false) }
-  val hidden = (bars.size - top).coerceAtLeast(0)
-  val shown = if (all || hidden == 0) bars else bars.take(top)
   val max = bars.maxOf { it.value }.takeIf { it > 0.0 } ?: 1.0
   val grow = rememberV3Grow(bars.map { it.key to it.value })
-  val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
   val c = PhoneV3.colors
-  Column(modifier.fillMaxWidth()) {
-    shown.forEach { b ->
-      val on = selected == null || selected == b.key
-      Row(
-        Modifier
-          .fillMaxWidth()
-          .heightIn(min = 44.dp)
-          .then(if (onPick != null) Modifier.v3Pressable(label = b.label, role = Role.Tab, scale = 1f) { onPick(b.key) } else Modifier)
-          .semantics(mergeDescendants = true) {
-            contentDescription = "${b.label}: ${b.amount}"
-            if (onPick != null) this.selected = selected == b.key
-          }
-          .alpha(if (on) 1f else 0.45f),
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        Box(Modifier.size(9.dp).clip(CircleShape).background(b.color))
-        Spacer(Modifier.width(8.dp))
-        Text(
-          b.label,
-          style = v3Text(13, if (selected == b.key) FontWeight.SemiBold else FontWeight.Medium, 18),
-          color = c.ink,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-          modifier = Modifier.weight(0.34f),
-        )
-        Spacer(Modifier.width(8.dp))
-        Box(Modifier.weight(0.4f).height(8.dp).clip(RoundedCornerShape(50)).background(track)) {
+  BoxWithConstraints(modifier.fillMaxWidth()) {
+    val full = maxWidth
+    Row(
+      Modifier
+        .horizontalScroll(rememberScrollState())
+        .widthIn(min = full)
+        .padding(top = 4.dp),
+      horizontalArrangement = Arrangement.spacedBy(V3SummaryBarsSpec.GAP, Alignment.CenterHorizontally),
+      verticalAlignment = Alignment.Bottom,
+    ) {
+      bars.forEach { b ->
+        val on = selected == null || selected == b.key
+        Column(
+          Modifier
+            .width(V3SummaryBarsSpec.COLUMN)
+            .then(if (onPick != null) Modifier.v3Pressable(label = b.label, role = Role.Tab, scale = 1f) { onPick(b.key) } else Modifier)
+            .semantics(mergeDescendants = true) {
+              contentDescription = "${b.label}: ${b.amount}"
+              if (onPick != null) this.selected = selected == b.key
+            }
+            .alpha(if (on) 1f else 0.45f)
+            .testTag(V3SummaryBarsSpec.COLUMN_TAG),
+          horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+          Text(b.amount, style = v3Text(11, FontWeight.SemiBold, 14), color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+          Spacer(Modifier.height(3.dp))
           Box(
-            Modifier
-              //  صفر ⇒ بی نوار (نه نقطهٔ گمراه‌کننده)؛ مقدارِ بسیار کوچک دست‌کم یک تکهٔ دیدنی
-              .fillMaxWidth(if (b.value <= 0.0) 0f else (b.value / max).toFloat().coerceIn(0.03f, 1f))
-              .fillMaxHeight()
-              .graphicsLayer { scaleX = grow; transformOrigin = TransformOrigin(if (rtl) 1f else 0f, 0.5f) }
-              .clip(RoundedCornerShape(50))
-              .background(b.color),
+            Modifier.width(V3SummaryBarsSpec.BAR).height(V3SummaryBarsSpec.HEIGHT).clip(RoundedCornerShape(6.dp)).background(track),
+            contentAlignment = Alignment.BottomCenter,
+          ) {
+            Box(
+              Modifier
+                .fillMaxWidth()
+                //  صفر ⇒ بی ستون (نه تکهٔ گمراه‌کننده)؛ مقدارِ بسیار کوچک دست‌کم یک تکهٔ دیدنی
+                .fillMaxHeight(if (b.value <= 0.0) 0f else (b.value / max).toFloat().coerceIn(0.04f, 1f))
+                .graphicsLayer { scaleY = grow; transformOrigin = TransformOrigin(0.5f, 1f) }
+                .clip(RoundedCornerShape(6.dp))
+                .background(b.color),
+            )
+          }
+          Spacer(Modifier.height(4.dp))
+          Text(
+            b.label,
+            style = v3Text(12, if (selected == b.key) FontWeight.SemiBold else FontWeight.Medium, 16),
+            color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
           )
         }
-        Spacer(Modifier.width(8.dp))
-        Text(b.amount, style = v3Text(13, FontWeight.SemiBold, 18), color = c.ink, maxLines = 1, modifier = Modifier.weight(0.26f, fill = false))
-      }
-    }
-    if (hidden > 0) {
-      Row(
-        Modifier
-          .fillMaxWidth()
-          .heightIn(min = 44.dp)
-          .v3Pressable(label = if (all) StrLook.fewerMetrics else StrLook.moreRows(hidden), role = Role.Button, scale = 1f) { all = !all }
-          .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-      ) {
-        Text(if (all) StrLook.fewerMetrics else StrLook.moreRows(hidden), style = v3Text(13, FontWeight.SemiBold, 18), color = c.inkMuted)
-        Spacer(Modifier.width(2.dp))
-        Icon(if (all) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown, contentDescription = null, tint = c.inkMuted, modifier = Modifier.size(18.dp))
       }
     }
   }
+}
+
+/** اندازه‌های نمودارِ ستونیِ خلاصه — پهنای ستون (جای زدن)، پهنای ستونِ رنگی، بلندیِ بیشینه و فاصله */
+object V3SummaryBarsSpec {
+  val COLUMN = 60.dp
+  val BAR = 22.dp
+  val HEIGHT = 64.dp
+  val GAP = 8.dp
+  const val COLUMN_TAG = "v3-summary-bar"
 }

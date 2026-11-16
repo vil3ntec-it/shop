@@ -105,7 +105,7 @@ val OnlineModule = AppModule(
   routes = listOf(
     V3Route(OnlinePaths.ORDERS, RouteKind.TAB, { StrOnline.ordersTitle }, needs = setOf(Need.ORDERS_LIVE), chrome = Chrome.OWN) { OrdersRoute() },
     V3Route(OnlinePaths.NEW_ORDER, RouteKind.PAGE, { StrOnline.manualOrder }, parent = OnlinePaths.ORDERS, needs = setOf(Need.ORDERS_LIVE), chrome = Chrome.OWN) { NewOrderRoute() },
-    V3Route(OnlinePaths.RISK_LISTS, RouteKind.PAGE, { StrRisk.listsTitle }, parent = OnlinePaths.ORDERS, needs = setOf(Need.ORDERS_LIVE)) { RiskListsRoute() },
+    V3Route(OnlinePaths.RISK_LISTS, RouteKind.PAGE, { StrRisk.listsTitle }, parent = OnlinePaths.ORDERS, needs = setOf(Need.ORDERS_LIVE), chrome = Chrome.OWN) { RiskListsRoute() },
     V3Route("orders/{id}", RouteKind.PAGE, { StrOnline.ordersTitle }, parent = OnlinePaths.ORDERS, needs = setOf(Need.ORDERS_LIVE), chrome = Chrome.OWN) {
       OrderDetailRoute(args["id"].orEmpty())
     },
@@ -115,9 +115,9 @@ val OnlineModule = AppModule(
     V3Route("storefront/products/{id}", RouteKind.SHEET, { StrOnline.sfTitle }, parent = OnlinePaths.storefront(StorefrontModel.PRODUCTS), needs = setOf(Need.STOREFRONT), chrome = Chrome.OWN) {
       StorefrontProductRoute()
     },
-    V3Route(OnlinePaths.STOREFRONT_CAMPAIGNS, RouteKind.PAGE, { StrReach.campaigns }, parent = OnlinePaths.STOREFRONT, needs = setOf(Need.STOREFRONT)) { StorefrontCampaignsRoute() },
-    V3Route(OnlinePaths.STOREFRONT_MEDIA, RouteKind.PAGE, { StrReach.media }, parent = OnlinePaths.STOREFRONT, needs = setOf(Need.STOREFRONT)) { StorefrontMediaRoute() },
-    V3Route(OnlinePaths.STOREFRONT_TRUST, RouteKind.PAGE, { StrTrust.title }, parent = OnlinePaths.STOREFRONT, needs = setOf(Need.STOREFRONT)) { TrustCasesRoute() },
+    V3Route(OnlinePaths.STOREFRONT_CAMPAIGNS, RouteKind.PAGE, { StrReach.campaigns }, parent = OnlinePaths.STOREFRONT, needs = setOf(Need.STOREFRONT), chrome = Chrome.OWN) { StorefrontCampaignsRoute() },
+    V3Route(OnlinePaths.STOREFRONT_MEDIA, RouteKind.PAGE, { StrReach.media }, parent = OnlinePaths.STOREFRONT, needs = setOf(Need.STOREFRONT), chrome = Chrome.OWN) { StorefrontMediaRoute() },
+    V3Route(OnlinePaths.STOREFRONT_TRUST, RouteKind.PAGE, { StrTrust.title }, parent = OnlinePaths.STOREFRONT, needs = setOf(Need.STOREFRONT), chrome = Chrome.OWN) { TrustCasesRoute() },
     V3Route(OnlinePaths.CHAT, RouteKind.PAGE, { StrOnline.ctTitle }, needs = setOf(Need.CHAT), chrome = Chrome.OWN) { ChatRoute() },
     V3Route("chat/{conversationId}", RouteKind.PAGE, { StrOnline.ctTitle }, parent = OnlinePaths.CHAT, needs = setOf(Need.CHAT), chrome = Chrome.OWN) {
       ChatThreadRoute(args["conversationId"].orEmpty())

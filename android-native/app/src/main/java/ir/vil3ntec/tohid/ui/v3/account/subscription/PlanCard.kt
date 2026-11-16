@@ -224,7 +224,8 @@ private fun PlanHeader(
       if (option.discounted) {
         Text(money(option.fullPrice.toDouble()), style = V3Type.footnote.copy(textDecoration = TextDecoration.LineThrough), color = c.inkMuted)
       }
-      Text(money(option.price.toDouble()), style = V3Type.figure, color = c.ink)
+      //  کالبدِ یکسان (p0r3): بهای طرح با نوشتهٔ عنوانِ کیت (۱۹)؛ عددِ درشت فقط در خلاصه
+      Text(money(option.price.toDouble()), style = V3Type.title, color = c.ink)
       Text(currency, style = V3Type.caption, color = c.inkMuted)
     }
     Spacer(Modifier.width(4.dp))
