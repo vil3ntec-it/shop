@@ -384,7 +384,8 @@ export function restoreWiredNoOps(body) {
     return body.slice(at, next < 0 ? undefined : at + 1 + next);
   };
   return /^RestoreRoute\.Route\.LOCAL -> runCatching \{ engine\.resetTo\(next, staging\) \}/.test(branch('LOCAL'))
-    && /^RestoreRoute\.Route\.FROM_SERVER -> try \{\s*when \(val out = engine\.rebuildFromServer\(next, pushedStaging\)\)/.test(branch('FROM_SERVER'));
+    //  e-newinstall (۱۴۰۵/۰۸/۲۶): آرگومانِ سومِ `carry` (صفِ نرفتهٔ نصبِ دیگرِ همین حساب از همان پشتیبان، پیش‌فرض خالی) همان راه است
+    && /^RestoreRoute\.Route\.FROM_SERVER -> try \{\s*when \(val out = engine\.rebuildFromServer\(next, pushedStaging(?:, carry)?\)\)/.test(branch('FROM_SERVER'));
 }
 
 /*
