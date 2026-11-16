@@ -70,6 +70,15 @@
   `SafePanelAndroid`، `ProductImportDialog`، `HesabPayAccountSettings`، `DevicesHw`، `QuoteBarAndroid`، `LoyaltyBarAndroid` و یک‌پنجره‌ای‌ها. ۳۲ پنجرهٔ
   پاک‌کننده `danger = true` گرفتند (رنگِ سرخِ دکمه یا واژهٔ پاک/لغو/باطل/برداشتن). در `Profile`/`Sale`/`SaleDialogs`/`Settings` نامِ کامل (بی import) تا
   سقفِ خطِ `tools/quality` نگه داشته شود.
+- **آزمون‌ها** (هدف‌دار، lane A): ۷۹ کلاس، ۴۳۵ آزمون — `DeskDialogBridgeUiTest` (پارامتری، ۴ پنجره × Esc و Enter/فوکوسِ امن: نمونهٔ عادی،
+  نمونهٔ پاک‌کننده، «پاک کردنِ همه»، «دلیلِ چاپِ دوباره»)، `WipeAllUiTest`، `ShiftNoSaleDeskUiTest`، `HeldClaimSheetsUiTest`، `SaleFocusUiTest`،
+  `QuotePdfDeskTest`، `SafeCurrencyUiTest`، `TillNewCustomerUiTest`، `OrderRefundReceiptsUiTest`، همهٔ سیم‌کشی‌های منبعِ پرونده‌های دست‌خورده،
+  `LookGuardTest`، `HardcodedColorsTest`، `PageAnatomyGuardTest`، `NavRowUiTest`، `DariCoverageTest`، `DariWordsTest` سبز. تنها قرمز
+  (`DeskProductsD3aUiTest` «هر کارِ پیشین…») از دادهٔ کهنهٔ `desktop/build/test-data` بود: پس از `rm -rf` همان ۳ از ۳ سبز (روی main هم سبز).
+  هیچ آزمونِ پیشین و هیچ هشِ `LookGuardTest` عوض نشد.
+- **عکس‌ها**: `D3dShotsTest` (`D3D_SHOTS`/`D3D_TAG`) — ۱۰ پنجره (پاک کردنِ همه ۱ و ۲، دلیلِ چاپِ دوباره، قیمتِ CRM، بازگشاییِ فاکتور، لغوِ فاکتور،
+  ارزِ گاوصندوق، سابقهٔ ورودِ کالا، ورود/خروجِ نقد، بستن با شمارش) × روشن/تیره، پیش روی `origin/main` e8a22edfd و پس، با `compare-*.png` در
+  `/home/user/wt-d3c-shots/d3d/`.
 - **مانده**: کادرهای متنِ درونِ پنجره‌ها هنوز `OutlinedTextField` ِ Material‌اند (فقط قاب و دکمه‌ها کامپیوتری شدند)؛ `IconButton`/`RadioButton`/`Checkbox`
   ِ درونِ بدنه همان Material.
 ### ۱۴۰۵/۰۸/۲۶ — عاملِ e-desk-d3c زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-desk-d3c` (از `origin/main` a0b0f9355، `origin/main` 7e2a36923 ادغام شد) — فرم‌های خرید و پنجره‌های کامپیوتر روی `ui/desk`
