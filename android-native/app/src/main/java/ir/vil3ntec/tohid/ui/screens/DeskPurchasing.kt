@@ -18,6 +18,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -294,6 +296,7 @@ private fun PurchasePane(d: ShopData, inv: PurchaseBook.Invoice, names: Map<Stri
         DeskDivider()
       }
     }
+    DeskFxInvoiceRows(inv)  //  PUR-11: نرخ و جمعِ ارزیِ فاکتورِ ارزی (جمع‌های زیر معادلِ افغانی)
     DeskInfoRow(StrInvoices.total, "${money(inv.total)} ؋", strong = true)
     DeskInfoRow(StrInvoices.colPaid, money(inv.paid))
     DeskInfoRow(StrPurchasePages.onSupplierAccount, money(inv.debt), strong = inv.debt > 0.5, valueColor = if (inv.debt > 0.5) c.negative else null)
@@ -366,6 +369,13 @@ private fun NewPurchaseInvoice(
   val buys = remember(d) { ir.vil3ntec.tohid.data.PurchaseOrderBook.buys(d) }
   var touched by remember { mutableStateOf<Draft?>(null) }
   var historyFor by remember { mutableStateOf<String?>(null) }
+  //  PUR-11: ارزِ فاکتور (ارزهای گاوصندوق + دفتر؛ `DeskPurchaseFx.kt`)؛ افغانی ⇒ همان فرمِ پیشین. ارزِ تازه قیمت‌های تایپی را پاک می‌کند
+  val customCurrencies = remember { ir.vil3ntec.tohid.data.SafeCurrencyPref.custom(context) }
+  val tillRates = remember { ir.vil3ntec.tohid.data.FxTillPref.rates(context) }
+  val currencies = remember(d.purchases, d.supplierPayments) { ir.vil3ntec.tohid.data.SafeCurrencies.all(customCurrencies, ir.vil3ntec.tohid.data.SupplierFx.inLedger(d)) }
+  val fxState = remember { DeskFxInvoice() }
+  val fx = fxState.fx; val fxCode = fxState.code
+  fun pickCurrency(code: String) { if (fxState.pick(code) { ir.vil3ntec.tohid.data.SupplierFx.defaultRate(d, it, tillRates) }) { lines.forEach { it.price = "" }; paid = "" } }
 
   //  بارکد از بارکدخوان ⇐ ردیف (همان کالا دوباره ⇐ یکی بیشتر)
   LaunchedEffect(pending.size) {
@@ -380,31 +390,40 @@ private fun NewPurchaseInvoice(
       else {
         val empty = lines.lastOrNull()?.takeIf { it.productId.isBlank() && it.query.isBlank() }
         if (empty != null) lines.remove(empty)
-        lines += Draft(p, unit)
+        lines += Draft(p, unit).also { if (fxCode != null) it.price = "" }
         lines += Draft()
       }
     }
   }
 
-  val total = lines.sumOf { if (it.productId.isNotBlank()) it.total() else 0.0 }
-  val paidValue = paid.toDoubleOrNull() ?: 0.0
+  //  PUR-11: فاکتورِ ارزی ⇒ جمع و پرداخت به همان ارز و معادلِ افغانیِ سند (همان `PurchaseFx.doc` ِ ثبت)
+  val real = lines.filter { it.productId.isNotBlank() }
+  val fxTotal = fx?.let { f -> real.sumOf { f.line(it.qty, it.price) ?: 0L } } ?: 0L
+  val fxPaid = fx?.minor(paid) ?: 0L
+  val fxDoc = fx?.doc(real.map { it.qty to it.price }, paid)
+  val total = if (fx != null) (fxDoc?.afnTotal ?: 0L) / 100.0 else lines.sumOf { if (it.productId.isNotBlank()) it.total() else 0.0 }
+  val paidValue = if (fx != null) (fxDoc?.afnPaid ?: 0L) / 100.0 else paid.toDoubleOrNull() ?: 0.0
 
   fun save() {
     val sid = supplierId ?: return toast(StrPurchasePages.chooseSupplier)
-    val ls = lines.filter { it.productId.isNotBlank() }.map {
+    val rate = fx?.let { it.rate ?: return toast(ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.rateBad) }
+    val ls = lines.filter { it.productId.isNotBlank() }.mapIndexed { i, it ->
       val exp = it.expiry.trim()
-      PurchaseBook.Line(it.productId, it.qty.toDoubleOrNull() ?: 0.0, it.price.toDoubleOrNull() ?: 0.0,
+      PurchaseBook.Line(it.productId, it.qty.toDoubleOrNull() ?: 0.0, if (fx != null) 0.0 else it.price.toDoubleOrNull() ?: 0.0,
         expiryDate = if (exp.isEmpty()) "" else ir.vil3ntec.tohid.Jalali.parseTyped(exp) ?: return toast(StrPurchasePages.expiryBad(exp)),
-        unitName = if (unitsOn) it.unitName else null)
+        unitName = if (unitsOn) it.unitName else null,
+        fxPrice = fx?.let { f -> f.minor(it.price) ?: return toast(ir.vil3ntec.tohid.core.i18n.StrGoods.rowPriceBad(i + 1)) })
     }
+    if (fx != null && paid.isNotBlank() && fx.minor(paid) == null) return toast(ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.amountBad)
     val iso = if (date.isBlank()) today else ir.vil3ntec.tohid.Jalali.parseTyped(date) ?: return toast(StrPurchasePages.invoiceDateBad(formatDate(today)))
     val landedValue = if (!stockOn || landed.isBlank()) 0.0 else landed.toDoubleOrNull() ?: return toast(StrPurchasePages.landedBad)
     val user = if (stockOn) runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull() else null
     val dueIso = if (!stockOn || due.isBlank()) null else ir.vil3ntec.tohid.Jalali.parseTyped(due) ?: return toast(StrPurchasePages.dueBad(formatDate(today)))
-    when (val r = PurchaseBook.record(d, sid, ls, paidValue, iso, notes, today, System.currentTimeMillis(), ::newId, landedTotal = landedValue, userId = user, dueDate = dueIso, key = saveKey)) {
+    when (val r = PurchaseBook.record(d, sid, ls, paidValue, iso, notes, today, System.currentTimeMillis(), ::newId, landedTotal = landedValue, userId = user, dueDate = dueIso, key = saveKey, fx = rate, fxPaid = fxPaid)) {
       is PurchaseBook.Result.Failed -> toast(r.message)
       is PurchaseBook.Result.Ok -> {
         scope.launch { store.save(d, r.data) }
+        if (fxCode != null) runCatching { ir.vil3ntec.tohid.data.SafeCurrencyPref.setLast(context, fxCode!!) }
         toast(StrPurchasePages.purchaseSaved(r.invoiceNo, money(total)))
         onClose()
       }
@@ -459,20 +478,22 @@ private fun NewPurchaseInvoice(
       )
       Spacer(Modifier.width(8.dp))
       OutlinedTextField(date, { date = it }, singleLine = true, label = { Text(StrPurchasePages.dateSolar) }, modifier = Modifier.width(200.dp))
+      DeskFxInvoiceControls(fxState, currencies, { ir.vil3ntec.tohid.data.SafeCurrencies.name(it, customCurrencies) }, ::pickCurrency)
     }
+    if (fxCode != null) Text(ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.rateNote, Modifier.padding(top = 4.dp), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
     Spacer(Modifier.height(10.dp))
 
     //  ردیف‌ها — جدولِ نوشتنی
     val line = Shop.colors.border
     Column(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(8.dp)).border(1.dp, line, RoundedCornerShape(8.dp))) {
       Row(Modifier.fillMaxWidth().background(Shop.colors.surface2).padding(horizontal = 8.dp, vertical = 8.dp)) {
-        listOf("#" to 36.dp, StrPurchasePages.itemNameBarcode to 0.dp, StrPlaces.amount to 100.dp, StrReturnPages.unitPriceAfn to 130.dp, StrPurchasePages.expiryOptional to 150.dp, StrInvoices.total to 130.dp, "" to 40.dp).forEach { (t, w) ->
+        listOf("#" to 36.dp, StrPurchasePages.itemNameBarcode to 0.dp, StrPlaces.amount to 100.dp, (fxCode?.let(ir.vil3ntec.tohid.core.i18n.StrPurchaseFx::priceIn) ?: StrReturnPages.unitPriceAfn) to 130.dp, StrPurchasePages.expiryOptional to 150.dp, StrInvoices.total to 130.dp, "" to 40.dp).forEach { (t, w) ->
           Text(t, if (w == 0.dp) Modifier.weight(1f) else Modifier.width(w), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
         }
       }
       LazyColumn(Modifier.weight(1f)) {
         itemsIndexed(lines, key = { _, l -> System.identityHashCode(l) }) { i, l ->
-          LineRow(i, l, d, ir.vil3ntec.tohid.data.PurchaseOrderBook.lastPriceHint(buys, l.productId, supplierId), unitsOn, supplierId, onTouch = { touched = l }, onNext = {
+          LineRow(i, l, d, ir.vil3ntec.tohid.data.PurchaseOrderBook.lastPriceHint(buys, l.productId, supplierId), unitsOn, supplierId, fx, onTouch = { touched = l }, onNext = {
             if (i == lines.lastIndex) lines += Draft()
             scope.launch { kotlinx.coroutines.delay(60); runCatching { lines[i + 1].focus.requestFocus() } }
           }, onRemove = { if (lines.size > 1) lines.remove(l) else { l.productId = ""; l.query = ""; l.qty = ""; l.price = ""; l.unitName = null } })
@@ -483,8 +504,8 @@ private fun NewPurchaseInvoice(
     Row(verticalAlignment = Alignment.CenterVertically) {
       OutlinedTextField(notes, { notes = it }, singleLine = true, label = { Text(StrPurchasePages.notesSellerNo) }, modifier = Modifier.weight(1f))
       Spacer(Modifier.width(10.dp))
-      OutlinedTextField(paid, { paid = ir.vil3ntec.tohid.numericInput(it) }, singleLine = true, label = { Text(StrPurchasePages.paidAfn) }, modifier = Modifier.width(170.dp))
-      TextButton(onClick = { paid = Math.round(total).toString() }) { Text(Str.all) }
+      OutlinedTextField(paid, { paid = ir.vil3ntec.tohid.numericInput(it) }, singleLine = true, label = { Text(fxCode?.let(ir.vil3ntec.tohid.core.i18n.StrPurchaseFx::paidIn) ?: StrPurchasePages.paidAfn) }, modifier = Modifier.width(170.dp))
+      TextButton(onClick = { paid = fxCode?.let { ir.vil3ntec.tohid.data.PoForms.num(ir.vil3ntec.tohid.core.safe.SafeCurrency.major(fxTotal, it)) } ?: Math.round(total).toString() }) { Text(Str.all) }
       if (stockOn) {
         Spacer(Modifier.width(10.dp))
         OutlinedTextField(
@@ -503,8 +524,9 @@ private fun NewPurchaseInvoice(
       }
       Spacer(Modifier.width(10.dp))
       Column(horizontalAlignment = Alignment.End, modifier = Modifier.width(220.dp)) {
-        Text(StrPurchasePages.invoiceTotal(money(total)), fontWeight = FontWeight.Bold, color = Shop.colors.text)
-        Text(StrPurchasePages.toSupplierAccount(money((total - paidValue).coerceAtLeast(0.0))), color = Shop.colors.danger, style = MaterialTheme.typography.bodySmall)
+        //  PUR-11: فاکتورِ ارزی ⇒ جمع به ارز = معادلِ افغانی (بهای تمام‌شده)، و ماندهٔ همان ارز به حسابِ تأمین‌کننده
+        Text(fx?.let { ir.vil3ntec.tohid.data.SupplierFx.ltr("${it.text(fxTotal)} = ${money(total)} ؋") } ?: StrPurchasePages.invoiceTotal(money(total)), fontWeight = FontWeight.Bold, color = Shop.colors.text)
+        Text(StrPurchasePages.toSupplierAccount(fx?.text((fxTotal - fxPaid).coerceAtLeast(0L)) ?: money((total - paidValue).coerceAtLeast(0.0))), color = Shop.colors.danger, style = MaterialTheme.typography.bodySmall)
       }
       Spacer(Modifier.width(10.dp))
       Button(onClick = ::save, enabled = total > 0 && supplierId != null, modifier = Modifier.height(52.dp)) { Text(StrPurchasePages.saveInvoiceKey, fontWeight = FontWeight.Bold) }
@@ -515,7 +537,7 @@ private fun NewPurchaseInvoice(
 }
 
 @Composable
-private fun LineRow(i: Int, l: Draft, d: ShopData, hint: String?, unitsOn: Boolean, supplierId: String?, onTouch: () -> Unit, onNext: () -> Unit, onRemove: () -> Unit) {
+private fun LineRow(i: Int, l: Draft, d: ShopData, hint: String?, unitsOn: Boolean, supplierId: String?, fx: DeskFx?, onTouch: () -> Unit, onNext: () -> Unit, onRemove: () -> Unit) {
   var menu by remember { mutableStateOf(false) }
   val index = remember(d) { ShopStore.barcodeIndex(d) }
   val matches = remember(l.query, d) {
@@ -528,7 +550,7 @@ private fun LineRow(i: Int, l: Draft, d: ShopData, hint: String?, unitsOn: Boole
     //  PRD-07: واحدِ پیش‌فرضِ همین تأمین‌کننده (کارتنِ ۲۴ ِ ب)، وگرنه واحدِ پایه
     l.unitName = if (unitsOn) ir.vil3ntec.tohid.core.product.PurchaseUnits.defaultFor(p.purchaseUnits?.map(ShopStore::coreOf), supplierId)?.name else null
     if (l.qty.isBlank()) l.qty = "1"
-    if (l.price.isBlank()) l.price = defaultPrice(p, l.unitName)
+    if (l.price.isBlank() && fx == null) l.price = defaultPrice(p, l.unitName)  //  PUR-11: فاکتورِ ارزی قیمتِ افغانی را پیش‌پُر نمی‌کند
     runCatching { l.qtyFocus.requestFocus() }
   }
   fun enterOn(next: () -> Unit) = Modifier.onPreviewKeyEvent { e ->
@@ -565,20 +587,21 @@ private fun LineRow(i: Int, l: Draft, d: ShopData, hint: String?, unitsOn: Boole
     OutlinedTextField(l.qty, { l.qty = ir.vil3ntec.tohid.numericInput(it); onTouch() }, singleLine = true,
       modifier = Modifier.width(94.dp).focusRequester(l.qtyFocus).then(enterOn { runCatching { l.priceFocus.requestFocus() } }))
     Spacer(Modifier.width(6.dp))
+    val priceLabel = fx?.code?.let(ir.vil3ntec.tohid.core.i18n.StrPurchaseFx::priceIn) ?: StrReturnPages.unitPriceAfn  //  برچسبِ صفحه‌خوان = سرستون (PUR-11)
     OutlinedTextField(l.price, { l.price = ir.vil3ntec.tohid.numericInput(it); onTouch() }, singleLine = true,
-      modifier = Modifier.width(124.dp).focusRequester(l.priceFocus).then(enterOn(onNext)))
+      modifier = Modifier.width(124.dp).focusRequester(l.priceFocus).then(enterOn(onNext)).semantics { contentDescription = priceLabel })
     Spacer(Modifier.width(6.dp))
     OutlinedTextField(l.expiry, { l.expiry = it.take(10) }, singleLine = true, placeholder = { Text("۱۴۰۶/۰۳/۳۱") },
       modifier = Modifier.width(144.dp).then(enterOn(onNext)))
-    Text(if (l.productId.isNotBlank()) money(l.total()) else "", Modifier.width(130.dp), textAlign = TextAlign.End, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
+    Text(if (l.productId.isBlank()) "" else fx?.let { f -> f.line(l.qty, l.price)?.let(f::text).orEmpty() } ?: money(l.total()), Modifier.width(130.dp), textAlign = TextAlign.End, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
     IconButton(onClick = onRemove, modifier = Modifier.width(40.dp)) { Icon(Icons.Filled.Close, StrStock.removeRow, tint = Shop.colors.muted) }
   }
   //  PRD-07: واحدِ خریدِ همین ردیف و مقدار/بهای واحدِ پایه از هسته (`PurchaseUnits.baseCost`)
   val product = if (unitsOn && l.productId.isNotBlank()) d.products.find { it.id == l.productId } else null
-  if (product != null && !product.purchaseUnits.isNullOrEmpty()) PurchaseUnitPicker(product, l.unitName, l.qty, l.total()) { u ->
+  if (product != null && !product.purchaseUnits.isNullOrEmpty()) PurchaseUnitPicker(product, l.unitName, l.qty, fx?.afnOf(l.qty, l.price) ?: l.total()) { u ->
     val before = defaultPrice(product, l.unitName)
     l.unitName = u
-    if (l.price.isBlank() || l.price == before) l.price = defaultPrice(product, u)
+    if (fx == null && (l.price.isBlank() || l.price == before)) l.price = defaultPrice(product, u)
     onTouch()
   }
   //  PUR-09: آخرین فیِ همین تأمین‌کننده برای همین کالا (هنگامِ ورود)
@@ -661,6 +684,10 @@ private fun SupplierFile(store: ShopStore, d: ShopData, open: PurchaseBook.Suppl
   var amount by remember { mutableStateOf("") }
   val stockOn = remember(d.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
   val ledger = remember(d, open.supplier.id) { PurchaseBook.ledger(d, open.supplier.id) }
+  //  PUR-11: حساب‌های ارزیِ همین تأمین‌کننده؛ پرداخت به حسابِ ارزی به همان ارز یا افغانی با نرخِ خودش (همان مدلِ برگهٔ گوشی)
+  val fxAccounts = remember(d, open.supplier.id) { ir.vil3ntec.tohid.data.SupplierFx.accounts(d, open.supplier.id) }
+  var fxPay by remember(open.supplier.id) { mutableStateOf(ir.vil3ntec.tohid.ui.v3.money.PayForm()) }
+  val tillRates = remember { ir.vil3ntec.tohid.data.FxTillPref.rates(context) }
   fun sheet() = PurchaseBook.ledgerSheet(d, open.supplier, today)
   Column(
     Modifier.fillMaxSize().deskCard(c).onPreviewKeyEvent { e ->
@@ -697,6 +724,7 @@ private fun SupplierFile(store: ShopStore, d: ShopData, open: PurchaseBook.Suppl
           if (open.returned > 0.5) StrPurchasePages.creditNoteReturn + ": " + money(open.returned) + " ؋" else null,
         ).joinToString(" • "),
       )
+      DeskFxBalances(fxAccounts)
       DeskToolbar(
         end = {
           DeskButton(StrHistory.print, { sheet().let { ir.vil3ntec.tohid.print.ReportPrint.print(context, it, it.name) } }, icon = Icons.Outlined.Print)
@@ -707,10 +735,11 @@ private fun SupplierFile(store: ShopStore, d: ShopData, open: PurchaseBook.Suppl
         if (stockOn) DeskButton(StrPurchasePages.returnCredit, { returning = true })
       }
       if (returning) {
-        SupplierReturnDialog(d, open.supplier.id, onDismiss = { returning = false }) { productId, q, price, reason, date, key ->
+        SupplierReturnDialog(d, open.supplier.id, onDismiss = { returning = false }) { productId, q, price, reason, date, key, fx, fxPrice ->
           when (val r = PurchaseBook.supplierReturn(
             d, open.supplier.id, productId, q, price, reason, date, today, System.currentTimeMillis(), ::newId,
             userId = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull(), key = key,
+            fx = fx, fxPrice = fxPrice,
           )) {
             is PurchaseBook.Result.Failed -> toast(r.message)
             is PurchaseBook.Result.Ok -> { scope.launch { store.save(d, r.data) }; returning = false; toast(StrReach.returnSaved) }
@@ -722,20 +751,25 @@ private fun SupplierFile(store: ShopStore, d: ShopData, open: PurchaseBook.Suppl
         LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
         //  PUR-07: یک کلید برای همین ردیفِ پرداخت — Enter ِ پشتِ‌سرِهم یک پرداخت است
         val payKey = remember { newId() }
+        val fxCode = fxPay.account
         fun pay() {
+          val now = System.currentTimeMillis()
+          //  PUR-11: حسابِ ارزی ⇒ همان `SupplierFx.pay` (به همان ارز یا افغانی با نرخِ همین پرداخت)
+          if (fxCode != null) return deskFxPay(d, open.supplier.id, fxPay, amount, StrHistory.payment, today, now, ::newId, payKey).let { r -> if (r is LedgerEngine.Result.Ok) { scope.launch { store.save(d, r.data) }; paying = false; toast(StrPurchasePages.paymentSaved(amount)); amount = "" } else toast((r as LedgerEngine.Result.Failed).message) } // داده: یادداشتِ ردیفِ دفترِ تأمین‌کننده (داده)
           val a = amount.toDoubleOrNull() ?: return
-          when (val r = LedgerEngine.paySupplier(d, open.supplier.id, a, today, StrHistory.payment, today, System.currentTimeMillis(), ::newId, key = payKey)) { // داده: یادداشتِ ردیفِ دفترِ تأمین‌کننده (داده)
+          when (val r = LedgerEngine.paySupplier(d, open.supplier.id, a, today, StrHistory.payment, today, now, ::newId, key = payKey)) { // داده: یادداشتِ ردیفِ دفترِ تأمین‌کننده (داده)
             is LedgerEngine.Result.Failed -> toast(r.message)
             is LedgerEngine.Result.Ok -> { scope.launch { store.save(d, r.data) }; paying = false; amount = ""; toast(StrPurchasePages.paymentSaved(money(a))) }
           }
         }
+        DeskFxPayControls(fxAccounts, fxPay, amount, { fxPay = it; amount = "" }) { ir.vil3ntec.tohid.data.SupplierFx.defaultRate(d, it, tillRates) }
         Row(
           Modifier.fillMaxWidth().clip(DeskRadius.controlShape).background(c.positiveSoft).border(DeskSize.hairline, c.positive, DeskRadius.controlShape).padding(DeskSpace.x2),
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(DeskSpace.x2),
         ) {
           Text(StrPurchasePages.payTo(open.supplier.name), Modifier.weight(1f), style = DeskType.bodyStrong, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-          DeskTextField(amount, { amount = ir.vil3ntec.tohid.numericInput(it) }, StrCustomerPages.amountAfn, Modifier.width(180.dp), focus, onEnter = ::pay, onEscape = { paying = false })
+          DeskTextField(amount, { amount = ir.vil3ntec.tohid.numericInput(it) }, deskFxAmountLabel(fxPay) ?: StrCustomerPages.amountAfn, Modifier.width(180.dp), focus, onEnter = ::pay, onEscape = { paying = false })
           DeskButton(StrCustomerPages.saveKey, ::pay, kind = DeskButtonKind.PRIMARY, enabled = (amount.toDoubleOrNull() ?: 0.0) > 0)
           DeskButton(Str.cancel, { paying = false }, kind = DeskButtonKind.GHOST, shortcut = "Esc")
         }

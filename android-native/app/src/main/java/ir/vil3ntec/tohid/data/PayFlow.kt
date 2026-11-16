@@ -492,8 +492,9 @@ object PayFlow {
       ev += 3 to ShiftEventInput(id = id, type = "cash_out", at = at, amount = minor(amount), reason = reason, note = note)
     }
     d.expenses.forEach { out("exp:${it.id}", it.createdAt, it.amount, "petty_expense", null) }
-    d.supplierPayments.forEach { out("sup:${it.id}", it.createdAt, it.amount, "other", "پرداخت به تأمین‌کننده") }  // داده: دلیلِ رویدادِ شیفت درونِ گزارشِ Z ِ ذخیره‌شده
-    d.purchases.forEach { out("pur:${it.id}", it.createdAt, it.paidAmount, "other", "پیش‌پرداختِ خرید") }  // داده: دلیلِ رویدادِ شیفت درونِ گزارشِ Z ِ ذخیره‌شده
+    //  PUR-11: همان پولِ دخلِ [CashShift.totals] (`SupplierFx.drawerOut`/`drawerPaid`)؛ پرداخت به ارز ⇒ صفر ⇒ رویدادی نیست
+    d.supplierPayments.forEach { out("sup:${it.id}", it.createdAt, SupplierFx.drawerOut(it), "other", "پرداخت به تأمین‌کننده") }  // داده: دلیلِ رویدادِ شیفت درونِ گزارشِ Z ِ ذخیره‌شده
+    d.purchases.forEach { out("pur:${it.id}", it.createdAt, SupplierFx.drawerPaid(it), "other", "پیش‌پرداختِ خرید") }  // داده: دلیلِ رویدادِ شیفت درونِ گزارشِ Z ِ ذخیره‌شده
     val sorted = ev.sortedWith(compareBy<Pair<Int, ShiftEventInput>>({ it.first }, { it.second.at }, { it.second.id })).map { it.second }
     //  PAY-17: کشوی نام‌دار با مهر شمرده می‌شود، نه با ساعت — ردیفِ دستگاهِ دیگری با ساعتِ عقب‌تر (شناور) پیش از بازشدن نمی‌افتد
     return if (own == null) sorted else sorted.map { if (it.at < from) it.copy(at = from) else it }

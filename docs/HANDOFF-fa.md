@@ -57,6 +57,40 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۶ — عاملِ e-pur11 زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-pur11` (از `origin/main` 7e2a36923) — PUR-11: خرید به ارزِ دیگر (D-15 ب)
+
+- **تصمیمِ صاحب‌کار (۱۴۰۵/۰۸/۲۶): «همه را تمام کن»** ⇒ D-15 از «الف» (فقط وقتی دکانی خواست) به «ب»؛ ثبت در `OWNER-DECISIONS-fa.md` (جدول و §D-15)،
+  `OWNER-PENDING-fa.md`، `spec/BLOCKERS.md`، `MAINTAINER-fa.md`، `PROGRESS-fa.md` و README ِ `tools/claude-ops`. از #784 فقط ایده؛ کد تازه روی main.
+- **هسته** `core/purchase/PurchaseFx.kt` (commonMain، بی Double): `Rate(currency, rate, per)` = پول برای `per` واحد (`Pay.FX_PER`، ارزهای گاوصندوق)؛
+  `toAfn`/`fromAfn`/`lineFx` نیمه رو به بالا (به سوی +∞)؛ `doc` = یک تبدیل برای کلِ سند (به یک پول) + `allocate` ِ بزرگ‌ترین باقی‌مانده؛
+  `Account` (ماندهٔ ارزی + ارزشِ دفتری)، `payInFx`/`payInAfn` ⇒ `Settle(fx, value, carried, afnPaid)`، `diff = value − carried`؛ ضربِ ۱۲۸ بیتی.
+  **گرد:** ردیف ⇐ یک واحدِ کوچکِ ارز؛ سند ⇐ یک پول؛ پرداختِ بخشی ⇐ `round(afn × fx ÷ مانده)`؛ همهٔ مانده ⇐ همهٔ ارزشِ دفتری (+ بیشِ آن به نرخِ
+  پرداخت)؛ پولِ «همه» به افغانی دقیقاً همهٔ مانده را صاف می‌کند (ریالِ درشت‌دانه).
+- **دفتر:** `LedgerEngine.PurchaseDraft.exactTotalMinor` (بهای واحد از جمعِ دقیق، `costMinor`)؛ `PurchaseBook.record(fx, fxPaid)` و `Line.fxPrice`؛
+  فیلدهای افزودنیِ `Purchase`/`SupplierPayment` (`currency`، `fx…`؛ `amount` ِ پرداختِ ارزی = ارزشِ دفتری)؛ `data/SupplierFx.kt` (حساب‌ها، `pay`،
+  `drawerOut`/`drawerPaid` برای `CashShift` و `PayFlow`، `diff`، `defaultRate`، `returnRate`)؛ `PurchaseBook.open` هر ارز گروهِ خودش
+  (`fifo` ِ مشترک، افغانی بیت‌به‌بیت همان)؛ `supplierReturn(fx, fxPrice)`؛ `PurchaseViews` (`currency`، `fxTotal`، `fxRemaining`)؛ صورت‌حساب، برگه‌ها،
+  `ReportEngine.purchases` (`byCurrency`، `fxDiff`)، `ReportCsv` (ستون‌های ارز فقط وقتی هست)، `OwnerExport.HEADERS` + `license/owner-export.js`.
+- **صفحه:** گوشی — فرمِ «ثبت خرید» (ردیفِ «ارز» فقط با بیش از یک ارز؛ بخشِ «ارز و نرخ»؛ ارزِ تازه قیمت‌ها را پاک و نرخ را پیش‌پُر می‌کند؛ «نرسیده»
+  با ارز رد)، برگهٔ «پرداخت» (حساب/پرداخت با/نرخ/پیش‌نمایش)، صفحهٔ تأمین‌کننده («بدهی به تفکیکِ ارز»، پرداخت‌ها با ارز و اختلاف)، جزئیات و فهرستِ
+  خرید، گزارشِ خرید؛ کامپیوتر — `ui/screens/DeskPurchaseFx.kt` (کادرهای فاکتور، ردیفِ پرداختِ حسابِ ارزی، سطرهای پنجرهٔ فاکتور)، ستونِ قیمت به ارز،
+  کاشیِ «اختلافِ نرخ» ِ گزارش؛ برگهٔ مشترکِ «برگشت به تأمین‌کننده» به همان ارز و نرخ. رشته‌ها `StrPurchaseFx` (fa/en/ps، در `I18nTables`)؛ دری:
+  ۱۰ جمله در `DariText.PHRASES` + `dari-words.js --write` + `DARI-REVIEW-fa.md` §۱۳.
+- **همگام‌سازی:** همان جدول‌ها، فیلدِ افزودنی؛ بردارِ `ledger-sync-v1.json` با فیلدهای تازه (`TOHID_WRITE_VECTORS=ledger-sync`). `sync-v1.js`،
+  `routes/sync-v1.js`، PUMP_TABLES، `/api/pump/*`، admin-pump و pump-device دست نخوردند؛ هیچ تغییرِ سرورِ لازم نبود.
+- **آزمون‌های عمداً عوض‌شده:** `MoneyPagesModelTest` — رشتهٔ فراخوانِ `PurchaseBook.record` ِ مسیر حالا `fx = extras.fx, fxPaid = extras.fxPaid` را هم
+  می‌خواهد (سخت‌تر، نه سست‌تر). `tools/quality/baseline.json`: سقفِ `Models.kt` ۹۲۴ ⇐ ۹۳۰ (دلیل: ۱۲ فیلدِ افزودنیِ همگام‌شونده باید روی همان
+  مدل‌های سریالی باشند؛ فشرده در ۶ خط). `DeskPurchasing.kt` زیرِ ۸۰۰ ماند (کارِ تازه در `DeskPurchaseFx.kt`).
+- **نتیجه (lane A):** `PurchaseFxTest` ۱۳/۱۳؛ اجرای هدف‌دارِ ۵۷ کلاس ⇒ **۴۸۳ آزمون، ۰ شکست، ۰ SKIP** (تازه: `SupplierFxTest` ۱۰، `PurchaseFxFormTest` ۴،
+  `PurchaseFxUiTest` ۳، `PurchaseFxDeskUiTest` ۱؛ `LedgerSyncCoverageTest` ۷، `PageAnatomyGuardTest` ۹، `LookGuardTest` ۷، `HardcodedColorsTest` ۲،
+  `Dari*` و خانوادهٔ خرید/تأمین‌کننده/دخل/گزارش سبز — فهرست در STATUS ِ PUR-11). سرور (PGlite): `sync-ledger-coverage` ۴/۴، `owner-export` ۱۴/۱۴،
+  `dari-text` ۱۷/۱۷، `web-i18n` ۴۱/۴۱. عکس‌ها (`PUR11_SHOTS`، `PurchaseFxShotsTest`): `/home/user/wt-pur11-shots/`.
+- **مانده:** (۱) سفارشِ خریدِ سرور (PUR-02/04/14) به ارز: مهاجرتِ ستون‌های ارز/نرخ در `purchase_orders` و رسید/فاکتورِ تأمین‌کننده، فرمِ سفارش و
+  ارسالِ رسید با نرخِ سفارش — PUR-11 تا آن PARTIAL (PARTIAL-MAP «کد»). (۲) ⚠️ ساختِ کهنه ردیفِ ارزی را معادلِ افغانی می‌بیند و پرداختِ به ارز را از
+  دخلِ افغانی کم می‌کند ⇒ پیش از نخستین خریدِ ارزی همهٔ دستگاه‌ها به‌روز شوند. (۳) پولِ ارزیِ داده‌شده از گاوصندوقِ چندارزی خودکار برداشته نمی‌شود
+  (برداشتِ گاوصندوق را جدا ثبت کنید). (۴) `verify-data` ِ سرور (`sum.purchase_line`، فقط هشدار) برای ردیفِ ارزی با بیش از ~۲۰۰ واحد ممکن است
+  اختلافِ گردِ پول را هشدار دهد (همان حالِ PRD-07). (۵) آیفون ساخته نشد؛ دیدن روی دستگاهِ واقعی.
+
 ### ۱۴۰۵/۰۸/۲۶ — عاملِ e-phone-p0 زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-phone-p0` (از batch-69، ادغامِ main تا #1059 1802fca1a) — کالبدِ یکسانِ صفحه‌های گوشی (دورِ دوم)
 
 - **پیشین (۰۸/۲۴)**: نشان‌های `V3Anatomy` روی اجزای مشترک، `PageAnatomyGuardTest`، ممیزیِ `PhoneAnatomyAuditTest` (`P0_AUDIT`، `AnatomyProbe`)،
