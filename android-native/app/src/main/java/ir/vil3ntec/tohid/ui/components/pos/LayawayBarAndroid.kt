@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -192,7 +194,7 @@ private fun LayawayNewDialog(d: ShopData, store: ShopStore, cart: CartStore, deb
   val (plan, problem) = remember(order, d) { Layaways.plan(d, order, today) }
   val total = remember(lines, d) { Layaways.linesOf(d, lines)?.let(Layaways::linesTotal) ?: 0L }
 
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = { if (!busy) onDismiss() },
     title = { Text(StrLayaway.newLayaway) },
     text = {
@@ -226,7 +228,7 @@ private fun LayawayNewDialog(d: ShopData, store: ShopStore, cart: CartStore, deb
       }
     },
     confirmButton = {
-      TextButton(enabled = !busy && problem == null, onClick = {
+      ShopTextButton(enabled = !busy && problem == null, onClick = {
         busy = true
         scope.launch {
           val now = System.currentTimeMillis()
@@ -242,7 +244,7 @@ private fun LayawayNewDialog(d: ShopData, store: ShopStore, cart: CartStore, deb
         }
       }) { Text(StrLayaway.save) }
     },
-    dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(StrLayaway.cancel) } },
+    dismissButton = { ShopTextButton(enabled = !busy, onClick = onDismiss) { Text(StrLayaway.cancel) } },
   )
 }
 
@@ -284,7 +286,7 @@ private fun LayawayListDialog(store: ShopStore, views: List<Layaways.View>, toas
   var cancelling by remember { mutableStateOf<Layaways.View?>(null) }
   val shown = remember(views) { views.filter { it.active } + views.filter { !it.active }.take(CLOSED_SHOWN) }
 
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     title = { Text(StrLayaway.list(views.count { it.active }, views.count { it.late })) },
     text = {
@@ -293,16 +295,16 @@ private fun LayawayListDialog(store: ShopStore, views: List<Layaways.View>, toas
         shown.forEach { v ->
           LayawaySummary(v)
           Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (v.active && !v.paidUp) TextButton(onClick = { paying = v }) { Text(StrLayaway.pay) }
-            if (v.active && v.paidUp) TextButton(onClick = { delivering = v }) { Text(StrLayaway.deliver) }
-            TextButton(onClick = { scope.launch { toast(printLayaway(context, v)) } }) { Text(StrLayaway.print) }
-            if (v.active) TextButton(onClick = { cancelling = v }) { Text(StrLayaway.cancelLayaway, color = Shop.colors.danger) }
+            if (v.active && !v.paidUp) ShopTextButton(onClick = { paying = v }) { Text(StrLayaway.pay) }
+            if (v.active && v.paidUp) ShopTextButton(onClick = { delivering = v }) { Text(StrLayaway.deliver) }
+            ShopTextButton(onClick = { scope.launch { toast(printLayaway(context, v)) } }) { Text(StrLayaway.print) }
+            if (v.active) ShopTextButton(onClick = { cancelling = v }) { Text(StrLayaway.cancelLayaway, color = Shop.colors.danger) }
           }
           HorizontalDivider(color = Shop.colors.fieldBorder.copy(alpha = 0.35f))
         }
       }
     },
-    confirmButton = { TextButton(onClick = onDismiss) { Text(StrLayaway.close) } },
+    confirmButton = { ShopTextButton(onClick = onDismiss) { Text(StrLayaway.close) } },
   )
 
   paying?.let { v -> LayawayPayDialog(store, v, by, today, toast) { paying = null } }
@@ -320,7 +322,7 @@ private fun LayawayPayDialog(store: ShopStore, v: Layaways.View, by: String, tod
   var busy by remember { mutableStateOf(false) }
   val minor = wholeAfghani(amount)
   val problem = minor?.let { Layaway.payProblem(v.progress, it) } ?: "BAD_AMOUNT"
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = { if (!busy) onDismiss() },
     title = { Text(StrLayaway.payTitle(v.payCount + 1)) },
     text = {
@@ -336,8 +338,8 @@ private fun LayawayPayDialog(store: ShopStore, v: Layaways.View, by: String, tod
       }
     },
     confirmButton = {
-      TextButton(enabled = !busy && problem == null && minor != null, onClick = {
-        val m = minor ?: return@TextButton
+      ShopTextButton(enabled = !busy && problem == null && minor != null, onClick = {
+        val m = minor ?: return@ShopTextButton
         busy = true
         scope.launch {
           val now = System.currentTimeMillis()
@@ -350,7 +352,7 @@ private fun LayawayPayDialog(store: ShopStore, v: Layaways.View, by: String, tod
         }
       }) { Text(StrLayaway.payConfirm) }
     },
-    dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(StrLayaway.cancel) } },
+    dismissButton = { ShopTextButton(enabled = !busy, onClick = onDismiss) { Text(StrLayaway.cancel) } },
   )
 }
 
@@ -361,7 +363,7 @@ private fun LayawayDeliverDialog(store: ShopStore, v: Layaways.View, by: String,
   //  شناسهٔ فاکتورِ تحویل از سند — دو ضربه یا دو دستگاه یک فروش
   val key = remember(v.id) { Layaways.deliverKey(v) }
   var busy by remember { mutableStateOf(false) }
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = { if (!busy) onDismiss() },
     title = { Text(StrLayaway.deliverTitle) },
     text = {
@@ -373,7 +375,7 @@ private fun LayawayDeliverDialog(store: ShopStore, v: Layaways.View, by: String,
       }
     },
     confirmButton = {
-      TextButton(enabled = !busy, onClick = {
+      ShopTextButton(enabled = !busy, onClick = {
         busy = true
         scope.launch {
           val now = System.currentTimeMillis()
@@ -393,7 +395,7 @@ private fun LayawayDeliverDialog(store: ShopStore, v: Layaways.View, by: String,
         }
       }) { Text(StrLayaway.deliverConfirm) }
     },
-    dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(StrLayaway.cancel) } },
+    dismissButton = { ShopTextButton(enabled = !busy, onClick = onDismiss) { Text(StrLayaway.cancel) } },
   )
 }
 
@@ -405,7 +407,8 @@ private fun LayawayCancelDialog(store: ShopStore, v: Layaways.View, by: String, 
   val allowed = remember { ir.vil3ntec.tohid.data.ShopRole.canCancelSale(context) }
   var reason by remember { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
-  AlertDialog(
+  ShopAlertDialog(
+    danger = true,
     onDismissRequest = { if (!busy) onDismiss() },
     title = { Text(StrLayaway.cancelTitle) },
     text = {
@@ -420,7 +423,7 @@ private fun LayawayCancelDialog(store: ShopStore, v: Layaways.View, by: String, 
       }
     },
     confirmButton = {
-      TextButton(enabled = allowed && !busy, onClick = {
+      ShopTextButton(enabled = allowed && !busy, onClick = {
         busy = true
         scope.launch {
           val now = System.currentTimeMillis()
@@ -433,7 +436,7 @@ private fun LayawayCancelDialog(store: ShopStore, v: Layaways.View, by: String, 
         }
       }) { Text(StrLayaway.cancelConfirm, color = Shop.colors.danger) }
     },
-    dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(StrLayaway.cancel) } },
+    dismissButton = { ShopTextButton(enabled = !busy, onClick = onDismiss) { Text(StrLayaway.cancel) } },
   )
 }
 

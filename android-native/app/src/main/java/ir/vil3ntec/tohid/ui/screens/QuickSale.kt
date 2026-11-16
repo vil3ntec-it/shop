@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -379,7 +381,8 @@ fun QuickSaleScreen(
   /* ---------------------------- پنجره‌ها ---------------------------- */
 
   confirmDeleteCategory?.let { name ->
-    AlertDialog(
+    ShopAlertDialog(
+      danger = true,
       onDismissRequest = { confirmDeleteCategory = null },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrProducts.deleteCategoryTitle, color = Shop.colors.text) },
@@ -391,7 +394,7 @@ fun QuickSaleScreen(
         )
       },
       confirmButton = {
-        TextButton(onClick = {
+        ShopTextButton(onClick = {
           applyResult(WarehouseEngine.removeCategory(d, name), StrProducts.categoryDeleted) {
             if (category == name) category = null
           }
@@ -399,7 +402,7 @@ fun QuickSaleScreen(
         }) { Text(StrCustomerPrices.remove, color = Shop.colors.danger) }
       },
       dismissButton = {
-        TextButton(onClick = { confirmDeleteCategory = null }) { Text(Str.cancel) }
+        ShopTextButton(onClick = { confirmDeleteCategory = null }) { Text(Str.cancel) }
       },
     )
   }

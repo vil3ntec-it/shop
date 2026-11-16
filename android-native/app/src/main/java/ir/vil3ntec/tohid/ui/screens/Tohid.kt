@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -619,7 +621,8 @@ fun TohidConfirmDialog(
   onDismiss: () -> Unit,
   extra: @Composable (() -> Unit)? = null,
 ) {
-  AlertDialog(
+  ShopAlertDialog(
+    danger = true,
     onDismissRequest = onDismiss,
     containerColor = Shop.colors.surfaceSolid,
     shape = Shape.dialog,
@@ -634,11 +637,11 @@ fun TohidConfirmDialog(
       }
     },
     confirmButton = {
-      TextButton(onClick = onConfirm) {
+      ShopTextButton(onClick = onConfirm) {
         Text(confirmText, color = if (danger) Shop.colors.danger else Shop.colors.primary)
       }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(dismissText) } },
+    dismissButton = { ShopTextButton(onClick = onDismiss) { Text(dismissText) } },
   )
 }
 

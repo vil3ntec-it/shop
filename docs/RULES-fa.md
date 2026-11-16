@@ -2396,6 +2396,11 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
   - «فاکتورِ خریدِ تازه» (`NewPurchaseInvoice` + `DeskPurchaseForm.kt`) و پنجرهٔ «سفارش‌های خرید» (`PurchaseOrders.kt`: فهرست، ساختن/ویرایش،
     جزئیات، دریافت، تاریخچهٔ قیمت، لغو با دلیل) فقط از `ui/desk`؛ منطق، کلیدها و درخواست‌ها همان پیشین. سنجه: `DeskD3cUiTest`؛ عکس: `D3cShotsTest`
     (`D3C_SHOTS`/`D3C_TAG`، سد نیست).
+  - ⛔ پنجرهٔ پرونده‌های مشترک (`claude/e-desk-d3d`): به‌جای `AlertDialog`/`TextButton`/`Button`/`OutlinedButton` ِ Material فقط پلِ
+    `ui/components/common/ShopDialogs.kt` (`ShopAlertDialog`، `ShopTextButton`، `ShopButton`، `ShopOutlinedButton` — همان پارامترها). گوشی
+    (`LocalDeskLayout` = false) بایت‌به‌بایت همان Material است؛ کامپیوتر کارتِ `ui/desk` با «تأیید» ِ خط‌دارِ برند، Esc = `onDismissRequest`،
+    Enter = همان «تأیید». کارِ پاک‌کننده (پاک کردن، لغو، باطل، برداشتن، دور انداختن، رفتن به سرورِ دیگر…) `danger = true` می‌گیرد: «تأیید» ِ
+    سرخ، Enter نمی‌زند، فوکوسِ آغاز روی «انصراف». پنجرهٔ تازهٔ مشترک هم همین پل را صدا می‌زند. سنجه: `DeskDialogBridgeUiTest`؛ عکس: `D3dShotsTest`.
 - گوشی و آیفون دست نخوردند.
 - ⛔ **سیستمِ طراحیِ کامپیوتر — یک منبع** (خواستِ صاحب‌کار ۱۴۰۵/۰۸/۲۴، `claude/e-desk-d1`: «موبایل با کامپیوتر فرق داره؛ باید جوری
   درست کنی که رو کامپیوتر خونده بشه … طراحیِ موبایل رو نمی‌تونی روی کامپیوتر بیاری»):

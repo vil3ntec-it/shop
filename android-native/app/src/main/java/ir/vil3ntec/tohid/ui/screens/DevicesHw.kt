@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopButton
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -393,18 +396,18 @@ internal fun PrinterSettingsDialog(
       if (m == null) toast(StrDevicePages.noneWorked)
       else { s = s.copy(mode = m.key); toast(if (m.key == "column") StrDevicePages.columnPicked else StrDevicePages.rasterKept) }
     }
-    AlertDialog(
+    ShopAlertDialog(
       onDismissRequest = { modeAsk = false },
       title = { Text(StrDevicePages.whichSample) },
       text = { Text(StrDevicePages.whichSampleNote) },
       confirmButton = {
         Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-          TextButton(onClick = { pick(columnOk = true, rasterOk = true) }) { Text(StrDevicePages.bothSamples) }
-          TextButton(onClick = { pick(columnOk = false, rasterOk = true) }) { Text(StrDevicePages.only2) }
-          TextButton(onClick = { pick(columnOk = true, rasterOk = false) }) { Text(StrDevicePages.only1) }
+          ShopTextButton(onClick = { pick(columnOk = true, rasterOk = true) }) { Text(StrDevicePages.bothSamples) }
+          ShopTextButton(onClick = { pick(columnOk = false, rasterOk = true) }) { Text(StrDevicePages.only2) }
+          ShopTextButton(onClick = { pick(columnOk = true, rasterOk = false) }) { Text(StrDevicePages.only1) }
         }
       },
-      dismissButton = { TextButton(onClick = { pick(columnOk = false, rasterOk = false) }) { Text(StrProducts.noSupplier) } },
+      dismissButton = { ShopTextButton(onClick = { pick(columnOk = false, rasterOk = false) }) { Text(StrProducts.noSupplier) } },
     )
   }
 }
@@ -419,7 +422,7 @@ internal fun OpenDrawerDialog(printer: PrinterRegistry.Saved, initialReason: Str
   val scope = rememberCoroutineScope()
   var reason by remember { mutableStateOf(initialReason) }
   var busy by remember { mutableStateOf(false) }
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = { if (!busy) onDismiss() },
     title = { Text(StrShift.noSaleTitle) },
     text = {
@@ -432,7 +435,7 @@ internal fun OpenDrawerDialog(printer: PrinterRegistry.Saved, initialReason: Str
       }
     },
     confirmButton = {
-      Button(enabled = !busy && reason.isNotBlank(), onClick = {
+      ShopButton(enabled = !busy && reason.isNotBlank(), onClick = {
         busy = true
         scope.launch {
           val msg = PrintSpooler.openDrawer(context, printer, reason)
@@ -442,7 +445,7 @@ internal fun OpenDrawerDialog(printer: PrinterRegistry.Saved, initialReason: Str
         }
       }) { Text(StrDevicePages.openDrawer) }
     },
-    dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(Str.cancel) } },
+    dismissButton = { ShopTextButton(enabled = !busy, onClick = onDismiss) { Text(Str.cancel) } },
   )
 }
 

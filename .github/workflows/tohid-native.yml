@@ -131,11 +131,16 @@ jobs:
       - name: کلیدِ امضا
         env:
           KEYSTORE_B64: ${{ secrets.TOHID_KEYSTORE_B64 }}
+          #  F0-09/SEC-08 — نگهبانِ چرخشِ کلید، پیش‌فرض خاموش (رفتارِ امروزِ CI دست‌نخورده).
+          REQUIRE_EXTERNAL_KEYSTORE: ${{ vars.TOHID_REQUIRE_EXTERNAL_KEYSTORE }}
         run: |
           if [ -n "$KEYSTORE_B64" ]; then
             echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/tohid-release.jks"
             echo "TOHID_KEYSTORE=$RUNNER_TEMP/tohid-release.jks" >> "$GITHUB_ENV"
             echo "کلید از secret خوانده شد"
+          elif [ "$REQUIRE_EXTERNAL_KEYSTORE" = "1" ]; then
+            echo "::error::secret ِ TOHID_KEYSTORE_B64 تنظیم نشده و TOHID_REQUIRE_EXTERNAL_KEYSTORE=1 — نسخهٔ انتشار با کلیدِ داخلِ مخزن ساخته نمی‌شود (F0-09/SEC-08)"
+            exit 1
           else
             echo "::warning::secret به نام TOHID_KEYSTORE_B64 تنظیم نشده — فعلاً کلیدِ داخلِ مخزن استفاده می‌شود"
           fi
@@ -324,10 +329,15 @@ jobs:
       - name: کلیدِ امضا
         env:
           KEYSTORE_B64: ${{ secrets.TOHID_KEYSTORE_B64 }}
+          #  F0-09/SEC-08 — نگهبانِ چرخشِ کلید، پیش‌فرض خاموش (رفتارِ امروزِ CI دست‌نخورده).
+          REQUIRE_EXTERNAL_KEYSTORE: ${{ vars.TOHID_REQUIRE_EXTERNAL_KEYSTORE }}
         run: |
           if [ -n "$KEYSTORE_B64" ]; then
             echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/tohid-release.jks"
             echo "TOHID_KEYSTORE=$RUNNER_TEMP/tohid-release.jks" >> "$GITHUB_ENV"
+          elif [ "$REQUIRE_EXTERNAL_KEYSTORE" = "1" ]; then
+            echo "::error::secret ِ TOHID_KEYSTORE_B64 تنظیم نشده و TOHID_REQUIRE_EXTERNAL_KEYSTORE=1 — بستهٔ انتشار (AAB) با کلیدِ داخلِ مخزن ساخته نمی‌شود (F0-09/SEC-08)"
+            exit 1
           fi
 
       - name: ساختِ AAB ِ Play

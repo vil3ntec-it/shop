@@ -6,6 +6,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.isNotEnabled
 import androidx.compose.ui.test.runSkikoComposeUiTest
@@ -48,6 +49,7 @@ import kotlinx.coroutines.runBlocking
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.components.common.NavCatalog
 import ir.vil3ntec.tohid.ui.v3.modes.ModeState
+import ir.vil3ntec.tohid.ui.v3.products.QuickProductSpec
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -193,6 +195,10 @@ class CoreFlowsE2EIosTest {
         e.shot("05a-products")
         e.tap(Find.button(StrProducts.newProduct), StrProducts.newProduct)
         e.type(StrProducts.name, newProduct)
+        e.type(StrProducts.salePrice, "85")
+        //  e-phone-p2 (دستهٔ ۷۰): فرمِ سادهٔ یک‌کالایی — نام و قیمتِ فروش بیرون، قیمتِ خرید، دسته و واحد زیرِ «بیشتر» ِ تاشو
+        //  (نشانِ آزمون، نه نوشته: «بیشتر» هم‌نامِ زبانهٔ «بیشتر» ِ نوارِ پایین است)
+        e.tap(hasTestTag(QuickProductSpec.MORE_TAG), StrProducts.groupMore)
         //  ۶۳k: دسته و واحد کادرِ کشویی‌اند؛ «+ دستهٔ تازه» آخرین گزینهٔ همان فهرست ⇐ برگهٔ کوچکِ نام ⇐ «افزودن» ⇐ همان دسته
         //  برگزیده می‌شود. تا برگه کامل نرفته چیزی زده نمی‌شود (زدن روی پردهٔ برگهٔ در حالِ رفتن فرمِ زیرش را هم می‌بندد)
         e.tap(Find.dropdown(StrProducts.category), StrProducts.category)
@@ -204,9 +210,8 @@ class CoreFlowsE2EIosTest {
         e.tap(Find.button("عدد"), "عدد")
         e.waitFor(Find.dropdown(StrProducts.unit, "عدد"), "عدد")
         e.type(StrProducts.purchasePrice, "60")
-        e.type(StrProducts.salePrice, "85")
         e.shot("05b-new-product")
-        e.tap(Find.button(StrProducts.saveAll) and isEnabled(), StrProducts.saveAll)
+        e.tap(Find.button(StrKit.save) and isEnabled(), StrKit.save)
         e.until("کالای «$newProduct» در دفتر", 20_000) { store.data.value.products.any { it.name == newProduct } }
         val p = store.data.value.products.first { it.name == newProduct }
         assertEquals(85.0, p.salePrice, "قیمتِ فروش")

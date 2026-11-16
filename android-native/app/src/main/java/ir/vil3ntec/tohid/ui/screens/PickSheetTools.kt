@@ -2,6 +2,8 @@ package ir.vil3ntec.tohid.ui.screens
 
 // i18n: سه‌زبانه
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -75,7 +77,7 @@ internal fun PickPackedTools(s: PickSheetDto, repo: PickingRepository) {
   note?.let { (ok, text) -> Text(text, style = MaterialTheme.typography.bodySmall, color = if (ok) c.success else c.danger) }
 
   if (consent) {
-    AlertDialog(
+    ShopAlertDialog(
       onDismissRequest = { consent = false },
       containerColor = c.surfaceSolid,
       title = { Text(StrPick.photoTitle, color = c.text) },
@@ -88,9 +90,9 @@ internal fun PickPackedTools(s: PickSheetDto, repo: PickingRepository) {
         }
       },
       confirmButton = {
-        TextButton(enabled = parcelOnly, onClick = { consent = false; pick = true }) { Text(StrPick.photoTake, color = c.primary) }
+        ShopTextButton(enabled = parcelOnly, onClick = { consent = false; pick = true }) { Text(StrPick.photoTake, color = c.primary) }
       },
-      dismissButton = { TextButton(onClick = { consent = false }) { Text(Str.cancel, color = c.muted) } },
+      dismissButton = { ShopTextButton(onClick = { consent = false }) { Text(Str.cancel, color = c.muted) } },
     )
   }
   ParcelPhotoSource(open = pick, note = StrPick.photoNote, onDismiss = { pick = false }) { bytes ->

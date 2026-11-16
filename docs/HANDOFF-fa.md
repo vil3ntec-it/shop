@@ -176,6 +176,63 @@
   سه فیلد در یک خطِ `Models.kt` پیش‌فرضِ `Purchase.currency` را «null, @OptIn(…» می‌دید. هر فیلدِ ارزی حالا خطِ خودش را دارد (همان شکلِ
   `unitName`)؛ سقفِ `tools/quality/baseline.json` برای `Models.kt` ۹۳۰ ⇐ **۹۳۸** (دلیل: ۱۲ فیلدِ همگام‌شونده، یکی در هر خط، قراردادِ همین
   خواننده). `fields` پیش ۱ قرمز، پس ۰؛ `journeys-b` و `sync` سبز.
+### ۱۴۰۵/۰۸/۲۶ — عاملِ e-redteam-crack زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-redteam-crack` (از `origin/main` 57c2aa992) — ممیزیِ تیمِ قرمزِ «شکستنِ قفلِ اشتراک» (ART-*، SUB-*)
+
+- **یافته**: هیچ راهِ اشتراکِ رایگان پیدا نشد. حمله‌های **اجراشده** روی اشتراک/انتایتل‌منت و مجوز همه رد شدند — منقضی/لغو/معلق
+  هیچ APIِ پولی باز نمی‌کند، مجوز و کدِ آفلاینِ دست‌کاری‌شده بی‌ارزش است، جداییِ دکان‌ها و نقش‌ها سرِ جاست، و کلیدِ خصوصیِ مجوز
+  در هیچ برنامه/مخزن/خروجی نیست (فقط کلیدِ عمومی). خروجی‌های عمومی (APKِ پیش‌نمایش/بتا، بستهٔ لینوکس، وب) با `artifact-gate` و
+  بازرسیِ دستی پاک بودند.
+- **کارِ اصلاحی (در شاخه)**: نگهبانِ چرخشِ کلیدِ امضا در CI — پیش‌فرض خاموش. سه گامِ کلیدِ امضا در `tohid-native.yml` و
+  `tohid-native-preview.yml` حالا با متغیرِ مخزنِ `TOHID_REQUIRE_EXTERNAL_KEYSTORE=1` و نبودِ secret، به‌جای برگشتِ بی‌صدا به
+  کلیدِ داخلِ مخزن، با خطا می‌ایستند. متغیر که نباشد، رفتار دقیقاً همان CIِ امروز است. گزارشِ درون‌مخزنی:
+  `docs/security/REDTEAM-CRACK-1405-08-26-fa.md`.
+- **سنجش**: `node --test` روی `paid-routes-entitlement`(۶/۶)، `entitlement-boundaries`(۴/۴)، `entitlement-clock`(۵/۵)،
+  `admin-idempotency`(۷/۷)، `shop-offline-code`(۸/۸)، `license`(۶/۶)، `license-key-guard`(۱۱/۱۱)، `static-exposure`(۴/۴)،
+  `route-authz-inventory`(۴/۴)، `pump-trial`(۱۰/۱۰)، `pump-trial-backfill`(۳/۳)، `sec-sub-device-cap`(۷/۷، PGlite) — همه سبز؛
+  منطقِ bashِ نگهبان با سه حالت اجرا و YAML با `yaml.safe_load` سنجیده شد.
+- **مانده/قدمِ بعدی (کارِ صاحبِ مخزن، نه عامل)**: چرخشِ کلیدِ `tohid-release.jks` با چرخشِ v3 و دودمان (`apksigner rotate`) و
+  گذاشتنِ کلیدِ تازه فقط در secret ِ گیت‌هاب، سپس روشن کردنِ متغیرِ `TOHID_REQUIRE_EXTERNAL_KEYSTORE=1`. نقشهٔ گام‌به‌گام بیرونِ
+  مخزن سپرده شد. هم‌زمانیِ واقعی (PostgreSQL) و خروجی‌های ویندوز/مک (بی ابزارِ بازکردن) در این محیط سنجیده نشدند.
+
+### ۱۴۰۵/۰۸/۲۶ — هماهنگ‌کننده، شاخهٔ `claude/e-ios-e2e` (از `origin/main` e8a22edfd) — سناریوهای آیفون پس از دستهٔ ۷۰
+
+- **یافته**: کارِ «برنامهٔ آیفون — چارچوب، Xcode و شبیه‌ساز (گزارش)» (بی‌سد) از دستهٔ ۷۰ سرخ است؛ دستهٔ ۶۸ سبز بود. از «۰۴-صندوق» به بعد
+  همه رد. ریشه آزمون است، نه برنامه: (۱) e-phone-p1 صندوقِ گوشی را «حالتِ تمرکز» کرد (نوارِ پایین پنهان، «بازگشت» دیده می‌شود) و
+  `E2eSupport.toTab` با دیدنِ «بازگشت» زبانه را دوباره می‌زد که دیگر نبود؛ (۲) e-phone-p2 فرمِ «کالای تازه» را یک‌کالایی کرد (قیمتِ خرید،
+  دسته و واحد زیرِ «بیشتر» ِ تاشو، دکمه «ذخیره»). سناریوهای بعدی در همان حالِ گیرکرده می‌ماندند.
+- **کار**: `toTab` زدنِ دوباره را فقط وقتی نوار هنوز هست؛ «۰۵-کالا» قیمتِ فروش را بیرون می‌نویسد، «بیشتر» را با نشانِ
+  `QuickProductSpec.MORE_TAG` باز می‌کند (نوشته‌اش هم‌نامِ زبانهٔ «بیشتر» است) و با `StrKit.save` ذخیره می‌کند. گامِ پرداختِ «۰۴» و «۰۷» با
+  کارِ `claude/e-paystep` (گامِ جدای پرداخت) هم‌گام می‌شود.
+- **سنجش**: فقط روی مکِ CI (این‌جا لینوکس است و `iosTest` ساخته نمی‌شود) — نتیجه در همان کارِ گزارش.
+
+### ۱۴۰۵/۰۸/۲۶ — عاملِ e-desk-d3d زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-desk-d3d` (از `origin/main` e8a22edfd) — همهٔ پنجره‌های مشترک روی کامپیوتر با پلِ `ShopAlertDialog`
+
+- **خواست**: باقیِ `AlertDialog`/دکمهٔ Material ِ پرونده‌های مشترک روی کامپیوتر ⇐ پنجرهٔ کامپیوتر؛ گوشی و رفتار/داده همان.
+- **پل** (`ui/components/common/ShopDialogs.kt`، تازه): `ShopAlertDialog` (همان پارامترهای `AlertDialog` + `danger`)، `ShopTextButton`، `ShopButton`،
+  `ShopOutlinedButton`. گوشی (`LocalDeskLayout` = false) همان فراخوانِ Material با همان آرگومان‌ها؛ کامپیوتر کارتِ `ui/desk`، سرخط و «بستن»، بدنه
+  با قلم/رنگِ کامپیوتر، دکمه‌های خط‌دار (رنگِ دستیِ `Text` خوانا می‌ماند)، Esc = `onDismissRequest`، Enter = «تأیید» (ثبت از `SideEffect` ِ همان دکمه)،
+  `danger` ⇒ «تأیید» ِ سرخ، Enter نه، فوکوس روی «انصراف». برچسبِ آزمون `SHOP_DIALOG_TAG`.
+- **تبدیل** (فقط نامِ فراخوان؛ اسکریپتِ پرانتزشمارِ آگاه از رشته): ۹۹ `AlertDialog` در ۵۱ پرونده — از جمله `GiftCardBarAndroid` (۶)، `LayawayBarAndroid` (۵)،
+  `Settings` (۴)، `Profile` (۴)، `SpecialOrderBarAndroid` (۴)، `SecuritySettings` (۳)، `DeviceHubUi` (۳)، `CourierChecksUi` (۳)، `WipeAllDialog` (۲)،
+  `SalesVoidDialogs` (۲)، `ShiftV2` (ورود/خروجِ نقد و بستن با شمارش + شاخه‌های پیشین)، `Servers` (افزودنِ سرور و …)، `Sale`، `SaleDialogs`، `SalesHistory`،
+  `SafePanelAndroid`، `ProductImportDialog`، `HesabPayAccountSettings`، `DevicesHw`، `QuoteBarAndroid`، `LoyaltyBarAndroid` و یک‌پنجره‌ای‌ها. ۳۲ پنجرهٔ
+  پاک‌کننده `danger = true` گرفتند (رنگِ سرخِ دکمه یا واژهٔ پاک/لغو/باطل/برداشتن). در `Profile`/`Sale`/`SaleDialogs`/`Settings` نامِ کامل (بی import) تا
+  سقفِ خطِ `tools/quality` نگه داشته شود.
+- **آزمون‌ها** (هدف‌دار، lane A): ۷۹ کلاس، ۴۳۵ آزمون — `DeskDialogBridgeUiTest` (پارامتری، ۴ پنجره × Esc و Enter/فوکوسِ امن: نمونهٔ عادی،
+  نمونهٔ پاک‌کننده، «پاک کردنِ همه»، «دلیلِ چاپِ دوباره»)، `WipeAllUiTest`، `ShiftNoSaleDeskUiTest`، `HeldClaimSheetsUiTest`، `SaleFocusUiTest`،
+  `QuotePdfDeskTest`، `SafeCurrencyUiTest`، `TillNewCustomerUiTest`، `OrderRefundReceiptsUiTest`، همهٔ سیم‌کشی‌های منبعِ پرونده‌های دست‌خورده،
+  `LookGuardTest`، `HardcodedColorsTest`، `PageAnatomyGuardTest`، `NavRowUiTest`، `DariCoverageTest`، `DariWordsTest` سبز. تنها قرمز
+  (`DeskProductsD3aUiTest` «هر کارِ پیشین…») از دادهٔ کهنهٔ `desktop/build/test-data` بود: پس از `rm -rf` همان ۳ از ۳ سبز (روی main هم سبز).
+  هیچ آزمونِ پیشین و هیچ هشِ `LookGuardTest` عوض نشد.
+- **عکس‌ها**: `D3dShotsTest` (`D3D_SHOTS`/`D3D_TAG`) — ۱۰ پنجره (پاک کردنِ همه ۱ و ۲، دلیلِ چاپِ دوباره، قیمتِ CRM، بازگشاییِ فاکتور، لغوِ فاکتور،
+  ارزِ گاوصندوق، سابقهٔ ورودِ کالا، ورود/خروجِ نقد، بستن با شمارش) × روشن/تیره، پیش روی `origin/main` e8a22edfd و پس، با `compare-*.png` در
+  `/home/user/wt-d3c-shots/d3d/`.
+- **مانده**: کادرهای متنِ درونِ پنجره‌ها هنوز `OutlinedTextField` ِ Material‌اند (فقط قاب و دکمه‌ها کامپیوتری شدند)؛ `IconButton`/`RadioButton`/`Checkbox`
+  ِ درونِ بدنه همان Material.
+- **پس از گزارشِ عامل (هماهنگ‌کننده)**: در عکس‌ها «تأیید» و «انصراف» هم‌وزن دیده می‌شدند (هر دو خطِ دور روی سطحِ کارت). «تأیید» حالا
+  زمینهٔ کم‌رنگِ برند (`Desk.colors.selected`) و کارِ پاک‌کننده زمینهٔ `negativeSoft` دارد؛ خطِ دور و نوشته همان. زمینهٔ پُرِ برند نه، تا رنگِ
+  دستیِ `Text` ِ صفحه خوانا بماند. `DeskDialogBridgeUiTest`، `D3dShotsTest`، `HardcodedColorsTest`، `LookGuardTest`: ۱۸/۱۸ (خطِ A)؛ عکس‌های تازه
+  `/home/user/wt-d3c-shots/d3d-v2/` (+ `compare/`).
 ### ۱۴۰۵/۰۸/۲۶ — عاملِ e-branches4 زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-branches4` (از `origin/main` 7e2a36923) — پایانِ فازِ ۴ ِ شعبه‌ها
 
 - **خواست**: آخرین ردیف‌های «کد» ِ PARTIAL-MAP — INV-11/S21 (انتقالِ میانِ شعبه‌ها با «در راه» و حرکت در هر دو سو)، POS-16/S17 (موجودیِ

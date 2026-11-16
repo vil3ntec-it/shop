@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -98,7 +100,7 @@ internal fun DayEndDetailDialog(
   note: String = StrSalePages.detailNote,
   onClose: () -> Unit,
 ) {
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onClose,
     title = { Text(t.title, fontWeight = FontWeight.Bold) },
     text = {
@@ -107,6 +109,6 @@ internal fun DayEndDetailDialog(
         FreshTable(t, Modifier.fillMaxWidth().heightIn(max = 420.dp))
       }
     },
-    confirmButton = { TextButton(onClick = onClose) { Text(Str.close) } },
+    confirmButton = { ShopTextButton(onClick = onClose) { Text(Str.close) } },
   )
 }
