@@ -71,4 +71,31 @@ object BranchStock {
   /** آیا عضوِ فهرستِ `GET /shop/branches/members` این مجوز را دارد */
   fun granted(member: JsonObject?): Boolean =
     (member?.get("perms") as? JsonArray)?.any { (it as? JsonPrimitive)?.contentOrNull == PERM } == true
+
+  /*
+   *  ۹۴۶ — کلیدهای شعبه‌ایِ دکان (فقط صاحب، `GET/PUT /shop/branches/settings`، `server/src/lib/branch-settings.js`):
+   *  صاحب و مدیر همیشه موجودیِ شعبه‌های دیگر را می‌بینند (همان Square/Shopify/Lightspeed)؛ کارمند فقط با [Settings.staffOtherStock]
+   *  (پیش‌فرض خاموش) یا مجوزِ خودش ([PERM])؛ ارسالِ بیش از موجودی فقط با [Settings.transferNegative] (پیش‌فرض خاموش).
+   */
+  const val SETTINGS_PATH = "/shop/branches/settings"
+  val ALWAYS_ROLES: Set<String> = setOf("owner", "manager")
+
+  data class Settings(val staffOtherStock: Boolean = false, val transferNegative: Boolean = false)
+
+  /** `{settings: {...}}` (یا خودِ شیءِ تنظیم) ⇒ تنظیم؛ کلیدِ نیامده/نابولی ⇒ خاموش */
+  fun settingsOf(body: JsonObject?): Settings {
+    val o = (body?.get("settings") as? JsonObject) ?: body ?: return Settings()
+    fun b(k: String) = (o[k] as? JsonPrimitive)?.takeIf { !it.isString }?.contentOrNull == "true"
+    return Settings(staffOtherStock = b("staffOtherStock"), transferNegative = b("transferNegative"))
+  }
+
+  /** بدنهٔ `PUT` برای یک کلید */
+  fun settingsBody(staffOtherStock: Boolean? = null, transferNegative: Boolean? = null): JsonObject = buildJsonObject {
+    staffOtherStock?.let { put("staffOtherStock", it) }
+    transferNegative?.let { put("transferNegative", it) }
+  }
+
+  /** نقشِ [role] موجودیِ شعبه‌های دیگر را می‌بیند؟ (همان `other-branches.seesAll` ِ سرور؛ سرور باز هم داور است) */
+  fun seesOthers(role: String, settings: Settings, granted: Boolean): Boolean =
+    role in ALWAYS_ROLES || settings.staffOtherStock || granted
 }

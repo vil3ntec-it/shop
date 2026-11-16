@@ -362,9 +362,10 @@ test('مجوز: کارمندِ الف هرگز در ب دریافت نمی‌ک�
   //  نمای ب فقط همان کلیدهای انتقال (هیچ موجودی یا سندِ الف)
   const seen = (await bx(w.mgrB, `/${t.id}`, Bid)).body;
   assert.deepEqual(Object.keys(seen).sort(), ['steps', 'transfer']);
+  //  ۹۴۶: `sentAt`/`sentBy` (پیش‌نویس) و `returnedMilli` (برگشته به مبدأ) هم — همان کلیدهای خودِ انتقال، نه چیزِ دیگرِ الف
   assert.deepEqual(Object.keys(seen.transfer).sort(), ['closedAt', 'closedBy', 'createdAt', 'createdBy', 'direction', 'from', 'fromBranch',
-    'id', 'lines', 'note', 'pendingMilli', 'reason', 'shortMilli', 'status', 'to', 'toBranch'].sort());
-  assert.deepEqual(Object.keys(seen.transfer.lines[0]).sort(), ['pendingMilli', 'productId', 'receivedMilli', 'sentMilli', 'shortMilli']);
+    'id', 'lines', 'note', 'pendingMilli', 'reason', 'sentAt', 'sentBy', 'shortMilli', 'status', 'to', 'toBranch'].sort());
+  assert.deepEqual(Object.keys(seen.transfer.lines[0]).sort(), ['pendingMilli', 'productId', 'receivedMilli', 'returnedMilli', 'sentMilli', 'shortMilli']);
 });
 
 test('STF-06: عضوِ محدود به انبار از قفسه نمی‌فرستد و در قفسهٔ مقصد دریافت نمی‌کند', async () => {
@@ -437,6 +438,8 @@ test('مهاجرتِ ۹۳۵: با انتقالِ باز برگشت رد و هی�
   const { s, A, Bid } = w;
   const t = (await send(w.mgrA, A, body1(w))).body.transfer;
   const down = fs.readFileSync(path.join(__dirname, '..', 'migrations', 'rollback', '935_branch_transfers.down.sql'), 'utf8');
+  //  ۹۴۶ روی ۹۳۵ سوار است ⇒ برگشتِ واقعی به ترتیبِ وارون: اول ۹۴۶ (همان دُمِ `upgrade-rehearsal`)
+  const down946 = fs.readFileSync(path.join(__dirname, '..', 'migrations', 'rollback', '946_branch_transfer_drafts.down.sql'), 'utf8');
   const has = async (n) => (await one('SELECT to_regclass($1) AS r', [n])).r !== null;
   await assert.rejects(query(down), /open branch transfer/);
   assert.ok(await has('branch_transfers') && await has('branch_transfer_steps'));
@@ -449,6 +452,7 @@ test('مهاجرتِ ۹۳۵: با انتقالِ باز برگشت رد و هی�
   for (const o of await many("SELECT b.id, b.shop_id, b.to_branch FROM branch_transfers b WHERE status IN ('in_transit','partial')")) {
     await query("UPDATE branch_transfers SET status='rejected', closed_at=1 WHERE id=$1", [o.id]);
   }
+  await query(down946);
   await query(down);
   assert.ok(!(await has('branch_transfers')) && !(await has('branch_transfer_steps')));
   assert.equal((await one("SELECT COUNT(*)::int AS n FROM schema_migrations WHERE version='935_branch_transfers.sql'")).n, 0);
@@ -456,7 +460,7 @@ test('مهاجرتِ ۹۳۵: با انتقالِ باز برگشت رد و هی�
   assert.deepEqual(await many('SELECT * FROM stock_moves WHERE shop_id=$1 ORDER BY id', [s.shopId]), moves);
   //  دوباره بالا: همان پرونده، جدول‌ها و تریگر؛ درها دوباره کار می‌کنند
   const done = await require('../src/migrate').run();
-  assert.deepEqual(done, ['935_branch_transfers.sql']);
+  assert.deepEqual(done, ['935_branch_transfers.sql', '946_branch_transfer_drafts.sql']);
   assert.ok(await has('branch_transfers') && await has('branch_transfer_steps'));
   const t2 = await send(w.mgrA, A, body1(w, { lines: [{ productId: 'p1', qtyMilli: 1000 }] }));
   assert.equal(t2.status, 201, JSON.stringify(t2.body));

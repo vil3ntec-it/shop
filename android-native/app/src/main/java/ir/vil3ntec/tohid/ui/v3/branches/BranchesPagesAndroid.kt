@@ -29,6 +29,7 @@ import ir.vil3ntec.tohid.core.branch.BranchBook
 import ir.vil3ntec.tohid.core.branch.BranchKey
 import ir.vil3ntec.tohid.core.branch.BranchTally
 import ir.vil3ntec.tohid.core.i18n.StrBranchDesk
+import ir.vil3ntec.tohid.core.i18n.StrBranchTransfers
 import ir.vil3ntec.tohid.core.i18n.StrBranches
 import ir.vil3ntec.tohid.core.report.BranchesReport
 import ir.vil3ntec.tohid.data.BranchDesk
@@ -38,6 +39,15 @@ import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.ShopBranchesRepository
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
+import ir.vil3ntec.tohid.ui.theme.V3Section as V3SectionTone
+import ir.vil3ntec.tohid.ui.theme.V3Tone
+import ir.vil3ntec.tohid.ui.v3.V3DataRow
+import ir.vil3ntec.tohid.ui.v3.V3DataRowSpec
+import ir.vil3ntec.tohid.ui.v3.V3Message
+import ir.vil3ntec.tohid.ui.v3.V3RowMeta
+import ir.vil3ntec.tohid.ui.v3.V3Summary
+import ir.vil3ntec.tohid.ui.v3.nav.V3PageFootnote
+import ir.vil3ntec.tohid.ui.v3.nav.V3RoutePage
 import ir.vil3ntec.tohid.ui.v3.LocalV3Toasts
 import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
@@ -162,7 +172,7 @@ internal fun RouteScope.BranchesPage() {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val api = if (Backend.isReady(context)) Backend.api(context) else null
-  val state = remember(api) { api?.let { BranchesPageState(ShopBranchesRepository(it)) } }
+  val state = remember(api) { api?.let { BranchesPageState(ShopBranchesRepository(it), ir.vil3ntec.tohid.data.repo.BranchTransfersRepository(it)) } }
   var tick by remember { mutableStateOf(0) }
   if (state != null) LaunchedEffect(state, tick) { state.load() }
   var newName by remember { mutableStateOf("") }
@@ -184,7 +194,12 @@ internal fun RouteScope.BranchesPage() {
               V3ListRow(StrBranchDesk.switch, onClick = { BranchLive.pick = BranchBook.Pick.Ask(book.choices) })
             }
           }
-          V3Section(null) { V3ListRow(StrBranchDesk.report, onClick = { nav.open(BranchPaths.REPORT) }) }
+          V3Section(null) {
+            V3ListRow(StrBranchDesk.report, onClick = { nav.open(BranchPaths.REPORT) })
+            //  فازِ ۴ (INV-11/S21): انتقال میانِ شعبه‌ها — صفحه خودش پرچم و `stock.move` را از سرور می‌پرسد
+            V3Divider()
+            V3ListRow(StrBranchTransfers.title, onClick = { nav.open(BranchTransferPaths.LIST) })
+          }
           if (book.owner) OwnerParts(state, book, newName, { newName = it }, onCreate = {
             scope.launch { if (state.create(newName)) newName = "" }
           }, onRename = { renaming = it; renameTo = it.name })
@@ -239,6 +254,20 @@ private fun OwnerParts(
     V3TextField(newName, { onName(it.take(60)) }, StrBranchDesk.nameLabel, Modifier.fillMaxWidth().padding(horizontal = 12.dp))
     V3Button(StrBranchDesk.create, onCreate, Modifier.fillMaxWidth().padding(12.dp), enabled = newName.isNotBlank() && !state.busy)
   }
+  //  فازِ ۴: کلیدهای شعبه‌ایِ دکان (POS-16/S17، INV-11) — فقط صاحب، پیش‌فرض هر دو خاموش
+  state.settings?.let { st ->
+    V3Section(StrBranchTransfers.rules, footer = StrBranchTransfers.ownerOnlyRules) {
+      ir.vil3ntec.tohid.ui.v3.V3NavRow(
+        StrBranchTransfers.staffOtherStock, Icons.Outlined.Store, null, help = StrBranchTransfers.staffOtherStockHelp,
+        toggle = st.staffOtherStock, onToggle = { on -> scope.launch { state.setStaffOtherStock(on) } }, chevron = false,
+      )
+      V3Divider()
+      ir.vil3ntec.tohid.ui.v3.V3NavRow(
+        StrBranchTransfers.transferNegative, Icons.Outlined.Store, null, help = StrBranchTransfers.transferNegativeHelp,
+        toggle = st.transferNegative, onToggle = { on -> scope.launch { state.setTransferNegative(on) } }, chevron = false,
+      )
+    }
+  }
   val active = book.branches.filter { !it.archived }
   if (state.members.isNotEmpty()) {
     V3Section(StrBranchDesk.members, footer = StrBranchDesk.memberNote) {
@@ -251,6 +280,11 @@ private fun OwnerParts(
               val on = b.id in m.branches.ifEmpty { listOf(BranchKey.MAIN) }
               V3Chip(BranchLive.label(b), on, { scope.launch { state.setMember(m.id, state.toggled(m, b.id)) } })
             }
+            //  POS-16/S17: «موجودیِ شعبه‌های دیگر» برای همین عضو (صاحب و مدیر همیشه دارند؛ کلیدِ دکان همه را باز می‌کند)
+            if (state.settings != null && state.needsGrant(m)) {
+              val g = state.granted(m)
+              V3Chip(StrBranchTransfers.memberOtherStock, g, { scope.launch { state.grantOtherStock(m.id, !g) } })
+            }
           }
         }
       }
@@ -258,6 +292,11 @@ private fun OwnerParts(
   }
 }
 
+/**
+ *  RPT-18 — `branches/report` روی کالبدِ یکسان (فازِ ۴): تراشهٔ بازه در جای قاب، سرِ صفحه یک `V3Summary` (جمعِ همه برای صاحب،
+ *  وگرنه جمعِ شعبه‌های خودِ عضو بی برچسبِ «جمعِ همه»)، هر شعبه یک `V3DataRow` (فروشِ خالص، فاکتور، سهم) که برگهٔ جزئیاتِ
+ *  همان شعبه را باز می‌کند. کامپیوتر: جدولِ `ui/desk` با ردیفِ جمعِ پایین (`DeskBranchReport`). همه از سرور؛ «جمع» فقط صاحب.
+ */
 @Composable
 internal fun RouteScope.BranchReportPage() {
   val context = LocalContext.current
@@ -265,34 +304,84 @@ internal fun RouteScope.BranchReportPage() {
   val state = remember(api) { api?.let { BranchReportState(ShopBranchesRepository(it)) } }
   var tick by remember { mutableStateOf(0) }
   if (state != null) LaunchedEffect(state, state.days, tick) { state.load(todayIso()) }
-  V3Scaffold(title = StrBranchDesk.report, onBack = backOrNull, bottomReserve = bottomReserve) { pad ->
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding() + 24.dp)) {
-      V3ChipRow(contentPadding = PaddingValues(0.dp)) {
+  if (desk) return DeskBranchReport(state, onRetry = { tick++ })
+  var open by remember { mutableStateOf<BranchTally.Row?>(null) }
+  V3RoutePage(
+    StrBranchDesk.report,
+    chips = {
+      V3ChipRow {
         BranchTally.SPANS.forEach { d -> V3Chip(StrBranches.span(d), state?.days == d, { state?.days = d }) }
       }
-      Text(StrBranchDesk.reportNote, style = V3Type.footnote, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(top = 8.dp))
-      val v = state?.view
-      when {
-        state == null || state.off -> V3EmptyState(Icons.Outlined.Store, StrBranchDesk.off)
-        v == null && state.failed -> V3EmptyState(Icons.Outlined.CloudOff, StrBranchDesk.failed, action = StrBranchDesk.retry, onAction = { tick++ })
-        v == null -> Text(StrBranchDesk.loading, style = V3Type.callout, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(top = 16.dp))
-        else -> {
-          if (state.failed) Text(StrBranchDesk.failed, style = V3Type.footnote, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(top = 8.dp))
-          v.totals?.let { SummarySection(StrBranchDesk.allTogether, it, StrBranches.totalsNote) }
-          v.rows.forEach { r -> SummarySection(ir.vil3ntec.tohid.core.i18n.branchName(r.name, r.main) + if (r.archived) " · " + StrBranchDesk.archived else "", r.summary, null) }
+    },
+  ) {
+    val v = state?.view
+    when {
+      state == null || state.off -> V3EmptyState(Icons.Outlined.Store, StrBranchDesk.off)
+      v == null && state.failed -> V3EmptyState(Icons.Outlined.CloudOff, StrBranchDesk.failed, action = StrBranchDesk.retry, onAction = { tick++ })
+      v == null -> Text(StrBranchDesk.loading, style = V3Type.callout, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(top = 16.dp))
+      else -> {
+        if (state.failed) Text(StrBranchDesk.failed, style = V3Type.footnote, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(bottom = 8.dp))
+        val total = BranchReportFigures.total(v)
+        V3Summary(
+          label = if (v.totals != null) StrBranchDesk.allTogether else StrBranchDesk.report,
+          value = shown("netSales", total["netSales"]),
+          caption = StrBranches.branchCount(v.rows.size) + " · " + label("invoices") + " " + shown("invoices", total["invoices"]),
+          note = if (v.totals != null) StrBranches.totalsNote else null,
+          collapseKey = BranchPaths.REPORT,
+          section = V3SectionTone.SALES,
+        )
+        if (v.totals?.partial == true) V3Message(V3Tone.WARNING, StrBranches.partial, Modifier.padding(top = 8.dp))
+        V3Section(null) {
+          v.rows.forEachIndexed { i, r ->
+            if (i > 0) V3Divider(start = V3DataRowSpec.DIVIDER_START)
+            val share = v.totals?.let { BranchReportFigures.shareBp(r.summary, it) }?.let { StrBranches.share(ir.vil3ntec.tohid.ui.screens.ReportFreshModel.percent(it)) }
+            V3DataRow(
+              title = ir.vil3ntec.tohid.core.i18n.branchName(r.name, r.main) + if (r.archived) " · " + StrBranchDesk.archived else "",
+              secondary = listOfNotNull(
+                if (r.summary.empty) StrBranches.noneInRange else label("invoices") + " " + shown("invoices", r.summary["invoices"]),
+                share,
+              ).joinToString(" · "),
+              meta = V3RowMeta(amount = shown("netSales", r.summary["netSales"])),
+              icon = Icons.Outlined.Store,
+              hue = ir.vil3ntec.tohid.ui.v3.nav.V3Modules.hueOf("branches"),
+              danger = r.summary.partial,
+              onClick = { open = r },
+            )
+          }
         }
       }
+    }
+    V3PageFootnote(StrBranchDesk.reportNote)
+  }
+  open?.let { r ->
+    V3Sheet(onDismiss = { open = null }, title = ir.vil3ntec.tohid.core.i18n.branchName(r.name, r.main)) {
+      SummarySection(null, r.summary, null)
     }
   }
 }
 
-private fun shown(key: String, v: Long?): String = when {
+/** عددهای گزارشِ شعبه‌ها برای صفحه (گوشی و کامپیوتر): جمعِ سرور برای صاحب، وگرنه جمعِ ردیف‌های خودِ عضو */
+internal object BranchReportFigures {
+  fun total(v: BranchTally.View): Map<String, Long?> = v.totals?.values ?: BranchesReport.SUM_KEYS.associateWith { k ->
+    v.rows.mapNotNull { it.summary[k] }.takeIf { it.isNotEmpty() }?.sum()
+  }
+
+  /** سهمِ فروشِ خالصِ یک شعبه از جمع، به ده‌هزارم (همان `BranchesReport.shareBp`) */
+  fun shareBp(s: BranchesReport.Summary, totals: BranchesReport.Summary): Long? {
+    val all = totals["netSales"] ?: return null
+    val mine = s["netSales"] ?: return null
+    if (all <= 0 || mine < 0) return null
+    return (mine * 10_000 + all / 2) / all
+  }
+}
+
+internal fun shown(key: String, v: Long?): String = when {
   v == null -> "—"
   key in BranchesReport.COUNT_KEYS -> v.toString()
   else -> ir.vil3ntec.tohid.ui.v3.analytics.afn(PayFlow.major(v))
 }
 
-private fun label(key: String): String = when (key) {
+internal fun label(key: String): String = when (key) {
   "invoices" -> StrBranches.invoices
   "sales" -> StrBranches.sales
   "discount" -> StrBranches.discount
@@ -304,7 +393,7 @@ private fun label(key: String): String = when (key) {
 }
 
 @Composable
-private fun SummarySection(title: String, s: BranchesReport.Summary, footer: String?) {
+private fun SummarySection(title: String?, s: BranchesReport.Summary, footer: String?) {
   V3Section(title, footer = footer) {
     if (s.empty) {
       V3ListRow(StrBranches.noneInRange, chevron = false)

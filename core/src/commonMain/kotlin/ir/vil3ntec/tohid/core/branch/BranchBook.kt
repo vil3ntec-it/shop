@@ -47,7 +47,8 @@ object BranchBook {
     data class On(val book: Book) : Answer
   }
 
-  data class Member(val id: String, val userId: String, val name: String, val role: String, val branches: List<String>)
+  /** [perms] = مجوزهای شعبه‌ایِ همین عضو (`stock.view_other_branches`، فقط آن‌چه صاحب داده — `BranchStock.PERM`) */
+  data class Member(val id: String, val userId: String, val name: String, val role: String, val branches: List<String>, val perms: List<String> = emptyList())
   data class Members(val branches: List<Branch>, val members: List<Member>)
 
   /** پس از ورود یا در شروع: چه باید کرد */
@@ -132,7 +133,8 @@ object BranchBook {
     members = o["members"].list().mapNotNull { e ->
       val m = e as? JsonObject ?: return@mapNotNull null
       val id = m["id"].text()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-      Member(id, m["userId"].text().orEmpty(), m["name"].text()?.trim().orEmpty(), m["role"].text().orEmpty(), idsOf(m["branches"]))
+      val perms = (m["perms"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { it.text() }.orEmpty()
+      Member(id, m["userId"].text().orEmpty(), m["name"].text()?.trim().orEmpty(), m["role"].text().orEmpty(), idsOf(m["branches"]), perms)
     },
   )
 }

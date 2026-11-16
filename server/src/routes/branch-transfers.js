@@ -6,7 +6,7 @@
  *
  * ⛔ پرچم‌های `shop.branches` و `shop.catalog` هر دو لازم‌اند؛ هر کدام خاموش ⇒ `next('router')` ⇒ دقیقاً همان پاسخِ
  *    درِ ناشناخته (۴۰۴ ِ امروز)، با و بی سرآیند.
- * ⛔ نوشتن‌ها `stock.move` و کلیدِ یکتایی (`Idempotency-Key`) می‌خواهند؛ سقفِ نرخِ هر کاربرِ هر دکان؛ محدودهٔ مکانِ STF-06
+ * ⛔ نوشتن‌ها (ارسال/پیش‌نویس، ویرایش و ارسالِ پیش‌نویس، دریافت، رد، لغو) `stock.move` و کلیدِ یکتایی (`Idempotency-Key`) می‌خواهند؛ سقفِ نرخِ هر کاربرِ هر دکان؛ محدودهٔ مکانِ STF-06
  *    (ارسال از مبدأِ محدوده، دریافت/رد در مقصدِ محدوده). دکان و شعبه فقط از توکن و سرآیندِ سنجیده، هرگز از بدنه/پارامتر.
  */
 const express = require('express');
@@ -62,6 +62,19 @@ router.post('/branch-transfers/:id/receive', on, writeLimit, move, async (req, r
 
 router.post('/branch-transfers/:id/reject', on, writeLimit, move, async (req, res) => {
   done(res, await bt.reject(req.shopId, req.stockBranch, req.params.id, await opts(req)), false);
+});
+
+//  ۹۴۶: پیش‌نویس (ساختن با `draft: true` در همان `POST /`)، ویرایش و ارسالش، و لغوِ فرستنده — همه فقط شعبهٔ فرستنده
+router.put('/branch-transfers/:id', on, writeLimit, move, async (req, res) => {
+  done(res, await bt.edit(req.shopId, req.stockBranch, req.params.id, await opts(req)), false);
+});
+
+router.post('/branch-transfers/:id/send', on, writeLimit, move, async (req, res) => {
+  done(res, await bt.sendDraft(req.shopId, req.stockBranch, req.params.id, await opts(req)), false);
+});
+
+router.post('/branch-transfers/:id/cancel', on, writeLimit, move, async (req, res) => {
+  done(res, await bt.cancel(req.shopId, req.stockBranch, req.params.id, await opts(req)), false);
 });
 
 module.exports = router;

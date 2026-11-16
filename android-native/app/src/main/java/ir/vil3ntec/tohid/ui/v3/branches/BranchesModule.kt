@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ui.v3.branches
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Store
 import ir.vil3ntec.tohid.core.i18n.StrBranchDesk
+import ir.vil3ntec.tohid.core.i18n.StrBranchTransfers
 import ir.vil3ntec.tohid.ui.v3.nav.AppModule
 import ir.vil3ntec.tohid.ui.v3.nav.Chrome
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
@@ -32,5 +33,14 @@ val BranchesModule = AppModule(
   routes = listOf(
     V3Route(BranchPaths.ROOT, RouteKind.PAGE, { StrBranchDesk.title }, chrome = Chrome.OWN) { BranchesPage() },
     V3Route(BranchPaths.REPORT, RouteKind.PAGE, { StrBranchDesk.report }, parent = BranchPaths.ROOT, chrome = Chrome.OWN) { BranchReportPage() },
+    //  فازِ ۴ (INV-11/S21): انتقال میانِ شعبه‌ها — «تازه» پیش از «{id}» (همان سه بخش)
+    V3Route(BranchTransferPaths.LIST, RouteKind.PAGE, { StrBranchTransfers.title }, parent = BranchPaths.ROOT, chrome = Chrome.OWN) { BranchTransfersRoute() },
+    V3Route(BranchTransferPaths.NEW, RouteKind.PAGE, { StrBranchTransfers.newTransfer }, parent = BranchTransferPaths.LIST, chrome = Chrome.OWN) { BranchTransferFormRoute(null) },
+    V3Route("branches/transfers/{id}/edit", RouteKind.PAGE, { StrBranchTransfers.editDraft }, parent = BranchTransferPaths.LIST, chrome = Chrome.OWN) {
+      BranchTransferFormRoute(args["id"].orEmpty())
+    },
+    V3Route("branches/transfers/{id}", RouteKind.PAGE, { StrBranchTransfers.detail }, parent = BranchTransferPaths.LIST, chrome = Chrome.OWN) {
+      BranchTransferRoute(args["id"].orEmpty())
+    },
   ),
 )

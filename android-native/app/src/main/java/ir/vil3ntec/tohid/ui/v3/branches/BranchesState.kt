@@ -10,6 +10,8 @@ import ir.vil3ntec.tohid.core.branch.BranchTally
 import ir.vil3ntec.tohid.core.i18n.StrBranchDesk
 import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.data.BranchDesk
+import ir.vil3ntec.tohid.core.stock.BranchStock
+import ir.vil3ntec.tohid.data.repo.BranchRulesSource
 import ir.vil3ntec.tohid.data.repo.ShopBranchesSource
 import ir.vil3ntec.tohid.ui.screens.serverRefused
 
@@ -95,9 +97,12 @@ object BranchLive {
   val main: BranchBook.Branch get() = BranchBook.Branch(BranchKey.MAIN, "", archived = false, main = true)
 }
 
-/** صفحهٔ «شعبه‌ها»: دفترچه، اعضا (فقط صاحب)، نوشتن‌ها با پیامِ روشن */
+/**
+ *  صفحهٔ «شعبه‌ها»: دفترچه، اعضا (فقط صاحب)، نوشتن‌ها با پیامِ روشن. [rules] (فازِ ۴، فقط صاحب): کلیدهای شعبه‌ایِ دکان
+ *  (`staffOtherStock`، `transferNegative`) و مجوزِ «موجودیِ شعبه‌های دیگر» ِ هر عضو (POS-16/S17).
+ */
 @Stable
-class BranchesPageState(private val src: ShopBranchesSource) {
+class BranchesPageState(private val src: ShopBranchesSource, private val rules: BranchRulesSource? = null) {
   var book by mutableStateOf<BranchBook.Book?>(null)
     private set
   var members by mutableStateOf<List<BranchBook.Member>>(emptyList())
@@ -107,6 +112,9 @@ class BranchesPageState(private val src: ShopBranchesSource) {
   var failed by mutableStateOf(false)
     private set
   var busy by mutableStateOf(false)
+    private set
+  /** کلیدهای شعبه‌ایِ دکان (فقط صاحب و فقط با [rules]؛ null ⇒ هنوز نه) */
+  var settings by mutableStateOf<BranchStock.Settings?>(null)
     private set
   /** پیامِ آخرین نوشتن (ذخیره شد / ذخیره نشد: …) */
   var message by mutableStateOf<String?>(null)
@@ -127,11 +135,27 @@ class BranchesPageState(private val src: ShopBranchesSource) {
         is ApiResult.Success -> members = m.value.members
         is ApiResult.Failure -> failed = true
       }
+      rules?.let { r -> (r.settings() as? ApiResult.Success)?.let { settings = it.value } }
     } else {
       members = emptyList()
+      settings = null
     }
     busy = false
   }
+
+  /** کلیدِ «شاگردان موجودیِ شعبه‌های دیگر را ببینند» */
+  suspend fun setStaffOtherStock(on: Boolean): Boolean = rules?.let { r -> write { r.saveSettings(BranchStock.settingsBody(staffOtherStock = on)) } } == true
+
+  /** کلیدِ «ارسالِ بیش از موجودی» */
+  suspend fun setTransferNegative(on: Boolean): Boolean = rules?.let { r -> write { r.saveSettings(BranchStock.settingsBody(transferNegative = on)) } } == true
+
+  /** مجوزِ «موجودیِ شعبه‌های دیگر» ِ یک عضو (صاحب و مدیر همیشه دارند — دکمه‌اش فقط برای بقیه) */
+  suspend fun grantOtherStock(memberId: String, on: Boolean): Boolean = rules?.let { r -> write { r.grant(memberId, on) } } == true
+
+  /** آیا دکمهٔ مجوزِ عضو لازم است؟ صاحب و مدیر همیشه می‌بینند */
+  fun needsGrant(m: BranchBook.Member): Boolean = m.role !in BranchStock.ALWAYS_ROLES
+
+  fun granted(m: BranchBook.Member): Boolean = BranchStock.PERM in m.perms
 
   private suspend fun write(block: suspend () -> ApiResult<*>): Boolean {
     if (busy) return false

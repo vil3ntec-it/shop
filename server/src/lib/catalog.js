@@ -188,6 +188,8 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
       }
     }
 
+    //  INV-11: آینهٔ انتقالِ میانِ شعبه در دفترِ دستگاه سهمی ندارد (حرکت‌های `bxfer:` ِ سرور نشسته‌اند؛ `lib/branch-transfer-mirror.js`)
+    const mirrored = await require('./branch-transfer-mirror').mirroredIn(c, shopId, entries, decode);
     //  سهمِ مطلوبِ هر سند: { key ⇒ { want: Map<pid, milli>, kind, refType, refId, at, cancel } }
     const contrib = new Map();
     for (const r of entries) {
@@ -195,7 +197,7 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
       const want = new Map();
       const pid = str(d.productId);
       const q = rd.qty(d, 'units');
-      if (pid && q !== 0 && !cancelled(r, d)) want.set(pid, q);
+      if (pid && q !== 0 && !cancelled(r, d) && !mirrored.has(r.row_id)) want.set(pid, q);
       contrib.set(`we:${r.row_id}`, { want, kind: 'we', refType: 'warehouseEntries', refId: r.row_id, at: atOf(d, at), ...(await repackRef(d)) });
     }
     for (const r of items.values()) {
