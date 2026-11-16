@@ -26,6 +26,8 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
@@ -230,7 +232,16 @@ class NavRowUiTest {
       assertTrue("$p: عنوانِ درشت در بدنه «${big.joinToString { it.text() }}»", big.isEmpty())
       //  هر ردیفِ صفحهٔ اول و صفحهٔ دسته همان ردیفِ «بیشتر» است (`NAV`) و کاشی دارد (صفحهٔ بخش شاید ردیفی نداشته باشد)
       if (p == "settings" || p.count { it == '/' } == 1) {
-        val r = rows()
+        //  فهرستِ تنبل فقط ردیف‌های در قاب را می‌سازد؛ بالای «درباره» کارتِ به‌روزرسانی است که بلندی‌اش به پاسخِ شبکه بسته است
+        //  (CI ِ #1061: کارتِ بلند ردیف‌ها را بیرون از قابِ ۷۶۰ برد) ⇒ تا ردیفی پیدا شود پایین کشیده می‌شود؛ سنجه همان
+        var r = rows()
+        var swipes = 0
+        while (r.isEmpty() && swipes < 6) {
+          rule.onRoot().performTouchInput { swipeUp() }
+          rule.waitForIdle()
+          r = rows()
+          swipes++
+        }
         assertTrue("$p: ردیفِ `NAV` ندارد", r.isNotEmpty())
         r.forEach { assertEquals("$p: «${it.texts().firstOrNull()?.text()}»", 1, it.tiles().size) }
       }
