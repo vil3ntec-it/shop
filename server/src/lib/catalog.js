@@ -113,6 +113,29 @@ function atOf(d, at) {
   return Number.isSafeInteger(t) && t > 0 ? t : at;
 }
 
+/** نشانِ ردیفِ آینهٔ انتقالِ میانِ شعبه در `warehouseEntries` ِ دستگاه (`data/BranchTransferBookAndroid.kt`) */
+const BXFER_KIND = 'branch_transfer';
+const BXFER_RE = /^bxf_[0-9a-f]{24}$/;
+
+/**
+ * ردیف‌های ورودِ انبارِ این صفحه که آینهٔ یک انتقالِ میانِ شعبهٔ **واقعی** با همین شعبه به‌عنوانِ یک سرند ⇒ Set<row_id>.
+ * نشانِ بی انتقال (یا انتقالِ دکان/شعبهٔ دیگر) سهمِ عادی دارد — نشان دادن به‌تنهایی چیزی را از دفترِ سرور پنهان نمی‌کند.
+ */
+async function branchTransferMirrors(c, sk, entries) {
+  const want = new Map();
+  for (const r of entries) {
+    const d = decode(r.data) || {};
+    if (d.isAdjustment === true && d.adjKind === BXFER_KIND && typeof d.refId === 'string' && BXFER_RE.test(d.refId)) want.set(r.row_id, d.refId);
+  }
+  if (!want.size) return new Set();
+  const here = cb.branchOf(sk);
+  const real = new Set((await c.query(
+    `SELECT id FROM branch_transfers WHERE shop_id=$1 AND id = ANY($2::text[]) AND (from_branch=$3 OR to_branch=$3)`,
+    [cb.shopOf(sk), [...new Set(want.values())], here]
+  )).rows.map((r) => r.id));
+  return new Set([...want].filter(([, id]) => real.has(id)).map(([rowId]) => rowId));
+}
+
 /**
  * دفترِ همگام‌سازیِ دستگاه ⇒ کاتالوگ + حرکت‌های recorded (فقط تفاوت).
  * درونِ تراکنشِ فراخواننده؛ قفلِ موجودیِ دکان را می‌گیرد.
@@ -188,6 +211,9 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
       }
     }
 
+    //  INV-11 (فازِ ۴ ِ شعبه‌ها، `docs/BRANCHES-fa.md` §۱۰): ردیفِ «انتقالِ میانِ شعبه» ِ دفترِ دستگاه فقط آینهٔ گامِ سرور است
+    //  (حرکت‌های `bxfer:` همان دم در بخشِ هر سو نشستند) ⇒ این‌جا سهمی ندارد، وگرنه دو بار شمرده می‌شد
+    const mirrored = await branchTransferMirrors(c, shopId, entries);
     //  سهمِ مطلوبِ هر سند: { key ⇒ { want: Map<pid, milli>, kind, refType, refId, at, cancel } }
     const contrib = new Map();
     for (const r of entries) {
@@ -195,7 +221,7 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
       const want = new Map();
       const pid = str(d.productId);
       const q = rd.qty(d, 'units');
-      if (pid && q !== 0 && !cancelled(r, d)) want.set(pid, q);
+      if (pid && q !== 0 && !cancelled(r, d) && !mirrored.has(r.row_id)) want.set(pid, q);
       contrib.set(`we:${r.row_id}`, { want, kind: 'we', refType: 'warehouseEntries', refId: r.row_id, at: atOf(d, at), ...(await repackRef(d)) });
     }
     for (const r of items.values()) {
