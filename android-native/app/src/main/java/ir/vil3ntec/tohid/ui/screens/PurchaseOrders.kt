@@ -3,6 +3,33 @@ package ir.vil3ntec.tohid.ui.screens
 import androidx.compose.material.icons.automirrored.outlined.ListAlt
 import androidx.compose.material.icons.outlined.Close
 import ir.vil3ntec.tohid.ui.desk.deskCard
+import ir.vil3ntec.tohid.ui.desk.Desk
+import ir.vil3ntec.tohid.ui.desk.DeskButton
+import ir.vil3ntec.tohid.ui.desk.DeskButtonKind
+import ir.vil3ntec.tohid.ui.desk.DeskCell
+import ir.vil3ntec.tohid.ui.desk.DeskColumn
+import ir.vil3ntec.tohid.ui.desk.DeskDialog
+import ir.vil3ntec.tohid.ui.desk.DeskDialogAction
+import ir.vil3ntec.tohid.ui.desk.DeskDialogSize
+import ir.vil3ntec.tohid.ui.desk.DeskDialogText
+import ir.vil3ntec.tohid.ui.desk.DeskDivider
+import ir.vil3ntec.tohid.ui.desk.DeskDropdown
+import ir.vil3ntec.tohid.ui.desk.DeskIconButton
+import ir.vil3ntec.tohid.ui.desk.DeskNote
+import ir.vil3ntec.tohid.ui.desk.DeskOption
+import ir.vil3ntec.tohid.ui.desk.DeskReasonDialog
+import ir.vil3ntec.tohid.ui.desk.DeskSearchField
+import ir.vil3ntec.tohid.ui.desk.DeskSectionTitle
+import ir.vil3ntec.tohid.ui.desk.DeskSize
+import ir.vil3ntec.tohid.ui.desk.DeskSpace
+import ir.vil3ntec.tohid.ui.desk.DeskSubhead
+import ir.vil3ntec.tohid.ui.desk.DeskTableHead
+import ir.vil3ntec.tohid.ui.desk.DeskTableRow
+import ir.vil3ntec.tohid.ui.desk.DeskTextField
+import ir.vil3ntec.tohid.ui.desk.DeskToggleRow
+import ir.vil3ntec.tohid.ui.desk.DeskToolbar
+import ir.vil3ntec.tohid.ui.desk.DeskType
+import ir.vil3ntec.tohid.ui.desk.deskClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -277,96 +304,83 @@ private fun PoDetail(
     }
   }
 
-  Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+  //  کامپیوتر (`claude/e-desk-d3c`): سرخط با وضعیت به واژه (بی قرص)، جدولِ `ui/desk`، کارها با `DeskButton` و لغو با `DeskReasonDialog`؛
+  //  مجوزِ هر کار همان `PoForms.actions` و هر درخواست همان پیشین
+  val dc = Desk.colors
+  Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(DeskSpace.x2)) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Text("#${o.no} · ${o.supplierName}", style = MaterialTheme.typography.titleSmall, color = c.text, modifier = Modifier.weight(1f))
-      StatusPill(PurchaseOrderBook.label(st), poTone(st))
+      DeskSectionTitle("#${o.no} · ${o.supplierName}", Modifier.weight(1f))
+      Text(PurchaseOrderBook.label(st), style = DeskType.bodyStrong, color = dc.inkSecondary, maxLines = 1)
     }
     val meta = listOfNotNull(
       o.expectedDate?.let { StrPurchasePages.arrivesOn(ir.vil3ntec.tohid.formatDate(it)) },
       o.note.takeIf { it.isNotBlank() },
       o.cancelReason?.takeIf { st == PurchaseOrderCore.Status.CANCELLED }?.let { StrPurchasePages.cancelReasonIs(it) },
     )
-    if (meta.isNotEmpty()) Text(meta.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = c.muted)
-    Spacer(Modifier.height(10.dp))
+    if (meta.isNotEmpty()) DeskNote(meta.joinToString(" · "), maxLines = 3)
 
     //  ردیف‌ها: سفارش، پذیرفته، خراب، باقی‌مانده (PUR-04)
-    Row(Modifier.fillMaxWidth()) {
-      listOf(StrMoney.item to 3f, StrOnline.dlColOrder to 1f, StrPurchasePages.accepted to 1f, StrPurchasePages.damaged to 1f, StrInvoices.colBalance to 1f, StrReturnPages.unitPriceAfn to 1f).forEach { (h, w) ->
-        Text(h, style = MaterialTheme.typography.labelSmall, color = c.muted, modifier = Modifier.weight(w))
-      }
-    }
-    HorizontalDivider(color = c.border)
+    val cols = listOf(
+      DeskColumn(StrMoney.item, 3f), DeskColumn(StrOnline.dlColOrder, 1f, end = true), DeskColumn(StrPurchasePages.accepted, 1f, end = true),
+      DeskColumn(StrPurchasePages.damaged, 1f, end = true), DeskColumn(StrInvoices.colBalance, 1f, end = true), DeskColumn(StrReturnPages.unitPriceAfn, 1f, end = true),
+    )
+    DeskTableHead(cols)
     val prog = o.progress.associateBy { it.lineId }
     o.lines.forEach { l ->
       val p = prog[l.id]
-      Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(l.name.ifBlank { names[l.productId] ?: l.productId }, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(3f))
-        Text("${qty(PurchaseOrderBook.units(l.qtyMilli))} ${l.unit}", color = c.text, modifier = Modifier.weight(1f))
-        Text(qty(PurchaseOrderBook.units(p?.acceptedMilli ?: 0L)), color = c.success, modifier = Modifier.weight(1f))
-        Text(qty(PurchaseOrderBook.units(p?.damagedMilli ?: 0L)), color = if ((p?.damagedMilli ?: 0L) > 0) c.danger else c.muted, modifier = Modifier.weight(1f))
-        Text(qty(PurchaseOrderBook.units(p?.remainingMilli ?: 0L)), color = if ((p?.remainingMilli ?: 0L) > 0) c.warning else c.muted, modifier = Modifier.weight(1f))
-        Text(money(PurchaseOrderBook.asAfn(l.priceMinor)), color = c.muted, modifier = Modifier.weight(1f))
+      val name = l.name.ifBlank { names[l.productId] ?: l.productId }
+      DeskTableRow(cols, name, onClick = null) { i ->
+        when (i) {
+          0 -> DeskCell(name)
+          1 -> DeskCell("${qty(PurchaseOrderBook.units(l.qtyMilli))} ${l.unit}")
+          2 -> DeskCell(qty(PurchaseOrderBook.units(p?.acceptedMilli ?: 0L)), color = dc.positive)
+          3 -> DeskCell(qty(PurchaseOrderBook.units(p?.damagedMilli ?: 0L)), color = if ((p?.damagedMilli ?: 0L) > 0) dc.negative else dc.inkSecondary)
+          4 -> DeskCell(qty(PurchaseOrderBook.units(p?.remainingMilli ?: 0L)), color = if ((p?.remainingMilli ?: 0L) > 0) dc.warning else dc.inkSecondary)
+          else -> DeskCell(money(PurchaseOrderBook.asAfn(l.priceMinor)), muted = true)
+        }
       }
     }
-    HorizontalDivider(color = c.border)
-    Spacer(Modifier.height(6.dp))
     Text(
       StrPurchasePages.poTotals(money(PurchaseOrderBook.asAfn(o.totals.orderedMinor)), money(PurchaseOrderBook.asAfn(o.totals.acceptedMinor)), money(PurchaseOrderBook.asAfn(o.totals.remainingMinor))),
-      style = MaterialTheme.typography.bodySmall, color = c.text,
+      style = DeskType.bodyStrong, color = dc.ink,
     )
 
     //  کارها — مجوزِ هر کار از همان `PoForms.actions` ِ گوشیِ نسخهٔ ۳ (نقش × وضعیت)
     val can = PoForms.actions(o, perms)
-    Spacer(Modifier.height(12.dp))
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      if (can.receive) {
-        Button(onClick = { onReceive(o) }, enabled = !busy) { Text(StrPurchasePages.receiveGoods) }
-      }
-      if (can.send) {
-        Button(onClick = { act({ repo.send(o.id) }, StrPurchasePages.poSent) }, enabled = !busy) { Text(StrPurchasePages.sendToSupplier) }
-      }
-      if (can.edit) {
-        OutlinedButton(onClick = { onEdit(o) }, enabled = !busy) { Text(StrMoney.edit) }
-      }
-      if (can.cancel) {
-        OutlinedButton(onClick = { cancelAsk = true }, enabled = !busy) { Text(StrPay.cancel, color = c.danger) }
-      }
+    DeskToolbar(Modifier.padding(top = DeskSpace.x2)) {
+      if (can.receive) DeskButton(StrPurchasePages.receiveGoods, { onReceive(o) }, kind = DeskButtonKind.PRIMARY, enabled = !busy)
+      if (can.send) DeskButton(StrPurchasePages.sendToSupplier, { act({ repo.send(o.id) }, StrPurchasePages.poSent) }, kind = DeskButtonKind.PRIMARY, enabled = !busy)
+      if (can.edit) DeskButton(StrMoney.edit, { onEdit(o) }, enabled = !busy)
+      if (can.cancel) DeskButton(StrPay.cancel, { cancelAsk = true }, enabled = !busy)
       //  PUR-14: فاکتورِ کاغذیِ خودِ تأمین‌کننده، جدا از رسید (پس از فرستادن؛ فقط مدیر)
-      if (can.bill) {
-        OutlinedButton(onClick = { onBill(o) }, enabled = !busy) { Text(StrPurchasePages.supplierBill) }
-      }
+      if (can.bill) DeskButton(StrPurchasePages.supplierBill, { onBill(o) }, enabled = !busy)
     }
 
-    //  PUR-14: فاکتورهای ثبت‌شدهٔ تأمین‌کننده — همان فهرستِ گوشیِ نسخهٔ ۳ (`PurchaseBills.kt`)
+    //  PUR-14: فاکتورهای ثبت‌شدهٔ تأمین‌کننده — همان فهرست (`PurchaseBills.kt`، شاخهٔ کامپیوتر)
     PoBillsList(o, perms.manage, busy) { voidAsk = it }
 
     //  رسیدها و ثبت در دفترِ همین دستگاه
     if (o.receipts.isNotEmpty()) {
-      Spacer(Modifier.height(14.dp))
-      Text(Str.receipts, style = MaterialTheme.typography.labelLarge, color = c.muted, fontWeight = FontWeight.SemiBold)
+      DeskSubhead(Str.receipts, Modifier.padding(top = DeskSpace.x3))
       o.receipts.forEach { r ->
         val posted = PurchaseOrderBook.isPosted(d, r)
-        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DeskSpace.x2)) {
           Column(Modifier.weight(1f)) {
-            Text(
-              "${ir.vil3ntec.tohid.formatMillis(r.createdAt)} · ${money(PurchaseOrderBook.asAfn(r.totalMinor))} ؋",
-              color = c.text, style = MaterialTheme.typography.bodySmall,
-            )
+            Text("${ir.vil3ntec.tohid.formatMillis(r.createdAt)} · ${money(PurchaseOrderBook.asAfn(r.totalMinor))} ؋", style = DeskType.body, color = dc.ink)
             val dmg = r.posted.filter { it.damagedMilli > 0 }
             if (dmg.isNotEmpty()) Text(
               StrPurchasePages.damagedReturned + dmg.joinToString("، ") { p ->
                 "${o.lines.find { it.id == p.lineId }?.name.orEmpty()} ${qty(PurchaseOrderBook.units(p.damagedMilli))}"
               },
-              style = MaterialTheme.typography.labelSmall, color = c.danger,
+              style = DeskType.secondary, color = dc.negative,
             )
           }
           if (r.posted.any { it.acceptedMilli > 0 }) {
-            TextButton(onClick = { printLabels(r, a4 = false) }) { Text(StrPurchasePages.labelBtn) }
-            TextButton(onClick = { printLabels(r, a4 = true) }) { Text("A4") }
+            DeskButton(StrPurchasePages.labelBtn, { printLabels(r, a4 = false) }, kind = DeskButtonKind.GHOST)
+            DeskButton("A4", { printLabels(r, a4 = true) }, kind = DeskButtonKind.GHOST)
           }
-          if (posted) Text(StrPurchasePages.inLedger, style = MaterialTheme.typography.labelSmall, color = c.success)
-          else TextButton(onClick = { postReceipt(r) }) { Text(StrPurchasePages.postToLedger) }
+          if (posted) Text(StrPurchasePages.inLedger, style = DeskType.secondary, color = dc.positive)
+          else DeskButton(StrPurchasePages.postToLedger, { postReceipt(r) })
         }
       }
       //  PUR-14: سفارش ⇔ رسید ⇔ فاکتورِ تأمین‌کننده (یا فاکتورِ دفتر وقتی تأمین‌کننده فاکتوری نداده)
@@ -389,26 +403,15 @@ private fun PoDetail(
   if (cancelAsk) {
     var why by remember { mutableStateOf("") }
     val needWhy = PoForms.cancelNeedsReason(o)
-    AlertDialog(
-      onDismissRequest = { cancelAsk = false },
-      containerColor = c.surfaceSolid,
-      title = { Text(StrPurchasePages.cancelPoAsk(o.no), color = c.text) },
-      text = {
-        Column {
-          Text(
-            if (needWhy) StrPurchasePages.cancelOpenNote else StrPurchasePages.cancelDraftNote,
-            style = MaterialTheme.typography.bodySmall, color = c.muted,
-          )
-          OutlinedTextField(value = why, onValueChange = { why = it.take(300) }, label = { Text(if (needWhy) StrLoyalty.adjustReason else StrSafe.reason) }, singleLine = true)
-        }
+    DeskReasonDialog(
+      StrPurchasePages.cancelPoAsk(o.no), if (needWhy) StrPurchasePages.cancelOpenNote else StrPurchasePages.cancelDraftNote,
+      if (needWhy) StrLoyalty.adjustReason else StrSafe.reason, why, { why = it.take(300) },
+      StrPurchasePages.cancelIt, enabled = !needWhy || why.isNotBlank(),
+      onConfirm = {
+        cancelAsk = false
+        act({ repo.cancel(o.id, why.trim()) }, StrPurchasePages.poCancelled)
       },
-      confirmButton = {
-        TextButton(enabled = !needWhy || why.isNotBlank(), onClick = {
-          cancelAsk = false
-          act({ repo.cancel(o.id, why.trim()) }, StrPurchasePages.poCancelled)
-        }) { Text(StrPurchasePages.cancelIt, color = c.danger) }
-      },
-      dismissButton = { TextButton(onClick = { cancelAsk = false }) { Text(Str.cancel) } },
+      onDismiss = { cancelAsk = false },
     )
   }
 }
@@ -479,6 +482,13 @@ private fun PoEditor(
     }
   }
 
+  //  کامپیوتر (`claude/e-desk-d3c`): تأمین‌کننده کشویی، پیشنهادها `DeskButton`، جدولِ ردیف‌ها با `DeskNumberField` (همان نگهبانِ اسکن)،
+  //  جست‌وجوی کالا و دکمهٔ اصلی — ردیف‌ها، سنجش، کلیدِ یکتا و فرستادن همان پیشین (`PoForms`، `repo.create/update`)
+  val dc = Desk.colors
+  val cols = listOf(
+    DeskColumn("#", width = 32.dp), DeskColumn(StrMoney.item, 1f), DeskColumn(ir.vil3ntec.tohid.core.i18n.StrDeskWork.colQty, width = 130.dp, end = true),
+    DeskColumn(StrReturnPages.unitPriceAfn, width = 130.dp, end = true), DeskColumn(StrInvoices.total, width = 120.dp, end = true), DeskColumn("", width = 150.dp),
+  )
   Column(
     Modifier
       .fillMaxWidth()
@@ -490,60 +500,72 @@ private fun PoEditor(
         } else false
       }
       .verticalScroll(rememberScrollState()),
+    verticalArrangement = Arrangement.spacedBy(DeskSpace.x3),
   ) {
-    Text(if (base == null) StrPurchasePages.newPoTitle else StrPurchasePages.editPo(base.no), style = MaterialTheme.typography.titleSmall, color = c.text)
-    Spacer(Modifier.height(8.dp))
-    if (d.suppliers.isEmpty()) EmptyNote(StrPurchasePages.makeSupplierFirst)
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-      d.suppliers.sortedBy { it.name }.forEach { s ->
-        FilterChip(selected = supplierId == s.id, onClick = { supplierId = s.id }, label = { Text(s.name) }, shape = Shape.chip)
-      }
+    DeskSectionTitle(if (base == null) StrPurchasePages.newPoTitle else StrPurchasePages.editPo(base.no))
+    if (d.suppliers.isEmpty()) DeskNote(StrPurchasePages.makeSupplierFirst, maxLines = 2)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DeskSpace.x3)) {
+      DeskDropdown(
+        supplierId, d.suppliers.sortedBy { it.name }.map { DeskOption(it.id, it.name) }, { supplierId = it },
+        label = StrMoney.supplierLabel, shown = if (d.suppliers.none { it.id == supplierId }) StrMoney.pickSupplier else null,
+      )
+      DeskNote(
+        lead.days?.let { if (lead.manual) StrPurchasePages.leadManual(it) else StrPurchasePages.leadMeasured(it, lead.samples) }
+          ?: StrPurchasePages.leadUnknown(ReorderCore.DEFAULT_LEAD_DAYS),
+        Modifier.weight(1f), maxLines = 2,
+      )
     }
-    Spacer(Modifier.height(8.dp))
-    Text(
-      lead.days?.let { if (lead.manual) StrPurchasePages.leadManual(it) else StrPurchasePages.leadMeasured(it, lead.samples) }
-        ?: StrPurchasePages.leadUnknown(ReorderCore.DEFAULT_LEAD_DAYS),
-      style = MaterialTheme.typography.labelSmall, color = c.muted,
-    )
-    Spacer(Modifier.height(6.dp))
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      OutlinedButton(onClick = { addPlanned() }, enabled = supplierId.isNotBlank()) { Text(StrPurchasePages.suggestBySales) }
-      OutlinedButton(onClick = { addPicks(onlyLow = true) }, enabled = supplierId.isNotBlank()) { Text(StrPurchasePages.lowFromSupplier) }
-      OutlinedButton(onClick = { addPicks(onlyLow = false) }, enabled = supplierId.isNotBlank()) { Text(StrPurchasePages.allFromSupplier) }
+    DeskToolbar {
+      DeskButton(StrPurchasePages.suggestBySales, { addPlanned() }, enabled = supplierId.isNotBlank())
+      DeskButton(StrPurchasePages.lowFromSupplier, { addPicks(onlyLow = true) }, enabled = supplierId.isNotBlank())
+      DeskButton(StrPurchasePages.allFromSupplier, { addPicks(onlyLow = false) }, enabled = supplierId.isNotBlank())
     }
-    Spacer(Modifier.height(8.dp))
-    rows.forEachIndexed { i, r ->
-      Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("${i + 1}. ${r.name}", color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-        NumberField(r.qty, { v -> lastKey = r.key; rows = rows.map { if (it.key == r.key) it.copy(qty = v) else it } }, StrPurchasePages.qtyIn(PoForms.unitOf(r)), Modifier.width(120.dp))
-        NumberField(r.price, { v -> lastKey = r.key; rows = rows.map { if (it.key == r.key) it.copy(price = v) else it } }, r.unitName?.let(ir.vil3ntec.tohid.core.i18n.StrPurchaseUnits::priceIn) ?: StrReturnPages.unitPriceAfn, Modifier.width(120.dp))
-        TextButton(onClick = { historyFor = r.productId }) { Text(StrHome.history) }
-        TextButton(onClick = { rows = rows.filterNot { it.key == r.key } }) { Text(StrMoney.delete) }
-      }
-      //  PRD-07: واحدِ خریدِ ردیف؛ فی به نسبتِ ضریب جابه‌جا می‌شود (`PoForms.pickUnit`، فیِ هر واحدِ پایه همان می‌ماند)
-      val product = if (unitsOn) d.products.find { it.id == r.productId } else null
-      if (product != null && !product.purchaseUnits.isNullOrEmpty()) {
-        PurchaseUnitPicker(product, r.unitName, r.qty, PoForms.lineTotal(r)) { u ->
-          rows = rows.map { if (it.key == r.key) PoForms.pickUnit(d, it, u) else it }
+    if (rows.isNotEmpty()) Column {
+      DeskTableHead(cols)
+      rows.forEachIndexed { i, r ->
+        Row(
+          Modifier.fillMaxWidth().heightIn(min = DeskSize.tableRow).padding(horizontal = DeskSpace.x3, vertical = DeskSpace.x1),
+          verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DeskSpace.x3),
+        ) {
+          Box(Modifier.width(32.dp)) { DeskCell("${i + 1}", muted = true) }
+          Box(Modifier.weight(1f)) { DeskCell(r.name) }
+          DeskNumberField(r.qty, { v -> lastKey = r.key; rows = rows.map { if (it.key == r.key) it.copy(qty = v) else it } }, StrPurchasePages.qtyIn(PoForms.unitOf(r)), Modifier.width(130.dp), showLabel = false)
+          DeskNumberField(
+            r.price, { v -> lastKey = r.key; rows = rows.map { if (it.key == r.key) it.copy(price = v) else it } },
+            r.unitName?.let(ir.vil3ntec.tohid.core.i18n.StrPurchaseUnits::priceIn) ?: StrReturnPages.unitPriceAfn, Modifier.width(130.dp), showLabel = false,
+          )
+          Box(Modifier.width(120.dp), contentAlignment = Alignment.CenterEnd) { DeskCell(money(PoForms.lineTotal(r)), strong = true) }
+          Row(Modifier.width(150.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+            DeskButton(StrHome.history, { historyFor = r.productId }, kind = DeskButtonKind.GHOST)
+            DeskIconButton(androidx.compose.material.icons.Icons.Outlined.Close, StrMoney.delete, { rows = rows.filterNot { it.key == r.key } })
+          }
         }
+        //  PRD-07: واحدِ خریدِ ردیف؛ فی به نسبتِ ضریب جابه‌جا می‌شود (`PoForms.pickUnit`، فیِ هر واحدِ پایه همان می‌ماند)
+        val product = if (unitsOn) d.products.find { it.id == r.productId } else null
+        if (product != null && !product.purchaseUnits.isNullOrEmpty()) {
+          PurchaseUnitPicker(product, r.unitName, r.qty, PoForms.lineTotal(r)) { u ->
+            rows = rows.map { if (it.key == r.key) PoForms.pickUnit(d, it, u) else it }
+          }
+        }
+        //  PUR-09: آخرین فیِ همین تأمین‌کننده هنگامِ ورود (همان متنِ فرمِ فاکتورِ خریدِ دستی)
+        val last = remember(buys, r.productId, supplierId) { PurchaseOrderBook.lastPriceHint(buys, r.productId, supplierId) ?: PurchaseOrderBook.NO_BUY_YET }
+        DeskNote(last, Modifier.padding(start = DeskSpace.x3 * 2 + 32.dp, bottom = DeskSpace.x1))
+        DeskDivider(Modifier.padding(horizontal = DeskSpace.x3))
       }
-      //  PUR-09: آخرین فیِ همین تأمین‌کننده هنگامِ ورود (همان متنِ فرمِ فاکتورِ خریدِ دستی)
-      val last = remember(buys, r.productId, supplierId) { PurchaseOrderBook.lastPriceHint(buys, r.productId, supplierId) ?: PurchaseOrderBook.NO_BUY_YET }
-      Text(last, style = MaterialTheme.typography.labelSmall, color = c.muted, modifier = Modifier.padding(bottom = 4.dp))
     }
     PoProductPicker(d, StrSale.addReturnItem) { addProduct(it) }
-    Spacer(Modifier.height(8.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      OutlinedTextField(value = expected, onValueChange = { expected = it.take(10) }, label = { Text(StrPurchasePages.arrivalOptional) }, singleLine = true, modifier = Modifier.weight(1f))
-      OutlinedTextField(value = note, onValueChange = { note = it.take(500) }, label = { Text(StrDeliver.noteField) }, singleLine = true, modifier = Modifier.weight(2f))
+    Row(horizontalArrangement = Arrangement.spacedBy(DeskSpace.x3)) {
+      DeskFormLabeled(StrPurchasePages.arrivalOptional, Modifier.weight(1f)) {
+        DeskTextField(expected, { expected = it.take(10) }, Modifier.fillMaxWidth(), description = StrPurchasePages.arrivalOptional)
+      }
+      DeskFormLabeled(StrDeliver.noteField, Modifier.weight(2f)) {
+        DeskTextField(note, { note = it.take(500) }, Modifier.fillMaxWidth(), description = StrDeliver.noteField)
+      }
     }
-    val total = PoForms.total(rows)
-    Spacer(Modifier.height(6.dp))
-    Text(StrPurchasePages.poTotal(money(total), rows.size), style = MaterialTheme.typography.bodySmall, color = c.text)
-    error?.let { Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall) }
-    Spacer(Modifier.height(10.dp))
-    Button(onClick = { save() }, enabled = !busy && rows.isNotEmpty(), modifier = Modifier.fillMaxWidth()) {
-      Text(if (base == null) StrPurchasePages.saveDraft else StrKit.save)
+    error?.let { Text(it, style = DeskType.secondary, color = dc.negative) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Text(StrPurchasePages.poTotal(money(PoForms.total(rows)), rows.size), Modifier.weight(1f), style = DeskType.bodyStrong, color = dc.ink)
+      DeskButton(if (base == null) StrPurchasePages.saveDraft else StrKit.save, { save() }, kind = DeskButtonKind.PRIMARY, enabled = !busy && rows.isNotEmpty())
     }
   }
 
@@ -555,52 +577,48 @@ private fun changeText(p: SupplierPricing.Point): String = PurchaseOrderBook.cha
 /** تاریخچهٔ قیمتِ خریدِ یک کالا از همهٔ تأمین‌کنندگان، تازه‌ترین بالا (PUR-09) — فرمِ سفارشِ خرید و فاکتورِ خریدِ دستی */
 @Composable
 internal fun PriceHistoryDialog(d: ShopData, buys: List<SupplierPricing.Buy>, productId: String, supplierId: String, onDismiss: () -> Unit) {
-  val c = Shop.colors
   val names = remember(d) { d.suppliers.associate { it.id to it.name } }
   val rows = remember(buys, productId) { SupplierPricing.history(buys, productId).take(30) }
   val cheapest = remember(buys, productId) { SupplierPricing.bySupplier(buys, productId).firstOrNull() }
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    containerColor = c.surfaceSolid,
-    title = { Text(StrPurchasePages.priceHistoryOf(d.products.find { it.id == productId }?.name.orEmpty()), color = c.text) },
-    text = {
-      Column(Modifier.verticalScroll(rememberScrollState())) {
-        if (rows.isEmpty()) EmptyNote(StrPurchasePages.noPurchaseYet)
-        cheapest?.let {
-          Text(StrPurchasePages.cheapestLast(names[it.supplierId].orEmpty(), money(PurchaseOrderBook.asAfn(it.priceMinor))),
-            style = MaterialTheme.typography.labelSmall, color = c.success)
-        }
-        rows.forEach { p ->
-          Text(
-            "${ir.vil3ntec.tohid.formatDate(p.date)} · ${names[p.supplierId] ?: "—"} · ${qty(PurchaseOrderBook.units(p.qtyMilli))} × ${money(PurchaseOrderBook.asAfn(p.priceMinor))} ؋" + changeText(p),
-            style = MaterialTheme.typography.bodySmall,
-            color = if (p.supplierId == supplierId) c.text else c.muted,
-            fontWeight = if (p.supplierId == supplierId) FontWeight.SemiBold else FontWeight.Normal,
-            modifier = Modifier.padding(vertical = 3.dp),
-          )
-        }
-      }
-    },
-    confirmButton = { TextButton(onClick = onDismiss) { Text(Str.close) } },
-  )
+  //  کامپیوتر (`claude/e-desk-d3c`): پنجرهٔ `ui/desk` — همان ۳۰ خرید، تازه‌ترین بالا، و ارزان‌ترین آخرین خرید
+  val dc = Desk.colors
+  DeskDialog(
+    title = StrPurchasePages.priceHistoryOf(d.products.find { it.id == productId }?.name.orEmpty()),
+    onDismiss = onDismiss,
+    width = DeskDialogSize.form,
+    confirm = DeskDialogAction(Str.close, onClick = onDismiss),
+  ) {
+    if (rows.isEmpty()) DeskDialogText(StrPurchasePages.noPurchaseYet)
+    cheapest?.let {
+      DeskDialogText(StrPurchasePages.cheapestLast(names[it.supplierId].orEmpty(), money(PurchaseOrderBook.asAfn(it.priceMinor))), color = dc.positive)
+    }
+    rows.forEach { p ->
+      Text(
+        "${ir.vil3ntec.tohid.formatDate(p.date)} · ${names[p.supplierId] ?: "—"} · ${qty(PurchaseOrderBook.units(p.qtyMilli))} × ${money(PurchaseOrderBook.asAfn(p.priceMinor))} ؋" + changeText(p),
+        style = if (p.supplierId == supplierId) DeskType.bodyStrong else DeskType.body,
+        color = if (p.supplierId == supplierId) dc.ink else dc.inkSecondary,
+      )
+    }
+  }
 }
 
 @Composable
 private fun PoProductPicker(d: ShopData, hint: String, onPick: (Product) -> Unit) {
   var term by remember { mutableStateOf("") }
-  val c = Shop.colors
-  OutlinedTextField(value = term, onValueChange = { term = it }, placeholder = { Text(hint) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+  val dc = Desk.colors
+  //  کامپیوتر (`claude/e-desk-d3c`): جست‌وجوی `ui/desk` و ردیف‌های آرامِ زدنی — همان شش نتیجه
+  DeskSearchField(term, { term = it }, hint, Modifier.fillMaxWidth(), focus = null)
   val t = ir.vil3ntec.tohid.latinDigits(term).trim()
   if (t.isNotEmpty()) {
     val hits = d.products.filter { it.active && (TextNormalizer.matches(it.name, t) || t in it.barcodes) }.take(6)
-    if (hits.isEmpty()) Text(StrSale.noProductFound, style = MaterialTheme.typography.labelSmall, color = c.muted, modifier = Modifier.padding(6.dp))
+    if (hits.isEmpty()) DeskNote(StrSale.noProductFound, Modifier.padding(DeskSpace.x2))
     hits.forEach { p ->
       Row(
-        Modifier.fillMaxWidth().clip(Shape.button).clickable { onPick(p); term = "" }.padding(horizontal = 8.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().deskClickable(label = p.name) { onPick(p); term = "" }.padding(horizontal = DeskSpace.x3, vertical = DeskSpace.x2),
         verticalAlignment = Alignment.CenterVertically,
       ) {
-        Text(p.name, color = c.text, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(StrPurchasePages.stockOf(qty(ShopStore.stock(d, p.id)), p.unit), style = MaterialTheme.typography.labelSmall, color = c.muted)
+        Text(p.name, Modifier.weight(1f), style = DeskType.body, color = dc.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        DeskNote(StrPurchasePages.stockOf(qty(ShopStore.stock(d, p.id)), p.unit))
       }
     }
   }
@@ -680,48 +698,45 @@ private fun PoReceive(
     }
   }
 
-  Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-    Text(StrPurchasePages.receiveTitle(order.no, order.supplierName), style = MaterialTheme.typography.titleSmall, color = c.text)
-    Text(StrPurchasePages.receiveNote, style = MaterialTheme.typography.labelSmall, color = c.muted)
-    Spacer(Modifier.height(8.dp))
-    OutlinedTextField(
-      value = scan,
-      onValueChange = { v -> if (v.contains('\n')) { scanned(v.trim()); scan = "" } else scan = v.take(64) },
-      singleLine = false, maxLines = 1,
-      label = { Text(StrGrid.barcode) },
-      keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { if (scan.isNotBlank()) scanned(scan.trim()); scan = "" }),
-      modifier = Modifier.fillMaxWidth(),
-    )
+  //  کامپیوتر (`claude/e-desk-d3c`): کادرها و دکمه‌های `ui/desk` (مقدارها با `DeskNumberField` ِ نگهبانِ اسکن) — اسکن، سنجش و ثبت همان
+  val dc = Desk.colors
+  Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(DeskSpace.x3)) {
+    Column {
+      DeskSectionTitle(StrPurchasePages.receiveTitle(order.no, order.supplierName))
+      DeskNote(StrPurchasePages.receiveNote, maxLines = 3)
+    }
+    DeskFormLabeled(StrGrid.barcode) {
+      DeskTextField(
+        scan, { v -> if (v.contains('\n')) { scanned(v.trim()); scan = "" } else scan = v.take(64) }, Modifier.fillMaxWidth(),
+        description = StrGrid.barcode,
+        onKey = { e ->
+          if (e.type == KeyEventType.KeyDown && (e.key == Key.Enter || e.key == Key.NumPadEnter)) { if (scan.isNotBlank()) scanned(scan.trim()); scan = ""; true } else false
+        },
+      )
+    }
     //  PUR-04: دریافتِ کامل با یک کلیک (همان `PoForms.fillRemaining` ِ گوشی)؛ فقط کادرها پر می‌شوند، ثبت همان دکمهٔ پایین
     DeskReceiveAll(order, rows, enabled = !busy) { filled -> rows = filled; error = null; toast(StrPurchaseOrders.filledAll) }
-    Spacer(Modifier.height(8.dp))
     order.lines.forEach { l ->
       val r = rows[l.id] ?: PoForms.RecvRow()
       val left = prog[l.id]?.remainingMilli ?: l.qtyMilli
-      Column(Modifier.padding(vertical = 4.dp)) {
-        Text(StrPurchasePages.remainingOf(l.name, qty(PurchaseOrderBook.units(left)), l.unit), color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          NumberField(r.received, { v -> rows = rows + (l.id to (rows[l.id] ?: PoForms.RecvRow()).copy(received = v)); error = null }, StrPurchasePages.received, Modifier.weight(1f))
-          NumberField(r.damaged, { v -> rows = rows + (l.id to (rows[l.id] ?: PoForms.RecvRow()).copy(damaged = v)); error = null }, StrPurchasePages.damaged, Modifier.weight(1f))
-          if (perms.manage) NumberField(r.price, { v -> rows = rows + (l.id to (rows[l.id] ?: PoForms.RecvRow()).copy(price = v)); error = null }, StrReturnPages.unitPriceAfn, Modifier.weight(1f))
+      Column(verticalArrangement = Arrangement.spacedBy(DeskSpace.x1)) {
+        Text(StrPurchasePages.remainingOf(l.name, qty(PurchaseOrderBook.units(left)), l.unit), style = DeskType.bodyStrong, color = dc.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(horizontalArrangement = Arrangement.spacedBy(DeskSpace.x3)) {
+          DeskNumberField(r.received, { v -> rows = rows + (l.id to (rows[l.id] ?: PoForms.RecvRow()).copy(received = v)); error = null }, StrPurchasePages.received, Modifier.weight(1f))
+          DeskNumberField(r.damaged, { v -> rows = rows + (l.id to (rows[l.id] ?: PoForms.RecvRow()).copy(damaged = v)); error = null }, StrPurchasePages.damaged, Modifier.weight(1f))
+          if (perms.manage) DeskNumberField(r.price, { v -> rows = rows + (l.id to (rows[l.id] ?: PoForms.RecvRow()).copy(price = v)); error = null }, StrReturnPages.unitPriceAfn, Modifier.weight(1f))
         }
         //  PRD-07: ردیفِ به واحدِ خرید ⇒ آنچه به موجودی می‌رود به واحدِ پایه (مقدار × ضریب)
-        PoForms.toStock(d, l, r)?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = c.muted) }
+        PoForms.toStock(d, l, r)?.let { DeskNote(it, maxLines = 2) }
       }
     }
-    if (perms.manage) Row(verticalAlignment = Alignment.CenterVertically) {
-      Checkbox(checked = allowOver, onCheckedChange = { allowOver = it })
-      Text(StrPurchasePages.acceptOver, style = MaterialTheme.typography.bodySmall, color = c.text)
+    if (perms.manage) DeskToggleRow(allowOver, StrPurchasePages.acceptOver, { allowOver = it })
+    if (perms.manage) DeskNumberField(freight, { v -> freight = v; error = null }, StrPurchasePages.freightField, Modifier.fillMaxWidth(), note = StrPurchasePages.freightNote)
+    DeskFormLabeled(StrDeliver.noteField) {
+      DeskTextField(note, { note = it.take(500) }, Modifier.fillMaxWidth(), description = StrDeliver.noteField)
     }
-    if (perms.manage) {
-      NumberField(freight, { v -> freight = v; error = null }, StrPurchasePages.freightField, Modifier.fillMaxWidth())
-      Text(StrPurchasePages.freightNote,
-        style = MaterialTheme.typography.labelSmall, color = c.muted)
-    }
-    OutlinedTextField(value = note, onValueChange = { note = it.take(500) }, label = { Text(StrDeliver.noteField) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-    error?.let { Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall) }
-    Spacer(Modifier.height(10.dp))
-    Button(onClick = { submit() }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) StrSale.posting else StrLayaway.payConfirm) }
+    error?.let { Text(it, style = DeskType.secondary, color = dc.negative) }
+    DeskButton(if (busy) StrSale.posting else StrLayaway.payConfirm, { submit() }, Modifier.fillMaxWidth(), kind = DeskButtonKind.PRIMARY, enabled = !busy)
   }
 }
 
@@ -732,8 +747,5 @@ private fun PoReceive(
 @Composable
 private fun DeskReceiveAll(o: PurchaseOrderDto, rows: Map<String, PoForms.RecvRow>, enabled: Boolean, onFilled: (Map<String, PoForms.RecvRow>) -> Unit) {
   if (!PoForms.hasRemaining(o)) return
-  Spacer(Modifier.height(8.dp))
-  OutlinedButton(onClick = { onFilled(PoForms.fillRemaining(o, rows)) }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
-    Text(StrPurchaseOrders.receiveAll)
-  }
+  DeskButton(StrPurchaseOrders.receiveAll, { onFilled(PoForms.fillRemaining(o, rows)) }, enabled = enabled)
 }

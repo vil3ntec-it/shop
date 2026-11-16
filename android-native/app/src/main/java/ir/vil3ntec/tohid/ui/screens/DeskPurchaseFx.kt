@@ -1,24 +1,20 @@
 package ir.vil3ntec.tohid.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.text.style.TextAlign
+import ir.vil3ntec.tohid.ui.desk.DeskDropdown
+import ir.vil3ntec.tohid.ui.desk.DeskOption
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseFx
 import ir.vil3ntec.tohid.core.i18n.StrSafeCur
@@ -89,38 +85,27 @@ internal class DeskFxInvoice {
   }
 }
 
-/** کادرهای ارز، نرخ و واحدِ نرخ کنارِ تاریخِ فاکتور — فقط وقتی دکان جز افغانی ارزی دارد */
+/**
+ *  کادرهای «ارز»، نرخ و «نرخ برای» در کارتِ «مشخصات» ِ فاکتورِ خرید (کنارِ تاریخ، همان `DeskFormLabeled` ِ `DeskPurchaseForm.kt`) —
+ *  فقط وقتی دکان جز افغانی ارزی دارد؛ افغانی ⇒ فقط کادرِ «ارز».
+ */
 @Composable
 internal fun DeskFxInvoiceControls(state: DeskFxInvoice, currencies: List<String>, name: (String) -> String, onPick: (String) -> Unit) {
-  var currencyMenu by remember { mutableStateOf(false) }
-  var perMenu by remember { mutableStateOf(false) }
   if (currencies.size <= 1) return
-  val shown = state.code ?: PurchaseFx.AFN
-  Spacer(Modifier.width(8.dp))
-  Box {
-    OutlinedButton(onClick = { currencyMenu = true }, modifier = Modifier.semantics { contentDescription = "${StrSafeCur.currency}: $shown" }) {
-      Text("${StrSafeCur.currency}: $shown", maxLines = 1)
-    }
-    DropdownMenu(expanded = currencyMenu, onDismissRequest = { currencyMenu = false }) {
-      currencies.forEach { c -> DropdownMenuItem(text = { Text(name(c)) }, onClick = { currencyMenu = false; onPick(c) }) }
-    }
+  DeskFormLabeled(StrSafeCur.currency) {
+    DeskDropdown(state.code ?: PurchaseFx.AFN, currencies.map { DeskOption(it, name(it)) }, onPick, Modifier.widthIn(min = 150.dp))
   }
   val code = state.code ?: return
   val rate = state.fx?.rate
-  Spacer(Modifier.width(8.dp))
-  OutlinedTextField(
-    state.rateText, { state.rateText = ir.vil3ntec.tohid.numericInput(it) }, singleLine = true,
-    label = { Text(StrPurchaseFx.rateLabel(FxTill.afnText(state.per * 100), code)) },
-    isError = rate == null,
-    supportingText = { Text(rate?.let { StrPurchaseFx.rateLine(PurchaseFx.rateLine(it)) } ?: StrPurchaseFx.rateBad) },
-    modifier = Modifier.width(240.dp),
-  )
-  Spacer(Modifier.width(4.dp))
-  Box {
-    OutlinedButton(onClick = { perMenu = true }) { Text("${StrPurchaseFx.per} ${SupplierFx.ltr("${FxTill.afnText(state.per * 100)} $code")}", maxLines = 1) }
-    DropdownMenu(expanded = perMenu, onDismissRequest = { perMenu = false }) {
-      Pay.FX_PER.forEach { p -> DropdownMenuItem(text = { Text(SupplierFx.ltr("${FxTill.afnText(p * 100)} $code")) }, onClick = { state.per = p; perMenu = false }) }
-    }
+  val label = StrPurchaseFx.rateLabel(FxTill.afnText(state.per * 100), code)
+  DeskFormLabeled(label, note = rate?.let { StrPurchaseFx.rateLine(PurchaseFx.rateLine(it)) } ?: StrPurchaseFx.rateBad) {
+    DeskTextField(
+      state.rateText, { state.rateText = ir.vil3ntec.tohid.numericInput(it) }, Modifier.width(200.dp),
+      textAlign = TextAlign.End, isError = rate == null, description = label,
+    )
+  }
+  DeskFormLabeled(StrPurchaseFx.per) {
+    DeskDropdown(state.per, Pay.FX_PER.map { DeskOption(it, SupplierFx.ltr("${FxTill.afnText(it * 100)} $code")) }, { state.per = it })
   }
 }
 

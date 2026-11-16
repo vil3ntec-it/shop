@@ -185,7 +185,7 @@ class PurchaseFxShotsTest {
     }
     desk("desk-new-invoice-usd", base) {
       click(StrPurchasePages.newPurchaseKey)
-      onAllNodes(hasContentDescription("${StrSafeCur.currency}: AFN") and hasClickAction())[0].performSemanticsAction(SemanticsActions.OnClick)
+      onAllNodes(hasText(StrSafeCur.afn) and hasClickAction())[0].performSemanticsAction(SemanticsActions.OnClick)
       waitForIdle()
       click(StrFx.usd)
       typeIn(StrPurchaseFx.rateLabel("1", "USD"), "70.25")

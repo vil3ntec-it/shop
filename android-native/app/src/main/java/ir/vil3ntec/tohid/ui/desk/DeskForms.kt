@@ -93,6 +93,8 @@ fun DeskTextField(
   textAlign: TextAlign = TextAlign.Start,
   description: String? = null,
   suffix: String? = null,
+  /** (e-desk-d3c، افزودنی) نمایشِ پوشیده — رمز/PIN با `PasswordVisualTransformation()` */
+  visualTransformation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
 ) {
   val c = Desk.colors
   val src = remember { MutableInteractionSource() }
@@ -107,6 +109,7 @@ fun DeskTextField(
     onValueChange = onValueChange,
     enabled = enabled,
     singleLine = true,
+    visualTransformation = visualTransformation,
     interactionSource = src,
     textStyle = textStyle.copy(color = if (enabled) c.ink else c.inkMuted, textAlign = textAlign),
     cursorBrush = SolidColor(c.focus),

@@ -80,7 +80,10 @@ internal fun PoSuggest(
     }
   }
 
-  Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+  //  کامپیوتر (`claude/e-desk-d3c`): زبانهٔ دوتاییِ `ui/desk` و دکمهٔ `DeskButton`؛ گوشی همان تراشه‌ها و دکمه
+  val desk = ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout.current
+  if (desk) ir.vil3ntec.tohid.ui.desk.DeskSegmented(listOf(true to StrReach.tabReorder, false to StrPurchasePages.allDaysLeft), onlyDue, { onlyDue = it })
+  else Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
     FilterChip(selected = onlyDue, onClick = { onlyDue = true }, label = { Text(StrReach.tabReorder) }, shape = Shape.chip)
     FilterChip(selected = !onlyDue, onClick = { onlyDue = false }, label = { Text(StrPurchasePages.allDaysLeft) }, shape = Shape.chip)
   }
@@ -102,7 +105,11 @@ internal fun PoSuggest(
       Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(name, color = c.text, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (sid != null && perms.manage && due > 0) {
-          Button(onClick = { oneKey(sid) }, enabled = busy == null) {
+          if (desk) ir.vil3ntec.tohid.ui.desk.DeskButton(
+            if (busy == sid) StrSettings.buildingDots else StrPurchasePages.createDraftN(due), { oneKey(sid) },
+            kind = ir.vil3ntec.tohid.ui.desk.DeskButtonKind.PRIMARY, enabled = busy == null,
+          )
+          else Button(onClick = { oneKey(sid) }, enabled = busy == null) {
             Text(if (busy == sid) StrSettings.buildingDots else StrPurchasePages.createDraftN(due))
           }
         }

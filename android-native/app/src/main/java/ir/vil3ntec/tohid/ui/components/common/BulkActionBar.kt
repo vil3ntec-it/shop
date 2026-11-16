@@ -15,18 +15,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -134,98 +127,86 @@ fun BulkConfirmDialog(
   /** مثلاً «۲ مورد از انتخاب‌ها در فیلترِ فعلی دیده نمی‌شوند» */
   warnings: List<String> = emptyList(),
 ) {
-  val c = Shop.colors
+  //  کامپیوتر (`claude/e-desk-d3c`): تنها کاربر «کالاها» ِ کامپیوتر است ⇒ پنجره و دکمه‌های `ui/desk`؛ ردیفِ آرام (وضعیت به واژه، بی قرص)
+  val c = ir.vil3ntec.tohid.ui.desk.Desk.colors
   var reason by remember { mutableStateOf("") }
   val changing = rows.count { it.changes }
   val ready = changing > 0 && (!destructive || BulkModel.reasonValid(reason))
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    containerColor = c.surfaceSolid,
-    title = { Text(title, color = c.text) },
-    text = {
-      Column(Modifier.widthIn(min = 360.dp, max = 560.dp)) {
-        Text(
-          Str.bulkWillChange(changing) + if (rows.size > changing) " · " + Str.bulkUnchanged(rows.size - changing) else "",
-          style = MaterialTheme.typography.titleSmall, color = c.text,
-        )
-        if (note != null) {
-          Spacer(Modifier.height(4.dp))
-          Text(note, style = MaterialTheme.typography.bodySmall, color = c.muted)
-        }
-        for (w in warnings) {
-          Spacer(Modifier.height(4.dp))
-          Text(w, style = MaterialTheme.typography.bodySmall, color = c.warning)
-        }
-        Spacer(Modifier.height(8.dp))
-        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 260.dp).border(1.dp, c.border, Shape.card)) {
-          items(rows, key = { it.id }) { r ->
-            Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-              Text(r.label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-              Spacer(Modifier.width(8.dp))
-              StatusPill(if (r.changes) Str.change else Str.unchanged, if (r.changes) (if (destructive) PillTone.DANGER else PillTone.SUCCESS) else PillTone.NEUTRAL)
-            }
-            if (r.note.isNotEmpty()) Text(r.note, Modifier.padding(start = 10.dp, end = 10.dp, bottom = 6.dp), style = MaterialTheme.typography.bodySmall, color = c.muted)
-            HorizontalDivider(color = c.border)
-          }
-        }
-        if (destructive) {
-          Spacer(Modifier.height(10.dp))
-          OutlinedTextField(
-            value = reason,
-            onValueChange = { reason = it },
-            label = { Text(Str.reasonRequired) },
-            singleLine = true,
-            isError = reason.isNotEmpty() && !BulkModel.reasonValid(reason),
-            modifier = Modifier.fillMaxWidth(),
-          )
-        }
-      }
-    },
-    confirmButton = {
-      Button(
-        onClick = { onConfirm(reason.trim()) },
-        enabled = ready,
-        colors = if (destructive) ButtonDefaults.buttonColors(containerColor = c.button.danger.bg, contentColor = c.button.danger.text) else ButtonDefaults.buttonColors(),
-      ) { Text(confirmLabel) }
-    },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel) } },
-  )
+  ir.vil3ntec.tohid.ui.desk.DeskDialog(
+    title = title,
+    onDismiss = onDismiss,
+    subtitle = note,
+    danger = destructive,
+    width = ir.vil3ntec.tohid.ui.desk.DeskDialogSize.wide,
+    scroll = false,
+    confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(confirmLabel, enabled = ready, danger = destructive) { onConfirm(reason.trim()) },
+    dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(Str.cancel, onClick = onDismiss),
+  ) {
+    ir.vil3ntec.tohid.ui.desk.DeskDialogText(
+      Str.bulkWillChange(changing) + if (rows.size > changing) " · " + Str.bulkUnchanged(rows.size - changing) else "",
+      strong = true,
+    )
+    for (w in warnings) ir.vil3ntec.tohid.ui.desk.DeskDialogText(w, color = c.warning)
+    BulkDeskList(rows.size) { i ->
+      val r = rows[i]
+      BulkDeskRow(r.label, r.note, if (r.changes) Str.change else Str.unchanged, strong = r.changes, color = if (r.changes && destructive) c.negative else null)
+    }
+    if (destructive) {
+      ir.vil3ntec.tohid.ui.desk.DeskDialogField(
+        Str.reasonRequired, reason, { reason = it },
+        isError = reason.isNotEmpty() && !BulkModel.reasonValid(reason),
+      )
+    }
+  }
 }
 
 /** گزارشِ نتیجهٔ هر ردیف پس از کارِ گروهی — ناموفق‌ها اول */
 @Composable
 fun BulkResultDialog(title: String, results: List<BulkRowResult>, onDismiss: () -> Unit) {
-  val c = Shop.colors
+  val c = ir.vil3ntec.tohid.ui.desk.Desk.colors
   val (ok, failed) = BulkModel.summary(results)
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    containerColor = c.surfaceSolid,
-    title = { Text(title, color = c.text) },
-    text = {
-      Column(Modifier.widthIn(min = 360.dp, max = 560.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-          StatusPill(Str.okCount(ok), PillTone.SUCCESS)
-          if (failed > 0) {
-            Spacer(Modifier.width(8.dp))
-            StatusPill(Str.failedCount(failed), PillTone.DANGER)
-          }
-        }
-        Spacer(Modifier.height(8.dp))
-        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 300.dp).border(1.dp, c.border, Shape.card)) {
-          items(BulkModel.ordered(results), key = { it.id }) { r ->
-            Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-              Column(Modifier.weight(1f)) {
-                Text(r.label, style = MaterialTheme.typography.bodyMedium, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(r.note, style = MaterialTheme.typography.bodySmall, color = c.muted)
-              }
-              Spacer(Modifier.width(8.dp))
-              StatusPill(if (r.ok) Str.success else Str.failure, if (r.ok) PillTone.SUCCESS else PillTone.DANGER)
-            }
-            HorizontalDivider(color = c.border)
-          }
-        }
-      }
-    },
-    confirmButton = { TextButton(onClick = onDismiss) { Text(Str.close) } },
-  )
+  val ordered = remember(results) { BulkModel.ordered(results) }
+  ir.vil3ntec.tohid.ui.desk.DeskDialog(
+    title = title,
+    onDismiss = onDismiss,
+    subtitle = Str.okCount(ok) + if (failed > 0) " · " + Str.failedCount(failed) else "",
+    width = ir.vil3ntec.tohid.ui.desk.DeskDialogSize.wide,
+    scroll = false,
+    confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(Str.close, onClick = onDismiss),
+  ) {
+    BulkDeskList(ordered.size) { i ->
+      val r = ordered[i]
+      BulkDeskRow(r.label, r.note, if (r.ok) Str.success else Str.failure, strong = !r.ok, color = if (r.ok) null else c.negative)
+    }
+  }
+}
+
+/** فهرستِ تنبلِ ردیف‌های پنجرهٔ گروهی — کادرِ خطِ مویی، بلندیِ بیشتر ۲۸۰ */
+@Composable
+private fun BulkDeskList(count: Int, row: @Composable (Int) -> Unit) {
+  val c = ir.vil3ntec.tohid.ui.desk.Desk.colors
+  LazyColumn(
+    Modifier.fillMaxWidth().heightIn(max = 280.dp)
+      .clip(ir.vil3ntec.tohid.ui.desk.DeskRadius.controlShape)
+      .border(ir.vil3ntec.tohid.ui.desk.DeskSize.hairline, c.hairline, ir.vil3ntec.tohid.ui.desk.DeskRadius.controlShape),
+  ) {
+    items(count) { i -> row(i); ir.vil3ntec.tohid.ui.desk.DeskDivider() }
+  }
+}
+
+/** ردیفِ آرامِ پنجرهٔ گروهی: نام (و یادداشتِ کم‌رنگ) و وضعیت به واژه در پایان */
+@Composable
+private fun BulkDeskRow(label: String, note: String, status: String, strong: Boolean, color: androidx.compose.ui.graphics.Color?) {
+  val c = ir.vil3ntec.tohid.ui.desk.Desk.colors
+  Row(
+    Modifier.fillMaxWidth().heightIn(min = ir.vil3ntec.tohid.ui.desk.DeskSize.tableRow).padding(horizontal = ir.vil3ntec.tohid.ui.desk.DeskSpace.x3, vertical = ir.vil3ntec.tohid.ui.desk.DeskSpace.x1),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Column(Modifier.weight(1f)) {
+      Text(label, style = ir.vil3ntec.tohid.ui.desk.DeskType.body, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+      if (note.isNotEmpty()) Text(note, style = ir.vil3ntec.tohid.ui.desk.DeskType.secondary, color = c.inkSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    }
+    Spacer(Modifier.width(ir.vil3ntec.tohid.ui.desk.DeskSpace.x3))
+    Text(status, style = if (strong) ir.vil3ntec.tohid.ui.desk.DeskType.bodyStrong else ir.vil3ntec.tohid.ui.desk.DeskType.secondary, color = color ?: if (strong) c.ink else c.inkSecondary, maxLines = 1)
+  }
 }

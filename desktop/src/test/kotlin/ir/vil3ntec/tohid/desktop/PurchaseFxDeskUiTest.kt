@@ -105,12 +105,12 @@ class PurchaseFxDeskUiTest {
     }
     await(StrPurchasePages.newPurchaseKey)
     tap(StrPurchasePages.newPurchaseKey)
-    onAllNodes(hasContentDescription("${StrSafeCur.currency}: AFN") and hasClickAction())[0].performSemanticsAction(SemanticsActions.OnClick)
+    onAllNodes(hasText(StrSafeCur.afn) and hasClickAction())[0].performSemanticsAction(SemanticsActions.OnClick)
     waitForIdle()
     await(StrFx.usd)
     tap(StrFx.usd)
     await(StrPurchaseFx.priceIn("USD"))
-    onAllNodes(hasSetTextAction() and hasText(StrPurchaseFx.rateLabel("1", "USD"), substring = true))[0].performTextInput("70")
+    onAllNodes(hasSetTextAction() and hasContentDescription(StrPurchaseFx.rateLabel("1", "USD")))[0].performTextInput("70")
     //  بارکدخوان ⇐ ردیفِ تازه (قیمتِ افغانیِ کالا پیش‌پُر نمی‌شود)
     runOnIdle { ScanRouter.offer("6260011") }
     waitUntil(timeoutMillis = 20_000) { onAllNodes(hasSetTextAction() and hasContentDescription(StrPurchaseFx.priceIn("USD"))).fetchSemanticsNodes().isNotEmpty() && has("چای سبز") }
