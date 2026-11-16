@@ -63,6 +63,7 @@ internal fun TrustCasesContent(
   now: () -> Long,
   productName: (String) -> String? = { null },
   say: (String) -> Unit = {},
+  onBack: (() -> Unit)? = null,
 ) {
   var list by remember { mutableStateOf<List<TrustCaseDto>?>(null) }
   var error by remember { mutableStateOf<String?>(null) }
@@ -73,9 +74,8 @@ internal fun TrustCasesContent(
     TrustHub.refresh(repo)
     repo.cases().onSuccess { list = TrustModel.sorted(it) }.onFailure { error = it.userMessage }
   }
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
-    Text(StrTrust.intro, style = V3Type.subhead, color = PhoneV3.colors.inkMuted)
-    Spacer(Modifier.height(12.dp))
+  //  کالبدِ یکسان (p0): قابِ خودِ صفحه؛ توضیحِ بخش خطِ کم‌رنگِ پایان (پیش‌تر سرِ صفحه)
+  ir.vil3ntec.tohid.ui.v3.nav.V3PageFrame(StrTrust.title, onBack) {
     val l = list
     when {
       l == null && error != null -> V3Message(V3Tone.ERROR, StrTrust.loadFailed, body = error, action = StrTrust.retry, onAction = { reload++ })
@@ -93,6 +93,7 @@ internal fun TrustCasesContent(
         )
       }
     }
+    ir.vil3ntec.tohid.ui.v3.nav.V3PageFootnote(StrTrust.intro)
   }
   openId?.let { id ->
     TrustCaseSheet(repo, id, productName, now, onClose = { openId = null }, onChanged = { msg -> say(msg); reload++ })

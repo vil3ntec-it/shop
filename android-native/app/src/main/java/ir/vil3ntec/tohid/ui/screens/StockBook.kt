@@ -98,6 +98,8 @@ fun StockBookScreen(
   d: ShopData,
   snackbar: SnackbarHostState,
   onSettings: () -> Unit,
+  /** گوشی (کالبدِ یکسان، p0): نام در نوارِ قاب و «انتقال» دکمهٔ شناورِ قاب ⇒ سرخطِ بدنه فقط یادداشتِ بها؛ کامپیوتر همان سرخطِ پیشین */
+  head: Boolean = true,
 ) {
   val scope = rememberCoroutineScope()
   val context = LocalContext.current
@@ -169,7 +171,7 @@ fun StockBookScreen(
 
   Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
     Spacer(Modifier.height(12.dp))
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    if (head) Row(verticalAlignment = Alignment.CenterVertically) {
       Column(Modifier.weight(1f)) {
         Text(StrReach.stockBook, style = MaterialTheme.typography.titleLarge, color = Shop.colors.text)
         Text(StrStockPages.costNote, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
@@ -179,6 +181,8 @@ fun StockBookScreen(
         Spacer(Modifier.width(6.dp))
         Text(StrPlaces.transferTitle)
       }
+    } else {
+      Text(StrStockPages.costNote, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
     }
     Spacer(Modifier.height(12.dp))
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

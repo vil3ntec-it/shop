@@ -38,7 +38,12 @@ import ir.vil3ntec.tohid.sync.SyncStore
 private const val LOCKING = true
 
 @Composable
-fun VipGate(label: String, content: @Composable () -> Unit) {
+fun VipGate(
+  label: String,
+  /** کلیدِ قابلیتِ همین بخش در اشتراک (`SupportProblem.NAMES`: `sales`، `debtors`…) — برای «از پشتیبانی بخواه» ِ صفحهٔ قفل */
+  feature: String? = null,
+  content: @Composable () -> Unit,
+) {
   val context = LocalContext.current
   val state = remember { SyncStore(context) }
   val enforcing = LOCKING && AppConfig.isConfigured(context)
@@ -64,5 +69,5 @@ fun VipGate(label: String, content: @Composable () -> Unit) {
   }
 
   //  بازسازیِ VILL3N (G7): همان سدِ بالا، ظاهرِ کیتِ نسخهٔ ۳ — بی طلا؛ کلید به مسیرِ دقیق
-  ir.vil3ntec.tohid.ui.v3.account.subscription.LockedFeature(label, signedIn, state.serverDenied)
+  ir.vil3ntec.tohid.ui.v3.account.subscription.LockedFeature(label, signedIn, state.serverDenied, feature = feature, expired = status.state == License.State.EXPIRED)
 }

@@ -57,6 +57,14 @@ object StrOrdersHub {
     "Type the item by hand; add products later in Products.",
     "توکی په لاس ولیکئ؛ توکي وروسته په «توکو» کې ثبت کړئ.",
   )
+  /** p0r3 (صاحب‌کار: «قلمِ دستی به چه دردی می‌خوره … بردار»): سفارشِ دستی فقط از فهرستِ کالاها با قیمتِ خودشان */
+  val noProductsManual: String get() = t(
+    "سفارش از فهرستِ کالاها ساخته می‌شود؛ اول کالا را در «کالاها» ثبت کنید.",
+    "Orders are made from your product list; add products in Products first.",
+    "فرمایش د توکو له لړلیک جوړېږي؛ لومړی توکي په «توکو» کې ثبت کړئ.",
+  )
+  /** نامِ پیش‌فرضِ مشتریِ سفارشِ دستی وقتی کادر خالی است (صاحب‌کار: «اسم … خودش میاد یا می‌زنم مثلاً بیرون») */
+  val walkInCustomer: String get() = t("مشتریِ حضوری", "Walk-in customer", "حضوري پېرودونکی")
   fun unknownCode(code: String): String = t("کالایی با کدِ ${asIs(code)} نیست", "No product with code $code", "د $code کوډ سره توکی نشته")
   fun lineOf(qty: String, unit: String, price: String): String =
     t("${asIs(qty)} ${asIs(unit)} × ${asIs(price)}", "$qty $unit × $price", "$qty $unit × $price").replace("  ", " ")

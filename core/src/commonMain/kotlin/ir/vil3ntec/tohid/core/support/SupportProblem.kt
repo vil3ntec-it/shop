@@ -157,6 +157,14 @@ object SupportProblem {
   }
 
   /**
+   *  صفحهٔ قفلِ بخشِ پولی (`LockedFeature` ِ برنامه): اشتراکی که تمام شده ⇒ `subscription_expired`؛ وگرنه (اشتراک هست ولی همین بخش
+   *  در آن نیست، یا سرور نپذیرفت) ⇒ `plan_required:<قابلیتِ همان بخش>` تا پشتیبانی بداند کدام قابلیت را بدهد. قابلیتِ ناشناخته ⇒
+   *  همان `subscription_expired` (کدِ نامجاز هرگز ساخته نمی‌شود).
+   */
+  fun forLocked(feature: String?, expired: Boolean): String =
+    if (!expired && feature != null && parse("$PLAN_REQUIRED:$feature") != null) code(PLAN_REQUIRED, feature) else SUBSCRIPTION_EXPIRED
+
+  /**
    *  دروازهٔ «چرا سفارشِ آنلاین نمی‌رسد» (`lib/order-arrival.js`) که کارش پشتیبانی است ⇒ کدِ درخواست؛ دروازه‌ای که کارِ خودِ
    *  دکان است (ویترین، کالا، اشتراک) ⇒ null.
    */

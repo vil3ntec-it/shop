@@ -47,7 +47,8 @@ class DeviceCapWiringTest {
 
   @Test fun `صفحهٔ قفل با device_limit به خریدِ اشتراک نمی‌فرستد`() {
     val gate = src("ir/vil3ntec/tohid/ui/screens/Vip.kt")
-    assertTrue(gate.contains("LockedFeature(label, signedIn, state.serverDenied)"))
+    //  p0r3: کلیدِ قابلیت و «تمام شده» هم می‌رود (`SupportProblem.forLocked`)؛ `serverDenied` همان سومین آرگومان است
+    assertTrue(gate.contains("LockedFeature(label, signedIn, state.serverDenied, feature = feature, expired = status.state == License.State.EXPIRED)"))
     val locked = src("ir/vil3ntec/tohid/ui/v3/account/subscription/LockedFeature.kt")
     assertTrue(locked.contains("val next = DeviceCap.lockedNext(signedIn, serverDenied)"))
     assertTrue(locked.contains("DeviceCap.Next.DEVICES -> AccountLinks.SESSIONS"))

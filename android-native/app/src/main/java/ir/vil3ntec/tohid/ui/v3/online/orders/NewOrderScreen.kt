@@ -154,7 +154,6 @@ fun NewOrderScreen(
         onCount = { item, n -> apply(CartModel.addCount(d, cart, item.id, n)) },
         onMinus = { item -> CartModel.minusOne(d, cart, item.id)?.let { cart = it } },
         onHold = { item -> editProduct = item.id },
-        onFreeLine = { editFree = -1 },
         onScan = onScan?.let { scan ->
           {
             scan { code ->
@@ -170,7 +169,9 @@ fun NewOrderScreen(
     }
     ManualStep.DETAILS -> {
       ManualOrderBack { step = ManualStep.PICK }
-      val errors = if (tried > 0) NewOrderModel.errors(merged) else NewOrderModel.Errors()
+      //  نامِ خالی ⇒ «مشتریِ حضوری» (هرگز سدِ ثبت نیست)
+      val ready = NewOrderModel.withDefaultName(merged, StrOrdersHub.walkInCustomer)
+      val errors = if (tried > 0) NewOrderModel.errors(ready) else NewOrderModel.Errors()
       ManualDetails(
         form = form,
         merged = merged,
@@ -183,7 +184,7 @@ fun NewOrderScreen(
         summary = summary,
         onForm = { form = it },
         onBack = { step = ManualStep.PICK },
-        onSubmit = { if (NewOrderModel.errors(merged).isEmpty) onSubmit(merged) else tried++ },
+        onSubmit = { if (NewOrderModel.errors(ready).isEmpty) onSubmit(ready) else tried++ },
         onEditProduct = { editProduct = it },
         onRemoveProduct = { id ->
           val before = cart
@@ -197,7 +198,6 @@ fun NewOrderScreen(
           toasts?.undo(StrOnline.lineRemoved) { freeLines(before) }
         },
         onAddProducts = { step = ManualStep.PICK },
-        onAddFree = { editFree = -1 },
         onPickCustomer = { picking = true },
         extras = extras,
       )
@@ -219,18 +219,20 @@ fun NewOrderScreen(
       onDelete = if (cart.any { it.productId == id }) ({ cart = cart.filter { it.productId != id } }) else null,
     )
   }
+  //  p0r3: قلمِ دستیِ تازه ساخته نمی‌شود (صاحب‌کار: «اینو بردار؛ قیمتِ جنس‌هایی که انتخاب می‌کنم بسه»)؛ قلمِ دستیِ سفارشی که از پیش
+  //  داشت (تکرار/ویرایش) همان‌طور دیده، ویرایش و برداشته می‌شود — داده و همگام‌سازی دست نخورد
   editFree?.let { i ->
-    val line = if (i < 0) OrderDraft.LineInput(qty = "1") else form.lines.getOrNull(i) ?: return@let
+    val line = form.lines.getOrNull(i) ?: return@let
     OrderLineSheet(
-      index = if (i < 0) form.lines.size else i,
+      index = i,
       start = line,
-      onSave = { n -> freeLines(if (i < 0) form.lines + n else form.lines.toMutableList().also { it[i] = n }) },
+      onSave = { n -> freeLines(form.lines.toMutableList().also { it[i] = n }) },
       onDismiss = { editFree = null },
-      onDelete = if (i >= 0) ({
+      onDelete = {
         val before = form.lines
         freeLines(before.filterIndexed { j, _ -> j != i })
         toasts?.undo(StrOnline.lineRemoved) { freeLines(before) }
-      }) else null,
+      },
     )
   }
   if (picking) {
@@ -262,7 +264,6 @@ private fun ManualCatalog(
   onCount: (PhoneCatalogItem, Double) -> Unit,
   onMinus: (PhoneCatalogItem) -> Unit,
   onHold: (PhoneCatalogItem) -> Unit,
-  onFreeLine: () -> Unit,
   onScan: (() -> Unit)?,
 ) {
   var query by rememberSaveable { mutableStateOf("") }
@@ -294,17 +295,9 @@ private fun ManualCatalog(
       Modifier.fillMaxSize(),
       contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding() + 8.dp),
     ) {
-      item(key = "free") {
-        V3Section(null, padding = PaddingValues(0.dp), modifier = Modifier.padding(bottom = 12.dp)) {
-          V3ListRow(
-            StrOrdersHub.freeLine, Modifier.testTag(MANUAL_FREE_LINE), icon = Icons.Outlined.EditNote, hue = V3Hue.AMBER,
-            onClick = onFreeLine,
-          )
-        }
-      }
       when (empty) {
         CatalogEmpty.NO_PRODUCTS -> item(key = "empty") {
-          V3EmptyState(Icons.Outlined.Inventory2, StrOrdersHub.noProducts, body = StrOrdersHub.noProductsBody, action = StrOrdersHub.addFreeLine, onAction = onFreeLine)
+          V3EmptyState(Icons.Outlined.Inventory2, StrOrdersHub.noProducts, body = StrOrdersHub.noProductsManual)
         }
         CatalogEmpty.NO_MATCH -> item(key = "empty") { V3EmptyState(Icons.Outlined.SearchOff, StrSale.noItemFor(query.trim())) }
         CatalogEmpty.EMPTY_CATEGORY -> item(key = "empty") { V3EmptyState(Icons.Outlined.Category, StrSale.emptyCategory) }
@@ -345,7 +338,6 @@ private fun ManualDetails(
   onEditFree: (Int) -> Unit,
   onRemoveFree: (Int) -> Unit,
   onAddProducts: () -> Unit,
-  onAddFree: () -> Unit,
   onPickCustomer: () -> Unit,
   extras: @Composable (form: OrderDraft.Form, onForm: (OrderDraft.Form) -> Unit) -> Unit,
 ) {
@@ -377,15 +369,15 @@ private fun ManualDetails(
       if (merged.lines.isNotEmpty()) V3Divider()
       FlowRow(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         V3AddChip(StrOrdersHub.addProducts, onAddProducts)
-        V3AddChip(StrOrdersHub.addFreeLine, onAddFree)
       }
     }
 
     V3Section(StrOnline.customer, action = if (d.debtors.isNotEmpty()) StrOrdersHub.pickCustomer else null, onAction = onPickCustomer) {
       Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        //  اختیاری: مشتریِ برگزیده نامش را خودش می‌آورد؛ خالی ⇒ «مشتریِ حضوری» (همان نوشتهٔ کم‌رنگِ کادر)
         V3TextField(
           form.name, { onForm(form.copy(name = it.take(NewOrderModel.NAME_MAX))) }, StrOnline.customerName,
-          required = true, error = err(NewOrderModel.Field.NAME), modifier = Modifier.fillMaxWidth(),
+          placeholder = StrOrdersHub.walkInCustomer, error = err(NewOrderModel.Field.NAME), modifier = Modifier.fillMaxWidth(),
         )
         V3TextField(
           form.phone, { onForm(form.copy(phone = it.take(NewOrderModel.PHONE_MAX))) }, StrOnline.phone,

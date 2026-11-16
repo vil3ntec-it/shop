@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasSetTextAction
@@ -171,7 +172,7 @@ class OrdersP4UiTest {
   )
 
   @Test
-  fun `سفارشِ دستی - کالا از فهرست با مقدار، قلمِ دستی، اعتبار و ثبت با قلمِ کالادار`() {
+  fun `سفارشِ دستی - کالا از فهرست با مقدار، قلمِ دستیِ پیشین، نامِ پیش‌فرض و ثبت با قلمِ کالادار`() {
     var sent: OrderDraft.Form? = null
     rule.setContent {
       Phone {
@@ -182,8 +183,9 @@ class OrdersP4UiTest {
       }
     }
     rule.waitForIdle()
-    //  «قلمِ دستی (بیرون از فهرست)» در همان کاتالوگ
-    assertEquals(1, rule.onAllNodesWithTag(MANUAL_FREE_LINE, useUnmergedTree = true).fetchSemanticsNodes().size)
+    //  p0r3 (صاحب‌کار: «قلمِ دستی … بردار»): درِ ساختنِ قلمِ دستی در کاتالوگ نیست؛ قلمِ دستیِ سفارشِ پیشین («کیسه») همان می‌ماند
+    assertEquals(0, rule.onAllNodesWithTag(MANUAL_FREE_LINE, useUnmergedTree = true).fetchSemanticsNodes().size)
+    assertTrue(rule.onAllNodes(hasText(StrOrdersHub.freeLine)).fetchSemanticsNodes().isEmpty())
     //  دو بار «برنج» و یک بار «چای» ⇒ سه قلمِ سبد (نوارِ پایین: «۳ قلم · …»)
     rule.onNodeWithText("برنجِ سیلا").performClick()
     rule.onNodeWithText("برنجِ سیلا").performClick()
@@ -193,11 +195,13 @@ class OrdersP4UiTest {
     rule.onNodeWithText(StrOrdersHub.pickNext).performClick()
     rule.waitForIdle()
 
-    //  بی نام ⇒ ثبت نمی‌شود و خطای همان کادر
+    //  p0r3 (صاحب‌کار): نامِ خالی سدِ ثبت نیست ⇒ «مشتریِ حضوری»؛ هیچ خطای نام و درِ «قلمِ دستی» در جزئیات نیست
+    assertTrue(rule.onAllNodes(hasText(StrOrdersHub.addFreeLine)).fetchSemanticsNodes().isEmpty())
     rule.onNodeWithText(StrOnline.placeOrder).performClick()
     rule.waitForIdle()
-    assertNull(sent)
-    assertTrue(texts().any { it == StrOnline.errName })
+    assertEquals(StrOrdersHub.walkInCustomer, (OrderDraft.build(assertNotNullForm(sent)) as OrderDraft.Result.Ok).body.customerName)
+    assertTrue(texts().none { it == StrOnline.errName })
+    sent = null
 
     rule.onAllNodes(hasSetTextAction())[0].performTextInput("مریم احمدی")
     rule.onNodeWithText(StrOnline.placeOrder).performClick()
@@ -212,13 +216,27 @@ class OrdersP4UiTest {
     assertEquals("کیسه", body.lines[2].name)
   }
 
+  /**
+   *  p0r3: قلمِ دستیِ تازه ساخته نمی‌شود (کاتالوگِ خالی هم دکمهٔ «قلمِ دستی» ندارد)، ولی قلمِ دستیِ سفارشی که از پیش داشت هنوز
+   *  دیده و ویرایش می‌شود — داده و همگام‌سازی دست نخورده (پیش‌تر: «قلمِ دستی از کاتالوگ برگه را باز می‌کند»).
+   */
   @Test
-  fun `قلمِ دستی از کاتالوگ برگهٔ نام و مقدار و فی را باز می‌کند`() {
+  fun `قلمِ دستیِ تازه در سفارشِ دستی نیست ولی قلمِ پیشین ویرایش می‌شود`() {
     rule.setContent {
-      Phone { NewOrderScreen(sources = listOf("phone"), busy = false, failure = null, onSubmit = {}, onBack = {}, d = d) }
+      Phone {
+        NewOrderScreen(
+          sources = listOf("phone"), busy = false, failure = null, onSubmit = {}, onBack = {}, d = ShopData(),
+          start = OrderDraft.Form(lines = listOf(OrderDraft.LineInput("کیسه", "1", "10"))), startStep = ManualStep.PICK,
+        )
+      }
     }
     rule.waitForIdle()
-    rule.onAllNodesWithTag(MANUAL_FREE_LINE, useUnmergedTree = true)[0].performClick()
+    assertEquals(0, rule.onAllNodesWithTag(MANUAL_FREE_LINE, useUnmergedTree = true).fetchSemanticsNodes().size)
+    assertTrue("کاتالوگِ خالی: راهِ ثبتِ کالا، نه قلمِ دستی", rule.onAllNodes(hasText(StrOrdersHub.noProductsManual)).fetchSemanticsNodes().isNotEmpty())
+    assertTrue(rule.onAllNodes(hasText(StrOrdersHub.addFreeLine)).fetchSemanticsNodes().isEmpty())
+    rule.onNodeWithText(StrOrdersHub.pickNext).performClick()
+    rule.waitForIdle()
+    rule.onAllNodes(hasText("کیسه", substring = true) and hasClickAction())[0].performClick()
     rule.waitForIdle()
     assertTrue(rule.onAllNodes(hasText(StrOnline.lineName, substring = true)).fetchSemanticsNodes().isNotEmpty())
   }

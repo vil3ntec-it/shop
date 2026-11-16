@@ -44,6 +44,8 @@ import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Segmented
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
+import ir.vil3ntec.tohid.ui.v3.nav.V3RoutePage
+import ir.vil3ntec.tohid.ui.v3.nav.V3PageFootnote
 import kotlinx.coroutines.launch
 
 /*
@@ -187,13 +189,13 @@ internal fun RouteScope.ProductGalleryPage(productId: String) {
     is ProductGalleryState.Outcome.Failed -> toasts.show(o.message.ifBlank { StrProductGallery.notSent }, V3Tone.ERROR)
   }
 
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+  //  کالبدِ یکسان (p0): قابِ خودِ صفحه؛ «فقط خواندنی» خطِ کم‌رنگِ پایان
+  V3RoutePage(StrProductGallery.title) {
     when {
       state == null || port == null || state.off -> V3EmptyState(Icons.Outlined.PhotoLibrary, StrProductGallery.off)
       state.failed && state.items == null -> V3EmptyState(Icons.Outlined.CloudOff, StrProductGallery.failed, action = StrProductGallery.retry, onAction = { tick++ })
       state.items == null -> Text(StrProductGallery.loading, style = V3Type.callout, color = c.inkMuted, modifier = Modifier.padding(top = 16.dp))
       else -> {
-        if (!port.canWrite) Text(StrProductGallery.readOnly, style = V3Type.footnote, color = c.inkMuted)
         //  PRD-27: عکسِ ویترین
         V3Section(StrProductGallery.storefront, footer = StrProductGallery.storefrontNote) {
           val own = state.storefrontItem
@@ -269,6 +271,7 @@ internal fun RouteScope.ProductGalleryPage(productId: String) {
             )
           }
         }
+        if (!port.canWrite) V3PageFootnote(StrProductGallery.readOnly)
       }
     }
   }
