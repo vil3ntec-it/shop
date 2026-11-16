@@ -5,6 +5,7 @@ import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.i18n.StrSyncPlain
 import ir.vil3ntec.tohid.core.sync.SyncOutage
+import ir.vil3ntec.tohid.data.SupportDiag
 import ir.vil3ntec.tohid.sync.AutoSync
 import ir.vil3ntec.tohid.sync.v1.SyncStatus
 import ir.vil3ntec.tohid.ui.screens.ServerPulse
@@ -25,7 +26,13 @@ internal object SyncModel {
     AutoSync.Health.FAILED -> SyncState.FAILED
   }
 
-  fun headline(health: AutoSync.Health, running: Boolean, pending: Int): Line = when (health) {
+  /** @param failed گرهِ سرخِ موتور (`diagnose(...).tone == ERROR`) — شکستِ Sync v1 در `AutoSync.health` دیده نمی‌شود */
+  fun headline(health: AutoSync.Health, running: Boolean, pending: Int, failed: Boolean = false): Line = when {
+    failed -> Line(StrNav.lastAttemptFailed, V3Tone.ERROR)
+    else -> headlineOf(health, running, pending)
+  }
+
+  private fun headlineOf(health: AutoSync.Health, running: Boolean, pending: Int): Line = when (health) {
     AutoSync.Health.OK -> Line(StrNav.syncAllOnServer, V3Tone.SUCCESS)
     AutoSync.Health.WAITING -> Line(if (running) Str.sending else StrNav.pendingItems(pending), V3Tone.WARNING)
     AutoSync.Health.FAILED -> Line(StrNav.lastAttemptFailed, V3Tone.ERROR)
@@ -43,10 +50,35 @@ internal object SyncModel {
   fun queue(queued: Int): Line =
     if (queued > 0) Line(StrNav.changesQueued(queued), V3Tone.WARNING) else Line(StrNav.noChangesQueued, V3Tone.SUCCESS)
 
-  /** گرهِ همگام‌سازی به زبانِ آدم — چه شده، چه نگه داشته شده، کاربر چه کند */
-  enum class Problem { NONE, OFFLINE, SIGN_IN, SERVER, SERVER_BEHIND, NO_SHOP, LOCAL, REJECTED, UNKNOWN, UNREACHABLE, RETRYING }
+  /**
+   *  گرهِ همگام‌سازی به زبانِ آدم — چه شده، چه نگه داشته شده، کاربر چه کند. e-newinstall: [NOT_SIGNED_IN] (مهمان، «ادامه بدون
+   *  حساب») و [REFUSED] (سرور با پیامِ سادهٔ خودش رد کرد — همان پیام روی کارت، نه «همگام‌سازی کامل نشد»).
+   */
+  enum class Problem { NONE, OFFLINE, SIGN_IN, NOT_SIGNED_IN, SERVER, SERVER_BEHIND, NO_SHOP, LOCAL, REJECTED, REFUSED, UNKNOWN, UNREACHABLE, RETRYING }
 
-  data class Diagnosis(val problem: Problem, val title: String, val body: String, val action: String, val tone: V3Tone, val detail: String?)
+  /** دکمهٔ کارتِ گره — کاری که کاربر همان‌جا می‌کند */
+  enum class Fix { NONE, SIGN_IN, SHOP }
+
+  data class Diagnosis(
+    val problem: Problem,
+    val title: String,
+    val body: String,
+    val action: String,
+    val tone: V3Tone,
+    val detail: String?,
+    val fix: Fix = Fix.NONE,
+    /** کدِ ماشینیِ همان شکست (`SyncStatus.errorCode`) — فقط برای «جزئیات» و پشتیبانی */
+    val code: String = "",
+  )
+
+  /** کدهای سرور که یعنی «این حساب دکانی ندارد / دکانِ این نشست نیست» — `ApiFailure.code` (`middleware/auth.js`، `sync-v1-auth.js`) */
+  private val NO_SHOP_CODES = setOf("no_shop", "shop_not_found", "no_account")
+
+  /** کدهایی که با ورودِ دوباره درست می‌شوند (نشست، دستگاهِ این نشست، نشستِ بخشِ دیگر) */
+  private val SIGN_IN_CODES = setOf("session_expired", "invalid_token", "no_session", "session_required", "device_mismatch", "app_mismatch")
+
+  /** نشانه‌های متنیِ «دکان ندارید» — برای `lastError` ِ ساخت‌های پیش از کدِ ماندگار (`SyncStateV1.lastErrorCode`) */
+  private val NO_SHOP_HINTS = listOf("دکانی ثبت نشده", "دکان بسازید", "دکانتان را بسازید", "دکان پیدا نشد")
 
   private val OFFLINE_HINTS = listOf("unable to resolve", "failed to connect", "timeout", "timed out", "network", "connection", "socket", "اینترنت", "انترنت", "وصل نشد", "نت نیست")
   private val SIGN_IN_HINTS = listOf("401", "unauthor", "token", "نشست", "دوباره وارد", "وارد حساب")
@@ -59,6 +91,7 @@ internal object SyncModel {
     return when {
       raw.isBlank() -> Problem.NONE
       LOCAL_HINTS.any { it in low } -> Problem.LOCAL
+      NO_SHOP_HINTS.any { it in raw } -> Problem.NO_SHOP
       SIGN_IN_HINTS.any { it in low } -> Problem.SIGN_IN
       OFFLINE_HINTS.any { it in low } -> Problem.OFFLINE
       SERVER_HINTS.any { it in low } -> Problem.SERVER
@@ -79,6 +112,7 @@ internal object SyncModel {
       Problem.SIGN_IN -> StrSettings.diagSignInTitle
       Problem.SERVER -> StrSettings.diagServerTitle
       Problem.LOCAL -> StrSettings.diagLocalTitle
+      Problem.NO_SHOP -> StrSettings.diagNoShopTitle
       else -> e.takeIf { plain(it) } ?: StrSettings.diagUnknownTitle
     }
   }
@@ -134,36 +168,91 @@ internal object SyncModel {
     else -> null
   }
 
+  /** کدِ ماشینیِ شکست ⇒ گره؛ `null` ⇒ کد چیزی نمی‌گوید (حکمِ موتور و نشانه‌های متنی) */
+  fun fromCode(code: String): Problem? = when (code.trim()) {
+    "" -> null
+    in NO_SHOP_CODES -> Problem.NO_SHOP
+    in SIGN_IN_CODES -> Problem.SIGN_IN
+    else -> null
+  }
+
   /**
-   *  ترتیب: سرورِ عقب‌مانده (چیزی نمی‌رود تا به‌روز شود) ⇐ نبودنِ دکان ⇐ حکمِ موتور (SYN-12) ⇐ نتِ دستگاه ⇐
-   *  خطای آخرین دور ⇐ تغییرهای ردشده. `detail` همان متنِ خام **فقط برای پشتیبانی** است (`SupportDiagAndroid`) و
-   *  هرگز در صفحه نشان داده نمی‌شود. سرورِ گرفتار (حکمِ موتور) زرد است، نه سرخ: تقصیرِ این دستگاه نیست و خودش دوباره می‌رود.
+   *  ترتیب: بی نشست (مهمان) ⇐ سرورِ عقب‌مانده (چیزی نمی‌رود تا به‌روز شود) ⇐ نبودنِ دکان (کدِ سرور، نشانهٔ متن یا
+   *  `AutoSync`) ⇐ کدِ نشست ⇐ حکمِ موتور (SYN-12) ⇐ نتِ دستگاه ⇐ خطای آخرین دور ⇐ تغییرهای ردشده. سرورِ گرفتار
+   *  (حکمِ موتور) زرد است، نه سرخ: تقصیرِ این دستگاه نیست و خودش دوباره می‌رود.
+   *
+   *  e-newinstall: ۴۰۳ ِ «برای این حساب دکانی ثبت نشده» پیش‌تر یا «نشست تمام شد» دیده می‌شد (حکمِ AUTH ِ هر ۴۰۳) یا پس از
+   *  بازگشایی «همگام‌سازی کامل نشد» (هیچ نشانه‌ای نخورد) — و `AutoSync.needsShop` از وقتی دفتر با Sync v1 می‌رود هرگز روشن
+   *  نمی‌شود. حالا کدِ ماندگار ([code]) و نشانهٔ متن «دکان» را می‌گویند؛ ردِ دیگرِ سرور با پیامِ سادهٔ فارسیِ خودش
+   *  ([Problem.REFUSED])، و ۴۰۳ ِ کددار که نشست نیست دیگر «دوباره وارد شوید» نمی‌گوید.
+   *
+   *  `detail` همان متنِ خام است: برای پشتیبانی فرستاده می‌شود (`SupportDiagAndroid`) و فقط با زدنِ «جزئیات»، پوشانده
+   *  ([detailsText])، در برگه دیده می‌شود — هرگز روی خودِ کارت.
+   *
+   *  @param signedIn نشستِ حساب هست؛ `false` ⇒ [Problem.NOT_SIGNED_IN] با دکمهٔ ورود
+   *  @param queued تغییرهای در صف (برای متنِ مهمان)
    */
-  fun diagnose(error: String, holding: Boolean, dropped: Int, needsShop: Boolean, server: ServerPulse.State, outage: SyncOutage.Kind? = null): Diagnosis {
+  fun diagnose(
+    error: String,
+    holding: Boolean,
+    dropped: Int,
+    needsShop: Boolean,
+    server: ServerPulse.State,
+    outage: SyncOutage.Kind? = null,
+    code: String = "",
+    signedIn: Boolean = true,
+    queued: Int = 0,
+  ): Diagnosis {
     val raw = error.trim()
-    val judged = if (raw.isNotEmpty()) fromOutage(outage) else null
+    val byCode = if (raw.isNotEmpty()) fromCode(code) else null
+    //  حکمِ AUTH ِ موتور برای هر ۴۰۱/۴۰۳ است؛ ۴۰۳ ِ کددارِ دیگر (اشتراک، نقش، دستگاهِ بسته) نشست نیست
+    val judged = if (raw.isNotEmpty()) fromOutage(outage)?.takeUnless { it == Problem.SIGN_IN && code.isNotBlank() && byCode == null } else null
     val problem = when {
+      !signedIn -> Problem.NOT_SIGNED_IN
       holding -> Problem.SERVER_BEHIND
-      needsShop -> Problem.NO_SHOP
+      needsShop || byCode == Problem.NO_SHOP -> Problem.NO_SHOP
+      byCode != null -> byCode
       judged != null -> judged
       server == ServerPulse.State.NO_NET && raw.isNotEmpty() -> Problem.OFFLINE
-      raw.isNotEmpty() -> classify(raw)
+      raw.isNotEmpty() -> classify(raw).let { if (it == Problem.UNKNOWN && plain(raw)) Problem.REFUSED else it }
       dropped > 0 -> Problem.REJECTED
       else -> Problem.NONE
     }
-    val detail = raw.takeIf { it.isNotEmpty() && problem != Problem.SERVER_BEHIND }
+    val detail = raw.takeIf { it.isNotEmpty() && problem != Problem.SERVER_BEHIND && problem != Problem.NOT_SIGNED_IN }
+    fun d(title: String, body: String, action: String, tone: V3Tone, fix: Fix = Fix.NONE, det: String? = detail) =
+      Diagnosis(problem, title, body, action, tone, det, fix, code.trim())
     return when (problem) {
-      Problem.NONE -> Diagnosis(problem, StrNav.syncAllOnServer, "", "", V3Tone.SUCCESS, null)
-      Problem.OFFLINE -> Diagnosis(problem, StrSettings.diagOfflineTitle, StrSettings.diagOfflineBody, StrSettings.diagOfflineDo, V3Tone.WARNING, detail)
-      Problem.SIGN_IN -> Diagnosis(problem, StrSettings.diagSignInTitle, StrSettings.diagSignInBody, StrSettings.diagSignInDo, V3Tone.ERROR, detail)
-      Problem.SERVER -> Diagnosis(problem, StrSettings.diagServerTitle, StrSettings.diagServerBody, StrSettings.diagServerDo, if (judged == Problem.SERVER) V3Tone.WARNING else V3Tone.ERROR, detail)
-      Problem.UNREACHABLE -> Diagnosis(problem, StrSettings.diagUnreachableTitle, StrSettings.diagUnreachableBody, StrSettings.diagUnreachableDo, V3Tone.WARNING, detail)
-      Problem.RETRYING -> Diagnosis(problem, StrSettings.diagRetryingTitle, StrSettings.diagRetryingBody, StrSettings.diagRetryingDo, V3Tone.INFO, detail)
-      Problem.SERVER_BEHIND -> Diagnosis(problem, StrSettings.diagBehindTitle, StrNav.serverBehind, StrSettings.diagBehindDo, V3Tone.WARNING, null)
-      Problem.NO_SHOP -> Diagnosis(problem, StrSettings.diagNoShopTitle, StrSettings.diagNoShopBody, StrSettings.diagNoShopDo, V3Tone.WARNING, detail)
-      Problem.LOCAL -> Diagnosis(problem, StrSettings.diagLocalTitle, StrSettings.diagLocalBody, StrSettings.diagLocalDo, V3Tone.ERROR, detail)
-      Problem.REJECTED -> Diagnosis(problem, StrSyncPlain.rejectedTitle(dropped), StrNav.droppedChanges(dropped), StrSettings.diagRejectedDo, V3Tone.WARNING, null)
-      Problem.UNKNOWN -> Diagnosis(problem, StrSettings.diagUnknownTitle, StrSettings.diagUnknownBody, StrSettings.diagUnknownDo, V3Tone.ERROR, detail)
+      Problem.NONE -> d(StrNav.syncAllOnServer, "", "", V3Tone.SUCCESS, det = null)
+      Problem.NOT_SIGNED_IN -> d(StrSettings.diagGuestTitle, if (queued > 0) StrSettings.diagGuestBody(queued) else StrSettings.diagGuestBodyEmpty, StrSettings.diagGuestDo, V3Tone.WARNING, Fix.SIGN_IN)
+      Problem.OFFLINE -> d(StrSettings.diagOfflineTitle, StrSettings.diagOfflineBody, StrSettings.diagOfflineDo, V3Tone.WARNING)
+      Problem.SIGN_IN -> d(StrSettings.diagSignInTitle, StrSettings.diagSignInBody, StrSettings.diagSignInDo, V3Tone.ERROR, Fix.SIGN_IN)
+      Problem.SERVER -> d(StrSettings.diagServerTitle, StrSettings.diagServerBody, StrSettings.diagServerDo, if (judged == Problem.SERVER) V3Tone.WARNING else V3Tone.ERROR)
+      Problem.UNREACHABLE -> d(StrSettings.diagUnreachableTitle, StrSettings.diagUnreachableBody, StrSettings.diagUnreachableDo, V3Tone.WARNING)
+      Problem.RETRYING -> d(StrSettings.diagRetryingTitle, StrSettings.diagRetryingBody, StrSettings.diagRetryingDo, V3Tone.INFO)
+      Problem.SERVER_BEHIND -> d(StrSettings.diagBehindTitle, StrNav.serverBehind, StrSettings.diagBehindDo, V3Tone.WARNING, det = null)
+      Problem.NO_SHOP -> d(StrSettings.diagNoShopTitle, StrSettings.diagNoShopBody, StrSettings.diagNoShopDo, V3Tone.WARNING, Fix.SHOP)
+      Problem.LOCAL -> d(StrSettings.diagLocalTitle, StrSettings.diagLocalBody, StrSettings.diagLocalDo, V3Tone.ERROR)
+      Problem.REJECTED -> d(StrSyncPlain.rejectedTitle(dropped), StrNav.droppedChanges(dropped), StrSettings.diagRejectedDo, V3Tone.WARNING, det = null)
+      //  پیامِ سادهٔ خودِ سرور (`plain`: بی نشانی، بی کد و عددِ لاتین) همان بدنهٔ کارت است
+      Problem.REFUSED -> d(StrSettings.diagRefusedTitle, raw + "\n" + StrSettings.diagUnknownBody, StrSettings.diagRefusedDo, V3Tone.ERROR)
+      Problem.UNKNOWN -> d(StrSettings.diagUnknownTitle, StrSettings.diagUnknownBody, StrSettings.diagUnknownDo, V3Tone.ERROR)
     }
   }
+
+  /**
+   *  متنِ برگهٔ «جزئیات» (فقط با زدن، `SyncScreen`) — همان چیزی که پشتیبانی لازم دارد: نامِ گره، کد، متنِ خامِ خطا،
+   *  صف و ردشده‌ها و آخرین موفق. ⛔ نشانیِ سرور پوشانده (`SupportDiag.clean`: `api.•••`، IP ⇒ `•••`)؛ نسخهٔ سرور، Schema و
+   *  راهِ API هرگز (آن‌ها فقط در گزارشِ فرستاده‌شده‌اند، [facts]).
+   */
+  fun detailsText(d: Diagnosis, queued: Int, dropped: Int, lastOkAt: Long, now: Long): String = buildString {
+    append("sync: ").append(d.problem.name.lowercase())
+    if (d.code.isNotBlank()) append(" · code: ").append(SupportDiag.clean(d.code, 64))
+    append('\n')
+    d.detail?.takeIf { it.isNotBlank() }?.let { append(SupportDiag.clean(it, DETAIL_MAX)).append('\n') }
+    append("queued: ").append(queued).append(" · dropped: ").append(dropped).append('\n')
+    append("lastOk: ").append(if (lastOkAt > 0) lastOkAt.toString() else "-").append('\n')
+    append("at: ").append(now)
+  }
+
+  private const val DETAIL_MAX = 1200
 }

@@ -479,7 +479,29 @@ object StrSettings {
   val diagBehindDo: String get() = t("سرور باید به‌روز شود؛ تا آن وقت کارتان را ادامه دهید.", "The server needs an update; keep working until then.", "سرور باید تازه شي؛ تر هغه خپل کار ته دوام ورکړئ.")
   val diagNoShopTitle: String get() = t("برای این حساب دکانی ساخته نشده", "This account has no shop yet", "دې حساب ته لا دوکان نه دی جوړ شوی")
   val diagNoShopBody: String get() = t("همگام‌سازی جایی برای فرستادنِ دفتر ندارد؛ دفتر روی همین دستگاه کامل کار می‌کند.", "Sync has nowhere to send the ledger; the ledger works fully on this device.", "همغږي د دفتر لېږلو ځای نه لري؛ دفتر په همدې وسیله بشپړ کار کوي.")
-  val diagNoShopDo: String get() = t("از «حساب من» دکان را بسازید یا با کدِ دکان وارد شوید.", "Create the shop from “My account” or join with a shop code.", "له «زما حساب» دوکان جوړ کړئ یا د دوکان په کوډ ننوځئ.")
+  val diagNoShopDo: String get() = t("اگر دکان را پیش‌تر در برنامهٔ دیگری ساخته‌اید، خارج شوید و با همان ایمیلِ همان حساب وارد شوید؛ وگرنه دکان را بسازید یا با کدِ دکان بپیوندید.", "If you already made the shop in another app, sign out and sign in with that same account's email; otherwise create the shop or join with a shop code.", "که مو دوکان مخکې په بل اپ کې جوړ کړی، ووځئ او د هماغه حساب په برېښنالیک ننوځئ؛ که نه، دوکان جوړ کړئ یا د دوکان په کوډ یوځای شئ.")
+  val diagShopAction: String get() = t("ساختن یا پیوستن به دکان", "Create or join a shop", "دوکان جوړول یا ورسره یوځای کېدل")
+  //  e-newinstall: مهمان («ادامه بدون حساب») — تغییرها فقط روی همین دستگاه
+  val diagGuestTitle: String get() = t("وارد حساب نشده‌اید", "You're not signed in", "تاسو حساب ته نه یاست ننوتي")
+  fun diagGuestBody(queued: Any): String = t(
+    "تا وارد نشوید هیچ چیزی به سرور نمی‌رود و از سرور هم چیزی نمی‌آید؛ ${asIs(queued)} تغییرِ این دستگاه همین‌جا نگه داشته شده و گم نمی‌شود.",
+    "Nothing goes to the server or comes from it until you sign in; this device's $queued ${pl(queued, "change is", "changes are")} kept here and won't be lost.",
+    "تر ننوتلو پورې هېڅ سرور ته نه ځي او له سرور هم څه نه راځي؛ د دې وسیلې $queued بدلونونه همدلته ساتل شوي او نه ورکېږي.",
+  )
+  val diagGuestBodyEmpty: String get() = t(
+    "تا وارد نشوید هیچ چیزی به سرور نمی‌رود و از سرور هم چیزی نمی‌آید؛ هر چه این‌جا ثبت کنید روی همین دستگاه می‌ماند.",
+    "Nothing goes to the server or comes from it until you sign in; whatever you enter here stays on this device.",
+    "تر ننوتلو پورې هېڅ سرور ته نه ځي او له سرور هم څه نه راځي؛ هر څه چې دلته ثبت کړئ په همدې وسیله پاتې کېږي.",
+  )
+  val diagGuestDo: String get() = t("با همان ایمیلِ حسابِ دکان وارد شوید (اگر برنامهٔ قدیم را دارید، همان ایمیلِ آن)؛ همگام‌سازی خودش راه می‌افتد.", "Sign in with the shop account's email (the same one as in the old app, if you have it); sync starts by itself.", "د دوکان د حساب په برېښنالیک ننوځئ (که زوړ اپ لرئ، د هماغه برېښنالیک)؛ همغږي پخپله پیلېږي.")
+  //  e-newinstall: سرور با پیامِ سادهٔ خودش رد کرد — همان پیام بدنهٔ کارت است
+  val diagRefusedTitle: String get() = t("سرور همگام‌سازی را نپذیرفت", "The server refused to sync", "سرور همغږي ونه منله")
+  val diagRefusedDo: String get() = t("همان کاری را که پیامِ بالا می‌گوید بکنید و «همگام‌سازی حالا» را بزنید؛ اگر روشن نبود، «جزئیات» را رونوشت کنید و به پشتیبانی بفرستید.", "Do what the message above says and tap “Sync now”; if it isn't clear, copy “Details” and send it to support.", "هغه څه وکړئ چې پورته پیغام یې وایي او «اوس همغږي» ووهئ؛ که روښانه نه وه، «جزئیات» کاپي او ملاتړ ته یې ولېږئ.")
+  //  e-newinstall: «جزئیات» — فقط با زدن، در برگه (متنِ پوشانده برای پشتیبانی)
+  val diagDetailsAction: String get() = t("جزئیات", "Details", "جزئیات")
+  val diagDetailsTitle: String get() = t("جزئیات برای پشتیبانی", "Details for support", "د ملاتړ لپاره جزئیات")
+  val diagDetailsNote: String get() = t("این متن را رونوشت کنید و برای پشتیبانی بفرستید. نشانیِ سرور در آن پوشانده شده است.", "Copy this text and send it to support. The server address is hidden in it.", "دا متن کاپي او ملاتړ ته یې ولېږئ. د سرور پته پکې پټه شوې ده.")
+  val diagDetailsCopied: String get() = t("رونوشت شد — برای پشتیبانی بفرستید", "Copied — send it to support", "کاپي شو — ملاتړ ته یې ولېږئ")
   val diagLocalTitle: String get() = t("دفترِ تغییراتِ این دستگاه ناجور است", "This device's change log doesn't match", "د دې وسیلې د بدلونونو دفتر سمون نه خوري")
   val diagLocalBody: String get() = t("فهرستِ تغییرهای این دستگاه با دفتر نمی‌خواند و همگام‌سازی برای ایمنی ایستاد؛ هیچ داده‌ای پاک نشده.", "The list of changes doesn't match the ledger, so sync stopped for safety; no data was deleted.", "د بدلونونو لړ له دفتر سره سمون نه خوري، نو همغږي د خوندیتوب لپاره ودرېده؛ هېڅ معلومات نه دي پاک شوي.")
   val diagLocalDo: String get() = t("از «پشتیبان و بازگردانی» پشتیبانِ کامل بگیرید و به پشتیبانی خبر دهید.", "Take a full backup in “Backup & restore” and tell support.", "په «بیک‌اپ او بېرته راوستل» کې بشپړ بیک‌اپ واخلئ او ملاتړ ته ووایاست.")

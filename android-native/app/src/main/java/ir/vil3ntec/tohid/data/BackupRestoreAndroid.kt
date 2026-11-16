@@ -113,12 +113,30 @@ object BackupRestore {
 
   data class Confirmed(val ok: Boolean, val photos: Int, val message: String)
 
-  /** پس از تأییدِ کاربر — شرحِ ترتیب سرِ همین پرونده */
-  suspend fun confirm(context: Context, store: ShopStore, next: ShopData): Confirmed {
+  /**
+   *  e-newinstall — صفِ نرفتهٔ پشتیبان (`pending-ops.json`) که در بازیابیِ «از سرور» با همان `op_id`ها پیش از Snapshot
+   *  فرستاده می‌شود (`SyncV1Engine.rebuildFromServer`): برنامهٔ قدیم (`ir.vil3ntec.tohid`) ⇒ برنامهٔ تازه
+   *  (`com.vill3n.dailyshop`) با کارهایی که هنوز به سرور نرسیده بودند.
+   *
+   *  ⛔ فقط وقتی مُهرِ پشتیبان **همین حساب یا همین دکان** را می‌گوید (پشتیبانِ بی مُهر یا دفترِ بی‌صاحب ⇒ هیچ: صفِ دکانِ
+   *  دیگری هرگز با نشستِ این حساب نمی‌رود) و صف مالِ دستگاهِ دیگری است (صفِ همین نصب از پیش در صفِ خودش است).
+   */
+  fun carryOf(context: Context, opened: BackupBundle.Opened): List<ir.vil3ntec.tohid.sync.v1.SyncOp> {
+    val p = opened.pending ?: return emptyList()
+    val user = LedgerOwner.currentUser(context)
+    val shop = LedgerOwner.currentShop(context)
+    val mine = (opened.stamp.shop.isNotBlank() && opened.stamp.shop == shop) || (opened.stamp.user.isNotBlank() && opened.stamp.user == user)
+    if (!mine) return emptyList()
+    if (p.deviceId == runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Engine.of(context).deviceId() }.getOrDefault("")) return emptyList()
+    return p.ops.mapNotNull { ir.vil3ntec.tohid.sync.v1.SyncOp.fromJson(it) }
+  }
+
+  /** پس از تأییدِ کاربر — شرحِ ترتیب سرِ همین پرونده. @param carry [carryOf] ِ همان پشتیبان */
+  suspend fun confirm(context: Context, store: ShopStore, next: ShopData, carry: List<ir.vil3ntec.tohid.sync.v1.SyncOp> = emptyList()): Confirmed {
     store.keepSafetyCopy()
     //  پرچمِ `photo` با عکس‌هایی که پس از نشستن خواهند بود (روی دیسک ∪ کنار گذاشته)
     val fixed = withContext(Dispatchers.IO) { BackupBundle.reconcilePhotoFlags(context, next, staged = true) }
-    val r = store.restoreBackup(fixed)
+    val r = store.restoreBackup(fixed, carry)
     if (!r.ok) {
       withContext(Dispatchers.IO) { BackupBundle.dropStaging(context) }
       return Confirmed(false, 0, r.message)

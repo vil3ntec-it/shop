@@ -369,7 +369,8 @@ class ShopStore(
    *  خوانده‌نشده همان «بازسازی از سرور» (SEC-01).
    *  @return `message` ِ خالی یعنی نوشته شد و حرفی نیست
    */
-  suspend fun restoreBackup(next: ShopData): Rebuilt = withContext(Dispatchers.IO) {
+  /** @param carry e-newinstall: صفِ نرفتهٔ نصبِ دیگرِ همین حساب از همان پشتیبان — فقط راهِ «از سرور» (`SyncV1Engine.rebuildFromServer`) */
+  suspend fun restoreBackup(next: ShopData, carry: List<ir.vil3ntec.tohid.sync.v1.SyncOp> = emptyList()): Rebuilt = withContext(Dispatchers.IO) {
     if (TrainingMode.on) return@withContext Rebuilt(false, TRAINING_SEALED)
     extras = null; if (_unreadable.value != null) return@withContext rebuildFromServer(next)
     val engine = SyncV1Engine.of(context)
@@ -388,7 +389,7 @@ class ShopStore(
       RestoreRoute.Route.NEED_NET -> Rebuilt(false, StrSettings.restoreNeedNet)
       RestoreRoute.Route.NOT_ON_V3 -> Rebuilt(false, StrSettings.restoreNotOnV3)
       RestoreRoute.Route.FROM_SERVER -> try {
-        when (val out = engine.rebuildFromServer(next, pushedStaging)) {
+        when (val out = engine.rebuildFromServer(next, pushedStaging, carry)) {
           is SyncRebuild.Outcome.QueueLeft -> Rebuilt(false, StrSettings.restoreQueueLeft(out.count))
           is SyncRebuild.Outcome.Done -> Rebuilt(
             true,
