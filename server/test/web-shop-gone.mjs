@@ -201,7 +201,7 @@ try {
     const ctx = await browser.newContext();
     const { pg, bad } = await openPage(ctx);
     await pg.click('button[data-lang="en"]');
-    assert.deepEqual(await pg.evaluate(() => [document.documentElement.lang, document.documentElement.dir, document.title]), ['en', 'ltr', 'My Shop — install the app']);
+    assert.deepEqual(await pg.evaluate(() => [document.documentElement.lang, document.documentElement.dir, document.title]), ['en', 'ltr', 'Daily Shop — install the app']);
     assert.match(await pg.textContent('h1'), /^Shop management/);
     assert.equal(await pg.getAttribute('button[data-lang="en"]', 'aria-pressed'), 'true');
     await axe(pg, 'English');

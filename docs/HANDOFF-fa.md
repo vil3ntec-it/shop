@@ -57,6 +57,32 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۵ — عاملِ e-name زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-name` (از `origin/main` a0b0f9355) — نامِ برنامه «Daily Shop»
+
+- **خواستِ صاحب‌کار**: «اسم برنامه رو هم daily Shop بزار» — پس از شناسهٔ نصبِ تازه، روی گوشی دو برنامه هر دو «توحید · پیش‌نمایش» بودند.
+  نامِ دیدنی در **هر زبان** همین لاتینِ «Daily Shop» است؛ پیش‌نمایش «Daily Shop · پیش‌نمایش». قاعده در `RULES-fa.md` («⛔ نامِ برنامه …») به‌روز شد.
+- **جاهای عوض‌شده (فقط نمایش)**: `app_name` ِ main و preview؛ `Str.appName`، `StrAccount.systemSender`، `StrAppData.notOurBackup`/`fpTitle`/`exportNotOurs`،
+  `StrDesktop.trayOpen`، `StrSettings.aboutText`، `StrSync.codeSignature`؛ نوارِ به‌روزرسانی (`UpdateBanner`)، پیامِ خریدِ اشتراک (`PlansScreen`)،
+  اعلانِ «هنوز باز است» ِ کامپیوتر؛ کامپیوتر: `description`، `menuGroup` ِ MSI، `macOS.packageName`/`dockName` (فقط CFBundleName — بسته همان `Tohid.app`)؛
+  Inno: `AppName`، `AppVerName`، `DefaultGroupName`، `UninstallDisplayName`، میان‌برها، پیام‌ها، و **`[InstallDelete]` برای میان‌برهای «فروشگاه من.lnk»**
+  (میز کار فقط با تیکِ همان میان‌بر) تا پس از به‌روزرسانی دو میان‌بر نماند؛ `setup-all/*`، `install.ps1`؛ آیفون `APP_NAME` و متنِ Face ID؛
+  حریمِ خصوصی (منبعِ `core/legal/legal-texts.json` + `generate.mjs` ⇐ رونوشتِ سرور و کاتلین، و `privacy.html`)؛ `index.html` (پنج زبان)،
+  `download.html`، `manifest.webmanifest`؛ پیش‌فرض‌های سرور (نامِ فرستندهٔ ایمیل، عنوانِ کدِ ورود، `vip-codes`، ایمیل/پیامکِ آزمایشیِ مدیر)؛
+  عنوان و متنِ انتشارها در سه ورک‌فلو (نامِ ورک‌فلوها نه) و هشدارِ عنوانِ پنجرهٔ CI ِ کامپیوتر؛ `GOOGLE-PLAY-fa.md` (متنِ فروشگاه)، `i18n-glossary.md`، `GOOGLE-LOGIN.md`.
+- **شناسه‌هایی که عمداً ماندند**: `com.vill3n.dailyshop`(+`.preview`)، بسته‌های `ir.vil3ntec.tohid`، `packageName = "Tohid"` ِ کامپیوتر (`Tohid.exe`، `Tohid.app`)،
+  `bundleID`، `upgradeUuid`، `AppId` و `DefaultDirName={localappdata}\Tohid` ِ Inno (دستشان بخورد نصبِ کهنه یتیم می‌شود)؛ پوشهٔ داده `Tohid`؛ پوشهٔ پشتیبانِ
+  «اسناد ⇐ فروشگاه من ⇐ پشتیبان» (`PlatformDesk`، داده روی دیسک)؛ برچسب/سرویسِ کلیددان (`My Shop data key`، `My Shop session key`، DPAPI `My Shop` —
+  `KekVault`، `LinuxSecretTool`، `WindowsDpapi`)؛ نامِ دارایی‌های انتشار (`MyShop-*`، `Tohid-*`)؛ نامِ ورک‌فلوها؛ مهاجرتِ ۰۰۸ ِ سرور؛ `senderName` ِ
+  پیامِ سیستمِ پشتیبانی در `support.js` (دادهٔ ذخیره‌شده و مشترک با پمپ؛ برنامه همان `StrAccount.systemSender` را نشان می‌دهد)؛ `KEEP` ِ `DariText` و
+  `license/dari.js` (بی‌زیان، آینه‌دار)؛ «دکان من» = نامِ پیش‌فرضِ دکانِ کاربر (نامِ برنامه نیست)؛ برنامهٔ مدیر «توحید مدیریت» (برنامهٔ دیگری است)؛
+  `license/*.js` (وبِ بازنشسته؛ فقط سرآیندِ توضیح)؛ `server/.env.example` و `FIREBASE-SETUP-fa.md` (نامِ کنسول، دیده نمی‌شود).
+- **آزمون‌هایی که عمداً عوض شدند (فقط رشتهٔ نام)**: `DariCoverageTest` (دو `notOurBackup`)، `DesktopTextTest` (سه ردیفِ `moved`؛ و برای خودِ نام به‌جای
+  «انگلیسی ≠ فارسی» حالا «در هر زبان دقیقاً Daily Shop» — سخت‌تر)، `SupportModelTest` («خبر از Daily Shop»)، `LegalTest` (دری: `contains("Daily Shop")`)،
+  `legal-pages.test.js` (عنوانِ انگلیسی)، `web-shop-gone.mjs` (عنوانِ انگلیسیِ صفحه). تازه: `AppNameTest` (۳: دو `app_name`، `Str.appName` در هر زبان،
+  Inno/مک/آیفون + ماندنِ `AppId`، پوشهٔ نصب، `packageName = "Tohid"` و `bundleID`).
+- **سنجش**: کاتلین (‎desktop/gradlew‎ قفلِ A): `core.i18n.*` (۱۱ کلاس، با `AppNameTest` ۳، `DariCoverageTest` ۲۳، `DariWordsTest` ۱۷، `DesktopTextTest` ۳)، `SupportModelTest`، `LookGuardTest` (۷؛ هیچ پروندهٔ هش‌دار دست نخورد)، `LinuxSecretToolTest` ⇐ ۱۰۰ ✅ ۰ ❌؛ `core` ‏`jvmTest` `core.legal.*` + `core.text.*` ⇐ ۵۰ ✅ ۰ ❌. سرور (PGlite): `legal-texts`، `legal-pages`، `mail-templates`، `platform`، `sms-admin`، `email-only-auth`، `auth`، `dari-text`، `kotlin-file-mirrors`، `backup-passphrase-warning`، `admin-ops-sms-usage`، `app-identity`، `card-data` ⇐ ۱۳۹ ✅ ۰ ❌. `generate.mjs --check` سالم؛ `precheck.sh` پس از کامیت ⇐ fail=0 (whatsnew: ۱ سطرِ تازه). نصابِ Inno، MSI، مک و آیفون این‌جا ساخته نشدند (CI ِ ویندوز/مک).
+- **قدمِ بعد (صاحب‌کار، بیرون از کد)**: نامِ صفحهٔ رضایتِ گوگل (OAuth consent) را در Google Cloud به «Daily Shop» عوض کنید؛ اگر `EMAIL_FROM_NAME`/نامِ فرستنده یا
+  عنوانِ کدِ ورود در پنلِ مدیر دستی «فروشگاه من» است، همان‌جا عوض شود (پیش‌فرضِ کد فقط وقتی خالی است به کار می‌رود). روی مک بسته همان `Tohid.app` است.
 ### ۱۴۰۵/۰۸/۲۵ — عاملِ e-paymethods زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-paymethods` (از `origin/main` a0b0f9355) — همهٔ روش‌های پرداخت در صندوق
 صاحب‌کار (با عکسِ برگهٔ «تسویهٔ فروش» ِ گوشی که فقط «نقدی | نسیه» داشت): «جای پرداخت چرا حساب‌های کاربری نمیاد، مثل کیو‌آر که ثبت کرده بود از
 حساب‌پی یا ان‌اف‌سی یا کارت‌خوانِ دستگاه — این‌ها همه باید بیایند یا نقدی».

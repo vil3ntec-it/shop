@@ -72,7 +72,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>برای اسکنِ بارکدِ کالا و گرفتنِ عکسِ کالا</string>
 	<key>NSFaceIDUsageDescription</key>
-	<string>برای باز کردنِ قفلِ «فروشگاه من» با Face ID</string>
+	<string>برای باز کردنِ قفلِ «Daily Shop» با Face ID</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>برای ثبتِ جای دکان روی نقشه و ویترینِ نزدیک — فقط با رضایتِ شما و فقط هنگامِ استفاده</string>
 	<key>NSLocalNetworkUsageDescription</key>

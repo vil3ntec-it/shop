@@ -57,7 +57,7 @@ test('ETag و ۳۰۴؛ HEAD بی بدنه', async () => {
 });
 
 test('هر چهار زبان متنِ همان منبع را با جهت و زبانِ درست دارند؛ زبانِ ناشناخته ⇒ فارسی', async () => {
-  const want = { fa: ['fa', 'rtl', legal.privacy.fa.title], en: ['en', 'ltr', 'Privacy policy of “My Shop”'], ps: ['ps', 'rtl', legal.privacy.ps.title] };
+  const want = { fa: ['fa', 'rtl', legal.privacy.fa.title], en: ['en', 'ltr', 'Privacy policy of “Daily Shop”'], ps: ['ps', 'rtl', legal.privacy.ps.title] };
   for (const [lang, [code, dir, title]] of Object.entries(want)) {
     const r = await get(`/legal/privacy${lang === 'fa' ? '' : `?lang=${lang}`}`);
     assert.match(r.text, new RegExp(`<html lang="${code}" dir="${dir}">`));

@@ -340,7 +340,7 @@ compose.desktop {
       packageVersion = appVersion
       //  ⚠️ لاتین: WiX (نصابِ MSI) متنِ بیرون از صفحه‌کدِ ۱۲۵۲ را نمی‌پذیرد
       //  و ساختِ نصابِ ویندوز با توضیحِ فارسی می‌شکند
-      description = "My Shop"
+      description = "Daily Shop"
       vendor = "VIL3NTEC"
       copyright = "© VIL3NTEC"
       //  ماژول‌های JDK که برنامه لازم دارد: شبکه، چاپ (javax.print در java.desktop)،
@@ -352,7 +352,7 @@ compose.desktop {
       )
       windows {
         menu = true
-        menuGroup = "Tohid"
+        menuGroup = "Daily Shop" //  فقط نامِ پوشهٔ منوی Start ِ MSI ِ قدیمی؛ شناسه‌ها (packageName، upgradeUuid) همان
         shortcut = true
         dirChooser = true
         perUserInstall = true
@@ -362,9 +362,10 @@ compose.desktop {
         iconFile.set(project.file("icons/tohid.ico"))
       }
       macOS {
-        //  نامی که کاربر در Finder و Dock می‌بیند — «فروشگاه من»، نه نامِ درونیِ «Tohid»
-        packageName = "My Shop"
-        dockName = "My Shop"
+        //  نامی که کاربر در نوارِ منو و Dock می‌بیند (‎--mac-package-name‎ = CFBundleName) — «Daily Shop»، نه نامِ درونیِ «Tohid»؛
+        //  نامِ بستهٔ ‎Tohid.app‎ (‎packageName‎ ِ بالا) و ‎bundleID‎ عوض نمی‌شوند
+        packageName = "Daily Shop"
+        dockName = "Daily Shop"
         bundleID = "ir.vil3ntec.tohid.desktop"
         iconFile.set(project.file("icons/tohid.icns"))
       }

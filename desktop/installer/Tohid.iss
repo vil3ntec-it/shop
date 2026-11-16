@@ -1,4 +1,4 @@
-﻿; نصابِ ویندوزِ «فروشگاه من» — Inno Setup 6.5+، دو گونه از یک فایل:
+﻿; نصابِ ویندوزِ «Daily Shop» — Inno Setup 6.5+، دو گونه از یک فایل:
 ;
 ;   Tohid-Windows-Offline.exe  (/DOffline، ~۱۳۰ مگابایت) — همه‌چیز داخلِ خودش؛ تنها گونه‌ای که ساخته می‌شود
 ;   Tohid-Windows-Setup.exe    (پیش‌فرض، ~۳ مگابایت) — «نصابِ آنلاین»؛ از 2.14.5 دیگر ساخته نمی‌شود
@@ -73,8 +73,8 @@
 [Setup]
 ; ⛔ هرگز عوض نشود — ویندوز با همین شناسه نسخهٔ تازه را روی همان برنامه می‌نشاند
 AppId={{8C2E4F1A-5B7D-4E3C-9A61-2F0D7B3E5C14}
-AppName=فروشگاه من
-AppVerName=فروشگاه من {#AppVersion}
+AppName=Daily Shop
+AppVerName=Daily Shop {#AppVersion}
 AppVersion={#AppVersion}
 VersionInfoVersion={#AppVersion}
 AppPublisher=VIL3NTEC
@@ -82,7 +82,7 @@ AppPublisherURL=https://vil3ntec-it.github.io/shop/
 AppSupportURL=https://vil3ntec-it.github.io/shop/download.html
 AppCopyright=(c) VIL3NTEC
 DefaultDirName={localappdata}\Tohid
-DefaultGroupName=فروشگاه من
+DefaultGroupName=Daily Shop
 DisableProgramGroupPage=yes
 ; صاحب‌کار (۱۴۰۵/۰۸/۲۴): «چرا نمی‌شه پوشهٔ موردِ نظر رو انتخاب کرد» — صفحهٔ پوشه همیشه دیده می‌شود (پیش‌تر ‎auto‎: با نصبِ پیشین
 ; اصلاً نمی‌آمد). پیش‌فرض همان پوشهٔ پیشین (‎UsePreviousAppDir‎) یا ‎{localappdata}\Tohid‎. دادهٔ دکان جدا از پوشهٔ نصب در
@@ -102,7 +102,7 @@ WizardSmallImageFile=wizard-small-55.bmp,wizard-small-69.bmp,wizard-small-83.bmp
 WizardImageStretch=no
 SetupIconFile=..\icons\tohid.ico
 UninstallDisplayIcon={app}\Tohid.exe
-UninstallDisplayName=فروشگاه من
+UninstallDisplayName=Daily Shop
 CloseApplications=force
 RestartApplications=no
 SetupLogging=yes
@@ -129,6 +129,10 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; پوشه‌های برنامه با هر نسخه کامل عوض می‌شوند — فایلِ کهنه از نسخهٔ قبل نمی‌ماند
 Type: filesandordirs; Name: "{app}\app"
 Type: filesandordirs; Name: "{app}\runtime"
+; نامِ برنامه «Daily Shop» شد (۱۴۰۵/۰۸/۲۵): میان‌برهای نامِ پیشین پاک می‌شوند تا دو برنامه در منو دیده نشود
+; (میز کار فقط وقتی میان‌برِ تازه ساخته می‌شود). ‎AppId‎ و پوشهٔ نصب همان‌اند، پس به‌روزرسانی روی همان برنامه می‌نشیند.
+Type: files; Name: "{autoprograms}\فروشگاه من.lnk"
+Type: files; Name: "{autodesktop}\فروشگاه من.lnk"; Tasks: desktopicon
 
 [Files]
 #ifdef Offline
@@ -142,12 +146,12 @@ Type: filesandordirs; Name: "{app}\app"
 Type: filesandordirs; Name: "{app}\runtime"
 
 [Icons]
-Name: "{autoprograms}\فروشگاه من"; Filename: "{app}\Tohid.exe"
-Name: "{autodesktop}\فروشگاه من"; Filename: "{app}\Tohid.exe"; Tasks: desktopicon
+Name: "{autoprograms}\Daily Shop"; Filename: "{app}\Tohid.exe"
+Name: "{autodesktop}\Daily Shop"; Filename: "{app}\Tohid.exe"; Tasks: desktopicon
 
 [Run]
 ; نصبِ دستی: تیکِ «Launch»؛ به‌روزرسانیِ بی‌صدا: خودکار باز می‌شود (آزمونِ CI با ‎/NOLAUNCH‎ نه)
-Filename: "{app}\Tohid.exe"; Description: "{cm:LaunchProgram,فروشگاه من}"; Flags: nowait postinstall; Check: MayLaunch
+Filename: "{app}\Tohid.exe"; Description: "{cm:LaunchProgram,Daily Shop}"; Flags: nowait postinstall; Check: MayLaunch
 
 [Code]
 const
@@ -187,7 +191,7 @@ begin
   Result := DirWritable(WizardDirValue);
   if not Result then
     SuppressibleMsgBox(
-      'فروشگاه من cannot be installed in this folder:' + #13#10 + WizardDirValue + #13#10#13#10 +
+      'Daily Shop cannot be installed in this folder:' + #13#10 + WizardDirValue + #13#10#13#10 +
       'Windows does not allow writing there without administrator rights.' + #13#10 +
       'Please choose another folder (for example on drive D:, or your Documents folder).',
       mbError, MB_OK, IDOK);
@@ -207,9 +211,9 @@ var
 
 procedure InitializeWizard;
 begin
-  DownloadPage := CreateDownloadPage('Downloading فروشگاه من', 'Setup is downloading and verifying the program files...', nil);
+  DownloadPage := CreateDownloadPage('Downloading Daily Shop', 'Setup is downloading and verifying the program files...', nil);
   DownloadPage.ShowBaseNameInsteadOfUrl := True;
-  ResumePage := CreateOutputProgressPage('Downloading فروشگاه من',
+  ResumePage := CreateOutputProgressPage('Downloading Daily Shop',
     'If the connection drops, setup waits and continues where it stopped - it does not start over.');
 end;
 
@@ -533,7 +537,7 @@ begin
   if UseLocalPayload then Exit;
   if not DownloadPayload(Err) then begin
     SuppressibleMsgBox(
-      'فروشگاه من could not be downloaded.' + #13#10#13#10 +
+      'Daily Shop could not be downloaded.' + #13#10#13#10 +
       'Reason: ' + Err + #13#10#13#10 +
       'Please check your internet connection (or turn your VPN/proxy off or on) and click Install again.' + #13#10#13#10 +
       'Without internet: download the full installer MyShop-Windows-Setup.exe from' + #13#10 +

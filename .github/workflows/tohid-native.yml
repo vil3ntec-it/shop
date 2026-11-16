@@ -472,11 +472,11 @@ jobs:
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: tohid-native
-          name: توحید — نسخهٔ بومی اندروید
+          name: Daily Shop — نسخهٔ بومی اندروید
           prerelease: true
           target_commitish: ${{ github.sha }}
           body: |
-            ## توحید — نسخهٔ بومی اندروید
+            ## Daily Shop — نسخهٔ بومی اندروید
 
             بازنویسی کامل با Kotlin و Jetpack Compose. بدون HTML، بدون WebView.
 
@@ -495,7 +495,7 @@ jobs:
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: tohid-native-beta
-          name: توحید — نسخهٔ آزمایشی اندروید (beta)
+          name: Daily Shop — نسخهٔ آزمایشی اندروید (beta)
           prerelease: true
           target_commitish: ${{ github.sha }}
           body: |
@@ -545,7 +545,7 @@ jobs:
             exit 0
           fi
           up Tohid-Native.apk
-          #  نامِ رو به کاربر «فروشگاه من» است؛ «Tohid-Native.apk» فقط برای به‌روزرسانیِ نسخه‌های نصب‌شده می‌ماند
+          #  نامِ رو به کاربر «Daily Shop» است؛ «Tohid-Native.apk» فقط برای به‌روزرسانیِ نسخه‌های نصب‌شده می‌ماند
           cp Tohid-Native.apk MyShop-Android.apk
           up MyShop-Android.apk
           #  نسخهٔ کافه‌بازار — برای بارگذاری در پنلِ بازار، نه برای به‌روزرسانیِ گوشی‌ها

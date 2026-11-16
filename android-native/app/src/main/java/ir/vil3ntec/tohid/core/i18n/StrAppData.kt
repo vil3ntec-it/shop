@@ -39,7 +39,7 @@ object StrAppData {
   fun keystoreNoAnswer(why: Any?): String = t("Keystore جواب نداد: ${asIs(why)}", "Keystore didn't answer: $why", "Keystore ځواب ورنه کړ: $why")
 
   // ── پشتیبان و دیسک (`BackupBundle`، `BackupClock`، `BackupMirror`، `DiskWrite`، `ShopStore`) ──
-  val notOurBackup: String get() = t("این فایل، پشتیبانِ فروشگاه من نیست", "This file isn't a My Shop backup", "دا فایل د زما دوکان بک‌اپ نه دی")
+  val notOurBackup: String get() = t("این فایل، پشتیبانِ Daily Shop نیست", "This file isn't a Daily Shop backup", "دا فایل د Daily Shop بک‌اپ نه دی")
   val noBackupYet: String get() = t("هنوز پشتیبانی گرفته نشده", "No backup has been made yet", "لا هېڅ بک‌اپ نه دی اخیستل شوی")
   fun yesterdayOn(date: Any?): String = t("دیروز — ${asIs(date)}", "Yesterday — $date", "پرون — $date")
   fun daysAgoOn(date: Any?, days: Any): String = t(
@@ -180,7 +180,7 @@ object StrAppData {
   )
   val googleBadAnswer: String get() = t("پاسخِ گوگل شناخته نشد", "Google's answer wasn't recognised", "د ګوګل ځواب ونه پېژندل شو")
   val googleBadToken: String get() = t("ورود با گوگل کامل نشد؛ دوباره امتحان کنید", "Google sign-in didn't finish; tap again", "د ګوګل ننوتل بشپړ نه شول؛ بیا یې ووهئ")
-  val fpTitle: String get() = t("باز کردن فروشگاه من", "Open My Shop", "زما دوکان خلاصول")
+  val fpTitle: String get() = t("باز کردن Daily Shop", "Open Daily Shop", "Daily Shop خلاصول")
   val fpSubtitle: String get() = t("انگشتتان را روی حسگر بگذارید", "Put your finger on the sensor", "خپله ګوته پر سېنسر کېږدئ")
   val fpUsePin: String get() = t("با رمز وارد می‌شوم", "I'll sign in with the PIN", "په رمز ننوځم")
 
@@ -271,9 +271,9 @@ object StrAppData {
   )
   val exportBad: String get() = t("فایلِ خروجی معتبر نیست", "The export file isn't valid", "د صادرولو فایل سم نه دی")
   val exportNotOurs: String get() = t(
-    "این فایل، خروجیِ کاملِ فروشگاه من نیست",
-    "This file isn't a full My Shop export",
-    "دا فایل د زما دوکان بشپړ صادرول نه دی",
+    "این فایل، خروجیِ کاملِ Daily Shop نیست",
+    "This file isn't a full Daily Shop export",
+    "دا فایل د Daily Shop بشپړ صادرول نه دی",
   )
   val exportNoVersion: String get() = t("نسخهٔ قالب در فایل نیست", "The format version isn't in the file", "د بڼې نسخه په فایل کې نشته")
   fun exportNewer(v: Any?): String = t(

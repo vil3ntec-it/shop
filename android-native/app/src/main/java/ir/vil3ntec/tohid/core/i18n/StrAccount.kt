@@ -500,7 +500,7 @@ object StrAccount {
   val supportIntro: String get() = t("هر مشکلی یا سؤالی دارید همین‌جا بنویسید — پاسخ می‌دهیم.", "Write any problem or question here — we'll answer.", "هره ستونزه یا پوښتنه چې لرئ همدلته ولیکئ — ځواب درکوو.")
   val messageHint: String get() = t("پیام شما…", "Your message…", "ستاسو پیغام…")
   val send: String get() = t("فرستادن", "Send", "لېږل")
-  val systemSender: String get() = t("خبر از فروشگاه من", "News from My Shop", "د زما دوکان خبر")
+  val systemSender: String get() = t("خبر از Daily Shop", "News from Daily Shop", "د Daily Shop خبر")
   val notSent: String get() = t("فرستاده نشد", "Not sent", "ونه لېږل شو")
 
   // حذفِ حساب (قاعدهٔ Google Play؛ `DeleteAccountSheet`، سرور: `routes/account-deletion.js`)

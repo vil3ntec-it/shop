@@ -525,7 +525,7 @@ router.post('/sms/test', requireSuperAdmin, rateLimit({ max: 10, keyPrefix: 'adm
   const send = otp.senders[cfg.provider] || otp.senders.log;
 
   const code = String(Math.floor(100000 + Math.random() * 900000));
-  const message = cfg.template ? cfg.template.replace(/\{code\}/g, code) : `کد آزمایشی فروشگاه من: ${code}`;
+  const message = cfg.template ? cfg.template.replace(/\{code\}/g, code) : `کد آزمایشی Daily Shop: ${code}`;
 
   try {
     const out = await send(to, code, message);

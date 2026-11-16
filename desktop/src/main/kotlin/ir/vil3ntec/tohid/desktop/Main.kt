@@ -206,7 +206,7 @@ fun main() {
           visible = false
           if (!prefs.getBoolean("desktop_tray_told", false)) {
             prefs.edit().putBoolean("desktop_tray_told", true).apply()
-            DesktopNotify.show("فروشگاه من هنوز باز است", "همگام‌سازی و هشدارها پشتِ صحنه می‌مانند. برای خروج: سینیِ سیستم ⇒ خروج")
+            DesktopNotify.show("Daily Shop هنوز باز است", "همگام‌سازی و هشدارها پشتِ صحنه می‌مانند. برای خروج: سینیِ سیستم ⇒ خروج")
           }
         } else quit()
       },
