@@ -57,6 +57,31 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۶ — عاملِ e-desk-d3c زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-desk-d3c` (از `origin/main` a0b0f9355) — فرم‌های خرید و پنجره‌های کامپیوتر روی `ui/desk` (WIP، مکث به خواستِ صاحب‌کار)
+
+- **خواست**: باقیِ طراحیِ کامپیوتر (d3b): فرمِ «فاکتورِ خریدِ تازه» و ویرایشگرِ سفارشِ خرید روی `ui/desk`، پنجره‌های تأییدِ کامپیوتر
+  بی دکمهٔ Material، و عکس‌های پیش/پسِ d3b دوباره. منطق و داده دست نمی‌خورد؛ گوشی همان.
+- **انجام‌شده** (کامپایلِ کامل سبز؛ از آزمون‌ها فقط `DeskDataScreensUiTest` اجرا شد: ۱۰ از ۱۰ سبز؛ آزمونِ تازه هنوز نیست):
+  - `ui/desk/DeskDialog.kt` (تازه، افزودنی): `DeskDialog` (کارتِ وسط، سرخط با کاشیِ آیکن، بدنهٔ پیمایشی، ردیفِ `DeskButton`؛ Esc/بیرون =
+    انصراف، Enter = کارِ اصلی، کارِ پاک‌کننده با فوکوسِ آغاز روی «انصراف»)، `DeskDialogAction`، `DeskDialogSize`، `DeskConfirmDialog`،
+    `DeskReasonDialog` (کادرِ دلیل با فوکوس)، `DeskDialogText`، `DeskDialogField`. `DeskKit`: `DeskButtonKind.DANGER` (افزودنی).
+  - `V3ConfirmSheet` با `LocalDeskLayout` ⇒ `DeskConfirmDialog` (۴۸ پرسشِ تأیید روی کامپیوتر؛ گوشی و پیش‌نمایشِ گوشی همان برگه).
+  - پنجره‌های فقط‌کامپیوتر روی `DeskDialog`: خالی کردنِ سبدِ صندوق (`DeskSale`)، حدهای موجودیِ گروهی (`DeskProducts`)، سقفِ اعتبار
+    (`DeskCreditLimitDialog`)، `BulkConfirmDialog`/`BulkResultDialog` (تنها کاربر: کالاهای کامپیوتر؛ ردیفِ آرام، وضعیت به واژه)؛ شاخهٔ
+    `LocalDeskLayout` در `PoBillVoidDialog` و `PoBillsList` (گوشی همان)؛ «برگشت به جدول» ِ `DeskInvoices` ⇒ `DeskButton`.
+  - `Fields.kt`: `DeskNumberField` (همان پالایهٔ رقم و نگهبانِ اسکنِ HW-05 روی کادرِ کامپیوتر). `PurchaseUnitPicker` (فقط فرم‌های خریدِ
+    کامپیوتر) ⇒ `DeskChip`/`DeskNote`.
+  - **فاکتورِ خریدِ تازه**: `NewPurchaseInvoice` (`DeskPurchasing.kt`) روی `DeskPage`/`DeskCard`/`DeskTableHead`/`DeskTextField`/`DeskDropdown`
+    و اجزای `ui/screens/DeskPurchaseForm.kt` (تازه: `PurchaseDraft` = همان `Draft`، `purchaseDefaultPrice`، `DeskPurchaseLineRow`، فهرستِ
+    پیشنهادِ بی‌دزدیِ فوکوس، نوارِ کلیدها). ردیف‌ها، اسکن، کلیدها (Enter/F9/Ctrl+Enter/Ctrl+S/Ctrl+I/Esc) و `save()` بایت‌به‌بایت همان.
+    نوشته‌های تازه در `StrDeskData` (۵ کلید).
+- **نیمه‌کاره / قدمِ بعدی**: (۱) ویرایشگر و جزئیات و دریافتِ سفارشِ خرید (`PoEditor`/`PoDetail`/`PoReceive`/`PriceHistoryDialog`/`PoProductPicker`
+  در `PurchaseOrders.kt`، فقط کامپیوتر) هنوز Material‌اند — همان الگوی بالا (`DeskNumberField` برای مقدار/فی، `DeskReasonDialog` برای لغو)؛
+  (۲) آزمونِ تازه: باز کردن/پر کردن/ثبتِ فاکتورِ خرید (ردیف و موجودی در دفتر همان پیشین) و پنجره‌ها (Enter/Esc، فوکوسِ «انصراف»)؛
+  سپس آزمون‌های میزِ موجود (`DeskDataScreensUiTest`، `DeskSaleD3aUiTest`، `LookGuardTest`، `HardcodedColorsTest`، `ScreenSpeedBenchTest`) و اجرای
+  کاملِ `desktop test`؛ (۳) عکس‌ها: «پیش» ِ d3c روی `origin/main`، پیش ِ d3b روی `origin/claude/e-desk-d1` (مشتری‌ها با بدنه) و `compare-*.png`
+  در `/home/user/wt-d3c-shots/` — هیچ‌کدام گرفته نشد؛ (۴) `AlertDialog` ِ پرونده‌های مشترک (۵۶ پرونده، مثلِ `HeldInvoiceBar`، `Servers`،
+  `ShiftV2`) هنوز Material‌اند. `quality` ِ precheck روی `origin/main` هم ۵ پروندهٔ بالای سقفِ `platform-deps` دارد که این شاخه دست نزده.
 ### ۱۴۰۵/۰۸/۲۵ — هماهنگ‌کننده (سیزنِ 01GcPTAL…)، پایانِ سیزن: دستهٔ ۷۰ (`claude/batch-70`، PR #1057)
 
 - **مرج‌شده در این سیزن**: #1053 (۶۶)، #1054 (۶۷)، #1055 (۶۸)، #1056 (۶۹)؛ سرور #151 (۱.۵۱.۲: کارتِ «اعلانِ گوشی (Firebase)» و دکمهٔ

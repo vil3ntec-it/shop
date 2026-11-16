@@ -111,6 +111,24 @@ internal fun PoBill(d: ShopData, repo: PurchaseOrderRepository, order: PurchaseO
 @Composable
 internal fun PoBillsList(order: PurchaseOrderDto, manage: Boolean, busy: Boolean, onVoid: (PoBillDto) -> Unit) {
   if (order.bills.isEmpty()) return
+  //  کامپیوتر (`claude/e-desk-d3c`): ردیفِ آرامِ `ui/desk` و دکمهٔ «باطل» ِ کامپیوتر — همان داده و همان شرطِ «باطل»
+  if (ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout.current) {
+    val dc = ir.vil3ntec.tohid.ui.desk.Desk.colors
+    ir.vil3ntec.tohid.ui.desk.DeskSubhead(StrSupplierBills.title, Modifier.padding(top = 14.dp, bottom = 4.dp))
+    order.bills.forEach { b ->
+      Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+          Text(
+            PurchaseOrderBook.billLine(b), style = ir.vil3ntec.tohid.ui.desk.DeskType.body, color = if (b.active) dc.ink else dc.inkMuted,
+            textDecoration = if (b.active) null else TextDecoration.LineThrough,
+          )
+          b.voidReason?.takeIf { !b.active }?.let { ir.vil3ntec.tohid.ui.desk.DeskNote(StrPurchasePages.voidedWhy(it)) }
+        }
+        if (PurchaseOrderBook.canVoid(b, manage)) ir.vil3ntec.tohid.ui.desk.DeskButton(StrPurchasePages.voidBtn, { onVoid(b) }, enabled = !busy, kind = ir.vil3ntec.tohid.ui.desk.DeskButtonKind.GHOST)
+      }
+    }
+    return
+  }
   val c = Shop.colors
   Spacer(Modifier.height(14.dp))
   Text(StrSupplierBills.title, style = MaterialTheme.typography.labelLarge, color = c.muted, fontWeight = FontWeight.SemiBold)
@@ -155,6 +173,14 @@ internal fun PoMatchLines(d: ShopData, order: PurchaseOrderDto) {
 internal fun PoBillVoidDialog(bill: PoBillDto, busy: Boolean, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
   val c = Shop.colors
   var why by remember(bill.id) { mutableStateOf("") }
+  //  کامپیوتر (`claude/e-desk-d3c`): پنجرهٔ دلیلِ `ui/desk` — همان دلیلِ لازم و همان [onConfirm]؛ گوشی همان پنجرهٔ پیشین
+  if (ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout.current) {
+    ir.vil3ntec.tohid.ui.desk.DeskReasonDialog(
+      StrPurchasePages.voidAsk(bill.billNo), StrPurchasePages.voidNote, StrLoyalty.adjustReason, why, { why = it.take(300) },
+      StrPurchasePages.voidIt, enabled = why.isNotBlank() && !busy, onConfirm = { onConfirm(why.trim()) }, onDismiss = onDismiss,
+    )
+    return
+  }
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = c.surfaceSolid,

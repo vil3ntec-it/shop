@@ -63,6 +63,32 @@ fun NumberField(
 }
 
 /**
+ *  کامپیوتر (`claude/e-desk-d3c`): همان [NumberField] — رقمِ لاتین، فقط رقم و نقطه، نگهبانِ اسکنِ HW-05 — روی کادرِ
+ *  `ui/desk` (۳۶dp، عدد ترازِ پایان). [label] برچسبِ کوچکِ بالا (مگر `showLabel = false` در خانهٔ جدول) و نامِ دسترسیِ کادر.
+ */
+@Composable
+fun DeskNumberField(
+  value: String,
+  onValueChange: (String) -> Unit,
+  label: String,
+  modifier: Modifier = Modifier,
+  showLabel: Boolean = true,
+  note: String? = null,
+  enabled: Boolean = true,
+) {
+  val c = ir.vil3ntec.tohid.ui.desk.Desk.colors
+  Column(modifier) {
+    if (showLabel) Text(label, Modifier.padding(bottom = 4.dp), style = ir.vil3ntec.tohid.ui.desk.DeskType.label, color = c.inkSecondary, maxLines = 1)
+    ir.vil3ntec.tohid.ui.desk.DeskTextField(
+      value, { raw -> onValueChange(latinDigits(raw).filter { it.isDigit() || it == '.' }) },
+      Modifier.fillMaxWidth().scanGuard(value, onValueChange),
+      enabled = enabled, textAlign = androidx.compose.ui.text.style.TextAlign.End, description = label,
+    )
+    if (note != null) Text(note, Modifier.padding(top = 4.dp), style = ir.vil3ntec.tohid.ui.desk.DeskType.secondary, color = c.inkSecondary)
+  }
+}
+
+/**
  *  HW-05 «اسکن هرگز در فیلد قیمت یا تعداد نمی‌نشیند» — فقط با «ابزارهای تازهٔ دستگاه» (`HwTools`) روشن.
  *
  *  بارکدخوان مثلِ صفحه‌کلید تایپ می‌کند، پس نخستین نویسه‌ها پیش از آن‌که بدانیم اسکن است به کادر
