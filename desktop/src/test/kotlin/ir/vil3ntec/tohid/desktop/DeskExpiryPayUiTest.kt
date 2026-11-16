@@ -28,6 +28,7 @@ import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrPay
 import ir.vil3ntec.tohid.core.i18n.StrPos
+import ir.vil3ntec.tohid.core.i18n.StrTillPay
 import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.ExpiryPref
 import ir.vil3ntec.tohid.data.Product
@@ -98,7 +99,7 @@ class DeskExpiryPayUiTest {
   /** حساب‌پیِ حالتِ ساده برای همین دکان (بی سرور: همان پاسخی که `GET /shop/payments/config` در حافظهٔ یک‌دقیقه‌ای می‌گذارد) */
   private fun simpleHesab() {
     assumeTrue("بی شبکه حساب‌پی پنهان است", env.online())
-    cached.set(env, System.currentTimeMillis() to TillHesab(false, "simple", SimpleAccount("0700000000", ""), payee = Payee("دکانِ آزمون", "1234", "fp-xp")))
+    cached.set(env, System.currentTimeMillis() to TillHesab(false, "simple", SimpleAccount("0700000000", ""), payee = Payee("دکانِ آزمون", "1234", "fp-xp"), flag = true))
   }
 
   private fun open() {
@@ -118,7 +119,13 @@ class DeskExpiryPayUiTest {
         }
       }
     }
-    rule.waitUntil(15_000) { has(StrPay.payToShop) }
+    rule.waitUntil(15_000) { has(StrTillPay.tileHesab) }
+  }
+
+  /** e-paystep: کاشیِ «حساب‌پی» ِ کنارِ سبد ⇒ گامِ پرداخت با حساب‌پی (همان دکمهٔ «پرداخت به حسابِ دکان» برای باقی) */
+  private fun hesabStep() {
+    tap(hasText(StrTillPay.tileHesab) and hasClickAction())
+    rule.waitUntil(10_000) { has(StrPay.payToShop) }
   }
 
   private fun has(text: String) = rule.onAllNodes(hasText(text)).fetchSemanticsNodes().isNotEmpty()
@@ -135,7 +142,7 @@ class DeskExpiryPayUiTest {
     simpleHesab()
     open()
 
-    tap(hasText(StrPay.payToShop) and hasClickAction())
+    hesabStep()
     runCatching { rule.waitUntil(10_000) { has(StrPos.expiredSaleTitle) } }
       .onFailure { throw AssertionError("پیش از گرفتنِ پول پنجرهٔ تأییدِ منقضی باز نشد؛ برگهٔ پول باز است: ${has(StrPay.shopHesabTitle)}", it) }
     assertFalse("برگهٔ پول پیش از تأیید باز نمی‌شود", has(StrPay.shopHesabTitle))
@@ -147,6 +154,7 @@ class DeskExpiryPayUiTest {
     assertEquals(0, sales())
 
     //  دوباره ⇒ همان پنجره؛ صاحبِ پشتِ صندوق با دلیل تأیید می‌کند ⇒ حالا برگهٔ پول، و «پول رسید» همان فروش را می‌نویسد
+    rule.waitUntil(5_000) { has(StrPay.payToShop) }
     tap(hasText(StrPay.payToShop) and hasClickAction())
     rule.waitUntil(10_000) { has(StrPos.expiredSaleTitle) }
     rule.onAllNodes(hasSetTextAction() and (hasContentDescription(StrPos.reasonKept) or hasText(StrPos.reasonKept)))[0].performTextInput("مشتری خودش خواست")

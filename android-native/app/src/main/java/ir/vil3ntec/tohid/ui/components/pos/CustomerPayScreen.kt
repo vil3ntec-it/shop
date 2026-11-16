@@ -59,7 +59,9 @@ fun CustomerPayScreen(storeName: String, v: CustomerPay.View) {
     //  پس رنگ‌ها از پالتِ روزِ Theme.kt می‌آیند، نه از تمِ جاری و نه عددِ ثابت (F0-18)
     val qr: @Composable () -> Unit = {
       Box(Modifier.size(side).clip(RoundedCornerShape(20.dp)).background(LightColors.surface), contentAlignment = Alignment.Center) {
-        if (rows != null && v.stage == CustomerPay.Stage.WAITING) QrImage(rows, Modifier.fillMaxSize().padding(10.dp))
+        //  عکسِ QR ِ خودِ دکان (۱۴۰۵/۰۸/۲۶) بزرگ؛ وگرنه همان QR ِ کشیده
+        if (v.picture != null && v.stage == CustomerPay.Stage.WAITING) ShopQrPicture(v.picture, Modifier.fillMaxSize().padding(10.dp))
+        else if (rows != null && v.stage == CustomerPay.Stage.WAITING) QrImage(rows, Modifier.fillMaxSize().padding(10.dp))
         else Text("✓", fontSize = 96.sp, color = LightColors.success)
       }
     }

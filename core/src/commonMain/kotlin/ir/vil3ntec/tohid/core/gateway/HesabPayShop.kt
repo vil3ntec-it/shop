@@ -44,13 +44,23 @@ data class PayeeTotal(val kind: String, val name: String, val last4: String, val
   }
 }
 
-/** حسابِ تازه‌ای که هنوز فعال نیست (۲۴ ساعت) — فقط نام و ۴ رقم */
-data class PendingPayee(val name: String, val last4: String, val until: Long)
+/** حسابِ تازه‌ای که هنوز فعال نیست (۲۴ ساعت) — فقط نام و ۴ رقم؛ `qrImage` = عکسِ QR ِ تازه دارد (۱۴۰۵/۰۸/۲۶) */
+data class PendingPayee(val name: String, val last4: String, val until: Long, val qrImage: Boolean = false)
 
-/** شماره و QR ِ دکان برای صندوقِ حالتِ ساده */
-data class SimpleAccount(val account: String, val qrPayload: String) {
+/**
+ *  شماره و QR ِ دکان برای صندوقِ حالتِ ساده؛ `qrImage` = هشِ sha256 ِ عکسِ QR ِ فعالِ دکان (صاحب‌کار ۱۴۰۵/۰۸/۲۶ — «عکسِ QR ِ
+ *  حساب‌پیم را بار می‌کنم»)، '' = بی عکس. صندوق عکس را فقط وقتی نشان می‌دهد که دوباره خوانده و همان [qrPayload] باشد.
+ */
+data class SimpleAccount(val account: String, val qrPayload: String, val qrImage: String = "") {
   /** آنچه در QR ِ صندوق کشیده می‌شود: QR ِ خودِ دکان، وگرنه شماره */
   val qrText: String get() = qrPayload.ifBlank { account }
+
+  companion object {
+    private val HASH = Regex("^[0-9a-f]{64}$")
+
+    /** فقط هشِ درست (هر چیزِ دیگرِ سرور ⇒ بی عکس) */
+    fun imageHash(v: Any?): String = (v as? String)?.takeIf { HASH.matches(it) }.orEmpty()
+  }
 }
 
 /**
@@ -88,7 +98,10 @@ data class TillHesab(
       val s = h["simple"] as? Map<*, *>
       val account = (s?.get("account") as? String).orEmpty()
       val qr = (s?.get("qrPayload") as? String).orEmpty()
-      val simple = if (mode == HesabPayShop.SIMPLE && (account.isNotBlank() || qr.isNotBlank())) SimpleAccount(account, qr) else null
+      val simple = if (mode == HesabPayShop.SIMPLE && (account.isNotBlank() || qr.isNotBlank())) {
+        //  عکس فقط همراهِ متنِ QR (سرور هم همین را می‌خواهد)
+        SimpleAccount(account, qr, if (qr.isBlank()) "" else SimpleAccount.imageHash(s?.get("qrImage")))
+      } else null
       val known = (h["payees"] as? List<*>).orEmpty().mapNotNull { Payee.fromMap(it as? Map<*, *>) }.filter { it.fp.isNotBlank() }
       val enabled = h["enabled"] == true
       val flag = (h["flag"] as? Boolean) ?: enabled
@@ -214,6 +227,8 @@ data class HesabAccountView(
   val opened: Boolean = false,
   val account: String = "",
   val qrPayload: String = "",
+  /** هشِ عکسِ QR ِ فعال ('' = بی عکس) — همان `GET /shop/payments/qr-image/<hash>` ِ صندوق */
+  val qrImage: String = "",
   val keyLast4: String = "",
   val merchantSet: Boolean = false,
   val webhookUrl: String = "",
@@ -239,7 +254,7 @@ data class HesabAccountView(
       val mode = (m["mode"] as? String)?.takeIf { it in HesabPayShop.MODES } ?: HesabPayShop.OFF
       val auto = m["auto"] as? Map<*, *>
       val p = m["pending"] as? Map<*, *>
-      val pending = p?.let { x -> long(x["until"])?.let { PendingPayee((x["name"] as? String).orEmpty(), (x["last4"] as? String).orEmpty(), it) } }
+      val pending = p?.let { x -> long(x["until"])?.let { PendingPayee((x["name"] as? String).orEmpty(), (x["last4"] as? String).orEmpty(), it, x["qrImage"] == true) } }
       val device = m["device"] as? Map<*, *>
       return HesabAccountView(
         pinSet = m["pinSet"] == true,
@@ -253,6 +268,7 @@ data class HesabAccountView(
         opened = opened,
         account = (m["account"] as? String).orEmpty(),
         qrPayload = (m["qrPayload"] as? String).orEmpty(),
+        qrImage = SimpleAccount.imageHash(m["qrImage"]),
         keyLast4 = (auto?.get("keyLast4") as? String).orEmpty(),
         merchantSet = auto?.get("merchantSet") == true,
         webhookUrl = (auto?.get("webhookUrl") as? String).orEmpty(),
@@ -300,11 +316,16 @@ class HesabPayAccountClient(private val transport: GatewayTransport) {
   /** رمز فراموش شد: رمز و حساب پاک و ۲۴ ساعت بی حسابِ تازه (سرور) */
   suspend fun resetPin(): AccountCall = of(transport.post("${HesabPayShop.ROOT}/pin/reset", emptyMap()), opened = false)
 
-  /** `name` = نامِ صاحبِ حساب (همان که صندوق کنارِ QR نشان می‌دهد)؛ سرور اجباری می‌خواهدش */
-  suspend fun saveSimple(pin: String, name: String, account: String, qr: String): AccountCall {
+  /**
+   *  `name` = نامِ صاحبِ حساب (همان که صندوق کنارِ QR نشان می‌دهد)؛ سرور اجباری می‌خواهدش. `qrImage` (۱۴۰۵/۰۸/۲۶) = عکسِ QR ِ
+   *  آماده‌شده (JPEG ِ کوچکِ بی فراداده) که [qr] را برنامه از خودِ آن خوانده؛ `keepQrImage` = عکسِ فعال بماند اگر متنِ QR همان است.
+   */
+  suspend fun saveSimple(pin: String, name: String, account: String, qr: String, qrImage: ByteArray? = null, keepQrImage: Boolean = false): AccountCall {
     val body = linkedMapOf<String, Any?>("pin" to pin, "name" to name.trim(), "mode" to HesabPayShop.SIMPLE)
     if (account.isNotBlank()) body["account"] = account.trim()
     if (qr.isNotBlank()) body["qr"] = qr.trim()
+    if (qrImage != null && qr.isNotBlank()) body["qrImage"] = kotlin.io.encoding.Base64.encode(qrImage)
+    else if (keepQrImage && qr.isNotBlank()) body["keepQrImage"] = true
     return of(transport.put("${HesabPayShop.ROOT}/account", body), opened = true)
   }
 

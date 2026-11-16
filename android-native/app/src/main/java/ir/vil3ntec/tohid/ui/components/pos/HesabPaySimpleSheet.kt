@@ -102,6 +102,8 @@ internal fun HesabPaySimpleEntry(
   if (due !is HesabPaySettle.Due.Amount) return
   var open by remember(saleKey) { mutableStateOf(false) }
   LaunchedEffect(ask) { if (ask > 0) { onAsked(); if (enabled && !busy && hook.ready()) open = true } }
+  //  صاحب‌کار ۱۴۰۵/۰۸/۲۶: عکسِ QR ِ خودِ دکان (خوانده و سنجیده) — پیش از باز شدن آماده
+  val picture = rememberShopQr(hook.env, simple)
   Column(modifier) {
     OutlinedButton(
       onClick = { if (hook.ready()) open = true },
@@ -116,6 +118,7 @@ internal fun HesabPaySimpleEntry(
     HesabPaySimpleSheet(
       saleKey = saleKey, simple = simple, payee = payee, amountMinor = due.minor, total = total, draft = draft, busy = busy,
       precheck = hook.precheck, now = hook.env::now, storeName = hook.env::storeName, onPaid = onPaid, onClose = { open = false },
+      picture = picture,
     )
   }
 }
@@ -134,6 +137,7 @@ private fun HesabPaySimpleSheet(
   storeName: () -> String,
   onPaid: (Settlement) -> Unit,
   onClose: () -> Unit,
+  picture: androidx.compose.ui.graphics.ImageBitmap? = null,
 ) {
   val c = Shop.colors
   val ref = remember(saleKey) { HesabPayShop.invoiceRef(saleKey) }
@@ -159,7 +163,7 @@ private fun HesabPaySimpleSheet(
   }
 
   //  نمایشگرِ رو به مشتری (HW-10): همان QR و مبلغ
-  LaunchedEffect(qrText, amountMinor) { CustomerPay.view.value = CustomerPay.View(amountMinor, qrText, CustomerPay.Stage.WAITING) }
+  LaunchedEffect(qrText, amountMinor, picture) { CustomerPay.view.value = CustomerPay.View(amountMinor, qrText, CustomerPay.Stage.WAITING, picture) }
   DisposableEffect(Unit) { onDispose { CustomerPay.view.value = null } }
   val shop = remember { storeName() }
   PayDevice.CustomerScreen(active = true) {
@@ -179,10 +183,12 @@ private fun HesabPaySimpleSheet(
           Spacer(Modifier.height(12.dp))
           //  کادرِ QR همیشه روشن (QR ِ وارونه را بیشترِ دوربین‌ها نمی‌خوانند) — همان پالتِ روزِ `HesabPaySheet`
           Box(
-            Modifier.size(260.dp).clip(RoundedCornerShape(16.dp)).background(LightColors.surface),
+            Modifier.size(if (picture != null) 320.dp else 260.dp).clip(RoundedCornerShape(16.dp)).background(LightColors.surface),
             contentAlignment = Alignment.Center,
           ) {
-            if (rows != null) QrImage(rows, Modifier.fillMaxSize().padding(8.dp))
+            //  عکسِ QR ِ خودِ دکان بزرگ؛ وگرنه همان QR ِ کشیده از متن
+            if (picture != null) ShopQrPicture(picture, Modifier.fillMaxSize().padding(8.dp))
+            else if (rows != null) QrImage(rows, Modifier.fillMaxSize().padding(8.dp))
             else Text(simple.account, fontSize = 28.sp, color = LightColors.textPrimary)
           }
           payee?.let { PayeeLine(it) }

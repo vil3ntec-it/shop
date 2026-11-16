@@ -50,6 +50,7 @@ import ir.vil3ntec.tohid.core.i18n.StrTillPay
 import ir.vil3ntec.tohid.core.pay.Settlement
 import ir.vil3ntec.tohid.core.pay.TillMethods
 import ir.vil3ntec.tohid.pay.HesabPaySettle
+import ir.vil3ntec.tohid.ui.components.pos.PayStep
 import ir.vil3ntec.tohid.pay.platform.HesabPayEnv
 import androidx.compose.runtime.produceState
 import kotlinx.coroutines.launch
@@ -104,7 +105,8 @@ fun RouteScope.CheckoutRoute() {
     val expiryGateOn = tillGuards.expiryGate
     val checkoutRules = tillGuards.rules
     val seller = remember { ir.vil3ntec.tohid.data.TillUser.me(context) } // S46: کاربرِ صندوق؛ خاموش ⇒ همان نامِ حساب
-    val payV2 = remember { ShopPolicy.payV2(context) }
+    //  e-paystep: فاکتور همیشه با تسویهٔ گامِ پرداخت ثبت می‌شود (پرچمِ `ShopPolicy.payV2` فقط صفحهٔ صندوق/شیفت را می‌گزیند)
+    val payV2 = true
     //  PAY-24: کارتِ هدیه و اعتبار در روش‌های پنل فقط با `GiftCardPref` ِ همین دستگاه (پیش‌فرض خاموش ⇒ همان روش‌ها)
     val giftOn = remember { GiftCardPref.on(context) }
     if (CheckoutSession.pay.stored != giftOn) CheckoutSession.pay.stored = giftOn
@@ -130,28 +132,33 @@ fun RouteScope.CheckoutRoute() {
     //  «اصلاحِ فاکتور» (`SaleReopen.extras`): فروشندهٔ همان فاکتور؛ وگرنه کاربرِ صندوق. تأییدها همیشه به نامِ کاربرِ صندوق‌اند
     val invoiceSeller = HeldSession.extras(cart).seller.ifBlank { seller }
     //  همین یک `Checkout` جمع، پیش‌سنجیِ حساب‌پی و ثبت را می‌سازد ⇒ قاعده‌ها و تأییدِ منقضی همه‌جا همان‌اند
+    //  e-paystep: هر فروش با تسویهٔ گامِ پرداخت ثبت می‌شود ⇒ گردِ نقد همان گردِ تسویه (`PayPanelState.cashRounding`)، نه فاکتور
     val checkout = CheckoutModel.checkout(
-      form, canDiscount, blockExpired, invoiceSeller, if (payV2) 0L else cashStep, rules = checkoutRules, expiryGate = expiryGateOn,
+      form, canDiscount, blockExpired, invoiceSeller, 0L, rules = checkoutRules, expiryGate = expiryGateOn,
     ).copy(lineSellers = lineSellers, tax = taxConfig).copy(expiryApproval = CheckoutSession.expiryApproval)
     val n = CheckoutModel.numbers(data, loyal, form, checkout)
     val decision = ShopRole.decide(context, "sales.discount", DiscountGate.req(n.discount, n.subtotal))
     val gate = DiscountGate.state(decision.decision, saleKey, n.discount, n.subtotal, CheckoutSession.approval)
     val discountError = CheckoutModel.discountError(form, canDiscount)
-    val paidError = CheckoutModel.paidError(form, payV2)
     val debtor = form.debtorId?.let { id -> data.debtors.find { it.id == id } }
-    //  e-paymethods: «نقد» ِ خودکار (پیش‌فرضِ هر تسویهٔ تازه) همان مبلغِ لازمِ همین لحظه — با تخفیف یا ردیفِ تازه دوباره
-    if (payV2) CheckoutSession.pay.syncAuto(n.finalTotal, form.debtorId)
-    //  ⛔ نسیه بی مشتری (`CreditDebtor`): هر سهمِ نپرداخته مشتریِ موجود و فعال می‌خواهد ⇒ «ثبت» خاموش با «انتخابِ مشتری»
-    val split = if (payV2) ir.vil3ntec.tohid.data.PayFlow.preview(CheckoutSession.pay.draft(n.finalTotal, form.debtorId)).valueOrNull() else null
-    val creditBlock = CheckoutModel.creditBlock(data, form, n, payV2, split)
+    //  e-paystep: «نقدی | نسیه» و پنلِ پرداخت دیگر در این برگه نیستند — گامِ پرداخت (`sale/checkout/pay`)، با پرچمِ `payV2` و بی آن
     //  PAY-21: «پرداخت با حساب‌پی (NFC/QR)» — فقط با `pay.hesabpay`، گیرندهٔ معلوم و نت (`TillHesab.tillNfc`)؛ یک دقیقه در حافظه
     val hesabEnv = remember { HesabPayEnv.of(context) }
     val till by produceState(TillHesab.OFF, saleKey) { value = hesabEnv.till() }
     //  e-paymethods: همهٔ روش‌های دکان به‌صورتِ کاشی (`TillMethods`): روش‌های روشنِ پنل (برداشته‌های دکان بیرون) + حالِ حساب‌پیِ
     //  خودِ دکان (آماده / ۲۴ ساعتِ در انتظار / راه‌اندازی‌نشده). فقط با پنلِ ترکیبی؛ «نقدی | نسیه» ِ پیشین بی کاشی می‌ماند
     val hesabState = TillMethods.hesab(till, ir.vil3ntec.tohid.data.ReportBridge.nowMs())
-    val tiles = if (payV2) TillMethods.tiles(CheckoutSession.pay.methods(), hesabState) else null
     val isOwner = remember { ShopRole.current(context) == ShopRole.OWNER }
+    //  حساب‌پی فقط وقتی پول گرفتنی است: نه با تخفیفِ تأییدنشده یا ممنوع (پول گرفته و فروش رد نشود)
+    val hesabOk = discountError == null && gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED
+    fun tilesFor(h: TillMethods.Hesab) = TillMethods.tiles(CheckoutSession.pay.methods(), h).map { t ->
+      if (t.kind == TillMethods.Kind.HESABPAY && t.enabled) t.copy(enabled = hesabOk) else t
+    }
+    val tiles = tilesFor(hesabState)
+    //  e-paystep: پرداختِ گرفته‌شده‌ای که ثبت نشده فقط برای همین مبلغ و همین مشتری (تخفیف یا مشتری عوض شد ⇒ دوباره پرداخت)
+    val settled = CheckoutSession.settled?.takeIf { st ->
+      st.total == ir.vil3ntec.tohid.data.PayFlow.minor(n.finalTotal) && (st.toAccount == 0L || CheckoutSession.settledFor == form.debtorId)
+    }
 
     /**
      *  S22: برگهٔ تأییدِ فروشِ منقضی (همان PIN ِ سقفِ اعتبار، `ExpiryApprovalRoute`) برای نیازِ [need] ِ همین سبد.
@@ -163,21 +170,20 @@ fun RouteScope.CheckoutRoute() {
       nav.open(SalesPaths.EXPIRY)
     }
 
-    /** @param paid تسویهٔ تأییدشدهٔ حساب‌پی (`HesabTillRoute`): کلِ فاکتور یا باقیِ پنل را پرداخته ⇒ نه نسیه، نه «پرداختی» */
-    fun submit(paid: Settlement? = null) {
-      if (!CheckoutModel.canSubmit(busy, discountError, paidError.takeIf { paid == null }, gate, creditBlock.takeIf { paid == null })) return
+    /**
+     *  ثبت — فقط با تسویهٔ تأییدشدهٔ گامِ پرداخت ([settled]) یا حساب‌پی (`HesabTillRoute`) ⇒ هرگز بی پرداخت (e-paystep).
+     *  @param paid تسویهٔ همان پرداخت؛ `null` ⇒ همان [settled] (پس از تأییدِ سقفِ اعتبار، سقف‌های سرور یا منقضی)
+     */
+    fun submit(paid: Settlement? = CheckoutSession.hesabPaid ?: settled) {
+      if (paid == null) return
+      if (!CheckoutModel.canSubmit(busy, discountError, null, gate, null)) return
       //  POS-12: سبد همین حالا با جابه‌جایی عوض شد ⇒ ردیف‌های قبلی با کلیدِ فاکتورِ دیگر ثبت نشوند
       if (!HeldRules.shownIsCurrent(lines, cart.lines.value)) { error = StrPos.cartChangedRetry; return }
       //  برگهٔ تأییدشده همراهِ فاکتور؛ «نیازمند تأیید» بی برگه یا «ممنوع» این‌جا نمی‌رسد. STF-03: با پرچمِ قیمتِ سرور برگهٔ
       //  «تخفیفِ پنهان» هم (تخفیفِ نوشته شاید صفر یا زیرِ سقف باشد)؛ سرور برگهٔ نالازم را مصرف نمی‌کند
       val signed = if (gate == DiscountGate.State.APPROVED || capRules.price) CheckoutSession.approval?.let(DiscountGate::json) else null
       val capSlips = buildMap { CheckoutSession.approval?.let { put(SaleCaps.DISCOUNT, it) }; putAll(CheckoutSession.capSlips) }
-      val options = if (paid != null) checkout.copy(settlement = paid, debtorId = form.debtorId, approval = signed)
-      else if (!payV2) CheckoutModel.legacy(checkout, n, form).copy(approval = signed)
-      else when (val r = CheckoutStoredPay.settle(data, CheckoutSession.pay.draft(n.finalTotal, form.debtorId))) {
-        is CheckoutStoredPay.Out.Ok -> checkout.copy(settlement = r.settlement, debtorId = form.debtorId, approval = signed)
-        is CheckoutStoredPay.Out.Bad -> { payError = r.message; return }
-      }
+      val options = checkout.copy(settlement = paid, debtorId = form.debtorId, approval = signed)
       payError = null
       error = null
       //  CRM-03 / S07 (پشتِ `ShopPolicy.creditGate`): نسیهٔ بیش از سقف ⇒ «درخواستِ تأیید»؛ بی تأیید هیچ چیز
@@ -280,14 +286,15 @@ fun RouteScope.CheckoutRoute() {
       if (freshExpiry != null && CheckoutSession.expiryPending && !submitted) { CheckoutSession.expiryPending = false; submit(CheckoutSession.hesabPaid) }
     }
 
-    /** «پرداخت با حساب‌پی (NFC/QR)» ⇐ `sale/checkout/hesabpay` (یا ثبتِ دوبارهٔ پرداختِ تأییدشده) — ردیفِ پیشین و کاشیِ حساب‌پی */
+    /** «پرداخت با حساب‌پی (NFC/QR)» ⇐ `sale/checkout/hesabpay` برای باقیِ گامِ پرداخت (یا ثبتِ دوبارهٔ پرداختِ تأییدشده) */
     val hesabPay = {
       //  S22: منقضیِ نپوشیده ⇒ تأییدِ مدیر پیش از گرفتنِ پول (پیش‌سنجیِ زیر هم با همان `checkout` رد می‌کرد)
       val expired = if (hesabPaid == null) CheckoutExpiry.uncovered(data, loyal, checkout, todayIso()) else null
       if (hesabPaid != null) submit(hesabPaid)
       else if (expired != null) askExpiry(expired, resubmit = false)
       else {
-        val draft = if (payV2) CheckoutSession.pay.draft(n.finalTotal, form.debtorId) else null
+        //  e-paystep: حساب‌پی باقیِ پرداخت‌های تأییدشدهٔ گامِ پرداخت را می‌گیرد
+        val draft = CheckoutSession.pay.draft(n.finalTotal, form.debtorId)
         //  پیش از گرفتنِ پول: همین فاکتور همین حالا ثبت‌شدنی است؟ (موجودی، تکرار، قاعده‌های POS-24) — همان سنجشِ صندوقِ کامپیوتر
         CheckoutSession.hesab = HesabTillModel.Ask(saleKey, n.finalTotal, draft, till) {
           HesabTillModel.precheck(data, loyal, checkout.copy(debtorId = form.debtorId), saleKey, todayIso())
@@ -297,6 +304,39 @@ fun RouteScope.CheckoutRoute() {
       }
       Unit
     }
+
+    /**
+     *  e-paystep — «پرداخت ‹مبلغ›»: هیچ چیز ثبت نمی‌شود؛ پیش از گرفتنِ پول همان سنجش‌های ثبت (منقضی، موجودی، تکرار) و سپس
+     *  گامِ پرداخت (`sale/checkout/pay`). پرداختِ گرفته‌شده‌ای که ثبتش رد شد ([settled]) ⇒ همان ثبت، بی پرداختِ دوم.
+     */
+    fun startPay(open: TillMethods.Kind? = null) {
+      if (!CheckoutModel.canSubmit(busy, discountError, null, gate, null)) return
+      val already = hesabPaid ?: settled
+      if (already != null) { submit(already); return }
+      if (!HeldRules.shownIsCurrent(lines, cart.lines.value)) { error = StrPos.cartChangedRetry; return }
+      CheckoutExpiry.uncovered(data, loyal, checkout, todayIso())?.let { need -> askExpiry(need, resubmit = false); return }
+      HesabTillModel.precheck(data, loyal, checkout.copy(debtorId = form.debtorId), saleKey, todayIso())?.let { error = it; return }
+      error = null
+      CheckoutSession.settled = null
+      CheckoutSession.form = form
+      CheckoutSession.hesabEnv = hesabEnv
+      CheckoutSession.payCtx = PayCtx(saleKey, n.finalTotal, form.debtorId, debtor?.name, tiles, isOwner && hesabState == TillMethods.Hesab.Setup, data, hesabPay) { t ->
+        val h = TillMethods.hesab(t, ir.vil3ntec.tohid.data.ReportBridge.nowMs())
+        tilesFor(h) to (isOwner && h == TillMethods.Hesab.Setup)
+      }
+      val entry = CheckoutSession.entry
+      val want = open ?: entry.tile?.kind ?: TillMethods.Kind.CASH
+      tiles.firstOrNull { it.kind == want && it.enabled && it.kind != TillMethods.Kind.HESABPAY }?.let { PayStep.open(entry, it, CheckoutSession.pay, n.finalTotal) }
+      nav.open(SalesPaths.PAY)
+    }
+    //  گامِ پرداخت با «نسیه» مشتری خواست ⇒ پس از گزینش (و جمعِ تازه با همان مشتری) همان گام با «نسیه»
+    val reopen = CheckoutSession.reopenPay
+    LaunchedEffect(reopen, form.debtorId) {
+      if (reopen != null && form.debtorId != null && !submitted) { CheckoutSession.reopenPay = null; startPay(reopen) }
+    }
+    //  گامِ پرداخت همهٔ فاکتور را گرفت ⇒ همان دم ثبت با همان تسویه
+    val paidNow = CheckoutSession.settled
+    LaunchedEffect(paidNow) { if (paidNow != null && paidNow === settled && !submitted) submit(paidNow) }
 
     actions = CheckoutActions(
       form = { CheckoutSession.form = it },
@@ -316,28 +356,8 @@ fun RouteScope.CheckoutRoute() {
       },
       addCoupon = { PromoLive.addCoupon(it) },
       removeCoupon = { PromoLive.removeCoupon(it) },
-      submit = { submit() },
+      submit = { startPay() },
       close = ::close,
-      method = { t ->
-        val p = CheckoutSession.pay
-        when (t.kind) {
-          TillMethods.Kind.CASH -> p.takeCash(n.finalTotal, form.debtorId)
-          TillMethods.Kind.CARD, TillMethods.Kind.WALLET, TillMethods.Kind.TRANSFER -> t.method?.let { p.takeMethod(it, n.finalTotal) }
-          //  ⛔ نسیه بی مشتری ثبت نمی‌شود (`CreditDebtor`): اول «انتخابِ مشتری»، و پس از گزینش باقی به حسابش
-          TillMethods.Kind.CREDIT -> if (form.debtorId == null) {
-            nav.openForResult(SalesPaths.customer(null)) { picked ->
-              if (!picked.isNullOrEmpty()) { CheckoutSession.form = (CheckoutSession.form ?: form).copy(debtorId = picked); CheckoutSession.pay.takeCredit() }
-            }
-          } else p.takeCredit()
-          //  حساب‌پی باقی را می‌گیرد: نقدی که همهٔ فاکتور را می‌پوشاند کنار، سپس همان برگهٔ `sale/checkout/hesabpay`
-          TillMethods.Kind.HESABPAY -> if (t.enabled) {
-            p.clearCoveringCash(n.finalTotal)
-            //  ردیف‌های دیگر همهٔ فاکتور را پوشانده‌اند ⇒ چیزی برای حساب‌پی نمانده (همان شرطِ ردیفِ پیشین)
-            if (HesabPaySettle.due(n.finalTotal, p.draft(n.finalTotal, form.debtorId)) is HesabPaySettle.Due.Amount) hesabPay()
-          }
-        }
-      },
-      setupHesab = { nav.open(ir.vil3ntec.tohid.ui.v3.settings.SettingsPaths.section(ir.vil3ntec.tohid.ui.screens.SettingsLayout.HESAB_SHOP)) },
       hesabPay = hesabPay,
     )
     CheckoutView(
@@ -357,25 +377,13 @@ fun RouteScope.CheckoutRoute() {
       busy = busy,
       error = error,
       discountError = discountError,
-      paidError = paidError,
+      paidError = null,
       payError = payError,
-      canSubmit = CheckoutModel.canSubmit(busy, discountError, paidError, gate, creditBlock),
-      creditBlock = creditBlock,
-      hesab = when {
-        hesabPaid != null -> HesabEntry(StrPay.recordSale, StrTillPay.confirmed, enabled = !busy)
-        //  e-paymethods: با پنلِ ترکیبی حساب‌پی کاشیِ خودش را دارد (`methods`)
-        payV2 -> null
-        till.tillNfc && HesabPaySettle.due(n.finalTotal, if (payV2) CheckoutSession.pay.draft(n.finalTotal, form.debtorId) else null) is HesabPaySettle.Due.Amount ->
-          HesabEntry(StrTillPay.entry, if (till.gateway) StrTillPay.entryAuto else StrTillPay.entrySimple, enabled = !busy && discountError == null && gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED)
-        else -> null
-      },
+      canSubmit = CheckoutModel.canSubmit(busy, discountError, null, gate, null),
+      //  e-paystep: دکمهٔ اصلی «پرداخت ‹مبلغ›»؛ پرداختِ گرفته‌شدهٔ ثبت‌نشده ⇒ «ثبتِ فروش (پرداخت دریافت شد)»
+      payLabel = if ((hesabPaid ?: settled) != null) StrTillPay.recordPaid else StrTillPay.payAmount(PhoneSaleText.amount(n.finalTotal)),
+      paidLine = (hesabPaid ?: settled)?.let { StrTillPay.paidWaiting },
       canAskApproval = !busy,
-      giftLedger = data.takeIf { giftOn },
-      methods = tiles?.map { t ->
-        //  حساب‌پی فقط وقتی پول گرفتنی است: نه با تخفیفِ تأییدنشده یا ممنوع (پول گرفته و فروش رد نشود — همان سدِ ردیفِ پیشین)
-        if (t.kind == TillMethods.Kind.HESABPAY && t.enabled) t.copy(enabled = discountError == null && gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED) else t
-      },
-      hesabSetup = payV2 && isOwner && hesabState == TillMethods.Hesab.Setup,
       points = if (loyalty != null) ({ LoyaltyBar(loyalty) }) else null,
     ).also { last[0] = it }
   }

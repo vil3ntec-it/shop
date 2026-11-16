@@ -101,6 +101,46 @@
   صف تا ابد می‌ماند — بهتر است همان op با دلیل `rejected` شود. (۵) opهای `unknown_table` ِ سرورِ قدیمی پس از به‌روز شدنِ سرور خودکار نمی‌روند
   (فقط `hash_mismatch` بازفرست دارد) — تصمیمِ صاحب محصول.
 
+### ۱۴۰۵/۰۸/۲۶ — عاملِ e-paystep زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-paystep` (از main ‏7e2a36923، #1060) — پرداخت در دو گام، کارت‌خوانِ هر برند، عکسِ QR ِ حساب‌پی
+
+- **خواستهٔ صاحب‌کار** (عکسِ برگهٔ «تسویهٔ فروش» با «ثبتِ فروش»): «وقتی ثبتِ فروش می‌زنم نباید پرداخت بشه؛ این باید ببره پیشِ بخشِ پرداخت…» و
+  تصمیم‌های ۱۴۰۵/۰۸/۲۶ (ثبت در `OWNER-DECISIONS-fa.md`): حساب‌پی فعلاً فقط «ساده» (API گرفته نمی‌شود)، عکسِ QR ِ حساب‌پی، کارت با هر کارت‌خوان و
+  شمارهٔ تأییدِ اختیاری.
+- **ساخته شد**: (۱) تسویهٔ گوشی فقط «پرداخت ‹مبلغ›» دارد و هیچ ثبت نمی‌کند ⇒ برگهٔ `sale/checkout/pay` (`PayStepRoute`)؛ کامپیوتر:
+  `PayStepDialog` (`ui/components/pos/PayStepDesk.kt`) با F9، دکمهٔ «پرداخت ‹مبلغ›» و کاشی‌های کنارِ سبد؛ منطقِ مشترک `ui/components/pos/PayStep.kt`
+  (`PayEntry` + `PayPanelState`): نقد (خالی = دقیق، دکمهٔ تند، پولِ پس)، کارت «کارت‌خوان تأیید کرد»، کیف پول/حواله با مرجع، نسیه با گزینشِ مشتری،
+  «روشِ دیگر برای باقی‌مانده»؛ فروش فقط با `Result.Done` از همان `submit`/`finish` ِ همیشگی. پرداختِ گرفته‌شده در `CheckoutSession.settled` تا ثبت
+  (فقط همان مبلغ و همان مشتری). گام به `payV2` بسته نیست. (۲) `afpay_card.needsRef = false` در `Payment.kt`، `pay-core.js` و `pay-v1.json`.
+  (۳) عکسِ QR: مهاجرتِ ۹۷۰ (`hesabpay_qr_images`، `shop_hesabpay.qr_image`)، `lib/hesabpay-qr-image.js` (دوباره رمزگذاری، بی فراداده)، همان درِ
+  تغییرِ حساب و ۲۴ ساعت، `GET /shop/payments/qr-image/:hash` فقط عکسِ فعال؛ برنامه: `pay/platform/ShopQrPicture` (ML Kit / ZXing + ImageIO) و
+  `HesabPayEnv.qrPicture` (هش + دوباره خواندن) ⇒ برگهٔ حساب‌پی، «پرداخت به حسابِ دکان» و نمایشگرِ مشتری؛ «انتخابِ عکسِ QR» در «حساب‌پیِ دکان».
+- **پاسخِ «چرا هنوز نقدی | نسیه؟»**: آن بخش پیرو ِ `ShopPolicy.payV2` بود — یا ساختِ پیش از #1058، یا `pay_v2=false` ِ صریح (تنظیمِ **دکان** و
+  همگام: «فقط نقد و نسیه» ِ هر دستگاه یا پشتیبانِ بازیابی‌شده به همه می‌رسد و پذیرش هرگز انتخابِ صریح را عوض نمی‌کند)، یا صندوقِ بازِ کهنه با
+  عددِ ناهمخوان (WAIT). حالا گامِ پرداخت به پرچم بسته نیست: هر دستگاه همان دم همهٔ روش‌ها را دارد (پرچم فقط صندوقِ شیفت را می‌گزیند).
+  خطرِ مانده (ساخته نشد): `pay_v2=true` ِ همگام‌شده می‌تواند صفحهٔ صندوقِ شیفتِ دستگاهِ دیگر را وسطِ شیفت عوض کند.
+- **آزمونِ عوض‌شده (عمدی)**: `PayMethodsCheckoutUiTest`، `DeskPayTilesUiTest`، `DeskSaleD3aUiTest` (F9 ⇒ گام، Enter، Enter)، `DeskExpiryPayUiTest`
+  (کاشیِ حساب‌پی ⇒ گام)، `PayPanelTilesTest` (کارت بی مرجع)، `GiftCardWiringTest` و `CheckoutCreditGateTest` (سیم‌کشیِ تازه در `PayStep`)،
+  `hesabpay-guard.test.js` (عکس بی متن ⇒ `hesabpay_qr_image_unread`)، `pay-v1.json` (حالتِ «کارت بی شمارهٔ تأیید»).
+- **آزمون‌ها**: تازه `PayStepTest` ۷، `HesabQrImageTest` ۴، `ShopQrPictureTest` ۳، `hesabpay-qr-image.test.js` ۳؛ اجرای هدف‌دارِ کامپیوتر ۵۱۷ آزمون
+  (`*PayStep*`، `*PayMethods*`، `*Checkout*`، `*Till*`، `*Hesab*`، `*Dari*`، `*LookGuard*`، `*PageAnatomyGuard*`، …) سبز پس از رفعِ دو آزمونِ کلید/عکس؛
+  سرور ۸۵ + ۲۸ + ۱۷ سبز روی PGlite. عکس‌ها: `/home/user/wt-pay-shots/paystep/` (پیش از main، پس از همین شاخه؛ روشن/تیره).
+- **آیفون** (خواستِ هماهنگ‌کننده؛ iosTest روی لینوکس اجرا نمی‌شود، پس فقط ویرایشِ کمینه با برچسب‌های موجود): `CoreFlowsE2EIosTest`
+  «04-till»: پس از «پرداخت» ِ سبد، دکمهٔ «پرداخت ‹مبلغ›» (`StrTillPay.payAmount(PhoneSaleText.amount(FREE_PRICE))`) ⇐ گامِ پرداخت ⇐ پیش از
+  تأیید هیچ فروش (سنجهٔ تازه) ⇐ «دریافت شد» (`StrTillPay.received`) ⇐ همان سنجه‌ها (نقد، مبلغ، قلم، سرور)؛ عکسِ تازهٔ `04d2-paystep`.
+  «07-credit»: «پرداخت ‹مبلغ›» ⇐ کاشیِ «نسیه» (`Find.clickLabel(StrTillPay.tileCredit)`) ⇐ بی مشتری هیچ فروش و «انتخابِ مشتری» باز
+  (`StrSale.newDebtor` دیده می‌شود؛ جای «ثبت فروش» ِ خاموش و `creditNeedsCustomer`) ⇐ قرض‌دارِ تازه ⇐ همان گام با «نسیه» و نامِ قرض‌دار
+  ⇐ «ثبت به حسابِ مشتری» (`StrTillPay.toAccountButton`) ⇐ همان سنجه‌های نسیه. `E2eSupport.toTab` دست نخورد (شاخهٔ `claude/e-ios-e2e`).
+  کدِ مشترک: `pay/platform/ShopQrPicture.kt` در `ios-exclude.txt` با همتای `ShopQrPictureIos.kt` (`CAN_READ = false`: دکمهٔ عکس پنهان،
+  صندوقِ آیفون همان QR ِ کشیده)؛ کامپایلِ آیفون این‌جا آزموده نشد.
+- **نیمه‌کاره / قدمِ بعد**: آزمونِ روی دستگاهِ واقعی (ML Kit روی گوشی، پنجرهٔ فایلِ ویندوز)؛ خواندنِ QR از عکس در آیفون (Vision)؛ اتصالِ خودکارِ کارت‌خوان (`DevicePaySettle`) و درگاهِ
+  خودکارِ حساب‌پی خاموش ماندند تا صاحب‌کار API را بگیرد؛ ردیف‌های PAY-06/PAY-21 همچنان PARTIAL.
+
+- **CI ِ #1065 (هماهنگ‌کننده)**: `core-fuzz.test.js` («پیکرهٔ فاز همان خروجیِ امروزِ مولّد… بایت‌به‌بایت») سرخ — `afpay_card.needsRef = false` در
+  `pay-core.js` چهار موردِ `pay.settle`/`pay.fix` ِ پیکره را عوض کرد و پیکره بازساخته نشده بود. `node server/scripts/core-fuzz.js --write`
+  (۴ مورد در `core/test-vectors/core-fuzz-v1.json`)؛ پیش ۳/۴، پس ۴/۴؛ `CoreFuzzTest`/`CoreVectors*` ِ core روی همان پیکره.
+- **CI ِ #1065 (۲)**: «آزمون‌های سرور روی PostgreSQL» — `shop-route-inventory.test.js` («هر مسیرِ شناسه‌دار… با ردیفِ واقعیِ الف»)
+  مسیرِ تازهٔ `GET /shop/payments/qr-image/:hash` را بی ردیفِ واقعی یافت. نخستین حسابِ حساب‌پیِ «الف» در همان آزمون حالا `qr` و `qrImage`
+  (JPEG ِ ۶۴×۶۴) می‌فرستد و هشِ عکسِ فعال `ids.qrImage` است + قاعدهٔ `concreteFor`. نسخهٔ پیشین روی PGlite ۱/۲ (همان پیام)، پس ۲/۲.
 ### ۱۴۰۵/۰۸/۲۶ — هماهنگ‌کننده، شاخهٔ `claude/e-ios-e2e` (از `origin/main` e8a22edfd) — سناریوهای آیفون پس از دستهٔ ۷۰
 
 - **یافته**: کارِ «برنامهٔ آیفون — چارچوب، Xcode و شبیه‌ساز (گزارش)» (بی‌سد) از دستهٔ ۷۰ سرخ است؛ دستهٔ ۶۸ سبز بود. از «۰۴-صندوق» به بعد

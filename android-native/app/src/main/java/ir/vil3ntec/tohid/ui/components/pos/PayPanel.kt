@@ -94,7 +94,7 @@ import kotlin.time.TimeSource
  */
 
 /** کلیدِ هر اسکناس، به ترتیبِ `CashKeys.NOTES` (۱۰ … ۱۰۰۰) */
-private val NOTE_KEYS = listOf(
+internal val NOTE_KEYS = listOf(
   KeyMap.SALE_PAYMENT_NOTE10, KeyMap.SALE_PAYMENT_NOTE20, KeyMap.SALE_PAYMENT_NOTE50,
   KeyMap.SALE_PAYMENT_NOTE100, KeyMap.SALE_PAYMENT_NOTE500, KeyMap.SALE_PAYMENT_NOTE1000,
 ).zip(CashKeys.NOTES)
@@ -429,7 +429,7 @@ private fun FxTenderBox(state: PayPanelState, bad: Boolean, onEnter: () -> Unit)
 }
 
 @Composable
-private fun MethodPicker(selected: String, methods: List<PayMethod>, target: Dp, modifier: Modifier, onPick: (String) -> Unit) {
+internal fun MethodPicker(selected: String, methods: List<PayMethod>, target: Dp, modifier: Modifier, onPick: (String) -> Unit) {
   var open by remember { mutableStateOf(false) }
   Box(modifier) {
     OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth().heightIn(min = maxOf(target, 44.dp))) {

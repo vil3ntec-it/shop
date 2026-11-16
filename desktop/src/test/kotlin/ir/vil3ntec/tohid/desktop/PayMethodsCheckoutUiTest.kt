@@ -31,7 +31,7 @@ import ir.vil3ntec.tohid.core.gateway.SimpleAccount
 import ir.vil3ntec.tohid.core.gateway.TillHesab
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
-import ir.vil3ntec.tohid.core.i18n.StrLedger
+import ir.vil3ntec.tohid.core.i18n.StrPay
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.i18n.StrTillPay
 import ir.vil3ntec.tohid.core.nav.Access
@@ -49,26 +49,24 @@ import ir.vil3ntec.tohid.data.WarehouseEntry
 import ir.vil3ntec.tohid.pay.platform.HesabPayEnv
 import ir.vil3ntec.tohid.ui.components.common.NavCatalog
 import ir.vil3ntec.tohid.ui.components.common.PhoneNav
+import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
 import ir.vil3ntec.tohid.ui.v3.LocalV3SystemBottom
 import ir.vil3ntec.tohid.ui.v3.LocalV3Toasts
 import ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout
-import ir.vil3ntec.tohid.ui.v3.nav.RouteArgs
-import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.nav.ShellContext
 import ir.vil3ntec.tohid.ui.v3.nav.V3Modules
 import ir.vil3ntec.tohid.ui.v3.nav.V3Nav
+import ir.vil3ntec.tohid.ui.v3.nav.V3RouteHost
 import ir.vil3ntec.tohid.ui.v3.rememberV3Toasts
 import ir.vil3ntec.tohid.ui.v3.sales.SalesPaths
-import ir.vil3ntec.tohid.ui.v3.sales.checkout.CheckoutRoute
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.CheckoutSession
 import ir.vil3ntec.tohid.ui.v3.sales.history.SaleTime
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -78,13 +76,13 @@ import org.junit.Test
 import java.io.File
 
 /**
- *  e-paymethods — برگهٔ «تسویهٔ فروش» ِ گوشیِ نسخهٔ ۳ (مسیرِ واقعیِ `sale/checkout` با دفترِ روی دیسک و ثبتِ واقعی) با پنلِ
- *  ترکیبی: همهٔ روش‌های دکان کاشی‌اند (نقد، کارت، حساب‌پی، کیف پول، حواله، نسیه) و هر کاشی همان کارِ پنل را می‌کند:
- *   - نقد ِ خودکار: «ثبت فروش» بی هیچ زدنی همان فروشِ نقدیِ کامل (پیش‌فرضِ «نقدی» ِ پیشین)؛
- *   - کارت: ردیفِ کارت با کلِ فاکتور، بی شمارهٔ تأیید ثبت نمی‌شود، با آن ردیفِ ثبتِ دستی (`manual`)؛
- *   - نسیه: بی مشتری اول «انتخابِ مشتری»، پس از گزینش همهٔ فاکتور به حسابِ همان مشتری؛
- *   - حساب‌پی: حسابِ تازه در ۲۴ ساعتِ امنیتی ⇒ کاشیِ خاموش با زمانِ فعال شدن؛ آماده ⇒ برگهٔ حساب‌پی برای همهٔ فاکتور؛
- *     راه‌اندازی‌نشده ⇒ هیچ کاشی و پیوندِ «راه‌اندازیِ حساب‌پی» فقط برای صاحب.
+ *  e-paystep — صندوقِ گوشیِ نسخهٔ ۳ در دو گام (مسیرهای واقعیِ `sale/checkout` و `sale/checkout/pay` در `V3RouteHost`، دفترِ روی دیسک و
+ *  ثبتِ واقعی). صاحب‌کار: «وقتی ثبتِ فروش می‌زنم نباید پرداخت بشه؛ باید ببره پیشِ بخشِ پرداخت…». هر آزمون یک راه:
+ *   - «پرداخت ‹مبلغ›» هیچ ثبت نمی‌کند و گامِ پرداخت را باز می‌کند؛ «بازگشت به سبد» ⇒ تسویه با سبدِ دست‌نخورده؛
+ *   - نقد: «دریافت شد» (خالی = دقیق)، یک فروش حتی با دو زدنِ پیاپی؛ دکمهٔ تند و پولِ پس؛
+ *   - کارت: «کارت‌خوان تأیید کرد» بی شمارهٔ تأیید (صاحب‌کار ۱۴۰۵/۰۸/۲۶) و با آن؛ نقدِ بخشی + کارت برای باقی؛
+ *   - نسیه: بی مشتری اول «انتخابِ مشتری»، سپس «ثبت به حسابِ مشتری»؛
+ *   - حساب‌پی: حسابِ ۲۴ ساعتِ در انتظار ⇒ کاشیِ خاموش با زمان؛ «ساده» ⇒ برگهٔ QR و «پول رسید» ِ دستی ⇒ همان فروش یک بار.
  */
 @OptIn(ExperimentalTestApi::class)
 class PayMethodsCheckoutUiTest {
@@ -104,6 +102,7 @@ class PayMethodsCheckoutUiTest {
   private val env get() = HesabPayEnv.of(ctx)
   private val cached = HesabPayEnv::class.java.getDeclaredField("cached").apply { isAccessible = true }
   private lateinit var store: ShopStore
+  private lateinit var cart: CartStore
   private lateinit var nav: V3Nav
 
   private fun clean() {
@@ -116,11 +115,8 @@ class PayMethodsCheckoutUiTest {
     env.forget()
   }
 
-  @Before fun up() {
-    I18n.source = { Lang.FA }
-    clean()
-    ShopPolicy.setPayV2(ctx, true)
-  }
+  //  گامِ پرداخت به پرچمِ `payV2` بسته نیست: همهٔ آزمون‌ها با «فقط نقد و نسیه» (خاموش)
+  @Before fun up() { I18n.source = { Lang.FA }; clean() }
 
   @After fun down() = clean()
 
@@ -132,7 +128,7 @@ class PayMethodsCheckoutUiTest {
   private fun open() {
     store = ShopStore(ctx).also { runBlocking { it.load() } }
     assertTrue(runBlocking { store.save(data) })
-    val cart = CartStore(ctx)
+    cart = CartStore(ctx)
     assertTrue(cart.set(listOf(SalesEngine.CartLine(rice.id, 2.0), SalesEngine.CartLine(tea.id, 1.0))))
     CheckoutSession.reset()
     nav = V3Nav(V3Modules.table, "home", NavStack.of("home")).also { n -> n.isTab = { it in TillShellHarness.navRoutes }; n.openDeep(SalesPaths.CHECKOUT) }
@@ -152,16 +148,15 @@ class PayMethodsCheckoutUiTest {
             access = Access.all(AppMode.SHOP, emptySet()), navAllowed = NavCatalog.allowed(canManage = true, ordersLive = true),
           )
           CompositionLocalProvider(LocalV3Toasts provides toasts, LocalV3SystemBottom provides 0.dp, LocalDeskLayout provides false) {
-            Box(Modifier.fillMaxSize()) {
-              val scope = remember(shell) { RouteScope(RouteArgs(SalesPaths.CHECKOUT, emptyMap()), nav, shell) }
-              scope.CheckoutRoute()
-            }
+            Box(Modifier.fillMaxSize()) { V3RouteHost(nav, shell, Modifier.fillMaxSize()) }
           }
         }
       }
     }
-    rule.waitUntil(15_000) { has(StrTillPay.methodsTitle) }
+    rule.waitUntil(15_000) { has(payLabel) }
   }
+
+  private val payLabel get() = StrTillPay.payAmount(PhoneSaleText.amount(total))
 
   private fun has(text: String, substring: Boolean = false) = rule.onAllNodes(hasText(text, substring = substring)).fetchSemanticsNodes().isNotEmpty()
 
@@ -170,63 +165,99 @@ class PayMethodsCheckoutUiTest {
     rule.waitForIdle()
   }
 
+  private fun tapText(text: String) = tap(hasText(text) and hasClickAction())
+
   /** کاشیِ روش با همین نام (برچسبِ زدنیِ `v3Pressable`) */
   private fun tile(name: String) = SemanticsMatcher("کاشیِ $name") { it.config.getOrNull(SemanticsActions.OnClick)?.label == name }
 
-  private fun record() = tap(hasText(StrSale.recordSale) and hasClickAction())
+  private fun type(label: String, value: String) {
+    rule.onAllNodes(hasSetTextAction() and (hasContentDescription(label) or hasText(label)))[0].performTextInput(value)
+    rule.waitForIdle()
+  }
+
+  /** «پرداخت ‹مبلغ›» ⇒ گامِ پرداخت */
+  private fun toPay() {
+    tapText(payLabel)
+    rule.waitUntil(10_000) { nav.current == SalesPaths.PAY && has(StrTillPay.amountDue) }
+  }
 
   private fun awaitSale() = rule.waitUntil(15_000) { store.data.value.sales.isNotEmpty() }.let { store.data.value.sales.single() }
 
-  private val methodNames = listOf(StrTillPay.tileCash, StrTillPay.tileCard, StrTillPay.tileWallet, StrTillPay.tileTransfer, StrTillPay.tileCredit)
-
-  @Test fun everyShopMethodIsATileAndCashIsTheOneTapDefault() {
+  @Test fun payRecordsNothingAndShowsEveryMethodAndBackKeepsTheCart() {
     open()
-    for (n in methodNames) assertTrue("کاشیِ «$n» نیست", rule.onAllNodes(tile(n)).fetchSemanticsNodes().isNotEmpty())
-    //  بی حساب‌پیِ دکان (بی نت یا بی حساب) کاشیِ حساب‌پی نیست
-    assertTrue(rule.onAllNodes(tile(StrTillPay.tileHesab)).fetchSemanticsNodes().isEmpty())
-    //  «نقد» ِ خودکار همان مبلغِ لازم است ⇒ «ثبت فروش» همان فروشِ نقدیِ کاملِ پیشین
-    assertEquals("1080", CheckoutSession.pay.cash)
-    record()
+    assertFalse("«ثبت فروش» دیگر در تسویه نیست", has(StrSale.recordSale))
+    toPay()
+    assertTrue(store.data.value.sales.isEmpty())
+    for (n in listOf(StrTillPay.tileCash, StrTillPay.tileCard, StrTillPay.tileWallet, StrTillPay.tileTransfer, StrTillPay.tileCredit)) {
+      assertTrue("کاشیِ «$n» نیست", rule.onAllNodes(tile(n)).fetchSemanticsNodes().isNotEmpty())
+    }
+    assertTrue(has(PhoneSaleText.amount(total)))
+    tapText(StrTillPay.backToCart)
+    rule.waitUntil(10_000) { nav.current == SalesPaths.CHECKOUT && has(payLabel) }
+    assertTrue(store.data.value.sales.isEmpty())
+    assertEquals(listOf(rice.id to 2.0, tea.id to 1.0), cart.lines.value.map { it.productId to it.quantity })
+  }
+
+  @Test fun cashReceivedRecordsExactlyOneSaleEvenOnADoubleTap() {
+    open()
+    toPay()
+    val button = rule.onAllNodes(hasText(StrTillPay.received) and hasClickAction())[0]
+    button.performSemanticsAction(SemanticsActions.OnClick)
+    runCatching { button.performSemanticsAction(SemanticsActions.OnClick) }
     val sale = awaitSale()
-    assertEquals(total, sale.finalTotal, 1e-9)
+    rule.waitForIdle()
+    assertEquals(1, store.data.value.sales.size)
     assertEquals("cash", sale.paymentMethod)
     assertEquals(listOf("cash" to 108_000L), sale.payments.orEmpty().filter { it.amountMinor > 0 }.map { it.kind to it.amountMinor })
-    assertEquals(0.0, sale.debtGiven, 1e-9)
   }
 
-  @Test fun cardNeedsTheTerminalApprovalNumberThenRecordsAManualCardRow() {
+  @Test fun quickCashChipShowsChangeAndRecordsIt() {
     open()
-    tap(tile(StrTillPay.tileCard))
-    //  نقدِ خودکار کنار رفت و کلِ فاکتور به کارت آمد
-    assertEquals("", CheckoutSession.pay.cash)
-    assertEquals(listOf("afpay_card" to "1080"), CheckoutSession.pay.rows.map { it.method to it.amount })
-    assertTrue(has(StrTillPay.cardRefHint))
-    //  بی شمارهٔ تأییدِ رسیدِ کارت‌خوان ثبت نمی‌شود
-    record()
-    rule.waitForIdle()
-    assertTrue(store.data.value.sales.isEmpty())
-    assertTrue("پیامِ «شمارهٔ مرجع»", has(StrLedger.refRequired("«کارت AfPay»"), substring = true) || has(StrSale.checkRow))
-    rule.onAllNodes(hasSetTextAction() and (hasContentDescription(StrSale.refNumber) or hasText(StrSale.refNumber)))[0].performTextInput("TRM-55120")
-    rule.waitForIdle()
-    record()
+    toPay()
+    tap(tile(StrTillPay.tileCash))
+    tapText(PhoneSaleText.amount(1100.0))
+    assertTrue(has(StrTillPay.changeDue(PhoneSaleText.amount(20.0))))
+    tapText(StrTillPay.received)
     val sale = awaitSale()
-    val card = sale.payments.orEmpty().single { it.amountMinor > 0 }
-    assertEquals(listOf("afpay_card", "card", "TRM-55120", "manual"), listOf(card.method, card.kind, card.ref, card.verification))
-    assertEquals(108_000L, card.amountMinor)
-    assertEquals("card", sale.paymentMethod)
+    assertEquals(110_000L, sale.tenderedMinor)
+    assertEquals(2_000L, sale.changeMinor)
   }
 
-  @Test fun creditWithoutACustomerOpensThePickerAndThenPutsTheWholeSaleOnTheAccount() {
+  @Test fun partCashThenTheCardTerminalApprovesTheRestWithoutAReference() {
     open()
-    tap(tile(StrTillPay.tileCredit))
-    assertTrue("بی مشتری اول «انتخابِ مشتری»: ${nav.current}", nav.current.startsWith("sale/checkout/customer"))
+    toPay()
+    type(StrSale.cashReceived, "500")
+    tapText(StrTillPay.received)
+    rule.waitUntil(5_000) { has(StrTillPay.remainingDue) && has(StrTillPay.otherForRest) }
     assertTrue(store.data.value.sales.isEmpty())
-    //  گزینشِ مشتری (همان نتیجهٔ برگهٔ انتخاب) ⇒ باقی به حسابش
+    assertTrue(has(PhoneSaleText.amount(580.0)))
+    tap(tile(StrTillPay.tileCard))
+    tapText(StrTillPay.cardApproved)
+    val sale = awaitSale()
+    assertEquals(listOf("cash" to 50_000L, "afpay_card" to 58_000L), sale.payments.orEmpty().filter { it.amountMinor > 0 }.map { it.method to it.amountMinor })
+    assertNull(sale.payments.orEmpty().single { it.method == "afpay_card" }.ref)
+  }
+
+  @Test fun cardWithTheOptionalApprovalNumberKeepsIt() {
+    open()
+    toPay()
+    tap(tile(StrTillPay.tileCard))
+    type(StrTillPay.approvalOptional, "TRM-55120")
+    tapText(StrTillPay.cardApproved)
+    val card = awaitSale().payments.orEmpty().single { it.amountMinor > 0 }
+    assertEquals(listOf("afpay_card", "card", "TRM-55120", "manual", 108_000L), listOf(card.method, card.kind, card.ref, card.verification, card.amountMinor))
+  }
+
+  @Test fun creditWithoutACustomerPicksOneThenPutsTheSaleOnTheAccount() {
+    open()
+    toPay()
+    tap(tile(StrTillPay.tileCredit))
+    rule.waitUntil(5_000) { nav.current.startsWith("sale/checkout/customer") }
+    assertTrue(store.data.value.sales.isEmpty())
     rule.runOnIdle { nav.finish("pm-c1") }
-    rule.waitForIdle()
-    assertEquals("pm-c1", CheckoutSession.form?.debtorId)
-    assertEquals("", CheckoutSession.pay.cash)
-    record()
+    //  برگشت به تسویه (جمع با همان مشتری) و همان گام با «نسیه»
+    rule.waitUntil(10_000) { nav.current == SalesPaths.PAY && has(StrTillPay.toAccountButton) }
+    tapText(StrTillPay.toAccountButton)
     val sale = awaitSale()
     assertEquals("credit", sale.paymentMethod)
     assertEquals("pm-c1", sale.debtorId)
@@ -237,44 +268,89 @@ class PayMethodsCheckoutUiTest {
     val until = System.currentTimeMillis() + 5 * 3_600_000L
     hesab(TillHesab(gateway = false, mode = HesabPayShop.OFF, simple = null, flag = true, pendingUntil = until))
     open()
+    toPay()
     rule.waitUntil(10_000) { has(StrTillPay.tileHesab) }
     val node = rule.onAllNodes(hasText(StrTillPay.tileHesab)).fetchSemanticsNodes().single()
     assertTrue("کاشیِ حساب‌پیِ در انتظار خاموش است", node.config.getOrNull(SemanticsProperties.Disabled) != null)
-    assertTrue(has(StrTillPay.tileSoon))
     assertTrue(has(StrTillPay.hesabPending(SaleTime.stamp(until))))
-    //  زدنِ کاشیِ خاموش هیچ برگه‌ای باز نمی‌کند و ۲۴ ساعت کوتاه نمی‌شود
     runCatching { rule.onAllNodes(hasText(StrTillPay.tileHesab))[0].performSemanticsAction(SemanticsActions.OnClick) }
     rule.waitForIdle()
     assertNull(CheckoutSession.hesab)
-    assertFalse(has(StrTillPay.hesabSetup))
+    assertEquals(SalesPaths.PAY, nav.current)
   }
 
-  @Test fun hesabPayReadyOpensTheShopsOwnQrForTheWholeInvoice() {
+  @Test fun hesabPaySimpleShowsTheShopsQrAndTheManualConfirmRecordsTheSaleOnce() {
     hesab(TillHesab(false, HesabPayShop.SIMPLE, SimpleAccount("0700000000", ""), payee = Payee("دکانِ آزمون", "0000", "fp-pm"), flag = true))
     open()
+    toPay()
     rule.waitUntil(10_000) { has(StrTillPay.tileHesab) }
     tap(hasText(StrTillPay.tileHesab) and hasClickAction())
-    val ask = CheckoutSession.hesab
-    assertNotNull("برگهٔ حساب‌پی باز نشد", ask)
-    assertEquals(SalesPaths.HESAB, nav.current)
-    //  نقدِ خودکار کنار رفت ⇒ حساب‌پی همهٔ فاکتور را می‌گیرد؛ پول فقط به حسابِ خودِ دکان (`TillHesab.simple` ِ سرور)
-    assertEquals("", CheckoutSession.pay.cash)
-    assertEquals(total, ask!!.total, 1e-9)
+    rule.waitUntil(10_000) { nav.current == SalesPaths.HESAB && has(StrPay.moneyArrived) }
+    assertEquals(total, CheckoutSession.hesab!!.total, 1e-9)
     assertTrue(store.data.value.sales.isEmpty())
+    val arrived = rule.onAllNodes(hasText(StrPay.moneyArrived) and hasClickAction())[0]
+    arrived.performSemanticsAction(SemanticsActions.OnClick)
+    runCatching { arrived.performSemanticsAction(SemanticsActions.OnClick) }
+    val sale = awaitSale()
+    rule.waitUntil(10_000) { CheckoutSession.done != null }
+    assertEquals(1, store.data.value.sales.size)
+    val row = sale.payments.orEmpty().single { it.amountMinor > 0 }
+    assertEquals(listOf("hesabpay", 108_000L), listOf(row.method, row.amountMinor))
   }
 
-  @Test fun hesabPayNotSetUpShowsOnlyTheOwnersSetupLink() {
-    hesab(TillHesab(gateway = false, mode = HesabPayShop.OFF, simple = null, flag = true))
-    open()
-    rule.waitUntil(10_000) { has(StrTillPay.hesabSetup) }
-    assertFalse(has(StrTillPay.tileHesab))
+  /** صاحب‌کار ۱۴۰۵/۰۸/۲۶: عکسِ QR ِ بارشدهٔ دکان (همان که «انتخابِ عکسِ QR» آماده می‌کند) در پوشهٔ همین دستگاه ⇒ هش */
+  private fun uploadedPicture(text: String): String {
+    val rows = ir.vil3ntec.tohid.core.qr.QrCode.encode(text, ir.vil3ntec.tohid.core.qr.QrCode.LARGE_MAX_VERSION)
+    val cell = 14
+    val side = (rows.size + 8) * cell
+    val img = java.awt.image.BufferedImage(side, side, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+    val g = img.createGraphics()
+    g.color = java.awt.Color.BLACK
+    for (y in rows.indices) for (x in rows.indices) if (rows[y][x]) g.fillRect((x + 4) * cell, (y + 4) * cell, cell, cell)
+    g.dispose()
+    val png = java.io.ByteArrayOutputStream().use { javax.imageio.ImageIO.write(img, "png", it); it.toByteArray() }
+    val ok = runBlocking { ir.vil3ntec.tohid.pay.platform.ShopQrPicture.prepare(png) } as ir.vil3ntec.tohid.pay.platform.ShopQrPicture.Prep.Ok
+    assertEquals(text, ok.payload)
+    val hash = ir.vil3ntec.tohid.core.audit.Sha256.hex(ir.vil3ntec.tohid.core.audit.Sha256.digest(ok.jpeg))
+    File(ctx.filesDir, "hesabpay-qr").apply { mkdirs() }.resolve(hash).writeBytes(ok.jpeg)
+    return hash
+  }
+
+  @Test fun theShopsUploadedQrPictureIsShownBigInThePaymentStepAndToTheCustomer() {
+    val payload = "HP|+93700000000|shop"
+    val hash = uploadedPicture(payload)
+    try {
+      hesab(TillHesab(false, HesabPayShop.SIMPLE, SimpleAccount("0700000000", payload, hash), payee = Payee("دکانِ آزمون", "0000", "fp-pm"), flag = true))
+      open()
+      toPay()
+      rule.waitUntil(10_000) { has(StrTillPay.tileHesab) }
+      tap(hasText(StrTillPay.tileHesab) and hasClickAction())
+      rule.waitUntil(10_000) { nav.current == SalesPaths.HESAB && has(StrPay.moneyArrived) }
+      //  همان عکس (خوانده و سنجیده) بزرگ در برگه و روی نمایشگرِ مشتری، نه QR ِ کشیده
+      rule.waitUntil(15_000) { rule.onAllNodes(hasContentDescription(StrTillPay.shopQrImage)).fetchSemanticsNodes().isNotEmpty() }
+      rule.waitUntil(5_000) { ir.vil3ntec.tohid.pay.CustomerPay.view.value?.picture != null }
+      assertEquals(payload, ir.vil3ntec.tohid.pay.CustomerPay.view.value!!.qrPayload)
+      tap(hasText(StrPay.moneyArrived) and hasClickAction())
+      val sale = awaitSale()
+      assertEquals("hesabpay", sale.payments.orEmpty().single { it.amountMinor > 0 }.method)
+    } finally {
+      File(ctx.filesDir, "hesabpay-qr").deleteRecursively()
+    }
   }
 
   @Test fun staffNeverSeesTheSetupLink() {
     ShopRole.remember(ctx, ShopRole.STAFF)
     hesab(TillHesab(gateway = false, mode = HesabPayShop.OFF, simple = null, flag = true))
     open()
-    rule.waitForIdle()
+    toPay()
     assertFalse(has(StrTillPay.hesabSetup))
+  }
+
+  @Test fun ownerSeesTheSetupLinkWhenHesabPayIsNotSetUp() {
+    hesab(TillHesab(gateway = false, mode = HesabPayShop.OFF, simple = null, flag = true))
+    open()
+    toPay()
+    rule.waitUntil(10_000) { has(StrTillPay.hesabSetup) }
+    assertFalse(has(StrTillPay.tileHesab))
   }
 }
