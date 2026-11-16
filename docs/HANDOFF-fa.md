@@ -80,6 +80,7 @@
 - **پیش‌آگاهی**: `precheck.sh` روی همین شاخه یک ❌ ِ «اندازهٔ فایل» دارد که مالِ main ِ پس از دستهٔ ۷۱ است، نه این کار:
   `data/ShopStore.kt` ۱۲۴۲ خط در برابرِ سقفِ ۱۲۴۱ ِ `tools/quality/baseline.json` (روی `origin/main` f7641ab93 ِ بی‌دست‌خورده هم همین). این شاخه
   `ShopStore.kt` را دست نزد؛ یا یک خط کم شود یا سقف با دلیل بالا برود.
+- **CI ِ #1059 (هماهنگ‌کننده)**: (۱) `DariCoverageTest`: «دوباره بزنید» ِ `StrSupportAsk.failed` ⇒ جملهٔ کاملِ دری در `DariText.PHRASES` (+ `dari.js`، ردیفِ `DARI-REVIEW-fa.md`) و پیامِ درونیِ `AskSupport` بی فارسیِ خام. (۲) `route-authz-inventory` (SEC-AUTH-10): `POST /api/support/requests` در گروهِ PUBLIC ِ «پشتیبانیِ مهمان» کنارِ `POST /api/support/messages` — همان `support.who`، دکان فقط از توکن (ردهٔ درست، نه سست‌تر).
 ### ۱۴۰۵/۰۸/۲۶ — هماهنگ‌کننده (سیزنِ 01GcPTAL…)، دستهٔ ۷۱ (`claude/batch-71`)
 
 - **درونِ دسته**: e-newinstall (همگام‌سازیِ برنامهٔ تازه: «دکان ندارید»/«وارد نشده‌اید»/پیامِ سرور، «جزئیات» با رونوشت، صفِ نرفتهٔ پشتیبانِ
