@@ -60,6 +60,13 @@ object NewOrderModel {
     return Errors(fields, lines)
   }
 
+  /**
+   *  p0r3 (صاحب‌کار): نامِ مشتری هرگز سدِ ثبت نیست — مشتریِ برگزیده نامش را خودش می‌آورد، وگرنه نوشتهٔ دلخواه («بیرون») و اگر
+   *  خالی ماند [default] («مشتریِ حضوری»). داوریِ نهایی همان `OrderDraft.build` با همین نام.
+   */
+  fun withDefaultName(f: OrderDraft.Form, default: String): OrderDraft.Form =
+    if (f.name.isBlank()) f.copy(name = default.take(NAME_MAX)) else f
+
   /** چند قلمِ پُرشده — برای خطِ خلاصهٔ نوارِ پایین */
   fun filled(f: OrderDraft.Form): Int = f.lines.count { !isBlank(it) }
 

@@ -59,24 +59,23 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun RiskListsContent(repo: OrdersRepository) {
+internal fun RiskListsContent(repo: OrdersRepository, onBack: (() -> Unit)? = null) {
   val cfg = OrdersLive.config.value
   val allowed = cfg != null && cfg.risk && cfg.permissions.contact
   //  (فهرست، پین؟) ِ برگهٔ باز؛ null ⇒ هیچ
   var adding by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
   var reload by remember { mutableStateOf(0) }
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
-    if (!allowed) {
-      V3Message(V3Tone.INFO, StrRisk.listsOnlyManagers)
-    } else {
-      FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        V3Button(StrRisk.blockANumber, { adding = OrderRisk.BLOCK to false }, kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.Block)
-        V3Button(StrRisk.trustANumber, { adding = OrderRisk.ALLOW to false }, kind = V3ButtonKind.NEUTRAL, icon = Icons.Outlined.VerifiedUser)
-        V3Button(StrRisk.blockAPlace, { adding = OrderRisk.BLOCK to true }, kind = V3ButtonKind.NEUTRAL, icon = Icons.Outlined.WrongLocation)
-      }
-      Spacer(Modifier.height(14.dp))
-      RiskEntriesList(repo, reload)
-    }
+  //  کالبدِ یکسان (p0): «بستنِ یک شماره» تنها دکمهٔ شناور، «اعتمادِ یک شماره» و «بستنِ یک جا» آیکن‌های نوار — پیش‌تر سه دکمه سرِ صفحه
+  ir.vil3ntec.tohid.ui.v3.nav.V3PageFrame(
+    StrRisk.listsTitle, onBack,
+    actions = if (!allowed) emptyList() else listOf(
+      ir.vil3ntec.tohid.ui.v3.V3Action(Icons.Outlined.VerifiedUser, StrRisk.trustANumber) { adding = OrderRisk.ALLOW to false },
+      ir.vil3ntec.tohid.ui.v3.V3Action(Icons.Outlined.WrongLocation, StrRisk.blockAPlace) { adding = OrderRisk.BLOCK to true },
+    ),
+    fab = if (!allowed) null else ({ e -> ir.vil3ntec.tohid.ui.v3.V3Fab(Icons.Outlined.Block, StrRisk.blockANumber, e, { adding = OrderRisk.BLOCK to false }) }),
+  ) {
+    if (!allowed) V3Message(V3Tone.INFO, StrRisk.listsOnlyManagers)
+    else RiskEntriesList(repo, reload)
   }
   adding?.let { (list, pin) ->
     RiskEntrySheet(repo, list, pinKind = pin, fixedPhone = null, fixedPin = null, onClose = { adding = null }, onDone = { adding = null; reload++ })

@@ -63,6 +63,8 @@ import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3MenuItem
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
+import ir.vil3ntec.tohid.core.i18n.StrPlaces
+import ir.vil3ntec.tohid.ui.v3.V3Fab
 import ir.vil3ntec.tohid.ui.v3.nav.V3RoutePage
 import ir.vil3ntec.tohid.ui.v3.nav.LandOn
 import ir.vil3ntec.tohid.ui.v3.products.ProductsPaths
@@ -185,7 +187,13 @@ internal fun RouteScope.StockLabelsRoute() {
 internal fun RouteScope.StockBookRoute() {
   val tab = StockExtras.bookTab(args.query("tab"))
   LaunchedEffect(tab) { if (tab != null) StockBookNav.tab.value = tab }
-  StockBookScreen(store, data, snackbar) { nav.open(SettingsPaths.section(SettingsLayout.STOCK_MODE)) }
+  val settings = { nav.open(SettingsPaths.section(SettingsLayout.STOCK_MODE)) }
+  //  گوشی: کالبدِ یکسان (p0) — نام در نوار، «انتقال» تنها دکمهٔ شناور (همان درِ `StockBookNav.transfer`)؛ کامپیوتر همان صفحهٔ خودش
+  if (desk) StockBookScreen(store, data, snackbar, settings)
+  else V3RoutePage(
+    StrReach.stockBook, scroll = false,
+    fab = { e -> V3Fab(Icons.Outlined.SwapHoriz, StrPlaces.transferTitle, e, { StockBookNav.transfer.value = true }) },
+  ) { StockBookScreen(store, data, snackbar, settings, head = false) }
 }
 
 /** ثبتِ چند کالا با هم — گوشی (۱۴۰۵/۰۸/۲۴) ⇐ فرمِ چندردیفیِ کالاها (`products/new?many=1`)؛ کامپیوتر همان برگهٔ پیشین */

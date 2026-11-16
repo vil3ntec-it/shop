@@ -136,7 +136,12 @@ internal fun PoBill(d: ShopData, repo: PurchaseOrderRepository, order: PurchaseO
     OutlinedTextField(value = note, onValueChange = { note = it.take(500) }, label = { Text(StrDeliver.noteField) }, singleLine = true, modifier = Modifier.fillMaxWidth())
     error?.let { Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall) }
     Spacer(Modifier.height(10.dp))
-    Button(onClick = { submit() }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) StrSale.posting else StrPurchasePages.saveBill) }
+    //  گوشی (درونِ قابِ کالبد): نوارِ چسبانِ ذخیره، مثلِ جزئیاتِ کالا؛ پنجرهٔ کامپیوتر همان دکمهٔ پایانِ فرم
+    if (ir.vil3ntec.tohid.ui.v3.nav.LocalV3PageBar.current != null) {
+      ir.vil3ntec.tohid.ui.v3.nav.V3PageSaveBar(StrPurchasePages.saveBill, { submit() }, enabled = !busy, loading = busy)
+    } else {
+      Button(onClick = { submit() }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) StrSale.posting else StrPurchasePages.saveBill) }
+    }
   }
 }
 

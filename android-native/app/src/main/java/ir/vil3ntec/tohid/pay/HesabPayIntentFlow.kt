@@ -27,8 +27,11 @@ class HesabPayIntentFlow(
 ) {
   sealed interface Step {
     data class Show(val intent: PaymentIntent) : Step
-    /** پایانِ این دور: پیامِ کاربر و «دوباره» شدنی است یا نه */
-    data class Stop(val message: String, val retry: Boolean) : Step
+    /**
+     *  پایانِ این دور: پیامِ کاربر و «دوباره» شدنی است یا نه. [support] = کدِ «از پشتیبانی بخواه» وقتی کارش با پشتیبانی است
+     *  (حساب‌پی برای دکان خاموش ⇒ `flag_off:pay.hesabpay`)؛ صندوق کنارِ پیام دکمه‌اش را می‌گذارد.
+     */
+    data class Stop(val message: String, val retry: Boolean, val support: String? = null) : Step
   }
 
   private var rec: PendingPayment? = null
@@ -81,12 +84,12 @@ class HesabPayIntentFlow(
         "provider_unavailable" -> { env.pending.save(p.copy(status = IntentStatus.FAILED.wire)); stop(StrPay.providerDown, true) }
         "already_paid" -> stop(StrPay.alreadyPaid, false)
         "intent_active" -> stop(StrPay.otherOpen, true)
-        "hesabpay_disabled" -> stop(StrPay.disabled, false)
+        "hesabpay_disabled" -> stop(StrPay.disabled, false, HESAB_OFF)
         "idempotency_key_reused" -> { forget(); stop(StrPay.unreachable, true) }
         else -> stop(r.message.ifEmpty { StrPay.unreachable }, true)
       }
       is GatewayCall.Offline -> stop(StrPay.unreachable, true)
-      GatewayCall.Disabled -> stop(StrPay.disabled, false)
+      GatewayCall.Disabled -> stop(StrPay.disabled, false, HESAB_OFF)
     }
   }
 
@@ -125,7 +128,12 @@ class HesabPayIntentFlow(
 
   fun settle(i: PaymentIntent): PayFlow.Outcome<Settlement> = HesabPaySettle.settle(total, draft, saleKey, i)
 
-  private fun stop(message: String, retry: Boolean) = Step.Stop(message, retry)
+  private fun stop(message: String, retry: Boolean, support: String? = null) = Step.Stop(message, retry, support)
+
+  companion object {
+    /** «حساب‌پی برای این دکان روشن نیست» ⇒ درخواستِ روشن کردنِ همان پرچم از پشتیبانی (`SupportProblem`) */
+    val HESAB_OFF: String = ir.vil3ntec.tohid.core.support.SupportProblem.code(ir.vil3ntec.tohid.core.support.SupportProblem.FLAG_OFF, "pay.hesabpay")
+  }
 }
 
 /** پرداختی رسید ولی خودکار بسته نشد (`HesabTill.verdict`) — پیامِ کاربر با دلیل */

@@ -125,7 +125,7 @@ val MoneyModule = AppModule(
       //  CRM-10: «ادغامِ تکراری‌ها» فقط با «گزارش‌های مشتری» روشن (پیش‌فرض خاموش)
       val crm = ShopPolicy.crmReports(LocalContext.current)
       val duplicates = remember(data, crm, MoneyUndo.hiddenDebtors) { DebtorMergeModel.groups(data, crm, MoneyUndo.hiddenDebtors).size }
-      VipGate(Str.debtors) {
+      VipGate(Str.debtors, feature = "debtors") {
         //  CRM-07: سفارشِ باز/لغوشدهٔ پروندهٔ مشتری ⇐ همان صفحهٔ سفارش
         if (desk) DeskCustomersScreen(store, data, snackbar, onOpenOrder = { nav.open(OnlinePaths.order(it)) })
         else DebtorsListScreen(
@@ -150,7 +150,7 @@ val MoneyModule = AppModule(
       val remindScope = rememberCoroutineScope()
       val viewed = ir.vil3ntec.tohid.ui.screens.rememberCustomerAccessNote(store) // CRM-15
       val chainOn = rememberDocChainOn() // S89: «حذف» با کلیدِ `shop.doc_chain` سندِ معکوس است
-      VipGate(Str.debtors) {
+      VipGate(Str.debtors, feature = "debtors") {
         DebtorLedgerScreen(
           id = id,
           d = data,
@@ -178,7 +178,7 @@ val MoneyModule = AppModule(
     V3Route("debtors/{id}/edit", RouteKind.SHEET, { StrMoney.editDebtor }, parent = "debtors/{id}", chrome = Chrome.OWN) { DebtorFormRoute(args["id"].orEmpty()) },
     V3Route("debtors/{id}/tx", RouteKind.SHEET, { StrMoney.newTx }, parent = "debtors/{id}", chrome = Chrome.OWN) { TxFormRoute() },
     V3Route(MoneyPaths.RECEIVE, RouteKind.SHEET, { StrMoney.receiveTitlePick }, parent = MoneyPaths.DEBTORS, chrome = Chrome.OWN) {
-      VipGate(Str.debtors) {
+      VipGate(Str.debtors, feature = "debtors") {
         ReceivePickerSheet(
           d = data,
           //  گامِ ۲ روی پشته؛ ثبت شد ⇒ هر دو گام بسته؛ «برگشت» ⇒ همین فهرست
@@ -245,14 +245,14 @@ val MoneyModule = AppModule(
     },
     V3Route(MoneyPaths.SUPPLIER_BILLS, RouteKind.PAGE, { StrSupplierBills.title }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) { SupplierBillsRoute() },
     V3Route("purchasing/bills/{id}", RouteKind.PAGE, { StrSupplierBills.order }, parent = MoneyPaths.SUPPLIER_BILLS, chrome = Chrome.OWN) { SupplierBillRoute(args["id"].orEmpty()) },
-    V3Route("purchasing/bills/{id}/new", RouteKind.PAGE, { StrSupplierBills.newBill }, parent = "purchasing/bills/{id}") { SupplierBillNewRoute(args["id"].orEmpty()) },
+    V3Route("purchasing/bills/{id}/new", RouteKind.PAGE, { StrSupplierBills.newBill }, parent = "purchasing/bills/{id}", chrome = Chrome.OWN) { SupplierBillNewRoute(args["id"].orEmpty()) },
     V3Route(MoneyPaths.PURCHASE_ORDERS, RouteKind.PAGE, { StrPurchasePages.purchaseOrders }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) { PurchaseOrdersRoute() },
-    V3Route(MoneyPaths.NEW_PURCHASE_ORDER, RouteKind.PAGE, { StrPurchasePages.newPoTitle }, parent = MoneyPaths.PURCHASE_ORDERS) { PurchaseOrderNewRoute() },
-    V3Route(MoneyPaths.PURCHASE_ORDER_SUGGEST, RouteKind.PAGE, { StrPurchasePages.reorderSuggest }, parent = MoneyPaths.PURCHASE_ORDERS) { PurchaseOrderSuggestRoute() },
+    V3Route(MoneyPaths.NEW_PURCHASE_ORDER, RouteKind.PAGE, { StrPurchasePages.newPoTitle }, parent = MoneyPaths.PURCHASE_ORDERS, chrome = Chrome.OWN) { PurchaseOrderNewRoute() },
+    V3Route(MoneyPaths.PURCHASE_ORDER_SUGGEST, RouteKind.PAGE, { StrPurchasePages.reorderSuggest }, parent = MoneyPaths.PURCHASE_ORDERS, chrome = Chrome.OWN) { PurchaseOrderSuggestRoute() },
     V3Route("purchasing/orders/{id}", RouteKind.PAGE, { StrSupplierBills.order }, parent = MoneyPaths.PURCHASE_ORDERS, chrome = Chrome.OWN) { PurchaseOrderRoute(args["id"].orEmpty()) },
-    V3Route("purchasing/orders/{id}/edit", RouteKind.PAGE, { StrMoney.edit }, parent = "purchasing/orders/{id}") { PurchaseOrderEditRoute(args["id"].orEmpty()) },
-    V3Route("purchasing/orders/{id}/receive", RouteKind.PAGE, { StrPurchasePages.receiveGoods }, parent = "purchasing/orders/{id}") { PurchaseOrderReceiveRoute(args["id"].orEmpty()) },
-    V3Route("purchasing/orders/{id}/match", RouteKind.PAGE, { StrPurchaseOrders.match }, parent = "purchasing/orders/{id}") { PurchaseOrderMatchRoute(args["id"].orEmpty()) },
+    V3Route("purchasing/orders/{id}/edit", RouteKind.PAGE, { StrMoney.edit }, parent = "purchasing/orders/{id}", chrome = Chrome.OWN) { PurchaseOrderEditRoute(args["id"].orEmpty()) },
+    V3Route("purchasing/orders/{id}/receive", RouteKind.PAGE, { StrPurchasePages.receiveGoods }, parent = "purchasing/orders/{id}", chrome = Chrome.OWN) { PurchaseOrderReceiveRoute(args["id"].orEmpty()) },
+    V3Route("purchasing/orders/{id}/match", RouteKind.PAGE, { StrPurchaseOrders.match }, parent = "purchasing/orders/{id}", chrome = Chrome.OWN) { PurchaseOrderMatchRoute(args["id"].orEmpty()) },
     V3Route(MoneyPaths.NEW_SUPPLIER, RouteKind.SHEET, { StrMoney.newSupplier }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) { SupplierFormRoute(null) },
     V3Route("purchasing/suppliers/{id}", RouteKind.PAGE, { Str.purchasing }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) {
       val id = args["id"].orEmpty()
@@ -371,7 +371,7 @@ private fun RouteScope.DebtorTxRoute() {
   val chainOn = rememberDocChainOn()
   val removable = remember(data, txId, chainOn) { !chainOn || ir.vil3ntec.tohid.data.DebtReverse.refusalOf(data, txId) == null }
   val removeLabel = if (!removable) null else if (chainOn) StrMoney.reverse else StrMoney.delete
-  VipGate(Str.debtors) {
+  VipGate(Str.debtors, feature = "debtors") {
     DebtorTxSheet(
       tx = tx,
       book = book,
@@ -399,7 +399,7 @@ private fun RouteScope.DeleteDebtorRoute() {
   //  S89: با کلیدِ `shop.doc_chain` قرض‌دارِ دارای ردیف پاک نمی‌شود (پاک شدنش یعنی حذفِ اسنادِ ثبت‌شده) ⇒ فقط دلیل و «بستن»
   val rows = ir.vil3ntec.tohid.data.CustomerAlias.of(data, id).let { own -> data.transactions.count { it.debtorId in own } }
   val deletable = ir.vil3ntec.tohid.core.debt.DebtReversal.canDeleteDebtor(rememberDocChainOn(), rows)
-  VipGate(Str.debtors) {
+  VipGate(Str.debtors, feature = "debtors") {
     if (!deletable) {
       V3ConfirmSheet(
         title = StrMoney.deleteDebtorTitle,
@@ -436,7 +436,7 @@ private fun RouteScope.MergeRoute() {
   if (!ShopPolicy.crmReports(LocalContext.current)) { LandOn(MoneyPaths.DEBTORS); return }
   val hidden = MoneyUndo.hiddenDebtors
   val groups = remember(data, hidden) { DebtorMergeModel.groups(data, true, hidden) }
-  VipGate(Str.debtors) {
+  VipGate(Str.debtors, feature = "debtors") {
     DebtorMergeSheet(
       groups = groups,
       blocked = store.mergeBlockedReason(),
@@ -456,7 +456,7 @@ private fun RouteScope.MergeConfirmRoute() {
   val p = remember(data, keepId, dropId) { DebtorMergeModel.preview(data, keepId, dropId) }
   val limitRules = ir.vil3ntec.tohid.ui.components.rememberCreditLimitRules() // CRM-03: ادغامی که سقفِ ماندگار را عوض می‌کند
   if (p == null) { LandOn(MoneyPaths.MERGE); return }
-  VipGate(Str.debtors) {
+  VipGate(Str.debtors, feature = "debtors") {
     V3ConfirmSheet(
       title = StrMoney.mergeConfirmTitle(p.drop.name, p.keep.name),
       message = StrMoney.mergeConfirmBody(p.transactions, p.sales, p.drop.name, p.keep.name, MoneyText.afn(p.balanceAfter)),
@@ -483,7 +483,7 @@ private fun RouteScope.DebtorFormRoute(id: String?) {
   val saved = remember { arrayOfNulls<String>(1) }
   //  CRM-03: «تغییرِ سقفِ اعتبار» (`customers.credit_limit`) پیش از ذخیره — فقط با پرچمِ `shop.credit_limit_perm` ِ دکان
   val limitRules = ir.vil3ntec.tohid.ui.components.rememberCreditLimitRules()
-  VipGate(Str.debtors) {
+  VipGate(Str.debtors, feature = "debtors") {
     DebtorFormSheet(
       debtor = debtor,
       onClose = { back() },
@@ -504,7 +504,7 @@ private fun RouteScope.TxFormRoute() {
   val id = args["id"].orEmpty()
   val debtor = data.debtors.find { it.id == id }
   if (debtor == null) { LandOn(MoneyPaths.DEBTORS); return }
-  VipGate(Str.debtors) {
+  VipGate(Str.debtors, feature = "debtors") {
     TxFormSheet(
       debtor = debtor,
       balance = ir.vil3ntec.tohid.data.ShopStore.debt(data, id),
