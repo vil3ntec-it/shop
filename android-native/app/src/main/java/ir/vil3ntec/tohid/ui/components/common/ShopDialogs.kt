@@ -71,8 +71,8 @@ import ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout
  *  پلِ پنجره‌های مشترکِ گوشی و کامپیوتر (`claude/e-desk-d3d`) — به‌جای `AlertDialog`/`TextButton`/`Button`/`OutlinedButton` ِ Material در
  *  پنجره‌های پرونده‌های مشترک. همان پارامترها، پس هر جای صدا زدن فقط نامش عوض می‌شود:
  *   • گوشی (و پیش‌نمایشِ گوشی، `LocalDeskLayout` = false): **بایت‌به‌بایت همان** `AlertDialog` و دکمه‌های Material با همان آرگومان‌ها؛
- *   • کامپیوتر: کارتِ `ui/desk` (سطح، خطِ مویی، گِردیِ ۱۲)، سرخطِ ۱۶ با «بستن»، بدنه و ردیفِ دکمه‌های کامپیوتر — «تأیید» با خطِ دورِ برند
- *     (کارِ پاک‌کننده با [danger]: خط و نوشتهٔ سرخ)، «انصراف» خطِ مویی، دکمهٔ درونِ بدنه بی‌زمینه. Esc یا زدنِ بیرون = همان `onDismissRequest`؛
+ *   • کامپیوتر: کارتِ `ui/desk` (سطح، خطِ مویی، گِردیِ ۱۲)، سرخطِ ۱۶ با «بستن»، بدنه و ردیفِ دکمه‌های کامپیوتر — «تأیید» با خطِ دورِ برند و زمینهٔ
+ *     کم‌رنگِ برند (کارِ پاک‌کننده با [danger]: خط، نوشته و زمینهٔ سرخ)، «انصراف» خطِ مویی، دکمهٔ درونِ بدنه بی‌زمینه. Esc یا زدنِ بیرون = همان `onDismissRequest`؛
  *     Enter = همان دکمهٔ «تأیید» وقتی روشن است، مگر کارِ پاک‌کننده که فوکوسِ آغازش روی «انصراف» است (Enter ⇒ انصراف).
  *  هیچ کار، سنجش یا نوشتنی این‌جا نیست: دکمه‌ها همان `onClick` ِ صفحه را صدا می‌زنند.
  */
@@ -236,9 +236,9 @@ fun ShopOutlinedButton(
 }
 
 /**
- *  دکمهٔ کامپیوترِ پنجره (۳۶dp، گِردیِ کنترل). «تأیید» خطِ دورِ برند و نوشتهٔ برند (کارِ پاک‌کننده: خط و نوشتهٔ سرخ)، «انصراف» و دکمهٔ پُرِ
- *  بدنه خطِ دورِ مویی، دکمهٔ بی‌زمینهٔ بدنه با نوشتهٔ برند — همه روی سطحِ کارت، تا رنگِ دستیِ `Text` ِ صفحه (سرخِ «پاک کن»، رنگِ اصلیِ
- *  «بازسازی») همیشه خوانا بماند.
+ *  دکمهٔ کامپیوترِ پنجره (۳۶dp، گِردیِ کنترل). «تأیید» خطِ دورِ برند، زمینهٔ کم‌رنگِ برند (`selected`) و نوشتهٔ برند (کارِ پاک‌کننده: خطِ سرخ و
+ *  زمینهٔ `negativeSoft`) تا کارِ اصلی از «انصراف» جدا دیده شود؛ «انصراف» و دکمهٔ پُرِ بدنه خطِ دورِ مویی روی سطحِ کارت، دکمهٔ بی‌زمینهٔ بدنه
+ *  با نوشتهٔ برند. زمینهٔ پُرِ برند نه: رنگِ دستیِ `Text` ِ صفحه (سرخِ «پاک کن»، رنگِ اصلیِ «بازسازی») روی زمینهٔ کم‌رنگ همیشه خوانا می‌ماند.
  */
 @Composable
 private fun DeskSlotButton(slot: ShopDialogSlot, onClick: () -> Unit, modifier: Modifier, enabled: Boolean, filled: Boolean, content: @Composable RowScope.() -> Unit) {
@@ -262,12 +262,18 @@ private fun DeskSlotButton(slot: ShopDialogSlot, onClick: () -> Unit, modifier: 
     confirm -> c.brandInk
     else -> c.hairline
   }
+  val rest = when {
+    confirm && enabled && danger -> c.negativeSoft
+    confirm && enabled -> c.selected
+    outlined -> c.surface
+    else -> Color.Transparent
+  }
   Row(
     modifier
       .heightIn(min = DeskSize.control)
       .then(if (slot == ShopDialogSlot.DISMISS && danger && host != null) Modifier.focusRequester(host.safe) else Modifier)
       .then(if (outlined) Modifier.border(if (confirm) 1.5.dp else DeskSize.hairline, edge, DeskRadius.controlShape) else Modifier)
-      .deskClickable(enabled = enabled, rest = if (outlined) c.surface else Color.Transparent, onClick = onClick)
+      .deskClickable(enabled = enabled, rest = rest, onClick = onClick)
       .padding(horizontal = DeskSpace.x3 + 2.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.Center,
