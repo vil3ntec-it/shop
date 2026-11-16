@@ -107,6 +107,8 @@ val replaced = listOf(
   "ui/Platform.kt",
   //  OPS-02: `FLAG_SECURE` ِ برگهٔ عبارتِ بازیابی — کامپیوتر پنجرهٔ امن ندارد (`Platform.SecureWindow` ِ بی‌اثر)
   "ui/SecureWindowAndroid.kt",
+  //  نوارهای سیستمِ گوشی همرنگِ برنامه (`Platform.SystemBars` ِ بی‌اثر)
+  "ui/SystemBarsAndroid.kt",
   //  بانکِ تصاویر: دوربینِ راهنما فقط گوشی است؛ نامِ فایل از دیسک، نه ContentResolver
   "scan/GuidedCapture.kt",
   "data/FileName.kt",

@@ -45,9 +45,9 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- *  کشیدن از لبهٔ راست ⇒ برگشت (صاحب‌کار ۱۴۰۵/۰۸/۲۵: «وقتی صفحه رو از راست به چپ بکشم از اون بخش بیاد بیرون») در همان
- *  میزبانِ مسیرها (`V3RouteHost`): کشیدنِ لبه صفحهٔ درونی را می‌بندد؛ کشیدنِ افقی از میانهٔ صفحه (تراشه‌ها، کاروسل، کشیدنِ ردیف)
- *  و کشیدنِ کوتاه دست نمی‌خورند.
+ *  کشیدنِ راست به چپ ⇒ برگشت (صاحب‌کار ۱۴۰۵/۰۸/۲۵: «وقتی صفحه رو از راست به چپ بکشم از اون بخش بیاد بیرون»؛ ۱۴۰۵/۰۸/۲۶: «از
+ *  وسط یا آخرِ صفحه هم») در همان میزبانِ مسیرها (`V3RouteHost`): کشیدنِ لبه و کشیدنِ میانهٔ صفحه هر دو صفحهٔ درونی را می‌بندند؛
+ *  کشیدنی که فرزندِ افقی خورد (برگه‌های «کالا/انبار»، تراشه، کاروسل، کشیدنِ ردیف)، کشیدنِ کوتاه، عمودی و کج دست نمی‌خورند.
  */
 @OptIn(ExperimentalTestApi::class)
 class EdgeSwipeBackUiTest {
@@ -56,10 +56,10 @@ class EdgeSwipeBackUiTest {
 
   private val detail = ProductsPaths.item("p-rice")
 
-  private fun show(): V3Nav {
+  private fun show(path: String = detail): V3Nav {
     I18n.source = { Lang.FA }
     ShopRole.remember(DesktopContext, ShopRole.OWNER)
-    val nav = V3Nav(V3Modules.table, "home", NavStack.of("home")).also { it.isTab = { p -> p in TillShellHarness.navRoutes }; it.openDeep(detail) }
+    val nav = V3Nav(V3Modules.table, "home", NavStack.of("home")).also { it.isTab = { p -> p in TillShellHarness.navRoutes }; it.openDeep(path) }
     val store = RouteUiHarness.loadedStore(MoneyDemo.full())
     rule.setContent {
       CompositionLocalProvider(
@@ -82,7 +82,7 @@ class EdgeSwipeBackUiTest {
       }
     }
     rule.waitForIdle()
-    assertEquals(detail, nav.current)
+    assertEquals(path, nav.current)
     return nav
   }
 
@@ -102,15 +102,30 @@ class EdgeSwipeBackUiTest {
   }
 
   @Test
-  fun `کشیدنِ افقی از میانهٔ صفحه، کوتاه یا عمودی برگشت نیست`() {
+  fun `کشیدنِ کوتاه یا عمودی برگشت نیست؛ کشیدنی که برگه‌های افقیِ صفحه خوردند هم نه`() {
     val nav = show()
     drag({ w -> w - 4f }, { w -> w * 0.9f })
     assertEquals("کوتاه‌تر از ۳۰٪ ⇒ سرِ جا", detail, nav.current)
     drag({ w -> w - 4f }, { w -> w - 10f }, dy = 300f)
     assertEquals("عمودی از لبه ⇒ پیمایش، نه برگشت", detail, nav.current)
-    //  میانهٔ صفحه مالِ خودِ صفحه است: جزئیاتِ کالا با کشیدنِ افقی میانِ «کالا» و «انبار» ِ همان کالا می‌رود — برگشت نیست
+    //  جزئیاتِ کالا برگه‌های افقیِ «کالا/انبار» دارد: کشیدنِ میانه را همان برگه‌ها می‌خورند — برگشت نیست
     drag({ w -> w * 0.6f }, { w -> w * 0.05f })
-    assertTrue("میانهٔ صفحه به فهرست برنگشت: ${nav.current}", nav.current != ProductsPaths.LIST && nav.current.endsWith("/p-rice"))
+    assertTrue("برگه‌های افقی کشیدن را خوردند، به فهرست برنگشت: ${nav.current}", nav.current != ProductsPaths.LIST && nav.current.endsWith("/p-rice"))
+  }
+
+  @Test
+  fun `کشیدن از میانه یا آخرِ صفحه هم می‌بندد؛ کشیدنِ کج یا عمودی نه`() {
+    val about = ir.vil3ntec.tohid.ui.v3.settings.SettingsPaths.ABOUT
+    var nav = show(about)
+    drag({ w -> w * 0.6f }, { w -> w * 0.6f - w * 0.4f }, dy = 120f)
+    assertEquals("کج (افقی کمتر از دو برابرِ عمودی) ⇒ سرِ جا", about, nav.current)
+    drag({ w -> w * 0.5f }, { w -> w * 0.5f + 4f }, dy = 300f)
+    assertEquals("عمودی از میانه ⇒ پیمایش", about, nav.current)
+    drag({ w -> w * 0.6f }, { w -> w * 0.1f })
+    assertTrue("میانهٔ صفحه ⇒ برگشت: ${nav.current}", nav.current != about)
+    nav = show(about)
+    drag({ w -> w * 0.35f }, { w -> 4f })
+    assertTrue("آخرِ صفحه (سمتِ چپ) ⇒ برگشت: ${nav.current}", nav.current != about)
   }
 
   @Test
@@ -119,5 +134,10 @@ class EdgeSwipeBackUiTest {
     assertTrue(EdgeSwipe.commits(0.3f, 0f))
     assertTrue("پرتابِ تند به چپ", EdgeSwipe.commits(0.1f, -1_500f))
     assertFalse("پرتاب به راست", EdgeSwipe.commits(0.1f, 1_500f))
+    assertTrue("لبه: افقیِ چیره", EdgeSwipe.starts(-30f, -20f, 8f, fromEdge = true))
+    assertFalse("میانه: افقی باید دو برابرِ عمودی باشد", EdgeSwipe.starts(-30f, -20f, 8f, fromEdge = false))
+    assertTrue("میانه: افقیِ روشن", EdgeSwipe.starts(-50f, -20f, 8f, fromEdge = false))
+    assertFalse("به راست هرگز", EdgeSwipe.starts(50f, 0f, 8f, fromEdge = true))
+    assertTrue("عمودی", EdgeSwipe.vertical(5f, 30f, 8f))
   }
 }
