@@ -165,6 +165,9 @@ ok(asked.some((u) => /\/products\/rice\/zoom\?v=[0-9a-f]{12}$/.test(u)), 'نخس
 ok(z.s === 1 && z.level === '۱۰۰٪', 'آغاز ۱۰۰٪', z.level);
 ok((await page.textContent('#zm .zm-hint')).includes('نسخهٔ بزرگ‌تری از این عکس نیست'), 'گفته شد که نسخهٔ بزرگ‌تری نیست');
 ok(await page.evaluate(() => document.activeElement?.classList.contains('zm-close')), 'تمرکز روی «بستن» ِ بیننده');
+//  تمرکزِ دیرهنگامِ برگهٔ کالا (`K.openSheet`، ۶۰ms) یا هر چیزِ دیگری بیرون از بیننده ⇒ بیننده تمرکز را پس می‌گیرد (CI ِ #1061)
+await page.evaluate(() => document.querySelector('#product-sheet button')?.focus());
+ok(await page.evaluate(() => document.activeElement?.classList.contains('zm-close')), 'تمرکزِ بیرون از بیننده به «بستن» برمی‌گردد (dialog ِ مودال)');
 ok(await page.$eval('#zm', (e) => e.getAttribute('role') === 'dialog' && e.getAttribute('aria-modal') === 'true' && e.getAttribute('aria-label') === 'عکسِ بزرگِ کالا'),
   'بیننده یک dialog ِ نام‌دار است');
 ok(await page.$eval('#zm .zm-out', (b) => b.disabled), '«کوچک‌تر» در ۱۰۰٪ خاموش');

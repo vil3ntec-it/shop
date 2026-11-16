@@ -890,22 +890,13 @@ fun DeskSaleScreen(
   }
 
   //  خالی کردنِ سبد کارِ پاک‌کننده است ⇐ تأیید، با فوکوسِ پیش‌فرض روی «انصراف» (۵.۱ بند ۱۱)
+  //  کامپیوتر (`claude/e-desk-d3c`): پنجرهٔ `ui/desk` — کارِ پاک‌کننده سرخ و فوکوسِ آغاز روی «انصراف» در خودِ `DeskDialog`
   if (confirmClear) {
-    val safe = remember { FocusRequester() }
-    AlertDialog(
-      onDismissRequest = { confirmClear = false; refocus() },
-      title = { Text(StrSale.newCartQ) },
-      text = { Text(StrSale.clearCartWarn(cart.size)) },
-      confirmButton = {
-        TextButton(onClick = { cartStore.clear(); selected = null; confirmClear = false; refocus() }) {
-          Text(StrSale.clearIt, color = Shop.colors.danger)
-        }
-      },
-      dismissButton = {
-        TextButton(onClick = { confirmClear = false; refocus() }, modifier = Modifier.focusRequester(safe)) { Text(Str.cancel) }
-        LaunchedEffect(Unit) { runCatching { safe.requestFocus() } }
-      },
-    )
+    ir.vil3ntec.tohid.ui.desk.DeskDialog(
+      title = StrSale.newCartQ, onDismiss = { confirmClear = false; refocus() },
+      confirm = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(StrSale.clearIt, danger = true) { cartStore.clear(); selected = null; confirmClear = false; refocus() },
+      dismiss = ir.vil3ntec.tohid.ui.desk.DeskDialogAction(Str.cancel) { confirmClear = false; refocus() },
+    ) { ir.vil3ntec.tohid.ui.desk.DeskDialogText(StrSale.clearCartWarn(cart.size)) }
   }
 
   //  POS-38: سفارشِ ارسال از همین سبد (با تخفیفِ خودکار، `priced`)؛ پس از ثبت سبد خالی — هیچ فروشی این‌جا نیست
