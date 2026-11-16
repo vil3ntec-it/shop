@@ -305,6 +305,9 @@ object StrAccount {
   val deviceBlocked: String get() = t("از کار افتاده", "Disabled", "بنده شوې")
   fun blockedAttempts(n: Any): String = t("${asIs(n)} تلاشِ ردشده", "$n blocked ${pl(n, "attempt", "attempts")}", "$n رد شوې هڅې")
   fun lastSeen(date: Any): String = t("آخرین بار: ${asIs(date)}", "Last seen: $date", "وروستی ځل: $date")
+  //  نسخهٔ برنامهٔ هر دستگاه (`core/staff/DeviceBuilds`، `appVersion` ِ فهرست): کمتر از ساختِ همین برنامه، و هرگز نگفته
+  val versionOld: String get() = t("نسخهٔ کهنه", "Old version", "زړه نسخه")
+  val versionUnknown: String get() = t("نسخهٔ نامعلوم", "Unknown version", "نامعلومه نسخه")
   val block: String get() = t("از کار انداختن", "Disable", "بندول")
   val unblock: String get() = t("برگرداندن", "Re-enable", "بیرته فعالول")
   val blockTitle: String get() = t("از کار انداختنِ این دستگاه", "Disable this device", "دا وسیله بندول")

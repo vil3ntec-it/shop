@@ -62,7 +62,7 @@ const OF_SHOP = `FROM devices d
 async function listForShop(shopId, page = null) {
   const rows = await many(
     `SELECT d.id, d.name, d.platform, d.status, d.created_at, d.last_seen_at,
-            d.disabled_at, d.blocked_attempts, d.last_blocked_at,
+            d.disabled_at, d.blocked_attempts, d.last_blocked_at, d.app_version,
             m.user_id, m.role, u.name AS user_name
        ${OF_SHOP}
       ${page ? 'ORDER BY d.created_at ASC, d.id ASC LIMIT $2 OFFSET $3' : 'ORDER BY d.last_seen_at DESC NULLS LAST'}`,
@@ -74,6 +74,8 @@ async function listForShop(shopId, page = null) {
     disabledAt: r.disabled_at === null ? null : Number(r.disabled_at),
     blockedAttempts: Number(r.blocked_attempts || 0),
     lastBlockedAt: r.last_blocked_at === null ? null : Number(r.last_blocked_at),
+    //  تازه‌ترین `X-App-Version` ِ درستِ همین دستگاه (مهاجرتِ ۹۸۰)؛ هرگز نگفته ⇒ null («نامعلوم»)
+    appVersion: r.app_version || null,
     member: { userId: r.user_id, role: r.role, name: r.user_name || '' },
   }));
 }

@@ -39,7 +39,9 @@ internal val SWITCH: List<String> get() = listOf(StrShell.switchOff, StrShell.sw
 
 /**
  *  یک کلیدِ خاموش | روشن با توضیح؛ `save` همان نوشتنِ رابطِ امروز؛ `more` بندهای دیگرِ توضیحِ همان بخش (به همان
- *  ترتیب)؛ `deviceOnly` ⇒ «فقط همین دستگاه» زیرِ توضیح
+ *  ترتیب)؛ `deviceOnly` ⇒ «فقط همین دستگاه» زیرِ توضیح. `askOn` (اختیاری): روشن کردن اول از آن می‌گذرد — کلید روشن و
+ *  نوشته نمی‌شود تا خودش `turnOn` را صدا بزند (مثلاً پس از تأییدِ صریح)؛ خاموش کردن همیشه همان دم. `status` خطِ کوتاهِ
+ *  زیرِ کلید (مثلاً «… دیده می‌شود») و `content` برگه‌ای که صفحه کنارِ کلید می‌کشد.
  */
 @Composable
 internal fun RouteScope.ToggleScreen(
@@ -50,17 +52,27 @@ internal fun RouteScope.ToggleScreen(
   note: String,
   deviceOnly: Boolean = false,
   more: List<String> = emptyList(),
+  askOn: ((turnOn: () -> Unit) -> Unit)? = null,
+  status: String? = null,
+  content: @Composable () -> Unit = {},
   save: (Boolean) -> Unit,
 ) {
   var on by remember { mutableStateOf(initial) }
   SettingsPageFrame(title = SettingsLayout.labelOf(key), subtitle = if (on) onText else StrSettings.off, onBack = onBack) {
     item(key = "choice") {
-      SettingsBlock { V3Segmented(SWITCH, if (on) 1 else 0, { on = it == 1; save(on) }) }
+      SettingsBlock {
+        V3Segmented(SWITCH, if (on) 1 else 0, { pick ->
+          val want = pick == 1
+          if (want && !on && askOn != null) askOn { on = true; save(true) } else { on = want; save(on) }
+        })
+      }
+      if (status != null) SettingsNote(status)
       SettingsNote(note)
       more.forEach { SettingsNote(it) }
       if (deviceOnly) SettingsNote(StrShell.thisDeviceOnly)
     }
   }
+  content()
 }
 
 /** `settings/sales/till-receive`: دریافتِ وجه یا قسط از مشتری در صندوق (POS-39)، پیش‌فرض خاموش */

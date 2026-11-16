@@ -49,6 +49,7 @@ import ir.vil3ntec.tohid.core.model.CatalogEntryDto
 import ir.vil3ntec.tohid.core.model.MemberPermsDto
 import ir.vil3ntec.tohid.core.perm.ApproverVault
 import ir.vil3ntec.tohid.core.perm.PinGuard
+import ir.vil3ntec.tohid.core.staff.DeviceBuilds
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.StaffPins
 import ir.vil3ntec.tohid.numericInput
@@ -58,6 +59,7 @@ import ir.vil3ntec.tohid.ui.components.common.PillTone
 import ir.vil3ntec.tohid.ui.components.common.StatusPill
 import ir.vil3ntec.tohid.ui.components.staff.PinPad
 import ir.vil3ntec.tohid.ui.theme.Radius
+import ir.vil3ntec.tohid.ui.v3.account.team.DeviceVersionModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonNull
@@ -422,28 +424,42 @@ fun DevicesSection(shops: ShopRepository, canEdit: Boolean, snackbar: SnackbarHo
   LaunchedEffect(Unit) { load() }
 
   val list = devices ?: return
+  //  نسخهٔ برنامهٔ هر دستگاه نسبت به همین ساخت (`DeviceVersionModel`، `appVersion` ِ فهرست)
+  val self = DeviceVersionModel.LocalSelf.current
+  val versions = DeviceVersionModel.states(list, self)
   SectionTitle(StrAccount.devicesTitle)
   Panel {
     if (list.isEmpty()) EmptyNote(StrAccount.noDevices)
     list.forEachIndexed { i, d ->
       if (i > 0) HorizontalDivider(Modifier.padding(vertical = 8.dp), color = Shop.colors.muted2.copy(alpha = 0.2f))
       val disabled = d.disabledAt != null
+      val version = versions[d.id]
       Column(Modifier.fillMaxWidth()) {
         Text(
           StrEvidence.step(d.member.name.ifBlank { StrAccount.staffMember }, d.name.ifBlank { d.platform.ifBlank { StrAccount.device } }),
           style = MaterialTheme.typography.bodyMedium,
           color = Shop.colors.text,
         )
+        DeviceVersionModel.versionOf(d, version, self)?.let {
+          Text(Str.version(it), style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        }
         Spacer(Modifier.height(4.dp))
-        //  وضعیت همیشه «متن + رنگ + نقطه» (VISUAL-DIRECTION ۱.۳)
-        when {
-          d.current -> StatePill(StrAccount.deviceThis, Shop.colors.primary)
-          disabled -> StatePill(
-            StrAccount.deviceBlocked + if (d.blockedAttempts > 0) StrSetupPages.rejectedTries(plain(d.blockedAttempts)) else "",
-            Shop.colors.danger,
-          )
-          d.status != "active" -> StatePill(StrAccount.deviceOut, Shop.colors.muted)
-          else -> StatePill(StrSettings.active, Shop.colors.success)
+        //  وضعیت همیشه «متن + رنگ + نقطه» (VISUAL-DIRECTION ۱.۳)؛ نسخهٔ کهنه/نامعلوم قرصِ دوم
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+          when {
+            d.current -> StatePill(StrAccount.deviceThis, Shop.colors.primary)
+            disabled -> StatePill(
+              StrAccount.deviceBlocked + if (d.blockedAttempts > 0) StrSetupPages.rejectedTries(plain(d.blockedAttempts)) else "",
+              Shop.colors.danger,
+            )
+            d.status != "active" -> StatePill(StrAccount.deviceOut, Shop.colors.muted)
+            else -> StatePill(StrSettings.active, Shop.colors.success)
+          }
+          when (version) {
+            DeviceBuilds.State.OLD -> StatePill(StrAccount.versionOld, Shop.colors.warning)
+            DeviceBuilds.State.UNKNOWN -> StatePill(StrAccount.versionUnknown, Shop.colors.muted)
+            else -> Unit
+          }
         }
         if (canEdit && !d.current && (disabled || d.status == "active")) {
           Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {

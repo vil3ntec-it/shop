@@ -89,6 +89,8 @@ data class ShopDeviceDto(
   val member: DeviceMemberDto = DeviceMemberDto(),
   /** دستگاهی که همین درخواست از آن آمده — از کار انداختنی نیست */
   val current: Boolean = false,
+  /** تازه‌ترین نسخهٔ برنامه‌ای که همین دستگاه گفته (`X-App-Version`، مهاجرتِ ۹۸۰)؛ سرورِ کهنه یا هرگز نگفته ⇒ null («نامعلوم») */
+  val appVersion: String? = null,
 )
 
 @Serializable

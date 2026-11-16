@@ -111,7 +111,11 @@ async function userFromToken(req, res, next, row) {
         return next(forbidden('دسترسی این دستگاه لغو شده است', 'device_revoked'));
       }
       req.device = dev;
-      query('UPDATE devices SET last_seen_at=$2 WHERE id=$1', [dev.id, now()]).catch(() => {});
+      //  نسخهٔ برنامهٔ همین دستگاه (مهاجرتِ ۹۸۰، `lib/device-app-version.js`) — فقط توکنِ دکان؛ پمپ همان پرسشِ پیشین
+      const ver = req.appSection === require('../lib/tenancy').SHOP.app
+        ? require('../lib/device-app-version').clean(req.headers['x-app-version']) : '';
+      if (ver) query('UPDATE devices SET last_seen_at=$2, app_version=$3 WHERE id=$1', [dev.id, now(), ver]).catch(() => {});
+      else query('UPDATE devices SET last_seen_at=$2 WHERE id=$1', [dev.id, now()]).catch(() => {});
     }
 
     req.user = user;

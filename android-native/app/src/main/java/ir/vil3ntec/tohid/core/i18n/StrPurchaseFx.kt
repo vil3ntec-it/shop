@@ -98,4 +98,26 @@ object StrPurchaseFx {
     "Only the shop owner or a manager can change this switch.",
     "یوازې د دوکان خاوند یا مدیر دا کیلي بدلولی شي.",
   )
+
+  // ── پیش از روشن کردن: نسخهٔ دستگاه‌های دکان (`core/staff/DeviceBuilds.gate`، `PurchaseFxDevicesSheet`) ──
+  val checking: String get() = t("نسخهٔ دستگاه‌ها دیده می‌شود…", "Checking the devices' versions…", "د وسایلو نسخې کتل کېږي…")
+  val devicesTitle: String get() = t("پیش از روشن کردن، این دستگاه‌ها را به‌روز کنید", "Update these devices before switching on", "د روښانولو مخکې دا وسایل تازه کړئ")
+  val devicesBody: String get() = t(
+    "این دستگاه‌ها نسخهٔ کهنه دارند یا نسخه‌شان معلوم نیست. دستگاهِ کهنه خریدِ ارزی را افغانی می‌خواند و پرداختِ ارزی را از دخلِ افغانی کم می‌کند.",
+    "These devices run an old version, or their version is unknown. An old device reads a foreign-currency purchase as AFN and takes a foreign-currency payment out of the AFN drawer.",
+    "دا وسایل زړه نسخه لري یا یې نسخه نامعلومه ده. زړه وسیله په بل اسعارو پېرود افغانۍ لولي او په بل اسعارو تادیه د افغانیو له دخل څخه کموي.",
+  )
+  val notChecked: String get() = t("سنجیده نشد", "Not checked", "ونه سنجول شوه")
+  val notCheckedNote: String get() = t(
+    "گوشی و کامپیوتر شمارهٔ نسخهٔ جدا دارند؛ دستگاهی را که «سنجیده نشد» روی خودش با آخرین نسخه بسنجید.",
+    "Phones and computers number their versions separately; check a “Not checked” device on the device itself against the latest version.",
+    "ګوشی او کمپیوټر د نسخې بېل شمېرې لري؛ هغه وسیله چې «ونه سنجول شوه» په خپله یې له وروستۍ نسخې سره پرتله کړئ.",
+  )
+  val noListTitle: String get() = t("نسخهٔ دستگاه‌ها دیده نشد", "Couldn't check the devices' versions", "د وسایلو نسخې ونه لیدل شوې")
+  val noListNote: String get() = t(
+    "فهرستِ دستگاه‌های دکان نرسید؛ به‌روز بودنِ همه را خودتان ببینید.",
+    "The shop's device list didn't load; make sure every device is up to date yourself.",
+    "د دوکان د وسایلو لړلیک رانغی؛ پخپله وګورئ چې ټول تازه دي.",
+  )
+  val turnOnAnyway: String get() = t("با این حال روشن کن", "Switch on anyway", "بیا هم یې روښانه کړئ")
 }

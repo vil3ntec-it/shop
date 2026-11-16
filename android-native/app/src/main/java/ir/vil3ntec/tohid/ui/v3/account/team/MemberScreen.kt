@@ -150,6 +150,9 @@ internal fun MemberContent(
             }
             TillPinMemberSection(tillPin, busy, actions.tillPinUnlock, actions.tillPinRemove)
             val devices = MemberModel.devicesOf(team.devices, member)
+            //  نسخهٔ هر دستگاه نسبت به همین ساخت و همهٔ دستگاه‌های دکان (`DeviceVersionModel`)
+            val self = DeviceVersionModel.LocalSelf.current
+            val versions = DeviceVersionModel.states(team.devices, self)
             V3Section(StrAccount.devicesTitle) {
               if (team.devices == null) V3Skeleton(rows = 2)
               else if (devices.isEmpty()) Text(StrAccount.noDevices, style = V3Type.callout, color = c.inkMuted, modifier = Modifier.padding(16.dp))
@@ -157,15 +160,17 @@ internal fun MemberContent(
                 if (i > 0) V3Divider(start = 64.dp)
                 val (status, label) = MemberModel.pill(d)
                 val action = MemberModel.actionOf(d, canEdit)
+                val version = versions[d.id]
                 V3ListRow(
                   title = MemberModel.deviceName(d),
-                  subtitle = d.lastSeenAt?.takeIf { it > 0 }?.let { StrAccount.lastSeen(AccountFormat.date(it)) },
+                  subtitle = DeviceVersionModel.subtitle(d, version, d.lastSeenAt?.takeIf { it > 0 }?.let { StrAccount.lastSeen(AccountFormat.date(it)) }, self),
                   icon = Icons.Outlined.Devices,
                   chevron = false,
                   modifier = Modifier.v3Stagger(stagger, d.id, i + perms.size),
                   trailing = {
                     Column(horizontalAlignment = Alignment.End) {
                       V3StatusPill(status, label)
+                      DeviceVersionModel.pill(version)?.let { (vs, vl) -> V3StatusPill(vs, vl, Modifier.padding(top = 4.dp)) }
                       when (action) {
                         MemberModel.DeviceAction.BLOCK -> V3TextButton(StrAccount.block, { actions.block(d.id) }, danger = true)
                         MemberModel.DeviceAction.UNBLOCK -> V3TextButton(StrAccount.unblock, { actions.unblock(d.id) })

@@ -57,6 +57,52 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۶ — عاملِ e-devver زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-devver` (از `origin/claude/e-pur11`، روی #1066؛ ادغامِ تا 2b934795a) — نسخهٔ برنامهٔ دستگاه‌های دکان و پرسشِ کلیدِ «خرید به ارزِ دیگر»
+
+- **خواست**: صاحب ببیند کدام دستگاهِ دکان برنامهٔ کهنه دارد، و کلیدِ «خرید به ارزِ دیگر» (PUR-11) پیش از روشن شدن همان را بپرسد.
+  قاعده: `RULES-fa.md` ⇐ بندِ PUR-11 (۷) و بندِ تازهٔ «🧑‍🤝‍🧑 نسخهٔ برنامهٔ دستگاه‌های دکان».
+- **گزارشِ نسخه (موجود، نه فیلدِ تازه)**: برنامه از پیش روی **هر** درخواست `X-App-Version` می‌فرستد (`Backend.kt`؛ گوشی `3.2.N`، کامپیوتر
+  `1.0.N`، وب `3.2`)، ولی سرور آن را فقط روی `tokens` (لحظهٔ ورود) و `sync_devices` (شناسهٔ همگام‌سازی) داشت. کمترین تغییر:
+  `middleware/auth.js` همان جا که `devices.last_seen_at` را می‌نوشت، تازه‌ترین نسخهٔ درست را در ستونِ تازهٔ `devices.app_version` می‌نویسد
+  (مهاجرتِ **۹۸۰** + `rollback/980_device_app_version.down.sql`)؛ فقط توکنِ دکان (`tenancy.SHOP.app`؛ پمپ همان پرسشِ پیشین)؛ اعتبارسنجی
+  `lib/device-app-version.js` (رقم و نقطه، پسوندِ کوتاه، ≤ ۳۲؛ ناجور ⇒ ننوشتن، درخواست رد نمی‌شود). `GET /api/shop/devices` ⇒ `appVersion`
+  (افزودنی، نگفته ⇒ `null`)؛ مرزِ دسترسی و `docs/api/routes.json` همان (کلیدهای بالای پاسخ عوض نشد ⇒ `api-contract` و
+  `route-authz-inventory` بی تغییر سبز). `sync-v1.js`، `routes/sync-v1.js`، PUMP_TABLES، `/api/pump/*`، admin-pump، `pump-device.js`،
+  `pump-support.js` دست نخوردند.
+- **برنامه**: `core/staff/DeviceBuilds.kt` (commonMain): گوشی و کامپیوتر دو خطِ ساخت با شمارهٔ CI ِ جدا ⇒ همان خط: کمتر از ساختِ همین
+  برنامه «نسخهٔ کهنه»؛ خطِ دیگر: کمتر از تازه‌ترینِ همان خط در دکان «کهنه»، وگرنه «سنجیده نشد» (هرگز «به‌روز» نمی‌گوید)؛ نگفته یا بی
+  شمارهٔ ساخت ⇒ «نسخهٔ نامعلوم»؛ همین دستگاه ساختِ خودش. `gate` ⇒ `Direct`/`Confirm(دستگاه‌ها)`/`NoList`. صفحه:
+  `ui/v3/account/team/DeviceVersionModel.kt` (`LocalSelf` = `AppConfig.appVersion`) ⇐ صفحهٔ هر کارمند (`MemberScreen`: نسخه کنارِ «آخرین بار»،
+  قرصِ «نسخهٔ کهنه»/«نسخهٔ نامعلوم») و «دستگاه‌ها» ِ صفحهٔ کارمندان (`TeamStaff.DevicesSection`)؛ کامپیوتر همان صفحه‌های V3 را درونِ پوسته
+  نشان می‌دهد. کلید: `PurchaseFxSettingsAndroid.kt` + `ToggleScreen(askOn, status, content)` (افزودنی؛ کلیدهای دیگر همان) + برگهٔ تازهٔ
+  `PurchaseFxDevicesSheet.kt` (گوشی `V3Sheet`، کامپیوتر `DeskDialog` ِ `ui/desk`)؛ ۸ ثانیه سقفِ انتظار؛ «خاموش» در میانِ سنجش پاسخِ دیر را
+  بی‌اثر می‌کند؛ شاگرد نه می‌پرسد نه می‌نویسد. همه بی API ِ فقط‌JVM (آیفون همان را کامپایل می‌کند).
+- **رشته‌ها**: `StrAccount.versionOld/versionUnknown`، `StrPurchaseFx.checking/devicesTitle/devicesBody/notChecked/notCheckedNote/noListTitle/
+  noListNote/turnOnAnyway`؛ دری: ۲ جمله در `DariText.PHRASES` + `dari-words.js --write` + دو سطر در `DARI-REVIEW-fa.md` §۱۴.
+- **آزمون‌ها**: سرور (PGlite): تازه `shop-device-version` ۶/۶ (نسخه نوشته و برگردانده می‌شود، تازه‌ترین می‌ماند؛ سرآیندِ ناجور
+  نوشته نمی‌شود و درخواست ۲۰۰؛ ساختِ بی سرآیند ⇒ `null` و سالم؛ مرزِ دسترسی صاحب/مدیر ۲۰۰، شاگرد ۴۰۳، بی توکن ۴۰۱، دکانِ دیگر نمی‌بیند؛
+  توکنِ پمپ نمی‌نویسد؛ بازگشتِ ۹۸۰)؛ همراه با `staff-perms` ۹، `route-authz-inventory` ۴، `api-contract` ۲، `shop-route-inventory` ۲،
+  `lost-device-replay-button` ۲، `sec-sub-device-cap` ۷، `sync-device-bind` ۶، `risk-device` ۱۰، `admin-console-writes` ۱۷،
+  `admin-control-plane` ۱۴، `codeql-hardening` ۱۳، `routes-idor-32` ۱۵، `migrate-eol` ۳، `dari-text` ۱۷، `web-i18n` ۴۱،
+  `sync-resend-dropped` ۵، `sync-ledger-coverage` ۴، `owner-export` ۱۴ ⇒ **۱۹ پرونده، ۱۸۹ آزمون، ۰ شکست**؛ سرتاسری
+  `run.mjs fields sync journeys-b scenario-s44` ⇒ ۳۳ گام سبز. برنامه (lane A): تازه `DeviceVersionModelTest` ۵ و `DeviceVersionUiTest` ۸
+  (فهرستِ کارمند و فهرستِ همهٔ دستگاه‌ها: نسخه، «نسخهٔ کهنه»، «نسخهٔ نامعلوم»، همین دستگاه ساختِ خودش؛ کلید: دستگاهِ کهنه ⇒ فهرست و
+  تأیید، انصراف ⇒ خاموش، همه به‌روز ⇒ همان دم و یک پرسش، فهرست نرسید ⇒ هشدار و تأیید، شاگرد ⇒ هیچ، پنجرهٔ `DeskDialog`)؛ اجرای
+  هدف‌دارِ ۳۷ کلاس ⇒ **۲۶۲ آزمون، ۰ شکست، ۱ SKIP** (`PurchaseFxShotsTest` بی `PUR11_SHOTS`) — `LookGuardTest` ۷، `PageAnatomyGuardTest` ۱۰،
+  `HardcodedColorsTest` ۲، `DariCoverageTest` ۲۳، `DariWordsTest` ۱۷، `I18nCoverageTest` ۸، `I18nFormatTest` ۱۱، `SupplierFxTest` ۱۱،
+  `PurchaseFxUiTest` ۶، `PurchaseFxDeskUiTest` ۳، `PurchaseFxFormTest` ۴، `Settings*` (Layout ۷، Tiers ۷، Port ۸، Home ۱۱، Models ۱۲)،
+  `DeskSettingsCoverageTest` ۳، `DesktopPhrasesTest` ۴، `TeamModelTest` ۷، `LostDeviceRestoreDesktopTest` ۴، `V3A11yGuardTest` ۶،
+  `InfraLeakGuardTest` ۸، `DroppedResend*` ۱۱، `ShopSettingsSyncTest` ۱۴، `MoneyPagesModelTest` ۱۶، `NavRowUiTest` ۳، `DeskD3cUiTest` ۸
+  (۴ سرخِ نخستِ `DeviceVersionUiTest` از خودِ آزمون بود: مسیرِ `/api/v1` و `Backend.shop` ِ بی سرورِ ساختگی ⇒ `TestBackendShop.kt`).
+- **آزمون‌های عمداً عوض‌شده**: هیچ.
+- **عکس‌ها**: `DeviceVersionShotsTest` (`DEVVER_SHOTS`، `DEVVER_TAG`) در `/home/user/wt-devver-shots/{before,after}/`: گوشی ۳۶۰×۷۶۰
+  روشن/تیره `phone-member-devices`، `phone-team-devices`، `phone-fx-switch-on`؛ کامپیوتر ۱۳۶۶×۷۶۸ `desk-member-devices`، `desk-fx-switch-on`
+  («پیش» روی `claude/e-pur11` با همان آزمون).
+- **مانده**: (۱) گوشی و کامپیوتر را نمی‌شود با شمارهٔ ساخت با هم سنجید ⇒ در دکانی که هم گوشی دارد هم کامپیوتر، دستگاهِ خطِ دیگر
+  «سنجیده نشد» است و کلید همیشه تأیید می‌خواهد. راهِ کامل: یک «پلهٔ داده» ِ مشترکِ `core` که هر دو ساخت در سرآیندی جدا بفرستند (یا
+  جدولِ «نخستین ساختِ هر خط» در سرور پس از انتشار، مثلِ `newer-fields.since`). (۲) دستگاهی که پس از استقرارِ سرور هنوز درخواستی نزده
+  «نامعلوم» است تا نخستین تماس. (۳) فهرستِ `/api/me/devices` (صفحهٔ اشتراک) نسخه ندارد — لازم نبود. (۴) آیفون ساخته نشد.
+
 ### ۱۴۰۵/۰۸/۲۶ — عاملِ e-pur11 زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-pur11` (از `origin/main` 7e2a36923) — PUR-11: خرید به ارزِ دیگر (D-15 ب)
 
 - **تصمیمِ صاحب‌کار (۱۴۰۵/۰۸/۲۶): «همه را تمام کن»** ⇒ D-15 از «الف» (فقط وقتی دکانی خواست) به «ب»؛ ثبت در `OWNER-DECISIONS-fa.md` (جدول و §D-15)،
