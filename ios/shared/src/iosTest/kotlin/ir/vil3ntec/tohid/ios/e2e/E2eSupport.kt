@@ -353,7 +353,9 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
     repeat(6) {
       if (shown(tab)) {
         tap(tab, name)
-        if (shown(Find.back)) tap(tab, "دوباره $name (ریشهٔ زبانه)")
+        //  e-phone-p1 (دستهٔ ۷۰): صندوقِ گوشی «حالتِ تمرکز» است — نوارِ پایین پنهان و «بازگشت» دیده می‌شود، و همین ریشهٔ
+        //  زبانه است. زدنِ دوباره فقط وقتی نوار هنوز هست (صفحهٔ درونیِ زبانه)
+        if (shown(Find.back) && shown(tab)) tap(tab, "دوباره $name (ریشهٔ زبانه)")
         return
       }
       if (shown(Find.back)) tap(Find.back, "بازگشت") else pump(800)
