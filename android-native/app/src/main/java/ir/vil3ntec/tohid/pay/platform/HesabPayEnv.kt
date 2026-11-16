@@ -13,6 +13,8 @@ import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.data.PermPolicy
 import ir.vil3ntec.tohid.data.repo.Backend
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -93,7 +95,7 @@ class HesabPayEnv private constructor(private val app: Context) {
     return img
   }
 
-  private suspend fun qrBytes(hash: String): ByteArray? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+  private suspend fun qrBytes(hash: String): ByteArray? = withContext(Dispatchers.IO) {
     val dir = java.io.File(app.filesDir, QR_DIR)
     val file = java.io.File(dir, hash)
     val local = runCatching { file.takeIf { it.isFile }?.readBytes() }.getOrNull()

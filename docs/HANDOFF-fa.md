@@ -80,7 +80,15 @@
 - **آزمون‌ها**: تازه `PayStepTest` ۷، `HesabQrImageTest` ۴، `ShopQrPictureTest` ۳، `hesabpay-qr-image.test.js` ۳؛ اجرای هدف‌دارِ کامپیوتر ۵۱۷ آزمون
   (`*PayStep*`، `*PayMethods*`، `*Checkout*`، `*Till*`، `*Hesab*`، `*Dari*`، `*LookGuard*`، `*PageAnatomyGuard*`، …) سبز پس از رفعِ دو آزمونِ کلید/عکس؛
   سرور ۸۵ + ۲۸ + ۱۷ سبز روی PGlite. عکس‌ها: `/home/user/wt-pay-shots/paystep/` (پیش از main، پس از همین شاخه؛ روشن/تیره).
-- **نیمه‌کاره / قدمِ بعد**: آزمونِ روی دستگاهِ واقعی (ML Kit روی گوشی، پنجرهٔ فایلِ ویندوز)؛ اتصالِ خودکارِ کارت‌خوان (`DevicePaySettle`) و درگاهِ
+- **آیفون** (خواستِ هماهنگ‌کننده؛ iosTest روی لینوکس اجرا نمی‌شود، پس فقط ویرایشِ کمینه با برچسب‌های موجود): `CoreFlowsE2EIosTest`
+  «04-till»: پس از «پرداخت» ِ سبد، دکمهٔ «پرداخت ‹مبلغ›» (`StrTillPay.payAmount(PhoneSaleText.amount(FREE_PRICE))`) ⇐ گامِ پرداخت ⇐ پیش از
+  تأیید هیچ فروش (سنجهٔ تازه) ⇐ «دریافت شد» (`StrTillPay.received`) ⇐ همان سنجه‌ها (نقد، مبلغ، قلم، سرور)؛ عکسِ تازهٔ `04d2-paystep`.
+  «07-credit»: «پرداخت ‹مبلغ›» ⇐ کاشیِ «نسیه» (`Find.clickLabel(StrTillPay.tileCredit)`) ⇐ بی مشتری هیچ فروش و «انتخابِ مشتری» باز
+  (`StrSale.newDebtor` دیده می‌شود؛ جای «ثبت فروش» ِ خاموش و `creditNeedsCustomer`) ⇐ قرض‌دارِ تازه ⇐ همان گام با «نسیه» و نامِ قرض‌دار
+  ⇐ «ثبت به حسابِ مشتری» (`StrTillPay.toAccountButton`) ⇐ همان سنجه‌های نسیه. `E2eSupport.toTab` دست نخورد (شاخهٔ `claude/e-ios-e2e`).
+  کدِ مشترک: `pay/platform/ShopQrPicture.kt` در `ios-exclude.txt` با همتای `ShopQrPictureIos.kt` (`CAN_READ = false`: دکمهٔ عکس پنهان،
+  صندوقِ آیفون همان QR ِ کشیده)؛ کامپایلِ آیفون این‌جا آزموده نشد.
+- **نیمه‌کاره / قدمِ بعد**: آزمونِ روی دستگاهِ واقعی (ML Kit روی گوشی، پنجرهٔ فایلِ ویندوز)؛ خواندنِ QR از عکس در آیفون (Vision)؛ اتصالِ خودکارِ کارت‌خوان (`DevicePaySettle`) و درگاهِ
   خودکارِ حساب‌پی خاموش ماندند تا صاحب‌کار API را بگیرد؛ ردیف‌های PAY-06/PAY-21 همچنان PARTIAL.
 
 ### ۱۴۰۵/۰۸/۲۶ — عاملِ e-desk-d3c زیرِ هماهنگ‌کننده، شاخهٔ `claude/e-desk-d3c` (از `origin/main` a0b0f9355، `origin/main` 7e2a36923 ادغام شد) — فرم‌های خرید و پنجره‌های کامپیوتر روی `ui/desk`

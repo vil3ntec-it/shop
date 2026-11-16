@@ -377,7 +377,7 @@ private fun HpOpened(
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       if (!Platform.DESKTOP) TextButton(onClick = onScan, enabled = !busy) { Text(StrPayPages.scanQr) }
       //  صاحب‌کار ۱۴۰۵/۰۸/۲۶: عکس/اسکرین‌شاتِ QR ِ حساب‌پی از گالری یا فایل — صندوق همان را بزرگ نشان می‌دهد
-      TextButton(onClick = onPickImage, enabled = !busy) { Text(ir.vil3ntec.tohid.core.i18n.StrTillPay.pickQrImage) }
+      if (ir.vil3ntec.tohid.pay.platform.ShopQrPicture.CAN_READ) TextButton(onClick = onPickImage, enabled = !busy) { Text(ir.vil3ntec.tohid.core.i18n.StrTillPay.pickQrImage) }
     }
     if (picked != null) {
       androidx.compose.foundation.Image(

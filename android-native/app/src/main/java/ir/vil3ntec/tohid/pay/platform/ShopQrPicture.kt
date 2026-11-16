@@ -38,6 +38,8 @@ import kotlin.coroutines.resume
 object ShopQrPicture {
   const val MAX_INPUT_BYTES = 25 * 1024 * 1024
   const val MAX_SIDE = 1024
+  /** این سکو QR را از عکس می‌خواند (آیفون هنوز نه ⇒ دکمهٔ «انتخابِ عکسِ QR» پنهان و صندوق همان QR ِ کشیده) */
+  const val CAN_READ = true
   private const val QUALITY = 92
 
   sealed interface Prep {

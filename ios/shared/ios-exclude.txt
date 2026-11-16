@@ -28,4 +28,5 @@ ui/SecureWindowAndroid.kt  # OPS-02: `FLAG_SECURE` ِ برگهٔ عبارت (and
 ui/Platform.kt  # «کدام سکو» (شناسهٔ دستگاه، پوشهٔ پشتیبان) — برای هر سکو جدا، مثلِ ui/PlatformDesk.kt؛ iOS: ui/PlatformIos.kt (identifierForVendor)
 ui/screens/Haptics.kt  # الگوی خامِ VibrationEffect.createWaveform؛ iOS: ui/screens/HapticsIos.kt ⇐ ios/IosHaptics.kt (مولدهای UIKit با همان معنا: موفق/خطا/تأیید/انتخاب/آستانه، گامِ ۱۰ §۰.۱۵)
 core/net/HttpBodyAndroid.kt  # java.util.zip ِ JVM برای پاسخِ gzip ِ `HttpEngine`؛ iOS: core/net/HttpBodyIos.kt (NSURLSession خودش باز می‌کند)
+pay/platform/ShopQrPicture.kt  # عکسِ QR ِ حساب‌پیِ دکان (۱۴۰۵/۰۸/۲۶): ML Kit، android.graphics و گالریِ سیستم؛ iOS: pay/platform/ShopQrPictureIos.kt (هنوز خواندنِ QR از عکس نیست ⇒ `CAN_READ = false`: دکمه پنهان و صندوق همان QR ِ کشیده از متن)
 sync/v3/V3GzipAndroid.kt  # java.util.zip ِ JVM؛ iOS: sync/v3/V3GzipIos.kt (push ِ v3 همیشه ساده — MIN_CHARS هرگز نمی‌رسد؛ سرور هر دو را می‌پذیرد)

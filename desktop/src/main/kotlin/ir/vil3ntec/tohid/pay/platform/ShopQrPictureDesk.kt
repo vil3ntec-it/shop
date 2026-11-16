@@ -30,6 +30,7 @@ import javax.imageio.ImageWriteParam
 object ShopQrPicture {
   const val MAX_INPUT_BYTES = 25 * 1024 * 1024
   const val MAX_SIDE = 1024
+  const val CAN_READ = true
   private const val QUALITY = 0.92f
   private val QR = listOf(BarcodeFormat.QR_CODE)
 
