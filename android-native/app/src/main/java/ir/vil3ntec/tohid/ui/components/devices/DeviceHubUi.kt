@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.ui.components.devices
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopButton
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -354,7 +357,7 @@ fun PendingScansPrompt(data: ShopData, open: (ScanTarget) -> Unit, onNewItem: (S
   ready?.let { plan ->
     //  بستنِ این پنجره کدهای ناشناسِ مانده را تا اسکنِ تازه دوباره نمی‌پرسد
     fun close() { ready = null; quietUntil = count }
-    AlertDialog(
+    ShopAlertDialog(
       onDismissRequest = { close() },
       title = { Text(StrDevices.heldReady(plan.invoices.size, ir.vil3ntec.tohid.money(plan.totalMinor / 100.0) + " ؋")) },
       text = {
@@ -364,7 +367,7 @@ fun PendingScansPrompt(data: ShopData, open: (ScanTarget) -> Unit, onNewItem: (S
         }
       },
       confirmButton = {
-        Button(onClick = {
+        ShopButton(onClick = {
           ScanSaleHold.payRequest.value = plan.invoices.firstOrNull()?.id
           close()
           open(ScanTarget.SALE)
@@ -372,8 +375,8 @@ fun PendingScansPrompt(data: ShopData, open: (ScanTarget) -> Unit, onNewItem: (S
       },
       dismissButton = {
         Row {
-          plan.unknown.firstOrNull()?.let { u -> TextButton(onClick = { close(); onNewItem(u.code) }) { Text(StrDevices.newItem) } }
-          TextButton(onClick = { close() }) { Text(StrDevices.later) }
+          plan.unknown.firstOrNull()?.let { u -> ShopTextButton(onClick = { close(); onNewItem(u.code) }) { Text(StrDevices.newItem) } }
+          ShopTextButton(onClick = { close() }) { Text(StrDevices.later) }
         }
       },
     )
@@ -392,11 +395,12 @@ fun PendingScansPrompt(data: ShopData, open: (ScanTarget) -> Unit, onNewItem: (S
   val sum = remember(pending) { PendingScans.summary(pending) }
 
   if (askDiscard) {
-    AlertDialog(
+    ShopAlertDialog(
+      danger = true,
       onDismissRequest = { askDiscard = false },
       text = { Text(StrDevices.discardAsk(sum.scans)) },
-      confirmButton = { TextButton(onClick = { askDiscard = false; ScanInbox.discardAll() }) { Text(StrDevices.discard) } },
-      dismissButton = { TextButton(onClick = { askDiscard = false }) { Text(Str.cancel) } },
+      confirmButton = { ShopTextButton(onClick = { askDiscard = false; ScanInbox.discardAll() }) { Text(StrDevices.discard) } },
+      dismissButton = { ShopTextButton(onClick = { askDiscard = false }) { Text(Str.cancel) } },
     )
     return
   }
@@ -423,7 +427,7 @@ fun PendingScansPrompt(data: ShopData, open: (ScanTarget) -> Unit, onNewItem: (S
     }
   }
 
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = { quietUntil = count },
     title = { Text(StrDevices.pendingTitle(sum.scans)) },
     text = {
@@ -438,8 +442,8 @@ fun PendingScansPrompt(data: ShopData, open: (ScanTarget) -> Unit, onNewItem: (S
         Target(StrDevices.toSale, StrDevices.toSaleLine) { toSale() }
       }
     },
-    confirmButton = { TextButton(onClick = { quietUntil = count }) { Text(StrDevices.later) } },
-    dismissButton = { TextButton(onClick = { askDiscard = true }) { Text(StrDevices.discard) } },
+    confirmButton = { ShopTextButton(onClick = { quietUntil = count }) { Text(StrDevices.later) } },
+    dismissButton = { ShopTextButton(onClick = { askDiscard = true }) { Text(StrDevices.discard) } },
   )
 }
 

@@ -1,5 +1,9 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopButton
+import ir.vil3ntec.tohid.ui.components.common.ShopOutlinedButton
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -242,7 +246,7 @@ private fun SafeMoveDialog(kind: String, views: Map<String, SafeCore.View>, stor
     }
   }
 
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = { if (!busy) onDismiss() },
     containerColor = Shop.colors.surfaceSolid,
     title = { Text(dialogTitle(kind), color = Shop.colors.text) },
@@ -252,8 +256,8 @@ private fun SafeMoveDialog(kind: String, views: Map<String, SafeCore.View>, stor
           Text(StrSafe.reason, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
           Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             reasons.forEach { r ->
-              if (r == reason) Button(onClick = {}) { Text(reasonLabel(r)) }
-              else OutlinedButton(onClick = { reason = r; error = null }) { Text(reasonLabel(r)) }
+              if (r == reason) ShopButton(onClick = {}) { Text(reasonLabel(r)) }
+              else ShopOutlinedButton(onClick = { reason = r; error = null }) { Text(reasonLabel(r)) }
             }
           }
         }
@@ -316,8 +320,8 @@ private fun SafeMoveDialog(kind: String, views: Map<String, SafeCore.View>, stor
         error?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger, modifier = Modifier.padding(top = 6.dp)) }
       }
     },
-    confirmButton = { TextButton(enabled = !busy, onClick = ::submit) { Text(StrSafe.record) } },
-    dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(StrSafe.cancel) } },
+    confirmButton = { ShopTextButton(enabled = !busy, onClick = ::submit) { Text(StrSafe.record) } },
+    dismissButton = { ShopTextButton(enabled = !busy, onClick = onDismiss) { Text(StrSafe.cancel) } },
   )
 }
 
@@ -327,7 +331,7 @@ private fun SafeHistoryDialog(views: Map<String, SafeCore.View>, onDismiss: () -
   val lines = remember(views) {
     views.values.flatMap { it.history }.sortedWith(compareByDescending<SafeCore.Line> { it.entry.at }.thenByDescending { it.entry.id })
   }
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     containerColor = Shop.colors.surfaceSolid,
     title = { Text(StrSafe.historyTitle, color = Shop.colors.text) },
@@ -343,7 +347,7 @@ private fun SafeHistoryDialog(views: Map<String, SafeCore.View>, onDismiss: () -
         }
       }
     },
-    confirmButton = { TextButton(onClick = onDismiss) { Text(StrSafe.close) } },
+    confirmButton = { ShopTextButton(onClick = onDismiss) { Text(StrSafe.close) } },
   )
 }
 

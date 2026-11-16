@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -295,31 +297,33 @@ fun HesabPayAccountSettings(ready: Boolean, toast: (String) -> Unit, onView: (He
   }
 
   if (askReset) {
-    AlertDialog(
+    ShopAlertDialog(
+      danger = true,
       onDismissRequest = { askReset = false },
       title = { Text(StrPayPages.resetPinTitle) },
       text = { Text(StrPayPages.resetPinBody) },
       confirmButton = {
-        TextButton(onClick = {
+        ShopTextButton(onClick = {
           askReset = false
           act({ env.account.resetPin() }) { show(it); pin = ""; env.forget(); toast(StrPayPages.pinReset) }
         }) { Text(StrPos.clearIt) }
       },
-      dismissButton = { TextButton(onClick = { askReset = false }) { Text(StrPos.nevermind) } },
+      dismissButton = { ShopTextButton(onClick = { askReset = false }) { Text(StrPos.nevermind) } },
     )
   }
   if (askRemove) {
-    AlertDialog(
+    ShopAlertDialog(
+      danger = true,
       onDismissRequest = { askRemove = false },
       title = { Text(StrPayPages.removeAccount) },
       text = { Text(StrPayPages.removeAccountBody) },
       confirmButton = {
-        TextButton(onClick = {
+        ShopTextButton(onClick = {
           askRemove = false
           act({ env.account.remove(pin) }) { show(it); account = ""; qr = ""; env.forget(); toast(StrPayPages.accountRemoved) }
         }) { Text(StrAccount.removeConfirm) }
       },
-      dismissButton = { TextButton(onClick = { askRemove = false }) { Text(StrPos.nevermind) } },
+      dismissButton = { ShopTextButton(onClick = { askRemove = false }) { Text(StrPos.nevermind) } },
     )
   }
   if (scanning) HpQrScanDialog(onDismiss = { scanning = false }) { text ->

@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -79,7 +81,7 @@ internal fun RestockDialog(
 ) {
   val c = Shop.colors
   var chosen by remember(order.id) { mutableStateOf<Set<Int>>(emptySet()) }
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     containerColor = c.surfaceSolid,
     title = { Text(StrOrderPages.restockTitle(order.orderNo), color = c.text) },
@@ -89,11 +91,11 @@ internal fun RestockDialog(
       }
     },
     confirmButton = {
-      TextButton(onClick = { onConfirm(chosen) }, enabled = !busy) {
+      ShopTextButton(onClick = { onConfirm(chosen) }, enabled = !busy) {
         Text(if (chosen.isEmpty()) StrOrderPages.restockNone else StrOrderPages.restockDo)
       }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(StrDevices.later) } },
+    dismissButton = { ShopTextButton(onClick = onDismiss) { Text(StrDevices.later) } },
   )
 }
 

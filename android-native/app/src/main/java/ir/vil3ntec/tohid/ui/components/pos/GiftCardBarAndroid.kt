@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -112,19 +114,19 @@ private fun GiftCardSellDialog(store: ShopStore, toast: (String) -> Unit, onDism
   var sold by remember { mutableStateOf<Pair<String, Long>?>(null) }
 
   sold?.let { (c, m) ->
-    AlertDialog(
+    ShopAlertDialog(
       onDismissRequest = { if (!busy) onDismiss() },
       title = { Text(StrGiftCard.sell) },
       text = { Text(StrGiftCard.sold(GiftCard.display(c), money(PayFlow.major(m))), color = Shop.colors.text) },
       confirmButton = {
-        TextButton(enabled = !busy, onClick = { busy = true; scope.launch { toast(printCard(context, c, m)); busy = false } }) { Text(StrGiftCard.printCard) }
+        ShopTextButton(enabled = !busy, onClick = { busy = true; scope.launch { toast(printCard(context, c, m)); busy = false } }) { Text(StrGiftCard.printCard) }
       },
-      dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(StrGiftCard.close) } },
+      dismissButton = { ShopTextButton(enabled = !busy, onClick = onDismiss) { Text(StrGiftCard.close) } },
     )
     return
   }
 
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = { if (!busy) onDismiss() },
     title = { Text(StrGiftCard.sell) },
     text = {
@@ -134,7 +136,7 @@ private fun GiftCardSellDialog(store: ShopStore, toast: (String) -> Unit, onDism
           singleLine = true, modifier = Modifier.fillMaxWidth(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          TextButton(onClick = { code = GiftCard.display(GiftCard.make { random.nextInt(it) }); error = null }) { Text(StrGiftCard.newCode) }
+          ShopTextButton(onClick = { code = GiftCard.display(GiftCard.make { random.nextInt(it) }); error = null }) { Text(StrGiftCard.newCode) }
         }
         Text(StrGiftCard.codeHint, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
         Spacer(Modifier.height(6.dp))
@@ -148,11 +150,11 @@ private fun GiftCardSellDialog(store: ShopStore, toast: (String) -> Unit, onDism
       }
     },
     confirmButton = {
-      TextButton(enabled = !busy, onClick = {
+      ShopTextButton(enabled = !busy, onClick = {
         val c = GiftCard.normalize(code)
         val m = wholeAfghani(amount)
-        if (c == null) { error = GiftCards.message(GiftCard.Code.BAD_CODE); return@TextButton }
-        if (m == null) { error = GiftCards.message(GiftCard.Code.INVALID_AMOUNT); return@TextButton }
+        if (c == null) { error = GiftCards.message(GiftCard.Code.BAD_CODE); return@ShopTextButton }
+        if (m == null) { error = GiftCards.message(GiftCard.Code.INVALID_AMOUNT); return@ShopTextButton }
         busy = true
         scope.launch {
           when (val r = GiftCardPref.issue(store, key, c, m, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), me.ifBlank { null })) {
@@ -164,7 +166,7 @@ private fun GiftCardSellDialog(store: ShopStore, toast: (String) -> Unit, onDism
         }
       }) { Text(StrGiftCard.save) }
     },
-    dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(StrGiftCard.cancel) } },
+    dismissButton = { ShopTextButton(enabled = !busy, onClick = onDismiss) { Text(StrGiftCard.cancel) } },
   )
 }
 
@@ -183,7 +185,7 @@ private fun GiftCardCheckDialog(d: ShopData, store: ShopStore, canSell: Boolean,
   recharging?.let { c -> GiftCardRechargeDialog(store, c, toast) { recharging = null } }
   voiding?.let { c -> GiftCardVoidDialog(store, c, canVoid, toast) { voiding = null } }
 
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     title = { Text(StrGiftCard.check) },
     text = {
@@ -192,7 +194,7 @@ private fun GiftCardCheckDialog(d: ShopData, store: ShopStore, canSell: Boolean,
           value = code, onValueChange = { code = it.take(GiftCard.CODE_LEN + 4); asked = null }, label = { Text(StrGiftCard.code) },
           singleLine = true, modifier = Modifier.fillMaxWidth(),
         )
-        TextButton(onClick = { asked = code }) { Text(StrGiftCard.lookup) }
+        ShopTextButton(onClick = { asked = code }) { Text(StrGiftCard.lookup) }
         asked?.let { q ->
           val c = GiftCard.normalize(q)
           val card = view.card(c)
@@ -209,16 +211,16 @@ private fun GiftCardCheckDialog(d: ShopData, store: ShopStore, canSell: Boolean,
               if (card.void) Text(StrGiftCard.isVoid, color = Shop.colors.danger)
               if (card.review) Text(StrGiftCard.review, color = Shop.colors.warning)
               if (!card.void && canSell) Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(onClick = { recharging = card.code }) { Text(StrGiftCard.recharge) }
-                TextButton(enabled = !printing, onClick = { printing = true; scope.launch { toast(printCard(context, card.code, null)); printing = false } }) { Text(StrGiftCard.printCard) }
-                if (canVoid) TextButton(onClick = { voiding = card }) { Text(StrGiftCard.voidCard, color = Shop.colors.danger) }
+                ShopTextButton(onClick = { recharging = card.code }) { Text(StrGiftCard.recharge) }
+                ShopTextButton(enabled = !printing, onClick = { printing = true; scope.launch { toast(printCard(context, card.code, null)); printing = false } }) { Text(StrGiftCard.printCard) }
+                if (canVoid) ShopTextButton(onClick = { voiding = card }) { Text(StrGiftCard.voidCard, color = Shop.colors.danger) }
               }
             }
           }
         }
       }
     },
-    confirmButton = { TextButton(onClick = onDismiss) { Text(StrGiftCard.close) } },
+    confirmButton = { ShopTextButton(onClick = onDismiss) { Text(StrGiftCard.close) } },
   )
 }
 
@@ -233,7 +235,7 @@ private fun GiftCardRechargeDialog(store: ShopStore, code: String, toast: (Strin
   var busy by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf<String?>(null) }
 
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = { if (!busy) onDismiss() },
     title = { Text(StrGiftCard.recharge) },
     text = {
@@ -249,8 +251,8 @@ private fun GiftCardRechargeDialog(store: ShopStore, code: String, toast: (Strin
       }
     },
     confirmButton = {
-      TextButton(enabled = !busy, onClick = {
-        val m = wholeAfghani(amount) ?: run { error = GiftCards.message(GiftCard.Code.INVALID_AMOUNT); return@TextButton }
+      ShopTextButton(enabled = !busy, onClick = {
+        val m = wholeAfghani(amount) ?: run { error = GiftCards.message(GiftCard.Code.INVALID_AMOUNT); return@ShopTextButton }
         busy = true
         scope.launch {
           when (val r = GiftCardPref.recharge(store, key, code, m, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), me.ifBlank { null })) {
@@ -262,7 +264,7 @@ private fun GiftCardRechargeDialog(store: ShopStore, code: String, toast: (Strin
         }
       }) { Text(StrGiftCard.rechargeSave) }
     },
-    dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(StrGiftCard.cancel) } },
+    dismissButton = { ShopTextButton(enabled = !busy, onClick = onDismiss) { Text(StrGiftCard.cancel) } },
   )
 }
 
@@ -277,7 +279,8 @@ private fun GiftCardVoidDialog(store: ShopStore, card: GiftCard.Card, allowed: B
   var busy by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf<String?>(null) }
 
-  AlertDialog(
+  ShopAlertDialog(
+    danger = true,
     onDismissRequest = { if (!busy) onDismiss() },
     title = { Text(StrGiftCard.voidCard) },
     text = {
@@ -292,8 +295,8 @@ private fun GiftCardVoidDialog(store: ShopStore, card: GiftCard.Card, allowed: B
       }
     },
     confirmButton = {
-      TextButton(enabled = !busy && allowed, onClick = {
-        if (reason.trim().length < GiftCard.REASON_MIN) { error = GiftCards.message(GiftCard.Code.REASON_REQUIRED); return@TextButton }
+      ShopTextButton(enabled = !busy && allowed, onClick = {
+        if (reason.trim().length < GiftCard.REASON_MIN) { error = GiftCards.message(GiftCard.Code.REASON_REQUIRED); return@ShopTextButton }
         busy = true
         scope.launch {
           when (val r = GiftCardPref.void(store, key, card.code, reason.trim(), allowed, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), me.ifBlank { null })) {
@@ -305,7 +308,7 @@ private fun GiftCardVoidDialog(store: ShopStore, card: GiftCard.Card, allowed: B
         }
       }) { Text(StrGiftCard.voidSave, color = Shop.colors.danger) }
     },
-    dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(StrGiftCard.cancel) } },
+    dismissButton = { ShopTextButton(enabled = !busy, onClick = onDismiss) { Text(StrGiftCard.cancel) } },
   )
 }
 
@@ -321,7 +324,7 @@ private fun GiftCardLiabilityDialog(d: ShopData, onDismiss: () -> Unit) {
     Text(value, style = if (strong) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodySmall, color = Shop.colors.text)
   }
 
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     title = { Text(StrGiftCard.liability) },
     text = {
@@ -349,7 +352,7 @@ private fun GiftCardLiabilityDialog(d: ShopData, onDismiss: () -> Unit) {
         }
       }
     },
-    confirmButton = { TextButton(onClick = onDismiss) { Text(StrGiftCard.close) } },
+    confirmButton = { ShopTextButton(onClick = onDismiss) { Text(StrGiftCard.close) } },
   )
 }
 

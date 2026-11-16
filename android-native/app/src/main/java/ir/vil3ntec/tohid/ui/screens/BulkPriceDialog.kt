@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopButton
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -83,7 +86,7 @@ fun BulkPriceDialog(
   val preview = remember(d, ids, f, op) { op?.let { WarehouseEngine.bulkPricePreview(d, ids, f, it) } }
   val ready = preview != null && preview.changed > 0 && reason.isNotBlank() && (!preview.needsConfirm || ack)
 
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     containerColor = c.surfaceSolid,
     title = { Text(StrCatalogPages.priceOfN(plain(ids.size)), color = c.text) },
@@ -154,9 +157,9 @@ fun BulkPriceDialog(
       }
     },
     confirmButton = {
-      Button(
+      ShopButton(
         onClick = {
-          val o = op ?: return@Button
+          val o = op ?: return@ShopButton
           onDone(
             WarehouseEngine.bulkPrice(
               d, ids, f, o, 100, confirmed = ack, by = me, reason = reason,
@@ -167,7 +170,7 @@ fun BulkPriceDialog(
         enabled = ready,
       ) { Text(StrSettings.put) }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel) } },
+    dismissButton = { ShopTextButton(onClick = onDismiss) { Text(Str.cancel) } },
   )
 }
 

@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -59,9 +61,9 @@ fun PreviewBanner(strip: Boolean = true) {
     textAlign = TextAlign.Center,
   )
   if (warn) {
-    AlertDialog(
+    ShopAlertDialog(
       onDismissRequest = { warn = false },
-      confirmButton = { TextButton(onClick = { warn = false }) { Text(StrShell.gotIt) } },
+      confirmButton = { ShopTextButton(onClick = { warn = false }) { Text(StrShell.gotIt) } },
       title = { Text(StrShell.previewBuild) },
       text = { Text(StrShell.previewNote) },
     )

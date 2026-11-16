@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopOutlinedButton
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -238,7 +241,7 @@ private fun QrDialog(c: CampaignDto, url: String, storeTitle: String, snackbar: 
 
   fun report(msg: String) { scope.launch { snackbar.showSnackbar(msg) } }
 
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onClose,
     title = { Text(c.name) },
     text = {
@@ -247,10 +250,10 @@ private fun QrDialog(c: CampaignDto, url: String, storeTitle: String, snackbar: 
         Text(CampaignLinks.displayUrl(url), style = MaterialTheme.typography.bodySmall)
         Text(CampaignLinks.SCAN_HINT, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-          OutlinedButton(onClick = { clipboard.setText(AnnotatedString(url)); report(StrMarketPages.linkCopied) }) { Text(StrSalePages.copyLink) }
-          OutlinedButton(enabled = !busy, onClick = {
+          ShopOutlinedButton(onClick = { clipboard.setText(AnnotatedString(url)); report(StrMarketPages.linkCopied) }) { Text(StrSalePages.copyLink) }
+          ShopOutlinedButton(enabled = !busy, onClick = {
             val pr = PrinterRegistry.defaultSaved(context)
-            if (pr == null) { report(StrPick.noPrinter); return@OutlinedButton }
+            if (pr == null) { report(StrPick.noPrinter); return@ShopOutlinedButton }
             busy = true
             scope.launch {
               val msg = runCatching {
@@ -265,7 +268,7 @@ private fun QrDialog(c: CampaignDto, url: String, storeTitle: String, snackbar: 
               report(msg)
             }
           }) { Text(StrMarketPages.printOnReceipt) }
-          OutlinedButton(enabled = !busy, onClick = {
+          ShopOutlinedButton(enabled = !busy, onClick = {
             busy = true
             scope.launch {
               runCatching {
@@ -280,7 +283,7 @@ private fun QrDialog(c: CampaignDto, url: String, storeTitle: String, snackbar: 
           //  MKT-10: پیوندِ «QR ِ رسید» ⇒ زیرِ هر فاکتورِ فروشِ همین دستگاه (پیش‌فرض خاموش)
           if (CampaignLinks.Source.of(c.source) == CampaignLinks.Source.QR_RECEIPT && !c.archived) {
             var onReceipt by remember(url) { mutableStateOf(ReceiptStoreQr.url(context) == url) }
-            OutlinedButton(onClick = {
+            ShopOutlinedButton(onClick = {
               ReceiptStoreQr.set(context, if (onReceipt) null else url)
               onReceipt = !onReceipt
               report(if (onReceipt) StrLabel.storeQrSet else StrLabel.storeQrCleared)
@@ -289,7 +292,7 @@ private fun QrDialog(c: CampaignDto, url: String, storeTitle: String, snackbar: 
         }
       }
     },
-    confirmButton = { TextButton(onClick = onClose) { Text(Str.close) } },
+    confirmButton = { ShopTextButton(onClick = onClose) { Text(Str.close) } },
   )
 }
 

@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopButton
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -152,7 +155,8 @@ fun ImageBulkImportSheet(store: ShopStore, d: ShopData, onDismiss: () -> Unit) {
   }
 
   if (confirmReplace > 0) {
-    AlertDialog(
+    ShopAlertDialog(
+      danger = true,
       onDismissRequest = { confirmReplace = 0 },
       containerColor = colors.surfaceSolid,
       title = { Text(StrImagePages.replaceCount(confirmReplace), color = colors.text) },
@@ -162,8 +166,8 @@ fun ImageBulkImportSheet(store: ShopStore, d: ShopData, onDismiss: () -> Unit) {
           color = colors.muted, style = MaterialTheme.typography.bodySmall,
         )
       },
-      confirmButton = { Button(onClick = { confirmReplace = 0; run() }) { Text(StrImagePages.replaceBtn) } },
-      dismissButton = { TextButton(onClick = { confirmReplace = 0 }) { Text(Str.cancel) } },
+      confirmButton = { ShopButton(onClick = { confirmReplace = 0; run() }) { Text(StrImagePages.replaceBtn) } },
+      dismissButton = { ShopTextButton(onClick = { confirmReplace = 0 }) { Text(Str.cancel) } },
     )
   }
 

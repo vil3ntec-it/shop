@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopButton
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -76,7 +79,7 @@ fun ProductImportDialog(
   val errors = plan.rows.filter { it.status == Status.ERROR }
   val ready = !busy && plan.problem == null && plan.writes > 0 && (updates == 0 || ack)
 
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     containerColor = c.surfaceSolid,
     title = { Text(StrStock.importTitle, color = c.text) },
@@ -142,7 +145,7 @@ fun ProductImportDialog(
             Line(StrCatalogPages.rowReason(plain(r.line), if (r.name.isNotBlank()) " «${r.name.take(60)}»" else "", r.reason), c.danger)
           }
           More(errors.size, 50)
-          TextButton(onClick = {
+          ShopTextButton(onClick = {
             val base = file.name.substringBeforeLast('.').ifBlank { "کالا" } // داده: نامِ پروندهٔ خروجیِ ردیف‌های رد
             onErrorReport(ProductImport.errorWorkbook(plan), "$base - ردیف‌های رد.xlsx") // داده: نامِ پروندهٔ خروجیِ ردیف‌های رد
           }) { Text(StrCatalogPages.rejectedFile) }
@@ -159,7 +162,7 @@ fun ProductImportDialog(
       }
     },
     confirmButton = {
-      Button(
+      ShopButton(
         enabled = ready,
         onClick = {
           busy = true
@@ -179,7 +182,7 @@ fun ProductImportDialog(
         )
       }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.close) } },
+    dismissButton = { ShopTextButton(onClick = onDismiss) { Text(Str.close) } },
   )
 }
 
@@ -187,7 +190,7 @@ fun ProductImportDialog(
 @Composable
 fun ProductImportHistoryDialog(entries: List<AuditEntry>, onDismiss: () -> Unit) {
   val c = Shop.colors
-  AlertDialog(
+  ShopAlertDialog(
     onDismissRequest = onDismiss,
     containerColor = c.surfaceSolid,
     title = { Text(StrReach.importHistory, color = c.text) },
@@ -205,7 +208,7 @@ fun ProductImportHistoryDialog(entries: List<AuditEntry>, onDismiss: () -> Unit)
         }
       }
     },
-    confirmButton = { TextButton(onClick = onDismiss) { Text(Str.close) } },
+    confirmButton = { ShopTextButton(onClick = onDismiss) { Text(Str.close) } },
   )
 }
 

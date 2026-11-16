@@ -2,6 +2,8 @@ package ir.vil3ntec.tohid.ui.screens
 
 // i18n: سه‌زبانه
 
+import ir.vil3ntec.tohid.ui.components.common.ShopAlertDialog
+import ir.vil3ntec.tohid.ui.components.common.ShopTextButton
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,21 +40,23 @@ fun WipeAllDialog(shopName: String, onDismiss: () -> Unit, onConfirm: () -> Unit
   var typing by rememberSaveable { mutableStateOf(false) }
   var typed by rememberSaveable { mutableStateOf("") }
   if (!typing) {
-    AlertDialog(
+    ShopAlertDialog(
+      danger = true,
       onDismissRequest = onDismiss,
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(StrSettings.wipeQ, color = Shop.colors.text) },
       text = { Text(StrSettings.wipeWarn, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted) },
       confirmButton = {
-        TextButton(onClick = { typed = ""; typing = true }) { Text(StrSettings.wipeNext, color = Shop.colors.danger) }
+        ShopTextButton(onClick = { typed = ""; typing = true }) { Text(StrSettings.wipeNext, color = Shop.colors.danger) }
       },
-      dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel) } },
+      dismissButton = { ShopTextButton(onClick = onDismiss) { Text(Str.cancel) } },
     )
     return
   }
   val expected = WipeAll.expected(shopName, StrSettings.wipe)
   val ok = remember(typed, expected) { WipeAll.matches(typed, expected) }
-  AlertDialog(
+  ShopAlertDialog(
+    danger = true,
     onDismissRequest = onDismiss,
     containerColor = Shop.colors.surfaceSolid,
     title = { Text(StrSettings.wipeNameTitle, color = Shop.colors.text) },
@@ -69,10 +73,10 @@ fun WipeAllDialog(shopName: String, onDismiss: () -> Unit, onConfirm: () -> Unit
       }
     },
     confirmButton = {
-      TextButton(onClick = onConfirm, enabled = ok) {
+      ShopTextButton(onClick = onConfirm, enabled = ok) {
         Text(StrSettings.wipe, color = if (ok) Shop.colors.danger else Shop.colors.muted)
       }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel) } },
+    dismissButton = { ShopTextButton(onClick = onDismiss) { Text(Str.cancel) } },
   )
 }
