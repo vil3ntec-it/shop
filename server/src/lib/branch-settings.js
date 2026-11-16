@@ -34,8 +34,12 @@ async function set(shopId, body, byUserId) {
     if (typeof b[k] !== 'boolean') throw badRequest('مقدارِ تنظیم فقط روشن یا خاموش است', 'bad_setting');
   }
   const before = await get(shopId);
-  const after = { ...before };
-  for (const k of keys) after[k] = b[k];
+  //  هر کلید صریح (نه `after[k]` با نامِ آمده از بدنه) — کلیدها بالا سنجیده شده‌اند، ولی نوشتن با نامِ ثابت جای هیچ تردیدی نمی‌گذارد
+  const has = (k) => Object.prototype.hasOwnProperty.call(b, k);
+  const after = {
+    staffOtherStock: has('staffOtherStock') ? b.staffOtherStock : before.staffOtherStock,
+    transferNegative: has('transferNegative') ? b.transferNegative : before.transferNegative,
+  };
   await query(
     `INSERT INTO shop_branch_settings (shop_id, staff_other_stock, transfer_negative, updated_by, updated_at)
      VALUES ($1,$2,$3,$4,$5)
