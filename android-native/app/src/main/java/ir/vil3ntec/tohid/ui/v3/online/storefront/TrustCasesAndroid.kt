@@ -23,6 +23,7 @@ internal fun RouteScope.TrustCasesRoute() {
     now = { System.currentTimeMillis() },
     productName = { id -> products.firstOrNull { it.id == id }?.name },
     say = { toasts.show(it) },
+    onBack = backOrNull,
   )
 }
 

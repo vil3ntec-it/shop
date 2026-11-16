@@ -15,5 +15,5 @@ import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 internal fun RouteScope.RiskListsRoute() {
   val context = LocalContext.current
   val repo = remember(context) { OrdersHub.repo(context) }
-  RiskListsContent(repo)
+  RiskListsContent(repo, onBack = backOrNull)
 }

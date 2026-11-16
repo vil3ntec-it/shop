@@ -34,7 +34,8 @@ class TillReceivePhoneWiringTest {
     assertFalse(s.contains("store.update"))
     assertFalse(s.contains("DebtorEngine.addTransaction"))
     assertFalse(s.contains("cartStore"))
-    assertTrue(s.contains("gate = { content -> VipGate(Str.debtors) { content() } }"))
+    //  ۱۴۰۵/۰۸/۲۶ (`claude/e-phone-p0r3`): قفل کلیدِ بخش را به «از پشتیبانی بخواه» می‌دهد (`plan_required:debtors`)
+    assertTrue(s.contains("gate = { content -> VipGate(Str.debtors, feature = \"debtors\") { content() } }"))
   }
 
   @Test fun `صندوقِ گوشی دکمه را دارد`() {

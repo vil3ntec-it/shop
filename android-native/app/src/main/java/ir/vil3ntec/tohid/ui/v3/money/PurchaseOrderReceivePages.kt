@@ -65,6 +65,8 @@ import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3ToggleRow
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
+import ir.vil3ntec.tohid.ui.v3.nav.V3PageSaveBar
+import ir.vil3ntec.tohid.ui.v3.V3Summary
 import ir.vil3ntec.tohid.ui.v3.sales.SalesPaths
 import kotlinx.coroutines.launch
 
@@ -83,7 +85,7 @@ internal fun RouteScope.PurchaseOrderReceiveRoute(id: String) {
   val host = rememberPurchaseOrderHost()
   var tick by remember { mutableStateOf(0) }
   val st = rememberPoState(host.repo, id, tick, { it.receive }) { it.get(id) }
-  PoPage {
+  PoPage(StrPurchasePages.receiveGoods) {
     val gate = st.gate { it.receive }
     val o = st.value
     if (gate != PoForms.Gate.OPEN || o == null) { PoGateView(gate, st.failure ?: st.cfgFailure, StrPurchaseOrders.receiveDenied) { tick++ }; return@PoPage }
@@ -223,10 +225,8 @@ private fun RouteScope.PoReceiveForm(host: PurchaseOrderHost, o: PurchaseOrderDt
   Spacer(Modifier.height(8.dp))
   V3TextField(note, { note = it.take(500) }, StrDeliver.noteField)
   error?.let { V3Message(V3Tone.ERROR, it, modifier = Modifier.padding(top = 8.dp)) }
-  V3Button(
-    StrLayaway.payConfirm, { submit() },
-    Modifier.fillMaxWidth().padding(top = 12.dp), icon = Icons.Outlined.MoveToInbox, loading = busy, haptic = true,
-  )
+  //  نوارِ چسبانِ ثبت (کالبدِ یکسان، p0)؛ پس از ثبت فرم این را نمی‌کشد و نوار برمی‌خیزد — همان رسید دوباره فرستاده نمی‌شود
+  V3PageSaveBar(StrLayaway.payConfirm, { submit() }, loading = busy)
 }
 
 /**
@@ -280,18 +280,21 @@ internal fun RouteScope.PurchaseOrderMatchRoute(id: String) {
   var tick by remember { mutableStateOf(0) }
   val st = rememberPoState(repo, id, tick, { true }) { it.get(id) }
   val c = PhoneV3.colors
-  PoPage {
+  PoPage(StrPurchaseOrders.match) {
     val gate = st.gate { true }
     val o = st.value
     if (gate != PoForms.Gate.OPEN || o == null) { PoGateView(gate, st.failure ?: st.cfgFailure, StrPurchaseOrders.manageOnly) { tick++ }; return@PoPage }
     val m = remember(data, o) { PoForms.matchView(data, o) }
-    Text(StrSupplierBills.orderTitle(o.no, o.supplierName), style = V3Type.title, color = c.ink, modifier = Modifier.semantics { heading() })
-    Text(if (m.supplier) StrPurchaseOrders.sideSupplier else StrPurchaseOrders.sideLedger, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(top = 4.dp))
-    if (!m.hasData) { V3EmptyState(Icons.AutoMirrored.Outlined.FactCheck, StrPurchaseOrders.matchNothing); return@PoPage }
-    Text(
-      StrPurchaseOrders.matchTotals(poAfn(m.orderedMinor), poAfn(m.acceptedMinor), poAfn(m.billedMinor)),
-      style = V3Type.callout, color = c.ink, modifier = Modifier.padding(top = 8.dp),
+    //  سرِ صفحه همان خلاصهٔ بخشِ خرید (کالبدِ یکسان، p0): سفارش و تأمین‌کننده، جمعِ سفارش، طرفِ فاکتور و سفارش/پذیرفته/فاکتور
+    V3Summary(
+      label = StrSupplierBills.orderTitle(o.no, o.supplierName),
+      value = "${poAfn(m.orderedMinor)} ؋",
+      caption = if (m.supplier) StrPurchaseOrders.sideSupplier else StrPurchaseOrders.sideLedger,
+      note = if (m.hasData) StrPurchaseOrders.matchTotals(poAfn(m.orderedMinor), poAfn(m.acceptedMinor), poAfn(m.billedMinor)) else null,
+      collapseKey = "purchasing/match",
+      section = ir.vil3ntec.tohid.ui.theme.V3Section.PURCHASES,
     )
+    if (!m.hasData) { V3EmptyState(Icons.AutoMirrored.Outlined.FactCheck, StrPurchaseOrders.matchNothing); return@PoPage }
     if (m.matched) V3Message(V3Tone.SUCCESS, PurchaseOrderBook.matchTitle(m.supplier), modifier = Modifier.padding(top = 10.dp))
     else V3Message(V3Tone.WARNING, StrPurchaseOrders.differences(m.flaggedCount), modifier = Modifier.padding(top = 10.dp))
     V3Section(StrPurchaseOrders.rowsTitle) {

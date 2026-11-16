@@ -171,7 +171,8 @@ fun StockCountToolsSheet(
           Spacer(Modifier.height(14.dp))
           Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-              Text(StrCount.title, style = MaterialTheme.typography.titleLarge, color = Shop.colors.text)
+              //  کالبدِ یکسان (p0r3): سرخطِ برگهٔ تمام‌صفحه با نوشتهٔ کیت (۱۷)، نه ۲۲ ِ Material
+              Text(StrCount.title, style = ir.vil3ntec.tohid.ui.v3.V3Type.headline, color = Shop.colors.text)
               Text(if (blind) StrCount.blindSubtitle else StrCount.subtitle, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
             }
             TextButton(onClick = onDismiss) { Text(StrCount.cancel) }

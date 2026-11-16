@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3
 
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Dark
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Light
@@ -62,6 +63,26 @@ class V3DataRowGuardTest {
     assertTrue(src.contains("chevron = action == null"))
     //  خطِ مبلغ یک خط
     assertTrue(src.contains("maxLines = 1"))
+  }
+
+  /**
+   *  p0r3 (صاحب‌کار، عکسِ «مصارف»: «سه خطِ زیرِ هم، ردیف‌ها بلند و ناهمسان»): مبلغ هم‌خطِ عنوان در سوی پایان (`titleEnd`)، جزئیات و
+   *  وضعیت یک خطِ افقی (`v3SecondText`)، همهٔ ردیف‌ها دوخطی و ۶۴dp — مثلِ برنامه‌های مالیِ حرفه‌ای.
+   */
+  @Test fun `مبلغ هم‌خطِ عنوان و جزئیات یک خط — ردیف‌ها دوخطی و هم‌بلندی`() {
+    val src = text("ui/v3/V3DataRow.kt")
+    assertTrue("مبلغ در پایانِ خطِ عنوان", src.contains("titleEnd = amount?.let { m -> { V3RowAmount(m) } }"))
+    assertTrue("خطِ دوم یک خط", src.contains("Text(second, style = V3Type.rowHelp, maxLines = 1"))
+    assertEquals(64.dp, V3DataRowSpec.MIN_HEIGHT)
+    assertEquals(V3DataRowSpec.DENSE_MIN_HEIGHT, V3DataRowSpec.MIN_HEIGHT)
+    assertTrue("سطرِ عنوان جای پایان دارد", text("ui/v3/V3ListRow.kt").contains("titleEnd()"))
+    for (c in listOf(PhoneV3Light, PhoneV3Dark)) {
+      val danger = v3RowToneColor(c, V3RowTone.DANGER)
+      val line = v3SecondText(c, "امروز · متفرقه", V3RowMeta("200 ؋", V3RowStatus("سررسید گذشته", V3RowTone.DANGER), V3RowStatus("تمام‌شده", V3RowTone.DANGER)))
+      assertEquals("امروز · متفرقه · سررسید گذشته · تمام‌شده", line.text)
+      assertEquals("دست‌بالا یک واژهٔ خطر", 1, line.spanStyles.count { it.item.color == danger })
+      assertFalse("مبلغ در خطِ دوم نیست", line.text.contains("200"))
+    }
   }
 
   @Test fun `خطِ مبلغ — مبلغ به رنگِ نوشته، وضعیت کم‌رنگ، دست‌بالا یک واژهٔ خطر و هیچ زرد`() {

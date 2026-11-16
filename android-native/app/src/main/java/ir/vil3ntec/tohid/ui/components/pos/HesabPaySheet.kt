@@ -187,7 +187,7 @@ private sealed interface Phase {
   data object Starting : Phase
   data class Live(val intent: PaymentIntent, val trouble: Boolean = false) : Phase
   data class Paid(val intent: PaymentIntent, val settlement: Settlement) : Phase
-  data class Ended(val message: String, val retry: Boolean) : Phase
+  data class Ended(val message: String, val retry: Boolean, val support: String? = null) : Phase
 }
 
 @Composable
@@ -226,7 +226,7 @@ private fun HesabPaySheet(
     if (!running) return@LaunchedEffect
     phase = Phase.Starting
     val start = flow.start()
-    if (start !is HesabPayIntentFlow.Step.Show) { phase = (start as HesabPayIntentFlow.Step.Stop).let { Phase.Ended(it.message, it.retry) }; return@LaunchedEffect }
+    if (start !is HesabPayIntentFlow.Step.Show) { phase = (start as HesabPayIntentFlow.Step.Stop).let { Phase.Ended(it.message, it.retry, it.support) }; return@LaunchedEffect }
     var cur = start.intent
     phase = Phase.Live(cur)
     val end = IntentPoller(env.client, now = env::now, sleep = { delay(it) }).run(cur) { ev ->
@@ -254,7 +254,7 @@ private fun HesabPaySheet(
     scope.launch {
       when (val r = flow.cancel(live)) {
         is HesabPayIntentFlow.Step.Show -> if (r.intent.status == IntentStatus.PAID) paid(r.intent) else onClose()
-        is HesabPayIntentFlow.Step.Stop -> phase = Phase.Ended(r.message, r.retry)
+        is HesabPayIntentFlow.Step.Stop -> phase = Phase.Ended(r.message, r.retry, r.support)
       }
     }
   }
@@ -414,6 +414,11 @@ private fun InfoPanel(
       }
       is Phase.Ended -> {
         Text(phase.message, color = c.danger, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge)
+        //  حساب‌پیِ خاموشِ دکان ⇒ «از پشتیبانی بخواه» (`flag_off:pay.hesabpay`)
+        phase.support?.let { code ->
+          Spacer(Modifier.height(10.dp))
+          ir.vil3ntec.tohid.ui.v3.account.support.AskSupportButton(code, facts = mapOf("screen" to "till:hesabpay"))
+        }
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedButton(onClick = onClose, modifier = Modifier.weight(1f).height(52.dp)) { Text(StrPay.close) }

@@ -107,6 +107,7 @@ import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.nav.V3PageFootnote
+import ir.vil3ntec.tohid.ui.v3.nav.V3PageSaveBar
 import ir.vil3ntec.tohid.ui.v3.nav.V3RoutePage
 import ir.vil3ntec.tohid.ui.v3.stock.ProductPickerList
 import kotlinx.coroutines.launch
@@ -194,11 +195,12 @@ internal fun PoGateView(gate: PoForms.Gate, failure: ApiFailure?, denied: String
 internal fun poAfn(minor: Long): String = money(PurchaseOrderBook.asAfn(minor))
 internal fun poUnits(milli: Long): String = qty(PurchaseOrderBook.units(milli))
 
-/** ستونِ پیمایش‌پذیرِ همهٔ صفحه‌ها (پهنای گوشی، فاصلهٔ ۱۶) */
+/**
+ *  قابِ صفحه‌های فرم و تطبیقِ سفارشِ خرید — همان کالبدِ یکسان (`V3RoutePage`، مسیر `Chrome.OWN`): عنوان در نوار، دکمهٔ ذخیرهٔ فرم
+ *  نوارِ چسبانِ پایین (`V3PageSaveBar`، مثلِ جزئیاتِ کالا).
+ */
 @Composable
-internal fun PoPage(content: @Composable () -> Unit) {
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) { content() }
-}
+internal fun RouteScope.PoPage(title: String, content: @Composable ColumnScope.() -> Unit) = V3RoutePage(title, content = content)
 
 /**
  *  کالبدِ یکسانِ فهرست و جزئیاتِ سفارشِ خرید (`claude/e-phone-p0`، صاحب‌کار: «یک بخش یک مدل، یک بخش مدلِ دیگه»): خودِ صفحه
@@ -213,7 +215,7 @@ internal fun RouteScope.PoScaffold(
   chips: (@Composable () -> Unit)? = null,
   fab: (@Composable BoxScope.(expanded: Boolean) -> Unit)? = null,
   content: @Composable ColumnScope.() -> Unit,
-) = V3RoutePage(title, actions, overflow, chips, fab, content)
+) = V3RoutePage(title, actions, overflow, chips, fab, content = content)
 
 /** یادداشتِ آرامِ پایانِ فهرست (پیش‌تر سرِ صفحه) — هیچ نوشته‌ای گم نمی‌شود */
 @Composable
@@ -503,7 +505,7 @@ internal fun RouteScope.PurchaseOrderNewRoute() {
   val repo = rememberPurchaseOrderHost().repo
   var tick by remember { mutableStateOf(0) }
   val st = rememberPoState(repo, Unit, tick, { it.manage }) { ApiResult.Success(Unit) }
-  PoPage {
+  PoPage(StrPurchasePages.newPoTitle) {
     val gate = st.gate { it.manage }
     if (gate != PoForms.Gate.OPEN) { PoGateView(gate, st.failure ?: st.cfgFailure, StrPurchaseOrders.manageOnly) { tick++ }; return@PoPage }
     PoEditorForm(repo, null, args.query("supplier"))
@@ -516,7 +518,7 @@ internal fun RouteScope.PurchaseOrderEditRoute(id: String) {
   val repo = rememberPurchaseOrderHost().repo
   var tick by remember { mutableStateOf(0) }
   val st = rememberPoState(repo, id, tick, { it.manage }) { it.get(id) }
-  PoPage {
+  PoPage(StrMoney.edit) {
     val gate = st.gate { it.manage }
     val o = st.value
     if (gate != PoForms.Gate.OPEN || o == null) { PoGateView(gate, st.failure ?: st.cfgFailure, StrPurchaseOrders.manageOnly) { tick++ }; return@PoPage }
@@ -673,14 +675,11 @@ private fun RouteScope.PoEditorForm(repo: PurchaseOrderRepository, base: Purchas
   V3TextField(expected, { expected = it.take(10); error = null }, StrPurchasePages.arrivalOptional, kind = V3FieldKind.DATE, placeholder = StrPurchaseOrders.arrivalHint)
   Spacer(Modifier.height(8.dp))
   V3TextField(note, { note = it.take(500) }, StrDeliver.noteField)
-  Text(
-    StrPurchasePages.poTotal(money(PoForms.total(rows)), rows.size),
-    style = V3Type.callout, color = c.ink, modifier = Modifier.padding(top = 10.dp),
-  )
   error?.let { V3Message(V3Tone.ERROR, it, modifier = Modifier.padding(top = 8.dp)) }
-  V3Button(
+  //  نوارِ چسبانِ ذخیره با جمعِ سفارش (کالبدِ یکسان، p0) — همیشه دیده، بالای صفحه‌کلید
+  V3PageSaveBar(
     if (base == null) StrPurchasePages.saveDraft else StrKit.save, { save() },
-    Modifier.fillMaxWidth().padding(top = 12.dp), enabled = rows.isNotEmpty() && picked, loading = busy, haptic = true,
+    enabled = rows.isNotEmpty() && picked, loading = busy, summary = StrPurchasePages.poTotal(money(PoForms.total(rows)), rows.size),
   )
 
   when (sheet) {
@@ -722,10 +721,11 @@ internal fun RouteScope.PurchaseOrderSuggestRoute() {
   val repo = rememberPurchaseOrderHost().repo
   var tick by remember { mutableStateOf(0) }
   val st = rememberPoState(repo, Unit, tick, { true }) { ApiResult.Success(Unit) }
-  Column(Modifier.fillMaxSize().padding(16.dp)) {
+  //  کالبدِ یکسان (p0): خودِ صفحه قاب دارد؛ `PoSuggest` ِ مشترک با کامپیوتر خودش پیمایش می‌کند
+  V3RoutePage(StrPurchasePages.reorderSuggest, scroll = false) {
     val gate = st.gate { true }
     val cfg = st.cfg
-    if (gate != PoForms.Gate.OPEN || cfg == null) { PoGateView(gate, st.failure ?: st.cfgFailure, StrPurchaseOrders.manageOnly) { tick++ }; return@Column }
+    if (gate != PoForms.Gate.OPEN || cfg == null) { PoGateView(gate, st.failure ?: st.cfgFailure, StrPurchaseOrders.manageOnly) { tick++ }; return@V3RoutePage }
     PoSuggest(data, repo, cfg.permissions, toast = { toasts.show(it) }, onCreated = { nav.open(MoneyPaths.purchaseOrder(it.id)) })
   }
 }

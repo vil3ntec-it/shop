@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3
 
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -158,7 +159,8 @@ fun V3SummaryFrame(
   //  چیدمانِ کارت در **هر زبان همان** (صاحب‌کار: «لی‌اوتش به دیگه جهت نره حتی با عوض کردن زبان»): پیکان در راست، کادرِ کشویی در چپ،
   //  نمودار نام در راست و مبلغ در چپ — جهتِ چیدمان ثابتِ راست‌به‌چپ؛ جهتِ خودِ نوشته از محتوا. درونِ کادرِ کشویی جهتِ زبان ([corner])
   val language = LocalLayoutDirection.current
-  val wrapped: @Composable () -> Unit = { if (corner != null) CompositionLocalProvider(LocalLayoutDirection provides language) { corner() } }
+  //  p0r3 (صاحب‌کار): کادرِ کشوییِ ماه/دوره درونِ کارتِ خلاصه بی جعبه — فقط نوشته و ▾ (`LocalV3DropdownPlain`)
+  val wrapped: @Composable () -> Unit = { if (corner != null) CompositionLocalProvider(LocalLayoutDirection provides language, LocalV3DropdownPlain provides true) { corner() } }
   val inLanguage: (@Composable () -> Unit)? = if (corner == null) null else wrapped
   CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
   Column(
@@ -231,17 +233,26 @@ private fun SummaryHeader(
     }
     return
   }
-  Box(press.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
-    val line = if (open) buildAnnotatedString { append(label) } else buildAnnotatedString {
-      append(label)
-      append(" · ")
-      withStyle(SpanStyle(color = valueColor, fontWeight = FontWeight.SemiBold)) { append(value) }
+  if (!open) {
+    //  p0r3 (صاحب‌کار): بسته ⇒ بی برچسبِ «جمعِ …» (فقط باز نشانش می‌دهد) و مبلغ نه وسط — در سوی پایان، کنارِ پیکان، نوارِ فشرده.
+    //  برچسب برای صفحه‌خوان در توضیحِ همان دکمه می‌ماند.
+    Row(
+      press.heightIn(min = 44.dp).semantics { contentDescription = "$label: $value" },
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Spacer(Modifier.weight(1f))
+      Text(value, style = v3Text(15, FontWeight.SemiBold, 22).copy(fontFeatureSettings = "tnum"), color = valueColor, maxLines = 1)
+      Spacer(Modifier.size(6.dp))
+      arrow(Modifier)
     }
+    return
+  }
+  Box(press.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
     Text(
-      line,
+      label,
       style = V3Type.subhead,
       color = labelColor,
-      maxLines = if (open) 2 else 1,
+      maxLines = 2,
       overflow = TextOverflow.Ellipsis,
       textAlign = TextAlign.Center,
       //  جای پیکان در هر دو سو، تا نوشته درست وسطِ کارت بماند
