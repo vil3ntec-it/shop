@@ -238,7 +238,18 @@ class AuthController(
         //  کد درست بود، حساب هنوز ساخته نشده: بلیت و بعد لوکیشن و شرایط
         CodePurpose.REGISTER -> auth.registerVerify(destination, code)
           .onSuccess { ui = ui.toTerms(it.ticket) }
-          .onFailure { fail(it) }
+          .onFailure { error ->
+            if (error is ApiFailure && error.code == "already_registered") {
+              // کد ثبت‌نام مصرف شده است و برای ورود با کد کاربردی ندارد.
+              cooldown.clear(destination)
+              ui = ui.backToForm().switchMode(false).copy(
+                email = destination, password = "", ticket = "", purpose = CodePurpose.OTP,
+                error = error.userText(StrAuth.serverUnreachable),
+              )
+            } else {
+              fail(error)
+            }
+          }
         CodePurpose.RESET -> auth.resetPassword(destination, code, newPassword)
           .onSuccess { finish(destination, it) }
           .onFailure { fail(it) }
