@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.platform.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
@@ -26,6 +27,10 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
@@ -63,6 +68,7 @@ import ir.vil3ntec.tohid.ui.components.pos.PhoneCartUi
 import ir.vil3ntec.tohid.ui.components.pos.PriceListPrefs
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
+import ir.vil3ntec.tohid.ui.v3.sales.cart.TillSpec
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
 import ir.vil3ntec.tohid.ui.v3.LocalV3SystemBottom
 import ir.vil3ntec.tohid.ui.v3.LocalV3Toasts
@@ -229,7 +235,11 @@ class P1SaleShotsTest {
         shot("1-sale-empty", dark, emptyList())
         shot("2-sale-3items", dark, three)
         shot("2b-sale-3items-list", dark, three, list = true)
-        shot("3-cart-open", dark, three) { tap(openCart) }
+        shot("3-cart-open", dark, three) {
+          val start = onNode(hasTestTag(TillSpec.BAR_TAG)).fetchSemanticsNode().boundsInRoot.center
+          onRoot().performTouchInput { swipe(start, start - Offset(0f, height * 0.55f), durationMillis = 390) }
+          settle()
+        }
         //  پس: «…» ِ سبد (همهٔ ابزارهای سبد با توضیح)؛ پیش: تنها «…» ِ صندوق همان «…» ِ سربرگ بود
         shot("4-menu-open", dark, three) { tap(openCart); tap(hasContentDescription(StrSale.cartMore) and hasClickAction()) }
       }

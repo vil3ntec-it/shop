@@ -202,7 +202,7 @@ fun SaleScreen(
         val debtor = debtorId?.let { id -> d.debtors.find { it.id == id } }
         val off = CartSummary.manualDiscount(cart, d.products)
         LazyColumn(
-          Modifier.weight(1f, fill = false).fillMaxWidth(),
+          Modifier.weight(1f).fillMaxWidth(),
           verticalArrangement = Arrangement.spacedBy(8.dp),
           contentPadding = PaddingValues(bottom = 12.dp),
         ) {
