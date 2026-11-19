@@ -182,7 +182,7 @@ private fun CustomerShot(query: String) = OverQuick {
 
 @Composable
 private fun DraftShot() = OverQuick {
-  DraftSheet(lines = 4, total = 2_350.0, dropped = 1, onContinue = {}, onDiscard = {}, onLater = {})
+  DraftSheet(lines = 4, total = 2_350.0, dropped = 1, onContinue = {}, onDiscard = { true }, onLater = {})
 }
 
 private val noSale = SaleActions({}, {}, {}, { _, _ -> }, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})

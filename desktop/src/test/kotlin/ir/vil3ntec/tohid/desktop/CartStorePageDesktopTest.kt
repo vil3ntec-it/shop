@@ -55,7 +55,7 @@ class CartStorePageDesktopTest {
     assertFalse(again.setPage(HeldExtras(payment = SalesEngine.Payment.CASH)))
     assertEquals(SaleDraft.Page.of(x), again.page.value)
     //  «ادامه» ⇒ همان تخفیف و روش (صفحه از `HeldSession` می‌گیرد)
-    again.resolveRecovery(again.recovered.value)
+    again.resolveRecovery(requireNotNull(again.recovered.value))
     assertEquals(x, again.page.value!!.extras())
     assertEquals(x, again.snapshot().page!!.extras())
   }
@@ -90,8 +90,33 @@ class CartStorePageDesktopTest {
     //  «دور انداختن» ِ پیش‌نویسِ بازیابی ⇒ صفحه هم
     val reopened = CartStore(DesktopContext)
     assertEquals(SaleDraft.Page.of(x), reopened.page.value)
-    reopened.resolveRecovery(null)
+    assertTrue(reopened.discardRecovery(requireNotNull(reopened.recovered.value)))
     assertNull(reopened.page.value)
     assertTrue(reopened.lines.value.isEmpty())
+
+    val restarted = CartStore(DesktopContext)
+    assertNull(restarted.recovered.value)
+    assertTrue(restarted.lines.value.isEmpty())
+  }
+
+  @Test
+  fun `اگر نوشتن شکست بخورد پیش‌نویس برای تلاش دوباره می‌ماند`() = runBlocking<Unit> {
+    val cart = CartStore(DesktopContext)
+    assertTrue(cart.replace(SaleDraft.of("H3", listOf(SalesEngine.CartLine("p1", 1.0)), null, 1)))
+    val recovered = CartStore(DesktopContext)
+    val pending = requireNotNull(recovered.recovered.value)
+    val temp = File(draft.parentFile, draft.name + ".tmp")
+    assertTrue(temp.mkdir())
+    val blocker = File(temp, "blocker").apply { writeText("test") }
+    try {
+      assertFalse(recovered.discardRecovery(pending))
+      assertEquals(pending, recovered.recovered.value)
+      assertEquals(pending.lines, CartStore(DesktopContext).recovered.value?.lines)
+    } finally {
+      blocker.delete()
+      temp.delete()
+    }
+    assertTrue(recovered.discardRecovery(pending))
+    assertNull(CartStore(DesktopContext).recovered.value)
   }
 }

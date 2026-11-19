@@ -13,7 +13,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -48,10 +52,12 @@ fun DraftPrompt(cartStore: CartStore, d: ShopData, loaded: Boolean, snackbar: Sn
   val pending = draft ?: return
   if (!loaded) return
   when (val decision = remember(pending, d) { SaleDraftRules.decide(pending, d) }) {
-    DraftRestore.None -> LaunchedEffect(pending) { cartStore.resolveRecovery(null) }
-    is DraftRestore.Posted -> LaunchedEffect(pending) {
-      cartStore.resolveRecovery(null)
-      snackbar.showSnackbar(StrSale.draftWasPosted)
+    DraftRestore.None -> LaunchedEffect(cartStore, pending) {
+      if (!cartStore.discardRecovery(pending)) snackbar.showSnackbar(StrSale.draftDiscardFailed)
+    }
+    is DraftRestore.Posted -> LaunchedEffect(cartStore, pending) {
+      val discarded = cartStore.discardRecovery(pending)
+      snackbar.showSnackbar(if (discarded) StrSale.draftWasPosted else StrSale.draftDiscardFailed)
     }
     is DraftRestore.Offer -> {
       val offer = decision.draft
@@ -69,7 +75,7 @@ fun DraftPrompt(cartStore: CartStore, d: ShopData, loaded: Boolean, snackbar: Sn
           keep()
           AppNav.go(SalesPaths.SALE)
         },
-        onDiscard = { cartStore.resolveRecovery(null) },
+        onDiscard = { cartStore.discardRecovery(pending) },
         onLater = { keep() },
       )
     }
@@ -78,12 +84,15 @@ fun DraftPrompt(cartStore: CartStore, d: ShopData, loaded: Boolean, snackbar: Sn
 
 /** برگهٔ «فاکتورِ نیمه‌کاره پیدا شد»: مبلغِ درشتِ شمارنده، شرح و دو کار */
 @Composable
-fun DraftSheet(lines: Int, total: Double, dropped: Int, onContinue: () -> Unit, onDiscard: () -> Unit, onLater: () -> Unit) {
+fun DraftSheet(lines: Int, total: Double, dropped: Int, onContinue: () -> Unit, onDiscard: suspend () -> Boolean, onLater: () -> Unit) {
   val c = PhoneV3.colors
   val shown = rememberCountUp(total)
   //  زدنِ یکی از دو کار ⇒ بستنِ برگه دیگر «بعداً» نیست
   val chosen = remember { booleanArrayOf(false) }
-  V3Sheet(onDismiss = { if (!chosen[0]) onLater() }, detents = false) { closer ->
+  val scope = rememberCoroutineScope()
+  var discarding by remember { mutableStateOf(false) }
+  var discardFailed by remember { mutableStateOf(false) }
+  V3Sheet(onDismiss = { if (!chosen[0] && !discarding) onLater() }, dismissible = !discarding, detents = false) { closer ->
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
       V3IconTile(Icons.AutoMirrored.Outlined.ReceiptLong, hue = V3Hue.AMBER, size = 52.dp)
       Spacer(Modifier.height(12.dp))
@@ -95,8 +104,20 @@ fun DraftSheet(lines: Int, total: Double, dropped: Int, onContinue: () -> Unit, 
     }
     Spacer(Modifier.height(20.dp))
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-      V3Button(StrSale.draftContinue, { chosen[0] = true; closer.close(onContinue) }, Modifier.fillMaxWidth(), haptic = true)
-      V3Button(StrSale.draftDiscard, { chosen[0] = true; closer.close(onDiscard) }, Modifier.fillMaxWidth(), kind = V3ButtonKind.SECONDARY)
+      if (discardFailed) Text(StrSale.draftDiscardFailed, style = V3Type.callout, color = c.ink)
+      V3Button(StrSale.draftContinue, { chosen[0] = true; closer.close(onContinue) }, Modifier.fillMaxWidth(), enabled = !discarding, haptic = true)
+      V3Button(StrSale.draftDiscard, {
+        if (discarding) return@V3Button
+        discarding = true
+        chosen[0] = true
+        scope.launch {
+          if (!onDiscard()) {
+            discardFailed = true
+            chosen[0] = false
+          }
+          discarding = false
+        }
+      }, Modifier.fillMaxWidth(), kind = V3ButtonKind.SECONDARY, enabled = !discarding, loading = discarding)
     }
   }
 }

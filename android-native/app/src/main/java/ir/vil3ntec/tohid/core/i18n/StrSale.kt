@@ -246,6 +246,7 @@ object StrSale {
   val draftNotPosted: String get() = t("این فاکتور هنوز ثبت نشده است.", "This invoice hasn't been recorded yet.", "دا بل لا نه دی ثبت شوی.")
   val draftContinue: String get() = t("ادامهٔ همین فاکتور", "Continue this invoice", "همدا بل ادامه کړئ")
   val draftDiscard: String get() = t("دور انداختن", "Discard", "لرې یې کړئ")
+  val draftDiscardFailed: String get() = t("پیش‌نویس پاک نشد. دوباره تلاش کنید.", "The draft could not be discarded. Try again.", "مسوده لرې نه شوه. بیا هڅه وکړئ.")
   val draftWasPosted: String get() = t("فاکتورِ نیمه‌کارهٔ پیش پیش‌تر ثبت شده بود — دوباره ثبت نشد", "The earlier unfinished invoice was already recorded — it wasn't recorded again", "مخکینی نیمګړی بل مخکې ثبت شوی و — بیا ثبت نه شو")
 
 
