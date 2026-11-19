@@ -47,6 +47,6 @@ fun QuickCartStrip(model: CartSummary.Model, onOpen: () -> Unit, onPay: () -> Un
   ) {
     CartDockPreview(model, Modifier.weight(1f).clip(RoundedCornerShape(18.dp)).v3Pressable(label = spoken, onClick = onOpen).padding(vertical = 4.dp))
     Spacer(Modifier.width(10.dp))
-    V3Button(StrSale.pay, onPay, height = 46.dp, cornerRadius = 23.dp, haptic = true)
+    V3Button(StrSale.pay, onPay, height = 46.dp, pill = true, haptic = true)
   }
 }

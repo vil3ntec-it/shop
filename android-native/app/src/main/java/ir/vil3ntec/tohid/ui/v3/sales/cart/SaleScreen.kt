@@ -228,7 +228,7 @@ fun SaleScreen(
         val footer = RoundedCornerShape(22.dp)
         Column(Modifier.fillMaxWidth().clip(footer).background(c.tile).border(1.dp, c.hairline, footer).padding(10.dp)) {
           Box(Modifier.padding(horizontal = 5.dp)) { TillTotal(total, tillMenu) }
-          V3Button(StrSale.pay, actions.pay, Modifier.fillMaxWidth(), height = 52.dp, cornerRadius = 26.dp, haptic = true)
+          V3Button(StrSale.pay, actions.pay, Modifier.fillMaxWidth(), height = 52.dp, pill = true, haptic = true)
         }
       },
     )

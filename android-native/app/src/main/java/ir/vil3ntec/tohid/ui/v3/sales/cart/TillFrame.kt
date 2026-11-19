@@ -250,7 +250,7 @@ private fun androidx.compose.foundation.layout.RowScope.TillBarCart(model: CartS
     bump = bump,
   )
   Spacer(Modifier.width(6.dp))
-  V3Button(StrSale.pay, onPay, height = 48.dp, cornerRadius = 24.dp, haptic = true)
+  V3Button(StrSale.pay, onPay, height = 48.dp, pill = true, haptic = true)
 }
 
 /** دکمهٔ گردِ اسکن — خنثی (رنگِ برند فقط مالِ «پرداخت» است) */
