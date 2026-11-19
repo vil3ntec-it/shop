@@ -27,10 +27,10 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -49,14 +49,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrKit
@@ -73,30 +71,19 @@ import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.v3.LocalV3SystemBottom
 import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Type
-import ir.vil3ntec.tohid.ui.v3.rememberCountUp
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 import kotlinx.coroutines.launch
 
 /*
- *  صندوقِ گوشی — **حالتِ تمرکز** (صاحب‌کار ۱۴۰۵/۰۸/۲۴: «سبد سیاه و تیره است اما … دکمه‌های شناورِ پایین سفید — خیلی مسخره شده»).
- *
- *    ┌ سربرگ: برگشت · «فروش» · جستجو · کاشی/فهرست · «…» ┐
- *    │  دسته‌ها، پرفروش‌ها، کالاها                          │
- *    │                                                      │
- *    ├╭────────────────────────────────────────────────────╮┤
- *    ││ (اسکن)   ۳ قلم / ۵۷۰ ؋   ˄            [ پرداخت ]   ││  ← تنها چیزِ پایین، چسبیده به لبهٔ پایین («سبد باید زیرِ صفحه باشه»):
- *    └┴────────────────────────────────────────────────────┴┘     کارتِ روشن، گوشه‌های بالا گرد، مرزِ مویی، سایهٔ نرم
- *
- *  نوارِ شناورِ برنامه این‌جا نیست (`ShellFrame.FOCUS`). سبدِ باز برگهٔ همان رنگِ کارت روی پرده است — در روز روشن، در شب سطحِ
- *  برآمدهٔ تیره — نه تختهٔ سیاه؛ رنگِ برند فقط روی «پرداخت». برگه درونِ همین صفحه است (نه پنجرهٔ جدا) تا بارکدخوانِ سخت‌افزاری
- *  (`hidScanner`) با سبدِ باز هم بخواند. کشیدنِ دستگیره به پایین، زدنِ پرده یا «برگشت» می‌بندد؛ «کاهشِ حرکت» ⇒ بی انیمیشن.
+ *  نوارِ سبد پایین صندوق می‌ماند. برگه در همان صفحه باز می‌شود تا بارکدخوان و میان‌برها همچنان کار کنند.
+ *  کشیدنِ دستگیره به پایین، زدنِ پرده یا برگشت برگه را می‌بندد. کاهش حرکت، انیمیشن را کنار می‌گذارد.
  */
 
 /** اندازه‌ها و نشان‌های آزمونِ صندوقِ گوشی */
 object TillSpec {
   val BAR_HEIGHT: Dp = 72.dp
-  /** جای لازم زیرِ آخرین کالا تا پشتِ نوار نماند (نوار به لبهٔ پایین چسبیده؛ نوارِ سیستم جدا افزوده می‌شود) */
-  val BAR_SPACE: Dp = BAR_HEIGHT + 8.dp
+  /** جای لازم زیرِ آخرین کالا تا پشتِ نوار نماند (فاصلهٔ نوار سیستم جدا افزوده می‌شود) */
+  val BAR_SPACE: Dp = BAR_HEIGHT + 16.dp
   /** بالای برگهٔ سبد همیشه کمی از کالاها دیده بماند */
   val SHEET_TOP_GAP: Dp = 56.dp
   const val BAR_TAG = "till-bar"
@@ -126,7 +113,6 @@ fun TillFrame(
   val c = PhoneV3.colors
   val motion = Motion.enabled
   val scope = rememberCoroutineScope()
-  val density = LocalDensity.current
   //  پوسته‌ای که خودش نوارِ سیستم را گرفته `LocalV3SystemBottom = 0.dp` می‌دهد (بی دوباره‌شماری)
   val navBottom = LocalV3SystemBottom.current ?: WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
   val showing = open && model.visible
@@ -184,10 +170,11 @@ fun TillFrame(
           .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = StrSale.closeCart, onClick = onClose)
           .semantics { contentDescription = StrSale.closeCart },
       )
-      val shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+      val shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
       Column(
         Modifier
           .align(Alignment.BottomCenter)
+          .widthIn(max = 640.dp)
           .fillMaxWidth()
           .heightIn(max = maxHeight - TillSpec.SHEET_TOP_GAP)
           .onSizeChanged { sheetH = it.height }
@@ -213,13 +200,12 @@ fun TillFrame(
 }
 
 /**
- *  نوارِ سبد — کارتِ روشنِ مرزدار (همان خانوادهٔ `QuickCartStrip`): اسکن در آغاز (کارِ اصلیِ صندوق، زیرِ شست)، «۳ قلم» و
- *  جمع (زدن ⇐ سبد باز می‌شود) و «پرداخت» با رنگِ برند. سبدِ خالی ⇒ فقط اسکن و «سبد خالی است». `pulse` ⇒ پرشِ کوچکِ جمع.
+ *  نوارِ سبد: اسکن، خلاصهٔ سبد و پرداخت. در سبد خالی، اسکن و پیام سبد خالی دیده می‌شوند.
  */
 @Composable
 private fun TillBar(model: CartSummary.Model, pulse: Int, onOpen: () -> Unit, onPay: () -> Unit, onScan: () -> Unit, navBottom: Dp, modifier: Modifier) {
   val c = PhoneV3.colors
-  val shape = RoundedCornerShape(topStart = PhoneV3.groupRadius, topEnd = PhoneV3.groupRadius)
+  val shape = RoundedCornerShape(28.dp)
   val bump = remember { Animatable(1f) }
   val first = remember { pulse }
   LaunchedEffect(pulse) {
@@ -229,13 +215,15 @@ private fun TillBar(model: CartSummary.Model, pulse: Int, onOpen: () -> Unit, on
   }
   Row(
     modifier
+      .widthIn(max = 640.dp)
       .fillMaxWidth()
+      .padding(start = 12.dp, end = 12.dp, bottom = navBottom + 8.dp)
       .shadow(12.dp, shape, clip = false, ambientColor = c.source.shadow, spotColor = c.source.shadow)
       .clip(shape)
       .background(c.card)
       .border(1.dp, c.hairline, shape)
       .testTag(TillSpec.BAR_TAG)
-      .padding(start = 12.dp, end = 12.dp, bottom = navBottom)
+      .padding(horizontal = 8.dp)
       .height(TillSpec.BAR_HEIGHT),
     verticalAlignment = Alignment.CenterVertically,
   ) {
@@ -247,37 +235,22 @@ private fun TillBar(model: CartSummary.Model, pulse: Int, onOpen: () -> Unit, on
   }
 }
 
-/** «۳ قلم / جمع» (زدن ⇐ سبد) و «پرداخت» — فقط با سبدِ پُر */
+/** خلاصهٔ سبد و پرداخت، فقط وقتی سبد پر است. */
 @Composable
 private fun androidx.compose.foundation.layout.RowScope.TillBarCart(model: CartSummary.Model, bump: Float, onOpen: () -> Unit, onPay: () -> Unit) {
-  val c = PhoneV3.colors
-  val total = rememberCountUp(model.total)
-    Row(
-      Modifier
-        .weight(1f)
-        .fillMaxHeight()
-        .padding(vertical = 6.dp)
-        .clip(RoundedCornerShape(14.dp))
-        .clickable(onClickLabel = StrSale.openCart, role = Role.Button, onClick = onOpen)
-        .semantics(mergeDescendants = true) { contentDescription = StrSale.cartSpoken(plain(model.count), PhoneSaleText.amount(model.total)) }
-        .padding(horizontal = 8.dp),
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      Column(Modifier.weight(1f)) {
-        Text(StrSale.linesCount(plain(model.count)), style = V3Type.footnote, color = c.inkMuted, maxLines = 1)
-        Text(
-          PhoneSaleText.amount(total),
-          style = V3Type.headline,
-          color = c.ink,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-          modifier = Modifier.graphicsLayer { scaleX = bump; scaleY = bump },
-        )
-      }
-      Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = null, tint = c.inkMuted, modifier = Modifier.size(22.dp))
-    }
-    Spacer(Modifier.width(6.dp))
-    V3Button(StrSale.pay, onPay, height = 48.dp, haptic = true)
+  CartDockPreview(
+    model,
+    modifier = Modifier.weight(1f)
+      .fillMaxHeight()
+      .padding(vertical = 6.dp)
+      .clip(RoundedCornerShape(18.dp))
+      .clickable(onClickLabel = StrSale.openCart, role = Role.Button, onClick = onOpen)
+      .semantics(mergeDescendants = true) { contentDescription = StrSale.cartSpoken(plain(model.count), PhoneSaleText.amount(model.total)) }
+      .padding(horizontal = 6.dp),
+    bump = bump,
+  )
+  Spacer(Modifier.width(6.dp))
+  V3Button(StrSale.pay, onPay, height = 48.dp, pill = true, haptic = true)
 }
 
 /** دکمهٔ گردِ اسکن — خنثی (رنگِ برند فقط مالِ «پرداخت» است) */

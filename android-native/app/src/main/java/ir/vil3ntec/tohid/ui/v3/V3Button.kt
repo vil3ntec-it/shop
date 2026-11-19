@@ -71,6 +71,7 @@ fun V3Button(
   loading: Boolean = false,
   haptic: Boolean = false,
   height: Dp = V3Space.control,
+  pill: Boolean = false,
 ) {
   val c = PhoneV3.colors
   val src = remember { MutableInteractionSource() }
@@ -80,13 +81,14 @@ fun V3Button(
   val fill = if (down && enabled && !loading) PhoneV3Roles.pressed(c, kind) else pair.bg
   val bg by animateColorAsState(fill, MotionSpec.tweenOf(MotionTokens.SHORT), label = "btnBg")
   val fg by animateColorAsState(pair.fg, MotionSpec.tweenOf(MotionTokens.SHORT), label = "btnFg")
-  val shape = RoundedCornerShape(V3ButtonSpec.radius)
+  val shape = if (pill) RoundedCornerShape(percent = 50) else RoundedCornerShape(V3ButtonSpec.radius)
+  val focusRadius = if (pill) height / 2 else V3ButtonSpec.radius
   val ring = PhoneV3Roles.focus(c)
   Row(
     modifier
       .v3Pressable(enabled = enabled && !loading, label = text, role = Role.Button, haptic = haptic, interaction = src, onClick = onClick)
       .heightIn(min = height)
-      .v3FocusRing(focused && enabled, ring)
+      .v3FocusRing(focused && enabled, ring, focusRadius)
       .clip(shape)
       .background(bg)
       .then(if (pair.border != pair.bg && enabled) Modifier.border(1.dp, pair.border, shape) else Modifier)

@@ -1,14 +1,18 @@
 package ir.vil3ntec.tohid.ui.v3.sales.cart
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.PostAdd
 import androidx.compose.runtime.Composable
@@ -22,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.core.i18n.StrSale
@@ -39,8 +44,8 @@ import ir.vil3ntec.tohid.ui.components.pos.TillMenu
 import ir.vil3ntec.tohid.ui.components.pos.TillOffer
 import ir.vil3ntec.tohid.ui.screens.VisualSearchHandle
 import ir.vil3ntec.tohid.ui.screens.VisualSearchHost
+import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.v3.V3Button
-import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.CustomerPickerModel
 
@@ -194,28 +199,37 @@ fun SaleScreen(
       sheet = { handle ->
         TillCartHeader(rows.size, tillMenu, onMore = { more = true }, modifier = handle)
         heldStrip?.let { strip -> Box(Modifier.fillMaxWidth().padding(bottom = 8.dp)) { strip() } }
-        //  قلم‌ها می‌لغزند؛ مشتری، تخفیف‌ها، جمع و «پرداخت» زیرشان می‌مانند
-        LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth()) {
-          itemsIndexed(rows, key = { _, r -> r.id }) { i, r ->
-            if (i > 0) V3Divider(start = 52.dp)
+        val debtor = debtorId?.let { id -> d.debtors.find { it.id == id } }
+        val off = CartSummary.manualDiscount(cart, d.products)
+        LazyColumn(
+          Modifier.weight(1f, fill = false).fillMaxWidth(),
+          verticalArrangement = Arrangement.spacedBy(8.dp),
+          contentPadding = PaddingValues(bottom = 12.dp),
+        ) {
+          itemsIndexed(rows, key = { _, r -> r.id }) { _, r ->
             TillCartRow(r, onMinus = { actions.step(r, -1) }, onPlus = { actions.step(r, +1) }, onDetails = { actions.line(r) })
           }
+          item {
+            TillCustomerRow(
+              name = debtor?.name,
+              balance = debtor?.let { CustomerPickerModel.label(ShopStore.debt(d, it.id)) },
+              onPick = actions.customer,
+              onClear = actions.clearCustomer,
+            )
+          }
+          if (off > 0 || promo.isNotEmpty()) item {
+            Column(Modifier.padding(horizontal = 4.dp)) {
+              if (off > 0) TillAdjustRow(StrSale.discountWord, off)
+              promo.forEach { p -> TillAdjustRow(p.name, p.discount) }
+            }
+          }
         }
-        V3Divider()
-        val debtor = debtorId?.let { id -> d.debtors.find { it.id == id } }
-        TillCustomerRow(
-          name = debtor?.name,
-          balance = debtor?.let { CustomerPickerModel.label(ShopStore.debt(d, it.id)) },
-          onPick = actions.customer,
-          onClear = actions.clearCustomer,
-        )
-        V3Divider()
-        val off = CartSummary.manualDiscount(cart, d.products)
-        if (off > 0 || promo.isNotEmpty()) Spacer(Modifier.height(6.dp))
-        if (off > 0) TillAdjustRow(StrSale.discountWord, off)
-        promo.forEach { p -> TillAdjustRow(p.name, p.discount) }
-        TillTotal(total, tillMenu)
-        V3Button(StrSale.pay, actions.pay, Modifier.fillMaxWidth(), height = 52.dp, haptic = true)
+        val c = PhoneV3.colors
+        val footer = RoundedCornerShape(22.dp)
+        Column(Modifier.fillMaxWidth().clip(footer).background(c.tile).border(1.dp, c.hairline, footer).padding(10.dp)) {
+          Box(Modifier.padding(horizontal = 5.dp)) { TillTotal(total, tillMenu) }
+          V3Button(StrSale.pay, actions.pay, Modifier.fillMaxWidth(), height = 52.dp, pill = true, haptic = true)
+        }
       },
     )
     if (more) TillMoreSheet(tillMenu) { more = false }
