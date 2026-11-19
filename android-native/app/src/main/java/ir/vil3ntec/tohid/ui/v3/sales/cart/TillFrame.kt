@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -43,7 +42,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -172,7 +170,7 @@ fun TillFrame(
     )
 
     val p = progress.value
-    val paneShape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
+    val paneShape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
     Box(
       Modifier.fillMaxSize().padding(bottom = bottomGap)
         .graphicsLayer { translationY = -p * travel }
@@ -195,7 +193,6 @@ fun TillFrame(
           .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = StrSale.closeCart, onClick = onClose)
           .semantics { contentDescription = StrSale.closeCart },
       )
-      val shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
       Column(
         Modifier
           .align(Alignment.BottomCenter)
@@ -203,17 +200,14 @@ fun TillFrame(
           .fillMaxWidth()
           .height(sheetHeight)
           .graphicsLayer { translationY = (1f - p) * travel }
-          .shadow(16.dp, shape, clip = false, ambientColor = c.source.shadow, spotColor = c.source.shadow)
-          .clip(shape)
           .background(c.card)
-          .border(1.dp, c.hairline, shape)
           .testTag(TillSpec.SHEET_TAG)
           .padding(start = 20.dp, end = 20.dp, bottom = 16.dp + navBottom),
       ) {
         //  دستگیره: کشیدنی؛ صفحه‌خوان آن را دکمهٔ «بستنِ سبد» می‌شنود
         Box(Modifier.fillMaxWidth().then(grip).testTag(TillSpec.SHEET_HANDLE_TAG).padding(top = 10.dp, bottom = 4.dp), contentAlignment = Alignment.Center) {
           Box(
-            Modifier.size(width = 38.dp, height = 5.dp).clip(RoundedCornerShape(50)).background(c.hairline)
+            Modifier.size(width = 34.dp, height = 4.dp).clip(CircleShape).background(c.inkMuted.copy(alpha = 0.45f))
               .semantics { role = Role.Button; contentDescription = StrSale.closeCart; onClick(StrSale.closeCart) { onClose(); true } },
           )
         }
@@ -229,7 +223,6 @@ fun TillFrame(
 @Composable
 private fun TillBar(model: CartSummary.Model, pulse: Int, onOpen: () -> Unit, onPay: () -> Unit, onScan: () -> Unit, navBottom: Dp, modifier: Modifier) {
   val c = PhoneV3.colors
-  val shape = RoundedCornerShape(28.dp)
   val bump = remember { Animatable(1f) }
   val first = remember { pulse }
   LaunchedEffect(pulse) {
@@ -242,10 +235,6 @@ private fun TillBar(model: CartSummary.Model, pulse: Int, onOpen: () -> Unit, on
       .widthIn(max = 640.dp)
       .fillMaxWidth()
       .padding(start = 12.dp, end = 12.dp, bottom = navBottom + 8.dp)
-      .shadow(12.dp, shape, clip = false, ambientColor = c.source.shadow, spotColor = c.source.shadow)
-      .clip(shape)
-      .background(c.card)
-      .border(1.dp, c.hairline, shape)
       .testTag(TillSpec.BAR_TAG)
       .padding(horizontal = 8.dp)
       .height(TillSpec.BAR_HEIGHT),
