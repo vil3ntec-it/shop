@@ -191,8 +191,9 @@ class SafeCurrencyUiTest {
     var d = ShopData()
     fun step(r: SafeBook.Result) { d = (r as SafeBook.Result.Ok).data }
     step(SafeBook.count(d, 500_000, null, "صاحب", now - 3 * 24 * 60 * 60 * 1000L, ids))
-    step(SafeBook.deposit(d, 120_000, "deposit", null, "صاحب", now - 60 * 60 * 1000L, ids))
-    step(SafeBook.deposit(d, 2_550, "USD", "deposit", null, "صاحب", now - 30 * 60 * 1000L, ids))
+    // دادهٔ «امروز» نباید در اجرای CI نزدیک نیمه‌شب به روز گذشته برود.
+    step(SafeBook.deposit(d, 120_000, "deposit", null, "صاحب", now, ids))
+    step(SafeBook.deposit(d, 2_550, "USD", "deposit", null, "صاحب", now, ids))
     return d
   }
 

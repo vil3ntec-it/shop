@@ -103,6 +103,12 @@ class PlansCardsUiTest {
   private fun details(code: String) = rule.onNodeWithTag(PlansTags.details(code))
   private fun state(s: String) = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, s)
 
+  @Test fun anEmptyServerCatalogHasNoPurchaseButton() {
+    show(emptyList())
+    rule.onNodeWithText(StrAccount.noPlansForSale).assertExists()
+    rule.onNodeWithTag(PlansTags.BUY).assertDoesNotExist()
+  }
+
   /**
    *  زدنِ سرِ کارتِ [code] با کارِ کلیکِ خودِ گره (همان `onClick` ِ لمس): پنجرهٔ آزمون ۷۶۸px است و کارتِ پایینی زیرِ کشوی
    *  باز و نوارِ چسبان، بیرون از قاب می‌افتد. لمسِ واقعی روی «ماهانه» ِ بالای فهرست جدا آزموده می‌شود.
