@@ -71,6 +71,7 @@ fun PhoneMoreScreen(
     storefrontOn = StorefrontGate.visible,
     deliveryOn = DeliveryGate.visible,
     flags = ModuleFlags.on.value,
+    keepOnlineEntries = true,
   )
   val scroll = rememberScrollState()
   val stagger = rememberV3Stagger()
@@ -109,7 +110,11 @@ fun PhoneMoreScreen(
 /** یک ردیفِ «بیشتر» — همان `V3NavRow` که تنظیمات، حساب و مرکزِ مدیریت هم می‌کشند (۶۵r، `V3NavRowGuardTest`) */
 @Composable
 internal fun MoreRow(item: MoreLayout.Item, onClick: () -> Unit) {
-  V3NavRow(title = item.label, icon = item.icon, hue = item.hue, value = item.value, onClick = onClick)
+  V3NavRow(
+    title = item.label, icon = item.icon, hue = item.hue, value = item.value,
+    help = if (item.available) null else ir.vil3ntec.tohid.core.i18n.StrReceipt.sectionUnavailable,
+    chevron = item.available, onClick = onClick.takeIf { item.available },
+  )
 }
 
 /**

@@ -41,13 +41,13 @@ test('هر عضو می‌خواند؛ فقط صاحب و مدیر می‌نوی�
   assert.deepEqual(first.body, { profile: { ...profiles.DEFAULTS }, rev: 0 });
 
   assert.equal((await h.put(P, { name: 'x' }, { token: t.staff })).status, 403);
-  const byManager = await h.put(P, { name: '  دکانِ نمونه  ', footer: 'تشکر' }, { token: t.manager });
+  const byManager = await h.put(P, { name: '  دکانِ نمونه  ', sellerName: '  فروشندهٔ نمونه  ', footer: 'تشکر' }, { token: t.manager });
   assert.equal(byManager.status, 200, JSON.stringify(byManager.body));
   assert.equal(byManager.body.profile.name, 'دکانِ نمونه');
   const byOwner = await h.put(P, { address: 'کابل', qr: false, logoMode: 'line', digits: 'fa', symbol: 'sign' }, { token: t.owner });
   assert.equal(byOwner.status, 200);
   assert.deepEqual(byOwner.body.profile, {
-    name: 'دکانِ نمونه', address: 'کابل', phone: '', footer: 'تشکر', qr: false,
+    name: 'دکانِ نمونه', sellerName: 'فروشندهٔ نمونه', address: 'کابل', phone: '', footer: 'تشکر', qr: false,
     logoMode: 'line', digits: 'fa', symbol: 'sign', logo: null,
   });
   assert.ok(byOwner.body.rev > byManager.body.rev);

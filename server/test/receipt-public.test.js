@@ -80,7 +80,7 @@ function assertPrivate(r) {
 test('QR ِ فروشِ همگام‌شده همان فاکتورِ کاغذی را نشان می‌دهد — بی قرض‌دار، بی شناسه', async () => {
   const a = await shop('الف');
   const token = newToken();
-  await sell(a, 'sale-a1', token);
+  await sell(a, 'sale-a1', token, { seller: 'account-login@example.test' });
   const r = await read(a.tag, token);
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assertPrivate(r);
@@ -89,7 +89,11 @@ test('QR ِ فروشِ همگام‌شده همان فاکتورِ کاغذی ر
   assert.equal(x.no, 'B1-154');
   assert.equal(x.date, '1405/08/02');
   assert.equal(x.time, '14:35');
-  assert.equal(x.cashier, 'احمد');
+  assert.equal(x.cashier, x.shop.name);
+  assert.doesNotMatch(JSON.stringify(x), /account-login@example\.test/);
+  assert.equal((await h.put('/api/shop/receipt-profile', { sellerName: 'فروشندهٔ نمونه' }, { token: a.token })).status, 200);
+  assert.equal((await read(a.tag, token)).body.receipt.cashier, 'فروشندهٔ نمونه');
+
   assert.equal(x.kind, 'نقدی');
   assert.equal(x.cancelled, false);
   assert.deepEqual(x.items, [

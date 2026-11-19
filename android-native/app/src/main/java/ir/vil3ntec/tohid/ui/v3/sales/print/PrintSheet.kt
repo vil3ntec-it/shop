@@ -72,6 +72,7 @@ fun PrintSheet(
   onPrint: suspend (link: String, width: Int, reason: String?) -> String,
   onDone: (String) -> Unit,
   onClose: () -> Unit,
+  preview: (@Composable (Int) -> Unit)? = null,
 ) {
   val context = LocalContext.current
   val prefs = remember { context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE) }
@@ -123,6 +124,7 @@ fun PrintSheet(
     },
     onDone = onDone,
     onClose = onClose,
+    preview = preview,
   )
 }
 
@@ -145,6 +147,7 @@ fun PrintBody(
   onDone: (String) -> Unit,
   onClose: () -> Unit,
   startReason: Boolean = false,
+  preview: (@Composable (Int) -> Unit)? = null,
 ) {
   val c = PhoneV3.colors
   val scope = rememberCoroutineScope()
@@ -187,6 +190,7 @@ fun PrintBody(
           val reason = PrintModel.reason(picked, other)
           V3Button(StrSale.reprint, { send(reason) }, Modifier.fillMaxWidth(), enabled = reason.isNotBlank() && !busy, loading = busy, haptic = true)
         } else {
+          preview?.invoke(width)
           PickPrinter(form, onForm, saved, granted, onAskBluetooth, paired, usb)
           Spacer(Modifier.height(18.dp))
           V3Button(

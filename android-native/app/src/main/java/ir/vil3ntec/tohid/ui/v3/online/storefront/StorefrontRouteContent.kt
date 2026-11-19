@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -66,6 +67,10 @@ internal fun RouteScope.StorefrontRoute() {
   LaunchedEffect(cfg?.zones) { if (cfg != null && tab !in StorefrontModel.tabs(cfg)) tab = StorefrontModel.STATUS }
   val settings = cfg?.settings
   val tz = settings?.timezone ?: "Asia/Kabul"
+  val storefrontUrl = settings?.takeIf { it.enabled }?.let {
+    ir.vil3ntec.tohid.print.ReceiptStoreQr.storefrontUrl(context, it.slug)
+  }
+  var showStoreQr by remember { mutableStateOf(false) }
 
   //  وضعیت: صفِ اعلامِ نرسیده همان لحظهٔ باز شدن دوباره فرستاده می‌شود (PRES-08)
   val sender = remember(context) { PresenceSender(context) { repo.declare(it, "") } }
@@ -168,6 +173,18 @@ internal fun RouteScope.StorefrontRoute() {
     else -> null
   }
 
+  if (showStoreQr && storefrontUrl != null) {
+    ir.vil3ntec.tohid.ui.v3.V3Sheet(onDismiss = { showStoreQr = false }, title = ir.vil3ntec.tohid.core.i18n.StrReceipt.shopQr) {
+      androidx.compose.foundation.layout.Box(
+        Modifier.padding(16.dp), contentAlignment = androidx.compose.ui.Alignment.Center,
+      ) {
+        ir.vil3ntec.tohid.ui.screens.QrBox(
+          storefrontUrl, side = 168.dp, maxVersion = ir.vil3ntec.tohid.core.qr.QrCode.LARGE_MAX_VERSION,
+        )
+      }
+    }
+  }
+
   StorefrontScreen(
     config = cfg,
     loading = loading,
@@ -177,7 +194,11 @@ internal fun RouteScope.StorefrontRoute() {
     onRetry = { scope.launch { reload() } },
     onBack = backOrNull?.let { b -> { if (dirty) askDiscard = true else b() } },
     bottomBar = bottomBar,
-    extras = storefrontExtras(cfg),
+    extras = storefrontExtras(cfg) + listOfNotNull(storefrontUrl?.let {
+      ir.vil3ntec.tohid.ui.v3.V3MenuItem(
+        Icons.Outlined.QrCode2, ir.vil3ntec.tohid.core.i18n.StrReceipt.shopQr,
+      ) { showStoreQr = true }
+    }),
   ) { t, pad ->
     val c = cfg ?: return@StorefrontScreen
     when (t) {

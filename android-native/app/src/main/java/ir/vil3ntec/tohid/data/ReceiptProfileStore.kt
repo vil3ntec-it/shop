@@ -44,6 +44,7 @@ object ReceiptProfileStore {
 
   data class Profile(
     val name: String = "",
+    val sellerName: String = "",
     val address: String = "",
     val phone: String = "",
     val footer: String = "",
@@ -60,6 +61,7 @@ object ReceiptProfileStore {
   /** بدنهٔ ویرایش — فقط فیلدهای غیرِ null فرستاده می‌شوند */
   data class Patch(
     val name: String? = null,
+    val sellerName: String? = null,
     val address: String? = null,
     val phone: String? = null,
     val footer: String? = null,
@@ -98,6 +100,7 @@ object ReceiptProfileStore {
   suspend fun save(context: Context, patch: Patch): String? = withContext(Dispatchers.IO) {
     val body = buildJsonObject {
       patch.name?.let { put("name", it) }
+      patch.sellerName?.let { put("sellerName", it) }
       patch.address?.let { put("address", it) }
       patch.phone?.let { put("phone", it) }
       patch.footer?.let { put("footer", it) }
@@ -193,7 +196,7 @@ object ReceiptProfileStore {
     fun s(k: String) = (p[k] as? JsonElement)?.let { runCatching { it.jsonPrimitive.contentOrNull }.getOrNull() }.orEmpty()
     val logo = p["logo"] as? JsonObject
     return Profile(
-      name = s("name"), address = s("address"), phone = s("phone"), footer = s("footer"),
+      name = s("name"), sellerName = s("sellerName"), address = s("address"), phone = s("phone"), footer = s("footer"),
       qr = runCatching { p["qr"]?.jsonPrimitive?.booleanOrNull }.getOrNull() ?: true,
       logoMode = LogoDither.Mode.of(s("logoMode")),
       digits = s("digits").ifBlank { "latin" },

@@ -10,6 +10,13 @@ package ir.vil3ntec.tohid.core.i18n
  */
 @Suppress("unused")
 object StrReceipt {
+  val sellerName: String get() = t("نام فروشنده برای فاکتور", "Seller name on invoices", "په بل کې د پلورونکي نوم")
+  val sellerNeedsInternet: String get() = t("برای ذخیرهٔ نام فروشنده به اینترنت وصل شوید", "Connect to save the seller name", "د پلورونکي نوم د ساتلو لپاره انټرنېټ سره وصل شئ")
+  val chooseShopName: String get() = t("نام دکان را انتخاب کنید", "Choose a shop name", "د دوکان نوم وټاکئ")
+  val shopQr: String get() = t("QR دکان", "Shop QR", "د دوکان QR")
+  val viewOnline: String get() = t("دیدن فاکتور آنلاین", "View invoice online", "بل آنلاین وګورئ")
+  val linkUnavailable: String get() = t("پیوند فاکتور باز نشد", "Could not open the invoice link", "د بل لینک خلاص نه شو")
+  val sectionUnavailable: String get() = t("فعلاً در دسترس نیست", "Currently unavailable", "اوس شتون نه لري")
 
   /* ------------------------------ فاکتور (`ReceiptLabels`) ------------------------------ */
 

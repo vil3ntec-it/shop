@@ -74,6 +74,9 @@ import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 import ir.vil3ntec.tohid.ui.v3.v3Shake
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
+import ir.vil3ntec.tohid.core.i18n.StrReceipt
+import ir.vil3ntec.tohid.data.ReceiptProfileStore
+import ir.vil3ntec.tohid.data.ShopRole
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -91,6 +94,7 @@ internal data class ProfileEditUi(
   val newPhone: String,
   val phoneError: String? = null,
   val shopName: String,
+  val sellerName: String? = null,
   val createdAt: Long,
   val busy: Boolean = false,
   val dirty: Boolean = false,
@@ -110,6 +114,7 @@ internal fun ProfileEditContent(
   onNewPhone: (String) -> Unit,
   onNewEmail: (String) -> Unit = {},
   onShopName: (String) -> Unit,
+  onSellerName: (String) -> Unit = {},
   onPhoto: () -> Unit,
   onSave: () -> Unit,
   onBack: (() -> Unit)?,
@@ -178,6 +183,10 @@ internal fun ProfileEditContent(
 
     V3Section(StrAccount.groupShop, Modifier.v3Stagger(stagger, "shop", 2), padding = PaddingValues(16.dp)) {
       V3TextField(ui.shopName, onShopName, StrAccount.shopName, helper = StrAccount.shopNameHelper)
+      ui.sellerName?.let {
+        Spacer(Modifier.height(14.dp))
+        V3TextField(it, onSellerName, StrReceipt.sellerName)
+      }
     }
 
     V3Section(StrAccount.groupMembership, Modifier.v3Stagger(stagger, "member", 3)) {
@@ -239,7 +248,11 @@ internal fun RouteScope.ProfileEditRoute() {
   val state = remember { SyncStore(context) }
   val prefs = remember { context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE) }
   var savedName by rememberSaveable { mutableStateOf(state.accountName) }
-  var savedShop by rememberSaveable { mutableStateOf(prefs.getString("store_name", "").orEmpty()) }
+  val canEditReceipt = !ShopRole.isStaff(context)
+  val receipt = remember { ReceiptProfileStore.current(context) }
+  var savedSeller by rememberSaveable { mutableStateOf(receipt.sellerName) }
+  var seller by rememberSaveable { mutableStateOf(savedSeller) }
+  var savedShop by rememberSaveable { mutableStateOf(prefs.getString("store_name", "").orEmpty().ifBlank { receipt.name }) }
   var name by rememberSaveable { mutableStateOf(savedName) }
   var shop by rememberSaveable { mutableStateOf(savedShop) }
   var claim by rememberSaveable { mutableStateOf("") }
@@ -293,10 +306,16 @@ internal fun RouteScope.ProfileEditRoute() {
 
   fun save() {
     val clean = name.trim()
+    val shopChanged = canEditReceipt && shop.trim() != ReceiptProfileStore.current(context).name
+    val sellerChanged = canEditReceipt && seller.trim() != savedSeller
     val wanted = claim.trim()
     val phoneOut = if (ProfileEditModel.phoneChanged(typedPhone, phone)) typedPhone.trim() else null
     val step = ProfileEditModel.step(clean, wanted + (phoneOut?.let { "#$it" } ?: ""), Backend.isReady(context), Backend.isOnline(context))
     if (step == ProfileEditModel.Step.NAME_MISSING) { nameError = StrAccount.nameRequired; return }
+    if (sellerChanged && step != ProfileEditModel.Step.SERVER) {
+      toasts.show(StrReceipt.sellerNeedsInternet, V3Tone.WARNING)
+      return
+    }
     //  نام و نامِ دکان همان لحظه روی گوشی — سربرگِ فاکتور و رسیدها همین را دارند
     prefs.edit().putString("store_name", shop.trim()).apply()
     state.accountName = clean
@@ -310,6 +329,18 @@ internal fun RouteScope.ProfileEditRoute() {
         busy = true
         scope.launch {
           val account = Backend.account(context)
+          if (shopChanged || sellerChanged) {
+            val error = ReceiptProfileStore.save(context, ReceiptProfileStore.Patch(
+              name = shop.trim().takeIf { shopChanged },
+              sellerName = seller.trim().takeIf { sellerChanged },
+            ))
+            if (error != null) {
+              toasts.show(error, V3Tone.WARNING)
+              busy = false
+              return@launch
+            }
+            savedSeller = seller.trim()
+          }
           account.updateProfile(clean, phoneOut, wanted, emailCode)
             .onSuccess { done ->
               state.accountName = done.user.name
@@ -343,15 +374,16 @@ internal fun RouteScope.ProfileEditRoute() {
       accountId = accountId, avatarVersion = version,
       name = name, nameError = nameError, email = email,
       newEmail = claim, emailError = emailError,
-      newPhone = typedPhone, phoneError = phoneError, shopName = shop, createdAt = state.accountCreatedAt,
+      newPhone = typedPhone, phoneError = phoneError, shopName = shop, sellerName = seller.takeIf { canEditReceipt }, createdAt = state.accountCreatedAt,
       busy = busy,
-      dirty = ProfileEditModel.dirty(name, savedName, shop, savedShop, claim + if (ProfileEditModel.phoneChanged(typedPhone, phone)) "#" else ""),
+      dirty = (canEditReceipt && seller.trim() != savedSeller) || ProfileEditModel.dirty(name, savedName, shop, savedShop, claim + if (ProfileEditModel.phoneChanged(typedPhone, phone)) "#" else ""),
       codeShown = form.shown, code = form.code, codeError = ProfileEditModel.codeError(form.problem), resendWait = resendWait,
     ),
     onName = { name = it; nameError = null },
     onNewPhone = { typedPhone = it; phoneError = null },
     onNewEmail = { claim = it; emailError = null; form = form.email(it) },
-    onShopName = { shop = it },
+    onShopName = { shop = it.take(80) },
+    onSellerName = { seller = it.take(80) },
     onPhoto = { sheet = true },
     onSave = ::save,
     onBack = backOrNull,

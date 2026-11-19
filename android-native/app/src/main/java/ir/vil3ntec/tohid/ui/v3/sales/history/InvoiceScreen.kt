@@ -36,6 +36,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrReceipt
 import ir.vil3ntec.tohid.data.ReturnFlow
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
@@ -78,8 +79,10 @@ fun InvoiceScreen(
   storeName: String,
   returnsV2: Boolean,
   actions: InvoiceActions,
-  /** فاکتورِ نسخهٔ ۲: پیش‌نمایشِ همان کاغذِ چاپ (`Receipts.bitmap`)؛ `null` ⇒ رسیدِ کارتی */
-  paper: ImageBitmap? = null,
+  sellerName: String = "",
+  editShopName: (() -> Unit)? = null,
+  onlineUrl: String? = null,
+  openOnline: (() -> Unit)? = null,
   /** PAY-07 — ردیف‌های غیرنقد با وضعیت (`PayStatusFlow.view`)؛ ضربه ⇐ برگهٔ وضعیتِ همان ردیف */
   payRows: List<ir.vil3ntec.tohid.data.PayStatusFlow.RowView> = emptyList(),
   onPayRow: ((Int) -> Unit)? = null,
@@ -113,7 +116,18 @@ fun InvoiceScreen(
     ) {
       RejectedWatch(force = true, data = d)
       RejectedBanner(sale.id)
-      if (paper != null) PaperPreview(paper, ReceiptModel.title(sale)) else ReceiptCard(d, sale, storeName, onDebtor = actions.debtor)
+      editShopName?.let { edit ->
+        V3ListRow(StrReceipt.chooseShopName, onClick = edit)
+      }
+      ReceiptCard(d, sale, storeName, onDebtor = actions.debtor, sellerName = sellerName)
+      if (onlineUrl != null && openOnline != null) {
+        V3Section(StrReceipt.viewOnline) {
+          Box(Modifier.fillMaxWidth().padding(12.dp), contentAlignment = Alignment.Center) {
+            ir.vil3ntec.tohid.ui.screens.QrBox(onlineUrl, maxVersion = ir.vil3ntec.tohid.core.qr.QrCode.LARGE_MAX_VERSION)
+          }
+          V3ListRow(StrReceipt.viewOnline, onClick = openOnline)
+        }
+      }
       PayStatusSection(payRows, onPayRow)
       if (docs.isNotEmpty()) {
         V3Section(StrSale.returnReceipts) {
@@ -134,7 +148,7 @@ fun InvoiceScreen(
 
 /** کاغذِ فاکتورِ نسخهٔ ۲ (لوگو، سربرگ و QR) روی کارتِ سفید، به پهنای صفحه تا ۴۰۰ */
 @Composable
-private fun PaperPreview(paper: ImageBitmap, label: String) {
+internal fun PaperPreview(paper: ImageBitmap, label: String) {
   val c = PhoneV3.colors
   Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
     Image(

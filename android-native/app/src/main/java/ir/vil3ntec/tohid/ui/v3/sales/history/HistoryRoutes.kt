@@ -44,7 +44,8 @@ import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.money.MoneyPaths
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.sales.SalesPaths
-import ir.vil3ntec.tohid.ui.v3.sales.checkout.storeName
+import ir.vil3ntec.tohid.ui.v3.account.AccountPaths
+import ir.vil3ntec.tohid.core.i18n.StrReceipt
 import ir.vil3ntec.tohid.ui.v3.sales.print.PrintModel
 import ir.vil3ntec.tohid.ui.v3.sales.print.PrintSheet
 import kotlinx.coroutines.launch
@@ -96,20 +97,15 @@ fun RouteScope.InvoiceRoute() {
   val sells = remember { ShopRole.canWrite(context, "sales") }
   val manages = remember { !ShopRole.isStaff(context) }
   val payActs = payRows.any { it.manual && ir.vil3ntec.tohid.core.pay.PayStatus.allowed(it.status, sells, manages).isNotEmpty() }
-  //  فاکتورِ نسخهٔ ۲ فقط با پرچمِ `shop.receipt_v2` (خاموش ⇒ همین رسیدِ کارتی، مثلِ پیش)
-  val receiptV2 = remember { ReceiptFlag.enabled(context) }
-  val paper by produceState<ImageBitmap?>(null, sale, data.saleItems.size, receiptV2) {
-    if (!receiptV2) return@produceState
-    value = withContext(Dispatchers.Default) {
-      //  همان QRِ رسیدِ برگشت که چاپ می‌گذارد (فروشِ بی توکن)
-      val qr = if (ReturnSettings.enabled(context) && sale.status != "cancelled") ReturnFlow.receiptCode(sale) else null
-      runCatching { Receipts.bitmap(context, data, sale, legacyQr = qr).asImageBitmap() }.getOrNull()
-    }
-  }
+  val receiptV2 = ReceiptFlag.enabled(context)
+  val shopName = Receipts.shopName(context)
+  val uri = androidx.compose.ui.platform.LocalUriHandler.current
+  val receiptUrl = Receipts.publicUrl(context, sale)
   InvoiceScreen(
     d = data,
     sale = sale,
-    storeName = remember { storeName(context) },
+    storeName = shopName,
+    sellerName = Receipts.sellerName(context),
     returnsV2 = v2,
     actions = InvoiceActions(
       print = { nav.open(SalesPaths.print(sale.id)) },
@@ -130,7 +126,11 @@ fun RouteScope.InvoiceRoute() {
       saveImage = if (Platform.DESKTOP) ({ scope.launch { toasts.show(ir.vil3ntec.tohid.print.InvoiceFile.save(context, data, sale, pdf = false)) } }) else null,
       savePdf = if (receiptV2 && Platform.DESKTOP) ({ scope.launch { toasts.show(ir.vil3ntec.tohid.print.InvoiceFile.save(context, data, sale, pdf = true)) } }) else null,
     ),
-    paper = paper,
+    editShopName = if (shopName.isBlank() && manages) ({ nav.open(AccountPaths.EDIT) }) else null,
+    onlineUrl = receiptUrl,
+    openOnline = receiptUrl?.let { url ->
+      { runCatching { uri.openUri(url) }.onFailure { toasts.show(StrReceipt.linkUnavailable, V3Tone.WARNING) }; Unit }
+    },
     payRows = payRows,
     //  فقط وقتی همین کاربر کاری روی یکی از ردیف‌ها دارد (ثبتِ دستیِ «تأییدشده» را فقط صاحب/مدیر اصلاح می‌کند)
     onPayRow = if (payActs) ({ nav.open(SalesPaths.payStatus(sale.id, it)) }) else null,
@@ -142,7 +142,20 @@ fun RouteScope.InvoiceRoute() {
 fun RouteScope.SalePrintRoute() {
   val context = LocalContext.current
   val sale = saleOrBack() ?: return
+  val snapshot = data
   PrintSheet(
+    preview = { width ->
+      val paper by produceState<ImageBitmap?>(null, sale, snapshot.saleItems, width) {
+        value = withContext(Dispatchers.Default) {
+          runCatching {
+            ir.vil3ntec.tohid.print.Receipt.render(
+              context, snapshot, sale, Receipts.shopName(context), width, qr = PrintJob.receiptQr(context, sale),
+            ).asImageBitmap()
+          }.getOrNull()
+        }
+      }
+      paper?.let { PaperPreview(it, ReceiptModel.title(sale)) }
+    },
     title = StrSale.printInvoice,
     needsReason = remember(sale.id) { PrintModel.needsReason(PrintLog.wasPrinted(context, sale.id), data, sale.id) },
     onPrint = { link, width, reason -> PrintSpooler.printSale(context, data, sale, link, width, reason) },
