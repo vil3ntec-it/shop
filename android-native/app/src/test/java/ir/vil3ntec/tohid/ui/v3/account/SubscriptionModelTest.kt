@@ -72,8 +72,10 @@ class SubscriptionModelTest {
   }
 
   @Test
-  fun `پلن‌ها — از سرور، وگرنه پیش‌فرض؛ انتخاب و تخفیف`() {
-    assertEquals(listOf("m1", "m6", "y1"), PlansModel.options(null).map { it.code })
+  fun `پلن‌های خرید از سرور می‌آیند، فهرست خالی هیچ انتخابی ندارد`() {
+    assertTrue(PlansModel.options(null).isEmpty())
+    assertTrue(PlansModel.options(PlansDto()).isEmpty())
+    assertEquals(null, PlansModel.pick(emptyList(), null))
     val dto = PlansDto(plans = listOf(
       PlanDto(code = "a", title = "ماهانه", price = 400, fullPrice = 500, days = 30, discount = PlanDiscountDto(label = "")),
       PlanDto(code = "b", title = "سالانه", price = 3600, days = 365, badge = "پیشنهاد ما"),
@@ -81,9 +83,9 @@ class SubscriptionModelTest {
     ))
     val options = PlansModel.options(dto)
     assertEquals(listOf("a", "b"), options.map { it.code })
-    assertEquals("b", PlansModel.pick(options, null).code)
-    assertEquals("a", PlansModel.pick(options, "a").code)
-    assertEquals("b", PlansModel.pick(options, "gone").code)
+    assertEquals("b", PlansModel.pick(options, null)?.code)
+    assertEquals("a", PlansModel.pick(options, "a")?.code)
+    assertEquals("b", PlansModel.pick(options, "gone")?.code)
     assertTrue(options[0].discounted); assertEquals(20, options[0].offPercent)
     assertEquals("٪20 تخفیف", PlansModel.discountText(options[0]))
     assertEquals("گرفتن اشتراک ماهانه — 400 افغانی", PlansModel.cta(options[0], "افغانی"))

@@ -21,6 +21,7 @@ object ApiEndpoints {
 
   /** تنظیماتِ باز سرور: کدام راهِ ورود روشن است، کمینهٔ نسخه، … */
   const val CONFIG = "/config"
+  const val PLANS = "/plans"
 
   /** گزارشِ خطای برنامه — با اجازهٔ کاربر (بندِ ۲۰.۸). توکن اختیاری است. */
   const val ERRORS = "/errors"
@@ -133,7 +134,6 @@ object ApiEndpoints {
     const val ROOT = "/me"
     const val DEVICES = "/me/devices"
     const val SUBSCRIPTION = "/me/subscription"
-    const val PLANS = "/me/plans"
     const val PURCHASE_REQUEST = "/me/purchase-request"
 
     /** AUTH-08 ⇐ «فقط ایمیل»: کدِ یک‌بارمصرف به ایمیلی که به حسابِ بی‌ایمیل افزوده می‌شود (درِ کدِ پیامکیِ شماره رفت) */

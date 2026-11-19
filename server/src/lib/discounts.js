@@ -178,9 +178,10 @@ async function useCode(codeId, { app, userId = '', tenantId = '', subscriptionId
    تاریخچهٔ قیمت
    ========================================================== */
 
-async function recordPrice({ app, plan, prevPrice = null, price, changedBy = '' }) {
+async function recordPrice({ app, plan, prevPrice = null, price, changedBy = '' }, client = null) {
   const a = appOf(app);
-  await query(
+  const run = client ? client.query.bind(client) : query;
+  await run(
     `INSERT INTO plan_price_history (id, app, plan, prev_price, price, currency, changed_at, changed_by)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
     [newId('pph'), a, String(plan), prevPrice === null ? null : Math.round(prevPrice), Math.round(price),

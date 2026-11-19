@@ -12,8 +12,7 @@ import kotlin.math.roundToLong
 
 /**
  *  «اشتراک و قیمت‌ها» (آزمون: `PlansModelTest`) — جای `VipScreen` بی طلا و بی نشانِ VIP.
- *  قیمت‌ها از سرور (`Backend.account.plans`)؛ تا نرسیده یا آفلاین همان سه پلنِ
- *  پیش‌فرضِ پیشین. کارتِ حالت یکی از سه است، نه دو کارتِ متناقض: وضعیتِ مجوزِ گوشی،
+ *  قیمت‌ها و فهرست خرید از سرور (`Backend.account.plans`). کارتِ حالت از وضعیتِ مجوزِ گوشی،
  *  دورهٔ باز به حرفِ سرور، یا دعوت به آزمایشی.
  */
 object PlansModel {
@@ -35,16 +34,9 @@ object PlansModel {
     val perDay: Double get() = if (days <= 0) 0.0 else price.toDouble() / days
   }
 
-  val fallback: List<Option>
-    get() = listOf(
-      Option("m1", StrAccount.planMonthly, 500, days = 30, months = 1),
-      Option("m6", StrAccount.planSixMonths, 2500, badge = StrAccount.badgeRecommended, days = 180, months = 6),
-      Option("y1", StrAccount.planYearly, 4000, badge = StrAccount.badgeBestValue, days = 365, months = 12),
-    )
-
-  /** پلن‌های فعالِ سرور، وگرنه پیش‌فرض‌ها */
-  fun options(dto: PlansDto?): List<Option> {
-    val fresh = dto?.plans.orEmpty().filter { it.active && it.days > 0 }.map { p ->
+  /** فقط پلن‌های فعالِ نرخ‌نامه. */
+  fun options(dto: PlansDto?): List<Option> =
+    dto?.plans.orEmpty().filter { it.active && it.days > 0 }.map { p ->
       Option(
         code = p.code,
         title = p.title.ifBlank { p.code },
@@ -56,12 +48,10 @@ object PlansModel {
         months = monthsOf(p.amount, p.unit),
       )
     }
-    return fresh.ifEmpty { fallback }
-  }
 
   /** انتخابِ کاربر؛ اگر دیگر در فهرست نیست ⇒ نشان‌دار («پیشنهاد ما»)، وگرنه اولی */
-  fun pick(options: List<Option>, chosen: String?): Option =
-    options.firstOrNull { it.code == chosen } ?: options.firstOrNull { it.badge.isNotBlank() } ?: options.first()
+  fun pick(options: List<Option>, chosen: String?): Option? =
+    options.firstOrNull { it.code == chosen } ?: options.firstOrNull { it.badge.isNotBlank() } ?: options.firstOrNull()
 
   fun price(amount: Long, currency: String): String = "${money(amount.toDouble())} $currency"
 
@@ -80,7 +70,7 @@ object PlansModel {
   data class Saving(val amount: Long, val percent: Int, val base: Option)
 
   /**
-   *  صرفه‌جوییِ [o] از **همین قیمت‌ها** (سرور یا پیش‌فرض)، نه عددِ نوشته: بهای همان مدت با کوتاه‌ترین پلن منهای
+   *  صرفه‌جوییِ [o] از قیمت‌های نرخ‌نامه: بهای همان مدت با کوتاه‌ترین پلن منهای
    *  قیمتِ [o]. ماهِ تقویمی اگر هر دو دارند (۱۲ × ماهانه برای یک سال)، وگرنه روزها. خودِ پایه، پلنِ کوتاه‌تر یا
    *  بی‌صرفه ⇒ null.
    */
@@ -98,10 +88,10 @@ object PlansModel {
   const val UNTOUCHED = ""
 
   /** کارتِ باز: [state] تا وقتی در فهرست است؛ دست‌نخورده یا کدِ رفته ⇒ انتخاب‌شده؛ null ⇒ همه بسته */
-  fun openCard(options: List<Option>, picked: Option, state: String?): String? = when {
+  fun openCard(options: List<Option>, picked: Option?, state: String?): String? = when {
     state == null -> null
     options.any { it.code == state } -> state
-    else -> picked.code
+    else -> picked?.code
   }
 
   /** زدنِ کارتِ [code]: همان کارتِ باز ⇒ بسته؛ هر کارتِ دیگر ⇒ فقط همان باز (یکی در هر لحظه) */

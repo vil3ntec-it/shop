@@ -20,17 +20,17 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1039,
+    "routes": 1040,
     "byAuth": {
       "none-detected": 201,
-      "admin": 299,
+      "admin": 300,
       "inline": 2,
       "user": 494,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-      "extracted": 680,
+      "extracted": 681,
       "empty": 357,
       "unresolved": 2
     }
@@ -189,6 +189,7 @@
     {"method":"POST","path":"/api/admin/payments/intents/:id/refund","area":"admin","source":"server/src/routes/admin-payments.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["id"],"query":[],"body":["note"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/admin/payments/reconcile","area":"admin","source":"server/src/routes/admin-payments.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/admin/plans","area":"admin","source":"server/src/routes/admin.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["app","config","plans"]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/admin/plans","area":"admin","source":"server/src/routes/admin.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":[],"query":[],"body":["active","amount","badge","maxDevices","price","title","unit"],"response":{"statuses":[201],"keys":[]},"errors":["400 bad_request","400 idempotency_key_required"],"shape":"extracted"},
     {"method":"PATCH","path":"/api/admin/plans/:code","area":"admin","source":"server/src/routes/admin.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["code"],"query":[],"body":["active","amount","badge","features","maxDevices","negotiable","price","sortOrder","title","unit"],"response":{"statuses":[200],"keys":["plan"]},"errors":["404 not_found"],"shape":"extracted"},
     {"method":"DELETE","path":"/api/admin/plans/:code/discount","area":"admin","source":"server/src/routes/admin-platform.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["code"],"query":["app"],"body":["app"],"response":{"statuses":[200],"keys":["plan"]},"errors":["404 not_found"],"shape":"extracted"},
     {"method":"PUT","path":"/api/admin/plans/:code/discount","area":"admin","source":"server/src/routes/admin-platform.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["code"],"query":["app"],"body":["app","label","percent","price","until"],"response":{"statuses":[200],"keys":["plan"]},"errors":["400 bad_discount","400 bad_until","404 not_found"],"shape":"extracted"},

@@ -89,15 +89,9 @@ class AccountRepository(private val api: ApiClient) {
   suspend fun subscription(): ApiResult<SubscriptionDto> =
     result { ApiJson.decode<SubscriptionDto>(api.get(ApiEndpoints.Me.SUBSCRIPTION)) }
 
-  /**
-   *  فهرستِ پلن‌ها.
-   *
-   *  این مسیر روی سرور `requireUser` دارد. لایهٔ قبلی آن را **بدونِ
-   *  توکن** صدا می‌زد، پس اگر روزی صفحه‌ای از آن استفاده می‌کرد، همیشه
-   *  ۴۰۱ می‌گرفت. اینجا با توکن فرستاده می‌شود.
-   */
+  /** نرخ‌نامهٔ فروشگاه، پیش و پس از ورود از همان مسیرِ عمومی. */
   suspend fun plans(): ApiResult<PlansDto> =
-    result { ApiJson.decode<PlansDto>(api.get(ApiEndpoints.Me.PLANS)) }
+    result { ApiJson.decode<PlansDto>(api.getPublic(ApiEndpoints.PLANS)) }
 
   /** درخواستِ خرید — مدیر بعد از گرفتنِ پول فعالش می‌کند */
   suspend fun requestPurchase(plan: String, note: String = ""): ApiResult<Unit> = result {

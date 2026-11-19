@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.desktop
 
+import ir.vil3ntec.tohid.desktop.shots.demoPlanOptions
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -80,7 +81,7 @@ class PlansCardsUiTest {
     Motion.load(ctx)
   }
 
-  private fun show(options: List<PlansModel.Option> = PlansModel.options(null)) {
+  private fun show(options: List<PlansModel.Option> = demoPlanOptions) {
     rule.setContent {
       CompositionLocalProvider(LocalContext provides ctx, LocalLayoutDirection provides LayoutDirection.Rtl) {
         TohidTheme(ThemeChoice.LIGHT) {
@@ -90,7 +91,7 @@ class PlansCardsUiTest {
               state = PlansModel.state(null, 0, 0, null, false, 0, false, 14, 7),
               options = options, picked = picked, currency = cur, signedIn = true, salesNumber = "0700123456", storeBuild = false,
             ),
-            PlansActions(back = null, pick = { chosen = it }, buy = { bought += picked.code }, open = { opened += it }, whatsapp = {}),
+            PlansActions(back = null, pick = { chosen = it }, buy = { picked?.let { bought += it.code } }, open = { opened += it }, whatsapp = {}),
           )
         }
       }
@@ -109,7 +110,7 @@ class PlansCardsUiTest {
   private fun tap(code: String) { card(code).performSemanticsAction(SemanticsActions.OnClick) }
 
   @Test fun everyCardShowsItsPriceCurrencyPerDayAndComputedSaving() {
-    val options = PlansModel.options(null)
+    val options = demoPlanOptions
     show(options)
     for (o in options) {
       card(o.code).assert(hasText(o.title)).assert(hasText(money(o.price.toDouble()))).assert(hasText(cur))
@@ -164,7 +165,7 @@ class PlansCardsUiTest {
   }
 
   @Test fun buttonLabelAndPriceFollowTheSelectionAndBuyThatPlan() {
-    val options = PlansModel.options(null)
+    val options = demoPlanOptions
     show(options)
     val buy = rule.onNodeWithTag(PlansTags.BUY)
     buy.assert(hasText(PlansModel.cta(options[1], cur)))
@@ -196,7 +197,7 @@ class PlansCardsUiTest {
     Motion.reducedForTest = true
     Motion.load(ctx)
     assertTrue(!Motion.enabled)
-    val options = PlansModel.options(null)
+    val options = demoPlanOptions
     show(options)
     tapYearlyThen(2)
     details("y1").assertExists()
@@ -217,7 +218,7 @@ class PlansCardsUiTest {
   }
 
   @Test fun headersAreBigEnoughToTouchAndLaidOutRightToLeft() {
-    val options = PlansModel.options(null)
+    val options = demoPlanOptions
     show(options)
     for (o in options) card(o.code).assertHeightIsAtLeast(48.dp)
     val title = rule.onNodeWithText(options[0].title, useUnmergedTree = true).getBoundsInRoot()

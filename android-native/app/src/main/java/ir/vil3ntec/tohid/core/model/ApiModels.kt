@@ -320,7 +320,7 @@ data class PlanDiscountDto(
 data class PlanDto(
   val code: String = "",
   val title: String = "",
-  val price: Long = 0,
+  val price: Long,
   /** قیمت پیش از تخفیف — اگر با `price` یکی بود، تخفیفی نیست */
   val fullPrice: Long = 0,
   val discount: PlanDiscountDto? = null,
