@@ -67,9 +67,8 @@ internal fun RouteScope.StorefrontRoute() {
   LaunchedEffect(cfg?.zones) { if (cfg != null && tab !in StorefrontModel.tabs(cfg)) tab = StorefrontModel.STATUS }
   val settings = cfg?.settings
   val tz = settings?.timezone ?: "Asia/Kabul"
-  val storefrontUrl = settings?.takeIf { it.enabled && it.slug.isNotBlank() }?.let {
-    ir.vil3ntec.tohid.core.config.AppConfig.baseUrl(context).trimEnd('/') + "/store/" +
-      ir.vil3ntec.tohid.core.nav.RoutePaths.encode(it.slug)
+  val storefrontUrl = settings?.takeIf { it.enabled }?.let {
+    ir.vil3ntec.tohid.print.ReceiptStoreQr.storefrontUrl(context, it.slug)
   }
   var showStoreQr by remember { mutableStateOf(false) }
 

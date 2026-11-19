@@ -1,6 +1,8 @@
 package ir.vil3ntec.tohid.print
 
 import android.content.Context
+import ir.vil3ntec.tohid.core.config.AppConfig
+import ir.vil3ntec.tohid.core.nav.RoutePaths
 import ir.vil3ntec.tohid.core.marketing.CampaignLinks
 
 /**
@@ -18,6 +20,13 @@ object ReceiptStoreQr {
   /** نشانیِ برگزیده، یا null (خاموش یا نشانیِ نادرست) */
   fun url(context: Context): String? =
     runCatching { prefs(context).getString(KEY, "").orEmpty() }.getOrDefault("").takeIf { it.isNotBlank() && CampaignLinks.receiptUrlOk(it) }
+
+  fun storefrontUrl(context: Context, slug: String): String? {
+    if (slug.isBlank()) return null
+    val origin = AppConfig.baseUrl(context).trimEnd('/')
+    if (!origin.startsWith("https://") && !origin.startsWith("http://")) return null
+    return "$origin/store/${RoutePaths.encode(slug)}"
+  }
 
   /** null ⇒ خاموش */
   fun set(context: Context, url: String?) {
