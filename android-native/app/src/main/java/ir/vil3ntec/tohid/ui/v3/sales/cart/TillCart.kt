@@ -80,9 +80,9 @@ internal fun CartDockPreview(model: CartSummary.Model, modifier: Modifier = Modi
   BoxWithConstraints(modifier, contentAlignment = Alignment.CenterStart) {
     val photoSpace = maxWidth - if (PhoneSaleText.amount(model.total).length > 10) 24.dp else 0.dp
     val photos = when {
-      photoSpace >= 172.dp -> 3
-      photoSpace >= 147.dp -> 2
-      photoSpace >= 120.dp -> 1
+      photoSpace >= 155.dp -> 3
+      photoSpace >= 134.dp -> 2
+      photoSpace >= 113.dp -> 1
       else -> 0
     }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
