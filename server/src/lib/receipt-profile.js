@@ -24,12 +24,12 @@ const KEY = 'receipt';
 const FLAG_KEY = 'shop.receipt_v2';
 const LOGO_MAX_BYTES = 200 * 1024;
 const LOGO_MAX_SIDE = 1024;
-const TEXT_MAX = Object.freeze({ name: 80, address: 160, phone: 32, footer: 160 });
+const TEXT_MAX = Object.freeze({ name: 80, sellerName: 80, address: 160, phone: 32, footer: 160 });
 const LOGO_MODES = Object.freeze(['auto', 'line', 'photo']);
 const DIGITS = Object.freeze(['latin', 'fa']);
 const SYMBOLS = Object.freeze(['word', 'sign']);
 const DEFAULTS = Object.freeze({
-  name: '', address: '', phone: '', footer: '', qr: true,
+  name: '', sellerName: '', address: '', phone: '', footer: '', qr: true,
   logoMode: 'auto', digits: 'latin', symbol: 'word', logo: null,
 });
 
@@ -54,7 +54,7 @@ function view(raw) {
   const text = (k) => (typeof r[k] === 'string' ? r[k].slice(0, TEXT_MAX[k]) : DEFAULTS[k]);
   const pick = (k, allowed) => (allowed.includes(r[k]) ? r[k] : DEFAULTS[k]);
   return {
-    name: text('name'), address: text('address'), phone: text('phone'), footer: text('footer'),
+    name: text('name'), sellerName: text('sellerName'), address: text('address'), phone: text('phone'), footer: text('footer'),
     qr: r.qr !== false,
     logoMode: pick('logoMode', LOGO_MODES), digits: pick('digits', DIGITS), symbol: pick('symbol', SYMBOLS),
     logo: logoView(r.logo),

@@ -249,7 +249,7 @@ function render({ sale, items, products, profile, tz, stamp = false }) {
     no: T.displayDigits(invoiceNo(sale), digits),
     date: iso ? C.formatSolarNumeric(iso, digits) : '',
     time: T.displayDigits(local.time, digits),
-    cashier: profile.name.includes('@') ? '' : profile.name,
+    cashier: [profile.sellerName, profile.name].find((name) => typeof name === 'string' && name.trim() && !name.includes('@')) || '',
     kind: kindOf(sale),
     cancelled: sale.status === 'cancelled',
     items: lines,
@@ -288,7 +288,8 @@ async function receiptOf(tag, tok) {
   const [products, tz, stamp] = await Promise.all([
     productsOf(store, shopId, ids), timezoneOf(shopId), require('./orders').flagOf(shopId, PROMO_FLAG),
   ]);
-  const view = render({ sale, items, products, profile: { ...profile, name: profile.name || shop.name || '' }, tz, stamp });
+  const name = [profile.name, shop.name].find((value) => typeof value === 'string' && value.trim() && !value.includes('@')) || '';
+  const view = render({ sale, items, products, profile: { ...profile, name }, tz, stamp });
   const logo = profile.logo ? await profiles.blob(profile.logo.hash) : null;
   view.shop.logo = logo ? `data:${logo.mime};base64,${logo.data.toString('base64')}` : null;
   return view;

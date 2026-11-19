@@ -79,6 +79,7 @@ fun InvoiceScreen(
   storeName: String,
   returnsV2: Boolean,
   actions: InvoiceActions,
+  sellerName: String = "",
   editShopName: (() -> Unit)? = null,
   onlineUrl: String? = null,
   openOnline: (() -> Unit)? = null,
@@ -118,7 +119,7 @@ fun InvoiceScreen(
       editShopName?.let { edit ->
         V3ListRow(StrReceipt.chooseShopName, onClick = edit)
       }
-      ReceiptCard(d, sale, storeName, onDebtor = actions.debtor)
+      ReceiptCard(d, sale, storeName, onDebtor = actions.debtor, sellerName = sellerName)
       if (onlineUrl != null && openOnline != null) {
         V3Section(StrReceipt.viewOnline) {
           Box(Modifier.fillMaxWidth().padding(12.dp), contentAlignment = Alignment.Center) {

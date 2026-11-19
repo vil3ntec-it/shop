@@ -80,6 +80,9 @@ object Receipts {
   fun shopName(context: Context): String =
     ReceiptProfileStore.current(context).name.trim().ifBlank { localName(context).trim() }.takeUnless { '@' in it }.orEmpty()
 
+  fun sellerName(context: Context): String =
+    ReceiptProfileStore.current(context).sellerName.trim().takeUnless { '@' in it }.orEmpty().ifBlank { shopName(context) }
+
   fun input(
     context: Context,
     d: ShopData,
@@ -113,7 +116,7 @@ object Receipts {
       invoiceNo = sale.invoiceLabel().orEmpty(),
       dateIso = sale.date,
       time = time,
-      cashier = shopName(context),
+      cashier = sellerName(context),
       //  PAY (v3 A4): برچسب و ردیف‌های پرداخت همان `PayFlow` ِ تاریخچه و جزئیات
       kind = kindOf(sale, labels),
       cancelled = sale.status == "cancelled",

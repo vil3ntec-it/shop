@@ -47,6 +47,7 @@ fun ReceiptCard(
   storeName: String,
   modifier: Modifier = Modifier,
   onDebtor: ((String) -> Unit)? = null,
+  sellerName: String = "",
 ) {
   val c = PhoneV3.colors
   val state = ReceiptModel.state(sale)
@@ -66,6 +67,10 @@ fun ReceiptCard(
       )
       Spacer(Modifier.height(2.dp))
       Text(ReceiptModel.subtitle(sale), style = V3Type.footnote, color = c.inkMuted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+      if (sellerName.isNotBlank()) {
+        Text("${ir.vil3ntec.tohid.core.i18n.StrReceipt.cashier} · $sellerName",
+          style = V3Type.footnote, color = c.inkMuted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+      }
       Spacer(Modifier.height(10.dp))
       V3StatusPill(statusOf(state), ReceiptModel.stateLabel(sale), Modifier.align(Alignment.CenterHorizontally))
     }

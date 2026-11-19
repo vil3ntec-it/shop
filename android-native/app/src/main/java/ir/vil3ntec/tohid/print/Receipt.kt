@@ -167,6 +167,8 @@ object Receipt {
       else -> ir.vil3ntec.tohid.data.PayFlow.payLabel(sale, cash = Str.cashSale)
     }
     line("${LocaleText.digitsIn(ir.vil3ntec.tohid.displayDate(sale.date), digits)} — ${LocaleText.digitsIn(time, digits)}   ($kind)", small, Layout.Alignment.ALIGN_CENTER)
+    val seller = Receipts.sellerName(context)
+    if (seller.isNotBlank() && seller != storeName) row(ir.vil3ntec.tohid.core.i18n.StrReceipt.cashier, seller, small)
     //  LOC-01: تاریخِ قمری فقط با تنظیمِ دکان (پیش‌فرض خاموش)
     LocaleChoice.lunarOn(sale.date)?.let { line(StrSale.hijriDate(it), small, Layout.Alignment.ALIGN_CENTER) }
 

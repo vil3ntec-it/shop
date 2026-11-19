@@ -10,6 +10,8 @@ package ir.vil3ntec.tohid.core.i18n
  */
 @Suppress("unused")
 object StrReceipt {
+  val sellerName: String get() = t("نام فروشنده برای فاکتور", "Seller name on invoices", "په بل کې د پلورونکي نوم")
+  val sellerNeedsInternet: String get() = t("برای ذخیرهٔ نام فروشنده به اینترنت وصل شوید", "Connect to save the seller name", "د پلورونکي نوم د ساتلو لپاره انټرنېټ سره وصل شئ")
   val chooseShopName: String get() = t("نام دکان را انتخاب کنید", "Choose a shop name", "د دوکان نوم وټاکئ")
   val shopQr: String get() = t("QR دکان", "Shop QR", "د دوکان QR")
   val viewOnline: String get() = t("دیدن فاکتور آنلاین", "View invoice online", "بل آنلاین وګورئ")

@@ -105,6 +105,7 @@ fun RouteScope.InvoiceRoute() {
     d = data,
     sale = sale,
     storeName = shopName,
+    sellerName = Receipts.sellerName(context),
     returnsV2 = v2,
     actions = InvoiceActions(
       print = { nav.open(SalesPaths.print(sale.id)) },

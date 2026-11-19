@@ -91,6 +91,9 @@ test('QR ِ فروشِ همگام‌شده همان فاکتورِ کاغذی ر
   assert.equal(x.time, '14:35');
   assert.equal(x.cashier, x.shop.name);
   assert.doesNotMatch(JSON.stringify(x), /account-login@example\.test/);
+  assert.equal((await h.put('/api/shop/receipt-profile', { sellerName: 'فروشندهٔ نمونه' }, { token: a.token })).status, 200);
+  assert.equal((await read(a.tag, token)).body.receipt.cashier, 'فروشندهٔ نمونه');
+
   assert.equal(x.kind, 'نقدی');
   assert.equal(x.cancelled, false);
   assert.deepEqual(x.items, [
