@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.data
 import android.content.Context
 import ir.vil3ntec.tohid.core.i18n.StrLedger
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -112,16 +113,19 @@ class CartStore(context: Context) : HeldCart {
 
   private fun persist() {
     val draft = SaleDraft.of(key, _lines.value, _debtorId.value, System.currentTimeMillis(), _coupons.value, _note.value, _priceList.value, _page.value)
-    write(file, draft) {
-      //  پیش‌نویس به فایل رسید ⇒ نسخهٔ کهنه دیگر لازم نیست و نباید روزی دوباره زنده شود
-      if (!training && (prefs.contains(LEGACY_KEY) || prefs.contains(LEGACY_DEBTOR_KEY))) {
-        prefs.edit().remove(LEGACY_KEY).remove(LEGACY_DEBTOR_KEY).apply()
-      }
+    write(file, draft, ::forgetLegacy)
+  }
+
+  private fun forgetLegacy() {
+    if (!training && (prefs.contains(LEGACY_KEY) || prefs.contains(LEGACY_DEBTOR_KEY))) {
+      prefs.edit().remove(LEGACY_KEY).remove(LEGACY_DEBTOR_KEY).apply()
     }
   }
 
   /** POS-12: جابه‌جاییِ فاکتور در جریان است ⇒ سبد دست نمی‌خورد (`HeldCart.freeze`) */
-  @Volatile private var frozen = false
+  @Volatile private var heldFrozen = false
+  @Volatile private var discardingRecovery = false
+  private val frozen: Boolean get() = heldFrozen || discardingRecovery
 
   /**
    *  RPT-09 — ردیف‌هایی که کاربر از همین فاکتورِ باز حذف کرد، با کلیدِ همان فاکتور: [set] بی آن ردیف
@@ -229,6 +233,11 @@ class CartStore(context: Context) : HeldCart {
   }
 
   private fun wipe() {
+    resetCart()
+    persist()
+  }
+
+  private fun resetCart() {
     key = null
     _lines.value = emptyList()
     _debtorId.value = null
@@ -237,7 +246,6 @@ class CartStore(context: Context) : HeldCart {
     _priceList.value = null
     _page.value = null
     _print.value = null
-    persist()
   }
 
   /** کلیدِ یکتای فاکتورِ همین سبد — شناسهٔ فروشی که از آن ثبت می‌شود */
@@ -275,10 +283,10 @@ class CartStore(context: Context) : HeldCart {
     return out
   }
 
-  /** پاسخِ پرسشِ بازیابی: `keep` = ادامه با همین ردیف‌ها؛ `null` = دور انداختن */
-  fun resolveRecovery(keep: SaleDraft?) {
+  /** ادامهٔ پیش‌نویس پس از پاسخ به پرسشِ بازیابی. */
+  fun resolveRecovery(keep: SaleDraft) {
+    if (frozen || _recovered.value == null) return
     _recovered.value = null
-    if (keep == null) { wipe(); return }
     key = keep.key ?: key
     _lines.value = keep.cart()
     _debtorId.value = keep.debtorId
@@ -289,11 +297,39 @@ class CartStore(context: Context) : HeldCart {
     persist()
   }
 
+  /** برگهٔ بازیابی تا جایگزینی اتمی فایل با سبد خالی باز می‌ماند. */
+  suspend fun discardRecovery(expected: SaleDraft): Boolean {
+    if (frozen || posting.value || _recovered.value != expected) return false
+    if (key != expected.key && _lines.value.isNotEmpty()) return false
+    discardingRecovery = true
+    return withContext(NonCancellable) {
+      try {
+        val empty = SaleDraft.of(null, emptyList(), null, System.currentTimeMillis())
+        val saved = withContext(Dispatchers.IO) {
+          runCatching {
+            writer.submit(Callable {
+              DiskWrite.text(file, SaleDraftCodec.encode(empty))
+              runCatching(::forgetLegacy)
+              true
+            }).get()
+          }.getOrDefault(false)
+        }
+        if (saved) {
+          resetCart()
+          _recovered.value = null
+        }
+        saved
+      } finally {
+        discardingRecovery = false
+      }
+    }
+  }
+
   /* ── POS-12: فاکتورهای نگه‌داشته (`HeldInvoiceStore`) ─────────────────── */
 
-  override val busy: Boolean get() = posting.value
+  override val busy: Boolean get() = posting.value || discardingRecovery
 
-  override fun freeze(on: Boolean) { frozen = on }
+  override fun freeze(on: Boolean) { heldFrozen = on }
 
   override val recovering: Boolean get() = _recovered.value != null
 
@@ -306,6 +342,7 @@ class CartStore(context: Context) : HeldCart {
    *  فاکتوری را گم کند.
    */
   override suspend fun replace(draft: SaleDraft?): Boolean {
+    if (discardingRecovery) return false
     val lines = draft?.cart().orEmpty()
     key = if (lines.isEmpty()) null else draft?.key ?: newKey()
     //  پیش از ردیف‌ها: صندوق سبدِ تازه را با لیستِ همان فاکتور قیمت می‌گذارد، نه با لیستِ فاکتورِ پیشین
@@ -332,6 +369,8 @@ class CartStore(context: Context) : HeldCart {
    * بی‌نام‌ونشان در سبد می‌ماند که نه قیمت دارد نه می‌شود حذفش کرد.
    */
   fun prune(d: ShopData) {
+    //  پیش از پاسخ، پالایشِ سبد با SaleDraftRules.decide است.
+    if (recovering) return
     //  سبدی که همین حالا فروش شده (کلیدش در دفتر هست) دوباره پیشنهاد نمی‌شود
     //  RPT-09: هیچ‌کدام کارِ کاربر نیست ⇒ «حذفِ ردیف» شمرده نمی‌شود
     if (SaleDraftRules.posted(d, key)) { drop(byUser = false); return }
