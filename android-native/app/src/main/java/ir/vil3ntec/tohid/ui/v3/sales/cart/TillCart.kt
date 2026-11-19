@@ -29,6 +29,10 @@ import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -152,6 +156,7 @@ private fun TillMoreButton(menu: TillMenu, onMore: () -> Unit) {
 @Composable
 internal fun TillCartRow(row: CartSummary.Row, onMinus: () -> Unit, onPlus: () -> Unit, onDetails: () -> Unit) {
   val c = PhoneV3.colors
+  var editing by rememberSaveable(row.id) { mutableStateOf(false) }
   Row(
     Modifier.fillMaxWidth()
       .clip(RoundedCornerShape(12.dp))
@@ -162,6 +167,9 @@ internal fun TillCartRow(row: CartSummary.Row, onMinus: () -> Unit, onPlus: () -
     horizontalArrangement = Arrangement.spacedBy(8.dp),
   ) {
     V3ProductThumb(row.id, row.name, size = 40.dp, shape = CircleShape)
+    Box(Modifier.heightIn(min = 48.dp).clickable(onClickLabel = StrSale.typeQtyPrice) { editing = !editing }.padding(horizontal = 4.dp), contentAlignment = Alignment.Center) {
+      Text(qty(row.quantity) + " ×", style = V3Type.footnote, color = c.ink)
+    }
     Column(Modifier.weight(1f)) {
       Text(row.name, style = V3Type.body.copy(fontWeight = FontWeight.SemiBold), color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
       val unit = if (row.unit.isNotBlank()) " / ${row.unit}" else ""
@@ -173,7 +181,7 @@ internal fun TillCartRow(row: CartSummary.Row, onMinus: () -> Unit, onPlus: () -
         PhoneSaleText.amount(row.lineTotal), style = V3Type.subhead.copy(fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum"),
         color = c.ink, maxLines = 1,
       )
-      TillStepper(row, onMinus, onPlus, onDetails)
+      if (editing) TillStepper(row, onMinus, onPlus, onDetails)
     }
   }
 }

@@ -192,8 +192,8 @@ fun SaleScreen(
           till = true,
         )
       },
-      sheet = { handle ->
-        TillCartHeader(rows.size, tillMenu, onMore = { more = true }, modifier = handle)
+      sheet = {
+        TillCartHeader(rows.size, tillMenu, onMore = { more = true })
         heldStrip?.let { strip -> Box(Modifier.fillMaxWidth().padding(bottom = 8.dp)) { strip() } }
         val debtor = debtorId?.let { id -> d.debtors.find { it.id == id } }
         val off = CartSummary.manualDiscount(cart, d.products)

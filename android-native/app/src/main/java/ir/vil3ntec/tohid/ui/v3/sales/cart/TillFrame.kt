@@ -5,9 +5,16 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.runtime.CompositionLocalProvider
+import ir.vil3ntec.tohid.ui.theme.LocalShopColors
+import ir.vil3ntec.tohid.ui.theme.ShopTheme
+import ir.vil3ntec.tohid.ui.theme.shopColors
+import kotlin.math.abs
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -47,8 +54,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -72,7 +77,7 @@ import kotlinx.coroutines.launch
 
 /*
  *  نوارِ سبد پایین صندوق می‌ماند. برگه در همان صفحه باز می‌شود تا بارکدخوان و میان‌برها همچنان کار کنند.
- *  کشیدنِ دستگیره به پایین، زدنِ پرده یا برگشت برگه را می‌بندد. کاهش حرکت، انیمیشن را کنار می‌گذارد.
+ *  کشیدنِ صفحه به پایین، زدنِ پرده یا برگشت برگه را می‌بندد. کاهش حرکت، انیمیشن را کنار می‌گذارد.
  */
 
 /** اندازه‌ها و نشان‌های آزمونِ صندوقِ گوشی */
@@ -83,7 +88,6 @@ object TillSpec {
   /** بالای برگهٔ سبد همیشه کمی از کالاها دیده بماند */
   val SHEET_TOP_GAP: Dp = 64.dp
   const val CATALOG_TAG = "till-catalog-pane"
-  const val SHEET_HANDLE_TAG = "till-sheet-handle"
   const val BAR_TAG = "till-bar"
   const val SHEET_TAG = "till-sheet"
   const val MORE_TAG = "till-more"
@@ -94,7 +98,7 @@ private val SHEET_SPRING = spring<Float>(dampingRatio = 0.9f, stiffness = 520f)
 
 /**
  *  @param catalog کالاها؛ `bottomGap` جای نوار زیرِ آخرین کالا
- *  @param sheet سبدِ باز؛ `dragHandle` برای سرِ سبد (کشیدن به پایین ⇐ بستن)
+ *  @param sheet سبدِ باز
  */
 @Composable
 fun TillFrame(
@@ -106,7 +110,7 @@ fun TillFrame(
   onPay: () -> Unit,
   onScan: () -> Unit,
   catalog: @Composable (bottomGap: Dp) -> Unit,
-  sheet: @Composable ColumnScope.(dragHandle: Modifier) -> Unit,
+  sheet: @Composable ColumnScope.() -> Unit,
 ) {
   val c = PhoneV3.colors
   val motion = Motion.enabled
@@ -140,78 +144,101 @@ fun TillFrame(
   LaunchedEffect(showing) { PhoneCartUi.sheetOpen.value = showing }
   BackHandler(enabled = showing, onBack = onClose)
 
-  BoxWithConstraints(Modifier.fillMaxSize().background(c.card)) {
+  val cartColors = remember {
+    val ivory = shopColors(ShopTheme.IVORY, dark = true)
+    val pay = ivory.button.primary.copy(bg = ivory.brandText, border = ivory.brandText, text = ivory.background)
+    ivory.copy(button = ivory.button.copy(primary = pay))
+  }
+  BoxWithConstraints(Modifier.fillMaxSize().background(cartColors.backgroundSubtle)) {
     val bottomGap = TillSpec.BAR_SPACE + navBottom
     val sheetHeight = (maxHeight - TillSpec.SHEET_TOP_GAP).coerceAtLeast(0.dp)
     val travel = with(density) { (sheetHeight - bottomGap).toPx() }.coerceAtLeast(1f)
     val catalogPeek = with(density) { 72.dp.toPx() }.coerceAtMost(travel * 0.22f)
-    val drag = rememberDraggableState { delta ->
-      scope.launch(start = CoroutineStart.UNDISPATCHED) {
-        progress.snapTo((progress.value - delta / travel).coerceIn(0f, 1f))
+    val openCart by rememberUpdatedState(onOpen)
+    val closeCart by rememberUpdatedState(onClose)
+    val swipe = Modifier.pointerInput(model.visible, showing, travel, motion) {
+      if (!model.visible) return@pointerInput
+      awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        val tracker = VelocityTracker()
+        tracker.addPosition(down.uptimeMillis, down.position)
+        val initial = progress.value
+        var claimed = false
+        try {
+          while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            val change = event.changes.singleOrNull() ?: break
+            if (change.id != down.id || change.isConsumed) break
+            val distance = change.position - down.position
+            tracker.addPosition(change.uptimeMillis, change.position)
+            if (!claimed) {
+              if (!change.pressed) break
+              if (distance.getDistance() <= maxOf(viewConfiguration.touchSlop, 24.dp.toPx())) continue
+              if (abs(distance.x) >= abs(distance.y) || (distance.y > 0) != showing) break
+              claimed = true
+            }
+            change.consume()
+            val fraction = (initial - distance.y / travel).coerceIn(0f, 1f)
+            scope.launch(start = CoroutineStart.UNDISPATCHED) { progress.snapTo(fraction) }
+            if (!change.pressed) {
+              val velocity = tracker.calculateVelocity().y / density.density
+              val expand = when {
+                abs(velocity) >= 550f -> velocity < 0f
+                showing -> fraction >= 0.7f
+                else -> fraction >= 0.26f
+              }
+              claimed = false
+              if (expand == showing) scope.launch { animate(showing) }
+              else if (expand) openCart() else closeCart()
+              break
+            }
+          }
+        } finally {
+          if (claimed) scope.launch { animate(showing) }
+        }
       }
     }
-    val grip = Modifier.draggable(
-      drag, Orientation.Vertical,
-      enabled = model.visible,
-      onDragStarted = { progress.stop() },
-      onDragStopped = { velocity ->
-        val keep = model.visible && when {
-          velocity < -900f -> true
-          velocity > 900f -> false
-          showing -> progress.value >= 0.62f
-          else -> progress.value >= 0.28f
-        }
-        when {
-          keep && !showing -> onOpen()
-          !keep && showing -> onClose()
-          else -> animate(keep)
-        }
-      },
-    )
 
-    val p = progress.value
-    val paneShape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
-    Box(
-      Modifier.fillMaxSize().padding(bottom = bottomGap)
-        .graphicsLayer { translationY = -p * travel }
-        .clip(paneShape).background(c.bg)
-        .testTag(TillSpec.CATALOG_TAG),
-    ) {
-      //  چند ردیف پایینِ فهرست از پشتِ لبهٔ بالاییِ سبد پیدا می‌مانند.
-      Box(Modifier.fillMaxSize().graphicsLayer { translationY = p * catalogPeek }) { catalog(8.dp) }
-    }
-    TillBar(
-      model, pulse, onOpen, onPay, onScan, navBottom,
-      Modifier.align(Alignment.BottomCenter).graphicsLayer { alpha = (1f - 4f * p).coerceIn(0f, 1f) }.then(grip),
-    )
-
-    if (p > 0.001f && sheetHeight > 0.dp) {
-      //  با ضربه روی بخش باقی‌ماندهٔ صفحه، سبد بسته می‌شود.
+    Box(Modifier.fillMaxSize().then(swipe)) {
+      val p = progress.value
+      val paneShape = RoundedCornerShape(bottomStart = PhoneV3.sheetRadius, bottomEnd = PhoneV3.sheetRadius)
       Box(
-        Modifier.fillMaxSize()
-          .background(c.black.copy(alpha = 0.1f * p))
-          .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = StrSale.closeCart, onClick = onClose)
-          .semantics { contentDescription = StrSale.closeCart },
-      )
-      Column(
-        Modifier
-          .align(Alignment.BottomCenter)
-          .widthIn(max = 640.dp)
-          .fillMaxWidth()
-          .height(sheetHeight)
-          .graphicsLayer { translationY = (1f - p) * travel }
-          .background(c.card)
-          .testTag(TillSpec.SHEET_TAG)
-          .padding(start = 20.dp, end = 20.dp, bottom = 16.dp + navBottom),
+        Modifier.fillMaxSize().padding(bottom = bottomGap)
+          .graphicsLayer { translationY = -p * travel }
+          .clip(paneShape).background(c.bg)
+          .testTag(TillSpec.CATALOG_TAG),
       ) {
-        //  دستگیره: کشیدنی؛ صفحه‌خوان آن را دکمهٔ «بستنِ سبد» می‌شنود
-        Box(Modifier.fillMaxWidth().then(grip).testTag(TillSpec.SHEET_HANDLE_TAG).padding(top = 10.dp, bottom = 4.dp), contentAlignment = Alignment.Center) {
+        //  چند ردیف پایینِ فهرست از پشتِ لبهٔ بالاییِ سبد پیدا می‌مانند.
+        Box(Modifier.fillMaxSize().graphicsLayer { translationY = p * catalogPeek }) { catalog(8.dp) }
+      }
+      CompositionLocalProvider(LocalShopColors provides cartColors) {
+        TillBar(
+          model, pulse, onOpen, onPay, onScan, navBottom,
+          Modifier.align(Alignment.BottomCenter).graphicsLayer { alpha = (1f - 4f * p).coerceIn(0f, 1f) },
+        )
+
+        if (p > 0.001f && sheetHeight > 0.dp) {
+          //  با ضربه روی بخش باقی‌ماندهٔ صفحه، سبد بسته می‌شود.
           Box(
-            Modifier.size(width = 34.dp, height = 4.dp).clip(CircleShape).background(c.inkMuted.copy(alpha = 0.45f))
-              .semantics { role = Role.Button; contentDescription = StrSale.closeCart; onClick(StrSale.closeCart) { onClose(); true } },
+            Modifier.fillMaxSize()
+              .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = StrSale.closeCart, onClick = onClose)
+              .semantics { contentDescription = StrSale.closeCart },
           )
+          Column(
+            Modifier
+              .align(Alignment.BottomCenter)
+              .widthIn(max = 640.dp)
+              .fillMaxWidth()
+              .height(sheetHeight)
+              .graphicsLayer { translationY = (1f - p) * travel }
+              .background(cartColors.backgroundSubtle)
+              .testTag(TillSpec.SHEET_TAG)
+              .padding(start = 20.dp, end = 20.dp, bottom = 16.dp + navBottom),
+          ) {
+            Spacer(Modifier.height(22.dp))
+            sheet()
+          }
         }
-        sheet(grip)
       }
     }
   }

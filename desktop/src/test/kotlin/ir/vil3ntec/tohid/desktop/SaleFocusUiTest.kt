@@ -49,8 +49,6 @@ import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.WarehouseEntry
 import ir.vil3ntec.tohid.ui.components.pos.PosNotesPrefs
 import ir.vil3ntec.tohid.ui.components.pos.PriceListPrefs
-import ir.vil3ntec.tohid.ui.theme.PhoneV3Dark
-import ir.vil3ntec.tohid.ui.theme.PhoneV3Light
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
 import ir.vil3ntec.tohid.ui.v3.nav.ShellFrame
@@ -158,13 +156,12 @@ class SaleFocusUiTest {
   }
 
   @Test
-  fun `کشیدن نوار به بالا صفحه فروش را همراه انگشت بالا می‌برد و دستگیره سبد آن را می‌بندد`() {
+  fun `کشیدن از وسط کالاها سبد را باز و کشیدن روی ردیف آن را می‌بندد`() {
     show(three)
     val catalog = hasTestTag(TillSpec.CATALOG_TAG)
-    val bar = hasTestTag(TillSpec.BAR_TAG)
     val openSheet = hasTestTag(TillSpec.SHEET_TAG)
     val closed = nodes(catalog).single().boundsInRoot.bottom
-    val start = nodes(bar).single().boundsInRoot.center
+    val start = nodes(catalog).single().boundsInRoot.center
     val rootHeight = rule.onRoot().fetchSemanticsNode().boundsInRoot.height
 
     rule.onRoot().performTouchInput {
@@ -176,13 +173,13 @@ class SaleFocusUiTest {
     assertTrue("سبد زیر صفحه در حال باز شدن است", has(openSheet))
 
     rule.onRoot().performTouchInput {
-      moveTo(start - Offset(0f, rootHeight * 0.53f))
+      moveTo(start - Offset(0f, rootHeight * 0.37f))
       up()
     }
     rule.mainClock.advanceTimeBy(1_500)
     rule.waitForIdle()
     assertTrue("سبد باز می‌ماند", has(hasText(StrSale.pay) and inSheet))
-    val grip = nodes(hasTestTag(TillSpec.SHEET_HANDLE_TAG)).single().boundsInRoot.center
+    val grip = nodes(hasTestTag(TillSpec.ROW_TAG)).first().boundsInRoot.center
     rule.onRoot().performTouchInput {
       swipe(grip, grip + Offset(0f, rootHeight * 0.52f), durationMillis = 390)
     }
@@ -194,21 +191,31 @@ class SaleFocusUiTest {
   }
 
   @Test
-  fun `روز — نوار و برگهٔ سبد سطحِ روشنِ کارت‌اند، نه تختهٔ سیاه`() = surfaces(dark = false)
+  fun emptyCatalogSwipeDoesNotRevealCart() {
+    show(emptyList())
+    rule.onRoot().performTouchInput {
+      swipe(center, center - Offset(0f, height * 0.35f), durationMillis = 300)
+    }
+    rule.waitForIdle()
+    assertFalse(has(hasTestTag(TillSpec.SHEET_TAG)))
+    assertTrue(cart.lines.value.isEmpty())
+  }
 
   @Test
-  fun `شب — نوار و برگهٔ سبد همان سطحِ برآمدهٔ تیرهٔ تم‌اند`() = surfaces(dark = true)
+  fun `نمای سبد روی زمینه تیره در تم روز`() = surfaces(dark = false)
+
+  @Test
+  fun `نمای سبد روی زمینه تیره در تم شب`() = surfaces(dark = true)
 
   private fun surfaces(dark: Boolean) {
     show(three, dark)
-    val want = if (dark) PhoneV3Dark.card else PhoneV3Light.card
+    val want = ir.vil3ntec.tohid.ui.theme.shopColors(ir.vil3ntec.tohid.ui.theme.ShopTheme.IVORY, true).backgroundSubtle
     assertClose("نوارِ سبد", want, pixelNearStart(TillSpec.BAR_TAG))
     click(openCart)
     rule.waitUntil(5_000) { has(hasTestTag(TillSpec.SHEET_TAG)) }
     val sheet = pixelNearStart(TillSpec.SHEET_TAG, fromTop = 40f)
     assertClose("برگهٔ سبد", want, sheet)
-    //  روز: هیچ سطحِ تیره زیرِ قلم‌ها نیست (پیش‌تر سبد روی `inverse` ِ تقریباً سیاه بود)
-    if (!dark) assertTrue("سطحِ برگه روشن است", luminance(sheet) > 0.8f)
+    assertTrue("سطح سبد تیره است", luminance(sheet) < 0.1f)
   }
 
   @Test
@@ -304,7 +311,7 @@ class SaleFocusUiTest {
       val s = src(rel)
       for (x in listOf("onBlack", "blackRaised", "colors.cart", "c.cart", "v.cart", "Color(0x")) assertFalse("$rel ⇐ $x", s.contains(x))
     }
-    assertTrue(frame.contains(".background(c.card)"))
+    assertTrue(frame.contains(".background(cartColors.backgroundSubtle)"))
   }
 
   /* ---------------- رنگ ---------------- */
