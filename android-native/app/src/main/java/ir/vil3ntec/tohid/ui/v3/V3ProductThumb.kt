@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -53,6 +54,7 @@ fun V3ProductThumb(
   size: Dp = 44.dp,
   version: Int = 0,
   force: Boolean = false,
+  shape: Shape = RoundedCornerShape(size * 0.27f),
 ) {
   val c = PhoneV3.colors
   val context = LocalContext.current
@@ -63,7 +65,6 @@ fun V3ProductThumb(
   LaunchedEffect(productId, version, synced, show) {
     bitmap = if (show) withContext(Dispatchers.IO) { runCatching { PhotoStore.load(context, productId) }.getOrNull() } else null
   }
-  val shape = RoundedCornerShape(size * 0.27f)
   Box(
     modifier.size(size).clip(shape).background(c.tile).border(1.dp, c.hairline, shape),
     contentAlignment = Alignment.Center,
