@@ -1,7 +1,5 @@
 package ir.vil3ntec.tohid.ui.v3.sales.cart
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.PostAdd
 import androidx.compose.runtime.Composable
@@ -26,7 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.core.i18n.StrSale
@@ -202,7 +198,7 @@ fun SaleScreen(
         val debtor = debtorId?.let { id -> d.debtors.find { it.id == id } }
         val off = CartSummary.manualDiscount(cart, d.products)
         LazyColumn(
-          Modifier.weight(1f, fill = false).fillMaxWidth(),
+          Modifier.weight(1f).fillMaxWidth(),
           verticalArrangement = Arrangement.spacedBy(8.dp),
           contentPadding = PaddingValues(bottom = 12.dp),
         ) {
@@ -224,10 +220,8 @@ fun SaleScreen(
             }
           }
         }
-        val c = PhoneV3.colors
-        val footer = RoundedCornerShape(22.dp)
-        Column(Modifier.fillMaxWidth().clip(footer).background(c.tile).border(1.dp, c.hairline, footer).padding(10.dp)) {
-          Box(Modifier.padding(horizontal = 5.dp)) { TillTotal(total, tillMenu) }
+        Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+          TillTotal(total, tillMenu)
           V3Button(StrSale.pay, actions.pay, Modifier.fillMaxWidth(), height = 52.dp, pill = true, haptic = true)
         }
       },

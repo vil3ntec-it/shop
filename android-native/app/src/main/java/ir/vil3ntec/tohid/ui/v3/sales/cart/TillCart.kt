@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.ShoppingBasket
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Person
@@ -80,7 +79,7 @@ internal fun CartDockPreview(model: CartSummary.Model, modifier: Modifier = Modi
   BoxWithConstraints(modifier, contentAlignment = Alignment.CenterStart) {
     val photoSpace = maxWidth - if (PhoneSaleText.amount(model.total).length > 10) 24.dp else 0.dp
     val photos = when {
-      photoSpace >= 155.dp -> 3
+      photoSpace >= 165.dp -> 3
       photoSpace >= 134.dp -> 2
       photoSpace >= 113.dp -> 1
       else -> 0
@@ -95,7 +94,7 @@ internal fun CartDockPreview(model: CartSummary.Model, modifier: Modifier = Modi
         )
       }
       if (photos > 0) {
-        Row(horizontalArrangement = Arrangement.spacedBy((-5).dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
           model.thumbs.take(photos).forEachIndexed { index, thumb ->
             key(index, thumb.id) { V3ProductThumb(thumb.id, thumb.initials, size = 27.dp, shape = CircleShape) }
           }
@@ -127,9 +126,6 @@ internal fun TillCartHeader(count: Int, menu: TillMenu, onMore: () -> Unit, modi
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(10.dp),
   ) {
-    Box(Modifier.size(42.dp).clip(CircleShape).background(c.tile), contentAlignment = Alignment.Center) {
-      Icon(Icons.Outlined.ShoppingBasket, null, tint = c.ink, modifier = Modifier.size(21.dp))
-    }
     Column(Modifier.weight(1f)) {
       Text(StrSale.cart, style = V3Type.title, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
       Text(StrSale.linesCount(plain(count)), style = V3Type.footnote, color = c.inkMuted, maxLines = 1)
@@ -149,39 +145,33 @@ private fun TillMoreButton(menu: TillMenu, onMore: () -> Unit) {
 }
 
 /**
- *  یک قلمِ سبد: عکس، نام و قیمت واحد در بالا، جمع ردیف و کنترل تعداد در پایین. زدن یا نگه
+ *  یک قلمِ سبد: عکس، نام و قیمت واحد در یک سمت، جمع ردیف و کنترل تعداد در سمت دیگر. زدن یا نگه
  *  داشتنِ ردیف و زدنِ مقدار ⇐ «تعداد و قیمتِ این ردیف» (`sale/line/{i}`).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun TillCartRow(row: CartSummary.Row, onMinus: () -> Unit, onPlus: () -> Unit, onDetails: () -> Unit) {
   val c = PhoneV3.colors
-  val shape = RoundedCornerShape(18.dp)
-  Column(
+  Row(
     Modifier.fillMaxWidth()
-      .clip(shape)
-      .background(c.tile)
+      .clip(RoundedCornerShape(12.dp))
       .combinedClickable(onClickLabel = StrSale.lineDetails, onLongClickLabel = StrSale.lineDetails, onLongClick = onDetails, onClick = onDetails)
       .testTag(TillSpec.ROW_TAG)
-      .padding(start = 10.dp, end = 10.dp, top = 10.dp, bottom = 6.dp),
+      .padding(vertical = 6.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
   ) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-      V3ProductThumb(row.id, row.name, size = 40.dp, shape = CircleShape)
-      Column(Modifier.weight(1f)) {
-        Text(row.name, style = V3Type.body.copy(fontWeight = FontWeight.SemiBold), color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        val unit = if (row.unit.isNotBlank()) " / ${row.unit}" else ""
-        val custom = if (row.custom && !row.free) " · ${StrSale.manualPriceTag}" else ""
-        Text(PhoneSaleText.amount(row.unitPrice) + unit + custom, style = V3Type.footnote, color = c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-      }
+    V3ProductThumb(row.id, row.name, size = 40.dp, shape = CircleShape)
+    Column(Modifier.weight(1f)) {
+      Text(row.name, style = V3Type.body.copy(fontWeight = FontWeight.SemiBold), color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+      val unit = if (row.unit.isNotBlank()) " / ${row.unit}" else ""
+      val custom = if (row.custom && !row.free) " · ${StrSale.manualPriceTag}" else ""
+      Text(PhoneSaleText.amount(row.unitPrice) + unit + custom, style = V3Type.footnote, color = c.inkMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
-    Row(
-      Modifier.fillMaxWidth().padding(start = 50.dp, top = 3.dp),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
       Text(
         PhoneSaleText.amount(row.lineTotal), style = V3Type.subhead.copy(fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum"),
-        color = c.ink, modifier = Modifier.weight(1f),
+        color = c.ink, maxLines = 1,
       )
       TillStepper(row, onMinus, onPlus, onDetails)
     }

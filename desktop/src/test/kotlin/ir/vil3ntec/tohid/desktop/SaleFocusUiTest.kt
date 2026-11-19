@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.desktop
 
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.platform.Configuration
@@ -24,6 +25,8 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.Str
@@ -152,6 +155,42 @@ class SaleFocusUiTest {
     assertEquals("sale", nav.current.substringBefore('?'))
     click(back)
     assertEquals("برگشت ⇒ خانه", "home", nav.current)
+  }
+
+  @Test
+  fun `کشیدن نوار به بالا صفحه فروش را همراه انگشت بالا می‌برد و دستگیره سبد آن را می‌بندد`() {
+    show(three)
+    val catalog = hasTestTag(TillSpec.CATALOG_TAG)
+    val bar = hasTestTag(TillSpec.BAR_TAG)
+    val openSheet = hasTestTag(TillSpec.SHEET_TAG)
+    val closed = nodes(catalog).single().boundsInRoot.bottom
+    val start = nodes(bar).single().boundsInRoot.center
+    val rootHeight = rule.onRoot().fetchSemanticsNode().boundsInRoot.height
+
+    rule.onRoot().performTouchInput {
+      down(start)
+      moveTo(start - Offset(0f, rootHeight * 0.1f))
+    }
+    rule.waitForIdle()
+    assertTrue("صفحه قبل از رها کردن انگشت بالا می‌رود", nodes(catalog).single().boundsInRoot.bottom < closed)
+    assertTrue("سبد زیر صفحه در حال باز شدن است", has(openSheet))
+
+    rule.onRoot().performTouchInput {
+      moveTo(start - Offset(0f, rootHeight * 0.53f))
+      up()
+    }
+    rule.mainClock.advanceTimeBy(1_500)
+    rule.waitForIdle()
+    assertTrue("سبد باز می‌ماند", has(hasText(StrSale.pay) and inSheet))
+    val grip = nodes(hasTestTag(TillSpec.SHEET_HANDLE_TAG)).single().boundsInRoot.center
+    rule.onRoot().performTouchInput {
+      swipe(grip, grip + Offset(0f, rootHeight * 0.52f), durationMillis = 390)
+    }
+    rule.mainClock.advanceTimeBy(1_500)
+    rule.waitForIdle()
+    assertFalse("کشیدن به پایین سبد را می‌بندد", has(openSheet))
+    assertEquals("صفحه فروش به جایش برمی‌گردد", closed, nodes(catalog).single().boundsInRoot.bottom, 1f)
+    assertEquals("کشیدن تعداد قلم را عوض نمی‌کند", three, cart.lines.value)
   }
 
   @Test
