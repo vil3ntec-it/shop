@@ -49,8 +49,6 @@ import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.WarehouseEntry
 import ir.vil3ntec.tohid.ui.components.pos.PosNotesPrefs
 import ir.vil3ntec.tohid.ui.components.pos.PriceListPrefs
-import ir.vil3ntec.tohid.ui.theme.PhoneV3Dark
-import ir.vil3ntec.tohid.ui.theme.PhoneV3Light
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
 import ir.vil3ntec.tohid.ui.v3.nav.ShellFrame
@@ -313,7 +311,7 @@ class SaleFocusUiTest {
       val s = src(rel)
       for (x in listOf("onBlack", "blackRaised", "colors.cart", "c.cart", "v.cart", "Color(0x")) assertFalse("$rel ⇐ $x", s.contains(x))
     }
-    assertTrue(frame.contains(".background(c.card)"))
+    assertTrue(frame.contains(".background(cartColors.backgroundSubtle)"))
   }
 
   /* ---------------- رنگ ---------------- */

@@ -77,7 +77,7 @@ import kotlinx.coroutines.launch
 
 /*
  *  نوارِ سبد پایین صندوق می‌ماند. برگه در همان صفحه باز می‌شود تا بارکدخوان و میان‌برها همچنان کار کنند.
- *  کشیدنِ دستگیره به پایین، زدنِ پرده یا برگشت برگه را می‌بندد. کاهش حرکت، انیمیشن را کنار می‌گذارد.
+ *  کشیدنِ صفحه به پایین، زدنِ پرده یا برگشت برگه را می‌بندد. کاهش حرکت، انیمیشن را کنار می‌گذارد.
  */
 
 /** اندازه‌ها و نشان‌های آزمونِ صندوقِ گوشی */
@@ -98,7 +98,7 @@ private val SHEET_SPRING = spring<Float>(dampingRatio = 0.9f, stiffness = 520f)
 
 /**
  *  @param catalog کالاها؛ `bottomGap` جای نوار زیرِ آخرین کالا
- *  @param sheet سبدِ باز؛ `dragHandle` برای سرِ سبد (کشیدن به پایین ⇐ بستن)
+ *  @param sheet سبدِ باز
  */
 @Composable
 fun TillFrame(
@@ -144,7 +144,11 @@ fun TillFrame(
   LaunchedEffect(showing) { PhoneCartUi.sheetOpen.value = showing }
   BackHandler(enabled = showing, onBack = onClose)
 
-  val cartColors = remember { shopColors(ShopTheme.IVORY, dark = true) }
+  val cartColors = remember {
+    val ivory = shopColors(ShopTheme.IVORY, dark = true)
+    val pay = ivory.button.primary.copy(bg = ivory.brandText, border = ivory.brandText, text = ivory.background)
+    ivory.copy(button = ivory.button.copy(primary = pay))
+  }
   BoxWithConstraints(Modifier.fillMaxSize().background(cartColors.backgroundSubtle)) {
     val bottomGap = TillSpec.BAR_SPACE + navBottom
     val sheetHeight = (maxHeight - TillSpec.SHEET_TOP_GAP).coerceAtLeast(0.dp)
@@ -169,7 +173,7 @@ fun TillFrame(
             tracker.addPosition(change.uptimeMillis, change.position)
             if (!claimed) {
               if (!change.pressed) break
-              if (distance.getDistance() <= viewConfiguration.touchSlop) continue
+              if (distance.getDistance() <= maxOf(viewConfiguration.touchSlop, 24.dp.toPx())) continue
               if (abs(distance.x) >= abs(distance.y) || (distance.y > 0) != showing) break
               claimed = true
             }
