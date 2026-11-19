@@ -21,6 +21,7 @@ object ApiEndpoints {
 
   /** تنظیماتِ باز سرور: کدام راهِ ورود روشن است، کمینهٔ نسخه، … */
   const val CONFIG = "/config"
+  const val PLANS = "/plans"
 
   /** گزارشِ خطای برنامه — با اجازهٔ کاربر (بندِ ۲۰.۸). توکن اختیاری است. */
   const val ERRORS = "/errors"

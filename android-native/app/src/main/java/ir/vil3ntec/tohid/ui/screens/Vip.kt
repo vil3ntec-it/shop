@@ -125,25 +125,6 @@ private data class Plan(
 }
 
 /**
- *  پلن‌های پیش‌فرض — فقط تا وقتی که سرور جواب بدهد.
- *
- *  ── چرا هنوز اینجا هستند ──────────────────────────────────────────
- *  برنامه باید آفلاین هم چیزی نشان بدهد؛ صفحهٔ خالیِ «قیمت‌ها خوانده
- *  نشد» بدتر از یک قیمتِ تقریبی است.
- *
- *  ── چرا دیگر تنها منبع نیستند ─────────────────────────────────────
- *  تا دیروز همین سه خط، تنها جای قیمت بودند. یعنی صاحب سامانه قیمت را
- *  در پنل عوض می‌کرد و روی گوشیِ هیچ‌کس چیزی تغییر نمی‌کرد — چون گوشی
- *  هرگز نمی‌پرسید. حالا اول از سرور خوانده می‌شود و این‌ها فقط
- *  جانشین‌اند.
- */
-private val FALLBACK_PLANS = listOf(
-  Plan("m1", "ماهانه", 500, days = 30),
-  Plan("m6", "۶ ماهه", 2500, badge = "پیشنهاد ما", days = 180),
-  Plan("y1", "۱ ساله", 4000, badge = "بیشترین صرفه", days = 365),
-)
-
-/**
  *  قفلِ قابلیت‌ها — روشن.
  *
  *  ── قاعده، از زبانِ صاحب مخزن ──────────────────────────────────────
@@ -310,18 +291,12 @@ fun VipScreen(onDismiss: () -> Unit) {
   val state = remember { SyncStore(context) }
   val signedIn = !state.accessToken.isNullOrBlank()
   val scope = rememberCoroutineScope()
-  /*
-   *  ── قیمت‌ها از سرور ───────────────────────────────────────────────
-   *  تا دیروز این فهرست در خودِ کد بود و هیچ‌وقت از سرور خوانده نمی‌شد.
-   *  یعنی عوض کردنِ قیمت در پنل مدیریت روی گوشیِ هیچ‌کس اثری نداشت، و
-   *  تخفیف اصلاً راهی برای رسیدن نداشت.
-   *
-   *  حالا اول از سرور، و اگر نرسید همان پیش‌فرض‌ها — پس آفلاین هم صفحه
-   *  خالی نمی‌ماند.
-   */
-  var plans by remember { mutableStateOf(FALLBACK_PLANS) }
+  var plans by remember { mutableStateOf(emptyList<Plan>()) }
   var currency by remember { mutableStateOf("؋") }
-  LaunchedEffect(Unit) {
+  var plansLoaded by remember { mutableStateOf(false) }
+  var plansError by remember { mutableStateOf<String?>(null) }
+  var planRequest by remember { mutableStateOf(0) }
+  LaunchedEffect(planRequest) {
     Backend.account(context).plans().onSuccess { dto ->
       val fresh = dto.plans
         .filter { it.active && it.days > 0 }
@@ -336,18 +311,19 @@ fun VipScreen(onDismiss: () -> Unit) {
             discountLabel = p.discount?.label.orEmpty(),
           )
         }
-      if (fresh.isNotEmpty()) plans = fresh
+      plans = fresh
       if (dto.currency.isNotBlank()) currency = dto.currency
-    }
+    }.onFailure { plansError = it.userMessage }
+    plansLoaded = true
   }
 
   // پیش‌فرض روی «پیشنهاد ما» است؛ کسی که تصمیم ندارد، همان را می‌گیرد
   var chosenPlan by rememberSaveable { mutableStateOf("") }
   //  اگر فهرست از سرور آمد و انتخابِ قبلی دیگر در آن نیست، به نشان‌دار
   //  برمی‌گردیم — وگرنه دکمهٔ خرید به پلنی اشاره می‌کرد که وجود ندارد
-  val picked = plans.find { it.title == chosenPlan }
+  val picked = plans.find { it.code == chosenPlan }
     ?: plans.find { it.badge.isNotBlank() }
-    ?: plans.first()
+    ?: plans.firstOrNull()
 
   //  کدِ اشتراک — پایینِ صفحه
   var codeOpen by rememberSaveable { mutableStateOf(false) }
@@ -467,27 +443,33 @@ fun VipScreen(onDismiss: () -> Unit) {
       )
       Spacer(Modifier.height(12.dp))
 
-      /*
-       *  هر سه مدت کنارِ هم، روی گوشی هم.
-       *
-       *  یک بار روی گوشی زیرِ هم گذاشتمشان چون سه کارت در عرضِ یک گوشی
-       *  یعنی هر کدام حدودِ صد نقطه؛ ولی زیرِ هم بودن، مقایسه را از بین
-       *  می‌برد: کاربر باید اسکرول می‌کرد تا قیمتِ دوم را کنارِ اولی
-       *  به‌یاد بیاورد. جایش خودِ کارت روی صفحهٔ باریک جمع‌وجور می‌شود —
-       *  فاصله‌های کمتر، قلمِ کوچک‌تر و «افغانی» زیرِ عدد نه کنارش.
-       */
-      Row(
-        Modifier.height(IntrinsicSize.Min),
-        horizontalArrangement = Arrangement.spacedBy(if (isTablet()) 10.dp else 7.dp),
-      ) {
-        plans.forEach { plan ->
-          PlanCard(
-            plan = plan,
-            selected = picked.title == plan.title,
-            onClick = { chosenPlan = plan.title },
-            modifier = Modifier.weight(1f).fillMaxHeight(),
-            stretch = true,
-          )
+      when {
+        !plansLoaded -> Text("در حال دریافت اشتراک‌ها…", color = colors.muted)
+        plansError != null -> {
+          Text("فهرست اشتراک‌ها دریافت نشد", color = colors.muted)
+          TextButton(onClick = { plansLoaded = false; plansError = null; planRequest++ }) {
+            Text("دوباره")
+          }
+        }
+        plans.isEmpty() -> Text("فعلاً اشتراکی برای خرید فعال نیست", color = colors.muted)
+        else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+          plans.chunked(3).forEach { row ->
+            Row(
+              Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+              horizontalArrangement = Arrangement.spacedBy(if (isTablet()) 10.dp else 7.dp),
+            ) {
+              row.forEach { plan ->
+                PlanCard(
+                  plan = plan,
+                  currency = currency,
+                  selected = picked?.code == plan.code,
+                  onClick = { chosenPlan = plan.code },
+                  modifier = Modifier.weight(1f).fillMaxHeight(),
+                  stretch = true,
+                )
+              }
+            }
+          }
         }
       }
 
@@ -538,7 +520,7 @@ fun VipScreen(onDismiss: () -> Unit) {
           textAlign = TextAlign.Center,
           modifier = Modifier.fillMaxWidth(),
         )
-      } else {
+      } else if (picked != null) {
       Spacer(Modifier.height(16.dp))
       BuyButton(
         text = "گرفتن اشتراک ${picked.title} — ${plain(picked.price)} $currency",
@@ -1178,6 +1160,7 @@ private fun TierCard(
 @Composable
 private fun PlanCard(
   plan: Plan,
+  currency: String,
   selected: Boolean,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
@@ -1289,7 +1272,7 @@ private fun PlanCard(
       // «افغانی» روی گوشی زیرِ عدد می‌رود نه کنارش: کنارِ هم بودنشان،
       // عرضی می‌خواهد که در یک‌سومِ صفحهٔ گوشی نیست
       Text(
-        "؋",
+        currency,
         style = MaterialTheme.typography.labelSmall,
         color = colors.muted,
         maxLines = 1,
@@ -1297,7 +1280,7 @@ private fun PlanCard(
       Spacer(Modifier.height(4.dp))
       Text(
         // روی گوشی «حدود» برداشته می‌شود؛ همان عدد را می‌گوید با جای کمتر
-        if (wide) "روزی حدود ${money(perDay)} ؋" else "روزی ${money(perDay)}",
+        if (wide) "روزی حدود ${money(perDay)} $currency" else "روزی ${money(perDay)}",
         style = MaterialTheme.typography.labelSmall,
         color = colors.muted2,
         textAlign = TextAlign.Center,

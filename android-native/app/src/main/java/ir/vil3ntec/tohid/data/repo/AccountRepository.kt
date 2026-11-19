@@ -68,7 +68,7 @@ class AccountRepository(private val api: ApiClient) {
    *  ۴۰۱ می‌گرفت. اینجا با توکن فرستاده می‌شود.
    */
   suspend fun plans(): ApiResult<PlansDto> =
-    result { ApiJson.decode<PlansDto>(api.get(ApiEndpoints.Me.PLANS)) }
+    result { ApiJson.decode<PlansDto>(api.getPublic(ApiEndpoints.PLANS)) }
 
   /** درخواستِ خرید — مدیر بعد از گرفتنِ پول فعالش می‌کند */
   suspend fun requestPurchase(plan: String, note: String = ""): ApiResult<Unit> = result {
