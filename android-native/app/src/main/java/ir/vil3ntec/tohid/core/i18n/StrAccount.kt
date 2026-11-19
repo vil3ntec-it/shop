@@ -383,6 +383,8 @@ object StrAccount {
   // «اشتراکِ من»
   val refreshFromServer: String get() = t("تازه کردن از سرور", "Refresh from server", "له سرور تازه کول")
   val reading: String get() = t("در حالِ خواندن…", "Loading…", "لوستل کېږي…")
+  val plansUnavailable: String get() = t("فهرست اشتراک‌ها دریافت نشد", "Could not load subscription plans", "د ګډون پلانونه ترلاسه نه شول")
+  val noPlansForSale: String get() = t("فعلاً اشتراکی برای خرید فعال نیست", "No subscription plans are currently for sale", "اوس د اخیستلو لپاره د ګډون پلان نشته")
   val plan: String get() = t("پلن", "Plan", "پلان")
   fun daysLeft(n: Any): String = t("${asIs(n)} روز مانده", "$n ${pl(n, "day", "days")} left", "$n ورځې پاتې")
   val permanent: String get() = t("دائمی ✓", "Permanent ✓", "تلپاتې ✓")

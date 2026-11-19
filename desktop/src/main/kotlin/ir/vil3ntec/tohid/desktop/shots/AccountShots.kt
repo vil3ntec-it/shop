@@ -207,9 +207,16 @@ private fun Subscription(days: Int, active: Boolean, color: String, progress: In
   )
 }
 
+internal val demoPlanOptions: List<PlansModel.Option>
+  get() = listOf(
+    PlansModel.Option("m1", ir.vil3ntec.tohid.core.i18n.StrAccount.planMonthly, 500, days = 30, months = 1),
+    PlansModel.Option("m6", ir.vil3ntec.tohid.core.i18n.StrAccount.planSixMonths, 2500, badge = ir.vil3ntec.tohid.core.i18n.StrAccount.badgeRecommended, days = 180, months = 6),
+    PlansModel.Option("y1", ir.vil3ntec.tohid.core.i18n.StrAccount.planYearly, 4000, badge = ir.vil3ntec.tohid.core.i18n.StrAccount.badgeBestValue, days = 365, months = 12),
+  )
+
 @Composable
 private fun Plans(signedIn: Boolean = true, license: License.State? = License.State.ACTIVE) {
-  val options = PlansModel.options(null)
+  val options = demoPlanOptions
   PlansContent(
     PlansUi(
       state = PlansModel.state(license, 12, System.currentTimeMillis() + 12 * DAY, "۶ ماهه", false, 0, false, 7, 7),

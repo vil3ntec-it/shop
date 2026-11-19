@@ -6,7 +6,8 @@
  * حتی با توکن معتبر خودش — نمی‌تواند به این مسیرها برسد.
  */
 const express = require('express');
-const { query, one, many, now } = require('../db');
+const { randomBytes } = require('node:crypto');
+const { query, one, many, newId, now, tx } = require('../db');
 const config = require('../config');
 const v = require('../lib/validate');
 const pw = require('../lib/password');
@@ -557,6 +558,47 @@ router.get('/plans', async (req, res) => {
     app: appOf(req),
     config: await plans.publicConfig(),
   });
+});
+
+router.post('/plans', requireSuperAdmin, async (req, res) => {
+  if (appOf(req) !== 'shop') throw badRequest('ساخت پلن تازه در بخش فروشگاه انجام می‌شود');
+  const input = req.body || {};
+  const title = v.text(input.title, { max: 60, field: 'عنوان پلن', required: true });
+  const amount = v.integer(input.amount, { min: 1, max: 120, field: 'مدت', def: null });
+  const unit = v.oneOf(input.unit, ['day', 'week', 'month', 'year'], { field: 'واحد' });
+  if (amount === null) throw badRequest('مدت پلن لازم است');
+  if (!Number.isInteger(input.price)) throw badRequest('قیمت پلن را به عدد صحیح بنویسید');
+  const price = v.integer(input.price, { min: 0, max: 1e7, field: 'قیمت' });
+  const maxDevices = v.integer(input.maxDevices, { min: 1, max: 100, field: 'بیشینهٔ دستگاه', def: 10 });
+  const badge = v.text(input.badge, { max: 30 });
+  const active = v.bool(input.active, true);
+  const idem = idempotency.fromRequest(req, `plan-create:shop:${req.admin.id}:${req.actor?.id || ''}`);
+  if (!idem) throw badRequest('کلید یکتایی لازم است', 'idempotency_key_required');
+
+  const out = await tx(async (client) => {
+    await idempotency.lock(client, idem);
+    const prior = await idempotency.find(idem, idempotency.viaClient(client));
+    if (prior) return { response: prior.response, replayed: true };
+
+    const code = `p-${randomBytes(8).toString('hex')}`;
+    const row = (await client.query(
+      `INSERT INTO plans (id, app, code, title, amount, unit, price_afn, max_devices, badge, active,
+                          sort_order, created_at, updated_at)
+       VALUES ($1,'shop',$2,$3,$4,$5,$6,$7,$8,$9,999,$10,$10) RETURNING *`,
+      [newId('plan'), code, title, amount, unit, price, maxDevices, badge, active, now()]
+    )).rows[0];
+    await require('../lib/discounts').recordPrice({ app: 'shop', plan: code, price, changedBy: req.admin.id }, client);
+    const logged = await audit.logIn(client, {
+      actorType: 'admin', userId: req.admin.id, action: 'admin.plan_created',
+      targetType: 'plan', targetId: `shop:${code}`, detail: { price, active },
+    });
+    const response = { plan: plans.shapePlan(row) };
+    await idempotency.save(client, idem, { resultId: code, response });
+    return { response, logged };
+  });
+  if (out.replayed) res.set('Idempotent-Replayed', 'true');
+  else await out.logged.afterCommit();
+  res.status(201).json(out.response);
 });
 
 router.patch('/plans/:code', requireSuperAdmin, async (req, res, next) => {

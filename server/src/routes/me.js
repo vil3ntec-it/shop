@@ -99,6 +99,7 @@ async function subscriptionHandler(req, res) {
 /** پلن‌ها و شماره‌ی واتساپ — برای صفحه‌ی اشتراک. */
 async function plansHandler(req, res) {
   const cfg = await plans.allConfig();
+  res.set('Cache-Control', 'no-store');
   res.json({
     plans: await plans.listPlans(),
     whatsapp: { number: cfg.whatsapp_number || '', message: cfg.whatsapp_message || '' },

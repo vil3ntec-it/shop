@@ -11,7 +11,7 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- *  کارت‌های بازشوندهٔ «اشتراک و قیمت‌ها» (`PlanCard`): صرفه‌جویی **از همان قیمت‌ها** (سرور یا پیش‌فرض) حساب می‌شود، نه
+ *  کارت‌های بازشوندهٔ «اشتراک و قیمت‌ها» (`PlanCard`): صرفه‌جویی از قیمت‌های سرور حساب می‌شود، نه
  *  عددِ نوشته؛ ماهِ تقویمی از `amount`/`unit` ِ سرور؛ و فقط یک کارت در هر لحظه باز است.
  */
 class PlansCardModelTest {
@@ -20,8 +20,14 @@ class PlansCardModelTest {
 
   private fun dto(vararg p: PlanDto) = PlansDto(plans = p.toList())
 
-  @Test fun savingComesFromTheFallbackPricesAgainstTheShortestPlan() {
-    val o = PlansModel.options(null)
+  private fun sampleOptions() = PlansModel.options(dto(
+    PlanDto(code = "m1", price = 500, amount = 1, unit = "month", days = 30),
+    PlanDto(code = "m6", price = 2500, amount = 6, unit = "month", days = 180, badge = "پیشنهاد"),
+    PlanDto(code = "y1", price = 4000, amount = 1, unit = "year", days = 365),
+  ))
+
+  @Test fun savingComesFromServerPricesAgainstTheShortestPlan() {
+    val o = sampleOptions()
     assertNull("پلنِ پایه صرفه‌جویی ندارد", PlansModel.saving(o[0], o))
     //  ۶ × ۵۰۰ = ۳۰۰۰ ⇐ ۲۵۰۰: ۵۰۰ کمتر (٪۱۷)؛ ۱۲ × ۵۰۰ = ۶۰۰۰ ⇐ ۴۰۰۰: ۲۰۰۰ کمتر (٪۳۳)
     val six = PlansModel.saving(o[1], o)!!
@@ -58,7 +64,7 @@ class PlansCardModelTest {
   }
 
   @Test fun oneCardOpenAtATimeAndTheSelectedOneIsOpenFirst() {
-    val o = PlansModel.options(null)
+    val o = sampleOptions()
     val picked = PlansModel.pick(o, null)
     assertEquals("m6", PlansModel.openCard(o, picked, PlansModel.UNTOUCHED))
     assertEquals("y1", PlansModel.openCard(o, picked, "y1"))

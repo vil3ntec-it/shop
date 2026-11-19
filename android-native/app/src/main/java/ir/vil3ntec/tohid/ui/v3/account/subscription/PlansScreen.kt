@@ -43,6 +43,7 @@ import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrAccount
 import ir.vil3ntec.tohid.core.model.PlansDto
+import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.platform.StoreChannel
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.LicenseGuard
@@ -69,12 +70,14 @@ import kotlinx.coroutines.launch
 internal data class PlansUi(
   val state: PlansModel.StateCard,
   val options: List<PlansModel.Option>,
-  val picked: PlansModel.Option,
+  val picked: PlansModel.Option?,
   val currency: String,
   val signedIn: Boolean,
   val salesNumber: String,
   /** نسخهٔ کافه‌بازار: پرداختِ بیرون از بازار ممنوع ⇒ نه خرید با واتساپ */
   val storeBuild: Boolean = StoreChannel.storeManaged(BuildConfig.STORE),
+  val plansLoading: Boolean = false,
+  val plansError: String? = null,
 )
 
 internal class PlansActions(
@@ -83,6 +86,7 @@ internal class PlansActions(
   val buy: () -> Unit,
   val open: (String) -> Unit,
   val whatsapp: () -> Unit,
+  val retry: () -> Unit = {},
 )
 
 /**
@@ -98,13 +102,14 @@ internal fun PlansContent(ui: PlansUi, actions: PlansActions) {
   //  کارتِ باز (UI، نه داده): دست‌نخورده ⇒ همان پلنِ انتخاب‌شده؛ null ⇒ همه بسته
   var openState by rememberSaveable { mutableStateOf<String?>(PlansModel.UNTOUCHED) }
   val open = PlansModel.openCard(ui.options, ui.picked, openState)
+  val picked = ui.picked
   val savings = remember(ui.options) { ui.options.associate { it.code to PlansModel.saving(it, ui.options) } }
   V3Scaffold(
     title = Str.plans,
     onBack = actions.back,
     notice = null,
-    bottomBar = if (ui.storeBuild) null else ({
-      PlansBuyBar(PlansModel.cta(ui.picked, ui.currency), ui.picked.price, onBuy = actions.buy, summary = StrAccount.buyFootnote)
+    bottomBar = if (ui.storeBuild || picked == null) null else ({
+      PlansBuyBar(PlansModel.cta(picked, ui.currency), picked.price, onBuy = actions.buy, summary = StrAccount.buyFootnote)
     }),
   ) { pad ->
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
@@ -118,13 +123,20 @@ internal fun PlansContent(ui: PlansUi, actions: PlansActions) {
           color = c.ink,
           modifier = Modifier.padding(top = 20.dp, bottom = 10.dp, start = 4.dp).semantics { heading() },
         )
+        when {
+          ui.plansLoading -> V3Message(V3Tone.INFO, StrAccount.reading)
+          ui.plansError != null -> V3Message(
+            V3Tone.WARNING, StrAccount.plansUnavailable, body = ui.plansError, action = StrAccount.tryAgain, onAction = actions.retry,
+          )
+          ui.options.isEmpty() -> V3Message(V3Tone.INFO, StrAccount.noPlansForSale)
+        }
         ui.options.forEachIndexed { i, o ->
           key(o.code) {
             PlanCard(
               option = o,
               saving = savings[o.code],
               currency = ui.currency,
-              selected = o.code == ui.picked.code,
+              selected = o.code == picked?.code,
               open = o.code == open,
               onTap = {
                 actions.pick(o.code)
@@ -183,14 +195,19 @@ internal fun RouteScope.PlansRoute() {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val signedIn = remember(nav.current) { !SyncStore(context).accessToken.isNullOrBlank() }
-  var dto by remember { mutableStateOf<PlansDto?>(null) }
+  var result by remember { mutableStateOf<ApiResult<PlansDto>?>(null) }
+  var request by remember { mutableStateOf(0) }
   var chosen by rememberSaveable { mutableStateOf<String?>(null) }
-  LaunchedEffect(Unit) { Backend.account(context).plans().onSuccess { dto = it } }
+  LaunchedEffect(request) { result = Backend.account(context).plans() }
   LaunchedEffect(Unit) { SubscriptionPulse.refresh(context) }
   val status = remember { runCatching { LicenseGuard.status(context, SyncStore(context)) }.getOrNull() }
+  val dto = result?.valueOrNull()
   val options = PlansModel.options(dto)
   val picked = PlansModel.pick(options, chosen)
-  val currency = dto?.currency?.takeIf { it.isNotBlank() && I18n.lang.persian } ?: I18n.currencyWord(I18n.lang)
+  val configuredCurrency = dto?.currency.orEmpty()
+  val currency = if (configuredCurrency.isBlank() || configuredCurrency == "افغانی") {
+    I18n.currencyWord(I18n.lang)
+  } else configuredCurrency
   val salesNumber = dto?.whatsapp?.number.orEmpty()
 
   fun whatsapp(text: String?) {
@@ -207,17 +224,21 @@ internal fun RouteScope.PlansRoute() {
         trialDays = dto?.trialDays ?: 0, warnDays = SUBSCRIPTION_WARN_DAYS,
       ),
       options = options, picked = picked, currency = currency, signedIn = signedIn, salesNumber = salesNumber,
+      plansLoading = result == null, plansError = result?.errorMessage(),
     ),
     PlansActions(
       back = backOrNull,
       pick = { chosen = it },
       buy = {
-        //  ثبتِ درخواست بی‌صداست: اگر نگرفت، واتساپ همچنان باز می‌شود
-        if (signedIn) scope.launch { Backend.account(context).requestPurchase(picked.code, "از برنامهٔ اندروید — ${picked.title}") }
-        whatsapp("$BUY_MESSAGE (${picked.title})")
+        if (picked != null) {
+          //  ثبتِ درخواست بی‌صداست: اگر نگرفت، واتساپ همچنان باز می‌شود
+          if (signedIn) scope.launch { Backend.account(context).requestPurchase(picked.code, "از برنامهٔ اندروید — ${picked.title}") }
+          whatsapp("$BUY_MESSAGE (${picked.title})")
+        }
       },
       open = { nav.open(it) },
       whatsapp = { whatsapp(null) },
+      retry = { result = null; request++ },
     ),
   )
 }

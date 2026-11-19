@@ -8,13 +8,12 @@ import ir.vil3ntec.tohid.ui.v3.account.subscription.PlansModel
 import ir.vil3ntec.tohid.ui.v3.account.subscription.PlansUi
 
 /**
- *  «اشتراک و قیمت‌ها» برای گزارشِ کشیدن (`NewScreensRenderTest.plansCardsReport`): همان سه پلنِ پیش‌فرض (قیمت‌ها همان
- *  `PlansModel.fallback`، بی سرور)، دعوتِ ۱۴ روزه، واردشده؛ [chosen] = پلنِ انتخاب‌شده و بازِ نخست (null ⇒ «پیشنهادِ ما»).
+ *  «اشتراک و قیمت‌ها» برای گزارشِ کشیدن، با دادهٔ نمونهٔ عکس‌ها و دعوتِ ۱۴ روزه.
  */
 internal object PlansDemo {
   @Composable
   fun Screen(chosen: String?) {
-    val options = PlansModel.options(null)
+    val options = demoPlanOptions
     PlansContent(
       PlansUi(
         state = PlansModel.state(null, 0, 0, null, false, 0, false, 14, 7),

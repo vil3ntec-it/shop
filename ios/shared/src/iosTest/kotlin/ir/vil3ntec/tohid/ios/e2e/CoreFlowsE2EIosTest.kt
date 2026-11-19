@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ios.e2e
 import android.content.IosContext
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.runSkikoComposeUiTest
@@ -12,6 +13,7 @@ import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.guide.WhatsNew
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrAuth
 import ir.vil3ntec.tohid.core.i18n.StrHero
@@ -45,6 +47,7 @@ import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.components.common.NavCatalog
 import ir.vil3ntec.tohid.ui.v3.modes.ModeState
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
+import ir.vil3ntec.tohid.ui.v3.V3DataRowSpec
 import ir.vil3ntec.tohid.ui.v3.products.QuickProductSpec
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.doubleOrNull
@@ -357,7 +360,8 @@ class CoreFlowsE2EIosTest {
         e.until("کاشی سفارشِ تازه را می‌شمارد", 60_000) { e.shown(Find.clickLabel(StrOrdersHub.tileFresh(1))) }
         e.shot("10a-home-orders")
         e.tap(tile, StrOrdersHub.tile)
-        val card = Find.button(StrOnline.orderTitle(order.orderNo))
+        val orderNumber = OnlineFmt.orderNo(order.orderNo)
+        val card = hasTestTag(V3DataRowSpec.ROW_TAG) and hasClickAction() and Find.text("$orderNumber · ", substring = true)
         e.waitFor(card, StrOnline.orderTitle(order.orderNo), 60_000)
         e.shot("10b-queue")
         e.tap(card, StrOnline.orderTitle(order.orderNo))

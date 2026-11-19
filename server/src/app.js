@@ -317,6 +317,7 @@ async function createApp({ runMigrations = true } = {}) {
         const message = cfg.whatsapp_message || '';
         const digits = String(number).replace(/[^0-9]/g, '').replace(/^0/, '93');
         const list = await plans.listPlans({ app });
+        res.set('Cache-Control', 'no-store');
         res.json({
           app,
           plans: list.map(p => ({

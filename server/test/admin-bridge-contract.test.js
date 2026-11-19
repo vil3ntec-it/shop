@@ -33,6 +33,50 @@ test.after(async () => { await h.stop(); });
 
 const periodEnd = (q, token) => h.get(`/api/admin/subscriptions/period-end?${new URLSearchParams(q)}`, { token });
 
+test('نرخ‌نامهٔ فروشگاه از قیمت و پلن‌های فعال ثبت‌شده در پنل می‌آید', async () => {
+  const token = await tok('bridge-malek');
+  const options = { token, headers: { 'Idempotency-Key': 'shop-plan-test-01' } };
+  const body = { title: 'دو هفته', amount: 2, unit: 'week', price: 275, maxDevices: 5 };
+  const route = '/api/admin/plans?app=shop';
+  const pumpBefore = (await h.get('/api/plans?app=pump')).body.plans;
+  assert.equal((await h.post(route, body)).status, 401);
+  assert.equal((await h.post(route, body, { ...options, token: await tok('bridge-admin') })).status, 403);
+  assert.equal((await h.post('/api/admin/plans?app=pump', body, options)).status, 400);
+  assert.equal((await h.post(route, { ...body, price: null }, options)).status, 400);
+
+  const created = await h.post(route, body, options);
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const { code } = created.body.plan;
+  const replay = await h.post(route, body, options);
+  assert.equal(replay.status, 201);
+  assert.equal(replay.headers.get('idempotent-replayed'), 'true');
+  assert.deepEqual(replay.body, created.body);
+  assert.equal((await h.post(route, { ...body, price: 999 }, options)).status, 409);
+
+  const active = await h.get('/api/plans');
+  assert.equal(active.headers.get('cache-control'), 'no-store');
+  assert.equal(active.body.plans.filter((p) => p.code === code).length, 1);
+  assert.ok(active.body.plans.length > 3);
+  const patch = (planCode, values) => h.api('PATCH', `/api/admin/plans/${planCode}?app=shop`, { body: values, token });
+  for (const old of active.body.plans.filter((p) => p.code !== code)) {
+    assert.equal((await patch(old.code, { active: false })).status, 200);
+  }
+  assert.equal((await patch(code, { price: 320 })).status, 200);
+  const publicPlans = (await h.get('/api/plans')).body.plans;
+  assert.deepEqual(publicPlans.map((p) => [p.code, p.price, p.days]), [[code, 320, 14]]);
+
+  const member = await h.newUser('خریدار پلن تازه');
+  const accountPlans = (await h.get('/api/me/plans', { token: member.accessToken })).body.plans;
+  assert.deepEqual(accountPlans.map((p) => [p.code, p.price]), [[code, 320]]);
+  const adminPlans = await h.get(route, { token });
+  assert.equal(adminPlans.body.plans.length, active.body.plans.length);
+  assert.equal((await patch(code, { active: false })).status, 200);
+  assert.deepEqual((await h.get('/api/plans')).body.plans, []);
+  assert.deepEqual((await h.get('/api/plans?app=pump')).body.plans, pumpBefore);
+  const history = (await h.get(`/api/admin/plans/${code}/price-history`, { token })).body.history;
+  assert.deepEqual(history.map((p) => [p.prevPrice, p.price]), [[275, 320], [null, 275]]);
+});
+
 /* ── S15 ───────────────────────────────────────────────────────────── */
 
 test('S15: یکمِ ماهِ کابل + یک ماه ⇒ یکمِ ماهِ بعدِ کابل (همان endOfPeriodIn)، نه ۲۹ ِ UTC ِ پنل', async () => {

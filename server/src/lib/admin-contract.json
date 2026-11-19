@@ -3,7 +3,7 @@
   "generator": "node tools/api-contract/generate.cjs (--check)",
   "source": "docs/api/routes.json",
   "superadmin": "فقط نگهبانِ نام‌دارِ requireSuperAdmin روی همان در؛ سنجشِ نقشِ درونِ گرداننده (و lib/admin-roles.js) این‌جا دیده نمی‌شود",
-  "routesHash": "9d979b537f3f9c49",
+  "routesHash": "0fd293cbe124d083",
   "routes": [
     {"method":"GET","path":"/api/admin/2fa","superadmin":false},
     {"method":"POST","path":"/api/admin/2fa/disable","superadmin":false},
@@ -147,6 +147,7 @@
     {"method":"POST","path":"/api/admin/payments/intents/:id/refund","superadmin":true},
     {"method":"POST","path":"/api/admin/payments/reconcile","superadmin":true},
     {"method":"GET","path":"/api/admin/plans","superadmin":false},
+    {"method":"POST","path":"/api/admin/plans","superadmin":true},
     {"method":"PATCH","path":"/api/admin/plans/:code","superadmin":true},
     {"method":"DELETE","path":"/api/admin/plans/:code/discount","superadmin":true},
     {"method":"PUT","path":"/api/admin/plans/:code/discount","superadmin":true},
