@@ -11,6 +11,19 @@ import org.junit.Test
  */
 class MoreLayoutTest {
 
+  @Test
+  fun `ردیف‌های آنلاین هنگام تغییر دسترسی در جای خود می‌مانند`() {
+    fun items(on: Boolean) = MoreLayout.groups(
+      true, on, 0, on, "1", storefrontOn = on, deliveryOn = on, keepOnlineEntries = true,
+    ).flatMap { it.items }
+    val off = items(false)
+    val on = items(true)
+    val online = setOf("orders", "storefront", "delivery", "chat")
+    assertEquals(on.map { it.id }, off.map { it.id })
+    assertEquals(online, off.filterNot { it.available }.map { it.id }.toSet())
+    assertTrue(on.all { it.available })
+  }
+
   private fun routes(g: List<MoreLayout.Group>) = g.flatMap { it.items }.map { it.route }.toSet()
 
   @Test

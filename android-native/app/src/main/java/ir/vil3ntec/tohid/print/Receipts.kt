@@ -77,6 +77,9 @@ object Receipts {
   fun localName(context: Context): String =
     context.getSharedPreferences("tohid", Context.MODE_PRIVATE).getString("store_name", "").orEmpty()
 
+  fun shopName(context: Context): String =
+    ReceiptProfileStore.current(context).name.trim().ifBlank { localName(context).trim() }.takeUnless { '@' in it }.orEmpty()
+
   fun input(
     context: Context,
     d: ShopData,
@@ -106,11 +109,11 @@ object Receipts {
     }
     val time = if (sale.createdAt > 0) SimpleDateFormat("HH:mm", Locale.US).format(Date(sale.createdAt)) else ""
     return ReceiptInput(
-      shop = ShopHeader(profile.name.ifBlank { fallbackName }, profile.address, profile.phone, profile.footer),
+      shop = ShopHeader(shopName(context).ifBlank { fallbackName.takeUnless { '@' in it }.orEmpty() }, profile.address, profile.phone, profile.footer),
       invoiceNo = sale.invoiceLabel().orEmpty(),
       dateIso = sale.date,
       time = time,
-      cashier = sale.seller,
+      cashier = shopName(context),
       //  PAY (v3 A4): برچسب و ردیف‌های پرداخت همان `PayFlow` ِ تاریخچه و جزئیات
       kind = kindOf(sale, labels),
       cancelled = sale.status == "cancelled",

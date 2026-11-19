@@ -32,8 +32,8 @@ internal fun HandoverQr(orderNo: Long, code: String, modifier: Modifier = Modifi
  *  بایت). ساخته نشد ⇒ هیچ (متن همیشه کنارش هست).
  */
 @Composable
-internal fun QrBox(text: String, modifier: Modifier = Modifier, side: Dp = 120.dp) {
-  val rows = remember(text) { runCatching { QrCode.encode(text) }.getOrNull() } ?: return
+internal fun QrBox(text: String, modifier: Modifier = Modifier, side: Dp = 120.dp, maxVersion: Int = QrCode.MAX_VERSION) {
+  val rows = remember(text, maxVersion) { runCatching { QrCode.encode(text, maxVersion) }.getOrNull() } ?: return
   QrMatrix(rows, "QR: $text", modifier, side)
 }
 

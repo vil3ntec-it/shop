@@ -28,6 +28,7 @@ object MoreLayout {
     val settingsGroup: String? = null,
     val icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     val hue: ir.vil3ntec.tohid.ui.v3.V3Hue? = null,
+    val available: Boolean = true,
   )
 
   data class Group(val title: String, val items: List<Item>)
@@ -66,11 +67,22 @@ object MoreLayout {
     deliveryOn: Boolean = false,
     /** پرچم‌های ماژولِ روشن (`ModuleFlags`) */
     flags: Set<String> = emptySet(),
+    keepOnlineEntries: Boolean = false,
   ): List<Group> {
     val access = access(canManage, ordersOn, chatOn, storefrontOn, deliveryOn, flags)
     val badges = buildMap { if (newOrders > 0) put("orders", ir.vil3ntec.tohid.core.i18n.StrCatalogPages.freshN(newOrders)) }
-    val fromModules = V3Modules.moreGroups(access).map { (g, entries) ->
-      val items = entries.map { e -> Item(e.id, e.label(), e.route, badges[e.id] ?: e.badge?.invoke(), icon = e.icon, hue = ir.vil3ntec.tohid.ui.v3.nav.V3Modules.hueOf(e)) }
+    val visible = if (keepOnlineEntries) access.copy(granted = access.granted + buildSet {
+      add(Need.ORDERS_LIVE)
+      add(Need.CHAT)
+      add(Need.DELIVERY)
+      if (canManage) add(Need.STOREFRONT)
+    }) else access
+    val fromModules = V3Modules.moreGroups(visible).map { (g, entries) ->
+      val items = entries.map { e ->
+        val available = access.allows(e.needs, null)
+        Item(e.id, e.label(), e.route, badges[e.id] ?: e.badge?.invoke(),
+          icon = e.icon, hue = V3Modules.hueOf(e), available = available)
+      }
       Group(g.title.text, if (g == MoreGroup.ACCOUNT) items + appItem(version) else items)
     }
     val withApp = if (fromModules.any { it.items.any { i -> i.route == APP } }) fromModules

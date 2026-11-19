@@ -108,7 +108,7 @@ object HwPages {
     val profile = printer.profile()
     if (ReceiptFlag.enabled(context)) return EscPos.document(saleMonoV2(context, d, sale, profile, copyMark), profile)
     val storeName = context.getSharedPreferences("tohid", Context.MODE_PRIVATE).getString("store_name", "") ?: ""
-    val bitmap = Receipt.render(context, d, sale, storeName, profile.paperDots, copyMark)
+    val bitmap = Receipt.render(context, d, sale, storeName, profile.paperDots, copyMark, qr = PrintJob.receiptQr(context, sale))
     val receipt = try { ThermalPrinter.toMono(bitmap, profile.paperDots) } finally { bitmap.recycle() }
     val logo = if (profile.logo) logoMono(context, profile.paperDots) else null
     val page = if (logo != null) stack(profile.paperDots, listOf(logo, receipt), gap = 12) else receipt
@@ -122,7 +122,7 @@ object HwPages {
   private fun saleMonoV2(
     context: Context, d: ShopData, sale: Sale, profile: ir.vil3ntec.tohid.core.hw.PrinterProfile, copyMark: String?,
   ): MonoImage {
-    val receipt = Receipts.mono(context, d, sale, profile.paperDots, copyMark)
+    val receipt = Receipts.mono(context, d, sale, profile.paperDots, copyMark, legacyQr = PrintJob.receiptQr(context, sale))
     val legacy = if (profile.logo && ReceiptProfileStore.current(context).logoHash == null) logoMono(context, profile.paperDots) else null
     return if (legacy != null) stack(profile.paperDots, listOf(legacy, receipt), gap = 12) else receipt
   }

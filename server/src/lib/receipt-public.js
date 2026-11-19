@@ -249,7 +249,7 @@ function render({ sale, items, products, profile, tz, stamp = false }) {
     no: T.displayDigits(invoiceNo(sale), digits),
     date: iso ? C.formatSolarNumeric(iso, digits) : '',
     time: T.displayDigits(local.time, digits),
-    cashier: typeof sale.seller === 'string' ? sale.seller.trim() : '',
+    cashier: profile.name.includes('@') ? '' : profile.name,
     kind: kindOf(sale),
     cancelled: sale.status === 'cancelled',
     items: lines,

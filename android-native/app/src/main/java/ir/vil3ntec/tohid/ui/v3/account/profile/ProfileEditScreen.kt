@@ -293,6 +293,7 @@ internal fun RouteScope.ProfileEditRoute() {
 
   fun save() {
     val clean = name.trim()
+    val shopChanged = shop.trim() != savedShop
     val wanted = claim.trim()
     val phoneOut = if (ProfileEditModel.phoneChanged(typedPhone, phone)) typedPhone.trim() else null
     val step = ProfileEditModel.step(clean, wanted + (phoneOut?.let { "#$it" } ?: ""), Backend.isReady(context), Backend.isOnline(context))
@@ -310,6 +311,10 @@ internal fun RouteScope.ProfileEditRoute() {
         busy = true
         scope.launch {
           val account = Backend.account(context)
+          if (shopChanged && !ir.vil3ntec.tohid.data.ShopRole.isStaff(context)) {
+            val error = ir.vil3ntec.tohid.data.ReceiptProfileStore.save(context, ir.vil3ntec.tohid.data.ReceiptProfileStore.Patch(name = shop.trim()))
+            if (error != null) toasts.show(error, V3Tone.WARNING)
+          }
           account.updateProfile(clean, phoneOut, wanted, emailCode)
             .onSuccess { done ->
               state.accountName = done.user.name
