@@ -463,7 +463,21 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             //  می‌رویم سراغِ لوکیشن و شرایط
             auth.registerVerify(destination, entered)
               .onSuccess { ticket = it.ticket; signupStep = "terms" }
-              .onFailure { fail(it) }
+              .onFailure { failure ->
+                if (failure is ApiFailure && failure.code == "already_registered") {
+                  cooldown.clear(destination)
+                  signupStep = ""
+                  codeSent = false
+                  code = ""
+                  ticket = ""
+                  resetting = false
+                  password = ""
+                  password2 = ""
+                  showPassword = false
+                  emailMode = "login"
+                }
+                fail(failure)
+              }
           } else {
             val done =
               if (resetting) auth.resetPassword(destination, entered, newPassword)
