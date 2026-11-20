@@ -1199,6 +1199,8 @@ if (axeSrc) {
   const vst = () => vp.evaluate(() => { const b = document.getElementById('ct-vc'); return b && !b.hidden ? b.getAttribute('data-st') : 'gone'; });
   const said = () => vp.textContent('#ct-vc-say');
   const record = async () => {
+    // ثبتِ پیام در سرور ممکن است پیش از بستنِ کادرِ بارگذاری در همین برگه باشد.
+    await vp.waitForFunction(() => !document.getElementById('ct-vc') || document.getElementById('ct-vc').hidden);
     await vp.click('#ct-vc-mic');
     await vp.waitForFunction(() => { const b = document.getElementById('ct-vc'); return b && !b.hidden && b.getAttribute('data-st') === 'rec'; }, null, { timeout: 15000 });
   };
