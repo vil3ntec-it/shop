@@ -241,27 +241,31 @@ const offMsg = await msgOf('پیامِ بی‌اینترنت');
 ok(await stOf(page, offMsg.id) === 'sent|رفت' && await stOf(page, hour.id) === 'read|خوانده شد',
   'پیامِ تازه‌تر از «خواندم» ِ دکان «رفت» می‌ماند؛ هر پیام از seq ِ خودش', `${await stOf(page, offMsg.id)} / ${await stOf(page, hour.id)}`);
 
-let drop = 1;
 const posted = [];
+let releaseResponse;
+const afterRead = new Promise((resolve) => { releaseResponse = resolve; });
 const postUrl = `**/api/store/${slug}/chat/conversations/${conv1.id}/messages`;
 await page.route(postUrl, async (route) => {
   if (route.request().method() !== 'POST') return route.fallback();
   posted.push(JSON.parse(route.request().postData() || '{}').clientId);
-  if (drop < 1) return route.fallback();
-  drop--;
-  await route.fetch();            //  سرور ثبت می‌کند…
-  return route.abort('failed');   //  …و جواب به صفحه نمی‌رسد
+  if (posted.length > 1) return route.fallback();
+  await route.fetch();
+  await afterRead;                 //  long-poll باید جلوتر از پاسخِ فرستادن برسد
+  return route.abort('failed');    //  پاسخِ دیر هم در شبکه گم می‌شود
 });
-await page.fill('#ct-text', 'جوابِ گم‌شده');
-await page.click('#ct-send');
-await page.waitForSelector('#ct-out .ct-q[data-st="waiting"] [data-q="retry"]', { timeout: 10000 });
-//  ⇐ تغییرِ عمدی: «زدنِ دوباره» پیش‌تر دوباره زدنِ «فرستادن» با همان متنِ کادر بود؛ متن حالا در حباب است ⇒ «دوباره» ِ همان حباب
-await page.click('#ct-out .ct-q [data-q="retry"]');
-await page.waitForFunction(() => /جوابِ گم‌شده/.test(document.getElementById('ct-list').textContent), null, { timeout: 15000 });
+try {
+  await page.fill('#ct-text', 'جوابِ گم‌شده');
+  await page.click('#ct-send');
+  await page.waitForFunction(() => /جوابِ گم‌شده/.test(document.getElementById('ct-list').textContent), null, { timeout: 15000 });
+  ok(await queued('جوابِ گم‌شده') === '' && await stored() === null,
+    'رسیدن پیام از long-poll پیش از پاسخ ارسال، حباب صف و دادهٔ ذخیره‌شده را پاک می‌کند');
+} finally {
+  releaseResponse();
+}
 await new Promise((r) => setTimeout(r, 1500));
 ok(await countFrom(conv1.id, 'جوابِ گم‌شده') === 1 && await bubbles('جوابِ گم‌شده') === 1 && await queued('جوابِ گم‌شده') === '' &&
-  posted.length === 2 && posted[0] === posted[1],
-'جوابِ گم‌شده و «دوباره» ِ حباب ⇒ همان clientId، یک پیام روی سرور و یک حباب', `${await countFrom(conv1.id, 'جوابِ گم‌شده')} / ${await bubbles('جوابِ گم‌شده')} / ${posted.length}`);
+  posted.length === 1 && Boolean(posted[0]),
+'گم‌شدن پاسخ پس از رسیدن پیام از long-poll، آن را دوباره به صف نمی‌برد', `${await countFrom(conv1.id, 'جوابِ گم‌شده')} / ${await bubbles('جوابِ گم‌شده')} / ${posted.length}`);
 await page.unroute(postUrl);
 
 //  ── CHAT-02: صف بستنِ برگه را تاب می‌آورد و با گشودنِ دوبارهٔ گفت‌وگو خودش می‌رود؛ «لغو»؛ ۴۰۱ صف را نگه می‌دارد؛ شمارهٔ دیگر ⇒ پاک ──
@@ -593,7 +597,11 @@ await page.click(li(six.id, '[data-act="edit"]'));
 ok(await page.inputValue('#ct-text') === 'ساعتِ شش' && /ذخیره/.test(await page.textContent('#ct-send')), '«ویرایش» ⇒ همان متن در کادر و «ذخیره»');
 await page.fill('#ct-text', 'ساعتِ هفت');
 await page.click('#ct-send');
-await page.waitForFunction((x) => /ساعتِ هفت/.test((document.querySelector(`#ct-list li[data-id="${x}"]`) || {}).textContent || ''), six.id, { timeout: 10000 });
+await page.waitForFunction((x) => {
+  const message = document.querySelector(`#ct-list li[data-id="${x}"]`);
+  return /ساعتِ هفت/.test(message?.textContent || '') &&
+    document.getElementById('ct-text').value === '' && !document.getElementById('ct-send').disabled;
+}, six.id, { timeout: 10000 });
 const sevenRow = await one('SELECT body, edited_at FROM shop_chat_messages WHERE id=$1', [six.id]);
 ok(sevenRow.body === 'ساعتِ هفت' && sevenRow.edited_at && await countFrom(conv1.id, 'ساعتِ هفت') === 1 && await page.$(li(six.id, '[data-edited]')) !== null &&
   !/ذخیره/.test(await page.textContent('#ct-send')) && await page.inputValue('#ct-text') === '',
