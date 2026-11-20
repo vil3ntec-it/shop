@@ -151,6 +151,11 @@ test('پرچمِ خاموش: config فقط `enabled: false`، نوشتن ۴۰۳ 
   const r = await send(shop.owner, photo());
   assert.equal(r.status, 403);
   assert.equal(code(r), 'purchase_ocr_disabled');
+  const mislabeled = await h.raw('POST', '/api/v1/shop/purchase-ocr/', Buffer.from('{'), {
+    token: shop.owner, headers: { 'Content-Type': 'application/json' },
+  });
+  assert.equal(mislabeled.status, 403);
+  assert.equal(code(mislabeled), 'purchase_ocr_disabled');
   assert.equal(seen(), null);
   assert.equal(ocr.LIMITS.WORKERS, 1, 'همزمانیِ پیش‌فرض ۱');
 });
