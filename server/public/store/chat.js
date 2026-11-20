@@ -493,6 +493,7 @@
     function render(list) {
       var l = conv.life || {};
       var cut = l.kind === 'general' && l.sessionAt ? l.sessionAt : 0;
+      confirmOutbox(list);
       list.forEach(function (m) { put(cut && m.createdAt < cut ? $('ct-old-list') : $('ct-list'), m, conv.id); });
       var old = $('ct-old-list').childNodes.length;
       $('ct-old').hidden = !old;
@@ -551,6 +552,23 @@
       var v = oq.items.length ? Q.dump(oq) : null;
       try { if (localStorage.getItem(Q.KEY) !== v) { if (v === null) localStorage.removeItem(Q.KEY); else localStorage.setItem(Q.KEY, v); } } catch (e) { /* بی حافظه */ }
     }
+    // اگر long-poll جلوتر از پاسخ ارسال برسد، همان پیامِ ثبت‌شده رسیدِ معتبر صف است.
+    function confirmOutbox(messages) {
+      var owner = phone();
+      if (!Q || !owner || !messages.length) return;
+      var delivered = new Set(messages.filter(function (m) {
+        return m.sender === 'customer' && m.mine && m.kind === 'text' && m.clientId;
+      }).map(function (m) { return m.clientId; }));
+      if (!delivered.size) return;
+      var current = onDisk();
+      if (current.phone !== owner) return;
+      var next = current;
+      Q.forConv(current, conv.id).forEach(function (x) {
+        if (x.slug === qslug && delivered.has(x.clientId)) next = Q.done(next, x.clientId);
+      });
+      if (next === current) return;
+      oq = next; saveQ(); outs();
+    }
     function send() {
       if (!conv) return;
       if (A && A.editing()) { A.save(); return; }
@@ -596,7 +614,9 @@
         if (conv && conv.id === x.convId && r.message) { put($('ct-list'), r.message, x.convId); $('ct-empty').hidden = true; }
       }, function (e) {
         delete flying[x.clientId];
-        oq = Q.failed(onDisk(), x.clientId, e, Date.now(), Math.random()); saveQ();
+        oq = onDisk();
+        if (!oq.items.some(function (item) { return item.clientId === x.clientId; })) return;
+        oq = Q.failed(oq, x.clientId, e, Date.now(), Math.random()); saveQ();
         if (e.code === 'chat_closed' || e.code === 'chat_blocked') reload();
         if (Q.failureOf(e) === 'verify') fail(e);   //  همهٔ صف تا تأییدِ دوباره می‌ماند
       }).then(function () { draining = false; outs(); drain(); });

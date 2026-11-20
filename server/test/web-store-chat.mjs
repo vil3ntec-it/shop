@@ -241,27 +241,31 @@ const offMsg = await msgOf('پیامِ بی‌اینترنت');
 ok(await stOf(page, offMsg.id) === 'sent|رفت' && await stOf(page, hour.id) === 'read|خوانده شد',
   'پیامِ تازه‌تر از «خواندم» ِ دکان «رفت» می‌ماند؛ هر پیام از seq ِ خودش', `${await stOf(page, offMsg.id)} / ${await stOf(page, hour.id)}`);
 
-let drop = 1;
 const posted = [];
+let releaseResponse;
+const afterRead = new Promise((resolve) => { releaseResponse = resolve; });
 const postUrl = `**/api/store/${slug}/chat/conversations/${conv1.id}/messages`;
 await page.route(postUrl, async (route) => {
   if (route.request().method() !== 'POST') return route.fallback();
   posted.push(JSON.parse(route.request().postData() || '{}').clientId);
-  if (drop < 1) return route.fallback();
-  drop--;
-  await route.fetch();            //  سرور ثبت می‌کند…
-  return route.abort('failed');   //  …و جواب به صفحه نمی‌رسد
+  if (posted.length > 1) return route.fallback();
+  await route.fetch();
+  await afterRead;                 //  long-poll باید جلوتر از پاسخِ فرستادن برسد
+  return route.abort('failed');    //  پاسخِ دیر هم در شبکه گم می‌شود
 });
-await page.fill('#ct-text', 'جوابِ گم‌شده');
-await page.click('#ct-send');
-await page.waitForSelector('#ct-out .ct-q[data-st="waiting"] [data-q="retry"]', { timeout: 10000 });
-//  ⇐ تغییرِ عمدی: «زدنِ دوباره» پیش‌تر دوباره زدنِ «فرستادن» با همان متنِ کادر بود؛ متن حالا در حباب است ⇒ «دوباره» ِ همان حباب
-await page.click('#ct-out .ct-q [data-q="retry"]');
-await page.waitForFunction(() => /جوابِ گم‌شده/.test(document.getElementById('ct-list').textContent), null, { timeout: 15000 });
+try {
+  await page.fill('#ct-text', 'جوابِ گم‌شده');
+  await page.click('#ct-send');
+  await page.waitForFunction(() => /جوابِ گم‌شده/.test(document.getElementById('ct-list').textContent), null, { timeout: 15000 });
+  ok(await queued('جوابِ گم‌شده') === '' && await stored() === null,
+    'رسیدن پیام از long-poll پیش از پاسخ ارسال، حباب صف و دادهٔ ذخیره‌شده را پاک می‌کند');
+} finally {
+  releaseResponse();
+}
 await new Promise((r) => setTimeout(r, 1500));
 ok(await countFrom(conv1.id, 'جوابِ گم‌شده') === 1 && await bubbles('جوابِ گم‌شده') === 1 && await queued('جوابِ گم‌شده') === '' &&
-  posted.length === 2 && posted[0] === posted[1],
-'جوابِ گم‌شده و «دوباره» ِ حباب ⇒ همان clientId، یک پیام روی سرور و یک حباب', `${await countFrom(conv1.id, 'جوابِ گم‌شده')} / ${await bubbles('جوابِ گم‌شده')} / ${posted.length}`);
+  posted.length === 1 && Boolean(posted[0]),
+'گم‌شدن پاسخ پس از رسیدن پیام از long-poll، آن را دوباره به صف نمی‌برد', `${await countFrom(conv1.id, 'جوابِ گم‌شده')} / ${await bubbles('جوابِ گم‌شده')} / ${posted.length}`);
 await page.unroute(postUrl);
 
 //  ── CHAT-02: صف بستنِ برگه را تاب می‌آورد و با گشودنِ دوبارهٔ گفت‌وگو خودش می‌رود؛ «لغو»؛ ۴۰۱ صف را نگه می‌دارد؛ شمارهٔ دیگر ⇒ پاک ──
@@ -319,7 +323,10 @@ ok(await bubbles('پیامِ ماندگار', qp) === 1 && await queued('پیا�
 await qp.evaluate(() => { const t = JSON.parse(localStorage.getItem('store-ticket')); t.ticket += 'xx'; localStorage.setItem('store-ticket', JSON.stringify(t)); });
 await qp.fill('#ct-text', 'پس از تأیید');
 await qp.click('#ct-send');
-await qp.waitForFunction(() => !document.getElementById('ct-verify').hidden, null, { timeout: 10000 });
+await qp.waitForFunction(() => {
+  const pending = JSON.parse(localStorage.getItem('store-chat-out'));
+  return !document.getElementById('ct-verify').hidden && pending?.items.some((item) => item.state === 'verify');
+}, null, { timeout: 10000 });
 ok(await countFrom(conv1.id, 'پس از تأیید') === 0 && (await stored(qp)).items[0].state === 'verify',
   '۴۰۱ ⇒ فرمِ تأیید؛ پیام «منتظرِ تأیید» در صف ماند', JSON.stringify((await stored(qp)).items.map((x) => x.state)));
 //  `refocus`: پیش از نوشتنِ کد، گفت‌وگو دوباره باز می‌شود (`verify()` و برگه دوباره) — تمرکزِ دیرِ ۶۰/۸۰ms ِ آن‌ها نباید کادرِ کدِ در
@@ -567,10 +574,11 @@ await page2.close();
 
 //  ── CHAT-14 در وب (`chat-acts.js` ِ دیربار): پاسخ، ویرایش تا `editUntil` ِ سرور، سنجاقِ فقط برای خودم، جست‌وجو ──
 const actOf = async (id, act) => {
-  await page.click(li(id, '.ct-more'));
+  const menu = li(id, '.ct-more');
+  if (await page.getAttribute(menu, 'aria-expanded') !== 'true') await page.click(menu);
   await page.waitForSelector(li(id, '[data-del="me"]'));
   const b = await page.$(li(id, `[data-act="${act}"]`));
-  if (!b) await page.click(li(id, '.ct-more'));
+  if (!b) await page.click(menu);
   return b;
 };
 ok(Boolean(await actOf(askId, 'reply')) && await page.$(li(askId, '[data-act="edit"]')) === null, 'پیامِ دکان: «پاسخ» هست، «ویرایش» نه');
@@ -593,7 +601,11 @@ await page.click(li(six.id, '[data-act="edit"]'));
 ok(await page.inputValue('#ct-text') === 'ساعتِ شش' && /ذخیره/.test(await page.textContent('#ct-send')), '«ویرایش» ⇒ همان متن در کادر و «ذخیره»');
 await page.fill('#ct-text', 'ساعتِ هفت');
 await page.click('#ct-send');
-await page.waitForFunction((x) => /ساعتِ هفت/.test((document.querySelector(`#ct-list li[data-id="${x}"]`) || {}).textContent || ''), six.id, { timeout: 10000 });
+await page.waitForFunction((x) => {
+  const message = document.querySelector(`#ct-list li[data-id="${x}"]`);
+  return /ساعتِ هفت/.test(message?.textContent || '') &&
+    document.getElementById('ct-text').value === '' && !document.getElementById('ct-send').disabled;
+}, six.id, { timeout: 10000 });
 const sevenRow = await one('SELECT body, edited_at FROM shop_chat_messages WHERE id=$1', [six.id]);
 ok(sevenRow.body === 'ساعتِ هفت' && sevenRow.edited_at && await countFrom(conv1.id, 'ساعتِ هفت') === 1 && await page.$(li(six.id, '[data-edited]')) !== null &&
   !/ذخیره/.test(await page.textContent('#ct-send')) && await page.inputValue('#ct-text') === '',
@@ -612,7 +624,10 @@ await page.fill('#ct-text', '');
 
 ok(Boolean(await actOf(askId, 'pin')), '«سنجاق» در نوارِ کارها');
 await page.click(li(askId, '[data-act="pin"]'));
-await page.waitForFunction(() => !document.getElementById('ct-pins').hidden, null, { timeout: 10000 });
+await page.waitForFunction((x) => {
+  const menu = document.querySelector(`#ct-list li[data-id="${x}"] .ct-more`);
+  return !document.getElementById('ct-pins').hidden && menu?.getAttribute('aria-expanded') === 'false';
+}, askId, { timeout: 10000 });
 const pinRow = await one("SELECT side FROM shop_chat_pins WHERE message_id=$1", [askId]);
 const shopPins = (await call('GET', `/api/shop/chat/conversations/${conv1.id}`, null, T)).body.conversation.pinned || [];
 ok(/کی می‌آیید؟/.test(await page.textContent('#ct-pins')) && pinRow && pinRow.side === 'customer' && !shopPins.some((x) => x.messageId === askId),
@@ -1191,6 +1206,8 @@ if (axeSrc) {
   const vst = () => vp.evaluate(() => { const b = document.getElementById('ct-vc'); return b && !b.hidden ? b.getAttribute('data-st') : 'gone'; });
   const said = () => vp.textContent('#ct-vc-say');
   const record = async () => {
+    // ثبتِ پیام در سرور ممکن است پیش از بستنِ کادرِ بارگذاری در همین برگه باشد.
+    await vp.waitForFunction(() => !document.getElementById('ct-vc') || document.getElementById('ct-vc').hidden);
     await vp.click('#ct-vc-mic');
     await vp.waitForFunction(() => { const b = document.getElementById('ct-vc'); return b && !b.hidden && b.getAttribute('data-st') === 'rec'; }, null, { timeout: 15000 });
   };
