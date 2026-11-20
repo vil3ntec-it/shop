@@ -44,6 +44,9 @@ object PurchaseViews {
     /** مقدار به واحدِ پایه وقتی ردیف به واحدِ خرید است («۴۸ دانه»)؛ وگرنه null */
     val baseQty: Double? = null,
     val baseUnit: String = "",
+    /** PUR-11: فی و جمعِ ردیفِ فاکتورِ ارزی به واحدِ کوچکِ همان ارز (افغانی ⇒ null) */
+    val fxUnit: Long? = null,
+    val fxTotal: Long? = null,
   )
 
   data class View(
@@ -73,6 +76,14 @@ object PurchaseViews {
     val notes: String = "",
     /** فاکتورِ دفتر (چاپ، برگشت)؛ سفارش ⇒ null */
     val invoice: PurchaseBook.Invoice? = null,
+    /**
+     *  PUR-11: فاکتورِ ارزی — ارز، نرخِ ثبت‌شده، جمع و ماندهٔ همان ارز (واحدِ کوچک). [total]/[paid]/[remaining] همچنان افغانی
+     *  (معادل و ارزشِ دفتری). افغانی ⇒ null.
+     */
+    val currency: String? = null,
+    val fxRate: ir.vil3ntec.tohid.core.purchase.PurchaseFx.Rate? = null,
+    val fxTotal: Long = 0,
+    val fxRemaining: Long? = null,
   ) {
     val names: List<String> get() = lines.map { it.name }.filter { it.isNotBlank() }.distinct()
     val isOrder: Boolean get() = kind == Kind.ORDER
@@ -130,7 +141,10 @@ object PurchaseViews {
     val products = ShopStore.productsById(d.products)
     val suppliers = d.suppliers.associateBy { it.id }
     val invoices = PurchaseBook.invoices(d)
-    val remaining = PurchaseBook.open(d).associate { it.invoice.key to it.remaining }
+    private val due = PurchaseBook.open(d)
+    val remaining = due.associate { it.invoice.key to it.remaining }
+    /** PUR-11: ماندهٔ ارزیِ فاکتورهای ارزی */
+    val fxRemaining = due.mapNotNull { x -> x.fxRemaining?.let { x.invoice.key to it } }.toMap()
     val entries = d.warehouseEntries.filter { it.purchaseId != null }.associateBy { it.purchaseId!! }
     /** خریدِ قدیمیِ بی `purchaseId` روی ورود ⇒ با `warehouseEntryId` (یک نقشه، نه جست‌وجوی خطی برای هر ردیف) */
     val entryById by lazy { d.warehouseEntries.associateBy { it.id } }
@@ -146,6 +160,7 @@ object PurchaseViews {
           inv.key, Kind.RETURN, inv.no, inv.supplierId, name(inv.supplierId), inv.date, inv.createdAt, lines,
           total = inv.total, billed = inv.total, paid = 0.0, remaining = 0.0, dueDate = null, pay = Pay.NONE,
           receipt = Receipt.RECEIVED, notes = notesOf(inv), invoice = inv,
+          currency = inv.currency, fxRate = inv.fxRate, fxTotal = inv.fxTotal,
         )
       }
       val left = (remaining[inv.key] ?: inv.debt).coerceAtLeast(0.0)
@@ -155,6 +170,8 @@ object PurchaseViews {
         total = inv.total, billed = inv.total, paid = paid, remaining = left, dueDate = inv.dueDate,
         pay = payOf(inv.total, paid, left, inv.dueDate, today), receipt = Receipt.RECEIVED,
         orderNo = orderNoOf(inv), landed = inv.lines.sumOf { it.landedCost ?: 0.0 }, notes = notesOf(inv), invoice = inv,
+        currency = inv.currency, fxRate = inv.fxRate, fxTotal = inv.fxTotal,
+        fxRemaining = if (inv.currency != null) (fxRemaining[inv.key] ?: (inv.fxTotal - inv.fxPaid)).coerceAtLeast(0L) else null,
       )
     }
 
@@ -174,6 +191,8 @@ object PurchaseViews {
         qty = qty, unit = inUnit ?: p.unit, unitCost = cost, total = sign * total, ordered = qty, received = qty,
         batch = e?.batch.orEmpty(), expiry = e?.expiryDate.orEmpty(), purchaseId = p.id,
         baseQty = if (inUnit != null) kotlin.math.abs(p.quantity) else null, baseUnit = if (inUnit != null) p.unit else "",
+        fxUnit = if (SupplierFx.cur(p.currency) != null) p.fxPriceMinor else null,
+        fxTotal = if (SupplierFx.cur(p.currency) != null) p.fxTotalMinor else null,
       )
     }
 

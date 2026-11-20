@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseFx
 import ir.vil3ntec.tohid.core.i18n.StrSheets
 
 /**
@@ -145,14 +146,23 @@ object ReportCsv {
   private fun purchases(d: ShopData, from: String, to: String): Sheet {
     val names = d.suppliers.associate { it.id to it.name }
     val products = d.products.associate { it.id to it.name }
-    val rows = mutableListOf(listOf(StrSheets.date, StrSheets.supplier, StrSheets.product, StrSheets.quantity, StrSheets.unit, StrSheets.purchasePrice, StrSheets.total, StrSheets.paid, StrSheets.debt))
-    ReportEngine.purchases(d, from, to).rows.forEach { p ->
-      rows += listOf(
+    val report = ReportEngine.purchases(d, from, to)
+    //  PUR-11: ستون‌های ارز فقط وقتی بازه خریدِ ارزی دارد (دکانِ فقط‌افغانی همان برگهٔ پیشین)؛ مبلغ‌ها همچنان افغانی
+    val fx = report.byCurrency.isNotEmpty() || report.fxDiff != 0L
+    val head = listOf(StrSheets.date, StrSheets.supplier, StrSheets.product, StrSheets.quantity, StrSheets.unit, StrSheets.purchasePrice, StrSheets.total, StrSheets.paid, StrSheets.debt)
+    val rows = mutableListOf(if (fx) head + listOf(StrPurchaseFx.currencyCol, StrPurchaseFx.fxAmountCol, StrPurchaseFx.rateCol) else head)
+    report.rows.forEach { p ->
+      val base = listOf(
         p.date, names[p.supplierId].orEmpty(), products[p.productId].orEmpty(),
         ir.vil3ntec.tohid.qty(p.quantity), p.unit, round(p.purchasePrice),
         round(p.totalAmount), round(p.paidAmount), round(p.debt),
       )
+      val code = SupplierFx.cur(p.currency)
+      rows += if (!fx) base else base + if (code == null) listOf("AFN", "", "") else listOf(
+        code, SafeCurrencies.number(p.fxTotalMinor ?: 0L, code), SupplierFx.rateOf(p)?.let(ir.vil3ntec.tohid.core.purchase.PurchaseFx::rateLine).orEmpty(),
+      )
     }
+    if (report.fxDiff != 0L) rows += listOf(StrPurchaseFx.fxDiffCol, "", "", "", "", "", round(report.fxDiff / 100.0), "", "", "", "", "")
     return Sheet(StrSheets.namePurchases(from, to), rows)
   }
 

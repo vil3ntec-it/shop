@@ -29,6 +29,7 @@ import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
 import ir.vil3ntec.tohid.core.i18n.StrPurchases
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseFx
 import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.data.PurchaseViews
 import ir.vil3ntec.tohid.formatDate
@@ -69,8 +70,10 @@ internal class PurchaseDetailActions(
 
 /** متن‌های آمادهٔ یک ردیفِ جزئیات (خالص): «۲ کارتن × ۱٬۲۰۰ ؋ (۴۸ دانه)» و «بارکد … · سری … · انقضا …» */
 internal object PurchaseLineText {
-  fun qty(l: PurchaseViews.Line): String {
-    val main = "${MoneyText.qtyUnit(l.qty, l.unit)} × ${money(l.unitCost)} ؋"
+  fun qty(l: PurchaseViews.Line, currency: String? = null): String {
+    //  PUR-11: ردیفِ فاکتورِ ارزی فیِ همان ارز را نشان می‌دهد (معادلِ افغانیِ جمع کنارِ ردیف است)
+    val price = if (currency != null && l.fxUnit != null) ir.vil3ntec.tohid.data.SupplierFx.text(l.fxUnit, currency) else "${money(l.unitCost)} ؋"
+    val main = "${MoneyText.qtyUnit(l.qty, l.unit)} × $price"
     return l.baseQty?.let { "$main (${MoneyText.qtyUnit(it, l.baseUnit)})" } ?: main
   }
 
@@ -148,7 +151,7 @@ internal fun PurchaseDetailScreen(v: PurchaseViews.View?, today: String, actions
             val known = l.name.isNotBlank()
             V3ListRow(
               l.name.ifBlank { StrMoney.deletedProduct },
-              subtitle = PurchaseLineText.qty(l),
+              subtitle = PurchaseLineText.qty(l, v.currency),
               tile = false,
               value = MoneyText.afn(kotlin.math.abs(l.total)),
               below = {
@@ -176,11 +179,19 @@ internal fun PurchaseDetailScreen(v: PurchaseViews.View?, today: String, actions
 
 @Composable
 private fun Totals(v: PurchaseViews.View) {
+  val code = v.currency
+  fun fx(minor: Long) = ir.vil3ntec.tohid.data.SupplierFx.text(minor, code ?: ir.vil3ntec.tohid.core.purchase.PurchaseFx.AFN)
   val rows = buildList {
-    add(StrPurchases.total to MoneyText.afn(kotlin.math.abs(v.total)))
+    if (code != null) {
+      //  PUR-11: ارزِ سند، نرخِ ثبت‌شده، جمع به همان ارز و معادلِ افغانی (بهای تمام‌شده)
+      v.fxRate?.let { add(StrPurchaseFx.rateCol to ir.vil3ntec.tohid.data.SupplierFx.rateText(it)) }
+      add(StrPurchaseFx.totalIn(code) to fx(kotlin.math.abs(v.fxTotal)))
+      add(StrPurchaseFx.afnEquivalent to MoneyText.afn(kotlin.math.abs(v.total)))
+    } else add(StrPurchases.total to MoneyText.afn(kotlin.math.abs(v.total)))
     if (v.kind != PurchaseViews.Kind.RETURN && v.billed > 0.5) {
       add(StrPurchases.paidLabel to MoneyText.afn(v.paid))
-      add(StrPurchases.remaining to MoneyText.afn(v.remaining))
+      if (code != null && v.fxRemaining != null) add(StrPurchases.remaining to ir.vil3ntec.tohid.data.SupplierFx.ltr("${fx(v.fxRemaining)} (${MoneyText.afn(v.remaining)})"))
+      else add(StrPurchases.remaining to MoneyText.afn(v.remaining))
     }
     v.dueDate?.let { add(StrPurchasePages.payDue to formatDate(it)) }
     if (v.landed > 0.5) add(StrPurchases.landed to MoneyText.afn(v.landed))

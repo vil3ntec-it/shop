@@ -19,6 +19,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseFx
+import ir.vil3ntec.tohid.core.pay.FxTill
+import ir.vil3ntec.tohid.core.pay.Pay
+import ir.vil3ntec.tohid.core.purchase.PurchaseFx
+import ir.vil3ntec.tohid.data.SafeCurrencies
+import ir.vil3ntec.tohid.ui.v3.V3Segmented
+import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.data.Expense
 import ir.vil3ntec.tohid.data.LedgerEngine
 import ir.vil3ntec.tohid.data.Supplier
@@ -86,20 +93,74 @@ internal fun SupplierPaySheet(
   onSaved: () -> Unit,
   /** e-rows-63b: «پرداخت» ِ یک خرید — مبلغ و یادداشتِ پیش‌پُر (ماندهٔ همان خرید)؛ null ⇒ برگهٔ خالیِ پیشین */
   prefill: PayForm? = null,
+  /**
+   *  PUR-11: حساب‌های ارزیِ همین تأمین‌کننده (`SupplierFx.accounts`)؛ خالی ⇒ همان برگهٔ افغانیِ پیشین. با حساب: تراشهٔ «حساب»
+   *  (افغانی | ارز)، «پرداخت با» (همان ارز | افغانی)، نرخِ همین پرداخت، و پیش‌نمایشِ «صاف می‌شود / ارزش / اختلافِ نرخ».
+   */
+  fxAccounts: List<PurchaseFx.Account> = emptyList(),
+  lastRate: (String) -> PurchaseFx.Rate? = { null },
 ) {
   val initial = remember(supplier.id, prefill) { prefill ?: PayForm(date = todayIso()) }
   var f by remember(supplier.id) { mutableStateOf(initial) }
   var tried by rememberSaveable { mutableStateOf(false) }
   var shake by remember { mutableStateOf(0) }
   val error = LedgerFormsModel.payError(f)
+  val code = f.account
+  val acc = fxAccounts.firstOrNull { it.currency == code }
   V3FormSheet(title = StrMoney.pay, dirty = f != initial, onClose = onClose) { sheet ->
     Column(Modifier.v3Shake(shake)) {
-      Text(StrMoney.owedLine(supplier.name, money(debt.coerceAtLeast(0.0))), style = v3Text(14, FontWeight.Medium, 20), color = PhoneV3.colors.inkMuted)
+      if (fxAccounts.isNotEmpty()) {
+        val codes = listOf<String?>(null) + fxAccounts.map { it.currency }
+        Text(StrPurchaseFx.account, style = v3Text(13, FontWeight.SemiBold, 18), color = PhoneV3.colors.inkMuted)
+        Spacer(Modifier.height(6.dp))
+        V3Segmented(codes.map { it ?: StrPurchaseFx.afnAccount }, codes.indexOf(code).coerceAtLeast(0), { i ->
+          f = LedgerFormsModel.setAccount(f, codes[i], codes[i]?.let(lastRate))
+        })
+        Spacer(Modifier.height(12.dp))
+      }
+      if (acc == null) {
+        Text(StrMoney.owedLine(supplier.name, money(debt.coerceAtLeast(0.0))), style = v3Text(14, FontWeight.Medium, 20), color = PhoneV3.colors.inkMuted)
+      } else {
+        val owed = if (acc.fx >= 0) StrPurchaseFx.owed(SafeCurrencies.format(acc.fx, acc.currency), MoneyText.afn(acc.afn / 100.0))
+        else StrPurchaseFx.credit(SafeCurrencies.format(-acc.fx, acc.currency))
+        Text("${supplier.name} — $owed", style = v3Text(14, FontWeight.Medium, 20), color = PhoneV3.colors.inkMuted)
+        Spacer(Modifier.height(12.dp))
+        Text(StrPurchaseFx.payWith, style = v3Text(13, FontWeight.SemiBold, 18), color = PhoneV3.colors.inkMuted)
+        Spacer(Modifier.height(6.dp))
+        V3Segmented(listOf(acc.currency, StrPurchaseFx.afnAccount), if (f.inAfn) 1 else 0, { i -> f = f.copy(inAfn = i == 1, amount = "") })
+        Spacer(Modifier.height(12.dp))
+        V3TextField(
+          f.rate, { f = f.copy(rate = it) }, StrPurchaseFx.rateLabel(FxTill.afnText(f.per * 100), acc.currency), kind = V3FieldKind.MONEY, required = true,
+          helper = LedgerFormsModel.fxRate(f)?.let { StrPurchaseFx.rateLine(PurchaseFx.rateLine(it)) },
+          error = (if (LedgerFormsModel.fxRate(f) == null) StrPurchaseFx.rateBad else null).takeIf { tried },
+        )
+        Spacer(Modifier.height(6.dp))
+        V3ChipRow(contentPadding = PaddingValues(0.dp)) {
+          Pay.FX_PER.forEach { p -> V3Chip(ir.vil3ntec.tohid.data.SupplierFx.ltr("${FxTill.afnText(p * 100)} ${acc.currency}"), selected = f.per == p, onClick = { f = f.copy(per = p) }) }
+        }
+      }
       Spacer(Modifier.height(12.dp))
-      V3TextField(f.amount, { f = f.copy(amount = it) }, StrMoney.payAmount, kind = V3FieldKind.MONEY, required = true, error = error.takeIf { tried })
-      LedgerFormsModel.settleAll(debt)?.let { all ->
+      V3TextField(
+        f.amount, { f = f.copy(amount = it) },
+        if (acc == null) StrMoney.payAmount else StrPurchaseFx.amountIn(if (f.inAfn) PurchaseFx.AFN else acc.currency),
+        kind = V3FieldKind.MONEY, required = true, error = error.takeIf { tried },
+      )
+      val all = if (acc == null) LedgerFormsModel.settleAll(debt) else LedgerFormsModel.settleAllFx(f, acc)
+      all?.let {
         Spacer(Modifier.height(8.dp))
-        V3Chip(StrMoney.settleAll, selected = f.amount == all, onClick = { f = f.copy(amount = all) })
+        V3Chip(StrMoney.settleAll, selected = f.amount == it, onClick = { f = f.copy(amount = it) })
+      }
+      LedgerFormsModel.fxSettle(f, acc)?.let { st ->
+        //  PUR-11: پیش‌نمایشِ همان حسابِ ثبت — صاف‌شده به ارز، ارزش به نرخِ این پرداخت و اختلافِ نرخ
+        Spacer(Modifier.height(10.dp))
+        val muted = PhoneV3.colors.inkMuted
+        Text(StrPurchaseFx.settles(SafeCurrencies.format(st.fx, acc?.currency ?: PurchaseFx.AFN)), style = V3Type.footnote, color = muted)
+        Text(StrPurchaseFx.value(MoneyText.afn(st.value / 100.0)), style = V3Type.footnote, color = muted)
+        if (st.diff != 0L) {
+          val amount = MoneyText.afn(kotlin.math.abs(st.diff) / 100.0)
+          Text(if (st.diff > 0) StrPurchaseFx.fxLoss(amount) else StrPurchaseFx.fxGain(amount), style = V3Type.footnote, color = muted)
+        }
+        if (!f.inAfn) Text(StrPurchaseFx.drawerNote, style = V3Type.footnote, color = muted)
       }
       Spacer(Modifier.height(12.dp))
       V3DateField(f.date, { f = f.copy(date = it) }, StrMoney.date)

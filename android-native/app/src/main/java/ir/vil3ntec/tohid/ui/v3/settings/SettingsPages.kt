@@ -123,6 +123,7 @@ import ir.vil3ntec.tohid.ui.v3.settings.sections.CountToolsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.DeliverLaterScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.GiftReceiptScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.PrintPhoneScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.PurchaseFxScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.LabelToolsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.PriceWhyScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.ProductInfoScreen
@@ -203,6 +204,7 @@ internal object SettingsPages {
     Page(SettingsLayout.DELIVER_LATER, Icons.Outlined.PendingActions) { DeliverLaterScreen(it) },
     Page(SettingsLayout.GIFT_RECEIPT, Icons.Outlined.Celebration) { GiftReceiptScreen(it) },
     Page(SettingsLayout.PRINT_PHONE, Icons.Outlined.Print) { PrintPhoneScreen(it) },
+    Page(SettingsLayout.PURCHASE_FX, Icons.Outlined.Payments) { PurchaseFxScreen(it) },
     Page(SettingsLayout.TILL_RECEIVE, Icons.Outlined.PointOfSale) { TillReceiveScreen(it) },
     Page(SettingsLayout.LINE_SELLER, Icons.Outlined.Badge) { LineSellerScreen(it) },
     Page(SettingsLayout.MULTI_DRAWER, Icons.Outlined.PointOfSale) { MultiDrawerScreen(it) },

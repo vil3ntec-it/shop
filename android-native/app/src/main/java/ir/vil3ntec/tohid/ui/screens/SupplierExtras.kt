@@ -81,22 +81,43 @@ fun SupplierReturnDialog(
   d: ShopData,
   supplierId: String,
   onDismiss: () -> Unit,
-  /** `key`: کلیدِ یکتای همین پنجره — دو کلیک یک سند (`PurchaseBook.supplierReturn`) */
-  onSave: (productId: String, quantity: Double, unitPrice: Double, reason: String, date: String, key: String) -> Unit,
+  /**
+   *  `key`: کلیدِ یکتای همین پنجره — دو کلیک یک سند (`PurchaseBook.supplierReturn`). PUR-11: کالایی که آخرین خریدش از همین
+   *  تأمین‌کننده به ارزِ دیگر بود ⇒ [fx] نرخِ همان خرید و [fxPrice] فیِ هر واحد به واحدِ کوچکِ همان ارز (اعتبار به همان حساب)؛
+   *  وگرنه هر دو null و همان سندِ کسرِ افغانی.
+   */
+  onSave: (productId: String, quantity: Double, unitPrice: Double, reason: String, date: String, key: String, fx: ir.vil3ntec.tohid.core.purchase.PurchaseFx.Rate?, fxPrice: Long?) -> Unit,
 ) {
   val key = remember { ir.vil3ntec.tohid.sync.v1.Ulid.next() }
   var saving by remember { mutableStateOf(false) }
   val options = remember(d, supplierId) { PurchaseBook.boughtFrom(d, supplierId) }
   var productId by remember { mutableStateOf(options.firstOrNull()?.id) }
   var amount by remember { mutableStateOf("") }
+  //  PUR-11: آخرین خریدِ ارزیِ همین کالا از همین تأمین‌کننده ⇒ برگشت به همان ارز و نرخ، فیِ پیش‌فرض = فیِ همان خرید برای یک واحدِ پایه
+  val fxBuy = remember(d, supplierId, productId) { productId?.let { ir.vil3ntec.tohid.data.SupplierFx.returnRate(d, supplierId, it) } }
+  val fxRate = fxBuy?.let(ir.vil3ntec.tohid.data.SupplierFx::rateOf)
+  val fxCode = fxRate?.currency
   var price by remember(productId) {
-    mutableStateOf(productId?.let { PurchaseBook.lastPrice(d, supplierId, it) }?.let { if (it == Math.floor(it)) it.toLong().toString() else it.toString() } ?: "")
+    mutableStateOf(
+      if (fxBuy != null && fxCode != null) {
+        val q = ir.vil3ntec.tohid.data.StockLedger.milli(fxBuy.quantity)
+        val unit = if (q > 0) Math.round((fxBuy.fxTotalMinor ?: 0L) * 1000.0 / q) else 0L
+        ir.vil3ntec.tohid.data.PoForms.num(ir.vil3ntec.tohid.core.safe.SafeCurrency.major(unit, fxCode))
+      } else productId?.let { PurchaseBook.lastPrice(d, supplierId, it) }?.let { if (it == Math.floor(it)) it.toLong().toString() else it.toString() } ?: "",
+    )
   }
   var reason by remember { mutableStateOf("") }
   var date by remember { mutableStateOf(formatDate(ir.vil3ntec.tohid.todayIso())) }
   val supplier = d.suppliers.find { it.id == supplierId }
   val product = d.products.find { it.id == productId }
   val total = (amount.toDoubleOrNull() ?: 0.0) * (price.toDoubleOrNull() ?: 0.0)
+  val fxPrice = fxCode?.let { c -> price.takeIf { it.isNotBlank() }?.let { ir.vil3ntec.tohid.data.SafeCurrencies.parse(it, c) } }
+  val fxCredit = if (fxRate != null && fxPrice != null) {
+    runCatching {
+      val fx = ir.vil3ntec.tohid.core.purchase.PurchaseFx.lineFx(ir.vil3ntec.tohid.data.StockLedger.milli(amount.toDoubleOrNull() ?: 0.0), fxPrice)
+      fx to ir.vil3ntec.tohid.core.purchase.PurchaseFx.toAfn(fx, fxRate)
+    }.getOrNull()
+  } else null
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
@@ -125,9 +146,19 @@ fun SupplierReturnDialog(
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
               NumberField(amount, { amount = it }, StrMoney.quantity, Modifier.weight(1f))
-              NumberField(price, { price = it }, StrCatalogPages.unitPrice, Modifier.weight(1f))
+              NumberField(price, { price = it }, fxCode?.let(ir.vil3ntec.tohid.core.i18n.StrPurchaseFx::priceIn) ?: StrCatalogPages.unitPrice, Modifier.weight(1f))
             }
-            if (total > 0) {
+            if (fxCode != null && fxRate != null) {
+              //  PUR-11: اعتبار به همان ارز و نرخِ خرید (معادلِ افغانی کنارش)
+              Spacer(Modifier.height(6.dp))
+              Text(ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.rateLine(ir.vil3ntec.tohid.core.purchase.PurchaseFx.rateLine(fxRate)), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+              fxCredit?.takeIf { it.first > 0 }?.let { (fx, afn) ->
+                Text(
+                  StrCatalogPages.creditNote(ir.vil3ntec.tohid.data.SupplierFx.ltr("${ir.vil3ntec.tohid.data.SafeCurrencies.format(fx, fxCode)} = ${money(afn / 100.0)}")),
+                  style = MaterialTheme.typography.bodySmall, color = Shop.colors.success,
+                )
+              }
+            } else if (total > 0) {
               Spacer(Modifier.height(6.dp))
               Text(StrCatalogPages.creditNote(money(total)), style = MaterialTheme.typography.bodySmall, color = Shop.colors.success)
             }
@@ -146,7 +177,10 @@ fun SupplierReturnDialog(
                 val iso = if (date.isBlank()) "" else ir.vil3ntec.tohid.Jalali.parseTyped(date) ?: "?"
                 saving = true
                 //  ردشده (دلیلِ خالی، مقدارِ بیش از موجودی…) ⇒ پنجره می‌ماند و دکمه دوباره باز می‌شود
-                onSave(productId ?: return@Button, amount.toDoubleOrNull() ?: 0.0, price.toDoubleOrNull() ?: -1.0, reason, iso, key)
+                onSave(
+                  productId ?: return@Button, amount.toDoubleOrNull() ?: 0.0, if (fxRate != null) 0.0 else price.toDoubleOrNull() ?: -1.0, reason, iso, key,
+                  fxRate, if (fxRate != null) fxPrice ?: -1L else null,
+                )
                 saving = false
               },
               modifier = Modifier.weight(1f),

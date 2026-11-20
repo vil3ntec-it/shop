@@ -70,8 +70,8 @@ object MoneyPaths {
   fun editSupplier(id: String) = supplier(id) + "/edit"
   fun paySupplier(id: String) = supplier(id) + "/pay"
   /** e-rows-63b: «پرداخت» ِ یک خرید — برگهٔ همان تأمین‌کننده با ماندهٔ خرید و شمارهٔ فاکتور (یادداشتِ `PurchaseBook.payNote`) */
-  fun payPurchase(id: String, amount: Double, invoiceNo: Int?) =
-    RoutePaths.withQuery(paySupplier(id), "amount" to PoForms.num(Math.round(amount * 100.0) / 100.0), "invoice" to invoiceNo?.toString())
+  fun payPurchase(id: String, amount: Double, invoiceNo: Int?, currency: String? = null) =
+    RoutePaths.withQuery(paySupplier(id), "amount" to PoForms.num(Math.round(amount * 100.0) / 100.0), "invoice" to invoiceNo?.toString(), "currency" to currency)
   /** e-rows-63b: جزئیاتِ یک خرید با کلیدِ `PurchaseViews.View.key` */
   fun purchase(key: String) = "purchasing/purchases/" + RoutePaths.encode(key)
   /** زبانهٔ خرید با زبانهٔ آغازین (`suppliers`) یا پالایهٔ پرداخت (`unpaid`، `overdue`) */
@@ -282,6 +282,10 @@ val MoneyModule = AppModule(
       val context = LocalContext.current
       //  PUR-05: یک کلید برای همین فرم — دو لمسِ «ثبت» پیش از بسته شدن یک خرید است (`PurchaseBook.record(key)`)
       val saveKey = remember { moneyId() }
+      //  PUR-11: ارزهای افزودهٔ دکان (تنظیمِ گاوصندوق) یک بار برای همین فرم
+      val customCurrencies = remember { ir.vil3ntec.tohid.data.SafeCurrencyPref.custom(context) }
+      val tillRates = remember { ir.vil3ntec.tohid.data.FxTillPref.rates(context) }
+      val fxOn = remember { ir.vil3ntec.tohid.data.PurchaseFxPref.on(context) }
       PurchaseFormScreen(
         d = data,
         supplierArg = args.query("supplier"),
@@ -292,7 +296,8 @@ val MoneyModule = AppModule(
           MoneyWriter.purchase(
             store, toasts, context,
             data,
-            ir.vil3ntec.tohid.data.PurchaseBook.record(data, supplierId, lines, paid, date, notes, todayIso(), System.currentTimeMillis(), ::moneyId, landedTotal = extras.landedTotal, dueDate = extras.dueDate, key = saveKey),
+            //  PUR-11: ارز و نرخِ فاکتور و پرداختِ هنگامِ خرید به همان ارز (`extras.fx`؛ افغانی ⇒ null و ۰، همان پیشین)
+            ir.vil3ntec.tohid.data.PurchaseBook.record(data, supplierId, lines, paid, date, notes, todayIso(), System.currentTimeMillis(), ::moneyId, landedTotal = extras.landedTotal, dueDate = extras.dueDate, key = saveKey, fx = extras.fx, fxPaid = extras.fxPaid),
             StrMoney.purchaseSaved,
           ) != null
         },
@@ -306,6 +311,13 @@ val MoneyModule = AppModule(
         onSaveLater = rememberSaveLater(saveKey),
         //  PUR-12/AI-10: «از عکسِ فاکتور» — دکمه فقط با پرچمِ روشن و اجازهٔ خرید (`GET /shop/purchase-ocr/config`)
         ocr = ir.vil3ntec.tohid.ui.screens.rememberInvoiceOcr(data.products),
+        //  PUR-11: ارزهای گاوصندوق (+ ارزهای دفترِ خرید) و آخرین نرخِ هر ارز (خرید/پرداخت، وگرنه نرخِ صندوقِ PAY-10)؛
+        //  کلیدِ دکانِ «خرید به ارزِ دیگر» خاموش ⇒ فقط افغانی (بی کادرِ ارز، `SupplierFx.offered`)
+        currencies = remember(data.purchases, data.supplierPayments) {
+          ir.vil3ntec.tohid.data.SupplierFx.offered(fxOn, ir.vil3ntec.tohid.data.SafeCurrencies.all(customCurrencies, ir.vil3ntec.tohid.data.SupplierFx.inLedger(data)))
+        },
+        currencyName = { code -> ir.vil3ntec.tohid.data.SafeCurrencies.name(code, customCurrencies) },
+        lastRate = { code -> ir.vil3ntec.tohid.data.SupplierFx.defaultRate(data, code, tillRates) },
       )
     },
 
@@ -551,19 +563,35 @@ private fun RouteScope.PayRoute() {
   val payKey = remember(id) { moneyId() }
   //  e-rows-63b: «پرداخت» ِ یک خرید ⇒ ماندهٔ همان خرید و یادداشتی که فاکتور را نام می‌برد (`PurchaseBook.open` اول همان را صاف می‌کند)
   val invoiceNo = args.query("invoice")?.toIntOrNull()?.takeIf { it > 0 }
-  val prefill = remember(id, invoiceNo) {
-    args.query("amount")?.takeIf { it.isNotBlank() }?.let { a -> PayForm(amount = a, date = todayIso(), notes = invoiceNo?.let { ir.vil3ntec.tohid.data.PurchaseBook.payNote(it) }.orEmpty()) }
+  //  PUR-11: «پرداخت» ِ خریدِ ارزی ⇒ حسابِ همان ارز با ماندهٔ همان ارز و آخرین نرخ
+  val payCurrency = args.query("currency")?.takeIf { ir.vil3ntec.tohid.data.SupplierFx.cur(it) != null }
+  val tillRates = remember { ir.vil3ntec.tohid.data.FxTillPref.rates(context) }
+  val prefill = remember(id, invoiceNo, payCurrency) {
+    args.query("amount")?.takeIf { it.isNotBlank() }?.let { a ->
+      val base = PayForm(amount = a, date = todayIso(), notes = invoiceNo?.let { ir.vil3ntec.tohid.data.PurchaseBook.payNote(it) }.orEmpty())
+      if (payCurrency == null) base else LedgerFormsModel.setAccount(base, payCurrency, ir.vil3ntec.tohid.data.SupplierFx.defaultRate(data, payCurrency, tillRates)).copy(amount = a)
+    }
   }
+  val fxAccounts = remember(data.purchases, data.supplierPayments, id) { ir.vil3ntec.tohid.data.SupplierFx.accounts(data, id) }
   SupplierPaySheet(
     supplier = supplier,
     debt = ir.vil3ntec.tohid.data.ShopStore.supplierDebt(data, id),
     prefill = prefill,
     onClose = { back() },
     onSave = { f ->
-      val result = LedgerEngine.paySupplier(data, id, LedgerFormsModel.payAmount(f), f.date, f.notes, todayIso(), System.currentTimeMillis(), ::moneyId, key = payKey)
+      val code = f.account
+      val rate = LedgerFormsModel.fxRate(f)
+      val minor = LedgerFormsModel.fxMinor(f)
+      val now = System.currentTimeMillis()
+      val result = if (code != null) {
+        if (rate == null || minor == null) LedgerEngine.Result.Failed(ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.amountBad)
+        else ir.vil3ntec.tohid.data.SupplierFx.pay(data, id, code, minor, f.inAfn, rate, f.date, f.notes, todayIso(), now, ::moneyId, key = payKey)
+      } else LedgerEngine.paySupplier(data, id, LedgerFormsModel.payAmount(f), f.date, f.notes, todayIso(), now, ::moneyId, key = payKey)
       MoneyWriter.ledger(store, toasts, context, data, result, StrMoney.saved) != null
     },
     onSaved = { back() },
+    fxAccounts = fxAccounts,
+    lastRate = { code -> ir.vil3ntec.tohid.data.SupplierFx.defaultRate(data, code, tillRates) },
   )
 }
 

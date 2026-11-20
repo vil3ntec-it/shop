@@ -37,7 +37,8 @@ internal class PurchaseRowText(
       val amount = amount(v)
       return PurchaseRowText(
         title = v.supplierName.ifBlank { StrMoney.supplierLabel },
-        subtitle = "$head · ${items(v)}",
+        //  PUR-11: خریدِ ارزی ⇒ جمع به همان ارز کنارِ اقلام (مبلغِ ردیف معادلِ افغانی است)
+        subtitle = "$head · ${items(v)}" + v.currency?.let { c -> " · " + ir.vil3ntec.tohid.data.SupplierFx.text(kotlin.math.abs(v.fxTotal), c) }.orEmpty(),
         amount = amount,
         pay = pay(v, today),
         receipt = receipt(v),

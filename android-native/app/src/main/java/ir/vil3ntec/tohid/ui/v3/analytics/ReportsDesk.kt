@@ -349,6 +349,12 @@ private fun DeskKpis(d: ShopData, rep: DeskRep, from: String, to: String) {
         KpiStat(StrReports.paid, r.paid, ::afn, m, hue = V3Hue.BRAND)
         KpiStat(StrReports.onSupplierAccount, r.debt, ::afn, m, hue = V3Hue.ORANGE)
         KpiStat(StrReports.topSupplier, 0.0, { r.bySupplier.firstOrNull()?.first ?: "—" }, m)
+        //  PUR-11: اختلافِ نرخِ پرداخت‌های ارزیِ بازه — فقط وقتی هست (دکانِ فقط‌افغانی همان چهار کاشی)
+        if (r.fxDiff != 0L) {
+          KpiStat(ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.fxDiffCol, r.fxDiff / 100.0, ::afn, m,
+            valueColor = if (r.fxDiff > 0) PhoneV3.colors.negative else null,
+            caption = ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.fxDiffReportNote)
+        }
       }
       DeskRep.EXPENSES -> {
         val rows = remember(d, from, to) { d.expenses.filter { it.date in from..to } }
