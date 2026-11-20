@@ -28,6 +28,7 @@ const E = await boot({ name: 'newinstall', env: {
 } });
 
 const COLLECTIONS = ['products', 'warehouseEntries', 'debtors', 'sales', 'saleItems', 'transactions', 'stockMovements'];
+const seededDevices = new Map();
 
 /** دکانِ پُرِ برنامهٔ قدیم: صاحب + دکان + کالا، موجودی، مشتری و یک فروشِ قرضی — همه روی سرور */
 async function seedShop({ email, name = 'صاحبِ دکان', shop = 'دکانِ قدیمی', products = 3 }) {
@@ -41,6 +42,7 @@ async function seedShop({ email, name = 'صاحبِ دکان', shop = 'دکان�
   if (sold && sold.ok === false) throw new Error(`فروشِ برنامهٔ قدیم: ${sold.message}`);
   const pushed = await old.sync();
   if (!pushed.ok) throw new Error(`push ِ برنامهٔ قدیم: ${JSON.stringify(pushed)}`);
+  seededDevices.set(String(owner.shopId), old);
   const rows = Object.fromEntries(COLLECTIONS.map((c) => [c, (old.ledger[c] || []).length]));
   return {
     email, password: owner.password, userId: String(owner.user.id), shopId: String(owner.shopId),
@@ -56,6 +58,17 @@ async function oplog(shopId) {
 
 const routes = {
   'POST /seed': async (b) => seedShop(b),
+  'POST /product-price': async ({ shopId, productId, price }) => {
+    const device = seededDevices.get(shopId);
+    if (!device || !Number.isFinite(price) || !device.ledger.products.some((p) => p.id === productId)) {
+      throw new Error('دکان، کالا یا قیمتِ آزمون معتبر نیست');
+    }
+    const products = device.ledger.products.map((p) => p.id === productId ? { ...p, salePrice: price } : p);
+    device.save({ ...device.ledger, products });
+    const result = await device.sync();
+    if (!result.ok || device.queue.length) throw new Error('قیمتِ دستگاهِ دوم به سرور نرسید');
+    return { cursor: device.cursor };
+  },
   /** حسابِ تازهٔ بی دکان (ثبت‌نامِ سه‌پله‌ای ِ برنامه) */
   'POST /account': async (b) => {
     const a = await E.register(String(b.email), String(b.name || 'حسابِ تازه'));

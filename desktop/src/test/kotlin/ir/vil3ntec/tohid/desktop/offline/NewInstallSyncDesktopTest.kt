@@ -13,6 +13,7 @@ import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.desktop.DesktopContext
 import ir.vil3ntec.tohid.platform.ServerSwitchAndroid
+import ir.vil3ntec.tohid.scenario.FakeLivePort
 import ir.vil3ntec.tohid.sync.AutoSync
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
@@ -70,6 +71,49 @@ class NewInstallSyncDesktopTest {
     rounds(store)
     assertPulled(store, shop)
     assertGreen()
+  }
+
+  @Test fun `S76 — موتور واقعی پس از خبرهای تکراری و کهنه آخرین قیمت سرور را نگه می‌دارد`() = runBlocking {
+    val shop = seed("s76")
+    val store = ShopStore(ctx).also { it.load() }
+    signIn(store, shop)
+    rounds(store)
+    val product = (shop.seed["products"] as JsonArray).first() as JsonPrimitive
+    val id = product.content
+    fun price(): Double = store.ledgerNow().products.single { it.id == id }.salePrice
+    fun changePrice(value: Int): Long =
+      ctl("/product-price", obj("shopId" to shop.shopId, "productId" to id, "price" to value)).str("cursor").toLong()
+
+    val port = FakeLivePort()
+    val pulled = mutableListOf<Long>()
+    val live = port.socket {
+      runBlocking { engine.runOnce(store::ledgerNow, store::applyFromServerNow).getOrThrow() }
+      pulled += engine.state.cursor
+    }
+    try {
+      live.connect()
+      port.last.opens()
+      port.last.says("""{"event":"hello","cursor":0}""")
+      assertEquals(100.0, price(), 0.0)
+
+      val early = changePrice(120)
+      port.last.says("""{"event":"changed","cursor":$early}""")
+      assertEquals(120.0, price(), 0.0)
+      val missed = changePrice(150)
+      val latest = changePrice(180)
+      val serverBefore = ctl("/oplog", obj("shopId" to shop.shopId)).str("ops")
+      for (cursor in listOf(latest, latest, missed, early)) {
+        port.last.says("""{"event":"changed","cursor":$cursor}""")
+        assertEquals(180.0, price(), 0.0)
+        assertEquals(latest, engine.state.cursor)
+      }
+      assertEquals(6, pulled.size)
+      assertEquals(pulled.sorted(), pulled)
+      assertEquals(0, engine.queueSize())
+      assertEquals(serverBefore, ctl("/oplog", obj("shopId" to shop.shopId)).str("ops"))
+    } finally {
+      live.disconnect()
+    }
   }
 
   /** (ب) نصبِ تازه پیش از ورود چند کار روی همین دستگاه کرد (چند op در صف)؛ بعد با همان حساب وارد شد */
