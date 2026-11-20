@@ -323,7 +323,10 @@ ok(await bubbles('پیامِ ماندگار', qp) === 1 && await queued('پیا�
 await qp.evaluate(() => { const t = JSON.parse(localStorage.getItem('store-ticket')); t.ticket += 'xx'; localStorage.setItem('store-ticket', JSON.stringify(t)); });
 await qp.fill('#ct-text', 'پس از تأیید');
 await qp.click('#ct-send');
-await qp.waitForFunction(() => !document.getElementById('ct-verify').hidden, null, { timeout: 10000 });
+await qp.waitForFunction(() => {
+  const pending = JSON.parse(localStorage.getItem('store-chat-out'));
+  return !document.getElementById('ct-verify').hidden && pending?.items.some((item) => item.state === 'verify');
+}, null, { timeout: 10000 });
 ok(await countFrom(conv1.id, 'پس از تأیید') === 0 && (await stored(qp)).items[0].state === 'verify',
   '۴۰۱ ⇒ فرمِ تأیید؛ پیام «منتظرِ تأیید» در صف ماند', JSON.stringify((await stored(qp)).items.map((x) => x.state)));
 //  `refocus`: پیش از نوشتنِ کد، گفت‌وگو دوباره باز می‌شود (`verify()` و برگه دوباره) — تمرکزِ دیرِ ۶۰/۸۰ms ِ آن‌ها نباید کادرِ کدِ در
@@ -571,10 +574,11 @@ await page2.close();
 
 //  ── CHAT-14 در وب (`chat-acts.js` ِ دیربار): پاسخ، ویرایش تا `editUntil` ِ سرور، سنجاقِ فقط برای خودم، جست‌وجو ──
 const actOf = async (id, act) => {
-  await page.click(li(id, '.ct-more'));
+  const menu = li(id, '.ct-more');
+  if (await page.getAttribute(menu, 'aria-expanded') !== 'true') await page.click(menu);
   await page.waitForSelector(li(id, '[data-del="me"]'));
   const b = await page.$(li(id, `[data-act="${act}"]`));
-  if (!b) await page.click(li(id, '.ct-more'));
+  if (!b) await page.click(menu);
   return b;
 };
 ok(Boolean(await actOf(askId, 'reply')) && await page.$(li(askId, '[data-act="edit"]')) === null, 'پیامِ دکان: «پاسخ» هست، «ویرایش» نه');
@@ -620,7 +624,10 @@ await page.fill('#ct-text', '');
 
 ok(Boolean(await actOf(askId, 'pin')), '«سنجاق» در نوارِ کارها');
 await page.click(li(askId, '[data-act="pin"]'));
-await page.waitForFunction(() => !document.getElementById('ct-pins').hidden, null, { timeout: 10000 });
+await page.waitForFunction((x) => {
+  const menu = document.querySelector(`#ct-list li[data-id="${x}"] .ct-more`);
+  return !document.getElementById('ct-pins').hidden && menu?.getAttribute('aria-expanded') === 'false';
+}, askId, { timeout: 10000 });
 const pinRow = await one("SELECT side FROM shop_chat_pins WHERE message_id=$1", [askId]);
 const shopPins = (await call('GET', `/api/shop/chat/conversations/${conv1.id}`, null, T)).body.conversation.pinned || [];
 ok(/کی می‌آیید؟/.test(await page.textContent('#ct-pins')) && pinRow && pinRow.side === 'customer' && !shopPins.some((x) => x.messageId === askId),
