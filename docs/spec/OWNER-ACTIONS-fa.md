@@ -449,3 +449,20 @@
 6. **آیفون (روزِ حسابِ Apple Developer):** شناسهٔ `com.vill3n.dailyshop` را ثبت کنید (نه نامِ پیشین)؛ روی سرور
    `APNS_BUNDLE_ID=com.vill3n.dailyshop` و `APPLE_CLIENT_IDS=com.vill3n.dailyshop`.
 
+
+## ۱۱) «از عکسِ فاکتور» (PUR-12/AI-10، پس از انتشار) — نصبِ Tesseract روی سرورِ خودتان (۱۴۰۵/۰۸/۲۶)
+
+قابلیت پشتِ پرچمِ خاموشِ **`shop.purchase_ocr`** است (پنلِ مرکزی ⇐ پرچم‌ها، برای یک دکان یا `all`)؛ خاموش ⇒ دکمه‌ای در برنامه نیست.
+خواندنِ عکس رایگان و فقط روی **همان کامپیوتری** است که سرورِ حساب را اجرا می‌کند (بی سرویسِ ابری، بی API ِ پولی). پیش از روشن کردن:
+
+- **کامپیوترِ خانگیِ ویندوز** (پنلِ خانگی سرور را بالا می‌آورد): نصابِ Tesseract ِ UB Mannheim — `winget install --id UB-Mannheim.TesseractOCR`
+  — و در نصاب زیرِ «Additional language data» تیکِ **Persian** (یا فایلِ `fas.traineddata` را در `C:\Program Files\Tesseract-OCR\tessdata`
+  بگذارید). سرور همان `C:\Program Files\Tesseract-OCR\tesseract.exe` را خودش پیدا می‌کند؛ جای دیگر ⇒ `TESSERACT_BIN=<مسیرِ کامل>` در `.env`.
+- **لینوکس (Debian/Ubuntu)**: `sudo apt install tesseract-ocr tesseract-ocr-fas`
+- **داکر (`server/Dockerfile`)**: خودِ image از این نسخه `tesseract-ocr` و `tesseract-ocr-data-fas` را می‌گذارد (Alpine؛ اگر نصب نشود ساخت
+  نمی‌شکند و برنامه «نصب نیست» می‌گوید) — فقط `docker compose build && docker compose up -d`.
+- سنجه: `tesseract --list-langs` باید `fas` را نشان دهد. برنامه تا ۶۰ ثانیه پس از نصب «نصب نیست» را کنار می‌گذارد (بی ری‌استارت).
+- اختیاری در `.env`: `PURCHASE_OCR_WORKERS=1|2` (چند عکس هم‌زمان، پیش‌فرض ۱)، `PURCHASE_OCR_TIMEOUT_MS` (پیش‌فرض و سقف ۲۴۰۰۰)،
+  `PURCHASE_OCR_LANG=fas` (فقط فارسی؛ پیش‌فرض `fas+eng` که نامِ لاتینِ کالا را هم می‌خواند).
+- پولی است: فقط دکانِ با اشتراکِ فعال یا دورهٔ آزمایشی؛ مجوزِ «نوشتنِ خرید» (`stock.adjust`: صاحب، مدیر، انباردار). عکس و متن روی سرور
+  نمی‌مانند؛ هیچ ردیفی بی تأییدِ ردیف‌به‌ردیف به فاکتور نمی‌رود و ثبت همان «ثبت» ِ همیشگی است.

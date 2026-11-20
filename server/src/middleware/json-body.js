@@ -15,6 +15,7 @@ const express = require('express');
 
 const LIMIT = '2mb';
 const RAW_SYNC = /^\/api(?:\/v1)?\/(?:sync|shop\/sync|pump)(?:\/|$)/;
+const RAW_PURCHASE_OCR = /^\/api(?:\/v1)?\/shop\/purchase-ocr\/?$/i;
 const DIRTY = Symbol('jsonNul');
 const ESC = Buffer.from('\\u0000');
 
@@ -55,6 +56,8 @@ function jsonBody() {
     verify: (req, _res, buf, enc) => { if (!/^utf-?8$/i.test(String(enc || 'utf-8')) || buf.includes(ESC)) req[DIRTY] = true; },
   });
   return function jsonBodyParser(req, res, next) {
+    // بارگذاریِ عکس پس از پرچم، احراز و سهمیهٔ همان مسیر خوانده می‌شود.
+    if (req.method === 'POST' && RAW_PURCHASE_OCR.test(req.path)) return next();
     if (RAW_SYNC.test(req.path)) return plain(req, res, next);
     return clean(req, res, (err) => {
       if (!err && req[DIRTY]) req.body = stripNul(req.body);

@@ -8,6 +8,12 @@ FROM node:22-alpine
 # postgres:16 در docker-compose هماهنگ است.
 RUN apk add --no-cache postgresql16-client tini
 
+# PUR-12/AI-10 «از عکسِ فاکتور»: Tesseract و دادهٔ فارسی/انگلیسی — رایگان و روی همین سرور (بی سرویسِ ابری).
+# نامِ Alpine ِ همان tesseract-ocr و tesseract-ocr-fas ِ Debian. نصب‌نشدن ساخت را نمی‌شکند: سرور فقط «نصب نیست»
+# می‌گوید (lib/purchase-ocr.js) و خودِ قابلیت پشتِ پرچمِ خاموشِ shop.purchase_ocr است.
+RUN apk add --no-cache tesseract-ocr tesseract-ocr-data-fas tesseract-ocr-data-eng \
+  || echo "tesseract-ocr installed? no — purchase-ocr will report not installed"
+
 ENV NODE_ENV=production
 WORKDIR /app
 

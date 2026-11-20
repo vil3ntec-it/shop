@@ -131,9 +131,15 @@ jobs:
         working-directory: server
         run: npm ci --no-audit --no-fund
 
+      - name: نصبِ موتورِ خواندنِ فاکتورِ فارسی
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-fas
+
       - name: آزمون‌های سرور
         working-directory: server
         env:
+          PURCHASE_OCR_REQUIRE_REAL: '1'
           # GATE-NEW-05: هر آزمون یک خطِ شواهد (شناسه، commit، محیط، نتیجه، دستورِ بازتولید) — scripts/test-evidence.js
           TEST_EVIDENCE_FILE: ${{ runner.temp }}/evidence/server-postgres.jsonl
         run: npm test
