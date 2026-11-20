@@ -106,6 +106,7 @@ object SettingsHelp {
     SettingsLayout.LINE_PRICING -> H.linePricingLine
     SettingsLayout.LINE_SELLER -> ir.vil3ntec.tohid.core.i18n.StrLineSeller.helpLine
     SettingsLayout.PRINT_PHONE -> ir.vil3ntec.tohid.core.i18n.StrCustomerMask.helpLine
+    SettingsLayout.PURCHASE_FX -> ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.helpLine
     SettingsLayout.TILL_GOODS -> H.tillGoodsLine
     SettingsLayout.PRICE_LIST -> H.priceListLine
     SettingsLayout.AUTO_FEES -> H.feesLine
@@ -173,6 +174,7 @@ object SettingsHelp {
     SettingsLayout.LINE_PRICING -> H.linePricingExample
     SettingsLayout.LINE_SELLER -> ir.vil3ntec.tohid.core.i18n.StrLineSeller.helpExample
     SettingsLayout.PRINT_PHONE -> ir.vil3ntec.tohid.core.i18n.StrCustomerMask.helpExample
+    SettingsLayout.PURCHASE_FX -> ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.helpExample
     SettingsLayout.TILL_GOODS -> H.tillGoodsExample
     SettingsLayout.PRICE_LIST -> H.priceListExample
     SettingsLayout.AUTO_FEES -> H.feesExample

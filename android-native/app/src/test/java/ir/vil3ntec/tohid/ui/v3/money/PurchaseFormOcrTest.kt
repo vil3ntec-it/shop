@@ -45,6 +45,15 @@ class PurchaseFormOcrTest {
     assertEquals(listOf(PurchaseRow("rice", "3", "900")), f.more)
   }
 
+  @Test fun recognizedAfnPricesCannotBeAppliedToAForeignCurrencyDraft() {
+    val foreign = PurchaseFormModel.setCurrency(base, "USD")
+    val (form, added) = PurchaseFormModel.withAccepted(
+      foreign, listOf(InvoiceOcr.Accepted("rice", 1.0, 950.0)), d,
+    )
+    assertEquals(0, added)
+    assertEquals(foreign, form)
+  }
+
   @Test fun unknownProductsAndTheRowCapAreRespected() {
     val (f, n) = PurchaseFormModel.withAccepted(base, listOf(InvoiceOcr.Accepted("gone", 1.0, 1.0)), d)
     assertEquals(0, n)

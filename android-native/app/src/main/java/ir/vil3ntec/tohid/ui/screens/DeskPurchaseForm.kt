@@ -88,12 +88,15 @@ internal fun purchaseDefaultPrice(p: Product, unit: String?): String {
   return Math.round(base * f / 1000.0).toString()
 }
 
-/** ستون‌های جدولِ ردیف‌ها — سرِ جدول ([ir.vil3ntec.tohid.ui.desk.DeskTableHead]) و ردیف همین پهناها را می‌گیرند */
-internal fun purchaseLineColumns(): List<DeskColumn> = listOf(
+/**
+ *  ستون‌های جدولِ ردیف‌ها — سرِ جدول ([ir.vil3ntec.tohid.ui.desk.DeskTableHead]) و ردیف همین پهناها را می‌گیرند. PUR-11: فاکتورِ
+ *  ارزی ([fxCode]) ⇒ سرستونِ فی «قیمتِ هر واحد (USD)».
+ */
+internal fun purchaseLineColumns(fxCode: String? = null): List<DeskColumn> = listOf(
   DeskColumn("#", width = 32.dp),
   DeskColumn(StrPurchasePages.itemNameBarcode, weight = 1f),
   DeskColumn(StrPlaces.amount, width = 110.dp, end = true),
-  DeskColumn(StrReturnPages.unitPriceAfn, width = 140.dp, end = true),
+  DeskColumn(fxCode?.let(ir.vil3ntec.tohid.core.i18n.StrPurchaseFx::priceIn) ?: StrReturnPages.unitPriceAfn, width = 140.dp, end = true),
   DeskColumn(StrPurchasePages.expiryOptional, width = 150.dp),
   DeskColumn(StrInvoices.total, width = 130.dp, end = true),
   DeskColumn("", width = DeskSize.control),
@@ -166,6 +169,8 @@ internal fun DeskPurchaseLineRow(
   onTouch: () -> Unit,
   onNext: () -> Unit,
   onRemove: () -> Unit,
+  /** PUR-11: ارز و نرخِ فاکتور (`DeskPurchaseFx.kt`)؛ null = افغانی، همان ردیفِ پیشین */
+  fx: DeskFx? = null,
 ) {
   var menu by remember { mutableStateOf(false) }
   val index = remember(d) { ShopStore.barcodeIndex(d) }
@@ -179,10 +184,10 @@ internal fun DeskPurchaseLineRow(
     //  PRD-07: واحدِ پیش‌فرضِ همین تأمین‌کننده (کارتنِ ۲۴ ِ ب)، وگرنه واحدِ پایه
     l.unitName = if (unitsOn) ir.vil3ntec.tohid.core.product.PurchaseUnits.defaultFor(p.purchaseUnits?.map(ShopStore::coreOf), supplierId)?.name else null
     if (l.qty.isBlank()) l.qty = "1"
-    if (l.price.isBlank()) l.price = purchaseDefaultPrice(p, l.unitName)
+    if (l.price.isBlank() && fx == null) l.price = purchaseDefaultPrice(p, l.unitName)  //  PUR-11: فاکتورِ ارزی قیمتِ افغانی را پیش‌پُر نمی‌کند
     runCatching { l.qtyFocus.requestFocus() }
   }
-  val cols = purchaseLineColumns()
+  val cols = purchaseLineColumns(fx?.code)
   Column(Modifier.fillMaxWidth()) {
     Row(
       Modifier.fillMaxWidth().heightIn(min = DeskSize.tableRow).padding(horizontal = DeskSpace.x3, vertical = DeskSpace.x1),
@@ -218,23 +223,23 @@ internal fun DeskPurchaseLineRow(
       Box(cellOf(cols[3])) {
         DeskTextField(
           l.price, { l.price = ir.vil3ntec.tohid.numericInput(it); onTouch() }, Modifier.fillMaxWidth(),
-          focusRequester = l.priceFocus, textAlign = TextAlign.End, description = StrReturnPages.unitPriceAfn, onKey = enterKey(onNext),
+          focusRequester = l.priceFocus, textAlign = TextAlign.End, description = cols[3].title, onKey = enterKey(onNext),
         )
       }
       Box(cellOf(cols[4])) {
         DeskTextField(l.expiry, { l.expiry = it.take(10) }, Modifier.fillMaxWidth(), placeholder = "۱۴۰۶/۰۳/۳۱", description = StrPurchasePages.expiryOptional, onKey = enterKey(onNext))
       }
       Box(cellOf(cols[5]), contentAlignment = Alignment.CenterEnd) {
-        if (l.productId.isNotBlank()) DeskCell(money(l.total()), strong = true)
+        if (l.productId.isNotBlank()) DeskCell(fx?.let { f -> f.line(l.qty, l.price)?.let(f::text).orEmpty() } ?: money(l.total()), strong = true)
       }
       Box(cellOf(cols[6]), contentAlignment = Alignment.Center) { DeskIconButton(Icons.Outlined.Close, StrStock.removeRow, onRemove) }
     }
     //  PRD-07: واحدِ خریدِ همین ردیف و مقدار/بهای واحدِ پایه از هسته (`PurchaseUnits.baseCost`)
     val product = if (unitsOn && l.productId.isNotBlank()) d.products.find { it.id == l.productId } else null
-    if (product != null && !product.purchaseUnits.isNullOrEmpty()) PurchaseUnitPicker(product, l.unitName, l.qty, l.total()) { u ->
+    if (product != null && !product.purchaseUnits.isNullOrEmpty()) PurchaseUnitPicker(product, l.unitName, l.qty, fx?.afnOf(l.qty, l.price) ?: l.total()) { u ->
       val before = purchaseDefaultPrice(product, l.unitName)
       l.unitName = u
-      if (l.price.isBlank() || l.price == before) l.price = purchaseDefaultPrice(product, u)
+      if (fx == null && (l.price.isBlank() || l.price == before)) l.price = purchaseDefaultPrice(product, u)
       onTouch()
     }
     //  PUR-09: آخرین فیِ همین تأمین‌کننده برای همین کالا (هنگامِ ورود)

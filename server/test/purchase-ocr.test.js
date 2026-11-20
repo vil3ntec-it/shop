@@ -45,8 +45,9 @@ const fs = require('fs'), path = require('path');
 const mode = JSON.parse(fs.readFileSync(path.join(__dirname, 'mode.json'), 'utf8'));
 const args = process.argv.slice(2);
 if (args[0] === '--list-langs') {
-  process.stdout.write('List of available languages in "/usr/share/tessdata/" (' + mode.langs.length + '):\\n' + mode.langs.join('\\n') + '\\n');
-  process.exit(0);
+  fs.appendFileSync(path.join(__dirname, 'probes.log'), 'probe\\n');
+  setTimeout(() => process.stdout.write('List of available languages in "/usr/share/tessdata/" (' + mode.langs.length + '):\\n' + mode.langs.join('\\n') + '\\n'), mode.probeDelay || 0);
+  return;
 }
 const file = args[0];
 const b = fs.readFileSync(file);
@@ -67,6 +68,7 @@ else if (mode.run === 'flood') {
 function setMode(m) {
   fs.writeFileSync(path.join(FAKE, 'mode.json'), JSON.stringify({ langs: ['eng', 'fas', 'osd'], run: 'ok', tsv: TSV, ...m }));
   try { fs.unlinkSync(path.join(FAKE, 'seen.json')); } catch { /* نبود */ }
+  fs.rmSync(path.join(FAKE, 'probes.log'), { force: true });
   process.env.TESSERACT_BIN = BIN;
   ocr._test.reset();
 }
@@ -294,6 +296,17 @@ test('مهلت، خروجیِ بی‌اندازه و شکستِ Tesseract ⇒ ۵
     assert.equal(ocr._test.active(), 0);
   }
   assert.deepEqual(leftovers(), []);
+});
+
+test('درخواست‌های هم‌زمان وضعیت موتور فقط یک بار زبان‌ها را می‌خوانند', async () => {
+  await setFlag(shop.shopId, true);
+  setMode({ probeDelay: 300 });
+  const responses = await Promise.all(Array.from({ length: 12 }, () => config(shop.owner)));
+  for (const response of responses) {
+    assert.equal(response.status, 200);
+    assert.equal(response.body.available, true);
+  }
+  assert.equal(fs.readFileSync(path.join(FAKE, 'probes.log'), 'utf8'), 'probe\n');
 });
 
 test('همزمانی ۱: درخواستِ دوم در حینِ اولی ۵۰۳ ِ ocr_busy با Retry-After، بی صف', async () => {

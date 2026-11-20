@@ -102,6 +102,12 @@ object ReportEngine {
     /** نامِ تأمین‌کننده ⇒ جمعِ خرید در بازه، بیشترین اول */
     val bySupplier: List<Pair<String, Double>>,
     val rows: List<Purchase>,
+    /**
+     *  PUR-11: خریدهای ارزیِ بازه به تفکیکِ ارز (کد ⇒ جمع به واحدِ کوچکِ همان ارز؛ عددهای بالا معادلِ افغانی‌اند) و جمعِ اختلافِ
+     *  نرخِ پرداخت‌های بازه به پول (مثبت = زیان). دکانِ فقط‌افغانی ⇒ خالی و ۰.
+     */
+    val byCurrency: List<Pair<String, Long>> = emptyList(),
+    val fxDiff: Long = 0,
   )
 
   /** خریدهای یک بازه — جمع، پرداخت‌شده، بدهیِ به‌جامانده و سهمِ هر تأمین‌کننده */
@@ -118,6 +124,9 @@ object ReportEngine {
       debt = rows.sumOf { it.debt },
       bySupplier = bySupplier,
       rows = rows,
+      byCurrency = rows.mapNotNull { p -> SupplierFx.cur(p.currency)?.let { it to (p.fxTotalMinor ?: 0L) } }
+        .groupBy({ it.first }, { it.second }).map { (c, l) -> c to l.sum() }.sortedBy { it.first },
+      fxDiff = SupplierFx.diff(d, from, to),
     )
   }
 
