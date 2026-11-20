@@ -106,7 +106,8 @@ function run(args, { timeoutMs, maxOut = LIMITS.STDOUT_MAX } = {}) {
 }
 
 let cache = null;   // { at, value }
-/** خواننده‌ای که آزمون جایش می‌گذارد (`_setStatus`)؛ پیش‌فرض همان `tesseract --list-langs` */
+let pendingStatus = null;
+/** خواندنِ زبان‌های نصب‌شده با `tesseract --list-langs` */
 async function probe() {
   try {
     const r = await run(['--list-langs'], { timeoutMs: LIMITS.LANGS_TIMEOUT_MS, maxOut: 64 * 1024 });
@@ -120,19 +121,24 @@ async function probe() {
 
 /** حالِ موتور — کشِ `LANGS_TTL_MS`؛ `fas` لازم است، `eng` اگر بود کنارش (نام‌های لاتینِ کالا) */
 async function status({ fresh = false } = {}) {
-  const t = Date.now();
-  if (!fresh && cache && t - cache.at < LIMITS.LANGS_TTL_MS) return cache.value;
-  const p = await probe();
-  const fas = p.langs.includes('fas');
-  const value = {
-    installed: p.installed,
-    langs: p.langs.filter((l) => l === 'fas' || l === 'eng'),
-    //  `PURCHASE_OCR_LANG=fas` ⇒ فقط فارسی (سرخط‌های فارسی کمی بهتر؛ نامِ لاتینِ کالا بدتر) — پیش‌فرض `fas+eng` اگر eng بود
-    lang: fas ? (p.langs.includes('eng') && String(process.env.PURCHASE_OCR_LANG || '').trim() !== 'fas' ? 'fas+eng' : 'fas') : null,
-    missing: !p.installed ? [PACKAGES.bin, PACKAGES.fas] : fas ? [] : [PACKAGES.fas],
-  };
-  cache = { at: t, value };
-  return value;
+  if (!fresh && cache && Date.now() - cache.at < LIMITS.LANGS_TTL_MS) return cache.value;
+  if (pendingStatus) return pendingStatus;
+  const request = probe().then((p) => {
+    const fas = p.langs.includes('fas');
+    const useEnglish = p.langs.includes('eng') && String(process.env.PURCHASE_OCR_LANG || '').trim() !== 'fas';
+    const value = {
+      installed: p.installed,
+      langs: p.langs.filter((l) => l === 'fas' || l === 'eng'),
+      lang: fas ? (useEnglish ? 'fas+eng' : 'fas') : null,
+      missing: !p.installed ? [PACKAGES.bin, PACKAGES.fas] : fas ? [] : [PACKAGES.fas],
+    };
+    if (pendingStatus === request) cache = { at: Date.now(), value };
+    return value;
+  }).finally(() => {
+    if (pendingStatus === request) pendingStatus = null;
+  });
+  pendingStatus = request;
+  return request;
 }
 
 const notInstalled = (missing) => Object.assign(
@@ -279,7 +285,7 @@ async function read(buf) {
 const _test = {
   setPrepare(fn) { prepImpl = fn || prepare; },
   setTimeoutMs(ms) { ocrTimeoutMs = ms; },
-  reset() { cache = null; prepImpl = prepare; ocrTimeoutMs = LIMITS.OCR_TIMEOUT_MS; },
+  reset() { cache = null; pendingStatus = null; prepImpl = prepare; ocrTimeoutMs = LIMITS.OCR_TIMEOUT_MS; },
   active: () => active,
 };
 
