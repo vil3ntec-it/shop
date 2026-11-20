@@ -26,6 +26,7 @@ object I18nTables {
     StrPriceCheck, StrChat, StrLabel, StrOrderSlip, StrCount, StrGift, StrRetPolicy, StrDeliver, StrProduct, StrGrid,
     StrRisk, StrPay, StrAdmin, StrShift, StrCourier, StrOrderOps, StrPayFix, StrSpecialOrder, StrSafe, StrGiftCard,
     StrTaxQuarter, StrCustomerCard, StrOrderFeedback, StrLayaway, StrVisualSearch,
+    StrInvoiceOcr, // PUR-12/AI-10: «از عکسِ فاکتور» و بازبینیِ ردیف‌به‌ردیف
     StrTill, // S28b، S45، S46، S50
     StrStates, // دستهٔ ۶۳ (e-rows-63i): متنِ پیش‌فرضِ خطای ساده در حالت‌های مشترکِ خالی/خطا
     StrA11y, // صفحه‌خوان در نسخهٔ ۳: باز/بسته، کارِ نگه‌داشتن، QR ِ پرداخت، «نیاز به توجه»، ضبطِ صدا با زدن، جابه‌جاییِ نوار

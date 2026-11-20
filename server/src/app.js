@@ -386,6 +386,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/catalog', require('./routes/catalog'));
     //  سفارشِ خرید از تأمین‌کننده (PUR-02/04) — پیش از `/shop`، پشتِ پرچمِ خاموشِ `shop.purchase_orders`
     api.use('/shop/purchase-orders', require('./routes/purchase-orders'));
+    //  PUR-12/AI-10: «از عکسِ فاکتور» (Tesseract ِ همین سرور، فقط متن؛ هیچ ثبت) — پیش از `/shop`، پشتِ پرچمِ خاموشِ `shop.purchase_ocr`
+    api.use('/shop/purchase-ocr', require('./routes/purchase-ocr'));
     //  اعلانِ سفارش (v3 §۳۰) — پیش از `/shop` به همان دلیلِ `/shop/orders`؛ پیش‌فرض روشن (۱۴۰۵/۰۸/۲۴، فقط `false` خاموش)
     api.use('/shop/order-notify', require('./routes/order-notify'));
     //  پوشِ گوشی (FCM، O-01) — ثبتِ توکنِ هر عضو و دستگاه؛ پیش از `/shop`؛ پشتِ پرچمِ `shop.device_push` (پیش‌فرض روشن از ۱۴۰۵/۰۸/۲۴)
