@@ -6,6 +6,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('node:child_process');
 const { shardOf } = require('../scripts/test-shard');
 
 const real = fs.readdirSync(__dirname).filter((f) => f.endsWith('.test.js')).sort();
@@ -34,14 +35,28 @@ test('مقدارِ ناجور ⇒ خطا، نه اجرای بی‌صدای هی�
   }
 });
 
-test('test-pglite.js فهرست را از همین تابع می‌گیرد و server.yml هر دو کارِ PGlite و Electron را دو تکه می‌کند', () => {
+test('تکه‌بندی PostgreSQL فقط در اجرای بیرونی انتخاب می‌کند و اجرای درونی فهرست کامل خود را دارد', () => {
+  const env = { ...process.env, TEST_SHARD: '2/2', TEST_POSTGRES_SHARD: '2/2' };
+  delete env.NODE_TEST_CONTEXT;
+  delete env.TEST_EVIDENCE_FILE;
+  const result = spawnSync(process.execPath, [
+    'scripts/test-run.js', '--test-concurrency=1',
+    'test/fixtures/test-failures-sample.js', 'test/test-evidence.test.js',
+  ], { cwd: path.join(__dirname, '..'), env, encoding: 'utf8', timeout: 30_000 });
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.match(result.stdout, /^# pass 2$/m);
+});
+
+test('هر سه کارِ پایگاه داده در CI از همان تکه‌بندی استفاده می‌کنند', () => {
   const runner = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'test-pglite.js'), 'utf8');
   assert.match(runner, /shardOf\(\s*all\s*,\s*process\.env\.TEST_SHARD\s*\)/);
   const yml = fs.readFileSync(path.join(__dirname, '..', '..', '.github', 'workflows', 'server.yml'), 'utf8');
-  for (const job of ['pglite', 'electron']) {
+  for (const job of ['pg', 'pglite', 'electron']) {
     const block = yml.split(new RegExp(`\\n  ${job}:\\n`))[1].split(/\n  [a-z0-9_-]+:\n/)[0];
     assert.match(block, /shard: \[1, 2\]/, `${job}: ماتریسِ دو تکه`);
-    assert.match(block, /TEST_SHARD: \$\{\{ matrix\.shard \}\}\/2/, `${job}: TEST_SHARD`);
+    const shardVariable = job === 'pg' ? 'TEST_POSTGRES_SHARD' : 'TEST_SHARD';
+    assert.ok(block.includes(shardVariable + ': ${{ matrix.shard }}/2'), job + ': ' + shardVariable);
     assert.match(block, /fail-fast: false/, `${job}: یک تکهٔ سرخ تکهٔ دیگر را لغو نکند`);
   }
+  assert.match(yml, /name: test-evidence-postgres-\$\{\{ matrix\.shard \}\}/);
 });

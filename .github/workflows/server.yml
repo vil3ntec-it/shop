@@ -93,14 +93,19 @@ permissions:
 jobs:
   # ⛔ تا ۱۴۰۵/۰۷/۲۷ همهٔ این‌ها در یک کار و پشتِ‌سرِهم می‌دوید (PostgreSQL، PGlite،
   # Electron، کرومیوم و سناریوهای سرتاسری) و با رشدِ آزمون‌ها به سقفِ ۵۰ دقیقه می‌خورد ⇒
-  # «لغو» بی هیچ آزمونِ قرمزی. حالا پنج کارِ هم‌زمان‌اند و کارِ پایانی با همان نامِ
+  # «لغو» بی هیچ آزمونِ قرمزی. حالا کارها هم‌زمان‌اند و کارِ پایانی با همان نامِ
   # همیشگی («آزمون‌های سرور») فقط وقتی سبز است که همه سبز باشند — پس قاعدهٔ مرج و نامِ
   # چکی که منتظرش هستیم عوض نمی‌شود.
   pg:
-    name: آزمون‌های سرور روی PostgreSQL
+    name: آزمون‌های سرور روی PostgreSQL (${{ matrix.shard }}/2)
     #  pg_dump ِ ubuntu-latest (۲۶٫۰۴) `SET transaction_timeout` می‌نویسد که Postgres ِ سرویس نمی‌شناسد (backup / pump-isolation)
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    # هر تکه پایگاه آزمایشی خودش را دارد. اجرای یک‌تکه در #1081 به مهلت ۴۵ دقیقه رسید.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
 
     services:
       postgres:
@@ -141,14 +146,15 @@ jobs:
         env:
           PURCHASE_OCR_REQUIRE_REAL: '1'
           # GATE-NEW-05: هر آزمون یک خطِ شواهد (شناسه، commit، محیط، نتیجه، دستورِ بازتولید) — scripts/test-evidence.js
-          TEST_EVIDENCE_FILE: ${{ runner.temp }}/evidence/server-postgres.jsonl
+          TEST_EVIDENCE_FILE: ${{ runner.temp }}/evidence/server-postgres-${{ matrix.shard }}.jsonl
+          TEST_POSTGRES_SHARD: ${{ matrix.shard }}/2
         run: npm test
 
       - name: شواهدِ آزمون‌های سرور (PostgreSQL)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: test-evidence-postgres
+          name: test-evidence-postgres-${{ matrix.shard }}
           path: ${{ runner.temp }}/evidence
           if-no-files-found: ignore
           retention-days: 30
