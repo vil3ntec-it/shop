@@ -16,10 +16,14 @@ const os = require('os');
 const path = require('path');
 const failures = require('./test-failures');
 const watchdog = require('./test-watchdog');
+const { shardOf } = require('./test-shard');
 
 const args = process.argv.slice(2);
 const flags = args.filter((a) => a.startsWith('--'));
-const files = args.filter((a) => !a.startsWith('--'));
+const files = shardOf(args.filter((a) => !a.startsWith('--')), process.env.TEST_SHARD);
+if (process.env.TEST_SHARD && files.length === 0) {
+  throw new Error('هیچ پروندهٔ آزمونی در این تکه نیست');
+}
 
 const failed = path.join(os.tmpdir(), `test-failures-${process.pid}-${Date.now()}.jsonl`);
 //  `npm test` دو بار این را صدا می‌زند ⇒ هر اجرا به پروندهٔ شواهد افزوده می‌شود، نه رونویسی

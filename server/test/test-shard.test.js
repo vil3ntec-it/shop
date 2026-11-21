@@ -34,14 +34,17 @@ test('مقدارِ ناجور ⇒ خطا، نه اجرای بی‌صدای هی�
   }
 });
 
-test('test-pglite.js فهرست را از همین تابع می‌گیرد و server.yml هر دو کارِ PGlite و Electron را دو تکه می‌کند', () => {
+test('هر سه کارِ پایگاه داده در CI از همان تکه‌بندی استفاده می‌کنند', () => {
   const runner = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'test-pglite.js'), 'utf8');
   assert.match(runner, /shardOf\(\s*all\s*,\s*process\.env\.TEST_SHARD\s*\)/);
+  const postgres = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'test-run.js'), 'utf8');
+  assert.match(postgres, /shardOf\(.*process\.env\.TEST_SHARD\)/);
   const yml = fs.readFileSync(path.join(__dirname, '..', '..', '.github', 'workflows', 'server.yml'), 'utf8');
-  for (const job of ['pglite', 'electron']) {
+  for (const job of ['pg', 'pglite', 'electron']) {
     const block = yml.split(new RegExp(`\\n  ${job}:\\n`))[1].split(/\n  [a-z0-9_-]+:\n/)[0];
     assert.match(block, /shard: \[1, 2\]/, `${job}: ماتریسِ دو تکه`);
     assert.match(block, /TEST_SHARD: \$\{\{ matrix\.shard \}\}\/2/, `${job}: TEST_SHARD`);
     assert.match(block, /fail-fast: false/, `${job}: یک تکهٔ سرخ تکهٔ دیگر را لغو نکند`);
   }
+  assert.match(yml, /name: test-evidence-postgres-\$\{\{ matrix\.shard \}\}/);
 });
