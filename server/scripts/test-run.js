@@ -20,8 +20,11 @@ const { shardOf } = require('./test-shard');
 
 const args = process.argv.slice(2);
 const flags = args.filter((a) => a.startsWith('--'));
-const files = shardOf(args.filter((a) => !a.startsWith('--')), process.env.TEST_SHARD);
-if (process.env.TEST_SHARD && files.length === 0) {
+const shard = process.env.TEST_POSTGRES_SHARD;
+// Fixture tests invoke this runner themselves and must receive their entire file list.
+delete process.env.TEST_POSTGRES_SHARD;
+const files = shardOf(args.filter((a) => !a.startsWith('--')), shard);
+if (shard && files.length === 0) {
   throw new Error('هیچ پروندهٔ آزمونی در این تکه نیست');
 }
 

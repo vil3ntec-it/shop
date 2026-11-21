@@ -147,7 +147,7 @@ jobs:
           PURCHASE_OCR_REQUIRE_REAL: '1'
           # GATE-NEW-05: هر آزمون یک خطِ شواهد (شناسه، commit، محیط، نتیجه، دستورِ بازتولید) — scripts/test-evidence.js
           TEST_EVIDENCE_FILE: ${{ runner.temp }}/evidence/server-postgres-${{ matrix.shard }}.jsonl
-          TEST_SHARD: ${{ matrix.shard }}/2
+          TEST_POSTGRES_SHARD: ${{ matrix.shard }}/2
         run: npm test
 
       - name: شواهدِ آزمون‌های سرور (PostgreSQL)

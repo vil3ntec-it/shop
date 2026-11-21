@@ -64,7 +64,7 @@ test('هر آزمون یک خط با شناسه، نتیجه، زمان و دس�
     //  دستورِ بازتولید واقعاً همان یک آزمون را می‌زند
     const one = spawnSync('sh', ['-c', by['سبزِ نمونه'].repro.replace(/^cd server && /, '')], { encoding: 'utf8', cwd: SERVER, env: cleanEnv() });
     assert.equal(one.status, 0, one.stdout + one.stderr);
-    assert.match(one.stdout, /# tests 1\b/);
+    assert.match(one.stdout, /^(?:#|ℹ) tests 1\b/m);
 
     //  اجرای دوم (مثلِ `npm test`) به همان پرونده افزوده می‌شود
     const ok = path.join(os.tmpdir(), `ev-ok-${process.pid}.js`);
