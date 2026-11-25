@@ -341,3 +341,26 @@ test('۱۵) و رمز از میزِ مدیر عوض نمی‌شود — هیچ �
   assert.ok(!/password_hash/.test(src), 'میزِ کدها هیچ‌جا رمز نمی‌نویسد');
   assert.ok(!/hashPassword/.test(src), 'و رمزی هم نمی‌سازد');
 });
+
+test('پنل عملیاتی حتی برای مدیر کل کد ورود، بازیابی یا عضویت را نمایش نمی‌دهد', async (t) => {
+  const token = await adminToken();
+  const email = 'production-desk@test.local';
+  const started = await h.post('/api/auth/register/start', { name: 'آزمون', email, password: 'Passw0rd!test' });
+  assert.equal(started.status, 201);
+  const config = require('../src/config');
+  const previous = config.devCodes;
+  t.after(() => { config.devCodes = previous; });
+  config.devCodes = false;
+
+  const list = await h.get('/api/admin/otp?destination=' + email, { token });
+  const [row] = list.body.requests;
+  assert.equal(row.can_reveal, false);
+  for (const path of [`otp/${row.id}/reveal`, 'logins/test-id/reveal', 'shops/test-shop/staff-codes/reveal']) {
+    const result = await h.post('/api/admin/' + path, {}, { token });
+    assert.equal(result.status, 403);
+    assert.equal(result.body.error.code, 'code_display_disabled');
+    assert.equal(result.body.code, undefined);
+  }
+  const verified = await h.post('/api/auth/register/verify', { email, code: started.body.devCode });
+  assert.equal(verified.status, 200);
+});

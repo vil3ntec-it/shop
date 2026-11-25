@@ -1,4 +1,5 @@
 'use strict';
+const config = require('../config');
 /**
  * ورود با کدِ شش‌رقمیِ ایمیلی، مخصوصِ هر برنامه — هستهٔ منطق.
  *
@@ -314,6 +315,7 @@ function shape(r) {
     created_at: Number(r.created_at), expires_at: Number(r.expires_at),
     consumed_at: r.consumed_at ? Number(r.consumed_at) : null,
     superseded_at: r.superseded_at ? Number(r.superseded_at) : null,
+    can_reveal: config.devCodes && active,
     active, code_attempts: Number(r.attempts), max_attempts: Number(r.max_attempts),
     device_id: r.device_id, device_name: r.device_name, app_version: r.app_version, ip: r.ip,
     client_request_id: r.client_request_id,
