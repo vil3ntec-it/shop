@@ -22,6 +22,7 @@
  *     برای کدی که هنوز زنده است.
  */
 const express = require('express');
+const { requireTestCodeDisplay } = require('../middleware/admin-code-display');
 const otp = require('../lib/otp');
 const { one } = require('../db');
 const audit = require('../lib/audit');
@@ -44,7 +45,7 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/:id/reveal', requireSuperAdmin, async (req, res, next) => {
+router.post('/:id/reveal', requireSuperAdmin, requireTestCodeDisplay, async (req, res, next) => {
   try {
     const out = await otp.reveal(req.params.id);
     if (!out) return next(notFound('این درخواست پیدا نشد', 'request_not_found'));

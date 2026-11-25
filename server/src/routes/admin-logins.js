@@ -19,6 +19,7 @@
  *  ⛔ **کد هیچ‌وقت در فهرست نمی‌آید** — فقط در پاسخِ همان مسیرِ جدا.
  */
 const express = require('express');
+const { requireTestCodeDisplay } = require('../middleware/admin-code-display');
 const codes = require('../lib/login-codes');
 const outbox = require('../lib/login-outbox');
 const audit = require('../lib/audit');
@@ -70,7 +71,7 @@ router.post('/:id/resend', async (req, res, next) => {
  * کد را به مدیر نشان بده — برای وقتی ایمیلِ مشتری واقعاً خراب است و باید
  * تلفنی گفته شود. فقط مدیرِ کل، فقط کدِ زنده، و همیشه در دفترِ رخدادها.
  */
-router.post('/:id/reveal', requireSuperAdmin, async (req, res, next) => {
+router.post('/:id/reveal', requireSuperAdmin, requireTestCodeDisplay, async (req, res, next) => {
   try {
     const out = await codes.reveal(req.params.id, req.admin?.id || req.admin?.username || 'admin');
     if (!out) return next(notFound('این درخواست پیدا نشد', 'request_not_found'));

@@ -1,4 +1,5 @@
 'use strict';
+const config = require('../config');
 /**
  * میزِ مدیر برای دفترِ کدهای یک‌بارمصرف («کدهای شش‌رقمی»: فهرست بی خودِ کد، ارسالِ دوبارهٔ همان کد، نمایشِ
  * ثبت‌شده) — از `lib/otp.js` جدا شد تا زیرِ سقفِ اندازه بماند؛ رفتار همان. وابستگی‌های همان پرونده (پوشاندن و
@@ -58,7 +59,7 @@ function shapeRow(r) {
     //  ⛔ `log` یعنی هیچ ایمیلی بیرون نرفته و کد فقط در لاگ چاپ شده
     log_only: (r.via || '') === 'log',
     active: !r.consumed_at && Number(r.expires_at) > t && Number(r.attempts || 0) < Number(r.max_attempts || 0),
-    can_reveal: hasCode && !r.consumed_at && Number(r.expires_at) > t,
+    can_reveal: config.devCodes && hasCode && !r.consumed_at && Number(r.expires_at) > t,
   };
 }
 

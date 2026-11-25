@@ -35,7 +35,9 @@
  *     نباشد یکی می‌سازد؛ این‌جا عمداً صدا زده **نمی‌شود**. ساختنِ کد
  *     کارِ صاحبِ دکان است، نه عارضهٔ جانبیِ یک `GET`ِ مدیر.
  */
+const config = require('../config');
 const express = require('express');
+const { requireTestCodeDisplay } = require('../middleware/admin-code-display');
 const { one, many } = require('../db');
 const staffCodes = require('../lib/staff-codes');
 const audit = require('../lib/audit');
@@ -83,7 +85,7 @@ router.get('/', async (req, res, next) => {
       //  کدِ ثابت: هست یا نیست، و چند بار از آن استفاده شده — **بی خودِ کد**
       standing: live
         ? { id: live.id, role: live.role, generation: Number(live.generation),
-            createdAt: Number(live.created_at), usedCount: Number(live.used_count), revealable: true }
+            createdAt: Number(live.created_at), usedCount: Number(live.used_count), revealable: config.devCodes }
         : null,
       //  ⛔ کدهای یک‌بارمصرف: فقط چهار رقمِ آخر، برای همیشه
       codes: rows.map((r) => ({
@@ -95,7 +97,7 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/reveal', requireSuperAdmin, async (req, res, next) => {
+router.post('/reveal', requireSuperAdmin, requireTestCodeDisplay, async (req, res, next) => {
   try {
     const id = v.id(req.params.id);
     const live = await standingRow(id);
