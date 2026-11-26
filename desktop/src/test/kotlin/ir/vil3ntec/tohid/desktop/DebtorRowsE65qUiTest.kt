@@ -174,21 +174,16 @@ class DebtorRowsE65qUiTest {
     assertTrue(a.width < px(180f) && b.width < px(180f))
   }
 
-  @Test fun tappingATileOpensTheFileAndThePencilAndCrossStayOnTheCard() {
+  @Test fun tappingATileOpensTheFileWithoutShowingCornerActions() {
     val calls = Calls()
     show { DebtorsListScreen(book, null, null, calls.actions()) }
     rule.waitUntil(10_000) { count("نسیم آزمونی") > 0 }
     click("نسیم آزمونی")
     assertEquals(listOf("q-owe"), calls.open)
-    //  × و مدادِ هر کارت
-    val pencils = rule.onAllNodes(hasContentDescription(StrMoney.edit) and hasClickAction())
-    assertEquals(2, pencils.fetchSemanticsNodes().size)
-    assertEquals(2, rule.onAllNodes(hasContentDescription(StrMoney.delete) and hasClickAction()).fetchSemanticsNodes().size)
-    pencils[0].performSemanticsAction(SemanticsActions.OnClick)
-    rule.onAllNodes(hasContentDescription(StrMoney.delete) and hasClickAction())[1].performSemanticsAction(SemanticsActions.OnClick)
-    rule.waitForIdle()
-    assertEquals(1, calls.edit.size)
-    assertEquals(1, calls.delete.size)
+    assertTrue(rule.onAllNodes(hasContentDescription(StrMoney.edit) and hasClickAction()).fetchSemanticsNodes().isEmpty())
+    assertTrue(rule.onAllNodes(hasContentDescription(StrMoney.delete) and hasClickAction()).fetchSemanticsNodes().isEmpty())
+    assertTrue(calls.edit.isEmpty())
+    assertTrue(calls.delete.isEmpty())
   }
 
   @Test fun longPressKeepsOpenEditAndDelete() {
