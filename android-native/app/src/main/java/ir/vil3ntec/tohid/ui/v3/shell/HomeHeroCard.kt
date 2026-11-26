@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -115,7 +116,7 @@ internal data class HeroFace(
   /** نشانهٔ کنارِ عدد (`؋`؛ گاوصندوقِ ارزِ دیگر کدِ همان ارز) و اعشارِ واقعی برای ارزِ جز افغانی */
   val unit: String = "؋",
   val cents: Boolean = false,
-  /** گاوصندوقِ چندارزی: تراشهٔ ارزِ گوشهٔ نمودار (`HeroCurrencyChip`)؛ null ⇒ همان کادرِ امروز */
+  /** گاوصندوقِ چندارزی: تراشهٔ ارزِ سربرگ (`HeroCurrencyChip`)؛ null ⇒ همان کادرِ امروز */
   val currency: SafeCurrencyChoice? = null,
 )
 
@@ -236,12 +237,18 @@ private fun HeroCard(
       .padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 16.dp),
   ) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-      Text(face.title, color = hc.ink, style = v3Text(17, FontWeight.Bold, 24), maxLines = 1)
-      if (pages > 1) {
-        Spacer(Modifier.width(10.dp))
-        PageDots(pages, page, hc)
+      Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+        Text(face.title, color = hc.ink, style = v3Text(17, FontWeight.Bold, 24), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        if (pages > 1) {
+          Spacer(Modifier.width(8.dp))
+          PageDots(pages, page, hc)
+        }
       }
-      Spacer(Modifier.weight(1f))
+      face.currency?.let {
+        Spacer(Modifier.width(8.dp))
+        HeroCurrencyChip(it, hc)
+        Spacer(Modifier.width(8.dp))
+      }
       Box(
         Modifier.size(38.dp).clip(CircleShape).background(hc.track).border(1.dp, hc.edge, CircleShape)
           .v3Pressable(label = StrHero.addOrTake, scale = 0.9f, haptic = true, onClick = onPlus),
@@ -266,7 +273,7 @@ private fun HeroCard(
     }
     HeroChart(
       face.series, hc, face.empty, face.titles[range.ordinal], key = Triple(face.page, range, face.unit),
-      modifier = Modifier.fillMaxWidth().weight(1f), unit = face.unit, cents = face.cents, currency = face.currency,
+      modifier = Modifier.fillMaxWidth().weight(1f), unit = face.unit, cents = face.cents,
     )
     Spacer(Modifier.height(8.dp))
     HeroStats(face.first, face.second, hc, Modifier.height(62.dp * fs))
@@ -407,8 +414,6 @@ private fun HeroChart(
   modifier: Modifier,
   unit: String = "؋",
   cents: Boolean = false,
-  /** گاوصندوقِ چندارزی: تراشهٔ ارز در گوشهٔ بالای نمودار (سمتِ آینده، دور از آغازِ خط) */
-  currency: SafeCurrencyChoice? = null,
 ) {
   val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
   val measurer = rememberTextMeasurer()
@@ -426,6 +431,7 @@ private fun HeroChart(
   Box(
     modifier
       .clipToBounds()
+      .testTag("home-hero-chart")
       .semantics { contentDescription = StrHero.chart(title, if (cents) "${unitMoney(series.current)} $unit" else money(series.current)) }
       .drawWithCache {
         val n = series.values.size
@@ -515,6 +521,5 @@ private fun HeroChart(
         modifier = Modifier.fillMaxSize().padding(top = 8.dp).align(Alignment.TopCenter),
       )
     }
-    currency?.let { HeroCurrencyChip(it, hc, Modifier.align(Alignment.TopEnd)) }
   }
 }

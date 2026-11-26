@@ -1,8 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.account.profile
 
-import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3Hue
-import ir.vil3ntec.tohid.ui.v3.V3NavRowSpec
 import ir.vil3ntec.tohid.ui.v3.V3NavRow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -204,7 +202,9 @@ internal fun ProfileEditContent(
     //  قاعدهٔ Google Play: حریمِ خصوصی و «حذفِ حساب» در خودِ برنامه، پیدا و یک لمس دورتر
     V3Section(StrAccount.privacyPolicy, Modifier.v3Stagger(stagger, "privacy", 4)) {
       V3NavRow(StrAccount.privacyPolicy, icon = Icons.Outlined.PrivacyTip, hue = V3Hue.BRAND, help = StrAccount.privacyLine, onClick = onPrivacy)
-      V3Divider(start = V3NavRowSpec.DIVIDER_START)
+    }
+    Spacer(Modifier.height(24.dp))
+    V3Section(StrAccount.groupAccountDeletion, Modifier.v3Stagger(stagger, "delete-account", 5)) {
       V3NavRow(StrAccount.deleteAccount, icon = Icons.Outlined.DeleteForever, hue = null, help = StrAccount.deleteAccountLine, danger = true, onClick = onDelete)
     }
     Spacer(Modifier.height(24.dp))

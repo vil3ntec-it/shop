@@ -138,7 +138,7 @@ fun SafeCurrencyAddForm(choice: SafeCurrencyChoice, onDone: () -> Unit) {
 }
 
 /**
- *  تراشهٔ ارزِ گوشهٔ نمودارِ گاوصندوق (کادرِ بالای خانه): کدِ ارزِ نمودار روی شیارِ همان کادر؛ زدن ⇒ فهرستِ ارزهای دفتر.
+ *  تراشهٔ ارزِ سربرگِ گاوصندوق (کادرِ بالای خانه): کدِ ارزِ نمودار روی شیارِ همان کادر؛ زدن ⇒ فهرستِ ارزهای دفتر.
  *  ارزِ تازه این‌جا افزوده نمی‌شود (فقط دیدن) — افزودن در برگهٔ «+».
  */
 @Composable
@@ -152,7 +152,7 @@ internal fun HeroCurrencyChip(choice: SafeCurrencyChoice, hc: HeroColors, modifi
         .border(1.dp, hc.edge, CircleShape)
         .v3Pressable(label = StrSafeCur.pick, role = Role.DropdownList, onClick = { open = true })
         .semantics { contentDescription = StrSafeCur.chartCurrency(choice.name(choice.code)) }
-        .heightIn(min = 28.dp)
+        .heightIn(min = 44.dp)
         .padding(horizontal = 11.dp, vertical = 3.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {

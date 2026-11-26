@@ -100,6 +100,8 @@ object StrAccount {
   val saved: String get() = t("ذخیره شد", "Saved", "خوندي شو")
 
   // خروج از حساب
+  val groupSessions: String get() = t("خروج و نشست‌ها", "Sign-out and sessions", "وتل او ناستې")
+  val groupAccountDeletion: String get() = t("مدیریت حذف حساب", "Account deletion", "د حساب ړنګول")
   val signOutTitle: String get() = t("خروج از حساب؟", "Sign out?", "له حساب وځئ؟")
   val signOutBody: String get() = td("برای برگشتن، ایمیل و رمزتان را دوباره می‌زنید. دفترِ دکان روی همین گوشی سرِ جایش می‌ماند.", "To come back you enter your email and password again. The shop ledger stays on this phone.", "د بیرته راتګ لپاره به بیا ایمیل او پټنوم ولیکئ. د دوکان دفتر په همدې تلیفون پاتې کېږي.", "To come back you enter your email and password again. The shop ledger stays on this computer.", "د بیرته راتګ لپاره به بیا ایمیل او پټنوم ولیکئ. د دوکان دفتر په همدې کمپیوټر پاتې کېږي.")
   val signOutAction: String get() = t("خروج", "Sign out", "وتل")

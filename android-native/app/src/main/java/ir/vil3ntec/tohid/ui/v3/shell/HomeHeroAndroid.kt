@@ -75,13 +75,13 @@ fun rememberHeroInput(d: ShopData): HeroInput {
   val hour = HomeHero.hourOf(tick, start)
   //  ارز: هر ارز دفترِ جدای خودش است (`SafeCore.views`)؛ نمودار ارزِ برگزیدهٔ همین دستگاه را نشان می‌دهد
   val book = remember(d, safeOn) { if (safeOn) SafeBook.views(d) else null }
-  var viewed by remember { mutableStateOf(SafeCurrencyPref.viewed(context)) }
-  val pick = remember { { c: String -> viewed = c; SafeCurrencyPref.setViewed(context, c) } }
+  var viewed by remember(context) { mutableStateOf(SafeCurrencyPref.viewed(context)) }
+  val pick = remember(context) { { c: String -> viewed = c; SafeCurrencyPref.setViewed(context, c) } }
   val code = book?.let { if (viewed in it) viewed else SafeCurrency.AFN } ?: SafeCurrency.AFN
   val safe = book?.get(code)
   val codes = book?.keys?.toList() ?: listOf(SafeCurrency.AFN)
   val names = remember(codes) { SafeCurrencyPref.custom(context).let { c -> codes.associateWith { SafeCurrencies.name(it, c) } } }
-  return remember(today, start, hour, safe, blind, code, codes, names) {
+  return remember(today, start, hour, safe, blind, code, codes, names, pick) {
     HeroInput(today, start, System.currentTimeMillis(), hour, safe, blind, code, codes, names, pick)
   }
 }

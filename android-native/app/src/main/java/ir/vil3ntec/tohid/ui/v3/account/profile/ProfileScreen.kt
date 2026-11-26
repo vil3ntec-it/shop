@@ -52,6 +52,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.V3NavRow
 import ir.vil3ntec.tohid.ui.v3.V3NavRowSpec
 import ir.vil3ntec.tohid.ui.v3.nav.V3Modules
+import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.account.AccountFormat
 import ir.vil3ntec.tohid.ui.v3.account.AccountLinks
@@ -132,14 +133,12 @@ internal fun ProfileContent(
         Spacer(Modifier.height(16.dp))
         //  ۶۵r: همان کارت و ردیفِ «بیشتر» (`V3NavRow`) — کاشیِ رنگیِ هر بخش، عنوانِ یک‌خطی، پیکان
         V3Card(padding = PaddingValues(vertical = 4.dp)) {
-          ui.menu.forEachIndexed { i, item ->
+          ui.menu.filterNot { it.danger }.forEachIndexed { i, item ->
             if (i > 0) V3Divider(start = V3NavRowSpec.DIVIDER_START)
             V3NavRow(
               title = item.label,
               icon = menuIcon(item.item),
               hue = menuHue(item.item),
-              danger = item.danger,
-              chevron = !item.danger,
               modifier = Modifier.v3Stagger(stagger, item.item, i + 1),
               onClick = { onOpen(item.route) },
             )
@@ -148,6 +147,16 @@ internal fun ProfileContent(
         //  شعبه درونِ یک دکان (فازِ ۲): شعبهٔ جاری و راهِ «شعبه‌ها» — فقط با شعبه‌های روشن
         ir.vil3ntec.tohid.ui.v3.branches.BranchProfileCard(onOpen)
         modes?.invoke()
+        val sessionActions = ui.menu.filter { it.danger }
+        if (sessionActions.isNotEmpty()) {
+          Spacer(Modifier.height(32.dp))
+          V3Section(StrAccount.groupSessions) {
+            sessionActions.forEachIndexed { i, item ->
+              if (i > 0) V3Divider(start = V3NavRowSpec.DIVIDER_START)
+              V3NavRow(item.label, icon = menuIcon(item.item), hue = null, danger = true, chevron = false, onClick = { onOpen(item.route) })
+            }
+          }
+        }
         Spacer(Modifier.height(24.dp + pad.calculateBottomPadding()))
       }
     }

@@ -84,13 +84,22 @@ internal fun RouteScope.CategoryBody(
 ) {
   val parts = rememberCategoryParts(group, facts, rememberFeatureStates().on)
   val lockToggle = rememberLockToggle()
+  var expanded by rememberSaveable(group) { mutableStateOf(false) }
+  val common = parts.map(CategoryPart::commonOnly).filter { it.rows.isNotEmpty() }
+  val canExpand = common.isNotEmpty() && parts.any(CategoryPart::hasAdvanced)
+  val shown = if (canExpand && !expanded) common else parts
   SettingsPageFrame(title = SettingsLayout.groupLabel(group), onBack = onBack) {
-    parts.forEach { p ->
+    shown.forEach { p ->
       item(key = p.id) {
         PartCard(
           p, facts, onRow, onExtra, lockToggle,
           footer = if (p.id == "access") StrSettings.securityHelp else null,
         )
+      }
+    }
+    if (canExpand) {
+      item(key = "advanced-settings") {
+        V3TextButton(if (expanded) StrSettingsHome.hideAdvanced else StrSettingsHome.showAdvanced, { expanded = !expanded })
       }
     }
   }
