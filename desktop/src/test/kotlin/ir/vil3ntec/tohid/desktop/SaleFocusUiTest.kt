@@ -211,8 +211,13 @@ class SaleFocusUiTest {
     show(three, dark)
     val want = ir.vil3ntec.tohid.ui.theme.shopColors(ir.vil3ntec.tohid.ui.theme.ShopTheme.IVORY, true).backgroundSubtle
     assertClose("نوارِ سبد", want, pixelNearStart(TillSpec.BAR_TAG))
+    val catalog = hasTestTag(TillSpec.CATALOG_TAG)
+    val closedBottom = nodes(catalog).single().boundsInRoot.bottom
     click(openCart)
-    rule.waitUntil(5_000) { has(hasTestTag(TillSpec.SHEET_TAG)) }
+    rule.mainClock.advanceTimeBy(1_500)
+    rule.waitForIdle()
+    assertTrue("با لمس سبد، فهرست کالاها در همان صفحه بالا می‌رود", nodes(catalog).single().boundsInRoot.bottom < closedBottom)
+    assertTrue(has(hasTestTag(TillSpec.SHEET_TAG)))
     val sheet = pixelNearStart(TillSpec.SHEET_TAG, fromTop = 40f)
     assertClose("برگهٔ سبد", want, sheet)
     assertTrue("سطح سبد تیره است", luminance(sheet) < 0.1f)

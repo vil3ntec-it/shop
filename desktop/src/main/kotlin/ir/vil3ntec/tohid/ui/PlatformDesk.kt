@@ -70,6 +70,9 @@ object Platform {
   @androidx.compose.runtime.Composable
   fun SystemBars(dark: Boolean) = Unit
 
+  @androidx.compose.runtime.Composable
+  fun SaleNavigationBar(active: Boolean, themeDark: Boolean) = Unit
+
   fun saveFile(suggestedName: String, bytes: ByteArray): String? {
     var picked: java.io.File? = null
     val run = Runnable {

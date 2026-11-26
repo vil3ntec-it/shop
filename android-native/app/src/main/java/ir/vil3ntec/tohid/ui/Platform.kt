@@ -46,4 +46,7 @@ object Platform {
    */
   @androidx.compose.runtime.Composable
   fun SystemBars(dark: Boolean) = systemBarsAndroid(dark)
+
+  @androidx.compose.runtime.Composable
+  fun SaleNavigationBar(active: Boolean, themeDark: Boolean) = saleNavigationBarAndroid(active, themeDark)
 }

@@ -190,6 +190,7 @@ fun SaleScreen(
           onMinus = actions.minus,
           onMenu = { menu = true },
           till = true,
+          tillScanInHeader = cart.isEmpty(),
         )
       },
       sheet = {

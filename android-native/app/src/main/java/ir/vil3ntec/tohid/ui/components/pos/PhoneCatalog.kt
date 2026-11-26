@@ -165,6 +165,7 @@ fun PhoneCatalog(
   onMenu: (() -> Unit)? = null,
   /** صندوقِ نسخهٔ ۳ (۶۳w): سربرگِ آرام، جستجوی بخش با دکمهٔ نوار و اسکن به‌صورتِ تنها دکمهٔ شناور. false ⇒ چیدمانِ پیشین */
   till: Boolean = false,
+  tillScanInHeader: Boolean = false,
 ) {
   val v = PhoneV3.colors
   //  زیرِ نوارِ وضعیت؛ کمینهٔ ۲۴ (بلندیِ نوارِ وضعیتِ گوشی) تا در پنجرهٔ بی‌نوار هم همان‌جا بنشیند
@@ -179,7 +180,7 @@ fun PhoneCatalog(
   }
 
   if (till) {
-    TillCatalog(items, bestsellers, categories, category, onCategory, onCategoryHold, onAddCategory, search, onSearch, listMode, onToggleMode, onBack, onScan, emptyText, bottomGap, onTap, onHold, onMinus, onMenu, top, list, grid)
+    TillCatalog(items, bestsellers, categories, category, onCategory, onCategoryHold, onAddCategory, search, onSearch, listMode, onToggleMode, onBack, onScan, emptyText, bottomGap, onTap, onHold, onMinus, onMenu, top, list, grid, tillScanInHeader)
     return
   }
 

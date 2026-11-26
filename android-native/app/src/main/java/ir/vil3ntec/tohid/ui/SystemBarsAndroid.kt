@@ -7,6 +7,8 @@ import android.graphics.Color
 import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
@@ -40,6 +42,28 @@ internal fun systemBarsAndroid(dark: Boolean) {
       }
     }
     onDispose { }
+  }
+}
+
+/** The till draws its own dark backdrop beneath the Android navigation controls. */
+@Composable
+internal fun saleNavigationBarAndroid(active: Boolean, themeDark: Boolean) {
+  if (!active) return
+  val view = LocalView.current
+  val window = view.context.activityOf()?.window ?: return
+  val latestThemeDark = rememberUpdatedState(themeDark)
+  SideEffect {
+    @Suppress("DEPRECATION")
+    window.navigationBarColor = Color.TRANSPARENT
+    WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = false
+  }
+  DisposableEffect(window, view) {
+    onDispose {
+      val dark = latestThemeDark.value
+      @Suppress("DEPRECATION")
+      window.navigationBarColor = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O && !dark) OLD_LIGHT_SCRIM else Color.TRANSPARENT
+      WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !dark
+    }
   }
 }
 

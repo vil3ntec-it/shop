@@ -1,12 +1,10 @@
 package ir.vil3ntec.tohid.ui.v3.sales.cart
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -53,6 +51,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -95,6 +94,11 @@ object TillSpec {
   const val SHEET_TAG = "till-sheet"
   const val MORE_TAG = "till-more"
   const val ROW_TAG = "till-cart-row"
+}
+
+internal fun tillCartColors() = shopColors(ShopTheme.IVORY, dark = true).let { ivory ->
+  val pay = ivory.button.primary.copy(bg = ivory.brandText, border = ivory.brandText, text = ivory.background)
+  ivory.copy(button = ivory.button.copy(primary = pay))
 }
 
 private val SHEET_SPRING = spring<Float>(dampingRatio = 0.9f, stiffness = 520f)
@@ -147,14 +151,15 @@ fun TillFrame(
   LaunchedEffect(showing) { PhoneCartUi.sheetOpen.value = showing }
   BackHandler(enabled = showing, onBack = onClose)
 
-  val cartColors = remember {
-    val ivory = shopColors(ShopTheme.IVORY, dark = true)
-    val pay = ivory.button.primary.copy(bg = ivory.brandText, border = ivory.brandText, text = ivory.background)
-    ivory.copy(button = ivory.button.copy(primary = pay))
-  }
-  BoxWithConstraints(Modifier.fillMaxSize().background(c.bg)) {
+  val cartColors = remember { tillCartColors() }
+  val barSpace by animateDpAsState(
+    targetValue = if (model.visible) TillSpec.BAR_SPACE else 0.dp,
+    animationSpec = if (motion && model.visible && !showing) tween(260) else snap(),
+    label = "till-bar-space",
+  )
+  BoxWithConstraints(Modifier.fillMaxSize().background(if (model.visible) cartColors.backgroundSubtle else c.bg)) {
     val bottomGap = TillSpec.BAR_SPACE + navBottom
-    val reserved = if (model.visible) bottomGap else navBottom
+    val reserved = barSpace + navBottom
     val sheetHeight = (maxHeight - TillSpec.SHEET_TOP_GAP).coerceAtLeast(0.dp)
     val travel = with(density) { (sheetHeight - bottomGap).toPx() }.coerceAtLeast(1f)
     val catalogPeek = with(density) { 72.dp.toPx() }.coerceAtMost(travel * 0.22f)
@@ -203,30 +208,26 @@ fun TillFrame(
       }
     }
 
-    Box(Modifier.fillMaxSize().then(swipe)) {
+    Box(Modifier.fillMaxSize().clipToBounds().then(swipe)) {
       val p = if (model.visible) progress.value else 0f
       val paneShape = RoundedCornerShape(bottomStart = PhoneV3.sheetRadius, bottomEnd = PhoneV3.sheetRadius)
       Box(
         Modifier.fillMaxSize().padding(bottom = reserved)
           .graphicsLayer { translationY = -p * travel }
-          .then(if (model.visible) Modifier.clip(paneShape) else Modifier).background(c.bg)
+          .clip(paneShape).background(c.bg)
           .testTag(TillSpec.CATALOG_TAG),
       ) {
         //  چند ردیف پایینِ فهرست از پشتِ لبهٔ بالاییِ سبد پیدا می‌مانند.
         Box(Modifier.fillMaxSize().graphicsLayer { translationY = p * catalogPeek }) { catalog(8.dp) }
       }
       CompositionLocalProvider(LocalShopColors provides cartColors) {
-        AnimatedVisibility(
-          visible = model.visible,
-          modifier = Modifier.align(Alignment.BottomCenter)
-            .graphicsLayer { alpha = (1f - 4f * p).coerceIn(0f, 1f) },
-          enter = if (motion) slideInVertically { it } + fadeIn() else EnterTransition.None,
-          exit = ExitTransition.None,
-        ) {
-          Box(Modifier.fillMaxWidth().background(cartColors.backgroundSubtle), contentAlignment = Alignment.Center) {
-            TillBar(model, pulse, onOpen, onPay, onScan, navBottom, Modifier)
-          }
-        }
+        if (model.visible) TillBar(
+          model, pulse, onOpen, onPay, onScan, navBottom,
+          Modifier.align(Alignment.BottomCenter).graphicsLayer {
+            translationY = (TillSpec.BAR_SPACE - barSpace).toPx()
+            alpha = (1f - 4f * p).coerceIn(0f, 1f)
+          },
+        )
 
         if (p > 0.001f && sheetHeight > 0.dp) {
           //  با ضربه روی بخش باقی‌ماندهٔ صفحه، سبد بسته می‌شود.
