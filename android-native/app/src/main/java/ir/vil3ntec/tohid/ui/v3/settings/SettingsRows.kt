@@ -93,7 +93,11 @@ internal fun cameraGranted(context: android.content.Context): Boolean =
     android.content.pm.PackageManager.PERMISSION_GRANTED
 
 /** یک بخشِ کوتاهِ صفحهٔ دسته: ردیف‌های دیدنیِ `SettingsLayout` و ردیف‌هایی که ماژول‌ها همین‌جا گذاشته‌اند */
-internal class CategoryPart(val id: String, val rows: List<String>, val extra: List<SettingsEntry>)
+internal class CategoryPart(val id: String, val rows: List<String>, val extra: List<SettingsEntry>) {
+  fun hasAdvanced() = extra.isNotEmpty() || rows.any { !SettingsLayout.isCommon(it) }
+
+  fun commonOnly() = CategoryPart(id, rows.filter(SettingsLayout::isCommon), emptyList())
+}
 
 /**
  *  بخش‌های دیدنیِ یک دسته (نسخهٔ دوم، ۱۴۰۵/۰۸/۱۱) — گوشی، تبلت و کامپیوتر همین را می‌کشند: ردیف فقط با

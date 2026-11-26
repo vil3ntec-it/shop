@@ -11,6 +11,8 @@ object StrSettingsHome {
   val shop: String get() = t("دکان و امنیت", "Shop & security", "دوکان او امنیت")
   val goods: String get() = t("کالا و انبار", "Items & stock", "توکي او ګدام")
   val data: String get() = t("داده و پشتیبان", "Data & backup", "معلومات او بیک اپ")
+  val showAdvanced: String get() = t("تنظیمات بیشتر", "More settings", "نور تنظیمات")
+  val hideAdvanced: String get() = t("نمایش کمتر", "Show fewer settings", "لږ تنظیمات وښایئ")
   val look: String get() = t("ظاهر و زبان", "Look & language", "بڼه او ژبه")
 
   val shopLine: String get() = t("حساب، قفل، کدِ شاگرد و هشدارها", "Account, lock, staff code, alerts", "حساب، قلف، د شاګرد کوډ او خبرتیاوې")

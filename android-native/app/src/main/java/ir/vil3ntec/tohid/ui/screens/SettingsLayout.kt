@@ -321,6 +321,14 @@ object SettingsLayout {
       shown(key, serverOn) &&
       (key !in FEATURE_GATED || key in featuresOn)
 
+  /** تنظیماتی که برای کار روزانه یا راه‌اندازی اولیه جلوی دست می‌مانند. */
+  private val COMMON_ROWS = SettingsTiers.ESSENTIAL + setOf(
+    PROFILE, "هشدارها", "دستگاه‌های وارد شده", NAV_BAR,
+    PRINTER, RETURNS, "کالای منقضی", TILL_GOODS, LABEL_TOOLS,
+  )
+
+  fun isCommon(key: String): Boolean = key in COMMON_ROWS
+
   /** بخش‌های دیدنیِ یک دسته (بخشِ بی ردیف کنار می‌رود) */
   fun visibleParts(group: String, desktop: Boolean, serverOn: Set<String>, featuresOn: Set<String>): List<Part> =
     GROUPS.firstOrNull { it.title == group }?.parts.orEmpty()

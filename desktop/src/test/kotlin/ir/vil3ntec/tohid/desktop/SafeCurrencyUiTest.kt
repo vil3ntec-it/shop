@@ -18,6 +18,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -208,7 +209,10 @@ class SafeCurrencyUiTest {
     }
     rule.waitForIdle()
     val chip = StrSafeCur.chartCurrency(StrSafeCur.afn)
-    rule.onNodeWithContentDescription(chip).assertExists()
+    val picker = rule.onNodeWithContentDescription(chip).fetchSemanticsNode().boundsInRoot
+    val chart = rule.onNode(hasTestTag("home-hero-chart") and hasContentDescription(StrHero.safeWeek, substring = true))
+      .fetchSemanticsNode().boundsInRoot
+    assertTrue("Currency picker sits above the chart", picker.bottom < chart.top)
     rule.onAllNodesWithText(SafeCurrencies.format(120_000, "AFN")).assertCountEquals(1)   // «واریزِ امروز» به افغانی
     rule.onNodeWithContentDescription(chip).performClick()
     rule.waitForIdle()
