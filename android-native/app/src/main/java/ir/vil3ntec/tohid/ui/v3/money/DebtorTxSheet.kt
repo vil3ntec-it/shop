@@ -93,7 +93,7 @@ internal fun DebtorTxSheet(
             if (tx.type == "give") {
               V3Button(StrMoney.setDue, { step = TxStep.DUE }, Modifier.weight(1f), kind = V3ButtonKind.NEUTRAL, icon = Icons.Outlined.Event)
             }
-            if (removeLabel != null) V3Button(removeLabel, { closer.close(actions.onDelete) }, Modifier.weight(1f), kind = V3ButtonKind.DANGER, haptic = true)
+            if (removeLabel != null) V3Button(removeLabel, actions.onDelete, Modifier.weight(1f), kind = V3ButtonKind.DANGER, haptic = true)
           }
         }
         TxStep.DUE -> DueStep(

@@ -32,6 +32,24 @@ class DebtBookTest {
       WarehouseEntry(id = "w2", productId = "p2", units = 100.0),
     ),
   )
+  @Test fun refusesUnrepresentableTransactionInEitherDirection() {
+    val day = "2026-11-26"
+    for (kind in DebtorEngine.Kind.entries) {
+      val result = DebtorEngine.addTransaction(d0, "c1", kind, 6_565_656_565_656_556.0, day, "", day, 0, ::newId)
+      assertTrue(result is DebtorEngine.Result.Failed)
+    }
+  }
+
+  @Test fun refusesBackdatedTransactionThatOverflowsAnIntermediateBalance() {
+    val day = "2026-11-26"
+    val big = 50_000_000_000_000.0
+    val original = tx(d0, "c1", DebtorEngine.Kind.GIVE, big, day, 1)
+    val paid = tx(original, "c1", DebtorEngine.Kind.RECEIVE, big, day, 2)
+    val result = DebtorEngine.addTransaction(paid, "c1", DebtorEngine.Kind.GIVE, big, "2026-11-25", "", day, 3, ::newId)
+    assertTrue(result is DebtorEngine.Result.Failed)
+    assertTrue(DebtorEngine.addTransaction(paid, "c1", DebtorEngine.Kind.GIVE, 100.0, day, "", day, 3, ::newId) is DebtorEngine.Result.Ok)
+  }
+
   private val m = DebtBook::minor
 
   private fun ok(r: SalesEngine.Result) = (r as SalesEngine.Result.Ok).data

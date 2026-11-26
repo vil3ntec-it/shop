@@ -1,8 +1,10 @@
 package ir.vil3ntec.tohid.desktop
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import ir.vil3ntec.tohid.core.i18n.I18n
@@ -10,11 +12,14 @@ import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.ui.screens.Motion
+import ir.vil3ntec.tohid.ui.components.pos.CartSummary
 import ir.vil3ntec.tohid.ui.screens.MotionTokens
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
 import ir.vil3ntec.tohid.ui.v3.sales.cart.KeypadItem
 import ir.vil3ntec.tohid.ui.v3.sales.cart.KeypadSheet
+import ir.vil3ntec.tohid.ui.v3.sales.cart.TillFrame
+import ir.vil3ntec.tohid.ui.v3.sales.cart.TillSpec
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -59,6 +64,34 @@ class ReducedMotionTillUiTest {
     forgetChoice()
     Motion.load(ctx)
     assertTrue("گوشیِ بی «کاهشِ حرکت» ⇒ حرکت روشن", Motion.enabled)
+  }
+
+  @Test fun cartBarAppearsOnlyWhileTheCartContainsAnItem() {
+    Motion.reducedForTest = false
+    Motion.load(ctx)
+    val items = mutableStateOf(emptyList<CartSummary.Line>())
+    rule.setContent {
+      CompositionLocalProvider(LocalContext provides ctx) {
+        TohidTheme(ThemeChoice.LIGHT) {
+          TillFrame(
+            model = CartSummary.of(items.value, if (items.value.isEmpty()) 0.0 else 90.0),
+            open = false,
+            onOpen = {},
+            onClose = {},
+            pulse = items.value.size,
+            onPay = {},
+            onScan = {},
+            catalog = {},
+            sheet = {},
+          )
+        }
+      }
+    }
+    rule.onNodeWithTag(TillSpec.BAR_TAG).assertDoesNotExist()
+    rule.runOnIdle { items.value = listOf(CartSummary.Line(tea.id, tea.name, true)) }
+    rule.onNodeWithTag(TillSpec.BAR_TAG).assertExists()
+    rule.runOnIdle { items.value = emptyList() }
+    rule.onNodeWithTag(TillSpec.BAR_TAG).assertDoesNotExist()
   }
 
   /** «افزودن به سبد» با ۳ عدد؛ تا چند قاب پس از زدن، کارِ دکمه انجام شده؟ */

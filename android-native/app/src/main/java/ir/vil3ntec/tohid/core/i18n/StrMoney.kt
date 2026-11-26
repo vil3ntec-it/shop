@@ -105,6 +105,8 @@ object StrMoney {
   fun debtorDeleted(name: Any): String = t("«${asIs(name)}» حذف شد", "“$name” deleted", "«$name» ړنګ شو")
   val deleteDebtorTitle: String get() = t("حذفِ قرض‌دار؟", "Delete this debtor?", "پوروړی ړنګ شي؟")
   val deleteTxTitle: String get() = t("حذفِ تراکنش؟", "Delete this transaction?", "راکړه ورکړه ړنګه شي؟")
+  val txCannotRemove: String get() = t("این تراکنش از اینجا قابل برگشت نیست.", "This transaction cannot be reversed here.", "دا راکړه ورکړه دلته نه شي بېرته ګرځېدای.")
+  val reverseTxBody: String get() = t("یک سند معکوس ثبت می‌شود و ماندهٔ حساب دوباره حساب می‌شود.", "A reversal will be recorded and the balance recalculated.", "معکوس سند ثبتېږي او پاتې حساب بیا شمېرل کېږي.")
   val deleteTxBody: String get() = t(
     "این تراکنش پاک می‌شود و ماندهٔ حساب دوباره حساب می‌شود.",
     "This transaction is removed and the balance is recalculated.",

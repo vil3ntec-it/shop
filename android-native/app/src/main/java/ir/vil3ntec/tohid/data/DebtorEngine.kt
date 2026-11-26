@@ -20,6 +20,16 @@ object DebtorEngine {
   /** give = قرض داده شد | receive = پول گرفته شد */
   enum class Kind { GIVE, RECEIVE }
 
+  /** مبلغ باید در واحد کوچک ارز هم قابل نمایش و ذخیره باشد. */
+  fun transactionAmountError(amount: Double): String? = when {
+    !amount.isFinite() || amount <= 0 -> StrLedger.amountBad
+    else -> try {
+      if (DebtBook.minor(amount).minor > 0) null else StrLedger.amountBad
+    } catch (_: ArithmeticException) {
+      StrLedger.amountTooBig
+    }
+  }
+
   data class DebtorDraft(
     val name: String = "",
     val phone: String = "",
@@ -186,14 +196,18 @@ object DebtorEngine {
     txId: String? = null,
   ): Result {
     val debtor = d.debtors.find { it.id == debtorId } ?: return Result.Failed(StrLedger.debtorNotFound)
-    if (amount.isNaN() || amount <= 0) return Result.Failed(StrLedger.amountBad)
+    transactionAmountError(amount)?.let { return Result.Failed(it) }
 
     val when_ = date.ifBlank { today }
     //  رسید سررسید ندارد
     val due = if (kind == Kind.GIVE) dueDate?.trim()?.takeIf { it.isNotEmpty() } else null
     dueProblem(due, when_)?.let { return Result.Failed(it) }
 
-    val credit = if (kind == Kind.GIVE) DebtBook.creditCheck(d, debtorId, DebtBook.minor(amount)) else null
+    val credit = try {
+      if (kind == Kind.GIVE) DebtBook.creditCheck(d, debtorId, DebtBook.minor(amount)) else null
+    } catch (_: ArithmeticException) {
+      return Result.Failed(StrLedger.amountTooBig)
+    }
     if (credit != null && credit.over && !overLimit) return Result.Failed(DebtBook.overLimitMsg(credit))
 
     val id = txId ?: newId()
@@ -207,6 +221,14 @@ object DebtorEngine {
       createdAt = now,
       dueDate = due,
     )
+
+    val updated = d.copy(transactions = d.transactions + transaction)
+    try {
+      // A backdated amount can overflow an intermediate balance even when the final balance fits.
+      DebtBook.book(updated, debtorId, today)
+    } catch (_: ArithmeticException) {
+      return Result.Failed(StrLedger.amountTooBig)
+    }
 
     val audit = if (credit != null && credit.over) {
       d.auditLog + AuditEntry(
@@ -231,7 +253,7 @@ object DebtorEngine {
     }
 
     return Result.Ok(
-      d.copy(transactions = d.transactions + transaction, auditLog = audit),
+      updated.copy(auditLog = audit),
       id = id,
     )
   }

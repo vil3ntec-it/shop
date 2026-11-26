@@ -159,7 +159,7 @@ internal object DebtorFormsModel {
 
   fun amountOf(f: TxForm): Double = f.amount.trim().toDoubleOrNull() ?: 0.0
 
-  fun amountError(f: TxForm): String? = if (amountOf(f) <= 0) StrKit.notANumber else null
+  fun amountError(f: TxForm): String? = DebtorEngine.transactionAmountError(amountOf(f))
 
   /** سررسیدِ ناخوانا فقط برای برد (رسید سررسید ندارد) — «ثبت» بسته می‌ماند */
   fun dueBroken(f: TxForm): Boolean = f.kind == DebtorEngine.Kind.GIVE && DebtorTxModel.dueBroken(f.dueText)
@@ -173,8 +173,12 @@ internal object DebtorFormsModel {
 
   /** بردی که از سقف می‌گذرد ⇒ گامِ دوم با هشدار؛ رسید یا بی سقف ⇒ null */
   fun overLimit(d: ShopData, debtorId: String, f: TxForm): DebtBook.Credit? {
-    if (f.kind != DebtorEngine.Kind.GIVE || amountOf(f) <= 0) return null
-    return DebtBook.creditCheck(d, debtorId, DebtBook.minor(amountOf(f)))?.takeIf { it.over }
+    if (f.kind != DebtorEngine.Kind.GIVE || amountError(f) != null) return null
+    return try {
+      DebtBook.creditCheck(d, debtorId, DebtBook.minor(amountOf(f)))?.takeIf { it.over }
+    } catch (_: ArithmeticException) {
+      null // The engine reports the range error if the user submits.
+    }
   }
 
   fun submit(d: ShopData, debtorId: String, f: TxForm, today: String, now: Long, newId: () -> String, overLimit: Boolean): DebtorEngine.Result =

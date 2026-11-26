@@ -41,7 +41,6 @@ import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
@@ -488,21 +487,7 @@ fun DebtorTile(
       }
     }
 
-    CornerButton(
-      Icons.Filled.Close,
-      ir.vil3ntec.tohid.core.i18n.StrMoney.delete,
-      onDelete,
-      c,
-      Modifier.align(Alignment.TopStart).padding(4.dp),
-    )
-    //  در راست‌به‌چپ، `BottomEnd` همان کنجِ پایین-چپ است
-    CornerButton(
-      Icons.Filled.Edit,
-      ir.vil3ntec.tohid.core.i18n.StrMoney.edit,
-      onEdit,
-      c,
-      Modifier.align(Alignment.BottomEnd).padding(6.dp),
-    )
+
   }
 }
 
@@ -522,32 +507,6 @@ private fun DaysPill(text: String, c: PhoneV3DebtColors) {
   ) {
     Icon(Icons.Filled.Schedule, contentDescription = null, tint = c.onPill, modifier = Modifier.size(11.dp))
     Text(text, style = MaterialTheme.typography.labelSmall, color = c.onPill, fontWeight = FontWeight.Normal, maxLines = 1)
-  }
-}
-
-/** دکمهٔ ریزِ گوشهٔ کارت — زمینهٔ صفحه با لبهٔ سفید، آیکنِ خاکستری */
-@Composable
-private fun CornerButton(
-  icon: ImageVector,
-  description: String,
-  onClick: () -> Unit,
-  c: PhoneV3DebtColors,
-  modifier: Modifier = Modifier,
-) {
-  val source = remember { MutableInteractionSource() }
-  val pressed by source.collectIsPressedAsState()
-  val shape = RoundedCornerShape(PhoneV3Debt.cornerButtonRadius)
-  Box(
-    modifier
-      .size(PhoneV3Debt.cornerButton)
-      .pressScale(pressed)
-      .clip(shape)
-      .background(c.surface)
-      .border(1.dp, c.edge, shape)
-      .clickable(interactionSource = source, indication = LocalIndication.current, role = Role.Button, onClick = onClick),
-    contentAlignment = Alignment.Center,
-  ) {
-    Icon(icon, contentDescription = description, tint = c.icon, modifier = Modifier.size(12.dp))
   }
 }
 
