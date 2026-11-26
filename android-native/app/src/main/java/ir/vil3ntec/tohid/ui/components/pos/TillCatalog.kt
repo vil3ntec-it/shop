@@ -105,6 +105,7 @@ internal fun TillCatalog(
   top: Dp,
   list: androidx.compose.foundation.lazy.LazyListState,
   grid: androidx.compose.foundation.lazy.grid.LazyGridState,
+  scanInHeader: Boolean,
 ) {
   val v = PhoneV3.colors
   val spec = V3Search(search, onSearch, StrSale.catalogHint, onScan = onScan)
@@ -125,7 +126,7 @@ internal fun TillCatalog(
           Spacer(Modifier.width(4.dp))
         } else Spacer(Modifier.width(12.dp))
         Text(Str.sale, color = v.ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f).semantics { heading() })
-        TillIcon(StrKit.scanBarcode, Icons.Outlined.QrCodeScanner, onScan)
+        if (scanInHeader) TillIcon(StrKit.scanBarcode, Icons.Outlined.QrCodeScanner, onScan)
         if (!navSearch) TillIcon(StrKit.search, Icons.Outlined.Search, finder.open)
         TillIcon(if (listMode) StrSale.gridView else StrSale.listView, if (listMode) Icons.Outlined.GridView else Icons.Outlined.ViewList, onToggleMode)
         if (onMenu != null) TillIcon(StrKit.more, Icons.Outlined.MoreHoriz, onMenu)

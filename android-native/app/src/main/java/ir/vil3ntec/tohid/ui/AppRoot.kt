@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
@@ -435,6 +437,9 @@ private fun AppRootActive(
     sheetOnTop = nav.current != nav.page, keyboard = ir.vil3ntec.tohid.ui.v3.nav.rememberKeyboardOpen(),
   )
   val navVisible = ShellFrame.navVisible(bar)
+  val saleNavigation = !Platform.DESKTOP && page == ir.vil3ntec.tohid.ui.v3.sales.SalesPaths.SALE && nav.gate == null
+  Platform.SaleNavigationBar(saleNavigation, PhoneV3.colors.source.isDark)
+  val saleNavigationColor = remember { ir.vil3ntec.tohid.ui.v3.sales.cart.tillCartColors().backgroundSubtle }
   //  ۶۳w: دکمهٔ جست‌وجوی نوار روی این بخش ⇒ جست‌وجوی همین بخش؛ نه ⇒ ذره‌بینِ سربرگ (`LocalV3NavSearch`)
   val navSearch = ShellFrame.navSearch(phoneNav, page, navRoutes, V3Modules.sections, nav.gate != null, NavCatalog.SEARCH in navLayout.ids)
   val navReserve = PhoneNav.RESERVE + (if (renewDays != null) PhoneNav.RENEW_RESERVE else 0.dp)
@@ -673,6 +678,9 @@ private fun AppRootActive(
             V3RouteHost(nav, shell, Modifier.fillMaxSize())
           }
         }
+      }
+      if (saleNavigation && navInset > 0.dp) {
+        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(navInset).background(saleNavigationColor))
       }
       //  نوارِ شناورِ r10 — دایرهٔ شروع، قرص، دایرهٔ پایان؛ نگه‌داشتن = ویرایشگر
       if (navVisible) PhoneNavBar(

@@ -42,4 +42,7 @@ object Platform {
   /** نوارهای سیستمِ اندروید — آیفون نوارِ وضعیت را از خودِ نما می‌گیرد */
   @androidx.compose.runtime.Composable
   fun SystemBars(dark: Boolean) = Unit
+
+  @androidx.compose.runtime.Composable
+  fun SaleNavigationBar(active: Boolean, themeDark: Boolean) = Unit
 }
