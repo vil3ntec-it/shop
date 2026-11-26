@@ -1,6 +1,11 @@
 package ir.vil3ntec.tohid.ui.v3.sales.cart
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -38,7 +43,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -70,7 +74,6 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.v3.LocalV3SystemBottom
 import ir.vil3ntec.tohid.ui.v3.V3Button
-import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
@@ -149,8 +152,9 @@ fun TillFrame(
     val pay = ivory.button.primary.copy(bg = ivory.brandText, border = ivory.brandText, text = ivory.background)
     ivory.copy(button = ivory.button.copy(primary = pay))
   }
-  BoxWithConstraints(Modifier.fillMaxSize().background(cartColors.backgroundSubtle)) {
+  BoxWithConstraints(Modifier.fillMaxSize().background(c.bg)) {
     val bottomGap = TillSpec.BAR_SPACE + navBottom
+    val reserved = if (model.visible) bottomGap else navBottom
     val sheetHeight = (maxHeight - TillSpec.SHEET_TOP_GAP).coerceAtLeast(0.dp)
     val travel = with(density) { (sheetHeight - bottomGap).toPx() }.coerceAtLeast(1f)
     val catalogPeek = with(density) { 72.dp.toPx() }.coerceAtMost(travel * 0.22f)
@@ -200,22 +204,29 @@ fun TillFrame(
     }
 
     Box(Modifier.fillMaxSize().then(swipe)) {
-      val p = progress.value
+      val p = if (model.visible) progress.value else 0f
       val paneShape = RoundedCornerShape(bottomStart = PhoneV3.sheetRadius, bottomEnd = PhoneV3.sheetRadius)
       Box(
-        Modifier.fillMaxSize().padding(bottom = bottomGap)
+        Modifier.fillMaxSize().padding(bottom = reserved)
           .graphicsLayer { translationY = -p * travel }
-          .clip(paneShape).background(c.bg)
+          .then(if (model.visible) Modifier.clip(paneShape) else Modifier).background(c.bg)
           .testTag(TillSpec.CATALOG_TAG),
       ) {
         //  چند ردیف پایینِ فهرست از پشتِ لبهٔ بالاییِ سبد پیدا می‌مانند.
         Box(Modifier.fillMaxSize().graphicsLayer { translationY = p * catalogPeek }) { catalog(8.dp) }
       }
       CompositionLocalProvider(LocalShopColors provides cartColors) {
-        TillBar(
-          model, pulse, onOpen, onPay, onScan, navBottom,
-          Modifier.align(Alignment.BottomCenter).graphicsLayer { alpha = (1f - 4f * p).coerceIn(0f, 1f) },
-        )
+        AnimatedVisibility(
+          visible = model.visible,
+          modifier = Modifier.align(Alignment.BottomCenter)
+            .graphicsLayer { alpha = (1f - 4f * p).coerceIn(0f, 1f) },
+          enter = if (motion) slideInVertically { it } + fadeIn() else EnterTransition.None,
+          exit = ExitTransition.None,
+        ) {
+          Box(Modifier.fillMaxWidth().background(cartColors.backgroundSubtle), contentAlignment = Alignment.Center) {
+            TillBar(model, pulse, onOpen, onPay, onScan, navBottom, Modifier)
+          }
+        }
 
         if (p > 0.001f && sheetHeight > 0.dp) {
           //  با ضربه روی بخش باقی‌ماندهٔ صفحه، سبد بسته می‌شود.
@@ -245,11 +256,10 @@ fun TillFrame(
 }
 
 /**
- *  نوارِ سبد: اسکن، خلاصهٔ سبد و پرداخت. در سبد خالی، اسکن و پیام سبد خالی دیده می‌شوند.
+ *  نوارِ سبدِ پُر: اسکن، خلاصهٔ سبد و پرداخت.
  */
 @Composable
 private fun TillBar(model: CartSummary.Model, pulse: Int, onOpen: () -> Unit, onPay: () -> Unit, onScan: () -> Unit, navBottom: Dp, modifier: Modifier) {
-  val c = PhoneV3.colors
   val bump = remember { Animatable(1f) }
   val first = remember { pulse }
   LaunchedEffect(pulse) {
@@ -269,9 +279,7 @@ private fun TillBar(model: CartSummary.Model, pulse: Int, onOpen: () -> Unit, on
   ) {
     TillScanButton(onScan)
     Spacer(Modifier.width(4.dp))
-    if (!model.visible) {
-      Text(StrSale.emptyCartStrip, style = V3Type.callout, color = c.inkMuted, maxLines = 1, modifier = Modifier.weight(1f).padding(horizontal = 8.dp))
-    } else TillBarCart(model, bump.value, onOpen, onPay)
+    TillBarCart(model, bump.value, onOpen, onPay)
   }
 }
 

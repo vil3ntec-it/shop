@@ -137,7 +137,7 @@ internal fun TxFormSheet(
           Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             V3TextField(
               f.amount, { f = f.copy(amount = it) }, StrMoney.amount, Modifier.weight(1f),
-              kind = V3FieldKind.MONEY, required = true, error = amountError.takeIf { tried },
+              kind = V3FieldKind.MONEY, required = true, error = amountError.takeIf { tried || f.amount.isNotBlank() },
             )
             TxKindToggle(f.kind, onToggle = { f = f.copy(kind = f.kind.flipped()) })
           }
@@ -153,7 +153,7 @@ internal fun TxFormSheet(
             TxDueChips(f.due) { f = f.copy(due = it) }
           }
           Spacer(Modifier.height(14.dp))
-          Text(
+          if (amountError == null) Text(
             StrMoney.balanceAfterSave(MoneyText.state(DebtorFormsModel.balanceAfter(balance, f))),
             style = v3Text(14, FontWeight.SemiBold, 20),
             color = PhoneV3.colors.ink,

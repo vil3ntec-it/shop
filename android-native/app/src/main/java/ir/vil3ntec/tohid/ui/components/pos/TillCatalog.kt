@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.ViewList
 import androidx.compose.material3.Icon
@@ -124,6 +125,7 @@ internal fun TillCatalog(
           Spacer(Modifier.width(4.dp))
         } else Spacer(Modifier.width(12.dp))
         Text(Str.sale, color = v.ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f).semantics { heading() })
+        TillIcon(StrKit.scanBarcode, Icons.Outlined.QrCodeScanner, onScan)
         if (!navSearch) TillIcon(StrKit.search, Icons.Outlined.Search, finder.open)
         TillIcon(if (listMode) StrSale.gridView else StrSale.listView, if (listMode) Icons.Outlined.GridView else Icons.Outlined.ViewList, onToggleMode)
         if (onMenu != null) TillIcon(StrKit.more, Icons.Outlined.MoreHoriz, onMenu)

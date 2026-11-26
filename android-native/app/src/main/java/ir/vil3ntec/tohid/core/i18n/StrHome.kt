@@ -256,7 +256,7 @@ object StrHome {
   fun txPaidNow(a: Any): String = t("پرداختِ همان لحظه ${asIs(a)}", "Paid at sale $a", "سمدستي ورکړه $a")
   fun txReturned(q: Any): String = t("مرجوعی ${asIs(q)}", "returned $q", "بېرته $q")
   val txAll: String get() = t("همه", "All", "ټول")
-  val drawer: String get() = t("صندوق", "Drawer", "صندوق")
+  val drawer: String get() = t("دخل فروشگاه", "Shop till", "د دوکان دخل")
   val safe: String get() = t("گاوصندوق", "Safe", "سېف")
   val safeSoon: String get() = t("شمارش و موجودیِ دقیقِ گاوصندوق به‌زودی همین‌جا", "Safe count and balance — coming soon", "د سېف شمېرنه او دقیقه موجودي ژر دلته")
   //  HOME-V2: کادرِ پنهانِ کششی، مقایسهٔ فروش، «امروز»

@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
@@ -149,7 +150,6 @@ val MoneyModule = AppModule(
       val id = CustomerCrm.resolve(data, args["id"].orEmpty())
       val remindScope = rememberCoroutineScope()
       val viewed = ir.vil3ntec.tohid.ui.screens.rememberCustomerAccessNote(store) // CRM-15
-      val chainOn = rememberDocChainOn() // S89: «حذف» با کلیدِ `shop.doc_chain` سندِ معکوس است
       VipGate(Str.debtors, feature = "debtors") {
         DebtorLedgerScreen(
           id = id,
@@ -161,7 +161,7 @@ val MoneyModule = AppModule(
             onEdit = { nav.open(MoneyPaths.editDebtor(id)) },
             onDelete = { nav.open(MoneyPaths.deleteDebtor(id)) },
             onOpenTx = { nav.open(MoneyPaths.txDetail(id, it)) },
-            onDeleteTx = { MoneyUndo.removeTxLater(store, snackbar, it, chainOn) },
+            onDeleteTx = { nav.open(RoutePaths.withQuery(MoneyPaths.txDetail(id, it), "confirm" to "1")) },
             onOpenSale = { nav.open(SalesPaths.invoice(it)) },
             onOlderSales = { nav.open(SalesPaths.history(q = data.debtors.find { d -> d.id == id }?.name)) },
             //  CRM-06: یک ردِ `debt_reminder` در روز برای هر راه (زمان‌بندیِ «یادآوریِ امروز»)
@@ -385,7 +385,30 @@ private fun RouteScope.DebtorTxRoute() {
   val chainOn = rememberDocChainOn()
   val removable = remember(data, txId, chainOn) { !chainOn || ir.vil3ntec.tohid.data.DebtReverse.refusalOf(data, txId) == null }
   val removeLabel = if (!removable) null else if (chainOn) StrMoney.reverse else StrMoney.delete
+  val confirmOnly = args.query("confirm") == "1"
+  var confirmRemoval by rememberSaveable(txId, confirmOnly) { mutableStateOf(confirmOnly) }
   VipGate(Str.debtors, feature = "debtors") {
+    if (confirmRemoval) {
+      V3ConfirmSheet(
+        title = if (chainOn && removable) StrMoney.reverse else StrMoney.deleteTxTitle,
+        message = when {
+          !removable -> StrMoney.txCannotRemove
+          chainOn -> StrMoney.reverseTxBody
+          else -> StrMoney.deleteTxBody
+        },
+        confirm = removeLabel ?: ir.vil3ntec.tohid.core.i18n.StrKit.close,
+        icon = Icons.Outlined.DeleteOutline,
+        danger = removable,
+        onConfirm = {
+          if (removable) {
+            if (!confirmOnly) back()
+            MoneyUndo.removeTxLater(store, snackbar, txId, chainOn)
+          }
+        },
+        onDismiss = { if (confirmOnly) back() else confirmRemoval = false },
+      )
+      return@VipGate
+    }
     DebtorTxSheet(
       tx = tx,
       book = book,
@@ -394,7 +417,7 @@ private fun RouteScope.DebtorTxRoute() {
       removeLabel = removeLabel,
       actions = DebtorTxSheetActions(
         onClose = { back() },
-        onDelete = { MoneyUndo.removeTxLater(store, snackbar, txId, chainOn) },
+        onDelete = { confirmRemoval = true },
         onSaveDue = { due -> MoneyWriter.debtor(store, toasts, context, data, DebtorEngine.setDueDate(data, txId, due), StrMoney.dueSaved) },
       ),
     )

@@ -119,6 +119,7 @@ fun DebtorsScreen(
   var openId by rememberSaveable { mutableStateOf<String?>(null) }
   var form by remember { mutableStateOf<DebtorFormState?>(null) }
   var txFor by remember { mutableStateOf<Pair<String, DebtorEngine.Kind>?>(null) }
+  var confirmDeleteTx by remember { mutableStateOf<String?>(null) }
   var confirmDelete by remember { mutableStateOf<Debtor?>(null) }
   //  «حذف با برگرداندن»: ردیف/قرض‌دار همین حالا پنهان می‌شود و دفتر فقط وقتی عوض
   //  می‌شود که «برگرداندن» زده نشود (`DebtorLedgerModel.PendingDelete`)
@@ -220,7 +221,7 @@ fun DebtorsScreen(
       onCompose = { kind -> txFor = account.debtor.id to kind },
       onEdit = { form = DebtorFormState.of(account.debtor) },
       onDelete = { confirmDelete = account.debtor },
-      onDeleteTx = { deleteLater(DebtorLedgerModel.PendingDelete.Transaction(it), StrDebtor.txDeleted) },
+      onDeleteTx = { confirmDeleteTx = it },
       onOpenTx = { receiptFor = it },
       onDue = { dueFor = it },
     )
@@ -391,8 +392,8 @@ fun DebtorsScreen(
       onSave = { chosenKind, amount, date, notes, due ->
         val pending = PendingTx(debtorId, chosenKind, amount, date, notes, due)
         //  CRM-03: بردِ بیش از سقف فقط با تأییدِ صریح — مشتریِ بی سقف همان رفتارِ همیشه
-        val credit = if (chosenKind == DebtorEngine.Kind.GIVE && !amount.isNaN() && amount > 0) {
-          DebtBook.creditCheck(d, debtorId, DebtBook.minor(amount))
+        val credit = if (chosenKind == DebtorEngine.Kind.GIVE && DebtorEngine.transactionAmountError(amount) == null) {
+          debtCreditOrNull(d, debtorId, amount)
         } else null
         if (credit != null && credit.over) overLimit = pending
         else record(pending, over = false)
@@ -401,7 +402,7 @@ fun DebtorsScreen(
   }
 
   overLimit?.let { pending ->
-    val credit = DebtBook.creditCheck(d, pending.debtorId, DebtBook.minor(pending.amount))
+    val credit = debtCreditOrNull(d, pending.debtorId, pending.amount)
     if (credit == null) {
       //  سقف در همین فاصله برداشته شد ⇒ پرسشی نمانده
       LaunchedEffect(pending) { overLimit = null }
@@ -444,6 +445,16 @@ fun DebtorsScreen(
         onSave = { due -> apply(DebtorEngine.setDueDate(d, txId, due), StrMoney.dueSaved) { dueFor = null } },
       ) }
     }
+  }
+
+  confirmDeleteTx?.let { txId ->
+    ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet(
+      title = StrMoney.deleteTxTitle,
+      message = StrMoney.deleteTxBody,
+      confirm = StrMoney.delete,
+      onDismiss = { confirmDeleteTx = null },
+      onConfirm = { deleteLater(DebtorLedgerModel.PendingDelete.Transaction(txId), StrDebtor.txDeleted) },
+    )
   }
 
   confirmDelete?.let { debtor ->
@@ -547,4 +558,10 @@ private data class PendingTx(
   val due: String?,
 ) {
   fun entry(overLimit: Boolean) = DebtEntry.Entry(debtorId, kind, amount, date, notes, dueDate = due, overLimit = overLimit)
+}
+
+private fun debtCreditOrNull(d: ShopData, debtorId: String, amount: Double): DebtBook.Credit? = try {
+  DebtBook.creditCheck(d, debtorId, DebtBook.minor(amount))
+} catch (_: ArithmeticException) {
+  null // Submission reports the range error.
 }
