@@ -7,6 +7,8 @@ import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import ir.vil3ntec.tohid.ui.v3.V3_FORM_PRIMARY_TAG
 import androidx.compose.ui.test.performSemanticsAction
 import ir.vil3ntec.tohid.core.i18n.StrHistory
 import ir.vil3ntec.tohid.core.i18n.StrMoney
@@ -190,7 +192,7 @@ class PurchasesRoutesUiTest {
     h.click(StrPurchaseWorkflow.deliveryOptions)
     h.click(StrPurchases.laterReceived)
     h.await(StrPurchases.laterHow)
-    val save = rule.onAllNodes(hasText(StrMoney.newPurchase) and hasClickAction())[0]
+    val save = rule.onNodeWithTag(V3_FORM_PRIMARY_TAG)
     save.performSemanticsAction(SemanticsActions.OnClick)
     runCatching { save.performSemanticsAction(SemanticsActions.OnClick) }
     h.awaitThat { store.data.value.supplierPayments.isNotEmpty() }

@@ -32,12 +32,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
+
+internal const val V3_FORM_PRIMARY_TAG = "v3-form-primary"
 
 /**
  *  فرمِ نسخهٔ ۳: سربرگِ `V3Scaffold` (عنوانِ کوچکِ وسط، برگشت)، بدنهٔ پیمایش‌پذیر
@@ -142,7 +145,7 @@ fun V3FormBar(
         if (secondary != null && onSecondary != null) {
           V3Button(secondary, onSecondary, Modifier.weight(1f), kind = V3ButtonKind.SECONDARY)
         }
-        V3Button(primary, onPrimary, Modifier.weight(if (secondary != null) 1.4f else 1f), enabled = primaryEnabled, loading = loading, haptic = true)
+        V3Button(primary, onPrimary, Modifier.weight(if (secondary != null) 1.4f else 1f).testTag(V3_FORM_PRIMARY_TAG), enabled = primaryEnabled, loading = loading, haptic = true)
       }
     }
   }

@@ -15,6 +15,6 @@ object StrPurchaseWorkflow {
   val productDates get() = t("تاریخ تولید، انقضا و بارکد", "Production date, expiry and barcode", "د تولید نېټه، ختمېدل او بارکوډ")
   val statement get() = t("گردش حساب", "Account activity", "د حساب راکړه ورکړه")
   val allCategories get() = t("همهٔ دسته‌ها", "All categories", "ټولې ډلې")
-  fun basePrice(total: String, each: String) = t("$total عدد · هر عدد $each", "$total units · $each each", "$total دانې · هره دانه $each")
+  fun basePrice(total: String, each: String) = t("${asIs(total)} عدد · هر عدد ${asIs(each)}", "$total units · $each each", "$total دانې · هره دانه $each")
   val deliveryOptions get() = t("زمان دریافت کالا و هزینهٔ جانبی", "Delivery timing and extra costs", "د توکو د ترلاسه کولو وخت او اضافي لګښتونه")
 }
