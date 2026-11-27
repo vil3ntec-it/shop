@@ -6,8 +6,6 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.hasScrollToIndexAction
-import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -111,9 +109,10 @@ class PurchaseFxUiTest {
     h.click("چای سبز")
     h.type(StrMoney.quantity, "10")
     h.type(StrPurchaseFx.priceIn("USD"), "10")
-    rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(StrPurchaseWorkflow.paymentLater))
-    h.click(StrPurchaseWorkflow.paymentLater)
     rule.onNodeWithTag(V3_FORM_PRIMARY_TAG).performSemanticsAction(SemanticsActions.OnClick)
+    h.await(StrPurchaseWorkflow.paymentLater)
+    h.click(StrPurchaseWorkflow.paymentLater)
+    h.click(StrPurchaseWorkflow.confirmPurchase)
     h.awaitThat { store.data.value.purchases.isNotEmpty() }
     val d = store.data.value
     val p = d.purchases.single()
