@@ -149,6 +149,17 @@ class PurchasesRoutesUiTest {
     assertFalse(h.has(StrPurchases.leftAll(money(3320.0)), substring = true))
   }
 
+  @Test fun supplierTabOpensASeparateAccountFromItsTile() {
+    h.show(MoneyPaths.PURCHASING, data)
+    h.await(StrPurchasePages.suppliers)
+    h.click(StrPurchasePages.suppliers)
+    h.await("شرکت پخش البرز")
+    assertTrue(h.has("عمده‌فروشی پامیر"))
+    h.click("شرکت پخش البرز")
+    h.await(StrPurchaseWorkflow.statement)
+    assertFalse(h.has("عمده‌فروشی پامیر"))
+  }
+
   @Test fun supplierPageListsItsPurchasesAndPayments() {
     h.show(MoneyPaths.supplier(PurchaseDemo.ALBORZ), data)
     h.await(StrPurchaseWorkflow.statement)
