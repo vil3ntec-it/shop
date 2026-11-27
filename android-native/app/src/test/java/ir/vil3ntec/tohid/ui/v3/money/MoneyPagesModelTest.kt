@@ -194,13 +194,15 @@ class MoneyPagesModelTest {
     //  e-rows-63b (تغییرِ عمدی): هر خرید، تک‌ردیفه هم، `onSaveMany` ⇒ `PurchaseBook.record` (فاکتورِ شماره‌دار، «پرداخت» ِ همان
     //  خرید)؛ راهِ تک‌ردیفهٔ `onSave` دیگر نیست — اثرها همان `addPurchase` ِ هر ردیف
     assertFalse(src.contains("onSave("))
-    assertTrue(src.contains("PurchaseFormModel.paid(snapshot), snapshot.date, snapshot.notes.trim(), PurchaseFormModel.extras(snapshot, extrasOn),\n        ) -> onBack()"))
+    assertTrue(src.contains("PurchaseFormModel.paid(snapshot), snapshot.date, snapshot.notes.trim(), PurchaseFormModel.extras(snapshot, extrasOn),"))
     val routes = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
       .map { java.io.File(it, "ir/vil3ntec/tohid/ui/v3/money/MoneyRoutes.kt") }.first { it.isFile }.readText()
     //  PUR-05 (دورِ ۳۱): همان فراخوانی با کلیدِ همین فرم — دو لمسِ «ثبت» یک فاکتور است؛ تک‌ردیفه هم با شناسه‌های همان کلید
     //  (PUR-05، هزینهٔ جانبی و سررسید: همان فراخوانی، با `extras` ِ فرم پیش از کلید)
     //  PUR-11 (تغییرِ عمدی، سخت‌تر): همان فراخوانی، و پس از کلید ارز/نرخ و پرداختِ ارزیِ همان `extras`
-    assertTrue(routes.contains("ir.vil3ntec.tohid.data.PurchaseBook.record(data, supplierId, lines, paid, date, notes, todayIso(), System.currentTimeMillis(), ::moneyId, landedTotal = extras.landedTotal, dueDate = extras.dueDate, key = saveKey, fx = extras.fx, fxPaid = extras.fxPaid)"))
+    assertTrue(routes.contains("MoneyWriter.recordPurchase(store, toasts, context) { latest ->"))
+    assertTrue(routes.contains("latest, supplierId, lines, paid, date, notes, today, now, ::moneyId,"))
+    assertTrue(routes.contains("landedTotal = extras.landedTotal, dueDate = extras.dueDate, key = saveKey, fx = extras.fx, fxPaid = extras.fxPaid,"))
     //  e-rows-63b (تغییرِ عمدی): راهِ تک‌ردیفهٔ `addPurchase` ِ مسیر رفت — همان کلید فقط به `PurchaseBook.record` و سفارشِ نرسیده می‌رود
     assertFalse(routes.contains("LedgerEngine.addPurchase(data, draft"))
     assertTrue(routes.contains("onSaveLater = rememberSaveLater(saveKey),"))
