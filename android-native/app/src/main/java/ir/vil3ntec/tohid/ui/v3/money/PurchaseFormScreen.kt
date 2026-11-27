@@ -323,20 +323,20 @@ internal fun PurchaseFormScreen(
     } ?: StrMoney.noSupplierBuyYet
   }
 
-  fun submit() {
+  val submit: () -> Unit = {
+    val snapshot = form
     tried = true
     when {
       busy -> Unit
-      errors.any -> shake++
+      PurchaseFormModel.errors(snapshot, d).any -> shake++
       //  e-rows-63b: نرسیده ⇒ سفارشِ خرید (سرور)؛ بی آن پیامِ «روشن نیست» و هیچ ثبت
       //  PUR-11: سفارشِ خرید فقط افغانی است
-      form.later && fxCode != null -> { shake++; notify(V3Tone.ERROR, StrPurchaseFx.laterAfnOnly) }
-      form.later && !laterOn -> { shake++; notify(V3Tone.ERROR, StrPurchases.laterOff) }
-      form.later -> { busy = true; onSaveLater(form) { ok -> busy = false; if (ok) onBack() } }
+      snapshot.later && snapshot.currency != null -> { shake++; notify(V3Tone.ERROR, StrPurchaseFx.laterAfnOnly) }
+      snapshot.later && !laterOn -> { shake++; notify(V3Tone.ERROR, StrPurchases.laterOff) }
+      snapshot.later -> { busy = true; onSaveLater(snapshot) { ok -> busy = false; if (ok) onBack() } }
       //  e-rows-63b: هر خرید یک فاکتورِ شماره‌دار (`PurchaseBook.record`) — تک‌ردیفه هم، تا «خریدِ #n» و «پرداخت» ِ همان خرید
       //  (یادداشتِ `PurchaseBook.payNote`) کار کنند؛ اثرها همان `addPurchase` ِ هر ردیف است
       else -> {
-        val snapshot = form
         busy = true
         scope.launch {
           try {
@@ -366,7 +366,7 @@ internal fun PurchaseFormScreen(
   V3Form(
     title = StrMoney.newPurchase,
     primary = StrMoney.newPurchase,
-    onPrimary = ::submit,
+    onPrimary = submit,
     onBack = onBack.takeUnless { busy },
     dirty = PurchaseFormModel.dirty(form, initial),
     summary = when {
