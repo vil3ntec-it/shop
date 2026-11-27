@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
@@ -69,6 +71,7 @@ fun V3Form(
   /** نوشته‌ای ذخیره‌نشده هست ⇒ «برگشت» (دکمه یا کلیدِ گوشی) اول برگهٔ «دور ریخته شود؟» */
   dirty: Boolean = false,
   listContent: (LazyListScope.() -> Unit)? = null,
+  listState: LazyListState? = null,
   content: @Composable ColumnScope.() -> Unit = {},
 ) {
   val c = PhoneV3.colors
@@ -98,6 +101,7 @@ fun V3Form(
       if (listContent != null) LazyColumn(
         Modifier.widthIn(max = 640.dp).fillMaxWidth().background(c.bg),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding()),
+        state = listState ?: rememberLazyListState(),
         content = listContent,
       ) else Column(
         Modifier
