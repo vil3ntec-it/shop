@@ -427,10 +427,18 @@ internal object PurchaseFormModel {
     else num(text).let { if (it == null || it < 0) StrMoney.invalidNumber else null }
 
   private fun paidError(f: PurchaseForm): String? {
-    if (f.paid.isBlank()) return null
-    val code = f.currency
-    return if (code != null) (if (fxMinor(f.paid, code) == null) StrMoney.invalidNumber else null)
-    else if ((num(f.paid) ?: -1.0) < 0) StrMoney.invalidNumber else null
+    if (f.pay == PurchasePay.FULL || f.pay == PurchasePay.LATER) return null
+    if (f.paid.isBlank()) return StrPurchaseWorkflow.partialAmountRequired.takeIf { f.pay == PurchasePay.PART }
+    val currency = f.currency
+    val paid = if (currency == null) num(f.paid) else fxMinor(f.paid, currency)?.toDouble()
+    if (paid == null || paid < 0) return StrMoney.invalidNumber
+    if (f.pay != PurchasePay.PART) return null
+    val payable = if (currency == null) total(f) else fxTotal(f).toDouble()
+    return when {
+      paid <= 0 -> StrPurchaseWorkflow.partialAmountRequired
+      paid > payable -> StrPurchaseWorkflow.paymentTooHigh
+      else -> null
+    }
   }
 
   /** PUR-05: انقضای تایپ‌شده ⇒ `yyyy-MM-dd`؛ خالی ⇒ "" (بی انقضا)؛ نادرست ⇒ null (همان قاعدهٔ «ورودِ کالا» ِ انبار) */

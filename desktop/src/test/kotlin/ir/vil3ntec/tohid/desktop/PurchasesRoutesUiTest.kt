@@ -179,6 +179,43 @@ class PurchasesRoutesUiTest {
    *  «الان رسیده؟ نه» ⇐ همان سفارشِ خریدِ سرور: یک ساختن با کلیدِ فرم (دو لمس ⇒ یک درخواست)، یک فرستادن، و پیش‌پرداختِ کامل
    *  یک بار پس از سرور؛ هیچ خرید، موجودی یا بدهیِ دفتر تا «دریافتِ کالا».
    */
+  @Test fun newLineClosesThePreviousBarcodeFieldAndReopensWithItsValue() {
+    h.show(MoneyPaths.newPurchase(PurchaseDemo.PAMIR), data)
+    h.await(StrMoney.pickItem)
+    h.type(StrPurchaseWorkflow.optionalBarcode, "123456")
+    rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(StrMoney.addPurchaseRow))
+    h.click(StrMoney.addPurchaseRow)
+    h.await(StrMoney.purchaseRow(2))
+    rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(StrMoney.purchaseRow(1)))
+    assertFalse(h.has("123456"))
+    h.click(StrMoney.purchaseRow(1))
+    h.await("123456")
+  }
+
+  @Test fun partialPaymentUsesTheTypedAmountAndShowsTheBalance() {
+    val store = disk()
+    h.show(MoneyPaths.newPurchase(PurchaseDemo.PAMIR), store)
+    h.await(StrMoney.pickItem)
+    h.click(StrMoney.pickItem)
+    h.await("نمک")
+    h.click("نمک")
+    h.type(StrMoney.quantity, "10")
+    h.type(StrPurchaseWorkflow.optionalBarcode, "۱۲۳۴۵")
+    assertFalse(h.has(StrPurchaseWorkflow.paymentPart))
+    rule.onNodeWithTag(V3_FORM_PRIMARY_TAG).performSemanticsAction(SemanticsActions.OnClick)
+    h.await(StrPurchaseWorkflow.paymentPart)
+    h.click(StrPurchaseWorkflow.paymentPart)
+    h.type(StrPurchaseWorkflow.paidAmount, "70")
+    val count = store.data.value.purchases.size
+    h.click(StrPurchaseWorkflow.confirmPurchase)
+    h.awaitThat { store.data.value.purchases.size > count }
+    val purchase = store.data.value.purchases.maxBy { it.createdAt }
+    assertEquals(200.0, purchase.totalAmount, 0.0)
+    assertEquals(70.0, purchase.paidAmount, 0.0)
+    assertEquals(130.0, purchase.debt, 0.0)
+    assertEquals("12345", purchase.barcode)
+  }
+
   @Test fun notReceivedNowSendsOnePurchaseOrderWithOnePrepaymentAndNoStock() {
     val fake = FakePurchaseOrders(h.server)
     val store = disk()
@@ -188,13 +225,17 @@ class PurchasesRoutesUiTest {
     h.await("نمک")
     h.click("نمک")
     h.type(StrMoney.quantity, "10")
-    rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(StrPurchaseWorkflow.deliveryOptions))
-    h.click(StrPurchaseWorkflow.deliveryOptions)
+    rule.onNodeWithTag(V3_FORM_PRIMARY_TAG).performSemanticsAction(SemanticsActions.OnClick)
+    h.await(StrPurchaseWorkflow.paymentNow)
+    h.click(StrPurchaseWorkflow.confirmPurchase)
+    h.await(StrPurchaseWorkflow.paymentRequired)
+    assertTrue(fake.writes().isEmpty())
+    h.click(StrPurchaseWorkflow.paymentNow)
+    h.click(StrPurchaseWorkflow.purchaseDetails)
     h.click(StrPurchases.laterReceived)
     h.await(StrPurchases.laterHow)
-    val save = rule.onNodeWithTag(V3_FORM_PRIMARY_TAG)
-    save.performSemanticsAction(SemanticsActions.OnClick)
-    runCatching { save.performSemanticsAction(SemanticsActions.OnClick) }
+    h.click(StrPurchaseWorkflow.confirmPurchase)
+    runCatching { h.click(StrPurchaseWorkflow.confirmPurchase) }
     h.awaitThat { store.data.value.supplierPayments.isNotEmpty() }
     val root = FakePurchaseOrders.ROOT
     val creates = fake.writes().filter { it.path == root && it.method == "POST" }
