@@ -17,6 +17,10 @@ import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.text.TextLayoutResult
@@ -25,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.StrHistory
+import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseWorkflow
 import ir.vil3ntec.tohid.core.i18n.StrPurchases
 import ir.vil3ntec.tohid.core.model.OrderCustomerDto
 import ir.vil3ntec.tohid.core.model.OrderDto
@@ -54,7 +60,7 @@ import org.junit.Test
 
 /**
  *  ۶۸c — «ردیفِ فهرستِ داده» روی گره‌های واقعی، گوشیِ ۳۶۰dp (صاحب‌کار: «این شلوغی‌هات رو … درست کن دقیق و منظم»):
- *   • هر ردیفِ خریدها، تأمین‌کننده‌ها، صفحهٔ تأمین‌کننده، مصارف، رسیدها، تاریخچهٔ فروش، کالاها، انبار و صفِ سفارش‌ها دست‌بالا
+ *   • هر ردیفِ خریدها، مصارف، رسیدها، تاریخچهٔ فروش، کالاها، انبار و صفِ سفارش‌ها دست‌بالا
  *     **یک** قرصِ کار دارد؛ عنوانش یک خطِ ۱۶ و خطِ دومش یک خطِ ۱۳ است؛
  *   • خطِ مبلغ یک خط است و جز رنگِ نوشته و کم‌رنگ دست‌بالا یک رنگ (خطر) دارد — هیچ زرد/کهربایی؛
  *   • ردیفِ پالایهٔ خریدها در ۳۶۰dp (فارسی و انگلیسی) هیچ کادرِ بریده‌ای ندارد و «فیلتر» برگهٔ همان سه کادر را باز می‌کند.
@@ -150,16 +156,21 @@ class DataRowsE68cUiTest {
     assertAnatomy("خریدها", 4)
   }
 
-  @Test fun suppliersListAndSupplierPageFollowTheAnatomy() {
+  @Test fun supplierListUsesSeparateAccountTilesWithLongPressActions() {
     phone(MoneyPaths.purchasing(tab = "suppliers"), PurchaseDemo.full())
     h.await("شرکت پخش البرز")
-    assertAnatomy("تأمین‌کننده‌ها", 2)
+    for (name in listOf("شرکت پخش البرز", "عمده‌فروشی پامیر")) {
+      val tile = hasText(name) and hasClickAction() and SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick)
+      assertEquals(name, 1, rule.onAllNodes(tile).fetchSemanticsNodes().size)
+    }
   }
 
-  @Test fun supplierPageFollowsTheAnatomy() {
+  @Test fun supplierLedgerHasTappablePurchasesAndPayments() {
     phone(MoneyPaths.supplier(PurchaseDemo.ALBORZ), PurchaseDemo.full())
-    h.await(StrPurchases.tabPurchases)
-    assertAnatomy("صفحهٔ تأمین‌کننده", 2)
+    h.await(StrPurchaseWorkflow.statement)
+    for (kind in listOf(StrPurchases.purchase, StrMoney.payment)) {
+      assertTrue(kind, rule.onAllNodes(hasContentDescription(kind) and hasClickAction()).fetchSemanticsNodes().isNotEmpty())
+    }
   }
 
   @Test fun expensesFollowTheAnatomy() = route("expenses", MoneyDemo.full(), "مصارف", 2)
