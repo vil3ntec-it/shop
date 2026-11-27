@@ -68,7 +68,7 @@ internal class PurchaseRowText(
 
     /** «۱۲٬۰۰۰ ؋»؛ سندِ کسر «−۴۰۰ ؋» */
     fun amount(v: PurchaseViews.View): String =
-      if (v.kind == PurchaseViews.Kind.RETURN) MoneyText.signed(-v.total, plus = false) + " ؋" else MoneyText.afn(v.total)
+      if (v.kind == PurchaseViews.Kind.RETURN) MoneyText.signed(-v.total, plus = false) + " ؋" else MoneyText.preciseAfn(v.total)
 
     /** «آرد»، «آرد، روغن»، «آرد، روغن و ۳ قلمِ دیگر»؛ کالای حذف‌شده ⇒ «(محصول حذف‌شده)» */
     fun items(v: PurchaseViews.View): String {

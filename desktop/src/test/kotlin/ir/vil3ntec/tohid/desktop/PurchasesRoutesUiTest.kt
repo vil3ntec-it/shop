@@ -3,13 +3,18 @@ package ir.vil3ntec.tohid.desktop
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import ir.vil3ntec.tohid.ui.v3.V3_FORM_PRIMARY_TAG
 import androidx.compose.ui.test.performSemanticsAction
 import ir.vil3ntec.tohid.core.i18n.StrHistory
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseOrders
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseWorkflow
 import ir.vil3ntec.tohid.core.i18n.StrPurchases
 import ir.vil3ntec.tohid.data.PurchaseBook
 import ir.vil3ntec.tohid.data.PurchaseViews
@@ -94,6 +99,7 @@ class PurchasesRoutesUiTest {
     assertTrue(h.has(StrPurchases.noCode, substring = true))
     assertTrue(h.has("آرد"))
     assertTrue(h.has("50 کیلو × 40 ؋", substring = true))
+    rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(StrPurchases.remaining))
     assertTrue(h.has(StrPurchases.remaining))
   }
 
@@ -102,6 +108,7 @@ class PurchasesRoutesUiTest {
     val store = disk()
     h.show(MoneyPaths.purchase(big.key), store)
     h.await(StrPurchases.barcode(PurchaseLineText.ltr(PurchaseDemo.FLOUR_CODE)), substring = true)
+    rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(StrMoney.pay))
     h.click(StrMoney.pay)
     h.await(StrMoney.recordPayment)
     assertTrue(h.has(PurchaseBook.payNote(PurchaseDemo.BIG_NO), substring = true))
@@ -144,14 +151,28 @@ class PurchasesRoutesUiTest {
     assertFalse(h.has(StrPurchases.leftAll(money(3320.0)), substring = true))
   }
 
+  @Test fun supplierTabOpensASeparateAccountFromItsTile() {
+    h.show(MoneyPaths.PURCHASING, data)
+    h.await(StrPurchasePages.suppliers)
+    h.click(StrPurchasePages.suppliers)
+    h.await("شرکت پخش البرز")
+    assertTrue(h.has("عمده‌فروشی پامیر"))
+    h.click("شرکت پخش البرز")
+    h.await(StrPurchaseWorkflow.statement)
+    assertFalse(h.has("عمده‌فروشی پامیر"))
+  }
+
   @Test fun supplierPageListsItsPurchasesAndPayments() {
     h.show(MoneyPaths.supplier(PurchaseDemo.ALBORZ), data)
-    h.await(StrPurchases.tabPurchases)
-    assertTrue(h.has(StrPurchases.payments))
-    assertTrue(h.has(StrPurchases.leftAll(money(3320.0)), substring = true))
-    assertTrue(h.has(StrPurchases.noPayments))
+    h.await(StrPurchaseWorkflow.statement)
+    assertTrue(h.has(StrMoney.payment))
     assertFalse(h.has("عمده‌فروشی پامیر"))
     assertTrue(h.has(StrPurchases.newPurchase))
+    val reference = "#${PurchaseDemo.BIG_NO}"
+    rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(reference))
+    h.click(reference)
+    h.await(StrPurchases.lines(5))
+    assertTrue(h.has("آرد"))
   }
 
   /**
@@ -162,14 +183,16 @@ class PurchasesRoutesUiTest {
     val fake = FakePurchaseOrders(h.server)
     val store = disk()
     h.show(MoneyPaths.newPurchase(PurchaseDemo.PAMIR), store)
-    h.await(StrPurchases.receivedNow)
+    h.await(StrMoney.pickItem)
     h.click(StrMoney.pickItem)
     h.await("نمک")
     h.click("نمک")
     h.type(StrMoney.quantity, "10")
+    rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(StrPurchaseWorkflow.deliveryOptions))
+    h.click(StrPurchaseWorkflow.deliveryOptions)
     h.click(StrPurchases.laterReceived)
     h.await(StrPurchases.laterHow)
-    val save = rule.onAllNodes(hasText(StrMoney.newPurchase) and hasClickAction())[0]
+    val save = rule.onNodeWithTag(V3_FORM_PRIMARY_TAG)
     save.performSemanticsAction(SemanticsActions.OnClick)
     runCatching { save.performSemanticsAction(SemanticsActions.OnClick) }
     h.awaitThat { store.data.value.supplierPayments.isNotEmpty() }

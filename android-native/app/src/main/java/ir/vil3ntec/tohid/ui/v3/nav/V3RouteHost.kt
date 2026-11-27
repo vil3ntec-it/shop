@@ -106,7 +106,10 @@ fun V3RouteHost(nav: V3Nav, shell: ShellContext, modifier: Modifier = Modifier) 
           if (edgeProgress > 0f) translationX = -size.width * 0.25f * edgeProgress
         },
       //  کامپیوتر/پهن: صفحه‌ها هم‌سطح‌اند ⇐ محو، نه لغزشِ تمام‌عرض
-      transitionSpec = { V3Transitions.page(if (nav.wide) Move.NONE else nav.move, dir, nav.tabForward) },
+      transitionSpec = {
+        val purchasing = initialState.substringBefore('?').let { it == "purchasing" || it.startsWith("purchasing/") }
+        V3Transitions.page(if (nav.wide) Move.NONE else nav.move, dir, nav.tabForward, quickBack = purchasing)
+      },
       label = "route",
     ) { path ->
       //  PERF-SCREEN: صفحهٔ زیرِ دروازه (قفل) پوشیده است — چیزِ زنده‌اش (`V3Live`) می‌ایستد

@@ -74,8 +74,8 @@ internal fun LedgerRow(
   up: Boolean,
   kindLabel: String,
   onClick: () -> Unit,
-  onLongClick: () -> Unit,
-  onDelete: () -> Unit,
+  onLongClick: (() -> Unit)?,
+  onDelete: (() -> Unit)?,
   modifier: Modifier = Modifier,
   /** «فاکتور #۱۲» ِ یادداشت (`InvoiceRefs.split`)؛ null ⇒ فقط تاریخ */
   invoice: InvoicePiece? = null,
@@ -93,7 +93,7 @@ internal fun LedgerRow(
   @Suppress("DEPRECATION")
   val swipe = rememberSwipeToDismissBoxState(
     confirmValueChange = { value ->
-      if (value == SwipeToDismissBoxValue.EndToStart) {
+      if (value == SwipeToDismissBoxValue.EndToStart && onDelete != null) {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         onDelete()
         true
@@ -104,6 +104,7 @@ internal fun LedgerRow(
     state = swipe,
     modifier = modifier,
     enableDismissFromStartToEnd = false,
+    enableDismissFromEndToStart = onDelete != null,
     backgroundContent = {
       Box(Modifier.fillMaxSize().clip(shape).background(c.tile).padding(horizontal = 16.dp), contentAlignment = Alignment.CenterEnd) {
         //  فقط نما: صفحه‌خوان «حذف» را کارِ سفارشیِ خودِ ردیف می‌شنود، نه نوشتهٔ جدای زیرِ آن
@@ -125,11 +126,11 @@ internal fun LedgerRow(
           role = Role.Button,
           onClickLabel = StrMoney.details,
           onLongClickLabel = StrA11y.moreActions,
-          onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onLongClick() },
+          onLongClick = onLongClick?.let { action -> { haptic.performHapticFeedback(HapticFeedbackType.LongPress); action() } },
           onClick = onClick,
         )
         //  کشیدن برای حذف جایگزینِ صفحه‌خوان می‌خواهد (همان `onDelete` ِ کشیدن، با همان «برگرداندن»)
-        .semantics { customActions = listOf(CustomAccessibilityAction(StrMoney.delete) { onDelete(); true }) }
+        .semantics { if (onDelete != null) customActions = listOf(CustomAccessibilityAction(StrMoney.delete) { onDelete(); true }) }
         .padding(horizontal = 12.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {

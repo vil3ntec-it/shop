@@ -106,6 +106,7 @@
     salePrice: 'قیمت فروش',
     wholesalePrice: 'قیمت عمده',
     minStock: 'حداقل موجودی',
+    barcode: 'بارکد',
     barcodes: 'بارکدها',
     photo: 'عکس دارد',
     active: 'فعال',

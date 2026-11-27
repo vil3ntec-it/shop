@@ -78,7 +78,8 @@ object MoneyPaths {
   /** زبانهٔ خرید با زبانهٔ آغازین (`suppliers`) یا پالایهٔ پرداخت (`unpaid`، `overdue`) */
   fun purchasing(tab: String? = null, pay: String? = null) = RoutePaths.withQuery(PURCHASING, "tab" to tab, "pay" to pay)
   fun returnSupplier(id: String) = supplier(id) + "/return"
-  fun newPurchase(supplier: String? = null) = RoutePaths.withQuery("purchasing/new", "supplier" to supplier)
+  fun newPurchase(supplier: String? = null, barcode: String? = null) =
+    RoutePaths.withQuery("purchasing/new", "supplier" to supplier, "barcode" to barcode)
   /** PUR-14: فاکتورهای تأمین‌کننده در گوشی — درش فقط با پرچمِ `shop.purchase_orders` و برای مدیر/صاحب (`rememberSupplierBillsDoor`) */
   const val SUPPLIER_BILLS = "purchasing/bills"
   fun supplierBill(orderId: String) = SUPPLIER_BILLS + "/" + RoutePaths.encode(orderId)
@@ -211,8 +212,11 @@ val MoneyModule = AppModule(
 
     /* --------------------------- خرید و تأمین‌کننده --------------------------- */
     V3Route(MoneyPaths.PURCHASING, RouteKind.TAB, { Str.purchasing }, chrome = Chrome.OWN) {
-      if (desk) DeskPurchasingScreen(store, data, snackbar)
-      else {
+      if (desk) DeskPurchasingScreen(
+        store, data, snackbar,
+        onNewPurchase = { barcode -> nav.open(MoneyPaths.newPurchase(barcode = barcode)) },
+        onSupplierLedger = { id -> nav.open(MoneyPaths.supplier(id)) },
+      ) else {
         //  PUR-14: فاکتورِ تأمین‌کننده و «باطل» روی گوشی هم (پیش‌تر فقط پنجرهٔ «سفارش‌های خرید» ِ کامپیوتر)
         val billsDoor = rememberSupplierBillsDoor()
         //  PUR-02/03/04: «سفارش‌های خرید» روی گوشی هم (پیش‌تر فقط پنجرهٔ کامپیوتر) — همان پرچم
@@ -289,17 +293,20 @@ val MoneyModule = AppModule(
       PurchaseFormScreen(
         d = data,
         supplierArg = args.query("supplier"),
+        initialBarcode = args.query("barcode"),
         onBack = { back() },
         onNewProduct = { nav.open(ProductsPaths.new()) },
+        onCategory = { selected, done -> nav.openForResult(ProductsPaths.categories(pick = true, selected = selected), done) },
         //  PUR-05: همان فاکتورِ چندردیفهٔ کامپیوتر (`DeskPurchasing`)، با هزینهٔ جانبی (PUR-06) و سررسید (PUR-07)
         onSaveMany = { supplierId, lines, paid, date, notes, extras ->
-          MoneyWriter.purchase(
-            store, toasts, context,
-            data,
-            //  PUR-11: ارز و نرخِ فاکتور و پرداختِ هنگامِ خرید به همان ارز (`extras.fx`؛ افغانی ⇒ null و ۰، همان پیشین)
-            ir.vil3ntec.tohid.data.PurchaseBook.record(data, supplierId, lines, paid, date, notes, todayIso(), System.currentTimeMillis(), ::moneyId, landedTotal = extras.landedTotal, dueDate = extras.dueDate, key = saveKey, fx = extras.fx, fxPaid = extras.fxPaid),
-            StrMoney.purchaseSaved,
-          ) != null
+          val today = todayIso()
+          val now = System.currentTimeMillis()
+          MoneyWriter.recordPurchase(store, toasts, context) { latest ->
+            ir.vil3ntec.tohid.data.PurchaseBook.record(
+              latest, supplierId, lines, paid, date, notes, today, now, ::moneyId,
+              landedTotal = extras.landedTotal, dueDate = extras.dueDate, key = saveKey, fx = extras.fx, fxPaid = extras.fxPaid,
+            )
+          }
         },
         //  همان شرطِ کامپیوتر (`DeskPurchasing.stockOn`)
         extrasOn = remember(data.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(data) },

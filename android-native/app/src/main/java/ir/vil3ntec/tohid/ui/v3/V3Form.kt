@@ -3,7 +3,10 @@ package ir.vil3ntec.tohid.ui.v3
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -29,12 +32,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
+
+internal const val V3_FORM_PRIMARY_TAG = "v3-form-primary"
 
 /**
  *  فرمِ نسخهٔ ۳: سربرگِ `V3Scaffold` (عنوانِ کوچکِ وسط، برگشت)، بدنهٔ پیمایش‌پذیر
@@ -62,7 +68,8 @@ fun V3Form(
   summary: String? = null,
   /** نوشته‌ای ذخیره‌نشده هست ⇒ «برگشت» (دکمه یا کلیدِ گوشی) اول برگهٔ «دور ریخته شود؟» */
   dirty: Boolean = false,
-  content: @Composable ColumnScope.() -> Unit,
+  listContent: (LazyListScope.() -> Unit)? = null,
+  content: @Composable ColumnScope.() -> Unit = {},
 ) {
   val c = PhoneV3.colors
   var askDiscard by remember { mutableStateOf(false) }
@@ -88,7 +95,11 @@ fun V3Form(
     },
   ) { pad ->
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-      Column(
+      if (listContent != null) LazyColumn(
+        Modifier.widthIn(max = 640.dp).fillMaxWidth().background(c.bg),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding()),
+        content = listContent,
+      ) else Column(
         Modifier
           .widthIn(max = 640.dp)
           .fillMaxWidth()
@@ -134,7 +145,7 @@ fun V3FormBar(
         if (secondary != null && onSecondary != null) {
           V3Button(secondary, onSecondary, Modifier.weight(1f), kind = V3ButtonKind.SECONDARY)
         }
-        V3Button(primary, onPrimary, Modifier.weight(if (secondary != null) 1.4f else 1f), enabled = primaryEnabled, loading = loading, haptic = true)
+        V3Button(primary, onPrimary, Modifier.weight(if (secondary != null) 1.4f else 1f).testTag(V3_FORM_PRIMARY_TAG), enabled = primaryEnabled, loading = loading, haptic = true)
       }
     }
   }

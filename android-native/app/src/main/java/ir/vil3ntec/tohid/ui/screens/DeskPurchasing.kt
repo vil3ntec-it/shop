@@ -113,12 +113,19 @@ import ir.vil3ntec.tohid.ui.desk.rememberDeskLoad
  *  منطق: `PurchaseBook` (هر ردیف همان `LedgerEngine.addPurchase`).
  */
 @Composable
-fun DeskPurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
+fun DeskPurchasingScreen(
+  store: ShopStore,
+  d: ShopData,
+  snackbar: SnackbarHostState,
+  onNewPurchase: ((String?) -> Unit)? = null,
+  onSupplierLedger: ((String) -> Unit)? = null,
+) {
   val scope = rememberCoroutineScope()
   fun toast(t: String) { scope.launch { snackbar.showSnackbar(t) } }
   var tab by remember { mutableStateOf(0) }
   var editing by remember { mutableStateOf(false) }
   val unitsOn = purchaseUnitsOn()
+  val launchPurchase by rememberUpdatedState(onNewPurchase)
   val pending = remember { mutableStateListOf<Scan>() }
   //  عکسِ CI (`D3bShotsTest`): زبانهٔ «تأمین‌کنندگان»
   val shotTab = DeskDataShot.tab.value
@@ -133,13 +140,16 @@ fun DeskPurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
       val unitHit = if (unitsOn) ShopStore.purchaseUnitIndex(latest).find(code) else null
       val id = unitHit?.productId ?: ShopStore.barcodeIndex(latest)[code]
       if (id == null) { toast(StrPurchasePages.barcodeUnknown(code)); true }
-      else { pending += Scan(id, unitHit?.unit?.name); editing = true; true }
+      else {
+        launchPurchase?.invoke(code) ?: run { pending += Scan(id, unitHit?.unit?.name); editing = true }
+        true
+      }
     }
     onDispose { ir.vil3ntec.tohid.scan.ScanRouter.unregister(owner) }
   }
 
   //  Ctrl+N (پنجره) و دکمهٔ «+» ⇐ فاکتورِ خریدِ تازه
-  val add = remember { { editing = true } }
+  val add = remember { { launchPurchase?.invoke(null) ?: run { editing = true } } }
   DisposableEffect(Unit) {
     ir.vil3ntec.tohid.ui.AppNav.addAction.value = add
     onDispose { if (ir.vil3ntec.tohid.ui.AppNav.addAction.value === add) ir.vil3ntec.tohid.ui.AppNav.addAction.value = null }
@@ -152,7 +162,7 @@ fun DeskPurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
 
   DeskPage(
     Modifier.onPreviewKeyEvent { e ->
-      if (e.type == KeyEventType.KeyDown && e.isPrimaryModifier && e.key == Key.N) { editing = true; true } else false
+      if (e.type == KeyEventType.KeyDown && e.isPrimaryModifier && e.key == Key.N) { add(); true } else false
     },
   ) {
     PurchaseKpis(d)
@@ -160,12 +170,12 @@ fun DeskPurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
       end = {
         //  PUR-02/04: فقط با پرچمِ سرورِ `shop.purchase_orders` دیده می‌شود
         PurchaseOrdersEntry(store, d, ::toast)
-        DeskButton(StrPurchasePages.newPurchaseKey, { editing = true }, kind = DeskButtonKind.PRIMARY)
+        DeskButton(StrPurchasePages.newPurchaseKey, add, kind = DeskButtonKind.PRIMARY)
       },
     ) {
       DeskSegmented(listOf(0 to StrPurchasePages.purchaseInvoices, 1 to StrPurchasePages.suppliers), tab, { tab = it })
     }
-    if (tab == 0) PurchaseInvoices(d, ::toast) else Suppliers(store, d, ::toast)
+    if (tab == 0) PurchaseInvoices(d, ::toast) else Suppliers(store, d, ::toast, onSupplierLedger)
   }
 }
 
@@ -544,7 +554,7 @@ private fun NewPurchaseInvoice(
  *  تأمین‌کنندهٔ برگزیده در کنار: بدهیِ ما، چهار عددِ آرام، F7 پرداخت (و «برگشت» با دفترِ موجودی)، چاپ و اکسل.
  */
 @Composable
-private fun ColumnScope.Suppliers(store: ShopStore, d: ShopData, toast: (String) -> Unit) {
+private fun ColumnScope.Suppliers(store: ShopStore, d: ShopData, toast: (String) -> Unit, onSupplierLedger: ((String) -> Unit)?) {
   val scope = rememberCoroutineScope()
   var openId by remember { mutableStateOf<String?>(null) }
   val today = ir.vil3ntec.tohid.todayIso()
@@ -593,7 +603,9 @@ private fun ColumnScope.Suppliers(store: ShopStore, d: ShopData, toast: (String)
       }
       Box(Modifier.weight(1f).fillMaxHeight()) {
         if (open == null) DeskPaneHint(Icons.Outlined.Storefront, StrDeskData.pickSupplier, Modifier.fillMaxSize())
-        else key(open.supplier.id) { SupplierFile(store, d, open, today, toast) { openId = null } }
+        else key(open.supplier.id) {
+          SupplierFile(store, d, open, today, toast, onSupplierLedger?.let { go -> { go(open.supplier.id) } }) { openId = null }
+        }
       }
     }
   }
@@ -601,7 +613,10 @@ private fun ColumnScope.Suppliers(store: ShopStore, d: ShopData, toast: (String)
 
 /** صورت‌حسابِ یک تأمین‌کننده — پنلِ کنارِ فهرست */
 @Composable
-private fun SupplierFile(store: ShopStore, d: ShopData, open: PurchaseBook.SupplierSummary, today: String, toast: (String) -> Unit, onClose: () -> Unit) {
+private fun SupplierFile(
+  store: ShopStore, d: ShopData, open: PurchaseBook.SupplierSummary, today: String,
+  toast: (String) -> Unit, onSupplierLedger: (() -> Unit)?, onClose: () -> Unit,
+) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val c = Desk.colors
@@ -658,6 +673,9 @@ private fun SupplierFile(store: ShopStore, d: ShopData, open: PurchaseBook.Suppl
         },
       ) {
         DeskButton(StrPurchasePages.paySupplierKey, { paying = true }, kind = DeskButtonKind.PRIMARY)
+        if (onSupplierLedger != null) {
+          DeskButton(ir.vil3ntec.tohid.core.i18n.StrPurchaseWorkflow.statement, onSupplierLedger)
+        }
         if (stockOn) DeskButton(StrPurchasePages.returnCredit, { returning = true })
       }
       if (returning) {

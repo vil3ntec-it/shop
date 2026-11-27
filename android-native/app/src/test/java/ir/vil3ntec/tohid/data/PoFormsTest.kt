@@ -309,7 +309,7 @@ class PoFormsTest {
     )
     //  ویرایشِ همان پیش‌نویس: واحد و واحدِ پایه برمی‌گردند (بی `d` همان نامِ ردیف)
     val draft = unitPo.copy(state = "draft", status = "draft")
-    assertEquals(PoForms.EditRow(0, "tea", "چای", "دانه", "2", "1000", "کارتن ۲۴"), PoForms.rowsOf(draft, du)[0])
+    assertEquals(PoForms.EditRow(0, "tea", "چای", "دانه", "2", "1000", "کارتن ۲۴", factorMilli = 24_000), PoForms.rowsOf(draft, du)[0])
     assertEquals("کارتن ۲۴", PoForms.rowsOf(draft)[0].unit)
     assertEquals(PoForms.EditRow(1, "pB", "کالای B", "عدد", "10", "200"), PoForms.rowsOf(draft, du)[1])
 

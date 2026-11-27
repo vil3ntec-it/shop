@@ -45,6 +45,29 @@ internal object MoneyWriter {
     is PurchaseBook.Result.Ok -> { ok(store, toasts, context, base, result.data, done); result.invoiceNo }
   }
 
+  suspend fun recordPurchase(
+    store: ShopStore,
+    toasts: V3Toasts?,
+    context: Context,
+    record: (ShopData) -> PurchaseBook.Result,
+  ): Boolean {
+    var result: PurchaseBook.Result? = null
+    val saved = store.update { latest ->
+      val next = record(latest)
+      result = next
+      (next as? PurchaseBook.Result.Ok)?.data
+    }
+    if (saved != true) {
+      val reason = (result as? PurchaseBook.Result.Failed)?.message
+      toasts?.show(reason ?: ir.vil3ntec.tohid.core.i18n.StrProducts.saveFailed, V3Tone.ERROR)
+      return false
+    }
+    V3Celebrate.fire(haptic = false)
+    toasts?.show(ir.vil3ntec.tohid.core.i18n.StrMoney.purchaseSaved, V3Tone.SUCCESS)
+    Haptics.success(context)
+    return true
+  }
+
   fun debtor(store: ShopStore, toasts: V3Toasts?, context: Context?, base: ShopData, result: DebtorEngine.Result, done: String): String? = when (result) {
     is DebtorEngine.Result.Failed -> { toasts?.show(result.message, V3Tone.ERROR); null }
     is DebtorEngine.Result.Ok -> { ok(store, toasts, context, base, result.data, done); result.id }

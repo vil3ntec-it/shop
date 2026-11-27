@@ -156,6 +156,7 @@ object PoForms {
   data class EditRow(
     val key: Int, val productId: String, val name: String, val unit: String, val qty: String, val price: String,
     val unitName: String? = null,
+    val factorMilli: Long? = null,
   )
 
   /** واحدی که مقدار و فیِ ردیف به آن است (کادرِ «مقدار به …») */
@@ -168,7 +169,7 @@ object PoForms {
   fun rowsOf(base: PurchaseOrderDto?, d: ShopData? = null): List<EditRow> = base?.lines.orEmpty().mapIndexed { i, l ->
     val inUnit = l.factorMilli != null
     val baseUnit = if (inUnit) d?.products?.find { it.id == l.productId }?.unit ?: l.unit else l.unit
-    EditRow(i, l.productId, l.name, baseUnit, num(PurchaseOrderBook.units(l.qtyMilli)), num(PurchaseOrderBook.asAfn(l.priceMinor)), if (inUnit) l.unit else null)
+    EditRow(i, l.productId, l.name, baseUnit, num(PurchaseOrderBook.units(l.qtyMilli)), num(PurchaseOrderBook.asAfn(l.priceMinor)), if (inUnit) l.unit else null, l.factorMilli)
   }
 
   private fun nextKey(rows: List<EditRow>): Int = (rows.maxOfOrNull { it.key } ?: -1) + 1
@@ -220,8 +221,10 @@ object PoForms {
     val units = p.purchaseUnits?.map(ShopStore::coreOf)
     val to = PurchaseUnits.find(units, unitName)
     if (unitName != null && to == null) return row
-    val next = row.copy(unit = p.unit, unitName = to?.name)
-    return repriced(p, row.price, row.unitName, to?.name)?.let { next.copy(price = it) } ?: next
+    if (row.unitName == to?.name) return row
+    val fromFactor = row.factorMilli ?: PurchaseUnits.find(units, row.unitName)?.factorMilli ?: PurchaseUnits.MILLI
+    val next = row.copy(unit = p.unit, unitName = to?.name, factorMilli = null)
+    return repriced(row.price, fromFactor, to?.factorMilli ?: PurchaseUnits.MILLI)?.let { next.copy(price = it) } ?: next
   }
 
   /**
@@ -233,8 +236,14 @@ object PoForms {
     val units = p.purchaseUnits?.map(ShopStore::coreOf)
     val f = PurchaseUnits.find(units, from)?.factorMilli ?: PurchaseUnits.MILLI
     val t = PurchaseUnits.find(units, to)?.factorMilli ?: PurchaseUnits.MILLI
-    val v = parse(price)?.takeIf { it >= 0 } ?: return null
-    return runCatching { num(PurchaseOrderBook.asAfn(PurchaseOrderCore.mulDivRound(PurchaseOrderBook.minor(v), t, f))) }.getOrNull()
+    return repriced(price, f, t)
+  }
+
+  private fun repriced(price: String, fromFactor: Long, toFactor: Long): String? {
+    val value = parse(price)?.takeIf { it >= 0 } ?: return null
+    return runCatching {
+      num(PurchaseOrderBook.asAfn(PurchaseOrderCore.mulDivRound(PurchaseOrderBook.minor(value), toFactor, fromFactor)))
+    }.getOrNull()
   }
 
   /**
@@ -243,11 +252,11 @@ object PoForms {
    */
   fun unitLine(d: ShopData, r: EditRow): String? {
     val p = d.products.find { it.id == r.productId } ?: return null
-    val u = PurchaseUnits.find(p.purchaseUnits?.map(ShopStore::coreOf), r.unitName) ?: return null
+    val factor = r.factorMilli ?: PurchaseUnits.find(p.purchaseUnits?.map(ShopStore::coreOf), r.unitName)?.factorMilli ?: return null
     val q = parse(r.qty)?.takeIf { it > 0 } ?: return null
     val pr = parse(r.price)?.takeIf { it >= 0 } ?: return null
     val qm = PurchaseOrderBook.milli(q)
-    val bc = runCatching { PurchaseUnits.baseCost(qm, u.factorMilli, PurchaseUnits.lineTotalMinor(qm, PurchaseOrderBook.minor(pr))) }.getOrNull() ?: return null
+    val bc = runCatching { PurchaseUnits.baseCost(qm, factor, PurchaseUnits.lineTotalMinor(qm, PurchaseOrderBook.minor(pr))) }.getOrNull() ?: return null
     return StrPurchaseUnits.lineBase(qty(PurchaseOrderBook.units(bc.baseQtyMilli)), p.unit, money(PurchaseOrderBook.asAfn(bc.unitCostMinor)))
   }
 
@@ -272,7 +281,11 @@ object PoForms {
       //  کالا هست و مقدارِ پایهٔ کالای شمارشی عددِ درست است)؛ ردیفِ پایه همان ردیفِ پیشین (بی `factorMilli`)
       val inUnit = r.unitName?.let { name ->
         val product = d.products.find { it.id == r.productId } ?: return DraftCheck.Bad(StrGoods.rowOfWhy(i + 1, StrLedger.pickProduct))
-        PurchaseBook.inUnitOf(product, name, q, q * p) ?: return DraftCheck.Bad(StrGoods.rowOfWhy(i + 1, PurchaseBook.unitWhy(product, name, q)))
+        val packed = if (r.factorMilli == null) PurchaseBook.inUnitOf(product, name, q, q * p)
+          else PurchaseBook.inUnitOf(product, name, r.factorMilli, q, q * p)
+        packed ?: return DraftCheck.Bad(StrGoods.rowOfWhy(i + 1, if (r.factorMilli == null) {
+          PurchaseBook.unitWhy(product, name, q)
+        } else ir.vil3ntec.tohid.core.i18n.StrStock.errAmount))
       }
       lines += PoLineDto(
         id = "l${i + 1}", productId = r.productId, name = r.name, unit = inUnit?.name ?: r.unit,

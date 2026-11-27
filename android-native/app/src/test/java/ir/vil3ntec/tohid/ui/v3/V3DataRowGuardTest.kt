@@ -30,8 +30,8 @@ class V3DataRowGuardTest {
 
   /** فایلِ ردیفِ هر فهرستِ داده */
   private val lists = listOf(
-    "ui/v3/money/PurchasesList.kt", "ui/v3/money/PurchaseOrderRow.kt", "ui/v3/money/SuppliersScreen.kt",
-    "ui/v3/money/SupplierLedgerScreen.kt", "ui/v3/money/ExpensesScreen.kt", "ui/v3/money/ReceiptsScreen.kt",
+    "ui/v3/money/PurchasesList.kt", "ui/v3/money/PurchaseOrderRow.kt",
+    "ui/v3/money/ExpensesScreen.kt", "ui/v3/money/ReceiptsScreen.kt",
     "ui/v3/sales/history/HistoryParts.kt", "ui/v3/products/ProductsListParts.kt", "ui/v3/stock/StockListParts.kt",
     "ui/v3/online/orders/OrderCard.kt", "ui/screens/Promos.kt", "ui/v3/account/team/TeamScreen.kt",
   )
@@ -50,6 +50,13 @@ class V3DataRowGuardTest {
     assertFalse("دکمهٔ «ویرایش» و «حذف» ِ کارتِ تخفیف", text("ui/screens/Promos.kt").contains("TextButton(onClick = onEdit)"))
     assertFalse("دکمهٔ بزرگِ گامِ بعدیِ کارتِ صف", text("ui/v3/online/orders/OrderCard.kt").contains("V3Button("))
     assertTrue(bad.joinToString("\n"), bad.isEmpty())
+  }
+
+  @Test fun supplierAccountsUseTheSameTilesAndLedgerRowsAsDebtorAccounts() {
+    assertTrue(text("ui/v3/money/SuppliersScreen.kt").contains("AccountBalanceTile("))
+    assertTrue(text("ui/screens/PhoneDebtors.kt").contains("AccountBalanceTile("))
+    assertTrue(text("ui/v3/money/SupplierLedgerScreen.kt").contains("LedgerRow("))
+    assertTrue(text("ui/v3/money/DebtorLedgerScreen.kt").contains("LedgerRow("))
   }
 
   @Test fun `V3DataRow یک کار می‌گیرد و جای دکمهٔ دیگری ندارد`() {

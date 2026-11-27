@@ -9,8 +9,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.AssignmentReturn
 import androidx.compose.material.icons.outlined.Inventory2
@@ -33,7 +34,7 @@ import ir.vil3ntec.tohid.core.i18n.StrPurchaseFx
 import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.data.PurchaseViews
 import ir.vil3ntec.tohid.formatDate
-import ir.vil3ntec.tohid.money
+import ir.vil3ntec.tohid.unitMoney
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.v3.V3AmountStatus
@@ -72,7 +73,7 @@ internal class PurchaseDetailActions(
 internal object PurchaseLineText {
   fun qty(l: PurchaseViews.Line, currency: String? = null): String {
     //  PUR-11: ردیفِ فاکتورِ ارزی فیِ همان ارز را نشان می‌دهد (معادلِ افغانیِ جمع کنارِ ردیف است)
-    val price = if (currency != null && l.fxUnit != null) ir.vil3ntec.tohid.data.SupplierFx.text(l.fxUnit, currency) else "${money(l.unitCost)} ؋"
+    val price = if (currency != null && l.fxUnit != null) ir.vil3ntec.tohid.data.SupplierFx.text(l.fxUnit, currency) else "${unitMoney(l.unitCost)} ؋"
     val main = "${MoneyText.qtyUnit(l.qty, l.unit)} × $price"
     return l.baseQty?.let { "$main (${MoneyText.qtyUnit(it, l.baseUnit)})" } ?: main
   }
@@ -86,6 +87,7 @@ internal object PurchaseLineText {
   fun codes(l: PurchaseViews.Line): String = listOfNotNull(
     l.code?.let { StrPurchases.barcode(ltr(it)) } ?: StrPurchases.noCode,
     l.batch.takeIf { it.isNotBlank() }?.let { StrPurchases.batch(ltr(it)) },
+    l.production.takeIf { it.isNotBlank() }?.let { ir.vil3ntec.tohid.core.i18n.StrSheets.productionDate + " " + ltr(formatDate(it)) },
     l.expiry.takeIf { it.isNotBlank() }?.let { StrPurchases.expires(ltr(formatDate(it))) },
   ).joinToString(" · ")
 
@@ -131,47 +133,53 @@ internal fun PurchaseDetailScreen(v: PurchaseViews.View?, today: String, actions
     ),
   ) { pad ->
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-      Column(
-        Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState())
-          .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding() + 16.dp),
+      LazyColumn(
+        Modifier.widthIn(max = 720.dp).fillMaxWidth(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding() + 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
       ) {
-        V3Section(null) {
-          V3ListRow(
-            text.title,
-            subtitle = listOfNotNull(formatDate(v.date), v.orderNo?.takeIf { !v.isOrder }?.let(StrPurchases::fromOrder)).joinToString(" · "),
-            leading = { LetterAvatar(v.supplierName, V3Modules.hueOf("purchasing")) },
-            below = { V3AmountStatus(text.amount, text.pay, align = TextAlign.Start, second = text.receipt, maxLines = 2) },
-            onClick = { actions.onSupplier(v.supplierId) },
-          )
-        }
-        V3Section(StrPurchases.lines(v.lines.size)) {
-          v.lines.forEachIndexed { i, l ->
-            if (i > 0) V3Divider(start = 16.dp)
-            val known = l.name.isNotBlank()
+        item {
+          V3Section(null) {
             V3ListRow(
-              l.name.ifBlank { StrMoney.deletedProduct },
-              subtitle = PurchaseLineText.qty(l, v.currency),
-              tile = false,
-              value = MoneyText.afn(kotlin.math.abs(l.total)),
-              below = {
-                Column {
-                  Text(PurchaseLineText.codes(l), style = V3Type.footnote, color = PhoneV3.colors.inkMuted)
-                  PurchaseLineText.receipt(v, l)?.let { V3QuietStatus(it) }
-                }
-              },
-              chevron = known,
-              onClick = if (known) ({ actions.onProduct(l.productId) }) else null,
+              text.title,
+              subtitle = listOfNotNull(formatDate(v.date), v.orderNo?.takeIf { !v.isOrder }?.let(StrPurchases::fromOrder)).joinToString(" · "),
+              leading = { LetterAvatar(v.supplierName, V3Modules.hueOf("purchasing")) },
+              below = { V3AmountStatus(text.amount, text.pay, align = TextAlign.Start, second = text.receipt, maxLines = 2) },
+              onClick = { actions.onSupplier(v.supplierId) },
             )
           }
         }
-        V3Section(null) {
-          Totals(v)
+        item {
+          Text(StrPurchases.lines(v.lines.size), style = V3Type.subhead, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(horizontal = 4.dp))
         }
-        if (v.notes.isNotBlank()) Text(v.notes, style = V3Type.subhead, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(horizontal = 4.dp))
-        if (v.isOrder) V3Message(V3Tone.INFO, StrPurchases.pendingNote)
-        if (v.kind == PurchaseViews.Kind.RETURN) V3Message(V3Tone.INFO, StrPurchases.returnNote)
-        DetailButtons(v, actions)
+        items(v.lines) { line ->
+          val known = line.name.isNotBlank()
+          V3Section(null) {
+            V3ListRow(
+              line.name.ifBlank { StrMoney.deletedProduct },
+              subtitle = PurchaseLineText.qty(line, v.currency),
+              tile = false,
+              value = MoneyText.preciseAfn(kotlin.math.abs(line.total)),
+              below = {
+                Column {
+                  Text(PurchaseLineText.codes(line), style = V3Type.footnote, color = PhoneV3.colors.inkMuted)
+                  PurchaseLineText.receipt(v, line)?.let { V3QuietStatus(it) }
+                }
+              },
+              chevron = known,
+              onClick = if (known) ({ actions.onProduct(line.productId) }) else null,
+            )
+          }
+        }
+        item {
+          Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            V3Section(null) { Totals(v) }
+            if (v.notes.isNotBlank()) Text(v.notes, style = V3Type.subhead, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(horizontal = 4.dp))
+            if (v.isOrder) V3Message(V3Tone.INFO, StrPurchases.pendingNote)
+            if (v.kind == PurchaseViews.Kind.RETURN) V3Message(V3Tone.INFO, StrPurchases.returnNote)
+            DetailButtons(v, actions)
+          }
+        }
       }
     }
   }
@@ -186,15 +194,15 @@ private fun Totals(v: PurchaseViews.View) {
       //  PUR-11: ارزِ سند، نرخِ ثبت‌شده، جمع به همان ارز و معادلِ افغانی (بهای تمام‌شده)
       v.fxRate?.let { add(StrPurchaseFx.rateCol to ir.vil3ntec.tohid.data.SupplierFx.rateText(it)) }
       add(StrPurchaseFx.totalIn(code) to fx(kotlin.math.abs(v.fxTotal)))
-      add(StrPurchaseFx.afnEquivalent to MoneyText.afn(kotlin.math.abs(v.total)))
-    } else add(StrPurchases.total to MoneyText.afn(kotlin.math.abs(v.total)))
+      add(StrPurchaseFx.afnEquivalent to MoneyText.preciseAfn(kotlin.math.abs(v.total)))
+    } else add(StrPurchases.total to MoneyText.preciseAfn(kotlin.math.abs(v.total)))
     if (v.kind != PurchaseViews.Kind.RETURN && v.billed > 0.5) {
-      add(StrPurchases.paidLabel to MoneyText.afn(v.paid))
-      if (code != null && v.fxRemaining != null) add(StrPurchases.remaining to ir.vil3ntec.tohid.data.SupplierFx.ltr("${fx(v.fxRemaining)} (${MoneyText.afn(v.remaining)})"))
-      else add(StrPurchases.remaining to MoneyText.afn(v.remaining))
+      add(StrPurchases.paidLabel to MoneyText.preciseAfn(v.paid))
+      if (code != null && v.fxRemaining != null) add(StrPurchases.remaining to ir.vil3ntec.tohid.data.SupplierFx.ltr("${fx(v.fxRemaining)} (${MoneyText.preciseAfn(v.remaining)})"))
+      else add(StrPurchases.remaining to MoneyText.preciseAfn(v.remaining))
     }
     v.dueDate?.let { add(StrPurchasePages.payDue to formatDate(it)) }
-    if (v.landed > 0.5) add(StrPurchases.landed to MoneyText.afn(v.landed))
+    if (v.landed > 0.5) add(StrPurchases.landed to MoneyText.preciseAfn(v.landed))
   }
   rows.forEachIndexed { i, (label, value) ->
     if (i > 0) V3Divider(start = 16.dp)

@@ -6,8 +6,12 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import ir.vil3ntec.tohid.ui.v3.V3_FORM_PRIMARY_TAG
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import ir.vil3ntec.tohid.core.i18n.I18n
@@ -15,7 +19,7 @@ import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.StrFx
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseFx
-import ir.vil3ntec.tohid.core.i18n.StrPurchases
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseWorkflow
 import ir.vil3ntec.tohid.core.i18n.StrSafeCur
 import ir.vil3ntec.tohid.core.purchase.PurchaseFx
 import ir.vil3ntec.tohid.data.Product
@@ -81,7 +85,6 @@ class PurchaseFxUiTest {
   @Test fun phoneFormHasNoCurrencyPickerWhileTheShopSwitchIsOff() {
     assertFalse(PurchaseFxPref.on(ctx))
     h.show(MoneyPaths.newPurchase("dubai"), disk())
-    h.await(StrPurchases.receivedNow)
     h.await(StrMoney.pickItem)
     assertFalse(h.has(StrSafeCur.currency))
     assertFalse(h.has(StrPurchaseFx.section))
@@ -90,7 +93,6 @@ class PurchaseFxUiTest {
   @Test fun phoneFormShowsTheCurrencyPickerWhenTheShopSwitchIsOn() {
     PurchaseFxPref.set(ctx, true)
     h.show(MoneyPaths.newPurchase("dubai"), disk())
-    h.await(StrPurchases.receivedNow)
     h.await(StrSafeCur.currency)
   }
 
@@ -98,7 +100,6 @@ class PurchaseFxUiTest {
     PurchaseFxPref.set(ctx, true)
     val store = disk()
     h.show(MoneyPaths.newPurchase("dubai"), store)
-    h.await(StrPurchases.receivedNow)
     //  ارز ⇐ دالر: بخشِ «ارز و نرخ»، قیمت به دالر
     h.click(StrSafeCur.currency)
     h.await(StrFx.usd)
@@ -110,9 +111,9 @@ class PurchaseFxUiTest {
     h.click("چای سبز")
     h.type(StrMoney.quantity, "10")
     h.type(StrPurchaseFx.priceIn("USD"), "10")
-    h.await(StrPurchaseFx.afnEquivalent)
-    h.click(StrPurchases.payLater)
-    rule.onAllNodes(hasText(StrMoney.newPurchase) and hasClickAction())[0].performSemanticsAction(SemanticsActions.OnClick)
+    rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(StrPurchaseWorkflow.paymentLater))
+    h.click(StrPurchaseWorkflow.paymentLater)
+    rule.onNodeWithTag(V3_FORM_PRIMARY_TAG).performSemanticsAction(SemanticsActions.OnClick)
     h.awaitThat { store.data.value.purchases.isNotEmpty() }
     val d = store.data.value
     val p = d.purchases.single()
@@ -134,8 +135,8 @@ class PurchaseFxUiTest {
     h.show(MoneyPaths.supplier("dubai"), withUsdBill())
     h.await(StrPurchaseFx.byCurrency)
     assertTrue(h.has(StrPurchaseFx.owed("100 USD", "7,000 ؋"), substring = true))
-    //  ردیفِ خرید: جمعِ دالری کنارِ اقلام
-    assertTrue(h.has("چای سبز · " + SupplierFx.text(10_000, "USD"), substring = true))
+    h.await(StrPurchaseWorkflow.statement)
+    assertTrue(h.has("7,000 ؋"))
   }
 
   @Test fun phonePaymentInUsdAtAnotherRateRecordsTheExchangeDifference() {

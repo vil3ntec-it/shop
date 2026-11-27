@@ -12,6 +12,7 @@ on:
   pull_request:
     paths:
       - 'core/**'
+      - 'android-native/app/src/main/java/**'
       - 'ios/**'
       - '.github/workflows/ios-spike.yml'
 

@@ -422,9 +422,37 @@ fun DebtorTile(
   modifier: Modifier = Modifier,
 ) {
   val c = PhoneV3Debt.colors
-  val tint = if (row.owes) c.owe else c.settled
-  //  توپر روی زمینه: لکهٔ نورِ پشتِ کارت متنِ قرمز/سبز را کم‌رنگ نمی‌کند
-  val fill = if (row.owes) c.oweTint else c.settledTint
+  val days = DebtorListModel.daysLabel(row)
+  AccountBalanceTile(
+    name = row.debtor.name.ifBlank { ir.vil3ntec.tohid.core.i18n.StrMoney.noName },
+    amount = money(kotlin.math.abs(row.balance)),
+    subtitle = DebtorListModel.subtitle(row, ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()),
+    tint = if (row.owes) c.owe else c.settled,
+    fill = if (row.owes) c.oweTint else c.settledTint,
+    onOpen = onOpen,
+    onEdit = onEdit,
+    onDelete = onDelete,
+    modifier = modifier,
+    footer = if (days == null) null else ({ DaysPill(days, c) }),
+  )
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+internal fun AccountBalanceTile(
+  name: String,
+  amount: String,
+  subtitle: String,
+  tint: Color,
+  fill: Color,
+  onOpen: () -> Unit,
+  onEdit: () -> Unit,
+  onDelete: () -> Unit,
+  modifier: Modifier = Modifier,
+  onPay: (() -> Unit)? = null,
+  footer: (@Composable () -> Unit)? = null,
+) {
+  val c = PhoneV3Debt.colors
   val shape = RoundedCornerShape(PhoneV3Debt.cardRadius)
   val source = remember { MutableInteractionSource() }
   val pressed by source.collectIsPressedAsState()
@@ -446,16 +474,18 @@ fun DebtorTile(
   ) {
     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
       DropdownMenuItem(text = { Text(ir.vil3ntec.tohid.core.i18n.StrMoney.openAccount) }, onClick = { menu = false; onOpen() })
+      if (onPay != null) {
+        DropdownMenuItem(text = { Text(ir.vil3ntec.tohid.core.i18n.StrMoney.pay) }, onClick = { menu = false; onPay() })
+      }
       DropdownMenuItem(text = { Text(ir.vil3ntec.tohid.core.i18n.StrMoney.edit) }, onClick = { menu = false; onEdit() })
       DropdownMenuItem(text = { Text(ir.vil3ntec.tohid.core.i18n.StrMoney.delete, color = c.owe) }, onClick = { menu = false; onDelete() })
     }
     Column(
-      //  پایین جای بیشتری می‌خواهد: مدادِ ویرایش در همان گوشه می‌نشیند
       Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 22.dp, bottom = 34.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
     ) {
       Text(
-        row.debtor.name.ifBlank { ir.vil3ntec.tohid.core.i18n.StrMoney.noName },
+        name,
         style = MaterialTheme.typography.titleSmall,
         color = c.ink,
         fontWeight = FontWeight.Bold,
@@ -465,29 +495,26 @@ fun DebtorTile(
       )
       Spacer(Modifier.height(6.dp))
       Text(
-        money(kotlin.math.abs(row.balance)),
+        amount,
         style = MaterialTheme.typography.titleMedium,
         color = tint,
         fontWeight = FontWeight.Bold,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
-      //  تا دو خط، وسط‌چین: «۱٬۰۰۰ افغانی بدهکار» در کارتِ ۱۱۴dpِ گوشی کامل دیده می‌شود
       Text(
-        DebtorListModel.subtitle(row, ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()),
+        subtitle,
         style = MaterialTheme.typography.labelSmall,
         color = c.muted,
         textAlign = TextAlign.Center,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
       )
-      DebtorListModel.daysLabel(row)?.let { days ->
+      if (footer != null) {
         Spacer(Modifier.height(5.dp))
-        DaysPill(days, c)
+        footer()
       }
     }
-
-
   }
 }
 
