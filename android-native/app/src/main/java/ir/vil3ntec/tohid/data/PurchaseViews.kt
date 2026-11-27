@@ -112,7 +112,7 @@ object PurchaseViews {
   }
 
   private fun buildViews(ctx: Ctx, orders: List<PurchaseOrderDto>, supplierId: String?): List<View> {
-    val invoices = if (supplierId == null) ctx.invoices else ctx.invoices.filter { it.supplierId == supplierId }
+    val invoices = ctx.invoices
     val open = orders.filter { it.isOpen() && (supplierId == null || it.supplierId == supplierId) }
     val folded = HashSet<String>()
     val orderViews = open.map { o ->
@@ -135,7 +135,7 @@ object PurchaseViews {
 
   /** خریدهای یک تأمین‌کننده (صفحهٔ تأمین‌کننده) */
   fun ofSupplier(d: ShopData, supplierId: String, today: String, orders: List<PurchaseOrderDto> = emptyList()): List<View> =
-    buildViews(Ctx(d, today), orders, supplierId)
+    buildViews(Ctx(d, today, supplierId), orders, supplierId)
 
   fun orderKey(orderId: String): String = "po:$orderId"
 
@@ -145,11 +145,11 @@ object PurchaseViews {
 
   private fun orderNoOf(inv: PurchaseBook.Invoice): Int? = inv.lines.firstNotNullOfOrNull(PurchaseOrderBook::orderNoOf)
 
-  private class Ctx(val d: ShopData, val today: String) {
+  private class Ctx(val d: ShopData, val today: String, supplierId: String? = null) {
     val products = ShopStore.productsById(d.products)
     val suppliers = d.suppliers.associateBy { it.id }
-    val invoices = PurchaseBook.invoices(d)
-    private val due = PurchaseBook.open(d)
+    val invoices = PurchaseBook.invoices(d, supplierId)
+    private val due = PurchaseBook.open(invoices, d.supplierPayments, supplierId)
     val remaining = due.associate { it.invoice.key to it.remaining }
     /** PUR-11: ماندهٔ ارزیِ فاکتورهای ارزی */
     val fxRemaining = due.mapNotNull { x -> x.fxRemaining?.let { x.invoice.key to it } }.toMap()

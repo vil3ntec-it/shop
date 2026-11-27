@@ -304,12 +304,18 @@ object PurchaseBook {
    *  اضافه‌پرداختِ هر فاکتور به ترتیب روی **قدیمی‌ترین** فاکتورها می‌نشینند (FIFO). پس جمعِ
    *  مانده‌ها همان `max(0, supplierDebt)` است و یادآورِ سررسید با پرداخت پاک می‌شود.
    */
-  fun open(d: ShopData, supplierId: String? = null): List<Due> {
+  fun open(d: ShopData, supplierId: String? = null): List<Due> =
+    open(invoices(d, supplierId), d.supplierPayments, supplierId)
+
+  internal fun open(invoices: List<Invoice>, payments: List<SupplierPayment>, supplierId: String?): List<Due> {
     val out = ArrayList<Due>()
+    val byAccount = payments.asSequence()
+      .filter { supplierId == null || it.supplierId == supplierId }
+      .groupBy { it.supplierId to SupplierFx.cur(it.currency) }
     //  PUR-11: هر ارز حسابِ جدا — پرداختِ حسابِ دالری فقط فاکتورهای دالری را صاف می‌کند (افغانی همان گروهِ پیشین، بیت‌به‌بیت)
-    invoices(d, supplierId).groupBy { it.supplierId to it.currency }.forEach { (key, list) ->
-      val (sid, cur) = key
-      val pays = d.supplierPayments.filter { it.supplierId == sid && SupplierFx.cur(it.currency) == cur }
+    invoices.groupBy { it.supplierId to it.currency }.forEach { (key, list) ->
+      val cur = key.second
+      val pays = byAccount[key].orEmpty()
       val afn = fifo(list, pays, { it.total }, { it.debt }, { it.amount })
       val fx = if (cur == null) null
       else fifo(list, pays, { it.fxTotal.toDouble() }, { (it.fxTotal - it.fxPaid).toDouble() }, { (it.fxAmountMinor ?: 0L).toDouble() })
