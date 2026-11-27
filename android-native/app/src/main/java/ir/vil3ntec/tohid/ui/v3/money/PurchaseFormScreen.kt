@@ -31,6 +31,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import ir.vil3ntec.tohid.ui.screens.isPrimaryModifier
+import ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseWorkflow as Workflow
@@ -237,6 +244,7 @@ internal fun PurchaseFormScreen(
   currencies: List<String> = listOf(ir.vil3ntec.tohid.core.purchase.PurchaseFx.AFN),
   currencyName: (String) -> String = { it },
   lastRate: (String) -> ir.vil3ntec.tohid.core.purchase.PurchaseFx.Rate? = { null },
+  initialBarcode: String? = null,
 ) {
   val initial = remember(supplierArg) { PurchaseFormModel.initial(supplierArg?.takeIf { id -> d.suppliers.any { it.id == id } }, todayIso()) }
   //  نوشته‌ها با چرخشِ گوشی و برگشت از «کالای تازه» نمی‌روند
@@ -262,6 +270,13 @@ internal fun PurchaseFormScreen(
     when (val r = PurchaseFormModel.scan(form, d, code, barcodes, unitIndex)) {
       is PurchaseFormModel.Scan.Added -> { form = r.form; r.unit?.let { notify(V3Tone.SUCCESS, StrPurchaseUnits.scanned(r.name, it)) } }
       is PurchaseFormModel.Scan.Unknown -> notify(V3Tone.ERROR, StrPurchasePages.barcodeUnknown(r.code))
+    }
+  }
+  var initialScanHandled by rememberSaveable(initialBarcode) { mutableStateOf(false) }
+  LaunchedEffect(initialBarcode) {
+    if (!initialScanHandled && !initialBarcode.isNullOrBlank()) {
+      initialScanHandled = true
+      onScanCode(initialBarcode)
     }
   }
   val scanOwner = remember { Any() }
@@ -308,40 +323,50 @@ internal fun PurchaseFormScreen(
     } ?: StrMoney.noSupplierBuyYet
   }
 
+  fun submit() {
+    tried = true
+    when {
+      busy -> Unit
+      errors.any -> shake++
+      //  e-rows-63b: نرسیده ⇒ سفارشِ خرید (سرور)؛ بی آن پیامِ «روشن نیست» و هیچ ثبت
+      //  PUR-11: سفارشِ خرید فقط افغانی است
+      form.later && fxCode != null -> { shake++; notify(V3Tone.ERROR, StrPurchaseFx.laterAfnOnly) }
+      form.later && !laterOn -> { shake++; notify(V3Tone.ERROR, StrPurchases.laterOff) }
+      form.later -> { busy = true; onSaveLater(form) { ok -> busy = false; if (ok) onBack() } }
+      //  e-rows-63b: هر خرید یک فاکتورِ شماره‌دار (`PurchaseBook.record`) — تک‌ردیفه هم، تا «خریدِ #n» و «پرداخت» ِ همان خرید
+      //  (یادداشتِ `PurchaseBook.payNote`) کار کنند؛ اثرها همان `addPurchase` ِ هر ردیف است
+      else -> {
+        val snapshot = form
+        busy = true
+        scope.launch {
+          try {
+            val saved = onSaveMany(
+              snapshot.supplierId.orEmpty(),
+              PurchaseFormModel.lines(snapshot) { id -> productById[id]?.unit.orEmpty() },
+              PurchaseFormModel.paid(snapshot), snapshot.date, snapshot.notes.trim(), PurchaseFormModel.extras(snapshot, extrasOn),
+            )
+            if (saved) onBack()
+          } finally {
+            busy = false
+          }
+        }
+      }
+    }
+  }
+
+  val desktop = LocalDeskLayout.current
+  val formModifier = Modifier.v3Shake(shake)
+  val keyboardModifier = if (desktop) formModifier.onPreviewKeyEvent { event ->
+    val save = event.type == KeyEventType.KeyDown &&
+      (event.key == Key.F9 || (event.isPrimaryModifier && (event.key == Key.Enter || event.key == Key.S)))
+    if (save) submit()
+    save
+  } else formModifier
   BackHandler(enabled = busy) {}
   V3Form(
     title = StrMoney.newPurchase,
     primary = StrMoney.newPurchase,
-    onPrimary = {
-      tried = true
-      when {
-        busy -> Unit
-        errors.any -> shake++
-        //  e-rows-63b: نرسیده ⇒ سفارشِ خرید (سرور)؛ بی آن پیامِ «روشن نیست» و هیچ ثبت
-        //  PUR-11: سفارشِ خرید فقط افغانی است
-        form.later && fxCode != null -> { shake++; notify(V3Tone.ERROR, StrPurchaseFx.laterAfnOnly) }
-        form.later && !laterOn -> { shake++; notify(V3Tone.ERROR, StrPurchases.laterOff) }
-        form.later -> { busy = true; onSaveLater(form) { ok -> busy = false; if (ok) onBack() } }
-        //  e-rows-63b: هر خرید یک فاکتورِ شماره‌دار (`PurchaseBook.record`) — تک‌ردیفه هم، تا «خریدِ #n» و «پرداخت» ِ همان خرید
-        //  (یادداشتِ `PurchaseBook.payNote`) کار کنند؛ اثرها همان `addPurchase` ِ هر ردیف است
-        else -> {
-          val snapshot = form
-          busy = true
-          scope.launch {
-            try {
-              val saved = onSaveMany(
-                snapshot.supplierId.orEmpty(),
-                PurchaseFormModel.lines(snapshot) { id -> productById[id]?.unit.orEmpty() },
-                PurchaseFormModel.paid(snapshot), snapshot.date, snapshot.notes.trim(), PurchaseFormModel.extras(snapshot, extrasOn),
-              )
-              if (saved) onBack()
-            } finally {
-              busy = false
-            }
-          }
-        }
-      }
-    },
+    onPrimary = ::submit,
     onBack = onBack.takeUnless { busy },
     dirty = PurchaseFormModel.dirty(form, initial),
     summary = when {
@@ -349,7 +374,7 @@ internal fun PurchaseFormScreen(
       total > 0 -> "${StrMoney.purchaseTotal}: ${MoneyText.preciseAfn(total)}"
       else -> null
     },
-    modifier = Modifier.v3Shake(shake),
+    modifier = keyboardModifier,
     loading = busy,
     listContent = {
       item(key = "supplier-and-currency") { Column {

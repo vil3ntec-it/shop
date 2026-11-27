@@ -78,8 +78,8 @@ object ScreenGuides {
         "“Today's sales” compares today with the same hour yesterday; click it to open “Reports”.",
       ),
       GuideText(
-        "کادرِ «صندوق» پولِ نقدِ دخل را همین حالا نشان می‌دهد.",
-        "The “Drawer” card shows the cash in the drawer right now.",
+        "کادرِ «دخل فروشگاه» پولِ نقدِ دخل را همین حالا نشان می‌دهد.",
+        "The “Shop till” card shows the cash in the drawer right now.",
       ),
       GuideText(
         "میان‌برها کار را یک‌راست باز می‌کنند: «سفارش‌های آنلاین»، «دریافت» از قرض‌دار، «ورودِ کالا» و «تاریخچه».",

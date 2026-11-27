@@ -244,6 +244,28 @@ class DeskDataScreensUiTest {
     await(StrCustomerPages.amountAfn)
   }
 
+  @Test fun purchasingOpensTheSharedFormAndSupplierLedger() = ui { set ->
+    val data = D3bDemo.full()
+    val store = RouteUiHarness.memoryStore(data)
+    val calls = ArrayList<String>()
+    set {
+      DeskPurchasingScreen(
+        store, data, remember { SnackbarHostState() },
+        onNewPurchase = { calls += "purchase:${it.orEmpty()}" },
+        onSupplierLedger = { calls += "supplier:$it" },
+      )
+    }
+    await(StrPurchasePages.newPurchaseKey)
+    tap(StrPurchasePages.newPurchaseKey)
+    tap(StrPurchasePages.suppliers)
+    tap("شرکت پخش البرز")
+    val statement = ir.vil3ntec.tohid.core.i18n.StrPurchaseWorkflow.statement
+    await(statement)
+    tap(statement)
+    val supplier = data.suppliers.single { it.name == "شرکت پخش البرز" }
+    assertEquals(listOf("purchase:", "supplier:${supplier.id}"), calls)
+  }
+
   @Test fun expensesSelectAndDeleteWithTheSameQuestion() = ui { set ->
     val d = D3bDemo.full()
     val log = ArrayList<String>()

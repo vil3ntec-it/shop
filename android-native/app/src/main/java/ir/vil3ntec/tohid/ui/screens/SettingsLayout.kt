@@ -323,8 +323,8 @@ object SettingsLayout {
 
   /** تنظیماتی که برای کار روزانه یا راه‌اندازی اولیه جلوی دست می‌مانند. */
   private val COMMON_ROWS = SettingsTiers.ESSENTIAL + setOf(
-    PROFILE, "هشدارها", "دستگاه‌های وارد شده", NAV_BAR,
-    PRINTER, RETURNS, "کالای منقضی", TILL_GOODS, LABEL_TOOLS,
+    PROFILE, "هشدارها", "دستگاه‌های وارد شده", NAV_BAR, // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
+    PRINTER, RETURNS, "کالای منقضی", TILL_GOODS, LABEL_TOOLS, // داده: کلیدِ بخشِ تنظیمات (نامِ صفحه با labelOf)
   )
 
   fun isCommon(key: String): Boolean = key in COMMON_ROWS

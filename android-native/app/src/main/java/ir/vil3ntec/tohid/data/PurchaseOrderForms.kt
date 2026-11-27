@@ -221,8 +221,10 @@ object PoForms {
     val units = p.purchaseUnits?.map(ShopStore::coreOf)
     val to = PurchaseUnits.find(units, unitName)
     if (unitName != null && to == null) return row
-    val next = row.copy(unit = p.unit, unitName = to?.name)
-    return repriced(p, row.price, row.unitName, to?.name)?.let { next.copy(price = it) } ?: next
+    if (row.unitName == to?.name) return row
+    val fromFactor = row.factorMilli ?: PurchaseUnits.find(units, row.unitName)?.factorMilli ?: PurchaseUnits.MILLI
+    val next = row.copy(unit = p.unit, unitName = to?.name, factorMilli = null)
+    return repriced(row.price, fromFactor, to?.factorMilli ?: PurchaseUnits.MILLI)?.let { next.copy(price = it) } ?: next
   }
 
   /**
@@ -234,8 +236,14 @@ object PoForms {
     val units = p.purchaseUnits?.map(ShopStore::coreOf)
     val f = PurchaseUnits.find(units, from)?.factorMilli ?: PurchaseUnits.MILLI
     val t = PurchaseUnits.find(units, to)?.factorMilli ?: PurchaseUnits.MILLI
-    val v = parse(price)?.takeIf { it >= 0 } ?: return null
-    return runCatching { num(PurchaseOrderBook.asAfn(PurchaseOrderCore.mulDivRound(PurchaseOrderBook.minor(v), t, f))) }.getOrNull()
+    return repriced(price, f, t)
+  }
+
+  private fun repriced(price: String, fromFactor: Long, toFactor: Long): String? {
+    val value = parse(price)?.takeIf { it >= 0 } ?: return null
+    return runCatching {
+      num(PurchaseOrderBook.asAfn(PurchaseOrderCore.mulDivRound(PurchaseOrderBook.minor(value), toFactor, fromFactor)))
+    }.getOrNull()
   }
 
   /**
@@ -244,11 +252,11 @@ object PoForms {
    */
   fun unitLine(d: ShopData, r: EditRow): String? {
     val p = d.products.find { it.id == r.productId } ?: return null
-    val u = PurchaseUnits.find(p.purchaseUnits?.map(ShopStore::coreOf), r.unitName) ?: return null
+    val factor = r.factorMilli ?: PurchaseUnits.find(p.purchaseUnits?.map(ShopStore::coreOf), r.unitName)?.factorMilli ?: return null
     val q = parse(r.qty)?.takeIf { it > 0 } ?: return null
     val pr = parse(r.price)?.takeIf { it >= 0 } ?: return null
     val qm = PurchaseOrderBook.milli(q)
-    val bc = runCatching { PurchaseUnits.baseCost(qm, u.factorMilli, PurchaseUnits.lineTotalMinor(qm, PurchaseOrderBook.minor(pr))) }.getOrNull() ?: return null
+    val bc = runCatching { PurchaseUnits.baseCost(qm, factor, PurchaseUnits.lineTotalMinor(qm, PurchaseOrderBook.minor(pr))) }.getOrNull() ?: return null
     return StrPurchaseUnits.lineBase(qty(PurchaseOrderBook.units(bc.baseQtyMilli)), p.unit, money(PurchaseOrderBook.asAfn(bc.unitCostMinor)))
   }
 
@@ -275,7 +283,9 @@ object PoForms {
         val product = d.products.find { it.id == r.productId } ?: return DraftCheck.Bad(StrGoods.rowOfWhy(i + 1, StrLedger.pickProduct))
         val packed = if (r.factorMilli == null) PurchaseBook.inUnitOf(product, name, q, q * p)
           else PurchaseBook.inUnitOf(product, name, r.factorMilli, q, q * p)
-        packed ?: return DraftCheck.Bad(StrGoods.rowOfWhy(i + 1, ir.vil3ntec.tohid.core.i18n.StrStock.errAmount))
+        packed ?: return DraftCheck.Bad(StrGoods.rowOfWhy(i + 1, if (r.factorMilli == null) {
+          PurchaseBook.unitWhy(product, name, q)
+        } else ir.vil3ntec.tohid.core.i18n.StrStock.errAmount))
       }
       lines += PoLineDto(
         id = "l${i + 1}", productId = r.productId, name = r.name, unit = inUnit?.name ?: r.unit,
