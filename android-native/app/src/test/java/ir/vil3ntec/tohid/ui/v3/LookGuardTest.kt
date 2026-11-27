@@ -78,8 +78,8 @@ class LookGuardTest {
     "ui/v3/shell/HomeAccents.kt" to "661f1bb3f069b39a",
     "ui/v3/shell/HomeDrawerCard.kt" to "b2abe9468bb6cfd6",
     "ui/v3/shell/HomeHero.kt" to "7d387b698015fed9",
-    "ui/v3/shell/HomeHeroAndroid.kt" to "e4a463554ab28c6c", // ۶۳f: فقط سرعت؛ ظاهر همان
-    "ui/v3/shell/HomeHeroCard.kt" to "dfe6ef9b70b42ed0",
+    "ui/v3/shell/HomeHeroAndroid.kt" to "6469048b81f553ba", //  #1088: انتخاب ارز گاوصندوق
+    "ui/v3/shell/HomeHeroCard.kt" to "b2cb6753922c4e6a", //  #1088: انتخاب ارز گاوصندوق
     "ui/v3/shell/HomeSalesCard.kt" to "4ba6b745c8b4805b",
     "ui/v3/shell/HomeScreen.kt" to "2053f8948f58e2d0",
     "ui/v3/shell/HomeShortcuts.kt" to "8df1e96ad45f5aa6", // ۶۳f: فقط سرعت؛ ظاهر همان
