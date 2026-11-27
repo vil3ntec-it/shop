@@ -118,7 +118,7 @@ internal fun SuppliersScreen(
   var filter by remember { mutableStateOf(PurchaseViews.Filter(pay = PurchaseViews.PayFilter.entries.firstOrNull { it.name == payArg?.uppercase() } ?: PurchaseViews.PayFilter.ALL)) }
   var query by rememberSaveable { mutableStateOf("") }
   val today = remember { todayIso() }
-  val views = remember(d, orders, today) { PurchaseViews.all(d, today, orders) }
+  val views = remember(d, orders, today, tab) { if (tab == 0) PurchaseViews.all(d, today, orders) else emptyList() }
   val greg = PurchaseRowText.gregorian()
   val shown = remember(views, filter, query, greg) {
     PurchaseViews.search(d, views.filter { PurchaseViews.matches(it, filter, greg, today) }, query)
@@ -179,8 +179,6 @@ internal fun SuppliersScreen(
           itemsIndexed(rows, key = { _, r -> r.supplier.id }) { i, r ->
             SupplierRow(
               row = r,
-              first = i == 0,
-              last = i == rows.lastIndex,
               actions = actions,
               onAskDelete = { confirmDelete = r.supplier.id },
               modifier = Modifier.v3AnimateItem(this).v3Stagger(stagger, r.supplier.id, i),
@@ -207,17 +205,14 @@ internal fun SuppliersScreen(
 @Composable
 private fun SupplierRow(
   row: SuppliersModel.Row,
-  first: Boolean,
-  last: Boolean,
   actions: SuppliersActions,
   onAskDelete: () -> Unit,
   modifier: Modifier,
 ) {
   val c = PhoneV3.colors
-  val r = PhoneV3.groupRadius
-  val shape = RoundedCornerShape(topStart = if (first) r else 0.dp, topEnd = if (first) r else 0.dp, bottomStart = if (last) r else 0.dp, bottomEnd = if (last) r else 0.dp)
+  val shape = RoundedCornerShape(PhoneV3.groupRadius)
   val s = row.supplier
-  Column(modifier.clip(shape).background(c.card)) {
+  Column(modifier.padding(bottom = 8.dp).clip(shape).background(c.card)) {
     //  کالبدِ ردیفِ داده (۶۸c): نام · شماره · «۱۲٬۴۰۰ ؋ • بدهکاریم» به واژهٔ آرام — بی مبلغِ رنگی در پایان
     V3DataRow(
       title = s.name,
@@ -231,7 +226,6 @@ private fun SupplierRow(
       ),
       onClick = { actions.onOpen(s.id) },
     )
-    if (!last) V3Divider(start = V3DataRowSpec.DIVIDER_START)
   }
 }
 

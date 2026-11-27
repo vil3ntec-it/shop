@@ -35,6 +35,9 @@ object PurchaseBook {
      *  `fx`)؛ آن‌جا [price] نادیده است و بهای افغانی از معادلِ سند می‌آید. فاکتورِ افغانی آن را نادیده می‌گیرد.
      */
     val fxPrice: Long? = null,
+    val factorMilli: Long? = null,
+    val productionDate: String = "",
+    val barcode: String? = null,
   )
 
   sealed interface Result {
@@ -45,7 +48,9 @@ object PurchaseBook {
   /** شمارهٔ بعدیِ فاکتورِ خرید */
   fun nextNo(d: ShopData): Int = (d.purchases.maxOfOrNull { it.invoiceNo } ?: 0) + 1
 
-  fun lineTotal(l: Line): Double = Math.round(l.quantity * l.price).toDouble()
+  fun lineTotal(l: Line): Double =
+    if (l.factorMilli != null) Math.round(l.quantity * l.price * 100.0) / 100.0
+    else Math.round(l.quantity * l.price).toDouble()
 
   /**
    *  PRD-07: ردیف به واحدِ خریدِ [name] ⇐ ورودیِ موتور، یا null (واحد روی کالا نیست، یا مقدارِ پایهٔ کالای شمارشی اعشاری می‌شود).
@@ -53,12 +58,16 @@ object PurchaseBook {
    */
   fun inUnitOf(product: Product, name: String, quantity: Double, total: Double): LedgerEngine.InUnit? {
     val u = ir.vil3ntec.tohid.core.product.PurchaseUnits.find(product.purchaseUnits?.map(ShopStore::coreOf), name) ?: return null
-    if (quantity.isNaN() || quantity <= 0 || total.isNaN() || total < 0) return null
-    val q = StockLedger.milli(quantity)
+    return inUnitOf(product, u.name, u.factorMilli, quantity, total)
+  }
+
+  internal fun inUnitOf(product: Product, name: String, factorMilli: Long, quantity: Double, total: Double): LedgerEngine.InUnit? {
+    if (!quantity.isFinite() || quantity <= 0 || !total.isFinite() || total < 0) return null
+    val q = runCatching { StockLedger.milli(quantity) }.getOrNull() ?: return null
     if (q <= 0) return null
-    val base = runCatching { ir.vil3ntec.tohid.core.product.PurchaseUnits.baseQtyMilli(q, u.factorMilli) }.getOrNull() ?: return null
+    val base = runCatching { ir.vil3ntec.tohid.core.product.PurchaseUnits.baseQtyMilli(q, factorMilli) }.getOrNull() ?: return null
     if (base <= 0 || (!wholeOk(product) && base % 1000 != 0L)) return null
-    return LedgerEngine.InUnit(u.name, q, u.factorMilli, StockLedger.minor(total))
+    return runCatching { LedgerEngine.InUnit(name, q, factorMilli, StockLedger.minor(total)) }.getOrNull()
   }
 
   /** همان قاعدهٔ اعشارِ بسته‌ها و واحدهای خرید: واحدِ وزنی یا واحدِ فروشِ دوم */
@@ -113,8 +122,8 @@ object PurchaseBook {
     val real = lines.filter { it.productId.isNotBlank() }
     if (real.isEmpty()) return Result.Failed(StrGoods.oneRowNeeded)
     real.forEachIndexed { i, l ->
-      if (l.quantity.isNaN() || l.quantity <= 0) return Result.Failed(StrGoods.rowQtyBad(i + 1))
-      if (fx == null && (l.price.isNaN() || l.price < 0)) return Result.Failed(StrGoods.rowPriceBad(i + 1))
+      if (!l.quantity.isFinite() || l.quantity <= 0) return Result.Failed(StrGoods.rowQtyBad(i + 1))
+      if (fx == null && (!l.price.isFinite() || l.price < 0)) return Result.Failed(StrGoods.rowPriceBad(i + 1))
       if (fx != null && (l.fxPrice == null || l.fxPrice < 0)) return Result.Failed(StrGoods.rowPriceBad(i + 1))
     }
     //  PUR-11: سندِ ارزی ⇒ جمعِ ارزیِ ردیف‌ها، معادلِ افغانیِ یک‌بارهٔ سند و سهمِ دقیقِ هر ردیف (افغانی و پرداخت)
@@ -130,7 +139,9 @@ object PurchaseBook {
     val inUnits = real.mapIndexed { i, l ->
       val name = l.unitName?.trim()?.ifEmpty { null } ?: return@mapIndexed null
       val product = d.products.find { it.id == l.productId } ?: return Result.Failed(StrGoods.rowOfWhy(i + 1, ir.vil3ntec.tohid.core.i18n.StrLedger.pickProduct))
-      inUnitOf(product, name, l.quantity, afnOf(i)) ?: return Result.Failed(StrGoods.rowOfWhy(i + 1, unitWhy(product, name, l.quantity)))
+      val packed = if (l.factorMilli == null) inUnitOf(product, name, l.quantity, afnOf(i))
+        else inUnitOf(product, name, l.factorMilli, l.quantity, afnOf(i))
+      packed ?: return Result.Failed(StrGoods.rowOfWhy(i + 1, if (l.factorMilli == null) unitWhy(product, name, l.quantity) else StrStock.errAmount))
     }
     val total = real.indices.sumOf { afnOf(it) }
     var left = if (paid.isNaN() || paid < 0) 0.0 else minOf(paid, total)
@@ -152,6 +163,8 @@ object PurchaseBook {
           purchasePrice = if (doc != null) 0.0 else l.price, paidAmount = pay, date = date,
           notes = listOf(tag, notes.trim()).filter { it.isNotBlank() }.joinToString(" — "),
           expiryDate = l.expiryDate,
+          productionDate = l.productionDate,
+          barcode = l.barcode,
           dueDate = dueDate,
           inUnit = inUnits[i],
           exactTotalMinor = doc?.afnLines?.get(i),

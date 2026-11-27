@@ -15,6 +15,8 @@ internal object MoneyText {
   /** مبلغ با «؋» — «1,200 ؋» */
   fun afn(value: Double): String = "${money(value)} ؋"
 
+  fun preciseAfn(value: Double): String = "${ir.vil3ntec.tohid.unitMoney(value)} ؋"
+
   /** مبلغِ علامت‌دار «+۱٬۲۰۰» / «−۴۰۰» — جداشده به چپ‌به‌راست تا علامت در صفحهٔ راست‌به‌چپ پیشِ عدد بماند */
   fun signed(value: Double, plus: Boolean): String = "\u2066${if (plus) "+" else "−"}${money(value)}\u2069"
 

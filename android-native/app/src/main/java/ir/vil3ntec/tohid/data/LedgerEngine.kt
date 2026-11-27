@@ -202,6 +202,7 @@ object LedgerEngine {
      *  `purchasePrice` ِ بالا نادیده. با [inUnit] نادیده (آن‌جا [InUnit.totalMinor] همین کار را می‌کند). `null` = همان خریدِ امروز.
      */
     val exactTotalMinor: Long? = null,
+    val barcode: String? = null,
   )
 
   /** ردیفِ خرید به واحدِ خرید: نام، مقدار به همان واحد (هزارم)، ضریب به واحدِ پایه (هزارم) و جمعِ دقیقِ ردیف (صدمِ افغانی) */
@@ -332,6 +333,7 @@ object LedgerEngine {
           paidAmount = paid,
           debt = totalAmount - paid,
           warehouseEntryId = entryId,
+          barcode = draft.barcode,
           createdAt = now,
           dueDate = due,
           //  خریدِ تکی: هزینهٔ جانبی روی ردیفِ خرید هم (مثلِ فاکتورِ چندردیفه، `PurchaseBook`)

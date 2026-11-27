@@ -156,6 +156,7 @@ object PoForms {
   data class EditRow(
     val key: Int, val productId: String, val name: String, val unit: String, val qty: String, val price: String,
     val unitName: String? = null,
+    val factorMilli: Long? = null,
   )
 
   /** واحدی که مقدار و فیِ ردیف به آن است (کادرِ «مقدار به …») */
@@ -168,7 +169,7 @@ object PoForms {
   fun rowsOf(base: PurchaseOrderDto?, d: ShopData? = null): List<EditRow> = base?.lines.orEmpty().mapIndexed { i, l ->
     val inUnit = l.factorMilli != null
     val baseUnit = if (inUnit) d?.products?.find { it.id == l.productId }?.unit ?: l.unit else l.unit
-    EditRow(i, l.productId, l.name, baseUnit, num(PurchaseOrderBook.units(l.qtyMilli)), num(PurchaseOrderBook.asAfn(l.priceMinor)), if (inUnit) l.unit else null)
+    EditRow(i, l.productId, l.name, baseUnit, num(PurchaseOrderBook.units(l.qtyMilli)), num(PurchaseOrderBook.asAfn(l.priceMinor)), if (inUnit) l.unit else null, l.factorMilli)
   }
 
   private fun nextKey(rows: List<EditRow>): Int = (rows.maxOfOrNull { it.key } ?: -1) + 1
@@ -272,7 +273,9 @@ object PoForms {
       //  کالا هست و مقدارِ پایهٔ کالای شمارشی عددِ درست است)؛ ردیفِ پایه همان ردیفِ پیشین (بی `factorMilli`)
       val inUnit = r.unitName?.let { name ->
         val product = d.products.find { it.id == r.productId } ?: return DraftCheck.Bad(StrGoods.rowOfWhy(i + 1, StrLedger.pickProduct))
-        PurchaseBook.inUnitOf(product, name, q, q * p) ?: return DraftCheck.Bad(StrGoods.rowOfWhy(i + 1, PurchaseBook.unitWhy(product, name, q)))
+        val packed = if (r.factorMilli == null) PurchaseBook.inUnitOf(product, name, q, q * p)
+          else PurchaseBook.inUnitOf(product, name, r.factorMilli, q, q * p)
+        packed ?: return DraftCheck.Bad(StrGoods.rowOfWhy(i + 1, ir.vil3ntec.tohid.core.i18n.StrStock.errAmount))
       }
       lines += PoLineDto(
         id = "l${i + 1}", productId = r.productId, name = r.name, unit = inUnit?.name ?: r.unit,

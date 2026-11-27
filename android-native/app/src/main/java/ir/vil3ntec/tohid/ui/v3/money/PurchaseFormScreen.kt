@@ -3,8 +3,9 @@ package ir.vil3ntec.tohid.ui.v3.money
 import ir.vil3ntec.tohid.core.i18n.StrPurchases
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.ui.v3.V3Segmented
-import ir.vil3ntec.tohid.money
 import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -23,6 +24,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -30,10 +33,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseWorkflow as Workflow
+import ir.vil3ntec.tohid.core.i18n.StrSheets
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseFx
 import ir.vil3ntec.tohid.core.i18n.StrSafeCur
 import ir.vil3ntec.tohid.data.SafeCurrencies
+import ir.vil3ntec.tohid.data.PoForms
+import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.ui.v3.V3Chip
 import ir.vil3ntec.tohid.ui.v3.V3ChipRow
 import androidx.compose.material.icons.outlined.CurrencyExchange
@@ -55,8 +62,8 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Button
-import ir.vil3ntec.tohid.ui.v3.V3DateField
 import ir.vil3ntec.tohid.ui.v3.V3Divider
+import ir.vil3ntec.tohid.ui.v3.V3DateField
 import ir.vil3ntec.tohid.ui.v3.V3FieldKind
 import ir.vil3ntec.tohid.ui.v3.V3Form
 import ir.vil3ntec.tohid.ui.v3.V3Message
@@ -111,6 +118,29 @@ private val PurchaseFormFxSaver = listSaver<PurchaseForm, String>(
     val n = v.lastOrNull()?.toIntOrNull()?.takeIf { it + 4 == v.size }
     if (n == null) PurchaseFormFlowSaver.restore(v)
     else PurchaseFormFlowSaver.restore(v.take(n))?.copy(currency = v[n].ifEmpty { null }, rate = v[n + 1], per = v[n + 2].toLongOrNull() ?: 1L)
+  },
+)
+
+/** Append packaging metadata with a marker so previously saved forms still restore. */
+private val PurchaseFormPackagingSaver = listSaver<PurchaseForm, String>(
+  save = { form ->
+    @Suppress("UNCHECKED_CAST")
+    val base = with(PurchaseFormFxSaver) { save(form) } as List<String>
+    base + (listOf(form.packaging) + form.more.map { it.packaging }).flatMap {
+      listOf(if (it.carton) "1" else "0", it.pieces, it.production, it.barcode)
+    } + listOf(base.size.toString(), "packages")
+  },
+  restore = { values ->
+    if (values.lastOrNull() != "packages") PurchaseFormFxSaver.restore(values)
+    else {
+      val end = values[values.size - 2].toInt()
+      val packs = values.subList(end, values.size - 2).chunked(4).map {
+        PurchasePackaging(it[0] == "1", it[1], it[2], it[3])
+      }
+      PurchaseFormFxSaver.restore(values.take(end))?.let { f ->
+        f.copy(packaging = packs.first(), more = f.more.zip(packs.drop(1)) { row, pack -> row.copy(packaging = pack) })
+      }
+    }
   },
 )
 
@@ -177,11 +207,12 @@ internal fun PurchaseFormScreen(
   supplierArg: String?,
   onBack: () -> Unit,
   onNewProduct: () -> Unit,
+  onCategory: ((String?, (String?) -> Unit) -> Unit)? = null,
   /**
    *  PUR-05: فاکتورِ دفترِ خرید (تأمین‌کننده، ردیف‌ها، پرداخت، تاریخ، توضیح، هزینهٔ جانبی و سررسید) ⇒ `PurchaseBook.record`؛
    *  `true` ⇐ پذیرفته
    */
-  onSaveMany: (String, List<PurchaseBook.Line>, Double, String, String, PurchaseFormModel.Extras) -> Boolean,
+  onSaveMany: suspend (String, List<PurchaseBook.Line>, Double, String, String, PurchaseFormModel.Extras) -> Boolean,
   /**
    *  موتورِ تازهٔ موجودی (`StockLedger.isOn`) ⇒ کادرهای «هزینهٔ جانبی» (PUR-06) و «سررسیدِ پرداخت» (PUR-07) — همان شرطِ
    *  فرمِ خریدِ کامپیوتر (`DeskPurchasing`)؛ خاموش ⇒ همان فرمِ پیشین
@@ -209,8 +240,9 @@ internal fun PurchaseFormScreen(
 ) {
   val initial = remember(supplierArg) { PurchaseFormModel.initial(supplierArg?.takeIf { id -> d.suppliers.any { it.id == id } }, todayIso()) }
   //  نوشته‌ها با چرخشِ گوشی و برگشت از «کالای تازه» نمی‌روند
-  var form by rememberSaveable(supplierArg, stateSaver = PurchaseFormFxSaver) { mutableStateOf(initial) }
+  var form by rememberSaveable(supplierArg, stateSaver = PurchaseFormPackagingSaver) { mutableStateOf(initial) }
   var busy by remember { mutableStateOf(false) }
+  val scope = rememberCoroutineScope()
   var tried by rememberSaveable { mutableStateOf(false) }
   //  کادرهای پنهان (موتورِ تازه خاموش) هیچ اثری ندارند — نوشتهٔ برگشته از چرخشِ صفحه هم پاک می‌شود
   LaunchedEffect(extrasOn) {
@@ -230,7 +262,6 @@ internal fun PurchaseFormScreen(
     when (val r = PurchaseFormModel.scan(form, d, code, barcodes, unitIndex)) {
       is PurchaseFormModel.Scan.Added -> { form = r.form; r.unit?.let { notify(V3Tone.SUCCESS, StrPurchaseUnits.scanned(r.name, it)) } }
       is PurchaseFormModel.Scan.Unknown -> notify(V3Tone.ERROR, StrPurchasePages.barcodeUnknown(r.code))
-      PurchaseFormModel.Scan.Full -> notify(V3Tone.ERROR, StrMoney.purchaseRowsFull(PurchaseFormModel.MAX_ROWS))
     }
   }
   val scanOwner = remember { Any() }
@@ -240,11 +271,12 @@ internal fun PurchaseFormScreen(
     onDispose { ScanRouter.unregister(scanOwner) }
   }
   //  کالای تازه از همین فرم (فرمِ «کالای جدید» دست نمی‌خورد): کالایی که پس از رفتن به آن فرم پیدا شد، ردیفِ همان‌جا می‌شود
-  var waitingProduct by remember { mutableStateOf<Set<String>?>(null) }
-  var pickRowAtAdd by remember { mutableStateOf(-1) }
+  var waitingProduct by rememberSaveable { mutableStateOf<ArrayList<String>?>(null) }
+  var pickRowAtAdd by rememberSaveable { mutableStateOf(-1) }
   LaunchedEffect(d.products) {
     val before = waitingProduct ?: return@LaunchedEffect
-    val added = d.products.filter { it.id !in before }
+    val known = before.toHashSet()
+    val added = d.products.filter { it.id !in known }
     if (added.size == 1) {
       val p = added.single()
       form = if (pickRowAtAdd < 0) PurchaseFormModel.pickProduct(form, p, unitsOn) else PurchaseFormModel.pickRowProduct(form, pickRowAtAdd, p, unitsOn)
@@ -255,9 +287,11 @@ internal fun PurchaseFormScreen(
   var picker by remember { mutableStateOf<PurchasePicker?>(null) }
   //  کالای کدام ردیف انتخاب می‌شود: -1 = ردیفِ نخست، وگرنه شمارهٔ ردیفِ افزوده (PUR-05)
   var pickRow by remember { mutableStateOf(-1) }
-  val errors = PurchaseFormModel.errors(form, d)
+  var deliverySettings by rememberSaveable { mutableStateOf(false) }
+  var selectedCategory by rememberSaveable { mutableStateOf<String?>(null) }
+  val errors = remember(form, d) { PurchaseFormModel.errors(form, d) }
   val shownErrors = if (tried) errors else PurchaseFormModel.Errors()
-  val product = d.products.find { it.id == form.productId }
+  val productById = remember(d.products) { d.products.associateBy { it.id } }
   val supplier = d.suppliers.find { it.id == form.supplierId }
   val total = PurchaseFormModel.total(form)
   //  PUR-11: فاکتورِ ارزی — جمع و پرداخت به همان ارز، معادلِ افغانی با نرخِ همین فاکتور
@@ -265,7 +299,7 @@ internal fun PurchaseFormScreen(
   val fxTotal = PurchaseFormModel.fxTotal(form)
   fun fx(minor: Long): String = SafeCurrencies.format(minor, fxCode ?: ir.vil3ntec.tohid.core.purchase.PurchaseFx.AFN)
   //  PUR-09: آخرین فیِ همین تأمین‌کننده برای همین کالا، زیرِ «قیمت هر واحد»
-  val buys = remember(d) { PurchaseOrderBook.buys(d) }
+  val buys = remember(d.purchases) { PurchaseOrderBook.buys(d) }
   val lastPrice = remember(buys, form.productId, form.supplierId) {
     val pid = form.productId; val sid = form.supplierId
     if (pid == null || sid == null) null
@@ -274,6 +308,7 @@ internal fun PurchaseFormScreen(
     } ?: StrMoney.noSupplierBuyYet
   }
 
+  BackHandler(enabled = busy) {}
   V3Form(
     title = StrMoney.newPurchase,
     primary = StrMoney.newPurchase,
@@ -289,243 +324,184 @@ internal fun PurchaseFormScreen(
         form.later -> { busy = true; onSaveLater(form) { ok -> busy = false; if (ok) onBack() } }
         //  e-rows-63b: هر خرید یک فاکتورِ شماره‌دار (`PurchaseBook.record`) — تک‌ردیفه هم، تا «خریدِ #n» و «پرداخت» ِ همان خرید
         //  (یادداشتِ `PurchaseBook.payNote`) کار کنند؛ اثرها همان `addPurchase` ِ هر ردیف است
-        onSaveMany(
-          form.supplierId.orEmpty(),
-          PurchaseFormModel.lines(form) { id -> d.products.find { it.id == id }?.unit.orEmpty() },
-          PurchaseFormModel.paid(form), form.date, form.notes.trim(), PurchaseFormModel.extras(form, extrasOn),
-        ) -> onBack()
-      }
-    },
-    onBack = onBack,
-    dirty = PurchaseFormModel.dirty(form, initial),
-    summary = when {
-      fxCode != null && fxTotal > 0 -> "${StrMoney.purchaseTotal}: ${ir.vil3ntec.tohid.data.SupplierFx.ltr("${fx(fxTotal)} = ${MoneyText.afn(total)}")}"
-      total > 0 -> "${StrMoney.purchaseTotal}: ${MoneyText.afn(total)}"
-      else -> null
-    },
-  ) {
-    Column(Modifier.v3Shake(shake)) {
-      //  PUR-12/AI-10: آغاز از عکسِ فاکتورِ کاغذی (بالای فرم، پیش از نوشتنِ ردیف‌ها) — فقط ردیف‌های تأییدشده به همین فرم می‌آیند؛
-      //  ثبت همان «ثبت» است. پرچمِ خاموش یا بی اجازه ⇒ هیچ
-      if (ocr != null && fxCode == null && d.products.isNotEmpty()) {
-        ir.vil3ntec.tohid.ui.screens.InvoiceOcrPhoneButton(ocr, Modifier.fillMaxWidth().padding(bottom = 8.dp))
-      }
-      //  تأمین‌کننده و کالا در یک کارت — برچسبِ هر ردیف خودش سرخط است
-      V3Section(null, padding = PaddingValues(vertical = 4.dp)) {
-        V3PickerRow(
-          label = StrMoney.supplierLabel,
-          value = supplier?.name,
-          placeholder = StrMoney.pickSupplier,
-          icon = Icons.Outlined.LocalShipping,
-          error = shownErrors.supplier,
-          onClick = { picker = PurchasePicker.SUPPLIER },
-        )
-        V3Divider(start = 64.dp)
-        if (d.products.isEmpty()) {
-          Column(Modifier.padding(12.dp)) {
-            V3Message(V3Tone.INFO, StrMoney.noProductsHint, action = StrMoney.addProduct, onAction = onNewProduct)
-          }
-        } else {
-          V3PickerRow(
-            label = StrMoney.item,
-            value = product?.name,
-            placeholder = StrMoney.pickItem,
-            icon = Icons.Outlined.Inventory2,
-            error = shownErrors.product,
-            onClick = { pickRow = -1; picker = PurchasePicker.PRODUCT },
-          )
-        }
-        //  PUR-11: ارزِ فاکتور — فقط وقتی دکان جز افغانی ارزی دارد (ارزهای گاوصندوق)؛ پیش‌فرض افغانی، همان فرمِ پیشین
-        if (currencies.size > 1) {
-          V3Divider(start = 64.dp)
-          V3PickerRow(
-            label = StrSafeCur.currency,
-            value = currencyName(fxCode ?: ir.vil3ntec.tohid.core.purchase.PurchaseFx.AFN),
-            icon = Icons.Outlined.CurrencyExchange,
-            onClick = { picker = PurchasePicker.CURRENCY },
-          )
-        }
-      }
-      if (fxCode != null) {
-        V3Section(StrPurchaseFx.section, padding = PaddingValues(16.dp)) {
-          V3TextField(
-            value = form.rate,
-            onValueChange = { form = form.copy(rate = it) },
-            label = StrPurchaseFx.rateLabel(ir.vil3ntec.tohid.core.pay.FxTill.afnText(form.per * 100), fxCode),
-            kind = V3FieldKind.MONEY,
-            required = true,
-            helper = PurchaseFormModel.fxRate(form)?.let { StrPurchaseFx.rateLine(ir.vil3ntec.tohid.core.purchase.PurchaseFx.rateLine(it)) },
-            error = shownErrors.rate,
-          )
-          Spacer(Modifier.height(8.dp))
-          Text(StrPurchaseFx.per, style = V3Type.footnote, color = PhoneV3.colors.inkMuted)
-          Spacer(Modifier.height(4.dp))
-          V3ChipRow(contentPadding = PaddingValues(0.dp)) {
-            ir.vil3ntec.tohid.core.pay.Pay.FX_PER.forEach { p ->
-              V3Chip(ir.vil3ntec.tohid.data.SupplierFx.ltr("${ir.vil3ntec.tohid.core.pay.FxTill.afnText(p * 100)} $fxCode"), selected = form.per == p, onClick = { form = form.copy(per = p) })
+        else -> {
+          val snapshot = form
+          busy = true
+          scope.launch {
+            try {
+              val saved = onSaveMany(
+                snapshot.supplierId.orEmpty(),
+                PurchaseFormModel.lines(snapshot) { id -> productById[id]?.unit.orEmpty() },
+                PurchaseFormModel.paid(snapshot), snapshot.date, snapshot.notes.trim(), PurchaseFormModel.extras(snapshot, extrasOn),
+              )
+              if (saved) onBack()
+            } finally {
+              busy = false
             }
           }
-          Spacer(Modifier.height(8.dp))
-          Text(StrPurchaseFx.rateNote, style = V3Type.footnote, color = PhoneV3.colors.inkMuted)
         }
       }
-      V3Section(StrMoney.qtyAndPrice, padding = PaddingValues(16.dp)) {
-        V3TextField(
-          value = form.quantity,
-          onValueChange = { form = form.copy(quantity = it) },
-          label = StrMoney.quantity,
-          kind = V3FieldKind.NUMBER,
-          required = true,
-          suffix = (form.unitName ?: product?.unit)?.takeIf { it.isNotBlank() },
-          error = shownErrors.quantity,
-        )
-        Spacer(Modifier.height(12.dp))
-        V3TextField(
-          value = form.price,
-          onValueChange = { form = form.copy(price = it) },
-          label = fxCode?.let(StrPurchaseFx::priceIn) ?: form.unitName?.let(StrPurchaseUnits::priceIn) ?: StrMoney.unitPrice,
-          kind = V3FieldKind.MONEY,
-          required = true,
-          helper = lastPrice,
-          error = shownErrors.price,
-        )
-        Spacer(Modifier.height(12.dp))
-        if (unitsOn) RowUnit(d, form.productId, form.unitName, form.quantity, form.price, shownErrors.unit, form) { u ->
-          form = PurchaseFormModel.pickUnit(form, d, -1, u)
+    },
+    onBack = onBack.takeUnless { busy },
+    dirty = PurchaseFormModel.dirty(form, initial),
+    summary = when {
+      fxCode != null && fxTotal > 0 -> "${StrMoney.purchaseTotal}: ${ir.vil3ntec.tohid.data.SupplierFx.ltr("${fx(fxTotal)} = ${MoneyText.preciseAfn(total)}")}"
+      total > 0 -> "${StrMoney.purchaseTotal}: ${MoneyText.preciseAfn(total)}"
+      else -> null
+    },
+    modifier = Modifier.v3Shake(shake),
+    loading = busy,
+    listContent = {
+      item(key = "supplier-and-currency") { Column {
+        //  PUR-12/AI-10: آغاز از عکسِ فاکتورِ کاغذی (بالای فرم، پیش از نوشتنِ ردیف‌ها) — فقط ردیف‌های تأییدشده به همین فرم می‌آیند؛
+        //  ثبت همان «ثبت» است. پرچمِ خاموش یا بی اجازه ⇒ هیچ
+        if (ocr != null && fxCode == null && d.products.isNotEmpty()) {
+          ir.vil3ntec.tohid.ui.screens.InvoiceOcrPhoneButton(ocr, Modifier.fillMaxWidth().padding(bottom = 8.dp))
         }
-        //  کالای نرسیده انقضایش هنگامِ «دریافتِ کالا» ثبت می‌شود
-        if (!form.later) ExpiryField(form.expiry, { form = form.copy(expiry = it) }, shownErrors.expiry)
-        if (fxCode != null) {
-          LiveLine(StrPurchaseFx.totalIn(fxCode), fx(fxTotal))
-          LiveLine(StrPurchaseFx.afnEquivalent, MoneyText.afn(total))
-        } else LiveLine(StrMoney.purchaseTotal, MoneyText.afn(total))
-      }
-      //  PUR-05: ردیف‌های افزوده — هر کدام کالا، مقدار و قیمتِ خودش
-      form.more.forEachIndexed { i, row ->
-        val rowProduct = d.products.find { it.id == row.productId }
-        val rowErrors = if (tried) shownErrors.rows.getOrNull(i) ?: PurchaseFormModel.RowErrors() else PurchaseFormModel.RowErrors()
-        V3Section(StrMoney.purchaseRow(i + 2), padding = PaddingValues(16.dp)) {
+        //  تأمین‌کننده و ارز برای همهٔ ردیف‌های فاکتور
+        V3Section(null, padding = PaddingValues(vertical = 4.dp)) {
           V3PickerRow(
-            label = StrMoney.item,
-            value = rowProduct?.name,
-            placeholder = StrMoney.pickItem,
-            icon = Icons.Outlined.Inventory2,
-            error = rowErrors.product,
-            onClick = { pickRow = i; picker = PurchasePicker.PRODUCT },
+            label = StrMoney.supplierLabel,
+            value = supplier?.name,
+            placeholder = StrMoney.pickSupplier,
+            icon = Icons.Outlined.LocalShipping,
+            error = shownErrors.supplier,
+            onClick = { picker = PurchasePicker.SUPPLIER },
           )
-          Spacer(Modifier.height(12.dp))
-          V3TextField(
-            value = row.quantity,
-            onValueChange = { form = PurchaseFormModel.setRow(form, i, row.copy(quantity = it)) },
-            label = StrMoney.quantity,
-            kind = V3FieldKind.NUMBER,
-            required = true,
-            suffix = (row.unitName ?: rowProduct?.unit)?.takeIf { it.isNotBlank() },
-            error = rowErrors.quantity,
-          )
-          Spacer(Modifier.height(12.dp))
-          V3TextField(
-            value = row.price,
-            onValueChange = { form = PurchaseFormModel.setRow(form, i, row.copy(price = it)) },
-            label = fxCode?.let(StrPurchaseFx::priceIn) ?: row.unitName?.let(StrPurchaseUnits::priceIn) ?: StrMoney.unitPrice,
-            kind = V3FieldKind.MONEY,
-            required = true,
-            error = rowErrors.price,
-          )
-          Spacer(Modifier.height(12.dp))
-          if (unitsOn) RowUnit(d, row.productId, row.unitName, row.quantity, row.price, rowErrors.unit, form) { u ->
-            form = PurchaseFormModel.pickUnit(form, d, i, u)
+          //  PUR-11: ارزِ فاکتور — فقط وقتی دکان جز افغانی ارزی دارد (ارزهای گاوصندوق)؛ پیش‌فرض افغانی، همان فرمِ پیشین
+          if (currencies.size > 1) {
+            V3Divider(start = 64.dp)
+            V3PickerRow(
+              label = StrSafeCur.currency,
+              value = currencyName(fxCode ?: ir.vil3ntec.tohid.core.purchase.PurchaseFx.AFN),
+              icon = Icons.Outlined.CurrencyExchange,
+              onClick = { picker = PurchasePicker.CURRENCY },
+            )
           }
-          if (!form.later) ExpiryField(row.expiry, { form = PurchaseFormModel.setRow(form, i, row.copy(expiry = it)) }, rowErrors.expiry)
-          Spacer(Modifier.height(12.dp))
-          V3Button(StrMoney.removePurchaseRow, { form = PurchaseFormModel.removeRow(form, i) }, Modifier.fillMaxWidth(), kind = V3ButtonKind.NEUTRAL)
         }
-      }
-      if (d.products.isNotEmpty() && form.more.size + 1 < PurchaseFormModel.MAX_ROWS) {
-        V3Button(
-          StrMoney.addPurchaseRow, { form = PurchaseFormModel.addRow(form) },
-          Modifier.fillMaxWidth().padding(vertical = 8.dp), kind = V3ButtonKind.SECONDARY,
-        )
-      }
-      //  e-rows-63b: افزودنِ ردیف با دوربین — همان راهِ بارکدخوان (`PurchaseFormModel.scan`)
-      if (onScan != null && d.products.isNotEmpty()) {
-        V3Button(
-          StrKit.scanBarcode, { onScan { code -> onScanCode(code) } },
-          Modifier.fillMaxWidth().padding(bottom = 8.dp), kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.QrCodeScanner,
-        )
-      }
-      //  e-rows-63b: «الان رسیده؟» — بله ⇒ فاکتورِ دفتر (کالا همین حالا به انبار)؛ نه ⇒ سفارشِ خرید و «دریافتِ کالا» ِ بعدی
-      V3Section(StrPurchases.receivedNow, padding = PaddingValues(16.dp)) {
-        V3Segmented(
-          listOf(StrPurchases.yesReceived, StrPurchases.laterReceived), if (form.later) 1 else 0,
-          { i -> form = PurchaseFormModel.setLater(form, i == 1) },
-        )
-        if (form.later) {
-          Spacer(Modifier.height(10.dp))
-          V3Message(if (laterOn) V3Tone.INFO else V3Tone.WARNING, if (laterOn) StrPurchases.laterHow else StrPurchases.laterOff)
-        }
-      }
-      V3Section(if (form.later) StrPurchases.prepay else StrMoney.paidSection, padding = PaddingValues(16.dp)) {
-        //  e-rows-63b: سه گزینهٔ روشن به‌جای «خالی یعنی نسیه»
-        val modes = PurchasePay.entries
-        V3Segmented(
-          listOf(StrPurchases.payFull, StrPurchases.payPart, StrPurchases.payLater),
-          modes.indexOf(form.pay ?: PurchasePay.PART),
-          { i -> form = PurchaseFormModel.setPay(form, modes[i]) },
-        )
-        Spacer(Modifier.height(12.dp))
-        when {
-          PurchaseFormModel.typesPaid(form) -> V3TextField(
-            value = form.paid,
-            onValueChange = { form = form.copy(paid = it) },
-            label = fxCode?.let(StrPurchaseFx::paidIn) ?: StrMoney.paidField,
-            kind = V3FieldKind.MONEY,
-            helper = if (form.pay == null) StrMoney.paidHelper else null,
-            error = shownErrors.paid,
-          )
-          form.pay == PurchasePay.FULL && fxCode != null -> Text(StrPurchaseFx.paidAll(fx(fxTotal)), style = V3Type.subhead, color = PhoneV3.colors.inkMuted)
-          form.pay == PurchasePay.FULL -> Text(StrPurchases.paidAll(money(total)), style = V3Type.subhead, color = PhoneV3.colors.inkMuted)
-          else -> Text(StrPurchases.laterNote, style = V3Type.subhead, color = PhoneV3.colors.inkMuted)
-        }
-        val left = PurchaseFormModel.remaining(form)
         if (fxCode != null) {
-          val fxLeft = (fxTotal - PurchaseFormModel.fxPaid(form)).coerceAtLeast(0L)
-          LiveLine(StrMoney.remainingLabel, ir.vil3ntec.tohid.data.SupplierFx.ltr("${fx(fxLeft)} = ${MoneyText.afn(left)}"), if (fxLeft > 0) LedgerTone.OWE else LedgerTone.SETTLED)
-          Spacer(Modifier.height(6.dp))
-          Text(StrPurchaseFx.drawerNote, style = V3Type.footnote, color = PhoneV3.colors.inkMuted)
-        } else LiveLine(StrMoney.remainingLabel, MoneyText.afn(left), if (left > 0) LedgerTone.OWE else LedgerTone.SETTLED)
-        Spacer(Modifier.height(12.dp))
-        V3DateField(form.date, { form = form.copy(date = it) }, StrMoney.date)
-        if (extrasOn && !form.later) {
-          //  PUR-06: کرایه/گمرک روی بهای ردیف‌ها (نه بدهیِ تأمین‌کننده)
-          Spacer(Modifier.height(12.dp))
-          V3TextField(
-            value = form.landed,
-            onValueChange = { form = form.copy(landed = it) },
-            label = StrPurchasePages.landedAfn,
-            kind = V3FieldKind.MONEY,
-            helper = StrPurchasePages.landedNote,
-            error = shownErrors.landed,
-          )
+          V3Section(StrPurchaseFx.section, padding = PaddingValues(16.dp)) {
+            V3TextField(
+              value = form.rate,
+              onValueChange = { form = form.copy(rate = it) },
+              label = StrPurchaseFx.rateLabel(ir.vil3ntec.tohid.core.pay.FxTill.afnText(form.per * 100), fxCode),
+              kind = V3FieldKind.MONEY,
+              required = true,
+              helper = PurchaseFormModel.fxRate(form)?.let { StrPurchaseFx.rateLine(ir.vil3ntec.tohid.core.purchase.PurchaseFx.rateLine(it)) },
+              error = shownErrors.rate,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(StrPurchaseFx.per, style = V3Type.footnote, color = PhoneV3.colors.inkMuted)
+            Spacer(Modifier.height(4.dp))
+            V3ChipRow(contentPadding = PaddingValues(0.dp)) {
+              ir.vil3ntec.tohid.core.pay.Pay.FX_PER.forEach { p ->
+                V3Chip(ir.vil3ntec.tohid.data.SupplierFx.ltr("${ir.vil3ntec.tohid.core.pay.FxTill.afnText(p * 100)} $fxCode"), selected = form.per == p, onClick = { form = form.copy(per = p) })
+              }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(StrPurchaseFx.rateNote, style = V3Type.footnote, color = PhoneV3.colors.inkMuted)
+          }
         }
-        if (PurchaseFormModel.dueShown(form, extrasOn)) {
-          //  PUR-07: سررسیدِ کلِ فاکتور برای یادآورِ بدهی — با «بخشی/بعداً» همه‌جا (e-rows-63b)
-          Spacer(Modifier.height(12.dp))
-          V3TextField(
-            form.due, { form = form.copy(due = it) }, StrPurchasePages.payDue, Modifier.fillMaxWidth(),
-            kind = V3FieldKind.DATE,
-            placeholder = StrStock.datePlaceholder,
-            helper = PurchaseFormModel.dueIso(form)?.takeIf { it.isNotEmpty() }?.let(::formatDate) ?: StrPurchasePages.optionalReminder,
-            error = shownErrors.due,
-          )
+      } }
+      itemsIndexed(listOf(PurchaseFormModel.first(form)) + form.more) { index, row ->
+        val i = index - 1
+        val rowErrors = if (i < 0) PurchaseFormModel.RowErrors(
+          shownErrors.product, shownErrors.quantity, shownErrors.price, shownErrors.expiry, shownErrors.unit, shownErrors.packaging, shownErrors.production,
+        ) else shownErrors.rows.getOrNull(i) ?: PurchaseFormModel.RowErrors()
+        PurchaseItemCard(
+          row = row, product = productById[row.productId], number = index + 1, errors = rowErrors,
+          form = form, d = d, unitsOn = unitsOn, lastPrice = lastPrice.takeIf { i < 0 },
+          onChoose = { pickRow = i; picker = PurchasePicker.PRODUCT },
+          onChange = { changed ->
+            form = if (i < 0) PurchaseFormModel.withFirst(form, changed) else PurchaseFormModel.setRow(form, i, changed)
+          },
+          onPickUnit = { form = PurchaseFormModel.pickUnit(form, d, i, it) },
+          onRemove = if (i >= 0) ({ form = PurchaseFormModel.removeRow(form, i) }) else null,
+        )
+      }
+      item(key = "add-items") {
+        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+          V3Button(StrMoney.addPurchaseRow, { form = PurchaseFormModel.addRow(form) }, Modifier.weight(1f), kind = V3ButtonKind.SECONDARY)
+          if (onScan != null) V3Button(StrKit.scanBarcode, { onScan { code -> onScanCode(code) } }, Modifier.weight(1f), kind = V3ButtonKind.NEUTRAL, icon = Icons.Outlined.QrCodeScanner)
         }
       }
-      V3Section(StrMoney.notesSection, padding = PaddingValues(16.dp)) {
-        V3TextField(form.notes, { form = form.copy(notes = it) }, StrMoney.notesField, singleLine = false)
-      }
-      Spacer(Modifier.height(16.dp))
-    }
-  }
+      item(key = "purchase-settlement") { Column {
+        //  e-rows-63b: «الان رسیده؟» — بله ⇒ فاکتورِ دفتر (کالا همین حالا به انبار)؛ نه ⇒ سفارشِ خرید و «دریافتِ کالا» ِ بعدی
+        if (laterOn || extrasOn) ir.vil3ntec.tohid.ui.v3.V3TextButton(Workflow.deliveryOptions, { deliverySettings = !deliverySettings })
+        if (deliverySettings && laterOn) V3Section(StrPurchases.receivedNow, padding = PaddingValues(16.dp)) {
+          V3Segmented(
+            listOf(StrPurchases.yesReceived, StrPurchases.laterReceived), if (form.later) 1 else 0,
+            { i -> form = PurchaseFormModel.setLater(form, i == 1) },
+          )
+          if (form.later) {
+            Spacer(Modifier.height(10.dp))
+            V3Message(if (laterOn) V3Tone.INFO else V3Tone.WARNING, if (laterOn) StrPurchases.laterHow else StrPurchases.laterOff)
+          }
+        }
+        V3Section(if (form.later) StrPurchases.prepay else StrMoney.paidSection, padding = PaddingValues(16.dp)) {
+          if (fxCode != null) {
+            LiveLine(StrPurchaseFx.totalIn(fxCode), fx(fxTotal))
+            LiveLine(StrPurchaseFx.afnEquivalent, MoneyText.preciseAfn(total))
+          } else LiveLine(StrMoney.purchaseTotal, MoneyText.preciseAfn(total))
+          Spacer(Modifier.height(12.dp))
+          V3Segmented(
+            listOf(Workflow.paymentNow, Workflow.paymentLater), if (form.pay == PurchasePay.LATER) 1 else 0,
+            { i ->
+              if (i == 1) form = PurchaseFormModel.setPay(form, PurchasePay.LATER)
+              else if (form.pay == PurchasePay.LATER) form = PurchaseFormModel.setPay(form, PurchasePay.FULL)
+            },
+          )
+          if (form.pay != PurchasePay.LATER) {
+            Spacer(Modifier.height(12.dp))
+            V3TextField(
+              value = if (form.pay == PurchasePay.FULL) {
+                if (fxCode != null) PoForms.num(ir.vil3ntec.tohid.core.safe.SafeCurrency.major(fxTotal, fxCode)) else PoForms.num(total)
+              } else form.paid,
+              onValueChange = { form = form.copy(pay = PurchasePay.PART, paid = it) },
+              label = fxCode?.let(StrPurchaseFx::paidIn) ?: Workflow.paidAmount,
+              kind = V3FieldKind.MONEY, error = shownErrors.paid,
+            )
+          }
+          val left = PurchaseFormModel.remaining(form)
+          if (fxCode != null) {
+            val fxLeft = (fxTotal - PurchaseFormModel.fxPaid(form)).coerceAtLeast(0L)
+            LiveLine(StrMoney.remainingLabel, ir.vil3ntec.tohid.data.SupplierFx.ltr("${fx(fxLeft)} = ${MoneyText.preciseAfn(left)}"), if (fxLeft > 0) LedgerTone.OWE else LedgerTone.SETTLED)
+            Spacer(Modifier.height(6.dp))
+            Text(StrPurchaseFx.drawerNote, style = V3Type.footnote, color = PhoneV3.colors.inkMuted)
+          } else LiveLine(StrMoney.remainingLabel, MoneyText.preciseAfn(left), if (left > 0) LedgerTone.OWE else LedgerTone.SETTLED)
+          Spacer(Modifier.height(12.dp))
+          V3DateField(form.date, { form = form.copy(date = it) }, StrMoney.date)
+          if (extrasOn && !form.later && (deliverySettings || form.landed.isNotBlank())) {
+            //  PUR-06: کرایه/گمرک روی بهای ردیف‌ها (نه بدهیِ تأمین‌کننده)
+            Spacer(Modifier.height(12.dp))
+            V3TextField(
+              value = form.landed,
+              onValueChange = { form = form.copy(landed = it) },
+              label = StrPurchasePages.landedAfn,
+              kind = V3FieldKind.MONEY,
+              helper = StrPurchasePages.landedNote,
+              error = shownErrors.landed,
+            )
+          }
+          if (PurchaseFormModel.dueShown(form, extrasOn)) {
+            //  PUR-07: سررسیدِ کلِ فاکتور برای یادآورِ بدهی — با «بخشی/بعداً» همه‌جا (e-rows-63b)
+            Spacer(Modifier.height(12.dp))
+            V3TextField(
+              form.due, { form = form.copy(due = it) }, StrPurchasePages.payDue, Modifier.fillMaxWidth(),
+              kind = V3FieldKind.DATE,
+              placeholder = StrStock.datePlaceholder,
+              helper = PurchaseFormModel.dueIso(form)?.takeIf { it.isNotEmpty() }?.let(::formatDate) ?: StrPurchasePages.optionalReminder,
+              error = shownErrors.due,
+            )
+          }
+        }
+        V3Section(StrMoney.notesSection, padding = PaddingValues(16.dp)) {
+          V3TextField(form.notes, { form = form.copy(notes = it) }, StrMoney.notesField, singleLine = false)
+        }
+        Spacer(Modifier.height(16.dp))
+      } }
+    },
+  )
 
   if (ocr != null && fxCode == null) {
     ir.vil3ntec.tohid.ui.screens.InvoiceOcrPhoneHost(ocr, d.products) { rows ->
@@ -539,7 +515,8 @@ internal fun PurchaseFormScreen(
   when (picker) {
     PurchasePicker.SUPPLIER -> IdPickerSheet(
       title = StrMoney.supplierLabel,
-      options = d.suppliers.map { PickOption(it.id, it.name, it.phone.ifBlank { null }) },
+      options = d.suppliers.sortedBy { it.name }.map { PickOption(it.id, it.name, listOf(it.phone, it.address).filter(String::isNotBlank).joinToString(" · ").ifBlank { null }) },
+      searchAlways = true,
       selected = form.supplierId,
       onPick = { id -> form = form.copy(supplierId = id) },
       onDismiss = { picker = null },
@@ -550,7 +527,26 @@ internal fun PurchaseFormScreen(
       val current = if (pickRow < 0) form.productId else form.more.getOrNull(pickRow)?.productId
       IdPickerSheet(
         title = StrMoney.item,
-        options = d.products.filter { it.active || it.id == current }.map { PickOption(it.id, it.name, it.barcodes.firstOrNull()) },
+        options = d.products.filter { (it.active || it.id == current) && (selectedCategory == null || it.category == selectedCategory) }
+          .map { PickOption(it.id, it.name, listOfNotNull(it.category.takeIf(String::isNotBlank), it.barcodes.firstOrNull()).joinToString(" · ")) },
+        searchAlways = true,
+        header = {
+          if (d.productCategories.isNotEmpty()) V3ChipRow {
+            V3Chip(Workflow.allCategories, selectedCategory == null, onClick = { selectedCategory = null })
+            d.productCategories.forEach { category ->
+              V3Chip(category, selectedCategory == category, onClick = { selectedCategory = category })
+            }
+          }
+          onCategory?.let { open ->
+            ir.vil3ntec.tohid.ui.v3.V3TextButton(ir.vil3ntec.tohid.core.i18n.StrProducts.categoriesTitle, {
+              picker = null
+              open(selectedCategory) { category ->
+                if (category != null) selectedCategory = category
+                picker = PurchasePicker.PRODUCT
+              }
+            })
+          }
+        },
         selected = current,
         onPick = { id ->
           d.products.find { it.id == id }?.let { p ->
@@ -560,7 +556,7 @@ internal fun PurchaseFormScreen(
         onDismiss = { picker = null },
         //  کالای تازه: همان فرمِ «کالای جدید» (۶۳k) — پس از ذخیره، همان ردیف همان کالا را می‌گیرد
         addLabel = StrMoney.addProduct,
-        onAdd = { waitingProduct = d.products.mapTo(HashSet()) { it.id }; pickRowAtAdd = pickRow; onNewProduct() },
+        onAdd = { waitingProduct = d.products.mapTo(ArrayList()) { it.id }; pickRowAtAdd = pickRow; onNewProduct() },
       )
     }
     PurchasePicker.CURRENCY -> IdPickerSheet(
@@ -581,5 +577,84 @@ private fun LiveLine(label: String, value: String, tone: LedgerTone = LedgerTone
   Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
     Text(label, style = v3Text(13, FontWeight.Medium, 18), color = c.inkMuted, modifier = Modifier.weight(1f))
     Text(value, style = v3Text(15, FontWeight.Bold, 20), color = if (tone == LedgerTone.NEUTRAL) c.ink else tone.ink())
+  }
+}
+
+@Composable
+private fun PurchaseItemCard(
+  row: PurchaseRow,
+  product: Product?,
+  number: Int,
+  errors: PurchaseFormModel.RowErrors,
+  form: PurchaseForm,
+  d: ShopData,
+  unitsOn: Boolean,
+  lastPrice: String?,
+  onChoose: () -> Unit,
+  onChange: (PurchaseRow) -> Unit,
+  onPickUnit: (String?) -> Unit,
+  onRemove: (() -> Unit)?,
+) {
+  val pack = row.packaging
+  var details by rememberSaveable(row.productId, number) { mutableStateOf(false) }
+  val gap = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)
+  V3Section(StrMoney.purchaseRow(number), padding = PaddingValues(14.dp)) {
+    Column(verticalArrangement = gap) {
+      V3PickerRow(
+        label = StrMoney.item, value = product?.name, placeholder = StrMoney.pickItem,
+        icon = Icons.Outlined.Inventory2, error = errors.product, onClick = onChoose,
+      )
+      V3Segmented(listOf(Workflow.loose, Workflow.carton), if (pack.carton) 1 else 0, { selected ->
+        if ((selected == 1) != pack.carton) {
+          onChange(row.copy(unitName = null, quantity = "", price = "", packaging = pack.copy(carton = selected == 1)))
+        }
+      })
+      if (pack.carton) {
+        Row(horizontalArrangement = gap) {
+          V3TextField(row.quantity, { onChange(row.copy(quantity = it)) }, Workflow.cartons, Modifier.weight(1f), kind = V3FieldKind.NUMBER, required = true, error = errors.quantity)
+          V3TextField(pack.pieces, { onChange(row.copy(packaging = pack.copy(pieces = it))) }, Workflow.pieces, Modifier.weight(1f), kind = V3FieldKind.NUMBER, required = true, error = errors.packaging)
+        }
+        V3TextField(
+          row.price, { onChange(row.copy(price = it)) }, Workflow.cartonPrice,
+          kind = V3FieldKind.MONEY, required = true, error = errors.price,
+          suffix = form.currency ?: "؋",
+        )
+        val pieces = pack.piecesPerCarton()
+        val cartons = row.quantity.toLongOrNull()
+        val price = row.price.toDoubleOrNull()
+        if (pieces != null && cartons != null && cartons > 0 && cartons <= Long.MAX_VALUE / pieces && price != null && price.isFinite() && price >= 0) {
+          val currency = form.currency ?: ir.vil3ntec.tohid.core.purchase.PurchaseFx.AFN
+          val unitPrice = ir.vil3ntec.tohid.unitMoney(price / pieces)
+          Text(Workflow.basePrice(ir.vil3ntec.tohid.qty((cartons * pieces).toDouble()), "$unitPrice $currency"), style = V3Type.subhead, color = PhoneV3.colors.ink)
+        }
+      } else {
+        Row(horizontalArrangement = gap) {
+          V3TextField(
+            row.quantity, { onChange(row.copy(quantity = it)) }, StrMoney.quantity, Modifier.weight(1f),
+            kind = V3FieldKind.NUMBER, required = true, suffix = row.unitName ?: product?.unit, error = errors.quantity,
+          )
+          V3TextField(
+            row.price, { onChange(row.copy(price = it)) },
+            form.currency?.let(StrPurchaseFx::priceIn) ?: row.unitName?.let(StrPurchaseUnits::priceIn) ?: StrMoney.unitPrice,
+            Modifier.weight(1f), kind = V3FieldKind.MONEY, required = true, helper = lastPrice, error = errors.price,
+          )
+        }
+        if (unitsOn) RowUnit(d, row.productId, row.unitName, row.quantity, row.price, errors.unit, form, onPickUnit)
+      }
+      if (!form.later) {
+        ir.vil3ntec.tohid.ui.v3.V3TextButton(Workflow.productDates, { details = !details })
+        if (details || errors.expiry != null || errors.production != null) {
+          V3TextField(
+            pack.production, { onChange(row.copy(packaging = pack.copy(production = it))) }, StrSheets.productionDate,
+            kind = V3FieldKind.DATE, placeholder = StrStock.datePlaceholder, error = errors.production,
+          )
+          ExpiryField(row.expiry, { onChange(row.copy(expiry = it)) }, errors.expiry)
+          V3TextField(
+            pack.barcode, { onChange(row.copy(packaging = pack.copy(barcode = it.take(128)))) }, Workflow.optionalBarcode,
+          )
+        }
+      }
+      if (onRemove != null) ir.vil3ntec.tohid.ui.v3.V3TextButton(StrMoney.removePurchaseRow, onRemove, danger = true)
+    }
   }
 }

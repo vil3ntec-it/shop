@@ -54,13 +54,13 @@ class PurchaseFormOcrTest {
     assertEquals(foreign, form)
   }
 
-  @Test fun unknownProductsAndTheRowCapAreRespected() {
+  @Test fun unknownProductsAreSkippedAndAcceptedRowsAreKept() {
     val (f, n) = PurchaseFormModel.withAccepted(base, listOf(InvoiceOcr.Accepted("gone", 1.0, 1.0)), d)
     assertEquals(0, n)
     assertEquals(base, f)
     val many = (1..60).map { InvoiceOcr.Accepted(if (it % 2 == 0) "rice" else "tea", it.toDouble(), 10.0) }
     val (g, m) = PurchaseFormModel.withAccepted(base, many, d)
-    assertEquals(PurchaseFormModel.MAX_ROWS, m)
-    assertEquals(PurchaseFormModel.MAX_ROWS - 1, g.more.size)
+    assertEquals(many.size, m)
+    assertEquals(many.size - 1, g.more.size)
   }
 }

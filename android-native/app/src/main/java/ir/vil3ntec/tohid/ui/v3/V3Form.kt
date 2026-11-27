@@ -3,7 +3,10 @@ package ir.vil3ntec.tohid.ui.v3
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -62,7 +65,8 @@ fun V3Form(
   summary: String? = null,
   /** نوشته‌ای ذخیره‌نشده هست ⇒ «برگشت» (دکمه یا کلیدِ گوشی) اول برگهٔ «دور ریخته شود؟» */
   dirty: Boolean = false,
-  content: @Composable ColumnScope.() -> Unit,
+  listContent: (LazyListScope.() -> Unit)? = null,
+  content: @Composable ColumnScope.() -> Unit = {},
 ) {
   val c = PhoneV3.colors
   var askDiscard by remember { mutableStateOf(false) }
@@ -88,7 +92,11 @@ fun V3Form(
     },
   ) { pad ->
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-      Column(
+      if (listContent != null) LazyColumn(
+        Modifier.widthIn(max = 640.dp).fillMaxWidth().background(c.bg),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding()),
+        content = listContent,
+      ) else Column(
         Modifier
           .widthIn(max = 640.dp)
           .fillMaxWidth()

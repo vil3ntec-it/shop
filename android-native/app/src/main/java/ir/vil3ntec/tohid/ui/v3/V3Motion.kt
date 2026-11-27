@@ -66,7 +66,7 @@ object V3Transitions {
   /**
    *  @param forward فقط برای `SWITCH` (تب): تبِ تازه بعد از تبِ پیشین در نوار است ⇒ از سمتِ پایان می‌آید
    */
-  fun page(move: Move, dir: LayoutDirection, forward: Boolean = true): ContentTransform {
+  fun page(move: Move, dir: LayoutDirection, forward: Boolean = true, quickBack: Boolean = false): ContentTransform {
     if (!Motion.enabled) return EnterTransition.None togetherWith ExitTransition.None
     val end = endSign(dir)
     return when (move) {
@@ -76,10 +76,13 @@ object V3Transitions {
         slideInHorizontally(MotionSpec.pageOffset) { w -> end * w }
           .togetherWith(slideOutHorizontally(MotionSpec.pageOffset) { w -> -end * (w * 3 / 10) } + fadeOut(tween(MotionTokens.LONG), targetAlpha = DIM))
       //  برگشت: برعکس — صفحهٔ رفته رویِ پیشین است تا بیرون برود
-      Move.POP ->
-        (slideInHorizontally(MotionSpec.pageOffset) { w -> -end * (w * 3 / 10) } + fadeIn(tween(MotionTokens.LONG), initialAlpha = DIM))
-          .togetherWith(slideOutHorizontally(MotionSpec.pageOffset) { w -> end * w })
+      Move.POP -> {
+        val backOffset = if (quickBack) tween(MotionTokens.SHORT, easing = MotionTokens.EmphasizedDecelerate) else MotionSpec.pageOffset
+        (slideInHorizontally(backOffset) { w -> -end * (w * 3 / 10) } +
+          fadeIn(tween(if (quickBack) MotionTokens.SHORT else MotionTokens.LONG), initialAlpha = DIM))
+          .togetherWith(slideOutHorizontally(backOffset) { w -> end * w })
           .apply { targetContentZIndex = -1f }
+      }
       //  تب (shared-axis X): لغزشِ کوتاه (۱۰٪) + محو به سمتِ ترتیبِ تب‌ها، آینه در RTL
       Move.SWITCH -> {
         val s = if (forward) end else -end

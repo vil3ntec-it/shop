@@ -46,15 +46,18 @@ internal fun IdPickerSheet(
   /** e-rows-63b: ردیفِ «+ تازه» بالای گزینه‌ها (تأمین‌کننده/کالای تازه در فرمِ خرید)؛ زدن ⇒ برگه بسته و [onAdd]؛ null ⇒ نیست */
   addLabel: String? = null,
   onAdd: (() -> Unit)? = null,
+  searchAlways: Boolean = false,
+  header: (@Composable () -> Unit)? = null,
 ) {
   var query by rememberSaveable { mutableStateOf("") }
   val term = query.trim()
   val shown = if (term.isEmpty()) options else options.filter { it.title.contains(term, ignoreCase = true) || it.subtitle?.contains(term, ignoreCase = true) == true }
   V3Sheet(onDismiss = onDismiss, title = title) { closer ->
-    if (options.size > 6) {
+    if (searchAlways || options.size > 6) {
       V3SearchField(query, { query = it }, StrKit.searchHint)
       Spacer(Modifier.height(10.dp))
     }
+    header?.invoke()
     if (addLabel != null && onAdd != null) {
       V3ListRow(title = addLabel, icon = Icons.Outlined.Add, chevron = false, onClick = { closer.close(onAdd) })
       Spacer(Modifier.height(10.dp))

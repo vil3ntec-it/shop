@@ -127,12 +127,12 @@ class PurchaseFormUnitsTest {
     val d = record(r.form)
     assertEquals(72.0, ShopStore.stock(d, "tea"), 1e-9)
     assertEquals(1.0, ShopStore.stock(d, "rice"), 1e-9)
-    //  سقفِ ردیف: کالای تازه پذیرفته نمی‌شود، همان کالا و همان واحد هنوز یکی بیشتر
+    //  افزودن و اسکن از سقف پیشین عبور می‌کنند
     var full = a.form
-    repeat(PurchaseFormModel.MAX_ROWS - 1) { full = PurchaseFormModel.addRow(full) }
+    repeat(60) { full = PurchaseFormModel.addRow(full) }
     full = full.copy(more = full.more.map { it.copy(productId = "rice", quantity = "1", price = "10") })
-    assertEquals(PurchaseFormModel.MAX_ROWS - 1, full.more.size)
-    assertEquals(PurchaseFormModel.Scan.Full, PurchaseFormModel.scan(full, d0, "111", index, units))
+    assertEquals(60, full.more.size)
+    assertEquals(61, added(PurchaseFormModel.scan(full, d0, "111", index, units)).form.more.size)
     assertEquals("2", added(PurchaseFormModel.scan(full, d0, "555", index, units)).form.quantity)
   }
 
@@ -188,4 +188,23 @@ class PurchaseFormUnitsTest {
     assertEquals(f.copy(quantity = "1"), off.copy(more = emptyList()))
     assertEquals(PurchaseRow("tea", "", "40", "", null), off.more.single())
   }
+  @Test fun adHocCartonRetainsExactPriceAndRegistersAllStock() {
+    val bought = PurchaseForm(
+      supplierId = "supA", productId = "tea", quantity = "3", price = "201.25",
+      packaging = PurchasePackaging(carton = true, pieces = "24", production = "2026-09-01", barcode = "321432"),
+      expiry = "2027-09-01", paid = "200.25", pay = PurchasePay.PART,
+    )
+    assertEquals(603.75, PurchaseFormModel.total(bought), 0.0)
+    val saved = record(bought)
+    assertEquals(72.0, ShopStore.stock(saved, "tea"), 0.0)
+    val line = saved.purchases.single()
+    assertEquals(603.75, line.totalAmount, 0.0)
+    assertEquals(200.25, line.paidAmount, 0.0)
+    assertEquals(403.50, ShopStore.supplierDebt(saved, "supA"), 0.0)
+    assertEquals(24_000L, line.unitFactorMilli)
+    assertEquals("321432", line.barcode)
+    assertEquals("2026-09-01", saved.warehouseEntries.single().productionDate)
+    assertEquals("2027-09-01", saved.warehouseEntries.single().expiryDate)
+  }
+
 }

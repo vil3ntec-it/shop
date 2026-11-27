@@ -47,6 +47,7 @@ object PurchaseViews {
     /** PUR-11: فی و جمعِ ردیفِ فاکتورِ ارزی به واحدِ کوچکِ همان ارز (افغانی ⇒ null) */
     val fxUnit: Long? = null,
     val fxTotal: Long? = null,
+    val production: String = "",
   )
 
   data class View(
@@ -107,27 +108,34 @@ object PurchaseViews {
    *  و فاکتورهای رسیدِ سفارش همان ردیف‌های «رسیده»ٔ خودشان‌اند.
    */
   fun all(d: ShopData, today: String, orders: List<PurchaseOrderDto> = emptyList()): List<View> {
-    val ctx = Ctx(d, today)
-    val open = orders.filter { it.isOpen() }
+    return buildViews(Ctx(d, today), orders, null)
+  }
+
+  private fun buildViews(ctx: Ctx, orders: List<PurchaseOrderDto>, supplierId: String?): List<View> {
+    val invoices = if (supplierId == null) ctx.invoices else ctx.invoices.filter { it.supplierId == supplierId }
+    val open = orders.filter { it.isOpen() && (supplierId == null || it.supplierId == supplierId) }
     val folded = HashSet<String>()
     val orderViews = open.map { o ->
-      val mine = ctx.invoices.filter { inv -> inv.supplierId == o.supplierId && orderNoOf(inv) == o.no }
+      val mine = invoices.filter { inv -> inv.supplierId == o.supplierId && orderNoOf(inv) == o.no }
       mine.forEach { folded += it.key }
       ctx.order(o, mine)
     }
-    val bills = ctx.invoices.filter { it.key !in folded }.map(ctx::bill)
+    val bills = invoices.filter { it.key !in folded }.map(ctx::bill)
     return (bills + orderViews).sortedWith(compareByDescending<View> { it.date }.thenByDescending { it.createdAt })
   }
 
   /** یک خرید با کلیدِ مسیرش ([View.key])؛ نبود ⇒ null */
   fun find(d: ShopData, key: String, today: String, orders: List<PurchaseOrderDto> = emptyList()): View? =
-    all(d, today, orders).firstOrNull { it.key == key }
-      //  فاکتورِ رسیدی که در سفارشِ بازش تا شده هم با کلیدِ خودش باز می‌شود
-      ?: Ctx(d, today).let { c -> c.invoices.firstOrNull { it.key == key }?.let(c::bill) }
+    Ctx(d, today).let { c ->
+      c.invoices.firstOrNull { it.key == key }?.let(c::bill)
+        ?: orders.firstOrNull { it.isOpen() && orderKey(it.id) == key }?.let { order ->
+          c.order(order, c.invoices.filter { it.supplierId == order.supplierId && orderNoOf(it) == order.no })
+        }
+    }
 
   /** خریدهای یک تأمین‌کننده (صفحهٔ تأمین‌کننده) */
   fun ofSupplier(d: ShopData, supplierId: String, today: String, orders: List<PurchaseOrderDto> = emptyList()): List<View> =
-    all(d, today, orders.filter { it.supplierId == supplierId }).filter { it.supplierId == supplierId }
+    buildViews(Ctx(d, today), orders, supplierId)
 
   fun orderKey(orderId: String): String = "po:$orderId"
 
@@ -187,9 +195,9 @@ object PurchaseViews {
       val total = kotlin.math.abs(p.totalAmount)
       val cost = if (inUnit != null && qty > 0) total / qty else p.purchasePrice
       return Line(
-        productId = p.productId, name = product?.name.orEmpty(), code = code(product),
+        productId = p.productId, name = product?.name.orEmpty(), code = p.barcode ?: code(product),
         qty = qty, unit = inUnit ?: p.unit, unitCost = cost, total = sign * total, ordered = qty, received = qty,
-        batch = e?.batch.orEmpty(), expiry = e?.expiryDate.orEmpty(), purchaseId = p.id,
+        batch = e?.batch.orEmpty(), expiry = e?.expiryDate.orEmpty(), purchaseId = p.id, production = e?.productionDate.orEmpty(),
         baseQty = if (inUnit != null) kotlin.math.abs(p.quantity) else null, baseUnit = if (inUnit != null) p.unit else "",
         fxUnit = if (SupplierFx.cur(p.currency) != null) p.fxPriceMinor else null,
         fxTotal = if (SupplierFx.cur(p.currency) != null) p.fxTotalMinor else null,

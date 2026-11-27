@@ -291,15 +291,17 @@ val MoneyModule = AppModule(
         supplierArg = args.query("supplier"),
         onBack = { back() },
         onNewProduct = { nav.open(ProductsPaths.new()) },
+        onCategory = { selected, done -> nav.openForResult(ProductsPaths.categories(pick = true, selected = selected), done) },
         //  PUR-05: همان فاکتورِ چندردیفهٔ کامپیوتر (`DeskPurchasing`)، با هزینهٔ جانبی (PUR-06) و سررسید (PUR-07)
         onSaveMany = { supplierId, lines, paid, date, notes, extras ->
-          MoneyWriter.purchase(
-            store, toasts, context,
-            data,
-            //  PUR-11: ارز و نرخِ فاکتور و پرداختِ هنگامِ خرید به همان ارز (`extras.fx`؛ افغانی ⇒ null و ۰، همان پیشین)
-            ir.vil3ntec.tohid.data.PurchaseBook.record(data, supplierId, lines, paid, date, notes, todayIso(), System.currentTimeMillis(), ::moneyId, landedTotal = extras.landedTotal, dueDate = extras.dueDate, key = saveKey, fx = extras.fx, fxPaid = extras.fxPaid),
-            StrMoney.purchaseSaved,
-          ) != null
+          val today = todayIso()
+          val now = System.currentTimeMillis()
+          MoneyWriter.recordPurchase(store, toasts, context) { latest ->
+            ir.vil3ntec.tohid.data.PurchaseBook.record(
+              latest, supplierId, lines, paid, date, notes, today, now, ::moneyId,
+              landedTotal = extras.landedTotal, dueDate = extras.dueDate, key = saveKey, fx = extras.fx, fxPaid = extras.fxPaid,
+            )
+          }
         },
         //  همان شرطِ کامپیوتر (`DeskPurchasing.stockOn`)
         extrasOn = remember(data.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(data) },

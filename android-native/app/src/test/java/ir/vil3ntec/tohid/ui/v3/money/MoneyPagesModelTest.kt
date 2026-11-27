@@ -160,10 +160,10 @@ class MoneyPagesModelTest {
     assertEquals(one, PurchaseFormModel.removeRow(f, 0))
     assertEquals(f, PurchaseFormModel.removeRow(f, 5))
     assertEquals(f, PurchaseFormModel.setRow(f, 5, PurchaseRow()))
-    //  سقفِ ردیف‌ها (ردیفِ نخست هم شمرده می‌شود)
+    //  افزودن ردیف‌ها بالای سقف قدیمی
     var big = one
-    repeat(PurchaseFormModel.MAX_ROWS + 5) { big = PurchaseFormModel.addRow(big) }
-    assertEquals(PurchaseFormModel.MAX_ROWS - 1, big.more.size)
+    repeat(55) { big = PurchaseFormModel.addRow(big) }
+    assertEquals(55, big.more.size)
     //  ثبت: همان فاکتورِ چندردیفهٔ کامپیوتر با یک شماره و پرداختِ پخش‌شده به ترتیب
     val lines = PurchaseFormModel.lines(f) { id -> if (id == p.id) "کیلو" else "" }
     assertEquals(listOf(p.id, p.id), lines.map { it.productId })
@@ -194,7 +194,7 @@ class MoneyPagesModelTest {
     //  e-rows-63b (تغییرِ عمدی): هر خرید، تک‌ردیفه هم، `onSaveMany` ⇒ `PurchaseBook.record` (فاکتورِ شماره‌دار، «پرداخت» ِ همان
     //  خرید)؛ راهِ تک‌ردیفهٔ `onSave` دیگر نیست — اثرها همان `addPurchase` ِ هر ردیف
     assertFalse(src.contains("onSave("))
-    assertTrue(src.contains("PurchaseFormModel.paid(form), form.date, form.notes.trim(), PurchaseFormModel.extras(form, extrasOn),\n        ) -> onBack()"))
+    assertTrue(src.contains("PurchaseFormModel.paid(snapshot), snapshot.date, snapshot.notes.trim(), PurchaseFormModel.extras(snapshot, extrasOn),\n        ) -> onBack()"))
     val routes = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
       .map { java.io.File(it, "ir/vil3ntec/tohid/ui/v3/money/MoneyRoutes.kt") }.first { it.isFile }.readText()
     //  PUR-05 (دورِ ۳۱): همان فراخوانی با کلیدِ همین فرم — دو لمسِ «ثبت» یک فاکتور است؛ تک‌ردیفه هم با شناسه‌های همان کلید
@@ -260,8 +260,8 @@ class MoneyPagesModelTest {
     assertTrue(screen.contains(".let { f -> if ((v.size - 8) % 4 == 2) f.copy(landed = v[v.size - 2], due = v[v.size - 1]) else f }"))
     //  e-rows-63b: هزینهٔ جانبی همچنان فقط با موتورِ تازه، و نه برای کالای نرسیده (بها با «دریافتِ کالا»)؛ سررسید با «بخشی/بعداً»
     //  همه‌جا (`PurchaseFormModel.dueShown`، `PurchasesModelTest`)
-    assertTrue(screen.indexOf("if (extrasOn && !form.later) {") in 0 until screen.indexOf("label = StrPurchasePages.landedAfn"))
-    assertTrue(screen.contains("PurchaseFormModel.paid(form), form.date, form.notes.trim(), PurchaseFormModel.extras(form, extrasOn),"))
+    assertTrue(screen.indexOf("if (extrasOn && !form.later &&") in 0 until screen.indexOf("label = StrPurchasePages.landedAfn"))
+    assertTrue(screen.contains("PurchaseFormModel.paid(snapshot), snapshot.date, snapshot.notes.trim(), PurchaseFormModel.extras(snapshot, extrasOn),"))
     val routes = src("ir/vil3ntec/tohid/ui/v3/money/MoneyRoutes.kt")
     assertTrue(routes.contains("extrasOn = remember(data.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(data) },"))
     //  همان شرطِ کامپیوتر

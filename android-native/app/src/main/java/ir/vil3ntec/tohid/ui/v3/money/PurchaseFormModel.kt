@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
 import ir.vil3ntec.tohid.Jalali
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseWorkflow
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseFx
 import ir.vil3ntec.tohid.core.pay.FxTill
@@ -61,7 +62,19 @@ internal data class PurchaseForm(
   val currency: String? = null,
   val rate: String = "",
   val per: Long = 1,
+  val packaging: PurchasePackaging = PurchasePackaging(),
 )
+
+internal data class PurchasePackaging(
+  val carton: Boolean = false,
+  val pieces: String = "",
+  val production: String = "",
+  val barcode: String = "",
+) {
+  fun piecesPerCarton(): Long? =
+    pieces.trim().toLongOrNull()?.takeIf { it in 1..PurchaseUnits.MAX_FACTOR_MILLI / PurchaseUnits.MILLI }
+  fun factor(): Long? = if (carton) piecesPerCarton()?.times(PurchaseUnits.MILLI) else null
+}
 
 /** «پرداخت» ِ فرمِ خرید (e-rows-63b) */
 internal enum class PurchasePay { FULL, PART, LATER }
@@ -71,6 +84,7 @@ internal data class PurchaseRow(
   val productId: String? = null, val quantity: String = "", val price: String = "", val expiry: String = "",
   /** PRD-07: همان [PurchaseForm.unitName] برای این ردیف */
   val unitName: String? = null,
+  val packaging: PurchasePackaging = PurchasePackaging(),
 )
 
 /**
@@ -83,12 +97,12 @@ internal object PurchaseFormModel {
   fun initial(supplierId: String?, today: String) =
     PurchaseForm(supplierId = supplierId?.takeIf { it.isNotBlank() }, date = today, pay = PurchasePay.FULL)
 
-  private fun num(text: String): Double? = text.trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()
+  private fun num(text: String): Double? = text.trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()?.takeIf { it.isFinite() }
 
-  /** سقفِ ردیف‌های یک فاکتورِ گوشی (ردیفِ نخست هم شمرده می‌شود) */
-  const val MAX_ROWS = 50
-
-  private fun rowTotal(quantity: String, price: String): Double = Math.round((num(quantity) ?: 0.0) * (num(price) ?: 0.0)).toDouble()
+  private fun rowTotal(row: PurchaseRow): Double = PurchaseBook.lineTotal(PurchaseBook.Line(
+    productId = row.productId.orEmpty(), quantity = num(row.quantity) ?: 0.0, price = num(row.price) ?: 0.0,
+    factorMilli = row.packaging.factor(),
+  ))
 
   /**
    *  جمعِ خرید = جمعِ مقدار × قیمتِ هر ردیف، هر ردیف گردشده مثلِ موتور (`PurchaseBook.lineTotal`)؛ تک‌ردیفه همان امروز.
@@ -96,7 +110,7 @@ internal object PurchaseFormModel {
    */
   fun total(f: PurchaseForm): Double =
     if (f.currency != null) (fxDoc(f)?.afnTotal ?: 0L) / 100.0
-    else rowTotal(f.quantity, f.price) + f.more.sumOf { rowTotal(it.quantity, it.price) }
+    else rowTotal(first(f)) + f.more.sumOf(::rowTotal)
 
   /* ── PUR-11: ارز و نرخِ فاکتور ──────────────────────────────────── */
 
@@ -176,8 +190,8 @@ internal object PurchaseFormModel {
   /** سررسیدِ پیش‌نویس برای موتور: ندارد یا نادرست ⇒ null (نادرست پیش‌تر خطای درجا دارد) */
   private fun dueOrNull(f: PurchaseForm): String? = dueIso(f)?.ifEmpty { null }
 
-  /** ردیفِ تازهٔ خالی؛ پس از سقف همان فرم */
-  fun addRow(f: PurchaseForm): PurchaseForm = if (f.more.size + 1 >= MAX_ROWS) f else f.copy(more = f.more + PurchaseRow())
+  /** افزودن یک ردیف خالی به خرید */
+  fun addRow(f: PurchaseForm): PurchaseForm = f.copy(more = f.more + PurchaseRow())
 
   fun removeRow(f: PurchaseForm, index: Int): PurchaseForm =
     if (index !in f.more.indices) f else f.copy(more = f.more.filterIndexed { i, _ -> i != index })
@@ -193,7 +207,7 @@ internal object PurchaseFormModel {
 
   /**
    *  PUR-12/AI-10: ردیف‌های **تأییدشدهٔ** «از عکسِ فاکتور» ⇒ ردیف‌های همین فرم: ردیفِ نخستِ خالی، سپس ردیف‌های خالیِ افزوده،
-   *  سپس ردیفِ تازه تا [MAX_ROWS]؛ مقدار به واحدِ پایه (`unitName = null`) و فی همان که کاربر تأیید کرد. ثبت هنوز همان «ثبت» ِ فرم
+   *  سپس ردیفِ تازه؛ مقدار به واحدِ پایه (`unitName = null`) و فی همان که کاربر تأیید کرد. ثبت هنوز همان «ثبت» ِ فرم
    *  است (`PurchaseBook.record`). ⇒ (فرم، شمارِ افزوده)؛ کالای نبودِ دفتر کنار می‌رود.
    */
   fun withAccepted(f: PurchaseForm, rows: List<ir.vil3ntec.tohid.core.purchase.InvoiceOcr.Accepted>, d: ShopData): Pair<PurchaseForm, Int> {
@@ -209,7 +223,6 @@ internal object PurchaseFormModel {
       out = when {
         blank(first(out)) -> withFirst(out, r.copy(expiry = out.expiry))
         empty >= 0 -> setRow(out, empty, r)
-        out.more.size + 1 >= MAX_ROWS -> break
         else -> out.copy(more = out.more + r)
       }
       added++
@@ -253,10 +266,10 @@ internal object PurchaseFormModel {
   /* ── PRD-07: واحدِ خریدِ ردیف ──────────────────────────────────────── */
 
   /** ردیفِ نخست به شکلِ یک ردیف (و برگشت) — تا هر کارِ ردیف یک بار نوشته شود */
-  private fun first(f: PurchaseForm) = PurchaseRow(f.productId, f.quantity, f.price, f.expiry, f.unitName)
+  fun first(f: PurchaseForm) = PurchaseRow(f.productId, f.quantity, f.price, f.expiry, f.unitName, f.packaging)
 
-  private fun withFirst(f: PurchaseForm, r: PurchaseRow) =
-    f.copy(productId = r.productId, quantity = r.quantity, price = r.price, expiry = r.expiry, unitName = r.unitName)
+  fun withFirst(f: PurchaseForm, r: PurchaseRow) =
+    f.copy(productId = r.productId, quantity = r.quantity, price = r.price, expiry = r.expiry, unitName = r.unitName, packaging = r.packaging)
 
   private fun row(f: PurchaseForm, index: Int): PurchaseRow? = if (index < 0) first(f) else f.more.getOrNull(index)
 
@@ -267,10 +280,10 @@ internal object PurchaseFormModel {
    *  PUR-11: فاکتورِ ارزی ([fx]) قیمتِ افغانیِ کالا را پیش‌پُر نمی‌کند (افغانی دالر خوانده نشود).
    */
   private fun picked(r: PurchaseRow, p: Product, unit: String?, fx: Boolean = false): PurchaseRow {
-    val price = if (!fx && r.price.isBlank() && p.purchasePrice > 0) priceText(p.purchasePrice).let { base ->
+    val price = if (!fx && !r.packaging.carton && r.price.isBlank() && p.purchasePrice > 0) priceText(p.purchasePrice).let { base ->
       if (unit == null) base else PoForms.repriced(p, base, null, unit) ?: base
     } else r.price
-    return r.copy(productId = p.id, price = price, unitName = unit)
+    return r.copy(productId = p.id, price = price, unitName = unit.takeUnless { r.packaging.carton })
   }
 
   /** واحدِ پیش‌فرضِ همین تأمین‌کننده (`PurchaseUnits.defaultFor`)؛ پرچمِ خاموش ⇒ همیشه واحدِ پایه */
@@ -342,8 +355,6 @@ internal object PurchaseFormModel {
     /** [unit] نامِ واحدِ خریدی که بارکدش خوانده شد؛ بارکدِ خودِ کالا ⇒ null */
     data class Added(val form: PurchaseForm, val name: String, val unit: String?) : Scan
     data class Unknown(val code: String) : Scan
-    /** کالای تازه و فاکتور به [MAX_ROWS] رسیده */
-    data object Full : Scan
   }
 
   private fun sameUnit(a: String?, b: String?): Boolean =
@@ -364,15 +375,15 @@ internal object PurchaseFormModel {
     val p = d.products.find { it.id == pid } ?: return Scan.Unknown(code)
     val unit = hit?.unit?.name ?: defaultUnit(p, f.supplierId, units != null)
     val rows = listOf(first(f)) + f.more
-    val same = rows.indexOfFirst { it.productId == p.id && sameUnit(it.unitName, unit) }
+    val same = rows.indexOfFirst { it.productId == p.id && sameUnit(it.unitName, unit) && !it.packaging.carton }
     val at = when {
       same >= 0 -> same - 1
       f.productId == null -> -1
       else -> f.more.indexOfFirst { it.productId == null }.takeIf { it >= 0 }
-        ?: (if (f.more.size + 1 >= MAX_ROWS) return Scan.Full else f.more.size)
+        ?: f.more.size
     }
     val base = if (at >= f.more.size) addRow(f) else f
-    val r = row(base, at) ?: return Scan.Full
+    val r = row(base, at) ?: return Scan.Unknown(code)
     val next = if (same >= 0) r.copy(quantity = plusOne(r.quantity)) else picked(r, p, unit, f.currency != null).copy(quantity = r.quantity.ifBlank { "1" })
     return Scan.Added(put(base, at, next), p.name, hit?.unit?.name)
   }
@@ -382,8 +393,10 @@ internal object PurchaseFormModel {
     val product: String? = null, val quantity: String? = null, val price: String? = null, val expiry: String? = null,
     /** PRD-07 */
     val unit: String? = null,
+    val packaging: String? = null,
+    val production: String? = null,
   ) {
-    val any: Boolean get() = listOf(product, quantity, price, expiry, unit).any { it != null }
+    val any: Boolean get() = listOf(product, quantity, price, expiry, unit, packaging, production).any { it != null }
   }
 
   data class Errors(
@@ -402,8 +415,10 @@ internal object PurchaseFormModel {
     val unit: String? = null,
     /** PUR-11: نرخِ فاکتورِ ارزی */
     val rate: String? = null,
+    val packaging: String? = null,
+    val production: String? = null,
   ) {
-    val any: Boolean get() = listOf(supplier, product, quantity, price, paid, expiry, landed, due, unit, rate).any { it != null } || rows.any { it.any }
+    val any: Boolean get() = listOf(supplier, product, quantity, price, paid, expiry, landed, due, unit, rate, packaging, production).any { it != null } || rows.any { it.any }
   }
 
   private fun quantityError(text: String): String? = num(text).let { if (it == null || it <= 0) StrMoney.invalidNumber else null }
@@ -423,6 +438,21 @@ internal object PurchaseFormModel {
 
   private fun expiryError(text: String): String? = if (expiryIso(text) == null) StrStock.errExpiry else null
 
+  private fun packagingError(row: PurchaseRow): String? {
+    if (!row.packaging.carton) return null
+    val pieces = row.packaging.piecesPerCarton()
+    val cartons = row.quantity.trim().toLongOrNull()
+    return if (pieces == null || cartons == null || cartons <= 0 || cartons > Long.MAX_VALUE / 1000 / pieces)
+      StrPurchaseWorkflow.cartonInvalid else null
+  }
+
+  private fun productionError(row: PurchaseRow, later: Boolean): String? = when {
+    !later && expiryIso(row.packaging.production) == null -> StrStock.errExpiry
+    !later && expiryIso(row.packaging.production).orEmpty().isNotEmpty() &&
+      expiryIso(row.expiry).orEmpty().isNotEmpty() && expiryIso(row.packaging.production).orEmpty() > expiryIso(row.expiry).orEmpty() -> StrPurchaseWorkflow.dateOrder
+    else -> null
+  }
+
   /** خطای درجای هر کادر — همان شرط‌های موتور، پیش از زدن؛ [d] (PRD-07) برای سنجشِ واحدِ خریدِ ردیف‌ها */
   fun errors(f: PurchaseForm, d: ShopData? = null): Errors = Errors(
     supplier = if (f.supplierId == null) StrMoney.pickSupplier else null,
@@ -435,11 +465,15 @@ internal object PurchaseFormModel {
         product = if (r.productId == null) StrMoney.pickItem else null,
         quantity = quantityError(r.quantity),
         price = priceError(r.price, f.currency),
-        expiry = expiryError(r.expiry),
+        expiry = if (f.later) null else expiryError(r.expiry),
+        packaging = packagingError(r),
+        production = productionError(r, f.later),
         unit = unitError(d, r.productId, r.unitName, r.quantity, r.price, f),
       )
     },
-    expiry = expiryError(f.expiry),
+    expiry = if (f.later) null else expiryError(f.expiry),
+    packaging = packagingError(first(f)),
+    production = productionError(first(f), f.later),
     landed = if (landedTotal(f) == null) StrPurchasePages.landedBad else null,
     //  همان دو شرطِ موتور (`PurchaseBook.record`/`LedgerEngine.addPurchase`): تاریخِ درست و نه پیش از تاریخِ خرید
     due = when (val iso = dueIso(f)) {
@@ -495,7 +529,11 @@ internal object PurchaseFormModel {
       val id = r.productId.orEmpty()
       PurchaseBook.Line(
         productId = id, quantity = num(r.quantity) ?: 0.0, price = if (f.currency != null) 0.0 else num(r.price) ?: -1.0, unit = unitOf(id),
-        expiryDate = expiryIso(r.expiry).orEmpty(), unitName = unitOrNull(r.unitName),
+        expiryDate = expiryIso(r.expiry).orEmpty(),
+        unitName = if (r.packaging.carton) StrPurchaseWorkflow.carton else unitOrNull(r.unitName),
+        factorMilli = r.packaging.factor(),
+        productionDate = expiryIso(r.packaging.production).orEmpty(),
+        barcode = r.packaging.barcode.trim().take(128).ifEmpty { null },
         //  PUR-11: فیِ ردیف به واحدِ کوچکِ ارزِ فاکتور
         fxPrice = f.currency?.let { code -> fxMinor(r.price, code) ?: -1L },
       )
@@ -515,6 +553,6 @@ internal object PurchaseFormModel {
   fun orderRows(f: PurchaseForm, d: ShopData): List<PoForms.EditRow> =
     (listOf(first(f)) + f.more).mapIndexed { i, r ->
       val p = d.products.find { it.id == r.productId }
-      PoForms.EditRow(i, r.productId.orEmpty(), p?.name.orEmpty(), p?.unit.orEmpty(), r.quantity.trim(), r.price.trim(), unitOrNull(r.unitName))
+      PoForms.EditRow(i, r.productId.orEmpty(), p?.name.orEmpty(), p?.unit.orEmpty(), r.quantity.trim(), r.price.trim(), if (r.packaging.carton) StrPurchaseWorkflow.carton else unitOrNull(r.unitName), r.packaging.factor())
     }
 }
