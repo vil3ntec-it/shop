@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.desktop
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.hasText
@@ -55,7 +56,8 @@ class PurchasesRoutesUiTest {
   private val ctx = DesktopContext
 
   /** دفترِ روی دیسک (همان راهِ `ExchangeGuardsPhoneUiTest`) — برای آزمونی که صفحه در دفتر می‌نویسد */
-  private fun disk(): ShopStore = ShopStore(ctx).also { s -> runBlocking { s.load(); assertTrue(s.replaceAll(data)) } }
+  private fun disk(seed: ir.vil3ntec.tohid.data.ShopData = data): ShopStore =
+    ShopStore(ctx).also { s -> runBlocking { s.load(); assertTrue(s.replaceAll(seed)) } }
 
   private fun clean() {
     ctx.filesDir.listFiles().orEmpty().filter { it.name.startsWith("shop-data.json") }.forEach { it.deleteRecursively() }
@@ -214,9 +216,13 @@ class PurchasesRoutesUiTest {
   }
 
   @Test fun unpaidNewCartonPurchaseIsBilledNowAndReceivedFromItsDetails() {
-    val store = disk()
+    val category = "نوشیدنی"
+    val store = disk(data.copy(productCategories = listOf(category)))
     h.show(MoneyPaths.newPurchase(PurchaseDemo.PAMIR), store)
     h.await(StrPurchaseWorkflow.loose)
+    rule.onNode(hasContentDescription("${StrProducts.category}: ${StrProducts.pickCategory}"))
+      .performSemanticsAction(SemanticsActions.OnClick)
+    h.click(category)
     h.click(StrPurchaseWorkflow.loose)
     h.await(StrPurchaseWorkflow.carton)
     h.type(StrProducts.name, "چای کوهی")
@@ -242,10 +248,13 @@ class PurchasesRoutesUiTest {
     assertEquals(6000.0, purchase.debt, 0.0)
     assertEquals(0.0, ShopStore.stock(recorded, product.id), 0.0)
     assertEquals(30.0, product.salePrice, 0.0)
-    val view = PurchaseViews.all(recorded, today).single { it.awaitingDelivery }
+    assertEquals(category, product.category)
+    assertTrue(PurchaseViews.all(recorded, today).single { it.awaitingDelivery }.lines.any { it.productId == product.id })
     assertEquals(listOf("9504000370640"), product.barcodes)
 
-    h.show(MoneyPaths.purchase(view.key) + "?receive=1", store)
+    h.await(StrPurchases.tabPurchases)
+    h.await(StrPurchaseWorkflow.confirmDelivery)
+    h.click(StrPurchaseWorkflow.confirmDelivery)
     h.await(StrPurchaseWorkflow.postDelivery)
     h.click(StrPurchaseWorkflow.postDelivery)
     h.awaitThat { ShopStore.stock(store.data.value, product.id) == 250.0 }
