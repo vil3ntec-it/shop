@@ -203,9 +203,9 @@ class MoneyPagesModelTest {
     assertTrue(routes.contains("MoneyWriter.recordPurchase(store, toasts, context) { latest ->"))
     assertTrue(routes.contains("latest, supplierId, lines, paid, date, notes, today, now, ::moneyId,"))
     assertTrue(routes.contains("landedTotal = extras.landedTotal, dueDate = extras.dueDate, key = saveKey, fx = extras.fx, fxPaid = extras.fxPaid,"))
-    //  e-rows-63b (تغییرِ عمدی): راهِ تک‌ردیفهٔ `addPurchase` ِ مسیر رفت — همان کلید فقط به `PurchaseBook.record` و سفارشِ نرسیده می‌رود
+    //  Both outcomes use the same transaction and keep the original invoice key.
     assertFalse(routes.contains("LedgerEngine.addPurchase(data, draft"))
-    assertTrue(routes.contains("onSaveLater = rememberSaveLater(saveKey),"))
+    assertTrue(routes.contains("awaitDelivery = extras.awaitDelivery,"))
     assertTrue(routes.contains("val saveKey = remember { moneyId() }"))
   }
 
@@ -254,15 +254,14 @@ class MoneyPagesModelTest {
   }
 
   @Test
-  fun `فرمِ خرید — هزینهٔ جانبی و سررسید فقط با موتورِ تازه دیده می‌شوند و با چرخشِ صفحه نمی‌روند`() {
+  fun `فرمِ خرید — هزینهٔ جانبی با موتورِ تازه دیده می‌شود و با چرخشِ صفحه نمی‌رود`() {
     fun src(rel: String) = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
       .map { java.io.File(it, rel) }.first { it.isFile }.readText()
     val screen = src("ir/vil3ntec/tohid/ui/v3/money/PurchaseFormScreen.kt")
     assertTrue(screen.contains("+ listOf(it.landed, it.due) }"))
     assertTrue(screen.contains(".let { f -> if ((v.size - 8) % 4 == 2) f.copy(landed = v[v.size - 2], due = v[v.size - 1]) else f }"))
-    //  e-rows-63b: هزینهٔ جانبی همچنان فقط با موتورِ تازه، و نه برای کالای نرسیده (بها با «دریافتِ کالا»)؛ سررسید با «بخشی/بعداً»
-    //  همه‌جا (`PurchaseFormModel.dueShown`، `PurchasesModelTest`)
-    assertTrue(screen.indexOf("if (extrasOn && !form.later &&") in 0 until screen.indexOf("label = StrPurchasePages.landedAfn"))
+    //  Delivery may be deferred, but the expense belongs to the same invoice.
+    assertTrue(screen.substringAfter("if (deliverySettings)").substringBefore("label = StrPurchasePages.landedAfn").contains("if (extrasOn)"))
     assertTrue(screen.contains("PurchaseFormModel.paid(snapshot), snapshot.date, snapshot.notes.trim(), PurchaseFormModel.extras(snapshot, extrasOn),"))
     val routes = src("ir/vil3ntec/tohid/ui/v3/money/MoneyRoutes.kt")
     assertTrue(routes.contains("extrasOn = remember(data.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(data) },"))

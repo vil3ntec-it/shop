@@ -83,7 +83,7 @@ class PurchaseFxUiTest {
   @Test fun phoneFormHasNoCurrencyPickerWhileTheShopSwitchIsOff() {
     assertFalse(PurchaseFxPref.on(ctx))
     h.show(MoneyPaths.newPurchase("dubai"), disk())
-    h.await(StrMoney.pickItem)
+    h.await(StrPurchaseWorkflow.findProduct)
     assertFalse(h.has(StrSafeCur.currency))
     assertFalse(h.has(StrPurchaseFx.section))
   }
@@ -104,7 +104,7 @@ class PurchaseFxUiTest {
     h.click(StrFx.usd)
     h.await(StrPurchaseFx.section)
     replace(StrPurchaseFx.rateLabel("1", "USD"), "70")
-    h.click(StrMoney.pickItem)
+    h.click(StrPurchaseWorkflow.findProduct)
     h.await("چای سبز")
     h.click("چای سبز")
     h.type(StrMoney.quantity, "10")

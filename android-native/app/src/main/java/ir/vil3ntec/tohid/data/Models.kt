@@ -767,6 +767,17 @@ data class Purchase(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val fxTotalMinor: Long? = null,
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val fxPaidMinor: Long? = null,
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val barcode: String? = null,
+  /** A billed line awaiting physical delivery. Its linked warehouse entry records receipt. */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val delivery: PurchaseDelivery? = null,
+)
+
+@Serializable
+data class PurchaseDelivery(
+  val invoiceId: String,
+  val expiryDate: String = "",
+  val productionDate: String = "",
+  val locationId: String? = null,
+  val userId: String? = null,
 )
 
 @Serializable
@@ -784,6 +795,7 @@ data class SupplierPayment(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val fxPer: Long? = null,
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val fxDiffMinor: Long? = null,
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val afnPaidMinor: Long? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val purchaseInvoiceId: String? = null,
 )
 
 @Serializable

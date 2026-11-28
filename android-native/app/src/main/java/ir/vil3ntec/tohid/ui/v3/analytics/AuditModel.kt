@@ -18,7 +18,7 @@ import ir.vil3ntec.tohid.ui.v3.stock.StockPaths
 object AuditModel {
   /** همهٔ نوع‌ها به ترتیبِ برگهٔ «نوعِ رویداد» (همان AUDIT_TYPE_LABELS ِ وب) */
   val KINDS = listOf(
-    "sale", "cancel_sale", "return", "purchase", "customer_payment", "supplier_payment", "stock_adjustment",
+    "sale", "cancel_sale", "return", "purchase", "purchase_received", "customer_payment", "supplier_payment", "stock_adjustment",
     "supplier_return", "price_change", "product_edit", "shift_open", "shift_close", "delete_product",
     "debtor_delete", "debt_tx_delete", "expense_delete", "delete_entry", "data_export", "debt_due_set",
     "credit_over_limit", "credit_limit_set", "debt_tx_reverse",
@@ -75,6 +75,8 @@ object AuditModel {
       "customer_payment", "credit_over_limit", "credit_limit_set", "debt_tx_delete", "debt_tx_reverse", "customer_view" -> debtor()
       "debt_due_set" -> d.transactions.firstOrNull { it.id == ref }?.let { debtor(it.debtorId) }
       "purchase" -> d.purchases.firstOrNull { it.id == ref }?.let { supplier(it.supplierId) }
+      "purchase_received" -> ir.vil3ntec.tohid.data.PurchaseBook.invoices(d)
+        .firstOrNull { invoice -> invoice.lines.any { it.id == ref } }?.let { MoneyPaths.purchase(it.key) }
       "supplier_payment" -> d.supplierPayments.firstOrNull { it.id == ref }?.let { supplier(it.supplierId) }
       "stock_adjustment", "supplier_return" ->
         d.warehouseEntries.firstOrNull { it.id == ref }?.productId?.takeIf { id -> d.products.any { it.id == id } }?.let { StockPaths.item(it) }

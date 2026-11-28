@@ -115,22 +115,22 @@ class PurchasesModelTest {
     assertNull(PurchaseFormModel.extras(legacy, on = false).dueDate)
   }
 
-  @Test fun `الان رسیده نه — بی سررسید و هزینهٔ جانبی، و ردیف‌های سفارشِ خرید همان ردیف‌های فرم`() {
-    var f = PurchaseFormModel.initial("s1", today).copy(productId = "p0", quantity = "4", price = "250", due = "1405/09/10", landed = "50")
-    f = PurchaseFormModel.addRow(f)
-    f = PurchaseFormModel.setRow(f, 0, f.more[0].copy(productId = "p1", quantity = "2", price = "90"))
-    f = PurchaseFormModel.setLater(f, true)
-    assertTrue(f.later)
-    assertEquals("", f.due)
-    assertEquals("", f.landed)
-    assertFalse(PurchaseFormModel.dueShown(PurchaseFormModel.setPay(f, PurchasePay.LATER), extrasOn = true))
-    val rows = PurchaseFormModel.orderRows(f, d0)
-    assertEquals(listOf("p0", "p1"), rows.map { it.productId })
-    assertEquals(listOf("4", "2"), rows.map { it.qty })
-    assertEquals(listOf("250", "90"), rows.map { it.price })
-    assertEquals(listOf("آرد", "روغن"), rows.map { it.name })
-    //  پیش‌پرداختِ کامل = جمعِ سفارش
-    assertEquals(1180.0, PurchaseFormModel.paid(f), 0.0)
-    assertFalse(PurchaseFormModel.setLater(f, false).later)
+  @Test fun deferredDeliveryRetainsCostsDueDatesAndEveryLine() {
+    val form = PurchaseFormModel.initial("s1", today).copy(
+      productId = "p0", quantity = "4", price = "250", due = "1405/09/10", landed = "50", later = true,
+      expiry = "2027-02-01", packaging = PurchasePackaging(production = "2026-10-01"),
+      more = listOf(PurchaseRow(productId = "p1", quantity = "2", price = "90")),
+    )
+    val credit = PurchaseFormModel.setPay(form, PurchasePay.LATER)
+    val extras = PurchaseFormModel.extras(credit, on = true)
+    assertTrue(extras.awaitDelivery)
+    assertEquals(50.0, extras.landedTotal, 0.0)
+    assertEquals(PurchaseFormModel.dueIso(form), extras.dueDate)
+    val lines = PurchaseFormModel.lines(credit) { "عدد" }
+    assertEquals(listOf("p0", "p1"), lines.map { it.productId })
+    assertEquals(listOf(4.0, 2.0), lines.map { it.quantity })
+    assertEquals("2027-02-01", lines.first().expiryDate)
+    assertEquals("2026-10-01", lines.first().productionDate)
+    assertEquals(1180.0, PurchaseFormModel.remaining(credit), 0.0)
   }
 }

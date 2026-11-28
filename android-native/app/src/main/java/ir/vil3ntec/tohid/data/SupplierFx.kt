@@ -131,6 +131,7 @@ object SupplierFx {
     now: Long,
     newId: () -> String,
     key: String? = null,
+    purchaseInvoiceId: String? = null,
   ): LedgerEngine.Result {
     val k = key?.trim()?.ifEmpty { null }
     if (k != null && d.supplierPayments.any { it.id == k }) return LedgerEngine.Result.Failed(LedgerEngine.ALREADY_PAID)
@@ -159,6 +160,7 @@ object SupplierFx {
           fxPer = rate.per,
           fxDiffMinor = s.diff.takeIf { it != 0L },
           afnPaidMinor = s.afnPaid,
+          purchaseInvoiceId = purchaseInvoiceId,
         ),
         auditLog = d.auditLog + AuditEntry(
           id = if (k != null) "$k-a" else newId(),

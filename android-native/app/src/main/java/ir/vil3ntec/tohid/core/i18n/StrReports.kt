@@ -190,6 +190,7 @@ object StrReports {
     "cancel_sale" -> t("لغو فروش", "Sale cancelled", "پلور لغوه شو")
     "return" -> t("مرجوعی", "Return", "بېرته راګرځول")
     "purchase" -> t("ثبت خرید", "Purchase recorded", "پېرود ثبت شو")
+    "purchase_received" -> StrPurchaseWorkflow.postDelivery
     "customer_payment" -> t("پرداخت مشتری", "Customer payment", "د پېرودونکي ورکړه")
     "supplier_payment" -> t("پرداخت تأمین‌کننده", "Supplier payment", "عرضه‌کوونکي ته ورکړه")
     "stock_adjustment" -> t("اصلاح موجودی", "Stock adjustment", "د موجودۍ سمون")

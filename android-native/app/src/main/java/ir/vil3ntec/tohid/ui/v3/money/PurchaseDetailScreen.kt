@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseWorkflow
 import ir.vil3ntec.tohid.core.i18n.StrPurchases
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseFx
 import ir.vil3ntec.tohid.core.i18n.StrReach
@@ -67,6 +68,7 @@ internal class PurchaseDetailActions(
   /** «برگشت به تأمین‌کننده» (سندِ کسر، PUR-08) */
   val onReturn: (String) -> Unit,
   val onPrint: (PurchaseViews.View) -> Unit,
+  val onDelivery: (() -> Unit)? = null,
 )
 
 /** متن‌های آمادهٔ یک ردیفِ جزئیات (خالص): «۲ کارتن × ۱٬۲۰۰ ؋ (۴۸ دانه)» و «بارکد … · سری … · انقضا …» */
@@ -94,6 +96,7 @@ internal object PurchaseLineText {
   /** رسیدنِ ردیف: خریدِ دفتر «رسیده»؛ سفارش «رسیده ۲ از ۵» (کمتر از سفارش ⇒ کهربایی) */
   fun receipt(v: PurchaseViews.View, l: PurchaseViews.Line): V3RowStatus? = when {
     v.kind == PurchaseViews.Kind.RETURN -> null
+    !v.isOrder && l.received < l.ordered -> V3RowStatus(StrPurchaseWorkflow.inTransit, V3RowTone.ATTENTION)
     !v.isOrder -> V3RowStatus(StrPurchases.received)
     else -> V3RowStatus(
       StrPurchases.receivedOf(ir.vil3ntec.tohid.qty(l.received), ir.vil3ntec.tohid.qty(l.ordered)),
@@ -108,7 +111,7 @@ internal object PurchaseLineText {
  *  «دریافتِ کالا» ِ سفارشِ باز، «برگشت به تأمین‌کننده»، «چاپ یا اشتراک». نوارِ چسبان ندارد؛ کارها تهِ همان صفحه‌اند.
  */
 @Composable
-internal fun PurchaseDetailScreen(v: PurchaseViews.View?, today: String, actions: PurchaseDetailActions) {
+internal fun PurchaseDetailScreen(v: PurchaseViews.View?, today: String, actions: PurchaseDetailActions, receiving: Boolean = false) {
   if (v == null) {
     V3Scaffold(title = StrPurchases.purchase, onBack = actions.onBack, largeTitle = false) { pad ->
       Column(Modifier.fillMaxSize().padding(bottom = pad.calculateBottomPadding())) { V3EmptyState(Icons.Outlined.Inventory2, StrPurchases.notFound) }
@@ -129,7 +132,7 @@ internal fun PurchaseDetailScreen(v: PurchaseViews.View?, today: String, actions
     largeTitle = false,
     overflow = listOfNotNull(
       V3MenuItem(Icons.Outlined.Print, StrPurchases.printShare) { actions.onPrint(v) }.takeIf { v.invoice != null },
-      V3MenuItem(Icons.AutoMirrored.Outlined.AssignmentReturn, StrReach.supplierReturn) { actions.onReturn(v.supplierId) }.takeIf { bill },
+      V3MenuItem(Icons.AutoMirrored.Outlined.AssignmentReturn, StrReach.supplierReturn) { actions.onReturn(v.supplierId) }.takeIf { bill && v.receipt != PurchaseViews.Receipt.PENDING },
     ),
   ) { pad ->
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
@@ -176,8 +179,9 @@ internal fun PurchaseDetailScreen(v: PurchaseViews.View?, today: String, actions
             V3Section(null) { Totals(v) }
             if (v.notes.isNotBlank()) Text(v.notes, style = V3Type.subhead, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(horizontal = 4.dp))
             if (v.isOrder) V3Message(V3Tone.INFO, StrPurchases.pendingNote)
+            if (v.awaitingDelivery) V3Message(V3Tone.INFO, StrPurchaseWorkflow.awaitingStock)
             if (v.kind == PurchaseViews.Kind.RETURN) V3Message(V3Tone.INFO, StrPurchases.returnNote)
-            DetailButtons(v, actions)
+            DetailButtons(v, actions, receiving)
           }
         }
       }
@@ -212,14 +216,16 @@ private fun Totals(v: PurchaseViews.View) {
 
 /** کارهای تهِ صفحه: کارِ اصلی (پرداخت یا دریافت) پررنگ، بقیه ثانوی — همه در همان ستون، نه نوارِ چسبان */
 @Composable
-private fun DetailButtons(v: PurchaseViews.View, actions: PurchaseDetailActions) {
+private fun DetailButtons(v: PurchaseViews.View, actions: PurchaseDetailActions, receiving: Boolean) {
   Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     val receive = actions.onReceive?.takeIf { v.isOrder && v.orderId != null }
     if (receive != null) V3Button(StrPurchasePages.receiveGoods, { receive(v.orderId!!) }, Modifier.fillMaxWidth(), icon = Icons.Outlined.MoveToInbox)
+    val delivery = actions.onDelivery?.takeIf { v.awaitingDelivery }
+    if (delivery != null) V3Button(StrPurchaseWorkflow.confirmDelivery, delivery, Modifier.fillMaxWidth(), icon = Icons.Outlined.MoveToInbox, loading = receiving)
     if (v.kind != PurchaseViews.Kind.RETURN && v.remaining > 0.5) {
       V3Button(
         StrMoney.pay, { actions.onPay(v) }, Modifier.fillMaxWidth(), icon = Icons.Outlined.Payments,
-        kind = if (receive != null) V3ButtonKind.SECONDARY else V3ButtonKind.PRIMARY,
+        kind = if (receive != null || delivery != null) V3ButtonKind.SECONDARY else V3ButtonKind.PRIMARY,
       )
     }
     val order = actions.onOrder?.takeIf { v.orderId != null }

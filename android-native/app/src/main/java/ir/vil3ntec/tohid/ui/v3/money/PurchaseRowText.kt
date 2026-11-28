@@ -62,6 +62,7 @@ internal class PurchaseRowText(
      *  نرسیده»)؛ «رسیده» ِ عادی ⇒ null.
      */
     fun rowReceipt(v: PurchaseViews.View): V3RowStatus? = when {
+      v.awaitingDelivery -> receipt(v)
       v.pay == PurchaseViews.Pay.OVERDUE && v.remaining < kotlin.math.abs(v.total) - 0.5 -> V3RowStatus(StrPurchases.leftAll(money(v.remaining)))
       else -> receipt(v)?.takeIf { v.receipt != PurchaseViews.Receipt.RECEIVED }
     }
@@ -93,6 +94,7 @@ internal class PurchaseRowText(
       v.kind == PurchaseViews.Kind.RETURN -> null
       v.receipt == PurchaseViews.Receipt.RECEIVED -> V3RowStatus(StrPurchases.received)
       v.receipt == PurchaseViews.Receipt.PARTIAL -> V3RowStatus(StrPurchases.partReceived, V3RowTone.ATTENTION)
+      v.awaitingDelivery -> V3RowStatus(ir.vil3ntec.tohid.core.i18n.StrPurchaseWorkflow.inTransit, V3RowTone.ATTENTION)
       else -> V3RowStatus(StrPurchases.notReceived, V3RowTone.ATTENTION)
     }
 

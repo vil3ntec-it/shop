@@ -49,10 +49,11 @@ internal object MoneyWriter {
     store: ShopStore,
     toasts: V3Toasts?,
     context: Context,
+    done: String = ir.vil3ntec.tohid.core.i18n.StrMoney.purchaseSaved,
     record: (ShopData) -> PurchaseBook.Result,
   ): Boolean {
     var result: PurchaseBook.Result? = null
-    val saved = store.update { latest ->
+    val saved = store.update(checkRole = true) { latest ->
       val next = record(latest)
       result = next
       (next as? PurchaseBook.Result.Ok)?.data
@@ -63,7 +64,7 @@ internal object MoneyWriter {
       return false
     }
     V3Celebrate.fire(haptic = false)
-    toasts?.show(ir.vil3ntec.tohid.core.i18n.StrMoney.purchaseSaved, V3Tone.SUCCESS)
+    toasts?.show(done, V3Tone.SUCCESS)
     Haptics.success(context)
     return true
   }

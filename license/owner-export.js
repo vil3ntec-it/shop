@@ -98,6 +98,8 @@
     saleId: 'شناسهٔ فاکتور',
     saleItemId: 'شناسهٔ قلم فاکتور',
     purchaseId: 'شناسهٔ خرید',
+    delivery: 'جزئیات دریافت خرید',
+    purchaseInvoiceId: 'شناسهٔ فاکتور خرید',
     warehouseEntryId: 'شناسهٔ ورودی انبار',
     refId: 'شناسهٔ مرجع',
     refIds: 'ردیف‌های مرتبط',
