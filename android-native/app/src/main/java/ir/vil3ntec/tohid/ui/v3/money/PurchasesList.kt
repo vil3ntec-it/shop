@@ -36,6 +36,7 @@ import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.StrHistory
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseWorkflow
 import ir.vil3ntec.tohid.core.i18n.StrPurchases
 import ir.vil3ntec.tohid.data.PurchasePeriods
 import ir.vil3ntec.tohid.data.PurchaseViews
@@ -75,7 +76,7 @@ internal fun PurchaseListRow(v: PurchaseViews.View, today: String, onOpen: () ->
       PurchaseViews.Kind.BILL -> Icons.AutoMirrored.Outlined.ReceiptLong
     },
     action = when {
-      onReceive != null -> V3RowAction(StrPurchasePages.receiveGoods, Icons.Outlined.MoveToInbox, onClick = onReceive)
+      onReceive != null -> V3RowAction(if (v.awaitingDelivery) StrPurchaseWorkflow.confirmDelivery else StrPurchasePages.receiveGoods, Icons.Outlined.MoveToInbox, onClick = onReceive)
       onPay != null -> V3RowAction(StrMoney.pay, Icons.Outlined.Payments, onClick = onPay)
       else -> null
     },
@@ -91,6 +92,7 @@ internal class PurchasesActions(
   /** «دریافتِ کالا» ِ سفارشِ باز — null ⇒ نقش اجازه ندارد یا سفارشی بار نشده */
   val onReceive: ((PurchaseViews.View) -> Unit)?,
   val onNew: () -> Unit,
+  val onDelivery: ((PurchaseViews.View) -> Unit)? = null,
 )
 
 /**
@@ -236,7 +238,11 @@ internal fun LazyListScope.purchasesContent(
         v, today,
         onOpen = { actions.onOpen(v) },
         onPay = if (v.kind != PurchaseViews.Kind.RETURN && v.remaining > 0.5) ({ actions.onPay(v) }) else null,
-        onReceive = actions.onReceive?.takeIf { v.isOrder }?.let { f -> { f(v) } },
+        onReceive = when {
+          v.awaitingDelivery -> actions.onDelivery
+          v.isOrder -> actions.onReceive
+          else -> null
+        }?.let { f -> { f(v) } },
       )
       if (!last) V3Divider(start = V3DataRowSpec.DIVIDER_START)
     }

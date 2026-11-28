@@ -608,11 +608,12 @@ class ShopStore(
    *  [transform] باید سبک و خالص باشد. `null` ⇒ چیزی برای نوشتن نبود. قفلِ نرم مثلِ [save].
    *  @return null (هیچ) · true (نوشته شد) · false (قفلِ نرم یا دیسک)
    */
-  suspend fun update(transform: (ShopData) -> ShopData?): Boolean? = withContext(Dispatchers.IO) {
+  suspend fun update(checkRole: Boolean = false, transform: (ShopData) -> ShopData?): Boolean? = withContext(Dispatchers.IO) {
     val engine = SyncV1Engine.of(context)
     synchronized(engine) {
       val cur = currentForWrite() ?: return@synchronized false
       val next = transform(cur) ?: return@synchronized null
+      if (checkRole && roleRefused(cur, next)) return@synchronized false
       if (touchesPaid(cur, next) && SoftLock.isLocked(context)) {
         SoftLock.noteBlocked()
         _blocked.tryEmit(Unit)

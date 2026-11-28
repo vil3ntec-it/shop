@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
-import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.heightIn
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
@@ -55,17 +55,17 @@ import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseFx
 import ir.vil3ntec.tohid.core.i18n.StrSafeCur
 import ir.vil3ntec.tohid.data.SafeCurrencies
-import ir.vil3ntec.tohid.data.PoForms
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.ui.v3.V3Chip
 import ir.vil3ntec.tohid.ui.v3.V3ChipRow
 import androidx.compose.material.icons.outlined.CurrencyExchange
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseUnits
+import ir.vil3ntec.tohid.core.i18n.StrProducts
 import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.core.purchase.SupplierPricing
-import ir.vil3ntec.tohid.data.LedgerEngine
 import ir.vil3ntec.tohid.data.PurchaseBook
+import ir.vil3ntec.tohid.data.PurchaseCatalog
 import ir.vil3ntec.tohid.data.PurchaseOrderBook
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.data.ShopData
@@ -78,6 +78,9 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Button
+import ir.vil3ntec.tohid.ui.v3.V3Choice
+import ir.vil3ntec.tohid.ui.v3.V3Dropdown
+import ir.vil3ntec.tohid.ui.v3.V3TextButton
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3DateField
 import ir.vil3ntec.tohid.ui.v3.V3FieldKind
@@ -90,6 +93,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.v3Shake
 
 private enum class PurchasePicker { SUPPLIER, PRODUCT, CURRENCY }
+private const val MANAGE_CATEGORIES = "\u0000"
 
 private val PurchaseFormSaver = listSaver<PurchaseForm, String>(
   //  هشت کادرِ ردیفِ نخست (با انقضا)، سپس چهارتایی‌های ردیف‌های افزوده (PUR-05)، و در پایان دوتاییِ «هزینهٔ جانبی» و
@@ -137,24 +141,35 @@ private val PurchaseFormFxSaver = listSaver<PurchaseForm, String>(
   },
 )
 
-/** Append packaging metadata with a marker so previously saved forms still restore. */
+/** Row fields from earlier versions remain readable when the activity restores a draft. */
 private val PurchaseFormPackagingSaver = listSaver<PurchaseForm, String>(
   save = { form ->
     @Suppress("UNCHECKED_CAST")
     val base = with(PurchaseFormFxSaver) { save(form) } as List<String>
-    base + (listOf(form.packaging) + form.more.map { it.packaging }).flatMap {
-      listOf(if (it.carton) "1" else "0", it.pieces, it.production, it.barcode)
-    } + listOf(base.size.toString(), "packages")
+    base + (listOf(PurchaseFormModel.first(form)) + form.more).flatMap { row ->
+      val pack = row.packaging
+      val item = row.identity
+      listOf(if (pack.carton) "1" else "0", pack.pieces, pack.production, pack.barcode, item.name, item.category, item.salePrice)
+    } + listOf(base.size.toString(), "purchase-rows")
   },
   restore = { values ->
-    if (values.lastOrNull() != "packages") PurchaseFormFxSaver.restore(values)
+    val width = when (values.lastOrNull()) {
+      "purchase-rows" -> 7
+      "packages" -> 4
+      else -> 0
+    }
+    if (width == 0) PurchaseFormFxSaver.restore(values)
     else {
       val end = values[values.size - 2].toInt()
-      val packs = values.subList(end, values.size - 2).chunked(4).map {
-        PurchasePackaging(it[0] == "1", it[1], it[2], it[3])
-      }
-      PurchaseFormFxSaver.restore(values.take(end))?.let { f ->
-        f.copy(packaging = packs.first(), more = f.more.zip(packs.drop(1)) { row, pack -> row.copy(packaging = pack) })
+      val fields = values.subList(end, values.size - 2).chunked(width)
+      PurchaseFormFxSaver.restore(values.take(end))?.let { form ->
+        val restored = (listOf(PurchaseFormModel.first(form)) + form.more).zip(fields) { row, it ->
+          row.copy(
+            packaging = PurchasePackaging(it[0] == "1", it[1], it[2], it[3]),
+            identity = if (width == 7) PurchaseIdentity(it[4], it[5], it[6]) else row.identity,
+          )
+        }
+        PurchaseFormModel.withFirst(form.copy(more = restored.drop(1)), restored.first())
       }
     }
   },
@@ -206,23 +221,12 @@ private fun ExpiryField(value: String, onValue: (String) -> Unit, error: String?
   )
 }
 
-/**
- *  «ثبت خرید» (`purchasing/new?supplier=`، صفحه): گروه‌های «تأمین‌کننده» (پیش‌پُر از حسابِ همان
- *  تأمین‌کننده)، «کالا» (انبارِ خالی ⇒ راهنما و پیوندِ «کالای تازه»)، «مقدار و قیمت» با «جمع خرید»
- *  ِ زنده، «پرداخت» (خالی یعنی نسیه) با «باقی‌مانده» ِ زنده، تاریخ و توضیحات. دکمهٔ چسبانِ «ثبت خرید»؛
- *  نوشتهٔ ذخیره‌نشده ⇒ «دور ریخته شود؟».
- *  PUR-05: «افزودنِ ردیفِ کالا» ⇒ فاکتورِ چندردیفه (کالا، مقدار و قیمتِ هر ردیف، یک پرداخت برای کل).
- *  e-rows-63b (سادهٔ صاحب‌کار): تأمین‌کننده یا کالای تازه از همان برگهٔ انتخاب، افزودن با اسکن (دوربین و بارکدخوان)، «پرداخت»
- *  با سه گزینه (کامل / بخشی / بعداً با سررسید) و «الان رسیده؟». رسیده ⇒ **همیشه** یک فاکتورِ شماره‌دار با `PurchaseBook.record`
- *  ([onSaveMany]، اثرِ هر ردیف همان `addPurchase`: انبار، حرکت، بدهی، بهای خرید)، با یک کلید برای همین فرم (دو لمس یک خرید)؛
- *  نرسیده ⇒ سفارشِ خرید ([onSaveLater]) و کالا با «دریافتِ کالا» می‌آید.
- */
+/** Shared purchase form for catalog matching, payment and physical delivery. */
 @Composable
 internal fun PurchaseFormScreen(
   d: ShopData,
   supplierArg: String?,
   onBack: () -> Unit,
-  onNewProduct: () -> Unit,
   onCategory: ((String?, (String?) -> Unit) -> Unit)? = null,
   /**
    *  PUR-05: فاکتورِ دفترِ خرید (تأمین‌کننده، ردیف‌ها، پرداخت، تاریخ، توضیح، هزینهٔ جانبی و سررسید) ⇒ `PurchaseBook.record`؛
@@ -240,10 +244,6 @@ internal fun PurchaseFormScreen(
   onNewSupplier: ((String?) -> Unit) -> Unit = {},
   /** e-rows-63b: دکمهٔ «اسکنِ بارکد» (دوربین) ⇒ همان افزودنِ ردیفِ بارکدخوان؛ null ⇒ نیست */
   onScan: (((String) -> Unit) -> Unit)? = null,
-  /** e-rows-63b: «الان رسیده؟ نه» شدنی است؟ (پرچمِ سفارشِ خرید روشن، اینترنت، نقشِ مدیر) */
-  laterOn: Boolean = false,
-  /** e-rows-63b: کالای نرسیده ⇒ سفارشِ خرید (و پیش‌پرداخت)؛ پاسخ با `true` ⇐ فرستاده شد */
-  onSaveLater: (PurchaseForm, (Boolean) -> Unit) -> Unit = { _, done -> done(false) },
   /** PUR-12/AI-10: «از عکسِ فاکتور» (`ui/screens/InvoiceOcrUi.kt`)؛ null یا پرچمِ خاموش ⇒ نه دکمه، نه برگه */
   ocr: ir.vil3ntec.tohid.ui.screens.InvoiceOcrController? = null,
   /**
@@ -282,12 +282,20 @@ internal fun PurchaseFormScreen(
   LaunchedEffect(unitsOn) { if (!unitsOn && PurchaseFormModel.hasUnits(form)) form = PurchaseFormModel.withoutUnits(form, d) }
   //  بارکدخوانِ وصل یا گوشیِ جفت‌شده تا این صفحه باز است همین‌جا (نه صندوق) — همان راهِ دریافتِ سفارشِ خرید؛ فقط با همان
   //  پرچم (خاموش ⇒ همان صفحهٔ پیشین، بی بارکدخوان)
-  val barcodes = remember(d) { ShopStore.barcodeIndex(d) }
+  val barcodes = remember(d.products) { ShopStore.barcodeIndex(d) }
+  val catalog = remember(d.products) { PurchaseCatalog.Index(d.products) }
   val unitIndex = remember(d, unitsOn) { if (unitsOn) ShopStore.purchaseUnitIndex(d) else null }
+  fun setRowBarcode(at: Int, code: String) {
+    val row = PurchaseFormModel.row(form, at) ?: return
+    form = PurchaseFormModel.put(form, at, row.copy(packaging = row.packaging.copy(barcode = code.trim().take(128))))
+  }
   val onScanCode by rememberUpdatedState<(String) -> Unit> { code ->
     when (val r = PurchaseFormModel.scan(form, d, code, barcodes, unitIndex)) {
       is PurchaseFormModel.Scan.Added -> { form = r.form; r.unit?.let { notify(V3Tone.SUCCESS, StrPurchaseUnits.scanned(r.name, it)) } }
-      is PurchaseFormModel.Scan.Unknown -> notify(V3Tone.ERROR, StrPurchasePages.barcodeUnknown(r.code))
+      is PurchaseFormModel.Scan.Unknown -> {
+        if (PurchaseCatalog.barcode(r.code) != null) setRowBarcode(expandedRow.coerceAtLeast(0) - 1, r.code)
+        else notify(V3Tone.ERROR, Workflow.invalidBarcode)
+      }
     }
   }
   var initialScanHandled by rememberSaveable(initialBarcode) { mutableStateOf(false) }
@@ -303,29 +311,15 @@ internal fun PurchaseFormScreen(
     ScanRouter.register(scanOwner) { code -> onScanCode(code); true }
     onDispose { ScanRouter.unregister(scanOwner) }
   }
-  //  کالای تازه از همین فرم (فرمِ «کالای جدید» دست نمی‌خورد): کالایی که پس از رفتن به آن فرم پیدا شد، ردیفِ همان‌جا می‌شود
-  var waitingProduct by rememberSaveable { mutableStateOf<ArrayList<String>?>(null) }
-  var pickRowAtAdd by rememberSaveable { mutableStateOf(-1) }
-  LaunchedEffect(d.products) {
-    val before = waitingProduct ?: return@LaunchedEffect
-    val known = before.toHashSet()
-    val added = d.products.filter { it.id !in known }
-    if (added.size == 1) {
-      val p = added.single()
-      form = if (pickRowAtAdd < 0) PurchaseFormModel.pickProduct(form, p, unitsOn) else PurchaseFormModel.pickRowProduct(form, pickRowAtAdd, p, unitsOn)
-    }
-    if (added.isNotEmpty()) waitingProduct = null
-  }
   var shake by remember { mutableStateOf(0) }
   var picker by remember { mutableStateOf<PurchasePicker?>(null) }
   //  کالای کدام ردیف انتخاب می‌شود: -1 = ردیفِ نخست، وگرنه شمارهٔ ردیفِ افزوده (PUR-05)
   var pickRow by remember { mutableStateOf(-1) }
   var deliverySettings by rememberSaveable { mutableStateOf(false) }
-  var selectedCategory by rememberSaveable { mutableStateOf<String?>(null) }
-  val errors = remember(form, d) { PurchaseFormModel.errors(form, d) }
+  val errors = remember(form, d) { PurchaseFormModel.errors(form, d, catalog) }
   val shownErrors = if (tried) errors else PurchaseFormModel.Errors()
   fun rowErrors(index: Int, from: PurchaseFormModel.Errors = errors) = if (index == 0) PurchaseFormModel.RowErrors(
-    from.product, from.quantity, from.price, from.expiry, from.unit, from.packaging, from.production,
+    from.product, from.quantity, from.price, from.expiry, from.unit, from.packaging, from.production, from.salePrice,
   ) else from.rows.getOrNull(index - 1) ?: PurchaseFormModel.RowErrors()
   val productById = remember(d.products) { d.products.associateBy { it.id } }
   val supplier = d.suppliers.find { it.id == form.supplierId }
@@ -345,7 +339,7 @@ internal fun PurchaseFormScreen(
   }
 
   val openPayment: () -> Unit = {
-    val currentErrors = PurchaseFormModel.errors(form, d)
+    val currentErrors = PurchaseFormModel.errors(form, d, catalog)
     tried = true
     when {
       currentErrors.supplier != null || currentErrors.rate != null -> scrollToRow = 0
@@ -363,18 +357,11 @@ internal fun PurchaseFormScreen(
   val submit: () -> Unit = submit@{
     if (busy) return@submit
     val snapshot = form
-    val invalid = PurchaseFormModel.errors(snapshot, d)
+    val invalid = PurchaseFormModel.errors(snapshot, d, catalog)
     triedPayment = true
     when {
       snapshot.pay == null || invalid.paid != null -> Unit
       invalid.any -> shake++
-      //  e-rows-63b: نرسیده ⇒ سفارشِ خرید (سرور)؛ بی آن پیامِ «روشن نیست» و هیچ ثبت
-      //  PUR-11: سفارشِ خرید فقط افغانی است
-      snapshot.later && snapshot.currency != null -> { shake++; notify(V3Tone.ERROR, StrPurchaseFx.laterAfnOnly) }
-      snapshot.later && !laterOn -> { shake++; notify(V3Tone.ERROR, StrPurchases.laterOff) }
-      snapshot.later -> { busy = true; onSaveLater(snapshot) { ok -> busy = false; if (ok) { confirming = false; onBack() } } }
-      //  e-rows-63b: هر خرید یک فاکتورِ شماره‌دار (`PurchaseBook.record`) — تک‌ردیفه هم، تا «خریدِ #n» و «پرداخت» ِ همان خرید
-      //  (یادداشتِ `PurchaseBook.payNote`) کار کنند؛ اثرها همان `addPurchase` ِ هر ردیف است
       else -> {
         busy = true
         scope.launch {
@@ -471,26 +458,29 @@ internal fun PurchaseFormScreen(
       itemsIndexed(listOf(PurchaseFormModel.first(form)) + form.more) { index, row ->
         val i = index - 1
         val rowErrors = if (tried) rowErrors(index) else PurchaseFormModel.RowErrors()
+        val match = remember(row.productId, row.identity, row.packaging.barcode, catalog) { PurchaseFormModel.catalogMatch(row, catalog) }
+        fun change(changed: PurchaseRow) { form = PurchaseFormModel.put(form, i, changed) }
         PurchaseItemCard(
-          row = row, product = productById[row.productId], number = index + 1, errors = rowErrors,
+          row = row, product = match.product, number = index + 1, errors = rowErrors,
           expanded = expandedRow == index,
           onToggle = { expandedRow = if (expandedRow == index) -1 else index },
-          onScan = onScan?.let { scan ->
-            {
-              scan { code ->
-                val current = if (i < 0) PurchaseFormModel.first(form) else form.more.getOrNull(i)
-                if (current != null) {
-                  val changed = current.copy(packaging = current.packaging.copy(barcode = code.trim().take(128)))
-                  form = if (i < 0) PurchaseFormModel.withFirst(form, changed) else PurchaseFormModel.setRow(form, i, changed)
-                }
-              }
-            }
-          },
+          onScan = onScan?.let { scan -> { scan { code -> setRowBarcode(i, code) } } },
           form = form, d = d, unitsOn = unitsOn, lastPrice = lastPrice.takeIf { i < 0 },
           onChoose = { pickRow = i; picker = PurchasePicker.PRODUCT },
-          onChange = { changed ->
-            form = if (i < 0) PurchaseFormModel.withFirst(form, changed) else PurchaseFormModel.setRow(form, i, changed)
+          canManageCategories = onCategory != null,
+          onCategory = { category ->
+            if (category == MANAGE_CATEGORIES) {
+              onCategory?.invoke(row.identity.category.ifBlank { null }) { selected ->
+                val current = PurchaseFormModel.row(form, i)
+                if (selected != null && current != null && selected != current.identity.category) {
+                  change(current.copy(productId = null, unitName = null, identity = current.identity.copy(category = selected)))
+                }
+              }
+            } else if (category != row.identity.category) {
+              change(row.copy(productId = null, unitName = null, identity = row.identity.copy(category = category)))
+            }
           },
+          onChange = ::change,
           onPickUnit = { form = PurchaseFormModel.pickUnit(form, d, i, it) },
           onRemove = if (i >= 0) ({
             form = PurchaseFormModel.removeRow(form, i)
@@ -560,21 +550,22 @@ internal fun PurchaseFormScreen(
         )
       }
     }
-    ir.vil3ntec.tohid.ui.v3.V3TextButton(Workflow.purchaseDetails, { deliverySettings = !deliverySettings })
-    if (deliverySettings) {
-      if (laterOn) V3Section(StrPurchases.receivedNow, padding = PaddingValues(16.dp)) {
-        V3Segmented(
-          listOf(StrPurchases.yesReceived, StrPurchases.laterReceived), if (form.later) 1 else 0,
-          { i -> form = PurchaseFormModel.setLater(form, i == 1) },
-        )
-        if (form.later) {
-          Spacer(Modifier.height(10.dp))
-          V3Message(if (laterOn) V3Tone.INFO else V3Tone.WARNING, if (laterOn) StrPurchases.laterHow else StrPurchases.laterOff)
-        }
+    V3Section(Workflow.deliveryStatus, padding = PaddingValues(16.dp)) {
+      V3Segmented(
+        listOf(StrPurchases.yesReceived, Workflow.inTransit),
+        if (form.later) 1 else 0,
+        { i -> form = form.copy(later = i == 1) },
+      )
+      if (form.later) {
+        Spacer(Modifier.height(10.dp))
+        V3Message(V3Tone.INFO, Workflow.awaitingStock)
       }
+    }
+    V3TextButton(Workflow.purchaseDetails, { deliverySettings = !deliverySettings })
+    if (deliverySettings) {
       V3Section(null, padding = PaddingValues(16.dp)) {
         V3DateField(form.date, { form = form.copy(date = it) }, StrMoney.date)
-        if (extrasOn && !form.later && (deliverySettings || form.landed.isNotBlank())) {
+        if (extrasOn) {
           //  PUR-06: کرایه/گمرک روی بهای ردیف‌ها (نه بدهیِ تأمین‌کننده)
           Spacer(Modifier.height(12.dp))
           V3TextField(
@@ -616,39 +607,21 @@ internal fun PurchaseFormScreen(
       onAdd = { onNewSupplier { id -> if (id != null) form = form.copy(supplierId = id) } },
     )
     PurchasePicker.PRODUCT -> {
-      val current = if (pickRow < 0) form.productId else form.more.getOrNull(pickRow)?.productId
+      val row = PurchaseFormModel.row(form, pickRow)
+      val current = row?.productId
+      val category = row?.identity?.category.orEmpty()
       IdPickerSheet(
         title = StrMoney.item,
-        options = d.products.filter { (it.active || it.id == current) && (selectedCategory == null || it.category == selectedCategory) }
+        options = d.products.filter { (it.active || it.id == current) && (category.isBlank() || it.category == category) }
           .map { PickOption(it.id, it.name, listOfNotNull(it.category.takeIf(String::isNotBlank), it.barcodes.firstOrNull()).joinToString(" · ")) },
         searchAlways = true,
-        header = {
-          if (d.productCategories.isNotEmpty()) V3ChipRow {
-            V3Chip(Workflow.allCategories, selectedCategory == null, onClick = { selectedCategory = null })
-            d.productCategories.forEach { category ->
-              V3Chip(category, selectedCategory == category, onClick = { selectedCategory = category })
-            }
-          }
-          onCategory?.let { open ->
-            ir.vil3ntec.tohid.ui.v3.V3TextButton(ir.vil3ntec.tohid.core.i18n.StrProducts.categoriesTitle, {
-              picker = null
-              open(selectedCategory) { category ->
-                if (category != null) selectedCategory = category
-                picker = PurchasePicker.PRODUCT
-              }
-            })
-          }
-        },
         selected = current,
         onPick = { id ->
-          d.products.find { it.id == id }?.let { p ->
-            form = if (pickRow < 0) PurchaseFormModel.pickProduct(form, p, unitsOn) else PurchaseFormModel.pickRowProduct(form, pickRow, p, unitsOn)
+          productById[id]?.let { product ->
+            form = if (pickRow < 0) PurchaseFormModel.pickProduct(form, product, unitsOn) else PurchaseFormModel.pickRowProduct(form, pickRow, product, unitsOn)
           }
         },
         onDismiss = { picker = null },
-        //  کالای تازه: همان فرمِ «کالای جدید» (۶۳k) — پس از ذخیره، همان ردیف همان کالا را می‌گیرد
-        addLabel = StrMoney.addProduct,
-        onAdd = { waitingProduct = d.products.mapTo(ArrayList()) { it.id }; pickRowAtAdd = pickRow; onNewProduct() },
       )
     }
     PurchasePicker.CURRENCY -> IdPickerSheet(
@@ -708,6 +681,8 @@ private fun PurchaseItemCard(
   onToggle: () -> Unit,
   onScan: (() -> Unit)?,
   onChoose: () -> Unit,
+  canManageCategories: Boolean,
+  onCategory: (String) -> Unit,
   onChange: (PurchaseRow) -> Unit,
   onPickUnit: (String?) -> Unit,
   onRemove: (() -> Unit)?,
@@ -718,7 +693,7 @@ private fun PurchaseItemCard(
   V3Section(null, padding = PaddingValues(if (expanded) 14.dp else 0.dp)) {
     V3ListRow(
       title = StrMoney.purchaseRow(number),
-      subtitle = product?.name.takeUnless { expanded },
+      subtitle = (product?.name ?: row.identity.name.takeIf { it.isNotBlank() }).takeUnless { expanded },
       trailing = {
         Icon(if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, contentDescription = null)
       },
@@ -726,15 +701,34 @@ private fun PurchaseItemCard(
       onClick = onToggle,
     )
     if (expanded) Column(verticalArrangement = gap) {
-      V3PickerRow(
-        label = StrMoney.item, value = product?.name, placeholder = StrMoney.pickItem,
-        icon = Icons.Outlined.Inventory2, error = errors.product, onClick = onChoose,
+      Row(horizontalArrangement = gap, verticalAlignment = Alignment.CenterVertically) {
+        V3Button(
+          if (pack.carton) Workflow.carton else Workflow.loose,
+          { onChange(row.copy(unitName = null, quantity = "", price = "", packaging = pack.copy(carton = !pack.carton))) },
+          Modifier.weight(1f), kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.SwapHoriz, height = 44.dp,
+        )
+        val categories = d.productCategories + listOfNotNull(product?.category?.takeIf { it.isNotBlank() && it !in d.productCategories })
+        V3Dropdown(
+          value = row.identity.category.ifBlank { product?.category?.ifBlank { null } ?: StrProducts.pickCategory },
+          choices = listOf(V3Choice("", Workflow.allCategories)) + categories.map { V3Choice(it, it) } +
+            if (canManageCategories) listOf(V3Choice(MANAGE_CATEGORIES, StrProducts.categoriesTitle, divider = true)) else emptyList(),
+          selected = row.identity.category.ifBlank { product?.category.orEmpty() },
+          onSelect = onCategory, label = StrProducts.category, modifier = Modifier.weight(1f),
+        )
+      }
+      V3TextField(
+        row.identity.name,
+        { entered -> onChange(row.copy(productId = null, unitName = null, identity = row.identity.copy(name = entered))) },
+        StrProducts.name, placeholder = product?.name ?: StrProducts.namePlaceholder, error = errors.product,
+        helper = when {
+          product != null -> Workflow.productMatch
+          row.identity.name.isNotBlank() && errors.product == null -> Workflow.createsProduct
+          else -> null
+        },
       )
-      V3Segmented(listOf(Workflow.loose, Workflow.carton), if (pack.carton) 1 else 0, { selected ->
-        if ((selected == 1) != pack.carton) {
-          onChange(row.copy(unitName = null, quantity = "", price = "", packaging = pack.copy(carton = selected == 1)))
-        }
-      })
+      if (d.products.any { (it.active || it.id == row.productId) && (row.identity.category.isBlank() || it.category == row.identity.category) }) {
+        V3TextButton(Workflow.findProduct, onChoose)
+      }
       if (pack.carton) {
         Row(horizontalArrangement = gap) {
           V3TextField(row.quantity, { onChange(row.copy(quantity = it)) }, Workflow.cartons, Modifier.weight(1f), kind = V3FieldKind.NUMBER, required = true, error = errors.quantity)
@@ -771,16 +765,18 @@ private fun PurchaseItemCard(
         pack.barcode, { onChange(row.copy(packaging = pack.copy(barcode = it.take(128)))) }, Workflow.optionalBarcode,
         kind = V3FieldKind.BARCODE, onScan = onScan,
       )
-      if (!form.later) {
-        ir.vil3ntec.tohid.ui.v3.V3TextButton(Workflow.productDates, { details = !details })
-        if (details || errors.expiry != null || errors.production != null) {
-          V3TextField(
-            pack.production, { onChange(row.copy(packaging = pack.copy(production = it))) }, StrSheets.productionDate,
-            kind = V3FieldKind.DATE, placeholder = StrStock.datePlaceholder, error = errors.production,
-          )
-          ExpiryField(row.expiry, { onChange(row.copy(expiry = it)) }, errors.expiry)
-
-        }
+      V3TextField(
+        row.identity.salePrice, { onChange(row.copy(identity = row.identity.copy(salePrice = it))) }, Workflow.newSalePrice,
+        kind = V3FieldKind.MONEY, placeholder = product?.let { ir.vil3ntec.tohid.unitMoney(it.salePrice) },
+        error = errors.salePrice, required = product == null,
+      )
+      V3TextButton(Workflow.productDates, { details = !details })
+      if (details || errors.expiry != null || errors.production != null) {
+        V3TextField(
+          pack.production, { onChange(row.copy(packaging = pack.copy(production = it))) }, StrSheets.productionDate,
+          kind = V3FieldKind.DATE, placeholder = StrStock.datePlaceholder, error = errors.production,
+        )
+        ExpiryField(row.expiry, { onChange(row.copy(expiry = it)) }, errors.expiry)
       }
       if (onRemove != null) ir.vil3ntec.tohid.ui.v3.V3TextButton(StrMoney.removePurchaseRow, onRemove, danger = true)
     }

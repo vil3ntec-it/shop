@@ -6,7 +6,7 @@ import ir.vil3ntec.tohid.core.text.TextNormalizer
 /**
  *  «خریدها» (e-rows-63b، خواستهٔ صاحب‌کار: «نمی‌شود خریدهایی که کردم را ببینم … بارکد، نامِ اقلام … آورد یا نیاورد، پولش داده
  *  شده یا بعداً») — یک نما برای هر خرید، خالص و زیرِ آزمون، فقط **خواندنِ** همان دفتر:
- *   • فاکتورِ خریدِ دفتر (`PurchaseBook.invoices`): همیشه «رسیده» (ثبتش همان لحظه کالا را به انبار برد)؛ مانده همان
+ *   • فاکتورِ خریدِ دفتر (`PurchaseBook.invoices`): دریافت بر اساس ورودِ انبار؛ مانده همان
  *     `PurchaseBook.open` (پرداخت‌های بعدی، سندهای کسر و پرداختِ نام‌دارِ همان فاکتور).
  *   • سندِ کسر (برگشت به تأمین‌کننده): ردیفِ خودش، مبلغِ منفی.
  *   • سفارشِ خریدِ باز از سرور (فرستاده/بخشی، پرچمِ `shop.purchase_orders`): «هنوز نرسیده» / «نیمه‌رسیده». ردیف‌هایی که
@@ -88,6 +88,7 @@ object PurchaseViews {
   ) {
     val names: List<String> get() = lines.map { it.name }.filter { it.isNotBlank() }.distinct()
     val isOrder: Boolean get() = kind == Kind.ORDER
+    val awaitingDelivery: Boolean get() = kind == Kind.BILL && receipt != Receipt.RECEIVED
   }
 
   private const val CENT = 0.5
@@ -156,6 +157,7 @@ object PurchaseViews {
     val entries = d.warehouseEntries.filter { it.purchaseId != null }.associateBy { it.purchaseId!! }
     /** خریدِ قدیمیِ بی `purchaseId` روی ورود ⇒ با `warehouseEntryId` (یک نقشه، نه جست‌وجوی خطی برای هر ردیف) */
     val entryById by lazy { d.warehouseEntries.associateBy { it.id } }
+    val received by lazy { PurchaseBook.receivedPurchases(d) }
 
     fun name(supplierId: String, fallback: String = "") = suppliers[supplierId]?.name ?: fallback
 
@@ -171,12 +173,17 @@ object PurchaseViews {
           currency = inv.currency, fxRate = inv.fxRate, fxTotal = inv.fxTotal,
         )
       }
+      val receipt = when {
+        lines.all { it.received >= it.ordered } -> Receipt.RECEIVED
+        lines.any { it.received > 0 } -> Receipt.PARTIAL
+        else -> Receipt.PENDING
+      }
       val left = (remaining[inv.key] ?: inv.debt).coerceAtLeast(0.0)
       val paid = (inv.total - left).coerceAtLeast(0.0)
       return View(
         inv.key, Kind.BILL, inv.no, inv.supplierId, name(inv.supplierId), inv.date, inv.createdAt, lines,
         total = inv.total, billed = inv.total, paid = paid, remaining = left, dueDate = inv.dueDate,
-        pay = payOf(inv.total, paid, left, inv.dueDate, today), receipt = Receipt.RECEIVED,
+        pay = payOf(inv.total, paid, left, inv.dueDate, today), receipt = receipt,
         orderNo = orderNoOf(inv), landed = inv.lines.sumOf { it.landedCost ?: 0.0 }, notes = notesOf(inv), invoice = inv,
         currency = inv.currency, fxRate = inv.fxRate, fxTotal = inv.fxTotal,
         fxRemaining = if (inv.currency != null) (fxRemaining[inv.key] ?: (inv.fxTotal - inv.fxPaid)).coerceAtLeast(0L) else null,
@@ -193,11 +200,13 @@ object PurchaseViews {
       val qty = if (inUnit != null) p.unitQtyMilli!! / 1000.0 else kotlin.math.abs(p.quantity)
       val sign = if (p.totalAmount < 0) -1.0 else 1.0
       val total = kotlin.math.abs(p.totalAmount)
+      val pending = p.delivery != null && PurchaseBook.awaitsDelivery(p, received)
       val cost = if (inUnit != null && qty > 0) total / qty else p.purchasePrice
       return Line(
         productId = p.productId, name = product?.name.orEmpty(), code = p.barcode ?: code(product),
-        qty = qty, unit = inUnit ?: p.unit, unitCost = cost, total = sign * total, ordered = qty, received = qty,
-        batch = e?.batch.orEmpty(), expiry = e?.expiryDate.orEmpty(), purchaseId = p.id, production = e?.productionDate.orEmpty(),
+        qty = qty, unit = inUnit ?: p.unit, unitCost = cost, total = sign * total, ordered = qty, received = if (pending) 0.0 else qty,
+        batch = e?.batch.orEmpty(), expiry = (e?.expiryDate ?: p.delivery?.expiryDate).orEmpty(),
+        purchaseId = p.id, production = (e?.productionDate ?: p.delivery?.productionDate).orEmpty(),
         baseQty = if (inUnit != null) kotlin.math.abs(p.quantity) else null, baseUnit = if (inUnit != null) p.unit else "",
         fxUnit = if (SupplierFx.cur(p.currency) != null) p.fxPriceMinor else null,
         fxTotal = if (SupplierFx.cur(p.currency) != null) p.fxTotalMinor else null,

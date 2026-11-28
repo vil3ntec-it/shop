@@ -5,16 +5,23 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseWorkflow
+import ir.vil3ntec.tohid.data.PurchaseBook
 import ir.vil3ntec.tohid.data.PoPermsDto
 import ir.vil3ntec.tohid.data.PurchaseOrderDto
 import ir.vil3ntec.tohid.data.PurchaseViews
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.platform.rememberPurchaseOrderHost
+import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
 import ir.vil3ntec.tohid.ui.v3.nav.LandOn
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.products.ProductsPaths
 import ir.vil3ntec.tohid.ui.v3.sales.SalesPaths
+import kotlinx.coroutines.launch
 
 /*
  *  سیم‌کشیِ «خریدها» (e-rows-63b) — هیچ منطقِ دفتر این‌جا نیست؛ فقط مسیرها:
@@ -47,10 +54,10 @@ internal fun rememberOpenOrders(door: Boolean): OpenOrders {
 /** «پرداخت» ِ یک خرید: برگهٔ پرداختِ تأمین‌کننده با ماندهٔ همین خرید و یادداشتی که آن را نام می‌برد (`PurchaseBook.payNote`) */
 internal fun RouteScope.payPurchase(v: PurchaseViews.View) {
   val code = v.currency
-  //  PUR-11: فاکتورِ ارزی ⇒ ماندهٔ همان ارز روی حسابِ همان ارز
-  if (code != null && v.fxRemaining != null) {
-    nav.open(MoneyPaths.payPurchase(v.supplierId, ir.vil3ntec.tohid.core.safe.SafeCurrency.major(v.fxRemaining, code), v.no.takeIf { it > 0 && !v.isOrder }, code))
-  } else nav.open(MoneyPaths.payPurchase(v.supplierId, v.remaining, v.no.takeIf { it > 0 && !v.isOrder }))
+  val amount = if (code != null && v.fxRemaining != null) {
+    ir.vil3ntec.tohid.core.safe.SafeCurrency.major(v.fxRemaining, code)
+  } else v.remaining
+  nav.open(MoneyPaths.payPurchase(v.supplierId, amount, v.no.takeIf { it > 0 && !v.isOrder }, code, v.invoice?.deliveryInvoiceId))
 }
 
 /** کارهای فهرستِ «خریدها» در زبانهٔ خرید */
@@ -62,6 +69,7 @@ internal fun RouteScope.purchasesActions(open: OpenOrders): PurchasesActions = P
   },
   onPay = { payPurchase(it) },
   onReceive = if (open.canReceive) ({ v -> v.orderId?.let { id -> nav.openForResult(MoneyPaths.receivePurchaseOrder(id)) { open.refresh() } } }) else null,
+  onDelivery = { v -> nav.open(MoneyPaths.purchase(v.key) + "?receive=1") },
   onNew = { nav.open(MoneyPaths.newPurchase()) },
 )
 
@@ -77,6 +85,35 @@ internal fun RouteScope.PurchaseDetailRoute(key: String) {
   val today = remember { todayIso() }
   val view = remember(data, key, today) { PurchaseViews.find(data, key, today) }
   val print = rememberPurchasePrint(data)
+  val context = LocalContext.current
+  val scope = rememberCoroutineScope()
+  var confirming by rememberSaveable(key) { mutableStateOf(args.query("receive") == "1") }
+  var receiving by remember { mutableStateOf(false) }
+  if (confirming && view?.awaitingDelivery == true) {
+    V3ConfirmSheet(
+      title = StrPurchaseWorkflow.confirmDelivery,
+      message = StrPurchaseWorkflow.confirmDeliveryBody,
+      confirm = StrPurchaseWorkflow.postDelivery,
+      danger = false,
+      onDismiss = { confirming = false },
+      onConfirm = {
+        if (!receiving) {
+          val ids = view.lines.mapNotNull { it.purchaseId }.toSet()
+          receiving = true
+          scope.launch {
+            try {
+              MoneyWriter.recordPurchase(store, toasts, context, StrPurchaseWorkflow.deliverySaved) { latest ->
+                PurchaseBook.confirmDelivery(latest, ids, todayIso(), System.currentTimeMillis())
+              }
+            } finally {
+              confirming = false
+              receiving = false
+            }
+          }
+        }
+      },
+    )
+  }
   PurchaseDetailScreen(
     view, today,
     PurchaseDetailActions(
@@ -85,18 +122,11 @@ internal fun RouteScope.PurchaseDetailRoute(key: String) {
       onProduct = { nav.open(ProductsPaths.item(it)) },
       onPay = { payPurchase(it) },
       onReceive = null,
+      onDelivery = { confirming = true },
       onOrder = null,
       onReturn = { nav.open(MoneyPaths.returnSupplier(it)) },
       onPrint = print,
     ),
+    receiving = receiving,
   )
-}
-
-/** نقشِ کاربر در سفارشِ خرید (فرمِ «خریدِ تازه»: «الان رسیده؟ نه» فقط برای مدیر/صاحب با پرچمِ روشن) */
-@Composable
-internal fun rememberPoManage(door: Boolean): Boolean {
-  val repo = rememberPurchaseOrderHost().repo
-  var manage by remember { mutableStateOf(false) }
-  LaunchedEffect(door) { manage = door && repo.config().valueOrNull()?.let { it.enabled && it.permissions.manage } == true }
-  return manage
 }

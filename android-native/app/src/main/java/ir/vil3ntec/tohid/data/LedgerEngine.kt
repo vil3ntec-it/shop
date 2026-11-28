@@ -203,6 +203,7 @@ object LedgerEngine {
      */
     val exactTotalMinor: Long? = null,
     val barcode: String? = null,
+    val deliveryInvoiceId: String? = null,
   )
 
   /** ردیفِ خرید به واحدِ خرید: نام، مقدار به همان واحد (هزارم)، ضریب به واحدِ پایه (هزارم) و جمعِ دقیقِ ردیف (صدمِ افغانی) */
@@ -260,103 +261,67 @@ object LedgerEngine {
     if (d.purchases.any { it.id == purchaseId }) return Result.Failed(PurchaseBook.ALREADY_RECORDED)
     val entryId = newId()
 
-    var products = d.products
-    var history = d.priceHistory
-    var audit = d.auditLog
-
-    // قیمتِ خریدِ کالا با آخرین خرید به‌روز می‌شود، و تغییرش می‌ماند
-    if (product.purchasePrice != unitPrice) {
-      history = history + PriceChange(
-        id = newId(),
-        productId = product.id,
-        oldPrice = product.purchasePrice,
-        newPrice = unitPrice,
-        date = today,
-        createdAt = now,
-      )
-      audit = audit + AuditEntry(
-        id = newId(),
-        type = "price_change",
-        date = today,
-        refId = product.id,
-        notes = "تغییر قیمت خرید از ${money(product.purchasePrice)} به ${money(unitPrice)} افغانی",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
-        createdAt = now,
-      )
-      products = products.map {
-        if (it.id == product.id) it.copy(purchasePrice = unitPrice) else it
-      }
-    }
-
-    audit = audit + AuditEntry(
-      id = newId(),
-      type = "purchase",
-      date = date,
-      refId = purchaseId,
-      notes = "ثبت خرید ${draft.inUnit?.let { "${money(it.qtyMilli / 1000.0)} ${it.name} = " }.orEmpty()}${money(quantity)} $unit از «${supplier.name}» به مبلغ ${money(totalAmount)} افغانی",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
-      createdAt = now,
+    val costed = if (draft.deliveryInvoiceId != null) d else updatePurchaseCost(d, product, unitPrice, today, now, newId)
+    val receipt = PurchaseDelivery(
+      draft.deliveryInvoiceId.orEmpty(), draft.expiryDate, draft.productionDate, userId = draft.userId?.trim()?.ifEmpty { null },
     )
-
-    return Result.Ok(
-      d.copy(
-        products = products,
-        priceHistory = history,
-        auditLog = audit,
-        warehouseEntries = d.warehouseEntries + WarehouseEntry(
-          id = entryId,
-          productId = product.id,
-          cartons = 0.0,
-          perCarton = 0.0,
-          units = quantity,
-          unit = unit,
-          price = unitPrice,
-          date = date,
-          notes = draft.notes.ifBlank { "خرید از تأمین‌کننده" },  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
-          purchaseId = purchaseId,
-          createdAt = now,
-          expiryDate = draft.expiryDate,
-          productionDate = draft.productionDate,
-          landedCost = landed,
-          landedCostMinor = landed?.let(StockLedger::minor),
-          userId = draft.userId?.trim()?.ifEmpty { null },
-          costMinor = pu?.totalMinor ?: exact,
-        ),
-        purchases = d.purchases + Purchase(
-          id = purchaseId,
-          productId = product.id,
-          supplierId = supplier.id,
-          quantity = quantity,
-          unit = unit,
-          purchasePrice = unitPrice,
-          totalAmount = totalAmount,
-          date = date,
-          notes = draft.notes,
-          paidAmount = paid,
-          debt = totalAmount - paid,
-          warehouseEntryId = entryId,
-          barcode = draft.barcode,
-          createdAt = now,
-          dueDate = due,
-          //  خریدِ تکی: هزینهٔ جانبی روی ردیفِ خرید هم (مثلِ فاکتورِ چندردیفه، `PurchaseBook`)
-          landedCost = landed,
-          landedCostMinor = landed?.let(StockLedger::minor),
-          unitName = draft.inUnit?.name,
-          unitQtyMilli = draft.inUnit?.qtyMilli,
-          unitFactorMilli = draft.inUnit?.factorMilli,
-        ),
-        stockMovements = d.stockMovements + StockMovement(
-          id = newId(),
-          productId = product.id,
-          type = "purchase_in",
-          qty = quantity,
-          date = date,
-          notes = draft.notes.ifBlank { "ثبت خرید" },  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
-          refId = purchaseId,
-          createdAt = now,
-        ),
+    val purchase = Purchase(
+      id = purchaseId, productId = product.id, supplierId = supplier.id,
+      quantity = quantity, unit = unit, purchasePrice = unitPrice, totalAmount = totalAmount,
+      date = date, notes = draft.notes, paidAmount = paid, debt = totalAmount - paid,
+      warehouseEntryId = entryId, barcode = draft.barcode, createdAt = now, dueDate = due,
+      landedCost = landed, landedCostMinor = landed?.let(StockLedger::minor),
+      unitName = draft.inUnit?.name, unitQtyMilli = draft.inUnit?.qtyMilli, unitFactorMilli = draft.inUnit?.factorMilli,
+      delivery = receipt.takeIf { draft.deliveryInvoiceId != null },
+    )
+    val recorded = costed.copy(
+      purchases = costed.purchases + purchase,
+      auditLog = costed.auditLog + AuditEntry(
+        id = newId(),
+        type = "purchase",
+        date = date,
+        refId = purchaseId,
+        notes = "ثبت خرید ${draft.inUnit?.let { "${money(it.qtyMilli / 1000.0)} ${it.name} = " }.orEmpty()}${money(quantity)} $unit از «${supplier.name}» به مبلغ ${money(totalAmount)} افغانی",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+        createdAt = now,
       ),
-      id = purchaseId,
+    )
+    val result = if (purchase.delivery != null) recorded
+      else putPurchaseInStock(recorded, purchase, receipt, entryId, newId(), date, now, pu?.totalMinor ?: exact)
+    return Result.Ok(result, id = purchaseId)
+  }
+
+  internal fun updatePurchaseCost(
+    d: ShopData, product: Product, price: Double, date: String, now: Long, newId: () -> String,
+  ): ShopData {
+    if (product.purchasePrice == price) return d
+    return d.copy(
+      products = d.products.map { if (it.id == product.id) it.copy(purchasePrice = price) else it },
+      priceHistory = d.priceHistory + PriceChange(
+        id = newId(), productId = product.id, oldPrice = product.purchasePrice, newPrice = price, date = date, createdAt = now,
+      ),
+      auditLog = d.auditLog + AuditEntry(
+        id = newId(), type = "price_change", date = date, refId = product.id, createdAt = now,
+        notes = "تغییر قیمت خرید از ${money(product.purchasePrice)} به ${money(price)} افغانی", // داده: یادداشتِ سابقهٔ دفتر
+      ),
     )
   }
+
+  internal fun putPurchaseInStock(
+    d: ShopData, p: Purchase, delivery: PurchaseDelivery, entryId: String, movementId: String,
+    date: String, now: Long, exactCost: Long?,
+  ): ShopData = d.copy(
+    warehouseEntries = d.warehouseEntries + WarehouseEntry(
+      id = entryId, productId = p.productId, units = p.quantity, unit = p.unit, price = p.purchasePrice,
+      date = date, notes = p.notes.ifBlank { "خرید از تأمین‌کننده" }, // داده: یادداشتِ سابقهٔ دفتر
+      purchaseId = p.id, createdAt = now, expiryDate = delivery.expiryDate, productionDate = delivery.productionDate,
+      landedCost = p.landedCost, landedCostMinor = p.landedCostMinor, userId = delivery.userId,
+      locationId = delivery.locationId, costMinor = exactCost,
+    ),
+    stockMovements = d.stockMovements + StockMovement(
+      id = movementId, productId = p.productId, type = "purchase_in", qty = p.quantity, date = date,
+      notes = p.notes.ifBlank { "ثبت خرید" }, refId = p.id, createdAt = now, // داده: یادداشتِ سابقهٔ دفتر
+    ),
+  )
 
   /** پرداخت به تأمین‌کننده — بدهیِ ما به او را کم می‌کند */
   fun paySupplier(
@@ -373,6 +338,7 @@ object LedgerEngine {
      *  لمسِ پشتِ‌سرِهم یک پرداخت است — با دفترِ کهنه همان شناسه (ادغام یکی‌اش می‌کند)، با دفترِ تازه رد. `null` = پیشین.
      */
     key: String? = null,
+    purchaseInvoiceId: String? = null,
   ): Result {
     val k = key?.trim()?.ifEmpty { null }
     if (k != null && d.supplierPayments.any { it.id == k }) return Result.Failed(ALREADY_PAID)
@@ -390,6 +356,7 @@ object LedgerEngine {
           date = when_,
           notes = notes.trim(),
           createdAt = now,
+          purchaseInvoiceId = purchaseInvoiceId,
         ),
         auditLog = d.auditLog + AuditEntry(
           id = if (k != null) "$k-a" else newId(),

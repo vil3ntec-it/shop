@@ -500,6 +500,10 @@ object WarehouseEngine {
    */
   fun deleteProduct(d: ShopData, id: String, today: String, now: Long, newId: () -> String): Result {
     val product = d.products.find { it.id == id } ?: return Result.Failed(StrGoods.productNotFound)
+    val received by lazy { PurchaseBook.receivedPurchases(d) }
+    if (d.purchases.any { it.productId == id && it.delivery != null && PurchaseBook.awaitsDelivery(it, received) }) {
+      return Result.Failed(ir.vil3ntec.tohid.core.i18n.StrPurchaseWorkflow.productAwaitingDelivery)
+    }
     return Result.Ok(
       d.copy(
         products = d.products.filter { it.id != id },

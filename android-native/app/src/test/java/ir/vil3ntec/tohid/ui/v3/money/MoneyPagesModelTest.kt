@@ -203,9 +203,9 @@ class MoneyPagesModelTest {
     assertTrue(routes.contains("MoneyWriter.recordPurchase(store, toasts, context) { latest ->"))
     assertTrue(routes.contains("latest, supplierId, lines, paid, date, notes, today, now, ::moneyId,"))
     assertTrue(routes.contains("landedTotal = extras.landedTotal, dueDate = extras.dueDate, key = saveKey, fx = extras.fx, fxPaid = extras.fxPaid,"))
-    //  e-rows-63b (تغییرِ عمدی): راهِ تک‌ردیفهٔ `addPurchase` ِ مسیر رفت — همان کلید فقط به `PurchaseBook.record` و سفارشِ نرسیده می‌رود
+    //  Both outcomes use the same transaction and keep the original invoice key.
     assertFalse(routes.contains("LedgerEngine.addPurchase(data, draft"))
-    assertTrue(routes.contains("onSaveLater = rememberSaveLater(saveKey),"))
+    assertTrue(routes.contains("awaitDelivery = extras.awaitDelivery,"))
     assertTrue(routes.contains("val saveKey = remember { moneyId() }"))
   }
 

@@ -4,6 +4,8 @@ import ir.vil3ntec.tohid.core.i18n.StrSheets
 import ir.vil3ntec.tohid.core.i18n.StrGoods
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
 import ir.vil3ntec.tohid.core.i18n.StrStock
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseWorkflow
+import ir.vil3ntec.tohid.core.stock.StockCore
 /**
  *  فاکتورِ خریدِ چندردیفه و حسابِ تأمین‌کننده.
  *
@@ -38,6 +40,9 @@ object PurchaseBook {
     val factorMilli: Long? = null,
     val productionDate: String = "",
     val barcode: String? = null,
+    val productName: String = "",
+    val category: String = "",
+    val salePrice: Double? = null,
   )
 
   sealed interface Result {
@@ -112,6 +117,7 @@ object PurchaseBook {
      */
     fx: ir.vil3ntec.tohid.core.purchase.PurchaseFx.Rate? = null,
     fxPaid: Long = 0,
+    awaitDelivery: Boolean = false,
   ): Result {
     val k = key?.trim()?.ifEmpty { null }
     if (k != null && d.purchases.any { it.id.startsWith("$k-") }) return Result.Failed(ALREADY_RECORDED)
@@ -119,12 +125,34 @@ object PurchaseBook {
     if (landedTotal.isNaN() || landedTotal < 0) return Result.Failed(StrPurchasePages.landedBad)
     val due = dueDate?.trim()?.ifEmpty { null }
     if (due != null && due < date.ifBlank { today }) return Result.Failed(DUE_BEFORE_DATE)
-    val real = lines.filter { it.productId.isNotBlank() }
-    if (real.isEmpty()) return Result.Failed(StrGoods.oneRowNeeded)
-    real.forEachIndexed { i, l ->
+    val candidates = lines.filter { it.productId.isNotBlank() || it.productName.isNotBlank() || !it.barcode.isNullOrBlank() }
+    if (candidates.isEmpty()) return Result.Failed(StrGoods.oneRowNeeded)
+    candidates.forEachIndexed { i, l ->
+      if (listOf(l.expiryDate, l.productionDate).any { it.isNotBlank() && !StockCore.isoDateOk(it) }) {
+        return Result.Failed(StrGoods.rowOfWhy(i + 1, StrStock.errExpiry))
+      }
+      if (l.productionDate.isNotBlank() && l.expiryDate.isNotBlank() && l.productionDate > l.expiryDate) {
+        return Result.Failed(StrGoods.rowOfWhy(i + 1, StrPurchaseWorkflow.dateOrder))
+      }
       if (!l.quantity.isFinite() || l.quantity <= 0) return Result.Failed(StrGoods.rowQtyBad(i + 1))
       if (fx == null && (!l.price.isFinite() || l.price < 0)) return Result.Failed(StrGoods.rowPriceBad(i + 1))
       if (fx != null && (l.fxPrice == null || l.fxPrice < 0)) return Result.Failed(StrGoods.rowPriceBad(i + 1))
+    }
+    var cur = d
+    var catalog = PurchaseCatalog.Index(cur.products)
+    val real = candidates.mapIndexed { i, line ->
+      val match = catalog.resolve(line.productId, line.productName, line.category, line.barcode)
+      when (val prepared = PurchaseCatalog.write(cur, line, match, supplierId, today, now, newId)) {
+        is WarehouseEngine.Result.Failed -> return Result.Failed(StrGoods.rowOfWhy(i + 1, prepared.message))
+        is WarehouseEngine.Result.Ok -> {
+          if (prepared.data.products !== cur.products) catalog = PurchaseCatalog.Index(prepared.data.products)
+          cur = prepared.data
+          line.copy(
+            productId = prepared.id,
+            barcode = PurchaseCatalog.barcode(line.barcode),
+          )
+        }
+      }
     }
     //  PUR-11: سندِ ارزی ⇒ جمعِ ارزیِ ردیف‌ها، معادلِ افغانیِ یک‌بارهٔ سند و سهمِ دقیقِ هر ردیف (افغانی و پرداخت)
     val doc = fx?.let { r ->
@@ -138,7 +166,7 @@ object PurchaseBook {
     //  PRD-07: واحدِ خریدِ هر ردیف ⇐ ضریب (پیش از هر اثر؛ ردیفِ بی واحد همان امروز)
     val inUnits = real.mapIndexed { i, l ->
       val name = l.unitName?.trim()?.ifEmpty { null } ?: return@mapIndexed null
-      val product = d.products.find { it.id == l.productId } ?: return Result.Failed(StrGoods.rowOfWhy(i + 1, ir.vil3ntec.tohid.core.i18n.StrLedger.pickProduct))
+      val product = ShopStore.product(cur, l.productId) ?: return Result.Failed(StrGoods.rowOfWhy(i + 1, ir.vil3ntec.tohid.core.i18n.StrLedger.pickProduct))
       val packed = if (l.factorMilli == null) inUnitOf(product, name, l.quantity, afnOf(i))
         else inUnitOf(product, name, l.factorMilli, l.quantity, afnOf(i))
       packed ?: return Result.Failed(StrGoods.rowOfWhy(i + 1, if (l.factorMilli == null) unitWhy(product, name, l.quantity) else StrStock.errAmount))
@@ -147,8 +175,8 @@ object PurchaseBook {
     var left = if (paid.isNaN() || paid < 0) 0.0 else minOf(paid, total)
 
     val no = nextNo(d)
+    val deliveryInvoiceId = if (awaitDelivery) k ?: newId() else null
     val tag = "فاکتورِ خرید #$no"  // داده: تکهٔ یادداشتِ سابقه
-    var cur = d
     val ids = mutableListOf<String>()
     for ((i, l) in real.withIndex()) {
       val lt = afnOf(i)
@@ -168,6 +196,7 @@ object PurchaseBook {
           dueDate = dueDate,
           inUnit = inUnits[i],
           exactTotalMinor = doc?.afnLines?.get(i),
+          deliveryInvoiceId = deliveryInvoiceId,
         ),
         today, now, lineIds,
       )
@@ -197,7 +226,11 @@ object PurchaseBook {
       cur = cur.copy(
         purchases = cur.purchases.map { p ->
           val share = landed[p.id] ?: 0L
-          if (share > 0) p.copy(landedCost = share / 100.0, landedCostMinor = share) else p
+          if (p.id !in set) p else p.copy(
+            landedCost = (share / 100.0).takeIf { share > 0 },
+            landedCostMinor = share.takeIf { it > 0 },
+            delivery = p.delivery?.copy(locationId = loc, userId = user),
+          )
         },
         warehouseEntries = cur.warehouseEntries.map { w ->
           val pid = w.purchaseId
@@ -214,6 +247,38 @@ object PurchaseBook {
     return Result.Ok(cur, no)
   }
 
+  private const val DELIVERY_AUDIT = "purchase_received"
+
+  internal fun receivedPurchases(d: ShopData): Set<String> = buildSet {
+    d.warehouseEntries.forEach { add(it.id) }
+    d.auditLog.filter { it.type == DELIVERY_AUDIT }.mapNotNullTo(this) { it.refId }
+  }
+
+  internal fun awaitsDelivery(p: Purchase, received: Set<String>): Boolean =
+    p.delivery != null && p.warehouseEntryId !in received && p.id !in received
+
+  /** A confirmation adds stock once, without reposting the invoice or supplier debt. */
+  fun confirmDelivery(d: ShopData, purchaseIds: Set<String>, date: String, now: Long): Result {
+    if (!StockCore.isoDateOk(date)) return Result.Failed(StrGoods.dateBad)
+    val arrived = receivedPurchases(d)
+    val pending = d.purchases.filter { it.id in purchaseIds && awaitsDelivery(it, arrived) }
+    if (pending.isEmpty()) return Result.Failed(StrPurchaseWorkflow.alreadyDelivered)
+    var cur = d
+    val events = ArrayList<AuditEntry>(pending.size)
+    for (p in pending) {
+      val product = ShopStore.product(cur, p.productId) ?: return Result.Failed(StrGoods.productNotFound)
+      val entryId = p.warehouseEntryId ?: return Result.Failed(StrGoods.productNotFound)
+      val delivery = p.delivery ?: continue
+      // Both devices use the original warehouse ID and the same receipt-derived movement and history IDs.
+      var n = 0
+      cur = LedgerEngine.updatePurchaseCost(cur, product, p.purchasePrice, date, now) { "${p.id}-received-cost-${n++}" }
+      val exact = StockLedger.minor(p.totalAmount).takeIf { p.unitName != null || p.currency != null }
+      cur = LedgerEngine.putPurchaseInStock(cur, p, delivery, entryId, "${p.id}-received", date, now, exact)
+      events += AuditEntry(id = "${p.id}-received-audit", type = DELIVERY_AUDIT, refId = p.id, date = date, createdAt = now)
+    }
+    return Result.Ok(cur.copy(auditLog = cur.auditLog + events), pending.first().invoiceNo)
+  }
+
   /* ── فاکتورها ───────────────────────────────────────────────────── */
 
   data class Invoice(
@@ -224,6 +289,7 @@ object PurchaseBook {
     val date: String,
     val lines: List<Purchase>,
   ) {
+    val deliveryInvoiceId: String? get() = lines.firstOrNull()?.delivery?.invoiceId
     val total: Double get() = lines.sumOf { it.totalAmount }
     val paid: Double get() = lines.sumOf { it.paidAmount }
     val debt: Double get() = total - paid
@@ -239,19 +305,19 @@ object PurchaseBook {
     val fxPaid: Long get() = lines.sumOf { it.fxPaidMinor ?: 0L }
   }
 
-  /**
-   *  همهٔ فاکتورهای خرید، تازه‌ترین بالا. هر فاکتور = (شماره، تأمین‌کننده): دو دستگاهِ بی همگام‌سازی هر کدام [nextNo]
-   *  را روی دفترِ خودش می‌گیرد، پس پس از همگام‌سازی یک شماره ممکن است مالِ دو تأمین‌کننده باشد — هرگز یکی نمی‌شوند
-   *  (وگرنه یادآورِ سررسید بدهیِ یکی را به نامِ دیگری می‌گذاشت). کلید «#n» است و فقط وقتی همان شماره مالِ چند
-   *  تأمین‌کننده است «#n·تأمین‌کننده» — از کلِ دفتر، پس کلیدِ فهرستِ یک تأمین‌کننده همان کلیدِ فهرستِ همه است.
-   */
+  /** Delivery invoices have a stable ID across devices, even when two offline invoices get the same number. */
   fun invoices(d: ShopData, supplierId: String? = null): List<Invoice> {
-    val shared = d.purchases.filter { it.invoiceNo > 0 }.groupBy { it.invoiceNo }
+    val shared = d.purchases.filter { it.invoiceNo > 0 && it.delivery == null }.groupBy { it.invoiceNo }
       .filterValues { ls -> ls.mapTo(HashSet()) { it.supplierId }.size > 1 }.keys
     val list = d.purchases.filter { supplierId == null || it.supplierId == supplierId }
-    val grouped = list.filter { it.invoiceNo > 0 }.groupBy { it.invoiceNo to it.supplierId }.map { (k, ls) ->
-      val (no, sid) = k
-      Invoice(if (no in shared) "#$no·$sid" else "#$no", no, sid, ls.minOf { it.date }, ls.sortedBy { it.createdAt })
+    val grouped = list.filter { it.invoiceNo > 0 }.groupBy { Triple(it.invoiceNo, it.supplierId, it.delivery?.invoiceId) }.map { (k, ls) ->
+      val (no, sid, id) = k
+      val key = when {
+        id != null -> "delivery:$id"
+        no in shared -> "#$no·$sid"
+        else -> "#$no"
+      }
+      Invoice(key, no, sid, ls.minOf { it.date }, ls.sortedBy { it.createdAt })
     }
     val singles = list.filter { it.invoiceNo <= 0 }.map { Invoice(it.id, 0, it.supplierId, it.date, listOf(it)) }
     return (grouped + singles).sortedWith(compareByDescending<Invoice> { it.date }.thenByDescending { it.createdAt })
@@ -340,11 +406,15 @@ object PurchaseBook {
     val bills = list.filter { !it.isReturn }
     val left = HashMap<String, Double>(bills.size * 2)
     bills.forEach { left[it.key] = debtOf(it).coerceAtLeast(0.0) }
-    val byNo = bills.filter { it.no > 0 }.associateBy { it.no }
+    val byNo = bills.filter { it.no > 0 && it.deliveryInvoiceId == null }.associateBy { it.no }
+    val byDeliveryId = bills.mapNotNull { bill -> bill.deliveryInvoiceId?.let { it to bill } }.toMap()
     var credit = list.filter { it.isReturn }.sumOf { -totalOf(it) } + bills.sumOf { (-debtOf(it)).coerceAtLeast(0.0) }
     pays.forEach { p ->
       var amount = payOf(p)
-      val target = if (amount > 0) paidInvoiceNo(p.notes)?.let(byNo::get) else null
+      val target = if (amount <= 0) null else {
+        val deliveryInvoiceId = p.purchaseInvoiceId
+        if (deliveryInvoiceId == null) paidInvoiceNo(p.notes)?.let(byNo::get) else byDeliveryId[deliveryInvoiceId]
+      }
       if (target != null) {
         val take = minOf(amount, left[target.key] ?: 0.0)
         left[target.key] = (left[target.key] ?: 0.0) - take
@@ -395,8 +465,12 @@ object PurchaseBook {
    *  سقفِ برگشت به یک تأمین‌کننده: خریدهای همین (تأمین‌کننده، کالا) منهای برگشت‌های پیشین به
    *  او (سندهای کسر = خریدِ منفی). بی این، کالای خریده از دیگری هم به او برمی‌گشت.
    */
-  fun returnable(d: ShopData, supplierId: String, productId: String): Double =
-    kotlin.math.max(0.0, d.purchases.filter { it.supplierId == supplierId && it.productId == productId }.sumOf { it.quantity })
+  fun returnable(d: ShopData, supplierId: String, productId: String): Double {
+    val arrived = receivedPurchases(d)
+    return d.purchases.filter {
+      it.supplierId == supplierId && it.productId == productId && !awaitsDelivery(it, arrived)
+    }.sumOf { it.quantity }.coerceAtLeast(0.0)
+  }
 
   /** کالاهایی که از این تأمین‌کننده خریده شده‌اند — گزینه‌های برگشت */
   fun boughtFrom(d: ShopData, supplierId: String): List<Product> {

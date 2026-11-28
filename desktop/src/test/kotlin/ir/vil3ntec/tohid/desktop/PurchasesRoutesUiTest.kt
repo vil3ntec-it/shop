@@ -12,6 +12,7 @@ import ir.vil3ntec.tohid.ui.v3.V3_FORM_PRIMARY_TAG
 import androidx.compose.ui.test.performSemanticsAction
 import ir.vil3ntec.tohid.core.i18n.StrHistory
 import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrProducts
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseOrders
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseWorkflow
@@ -175,13 +176,9 @@ class PurchasesRoutesUiTest {
     assertTrue(h.has("آرد"))
   }
 
-  /**
-   *  «الان رسیده؟ نه» ⇐ همان سفارشِ خریدِ سرور: یک ساختن با کلیدِ فرم (دو لمس ⇒ یک درخواست)، یک فرستادن، و پیش‌پرداختِ کامل
-   *  یک بار پس از سرور؛ هیچ خرید، موجودی یا بدهیِ دفتر تا «دریافتِ کالا».
-   */
   @Test fun newLineClosesThePreviousBarcodeFieldAndReopensWithItsValue() {
     h.show(MoneyPaths.newPurchase(PurchaseDemo.PAMIR), data)
-    h.await(StrMoney.pickItem)
+    h.await(StrPurchaseWorkflow.findProduct)
     h.type(StrPurchaseWorkflow.optionalBarcode, "123456")
     rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(StrMoney.addPurchaseRow))
     h.click(StrMoney.addPurchaseRow)
@@ -195,12 +192,12 @@ class PurchasesRoutesUiTest {
   @Test fun partialPaymentUsesTheTypedAmountAndShowsTheBalance() {
     val store = disk()
     h.show(MoneyPaths.newPurchase(PurchaseDemo.PAMIR), store)
-    h.await(StrMoney.pickItem)
-    h.click(StrMoney.pickItem)
+    h.await(StrPurchaseWorkflow.findProduct)
+    h.click(StrPurchaseWorkflow.findProduct)
     h.await("نمک")
     h.click("نمک")
     h.type(StrMoney.quantity, "10")
-    h.type(StrPurchaseWorkflow.optionalBarcode, "۱۲۳۴۵")
+    h.type(StrPurchaseWorkflow.optionalBarcode, "۹۸۷۶۵۴۳۲۱۰")
     assertFalse(h.has(StrPurchaseWorkflow.paymentPart))
     rule.onNodeWithTag(V3_FORM_PRIMARY_TAG).performSemanticsAction(SemanticsActions.OnClick)
     h.await(StrPurchaseWorkflow.paymentPart)
@@ -213,43 +210,46 @@ class PurchasesRoutesUiTest {
     assertEquals(200.0, purchase.totalAmount, 0.0)
     assertEquals(70.0, purchase.paidAmount, 0.0)
     assertEquals(130.0, purchase.debt, 0.0)
-    assertEquals("12345", purchase.barcode)
+    assertEquals("9876543210", purchase.barcode)
   }
 
-  @Test fun notReceivedNowSendsOnePurchaseOrderWithOnePrepaymentAndNoStock() {
-    val fake = FakePurchaseOrders(h.server)
+  @Test fun unpaidNewCartonPurchaseIsBilledNowAndReceivedFromItsDetails() {
     val store = disk()
     h.show(MoneyPaths.newPurchase(PurchaseDemo.PAMIR), store)
-    h.await(StrMoney.pickItem)
-    h.click(StrMoney.pickItem)
-    h.await("نمک")
-    h.click("نمک")
-    h.type(StrMoney.quantity, "10")
+    h.await(StrPurchaseWorkflow.loose)
+    h.click(StrPurchaseWorkflow.loose)
+    h.await(StrPurchaseWorkflow.carton)
+    h.type(StrProducts.name, "چای کوهی")
+    h.type(StrPurchaseWorkflow.cartons, "10")
+    h.type(StrPurchaseWorkflow.pieces, "25")
+    h.type(StrPurchaseWorkflow.cartonPrice, "600")
+    h.type(StrPurchaseWorkflow.optionalBarcode, "9504000370640")
+    h.type(StrPurchaseWorkflow.newSalePrice, "30")
     rule.onNodeWithTag(V3_FORM_PRIMARY_TAG).performSemanticsAction(SemanticsActions.OnClick)
     h.await(StrPurchaseWorkflow.paymentNow)
     h.click(StrPurchaseWorkflow.confirmPurchase)
     h.await(StrPurchaseWorkflow.paymentRequired)
-    assertTrue(fake.writes().isEmpty())
-    h.click(StrPurchaseWorkflow.paymentNow)
-    h.click(StrPurchaseWorkflow.purchaseDetails)
-    h.click(StrPurchases.laterReceived)
-    h.await(StrPurchases.laterHow)
+    h.click(StrPurchaseWorkflow.paymentLater)
+    h.click(StrPurchaseWorkflow.inTransit)
+    h.await(StrPurchaseWorkflow.awaitingStock)
     h.click(StrPurchaseWorkflow.confirmPurchase)
-    runCatching { h.click(StrPurchaseWorkflow.confirmPurchase) }
-    h.awaitThat { store.data.value.supplierPayments.isNotEmpty() }
-    val root = FakePurchaseOrders.ROOT
-    val creates = fake.writes().filter { it.path == root && it.method == "POST" }
-    assertEquals(1, creates.size)
-    assertTrue(!creates.single().key.isNullOrBlank())
-    assertEquals(1, fake.writes("/po-new-1/send").size)
-    assertEquals("sent", fake.order("po-new-1")!!.state)
-    val pay = store.data.value.supplierPayments.single()
-    assertEquals(creates.single().key + "-pay", pay.id)
-    assertEquals(200.0, pay.amount, 0.0)
-    assertEquals(StrPurchases.prepaidNote(fake.order("po-new-1")!!.no), pay.notes)
-    //  کالا هنوز نیامده: نه خرید، نه موجودیِ تازه؛ پامیر پیش‌پرداخت دارد
-    assertEquals(data.purchases.size, store.data.value.purchases.size)
-    assertEquals(ShopStore.stock(data, "salt"), ShopStore.stock(store.data.value, "salt"), 0.0)
-    assertEquals(ShopStore.supplierDebt(data, PurchaseDemo.PAMIR) - 200.0, ShopStore.supplierDebt(store.data.value, PurchaseDemo.PAMIR), 0.0)
+    h.awaitThat { store.data.value.purchases.size > data.purchases.size }
+
+    val recorded = store.data.value
+    val purchase = recorded.purchases.last()
+    val product = recorded.products.single { it.name == "چای کوهی" }
+    assertEquals(product.id, purchase.productId)
+    assertEquals(6000.0, purchase.debt, 0.0)
+    assertEquals(0.0, ShopStore.stock(recorded, product.id), 0.0)
+    assertEquals(30.0, product.salePrice, 0.0)
+    val view = PurchaseViews.all(recorded, today).single { it.awaitingDelivery }
+    assertEquals(listOf("9504000370640"), product.barcodes)
+
+    h.show(MoneyPaths.purchase(view.key) + "?receive=1", store)
+    h.await(StrPurchaseWorkflow.postDelivery)
+    h.click(StrPurchaseWorkflow.postDelivery)
+    h.awaitThat { ShopStore.stock(store.data.value, product.id) == 250.0 }
+    assertEquals(24.0, ShopStore.product(store.data.value, product.id)!!.purchasePrice, 0.0)
+    assertEquals(recorded.purchases, store.data.value.purchases)
   }
 }

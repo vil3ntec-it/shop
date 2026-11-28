@@ -71,8 +71,11 @@ object MoneyPaths {
   fun editSupplier(id: String) = supplier(id) + "/edit"
   fun paySupplier(id: String) = supplier(id) + "/pay"
   /** e-rows-63b: «پرداخت» ِ یک خرید — برگهٔ همان تأمین‌کننده با ماندهٔ خرید و شمارهٔ فاکتور (یادداشتِ `PurchaseBook.payNote`) */
-  fun payPurchase(id: String, amount: Double, invoiceNo: Int?, currency: String? = null) =
-    RoutePaths.withQuery(paySupplier(id), "amount" to PoForms.num(Math.round(amount * 100.0) / 100.0), "invoice" to invoiceNo?.toString(), "currency" to currency)
+  fun payPurchase(id: String, amount: Double, invoiceNo: Int?, currency: String? = null, invoiceId: String? = null) =
+    RoutePaths.withQuery(
+      paySupplier(id), "amount" to PoForms.num(Math.round(amount * 100.0) / 100.0),
+      "invoice" to invoiceNo?.toString(), "currency" to currency, "invoiceId" to invoiceId,
+    )
   /** e-rows-63b: جزئیاتِ یک خرید با کلیدِ `PurchaseViews.View.key` */
   fun purchase(key: String) = "purchasing/purchases/" + RoutePaths.encode(key)
   /** زبانهٔ خرید با زبانهٔ آغازین (`suppliers`) یا پالایهٔ پرداخت (`unpaid`، `overdue`) */
@@ -295,7 +298,6 @@ val MoneyModule = AppModule(
         supplierArg = args.query("supplier"),
         initialBarcode = args.query("barcode"),
         onBack = { back() },
-        onNewProduct = { nav.open(ProductsPaths.new()) },
         onCategory = { selected, done -> nav.openForResult(ProductsPaths.categories(pick = true, selected = selected), done) },
         //  PUR-05: همان فاکتورِ چندردیفهٔ کامپیوتر (`DeskPurchasing`)، با هزینهٔ جانبی (PUR-06) و سررسید (PUR-07)
         onSaveMany = { supplierId, lines, paid, date, notes, extras ->
@@ -305,17 +307,16 @@ val MoneyModule = AppModule(
             ir.vil3ntec.tohid.data.PurchaseBook.record(
               latest, supplierId, lines, paid, date, notes, today, now, ::moneyId,
               landedTotal = extras.landedTotal, dueDate = extras.dueDate, key = saveKey, fx = extras.fx, fxPaid = extras.fxPaid,
+              awaitDelivery = extras.awaitDelivery,
             )
           }
         },
         //  همان شرطِ کامپیوتر (`DeskPurchasing.stockOn`)
         extrasOn = remember(data.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(data) },
         notify = { tone, text -> toasts.show(text, tone) },
-        //  e-rows-63b: تأمین‌کنندهٔ تازه از همان برگهٔ انتخاب، اسکن با دوربین، و «الان رسیده؟ نه» ⇒ سفارشِ خرید (همان کلیدِ فرم)
+        //  تأمین‌کنندهٔ تازه از همان برگهٔ انتخاب و اسکن با دوربین
         onNewSupplier = { picked -> nav.openForResult(MoneyPaths.NEW_SUPPLIER) { picked(it) } },
         onScan = purchaseScan(),
-        laterOn = rememberPoManage(rememberPurchaseOrdersDoor()),
-        onSaveLater = rememberSaveLater(saveKey),
         //  PUR-12/AI-10: «از عکسِ فاکتور» — دکمه فقط با پرچمِ روشن و اجازهٔ خرید (`GET /shop/purchase-ocr/config`)
         ocr = ir.vil3ntec.tohid.ui.screens.rememberInvoiceOcr(data.products),
         //  PUR-11: ارزهای گاوصندوق (+ ارزهای دفترِ خرید) و آخرین نرخِ هر ارز (خرید/پرداخت، وگرنه نرخِ صندوقِ PAY-10)؛
@@ -593,6 +594,9 @@ private fun RouteScope.PayRoute() {
   val payKey = remember(id) { moneyId() }
   //  e-rows-63b: «پرداخت» ِ یک خرید ⇒ ماندهٔ همان خرید و یادداشتی که فاکتور را نام می‌برد (`PurchaseBook.open` اول همان را صاف می‌کند)
   val invoiceNo = args.query("invoice")?.toIntOrNull()?.takeIf { it > 0 }
+  val invoiceId = args.query("invoiceId")?.takeIf { key ->
+    data.purchases.any { it.supplierId == id && it.delivery?.invoiceId == key }
+  }
   //  PUR-11: «پرداخت» ِ خریدِ ارزی ⇒ حسابِ همان ارز با ماندهٔ همان ارز و آخرین نرخ
   val payCurrency = args.query("currency")?.takeIf { ir.vil3ntec.tohid.data.SupplierFx.cur(it) != null }
   val tillRates = remember { ir.vil3ntec.tohid.data.FxTillPref.rates(context) }
@@ -615,8 +619,8 @@ private fun RouteScope.PayRoute() {
       val now = System.currentTimeMillis()
       val result = if (code != null) {
         if (rate == null || minor == null) LedgerEngine.Result.Failed(ir.vil3ntec.tohid.core.i18n.StrPurchaseFx.amountBad)
-        else ir.vil3ntec.tohid.data.SupplierFx.pay(data, id, code, minor, f.inAfn, rate, f.date, f.notes, todayIso(), now, ::moneyId, key = payKey)
-      } else LedgerEngine.paySupplier(data, id, LedgerFormsModel.payAmount(f), f.date, f.notes, todayIso(), now, ::moneyId, key = payKey)
+        else ir.vil3ntec.tohid.data.SupplierFx.pay(data, id, code, minor, f.inAfn, rate, f.date, f.notes, todayIso(), now, ::moneyId, key = payKey, purchaseInvoiceId = invoiceId)
+      } else LedgerEngine.paySupplier(data, id, LedgerFormsModel.payAmount(f), f.date, f.notes, todayIso(), now, ::moneyId, key = payKey, purchaseInvoiceId = invoiceId)
       MoneyWriter.ledger(store, toasts, context, data, result, StrMoney.saved) != null
     },
     onSaved = { back() },

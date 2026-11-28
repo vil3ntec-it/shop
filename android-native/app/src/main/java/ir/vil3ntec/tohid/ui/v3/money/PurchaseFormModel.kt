@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ui.v3.money
 import ir.vil3ntec.tohid.Jalali
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseWorkflow
 import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrGoods
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseFx
 import ir.vil3ntec.tohid.core.pay.FxTill
 import ir.vil3ntec.tohid.core.purchase.PurchaseFx
@@ -15,6 +16,7 @@ import ir.vil3ntec.tohid.data.LedgerEngine
 import ir.vil3ntec.tohid.data.PoForms
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.PurchaseBook
+import ir.vil3ntec.tohid.data.PurchaseCatalog
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.formatDate
@@ -53,7 +55,7 @@ internal data class PurchaseForm(
    *  تایپیِ پیشین (خالی = نسیه) — فرمِ تازه ([PurchaseFormModel.initial]) همیشه یکی را دارد.
    */
   val pay: PurchasePay? = null,
-  /** e-rows-63b: «الان رسیده؟ نه» ⇒ سفارشِ خرید (سرور، `shop.purchase_orders`)، نه فاکتورِ دفتر؛ کالا با «دریافتِ کالا» می‌آید */
+  /** Invoice is posted now and stock is posted on delivery confirmation. */
   val later: Boolean = false,
   /**
    *  PUR-11 — ارزِ فاکتور (`null` = افغانی، همان فرمِ پیشین): قیمت‌ها و «پرداخت‌شده» به همین ارز تایپ می‌شوند و [rate] (پول برای
@@ -63,6 +65,13 @@ internal data class PurchaseForm(
   val rate: String = "",
   val per: Long = 1,
   val packaging: PurchasePackaging = PurchasePackaging(),
+  val identity: PurchaseIdentity = PurchaseIdentity(),
+)
+
+internal data class PurchaseIdentity(
+  val name: String = "",
+  val category: String = "",
+  val salePrice: String = "",
 )
 
 internal data class PurchasePackaging(
@@ -85,6 +94,7 @@ internal data class PurchaseRow(
   /** PRD-07: همان [PurchaseForm.unitName] برای این ردیف */
   val unitName: String? = null,
   val packaging: PurchasePackaging = PurchasePackaging(),
+  val identity: PurchaseIdentity = PurchaseIdentity(),
 )
 
 /**
@@ -157,7 +167,7 @@ internal object PurchaseFormModel {
 
   /**
    *  ارزِ فاکتور ⇒ فرم: ارزِ تازه قیمت‌ها و «پرداخت‌شده» را پاک می‌کند (عددِ افغانیِ تایپی دالر خوانده نشود) و نرخ را از آخرین
-   *  نرخِ همین ارز ([lastRate]: پول برای per) پیش‌پُر؛ افغانی ⇒ همان فرمِ پیشین (بی نرخ). «نرسیده» با ارز ممکن نیست.
+   *  نرخِ همین ارز ([lastRate]: پول برای per) پیش‌پُر؛ افغانی ⇒ همان فرمِ پیشین (بی نرخ).
    */
   fun setCurrency(f: PurchaseForm, code: String?, lastRate: PurchaseFx.Rate? = null): PurchaseForm {
     val c = code?.takeIf { it != PurchaseFx.AFN }
@@ -168,7 +178,6 @@ internal object PurchaseFormModel {
     return cleared.copy(
       rate = r?.let { FxTill.afnText(it.rate) }.orEmpty(),
       per = r?.per ?: PurchaseFx.defaultPer(c),
-      later = false,
     )
   }
 
@@ -215,7 +224,7 @@ internal object PurchaseFormModel {
     if (f.currency != null) return f to 0
     var out = f
     var added = 0
-    fun blank(r: PurchaseRow) = r.productId == null && r.quantity.isBlank() && r.price.isBlank()
+    fun blank(r: PurchaseRow) = free(r) && r.quantity.isBlank() && r.price.isBlank()
     for (a in rows) {
       if (d.products.none { it.id == a.productId }) continue
       val r = PurchaseRow(a.productId, ir.vil3ntec.tohid.core.purchase.InvoiceOcr.text(a.qty), ir.vil3ntec.tohid.core.purchase.InvoiceOcr.text(a.price))
@@ -236,12 +245,9 @@ internal object PurchaseFormModel {
   /** کادرِ مبلغِ پرداخت پیداست؟ (بخشی، یا کادرِ تایپیِ پیشین) */
   fun typesPaid(f: PurchaseForm): Boolean = f.pay == null || f.pay == PurchasePay.PART
 
-  /**
-   *  کادرِ «سررسیدِ پرداخت» پیداست؟ نسیه یا بخشی (هر جا، e-rows-63b) یا موتورِ تازهٔ موجودی (PUR-07، همان شرطِ کامپیوتر)؛ نه برای
-   *  «همه را دادم» و نه کالای نرسیده (سفارش سررسیدِ پرداخت ندارد؛ بدهی با رسیدنِ کالا می‌آید).
-   */
+  /** Delivery timing and the supplier's payment due date are independent. */
   fun dueShown(f: PurchaseForm, extrasOn: Boolean): Boolean =
-    !f.later && f.pay != PurchasePay.FULL && (extrasOn || f.pay == PurchasePay.PART || f.pay == PurchasePay.LATER)
+    f.pay != PurchasePay.FULL && (extrasOn || f.pay == PurchasePay.PART || f.pay == PurchasePay.LATER)
 
   /** گزینهٔ پرداخت ⇒ فرم: «همه» و «بعداً» مبلغِ تایپی را پاک می‌کنند؛ «همه» سررسید را هم */
   fun setPay(f: PurchaseForm, pay: PurchasePay): PurchaseForm = when (pay) {
@@ -249,9 +255,6 @@ internal object PurchaseFormModel {
     PurchasePay.PART -> f.copy(pay = pay)
     PurchasePay.LATER -> f.copy(pay = pay, paid = "")
   }
-
-  /** «الان رسیده؟» ⇒ فرم: نرسیده سررسیدِ پرداخت و هزینهٔ جانبی ندارد (بها و بدهی با رسید می‌آیند) */
-  fun setLater(f: PurchaseForm, later: Boolean): PurchaseForm = if (later) f.copy(later = true, due = "", landed = "") else f.copy(later = false)
 
   /**
    *  کالا که انتخاب شد و قیمت خالی بود ⇒ قیمتِ خریدِ فعلیِ همان کالا (قابلِ عوض کردن).
@@ -266,14 +269,14 @@ internal object PurchaseFormModel {
   /* ── PRD-07: واحدِ خریدِ ردیف ──────────────────────────────────────── */
 
   /** ردیفِ نخست به شکلِ یک ردیف (و برگشت) — تا هر کارِ ردیف یک بار نوشته شود */
-  fun first(f: PurchaseForm) = PurchaseRow(f.productId, f.quantity, f.price, f.expiry, f.unitName, f.packaging)
+  fun first(f: PurchaseForm) = PurchaseRow(f.productId, f.quantity, f.price, f.expiry, f.unitName, f.packaging, f.identity)
 
   fun withFirst(f: PurchaseForm, r: PurchaseRow) =
-    f.copy(productId = r.productId, quantity = r.quantity, price = r.price, expiry = r.expiry, unitName = r.unitName, packaging = r.packaging)
+    f.copy(productId = r.productId, quantity = r.quantity, price = r.price, expiry = r.expiry, unitName = r.unitName, packaging = r.packaging, identity = r.identity)
 
-  private fun row(f: PurchaseForm, index: Int): PurchaseRow? = if (index < 0) first(f) else f.more.getOrNull(index)
+  fun row(f: PurchaseForm, index: Int): PurchaseRow? = if (index < 0) first(f) else f.more.getOrNull(index)
 
-  private fun put(f: PurchaseForm, index: Int, r: PurchaseRow): PurchaseForm = if (index < 0) withFirst(f, r) else setRow(f, index, r)
+  fun put(f: PurchaseForm, index: Int, r: PurchaseRow): PurchaseForm = if (index < 0) withFirst(f, r) else setRow(f, index, r)
 
   /**
    *  کالا روی ردیف با واحدِ [unit]؛ قیمتِ خالی ⇒ قیمتِ خریدِ کالا به همان واحد (`PoForms.repriced`، همان حسابِ سفارشِ خرید).
@@ -283,7 +286,10 @@ internal object PurchaseFormModel {
     val price = if (!fx && !r.packaging.carton && r.price.isBlank() && p.purchasePrice > 0) priceText(p.purchasePrice).let { base ->
       if (unit == null) base else PoForms.repriced(p, base, null, unit) ?: base
     } else r.price
-    return r.copy(productId = p.id, price = price, unitName = unit.takeUnless { r.packaging.carton })
+    return r.copy(
+      productId = p.id, price = price, unitName = unit.takeUnless { r.packaging.carton },
+      identity = if (r.productId == p.id) r.identity else PurchaseIdentity(name = p.name, category = p.category),
+    )
   }
 
   /** واحدِ پیش‌فرضِ همین تأمین‌کننده (`PurchaseUnits.defaultFor`)؛ پرچمِ خاموش ⇒ همیشه واحدِ پایه */
@@ -360,6 +366,12 @@ internal object PurchaseFormModel {
   private fun sameUnit(a: String?, b: String?): Boolean =
     if (a == null || b == null) a == b else PurchaseUnits.key(a) == PurchaseUnits.key(b)
 
+  fun catalogMatch(row: PurchaseRow, catalog: PurchaseCatalog.Index): PurchaseCatalog.Match =
+    catalog.resolve(row.productId, row.identity.name, row.identity.category, row.packaging.barcode)
+
+  private fun free(row: PurchaseRow): Boolean =
+    row.productId == null && row.identity.name.isBlank() && row.packaging.barcode.isBlank()
+
   private fun plusOne(text: String): String = PoForms.num((num(text)?.takeIf { it > 0 } ?: 0.0) + 1.0)
 
   /**
@@ -378,8 +390,8 @@ internal object PurchaseFormModel {
     val same = rows.indexOfFirst { it.productId == p.id && sameUnit(it.unitName, unit) && !it.packaging.carton }
     val at = when {
       same >= 0 -> same - 1
-      f.productId == null -> -1
-      else -> f.more.indexOfFirst { it.productId == null }.takeIf { it >= 0 }
+      free(first(f)) -> -1
+      else -> f.more.indexOfFirst(::free).takeIf { it >= 0 }
         ?: f.more.size
     }
     val base = if (at >= f.more.size) addRow(f) else f
@@ -395,8 +407,9 @@ internal object PurchaseFormModel {
     val unit: String? = null,
     val packaging: String? = null,
     val production: String? = null,
+    val salePrice: String? = null,
   ) {
-    val any: Boolean get() = listOf(product, quantity, price, expiry, unit, packaging, production).any { it != null }
+    val any: Boolean get() = listOf(product, quantity, price, expiry, unit, packaging, production, salePrice).any { it != null }
   }
 
   data class Errors(
@@ -417,8 +430,9 @@ internal object PurchaseFormModel {
     val rate: String? = null,
     val packaging: String? = null,
     val production: String? = null,
+    val salePrice: String? = null,
   ) {
-    val any: Boolean get() = listOf(supplier, product, quantity, price, paid, expiry, landed, due, unit, rate, packaging, production).any { it != null } || rows.any { it.any }
+    val any: Boolean get() = listOf(supplier, product, quantity, price, paid, expiry, landed, due, unit, rate, packaging, production, salePrice).any { it != null } || rows.any { it.any }
   }
 
   private fun quantityError(text: String): String? = num(text).let { if (it == null || it <= 0) StrMoney.invalidNumber else null }
@@ -454,44 +468,47 @@ internal object PurchaseFormModel {
       StrPurchaseWorkflow.cartonInvalid else null
   }
 
-  private fun productionError(row: PurchaseRow, later: Boolean): String? = when {
-    !later && expiryIso(row.packaging.production) == null -> StrStock.errExpiry
-    !later && expiryIso(row.packaging.production).orEmpty().isNotEmpty() &&
-      expiryIso(row.expiry).orEmpty().isNotEmpty() && expiryIso(row.packaging.production).orEmpty() > expiryIso(row.expiry).orEmpty() -> StrPurchaseWorkflow.dateOrder
-    else -> null
+  private fun productionError(row: PurchaseRow): String? {
+    val production = expiryIso(row.packaging.production) ?: return StrStock.errExpiry
+    val expiry = expiryIso(row.expiry).orEmpty()
+    return StrPurchaseWorkflow.dateOrder.takeIf { production.isNotEmpty() && expiry.isNotEmpty() && production > expiry }
   }
 
-  /** خطای درجای هر کادر — همان شرط‌های موتور، پیش از زدن؛ [d] (PRD-07) برای سنجشِ واحدِ خریدِ ردیف‌ها */
-  fun errors(f: PurchaseForm, d: ShopData? = null): Errors = Errors(
-    supplier = if (f.supplierId == null) StrMoney.pickSupplier else null,
-    product = if (f.productId == null) StrMoney.pickItem else null,
-    quantity = quantityError(f.quantity),
-    price = priceError(f.price, f.currency),
-    paid = paidError(f),
-    rows = f.more.map { r ->
-      RowErrors(
-        product = if (r.productId == null) StrMoney.pickItem else null,
-        quantity = quantityError(r.quantity),
-        price = priceError(r.price, f.currency),
-        expiry = if (f.later) null else expiryError(r.expiry),
-        packaging = packagingError(r),
-        production = productionError(r, f.later),
-        unit = unitError(d, r.productId, r.unitName, r.quantity, r.price, f),
-      )
-    },
-    expiry = if (f.later) null else expiryError(f.expiry),
-    packaging = packagingError(first(f)),
-    production = productionError(first(f), f.later),
-    landed = if (landedTotal(f) == null) StrPurchasePages.landedBad else null,
-    //  همان دو شرطِ موتور (`PurchaseBook.record`/`LedgerEngine.addPurchase`): تاریخِ درست و نه پیش از تاریخِ خرید
-    due = when (val iso = dueIso(f)) {
-      null -> StrPurchasePages.dueBad(formatDate(f.date.ifBlank { todayIso() }))
-      "" -> null
-      else -> if (f.date.isNotBlank() && iso < f.date) PurchaseBook.DUE_BEFORE_DATE else null
-    },
-    unit = unitError(d, f.productId, f.unitName, f.quantity, f.price, f),
-    rate = if (f.currency != null && fxRate(f) == null) StrPurchaseFx.rateBad else null,
-  )
+  private fun rowErrors(f: PurchaseForm, row: PurchaseRow, d: ShopData?, catalog: PurchaseCatalog.Index?): RowErrors {
+    val match = catalog?.let { catalogMatch(row, it) }
+    val product = match?.product
+    val needsNew = product == null && row.productId == null && row.identity.name.isNotBlank()
+    return RowErrors(
+      product = match?.problem ?: StrGoods.nameNeeded.takeIf { product == null && row.productId == null && !needsNew },
+      quantity = quantityError(row.quantity),
+      price = priceError(row.price, f.currency),
+      expiry = expiryError(row.expiry),
+      packaging = packagingError(row),
+      production = productionError(row),
+      unit = unitError(d, row.productId, row.unitName, row.quantity, row.price, f),
+      salePrice = StrGoods.salePriceBad.takeIf {
+        (needsNew || row.identity.salePrice.isNotBlank()) && priceError(row.identity.salePrice) != null
+      },
+    )
+  }
+
+  /** This also validates inline catalog fields, against the same matching rules as the purchase write. */
+  fun errors(f: PurchaseForm, d: ShopData? = null, catalog: PurchaseCatalog.Index? = d?.let { PurchaseCatalog.Index(it.products) }): Errors {
+    val first = rowErrors(f, first(f), d, catalog)
+    return Errors(
+      supplier = StrMoney.pickSupplier.takeIf { f.supplierId == null || (d != null && d.suppliers.none { it.id == f.supplierId }) },
+      product = first.product, quantity = first.quantity, price = first.price, expiry = first.expiry,
+      packaging = first.packaging, production = first.production, unit = first.unit, salePrice = first.salePrice,
+      paid = paidError(f), rows = f.more.map { rowErrors(f, it, d, catalog) },
+      landed = StrPurchasePages.landedBad.takeIf { landedTotal(f) == null },
+      due = when (val iso = dueIso(f)) {
+        null -> StrPurchasePages.dueBad(formatDate(f.date.ifBlank { todayIso() }))
+        "" -> null
+        else -> PurchaseBook.DUE_BEFORE_DATE.takeIf { f.date.isNotBlank() && iso < f.date }
+      },
+      rate = StrPurchaseFx.rateBad.takeIf { f.currency != null && fxRate(f) == null },
+    )
+  }
 
   /** چیزی نوشته یا عوض شده ⇒ «برگشت» اول «دور ریخته شود؟» */
   fun dirty(f: PurchaseForm, initial: PurchaseForm): Boolean = f != initial
@@ -522,10 +539,11 @@ internal object PurchaseFormModel {
     /** PUR-11: نرخِ فاکتورِ ارزی و پرداختِ هنگامِ خرید به همان ارز (واحدِ کوچک)؛ افغانی ⇒ null و ۰ */
     val fx: PurchaseFx.Rate? = null,
     val fxPaid: Long = 0,
+    val awaitDelivery: Boolean = false,
   )
 
   fun extras(f: PurchaseForm, on: Boolean): Extras =
-    Extras(if (on) landedTotal(f) ?: 0.0 else 0.0, if (dueShown(f, on)) dueOrNull(f) else null, fxRate(f), fxPaid(f))
+    Extras(if (on) landedTotal(f) ?: 0.0 else 0.0, if (dueShown(f, on)) dueOrNull(f) else null, fxRate(f), fxPaid(f), f.later)
 
   /**
    *  PUR-05: ردیف‌های فاکتورِ چندردیفه برای `PurchaseBook.record` (همان فاکتورِ چندردیفهٔ کامپیوتر): ردیفِ نخست، سپس
@@ -541,7 +559,10 @@ internal object PurchaseFormModel {
         unitName = if (r.packaging.carton) StrPurchaseWorkflow.carton else unitOrNull(r.unitName),
         factorMilli = r.packaging.factor(),
         productionDate = expiryIso(r.packaging.production).orEmpty(),
-        barcode = r.packaging.barcode.trim().take(128).ifEmpty { null },
+        barcode = r.packaging.barcode.trim().ifEmpty { null },
+        productName = r.identity.name.trim(),
+        category = r.identity.category,
+        salePrice = num(r.identity.salePrice),
         //  PUR-11: فیِ ردیف به واحدِ کوچکِ ارزِ فاکتور
         fxPrice = f.currency?.let { code -> fxMinor(r.price, code) ?: -1L },
       )
@@ -554,13 +575,4 @@ internal object PurchaseFormModel {
     PurchasePay.PART, null -> num(f.paid) ?: 0.0
   }
 
-  /**
-   *  e-rows-63b: «الان رسیده؟ نه» ⇒ ردیف‌های سفارشِ خرید (`PoForms.draft` ⇐ همان ساختنِ سفارشِ امروز). واحدِ خریدِ ردیف همان
-   *  واحد می‌ماند (`EditRow.unitName`)؛ انقضا در سفارش نیست (هنگامِ دریافت).
-   */
-  fun orderRows(f: PurchaseForm, d: ShopData): List<PoForms.EditRow> =
-    (listOf(first(f)) + f.more).mapIndexed { i, r ->
-      val p = d.products.find { it.id == r.productId }
-      PoForms.EditRow(i, r.productId.orEmpty(), p?.name.orEmpty(), p?.unit.orEmpty(), r.quantity.trim(), r.price.trim(), if (r.packaging.carton) StrPurchaseWorkflow.carton else unitOrNull(r.unitName), r.packaging.factor())
-    }
 }

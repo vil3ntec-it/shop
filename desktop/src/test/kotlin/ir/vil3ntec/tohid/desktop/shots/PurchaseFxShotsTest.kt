@@ -33,6 +33,7 @@ import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.StrFx
 import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseWorkflow
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseFx
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
 import ir.vil3ntec.tohid.core.i18n.StrSafeCur
@@ -182,7 +183,7 @@ class PurchaseFxShotsTest {
         click(StrSafeCur.currency)
         click(StrFx.usd)
         typeIn(StrPurchaseFx.rateLabel("1", "USD"), "70.25", replace = true)
-        click(StrMoney.pickItem)
+        click(StrPurchaseWorkflow.findProduct)
         click("چای سبزِ دوبی")
         typeIn(StrMoney.quantity, "10")
         typeIn(StrPurchaseFx.priceIn("USD"), "10")
