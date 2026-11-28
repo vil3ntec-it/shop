@@ -459,6 +459,7 @@ internal fun PurchaseFormScreen(
         val i = index - 1
         val rowErrors = if (tried) rowErrors(index) else PurchaseFormModel.RowErrors()
         val match = remember(row.productId, row.identity, row.packaging.barcode, catalog) { PurchaseFormModel.catalogMatch(row, catalog) }
+        val currentCategory = row.identity.category.ifBlank { match.product?.category.orEmpty() }
         fun change(changed: PurchaseRow) { form = PurchaseFormModel.put(form, i, changed) }
         PurchaseItemCard(
           row = row, product = match.product, number = index + 1, errors = rowErrors,
@@ -470,13 +471,13 @@ internal fun PurchaseFormScreen(
           canManageCategories = onCategory != null,
           onCategory = { category ->
             if (category == MANAGE_CATEGORIES) {
-              onCategory?.invoke(row.identity.category.ifBlank { null }) { selected ->
+              onCategory?.invoke(currentCategory.ifBlank { null }) { selected ->
                 val current = PurchaseFormModel.row(form, i)
-                if (selected != null && current != null && selected != current.identity.category) {
+                if (selected != null && current != null && selected != currentCategory) {
                   change(current.copy(productId = null, unitName = null, identity = current.identity.copy(category = selected)))
                 }
               }
-            } else if (category != row.identity.category) {
+            } else if (category != currentCategory) {
               change(row.copy(productId = null, unitName = null, identity = row.identity.copy(category = category)))
             }
           },
@@ -609,7 +610,7 @@ internal fun PurchaseFormScreen(
     PurchasePicker.PRODUCT -> {
       val row = PurchaseFormModel.row(form, pickRow)
       val current = row?.productId
-      val category = row?.identity?.category.orEmpty()
+      val category = row?.identity?.category.orEmpty().ifBlank { productById[current]?.category.orEmpty() }
       IdPickerSheet(
         title = StrMoney.item,
         options = d.products.filter { (it.active || it.id == current) && (category.isBlank() || it.category == category) }
@@ -717,8 +718,11 @@ private fun PurchaseItemCard(
         )
       }
       V3TextField(
-        row.identity.name,
-        { entered -> onChange(row.copy(productId = null, unitName = null, identity = row.identity.copy(name = entered))) },
+        row.identity.name.ifBlank { product?.name.orEmpty().takeIf { row.productId != null }.orEmpty() },
+        { entered ->
+          val category = row.identity.category.ifBlank { product?.category.orEmpty() }
+          onChange(row.copy(productId = null, unitName = null, identity = row.identity.copy(name = entered, category = category)))
+        },
         StrProducts.name, placeholder = product?.name ?: StrProducts.namePlaceholder, error = errors.product,
         helper = when {
           product != null -> Workflow.productMatch

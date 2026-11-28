@@ -3,7 +3,6 @@ package ir.vil3ntec.tohid.desktop
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.hasText
@@ -220,8 +219,8 @@ class PurchasesRoutesUiTest {
     val store = disk(data.copy(productCategories = listOf(category)))
     h.show(MoneyPaths.newPurchase(PurchaseDemo.PAMIR), store)
     h.await(StrPurchaseWorkflow.loose)
-    rule.onNode(hasContentDescription("${StrProducts.category}: ${StrProducts.pickCategory}"))
-      .performSemanticsAction(SemanticsActions.OnClick)
+    h.await(StrProducts.pickCategory)
+    h.click(StrProducts.pickCategory)
     h.click(category)
     h.click(StrPurchaseWorkflow.loose)
     h.await(StrPurchaseWorkflow.carton)

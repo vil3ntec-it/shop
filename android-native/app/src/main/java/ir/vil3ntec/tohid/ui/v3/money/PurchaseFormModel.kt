@@ -288,7 +288,7 @@ internal object PurchaseFormModel {
     } else r.price
     return r.copy(
       productId = p.id, price = price, unitName = unit.takeUnless { r.packaging.carton },
-      identity = if (r.productId == p.id) r.identity else PurchaseIdentity(name = p.name, category = p.category),
+      identity = if (r.productId == p.id) r.identity else PurchaseIdentity(),
     )
   }
 
@@ -560,8 +560,8 @@ internal object PurchaseFormModel {
         factorMilli = r.packaging.factor(),
         productionDate = expiryIso(r.packaging.production).orEmpty(),
         barcode = r.packaging.barcode.trim().ifEmpty { null },
-        productName = r.identity.name.trim(),
-        category = r.identity.category,
+        productName = r.identity.name.trim().takeIf { id.isBlank() }.orEmpty(),
+        category = r.identity.category.takeIf { id.isBlank() }.orEmpty(),
         salePrice = num(r.identity.salePrice),
         //  PUR-11: فیِ ردیف به واحدِ کوچکِ ارزِ فاکتور
         fxPrice = f.currency?.let { code -> fxMinor(r.price, code) ?: -1L },

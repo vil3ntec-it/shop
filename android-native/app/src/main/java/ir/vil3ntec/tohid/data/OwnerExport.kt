@@ -138,6 +138,8 @@ object OwnerExport {
     "saleId" to "شناسهٔ فاکتور",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "saleItemId" to "شناسهٔ قلم فاکتور",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "purchaseId" to "شناسهٔ خرید",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "delivery" to "جزئیات دریافت خرید",  // داده: ستونِ خروجیِ کاملِ صاحب
+    "purchaseInvoiceId" to "شناسهٔ فاکتور خرید",  // داده: ستونِ خروجیِ کاملِ صاحب
     "warehouseEntryId" to "شناسهٔ ورودی انبار",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "refId" to "شناسهٔ مرجع",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "refIds" to "ردیف‌های مرتبط",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)

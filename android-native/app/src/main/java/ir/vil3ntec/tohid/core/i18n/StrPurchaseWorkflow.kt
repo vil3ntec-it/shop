@@ -24,7 +24,6 @@ object StrPurchaseWorkflow {
   val allCategories get() = t("همهٔ دسته‌ها", "All categories", "ټولې ډلې")
   fun basePrice(total: String, each: String) = t("${asIs(total)} عدد · هر عدد ${asIs(each)}", "$total units · $each each", "$total دانې · هره دانه $each")
   val deliveryOptions get() = t("زمان دریافت کالا و هزینهٔ جانبی", "Delivery timing and extra costs", "د توکو د ترلاسه کولو وخت او اضافي لګښتونه")
-  val packaging get() = t("نوع بسته‌بندی", "Packaging", "بسته‌بندي")
   val findProduct get() = t("انتخاب از کالاهای موجود", "Choose an existing product", "له شته توکو یې وټاکئ")
   val productMatch get() = t("به همین کالا اضافه می‌شود", "Adds to this product", "همدې توکي ته زیاتېږي")
   val createsProduct get() = t("به‌عنوان کالای جدید ثبت می‌شود", "Creates a new product", "د نوي توکي په توګه ثبتېږي")
