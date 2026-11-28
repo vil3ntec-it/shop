@@ -38,6 +38,8 @@ import ir.vil3ntec.tohid.core.i18n.StrHistory
 import ir.vil3ntec.tohid.core.i18n.StrInvoices
 import ir.vil3ntec.tohid.core.i18n.StrLook
 import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseWorkflow
+import ir.vil3ntec.tohid.data.PurchaseBook
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
 import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.core.i18n.StrSale
@@ -264,6 +266,28 @@ class DeskDataScreensUiTest {
     tap(statement)
     val supplier = data.suppliers.single { it.name == "شرکت پخش البرز" }
     assertEquals(listOf("purchase:", "supplier:${supplier.id}"), calls)
+  }
+
+  @Test fun desktopInvoicePaneOpensTheConfirmationForThePendingPurchase() = ui { set ->
+    val base = PurchaseDemo.full()
+    val today = ir.vil3ntec.tohid.todayIso()
+    val result = PurchaseBook.record(
+      base, PurchaseDemo.PAMIR, listOf(PurchaseBook.Line("salt", 2.0, 20.0)), 0.0, today, "", today,
+      System.currentTimeMillis(), { "desk-receipt" }, key = "desk-in-transit", awaitDelivery = true,
+    ) as PurchaseBook.Result.Ok
+    val calls = ArrayList<String>()
+    set {
+      DeskPurchasingScreen(
+        RouteUiHarness.memoryStore(result.data), result.data, remember { SnackbarHostState() },
+        onConfirmDelivery = { calls += it },
+      )
+    }
+    val label = StrPurchaseWorkflow.confirmDelivery
+    await("#${result.invoiceNo}")
+    tap("#${result.invoiceNo}")
+    await(label)
+    tap(label)
+    assertEquals(listOf("delivery:desk-in-transit"), calls)
   }
 
   @Test fun expensesSelectAndDeleteWithTheSameQuestion() = ui { set ->

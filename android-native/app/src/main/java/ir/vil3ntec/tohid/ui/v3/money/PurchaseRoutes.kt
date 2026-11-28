@@ -69,7 +69,7 @@ internal fun RouteScope.purchasesActions(open: OpenOrders): PurchasesActions = P
   },
   onPay = { payPurchase(it) },
   onReceive = if (open.canReceive) ({ v -> v.orderId?.let { id -> nav.openForResult(MoneyPaths.receivePurchaseOrder(id)) { open.refresh() } } }) else null,
-  onDelivery = { v -> nav.open(MoneyPaths.purchase(v.key) + "?receive=1") },
+  onDelivery = { v -> nav.open(MoneyPaths.purchaseDelivery(v.key)) },
   onNew = { nav.open(MoneyPaths.newPurchase()) },
 )
 

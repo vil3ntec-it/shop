@@ -78,6 +78,7 @@ object MoneyPaths {
     )
   /** e-rows-63b: جزئیاتِ یک خرید با کلیدِ `PurchaseViews.View.key` */
   fun purchase(key: String) = "purchasing/purchases/" + RoutePaths.encode(key)
+  fun purchaseDelivery(key: String) = RoutePaths.withQuery(purchase(key), "receive" to "1")
   /** زبانهٔ خرید با زبانهٔ آغازین (`suppliers`) یا پالایهٔ پرداخت (`unpaid`، `overdue`) */
   fun purchasing(tab: String? = null, pay: String? = null) = RoutePaths.withQuery(PURCHASING, "tab" to tab, "pay" to pay)
   fun returnSupplier(id: String) = supplier(id) + "/return"
@@ -219,6 +220,7 @@ val MoneyModule = AppModule(
         store, data, snackbar,
         onNewPurchase = { barcode -> nav.open(MoneyPaths.newPurchase(barcode = barcode)) },
         onSupplierLedger = { id -> nav.open(MoneyPaths.supplier(id)) },
+        onConfirmDelivery = { key -> nav.open(MoneyPaths.purchaseDelivery(key)) },
       ) else {
         //  PUR-14: فاکتورِ تأمین‌کننده و «باطل» روی گوشی هم (پیش‌تر فقط پنجرهٔ «سفارش‌های خرید» ِ کامپیوتر)
         val billsDoor = rememberSupplierBillsDoor()

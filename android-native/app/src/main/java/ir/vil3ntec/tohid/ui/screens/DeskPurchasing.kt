@@ -37,6 +37,8 @@ import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.i18n.StrPlaces
 import ir.vil3ntec.tohid.core.i18n.StrPriceCheck
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseWorkflow
+import ir.vil3ntec.tohid.core.i18n.StrPurchases
 import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.core.i18n.StrReturnPages
@@ -119,6 +121,7 @@ fun DeskPurchasingScreen(
   snackbar: SnackbarHostState,
   onNewPurchase: ((String?) -> Unit)? = null,
   onSupplierLedger: ((String) -> Unit)? = null,
+  onConfirmDelivery: ((String) -> Unit)? = null,
 ) {
   val scope = rememberCoroutineScope()
   fun toast(t: String) { scope.launch { snackbar.showSnackbar(t) } }
@@ -139,11 +142,13 @@ fun DeskPurchasingScreen(
       //  PRD-07: بارکدِ واحدِ خرید (کارتنِ ۲۴ ِ تأمین‌کنندهٔ ب) همان واحد را برمی‌گزیند — فقط با `ShopPolicy.productTools`
       val unitHit = if (unitsOn) ShopStore.purchaseUnitIndex(latest).find(code) else null
       val id = unitHit?.productId ?: ShopStore.barcodeIndex(latest)[code]
-      if (id == null) { toast(StrPurchasePages.barcodeUnknown(code)); true }
-      else {
-        launchPurchase?.invoke(code) ?: run { pending += Scan(id, unitHit?.unit?.name); editing = true }
-        true
+      val launch = launchPurchase
+      when {
+        launch != null -> launch(code)
+        id != null -> { pending += Scan(id, unitHit?.unit?.name); editing = true }
+        else -> toast(StrPurchasePages.barcodeUnknown(code))
       }
+      true
     }
     onDispose { ir.vil3ntec.tohid.scan.ScanRouter.unregister(owner) }
   }
@@ -175,7 +180,7 @@ fun DeskPurchasingScreen(
     ) {
       DeskSegmented(listOf(0 to StrPurchasePages.purchaseInvoices, 1 to StrPurchasePages.suppliers), tab, { tab = it })
     }
-    if (tab == 0) PurchaseInvoices(d, ::toast) else Suppliers(store, d, ::toast, onSupplierLedger)
+    if (tab == 0) PurchaseInvoices(d, ::toast, onConfirmDelivery) else Suppliers(store, d, ::toast, onSupplierLedger)
   }
 }
 
@@ -203,12 +208,16 @@ private fun PurchaseKpis(d: ShopData) {
 /* ══════════════════════════ فهرستِ فاکتورها ══════════════════════════ */
 
 @Composable
-private fun ColumnScope.PurchaseInvoices(d: ShopData, toast: (String) -> Unit) {
+private fun ColumnScope.PurchaseInvoices(d: ShopData, toast: (String) -> Unit, onConfirmDelivery: ((String) -> Unit)?) {
   var supplier by remember { mutableStateOf<String?>(null) }
   var picked by remember { mutableStateOf<String?>(null) }
   val list = rememberDeskLoad(d, supplier) { PurchaseBook.invoices(d, supplier) }.orEmpty()
   //  ماندهٔ واقعیِ هر فاکتور (پرداخت‌های بعدی و سندِ کسر FIFO) — برای رنگِ سررسید
   val remaining = remember(d) { PurchaseBook.open(d).associate { it.invoice.key to it.remaining } }
+  val awaiting = remember(d, list) {
+    val receipts = PurchaseBook.receivedPurchases(d)
+    list.filter { invoice -> invoice.lines.any { PurchaseBook.awaitsDelivery(it, receipts) } }.mapTo(HashSet()) { it.key }
+  }
   val names = remember(d) { d.suppliers.associate { it.id to it.name } }
   val today = ir.vil3ntec.tohid.todayIso()
   val shotPick = DeskDataShot.pick.value
@@ -256,7 +265,10 @@ private fun ColumnScope.PurchaseInvoices(d: ShopData, toast: (String) -> Unit) {
       when (col) {
         0 -> DeskCell(if (v.isReturn) StrHistory.returns else if (v.no > 0) "#${v.no}" else "—", muted = v.isReturn)
         1 -> DeskCell(formatDate(v.date), muted = true)
-        2 -> DeskCell(names[v.supplierId] ?: "—")
+        2 -> {
+          val supplierName = names[v.supplierId] ?: "—"
+          DeskCell(if (v.key in awaiting) "$supplierName · ${StrPurchaseWorkflow.inTransit}" else supplierName)
+        }
         3 -> DeskCell(ir.vil3ntec.tohid.plain(v.lines.size), muted = true)
         4 -> DeskCell(money(v.total), strong = true)
         5 -> DeskCell(money(v.paid), muted = true)
@@ -264,14 +276,22 @@ private fun ColumnScope.PurchaseInvoices(d: ShopData, toast: (String) -> Unit) {
       }
     }
    }
-   if (inv != null) Box(Modifier.width(paneW).fillMaxHeight()) { PurchasePane(d, inv, names, remaining, today, toast, onClose = { picked = null }) }
+   if (inv != null) Box(Modifier.width(paneW).fillMaxHeight()) {
+     PurchasePane(
+       d, inv, names, remaining, today, toast, onClose = { picked = null },
+       awaiting = inv.key in awaiting, onConfirmDelivery = onConfirmDelivery?.let { confirm -> { confirm(inv.key) } },
+     )
+   }
    }
   }
 }
 
 /** پنلِ فاکتورِ خریدِ برگزیده: ردیف‌ها، جمع‌ها، سررسید و چاپ/اکسل */
 @Composable
-private fun PurchasePane(d: ShopData, inv: PurchaseBook.Invoice, names: Map<String, String>, remaining: Map<String, Double>, today: String, toast: (String) -> Unit, onClose: () -> Unit) {
+private fun PurchasePane(
+  d: ShopData, inv: PurchaseBook.Invoice, names: Map<String, String>, remaining: Map<String, Double>,
+  today: String, toast: (String) -> Unit, onClose: () -> Unit, awaiting: Boolean, onConfirmDelivery: (() -> Unit)?,
+) {
   val context = LocalContext.current
   val c = Desk.colors
   val late = inv.dueDate?.let { due -> !inv.isReturn && due < today && (remaining[inv.key] ?: 0.0) > 0.5 } == true
@@ -287,6 +307,12 @@ private fun PurchasePane(d: ShopData, inv: PurchaseBook.Invoice, names: Map<Stri
       }, Modifier.weight(1f), icon = Icons.Outlined.TableChart)
     },
   ) {
+    if (inv.deliveryInvoiceId != null) {
+      DeskNote(if (awaiting) StrPurchaseWorkflow.inTransit else StrPurchases.received)
+      if (awaiting && onConfirmDelivery != null) {
+        DeskButton(StrPurchaseWorkflow.confirmDelivery, onConfirmDelivery, kind = DeskButtonKind.PRIMARY, icon = Icons.Outlined.LocalShipping)
+      }
+    }
     inv.dueDate?.takeIf { !inv.isReturn }?.let { due ->
       DeskNote(StrPurchasePages.dueOn(formatDate(due)))
       if (late) Text(StrPurchasePages.overdue, style = DeskType.label, color = c.negative)
